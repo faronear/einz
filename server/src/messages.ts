@@ -96,8 +96,11 @@ export function syncMessages(
     )
     .all(cfg.space_id, after, safeLimit + 1) as StoredMessage[];
 
-  const hasMore = rows.length > safeLimit;
-  const page = hasMore ? rows.slice(0, safeLimit) : rows;
+  // v 是协议常量（未入库），同步响应需补齐（PROTOCOL.md §5.2）
+  const withVersion: StoredMessage[] = rows.map((r) => ({ ...r, v: 1 }));
+
+  const hasMore = withVersion.length > safeLimit;
+  const page = hasMore ? withVersion.slice(0, safeLimit) : withVersion;
   const last = page.length > 0 ? page[page.length - 1].server_sequence : after;
 
   return { messages: page, last_sequence: last, has_more: hasMore };

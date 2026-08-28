@@ -10,7 +10,6 @@ dependencies:
   onlyspace_shared:
     path: ../shared
   args: ^2.5.0
-  sodium_libs: ^1.0.0
 
 dev_dependencies:
   lints: ^4.0.0

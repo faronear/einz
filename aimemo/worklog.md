@@ -99,3 +99,22 @@
 - monorepo 骨架：`shared/`、`cli/` pubspec 已建（未装 Dart 未验证）；`app/` 占位。
 
 **遗留：** Dart SDK 安装后继续 shared 核心包 → CLI → 一次性配置工具 → 端到端验收（任务 #12–#15）。
+
+### Phase 0 客户端完成：shared 核心包 + CLI + 端到端验收（Dart 3.11 已装）
+
+**背景：** Server 先行阶段提交后，老板选择"装 Dart 继续 Phase 0"。安装 Dart SDK 3.11.0（brew install dart-sdk，注意公式名为 dart-sdk 而非 dart）。
+
+**产出（全部验证通过）：**
+
+- `shared/`：纯 Dart 核心包——`sodium.dart`（跨平台加载 libsodium：`LIBSODIUM_PATH` env / macOS Homebrew 路径）、`keys.dart`（DeviceKeyPair / seal/sealOpen / 派生）、`message_crypto.dart`（MessageEnvelope + XChaCha20-Poly1305 加解密 + AAD 绑定）、`attachment_crypto.dart`、`protocol/types.dart`、`sync/sync_state.dart`。`dart analyze` 无警告，8 项单元测试全过（密封闭环 / 错误私钥 / 加密解密 / 派生确定性 / AAD 绑定 / 附件 / 配置产物 / 同步锚点）。
+- `cli/`：Dart CLI 测试端（bin/onlyspace.dart）——`init` / `pubkey` / `config`（生成 Space Key + 密封双方 + 产出服务器 config.json）/ `import` / `auth` / `send` / `sync`。`dart analyze` 无警告。
+- `cli/test/e2e.sh`：**端到端验收全部通过**——init(A/B) → config → import → 启动 Server → 双端认证 → A 发密文 → B 同步解密出明文 → DB 明文隔离检查 → 白名单外 403。
+- `docs/PROTOCOL.md`：补充 §8.1 WS token 必须 URL 编码（session_token 为标准 base64 含 +/=）。
+
+**关键踩坑（跨语言互通）：**
+
+1. **base64 变体不兼容（500 INTERNAL）**：Dart `base64Encode` 输出标准 base64（带 `=` 填充），而 libsodium-wrappers 默认变体是 URL-safe 无填充 → `from_base64` 报 "incomplete input"。修复：Server `crypto.ts` 与冒烟测试统一显式使用 `sodium.base64_variants.ORIGINAL`。
+2. **WS token URL 编码**：session_token 含 `+`/`=`，直接拼进 `wss://...?token=` 被查询串解析破坏 → 必须 `encodeURIComponent`。
+3. **sync 响应缺 `v` 字段**：`v` 是协议常量未入库，`/sync` 需补齐 `v:1`（PROTOCOL.md §5.2），否则 Dart 客户端解析崩溃。
+
+**遗留：** 任务 #16 Flutter app/ 骨架待装 Flutter SDK。

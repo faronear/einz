@@ -7,7 +7,7 @@ environment:
   sdk: ^3.5.0
 
 dependencies:
-  sodium_libs: ^1.0.0
+  sodium: ^2.0.0
   uuid: ^4.3.0
 
 dev_dependencies:

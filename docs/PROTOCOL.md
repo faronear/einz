@@ -192,6 +192,7 @@
 wss://host/ws?pv=1&token=<session_token>
 ```
 
+- **`token` 必须 URL 编码**（session_token 为标准 base64，含 `+`/`=` 等字符，直接拼接会被查询串解析破坏）。
 - 握手失败（token 无效/过期/非白名单）→ 关闭并返回 4401。
 - 连接期间 Server 持续校验 token 有效期。
 

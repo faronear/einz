@@ -11,6 +11,9 @@ import { createRequire } from "node:module";
 // libsodium-wrappers 的 ESM 入口在 Node ESM 下损坏，统一用 CJS 构建（同 server/src/crypto.ts）。
 const require = createRequire(import.meta.url);
 const sodium = require("libsodium-wrappers") as typeof import("libsodium-wrappers");
+
+// 与 Server 协议一致：标准 base64 + 填充（同 server/src/crypto.ts 的 B64）
+const B64 = sodium.base64_variants.ORIGINAL;
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -96,13 +99,13 @@ class TestDevice {
       sealed_challenge: string;
     };
 
-    const sealed = sodium.from_base64(sealed_challenge);
+    const sealed = sodium.from_base64(sealed_challenge, B64);
     const plaintext = sodium.crypto_box_seal_open(sealed, this.keypair.publicKey, this.keypair.privateKey);
 
     const verifyRes = await fetch(`http://127.0.0.1:${port}/auth/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ challenge_id, challenge_plaintext: sodium.to_base64(plaintext) }),
+      body: JSON.stringify({ challenge_id, challenge_plaintext: sodium.to_base64(plaintext, B64) }),
     });
     assert.equal(verifyRes.status, 200, "verify should succeed");
     const { session_token } = (await verifyRes.json()) as { session_token: string };
@@ -127,19 +130,19 @@ class TestDevice {
       key_version: 1,
       message_id: messageId,
       sender_device_id: this.deviceId,
-      nonce: sodium.to_base64(nonce),
-      ciphertext: sodium.to_base64(ciphertext),
+      nonce: sodium.to_base64(nonce, B64),
+      ciphertext: sodium.to_base64(ciphertext, B64),
     };
   }
 
   /** 客户端 E2EE 解密（验证同步回来的密文可解）。 */
   decryptMessage(env: MessageEnvelope, spaceId: string): string {
     const msgKey = sodium.crypto_generichash(32, sodium.from_string(`m:${env.message_id}`), this.spaceKey);
-    const nonce = sodium.from_base64(env.nonce);
+    const nonce = sodium.from_base64(env.nonce, B64);
     const aad = sodium.from_string(`onlyspace-v1${spaceId}${env.message_id}${env.sender_device_id}text1`);
     const plain = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
       null,
-      sodium.from_base64(env.ciphertext),
+      sodium.from_base64(env.ciphertext, B64),
       aad,
       nonce,
       msgKey
@@ -180,8 +183,8 @@ async function main(): Promise<void> {
   const config = {
     space_id: "space-smoke-test",
     devices: [
-      { device_id: devA.deviceId, person_id: devA.personId, public_key: sodium.to_base64(devA.keypair.publicKey), status: "active" },
-      { device_id: devB.deviceId, person_id: devB.personId, public_key: sodium.to_base64(devB.keypair.publicKey), status: "active" },
+      { device_id: devA.deviceId, person_id: devA.personId, public_key: sodium.to_base64(devA.keypair.publicKey, B64), status: "active" },
+      { device_id: devB.deviceId, person_id: devB.personId, public_key: sodium.to_base64(devB.keypair.publicKey, B64), status: "active" },
     ],
   };
   const configPath = join(tempDir, "config.json");
@@ -250,7 +253,8 @@ async function main(): Promise<void> {
 
     // 10) WS：A 连接后，B 发消息 → A 实时收到 message.new
     await new Promise<void>((done, fail) => {
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?pv=1&token=${devA.sessionToken}`);
+      // token 含 base64 的 +/= 字符，作为查询参数必须 URL 编码（PROTOCOL.md §8.1）
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?pv=1&token=${encodeURIComponent(devA.sessionToken)}`);
       const timer = setTimeout(() => fail(new Error("WS message.new timeout")), 5000);
       ws.on("message", (data) => {
         const frame = JSON.parse(data.toString());
