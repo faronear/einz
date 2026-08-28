@@ -118,3 +118,16 @@
 3. **sync 响应缺 `v` 字段**：`v` 是协议常量未入库，`/sync` 需补齐 `v:1`（PROTOCOL.md §5.2），否则 Dart 客户端解析崩溃。
 
 **遗留：** 任务 #16 Flutter app/ 骨架待装 Flutter SDK。
+
+### 跨机器交接（老板换电脑继续）
+
+**背景：** 本机安装 Flutter 因**磁盘空间不足**失败（数据卷 199/228 GiB，仅剩 5.8GiB；Flutter 需 6–7GiB+）。Google storage 与 GitHub 均不可达，Flutter 中国镜像（storage.flutter-io.cn）可用且已下载 2.0GB SDK 包，但解压时磁盘写满。老板决定**换一台电脑继续安装 Flutter**。
+
+**交接动作：**
+
+- 确认 git：工作树干净，5 个提交（HEAD `ece01e8`），**无远程仓库**。
+- 产出 `docs/HANDOFF.md`：仓库搬运方式（git bundle / 建远程）、新电脑环境依赖表（Node 22 / Dart SDK 3.11 / libsodium / Flutter 镜像安装）、Phase 0 完成状态与验证命令、续接步骤（#16 Flutter app/ 骨架 → Phase 1）、已知踩坑备忘（base64 ORIGINAL 变体、WS token URL 编码、sync 补 v 字段、LIBSODIUM_PATH、libsodium-wrappers ESM 坑）。
+- 生成 `onlyspace.bundle`（单文件全历史，便于跨机搬运）。
+- 任务状态：**#16 保持待办**（新电脑装 Flutter 后完成），其余 Phase 0 任务全部完成。
+
+**待新电脑确认环境后：** 运行 HANDOFF.md §4 的验证命令 → 完成任务 #16 → 进入 Phase 1 消息 MVP。
