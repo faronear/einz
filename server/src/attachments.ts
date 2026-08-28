@@ -1,11 +1,29 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { getDb } from "./db.js";
 import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
 
 const FILES_ROOT = process.env.ONLYSPACE_FILES ?? resolve(import.meta.dirname, "../data/files");
+
+/** 宽松 ID 校验（P1 路径遍历防御）：仅允许 hex + 连字符，杜绝 /、.、\ 等路径字符。
+ *  CLI 生成的附件/消息 ID 为 38 字符非标准 UUID，故不强制 UUID 格式，只做字符集白名单。 */
+const SAFE_ID_RE = /^[0-9a-fA-F-]{8,64}$/;
+function assertSafeId(id: string, what: string): void {
+  if (typeof id !== "string" || !SAFE_ID_RE.test(id)) {
+    throw new ApiError("INVALID_REQUEST", `invalid ${what}: illegal characters`, 400);
+  }
+}
+
+/** 确保解析后的路径仍位于 FILES_ROOT 内（纵深防御，读写双侧生效）。 */
+function assertInsideFilesRoot(full: string): void {
+  // 用平台分隔符拼接 root，避免 Windows（resolve 返回 \）与 "/" 混用误判
+  const root = resolve(FILES_ROOT) + sep;
+  if (!resolve(full).startsWith(root)) {
+    throw new ApiError("INVALID_REQUEST", "storage path escapes files root", 400);
+  }
+}
 
 export interface AttachmentMeta {
   attachment_id: string;
@@ -29,6 +47,10 @@ export function storeAttachment(
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
 
+  // P1 路径遍历防御：attachment_id/message_id 必须在安全字符集内（拒绝 / . \ 等）
+  assertSafeId(meta.attachment_id, "attachment_id");
+  assertSafeId(meta.message_id, "message_id");
+
   const db = getDb();
   const msg = db.prepare(`SELECT message_id FROM messages WHERE message_id = ?`).get(meta.message_id);
   if (!msg) throw new ApiError("INVALID_REQUEST", "message not found", 400);
@@ -42,7 +64,9 @@ export function storeAttachment(
   const dir = join(FILES_ROOT, shard);
   mkdirSync(dir, { recursive: true });
   const storagePath = `${shard}/${meta.attachment_id}`;
-  writeFileSync(join(FILES_ROOT, storagePath), blob, { flag: "wx" });
+  const full = join(FILES_ROOT, storagePath);
+  assertInsideFilesRoot(full);
+  writeFileSync(full, blob, { flag: "wx" });
 
   const now = Date.now();
   db.prepare(
@@ -59,12 +83,15 @@ export function getAttachmentBlob(cfg: ServerConfig, token: string, attachmentId
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
 
+  assertSafeId(attachmentId, "attachment_id");
+
   const row = getDb()
     .prepare(`SELECT storage_path FROM attachments WHERE attachment_id = ?`)
     .get(attachmentId) as { storage_path: string } | undefined;
   if (!row) throw new ApiError("NOT_FOUND", "attachment not found", 404);
 
   const full = join(FILES_ROOT, row.storage_path);
+  assertInsideFilesRoot(full);
   if (!existsSync(full)) throw new ApiError("NOT_FOUND", "attachment file missing", 404);
   return readFileSync(full);
 }

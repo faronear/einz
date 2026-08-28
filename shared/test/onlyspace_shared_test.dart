@@ -48,7 +48,7 @@ void main() {
       expect(env.v, 1);
       expect(env.keyVersion, 1);
 
-      final decrypted = await decryptMessage(env: env, spaceKey: spaceKey, spaceId: 'space-test', keyVersion: 1);
+      final decrypted = await decryptMessage(env: env, spaceKey: spaceKey, spaceId: 'space-test');
       expect(decrypted, plain);
     });
 
@@ -70,7 +70,7 @@ void main() {
         messageId: 'msg-1',
       );
       expect(
-        () => decryptMessage(env: env, spaceKey: spaceKey, spaceId: 'space-b', keyVersion: 1),
+        () => decryptMessage(env: env, spaceKey: spaceKey, spaceId: 'space-b'),
         throwsA(isA<FormatException>()),
       );
     });
@@ -219,13 +219,11 @@ void main() {
         env: env,
         spaceKey: ring2.keyForVersion(1)!,
         spaceId: 'space-1',
-        keyVersion: 1,
       );
       final newPlain = await decryptMessage(
         env: newEnv,
         spaceKey: ring2.keyForVersion(2)!,
         spaceId: 'space-1',
-        keyVersion: 2,
       );
       expect(oldPlain, 'old message');
       expect(newPlain, 'new message');

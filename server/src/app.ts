@@ -81,11 +81,21 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // 附件
   if (method === "POST" && path === "/attachments") {
     const token = bearer(req);
-    const meta = JSON.parse(req.headers["x-attachment-meta"] as string);
+    // P2 修复：x-attachment-meta 缺失/坏 JSON 应返回 400，而非崩溃成 500（PROTOCOL.md §9）
+    const rawMeta = req.headers["x-attachment-meta"];
+    let meta: unknown;
+    if (typeof rawMeta !== "string" || rawMeta.length === 0) {
+      throw new ApiError("INVALID_REQUEST", "missing x-attachment-meta header", 400);
+    }
+    try {
+      meta = JSON.parse(rawMeta);
+    } catch {
+      throw new ApiError("INVALID_REQUEST", "malformed x-attachment-meta header", 400);
+    }
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     const blob = Buffer.concat(chunks);
-    sendJson(res, 200, storeAttachment(cfg, token, meta, blob));
+    sendJson(res, 200, storeAttachment(cfg, token, meta as never, blob));
     return;
   }
   const attMatch = path.match(/^\/attachments\/([^/]+)$/);

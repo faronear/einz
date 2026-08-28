@@ -104,11 +104,12 @@ Future<MessageEnvelope> encryptMessage({
 }
 
 /// 解密一条消息（失败抛 [FormatException]）。
+/// 注意：密钥由调用方按 env.keyVersion 从密钥归档中选择（E2EE.md §9.2），
+/// AAD 使用 env 携带的 key_version，本函数不再接收冗余的 keyVersion 参数。
 Future<String> decryptMessage({
   required MessageEnvelope env,
   required Uint8List spaceKey,
   required String spaceId,
-  required int keyVersion,
 }) async {
   final s = await sodium();
   final messageKey = await deriveSubKey(s, spaceKey, 'm', env.messageId);

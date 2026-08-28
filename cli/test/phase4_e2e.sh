@@ -131,11 +131,11 @@ dart run bin/onlyspace.dart sync --store "$WORK/a.json" --server "http://127.0.0
 step "8. 【段 D】服务重启后数据完好"
 stop_server
 start_server
-# sync 为增量：重启后应正常返回且无新增（锚点不倒退、无重复）
-dart run bin/onlyspace.dart sync --store "$WORK/a.json" --server "http://127.0.0.1:$PORT" 2>&1 | grep -q "新增=0" \
-  && echo "✅ 重启后 sync 正常（增量无重复，锚点不倒退）" \
+# 锚点只随 /sync 推进（send 不推进）：重启后 sync 应拉回服务端待同步数据
+SYNC_D1="$(dart run bin/onlyspace.dart sync --store "$WORK/a.json" --server "http://127.0.0.1:$PORT")"
+echo "$SYNC_D1" | grep -q "离线消息" && echo "✅ 重启后 sync 拉到待同步消息（锚点语义正确）" \
   || { echo "❌ 重启后 sync 异常"; exit 1; }
-# 本地历史（drift/JSON 落盘）不受服务重启影响
+# 本地历史（JSON 落盘）不受服务重启影响
 HIST_A2="$(dart run bin/onlyspace.dart history --store "$WORK/a.json")"
 echo "$HIST_A2" | grep -q "v1时代消息" && echo "✅ 重启后本地历史完好" \
   || { echo "❌ 重启后数据丢失"; exit 1; }

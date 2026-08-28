@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
@@ -10,7 +11,7 @@ import 'local_database.dart';
 ///
 /// - 发送：加密 → 写入本地（status=pending）→ 尝试立即上传；失败留队
 /// - 同步：has_more 翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列
-/// - 历史：从本地库读取并解密展示
+/// - 历史：从本地库读取并解密展示（按消息 key_version 选密钥，轮换后旧消息用归档密钥）
 ///
 /// 密钥（SpaceKey）由调用方注入（真机来自 Keychain/Keystore，见 DATABASE.md §4）。
 class MessageRepository {
@@ -21,8 +22,9 @@ class MessageRepository {
     required this.spaceId,
     required this.deviceId,
     this.keyVersion = 1,
+    Map<int, Uint8List>? archivedKeys,
     this.token,
-  });
+  }) : archivedKeys = archivedKeys ?? {};
 
   final LocalDatabase db;
   final ApiClient api;
@@ -30,6 +32,9 @@ class MessageRepository {
   final String spaceId;
   final String deviceId;
   final int keyVersion;
+
+  /// 归档 Space Key（key_version → 密钥），轮换后解密旧消息（E2EE.md §9.2）。
+  final Map<int, Uint8List> archivedKeys;
 
   /// 会话 token（认证后注入；未认证时发送只入队不同步）。
   String? token;
@@ -128,20 +133,37 @@ class MessageRepository {
     final rows = await (db.select(db.localMessages)
           ..where((m) => m.spaceId.equals(spaceId)))
         .get();
-    rows.sort((a, b) => (a.serverSequence ?? 0).compareTo(b.serverSequence ?? 0));
+    // 未同步（serverSequence 为 null）排最后；同步的按 seq 升序（P3 修复，与注释一致）
+    rows.sort((a, b) {
+      final an = a.serverSequence;
+      final bn = b.serverSequence;
+      if (an == null && bn == null) return a.localCreatedAt.compareTo(b.localCreatedAt);
+      if (an == null) return 1;
+      if (bn == null) return -1;
+      return an.compareTo(bn);
+    });
 
     final out = <({MessageEnvelope env, String plaintext, String sender})>[];
     for (final row in rows) {
       final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
+      final key = _keyForVersion(env.keyVersion);
+      if (key == null) {
+        throw StateError('缺少 key_version=${env.keyVersion} 的 Space Key，无法解密历史消息（需导入归档密钥）');
+      }
       final plain = await decryptMessage(
         env: env,
-        spaceKey: spaceKey,
+        spaceKey: key,
         spaceId: spaceId,
-        keyVersion: keyVersion,
       );
       out.add((env: env, plaintext: plain, sender: env.senderDeviceId == deviceId ? 'me' : 'peer'));
     }
     return out;
+  }
+
+  /// 按 key_version 选解密密钥：当前版本用 spaceKey，旧版本用归档（E2EE.md §9.2）。
+  Uint8List? _keyForVersion(int version) {
+    if (version == keyVersion) return spaceKey;
+    return archivedKeys[version];
   }
 
   /// 待发送队列长度。
@@ -193,7 +215,8 @@ class MessageRepository {
         createdAt: Value(createdAt),
       ),
     );
-    await _advanceAnchor(serverSequence);
+    // 注意：不在这里推进锚点。锚点只在 /sync 响应时推进（P2 修复）——
+    // 否则新设备未同步先发消息会跳过对方历史（PROTOCOL.md §5.2）。
   }
 
   Future<void> _advanceAnchor(int serverSequence) async {
@@ -239,12 +262,13 @@ class MessageRepository {
         );
   }
 
-  /// 简易 UUIDv7（与 CLI 测试端同构；App 生产可用 uuid 包）。
+  /// UUIDv7（CSPRNG 随机段，格式 8-4-4-4-12；P2 修复：原实现用时间戳当随机数会碰撞丢消息）。
   String _uuidv7() {
-    final rand = List<int>.generate(10, (_) => DateTime.now().millisecondsSinceEpoch % 256);
+    final r = Random.secure();
+    final rand = List<int>.generate(12, (_) => r.nextInt(256)); // 24 hex 随机段
     final t = DateTime.now().millisecondsSinceEpoch;
-    final hex = rand.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     final tHex = t.toRadixString(16).padLeft(12, '0');
-    return '${tHex.substring(0, 8)}-${tHex.substring(8)}-7${hex.substring(0, 3)}-9${hex.substring(3, 7)}-${hex.substring(7)}';
+    final hex = rand.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${tHex.substring(0, 8)}-${tHex.substring(8, 12)}-7${hex.substring(0, 3)}-9${hex.substring(3, 6)}-${hex.substring(6, 18)}';
   }
 }

@@ -88,7 +88,7 @@ void main() {
     expect(hist.first.sender, 'me');
   });
 
-  test('在线发送：有 token 时立即上传并置 sent、推进锚点', () async {
+  test('在线发送：有 token 时立即上传并置 sent（锚点不推进）', () async {
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');
 
@@ -96,7 +96,8 @@ void main() {
 
     expect(api.posted.length, 1);
     expect(await repo.pendingCount, 0);
-    expect(await repo.lastSequence, 1, reason: '发送成功后锚点应为 1');
+    // P2 修复：锚点只随 /sync 推进，send/补发不推进——否则新设备未同步先发消息会跳过对方历史
+    expect(await repo.lastSequence, 0, reason: 'send 不应推进锚点（锚点只随 /sync 推进）');
   });
 
   test('同步：翻页拉全量落库 + attachments_meta + 锚点推进', () async {
@@ -143,7 +144,8 @@ void main() {
 
     expect(api.posted.length, 1, reason: '补发恰一次');
     expect(await repo.pendingCount, 0, reason: '队列已清空');
-    expect(await repo.lastSequence, 1);
+    // P2 修复：补发不推进锚点（本场景服务端无其他消息，锚点保持 0）
+    expect(await repo.lastSequence, 0, reason: '补发不应推进锚点（锚点只随 /sync 推进）');
   });
 
   test('锚点只前进不倒退：重复 sync 不重复计数', () async {

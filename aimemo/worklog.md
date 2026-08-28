@@ -253,3 +253,27 @@
 **验证（全部通过）：** server 冒烟、shared 13 单测、cli analyze 无警告、四个 e2e 脚本（Phase 0/1/2/4）全部通过。
 
 **遗留：** 备份加密密钥（ONLYSPACE_BACKUP_KEY）的保管与轮换策略待部署文档明确；附件解密缓存清理策略；真机/iOS 待环境（同 Phase 3 遗留）。
+
+### V1 发布前代码审查（deep+verify，全项目 c6f4bfd..134d4b4）+ 24 项发现修复
+
+**背景：** 老板确认做 V1 发布前代码审查/安全检查。code_review 工具（deep+verify，10 提交/124 文件/+13844 行）产出 **24 项发现**（dedup 后），老板确认**全修（P1+P2+P3）**。
+
+**P1 修复（路径遍历，2 项同根因）：**
+
+- `server/src/attachments.ts`：`attachment_id` 来自客户端 `x-attachment-meta` 头且无校验，直接拼进存储路径 → 白名单内失陷设备可写/读服务器任意文件（容器 root 运行）。修复：`assertSafeId`（仅允许 hex+连字符 8–64 位，拒绝 `/ . \`）+ `assertInsideFilesRoot`（resolve 后必须位于 FILES_ROOT 内），**storeAttachment 与 getAttachmentBlob 读写双侧生效**。**踩坑：** 初版 root 用 `"/"` 拼接，Windows 上 `resolve()` 返回 `\` 导致误判 phase2 附件上传失败 → 改用平台 `sep`。
+
+**P2 修复（5 项）：**
+
+| 发现 | 修复 |
+| --- | --- |
+| 撤销后不关闭被撤销设备的 WS | `notifyRevoked` 发帧后 `close(4403)` + 移出 conns（否则 revoked 设备继续收新消息解密） |
+| app `_uuidv7` 时间戳伪随机 + 格式非法 | 改 `Random.secure()` CSPRNG + 正确 8-4-4-4-12 UUIDv7 |
+| `MessageRepository.history()` 固定密钥解密 | 注入 `archivedKeys`（key_version→密钥），按 `env.keyVersion` 选密钥（对齐 CLI `spaceKeyForVersion`）；缺密钥时抛明确 StateError |
+| 发送推进锚点跳过未同步历史 | **锚点只在 /sync 响应推进**：`_markSent`/CLI `_flushPending` 不再推进（PROTOCOL.md §5.2），避免新设备未同步先发消息 → 对方历史被永久跳过 |
+| `x-attachment-meta` 缺失/坏 JSON → 500 | 显式校验 → 400 INVALID_REQUEST（协议 §9） |
+
+**P3 修复（3 项）：** `decryptMessage` 移除死参数 keyVersion（AAD 用 env.keyVersion，误导调用方；全部调用方同步更新）；历史排序 null-last（未同步排最后，app + CLI store 双修）；Gradle 腾讯云镜像加 `distributionSha256Sum`（官方 9.3.1-all checksum，防供应链）；顺带 main.dart `_generateDeviceKey` 加 mounted 检查（防 setState-after-dispose）。
+
+**回归验证（全部通过）：** server 冒烟、shared 13 单测、cli analyze、**四个 e2e 脚本**（e2e/phase1/phase2/phase4）、app flutter test 6 项。phase4 段 D 断言随锚点语义更新（重启后 sync 拉待同步数据 + 本地历史完好）；app 两处单测断言更新（send/补发不推进锚点）。
+
+**遗留：** 审查未覆盖的浅层项（UI 细节、性能微优化）未列；Gradle 正式环境建议改回 services.gradle.org 官方地址（当前腾讯云镜像 + checksum 锁定）。

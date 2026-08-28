@@ -47,11 +47,13 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     try {
       // 首次调用会加载 libsodium（shared 的 loadDynamicLibrary 策略）
       final pair = await DeviceKeyPair.generate(deviceId: 'dev-mobile');
+      if (!mounted) return; // P3 修复：异步间隙后组件可能已销毁，避免 setState-after-dispose
       setState(() => _keyPair = pair);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'libsodium 加载或密钥生成失败: $e');
     } finally {
-      setState(() => _busy = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
 

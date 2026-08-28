@@ -226,9 +226,11 @@ Future<void> _cmdSend(ArgResults opts) async {
   }
 }
 
-/// 补发离线队列中的所有消息；成功一条出队一条、写入历史并推进锚点。
+/// 补发离线队列中的所有消息；成功一条出队一条、写入历史（不推进锚点）。
 /// 网络失败时停止本轮补发，剩余留队（下次 sync/listen 再试）。
 /// 返回本轮成功补发的条数。
+/// 注意：锚点只在 /sync 响应时推进（P2 修复）——否则新设备未同步先发消息
+/// 会跳过对方历史（PROTOCOL.md §5.2，锚点 = 已同步的最高 seq）。
 Future<int> _flushPending(DeviceStore store, String path, String server) async {
   store.requireSession();
   final api = ApiClient(server);
@@ -237,9 +239,6 @@ Future<int> _flushPending(DeviceStore store, String path, String server) async {
     try {
       final result = await api.postMessage(env, store.sessionToken!);
       store.dequeuePending(env.messageId);
-      if (result.serverSequence > store.lastServerSequence) {
-        store.lastServerSequence = result.serverSequence;
-      }
       store.upsertHistory(env, serverSequence: result.serverSequence, createdAt: result.createdAt);
       sent++;
       stdout.writeln('  ↳ 补发成功: message_id=${env.messageId} seq=${result.serverSequence}');
@@ -270,7 +269,6 @@ Future<void> _cmdSync(ArgResults opts) async {
       env: env,
       spaceKey: base64Decode(keyB64),
       spaceId: store.spaceId!,
-      keyVersion: env.keyVersion,
     );
     final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
     stdout.writeln('[$sender seq=${env.serverSequence} v${env.keyVersion}] $plain');
@@ -413,7 +411,6 @@ Future<void> _cmdHistory(ArgResults opts) async {
       env: env,
       spaceKey: base64Decode(keyB64),
       spaceId: store.spaceId!,
-      keyVersion: env.keyVersion,
     );
     final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
     stdout.writeln('[$sender seq=${env.serverSequence ?? '-'} v${env.keyVersion}] $plain');
@@ -555,8 +552,7 @@ Future<void> _cmdListen(ArgResults opts) async {
               env: env,
               spaceKey: base64Decode(keyB64),
               spaceId: store.spaceId!,
-              keyVersion: env.keyVersion,
-            );
+                    );
             final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
             stdout.writeln('[$sender seq=$seq v${env.keyVersion}] $plain');
           case 'key.rotation':

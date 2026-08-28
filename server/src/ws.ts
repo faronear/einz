@@ -96,12 +96,16 @@ export function broadcastNewMessage(exceptDeviceId: string, message: MessageEnve
   }
 }
 
-/** 通知设备被撤销（PROTOCOL.md §8.2 device.revoked）。 */
+/** 通知设备被撤销（PROTOCOL.md §8.2 device.revoked）。
+ *  发帧后主动关闭连接并移出 conns——否则被撤销设备仍能持续接收新消息广播（P2 修复）。 */
 export function notifyRevoked(deviceId: string): void {
   const conn = conns.get(deviceId);
-  if (conn && conn.ws.readyState === WebSocket.OPEN) {
+  if (!conn) return;
+  if (conn.ws.readyState === WebSocket.OPEN) {
     conn.ws.send(JSON.stringify({ id: 0, type: "device.revoked", payload: { device_id: deviceId } }));
+    conn.ws.close(4403, "REVOKED");
   }
+  conns.delete(deviceId);
 }
 
 /** 通知剩余设备执行 Space Key 轮换（PROTOCOL.md §8.2 key.rotation）。 */

@@ -204,13 +204,20 @@ class DeviceStore {
     }
   }
 
-  /// 历史消息信封列表（按 server_sequence 升序；未同步的排最后）。
+  /// 历史消息信封列表（按 server_sequence 升序；未同步的排最后，P3 修复与注释一致）。
   List<MessageEnvelope> get historyEnvelopes {
     final list = history.map((m) {
       final env = MessageEnvelope.fromJson(m);
-      return (env: env, seq: (m['server_sequence'] as int?) ?? 0);
+      return (env: env, seq: m['server_sequence'] as int?);
     }).toList();
-    list.sort((a, b) => a.seq.compareTo(b.seq));
+    list.sort((a, b) {
+      final an = a.seq;
+      final bn = b.seq;
+      if (an == null && bn == null) return 0;
+      if (an == null) return 1;
+      if (bn == null) return -1;
+      return an.compareTo(bn);
+    });
     return list.map((e) => e.env).toList();
   }
 
