@@ -368,9 +368,14 @@ Future<void> _cmdRestore(ArgResults opts) async {
       spaceKey: data['space_key'] as String?,
       spaceId: data['space_id'] as String?,
       keyVersion: (data['key_version'] as int?) ?? 1,
+      // 备份内容一并还原：本地历史 / 附件元数据 / 离线队列 / 归档密钥（E2EE.md §10.1）
+      history: (data['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+      attachments: (data['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+      pending: (data['pending'] as List?)?.cast<String>() ?? [],
+      archivedSpaceKeys: (data['archived_space_keys'] as List?)?.cast<Map<String, dynamic>>() ?? [],
     );
     restored.save(outPath);
-    stdout.writeln('✅ 已恢复设备存储: $outPath（提示：设备身份需重新 init 并登记白名单）');
+    stdout.writeln('✅ 已恢复设备存储: $outPath（历史 ${restored.historyCount} 条 + 队列 ${restored.pendingCount} 条；提示：设备身份需重新 init 并登记白名单）');
   }
 }
 
