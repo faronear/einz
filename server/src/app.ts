@@ -1,0 +1,163 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { WebSocketServer } from "ws";
+import { loadConfig, type ServerConfig } from "./config.js";
+import { openDb } from "./db.js";
+import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
+import { postMessage, syncMessages } from "./messages.js";
+import { getAttachmentBlob, storeAttachment } from "./attachments.js";
+import { listDevices, revokeDevice } from "./devices.js";
+import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
+import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked } from "./ws.js";
+
+const PORT = Number(process.env.PORT ?? 3000);
+const cfg: ServerConfig = loadConfig();
+openDb();
+
+const server = createServer(async (req, res) => {
+  try {
+    await route(req, res);
+  } catch (err) {
+    if (err instanceof ApiError) {
+      sendJson(res, err.httpStatus, { error: { code: err.code, message: err.message } });
+    } else {
+      console.error("[error]", err);
+      sendJson(res, 500, { error: { code: "INTERNAL", message: "Internal Server Error" } });
+    }
+  }
+});
+
+const wss = new WebSocketServer({ noServer: true });
+attachWs(wss, cfg);
+
+server.on("upgrade", (req, socket, head) => {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  if (url.pathname !== "/ws") {
+    socket.destroy();
+    return;
+  }
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+});
+
+async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  const path = url.pathname;
+  const method = req.method ?? "GET";
+
+  // 认证（challenge-response）
+  if (method === "POST" && path === "/auth/challenge") {
+    const body = await readJson(req);
+    const deviceId = String(body?.device_id ?? "");
+    const result = await createChallenge(cfg, deviceId);
+    sendJson(res, 200, result);
+    return;
+  }
+  if (method === "POST" && path === "/auth/verify") {
+    const body = await readJson(req);
+    const result = verifyChallenge(cfg, String(body?.challenge_id ?? ""), String(body?.challenge_plaintext ?? ""));
+    sendJson(res, 200, result);
+    return;
+  }
+
+  // 消息与同步
+  if (method === "POST" && path === "/messages") {
+    const body = await readJson(req);
+    const token = bearer(req);
+    const result = postMessage(cfg, token, body);
+    const envelope = body as { sender_device_id?: string };
+    const stored = { ...(body as object), server_sequence: result.server_sequence, created_at: result.created_at };
+    broadcastNewMessage(envelope.sender_device_id ?? "", stored as never);
+    sendJson(res, 200, result);
+    return;
+  }
+  if (method === "GET" && path === "/sync") {
+    const token = bearer(req);
+    const after = Number(url.searchParams.get("after") ?? 0);
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    sendJson(res, 200, syncMessages(cfg, token, after, limit));
+    return;
+  }
+
+  // 附件
+  if (method === "POST" && path === "/attachments") {
+    const token = bearer(req);
+    const meta = JSON.parse(req.headers["x-attachment-meta"] as string);
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const blob = Buffer.concat(chunks);
+    sendJson(res, 200, storeAttachment(cfg, token, meta, blob));
+    return;
+  }
+  const attMatch = path.match(/^\/attachments\/([^/]+)$/);
+  if (method === "GET" && attMatch) {
+    const token = bearer(req);
+    const blob = getAttachmentBlob(cfg, token, attMatch[1]);
+    res.writeHead(200, { "Content-Type": "application/octet-stream" });
+    res.end(blob);
+    return;
+  }
+
+  // 设备
+  if (method === "GET" && path === "/devices") {
+    sendJson(res, 200, listDevices(cfg, bearer(req)));
+    return;
+  }
+  const devMatch = path.match(/^\/devices\/([^/]+)$/);
+  if (method === "DELETE" && devMatch) {
+    const result = revokeDevice(cfg, bearer(req), devMatch[1]);
+    notifyRevoked(devMatch[1]);
+    // 注：Space Key 轮换由剩余可信设备在客户端发起（E2EE.md §9.1），Server 只返回
+    // key_rotation_required 信号；key.rotation WS 事件在 Phase 4 实现。
+    sendJson(res, 200, result);
+    return;
+  }
+
+  // 推送
+  if (method === "POST" && path === "/push/register") {
+    const body = await readJson(req);
+    sendJson(res, 200, registerPushToken(cfg, bearer(req), body));
+    return;
+  }
+  if (method === "DELETE" && path === "/push/register") {
+    sendJson(res, 200, unregisterPushToken(cfg, bearer(req)));
+    return;
+  }
+
+  // 空间
+  if (method === "GET" && path === "/space") {
+    sendJson(res, 200, getSpace(cfg, bearer(req)));
+    return;
+  }
+
+  sendJson(res, 404, { error: { code: "NOT_FOUND", message: "not found" } });
+}
+
+function bearer(req: IncomingMessage): string {
+  const h = req.headers.authorization ?? "";
+  const m = h.match(/^Bearer (.+)$/);
+  if (!m) throw new ApiError("UNAUTHORIZED", "missing bearer token", 401);
+  return m[1];
+}
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  const text = Buffer.concat(chunks).toString("utf8");
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new ApiError("INVALID_REQUEST", "invalid json body", 400);
+  }
+}
+
+function sendJson(res: ServerResponse, status: number, data: unknown): void {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(data));
+}
+
+// 定期清理过期 challenge/session
+setInterval(cleanupExpired, 60 * 60 * 1000).unref();
+
+server.listen(PORT, () => {
+  console.log(`[onlyspace] server listening on :${PORT} space=${cfg.space_id}`);
+});

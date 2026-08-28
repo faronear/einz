@@ -1,0 +1,16 @@
+name: onlyspace_cli
+description: OnlySpace CLI 测试端（无 UI，Phase 0-4 测试驱动）
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  onlyspace_shared:
+    path: ../shared
+  args: ^2.5.0
+  sodium_libs: ^1.0.0
+
+dev_dependencies:
+  lints: ^4.0.0

@@ -1,0 +1,45 @@
+# OnlySpace 单机部署（productLens §13.2）：Caddy（TLS/反代）+ Node 服务
+# 使用前：
+#   1. 按 docs/SETUP.md 生成 config.json（白名单），放到 ./config/config.json
+#   2. 修改 Caddyfile 中的域名
+#   3. docker compose up -d
+services:
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - ONLYSPACE_CONFIG=/config/config.json
+      - ONLYSPACE_DB=/data/app.db
+      - ONLYSPACE_FILES=/data/files
+    volumes:
+      - ./config:/config:ro
+      - ./data:/data
+    expose:
+      - "3000"
+    networks:
+      - onlyspace
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - onlyspace
+    depends_on:
+      - server
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  onlyspace:

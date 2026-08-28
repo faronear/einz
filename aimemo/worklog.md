@@ -84,3 +84,18 @@
 - `aimemo/productLens.zhcn.md`：补回 §7.2 共享核心（shared/）、新增 §7.5 CLI 测试端、§14.1 开发工具与非目标、§14.2 V2 候选（明确不采用 Web）、§14.3 Phase 0/1 含 CLI、§15 ADR 第 10 条。
 - `aimemo/projectPlan.md`：monorepo 骨架增加 `cli/` 与 `shared/`，Phase 0 增加 shared 核心包与 CLI 任务，Phase 1 增加 CLI 双端收发验证与自动化测试脚本。
 - 提交：`86ea7d1`（第二轮）后，本轮修改待提交。
+
+### Phase 0 启动：设计文档 + Server 先行（待装 Dart SDK）
+
+**决策：** 前向保密采用 **A. 简单派生**（Space Key → 每消息派生 Message Key，不做双棘轮；代价=Space Key 泄露则历史可解，已接受）。环境检查：Node 22 ✅ / Dart ❌ / Flutter ❌。老板决定**暂不装 Dart，先做 Server**。
+
+**产出（Server 先行阶段，待提交）：**
+
+- `docs/`：`E2EE.md`（11 章：密钥层级/派生/配置分发/认证/轮换/恢复/决策记录）、`PROTOCOL.md`（11 章：REST/同步/附件/设备/推送/WS/错误/限流/版本）、`DATABASE.md`（双端 schema+迁移）、`SETUP.md`（一次性配置手册）。
+- `server/`：Node+TS 实现——静态白名单 config.json、challenge-response 认证、消息持久化（server_sequence 幂等）、增量同步、加密附件存取、设备撤销、推送占位、WebSocket 网关（hello/message.new/ping 心跳）。
+- `server/test/smoke.test.ts` 冒烟测试**全部通过**：白名单 403 / 认证 / E2EE 密文 / 幂等 / 同步 / **明文隔离（响应与 DB 均无明文）** / WS 实时。
+- 踩坑记录：libsodium-wrappers 的 ESM 入口在 Node ESM 下损坏（缺 libsodium.mjs）→ 用 `createRequire` 强制 CJS 构建；测试客户端 envelope 的 v/key_version 必须为 number（与 Server 校验一致）。
+- `deployment/`：docker-compose（server + Caddy）+ Caddyfile + server/Dockerfile（node:22-slim，better-sqlite3 原生模块避免 Alpine）。
+- monorepo 骨架：`shared/`、`cli/` pubspec 已建（未装 Dart 未验证）；`app/` 占位。
+
+**遗留：** Dart SDK 安装后继续 shared 核心包 → CLI → 一次性配置工具 → 端到端验收（任务 #12–#15）。

@@ -1,0 +1,37 @@
+# --- Node ---
+node_modules/
+dist/
+*.tsbuildinfo
+
+# --- Dart / Flutter ---
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+
+# --- 数据库与数据 ---
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+server/data/
+deployment/data/
+deployment/config/
+
+# --- 密钥与配置（禁止提交） ---
+.env
+server/config/config.json
+deployment/config/config.json
+*.pem
+*.key
+!docs/**/*.key
+
+# --- 构建产物 ---
+*.apk
+*.ipa
+*.aab
+
+# --- 系统 ---
+.DS_Store
