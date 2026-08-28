@@ -41,11 +41,11 @@
 
 ## Phase 1 — 消息 MVP（估算 5–10 天）
 
-- [ ] 文字消息全链路（REST + WebSocket），先用 CLI 双端收发验证
-- [ ] Client/Server SQLite（drift / better-sqlite3，shared 层同步逻辑）
-- [ ] 离线发送队列 + 自动同步（per-space server_sequence）
-- [ ] 消息历史加载
-- [ ] CLI 自动化测试脚本：离线发送 → 恢复网络 → 自动补发 → 无重复无乱序
+- [x] 文字消息全链路（REST + WebSocket），先用 CLI 双端收发验证
+- [ ] Client/Server SQLite（drift / better-sqlite3，shared 层同步逻辑）—— **CLI 端已用 JSON 落盘实现（pending/history/锚点）**，drift 入库待移动端集成（Phase 3）
+- [x] 离线发送队列 + 自动同步（per-space server_sequence）
+- [x] 消息历史加载
+- [x] CLI 自动化测试脚本：离线发送 → 恢复网络 → 自动补发 → 无重复无乱序（`cli/test/phase1_e2e.sh` 全过）
 
 ## Phase 2 — 媒体（估算 3–7 天）
 

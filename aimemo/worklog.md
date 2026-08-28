@@ -159,3 +159,23 @@
 - 验证：`dart analyze` 无警告（注：`flutter analyze` 的 analysis server 在含中文的路径下 LSP 通信报错，改用 `dart analyze` 绕过）、`flutter test` 全过、shared 回归 8 项全过。
 
 **遗留：** `flutter analyze` 在中文路径下的 LSP 异常待查（不阻塞开发）；Phase 1 消息 MVP 为下一步。`onlyspace.bundle`（96K 交接产物）未入库，HANDOFF 完成后可删。
+
+### Phase 1 消息 MVP：离线队列 + 自动同步 + WS 实时（CLI 测试端）
+
+**背景：** 老板确认删除 `onlyspace.bundle`（交接产物，删除后工作树干净），继续 Phase 1。探索结论：**server 已满足 Phase 1 全部契约**（`/sync` 分页 + has_more、WS message.new 广播、message_id 幂等），改动集中在 CLI 测试端。
+
+**实现（`cli/`，全部 `dart analyze` 无警告）：**
+
+- `lib/store.dart` 扩展：**pending 离线发送队列**（MessageEnvelope JSON 落盘，幂等入队/出队）+ **history 本地消息历史**（按 message_id 幂等 upsert，seq 升序展示）+ `advanceAnchor`（锚点只前进不倒退，与 shared SyncState 语义一致）。
+- `bin/onlyspace.dart`：
+  - `send`：**先入队再尝试立即发送**——离线时（server 不可达/无 session）消息留队不丢；`--server` 可省略（纯离线模式）。
+  - `_flushPending`：补发队列，成功一条出队一条 + 写历史 + 推进锚点；网络失败停止本轮留队。
+  - `sync`：**has_more 翻页拉全量**（`_syncIncremental`）→ 落盘历史 → 推进锚点 → 补发队列；`--after` 默认取本地锚点。
+  - `listen`（新命令）：WS 实时接收 `message.new`，实时落盘 + 解密打印；断线 2s 自动重连，重连前先 `/sync` 补齐 + 补发（PROTOCOL §8.3 语义：WS 只是实时加速，不依赖它保证不丢）。
+- `test/phase1_e2e.sh`（新）：**Phase 1 自动化验收全过**——停 Server 模拟离线 → A 发 3 条全部留队（队列=3）→ 重启 Server → A sync 自动补发（补发=3 队列剩余=0）→ B sync 收到 3 条**无重复无乱序**（seq 升序）→ 二次 sync 新增=0（幂等）→ B listen WS 实时收到新消息。
+
+**踩坑（Windows / Git Bash）：** ① `(cmd) &` 的 `$!` 是 subshell PID，`kill` 只杀 bash 外壳、node 变孤儿继续跑（"离线"不生效）→ `start_server` 改用 `exec env ...` 使 `$!` 直接是 node 进程；② Windows 原生 python 不认 `/tmp/...` MSYS 路径 → 脚本里用 `cygpath -m` 转换。
+
+**验证：** server 冒烟全过、shared 8 单测全过、cli analyze 无警告、`e2e.sh`（Phase 0 回归）与 `phase1_e2e.sh` 双双通过。
+
+**Phase 1 剩余：** drift 客户端 SQLite 入库（DATABASE.md §3 local_messages/sync_state）留待移动端集成（Phase 3）时随 app 一起做——CLI 测试端已用 JSON 落盘等价验证了状态机。

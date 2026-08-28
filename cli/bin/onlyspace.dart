@@ -30,7 +30,7 @@ Future<void> main(List<String> args) async {
     ..addOption('out-config', help: '输出服务器 config.json 路径')
     ..addOption('out-sealed-peer', help: '输出给对方设备的密封 Space Key 文件')
     ..addOption('sealed-file', help: '导入的密封 Space Key 文件（import 用）')
-    ..addOption('after', defaultsTo: '0', help: '同步起点 server_sequence');
+    ..addOption('after', help: '同步起点 server_sequence（默认: 本地锚点 last_server_sequence）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
   final opts = parser.parse(rest);
@@ -50,6 +50,8 @@ Future<void> main(List<String> args) async {
       await _cmdSend(opts);
     case 'sync':
       await _cmdSync(opts);
+    case 'listen':
+      await _cmdListen(opts);
     case 'help':
     default:
       stdout.writeln(parser.usage);
@@ -162,14 +164,11 @@ Future<void> _cmdAuth(ArgResults opts) async {
 }
 
 Future<void> _cmdSend(ArgResults opts) async {
-  final store = DeviceStore.load(_require(opts, 'store'));
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
   store.requireSpace();
-  final server = _require(opts, 'server');
   final message = _require(opts, 'message');
-  if (store.sessionToken == null) {
-    throw StateError('未认证，先运行 auth');
-  }
-  final api = ApiClient(server);
+
   final messageId = await _uuidv7();
   final env = await encryptMessage(
     plaintext: message,
@@ -178,24 +177,64 @@ Future<void> _cmdSend(ArgResults opts) async {
     senderDeviceId: store.deviceId,
     messageId: messageId,
   );
-  final result = await api.postMessage(env, store.sessionToken!);
-  store.lastServerSequence = result.serverSequence;
-  store.save(_require(opts, 'store'));
-  stdout.writeln('✅ 已发送: message_id=${result.messageId} seq=${result.serverSequence}');
+
+  // 1) 先入队（幂等），保证离线不丢
+  store.enqueuePending(jsonEncode(env.toJson()));
+  store.save(path);
+
+  // 2) 尝试立即发送；--server 可省略（纯离线模式：只入队）
+  final server = opts['server'] as String?;
+  if (server == null || store.sessionToken == null) {
+    stdout.writeln('📤 已入队（离线，待恢复后自动补发）: message_id=$messageId');
+    return;
+  }
+  final sent = await _flushPending(store, path, server);
+  if (sent > 0) {
+    stdout.writeln('✅ 已发送并出队: message_id=$messageId');
+  } else {
+    stdout.writeln('⚠️ 发送失败，已留在队列，恢复网络后自动补发: message_id=$messageId');
+  }
+}
+
+/// 补发离线队列中的所有消息；成功一条出队一条、写入历史并推进锚点。
+/// 网络失败时停止本轮补发，剩余留队（下次 sync/listen 再试）。
+/// 返回本轮成功补发的条数。
+Future<int> _flushPending(DeviceStore store, String path, String server) async {
+  store.requireSession();
+  final api = ApiClient(server);
+  var sent = 0;
+  for (final env in store.pendingEnvelopes) {
+    try {
+      final result = await api.postMessage(env, store.sessionToken!);
+      store.dequeuePending(env.messageId);
+      if (result.serverSequence > store.lastServerSequence) {
+        store.lastServerSequence = result.serverSequence;
+      }
+      store.upsertHistory(env, serverSequence: result.serverSequence, createdAt: result.createdAt);
+      sent++;
+      stdout.writeln('  ↳ 补发成功: message_id=${env.messageId} seq=${result.serverSequence}');
+    } on Exception catch (e) {
+      stdout.writeln('  ↳ 补发失败（留队）: message_id=${env.messageId} → $e');
+      break; // 网络层问题：停止本轮，避免空转
+    }
+  }
+  if (sent > 0) store.save(path);
+  return sent;
 }
 
 Future<void> _cmdSync(ArgResults opts) async {
-  final store = DeviceStore.load(_require(opts, 'store'));
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
   store.requireSpace();
   final server = _require(opts, 'server');
-  if (store.sessionToken == null) {
-    throw StateError('未认证，先运行 auth');
-  }
-  final api = ApiClient(server);
-  final after = int.parse(opts['after'] as String);
-  final result = await api.sync(store.sessionToken!, after: after);
+  final afterOpt = opts['after'] as String?;
 
-  for (final env in result.messages) {
+  // 1) 增量拉取（has_more 翻页拉全量）并落盘历史
+  final added = await _syncIncremental(store, server, after: afterOpt == null ? null : int.parse(afterOpt));
+  store.save(path);
+
+  // 2) 解密并打印本次新增消息
+  for (final env in added) {
     final plain = await decryptMessage(
       env: env,
       spaceKey: base64Decode(store.spaceKey!),
@@ -205,9 +244,109 @@ Future<void> _cmdSync(ArgResults opts) async {
     final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
     stdout.writeln('[$sender seq=${env.serverSequence}] $plain');
   }
-  store.lastServerSequence = result.lastSequence;
-  store.save(_require(opts, 'store'));
-  stdout.writeln('ℹ️  同步完成: last_sequence=${result.lastSequence} has_more=${result.hasMore}');
+
+  // 3) 补发离线队列（网络已恢复时）
+  final flushed = await _flushPending(store, path, server);
+  stdout.writeln(
+      'ℹ️  同步完成: last_sequence=${store.lastServerSequence} 新增=${added.length} 补发=$flushed 队列剩余=${store.pendingCount}');
+}
+
+/// 实时监听：连接 WS 接收 message.new，实时落盘历史并解密打印。
+/// 断线自动重连，重连前先 /sync 补齐错过的消息（PROTOCOL.md §8.3）。
+Future<void> _cmdListen(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  store.requireSpace();
+  final server = _require(opts, 'server');
+  store.requireSession();
+
+  // 启动前先补一次同步（含补发离线队列），避免错过断线期间消息
+  final added = await _syncIncremental(store, server);
+  await _flushPending(store, path, server);
+  store.save(path);
+  if (added.isNotEmpty) {
+    stdout.writeln('📥 启动前补齐 ${added.length} 条');
+  }
+
+  final wsUrl = server.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+  stdout.writeln('🔌 实时监听: $wsUrl/ws（Ctrl+C 退出）');
+  while (true) {
+    try {
+      // token 含 base64 的 +/= 字符，必须 URL 编码（PROTOCOL.md §8.1）
+      final uri = Uri.parse('$wsUrl/ws?pv=1&token=${Uri.encodeQueryComponent(store.sessionToken!)}');
+      final ws = await WebSocket.connect(uri.toString());
+      stdout.writeln('✅ WS 已连接');
+      await for (final data in ws) {
+        final frame = jsonDecode(data as String) as Map<String, dynamic>;
+        switch (frame['type']) {
+          case 'hello':
+            final payload = frame['payload'] as Map<String, dynamic>;
+            stdout.writeln('ℹ️  hello: device_id=${payload['device_id']} space_id=${payload['space_id']}');
+          case 'message.new':
+            final payload = frame['payload'] as Map<String, dynamic>;
+            final env = MessageEnvelope.fromJson(payload['message'] as Map<String, dynamic>);
+            final seq = payload['server_sequence'] as int;
+            final createdAt = payload['message']['created_at'] as int;
+            store.upsertHistory(env, serverSequence: seq, createdAt: createdAt);
+            store.advanceAnchor(seq);
+            store.save(path);
+            final plain = await decryptMessage(
+              env: env,
+              spaceKey: base64Decode(store.spaceKey!),
+              spaceId: store.spaceId!,
+              keyVersion: env.keyVersion,
+            );
+            final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
+            stdout.writeln('[$sender seq=$seq] $plain');
+          case 'ping':
+            // 忽略服务端不应下发的类型；心跳由客户端发起
+          default:
+          // 忽略未知帧（pong / sync.advance / key.rotation / device.revoked 等）
+        }
+      }
+      stdout.writeln('⚠️ WS 已断开，2 秒后重连…');
+    } catch (e) {
+      stdout.writeln('⚠️ WS 连接失败: $e，2 秒后重连…');
+    }
+    await Future<void>.delayed(const Duration(seconds: 2));
+    // 重连前补齐错过的消息 + 补发离线队列
+    try {
+      final backfilled = await _syncIncremental(store, server);
+      await _flushPending(store, path, server);
+      store.save(path);
+      if (backfilled.isNotEmpty) {
+        stdout.writeln('📥 重连补齐 ${backfilled.length} 条');
+      }
+    } catch (_) {
+      // server 不可达，继续等待重连
+    }
+  }
+}
+
+/// 增量拉取：从本地锚点（或指定 after）开始，has_more 时翻页拉全量，
+/// 每条落盘 history 并推进锚点。返回本次新增消息（按 server_sequence 升序）。
+Future<List<MessageEnvelope>> _syncIncremental(
+  DeviceStore store,
+  String server, {
+  int? after,
+}) async {
+  store.requireSession();
+  final api = ApiClient(server);
+  var cursor = after ?? store.lastServerSequence;
+  final added = <MessageEnvelope>[];
+  while (true) {
+    final result = await api.sync(store.sessionToken!, after: cursor);
+    for (final env in result.messages) {
+      store.upsertHistory(env, serverSequence: env.serverSequence!, createdAt: env.createdAt!);
+      added.add(env);
+    }
+    if (result.messages.isNotEmpty) {
+      cursor = result.lastSequence;
+      store.advanceAnchor(result.lastSequence);
+    }
+    if (!result.hasMore || result.messages.isEmpty) break;
+  }
+  return added;
 }
 
 /// 简易 UUIDv7 生成（Dart 无内置，用随机 16 字节 + 时间前缀的近似实现即可满足测试）。
