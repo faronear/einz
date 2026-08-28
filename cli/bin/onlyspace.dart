@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:onlyspace_shared/onlyspace_shared.dart';
 
 import 'package:onlyspace_cli/client.dart';
@@ -30,7 +31,12 @@ Future<void> main(List<String> args) async {
     ..addOption('out-config', help: '输出服务器 config.json 路径')
     ..addOption('out-sealed-peer', help: '输出给对方设备的密封 Space Key 文件')
     ..addOption('sealed-file', help: '导入的密封 Space Key 文件（import 用）')
-    ..addOption('after', help: '同步起点 server_sequence（默认: 本地锚点 last_server_sequence）');
+    ..addOption('after', help: '同步起点 server_sequence（默认: 本地锚点 last_server_sequence）')
+    ..addOption('file', help: '要上传的本地文件路径（attach 用）')
+    ..addOption('type', help: '附件类型: image|video|voice（attach 用，默认按扩展名推断）')
+    ..addOption('caption', help: '附件消息描述文本（attach 用，默认文件名）')
+    ..addOption('attachment-id', help: '要下载的附件 ID（fetch 用）')
+    ..addOption('out', help: '下载输出的本地文件路径（fetch 用，默认当前目录）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
   final opts = parser.parse(rest);
@@ -52,6 +58,10 @@ Future<void> main(List<String> args) async {
       await _cmdSync(opts);
     case 'listen':
       await _cmdListen(opts);
+    case 'attach':
+      await _cmdAttach(opts);
+    case 'fetch':
+      await _cmdFetch(opts);
     case 'help':
     default:
       stdout.writeln(parser.usage);
@@ -251,6 +261,135 @@ Future<void> _cmdSync(ArgResults opts) async {
       'ℹ️  同步完成: last_sequence=${store.lastServerSequence} 新增=${added.length} 补发=$flushed 队列剩余=${store.pendingCount}');
 }
 
+/// 下载附件：GET /attachments/:id → 校验密文 sha256 → 解密 → 写本地文件。
+/// 需要本地已有该附件的元数据（nonce/sha256），否则提示先 sync。
+Future<void> _cmdFetch(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  store.requireSpace();
+  final server = _require(opts, 'server');
+  store.requireSession();
+  final attachmentId = _require(opts, 'attachment-id');
+
+  final meta = store.attachmentMeta(attachmentId);
+  if (meta == null) {
+    throw StateError('本地无附件元数据: $attachmentId（先运行 sync 拉取元数据）');
+  }
+
+  final api = ApiClient(server);
+  final blob = await api.getAttachment(attachmentId, store.sessionToken!);
+
+  // 校验密文完整性（sha256 与元数据一致，PROTOCOL.md §6.1；编码与 Server 同为 base64）
+  final actual = base64Encode(crypto.sha256.convert(blob).bytes);
+  if (actual != meta['sha256']) {
+    throw StateError('附件密文 sha256 校验失败（传输损坏或被篡改）');
+  }
+
+  final plain = await decryptAttachment(
+    cipherText: blob,
+    nonce: base64Decode(meta['nonce'] as String),
+    spaceKey: base64Decode(store.spaceKey!),
+    attachmentId: attachmentId,
+    spaceId: store.spaceId!,
+    keyVersion: meta['key_version'] as int,
+  );
+
+  // 输出路径：--out 指定，或当前目录下 <attachment_id>.bin
+  final out = (opts['out'] as String?) ?? '${attachmentId.substring(0, 8)}.bin';
+  File(out).writeAsBytesSync(plain);
+  stdout.writeln('✅ 附件已下载并解密: $out（${plain.length} 字节）');
+}
+
+/// 上传附件：本地文件加密 → 先发一条附件消息（type=image/video/voice）→
+/// 再上传密文 blob（PROTOCOL.md §6.1：必须先有对应 message）。
+Future<void> _cmdAttach(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  store.requireSpace();
+  final server = _require(opts, 'server');
+  store.requireSession();
+  final filePath = _require(opts, 'file');
+
+  final file = File(filePath);
+  if (!file.existsSync()) {
+    throw StateError('文件不存在: $filePath');
+  }
+  final fileBytes = file.readAsBytesSync();
+  final fileName = file.path.split(RegExp(r'[\\/]')).last;
+
+  final messageId = await _uuidv7();
+  final attachmentId = await _uuidv7();
+  final type = _inferAttachmentType(opts['type'] as String?, fileName);
+  final caption = (opts['caption'] as String?) ?? '📎 $fileName';
+
+  // 1) 加密文件（密文 + 元数据）
+  final enc = await encryptAttachment(
+    fileBytes: fileBytes,
+    spaceKey: base64Decode(store.spaceKey!),
+    attachmentId: attachmentId,
+    spaceId: store.spaceId!,
+    keyVersion: store.keyVersion,
+  );
+
+  // 2) 先发附件消息（正文为描述文本，密文上链）
+  final env = await encryptMessage(
+    plaintext: caption,
+    spaceKey: base64Decode(store.spaceKey!),
+    spaceId: store.spaceId!,
+    senderDeviceId: store.deviceId,
+    messageId: messageId,
+    type: type,
+    keyVersion: store.keyVersion,
+  );
+  final api = ApiClient(server);
+  final msg = await api.postMessage(env, store.sessionToken!);
+
+  // 3) 再上传附件 blob（Server 校验 size + sha256）
+  final att = await api.postAttachment(
+    messageId: messageId,
+    attachmentId: attachmentId,
+    keyVersion: store.keyVersion,
+    size: enc.size,
+    sha256: enc.sha256,
+    nonce: base64Encode(enc.nonce),
+    blob: enc.cipher,
+    token: store.sessionToken!,
+  );
+
+  // 4) 落盘：附件元数据 + 消息历史 + 推进锚点
+  store.upsertAttachment(
+    attachmentId: attachmentId,
+    messageId: messageId,
+    keyVersion: store.keyVersion,
+    size: enc.size,
+    sha256: enc.sha256,
+    nonce: base64Encode(enc.nonce),
+    createdAt: att['created_at'] as int,
+  );
+  store.upsertHistory(env, serverSequence: msg.serverSequence, createdAt: msg.createdAt);
+  store.advanceAnchor(msg.serverSequence);
+  store.save(path);
+
+  stdout.writeln('✅ 附件已上传: attachment_id=$attachmentId');
+  stdout.writeln('   message_id=$messageId type=$type seq=${msg.serverSequence}');
+  stdout.writeln('   密文 ${enc.size} 字节，sha256=${enc.sha256.substring(0, 16)}…');
+}
+
+/// 推断附件类型：显式指定优先，否则按扩展名（默认 image）。
+String _inferAttachmentType(String? explicit, String fileName) {
+  if (explicit != null) {
+    const allowed = {'image', 'video', 'voice'};
+    if (!allowed.contains(explicit)) throw StateError('--type 只能是 image|video|voice');
+    return explicit;
+  }
+  final ext = fileName.split('.').last.toLowerCase();
+  const videoExt = {'mp4', 'mov', 'mkv', 'avi', 'webm'};
+  const voiceExt = {'mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac'};
+  if (videoExt.contains(ext)) return 'video';
+  if (voiceExt.contains(ext)) return 'voice';
+  return 'image';
+}
+
 /// 实时监听：连接 WS 接收 message.new，实时落盘历史并解密打印。
 /// 断线自动重连，重连前先 /sync 补齐错过的消息（PROTOCOL.md §8.3）。
 Future<void> _cmdListen(ArgResults opts) async {
@@ -339,6 +478,18 @@ Future<List<MessageEnvelope>> _syncIncremental(
     for (final env in result.messages) {
       store.upsertHistory(env, serverSequence: env.serverSequence!, createdAt: env.createdAt!);
       added.add(env);
+    }
+    // 附件元数据落盘（供 fetch 解密，PROTOCOL.md §5.2 attachments_meta）
+    for (final meta in result.attachmentsMeta) {
+      store.upsertAttachment(
+        attachmentId: meta['attachment_id'] as String,
+        messageId: meta['message_id'] as String,
+        keyVersion: meta['key_version'] as int,
+        size: meta['size'] as int,
+        sha256: meta['sha256'] as String,
+        nonce: meta['nonce'] as String,
+        createdAt: meta['created_at'] as int,
+      );
     }
     if (result.messages.isNotEmpty) {
       cursor = result.lastSequence;

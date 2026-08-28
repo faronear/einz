@@ -179,3 +179,26 @@
 **验证：** server 冒烟全过、shared 8 单测全过、cli analyze 无警告、`e2e.sh`（Phase 0 回归）与 `phase1_e2e.sh` 双双通过。
 
 **Phase 1 剩余：** drift 客户端 SQLite 入库（DATABASE.md §3 local_messages/sync_state）留待移动端集成（Phase 3）时随 app 一起做——CLI 测试端已用 JSON 落盘等价验证了状态机。
+
+### Phase 2 媒体：附件加密上传/下载/解密闭环（CLI 测试端）
+
+**背景：** 老板确认继续 Phase 2 媒体。探索结论：server 的附件存储（attachments.ts）与 shared 的附件加密（attachment_crypto.dart）骨架已在 Phase 0 建好，差距在**协议对齐 + CLI 端命令 + 消息↔附件关联**。
+
+**修复的协议偏差（实现与文档对齐）：**
+
+1. **sha256 编码不统一（500/sha256 mismatch）**：server 用 Node `digest("base64")`，而 shared/CLI 用 hex `toString()` → 统一为 **base64(32B)**（PROTOCOL.md §6.1）。同时把 E2EE.md §6.1 的"BLAKE2b-256"更正为 SHA-256（实现即 SHA-256，文档写错）。
+2. **附件 AAD 未绑定空间上下文**：shared 原实现 AAD 只有 `"onlyspace-v1-a"+attachment_id`，与 E2EE.md §6.1（须绑定 space_id + key_version）不符 → 补上 `spaceId`/`keyVersion` 参数，AAD = `"onlyspace-v1"+space_id+attachment_id+key_version`，并新增"换 space_id 无法解密"单测。
+
+**实现（`shared/` + `server/` + `cli/`）：**
+
+- shared `attachment_crypto.dart`：`encryptAttachment` 返回密文+nonce+**sha256(base64)**+size；加解密均绑定 space_id/key_version；新增 `crypto` 依赖。9 项单测全过（新增 AAD 绑定测试）。
+- server `messages.ts`：`/sync` 响应补 **`attachments_meta`**（随本页消息返回附件元数据，PROTOCOL.md §5.2；复用 attachments.ts 的 `attachmentsForMessages`）。
+- cli：
+  - `client.dart`：`postAttachment`（x-attachment-meta 头 + 密文 blob）、`getAttachment`（下载密文）；`sync` 返回 `attachmentsMeta`。
+  - `store.dart`：附件元数据存储（`upsertAttachment`/`attachmentMeta`，幂等）。
+  - `onlyspace.dart`：**`attach`** 命令（加密文件 → 先发附件消息 type=image/video/voice → 再上传 blob，类型按扩展名推断）；**`fetch`** 命令（下载 → 校验 sha256 → 解密 → 写本地文件，防传输损坏）。
+- `test/phase2_e2e.sh`（新）：**验收全过**——A attach 上传含明文字符串的测试文件 → **明文隔离检查**（attachments 表与 files/ blob 均无明文）→ B sync 收到消息 + attachments_meta 落盘 → B fetch 下载解密 → **与原文件逐字节一致**（cmp）。
+
+**验证：** server 冒烟全过、shared 9 单测全过、cli analyze 无警告、三个 e2e 脚本（Phase 0/1/2）全部通过（回归无破坏）。
+
+**Phase 2 剩余：** 附件分片上传、本地解密缓存目录管理（App 私有目录）留待移动端集成（Phase 3）。

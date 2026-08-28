@@ -24,8 +24,10 @@ class DeviceStore {
     this.lastServerSequence = 0,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
+    List<Map<String, dynamic>>? attachments,
   })  : pending = pending ?? [],
-        history = history ?? [];
+        history = history ?? [],
+        attachments = attachments ?? [];
 
   final String deviceId;
   final String publicKey; // base64
@@ -41,6 +43,9 @@ class DeviceStore {
 
   /// 本地消息历史：完整信封 + server_sequence + created_at（与 Server 同步后落盘）。
   final List<Map<String, dynamic>> history;
+
+  /// 本地附件元数据（上传/同步后落盘，解密需要 nonce/sha256/key_version）。
+  final List<Map<String, dynamic>> attachments;
 
   static Future<DeviceStore> create(String deviceId) async {
     final kp = await DeviceKeyPair.generate(deviceId: deviceId);
@@ -62,6 +67,7 @@ class DeviceStore {
         'last_server_sequence': lastServerSequence,
         'pending': pending,
         'history': history,
+        'attachments': attachments,
       };
 
   static DeviceStore fromJson(Map<String, dynamic> json) => DeviceStore(
@@ -75,6 +81,7 @@ class DeviceStore {
         lastServerSequence: (json['last_server_sequence'] as int?) ?? 0,
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+        attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
       );
 
   void save(String path) {
@@ -177,4 +184,43 @@ class DeviceStore {
   }
 
   int get historyCount => history.length;
+
+  // ---------- 附件元数据 ----------
+
+  /// 记录一条附件元数据（按 attachment_id 幂等 upsert）。
+  void upsertAttachment({
+    required String attachmentId,
+    required String messageId,
+    required int keyVersion,
+    required int size,
+    required String sha256,
+    required String nonce,
+    required int createdAt,
+  }) {
+    final existing = attachments.indexWhere((a) => a['attachment_id'] == attachmentId);
+    final entry = {
+      'attachment_id': attachmentId,
+      'message_id': messageId,
+      'key_version': keyVersion,
+      'size': size,
+      'sha256': sha256,
+      'nonce': nonce,
+      'created_at': createdAt,
+    };
+    if (existing >= 0) {
+      attachments[existing] = entry;
+    } else {
+      attachments.add(entry);
+    }
+  }
+
+  /// 按 attachment_id 查询附件元数据（不存在返回 null）。
+  Map<String, dynamic>? attachmentMeta(String attachmentId) {
+    for (final a in attachments) {
+      if (a['attachment_id'] == attachmentId) return a;
+    }
+    return null;
+  }
+
+  int get attachmentCount => attachments.length;
 }

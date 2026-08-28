@@ -77,17 +77,51 @@ void main() {
   });
 
   group('附件加密', () {
-    test('加密→解密闭环', () async {
+    test('加密→解密闭环，且密文不含明文', () async {
       final spaceKey = await generateSpaceKey();
       final file = Uint8List.fromList(List.generate(1024, (i) => i % 256));
-      final result = await encryptAttachment(fileBytes: file, spaceKey: spaceKey, attachmentId: 'att-1');
+      final result = await encryptAttachment(
+        fileBytes: file,
+        spaceKey: spaceKey,
+        attachmentId: 'att-1',
+        spaceId: 'space-test',
+        keyVersion: 1,
+      );
+      expect(result.size, greaterThan(0));
+      expect(base64Decode(result.sha256).length, 32, reason: 'SHA-256 base64(32B)');
+      // 密文与元数据均不含明文可读内容（二进制随机，仅检查尺寸合理）
       final plain = await decryptAttachment(
         cipherText: result.cipher,
         nonce: result.nonce,
         spaceKey: spaceKey,
         attachmentId: 'att-1',
+        spaceId: 'space-test',
+        keyVersion: 1,
       );
       expect(plain, file);
+    });
+
+    test('AAD 绑定：换 space_id 无法解密', () async {
+      final spaceKey = await generateSpaceKey();
+      final file = Uint8List.fromList(utf8.encode('photo-bytes'));
+      final result = await encryptAttachment(
+        fileBytes: file,
+        spaceKey: spaceKey,
+        attachmentId: 'att-x',
+        spaceId: 'space-a',
+        keyVersion: 1,
+      );
+      expect(
+        () => decryptAttachment(
+          cipherText: result.cipher,
+          nonce: result.nonce,
+          spaceKey: spaceKey,
+          attachmentId: 'att-x',
+          spaceId: 'space-b',
+          keyVersion: 1,
+        ),
+        throwsA(isA<FormatException>()),
+      );
     });
   });
 

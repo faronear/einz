@@ -168,7 +168,7 @@ AttachmentKey = 派生(§4.2, attachment_id)
 nonce = randombytes(24)
 AAD   = "onlyspace-v1" ‖ space_id ‖ attachment_id ‖ key_version
 blob  = crypto_aead_xchacha20poly1305_ietf_encrypt(原始文件字节, aad, nonce, AttachmentKey)
-sha256 = BLAKE2b-256(blob)        // 密文哈希，用于完整性校验
+sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（base64，与 Server 校验一致）
 ```
 
 ### 6.2 元数据（存 SQLite，不含任何可读内容）

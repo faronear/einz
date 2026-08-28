@@ -1,6 +1,7 @@
 import { getDb } from "./db.js";
 import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
+import { attachmentsForMessages, type AttachmentMeta } from "./attachments.js";
 
 const ALLOWED_TYPES = new Set(["text", "image", "video", "voice", "system"]);
 
@@ -81,7 +82,7 @@ export function syncMessages(
   token: string,
   after: number,
   limit: number
-): { messages: StoredMessage[]; last_sequence: number; has_more: boolean } {
+): { messages: StoredMessage[]; attachments_meta: AttachmentMeta[]; last_sequence: number; has_more: boolean } {
   const { device_id } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
@@ -103,5 +104,9 @@ export function syncMessages(
   const page = hasMore ? withVersion.slice(0, safeLimit) : withVersion;
   const last = page.length > 0 ? page[page.length - 1].server_sequence : after;
 
-  return { messages: page, last_sequence: last, has_more: hasMore };
+  // 附件元数据：随本页消息返回（PROTOCOL.md §5.2 attachments_meta）
+  const messageIds = page.map((m) => m.message_id);
+  const attachmentsMeta = attachmentsForMessages(messageIds);
+
+  return { messages: page, attachments_meta: attachmentsMeta, last_sequence: last, has_more: hasMore };
 }
