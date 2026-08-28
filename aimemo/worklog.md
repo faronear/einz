@@ -277,3 +277,15 @@
 **回归验证（全部通过）：** server 冒烟、shared 13 单测、cli analyze、**四个 e2e 脚本**（e2e/phase1/phase2/phase4）、app flutter test 6 项。phase4 段 D 断言随锚点语义更新（重启后 sync 拉待同步数据 + 本地历史完好）；app 两处单测断言更新（send/补发不推进锚点）。
 
 **遗留：** 审查未覆盖的浅层项（UI 细节、性能微优化）未列；Gradle 正式环境建议改回 services.gradle.org 官方地址（当前腾讯云镜像 + checksum 锁定）。
+
+### 部署手册（docs/DEPLOYMENT.md）+ 试用指引
+
+**背景：** V1 审查修复完成后，老板要求整理部署手册并指导试用。
+
+**产出：**
+
+- `docs/DEPLOYMENT.md`（v1.0，命令全部本机实测）：§1 部署形态速览 → §2 **本机 5 分钟快速试用**（init/config/import/auth/send/sync/listen/attach/fetch + CLI 命令总览表）→ §3 生产部署（Docker Compose + Caddy，含 `ONLYSPACE_BACKUP_KEY` 注入与验证）→ §4 一次性配置命令级实作（替代 SETUP.md "[待开发]" 标注）→ §5 运维（Server 备份/恢复、客户端恢复码、撤销+轮换）→ §6 安全边界清单 → §7 故障排查 → §8 验收清单。
+- `README.md`：设计文档表加 DEPLOYMENT.md 链接；SETUP.md 标注改为"设计稿，命令级实作见 DEPLOYMENT.md"。
+- **验证**：按手册 §2 命令链完整跑通（init/config/import → 启动 server → auth 双端 → send → B sync 解出明文 → B listen 实时收到 → history 2 条完整）。**踩坑记录：** ① 跨 bash 会话的后台 server 会被清理 → 验证需单会话内完成；② server 须在 config.json 生成**之后**启动（否则 loadConfig 失败退出）。
+
+**遗留：** docker-compose.yml 未预置 ONLYSPACE_BACKUP_KEY（部署时注入）；生产环境建议按手册 §3 补 environment；App 真机验证仍待环境。
