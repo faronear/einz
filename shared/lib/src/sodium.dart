@@ -37,6 +37,9 @@ Future<DynamicLibrary> loadDynamicLibrary() async {
       '/lib/x86_64-linux-gnu/libsodium.so',
     ],
     if (Platform.isWindows) 'libsodium.dll',
+    // 移动端：原生库由宿主 App 打包（Phase 3 接入 sodium_libs 等插件时生效）
+    if (Platform.isAndroid) 'libsodium.so',
+    if (Platform.isIOS) 'libsodium.dylib',
   ];
 
   Object? lastError;

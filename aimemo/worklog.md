@@ -131,3 +131,31 @@
 - 任务状态：**#16 保持待办**（新电脑装 Flutter 后完成），其余 Phase 0 任务全部完成。
 
 **待新电脑确认环境后：** 运行 HANDOFF.md §4 的验证命令 → 完成任务 #16 → 进入 Phase 1 消息 MVP。
+
+### 跨机器续接完成（Windows：环境安装 + 全量验证 + #16 app 骨架）
+
+**背景：** 按 `docs/HANDOFF.md` 在 Windows 新机器续接。本机环境：Node v20.20.0（手册要求 ≥22，实测冒烟全过）、Dart / Flutter / libsodium 均未装。
+
+**环境安装（Windows 途径）：**
+
+- Dart SDK 3.12.2（stable）：winget 无 Dart 包，改为中国镜像下载 zip → 解压至 `D:\devtools\dart-sdk\dart-sdk`，用户 PATH 已加。
+- libsodium：`download.libsodium.org` 的 msvc 包（Win64 Release v143 dynamic libsodium.dll）→ `D:\devtools\libsodium\...`，测试需设 `LIBSODIUM_PATH` 指向该 DLL（对应 HANDOFF 踩坑 #4）。
+- Flutter 3.47.2（stable，2026-08-26）：中国镜像 `storage.flutter-io.cn` 下载 `flutter_windows_3.47.2-stable.zip`（1.8GB）→ `D:\devtools\flutter\flutter`，用户 PATH 已加。
+
+**验证与修复（HANDOFF §4 全流程跑通）：**
+
+- server：`npm install && npm run build && npm test` ✅ 冒烟全过。**修复 Windows EBUSY**：测试 finally 中 `kill` 后立刻 `rmSync` 会撞上未释放的 app.db 句柄 → 改为等子进程退出（3s 超时强杀）+ 重试清理（`server/test/smoke.test.ts`）。
+- shared：`dart analyze` 无警告 + 8 项单测全过（设 LIBSODIUM_PATH 后）。
+- cli：`dart analyze` 无警告 + `e2e.sh` 全过。**修复两处 Windows 问题**：① 内嵌 `node -e` 脚本里的 POSIX 路径（`/d/...`、`/tmp/...`）Windows Node 无法解析——MSYS 只自动转换环境变量与纯路径参数，脚本字符串不转换 → 用 `cygpath -m` 显式转 Windows 格式；② cleanup 的 `rm -rf` 同样遇 EBUSY → 加重试。
+- 恢复 `cli/test/e2e.sh` 可执行位（跨机器拷贝时 755→644 丢失）。
+
+**任务 #16 完成（Flutter app/ 骨架）：**
+
+- `flutter create . --platforms=ios,android --project-name onlyspace`（在 `app/` 内，Flutter 3.47.2）。
+- `app/pubspec.yaml` 接入 `onlyspace_shared: path: ../shared`。
+- `app/lib/main.dart` 重写为 OnlySpace 首屏骨架：接入 shared 的 `DeviceKeyPair.generate()` 作为"生成设备密钥"自检入口（libsodium 懒加载，测试不触发）。
+- `app/test/widget_test.dart` 改为骨架首屏渲染测试。
+- **顺手补移动端加载分支**：`shared/src/sodium.dart` 增加 Android `libsodium.so` / iOS `libsodium.dylib` 候选（此前只有 macOS/Linux/Windows，真机必然加载失败；原生库打包归 Phase 3）。
+- 验证：`dart analyze` 无警告（注：`flutter analyze` 的 analysis server 在含中文的路径下 LSP 通信报错，改用 `dart analyze` 绕过）、`flutter test` 全过、shared 回归 8 项全过。
+
+**遗留：** `flutter analyze` 在中文路径下的 LSP 异常待查（不阻塞开发）；Phase 1 消息 MVP 为下一步。`onlyspace.bundle`（96K 交接产物）未入库，HANDOFF 完成后可删。

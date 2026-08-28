@@ -15,7 +15,11 @@ SERVER_PID=""
 
 cleanup() {
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true
-  rm -rf "$WORK"
+  # Windows（Git Bash）下 server 进程退出是异步的，句柄未释放时 rm 会报 EBUSY，重试几次
+  for _ in 1 2 3 4 5; do
+    rm -rf "$WORK" 2>/dev/null && break
+    sleep 0.3
+  done
 }
 trap cleanup EXIT
 
@@ -69,9 +73,12 @@ echo "$SYNC_OUT" | grep -q "$MESSAGE" \
   || { echo "❌ B 未解密出明文"; exit 1; }
 
 echo "==> 8. DB 明文隔离检查（Server 只应存密文）"
+# 内嵌 node 脚本中的路径不会被 MSYS 自动转换，需显式转成 Windows 格式（Node 可识别正斜杠）
+ROOT_WIN="$(cygpath -m "$ROOT")"
+WORK_WIN="$(cygpath -m "$WORK")"
 node -e "
-const Database = require('$ROOT/server/node_modules/better-sqlite3');
-const db = new Database('$WORK/app.db', { readonly: true });
+const Database = require('$ROOT_WIN/server/node_modules/better-sqlite3');
+const db = new Database('$WORK_WIN/app.db', { readonly: true });
 const rows = db.prepare('SELECT ciphertext FROM messages').all();
 if (rows.length === 0) { console.error('❌ 数据库无消息'); process.exit(1); }
 const all = JSON.stringify(rows);

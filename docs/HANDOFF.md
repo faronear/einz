@@ -1,8 +1,8 @@
 # OnlySpace — 跨机器交接手册（HANDOFF）
 
 > **用途：** 从本机（macOS, `/Users/Shared/product-产品/only`）迁移工作到另一台电脑继续开发。
-> **最后更新：** 2026-08-28
-> **git HEAD：** `ece01e8`（5 个提交，工作树干净，无远程仓库）
+> **最后更新：** 2026-08-28（Windows 续接已完成，见 §3/§4 状态）
+> **git HEAD：** `ece01e8`（5 个提交，工作树干净，无远程仓库）→ **Windows 续接后已推进**
 
 ---
 
@@ -64,7 +64,7 @@ flutter --version
 | `cli/` 测试端 + 配置工具 | ✅ 完成 | `cd cli && dart pub get && dart analyze` |
 | 端到端验收 `cli/test/e2e.sh` | ✅ 通过 | `cd cli && bash test/e2e.sh` |
 | `deployment/` docker-compose + Caddy | ✅ 完成 | — |
-| **#16 Flutter app/ 骨架** | ⏸ **待新电脑安装 Flutter 后完成** | `flutter create app` 并入 monorepo |
+| **#16 Flutter app/ 骨架** | ✅ **已完成（Windows 续接）** | `flutter create . --platforms=ios,android`，接入 `onlyspace_shared`，`dart analyze` + `flutter test` 全过 |
 | Phase 1 消息 MVP | ⏸ 下一步 | — |
 
 ---

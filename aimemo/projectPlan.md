@@ -14,8 +14,8 @@
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| Phase 0 | 架构 + 密码学 PoC | [ ] 未开始 |
-| Phase 1 | 消息 MVP | [ ] 未开始 |
+| Phase 0 | 架构 + 密码学 PoC | [x] 已完成（#16 app 骨架于跨机器续接后完成） |
+| Phase 1 | 消息 MVP | [>] 下一步 |
 | Phase 2 | 媒体 | [ ] 未开始 |
 | Phase 3 | 移动端集成 | [ ] 未开始 |
 | Phase 4 | 加固 | [ ] 未开始 |
@@ -26,18 +26,18 @@
 
 **目标：** 验证"设备密钥 → 一次性配置 → Space Key → 加解密 → 认证"全链路跑通，Server 只见密文。
 
-- [ ] 产出 `docs/E2EE.md`（密钥层级、派生、一次性配置的密钥分发、轮换、恢复细节）
-- [ ] 产出 `docs/SETUP.md`（一次性配置手册：两台设备 + 服务器白名单操作步骤）
-- [ ] 产出 `docs/PROTOCOL.md`（REST + WebSocket 消息格式、版本化）
-- [ ] 产出 `docs/DATABASE.md`（双端 schema 与迁移）
-- [ ] 搭建 monorepo 骨架：`app/`（Flutter）、`cli/`（Dart CLI 测试端）、`server/`（Node+TS）、`shared/`（纯 Dart 核心包）、`deployment/`、`docs/`
-- [ ] `shared/` 核心包：crypto（libsodium 封装）、protocol（类型与契约）、sync（状态机）——纯 Dart，App 与 CLI 共用
-- [ ] CLI 测试端：`dart run` 无 UI，作为"第二台设备"跑完整流程
-- [ ] Client：Flutter + sodium_libs，生成 Device Key，Keychain/Keystore 存取
-- [ ] Server：加载静态白名单（config.json）+ challenge-response 认证
-- [ ] 一次性配置工具：生成 Space Key、分别密封、写入两端、登记白名单
-- [ ] 消息：客户端加密上传，Server 只存密文，对方解密
-- [ ] 验收：A（CLI）加密 → Server 只见密文 → B（CLI）解密
+- [x] 产出 `docs/E2EE.md`（密钥层级、派生、一次性配置的密钥分发、轮换、恢复细节）
+- [x] 产出 `docs/SETUP.md`（一次性配置手册：两台设备 + 服务器白名单操作步骤）
+- [x] 产出 `docs/PROTOCOL.md`（REST + WebSocket 消息格式、版本化）
+- [x] 产出 `docs/DATABASE.md`（双端 schema 与迁移）
+- [x] 搭建 monorepo 骨架：`app/`（Flutter）、`cli/`（Dart CLI 测试端）、`server/`（Node+TS）、`shared/`（纯 Dart 核心包）、`deployment/`、`docs/`
+- [x] `shared/` 核心包：crypto（libsodium 封装）、protocol（类型与契约）、sync（状态机）——纯 Dart，App 与 CLI 共用
+- [x] CLI 测试端：`dart run` 无 UI，作为"第二台设备"跑完整流程
+- [x] Client：Flutter + sodium_libs，生成 Device Key，Keychain/Keystore 存取 —— **骨架完成**（app/ 已生成并接入 shared；安全存储与消息界面归 Phase 1/3）
+- [x] Server：加载静态白名单（config.json）+ challenge-response 认证
+- [x] 一次性配置工具：生成 Space Key、分别密封、写入两端、登记白名单（CLI `config`/`import` 命令）
+- [x] 消息：客户端加密上传，Server 只存密文，对方解密
+- [x] 验收：A（CLI）加密 → Server 只见密文 → B（CLI）解密（`cli/test/e2e.sh` 全过）
 
 ## Phase 1 — 消息 MVP（估算 5–10 天）
 

@@ -272,8 +272,31 @@ async function main(): Promise<void> {
 
     console.log("✅ 冒烟测试全部通过：认证 / E2EE 密文 / 幂等 / 同步 / 白名单 / 明文隔离 / WS 实时");
   } finally {
-    serverProc?.kill("SIGTERM");
-    rmSync(tempDir, { recursive: true, force: true });
+    // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，
+    // 否则 app.db 句柄未释放，rmSync 会报 EBUSY。
+    await new Promise<void>((done) => {
+      if (!serverProc || serverProc.exitCode !== null) {
+        done();
+        return;
+      }
+      const timer = setTimeout(() => {
+        serverProc?.kill("SIGKILL");
+        done();
+      }, 3000);
+      serverProc.once("exit", () => {
+        clearTimeout(timer);
+        done();
+      });
+    });
+    // 兜底：句柄释放延迟时重试清理
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
   }
 }
 
