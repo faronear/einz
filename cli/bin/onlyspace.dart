@@ -5,7 +5,6 @@ import 'package:args/args.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:onlyspace_shared/onlyspace_shared.dart';
 
-import 'package:onlyspace_cli/client.dart';
 import 'package:onlyspace_cli/store.dart';
 
 /// OnlySpace CLI 测试端（无 UI，Phase 0–4 测试驱动）。

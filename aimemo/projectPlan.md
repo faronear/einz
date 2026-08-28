@@ -15,9 +15,9 @@
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | Phase 0 | 架构 + 密码学 PoC | [x] 已完成（#16 app 骨架于跨机器续接后完成） |
-| Phase 1 | 消息 MVP | [>] 下一步 |
-| Phase 2 | 媒体 | [ ] 未开始 |
-| Phase 3 | 移动端集成 | [ ] 未开始 |
+| Phase 1 | 消息 MVP | [x] 已完成（CLI 测试端：离线队列/自动同步/WS 实时） |
+| Phase 2 | 媒体 | [x] 已完成（CLI 测试端：附件加密上传/下载/解密闭环） |
+| Phase 3 | 移动端集成 | [>] 代码层完成（drift 本地库/签名 APK），真机验证待环境 |
 | Phase 4 | 加固 | [ ] 未开始 |
 
 ---
@@ -54,9 +54,13 @@
 
 ## Phase 3 — 移动端集成（估算 3–7 天）
 
-- [ ] APNs / FCM 推送（不含正文）
-- [ ] 相机 / 麦克风 / 权限
-- [ ] iOS Ad Hoc / Android 签名 APK 构建流程
+- [x] 推送决策：**WS 兜底 + Server 占位**（FCM 大陆不可达、厂商推送需各家开发者账号，已决策不接；APNs 留待 iOS 上线，大陆可用）
+- [x] 相机 / 麦克风 / 权限（AndroidManifest 已声明 CAMERA/RECORD_AUDIO/INTERNET，真机权限流待验证）
+- [x] Android 签名 APK 构建流程（JDK 17 + SDK 36 + keystore + key.properties 签名配置，`flutter build apk --release` 产出 50MB 签名 APK 并 apksigner 验证通过）
+- [x] 客户端本地库：drift SQLite（local_messages/sync_state/local_attachments，DATABASE.md §3）——补 Phase 1 遗留
+- [x] app 接入 shared 核心包：ApiClient 上移 shared（App/CLI 共用）、MessageRepository（发送/同步/历史/补发），6 项单测全过
+- [ ] **iOS 明确跳过**（Windows 无 Xcode；APNs/Ad Hoc 留待 Mac 环境，见 worklog 决策记录）
+- [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
 
 ## Phase 4 — 加固（估算 3–7 天）
 

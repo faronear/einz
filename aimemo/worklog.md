@@ -202,3 +202,30 @@
 **验证：** server 冒烟全过、shared 9 单测全过、cli analyze 无警告、三个 e2e 脚本（Phase 0/1/2）全部通过（回归无破坏）。
 
 **Phase 2 剩余：** 附件分片上传、本地解密缓存目录管理（App 私有目录）留待移动端集成（Phase 3）。
+
+### Phase 3 移动端集成（Windows：工具链 + drift 本地库 + 签名 APK；iOS 跳过）
+
+**范围确认（老板决策）：** ① 安装 Android 工具链做完整签名 APK 构建；② 推送**不接 FCM**（FCM 在中国大陆不可达，与产品定位矛盾）→ 决策 **WS 兜底 + Server 推送占位**（APNs 大陆可用，留待 iOS 上线；厂商推送需各家开发者账号，暂不接）；③ **iOS 明确跳过**（Windows 无 Xcode，APNs/Ad Hoc 留待 Mac 环境）。
+
+**环境安装（Windows，中国镜像）：**
+
+- JDK 17.0.20.1（Temurin，清华 Adoptium 镜像）→ `D:\devtools\jdk`，JAVA_HOME 已设。
+- Android SDK：cmdline-tools（dl.google.com 可达）+ platform-tools + platforms;android-35/36 + build-tools;35.0.0 + NDK/CMake → `D:\Android\Sdk`，ANDROID_HOME 已设，flutter doctor 全绿。
+
+**实现：**
+
+- `shared/`：**ApiClient 从 cli 上移 shared**（`src/protocol/api_client.dart`，App/CLI 共用），cli/client.dart 改为 re-export。
+- `app/`：
+  - `data/local_database.dart`：**drift SQLite 本地库**（DATABASE.md §3：local_messages / local_attachments / sync_state / drafts / app_state），build_runner 生成（**踩坑：build_runner 的 AOT 编译在中文路径写入失败 → 用 `--force-jit`**；`library;` 指令必须在 import 之前）。
+  - `data/message_repository.dart`：**MessageRepository**（发送=加密→落库 pending→尝试上传；同步=has_more 翻页→落库→推进锚点→补发队列；历史=解密展示），把 Phase 1 的 CLI 状态机完整搬到 drift 上。**6 项单测全过**（离线入队/在线发送/翻页同步/补发无重复/锚点不倒退/widget 骨架）。
+  - Android：Manifest 声明 INTERNET/CAMERA/RECORD_AUDIO（uses-feature 非必需）；keystore（D:\devtools\android-keystore，不入库）+ key.properties（app/android/，.gitignore 忽略）+ build.gradle.kts 签名配置（无 key.properties 时回退 debug 签名）。
+
+**APK 构建（Phase 3 关键验证）与中文路径大坑：**
+
+- 中文路径（`product-产品`）导致 Flutter AOT 工具链全线失败：`flutter analyze` LSP 崩、build_runner AOT 写入失败、**`gen_snapshot` 读 app.dill 时路径乱码**、Gradle 的 `libdartjni.so` "expected output but none"（文件其实已生成）。尝试 `chcp 65001`、8.3 短路径（`PRODUC~1`）、junction（`D:\only-build`）**均无效**——flutter.bat 内部解析回真实中文路径。
+- **解决方案（老板批准外部临时构建）**：复制仓库到纯 ASCII 路径 `D:\build-onlyspace` 构建 → `flutter build apk --release` 成功产出 **50MB app-release.apk** → apksigner 验证签名（CN=OnlySpace）→ 产物拷回 `app/build/` → 删除临时目录。
+- 其余踩坑：Gradle 9.3.1 distribution 从 services.gradle.org 下载失败 → 腾讯云镜像；`android.overridePathCheck=true` 放行非 ASCII 路径；build.gradle.kts 需 `import java.util.Properties`（Kotlin DSL）。
+
+**验证（全部通过）：** server 冒烟、shared 9 单测、cli analyze + 三 e2e 脚本回归、app dart analyze + flutter test 6 项、签名 APK 构建。
+
+**遗留：** 真机验证（权限流/WS 长连接/后台保活）待 Android 真机；iOS（Info.plist 权限声明、APNs、Ad Hoc）留待 Mac 环境；`flutter analyze`/`flutter build` 在中文路径的已知缺陷 → 老板已决定以后迁移到无中文路径。
