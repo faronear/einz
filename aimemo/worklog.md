@@ -60,3 +60,27 @@
 - 初始化 git 仓库，首次提交 `c6f4bfd`（目录改名 + 文档重写）。
 - `aimemo/productLens.zhcn.md` 更新至 v2.1：§1.1 部署形态前提、§2.3 静态白名单、§3.2 威胁表收窄、§5 改"一次性人工配置"、§8.2/8.3 服务端哑化（config.json 白名单）、§14/15/16/17 同步更新。
 - `aimemo/projectPlan.md` 同步：Phase 0 增加 `docs/SETUP.md` 与一次性配置工具任务，删除配对任务。
+
+### 第三轮：Web/电脑端探讨与 CLI 测试端决策
+
+**背景：** 老板询问"Flutter 能否支持 Web 客户端"，展开客户端形态讨论。
+
+**讨论结论：**
+
+- Flutter 技术上支持 Web（WASM+JS），但 **Web 会破坏 E2EE 核心信任模型**：浏览器每次从服务器下载代码，服务器被攻破即可注入恶意代码读取明文/密钥，E2EE 降级为"传输加密 + 服务器诚实"。这是所有 Web E2EE（WhatsApp/Telegram/Signal Web）的固有缺陷。
+- 若需求是"在电脑上用"，**Flutter 桌面端**优于 Web：dart:ffi + `sodium_libs` + 系统 Keychain 全可用，几乎零额外适配。
+- 老板真实需求：电脑端需要但可后置，**先用 CLI 验证功能与流程**（无 UI，可脚本化）。
+
+**老板决策（第三轮）：**
+
+| 决策点 | 结论 |
+| --- | --- |
+| Web 客户端 | **不做**（破坏 E2EE 信任模型，明确写入非目标） |
+| 电脑端 | 暂缓（V2 再评估：CLI 加 TUI 升级，或 Flutter 桌面端） |
+| CLI 测试端 | **Dart CLI + `shared/` 核心包**，Phase 0–4 作为测试驱动 |
+
+**产出：**
+
+- `aimemo/productLens.zhcn.md`：补回 §7.2 共享核心（shared/）、新增 §7.5 CLI 测试端、§14.1 开发工具与非目标、§14.2 V2 候选（明确不采用 Web）、§14.3 Phase 0/1 含 CLI、§15 ADR 第 10 条。
+- `aimemo/projectPlan.md`：monorepo 骨架增加 `cli/` 与 `shared/`，Phase 0 增加 shared 核心包与 CLI 任务，Phase 1 增加 CLI 双端收发验证与自动化测试脚本。
+- 提交：`86ea7d1`（第二轮）后，本轮修改待提交。

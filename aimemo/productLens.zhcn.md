@@ -267,6 +267,8 @@ Domain Services（chat / sync / crypto / media / config / push）
 Persistence（SQLite / Secure Key Storage / 本地文件）
 ```
 
+**共享核心（shared/）：** 加密、协议、同步状态机等**纯 Dart、不依赖 Flutter** 的代码放入 `shared/` 包，由 App 与 CLI 测试端共同依赖——保证"CLI 测的就是 App 跑的逻辑"（§7.5）。
+
 ### 7.3 客户端职责
 
 - 生成 Device Identity Key；私钥只存 Keychain / Keystore，**永不离开设备**。
@@ -279,6 +281,14 @@ Persistence（SQLite / Secure Key Storage / 本地文件）
 ### 7.4 本地数据（Client SQLite）
 
 本地消息、密文内容、附件元数据、同步状态（last_server_sequence）、草稿、本地应用状态。
+
+### 7.5 CLI 测试端（开发工具）
+
+V1 只做手机端；电脑端暂缓。但在开发期提供一个 **Dart CLI**（`cli/`，`dart run`，无 UI）作为测试驱动：
+
+- 与 App 共享 `shared/` 核心代码（加解密、协议、同步逻辑），可脚本化、自动化测试。
+- 充当"第二台设备"，端到端验证：一次性配置、E2EE、收发消息、离线队列、增量同步、媒体上传、撤销轮换。
+- 未来可演进为正式电脑端（加 TUI/界面即用），届时再评估 Flutter 桌面端；**不做 Web 客户端**（浏览器代码由服务器下发，破坏 E2EE 信任模型，见 worklog 决策）。
 
 ---
 
@@ -446,18 +456,20 @@ Internet ──► Caddy（HTTPS/WSS、证书、反代）──► Node.js（SQL
 
 **可选（V1 内按优先级）：** 共同回忆、私人笔记、纪念日 / 在一起的天数。
 
-**明确不做（V1 非目标）：** 好友/关注/群聊/公开主页/搜索/Feed/评论点赞；支付/订阅/广告；App Store / Google Play 上架；音视频通话；一人多设备同步；动态配对/邀请（无此场景）。
+**开发工具：** CLI 测试端（与 App 共享 `shared/` 核心代码，用于 Phase 0–4 的协议与流程验证，§7.5）。
+
+**明确不做（V1 非目标）：** 好友/关注/群聊/公开主页/搜索/Feed/评论点赞；支付/订阅/广告；App Store / Google Play 上架；音视频通话；一人多设备同步；动态配对/邀请（无此场景）；Web 客户端（破坏 E2EE 信任模型）；电脑端正式客户端（暂缓，V2 再评估）。
 
 ### 14.2 V2 候选（按需评估）
 
-共享相册、日历、富笔记、位置共享、消息表情回应、贴纸、主题、一人多设备、设备间密钥迁移、搜索、语音/视频通话（WebRTC + STUN/TURN，成熟方案，不自研）。
+共享相册、日历、富笔记、位置共享、消息表情回应、贴纸、主题、一人多设备、设备间密钥迁移、搜索、语音/视频通话（WebRTC + STUN/TURN，成熟方案，不自研）、正式电脑端（CLI 加 TUI 升级，或 Flutter 桌面端）。**明确不采用 Web 客户端**（浏览器代码由服务器下发，E2EE 降级）。
 
 ### 14.3 开发阶段（估算）
 
 | 阶段 | 内容 | 估算 |
 | --- | --- | --- |
-| Phase 0 | 架构 + 密码学 PoC（设备密钥、一次性配置、Space Key、加解密、认证） | 2–5 天 |
-| Phase 1 | 消息 MVP（Client/Server/SQLite/REST/WebSocket/文字/Sync/离线队列） | 5–10 天 |
+| Phase 0 | 架构 + 密码学 PoC（`shared/` 核心包 + CLI 测试端，设备密钥、一次性配置、Space Key、加解密、认证） | 2–5 天 |
+| Phase 1 | 消息 MVP（Server + CLI 收发验证 + SQLite/REST/WebSocket/文字/Sync/离线队列） | 5–10 天 |
 | Phase 2 | 媒体（图/视频/语音，加密上传下载、本地缓存） | 3–7 天 |
 | Phase 3 | 移动端集成（APNs/FCM、Keychain/Keystore、相机/麦克风、权限） | 3–7 天 |
 | Phase 4 | 加固（撤销+轮换、备份恢复、安全/离线/重启测试） | 3–7 天 |
@@ -491,6 +503,7 @@ docs/ARCHITECTURE.md ← 部署与运维（含备份演练）
 | 7 | 恢复模型 | V1 纯本地（模型 A），预留托管（模型 B） | 保持简单；密钥层级保留 B 的派生路径 |
 | 8 | 多设备 | 预留，V1 一人一机 | Person ≠ Device 分开建模，不阻塞未来 |
 | 9 | 部署形态 | **固定两人一空间**（删除配对流程，静态白名单） | 只服务固定两人、不分发；服务器退化为哑转发器，砍掉约 40–50% 服务端代码 |
+| 10 | CLI 测试端 | **Dart CLI + `shared/` 核心包** | 与 App 共享加解密/协议/同步代码，"CLI 测的就是 App 跑的逻辑"；无 UI 可脚本化，作为 Phase 0–4 的测试驱动；未来可升级为正式电脑端 |
 
 ---
 
