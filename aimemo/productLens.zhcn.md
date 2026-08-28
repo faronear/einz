@@ -28,10 +28,12 @@ OnlySpace 是一个专门为**两个确定的人**设计的私密通信与共享
 
 > 用尽可能简单的技术，为两个人建立一个**长期、私密、可靠、可控制**的数据空间。
 
+**部署形态（关键前提）：** 系统**只服务于固定的两个人、永远只有一个 Space、不对外分发**——设备由我们亲手安装配置，不存在"邀请陌生人加入"的场景。这一前提让架构可以大幅简化：配对流程整体删除，服务器退化为**静态白名单哑转发器**（见 §2.3、§5、§8）。
+
 ### 1.2 核心设计原则
 
 1. **一个 Space 永远只属于两个人。**
-   系统不设计通用的"好友 / 联系人 / 群组"模型；"两人"约束由**服务端数据模型**强制保证，不能只靠客户端 UI。
+   系统不设计通用的"好友 / 联系人 / 群组"模型；"两人"约束由**服务端静态白名单**强制保证（§2.3），不能只靠客户端 UI。
 2. **隐私优先。**
    Server 是传输、同步和存储服务，**不是可信的内容读取者**。用户内容在客户端加密后上传，Server 原则上只保存密文，不需要知道消息正文、图片/视频/语音内容、私人笔记。
 3. **Local-First。**
@@ -44,7 +46,7 @@ OnlySpace 是一个专门为**两个确定的人**设计的私密通信与共享
 | 类别 | 功能 |
 | --- | --- |
 | 通信 | 文字消息、图片、视频、语音消息、已读状态 |
-| 空间 | 创建 Space、邀请配对、两人绑定、纪念日、在一起的天数 |
+| 空间 | 一次性人工配置（固定两人一空间）、纪念日、在一起的天数 |
 | 内容 | 共同回忆、私人笔记 |
 | 可靠性 | 离线发送、自动同步、Push Notification、消息历史 |
 | 安全 | E2EE、服务端加密存储、设备密码学身份、设备撤销、加密备份 |
@@ -53,6 +55,7 @@ OnlySpace 是一个专门为**两个确定的人**设计的私密通信与共享
 ### 1.4 分发方式
 
 - Android：签名 APK；iOS：Ad Hoc 分发。
+- **仅安装到固定的两台设备**（我们亲手配置），不向任何第三方分发。
 - 不上架 Apple App Store / Google Play，不使用 Enterprise Certificate。
 - 无广告、无订阅、无商业化、无公开用户发现机制。
 
@@ -66,7 +69,7 @@ OnlySpace 是一个专门为**两个确定的人**设计的私密通信与共享
 | --- | --- | --- |
 | Person | Space 中的人，无账号体系 | V1 由设备密码学身份代表 |
 | Device | 物理设备，持有密钥对 | 属于某个 Person |
-| Space | 私有空间 | **恰好两个 Person**，服务端强制 |
+| Space | 私有空间（全系统唯一） | **恰好两个 Person**，静态白名单强制 |
 | Message | 消息 | 密文存储 |
 | Attachment | 大文件附件（图/视频/语音） | 独立加密 blob，消息只存元数据 |
 
@@ -86,11 +89,13 @@ Space
 - **V1 约束：一个 Person = 一个活跃 Device。**
 - 预留扩展：一个 Person = 多个 Device（影响同步协议与密钥包装，见 §4、§9）。
 
-### 2.3 "永远两个人"的服务端强制
+### 2.3 "永远两个人"的服务端强制：静态白名单
 
-- 成员关系由数据模型保证：`space_members(space_id, person_id)` 恰好 2 行，且 2 个 Person 不同。
-- 任何导致第三个成员加入的操作必须被 Server 拒绝。
-- Device 是成员的从属（属于 Person），不参与成员资格计数。
+固定两人一空间意味着**不需要动态成员管理**，改为**静态白名单**：
+
+- Server 配置文件登记**两台设备**的公钥（及其所属 Person）。
+- Server 启动时加载白名单：**不在白名单中的设备一律拒绝**认证、同步、上传——这比任何动态"拒绝第三人"逻辑都更硬。
+- 原 `space_members` 表不再需要（§8.3）；Person ≠ Device 建模保留（§2.2），为未来多设备预留。
 
 ---
 
@@ -111,13 +116,11 @@ Device A ──(TLS)── Internet ──(TLS)── Server ──(TLS)── I
 
 | 威胁 | 防护 |
 | --- | --- |
-| 配对码被窃取 / 邀请被拦截 | 配对码短期有效、一次性、绑定 Space、显式确认（§5） |
-| 未授权设备访问 | 设备公钥认证 + Space 成员校验（§8） |
+| 白名单外设备访问 | 静态白名单：配置之外一律拒绝（§2.3、§8.3） |
 | 手机丢失 | 设备撤销 + Space Key 轮换（§4、§12） |
 | Server 被入侵 / 管理员看库 | 只见密文 + 元数据，不见明文（E2EE 核心价值） |
 | Backup 泄露 | 备份保持加密，密钥不随备份明文保存（§11） |
 | Push 泄露正文 | 推送不含消息正文，仅提示（§10） |
-| 重复配对尝试 | Pairing 端点限流（§8.3） |
 
 ### 3.3 元数据边界
 
@@ -151,7 +154,7 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 要点：
 
 - **消息/附件密钥按需派生**：一个消息密钥泄露不影响其他消息；附件密钥独立于消息内容。
-- **Space Key 分发**：创建时由发起方生成，分别用两个 Device 公钥（X25519 sealed box）包装后交给 Server 保存；Server 永远接触不到 Space Key 明文。
+- **Space Key 分发**：一次性配置时生成，分别用两个 Device 公钥（X25519 sealed box）包装后由配置工具分发到两端（§5）；Server 永远接触不到 Space Key 明文。
 - **key_version**：每条密文携带其密钥版本号，密钥轮换后旧密文仍可解密。
 
 ### 4.3 消息加密格式
@@ -181,34 +184,33 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 
 ---
 
-## 5. 配对流程
+## 5. 一次性人工配置（替代配对流程）
 
-场景：Person A 创建 Space，邀请 Person B 加入。配对是**设备身份 + Space 信任 + 加密密钥交换**的一次性建立过程。
+系统固定为**两人一空间、不分发**（§1.1），不存在"邀请陌生人加入"的场景。因此**配对流程整体删除**，改为由开发者（我们）亲手完成的一次性人工配置。
 
-### 5.1 握手顺序（Server 全程只见密文）
+### 5.1 配置流程
 
 ```text
-1. A 创建 Space，生成 Space Key
-   ├── 用 A 的公钥密封 Space Key，上传 Server 保存
-   └── 生成一次性配对码（space_id + token + A 公钥），以二维码展示
-2. B 扫码 → 生成自己的 Device 密钥对
-   └── POST /pair/join（token + B 公钥）
-3. Server 校验 token（短期 / 一次性 / 绑定 Space）→ 登记 B 设备为"待确认成员"
-   └── 通知 A（WebSocket / Push）
-4. A 确认 → 客户端现场用 B 的公钥密封 Space Key，上传 Server
-5. B 拉取并解密 Space Key → 配对完成
+1. 手机 1（Person A）首次启动，生成 Device Identity Key（私钥留本机）
+2. 手机 2（Person B）首次启动，生成 Device Identity Key（私钥留本机）
+3. 配置阶段生成 Space Key
+   ├── 用 A 的公钥密封一份
+   └── 用 B 的公钥密封一份
+4. 把两台设备的公钥写入 Server 配置文件（静态白名单，§2.3）
+5. 把各自密封的 Space Key 导入对应手机（Server 只存密封密文）
 ```
 
-### 5.2 配对码约束
+### 5.2 为什么可以这样做
 
-- 短期有效；一次性；成功后立即失效。
-- 绑定具体 Space；不暴露 Space Key 明文。
-- Pairing 端点必须限流（§8.3）。
+- 原配对四步握手（创建 → 扫码 → 确认 → 转交密钥）解决的是"两个互不认识、服务器也不认识"的人安全建立关系的问题。
+- 现在设备由我们亲手安装、公钥由我们亲手登记，**信任在配置现场建立**，不需要协议级握手。
+- 服务器退化为"只认两张白名单的哑转发器"（§8）。
 
-### 5.3 为什么是"确认"而不是"扫码即加入"
+### 5.3 配置产物
 
-- 防止配对码被转发给第三人：B 提交公钥后，必须 A 显式确认才完成密钥交换。
-- 确认动作由 A 的受信设备完成，是"两人同意"在服务端的强制体现。
+- Server：`config.json`（两台设备的 device_id + public_key + 所属 Person，§8.3）。
+- 客户端：导入自己的密封 Space Key；身份私钥不出设备。
+- 配置只做一次；未来增加设备（预留的多设备能力）时，用已有可信设备作保（§16）。
 
 ---
 
@@ -232,7 +234,7 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 - SQLite 只保存附件元数据：storage_path、encrypted_size、**密文 sha256**、key_version。
 - 实际 blob 存 Server 加密文件目录（`/data/files/`，按 id 分片）。
 - 下载后解密缓存于 **App 私有目录**（加密缓存、用完清理），不写公共目录；用户明确要求时才存入系统相册。
-- 附件访问必须校验：设备已认证 + 属于该 Space 成员。
+- 附件访问必须校验：设备已认证 + 在白名单内（§2.3）。
 
 ---
 
@@ -259,7 +261,7 @@ UI（页面 / 组件）
 Application State（stores：space / chat / device）
    │
    ▼
-Domain Services（chat / sync / crypto / media / pairing / push）
+Domain Services（chat / sync / crypto / media / config / push）
    │
    ▼
 Persistence（SQLite / Secure Key Storage / 本地文件）
@@ -268,6 +270,7 @@ Persistence（SQLite / Secure Key Storage / 本地文件）
 ### 7.3 客户端职责
 
 - 生成 Device Identity Key；私钥只存 Keychain / Keystore，**永不离开设备**。
+- 一次性配置：生成/导入密钥材料、登记设备公钥、导入密封 Space Key（§5）。
 - 加密 / 解密消息与媒体（依赖 libsodium，密钥不落入普通内存缓存）。
 - 本地 SQLite 管理、离线发送队列、同步状态跟踪。
 - WebSocket 实时连接、Push 注册与处理。
@@ -302,13 +305,13 @@ Routes / Gateway
    │
    ▼
 Application Services
-   ├── Authentication（challenge-response，设备公钥验证签名）
-   ├── Pairing（创建/加入/确认 Space，一次性 token）
+   ├── Authentication（challenge-response，白名单内公钥验证签名）
+   ├── Config（加载静态白名单：两台设备公钥）
    ├── Messaging（消息持久化、广播）
    ├── Synchronization（per-space 单调序列，增量拉取）
-   ├── Attachments（加密 blob 存取、成员校验）
+   ├── Attachments（加密 blob 存取、白名单校验）
    ├── Push（APNs / FCM 转发，不含正文）
-   └── Devices（注册、列表、撤销）
+   └── Devices（列表、撤销）
    │
    ▼
 Repositories（SQLite + File Storage）
@@ -316,13 +319,11 @@ Repositories（SQLite + File Storage）
 
 ### 8.3 服务端要点
 
-- **无账号体系**：不设 username / password / email；身份 = 已注册的 Device 公钥。认证 = 证明持有对应私钥（challenge-response）。
-- **数据模型要点：**
+- **无账号体系 + 静态白名单**：不设 username / password / email；身份 = 白名单内的 Device 公钥（由配置文件定义，§5）。认证 = 证明持有对应私钥（challenge-response）。
+- **数据模型要点：**（固定两人一空间，`spaces` / `space_members` 表不再需要，由配置文件表达）
 
 ```text
-spaces(id, created_at)
-space_members(space_id, person_id)      ← 恰好 2 行，服务端强制"永远两个人"
-devices(device_id, person_id, public_key, status, last_seen)
+config.json：{ space_id, devices: [{device_id, person_id, public_key, status}] }
 messages(id, space_id, sender_device_id, type, key_version, nonce, ciphertext,
          created_at, server_sequence)   ← server_sequence 为 per-space 单调序列
 attachments(id, message_id, storage_path, encrypted_size, sha256, key_version, created_at)
@@ -330,8 +331,8 @@ push_tokens(device_id, platform, token, updated_at)
 sync_state(...)                          ← 客户端增量同步锚点
 ```
 
-- **两条硬规则：** ① Server 先持久化消息，再广播/推送；② 任何消息、附件读取都先校验"设备已认证 + 属于该 Space"。
-- **防护：** 对认证、配对、附件上传、API、WebSocket 做基本限流（尤其 Pairing）；日志禁止包含任何用户内容与密钥；错误响应不暴露内部实现细节（如 SQL、路径）。
+- **两条硬规则：** ① Server 先持久化消息，再广播/推送；② 任何消息、附件读取都先校验"设备已认证 + 在白名单内"。
+- **防护：** 对认证、附件上传、API、WebSocket 做基本限流；日志禁止包含任何用户内容与密钥；错误响应不暴露内部实现细节（如 SQL、路径）。
 
 ---
 
@@ -352,7 +353,7 @@ sync_state(...)                          ← 客户端增量同步锚点
 
 ### 9.3 实时通道
 
-- WebSocket 用于实时消息、同步事件、投递状态；REST 用于配对、认证、初次同步、附件上传下载、设备管理、备份。
+- WebSocket 用于实时消息、同步事件、投递状态；REST 用于认证、初次同步、附件上传下载、设备管理、备份（一次性配置在安装阶段完成，不走运行时 API）。
 - 顺序保证：Server 先持久化，再广播（§8.3）。
 
 ---
@@ -385,7 +386,7 @@ OnlySpace 的数据具有长期价值，备份是 V1 必须项。备份内容：
 ### 11.3 客户端备份 / 换机恢复（V1：纯本地，模型 A）
 
 - App 内可导出**加密备份**，密钥由用户**离线保存的恢复码**派生（助记词 / 打印二维码）。
-- 新设备：安装 → 输入恢复码 → 解密导入备份 → 重新注册设备身份并配对。
+- 新设备：安装 → 输入恢复码 → 解密导入备份 → 重新生成设备身份并登记入白名单（§5 配置流程）。
 - 责任边界：恢复码是"两台设备同时丢失"时的最后保险，须明确提示用户妥善保存；**Server 不接触恢复材料**。
 
 ### 11.4 预留（模型 B，Signal PIN 模式）
@@ -433,7 +434,7 @@ Internet ──► Caddy（HTTPS/WSS、证书、反代）──► Node.js（SQL
 
 **核心（必须）：**
 
-1. 创建 Space / 邀请配对 / 两人绑定
+1. 一次性人工配置（静态白名单 + Space Key 分发）
 2. 设备身份认证（challenge-response）
 3. E2EE（密钥层级、消息与媒体加密）
 4. 文字消息
@@ -445,7 +446,7 @@ Internet ──► Caddy（HTTPS/WSS、证书、反代）──► Node.js（SQL
 
 **可选（V1 内按优先级）：** 共同回忆、私人笔记、纪念日 / 在一起的天数。
 
-**明确不做（V1 非目标）：** 好友/关注/群聊/公开主页/搜索/Feed/评论点赞；支付/订阅/广告；App Store / Google Play 上架；音视频通话；一人多设备同步。
+**明确不做（V1 非目标）：** 好友/关注/群聊/公开主页/搜索/Feed/评论点赞；支付/订阅/广告；App Store / Google Play 上架；音视频通话；一人多设备同步；动态配对/邀请（无此场景）。
 
 ### 14.2 V2 候选（按需评估）
 
@@ -455,18 +456,19 @@ Internet ──► Caddy（HTTPS/WSS、证书、反代）──► Node.js（SQL
 
 | 阶段 | 内容 | 估算 |
 | --- | --- | --- |
-| Phase 0 | 架构 + 密码学 PoC（设备密钥、配对、Space Key、加解密、认证） | 2–5 天 |
+| Phase 0 | 架构 + 密码学 PoC（设备密钥、一次性配置、Space Key、加解密、认证） | 2–5 天 |
 | Phase 1 | 消息 MVP（Client/Server/SQLite/REST/WebSocket/文字/Sync/离线队列） | 5–10 天 |
 | Phase 2 | 媒体（图/视频/语音，加密上传下载、本地缓存） | 3–7 天 |
 | Phase 3 | 移动端集成（APNs/FCM、Keychain/Keystore、相机/麦克风、权限） | 3–7 天 |
 | Phase 4 | 加固（撤销+轮换、备份恢复、安全/离线/重启测试） | 3–7 天 |
 
-总计约 16–36 天（有经验全栈 + AI 辅助），现实目标：4–6 周完成可长期使用的 iOS + Android MVP。若先只做文字 + 配对 + E2EE + 同步，可明显更快。
+总计约 16–36 天（有经验全栈 + AI 辅助），现实目标：4–6 周完成可长期使用的 iOS + Android MVP。若先只做文字 + 一次性配置 + E2EE + 同步，可明显更快（配置流程替代配对，进一步减少工作量）。
 
 ### 14.4 配套文档计划（编码前优先完成）
 
 ```text
-docs/E2EE.md      ← 最高优先级：密钥层级、派生、配对握手、轮换、恢复细节
+docs/E2EE.md      ← 最高优先级：密钥层级、派生、一次性配置的密钥分发、轮换、恢复细节
+docs/SETUP.md     ← 一次性配置手册（两台设备 + 服务器白名单的操作步骤）
 docs/PROTOCOL.md  ← 协议唯一权威（REST + WebSocket 消息格式、版本化）
 docs/DATABASE.md  ← 双端 SQLite schema 与迁移
 docs/ARCHITECTURE.md ← 部署与运维（含备份演练）
@@ -488,16 +490,17 @@ docs/ARCHITECTURE.md ← 部署与运维（含备份演练）
 | 6 | 实时/请求 | REST + WebSocket 结合 | 请求-响应用 REST，实时事件用 WS |
 | 7 | 恢复模型 | V1 纯本地（模型 A），预留托管（模型 B） | 保持简单；密钥层级保留 B 的派生路径 |
 | 8 | 多设备 | 预留，V1 一人一机 | Person ≠ Device 分开建模，不阻塞未来 |
+| 9 | 部署形态 | **固定两人一空间**（删除配对流程，静态白名单） | 只服务固定两人、不分发；服务器退化为哑转发器，砍掉约 40–50% 服务端代码 |
 
 ---
 
 ## 16. Open Questions（待评审）
 
-- [ ] 配对码二维码的具体载荷与长度约束（§5.1 握手细节 → E2EE.md）。
+- [ ] 一次性配置的具体操作形式：命令行工具 / 配置界面 / 二维码，及其产物格式（→ SETUP.md）。
 - [ ] 消息删除语义：本地删 / 双方删 / 服务端删 的具体规则（V1 先定义清楚再实现）。
 - [ ] 已读回执的粒度（sent / delivered / read）与展示方式。
 - [ ] 模型 B（托管恢复）的密钥派生路径细节（仅设计预留，不实现）。
-- [ ] 一人多设备时同步协议与密钥包装的扩展方式（V2 前再定）。
+- [ ] 一人多设备时，新设备加入的"可信设备作保"流程（V2 前再定，§5.3）。
 - [ ] 音视频通话的 WebRTC 方案选型（V2 再评估）。
 
 ---
@@ -510,8 +513,8 @@ docs/ARCHITECTURE.md ← 部署与运维（含备份演练）
 - 禁止自己实现加密算法或自定义 construction（只用 libsodium 标准原语）。
 - 禁止把媒体明文放进公共存储。
 - 禁止在 Push Notification 中发送消息正文。
-- 禁止相信客户端自报的 Space 成员资格（服务端必须校验）。
-- 禁止只靠 UI 限制"两个人"（服务端数据模型强制）。
+- 禁止相信客户端自报的 Space 成员资格（服务端按白名单校验，§2.3）。
+- 禁止只靠 UI 限制"两个人"（服务端静态白名单强制）。
 - 禁止直接复制正在运行的 SQLite 文件作为备份（用官方 Backup API）。
 - 禁止使用 iOS Enterprise Certificate 做私有分发。
 

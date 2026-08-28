@@ -4,6 +4,7 @@
 > 状态标记：`[ ]` 待办、`[>]` 进行中、`[⏸]` 被阻塞、`[x]` 已完成。
 
 - **产品：** OnlySpace — 两个人的私密聊天与共享私人空间
+- **部署形态：** 固定两人一空间、不分发（静态白名单，无动态配对）
 - **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.0）
 - **最后更新：** 2026-08-28
 
@@ -23,15 +24,16 @@
 
 ## Phase 0 — 架构 + 密码学 PoC（估算 2–5 天）
 
-**目标：** 验证"设备密钥 → 配对 → Space Key → 加解密 → 认证"全链路跑通，Server 只见密文。
+**目标：** 验证"设备密钥 → 一次性配置 → Space Key → 加解密 → 认证"全链路跑通，Server 只见密文。
 
-- [ ] 产出 `docs/E2EE.md`（密钥层级、派生、配对握手、轮换、恢复细节）
+- [ ] 产出 `docs/E2EE.md`（密钥层级、派生、一次性配置的密钥分发、轮换、恢复细节）
+- [ ] 产出 `docs/SETUP.md`（一次性配置手册：两台设备 + 服务器白名单操作步骤）
 - [ ] 产出 `docs/PROTOCOL.md`（REST + WebSocket 消息格式、版本化）
 - [ ] 产出 `docs/DATABASE.md`（双端 schema 与迁移）
 - [ ] 搭建 monorepo 骨架：`app/`（Flutter）、`server/`（Node+TS）、`shared/`、`deployment/`、`docs/`
 - [ ] Client：Flutter + sodium_libs，生成 Device Key，Keychain/Keystore 存取
-- [ ] Server：设备注册 + challenge-response 认证
-- [ ] 配对：创建 Space → 配对码 → join → 确认 → Space Key 密封交换
+- [ ] Server：加载静态白名单（config.json）+ challenge-response 认证
+- [ ] 一次性配置工具：生成 Space Key、分别密封、写入两端、登记白名单
 - [ ] 消息：客户端加密上传，Server 只存密文，对方解密
 - [ ] 验收：A 加密 → Server 只见密文 → B 解密
 
@@ -64,6 +66,6 @@
 
 ## 待定事项（承接 productLens §16 Open Questions）
 
-- [ ] 配对码二维码载荷细节 → 归入 E2EE.md
+- [ ] 一次性配置的具体操作形式（命令行 / 配置界面 / 二维码）→ 归入 SETUP.md
 - [ ] 消息删除语义
 - [ ] 已读回执粒度
