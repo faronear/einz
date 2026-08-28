@@ -1,0 +1,13 @@
+{
+  "name": "only",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "syncAgentRule": "node -e \"fetch('https://git.tic.cc/opx/sysconfig/raw/branch/main/agents/syncAgentRule.mjs').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text()}).then(async t=>{await import('data:text/javascript;base64,'+Buffer.from(t).toString('base64'))})\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
