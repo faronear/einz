@@ -229,3 +229,27 @@
 **验证（全部通过）：** server 冒烟、shared 9 单测、cli analyze + 三 e2e 脚本回归、app dart analyze + flutter test 6 项、签名 APK 构建。
 
 **遗留：** 真机验证（权限流/WS 长连接/后台保活）待 Android 真机；iOS（Info.plist 权限声明、APNs、Ad Hoc）留待 Mac 环境；`flutter analyze`/`flutter build` 在中文路径的已知缺陷 → 老板已决定以后迁移到无中文路径。
+
+### Phase 4 加固：设备撤销/密钥轮换 + 备份恢复 + 安全韧性测试
+
+**背景：** 老板确认继续 Phase 4 加固。探索结论：撤销路由（devices.ts + notifyRevoked）已在 Phase 0 建好，但 **key.rotation WS 通知未接**（app.ts 注释明说留到 Phase 4）、shared 无 pwhash/备份封装、Server 无备份脚本。
+
+**shared（新增 2 文件 + 4 单测，13 项全过）：**
+
+- `src/crypto/backup.dart`：恢复码（12 词助记词表）+ `deriveBackupKey`（**Argon2id**，`sodium_sumo` 的 pwhash——注意普通 `sodium()` 实例的 pwhash 被 deprecated，须用 `SodiumSumoInit.init2`）+ `encryptBackup/decryptBackup`（XChaCha20-Poly1305，文件头 {format, salt, nonce, ciphertext}，E2EE.md §10）。**踩坑：** 初版 encryptBackup 由调用方传 backupKey、内部另生成 salt 导致解密密钥不匹配 → 改为内部统一生成 salt 派生密钥。
+- `src/crypto/keyring.dart`：`SpaceKeyRing`（current + archived 归档结构，E2EE.md §9.2），`rotate()` 递增 key_version 并归档旧密钥，`keyForVersion()` 按版本取密钥。
+
+**Server（备份 + 撤销感知修复）：**
+
+- `src/backup.ts` + `scripts/backup.ts` / `scripts/restore.ts`（npm run backup/restore）：**SQLite 官方 Backup API** 在线备份 app.db（读写中可安全备份）+ files/ + config.json → **AES-256-GCM 加密归档**到 backups/（密钥 ONLYSPACE_BACKUP_KEY，base64 32B）。**演练通过**：产生 2 条消息 → 备份（verify 校验）→ 删 app.db → restore → 重启 server → B 同步出全部消息。
+- **发现并修复撤销不生效的 bug**：`isActiveDevice` 原来只查静态 config.json，撤销只改数据库 → 被撤销设备仍能认证。修复：① server 启动时 `syncWhitelistToDb` 把白名单登记进 devices 表（INSERT OR IGNORE，撤销状态不被覆盖）；② `isActiveDevice` 叠加数据库 status 校验（revoked 即拒）。**同时修正 key.rotation 通知方向**：应发给"除被撤销设备外"的剩余设备（含撤销发起者），不是排除发起者。
+
+**CLI（撤销/轮换/备份/历史命令）：**
+
+- `rotate` 命令：当前 Space Key 归档（key_version+1）+ 新密钥 seal 给对方（E2EE.md §9.1）；`import` 支持 `--key-version`（轮换导入自动归档旧密钥）；`history` 命令：本地历史按 key_version 选密钥解密（归档 v1 解旧消息、当前 v2 解新消息）；`backup/restore` 命令；listen 处理 `key.rotation` / `device.revoked` 帧。
+- **发现并修复 key_version 未传递 bug**：`send` 调 encryptMessage 未传 keyVersion（默认 1）→ 轮换后新消息仍标 v1、解密错拿归档密钥 → 补 `keyVersion: store.keyVersion`。
+- `test/phase4_e2e.sh`（新）：**验收全过**——段 A：撤销 B → A 收 key.rotation 通知 → B 认证 403 / sync 401；段 B：A 轮换（v1→v2 归档）→ history 双版本解密成功；段 C：离线入队→恢复补发（回归）；段 D：服务重启后 sync 正常 + 本地历史完好；段 E：白名单外 403；段 F：篡改检测（shared 单测 AAD 绑定 + fetch sha256 校验覆盖）。
+
+**验证（全部通过）：** server 冒烟、shared 13 单测、cli analyze 无警告、四个 e2e 脚本（Phase 0/1/2/4）全部通过。
+
+**遗留：** 备份加密密钥（ONLYSPACE_BACKUP_KEY）的保管与轮换策略待部署文档明确；附件解密缓存清理策略；真机/iOS 待环境（同 Phase 3 遗留）。

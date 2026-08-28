@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { WebSocketServer } from "ws";
-import { loadConfig, type ServerConfig } from "./config.js";
-import { openDb } from "./db.js";
+import { loadConfig, syncWhitelistToDb, type ServerConfig } from "./config.js";
+import { getDb, openDb } from "./db.js";
 import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment } from "./attachments.js";
@@ -12,6 +12,7 @@ import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked } from 
 const PORT = Number(process.env.PORT ?? 3000);
 const cfg: ServerConfig = loadConfig();
 openDb();
+syncWhitelistToDb(cfg);
 
 const server = createServer(async (req, res) => {
   try {
@@ -105,8 +106,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "DELETE" && devMatch) {
     const result = revokeDevice(cfg, bearer(req), devMatch[1]);
     notifyRevoked(devMatch[1]);
-    // 注：Space Key 轮换由剩余可信设备在客户端发起（E2EE.md §9.1），Server 只返回
-    // key_rotation_required 信号；key.rotation WS 事件在 Phase 4 实现。
+    // Space Key 轮换由剩余可信设备在客户端发起（E2EE.md §9.1）；
+    // key.rotation 通知发给"除被撤销设备外"的所有剩余设备（含撤销发起者），
+    // 用已入库消息的最大 key_version+1 作为建议版本（PROTOCOL.md §8.2）。
+    const maxVersion = (getDb()
+      .prepare(`SELECT COALESCE(MAX(key_version), 0) + 1 AS next FROM messages`)
+      .get() as { next: number }).next;
+    notifyKeyRotation(devMatch[1], maxVersion);
     sendJson(res, 200, result);
     return;
   }

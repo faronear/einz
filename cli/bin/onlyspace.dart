@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:args/args.dart';
 import 'package:crypto/crypto.dart' as crypto;
@@ -35,7 +36,10 @@ Future<void> main(List<String> args) async {
     ..addOption('type', help: '附件类型: image|video|voice（attach 用，默认按扩展名推断）')
     ..addOption('caption', help: '附件消息描述文本（attach 用，默认文件名）')
     ..addOption('attachment-id', help: '要下载的附件 ID（fetch 用）')
-    ..addOption('out', help: '下载输出的本地文件路径（fetch 用，默认当前目录）');
+    ..addOption('out', help: '下载输出的本地文件路径（fetch 用）/ 备份输出文件（backup 用）')
+    ..addOption('in', help: '备份输入文件（restore 用）')
+    ..addOption('recovery-code', help: '12 词恢复码（restore 用；backup 会自动生成并打印）')
+    ..addOption('key-version', help: '导入的 Space Key 版本号（import 用，默认 1；轮换导入时用新版本）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
   final opts = parser.parse(rest);
@@ -61,6 +65,14 @@ Future<void> main(List<String> args) async {
       await _cmdAttach(opts);
     case 'fetch':
       await _cmdFetch(opts);
+    case 'backup':
+      await _cmdBackup(opts);
+    case 'restore':
+      await _cmdRestore(opts);
+    case 'rotate':
+      await _cmdRotate(opts);
+    case 'history':
+      await _cmdHistory(opts);
     case 'help':
     default:
       stdout.writeln(parser.usage);
@@ -140,17 +152,25 @@ Future<void> _cmdConfig(ArgResults opts) async {
 }
 
 Future<void> _cmdImport(ArgResults opts) async {
-  final store = DeviceStore.load(_require(opts, 'store'));
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
   final sealedFile = _require(opts, 'sealed-file');
   final spaceId = _require(opts, 'space-id');
+  final keyVersion = int.tryParse(opts['key-version'] as String? ?? '1') ?? 1;
   final s = await sodium();
 
   final sealed = base64Decode(File(sealedFile).readAsStringSync().trim());
   final opened = await sealOpen(s, sealed, store.publicKeyBytes, store.privateKeyBytes);
+
+  // 轮换导入（--key-version > 当前）：旧密钥归档（E2EE.md §9.2），写入新版本密钥
+  if (keyVersion > store.keyVersion && store.spaceKey != null) {
+    store.archivedSpaceKeys.add({'key_version': store.keyVersion, 'space_key': store.spaceKey});
+  }
   store.spaceKey = base64Encode(opened);
   store.spaceId = spaceId;
-  store.save(_require(opts, 'store'));
-  stdout.writeln('✅ Space Key 导入成功: ${store.deviceId}');
+  store.keyVersion = keyVersion;
+  store.save(path);
+  stdout.writeln('✅ Space Key 导入成功: ${store.deviceId}（key_version=$keyVersion）');
 }
 
 Future<void> _cmdAuth(ArgResults opts) async {
@@ -185,6 +205,7 @@ Future<void> _cmdSend(ArgResults opts) async {
     spaceId: store.spaceId!,
     senderDeviceId: store.deviceId,
     messageId: messageId,
+    keyVersion: store.keyVersion, // 轮换后新消息必须用当前 key_version（E2EE.md §9.1）
   );
 
   // 1) 先入队（幂等），保证离线不丢
@@ -242,16 +263,17 @@ Future<void> _cmdSync(ArgResults opts) async {
   final added = await _syncIncremental(store, server, after: afterOpt == null ? null : int.parse(afterOpt));
   store.save(path);
 
-  // 2) 解密并打印本次新增消息
+  // 2) 解密并打印本次新增消息（按消息 key_version 选密钥，轮换后旧消息用归档密钥）
   for (final env in added) {
+    final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey!;
     final plain = await decryptMessage(
       env: env,
-      spaceKey: base64Decode(store.spaceKey!),
+      spaceKey: base64Decode(keyB64),
       spaceId: store.spaceId!,
       keyVersion: env.keyVersion,
     );
     final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
-    stdout.writeln('[$sender seq=${env.serverSequence}] $plain');
+    stdout.writeln('[$sender seq=${env.serverSequence} v${env.keyVersion}] $plain');
   }
 
   // 3) 补发离线队列（网络已恢复时）
@@ -297,6 +319,106 @@ Future<void> _cmdFetch(ArgResults opts) async {
   final out = (opts['out'] as String?) ?? '${attachmentId.substring(0, 8)}.bin';
   File(out).writeAsBytesSync(plain);
   stdout.writeln('✅ 附件已下载并解密: $out（${plain.length} 字节）');
+}
+
+/// 备份导出（E2EE.md §10.1）：生成恢复码 → 加密导出密钥归档 + 消息历史。
+Future<void> _cmdBackup(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  final outPath = _require(opts, 'out');
+
+  // 备份内容：密钥归档 + 历史消息 + 附件元数据（JSON）
+  final payload = jsonEncode({
+    'device_id': store.deviceId,
+    'space_id': store.spaceId,
+    'key_version': store.keyVersion,
+    'space_key': store.spaceKey, // base64（测试端明文存储；App 生产走 Keychain/Keystore）
+    'history': store.history,
+    'attachments': store.attachments,
+  });
+
+  final recoveryCode = await generateRecoveryCode();
+  final file = await encryptBackup(payload: Uint8List.fromList(utf8.encode(payload)), recoveryCode: recoveryCode);
+  File(outPath).writeAsStringSync(JsonEncoder.withIndent('  ').convert(file.toJson()));
+
+  stdout.writeln('✅ 备份已导出: $outPath');
+  stdout.writeln('⚠️  恢复码（请离线妥善保存，丢失即无法恢复）:');
+  stdout.writeln('   $recoveryCode');
+}
+
+/// 恢复（E2EE.md §10.2）：输入恢复码 → 解密备份 → 展示/写回设备存储。
+Future<void> _cmdRestore(ArgResults opts) async {
+  final inPath = _require(opts, 'in');
+  final recoveryCode = _require(opts, 'recovery-code');
+  final outPath = opts['store'] as String?;
+
+  final raw = File(inPath).readAsStringSync();
+  final file = BackupFile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+  final plain = await decryptBackup(file: file, recoveryCode: recoveryCode);
+  final data = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
+
+  stdout.writeln('✅ 备份解密成功（恢复码有效）');
+  stdout.writeln('   device_id=${data['device_id']} space_id=${data['space_id']}');
+  stdout.writeln('   key_version=${data['key_version']} 历史消息=${(data['history'] as List).length} 条');
+
+  // 写回设备存储（--store 指定时；测试端恢复 = 生成新 store 并填入密钥）
+  if (outPath != null) {
+    final restored = DeviceStore(
+      deviceId: data['device_id'] as String,
+      publicKey: '', // 新设备公钥未生成：恢复后需重新 init + 登记白名单（E2EE.md §10.2 步骤 4）
+      privateKey: '',
+      spaceKey: data['space_key'] as String?,
+      spaceId: data['space_id'] as String?,
+      keyVersion: (data['key_version'] as int?) ?? 1,
+    );
+    restored.save(outPath);
+    stdout.writeln('✅ 已恢复设备存储: $outPath（提示：设备身份需重新 init 并登记白名单）');
+  }
+}
+
+/// Space Key 轮换（E2EE.md §9.1）：当前密钥归档（key_version+1），生成新密钥，
+/// seal 给对方设备，写 sealed 文件。对方用 `import --key-version N` 导入并归档旧密钥。
+Future<void> _cmdRotate(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  store.requireSpace();
+  final peerPubkey = _require(opts, 'peer-pubkey');
+  final outSealedPeer = _require(opts, 'out-sealed-peer');
+
+  final s = await sodium();
+  final newKeyB64 = await store.rotateSpaceKey();
+  final sealedPeer = await sealFor(s, base64Decode(peerPubkey), base64Decode(newKeyB64));
+  File(outSealedPeer).writeAsStringSync(base64Encode(sealedPeer));
+
+  store.save(path);
+  stdout.writeln('✅ Space Key 已轮换: key_version=${store.keyVersion}（旧版本已归档）');
+  stdout.writeln('   对方密封副本已写入: $outSealedPeer（对方执行 import --key-version ${store.keyVersion}）');
+}
+
+/// 解密本地消息历史（不依赖 Server）：按每条消息的 key_version 选密钥，
+/// 轮换后旧消息用归档密钥、新消息用当前密钥（E2EE.md §9.2）。
+Future<void> _cmdHistory(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  store.requireSpace();
+
+  final envs = store.historyEnvelopes;
+  if (envs.isEmpty) {
+    stdout.writeln('ℹ️  本地暂无消息历史');
+    return;
+  }
+  for (final env in envs) {
+    final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey!;
+    final plain = await decryptMessage(
+      env: env,
+      spaceKey: base64Decode(keyB64),
+      spaceId: store.spaceId!,
+      keyVersion: env.keyVersion,
+    );
+    final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
+    stdout.writeln('[$sender seq=${env.serverSequence ?? '-'} v${env.keyVersion}] $plain');
+  }
+  stdout.writeln('ℹ️  共 ${envs.length} 条本地消息');
 }
 
 /// 上传附件：本地文件加密 → 先发一条附件消息（type=image/video/voice）→
@@ -428,14 +550,23 @@ Future<void> _cmdListen(ArgResults opts) async {
             store.upsertHistory(env, serverSequence: seq, createdAt: createdAt);
             store.advanceAnchor(seq);
             store.save(path);
+            final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey!;
             final plain = await decryptMessage(
               env: env,
-              spaceKey: base64Decode(store.spaceKey!),
+              spaceKey: base64Decode(keyB64),
               spaceId: store.spaceId!,
               keyVersion: env.keyVersion,
             );
             final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
-            stdout.writeln('[$sender seq=$seq] $plain');
+            stdout.writeln('[$sender seq=$seq v${env.keyVersion}] $plain');
+          case 'key.rotation':
+            final payload = frame['payload'] as Map<String, dynamic>;
+            stdout.writeln('🔑 收到 Space Key 轮换通知: 建议 key_version=${payload['key_version']}');
+            stdout.writeln('   请执行 rotate --peer-pubkey <对方公钥> --out-sealed-peer <文件> 后 import');
+          case 'device.revoked':
+            final payload = frame['payload'] as Map<String, dynamic>;
+            stdout.writeln('🚫 本设备已被撤销: device_id=${payload['device_id']}');
+            return; // 被撤销：退出监听
           case 'ping':
             // 忽略服务端不应下发的类型；心跳由客户端发起
           default:

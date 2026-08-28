@@ -25,9 +25,11 @@ class DeviceStore {
     List<String>? pending,
     List<Map<String, dynamic>>? history,
     List<Map<String, dynamic>>? attachments,
+    List<Map<String, dynamic>>? archivedSpaceKeys,
   })  : pending = pending ?? [],
         history = history ?? [],
-        attachments = attachments ?? [];
+        attachments = attachments ?? [],
+        archivedSpaceKeys = archivedSpaceKeys ?? [];
 
   final String deviceId;
   final String publicKey; // base64
@@ -46,6 +48,9 @@ class DeviceStore {
 
   /// 本地附件元数据（上传/同步后落盘，解密需要 nonce/sha256/key_version）。
   final List<Map<String, dynamic>> attachments;
+
+  /// 归档 Space Key（E2EE.md §9.2）：[{key_version, space_key(base64)}]，只读用于解密旧消息。
+  final List<Map<String, dynamic>> archivedSpaceKeys;
 
   static Future<DeviceStore> create(String deviceId) async {
     final kp = await DeviceKeyPair.generate(deviceId: deviceId);
@@ -68,6 +73,7 @@ class DeviceStore {
         'pending': pending,
         'history': history,
         'attachments': attachments,
+        'archived_space_keys': archivedSpaceKeys,
       };
 
   static DeviceStore fromJson(Map<String, dynamic> json) => DeviceStore(
@@ -82,6 +88,7 @@ class DeviceStore {
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+        archivedSpaceKeys: (json['archived_space_keys'] as List?)?.cast<Map<String, dynamic>>() ?? [],
       );
 
   void save(String path) {
@@ -103,6 +110,30 @@ class DeviceStore {
     if (spaceKey == null || spaceId == null) {
       throw StateError('设备尚未导入 Space Key（先运行 config 或 import）');
     }
+  }
+
+  /// 按 key_version 取 Space Key（当前或归档）；未知版本返回 null。
+  /// 用于解密历史消息（E2EE.md §9.2：归档密钥只读，不参与新加密）。
+  String? spaceKeyForVersion(int version) {
+    if (version == keyVersion) return spaceKey;
+    for (final entry in archivedSpaceKeys) {
+      if (entry['key_version'] == version) return entry['space_key'] as String?;
+    }
+    return null;
+  }
+
+  /// 轮换 Space Key：当前密钥归档（key_version+1），生成新密钥（E2EE.md §9.1 步骤 3–4）。
+  /// 返回新 Space Key（base64）；调用方负责 seal 给对方并保存。
+  Future<String> rotateSpaceKey() async {
+    final s = await sodium();
+    final newKey = s.randombytes.buf(32);
+    final newB64 = base64Encode(newKey);
+    if (spaceKey != null) {
+      archivedSpaceKeys.add({'key_version': keyVersion, 'space_key': spaceKey});
+    }
+    spaceKey = newB64;
+    keyVersion = keyVersion + 1;
+    return newB64;
   }
 
   void requireSession() {

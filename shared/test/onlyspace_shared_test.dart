@@ -157,4 +157,85 @@ void main() {
       expect(st.lastServerSequence, 10);
     });
   });
+
+  group('备份恢复（恢复码 + Argon2id）', () {
+    test('备份加密→解密闭环，内容一致', () async {
+      final code = await generateRecoveryCode();
+      final words = code.split(' ');
+      expect(words.length, 12, reason: '恢复码应为 12 词');
+
+      final payload = Uint8List.fromList(utf8.encode('{"space_key":"secret","history":[...]}'));
+      final file = await encryptBackup(payload: payload, recoveryCode: code);
+
+      final json = file.toJson();
+      final restored = BackupFile.fromJson(json);
+      final plain = await decryptBackup(file: restored, recoveryCode: code);
+      expect(utf8.decode(plain), utf8.decode(payload));
+    });
+
+    test('错误恢复码无法解密', () async {
+      final code = await generateRecoveryCode();
+      final payload = Uint8List.fromList(utf8.encode('top-secret'));
+      final file = await encryptBackup(payload: payload, recoveryCode: code);
+
+      await expectLater(
+        decryptBackup(file: file, recoveryCode: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon'),
+        throwsA(isA<FormatException>()),
+      );
+    });
+  });
+
+  group('Space Key 轮换（归档）', () {
+    test('轮换后 key_version +1，旧密钥归档可解密旧消息', () async {
+      final s = await sodium();
+      final original = s.randombytes.buf(32);
+      final ring = await SpaceKeyRing.create(original, keyVersion: 1);
+
+      // 用 v1 密钥加密一条"旧消息"
+      final env = await encryptMessage(
+        plaintext: 'old message',
+        spaceKey: original,
+        spaceId: 'space-1',
+        senderDeviceId: 'dev-a',
+        messageId: 'msg-old',
+        keyVersion: 1,
+      );
+
+      // 轮换到 v2
+      final ring2 = await ring.rotate();
+      expect(ring2.currentVersion, 2);
+      expect(ring2.hasVersion(1), true, reason: '旧密钥应已归档');
+
+      // 新消息用 v2 加密，旧消息用归档 v1 解密
+      final newEnv = await encryptMessage(
+        plaintext: 'new message',
+        spaceKey: ring2.currentKey,
+        spaceId: 'space-1',
+        senderDeviceId: 'dev-a',
+        messageId: 'msg-new',
+        keyVersion: 2,
+      );
+      final oldPlain = await decryptMessage(
+        env: env,
+        spaceKey: ring2.keyForVersion(1)!,
+        spaceId: 'space-1',
+        keyVersion: 1,
+      );
+      final newPlain = await decryptMessage(
+        env: newEnv,
+        spaceKey: ring2.keyForVersion(2)!,
+        spaceId: 'space-1',
+        keyVersion: 2,
+      );
+      expect(oldPlain, 'old message');
+      expect(newPlain, 'new message');
+    });
+
+    test('未知 key_version 返回 null', () async {
+      final s = await sodium();
+      final ring = await SpaceKeyRing.create(s.randombytes.buf(32), keyVersion: 3);
+      expect(ring.keyForVersion(3), isNotNull);
+      expect(ring.keyForVersion(99), isNull);
+    });
+  });
 }

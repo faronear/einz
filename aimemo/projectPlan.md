@@ -17,8 +17,8 @@
 | Phase 0 | 架构 + 密码学 PoC | [x] 已完成（#16 app 骨架于跨机器续接后完成） |
 | Phase 1 | 消息 MVP | [x] 已完成（CLI 测试端：离线队列/自动同步/WS 实时） |
 | Phase 2 | 媒体 | [x] 已完成（CLI 测试端：附件加密上传/下载/解密闭环） |
-| Phase 3 | 移动端集成 | [>] 代码层完成（drift 本地库/签名 APK），真机验证待环境 |
-| Phase 4 | 加固 | [ ] 未开始 |
+| Phase 3 | 移动端集成 | [x] 代码层完成（drift 本地库/签名 APK），真机验证待环境 |
+| Phase 4 | 加固 | [x] 已完成（撤销/轮换/备份恢复/安全韧性测试，phase4_e2e.sh 全过） |
 
 ---
 
@@ -66,8 +66,10 @@
 
 - [ ] 设备撤销 + Space Key 轮换
 - [ ] 备份与恢复（模型 A：本地加密备份 + 恢复码）
-- [ ] 安全测试 / 离线 / 网络故障 / 服务重启测试
-- [ ] Server 备份脚本（SQLite Backup API）与恢复演练
+- [x] 设备撤销 + Space Key 轮换（撤销生效于认证/同步路径 + key.rotation WS 通知 + 归档密钥解旧消息）
+- [x] 备份与恢复（模型 A：本地加密备份 + 恢复码，shared backup.dart + CLI backup/restore）
+- [x] 安全测试 / 离线 / 网络故障 / 服务重启测试（phase4_e2e.sh 段 C/D/E/F 全过）
+- [x] Server 备份脚本（SQLite Backup API）与恢复演练（npm run backup/restore，演练通过）
 
 ---
 
