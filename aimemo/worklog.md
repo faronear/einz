@@ -322,3 +322,16 @@
 **构建与验证：** 外部临时构建（D:\build-onlyspace，规避中文路径，JAVA_HOME 需指到 jdk-17.0.20.1+1 子目录）→ `flutter build apk --release` 成功（55.0MB）→ apksigner 验证签名 **CN=OnlySpace** ✅ → 产物拷回 `app/build/app-release.apk`，jniLibs/pubspec 同步回源仓库。
 
 **真机首次使用流程（待老板执行）：** 装 APK → App 生成密钥 → 公钥加服务器 config.json（devices 数组新增条目）+ 重启 server 容器 → 本地 `seal` 生成副本 → App 粘贴 → 认证进聊天页。
+
+### iOS 开发启动（老板已购置 Mac；2026-08-29）
+
+**背景：** 老板确认有 Mac（macOS + Xcode），iOS 从"明确跳过"转为启动开发（projectPlan Phase 3 状态已更新）。老板选择**暂无 Apple 付费账号，APNs 验证留待**（WS/轮询兜底不受影响）。
+
+**已完成（代码层，Windows 侧）：**
+
+- `app/ios/Runner/Info.plist`：App 显示名 OnlySpace + 4 项权限声明（相机/麦克风/相册读/相册写，对齐 AndroidManifest，plist 解析验证通过）
+- **iOS libsodium 集成**：sodium_libs 包内 `ios/Libraries/libsodium.xcframework`（静态库，ios-arm64 + simulator）复制到 `app/ios/Libraries/` → 本地 `libsodium.podspec`（vendored_frameworks + -force_load，仿 sodium_libs 的 iOS 集成）→ `app/ios/Podfile`（**Flutter 3.47 默认 SPM，需 CocoaPods：`flutter config --no-enable-swift-package-manager`**）→ shared `loadDynamicLibrary` iOS 分支改 `DynamicLibrary.process()`（静态链接符号在进程内，dylib open 会失败）。shared analyze + 13 单测过
+- **APNs 接入代码**：shared ApiClient 补 `registerPushToken`/`unregisterPushToken`（+ `_delete` 辅助，对齐 PROTOCOL.md §7.3）；`AppDelegate.swift` 注册远程通知 + MethodChannel('onlyspace/apns') 传 device token；`chat_page.dart` 认证后 `_registerPushToken()`（失败静默降级）。shared analyze + 13 单测、app flutter test 6 项全过
+- `docs/IOS.md`：Mac 构建指引（clone/构建/真机签名/Ad Hoc/已知点/快速参考）
+
+**遗留/下一步（Mac 侧执行）：** ① 远程仓库推送（AtomGit PAT，`git push` 阻塞在凭据，需老板交互终端配置——见 DEPLOYMENT 相关说明）；② Mac clone → `flutter config --no-enable-swift-package-manager` → build ios 验证 libsodium 链接；③ 真机签名运行；④ APNs/Ad Hoc 待 Apple 付费账号（Server `sendPushHint` 仍为日志占位）。

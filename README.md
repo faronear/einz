@@ -22,6 +22,7 @@ aimemo/      记忆与工作空间（productLens / projectPlan / worklog / userP
 | `docs/PROTOCOL.md` | REST + WebSocket 协议唯一权威 |
 | `docs/DATABASE.md` | 双端 SQLite schema 与迁移 |
 | `docs/DEPLOYMENT.md` | **部署手册（从零部署 + 快速试用 + 备份恢复/撤销轮换运维 + 故障排查）** |
+| `docs/IOS.md` | **iOS 构建与真机验证指引（Mac 环境）** |
 | `docs/SETUP.md` | 一次性配置设计稿（命令级实作见 DEPLOYMENT.md §2/§4） |
 
 ## 快速开始（Server）

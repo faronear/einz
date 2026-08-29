@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
 
 import 'data/local_database.dart';
@@ -51,6 +53,22 @@ class _ChatPageState extends State<ChatPage> {
     _refresh();
     // 每 3 秒轮询同步（准实时；正式版用 WS listen 推送）
     _ticker = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
+    _registerPushToken();
+  }
+
+  /// iOS：认证后把 APNs device token 注册到 Server（PROTOCOL.md §7.3）。
+  /// 推送只发"有新消息"提示；注册失败不影响聊天（WS/轮询兜底）。
+  Future<void> _registerPushToken() async {
+    if (!Platform.isIOS) return;
+    try {
+      const channel = MethodChannel('onlyspace/apns');
+      final apnsToken = await channel.invokeMethod<String>('getToken');
+      if (apnsToken != null && apnsToken.isNotEmpty) {
+        await _repo.api.registerPushToken('ios', apnsToken, widget.token);
+      }
+    } catch (_) {
+      // 忽略：APNs 未就绪（模拟器/未配 entitlement）时静默降级
+    }
   }
 
   @override

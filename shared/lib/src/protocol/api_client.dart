@@ -38,6 +38,17 @@ class ApiClient {
     return PostMessageResult.fromJson(res);
   }
 
+  /// 注册 Push Token（PROTOCOL.md §7.3）：platform = ios | android。
+  /// 推送只发"有新消息"提示，绝不携带正文（productLens §10）。
+  Future<void> registerPushToken(String platform, String pushToken, String token) async {
+    await _post(Api.pushRegister, {'platform': platform, 'token': pushToken}, token: token);
+  }
+
+  /// 注销 Push Token。
+  Future<void> unregisterPushToken(String token) async {
+    await _delete(Api.pushRegister, token: token);
+  }
+
   /// 上传附件密文 blob（PROTOCOL.md §6.1）：元数据走 x-attachment-meta 头，body 为密文。
   Future<Map<String, dynamic>> postAttachment({
     required String messageId,
@@ -135,6 +146,24 @@ class ApiClient {
     final client = _client;
     try {
       final req = await client.getUrl(Uri.parse('$baseUrl$path'));
+      if (token != null) {
+        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      }
+      final res = await req.close();
+      final text = await res.transform(utf8.decoder).join();
+      if (res.statusCode >= 400) {
+        throw _errorFrom(res.statusCode, text);
+      }
+      return jsonDecode(text) as Map<String, dynamic>;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _delete(String path, {String? token}) async {
+    final client = _client;
+    try {
+      final req = await client.deleteUrl(Uri.parse('$baseUrl$path'));
       if (token != null) {
         req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       }

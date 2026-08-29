@@ -59,8 +59,9 @@
 - [x] Android 签名 APK 构建流程（JDK 17 + SDK 36 + keystore + key.properties 签名配置，`flutter build apk --release` 产出 50MB 签名 APK 并 apksigner 验证通过）
 - [x] 客户端本地库：drift SQLite（local_messages/sync_state/local_attachments，DATABASE.md §3）——补 Phase 1 遗留
 - [x] app 接入 shared 核心包：ApiClient 上移 shared（App/CLI 共用）、MessageRepository（发送/同步/历史/补发），6 项单测全过
-- [ ] **iOS 明确跳过**（Windows 无 Xcode；APNs/Ad Hoc 留待 Mac 环境，见 worklog 决策记录）
+- [x] **iOS 启动开发**（老板已购置 Mac）：Info.plist 权限声明 + libsodium 静态库集成（Podfile 本地 pod + DynamicLibrary.process）+ APNs 注册代码（ApiClient registerPushToken + AppDelegate）；构建/真机验证见 docs/IOS.md，待 Mac 执行
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
+- [ ] iOS 真机构建/签名/Ad Hoc（docs/IOS.md §3–§4）——待 Mac + Apple 付费账号（APNs 暂无账号，WS/轮询兜底）
 
 ## Phase 4 — 加固（估算 3–7 天）
 
