@@ -284,4 +284,48 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get burnOption7Days => '7 天';
+
+  @override
+  String get lockPageTitle => 'OnlySpace 已锁定';
+
+  @override
+  String get lockPagePinPrompt => '输入 PIN 解锁';
+
+  @override
+  String lockPageLockedSeconds(int seconds) {
+    return '已锁定 $seconds 秒';
+  }
+
+  @override
+  String get lockPagePinLabel => 'PIN';
+
+  @override
+  String get lockPageUnlock => '解锁';
+
+  @override
+  String get lockPageUseRecovery => '忘记 PIN？使用恢复码';
+
+  @override
+  String get lockPageRecoveryLabel => '12 词恢复码';
+
+  @override
+  String get lockPageRecoveryUnlock => '用恢复码解锁';
+
+  @override
+  String get lockPageBackToPin => '返回输入 PIN';
+
+  @override
+  String lockPageTooManyAttempts(int seconds) {
+    return '尝试次数过多，请 $seconds 秒后再试';
+  }
+
+  @override
+  String lockPageUnlockFailed(String error) {
+    return '解锁失败: $error';
+  }
+
+  @override
+  String lockPageRecoveryFailed(String error) {
+    return '恢复失败: $error';
+  }
 }

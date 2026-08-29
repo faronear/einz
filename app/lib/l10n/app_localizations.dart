@@ -577,6 +577,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'7 days'**
   String get burnOption7Days;
+
+  /// No description provided for @lockPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OnlySpace Locked'**
+  String get lockPageTitle;
+
+  /// No description provided for @lockPagePinPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter PIN to unlock'**
+  String get lockPagePinPrompt;
+
+  /// No description provided for @lockPageLockedSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked for {seconds} seconds'**
+  String lockPageLockedSeconds(int seconds);
+
+  /// No description provided for @lockPagePinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get lockPagePinLabel;
+
+  /// No description provided for @lockPageUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get lockPageUnlock;
+
+  /// No description provided for @lockPageUseRecovery.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot PIN? Use recovery code'**
+  String get lockPageUseRecovery;
+
+  /// No description provided for @lockPageRecoveryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'12-word recovery code'**
+  String get lockPageRecoveryLabel;
+
+  /// No description provided for @lockPageRecoveryUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with recovery code'**
+  String get lockPageRecoveryUnlock;
+
+  /// No description provided for @lockPageBackToPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to PIN'**
+  String get lockPageBackToPin;
+
+  /// No description provided for @lockPageTooManyAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts, try again in {seconds}s'**
+  String lockPageTooManyAttempts(int seconds);
+
+  /// No description provided for @lockPageUnlockFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock failed: {error}'**
+  String lockPageUnlockFailed(String error);
+
+  /// No description provided for @lockPageRecoveryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery failed: {error}'**
+  String lockPageRecoveryFailed(String error);
 }
 
 class _AppLocalizationsDelegate

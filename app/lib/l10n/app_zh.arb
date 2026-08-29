@@ -165,5 +165,37 @@
   "burnOption30Minutes": "30 分钟",
   "burnOption1Hour": "1 小时",
   "burnOption1Day": "1 天",
-  "burnOption7Days": "7 天"
+  "burnOption7Days": "7 天",
+  "lockPageTitle": "OnlySpace 已锁定",
+  "lockPagePinPrompt": "输入 PIN 解锁",
+  "lockPageLockedSeconds": "已锁定 {seconds} 秒",
+  "@lockPageLockedSeconds": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "lockPagePinLabel": "PIN",
+  "lockPageUnlock": "解锁",
+  "lockPageUseRecovery": "忘记 PIN？使用恢复码",
+  "lockPageRecoveryLabel": "12 词恢复码",
+  "lockPageRecoveryUnlock": "用恢复码解锁",
+  "lockPageBackToPin": "返回输入 PIN",
+  "lockPageTooManyAttempts": "尝试次数过多，请 {seconds} 秒后再试",
+  "@lockPageTooManyAttempts": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "lockPageUnlockFailed": "解锁失败: {error}",
+  "@lockPageUnlockFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "lockPageRecoveryFailed": "恢复失败: {error}",
+  "@lockPageRecoveryFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  }
 }

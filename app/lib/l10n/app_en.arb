@@ -165,5 +165,37 @@
   "burnOption30Minutes": "30 minutes",
   "burnOption1Hour": "1 hour",
   "burnOption1Day": "1 day",
-  "burnOption7Days": "7 days"
+  "burnOption7Days": "7 days",
+  "lockPageTitle": "OnlySpace Locked",
+  "lockPagePinPrompt": "Enter PIN to unlock",
+  "lockPageLockedSeconds": "Locked for {seconds} seconds",
+  "@lockPageLockedSeconds": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "lockPagePinLabel": "PIN",
+  "lockPageUnlock": "Unlock",
+  "lockPageUseRecovery": "Forgot PIN? Use recovery code",
+  "lockPageRecoveryLabel": "12-word recovery code",
+  "lockPageRecoveryUnlock": "Unlock with recovery code",
+  "lockPageBackToPin": "Back to PIN",
+  "lockPageTooManyAttempts": "Too many attempts, try again in {seconds}s",
+  "@lockPageTooManyAttempts": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "lockPageUnlockFailed": "Unlock failed: {error}",
+  "@lockPageUnlockFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "lockPageRecoveryFailed": "Recovery failed: {error}",
+  "@lockPageRecoveryFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  }
 }

@@ -507,3 +507,14 @@
 **验证：** gen-l10n 成功；analyze 无问题；flutter test **25 项全过**（含 golden 3 项更新后）；chat_page golden 已更新（界面含 🌐 按钮等变化）。
 
 **遗留：** lock_page 160 行 + main.dart 39 行含中文的文案**未在本批抽取**（后续批次）；l10n 键在 setupPage/chatPage 前缀下组织，后续页沿用。
+
+### 多语言第二批（lock_page 全量抽取；2026-08-29）
+
+**内容：**
+- ARB 加 `lockPage.*` 12 键（中英双语，含 int 占位符：`lockPageLockedSeconds(seconds)`/`lockPageTooManyAttempts(seconds)`、String 错误参数）
+- lock_page.dart 12 处替换：AppBar title、PIN 提示、锁定倒计时 label（三目：locked ? LockedSeconds : PinLabel）、解锁/恢复码入口按钮、错误消息（TooManyAttempts/UnlockFailed/RecoveryFailed）；**AppLockException 的 e.message 来自 app_lock.dart（业务消息，非本页字面量），保留原样**
+- main.dart 确认**无 UI 中文文案**（`title: 'OnlySpace'` 英文，39 行中文均为注释）→ 无需替换
+
+**验证：** gen-l10n 成功（lockPage 键生成）；analyze 无问题；flutter test **25 项全过**；lock_page golden 更新（0.31% 像素差，label 三目等渲染变化）。
+
+**状态：** 四个页面（设置/聊天/锁屏/启动）**全部中英文化完成**；剩余可选项：app_lock 业务错误消息国际化、英文文案润色。

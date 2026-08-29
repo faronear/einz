@@ -297,4 +297,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get burnOption7Days => '7 days';
+
+  @override
+  String get lockPageTitle => 'OnlySpace Locked';
+
+  @override
+  String get lockPagePinPrompt => 'Enter PIN to unlock';
+
+  @override
+  String lockPageLockedSeconds(int seconds) {
+    return 'Locked for $seconds seconds';
+  }
+
+  @override
+  String get lockPagePinLabel => 'PIN';
+
+  @override
+  String get lockPageUnlock => 'Unlock';
+
+  @override
+  String get lockPageUseRecovery => 'Forgot PIN? Use recovery code';
+
+  @override
+  String get lockPageRecoveryLabel => '12-word recovery code';
+
+  @override
+  String get lockPageRecoveryUnlock => 'Unlock with recovery code';
+
+  @override
+  String get lockPageBackToPin => 'Back to PIN';
+
+  @override
+  String lockPageTooManyAttempts(int seconds) {
+    return 'Too many attempts, try again in ${seconds}s';
+  }
+
+  @override
+  String lockPageUnlockFailed(String error) {
+    return 'Unlock failed: $error';
+  }
+
+  @override
+  String lockPageRecoveryFailed(String error) {
+    return 'Recovery failed: $error';
+  }
 }

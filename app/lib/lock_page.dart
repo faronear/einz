@@ -7,6 +7,7 @@ import 'package:onlyspace_shared/onlyspace_shared.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'l10n/app_localizations.dart';
 
 /// 锁屏页：输入 PIN 解密 Space Key 包 → 进入聊天页。
 /// 连续错误锁定倒计时；PIN 丢失可展开"使用恢复码"入口（12 词）。
@@ -111,13 +112,13 @@ class _LockPageState extends State<LockPage> {
       _enterChat(payload);
     } on AppLockLockedException catch (e) {
       if (!mounted) return;
-      setState(() => _error = '尝试次数过多，请 ${e.remainingSeconds} 秒后再试');
+      setState(() => _error = AppLocalizations.of(context)!.lockPageTooManyAttempts(e.remainingSeconds));
     } on AppLockException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = '解锁失败: $e');
+      setState(() => _error = AppLocalizations.of(context)!.lockPageUnlockFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -139,7 +140,7 @@ class _LockPageState extends State<LockPage> {
       setState(() => _error = e.message);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = '恢复失败: $e');
+      setState(() => _error = AppLocalizations.of(context)!.lockPageRecoveryFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -147,9 +148,10 @@ class _LockPageState extends State<LockPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final locked = _lockSeconds > 0;
     return Scaffold(
-      appBar: AppBar(title: const Text('OnlySpace · 已锁定')),
+      appBar: AppBar(title: Text(l10n.lockPageTitle)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -157,7 +159,9 @@ class _LockPageState extends State<LockPage> {
           children: [
             const Icon(Icons.lock_outline, size: 56),
             const SizedBox(height: 12),
-            const Text('输入 PIN 解锁', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(l10n.lockPagePinPrompt,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 24),
             if (!_showRecovery) ...[
               TextField(
@@ -166,7 +170,7 @@ class _LockPageState extends State<LockPage> {
                 enabled: !locked,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: locked ? '已锁定 $_lockSeconds 秒' : 'PIN',
+                  labelText: locked ? l10n.lockPageLockedSeconds(_lockSeconds) : l10n.lockPagePinLabel,
                   border: const OutlineInputBorder(),
                 ),
                 onSubmitted: (_) => _unlock(),
@@ -174,29 +178,29 @@ class _LockPageState extends State<LockPage> {
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: locked || _busy ? null : _unlock,
-                child: const Text('解锁'),
+                child: Text(l10n.lockPageUnlock),
               ),
               TextButton(
                 onPressed: () => setState(() => _showRecovery = true),
-                child: const Text('忘记 PIN？使用恢复码'),
+                child: Text(l10n.lockPageUseRecovery),
               ),
             ] else ...[
               TextField(
                 controller: _recovery,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: '12 词恢复码',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.lockPageRecoveryLabel,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: _busy ? null : _unlockWithRecovery,
-                child: const Text('用恢复码解锁'),
+                child: Text(l10n.lockPageRecoveryUnlock),
               ),
               TextButton(
                 onPressed: () => setState(() => _showRecovery = false),
-                child: const Text('返回输入 PIN'),
+                child: Text(l10n.lockPageBackToPin),
               ),
             ],
             if (_error != null) ...[
