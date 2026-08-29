@@ -20,6 +20,8 @@ class ChatPage extends StatefulWidget {
     required this.spaceKey,
     required this.keyVersion,
     required this.token,
+    this.db,
+    this.api,
   });
 
   final String server;
@@ -28,6 +30,12 @@ class ChatPage extends StatefulWidget {
   final Uint8List spaceKey;
   final int keyVersion;
   final String token;
+
+  /// 测试注入用；默认新建（生产路径）。
+  final LocalDatabase? db;
+
+  /// 测试注入用（fake api）；默认按 [server] 新建（生产路径）。
+  final ApiClient? api;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -45,8 +53,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _repo = MessageRepository(
-      db: LocalDatabase(),
-      api: ApiClient(widget.server),
+      db: widget.db ?? LocalDatabase(),
+      api: widget.api ?? ApiClient(widget.server),
       spaceKey: widget.spaceKey,
       spaceId: widget.spaceId,
       deviceId: widget.deviceId,

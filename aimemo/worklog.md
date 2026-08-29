@@ -363,3 +363,14 @@
 **验证：** flutter test **15 项全过**（原 10 + lock_timer 5）。analyze 无问题（顺带清理 chat_page 的 unnecessary_import）。
 
 **行为：** 聊天中切后台 ≤30s 回前台不锁；>30s 回前台弹锁屏，解锁后回到原聊天页（消息不丢）。冷启动锁屏行为不变。
+
+### 界面截图展示（golden 渲染；2026-08-29）
+
+老板暂无手机，想先看界面 → 用 **golden 测试渲染**替代模拟器截图（无 AVD、无手机、app 无桌面平台目录）：
+
+- `app/test/golden_render_test.dart`：加载系统中文字体（C:\Windows\Fonts\simhei.ttf 覆盖 'Roboto' family，否则中文渲染为方块）+ 390×844 手机尺寸，渲染 SetupPage / LockPage / ChatPage（fake api 返回 2 条 libsodium 真实加密消息）→ matchesGoldenFile 输出 PNG
+- `app/test/goldens/{setup_page,lock_page,chat_page}.png`：**UI 回归基准图**（后续 flutter test 自动比对界面变化）
+- 为此给 LockPage/ChatPage 加了 `db`/`api` 测试注入参数（生产路径默认不变）
+- 生成命令：`flutter test --update-goldens test/golden_render_test.dart`（3 项全过）
+
+**入库决定：** 老板确认 golden 截图作为 UI 基准图入库（含 golden 测试 + 注入参数改动）。

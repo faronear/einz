@@ -13,9 +13,12 @@ import 'data/local_database.dart';
 /// [asOverlay]：true = 聊天中切后台超时返回的覆盖锁屏（解锁成功 pop 回聊天页，
 /// 保留消息状态）；false = 冷启动锁屏（解锁成功 pushReplacement 进聊天页）。
 class LockPage extends StatefulWidget {
-  const LockPage({super.key, this.asOverlay = false});
+  const LockPage({super.key, this.asOverlay = false, this.db});
 
   final bool asOverlay;
+
+  /// 测试注入用；默认新建（生产路径）。
+  final LocalDatabase? db;
 
   @override
   State<LockPage> createState() => _LockPageState();
@@ -34,7 +37,7 @@ class _LockPageState extends State<LockPage> {
   @override
   void initState() {
     super.initState();
-    _lock = AppLockService(LocalDatabase());
+    _lock = AppLockService(widget.db ?? LocalDatabase());
     _refreshLockSeconds();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _refreshLockSeconds());
   }
