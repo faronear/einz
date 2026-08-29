@@ -7,6 +7,17 @@ import 'package:onlyspace_shared/onlyspace_shared.dart';
 import 'burn_after_settings.dart';
 import 'local_database.dart';
 
+/// 历史消息记录（UI 渲染单元）：env=密文信封、plaintext=明文、
+/// sender=身份判断（'me'/'peer'，person 维度）、attachment=附件元数据、
+/// expiresAt=阅后即焚到期时间（null=永久）。
+typedef HistoryMessage = ({
+  MessageEnvelope env,
+  String plaintext,
+  String sender,
+  Map<String, dynamic>? attachment,
+  int? expiresAt
+});
+
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
 /// （加密/解密、ApiClient、同步语义）接起来。
 ///
@@ -259,7 +270,9 @@ class MessageRepository {
 
   /// 读取本地历史（解密为明文，按 server_sequence 升序；未同步的排最后）。
   /// 附件消息附带本地附件元数据（attachment != null）；阅后即焚消息附带到期时间（expiresAt）。
-  Future<List<({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt})>> history() async {
+  /// 读取本地历史（解密为明文，按 server_sequence 升序；未同步的排最后）。
+  /// 附件消息附带本地附件元数据（attachment != null）；阅后即焚消息附带到期时间（expiresAt）。
+  Future<List<HistoryMessage>> history() async {
     final rows = await (db.select(db.localMessages)
           ..where((m) => m.spaceId.equals(spaceId)))
         .get();
@@ -272,8 +285,59 @@ class MessageRepository {
       if (bn == null) return -1;
       return an.compareTo(bn);
     });
+    return _rowsToHistory(rows);
+  }
 
-    final out = <({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt})>[];
+  /// 分页读取最近 [limit] 条（升序：同步的旧→新 + 未同步排最后），UI 首屏用。
+  Future<List<HistoryMessage>> historyRecent({int limit = 50}) async {
+    final unsynced = await (db.select(db.localMessages)
+          ..where((m) => m.spaceId.equals(spaceId) & m.serverSequence.isNull()))
+        .get();
+    final synced = await (db.select(db.localMessages)
+          ..where((m) => m.spaceId.equals(spaceId) & m.serverSequence.isNotNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.serverSequence)])
+          ..limit(limit))
+        .get();
+    return _rowsToHistory([...synced.reversed, ...unsynced]);
+  }
+
+  /// 分页读取比 [beforeSequence] 更早的 [limit] 条（升序），上滑加载历史用。
+  Future<List<HistoryMessage>> historyBefore({
+    required int beforeSequence,
+    required int limit,
+  }) async {
+    final rows = await (db.select(db.localMessages)
+          ..where((m) =>
+              m.spaceId.equals(spaceId) &
+              m.serverSequence.isNotNull() &
+              m.serverSequence.isSmallerThanValue(beforeSequence))
+          ..orderBy([(t) => OrderingTerm.desc(t.serverSequence)])
+          ..limit(limit))
+        .get();
+    return _rowsToHistory(rows.reversed.toList());
+  }
+
+  /// 分页读取比 [afterSequence] 更新的消息（含未同步 pending），增量刷新追加用。
+  Future<List<HistoryMessage>> historySince({required int afterSequence}) async {
+    final rows = await (db.select(db.localMessages)
+          ..where((m) =>
+              m.spaceId.equals(spaceId) &
+              (m.serverSequence.isNull() | m.serverSequence.isBiggerThanValue(afterSequence))))
+        .get();
+    rows.sort((a, b) {
+      final an = a.serverSequence;
+      final bn = b.serverSequence;
+      if (an == null && bn == null) return a.localCreatedAt.compareTo(b.localCreatedAt);
+      if (an == null) return 1;
+      if (bn == null) return -1;
+      return an.compareTo(bn);
+    });
+    return _rowsToHistory(rows);
+  }
+
+  /// 行 → 历史记录（解密 + 附件元数据 + person 身份 + 阅后即焚到期）。
+  Future<List<HistoryMessage>> _rowsToHistory(List<LocalMessage> rows) async {
+    final out = <HistoryMessage>[];
     for (final row in rows) {
       final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
       final key = _keyForVersion(env.keyVersion);

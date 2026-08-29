@@ -45,10 +45,19 @@ class FakeApi extends ApiClient {
     final page = pages.isEmpty
         ? (messages: <MessageEnvelope>[], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: after, hasMore: false)
         : pages.removeAt(0);
+    // 模拟 Server 分配 server_sequence（真实 Server 在同步响应中携带，见 PROTOCOL.md §5.2）
+    var seq = after;
+    final messages = <MessageEnvelope>[
+      for (final env in page.messages)
+        () {
+          seq++;
+          return MessageEnvelope.fromJson({...env.toJson(), 'server_sequence': seq});
+        }(),
+    ];
     return (
-      messages: page.messages,
+      messages: messages,
       attachmentsMeta: page.attachmentsMeta,
-      lastSequence: page.lastSequence,
+      lastSequence: seq,
       hasMore: page.hasMore,
     );
   }
@@ -148,6 +157,64 @@ void main() {
     // 到期（+61s）：删除
     expect(await repo.purgeExpired(now: now + 61 * 1000), 1);
     expect((await repo.history()).length, 0, reason: '到期消息应被本地删除');
+  });
+
+  test('分页：historyRecent 最近 N 条升序 / historyBefore 更早 / historySince 新增', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok'); // 需要 token 才能 sync 拉取
+    final envs = <MessageEnvelope>[];
+    for (var i = 1; i <= 7; i++) {
+      envs.add(await encryptMessage(
+        plaintext: 'msg-$i',
+        spaceKey: spaceKey,
+        spaceId: 'space-test',
+        senderDeviceId: 'dev-b',
+        messageId: 'msg-$i',
+        keyVersion: 1,
+      ));
+    }
+    api.pages.add((messages: envs, attachmentsMeta: const [], lastSequence: 7, hasMore: false));
+    await repo.sync();
+
+    // recent：最近 3 条（升序）
+    final recent = await repo.historyRecent(limit: 3);
+    expect(recent.map((h) => h.env.messageId).toList(), ['msg-5', 'msg-6', 'msg-7']);
+
+    // before：比 seq=4 更早的 2 条（升序）
+    final before = await repo.historyBefore(beforeSequence: 4, limit: 2);
+    expect(before.map((h) => h.env.messageId).toList(), ['msg-2', 'msg-3']);
+
+    // since：比 seq=5 更新（升序）
+    final since = await repo.historySince(afterSequence: 5);
+    expect(since.map((h) => h.env.messageId).toList(), ['msg-6', 'msg-7']);
+  });
+
+  test('分页：未同步 pending 消息排最后（recent/since 含未同步）', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok'); // sync 拉取需要 token
+    final envs = <MessageEnvelope>[];
+    for (var i = 1; i <= 3; i++) {
+      envs.add(await encryptMessage(
+        plaintext: 'msg-$i',
+        spaceKey: spaceKey,
+        spaceId: 'space-test',
+        senderDeviceId: 'dev-b',
+        messageId: 'msg-$i',
+        keyVersion: 1,
+      ));
+    }
+    api.pages.add((messages: envs, attachmentsMeta: const [], lastSequence: 3, hasMore: false));
+    await repo.sync();
+    repo.token = null; // 之后 send 只落库 pending（不尝试上传 → 未同步）
+    final mid = await repo.send('pending-new'); // 未同步
+
+    // recent(limit 2)：最近 2 条同步 + 未同步全部（排最后）
+    final recent = await repo.historyRecent(limit: 2);
+    expect(recent.map((h) => h.env.messageId).toList(), ['msg-2', 'msg-3', mid]);
+
+    // since(2)：比 seq=2 更新 + 未同步
+    final since = await repo.historySince(afterSequence: 2);
+    expect(since.map((h) => h.env.messageId).toList(), ['msg-3', mid]);
   });
 
   test('离线发送：无 token 时消息入 pending 队列，本地可见', () async {

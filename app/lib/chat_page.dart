@@ -63,8 +63,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _picker = ImagePicker();
   // 图片解密缓存（messageId → Future<bytes>），避免重复下载解密。
   final Map<String, Future<Uint8List>> _imageCache = {};
-  List<({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt})> _messages = [];
+  List<HistoryMessage> _messages = [];
   Timer? _ticker;
+  // 分页加载（UI 懒渲染）：上滑到顶部加载更早历史；ticker 只增量追加新增
+  final ScrollController _scrollController = ScrollController();
+  bool _hasMoreOlder = true;
+  bool _loadingOlder = false;
+  static const int _pageSize = 50;
   bool _recording = false;
   String? _recordingPath;
   String? _playingMessageId;
@@ -85,7 +90,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       token: widget.token,
       settings: BurnAfterSettings(db),
     );
-    _refresh();
+    _loadInitial();
+    _scrollController.addListener(_maybeLoadOlder);
     _loadBurnLabel();
     // 每 3 秒轮询同步（准实时；正式版用 WS listen 推送）
     _ticker = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
@@ -157,6 +163,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _scrollController.dispose();
     _input.dispose();
     super.dispose();
   }
@@ -175,16 +182,76 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 首次载入：同步全量 → 清理到期 → 只渲染最近一页（UI 分页懒加载）。
+  Future<void> _loadInitial() async {
+    try {
+      await _repo.sync();
+      await _repo.purgeExpired();
+      await _repo.refreshDeviceMap();
+      final recent = await _repo.historyRecent(limit: _pageSize);
+      if (!mounted) return;
+      setState(() => _messages = recent);
+    } catch (_) {
+      // 网络抖动忽略：保持空列表，等 ticker 重试
+    }
+  }
+
+  /// 已加载列表中最新的 serverSequence（未同步=最新时返回 0）。
+  int get _lastLoadedSequence {
+    for (final m in _messages.reversed) {
+      final s = m.env.serverSequence;
+      if (s != null) return s;
+    }
+    return 0;
+  }
+
+  /// 滚动到接近顶部时加载更早的历史（分页）。
+  void _maybeLoadOlder() {
+    if (!_hasMoreOlder || _loadingOlder) return;
+    if (_scrollController.position.extentBefore < 200) {
+      _loadOlder();
+    }
+  }
+
+  Future<void> _loadOlder() async {
+    if (_loadingOlder || !_hasMoreOlder) return;
+    _loadingOlder = true;
+    try {
+      final first = _messages.isEmpty ? null : _messages.first.env.serverSequence;
+      if (first == null) {
+        // 没有已同步消息（或全是未同步）→ 没有更早历史
+        if (mounted) setState(() => _hasMoreOlder = false);
+        return;
+      }
+      final older = await _repo.historyBefore(beforeSequence: first, limit: _pageSize);
+      if (!mounted) return;
+      setState(() {
+        _messages = [...older, ..._messages];
+        if (older.length < _pageSize) _hasMoreOlder = false;
+      });
+    } catch (_) {
+      // 加载失败：下次滚动再试
+    } finally {
+      _loadingOlder = false;
+    }
+  }
+
   Future<void> _refresh() async {
     try {
       await _repo.sync();
+      final now = DateTime.now().millisecondsSinceEpoch;
       // 阅后即焚：删除本设备已到期的消息（纯本地）
-      await _repo.purgeExpired();
-      // 拉取设备 → person 映射（多设备身份：同用户其他设备的消息显示为"我"）
+      await _repo.purgeExpired(now: now);
+      // 增量刷新：只取比已加载最新更晚的消息追加（不重建全量列表）
+      final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
       await _repo.refreshDeviceMap();
-      final hist = await _repo.history();
       if (!mounted) return;
-      setState(() => _messages = hist);
+      setState(() {
+        // 移除本设备已到期的消息（与 purgeExpired 同一标准）
+        _messages.removeWhere((m) => m.expiresAt != null && m.expiresAt! <= now);
+        final existing = {for (final m in _messages) m.env.messageId};
+        _messages.addAll(fresh.where((f) => !existing.contains(f.env.messageId)));
+      });
     } catch (_) {
       // 网络抖动忽略，下次轮询重试
     }
@@ -638,6 +705,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(12),
               itemCount: _messages.length,
               itemBuilder: (context, i) {

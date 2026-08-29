@@ -467,3 +467,23 @@
 **验证：** flutter test **23 项全过**（+4：设置 3 + purgeExpired 1）；analyze 无问题；golden chat_page 更新（AppBar ⏱ 按钮）。Server/shared 零改动。
 
 **行为：** 设置后新到达的消息带到期时间；到期后本设备无痕删除（消息+附件）；改设置只影响之后的消息（落库时快照）。
+
+### 聊天分页加载优化（UI 懒渲染 + 增量刷新；2026-08-29）
+
+**背景：** 老板问"新设备初次载入历史是否有分页"——确认拉取层有分页（sync 翻页 100/页 + has_more），但 UI 层无分页（history() 全量渲染 + 每次 _refresh 全量 setState）。老板要求立即优化。
+
+**实现：**
+- `message_repository.dart`：
+  - `typedef HistoryMessage`（env/plaintext/sender/attachment/expiresAt）替代长 record 类型
+  - `history()` 重构（提取 `_rowsToHistory` 公共解密方法）
+  - 新增分页方法：`historyRecent(limit)`（未同步全部 + 同步最近 N 条 DESC→升序）、`historyBefore(beforeSequence, limit)`（更早 N 条升序）、`historySince(afterSequence)`（更新 + 未同步，NULL 排最后）
+- `chat_page.dart`：
+  - 首屏 `_loadInitial()`：sync 全量 → purgeExpired → 只渲染 `historyRecent(50)`
+  - `ScrollController` 上滑到顶（extentBefore < 200）→ `_loadOlder()` 插入头部（`_hasMoreOlder`/`_loadingOlder` 防重入）
+  - 3s ticker `_refresh()` 改**增量**：sync → purgeExpired(now) → `historySince(_lastLoadedSequence)` 追加去重 + 到期消息本地移除（不再全量 setState）
+
+**排障（测试）：** 分页单测首次失败 `Actual: []`——两个根因：① FakeApi.sync 不给 env 赋 serverSequence（本地全 NULL → historyRecent 查不到）→ FakeApi 模拟 Server 分配递增序列；② `repo.sync()` 在 token=null 时直接 return 0 → 分页测试须 `makeRepo(api, token: 'tok')`；③ send 后 token 置 null 才能产生"未同步 pending"（否则 postMessage 成功赋序列）。
+
+**drift API 备忘：** 2.34.3 的 `orderBy` 参数是 `List<OrderClauseGenerator<T>>`（函数形式 `[(t) => OrderingTerm.desc(t.serverSequence)]`，不是 OrderingTerm 列表）；DataClass 名是 `LocalMessage`（单数化）。
+
+**验证：** flutter test **25 项全过**（+2 分页用例）；analyze 无问题（顺手删 golden_render_test 多余 dart:typed_data import）；golden 3 项通过（UI 渲染结构未变，无需更新基准图）。

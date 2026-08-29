@@ -8,7 +8,6 @@
 // （Windows 的 simhei.ttf）覆盖默认 'Roboto' family 使文字可读。
 
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
