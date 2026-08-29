@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:onlyspace/data/burn_after_settings.dart';
 import 'package:onlyspace/data/local_database.dart';
 import 'package:onlyspace/data/message_repository.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
@@ -119,6 +120,34 @@ void main() {
     final byMsg = {for (final h in hist) h.env.messageId: h.sender};
     expect(byMsg['msg-a2-1'], 'me', reason: '同 person 的另一设备消息应显示为 me');
     expect(byMsg['msg-b-1'], 'peer', reason: '对方设备消息显示为 peer');
+  });
+
+  test('purgeExpired：到期消息本地删除，未到期保留（阅后即焚）', () async {
+    final api = FakeApi();
+    final settings = BurnAfterSettings(db);
+    final repo = MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      settings: settings,
+    );
+    await settings.save(60); // 设置 1 分钟焚毁（本设备独立，纯本地）
+
+    final mid = await repo.send('burn after 60s');
+    final hist = await repo.history();
+    expect(hist.single.env.messageId, mid);
+    expect(hist.single.expiresAt, isNotNull, reason: '阅后即焚消息应带到期时间');
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // 未到期（+59s）：不删除
+    expect(await repo.purgeExpired(now: now + 59 * 1000), 0);
+    expect((await repo.history()).length, 1);
+    // 到期（+61s）：删除
+    expect(await repo.purgeExpired(now: now + 61 * 1000), 1);
+    expect((await repo.history()).length, 0, reason: '到期消息应被本地删除');
   });
 
   test('离线发送：无 token 时消息入 pending 队列，本地可见', () async {

@@ -26,6 +26,9 @@ class LocalMessages extends Table {
   TextColumn get status =>
       text().withDefault(const Constant('pending'))(); // pending|sent|delivered|read|failed
   IntColumn get localCreatedAt => integer()();
+  // 阅后即焚（纯本地，每设备独立）：到达本设备时的设置快照 + 到期时间戳
+  IntColumn get burnAfterSeconds => integer().withDefault(const Constant(0))(); // 0=无限
+  IntColumn get expiresAt => integer().nullable()(); // NULL/0=永久；非空=到期时间戳
 
   @override
   Set<Column> get primaryKey => {messageId};
@@ -82,7 +85,18 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            // v2：local_messages 加阅后即焚列（burn_after_seconds 默认 0、expires_at 可空）
+            await m.addColumn(localMessages, localMessages.burnAfterSeconds);
+            await m.addColumn(localMessages, localMessages.expiresAt);
+          }
+        },
+      );
 
   static QueryExecutor _openConnection() => driftDatabase(name: 'onlyspace');
 }

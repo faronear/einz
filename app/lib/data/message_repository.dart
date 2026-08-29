@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
 
+import 'burn_after_settings.dart';
 import 'local_database.dart';
 
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
@@ -24,6 +25,7 @@ class MessageRepository {
     this.keyVersion = 1,
     Map<int, Uint8List>? archivedKeys,
     this.token,
+    this.settings,
   }) : archivedKeys = archivedKeys ?? {};
 
   final LocalDatabase db;
@@ -35,6 +37,19 @@ class MessageRepository {
 
   /// 归档 Space Key（key_version → 密钥），轮换后解密旧消息（E2EE.md §9.2）。
   final Map<int, Uint8List> archivedKeys;
+
+  /// 阅后即焚设置（可选；未注入时默认 0=无限，行为与旧版一致）。
+  final BurnAfterSettings? settings;
+
+  /// 当前阅后即焚秒数（0=无限）。
+  Future<int> _burnAfter() async => await settings?.load() ?? 0;
+
+  /// 阅后即焚状态快照：当前设置的秒数 + 到期时间戳（burn<=0 时 expiresAt=null 永久）。
+  Future<({int burn, int? expiresAt})> _burnState() async {
+    final burn = await _burnAfter();
+    final expiresAt = burn > 0 ? DateTime.now().millisecondsSinceEpoch + burn * 1000 : null;
+    return (burn: burn, expiresAt: expiresAt);
+  }
 
   /// 会话 token（认证后注入；未认证时发送只入队不同步）。
   String? token;
@@ -86,7 +101,8 @@ class MessageRepository {
       type: type,
       keyVersion: keyVersion,
     );
-    await _insertLocal(env, status: 'pending');
+    final bs = await _burnState();
+    await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
 
     final t = token;
     if (t != null) {
@@ -168,6 +184,22 @@ class MessageRepository {
     return messageId;
   }
 
+  /// 删除本设备上已到期的阅后即焚消息（纯本地，Server 不参与）。
+  /// [now] 可注入测试（毫秒时间戳）；返回删除条数。
+  Future<int> purgeExpired({int? now}) async {
+    final t = now ?? DateTime.now().millisecondsSinceEpoch;
+    final expired = await (db.select(db.localMessages)
+          ..where((m) => m.expiresAt.isNotNull() & m.expiresAt.isSmallerOrEqualValue(t)))
+        .get();
+    var deleted = 0;
+    for (final row in expired) {
+      await (db.delete(db.localAttachments)..where((a) => a.messageId.equals(row.messageId))).go();
+      await (db.delete(db.localMessages)..where((m) => m.messageId.equals(row.messageId))).go();
+      deleted++;
+    }
+    return deleted;
+  }
+
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
   /// 返回本次新增的消息条数。
   Future<int> sync() async {
@@ -179,9 +211,12 @@ class MessageRepository {
     while (true) {
       final result = await api.sync(t, after: cursor);
       for (final env in result.messages) {
+        final bs = await _burnState();
         await _insertLocal(
           env,
           status: env.senderDeviceId == deviceId ? 'sent' : 'delivered',
+          burnAfterSeconds: bs.burn,
+          expiresAt: bs.expiresAt,
         );
         added++;
       }
@@ -223,8 +258,8 @@ class MessageRepository {
   }
 
   /// 读取本地历史（解密为明文，按 server_sequence 升序；未同步的排最后）。
-  /// 附件消息附带本地附件元数据（attachment != null，供渲染时下载解密展示）。
-  Future<List<({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment})>> history() async {
+  /// 附件消息附带本地附件元数据（attachment != null）；阅后即焚消息附带到期时间（expiresAt）。
+  Future<List<({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt})>> history() async {
     final rows = await (db.select(db.localMessages)
           ..where((m) => m.spaceId.equals(spaceId)))
         .get();
@@ -238,7 +273,7 @@ class MessageRepository {
       return an.compareTo(bn);
     });
 
-    final out = <({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment})>[];
+    final out = <({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt})>[];
     for (final row in rows) {
       final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
       final key = _keyForVersion(env.keyVersion);
@@ -266,6 +301,7 @@ class MessageRepository {
                 'sha256': att.sha256,
                 'nonce': att.nonce,
               },
+        expiresAt: row.expiresAt,
       ));
     }
     return out;
@@ -310,7 +346,12 @@ class MessageRepository {
 
   // ---------- 本地库操作 ----------
 
-  Future<void> _insertLocal(MessageEnvelope env, {required String status}) async {
+  Future<void> _insertLocal(
+    MessageEnvelope env, {
+    required String status,
+    int burnAfterSeconds = 0,
+    int? expiresAt,
+  }) async {
     final existing = await (db.select(db.localMessages)
           ..where((m) => m.messageId.equals(env.messageId)))
         .getSingleOrNull();
@@ -336,6 +377,8 @@ class MessageRepository {
             localCreatedAt: DateTime.now().millisecondsSinceEpoch,
             status: Value(status),
             serverSequence: Value(env.serverSequence),
+            burnAfterSeconds: Value(burnAfterSeconds),
+            expiresAt: Value(expiresAt),
           ),
         );
   }

@@ -66,6 +66,7 @@
 - [x] **App 附件消息（语音/图像/视频）**：MessageRepository.sendAttachment（encryptAttachment 加密 blob → /attachments 上传 + caption 消息 + 本地附件元数据落库）+ history 关联附件 + fetchAttachment 下载解密；chat_page：语音（按住说话录音 record → 播放条 audioplayers）、图像（拍照/相册 image_picker → 缩略展示/点击全屏）、视频（拍摄/相册 → 下载解密 video_player 播放）；插件懒构造避免测试环境 MissingPluginException；flutter test 18 项全过 + golden 更新
 - [x] **App 附件扩展（音频文件/任意文件）+ 固定服务器地址**：协议 kMessageTypes/Server ALLOWED_TYPES 加 audio/file；chat_page 附件 sheet 扩至 6 项（file_picker 12.x：FilePicker 静态方法 + readAsBytes）；audio 播放条（与 voice 共用 _playAudioMessage）、file 文件卡片（下载保存 path_provider）；setup_page 服务器地址改固定常量 kOnlySpaceServer（移除输入框）；全量验证过（server 冒烟/shared 16/app 18）
 - [x] **多设备身份判断（person_id）**：shared ApiClient 加 getSpace + SpaceResult/SpaceDevice（含 person_id 映射，const 构造）；MessageRepository 加 refreshDeviceMap 缓存 + _isSamePerson（person 优先、device 降级），history sender 按 person 判断——同用户不同设备的消息显示为 me；chat_page _refresh 拉取映射；单测（shared getSpace 2 项 + app person 判断 1 项），shared 18/app 19 全过
+- [x] **阅后即焚（纯本地，每设备独立）**：Server 零改动——BurnAfterSettings（app_state 存档位：无限/1分/5分/30分/1小时/1天/7天）；local_messages 加 burn_after_seconds/expires_at 列（schemaVersion 2 + addColumn 迁移）；send/sync 落库按本设备设置算 expiresAt；purgeExpired 到期删除（3s ticker 联动）；chat_page 顶栏 ⏱ 选择器 + 消息 ⏱ 标记；单测（设置 3 项 + purgeExpired 1 项），flutter test 23 项全过
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
 - [ ] iOS 真机构建/签名/Ad Hoc（docs/IOS.md §3–§4）——待 Mac + Apple 付费账号（APNs 暂无账号，WS/轮询兜底）
 

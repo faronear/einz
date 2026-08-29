@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 
+import 'data/burn_after_settings.dart';
 import 'data/local_database.dart';
 import 'data/lock_timer.dart';
 import 'data/message_repository.dart';
@@ -62,29 +63,79 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _picker = ImagePicker();
   // 图片解密缓存（messageId → Future<bytes>），避免重复下载解密。
   final Map<String, Future<Uint8List>> _imageCache = {};
-  List<({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment})> _messages = [];
+  List<({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt})> _messages = [];
   Timer? _ticker;
   bool _recording = false;
   String? _recordingPath;
   String? _playingMessageId;
+  String _burnLabel = '无限'; // 当前阅后即焚档位文字（顶栏 tooltip）
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final db = widget.db ?? LocalDatabase();
     _repo = MessageRepository(
-      db: widget.db ?? LocalDatabase(),
+      db: db,
       api: widget.api ?? ApiClient(widget.server),
       spaceKey: widget.spaceKey,
       spaceId: widget.spaceId,
       deviceId: widget.deviceId,
       keyVersion: widget.keyVersion,
       token: widget.token,
+      settings: BurnAfterSettings(db),
     );
     _refresh();
+    _loadBurnLabel();
     // 每 3 秒轮询同步（准实时；正式版用 WS listen 推送）
     _ticker = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
     _registerPushToken();
+  }
+
+  /// 加载本设备阅后即焚档位（每设备独立，纯本地）。
+  Future<void> _loadBurnLabel() async {
+    final s = BurnAfterSettings(widget.db ?? LocalDatabase());
+    final seconds = await s.load();
+    final label = kBurnAfterOptions.entries.firstWhere(
+      (e) => e.value == seconds,
+      orElse: () => const MapEntry('无限', 0),
+    ).key;
+    if (mounted) setState(() => _burnLabel = label);
+  }
+
+  /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
+  Future<void> _showBurnPicker() async {
+    final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
+    final current = await settings.load();
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('阅后即焚（仅本设备生效）', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            for (final entry in kBurnAfterOptions.entries)
+              ListTile(
+                title: Text(entry.key),
+                trailing: entry.value == current ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(ctx).pop(entry.key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    final seconds = kBurnAfterOptions[picked]!;
+    await settings.save(seconds);
+    if (!mounted) return;
+    setState(() => _burnLabel = picked);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(seconds == 0 ? '阅后即焚已关闭（消息永久保留）' : '消息将在 $picked 后自动删除')),
+    );
   }
 
   /// iOS：认证后把 APNs device token 注册到 Server（PROTOCOL.md §7.3）。
@@ -127,6 +178,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _refresh() async {
     try {
       await _repo.sync();
+      // 阅后即焚：删除本设备已到期的消息（纯本地）
+      await _repo.purgeExpired();
       // 拉取设备 → person 映射（多设备身份：同用户其他设备的消息显示为"我"）
       await _repo.refreshDeviceMap();
       final hist = await _repo.history();
@@ -203,7 +256,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _playAudioMessage(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) async {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) async {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
@@ -354,7 +407,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 视频消息：播放按钮 + 说明文字；点击下载解密后全屏播放。
   Widget _buildVideo(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -369,7 +422,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _playVideo(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) async {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) async {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
@@ -428,7 +481,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 图片消息：下载解密 → 缩略展示；点击全屏查看。
   Widget _buildImage(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
     final att = m.attachment;
     if (att == null) return Text('📷 ${m.plaintext}');
     final future = _imageCache.putIfAbsent(
@@ -471,7 +524,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 消息内容按类型渲染（text 文本 / voice、audio 播放条 / image、video、file 各自卡片）。
   Widget _buildMessageContent(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
     switch (m.env.type) {
       case 'voice':
       case 'audio':
@@ -489,7 +542,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 音频消息（语音/音频文件共用）：播放条；点击下载解密后播放。
   Widget _buildAudioBar(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
     final playing = _playingMessageId == m.env.messageId;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -511,7 +564,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 文件消息：文件卡片（文件名 + 大小 + 下载保存）。
   Widget _buildFileCard(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
     final size = (m.attachment?['size'] as int?) ?? 0;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -543,7 +596,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 下载并保存文件附件到应用文档目录（captain=文件名）。
   Future<void> _downloadFile(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment}) m) async {
+      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) async {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
@@ -571,7 +624,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('OnlySpace · ${widget.spaceId}')),
+      appBar: AppBar(
+        title: Text('OnlySpace · ${widget.spaceId}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.timer_outlined),
+            tooltip: '阅后即焚：$_burnLabel',
+            onPressed: _showBurnPicker,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -590,7 +652,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       color: mine ? Colors.indigo.shade100 : Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: _buildMessageContent(m),
+                    child: Column(
+                      crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (m.expiresAt != null)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 2),
+                            child: Text('⏱ 阅后即焚', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          ),
+                        _buildMessageContent(m),
+                      ],
+                    ),
                   ),
                 );
               },

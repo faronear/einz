@@ -125,6 +125,29 @@ class $LocalMessagesTable extends LocalMessages
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _burnAfterSecondsMeta = const VerificationMeta(
+    'burnAfterSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> burnAfterSeconds = GeneratedColumn<int>(
+    'burn_after_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _expiresAtMeta = const VerificationMeta(
+    'expiresAt',
+  );
+  @override
+  late final GeneratedColumn<int> expiresAt = GeneratedColumn<int>(
+    'expires_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     messageId,
@@ -138,6 +161,8 @@ class $LocalMessagesTable extends LocalMessages
     createdAt,
     status,
     localCreatedAt,
+    burnAfterSeconds,
+    expiresAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -244,6 +269,21 @@ class $LocalMessagesTable extends LocalMessages
     } else if (isInserting) {
       context.missing(_localCreatedAtMeta);
     }
+    if (data.containsKey('burn_after_seconds')) {
+      context.handle(
+        _burnAfterSecondsMeta,
+        burnAfterSeconds.isAcceptableOrUnknown(
+          data['burn_after_seconds']!,
+          _burnAfterSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('expires_at')) {
+      context.handle(
+        _expiresAtMeta,
+        expiresAt.isAcceptableOrUnknown(data['expires_at']!, _expiresAtMeta),
+      );
+    }
     return context;
   }
 
@@ -297,6 +337,14 @@ class $LocalMessagesTable extends LocalMessages
         DriftSqlType.int,
         data['${effectivePrefix}local_created_at'],
       )!,
+      burnAfterSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}burn_after_seconds'],
+      )!,
+      expiresAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}expires_at'],
+      ),
     );
   }
 
@@ -318,6 +366,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   final int createdAt;
   final String status;
   final int localCreatedAt;
+  final int burnAfterSeconds;
+  final int? expiresAt;
   const LocalMessage({
     required this.messageId,
     required this.spaceId,
@@ -330,6 +380,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     required this.createdAt,
     required this.status,
     required this.localCreatedAt,
+    required this.burnAfterSeconds,
+    this.expiresAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -347,6 +399,10 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     map['created_at'] = Variable<int>(createdAt);
     map['status'] = Variable<String>(status);
     map['local_created_at'] = Variable<int>(localCreatedAt);
+    map['burn_after_seconds'] = Variable<int>(burnAfterSeconds);
+    if (!nullToAbsent || expiresAt != null) {
+      map['expires_at'] = Variable<int>(expiresAt);
+    }
     return map;
   }
 
@@ -365,6 +421,10 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       createdAt: Value(createdAt),
       status: Value(status),
       localCreatedAt: Value(localCreatedAt),
+      burnAfterSeconds: Value(burnAfterSeconds),
+      expiresAt: expiresAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expiresAt),
     );
   }
 
@@ -385,6 +445,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       status: serializer.fromJson<String>(json['status']),
       localCreatedAt: serializer.fromJson<int>(json['localCreatedAt']),
+      burnAfterSeconds: serializer.fromJson<int>(json['burnAfterSeconds']),
+      expiresAt: serializer.fromJson<int?>(json['expiresAt']),
     );
   }
   @override
@@ -402,6 +464,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       'createdAt': serializer.toJson<int>(createdAt),
       'status': serializer.toJson<String>(status),
       'localCreatedAt': serializer.toJson<int>(localCreatedAt),
+      'burnAfterSeconds': serializer.toJson<int>(burnAfterSeconds),
+      'expiresAt': serializer.toJson<int?>(expiresAt),
     };
   }
 
@@ -417,6 +481,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     int? createdAt,
     String? status,
     int? localCreatedAt,
+    int? burnAfterSeconds,
+    Value<int?> expiresAt = const Value.absent(),
   }) => LocalMessage(
     messageId: messageId ?? this.messageId,
     spaceId: spaceId ?? this.spaceId,
@@ -431,6 +497,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     createdAt: createdAt ?? this.createdAt,
     status: status ?? this.status,
     localCreatedAt: localCreatedAt ?? this.localCreatedAt,
+    burnAfterSeconds: burnAfterSeconds ?? this.burnAfterSeconds,
+    expiresAt: expiresAt.present ? expiresAt.value : this.expiresAt,
   );
   LocalMessage copyWithCompanion(LocalMessagesCompanion data) {
     return LocalMessage(
@@ -455,6 +523,10 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       localCreatedAt: data.localCreatedAt.present
           ? data.localCreatedAt.value
           : this.localCreatedAt,
+      burnAfterSeconds: data.burnAfterSeconds.present
+          ? data.burnAfterSeconds.value
+          : this.burnAfterSeconds,
+      expiresAt: data.expiresAt.present ? data.expiresAt.value : this.expiresAt,
     );
   }
 
@@ -471,7 +543,9 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           ..write('serverSequence: $serverSequence, ')
           ..write('createdAt: $createdAt, ')
           ..write('status: $status, ')
-          ..write('localCreatedAt: $localCreatedAt')
+          ..write('localCreatedAt: $localCreatedAt, ')
+          ..write('burnAfterSeconds: $burnAfterSeconds, ')
+          ..write('expiresAt: $expiresAt')
           ..write(')'))
         .toString();
   }
@@ -489,6 +563,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     createdAt,
     status,
     localCreatedAt,
+    burnAfterSeconds,
+    expiresAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -504,7 +580,9 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           other.serverSequence == this.serverSequence &&
           other.createdAt == this.createdAt &&
           other.status == this.status &&
-          other.localCreatedAt == this.localCreatedAt);
+          other.localCreatedAt == this.localCreatedAt &&
+          other.burnAfterSeconds == this.burnAfterSeconds &&
+          other.expiresAt == this.expiresAt);
 }
 
 class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
@@ -519,6 +597,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
   final Value<int> createdAt;
   final Value<String> status;
   final Value<int> localCreatedAt;
+  final Value<int> burnAfterSeconds;
+  final Value<int?> expiresAt;
   final Value<int> rowid;
   const LocalMessagesCompanion({
     this.messageId = const Value.absent(),
@@ -532,6 +612,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     this.createdAt = const Value.absent(),
     this.status = const Value.absent(),
     this.localCreatedAt = const Value.absent(),
+    this.burnAfterSeconds = const Value.absent(),
+    this.expiresAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalMessagesCompanion.insert({
@@ -546,6 +628,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     required int createdAt,
     this.status = const Value.absent(),
     required int localCreatedAt,
+    this.burnAfterSeconds = const Value.absent(),
+    this.expiresAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : messageId = Value(messageId),
        spaceId = Value(spaceId),
@@ -568,6 +652,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     Expression<int>? createdAt,
     Expression<String>? status,
     Expression<int>? localCreatedAt,
+    Expression<int>? burnAfterSeconds,
+    Expression<int>? expiresAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -582,6 +668,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
       if (createdAt != null) 'created_at': createdAt,
       if (status != null) 'status': status,
       if (localCreatedAt != null) 'local_created_at': localCreatedAt,
+      if (burnAfterSeconds != null) 'burn_after_seconds': burnAfterSeconds,
+      if (expiresAt != null) 'expires_at': expiresAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -598,6 +686,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     Value<int>? createdAt,
     Value<String>? status,
     Value<int>? localCreatedAt,
+    Value<int>? burnAfterSeconds,
+    Value<int?>? expiresAt,
     Value<int>? rowid,
   }) {
     return LocalMessagesCompanion(
@@ -612,6 +702,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
       createdAt: createdAt ?? this.createdAt,
       status: status ?? this.status,
       localCreatedAt: localCreatedAt ?? this.localCreatedAt,
+      burnAfterSeconds: burnAfterSeconds ?? this.burnAfterSeconds,
+      expiresAt: expiresAt ?? this.expiresAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -652,6 +744,12 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     if (localCreatedAt.present) {
       map['local_created_at'] = Variable<int>(localCreatedAt.value);
     }
+    if (burnAfterSeconds.present) {
+      map['burn_after_seconds'] = Variable<int>(burnAfterSeconds.value);
+    }
+    if (expiresAt.present) {
+      map['expires_at'] = Variable<int>(expiresAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -672,6 +770,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
           ..write('createdAt: $createdAt, ')
           ..write('status: $status, ')
           ..write('localCreatedAt: $localCreatedAt, ')
+          ..write('burnAfterSeconds: $burnAfterSeconds, ')
+          ..write('expiresAt: $expiresAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1983,6 +2083,8 @@ typedef $$LocalMessagesTableCreateCompanionBuilder =
       required int createdAt,
       Value<String> status,
       required int localCreatedAt,
+      Value<int> burnAfterSeconds,
+      Value<int?> expiresAt,
       Value<int> rowid,
     });
 typedef $$LocalMessagesTableUpdateCompanionBuilder =
@@ -1998,6 +2100,8 @@ typedef $$LocalMessagesTableUpdateCompanionBuilder =
       Value<int> createdAt,
       Value<String> status,
       Value<int> localCreatedAt,
+      Value<int> burnAfterSeconds,
+      Value<int?> expiresAt,
       Value<int> rowid,
     });
 
@@ -2097,6 +2201,16 @@ class $$LocalMessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get burnAfterSeconds => $composableBuilder(
+    column: $table.burnAfterSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> localAttachmentsRefs(
     Expression<bool> Function($$LocalAttachmentsTableFilterComposer f) f,
   ) {
@@ -2186,6 +2300,16 @@ class $$LocalMessagesTableOrderingComposer
     column: $table.localCreatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get burnAfterSeconds => $composableBuilder(
+    column: $table.burnAfterSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalMessagesTableAnnotationComposer
@@ -2239,6 +2363,14 @@ class $$LocalMessagesTableAnnotationComposer
     column: $table.localCreatedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get burnAfterSeconds => $composableBuilder(
+    column: $table.burnAfterSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get expiresAt =>
+      $composableBuilder(column: $table.expiresAt, builder: (column) => column);
 
   Expression<T> localAttachmentsRefs<T extends Object>(
     Expression<T> Function($$LocalAttachmentsTableAnnotationComposer a) f,
@@ -2307,6 +2439,8 @@ class $$LocalMessagesTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int> localCreatedAt = const Value.absent(),
+                Value<int> burnAfterSeconds = const Value.absent(),
+                Value<int?> expiresAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalMessagesCompanion(
                 messageId: messageId,
@@ -2320,6 +2454,8 @@ class $$LocalMessagesTableTableManager
                 createdAt: createdAt,
                 status: status,
                 localCreatedAt: localCreatedAt,
+                burnAfterSeconds: burnAfterSeconds,
+                expiresAt: expiresAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2335,6 +2471,8 @@ class $$LocalMessagesTableTableManager
                 required int createdAt,
                 Value<String> status = const Value.absent(),
                 required int localCreatedAt,
+                Value<int> burnAfterSeconds = const Value.absent(),
+                Value<int?> expiresAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalMessagesCompanion.insert(
                 messageId: messageId,
@@ -2348,6 +2486,8 @@ class $$LocalMessagesTableTableManager
                 createdAt: createdAt,
                 status: status,
                 localCreatedAt: localCreatedAt,
+                burnAfterSeconds: burnAfterSeconds,
+                expiresAt: expiresAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

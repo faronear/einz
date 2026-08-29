@@ -448,3 +448,22 @@
 **验证：** shared dart test 18 项全过（+2）、app flutter test 19 项全过（+1）。
 
 **后续关联：** 阅后即焚计划前置已就绪——"自己的消息"在多设备间语义一致。
+
+### 阅后即焚实现（纯本地、每设备独立；2026-08-29）
+
+**最终语义（多轮澄清后）：** 服务器**不记录**阅后即焚状态——每台设备按自己的设置（分钟/小时/天，默认无限）管理**自己本地**副本的删除。设置、计时、删除全部纯本地，**Server 零改动**。
+
+**实现：**
+- `data/burn_after_settings.dart`：`kBurnAfterOptions`（无限/1分/5分/30分/1小时/1天/7天）+ `BurnAfterSettings`（app_state 存取，load/save）
+- `local_database.dart`：local_messages 加 `burn_after_seconds`（默认 0）+ `expires_at`（可空）；**schemaVersion 1→2** + MigrationStrategy `m.addColumn(localMessages, ...)`（drift 2.34.3 正确 API；TableMigration 需 TableInfo 不行）
+- `message_repository.dart`：`_burnState()`（设置快照：burn + expiresAt）；send/sync 落库写新字段（**消息到达本设备时的设置快照**）；`purgeExpired(now)` 删除到期消息 + 关联附件（可注入 now 测试）；history 返回带 expiresAt
+- `chat_page.dart`：顶栏 **⏱ 按钮**（tooltip 显示当前档位）→ BottomSheet 档位选择（当前项打勾）→ 保存 + SnackBar 提示；3s ticker `_refresh` 里调 purgeExpired（到期消息自然消失）；气泡顶部"⏱ 阅后即焚"小字标记
+- 测试：`burn_after_settings_test.dart`（默认 0/往返/关闭，3 项）+ message_repository_test 加 purgeExpired 用例（+59s 不删、+61s 删）
+
+**排障记录（关键）：**
+- **中文路径 build_runner 失败**（AOT 编译写入 .dart_tool 报错）→ 外部目录 `D:\build-onlyspace\onlyspace\app`（无中文路径、依赖已解析）跑 `dart run build_runner` 生成 g.dart 拷回仓库；**PATH 的独立 dart 3.12.2 不满足 pubspec ^3.13.2**，需用 Flutter 自带 dart（3.13.2）跑
+- drift 2.34.3 迁移：`TableMigration(LocalMessages())` 类型错误（需 TableInfo）→ 用 `m.addColumn(localMessages, localMessages.xxx)`（生成表 getter，正确 API）
+
+**验证：** flutter test **23 项全过**（+4：设置 3 + purgeExpired 1）；analyze 无问题；golden chat_page 更新（AppBar ⏱ 按钮）。Server/shared 零改动。
+
+**行为：** 设置后新到达的消息带到期时间；到期后本设备无痕删除（消息+附件）；改设置只影响之后的消息（落库时快照）。
