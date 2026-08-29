@@ -336,29 +336,42 @@ dart run bin/onlyspace.dart import \
 > 原则：Server 代码变更均为**向后兼容**（新增表/端点，存量接口与数据不动）。
 > 新表由 `CREATE TABLE IF NOT EXISTS` 在启动时自动创建，**无需手动迁移**。
 
-### 9.1 代码传输：git archive + scp（推荐）或 git pull
+### 9.1 代码传输：git pull（主推）——VPS 一次性初始化
 
-```powershell
-# 方式 A：git archive 打包上传（不要求 VPS 持有仓库凭据，最小权限）
-cd D:\Seafile\product-产品\only
-git archive --format=tar.gz -o onlyspace-update.tar.gz main
-scp onlyspace-update.tar.gz root@<VPS>:/root/
-
-# 方式 B：VPS 已 clone 仓库且配好 git.tic.cc 凭据时，直接增量拉取
-ssh root@<VPS> "cd /opt/onlyspace && git pull"
-```
-
-> 为什么默认用 git archive 而非 push/pull：正式部署时远程仓库尚未建立（git.tic.cc/fon/only
-> 是后补的），且 VPS 只负责运行代码，不必保留仓库访问令牌——archive + scp 把"代码传输"与
-> "仓库凭据"解耦。若 VPS 已配好凭据，git pull 同样可用（增量、可追溯），两者任选其一保持一致即可。
-
-### 9.2 VPS 解包 + 重建 server 容器
+> 前置：VPS 已装 git；本地化文件（`deployment/.env`、`server/data/`、`deployment/config/`、`*.db`）
+> 均已被仓库 .gitignore 忽略，git 操作不会触碰——**唯一例外是 `deployment/Caddyfile`**
+> （仓库内为占位域名 `private.example.com`，VPS 部署时已 sed 为真实域名），需标记
+> `assume-unchanged` 防 pull 覆盖。
 
 ```bash
+# VPS 一次性（把现有部署目录转换为 git 工作树；server/ deployment/ 等
+# 会被仓库版本对齐覆盖，data/ .env 等本地数据不受影响）
 cd /opt/onlyspace
-tar xzf /root/onlyspace-update.tar.gz --overwrite      # 解包覆盖 server/ deployment/ 等
+git init
+git remote add origin https://git.tic.cc/fon/only
+git fetch origin
+git checkout -b main origin/main
+git update-index --assume-unchanged deployment/Caddyfile   # Caddyfile 保留 VPS 域名，pull 不覆盖
+git status --short                                          # 应只显示本地未跟踪项（data/ .env 等）
+```
+
+> 说明：`git checkout -b main origin/main` 会把仓库代码写入工作树并覆盖同名旧文件
+> （server/、deployment/ 等对齐到仓库版本）；本地数据文件因 .gitignore 而保持不动。
+
+### 9.2 每次更新：本机 push → VPS pull → 重建 server 容器
+
+```powershell
+# 本机（Windows PowerShell）：新代码提交并推送到远程仓库
+cd D:\Seafile\product-产品\only
+git push origin main
+```
+
+```bash
+# VPS：拉取 → 重建 server 容器（server 代码进镜像，必须 --build）
+cd /opt/onlyspace
+git pull --ff-only
 cd deployment
-docker compose up -d --build server                    # server 代码进镜像，必须 --build
+docker compose up -d --build server
 docker compose ps                                       # 确认 server 重新 running/healthy
 ```
 
@@ -387,9 +400,9 @@ dart run .\bin\onlyspace.dart escrow --action download --store C:\deploy\b.json 
 | --- | --- |
 | 存量数据 | 不受影响（messages/devices/会话等全部不动，新表初始为空） |
 | 白名单 | 无需改动（既有设备认证不受影响） |
-| Caddy / HTTPS / 备份密钥 | 均无需改动 |
+| Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖） |
 | App 侧 | 需重新安装 APK 才能启用新 UI（CLI 不受影响） |
-| 回滚 | 保留上一份 tar 包重新解包 + `docker compose up -d --build` 即可 |
+| 回滚 | `cd /opt/onlyspace && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ deployment/ shared/` → 重新 `docker compose up -d --build server` |
 
 
 
