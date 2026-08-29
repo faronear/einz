@@ -415,3 +415,21 @@
 **验证：** app analyze 无问题 + flutter test **18 项全过**（golden 3 + app_lock 4 + lock_timer 5 + message_repository 6）；shared 16 项全过（未改动）。
 
 **遗留：** ① 附件离线发送 v1 不做（blob 需联网上传）；② 图片压缩/视频转码未做（原样上传，v1 够用）；③ 真机录音/播放/拍照/相册需真机验证（老板有手机后可测）。
+
+### App 附件扩展（音频文件/任意文件）+ 固定服务器地址（2026-08-29）
+
+老板新需求：① 支持上传音频文件（mp3 等）；② 支持任意文件附件；③ 配置界面不再让用户输入服务器地址（域名固定）。
+
+**协议层：** `shared kMessageTypes` 与 `server/src/messages.ts ALLOWED_TYPES` 同步加 `audio`/`file`（Server 有独立白名单校验，漏改会拒绝消息——已同步 + npm run build 过）。
+
+**chat_page：**
+- 附件 sheet 扩至 **6 项**（拍照/相册图片/拍摄视频/相册视频/音频文件/任意文件），新增 `_AttachmentKind` 枚举（顶层，Dart 不允许类内 enum）
+- **file_picker 12.x API 大改**（排障关键）：`FilePicker` 为 `abstract final class`，**无 `platform` 静态成员**；`pickFiles()` 返回 `List<PlatformFile>`（非 FilePickerResult）；`PlatformFile` **无 `bytes` getter**（`withData` 已废弃），用异步 `readAsBytes()`；`name` 非空（`?? 兜底` 是死代码）
+- audio 消息：与 voice 共用播放条（`_playAudioMessage` 泛化，临时文件扩展名按类型：voice→m4a、audio→原扩展名）；file 消息：文件卡片（📄 文件名 + 大小格式化 + 下载保存到应用文档目录 path_provider）
+- 附件选择后 caption=文件名（file/audio 消息正文即文件名，渲染直接显示）
+
+**setup_page：** 服务器地址输入框移除，改顶层常量 `kOnlySpaceServer = 'https://only.tic.cc'`（删 controller/dispose/4 处使用点）。
+
+**验证：** app analyze 无问题 + flutter test 18 项全过（golden setup_page 更新）+ shared 16 项 + server 冒烟全过。
+
+**遗留：** 文件附件下载保存到应用文档目录（用户可经文件管理器访问）；大文件上传未做进度条/断点（v1 内存读取）。

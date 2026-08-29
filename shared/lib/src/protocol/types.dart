@@ -5,7 +5,7 @@ library;
 const int kProtocolVersion = 1;
 
 /// 消息类型。
-const Set<String> kMessageTypes = {'text', 'image', 'video', 'voice', 'system'};
+const Set<String> kMessageTypes = {'text', 'image', 'video', 'voice', 'audio', 'file', 'system'};
 
 /// 认证 / 同步相关 REST 端点（PROTOCOL.md §4）。
 class Api {

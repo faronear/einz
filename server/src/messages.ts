@@ -3,7 +3,7 @@ import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
 import { attachmentsForMessages, type AttachmentMeta } from "./attachments.js";
 
-const ALLOWED_TYPES = new Set(["text", "image", "video", "voice", "system"]);
+const ALLOWED_TYPES = new Set(["text", "image", "video", "voice", "audio", "file", "system"]);
 
 export interface MessageEnvelope {
   v: number;

@@ -64,6 +64,7 @@
 - [x] **后台切回锁定**：ChatPage 生命周期监听（WidgetsBindingObserver：切后台记时、回前台超 30s 覆盖锁屏保留聊天状态）；LockPage 覆盖模式（asOverlay pop）；LockTimer 纯逻辑 + 5 项单测，flutter test 15 项全过
 - [x] **口令托管密钥（KEY_ESCROW.md，已实现）**：Server /key-escrow 三端点（表+冒烟用例）；shared KeyEscrowService（复用 backup.dart Argon2id+XChaCha20）+ 3 项单测；CLI escrow upload/download（全链路 e2e + 双端口令接入 e2e 过）；App 接入口令（SetPinDialog 可选上传）+ 新设备凭口令接入（③按钮）+ rotate 后解锁自动重传（_syncEscrow）；flutter test 18 项全过
 - [x] **App 附件消息（语音/图像/视频）**：MessageRepository.sendAttachment（encryptAttachment 加密 blob → /attachments 上传 + caption 消息 + 本地附件元数据落库）+ history 关联附件 + fetchAttachment 下载解密；chat_page：语音（按住说话录音 record → 播放条 audioplayers）、图像（拍照/相册 image_picker → 缩略展示/点击全屏）、视频（拍摄/相册 → 下载解密 video_player 播放）；插件懒构造避免测试环境 MissingPluginException；flutter test 18 项全过 + golden 更新
+- [x] **App 附件扩展（音频文件/任意文件）+ 固定服务器地址**：协议 kMessageTypes/Server ALLOWED_TYPES 加 audio/file；chat_page 附件 sheet 扩至 6 项（file_picker 12.x：FilePicker 静态方法 + readAsBytes）；audio 播放条（与 voice 共用 _playAudioMessage）、file 文件卡片（下载保存 path_provider）；setup_page 服务器地址改固定常量 kOnlySpaceServer（移除输入框）；全量验证过（server 冒烟/shared 16/app 18）
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
 - [ ] iOS 真机构建/签名/Ad Hoc（docs/IOS.md §3–§4）——待 Mac + Apple 付费账号（APNs 暂无账号，WS/轮询兜底）
 

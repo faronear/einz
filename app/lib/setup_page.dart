@@ -7,6 +7,9 @@ import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 
+/// 服务器固定地址（产品部署域名固定，无需用户输入）。
+const String kOnlySpaceServer = 'https://only.tic.cc';
+
 /// 设置页：一次性配置（生成设备身份 → 登记白名单 → 导入 Space Key → 认证）。
 ///
 /// 与 CLI 的 init/pubkey/import/auth 流程对齐（docs/DEPLOYMENT.md §4）：
@@ -22,7 +25,6 @@ class SetupPage extends StatefulWidget {
 
 class _SetupPageState extends State<SetupPage> {
   final _deviceId = TextEditingController(text: 'dev-mobile');
-  final _server = TextEditingController(text: 'https://only.tic.cc');
   final _spaceId = TextEditingController(text: 'space-demo');
   final _sealedKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -30,7 +32,6 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     _deviceId.dispose();
-    _server.dispose();
     _spaceId.dispose();
     _sealedKey.dispose();
     _escrowPassphrase.dispose();
@@ -86,7 +87,7 @@ class _SetupPageState extends State<SetupPage> {
       );
 
       // 2) challenge-response 认证
-      final api = ApiClient(_server.text.trim());
+      final api = ApiClient(kOnlySpaceServer);
       final challenge = await api.challenge(kp.deviceId);
       final opened = await sealOpen(
         s,
@@ -99,7 +100,7 @@ class _SetupPageState extends State<SetupPage> {
 
       // 3) 先设置启动锁（PIN 加密 Space Key 包），再进入聊天页
       final ok = await _setupLockAndEnter(
-        server: _server.text.trim(),
+        server: kOnlySpaceServer,
         spaceId: _spaceId.text.trim(),
         deviceId: kp.deviceId,
         spaceKeyB64: base64Encode(spaceKey),
@@ -109,7 +110,7 @@ class _SetupPageState extends State<SetupPage> {
       if (ok && mounted) {
         Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => ChatPage(
-            server: _server.text.trim(),
+            server: kOnlySpaceServer,
             spaceId: _spaceId.text.trim(),
             deviceId: kp.deviceId,
             spaceKey: spaceKey,
@@ -162,7 +163,7 @@ class _SetupPageState extends State<SetupPage> {
       setState(() => _status = '⚠️ 请先生成设备密钥（①），并把公钥加入服务器白名单');
       return;
     }
-    final server = _server.text.trim();
+    final server = kOnlySpaceServer;
     final spaceId = _spaceId.text.trim();
     final passphrase = _escrowPassphrase.text.trim();
     if (server.isEmpty || spaceId.isEmpty || passphrase.isEmpty) {
@@ -244,8 +245,6 @@ class _SetupPageState extends State<SetupPage> {
           ),
           const SizedBox(height: 16),
           TextField(controller: _deviceId, decoration: const InputDecoration(labelText: '设备 ID')),
-          const SizedBox(height: 12),
-          TextField(controller: _server, decoration: const InputDecoration(labelText: '服务器地址')),
           const SizedBox(height: 12),
           TextField(controller: _spaceId, decoration: const InputDecoration(labelText: 'Space ID')),
           const SizedBox(height: 12),
