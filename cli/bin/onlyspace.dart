@@ -71,6 +71,8 @@ Future<void> main(List<String> args) async {
       await _cmdRestore(opts);
     case 'rotate':
       await _cmdRotate(opts);
+    case 'seal':
+      await _cmdSeal(opts);
     case 'history':
       await _cmdHistory(opts);
     case 'help':
@@ -377,6 +379,22 @@ Future<void> _cmdRestore(ArgResults opts) async {
     restored.save(outPath);
     stdout.writeln('✅ 已恢复设备存储: $outPath（历史 ${restored.historyCount} 条 + 队列 ${restored.pendingCount} 条；提示：设备身份需重新 init 并登记白名单）');
   }
+}
+
+/// 用本机已持有的 Space Key 密封给新设备公钥，输出 sealed 副本（一次性配置：
+/// 把已有 Space Key 分发给新加入的设备，如 App 真机）。E2EE.md §7。
+Future<void> _cmdSeal(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  store.requireSpace();
+  final peerPubkey = _require(opts, 'peer-pubkey');
+  final out = _require(opts, 'out');
+
+  final s = await sodium();
+  final sealed = await sealFor(s, base64Decode(peerPubkey), base64Decode(store.spaceKey!));
+  File(out).writeAsStringSync(base64Encode(sealed));
+  stdout.writeln('✅ 已用本机 Space Key（v${store.keyVersion}）密封给目标设备公钥');
+  stdout.writeln('   副本已写入: $out（对方用 import 或 App 粘贴导入）');
 }
 
 /// Space Key 轮换（E2EE.md §9.1）：当前密钥归档（key_version+1），生成新密钥，

@@ -289,3 +289,36 @@
 - **验证**：按手册 §2 命令链完整跑通（init/config/import → 启动 server → auth 双端 → send → B sync 解出明文 → B listen 实时收到 → history 2 条完整）。**踩坑记录：** ① 跨 bash 会话的后台 server 会被清理 → 验证需单会话内完成；② server 须在 config.json 生成**之后**启动（否则 loadConfig 失败退出）。
 
 **遗留：** docker-compose.yml 未预置 ONLYSPACE_BACKUP_KEY（部署时注入）；生产环境建议按手册 §3 补 environment；App 真机验证仍待环境。
+
+### 正式部署完成（2026-08-28，only.tic.cc）
+
+老板按 DEPLOYMENT.md 分步部署（8 步全通）：VPS + Docker Compose + Caddy（TLS 自动签发）→ CLI 生成白名单 config.json（dev-a1/dev-b1）→ 上传 `/opt/onlyspace` → 注入 ONLYSPACE_BACKUP_KEY（.env）→ `docker compose up -d --build` → 验证 HTTPS/403 → CLI 远程双端认证收发闭环（B 同步解出明文）。
+
+**踩坑：** 部署教学中第 3 步漏了 B 的 `import`（sealed-b.txt 导入）——A 生成 Space Key 后 B 必须导入才有密钥解密；auth 只需身份密钥所以能过，sync 需要 Space Key 才报"设备尚未导入 Space Key"。已补。
+
+**部署事实：** 域名 only.tic.cc；服务器 /opt/onlyspace；白名单 deployment/config/config.json；备份密钥 deployment/.env；本地设备 store 在 C:\deploy\{a,b}.json，sealed-b.txt 待交给对方。
+
+**运维提醒：** ① 备份密钥（.env）务必留档；② 每日 `npm run backup`（cron）；③ 对方设备导入 sealed-b.txt + b.json 后即可互聊；④ App 真机验证仍待环境。
+
+### App 真机版：最小可用 UI + libsodium Android 集成 + 签名 APK（2026-08-29）
+
+老板选择"装 App 到真机"。调研：app 原为 Phase 0 骨架（仅密钥自检页），MessageRepository 已实现但未被 UI 使用；签名配置完好（keystore + key.properties）。
+
+**补齐最小可用 UI（app/lib/）：**
+
+- `setup_page.dart`：一次性配置页（设备 ID/服务器/space_id 输入 → 生成设备密钥展示公钥 → 粘贴 sealed 副本 → challenge-response 认证 → 进聊天页）
+- `chat_page.dart`：聊天页（MessageRepository 历史/发送 + 每 3 秒轮询 sync 准实时；正式版换 WS listen）
+- `main.dart` 入口改为 SetupPage；widget_test 更新匹配新 UI（6 项测试全过）
+
+**关键坑（libsodium Android 集成）：**
+
+- shared 的 loadDynamicLibrary Android 分支 `open('libsodium.so')`，需要 APK 自带 .so
+- 尝试 `sodium_libs ^2.2.1+6`（sodium 官方推荐 Flutter 加载方式）→ **工具链不兼容**：该包用 AGP 7.3.0 + Kotlin 1.7.10 + compileSdk 33（Built-in Kotlin 迁移失败 + AAR metadata 15 项不兼容），补丁 compileSdk 也无法绕过 Kotlin 编译 → 放弃
+- 尝试 NDK 交叉编译 libsodium（Git Bash 下 configure 失败）→ 放弃
+- **最终方案**：直接从 sodium_libs 包提取预编译的 `android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86,x86_64}/libsodium.so` 拷入 app jniLibs（绕开其 Gradle 插件），移除 sodium_libs 依赖 → 构建成功
+
+**CLI 补 seal 命令**：`seal --store <s> --peer-pubkey <b64> --out <f>`——用本机 Space Key 密封给新设备公钥（App 真机一次性配置需要"对 App 公钥的 sealed 副本"，原 CLI 无此命令），实测通过。
+
+**构建与验证：** 外部临时构建（D:\build-onlyspace，规避中文路径，JAVA_HOME 需指到 jdk-17.0.20.1+1 子目录）→ `flutter build apk --release` 成功（55.0MB）→ apksigner 验证签名 **CN=OnlySpace** ✅ → 产物拷回 `app/build/app-release.apk`，jniLibs/pubspec 同步回源仓库。
+
+**真机首次使用流程（待老板执行）：** 装 APK → App 生成密钥 → 公钥加服务器 config.json（devices 数组新增条目）+ 重启 server 容器 → 本地 `seal` 生成副本 → App 粘贴 → 认证进聊天页。
