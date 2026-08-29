@@ -1,10 +1,11 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
 
 import 'chat_page.dart';
+import 'data/app_lock.dart';
+import 'data/local_database.dart';
 
 /// 设置页：一次性配置（生成设备身份 → 登记白名单 → 导入 Space Key → 认证）。
 ///
@@ -85,23 +86,60 @@ class _SetupPageState extends State<SetupPage> {
       final session = await api.verify(challenge.challengeId, base64Encode(opened));
       if (!mounted) return;
 
-      // 3) 进入聊天页
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => ChatPage(
-          server: _server.text.trim(),
-          spaceId: _spaceId.text.trim(),
-          deviceId: kp.deviceId,
-          spaceKey: spaceKey,
-          keyVersion: 1,
-          token: session.sessionToken,
-        ),
-      ));
+      // 3) 先设置启动锁（PIN 加密 Space Key 包），再进入聊天页
+      final ok = await _setupLockAndEnter(
+        server: _server.text.trim(),
+        spaceId: _spaceId.text.trim(),
+        deviceId: kp.deviceId,
+        spaceKeyB64: base64Encode(spaceKey),
+        keyVersion: 1,
+        token: session.sessionToken,
+      );
+      if (ok && mounted) {
+        Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => ChatPage(
+            server: _server.text.trim(),
+            spaceId: _spaceId.text.trim(),
+            deviceId: kp.deviceId,
+            spaceKey: spaceKey,
+            keyVersion: 1,
+            token: session.sessionToken,
+          ),
+        ));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _status = '❌ 导入/认证失败: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// 认证成功后设置启动锁：弹对话框输入 PIN（两次确认）→ 生成恢复码展示 → 确认后进聊天页。
+  /// 返回 true 表示 PIN 已设置完成。
+  Future<bool> _setupLockAndEnter({
+    required String server,
+    required String spaceId,
+    required String deviceId,
+    required String spaceKeyB64,
+    required int keyVersion,
+    required String token,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => SetPinDialog(
+        payload: AppLockPayload(
+          server: server,
+          spaceId: spaceId,
+          deviceId: deviceId,
+          spaceKeyB64: spaceKeyB64,
+          keyVersion: keyVersion,
+          token: token,
+        ),
+      ),
+    );
+    return ok ?? false;
   }
 
   @override
@@ -170,6 +208,139 @@ class _SetupPageState extends State<SetupPage> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// 设置启动锁对话框（两段式）：
+/// 阶段 1：输入 PIN（两次确认）→ AppLockService.setPin 加密 Space Key 包；
+/// 阶段 2：展示 12 词恢复码（PIN 丢失兑底），确认已保存后关闭并进入聊天页。
+class SetPinDialog extends StatefulWidget {
+  const SetPinDialog({super.key, required this.payload});
+
+  final AppLockPayload payload;
+
+  @override
+  State<SetPinDialog> createState() => _SetPinDialogState();
+}
+
+class _SetPinDialogState extends State<SetPinDialog> {
+  final _pin = TextEditingController();
+  final _confirm = TextEditingController();
+  late final AppLockService _lock;
+  bool _stage2 = false;
+  bool _busy = false;
+  String? _error;
+  String? _recoveryCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _lock = AppLockService(LocalDatabase());
+  }
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _setup() async {
+    final pin = _pin.text;
+    if (pin.length < 4) {
+      setState(() => _error = 'PIN 至少 4 位');
+      return;
+    }
+    if (pin != _confirm.text) {
+      setState(() => _error = '两次输入的 PIN 不一致');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final code = await _lock.setPin(pin, payload: widget.payload);
+      if (!mounted) return;
+      setState(() {
+        _recoveryCode = code;
+        _stage2 = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '设置失败: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_stage2 ? '保存恢复码' : '设置启动锁'),
+      content: _stage2 ? _buildRecovery() : _buildPinForm(),
+      actions: [
+        if (!_stage2)
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('跳过')),
+        if (_stage2)
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('我已保存，进入聊天'),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPinForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('每次启动需输入 PIN 才能查看消息；Space Key 将被 PIN 加密保护。'),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _pin,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'PIN（至少 4 位）', border: OutlineInputBorder()),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _confirm,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: '确认 PIN', border: OutlineInputBorder()),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+        ],
+        const SizedBox(height: 12),
+        FilledButton(
+          onPressed: _busy ? null : _setup,
+          child: _busy
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('设置 PIN'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecovery() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('请离线保存以下恢复码（PIN 丢失时用它解锁）：', style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        Card(
+          color: Colors.amber.shade50,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: SelectableText(_recoveryCode ?? '', style: const TextStyle(fontSize: 14)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text('恢复码与 PIN 分开保存；丢失恢复码且忘记 PIN 将无法解锁。',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
     );
   }
 }

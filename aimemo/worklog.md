@@ -335,3 +335,19 @@
 - `docs/IOS.md`：Mac 构建指引（clone/构建/真机签名/Ad Hoc/已知点/快速参考）
 
 **遗留/下一步（Mac 侧执行）：** ① 远程仓库已配置并推送成功（老板自建 Gitea：`https://git.tic.cc/fon/only`，main 已推，Mac 直接 clone）；② Mac clone → `flutter config --no-enable-swift-package-manager` → build ios 验证 libsodium 链接；③ 真机签名运行；④ APNs/Ad Hoc 待 Apple 付费账号（Server `sendPushHint` 仍为日志占位）。
+
+### App 启动锁（方案 B：PIN 加密密钥；2026-08-29）
+
+**需求：** 老板要求每次启动 App 输入验证码/口令才允许查看消息。给出三层次方案（A 本地校验 / B PIN 加密密钥 / C 生物识别增强），老板选 **B（推荐）**：Argon2id 派生密钥**加密 Space Key 包**，输错 PIN 即解不出密钥——防偷看 + 防设备取证，且复用 backup.dart 现有基建（encryptBackup/decryptBackup 的 recoveryCode 即 passphrase，XChaCha20 格式一致）。
+
+**实现（app/lib/）：**
+
+- `data/app_lock.dart`：`AppLockService`（setPin 双份加密：PIN 一份 + 12 词恢复码一份存 drift app_state；unlock 解密；错误 5 次 → 锁定 30s 纯本地计时；unlockWithRecovery 兑底；AppLockPayload 含 server/spaceKeyB64/spaceId/deviceId/keyVersion/token）+ AppLockException/AppLockLockedException
+- `lock_page.dart`：锁屏页（PIN 输入/锁定倒计时 1s 刷新/展开恢复码入口/解锁成功进 ChatPage）
+- `main.dart`：`StartupGate` 启动门（检查 isSetup → LockPage or SetupPage）
+- `setup_page.dart`：认证成功后 `_setupLockAndEnter` 弹 `SetPinDialog`（PIN 两次确认 → 展示恢复码要求离线保存 → 进聊天页）；**注意 payload 需含 server 字段**（锁屏后直接进聊天页需要）
+- `test/app_lock_test.dart`：4 项单测（设置+正确解锁 / 错误 PIN / 5 次锁定期间正确 PIN 也被拒 / 恢复码兑底+锁定清除）
+
+**验证：** app flutter test **10 项全过**（原 6 + app_lock 4）。widget_test 改为直接渲染 SetupPage（绕过 StartupGate——它依赖真实 drift 库，widget 测试环境用内存库）。
+
+**设计要点（可写 docs/APP_LOCK.md 用）：** PIN 纯本地验证、Server 不见口令；锁定纯本地计时防爆破；恢复码与 PIN 分开保存；冷启动必锁，后台切回锁定留待后续阶段（app lifecycle observer）。
