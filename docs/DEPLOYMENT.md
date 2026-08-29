@@ -331,5 +331,65 @@ dart run bin/onlyspace.dart import \
 - [ ] `backup`/`restore`（恢复码）闭环通过
 - [ ] 撤销 B：B 认证 403、A 收到 key.rotation、A 轮换后双版本历史可解
 
+## 9. 版本升级（新代码上线）
+
+> 原则：Server 代码变更均为**向后兼容**（新增表/端点，存量接口与数据不动）。
+> 新表由 `CREATE TABLE IF NOT EXISTS` 在启动时自动创建，**无需手动迁移**。
+
+### 9.1 代码传输：git archive + scp（推荐）或 git pull
+
+```powershell
+# 方式 A：git archive 打包上传（不要求 VPS 持有仓库凭据，最小权限）
+cd D:\Seafile\product-产品\only
+git archive --format=tar.gz -o onlyspace-update.tar.gz main
+scp onlyspace-update.tar.gz root@<VPS>:/root/
+
+# 方式 B：VPS 已 clone 仓库且配好 git.tic.cc 凭据时，直接增量拉取
+ssh root@<VPS> "cd /opt/onlyspace && git pull"
+```
+
+> 为什么默认用 git archive 而非 push/pull：正式部署时远程仓库尚未建立（git.tic.cc/fon/only
+> 是后补的），且 VPS 只负责运行代码，不必保留仓库访问令牌——archive + scp 把"代码传输"与
+> "仓库凭据"解耦。若 VPS 已配好凭据，git pull 同样可用（增量、可追溯），两者任选其一保持一致即可。
+
+### 9.2 VPS 解包 + 重建 server 容器
+
+```bash
+cd /opt/onlyspace
+tar xzf /root/onlyspace-update.tar.gz --overwrite      # 解包覆盖 server/ deployment/ 等
+cd deployment
+docker compose up -d --build server                    # server 代码进镜像，必须 --build
+docker compose ps                                       # 确认 server 重新 running/healthy
+```
+
+> Caddy 容器与 `deployment/.env`（备份密钥、域名等）无需改动。
+
+### 9.3 验证新端点
+
+```bash
+# 新端点已注册（401 = 端点活；404 = 尚未生效）
+curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
+```
+
+### 9.4 客户端实测（以口令托管为例，本机 PowerShell）
+
+```powershell
+cd D:\Seafile\product-产品\only\cli
+dart run .\bin\onlyspace.dart escrow --action upload --store C:\deploy\a.json `
+  --server https://only.tic.cc --passphrase "你的接入口令"
+dart run .\bin\onlyspace.dart escrow --action download --store C:\deploy\b.json `
+  --server https://only.tic.cc --passphrase "你的接入口令"
+```
+
+### 9.5 升级注意事项
+
+| 项 | 说明 |
+| --- | --- |
+| 存量数据 | 不受影响（messages/devices/会话等全部不动，新表初始为空） |
+| 白名单 | 无需改动（既有设备认证不受影响） |
+| Caddy / HTTPS / 备份密钥 | 均无需改动 |
+| App 侧 | 需重新安装 APK 才能启用新 UI（CLI 不受影响） |
+| 回滚 | 保留上一份 tar 包重新解包 + `docker compose up -d --build` 即可 |
+
 
 
