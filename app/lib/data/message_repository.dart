@@ -74,6 +74,74 @@ class MessageRepository {
     return messageId;
   }
 
+  /// 发送附件消息（语音/图像/视频，PROTOCOL.md §6）：
+  /// 加密文件 blob 上传 /attachments + 发送 caption 消息 + 本地附件元数据落库。
+  /// 无 token 时消息入 pending 队列（附件 blob 需联网时上传，v1 不做离线附件补传）。
+  /// 返回 message_id。
+  Future<String> sendAttachment({
+    required Uint8List fileBytes,
+    required String fileName,
+    required String type, // image | video | voice
+    String? caption,
+  }) async {
+    final messageId = _uuidv7();
+    final attachmentId = _uuidv7();
+    final plain = caption ?? (type == 'voice' ? '🎤 语音消息' : '📎 $fileName');
+
+    // 1) 加密文件（密文 + sha256 + nonce + size）
+    final enc = await encryptAttachment(
+      fileBytes: fileBytes,
+      spaceKey: spaceKey,
+      attachmentId: attachmentId,
+      spaceId: spaceId,
+      keyVersion: keyVersion,
+    );
+
+    // 2) 发送 caption 消息（type 标记，供接收端渲染）
+    final env = await encryptMessage(
+      plaintext: plain,
+      spaceKey: spaceKey,
+      spaceId: spaceId,
+      senderDeviceId: deviceId,
+      messageId: messageId,
+      type: type,
+      keyVersion: keyVersion,
+    );
+    await _insertLocal(env, status: 'pending');
+
+    final t = token;
+    if (t != null) {
+      try {
+        // 3) 上传密文 blob（x-attachment-meta 头带元数据）
+        await api.postAttachment(
+          messageId: messageId,
+          attachmentId: attachmentId,
+          keyVersion: keyVersion,
+          size: enc.size,
+          sha256: enc.sha256,
+          nonce: base64Encode(enc.nonce),
+          blob: enc.cipher,
+          token: t,
+        );
+        // 4) 发消息
+        final result = await api.postMessage(env, t);
+        await _markSent(env.messageId, result.serverSequence, result.createdAt);
+        // 5) 本地附件元数据落库（供历史渲染关联）
+        await _insertAttachmentMeta({
+          'attachment_id': attachmentId,
+          'message_id': messageId,
+          'key_version': keyVersion,
+          'size': enc.size,
+          'sha256': enc.sha256,
+          'nonce': base64Encode(enc.nonce),
+        });
+      } on Exception {
+        // 失败：消息留 pending（补发时消息会重发，但附件 blob 未上传 v1 不自动补传）
+      }
+    }
+    return messageId;
+  }
+
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
   /// 返回本次新增的消息条数。
   Future<int> sync() async {
@@ -129,7 +197,8 @@ class MessageRepository {
   }
 
   /// 读取本地历史（解密为明文，按 server_sequence 升序；未同步的排最后）。
-  Future<List<({MessageEnvelope env, String plaintext, String sender})>> history() async {
+  /// 附件消息附带本地附件元数据（attachment != null，供渲染时下载解密展示）。
+  Future<List<({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment})>> history() async {
     final rows = await (db.select(db.localMessages)
           ..where((m) => m.spaceId.equals(spaceId)))
         .get();
@@ -143,7 +212,7 @@ class MessageRepository {
       return an.compareTo(bn);
     });
 
-    final out = <({MessageEnvelope env, String plaintext, String sender})>[];
+    final out = <({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment})>[];
     for (final row in rows) {
       final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
       final key = _keyForVersion(env.keyVersion);
@@ -155,9 +224,47 @@ class MessageRepository {
         spaceKey: key,
         spaceId: spaceId,
       );
-      out.add((env: env, plaintext: plain, sender: env.senderDeviceId == deviceId ? 'me' : 'peer'));
+      final att = await (db.select(db.localAttachments)
+            ..where((a) => a.messageId.equals(env.messageId)))
+          .getSingleOrNull();
+      out.add((
+        env: env,
+        plaintext: plain,
+        sender: env.senderDeviceId == deviceId ? 'me' : 'peer',
+        attachment: att == null
+            ? null
+            : {
+                'attachment_id': att.attachmentId,
+                'key_version': att.keyVersion,
+                'size': att.size,
+                'sha256': att.sha256,
+                'nonce': att.nonce,
+              },
+      ));
     }
     return out;
+  }
+
+  /// 下载并解密附件密文（校验 sha256 + AEAD 解密，PROTOCOL.md §6.2）。
+  Future<Uint8List> fetchAttachment({
+    required String attachmentId,
+    required int keyVersion,
+    required String sha256,
+    required Uint8List nonce,
+  }) async {
+    final t = token;
+    if (t == null) throw StateError('未认证，无法下载附件');
+    final key = _keyForVersion(keyVersion);
+    if (key == null) throw StateError('缺少 key_version=$keyVersion 的 Space Key');
+    final blob = await api.getAttachment(attachmentId, t);
+    return decryptAttachment(
+      cipherText: blob,
+      nonce: nonce,
+      spaceKey: key,
+      attachmentId: attachmentId,
+      spaceId: spaceId,
+      keyVersion: keyVersion,
+    );
   }
 
   /// 按 key_version 选解密密钥：当前版本用 spaceKey，旧版本用归档（E2EE.md §9.2）。

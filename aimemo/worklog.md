@@ -391,3 +391,27 @@
 **排障记录（关键）：** ① bash 内后台 server 不 kill 必超时（工具等待全部子进程）→ 改用 **Node 脚本 spawn 管理 server 生命周期**（finally kill）；② `dart run` 进程被杀后留下编译锁会卡死 → 用 `dart compile exe` 编译 CLI 后直跑 exe；③ shared 测试用 flutter_test 报 URI 不存在（纯 Dart 包用 `package:test`）；④ `package:test` 的 expect 只接受 2 个位置参数；⑤ C 新设备需先加白名单再 escrow download（auth 依赖白名单公钥）；⑥ CLI sync 前需先 auth（store.sessionToken）。
 
 **部署影响：** VPS 现有 server 容器需重新构建（新表 + 新端点）才能使用口令托管；存量数据不受影响（key_escrow 表为空）。
+
+### App 附件消息：语音 / 图像 / 视频（2026-08-29）
+
+老板需求：聊天页添加语音输入 + 图像、视频功能。协议层（kMessageTypes 含 image/video/voice）与 Server 附件链路早已就绪，本次为 App 端完整接入。
+
+**依赖**（pubspec 新增）：`image_picker ^1.2.3`（拍照/拍摄/相册）、`record ^7.1.1`（录音）、`audioplayers ^6.8.1`（语音播放）、`video_player ^2.14.0`（视频播放）。
+
+**MessageRepository**（app/lib/data/message_repository.dart）：
+- `sendAttachment({fileBytes, fileName, type, caption})`：encryptAttachment 加密 blob → `api.postAttachment`（/attachments，x-attachment-meta 带 sha256/nonce/size）→ 发 caption 消息（type 标记）→ 本地附件元数据落库；无 token 时消息入 pending（v1 附件 blob 不做离线补传）
+- `history()` 扩展：按 message_id 关联 local_attachments，返回附件元数据
+- `fetchAttachment({attachmentId, keyVersion, sha256, nonce})`：下载密文 → decryptAttachment（AEAD + sha256 校验）
+
+**chat_page**（语音/图像/视频三类 UI）：
+- 语音：输入区 mic 图标**按住说话**（GestureDetector 长按 → record 录音到临时 m4a → 松开 `sendAttachment(type: voice)`）→ 接收渲染播放条（点击 `fetchAttachment` 解密 → 临时文件 → audioplayers 播放，onPlayerComplete 复位）
+- 图像：附件 sheet（拍照/相册图片）→ pickImage(maxWidth:1600) → `sendAttachment(type: image)` → 接收缩略图（FutureBuilder 下载解密 → Image.memory，`_imageCache` 防重复下载）→ 点击全屏（InteractiveViewer）
+- 视频：sheet（拍摄视频/相册视频，pickVideo maxDuration 1min）→ `sendAttachment(type: video)` → 接收播放按钮（下载解密 → video_player 对话框播放）
+
+**排障记录（关键）：**
+- `AudioRecorder()`/`AudioPlayer()` **构造即触发原生平台通道** → widget 测试 MissingPluginException → 改为**懒构造**（仅录音/播放时 `??=` 实例化），渲染路径不触碰平台通道
+- golden ChatPage 基准图更新（新增 mic/+ 按钮后界面变化）；flutter test failures 产物不入库（rm 清理）
+
+**验证：** app analyze 无问题 + flutter test **18 项全过**（golden 3 + app_lock 4 + lock_timer 5 + message_repository 6）；shared 16 项全过（未改动）。
+
+**遗留：** ① 附件离线发送 v1 不做（blob 需联网上传）；② 图片压缩/视频转码未做（原样上传，v1 够用）；③ 真机录音/播放/拍照/相册需真机验证（老板有手机后可测）。
