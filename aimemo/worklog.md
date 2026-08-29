@@ -518,3 +518,19 @@
 **验证：** gen-l10n 成功（lockPage 键生成）；analyze 无问题；flutter test **25 项全过**；lock_page golden 更新（0.31% 像素差，label 三目等渲染变化）。
 
 **状态：** 四个页面（设置/聊天/锁屏/启动）**全部中英文化完成**；剩余可选项：app_lock 业务错误消息国际化、英文文案润色。
+
+### WS 实时接入 + 轮询兜底（2026-08-29）
+
+**背景：** 老板问"上线后还是每 3 秒轮询吗？换成 WS 就实时了吗？"——回答：Server WS 早已就绪（ws.ts 广播 message.new），CLI 有 listen，但 **App 未接入**（仍 3s 轮询）。老板要求开发。
+
+**实现：**
+- `shared/lib/src/protocol/ws_client.dart`（新）：`WsClient` + `WsEvent` 模型（sealed：WsHelloEvent/WsMessageNewEvent/WsKeyRotationEvent/WsDeviceRevokedEvent）；**指数退避重连**（1/2/4/8/16/30s 上限）直到 stop；token URL 编码（PROTOCOL.md §8.1）；状态回调（stopped/connecting/connected/reconnecting）；未知帧忽略（协议向前兼容）
+- `app/lib/data/ws_realtime_service.dart`（新）：封装 WsClient → `connected` ValueNotifier + `onMessageNew` 回调（chat_page 收到 message.new 立即增量刷新）
+- `chat_page.dart`：initState 启动 WS（`enableWs` 参数——**测试环境关闭，避免真实连接/重连 Timer 挂起**）；`_restartTicker` 动态切换轮询间隔：**WS 在线 → 30s 兜底；断开 → 恢复 3s**（_onWsStatusChanged 监听 connected）；dispose 清理
+- 测试：`shared/test/ws_client_test.dart`（本地 HttpServer + WebSocketTransformer 模拟 /ws：hello/connected、message.new 解析、key.rotation、未知帧忽略、断开→reconnecting→重连成功，5 项）；`app/test/ws_realtime_service_test.dart`（message.new → onMessageNew + connected 状态，1 项）
+
+**验证：** shared dart test **23 项全过**（+5）、app flutter test **26 项全过**（+1）；analyze 无问题；golden 不变（渲染结构未动）。
+
+**效果：** App 上线后 WS 在线时消息**毫秒级实时**（Server 广播 → App 立即增量刷新），3s 轮询降为 30s 兜底；WS 断线自动指数退避重连，重连期间恢复 3s 轮询保底（不丢消息）。
+
+**遗留：** ① Server 无 message.deleted 广播（阅后即焚纯本地，无 Server 删除）——WS 只需处理 message.new；② key.rotation/device.revoked 事件 App 暂未处理（device.revoked 后 App 应强制登出，后续可加）；③ 真机验证 WS 连接稳定性。

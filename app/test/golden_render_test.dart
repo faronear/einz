@@ -122,6 +122,7 @@ void main() {
         token: 'tok',
         db: db,
         api: api,
+        enableWs: false, // 测试环境不连真实 WS（避免重连 Timer 挂起）
       ),
     ));
     // 等 sync + history 异步完成（fake api 返回 2 条消息，落库后解密显示）

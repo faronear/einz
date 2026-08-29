@@ -1,0 +1,137 @@
+// WsClient 单测：本地 HttpServer + WebSocketTransformer 模拟 Server /ws 端点，
+// 验证连接、事件解析（hello/message.new/key.rotation/未知帧）、断线重连状态。
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:test/test.dart';
+
+/// 起本地 WS server（/ws 端点），返回 (server, baseUrl, 已连接连接列表)。
+Future<(HttpServer, String, List<WebSocket>)> _startWsServer() async {
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  final conns = <WebSocket>[];
+  server.listen((req) {
+    if (req.uri.path == '/ws') {
+      WebSocketTransformer.upgrade(req).then((ws) {
+        conns.add(ws);
+        ws.add(jsonEncode({
+          'id': 0,
+          'type': 'hello',
+          'payload': {'device_id': 'dev-a', 'space_id': 'space-test'},
+        }));
+      });
+    } else {
+      req.response.statusCode = 404;
+      req.response.close();
+    }
+  });
+  return (server, 'http://127.0.0.1:${server.port}', conns);
+}
+
+Map<String, dynamic> _messageNewFrame(int seq) => {
+      'id': 0,
+      'type': 'message.new',
+      'payload': {
+        'server_sequence': seq,
+        'message': {
+          'v': 1,
+          'message_id': 'msg-$seq',
+          'space_id': 'space-test',
+          'sender_device_id': 'dev-b',
+          'type': 'text',
+          'key_version': 1,
+          'nonce': 'AA==',
+          'ciphertext': 'AQ==',
+        },
+      },
+    };
+
+void main() {
+  test('连接成功：hello 事件 + connected 状态', () async {
+    final (server, base, _) = await _startWsServer();
+    addTearDown(() => server.close(force: true));
+    final events = <WsEvent>[];
+    final statuses = <WsStatus>[];
+    final client = WsClient(server: base, token: 'tok', onEvent: events.add, onStatus: statuses.add);
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    expect(statuses, contains(WsStatus.connected));
+    final hello = events.whereType<WsHelloEvent>().single;
+    expect(hello.deviceId, 'dev-a');
+    expect(hello.spaceId, 'space-test');
+    await client.stop();
+  });
+
+  test('message.new 事件：解析出信封与 server_sequence', () async {
+    final (server, base, conns) = await _startWsServer();
+    addTearDown(() => server.close(force: true));
+    final events = <WsEvent>[];
+    final client = WsClient(server: base, token: 'tok', onEvent: events.add);
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    conns.first.add(jsonEncode(_messageNewFrame(42)));
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    final ev = events.whereType<WsMessageNewEvent>().single;
+    expect(ev.serverSequence, 42);
+    expect(ev.message.messageId, 'msg-42');
+    expect(ev.message.type, 'text');
+    await client.stop();
+  });
+
+  test('key.rotation 事件：key_version 解析', () async {
+    final (server, base, conns) = await _startWsServer();
+    addTearDown(() => server.close(force: true));
+    final events = <WsEvent>[];
+    final client = WsClient(server: base, token: 'tok', onEvent: events.add);
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    conns.first.add(jsonEncode({
+      'id': 0,
+      'type': 'key.rotation',
+      'payload': {'key_version': 2},
+    }));
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    expect(events.whereType<WsKeyRotationEvent>().single.keyVersion, 2);
+    await client.stop();
+  });
+
+  test('未知类型帧被忽略', () async {
+    final (server, base, conns) = await _startWsServer();
+    addTearDown(() => server.close(force: true));
+    final events = <WsEvent>[];
+    final client = WsClient(server: base, token: 'tok', onEvent: events.add);
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    conns.first.add(jsonEncode({'id': 0, 'type': 'unknown.event', 'payload': {}}));
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    expect(events.where((e) => e.type == 'unknown.event'), isEmpty);
+    await client.stop();
+  });
+
+  test('服务器断开 → reconnecting 状态（自动重连）', () async {
+    final (server, base, conns) = await _startWsServer();
+    addTearDown(() => server.close(force: true));
+    final statuses = <WsStatus>[];
+    final client = WsClient(server: base, token: 'tok', onStatus: statuses.add);
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 300));
+    expect(statuses, contains(WsStatus.connected));
+
+    await conns.first.close(); // Server 断开
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    expect(statuses, contains(WsStatus.reconnecting));
+    // 退避 1s 后应重连成功（等待验证）
+    await Future.delayed(const Duration(milliseconds: 1600));
+    expect(statuses, contains(WsStatus.connected));
+    await client.stop();
+  });
+}

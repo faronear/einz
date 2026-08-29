@@ -17,6 +17,7 @@ import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/message_repository.dart';
+import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 
@@ -35,6 +36,7 @@ class ChatPage extends StatefulWidget {
     required this.token,
     this.db,
     this.api,
+    this.enableWs = true,
   });
 
   final String server;
@@ -49,6 +51,9 @@ class ChatPage extends StatefulWidget {
 
   /// 测试注入用（fake api）；默认按 [server] 新建（生产路径）。
   final ApiClient? api;
+
+  /// WS 实时开关（测试环境关闭，避免真实连接与重连 Timer）。
+  final bool enableWs;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -76,6 +81,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _recordingPath;
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
+  WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
 
   /// 阅后即焚档位文案（l10n 映射）。
   String _burnOptionLabel(int seconds, AppLocalizations l10n) {
@@ -117,9 +123,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
     _loadBurnLabel();
-    // 每 3 秒轮询同步（准实时；正式版用 WS listen 推送）
-    _ticker = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
+    // 每 3 秒轮询同步（WS 连接成功后降频为 30s 兜底；断开恢复高频——见 _onWsStatusChanged）
+    _restartTicker(const Duration(seconds: 3));
     _registerPushToken();
+    if (widget.enableWs) {
+      final ws = WsRealtimeService(server: widget.server, token: widget.token);
+      _ws = ws;
+      ws.connected.addListener(_onWsStatusChanged);
+      ws.start(onMessageNew: () => _refresh());
+    }
+  }
+
+  /// 重建轮询 ticker（WS 状态变化时切换间隔）。
+  void _restartTicker(Duration interval) {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(interval, (_) => _refresh());
+  }
+
+  /// WS 状态变化：在线 → 降频兜底（30s）；离线 → 恢复高频轮询（3s）。
+  void _onWsStatusChanged() {
+    final online = _ws?.connected.value ?? false;
+    _restartTicker(online ? const Duration(seconds: 30) : const Duration(seconds: 3));
   }
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
@@ -221,6 +245,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _ws?.connected.removeListener(_onWsStatusChanged);
+    _ws?.stop();
     _scrollController.dispose();
     _input.dispose();
     super.dispose();
