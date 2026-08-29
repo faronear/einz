@@ -50,6 +50,44 @@ class SessionResult {
       );
 }
 
+/// 空间设备信息（GET /space 返回）：device_id → person_id 映射，
+/// 用于判断消息是否"同一个人"发送（多设备身份语义，PROTOCOL.md §7.3）。
+class SpaceDevice {
+  const SpaceDevice({
+    required this.deviceId,
+    required this.personId,
+    required this.status,
+    this.lastSeen,
+  });
+
+  final String deviceId;
+  final String personId;
+  final String status;
+  final int? lastSeen;
+
+  factory SpaceDevice.fromJson(Map<String, dynamic> json) => SpaceDevice(
+        deviceId: json['device_id'] as String,
+        personId: json['person_id'] as String,
+        status: json['status'] as String,
+        lastSeen: json['last_seen'] as int?,
+      );
+}
+
+/// 空间信息（GET /space 响应）。
+class SpaceResult {
+  const SpaceResult({required this.spaceId, required this.devices});
+
+  final String spaceId;
+  final List<SpaceDevice> devices;
+
+  factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(
+        spaceId: json['space_id'] as String,
+        devices: (json['devices'] as List)
+            .map((d) => SpaceDevice.fromJson(d as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 /// 上传消息的返回。
 class PostMessageResult {
   PostMessageResult({required this.messageId, required this.serverSequence, required this.createdAt});

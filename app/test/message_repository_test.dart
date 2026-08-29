@@ -21,6 +21,14 @@ class FakeApi extends ApiClient {
   /// 编排的 sync 页（每页是一个 SyncPage）。
   List<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> pages = [];
 
+  /// 编排的 /space 设备列表（person 映射测试用）。
+  List<SpaceDevice> spaceDevices = [];
+
+  @override
+  Future<SpaceResult> getSpace(String token) async {
+    return SpaceResult(spaceId: 'space-test', devices: spaceDevices);
+  }
+
   @override
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
     posted.add(env.messageId);
@@ -71,6 +79,47 @@ void main() {
         keyVersion: 1,
         token: token,
       );
+
+  test('person 身份判断：同 person 不同设备显示 me，对方设备显示 peer', () async {
+    final api = FakeApi();
+    api.spaceDevices = [
+      const SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+      const SpaceDevice(deviceId: 'dev-a2', personId: 'person-a', status: 'active'),
+      const SpaceDevice(deviceId: 'dev-b', personId: 'person-b', status: 'active'),
+    ];
+    final repo = makeRepo(api, token: 'tok');
+    await repo.refreshDeviceMap();
+
+    // 同 person 的另一设备（dev-a2）与对方设备（dev-b）各发一条消息
+    final fromA2 = await encryptMessage(
+      plaintext: '来自我的另一台设备',
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      senderDeviceId: 'dev-a2',
+      messageId: 'msg-a2-1',
+      keyVersion: 1,
+    );
+    final fromB = await encryptMessage(
+      plaintext: '来自对方',
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      senderDeviceId: 'dev-b',
+      messageId: 'msg-b-1',
+      keyVersion: 1,
+    );
+    api.pages.add((
+      messages: [fromA2, fromB],
+      attachmentsMeta: <Map<String, dynamic>>[],
+      lastSequence: 2,
+      hasMore: false,
+    ));
+
+    await repo.sync();
+    final hist = await repo.history();
+    final byMsg = {for (final h in hist) h.env.messageId: h.sender};
+    expect(byMsg['msg-a2-1'], 'me', reason: '同 person 的另一设备消息应显示为 me');
+    expect(byMsg['msg-b-1'], 'peer', reason: '对方设备消息显示为 peer');
+  });
 
   test('离线发送：无 token 时消息入 pending 队列，本地可见', () async {
     final api = FakeApi();

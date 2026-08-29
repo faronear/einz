@@ -433,3 +433,18 @@
 **验证：** app analyze 无问题 + flutter test 18 项全过（golden setup_page 更新）+ shared 16 项 + server 冒烟全过。
 
 **遗留：** 文件附件下载保存到应用文档目录（用户可经文件管理器访问）；大文件上传未做进度条/断点（v1 内存读取）。
+
+### 多设备身份判断修复（person_id，2026-08-29）
+
+**背景：** 老板询问"A 设备发的消息，A 的其他设备上线后能否获得"——确认同步机制已支持（sync 按 space 维度 + 锚点只在 sync 推进），但发现**显示语义瑕疵**：sender 判断基于 device_id，同用户另一设备（dev-a2）的消息在 dev-a 上显示为"对方"（气泡方向错）。阅后即焚计划的"自己的消息"语义需要 person 维度。老板决定先单独修复。
+
+**实现：**
+- `shared`：`SpaceDevice`/`SpaceResult`（GET /space 返回 device_id→person_id 映射，const 构造）+ ApiClient.getSpace；测试 `get_space_test.dart`（本地 HttpServer 模拟 /space，2 项）
+- `app`：MessageRepository 加 `refreshDeviceMap()`（getSpace 缓存）+ `_isSamePerson()`（**person 优先、映射缺失降级 device**）；history() 的 sender 判断改 `_isSamePerson`；chat_page `_refresh` 先拉映射再读历史
+- 测试：message_repository_test 加 person 判断用例（FakeApi.getSpace override：dev-a/dev-a2→person-a、dev-b→person-b，dev-a2 的消息显示 me、dev-b 显示 peer）
+
+**排障：** SpaceDevice 构造函数未加 const → 测试 `const SpaceDevice(...)` 编译失败 → types.dart 补 const。
+
+**验证：** shared dart test 18 项全过（+2）、app flutter test 19 项全过（+1）。
+
+**后续关联：** 阅后即焚计划前置已就绪——"自己的消息"在多设备间语义一致。

@@ -39,6 +39,32 @@ class MessageRepository {
   /// 会话 token（认证后注入；未认证时发送只入队不同步）。
   String? token;
 
+  /// 设备 → 用户（person_id）映射（GET /space 缓存，多设备身份语义）。
+  /// 用于判断消息是否"同一个人"发送：同 person 不同设备显示为 'me'。
+  final Map<String, String> _personByDevice = {};
+
+  /// 拉取空间设备映射（person_id）。映射缺失时 history 的 sender 判断降级为 device 维度。
+  Future<void> refreshDeviceMap() async {
+    final t = token;
+    if (t == null) return;
+    try {
+      final space = await api.getSpace(t);
+      _personByDevice
+        ..clear()
+        ..addEntries(space.devices.map((d) => MapEntry(d.deviceId, d.personId)));
+    } catch (_) {
+      // 网络抖动忽略：保留旧映射（无映射时降级 device 判断）
+    }
+  }
+
+  /// 消息是否"同一个人"发送：优先 person 维度，映射缺失降级 device 维度。
+  bool _isSamePerson(String senderDeviceId) {
+    final my = _personByDevice[deviceId];
+    final sender = _personByDevice[senderDeviceId];
+    if (my != null && sender != null) return my == sender;
+    return senderDeviceId == deviceId;
+  }
+
   /// 当前同步锚点（本地库 sync_state）。
   Future<int> get lastSequence async {
     final row = await (db.select(db.syncState)
@@ -230,7 +256,7 @@ class MessageRepository {
       out.add((
         env: env,
         plaintext: plain,
-        sender: env.senderDeviceId == deviceId ? 'me' : 'peer',
+        sender: _isSamePerson(env.senderDeviceId) ? 'me' : 'peer',
         attachment: att == null
             ? null
             : {

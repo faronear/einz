@@ -127,6 +127,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _refresh() async {
     try {
       await _repo.sync();
+      // 拉取设备 → person 映射（多设备身份：同用户其他设备的消息显示为"我"）
+      await _repo.refreshDeviceMap();
       final hist = await _repo.history();
       if (!mounted) return;
       setState(() => _messages = hist);

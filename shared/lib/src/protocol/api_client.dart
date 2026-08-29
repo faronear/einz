@@ -50,6 +50,12 @@ class ApiClient {
     await _delete(Api.pushRegister, token: token);
   }
 
+  /// 获取空间信息（space_id + 设备列表，含 person_id 映射，PROTOCOL.md §7.3）。
+  Future<SpaceResult> getSpace(String token) async {
+    final res = await _get(Api.space, token: token);
+    return SpaceResult.fromJson(res);
+  }
+
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
   Future<void> uploadKeyEscrow(BackupFile package, String token) async {
     await _post(Api.keyEscrow, {'package': package.toJson()}, token: token);
