@@ -487,3 +487,23 @@
 **drift API 备忘：** 2.34.3 的 `orderBy` 参数是 `List<OrderClauseGenerator<T>>`（函数形式 `[(t) => OrderingTerm.desc(t.serverSequence)]`，不是 OrderingTerm 列表）；DataClass 名是 `LocalMessage`（单数化）。
 
 **验证：** flutter test **25 项全过**（+2 分页用例）；analyze 无问题（顺手删 golden_render_test 多余 dart:typed_data import）；golden 3 项通过（UI 渲染结构未变，无需更新基准图）。
+
+### 多语言界面（中文/英文，官方 l10n；2026-08-29）
+
+**背景：** 老板问"目前有多语言界面吗？至少需要英文、中文"——现状：全部硬编码中文（chat_page 590 行/setup_page 387/lock_page 160/main 39 行含中文），无任何 i18n 基础设施。老板确认决策：**官方 l10n + 跟随系统/手动覆盖 + 分批（先核心：设置页+聊天页）**。
+
+**基础设施：**
+- pubspec 加 `flutter_localizations` + `intl: any` + `generate: true`；`l10n.yaml`（arb-dir: lib/l10n，template: app_en.arb）
+- `lib/l10n/app_en.arb` + `app_zh.arb`：各 60+ 键（通用 9 + setupPage.* 18 + setPinDialog.* 12 + chatPage.* 27 + burnOption.* 7），占位符用 `{name}` + `@key.placeholders`
+- gen-l10n 生成 `lib/l10n/app_localizations*.dart`（**入库**，generate: true 时 pub get 自动生成）
+- `data/locale_settings.dart`：LocaleSettings（app_state locale：system/zh/en）+ `localeNotifier`（ValueNotifier，切换即时生效）
+- `main.dart` OnlySpaceApp 改 StatefulWidget：MaterialApp 加 `localizationsDelegates/supportedLocales/locale`（null=跟随系统；手动选择 zh/en 覆盖）
+
+**文案抽取（核心工作量）：**
+- setup_page.dart：~30 处（build UI + 状态消息 + SetPinDialog 全部）——`AppLocalizations.of(context)!` 替换；**async 方法 await 后取 l10n 会触发 use_build_context_synchronously lint → 在 await 前取局部变量**（_uploadEscrow 排障）
+- chat_page.dart：~35 处（SnackBar 错误/附件 sheet 6 项/播放错误/输入区/阅后即焚档位）——**阅后即焚档位标签改 `_burnSeconds`（存秒数）+ `_burnOptionLabel(seconds, l10n)` switch 映射**（原存中文 key 无法国际化）；附件选择弹层、🌐/⏱ 弹层用 l10n
+- golden/widget 测试：MaterialApp 补 `localizationsDelegates + locale: Locale('zh')`（页面用 AppLocalizations.of 需要；基准图是中文渲染）；ChatPage golden 0.05% 像素差 → `--update-goldens`
+
+**验证：** gen-l10n 成功；analyze 无问题；flutter test **25 项全过**（含 golden 3 项更新后）；chat_page golden 已更新（界面含 🌐 按钮等变化）。
+
+**遗留：** lock_page 160 行 + main.dart 39 行含中文的文案**未在本批抽取**（后续批次）；l10n 键在 setupPage/chatPage 前缀下组织，后续页沿用。

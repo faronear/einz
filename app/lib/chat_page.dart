@@ -14,8 +14,10 @@ import 'package:video_player/video_player.dart';
 
 import 'data/burn_after_settings.dart';
 import 'data/local_database.dart';
+import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/message_repository.dart';
+import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 
 /// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
@@ -73,7 +75,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _recording = false;
   String? _recordingPath;
   String? _playingMessageId;
-  String _burnLabel = '无限'; // 当前阅后即焚档位文字（顶栏 tooltip）
+  int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
+
+  /// 阅后即焚档位文案（l10n 映射）。
+  String _burnOptionLabel(int seconds, AppLocalizations l10n) {
+    switch (seconds) {
+      case 0:
+        return l10n.burnOptionUnlimited;
+      case 60:
+        return l10n.burnOption1Minute;
+      case 300:
+        return l10n.burnOption5Minutes;
+      case 1800:
+        return l10n.burnOption30Minutes;
+      case 3600:
+        return l10n.burnOption1Hour;
+      case 86400:
+        return l10n.burnOption1Day;
+      case 604800:
+        return l10n.burnOption7Days;
+      default:
+        return '$seconds s';
+    }
+  }
 
   @override
   void initState() {
@@ -98,20 +122,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _registerPushToken();
   }
 
-  /// 加载本设备阅后即焚档位（每设备独立，纯本地）。
+  /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
   Future<void> _loadBurnLabel() async {
     final s = BurnAfterSettings(widget.db ?? LocalDatabase());
     final seconds = await s.load();
-    final label = kBurnAfterOptions.entries.firstWhere(
-      (e) => e.value == seconds,
-      orElse: () => const MapEntry('无限', 0),
-    ).key;
-    if (mounted) setState(() => _burnLabel = label);
+    if (mounted) setState(() => _burnSeconds = seconds);
   }
 
-  /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
-  Future<void> _showBurnPicker() async {
-    final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
+  /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效）。
+  Future<void> _showLocalePicker() async {
+    final settings = LocaleSettings(widget.db ?? LocalDatabase());
     final current = await settings.load();
     if (!mounted) return;
     final picked = await showModalBottomSheet<String>(
@@ -122,25 +142,63 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             const Padding(
               padding: EdgeInsets.all(12),
-              child: Text('阅后即焚（仅本设备生效）', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: Text('界面语言 / Language', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
-            for (final entry in kBurnAfterOptions.entries)
+            for (final option in kLocaleOptions)
               ListTile(
-                title: Text(entry.key),
-                trailing: entry.value == current ? const Icon(Icons.check) : null,
-                onTap: () => Navigator.of(ctx).pop(entry.key),
+                title: Text(kLocaleLabels[option]!),
+                trailing: option == current ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(ctx).pop(option),
               ),
           ],
         ),
       ),
     );
     if (picked == null) return;
-    final seconds = kBurnAfterOptions[picked]!;
+    await settings.save(picked);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!))),
+    );
+  }
+
+  /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
+  Future<void> _showBurnPicker() async {
+    final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
+    final current = await settings.load();
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(l10n.chatPageBurnHeading, style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            for (final entry in kBurnAfterOptions.entries)
+              ListTile(
+                title: Text(_burnOptionLabel(entry.value, l10n)),
+                trailing: entry.value == current ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(ctx).pop(entry.value.toString()),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    final seconds = int.parse(picked);
     await settings.save(seconds);
     if (!mounted) return;
-    setState(() => _burnLabel = picked);
+    setState(() => _burnSeconds = seconds);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(seconds == 0 ? '阅后即焚已关闭（消息永久保留）' : '消息将在 $picked 后自动删除')),
+      SnackBar(
+        content: Text(seconds == 0
+            ? l10n.chatPageBurnOff
+            : l10n.chatPageBurnWillDelete(_burnOptionLabel(seconds, l10n))),
+      ),
     );
   }
 
@@ -266,7 +324,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发送失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageSendFailed('$e'))));
     }
   }
 
@@ -283,7 +342,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('录音启动失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVoiceStartFailed('$e'))));
     }
   }
 
@@ -310,7 +370,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('录音失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVoiceFailed('$e'))));
     }
   }
 
@@ -327,7 +388,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('音频附件元数据缺失')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageAudioMetaMissing)));
       return;
     }
     // 正在播放同一条 → 停止
@@ -356,13 +418,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (e) {
       if (!mounted) return;
       setState(() => _playingMessageId = null);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('音频播放失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'))));
     }
   }
 
   // ---------- 图像/视频/音频/文件：选择 → 加密上传 → 发送 ----------
 
   Future<void> _showAttachmentSheet() async {
+    final l10n = AppLocalizations.of(context)!;
     final kind = await showModalBottomSheet<_AttachmentKind>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -371,32 +435,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: const Text('拍照'),
+              title: Text(l10n.chatPageAttachPhoto),
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('相册图片'),
+              title: Text(l10n.chatPageAttachGalleryImage),
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.galleryImage),
             ),
             ListTile(
               leading: const Icon(Icons.videocam),
-              title: const Text('拍摄视频'),
+              title: Text(l10n.chatPageAttachVideoCamera),
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoCamera),
             ),
             ListTile(
               leading: const Icon(Icons.movie),
-              title: const Text('相册视频'),
+              title: Text(l10n.chatPageAttachVideoGallery),
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoGallery),
             ),
             ListTile(
               leading: const Icon(Icons.music_note),
-              title: const Text('音频文件（mp3 等）'),
+              title: Text(l10n.chatPageAttachAudioFile),
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.audioFile),
             ),
             ListTile(
               leading: const Icon(Icons.insert_drive_file),
-              title: const Text('任意文件'),
+              title: Text(l10n.chatPageAttachAnyFile),
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.anyFile),
             ),
           ],
@@ -466,7 +530,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发送失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageSendFailed('$e'))));
     }
   }
 
@@ -493,7 +558,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('视频附件元数据缺失')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVideoMetaMissing)));
       return;
     }
     VideoPlayerController? controller;
@@ -542,7 +608,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (e) {
       await controller?.dispose();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('视频播放失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVideoPlayFailed('$e'))));
     }
   }
 
@@ -572,7 +639,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           );
         }
-        if (snap.hasError) return Text('📷 ${m.plaintext}\n（加载失败）');
+        if (snap.hasError) {
+          return Text(AppLocalizations.of(context)!.chatPageImageLoadFailed(m.plaintext));
+        }
         return const SizedBox(width: 60, height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
       },
     );
@@ -621,7 +690,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
         Flexible(
           child: Text(
-            playing ? '播放中…' : (m.env.type == 'voice' ? '🎤 语音' : '🎵 ${m.plaintext}'),
+            playing
+                ? AppLocalizations.of(context)!.chatPagePlaying
+                : (m.env.type == 'voice'
+                    ? '🎤 ${AppLocalizations.of(context)!.chatPageVoiceLabel}'
+                    : '🎵 ${m.plaintext}'),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -667,7 +740,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('附件元数据缺失')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageAttachmentMetaMissing)));
       return;
     }
     try {
@@ -681,22 +755,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final file = File('${dir.path}/${m.plaintext}');
       await file.writeAsBytes(bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已保存: ${file.path}')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageSaved(file.path))));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('下载失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageDownloadFailed('$e'))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         title: Text('OnlySpace · ${widget.spaceId}'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: 'Language / 语言',
+            onPressed: _showLocalePicker,
+          ),
+          IconButton(
             icon: const Icon(Icons.timer_outlined),
-            tooltip: '阅后即焚：$_burnLabel',
+            tooltip: l10n.chatPageBurnTooltip(_burnOptionLabel(_burnSeconds, l10n)),
             onPressed: _showBurnPicker,
           ),
         ],
@@ -725,9 +807,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (m.expiresAt != null)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 2),
-                            child: Text('⏱ 阅后即焚', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(l10n.chatPageBurnBadge,
+                                style: const TextStyle(fontSize: 10, color: Colors.grey)),
                           ),
                         _buildMessageContent(m),
                       ],
@@ -760,14 +843,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   if (_recording)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 8),
-                      child: Text('录音中…松开发送', style: TextStyle(color: Colors.red, fontSize: 12)),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(l10n.chatPageRecordingHint,
+                          style: const TextStyle(color: Colors.red, fontSize: 12)),
                     ),
                   Expanded(
                     child: TextField(
                       controller: _input,
-                      decoration: const InputDecoration(hintText: '输入消息…', isDense: true),
+                      decoration: InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
                       onSubmitted: (_) => _send(),
                     ),
                   ),

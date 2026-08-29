@@ -68,6 +68,7 @@
 - [x] **多设备身份判断（person_id）**：shared ApiClient 加 getSpace + SpaceResult/SpaceDevice（含 person_id 映射，const 构造）；MessageRepository 加 refreshDeviceMap 缓存 + _isSamePerson（person 优先、device 降级），history sender 按 person 判断——同用户不同设备的消息显示为 me；chat_page _refresh 拉取映射；单测（shared getSpace 2 项 + app person 判断 1 项），shared 18/app 19 全过
 - [x] **阅后即焚（纯本地，每设备独立）**：Server 零改动——BurnAfterSettings（app_state 存档位：无限/1分/5分/30分/1小时/1天/7天）；local_messages 加 burn_after_seconds/expires_at 列（schemaVersion 2 + addColumn 迁移）；send/sync 落库按本设备设置算 expiresAt；purgeExpired 到期删除（3s ticker 联动）；chat_page 顶栏 ⏱ 选择器 + 消息 ⏱ 标记；单测（设置 3 项 + purgeExpired 1 项），flutter test 23 项全过
 - [x] **聊天分页加载优化（UI 懒渲染 + 增量刷新）**：MessageRepository 分页方法 historyRecent（最近 N 条升序）/historyBefore（更早）/historySince（新增含未同步），typedef HistoryMessage；chat_page 首屏只渲染最近 50 条 + ScrollController 上滑到顶加载更早（插入头部）+ 3s ticker 只增量追加新增（去重）+ 到期消息本地移除；单测 2 项（FakeApi 模拟 Server 分配 server_sequence），flutter test 25 项全过 + golden 确认通过
+- [x] **多语言界面（中/英，官方 l10n）**：flutter_localizations + gen-l10n（l10n.yaml + app_en.arb/app_zh.arb 各 60+ 键）；LocaleSettings（app_state locale 偏好 system/zh/en + localeNotifier 即时生效）；main.dart MaterialApp 接入（跟随系统 + 手动覆盖）；**setup_page + chat_page 全部文案中英文化**（~65 处替换：按钮/标签/提示/错误/占位符键）；聊天页顶栏 🌐 切换（跟随系统/中文/English）；阅后即焚档位标签改 _burnSeconds + l10n 映射；golden/widget 测试指定中文 locale + delegates；flutter test 25 项全过 + golden 更新；**待办：lock_page/main 文案后续批次**
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
 - [ ] iOS 真机构建/签名/Ad Hoc（docs/IOS.md §3–§4）——待 Mac + Apple 付费账号（APNs 暂无账号，WS/轮询兜底）
 

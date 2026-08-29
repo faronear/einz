@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onlyspace/chat_page.dart';
 import 'package:onlyspace/data/local_database.dart';
+import 'package:onlyspace/l10n/app_localizations.dart';
 import 'package:onlyspace/lock_page.dart';
 import 'package:onlyspace/setup_page.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
@@ -55,7 +56,12 @@ void main() {
 
   testWidgets('golden: 设置页 SetupPage', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await tester.pumpWidget(const MaterialApp(home: SetupPage()));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: SetupPage(),
+    ));
     await tester.pump();
     await expectLater(find.byType(SetupPage), matchesGoldenFile('goldens/setup_page.png'));
   });
@@ -64,7 +70,12 @@ void main() {
     _usePhoneSize(tester);
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
-    await tester.pumpWidget(MaterialApp(home: LockPage(db: db)));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: LockPage(db: db),
+    ));
     await tester.pump(const Duration(milliseconds: 100));
     await expectLater(find.byType(LockPage), matchesGoldenFile('goldens/lock_page.png'));
   });
@@ -99,6 +110,9 @@ void main() {
     ));
 
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
       home: ChatPage(
         server: 'https://only.tic.cc',
         spaceId: 'space-demo',

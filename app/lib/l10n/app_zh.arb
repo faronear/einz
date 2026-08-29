@@ -1,0 +1,169 @@
+{
+  "@@locale": "zh",
+  "appTitle": "OnlySpace",
+  "cancel": "取消",
+  "ok": "确定",
+  "send": "发送",
+  "confirm": "确认",
+  "delete": "删除",
+  "settings": "设置",
+  "loading": "加载中…",
+  "skip": "跳过",
+  "setupPageTitle": "OnlySpace · 设备配置",
+  "setupPageHeading": "一次性配置",
+  "setupPageInstructions": "1) 生成设备密钥 → 公钥加入服务器白名单（config.json）并重启\n2) 粘贴对方用你公钥密封的 Space Key 副本 → 认证",
+  "setupPageDeviceIdLabel": "设备 ID",
+  "setupPageSpaceIdLabel": "Space ID",
+  "setupPageSealedKeyLabel": "密封的 Space Key（base64）",
+  "setupPageSealedKeyHint": "粘贴 sealed 副本（sealed-*.txt 内容）",
+  "setupPageKeyInfo": "设备 ID: {deviceId}\n公钥: {publicKey}\n（把公钥加入 config.json 后重启服务器）",
+  "@setupPageKeyInfo": {
+    "placeholders": {
+      "deviceId": {"type": "String"},
+      "publicKey": {"type": "String"}
+    }
+  },
+  "setupPageGenerateKey": "① 生成设备密钥",
+  "setupPageImportAuth": "② 导入并认证",
+  "setupPageEscrowLabel": "接入口令（新设备凭它接入，可跳过）",
+  "setupPageEscrowHelper": "口令托管：Server 只存密文（KEY_ESCROW.md）",
+  "setupPageEscrowAccess": "③ 凭口令接入（无需 sealed 副本）",
+  "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
+  "@setupPageKeyGenFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setupPageGenKeyFirst": "⚠️ 先生成设备密钥",
+  "setupPagePasteSealed": "⚠️ 请粘贴密封的 Space Key 副本（base64）",
+  "setupPageImportFailed": "❌ 导入/认证失败: {error}",
+  "@setupPageImportFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setupPageEscrowGenKeyFirst": "⚠️ 请先生成设备密钥（①），并把公钥加入服务器白名单",
+  "setupPageEscrowFillAll": "⚠️ 请填写 Space ID 与接入口令",
+  "setupPageNoEscrow": "❌ Server 无口令托管包（请先在对端设置接入口令）",
+  "setupPageEscrowFailed": "❌ 口令接入失败: {error}",
+  "@setupPageEscrowFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setPinDialogTitle": "设置启动锁",
+  "setPinDialogRecoveryTitle": "保存恢复码",
+  "setPinDialogEnterChat": "我已保存，进入聊天",
+  "setPinDialogIntro": "每次启动需输入 PIN 才能查看消息；Space Key 将被 PIN 加密保护。",
+  "setPinDialogPinLabel": "PIN（至少 4 位）",
+  "setPinDialogConfirmLabel": "确认 PIN",
+  "setPinDialogEscrowLabel": "接入口令（可选，换设备凭它接入）",
+  "setPinDialogEscrowHelper": "口令托管：Server 只存密文，无口令解不开（KEY_ESCROW.md）",
+  "setPinDialogSetPin": "设置 PIN",
+  "setPinDialogPinTooShort": "PIN 至少 4 位",
+  "setPinDialogPinMismatch": "两次输入的 PIN 不一致",
+  "setPinDialogSetupFailed": "设置失败: {error}",
+  "@setPinDialogSetupFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setPinDialogEscrowUploaded": "✅ 接入口令已上传托管（换设备可凭口令接入）",
+  "setPinDialogEscrowUploadFailed": "⚠️ 托管上传失败: {error}（可稍后在聊天页重试）",
+  "@setPinDialogEscrowUploadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setPinDialogRecoveryIntro": "请离线保存以下恢复码（PIN 丢失时用它解锁）：",
+  "setPinDialogRecoveryWarning": "恢复码与 PIN 分开保存；丢失恢复码且忘记 PIN 将无法解锁。",
+  "chatPageLocaleSwitched": "已切换：{label}",
+  "@chatPageLocaleSwitched": {
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+  "chatPageBurnHeading": "阅后即焚（仅本设备生效）",
+  "chatPageBurnOff": "阅后即焚已关闭（消息永久保留）",
+  "chatPageBurnWillDelete": "消息将在 {duration} 后自动删除",
+  "@chatPageBurnWillDelete": {
+    "placeholders": {
+      "duration": {"type": "String"}
+    }
+  },
+  "chatPageBurnTooltip": "阅后即焚：{label}",
+  "@chatPageBurnTooltip": {
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+  "chatPageBurnBadge": "⏱ 阅后即焚",
+  "chatPageSendFailed": "发送失败: {error}",
+  "@chatPageSendFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageVoiceStartFailed": "录音启动失败: {error}",
+  "@chatPageVoiceStartFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageVoiceFailed": "录音失败: {error}",
+  "@chatPageVoiceFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageRecordingHint": "录音中…松开发送",
+  "chatPageInputHint": "输入消息…",
+  "chatPageAudioMetaMissing": "音频附件元数据缺失",
+  "chatPageAudioPlayFailed": "音频播放失败: {error}",
+  "@chatPageAudioPlayFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageAttachPhoto": "拍照",
+  "chatPageAttachGalleryImage": "相册图片",
+  "chatPageAttachVideoCamera": "拍摄视频",
+  "chatPageAttachVideoGallery": "相册视频",
+  "chatPageAttachAudioFile": "音频文件（mp3 等）",
+  "chatPageAttachAnyFile": "任意文件",
+  "chatPageVideoMetaMissing": "视频附件元数据缺失",
+  "chatPageVideoPlayFailed": "视频播放失败: {error}",
+  "@chatPageVideoPlayFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageImageLoadFailed": "{plaintext}\n（加载失败）",
+  "@chatPageImageLoadFailed": {
+    "placeholders": {
+      "plaintext": {"type": "String"}
+    }
+  },
+  "chatPagePlaying": "播放中…",
+  "chatPageVoiceLabel": "语音",
+  "chatPageAttachmentMetaMissing": "附件元数据缺失",
+  "chatPageSaved": "已保存: {path}",
+  "@chatPageSaved": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "chatPageDownloadFailed": "下载失败: {error}",
+  "@chatPageDownloadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "burnOptionUnlimited": "无限",
+  "burnOption1Minute": "1 分钟",
+  "burnOption5Minutes": "5 分钟",
+  "burnOption30Minutes": "30 分钟",
+  "burnOption1Hour": "1 小时",
+  "burnOption1Day": "1 天",
+  "burnOption7Days": "7 天"
+}

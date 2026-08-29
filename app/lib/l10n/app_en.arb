@@ -1,0 +1,169 @@
+{
+  "@@locale": "en",
+  "appTitle": "OnlySpace",
+  "cancel": "Cancel",
+  "ok": "OK",
+  "send": "Send",
+  "confirm": "Confirm",
+  "delete": "Delete",
+  "settings": "Settings",
+  "loading": "Loading...",
+  "skip": "Skip",
+  "setupPageTitle": "OnlySpace · Device Setup",
+  "setupPageHeading": "One-time setup",
+  "setupPageInstructions": "1) Generate device key → add the public key to the server whitelist (config.json) and restart\n2) Paste the Space Key sealed with your public key → authenticate",
+  "setupPageDeviceIdLabel": "Device ID",
+  "setupPageSpaceIdLabel": "Space ID",
+  "setupPageSealedKeyLabel": "Sealed Space Key (base64)",
+  "setupPageSealedKeyHint": "Paste the sealed copy (contents of sealed-*.txt)",
+  "setupPageKeyInfo": "Device ID: {deviceId}\nPublic key: {publicKey}\n(Add the public key to config.json and restart the server)",
+  "@setupPageKeyInfo": {
+    "placeholders": {
+      "deviceId": {"type": "String"},
+      "publicKey": {"type": "String"}
+    }
+  },
+  "setupPageGenerateKey": "① Generate device key",
+  "setupPageImportAuth": "② Import & authenticate",
+  "setupPageEscrowLabel": "Access passphrase (new devices can join with it, optional)",
+  "setupPageEscrowHelper": "Key escrow: the server only stores ciphertext (KEY_ESCROW.md)",
+  "setupPageEscrowAccess": "③ Join with passphrase (no sealed copy needed)",
+  "setupPageKeyGenFailed": "❌ Key generation failed: {error}",
+  "@setupPageKeyGenFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setupPageGenKeyFirst": "⚠️ Generate the device key first",
+  "setupPagePasteSealed": "⚠️ Paste the sealed Space Key copy (base64)",
+  "setupPageImportFailed": "❌ Import/authentication failed: {error}",
+  "@setupPageImportFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setupPageEscrowGenKeyFirst": "⚠️ Generate the device key first (①) and add its public key to the server whitelist",
+  "setupPageEscrowFillAll": "⚠️ Fill in Space ID and the access passphrase",
+  "setupPageNoEscrow": "❌ No escrow package on the server (set an access passphrase on the other device first)",
+  "setupPageEscrowFailed": "❌ Passphrase join failed: {error}",
+  "@setupPageEscrowFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setPinDialogTitle": "Set up app lock",
+  "setPinDialogRecoveryTitle": "Save recovery code",
+  "setPinDialogEnterChat": "I saved it, enter chat",
+  "setPinDialogIntro": "You must enter the PIN at every startup to view messages; the Space Key is encrypted with the PIN.",
+  "setPinDialogPinLabel": "PIN (at least 4 characters)",
+  "setPinDialogConfirmLabel": "Confirm PIN",
+  "setPinDialogEscrowLabel": "Access passphrase (optional, for joining on new devices)",
+  "setPinDialogEscrowHelper": "Key escrow: the server only stores ciphertext, it cannot be opened without the passphrase (KEY_ESCROW.md)",
+  "setPinDialogSetPin": "Set PIN",
+  "setPinDialogPinTooShort": "PIN must be at least 4 characters",
+  "setPinDialogPinMismatch": "The two PINs do not match",
+  "setPinDialogSetupFailed": "Setup failed: {error}",
+  "@setPinDialogSetupFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setPinDialogEscrowUploaded": "✅ Access passphrase uploaded to escrow (join with it on new devices)",
+  "setPinDialogEscrowUploadFailed": "⚠️ Escrow upload failed: {error} (you can retry later in chat)",
+  "@setPinDialogEscrowUploadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "setPinDialogRecoveryIntro": "Save the following recovery code offline (use it to unlock if the PIN is lost):",
+  "setPinDialogRecoveryWarning": "Keep the recovery code and PIN separately; if you lose the code and forget the PIN, you cannot unlock.",
+  "chatPageLocaleSwitched": "Switched to {label}",
+  "@chatPageLocaleSwitched": {
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+  "chatPageBurnHeading": "Burn-after (only affects this device)",
+  "chatPageBurnOff": "Burn-after is off (messages are kept forever)",
+  "chatPageBurnWillDelete": "Messages will be auto-deleted after {duration}",
+  "@chatPageBurnWillDelete": {
+    "placeholders": {
+      "duration": {"type": "String"}
+    }
+  },
+  "chatPageBurnTooltip": "Burn-after: {label}",
+  "@chatPageBurnTooltip": {
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+  "chatPageBurnBadge": "⏱ Burn-after",
+  "chatPageSendFailed": "Send failed: {error}",
+  "@chatPageSendFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageVoiceStartFailed": "Recording start failed: {error}",
+  "@chatPageVoiceStartFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageVoiceFailed": "Recording failed: {error}",
+  "@chatPageVoiceFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageRecordingHint": "Recording… release to send",
+  "chatPageInputHint": "Type a message…",
+  "chatPageAudioMetaMissing": "Audio attachment metadata missing",
+  "chatPageAudioPlayFailed": "Audio playback failed: {error}",
+  "@chatPageAudioPlayFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageAttachPhoto": "Take photo",
+  "chatPageAttachGalleryImage": "Gallery image",
+  "chatPageAttachVideoCamera": "Record video",
+  "chatPageAttachVideoGallery": "Gallery video",
+  "chatPageAttachAudioFile": "Audio file (mp3 etc.)",
+  "chatPageAttachAnyFile": "Any file",
+  "chatPageVideoMetaMissing": "Video attachment metadata missing",
+  "chatPageVideoPlayFailed": "Video playback failed: {error}",
+  "@chatPageVideoPlayFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageImageLoadFailed": "{plaintext}\n(failed to load)",
+  "@chatPageImageLoadFailed": {
+    "placeholders": {
+      "plaintext": {"type": "String"}
+    }
+  },
+  "chatPagePlaying": "Playing…",
+  "chatPageVoiceLabel": "Voice",
+  "chatPageAttachmentMetaMissing": "Attachment metadata missing",
+  "chatPageSaved": "Saved: {path}",
+  "@chatPageSaved": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "chatPageDownloadFailed": "Download failed: {error}",
+  "@chatPageDownloadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "burnOptionUnlimited": "Unlimited",
+  "burnOption1Minute": "1 minute",
+  "burnOption5Minutes": "5 minutes",
+  "burnOption30Minutes": "30 minutes",
+  "burnOption1Hour": "1 hour",
+  "burnOption1Day": "1 day",
+  "burnOption7Days": "7 days"
+}

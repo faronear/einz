@@ -6,6 +6,7 @@ import 'package:onlyspace_shared/onlyspace_shared.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'l10n/app_localizations.dart';
 
 /// 服务器固定地址（产品部署域名固定，无需用户输入）。
 const String kOnlySpaceServer = 'https://only.tic.cc';
@@ -53,7 +54,7 @@ class _SetupPageState extends State<SetupPage> {
       setState(() => _keyPair = pair);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _status = '❌ 密钥生成失败: $e');
+      setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -64,12 +65,12 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _importAndAuth() async {
     final kp = _keyPair;
     if (kp == null) {
-      setState(() => _status = '⚠️ 先生成设备密钥');
+      setState(() => _status = AppLocalizations.of(context)!.setupPageGenKeyFirst);
       return;
     }
     final sealedRaw = _sealedKey.text.trim();
     if (sealedRaw.isEmpty) {
-      setState(() => _status = '⚠️ 请粘贴密封的 Space Key 副本（base64）');
+      setState(() => _status = AppLocalizations.of(context)!.setupPagePasteSealed);
       return;
     }
     setState(() {
@@ -121,7 +122,7 @@ class _SetupPageState extends State<SetupPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _status = '❌ 导入/认证失败: $e');
+      setState(() => _status = AppLocalizations.of(context)!.setupPageImportFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -160,14 +161,14 @@ class _SetupPageState extends State<SetupPage> {
   /// 解出 Space Key → 设置 PIN → 进聊天页。无需 sealed 副本。
   Future<void> _escrowAccess() async {
     if (_keyPair == null) {
-      setState(() => _status = '⚠️ 请先生成设备密钥（①），并把公钥加入服务器白名单');
+      setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowGenKeyFirst);
       return;
     }
     final server = kOnlySpaceServer;
     final spaceId = _spaceId.text.trim();
     final passphrase = _escrowPassphrase.text.trim();
-    if (server.isEmpty || spaceId.isEmpty || passphrase.isEmpty) {
-      setState(() => _status = '⚠️ 请填写服务器地址、Space ID 与接入口令');
+    if (spaceId.isEmpty || passphrase.isEmpty) {
+      setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFillAll);
       return;
     }
     setState(() {
@@ -193,7 +194,7 @@ class _SetupPageState extends State<SetupPage> {
       final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
       if (payload == null) {
         if (!mounted) return;
-        setState(() => _status = '❌ Server 无口令托管包（请先在对端设置接入口令）');
+        setState(() => _status = AppLocalizations.of(context)!.setupPageNoEscrow);
         return;
       }
       final spaceKey = base64Decode(payload.spaceKeyB64);
@@ -223,7 +224,7 @@ class _SetupPageState extends State<SetupPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _status = '❌ 口令接入失败: $e');
+      setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -231,29 +232,29 @@ class _SetupPageState extends State<SetupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('OnlySpace · 设备配置')),
+      appBar: AppBar(title: Text(l10n.setupPageTitle)),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text('一次性配置', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+          Text(l10n.setupPageHeading, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Text(
-            '1) 生成设备密钥 → 公钥加入服务器白名单（config.json）并重启\n'
-            '2) 粘贴对方用你公钥密封的 Space Key 副本 → 认证',
+            l10n.setupPageInstructions,
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
-          TextField(controller: _deviceId, decoration: const InputDecoration(labelText: '设备 ID')),
+          TextField(controller: _deviceId, decoration: InputDecoration(labelText: l10n.setupPageDeviceIdLabel)),
           const SizedBox(height: 12),
-          TextField(controller: _spaceId, decoration: const InputDecoration(labelText: 'Space ID')),
+          TextField(controller: _spaceId, decoration: InputDecoration(labelText: l10n.setupPageSpaceIdLabel)),
           const SizedBox(height: 12),
           TextField(
             controller: _sealedKey,
             maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: '密封的 Space Key（base64）',
-              hintText: '粘贴 sealed 副本（sealed-*.txt 内容）',
+            decoration: InputDecoration(
+              labelText: l10n.setupPageSealedKeyLabel,
+              hintText: l10n.setupPageSealedKeyHint,
             ),
           ),
           const SizedBox(height: 16),
@@ -262,9 +263,7 @@ class _SetupPageState extends State<SetupPage> {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: SelectableText(
-                  '设备 ID: ${_keyPair!.deviceId}\n'
-                  '公钥: ${_keyPair!.publicKeyB64}\n'
-                  '（把公钥加入 config.json 后重启服务器）',
+                  l10n.setupPageKeyInfo(_keyPair!.deviceId, _keyPair!.publicKeyB64),
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -275,14 +274,14 @@ class _SetupPageState extends State<SetupPage> {
               Expanded(
                 child: FilledButton(
                   onPressed: _busy ? null : _generateKey,
-                  child: const Text('① 生成设备密钥'),
+                  child: Text(l10n.setupPageGenerateKey),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
                   onPressed: _busy ? null : _importAndAuth,
-                  child: const Text('② 导入并认证'),
+                  child: Text(l10n.setupPageImportAuth),
                 ),
               ),
             ],
@@ -291,16 +290,16 @@ class _SetupPageState extends State<SetupPage> {
           TextField(
             controller: _escrowPassphrase,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: '接入口令（新设备凭它接入，可跳过）',
-              helperText: '口令托管：Server 只存密文（KEY_ESCROW.md）',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.setupPageEscrowLabel,
+              helperText: l10n.setupPageEscrowHelper,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 8),
           FilledButton.tonal(
             onPressed: _busy ? null : _escrowAccess,
-            child: const Text('③ 凭口令接入（无需 sealed 副本）'),
+            child: Text(l10n.setupPageEscrowAccess),
           ),
           if (_status != null) ...[
             const SizedBox(height: 12),
@@ -352,11 +351,11 @@ class _SetPinDialogState extends State<SetPinDialog> {
   Future<void> _setup() async {
     final pin = _pin.text;
     if (pin.length < 4) {
-      setState(() => _error = 'PIN 至少 4 位');
+      setState(() => _error = AppLocalizations.of(context)!.setPinDialogPinTooShort);
       return;
     }
     if (pin != _confirm.text) {
-      setState(() => _error = '两次输入的 PIN 不一致');
+      setState(() => _error = AppLocalizations.of(context)!.setPinDialogPinMismatch);
       return;
     }
     setState(() {
@@ -386,7 +385,7 @@ class _SetPinDialogState extends State<SetPinDialog> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = '设置失败: $e');
+      setState(() => _error = AppLocalizations.of(context)!.setPinDialogSetupFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -394,6 +393,7 @@ class _SetPinDialogState extends State<SetPinDialog> {
 
   /// 口令加密 Space Key 包并上传托管（Server 只存密文；失败不阻塞进入聊天）。
   Future<void> _uploadEscrow(String passphrase, AppLockPayload payload) async {
+    final l10n = AppLocalizations.of(context)!; // await 前取，避免跨 async gap 用 context
     try {
       final api = ApiClient(payload.server);
       final escrow = KeyEscrowService(api);
@@ -404,54 +404,56 @@ class _SetPinDialogState extends State<SetPinDialog> {
         keyVersion: payload.keyVersion,
         token: payload.token ?? '',
       );
-      _escrowStatus = '✅ 接入口令已上传托管（换设备可凭口令接入）';
+      _escrowStatus = l10n.setPinDialogEscrowUploaded;
     } catch (e) {
-      _escrowStatus = '⚠️ 托管上传失败: $e（可稍后在聊天页重试）';
+      _escrowStatus = l10n.setPinDialogEscrowUploadFailed('$e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: Text(_stage2 ? '保存恢复码' : '设置启动锁'),
+      title: Text(_stage2 ? l10n.setPinDialogRecoveryTitle : l10n.setPinDialogTitle),
       content: _stage2 ? _buildRecovery() : _buildPinForm(),
       actions: [
         if (!_stage2)
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('跳过')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.skip)),
         if (_stage2)
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('我已保存，进入聊天'),
+            child: Text(l10n.setPinDialogEnterChat),
           ),
       ],
     );
   }
 
   Widget _buildPinForm() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('每次启动需输入 PIN 才能查看消息；Space Key 将被 PIN 加密保护。'),
+        Text(l10n.setPinDialogIntro),
         const SizedBox(height: 12),
         TextField(
           controller: _pin,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'PIN（至少 4 位）', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.setPinDialogPinLabel, border: const OutlineInputBorder()),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: _confirm,
           obscureText: true,
-          decoration: const InputDecoration(labelText: '确认 PIN', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.setPinDialogConfirmLabel, border: const OutlineInputBorder()),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: _escrowPassphrase,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: '接入口令（可选，换设备凭它接入）',
-            helperText: '口令托管：Server 只存密文，无口令解不开（KEY_ESCROW.md）',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: l10n.setPinDialogEscrowLabel,
+            helperText: l10n.setPinDialogEscrowHelper,
+            border: const OutlineInputBorder(),
           ),
         ),
         if (_error != null) ...[
@@ -463,17 +465,18 @@ class _SetPinDialogState extends State<SetPinDialog> {
           onPressed: _busy ? null : _setup,
           child: _busy
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('设置 PIN'),
+              : Text(l10n.setPinDialogSetPin),
         ),
       ],
     );
   }
 
   Widget _buildRecovery() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('请离线保存以下恢复码（PIN 丢失时用它解锁）：', style: TextStyle(fontWeight: FontWeight.w600)),
+        Text(l10n.setPinDialogRecoveryIntro, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         Card(
           color: Colors.amber.shade50,
@@ -487,8 +490,8 @@ class _SetPinDialogState extends State<SetPinDialog> {
           Text(_escrowStatus!, style: const TextStyle(fontSize: 12)),
         ],
         const SizedBox(height: 8),
-        const Text('恢复码与 PIN 分开保存；丢失恢复码且忘记 PIN 将无法解锁。',
-            style: TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(l10n.setPinDialogRecoveryWarning,
+            style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }

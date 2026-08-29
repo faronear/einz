@@ -7,11 +7,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:onlyspace/l10n/app_localizations.dart';
 import 'package:onlyspace/setup_page.dart';
 
 void main() {
   testWidgets('OnlySpace 设置页首屏渲染', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: SetupPage()));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: const SetupPage(),
+    ));
 
     // AppBar 标题
     expect(find.text('OnlySpace · 设备配置'), findsOneWidget);

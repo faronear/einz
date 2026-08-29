@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'data/locale_settings.dart';
+import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 
@@ -13,8 +15,42 @@ void main() {
   runApp(const OnlySpaceApp());
 }
 
-class OnlySpaceApp extends StatelessWidget {
+class OnlySpaceApp extends StatefulWidget {
   const OnlySpaceApp({super.key});
+
+  @override
+  State<OnlySpaceApp> createState() => _OnlySpaceAppState();
+}
+
+class _OnlySpaceAppState extends State<OnlySpaceApp> {
+  Locale? _locale; // null = 跟随系统
+
+  @override
+  void initState() {
+    super.initState();
+    _initLocale();
+    // 语言切换（聊天页 🌐）即时生效
+    localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    localeNotifier.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    _initLocale();
+  }
+
+  Future<void> _initLocale() async {
+    final settings = LocaleSettings(LocalDatabase());
+    final pref = await settings.load();
+    if (!mounted) return;
+    setState(() {
+      _locale = pref == 'system' ? null : Locale(pref);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +59,10 @@ class OnlySpaceApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
       ),
+      // l10n：中英文资源 + 跟随系统/手动覆盖（locale=null 时跟随系统）
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: _locale,
       home: const StartupGate(),
     );
   }
