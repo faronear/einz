@@ -25,6 +25,17 @@ class _SetupPageState extends State<SetupPage> {
   final _server = TextEditingController(text: 'https://only.tic.cc');
   final _spaceId = TextEditingController(text: 'space-demo');
   final _sealedKey = TextEditingController();
+  final _escrowPassphrase = TextEditingController();
+
+  @override
+  void dispose() {
+    _deviceId.dispose();
+    _server.dispose();
+    _spaceId.dispose();
+    _sealedKey.dispose();
+    _escrowPassphrase.dispose();
+    super.dispose();
+  }
 
   DeviceKeyPair? _keyPair;
   String? _status;
@@ -124,6 +135,7 @@ class _SetupPageState extends State<SetupPage> {
     required String spaceKeyB64,
     required int keyVersion,
     required String token,
+    String? escrowPassphrase,
   }) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -136,10 +148,84 @@ class _SetupPageState extends State<SetupPage> {
           spaceKeyB64: spaceKeyB64,
           keyVersion: keyVersion,
           token: token,
+          escrowPassphrase: escrowPassphrase,
         ),
       ),
     );
     return ok ?? false;
+  }
+
+  /// 新设备凭口令接入（KEY_ESCROW.md §5）：认证 → 拉取托管包 → 口令解密
+  /// 解出 Space Key → 设置 PIN → 进聊天页。无需 sealed 副本。
+  Future<void> _escrowAccess() async {
+    if (_keyPair == null) {
+      setState(() => _status = '⚠️ 请先生成设备密钥（①），并把公钥加入服务器白名单');
+      return;
+    }
+    final server = _server.text.trim();
+    final spaceId = _spaceId.text.trim();
+    final passphrase = _escrowPassphrase.text.trim();
+    if (server.isEmpty || spaceId.isEmpty || passphrase.isEmpty) {
+      setState(() => _status = '⚠️ 请填写服务器地址、Space ID 与接入口令');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    try {
+      final api = ApiClient(server);
+      final s = await sodium();
+
+      // 1) challenge-response 认证
+      final challenge = await api.challenge(_keyPair!.deviceId);
+      final opened = await sealOpen(
+        s,
+        base64Decode(challenge.sealedChallenge),
+        _keyPair!.publicKey,
+        _keyPair!.privateKey,
+      );
+      final session = await api.verify(challenge.challengeId, base64Encode(opened));
+
+      // 2) 拉取托管包并口令解密
+      final escrow = KeyEscrowService(api);
+      final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
+      if (payload == null) {
+        if (!mounted) return;
+        setState(() => _status = '❌ Server 无口令托管包（请先在对端设置接入口令）');
+        return;
+      }
+      final spaceKey = base64Decode(payload.spaceKeyB64);
+      if (!mounted) return;
+
+      // 3) 设置 PIN（含接入口令）→ 进聊天页
+      final ok = await _setupLockAndEnter(
+        server: server,
+        spaceId: payload.spaceId,
+        deviceId: _keyPair!.deviceId,
+        spaceKeyB64: payload.spaceKeyB64,
+        keyVersion: payload.keyVersion,
+        token: session.sessionToken,
+        escrowPassphrase: passphrase,
+      );
+      if (ok && mounted) {
+        Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => ChatPage(
+            server: server,
+            spaceId: payload.spaceId,
+            deviceId: _keyPair!.deviceId,
+            spaceKey: spaceKey,
+            keyVersion: payload.keyVersion,
+            token: session.sessionToken,
+          ),
+        ));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = '❌ 口令接入失败: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -202,6 +288,21 @@ class _SetupPageState extends State<SetupPage> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _escrowPassphrase,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: '接入口令（新设备凭它接入，可跳过）',
+              helperText: '口令托管：Server 只存密文（KEY_ESCROW.md）',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonal(
+            onPressed: _busy ? null : _escrowAccess,
+            child: const Text('③ 凭口令接入（无需 sealed 副本）'),
+          ),
           if (_status != null) ...[
             const SizedBox(height: 12),
             Text(_status!, style: const TextStyle(fontSize: 13)),
@@ -227,11 +328,13 @@ class SetPinDialog extends StatefulWidget {
 class _SetPinDialogState extends State<SetPinDialog> {
   final _pin = TextEditingController();
   final _confirm = TextEditingController();
+  final _escrowPassphrase = TextEditingController();
   late final AppLockService _lock;
   bool _stage2 = false;
   bool _busy = false;
   String? _error;
   String? _recoveryCode;
+  String? _escrowStatus;
 
   @override
   void initState() {
@@ -243,6 +346,7 @@ class _SetPinDialogState extends State<SetPinDialog> {
   void dispose() {
     _pin.dispose();
     _confirm.dispose();
+    _escrowPassphrase.dispose();
     super.dispose();
   }
 
@@ -261,7 +365,21 @@ class _SetPinDialogState extends State<SetPinDialog> {
       _error = null;
     });
     try {
-      final code = await _lock.setPin(pin, payload: widget.payload);
+      final escrowPass = _escrowPassphrase.text.trim();
+      // 接入口令（与 App 锁 PIN 区分，KEY_ESCROW.md）：非空则一并加密保存
+      final payload = AppLockPayload(
+        server: widget.payload.server,
+        spaceId: widget.payload.spaceId,
+        deviceId: widget.payload.deviceId,
+        spaceKeyB64: widget.payload.spaceKeyB64,
+        keyVersion: widget.payload.keyVersion,
+        token: widget.payload.token,
+        escrowPassphrase: escrowPass.isEmpty ? null : escrowPass,
+      );
+      final code = await _lock.setPin(pin, payload: payload);
+      if (escrowPass.isNotEmpty) {
+        await _uploadEscrow(escrowPass, payload);
+      }
       if (!mounted) return;
       setState(() {
         _recoveryCode = code;
@@ -272,6 +390,24 @@ class _SetPinDialogState extends State<SetPinDialog> {
       setState(() => _error = '设置失败: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 口令加密 Space Key 包并上传托管（Server 只存密文；失败不阻塞进入聊天）。
+  Future<void> _uploadEscrow(String passphrase, AppLockPayload payload) async {
+    try {
+      final api = ApiClient(payload.server);
+      final escrow = KeyEscrowService(api);
+      await escrow.upload(
+        passphrase: passphrase,
+        spaceKeyB64: payload.spaceKeyB64,
+        spaceId: payload.spaceId,
+        keyVersion: payload.keyVersion,
+        token: payload.token ?? '',
+      );
+      _escrowStatus = '✅ 接入口令已上传托管（换设备可凭口令接入）';
+    } catch (e) {
+      _escrowStatus = '⚠️ 托管上传失败: $e（可稍后在聊天页重试）';
     }
   }
 
@@ -309,6 +445,16 @@ class _SetPinDialogState extends State<SetPinDialog> {
           obscureText: true,
           decoration: const InputDecoration(labelText: '确认 PIN', border: OutlineInputBorder()),
         ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _escrowPassphrase,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: '接入口令（可选，换设备凭它接入）',
+            helperText: '口令托管：Server 只存密文，无口令解不开（KEY_ESCROW.md）',
+            border: OutlineInputBorder(),
+          ),
+        ),
         if (_error != null) ...[
           const SizedBox(height: 8),
           Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -337,6 +483,10 @@ class _SetPinDialogState extends State<SetPinDialog> {
             child: SelectableText(_recoveryCode ?? '', style: const TextStyle(fontSize: 14)),
           ),
         ),
+        if (_escrowStatus != null) ...[
+          const SizedBox(height: 8),
+          Text(_escrowStatus!, style: const TextStyle(fontSize: 12)),
+        ],
         const SizedBox(height: 8),
         const Text('恢复码与 PIN 分开保存；丢失恢复码且忘记 PIN 将无法解锁。',
             style: TextStyle(fontSize: 12, color: Colors.grey)),

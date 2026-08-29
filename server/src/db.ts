@@ -54,6 +54,12 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(import.meta.di
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS key_escrow (
+      space_id   TEXT PRIMARY KEY,
+      package    TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS challenges (
       challenge_id TEXT PRIMARY KEY,
       device_id    TEXT NOT NULL,

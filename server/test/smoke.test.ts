@@ -270,7 +270,54 @@ async function main(): Promise<void> {
       ws.on("error", (e) => fail(e));
     });
 
-    console.log("✅ 冒烟测试全部通过：认证 / E2EE 密文 / 幂等 / 同步 / 白名单 / 明文隔离 / WS 实时");
+    // 11) 密钥托管（口令托管，KEY_ESCROW.md §4）：A 上传 → B 拉取一致 →
+    //     坏字段 400 / 无 token 401 → 数据库只存原样密文包 → DELETE 清空
+    const escrowPkg = {
+      format: "backup-v1",
+      salt: sodium.to_base64(sodium.randombytes_buf(16), B64),
+      nonce: sodium.to_base64(sodium.randombytes_buf(24), B64),
+      ciphertext: sodium.to_base64(sodium.randombytes_buf(48), B64),
+    };
+    const escrowUp = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${devA.sessionToken}` },
+      body: JSON.stringify({ package: escrowPkg }),
+    });
+    assert.equal(escrowUp.status, 200, "escrow upload should succeed");
+
+    const escrowGet = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
+      headers: { Authorization: `Bearer ${devB.sessionToken}` },
+    });
+    assert.equal(escrowGet.status, 200, "whitelisted peer should fetch escrow");
+    const escrowBody = (await escrowGet.json()) as { package: typeof escrowPkg };
+    assert.equal(escrowBody.package.ciphertext, escrowPkg.ciphertext, "B should fetch the same escrow package");
+
+    const escrowBad = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${devA.sessionToken}` },
+      body: JSON.stringify({ package: { format: "x", salt: "y", nonce: "z" } }),
+    });
+    assert.equal(escrowBad.status, 400, "malformed escrow package must be rejected");
+
+    const escrowNoAuth = await fetch(`http://127.0.0.1:${port}/key-escrow`);
+    assert.equal(escrowNoAuth.status, 401, "missing token must be rejected");
+
+    const escrowDb = new Database(join(tempDir, "app.db"), { readonly: true });
+    const escrowRow = escrowDb.prepare(`SELECT package FROM key_escrow`).get() as { package: string };
+    assert.ok(escrowRow.package.includes(escrowPkg.ciphertext), "package stored verbatim (server must not parse content)");
+    escrowDb.close();
+
+    const escrowDel = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${devA.sessionToken}` },
+    });
+    assert.equal(escrowDel.status, 200, "escrow delete should succeed");
+    const escrowAfter = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
+      headers: { Authorization: `Bearer ${devA.sessionToken}` },
+    });
+    assert.deepEqual(await escrowAfter.json(), {}, "escrow cleared after delete");
+
+    console.log("✅ 冒烟测试全部通过：认证 / E2EE 密文 / 幂等 / 同步 / 白名单 / 明文隔离 / WS 实时 / 密钥托管");
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，
     // 否则 app.db 句柄未释放，rmSync 会报 EBUSY。

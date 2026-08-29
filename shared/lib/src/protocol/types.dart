@@ -17,6 +17,7 @@ class Api {
   static const devices = '/devices';
   static const pushRegister = '/push/register';
   static const space = '/space';
+  static const keyEscrow = '/key-escrow';
 }
 
 /// 认证挑战结果。

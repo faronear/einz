@@ -116,6 +116,7 @@ class AppLockPayload {
     required this.deviceId,
     this.keyVersion = 1,
     this.token,
+    this.escrowPassphrase,
   });
 
   final String server;
@@ -125,6 +126,10 @@ class AppLockPayload {
   final int keyVersion;
   final String? token;
 
+  /// 口令托管（KEY_ESCROW.md）的接入口令：与 App 锁 PIN 区分，
+  /// 同样受 PIN 加密保护；解锁/认证成功时用于自动重传托管包（rotate 后同步）。
+  final String? escrowPassphrase;
+
   Map<String, dynamic> toJson() => {
         'server': server,
         'space_key': spaceKeyB64,
@@ -132,6 +137,7 @@ class AppLockPayload {
         'device_id': deviceId,
         'key_version': keyVersion,
         'token': token,
+        'escrow_passphrase': escrowPassphrase,
       };
 
   factory AppLockPayload.fromJson(Map<String, dynamic> json) => AppLockPayload(
@@ -141,6 +147,7 @@ class AppLockPayload {
         deviceId: json['device_id'] as String,
         keyVersion: (json['key_version'] as int?) ?? 1,
         token: json['token'] as String?,
+        escrowPassphrase: json['escrow_passphrase'] as String?,
       );
 }
 

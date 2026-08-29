@@ -184,6 +184,32 @@
 - 设备撤销时其 Token 一并清除。
 - **推送永不携带消息正文**，只发 `{ "type": "new_message", "space_id": "…" }` 提示（productLens §10）。
 
+### 7.4 密钥托管 POST/GET/DELETE /key-escrow（口令托管）
+
+> 口令托管密钥（KEY_ESCROW.md §4）：客户端用**口令**（Argon2id）派生密钥把
+> `{space_key, space_id, key_version}` 加密成密文包后托管到 Server。Server 只存
+> **被口令加密的密文包**，不解析内容——没有口令任何一方（含 Server 本身）都无法解开。
+> 用途：换设备/朋友新接入时凭口令拉取解密，免 sealed 副本离线传递。
+
+```json
+// POST /key-escrow（上传/更新，按 space 一份，UPSERT）
+{ "package": { "format": "backup-v1", "salt": "b64", "nonce": "b64", "ciphertext": "b64" } }
+// 响应 200
+{ "ok": true }
+
+// GET /key-escrow（拉取；白名单内任一设备可读）
+// 响应 200（未托管时为空对象）
+{ "package": { "format": "backup-v1", "salt": "b64", "nonce": "b64", "ciphertext": "b64" } }
+
+// DELETE /key-escrow（清除）
+{ "ok": true }
+```
+
+- 鉴权：Bearer session_token（challenge-response 后）；设备须在白名单（403）。
+- 包结构校验仅限字段类型（`format`/`salt`/`nonce`/`ciphertext` 均为非空 base64 字符串，400 拒绝坏字段）；**Server 永不解析包内容**。
+- 口令验证发生在客户端（解密失败 = 口令错，AEAD tag 校验），Server 无法限速 → 依赖 Argon2id 慢哈希 + 口令熵要求 + 客户端本地错误处理。
+- 客户端接入流程：生成身份 → 白名单登记 → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。密钥轮换后客户端解锁时自动重传新密文包（KEY_ESCROW.md §7）。
+
 ## 8. WebSocket（实时通道）
 
 ### 8.1 连接

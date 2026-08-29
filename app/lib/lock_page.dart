@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:onlyspace_shared/onlyspace_shared.dart';
 
 import 'chat_page.dart';
 import 'data/app_lock.dart';
@@ -75,6 +76,28 @@ class _LockPageState extends State<LockPage> {
     ));
   }
 
+  /// rotate 后同步：解锁成功时用最新 Space Key 重传口令托管包
+  /// （KEY_ESCROW.md §7，失败静默，下次解锁自动重试）。
+  void _syncEscrow(AppLockPayload payload) {
+    final pass = payload.escrowPassphrase;
+    final token = payload.token;
+    if (pass == null || pass.isEmpty || token == null || token.isEmpty) return;
+    unawaited(() async {
+      try {
+        final escrow = KeyEscrowService(ApiClient(payload.server));
+        await escrow.upload(
+          passphrase: pass,
+          spaceKeyB64: payload.spaceKeyB64,
+          spaceId: payload.spaceId,
+          keyVersion: payload.keyVersion,
+          token: token,
+        );
+      } catch (_) {
+        // 忽略：托管不可用不影响聊天（离线/Server 暂不可达）
+      }
+    }());
+  }
+
   Future<void> _unlock() async {
     if (_busy || _pin.text.isEmpty) return;
     setState(() {
@@ -84,6 +107,7 @@ class _LockPageState extends State<LockPage> {
     try {
       final payload = await _lock.unlock(_pin.text);
       if (!mounted) return;
+      _syncEscrow(payload); // rotate 后同步：重传口令托管包
       _enterChat(payload);
     } on AppLockLockedException catch (e) {
       if (!mounted) return;
@@ -108,6 +132,7 @@ class _LockPageState extends State<LockPage> {
     try {
       final payload = await _lock.unlockWithRecovery(_recovery.text.trim());
       if (!mounted) return;
+      _syncEscrow(payload);
       _enterChat(payload);
     } on AppLockException catch (e) {
       if (!mounted) return;

@@ -39,7 +39,9 @@ Future<void> main(List<String> args) async {
     ..addOption('out', help: '下载输出的本地文件路径（fetch 用）/ 备份输出文件（backup 用）')
     ..addOption('in', help: '备份输入文件（restore 用）')
     ..addOption('recovery-code', help: '12 词恢复码（restore 用；backup 会自动生成并打印）')
-    ..addOption('key-version', help: '导入的 Space Key 版本号（import 用，默认 1；轮换导入时用新版本）');
+    ..addOption('key-version', help: '导入的 Space Key 版本号（import 用，默认 1；轮换导入时用新版本）')
+    ..addOption('action', help: 'escrow 子命令: upload|download')
+    ..addOption('passphrase', help: '口令托管密钥的口令（escrow 用）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
   final opts = parser.parse(rest);
@@ -74,7 +76,15 @@ Future<void> main(List<String> args) async {
     case 'seal':
       await _cmdSeal(opts);
     case 'history':
-      await _cmdHistory(opts);
+      _cmdHistory(opts);
+    case 'escrow':
+      // 口令托管（KEY_ESCROW.md §4）：upload = 口令加密 Space Key 包上传；
+      // download = 拉取并解出写回 store（新设备凭口令接入）
+      if (opts['action'] == 'upload') {
+        await _cmdEscrowUpload(opts);
+      } else {
+        await _cmdEscrowDownload(opts);
+      }
     case 'help':
     default:
       stdout.writeln(parser.usage);
@@ -192,6 +202,74 @@ Future<void> _cmdAuth(ArgResults opts) async {
   store.sessionToken = session.sessionToken;
   store.save(_require(opts, 'store'));
   stdout.writeln('✅ 认证成功: space_id=${session.spaceId}');
+}
+
+/// escrow upload：口令加密 Space Key 包并上传托管（KEY_ESCROW.md §4）。
+/// Server 只存密文，无口令不可解。
+Future<void> _cmdEscrowUpload(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  store.requireSpace();
+  final server = _require(opts, 'server');
+  final passphrase = _require(opts, 'passphrase');
+  final api = ApiClient(server);
+  final s = await sodium();
+
+  final challenge = await api.challenge(store.deviceId);
+  final opened = await sealOpen(
+    s,
+    base64Decode(challenge.sealedChallenge),
+    store.publicKeyBytes,
+    store.privateKeyBytes,
+  );
+  final session = await api.verify(challenge.challengeId, base64Encode(opened));
+
+  final escrow = KeyEscrowService(api);
+  await escrow.upload(
+    passphrase: passphrase,
+    spaceKeyB64: store.spaceKey!,
+    spaceId: store.spaceId!,
+    keyVersion: store.keyVersion,
+    token: session.sessionToken,
+  );
+  stdout.writeln('✅ 口令托管包已上传（Server 只存密文）: space_id=${store.spaceId}');
+}
+
+/// escrow download：拉取口令托管包并解出 Space Key 写回 store。
+/// 新设备接入：init（生成身份）→ 白名单登记 → escrow download（凭口令）→ send/sync。
+Future<void> _cmdEscrowDownload(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  final server = _require(opts, 'server');
+  final passphrase = _require(opts, 'passphrase');
+  final api = ApiClient(server);
+  final s = await sodium();
+
+  final challenge = await api.challenge(store.deviceId);
+  final opened = await sealOpen(
+    s,
+    base64Decode(challenge.sealedChallenge),
+    store.publicKeyBytes,
+    store.privateKeyBytes,
+  );
+  final session = await api.verify(challenge.challengeId, base64Encode(opened));
+
+  final escrow = KeyEscrowService(api);
+  final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
+  if (payload == null) {
+    stdout.writeln('⚠️ Server 无口令托管包（请先在对端执行 escrow upload）');
+    return;
+  }
+
+  // 写回 store（参照 import 的归档逻辑：新版本 > 当前时归档旧密钥）
+  if (payload.keyVersion > store.keyVersion && store.spaceKey != null) {
+    store.archivedSpaceKeys.add({'key_version': store.keyVersion, 'space_key': store.spaceKey});
+  }
+  store.spaceKey = payload.spaceKeyB64;
+  store.spaceId = payload.spaceId;
+  store.keyVersion = payload.keyVersion;
+  store.save(path);
+  stdout.writeln('✅ 口令托管包已解出 Space Key: space_id=${payload.spaceId} key_version=${payload.keyVersion}');
 }
 
 Future<void> _cmdSend(ArgResults opts) async {

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../crypto/backup.dart';
 import 'types.dart';
 import '../crypto/message_crypto.dart';
 
@@ -47,6 +48,24 @@ class ApiClient {
   /// 注销 Push Token。
   Future<void> unregisterPushToken(String token) async {
     await _delete(Api.pushRegister, token: token);
+  }
+
+  /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
+  Future<void> uploadKeyEscrow(BackupFile package, String token) async {
+    await _post(Api.keyEscrow, {'package': package.toJson()}, token: token);
+  }
+
+  /// 拉取口令托管密文包；未托管时返回 null。
+  Future<BackupFile?> getKeyEscrow(String token) async {
+    final res = await _get(Api.keyEscrow, token: token);
+    final pkg = res['package'];
+    if (pkg == null) return null;
+    return BackupFile.fromJson(pkg as Map<String, dynamic>);
+  }
+
+  /// 清除口令托管密文包。
+  Future<void> deleteKeyEscrow(String token) async {
+    await _delete(Api.keyEscrow, token: token);
   }
 
   /// 上传附件密文 blob（PROTOCOL.md §6.1）：元数据走 x-attachment-meta 头，body 为密文。

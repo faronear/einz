@@ -7,6 +7,7 @@ import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment } from "./attachments.js";
 import { listDevices, revokeDevice } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
+import { deleteKeyEscrow, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked } from "./ws.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -135,6 +136,21 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "DELETE" && path === "/push/register") {
     sendJson(res, 200, unregisterPushToken(cfg, bearer(req)));
+    return;
+  }
+
+  // 密钥托管（口令托管，KEY_ESCROW.md §4）：Server 只存密文包，不解析内容
+  if (method === "POST" && path === "/key-escrow") {
+    const body = await readJson(req);
+    sendJson(res, 200, uploadKeyEscrow(cfg, bearer(req), body));
+    return;
+  }
+  if (method === "GET" && path === "/key-escrow") {
+    sendJson(res, 200, getKeyEscrow(cfg, bearer(req)));
+    return;
+  }
+  if (method === "DELETE" && path === "/key-escrow") {
+    sendJson(res, 200, deleteKeyEscrow(cfg, bearer(req)));
     return;
   }
 

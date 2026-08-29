@@ -374,3 +374,20 @@
 - 生成命令：`flutter test --update-goldens test/golden_render_test.dart`（3 项全过）
 
 **入库决定：** 老板确认 golden 截图作为 UI 基准图入库（含 golden 测试 + 注入参数改动）。
+
+### 口令托管密钥实现（KEY_ESCROW.md，2026-08-29）
+
+老板决定放弃 Server 明文管钥，把现有实现升级为口令托管（KEY_ESCROW.md 方案落地，决策点全按推荐：按 space 存一份 / 口令与 App 锁 PIN 区分 / 保留 seal-import 兜底 / 支持重传）。
+
+**分层实现与验证：**
+
+- **Server**：`key_escrow` 表（space_id 主键）+ `src/escrow.ts` 三端点（POST/GET/DELETE，白名单鉴权，包结构仅校验字段类型、**不解析内容**）+ app.ts 路由；smoke.test.ts §11 增 7 项断言（上传/拉取一致/坏字段 400/无 token 401/DB 只存密文包/DELETE 清空）——`npm test` 全过
+- **shared**：Api 常量 `keyEscrow` + ApiClient 三方法（uploadKeyEscrow/getKeyEscrow/deleteKeyEscrow）+ `src/crypto/key_escrow.dart`（KeyEscrowService：createPackage/openPackage/upload/fetch/remove，复用 backup.dart 零新密码学）+ EscrowPayload + 3 项单测——dart test 16 项全过
+- **CLI**：`escrow --action upload|download` 命令（auth → KeyEscrowService → store 读写，download 参照 import 归档逻辑）；**全链路 e2e 过**（upload → Server 密文 → download → 错误口令 FormatException 拒绝 → 收发解密）
+- **App**：AppLockPayload 加 `escrowPassphrase`（被 App 锁 PIN 加密，与 PIN 区分）；SetPinDialog 加"接入口令"可选输入 + 上传托管（阶段2 显示状态）；SetupPage 加"③ 凭口令接入"（认证 → fetch → 口令解密 → 设置 PIN → 进聊天，免 sealed 副本）；LockPage 解锁成功 `_syncEscrow` 重传（rotate 后自动同步）——flutter test 18 项全过（golden setup_page 基准图更新）
+- **协议文档**：PROTOCOL.md 增补 §7.4（/key-escrow 三端点、鉴权、口令验证在客户端、接入流程）；KEY_ESCROW.md 状态 [待评审]→[已实现]
+- **双端 e2e**（escrow-pair-e2e.mjs）：A 上传 → B 清空 Space Key 凭口令接入 → A↔B 互发互收解密，全过
+
+**排障记录（关键）：** ① bash 内后台 server 不 kill 必超时（工具等待全部子进程）→ 改用 **Node 脚本 spawn 管理 server 生命周期**（finally kill）；② `dart run` 进程被杀后留下编译锁会卡死 → 用 `dart compile exe` 编译 CLI 后直跑 exe；③ shared 测试用 flutter_test 报 URI 不存在（纯 Dart 包用 `package:test`）；④ `package:test` 的 expect 只接受 2 个位置参数；⑤ C 新设备需先加白名单再 escrow download（auth 依赖白名单公钥）；⑥ CLI sync 前需先 auth（store.sessionToken）。
+
+**部署影响：** VPS 现有 server 容器需重新构建（新表 + 新端点）才能使用口令托管；存量数据不受影响（key_escrow 表为空）。

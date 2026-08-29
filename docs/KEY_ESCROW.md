@@ -1,8 +1,8 @@
 # 口令托管密钥（Passphrase-Protected Key Escrow）方案
 
-> **状态：`[待评审]`** — 本方案由 AtomCode 提出，供老板审核。
+> **状态：`[已实现]`**（2026-08-29 落地：Server 三端点 + shared KeyEscrowService + CLI escrow 命令 + App 接入口令/凭口令接入/rotate 自动重传；Server 冒烟、shared 16 项、App 18 项、CLI 全链路与双端 e2e 全过）。
 > **定位：** 在**不推倒现有 E2EE**（Server 只见密文）的前提下，解决"换设备 / 朋友新接入门槛高"的痛点。
-> **相关文档：** docs/E2EE.md（协议）、docs/DEPLOYMENT.md §2.2（当前 seal/import 分发）、docs/PROTOCOL.md
+> **相关文档：** docs/E2EE.md（协议）、docs/DEPLOYMENT.md §2.2（当前 seal/import 分发）、docs/PROTOCOL.md §7.4（协议增补）
 
 ---
 
