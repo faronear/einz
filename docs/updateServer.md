@@ -113,7 +113,8 @@ cd deployment && docker compose up -d --build server
 | --- | --- |
 | 存量数据 | 不受影响（messages/devices/会话等不动，新表初始为空） |
 | 白名单 | 无需改动（既有设备认证不受影响） |
-| Caddy / HTTPS / 备份密钥 | 无需改动（Caddyfile 已 assume-unchanged） |
+| Caddy / HTTPS | 无需改动（Caddyfile 已 assume-unchanged） |
+| 备份密钥 | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `ONLYSPACE_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose |
 | App 侧 | 需重新安装 APK 才能启用新 UI（CLI 不受影响） |
 | 首次在 VPS 用 git | 先 `git config --global user.email/user.name`（避免提交时报错） |
 | pull 冲突 | 若 `git pull` 报冲突：多半是 Caddyfile 被误改——先 `git checkout -- deployment/Caddyfile` 还原，再 `git update-index --assume-unchanged deployment/Caddyfile` |

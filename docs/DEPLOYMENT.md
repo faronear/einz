@@ -178,7 +178,9 @@ ONLYSPACE_BACKUP_KEY=<上一步输出> docker compose up -d --build
 docker compose ps                       # 两个服务均 healthy/running
 ```
 
-> 说明：`docker-compose.yml` 未预置 `ONLYSPACE_BACKUP_KEY`，部署时按上方式注入（或加入 environment 段）。未设置时 `npm run backup` 会拒绝执行（防误备份明文）。
+> 说明：`docker-compose.yml` 已预置 `ONLYSPACE_BACKUP_KEY=${ONLYSPACE_BACKUP_KEY}` 注入
+> （由 compose 自动读取 `deployment/.env` 提供，.env 已在 .gitignore、不入库）。
+> 未设置时 `npm run backup` 会拒绝执行（防误备份明文）。
 
 ### 3.3 验证部署
 
