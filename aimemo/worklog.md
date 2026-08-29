@@ -334,4 +334,4 @@
 - **APNs 接入代码**：shared ApiClient 补 `registerPushToken`/`unregisterPushToken`（+ `_delete` 辅助，对齐 PROTOCOL.md §7.3）；`AppDelegate.swift` 注册远程通知 + MethodChannel('onlyspace/apns') 传 device token；`chat_page.dart` 认证后 `_registerPushToken()`（失败静默降级）。shared analyze + 13 单测、app flutter test 6 项全过
 - `docs/IOS.md`：Mac 构建指引（clone/构建/真机签名/Ad Hoc/已知点/快速参考）
 
-**遗留/下一步（Mac 侧执行）：** ① 远程仓库推送（AtomGit PAT，`git push` 阻塞在凭据，需老板交互终端配置——见 DEPLOYMENT 相关说明）；② Mac clone → `flutter config --no-enable-swift-package-manager` → build ios 验证 libsodium 链接；③ 真机签名运行；④ APNs/Ad Hoc 待 Apple 付费账号（Server `sendPushHint` 仍为日志占位）。
+**遗留/下一步（Mac 侧执行）：** ① 远程仓库已配置并推送成功（老板自建 Gitea：`https://git.tic.cc/fon/only`，main 已推，Mac 直接 clone）；② Mac clone → `flutter config --no-enable-swift-package-manager` → build ios 验证 libsodium 链接；③ 真机签名运行；④ APNs/Ad Hoc 待 Apple 付费账号（Server `sendPushHint` 仍为日志占位）。

@@ -7,7 +7,7 @@
 
 ## 0. 先完成代码同步（Windows 侧，一次）
 
-项目已建 AtomGit 远程仓库：`https://atomgit.com/gcw_jugxxZO4/onlyspace.git`（私有）。
+项目远程仓库：`https://git.tic.cc/fon/only`（老板自建 Gitea，私有）。
 
 - Windows 开发机需**推送一次**并让 Git 记住凭据（Personal Access Token，见 DEPLOYMENT.md §0 配置方法）：
 
@@ -44,7 +44,7 @@ sudo gem install cocoapods
 ## 2. 拉取代码并构建（无签名验证编译）
 
 ```bash
-git clone https://atomgit.com/gcw_jugxxZO4/onlyspace.git
+git clone https://git.tic.cc/fon/only
 cd onlyspace/app
 
 flutter pub get
@@ -113,7 +113,7 @@ Xcode 内配置（Target `Runner` → Signing & Capabilities）：
 
 ```bash
 # Mac（第一次）
-git clone https://atomgit.com/gcw_jugxxZO4/onlyspace.git && cd onlyspace/app
+git clone https://git.tic.cc/fon/only && cd onlyspace/app
 flutter config --no-enable-swift-package-manager
 flutter pub get && flutter build ios --debug --no-codesign   # 验证编译
 open ios/Runner.xcworkspace                                  # 签名 → Run
