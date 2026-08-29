@@ -72,6 +72,7 @@
 - [x] **多语言界面第二批（lock_page 全量抽取）**：ARB 加 lockPage.* 12 键（含 int 占位符秒数/错误参数）；lock_page 12 处硬编码中文 → AppLocalizations（AppBar/PIN 提示/锁定倒计时/解锁/恢复码入口）；main.dart 确认无 UI 中文文案（注释除外，无需替换）；flutter test 25 项全过 + lock_page golden 更新；**至此四个页面（设置/聊天/锁屏/启动）全部中英文化完成**
 - [x] **WS 实时接入 + 轮询兜底**：shared 新增 WsClient（ws_client.dart：WsEvent 模型 hello/message.new/key.rotation/device.revoked + 连接/指数退避重连/状态回调，导出）；app 新增 WsRealtimeService（connected ValueNotifier + onMessageNew）；chat_page 接入（收到 message.new → 立即增量刷新；**WS 在线轮询降频 30s 兜底、断开恢复 3s**；enableWs 测试开关）；单测（shared ws_client 5 项：连接/解析/未知帧/断开重连；app ws_realtime 1 项：message.new 触发 + connected 状态），shared 23/app 26 全过；Server 侧 WS 早已就绪（ws.ts 广播 message.new）
 - [x] **device.revoked 撤销处理**：WsRealtimeService 加 onDeviceRevoked 分发；AppLockService 加 clear()（删除锁包 4 key：package/recovery/attempts/locked_until）；chat_page 收到 revoked → 停轮询/WS → 清理本地（锁包+消息库+附件+syncState）→ SnackBar 提示（chatPageDeviceRevoked 键）→ pushAndRemoveUntil 强制回设置页；单测（AppLockService.clear 1 项 + WsRealtimeService revoked 分发 1 项），app flutter test 28 项全过；**key.rotation 暂不处理**（App 无密钥轮换导入流程，仅 CLI rotate 离线流程，事件为通知性）
+- [x] **Server 备份密钥改名（命名消歧）**：`ONLYSPACE_BACKUP_KEY` → `ONLYSPACE_DB_BACKUP_KEY`（backup.ts/scripts/docker-compose/DEPLOYMENT.md/updateServer.md 全部同步；dist 编译产物随 build 更新）；updateServer.md §5 加"旧部署升级"说明（VPS .env 手动改名 + 重启）；E2EE.md 末尾加**密钥命名对照表**（Space Key / 口令派生密钥 / DB 备份密钥三层，防混淆）；server build + smoke 全过；**VPS 需手动改 deployment/.env 变量名并重启**
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
 - [ ] iOS 真机构建/签名/Ad Hoc（docs/IOS.md §3–§4）——待 Mac + Apple 付费账号（APNs 暂无账号，WS/轮询兜底）
 

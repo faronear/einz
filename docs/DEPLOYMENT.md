@@ -174,11 +174,11 @@ python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
 
 # 4) 起服务
 cd deployment
-ONLYSPACE_BACKUP_KEY=<上一步输出> docker compose up -d --build
+ONLYSPACE_DB_BACKUP_KEY=<上一步输出> docker compose up -d --build
 docker compose ps                       # 两个服务均 healthy/running
 ```
 
-> 说明：`docker-compose.yml` 已预置 `ONLYSPACE_BACKUP_KEY=${ONLYSPACE_BACKUP_KEY}` 注入
+> 说明：`docker-compose.yml` 已预置 `ONLYSPACE_DB_BACKUP_KEY=${ONLYSPACE_DB_BACKUP_KEY}` 注入
 > （由 compose 自动读取 `deployment/.env` 提供，.env 已在 .gitignore、不入库）。
 > 未设置时 `npm run backup` 会拒绝执行（防误备份明文）。
 
@@ -228,8 +228,8 @@ SETUP.md §3 的设计流程已由 CLI 实现（2.2 已演示）。要点重申�
 ```bash
 cd server   # 或 docker compose exec server npm run backup
 
-# 备份（需 ONLYSPACE_BACKUP_KEY，base64 32B）
-export ONLYSPACE_BACKUP_KEY="<部署时生成的密钥>"
+# 备份（需 ONLYSPACE_DB_BACKUP_KEY，base64 32B）
+export ONLYSPACE_DB_BACKUP_KEY="<部署时生成的密钥>"
 npm run backup -- --verify
 # 产物：data/backups/backup-<ts>.json（AES-256-GCM 加密的 app.db + files/ + config.json）
 
@@ -295,7 +295,7 @@ dart run bin/onlyspace.dart import \
 | 服务端只见密文 | E2EE 全链路（消息/附件均为密文 + 元数据） | `messages` 表只有 ciphertext（冒烟测试验证） |
 | 路径遍历 | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧） | 失陷白名单设备也无法越出 `files/`（V1 审查 P1 修复） |
 | WS 撤销实时性 | 撤销即关闭被撤销设备连接（close 4403） | 无法继续收新消息广播（P2 修复） |
-| 备份加密 | Server 备份 AES-256-GCM（`ONLYSPACE_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露 |
+| 备份加密 | Server 备份 AES-256-GCM（`ONLYSPACE_DB_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露 |
 | 供应链 | Gradle 镜像 `distributionSha256Sum` 锁定官方校验和 | 构建工具链不可被镜像篡改（P3 修复） |
 | 认证 | challenge-response（一次性、5 分钟过期）；session_token 服务端签发 | 防重放 |
 | 前向保密 | Space Key 简单派生（已接受的代价，E2EE.md §11.1） | 轮换 + 安全存储缓解 |
@@ -318,7 +318,7 @@ dart run bin/onlyspace.dart import \
 | WS 连不上 | 反代未开 WSS / token 未 URL 编码 | 检查 Caddy；token 含 `+`/`=` 需编码（客户端自动处理） |
 | `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷） | 拷贝到纯 ASCII 路径构建（`D:\build-onlyspace`），产物拷回 |
 | 撤销后设备仍能认证 | Server 版本过旧（未含 Phase 4 撤销感知） | 重新 `npm run build` 部署 |
-| 备份命令拒绝执行 | 未设置 `ONLYSPACE_BACKUP_KEY` | 设置 base64 32B 密钥（§3.2/§5.1） |
+| 备份命令拒绝执行 | 未设置 `ONLYSPACE_DB_BACKUP_KEY` | 设置 base64 32B 密钥（§3.2/§5.1） |
 
 ---
 

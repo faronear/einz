@@ -548,3 +548,21 @@
 **验证：** app flutter test **28 项全过**（+2）；analyze 无问题；shared 23 项不变。
 
 **安全语义：** Server 广播 device.revoked 后主动断开连接（P2 修复），App 收到即清数据登出——被撤销设备上不留密钥与消息副本。
+
+### Server 备份密钥改名（命名消歧；2026-08-29）
+
+**背景：** 老板指出 `backup key`（实为口令派生机制，非独立实体）与 `ONLYSPACE_BACKUP_KEY`（Server env）命名易混淆。老板确认方案：**改 Server env 名 + 文档对照表**；backup.dart 保持原名。
+
+**改动：**
+- `ONLYSPACE_BACKUP_KEY` → `ONLYSPACE_DB_BACKUP_KEY`（全库同步）：
+  - `server/src/backup.ts`（注释 + process.env 读取 + 2 错误消息）
+  - `server/scripts/backup.ts`（注释）
+  - `deployment/docker-compose.yml`（注入行）
+  - `docs/DEPLOYMENT.md`（7 处：起服务示例 + 说明）
+  - `docs/updateServer.md` §5（备份密钥行 + 新增"旧部署升级"行：2026-08 前部署的 .env 旧变量名需手动改名 + `docker compose up -d --build server`，否则 backup 脚本拒绝执行）
+  - `server/dist/`（编译产物，.gitignore 不入库，build 自动更新——已确认 dist/backup.js 含新名）
+- `docs/E2EE.md` 末尾加**附录：密钥命名对照**：Space Key（消息 E2EE）/ 口令派生密钥（backup.dart 三处复用：CLI 备份、App 锁、托管）/ DB 备份密钥（Server env）——三层独立互相解不开
+
+**验证：** server `npm run build` 通过；smoke 测试全过；grep 确认 server/src、scripts、deployment、DEPLOYMENT.md 无残留旧名（仅文档升级说明有意提及旧名）。
+
+**⚠️ VPS 运维提醒（交付时同步老板）：** VPS 的 `deployment/.env`（gitignore 不入库）需手动把 `ONLYSPACE_BACKUP_KEY` 改名 `ONLYSPACE_DB_BACKUP_KEY` 后重启 server，否则 backup 脚本报"变量未设置"拒绝备份。

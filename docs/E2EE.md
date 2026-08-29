@@ -365,3 +365,19 @@ Client                     Server
 - 禁止使用密码/恢复码直接作为消息加密密钥（必须经 Argon2id 派生）。
 - 禁止信任客户端自报的成员资格（服务端按白名单校验）。
 - 禁止将密文与明文混合存储（附件 blob 一律密文；本地明文缓存仅限 App 私有目录）。
+
+### 附录：密钥命名对照（防混淆）
+
+OnlySpace 涉及多个"密钥"概念，命名与用途对照如下：
+
+| 名称 | 实体类型 | 用途 | 谁持有 |
+| --- | --- | --- | --- |
+| **Space Key** | 32B 对称密钥 | 消息/附件 E2EE 加密（§5/§6）；key_version 轮换 + 归档（§9.2） | 双方设备（App 锁 PIN 包 / 口令托管保管） |
+| **口令派生密钥** | 无独立实体（口令经 Argon2id 派生，§4.3） | CLI backup/restore 备份文件、App 锁 PIN/恢复码、口令托管包加密（三处复用 backup.dart） | 口令持有者（恢复码 / PIN / 接入口令） |
+| **ONLYSPACE_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B） | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文） | 部署者（deployment/.env，gitignore 保护） |
+
+> 注：Server 备份密钥 2026-08 起从 `ONLYSPACE_BACKUP_KEY` 更名为 `ONLYSPACE_DB_BACKUP_KEY`，
+> 避免与 CLI 的 backup（口令派生）概念混淆；旧部署升级需同步改 `.env` 变量名（docs/updateServer.md §5）。
+>
+> 层次关系：**Space Key 管"说话内容"（消息/附件密文），口令派生密钥管"保管手段"（备份/锁包/托管包），
+> DB 备份密钥管"运维备份"（Server 数据库文件）**——三层独立，互相解不开。

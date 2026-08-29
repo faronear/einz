@@ -5,7 +5,7 @@
  *       + /data/files/（附件密文 blob）+ config.json（白名单）
  * 产物 = 单文件，AES-256-GCM 加密归档到 <data>/backups/。
  *
- * 密钥：环境变量 ONLYSPACE_BACKUP_KEY（base64 32B）。未设置时拒绝执行（防误备份明文）。
+ * 密钥：环境变量 ONLYSPACE_DB_BACKUP_KEY（base64 32B）。未设置时拒绝执行（防误备份明文）。
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync, copyFileSync } from "node:fs";
@@ -31,10 +31,10 @@ export function resolveBackupPaths(env: NodeJS.ProcessEnv = process.env): Backup
 }
 
 function backupKey(): Buffer {
-  const raw = process.env.ONLYSPACE_BACKUP_KEY;
-  if (!raw) throw new Error("ONLYSPACE_BACKUP_KEY 未设置（应为 base64 32B），拒绝备份");
+  const raw = process.env.ONLYSPACE_DB_BACKUP_KEY;
+  if (!raw) throw new Error("ONLYSPACE_DB_BACKUP_KEY 未设置（应为 base64 32B），拒绝备份");
   const key = Buffer.from(raw, "base64");
-  if (key.length !== 32) throw new Error("ONLYSPACE_BACKUP_KEY 必须为 base64(32B)");
+  if (key.length !== 32) throw new Error("ONLYSPACE_DB_BACKUP_KEY 必须为 base64(32B)");
   return key;
 }
 
