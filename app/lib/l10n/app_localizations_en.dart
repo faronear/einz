@@ -278,6 +278,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageDeviceRevoked =>
+      'Device revoked — local data cleared, please set up again';
+
+  @override
   String get burnOptionUnlimited => 'Unlimited';
 
   @override

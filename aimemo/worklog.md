@@ -534,3 +534,17 @@
 **效果：** App 上线后 WS 在线时消息**毫秒级实时**（Server 广播 → App 立即增量刷新），3s 轮询降为 30s 兜底；WS 断线自动指数退避重连，重连期间恢复 3s 轮询保底（不丢消息）。
 
 **遗留：** ① Server 无 message.deleted 广播（阅后即焚纯本地，无 Server 删除）——WS 只需处理 message.new；② key.rotation/device.revoked 事件 App 暂未处理（device.revoked 后 App 应强制登出，后续可加）；③ 真机验证 WS 连接稳定性。
+
+### device.revoked 撤销处理（2026-08-29）
+
+**背景：** 老板要求做 device.revoked（撤销强制登出）+ 询问 key.rotation。**key.rotation 说明**：Space Key 轮换目前是 CLI 离线流程（rotate → 密封给对方 → import），Server 广播仅通知性；App 密钥管理固定 keyVersion=1、无导入流程 → 收到 key.rotation 暂无实际动作，**本次不处理**。
+
+**实现：**
+- `WsRealtimeService`：加 `onDeviceRevoked` 回调（onEvent 分发 WsDeviceRevokedEvent）
+- `AppLockService.clear()`：删除锁包 4 个 key（app_lock.package/recovery/attempts/locked_until）——设备撤销后回到未配置状态，防止残留密钥
+- `chat_page._onDeviceRevoked()`：停轮询/WS → 清理本地（AppLockService.clear + 清空 localMessages/localAttachments/syncState）→ SnackBar 提示（新增 l10n 键 chatPageDeviceRevoked）→ `pushAndRemoveUntil` 强制回 SetupPage（清空导航栈）；清理失败不阻塞登出（尽力清除）
+- 测试：app_lock_test 加 clear 用例（clear 后 isSetup=false + 原 PIN 解锁抛 AppLockException）；ws_realtime_service_test 加 revoked 分发用例（广播 device.revoked → onDeviceRevoked 触发 1 次）
+
+**验证：** app flutter test **28 项全过**（+2）；analyze 无问题；shared 23 项不变。
+
+**安全语义：** Server 广播 device.revoked 后主动断开连接（P2 修复），App 收到即清数据登出——被撤销设备上不留密钥与消息副本。

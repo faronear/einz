@@ -66,6 +66,16 @@ void main() {
     expect(await lock.remainingLockSeconds, greaterThan(0));
   });
 
+  test('clear：删除锁包后 isSetup=false，原 PIN 无法再解锁（设备撤销清理）', () async {
+    await lock.setPin('1234', payload: payload);
+    expect(await lock.isSetup, true);
+
+    await lock.clear();
+    expect(await lock.isSetup, false, reason: 'clear 后应回到未配置状态');
+    await expectLater(lock.unlock('1234'), throwsA(isA<AppLockException>()),
+        reason: '锁包已删，原 PIN 不应再能解锁');
+  });
+
   test('恢复码兑底：PIN 丢失时用恢复码解锁成功，错误恢复码被拒', () async {
     final recovery = await lock.setPin('1234', payload: payload);
     // 用错误 PIN 触发锁定也无妨：恢复码不受锁定限制

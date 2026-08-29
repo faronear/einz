@@ -13,6 +13,7 @@ import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 
 import 'data/burn_after_settings.dart';
+import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
@@ -20,6 +21,7 @@ import 'data/message_repository.dart';
 import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
+import 'setup_page.dart';
 
 /// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
 enum _AttachmentKind { photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
@@ -130,8 +132,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final ws = WsRealtimeService(server: widget.server, token: widget.token);
       _ws = ws;
       ws.connected.addListener(_onWsStatusChanged);
-      ws.start(onMessageNew: () => _refresh());
+      ws.start(
+        onMessageNew: () => _refresh(),
+        onDeviceRevoked: _onDeviceRevoked,
+      );
     }
+  }
+
+  /// 本设备被撤销（Server 广播 device.revoked）：清理本地数据（锁包+消息库）
+  /// → 提示 → 强制回设置页重新配置。
+  Future<void> _onDeviceRevoked() async {
+    _ticker?.cancel();
+    await _ws?.stop();
+    if (!mounted) return;
+    try {
+      final db = widget.db ?? LocalDatabase();
+      await AppLockService(db).clear();
+      await (db.delete(db.localAttachments)).go();
+      await (db.delete(db.localMessages)).go();
+      await (db.delete(db.syncState)).go();
+    } catch (_) {
+      // 清理失败不阻塞登出（尽力清除）
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageDeviceRevoked)),
+    );
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const SetupPage()),
+      (route) => false,
+    );
   }
 
   /// 重建轮询 ticker（WS 状态变化时切换间隔）。

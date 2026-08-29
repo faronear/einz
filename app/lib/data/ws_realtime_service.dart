@@ -17,14 +17,19 @@ class WsRealtimeService {
   /// 新消息到达回调（WS 在线时 chat_page 收到即增量刷新，无需等轮询）。
   void Function()? onMessageNew;
 
+  /// 本设备被撤销回调（Server 广播 device.revoked——App 应清理本地数据并强制登出）。
+  void Function()? onDeviceRevoked;
+
   /// 建立连接（自动重连直到 [stop]）。
-  void start({void Function()? onMessageNew}) {
+  void start({void Function()? onMessageNew, void Function()? onDeviceRevoked}) {
     this.onMessageNew = onMessageNew;
+    this.onDeviceRevoked = onDeviceRevoked;
     _client = WsClient(
       server: server,
       token: token,
       onEvent: (e) {
         if (e is WsMessageNewEvent) this.onMessageNew?.call();
+        if (e is WsDeviceRevokedEvent) this.onDeviceRevoked?.call();
       },
       onStatus: (s) => connected.value = s == WsStatus.connected,
     )..start();

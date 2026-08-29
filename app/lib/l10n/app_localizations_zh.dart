@@ -265,6 +265,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageDeviceRevoked => '设备已被撤销，本地数据已清除，请重新配置';
+
+  @override
   String get burnOptionUnlimited => '无限';
 
   @override

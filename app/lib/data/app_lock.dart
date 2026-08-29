@@ -28,6 +28,13 @@ class AppLockService {
   /// 是否已设置启动锁。
   Future<bool> get isSetup async => await _get(_kPackage) != null;
 
+  /// 清除本地锁与密钥包（设备被撤销时调用：回到未配置状态，防止残留密钥）。
+  Future<void> clear() async {
+    await (db.delete(db.appState)
+          ..where((s) => s.key.isIn({_kPackage, _kRecovery, _kAttempts, _kLockedUntil})))
+        .go();
+  }
+
   /// 设置 PIN 并加密保存 Space Key 包；返回 12 词恢复码（用户需离线保存）。
   Future<String> setPin(String pin, {required AppLockPayload payload}) async {
     final bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload.toJson())));

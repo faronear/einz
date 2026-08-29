@@ -536,6 +536,12 @@ abstract class AppLocalizations {
   /// **'Download failed: {error}'**
   String chatPageDownloadFailed(String error);
 
+  /// No description provided for @chatPageDeviceRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Device revoked — local data cleared, please set up again'**
+  String get chatPageDeviceRevoked;
+
   /// No description provided for @burnOptionUnlimited.
   ///
   /// In en, this message translates to:

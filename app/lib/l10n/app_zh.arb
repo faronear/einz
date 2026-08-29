@@ -159,6 +159,7 @@
       "error": {"type": "String"}
     }
   },
+  "chatPageDeviceRevoked": "设备已被撤销，本地数据已清除，请重新配置",
   "burnOptionUnlimited": "无限",
   "burnOption1Minute": "1 分钟",
   "burnOption5Minutes": "5 分钟",

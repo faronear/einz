@@ -159,6 +159,7 @@
       "error": {"type": "String"}
     }
   },
+  "chatPageDeviceRevoked": "Device revoked — local data cleared, please set up again",
   "burnOptionUnlimited": "Unlimited",
   "burnOption1Minute": "1 minute",
   "burnOption5Minutes": "5 minutes",
