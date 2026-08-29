@@ -61,6 +61,7 @@
 - [x] app 接入 shared 核心包：ApiClient 上移 shared（App/CLI 共用）、MessageRepository（发送/同步/历史/补发），6 项单测全过
 - [x] **iOS 启动开发**（老板已购置 Mac）：Info.plist 权限声明 + libsodium 静态库集成（Podfile 本地 pod + DynamicLibrary.process）+ APNs 注册代码（ApiClient registerPushToken + AppDelegate）；构建/真机验证见 docs/IOS.md，待 Mac 执行
 - [x] **App 启动锁（方案 B：PIN 加密密钥）**：AppLockService（Argon2id 派生密钥加密 Space Key 包存 drift app_state，错误 5 次锁定 30s，12 词恢复码兑底）+ 锁屏页 + 启动门 + 认证后设置 PIN；4 项单测，flutter test 10 项全过
+- [x] **后台切回锁定**：ChatPage 生命周期监听（WidgetsBindingObserver：切后台记时、回前台超 30s 覆盖锁屏保留聊天状态）；LockPage 覆盖模式（asOverlay pop）；LockTimer 纯逻辑 + 5 项单测，flutter test 15 项全过
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
 - [ ] iOS 真机构建/签名/Ad Hoc（docs/IOS.md §3–§4）——待 Mac + Apple 付费账号（APNs 暂无账号，WS/轮询兜底）
 

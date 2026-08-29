@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
 
 import 'data/local_database.dart';
+import 'data/lock_timer.dart';
 import 'data/message_repository.dart';
+import 'lock_page.dart';
 
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
@@ -32,15 +33,17 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late final MessageRepository _repo;
   final _input = TextEditingController();
+  final _lockTimer = LockTimer();
   List<({String plaintext, String sender})> _messages = [];
   Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _repo = MessageRepository(
       db: LocalDatabase(),
       api: ApiClient(widget.server),
@@ -73,9 +76,24 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _input.dispose();
     super.dispose();
+  }
+
+  /// App 生命周期：切后台记时，回前台超过阈值 → 覆盖锁屏（保留聊天页状态）。
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _lockTimer.recordBackgrounded(DateTime.now());
+    } else if (state == AppLifecycleState.resumed) {
+      final relock = _lockTimer.shouldRelock(now: DateTime.now());
+      _lockTimer.clear();
+      if (relock && mounted) {
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LockPage(asOverlay: true)));
+      }
+    }
   }
 
   Future<void> _refresh() async {

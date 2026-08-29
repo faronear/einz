@@ -351,3 +351,15 @@
 **验证：** app flutter test **10 项全过**（原 6 + app_lock 4）。widget_test 改为直接渲染 SetupPage（绕过 StartupGate——它依赖真实 drift 库，widget 测试环境用内存库）。
 
 **设计要点（可写 docs/APP_LOCK.md 用）：** PIN 纯本地验证、Server 不见口令；锁定纯本地计时防爆破；恢复码与 PIN 分开保存；冷启动必锁，后台切回锁定留待后续阶段（app lifecycle observer）。
+
+### 后台切回锁定（App 锁增强；2026-08-29）
+
+老板选"1. 后台切回锁定"。实现：
+
+- `app/lib/data/lock_timer.dart`：`LockTimer` 纯逻辑（recordBackgrounded/shouldRelock/clear，阈值 30s 可配）+ `test/lock_timer_test.dart` 5 项单测（未后台/29s/30s/clear 重置/自定义阈值）
+- `app/lib/chat_page.dart`：`with WidgetsBindingObserver`——paused/inactive 记时，resumed 超 30s → `Navigator.push(LockPage(asOverlay: true))`；**注意 switch 语句 case 需 break（改用 if/else）**
+- `app/lib/lock_page.dart`：加 `asOverlay` 参数——覆盖模式解锁成功 `pop()` 回聊天页（保留消息状态），冷启动模式 `pushReplacement` 进聊天页
+
+**验证：** flutter test **15 项全过**（原 10 + lock_timer 5）。analyze 无问题（顺带清理 chat_page 的 unnecessary_import）。
+
+**行为：** 聊天中切后台 ≤30s 回前台不锁；>30s 回前台弹锁屏，解锁后回到原聊天页（消息不丢）。冷启动锁屏行为不变。

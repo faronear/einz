@@ -9,8 +9,13 @@ import 'data/local_database.dart';
 
 /// 锁屏页：输入 PIN 解密 Space Key 包 → 进入聊天页。
 /// 连续错误锁定倒计时；PIN 丢失可展开"使用恢复码"入口（12 词）。
+///
+/// [asOverlay]：true = 聊天中切后台超时返回的覆盖锁屏（解锁成功 pop 回聊天页，
+/// 保留消息状态）；false = 冷启动锁屏（解锁成功 pushReplacement 进聊天页）。
 class LockPage extends StatefulWidget {
-  const LockPage({super.key});
+  const LockPage({super.key, this.asOverlay = false});
+
+  final bool asOverlay;
 
   @override
   State<LockPage> createState() => _LockPageState();
@@ -49,6 +54,12 @@ class _LockPageState extends State<LockPage> {
   }
 
   void _enterChat(AppLockPayload payload) {
+    if (widget.asOverlay) {
+      // 覆盖锁屏（聊天中切后台超时返回）：解锁成功 pop 回聊天页，保留消息状态
+      Navigator.of(context).pop();
+      return;
+    }
+    // 冷启动锁屏：解锁成功进入聊天页
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
         server: payload.server,
