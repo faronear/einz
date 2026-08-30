@@ -76,6 +76,13 @@ flutter:
   # l10n：启用 gen-l10n 从 lib/l10n/*.arb 生成 AppLocalizations
   generate: true
 
+# sqlite3 原生库：改用系统 SQLite（macOS/Linux 自带），避免从 GitHub 下载
+# 预编译库（国内网络 GitHub 不可达会卡构建）。详情见 sqlite3 包 doc/hook.md。
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

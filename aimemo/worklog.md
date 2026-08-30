@@ -598,3 +598,50 @@
 **排障：** ① 重构期字段重复定义（旧字段残留）与 _finish 重复（框架空实现 vs 新实现）→ 清理；② `FilledButton.tonal.icon` 不存在（API 无组合）→ tonal + Row；③ widget_test"选择你的情况"在 AppBar 与 body 各一次 → findsWidgets。
 
 **老板反馈落实：** 生成密钥后本页明确展示结果 ✅；每页一个输入 ✅；步骤前后关系清晰（进度圆点 + 步骤标题 + 上一步/下一步）✅；sealed 技术路径保留在折叠入口 ✅。
+
+### macOS 本机恢复 + Flutter 安装（2026-08-30）
+
+**背景：** 老板从 Windows 机器转回 macOS 本机继续。Windows 期间已推进大量工作（口令托管 KEY_ESCROW 落地、App 多语言/WS 实时/自建空间二维码/分步向导、Server 备份密钥改名 ONLYSPACE_DB_BACKUP_KEY、更新流程 git push/pull 化等，最新 HEAD e5f09c6）。
+
+**本次 macOS 会话完成：**
+
+- **回答 .env 问题**：docker-compose 变量名已从 `ONLYSPACE_BACKUP_KEY` 改名 `ONLYSPACE_DB_BACKUP_KEY`（7504791 消歧）；应在 `deployment/.env` 定义（compose 自动读取同目录 .env，gitignore 保护），新增 `deployment/.env.example` 模板；口令托管（KEY_ESCROW）的"接入口令"是客户端口令，与 DB 备份密钥是两回事。
+- **文档 macOS/Linux 化**：DEPLOYMENT.md / IOS.md / updateServer.md 中 PowerShell、`D:\`、`C:\`、`.\bin\`、`setx`、反引号续行全部改为 bash / `/Users/Shared/product-产品/only` / `bin/`、`\` 续行；libsodium 提示改为 `/opt/homebrew/lib/libsodium.dylib`。
+- **Flutter 安装**：磁盘已腾出（13GiB），中国镜像下载 3.41.0 后因 App 需要 Dart ^3.13.2（Windows 用 Flutter 3.47.2）不匹配，卸载换装 **Flutter 3.47.2**（Dart 3.13.2）到 `~/development/flutter`；Google storage/GitHub 不可达，全程 storage.flutter-io.cn。
+- **验证链全绿**：server build + 冒烟（含密钥托管）；shared analyze + 26 单测（修 1 个 unused_import）；cli analyze + e2e 全过；app flutter test **39 项全过**（ASCII 路径副本 /tmp/onlyspace-build 跑的，因仓库路径含中文"产品"触发 analysis_server 崩溃缺陷）。
+- **App 侧修复（Windows 产物在 macOS 的适配）**：
+  1. `e2e.sh` cygpath 是 Windows 专用 → 加 `command -v cygpath` 判断跨平台；
+  2. `app/pubspec.yaml` 加 sqlite3 `hooks: source: system`（否则 flutter test 尝试从 GitHub 下载预编译 sqlite3 原生库，国内网络必失败）；
+  3. `golden_render_test.dart` 字体加载硬编码 `C:\Windows\Fonts\simhei.ttf` → 改为跨平台候选（macOS Hiragino/STHeiti / Windows simhei / Linux Noto）；goldens 基准图在 macOS 重新生成（--update-goldens，含新 setup_step_*.png）；
+  4. `widget_test.dart` `_wrap` lint 修复（no_leading_underscores_for_local_identifiers）。
+
+**遗留：** app 的 Android SDK / Xcode 工具链未装（flutter doctor 有警告），真机构建验证留待 Phase 3 移动端；goldens 已按 macOS 平台重新生成入库。
+
+### 设置向导页眉改造 + golden 树形编号（2026-08-30）
+
+**老板需求：** 首页选择空间类型后，每一页页眉固定显示所选角色名（创建新空间/加入你的空间/导入 sealed 密钥），本页功能描述移到 body 上方；golden 文件名按页面出现顺序树形编号。
+
+**编号规则（老板确认）：** 页面层级用 `.` 分隔；并列分流同层按数字顺序。映射：`setup_step1_roles.png`（1=首页角色选择）、`setup_step1.1.x_*`（create 分流）、`setup_step1.2.x_*`（join 分流）、`setup_step1.3.x_*`（advanced 分流），分流内按出现顺序（如 1.1.1_device=设备名、1.1.2_whitelist=白名单…）。
+
+**实现：**
+- setup_page.dart：新增 `_appBarTitle`（按角色返回 wizardAppBarCreate/Join/Advanced，第 0 步仍显示引导语）；AppBar 改用角色名；步骤标题 `_stepTitle` 移到 body 进度圆点下方（20px w600）
+- l10n：新增 `wizardAppBarCreate/Join/Advanced` 三键（zh/en），gen-l10n 重新生成
+- golden 文件：10 个 git mv 重命名（含 setup_page.png → setup_step1_roles.png）；golden_render_test.dart 用例名与 matchesGoldenFile 路径全部同步（含 skip 列表 keygen/whitelist 新名）
+- widget_test：补 AppBar 角色标题断言（创建新空间/加入你的空间）
+
+**验证：** app flutter analyze 无问题；flutter test **39 项全过**（golden 基准图已按新 UI 重新生成；锁屏/聊天页基准图未动）。
+
+### 项目路径改名 product-产品 → productX + session 找回（2026-08-30）
+
+**背景：** 老板把项目目录从 `/Users/Shared/product-产品/only` 手动重命名为 `/Users/Shared/productX/only`，重启 atom 后找不到原来的 session（session 按工作目录哈希分桶存储，旧桶 202a4f4986bdf4ed 不再被新路径命中）。另核实：`/Users/Shared/only` 并不存在，实际路径以 `/Users/Shared/productX/only` 为准。
+
+**session 找回（atom 侧，~/.atomcode/sessions/）：**
+- session 存储机制：`~/.atomcode/sessions/<工作目录hash>/` 分桶，会话 meta 的 `working_dir` 字段决定归属；`~/.atomcode/history-v2/<hash>/entries.jsonl` 存历史提问索引。
+- 迁移动作：把旧桶 `202a4f4986bdf4ed`（product-产品/only，3 个会话：623c51f8 架构重构讨论、9b00b45c fork、ce33edfe 空会话）与 `dac869ed60aeec99`（productAll/only，1 个会话 9182817b，上次改名遗留）下的会话文件全部移入新桶 `36c61259c00d9bf2`，并将这些 meta 的 `working_dir` 更新为 `/Users/Shared/productX/only`；history-v2 的 entries.jsonl 一并合并。
+- 备份：迁移前已打包 `~/.atomcode/backup-sessions-20260830.tar.gz`（sessions + history-v2）。
+- 效果：在 `/Users/Shared/productX/only` 启动 atom 后 `/resume` 即可看到全部历史会话（OnlySpace 架构设计重构讨论等）。
+
+**项目内文档同步（以实际路径为准）：**
+- `docs/DEPLOYMENT.md`、`docs/IOS.md`、`docs/updateServer.md`、`docs/HANDOFF.md` 中的 `cd /Users/Shared/product-产品/only` 全部改为 `/Users/Shared/productX/only`。
+- `app/android/gradle.properties` 注释同步（现路径 productX 已是 ASCII，保留 overridePathCheck 开关防未来非 ASCII 路径）。
+- `aimemo/worklog.md` 旧条目与 `notes/cli-config.md`（Windows 机器历史命令）为历史记录，未改写。

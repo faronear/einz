@@ -141,6 +141,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleAdvanced => 'Advanced: import a sealed key copy';
 
   @override
+  String get wizardAppBarCreate => 'Create a new space';
+
+  @override
+  String get wizardAppBarJoin => 'Join your partner\'s space';
+
+  @override
+  String get wizardAppBarAdvanced => 'Import sealed key';
+
+  @override
   String get wizardNext => 'Next';
 
   @override

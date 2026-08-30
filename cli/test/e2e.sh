@@ -73,9 +73,14 @@ echo "$SYNC_OUT" | grep -q "$MESSAGE" \
   || { echo "❌ B 未解密出明文"; exit 1; }
 
 echo "==> 8. DB 明文隔离检查（Server 只应存密文）"
-# 内嵌 node 脚本中的路径不会被 MSYS 自动转换，需显式转成 Windows 格式（Node 可识别正斜杠）
-ROOT_WIN="$(cygpath -m "$ROOT")"
-WORK_WIN="$(cygpath -m "$WORK")"
+# 跨平台：Windows（Git Bash）用 cygpath 转 MSYS 路径；macOS/Linux 直接用原路径
+if command -v cygpath >/dev/null 2>&1; then
+  ROOT_WIN="$(cygpath -m "$ROOT")"
+  WORK_WIN="$(cygpath -m "$WORK")"
+else
+  ROOT_WIN="$ROOT"
+  WORK_WIN="$WORK"
+fi
 node -e "
 const Database = require('$ROOT_WIN/server/node_modules/better-sqlite3');
 const db = new Database('$WORK_WIN/app.db', { readonly: true });

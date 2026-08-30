@@ -20,6 +20,8 @@
 | Phase 3 | 移动端集成 | [x] 代码层完成（drift 本地库/签名 APK），真机验证待环境 |
 | Phase 4 | 加固 | [x] 已完成（撤销/轮换/备份恢复/安全韧性测试，phase4_e2e.sh 全过） |
 
+> **环境（macOS 本机，2026-08-30）：** Node 22 / Dart 3.11.0（brew）/ libsodium（brew）/ **Flutter 3.47.2**（`~/development/flutter`，Dart 3.13.2，中国镜像安装）已就绪；app 测试需在纯 ASCII 路径跑（仓库路径含中文触发 analysis_server 崩溃，见 DEPLOYMENT.md §7）；Android SDK / Xcode 未装，真机验证待 Phase 3 环境。
+
 ---
 
 ## Phase 0 — 架构 + 密码学 PoC（估算 2–5 天）

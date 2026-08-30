@@ -134,6 +134,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleAdvanced => '高级：导入 sealed 密钥副本';
 
   @override
+  String get wizardAppBarCreate => '创建新空间';
+
+  @override
+  String get wizardAppBarJoin => '加入你的空间';
+
+  @override
+  String get wizardAppBarAdvanced => '导入 sealed 密钥';
+
+  @override
   String get wizardNext => '下一步';
 
   @override

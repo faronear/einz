@@ -332,6 +332,24 @@ abstract class AppLocalizations {
   /// **'Advanced: import a sealed key copy'**
   String get wizardRoleAdvanced;
 
+  /// No description provided for @wizardAppBarCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new space'**
+  String get wizardAppBarCreate;
+
+  /// No description provided for @wizardAppBarJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Join your partner\'s space'**
+  String get wizardAppBarJoin;
+
+  /// No description provided for @wizardAppBarAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Import sealed key'**
+  String get wizardAppBarAdvanced;
+
   /// No description provided for @wizardNext.
   ///
   /// In en, this message translates to:

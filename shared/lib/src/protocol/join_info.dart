@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// 加入信息（A 端生成 → 二维码/文本分享给 B，KEY_ESCROW.md §6 流程）：
 ///
 /// 格式：`onlyspace-join-v1?space=<spaceId>&p=<passphrase>`

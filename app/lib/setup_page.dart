@@ -63,13 +63,19 @@ class _SetupPageState extends State<SetupPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(_stepTitle(l10n))),
+      appBar: AppBar(title: Text(_appBarTitle(l10n))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildProgressDots(),
+            if (_role != null && _step > 0) ...[
+              const SizedBox(height: 16),
+              // 本页功能标题（AppBar 只显示所选角色名，见 _appBarTitle）
+              Text(_stepTitle(l10n),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+            ],
             const SizedBox(height: 16),
             Expanded(
               child: AnimatedSwitcher(
@@ -118,7 +124,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 步骤标题（AppBar）。
+  /// 步骤标题（body 上方；AppBar 只显示所选角色名，见 _appBarTitle）。
   String _stepTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardRoleTitle;
     switch (_role!) {
@@ -145,6 +151,19 @@ class _SetupPageState extends State<SetupPage> {
           case 3: return l10n.wizardStepPin;
           default: return l10n.wizardStepDone;
         }
+    }
+  }
+
+  /// 页眉标题（AppBar）：固定显示所选角色名（第 0 步未选角色时显示引导语）。
+  String _appBarTitle(AppLocalizations l10n) {
+    if (_role == null || _step == 0) return l10n.wizardRoleTitle;
+    switch (_role!) {
+      case _WizardRole.create:
+        return l10n.wizardAppBarCreate;
+      case _WizardRole.join:
+        return l10n.wizardAppBarJoin;
+      case _WizardRole.advanced:
+        return l10n.wizardAppBarAdvanced;
     }
   }
 
