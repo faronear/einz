@@ -566,3 +566,18 @@
 **验证：** server `npm run build` 通过；smoke 测试全过；grep 确认 server/src、scripts、deployment、DEPLOYMENT.md 无残留旧名（仅文档升级说明有意提及旧名）。
 
 **⚠️ VPS 运维提醒（交付时同步老板）：** VPS 的 `deployment/.env`（gitignore 不入库）需手动把 `ONLYSPACE_BACKUP_KEY` 改名 `ONLYSPACE_DB_BACKUP_KEY` 后重启 server，否则 backup 脚本报"变量未设置"拒绝备份。
+
+### 自建空间 + 二维码加入（降小白门槛；2026-08-29）
+
+**背景：** 老板要求 App 支持自生成 Space Key——第一个使用者（老板，技术型）纯 App 完成建空间，第二个使用者（小白）零门槛加入。决策：**A 端一键生成 + 二维码分享 + 白名单保持手动**。
+
+**实现：**
+- `shared/lib/src/protocol/join_info.dart`（新）：`JoinInfo`（`onlyspace-join-v1?space=<spaceId>&p=<passphrase>`，口令 URL 编码防特殊字符）+ `decode` null 安全；3 单测（往返/特殊字符中文口令/格式不符）
+- `setup_page` A 端：新增**"自建空间（一键生成 Space Key）"**按钮（与③凭口令接入并列）→ `_generateSpaceKeyAndAuth()`：`Random.secure()` 生成 32B Space Key（**shared sodium 无 randombytes 暴露，用 Dart CSPRNG**）→ challenge-response 认证 → SetPinDialog（口令托管复用）→ `_showJoinInfoDialog()`（**QrImageView 二维码** + 口令/空间文本 + 一键复制 joinDialog.* 键）→ 确认进聊天页；未生成密钥/未填口令分别提示
+- `setup_page` B 端：口令输入框 📷 suffixIcon → `_scanJoinCode()` → `_JoinScanPage`（**MobileScanner 懒构造**——进入页面才实例化，widget 测试不触碰原生相机通道；扫到 onlyspace-join-v1 自动填 spaceId/口令 → scanJoinFound 提示）
+- 依赖：`qr_flutter 4.1.0`（纯 Dart 绘制，测试环境安全）+ `mobile_scanner 7.4.0`（相机权限拍照时已配置，Android CAMERA/iOS NSCameraUsageDescription 复用）
+- 测试：widget_test 加"自建空间入口"用例（**ensureVisible 滚动修复**——按钮在 ListView 视口外 tap 命中失败）；flutter test **29 项全过** + setup golden 更新（新增按钮/suffixIcon）
+
+**小白（B）完整流程（零技术）：** 装 App → ①生成设备密钥 → 把公钥转发给 A → A 加 VPS 白名单 → 📷 扫 A 的二维码 → ③凭口令接入 → 完成。A 全程纯 App（不再需要 CLI）。
+
+**遗留：** ① 二维码分享对话框（joinDialog）展示时机在进聊天页前——若 A 想"先建空间后补发邀请"，可后续加聊天页内入口；② mobile_scanner 需真机验证（模拟器相机不可用）；③ 白名单仍需 A 上 VPS 操作（保持手动，安全核心不变）。

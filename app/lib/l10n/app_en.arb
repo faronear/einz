@@ -28,6 +28,29 @@
   "setupPageEscrowLabel": "Access passphrase (new devices can join with it, optional)",
   "setupPageEscrowHelper": "Key escrow: the server only stores ciphertext (KEY_ESCROW.md)",
   "setupPageEscrowAccess": "③ Join with passphrase (no sealed copy needed)",
+  "setupPageGenerateSpaceKey": "Create space (one-tap generate key)",
+  "setupPageNeedPassphrase": "⚠️ Set an access passphrase above first (your partner joins with it)",
+  "joinDialogTitle": "Invite your partner",
+  "joinDialogHint": "They install the app, tap ③ Join with passphrase, then scan this code or paste the info below.",
+  "joinDialogSpace": "Space: {spaceId}",
+  "@joinDialogSpace": {
+    "placeholders": {
+      "spaceId": {"type": "String"}
+    }
+  },
+  "joinDialogPassphrase": "Passphrase: {passphrase}",
+  "@joinDialogPassphrase": {
+    "placeholders": {
+      "passphrase": {"type": "String"}
+    }
+  },
+  "joinDialogCopy": "Copy join info",
+  "joinDialogCopied": "Join info copied — send it to your partner",
+  "joinDialogContinue": "I shared it, enter chat",
+  "scanJoinTooltip": "Scan to join",
+  "scanJoinTitle": "Scan to join",
+  "scanJoinHint": "Scan your partner's join QR code",
+  "scanJoinFound": "Join info recognized — space & passphrase filled in",
   "setupPageKeyGenFailed": "❌ Key generation failed: {error}",
   "@setupPageKeyGenFailed": {
     "placeholders": {

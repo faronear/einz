@@ -83,6 +83,52 @@ class AppLocalizationsEn extends AppLocalizations {
       '③ Join with passphrase (no sealed copy needed)';
 
   @override
+  String get setupPageGenerateSpaceKey => 'Create space (one-tap generate key)';
+
+  @override
+  String get setupPageNeedPassphrase =>
+      '⚠️ Set an access passphrase above first (your partner joins with it)';
+
+  @override
+  String get joinDialogTitle => 'Invite your partner';
+
+  @override
+  String get joinDialogHint =>
+      'They install the app, tap ③ Join with passphrase, then scan this code or paste the info below.';
+
+  @override
+  String joinDialogSpace(String spaceId) {
+    return 'Space: $spaceId';
+  }
+
+  @override
+  String joinDialogPassphrase(String passphrase) {
+    return 'Passphrase: $passphrase';
+  }
+
+  @override
+  String get joinDialogCopy => 'Copy join info';
+
+  @override
+  String get joinDialogCopied => 'Join info copied — send it to your partner';
+
+  @override
+  String get joinDialogContinue => 'I shared it, enter chat';
+
+  @override
+  String get scanJoinTooltip => 'Scan to join';
+
+  @override
+  String get scanJoinTitle => 'Scan to join';
+
+  @override
+  String get scanJoinHint => 'Scan your partner\'s join QR code';
+
+  @override
+  String get scanJoinFound =>
+      'Join info recognized — space & passphrase filled in';
+
+  @override
   String setupPageKeyGenFailed(String error) {
     return '❌ Key generation failed: $error';
   }

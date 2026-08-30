@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'chat_page.dart';
 import 'data/app_lock.dart';
@@ -126,6 +130,132 @@ class _SetupPageState extends State<SetupPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// 自建空间（第一个设备，纯 App 完成）：随机生成 Space Key → 认证 →
+  /// 设置 PIN/口令托管 → 展示二维码加入信息（对方扫码/粘贴口令接入）。
+  Future<void> _generateSpaceKeyAndAuth() async {
+    final kp = _keyPair;
+    if (kp == null) {
+      setState(() => _status = AppLocalizations.of(context)!.setupPageGenKeyFirst);
+      return;
+    }
+    final passphrase = _escrowPassphrase.text.trim();
+    if (passphrase.isEmpty) {
+      setState(() => _status = AppLocalizations.of(context)!.setupPageNeedPassphrase);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    try {
+      final s = await sodium();
+      // 1) 随机生成 Space Key（CSPRNG 32B）
+      final rng = Random.secure();
+      final spaceKey = Uint8List.fromList(List.generate(32, (_) => rng.nextInt(256)));
+
+      // 2) challenge-response 认证
+      final api = ApiClient(kOnlySpaceServer);
+      final challenge = await api.challenge(kp.deviceId);
+      final opened = await sealOpen(
+        s,
+        base64Decode(challenge.sealedChallenge),
+        kp.publicKey,
+        kp.privateKey,
+      );
+      final session = await api.verify(challenge.challengeId, base64Encode(opened));
+      if (!mounted) return;
+
+      // 3) 设置 PIN（含接入口令 → 上传托管）
+      final ok = await _setupLockAndEnter(
+        server: kOnlySpaceServer,
+        spaceId: _spaceId.text.trim(),
+        deviceId: kp.deviceId,
+        spaceKeyB64: base64Encode(spaceKey),
+        keyVersion: 1,
+        token: session.sessionToken,
+        escrowPassphrase: passphrase,
+      );
+      if (!ok || !mounted) return;
+
+      // 4) 展示二维码加入信息（对方扫码接入）；确认后进聊天页
+      final shared = await _showJoinInfoDialog(
+        JoinInfo(spaceId: _spaceId.text.trim(), passphrase: passphrase),
+      );
+      if (!mounted) return;
+      if (shared) {
+        Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => ChatPage(
+            server: kOnlySpaceServer,
+            spaceId: _spaceId.text.trim(),
+            deviceId: kp.deviceId,
+            spaceKey: spaceKey,
+            keyVersion: 1,
+            token: session.sessionToken,
+          ),
+        ));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 展示二维码加入信息（A → B 分享）：二维码 + 口令/空间文本 + 一键复制。
+  /// 返回 true = 已分享，进入聊天页。
+  Future<bool> _showJoinInfoDialog(JoinInfo info) async {
+    final l10n = AppLocalizations.of(context)!;
+    final copied = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.joinDialogTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(l10n.joinDialogHint, style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 12),
+            QrImageView(data: info.encode(), version: QrVersions.auto, size: 180),
+            const SizedBox(height: 12),
+            SelectableText(l10n.joinDialogSpace(info.spaceId),
+                style: const TextStyle(fontSize: 12)),
+            SelectableText(l10n.joinDialogPassphrase(info.passphrase),
+                style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: info.encode()));
+              ScaffoldMessenger.of(ctx)
+                  .showSnackBar(SnackBar(content: Text(l10n.joinDialogCopied)));
+            },
+            child: Text(l10n.joinDialogCopy),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.joinDialogContinue),
+          ),
+        ],
+      ),
+    );
+    return copied ?? false;
+  }
+
+  /// 扫码加入（B 端）：扫描 A 的加入二维码 → 自动填入空间 ID 与口令。
+  Future<void> _scanJoinCode() async {
+    final l10n = AppLocalizations.of(context)!;
+    final info = await Navigator.of(context).push<JoinInfo>(
+      MaterialPageRoute(builder: (_) => const _JoinScanPage()),
+    );
+    if (info == null || !mounted) return;
+    _spaceId.text = info.spaceId;
+    _escrowPassphrase.text = info.passphrase;
+    setState(() => _status = null);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.scanJoinFound)));
   }
 
   /// 认证成功后设置启动锁：弹对话框输入 PIN（两次确认）→ 生成恢复码展示 → 确认后进聊天页。
@@ -294,12 +424,30 @@ class _SetupPageState extends State<SetupPage> {
               labelText: l10n.setupPageEscrowLabel,
               helperText: l10n.setupPageEscrowHelper,
               border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.qr_code_scanner),
+                tooltip: l10n.scanJoinTooltip,
+                onPressed: _scanJoinCode,
+              ),
             ),
           ),
           const SizedBox(height: 8),
-          FilledButton.tonal(
-            onPressed: _busy ? null : _escrowAccess,
-            child: Text(l10n.setupPageEscrowAccess),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: _busy ? null : _generateSpaceKeyAndAuth,
+                  child: Text(l10n.setupPageGenerateSpaceKey),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: _busy ? null : _escrowAccess,
+                  child: Text(l10n.setupPageEscrowAccess),
+                ),
+              ),
+            ],
           ),
           if (_status != null) ...[
             const SizedBox(height: 12),
@@ -493,6 +641,57 @@ class _SetPinDialogState extends State<SetPinDialog> {
         Text(l10n.setPinDialogRecoveryWarning,
             style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
+    );
+  }
+}
+
+/// 扫码加入页（B 端）：MobileScanner 懒构造——进入页面才实例化
+/// （widget 测试不进入此页，不触碰原生相机通道）。
+class _JoinScanPage extends StatefulWidget {
+  const _JoinScanPage();
+
+  @override
+  State<_JoinScanPage> createState() => _JoinScanPageState();
+}
+
+class _JoinScanPageState extends State<_JoinScanPage> {
+  late final MobileScannerController _controller = MobileScannerController();
+  bool _handled = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    for (final b in capture.barcodes) {
+      final raw = b.rawValue;
+      if (raw == null) continue;
+      final info = JoinInfo.decode(raw);
+      if (info != null) {
+        _handled = true;
+        Navigator.of(context).pop(info);
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.scanJoinTitle)),
+      body: Column(
+        children: [
+          Expanded(child: MobileScanner(controller: _controller, onDetect: _onDetect)),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(l10n.scanJoinHint, style: const TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
     );
   }
 }

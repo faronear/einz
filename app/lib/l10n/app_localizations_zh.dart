@@ -79,6 +79,49 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEscrowAccess => '③ 凭口令接入（无需 sealed 副本）';
 
   @override
+  String get setupPageGenerateSpaceKey => '自建空间（一键生成 Space Key）';
+
+  @override
+  String get setupPageNeedPassphrase => '⚠️ 请先在上方填写接入口令（对方凭它接入）';
+
+  @override
+  String get joinDialogTitle => '邀请对方加入';
+
+  @override
+  String get joinDialogHint => '对方安装 App 后点“③ 凭口令接入”，扫码或粘贴下方信息即可加入';
+
+  @override
+  String joinDialogSpace(String spaceId) {
+    return '空间: $spaceId';
+  }
+
+  @override
+  String joinDialogPassphrase(String passphrase) {
+    return '口令: $passphrase';
+  }
+
+  @override
+  String get joinDialogCopy => '复制加入信息';
+
+  @override
+  String get joinDialogCopied => '加入信息已复制，发给对方即可';
+
+  @override
+  String get joinDialogContinue => '我已分享，进入聊天';
+
+  @override
+  String get scanJoinTooltip => '扫码加入';
+
+  @override
+  String get scanJoinTitle => '扫码加入';
+
+  @override
+  String get scanJoinHint => '扫描对方的加入二维码';
+
+  @override
+  String get scanJoinFound => '已识别加入信息，空间与口令已自动填入';
+
+  @override
   String setupPageKeyGenFailed(String error) {
     return '❌ 密钥生成失败: $error';
   }

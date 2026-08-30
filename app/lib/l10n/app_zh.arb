@@ -28,6 +28,29 @@
   "setupPageEscrowLabel": "接入口令（新设备凭它接入，可跳过）",
   "setupPageEscrowHelper": "口令托管：Server 只存密文（KEY_ESCROW.md）",
   "setupPageEscrowAccess": "③ 凭口令接入（无需 sealed 副本）",
+  "setupPageGenerateSpaceKey": "自建空间（一键生成 Space Key）",
+  "setupPageNeedPassphrase": "⚠️ 请先在上方填写接入口令（对方凭它接入）",
+  "joinDialogTitle": "邀请对方加入",
+  "joinDialogHint": "对方安装 App 后点“③ 凭口令接入”，扫码或粘贴下方信息即可加入",
+  "joinDialogSpace": "空间: {spaceId}",
+  "@joinDialogSpace": {
+    "placeholders": {
+      "spaceId": {"type": "String"}
+    }
+  },
+  "joinDialogPassphrase": "口令: {passphrase}",
+  "@joinDialogPassphrase": {
+    "placeholders": {
+      "passphrase": {"type": "String"}
+    }
+  },
+  "joinDialogCopy": "复制加入信息",
+  "joinDialogCopied": "加入信息已复制，发给对方即可",
+  "joinDialogContinue": "我已分享，进入聊天",
+  "scanJoinTooltip": "扫码加入",
+  "scanJoinTitle": "扫码加入",
+  "scanJoinHint": "扫描对方的加入二维码",
+  "scanJoinFound": "已识别加入信息，空间与口令已自动填入",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
     "placeholders": {

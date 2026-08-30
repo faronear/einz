@@ -26,5 +26,25 @@ void main() {
     // 两个操作按钮
     expect(find.text('① 生成设备密钥'), findsOneWidget);
     expect(find.text('② 导入并认证'), findsOneWidget);
+    // 自建空间（一键生成 Space Key）入口
+    expect(find.text('自建空间（一键生成 Space Key）'), findsOneWidget);
+  });
+
+  testWidgets('自建空间入口：未生成设备密钥时提示先生成', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: const SetupPage(),
+    ));
+
+    // 按钮在 ListView 视口外，先滚动到可见再点击
+    final joinBtn = find.text('自建空间（一键生成 Space Key）');
+    await tester.ensureVisible(joinBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(joinBtn);
+    await tester.pump();
+    expect(find.text('⚠️ 先生成设备密钥'), findsOneWidget,
+        reason: '未生成设备密钥时点自建空间应提示先生成');
   });
 }

@@ -230,6 +230,84 @@ abstract class AppLocalizations {
   /// **'③ Join with passphrase (no sealed copy needed)'**
   String get setupPageEscrowAccess;
 
+  /// No description provided for @setupPageGenerateSpaceKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Create space (one-tap generate key)'**
+  String get setupPageGenerateSpaceKey;
+
+  /// No description provided for @setupPageNeedPassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ Set an access passphrase above first (your partner joins with it)'**
+  String get setupPageNeedPassphrase;
+
+  /// No description provided for @joinDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite your partner'**
+  String get joinDialogTitle;
+
+  /// No description provided for @joinDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'They install the app, tap ③ Join with passphrase, then scan this code or paste the info below.'**
+  String get joinDialogHint;
+
+  /// No description provided for @joinDialogSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Space: {spaceId}'**
+  String joinDialogSpace(String spaceId);
+
+  /// No description provided for @joinDialogPassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase: {passphrase}'**
+  String joinDialogPassphrase(String passphrase);
+
+  /// No description provided for @joinDialogCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy join info'**
+  String get joinDialogCopy;
+
+  /// No description provided for @joinDialogCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Join info copied — send it to your partner'**
+  String get joinDialogCopied;
+
+  /// No description provided for @joinDialogContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'I shared it, enter chat'**
+  String get joinDialogContinue;
+
+  /// No description provided for @scanJoinTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan to join'**
+  String get scanJoinTooltip;
+
+  /// No description provided for @scanJoinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan to join'**
+  String get scanJoinTitle;
+
+  /// No description provided for @scanJoinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your partner\'s join QR code'**
+  String get scanJoinHint;
+
+  /// No description provided for @scanJoinFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Join info recognized — space & passphrase filled in'**
+  String get scanJoinFound;
+
   /// No description provided for @setupPageKeyGenFailed.
   ///
   /// In en, this message translates to:
