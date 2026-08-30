@@ -1,0 +1,61 @@
+PODS:
+  - audioplayers_darwin (0.0.1):
+    - Flutter
+    - FlutterMacOS
+  - file_picker_darwin (1.0.0):
+    - Flutter
+    - FlutterMacOS
+  - Flutter (1.0.0)
+  - image_picker_ios (0.0.1):
+    - Flutter
+  - libsodium (1.0.20)
+  - mobile_scanner (7.0.0):
+    - Flutter
+    - FlutterMacOS
+  - record_ios (2.0.0):
+    - Flutter
+  - video_player_avfoundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/darwin`)
+  - file_picker_darwin (from `.symlinks/plugins/file_picker_darwin/darwin`)
+  - Flutter (from `Flutter`)
+  - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
+  - libsodium (from `./Libraries`)
+  - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
+  - record_ios (from `.symlinks/plugins/record_ios/ios`)
+  - video_player_avfoundation (from `.symlinks/plugins/video_player_avfoundation/darwin`)
+
+EXTERNAL SOURCES:
+  audioplayers_darwin:
+    :path: ".symlinks/plugins/audioplayers_darwin/darwin"
+  file_picker_darwin:
+    :path: ".symlinks/plugins/file_picker_darwin/darwin"
+  Flutter:
+    :path: Flutter
+  image_picker_ios:
+    :path: ".symlinks/plugins/image_picker_ios/ios"
+  libsodium:
+    :path: "./Libraries"
+  mobile_scanner:
+    :path: ".symlinks/plugins/mobile_scanner/darwin"
+  record_ios:
+    :path: ".symlinks/plugins/record_ios/ios"
+  video_player_avfoundation:
+    :path: ".symlinks/plugins/video_player_avfoundation/darwin"
+
+SPEC CHECKSUMS:
+  audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
+  file_picker_darwin: 5c32d1a83c7cd2e4e2d2eaea629cf830b3b5dc49
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
+  image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
+  libsodium: 5aa367f19e4c349df356067886e21c6034debb0e
+  mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
+  record_ios: 390a30c7caaf8b5d0fb1cb1d2fd5064b48b4520c
+  video_player_avfoundation: 3453f792138786248960ca029747fcd9f318ef52
+
+PODFILE CHECKSUM: 12c1c4fb0e405568cb95a1a8f76a8b2131d9a100
+
+COCOAPODS: 1.16.2

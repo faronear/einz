@@ -4,7 +4,7 @@
 # - Flutter 3.47 默认启用 Swift Package Manager；存在 Podfile 时走 CocoaPods。
 #   若 Mac 上构建提示 SPM 冲突，执行：flutter config --no-enable-swift-package-manager
 # - pod install 由 flutter build ios / flutter run 在 Mac 上自动执行。
-platform :ios, '12.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
