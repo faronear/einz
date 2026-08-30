@@ -1,0 +1,382 @@
+// OnlySpace TUI 聊天核心 —— 与 UI 无关的业务逻辑（方案 A 升级版）。
+//
+// 从 onlyspace_chat.dart（方案 B）提炼：认证 / 发送 / 补发 / 增量同步 / 历史 /
+// 解密 / UUIDv7 全部集中于此，供 TUI 界面（onlyspace_tui.dart）复用。
+// 定位不变：测试端明文落盘（同 store.dart），不上生产。
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:onlyspace_cli/store.dart';
+
+/// 展示用消息（已解密明文 + 归属）。
+class ChatMessage {
+  ChatMessage({
+    required this.env,
+    required this.plain,
+    required this.isMine,
+    required this.createdAt,
+    this.serverSequence,
+  });
+
+  final MessageEnvelope env;
+  final String plain;
+  final bool isMine;
+  final int createdAt;
+
+  /// 显式 server 序号：本地刚发送的消息与 WS 实时消息在 env 上可能没有
+  /// serverSequence（序号在应答/事件帧里），需由调用方显式传入，否则排序会错乱。
+  final int? serverSequence;
+
+  int? get seq => serverSequence ?? env.serverSequence;
+  int get keyVersion => env.keyVersion;
+}
+
+/// 聊天会话：封装设备状态、服务器交互与消息缓存。
+class ChatSession {
+  ChatSession(this.store, this.storePath, this.server);
+
+  final DeviceStore store;
+  final String storePath;
+  String server;
+
+  /// 展示缓存（按 server_sequence 升序；未同步的排最后）。
+  final List<ChatMessage> messages = [];
+
+  /// WS 实时监听（null = 未启动）。
+  WsClient? wsClient;
+
+  bool get hasSpace => store.spaceKey != null && store.spaceId != null;
+  bool get hasSession => store.sessionToken != null;
+
+  /// 从本地历史填充展示缓存（启动时调用，去重按 message_id）。
+  Future<void> loadHistory() async {
+    final seen = <String>{};
+    messages.clear();
+    for (final env in store.historyEnvelopes) {
+      if (!seen.add(env.messageId)) continue;
+      final plain = await _decrypt(env);
+      messages.add(ChatMessage(
+        env: env,
+        plain: plain,
+        isMine: env.senderDeviceId == store.deviceId,
+        createdAt: env.createdAt ?? DateTime.now().millisecondsSinceEpoch,
+        serverSequence: env.serverSequence,
+      ));
+    }
+    _sortMessages();
+  }
+
+  /// 认证（challenge → sealOpen → verify），成功写入 store。
+  Future<void> auth({String? serverOverride}) async {
+    final target = serverOverride ?? server;
+    if (target.isEmpty) throw StateError('缺少服务器地址（/auth <server> 或启动时 --server）');
+    final api = ApiClient(target);
+    final s = await sodium();
+
+    final challenge = await api.challenge(store.deviceId);
+    final opened = await sealOpen(
+      s,
+      base64Decode(challenge.sealedChallenge),
+      store.publicKeyBytes,
+      store.privateKeyBytes,
+    );
+    final session = await api.verify(challenge.challengeId, base64Encode(opened));
+    store.sessionToken = session.sessionToken;
+    store.save(storePath);
+    if (serverOverride != null) server = serverOverride;
+  }
+
+  /// 发送文本：加密 → 入队（离线不丢）→ 在线立即补发。
+  Future<bool> sendText(String text) async {
+    store.requireSpace();
+    final messageId = await _uuidv7();
+    final env = await encryptMessage(
+      plaintext: text,
+      spaceKey: base64Decode(store.spaceKey!),
+      spaceId: store.spaceId!,
+      senderDeviceId: store.deviceId,
+      messageId: messageId,
+      keyVersion: store.keyVersion,
+    );
+    store.enqueuePending(jsonEncode(env.toJson()));
+    store.save(storePath);
+
+    if (server.isEmpty || store.sessionToken == null) {
+      return false; // 离线：只入队
+    }
+    final sent = await flushPending();
+    if (sent.isNotEmpty) {
+      // 已发送：找到自己刚发的这条（按 messageId，避免补发旧消息时取错），
+      // 用 server 应答的真实 seq/createdAt 写入展示缓存，保证排序正确。
+      final mine = sent.where((e) => e.env.messageId == messageId).toList();
+      if (mine.isNotEmpty) {
+        final r = mine.first;
+        _appendDecrypted(
+          env,
+          serverSequence: r.serverSequence,
+          isMine: true,
+          plain: text,
+          createdAt: r.createdAt,
+        );
+      }
+    }
+    return sent.any((e) => e.env.messageId == messageId);
+  }
+
+  /// 补发离线队列：成功一条出队一条并写入历史；网络失败停止本轮。
+  /// 返回成功发送的（信封, serverSequence, createdAt），供调用方以真实序号落展示缓存。
+  Future<List<({MessageEnvelope env, int serverSequence, int createdAt})>> flushPending() async {
+    store.requireSession();
+    final api = ApiClient(server);
+    final sent = <({MessageEnvelope env, int serverSequence, int createdAt})>[];
+    for (final env in store.pendingEnvelopes) {
+      try {
+        final result = await api.postMessage(env, store.sessionToken!);
+        store.dequeuePending(env.messageId);
+        store.upsertHistory(env, serverSequence: result.serverSequence, createdAt: result.createdAt);
+        sent.add((env: env, serverSequence: result.serverSequence, createdAt: result.createdAt));
+      } on Exception {
+        break; // 网络层问题：停止本轮，避免空转
+      }
+    }
+    if (sent.isNotEmpty) store.save(storePath);
+    return sent;
+  }
+
+  /// 增量同步：从本地锚点拉取，落盘历史，返回新增消息（解密后已追加展示缓存）。
+  /// 同时补发离线队列。
+  Future<List<ChatMessage>> sync() async {
+    if (server.isEmpty) throw StateError('缺少服务器地址（--server）');
+    store.requireSpace();
+    store.requireSession();
+    final api = ApiClient(server);
+
+    var cursor = store.lastServerSequence;
+    final added = <MessageEnvelope>[];
+    while (true) {
+      final result = await api.sync(store.sessionToken!, after: cursor);
+      for (final env in result.messages) {
+        final seq = env.serverSequence ?? cursor;
+        store.upsertHistory(env, serverSequence: seq, createdAt: seq);
+        added.add(env);
+        cursor = seq;
+      }
+      if (result.lastSequence > cursor) cursor = result.lastSequence;
+      store.advanceAnchor(result.lastSequence);
+      if (!result.hasMore || result.messages.isEmpty) break;
+    }
+    store.save(storePath);
+
+    await flushPending();
+
+    final seen = <String>{};
+    final fresh = <ChatMessage>[];
+    for (final env in added) {
+      if (!seen.add(env.messageId)) continue;
+      final plain = await _decrypt(env);
+      final seq = env.serverSequence;
+      final msg = ChatMessage(
+        env: env,
+        plain: plain,
+        isMine: env.senderDeviceId == store.deviceId,
+        createdAt: env.createdAt ?? seq ?? 0,
+        serverSequence: seq,
+      );
+      fresh.add(msg);
+      _appendDedup(msg);
+    }
+    _sortMessages();
+    return fresh;
+  }
+
+  /// 启动 WS 实时监听（message.new → 落盘 + 解密 + 追加展示缓存）。
+  /// 收到 [onEvent]（已处理完消息后）回调，UI 据此重绘；
+  /// [onStatus]（连接状态变化）回调同样转发，UI 据此刷新状态栏。
+  void startWs({
+    required void Function(ChatMessage msg) onMessage,
+    void Function(WsStatus status)? onStatus,
+  }) {
+    if (server.isEmpty || store.sessionToken == null) return;
+    wsClient = WsClient(
+      server: server,
+      token: store.sessionToken!,
+      onEvent: (event) async {
+        if (event is WsMessageNewEvent) {
+          final env = event.message;
+          store.upsertHistory(env, serverSequence: event.serverSequence, createdAt: env.createdAt ?? 0);
+          store.advanceAnchor(event.serverSequence);
+          store.save(storePath);
+          final plain = await _decrypt(env);
+          final msg = ChatMessage(
+            env: env,
+            plain: plain,
+            isMine: env.senderDeviceId == store.deviceId,
+            createdAt: env.createdAt ?? event.serverSequence,
+            serverSequence: event.serverSequence,
+          );
+          _appendDedup(msg);
+          _sortMessages();
+          onMessage(msg);
+        }
+      },
+      onStatus: onStatus,
+    );
+    wsClient!.start();
+  }
+
+  void stopWs() {
+    wsClient?.stop();
+    wsClient = null;
+  }
+
+  /// 上传附件（PROTOCOL.md §6.1）：加密文件 → 发附件消息（正文为描述）→ 上传密文 blob。
+  /// 返回 (messageId, attachmentId, caption)。
+  Future<({String messageId, String attachmentId, String caption})> attachFile(
+    String filePath, {
+    String? caption,
+  }) async {
+    store.requireSpace();
+    store.requireSession();
+    final file = File(filePath);
+    if (!file.existsSync()) throw StateError('文件不存在: $filePath');
+    final fileBytes = file.readAsBytesSync();
+    final fileName = file.path.split(RegExp(r'[\\/]')).last;
+
+    final messageId = await _uuidv7();
+    final attachmentId = await _uuidv7();
+    final type = _inferAttachmentType(fileName);
+    final cap = caption ?? '📎 $fileName';
+
+    // 1) 加密文件（密文 + 元数据）
+    final enc = await encryptAttachment(
+      fileBytes: fileBytes,
+      spaceKey: base64Decode(store.spaceKey!),
+      attachmentId: attachmentId,
+      spaceId: store.spaceId!,
+      keyVersion: store.keyVersion,
+    );
+
+    // 2) 先发附件消息（正文为描述文本，密文上链）
+    final env = await encryptMessage(
+      plaintext: cap,
+      spaceKey: base64Decode(store.spaceKey!),
+      spaceId: store.spaceId!,
+      senderDeviceId: store.deviceId,
+      messageId: messageId,
+      type: type,
+      keyVersion: store.keyVersion,
+    );
+    final api = ApiClient(server);
+    final msg = await api.postMessage(env, store.sessionToken!);
+
+    // 3) 再上传附件 blob（Server 校验 size + sha256）
+    final att = await api.postAttachment(
+      messageId: messageId,
+      attachmentId: attachmentId,
+      keyVersion: store.keyVersion,
+      size: enc.size,
+      sha256: enc.sha256,
+      nonce: base64Encode(enc.nonce),
+      blob: enc.cipher,
+      token: store.sessionToken!,
+    );
+
+    // 4) 落盘：附件元数据 + 消息历史 + 推进锚点
+    store.upsertAttachment(
+      attachmentId: attachmentId,
+      messageId: messageId,
+      keyVersion: store.keyVersion,
+      size: enc.size,
+      sha256: enc.sha256,
+      nonce: base64Encode(enc.nonce),
+      createdAt: att['created_at'] as int,
+    );
+    store.upsertHistory(env, serverSequence: msg.serverSequence, createdAt: msg.createdAt);
+    store.advanceAnchor(msg.serverSequence);
+    store.save(storePath);
+    _appendDecrypted(
+      env,
+      serverSequence: msg.serverSequence,
+      isMine: true,
+      plain: cap,
+      createdAt: msg.createdAt,
+    );
+    _sortMessages();
+    return (messageId: messageId, attachmentId: attachmentId, caption: cap);
+  }
+
+  /// 按扩展名推断附件类型（与 onlyspace.dart 的 _inferAttachmentType 一致）。
+  static String _inferAttachmentType(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.heic')) {
+      return 'image';
+    }
+    if (lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm')) {
+      return 'video';
+    }
+    if (lower.endsWith('.m4a') || lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.aac')) {
+      return 'voice';
+    }
+    return 'other';
+  }
+
+  /// 按 key_version 选密钥解密（轮换后旧消息用归档密钥）。
+  Future<String> _decrypt(MessageEnvelope env) async {
+    final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey!;
+    return decryptMessage(
+      env: env,
+      spaceKey: base64Decode(keyB64),
+      spaceId: store.spaceId!,
+    );
+  }
+
+  void _appendDecrypted(
+    MessageEnvelope env, {
+    required int serverSequence,
+    required bool isMine,
+    required String plain,
+    required int createdAt,
+  }) {
+    _appendDedup(ChatMessage(
+      env: env,
+      plain: plain,
+      isMine: isMine,
+      createdAt: createdAt,
+      serverSequence: serverSequence,
+    ));
+    _sortMessages();
+  }
+
+  void _appendDedup(ChatMessage msg) {
+    messages.removeWhere((m) => m.env.messageId == msg.env.messageId);
+    messages.add(msg);
+  }
+
+  void _sortMessages() {
+    messages.sort((a, b) {
+      final an = a.seq;
+      final bn = b.seq;
+      if (an == null && bn == null) return a.createdAt.compareTo(b.createdAt);
+      if (an == null) return 1;
+      if (bn == null) return -1;
+      return an.compareTo(bn);
+    });
+  }
+
+  /// 简易 UUIDv7（与 onlyspace.dart 一致的近似实现）。
+  Future<String> _uuidv7() async {
+    final s = await sodium();
+    final rand = s.randombytes.buf(10);
+    final t = DateTime.now().millisecondsSinceEpoch;
+    final hex = rand.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final tHex = t.toRadixString(16).padLeft(12, '0');
+    return '${tHex.substring(0, 8)}-${tHex.substring(8)}-7${hex.substring(0, 3)}-9${hex.substring(3, 7)}-${hex.substring(7)}';
+  }
+}

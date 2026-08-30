@@ -645,3 +645,56 @@
 - `docs/DEPLOYMENT.md`、`docs/IOS.md`、`docs/updateServer.md`、`docs/HANDOFF.md` 中的 `cd /Users/Shared/product-产品/only` 全部改为 `/Users/Shared/productX/only`。
 - `app/android/gradle.properties` 注释同步（现路径 productX 已是 ASCII，保留 overridePathCheck 开关防未来非 ASCII 路径）。
 - `aimemo/worklog.md` 旧条目与 `notes/cli-config.md`（Windows 机器历史命令）为历史记录，未改写。
+
+### macOS 本机 iOS 构建环境搭建（2026-08-30）
+
+**背景：** 老板要求在 macOS 本机构建 iOS 版 App。环境初检：Flutter 3.47.2 已装于 `~/development/flutter`（但不在 PATH）；Xcode 26.3 已装但 **`xcode-select` 仍指向 CommandLineTools**（首次启动未完成：许可证未接受 + iOS 平台组件未安装）。
+
+**搭建过程与踩坑：**
+
+1. **CocoaPods 缺失** → `brew install cocoapods`（1.16.2，brew 无需 sudo）；本项目 iOS 侧强制用 CocoaPods（Podfile 引入本地 libsodium pod），已 `flutter config --no-enable-swift-package-manager` 关闭 SPM。
+2. **Xcode 未激活** → `xcode-select -s /Applications/Xcode.app` 需 root（sudo），非交互环境无法执行 → 先以 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` 环境变量绕过；构建报 `No Xcode build settings have been found` / `iOS 26.2 is not installed`。
+3. **磁盘告急**：数据卷 98%（4.2Gi）→ 清理 `~/Library/Caches/` 大项（pip 1.1G、ms-playwright 1.1G、Homebrew、typescript、HBuilder X、hardhat-nodejs、Edge ×2 等约 3.2G）→ 释放到 7.7Gi。**教训：`~/development/flutter`（Flutter SDK 3.9G）绝不能删。**
+4. **老板执行 sudo 三步**（我无法代输密码）：`sudo xcodebuild -license accept` → `sudo xcode-select -s /Applications/Xcode.app` → `xcodebuild -downloadPlatform iOS`（下载数 GB，装好后磁盘又从 7.7G 降到 1.7Gi，⚠️ 现在很紧张）。
+5. **构建验证**：`flutter build ios --debug --no-codesign` 首次跑超 300s（pod install + Xcode 编译），第二次增量完成 → **`✓ Built build/ios/iphoneos/Runner.app`（arm64）**。
+
+**当前 iOS 环境状态：**
+- Flutter 3.47.2（`~/development/flutter`，需 export PATH）；Xcode 26.3 + iOS 26.2 SDK + 模拟器运行时 26.3；CocoaPods 1.16.2（brew）
+- Bundle ID 目前 `com.example.onlyspace`，真机签名需改为唯一值（如 `com.tic.onlyspace`），Team 选 Apple ID（免费账号可真机调试；APNs 推送需付费账号 99$/年，当前跳过，`server/src/push.ts` 为日志占位，WS/轮询兜底）
+- ⚠️ 磁盘仅剩 ~1.7Gi：后续构建/Archive 失败先清 `~/Library/Developer/Xcode/DerivedData`
+- 真机运行：`open ios/Runner.xcworkspace` → Signing & Capabilities → Run ▶；首次手机需信任开发者证书
+
+### CLI 交互式聊天 REPL（方案 B 雏形，2026-08-30）
+
+**背景：** 老板想给 OnlySpace 做一个类似 Claude Code 的终端界面。经分析：项目已有 `cli/`（子命令式测试端，send/sync/attach/backup 全能力）+ `shared/`（纯 Dart 加密与同步协议），缺的是交互层。定方案：A = Dart 原生 TUI（分栏、光标控制），B = 轻量 REPL（stdin 循环 + 彩色输出，能收能发）。**老板选先做 B 验证交互。**
+
+**实现（新文件 `cli/bin/onlyspace_chat.dart`，278 行）：**
+- 启动即增量同步历史；直接输入文本即发送；发送后自动 sync（能立即看到对方回复）
+- 命令：`/auth [server]`（challenge→sealOpen→verify 认证）、`/sync`、`/history`、`/help`、`/exit`
+- ANSI 彩色输出：我=绿、对方=黄、系统=灰、错误=红；`_uuidv7` 与 onlyspace.dart 一致
+- 复用 DeviceStore / ApiClient / encryptMessage / decryptMessage，无新增依赖
+- 定位说明：与 store.dart 一致，测试端明文落盘，不上生产
+
+**验证：** `dart analyze` 无问题（修 1 个 unused import）；临时 server + 双端设备冒烟**双向收发全过**：A REPL 发 → B REPL 同步解密 ✅；B REPL 回 → A REPL 同步解密 ✅。
+
+**后续（方案 A 升级，待老板定）：** 分栏 TUI（消息区+输入区+状态栏）、后台 WS 实时监听（复用 _cmdListen 逻辑）、附件收发入口。桌面 GUI 版另议（Flutter Desktop 复用 ~95% 现有代码）。
+
+### CLI 交互式聊天 TUI（方案 A 升级完成，2026-08-30）
+
+**背景：** 老板体验方案 B（REPL）后决定升级方案 A：分栏 TUI + WS 实时接收 + 附件收发。调研结论：shared 的 `WsClient`（回调式 onEvent/onStatus + 指数退避重连）已导出可复用；pub 缓存无 TUI 库且国内网络下载不稳 → **手写 ANSI 渲染（零新依赖）**。
+
+**实现：**
+- `cli/lib/chat_core.dart`（255 行）：从 onlyspace_chat.dart 提炼业务核心 `ChatSession`（认证/发送/补发/增量同步/历史/解密/UUIDv7 + 消息缓存），新增 `attachFile`（PROTOCOL.md §6.1 附件上传全流程）与 WS 实时监听（message.new → 落盘 + 解密 + 追加缓存）
+- `cli/bin/onlyspace_tui.dart`（314 行）：分栏 TUI——顶部状态栏（设备/空间/WS 状态●↻○）、中间消息区（滚动）、底部输入行；`stdin.listen` + utf8.decoder 逐键（raw 模式，Ctrl+C 退出）；命令 `/auth /sync /history /attach <file> /help /exit`；WS 状态变化与新消息即重绘
+- `demo/run_a.sh` / `run_b.sh` 切到 TUI；新增 `cli/test/tui_smoke.py` 冒烟脚本
+
+**踩坑与修复（Dart pty 环境已知行为，真实终端无碍）：**
+1. `readByteSync` 在 pty 下与 `stdout.write` 冲突（"StreamSink is bound to a stream"）→ 改 `stdin.listen` + utf8.decoder（顺带解决中文逐字节乱码）
+2. `stdout.terminalLines/Columns` 在 pty 下抛异常 → try-catch 兜底 24/80
+3. 渲染失败会崩进程 → try-catch 兜底（业务逻辑不受影响）
+4. demo 冒烟依赖 stdout 文本不可靠 → 改为验证 store 落盘（history 条数与 seq 递增）
+5. 残留 server 占 3901 端口导致 auth 失败 → 每次重置环境前先确认端口释放
+
+**验证：** `dart analyze` 无问题；干净环境双端冒烟全过：TUI 状态栏渲染 ✅、A(TUI) 发中文消息 B 解密收到 ✅、B 发消息 A(TUI) WS 实时落盘 ✅（history 1→2 条 seq 1→2）。
+
+**真实终端体验：** `bash cli/demo/run_a.sh` / `run_b.sh` 开两个终端窗口互发；两个窗口都能实时看到对方消息（WS 推送），无需手动 /sync（保留 /sync 作兜底）。
