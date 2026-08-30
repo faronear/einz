@@ -308,6 +308,138 @@ abstract class AppLocalizations {
   /// **'Join info recognized — space & passphrase filled in'**
   String get scanJoinFound;
 
+  /// No description provided for @wizardRoleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How do you want to set up?'**
+  String get wizardRoleTitle;
+
+  /// No description provided for @wizardRoleCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m the first user — create a new space'**
+  String get wizardRoleCreate;
+
+  /// No description provided for @wizardRoleJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to join an existing space'**
+  String get wizardRoleJoin;
+
+  /// No description provided for @wizardRoleAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced: import a sealed key copy'**
+  String get wizardRoleAdvanced;
+
+  /// No description provided for @wizardNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get wizardNext;
+
+  /// No description provided for @wizardBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get wizardBack;
+
+  /// No description provided for @wizardDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get wizardDone;
+
+  /// No description provided for @wizardStepDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name'**
+  String get wizardStepDevice;
+
+  /// No description provided for @wizardStepWhitelist.
+  ///
+  /// In en, this message translates to:
+  /// **'Server whitelist'**
+  String get wizardStepWhitelist;
+
+  /// No description provided for @wizardStepPassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Access passphrase'**
+  String get wizardStepPassphrase;
+
+  /// No description provided for @wizardStepPin.
+  ///
+  /// In en, this message translates to:
+  /// **'App lock'**
+  String get wizardStepPin;
+
+  /// No description provided for @wizardStepShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite your partner'**
+  String get wizardStepShare;
+
+  /// No description provided for @wizardStepJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Join space'**
+  String get wizardStepJoin;
+
+  /// No description provided for @wizardStepSealed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import sealed key'**
+  String get wizardStepSealed;
+
+  /// No description provided for @wizardStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get wizardStepDone;
+
+  /// No description provided for @setupPageKeyGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Key generated'**
+  String get setupPageKeyGenerated;
+
+  /// No description provided for @wizardWhitelistHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add the public key below to the server whitelist (config.json) and restart, then continue.'**
+  String get wizardWhitelistHint;
+
+  /// No description provided for @wizardPassphraseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your partner joins with this passphrase — share it via QR code on the next step.'**
+  String get wizardPassphraseHint;
+
+  /// No description provided for @wizardPinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ll enter this PIN at every startup to unlock.'**
+  String get wizardPinHint;
+
+  /// No description provided for @wizardDoneText.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Setup complete!'**
+  String get wizardDoneText;
+
+  /// No description provided for @wizardShareHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your partner scans this code or pastes the info to join.'**
+  String get wizardShareHint;
+
+  /// No description provided for @wizardJoinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code from your partner, or paste the join info they sent you.'**
+  String get wizardJoinHint;
+
   /// No description provided for @setupPageKeyGenFailed.
   ///
   /// In en, this message translates to:

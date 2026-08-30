@@ -129,6 +129,77 @@ class AppLocalizationsEn extends AppLocalizations {
       'Join info recognized — space & passphrase filled in';
 
   @override
+  String get wizardRoleTitle => 'How do you want to set up?';
+
+  @override
+  String get wizardRoleCreate => 'I\'m the first user — create a new space';
+
+  @override
+  String get wizardRoleJoin => 'I want to join an existing space';
+
+  @override
+  String get wizardRoleAdvanced => 'Advanced: import a sealed key copy';
+
+  @override
+  String get wizardNext => 'Next';
+
+  @override
+  String get wizardBack => 'Back';
+
+  @override
+  String get wizardDone => 'Done';
+
+  @override
+  String get wizardStepDevice => 'Device name';
+
+  @override
+  String get wizardStepWhitelist => 'Server whitelist';
+
+  @override
+  String get wizardStepPassphrase => 'Access passphrase';
+
+  @override
+  String get wizardStepPin => 'App lock';
+
+  @override
+  String get wizardStepShare => 'Invite your partner';
+
+  @override
+  String get wizardStepJoin => 'Join space';
+
+  @override
+  String get wizardStepSealed => 'Import sealed key';
+
+  @override
+  String get wizardStepDone => 'Complete';
+
+  @override
+  String get setupPageKeyGenerated => '✅ Key generated';
+
+  @override
+  String get wizardWhitelistHint =>
+      'Add the public key below to the server whitelist (config.json) and restart, then continue.';
+
+  @override
+  String get wizardPassphraseHint =>
+      'Your partner joins with this passphrase — share it via QR code on the next step.';
+
+  @override
+  String get wizardPinHint =>
+      'You\'ll enter this PIN at every startup to unlock.';
+
+  @override
+  String get wizardDoneText => '✅ Setup complete!';
+
+  @override
+  String get wizardShareHint =>
+      'Your partner scans this code or pastes the info to join.';
+
+  @override
+  String get wizardJoinHint =>
+      'Scan the QR code from your partner, or paste the join info they sent you.';
+
+  @override
   String setupPageKeyGenFailed(String error) {
     return '❌ Key generation failed: $error';
   }

@@ -122,6 +122,72 @@ class AppLocalizationsZh extends AppLocalizations {
   String get scanJoinFound => '已识别加入信息，空间与口令已自动填入';
 
   @override
+  String get wizardRoleTitle => '选择你的情况';
+
+  @override
+  String get wizardRoleCreate => '我是第一个使用者，创建新空间';
+
+  @override
+  String get wizardRoleJoin => '我要加入对方的空间';
+
+  @override
+  String get wizardRoleAdvanced => '高级：导入 sealed 密钥副本';
+
+  @override
+  String get wizardNext => '下一步';
+
+  @override
+  String get wizardBack => '上一步';
+
+  @override
+  String get wizardDone => '完成';
+
+  @override
+  String get wizardStepDevice => '设备名称';
+
+  @override
+  String get wizardStepWhitelist => '加入服务器白名单';
+
+  @override
+  String get wizardStepPassphrase => '设置接入口令';
+
+  @override
+  String get wizardStepPin => '设置启动锁';
+
+  @override
+  String get wizardStepShare => '邀请对方加入';
+
+  @override
+  String get wizardStepJoin => '加入空间';
+
+  @override
+  String get wizardStepSealed => '导入 sealed 密钥';
+
+  @override
+  String get wizardStepDone => '完成';
+
+  @override
+  String get setupPageKeyGenerated => '✅ 密钥已生成';
+
+  @override
+  String get wizardWhitelistHint => '把下方公钥加入服务器白名单（config.json）并重启，然后继续';
+
+  @override
+  String get wizardPassphraseHint => '对方凭此口令加入——下一步将生成二维码分享给对方';
+
+  @override
+  String get wizardPinHint => '每次启动需输入此 PIN 解锁';
+
+  @override
+  String get wizardDoneText => '✅ 设置完成！';
+
+  @override
+  String get wizardShareHint => '对方扫码或粘贴下方信息即可加入';
+
+  @override
+  String get wizardJoinHint => '扫描对方发的二维码，或粘贴对方发给你的加入信息';
+
+  @override
   String setupPageKeyGenFailed(String error) {
     return '❌ 密钥生成失败: $error';
   }

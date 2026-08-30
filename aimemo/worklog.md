@@ -581,3 +581,20 @@
 **小白（B）完整流程（零技术）：** 装 App → ①生成设备密钥 → 把公钥转发给 A → A 加 VPS 白名单 → 📷 扫 A 的二维码 → ③凭口令接入 → 完成。A 全程纯 App（不再需要 CLI）。
 
 **遗留：** ① 二维码分享对话框（joinDialog）展示时机在进聊天页前——若 A 想"先建空间后补发邀请"，可后续加聊天页内入口；② mobile_scanner 需真机验证（模拟器相机不可用）；③ 白名单仍需 A 上 VPS 操作（保持手动，安全核心不变）。
+
+### 配置页分步向导重构（交互优化；2026-08-29）
+
+**背景：** 老板审核截图时提出关键交互批评：①"生成设备密钥"点击后无明确结果反馈；②"导入并认证"与"自建空间/凭口令接入"四个功能并列但无前后关系，易混淆；③ 建议**分步向导、每页只收集一个信息**。决策确认：**先选角色再进向导 + sealed 保留折叠入口**。
+
+**重构（setup_page 大改）：**
+- **第 0 步角色选择**：我是第一个使用者（创建新空间）/ 我要加入现有空间 / 高级 sealed（ExpansionTile 折叠）
+- **创建（create）7 步**：设备名+生成密钥（**本页 Card 明确显示"✅ 密钥已生成"+ 设备 ID/公钥，回应反馈缺失批评**）→ 白名单确认（展示公钥，用户 VPS 添加后继续）→ 接入口令 → PIN（_runPinSetup：生成 Space Key + 认证 + SetPinDialog）→ 二维码分享（QrImageView + 一键复制）→ 完成
+- **加入（join）5 步**：设备名 → 扫码/粘贴加入信息（_buildStepJoin：📷 扫码自动填 + 手动输入）→ PIN（_runJoinAccess：认证 → 托管拉取 → 口令解密）→ 完成
+- **高级（advanced）5 步**：设备名 → sealed 粘贴（_buildStepSealed）→ PIN（_runSealedImport：解封 → 认证）→ 完成
+- 框架：_WizardRole 枚举 + 步骤状态机（_step/_stepCount/_stepTitle/_buildStep）+ 进度圆点 + 底部上一步/下一步/完成 + AnimatedSwitcher；共享状态（_keyPair/_spaceKey/_sessionToken）；_nextStep 按 (role, step) 前置校验（每步一个信息未填即提示）；_authenticate 提取公共认证
+- l10n：wizardRole*/wizardStep*/wizard 提示键 + setupPageKeyGenerated（中英，zh/en 键一致性 diff 校验）
+- 测试：widget_test 重写 3 用例（首屏角色选择/创建分流+未生成密钥提示/加入分流）；golden setup_page 更新（向导首屏）；flutter test **30 项全过**
+
+**排障：** ① 重构期字段重复定义（旧字段残留）与 _finish 重复（框架空实现 vs 新实现）→ 清理；② `FilledButton.tonal.icon` 不存在（API 无组合）→ tonal + Row；③ widget_test"选择你的情况"在 AppBar 与 body 各一次 → findsWidgets。
+
+**老板反馈落实：** 生成密钥后本页明确展示结果 ✅；每页一个输入 ✅；步骤前后关系清晰（进度圆点 + 步骤标题 + 上一步/下一步）✅；sealed 技术路径保留在折叠入口 ✅。
