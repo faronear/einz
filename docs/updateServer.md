@@ -22,9 +22,9 @@ git clone https://git.tic.cc/fon/only
 cd only
 
 # 4) （CLI 实测才需要）安装 Node ≥ 20 / Dart ≥ 3.12 / libsodium：
-#    - Windows：设置 LIBSODIUM_PATH 指向 libsodium.dll
-#      setx LIBSODIUM_PATH "D:\path\to\libsodium.dll"
-#    - Linux/macOS：一般自动探测常见路径，无需设置
+#    - macOS（Homebrew）：brew install node dart-sdk libsodium
+#    - Linux：apt install libsodium-dev（或按发行版），一般自动探测常见路径，无需设置
+#    - 非标准路径时：export LIBSODIUM_PATH="/path/to/libsodium.dylib"（macOS）/ ".so"（Linux）
 ```
 
 ---
@@ -56,7 +56,7 @@ git status --short                                          # 应只显示本地
 ### 2.1 本机：提交并推送
 
 ```bash
-cd <仓库路径>        # 例：cd only 或 cd D:\xxx\only
+cd <仓库路径>        # 例：cd only 或 cd /Users/Shared/productX/only
 git add -A
 git commit -m "feat: 你的改动说明"
 git push origin main
@@ -79,20 +79,20 @@ curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
 
 ---
 
-## 3. 客户端实测（以口令托管为例，本机 PowerShell）
+## 3. 客户端实测（以口令托管为例，本机 macOS/Linux）
 
-```powershell
-cd <仓库路径>\cli
-dart run .\bin\onlyspace.dart escrow --action upload --store <a.json> `
+```bash
+cd /Users/Shared/productX/only/cli
+dart run bin/onlyspace.dart escrow --action upload --store /tmp/a.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
 # 期望：✅ 口令托管包已上传
 
-dart run .\bin\onlyspace.dart escrow --action download --store <b.json> `
+dart run bin/onlyspace.dart escrow --action download --store /tmp/b.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
 # 期望：✅ 口令托管包已解出 Space Key
 ```
 
-> `<a.json>`/`<b.json>` 为设备 store 文件路径（本机 C:\deploy\ 或按需生成：`init` 后 `config`/`import`）。
+> `/tmp/a.json`/`/tmp/b.json` 为设备 store 文件路径（本机 /tmp/ 或按需生成：`init` 后 `config`/`import`）。
 
 ---
 

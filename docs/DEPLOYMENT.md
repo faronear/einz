@@ -55,8 +55,8 @@ cd cli
 dart pub get
 ```
 
-> Windows 提示：若 CLI 报 libsodium 加载失败，先设置
-> `export LIBSODIUM_PATH="D:\path\to\libsodium.dll"`（Linux/macOS 一般无需设置，自动探测常见路径）。
+> macOS/Linux 提示：若 CLI 报 libsodium 加载失败，先设置
+> `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"`（Homebrew 安装一般自动探测，无需设置）。
 
 ### 2.2 生成两台设备身份 + 一次性配置（白名单 + Space Key 分发）
 
@@ -310,13 +310,13 @@ dart run bin/onlyspace.dart import \
 | --- | --- | --- |
 | Server 拒绝启动 | `config.json` 缺失/格式错（需 space_id + ≥1 active 设备） | 检查 `server/config/config.json`；用 CLI `config` 重新生成 |
 | `curl /space` 401/403 | 正常（未认证） | 按 §3.3 验证 |
-| CLI 报 libsodium 加载失败 | Windows 未设 `LIBSODIUM_PATH` | `export LIBSODIUM_PATH="D:\...\libsodium.dll"` |
+| CLI 报 libsodium 加载失败 | 未设 `LIBSODIUM_PATH`（或 libsodium 装在非标准路径） | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"` |
 | `auth` 失败（403） | 设备不在白名单 / 已被撤销 | 检查 config.json 与 devices 表状态；重新登记 |
 | `send` 提示"已入队（离线）" | `--server` 省略或未认证 | 补 `--server`；先 `auth` |
 | `sync` 拉不到对方消息 | 锚点已推进 / 网络 / 白名单 | 用 `--after 0` 强制全量重拉排查 |
 | `fetch` 报 sha256 不匹配 | 附件密文损坏或元数据过期 | 重新 `sync` 拉元数据后重试 |
 | WS 连不上 | 反代未开 WSS / token 未 URL 编码 | 检查 Caddy；token 含 `+`/`=` 需编码（客户端自动处理） |
-| `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷） | 拷贝到纯 ASCII 路径构建（`D:\build-onlyspace`），产物拷回 |
+| `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷） | 拷贝到纯 ASCII 路径构建（如 `/tmp/onlyspace-build`），产物拷回 |
 | 撤销后设备仍能认证 | Server 版本过旧（未含 Phase 4 撤销感知） | 重新 `npm run build` 部署 |
 | 备份命令拒绝执行 | 未设置 `ONLYSPACE_DB_BACKUP_KEY` | 设置 base64 32B 密钥（§3.2/§5.1） |
 
@@ -362,9 +362,9 @@ git status --short                                          # 应只显示本地
 
 ### 9.2 每次更新：本机 push → VPS pull → 重建 server 容器
 
-```powershell
-# 本机（Windows PowerShell）：新代码提交并推送到远程仓库
-cd D:\Seafile\product-产品\only
+```bash
+# 本机（macOS/Linux）：新代码提交并推送到远程仓库
+cd /Users/Shared/productX/only
 git push origin main
 ```
 
@@ -386,13 +386,13 @@ docker compose ps                                       # 确认 server 重新 r
 curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
 ```
 
-### 9.4 客户端实测（以口令托管为例，本机 PowerShell）
+### 9.4 客户端实测（以口令托管为例，本机 macOS/Linux）
 
-```powershell
-cd D:\Seafile\product-产品\only\cli
-dart run .\bin\onlyspace.dart escrow --action upload --store C:\deploy\a.json `
+```bash
+cd /Users/Shared/productX/only/cli
+dart run bin/onlyspace.dart escrow --action upload --store /tmp/a.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
-dart run .\bin\onlyspace.dart escrow --action download --store C:\deploy\b.json `
+dart run bin/onlyspace.dart escrow --action download --store /tmp/b.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
 ```
 

@@ -1,6 +1,6 @@
 # OnlySpace — 跨机器交接手册（HANDOFF）
 
-> **用途：** 从本机（macOS, `/Users/Shared/product-产品/only`）迁移工作到另一台电脑继续开发。
+> **用途：** 从本机（macOS, `/Users/Shared/productX/only`）迁移工作到另一台电脑继续开发。
 > **最后更新：** 2026-08-28（Windows 续接已完成，见 §3/§4 状态）
 > **git HEAD：** `ece01e8`（5 个提交，工作树干净，无远程仓库）→ **Windows 续接后已推进**
 

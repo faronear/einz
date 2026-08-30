@@ -5,14 +5,14 @@
 
 ---
 
-## 0. 先完成代码同步（Windows 侧，一次）
+## 0. 先完成代码同步（macOS 本机，一次）
 
 项目远程仓库：`https://git.tic.cc/fon/only`（老板自建 Gitea，私有）。
 
-- Windows 开发机需**推送一次**并让 Git 记住凭据（Personal Access Token，见 DEPLOYMENT.md §0 配置方法）：
+- 本机需**推送一次**并让 Git 记住凭据（Personal Access Token，见 DEPLOYMENT.md §0 配置方法）：
 
-```powershell
-cd D:\Seafile\product-产品\only
+```bash
+cd /Users/Shared/productX/only
 git push -u origin main
 # 弹窗时：用户名 = AtomGit 用户名，密码 = 访问令牌（Settings → 访问令牌 生成，勾选 repo 权限）
 ```
