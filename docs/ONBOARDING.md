@@ -31,12 +31,12 @@ cd deployment
 cp .env.example .env         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
 # ↑ 把输出粘贴到 .env 的 ONLYSPACE_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
-# ⚠️ 全新部署时 config.json 还不存在，server 会因缺少 /config/config.json 启动失败（属预期）。
-#    两种做法任选：
-#    a) 先放最小占位（space_id 用阶段 2 的同一个值）：echo '{"space_id":"<阶段2的UUID>","devices":[]}' > config/config.json
-#    b) 跳过本步，先完成阶段 1-2 生成白名单，到阶段 3 部署 config.json 后再启动 server
 docker compose up -d --build server
 curl -s https://only.tic.cc/health    # 期望 {"status":"ok",...}
+# 💡 全新部署时 config.json 尚未生成，Server 会进入"空转模式"正常启动：
+#    /health 可探活，但无 active 设备 → 业务接口（auth/发消息/登记）全部拒绝，
+#    日志打印 ⚠️ 空转提示。完成阶段 2 生成白名单、阶段 3 部署 config.json 后
+#    docker compose restart server 即恢复正常（无需先放占位文件）。
 
 # ② 本机（Mac）：拉最新代码
 cd /Users/Shared/productX/only && git pull

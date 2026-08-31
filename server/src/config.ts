@@ -20,22 +20,23 @@ export interface ServerConfig {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CONFIG_PATH = resolve(HERE, "../config/config.json");
 
-/** 加载静态白名单配置（productLens §8.3）。文件不存在时抛出，Server 拒绝启动。 */
+/** 加载静态白名单配置（productLens §8.3）。
+ *  文件不存在时进入**空转模式**正常启动（space_id=unconfigured、devices=[]）：
+ *  /health 可探活，但无 active 设备 → 一切业务（auth/发消息/登记）被拒绝；
+ *  部署 config.json 后重启即恢复正常。 */
 export function loadConfig(path = process.env.ONLYSPACE_CONFIG ?? DEFAULT_CONFIG_PATH): ServerConfig {
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(
-        `缺少配置文件 ${path}\n` +
-          `  服务端启动需要白名单 config.json（Docker 挂载的 ${path}）\n` +
-          `  请先用 CLI 生成白名单后部署（见 docs/ONBOARDING.md 阶段 2-3）：\n` +
-          `    dart run bin/onlyspace.dart config --store <store> --peer-pubkey <对方公钥> \\\n` +
-          `      --space-id <uuid> --out-config config.json\n` +
-          `  并把生成的 config.json 放到宿主机 deployment/config/ 目录后重启；\n` +
-          `  或先创建最小配置占位：{"space_id": "<uuid>", "devices": []}`
+      console.warn(
+        `⚠️ 缺少配置文件 ${path}：Server 进入空转模式（space_id=unconfigured、0 台设备）。\n` +
+          `   业务接口将被拒绝，仅 /health 可探活。部署白名单后重启恢复正常：\n` +
+          `   dart run bin/onlyspace.dart config --store <store> --peer-pubkey <对方公钥> ... --out-config config.json\n` +
+          `   然后把 config.json 放到宿主机 deployment/config/ 后 docker compose restart server`
       );
+      return { space_id: "unconfigured", devices: [] };
     }
     throw e;
   }
@@ -46,7 +47,9 @@ export function loadConfig(path = process.env.ONLYSPACE_CONFIG ?? DEFAULT_CONFIG
   }
   const active = cfg.devices.filter((d) => d.status === "active");
   if (active.length < 1) {
-    throw new Error(`config.json 至少需要 1 台 active 设备`);
+    console.warn(
+      `⚠️ config.json 暂无 active 设备：业务接口将拒绝一切请求（auth/发消息/登记）。部署白名单后重启生效。`
+    );
   }
   return cfg;
 }
