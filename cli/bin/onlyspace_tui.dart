@@ -151,6 +151,17 @@ Future<bool> _probeServer(String server) async {
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
   var creator = false; // 首设备自举成功（空间创建者）标记：走创建者初始化（生成 Space Key + 托管 + 邀请码）
+  var autoStore = false; // 自动模式（无 --store）：enroll 后按规范 id 重命名设备文件（personA_dev2.json）
+
+  // 自动模式：enroll 拿到规范 id 后，把设备文件重命名为 personA_dev2.json（原临时名 [device-id].json）
+  void renameToStandard(String personId, String deviceId) {
+    if (!autoStore) return;
+    final newPath = '${_defaultStoreDir()}/${personId}_$deviceId.json';
+    if (newPath == storePath) return;
+    File(storePath).renameSync(newPath);
+    storePath = newPath;
+    stdout.writeln('💾 设备文件: $newPath');
+  }
 
   // ① 服务器地址：--server 参数 > store 持久化值 > config 默认（cli/config.json）> 硬编码
   if (server.isEmpty) {
@@ -173,6 +184,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     store = await DeviceStore.create(deviceId.isEmpty ? 'dev-auto' : deviceId);
     // 自动模式（无 --store）→ 存默认目录 ~/.onlyspace/[device-id].json
     if (storePath.isEmpty) {
+      autoStore = true;
       final dir = _defaultStoreDir();
       Directory(dir).createSync(recursive: true);
       storePath = '$dir/${store.deviceId}.json';
@@ -213,6 +225,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         store.deviceId = r.deviceId; // 服务端分配的规范 id（dev1）
         store.personId = r.personId; // 规范 person id（personA）
         store.spaceId = r.spaceId;
+        renameToStandard(r.personId, r.deviceId); // 自动模式：设备文件改名为 personA_dev1.json
         store.save(storePath);
         creator = true;
         stdout.writeln('✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}');
@@ -233,6 +246,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
             store.deviceId = r.deviceId;
             store.personId = r.personId;
             store.spaceId = r.spaceId;
+            renameToStandard(r.personId, r.deviceId); // 自动模式：设备文件改名为 personB_dev2.json
             store.save(storePath);
             stdout.writeln('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
           } catch (e2) {
@@ -831,7 +845,7 @@ Future<void> _execCommand(String line) async {
 
   switch (cmd) {
     case '/help':
-      s.status = '命令: /auth [server] /server <地址> /sync /history /attach <file> /exit';
+      s.status = '命令: /auth [server] /server <地址> /invite [personA|personB] [名称] /sync /history /attach <file> /exit';
     case '/server':
       if (arg.isEmpty) {
         s.status = '当前服务器: ${s.session.server}；用法: /server <地址>';
@@ -882,11 +896,43 @@ Future<void> _execCommand(String line) async {
           s.status = '附件上传失败: $e';
         }
       }
+    case '/invite':
+      // 补发邀请码：/invite [personA|personB] [对方名称]（默认 personB=邀请对方）
+      await _execInvite(parts);
     case '/exit':
     case '/quit':
       s.running = false;
     default:
       s.status = '未知命令: $cmd（/help 查看）';
+  }
+}
+
+/// /invite [personA|personB] [对方名称]：补发一次性邀请码（默认 personB=邀请对方，
+/// 给第二使用者；personA=给自己加新设备）。需先 /auth 认证。
+Future<void> _execInvite(List<String> parts) async {
+  final s = _state!;
+  final token = s.session.store.sessionToken;
+  if (token == null) {
+    s.status = '未认证：先 /auth 再生成邀请码';
+    return;
+  }
+  final personId = parts.length > 1 ? parts[1] : 'personB';
+  if (personId != 'personA' && personId != 'personB') {
+    s.status = '用法: /invite [personA|personB] [对方名称]（默认 personB）';
+    return;
+  }
+  final name = parts.length > 2 ? parts.sublist(2).join(' ') : null;
+  try {
+    final api = ApiClient(s.session.server);
+    final r = await api.createInvite(
+      token: token,
+      personId: personId,
+      displayName: name,
+      hours: 24,
+    );
+    s.status = '✅ 邀请码（$personId${name != null && name.isNotEmpty ? '/$name' : ''}，24h 一次性）: ${r.inviteCode}';
+  } catch (e) {
+    s.status = '邀请码生成失败: $e';
   }
 }
 

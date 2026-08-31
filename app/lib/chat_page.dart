@@ -226,6 +226,99 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 邀请设备：生成一次性邀请码（POST /invites，需已认证）。
+  /// personB=邀请对方加入；personA=给自己加新设备；对方名称可填显示名（存 server 名称表）。
+  Future<void> _showInviteDialog() async {
+    String personId = 'personB';
+    final nameController = TextEditingController();
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('邀请设备',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+              const SizedBox(height: 4),
+              const Text('生成一次性邀请码（24h 有效，登记即用）'),
+              const SizedBox(height: 12),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'personB', label: Text('对方（personB）')),
+                  ButtonSegment(value: 'personA', label: Text('自己加设备（personA）')),
+                ],
+                selected: {personId},
+                onSelectionChanged: (s) => personId = s.first,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: '对方名称（可选，如 steffi）',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('取消')),
+                  FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('生成邀请码')),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      final name = nameController.text.trim();
+      final r = await api.createInvite(
+        token: widget.token,
+        personId: personId,
+        displayName: name.isEmpty ? null : name,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('邀请码已生成'),
+          content: SelectableText(r.inviteCode,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1)),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: r.inviteCode));
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx)
+                    .showSnackBar(const SnackBar(content: Text('邀请码已复制')));
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('复制'),
+            ),
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(), child: const Text('关闭')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('邀请码生成失败: $e')));
+    }
+  }
+
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
   Future<void> _showBurnPicker() async {
     final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
@@ -846,6 +939,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             icon: const Icon(Icons.timer_outlined),
             tooltip: l10n.chatPageBurnTooltip(_burnOptionLabel(_burnSeconds, l10n)),
             onPressed: _showBurnPicker,
+          ),
+          IconButton(
+            icon: const Icon(Icons.group_add),
+            tooltip: '邀请设备 / Invite',
+            onPressed: _showInviteDialog,
           ),
         ],
       ),
