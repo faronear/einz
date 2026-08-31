@@ -331,7 +331,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '请输入空间口令:', hidden: true);
+      final passphrase = await _prompt(session, '请输入空间口令:', hidden: true, required: true);
       try {
         await _busy(session, '⏳ 口令对接中......', () => session.accessByEscrow(passphrase));
         session.messages.add(_systemMessage(session, '✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}'));
@@ -1002,7 +1002,6 @@ Future<void> _execCommand(String line) async {
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
           s.session, '本设备尚未接入空间，请输入空间口令:'));
-      s.status = '等待口令输入后回车…';
       break;
     case '/sync':
       try {
