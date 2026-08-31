@@ -75,6 +75,59 @@ String _defaultServer() {
   return 'https://only.tic.cc';
 }
 
+/// 默认 store 目录：$HOME/.onlyspace（Windows 用 USERPROFILE）。
+String _defaultStoreDir() {
+  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '.';
+  return '$home/.onlyspace';
+}
+
+/// 自动发现设备并返回选定的 store 路径；无可用设备返回 ''（引导 init）。
+/// - 合法设备（DeviceStore.load 成功）→ 1 台直接用，多台列出选择；
+/// - 损坏/非 store 文件 → 自动备份为 .bak（保留现场）后继续。
+String _resolveAutoStore() {
+  final dir = _defaultStoreDir();
+  final valid = <({String path, DeviceStore store})>[];
+  final corrupt = <String>[];
+  final d = Directory(dir);
+  if (d.existsSync()) {
+    for (final f in d.listSync().whereType<File>().where((f) => f.path.endsWith('.json'))) {
+      try {
+        valid.add((path: f.path, store: DeviceStore.load(f.path)));
+      } catch (_) {
+        corrupt.add(f.path); // 格式损坏或非 store 文件
+      }
+    }
+  }
+
+  // 损坏文件：提示 + 备份 .bak（保留现场，不丢私钥数据）
+  if (corrupt.isNotEmpty) {
+    stdout.writeln('⚠️ 发现损坏的设备文件: ${corrupt.map((p) => p.split('/').last).join(', ')}');
+    for (final c in corrupt) {
+      try {
+        File(c).renameSync('$c.bak');
+      } catch (_) {}
+    }
+    stdout.writeln('   已备份为 .bak（可在目录查看现场）');
+  }
+
+  if (valid.isEmpty) return ''; // 无可用设备 → _onboard 引导 init
+
+  if (valid.length == 1) {
+    stdout.writeln('✅ 使用设备: ${valid.first.store.deviceId}');
+    return valid.first.path;
+  }
+
+  // 多台设备：列出选择（cooked 数字选择）
+  stdout.writeln('发现 ${valid.length} 台设备:');
+  for (var i = 0; i < valid.length; i++) {
+    stdout.writeln('  ${i + 1}) ${valid[i].store.deviceId}');
+  }
+  stdout.write('选择 [回车=1]: ');
+  final input = (stdin.readLineSync() ?? '').trim();
+  final idx = (int.tryParse(input) ?? 1).clamp(1, valid.length);
+  return valid[idx - 1].path;
+}
+
 /// 快速健康探测（GET {server}/health，3s 超时，不重试）：
 /// 能连（HTTP 200）→ true；连接失败/超时 → false。
 /// 不用 ApiClient（其 connectionTimeout 10s + 3 次重试，探测太慢）。
@@ -93,10 +146,10 @@ Future<bool> _probeServer(String server) async {
 }
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
-/// 返回 (就绪的 store, 生效的 server 地址)；引导中选择 sealed 导入时置
-/// exitCode=1（main 据此退出，提示用户改用 onlyspace.dart import）。
-Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
-  var store = File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
+/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
+/// sealed 导入时置 exitCode=1（main 据此退出，提示用户改用 onlyspace.dart import）。
+Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
+  var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
   // ① 服务器地址：--server 参数 > store 持久化值 > config 默认（cli/config.json）> 硬编码
   if (server.isEmpty) {
@@ -117,6 +170,12 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
     stdout.write('设备名称（如 dev-mac，回车默认 dev-auto）: ');
     final deviceId = (stdin.readLineSync() ?? '').trim();
     store = await DeviceStore.create(deviceId.isEmpty ? 'dev-auto' : deviceId);
+    // 自动模式（无 --store）→ 存默认目录 ~/.onlyspace/[device-id].json
+    if (storePath.isEmpty) {
+      final dir = _defaultStoreDir();
+      Directory(dir).createSync(recursive: true);
+      storePath = '$dir/${store.deviceId}.json';
+    }
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
     stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
@@ -165,7 +224,7 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
     if (choice == '2') {
       stdout.writeln('请先退出本程序，用 onlyspace.dart import 导入 sealed 文件后再运行。');
       exitCode = 1;
-      return (store, server);
+      return (store, server, storePath);
     }
     if (server.isEmpty) {
       stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
@@ -193,7 +252,7 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
       stdout.writeln('⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）');
     }
   }
-  return (store, server);
+  return (store, server, storePath);
 }
 
 /// 隐藏回显读取口令：
@@ -277,12 +336,14 @@ String _readPassphrase(String prompt) {
 Future<void> main(List<String> args) async {
   await sodium();
 
-  var storePath = 'store.json';
+  var storePath = '';
   var server = '';
+  var explicitStore = false; // 是否显式传 --store（自动发现 vs 手动指定）
   for (var i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--store':
         storePath = args[++i];
+        explicitStore = true;
       case '--server':
         server = args[++i];
     }
@@ -296,6 +357,12 @@ Future<void> main(List<String> args) async {
     return;
   }
 
+  // 无显式 --store：默认目录（~/.onlyspace）自动发现已有设备；
+  // 无设备 → 引导 init（存 [device-id].json）；损坏文件自动备份 .bak 后重新初始化。
+  if (!explicitStore) {
+    storePath = _resolveAutoStore();
+  }
+
   // 注：曾在引导前调用 _restoreTerminal() 以恢复"上次异常退出残留的无回显终端"，
   // 但 pty/重定向环境下 stdin 未订阅时设置 echo/lineMode 会触发未捕获异常导致
   // 进程 255 崩溃（已实测定位）。残留场景较少见（真实终端进程退出后由 shell 接管
@@ -307,6 +374,7 @@ Future<void> main(List<String> args) async {
   if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
   final store = onboard.$1;
   server = onboard.$2;
+  storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.onlyspace/[device-id].json）
 
   final session = ChatSession(store, storePath, server);
   await session.loadHistory();
