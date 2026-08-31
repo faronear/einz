@@ -111,6 +111,8 @@ dart run bin/onlyspace.dart escrow --action upload \
 # ✅ 口令托管包已上传（Server 只存密文）
 ```
 
+> 💡 如果设备身份是在 **TUI 里按引导创建的**（存为 `~/.onlyspace/[设备名].json`），上面命令的 `--store` 请换成实际文件名（如 `~/.onlyspace/dev-a1.json`）。CLI `auth`/`escrow` 没有自动发现，必须显式指定路径。
+
 ---
 
 ## 阶段 5：生成邀请码（VPS，白名单外新设备/演示动态登记）
@@ -131,7 +133,9 @@ ssh 你的VPS "cd /faronear/only/server && \
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/onlyspace_tui.dart --store ~/.onlyspace/a.json
+dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 下的设备
+# 自动使用已有设备（阶段 2 CLI 创建的 a.json，或 TUI 内创建的 [设备名].json），
+# 多台会列出选择；无设备才引导 init（存入 ~/.onlyspace/[设备名].json）
 # 启动探测 https://only.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
 # 状态栏 WS:● 在线；输入消息回车发送
 ```
@@ -142,7 +146,8 @@ dart run bin/onlyspace_tui.dart --store ~/.onlyspace/a.json
 
 ```powershell
 cd 你的only目录\cli
-dart run bin/onlyspace_tui.dart --store "$env:USERPROFILE\.onlyspace\b.json"
+dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.onlyspace\ 下的设备
+# 自动使用已有设备（b.json 或 TUI 内创建的 [设备名].json），多台会列出选择
 # 启动探测 → 能连 → 引导继续：
 #   - 无 Space Key → 问"接入方式" → 回车=1 口令接入
 #   - 口令: faronear（⚠️ 输口令，不是邀请码；Windows 隐藏回显无星号，回车提交）
