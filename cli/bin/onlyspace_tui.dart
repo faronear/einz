@@ -128,7 +128,7 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
       stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
     } else {
       stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
-      final passphrase = _readPassphrase('口令: ');
+      final passphrase = _readPassphrase('口令:（输入不回显）');
       try {
         await session.accessByEscrow(passphrase);
         stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
@@ -153,19 +153,50 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
   return (store, server);
 }
 
-/// 隐藏回显读取口令（pty 等环境下 echoMode 可能抛异常，退回普通输入）。
+/// 隐藏回显读取口令（逐键渲染星号，Windows PowerShell 也有输入反馈）：
+/// - ① raw 逐键：echo/line 关，非回车键输出 '*'（退格擦除一个），口令 ASCII 场景可靠；
+/// - ② 逐键失败（pty/重定向不支持 readByteSync）→ 回退整行隐藏读取；
+/// - try/finally 确保 echoMode/lineMode 无论成功/异常都恢复，避免终端停在无回显状态。
 String _readPassphrase(String prompt) {
   stdout.write(prompt);
+  stdout.flush();
   try {
     stdin.echoMode = false;
-    final v = stdin.readLineSync() ?? '';
-    stdin.echoMode = true;
+    stdin.lineMode = false;
+    final buf = StringBuffer();
+    while (true) {
+      final b = stdin.readByteSync();
+      if (b == -1 || b == 13 || b == 10) break; // EOF 或回车
+      if (b == 127 || b == 8) {
+        // 退格：删除最后一个字符并擦掉一个星号
+        if (buf.isNotEmpty) {
+          final s = buf.toString();
+          buf.clear();
+          buf.write(s.substring(0, s.length - 1));
+          stdout.write('\b \b');
+          stdout.flush();
+        }
+        continue;
+      }
+      if (b < 32) continue; // 忽略其他控制字符
+      buf.writeCharCode(b);
+      stdout.write('*');
+      stdout.flush();
+    }
     stdout.writeln();
-    return v;
+    return buf.toString();
   } catch (_) {
+    // pty/重定向等不支持逐键：退回整行隐藏读取
     final v = stdin.readLineSync() ?? '';
     stdout.writeln();
     return v;
+  } finally {
+    try {
+      stdin.echoMode = true;
+    } catch (_) {}
+    try {
+      stdin.lineMode = true;
+    } catch (_) {}
   }
 }
 
@@ -190,6 +221,10 @@ Future<void> main(List<String> args) async {
     exitCode = 1;
     return;
   }
+
+  // 上次异常退出（如 raw 模式下直接 Ctrl+C）可能残留无回显终端状态；
+  // 引导（cooked 问答）前先恢复终端回显+行缓冲，否则输入文字看不见。
+  _restoreTerminal();
 
   // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成设备身份；
   // 无 Space Key → 口令接入（escrow）；未认证 → auth。全部就绪后才进入 TUI。
