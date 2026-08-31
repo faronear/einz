@@ -233,9 +233,22 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     if (!autoStore) return;
     final newPath = '${_defaultStoreDir()}/${personId}_$deviceId.json';
     if (newPath == storePath) return;
+    if (File(newPath).existsSync()) File(newPath).deleteSync(); // 覆盖旧副本（如早期重命名残留）
     File(storePath).renameSync(newPath);
     storePath = newPath;
     session.messages.add(_systemMessage(session, '💾 设备文件: $newPath'));
+  }
+
+  // 已登记设备启动时若仍是临时名 pending.json（此前登记后未重命名——如旧版本
+  // 或加载已登记 store 跳过登记的场景）——自动重命名为标准名 personId_deviceId.json，
+  // 避免 ~/.onlyspace/ 残留临时文件（与标准名副本重复）
+  if (autoStore &&
+      storePath.endsWith('pending.json') &&
+      store.deviceId != null &&
+      store.deviceId!.isNotEmpty &&
+      store.personId != null &&
+      store.personId!.isNotEmpty) {
+    renameToStandard(store.personId!, store.deviceId!);
   }
 
   // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
@@ -288,7 +301,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       _scheduleRender();
     } catch (e) {
       if (e is ApiException && e.code == 'INVALID_REQUEST') {
-        session.messages.add(_systemMessage(session, '加入私密空间需要邀请码'));
         _scheduleRender();
         // 身份选择：询问用户是第一个人 personA 还是第二个人 personB（显示名称；
         // personB 名称为空则要求输入）
@@ -314,7 +326,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
         while (true) {
           if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
-          final inviteCode = await _prompt(session, '输入邀请码（由任意一个已认证设备提供）:');
+          final inviteCode = await _prompt(session, '加入私密空间需要输入邀请码（由任意一个已认证设备提供）:');
           if (inviteCode.isEmpty) {
             session.messages.add(_systemMessage(session, '未输入邀请码，请重新输入（或 Ctrl+C 退出）'));
             _scheduleRender();
@@ -338,7 +350,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             _scheduleRender();
             break;
           } catch (e2) {
-            session.messages.add(_systemMessage(session, '⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题），请重新输入'));
+            session.messages.add(_systemMessage(session, '⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）'));
             _scheduleRender();
           }
         }
@@ -360,7 +372,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         // 处理（逃生门——不能提示"非法口令"重输而困住用户）；其他 / 不当口令发送核对
         if (passphrase == '/exit' || passphrase == '/quit') {
           _state!.running = false;
-          break;
+          exit(0);
         }
         session.messages.add(_systemMessage(session, '口令不能以 / 开头，请重新输入（/exit 可退出）'));
         _scheduleRender();
