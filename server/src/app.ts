@@ -8,14 +8,23 @@ import { getAttachmentBlob, storeAttachment } from "./attachments.js";
 import { listDevices, revokeDevice } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
-import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked } from "./ws.js";
+import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
+const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
+const SERVER_VERSION = "1.0.0";
 const cfg: ServerConfig = loadConfig();
 openDb();
 syncWhitelistToDb(cfg);
 
 const server = createServer(async (req, res) => {
+  const start = Date.now();
+  // 请求/响应日志（pm2 log 式）：方法、路径、状态码、耗时；响应体不入日志（避免泄露密文）
+  res.on("finish", () => {
+    if (LOG_REQUESTS) {
+      console.log(`[req] ${req.method ?? "-"} ${req.url ?? "-"} ${res.statusCode} ${Date.now() - start}ms`);
+    }
+  });
   try {
     await route(req, res);
   } catch (err) {
@@ -44,6 +53,22 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
   const method = req.method ?? "GET";
+
+  // 健康检查（免鉴权，供外部随时探测服务状态）
+  if (method === "GET" && path === "/health") {
+    const msgCount = (getDb()
+      .prepare(`SELECT COUNT(*) AS n FROM messages`)
+      .get() as { n: number }).n;
+    sendJson(res, 200, {
+      status: "ok",
+      version: SERVER_VERSION,
+      uptime_sec: Math.floor(process.uptime()),
+      space_id: cfg.space_id,
+      ws_clients: wsConnCount(),
+      messages_count: msgCount,
+    });
+    return;
+  }
 
   // 认证（challenge-response）
   if (method === "POST" && path === "/auth/challenge") {

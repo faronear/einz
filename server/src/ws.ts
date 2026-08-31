@@ -12,6 +12,11 @@ interface Conn {
 
 const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1：每设备至多 1 条连接）
 
+/** 当前在线 WS 连接数（/health 健康检查用）。 */
+export function wsConnCount(): number {
+  return conns.size;
+}
+
 /** 注册 WS 服务（PROTOCOL.md §8）。 */
 export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
   wss.on("connection", (ws, req) => {
@@ -42,6 +47,7 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
 
     const conn: Conn = { ws, deviceId, alive: true };
     conns.set(deviceId, conn);
+    console.log(`[req] WS /ws connect device=${deviceId} total=${conns.size}`);
 
     ws.send(JSON.stringify({ id: 1, type: "hello", payload: { device_id: deviceId, space_id: cfg.space_id } }));
 
@@ -62,6 +68,7 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
 
     ws.on("close", () => {
       if (conns.get(deviceId) === conn) conns.delete(deviceId);
+      console.log(`[req] WS /ws disconnect device=${deviceId} total=${conns.size}`);
     });
   });
 

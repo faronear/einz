@@ -47,6 +47,20 @@ class ChatSession {
   /// WS 实时监听（null = 未启动）。
   WsClient? wsClient;
 
+  /// 断线开始时间（WS 处于 connecting/reconnecting 时记录；connected 时清空）。
+  /// 供 UI 状态栏显示"已断线 Ns"。
+  DateTime? wsDownSince;
+
+  /// 当前 WS 状态（无连接时为 stopped）。
+  WsStatus get wsStatus => wsClient?.status ?? WsStatus.stopped;
+
+  /// 已断线秒数（在线为 0）。
+  int get wsDownSeconds {
+    final since = wsDownSince;
+    if (since == null) return 0;
+    return DateTime.now().difference(since).inSeconds;
+  }
+
   bool get hasSpace => store.spaceKey != null && store.spaceId != null;
   bool get hasSession => store.sessionToken != null;
 
@@ -221,7 +235,19 @@ class ChatSession {
           onMessage(msg);
         }
       },
-      onStatus: onStatus,
+      onStatus: (status) {
+        // 维护断线时间：connected 清空，connecting/reconnecting 首次进入时记录
+        switch (status) {
+          case WsStatus.connected:
+            wsDownSince = null;
+          case WsStatus.connecting:
+          case WsStatus.reconnecting:
+            wsDownSince ??= DateTime.now();
+          case WsStatus.stopped:
+            break;
+        }
+        onStatus?.call(status);
+      },
     );
     wsClient!.start();
   }

@@ -24,6 +24,7 @@ import 'package:onlyspace_cli/chat_core.dart';
 // ---------- ANSI 转义 ----------
 const _esc = '\x1B';
 const _reset = '$_esc[0m';
+const _red = '$_esc[31m';
 const _green = '$_esc[32m';
 const _yellow = '$_esc[33m';
 const _cyan = '$_esc[36m';
@@ -202,13 +203,14 @@ void _render() {
   buf.write(_hideCursor);
   buf.write(_clearHome);
 
-  // 状态栏（第 1 行）
-  final ws = s.session.wsClient?.status ?? WsStatus.stopped;
+  // 状态栏（第 1 行）：WS 红绿灯状态（绿=在线，红=断线重连，黄=连接中，灰=离线）
+  final ws = s.session.wsStatus;
   final wsName = switch (ws) {
-    WsStatus.connected => 'WS:${_green}●${_reset}',
-    WsStatus.connecting => 'WS:${_yellow}↻${_reset}',
-    WsStatus.reconnecting => 'WS:${_yellow}↻重连${_reset}',
-    WsStatus.stopped => 'WS:${_gray}○${_reset}',
+    WsStatus.connected => 'WS:${_green}● 在线${_reset}',
+    WsStatus.connecting => 'WS:${_yellow}↻ 连接中${_reset}',
+    WsStatus.reconnecting =>
+      'WS:${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
+    WsStatus.stopped => 'WS:${_gray}○ 离线${_reset}',
   };
   buf.write('${_bold}OnlySpace TUI${_reset}  ${s.session.store.deviceId} @ ${s.session.store.spaceId ?? '-'}  $wsName');
   if (s.status.isNotEmpty) {
