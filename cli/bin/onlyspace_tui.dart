@@ -53,6 +53,9 @@ class _TuiState {
 
   /// 退出标志。
   bool running = true;
+
+  /// 等待邀请码输入（/auth 未登记引导）：输入循环的下一次输入按邀请码处理。
+  bool pendingInvite = false;
 }
 
 _TuiState? _state;
@@ -235,10 +238,12 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         // 区分自举失败：空间已有设备（需要邀请码）vs 网络/服务器错误（首个设备免邀请码）
         if (e is ApiException && e.code == 'INVALID_REQUEST') {
           stdout.writeln('空间已有设备（你不是第一个加入者），加入需要邀请码');
+          _guidanceNotes.add('空间已有设备（你不是第一个加入者），加入需要邀请码');
           stdout.write('邀请码（空间创建者提供）: ');
           final inviteCode = (stdin.readLineSync() ?? '').trim();
           if (inviteCode.isEmpty) {
             stdout.writeln('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
+            _guidanceNotes.add('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
           } else {
             try {
               final r = await ApiClient(server).enrollDevice(
@@ -310,10 +315,11 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         stdout.writeln('   可进入 TUI 后手动补：escrow upload / invite（onlyspace.dart 命令）');
       }
     } else if (store.spaceId == null) {
-      // 设备尚未登记成功（自举网络失败等）：跳过口令接入引导（接入需先登记）
+      // 设备尚未登记成功（未输邀请码/自举失败等）：跳过口令接入引导（接入需先登记）
       stdout.writeln();
-      stdout.writeln('⚠️ 设备尚未登记成功（网络问题？），跳过接入引导');
-      stdout.writeln('   可稍后重试引导，或进入 TUI 后 /auth 补配');
+      stdout.writeln('⚠️ 设备尚未登记成功，跳过接入引导');
+      stdout.writeln('   可稍后重试引导，或进入 TUI 后 /auth 补录');
+      _guidanceNotes.add('⚠️ 设备尚未登记成功，跳过接入引导（可进入 TUI 后 /auth 补录）');
     } else {
       stdout.writeln();
       stdout.writeln('本设备还没有 Space Key，无法收发消息。接入方式：');
@@ -351,6 +357,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     } catch (e) {
       // auth 抛 StateError（如 server 无效）也是 Error 子类，用 catch (e) 兜底
       stdout.writeln('⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）');
+      _guidanceNotes.add('⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）');
     }
   }
   return (store, server, storePath);
@@ -814,7 +821,9 @@ Future<void> _runInputLoop(ChatSession session) async {
         }
         if (busy) continue; // 上一条命令/消息还在处理
         busy = true;
-        final future = line.startsWith('/') ? _execCommand(line) : _sendText(line);
+        final future = (_state!.pendingInvite)
+            ? _handleInviteInput(line) // 等待邀请码：本次输入按邀请码登记
+            : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
         future.whenComplete(() {
           busy = false;
           if (!(_state?.running ?? false)) {
@@ -897,38 +906,12 @@ Future<void> _execCommand(String line) async {
     case '/auth':
       // 未登记（deviceId null，如引导时跳过/登记失败）→ 引导邀请码登记后再认证
       if (s.session.store.deviceId == null) {
-        // 临时切回行模式读取（可见输入），读完恢复 raw
-        try {
-          stdin.lineMode = true;
-          stdin.echoMode = true;
-        } catch (_) {}
-        stdout.write('设备尚未登记：请输入邀请码（空间创建者 /invite 获取）: ');
-        stdout.flush().ignore();
-        final inviteCode = (stdin.readLineSync() ?? '').trim();
-        try {
-          stdin.lineMode = false;
-          stdin.echoMode = false;
-        } catch (_) {}
-        if (inviteCode.isEmpty) {
-          s.status = '未输入邀请码，登记取消';
-          break;
-        }
-        try {
-          final r = await ApiClient(s.session.server).enrollDevice(
-            publicKey: s.session.store.publicKey,
-            inviteCode: inviteCode,
-            displayName: s.session.store.personName,
-            deviceName: s.session.store.deviceName,
-          );
-          s.session.store.deviceId = r.deviceId;
-          s.session.store.personId = r.personId;
-          s.session.store.spaceId = r.spaceId;
-          s.session.store.save(s.session.storePath);
-          s.status = '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}';
-        } catch (e) {
-          s.status = '邀请码登记失败: $e（无效/已用/过期或网络问题）';
-          break;
-        }
+        // 提示作为 system 消息进消息流；邀请码由输入循环接管输入——
+        // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
+        s.pendingInvite = true;
+        s.session.messages.add(_systemMessage(s.session, '设备尚未登记：请输入邀请码（空间创建者 /invite 获取）'));
+        s.status = '等待邀请码输入后回车…';
+        break;
       }
       try {
         await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
@@ -1002,6 +985,44 @@ Future<void> _execInvite(List<String> parts) async {
     s.status = ''; // 反馈在消息区（邀请码本身），状态栏保持干净
   } catch (e) {
     s.status = '邀请码生成失败: $e';
+  }
+}
+
+/// 输入循环接管的邀请码登记（/auth 未登记引导）：登记 → system 消息结果 → 认证 → WS。
+Future<void> _handleInviteInput(String inviteCode) async {
+  final s = _state!;
+  s.pendingInvite = false;
+  if (inviteCode.isEmpty) {
+    s.session.messages.add(_systemMessage(s.session, '未输入邀请码，登记取消'));
+    return;
+  }
+  try {
+    final r = await ApiClient(s.session.server).enrollDevice(
+      publicKey: s.session.store.publicKey,
+      inviteCode: inviteCode,
+      displayName: s.session.store.personName,
+      deviceName: s.session.store.deviceName,
+    );
+    s.session.store.deviceId = r.deviceId;
+    s.session.store.personId = r.personId;
+    s.session.store.spaceId = r.spaceId;
+    s.session.store.save(s.session.storePath);
+    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}'));
+    // 登记成功后继续认证
+    try {
+      await s.session.auth();
+      s.status = '✅ 认证成功: space_id=${s.session.store.spaceId}';
+      if (s.session.wsClient == null && s.session.hasSession) {
+        s.session.startWs(
+          onMessage: (_) => _render(),
+          onStatus: (_) => _render(),
+        );
+      }
+    } catch (e) {
+      s.status = '认证失败: $e';
+    }
+  } catch (e) {
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 邀请码登记失败: $e（无效/已用/过期或网络问题）'));
   }
 }
 
