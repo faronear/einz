@@ -934,7 +934,9 @@ Future<void> _execCommand(String line) async {
       }
       try {
         await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
-        s.status = '✅ 认证成功: space_id=${s.session.store.spaceId}';
+        // 认证结果作为 system 消息进消息流（不占顶部状态栏）
+        s.session.messages.add(_systemMessage(s.session, '✅ 认证成功: space_id=${s.session.store.spaceId}'));
+        s.status = '';
         // 认证成功后启动 WS 实时监听
         if (s.session.wsClient == null && s.session.hasSession) {
           s.session.startWs(
@@ -943,7 +945,8 @@ Future<void> _execCommand(String line) async {
           );
         }
       } catch (e) {
-        s.status = '认证失败: $e';
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 认证失败: $e'));
+        s.status = '';
       }
     case '/space':
       // 重新接入空间（口令托管）：未接入时引导输入口令，已接入则提示
@@ -1041,7 +1044,8 @@ Future<void> _handleInviteInput(String inviteCode) async {
     // 登记成功后继续认证
     try {
       await s.session.auth();
-      s.status = '✅ 认证成功: space_id=${s.session.store.spaceId}';
+      s.session.messages.add(_systemMessage(s.session, '✅ 认证成功: space_id=${s.session.store.spaceId}'));
+      s.status = '';
       if (s.session.wsClient == null && s.session.hasSession) {
         s.session.startWs(
           onMessage: (_) => _render(),
@@ -1049,7 +1053,8 @@ Future<void> _handleInviteInput(String inviteCode) async {
         );
       }
     } catch (e) {
-      s.status = '认证失败: $e';
+      s.session.messages.add(_systemMessage(s.session, '⚠️ 认证失败: $e'));
+      s.status = '';
     }
   } catch (e) {
     s.session.messages.add(_systemMessage(s.session, '⚠️ 邀请码登记失败: $e（无效/已用/过期或网络问题）'));
