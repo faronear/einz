@@ -32,7 +32,9 @@ const _gray = '$_esc[90m';
 const _bold = '$_esc[1m';
 const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息正文底色（区分收发双方）
 
-const _clearHome = '$_esc[2J$_esc[H';
+// \x1B[2J 清屏 + \x1B[3J 清除回滚缓冲 + \x1B[H 光标回家：全屏重绘应用（类似 vim/htop）
+// 不保留滚动历史——否则每次渲染的内容在终端回滚缓冲里累积成"重复渲染"
+const _clearHome = '$_esc[2J$_esc[3J$_esc[H';
 const _hideCursor = '$_esc[?25l';
 const _showCursor = '$_esc[?25h';
 
