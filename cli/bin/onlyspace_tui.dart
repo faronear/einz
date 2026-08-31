@@ -60,11 +60,56 @@ _TuiState? _state;
 /// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
 Timer? _resizeTimer;
 
+/// 默认服务器地址：优先读 cli/config.json 的 server 字段（本地可改），
+/// 文件缺失/格式异常时回退硬编码 https://only.tic.cc。
+String _defaultServer() {
+  try {
+    final f = File('config.json');
+    if (f.existsSync()) {
+      final v = (jsonDecode(f.readAsStringSync()) as Map<String, dynamic>)['server'];
+      if (v is String && v.isNotEmpty) return v;
+    }
+  } catch (_) {
+    // 配置缺失/损坏：回退默认值
+  }
+  return 'https://only.tic.cc';
+}
+
+/// 快速健康探测（GET {server}/health，3s 超时，不重试）：
+/// 能连（HTTP 200）→ true；连接失败/超时 → false。
+/// 不用 ApiClient（其 connectionTimeout 10s + 3 次重试，探测太慢）。
+Future<bool> _probeServer(String server) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+  try {
+    final req = await client.getUrl(Uri.parse('$server/health'));
+    final res = await req.close();
+    await res.drain<void>();
+    return res.statusCode == 200;
+  } catch (_) {
+    return false;
+  } finally {
+    client.close(force: true);
+  }
+}
+
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
 /// 返回 (就绪的 store, 生效的 server 地址)；引导中选择 sealed 导入时置
 /// exitCode=1（main 据此退出，提示用户改用 onlyspace.dart import）。
 Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
   var store = File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
+
+  // ① 服务器地址：--server 参数 > store 持久化值 > config 默认（cli/config.json）> 硬编码
+  if (server.isEmpty) {
+    final saved = store?.server;
+    server = (saved != null && saved.isNotEmpty) ? saved : _defaultServer();
+  }
+  // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（回车沿用当前值）
+  if (!await _probeServer(server)) {
+    stdout.writeln('⚠️ 无法连接服务器 $server（/health 探测失败）');
+    stdout.write('输入新服务器地址（回车沿用 $server）: ');
+    final input = (stdin.readLineSync() ?? '').trim();
+    if (input.isNotEmpty) server = input;
+  }
 
   if (store == null) {
     stdout.writeln('=== OnlySpace TUI 首次使用引导 ===');
@@ -72,19 +117,12 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
     stdout.write('设备名称（如 dev-mac，回车默认 dev-auto）: ');
     final deviceId = (stdin.readLineSync() ?? '').trim();
     store = await DeviceStore.create(deviceId.isEmpty ? 'dev-auto' : deviceId);
+    store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
     stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
     stdout.writeln('   公钥: ${store.publicKey}');
 
     // 邀请码动态登记：新设备凭创建者给的邀请码自动登记（免人工加白名单/重启 server）
-    if (server.isEmpty) {
-      const defaultServer = 'https://only.tic.cc';
-      stdout.write('服务器地址（回车默认 $defaultServer）: ');
-      server = (stdin.readLineSync() ?? '').trim();
-      if (server.isEmpty) server = defaultServer;
-      store.server = server; // 持久化：同一 store 后续启动不再询问
-      store.save(storePath);
-    }
     if (server.isNotEmpty) {
       stdout.write('邀请码（空间创建者提供，可留空跳过）: ');
       final inviteCode = (stdin.readLineSync() ?? '').trim();
@@ -108,20 +146,10 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
     }
   }
 
-  // 服务器地址：优先 store 持久化值（同一电脑多终端/多次启动只确认一次）；
-  // 无则默认 https://only.tic.cc，用户可覆盖输入后持久化。
-  if (server.isEmpty) {
-    final saved = store.server;
-    if (saved != null && saved.isNotEmpty) {
-      server = saved;
-    } else {
-      const defaultServer = 'https://only.tic.cc';
-      stdout.write('服务器地址（回车默认 $defaultServer）: ');
-      server = (stdin.readLineSync() ?? '').trim();
-      if (server.isEmpty) server = defaultServer;
-      store.server = server;
-      store.save(storePath);
-    }
+  // 持久化最终确认的 server（探测后沿用/用户覆盖），多终端共享同一 store 只设一次
+  if (store.server != server) {
+    store.server = server;
+    store.save(storePath);
   }
 
   final session = ChatSession(store, storePath, server);
