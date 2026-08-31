@@ -1028,6 +1028,9 @@ Future<void> _execCommand(String line) async {
     case '/exit':
     case '/quit':
       s.running = false;
+      // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS/同步挂起）
+      // 到不了末尾的 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
+      Future.delayed(const Duration(seconds: 2), () => exit(0));
     default:
       s.status = '未知命令: $cmd（/help 查看）';
   }
