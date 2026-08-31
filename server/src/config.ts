@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { getDb } from "./db.js";
 
 export interface DeviceConfig {
@@ -14,7 +15,10 @@ export interface ServerConfig {
   devices: DeviceConfig[];
 }
 
-const DEFAULT_CONFIG_PATH = resolve(import.meta.dirname, "../config/config.json");
+// 用 fileURLToPath 而非 import.meta.dirname：后者 Node 20.11+ 才存在，
+// VPS 宿主旧 Node 下为 undefined 导致 resolve(undefined, ...) 抛 ERR_INVALID_ARG_TYPE
+const HERE = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_CONFIG_PATH = resolve(HERE, "../config/config.json");
 
 /** 加载静态白名单配置（productLens §8.3）。文件不存在时抛出，Server 拒绝启动。 */
 export function loadConfig(path = process.env.ONLYSPACE_CONFIG ?? DEFAULT_CONFIG_PATH): ServerConfig {

@@ -1,11 +1,15 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 let db: Database.Database | null = null;
 
+// 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
+const HERE = dirname(fileURLToPath(import.meta.url));
+
 /** 打开（或创建）SQLite，按 DATABASE.md §2 建表。 */
-export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(import.meta.dirname, "../data/app.db")): Database.Database {
+export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data/app.db")): Database.Database {
   mkdirSync(dirname(path), { recursive: true });
   db = new Database(path);
   db.pragma("journal_mode = WAL");

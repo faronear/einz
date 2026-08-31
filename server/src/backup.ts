@@ -10,9 +10,13 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync, copyFileSync } from "node:fs";
 import { join, resolve, dirname, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 
 const FORMAT = "onlyspace-server-backup-v1";
+
+// 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 export interface BackupPaths {
   db: string; // app.db 路径
@@ -23,9 +27,9 @@ export interface BackupPaths {
 
 /** 从环境变量解析备份路径（与 app.ts / db.ts 默认值一致）。 */
 export function resolveBackupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
-  const db = env.ONLYSPACE_DB ?? resolve(import.meta.dirname, "../data/app.db");
-  const files = env.ONLYSPACE_FILES ?? resolve(import.meta.dirname, "../data/files");
-  const config = env.ONLYSPACE_CONFIG ?? resolve(import.meta.dirname, "../config/config.json");
+  const db = env.ONLYSPACE_DB ?? resolve(HERE, "../data/app.db");
+  const files = env.ONLYSPACE_FILES ?? resolve(HERE, "../data/files");
+  const config = env.ONLYSPACE_CONFIG ?? resolve(HERE, "../config/config.json");
   const dataDir = resolve(dirname(db));
   return { db, files, config, dataDir };
 }
