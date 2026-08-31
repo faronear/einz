@@ -230,6 +230,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         store.save(storePath);
         creator = true;
         stdout.writeln('✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}');
+        _guidanceNotes.add('✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}');
       } catch (e) {
         // 区分自举失败：空间已有设备（需要邀请码）vs 网络/服务器错误（首个设备免邀请码）
         if (e is ApiException && e.code == 'INVALID_REQUEST') {
@@ -253,6 +254,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
               renameToStandard(r.personId, r.deviceId); // 自动模式：设备文件改名为 personB_dev2.json
               store.save(storePath);
               stdout.writeln('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
+              _guidanceNotes.add('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
             } catch (e2) {
               stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）');
               stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
@@ -296,8 +298,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
           token: store.sessionToken!,
         );
         stdout.writeln('✅ 口令托管包已上传: space_id=${store.spaceId}');
+        _guidanceNotes.add('✅ 口令托管包已上传: space_id=${store.spaceId}');
         // 不主动生成邀请码（避免引导繁琐）：进对话后用 /invite 随时创建
         stdout.writeln('💡 输入 /invite 创建邀请码以添加更多设备');
+        _guidanceNotes.add('💡 输入 /invite 创建邀请码以添加更多设备');
         stdout.write('按回车进入对话…');
         stdout.flush().ignore(); // 无换行写入需显式 flush（终端行缓冲，否则滞留缓冲不显示）
         stdin.readLineSync(); // 等用户回车再进 TUI（提示留在屏上，不被 TUI 首屏覆盖）
@@ -484,6 +488,12 @@ Future<void> main(List<String> args) async {
 
   final session = ChatSession(store, storePath, server);
   await session.loadHistory();
+  // 引导阶段提示（自举/托管/邀请码指引）作为 system 消息进入对话流——
+  // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
+  for (final note in _guidanceNotes) {
+    session.messages.add(_systemMessage(session, note));
+  }
+  _guidanceNotes.clear();
   _state = _TuiState(session);
 
   // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
@@ -706,16 +716,25 @@ void _render() {
 }
 
 /// 格式化消息为多行（第一行带归属前缀，续行裸正文，自动按列宽折行）。
-/// 自己的消息：绿色前缀 + 普通正文；对方消息：正文加粉红背景（一眼区分收发双方）。
+/// 自己的消息：绿色前缀 + 普通正文；对方消息：正文加粉红背景（一眼区分收发双方）；
+/// 系统提示（isSystem）：灰色前缀 + 普通正文（sender 显示为 system）。
 List<String> _formatMessage(ChatMessage m, int cols) {
-  final who = m.isMine ? '我' : '对方';
-  final color = m.isMine ? _green : _yellow;
+  final String who;
+  final String color;
+  if (m.isSystem) {
+    who = 'system';
+    color = _gray;
+  } else {
+    who = m.isMine ? '我' : '对方';
+    color = m.isMine ? _green : _yellow;
+  }
   final seq = m.seq == null ? '' : ' seq=${m.seq}';
   final prefix = '$color[$who$seq v${m.keyVersion}]$_reset ';
   final body = m.plain.replaceAll('\n', ' ');
   final maxW = cols - _displayWidth(prefix);
   final wrapped = _wrapByWidth(body, maxW);
-  if (m.isMine) {
+  if (m.isMine || m.isSystem) {
+    // 自己消息与系统提示：普通正文（system 不用粉红背景）
     return [
       '$prefix${wrapped.first}',
       ...wrapped.skip(1).map((line) => '$line'),
@@ -978,21 +997,8 @@ Future<void> _execInvite(List<String> parts) async {
       displayName: name,
       hours: 24,
     );
-    // 邀请码作为对话流中的一条普通消息显示（随消息区滚动，不占顶部状态栏）
-    s.session.messages.add(ChatMessage(
-      env: MessageEnvelope(
-        v: 1,
-        type: 'text',
-        keyVersion: s.session.store.keyVersion,
-        messageId: 'invite-${DateTime.now().millisecondsSinceEpoch}',
-        senderDeviceId: s.session.store.deviceId ?? '-',
-        nonce: '',
-        ciphertext: '',
-      ),
-      plain: '邀请码（24 小时内一次性有效）: ${r.inviteCode}',
-      isMine: true,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-    ));
+    // 邀请码作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
+    s.session.messages.add(_systemMessage(s.session, '邀请码（24 小时内一次性有效）: ${r.inviteCode}'));
     s.status = ''; // 反馈在消息区（邀请码本身），状态栏保持干净
   } catch (e) {
     s.status = '邀请码生成失败: $e';
@@ -1006,4 +1012,26 @@ void _printFarewell(ChatSession session) {
     stdout.writeln();
     stdout.writeln('${_gray}已退出 OnlySpace TUI（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
   } catch (_) {}
+}
+
+/// 引导阶段产生的系统提示（进 TUI 后作为 system 消息显示在对话流）。
+final List<String> _guidanceNotes = [];
+
+/// 构造一条系统提示消息（sender 显示 system，随对话流滚动，不被状态条推到窗口上方）。
+ChatMessage _systemMessage(ChatSession session, String text) {
+  return ChatMessage(
+    env: MessageEnvelope(
+      v: 1,
+      type: 'text',
+      keyVersion: session.store.keyVersion,
+      messageId: 'sys-${DateTime.now().millisecondsSinceEpoch}',
+      senderDeviceId: session.store.deviceId ?? '-',
+      nonce: '',
+      ciphertext: '',
+    ),
+    plain: text,
+    isMine: false,
+    isSystem: true,
+    createdAt: DateTime.now().millisecondsSinceEpoch,
+  );
 }

@@ -18,12 +18,16 @@ class ChatMessage {
     required this.isMine,
     required this.createdAt,
     this.serverSequence,
+    this.isSystem = false,
   });
 
   final MessageEnvelope env;
   final String plain;
   final bool isMine;
   final int createdAt;
+
+  /// 系统提示消息（如邀请码、引导提示）：sender 显示为 system（不参与"我/对方"）。
+  final bool isSystem;
 
   /// 显式 server 序号：本地刚发送的消息与 WS 实时消息在 env 上可能没有
   /// serverSequence（序号在应答/事件帧里），需由调用方显式传入，否则排序会错乱。
