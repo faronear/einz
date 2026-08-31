@@ -59,22 +59,35 @@ class WsDeviceRevokedEvent extends WsEvent {
 /// - [server] 传 http(s) 基址（https://only.tic.cc），内部转换为 ws(s)://
 /// - token 含 base64 的 +/= 字符，必须 URL 编码（PROTOCOL.md §8.1）
 /// - [stop] 之前持续重连；状态经 [onStatus] 回调（App 据此切换轮询策略）
+/// - [onUnauthorized]：服务器以 4401 关闭（session 过期）时调用——CLI/App 在此
+///   重新认证并 [updateToken]，随后立即重连；未提供则按普通断线退避重连
 class WsClient {
   WsClient({
     required this.server,
-    required this.token,
+    required String token,
     this.onEvent,
     this.onStatus,
-  });
+    this.onUnauthorized,
+  }) : _token = token;
 
   final String server;
-  final String token;
+  String _token;
 
   /// 事件回调（message.new 等）。
   final void Function(WsEvent event)? onEvent;
 
   /// 连接状态回调。
   final void Function(WsStatus status)? onStatus;
+
+  /// 401（session 过期）续期回调：返回后立即用新 token 重连。
+  final Future<void> Function()? onUnauthorized;
+
+  String get token => _token;
+
+  /// 更新连接 token（重新认证后调用，供下一次重连使用）。
+  void updateToken(String newToken) {
+    _token = newToken;
+  }
 
   WebSocket? _ws;
   Timer? _reconnectTimer;
@@ -108,7 +121,7 @@ class WsClient {
     if (_stopped) return;
     _setStatus(_attempt == 0 ? WsStatus.connecting : WsStatus.reconnecting);
     final wsUrl = server.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
-    final uri = Uri.parse('$wsUrl/ws?pv=1&token=${Uri.encodeQueryComponent(token)}');
+    final uri = Uri.parse('$wsUrl/ws?pv=1&token=${Uri.encodeQueryComponent(_token)}');
     WebSocket.connect(uri.toString()).then((ws) {
       if (_stopped) {
         ws.close();
@@ -119,12 +132,30 @@ class WsClient {
       _setStatus(WsStatus.connected);
       ws.listen(
         _handleFrame,
-        onDone: _scheduleReconnect,
+        onDone: () => _onClosed(ws),
         onError: (_) => _scheduleReconnect(),
       );
     }).catchError((_) {
       _scheduleReconnect();
     });
+  }
+
+  /// 连接关闭：4401（session 过期）→ 续期后立即重连；其他 → 退避重连。
+  Future<void> _onClosed(WebSocket ws) async {
+    if (_stopped) return;
+    if (ws.closeCode == 4401 && onUnauthorized != null) {
+      try {
+        await onUnauthorized!(); // 重新认证并 updateToken
+        if (_stopped) return;
+        _attempt = 0;
+        _setStatus(WsStatus.reconnecting);
+        _connect(); // 用新 token 立即重连
+        return;
+      } catch (_) {
+        // 续期失败：走普通退避重连
+      }
+    }
+    _scheduleReconnect();
   }
 
   void _handleFrame(dynamic data) {

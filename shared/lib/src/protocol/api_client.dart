@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -14,10 +15,33 @@ class ApiClient {
 
   final String baseUrl;
 
+  /// 瞬时网络错误自动重试次数（翻墙/网络抖动下的间歇性握手失败不致命）。
+  static const retryCount = 3;
+
   HttpClient get _client {
     final c = HttpClient();
     c.connectionTimeout = const Duration(seconds: 10);
     return c;
+  }
+
+  /// 对瞬时网络错误（握手/连接/超时）自动重试；业务错误（4xx/5xx）不重试。
+  Future<T> _withRetry<T>(Future<T> Function() fn) async {
+    Object? last;
+    for (var attempt = 0; attempt < retryCount; attempt++) {
+      try {
+        return await fn();
+      } on SocketException catch (e) {
+        last = e;
+      } on HandshakeException catch (e) {
+        last = e;
+      } on TimeoutException catch (e) {
+        last = e;
+      }
+      if (attempt < retryCount - 1) {
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+    }
+    throw last!;
   }
 
   Future<ChallengeResult> challenge(String deviceId) async {
@@ -162,60 +186,66 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body,
-      {String? token, bool withToken = true}) async {
-    final client = _client;
-    try {
-      final req = await client.postUrl(Uri.parse('$baseUrl$path'));
-      req.headers.contentType = ContentType.json;
-      if (withToken && token != null) {
-        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      {String? token, bool withToken = true}) {
+    return _withRetry(() async {
+      final client = _client;
+      try {
+        final req = await client.postUrl(Uri.parse('$baseUrl$path'));
+        req.headers.contentType = ContentType.json;
+        if (withToken && token != null) {
+          req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        }
+        req.write(jsonEncode(body));
+        final res = await req.close();
+        final text = await res.transform(utf8.decoder).join();
+        if (res.statusCode >= 400) {
+          throw _errorFrom(res.statusCode, text);
+        }
+        return jsonDecode(text) as Map<String, dynamic>;
+      } finally {
+        client.close(force: true);
       }
-      req.write(jsonEncode(body));
-      final res = await req.close();
-      final text = await res.transform(utf8.decoder).join();
-      if (res.statusCode >= 400) {
-        throw _errorFrom(res.statusCode, text);
-      }
-      return jsonDecode(text) as Map<String, dynamic>;
-    } finally {
-      client.close(force: true);
-    }
+    });
   }
 
-  Future<Map<String, dynamic>> _get(String path, {String? token}) async {
-    final client = _client;
-    try {
-      final req = await client.getUrl(Uri.parse('$baseUrl$path'));
-      if (token != null) {
-        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+  Future<Map<String, dynamic>> _get(String path, {String? token}) {
+    return _withRetry(() async {
+      final client = _client;
+      try {
+        final req = await client.getUrl(Uri.parse('$baseUrl$path'));
+        if (token != null) {
+          req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        }
+        final res = await req.close();
+        final text = await res.transform(utf8.decoder).join();
+        if (res.statusCode >= 400) {
+          throw _errorFrom(res.statusCode, text);
+        }
+        return jsonDecode(text) as Map<String, dynamic>;
+      } finally {
+        client.close(force: true);
       }
-      final res = await req.close();
-      final text = await res.transform(utf8.decoder).join();
-      if (res.statusCode >= 400) {
-        throw _errorFrom(res.statusCode, text);
-      }
-      return jsonDecode(text) as Map<String, dynamic>;
-    } finally {
-      client.close(force: true);
-    }
+    });
   }
 
-  Future<Map<String, dynamic>> _delete(String path, {String? token}) async {
-    final client = _client;
-    try {
-      final req = await client.deleteUrl(Uri.parse('$baseUrl$path'));
-      if (token != null) {
-        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+  Future<Map<String, dynamic>> _delete(String path, {String? token}) {
+    return _withRetry(() async {
+      final client = _client;
+      try {
+        final req = await client.deleteUrl(Uri.parse('$baseUrl$path'));
+        if (token != null) {
+          req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        }
+        final res = await req.close();
+        final text = await res.transform(utf8.decoder).join();
+        if (res.statusCode >= 400) {
+          throw _errorFrom(res.statusCode, text);
+        }
+        return jsonDecode(text) as Map<String, dynamic>;
+      } finally {
+        client.close(force: true);
       }
-      final res = await req.close();
-      final text = await res.transform(utf8.decoder).join();
-      if (res.statusCode >= 400) {
-        throw _errorFrom(res.statusCode, text);
-      }
-      return jsonDecode(text) as Map<String, dynamic>;
-    } finally {
-      client.close(force: true);
-    }
+    });
   }
 
   ApiException _errorFrom(int status, String text) {

@@ -102,6 +102,18 @@ class ChatSession {
     if (serverOverride != null) server = serverOverride;
   }
 
+  /// 401（session 过期）时自动重新认证（challenge-response 无需用户干预）并重试一次。
+  /// 保证 24h 会话过期后不退出 TUI 也能无感续期；其他错误原样抛出。
+  Future<T> _withAutoAuth<T>(Future<T> Function(String token) fn) async {
+    try {
+      return await fn(store.sessionToken!);
+    } on ApiException catch (e) {
+      if (e.httpStatus != 401) rethrow;
+      await auth(); // 自动续期
+      return await fn(store.sessionToken!);
+    }
+  }
+
   /// 凭口令接入（escrow download，KEY_ESCROW.md §4）：先认证拿到 token，
   /// 再从 Server 拉取口令托管包解出 Space Key 写回 store。
   /// 新设备接入无需对方公钥（与 App「加入」流程一致）；口令错误抛 [FormatException]。
@@ -168,7 +180,7 @@ class ChatSession {
     final sent = <({MessageEnvelope env, int serverSequence, int createdAt})>[];
     for (final env in store.pendingEnvelopes) {
       try {
-        final result = await api.postMessage(env, store.sessionToken!);
+        final result = await _withAutoAuth((token) => api.postMessage(env, token));
         store.dequeuePending(env.messageId);
         store.upsertHistory(env, serverSequence: result.serverSequence, createdAt: result.createdAt);
         sent.add((env: env, serverSequence: result.serverSequence, createdAt: result.createdAt));
@@ -191,7 +203,7 @@ class ChatSession {
     var cursor = store.lastServerSequence;
     final added = <MessageEnvelope>[];
     while (true) {
-      final result = await api.sync(store.sessionToken!, after: cursor);
+      final result = await _withAutoAuth((token) => api.sync(token, after: cursor));
       for (final env in result.messages) {
         final seq = env.serverSequence ?? cursor;
         store.upsertHistory(env, serverSequence: seq, createdAt: seq);
@@ -237,6 +249,11 @@ class ChatSession {
     wsClient = WsClient(
       server: server,
       token: store.sessionToken!,
+      onUnauthorized: () async {
+        // session 过期（WS 4401）：自动重新认证并更新 token，随后 WsClient 立即重连
+        await auth();
+        wsClient?.updateToken(store.sessionToken!);
+      },
       onEvent: (event) async {
         if (event is WsMessageNewEvent) {
           final env = event.message;
@@ -316,19 +333,19 @@ class ChatSession {
       keyVersion: store.keyVersion,
     );
     final api = ApiClient(server);
-    final msg = await api.postMessage(env, store.sessionToken!);
+    final msg = await _withAutoAuth((token) => api.postMessage(env, token));
 
     // 3) 再上传附件 blob（Server 校验 size + sha256）
-    final att = await api.postAttachment(
-      messageId: messageId,
-      attachmentId: attachmentId,
-      keyVersion: store.keyVersion,
-      size: enc.size,
-      sha256: enc.sha256,
-      nonce: base64Encode(enc.nonce),
-      blob: enc.cipher,
-      token: store.sessionToken!,
-    );
+    final att = await _withAutoAuth((token) => api.postAttachment(
+          messageId: messageId,
+          attachmentId: attachmentId,
+          keyVersion: store.keyVersion,
+          size: enc.size,
+          sha256: enc.sha256,
+          nonce: base64Encode(enc.nonce),
+          blob: enc.cipher,
+          token: token,
+        ));
 
     // 4) 落盘：附件元数据 + 消息历史 + 推进锚点
     store.upsertAttachment(
