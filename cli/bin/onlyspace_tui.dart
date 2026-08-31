@@ -238,8 +238,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     session.messages.add(_systemMessage(session, '💾 设备文件: $newPath'));
   }
 
-  // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）
-  if (store.personName == null || store.personName!.isEmpty) {
+  // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
+  // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
+  if ((store.personName == null || store.personName!.isEmpty) && _probePersonNames.isEmpty) {
     final name = await _prompt(session, '你的名称（如 lukas，留空回车则不设置）');
     try {
       if (name.isNotEmpty) {
@@ -289,6 +290,27 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       if (e is ApiException && e.code == 'INVALID_REQUEST') {
         session.messages.add(_systemMessage(session, '加入私密空间需要邀请码'));
         _scheduleRender();
+        // 身份选择：询问用户是第一个人 personA 还是第二个人 personB（显示名称；
+        // personB 名称为空则要求输入）
+        String? chosenPerson;
+        while (true) {
+          if (!_state!.running) break;
+          final aName = _probePersonNames['personA'] ?? '未设置';
+          final bName = _probePersonNames['personB'] ?? '';
+          final bShow = bName.isEmpty ? '未设置' : bName;
+          final choice = await _prompt(session, '你是第一个人（personA：$aName）还是第二个人（personB：$bShow）？输入 1 或 2');
+          if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
+          if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
+          session.messages.add(_systemMessage(session, '请输入 1（第一个人 personA）或 2（第二个人 personB）'));
+          _scheduleRender();
+        }
+        if (chosenPerson == 'personB' && (_probePersonNames['personB'] ?? '').isEmpty) {
+          // personB 还没有名称——要求输入显示名
+          final name = await _prompt(session, 'personB 还没有名称，请输入显示名（如 steffi）：');
+          if (name.isNotEmpty) store.personName = name;
+        } else if (chosenPerson == 'personA') {
+          store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
+        }
         // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
         while (true) {
           if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
@@ -305,6 +327,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
               inviteCode: inviteCode,
               displayName: store.personName,
               deviceName: store.deviceName,
+              personId: chosenPerson, // 用户引导选择的身份（null 时服务端用邀请码绑定）
             ));
             store.deviceId = r.deviceId;
             store.personId = r.personId;

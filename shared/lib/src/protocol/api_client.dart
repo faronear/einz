@@ -66,6 +66,7 @@ class ApiClient {
     String? inviteCode,
     String? displayName,
     String? deviceName,
+    String? personId,
   }) async {
     final res = await _post(
       Api.devicesEnroll,
@@ -75,6 +76,7 @@ class ApiClient {
         if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
         if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
         if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
+        if (personId != null && personId.isNotEmpty) 'person_id': personId,
       },
       withToken: false,
     );

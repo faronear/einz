@@ -71,6 +71,7 @@ export function enrollDevice(
     invite_code?: string;
     display_name?: string;
     device_name?: string;
+    person_id?: string;
   };
   const deviceId = (b.device_id ?? "").trim();
   const publicKey = (b.public_key ?? "").trim();
@@ -123,14 +124,29 @@ export function enrollDevice(
     throw new ApiError("INVALID_INVITE", "邀请码已过期，请联系创建者重新生成", 400);
   }
 
-  // 2) 两 person 上限：空间内 distinct person ≤2；邀请码的 person 若是全新
-  //    （空间已满 2 个 person）则拒绝——同一个人多台设备不受限（person 已有 active 设备）。
+  // 2) person 决定：客户端可指定 person_id（后续设备引导时询问用户是
+  //    personA/personB），未指定则用邀请码绑定的 person
+  const personId = (b.person_id ?? "").trim() || invite.person_id;
+  if (personId !== "personA" && personId !== "personB") {
+    throw new ApiError("INVALID_REQUEST", "person_id 必须是 personA 或 personB", 400);
+  }
+  // personA 必须已入网（第一个创建人已自举）——不能凭空登记为第一个人
+  if (personId === "personA") {
+    const personAActive = db
+      .prepare(`SELECT COUNT(*) AS c FROM devices WHERE person_id = 'personA' AND status = 'active'`)
+      .get() as { c: number };
+    if (personAActive.c === 0) {
+      throw new ApiError("FORBIDDEN", "personA（第一个创建人）尚未入网，无法登记为其设备", 403);
+    }
+  }
+  // 两 person 上限：空间内 distinct person ≤2；指定的 person 若是全新
+  // （空间已满 2 个 person）则拒绝——同一个人多台设备不受限（person 已有 active 设备）。
   const personCount = db
     .prepare(`SELECT COUNT(DISTINCT person_id) AS c FROM devices WHERE status = 'active'`)
     .get() as { c: number };
   const thisPersonActive = db
     .prepare(`SELECT COUNT(*) AS c FROM devices WHERE person_id = ? AND status = 'active'`)
-    .get(invite.person_id) as { c: number };
+    .get(personId) as { c: number };
   if (personCount.c >= 2 && thisPersonActive.c === 0) {
     throw new ApiError("FORBIDDEN", "空间最多两个 person（当前已满），新人员请联系创建者调整白名单", 403);
   }
@@ -146,14 +162,19 @@ export function enrollDevice(
   }
   if (!existing) {
     db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
-      .run(assignedId, invite.person_id, publicKey, deviceName, now);
+      .run(assignedId, personId, publicKey, deviceName, now);
+  }
+  // 登记时设置/更新 person_name（后续设备引导时用户选择的身份名称）
+  const displayName = (b.display_name ?? "").trim();
+  if (displayName) {
+    setMeta(`person_name:${personId}`, displayName);
   }
 
   // 4) 标记邀请码已用（一次性）
   db.prepare(`UPDATE invites SET status = 'used', used_by = ?, used_at = ? WHERE invite_code = ?`)
     .run(assignedId, now, inviteCode);
 
-  return { ok: true, device_id: assignedId, person_id: invite.person_id, space_id: cfg.space_id };
+  return { ok: true, device_id: assignedId, person_id: personId, space_id: cfg.space_id };
 }
 
 /**
