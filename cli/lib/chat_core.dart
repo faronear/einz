@@ -446,9 +446,13 @@ class ChatSession {
     messages.sort((a, b) {
       final an = a.seq;
       final bn = b.seq;
-      if (an == null && bn == null) return a.createdAt.compareTo(b.createdAt);
-      if (an == null) return 1;
-      if (bn == null) return -1;
+      // 统一时间序：对话消息按 seq（服务端分配递增）；系统消息（无 seq）按
+      // createdAt，且与对话消息混合时也按 createdAt 对齐——系统消息穿插在
+      // 对话历史里、不排到末尾（否则渲染（最新在底部）会把系统消息画到最
+      // 下方、对话消息反而跑到上方）
+      if (an == null || bn == null) {
+        return a.createdAt.compareTo(b.createdAt);
+      }
       return an.compareTo(bn);
     });
   }
