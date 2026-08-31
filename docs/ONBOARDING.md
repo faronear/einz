@@ -8,13 +8,13 @@
 
 ## 术语速览
 
-| 概念 | 说明 |
-|---|---|
-| **space_id** | 空间唯一标识（UUID），`config` 命令生成，写入白名单与 store |
-| **Space Key** | 32B 随机空间密钥（端到端加密用），创建者生成，B 凭口令从托管包获取 |
-| **口令（passphrase）** | 创建者 escrow upload 时设定，B 凭它解出 Space Key。**别和邀请码混淆** |
-| **邀请码（invite_code）** | 一次性 24h 有效，白名单**外**的新设备登记用（白名单内的设备用不到） |
-| **白名单** | VPS `deployment/config/config.json` 的 devices 数组；数据库 devices 表为判定源（重启时 UPSERT 同步） |
+| 概念                      | 说明                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| **space_id**              | 空间唯一标识（UUID），`config` 命令生成，写入白名单与 store                                         |
+| **Space Key**             | 32B 随机空间密钥（端到端加密用），创建者生成，B 凭口令从托管包获取                                  |
+| **口令（passphrase）**    | 创建者 escrow upload 时设定，B 凭它解出 Space Key。**别和邀请码混淆**                               |
+| **邀请码（invite_code）** | 一次性 24h 有效，白名单**外**的新设备登记用（白名单内的设备用不到）                                 |
+| **白名单**                | VPS `deployment/config/config.json` 的 devices 数组；数据库 devices 表为判定源（重启时 UPSERT 同步） |
 
 ---
 
@@ -147,28 +147,28 @@ dart run bin/onlyspace_tui.dart --store "$env:USERPROFILE\.onlyspace\b.json"
 
 ## 阶段 8：AB 互通验证
 
-| 验证项 | 操作 | 期望 |
-|---|---|---|
-| A/B 在线 | 各自 TUI 状态栏 | `WS:● 在线` |
-| A→B 消息 | A 输入消息回车 | B 消息区实时出现（WS 推送） |
-| B→A 消息 | B 输入消息回车 | A 消息区实时出现 |
-| 对方消息样式 | 看消息区 | 对方粉色背景、自己绿色前缀 |
-| 退出恢复 | `/exit` | 正常回命令行（无需 Ctrl-C） |
-| 服务器重设 | `/server https://only.tic.cc` | 重连并认证 |
-| 服务器地址 | 启动引导 | 默认 only.tic.cc，能连零打扰；连不上才引导输入；`/server` 显性重设 |
+| 验证项       | 操作                          | 期望                                                               |
+| ------------ | ----------------------------- | ------------------------------------------------------------------ |
+| A/B 在线     | 各自 TUI 状态栏               | `WS:● 在线`                                                        |
+| A→B 消息     | A 输入消息回车                | B 消息区实时出现（WS 推送）                                        |
+| B→A 消息     | B 输入消息回车                | A 消息区实时出现                                                   |
+| 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀                                         |
+| 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                        |
+| 服务器重设   | `/server https://only.tic.cc` | 重连并认证                                                         |
+| 服务器地址   | 启动引导                      | 默认 only.tic.cc，能连零打扰；连不上才引导输入；`/server` 显性重设 |
 
 ---
 
 ## 常见坑速查
 
-| 症状 | 原因 | 处理 |
-|---|---|---|
-| `sealOpen` libsodium 失败 | 白名单公钥与 store 私钥不匹配（db 残留旧公钥） | 确认部署了 `/tmp/prod-config.json` 并 `docker compose restart server`（UPSERT 已修复） |
-| 口令接入 `FormatException: 备份解密失败` | **口令输成了邀请码** | 口令是 `faronear`（A 上传托管包时设的） |
-| invite 报 `path must be of type string` | VPS 宿主机 Node 旧 / env 未传 | 显式传宿主机路径 env；别用 sudo；旧 Node 兼容已修复 |
-| 启动 255 崩溃 | 旧代码渲染/终端问题 | 已全部修复（git pull 后重试） |
-| 二次启动还问服务器 | 旧代码 | 新版有探测+持久化，能连不再询问 |
-| `/health` 正常但 auth 报握手失败 | 本机翻墙/网络抖动 | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试 |
+| 症状                                    | 原因                                           | 处理                                                                                  |
+| --------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `sealOpen` libsodium 失败               | 白名单公钥与 store 私钥不匹配（db 残留旧公钥） | 确认部署了`/tmp/prod-config.json` 并 `docker compose restart server`（UPSERT 已修复） |
+| 口令接入`FormatException: 备份解密失败` | **口令输成了邀请码**                           | 口令是`faronear`（A 上传托管包时设的）                                                |
+| invite 报`path must be of type string`  | VPS 宿主机 Node 旧 / env 未传                  | 显式传宿主机路径 env；别用 sudo；旧 Node 兼容已修复                                   |
+| 启动 255 崩溃                           | 旧代码渲染/终端问题                            | 已全部修复（git pull 后重试）                                                         |
+| 二次启动还问服务器                      | 旧代码                                         | 新版有探测+持久化，能连不再询问                                                       |
+| `/health` 正常但 auth 报握手失败        | 本机翻墙/网络抖动                              | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试                                     |
 
 ---
 

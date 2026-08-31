@@ -23,13 +23,13 @@
 
 **仓库角色速览：**
 
-| 目录 | 角色 | 运行方式 |
-| --- | --- | --- |
-| `server/` | Node.js + TypeScript 哑转发器 | `npm run build && node dist/app.js`，或 Docker |
-| `shared/` | 纯 Dart 核心（crypto/protocol/sync），CLI 与 App 共用 | 库，不独立运行 |
-| `cli/` | Dart CLI 测试端（当前最完整的客户端实作） | `dart run bin/onlyspace.dart <命令>` |
-| `app/` | Flutter 手机客户端（V1 骨架 + 本地库） | `flutter run`（真机验证待环境） |
-| `deployment/` | Docker Compose + Caddy（生产单机部署） | `docker compose up -d` |
+| 目录          | 角色                                                  | 运行方式                                       |
+| ------------- | ----------------------------------------------------- | ---------------------------------------------- |
+| `server/`     | Node.js + TypeScript 哑转发器                         | `npm run build && node dist/app.js`，或 Docker |
+| `shared/`     | 纯 Dart 核心（crypto/protocol/sync），CLI 与 App 共用 | 库，不独立运行                                 |
+| `cli/`        | Dart CLI 测试端（当前最完整的客户端实作）             | `dart run bin/onlyspace.dart <命令>`           |
+| `app/`        | Flutter 手机客户端（V1 骨架 + 本地库）                | `flutter run`（真机验证待环境）                |
+| `deployment/` | Docker Compose + Caddy（生产单机部署）                | `docker compose up -d`                         |
 
 ---
 
@@ -85,11 +85,11 @@ dart run bin/onlyspace.dart import \
 
 产物（**config.json 禁止提交 Git**，私钥/恢复码离线保管）：
 
-| 产物 | 内容 | 去向 |
-| --- | --- | --- |
-| `$W/config.json` | space_id + A/B 白名单 | 服务器 `server/config/config.json` |
-| `$W/sealed-b.txt` | 密封 Space Key（仅 B 可解） | 导入 B 后删除 |
-| `$W/a.json` / `$W/b.json` | 设备 store（身份密钥 + Space Key） | 本机保存 |
+| 产物                      | 内容                               | 去向                              |
+| ------------------------- | ---------------------------------- | --------------------------------- |
+| `$W/config.json`          | space_id + A/B 白名单              | 服务器`server/config/config.json` |
+| `$W/sealed-b.txt`         | 密封 Space Key（仅 B 可解）        | 导入 B 后删除                     |
+| `$W/a.json` / `$W/b.json` | 设备 store（身份密钥 + Space Key） | 本机保存                          |
 
 ### 2.3 启动服务器并双端收发
 
@@ -125,22 +125,22 @@ dart run bin/onlyspace.dart fetch --store "$W/b.json" --server http://127.0.0.1:
 
 **CLI 命令总览：**
 
-| 命令 | 用途 |
-| --- | --- |
-| `init --store <s> --device-id <id>` | 生成本机身份密钥对 |
-| `pubkey --store <s>` | 导出公钥（base64） |
-| `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-sealed-peer <f>` | 生成 Space Key + 白名单 + 密封副本 |
-| `import --store <s> --sealed-file <f> --space-id <id> [--key-version N]` | 导入密封副本（轮换导入用 --key-version） |
-| `auth --store <s> --server <url>` | challenge-response 认证，拿 session_token |
-| `send --store <s> --server <url> --message <文本>` | 加密发送（先入队，失败自动补发；`--server` 可省略=纯离线入队） |
-| `sync --store <s> --server <url> [--after N]` | 增量同步（翻页拉全量 → 落库 → 推进锚点 → 补发队列） |
-| `listen --store <s> --server <url>` | WS 实时接收 message.new（断线 2s 重连，重连前先 /sync 补齐） |
-| `attach --store <s> --server <url> --file <p> [--type image\|video\|voice] [--caption <t>]` | 附件加密上传 |
-| `fetch --store <s> --server <url> --attachment-id <id> [--out <p>]` | 附件下载解密 |
-| `history --store <s>` | 解密本地历史（按 key_version 选密钥） |
-| `rotate --store <s> --peer-pubkey <b64> --out-sealed-peer <f>` | 轮换 Space Key（key_version+1，旧密钥归档） |
-| `backup --store <s> --out <f>` | 本地加密备份（生成 12 词恢复码） |
-| `restore --in <f> --recovery-code <12词> [--store <s>]` | 恢复码解密还原 |
+| 命令                                                                                            | 用途                                                           |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `init --store <s> --device-id <id>`                                                             | 生成本机身份密钥对                                             |
+| `pubkey --store <s>`                                                                            | 导出公钥（base64）                                             |
+| `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-sealed-peer <f>` | 生成 Space Key + 白名单 + 密封副本                             |
+| `import --store <s> --sealed-file <f> --space-id <id> [--key-version N]`                        | 导入密封副本（轮换导入用 --key-version）                       |
+| `auth --store <s> --server <url>`                                                               | challenge-response 认证，拿 session_token                      |
+| `send --store <s> --server <url> --message <文本>`                                              | 加密发送（先入队，失败自动补发；`--server` 可省略=纯离线入队） |
+| `sync --store <s> --server <url> [--after N]`                                                   | 增量同步（翻页拉全量 → 落库 → 推进锚点 → 补发队列）            |
+| `listen --store <s> --server <url>`                                                             | WS 实时接收 message.new（断线 2s 重连，重连前先 /sync 补齐）   |
+| `attach --store <s> --server <url> --file <p> [--type image\|video\|voice] [--caption <t>]`     | 附件加密上传                                                   |
+| `fetch --store <s> --server <url> --attachment-id <id> [--out <p>]`                             | 附件下载解密                                                   |
+| `history --store <s>`                                                                           | 解密本地历史（按 key_version 选密钥）                          |
+| `rotate --store <s> --peer-pubkey <b64> --out-sealed-peer <f>`                                  | 轮换 Space Key（key_version+1，旧密钥归档）                    |
+| `backup --store <s> --out <f>`                                                                  | 本地加密备份（生成 12 词恢复码）                               |
+| `restore --in <f> --recovery-code <12词> [--store <s>]`                                         | 恢复码解密还原                                                 |
 
 > 其余部分（生产部署 / 备份恢复 / 撤销轮换 / 安全边界 / 故障排查）见下节。
 
@@ -197,13 +197,13 @@ CLI 设备改用 `--server https://<你的域名>` 即可远程使用（WS 地�
 
 ### 3.4 端口与数据目录
 
-| 项 | 位置（容器内） | 说明 |
-| --- | --- | --- |
-| `app.db` | `/data/app.db` | SQLite（消息密文、设备表、会话、push token） |
-| 附件 blob | `/data/files/` | 密文文件，按 attachment_id 前 2 位分片 |
-| 备份产物 | `/data/backups/` | `npm run backup` 的加密归档 |
-| 白名单 | `/config/config.json` | 只读挂载，启动时加载 |
-| 服务端口 | `3000`（expose，仅内网） | 由 Caddy 反代对外 |
+| 项        | 位置（容器内）           | 说明                                         |
+| --------- | ------------------------ | -------------------------------------------- |
+| `app.db`  | `/data/app.db`           | SQLite（消息密文、设备表、会话、push token） |
+| 附件 blob | `/data/files/`           | 密文文件，按 attachment_id 前 2 位分片       |
+| 备份产物  | `/data/backups/`         | `npm run backup` 的加密归档                  |
+| 白名单    | `/config/config.json`    | 只读挂载，启动时加载                         |
+| 服务端口  | `3000`（expose，仅内网） | 由 Caddy 反代对外                            |
 
 ---
 
@@ -279,26 +279,26 @@ dart run bin/onlyspace.dart import \
 
 ### 5.4 数据目录备份策略（汇总）
 
-| 数据 | 手段 | 频率建议 |
-| --- | --- | --- |
+| 数据                           | 手段                                    | 频率建议        |
+| ------------------------------ | --------------------------------------- | --------------- |
 | Server app.db + files + config | `npm run backup`（加密归档到 backups/） | 每日（可 cron） |
-| 客户端密钥 + 历史 | `backup` 命令（恢复码加密） | 每次重大变更后 |
-| 恢复码 / 备份密钥 | 离线多份 | 永久 |
+| 客户端密钥 + 历史              | `backup` 命令（恢复码加密）             | 每次重大变更后  |
+| 恢复码 / 备份密钥              | 离线多份                                | 永久            |
 
 ---
 
 ## 6. 安全边界清单（V1 发布前已审查加固）
 
-| 边界 | 机制 | 说明 |
-| --- | --- | --- |
-| 白名单 | `config.json` + `isActiveDevice`（叠加数据库 revoked 状态） | 未登记设备 403；撤销后立即拒绝认证/同步/发送 |
-| 服务端只见密文 | E2EE 全链路（消息/附件均为密文 + 元数据） | `messages` 表只有 ciphertext（冒烟测试验证） |
-| 路径遍历 | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧） | 失陷白名单设备也无法越出 `files/`（V1 审查 P1 修复） |
-| WS 撤销实时性 | 撤销即关闭被撤销设备连接（close 4403） | 无法继续收新消息广播（P2 修复） |
-| 备份加密 | Server 备份 AES-256-GCM（`ONLYSPACE_DB_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露 |
-| 供应链 | Gradle 镜像 `distributionSha256Sum` 锁定官方校验和 | 构建工具链不可被镜像篡改（P3 修复） |
-| 认证 | challenge-response（一次性、5 分钟过期）；session_token 服务端签发 | 防重放 |
-| 前向保密 | Space Key 简单派生（已接受的代价，E2EE.md §11.1） | 轮换 + 安全存储缓解 |
+| 边界           | 机制                                                                                 | 说明                                                |
+| -------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| 白名单         | `config.json` + `isActiveDevice`（叠加数据库 revoked 状态）                          | 未登记设备 403；撤销后立即拒绝认证/同步/发送        |
+| 服务端只见密文 | E2EE 全链路（消息/附件均为密文 + 元数据）                                            | `messages` 表只有 ciphertext（冒烟测试验证）        |
+| 路径遍历       | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧）                    | 失陷白名单设备也无法越出`files/`（V1 审查 P1 修复） |
+| WS 撤销实时性  | 撤销即关闭被撤销设备连接（close 4403）                                               | 无法继续收新消息广播（P2 修复）                     |
+| 备份加密       | Server 备份 AES-256-GCM（`ONLYSPACE_DB_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露                                  |
+| 供应链         | Gradle 镜像`distributionSha256Sum` 锁定官方校验和                                    | 构建工具链不可被镜像篡改（P3 修复）                 |
+| 认证           | challenge-response（一次性、5 分钟过期）；session_token 服务端签发                   | 防重放                                              |
+| 前向保密       | Space Key 简单派生（已接受的代价，E2EE.md §11.1）                                    | 轮换 + 安全存储缓解                                 |
 
 **威胁模型提醒（E2EE.md §9.3）：** 被撤销设备已持有的历史密文无法收回（设备端已解密数据的固有属性）；密钥轮换阻止其读取**之后**的新消息。
 
@@ -306,19 +306,19 @@ dart run bin/onlyspace.dart import \
 
 ## 7. 故障排查
 
-| 症状 | 原因 | 处理 |
-| --- | --- | --- |
-| Server 拒绝启动 | `config.json` 缺失/格式错（需 space_id + ≥1 active 设备） | 检查 `server/config/config.json`；用 CLI `config` 重新生成 |
-| `curl /space` 401/403 | 正常（未认证） | 按 §3.3 验证 |
-| CLI 报 libsodium 加载失败 | 未设 `LIBSODIUM_PATH`（或 libsodium 装在非标准路径） | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"` |
-| `auth` 失败（403） | 设备不在白名单 / 已被撤销 | 检查 config.json 与 devices 表状态；重新登记 |
-| `send` 提示"已入队（离线）" | `--server` 省略或未认证 | 补 `--server`；先 `auth` |
-| `sync` 拉不到对方消息 | 锚点已推进 / 网络 / 白名单 | 用 `--after 0` 强制全量重拉排查 |
-| `fetch` 报 sha256 不匹配 | 附件密文损坏或元数据过期 | 重新 `sync` 拉元数据后重试 |
-| WS 连不上 | 反代未开 WSS / token 未 URL 编码 | 检查 Caddy；token 含 `+`/`=` 需编码（客户端自动处理） |
-| `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷） | 拷贝到纯 ASCII 路径构建（如 `/tmp/onlyspace-build`），产物拷回 |
-| 撤销后设备仍能认证 | Server 版本过旧（未含 Phase 4 撤销感知） | 重新 `npm run build` 部署 |
-| 备份命令拒绝执行 | 未设置 `ONLYSPACE_DB_BACKUP_KEY` | 设置 base64 32B 密钥（§3.2/§5.1） |
+| 症状                                   | 原因                                                      | 处理                                                          |
+| -------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------- |
+| Server 拒绝启动                        | `config.json` 缺失/格式错（需 space_id + ≥1 active 设备） | 检查`server/config/config.json`；用 CLI `config` 重新生成     |
+| `curl /space` 401/403                  | 正常（未认证）                                            | 按 §3.3 验证                                                  |
+| CLI 报 libsodium 加载失败              | 未设`LIBSODIUM_PATH`（或 libsodium 装在非标准路径）       | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"`   |
+| `auth` 失败（403）                     | 设备不在白名单 / 已被撤销                                 | 检查 config.json 与 devices 表状态；重新登记                  |
+| `send` 提示"已入队（离线）"            | `--server` 省略或未认证                                   | 补`--server`；先 `auth`                                       |
+| `sync` 拉不到对方消息                  | 锚点已推进 / 网络 / 白名单                                | 用`--after 0` 强制全量重拉排查                                |
+| `fetch` 报 sha256 不匹配               | 附件密文损坏或元数据过期                                  | 重新`sync` 拉元数据后重试                                     |
+| WS 连不上                              | 反代未开 WSS / token 未 URL 编码                          | 检查 Caddy；token 含`+`/`=` 需编码（客户端自动处理）          |
+| `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷）                            | 拷贝到纯 ASCII 路径构建（如`/tmp/onlyspace-build`），产物拷回 |
+| 撤销后设备仍能认证                     | Server 版本过旧（未含 Phase 4 撤销感知）                  | 重新`npm run build` 部署                                      |
+| 备份命令拒绝执行                       | 未设置`ONLYSPACE_DB_BACKUP_KEY`                           | 设置 base64 32B 密钥（§3.2/§5.1）                             |
 
 ---
 
@@ -398,13 +398,10 @@ dart run bin/onlyspace.dart escrow --action download --store /tmp/b.json \
 
 ### 9.5 升级注意事项
 
-| 项 | 说明 |
-| --- | --- |
-| 存量数据 | 不受影响（messages/devices/会话等全部不动，新表初始为空） |
-| 白名单 | 无需改动（既有设备认证不受影响） |
-| Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖） |
-| App 侧 | 需重新安装 APK 才能启用新 UI（CLI 不受影响） |
-| 回滚 | `cd /opt/onlyspace && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ deployment/ shared/` → 重新 `docker compose up -d --build server` |
-
-
-
+| 项                       | 说明                                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 存量数据                 | 不受影响（messages/devices/会话等全部不动，新表初始为空）                                                                                                    |
+| 白名单                   | 无需改动（既有设备认证不受影响）                                                                                                                             |
+| Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖）                                                                                                     |
+| App 侧                   | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                                 |
+| 回滚                     | `cd /opt/onlyspace && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ deployment/ shared/` → 重新 `docker compose up -d --build server` |
