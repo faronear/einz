@@ -50,6 +50,12 @@ dart run bin/onlyspace.dart pubkey --store "$env:USERPROFILE\.onlyspace\b.json"
 # ↑ 记下输出的 B 公钥（base64），离线发给 A
 ```
 
+> 💡 **也可以在 TUI 里按引导完成初始化**（空间已创建后更省事）：
+> 直接 `dart run bin/onlyspace_tui.dart`（不传 `--store`）→ 无设备时自动引导：
+> 问设备名 → 自动生成身份并存入 `~/.onlyspace/[设备名].json` → 服务器探测 →
+> 邀请码/口令接入 → 认证 → 直接进 TUI（init 一体化，无需敲 CLI 命令）。
+> ⚠️ 若 A **正在创建空间**、需要把 B 公钥提前写进白名单，仍需用上面的 CLI 命令拿公钥。
+
 ---
 
 ## 阶段 2：A 端（Mac）生成身份 + 创建空间
@@ -71,6 +77,8 @@ dart run bin/onlyspace.dart config \
 ```
 
 > 输出物：`/tmp/prod-config.json`（白名单：space_id + dev-a1/dev-b1 公钥）、`/tmp/sealed-b.txt`（给 B 的 sealed 副本，备用）。
+>
+> 💡 ① 步的设备身份也可在 TUI 内按引导生成（`dart run bin/onlyspace_tui.dart` 无 store 时自动 init 并存入 `~/.onlyspace/[设备名].json`）。⚠️ 但 **② 步创建空间（生成 Space Key + 白名单）目前仍需本 CLI 命令**（TUI 创建者路径待实现）。
 
 ---
 
