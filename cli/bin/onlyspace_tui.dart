@@ -62,6 +62,15 @@ class _TuiState {
 
   /// person_id → display_name（GET /space 拉取，消息前缀显示 person_name 用）。
   Map<String, String> personNames = {};
+
+  /// 引导问答等待类型（非 null 时输入循环的下一次输入按此问答处理）。
+  String? pendingGuidance;
+
+  /// 机密输入模式（口令等）：输入行回显 *（而非原文）。
+  bool hiddenInput = false;
+
+  /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
+  Completer<String>? pendingGuideCompleter;
 }
 
 _TuiState? _state;
@@ -165,18 +174,6 @@ Future<(bool, Map<String, String>)> _probeServer(String server) async {
 /// sealed 导入时置 exitCode=1（main 据此退出，提示用户改用 onlyspace.dart import）。
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
-  var creator = false; // 首设备自举成功（空间创建者）标记：走创建者初始化（生成 Space Key + 托管 + 邀请码）
-  var autoStore = false; // 自动模式（无 --store）：enroll 后按规范 id 重命名设备文件（personA_dev2.json）
-
-  // 自动模式：enroll 拿到规范 id 后，把设备文件重命名为 personA_dev2.json（原临时名 [device-id].json）
-  void renameToStandard(String personId, String deviceId) {
-    if (!autoStore) return;
-    final newPath = '${_defaultStoreDir()}/${personId}_$deviceId.json';
-    if (newPath == storePath) return;
-    File(storePath).renameSync(newPath);
-    storePath = newPath;
-    stdout.writeln('💾 设备文件: $newPath');
-  }
 
   // ① 服务器地址：--server 参数 > store 持久化值 > config 默认（cli/config.json）> 硬编码
   if (server.isEmpty) {
@@ -202,7 +199,6 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     store = await DeviceStore.create();
     // 自动模式（无 --store）→ 存默认目录 ~/.onlyspace/[临时].json（登记后重命名为 personA_dev1.json）
     if (storePath.isEmpty) {
-      autoStore = true;
       final dir = _defaultStoreDir();
       Directory(dir).createSync(recursive: true);
       storePath = '$dir/pending.json';
@@ -211,84 +207,122 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     store.save(storePath);
     stdout.writeln('✅ 设备身份已生成');
     stdout.writeln('   公钥: ${store.publicKey}');
+  }
+  // 引导问答（名称/登记/接入/口令）由 _runGuide 在 TUI 消息流中处理
+  // （system 提示 + you> 输入 + 机密 *）——此处仅返回，main 负责启动引导任务与输入循环
+  return (store, server, storePath);
+}
 
-    // 你的名称（显示层，如 lukas）与设备昵称（如 MacBook）：登记前询问，随 enroll 上报
-    if (store.personName == null || store.personName!.isEmpty) {
-      stdout.write('你的名称（如 lukas，留空回车则不设置）: ');
-      final name = (stdin.readLineSync() ?? '').trim();
-      if (name.isNotEmpty) {
-        store.personName = name;
-        stdout.writeln('✅ 已设置名称: $name');
-      }
-    }
-    if (store.deviceName == null || store.deviceName!.isEmpty) {
-      stdout.write('设备名称（显示用，如 MacBook，回车不设置）: ');
-      final name = (stdin.readLineSync() ?? '').trim();
-      if (name.isNotEmpty) {
-        store.deviceName = name;
-      }
-    }
-    store.save(storePath);
+/// 引导任务（与输入循环并发）：登记/接入/口令问答在 TUI 消息流中进行——
+/// 提示作为 system 消息（_prompt），回答走 you> 输入行（机密口令回显 *）。
+/// 引导完成后做启动同步 + WS；全部就绪后返回。
+Future<void> _runGuide(ChatSession session, String storePath, String server) async {
+  final store = session.store;
+  final autoStore = storePath.startsWith(_defaultStoreDir());
 
-    // 设备登记：先尝试首设备自举（空间无设备 → 免邀请码成为创建者）；
-    // 失败（空间已有设备）→ 凭创建者给的邀请码加入
-    if (server.isNotEmpty) {
-      try {
-        final r = await ApiClient(server).enrollDevice(
-          deviceId: store.deviceId,
-          publicKey: store.publicKey,
-          displayName: store.personName,
-          deviceName: store.deviceName,
-        );
-        store.deviceId = r.deviceId; // 服务端分配的规范 id（dev1）
-        store.personId = r.personId; // 规范 person id（personA）
-        store.spaceId = r.spaceId;
-        renameToStandard(r.personId, r.deviceId); // 自动模式：设备文件改名为 personA_dev1.json
-        store.save(storePath);
-        creator = true;
-        stdout.writeln('✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}');
-        _guidanceNotes.add('✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}');
-      } catch (e) {
-        // 区分自举失败：空间已有设备（需要邀请码）vs 网络/服务器错误（首个设备免邀请码）
-        if (e is ApiException && e.code == 'INVALID_REQUEST') {
-          stdout.writeln('空间已有设备（你不是第一个加入者），加入需要邀请码');
-          _guidanceNotes.add('空间已有设备（你不是第一个加入者），加入需要邀请码');
-          // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
+  // 自动模式：enroll 拿到规范 id 后，把设备文件重命名为 personA_dev2.json（原临时名 pending.json）
+  void renameToStandard(String personId, String deviceId) {
+    if (!autoStore) return;
+    final newPath = '${_defaultStoreDir()}/${personId}_$deviceId.json';
+    if (newPath == storePath) return;
+    File(storePath).renameSync(newPath);
+    storePath = newPath;
+    session.messages.add(_systemMessage(session, '💾 设备文件: $newPath'));
+  }
+
+  // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）
+  if (store.personName == null || store.personName!.isEmpty) {
+    final name = await _prompt(session, '你的名称（如 lukas，留空回车则不设置）');
+    if (name.isNotEmpty) {
+      store.personName = name;
+      session.messages.add(_systemMessage(session, '✅ 已设置名称: $name'));
+      _render();
+    }
+  }
+  // 设备名称（显示用，如 MacBook，回车不设置）
+  if (store.deviceName == null || store.deviceName!.isEmpty) {
+    final name = await _prompt(session, '设备名称（显示用，如 MacBook，回车不设置）');
+    if (name.isNotEmpty) {
+      store.deviceName = name;
+    }
+  }
+  store.save(storePath);
+
+  // 设备登记：先尝试首设备自举（空间无设备 → 免邀请码成为创建者）；失败 → 凭邀请码加入
+  if (server.isNotEmpty) {
+    try {
+      final r = await ApiClient(server).enrollDevice(
+        deviceId: store.deviceId,
+        publicKey: store.publicKey,
+        displayName: store.personName,
+        deviceName: store.deviceName,
+      );
+      store.deviceId = r.deviceId;
+      store.personId = r.personId;
+      store.spaceId = r.spaceId;
+      renameToStandard(r.personId, r.deviceId);
+      store.save(storePath);
+      session.messages.add(_systemMessage(session, '✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}'));
+      _render();
+      // 创建者：生成 Space Key + 上传口令托管包（两次确认，机密 *）
+      final sk = await generateSpaceKey();
+      store.spaceKey = base64Encode(sk);
+      store.save(storePath);
+      await _setupEscrowPassphrase(store, storePath, session);
+      session.messages.add(_systemMessage(session, '💡 输入 /invite 创建邀请码以添加更多设备'));
+      _render();
+    } catch (e) {
+      if (e is ApiException && e.code == 'INVALID_REQUEST') {
+        session.messages.add(_systemMessage(session, '空间已有设备（你不是第一个加入者），加入需要邀请码'));
+        _render();
+        // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
+        while (true) {
+          final inviteCode = await _prompt(session, '邀请码（空间创建者提供，输错会反复要求重输）');
+          if (inviteCode.isEmpty) {
+            session.messages.add(_systemMessage(session, '未输入邀请码，请重新输入（或 Ctrl+C 退出）'));
+            _render();
+            continue;
+          }
+          try {
+            final r = await ApiClient(server).enrollDevice(
+              deviceId: store.deviceId,
+              publicKey: store.publicKey,
+              inviteCode: inviteCode,
+              displayName: store.personName,
+              deviceName: store.deviceName,
+            );
+            store.deviceId = r.deviceId;
+            store.personId = r.personId;
+            store.spaceId = r.spaceId;
+            renameToStandard(r.personId, r.deviceId);
+            store.save(storePath);
+            session.messages.add(_systemMessage(session, '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}'));
+            _render();
+            break;
+          } catch (e2) {
+            session.messages.add(_systemMessage(session, '⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题），请重新输入'));
+            _render();
+          }
+        }
+        // 登记成功后口令接入（加入者——无 Space Key）
+        if (store.spaceKey == null && store.spaceId != null) {
           while (true) {
-            stdout.write('邀请码（空间创建者提供，输错会反复要求重输）: ');
-            final inviteCode = (stdin.readLineSync() ?? '').trim();
-            if (inviteCode.isEmpty) {
-              stdout.writeln('未输入邀请码，请重新输入（或 Ctrl+C 退出）');
-              _guidanceNotes.add('未输入邀请码，请重新输入');
-              continue;
-            }
+            final passphrase = await _prompt(session, '口令:（输入不回显，回车提交）', hidden: true);
             try {
-              final r = await ApiClient(server).enrollDevice(
-                deviceId: store.deviceId,
-                publicKey: store.publicKey,
-                inviteCode: inviteCode,
-                displayName: store.personName,
-                deviceName: store.deviceName,
-              );
-              store.deviceId = r.deviceId;
-              store.personId = r.personId;
-              store.spaceId = r.spaceId;
-              renameToStandard(r.personId, r.deviceId); // 自动模式：设备文件改名为 personB_dev2.json
-              store.save(storePath);
-              stdout.writeln('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
-              _guidanceNotes.add('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
-              break; // 登记成功，结束重试循环
-            } catch (e2) {
-              stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题），请重新输入');
-              _guidanceNotes.add('⚠️ 邀请码登记失败: $e2，请重新输入');
+              await session.accessByEscrow(passphrase);
+              session.messages.add(_systemMessage(session, '✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}'));
+              _render();
+              break;
+            } catch (e3) {
+              session.messages.add(_systemMessage(session, '⚠️ 口令接入失败: $e3，请重新输入口令（口令由创建者 escrow 托管时设置）'));
+              _render();
             }
           }
-        } else {
-          stdout.writeln('⚠️ 自举失败: $e（首个设备免邀请码；请确认服务器可达后重试）');
         }
+      } else {
+        session.messages.add(_systemMessage(session, '⚠️ 自举失败: $e（首个设备免邀请码；请确认服务器可达后重试）'));
+        _render();
       }
-    } else {
-      stdout.writeln('未提供服务器地址，稍后可在 TUI 内用 /auth 补配');
     }
   }
 
@@ -298,67 +332,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     store.save(storePath);
   }
 
-  final session = ChatSession(store, storePath, server);
-
-  // 无 Space Key → 引导接入：口令托管（推荐）或 sealed 导入（高级，提示用 CLI）
-  if (store.spaceKey == null || store.spaceId == null) {
-    if (creator) {
-      // 创建者初始化：生成 Space Key → 上传口令托管包 → 生成邀请码（对方加入用）
-      stdout.writeln();
-      stdout.writeln('你是空间创建者：现在生成 Space Key 并上传口令托管包（对方凭口令接入）');
-      final sk = await generateSpaceKey();
-      store.spaceKey = base64Encode(sk);
-      store.save(storePath);
-      await _setupEscrowPassphrase(store, storePath, session);
-      // 不主动生成邀请码（避免引导繁琐）：进对话后用 /invite 随时创建
-      stdout.writeln('💡 输入 /invite 创建邀请码以添加更多设备');
-      _guidanceNotes.add('💡 输入 /invite 创建邀请码以添加更多设备');
-      stdout.write('按回车进入对话…');
-      stdout.flush().ignore(); // 无换行写入需显式 flush（终端行缓冲，否则滞留缓冲不显示）
-      stdin.readLineSync(); // 等用户回车再进 TUI（提示留在屏上，不被 TUI 首屏覆盖）
-    } else if (store.spaceId == null) {
-      // 设备尚未登记成功（未输邀请码/自举失败等）：跳过口令接入引导（接入需先登记）
-      stdout.writeln();
-      stdout.writeln('⚠️ 设备尚未登记成功，跳过接入引导');
-      stdout.writeln('   可稍后重试引导，或进入 TUI 后 /auth 补录');
-      _guidanceNotes.add('⚠️ 设备尚未登记成功，跳过接入引导（可进入 TUI 后 /auth 补录）');
-    } else {
-      stdout.writeln();
-      stdout.writeln('本设备还没有 Space Key，无法收发消息。接入方式：');
-      stdout.writeln('  1) 口令接入（推荐）：输入空间创建者给你的 space_id + 口令');
-      stdout.writeln('  2) sealed 导入（高级）：dart run bin/onlyspace.dart import --store $storePath --sealed-file <文件>');
-      stdout.write('选择 [回车=1 / 2] : ');
-      final choice = (stdin.readLineSync() ?? '1').trim();
-      if (choice == '2') {
-        stdout.writeln('请先退出本程序，用 onlyspace.dart import 导入 sealed 文件后再运行。');
-        exitCode = 1;
-        return (store, server, storePath);
-      }
-      if (server.isEmpty) {
-        stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
-      } else {
-        // 口令接入重试循环：输错反复要求重输，直到接入成功（成功才结束引导）
-        while (true) {
-          stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
-          final passphrase = _readPassphrase('口令:（输入不回显，回车提交）');
-          try {
-            await session.accessByEscrow(passphrase);
-            stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
-            _guidanceNotes.add('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
-            break; // 接入成功，结束重试循环
-          } catch (e) {
-            // 注意：accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-            stdout.writeln('⚠️ 口令接入失败: $e，请重新输入口令（口令由创建者 escrow 托管时设置）');
-          }
-        }
-      }
-    }
-  }
-
   // 已登记但口令托管包未上传（创建者引导中断）：重启再进引导设置口令
   if (store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
-    stdout.writeln();
-    stdout.writeln('检测到尚未设置托管口令，现在设置（两次输入须一致；可 Ctrl+C 稍后重启再进）');
+    session.messages.add(_systemMessage(session, '检测到尚未设置托管口令，现在设置（两次输入须一致；可 Ctrl+C 稍后重启再进）'));
+    _render();
     await _setupEscrowPassphrase(store, storePath, session);
   }
 
@@ -366,101 +343,36 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   if (store.sessionToken == null && server.isNotEmpty) {
     try {
       await session.auth();
-      stdout.writeln('✅ 认证成功: space_id=${store.spaceId ?? '-'}');
+      session.messages.add(_systemMessage(session, '✅ 认证成功: space_id=${store.spaceId ?? '-'}'));
+      _render();
     } catch (e) {
-      // auth 抛 StateError（如 server 无效）也是 Error 子类，用 catch (e) 兜底
-      stdout.writeln('⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）');
-      _guidanceNotes.add('⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）');
+      session.messages.add(_systemMessage(session, '⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）'));
+      _render();
     }
   }
-  return (store, server, storePath);
-}
 
-/// 隐藏回显读取口令：
-/// - POSIX（macOS/Linux）：逐键渲染星号（echo/line 关 + readByteSync），输入有反馈；
-/// - **Windows：不用逐键**（Dart SDK：Windows 上 lineMode=false 后只收到 CR，
-///   逐键读会把输入吞成回车导致口令变空）→ 回退 echoMode=false + readLineSync
-///   整行隐藏读取（输入字节完整，只是无星号反馈）；
-/// - try/finally 确保 echoMode/lineMode 无论成功/异常都恢复，避免终端停在无回显状态；
-/// - stdout 写入全部 try-catch（pty 下 StreamSink 可能抛异常，与 TUI 渲染同理）。
-String _readPassphrase(String prompt) {
-  // pty 下 stdout StreamSink 可能抛异常（渲染 write 需 try-catch 的教训同源）
-  void safeWriteln() {
+  // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
+  // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
+  // 未接入空间（无 Space Key）时跳过——历史无法解密，且 _decrypt 会兜底占位。
+  if (session.hasSession && session.hasSpace && server.isNotEmpty) {
     try {
-      stdout.writeln();
-    } catch (_) {}
-  }
-
-  void safeWrite(String s) {
-    try {
-      stdout.write(s);
-    } catch (_) {}
-  }
-
-  void safeFlush() {
-    try {
-      stdout.flush().ignore(); // Future 异常同步 catch 接不到，必须 ignore()
-    } catch (_) {}
-  }
-
-  safeWrite(prompt);
-  safeFlush();
-  final isWindows = Platform.isWindows;
-  try {
-    if (isWindows) {
-      // Windows：整行隐藏读取（控制台关闭 ECHO，回车提交）
-      stdin.echoMode = false;
-      final v = stdin.readLineSync() ?? '';
-      safeWriteln();
-      try {
-        stdout.writeln('（已输入 ${v.length} 位口令）'); // Windows 无逐键星号，提交后给位数反馈
-      } catch (_) {}
-      return v;
-    }
-    // POSIX：逐键星号渲染
-    stdin.echoMode = false;
-    stdin.lineMode = false;
-    final buf = StringBuffer();
-    while (true) {
-      final b = stdin.readByteSync();
-      if (b == -1 || b == 13 || b == 10) break; // EOF 或回车
-      if (b == 127 || b == 8) {
-        // 退格：删除最后一个字符并擦掉一个星号
-        if (buf.isNotEmpty) {
-          final s = buf.toString();
-          buf.clear();
-          buf.write(s.substring(0, s.length - 1));
-          safeWrite('\b \b');
-          safeFlush();
-        }
-        continue;
+      final fresh = await session.sync();
+      if (fresh.isNotEmpty) {
+        _state!.status = '启动同步：新增 ${fresh.length} 条';
       }
-      if (b < 32) continue; // 忽略其他控制字符
-      buf.writeCharCode(b);
-      safeWrite('*');
-      safeFlush();
+    } catch (e) {
+      _state!.status = '启动同步跳过: $e（可稍后 /sync）';
     }
-    safeWriteln();
-    try {
-      stdout.writeln('（已输入 ${buf.length} 位口令）');
-    } catch (_) {}
-    return buf.toString();
-  } catch (_) {
-    // pty/重定向等不支持：退回整行隐藏读取
-    try {
-      stdout.writeln('（终端模式不可用：口令隐藏输入、无星号回显，回车提交）');
-    } catch (_) {}
-    final v = stdin.readLineSync() ?? '';
-    safeWriteln();
-    return v;
-  } finally {
-    try {
-      stdin.echoMode = true;
-    } catch (_) {}
-    try {
-      stdin.lineMode = true;
-    } catch (_) {}
   }
+
+  // 启动 WS 实时监听（已认证且配置了 server 时）；新消息到达或连接状态变化即重绘
+  if (session.hasSession && server.isNotEmpty) {
+    session.startWs(
+      onMessage: (_) => _render(),
+      onStatus: (_) => _render(),
+    );
+  }
+  _render();
 }
 
 Future<void> main(List<String> args) async {
@@ -518,27 +430,9 @@ Future<void> main(List<String> args) async {
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 person_name）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
 
-  // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
-  // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
-  // 未接入空间（无 Space Key）时跳过——历史无法解密，且 _decrypt 会兜底占位。
-  if (session.hasSession && session.hasSpace && server.isNotEmpty) {
-    try {
-      final fresh = await session.sync();
-      if (fresh.isNotEmpty) {
-        _state!.status = '启动同步：新增 ${fresh.length} 条';
-      }
-    } catch (e) {
-      _state!.status = '启动同步跳过: $e（可稍后 /sync）';
-    }
-  }
-
-  // 启动 WS 实时监听（已认证且配置了 server 时）；新消息到达或连接状态变化即重绘
-  if (session.hasSession && server.isNotEmpty) {
-    session.startWs(
-      onMessage: (_) => _render(),
-      onStatus: (_) => _render(),
-    );
-  }
+  // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
+  // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
+  final guide = _runGuide(session, storePath, server);
 
   _render();
 
@@ -557,6 +451,7 @@ Future<void> main(List<String> args) async {
   }
 
   await _runInputLoop(session);
+  await guide; // 引导任务收尾（启动同步/WS 已在其内部完成；异常已内部处理）
   _exitRaw();
   session.stopWs();
   _sigwinchSub?.cancel(); // 取消终端尺寸监听：否则 event loop 不空闲，进程挂起回不到命令行
@@ -669,7 +564,8 @@ void _render() {
   final rows = _termLines();
   final cols = _termCols();
   // 输入区折行行数：超长输入自动多行，消息区高度动态让位
-  final inputWrapped = _wrapInput(s.input.toString(), cols);
+  final display = s.hiddenInput ? '*' * s.input.length : s.input.toString();
+  final inputWrapped = _wrapInput(display, cols);
   s.inputLines = inputWrapped.length;
   final msgArea = rows - 1 - s.inputLines; // 顶部状态栏 1 行 + 输入区 N 行
 
@@ -849,6 +745,17 @@ Future<void> _runInputLoop(ChatSession session) async {
       }
       if (code == 13 || code == 10) {
         // 回车：提交输入
+        final gc = _state!.pendingGuideCompleter;
+        if (gc != null) {
+          // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
+          final answer = _state!.input.toString().trim();
+          _state!.input.clear();
+          _state!.pendingGuideCompleter = null;
+          _state!.hiddenInput = false;
+          if (!gc.isCompleted) gc.complete(answer);
+          inputChanged = true;
+          continue;
+        }
         final line = _state!.input.toString().trim();
         _state!.input.clear();
         if (line.isEmpty) {
@@ -1119,16 +1026,17 @@ Map<String, String> _probePersonNames = {};
 /// 设置托管口令（两次输入确认：留空/不一致反复重试直到成功；成功标记
 /// store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
-  stdout.writeln('设置托管口令（用于后续设备接入空间，务必牢记；两次输入须一致）');
   while (true) {
-    final p1 = _readPassphrase('设置口令:（输入不回显，回车提交）');
+    final p1 = await _prompt(session, '设置托管口令（用于后续设备接入空间，务必牢记）：请输入口令（输入不回显）', hidden: true);
     if (p1.isEmpty) {
-      stdout.writeln('⚠️ 口令不能为空，请重新设置');
+      session.messages.add(_systemMessage(session, '⚠️ 口令不能为空，请重新设置'));
+      _render();
       continue;
     }
-    final p2 = _readPassphrase('再次输入确认:（输入不回显，回车提交）');
+    final p2 = await _prompt(session, '再次输入确认（输入不回显）', hidden: true);
     if (p2 != p1) {
-      stdout.writeln('⚠️ 两次输入不一致，请重新设置口令');
+      session.messages.add(_systemMessage(session, '⚠️ 两次输入不一致，请重新设置口令'));
+      _render();
       continue;
     }
     try {
@@ -1143,11 +1051,12 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       );
       store.escrowUploaded = true;
       store.save(storePath);
-      stdout.writeln('✅ 口令托管包已上传: space_id=${store.spaceId}');
-      _guidanceNotes.add('✅ 口令托管包已上传: space_id=${store.spaceId}');
+      session.messages.add(_systemMessage(session, '✅ 口令托管包已上传: space_id=${store.spaceId}'));
+      _render();
       return;
     } catch (e) {
-      stdout.writeln('⚠️ 口令托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）');
+      session.messages.add(_systemMessage(session, '⚠️ 口令托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）'));
+      _render();
     }
   }
 }
@@ -1182,4 +1091,16 @@ ChatMessage _systemMessage(ChatSession session, String text) {
     isSystem: true,
     createdAt: DateTime.now().millisecondsSinceEpoch,
   );
+}
+
+/// 引导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
+/// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
+Future<String> _prompt(ChatSession session, String message, {bool hidden = false}) {
+  final s = _state!;
+  s.hiddenInput = hidden;
+  session.messages.add(_systemMessage(session, message));
+  _render();
+  final completer = Completer<String>();
+  s.pendingGuideCompleter = completer;
+  return completer.future;
 }
