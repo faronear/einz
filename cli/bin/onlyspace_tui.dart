@@ -295,15 +295,11 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
           token: store.sessionToken!,
         );
         stdout.writeln('✅ 口令托管包已上传: space_id=${store.spaceId}');
-        // 生成邀请码给"对方"（第二 person，规范 id=personB + 对方名称）
-        stdout.write('对方名称（如 steffi，回车默认不设置）: ');
-        final peerName = (stdin.readLineSync() ?? '').trim();
-        final invite = await api.createInvite(
-          token: store.sessionToken!,
-          personId: 'personB',
-          displayName: peerName.isEmpty ? null : peerName,
-        );
-        stdout.writeln('✅ 邀请码已生成（发给对方，24h 有效）: ${invite.inviteCode}');
+        // 不主动生成邀请码（避免引导繁琐）：进对话后用 /invite 随时创建
+        stdout.writeln('💡 输入 /invite 创建邀请码以添加更多设备');
+        stdout.write('按回车进入对话…');
+        stdout.flush().ignore(); // 无换行写入需显式 flush（终端行缓冲，否则滞留缓冲不显示）
+        stdin.readLineSync(); // 等用户回车再进 TUI（提示留在屏上，不被 TUI 首屏覆盖）
       } catch (e) {
         stdout.writeln('⚠️ 创建者初始化失败: $e');
         stdout.writeln('   可进入 TUI 后手动补：escrow upload / invite（onlyspace.dart 命令）');
@@ -941,7 +937,23 @@ Future<void> _execInvite(List<String> parts) async {
       displayName: name,
       hours: 24,
     );
-    s.status = '✅ 邀请码（$personId${name != null && name.isNotEmpty ? '/$name' : ''}，24h 一次性）: ${r.inviteCode}';
+    // 邀请码作为对话流中的一条普通消息显示（随消息区滚动，不占顶部状态栏）
+    final label = '$personId${name != null && name.isNotEmpty ? '/$name' : ''}';
+    s.session.messages.add(ChatMessage(
+      env: MessageEnvelope(
+        v: 1,
+        type: 'text',
+        keyVersion: s.session.store.keyVersion,
+        messageId: 'invite-${DateTime.now().millisecondsSinceEpoch}',
+        senderDeviceId: s.session.store.deviceId ?? '-',
+        nonce: '',
+        ciphertext: '',
+      ),
+      plain: '邀请码（$label，24h 一次性）: ${r.inviteCode}',
+      isMine: true,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    ));
+    s.status = ''; // 反馈在消息区（邀请码本身），状态栏保持干净
   } catch (e) {
     s.status = '邀请码生成失败: $e';
   }
