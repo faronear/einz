@@ -59,6 +59,7 @@ _TuiState? _state;
 
 /// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
 Timer? _resizeTimer;
+StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
 
 /// 默认服务器地址：优先读 cli/config.json 的 server 字段（本地可改），
 /// 文件缺失/格式异常时回退硬编码 https://only.tic.cc。
@@ -513,7 +514,7 @@ Future<void> main(List<String> args) async {
   // 否则缩窗后旧折行仍残留（终端物理重排了显示内容，但我们的布局未按新列数重算）。
   // Windows 无 SIGWINCH，watch 会抛 UnsupportedError → try-catch 兜底。
   try {
-    ProcessSignal.sigwinch.watch().listen((_) {
+    _sigwinchSub = ProcessSignal.sigwinch.watch().listen((_) {
       _resizeTimer?.cancel();
       _resizeTimer = Timer(const Duration(milliseconds: 120), () {
         if ((_state?.running ?? false)) _render();
@@ -526,7 +527,12 @@ Future<void> main(List<String> args) async {
   await _runInputLoop(session);
   _exitRaw();
   session.stopWs();
+  _sigwinchSub?.cancel(); // 取消终端尺寸监听：否则 event loop 不空闲，进程挂起回不到命令行
   _printFarewell(session);
+  try {
+    stdout.flush(); // 确保退出语输出后再退出
+  } catch (_) {}
+  exit(0); // 兜底强制退出（无论是否还有残留句柄）
 }
 
 // ---------- raw 模式 ----------
