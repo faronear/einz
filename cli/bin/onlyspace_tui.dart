@@ -59,6 +59,9 @@ class _TuiState {
 
   /// 等待空间口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
   bool pendingSpaceKey = false;
+
+  /// person_id → display_name（GET /space 拉取，消息前缀显示 person_name 用）。
+  Map<String, String> personNames = {};
 }
 
 _TuiState? _state;
@@ -513,6 +516,7 @@ Future<void> main(List<String> args) async {
   }
   _guidanceNotes.clear();
   _state = _TuiState(session);
+  _refreshPersonNames(_state!); // 拉取 person 名称表（消息前缀显示 person_name）
 
   // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
   // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
@@ -682,7 +686,7 @@ void _render() {
       'WS:${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
     WsStatus.stopped => 'WS:${_gray}○ 离线${_reset}',
   };
-  buf.write('${_bold}OnlySpace TUI${_reset}  $wsName  ${s.session.store.deviceId ?? '-'} @ ${s.session.store.spaceId ?? '-'}');
+  buf.write('${_bold}OnlySpace TUI${_reset}  $wsName  ${_personLabel(s.session.store)}');
   if (s.status.isNotEmpty) {
     buf.write('  ${_gray}${s.status}${_reset}');
   }
@@ -739,6 +743,13 @@ void _render() {
   }
 }
 
+/// 状态条身份标签：person_name@device_name（未设置回退规范 id）。
+String _personLabel(DeviceStore store) {
+  final person = store.personName ?? store.personId ?? '-';
+  final device = store.deviceName ?? store.deviceId ?? '-';
+  return '$person@$device';
+}
+
 /// 格式化消息为多行（第一行带归属前缀，续行裸正文，自动按列宽折行）。
 /// 自己的消息：绿色前缀 + 普通正文；对方消息：正文加粉红背景（一眼区分收发双方）；
 /// 系统提示（isSystem）：灰色前缀 + 普通正文（sender 显示为 system）。
@@ -748,9 +759,17 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   if (m.isSystem) {
     who = 'system';
     color = _gray;
+  } else if (m.isMine) {
+    // 自己的消息：前缀用 person_name（未设置回退"我"）
+    who = _state?.session.store.personName ?? '我';
+    color = _green;
   } else {
-    who = m.isMine ? '我' : '对方';
-    color = m.isMine ? _green : _yellow;
+    // 对方的消息：按 senderPersonId 查名称表（未拉取/未知回退"对方"）
+    final pid = m.env.senderPersonId;
+    who = (pid != null && _state?.personNames.containsKey(pid) == true)
+        ? _state!.personNames[pid]!
+        : '对方';
+    color = _yellow;
   }
   final seq = m.seq == null ? '' : ' seq=${m.seq}';
   final prefix = '$color[$who$seq v${m.keyVersion}]$_reset ';
@@ -937,6 +956,7 @@ Future<void> _execCommand(String line) async {
         // 认证结果作为 system 消息进消息流（不占顶部状态栏）
         s.session.messages.add(_systemMessage(s.session, '✅ 认证成功: space_id=${s.session.store.spaceId}'));
         s.status = '';
+        _refreshPersonNames(s); // 刷新 person 名称表（对方消息前缀显示其 person_name）
         // 认证成功后启动 WS 实时监听
         if (s.session.wsClient == null && s.session.hasSession) {
           s.session.startWs(
@@ -1046,6 +1066,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
       await s.session.auth();
       s.session.messages.add(_systemMessage(s.session, '✅ 认证成功: space_id=${s.session.store.spaceId}'));
       s.status = '';
+      _refreshPersonNames(s); // 刷新 person 名称表
       if (s.session.wsClient == null && s.session.hasSession) {
         s.session.startWs(
           onMessage: (_) => _render(),
@@ -1091,6 +1112,19 @@ void _printFarewell(ChatSession session) {
 
 /// 引导阶段产生的系统提示（进 TUI 后作为 system 消息显示在对话流）。
 final List<String> _guidanceNotes = [];
+
+/// 拉取空间 person 名称表（GET /space）到缓存（认证后调用；失败静默——
+/// 前缀回退"我/对方"）。用于消息前缀显示 person_name。
+Future<void> _refreshPersonNames(_TuiState s) async {
+  final token = s.session.store.sessionToken;
+  if (token == null) return;
+  try {
+    final r = await ApiClient(s.session.server).getSpace(token);
+    s.personNames = r.personNames;
+  } catch (_) {
+    // 拉取失败不影响聊天（前缀回退"我/对方"）
+  }
+}
 
 /// 构造一条系统提示消息（sender 显示 system，随对话流滚动，不被状态条推到窗口上方）。
 ChatMessage _systemMessage(ChatSession session, String text) {

@@ -51,12 +51,22 @@ export function sendPushHint(spaceId: string, exceptDeviceId: string): void {
   }
 }
 
-/** GET /space：空间信息（space_id + 成员设备）。 */
-export function getSpace(cfg: ServerConfig, token: string): { space_id: string; devices: unknown[] } {
+/** GET /space：空间信息（space_id + 成员设备 + person 名称表）。 */
+export function getSpace(
+  cfg: ServerConfig,
+  token: string
+): { space_id: string; devices: unknown[]; person_names: Record<string, string> } {
   const { device_id } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   const devices = getDb()
     .prepare(`SELECT device_id, person_id, status, last_seen FROM devices WHERE status = 'active'`)
     .all();
-  return { space_id: cfg.space_id, devices };
+  // person 名称表：meta person_name:personA → display_name（创建者/邀请时设置，显示层用）
+  const personNames: Record<string, string> = {};
+  for (const r of getDb()
+    .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_name:%'`)
+    .all() as { key: string; value: string }[]) {
+    personNames[r.key.slice("person_name:".length)] = r.value;
+  }
+  return { space_id: cfg.space_id, devices, person_names: personNames };
 }
