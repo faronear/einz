@@ -67,16 +67,19 @@ export function getDevice(cfg: ServerConfig, deviceId: string): DeviceConfig | u
 }
 
 /**
- * 把 config.json 白名单登记进 devices 表（INSERT OR IGNORE，幂等）：
- * 使撤销（UPDATE status='revoked'）真正作用于认证/同步/发送路径（E2EE.md §9.3）。
- * 已存在的行（含被撤销状态）不受影响——撤销后重启不会"复活"。
+ * 把 config.json 白名单登记进 devices 表（UPSERT，幂等）：
+ * - 新设备：INSERT；
+ * - 已存在设备：仅更新 person_id / public_key（白名单改公钥后重启即生效，
+ *   修复 "db 残留旧公钥 → challenge 用旧公钥 seal → 客户端解不开" 问题）；
+ * - **status 不覆盖**：被撤销（status='revoked'）的设备重启后不"复活"（E2EE.md §9.3）。
  */
 export function syncWhitelistToDb(cfg: ServerConfig): void {
   const db = getDb();
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO devices (device_id, person_id, public_key, status, created_at) VALUES (?, ?, ?, ?, ?)`
+  const upsert = db.prepare(
+    `INSERT INTO devices (device_id, person_id, public_key, status, created_at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(device_id) DO UPDATE SET person_id = excluded.person_id, public_key = excluded.public_key`
   );
   for (const d of cfg.devices) {
-    insert.run(d.device_id, d.person_id, d.public_key, d.status, Date.now());
+    upsert.run(d.device_id, d.person_id, d.public_key, d.status, Date.now());
   }
 }
