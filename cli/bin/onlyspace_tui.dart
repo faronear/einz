@@ -73,6 +73,7 @@ class _TuiState {
 
   /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
   Completer<String>? pendingGuideCompleter;
+  bool pendingGuideRequired = false; // 当前引导问答是否必填（留空回车不提交）
 }
 
 _TuiState? _state;
@@ -803,6 +804,15 @@ Future<void> _runInputLoop(ChatSession session) async {
         final gc = _state!.pendingGuideCompleter;
         if (gc != null) {
           final answer = _state!.input.toString().trim();
+          if (answer.isEmpty && (_state?.pendingGuideRequired ?? false)) {
+            // 必填问答（口令）留空回车：不提交——提示继续输入（不弹"请重新输入"，
+            // 输入行保留直接继续敲）
+            _state!.input.clear();
+            session.messages.add(_systemMessage(session, '此项不能为空，请继续输入'));
+            _scheduleRender();
+            inputChanged = true;
+            continue;
+          }
           _state!.input.clear();
           if (answer == '/exit' || answer == '/quit') {
             // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
@@ -1105,23 +1115,13 @@ final List<String> _guidanceNotes = [];
 /// 启动探测获取的 person 名称表（/health 系统信息，person_id → display_name）。
 Map<String, String> _probePersonNames = {};
 
-/// 设置托管口令（两次输入确认：留空/不一致反复重试直到成功；成功标记
-/// store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
+/// 设置托管口令（单次输入：口令不在消息流回显，留空回车由输入循环拦截不提交、
+/// 继续输入；成功标记 store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '设置托管口令（用于后续设备接入空间，务必牢记）：请输入口令（输入不回显）', hidden: true);
-    if (p1.isEmpty) {
-      session.messages.add(_systemMessage(session, '⚠️ 口令不能为空，请重新设置'));
-      _render();
-      continue;
-    }
-    final p2 = await _prompt(session, '再次输入确认（输入不回显）', hidden: true);
-    if (p2 != p1) {
-      session.messages.add(_systemMessage(session, '⚠️ 两次输入不一致，请重新设置口令'));
-      _render();
-      continue;
-    }
+    final p1 = await _prompt(session, '设置托管口令（用于后续设备接入空间，务必牢记）：请输入口令（输入不回显，回车提交）', hidden: true, required: true);
+    if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
       await session.auth(); // challenge-response 认证（写入 store.sessionToken）
@@ -1135,11 +1135,11 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       store.escrowUploaded = true;
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 口令托管包已上传: space_id=${store.spaceId}'));
-      _render();
+      _scheduleRender();
       return;
     } catch (e) {
       session.messages.add(_systemMessage(session, '⚠️ 口令托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）'));
-      _render();
+      _scheduleRender();
     }
   }
 }
@@ -1178,10 +1178,12 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 
 /// 引导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
 /// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
-Future<String> _prompt(ChatSession session, String message, {bool hidden = false}) {
+Future<String> _prompt(ChatSession session, String message,
+    {bool hidden = false, bool required = false}) {
   final s = _state!;
   if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
+  s.pendingGuideRequired = required; // 必填问答：留空回车由输入循环拦截不提交
   session.messages.add(_systemMessage(session, message));
   _scheduleRender(); // 提示渲染走事件循环（microtask 渲染真实终端不显示）
   final completer = Completer<String>();
