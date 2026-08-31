@@ -830,6 +830,26 @@ Future<void> _runInputLoop(ChatSession session) async {
         final gc = _state!.pendingGuideCompleter;
         if (gc != null) {
           final answer = _state!.input.toString().trim();
+          if (answer.startsWith('/')) {
+            // / 开头的输入按命令处理，不当作口令/邀请码回答提交（用户：要求
+            // 输入口令时 /exit 被当口令发送核对进"口令对接中"——应直接退出）
+            _state!.input.clear();
+            if (answer == '/exit' || answer == '/quit') {
+              // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
+              // 用户困在邀请码/口令重试循环无法退出
+              _state!.running = false;
+              _abortPendingGuide();
+              _restoreTerminal();
+              sub.cancel();
+              if (!completer.isCompleted) completer.complete();
+              inputChanged = true;
+              return;
+            }
+            session.messages.add(_systemMessage(session, '引导中仅支持 /exit 退出（输入未提交）'));
+            _scheduleRender();
+            inputChanged = true;
+            continue;
+          }
           if (answer.isEmpty && (_state?.pendingGuideRequired ?? false)) {
             // 必填问答（口令）留空回车：不提交——提示继续输入（不弹"请重新输入"，
             // 输入行保留直接继续敲）
@@ -840,17 +860,6 @@ Future<void> _runInputLoop(ChatSession session) async {
             continue;
           }
           _state!.input.clear();
-          if (answer == '/exit' || answer == '/quit') {
-            // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
-            // 用户困在邀请码/口令重试循环无法退出
-            _state!.running = false;
-            _abortPendingGuide();
-            _restoreTerminal();
-            sub.cancel();
-            if (!completer.isCompleted) completer.complete();
-            inputChanged = true;
-            return;
-          }
           // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
