@@ -31,6 +31,10 @@ cd deployment
 cp .env.example .env         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
 # ↑ 把输出粘贴到 .env 的 ONLYSPACE_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
+# ⚠️ 全新部署时 config.json 还不存在，server 会因缺少 /config/config.json 启动失败（属预期）。
+#    两种做法任选：
+#    a) 先放最小占位（space_id 用阶段 2 的同一个值）：echo '{"space_id":"<阶段2的UUID>","devices":[]}' > config/config.json
+#    b) 跳过本步，先完成阶段 1-2 生成白名单，到阶段 3 部署 config.json 后再启动 server
 docker compose up -d --build server
 curl -s https://only.tic.cc/health    # 期望 {"status":"ok",...}
 
@@ -94,7 +98,8 @@ dart run bin/onlyspace.dart config \
 ```bash
 scp /tmp/prod-config.json root@你的VPS:/faronear/only/deployment/config/config.json
 
-ssh 你的VPS "cd /faronear/only/deployment && docker compose restart server"
+# 全新部署（容器尚未启动）：up；已有容器：restart
+ssh 你的VPS "cd /faronear/only/deployment && docker compose up -d --build server"
 ssh 你的VPS "curl -s https://only.tic.cc/health"   # ok；space_id 应是新 UUID
 ```
 

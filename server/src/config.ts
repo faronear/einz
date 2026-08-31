@@ -22,7 +22,23 @@ const DEFAULT_CONFIG_PATH = resolve(HERE, "../config/config.json");
 
 /** 加载静态白名单配置（productLens §8.3）。文件不存在时抛出，Server 拒绝启动。 */
 export function loadConfig(path = process.env.ONLYSPACE_CONFIG ?? DEFAULT_CONFIG_PATH): ServerConfig {
-  const raw = readFileSync(path, "utf8");
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(
+        `缺少配置文件 ${path}\n` +
+          `  服务端启动需要白名单 config.json（Docker 挂载的 ${path}）\n` +
+          `  请先用 CLI 生成白名单后部署（见 docs/ONBOARDING.md 阶段 2-3）：\n` +
+          `    dart run bin/onlyspace.dart config --store <store> --peer-pubkey <对方公钥> \\\n` +
+          `      --space-id <uuid> --out-config config.json\n` +
+          `  并把生成的 config.json 放到宿主机 deployment/config/ 目录后重启；\n` +
+          `  或先创建最小配置占位：{"space_id": "<uuid>", "devices": []}`
+      );
+    }
+    throw e;
+  }
   const cfg = JSON.parse(raw) as ServerConfig;
 
   if (typeof cfg.space_id !== "string" || !Array.isArray(cfg.devices)) {
