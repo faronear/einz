@@ -876,6 +876,41 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/auth':
+      // 未登记（deviceId null，如引导时跳过/登记失败）→ 引导邀请码登记后再认证
+      if (s.session.store.deviceId == null) {
+        // 临时切回行模式读取（可见输入），读完恢复 raw
+        try {
+          stdin.lineMode = true;
+          stdin.echoMode = true;
+        } catch (_) {}
+        stdout.write('设备尚未登记：请输入邀请码（空间创建者 /invite 获取）: ');
+        stdout.flush().ignore();
+        final inviteCode = (stdin.readLineSync() ?? '').trim();
+        try {
+          stdin.lineMode = false;
+          stdin.echoMode = false;
+        } catch (_) {}
+        if (inviteCode.isEmpty) {
+          s.status = '未输入邀请码，登记取消';
+          break;
+        }
+        try {
+          final r = await ApiClient(s.session.server).enrollDevice(
+            publicKey: s.session.store.publicKey,
+            inviteCode: inviteCode,
+            displayName: s.session.store.personName,
+            deviceName: s.session.store.deviceName,
+          );
+          s.session.store.deviceId = r.deviceId;
+          s.session.store.personId = r.personId;
+          s.session.store.spaceId = r.spaceId;
+          s.session.store.save(s.session.storePath);
+          s.status = '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}';
+        } catch (e) {
+          s.status = '邀请码登记失败: $e（无效/已用/过期或网络问题）';
+          break;
+        }
+      }
       try {
         await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
         s.status = '✅ 认证成功: space_id=${s.session.store.spaceId}';
