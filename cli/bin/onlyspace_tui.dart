@@ -332,6 +332,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
       final passphrase = await _prompt(session, '请输入空间口令:', hidden: true, required: true);
+      if (passphrase.startsWith('/')) {
+        // 防御：/ 开头的输入（即使输入循环 / 检查被绕过）不当口令发送核对
+        session.messages.add(_systemMessage(session, '口令不能以 / 开头，请重新输入（/exit 可退出）'));
+        _scheduleRender();
+        continue;
+      }
       try {
         await _busy(session, '⏳ 口令对接中......', () => session.accessByEscrow(passphrase));
         session.messages.add(_systemMessage(session, '✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}'));
@@ -1133,6 +1139,11 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
   s.pendingSpaceKey = false;
   if (passphrase.isEmpty) {
     s.session.messages.add(_systemMessage(s.session, '未输入口令，接入取消'));
+    return;
+  }
+  if (passphrase.startsWith('/')) {
+    // 防御：/ 开头的输入不当口令发送核对
+    s.session.messages.add(_systemMessage(s.session, '口令不能以 / 开头，接入取消（可再输 /space 重试）'));
     return;
   }
   try {
