@@ -823,6 +823,9 @@ Future<void> _runInputLoop(ChatSession session) async {
         _restoreTerminal();
         sub.cancel();
         if (!completer.isCompleted) completer.complete();
+        // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
+        // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
+        Future.delayed(const Duration(seconds: 2), () => exit(0));
         return;
       }
       if (code == 13 || code == 10) {
@@ -843,6 +846,9 @@ Future<void> _runInputLoop(ChatSession session) async {
               sub.cancel();
               if (!completer.isCompleted) completer.complete();
               inputChanged = true;
+              // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
+              // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
+              Future.delayed(const Duration(seconds: 2), () => exit(0));
               return;
             }
             session.messages.add(_systemMessage(session, '引导中仅支持 /exit 退出（输入未提交）'));
@@ -904,6 +910,9 @@ Future<void> _runInputLoop(ChatSession session) async {
             _restoreTerminal();
             sub.cancel();
             if (!completer.isCompleted) completer.complete();
+            // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
+            // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
+            Future.delayed(const Duration(seconds: 2), () => exit(0));
           } else {
             _render();
           }
