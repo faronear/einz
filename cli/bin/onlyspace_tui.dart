@@ -682,7 +682,7 @@ void _render() {
       'WS:${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
     WsStatus.stopped => 'WS:${_gray}○ 离线${_reset}',
   };
-  buf.write('${_bold}OnlySpace TUI${_reset}  ${s.session.store.deviceId ?? '-'} @ ${s.session.store.spaceId ?? '-'}  $wsName');
+  buf.write('${_bold}OnlySpace TUI${_reset}  $wsName  ${s.session.store.deviceId ?? '-'} @ ${s.session.store.spaceId ?? '-'}');
   if (s.status.isNotEmpty) {
     buf.write('  ${_gray}${s.status}${_reset}');
   }
