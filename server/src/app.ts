@@ -58,6 +58,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const msgCount = (getDb()
       .prepare(`SELECT COUNT(*) AS n FROM messages`)
       .get() as { n: number }).n;
+    // person 名称表（meta person_name:*，显示层用）：启动探测时一并下发
+    const personNames: Record<string, string> = {};
+    for (const r of getDb()
+      .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_name:%'`)
+      .all() as { key: string; value: string }[]) {
+      personNames[r.key.slice("person_name:".length)] = r.value;
+    }
     sendJson(res, 200, {
       status: "ok",
       version: SERVER_VERSION,
@@ -65,6 +72,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       space_id: cfg.space_id,
       ws_clients: wsConnCount(),
       messages_count: msgCount,
+      person_names: personNames,
     });
     return;
   }

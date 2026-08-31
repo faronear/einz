@@ -138,18 +138,23 @@ String _resolveAutoStore() {
   return valid[idx - 1].path;
 }
 
-/// 快速健康探测（GET {server}/health，3s 超时，不重试）：
-/// 能连（HTTP 200）→ true；连接失败/超时 → false。
+/// 启动探测 + 获取系统信息（GET {server}/health，3s 超时，不重试）：
+/// 能连（HTTP 200）→ (true, personNames)；连接失败/超时 → (false, {})。
+/// 探测顺带取回 person 名称表（消息前缀显示 person_name，一举两得）；
 /// 不用 ApiClient（其 connectionTimeout 10s + 3 次重试，探测太慢）。
-Future<bool> _probeServer(String server) async {
+Future<(bool, Map<String, String>)> _probeServer(String server) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();
-    await res.drain<void>();
-    return res.statusCode == 200;
+    final body = await res.transform(utf8.decoder).join();
+    if (res.statusCode != 200) return (false, <String, String>{});
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final raw = json['person_names'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    final names = <String, String>{for (final e in raw.entries) e.key: e.value as String};
+    return (true, names);
   } catch (_) {
-    return false;
+    return (false, <String, String>{});
   } finally {
     client.close(force: true);
   }
@@ -179,7 +184,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     server = (saved != null && saved.isNotEmpty) ? saved : _defaultServer();
   }
   // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（回车沿用当前值）
-  if (!await _probeServer(server)) {
+  // 探测顺带取回 person 名称表（系统信息），供消息前缀显示 person_name
+  final (probeOk, probeNames) = await _probeServer(server);
+  _probePersonNames = probeNames;
+  if (!probeOk) {
     stdout.writeln('⚠️ 无法连接服务器 $server（/health 探测失败）');
     stdout.write('输入新服务器地址（回车沿用 $server）: ');
     final input = (stdin.readLineSync() ?? '').trim();
@@ -516,7 +524,8 @@ Future<void> main(List<String> args) async {
   }
   _guidanceNotes.clear();
   _state = _TuiState(session);
-  _refreshPersonNames(_state!); // 拉取 person 名称表（消息前缀显示 person_name）
+  _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 person_name）
+  _refreshPersonNames(_state!); // 认证后刷新（保持最新）
 
   // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
   // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
@@ -1112,6 +1121,9 @@ void _printFarewell(ChatSession session) {
 
 /// 引导阶段产生的系统提示（进 TUI 后作为 system 消息显示在对话流）。
 final List<String> _guidanceNotes = [];
+
+/// 启动探测获取的 person 名称表（/health 系统信息，person_id → display_name）。
+Map<String, String> _probePersonNames = {};
 
 /// 拉取空间 person 名称表（GET /space）到缓存（认证后调用；失败静默——
 /// 前缀回退"我/对方"）。用于消息前缀显示 person_name。
