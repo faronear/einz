@@ -959,6 +959,10 @@ Future<void> _execInvite(List<String> parts) async {
 }
 
 void _printFarewell(ChatSession session) {
-  stdout.writeln();
-  stdout.writeln('${_gray}已退出 OnlySpace TUI（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
+  // /exit 后 stdout 流可能已关闭（pty 下 stdin/stdout 共享 fd，退出流程副作用），
+  // 退出信息尽力而为——写入失败忽略，避免 "StreamSink is bound to a stream" 崩溃
+  try {
+    stdout.writeln();
+    stdout.writeln('${_gray}已退出 OnlySpace TUI（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
+  } catch (_) {}
 }
