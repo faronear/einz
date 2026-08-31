@@ -309,29 +309,13 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
       final sk = await generateSpaceKey();
       store.spaceKey = base64Encode(sk);
       store.save(storePath);
-      final passphrase = _readPassphrase('设置托管口令:（输入不回显，回车提交，对方凭它接入）');
-      try {
-        final api = ApiClient(server);
-        await session.auth(); // challenge-response 认证（写入 store.sessionToken）
-        await KeyEscrowService(api).upload(
-          passphrase: passphrase,
-          spaceKeyB64: store.spaceKey!,
-          spaceId: store.spaceId!,
-          keyVersion: store.keyVersion,
-          token: store.sessionToken!,
-        );
-        stdout.writeln('✅ 口令托管包已上传: space_id=${store.spaceId}');
-        _guidanceNotes.add('✅ 口令托管包已上传: space_id=${store.spaceId}');
-        // 不主动生成邀请码（避免引导繁琐）：进对话后用 /invite 随时创建
-        stdout.writeln('💡 输入 /invite 创建邀请码以添加更多设备');
-        _guidanceNotes.add('💡 输入 /invite 创建邀请码以添加更多设备');
-        stdout.write('按回车进入对话…');
-        stdout.flush().ignore(); // 无换行写入需显式 flush（终端行缓冲，否则滞留缓冲不显示）
-        stdin.readLineSync(); // 等用户回车再进 TUI（提示留在屏上，不被 TUI 首屏覆盖）
-      } catch (e) {
-        stdout.writeln('⚠️ 创建者初始化失败: $e');
-        stdout.writeln('   可进入 TUI 后手动补：escrow upload / invite（onlyspace.dart 命令）');
-      }
+      await _setupEscrowPassphrase(store, storePath, session);
+      // 不主动生成邀请码（避免引导繁琐）：进对话后用 /invite 随时创建
+      stdout.writeln('💡 输入 /invite 创建邀请码以添加更多设备');
+      _guidanceNotes.add('💡 输入 /invite 创建邀请码以添加更多设备');
+      stdout.write('按回车进入对话…');
+      stdout.flush().ignore(); // 无换行写入需显式 flush（终端行缓冲，否则滞留缓冲不显示）
+      stdin.readLineSync(); // 等用户回车再进 TUI（提示留在屏上，不被 TUI 首屏覆盖）
     } else if (store.spaceId == null) {
       // 设备尚未登记成功（未输邀请码/自举失败等）：跳过口令接入引导（接入需先登记）
       stdout.writeln();
@@ -369,6 +353,13 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         }
       }
     }
+  }
+
+  // 已登记但口令托管包未上传（创建者引导中断）：重启再进引导设置口令
+  if (store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
+    stdout.writeln();
+    stdout.writeln('检测到尚未设置托管口令，现在设置（两次输入须一致；可 Ctrl+C 稍后重启再进）');
+    await _setupEscrowPassphrase(store, storePath, session);
   }
 
   // 未认证 → 引导认证（白名单已登记时 challenge-response 成功）
@@ -1124,6 +1115,42 @@ final List<String> _guidanceNotes = [];
 
 /// 启动探测获取的 person 名称表（/health 系统信息，person_id → display_name）。
 Map<String, String> _probePersonNames = {};
+
+/// 设置托管口令（两次输入确认：留空/不一致反复重试直到成功；成功标记
+/// store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
+Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
+  stdout.writeln('设置托管口令（用于后续设备接入空间，务必牢记；两次输入须一致）');
+  while (true) {
+    final p1 = _readPassphrase('设置口令:（输入不回显，回车提交）');
+    if (p1.isEmpty) {
+      stdout.writeln('⚠️ 口令不能为空，请重新设置');
+      continue;
+    }
+    final p2 = _readPassphrase('再次输入确认:（输入不回显，回车提交）');
+    if (p2 != p1) {
+      stdout.writeln('⚠️ 两次输入不一致，请重新设置口令');
+      continue;
+    }
+    try {
+      final api = ApiClient(session.server);
+      await session.auth(); // challenge-response 认证（写入 store.sessionToken）
+      await KeyEscrowService(api).upload(
+        passphrase: p1,
+        spaceKeyB64: store.spaceKey!,
+        spaceId: store.spaceId!,
+        keyVersion: store.keyVersion,
+        token: store.sessionToken!,
+      );
+      store.escrowUploaded = true;
+      store.save(storePath);
+      stdout.writeln('✅ 口令托管包已上传: space_id=${store.spaceId}');
+      _guidanceNotes.add('✅ 口令托管包已上传: space_id=${store.spaceId}');
+      return;
+    } catch (e) {
+      stdout.writeln('⚠️ 口令托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）');
+    }
+  }
+}
 
 /// 拉取空间 person 名称表（GET /space）到缓存（认证后调用；失败静默——
 /// 前缀回退"我/对方"）。用于消息前缀显示 person_name。

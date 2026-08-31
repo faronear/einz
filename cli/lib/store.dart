@@ -26,6 +26,7 @@ class DeviceStore {
     this.sessionToken,
     this.server,
     this.lastServerSequence = 0,
+    this.escrowUploaded = false,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
     List<Map<String, dynamic>>? attachments,
@@ -47,6 +48,9 @@ class DeviceStore {
   String? sessionToken;
   String? server; // 服务器地址（TUI 引导确认后持久化，多终端无需重复输入）
   int lastServerSequence;
+
+  /// 创建者口令托管包是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
+  bool escrowUploaded;
 
   /// 离线发送队列：MessageEnvelope 的 JSON 字符串（已加密，落盘安全）。
   final List<String> pending;
@@ -82,6 +86,7 @@ class DeviceStore {
         'session_token': sessionToken,
         'server': server,
         'last_server_sequence': lastServerSequence,
+        'escrow_uploaded': escrowUploaded,
         'pending': pending,
         'history': history,
         'attachments': attachments,
@@ -101,6 +106,7 @@ class DeviceStore {
         sessionToken: json['session_token'] as String?,
         server: json['server'] as String?,
         lastServerSequence: (json['last_server_sequence'] as int?) ?? 0,
+        escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
