@@ -65,7 +65,7 @@ class ApiClient {
     required String publicKey,
     String? inviteCode,
     String? displayName,
-    String? nickname,
+    String? deviceName,
   }) async {
     final res = await _post(
       Api.devicesEnroll,
@@ -74,7 +74,7 @@ class ApiClient {
         'public_key': publicKey,
         if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
         if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
-        if (nickname != null && nickname.isNotEmpty) 'nickname': nickname,
+        if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
       },
       withToken: false,
     );

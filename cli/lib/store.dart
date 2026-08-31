@@ -19,7 +19,7 @@ class DeviceStore {
     required this.privateKey,
     this.personId,
     this.personName,
-    this.nickname,
+    this.deviceName,
     this.spaceKey,
     this.spaceId,
     this.keyVersion = 1,
@@ -40,7 +40,7 @@ class DeviceStore {
   final String privateKey; // base64（测试用明文存储）
   String? personId; // 规范 person id（personA/personB），enroll 后由服务端返回写入
   String? personName; // 使用者自定义名称（如 lukas），显示层用
-  String? nickname; // 设备自定义昵称（如 MacBook），显示层用
+  String? deviceName; // 设备自定义名称（如 MacBook），显示层用
   String? spaceKey; // base64，config/import 后填充
   String? spaceId;
   int keyVersion;
@@ -75,7 +75,7 @@ class DeviceStore {
         'private_key': privateKey,
         'person_id': personId,
         'person_name': personName,
-        'nickname': nickname,
+        'device_name': deviceName,
         'space_key': spaceKey,
         'space_id': spaceId,
         'key_version': keyVersion,
@@ -94,7 +94,7 @@ class DeviceStore {
         privateKey: json['private_key'] as String,
         personId: json['person_id'] as String?,
         personName: json['person_name'] as String?,
-        nickname: json['nickname'] as String?,
+        deviceName: json['device_name'] as String?,
         spaceKey: json['space_key'] as String?,
         spaceId: json['space_id'] as String?,
         keyVersion: (json['key_version'] as int?) ?? 1,

@@ -46,7 +46,7 @@ Future<void> main(List<String> args) async {
     ..addOption('passphrase', help: '口令托管密钥的口令（escrow 用）')
     ..addOption('invite-code', help: '邀请码（enroll 用；留空=首设备自举，登记为创建者）')
     ..addOption('hours', help: '邀请码有效期小时数（invite 用，默认 24）')
-    ..addOption('nickname', help: '设备自定义昵称（enroll 用，显示层，如 MacBook）')
+    ..addOption('device-name', help: '设备自定义名称（enroll 用，显示层，如 MacBook）')
     ..addOption('name', help: '对方自定义名称（invite 用，如 steffi；person_id 为规范 id）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
@@ -226,19 +226,19 @@ Future<void> _cmdEnroll(ArgResults opts) async {
   final server = _require(opts, 'server');
   final inviteCode = opts['invite-code'] as String?;
   final displayName = opts['person'] as String?; // 你的名称（如 lukas），enroll 后写入 store
-  final nickname = opts['nickname'] as String?;
+  final deviceName = opts['device-name'] as String?;
   final r = await ApiClient(server).enrollDevice(
     deviceId: store.deviceId,
     publicKey: store.publicKey,
     inviteCode: inviteCode,
     displayName: displayName,
-    nickname: nickname,
+    deviceName: deviceName,
   );
   // 登记响应带回服务端分配的规范 id：更新 store（deviceId=devN、personId=personA/B）
   store.deviceId = r.deviceId;
   store.personId = r.personId;
   if (displayName != null && displayName.isNotEmpty) store.personName = displayName;
-  if (nickname != null && nickname.isNotEmpty) store.nickname = nickname;
+  if (deviceName != null && deviceName.isNotEmpty) store.deviceName = deviceName;
   store.spaceId = r.spaceId;
   store.save(path);
   final isBootstrap = inviteCode == null || inviteCode.isEmpty;

@@ -70,7 +70,7 @@ export function enrollDevice(
     public_key?: string;
     invite_code?: string;
     display_name?: string;
-    nickname?: string;
+    device_name?: string;
   };
   const deviceId = (b.device_id ?? "").trim();
   const publicKey = (b.public_key ?? "").trim();
@@ -87,7 +87,7 @@ export function enrollDevice(
       throw new ApiError("INVALID_REQUEST", "device_id / public_key 必填", 400);
     }
     const assignedId = assignDeviceId(deviceId); // 首个设备 → dev1（规范 id）
-    const nickname = (b.nickname ?? "").trim() || assignedId;
+    const deviceName = (b.device_name ?? "").trim() || assignedId;
     const personId = "personA";
     const displayName = (b.display_name ?? "").trim() || "personA";
     const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(assignedId) as
@@ -97,12 +97,12 @@ export function enrollDevice(
       throw new ApiError("FORBIDDEN", "device revoked, cannot re-enroll", 403);
     }
     if (!existing) {
-      db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, nickname, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
-        .run(assignedId, personId, publicKey, nickname, now);
+      db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
+        .run(assignedId, personId, publicKey, deviceName, now);
     }
     setMeta("creator_person_id", personId); // 创建者标记（规范 id）
     setMeta(`person_name:${personId}`, displayName); // 名称表：personA → lukas
-    console.log(`[onlyspace] 首设备自举成功: device=${assignedId}（${nickname}）person=${personId}（${displayName}，空间创建者）`);
+    console.log(`[onlyspace] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${displayName}，空间创建者）`);
     return { ok: true, device_id: assignedId, person_id: personId, space_id: cfg.space_id };
   }
 
@@ -136,7 +136,7 @@ export function enrollDevice(
 
   // 3) 登记设备（幂等：已 active 直接成功；revoked 拒绝复活）
   const assignedId = assignDeviceId(deviceId); // 服务端分配规范 id（dev2、dev3…）
-  const nickname = (b.nickname ?? "").trim() || assignedId;
+  const deviceName = (b.device_name ?? "").trim() || assignedId;
   const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(assignedId) as
     | { status: string }
     | undefined;
@@ -144,8 +144,8 @@ export function enrollDevice(
     throw new ApiError("FORBIDDEN", "device revoked, cannot re-enroll", 403);
   }
   if (!existing) {
-    db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, nickname, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
-      .run(assignedId, invite.person_id, publicKey, nickname, now);
+    db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
+      .run(assignedId, invite.person_id, publicKey, deviceName, now);
   }
 
   // 4) 标记邀请码已用（一次性）

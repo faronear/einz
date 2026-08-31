@@ -203,11 +203,11 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         stdout.writeln('✅ 已设置名称: $name');
       }
     }
-    if (store.nickname == null || store.nickname!.isEmpty) {
-      stdout.write('设备昵称（如 MacBook，回车不设置）: ');
-      final nick = (stdin.readLineSync() ?? '').trim();
-      if (nick.isNotEmpty) {
-        store.nickname = nick;
+    if (store.deviceName == null || store.deviceName!.isEmpty) {
+      stdout.write('设备名称（显示用，如 MacBook，回车不设置）: ');
+      final name = (stdin.readLineSync() ?? '').trim();
+      if (name.isNotEmpty) {
+        store.deviceName = name;
       }
     }
     store.save(storePath);
@@ -220,7 +220,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
           deviceId: store.deviceId,
           publicKey: store.publicKey,
           displayName: store.personName,
-          nickname: store.nickname,
+          deviceName: store.deviceName,
         );
         store.deviceId = r.deviceId; // 服务端分配的规范 id（dev1）
         store.personId = r.personId; // 规范 person id（personA）
@@ -241,7 +241,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
               publicKey: store.publicKey,
               inviteCode: inviteCode,
               displayName: store.personName,
-              nickname: store.nickname,
+              deviceName: store.deviceName,
             );
             store.deviceId = r.deviceId;
             store.personId = r.personId;

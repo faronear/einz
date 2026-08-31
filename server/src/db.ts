@@ -21,7 +21,7 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data
       person_id   TEXT NOT NULL,
       public_key  TEXT NOT NULL,
       status      TEXT NOT NULL DEFAULT 'active',
-      nickname    TEXT,
+      device_name TEXT,
       last_seen   INTEGER,
       created_at  INTEGER NOT NULL
     );
@@ -103,9 +103,9 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data
   } catch {
     // 列已存在（新库）→ 忽略
   }
-  // 迁移：devices 表补充 nickname（设备昵称，显示层用）
+  // 迁移：devices 表补充 device_name（设备名称，显示层用）
   try {
-    db.exec(`ALTER TABLE devices ADD COLUMN nickname TEXT`);
+    db.exec(`ALTER TABLE devices ADD COLUMN device_name TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
