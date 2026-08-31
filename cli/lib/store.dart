@@ -21,6 +21,7 @@ class DeviceStore {
     this.spaceId,
     this.keyVersion = 1,
     this.sessionToken,
+    this.server,
     this.lastServerSequence = 0,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
@@ -38,6 +39,7 @@ class DeviceStore {
   String? spaceId;
   int keyVersion;
   String? sessionToken;
+  String? server; // 服务器地址（TUI 引导确认后持久化，多终端无需重复输入）
   int lastServerSequence;
 
   /// 离线发送队列：MessageEnvelope 的 JSON 字符串（已加密，落盘安全）。
@@ -69,6 +71,7 @@ class DeviceStore {
         'space_id': spaceId,
         'key_version': keyVersion,
         'session_token': sessionToken,
+        'server': server,
         'last_server_sequence': lastServerSequence,
         'pending': pending,
         'history': history,
@@ -84,6 +87,7 @@ class DeviceStore {
         spaceId: json['space_id'] as String?,
         keyVersion: (json['key_version'] as int?) ?? 1,
         sessionToken: json['session_token'] as String?,
+        server: json['server'] as String?,
         lastServerSequence: (json['last_server_sequence'] as int?) ?? 0,
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],

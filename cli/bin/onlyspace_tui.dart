@@ -78,8 +78,12 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
 
     // 邀请码动态登记：新设备凭创建者给的邀请码自动登记（免人工加白名单/重启 server）
     if (server.isEmpty) {
-      stdout.write('服务器地址（如 https://only.tic.cc）: ');
+      const defaultServer = 'https://only.tic.cc';
+      stdout.write('服务器地址（回车默认 $defaultServer）: ');
       server = (stdin.readLineSync() ?? '').trim();
+      if (server.isEmpty) server = defaultServer;
+      store.server = server; // 持久化：同一 store 后续启动不再询问
+      store.save(storePath);
     }
     if (server.isNotEmpty) {
       stdout.write('邀请码（空间创建者提供，可留空跳过）: ');
@@ -92,7 +96,7 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
             inviteCode: inviteCode,
           );
           stdout.writeln('✅ 邀请码登记成功: person_id=${r.personId} space_id=${r.spaceId}');
-        } on Exception catch (e) {
+        } catch (e) {
           stdout.writeln('⚠️ 邀请码登记失败: $e（无效/已用/过期或网络问题）');
           stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
         }
@@ -104,9 +108,20 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
     }
   }
 
+  // 服务器地址：优先 store 持久化值（同一电脑多终端/多次启动只确认一次）；
+  // 无则默认 https://only.tic.cc，用户可覆盖输入后持久化。
   if (server.isEmpty) {
-    stdout.write('服务器地址（如 https://only.tic.cc，回车跳过）: ');
-    server = (stdin.readLineSync() ?? '').trim();
+    final saved = store.server;
+    if (saved != null && saved.isNotEmpty) {
+      server = saved;
+    } else {
+      const defaultServer = 'https://only.tic.cc';
+      stdout.write('服务器地址（回车默认 $defaultServer）: ');
+      server = (stdin.readLineSync() ?? '').trim();
+      if (server.isEmpty) server = defaultServer;
+      store.server = server;
+      store.save(storePath);
+    }
   }
 
   final session = ChatSession(store, storePath, server);
@@ -176,7 +191,7 @@ String _readPassphrase(String prompt) {
 
   void safeFlush() {
     try {
-      stdout.flush();
+      stdout.flush().ignore(); // Future 异常同步 catch 接不到，必须 ignore()
     } catch (_) {}
   }
 
@@ -253,9 +268,10 @@ Future<void> main(List<String> args) async {
     return;
   }
 
-  // 上次异常退出（如 raw 模式下直接 Ctrl+C）可能残留无回显终端状态；
-  // 引导（cooked 问答）前先恢复终端回显+行缓冲，否则输入文字看不见。
-  _restoreTerminal();
+  // 注：曾在引导前调用 _restoreTerminal() 以恢复"上次异常退出残留的无回显终端"，
+  // 但 pty/重定向环境下 stdin 未订阅时设置 echo/lineMode 会触发未捕获异常导致
+  // 进程 255 崩溃（已实测定位）。残留场景较少见（真实终端进程退出后由 shell 接管
+  // termios），不做启动时强制恢复；退出路径 _exitRaw 已保证正常恢复。
 
   // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成设备身份；
   // 无 Space Key → 口令接入（escrow）；未认证 → auth。全部就绪后才进入 TUI。
@@ -277,7 +293,7 @@ Future<void> main(List<String> args) async {
       if (fresh.isNotEmpty) {
         _state!.status = '启动同步：新增 ${fresh.length} 条';
       }
-    } on Exception catch (e) {
+    } catch (e) {
       _state!.status = '启动同步跳过: $e（可稍后 /sync）';
     }
   }
@@ -328,6 +344,14 @@ void _restoreTerminal() {
   } catch (_) {
     // pty/重定向环境下 fd 可能已失效；真实终端无此问题。兜底不打断退出链路。
   }
+  // 恢复光标显示：_render 开头写了 \x1B[?25l 隐藏光标，退出必须恢复，
+  // 否则 Mac 终端看似"没回到正常命令行"，只能 Ctrl-C 强退。
+  // 注意：stdout.flush() 返回 Future，异常在 Future 里（同步 try-catch 接不到），
+  // 必须 .ignore() 吞掉——否则 pty 下未捕获异步异常导致进程 255 崩溃。
+  try {
+    stdout.write('\x1B[?25h');
+    stdout.flush().ignore();
+  } catch (_) {}
 }
 
 void _exitRaw() {
@@ -440,9 +464,15 @@ void _render() {
     buf.write('\r\n');
   }
 
-  // 输入区（多行）：首行带 prompt，续行缩进对齐；超长输入自动换行
+  // 输入区：**固定屏幕底部**（top = rows - inputLines + 1），
+  // 与 _renderInputLine 的定位计算完全一致——否则消息少时输入区被画在
+  // 屏幕中间，与局部重绘的底部定位不一致 → you> 跳动、上下重复。
+  // 逐行定位 + 清行（\x1B[K），避免残留旧行。
   final prompt = '${_cyan}you>${_reset} ';
+  final top = rows - inputWrapped.length + 1;
   for (var i = 0; i < inputWrapped.length; i++) {
+    buf.write('\x1B[${top + i};1H'); // 定位输入区各行第 1 列
+    buf.write('\x1B[K'); // 清除该行
     if (i == 0) {
       buf.write(prompt);
     } else {
@@ -458,9 +488,11 @@ void _render() {
   // 渲染可能因终端环境抛异常（如 pty 下 Dart stdout 与 stdin 共享 StreamSink，
   // stdin.listen 后 write 报 "StreamSink is bound to a stream"；真实终端无此问题）。
   // 兜底：渲染失败不崩溃，业务逻辑（发送/同步/WS 落盘）照常。
+  // 注意：flush() 返回 Future，异常在 Future 里，同步 try-catch 接不到——
+  // 必须 .ignore()，否则 pty 下发送消息触发重绘时未捕获异步异常导致进程 255 崩溃。
   try {
     stdout.write(buf.toString());
-    stdout.flush();
+    stdout.flush().ignore();
   } catch (_) {
     // 忽略渲染异常（终端能力不足时降级为不刷新界面）
   }
@@ -519,7 +551,7 @@ void _renderInputLine() {
   buf.write(_showCursor);
   try {
     stdout.write(buf.toString());
-    stdout.flush();
+    stdout.flush().ignore(); // Future 异常同步 catch 接不到，必须 ignore()
   } catch (_) {}
 }
 
@@ -606,7 +638,7 @@ Future<void> _sendText(String text) async {
   try {
     final ok = await s.session.sendText(text);
     s.status = ok ? '已发送' : '已入队（离线，恢复后自动补发）';
-  } on Exception catch (e) {
+  } catch (e) {
     s.status = '发送失败: $e';
   }
 }
@@ -619,7 +651,23 @@ Future<void> _execCommand(String line) async {
 
   switch (cmd) {
     case '/help':
-      s.status = '命令: /auth [server] /sync /history /attach <file> /exit';
+      s.status = '命令: /auth [server] /server <地址> /sync /history /attach <file> /exit';
+    case '/server':
+      if (arg.isEmpty) {
+        s.status = '当前服务器: ${s.session.server}；用法: /server <地址>';
+      } else {
+        try {
+          await s.session.auth(serverOverride: arg);
+          s.session.store.server = arg; // 持久化新地址
+          s.session.store.save(s.session.storePath);
+          if (s.session.wsClient == null && s.session.hasSession) {
+            s.session.startWs(onMessage: (_) => _render(), onStatus: (_) => _render());
+          }
+          s.status = '✅ 已切换服务器并认证: $arg';
+        } catch (e) {
+          s.status = '切换服务器失败: $e';
+        }
+      }
     case '/auth':
       try {
         await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
@@ -631,14 +679,14 @@ Future<void> _execCommand(String line) async {
             onStatus: (_) => _render(),
           );
         }
-      } on Exception catch (e) {
+      } catch (e) {
         s.status = '认证失败: $e';
       }
     case '/sync':
       try {
         final fresh = await s.session.sync();
         s.status = '同步完成: 新增=${fresh.length} 队列剩余=${s.session.store.pendingCount}';
-      } on Exception catch (e) {
+      } catch (e) {
         s.status = '同步失败: $e';
       }
     case '/history':
@@ -650,7 +698,7 @@ Future<void> _execCommand(String line) async {
         try {
           final r = await s.session.attachFile(arg);
           s.status = '✅ 附件已上传: ${r.caption} (id=${r.attachmentId.substring(0, 8)})';
-        } on Exception catch (e) {
+        } catch (e) {
           s.status = '附件上传失败: $e';
         }
       }
