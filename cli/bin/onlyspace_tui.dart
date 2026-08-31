@@ -263,12 +263,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 设备登记：先尝试首设备自举（空间无设备 → 免邀请码成为创建者）；失败 → 凭邀请码加入
   if (server.isNotEmpty) {
     try {
-      final r = await ApiClient(server).enrollDevice(
+      final r = await _busy(session, '⏳ 设备登记中......', () => ApiClient(server).enrollDevice(
         deviceId: store.deviceId,
         publicKey: store.publicKey,
         displayName: store.personName,
         deviceName: store.deviceName,
-      );
+      ));
       store.deviceId = r.deviceId;
       store.personId = r.personId;
       store.spaceId = r.spaceId;
@@ -297,13 +297,13 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             continue;
           }
           try {
-            final r = await ApiClient(server).enrollDevice(
+            final r = await _busy(session, '⏳ 邀请码登记中......', () => ApiClient(server).enrollDevice(
               deviceId: store.deviceId,
               publicKey: store.publicKey,
               inviteCode: inviteCode,
               displayName: store.personName,
               deviceName: store.deviceName,
-            );
+            ));
             store.deviceId = r.deviceId;
             store.personId = r.personId;
             store.spaceId = r.spaceId;
@@ -323,7 +323,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             if (!_state!.running) break; // 已退出：结束引导
             final passphrase = await _prompt(session, '口令:（输入不回显，回车提交）', hidden: true);
             try {
-              await session.accessByEscrow(passphrase);
+              await _busy(session, '⏳ 口令接入中......', () => session.accessByEscrow(passphrase));
               session.messages.add(_systemMessage(session, '✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}'));
               _scheduleRender();
               break;
@@ -356,7 +356,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 未认证 → 引导认证（白名单已登记时 challenge-response 成功）
   if (store.sessionToken == null && server.isNotEmpty) {
     try {
-      await session.auth();
+      await _busy(session, '⏳ 认证中......', () => session.auth());
       session.messages.add(_systemMessage(session, '✅ 认证成功: space_id=${store.spaceId ?? '-'}'));
       _scheduleRender();
     } catch (e) {
@@ -608,6 +608,26 @@ void _scheduleRender() {
       stderr.writeln('⚠️ 引导渲染异常: $e');
     }
   });
+}
+
+/// 后台操作包装（网络延迟体验统一优化）：操作前插入 busyText 状态消息并置
+/// processing（忽略输入、隐藏光标不闪烁），操作完成后移除 busyText（无论成败）；
+/// 异常 rethrow——由调用方 try-catch 产出结果消息（"打包中"替换为结果）。
+Future<T> _busy<T>(ChatSession session, String busyText, Future<T> Function() action) async {
+  final busyMsg = _systemMessage(session, busyText);
+  session.messages.add(busyMsg);
+  _state!.processing = true;
+  _scheduleRender();
+  try {
+    final r = await action();
+    _state!.processing = false;
+    session.messages.remove(busyMsg);
+    return r;
+  } catch (e) {
+    _state!.processing = false;
+    session.messages.remove(busyMsg);
+    rethrow;
+  }
 }
 
 void _render() {
@@ -1028,12 +1048,12 @@ Future<void> _execInvite(List<String> parts) async {
   final name = parts.length > 2 ? parts.sublist(2).join(' ') : null;
   try {
     final api = ApiClient(s.session.server);
-    final r = await api.createInvite(
+    final r = await _busy(s.session, '⏳ 邀请码生成中......', () => api.createInvite(
       token: token,
       personId: personId,
       displayName: name,
       hours: 24,
-    );
+    ));
     // 邀请码作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
     s.session.messages.add(_systemMessage(s.session, '邀请码（24 小时内一次性有效）: ${r.inviteCode}'));
     s.status = ''; // 反馈在消息区（邀请码本身），状态栏保持干净
@@ -1124,32 +1144,26 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
     if (!_state!.running) break; // 已退出：结束口令设置
     final p1 = await _prompt(session, '设置托管口令（用于后续设备接入空间，务必牢记）：请输入口令（输入不回显，回车提交）', hidden: true, required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
-    // 打包/上传期间：插入"打包中"状态消息、禁止输入、隐藏光标（不闪烁），
-    // 完成后把该消息替换为结果（成功/失败）——避免等待期间屏幕无变化像卡住
-    final busyMsg = _systemMessage(session, '⏳ 口令打包中......');
-    session.messages.add(busyMsg);
-    _state!.processing = true;
-    _scheduleRender();
     try {
       final api = ApiClient(session.server);
-      await session.auth(); // challenge-response 认证（写入 store.sessionToken）
-      await KeyEscrowService(api).upload(
-        passphrase: p1,
-        spaceKeyB64: store.spaceKey!,
-        spaceId: store.spaceId!,
-        keyVersion: store.keyVersion,
-        token: store.sessionToken!,
-      );
+      // _busy：打包/上传期间插入"⏳ 口令打包中......"、禁止输入、隐藏光标，
+      // 完成后移除（替换为下方结果消息）——统一体验优化
+      await _busy(session, '⏳ 口令打包中......', () async {
+        await session.auth(); // challenge-response 认证（写入 store.sessionToken）
+        await KeyEscrowService(api).upload(
+          passphrase: p1,
+          spaceKeyB64: store.spaceKey!,
+          spaceId: store.spaceId!,
+          keyVersion: store.keyVersion,
+          token: store.sessionToken!,
+        );
+      });
       store.escrowUploaded = true;
       store.save(storePath);
-      _state!.processing = false;
-      session.messages.remove(busyMsg); // 替换：移除"打包中"，加入结果消息
       session.messages.add(_systemMessage(session, '✅ 口令托管包已上传: space_id=${store.spaceId}'));
       _scheduleRender();
       return;
     } catch (e) {
-      _state!.processing = false;
-      session.messages.remove(busyMsg);
       session.messages.add(_systemMessage(session, '⚠️ 口令托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）'));
       _scheduleRender();
     }
