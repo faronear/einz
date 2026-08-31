@@ -545,21 +545,46 @@ List<String> _wrapByWidth(String s, int maxWidth) {
 }
 
 /// 终端行数（非终端/pty 下 terminalLines 可能抛异常，兜底 24）。
+/// 终端行数：stty size 优先（真实终端尺寸最可靠，raw 模式/stdout.terminalLines
+/// 失效时仍准确——此前兜底 24 与用户实际行数不符时渲染定位超出屏幕导致滚动、
+/// 新消息被滚出可视区），失败再退 terminalLines/默认。
 int _termLines() {
+  final size = _sttySize();
+  if (size != null) return size.$1;
   try {
-    return stdout.terminalLines;
-  } catch (_) {
-    return 24;
-  }
+    final t = stdout.terminalLines;
+    if (t > 0) return t;
+  } catch (_) {}
+  return 24;
 }
 
-/// 终端列数（非终端/pty 下 terminalColumns 可能抛异常，兜底 80）。
+/// 终端列数（同上：stty size 优先）。
 int _termCols() {
+  final size = _sttySize();
+  if (size != null) return size.$2;
   try {
-    return stdout.terminalColumns;
-  } catch (_) {
-    return 80;
-  }
+    final c = stdout.terminalColumns;
+    if (c > 0) return c;
+  } catch (_) {}
+  return 80;
+}
+
+/// stty size（"rows cols"），失败返回 null。轻量 ioctl，_render 每次调用可接受。
+(int, int)? _sttySize() {
+  try {
+    final r = Process.runSync('stty', ['size']);
+    if (r.exitCode == 0) {
+      final parts = (r.stdout as String).trim().split(RegExp(r'\s+'));
+      if (parts.length == 2) {
+        final rows = int.tryParse(parts[0]);
+        final cols = int.tryParse(parts[1]);
+        if (rows != null && cols != null && rows > 0 && cols > 0) {
+          return (rows, cols);
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
 }
 
 /// 输入内容折行：每行最大宽度 = cols - prompt 显示宽度（最后一行行首带 prompt）。
