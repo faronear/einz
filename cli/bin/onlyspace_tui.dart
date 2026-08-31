@@ -277,6 +277,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         _render();
         // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
         while (true) {
+          if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
           final inviteCode = await _prompt(session, '邀请码（空间创建者提供，输错会反复要求重输）');
           if (inviteCode.isEmpty) {
             session.messages.add(_systemMessage(session, '未输入邀请码，请重新输入（或 Ctrl+C 退出）'));
@@ -307,6 +308,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         // 登记成功后口令接入（加入者——无 Space Key）
         if (store.spaceKey == null && store.spaceId != null) {
           while (true) {
+            if (!_state!.running) break; // 已退出：结束引导
             final passphrase = await _prompt(session, '口令:（输入不回显，回车提交）', hidden: true);
             try {
               await session.accessByEscrow(passphrase);
@@ -738,6 +740,7 @@ Future<void> _runInputLoop(ChatSession session) async {
       if (code == 3) {
         // Ctrl+C → 退出（先恢复终端，再取消监听，见 _restoreTerminal 注释）
         _state!.running = false;
+        _abortPendingGuide(); // 释放引导问答等待，避免 _runGuide 挂起
         _restoreTerminal();
         sub.cancel();
         if (!completer.isCompleted) completer.complete();
@@ -774,6 +777,7 @@ Future<void> _runInputLoop(ChatSession session) async {
           if (!(_state?.running ?? false)) {
             // /exit 或 /quit：先恢复终端（必须在 sub.cancel 之前，否则 fd 失效
             // 无法设 echoMode），再取消监听并结束主流程（否则 await 永远挂起）
+            _abortPendingGuide(); // 释放引导问答等待，避免 _runGuide 挂起（await guide 卡死）
             _restoreTerminal();
             sub.cancel();
             if (!completer.isCompleted) completer.complete();
@@ -1027,6 +1031,7 @@ Map<String, String> _probePersonNames = {};
 /// store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
+    if (!_state!.running) break; // 已退出：结束口令设置
     final p1 = await _prompt(session, '设置托管口令（用于后续设备接入空间，务必牢记）：请输入口令（输入不回显）', hidden: true);
     if (p1.isEmpty) {
       session.messages.add(_systemMessage(session, '⚠️ 口令不能为空，请重新设置'));
@@ -1097,10 +1102,19 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 /// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
 Future<String> _prompt(ChatSession session, String message, {bool hidden = false}) {
   final s = _state!;
+  if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
   session.messages.add(_systemMessage(session, message));
   _render();
   final completer = Completer<String>();
   s.pendingGuideCompleter = completer;
   return completer.future;
+}
+
+/// 退出时释放引导问答等待（complete 空回答），避免 _runGuide 的 await 挂起。
+void _abortPendingGuide() {
+  final c = _state?.pendingGuideCompleter;
+  if (c != null && !c.isCompleted) c.complete('');
+  _state?.pendingGuideCompleter = null;
+  _state?.hiddenInput = false;
 }
