@@ -14,7 +14,7 @@ import 'package:onlyspace_shared/onlyspace_shared.dart';
 /// 支持"离线发送 → 恢复网络 → 自动补发 → 无重复无乱序"的验证。
 class DeviceStore {
   DeviceStore({
-    required this.deviceId,
+    this.deviceId,
     required this.publicKey,
     required this.privateKey,
     this.personId,
@@ -35,7 +35,7 @@ class DeviceStore {
         attachments = attachments ?? [],
         archivedSpaceKeys = archivedSpaceKeys ?? [];
 
-  String deviceId; // 服务端分配的规范 id（dev1/dev2…）；enroll 前为本地临时 id
+  String? deviceId; // 规范设备 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 personId 一致）
   final String publicKey; // base64
   final String privateKey; // base64（测试用明文存储）
   String? personId; // 规范 person id（personA/personB），enroll 后由服务端返回写入
@@ -60,10 +60,10 @@ class DeviceStore {
   /// 归档 Space Key（E2EE.md §9.2）：[{key_version, space_key(base64)}]，只读用于解密旧消息。
   final List<Map<String, dynamic>> archivedSpaceKeys;
 
-  static Future<DeviceStore> create(String deviceId) async {
+  static Future<DeviceStore> create({String? deviceId}) async {
     final kp = await DeviceKeyPair.generate(deviceId: deviceId);
     return DeviceStore(
-      deviceId: kp.deviceId,
+      deviceId: deviceId, // 显式临时 id；默认 null（登记后由服务端分配规范 id）
       publicKey: kp.publicKeyB64,
       privateKey: kp.privateKeyB64,
     );
@@ -89,7 +89,7 @@ class DeviceStore {
       };
 
   static DeviceStore fromJson(Map<String, dynamic> json) => DeviceStore(
-        deviceId: json['device_id'] as String,
+        deviceId: json['device_id'] as String?,
         publicKey: json['public_key'] as String,
         privateKey: json['private_key'] as String,
         personId: json['person_id'] as String?,

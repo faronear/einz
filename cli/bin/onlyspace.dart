@@ -117,7 +117,7 @@ Future<void> _cmdInit(ArgResults opts) async {
   if (File(path).existsSync()) {
     throw StateError('存储已存在: $path（如需重建请先删除）');
   }
-  final store = await DeviceStore.create(deviceId);
+  final store = await DeviceStore.create(deviceId: deviceId);
   store.save(path);
   stdout.writeln('✅ init: device_id=${store.deviceId}');
   stdout.writeln('   public_key=${store.publicKey}');
@@ -203,7 +203,7 @@ Future<void> _cmdAuth(ArgResults opts) async {
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId);
+  final challenge = await api.challenge(store.deviceId!);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
@@ -292,7 +292,7 @@ Future<void> _cmdEscrowUpload(ArgResults opts) async {
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId);
+  final challenge = await api.challenge(store.deviceId!);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
@@ -322,7 +322,7 @@ Future<void> _cmdEscrowDownload(ArgResults opts) async {
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId);
+  final challenge = await api.challenge(store.deviceId!);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
@@ -360,7 +360,7 @@ Future<void> _cmdSend(ArgResults opts) async {
     plaintext: message,
     spaceKey: base64Decode(store.spaceKey!),
     spaceId: store.spaceId!,
-    senderDeviceId: store.deviceId,
+    senderDeviceId: store.deviceId!,
     messageId: messageId,
     keyVersion: store.keyVersion, // 轮换后新消息必须用当前 key_version（E2EE.md §9.1）
   );
@@ -632,7 +632,7 @@ Future<void> _cmdAttach(ArgResults opts) async {
     plaintext: caption,
     spaceKey: base64Decode(store.spaceKey!),
     spaceId: store.spaceId!,
-    senderDeviceId: store.deviceId,
+    senderDeviceId: store.deviceId!,
     messageId: messageId,
     type: type,
     keyVersion: store.keyVersion,

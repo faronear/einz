@@ -83,8 +83,9 @@ export function enrollDevice(
   //    person 用规范 id（personA），自定义名称（display_name，如 lukas）存 meta 名称表
   const activeCount = (db.prepare(`SELECT COUNT(*) AS c FROM devices WHERE status = 'active'`).get() as { c: number }).c;
   if (activeCount === 0) {
-    if (!deviceId || !publicKey) {
-      throw new ApiError("INVALID_REQUEST", "device_id / public_key 必填", 400);
+    if (!publicKey) {
+      // device_id 可空：客户端登记前无 id（登记后由服务端分配规范 id dev1/dev2…）
+      throw new ApiError("INVALID_REQUEST", "public_key 必填", 400);
     }
     const assignedId = assignDeviceId(deviceId); // 首个设备 → dev1（规范 id）
     const deviceName = (b.device_name ?? "").trim() || assignedId;

@@ -91,7 +91,7 @@ class ChatSession {
     final api = ApiClient(target);
     final s = await sodium();
 
-    final challenge = await api.challenge(store.deviceId);
+    final challenge = await api.challenge(store.deviceId!);
     final opened = await sealOpen(
       s,
       base64Decode(challenge.sealedChallenge),
@@ -145,7 +145,7 @@ class ChatSession {
       plaintext: text,
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
-      senderDeviceId: store.deviceId,
+      senderDeviceId: store.deviceId!,
       senderPersonId: store.personId,
       messageId: messageId,
       keyVersion: store.keyVersion,
@@ -334,7 +334,7 @@ class ChatSession {
       plaintext: cap,
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
-      senderDeviceId: store.deviceId,
+      senderDeviceId: store.deviceId!,
       senderPersonId: store.personId,
       messageId: messageId,
       type: type,

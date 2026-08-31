@@ -61,7 +61,7 @@ class ApiClient {
   /// 新设备凭一次性邀请码动态登记（POST /devices/enroll，免认证——邀请码即准入令牌）。
   /// 登记成功后设备立即在服务端白名单生效（无需人工改 config.json / 重启）。
   Future<EnrollResult> enrollDevice({
-    required String deviceId,
+    String? deviceId,
     required String publicKey,
     String? inviteCode,
     String? displayName,
@@ -70,7 +70,7 @@ class ApiClient {
     final res = await _post(
       Api.devicesEnroll,
       {
-        'device_id': deviceId,
+        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
         'public_key': publicKey,
         if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
         if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,

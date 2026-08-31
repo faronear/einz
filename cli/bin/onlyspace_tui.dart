@@ -113,14 +113,14 @@ String _resolveAutoStore() {
   if (valid.isEmpty) return ''; // 无可用设备 → _onboard 引导 init
 
   if (valid.length == 1) {
-    stdout.writeln('✅ 使用设备: ${valid.first.store.deviceId}');
+    stdout.writeln('✅ 使用设备: ${valid.first.store.deviceId ?? '(未登记)'}');
     return valid.first.path;
   }
 
   // 多台设备：列出选择（cooked 数字选择）
   stdout.writeln('发现 ${valid.length} 台设备:');
   for (var i = 0; i < valid.length; i++) {
-    stdout.writeln('  ${i + 1}) ${valid[i].store.deviceId}');
+    stdout.writeln('  ${i + 1}) ${valid[i].store.deviceId ?? '(未登记)'}');
   }
   stdout.write('选择 [回车=1]: ');
   final input = (stdin.readLineSync() ?? '').trim();
@@ -179,24 +179,24 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   if (store == null) {
     stdout.writeln('=== OnlySpace TUI 首次使用引导 ===');
     stdout.writeln('本机还没有设备身份，现在生成（私钥保存在本机: $storePath）');
-    // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地临时 id 自动生成即可，
-    // 无需用户输入（输入也会被登记返回的规范 id 覆盖）
-    store = await DeviceStore.create('dev-auto');
-    // 自动模式（无 --store）→ 存默认目录 ~/.onlyspace/[device-id].json
+    // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
+    // 与 personId 一致），无需用户输入
+    store = await DeviceStore.create();
+    // 自动模式（无 --store）→ 存默认目录 ~/.onlyspace/[临时].json（登记后重命名为 personA_dev1.json）
     if (storePath.isEmpty) {
       autoStore = true;
       final dir = _defaultStoreDir();
       Directory(dir).createSync(recursive: true);
-      storePath = '$dir/${store.deviceId}.json';
+      storePath = '$dir/pending.json';
     }
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
-    stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}（登记后服务端分配 dev1 等规范 id）');
+    stdout.writeln('✅ 设备身份已生成');
     stdout.writeln('   公钥: ${store.publicKey}');
 
     // 你的名称（显示层，如 lukas）与设备昵称（如 MacBook）：登记前询问，随 enroll 上报
     if (store.personName == null || store.personName!.isEmpty) {
-      stdout.write('你的名称（如 lukas，回车默认 设备名）: ');
+      stdout.write('你的名称（如 lukas，留空回车则不设置）: ');
       final name = (stdin.readLineSync() ?? '').trim();
       if (name.isNotEmpty) {
         store.personName = name;
@@ -230,29 +230,35 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         creator = true;
         stdout.writeln('✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}');
       } catch (e) {
-        stdout.write('邀请码（空间创建者提供）: ');
-        final inviteCode = (stdin.readLineSync() ?? '').trim();
-        if (inviteCode.isEmpty) {
-          stdout.writeln('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
-        } else {
-          try {
-            final r = await ApiClient(server).enrollDevice(
-              deviceId: store.deviceId,
-              publicKey: store.publicKey,
-              inviteCode: inviteCode,
-              displayName: store.personName,
-              deviceName: store.deviceName,
-            );
-            store.deviceId = r.deviceId;
-            store.personId = r.personId;
-            store.spaceId = r.spaceId;
-            renameToStandard(r.personId, r.deviceId); // 自动模式：设备文件改名为 personB_dev2.json
-            store.save(storePath);
-            stdout.writeln('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
-          } catch (e2) {
-            stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）');
-            stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
+        // 区分自举失败：空间已有设备（需要邀请码）vs 网络/服务器错误（首个设备免邀请码）
+        if (e is ApiException && e.code == 'INVALID_REQUEST') {
+          stdout.writeln('空间已有设备（你不是第一个加入者），加入需要邀请码');
+          stdout.write('邀请码（空间创建者提供）: ');
+          final inviteCode = (stdin.readLineSync() ?? '').trim();
+          if (inviteCode.isEmpty) {
+            stdout.writeln('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
+          } else {
+            try {
+              final r = await ApiClient(server).enrollDevice(
+                deviceId: store.deviceId,
+                publicKey: store.publicKey,
+                inviteCode: inviteCode,
+                displayName: store.personName,
+                deviceName: store.deviceName,
+              );
+              store.deviceId = r.deviceId;
+              store.personId = r.personId;
+              store.spaceId = r.spaceId;
+              renameToStandard(r.personId, r.deviceId); // 自动模式：设备文件改名为 personB_dev2.json
+              store.save(storePath);
+              stdout.writeln('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
+            } catch (e2) {
+              stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）');
+              stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
+            }
           }
+        } else {
+          stdout.writeln('⚠️ 自举失败: $e（首个设备免邀请码；请确认服务器可达后重试）');
         }
       }
     } else {
@@ -302,6 +308,11 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         stdout.writeln('⚠️ 创建者初始化失败: $e');
         stdout.writeln('   可进入 TUI 后手动补：escrow upload / invite（onlyspace.dart 命令）');
       }
+    } else if (store.spaceId == null) {
+      // 设备尚未登记成功（自举网络失败等）：跳过口令接入引导（接入需先登记）
+      stdout.writeln();
+      stdout.writeln('⚠️ 设备尚未登记成功（网络问题？），跳过接入引导');
+      stdout.writeln('   可稍后重试引导，或进入 TUI 后 /auth 补配');
     } else {
       stdout.writeln();
       stdout.writeln('本设备还没有 Space Key，无法收发消息。接入方式：');
@@ -641,7 +652,7 @@ void _render() {
       'WS:${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
     WsStatus.stopped => 'WS:${_gray}○ 离线${_reset}',
   };
-  buf.write('${_bold}OnlySpace TUI${_reset}  ${s.session.store.deviceId} @ ${s.session.store.spaceId ?? '-'}  $wsName');
+  buf.write('${_bold}OnlySpace TUI${_reset}  ${s.session.store.deviceId ?? '-'} @ ${s.session.store.spaceId ?? '-'}  $wsName');
   if (s.status.isNotEmpty) {
     buf.write('  ${_gray}${s.status}${_reset}');
   }
