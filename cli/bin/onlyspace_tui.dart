@@ -327,6 +327,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         while (true) {
           if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
           final inviteCode = await _prompt(session, '加入私密空间需要输入邀请码（由任意一个已认证设备提供）:');
+          if (!_state!.running) break; // 退出中（/exit 逃生门已触发）——立即结束引导，不进登记
           if (inviteCode.isEmpty) {
             session.messages.add(_systemMessage(session, '未输入邀请码，请重新输入（或 Ctrl+C 退出）'));
             _scheduleRender();
@@ -367,12 +368,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
       final passphrase = await _prompt(session, '请输入空间口令:', hidden: true, required: true);
+      if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
+      if (passphrase.isEmpty) {
+        // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
+        // （此前漏过 / 检查直接进 accessByEscrow——"口令对接中"卡住退不出）
+        session.messages.add(_systemMessage(session, '口令不能为空，请重新输入（/exit 可退出）'));
+        _scheduleRender();
+        continue;
+      }
       if (passphrase.startsWith('/')) {
         // / 开头的输入（输入循环 / 检查被绕过时的兜底）：/exit、/quit 按退出
         // 处理（逃生门——不能提示"非法口令"重输而困住用户）；其他 / 不当口令发送核对
         if (passphrase == '/exit' || passphrase == '/quit') {
           _state!.running = false;
-          exit(0);
+          break; // running=false 后由 main 收尾 + 2 秒兜底退出（exit(0) 死代码已移除）
         }
         session.messages.add(_systemMessage(session, '口令不能以 / 开头，请重新输入（/exit 可退出）'));
         _scheduleRender();
