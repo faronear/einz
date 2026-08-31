@@ -11,6 +11,17 @@ function genInviteCode(len = 20): string {
   return s.match(/.{1,5}/g)!.join("-");
 }
 
+/** 分配设备规范 id：客户端传入的 id 已在 devices 表（幂等重登记）→ 原样返回；
+ *  否则分配下一个 devN（dev1、dev2…）。设备 id 与密钥解耦（仅标签，见 keys.ts），可安全重命名。 */
+function assignDeviceId(clientId: string): string {
+  const db = getDb();
+  if (db.prepare(`SELECT device_id FROM devices WHERE device_id = ?`).get(clientId)) return clientId;
+  const maxRow = db
+    .prepare(`SELECT MAX(CAST(SUBSTR(device_id, 4) AS INTEGER)) AS m FROM devices WHERE device_id LIKE 'dev%'`)
+    .get() as { m: number | null };
+  return `dev${(maxRow.m ?? 0) + 1}`;
+}
+
 /** GET /devices：设备列表（含 person 映射）。 */
 export function listDevices(cfg: ServerConfig, token: string): { devices: unknown[] } {
   const { device_id } = resolveSession(token);
@@ -54,7 +65,13 @@ export function enrollDevice(
   cfg: ServerConfig,
   body: unknown
 ): { ok: true; device_id: string; person_id: string; space_id: string } {
-  const b = (body ?? {}) as { device_id?: string; public_key?: string; invite_code?: string; person_id?: string };
+  const b = (body ?? {}) as {
+    device_id?: string;
+    public_key?: string;
+    invite_code?: string;
+    display_name?: string;
+    nickname?: string;
+  };
   const deviceId = (b.device_id ?? "").trim();
   const publicKey = (b.public_key ?? "").trim();
   const inviteCode = (b.invite_code ?? "").trim();
@@ -62,26 +79,31 @@ export function enrollDevice(
   const db = getDb();
   const now = Date.now();
 
-  // 0) 首设备自举：空间 0 台 active 设备 → 免邀请码，登记为创建者
+  // 0) 首设备自举：空间 0 台 active 设备 → 免邀请码，登记为创建者。
+  //    person 用规范 id（personA），自定义名称（display_name，如 lukas）存 meta 名称表
   const activeCount = (db.prepare(`SELECT COUNT(*) AS c FROM devices WHERE status = 'active'`).get() as { c: number }).c;
   if (activeCount === 0) {
     if (!deviceId || !publicKey) {
       throw new ApiError("INVALID_REQUEST", "device_id / public_key 必填", 400);
     }
-    const personId = (b.person_id ?? "").trim() || "person-1";
-    const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(deviceId) as
+    const assignedId = assignDeviceId(deviceId); // 首个设备 → dev1（规范 id）
+    const nickname = (b.nickname ?? "").trim() || assignedId;
+    const personId = "personA";
+    const displayName = (b.display_name ?? "").trim() || "personA";
+    const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(assignedId) as
       | { status: string }
       | undefined;
     if (existing && existing.status === "revoked") {
       throw new ApiError("FORBIDDEN", "device revoked, cannot re-enroll", 403);
     }
     if (!existing) {
-      db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, created_at) VALUES (?, ?, ?, 'active', ?)`)
-        .run(deviceId, personId, publicKey, now);
+      db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, nickname, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
+        .run(assignedId, personId, publicKey, nickname, now);
     }
-    setMeta("creator_person_id", personId); // 创建者标记：生成邀请码的唯一权限
-    console.log(`[onlyspace] 首设备自举成功: device=${deviceId} person=${personId}（空间创建者）`);
-    return { ok: true, device_id: deviceId, person_id: personId, space_id: cfg.space_id };
+    setMeta("creator_person_id", personId); // 创建者标记（规范 id）
+    setMeta(`person_name:${personId}`, displayName); // 名称表：personA → lukas
+    console.log(`[onlyspace] 首设备自举成功: device=${assignedId}（${nickname}）person=${personId}（${displayName}，空间创建者）`);
+    return { ok: true, device_id: assignedId, person_id: personId, space_id: cfg.space_id };
   }
 
   // 1) 常规登记：邀请码必填（空间已有设备）
@@ -113,22 +135,24 @@ export function enrollDevice(
   }
 
   // 3) 登记设备（幂等：已 active 直接成功；revoked 拒绝复活）
-  const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(deviceId) as
+  const assignedId = assignDeviceId(deviceId); // 服务端分配规范 id（dev2、dev3…）
+  const nickname = (b.nickname ?? "").trim() || assignedId;
+  const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(assignedId) as
     | { status: string }
     | undefined;
   if (existing && existing.status === "revoked") {
     throw new ApiError("FORBIDDEN", "device revoked, cannot re-enroll", 403);
   }
   if (!existing) {
-    db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, created_at) VALUES (?, ?, ?, 'active', ?)`)
-      .run(deviceId, invite.person_id, publicKey, now);
+    db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, nickname, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
+      .run(assignedId, invite.person_id, publicKey, nickname, now);
   }
 
   // 4) 标记邀请码已用（一次性）
   db.prepare(`UPDATE invites SET status = 'used', used_by = ?, used_at = ? WHERE invite_code = ?`)
-    .run(deviceId, now, inviteCode);
+    .run(assignedId, now, inviteCode);
 
-  return { ok: true, device_id: deviceId, person_id: invite.person_id, space_id: cfg.space_id };
+  return { ok: true, device_id: assignedId, person_id: invite.person_id, space_id: cfg.space_id };
 }
 
 /**
@@ -145,22 +169,21 @@ export function createInvite(
   const { device_id: callerId } = resolveSession(token);
   if (!isActiveDevice(cfg, callerId)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
 
-  const b = (body ?? {}) as { person_id?: string; hours?: number };
+  const b = (body ?? {}) as { person_id?: string; display_name?: string; hours?: number };
   const personId = (b.person_id ?? "").trim();
-  if (!personId) throw new ApiError("INVALID_REQUEST", "person_id 必填", 400);
+  if (personId !== "personA" && personId !== "personB") {
+    throw new ApiError("INVALID_REQUEST", "person_id 必须是规范 id: personA 或 personB", 400);
+  }
+  const displayName = (b.display_name ?? "").trim();
   const hours = Math.min(Math.max(Math.floor(b.hours ?? 24), 1), 168);
 
   const db = getDb();
-  // 权限：创建者专属（creator_person_id 未设置=旧库，放宽为任一 active 设备）
-  const creator = getMeta("creator_person_id");
-  if (creator) {
-    const caller = db.prepare(`SELECT person_id FROM devices WHERE device_id = ?`).get(callerId) as
-      | { person_id: string }
-      | undefined;
-    if (!caller || caller.person_id !== creator) {
-      throw new ApiError("FORBIDDEN", "仅创建者可生成邀请码", 403);
-    }
-  }
+  // 权限：任一 active 设备均可生成邀请码（第一/第二使用者都能邀请自己的其他设备）；
+  // 旧库无 active 设备时（未自举）拒绝（空间未初始化）
+  const caller = db.prepare(`SELECT person_id FROM devices WHERE device_id = ? AND status = 'active'`).get(callerId) as
+    | { person_id: string }
+    | undefined;
+  if (!caller) throw new ApiError("FORBIDDEN", "仅空间成员可生成邀请码（设备未激活）", 403);
 
   // 两 person 上限预检：新 person（无 active 设备）且空间已满 2 → 拒绝
   const personCount = db
@@ -172,11 +195,15 @@ export function createInvite(
   if (personCount.c >= 2 && thisPersonActive.c === 0) {
     throw new ApiError("FORBIDDEN", "空间最多两个 person（当前已满）", 403);
   }
+  // 名称表：新 person 首次被邀请时记录自定义名称（如 personB → steffi）
+  if (displayName) {
+    setMeta(`person_name:${personId}`, displayName);
+  }
 
   const code = genInviteCode();
   const expiresAt = Date.now() + hours * 3600_000;
   db.prepare(`INSERT INTO invites (invite_code, person_id, status, created_at, expires_at) VALUES (?, ?, 'pending', ?, ?)`)
     .run(code, personId, Date.now(), expiresAt);
-  console.log(`[onlyspace] 创建者生成邀请码: person=${personId} hours=${hours}`);
+  console.log(`[onlyspace] 生成邀请码: person=${personId}${displayName ? `（${displayName}）` : ""} hours=${hours}`);
   return { invite_code: code, person_id: personId, expires_at: expiresAt };
 }

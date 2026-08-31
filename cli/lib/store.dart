@@ -18,6 +18,8 @@ class DeviceStore {
     required this.publicKey,
     required this.privateKey,
     this.personId,
+    this.personName,
+    this.nickname,
     this.spaceKey,
     this.spaceId,
     this.keyVersion = 1,
@@ -33,10 +35,12 @@ class DeviceStore {
         attachments = attachments ?? [],
         archivedSpaceKeys = archivedSpaceKeys ?? [];
 
-  final String deviceId;
+  String deviceId; // 服务端分配的规范 id（dev1/dev2…）；enroll 前为本地临时 id
   final String publicKey; // base64
   final String privateKey; // base64（测试用明文存储）
-  String? personId; // 使用者身份（person-a/person-b）：同一个人多台设备填相同值，"自己/对方"判断维度
+  String? personId; // 规范 person id（personA/personB），enroll 后由服务端返回写入
+  String? personName; // 使用者自定义名称（如 lukas），显示层用
+  String? nickname; // 设备自定义昵称（如 MacBook），显示层用
   String? spaceKey; // base64，config/import 后填充
   String? spaceId;
   int keyVersion;
@@ -70,6 +74,8 @@ class DeviceStore {
         'public_key': publicKey,
         'private_key': privateKey,
         'person_id': personId,
+        'person_name': personName,
+        'nickname': nickname,
         'space_key': spaceKey,
         'space_id': spaceId,
         'key_version': keyVersion,
@@ -87,6 +93,8 @@ class DeviceStore {
         publicKey: json['public_key'] as String,
         privateKey: json['private_key'] as String,
         personId: json['person_id'] as String?,
+        personName: json['person_name'] as String?,
+        nickname: json['nickname'] as String?,
         spaceKey: json['space_key'] as String?,
         spaceId: json['space_id'] as String?,
         keyVersion: (json['key_version'] as int?) ?? 1,

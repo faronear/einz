@@ -45,7 +45,9 @@ Future<void> main(List<String> args) async {
     ..addOption('action', help: 'escrow 子命令: upload|download')
     ..addOption('passphrase', help: '口令托管密钥的口令（escrow 用）')
     ..addOption('invite-code', help: '邀请码（enroll 用；留空=首设备自举，登记为创建者）')
-    ..addOption('hours', help: '邀请码有效期小时数（invite 用，默认 24）');
+    ..addOption('hours', help: '邀请码有效期小时数（invite 用，默认 24）')
+    ..addOption('nickname', help: '设备自定义昵称（enroll 用，显示层，如 MacBook）')
+    ..addOption('name', help: '对方自定义名称（invite 用，如 steffi；person_id 为规范 id）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
   final opts = parser.parse(rest);
@@ -223,23 +225,31 @@ Future<void> _cmdEnroll(ArgResults opts) async {
   final store = DeviceStore.load(path);
   final server = _require(opts, 'server');
   final inviteCode = opts['invite-code'] as String?;
-  final personId = opts['person'] as String?;
+  final displayName = opts['person'] as String?; // 你的名称（如 lukas），enroll 后写入 store
+  final nickname = opts['nickname'] as String?;
   final r = await ApiClient(server).enrollDevice(
     deviceId: store.deviceId,
     publicKey: store.publicKey,
     inviteCode: inviteCode,
-    personId: personId,
+    displayName: displayName,
+    nickname: nickname,
   );
+  // 登记响应带回服务端分配的规范 id：更新 store（deviceId=devN、personId=personA/B）
+  store.deviceId = r.deviceId;
+  store.personId = r.personId;
+  if (displayName != null && displayName.isNotEmpty) store.personName = displayName;
+  if (nickname != null && nickname.isNotEmpty) store.nickname = nickname;
   store.spaceId = r.spaceId;
   store.save(path);
   final isBootstrap = inviteCode == null || inviteCode.isEmpty;
-  stdout.writeln('✅ 登记成功: person_id=${r.personId} space_id=${r.spaceId}');
+  stdout.writeln('✅ 登记成功: device_id=${r.deviceId} person_id=${r.personId} space_id=${r.spaceId}');
   if (isBootstrap) {
     stdout.writeln('   （首设备自举：你是空间创建者，可 escrow upload 上传托管包、invite 生成邀请码）');
   }
 }
 
-/// invite：创建者生成一次性邀请码（POST /invites，需先 auth 拿 session）。
+/// invite：生成一次性邀请码（POST /invites，需先 auth 拿 session）。
+/// person 为规范 id（personA=自己加设备 / personB=邀请对方）；--name 给新 person 设显示名。
 Future<void> _cmdInvite(ArgResults opts) async {
   final path = _require(opts, 'store');
   final store = DeviceStore.load(path);
@@ -248,10 +258,15 @@ Future<void> _cmdInvite(ArgResults opts) async {
     throw StateError('未认证：请先运行 auth --store $path --server $server');
   }
   final personId = _require(opts, 'person');
+  if (personId != 'personA' && personId != 'personB') {
+    throw StateError('--person 必须是规范 id: personA（自己加设备）或 personB（邀请对方）');
+  }
+  final name = opts['name'] as String?;
   final hours = int.tryParse(opts['hours'] as String? ?? '24') ?? 24;
   final r = await ApiClient(server).createInvite(
     token: store.sessionToken!,
     personId: personId,
+    displayName: name,
     hours: hours,
   );
   stdout.writeln('✅ 邀请码已生成（${hours}h 有效，一次性）: ${r.inviteCode}');

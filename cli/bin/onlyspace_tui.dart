@@ -182,6 +182,24 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
     stdout.writeln('   公钥: ${store.publicKey}');
 
+    // 你的名称（显示层，如 lukas）与设备昵称（如 MacBook）：登记前询问，随 enroll 上报
+    if (store.personName == null || store.personName!.isEmpty) {
+      stdout.write('你的名称（如 lukas，回车默认 设备名）: ');
+      final name = (stdin.readLineSync() ?? '').trim();
+      if (name.isNotEmpty) {
+        store.personName = name;
+        stdout.writeln('✅ 已设置名称: $name');
+      }
+    }
+    if (store.nickname == null || store.nickname!.isEmpty) {
+      stdout.write('设备昵称（如 MacBook，回车不设置）: ');
+      final nick = (stdin.readLineSync() ?? '').trim();
+      if (nick.isNotEmpty) {
+        store.nickname = nick;
+      }
+    }
+    store.save(storePath);
+
     // 设备登记：先尝试首设备自举（空间无设备 → 免邀请码成为创建者）；
     // 失败（空间已有设备）→ 凭创建者给的邀请码加入
     if (server.isNotEmpty) {
@@ -189,12 +207,15 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         final r = await ApiClient(server).enrollDevice(
           deviceId: store.deviceId,
           publicKey: store.publicKey,
-          personId: store.personId,
+          displayName: store.personName,
+          nickname: store.nickname,
         );
+        store.deviceId = r.deviceId; // 服务端分配的规范 id（dev1）
+        store.personId = r.personId; // 规范 person id（personA）
         store.spaceId = r.spaceId;
         store.save(storePath);
         creator = true;
-        stdout.writeln('✅ 首设备自举成功（你是空间创建者）: person_id=${r.personId} space_id=${r.spaceId}');
+        stdout.writeln('✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}');
       } catch (e) {
         stdout.write('邀请码（空间创建者提供）: ');
         final inviteCode = (stdin.readLineSync() ?? '').trim();
@@ -206,10 +227,14 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
               deviceId: store.deviceId,
               publicKey: store.publicKey,
               inviteCode: inviteCode,
+              displayName: store.personName,
+              nickname: store.nickname,
             );
+            store.deviceId = r.deviceId;
+            store.personId = r.personId;
             store.spaceId = r.spaceId;
             store.save(storePath);
-            stdout.writeln('✅ 邀请码登记成功: person_id=${r.personId} space_id=${r.spaceId}');
+            stdout.writeln('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
           } catch (e2) {
             stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）');
             stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
@@ -218,19 +243,6 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
       }
     } else {
       stdout.writeln('未提供服务器地址，稍后可在 TUI 内用 /auth 补配');
-    }
-  }
-
-  // 使用者身份（person id）：同一个人多台设备填相同值，"自己/对方"按 person 判断，
-  // 避免同一个人两台设备互发时被误判为"对方"（回车不设置=按设备判断，旧行为）。
-  // 无论身份是 TUI 创建还是 CLI init 生成，只要 store 无 person 就询问一次。
-  if (store.personId == null || store.personId!.isEmpty) {
-    stdout.write('你的身份（person id，如 luk / fanr，同一个人多台设备请填相同值，回车不设置）: ');
-    final personId = (stdin.readLineSync() ?? '').trim();
-    if (personId.isNotEmpty) {
-      store.personId = personId;
-      store.save(storePath);
-      stdout.writeln('✅ 已设置身份: person_id=$personId');
     }
   }
 
@@ -251,7 +263,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
       final sk = await generateSpaceKey();
       store.spaceKey = base64Encode(sk);
       store.save(storePath);
-      final passphrase = _readPassphrase('设置托管口令:（输入不回显，对方凭它接入）');
+      final passphrase = _readPassphrase('设置托管口令:（输入不回显，回车提交，对方凭它接入）');
       try {
         final api = ApiClient(server);
         await session.auth(); // challenge-response 认证（写入 store.sessionToken）
@@ -263,12 +275,13 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
           token: store.sessionToken!,
         );
         stdout.writeln('✅ 口令托管包已上传: space_id=${store.spaceId}');
-        // 生成邀请码给"对方"（第二 person）
-        stdout.write('对方的 person id（生成邀请码用，如 fanr，回车默认 person-b）: ');
-        final peerPerson = (stdin.readLineSync() ?? '').trim();
+        // 生成邀请码给"对方"（第二 person，规范 id=personB + 对方名称）
+        stdout.write('对方名称（如 steffi，回车默认不设置）: ');
+        final peerName = (stdin.readLineSync() ?? '').trim();
         final invite = await api.createInvite(
           token: store.sessionToken!,
-          personId: peerPerson.isEmpty ? 'person-b' : peerPerson,
+          personId: 'personB',
+          displayName: peerName.isEmpty ? null : peerName,
         );
         stdout.writeln('✅ 邀请码已生成（发给对方，24h 有效）: ${invite.inviteCode}');
       } catch (e) {
@@ -291,7 +304,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
       } else {
         stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
-        final passphrase = _readPassphrase('口令:（输入不回显）');
+        final passphrase = _readPassphrase('口令:（输入不回显，回车提交）');
         try {
           await session.accessByEscrow(passphrase);
           stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
@@ -353,6 +366,9 @@ String _readPassphrase(String prompt) {
       stdin.echoMode = false;
       final v = stdin.readLineSync() ?? '';
       safeWriteln();
+      try {
+        stdout.writeln('（已输入 ${v.length} 位口令）'); // Windows 无逐键星号，提交后给位数反馈
+      } catch (_) {}
       return v;
     }
     // POSIX：逐键星号渲染
@@ -379,9 +395,15 @@ String _readPassphrase(String prompt) {
       safeFlush();
     }
     safeWriteln();
+    try {
+      stdout.writeln('（已输入 ${buf.length} 位口令）');
+    } catch (_) {}
     return buf.toString();
   } catch (_) {
     // pty/重定向等不支持：退回整行隐藏读取
+    try {
+      stdout.writeln('（终端模式不可用：口令隐藏输入、无星号回显，回车提交）');
+    } catch (_) {}
     final v = stdin.readLineSync() ?? '';
     safeWriteln();
     return v;

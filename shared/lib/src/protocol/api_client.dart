@@ -64,7 +64,8 @@ class ApiClient {
     required String deviceId,
     required String publicKey,
     String? inviteCode,
-    String? personId,
+    String? displayName,
+    String? nickname,
   }) async {
     final res = await _post(
       Api.devicesEnroll,
@@ -72,20 +73,30 @@ class ApiClient {
         'device_id': deviceId,
         'public_key': publicKey,
         if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
-        if (personId != null && personId.isNotEmpty) 'person_id': personId,
+        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (nickname != null && nickname.isNotEmpty) 'nickname': nickname,
       },
       withToken: false,
     );
     return EnrollResult.fromJson(res);
   }
 
-  /// 创建者生成邀请码（POST /invites，需认证 token）。
+  /// 生成邀请码（POST /invites，需认证 token）：person_id 为规范 id（personA/personB）。
   Future<InviteResult> createInvite({
     required String token,
     required String personId,
+    String? displayName,
     int hours = 24,
   }) async {
-    final res = await _post(Api.invites, {'person_id': personId, 'hours': hours}, token: token);
+    final res = await _post(
+      Api.invites,
+      {
+        'person_id': personId,
+        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        'hours': hours,
+      },
+      token: token,
+    );
     return InviteResult.fromJson(res);
   }
 
