@@ -74,6 +74,7 @@ class _TuiState {
   /// 引导问答等待（_prompt 用）：输入循环提交回答时 complete。
   Completer<String>? pendingGuideCompleter;
   bool pendingGuideRequired = false; // 当前引导问答是否必填（留空回车不提交）
+  bool processing = false; // 后台处理中（如口令打包上传）：忽略输入、隐藏光标
 }
 
 _TuiState? _state;
@@ -679,7 +680,7 @@ void _render() {
       buf.write('\r\n');
     }
   }
-  buf.write(_showCursor);
+  if (!s.processing) buf.write(_showCursor); // 处理中（打包/上传）不显示光标（不闪烁）
 
   // 渲染可能因终端环境抛异常（如 pty 下 Dart stdout 与 stdin 共享 StreamSink，
   // stdin.listen 后 write 报 "StreamSink is bound to a stream"；真实终端无此问题）。
@@ -768,7 +769,7 @@ void _renderInputLine() {
     }
     buf.write(inputWrapped[i]);
   }
-  buf.write(_showCursor);
+  if (!s.processing) buf.write(_showCursor); // 处理中不显示光标（不闪烁）
   try {
     stdout.write(buf.toString());
     stdout.flush().ignore(); // Future 异常同步 catch 接不到，必须 ignore()
@@ -790,6 +791,7 @@ Future<void> _runInputLoop(ChatSession session) async {
     for (final ch in chunk.split('')) {
       if (!(_state?.running ?? false)) break;
       final code = ch.codeUnitAt(0);
+      if ((_state?.processing ?? false) && code != 3) continue; // 处理中（如口令打包）：忽略输入，Ctrl+C 仍可退出
       if (code == 3) {
         // Ctrl+C → 退出（先恢复终端，再取消监听，见 _restoreTerminal 注释）
         _state!.running = false;
@@ -1122,6 +1124,12 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
     if (!_state!.running) break; // 已退出：结束口令设置
     final p1 = await _prompt(session, '设置托管口令（用于后续设备接入空间，务必牢记）：请输入口令（输入不回显，回车提交）', hidden: true, required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
+    // 打包/上传期间：插入"打包中"状态消息、禁止输入、隐藏光标（不闪烁），
+    // 完成后把该消息替换为结果（成功/失败）——避免等待期间屏幕无变化像卡住
+    final busyMsg = _systemMessage(session, '⏳ 口令打包中......');
+    session.messages.add(busyMsg);
+    _state!.processing = true;
+    _scheduleRender();
     try {
       final api = ApiClient(session.server);
       await session.auth(); // challenge-response 认证（写入 store.sessionToken）
@@ -1134,10 +1142,14 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       );
       store.escrowUploaded = true;
       store.save(storePath);
+      _state!.processing = false;
+      session.messages.remove(busyMsg); // 替换：移除"打包中"，加入结果消息
       session.messages.add(_systemMessage(session, '✅ 口令托管包已上传: space_id=${store.spaceId}'));
       _scheduleRender();
       return;
     } catch (e) {
+      _state!.processing = false;
+      session.messages.remove(busyMsg);
       session.messages.add(_systemMessage(session, '⚠️ 口令托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）'));
       _scheduleRender();
     }
