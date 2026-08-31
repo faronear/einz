@@ -39,6 +39,7 @@ class ChatPage extends StatefulWidget {
     this.db,
     this.api,
     this.enableWs = true,
+    this.reauth,
   });
 
   final String server;
@@ -56,6 +57,10 @@ class ChatPage extends StatefulWidget {
 
   /// WS 实时开关（测试环境关闭，避免真实连接与重连 Timer）。
   final bool enableWs;
+
+  /// session 过期（401/4401）时自动重新认证的回调（setup_page 注入，
+  /// challenge-response 重新签发 token）——MessageRepository/WsRealtimeService 共用。
+  final Future<String> Function()? reauth;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -121,6 +126,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       keyVersion: widget.keyVersion,
       token: widget.token,
       settings: BurnAfterSettings(db),
+      reauth: widget.reauth,
     );
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
@@ -129,7 +135,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _restartTicker(const Duration(seconds: 3));
     _registerPushToken();
     if (widget.enableWs) {
-      final ws = WsRealtimeService(server: widget.server, token: widget.token);
+      final ws = WsRealtimeService(
+        server: widget.server,
+        token: widget.token,
+        reauth: widget.reauth,
+      );
       _ws = ws;
       ws.connected.addListener(_onWsStatusChanged);
       ws.start(

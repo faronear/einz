@@ -362,6 +362,8 @@ class _SetupPageState extends State<SetupPage> {
         spaceKey: sk,
         keyVersion: 1,
         token: token,
+        // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
+        reauth: () async => (await _authenticate(kp)).sessionToken,
       ),
     ));
   }

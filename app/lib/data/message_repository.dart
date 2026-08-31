@@ -37,6 +37,7 @@ class MessageRepository {
     Map<int, Uint8List>? archivedKeys,
     this.token,
     this.settings,
+    this.reauth,
   }) : archivedKeys = archivedKeys ?? {};
 
   final LocalDatabase db;
@@ -65,6 +66,25 @@ class MessageRepository {
   /// 会话 token（认证后注入；未认证时发送只入队不同步）。
   String? token;
 
+  /// 401（session 过期）时自动重新认证的回调（由上层注入：setup_page 的
+  /// challenge-response 流程），返回新 token 供 [_withAutoAuth] 重试。
+  final Future<String> Function()? reauth;
+
+  /// 401（session 过期）自动续期：调 [reauth] 拿新 token → 更新 [token] → 重试一次。
+  /// 保证 24h 会话过期后 app 请求无感恢复；其他错误原样抛出。
+  Future<T> _withAutoAuth<T>(Future<T> Function(String token) fn) async {
+    final t = token;
+    if (t == null) throw StateError('未认证');
+    try {
+      return await fn(t);
+    } on ApiException catch (e) {
+      if (e.httpStatus != 401 || reauth == null) rethrow;
+      final fresh = await reauth!();
+      token = fresh;
+      return await fn(fresh);
+    }
+  }
+
   /// 设备 → 用户（person_id）映射（GET /space 缓存，多设备身份语义）。
   /// 用于判断消息是否"同一个人"发送：同 person 不同设备显示为 'me'。
   final Map<String, String> _personByDevice = {};
@@ -74,7 +94,7 @@ class MessageRepository {
     final t = token;
     if (t == null) return;
     try {
-      final space = await api.getSpace(t);
+      final space = await _withAutoAuth((tok) => api.getSpace(tok));
       _personByDevice
         ..clear()
         ..addEntries(space.devices.map((d) => MapEntry(d.deviceId, d.personId)));
@@ -118,7 +138,7 @@ class MessageRepository {
     final t = token;
     if (t != null) {
       try {
-        final result = await api.postMessage(env, t);
+        final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
       } on Exception {
         // 网络失败：留在 pending 队列，下次 sync 自动补发
@@ -166,18 +186,18 @@ class MessageRepository {
     if (t != null) {
       try {
         // 3) 上传密文 blob（x-attachment-meta 头带元数据）
-        await api.postAttachment(
-          messageId: messageId,
-          attachmentId: attachmentId,
-          keyVersion: keyVersion,
-          size: enc.size,
-          sha256: enc.sha256,
-          nonce: base64Encode(enc.nonce),
-          blob: enc.cipher,
-          token: t,
-        );
+        await _withAutoAuth((tok) => api.postAttachment(
+              messageId: messageId,
+              attachmentId: attachmentId,
+              keyVersion: keyVersion,
+              size: enc.size,
+              sha256: enc.sha256,
+              nonce: base64Encode(enc.nonce),
+              blob: enc.cipher,
+              token: tok,
+            ));
         // 4) 发消息
-        final result = await api.postMessage(env, t);
+        final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
         // 5) 本地附件元数据落库（供历史渲染关联）
         await _insertAttachmentMeta({
@@ -220,7 +240,7 @@ class MessageRepository {
     var added = 0;
     var cursor = await lastSequence;
     while (true) {
-      final result = await api.sync(t, after: cursor);
+      final result = await _withAutoAuth((tok) => api.sync(tok, after: cursor));
       for (final env in result.messages) {
         final bs = await _burnState();
         await _insertLocal(
@@ -258,7 +278,7 @@ class MessageRepository {
     for (final row in rows) {
       final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
       try {
-        final result = await api.postMessage(env, t);
+        final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
         flushed++;
       } on Exception {
@@ -382,7 +402,7 @@ class MessageRepository {
     if (t == null) throw StateError('未认证，无法下载附件');
     final key = _keyForVersion(keyVersion);
     if (key == null) throw StateError('缺少 key_version=$keyVersion 的 Space Key');
-    final blob = await api.getAttachment(attachmentId, t);
+    final blob = await _withAutoAuth((tok) => api.getAttachment(attachmentId, tok));
     return decryptAttachment(
       cipherText: blob,
       nonce: nonce,

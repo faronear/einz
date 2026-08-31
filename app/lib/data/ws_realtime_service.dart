@@ -3,11 +3,24 @@ import 'package:onlyspace_shared/onlyspace_shared.dart';
 
 /// WS 实时服务：封装 shared [WsClient]（连接 + 指数退避重连），
 /// 事件回调 + 连接状态通知（chat_page 据此切换轮询策略）。
+/// [reauth]：session 过期（WS 4401）时自动重新认证的回调（返回新 token），
+/// 供 WsClient.onUnauthorized 续期后立即重连——24h 会话过期无感恢复。
 class WsRealtimeService {
-  WsRealtimeService({required this.server, required this.token});
+  WsRealtimeService({required this.server, required String token, this.reauth}) : _token = token;
 
   final String server;
-  final String token;
+  String _token;
+
+  /// 401（session 过期）时自动重新认证的回调（由上层注入：setup_page 的
+  /// challenge-response 流程），返回新 token 供 [updateToken] 后重连。
+  final Future<String> Function()? reauth;
+
+  String get token => _token;
+
+  /// 更新连接 token（重新认证后调用，供下一次重连使用）。
+  void updateToken(String newToken) {
+    _token = newToken;
+  }
 
   WsClient? _client;
 
@@ -26,7 +39,12 @@ class WsRealtimeService {
     this.onDeviceRevoked = onDeviceRevoked;
     _client = WsClient(
       server: server,
-      token: token,
+      token: _token,
+      onUnauthorized: () async {
+        // session 过期（4401）：自动重新认证并更新 token，随后 WsClient 立即重连
+        final fresh = await reauth?.call();
+        if (fresh != null) updateToken(fresh);
+      },
       onEvent: (e) {
         if (e is WsMessageNewEvent) this.onMessageNew?.call();
         if (e is WsDeviceRevokedEvent) this.onDeviceRevoked?.call();
