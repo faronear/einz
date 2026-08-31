@@ -677,15 +677,21 @@ void _render() {
   }
   buf.write('\r\n');
 
-  // 消息区：拼接本地历史 + 系统提示，取末尾 msgArea 行（长消息折行多行）
+  // 消息区：从下往上堆叠——最新消息紧贴输入条（输入条上方），旧消息向上滚出，
+  // 消息量变化时消息流固定在底部堆叠，避免跳来跳去
   final lines = <String>[];
   for (final m in s.session.messages) {
     lines.addAll(_formatMessage(m, cols));
   }
   final start = lines.length > msgArea ? lines.length - msgArea : 0;
-  for (var i = start; i < lines.length; i++) {
-    buf.write(lines[i]);
-    buf.write('\r\n');
+  final visible = lines.sublist(start);
+  final bottom = rows - s.inputLines; // 输入条上方第一行（消息区底部）
+  var row = bottom;
+  for (var i = visible.length - 1; i >= 0; i--) {
+    buf.write('\x1B[$row;1H');
+    buf.write('\x1B[K');
+    buf.write(visible[i]);
+    row--;
   }
 
   // 输入区：**固定屏幕底部**（top = rows - inputLines + 1），
