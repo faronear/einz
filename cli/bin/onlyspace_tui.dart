@@ -30,6 +30,7 @@ const _yellow = '$_esc[33m';
 const _cyan = '$_esc[36m';
 const _gray = '$_esc[90m';
 const _bold = '$_esc[1m';
+const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息正文底色（区分收发双方）
 
 const _clearHome = '$_esc[2J$_esc[H';
 const _hideCursor = '$_esc[?25l';
@@ -47,11 +48,17 @@ class _TuiState {
   /// 系统提示行（命令结果 / 错误），显示在状态栏下方。
   String status = '';
 
+  /// 输入区当前折行行数（>=1）：超长输入自动多行时消息区动态让位。
+  int inputLines = 1;
+
   /// 退出标志。
   bool running = true;
 }
 
 _TuiState? _state;
+
+/// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
+Timer? _resizeTimer;
 
 Future<void> main(List<String> args) async {
   await sodium();
@@ -111,6 +118,21 @@ Future<void> main(List<String> args) async {
   }
 
   _render();
+
+  // 终端窗口尺寸变化（SIGWINCH，macOS/Linux）→ 防抖后全量重绘：
+  // 否则缩窗后旧折行仍残留（终端物理重排了显示内容，但我们的布局未按新列数重算）。
+  // Windows 无 SIGWINCH，watch 会抛 UnsupportedError → try-catch 兜底。
+  try {
+    ProcessSignal.sigwinch.watch().listen((_) {
+      _resizeTimer?.cancel();
+      _resizeTimer = Timer(const Duration(milliseconds: 120), () {
+        if ((_state?.running ?? false)) _render();
+      });
+    });
+  } catch (_) {
+    // 非 POSIX 平台忽略：尺寸变化不自动重绘，下次输入/消息会触发
+  }
+
   await _runInputLoop(session);
   _exitRaw();
   session.stopWs();
@@ -159,19 +181,26 @@ int _displayWidth(String s) {
   return w;
 }
 
-/// 从尾部截取不超过 [maxWidth] 显示宽度的子串。
-/// [maxWidth] <= 0 时返回空串（防止窄终端下 substring 越界抛 RangeError）。
-String _tailByWidth(String s, int maxWidth) {
-  if (maxWidth <= 0) return '';
-  final runes = s.runes.toList();
+/// 按显示宽度把 [s] 折成不超过 [maxWidth] 的多行（从头开始，自动换行）。
+/// 消息展示用：长消息完整显示为多行，而不是截断成一行丢尾部/头部。
+List<String> _wrapByWidth(String s, int maxWidth) {
+  if (maxWidth <= 0) return [s];
+  final result = <String>[];
+  final buf = StringBuffer();
   var w = 0;
-  for (var i = runes.length - 1; i >= 0; i--) {
-    w += _displayWidth(String.fromCharCode(runes[i]));
-    if (w > maxWidth) {
-      return String.fromCharCodes(runes.sublist(i + 1));
+  for (final r in s.runes) {
+    final ch = String.fromCharCode(r);
+    final cw = _displayWidth(ch);
+    if (w + cw > maxWidth && buf.isNotEmpty) {
+      result.add(buf.toString());
+      buf.clear();
+      w = 0;
     }
+    buf.write(ch);
+    w += cw;
   }
-  return s;
+  if (buf.isNotEmpty || result.isEmpty) result.add(buf.toString());
+  return result;
 }
 
 /// 终端行数（非终端/pty 下 terminalLines 可能抛异常，兜底 24）。
@@ -192,12 +221,21 @@ int _termCols() {
   }
 }
 
+/// 输入内容折行：每行最大宽度 = cols - prompt 显示宽度（最后一行行首带 prompt）。
+List<String> _wrapInput(String input, int cols) {
+  final prompt = '${_cyan}you>${_reset} ';
+  return _wrapByWidth(input, cols - _displayWidth(prompt));
+}
+
 void _render() {
   final s = _state;
   if (s == null) return;
   final rows = _termLines();
   final cols = _termCols();
-  final msgArea = rows - 2; // 顶部状态栏 1 行 + 底部输入行 1 行
+  // 输入区折行行数：超长输入自动多行，消息区高度动态让位
+  final inputWrapped = _wrapInput(s.input.toString(), cols);
+  s.inputLines = inputWrapped.length;
+  final msgArea = rows - 1 - s.inputLines; // 顶部状态栏 1 行 + 输入区 N 行
 
   final buf = StringBuffer();
   buf.write(_hideCursor);
@@ -218,10 +256,10 @@ void _render() {
   }
   buf.write('\r\n');
 
-  // 消息区：拼接本地历史 + 系统提示，取末尾 msgArea 行
+  // 消息区：拼接本地历史 + 系统提示，取末尾 msgArea 行（长消息折行多行）
   final lines = <String>[];
   for (final m in s.session.messages) {
-    lines.add(_formatMessage(m, cols));
+    lines.addAll(_formatMessage(m, cols));
   }
   final start = lines.length > msgArea ? lines.length - msgArea : 0;
   for (var i = start; i < lines.length; i++) {
@@ -229,11 +267,19 @@ void _render() {
     buf.write('\r\n');
   }
 
-  // 输入行（最后一行）
+  // 输入区（多行）：首行带 prompt，续行缩进对齐；超长输入自动换行
   final prompt = '${_cyan}you>${_reset} ';
-  final visible = _tailByWidth(s.input.toString(), cols - _displayWidth(prompt));
-  buf.write(prompt);
-  buf.write(visible);
+  for (var i = 0; i < inputWrapped.length; i++) {
+    if (i == 0) {
+      buf.write(prompt);
+    } else {
+      buf.write('      '); // 缩进对齐 prompt（'you> ' 宽度）
+    }
+    buf.write(inputWrapped[i]);
+    if (i < inputWrapped.length - 1) {
+      buf.write('\r\n');
+    }
+  }
   buf.write(_showCursor);
 
   // 渲染可能因终端环境抛异常（如 pty 下 Dart stdout 与 stdin 共享 StreamSink，
@@ -247,32 +293,56 @@ void _render() {
   }
 }
 
-String _formatMessage(ChatMessage m, int cols) {
+/// 格式化消息为多行（第一行带归属前缀，续行裸正文，自动按列宽折行）。
+/// 自己的消息：绿色前缀 + 普通正文；对方消息：正文加粉红背景（一眼区分收发双方）。
+List<String> _formatMessage(ChatMessage m, int cols) {
   final who = m.isMine ? '我' : '对方';
   final color = m.isMine ? _green : _yellow;
   final seq = m.seq == null ? '' : ' seq=${m.seq}';
   final prefix = '$color[$who$seq v${m.keyVersion}]$_reset ';
   final body = m.plain.replaceAll('\n', ' ');
   final maxW = cols - _displayWidth(prefix);
-  final trimmed = maxW > 0 && _displayWidth(body) > maxW ? _tailByWidth(body, maxW) : body;
-  return '$prefix$trimmed';
+  final wrapped = _wrapByWidth(body, maxW);
+  if (m.isMine) {
+    return [
+      '$prefix${wrapped.first}',
+      ...wrapped.skip(1).map((line) => '$line'),
+    ];
+  }
+  final pink = (String line) => '$_bgPink$line$_reset';
+  return [
+    '$prefix${pink(wrapped.first)}',
+    ...wrapped.skip(1).map(pink),
+  ];
 }
 
-/// 只重绘输入行（不清屏）：打字时用，避免全量 \x1B[2J 清屏打断
+/// 只重绘输入区（不清屏）：打字时用，避免全量 \x1B[2J 清屏打断
 /// 输入法（IME）预编辑——中文/长文字输入"没有回显"的根因。
+/// 输入区行数变化（超长切多行/退回单行）时消息区高度随之变化，需全量重绘。
 void _renderInputLine() {
   final s = _state;
   if (s == null) return;
   final rows = _termLines();
   final cols = _termCols();
+  final inputWrapped = _wrapInput(s.input.toString(), cols);
+  if (inputWrapped.length != s.inputLines) {
+    _render(); // 行数变化 → 消息区让位 → 全量重绘
+    return;
+  }
   final prompt = '${_cyan}you>${_reset} ';
-  final visible = _tailByWidth(s.input.toString(), cols - _displayWidth(prompt));
+  final top = rows - inputWrapped.length + 1; // 输入区顶部行号
 
   final buf = StringBuffer();
-  buf.write('\x1B[${rows};1H'); // 定位到最后一行第 1 列
-  buf.write('\x1B[K'); // 清除该行
-  buf.write(prompt);
-  buf.write(visible);
+  for (var i = 0; i < inputWrapped.length; i++) {
+    buf.write('\x1B[${top + i};1H'); // 定位到输入区各行第 1 列
+    buf.write('\x1B[K'); // 清除该行
+    if (i == 0) {
+      buf.write(prompt);
+    } else {
+      buf.write('      ');
+    }
+    buf.write(inputWrapped[i]);
+  }
   buf.write(_showCursor);
   try {
     stdout.write(buf.toString());
@@ -291,6 +361,7 @@ Future<void> _runInputLoop(ChatSession session) async {
   // utf8.decoder：raw 模式下多字节字符（如中文）可能被拆成多个字节到达，
   // 由解码器缓冲拼合后再逐字符处理（避免中文乱码）。
   sub = stdin.transform(utf8.decoder).listen((chunk) {
+    var inputChanged = false;
     for (final ch in chunk.split('')) {
       if (!(_state?.running ?? false)) break;
       final code = ch.codeUnitAt(0);
@@ -307,7 +378,7 @@ Future<void> _runInputLoop(ChatSession session) async {
         final line = _state!.input.toString().trim();
         _state!.input.clear();
         if (line.isEmpty) {
-          _renderInputLine();
+          inputChanged = true; // 清空输入行，等待下方统一重绘
           continue;
         }
         if (busy) continue; // 上一条命令/消息还在处理
@@ -328,19 +399,25 @@ Future<void> _runInputLoop(ChatSession session) async {
         continue;
       }
       if (code == 127 || code == 8) {
-        // 退格：只重绘输入行（不清屏，避免打断 IME）
+        // 退格
         final cur = _state!.input.toString();
         if (cur.isNotEmpty) {
           _state!.input.clear();
           _state!.input.write(cur.substring(0, cur.length - 1));
         }
-        _renderInputLine();
+        inputChanged = true;
         continue;
       }
       if (code >= 32) {
         _state!.input.writeCharCode(code);
-        _renderInputLine();
+        inputChanged = true;
       }
+    }
+    // 整个 chunk 处理完统一渲染一次：若逐字符渲染（含 stdout.write+flush），
+    // 连续输入多个字符（如 IME 一次提交一串中文）时后续输出会因 flush 竞态
+    // 丢失——表现为"只有第一个字回显、其余要等下一次输入才出现"。
+    if (inputChanged && (_state?.running ?? false)) {
+      _renderInputLine();
     }
   }, onDone: () {
     if (!completer.isCompleted) {
