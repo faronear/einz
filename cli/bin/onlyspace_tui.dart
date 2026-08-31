@@ -809,6 +809,16 @@ Future<void> _runInputLoop(ChatSession session) async {
           } catch (e) {
             stderr.writeln('⚠️ 引导渲染异常: $e'); // 防崩 + 可诊断
           }
+          // continuation（microtask）的渲染在真实终端不显示（用户：you> 无变化、
+          // 要回车才变化）——延迟到事件循环（continuation 之后）再渲染一次，
+          // 此时消息区已含下一步提示（事件回调渲染与输入循环同机制，可靠显示）
+          Future.delayed(Duration.zero, () {
+            try {
+              _render();
+            } catch (e) {
+              stderr.writeln('⚠️ 引导渲染异常: $e');
+            }
+          });
           inputChanged = true;
           continue;
         }
