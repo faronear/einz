@@ -243,7 +243,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       if (name.isNotEmpty) {
         store.personName = name;
         session.messages.add(_systemMessage(session, '✅ 已设置名称: $name'));
-        _render();
+        _scheduleRender();
       }
     } catch (e) {
       stderr.writeln('⚠️ 名称处理异常: $e'); // 防崩 + 可诊断
@@ -273,25 +273,25 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       renameToStandard(r.personId, r.deviceId);
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}'));
-      _render();
+      _scheduleRender();
       // 创建者：生成 Space Key + 上传口令托管包（两次确认，机密 *）
       final sk = await generateSpaceKey();
       store.spaceKey = base64Encode(sk);
       store.save(storePath);
       await _setupEscrowPassphrase(store, storePath, session);
       session.messages.add(_systemMessage(session, '💡 输入 /invite 创建邀请码以添加更多设备'));
-      _render();
+      _scheduleRender();
     } catch (e) {
       if (e is ApiException && e.code == 'INVALID_REQUEST') {
         session.messages.add(_systemMessage(session, '空间已有设备（你不是第一个加入者），加入需要邀请码'));
-        _render();
+        _scheduleRender();
         // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
         while (true) {
           if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
           final inviteCode = await _prompt(session, '邀请码（空间创建者提供，输错会反复要求重输）');
           if (inviteCode.isEmpty) {
             session.messages.add(_systemMessage(session, '未输入邀请码，请重新输入（或 Ctrl+C 退出）'));
-            _render();
+            _scheduleRender();
             continue;
           }
           try {
@@ -308,11 +308,11 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             renameToStandard(r.personId, r.deviceId);
             store.save(storePath);
             session.messages.add(_systemMessage(session, '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}'));
-            _render();
+            _scheduleRender();
             break;
           } catch (e2) {
             session.messages.add(_systemMessage(session, '⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题），请重新输入'));
-            _render();
+            _scheduleRender();
           }
         }
         // 登记成功后口令接入（加入者——无 Space Key）
@@ -323,17 +323,17 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             try {
               await session.accessByEscrow(passphrase);
               session.messages.add(_systemMessage(session, '✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}'));
-              _render();
+              _scheduleRender();
               break;
             } catch (e3) {
               session.messages.add(_systemMessage(session, '⚠️ 口令接入失败: $e3，请重新输入口令（口令由创建者 escrow 托管时设置）'));
-              _render();
+              _scheduleRender();
             }
           }
         }
       } else {
         session.messages.add(_systemMessage(session, '⚠️ 自举失败: $e（首个设备免邀请码；请确认服务器可达后重试）'));
-        _render();
+        _scheduleRender();
       }
     }
   }
@@ -347,7 +347,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已登记但口令托管包未上传（创建者引导中断）：重启再进引导设置口令
   if (store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
     session.messages.add(_systemMessage(session, '检测到尚未设置托管口令，现在设置（两次输入须一致；可 Ctrl+C 稍后重启再进）'));
-    _render();
+    _scheduleRender();
     await _setupEscrowPassphrase(store, storePath, session);
   }
 
@@ -356,10 +356,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     try {
       await session.auth();
       session.messages.add(_systemMessage(session, '✅ 认证成功: space_id=${store.spaceId ?? '-'}'));
-      _render();
+      _scheduleRender();
     } catch (e) {
       session.messages.add(_systemMessage(session, '⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）'));
-      _render();
+      _scheduleRender();
     }
   }
 
@@ -380,11 +380,11 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 启动 WS 实时监听（已认证且配置了 server 时）；新消息到达或连接状态变化即重绘
   if (session.hasSession && server.isNotEmpty) {
     session.startWs(
-      onMessage: (_) => _render(),
-      onStatus: (_) => _render(),
+      onMessage: (_) => _scheduleRender(),
+      onStatus: (_) => _scheduleRender(),
     );
   }
-  _render();
+  _scheduleRender();
 }
 
 Future<void> main(List<String> args) async {
@@ -593,6 +593,19 @@ int _termCols() {
 List<String> _wrapInput(String input, int cols) {
   final prompt = '${_cyan}you>${_reset} ';
   return _wrapByWidth(input, cols - _displayWidth(prompt));
+}
+
+/// 渲染调度到事件循环：microtask（_runGuide continuation）里的 _render 输出
+/// 在真实终端不显示（用户：提示要回车才出现）——延迟到事件循环后与输入循环
+/// 同机制可靠显示。引导流程的渲染统一走这里。
+void _scheduleRender() {
+  Future.delayed(Duration.zero, () {
+    try {
+      _render();
+    } catch (e) {
+      stderr.writeln('⚠️ 引导渲染异常: $e');
+    }
+  });
 }
 
 void _render() {
@@ -1170,7 +1183,7 @@ Future<String> _prompt(ChatSession session, String message, {bool hidden = false
   if (!s.running) return Future.value(''); // 已退出：不再等待输入（避免 _runGuide 挂起）
   s.hiddenInput = hidden;
   session.messages.add(_systemMessage(session, message));
-  _render();
+  _scheduleRender(); // 提示渲染走事件循环（microtask 渲染真实终端不显示）
   final completer = Completer<String>();
   s.pendingGuideCompleter = completer;
   return completer.future;
