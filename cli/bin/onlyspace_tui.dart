@@ -153,14 +153,45 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
   return (store, server);
 }
 
-/// 隐藏回显读取口令（逐键渲染星号，Windows PowerShell 也有输入反馈）：
-/// - ① raw 逐键：echo/line 关，非回车键输出 '*'（退格擦除一个），口令 ASCII 场景可靠；
-/// - ② 逐键失败（pty/重定向不支持 readByteSync）→ 回退整行隐藏读取；
-/// - try/finally 确保 echoMode/lineMode 无论成功/异常都恢复，避免终端停在无回显状态。
+/// 隐藏回显读取口令：
+/// - POSIX（macOS/Linux）：逐键渲染星号（echo/line 关 + readByteSync），输入有反馈；
+/// - **Windows：不用逐键**（Dart SDK：Windows 上 lineMode=false 后只收到 CR，
+///   逐键读会把输入吞成回车导致口令变空）→ 回退 echoMode=false + readLineSync
+///   整行隐藏读取（输入字节完整，只是无星号反馈）；
+/// - try/finally 确保 echoMode/lineMode 无论成功/异常都恢复，避免终端停在无回显状态；
+/// - stdout 写入全部 try-catch（pty 下 StreamSink 可能抛异常，与 TUI 渲染同理）。
 String _readPassphrase(String prompt) {
-  stdout.write(prompt);
-  stdout.flush();
+  // pty 下 stdout StreamSink 可能抛异常（渲染 write 需 try-catch 的教训同源）
+  void safeWriteln() {
+    try {
+      stdout.writeln();
+    } catch (_) {}
+  }
+
+  void safeWrite(String s) {
+    try {
+      stdout.write(s);
+    } catch (_) {}
+  }
+
+  void safeFlush() {
+    try {
+      stdout.flush();
+    } catch (_) {}
+  }
+
+  safeWrite(prompt);
+  safeFlush();
+  final isWindows = Platform.isWindows;
   try {
+    if (isWindows) {
+      // Windows：整行隐藏读取（控制台关闭 ECHO，回车提交）
+      stdin.echoMode = false;
+      final v = stdin.readLineSync() ?? '';
+      safeWriteln();
+      return v;
+    }
+    // POSIX：逐键星号渲染
     stdin.echoMode = false;
     stdin.lineMode = false;
     final buf = StringBuffer();
@@ -173,22 +204,22 @@ String _readPassphrase(String prompt) {
           final s = buf.toString();
           buf.clear();
           buf.write(s.substring(0, s.length - 1));
-          stdout.write('\b \b');
-          stdout.flush();
+          safeWrite('\b \b');
+          safeFlush();
         }
         continue;
       }
       if (b < 32) continue; // 忽略其他控制字符
       buf.writeCharCode(b);
-      stdout.write('*');
-      stdout.flush();
+      safeWrite('*');
+      safeFlush();
     }
-    stdout.writeln();
+    safeWriteln();
     return buf.toString();
   } catch (_) {
-    // pty/重定向等不支持逐键：退回整行隐藏读取
+    // pty/重定向等不支持：退回整行隐藏读取
     final v = stdin.readLineSync() ?? '';
-    stdout.writeln();
+    safeWriteln();
     return v;
   } finally {
     try {
