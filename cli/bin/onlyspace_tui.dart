@@ -607,10 +607,14 @@ void _render() {
   final start = lines.length > msgArea ? lines.length - msgArea : 0;
   final visible = lines.sublist(start);
   final bottom = rows - s.inputLines; // 输入条上方第一行（消息区底部）
+  // 先清空整个消息区（第 2 行到输入行上方）：连续渲染时旧行残留可能覆盖新消息
+  // （表现为"连续两个 system 消息第二个不显示"）
+  for (var r = 2; r < bottom; r++) {
+    buf.write('\x1B[$r;1H\x1B[K');
+  }
   var row = bottom;
   for (var i = visible.length - 1; i >= 0; i--) {
     buf.write('\x1B[$row;1H');
-    buf.write('\x1B[K');
     buf.write(visible[i]);
     row--;
   }
