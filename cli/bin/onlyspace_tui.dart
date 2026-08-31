@@ -179,9 +179,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   if (store == null) {
     stdout.writeln('=== OnlySpace TUI 首次使用引导 ===');
     stdout.writeln('本机还没有设备身份，现在生成（私钥保存在本机: $storePath）');
-    stdout.write('设备名称（如 dev-mac，回车默认 dev-auto）: ');
-    final deviceId = (stdin.readLineSync() ?? '').trim();
-    store = await DeviceStore.create(deviceId.isEmpty ? 'dev-auto' : deviceId);
+    // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地临时 id 自动生成即可，
+    // 无需用户输入（输入也会被登记返回的规范 id 覆盖）
+    store = await DeviceStore.create('dev-auto');
     // 自动模式（无 --store）→ 存默认目录 ~/.onlyspace/[device-id].json
     if (storePath.isEmpty) {
       autoStore = true;
@@ -191,7 +191,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     }
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
-    stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
+    stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}（登记后服务端分配 dev1 等规范 id）');
     stdout.writeln('   公钥: ${store.publicKey}');
 
     // 你的名称（显示层，如 lukas）与设备昵称（如 MacBook）：登记前询问，随 enroll 上报

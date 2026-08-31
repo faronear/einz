@@ -70,7 +70,8 @@ dart run bin/onlyspace.dart init --store "$env:USERPROFILE\.onlyspace\b.json" --
 cd /Users/Shared/productX/only/cli
 dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现/创建设备
 # 引导流程：
-#   设备名称（如 dev-a1）→ 你的名称（如 lukas）→ 设备昵称（如 MacBook）
+# 引导流程（设备身份自动生成，登记后由服务端分配 dev1 等规范 id）：
+#   你的名称（如 lukas）→ 设备名称（显示用，如 MacBook）
 #   ✅ 首设备自举成功（你是空间创建者，分配为 dev1 / personA）
 #   设置托管口令:（如 faronear，对方凭它接入）
 #   ✅ 口令托管包已上传
@@ -128,7 +129,8 @@ dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 
 cd 你的only目录\cli
 dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.onlyspace\ 下的设备
 # 引导流程（空间已有设备 → 走邀请码登记）：
-#   设备名称（如 dev-b1）→ 你的名称（如 steffi）→ 设备昵称（如 Windows）
+# 引导流程（空间已有设备 → 走邀请码登记；设备身份自动生成）：
+#   你的名称（如 steffi）→ 设备名称（显示用，如 Windows）
 #   ⚠️ 自举失败（空间已有创建者）→ 输入邀请码: XXXX-XXXXX-XXXXX-XXXXX
 #   ✅ 邀请码登记成功（分配为 dev2 / personB）
 #   无 Space Key → 问"接入方式" → 回车=1 口令接入
