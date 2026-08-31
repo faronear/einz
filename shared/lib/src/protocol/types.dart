@@ -15,6 +15,7 @@ class Api {
   static const sync = '/sync';
   static const attachments = '/attachments';
   static const devices = '/devices';
+  static const devicesEnroll = '/devices/enroll';
   static const pushRegister = '/push/register';
   static const space = '/space';
   static const keyEscrow = '/key-escrow';
@@ -47,6 +48,21 @@ class SessionResult {
         sessionToken: json['session_token'] as String,
         spaceId: json['space_id'] as String,
         expiresIn: json['expires_in'] as int,
+      );
+}
+
+/// 动态登记结果（POST /devices/enroll 返回）：登记后设备已在白名单生效。
+class EnrollResult {
+  const EnrollResult({required this.deviceId, required this.personId, required this.spaceId});
+
+  final String deviceId;
+  final String personId;
+  final String spaceId;
+
+  factory EnrollResult.fromJson(Map<String, dynamic> json) => EnrollResult(
+        deviceId: json['device_id'] as String,
+        personId: json['person_id'] as String,
+        spaceId: json['space_id'] as String,
       );
 }
 

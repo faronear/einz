@@ -34,6 +34,21 @@ class ApiClient {
     return SessionResult.fromJson(res);
   }
 
+  /// 新设备凭一次性邀请码动态登记（POST /devices/enroll，免认证——邀请码即准入令牌）。
+  /// 登记成功后设备立即在服务端白名单生效（无需人工改 config.json / 重启）。
+  Future<EnrollResult> enrollDevice({
+    required String deviceId,
+    required String publicKey,
+    required String inviteCode,
+  }) async {
+    final res = await _post(
+      Api.devicesEnroll,
+      {'device_id': deviceId, 'public_key': publicKey, 'invite_code': inviteCode},
+      withToken: false,
+    );
+    return EnrollResult.fromJson(res);
+  }
+
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
     final res = await _post(Api.messages, env.toJson(), token: token);
     return PostMessageResult.fromJson(res);

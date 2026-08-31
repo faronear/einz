@@ -75,11 +75,33 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
     store.save(storePath);
     stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
     stdout.writeln('   公钥: ${store.publicKey}');
-    stdout.writeln();
-    stdout.writeln('下一步：把上面的公钥发给空间创建者，加入服务器白名单');
-    stdout.writeln('（VPS 上 config.json 的 devices 数组，改后重启 server）');
-    stdout.writeln('加好白名单后按回车继续…');
-    stdin.readLineSync();
+
+    // 邀请码动态登记：新设备凭创建者给的邀请码自动登记（免人工加白名单/重启 server）
+    if (server.isEmpty) {
+      stdout.write('服务器地址（如 https://only.tic.cc）: ');
+      server = (stdin.readLineSync() ?? '').trim();
+    }
+    if (server.isNotEmpty) {
+      stdout.write('邀请码（空间创建者提供，可留空跳过）: ');
+      final inviteCode = (stdin.readLineSync() ?? '').trim();
+      if (inviteCode.isNotEmpty) {
+        try {
+          final r = await ApiClient(server).enrollDevice(
+            deviceId: store.deviceId,
+            publicKey: store.publicKey,
+            inviteCode: inviteCode,
+          );
+          stdout.writeln('✅ 邀请码登记成功: person_id=${r.personId} space_id=${r.spaceId}');
+        } on Exception catch (e) {
+          stdout.writeln('⚠️ 邀请码登记失败: $e（无效/已用/过期或网络问题）');
+          stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
+        }
+      } else {
+        stdout.writeln('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
+      }
+    } else {
+      stdout.writeln('未提供服务器地址，稍后可在 TUI 内用 /auth 补配');
+    }
   }
 
   if (server.isEmpty) {
@@ -110,7 +132,8 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
       try {
         await session.accessByEscrow(passphrase);
         stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
-      } on Exception catch (e) {
+      } catch (e) {
+        // 注意：accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
         stdout.writeln('⚠️ 口令接入失败: $e');
         stdout.writeln('   请确认：公钥已加入白名单？Server 已由创建者上传托管包？口令正确？');
       }
@@ -122,7 +145,8 @@ Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
     try {
       await session.auth();
       stdout.writeln('✅ 认证成功: space_id=${store.spaceId ?? '-'}');
-    } on Exception catch (e) {
+    } catch (e) {
+      // auth 抛 StateError（如 server 无效）也是 Error 子类，用 catch (e) 兜底
       stdout.writeln('⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）');
     }
   }
@@ -179,8 +203,9 @@ Future<void> main(List<String> args) async {
   _state = _TuiState(session);
 
   // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
-  // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）
-  if (session.hasSession && server.isNotEmpty) {
+  // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
+  // 未接入空间（无 Space Key）时跳过——历史无法解密，且 _decrypt 会兜底占位。
+  if (session.hasSession && session.hasSpace && server.isNotEmpty) {
     try {
       final fresh = await session.sync();
       if (fresh.isNotEmpty) {

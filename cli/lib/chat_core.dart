@@ -375,8 +375,10 @@ class ChatSession {
   }
 
   /// 按 key_version 选密钥解密（轮换后旧消息用归档密钥）。
+  /// 设备未接入空间（spaceKey 为 null）时返回占位文本，避免 sync/WS 解密崩溃。
   Future<String> _decrypt(MessageEnvelope env) async {
-    final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey!;
+    final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey;
+    if (keyB64 == null) return '（未接入空间，无法解密）';
     return decryptMessage(
       env: env,
       spaceKey: base64Decode(keyB64),
