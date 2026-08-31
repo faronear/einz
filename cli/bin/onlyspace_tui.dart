@@ -750,9 +750,20 @@ Future<void> _runInputLoop(ChatSession session) async {
         // 回车：提交输入
         final gc = _state!.pendingGuideCompleter;
         if (gc != null) {
-          // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
           final answer = _state!.input.toString().trim();
           _state!.input.clear();
+          if (answer == '/exit' || answer == '/quit') {
+            // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
+            // 用户困在邀请码/口令重试循环无法退出
+            _state!.running = false;
+            _abortPendingGuide();
+            _restoreTerminal();
+            sub.cancel();
+            if (!completer.isCompleted) completer.complete();
+            inputChanged = true;
+            return;
+          }
+          // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
           if (!gc.isCompleted) gc.complete(answer);
