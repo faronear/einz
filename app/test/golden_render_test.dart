@@ -104,11 +104,13 @@ void main() {
 
   testWidgets('golden: 首页-角色选择（1）', (WidgetTester tester) async {
     _usePhoneSize(tester);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
-      home: SetupPage(),
+      home: SetupPage(db: db, probeServer: (_) async => true),
     ));
     await tester.pump();
     await expectLater(find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1_roles.png'));
@@ -182,11 +184,13 @@ void main() {
   // ---------- 向导步骤渲染（真实交互路径走到目标步骤再截图）----------
 
   Future<void> pumpSetup(WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
-      home: SetupPage(),
+      home: SetupPage(db: db, probeServer: (_) async => true),
     ));
     await tester.pumpAndSettle();
   }

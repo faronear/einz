@@ -10,10 +10,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
-
-/// 服务器固定地址（产品部署域名固定，无需用户输入）。
-const String kOnlySpaceServer = 'https://only.tic.cc';
 
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间 / 高级导入 sealed。
 enum _WizardRole { create, join, advanced }
@@ -25,7 +23,13 @@ enum _WizardRole { create, join, advanced }
 /// 2. 导入 Space Key：粘贴 sealed 密封副本（base64，由对方用本公钥 seal），或直接粘贴明文 base64
 /// 3. challenge-response 认证，拿到 session_token
 class SetupPage extends StatefulWidget {
-  const SetupPage({super.key});
+  const SetupPage({super.key, this.db, this.probeServer});
+
+  /// 测试注入用；默认新建（生产路径）。
+  final LocalDatabase? db;
+
+  /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 ServerSettings.probe。
+  final Future<bool> Function(String server)? probeServer;
 
   @override
   State<SetupPage> createState() => _SetupPageState();
@@ -36,6 +40,11 @@ class _SetupPageState extends State<SetupPage> {
   final _spaceId = TextEditingController(text: 'space-demo');
   final _sealedKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
+  final _serverController = TextEditingController();
+
+  // 服务器地址：默认 only.tic.cc，探测失败时引导输入并持久化（降低小白负担）
+  String _server = kOnlySpaceServer;
+  bool _probeFailed = false;
 
   // 向导状态：角色分流 + 步骤索引 + 跨步骤共享数据
   _WizardRole? _role;
@@ -52,7 +61,50 @@ class _SetupPageState extends State<SetupPage> {
     _spaceId.dispose();
     _sealedKey.dispose();
     _escrowPassphrase.dispose();
+    _serverController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initServer();
+  }
+
+  /// 服务器地址初始化：读持久化值（无则默认 only.tic.cc）→ 快速探测。
+  /// 能连 → 零打扰（不显示任何 UI）；无法连接 → 显示输入框引导覆盖（降低小白负担）。
+  Future<void> _initServer() async {
+    try {
+      final db = widget.db ?? LocalDatabase();
+      final settings = ServerSettings(db);
+      final saved = await settings.load();
+      final probe = widget.probeServer ?? ServerSettings.probe;
+      final ok = await probe(saved);
+      if (!mounted) return;
+      setState(() {
+        _server = saved;
+        _probeFailed = !ok;
+        _serverController.text = saved;
+      });
+    } catch (_) {
+      // 测试环境无 path_provider/数据库实现 → 跳过探测（保持默认服务器，零打扰）
+    }
+  }
+
+  /// 保存用户输入的服务器地址并重新探测。
+  Future<void> _saveServer() async {
+    final input = _serverController.text.trim();
+    if (input.isEmpty) return;
+    final probe = widget.probeServer ?? ServerSettings.probe;
+    final ok = await probe(input);
+    if (!mounted) return;
+    setState(() {
+      _server = input;
+      _probeFailed = !ok;
+    });
+    if (ok) {
+      await ServerSettings(widget.db ?? LocalDatabase()).save(input);
+    }
   }
 
   // 旧版四路径方法（_generateKey/_importAndAuth/_generateSpaceKeyAndAuth/
@@ -69,6 +121,37 @@ class _SetupPageState extends State<SetupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 服务器探测失败 → 顶部引导卡片（能连时完全不显示，零打扰）
+            if (_probeFailed) ...[
+              Card(
+                color: Colors.amber.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('⚠️ 无法连接服务器 $_server（/health 探测失败）',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _serverController,
+                        decoration: const InputDecoration(
+                          labelText: '服务器地址',
+                          hintText: 'https://...',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _busy ? null : _saveServer,
+                        child: const Text('保存并重试'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             _buildProgressDots(),
             if (_role != null && _step > 0) ...[
               const SizedBox(height: 16),
@@ -309,7 +392,7 @@ class _SetupPageState extends State<SetupPage> {
   /// challenge-response 认证，返回 session（PROTOCOL.md §4）。
   Future<SessionResult> _authenticate(DeviceKeyPair kp) async {
     final s = await sodium();
-    final api = ApiClient(kOnlySpaceServer);
+    final api = ApiClient(_server);
     final challenge = await api.challenge(kp.deviceId);
     final opened = await sealOpen(
       s,
@@ -356,7 +439,7 @@ class _SetupPageState extends State<SetupPage> {
     if (kp == null || sk == null || token == null) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
-        server: kOnlySpaceServer,
+        server: _server,
         spaceId: _spaceId.text.trim(),
         deviceId: kp.deviceId,
         spaceKey: sk,
@@ -518,7 +601,7 @@ class _SetupPageState extends State<SetupPage> {
       }
       // 3) 设置 PIN（含接入口令 → 上传托管）
       final ok = await _setupLockAndEnter(
-        server: kOnlySpaceServer,
+        server: _server,
         spaceId: _spaceId.text.trim(),
         deviceId: kp.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
@@ -657,7 +740,7 @@ class _SetupPageState extends State<SetupPage> {
     try {
       final session = await _authenticate(kp);
       _sessionToken = session.sessionToken;
-      final escrow = KeyEscrowService(ApiClient(kOnlySpaceServer));
+      final escrow = KeyEscrowService(ApiClient(_server));
       final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
       if (payload == null) {
         if (!mounted) return;
@@ -668,7 +751,7 @@ class _SetupPageState extends State<SetupPage> {
       _spaceId.text = payload.spaceId;
       if (!mounted) return;
       final ok = await _setupLockAndEnter(
-        server: kOnlySpaceServer,
+        server: _server,
         spaceId: payload.spaceId,
         deviceId: kp.deviceId,
         spaceKeyB64: payload.spaceKeyB64,
@@ -741,7 +824,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       // 3) 设置 PIN → 完成步骤
       final ok = await _setupLockAndEnter(
-        server: kOnlySpaceServer,
+        server: _server,
         spaceId: _spaceId.text.trim(),
         deviceId: kp.deviceId,
         spaceKeyB64: base64Encode(spaceKey),

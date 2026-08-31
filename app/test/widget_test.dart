@@ -3,19 +3,25 @@
 // 直接渲染 SetupPage 验证向导流程（不经过 StartupGate——它依赖真实
 // drift 数据库初始化；不触发密钥生成按钮，避免在测试环境加载 libsodium）。
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:onlyspace/data/local_database.dart';
 import 'package:onlyspace/l10n/app_localizations.dart';
 import 'package:onlyspace/setup_page.dart';
 
 void main() {
-  Widget wrapApp() => MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('zh'),
-        home: const SetupPage(),
-      );
+  Widget wrapApp() {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    return MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: SetupPage(db: db, probeServer: (_) async => true),
+    );
+  }
 
   testWidgets('设置向导首屏：角色选择', (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp());
