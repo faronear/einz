@@ -237,10 +237,14 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）
   if (store.personName == null || store.personName!.isEmpty) {
     final name = await _prompt(session, '你的名称（如 lukas，留空回车则不设置）');
-    if (name.isNotEmpty) {
-      store.personName = name;
-      session.messages.add(_systemMessage(session, '✅ 已设置名称: $name'));
-      _render();
+    try {
+      if (name.isNotEmpty) {
+        store.personName = name;
+        session.messages.add(_systemMessage(session, '✅ 已设置名称: $name'));
+        _render();
+      }
+    } catch (e) {
+      stderr.writeln('⚠️ 名称处理异常: $e'); // 防崩 + 可诊断
     }
   }
   // 设备名称（显示用，如 MacBook，回车不设置）
@@ -771,6 +775,11 @@ Future<void> _runInputLoop(ChatSession session) async {
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
           if (!gc.isCompleted) gc.complete(answer);
+          try {
+            _render(); // complete 后立即全量渲染（界面即时响应，不等 _runGuide continuation）
+          } catch (e) {
+            stderr.writeln('⚠️ 引导渲染异常: $e'); // 防崩 + 可诊断
+          }
           inputChanged = true;
           continue;
         }
