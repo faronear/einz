@@ -193,7 +193,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 
   if (store == null) {
     stdout.writeln('=== OnlySpace TUI 首次使用引导 ===');
+    _guidanceNotes.add('=== OnlySpace TUI 首次使用引导 ===');
     stdout.writeln('本机还没有设备身份，现在生成（私钥保存在本机: $storePath）');
+    _guidanceNotes.add('本机还没有设备身份，现在生成（私钥保存在本机: $storePath）');
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
     store = await DeviceStore.create();
@@ -206,7 +208,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
     stdout.writeln('✅ 设备身份已生成');
+    _guidanceNotes.add('✅ 设备身份已生成');
     stdout.writeln('   公钥: ${store.publicKey}');
+    _guidanceNotes.add('   公钥: ${store.publicKey}');
   }
   // 引导问答（名称/登记/接入/口令）由 _runGuide 在 TUI 消息流中处理
   // （system 提示 + you> 输入 + 机密 *）——此处仅返回，main 负责启动引导任务与输入循环
