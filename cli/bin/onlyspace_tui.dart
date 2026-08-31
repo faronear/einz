@@ -891,9 +891,9 @@ Future<void> _runInputLoop(ChatSession session) async {
         if (busy) continue; // 上一条命令/消息还在处理
         busy = true;
         final future = (_state!.pendingInvite)
-            ? _handleInviteInput(line) // 等待邀请码：本次输入按邀请码登记
+            ? (line.startsWith('/') ? _execCommand(line) : _handleInviteInput(line)) // / 开头按命令（/exit 退出），否则按邀请码
             : (_state!.pendingSpaceKey)
-                ? _handleSpaceKeyInput(line) // 等待口令：本次输入按口令接入
+                ? (line.startsWith('/') ? _execCommand(line) : _handleSpaceKeyInput(line)) // / 开头按命令（/exit 退出），否则按口令
                 : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
         future.whenComplete(() {
           busy = false;
