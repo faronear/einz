@@ -91,7 +91,12 @@ class ChatSession {
     final api = ApiClient(target);
     final s = await sodium();
 
-    final challenge = await api.challenge(store.deviceId!);
+    // 未登记（登记失败/邀请码输错）时 deviceId 为 null——先检查，避免空断言崩溃
+    final deviceId = store.deviceId;
+    if (deviceId == null) {
+      throw StateError('设备尚未登记（无 device_id），请先完成引导登记（自举或邀请码）');
+    }
+    final challenge = await api.challenge(deviceId);
     final opened = await sealOpen(
       s,
       base64Decode(challenge.sealedChallenge),

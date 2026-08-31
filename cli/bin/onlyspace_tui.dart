@@ -938,7 +938,6 @@ Future<void> _execInvite(List<String> parts) async {
       hours: 24,
     );
     // 邀请码作为对话流中的一条普通消息显示（随消息区滚动，不占顶部状态栏）
-    final label = '$personId${name != null && name.isNotEmpty ? '/$name' : ''}';
     s.session.messages.add(ChatMessage(
       env: MessageEnvelope(
         v: 1,
@@ -949,7 +948,7 @@ Future<void> _execInvite(List<String> parts) async {
         nonce: '',
         ciphertext: '',
       ),
-      plain: '邀请码（$label，24h 一次性）: ${r.inviteCode}',
+      plain: '邀请码（24 小时内一次性有效）: ${r.inviteCode}',
       isMine: true,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     ));
