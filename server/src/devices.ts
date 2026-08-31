@@ -65,7 +65,19 @@ export function enrollDevice(
     throw new ApiError("INVALID_INVITE", "邀请码已过期，请联系创建者重新生成", 400);
   }
 
-  // 2) 登记设备（幂等：已 active 直接成功；revoked 拒绝复活）
+  // 2) 两 person 上限：空间内 distinct person ≤2；邀请码的 person 若是全新
+  //    （空间已满 2 个 person）则拒绝——同一个人多台设备不受限（person 已有 active 设备）。
+  const personCount = db
+    .prepare(`SELECT COUNT(DISTINCT person_id) AS c FROM devices WHERE status = 'active'`)
+    .get() as { c: number };
+  const thisPersonActive = db
+    .prepare(`SELECT COUNT(*) AS c FROM devices WHERE person_id = ? AND status = 'active'`)
+    .get(invite.person_id) as { c: number };
+  if (personCount.c >= 2 && thisPersonActive.c === 0) {
+    throw new ApiError("FORBIDDEN", "空间最多两个 person（当前已满），新人员请联系创建者调整白名单", 403);
+  }
+
+  // 3) 登记设备（幂等：已 active 直接成功；revoked 拒绝复活）
   const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(deviceId) as
     | { status: string }
     | undefined;

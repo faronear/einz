@@ -74,7 +74,9 @@ class ChatSession {
       messages.add(ChatMessage(
         env: env,
         plain: plain,
-        isMine: env.senderDeviceId == store.deviceId,
+        isMine: env.senderPersonId != null && store.personId != null
+            ? env.senderPersonId == store.personId
+            : env.senderDeviceId == store.deviceId,
         createdAt: env.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         serverSequence: env.serverSequence,
       ));
@@ -144,6 +146,7 @@ class ChatSession {
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
       senderDeviceId: store.deviceId,
+      senderPersonId: store.personId,
       messageId: messageId,
       keyVersion: store.keyVersion,
     );
@@ -227,7 +230,9 @@ class ChatSession {
       final msg = ChatMessage(
         env: env,
         plain: plain,
-        isMine: env.senderDeviceId == store.deviceId,
+        isMine: env.senderPersonId != null && store.personId != null
+            ? env.senderPersonId == store.personId
+            : env.senderDeviceId == store.deviceId,
         createdAt: env.createdAt ?? seq ?? 0,
         serverSequence: seq,
       );
@@ -264,7 +269,9 @@ class ChatSession {
           final msg = ChatMessage(
             env: env,
             plain: plain,
-            isMine: env.senderDeviceId == store.deviceId,
+            isMine: env.senderPersonId != null && store.personId != null
+            ? env.senderPersonId == store.personId
+            : env.senderDeviceId == store.deviceId,
             createdAt: env.createdAt ?? event.serverSequence,
             serverSequence: event.serverSequence,
           );
@@ -328,6 +335,7 @@ class ChatSession {
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
       senderDeviceId: store.deviceId,
+      senderPersonId: store.personId,
       messageId: messageId,
       type: type,
       keyVersion: store.keyVersion,

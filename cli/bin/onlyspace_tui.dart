@@ -181,6 +181,16 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
     stdout.writeln('   公钥: ${store.publicKey}');
 
+    // 使用者身份（person id）：同一个人多台设备填相同值，"自己/对方"按 person 判断，
+    // 避免同一个人两台设备互发时被误判为"对方"（回车不设置=按设备判断，旧行为）
+    stdout.write('你的身份（person id，如 person-a / person-b，同一个人多台设备请填相同值，回车不设置）: ');
+    final personId = (stdin.readLineSync() ?? '').trim();
+    if (personId.isNotEmpty) {
+      store.personId = personId;
+      store.save(storePath);
+      stdout.writeln('✅ 已设置身份: person_id=$personId');
+    }
+
     // 邀请码动态登记：新设备凭创建者给的邀请码自动登记（免人工加白名单/重启 server）
     if (server.isNotEmpty) {
       stdout.write('邀请码（空间创建者提供，可留空跳过）: ');

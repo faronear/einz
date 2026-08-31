@@ -11,6 +11,7 @@ export interface MessageEnvelope {
   key_version: number;
   message_id: string;
   sender_device_id: string;
+  sender_person_id?: string;
   nonce: string;
   ciphertext: string;
 }
@@ -33,12 +34,17 @@ function validateEnvelope(body: unknown): MessageEnvelope {
   ) {
     throw new ApiError("INVALID_REQUEST", "invalid message envelope", 400);
   }
+  const sp = b.sender_person_id;
+  if (sp !== undefined && typeof sp !== "string") {
+    throw new ApiError("INVALID_REQUEST", "invalid sender_person_id", 400);
+  }
   return {
     v: b.v,
     type: b.type,
     key_version: b.key_version,
     message_id: b.message_id,
     sender_device_id: b.sender_device_id,
+    ...(sp !== undefined ? { sender_person_id: sp as string } : {}),
     nonce: b.nonce,
     ciphertext: b.ciphertext,
   };
@@ -69,9 +75,9 @@ export function postMessage(cfg: ServerConfig, token: string, body: unknown): { 
     .get() as { next: number };
 
   db.prepare(
-    `INSERT INTO messages (message_id, space_id, sender_device_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(env.message_id, cfg.space_id, env.sender_device_id, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
+    `INSERT INTO messages (message_id, space_id, sender_device_id, sender_person_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(env.message_id, cfg.space_id, env.sender_device_id, env.sender_person_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
 
   return { message_id: env.message_id, server_sequence: nextSeq.next, created_at: now };
 }
@@ -91,7 +97,7 @@ export function syncMessages(
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT message_id, sender_device_id, type, key_version, nonce, ciphertext, server_sequence, created_at
+      `SELECT message_id, sender_device_id, sender_person_id, type, key_version, nonce, ciphertext, server_sequence, created_at
        FROM messages WHERE space_id = ? AND server_sequence > ?
        ORDER BY server_sequence ASC LIMIT ?`
     )

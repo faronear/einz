@@ -17,6 +17,7 @@ class DeviceStore {
     required this.deviceId,
     required this.publicKey,
     required this.privateKey,
+    this.personId,
     this.spaceKey,
     this.spaceId,
     this.keyVersion = 1,
@@ -35,6 +36,7 @@ class DeviceStore {
   final String deviceId;
   final String publicKey; // base64
   final String privateKey; // base64（测试用明文存储）
+  String? personId; // 使用者身份（person-a/person-b）：同一个人多台设备填相同值，"自己/对方"判断维度
   String? spaceKey; // base64，config/import 后填充
   String? spaceId;
   int keyVersion;
@@ -67,6 +69,7 @@ class DeviceStore {
         'device_id': deviceId,
         'public_key': publicKey,
         'private_key': privateKey,
+        'person_id': personId,
         'space_key': spaceKey,
         'space_id': spaceId,
         'key_version': keyVersion,
@@ -83,6 +86,7 @@ class DeviceStore {
         deviceId: json['device_id'] as String,
         publicKey: json['public_key'] as String,
         privateKey: json['private_key'] as String,
+        personId: json['person_id'] as String?,
         spaceKey: json['space_key'] as String?,
         spaceId: json['space_id'] as String?,
         keyVersion: (json['key_version'] as int?) ?? 1,

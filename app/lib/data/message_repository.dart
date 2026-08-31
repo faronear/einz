@@ -128,6 +128,7 @@ class MessageRepository {
       spaceKey: spaceKey,
       spaceId: spaceId,
       senderDeviceId: deviceId,
+      senderPersonId: _personByDevice[deviceId],
       messageId: messageId,
       type: type,
       keyVersion: keyVersion,

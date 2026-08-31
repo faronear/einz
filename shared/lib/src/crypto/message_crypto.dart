@@ -14,6 +14,7 @@ class MessageEnvelope {
     required this.keyVersion,
     required this.messageId,
     required this.senderDeviceId,
+    this.senderPersonId,
     required this.nonce,
     required this.ciphertext,
     this.serverSequence,
@@ -25,6 +26,7 @@ class MessageEnvelope {
   final int keyVersion;
   final String messageId;
   final String senderDeviceId;
+  final String? senderPersonId; // 发送者归属 person（"自己/对方"判断维度，旧消息可能缺失）
   final String nonce; // base64(24B)
   final String ciphertext; // base64(密文+MAC)
   final int? serverSequence; // Server 分配（同步响应中携带）
@@ -36,6 +38,7 @@ class MessageEnvelope {
         'key_version': keyVersion,
         'message_id': messageId,
         'sender_device_id': senderDeviceId,
+        if (senderPersonId != null) 'sender_person_id': senderPersonId,
         'nonce': nonce,
         'ciphertext': ciphertext,
         if (serverSequence != null) 'server_sequence': serverSequence,
@@ -48,6 +51,7 @@ class MessageEnvelope {
         keyVersion: json['key_version'] as int,
         messageId: json['message_id'] as String,
         senderDeviceId: json['sender_device_id'] as String,
+        senderPersonId: json['sender_person_id'] as String?,
         nonce: json['nonce'] as String,
         ciphertext: json['ciphertext'] as String,
         serverSequence: json['server_sequence'] as int?,
@@ -67,6 +71,7 @@ Future<MessageEnvelope> encryptMessage({
   required Uint8List spaceKey,
   required String spaceId,
   required String senderDeviceId,
+  String? senderPersonId,
   required String messageId,
   String type = 'text',
   int keyVersion = 1,
@@ -80,6 +85,7 @@ Future<MessageEnvelope> encryptMessage({
     keyVersion: keyVersion,
     messageId: messageId,
     senderDeviceId: senderDeviceId,
+    senderPersonId: senderPersonId,
     nonce: base64Encode(nonce),
     ciphertext: '',
   );
@@ -98,6 +104,7 @@ Future<MessageEnvelope> encryptMessage({
     keyVersion: keyVersion,
     messageId: messageId,
     senderDeviceId: senderDeviceId,
+    senderPersonId: senderPersonId,
     nonce: env.nonce,
     ciphertext: base64Encode(cipher),
   );

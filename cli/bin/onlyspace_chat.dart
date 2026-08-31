@@ -258,7 +258,9 @@ Future<void> _printEnvelope(DeviceStore store, MessageEnvelope env) async {
     spaceKey: base64Decode(keyB64),
     spaceId: store.spaceId!,
   );
-  final isMine = env.senderDeviceId == store.deviceId;
+  final isMine = env.senderPersonId != null && store.personId != null
+      ? env.senderPersonId == store.personId
+      : env.senderDeviceId == store.deviceId;
   final sender = isMine ? '我' : '对方';
   final color = isMine ? _green : _yellow;
   final seq = env.serverSequence;

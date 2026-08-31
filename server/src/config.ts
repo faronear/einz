@@ -86,4 +86,9 @@ export function syncWhitelistToDb(cfg: ServerConfig): void {
   for (const d of cfg.devices) {
     upsert.run(d.device_id, d.person_id, d.public_key, d.status, Date.now());
   }
+  // 两 person 上限提示：种子白名单应只含 person-a/person-b（同 person 多设备允许）
+  const distinctPersons = new Set(cfg.devices.map((d) => d.person_id));
+  if (distinctPersons.size > 2) {
+    console.warn(`⚠️ config.json 白名单含 ${distinctPersons.size} 个 person（上限 2），请检查是否混入多余人员`);
+  }
 }

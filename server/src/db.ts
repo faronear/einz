@@ -29,6 +29,7 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data
       message_id       TEXT PRIMARY KEY,
       space_id         TEXT NOT NULL,
       sender_device_id TEXT NOT NULL,
+      sender_person_id TEXT,
       type             TEXT NOT NULL,
       key_version      INTEGER NOT NULL,
       nonce            TEXT NOT NULL,
@@ -89,6 +90,13 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data
       created_at    INTEGER NOT NULL
     );
   `);
+
+  // 迁移：messages 表补充 sender_person_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
+  try {
+    db.exec(`ALTER TABLE messages ADD COLUMN sender_person_id TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
   return db;
 }
 
