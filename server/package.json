@@ -10,7 +10,8 @@
     "dev": "tsx src/app.ts",
     "test": "tsx test/smoke.test.ts",
     "backup": "tsx scripts/backup.ts",
-    "restore": "tsx scripts/restore.ts"
+    "restore": "tsx scripts/restore.ts",
+    "invite": "tsx scripts/invite.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

@@ -68,6 +68,16 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(import.meta.di
       used         INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS invites (
+      invite_code TEXT PRIMARY KEY,
+      person_id   TEXT NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'pending',  -- pending | used | expired
+      created_at  INTEGER NOT NULL,
+      expires_at  INTEGER NOT NULL,
+      used_by     TEXT,
+      used_at     INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       session_token TEXT PRIMARY KEY,
       device_id     TEXT NOT NULL,

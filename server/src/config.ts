@@ -31,19 +31,38 @@ export function loadConfig(path = process.env.ONLYSPACE_CONFIG ?? DEFAULT_CONFIG
   return cfg;
 }
 
-export function isActiveDevice(cfg: ServerConfig, deviceId: string): boolean {
-  // 1) 必须在静态白名单（config.json）中
-  const inWhitelist = cfg.devices.some((d) => d.device_id === deviceId);
-  if (!inWhitelist) return false;
-  // 2) 数据库撤销状态优先：devices.status = 'revoked' 即拒绝（E2EE.md §9.3）
-  //    数据库无记录（首次启动/尚未登记）时回退到 config 状态，视为 active。
-  const row = getDb().prepare(`SELECT status FROM devices WHERE device_id = ?`).get(deviceId) as
-    | { status: string }
-    | undefined;
-  return row == null ? true : row.status === "active";
+/**
+ * 设备是否在白名单且未被撤销。
+ * 判定源 = 数据库 devices 表（运行时可写：启动时 syncWhitelistToDb 登记 config.json
+ * 种子，之后由动态登记端点 POST /devices/enroll 热加入）——因此新设备登记后
+ * **无需重启 Server** 即生效（此前判定源是启动时载入内存的 config.json，必须重启）。
+ * 撤销（status='revoked'）同样实时生效（E2EE.md §9.3）。
+ */
+export function isActiveDevice(_cfg: ServerConfig, deviceId: string): boolean {
+  const row = getDb()
+    .prepare(`SELECT status FROM devices WHERE device_id = ?`)
+    .get(deviceId) as { status: string } | undefined;
+  if (row == null) return false; // db 无记录 = 未登记（config.json 种子或 enroll）→ 拒绝
+  return row.status === "active";
 }
 
+/**
+ * 取设备信息（含公钥，用于 challenge seal 等）。
+ * 优先查数据库（动态登记设备在这里；含 public_key/person_id/status），
+ * 未登记时回退内存 config.json 种子——与 isActiveDevice 的判定源保持一致。
+ */
 export function getDevice(cfg: ServerConfig, deviceId: string): DeviceConfig | undefined {
+  const row = getDb()
+    .prepare(`SELECT device_id, person_id, public_key, status FROM devices WHERE device_id = ?`)
+    .get(deviceId) as { device_id: string; person_id: string; public_key: string; status: string } | undefined;
+  if (row) {
+    return {
+      device_id: row.device_id,
+      person_id: row.person_id,
+      public_key: row.public_key,
+      status: row.status as DeviceConfig["status"],
+    };
+  }
   return cfg.devices.find((d) => d.device_id === deviceId);
 }
 
