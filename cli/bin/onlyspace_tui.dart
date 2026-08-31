@@ -56,6 +56,9 @@ class _TuiState {
 
   /// 等待邀请码输入（/auth 未登记引导）：输入循环的下一次输入按邀请码处理。
   bool pendingInvite = false;
+
+  /// 等待空间口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
+  bool pendingSpaceKey = false;
 }
 
 _TuiState? _state;
@@ -239,12 +242,15 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
         if (e is ApiException && e.code == 'INVALID_REQUEST') {
           stdout.writeln('空间已有设备（你不是第一个加入者），加入需要邀请码');
           _guidanceNotes.add('空间已有设备（你不是第一个加入者），加入需要邀请码');
-          stdout.write('邀请码（空间创建者提供）: ');
-          final inviteCode = (stdin.readLineSync() ?? '').trim();
-          if (inviteCode.isEmpty) {
-            stdout.writeln('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
-            _guidanceNotes.add('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
-          } else {
+          // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
+          while (true) {
+            stdout.write('邀请码（空间创建者提供，输错会反复要求重输）: ');
+            final inviteCode = (stdin.readLineSync() ?? '').trim();
+            if (inviteCode.isEmpty) {
+              stdout.writeln('未输入邀请码，请重新输入（或 Ctrl+C 退出）');
+              _guidanceNotes.add('未输入邀请码，请重新输入');
+              continue;
+            }
             try {
               final r = await ApiClient(server).enrollDevice(
                 deviceId: store.deviceId,
@@ -260,9 +266,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
               store.save(storePath);
               stdout.writeln('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
               _guidanceNotes.add('✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}');
+              break; // 登记成功，结束重试循环
             } catch (e2) {
-              stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）');
-              stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
+              stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题），请重新输入');
+              _guidanceNotes.add('⚠️ 邀请码登记失败: $e2，请重新输入');
             }
           }
         } else {
@@ -335,15 +342,19 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
       if (server.isEmpty) {
         stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
       } else {
-        stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
-        final passphrase = _readPassphrase('口令:（输入不回显，回车提交）');
-        try {
-          await session.accessByEscrow(passphrase);
-          stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
-        } catch (e) {
-          // 注意：accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-          stdout.writeln('⚠️ 口令接入失败: $e');
-          stdout.writeln('   请确认：公钥已加入白名单？Server 已由创建者上传托管包？口令正确？');
+        // 口令接入重试循环：输错反复要求重输，直到接入成功（成功才结束引导）
+        while (true) {
+          stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
+          final passphrase = _readPassphrase('口令:（输入不回显，回车提交）');
+          try {
+            await session.accessByEscrow(passphrase);
+            stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
+            _guidanceNotes.add('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
+            break; // 接入成功，结束重试循环
+          } catch (e) {
+            // 注意：accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
+            stdout.writeln('⚠️ 口令接入失败: $e，请重新输入口令（口令由创建者 escrow 托管时设置）');
+          }
         }
       }
     }
@@ -829,7 +840,9 @@ Future<void> _runInputLoop(ChatSession session) async {
         busy = true;
         final future = (_state!.pendingInvite)
             ? _handleInviteInput(line) // 等待邀请码：本次输入按邀请码登记
-            : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
+            : (_state!.pendingSpaceKey)
+                ? _handleSpaceKeyInput(line) // 等待口令：本次输入按口令接入
+                : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
         future.whenComplete(() {
           busy = false;
           if (!(_state?.running ?? false)) {
@@ -892,7 +905,7 @@ Future<void> _execCommand(String line) async {
 
   switch (cmd) {
     case '/help':
-      s.status = '命令: /auth [server] /server <地址> /invite [personA|personB] [名称] /sync /history /attach <file> /exit';
+      s.status = '命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /sync /history /attach <file> /exit';
     case '/server':
       if (arg.isEmpty) {
         s.status = '当前服务器: ${s.session.server}；用法: /server <地址>';
@@ -932,6 +945,17 @@ Future<void> _execCommand(String line) async {
       } catch (e) {
         s.status = '认证失败: $e';
       }
+    case '/space':
+      // 重新接入空间（口令托管）：未接入时引导输入口令，已接入则提示
+      if (s.session.hasSpace) {
+        s.session.messages.add(_systemMessage(s.session, '已接入空间'));
+        break;
+      }
+      s.pendingSpaceKey = true;
+      s.session.messages.add(_systemMessage(
+          s.session, '尚未接入空间：请输入空间口令（创建者 escrow 托管，口令在创建者初始化时设置）'));
+      s.status = '等待口令输入后回车…';
+      break;
     case '/sync':
       try {
         final fresh = await s.session.sync();
@@ -1029,6 +1053,25 @@ Future<void> _handleInviteInput(String inviteCode) async {
     }
   } catch (e) {
     s.session.messages.add(_systemMessage(s.session, '⚠️ 邀请码登记失败: $e（无效/已用/过期或网络问题）'));
+  }
+}
+
+/// 输入循环接管的空间口令接入（/space 未接入引导）：口令 → accessByEscrow。
+Future<void> _handleSpaceKeyInput(String passphrase) async {
+  final s = _state!;
+  s.pendingSpaceKey = false;
+  if (passphrase.isEmpty) {
+    s.session.messages.add(_systemMessage(s.session, '未输入口令，接入取消'));
+    return;
+  }
+  try {
+    await s.session.accessByEscrow(passphrase);
+    s.session.messages.add(_systemMessage(
+        s.session,
+        '✅ 口令接入成功: space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}'));
+  } catch (e) {
+    // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令接入失败: $e（口令错误？Server 已有创建者托管包？）'));
   }
 }
 
