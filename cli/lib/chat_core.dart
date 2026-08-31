@@ -102,6 +102,27 @@ class ChatSession {
     if (serverOverride != null) server = serverOverride;
   }
 
+  /// 凭口令接入（escrow download，KEY_ESCROW.md §4）：先认证拿到 token，
+  /// 再从 Server 拉取口令托管包解出 Space Key 写回 store。
+  /// 新设备接入无需对方公钥（与 App「加入」流程一致）；口令错误抛 [FormatException]。
+  Future<void> accessByEscrow(String passphrase) async {
+    await auth(); // 拉取托管包需要 session_token
+    final api = ApiClient(server);
+    final escrow = KeyEscrowService(api);
+    final payload = await escrow.fetch(passphrase: passphrase, token: store.sessionToken!);
+    if (payload == null) {
+      throw StateError('Server 无口令托管包（请先在对端执行 escrow upload）');
+    }
+    // 写回 store（参照 import 的归档逻辑：新版本 > 当前时归档旧密钥）
+    if (payload.keyVersion > store.keyVersion && store.spaceKey != null) {
+      store.archivedSpaceKeys.add({'key_version': store.keyVersion, 'space_key': store.spaceKey});
+    }
+    store.spaceKey = payload.spaceKeyB64;
+    store.spaceId = payload.spaceId;
+    store.keyVersion = payload.keyVersion;
+    store.save(storePath);
+  }
+
   /// 发送文本：加密 → 入队（离线不丢）→ 在线立即补发。
   Future<bool> sendText(String text) async {
     store.requireSpace();

@@ -60,6 +60,91 @@ _TuiState? _state;
 /// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
 Timer? _resizeTimer;
 
+/// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
+/// 返回 (就绪的 store, 生效的 server 地址)；引导中选择 sealed 导入时置
+/// exitCode=1（main 据此退出，提示用户改用 onlyspace.dart import）。
+Future<(DeviceStore, String)> _onboard(String storePath, String server) async {
+  var store = File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
+
+  if (store == null) {
+    stdout.writeln('=== OnlySpace TUI 首次使用引导 ===');
+    stdout.writeln('本机还没有设备身份，现在生成（私钥保存在本机: $storePath）');
+    stdout.write('设备名称（如 dev-mac，回车默认 dev-auto）: ');
+    final deviceId = (stdin.readLineSync() ?? '').trim();
+    store = await DeviceStore.create(deviceId.isEmpty ? 'dev-auto' : deviceId);
+    store.save(storePath);
+    stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
+    stdout.writeln('   公钥: ${store.publicKey}');
+    stdout.writeln();
+    stdout.writeln('下一步：把上面的公钥发给空间创建者，加入服务器白名单');
+    stdout.writeln('（VPS 上 config.json 的 devices 数组，改后重启 server）');
+    stdout.writeln('加好白名单后按回车继续…');
+    stdin.readLineSync();
+  }
+
+  if (server.isEmpty) {
+    stdout.write('服务器地址（如 https://only.tic.cc，回车跳过）: ');
+    server = (stdin.readLineSync() ?? '').trim();
+  }
+
+  final session = ChatSession(store, storePath, server);
+
+  // 无 Space Key → 引导接入：口令托管（推荐）或 sealed 导入（高级，提示用 CLI）
+  if (store.spaceKey == null || store.spaceId == null) {
+    stdout.writeln();
+    stdout.writeln('本设备还没有 Space Key，无法收发消息。接入方式：');
+    stdout.writeln('  1) 口令接入（推荐）：输入空间创建者给你的 space_id + 口令');
+    stdout.writeln('  2) sealed 导入（高级）：dart run bin/onlyspace.dart import --store $storePath --sealed-file <文件>');
+    stdout.write('选择 [回车=1 / 2] : ');
+    final choice = (stdin.readLineSync() ?? '1').trim();
+    if (choice == '2') {
+      stdout.writeln('请先退出本程序，用 onlyspace.dart import 导入 sealed 文件后再运行。');
+      exitCode = 1;
+      return (store, server);
+    }
+    if (server.isEmpty) {
+      stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
+    } else {
+      stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
+      final passphrase = _readPassphrase('口令: ');
+      try {
+        await session.accessByEscrow(passphrase);
+        stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
+      } on Exception catch (e) {
+        stdout.writeln('⚠️ 口令接入失败: $e');
+        stdout.writeln('   请确认：公钥已加入白名单？Server 已由创建者上传托管包？口令正确？');
+      }
+    }
+  }
+
+  // 未认证 → 引导认证（白名单已登记时 challenge-response 成功）
+  if (store.sessionToken == null && server.isNotEmpty) {
+    try {
+      await session.auth();
+      stdout.writeln('✅ 认证成功: space_id=${store.spaceId ?? '-'}');
+    } on Exception catch (e) {
+      stdout.writeln('⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）');
+    }
+  }
+  return (store, server);
+}
+
+/// 隐藏回显读取口令（pty 等环境下 echoMode 可能抛异常，退回普通输入）。
+String _readPassphrase(String prompt) {
+  stdout.write(prompt);
+  try {
+    stdin.echoMode = false;
+    final v = stdin.readLineSync() ?? '';
+    stdin.echoMode = true;
+    stdout.writeln();
+    return v;
+  } catch (_) {
+    final v = stdin.readLineSync() ?? '';
+    stdout.writeln();
+    return v;
+  }
+}
+
 Future<void> main(List<String> args) async {
   await sodium();
 
@@ -74,16 +159,6 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  DeviceStore store;
-  try {
-    store = DeviceStore.load(storePath);
-  } on StateError catch (e) {
-    stderr.writeln('$e');
-    stderr.writeln('先运行: dart run bin/onlyspace.dart init --store $storePath --device-id <id>');
-    exitCode = 1;
-    return;
-  }
-
   // 终端能力检测：TUI 需要可交互 stdin（raw 逐键）；stdout 非终端时渲染降级但不致命
   final term = Platform.environment['TERM'] ?? '';
   if (!stdin.hasTerminal || term == 'dumb') {
@@ -91,6 +166,13 @@ Future<void> main(List<String> args) async {
     exitCode = 1;
     return;
   }
+
+  // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成设备身份；
+  // 无 Space Key → 口令接入（escrow）；未认证 → auth。全部就绪后才进入 TUI。
+  final onboard = await _onboard(storePath, server);
+  if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
+  final store = onboard.$1;
+  server = onboard.$2;
 
   final session = ChatSession(store, storePath, server);
   await session.loadHistory();
