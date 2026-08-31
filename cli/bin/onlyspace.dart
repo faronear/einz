@@ -30,6 +30,8 @@ Future<void> main(List<String> args) async {
     ..addOption('space-id', help: 'Space ID')
     ..addOption('out-config', help: '输出服务器 config.json 路径')
     ..addOption('out-sealed-peer', help: '输出给对方设备的密封 Space Key 文件')
+    ..addOption('person', help: '创建者 person id（config 用，默认 person-a）')
+    ..addOption('peer-person', help: '对方 person id（config 用，默认 person-b）')
     ..addOption('sealed-file', help: '导入的密封 Space Key 文件（import 用）')
     ..addOption('after', help: '同步起点 server_sequence（默认: 本地锚点 last_server_sequence）')
     ..addOption('file', help: '要上传的本地文件路径（attach 用）')
@@ -139,13 +141,13 @@ Future<void> _cmdConfig(ArgResults opts) async {
       'devices': [
         {
           'device_id': store.deviceId,
-          'person_id': 'person-a',
+          'person_id': (opts['person'] as String?) ?? 'person-a',
           'public_key': store.publicKey,
           'status': 'active',
         },
         {
           'device_id': 'dev-b1',
-          'person_id': 'person-b',
+          'person_id': (opts['peer-person'] as String?) ?? 'person-b',
           'public_key': peerPubkey,
           'status': 'active',
         },

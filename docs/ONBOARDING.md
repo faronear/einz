@@ -15,6 +15,7 @@
 | **口令（passphrase）**    | 创建者 escrow upload 时设定，B 凭它解出 Space Key。**别和邀请码混淆**                               |
 | **邀请码（invite_code）** | 一次性 24h 有效，白名单**外**的新设备登记用（白名单内的设备用不到）                                 |
 | **白名单**                | VPS `deployment/config/config.json` 的 devices 数组；数据库 devices 表为判定源（重启时 UPSERT 同步） |
+| **person id**             | 使用者身份（如 `luk` / `fanr`）：同一个人多台设备填相同值，"自己/对方"按它判断；一个空间最多两个 person（同 person 多设备允许） |
 
 ---
 
@@ -26,6 +27,10 @@ ssh 你的VPS
 cd /faronear/only            # ← 你的实际部署目录（下同，按需替换）
 git pull
 cd deployment
+# 首次部署（或 .env 丢失后重建）：生成备份密钥
+cp .env.example .env         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
+python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
+# ↑ 把输出粘贴到 .env 的 ONLYSPACE_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
 docker compose up -d --build server
 curl -s https://only.tic.cc/health    # 期望 {"status":"ok",...}
 
@@ -52,8 +57,8 @@ dart run bin/onlyspace.dart pubkey --store "$env:USERPROFILE\.onlyspace\b.json"
 
 > 💡 **也可以在 TUI 里按引导完成初始化**（空间已创建后更省事）：
 > 直接 `dart run bin/onlyspace_tui.dart`（不传 `--store`）→ 无设备时自动引导：
-> 问设备名 → 自动生成身份并存入 `~/.onlyspace/[设备名].json` → 服务器探测 →
-> 邀请码/口令接入 → 认证 → 直接进 TUI（init 一体化，无需敲 CLI 命令）。
+> 问设备名 → 自动生成身份并存入 `~/.onlyspace/[设备名].json` → **问"你的身份（person id）"**（与 A 约定不同的值，如 `fanr`；同一个人多台设备填相同值）→
+> 服务器探测 → 邀请码/口令接入 → 认证 → 直接进 TUI（init 一体化，无需敲 CLI 命令）。
 > ⚠️ 若 A **正在创建空间**、需要把 B 公钥提前写进白名单，仍需用上面的 CLI 命令拿公钥。
 
 ---
@@ -71,6 +76,8 @@ SPACE_ID=$(python3 -c "import uuid;print(uuid.uuid4())")
 dart run bin/onlyspace.dart config \
   --store ~/.onlyspace/a.json \
   --peer-pubkey "<阶段1拿到的B公钥>" \
+  --person luk \                    # 你的 person id（默认 person-a，可自定义如 luk）
+  --peer-person fanr \              # 对方的 person id（默认 person-b，与 B 引导输入保持一致）
   --space-id "$SPACE_ID" \
   --out-config /tmp/prod-config.json \
   --out-sealed-peer /tmp/sealed-b.txt
@@ -136,6 +143,7 @@ cd /Users/Shared/productX/only/cli
 dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 下的设备
 # 自动使用已有设备（阶段 2 CLI 创建的 a.json，或 TUI 内创建的 [设备名].json），
 # 多台会列出选择；无设备才引导 init（存入 ~/.onlyspace/[设备名].json）
+# 首次运行会问"你的身份（person id）"（如 luk，与阶段 2 的 --person 一致）——之后不再问
 # 启动探测 https://only.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
 # 状态栏 WS:● 在线；输入消息回车发送
 ```
@@ -148,6 +156,7 @@ dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 
 cd 你的only目录\cli
 dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.onlyspace\ 下的设备
 # 自动使用已有设备（b.json 或 TUI 内创建的 [设备名].json），多台会列出选择
+# 首次运行会问"你的身份（person id）"（与阶段 2 的 --peer-person 保持一致，如 fanr）
 # 启动探测 → 能连 → 引导继续：
 #   - 无 Space Key → 问"接入方式" → 回车=1 口令接入
 #   - 口令: faronear（⚠️ 输口令，不是邀请码；Windows 隐藏回显无星号，回车提交）
