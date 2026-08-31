@@ -260,8 +260,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   }
   store.save(storePath);
 
-  // 设备登记：先尝试首设备自举（空间无设备 → 免邀请码成为创建者）；失败 → 凭邀请码加入
-  if (server.isNotEmpty) {
+  // 设备登记：未登记才 enroll（首设备自举 / 凭邀请码加入）——已登记设备（重启
+  // 进入）跳过 enroll，直接走认证/TUI（否则服务端 activeCount>0 会误判"空间
+  // 已有设备"要求邀请码，创建者自己被挡在门外）
+  if (server.isNotEmpty && (store.deviceId == null || store.spaceId == null)) {
     try {
       final r = await _busy(session, '⏳ 设备登记中......', () => ApiClient(server).enrollDevice(
         deviceId: store.deviceId,
