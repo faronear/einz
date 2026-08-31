@@ -89,6 +89,11 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data
       expires_at    INTEGER NOT NULL,
       created_at    INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   // 迁移：messages 表补充 sender_person_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
@@ -103,4 +108,19 @@ export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data
 export function getDb(): Database.Database {
   if (!db) throw new Error("db 未初始化，先调用 openDb()");
   return db;
+}
+
+/** 读取 meta（key-value 配置，如 space_id）；不存在返回 null。 */
+export function getMeta(key: string): string | null {
+  const row = getDb()
+    .prepare(`SELECT value FROM meta WHERE key = ?`)
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+/** 写入 meta（UPSERT）。 */
+export function setMeta(key: string, value: string): void {
+  getDb()
+    .prepare(`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .run(key, value);
 }

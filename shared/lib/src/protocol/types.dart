@@ -16,6 +16,7 @@ class Api {
   static const attachments = '/attachments';
   static const devices = '/devices';
   static const devicesEnroll = '/devices/enroll';
+  static const invites = '/invites';
   static const pushRegister = '/push/register';
   static const space = '/space';
   static const keyEscrow = '/key-escrow';
@@ -63,6 +64,21 @@ class EnrollResult {
         deviceId: json['device_id'] as String,
         personId: json['person_id'] as String,
         spaceId: json['space_id'] as String,
+      );
+}
+
+/// 邀请码生成结果（POST /invites 返回，创建者调用）。
+class InviteResult {
+  const InviteResult({required this.inviteCode, required this.personId, required this.expiresAt});
+
+  final String inviteCode;
+  final String personId;
+  final int expiresAt;
+
+  factory InviteResult.fromJson(Map<String, dynamic> json) => InviteResult(
+        inviteCode: json['invite_code'] as String,
+        personId: json['person_id'] as String,
+        expiresAt: json['expires_at'] as int,
       );
 }
 

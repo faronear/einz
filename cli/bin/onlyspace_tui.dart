@@ -150,6 +150,7 @@ Future<bool> _probeServer(String server) async {
 /// sealed 导入时置 exitCode=1（main 据此退出，提示用户改用 onlyspace.dart import）。
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
+  var creator = false; // 首设备自举成功（空间创建者）标记：走创建者初始化（生成 Space Key + 托管 + 邀请码）
 
   // ① 服务器地址：--server 参数 > store 持久化值 > config 默认（cli/config.json）> 硬编码
   if (server.isEmpty) {
@@ -181,24 +182,39 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     stdout.writeln('✅ 设备身份已生成: device_id=${store.deviceId}');
     stdout.writeln('   公钥: ${store.publicKey}');
 
-    // 邀请码动态登记：新设备凭创建者给的邀请码自动登记（免人工加白名单/重启 server）
+    // 设备登记：先尝试首设备自举（空间无设备 → 免邀请码成为创建者）；
+    // 失败（空间已有设备）→ 凭创建者给的邀请码加入
     if (server.isNotEmpty) {
-      stdout.write('邀请码（空间创建者提供，可留空跳过）: ');
-      final inviteCode = (stdin.readLineSync() ?? '').trim();
-      if (inviteCode.isNotEmpty) {
-        try {
-          final r = await ApiClient(server).enrollDevice(
-            deviceId: store.deviceId,
-            publicKey: store.publicKey,
-            inviteCode: inviteCode,
-          );
-          stdout.writeln('✅ 邀请码登记成功: person_id=${r.personId} space_id=${r.spaceId}');
-        } catch (e) {
-          stdout.writeln('⚠️ 邀请码登记失败: $e（无效/已用/过期或网络问题）');
-          stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
+      try {
+        final r = await ApiClient(server).enrollDevice(
+          deviceId: store.deviceId,
+          publicKey: store.publicKey,
+          personId: store.personId,
+        );
+        store.spaceId = r.spaceId;
+        store.save(storePath);
+        creator = true;
+        stdout.writeln('✅ 首设备自举成功（你是空间创建者）: person_id=${r.personId} space_id=${r.spaceId}');
+      } catch (e) {
+        stdout.write('邀请码（空间创建者提供）: ');
+        final inviteCode = (stdin.readLineSync() ?? '').trim();
+        if (inviteCode.isEmpty) {
+          stdout.writeln('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
+        } else {
+          try {
+            final r = await ApiClient(server).enrollDevice(
+              deviceId: store.deviceId,
+              publicKey: store.publicKey,
+              inviteCode: inviteCode,
+            );
+            store.spaceId = r.spaceId;
+            store.save(storePath);
+            stdout.writeln('✅ 邀请码登记成功: person_id=${r.personId} space_id=${r.spaceId}');
+          } catch (e2) {
+            stdout.writeln('⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）');
+            stdout.writeln('   可联系创建者重新生成邀请码，或人工加入白名单后重试');
+          }
         }
-      } else {
-        stdout.writeln('未输入邀请码：请把上面的公钥发给空间创建者加入白名单');
       }
     } else {
       stdout.writeln('未提供服务器地址，稍后可在 TUI 内用 /auth 补配');
@@ -228,29 +244,62 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 
   // 无 Space Key → 引导接入：口令托管（推荐）或 sealed 导入（高级，提示用 CLI）
   if (store.spaceKey == null || store.spaceId == null) {
-    stdout.writeln();
-    stdout.writeln('本设备还没有 Space Key，无法收发消息。接入方式：');
-    stdout.writeln('  1) 口令接入（推荐）：输入空间创建者给你的 space_id + 口令');
-    stdout.writeln('  2) sealed 导入（高级）：dart run bin/onlyspace.dart import --store $storePath --sealed-file <文件>');
-    stdout.write('选择 [回车=1 / 2] : ');
-    final choice = (stdin.readLineSync() ?? '1').trim();
-    if (choice == '2') {
-      stdout.writeln('请先退出本程序，用 onlyspace.dart import 导入 sealed 文件后再运行。');
-      exitCode = 1;
-      return (store, server, storePath);
-    }
-    if (server.isEmpty) {
-      stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
-    } else {
-      stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
-      final passphrase = _readPassphrase('口令:（输入不回显）');
+    if (creator) {
+      // 创建者初始化：生成 Space Key → 上传口令托管包 → 生成邀请码（对方加入用）
+      stdout.writeln();
+      stdout.writeln('你是空间创建者：现在生成 Space Key 并上传口令托管包（对方凭口令接入）');
+      final sk = await generateSpaceKey();
+      store.spaceKey = base64Encode(sk);
+      store.save(storePath);
+      final passphrase = _readPassphrase('设置托管口令:（输入不回显，对方凭它接入）');
       try {
-        await session.accessByEscrow(passphrase);
-        stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
+        final api = ApiClient(server);
+        await session.auth(); // challenge-response 认证（写入 store.sessionToken）
+        await KeyEscrowService(api).upload(
+          passphrase: passphrase,
+          spaceKeyB64: store.spaceKey!,
+          spaceId: store.spaceId!,
+          keyVersion: store.keyVersion,
+          token: store.sessionToken!,
+        );
+        stdout.writeln('✅ 口令托管包已上传: space_id=${store.spaceId}');
+        // 生成邀请码给"对方"（第二 person）
+        stdout.write('对方的 person id（生成邀请码用，如 fanr，回车默认 person-b）: ');
+        final peerPerson = (stdin.readLineSync() ?? '').trim();
+        final invite = await api.createInvite(
+          token: store.sessionToken!,
+          personId: peerPerson.isEmpty ? 'person-b' : peerPerson,
+        );
+        stdout.writeln('✅ 邀请码已生成（发给对方，24h 有效）: ${invite.inviteCode}');
       } catch (e) {
-        // 注意：accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-        stdout.writeln('⚠️ 口令接入失败: $e');
-        stdout.writeln('   请确认：公钥已加入白名单？Server 已由创建者上传托管包？口令正确？');
+        stdout.writeln('⚠️ 创建者初始化失败: $e');
+        stdout.writeln('   可进入 TUI 后手动补：escrow upload / invite（onlyspace.dart 命令）');
+      }
+    } else {
+      stdout.writeln();
+      stdout.writeln('本设备还没有 Space Key，无法收发消息。接入方式：');
+      stdout.writeln('  1) 口令接入（推荐）：输入空间创建者给你的 space_id + 口令');
+      stdout.writeln('  2) sealed 导入（高级）：dart run bin/onlyspace.dart import --store $storePath --sealed-file <文件>');
+      stdout.write('选择 [回车=1 / 2] : ');
+      final choice = (stdin.readLineSync() ?? '1').trim();
+      if (choice == '2') {
+        stdout.writeln('请先退出本程序，用 onlyspace.dart import 导入 sealed 文件后再运行。');
+        exitCode = 1;
+        return (store, server, storePath);
+      }
+      if (server.isEmpty) {
+        stdout.writeln('⚠️ 未提供服务器地址，跳过口令接入（之后可 /auth 后手动 escrow download）');
+      } else {
+        stdout.writeln('口令由空间创建者告知（escrow 托管包按空间一份，凭口令即可解出 Space Key）');
+        final passphrase = _readPassphrase('口令:（输入不回显）');
+        try {
+          await session.accessByEscrow(passphrase);
+          stdout.writeln('✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}');
+        } catch (e) {
+          // 注意：accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
+          stdout.writeln('⚠️ 口令接入失败: $e');
+          stdout.writeln('   请确认：公钥已加入白名单？Server 已由创建者上传托管包？口令正确？');
+        }
       }
     }
   }

@@ -1,11 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { WebSocketServer } from "ws";
-import { loadConfig, syncWhitelistToDb, type ServerConfig } from "./config.js";
+import { loadConfig, type ServerConfig } from "./config.js";
 import { getDb, openDb } from "./db.js";
 import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment } from "./attachments.js";
-import { enrollDevice, listDevices, revokeDevice } from "./devices.js";
+import { createInvite, enrollDevice, listDevices, revokeDevice } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
@@ -13,9 +13,8 @@ import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConn
 const PORT = Number(process.env.PORT ?? 3000);
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
 const SERVER_VERSION = "1.0.0";
+openDb(); // 先开库：loadConfig 需要从 db meta 读/生成 space_id
 const cfg: ServerConfig = loadConfig();
-openDb();
-syncWhitelistToDb(cfg);
 
 const server = createServer(async (req, res) => {
   const start = Date.now();
@@ -138,6 +137,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // 动态登记（免认证，邀请码即准入令牌）：新设备凭邀请码登记，立即生效无需重启
     const body = await readJson(req);
     sendJson(res, 200, enrollDevice(cfg, body));
+    return;
+  }
+  if (method === "POST" && path === "/invites") {
+    // 创建者生成邀请码（白名单外新设备加入用）
+    const body = await readJson(req);
+    sendJson(res, 200, createInvite(cfg, bearer(req), body));
     return;
   }
   if (method === "GET" && path === "/devices") {

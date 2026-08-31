@@ -43,7 +43,9 @@ Future<void> main(List<String> args) async {
     ..addOption('recovery-code', help: '12 词恢复码（restore 用；backup 会自动生成并打印）')
     ..addOption('key-version', help: '导入的 Space Key 版本号（import 用，默认 1；轮换导入时用新版本）')
     ..addOption('action', help: 'escrow 子命令: upload|download')
-    ..addOption('passphrase', help: '口令托管密钥的口令（escrow 用）');
+    ..addOption('passphrase', help: '口令托管密钥的口令（escrow 用）')
+    ..addOption('invite-code', help: '邀请码（enroll 用；留空=首设备自举，登记为创建者）')
+    ..addOption('hours', help: '邀请码有效期小时数（invite 用，默认 24）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
   final opts = parser.parse(rest);
@@ -87,6 +89,12 @@ Future<void> main(List<String> args) async {
       } else {
         await _cmdEscrowDownload(opts);
       }
+    case 'enroll':
+      // 设备登记：首个设备免邀请码自举（=创建者），之后凭邀请码加入
+      await _cmdEnroll(opts);
+    case 'invite':
+      // 创建者生成邀请码（POST /invites）
+      await _cmdInvite(opts);
     case 'help':
     default:
       stdout.writeln(parser.usage);
@@ -206,12 +214,64 @@ Future<void> _cmdAuth(ArgResults opts) async {
   stdout.writeln('✅ 认证成功: space_id=${session.spaceId}');
 }
 
+/// enroll：设备动态登记。
+/// - 不带邀请码 → 首设备自举（空间无设备时），登记为创建者（person 用 --person 指定）；
+/// - 带邀请码 → 常规登记（加入已有空间，person 由服务端按邀请码决定）。
+/// 登记响应带 server 的 space_id，写入 store（后续 escrow/发消息用它，与服务端一致）。
+Future<void> _cmdEnroll(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  final server = _require(opts, 'server');
+  final inviteCode = opts['invite-code'] as String?;
+  final personId = opts['person'] as String?;
+  final r = await ApiClient(server).enrollDevice(
+    deviceId: store.deviceId,
+    publicKey: store.publicKey,
+    inviteCode: inviteCode,
+    personId: personId,
+  );
+  store.spaceId = r.spaceId;
+  store.save(path);
+  final isBootstrap = inviteCode == null || inviteCode.isEmpty;
+  stdout.writeln('✅ 登记成功: person_id=${r.personId} space_id=${r.spaceId}');
+  if (isBootstrap) {
+    stdout.writeln('   （首设备自举：你是空间创建者，可 escrow upload 上传托管包、invite 生成邀请码）');
+  }
+}
+
+/// invite：创建者生成一次性邀请码（POST /invites，需先 auth 拿 session）。
+Future<void> _cmdInvite(ArgResults opts) async {
+  final path = _require(opts, 'store');
+  final store = DeviceStore.load(path);
+  final server = _require(opts, 'server');
+  if (store.sessionToken == null) {
+    throw StateError('未认证：请先运行 auth --store $path --server $server');
+  }
+  final personId = _require(opts, 'person');
+  final hours = int.tryParse(opts['hours'] as String? ?? '24') ?? 24;
+  final r = await ApiClient(server).createInvite(
+    token: store.sessionToken!,
+    personId: personId,
+    hours: hours,
+  );
+  stdout.writeln('✅ 邀请码已生成（${hours}h 有效，一次性）: ${r.inviteCode}');
+}
+
 /// escrow upload：口令加密 Space Key 包并上传托管（KEY_ESCROW.md §4）。
 /// Server 只存密文，无口令不可解。
+/// 创建者初始化：store 无 Space Key 时自动生成（自主模式，无 config 命令）。
 Future<void> _cmdEscrowUpload(ArgResults opts) async {
   final path = _require(opts, 'store');
   final store = DeviceStore.load(path);
-  store.requireSpace();
+  if (store.spaceId == null) {
+    throw StateError('缺少 space_id：请先运行 enroll（登记响应会写入 server 的 space_id）');
+  }
+  if (store.spaceKey == null) {
+    final sk = await generateSpaceKey();
+    store.spaceKey = base64Encode(sk);
+    store.save(path);
+    stdout.writeln('✅ 已生成 Space Key（创建者初始化，key_version=1）');
+  }
   final server = _require(opts, 'server');
   final passphrase = _require(opts, 'passphrase');
   final api = ApiClient(server);

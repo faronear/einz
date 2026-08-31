@@ -63,14 +63,30 @@ class ApiClient {
   Future<EnrollResult> enrollDevice({
     required String deviceId,
     required String publicKey,
-    required String inviteCode,
+    String? inviteCode,
+    String? personId,
   }) async {
     final res = await _post(
       Api.devicesEnroll,
-      {'device_id': deviceId, 'public_key': publicKey, 'invite_code': inviteCode},
+      {
+        'device_id': deviceId,
+        'public_key': publicKey,
+        if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
+        if (personId != null && personId.isNotEmpty) 'person_id': personId,
+      },
       withToken: false,
     );
     return EnrollResult.fromJson(res);
+  }
+
+  /// 创建者生成邀请码（POST /invites，需认证 token）。
+  Future<InviteResult> createInvite({
+    required String token,
+    required String personId,
+    int hours = 24,
+  }) async {
+    final res = await _post(Api.invites, {'person_id': personId, 'hours': hours}, token: token);
+    return InviteResult.fromJson(res);
   }
 
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {

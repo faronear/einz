@@ -1,6 +1,15 @@
-import { getDb } from "./db.js";
+import { randomInt } from "node:crypto";
+import { getDb, getMeta, setMeta } from "./db.js";
 import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, getDevice, type ServerConfig } from "./config.js";
+
+/** 邀请码字符集（去易混字符 0/O/1/I）与格式：5 字符一组，共 4 组。 */
+const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function genInviteCode(len = 20): string {
+  let s = "";
+  for (let i = 0; i < len; i++) s += INVITE_ALPHABET[randomInt(INVITE_ALPHABET.length)];
+  return s.match(/.{1,5}/g)!.join("-");
+}
 
 /** GET /devices：设备列表（含 person 映射）。 */
 export function listDevices(cfg: ServerConfig, token: string): { devices: unknown[] } {
@@ -33,28 +42,54 @@ export function revokeDevice(cfg: ServerConfig, token: string, targetDeviceId: s
 }
 
 /**
- * POST /devices/enroll：新设备凭一次性邀请码动态登记（免认证——邀请码即准入令牌）。
- * 登记写入 devices 表（status='active'），判定源已是数据库，故登记后**立即生效、无需重启**。
- * - person_id 取自邀请码记录（不信任客户端提交），防止邀请码被用于登记成其他 person；
- * - 邀请码必须 pending 且未过期；成功后标记 used（一次性）；
+ * POST /devices/enroll：设备动态登记（免认证——准入令牌即"邀请码"或"首设备自举"）。
+ * - **首设备自举**：空间还没有任何 active 设备时，免邀请码——第一个登记的设备
+ *   自动成为空间创建者（person 客户端自报，写入 creator_person_id，拥有生成邀请码权限）；
+ * - **常规登记**：空间已有设备后，凭创建者生成的一次性邀请码加入（person 取自
+ *   邀请码记录，不信任客户端提交）；
+ * - 登记写入 devices 表（status='active'），判定源已是数据库，登记后立即生效、无需重启；
  * - 已登记设备幂等返回成功；被撤销设备拒绝复活。
  */
 export function enrollDevice(
   cfg: ServerConfig,
   body: unknown
 ): { ok: true; device_id: string; person_id: string; space_id: string } {
-  const b = (body ?? {}) as { device_id?: string; public_key?: string; invite_code?: string };
+  const b = (body ?? {}) as { device_id?: string; public_key?: string; invite_code?: string; person_id?: string };
   const deviceId = (b.device_id ?? "").trim();
   const publicKey = (b.public_key ?? "").trim();
   const inviteCode = (b.invite_code ?? "").trim();
-  if (!deviceId || !publicKey || !inviteCode) {
-    throw new ApiError("INVALID_REQUEST", "device_id / public_key / invite_code 必填", 400);
-  }
 
   const db = getDb();
   const now = Date.now();
 
-  // 1) 校验邀请码：存在 + pending + 未过期
+  // 0) 首设备自举：空间 0 台 active 设备 → 免邀请码，登记为创建者
+  const activeCount = (db.prepare(`SELECT COUNT(*) AS c FROM devices WHERE status = 'active'`).get() as { c: number }).c;
+  if (activeCount === 0) {
+    if (!deviceId || !publicKey) {
+      throw new ApiError("INVALID_REQUEST", "device_id / public_key 必填", 400);
+    }
+    const personId = (b.person_id ?? "").trim() || "person-1";
+    const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(deviceId) as
+      | { status: string }
+      | undefined;
+    if (existing && existing.status === "revoked") {
+      throw new ApiError("FORBIDDEN", "device revoked, cannot re-enroll", 403);
+    }
+    if (!existing) {
+      db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, created_at) VALUES (?, ?, ?, 'active', ?)`)
+        .run(deviceId, personId, publicKey, now);
+    }
+    setMeta("creator_person_id", personId); // 创建者标记：生成邀请码的唯一权限
+    console.log(`[onlyspace] 首设备自举成功: device=${deviceId} person=${personId}（空间创建者）`);
+    return { ok: true, device_id: deviceId, person_id: personId, space_id: cfg.space_id };
+  }
+
+  // 1) 常规登记：邀请码必填（空间已有设备）
+  if (!inviteCode) {
+    throw new ApiError("INVALID_REQUEST", "device_id / public_key / invite_code 必填（首个设备免邀请码自举）", 400);
+  }
+
+  // 校验邀请码：存在 + pending + 未过期
   const invite = db.prepare(`SELECT person_id, status, expires_at FROM invites WHERE invite_code = ?`).get(inviteCode) as
     | { person_id: string; status: string; expires_at: number }
     | undefined;
@@ -89,9 +124,59 @@ export function enrollDevice(
       .run(deviceId, invite.person_id, publicKey, now);
   }
 
-  // 3) 标记邀请码已用（一次性）
+  // 4) 标记邀请码已用（一次性）
   db.prepare(`UPDATE invites SET status = 'used', used_by = ?, used_at = ? WHERE invite_code = ?`)
     .run(deviceId, now, inviteCode);
 
   return { ok: true, device_id: deviceId, person_id: invite.person_id, space_id: cfg.space_id };
+}
+
+/**
+ * POST /invites：创建者生成一次性邀请码（白名单外新设备加入用）。
+ * - 权限：仅创建者（首设备自举登记的 person，meta 里 creator_person_id）可生成；
+ *   旧库未自举（无 creator 标记）时放宽为任一 active 设备（向后兼容）。
+ * - person_id 必填（给谁的邀请）；两 person 上限预检：新 person 且空间已满 2 → 拒绝。
+ */
+export function createInvite(
+  cfg: ServerConfig,
+  token: string,
+  body: unknown
+): { invite_code: string; person_id: string; expires_at: number } {
+  const { device_id: callerId } = resolveSession(token);
+  if (!isActiveDevice(cfg, callerId)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+
+  const b = (body ?? {}) as { person_id?: string; hours?: number };
+  const personId = (b.person_id ?? "").trim();
+  if (!personId) throw new ApiError("INVALID_REQUEST", "person_id 必填", 400);
+  const hours = Math.min(Math.max(Math.floor(b.hours ?? 24), 1), 168);
+
+  const db = getDb();
+  // 权限：创建者专属（creator_person_id 未设置=旧库，放宽为任一 active 设备）
+  const creator = getMeta("creator_person_id");
+  if (creator) {
+    const caller = db.prepare(`SELECT person_id FROM devices WHERE device_id = ?`).get(callerId) as
+      | { person_id: string }
+      | undefined;
+    if (!caller || caller.person_id !== creator) {
+      throw new ApiError("FORBIDDEN", "仅创建者可生成邀请码", 403);
+    }
+  }
+
+  // 两 person 上限预检：新 person（无 active 设备）且空间已满 2 → 拒绝
+  const personCount = db
+    .prepare(`SELECT COUNT(DISTINCT person_id) AS c FROM devices WHERE status = 'active'`)
+    .get() as { c: number };
+  const thisPersonActive = db
+    .prepare(`SELECT COUNT(*) AS c FROM devices WHERE person_id = ? AND status = 'active'`)
+    .get(personId) as { c: number };
+  if (personCount.c >= 2 && thisPersonActive.c === 0) {
+    throw new ApiError("FORBIDDEN", "空间最多两个 person（当前已满）", 403);
+  }
+
+  const code = genInviteCode();
+  const expiresAt = Date.now() + hours * 3600_000;
+  db.prepare(`INSERT INTO invites (invite_code, person_id, status, created_at, expires_at) VALUES (?, ?, 'pending', ?, ?)`)
+    .run(code, personId, Date.now(), expiresAt);
+  console.log(`[onlyspace] 创建者生成邀请码: person=${personId} hours=${hours}`);
+  return { invite_code: code, person_id: personId, expires_at: expiresAt };
 }

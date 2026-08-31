@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { getDb } from "./db.js";
+import { randomUUID } from "node:crypto";
+import { getDb, getMeta, setMeta } from "./db.js";
 
 export interface DeviceConfig {
   device_id: string;
@@ -12,102 +10,43 @@ export interface DeviceConfig {
 
 export interface ServerConfig {
   space_id: string;
-  devices: DeviceConfig[];
 }
 
-// 用 fileURLToPath 而非 import.meta.dirname：后者 Node 20.11+ 才存在，
-// VPS 宿主旧 Node 下为 undefined 导致 resolve(undefined, ...) 抛 ERR_INVALID_ARG_TYPE
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_CONFIG_PATH = resolve(HERE, "../config/config.json");
-
-/** 加载静态白名单配置（productLens §8.3）。
- *  文件不存在时进入**空转模式**正常启动（space_id=unconfigured、devices=[]）：
- *  /health 可探活，但无 active 设备 → 一切业务（auth/发消息/登记）被拒绝；
- *  部署 config.json 后重启即恢复正常。 */
-export function loadConfig(path = process.env.ONLYSPACE_CONFIG ?? DEFAULT_CONFIG_PATH): ServerConfig {
-  let raw: string;
-  try {
-    raw = readFileSync(path, "utf8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
-      console.warn(
-        `⚠️ 缺少配置文件 ${path}：Server 进入空转模式（space_id=unconfigured、0 台设备）。\n` +
-          `   业务接口将被拒绝，仅 /health 可探活。部署白名单后重启恢复正常：\n` +
-          `   dart run bin/onlyspace.dart config --store <store> --peer-pubkey <对方公钥> ... --out-config config.json\n` +
-          `   然后把 config.json 放到宿主机 deployment/config/ 后 docker compose restart server`
-      );
-      return { space_id: "unconfigured", devices: [] };
-    }
-    throw e;
-  }
-  const cfg = JSON.parse(raw) as ServerConfig;
-
-  if (typeof cfg.space_id !== "string" || !Array.isArray(cfg.devices)) {
-    throw new Error(`config.json 格式错误: 需要 space_id + devices`);
-  }
-  const active = cfg.devices.filter((d) => d.status === "active");
-  if (active.length < 1) {
-    console.warn(
-      `⚠️ config.json 暂无 active 设备：业务接口将拒绝一切请求（auth/发消息/登记）。部署白名单后重启生效。`
-    );
-  }
-  return cfg;
+/** 加载服务配置：space_id 持久化在 db meta 表（首启自动生成 UUID，之后不变）。
+ *  不再读取 config.json——自主模式：白名单完全靠动态登记
+ *  （POST /devices/enroll：第一个设备免邀请码自举为创建者，之后设备凭邀请码加入）。 */
+export function loadConfig(): ServerConfig {
+  const existing = getMeta("space_id");
+  if (existing) return { space_id: existing };
+  const spaceId = randomUUID();
+  setMeta("space_id", spaceId);
+  console.log(`[onlyspace] 首次启动：已生成 space_id=${spaceId}（持久化在 db meta，可在 /health 查看）`);
+  return { space_id: spaceId };
 }
 
 /**
  * 设备是否在白名单且未被撤销。
- * 判定源 = 数据库 devices 表（运行时可写：启动时 syncWhitelistToDb 登记 config.json
- * 种子，之后由动态登记端点 POST /devices/enroll 热加入）——因此新设备登记后
- * **无需重启 Server** 即生效（此前判定源是启动时载入内存的 config.json，必须重启）。
- * 撤销（status='revoked'）同样实时生效（E2EE.md §9.3）。
+ * 判定源 = 数据库 devices 表（运行时可写：POST /devices/enroll 动态登记）。
+ * 撤销（status='revoked'）实时生效（E2EE.md §9.3）。
  */
 export function isActiveDevice(_cfg: ServerConfig, deviceId: string): boolean {
   const row = getDb()
     .prepare(`SELECT status FROM devices WHERE device_id = ?`)
     .get(deviceId) as { status: string } | undefined;
-  if (row == null) return false; // db 无记录 = 未登记（config.json 种子或 enroll）→ 拒绝
+  if (row == null) return false; // db 无记录 = 未登记 → 拒绝
   return row.status === "active";
 }
 
-/**
- * 取设备信息（含公钥，用于 challenge seal 等）。
- * 优先查数据库（动态登记设备在这里；含 public_key/person_id/status），
- * 未登记时回退内存 config.json 种子——与 isActiveDevice 的判定源保持一致。
- */
-export function getDevice(cfg: ServerConfig, deviceId: string): DeviceConfig | undefined {
+/** 取设备信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 devices 表。 */
+export function getDevice(_cfg: ServerConfig, deviceId: string): DeviceConfig | undefined {
   const row = getDb()
     .prepare(`SELECT device_id, person_id, public_key, status FROM devices WHERE device_id = ?`)
     .get(deviceId) as { device_id: string; person_id: string; public_key: string; status: string } | undefined;
-  if (row) {
-    return {
-      device_id: row.device_id,
-      person_id: row.person_id,
-      public_key: row.public_key,
-      status: row.status as DeviceConfig["status"],
-    };
-  }
-  return cfg.devices.find((d) => d.device_id === deviceId);
-}
-
-/**
- * 把 config.json 白名单登记进 devices 表（UPSERT，幂等）：
- * - 新设备：INSERT；
- * - 已存在设备：仅更新 person_id / public_key（白名单改公钥后重启即生效，
- *   修复 "db 残留旧公钥 → challenge 用旧公钥 seal → 客户端解不开" 问题）；
- * - **status 不覆盖**：被撤销（status='revoked'）的设备重启后不"复活"（E2EE.md §9.3）。
- */
-export function syncWhitelistToDb(cfg: ServerConfig): void {
-  const db = getDb();
-  const upsert = db.prepare(
-    `INSERT INTO devices (device_id, person_id, public_key, status, created_at) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(device_id) DO UPDATE SET person_id = excluded.person_id, public_key = excluded.public_key`
-  );
-  for (const d of cfg.devices) {
-    upsert.run(d.device_id, d.person_id, d.public_key, d.status, Date.now());
-  }
-  // 两 person 上限提示：种子白名单应只含 person-a/person-b（同 person 多设备允许）
-  const distinctPersons = new Set(cfg.devices.map((d) => d.person_id));
-  if (distinctPersons.size > 2) {
-    console.warn(`⚠️ config.json 白名单含 ${distinctPersons.size} 个 person（上限 2），请检查是否混入多余人员`);
-  }
+  if (!row) return undefined;
+  return {
+    device_id: row.device_id,
+    person_id: row.person_id,
+    public_key: row.public_key,
+    status: row.status as DeviceConfig["status"],
+  };
 }

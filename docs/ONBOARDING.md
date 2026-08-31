@@ -1,25 +1,27 @@
 # OnlySpace 部署与 AB 互通操作手册（Onboarding）
 
-从零开始：VPS 部署 → A/B 双设备生成身份 → 创建空间 → 认证/托管 → 邀请码 → TUI 接入 → 双端互通对话。
+从零开始：VPS 部署（**无需任何配置文件**）→ 首个设备自举成为创建者 → 口令托管 → 邀请码 → 对方加入 → 双端互通对话。
 
 > 适用：两人私密空间（person-a / person-b），服务器自建，客户端 TUI（Mac / Windows）。
+> 自主模式：**不需要 config.json**——server 首启自动生成 space_id，白名单完全靠动态登记（首个设备免邀请码自举为创建者，之后设备凭邀请码加入）。
 
 ---
 
 ## 术语速览
 
-| 概念                      | 说明                                                                                                |
-| ------------------------- | --------------------------------------------------------------------------------------------------- |
-| **space_id**              | 空间唯一标识（UUID），`config` 命令生成，写入白名单与 store                                         |
-| **Space Key**             | 32B 随机空间密钥（端到端加密用），创建者生成，B 凭口令从托管包获取                                  |
-| **口令（passphrase）**    | 创建者 escrow upload 时设定，B 凭它解出 Space Key。**别和邀请码混淆**                               |
-| **邀请码（invite_code）** | 一次性 24h 有效，白名单**外**的新设备登记用（白名单内的设备用不到）                                 |
-| **白名单**                | VPS `deployment/config/config.json` 的 devices 数组；数据库 devices 表为判定源（重启时 UPSERT 同步） |
+| 概念                      | 说明                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **space_id**              | 空间唯一标识（UUID）。**server 首启自动生成并持久化**（db meta 表），`/health` 可查看；登记响应会带回给客户端 |
+| **Space Key**             | 32B 随机空间密钥（端到端加密用），创建者生成，对方凭口令从托管包获取                                          |
+| **口令（passphrase）**    | 创建者 escrow upload 时设定，对方凭它解出 Space Key。**别和邀请码混淆**                                       |
+| **邀请码（invite_code）** | 一次性（默认 24h 有效），创建者生成、白名单外新设备登记用                                                      |
 | **person id**             | 使用者身份（如 `luk` / `fanr`）：同一个人多台设备填相同值，"自己/对方"按它判断；一个空间最多两个 person（同 person 多设备允许） |
+| **自举（bootstrap）**     | 空间 0 台设备时，第一个登记的设备免邀请码自动成为**创建者**（拥有生成邀请码权限）                              |
+| **白名单**                | 数据库 devices 表（动态登记，运行时可写，**无需 config.json 种子**）；撤销（revoked）实时生效                 |
 
 ---
 
-## 阶段 0：准备（VPS + 本机）
+## 阶段 0：VPS 部署（不需要任何配置文件）
 
 ```bash
 # ① VPS：拉最新代码 + 重建 server
@@ -32,175 +34,144 @@ cp .env.example .env         # 模板在仓库里（.gitignore 不覆盖，git p
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
 # ↑ 把输出粘贴到 .env 的 ONLYSPACE_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
 docker compose up -d --build server
-curl -s https://only.tic.cc/health    # 期望 {"status":"ok",...}
-# 💡 全新部署时 config.json 尚未生成，Server 会进入"空转模式"正常启动：
-#    /health 可探活，但无 active 设备 → 业务接口（auth/发消息/登记）全部拒绝，
-#    日志打印 ⚠️ 空转提示。完成阶段 2 生成白名单、阶段 3 部署 config.json 后
-#    docker compose restart server 即恢复正常（无需先放占位文件）。
+curl -s https://only.tic.cc/health
+# {"status":"ok","space_id":"<自动生成的UUID>",...}   ← 首次启动自动生成 space_id，无需任何配置
+docker compose logs -f server   # 查看日志（启动/登记/邀请码等事件；Ctrl+C 停止跟踪）
 
 # ② 本机（Mac）：拉最新代码
 cd /Users/Shared/productX/only && git pull
 
 # ③ 可选：清掉旧设备身份（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
-rm -f ~/.onlyspace/a.json ~/.onlyspace/b.json
+rm -f ~/.onlyspace/*.json
 mkdir -p ~/.onlyspace
 ```
+
+> 💡 server 处于"未初始化"状态（0 台设备）时，业务接口（auth/发消息）会拒绝——**首个设备自举后即自动激活**，全程无需重启、无需配置文件。
 
 ---
 
 ## 阶段 1：B 端（Windows）生成设备身份
 
-> 身份必须在 B 自己的机器上生成（私钥留本机）。单机体验可在 Mac 生成后把 store 文件拷给 B。
+> 身份必须在 B 自己的机器上生成（私钥留本机）。**也可以跳过本阶段**——B 直接用 TUI 引导，登记时自动生成身份。
 
 ```powershell
 cd 你的only目录\cli
 dart run bin/onlyspace.dart init --store "$env:USERPROFILE\.onlyspace\b.json" --device-id dev-b1
-dart run bin/onlyspace.dart pubkey --store "$env:USERPROFILE\.onlyspace\b.json"
-# ↑ 记下输出的 B 公钥（base64），离线发给 A
+# 用 TUI 引导时无需手动 init（见阶段 5）
 ```
-
-> 💡 **也可以在 TUI 里按引导完成初始化**（空间已创建后更省事）：
-> 直接 `dart run bin/onlyspace_tui.dart`（不传 `--store`）→ 无设备时自动引导：
-> 问设备名 → 自动生成身份并存入 `~/.onlyspace/[设备名].json` → **问"你的身份（person id）"**（与 A 约定不同的值，如 `fanr`；同一个人多台设备填相同值）→
-> 服务器探测 → 邀请码/口令接入 → 认证 → 直接进 TUI（init 一体化，无需敲 CLI 命令）。
-> ⚠️ 若 A **正在创建空间**、需要把 B 公钥提前写进白名单，仍需用上面的 CLI 命令拿公钥。
 
 ---
 
-## 阶段 2：A 端（Mac）生成身份 + 创建空间
+## 阶段 2：A 端（Mac）创建空间（首设备自举）
+
+**方式一：TUI 全自动（推荐）**——直接启动，引导会完成：生成身份 → 自举登记（成为创建者）→ 生成 Space Key → 上传口令托管包 → 生成邀请码：
 
 ```bash
 cd /Users/Shared/productX/only/cli
+dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现/创建设备
+# 引导流程：
+#   设备名称（如 dev-a1）→ 你的身份（person id，如 luk）
+#   ✅ 首设备自举成功（你是空间创建者）
+#   设置托管口令:（如 faronear，对方凭它接入）
+#   ✅ 口令托管包已上传
+#   对方的 person id（生成邀请码用，如 fanr）→ ✅ 邀请码已生成（发给对方）
+# 直接进入 TUI，状态栏 WS:● 在线
+```
 
-# ① A 生成设备身份
+**方式二：CLI 分步命令**（等价流程）：
+
+```bash
+cd /Users/Shared/productX/only/cli
 dart run bin/onlyspace.dart init --store ~/.onlyspace/a.json --device-id dev-a1
-
-# ② 创建空间：生成 Space Key + 白名单 config.json（含 A/B 公钥）+ sealed 副本
-SPACE_ID=$(python3 -c "import uuid;print(uuid.uuid4())")
-dart run bin/onlyspace.dart config \
-  --store ~/.onlyspace/a.json \
-  --peer-pubkey "<阶段1拿到的B公钥>" \
-  --person luk \                    # 你的 person id（默认 person-a，可自定义如 luk）
-  --peer-person fanr \              # 对方的 person id（默认 person-b，与 B 引导输入保持一致）
-  --space-id "$SPACE_ID" \
-  --out-config /tmp/prod-config.json \
-  --out-sealed-peer /tmp/sealed-b.txt
+# ① 首设备自举登记（免邀请码，成为创建者；person 用 --person 指定）
+dart run bin/onlyspace.dart enroll --store ~/.onlyspace/a.json \
+  --server https://only.tic.cc --person luk
+# ✅ 登记成功: person_id=luk space_id=<服务端的UUID>
+# ② 上传口令托管包（store 无 Space Key 时自动生成）
+dart run bin/onlyspace.dart auth --store ~/.onlyspace/a.json --server https://only.tic.cc
+dart run bin/onlyspace.dart escrow --action upload \
+  --store ~/.onlyspace/a.json --server https://only.tic.cc --passphrase 'faronear'
+# ✅ 口令托管包已上传
 ```
-
-> 输出物：`/tmp/prod-config.json`（白名单：space_id + dev-a1/dev-b1 公钥）、`/tmp/sealed-b.txt`（给 B 的 sealed 副本，备用）。
->
-> 💡 ① 步的设备身份也可在 TUI 内按引导生成（`dart run bin/onlyspace_tui.dart` 无 store 时自动 init 并存入 `~/.onlyspace/[设备名].json`）。⚠️ 但 **② 步创建空间（生成 Space Key + 白名单）目前仍需本 CLI 命令**（TUI 创建者路径待实现）。
 
 ---
 
-## 阶段 3：部署白名单到 VPS + 重启
-
-```bash
-scp /tmp/prod-config.json root@你的VPS:/faronear/only/deployment/config/config.json
-
-# 全新部署（容器尚未启动）：up；已有容器：restart
-ssh 你的VPS "cd /faronear/only/deployment && docker compose up -d --build server"
-ssh 你的VPS "curl -s https://only.tic.cc/health"   # ok；space_id 应是新 UUID
-```
-
-> 第一台设备只能手动加白名单（server 启动要求 ≥1 台 active 设备）；之后的设备走邀请码动态登记。重启时 UPSERT 会把 db 公钥同步为 config.json 的新值。
-
----
-
-## 阶段 4：A 认证 + 上传口令托管包
+## 阶段 3：A 生成邀请码（创建者客户端）
 
 ```bash
 cd /Users/Shared/productX/only/cli
-
-# ① A 认证（challenge-response）
-dart run bin/onlyspace.dart auth --store ~/.onlyspace/a.json --server https://only.tic.cc
-# ✅ 认证成功: space_id=<新UUID>
-
-# ② A 上传口令托管包（B 凭口令接入；口令务必记住：faronear）
-dart run bin/onlyspace.dart escrow --action upload \
-  --store ~/.onlyspace/a.json --server https://only.tic.cc \
-  --passphrase 'faronear'
-# ✅ 口令托管包已上传（Server 只存密文）
+dart run bin/onlyspace.dart invite --store ~/.onlyspace/a.json \
+  --server https://only.tic.cc --person fanr [--hours 24]
+# ✅ 邀请码已生成（24h 有效，一次性）: XXXX-XXXXX-XXXXX-XXXXX
+# 把邀请码离线发给对方（邀请码绑定 fanr 这个人，一次性、24h 过期）
 ```
 
-> 💡 如果设备身份是在 **TUI 里按引导创建的**（存为 `~/.onlyspace/[设备名].json`），上面命令的 `--store` 请换成实际文件名（如 `~/.onlyspace/dev-a1.json`）。CLI `auth`/`escrow` 没有自动发现，必须显式指定路径。
+> TUI 方式创建空间时**已自动生成**邀请码（阶段 2 引导里打印），此命令用于之后随时补发。权限：仅创建者（首个自举的 person）可生成。
 
 ---
 
-## 阶段 5：生成邀请码（VPS，白名单外新设备/演示动态登记）
-
-```bash
-ssh 你的VPS "cd /faronear/only/server && \
-  ONLYSPACE_CONFIG=/faronear/only/deployment/config/config.json \
-  ONLYSPACE_DB=/faronear/only/deployment/data/app.db \
-  npm run invite -- --person person-b"
-# ✅ 邀请码已生成（一次性，24h 有效）: XXXX-XXXXX-XXXXX-XXXXX
-```
-
-> ⚠️ 用**宿主机路径**（不是容器内 `/config`、`/data`）；env 必须显式传（别用 sudo）。dev-b1 已在白名单，用不到邀请码；它主要给"白名单外新设备"（可再 init 一台 dev-b2 体验完整动态登记）。
-
----
-
-## 阶段 6：A 进入 TUI（Mac）
+## 阶段 4：A 进入 TUI（Mac，日常使用）
 
 ```bash
 cd /Users/Shared/productX/only/cli
 dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 下的设备
-# 自动使用已有设备（阶段 2 CLI 创建的 a.json，或 TUI 内创建的 [设备名].json），
-# 多台会列出选择；无设备才引导 init（存入 ~/.onlyspace/[设备名].json）
-# 首次运行会问"你的身份（person id）"（如 luk，与阶段 2 的 --person 一致）——之后不再问
+# 自动使用已有设备（a.json 或 [设备名].json），多台会列出选择
 # 启动探测 https://only.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
 # 状态栏 WS:● 在线；输入消息回车发送
 ```
 
 ---
 
-## 阶段 7：B 进入 TUI（Windows）
+## 阶段 5：B 进入 TUI（Windows，加入空间）
 
 ```powershell
 cd 你的only目录\cli
 dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.onlyspace\ 下的设备
-# 自动使用已有设备（b.json 或 TUI 内创建的 [设备名].json），多台会列出选择
-# 首次运行会问"你的身份（person id）"（与阶段 2 的 --peer-person 保持一致，如 fanr）
-# 启动探测 → 能连 → 引导继续：
-#   - 无 Space Key → 问"接入方式" → 回车=1 口令接入
-#   - 口令: faronear（⚠️ 输口令，不是邀请码；Windows 隐藏回显无星号，回车提交）
-#   - ✅ 口令接入成功 → 认证成功 → 进入 TUI
+# 引导流程（空间已有设备 → 走邀请码登记）：
+#   设备名称（如 dev-b1）→ 你的身份（person id，如 fanr）
+#   ⚠️ 自举失败（空间已有创建者）→ 输入邀请码: XXXX-XXXXX-XXXXX-XXXXX
+#   ✅ 邀请码登记成功
+#   无 Space Key → 问"接入方式" → 回车=1 口令接入
+#   口令: faronear（⚠️ 输口令，不是邀请码；Windows 隐藏回显无星号，回车提交）
+#   ✅ 口令接入成功 → 认证成功 → 进入 TUI
 ```
 
-> B 走"白名单外新设备"体验：先 `init` 一台 dev-b2 → TUI 引导输入邀请码（阶段 5）→ ✅ 登记成功 → 再口令接入。
+> 同一人加第二台设备：TUI 引导时 person 填**相同值**（如 fanr）、邀请码再生成一个即可（同 person 多设备不受两 person 上限影响）。
 
 ---
 
-## 阶段 8：AB 互通验证
+## 阶段 6：AB 互通验证
 
 | 验证项       | 操作                          | 期望                                                               |
 | ------------ | ----------------------------- | ------------------------------------------------------------------ |
 | A/B 在线     | 各自 TUI 状态栏               | `WS:● 在线`                                                        |
 | A→B 消息     | A 输入消息回车                | B 消息区实时出现（WS 推送）                                        |
 | B→A 消息     | B 输入消息回车                | A 消息区实时出现                                                   |
-| 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀                                         |
+| 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀（**同 person 多设备互显"我"**）         |
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                        |
 | 服务器重设   | `/server https://only.tic.cc` | 重连并认证                                                         |
-| 服务器地址   | 启动引导                      | 默认 only.tic.cc，能连零打扰；连不上才引导输入；`/server` 显性重设 |
+| 邀请码       | 创建者 `/invite` 之外 | 需补发时用 CLI `dart run bin/onlyspace.dart invite ...`            |
 
 ---
 
 ## 常见坑速查
 
-| 症状                                    | 原因                                           | 处理                                                                                  |
-| --------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `sealOpen` libsodium 失败               | 白名单公钥与 store 私钥不匹配（db 残留旧公钥） | 确认部署了`/tmp/prod-config.json` 并 `docker compose restart server`（UPSERT 已修复） |
-| 口令接入`FormatException: 备份解密失败` | **口令输成了邀请码**                           | 口令是`faronear`（A 上传托管包时设的）                                                |
-| invite 报`path must be of type string`  | VPS 宿主机 Node 旧 / env 未传                  | 显式传宿主机路径 env；别用 sudo；旧 Node 兼容已修复                                   |
-| 启动 255 崩溃                           | 旧代码渲染/终端问题                            | 已全部修复（git pull 后重试）                                                         |
-| 二次启动还问服务器                      | 旧代码                                         | 新版有探测+持久化，能连不再询问                                                       |
-| `/health` 正常但 auth 报握手失败        | 本机翻墙/网络抖动                              | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试                                     |
+| 症状                                        | 原因                                   | 处理                                                                                |
+| ------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
+| server 日志报"缺少配置文件"                 | 旧版本行为（已移除）                   | `git pull` 后 server 不再读 config.json（自主模式），无需配置文件                   |
+| 首设备自举失败/被要求邀请码                 | 空间已有设备（你不是第一个）           | 这是正常加入者路径：输入创建者给的邀请码即可                                        |
+| 口令接入 `FormatException: 备份解密失败`    | **口令输成了邀请码**                   | 口令是创建者 escrow upload 时设的（如 faronear），不是邀请码                        |
+| 只有 `/health` 可用、业务全拒               | 空间 0 台设备（未自举）                | 让第一个设备走一次引导（自举）即激活，无需重启                                      |
+| 生成邀请码报 403                            | 非创建者调用 `invite`                  | 邀请码只能由**首设备自举的 person** 生成（TUI 引导自动完成或 CLI invite 命令）      |
+| 启动 255 崩溃                               | 旧代码渲染/终端问题                    | 已全部修复（git pull 后重试）                                                       |
+| `/health` 正常但 auth 握手失败              | 本机翻墙/网络抖动                      | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试                                    |
 
 ---
 
 ## 说明
 
-- 白名单修改（换公钥/加设备）后必须 `docker compose restart server`（db 由 UPSERT 同步）
-- 撤销设备：白名单外设备仍可被 server 拒绝；被撤销设备重启不复活
-- 服务端监控：`GET /health`（免鉴权）、`docker logs -f` 看请求日志（`LOG_LEVEL=quiet` 可关）
+- **无 config.json**：space_id 由 server 首启自动生成（db meta 表持久化）；白名单 = devices 表（动态登记）
+- **信任模型**：空间 0 台设备时，**第一个登记的设备成为创建者**（先到先得）——私有部署场景适用；创建者拥有生成邀请码的唯一权限
+- **两 person 上限**：空间内 distinct person ≤2（同 person 多设备允许）；新 person 登记/发邀请码时由 server 强制检查
+- 撤销设备：`DELETE /devices/:id`（需认证）；被撤销设备重启不复活，且触发密钥轮换
+- 服务端监控：`GET /health`（免鉴权）、`docker compose logs -f server`（启动/登记/邀请码事件）
