@@ -96,3 +96,4 @@
 - [ ] 一次性配置的具体操作形式（命令行 / 配置界面 / 二维码）→ 归入 SETUP.md
 - [ ] 消息删除语义
 - [ ] 已读回执粒度
+- [ ] **TUI/CLI 接入已有 escrow 实现**（生产化安全加固候选）：新设备接入改走 `escrow download`（凭口令取 Space Key），替代直接传输 sealed 文件，降低 store 泄露风险；配套考察加密 store（Keychain/secret-service）——待有空时考察决定是否实施
