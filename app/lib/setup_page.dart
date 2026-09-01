@@ -42,7 +42,7 @@ class _SetupPageState extends State<SetupPage> {
   final _escrowPassphrase = TextEditingController();
   final _serverController = TextEditingController();
 
-  // 服务器地址：默认 only.tic.cc，探测失败时引导输入并持久化（降低小白负担）
+  // 服务器地址：默认 einz.tic.cc，探测失败时引导输入并持久化（降低小白负担）
   String _server = kEinzServer;
   bool _probeFailed = false;
 
@@ -71,7 +71,7 @@ class _SetupPageState extends State<SetupPage> {
     _initServer();
   }
 
-  /// 服务器地址初始化：读持久化值（无则默认 only.tic.cc）→ 快速探测。
+  /// 服务器地址初始化：读持久化值（无则默认 einz.tic.cc）→ 快速探测。
   /// 能连 → 零打扰（不显示任何 UI）；无法连接 → 显示输入框引导覆盖（降低小白负担）。
   Future<void> _initServer() async {
     try {

@@ -84,7 +84,7 @@ Timer? _resizeTimer;
 StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
 
 /// 默认服务器地址：优先读 cli/config.json 的 server 字段（本地可改），
-/// 文件缺失/格式异常时回退硬编码 https://only.tic.cc。
+/// 文件缺失/格式异常时回退硬编码 https://einz.tic.cc。
 String _defaultServer() {
   try {
     final f = File('config.json');
@@ -95,7 +95,7 @@ String _defaultServer() {
   } catch (_) {
     // 配置缺失/损坏：回退默认值
   }
-  return 'https://only.tic.cc';
+  return 'https://einz.tic.cc';
 }
 
 /// 默认 store 目录：$HOME/.einz（Windows 用 USERPROFILE）。

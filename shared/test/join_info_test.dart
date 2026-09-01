@@ -23,7 +23,7 @@ void main() {
   });
 
   test('格式不符返回 null', () {
-    expect(JoinInfo.decode('https://only.tic.cc/foo'), isNull);
+    expect(JoinInfo.decode('https://einz.tic.cc/foo'), isNull);
     expect(JoinInfo.decode('einz-join-v1?space=only'), isNull); // 缺 p
     expect(JoinInfo.decode('einz-join-v1?p=123'), isNull); // 缺 space
     expect(JoinInfo.decode(''), isNull);

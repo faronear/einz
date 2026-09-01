@@ -34,7 +34,7 @@ bash deployment/.env.sh         # 模板在仓库里（.gitignore 不覆盖，gi
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
 # ↑ 把输出粘贴到 .env 的 EINZ_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
 docker compose up -d --build server
-curl -s https://only.tic.cc/health
+curl -s https://einz.tic.cc/health
 # {"status":"ok","space_id":"<自动生成的UUID>",...}   ← 首次启动自动生成 space_id，无需任何配置
 docker compose logs -f server   # 查看日志（启动/登记/邀请码等事件；Ctrl+C 停止跟踪）
 
@@ -86,12 +86,12 @@ cd /Users/Shared/productX/only/cli
 dart run bin/einz.dart init --store ~/.einz/a.json --device-id dev-a1
 # ① 首设备自举登记（免邀请码，成为创建者；--person 是你的名称，如 lukas）
 dart run bin/einz.dart enroll --store ~/.einz/a.json \
-  --server https://only.tic.cc --person lukas [--device-name MacBook]
+  --server https://einz.tic.cc --person lukas [--device-name MacBook]
 # ✅ 登记成功: device_id=dev1 person_id=personA space_id=<服务端的UUID>
 # ② 上传口令托管包（store 无 Space Key 时自动生成）
-dart run bin/einz.dart auth --store ~/.einz/a.json --server https://only.tic.cc
+dart run bin/einz.dart auth --store ~/.einz/a.json --server https://einz.tic.cc
 dart run bin/einz.dart escrow --action upload \
-  --store ~/.einz/a.json --server https://only.tic.cc --passphrase 'faronear'
+  --store ~/.einz/a.json --server https://einz.tic.cc --passphrase 'faronear'
 # ✅ 口令托管包已上传
 ```
 
@@ -102,7 +102,7 @@ dart run bin/einz.dart escrow --action upload \
 ```bash
 cd /Users/Shared/productX/only/cli
 dart run bin/einz.dart invite --store ~/.einz/a.json \
-  --server https://only.tic.cc --person personB --name steffi [--hours 24]
+  --server https://einz.tic.cc --person personB --name steffi [--hours 24]
 # ✅ 邀请码已生成（24h 有效，一次性）: XXXX-XXXXX-XXXXX-XXXXX
 # 把邀请码离线发给对方（绑定 personB=steffi；给自己加设备用 --person personA）
 ```
@@ -117,7 +117,7 @@ dart run bin/einz.dart invite --store ~/.einz/a.json \
 cd /Users/Shared/productX/only/cli
 dart run bin/einz_tui.dart   # 不传 --store：自动发现 ~/.einz/ 下的设备
 # 自动使用已有设备（a.json 或 [设备名].json），多台会列出选择
-# 启动探测 https://only.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
+# 启动探测 https://einz.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
 # 状态栏 WS:● 在线；输入消息回车发送
 ```
 
@@ -151,7 +151,7 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz
 | B→A 消息    | B 输入消息回车                  | A 消息区实时出现                                                 |
 | 对方消息样式 | 看消息区                        | 对方粉色背景、自己绿色前缀（**同 person 多设备互显"我"**） |
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                      |
-| 服务器重设   | `/server https://only.tic.cc` | 重连并认证                                                       |
+| 服务器重设   | `/server https://einz.tic.cc` | 重连并认证                                                       |
 | 邀请码       | 创建者`/invite` 之外          | 需补发时用 CLI`dart run bin/einz.dart invite ...`         |
 
 ---

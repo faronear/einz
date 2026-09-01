@@ -1,6 +1,6 @@
 # 服务器更新流程（git push/pull 版）
 
-> **用途：** 在任意电脑上把新代码更新到 only.tic.cc 生产服务器。
+> **用途：** 在任意电脑上把新代码更新到 einz.tic.cc 生产服务器。
 > **适用：** 口令托管（KEY_ESCROW.md）、以及以后任何 Server 代码变更。
 > **原则：** 变更均向后兼容（新增表/端点，存量接口与数据不动；新表由 `CREATE TABLE IF NOT EXISTS` 启动自动创建）；server 代码构建进 Docker 镜像，**必须 `--build` 重建**。
 > 关联文档：docs/DEPLOYMENT.md §9（本章节的仓库内原版）。
@@ -48,7 +48,7 @@ git status --short                                          # 应只显示本地
 - 本地化文件 `deployment/.env`（备份密钥）、`server/data/`、`deployment/config/`、`*.db`
   全部在仓库 .gitignore 中 → git 操作不触碰，**本地数据零风险**；
 - 唯一例外 `deployment/Caddyfile`：仓库内是占位域名 `private.example.com`，
-  VPS 部署时已 sed 成真实域名（only.tic.cc）→ 用 `assume-unchanged` 标记，pull 不覆盖。
+  VPS 部署时已 sed 成真实域名（einz.tic.cc）→ 用 `assume-unchanged` 标记，pull 不覆盖。
 
 ---
 
@@ -73,7 +73,7 @@ docker compose up -d --build server      # server 代码进镜像，必须 --bui
 docker compose ps                         # 确认 running/healthy
 
 # 验证新端点已生效（401 = 端点活；404 = 尚未生效）
-curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
+curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 ```
 
 > Caddy 容器与 `deployment/.env` 无需改动。
@@ -85,11 +85,11 @@ curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
 ```bash
 cd /Users/Shared/productX/only/cli
 dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
-  --server https://only.tic.cc --passphrase "你的接入口令"
+  --server https://einz.tic.cc --passphrase "你的接入口令"
 # 期望：✅ 口令托管包已上传
 
 dart run bin/einz.dart escrow --action download --store /tmp/b.json \
-  --server https://only.tic.cc --passphrase "你的接入口令"
+  --server https://einz.tic.cc --passphrase "你的接入口令"
 # 期望：✅ 口令托管包已解出 Space Key
 ```
 

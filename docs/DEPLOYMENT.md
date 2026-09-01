@@ -384,7 +384,7 @@ docker compose ps                                       # 确认 server 重新 r
 
 ```bash
 # 新端点已注册（401 = 端点活；404 = 尚未生效）
-curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
+curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 ```
 
 ### 9.4 客户端实测（以口令托管为例，本机 macOS/Linux）
@@ -392,9 +392,9 @@ curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
 ```bash
 cd /Users/Shared/productX/only/cli
 dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
-  --server https://only.tic.cc --passphrase "你的接入口令"
+  --server https://einz.tic.cc --passphrase "你的接入口令"
 dart run bin/einz.dart escrow --action download --store /tmp/b.json \
-  --server https://only.tic.cc --passphrase "你的接入口令"
+  --server https://einz.tic.cc --passphrase "你的接入口令"
 ```
 
 ### 9.5 升级注意事项

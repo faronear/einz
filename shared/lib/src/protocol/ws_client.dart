@@ -56,7 +56,7 @@ class WsDeviceRevokedEvent extends WsEvent {
 
 /// WS 实时客户端：连接 / 事件回调 / 自动重连（指数退避，上限 30s）。
 ///
-/// - [server] 传 http(s) 基址（https://only.tic.cc），内部转换为 ws(s)://
+/// - [server] 传 http(s) 基址（https://einz.tic.cc），内部转换为 ws(s)://
 /// - token 含 base64 的 +/= 字符，必须 URL 编码（PROTOCOL.md §8.1）
 /// - [stop] 之前持续重连；状态经 [onStatus] 回调（App 据此切换轮询策略）
 /// - [onUnauthorized]：服务器以 4401 关闭（session 过期）时调用——CLI/App 在此

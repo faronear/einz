@@ -3,11 +3,11 @@ import 'dart:io';
 import 'local_database.dart';
 
 /// 默认服务器地址（产品部署域名固定）。
-const String kEinzServer = 'https://only.tic.cc';
+const String kEinzServer = 'https://einz.tic.cc';
 
 /// 服务器地址设置（存本设备 app_state，key='server'）。
 ///
-/// 降低小白负担：默认 only.tic.cc 能连时全程零打扰；用户手动改过的地址
+/// 降低小白负担：默认 einz.tic.cc 能连时全程零打扰；用户手动改过的地址
 /// 持久化到本设备，下次启动优先使用，直到连不上才需要重新设置。
 class ServerSettings {
   ServerSettings(this.db);
@@ -16,7 +16,7 @@ class ServerSettings {
 
   static const _kKey = 'server';
 
-  /// 当前服务器地址：持久化值优先，无则默认 only.tic.cc。
+  /// 当前服务器地址：持久化值优先，无则默认 einz.tic.cc。
   Future<String> load() async {
     final row = await (db.select(db.appState)..where((s) => s.key.equals(_kKey))).getSingleOrNull();
     final v = row?.value;
