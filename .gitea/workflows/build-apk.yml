@@ -51,7 +51,12 @@ jobs:
       - name: Install x86_64 libs for AAPT2 (QEMU)
         run: |
           # aapt2 是 x86_64 动态链接程序，经 QEMU 模拟运行需要 amd64 glibc/libstdc++
+          # Ubuntu arm64 镜像的 apt 源是 ports.ubuntu.com（无 amd64 索引），
+          # 必须为 amd64 架构单独添加 archive.ubuntu.com 源，否则 apt update 404
           dpkg --add-architecture amd64
+          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main universe" > /etc/apt/sources.list.d/amd64.list
+          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble-updates main universe" >> /etc/apt/sources.list.d/amd64.list
+          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble-security main universe" >> /etc/apt/sources.list.d/amd64.list
           apt-get update -qq
           apt-get install -y -qq libc6:amd64 libstdc++6:amd64
 
