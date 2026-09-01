@@ -36,10 +36,10 @@ jobs:
           java-version: '21'
 
       - name: Setup Flutter 3.47.2
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: '3.47.2'
+        run: |
+          git clone --depth 1 -b 3.47.2 https://github.com/flutter/flutter.git /opt/flutter
+          /opt/flutter/bin/flutter --version
+          echo "/opt/flutter/bin" >> "$GITHUB_PATH"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
