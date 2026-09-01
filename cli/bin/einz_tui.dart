@@ -214,8 +214,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       stderr.writeln('⚠️ 名称处理异常: $e'); // 防崩 + 可诊断
     }
   }
-  // 设备名称（显示用，如 MacBook，回车不设置）
-  if (store.deviceName == null || store.deviceName!.isEmpty) {
+  // 设备名称（显示用，如 MacBook，回车不设置）——仅新设备（未登记）首次配置时询问；
+  // 已登记设备重启不再重复询问（首次跳过则一直不设，状态条回退规范 id dev1）
+  if (store.deviceId == null && (store.deviceName == null || store.deviceName!.isEmpty)) {
     final name = await _prompt(session, '设备名称（显示用，如 MacBook，回车不设置）');
     if (name.isNotEmpty) {
       store.deviceName = name;
