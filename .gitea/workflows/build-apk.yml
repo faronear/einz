@@ -48,6 +48,13 @@ jobs:
           # 只装 platform-tools + 接受 licenses，缺的 platforms/build-tools 由 Gradle 自动补装
           packages: 'platform-tools'
 
+      - name: Install x86_64 libs for AAPT2 (QEMU)
+        run: |
+          # aapt2 是 x86_64 动态链接程序，经 QEMU 模拟运行需要 amd64 glibc/libstdc++
+          dpkg --add-architecture amd64
+          apt-get update -qq
+          apt-get install -y -qq libc6:amd64 libstdc++6:amd64
+
       - name: Flutter pub get
         working-directory: app
         run: flutter pub get
