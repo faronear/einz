@@ -743,11 +743,12 @@ void _render() {
   }
 }
 
-/// 状态条身份标签：person_name@device_name（未设置回退服务器名称表，再回退规范 id）。
+/// 状态条身份标签：person_name@device_name（远程名称表优先——同 person 多设备同步
+/// 显示最新名字；未拉取/未知回退本地 store，再回退规范 id）。
 String _personLabel(DeviceStore store, Map<String, String> personNames) {
   final pid = store.personId;
-  final person = store.personName ??
-      (pid != null ? personNames[pid] : null) ??
+  final person = (pid != null ? personNames[pid] : null) ??
+      store.personName ??
       store.personId ??
       '-';
   final device = store.deviceName ?? store.deviceId ?? '-';
@@ -764,12 +765,13 @@ List<String> _formatMessage(ChatMessage m, int cols) {
     who = 'system';
     color = _gray;
   } else if (m.isMine) {
-    // 自己的消息：前缀用 person_name（本地未设置回退服务器名称表，再回退"我"）
+    // 自己的消息：前缀用 person_name（远程名称表优先——同 person 多设备同步；
+    // 未拉取回退本地 store，再回退"我"）
     final myStore = _state?.session.store;
     final myPid = myStore?.personId;
-    who = (myStore?.personName?.isNotEmpty ?? false)
-        ? myStore!.personName!
-        : (myPid != null ? _state?.personNames[myPid] : null) ?? '我';
+    who = (myPid != null ? _state?.personNames[myPid] : null) ??
+        (myStore?.personName?.isNotEmpty ?? false ? myStore!.personName! : null) ??
+        '我';
     color = _green;
   } else {
     // 对方的消息：按 senderPersonId 查名称表（未拉取/未知回退"对方"）
