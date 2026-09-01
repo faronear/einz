@@ -30,7 +30,7 @@ cd /faronear/only            # ← 你的实际部署目录（下同，按需替
 git pull
 cd deployment
 # 首次部署（或 .env 丢失后重建）：生成备份密钥
-cp .env.example .env         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
+bash deployment/.env.sh         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
 # ↑ 把输出粘贴到 .env 的 EINZ_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
 docker compose up -d --build server
