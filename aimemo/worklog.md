@@ -732,3 +732,29 @@
 **验证：** 新 APK 重装模拟器，无崩溃日志，topResumedActivity 稳定在 MainActivity；截图确认渲染出浅色设置页界面（screencap 像素分析非全黑，1080x2400）。截图存 `aimemo/shots/emu_setup_20260901.png`。
 
 **结论：** 首版 debug 签名 APK 不可用（此 bug 真机同样会崩）；修复版 `app-release.apk`（75.7MB, cc.tic.einz, v1.0.0+1）为当前可用版本，模拟器运行正常。
+
+### macOS 本机磁盘清理：npm 缓存（2026-09-01 续）
+
+**背景：** 老板考虑卸载本机（macOS）Xcode 与 iOS 开发资源释放空间。盘点后发现：Xcode 相关合计仅 ~7GB（Xcode.app 5.0G + CommandLineTools 1.8G + 模拟器等 0.25G），而磁盘大头在别处（`~/.npm` 9.5G、`~/.cache` 6.6G、Parallels 4.4G、Homebrew 7.5G、Seafile 21G）。
+
+**老板决策：** 只清 npm 缓存，不卸载 Xcode（保留 iOS 打包能力）。
+
+**执行：** `npm cache clean --force` → `~/.npm` 9.5G → 294MB，释放约 **9.2GB**；磁盘占用 93% → 53%，可用 ~1GB → ~10GB。无代码改动，无需 commit。
+
+**备查：** 若日后仍需腾空间：`~/Library/Developer/CoreSimulator`（192M）、`/Library/Developer/CommandLineTools`（1.8G，brew/git 依赖，建议保留）、`brew cleanup --prune=all`、Parallels 虚拟机镜像（4.4G，不用可删）、`~/.cache`（6.6G，需逐项甄别）。
+
+### macOS 本机环境盘点 + Flutter 配 PATH（2026-09-01 续）
+
+**盘点结论：** 本机 Flutter SDK 其实已安装于 `~/development/flutter`（3.47.2 stable / Dart 3.13.2，与项目 pubspec.lock 要求匹配），但从未配 PATH，终端 `flutter` 一直 command not found。另发现 brew 独立装了一份旧版 dart-sdk 3.11.0（`/opt/homebrew/bin/dart`），**不满足项目 dart>=3.13.2 要求**，且此前因 flutter 不在 PATH 而遮蔽了正确版本。
+
+**操作：** `~/.bashrc` 的 add path 段前置 `export PATH="$HOME/development/flutter/bin:$PATH"`（置于 brew 之前）。默认 shell 为 /bin/bash，`.bash_profile` 已 source `.bashrc`，故无需改 zsh。验证：`which flutter`→SDK、`which dart`→SDK 自带 3.13.2 ✓。
+
+**备注：** brew dart 3.11.0 保留未删（被遮蔽），如需可 `brew uninstall dart`。新终端或 `source ~/.bashrc` 后生效。
+
+### Homebrew 半更新损坏修复（2026-09-01 续）
+
+**背景：** 卸载 brew dart-sdk 时 brew 报 `Unexpected method 'command_wrapper' called on Cask drawio`，`brew update` 报 sorbet-runtime 的 `UnboundMethod#bind_call` 崩溃。根因：此前一次 `brew update` 半途而废，git 代码已被推到 6.0.20-85，但 vendored gems（`vendor/bundle/ruby/4.0.0` 仅 8 个，5.0.7 时代旧版本）未同步重建，新旧不匹配导致崩溃。
+
+**修复：** `brew install-bundler-gems`（官方内部命令，按 `Gemfile.lock` 重建 vendored gems，8 个全部重装）。**验证：** `brew update`、`brew info --cask drawio`（原崩溃点）、`brew doctor`、`brew list --versions` 全部正常。
+
+**经验：** brew 半更新（git 代码已 fetch 但 gems 未重建）是常见损坏态，`install-bundler-gems` 是轻量修复手段，比重装 brew 快。另：brew 已随修复升级至 6.0.20；`brew uninstall <formula>` 遇 cask 加载错误时可用 `--formula` 参数绕过。
