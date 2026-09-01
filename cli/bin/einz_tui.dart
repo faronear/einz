@@ -662,7 +662,7 @@ void _render() {
       'WS:${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
     WsStatus.stopped => 'WS:${_gray}○ 离线${_reset}',
   };
-  buf.write('${_bold}Einz TUI${_reset}  $wsName  ${_personLabel(s.session.store)}');
+  buf.write('${_bold}Einz TUI${_reset}  $wsName  ${_personLabel(s.session.store, s.personNames)}');
   if (s.status.isNotEmpty) {
     buf.write('  ${_gray}${s.status}${_reset}');
   }
@@ -723,9 +723,13 @@ void _render() {
   }
 }
 
-/// 状态条身份标签：person_name@device_name（未设置回退规范 id）。
-String _personLabel(DeviceStore store) {
-  final person = store.personName ?? store.personId ?? '-';
+/// 状态条身份标签：person_name@device_name（未设置回退服务器名称表，再回退规范 id）。
+String _personLabel(DeviceStore store, Map<String, String> personNames) {
+  final pid = store.personId;
+  final person = store.personName ??
+      (pid != null ? personNames[pid] : null) ??
+      store.personId ??
+      '-';
   final device = store.deviceName ?? store.deviceId ?? '-';
   return '$person@$device';
 }
@@ -740,8 +744,12 @@ List<String> _formatMessage(ChatMessage m, int cols) {
     who = 'system';
     color = _gray;
   } else if (m.isMine) {
-    // 自己的消息：前缀用 person_name（未设置回退"我"）
-    who = _state?.session.store.personName ?? '我';
+    // 自己的消息：前缀用 person_name（本地未设置回退服务器名称表，再回退"我"）
+    final myStore = _state?.session.store;
+    final myPid = myStore?.personId;
+    who = (myStore?.personName?.isNotEmpty ?? false)
+        ? myStore!.personName!
+        : (myPid != null ? _state?.personNames[myPid] : null) ?? '我';
     color = _green;
   } else {
     // 对方的消息：按 senderPersonId 查名称表（未拉取/未知回退"对方"）
