@@ -1,7 +1,7 @@
 // Einz TUI 聊天核心 —— 与 UI 无关的业务逻辑（方案 A 升级版）。
 //
-// 从 onlyspace_chat.dart（方案 B）提炼：认证 / 发送 / 补发 / 增量同步 / 历史 /
-// 解密 / UUIDv7 全部集中于此，供 TUI 界面（onlyspace_tui.dart）复用。
+// 从 einz_chat.dart（方案 B）提炼：认证 / 发送 / 补发 / 增量同步 / 历史 /
+// 解密 / UUIDv7 全部集中于此，供 TUI 界面（einz_tui.dart）复用。
 // 定位不变：测试端明文落盘（同 store.dart），不上生产。
 
 import 'dart:convert';
@@ -388,7 +388,7 @@ class ChatSession {
     return (messageId: messageId, attachmentId: attachmentId, caption: cap);
   }
 
-  /// 按扩展名推断附件类型（与 onlyspace.dart 的 _inferAttachmentType 一致）。
+  /// 按扩展名推断附件类型（与 einz.dart 的 _inferAttachmentType 一致）。
   static String _inferAttachmentType(String fileName) {
     final lower = fileName.toLowerCase();
     if (lower.endsWith('.png') ||
@@ -457,7 +457,7 @@ class ChatSession {
     });
   }
 
-  /// 简易 UUIDv7（与 onlyspace.dart 一致的近似实现）。
+  /// 简易 UUIDv7（与 einz.dart 一致的近似实现）。
   Future<String> _uuidv7() async {
     final s = await sodium();
     final rand = s.randombytes.buf(10);

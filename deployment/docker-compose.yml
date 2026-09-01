@@ -24,7 +24,7 @@ services:
     expose:
       - "3000"
     networks:
-      - onlyspace
+      - einz
 
   caddy:
     image: caddy:2
@@ -37,7 +37,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     networks:
-      - onlyspace
+      - einz
     depends_on:
       - server
 
@@ -46,4 +46,4 @@ volumes:
   caddy_config:
 
 networks:
-  onlyspace:
+  einz:

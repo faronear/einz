@@ -12,7 +12,7 @@ import 'package:sodium/sodium_sumo.dart';
 
 import '../sodium.dart';
 
-const String kBackupFormat = 'onlyspace-backup-v1';
+const String kBackupFormat = 'einz-backup-v1';
 
 /// 获取 SodiumSumo 实例（pwhash/Argon2id 只在 sumo 构建中提供）。
 Future<SodiumSumo> _sumo() => SodiumSumoInit.init2(loadDynamicLibrary);

@@ -116,7 +116,7 @@ class TestDevice {
   encryptMessage(messageId: string, plaintext: string, spaceId: string): MessageEnvelope {
     const msgKey = sodium.crypto_generichash(32, sodium.from_string(`m:${messageId}`), this.spaceKey);
     const nonce = sodium.randombytes_buf(24);
-    const aad = sodium.from_string(`onlyspace-v1${spaceId}${messageId}${this.deviceId}text1`);
+    const aad = sodium.from_string(`einz-v1${spaceId}${messageId}${this.deviceId}text1`);
     const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
       sodium.from_string(plaintext),
       aad,
@@ -139,7 +139,7 @@ class TestDevice {
   decryptMessage(env: MessageEnvelope, spaceId: string): string {
     const msgKey = sodium.crypto_generichash(32, sodium.from_string(`m:${env.message_id}`), this.spaceKey);
     const nonce = sodium.from_base64(env.nonce, B64);
-    const aad = sodium.from_string(`onlyspace-v1${spaceId}${env.message_id}${env.sender_device_id}text1`);
+    const aad = sodium.from_string(`einz-v1${spaceId}${env.message_id}${env.sender_device_id}text1`);
     const plain = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
       null,
       sodium.from_base64(env.ciphertext, B64),
@@ -174,7 +174,7 @@ class TestDevice {
 async function main(): Promise<void> {
   await sodium.ready;
 
-  tempDir = mkdtempSync(join(tmpdir(), "onlyspace-smoke-"));
+  tempDir = mkdtempSync(join(tmpdir(), "einz-smoke-"));
   const spaceKey = sodium.randombytes_buf(32);
   const devA = new TestDevice("dev-a1", "person-a", spaceKey);
   const devB = new TestDevice("dev-b1", "person-b", spaceKey);

@@ -98,5 +98,5 @@ class LocalDatabase extends _$LocalDatabase {
         },
       );
 
-  static QueryExecutor _openConnection() => driftDatabase(name: 'onlyspace');
+  static QueryExecutor _openConnection() => driftDatabase(name: 'einz');
 }

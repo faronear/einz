@@ -21,7 +21,7 @@ import UIKit
 
     // MethodChannel：Dart 侧取 APNs device token，认证后调用 Server /push/register。
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "Einz") {
-      let channel = FlutterMethodChannel(name: "onlyspace/apns", binaryMessenger: registrar.messenger())
+      let channel = FlutterMethodChannel(name: "einz/apns", binaryMessenger: registrar.messenger())
       channel.setMethodCallHandler { [weak self] call, result in
         if call.method == "getToken" {
           result(self?.apnsToken ?? "")

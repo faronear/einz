@@ -45,7 +45,7 @@ sudo gem install cocoapods
 
 ```bash
 git clone https://git.tic.cc/fon/only
-cd onlyspace/app
+cd only/app
 
 flutter pub get
 
@@ -72,7 +72,7 @@ open ios/Runner.xcworkspace      # Xcode 打开（注意是 .xcworkspace，含 P
 
 Xcode 内配置（Target `Runner` → Signing & Capabilities）：
 1. **Team**：选择你的 Apple ID 团队（免费账号选 Personal Team；会生成开发签名）
-2. **Bundle Identifier**：改为唯一值，如 `com.tic.onlyspace`（免费账号 bundle id 会被追加 team 前缀，正常）
+2. **Bundle Identifier**：改为唯一值，如 `com.tic.einz`（免费账号 bundle id 会被追加 team 前缀，正常）
 3. 若需推送：添加 **Push Notifications** capability（需付费账号；暂无则跳过，WS/轮询兜底不受影响）
 4. 点击 **Run ▶**（连上 iPhone，首次需在手机"设置 → 通用 → VPN与设备管理"信任开发者证书）
 
@@ -113,7 +113,7 @@ Xcode 内配置（Target `Runner` → Signing & Capabilities）：
 
 ```bash
 # Mac（第一次）
-git clone https://git.tic.cc/fon/only && cd onlyspace/app
+git clone https://git.tic.cc/fon/only && cd only/app
 flutter config --no-enable-swift-package-manager
 flutter pub get && flutter build ios --debug --no-codesign   # 验证编译
 open ios/Runner.xcworkspace                                  # 签名 → Run

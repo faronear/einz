@@ -12,12 +12,12 @@
 
 **方式 A（推荐）：git bundle 单文件**
 ```bash
-# 本机生成（已随本手册生成，见仓库根 onlyspace.bundle 或重新生成）
+# 本机生成（已随本手册生成，见仓库根 einz.bundle 或重新生成）
 cd <本机仓库>
-git bundle create onlyspace.bundle --all
+git bundle create einz.bundle --all
 
 # 新电脑
-git clone onlyspace.bundle only
+git clone einz.bundle only
 cd only
 ```
 
@@ -82,7 +82,7 @@ cd ../cli && dart pub get && dart analyze && bash test/e2e.sh
 
 # 3. 完成任务 #16：Flutter app/ 骨架
 cd app
-flutter create . --platforms=ios,android --project-name onlyspace
+flutter create . --platforms=ios,android --project-name einz
 # 在 app/pubspec.yaml 添加:
 #   einz_shared:
 #     path: ../shared

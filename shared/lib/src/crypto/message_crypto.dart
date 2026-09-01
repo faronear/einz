@@ -60,9 +60,8 @@ class MessageEnvelope {
 }
 
 /// 构造 AAD（E2EE.md §5.2）："einz-v1" ‖ space_id ‖ message_id ‖ sender ‖ type ‖ key_version
-/// （prefix 可传旧版 "onlyspace-v1" 以解密改名前的历史消息）
-Uint8List _buildAad(String spaceId, MessageEnvelope env, {String prefix = 'einz-v1'}) {
-  final aad = '$prefix$spaceId${env.messageId}${env.senderDeviceId}${env.type}${env.keyVersion}';
+Uint8List _buildAad(String spaceId, MessageEnvelope env) {
+  final aad = 'einz-v1$spaceId${env.messageId}${env.senderDeviceId}${env.type}${env.keyVersion}';
   return Uint8List.fromList(utf8.encode(aad));
 }
 
@@ -121,22 +120,18 @@ Future<String> decryptMessage({
 }) async {
   final s = await sodium();
   final messageKey = await deriveSubKey(s, spaceKey, 'm', env.messageId);
+  final aad = _buildAad(spaceId, env);
   final key = s.secureCopy(messageKey);
-  Uint8List tryDecrypt(Uint8List aad) => s.crypto.aeadXChaCha20Poly1305IETF.decrypt(
-        cipherText: base64Decode(env.ciphertext),
-        nonce: base64Decode(env.nonce),
-        key: key,
-        additionalData: aad,
-      );
   try {
-    return utf8.decode(tryDecrypt(_buildAad(spaceId, env)));
-  } on SodiumException {
-    // 兼容改名前的历史消息（旧 AAD onlyspace-v1）
-    try {
-      return utf8.decode(tryDecrypt(_buildAad(spaceId, env, prefix: 'onlyspace-v1')));
-    } on SodiumException catch (e) {
-      throw FormatException('消息解密失败（AAD/密钥/密文不匹配）: ${e.originalMessage}');
-    }
+    final plain = s.crypto.aeadXChaCha20Poly1305IETF.decrypt(
+      cipherText: base64Decode(env.ciphertext),
+      nonce: base64Decode(env.nonce),
+      key: key,
+      additionalData: aad,
+    );
+    return utf8.decode(plain);
+  } on SodiumException catch (e) {
+    throw FormatException('消息解密失败（AAD/密钥/密文不匹配）: ${e.originalMessage}');
   } finally {
     key.dispose();
   }

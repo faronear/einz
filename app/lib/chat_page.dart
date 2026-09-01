@@ -364,7 +364,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _registerPushToken() async {
     if (!Platform.isIOS) return;
     try {
-      const channel = MethodChannel('onlyspace/apns');
+      const channel = MethodChannel('einz/apns');
       final apnsToken = await channel.invokeMethod<String>('getToken');
       if (apnsToken != null && apnsToken.isNotEmpty) {
         await _repo.api.registerPushToken('ios', apnsToken, widget.token);
@@ -493,7 +493,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _startVoice() async {
     if (_recording) return;
     try {
-      final path = '${Directory.systemTemp.path}/onlyspace_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await (_recorder ??= AudioRecorder()).start(const RecordConfig(), path: path);
       setState(() {
         _recording = true;
@@ -567,7 +567,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         nonce: base64Decode(att['nonce'] as String),
       );
       final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
-      final tmp = File('${Directory.systemTemp.path}/onlyspace_audio_${m.env.messageId}.$ext');
+      final tmp = File('${Directory.systemTemp.path}/einz_audio_${m.env.messageId}.$ext');
       await tmp.writeAsBytes(bytes);
       await player.stop();
       await player.play(DeviceFileSource(tmp.path));
@@ -729,7 +729,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         sha256: att['sha256'] as String,
         nonce: base64Decode(att['nonce'] as String),
       );
-      final tmp = File('${Directory.systemTemp.path}/onlyspace_video_${m.env.messageId}.mp4');
+      final tmp = File('${Directory.systemTemp.path}/einz_video_${m.env.messageId}.mp4');
       await tmp.writeAsBytes(bytes);
       controller = VideoPlayerController.file(tmp);
       await controller.initialize();

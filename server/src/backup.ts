@@ -113,8 +113,7 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
     tag: string;
     data: string;
   };
-  // 兼容旧格式（改名前的 onlyspace-server-backup-v1），旧备份仍可恢复
-  if (file.format !== FORMAT && file.format !== "onlyspace-server-backup-v1") throw new Error(`备份格式不兼容: ${file.format}`);
+  if (file.format !== FORMAT) throw new Error(`备份格式不兼容: ${file.format}`);
 
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(file.nonce, "base64"));
   decipher.setAuthTag(Buffer.from(file.tag, "base64"));
@@ -162,8 +161,7 @@ export function verifyBackup(backupPath: string, paths = resolveBackupPaths()): 
     tag: string;
     data: string;
   };
-  // 兼容旧格式（改名前的 onlyspace-server-backup-v1），旧备份仍可恢复
-  if (file.format !== FORMAT && file.format !== "onlyspace-server-backup-v1") throw new Error(`备份格式不兼容: ${file.format}`);
+  if (file.format !== FORMAT) throw new Error(`备份格式不兼容: ${file.format}`);
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(file.nonce, "base64"));
   decipher.setAuthTag(Buffer.from(file.tag, "base64"));
   const payload = Buffer.concat([decipher.update(Buffer.from(file.data, "base64")), decipher.final()]).toString("utf8");
