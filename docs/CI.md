@@ -4,7 +4,7 @@
 
 | 产物 | CI 平台 | 构建机 | 签名 | 前置条件 |
 | --- | --- | --- | --- | --- |
-| Android debug APK | Gitea Actions（自建 git.tic.cc） | Oracle Cloud 免费 ARM 服务器（2 OCPU / 12 GB，Linux + Docker） | debug 自动签名，无需 keystore | Gitea 启用 Actions + 注册 gitea-runner |
+| Android debug APK | Gitea Actions（自建 git.tic.cc） | Linux x64 服务器（Docker） | debug 自动签名，无需 keystore | Gitea 启用 Actions + 注册 gitea-runner |
 | iOS IPA | Codemagic（云） | Codemagic 云 macOS | Apple 开发者签名 | Apple Developer 账号 + Codemagic 配置 |
 
 ---
@@ -36,11 +36,11 @@ sudo -u git gitea --config /etc/gitea/app.ini actions generate-runner-token
 
 > ⚠️ 注意：注册令牌是 Actions runner 专用令牌（一长串随机字符，无 `reg_` 前缀要求），**不是** API 个人访问令牌——`generate-access-token` 生成的令牌不能用于注册 runner。
 
-### 1.3 在 Oracle Cloud 免费 ARM 服务器上安装 gitea-runner
+### 1.3 在 Linux x64 服务器上安装 gitea-runner
 
-构建机：Oracle Cloud Always Free 的 ARM 实例（Ampere A1，2 OCPU / 12 GB RAM）——内存充足，2 核跑单任务构建足够；海外网络直连镜像源，无国内拉取问题。首次构建约 10–20 分钟（依赖下载 + 编译），增量 3–5 分钟。
+构建机：任意 Linux x86_64 服务器（2 核 / 4 GB 以上内存，装 Docker）。**注意：必须是 x86_64**——Android 构建工具 aapt2 无 linux-arm64 版，ARM 主机无法直接构建（详见下方说明）。海外网络直连镜像源更省事。首次构建约 10–20 分钟（依赖下载 + 编译），增量 3–5 分钟。
 
-**① 安装 Docker**（Oracle Cloud 默认镜像不含 Docker）：
+**① 安装 Docker**（多数云镜像不含 Docker）：
 
 ```bash
 curl -fsSL https://get.docker.com | sh
@@ -48,16 +48,14 @@ sudo systemctl enable --now docker
 docker version
 ```
 
-**② 下载并安装 gitea-runner**（注意：runner 项目已由 act_runner 更名为 **gitea-runner**；Oracle ARM CPU 用 `linux-arm64`，x86 服务器用 `linux-amd64`；版本见 https://gitea.com/gitea/act_runner/releases）：
+**② 下载并安装 gitea-runner**（注意：runner 项目已由 act_runner 更名为 **gitea-runner**；x86_64 服务器用 `linux-amd64`；版本见 https://gitea.com/gitea/act_runner/releases）：
 
 ```bash
 sudo curl -sSL -o /usr/local/bin/gitea-runner \
-  https://gitea.com/gitea/act_runner/releases/download/v3.3.2/gitea-runner-3.3.2-linux-arm64
+  https://gitea.com/gitea/act_runner/releases/download/v3.3.2/gitea-runner-3.3.2-linux-amd64
 sudo chmod +x /usr/local/bin/gitea-runner
 gitea-runner --version
 ```
-
-（若服务器是 x86_64，把 URL 中 `linux-arm64` 换成 `linux-amd64`）
 
 **③ 注册到 git.tic.cc**：
 
@@ -93,36 +91,7 @@ systemctl status gitea-runner   # active (running) 即成功
 注册时注意：
 - Gitea 地址填 `https://git.tic.cc`
 - 标签保持默认（`ubuntu-latest` 等），工作流使用 `ubuntu-latest`
-- runner 基础镜像（`docker.gitea.com/runner-images`）支持 ARM 多架构，海外主机拉取很快；若个别镜像在 ARM 上异常，可把标签改为指向 `catthehacker/ubuntu:act-latest`（multi-arch）并重启
-
-**⑤ ARM 主机的 AAPT2 兼容（QEMU 模拟，必需）**
-
-Google 的 Android 构建工具 aapt2 在 Linux 上**只有 x86_64 版**（无 linux-arm64），ARM 主机构建 APK 会报 `AAPT2 ... Syntax error: ")" unexpected`。解决：宿主机注册 QEMU binfmt，让容器内的 x86_64 aapt2 自动经模拟器运行：
-
-```bash
-sudo apt update && sudo apt install -y qemu-user-static binfmt-support
-ls /proc/sys/fs/binfmt_misc/ | grep qemu    # 应看到 qemu-x86_64
-```
-
-创建 gitea-runner 配置（放在 `.runner` 所在目录，如 `/root/config.yaml`），把宿主 QEMU 解释器挂载进 job 容器：
-
-```yaml
-container:
-  options: "-v /usr/libexec/qemu-binfmt:/usr/libexec/qemu-binfmt"
-```
-
-更新 systemd 服务（`systemctl edit --force --full gitea-runner`），`[Service]` 段加：
-
-```ini
-WorkingDirectory=/root
-ExecStart=/usr/local/bin/gitea-runner daemon --config /root/config.yaml
-```
-
-```bash
-sudo systemctl daemon-reload && sudo systemctl restart gitea-runner
-```
-
-> 效果：仅 aapt2（x86_64）经 QEMU 模拟，JDK/Gradle/Flutter 等仍原生 arm64 运行，性能损失集中在资源处理阶段（每次构建多几分钟）。
+- **为何必须 x86_64**：Android 构建工具 aapt2 只有 linux-x86_64 版（无 linux-arm64），ARM 主机会报 `AAPT2 ... Syntax error`；即使配 QEMU 模拟也伴随动态链接库缺失等连锁问题，故不推荐 ARM 主机，直接选 x86_64 服务器最省事。
 
 ### 1.4 验证
 
@@ -130,7 +99,7 @@ sudo systemctl daemon-reload && sudo systemctl restart gitea-runner
 
 ### 1.5 Runner 网络要求与镜像
 
-构建过程需要访问：GitHub（下载 Flutter SDK、拉取公共 action、sqlite3 预编译库）、Gradle Maven 仓库、pub.dev。**海外 runner（Oracle 服务器）直连即可，无需任何镜像配置**；仅当 runner 位于国内且出口受限时，才在 gitea-runner 环境（或 Gitea 仓库 Secrets）配置镜像变量：
+构建过程需要访问：GitHub（下载 Flutter SDK、拉取公共 action、sqlite3 预编译库）、Gradle Maven 仓库、pub.dev。**海外 runner 直连即可，无需任何镜像配置**；仅当 runner 位于国内且出口受限时，才在 gitea-runner 环境（或 Gitea 仓库 Secrets）配置镜像变量：
 
 | 变量 | 国内镜像值 |
 | --- | --- |

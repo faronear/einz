@@ -36,29 +36,13 @@ jobs:
           java-version: '21'
 
       - name: Setup Flutter 3.47.2
-        run: |
-          git clone --depth 1 -b 3.47.2 https://github.com/flutter/flutter.git /opt/flutter
-          /opt/flutter/bin/flutter --version
-          echo "/opt/flutter/bin" >> "$GITHUB_PATH"
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.2'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          # arm64 上默认 tools 包依赖 emulator（无 arm64 stable 版）会失败，
-          # 只装 platform-tools + 接受 licenses，缺的 platforms/build-tools 由 Gradle 自动补装
-          packages: 'platform-tools'
-
-      - name: Install x86_64 libs for AAPT2 (QEMU)
-        run: |
-          # aapt2 是 x86_64 动态链接程序，经 QEMU 模拟运行需要 amd64 glibc/libstdc++
-          # Ubuntu arm64 镜像的 apt 源是 ports.ubuntu.com（无 amd64 索引），
-          # 必须为 amd64 架构单独添加 archive.ubuntu.com 源，否则 apt update 404
-          dpkg --add-architecture amd64
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main universe" > /etc/apt/sources.list.d/amd64.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble-updates main universe" >> /etc/apt/sources.list.d/amd64.list
-          echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble-security main universe" >> /etc/apt/sources.list.d/amd64.list
-          apt-get update -qq
-          apt-get install -y -qq libc6:amd64 libstdc++6:amd64
 
       - name: Flutter pub get
         working-directory: app
