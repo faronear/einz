@@ -337,6 +337,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       try {
         await _busy(session, '⏳ 口令对接中......', () => session.accessByEscrow(passphrase));
         session.messages.add(_systemMessage(session, '✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}'));
+        store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
+        store.save(storePath);
         _scheduleRender();
         break;
       } catch (e3) {
@@ -1151,6 +1153,8 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
     s.session.messages.add(_systemMessage(
         s.session,
         '✅ 口令接入成功: space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}'));
+    s.session.store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
+    s.session.store.save(s.session.storePath);
   } catch (e) {
     // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
     s.session.messages.add(_systemMessage(s.session, '⚠️ 口令接入失败: $e（口令错误？Server 已有创建者托管包？）'));
