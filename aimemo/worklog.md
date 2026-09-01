@@ -698,3 +698,22 @@
 **验证：** `dart analyze` 无问题；干净环境双端冒烟全过：TUI 状态栏渲染 ✅、A(TUI) 发中文消息 B 解密收到 ✅、B 发消息 A(TUI) WS 实时落盘 ✅（history 1→2 条 seq 1→2）。
 
 **真实终端体验：** `bash cli/demo/run_a.sh` / `run_b.sh` 开两个终端窗口互发；两个窗口都能实时看到对方消息（WS 推送），无需手动 /sync（保留 /sync 作兜底）。
+
+### Android release APK 首次构建（2026-09-01）
+
+**背景：** 新项目环境（Windows 无 Flutter/JDK，Android SDK 在 `D:\Android\Sdk` 已齐备：platforms 33/35/36、build-tools 35/36、ndk 28.2）。老板拍板：debug 签名、包名 `cc.tic.einz`、单文件全架构 APK。
+
+**环境搭建（工具链装在 `D:\devtools`）：**
+- Flutter 3.47.2（stable，Dart 3.13.2，满足 pubspec.lock 的 flutter>=3.44/dart>=3.13.2）。**踩坑：** 腾讯 flutter_infra_release 镜像只有版本清单（releases_linux.json 等 200），无 Windows 实体包（全 404）；官方 GCS 实体包正确 URL 是 `https://storage.googleapis.com/flutter_infra_release/releases/<archive>`（archive 路径带 `stable/windows/` 前缀，**不是** `flutter/<version>/windows-x64/`）。清华 flutter 镜像同样 404。
+- JDK 21（Adoptium，清华镜像 `OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip`）——AGP 9.1.0 需要 JBR/JDK 17+，21 兼容。
+- 构建脚本固化在 `D:\devtools\run_apk_build.sh`（export FLUTTER_ROOT/JAVA_HOME/ANDROID_HOME 后 `flutter build apk --release`），下次重建直接跑它。
+
+**构建问题与修复：**
+1. **Kotlin 增量编译跨盘符失败**：pub 缓存在 C 盘、项目在 D 盘，Kotlin daemon 关缓存时报 `this and base files have different roots: C:\Users\...\Pub\Cache\... and D:\Seafile\einz\app\android` → `gradle.properties` 加 `kotlin.incremental=false` + 清 `app/build/android_file_picker/kotlin` 残留缓存后一次通过。
+2. **后台构建被杀**：bash 工具里 `nohup … &` 启动的进程在工具调用返回时被回收 → 只能前台跑，单次 300s 超时；首次失败后依赖已下载完，续跑 213s 完成。
+
+**产物验证：** `app/build/app/outputs/flutter-apk/app-release.apk`，70.8MB，`cc.tic.einz`，versionCode 1 / versionName 1.0.0，minSdk 24 / targetSdk 36，apksigner 验证通过（Android Debug 证书，符合本次"debug 签名"约定）。
+
+**改动（2 文件）：** `app/android/app/build.gradle.kts`（applicationId → cc.tic.einz）、`app/android/gradle.properties`（kotlin.incremental=false + 注释）。
+
+**待办（非本次范围）：** release keystore（`app/android/key.properties`）未配，上架/长期升级前必须换正式签名并重建（换签名后用户需卸载重装，越早换越好）。
