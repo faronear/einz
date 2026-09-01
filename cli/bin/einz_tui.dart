@@ -999,7 +999,7 @@ Future<void> _execCommand(String line) async {
 
   switch (cmd) {
     case '/help':
-      s.status = '命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /rename <名字> /sync /history /attach <file> /exit';
+      s.status = '命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /rename <名字> /device <设备名> /sync /history /attach <file> /exit';
     case '/server':
       if (arg.isEmpty) {
         s.status = '当前服务器: ${s.session.server}；用法: /server <地址>';
@@ -1092,6 +1092,23 @@ Future<void> _execCommand(String line) async {
           s.status = '✅ 已重命名: $old → $arg';
         } catch (e) {
           s.status = '重命名失败: $e';
+        }
+      }
+    case '/device':
+      // 重设本设备名称（device_name）：本地 + 服务端同步
+      if (arg.isEmpty) {
+        s.status = '用法: /device <设备名>';
+      } else if (s.session.store.sessionToken == null) {
+        s.status = '未认证，请先 /auth';
+      } else {
+        try {
+          final old = s.session.store.deviceName ?? '(未设置)';
+          s.session.store.deviceName = arg;
+          s.session.store.save(s.session.storePath);
+          await ApiClient(s.session.server).updateDeviceName(arg, s.session.store.sessionToken!);
+          s.status = '✅ 设备名已更新: $old → $arg';
+        } catch (e) {
+          s.status = '设备名更新失败: $e';
         }
       }
     case '/exit':
