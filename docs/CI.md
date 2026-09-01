@@ -4,7 +4,7 @@
 
 | 产物 | CI 平台 | 构建机 | 签名 | 前置条件 |
 | --- | --- | --- | --- | --- |
-| Android debug APK | Gitea Actions（自建 git.tic.cc） | 自有服务器（Linux + Docker） | debug 自动签名，无需 keystore | Gitea 启用 Actions + 注册 act_runner |
+| Android debug APK | Gitea Actions（自建 git.tic.cc） | iMac 2019（macOS + OrbStack，64 GB 内存 / 2 TB SSD） | debug 自动签名，无需 keystore | Gitea 启用 Actions + iMac 注册 act_runner |
 | iOS IPA | Codemagic（云） | Codemagic 云 macOS | Apple 开发者签名 | Apple Developer 账号 + Codemagic 配置 |
 
 ---
@@ -33,35 +33,57 @@ sudo -u git gitea admin user generate-access-token \
   --username <管理员用户名> --token-name act_runner --scopes all
 ```
 
-### 1.3 服务器安装 act_runner（Docker 模式）
+### 1.3 在 iMac 2019 上安装 act_runner（OrbStack 方案）
 
-在要跑构建的服务器上（要求：Linux x86_64/arm64、已装 Docker）：
+构建机：iMac 2019（Intel，64 GB 内存 / 2 TB SSD）——内存、磁盘远超构建需求，可并行多个构建；CPU 为 6–8 核 Intel，单任务构建约 10–20 分钟（首次）/ 3–5 分钟（增量）。
+
+**① 安装 OrbStack**（macOS 轻量 Docker 运行时，性能优于 Docker Desktop，Intel Mac 支持）：
 
 ```bash
-# 下载 act_runner（版本见 https://gitea.com/gitea/act_runner/releases）
+brew install orbstack      # 或官网 https://orbstack.dev 下载安装
+# 启动后确认 docker 可用：
+docker version
+```
+
+**② 下载并安装 act_runner**（注意是 **darwin_amd64**——iMac 2019 为 Intel 芯片；版本见 https://gitea.com/gitea/act_runner/releases）：
+
+```bash
 curl -sSL -o act_runner.tar.gz \
-  https://gitea.com/gitea/act_runner/releases/download/v0.2.11/act_runner_0.2.11_linux_amd64.tar.gz
+  https://gitea.com/gitea/act_runner/releases/download/v0.2.11/act_runner_0.2.11_darwin_amd64.tar.gz
 tar -xzf act_runner.tar.gz && sudo mv act_runner /usr/local/bin/
+```
 
-# 注册（交互式，按提示输入 Gitea 地址与令牌）
+**③ 注册到 git.tic.cc**（交互式）：
+
+```bash
 act_runner register
+# 按提示填写：
+#   - Gitea 地址：https://git.tic.cc
+#   - 注册令牌：§1.2 生成的 reg_xxx
+#   - 标签：保持默认（含 ubuntu-latest，工作流使用该标签）
+```
 
-# 以 Docker 方式启动（作为服务常驻）
+**④ 以 Docker 模式启动**（OrbStack 提供 Docker socket，act_runner 直接复用）：
+
+```bash
 act_runner daemon
 ```
+
+**⑤ 开机自启**（可选）：用 launchd 托管，新建 `~/Library/LaunchAgents/com.gitea.act-runner.plist`（`ProgramArguments` 指向 `/usr/local/bin/act_runner daemon`，`RunAtLoad` 为 true），然后 `launchctl load ~/Library/LaunchAgents/com.gitea.act-runner.plist`。
 
 注册时注意：
 - Gitea 地址填 `https://git.tic.cc`
 - 标签保持默认（`ubuntu-latest` 等），工作流使用 `ubuntu-latest`
-- 推荐用 systemd 托管：`act_runner` 官方文档提供 `act_runner.service` 模板
+- Gitea Actions 没有远程唤醒机制：iMac 休眠时不会接活，建议系统设置关闭自动休眠，或保持电源唤醒
+- 若改用 Linux 服务器作 runner：步骤同上，二进制换 `act_runner_<版本>_linux_amd64.tar.gz`，进程托管用 systemd（官方提供 `act_runner.service` 模板）
 
 ### 1.4 验证
 
 推送任意改动到 main 分支，在 Gitea 仓库页 **Actions** 标签查看构建日志；构建成功后可在构建详情的 **Artifacts** 下载 `einz-debug-apk`。
 
-### 1.5 服务器网络要求与镜像
+### 1.5 Runner 网络要求与镜像
 
-构建过程需要访问：GitHub（下载 Flutter SDK、拉取公共 action、sqlite3 预编译库）、Gradle Maven 仓库、pub.dev。若服务器出口受限，在 act_runner 环境（或 Gitea 仓库 Secrets）配置镜像变量：
+构建过程需要访问：GitHub（下载 Flutter SDK、拉取公共 action、sqlite3 预编译库）、Gradle Maven 仓库、pub.dev。若 runner 机器（iMac）出口受限，在 act_runner 环境（或 Gitea 仓库 Secrets）配置镜像变量：
 
 | 变量 | 国内镜像值 |
 | --- | --- |
