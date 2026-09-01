@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'chat_page.dart';
@@ -43,7 +43,7 @@ class _SetupPageState extends State<SetupPage> {
   final _serverController = TextEditingController();
 
   // 服务器地址：默认 only.tic.cc，探测失败时引导输入并持久化（降低小白负担）
-  String _server = kOnlySpaceServer;
+  String _server = kEinzServer;
   bool _probeFailed = false;
 
   // 向导状态：角色分流 + 步骤索引 + 跨步骤共享数据

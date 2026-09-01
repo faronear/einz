@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 
 import 'chat_page.dart';
 import 'data/app_lock.dart';

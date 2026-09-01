@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onlyspace/data/ws_realtime_service.dart';
+import 'package:einz/data/ws_realtime_service.dart';
 
 /// 起本地 WS server（/ws 端点），返回 (server, 已连接连接列表)。
 Future<(HttpServer, List<WebSocket>)> _startWsServer() async {

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>OnlySpace</string>
+	<string>Einz</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,13 +27,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>OnlySpace 需要使用相机拍摄照片或视频并加密发送给对方。</string>
+	<string>Einz 需要使用相机拍摄照片或视频并加密发送给对方。</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>OnlySpace 需要使用麦克风录制语音消息并加密发送给对方。</string>
+	<string>Einz 需要使用麦克风录制语音消息并加密发送给对方。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>OnlySpace 需要保存下载解密的照片/视频到相册。</string>
+	<string>Einz 需要保存下载解密的照片/视频到相册。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>OnlySpace 需要访问相册以选择要加密发送的照片/视频。</string>
+	<string>Einz 需要访问相册以选择要加密发送的照片/视频。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

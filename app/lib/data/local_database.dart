@@ -3,7 +3,7 @@ library;
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
-/// OnlySpace 客户端本地库（Local-First 主存储，DATABASE.md §3）。
+/// Einz 客户端本地库（Local-First 主存储，DATABASE.md §3）。
 ///
 /// - 消息密文与本地状态（pending/sent/...）
 /// - 附件元数据（解密所需 nonce/sha256）

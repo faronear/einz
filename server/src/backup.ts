@@ -5,7 +5,7 @@
  *       + /data/files/（附件密文 blob）+ config.json（白名单）
  * 产物 = 单文件，AES-256-GCM 加密归档到 <data>/backups/。
  *
- * 密钥：环境变量 ONLYSPACE_DB_BACKUP_KEY（base64 32B）。未设置时拒绝执行（防误备份明文）。
+ * 密钥：环境变量 EINZ_DB_BACKUP_KEY（base64 32B）。未设置时拒绝执行（防误备份明文）。
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync, copyFileSync } from "node:fs";
@@ -13,7 +13,7 @@ import { join, resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 
-const FORMAT = "onlyspace-server-backup-v1";
+const FORMAT = "einz-server-backup-v1";
 
 // 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -27,18 +27,18 @@ export interface BackupPaths {
 
 /** 从环境变量解析备份路径（与 app.ts / db.ts 默认值一致）。 */
 export function resolveBackupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
-  const db = env.ONLYSPACE_DB ?? resolve(HERE, "../data/app.db");
-  const files = env.ONLYSPACE_FILES ?? resolve(HERE, "../data/files");
-  const config = env.ONLYSPACE_CONFIG ?? resolve(HERE, "../config/config.json");
+  const db = env.EINZ_DB ?? resolve(HERE, "../data/app.db");
+  const files = env.EINZ_FILES ?? resolve(HERE, "../data/files");
+  const config = env.EINZ_CONFIG ?? resolve(HERE, "../config/config.json");
   const dataDir = resolve(dirname(db));
   return { db, files, config, dataDir };
 }
 
 function backupKey(): Buffer {
-  const raw = process.env.ONLYSPACE_DB_BACKUP_KEY;
-  if (!raw) throw new Error("ONLYSPACE_DB_BACKUP_KEY 未设置（应为 base64 32B），拒绝备份");
+  const raw = process.env.EINZ_DB_BACKUP_KEY;
+  if (!raw) throw new Error("EINZ_DB_BACKUP_KEY 未设置（应为 base64 32B），拒绝备份");
   const key = Buffer.from(raw, "base64");
-  if (key.length !== 32) throw new Error("ONLYSPACE_DB_BACKUP_KEY 必须为 base64(32B)");
+  if (key.length !== 32) throw new Error("EINZ_DB_BACKUP_KEY 必须为 base64(32B)");
   return key;
 }
 
@@ -113,7 +113,8 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
     tag: string;
     data: string;
   };
-  if (file.format !== FORMAT) throw new Error(`备份格式不兼容: ${file.format}`);
+  // 兼容旧格式（改名前的 onlyspace-server-backup-v1），旧备份仍可恢复
+  if (file.format !== FORMAT && file.format !== "onlyspace-server-backup-v1") throw new Error(`备份格式不兼容: ${file.format}`);
 
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(file.nonce, "base64"));
   decipher.setAuthTag(Buffer.from(file.tag, "base64"));
@@ -161,7 +162,8 @@ export function verifyBackup(backupPath: string, paths = resolveBackupPaths()): 
     tag: string;
     data: string;
   };
-  if (file.format !== FORMAT) throw new Error(`备份格式不兼容: ${file.format}`);
+  // 兼容旧格式（改名前的 onlyspace-server-backup-v1），旧备份仍可恢复
+  if (file.format !== FORMAT && file.format !== "onlyspace-server-backup-v1") throw new Error(`备份格式不兼容: ${file.format}`);
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(file.nonce, "base64"));
   decipher.setAuthTag(Buffer.from(file.tag, "base64"));
   const payload = Buffer.concat([decipher.update(Buffer.from(file.data, "base64")), decipher.final()]).toString("utf8");

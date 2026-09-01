@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 
 import 'burn_after_settings.dart';
 import 'local_database.dart';

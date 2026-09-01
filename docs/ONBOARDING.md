@@ -1,4 +1,4 @@
-# OnlySpace 部署与 AB 互通操作手册（Onboarding）
+# Einz 部署与 AB 互通操作手册（Onboarding）
 
 从零开始：VPS 部署（**无需任何配置文件**）→ 首个设备自举成为创建者 → 口令托管 → 邀请码 → 对方加入 → 双端互通对话。
 
@@ -32,7 +32,7 @@ cd deployment
 # 首次部署（或 .env 丢失后重建）：生成备份密钥
 cp .env.example .env         # 模板在仓库里（.gitignore 不覆盖，git pull 不影响）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"   # 生成新密钥
-# ↑ 把输出粘贴到 .env 的 ONLYSPACE_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
+# ↑ 把输出粘贴到 .env 的 EINZ_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
 docker compose up -d --build server
 curl -s https://only.tic.cc/health
 # {"status":"ok","space_id":"<自动生成的UUID>",...}   ← 首次启动自动生成 space_id，无需任何配置
@@ -56,7 +56,7 @@ mkdir -p ~/.onlyspace
 
 ```powershell
 cd 你的only目录\cli
-dart run bin/onlyspace.dart init --store "$env:USERPROFILE\.onlyspace\b.json" --device-id dev-b1
+dart run bin/einz.dart init --store "$env:USERPROFILE\.onlyspace\b.json" --device-id dev-b1
 # 用 TUI 引导时无需手动 init（见阶段 5）
 ```
 
@@ -68,7 +68,7 @@ dart run bin/onlyspace.dart init --store "$env:USERPROFILE\.onlyspace\b.json" --
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现/创建设备
+dart run bin/einz_tui.dart   # 不传 --store：自动发现/创建设备
 # 引导流程：
 # 引导流程（设备身份自动生成，登记后由服务端分配 dev1 等规范 id）：
 #   你的名称（如 lukas）→ 设备名称（显示用，如 MacBook）
@@ -83,14 +83,14 @@ dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现/创建设备
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/onlyspace.dart init --store ~/.onlyspace/a.json --device-id dev-a1
+dart run bin/einz.dart init --store ~/.onlyspace/a.json --device-id dev-a1
 # ① 首设备自举登记（免邀请码，成为创建者；--person 是你的名称，如 lukas）
-dart run bin/onlyspace.dart enroll --store ~/.onlyspace/a.json \
+dart run bin/einz.dart enroll --store ~/.onlyspace/a.json \
   --server https://only.tic.cc --person lukas [--device-name MacBook]
 # ✅ 登记成功: device_id=dev1 person_id=personA space_id=<服务端的UUID>
 # ② 上传口令托管包（store 无 Space Key 时自动生成）
-dart run bin/onlyspace.dart auth --store ~/.onlyspace/a.json --server https://only.tic.cc
-dart run bin/onlyspace.dart escrow --action upload \
+dart run bin/einz.dart auth --store ~/.onlyspace/a.json --server https://only.tic.cc
+dart run bin/einz.dart escrow --action upload \
   --store ~/.onlyspace/a.json --server https://only.tic.cc --passphrase 'faronear'
 # ✅ 口令托管包已上传
 ```
@@ -101,7 +101,7 @@ dart run bin/onlyspace.dart escrow --action upload \
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/onlyspace.dart invite --store ~/.onlyspace/a.json \
+dart run bin/einz.dart invite --store ~/.onlyspace/a.json \
   --server https://only.tic.cc --person personB --name steffi [--hours 24]
 # ✅ 邀请码已生成（24h 有效，一次性）: XXXX-XXXXX-XXXXX-XXXXX
 # 把邀请码离线发给对方（绑定 personB=steffi；给自己加设备用 --person personA）
@@ -115,7 +115,7 @@ dart run bin/onlyspace.dart invite --store ~/.onlyspace/a.json \
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 下的设备
+dart run bin/einz_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 下的设备
 # 自动使用已有设备（a.json 或 [设备名].json），多台会列出选择
 # 启动探测 https://only.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
 # 状态栏 WS:● 在线；输入消息回车发送
@@ -127,7 +127,7 @@ dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 
 
 ```powershell
 cd 你的only目录\cli
-dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.onlyspace\ 下的设备
+dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.onlyspace\ 下的设备
 # 引导流程（空间已有设备 → 走邀请码登记）：
 # 引导流程（空间已有设备 → 走邀请码登记；设备身份自动生成）：
 #   你的名称（如 steffi）→ 设备名称（显示用，如 Windows）
@@ -152,7 +152,7 @@ dart run bin/onlyspace_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\
 | 对方消息样式 | 看消息区                        | 对方粉色背景、自己绿色前缀（**同 person 多设备互显"我"**） |
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                      |
 | 服务器重设   | `/server https://only.tic.cc` | 重连并认证                                                       |
-| 邀请码       | 创建者`/invite` 之外          | 需补发时用 CLI`dart run bin/onlyspace.dart invite ...`         |
+| 邀请码       | 创建者`/invite` 之外          | 需补发时用 CLI`dart run bin/einz.dart invite ...`         |
 
 ---
 

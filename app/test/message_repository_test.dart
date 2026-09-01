@@ -7,10 +7,10 @@ import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onlyspace/data/burn_after_settings.dart';
-import 'package:onlyspace/data/local_database.dart';
-import 'package:onlyspace/data/message_repository.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz/data/burn_after_settings.dart';
+import 'package:einz/data/local_database.dart';
+import 'package:einz/data/message_repository.dart';
+import 'package:einz_shared/einz_shared.dart';
 
 /// fake ApiClient：不真正联网，返回预先编排的数据。
 class FakeApi extends ApiClient {

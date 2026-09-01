@@ -1,6 +1,6 @@
 {
   "@@locale": "zh",
-  "appTitle": "OnlySpace",
+  "appTitle": "Einz",
   "cancel": "取消",
   "ok": "确定",
   "send": "发送",
@@ -9,7 +9,7 @@
   "settings": "设置",
   "loading": "加载中…",
   "skip": "跳过",
-  "setupPageTitle": "OnlySpace · 设备配置",
+  "setupPageTitle": "Einz · 设备配置",
   "setupPageHeading": "一次性配置",
   "setupPageInstructions": "1) 生成设备密钥 → 公钥加入服务器白名单（config.json）并重启\n2) 粘贴对方用你公钥密封的 Space Key 副本 → 认证",
   "setupPageDeviceIdLabel": "设备 ID",
@@ -215,7 +215,7 @@
   "burnOption1Hour": "1 小时",
   "burnOption1Day": "1 天",
   "burnOption7Days": "7 天",
-  "lockPageTitle": "OnlySpace 已锁定",
+  "lockPageTitle": "Einz 已锁定",
   "lockPagePinPrompt": "输入 PIN 解锁",
   "lockPageLockedSeconds": "已锁定 {seconds} 秒",
   "@lockPageLockedSeconds": {

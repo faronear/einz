@@ -9,7 +9,7 @@ let db: Database.Database | null = null;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** 打开（或创建）SQLite，按 DATABASE.md §2 建表。 */
-export function openDb(path = process.env.ONLYSPACE_DB ?? resolve(HERE, "../data/app.db")): Database.Database {
+export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/app.db")): Database.Database {
   mkdirSync(dirname(path), { recursive: true });
   db = new Database(path);
   db.pragma("journal_mode = WAL");

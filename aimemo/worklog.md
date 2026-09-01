@@ -1,4 +1,4 @@
-# OnlySpace — 工作日志（worklog）
+# Einz — 工作日志（worklog）
 
 > 事件视角：按时间线记录工作过程与重要变化。持续追加，不覆写历史。
 
@@ -8,12 +8,12 @@
 
 ### 架构评审与 productLens 重构（v1.0 → v2.0）
 
-**背景：** 老板要求评估 `aimemo/productLens.zhcn.md`（原 2164 行 Draft v1.0），继续讨论 OnlySpace 架构，允许大幅删改。
+**背景：** 老板要求评估 `aimemo/productLens.zhcn.md`（原 2164 行 Draft v1.0），继续讨论 Einz 架构，允许大幅删改。
 
 **评审发现：**
 
 - 方向正确（E2EE 从 V1 开始、Server 只存密文、设备密码学身份、Local-First、两人约束服务端强制），骨架保留。
-- 形式问题：大量重复（E2EE 流程图出现 3+ 次）、Markdown 标题/表格损坏（§2.2 起大量小节标题丢失 `##`）、文件末尾残留多余代码块、命名不一致（Only Space / OnlySpace / private-space）。
+- 形式问题：大量重复（E2EE 流程图出现 3+ 次）、Markdown 标题/表格损坏（§2.2 起大量小节标题丢失 `##`）、文件末尾残留多余代码块、命名不一致（Only Space / Einz / private-space）。
 - 架构空白：① 密钥层级与恢复模型未定义（丢机/换机如何恢复）；② 设备撤销后未定义 Space Key 轮换；③ 配对握手顺序未定死；④ 消息 schema 缺 nonce/key_version；⑤ server_sequence 作用域未明确（应为 per-space）。
 
 **老板决策（2026-08-28）：**
@@ -23,7 +23,7 @@
 | 恢复模型 | V1 纯本地备份+恢复码（模型 A），架构预留服务器托管（模型 B） |
 | 多设备 | Person≠Device 分开建模，V1 一人一机，预留扩展 |
 | 技术栈 | **放弃 UniApp**，改用 **Flutter**（dart:ffi 绑原生 libsodium，无 WebView 中间层；flutter_secure_storage / drift / camera 生态成熟） |
-| 文档 | 确认按新结构大幅重写，统一命名 OnlySpace |
+| 文档 | 确认按新结构大幅重写，统一命名 Einz |
 
 **产出：**
 
@@ -152,8 +152,8 @@
 **任务 #16 完成（Flutter app/ 骨架）：**
 
 - `flutter create . --platforms=ios,android --project-name onlyspace`（在 `app/` 内，Flutter 3.47.2）。
-- `app/pubspec.yaml` 接入 `onlyspace_shared: path: ../shared`。
-- `app/lib/main.dart` 重写为 OnlySpace 首屏骨架：接入 shared 的 `DeviceKeyPair.generate()` 作为"生成设备密钥"自检入口（libsodium 懒加载，测试不触发）。
+- `app/pubspec.yaml` 接入 `einz_shared: path: ../shared`。
+- `app/lib/main.dart` 重写为 Einz 首屏骨架：接入 shared 的 `DeviceKeyPair.generate()` 作为"生成设备密钥"自检入口（libsodium 懒加载，测试不触发）。
 - `app/test/widget_test.dart` 改为骨架首屏渲染测试。
 - **顺手补移动端加载分支**：`shared/src/sodium.dart` 增加 Android `libsodium.so` / iOS `libsodium.dylib` 候选（此前只有 macOS/Linux/Windows，真机必然加载失败；原生库打包归 Phase 3）。
 - 验证：`dart analyze` 无警告（注：`flutter analyze` 的 analysis server 在含中文的路径下 LSP 通信报错，改用 `dart analyze` 绕过）、`flutter test` 全过、shared 回归 8 项全过。
@@ -223,7 +223,7 @@
 **APK 构建（Phase 3 关键验证）与中文路径大坑：**
 
 - 中文路径（`product-产品`）导致 Flutter AOT 工具链全线失败：`flutter analyze` LSP 崩、build_runner AOT 写入失败、**`gen_snapshot` 读 app.dill 时路径乱码**、Gradle 的 `libdartjni.so` "expected output but none"（文件其实已生成）。尝试 `chcp 65001`、8.3 短路径（`PRODUC~1`）、junction（`D:\only-build`）**均无效**——flutter.bat 内部解析回真实中文路径。
-- **解决方案（老板批准外部临时构建）**：复制仓库到纯 ASCII 路径 `D:\build-onlyspace` 构建 → `flutter build apk --release` 成功产出 **50MB app-release.apk** → apksigner 验证签名（CN=OnlySpace）→ 产物拷回 `app/build/` → 删除临时目录。
+- **解决方案（老板批准外部临时构建）**：复制仓库到纯 ASCII 路径 `D:\build-onlyspace` 构建 → `flutter build apk --release` 成功产出 **50MB app-release.apk** → apksigner 验证签名（CN=Einz）→ 产物拷回 `app/build/` → 删除临时目录。
 - 其余踩坑：Gradle 9.3.1 distribution 从 services.gradle.org 下载失败 → 腾讯云镜像；`android.overridePathCheck=true` 放行非 ASCII 路径；build.gradle.kts 需 `import java.util.Properties`（Kotlin DSL）。
 
 **验证（全部通过）：** server 冒烟、shared 9 单测、cli analyze + 三 e2e 脚本回归、app dart analyze + flutter test 6 项、签名 APK 构建。
@@ -241,7 +241,7 @@
 
 **Server（备份 + 撤销感知修复）：**
 
-- `src/backup.ts` + `scripts/backup.ts` / `scripts/restore.ts`（npm run backup/restore）：**SQLite 官方 Backup API** 在线备份 app.db（读写中可安全备份）+ files/ + config.json → **AES-256-GCM 加密归档**到 backups/（密钥 ONLYSPACE_BACKUP_KEY，base64 32B）。**演练通过**：产生 2 条消息 → 备份（verify 校验）→ 删 app.db → restore → 重启 server → B 同步出全部消息。
+- `src/backup.ts` + `scripts/backup.ts` / `scripts/restore.ts`（npm run backup/restore）：**SQLite 官方 Backup API** 在线备份 app.db（读写中可安全备份）+ files/ + config.json → **AES-256-GCM 加密归档**到 backups/（密钥 EINZ_BACKUP_KEY，base64 32B）。**演练通过**：产生 2 条消息 → 备份（verify 校验）→ 删 app.db → restore → 重启 server → B 同步出全部消息。
 - **发现并修复撤销不生效的 bug**：`isActiveDevice` 原来只查静态 config.json，撤销只改数据库 → 被撤销设备仍能认证。修复：① server 启动时 `syncWhitelistToDb` 把白名单登记进 devices 表（INSERT OR IGNORE，撤销状态不被覆盖）；② `isActiveDevice` 叠加数据库 status 校验（revoked 即拒）。**同时修正 key.rotation 通知方向**：应发给"除被撤销设备外"的剩余设备（含撤销发起者），不是排除发起者。
 
 **CLI（撤销/轮换/备份/历史命令）：**
@@ -252,7 +252,7 @@
 
 **验证（全部通过）：** server 冒烟、shared 13 单测、cli analyze 无警告、四个 e2e 脚本（Phase 0/1/2/4）全部通过。
 
-**遗留：** 备份加密密钥（ONLYSPACE_BACKUP_KEY）的保管与轮换策略待部署文档明确；附件解密缓存清理策略；真机/iOS 待环境（同 Phase 3 遗留）。
+**遗留：** 备份加密密钥（EINZ_BACKUP_KEY）的保管与轮换策略待部署文档明确；附件解密缓存清理策略；真机/iOS 待环境（同 Phase 3 遗留）。
 
 ### V1 发布前代码审查（deep+verify，全项目 c6f4bfd..134d4b4）+ 24 项发现修复
 
@@ -284,15 +284,15 @@
 
 **产出：**
 
-- `docs/DEPLOYMENT.md`（v1.0，命令全部本机实测）：§1 部署形态速览 → §2 **本机 5 分钟快速试用**（init/config/import/auth/send/sync/listen/attach/fetch + CLI 命令总览表）→ §3 生产部署（Docker Compose + Caddy，含 `ONLYSPACE_BACKUP_KEY` 注入与验证）→ §4 一次性配置命令级实作（替代 SETUP.md "[待开发]" 标注）→ §5 运维（Server 备份/恢复、客户端恢复码、撤销+轮换）→ §6 安全边界清单 → §7 故障排查 → §8 验收清单。
+- `docs/DEPLOYMENT.md`（v1.0，命令全部本机实测）：§1 部署形态速览 → §2 **本机 5 分钟快速试用**（init/config/import/auth/send/sync/listen/attach/fetch + CLI 命令总览表）→ §3 生产部署（Docker Compose + Caddy，含 `EINZ_BACKUP_KEY` 注入与验证）→ §4 一次性配置命令级实作（替代 SETUP.md "[待开发]" 标注）→ §5 运维（Server 备份/恢复、客户端恢复码、撤销+轮换）→ §6 安全边界清单 → §7 故障排查 → §8 验收清单。
 - `README.md`：设计文档表加 DEPLOYMENT.md 链接；SETUP.md 标注改为"设计稿，命令级实作见 DEPLOYMENT.md"。
 - **验证**：按手册 §2 命令链完整跑通（init/config/import → 启动 server → auth 双端 → send → B sync 解出明文 → B listen 实时收到 → history 2 条完整）。**踩坑记录：** ① 跨 bash 会话的后台 server 会被清理 → 验证需单会话内完成；② server 须在 config.json 生成**之后**启动（否则 loadConfig 失败退出）。
 
-**遗留：** docker-compose.yml 未预置 ONLYSPACE_BACKUP_KEY（部署时注入）；生产环境建议按手册 §3 补 environment；App 真机验证仍待环境。
+**遗留：** docker-compose.yml 未预置 EINZ_BACKUP_KEY（部署时注入）；生产环境建议按手册 §3 补 environment；App 真机验证仍待环境。
 
 ### 正式部署完成（2026-08-28，only.tic.cc）
 
-老板按 DEPLOYMENT.md 分步部署（8 步全通）：VPS + Docker Compose + Caddy（TLS 自动签发）→ CLI 生成白名单 config.json（dev-a1/dev-b1）→ 上传 `/opt/onlyspace` → 注入 ONLYSPACE_BACKUP_KEY（.env）→ `docker compose up -d --build` → 验证 HTTPS/403 → CLI 远程双端认证收发闭环（B 同步解出明文）。
+老板按 DEPLOYMENT.md 分步部署（8 步全通）：VPS + Docker Compose + Caddy（TLS 自动签发）→ CLI 生成白名单 config.json（dev-a1/dev-b1）→ 上传 `/opt/onlyspace` → 注入 EINZ_BACKUP_KEY（.env）→ `docker compose up -d --build` → 验证 HTTPS/403 → CLI 远程双端认证收发闭环（B 同步解出明文）。
 
 **踩坑：** 部署教学中第 3 步漏了 B 的 `import`（sealed-b.txt 导入）——A 生成 Space Key 后 B 必须导入才有密钥解密；auth 只需身份密钥所以能过，sync 需要 Space Key 才报"设备尚未导入 Space Key"。已补。
 
@@ -319,7 +319,7 @@
 
 **CLI 补 seal 命令**：`seal --store <s> --peer-pubkey <b64> --out <f>`——用本机 Space Key 密封给新设备公钥（App 真机一次性配置需要"对 App 公钥的 sealed 副本"，原 CLI 无此命令），实测通过。
 
-**构建与验证：** 外部临时构建（D:\build-onlyspace，规避中文路径，JAVA_HOME 需指到 jdk-17.0.20.1+1 子目录）→ `flutter build apk --release` 成功（55.0MB）→ apksigner 验证签名 **CN=OnlySpace** ✅ → 产物拷回 `app/build/app-release.apk`，jniLibs/pubspec 同步回源仓库。
+**构建与验证：** 外部临时构建（D:\build-onlyspace，规避中文路径，JAVA_HOME 需指到 jdk-17.0.20.1+1 子目录）→ `flutter build apk --release` 成功（55.0MB）→ apksigner 验证签名 **CN=Einz** ✅ → 产物拷回 `app/build/app-release.apk`，jniLibs/pubspec 同步回源仓库。
 
 **真机首次使用流程（待老板执行）：** 装 APK → App 生成密钥 → 公钥加服务器 config.json（devices 数组新增条目）+ 重启 server 容器 → 本地 `seal` 生成副本 → App 粘贴 → 认证进聊天页。
 
@@ -329,7 +329,7 @@
 
 **已完成（代码层，Windows 侧）：**
 
-- `app/ios/Runner/Info.plist`：App 显示名 OnlySpace + 4 项权限声明（相机/麦克风/相册读/相册写，对齐 AndroidManifest，plist 解析验证通过）
+- `app/ios/Runner/Info.plist`：App 显示名 Einz + 4 项权限声明（相机/麦克风/相册读/相册写，对齐 AndroidManifest，plist 解析验证通过）
 - **iOS libsodium 集成**：sodium_libs 包内 `ios/Libraries/libsodium.xcframework`（静态库，ios-arm64 + simulator）复制到 `app/ios/Libraries/` → 本地 `libsodium.podspec`（vendored_frameworks + -force_load，仿 sodium_libs 的 iOS 集成）→ `app/ios/Podfile`（**Flutter 3.47 默认 SPM，需 CocoaPods：`flutter config --no-enable-swift-package-manager`**）→ shared `loadDynamicLibrary` iOS 分支改 `DynamicLibrary.process()`（静态链接符号在进程内，dylib open 会失败）。shared analyze + 13 单测过
 - **APNs 接入代码**：shared ApiClient 补 `registerPushToken`/`unregisterPushToken`（+ `_delete` 辅助，对齐 PROTOCOL.md §7.3）；`AppDelegate.swift` 注册远程通知 + MethodChannel('onlyspace/apns') 传 device token；`chat_page.dart` 认证后 `_registerPushToken()`（失败静默降级）。shared analyze + 13 单测、app flutter test 6 项全过
 - `docs/IOS.md`：Mac 构建指引（clone/构建/真机签名/Ad Hoc/已知点/快速参考）
@@ -428,7 +428,7 @@
 - audio 消息：与 voice 共用播放条（`_playAudioMessage` 泛化，临时文件扩展名按类型：voice→m4a、audio→原扩展名）；file 消息：文件卡片（📄 文件名 + 大小格式化 + 下载保存到应用文档目录 path_provider）
 - 附件选择后 caption=文件名（file/audio 消息正文即文件名，渲染直接显示）
 
-**setup_page：** 服务器地址输入框移除，改顶层常量 `kOnlySpaceServer = 'https://only.tic.cc'`（删 controller/dispose/4 处使用点）。
+**setup_page：** 服务器地址输入框移除，改顶层常量 `kEinzServer = 'https://only.tic.cc'`（删 controller/dispose/4 处使用点）。
 
 **验证：** app analyze 无问题 + flutter test 18 项全过（golden setup_page 更新）+ shared 16 项 + server 冒烟全过。
 
@@ -497,7 +497,7 @@
 - `lib/l10n/app_en.arb` + `app_zh.arb`：各 60+ 键（通用 9 + setupPage.* 18 + setPinDialog.* 12 + chatPage.* 27 + burnOption.* 7），占位符用 `{name}` + `@key.placeholders`
 - gen-l10n 生成 `lib/l10n/app_localizations*.dart`（**入库**，generate: true 时 pub get 自动生成）
 - `data/locale_settings.dart`：LocaleSettings（app_state locale：system/zh/en）+ `localeNotifier`（ValueNotifier，切换即时生效）
-- `main.dart` OnlySpaceApp 改 StatefulWidget：MaterialApp 加 `localizationsDelegates/supportedLocales/locale`（null=跟随系统；手动选择 zh/en 覆盖）
+- `main.dart` EinzApp 改 StatefulWidget：MaterialApp 加 `localizationsDelegates/supportedLocales/locale`（null=跟随系统；手动选择 zh/en 覆盖）
 
 **文案抽取（核心工作量）：**
 - setup_page.dart：~30 处（build UI + 状态消息 + SetPinDialog 全部）——`AppLocalizations.of(context)!` 替换；**async 方法 await 后取 l10n 会触发 use_build_context_synchronously lint → 在 await 前取局部变量**（_uploadEscrow 排障）
@@ -513,7 +513,7 @@
 **内容：**
 - ARB 加 `lockPage.*` 12 键（中英双语，含 int 占位符：`lockPageLockedSeconds(seconds)`/`lockPageTooManyAttempts(seconds)`、String 错误参数）
 - lock_page.dart 12 处替换：AppBar title、PIN 提示、锁定倒计时 label（三目：locked ? LockedSeconds : PinLabel）、解锁/恢复码入口按钮、错误消息（TooManyAttempts/UnlockFailed/RecoveryFailed）；**AppLockException 的 e.message 来自 app_lock.dart（业务消息，非本页字面量），保留原样**
-- main.dart 确认**无 UI 中文文案**（`title: 'OnlySpace'` 英文，39 行中文均为注释）→ 无需替换
+- main.dart 确认**无 UI 中文文案**（`title: 'Einz'` 英文，39 行中文均为注释）→ 无需替换
 
 **验证：** gen-l10n 成功（lockPage 键生成）；analyze 无问题；flutter test **25 项全过**；lock_page golden 更新（0.31% 像素差，label 三目等渲染变化）。
 
@@ -551,10 +551,10 @@
 
 ### Server 备份密钥改名（命名消歧；2026-08-29）
 
-**背景：** 老板指出 `backup key`（实为口令派生机制，非独立实体）与 `ONLYSPACE_BACKUP_KEY`（Server env）命名易混淆。老板确认方案：**改 Server env 名 + 文档对照表**；backup.dart 保持原名。
+**背景：** 老板指出 `backup key`（实为口令派生机制，非独立实体）与 `EINZ_BACKUP_KEY`（Server env）命名易混淆。老板确认方案：**改 Server env 名 + 文档对照表**；backup.dart 保持原名。
 
 **改动：**
-- `ONLYSPACE_BACKUP_KEY` → `ONLYSPACE_DB_BACKUP_KEY`（全库同步）：
+- `EINZ_BACKUP_KEY` → `EINZ_DB_BACKUP_KEY`（全库同步）：
   - `server/src/backup.ts`（注释 + process.env 读取 + 2 错误消息）
   - `server/scripts/backup.ts`（注释）
   - `deployment/docker-compose.yml`（注入行）
@@ -565,7 +565,7 @@
 
 **验证：** server `npm run build` 通过；smoke 测试全过；grep 确认 server/src、scripts、deployment、DEPLOYMENT.md 无残留旧名（仅文档升级说明有意提及旧名）。
 
-**⚠️ VPS 运维提醒（交付时同步老板）：** VPS 的 `deployment/.env`（gitignore 不入库）需手动把 `ONLYSPACE_BACKUP_KEY` 改名 `ONLYSPACE_DB_BACKUP_KEY` 后重启 server，否则 backup 脚本报"变量未设置"拒绝备份。
+**⚠️ VPS 运维提醒（交付时同步老板）：** VPS 的 `deployment/.env`（gitignore 不入库）需手动把 `EINZ_BACKUP_KEY` 改名 `EINZ_DB_BACKUP_KEY` 后重启 server，否则 backup 脚本报"变量未设置"拒绝备份。
 
 ### 自建空间 + 二维码加入（降小白门槛；2026-08-29）
 
@@ -601,11 +601,11 @@
 
 ### macOS 本机恢复 + Flutter 安装（2026-08-30）
 
-**背景：** 老板从 Windows 机器转回 macOS 本机继续。Windows 期间已推进大量工作（口令托管 KEY_ESCROW 落地、App 多语言/WS 实时/自建空间二维码/分步向导、Server 备份密钥改名 ONLYSPACE_DB_BACKUP_KEY、更新流程 git push/pull 化等，最新 HEAD e5f09c6）。
+**背景：** 老板从 Windows 机器转回 macOS 本机继续。Windows 期间已推进大量工作（口令托管 KEY_ESCROW 落地、App 多语言/WS 实时/自建空间二维码/分步向导、Server 备份密钥改名 EINZ_DB_BACKUP_KEY、更新流程 git push/pull 化等，最新 HEAD e5f09c6）。
 
 **本次 macOS 会话完成：**
 
-- **回答 .env 问题**：docker-compose 变量名已从 `ONLYSPACE_BACKUP_KEY` 改名 `ONLYSPACE_DB_BACKUP_KEY`（7504791 消歧）；应在 `deployment/.env` 定义（compose 自动读取同目录 .env，gitignore 保护），新增 `deployment/.env.example` 模板；口令托管（KEY_ESCROW）的"接入口令"是客户端口令，与 DB 备份密钥是两回事。
+- **回答 .env 问题**：docker-compose 变量名已从 `EINZ_BACKUP_KEY` 改名 `EINZ_DB_BACKUP_KEY`（7504791 消歧）；应在 `deployment/.env` 定义（compose 自动读取同目录 .env，gitignore 保护），新增 `deployment/.env.example` 模板；口令托管（KEY_ESCROW）的"接入口令"是客户端口令，与 DB 备份密钥是两回事。
 - **文档 macOS/Linux 化**：DEPLOYMENT.md / IOS.md / updateServer.md 中 PowerShell、`D:\`、`C:\`、`.\bin\`、`setx`、反引号续行全部改为 bash / `/Users/Shared/product-产品/only` / `bin/`、`\` 续行；libsodium 提示改为 `/opt/homebrew/lib/libsodium.dylib`。
 - **Flutter 安装**：磁盘已腾出（13GiB），中国镜像下载 3.41.0 后因 App 需要 Dart ^3.13.2（Windows 用 Flutter 3.47.2）不匹配，卸载换装 **Flutter 3.47.2**（Dart 3.13.2）到 `~/development/flutter`；Google storage/GitHub 不可达，全程 storage.flutter-io.cn。
 - **验证链全绿**：server build + 冒烟（含密钥托管）；shared analyze + 26 单测（修 1 个 unused_import）；cli analyze + e2e 全过；app flutter test **39 项全过**（ASCII 路径副本 /tmp/onlyspace-build 跑的，因仓库路径含中文"产品"触发 analysis_server 崩溃缺陷）。
@@ -639,7 +639,7 @@
 - session 存储机制：`~/.atomcode/sessions/<工作目录hash>/` 分桶，会话 meta 的 `working_dir` 字段决定归属；`~/.atomcode/history-v2/<hash>/entries.jsonl` 存历史提问索引。
 - 迁移动作：把旧桶 `202a4f4986bdf4ed`（product-产品/only，3 个会话：623c51f8 架构重构讨论、9b00b45c fork、ce33edfe 空会话）与 `dac869ed60aeec99`（productAll/only，1 个会话 9182817b，上次改名遗留）下的会话文件全部移入新桶 `36c61259c00d9bf2`，并将这些 meta 的 `working_dir` 更新为 `/Users/Shared/productX/only`；history-v2 的 entries.jsonl 一并合并。
 - 备份：迁移前已打包 `~/.atomcode/backup-sessions-20260830.tar.gz`（sessions + history-v2）。
-- 效果：在 `/Users/Shared/productX/only` 启动 atom 后 `/resume` 即可看到全部历史会话（OnlySpace 架构设计重构讨论等）。
+- 效果：在 `/Users/Shared/productX/only` 启动 atom 后 `/resume` 即可看到全部历史会话（Einz 架构设计重构讨论等）。
 
 **项目内文档同步（以实际路径为准）：**
 - `docs/DEPLOYMENT.md`、`docs/IOS.md`、`docs/updateServer.md`、`docs/HANDOFF.md` 中的 `cd /Users/Shared/product-产品/only` 全部改为 `/Users/Shared/productX/only`。
@@ -666,7 +666,7 @@
 
 ### CLI 交互式聊天 REPL（方案 B 雏形，2026-08-30）
 
-**背景：** 老板想给 OnlySpace 做一个类似 Claude Code 的终端界面。经分析：项目已有 `cli/`（子命令式测试端，send/sync/attach/backup 全能力）+ `shared/`（纯 Dart 加密与同步协议），缺的是交互层。定方案：A = Dart 原生 TUI（分栏、光标控制），B = 轻量 REPL（stdin 循环 + 彩色输出，能收能发）。**老板选先做 B 验证交互。**
+**背景：** 老板想给 Einz 做一个类似 Claude Code 的终端界面。经分析：项目已有 `cli/`（子命令式测试端，send/sync/attach/backup 全能力）+ `shared/`（纯 Dart 加密与同步协议），缺的是交互层。定方案：A = Dart 原生 TUI（分栏、光标控制），B = 轻量 REPL（stdin 循环 + 彩色输出，能收能发）。**老板选先做 B 验证交互。**
 
 **实现（新文件 `cli/bin/onlyspace_chat.dart`，278 行）：**
 - 启动即增量同步历史；直接输入文本即发送；发送后自动 sync（能立即看到对方回复）

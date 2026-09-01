@@ -7,22 +7,22 @@ import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 
-/// OnlySpace 移动端入口。
+/// Einz 移动端入口。
 ///
 /// 启动流程：检查是否已设置启动锁 → 已设置进锁屏页（PIN 解密 Space Key 包），
 /// 未设置进一次性配置页（认证后设置 PIN）。
 void main() {
-  runApp(const OnlySpaceApp());
+  runApp(const EinzApp());
 }
 
-class OnlySpaceApp extends StatefulWidget {
-  const OnlySpaceApp({super.key});
+class EinzApp extends StatefulWidget {
+  const EinzApp({super.key});
 
   @override
-  State<OnlySpaceApp> createState() => _OnlySpaceAppState();
+  State<EinzApp> createState() => _EinzAppState();
 }
 
-class _OnlySpaceAppState extends State<OnlySpaceApp> {
+class _EinzAppState extends State<EinzApp> {
   Locale? _locale; // null = 跟随系统
 
   @override
@@ -55,7 +55,7 @@ class _OnlySpaceAppState extends State<OnlySpaceApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'OnlySpace',
+      title: 'Einz',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
       ),

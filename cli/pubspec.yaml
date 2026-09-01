@@ -1,5 +1,5 @@
-name: onlyspace_cli
-description: OnlySpace CLI 测试端（无 UI，Phase 0-4 测试驱动）
+name: einz_cli
+description: Einz CLI 测试端（无 UI，Phase 0-4 测试驱动）
 version: 0.1.0
 publish_to: none
 
@@ -7,7 +7,7 @@ environment:
   sdk: ^3.5.0
 
 dependencies:
-  onlyspace_shared:
+  einz_shared:
     path: ../shared
   args: ^2.5.0
   crypto: ^3.0.0

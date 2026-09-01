@@ -1,4 +1,4 @@
-// OnlySpace TUI 聊天核心 —— 与 UI 无关的业务逻辑（方案 A 升级版）。
+// Einz TUI 聊天核心 —— 与 UI 无关的业务逻辑（方案 A 升级版）。
 //
 // 从 onlyspace_chat.dart（方案 B）提炼：认证 / 发送 / 补发 / 增量同步 / 历史 /
 // 解密 / UUIDv7 全部集中于此，供 TUI 界面（onlyspace_tui.dart）复用。
@@ -7,8 +7,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:onlyspace_shared/onlyspace_shared.dart';
-import 'package:onlyspace_cli/store.dart';
+import 'package:einz_shared/einz_shared.dart';
+import 'package:einz_cli/store.dart';
 
 /// 展示用消息（已解密明文 + 归属）。
 class ChatMessage {

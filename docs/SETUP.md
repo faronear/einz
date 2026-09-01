@@ -1,7 +1,7 @@
-# OnlySpace — 一次性配置手册（docs/SETUP.md）
+# Einz — 一次性配置手册（docs/SETUP.md）
 
 > **状态：** Draft v0.1（Phase 0 产出）
-> **适用场景：** 首次部署 OnlySpace——两台设备 + 一台服务器，一次性建立信任关系。
+> **适用场景：** 首次部署 Einz——两台设备 + 一台服务器，一次性建立信任关系。
 > **关联文档：** `docs/E2EE.md` §7（密钥分发）、§8（认证）；`docs/PROTOCOL.md`；`aimemo/productLens.zhcn.md` §5。
 
 ---
@@ -24,7 +24,7 @@
 ## 2. 前置条件
 
 - 一台服务器（VPS，已装 Docker 与 Docker Compose，或 Node ≥ 22）。
-- 两台手机（iOS / Android），各安装 OnlySpace App（分发见 productLens §13）。
+- 两台手机（iOS / Android），各安装 Einz App（分发见 productLens §13）。
 - 一个域名（用于 Caddy HTTPS/WSS，如 `space.example.com`）。
 
 ---
@@ -66,7 +66,7 @@
 ```
 
 - 密封副本用公钥 A/B 分别加密：**只有对应设备能解开**（E2EE.md §7.1）。
-- 产物格式：`onlyspace-config-v1`（E2EE.md §7.1）。
+- 产物格式：`einz-config-v1`（E2EE.md §7.1）。
 
 ### 步骤 3：登记服务器白名单
 

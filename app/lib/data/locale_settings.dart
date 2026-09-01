@@ -12,7 +12,7 @@ const Map<String, String> kLocaleLabels = {
   'en': 'English',
 };
 
-/// 语言切换通知：OnlySpaceApp 监听后重建 MaterialApp（即时生效）。
+/// 语言切换通知：EinzApp 监听后重建 MaterialApp（即时生效）。
 final ValueNotifier<String> localeNotifier = ValueNotifier<String>('system');
 
 /// 语言偏好设置（存本设备 app_state，key='locale'）。

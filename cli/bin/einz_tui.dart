@@ -1,6 +1,6 @@
-// OnlySpace 交互式聊天 TUI —— 方案 A（分栏界面 + WS 实时接收 + 附件收发）。
+// Einz 交互式聊天 TUI —— 方案 A（分栏界面 + WS 实时接收 + 附件收发）。
 //
-// 与 onlyspace_chat.dart（方案 B，纯文本 REPL）不同，本文件提供：
+// 与 einz_chat.dart（方案 B，纯文本 REPL）不同，本文件提供：
 //   - 分栏布局：消息区（滚动）+ 输入区（底部）+ 状态栏（顶部，含 WS 状态）
 //   - 手写 ANSI 渲染（零新依赖；pub 缓存无 TUI 库且国内网络下载不稳）
 //   - 后台 WS 实时监听（复用 shared WsClient，断线自动重连）
@@ -8,7 +8,7 @@
 //   - 逐键输入（raw 模式），Ctrl+C 或 /exit 退出
 //
 // 用法：
-//   dart run bin/onlyspace_tui.dart --store demo/store-a.json --server http://127.0.0.1:3901
+//   dart run bin/einz_tui.dart --store demo/store-a.json --server http://127.0.0.1:3901
 //
 // 前置：store 已 init + config/import（已导入 Space Key）；未认证时先 /auth。
 // 定位：测试端明文落盘（同 store.dart），不上生产。
@@ -17,9 +17,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:onlyspace_shared/onlyspace_shared.dart';
-import 'package:onlyspace_cli/store.dart';
-import 'package:onlyspace_cli/chat_core.dart';
+import 'package:einz_shared/einz_shared.dart';
+import 'package:einz_cli/store.dart';
+import 'package:einz_cli/chat_core.dart';
 
 // ---------- ANSI 转义 ----------
 const _esc = '\x1B';
@@ -59,7 +59,7 @@ class _TuiState {
   /// 等待邀请码输入（/auth 未登记引导）：输入循环的下一次输入按邀请码处理。
   bool pendingInvite = false;
 
-  /// 等待空间口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
+  /// 等待空间加密口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
   bool pendingSpaceKey = false;
 
   /// person_id → display_name（GET /space 拉取，消息前缀显示 person_name 用）。
@@ -175,7 +175,7 @@ Future<(bool, Map<String, String>)> _probeServer(String server) async {
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
 /// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
-/// sealed 导入时置 exitCode=1（main 据此退出，提示用户改用 onlyspace.dart import）。
+/// sealed 导入时置 exitCode=1（main 据此退出，提示用户改用 einz.dart import）。
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
@@ -196,8 +196,8 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   }
 
   if (store == null) {
-    stdout.writeln('=== OnlySpace TUI 首次使用引导 ===');
-    _guidanceNotes.add('=== OnlySpace TUI 首次使用引导 ===');
+    stdout.writeln('=== Einz TUI 首次使用引导 ===');
+    _guidanceNotes.add('=== Einz TUI 首次使用引导 ===');
     stdout.writeln('本机还没有设备身份，现在生成（私钥保存在本机: $storePath）');
     _guidanceNotes.add('本机还没有设备身份，现在生成（私钥保存在本机: $storePath）');
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
@@ -367,7 +367,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '请输入空间口令:', hidden: true, required: true);
+      final passphrase = await _prompt(session, '请输入空间加密口令:', hidden: true, required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
@@ -467,7 +467,7 @@ Future<void> main(List<String> args) async {
   // 终端能力检测：TUI 需要可交互 stdin（raw 逐键）；stdout 非终端时渲染降级但不致命
   final term = Platform.environment['TERM'] ?? '';
   if (!stdin.hasTerminal || term == 'dumb') {
-    stderr.writeln('未检测到交互终端，请用: dart run bin/onlyspace_chat.dart --store $storePath ${server.isEmpty ? '' : '--server $server'}');
+    stderr.writeln('未检测到交互终端，请用: dart run bin/einz_chat.dart --store $storePath ${server.isEmpty ? '' : '--server $server'}');
     exitCode = 1;
     return;
   }
@@ -713,7 +713,7 @@ void _render() {
       'WS:${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
     WsStatus.stopped => 'WS:${_gray}○ 离线${_reset}',
   };
-  buf.write('${_bold}OnlySpace TUI${_reset}  $wsName  ${_personLabel(s.session.store)}');
+  buf.write('${_bold}Einz TUI${_reset}  $wsName  ${_personLabel(s.session.store)}');
   if (s.status.isNotEmpty) {
     buf.write('  ${_gray}${s.status}${_reset}');
   }
@@ -1074,7 +1074,7 @@ Future<void> _execCommand(String line) async {
       }
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
-          s.session, '本设备尚未接入空间，请输入空间口令:'));
+          s.session, '本设备尚未接入空间，请输入空间加密口令:'));
       break;
     case '/sync':
       try {
@@ -1182,7 +1182,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
   }
 }
 
-/// 输入循环接管的空间口令接入（/space 未接入引导）：口令 → accessByEscrow。
+/// 输入循环接管的空间加密口令接入（/space 未接入引导）：口令 → accessByEscrow。
 Future<void> _handleSpaceKeyInput(String passphrase) async {
   final s = _state!;
   s.pendingSpaceKey = false;
@@ -1215,7 +1215,7 @@ void _printFarewell(ChatSession session) {
   // 退出信息尽力而为——写入失败忽略，避免 "StreamSink is bound to a stream" 崩溃
   try {
     stdout.writeln();
-    stdout.writeln('${_gray}已退出 OnlySpace TUI（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
+    stdout.writeln('${_gray}已退出 Einz TUI（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
   } catch (_) {}
 }
 

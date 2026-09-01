@@ -30,7 +30,7 @@ def store_last_seq(path):
 def start_tui(store):
     master, slave = pty.openpty()
     env = dict(os.environ, TERM='xterm-256color')
-    cmd = ['dart', 'run', 'bin/onlyspace_tui.dart', '--store', store, '--server', SERVER]
+    cmd = ['dart', 'run', 'bin/einz_tui.dart', '--store', store, '--server', SERVER]
     p = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave, close_fds=True, cwd=CLI, env=env)
     os.close(slave)
     return master, p
@@ -62,8 +62,8 @@ def main():
     # 1) A TUI 启动并渲染状态栏
     print('[1] 启动 A TUI（pty）…')
     master, p = start_tui('demo/store-a.json')
-    out = read_until(master, 'OnlySpace TUI', timeout=25)
-    if 'OnlySpace TUI' not in out:
+    out = read_until(master, 'Einz TUI', timeout=25)
+    if 'Einz TUI' not in out:
         print('❌ TUI 未渲染状态栏'); print(out[-600:]); sys.exit(1)
     print('✅ TUI 状态栏渲染 OK')
 
@@ -73,7 +73,7 @@ def main():
     os.write(master, f'{msg_a}\r'.encode('utf-8'))
     time.sleep(4)  # 等发送 + 落盘
     # 检查 B 能否解密出 A 的消息（发送链路：用真正的 sync 子命令）
-    out_b = run_capture(['dart', 'run', 'bin/onlyspace.dart', 'sync', '--store', 'demo/store-b.json', '--server', SERVER])
+    out_b = run_capture(['dart', 'run', 'bin/einz.dart', 'sync', '--store', 'demo/store-b.json', '--server', SERVER])
     if msg_a in out_b:
         print('✅ A(TUI) 发送成功，B 已解密收到')
     else:
@@ -87,7 +87,7 @@ def main():
     before = store_history_count(STORE_A)
     before_seq = store_last_seq(STORE_A)
     msg_b = f'TUI冒烟B{int(time.time())}'
-    run_capture(['dart', 'run', 'bin/onlyspace.dart', 'send', '--store', 'demo/store-b.json', '--server', SERVER, '--message', msg_b])
+    run_capture(['dart', 'run', 'bin/einz.dart', 'send', '--store', 'demo/store-b.json', '--server', SERVER, '--message', msg_b])
     time.sleep(5)  # 等 WS message.new → 落盘
     after = store_history_count(STORE_A)
     after_seq = store_last_seq(STORE_A)

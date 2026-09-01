@@ -1,4 +1,4 @@
-# OnlySpace — E2EE 设计（docs/E2EE.md）
+# Einz — E2EE 设计（docs/E2EE.md）
 
 > **状态：** Draft v0.1（Phase 0 产出）
 > **权威依据：** `aimemo/productLens.zhcn.md` §4（密码学与密钥层级）、§5（一次性配置）
@@ -8,7 +8,7 @@
 
 ## 1. 目标与范围
 
-本文档定义 OnlySpace 的端到端加密协议：密钥层级、密钥派生、一次性配置分发、消息/附件加密格式、认证、密钥轮换、备份恢复。
+本文档定义 Einz 的端到端加密协议：密钥层级、密钥派生、一次性配置分发、消息/附件加密格式、认证、密钥轮换、备份恢复。
 
 **目标：**
 
@@ -141,7 +141,7 @@ BackupKey = crypto_pwhash(
 ```text
 明文 = UTF-8(消息正文)
 nonce = randombytes(24)
-AAD  = "onlyspace-v1" ‖ space_id ‖ message_id ‖ sender_device_id ‖ type ‖ key_version
+AAD  = "einz-v1" ‖ space_id ‖ message_id ‖ sender_device_id ‖ type ‖ key_version
 ciphertext = crypto_aead_xchacha20poly1305_ietf_encrypt(
                  message = 明文, aad = AAD, nonce = nonce, key = MessageKey)
 ```
@@ -166,7 +166,7 @@ MessageKey = 派生(§4.1, 使用该消息的 message_id 与对应 key_version �
 ```text
 AttachmentKey = 派生(§4.2, attachment_id)
 nonce = randombytes(24)
-AAD   = "onlyspace-v1" ‖ space_id ‖ attachment_id ‖ key_version
+AAD   = "einz-v1" ‖ space_id ‖ attachment_id ‖ key_version
 blob  = crypto_aead_xchacha20poly1305_ietf_encrypt(原始文件字节, aad, nonce, AttachmentKey)
 sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（base64，与 Server 校验一致）
 ```
@@ -193,13 +193,13 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
 
 系统固定两人一空间、无动态配对（productLens §5），密钥建立由**一次性人工配置**完成。
 
-### 7.1 配置产物格式（onlyspace-config-v1）
+### 7.1 配置产物格式（einz-config-v1）
 
 配置阶段生成一个 JSON 产物，包含 Space Key 的两种密封副本与元数据：
 
 ```json
 {
-  "format": "onlyspace-config-v1",
+  "format": "einz-config-v1",
   "space_id": "UUIDv7",
   "key_version": 1,
   "sealed_space_keys": [
@@ -436,15 +436,15 @@ Client                     Server
 
 ### 附录：密钥命名对照（防混淆）
 
-OnlySpace 涉及多个"密钥"概念，命名与用途对照如下：
+Einz 涉及多个"密钥"概念，命名与用途对照如下：
 
 | 名称 | 实体类型 | 用途 | 谁持有 |
 | --- | --- | --- | --- |
 | **Space Key** | 32B 对称密钥 | 消息/附件 E2EE 加密（§5/§6）；key_version 轮换 + 归档（§9.2） | 双方设备（App 锁 PIN 包 / 口令托管保管） |
 | **口令派生密钥** | 无独立实体（口令经 Argon2id 派生，§4.3） | CLI backup/restore 备份文件、App 锁 PIN/恢复码、口令托管包加密（三处复用 backup.dart） | 口令持有者（恢复码 / PIN / 接入口令） |
-| **ONLYSPACE_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B） | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文） | 部署者（deployment/.env，gitignore 保护） |
+| **EINZ_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B） | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文） | 部署者（deployment/.env，gitignore 保护） |
 
-> 注：Server 备份密钥 2026-08 起从 `ONLYSPACE_BACKUP_KEY` 更名为 `ONLYSPACE_DB_BACKUP_KEY`，
+> 注：Server 备份密钥 2026-08 起从 `EINZ_BACKUP_KEY` 更名为 `EINZ_DB_BACKUP_KEY`，
 > 避免与 CLI 的 backup（口令派生）概念混淆；旧部署升级需同步改 `.env` 变量名（docs/updateServer.md §5）。
 >
 > 层次关系：**Space Key 管"说话内容"（消息/附件密文），口令派生密钥管"保管手段"（备份/锁包/托管包），

@@ -7,7 +7,7 @@ import '../crypto/backup.dart';
 import 'types.dart';
 import '../crypto/message_crypto.dart';
 
-/// OnlySpace REST 客户端（dart:io，App 与 CLI 共用）。
+/// Einz REST 客户端（dart:io，App 与 CLI 共用）。
 ///
 /// 对应 docs/PROTOCOL.md §3–§6。
 class ApiClient {

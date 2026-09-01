@@ -4,7 +4,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 import 'package:test/test.dart';
 
 /// 起本地 WS server（/ws 端点），返回 (server, baseUrl, 已连接连接列表)。

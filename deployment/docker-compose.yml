@@ -11,13 +11,13 @@ services:
     restart: unless-stopped
     environment:
       - PORT=3000
-      - ONLYSPACE_CONFIG=/config/config.json
-      - ONLYSPACE_DB=/data/app.db
-      - ONLYSPACE_FILES=/data/files
+      - EINZ_CONFIG=/config/config.json
+      - EINZ_DB=/data/app.db
+      - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
       # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore，
       # 不入库、git pull 不覆盖）。未配置时 npm run backup 会拒绝执行（防明文备份）。
-      - ONLYSPACE_DB_BACKUP_KEY=${ONLYSPACE_DB_BACKUP_KEY}
+      - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
     volumes:
       - ./config:/config:ro
       - ./data:/data

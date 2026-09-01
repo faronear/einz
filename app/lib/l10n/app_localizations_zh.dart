@@ -10,7 +10,7 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'OnlySpace';
+  String get appTitle => 'Einz';
 
   @override
   String get cancel => '取消';
@@ -37,7 +37,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skip => '跳过';
 
   @override
-  String get setupPageTitle => 'OnlySpace · 设备配置';
+  String get setupPageTitle => 'Einz · 设备配置';
 
   @override
   String get setupPageHeading => '一次性配置';
@@ -407,7 +407,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get burnOption7Days => '7 天';
 
   @override
-  String get lockPageTitle => 'OnlySpace 已锁定';
+  String get lockPageTitle => 'Einz 已锁定';
 
   @override
   String get lockPagePinPrompt => '输入 PIN 解锁';

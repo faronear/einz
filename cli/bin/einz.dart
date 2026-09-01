@@ -4,21 +4,21 @@ import 'dart:typed_data';
 
 import 'package:args/args.dart';
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 
-import 'package:onlyspace_cli/store.dart';
+import 'package:einz_cli/store.dart';
 
-/// OnlySpace CLI 测试端（无 UI，Phase 0–4 测试驱动）。
+/// Einz CLI 测试端（无 UI，Phase 0–4 测试驱动）。
 ///
 /// 用法示例：
-///   dart run bin/onlyspace.dart init --store store-a.json --device-id dev-a1
-///   dart run bin/onlyspace.dart pubkey --store store-a.json
-///   dart run bin/onlyspace.dart config --store store-a.json --peer-pubkey <B公钥> \
+///   dart run bin/einz.dart init --store store-a.json --device-id dev-a1
+///   dart run bin/einz.dart pubkey --store store-a.json
+///   dart run bin/einz.dart config --store store-a.json --peer-pubkey <B公钥> \
 ///       --space-id space-1 --out-config config.json --out-sealed-peer sealed-b.json
-///   dart run bin/onlyspace.dart import --store store-b.json --sealed-file sealed-b.json --space-id space-1
-///   dart run bin/onlyspace.dart auth --store store-a.json --server http://localhost:3000
-///   dart run bin/onlyspace.dart send --store store-a.json --server ... --message "你好"
-///   dart run bin/onlyspace.dart sync --store store-b.json --server ...
+///   dart run bin/einz.dart import --store store-b.json --sealed-file sealed-b.json --space-id space-1
+///   dart run bin/einz.dart auth --store store-a.json --server http://localhost:3000
+///   dart run bin/einz.dart send --store store-a.json --server ... --message "你好"
+///   dart run bin/einz.dart sync --store store-b.json --server ...
 Future<void> main(List<String> args) async {
   await sodium();
   final parser = ArgParser()

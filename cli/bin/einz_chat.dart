@@ -1,4 +1,4 @@
-// OnlySpace 交互式聊天 CLI —— 方案 B 雏形（轻量 REPL：发送 + 同步 + 彩色输出）。
+// Einz 交互式聊天 CLI —— 方案 B 雏形（轻量 REPL：发送 + 同步 + 彩色输出）。
 //
 // 与 onlyspace.dart（子命令式测试端）不同，本文件提供持续对话体验：
 //   - 启动即同步历史，直接输入文本即发送
@@ -6,7 +6,7 @@
 //   - ANSI 彩色输出（我=绿色、对方=黄色、系统=灰、错误=红）
 //
 // 用法：
-//   dart run bin/onlyspace_chat.dart --store store-a.json --server http://localhost:3000
+//   dart run bin/einz_chat.dart --store store-a.json --server http://localhost:3000
 //
 // 前置：store 已 init + config/import（已导入 Space Key），若未认证先 /auth。
 // 说明：这是 Phase 0–4 的交互验证端，密钥仍以明文 JSON 落盘（同 store.dart 的测试定位）。
@@ -14,8 +14,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:onlyspace_shared/onlyspace_shared.dart';
-import 'package:onlyspace_cli/store.dart';
+import 'package:einz_shared/einz_shared.dart';
+import 'package:einz_cli/store.dart';
 
 // ---------- ANSI 颜色 ----------
 const _reset = '\x1B[0m';
@@ -49,12 +49,12 @@ Future<void> main(List<String> args) async {
     store = DeviceStore.load(storePath);
   } on StateError catch (e) {
     _err('$e');
-    _info('先运行: dart run bin/onlyspace.dart init --store $storePath --device-id <id>');
+    _info('先运行: dart run bin/einz.dart init --store $storePath --device-id <id>');
     exitCode = 1;
     return;
   }
 
-  _ok('OnlySpace 聊天 CLI（方案 B 雏形）');
+  _ok('Einz 聊天 CLI（方案 B 雏形）');
   _info('设备: ${store.deviceId}  空间: ${store.spaceId ?? '（未导入 Space Key）'}');
   if (server.isNotEmpty) _info('服务器: $server');
 
@@ -141,7 +141,7 @@ Future<void> _cmdAuth(DeviceStore store, String storePath, String server) async 
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId);
+  final challenge = await api.challenge(store.deviceId!);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
@@ -161,7 +161,7 @@ Future<void> _sendText(DeviceStore store, String storePath, String server, Strin
     plaintext: text,
     spaceKey: base64Decode(store.spaceKey!),
     spaceId: store.spaceId!,
-    senderDeviceId: store.deviceId,
+    senderDeviceId: store.deviceId!,
     messageId: messageId,
     keyVersion: store.keyVersion,
   );

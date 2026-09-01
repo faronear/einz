@@ -83,11 +83,11 @@ curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/onlyspace.dart escrow --action upload --store /tmp/a.json \
+dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
 # 期望：✅ 口令托管包已上传
 
-dart run bin/onlyspace.dart escrow --action download --store /tmp/b.json \
+dart run bin/einz.dart escrow --action download --store /tmp/b.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
 # 期望：✅ 口令托管包已解出 Space Key
 ```
@@ -114,8 +114,8 @@ cd deployment && docker compose up -d --build server
 | 存量数据 | 不受影响（messages/devices/会话等不动，新表初始为空） |
 | 白名单 | 无需改动（既有设备认证不受影响） |
 | Caddy / HTTPS | 无需改动（Caddyfile 已 assume-unchanged） |
-| 备份密钥 | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `ONLYSPACE_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose |
-| 旧部署升级 | 若 .env 里还是旧变量名 `ONLYSPACE_BACKUP_KEY`（2026-08 前部署）：手动改名为 `ONLYSPACE_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |
+| 备份密钥 | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose |
+| 旧部署升级 | 若 .env 里还是旧变量名 `EINZ_BACKUP_KEY`（2026-08 前部署）：手动改名为 `EINZ_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |
 | App 侧 | 需重新安装 APK 才能启用新 UI（CLI 不受影响） |
 | 首次在 VPS 用 git | 先 `git config --global user.email/user.name`（避免提交时报错） |
 | pull 冲突 | 若 `git pull` 报冲突：多半是 Caddyfile 被误改——先 `git checkout -- deployment/Caddyfile` 还原，再 `git update-index --assume-unchanged deployment/Caddyfile` |

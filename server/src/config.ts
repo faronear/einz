@@ -20,7 +20,7 @@ export function loadConfig(): ServerConfig {
   if (existing) return { space_id: existing };
   const spaceId = randomUUID();
   setMeta("space_id", spaceId);
-  console.log(`[onlyspace] 首次启动：已生成 space_id=${spaceId}（持久化在 db meta，可在 /health 查看）`);
+  console.log(`[einz] 首次启动：已生成 space_id=${spaceId}（持久化在 db meta，可在 /health 查看）`);
   return { space_id: spaceId };
 }
 

@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "OnlySpace",
+  "appTitle": "Einz",
   "cancel": "Cancel",
   "ok": "OK",
   "send": "Send",
@@ -9,7 +9,7 @@
   "settings": "Settings",
   "loading": "Loading...",
   "skip": "Skip",
-  "setupPageTitle": "OnlySpace · Device Setup",
+  "setupPageTitle": "Einz · Device Setup",
   "setupPageHeading": "One-time setup",
   "setupPageInstructions": "1) Generate device key → add the public key to the server whitelist (config.json) and restart\n2) Paste the Space Key sealed with your public key → authenticate",
   "setupPageDeviceIdLabel": "Device ID",
@@ -215,7 +215,7 @@
   "burnOption1Hour": "1 hour",
   "burnOption1Day": "1 day",
   "burnOption7Days": "7 days",
-  "lockPageTitle": "OnlySpace Locked",
+  "lockPageTitle": "Einz Locked",
   "lockPagePinPrompt": "Enter PIN to unlock",
   "lockPageLockedSeconds": "Locked for {seconds} seconds",
   "@lockPageLockedSeconds": {

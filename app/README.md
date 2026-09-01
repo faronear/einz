@@ -1,4 +1,4 @@
-# OnlySpace App（Flutter）
+# Einz App（Flutter）
 
 V1 手机客户端（iOS / Android）。待安装 Flutter SDK 后初始化工程骨架。
 

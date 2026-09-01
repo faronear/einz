@@ -1,4 +1,4 @@
-# OnlySpace — 数据库设计（docs/DATABASE.md）
+# Einz — 数据库设计（docs/DATABASE.md）
 
 > **状态：** Draft v0.1（Phase 0 产出）
 > **权威依据：** `aimemo/productLens.zhcn.md` §8.3（数据模型要点）、§7.4（客户端本地数据）

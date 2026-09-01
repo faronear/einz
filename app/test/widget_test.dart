@@ -1,4 +1,4 @@
-// OnlySpace 设置向导 widget 测试。
+// Einz 设置向导 widget 测试。
 //
 // 直接渲染 SetupPage 验证向导流程（不经过 StartupGate——它依赖真实
 // drift 数据库初始化；不触发密钥生成按钮，避免在测试环境加载 libsodium）。
@@ -7,9 +7,9 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:onlyspace/data/local_database.dart';
-import 'package:onlyspace/l10n/app_localizations.dart';
-import 'package:onlyspace/setup_page.dart';
+import 'package:einz/data/local_database.dart';
+import 'package:einz/l10n/app_localizations.dart';
+import 'package:einz/setup_page.dart';
 
 void main() {
   Widget wrapApp() {

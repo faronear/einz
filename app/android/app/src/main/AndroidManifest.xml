@@ -8,7 +8,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application
-        android:label="OnlySpace"
+        android:label="Einz"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

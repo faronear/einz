@@ -2,9 +2,9 @@
 // 用法：cd cli && dart run test/order_check.dart
 import 'dart:io';
 
-import 'package:onlyspace_shared/onlyspace_shared.dart';
-import 'package:onlyspace_cli/store.dart';
-import 'package:onlyspace_cli/chat_core.dart';
+import 'package:einz_shared/einz_shared.dart';
+import 'package:einz_cli/store.dart';
+import 'package:einz_cli/chat_core.dart';
 
 Future<void> main() async {
   await sodium();

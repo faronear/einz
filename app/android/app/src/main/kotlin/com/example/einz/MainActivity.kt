@@ -1,4 +1,4 @@
-package com.example.onlyspace
+package com.example.einz
 
 import io.flutter.embedding.android.FlutterActivity
 

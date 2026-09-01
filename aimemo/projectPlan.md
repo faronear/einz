@@ -1,9 +1,9 @@
-# OnlySpace — 开发计划（projectPlan）
+# Einz — 开发计划（projectPlan）
 
 > 项目视角：阶段计划、任务列表、进度跟踪。与 `aimemo/productLens.zhcn.md` 保持同步。
 > 状态标记：`[ ]` 待办、`[>]` 进行中、`[⏸]` 被阻塞、`[x]` 已完成。
 
-- **产品：** OnlySpace — 两个人的私密聊天与共享私人空间
+- **产品：** Einz — 两个人的私密聊天与共享私人空间
 - **部署形态：** 固定两人一空间、不分发（静态白名单，无动态配对）
 - **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.1）
 - **最后更新：** 2026-08-28
@@ -66,7 +66,7 @@
 - [x] **后台切回锁定**：ChatPage 生命周期监听（WidgetsBindingObserver：切后台记时、回前台超 30s 覆盖锁屏保留聊天状态）；LockPage 覆盖模式（asOverlay pop）；LockTimer 纯逻辑 + 5 项单测，flutter test 15 项全过
 - [x] **口令托管密钥（KEY_ESCROW.md，已实现）**：Server /key-escrow 三端点（表+冒烟用例）；shared KeyEscrowService（复用 backup.dart Argon2id+XChaCha20）+ 3 项单测；CLI escrow upload/download（全链路 e2e + 双端口令接入 e2e 过）；App 接入口令（SetPinDialog 可选上传）+ 新设备凭口令接入（③按钮）+ rotate 后解锁自动重传（_syncEscrow）；flutter test 18 项全过
 - [x] **App 附件消息（语音/图像/视频）**：MessageRepository.sendAttachment（encryptAttachment 加密 blob → /attachments 上传 + caption 消息 + 本地附件元数据落库）+ history 关联附件 + fetchAttachment 下载解密；chat_page：语音（按住说话录音 record → 播放条 audioplayers）、图像（拍照/相册 image_picker → 缩略展示/点击全屏）、视频（拍摄/相册 → 下载解密 video_player 播放）；插件懒构造避免测试环境 MissingPluginException；flutter test 18 项全过 + golden 更新
-- [x] **App 附件扩展（音频文件/任意文件）+ 固定服务器地址**：协议 kMessageTypes/Server ALLOWED_TYPES 加 audio/file；chat_page 附件 sheet 扩至 6 项（file_picker 12.x：FilePicker 静态方法 + readAsBytes）；audio 播放条（与 voice 共用 _playAudioMessage）、file 文件卡片（下载保存 path_provider）；setup_page 服务器地址改固定常量 kOnlySpaceServer（移除输入框）；全量验证过（server 冒烟/shared 16/app 18）
+- [x] **App 附件扩展（音频文件/任意文件）+ 固定服务器地址**：协议 kMessageTypes/Server ALLOWED_TYPES 加 audio/file；chat_page 附件 sheet 扩至 6 项（file_picker 12.x：FilePicker 静态方法 + readAsBytes）；audio 播放条（与 voice 共用 _playAudioMessage）、file 文件卡片（下载保存 path_provider）；setup_page 服务器地址改固定常量 kEinzServer（移除输入框）；全量验证过（server 冒烟/shared 16/app 18）
 - [x] **多设备身份判断（person_id）**：shared ApiClient 加 getSpace + SpaceResult/SpaceDevice（含 person_id 映射，const 构造）；MessageRepository 加 refreshDeviceMap 缓存 + _isSamePerson（person 优先、device 降级），history sender 按 person 判断——同用户不同设备的消息显示为 me；chat_page _refresh 拉取映射；单测（shared getSpace 2 项 + app person 判断 1 项），shared 18/app 19 全过
 - [x] **阅后即焚（纯本地，每设备独立）**：Server 零改动——BurnAfterSettings（app_state 存档位：无限/1分/5分/30分/1小时/1天/7天）；local_messages 加 burn_after_seconds/expires_at 列（schemaVersion 2 + addColumn 迁移）；send/sync 落库按本设备设置算 expiresAt；purgeExpired 到期删除（3s ticker 联动）；chat_page 顶栏 ⏱ 选择器 + 消息 ⏱ 标记；单测（设置 3 项 + purgeExpired 1 项），flutter test 23 项全过
 - [x] **聊天分页加载优化（UI 懒渲染 + 增量刷新）**：MessageRepository 分页方法 historyRecent（最近 N 条升序）/historyBefore（更早）/historySince（新增含未同步），typedef HistoryMessage；chat_page 首屏只渲染最近 50 条 + ScrollController 上滑到顶加载更早（插入头部）+ 3s ticker 只增量追加新增（去重）+ 到期消息本地移除；单测 2 项（FakeApi 模拟 Server 分配 server_sequence），flutter test 25 项全过 + golden 确认通过
@@ -74,7 +74,7 @@
 - [x] **多语言界面第二批（lock_page 全量抽取）**：ARB 加 lockPage.* 12 键（含 int 占位符秒数/错误参数）；lock_page 12 处硬编码中文 → AppLocalizations（AppBar/PIN 提示/锁定倒计时/解锁/恢复码入口）；main.dart 确认无 UI 中文文案（注释除外，无需替换）；flutter test 25 项全过 + lock_page golden 更新；**至此四个页面（设置/聊天/锁屏/启动）全部中英文化完成**
 - [x] **WS 实时接入 + 轮询兜底**：shared 新增 WsClient（ws_client.dart：WsEvent 模型 hello/message.new/key.rotation/device.revoked + 连接/指数退避重连/状态回调，导出）；app 新增 WsRealtimeService（connected ValueNotifier + onMessageNew）；chat_page 接入（收到 message.new → 立即增量刷新；**WS 在线轮询降频 30s 兜底、断开恢复 3s**；enableWs 测试开关）；单测（shared ws_client 5 项：连接/解析/未知帧/断开重连；app ws_realtime 1 项：message.new 触发 + connected 状态），shared 23/app 26 全过；Server 侧 WS 早已就绪（ws.ts 广播 message.new）
 - [x] **device.revoked 撤销处理**：WsRealtimeService 加 onDeviceRevoked 分发；AppLockService 加 clear()（删除锁包 4 key：package/recovery/attempts/locked_until）；chat_page 收到 revoked → 停轮询/WS → 清理本地（锁包+消息库+附件+syncState）→ SnackBar 提示（chatPageDeviceRevoked 键）→ pushAndRemoveUntil 强制回设置页；单测（AppLockService.clear 1 项 + WsRealtimeService revoked 分发 1 项），app flutter test 28 项全过；**key.rotation 暂不处理**（App 无密钥轮换导入流程，仅 CLI rotate 离线流程，事件为通知性）
-- [x] **Server 备份密钥改名（命名消歧）**：`ONLYSPACE_BACKUP_KEY` → `ONLYSPACE_DB_BACKUP_KEY`（backup.ts/scripts/docker-compose/DEPLOYMENT.md/updateServer.md 全部同步；dist 编译产物随 build 更新）；updateServer.md §5 加"旧部署升级"说明（VPS .env 手动改名 + 重启）；E2EE.md 末尾加**密钥命名对照表**（Space Key / 口令派生密钥 / DB 备份密钥三层，防混淆）；server build + smoke 全过；**VPS 需手动改 deployment/.env 变量名并重启**
+- [x] **Server 备份密钥改名（命名消歧）**：`EINZ_BACKUP_KEY` → `EINZ_DB_BACKUP_KEY`（backup.ts/scripts/docker-compose/DEPLOYMENT.md/updateServer.md 全部同步；dist 编译产物随 build 更新）；updateServer.md §5 加"旧部署升级"说明（VPS .env 手动改名 + 重启）；E2EE.md 末尾加**密钥命名对照表**（Space Key / 口令派生密钥 / DB 备份密钥三层，防混淆）；server build + smoke 全过；**VPS 需手动改 deployment/.env 变量名并重启**
 - [x] **自建空间 + 二维码加入（降小白门槛）**：shared 加 JoinInfo（onlyspace-join-v1?space=&p= 格式，URL 编码口令，decode null 安全）+ 3 单测；setup_page A 端新增"自建空间（一键生成 Space Key）"（Random.secure 生成 32B → 认证 → SetPinDialog/口令托管 → 二维码对话框 QrImageView + 一键复制 joinDialog.*）；B 端口令输入框 📷 扫码入口（mobile_scanner 7.4.0 懒构造 _JoinScanPage，扫到 onlyspace-join-v1 自动填 spaceId/口令）；依赖 qr_flutter 4.1.0 + mobile_scanner（相机权限拍照时已配置，复用）；Server 零改动；widget 测试加"自建空间入口"用例（ensureVisible 滚动）；flutter test 29 项全过 + setup golden 更新；**白名单保持手动（B 公钥 → A 加 VPS config.json）**
 - [x] **配置页分步向导重构（交互优化）**：SetupPage 重构为向导——第 0 步角色选择（创建新空间/加入现有空间/高级 sealed 折叠）；创建 7 步（设备名+生成密钥**本页明确反馈结果** → 白名单确认 → 接入口令 → PIN → 二维码分享 → 完成）、加入 5 步（设备名 → 扫码/口令加入 → PIN → 完成）、高级 5 步（设备名 → sealed 导入 → PIN → 完成）；每步只收集一个信息 + 底部上一步/下一步/完成 + 进度圆点 + 步骤标题（wizardStep* 键）；_nextStep 按步骤前置校验；_authenticate/_setupLockAndEnter/_runPinSetup/_runJoinAccess/_runSealedImport 复用原认证/托管/sealed 逻辑；widget_test 向导 3 用例 + golden 更新 + flutter test 30 项全过
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪

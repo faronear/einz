@@ -65,7 +65,7 @@ Future<Map<String, dynamic>> buildConfigPayload({
   final sealedA = await sealFor(s, publicKeyA, spaceKey);
   final sealedB = await sealFor(s, publicKeyB, spaceKey);
   return {
-    'format': 'onlyspace-config-v1',
+    'format': 'einz-config-v1',
     'space_id': spaceId,
     'key_version': keyVersion,
     'sealed_space_keys': [

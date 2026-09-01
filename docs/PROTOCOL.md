@@ -1,4 +1,4 @@
-# OnlySpace — 通信协议（docs/PROTOCOL.md）
+# Einz — 通信协议（docs/PROTOCOL.md）
 
 > **状态：** Draft v0.1（Phase 0 产出）
 > **权威性：** 本文档是 REST + WebSocket 协议的**唯一权威定义**；Client 与 Server 必须按本文档实现，任何不一致以本文档为准。

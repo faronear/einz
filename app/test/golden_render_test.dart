@@ -17,12 +17,12 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onlyspace/chat_page.dart';
-import 'package:onlyspace/data/local_database.dart';
-import 'package:onlyspace/l10n/app_localizations.dart';
-import 'package:onlyspace/lock_page.dart';
-import 'package:onlyspace/setup_page.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz/chat_page.dart';
+import 'package:einz/data/local_database.dart';
+import 'package:einz/l10n/app_localizations.dart';
+import 'package:einz/lock_page.dart';
+import 'package:einz/setup_page.dart';
+import 'package:einz_shared/einz_shared.dart';
 
 /// 最小 fake ApiClient：sync 返回编排好的消息页（渲染聊天界面用）。
 class _FakeApi extends ApiClient {

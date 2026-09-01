@@ -104,7 +104,7 @@ export function enrollDevice(
     }
     setMeta("creator_person_id", personId); // 创建者标记（规范 id）
     setMeta(`person_name:${personId}`, displayName); // 名称表：personA → lukas
-    console.log(`[onlyspace] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${displayName}，空间创建者）`);
+    console.log(`[einz] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${displayName}，空间创建者）`);
     return { ok: true, device_id: assignedId, person_id: personId, space_id: cfg.space_id };
   }
 
@@ -226,6 +226,6 @@ export function createInvite(
   const expiresAt = Date.now() + hours * 3600_000;
   db.prepare(`INSERT INTO invites (invite_code, person_id, status, created_at, expires_at) VALUES (?, ?, 'pending', ?, ?)`)
     .run(code, personId, Date.now(), expiresAt);
-  console.log(`[onlyspace] 生成邀请码: person=${personId}${displayName ? `（${displayName}）` : ""} hours=${hours}`);
+  console.log(`[einz] 生成邀请码: person=${personId}${displayName ? `（${displayName}）` : ""} hours=${hours}`);
   return { invite_code: code, person_id: personId, expires_at: expiresAt };
 }

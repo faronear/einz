@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OnlySpace Phase 2 验收：附件加密上传 → 下载 → 解密闭环 + Server 明文隔离
+# Einz Phase 2 验收：附件加密上传 → 下载 → 解密闭环 + Server 明文隔离
 #
 # 流程：
 #   init(A/B) → config → import → 启动 Server → auth 双端
@@ -12,7 +12,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="$(mktemp -d)"
-PORT="${ONLYSPACE_P2_PORT:-3903}"
+PORT="${EINZ_P2_PORT:-3903}"
 SERVER_PID=""
 MESSAGE="机密附件内容-Phase2-$(date +%s)"
 
@@ -31,9 +31,9 @@ step() { echo "==> $1"; }
 start_server() {
   # 用 exec 替换 subshell 为 node，使 $! 直接是 node 进程（Git Bash 下 kill subshell 杀不掉子进程）
   (cd "$ROOT/server" && exec env \
-    ONLYSPACE_CONFIG="$WORK/config.json" \
-    ONLYSPACE_DB="$WORK/app.db" \
-    ONLYSPACE_FILES="$WORK/files" \
+    EINZ_CONFIG="$WORK/config.json" \
+    EINZ_DB="$WORK/app.db" \
+    EINZ_FILES="$WORK/files" \
     PORT="$PORT" node dist/app.js >"$WORK/server.log" 2>&1) &
   SERVER_PID=$!
   for i in $(seq 1 20); do
@@ -46,23 +46,23 @@ start_server() {
 cd "$ROOT/cli"
 
 step "1. CLI init 两台设备"
-dart run bin/onlyspace.dart init --store "$WORK/store-a.json" --device-id dev-a1 >/dev/null
-dart run bin/onlyspace.dart init --store "$WORK/store-b.json" --device-id dev-b1 >/dev/null
-PUB_A="$(dart run bin/onlyspace.dart pubkey --store "$WORK/store-a.json")"
-PUB_B="$(dart run bin/onlyspace.dart pubkey --store "$WORK/store-b.json")"
+dart run bin/einz.dart init --store "$WORK/store-a.json" --device-id dev-a1 >/dev/null
+dart run bin/einz.dart init --store "$WORK/store-b.json" --device-id dev-b1 >/dev/null
+PUB_A="$(dart run bin/einz.dart pubkey --store "$WORK/store-a.json")"
+PUB_B="$(dart run bin/einz.dart pubkey --store "$WORK/store-b.json")"
 
 step "2. config（A 生成 Space Key + 白名单）+ import（B）"
-dart run bin/onlyspace.dart config \
+dart run bin/einz.dart config \
   --store "$WORK/store-a.json" --peer-pubkey "$PUB_B" \
   --space-id "space-p2" \
   --out-config "$WORK/config.json" --out-sealed-peer "$WORK/sealed-b.txt" >/dev/null
-dart run bin/onlyspace.dart import \
+dart run bin/einz.dart import \
   --store "$WORK/store-b.json" --sealed-file "$WORK/sealed-b.txt" --space-id "space-p2" >/dev/null
 
 step "3. 启动 Server + 双端认证"
 start_server
-dart run bin/onlyspace.dart auth --store "$WORK/store-a.json" --server "http://127.0.0.1:$PORT" >/dev/null
-dart run bin/onlyspace.dart auth --store "$WORK/store-b.json" --server "http://127.0.0.1:$PORT" >/dev/null
+dart run bin/einz.dart auth --store "$WORK/store-a.json" --server "http://127.0.0.1:$PORT" >/dev/null
+dart run bin/einz.dart auth --store "$WORK/store-b.json" --server "http://127.0.0.1:$PORT" >/dev/null
 
 step "4. 准备本地测试文件（含可识别明文字符串，用于明文隔离检查）"
 printf '%s\n' "$MESSAGE" >"$WORK/photo.bin"
@@ -71,7 +71,7 @@ SIZE="$(wc -c < "$WORK/photo.bin")"
 echo "    测试文件: $SIZE 字节"
 
 step "5. A attach 加密上传"
-ATTACH_OUT="$(dart run bin/onlyspace.dart attach \
+ATTACH_OUT="$(dart run bin/einz.dart attach \
   --store "$WORK/store-a.json" \
   --server "http://127.0.0.1:$PORT" \
   --file "$WORK/photo.bin" \
@@ -109,7 +109,7 @@ print("✅ files/ 附件 blob 全部为密文，无明文")
 EOF
 
 step "7. B sync → 收到附件消息（type=image）+ attachments_meta"
-SYNC_B="$(dart run bin/onlyspace.dart sync --store "$WORK/store-b.json" --server "http://127.0.0.1:$PORT")"
+SYNC_B="$(dart run bin/einz.dart sync --store "$WORK/store-b.json" --server "http://127.0.0.1:$PORT")"
 echo "$SYNC_B"
 echo "$SYNC_B" | grep -q "新增=1" \
   && echo "✅ B 收到 1 条新消息" \
@@ -119,7 +119,7 @@ ATTACH_NUM="$(python -c "import json;print(len(json.load(open(r'$(cygpath -m "$W
   || { echo "❌ B 附件元数据应 = 1 实际 $ATTACH_NUM"; exit 1; }
 
 step "8. B fetch 下载并解密"
-FETCH_OUT="$(dart run bin/onlyspace.dart fetch \
+FETCH_OUT="$(dart run bin/einz.dart fetch \
   --store "$WORK/store-b.json" \
   --server "http://127.0.0.1:$PORT" \
   --attachment-id "$ATTACH_ID" \

@@ -4,9 +4,9 @@
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onlyspace/data/app_lock.dart';
-import 'package:onlyspace/data/local_database.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz/data/app_lock.dart';
+import 'package:einz/data/local_database.dart';
+import 'package:einz_shared/einz_shared.dart';
 
 void main() {
   setUpAll(() async {

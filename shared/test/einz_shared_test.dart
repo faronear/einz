@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -140,7 +140,7 @@ void main() {
         deviceIdB: b.deviceId,
         publicKeyB: b.publicKey,
       );
-      expect(payload['format'], 'onlyspace-config-v1');
+      expect(payload['format'], 'einz-config-v1');
 
       final sealedA = base64Decode((payload['sealed_space_keys'] as List)[0]['sealed'] as String);
       final openedA = await sealOpen(s, sealedA, a.publicKey, a.privateKey);

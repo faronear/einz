@@ -3,7 +3,7 @@ import 'dart:io';
 import 'local_database.dart';
 
 /// 默认服务器地址（产品部署域名固定）。
-const String kOnlySpaceServer = 'https://only.tic.cc';
+const String kEinzServer = 'https://only.tic.cc';
 
 /// 服务器地址设置（存本设备 app_state，key='server'）。
 ///
@@ -20,7 +20,7 @@ class ServerSettings {
   Future<String> load() async {
     final row = await (db.select(db.appState)..where((s) => s.key.equals(_kKey))).getSingleOrNull();
     final v = row?.value;
-    return (v == null || v.isEmpty) ? kOnlySpaceServer : v;
+    return (v == null || v.isEmpty) ? kEinzServer : v;
   }
 
   /// 保存服务器地址。

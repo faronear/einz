@@ -1,5 +1,5 @@
 /**
- * OnlySpace Server 冒烟测试（Phase 0，可验证）
+ * Einz Server 冒烟测试（Phase 0，可验证）
  *
  * 模拟两台设备（Node 侧用 libsodium-wrappers 扮演客户端）：
  *   A 认证 → A 加密发送 → B 认证 → B 增量同步 → B 解密
@@ -195,9 +195,9 @@ async function main(): Promise<void> {
     env: {
       ...process.env,
       PORT: String(port),
-      ONLYSPACE_CONFIG: configPath,
-      ONLYSPACE_DB: join(tempDir, "app.db"),
-      ONLYSPACE_FILES: join(tempDir, "files"),
+      EINZ_CONFIG: configPath,
+      EINZ_DB: join(tempDir, "app.db"),
+      EINZ_FILES: join(tempDir, "files"),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

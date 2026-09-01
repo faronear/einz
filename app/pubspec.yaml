@@ -1,4 +1,4 @@
-name: onlyspace
+name: einz
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -38,8 +38,8 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-  # OnlySpace 共享核心包（crypto / protocol / sync）——纯 Dart，与 CLI 共用
-  onlyspace_shared:
+  # Einz 共享核心包（crypto / protocol / sync）——纯 Dart，与 CLI 共用
+  einz_shared:
     path: ../shared
 
   drift: ^2.34.3

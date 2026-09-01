@@ -1,4 +1,4 @@
-# OnlySpace iOS Podfile：Flutter 标准配置 + 本地 libsodium pod（静态库）。
+# Einz iOS Podfile：Flutter 标准配置 + 本地 libsodium pod（静态库）。
 #
 # 说明：
 # - Flutter 3.47 默认启用 Swift Package Manager；存在 Podfile 时走 CocoaPods。
@@ -37,7 +37,7 @@ target 'Runner' do
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
-  # OnlySpace：本地 libsodium 静态库（见 Libraries/libsodium.podspec）
+  # Einz：本地 libsodium 静态库（见 Libraries/libsodium.podspec）
   pod 'libsodium', :path => './Libraries'
 end
 

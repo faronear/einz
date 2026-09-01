@@ -1,4 +1,4 @@
-# OnlySpace — iOS 构建与真机验证指引（docs/IOS.md）
+# Einz — iOS 构建与真机验证指引（docs/IOS.md）
 
 > **状态：** v1.0（代码层就绪：Info.plist 权限、libsodium 静态库集成、APNs 注册代码；构建/签名/真机验证需在 **macOS + Xcode** 上执行，本文档逐步指引）
 > **前置：** 有 Mac（macOS 14+）、已装 Flutter 3.47+（含 Xcode 15+）、项目可从远程仓库 clone。

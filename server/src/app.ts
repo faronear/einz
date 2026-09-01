@@ -235,5 +235,5 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 setInterval(cleanupExpired, 60 * 60 * 1000).unref();
 
 server.listen(PORT, () => {
-  console.log(`[onlyspace] server listening on :${PORT} space=${cfg.space_id}`);
+  console.log(`[einz] server listening on :${PORT} space=${cfg.space_id}`);
 });

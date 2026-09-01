@@ -8,7 +8,7 @@ import { isActiveDevice, type ServerConfig } from "./config.js";
 
 // 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
 const HERE = dirname(fileURLToPath(import.meta.url));
-const FILES_ROOT = process.env.ONLYSPACE_FILES ?? resolve(HERE, "../data/files");
+const FILES_ROOT = process.env.EINZ_FILES ?? resolve(HERE, "../data/files");
 
 /** 宽松 ID 校验（P1 路径遍历防御）：仅允许 hex + 连字符，杜绝 /、.、\ 等路径字符。
  *  CLI 生成的附件/消息 ID 为 38 字符非标准 UUID，故不强制 UUID 格式，只做字符集白名单。 */

@@ -1,7 +1,7 @@
-# OnlySpace — 部署手册（docs/DEPLOYMENT.md）
+# Einz — 部署手册（docs/DEPLOYMENT.md）
 
 > **状态：** v1.0（Phase 0–4 完成后整理，命令均经本机实测）
-> **适用场景：** 从零部署 OnlySpace 并开始试用——服务器（Docker Compose + Caddy 或裸 Node）+ 两台设备（当前 CLI 测试端 / Flutter App）。
+> **适用场景：** 从零部署 Einz 并开始试用——服务器（Docker Compose + Caddy 或裸 Node）+ 两台设备（当前 CLI 测试端 / Flutter App）。
 > **关联文档：** `docs/E2EE.md`（密码学）、`docs/PROTOCOL.md`（协议）、`docs/DATABASE.md`（存储）、`docs/SETUP.md`（一次性配置的设计稿；本文档给出命令级实作）。
 
 ---
@@ -27,7 +27,7 @@
 | ------------- | ----------------------------------------------------- | ---------------------------------------------- |
 | `server/`     | Node.js + TypeScript 哑转发器                         | `npm run build && node dist/app.js`，或 Docker |
 | `shared/`     | 纯 Dart 核心（crypto/protocol/sync），CLI 与 App 共用 | 库，不独立运行                                 |
-| `cli/`        | Dart CLI 测试端（当前最完整的客户端实作）             | `dart run bin/onlyspace.dart <命令>`           |
+| `cli/`        | Dart CLI 测试端（当前最完整的客户端实作）             | `dart run bin/einz.dart <命令>`           |
 | `app/`        | Flutter 手机客户端（V1 骨架 + 本地库）                | `flutter run`（真机验证待环境）                |
 | `deployment/` | Docker Compose + Caddy（生产单机部署）                | `docker compose up -d`                         |
 
@@ -60,26 +60,26 @@ dart pub get
 
 ### 2.2 生成两台设备身份 + 一次性配置（白名单 + Space Key 分发）
 
-CLI 命令（在 `cli/` 目录，下面 `$W` 是临时工作目录，如 `/tmp/onlyspace-trial`）：
+CLI 命令（在 `cli/` 目录，下面 `$W` 是临时工作目录，如 `/tmp/einz-trial`）：
 
 ```bash
-W=/tmp/onlyspace-trial && mkdir -p $W
+W=/tmp/einz-trial && mkdir -p $W
 
 # 1) 设备 A/B 各自生成 X25519 身份密钥（私钥只留在本机 store）
-dart run bin/onlyspace.dart init --store "$W/a.json" --device-id dev-a1
-dart run bin/onlyspace.dart init --store "$W/b.json" --device-id dev-b1
+dart run bin/einz.dart init --store "$W/a.json" --device-id dev-a1
+dart run bin/einz.dart init --store "$W/b.json" --device-id dev-b1
 
 # 2) 取 B 的公钥，A 侧生成 Space Key 并输出：
 #    - config.json（服务器白名单 + space_id）
 #    - sealed-b.txt（密封给 B 的 Space Key 副本）
-PUB_B="$(dart run bin/onlyspace.dart pubkey --store "$W/b.json")"
-dart run bin/onlyspace.dart config \
+PUB_B="$(dart run bin/einz.dart pubkey --store "$W/b.json")"
+dart run bin/einz.dart config \
   --store "$W/a.json" --peer-pubkey "$PUB_B" \
   --space-id "space-demo" \
   --out-config "$W/config.json" --out-sealed-peer "$W/sealed-b.txt"
 
 # 3) B 导入密封副本，解出 Space Key
-dart run bin/onlyspace.dart import \
+dart run bin/einz.dart import \
   --store "$W/b.json" --sealed-file "$W/sealed-b.txt" --space-id "space-demo"
 ```
 
@@ -101,25 +101,25 @@ cd server && node dist/app.js          # 默认 :3000；可用 PORT=3000 指定
 
 ```bash
 # 终端 B：双端认证 + 发消息 + 同步
-dart run bin/onlyspace.dart auth  --store "$W/a.json" --server http://127.0.0.1:3000
-dart run bin/onlyspace.dart send  --store "$W/a.json" --server http://127.0.0.1:3000 --message "你好，B！"
-dart run bin/onlyspace.dart sync  --store "$W/b.json" --server http://127.0.0.1:3000   # B 应解出明文
+dart run bin/einz.dart auth  --store "$W/a.json" --server http://127.0.0.1:3000
+dart run bin/einz.dart send  --store "$W/a.json" --server http://127.0.0.1:3000 --message "你好，B！"
+dart run bin/einz.dart sync  --store "$W/b.json" --server http://127.0.0.1:3000   # B 应解出明文
 ```
 
 **实时聊天（WS）：** 终端 1 跑 `listen`，终端 2 发消息，实时收到：
 
 ```bash
-dart run bin/onlyspace.dart listen --store "$W/b.json" --server http://127.0.0.1:3000
+dart run bin/einz.dart listen --store "$W/b.json" --server http://127.0.0.1:3000
 # 另开终端：
-dart run bin/onlyspace.dart send --store "$W/a.json" --server http://127.0.0.1:3000 --message "实时消息"
+dart run bin/einz.dart send --store "$W/a.json" --server http://127.0.0.1:3000 --message "实时消息"
 ```
 
 **发图片/语音（附件）：**
 
 ```bash
-dart run bin/onlyspace.dart attach --store "$W/a.json" --server http://127.0.0.1:3000 \
+dart run bin/einz.dart attach --store "$W/a.json" --server http://127.0.0.1:3000 \
   --file ./photo.jpg --type image --caption "看看这个"
-dart run bin/onlyspace.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 \
+dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 \
   --attachment-id <附件ID> --out ./photo-b.jpg     # 下载→sha256 校验→解密→写文件
 ```
 
@@ -174,11 +174,11 @@ python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
 
 # 4) 起服务
 cd deployment
-ONLYSPACE_DB_BACKUP_KEY=<上一步输出> docker compose up -d --build
+EINZ_DB_BACKUP_KEY=<上一步输出> docker compose up -d --build
 docker compose ps                       # 两个服务均 healthy/running
 ```
 
-> 说明：`docker-compose.yml` 已预置 `ONLYSPACE_DB_BACKUP_KEY=${ONLYSPACE_DB_BACKUP_KEY}` 注入
+> 说明：`docker-compose.yml` 已预置 `EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}` 注入
 > （由 compose 自动读取 `deployment/.env` 提供，.env 已在 .gitignore、不入库）。
 > 未设置时 `npm run backup` 会拒绝执行（防误备份明文）。
 
@@ -228,8 +228,8 @@ SETUP.md §3 的设计流程已由 CLI 实现（2.2 已演示）。要点重申�
 ```bash
 cd server   # 或 docker compose exec server npm run backup
 
-# 备份（需 ONLYSPACE_DB_BACKUP_KEY，base64 32B）
-export ONLYSPACE_DB_BACKUP_KEY="<部署时生成的密钥>"
+# 备份（需 EINZ_DB_BACKUP_KEY，base64 32B）
+export EINZ_DB_BACKUP_KEY="<部署时生成的密钥>"
 npm run backup -- --verify
 # 产物：data/backups/backup-<ts>.json（AES-256-GCM 加密的 app.db + files/ + config.json）
 
@@ -245,11 +245,11 @@ npm run restore -- data/backups/backup-<ts>.json
 
 ```bash
 # 设备导出（生成 12 词恢复码，离线保存）
-dart run bin/onlyspace.dart backup --store "$W/a.json" --out "$W/backup-a.json"
+dart run bin/einz.dart backup --store "$W/a.json" --out "$W/backup-a.json"
 # ⚠️ 恢复码打印后请立即离线妥善保存（丢失即无法恢复）
 
 # 换机恢复（新设备：恢复密钥 → 重新生成身份 → 登记白名单）
-dart run bin/onlyspace.dart restore --in "$W/backup-a.json" --recovery-code "<12词>" --store "$W/a-new.json"
+dart run bin/einz.dart restore --in "$W/backup-a.json" --recovery-code "<12词>" --store "$W/a-new.json"
 # 之后：init 新身份 → 更新 config.json 白名单 → 重启服务器（E2EE.md §10.2）
 ```
 
@@ -264,11 +264,11 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
   -H "Authorization: Bearer <A的session_token>"
 
 # 2) 剩余设备 A 收到 key.rotation 通知 → 立即轮换（key_version+1，旧密钥归档）
-dart run bin/onlyspace.dart rotate \
+dart run bin/einz.dart rotate \
   --store "$W/a.json" --peer-pubkey "$PUB_B" --out-sealed-peer "$W/sealed-v2.txt"
 
 # 3) 若 B 是误撤（仍可信）：B 导入新版本密钥（旧密钥自动归档）
-dart run bin/onlyspace.dart import \
+dart run bin/einz.dart import \
   --store "$W/b.json" --sealed-file "$W/sealed-v2.txt" --space-id "space-demo" --key-version 2
 
 # 4) 服务器 config.json 移除被撤销设备 → 重启服务器生效
@@ -295,7 +295,7 @@ dart run bin/onlyspace.dart import \
 | 服务端只见密文 | E2EE 全链路（消息/附件均为密文 + 元数据）                                            | `messages` 表只有 ciphertext（冒烟测试验证）        |
 | 路径遍历       | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧）                    | 失陷白名单设备也无法越出`files/`（V1 审查 P1 修复） |
 | WS 撤销实时性  | 撤销即关闭被撤销设备连接（close 4403）                                               | 无法继续收新消息广播（P2 修复）                     |
-| 备份加密       | Server 备份 AES-256-GCM（`ONLYSPACE_DB_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露                                  |
+| 备份加密       | Server 备份 AES-256-GCM（`EINZ_DB_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露                                  |
 | 供应链         | Gradle 镜像`distributionSha256Sum` 锁定官方校验和                                    | 构建工具链不可被镜像篡改（P3 修复）                 |
 | 认证           | challenge-response（一次性、5 分钟过期）；session_token 服务端签发                   | 防重放                                              |
 | 前向保密       | Space Key 简单派生（已接受的代价，E2EE.md §11.1）                                    | 轮换 + 安全存储缓解                                 |
@@ -316,9 +316,9 @@ dart run bin/onlyspace.dart import \
 | `sync` 拉不到对方消息                  | 锚点已推进 / 网络 / 白名单                                | 用`--after 0` 强制全量重拉排查                                |
 | `fetch` 报 sha256 不匹配               | 附件密文损坏或元数据过期                                  | 重新`sync` 拉元数据后重试                                     |
 | WS 连不上                              | 反代未开 WSS / token 未 URL 编码                          | 检查 Caddy；token 含`+`/`=` 需编码（客户端自动处理）          |
-| `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷）                            | 拷贝到纯 ASCII 路径构建（如`/tmp/onlyspace-build`），产物拷回 |
+| `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷）                            | 拷贝到纯 ASCII 路径构建（如`/tmp/einz-build`），产物拷回 |
 | 撤销后设备仍能认证                     | Server 版本过旧（未含 Phase 4 撤销感知）                  | 重新`npm run build` 部署                                      |
-| 备份命令拒绝执行                       | 未设置`ONLYSPACE_DB_BACKUP_KEY`                           | 设置 base64 32B 密钥（§3.2/§5.1）                             |
+| 备份命令拒绝执行                       | 未设置`EINZ_DB_BACKUP_KEY`                           | 设置 base64 32B 密钥（§3.2/§5.1）                             |
 
 ---
 
@@ -390,9 +390,9 @@ curl -s -o /dev/null -w "%{http_code}" https://only.tic.cc/key-escrow
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/onlyspace.dart escrow --action upload --store /tmp/a.json \
+dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
-dart run bin/onlyspace.dart escrow --action download --store /tmp/b.json \
+dart run bin/einz.dart escrow --action download --store /tmp/b.json \
   --server https://only.tic.cc --passphrase "你的接入口令"
 ```
 

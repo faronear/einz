@@ -7,7 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
@@ -928,7 +928,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text('OnlySpace · ${widget.spaceId}'),
+        title: Text('Einz · ${widget.spaceId}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.language),

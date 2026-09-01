@@ -10,7 +10,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'OnlySpace';
+  String get appTitle => 'Einz';
 
   @override
   String get cancel => 'Cancel';
@@ -37,7 +37,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skip => 'Skip';
 
   @override
-  String get setupPageTitle => 'OnlySpace · Device Setup';
+  String get setupPageTitle => 'Einz · Device Setup';
 
   @override
   String get setupPageHeading => 'One-time setup';
@@ -429,7 +429,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get burnOption7Days => '7 days';
 
   @override
-  String get lockPageTitle => 'OnlySpace Locked';
+  String get lockPageTitle => 'Einz Locked';
 
   @override
   String get lockPagePinPrompt => 'Enter PIN to unlock';

@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 
 /// WS 实时服务：封装 shared [WsClient]（连接 + 指数退避重连），
 /// 事件回调 + 连接状态通知（chat_page 据此切换轮询策略）。

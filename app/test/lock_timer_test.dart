@@ -1,7 +1,7 @@
 // LockTimer 单测：后台计时与超时判断（纯逻辑，无需原生库）。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onlyspace/data/lock_timer.dart';
+import 'package:einz/data/lock_timer.dart';
 
 void main() {
   test('未进入后台：不要求重新锁定', () {

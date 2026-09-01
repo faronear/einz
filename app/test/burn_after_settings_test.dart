@@ -2,8 +2,8 @@
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onlyspace/data/burn_after_settings.dart';
-import 'package:onlyspace/data/local_database.dart';
+import 'package:einz/data/burn_after_settings.dart';
+import 'package:einz/data/local_database.dart';
 
 void main() {
   late LocalDatabase db;

@@ -22,7 +22,7 @@ Future<({Uint8List cipher, Uint8List nonce, String sha256, int size})> encryptAt
   final s = await sodium();
   final attKey = await deriveSubKey(s, spaceKey, 'a', attachmentId);
   final nonce = s.randombytes.buf(s.crypto.aeadXChaCha20Poly1305IETF.nonceBytes);
-  final aad = Uint8List.fromList(utf8.encode('onlyspace-v1$spaceId$attachmentId$keyVersion'));
+  final aad = Uint8List.fromList(utf8.encode('einz-v1$spaceId$attachmentId$keyVersion'));
   final key = s.secureCopy(attKey);
   final cipher = s.crypto.aeadXChaCha20Poly1305IETF.encrypt(
     message: fileBytes,
@@ -47,7 +47,7 @@ Future<Uint8List> decryptAttachment({
 }) async {
   final s = await sodium();
   final attKey = await deriveSubKey(s, spaceKey, 'a', attachmentId);
-  final aad = Uint8List.fromList(utf8.encode('onlyspace-v1$spaceId$attachmentId$keyVersion'));
+  final aad = Uint8List.fromList(utf8.encode('einz-v1$spaceId$attachmentId$keyVersion'));
   final key = s.secureCopy(attKey);
   try {
     return s.crypto.aeadXChaCha20Poly1305IETF.decrypt(
@@ -56,8 +56,19 @@ Future<Uint8List> decryptAttachment({
       key: key,
       additionalData: aad,
     );
-  } on SodiumException catch (e) {
-    throw FormatException('附件解密失败: ${e.originalMessage}');
+  } on SodiumException {
+    // 兼容改名前的历史附件（旧 AAD onlyspace-v1 加密）
+    final legacyAad = Uint8List.fromList(utf8.encode('onlyspace-v1$spaceId$attachmentId$keyVersion'));
+    try {
+      return s.crypto.aeadXChaCha20Poly1305IETF.decrypt(
+        cipherText: cipherText,
+        nonce: nonce,
+        key: key,
+        additionalData: legacyAad,
+      );
+    } on SodiumException catch (e) {
+      throw FormatException('附件解密失败: ${e.originalMessage}');
+    }
   } finally {
     key.dispose();
   }

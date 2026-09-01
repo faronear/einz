@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'OnlySpace'**
+  /// **'Einz'**
   String get appTitle;
 
   /// No description provided for @cancel.
@@ -155,7 +155,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'OnlySpace · Device Setup'**
+  /// **'Einz · Device Setup'**
   String get setupPageTitle;
 
   /// No description provided for @setupPageHeading.
@@ -815,7 +815,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'OnlySpace Locked'**
+  /// **'Einz Locked'**
   String get lockPageTitle;
 
   /// No description provided for @lockPagePinPrompt.

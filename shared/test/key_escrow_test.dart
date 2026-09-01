@@ -2,7 +2,7 @@
 //
 // 需要 LIBSODIUM_PATH 指向 libsodium.dll（与 shared 单测一致）。
 
-import 'package:onlyspace_shared/onlyspace_shared.dart';
+import 'package:einz_shared/einz_shared.dart';
 import 'package:test/test.dart';
 
 /// 假 ApiClient（不真正联网）测 KeyEscrowService 的纯加密逻辑；
