@@ -418,7 +418,7 @@ Einz 的数据具有长期价值，备份是 V1 必须项。备份内容：
 
 ### 13.1 客户端分发
 
-- Android：签名 APK（`onlyspace.apk`）。签名 Key 必须妥善保存，后续所有更新必须使用同一签名 Key。
+- Android：签名 APK（`einz.apk`）。签名 Key 必须妥善保存，后续所有更新必须使用同一签名 Key。
 - iOS：Ad Hoc 分发（Apple Developer 账号注册设备 UDID → 构建 → Ad Hoc Provisioning → IPA）。不使用 Enterprise Certificate，不依赖第三方非官方签名服务。
 
 ### 13.2 服务端部署
