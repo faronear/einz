@@ -95,6 +95,35 @@ systemctl status gitea-runner   # active (running) 即成功
 - 标签保持默认（`ubuntu-latest` 等），工作流使用 `ubuntu-latest`
 - runner 基础镜像（`docker.gitea.com/runner-images`）支持 ARM 多架构，海外主机拉取很快；若个别镜像在 ARM 上异常，可把标签改为指向 `catthehacker/ubuntu:act-latest`（multi-arch）并重启
 
+**⑤ ARM 主机的 AAPT2 兼容（QEMU 模拟，必需）**
+
+Google 的 Android 构建工具 aapt2 在 Linux 上**只有 x86_64 版**（无 linux-arm64），ARM 主机构建 APK 会报 `AAPT2 ... Syntax error: ")" unexpected`。解决：宿主机注册 QEMU binfmt，让容器内的 x86_64 aapt2 自动经模拟器运行：
+
+```bash
+sudo apt update && sudo apt install -y qemu-user-static binfmt-support
+ls /proc/sys/fs/binfmt_misc/ | grep qemu    # 应看到 qemu-x86_64
+```
+
+创建 gitea-runner 配置（放在 `.runner` 所在目录，如 `/root/config.yaml`），把宿主 QEMU 解释器挂载进 job 容器：
+
+```yaml
+container:
+  options: "-v /usr/libexec/qemu-binfmt:/usr/libexec/qemu-binfmt"
+```
+
+更新 systemd 服务（`systemctl edit --force --full gitea-runner`），`[Service]` 段加：
+
+```ini
+WorkingDirectory=/root
+ExecStart=/usr/local/bin/gitea-runner daemon --config /root/config.yaml
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl restart gitea-runner
+```
+
+> 效果：仅 aapt2（x86_64）经 QEMU 模拟，JDK/Gradle/Flutter 等仍原生 arm64 运行，性能损失集中在资源处理阶段（每次构建多几分钟）。
+
 ### 1.4 验证
 
 推送任意改动到 main 分支，在 Gitea 仓库页 **Actions** 标签查看构建日志；构建成功后可在构建详情的 **Artifacts** 下载 `einz-debug-apk`。
