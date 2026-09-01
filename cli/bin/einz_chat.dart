@@ -1,6 +1,6 @@
 // Einz 交互式聊天 CLI —— 方案 B 雏形（轻量 REPL：发送 + 同步 + 彩色输出）。
 //
-// 与 onlyspace.dart（子命令式测试端）不同，本文件提供持续对话体验：
+// 与 einz.dart（子命令式测试端）不同，本文件提供持续对话体验：
 //   - 启动即同步历史，直接输入文本即发送
 //   - /auth /sync /history /help /exit 命令
 //   - ANSI 彩色输出（我=绿色、对方=黄色、系统=灰、错误=红）
@@ -268,7 +268,7 @@ Future<void> _printEnvelope(DeviceStore store, MessageEnvelope env) async {
   stdout.writeln(_paint('[$sender $seqTag v${env.keyVersion}] $plain', color));
 }
 
-/// 简易 UUIDv7（与 onlyspace.dart 一致的近似实现）。
+/// 简易 UUIDv7（与 einz.dart 一致的近似实现）。
 Future<String> _uuidv7() async {
   final s = await sodium();
   final rand = s.randombytes.buf(10);
