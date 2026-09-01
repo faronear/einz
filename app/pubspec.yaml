@@ -76,17 +76,15 @@ flutter:
   # l10n：启用 gen-l10n 从 lib/l10n/*.arb 生成 AppLocalizations
   generate: true
 
-# sqlite3 原生库：改用系统 SQLite（macOS/Linux 自带），避免从 GitHub 下载
-# 预编译库（国内网络 GitHub 不可达会卡构建）。详情见 sqlite3 包 doc/hook.md。
-hooks:
-  user_defines:
-    sqlite3:
-      source: system
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+# sqlite3 原生库：用 sqlite3 包默认的捆绑预编译库（构建时从 GitHub releases
+# 下载并打入 APK）。曾配置 source: system 依赖系统 SQLite，但 Android 系统
+# 不提供 libsqlite3.so，启动即 dlopen 失败崩溃（2026-09-01 模拟器黑屏定位）。
+# 详情见 sqlite3 包 doc/hook.md。
 
   # To add assets to your application, add an assets section, like this:
   # assets:

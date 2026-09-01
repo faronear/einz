@@ -717,3 +717,18 @@
 **改动（2 文件）：** `app/android/app/build.gradle.kts`（applicationId → cc.tic.einz）、`app/android/gradle.properties`（kotlin.incremental=false + 注释）。
 
 **待办（非本次范围）：** release keystore（`app/android/key.properties`）未配，上架/长期升级前必须换正式签名并重建（换签名后用户需卸载重装，越早换越好）。
+
+### 模拟器验证 + 修复启动崩溃（libsqlite3.so 缺失，2026-09-01 续）
+
+**模拟器环境（Windows 本机）：** Hyper-V/WHPX 虚拟化可用（vmcompute 已启用）。补装 `emulator 37.1.11` + `system-images;android-35;google_apis;x86_64`（sdkmanager，Google 官方源经代理可达），AVD `einz_avd`（pixel_6，auto-select x86_64）。**踩坑：** bash 工具会话内的 `nohup … &` / `Start-Process` 子进程会在工具调用返回时被回收 → 改用计划任务 `EinzEmuStart` 跑 `D:\devtools\start_emulator.bat`，模拟器才真正脱离会话常驻。
+
+**发现真 bug（APK 在 Android 上无法启动）：** 首版 APK 装模拟器后黑屏，logcat 显示 `dlopen failed: library "libsqlite3.so" not found`（drift 初始化）。根因：`app/pubspec.yaml` 配了 `hooks: user_defines: sqlite3: source: system`（原意是桌面/测试环境走系统 SQLite 免下载），但 **Android 系统不提供 libsqlite3.so**，应用启动即崩。该配置对 Android 是错误方向。
+
+**修复（pubspec.yaml 一处）：**
+- 删除 `source: system` → sqlite3 包按默认捆绑预编译 `.so` 打入 APK（构建时从 GitHub releases 下载，本机代理可达，83s 重建成功；APK 70.8→75.7MB，三 ABI 均有 libsqlite3.so）
+- 顺带修复 `uses-material-design: true` 被错误缩进进 `hooks:` 块下的 YAML 结构错误（构建日志 MaterialIcons 字体缺失警告即此因），移回 `flutter:` 块
+- `sqlite3_flutter_libs 0.6.0+eol` 是 EOL 空壳包（无原生库），由 drift_flutter 强制引入，保留不动
+
+**验证：** 新 APK 重装模拟器，无崩溃日志，topResumedActivity 稳定在 MainActivity；截图确认渲染出浅色设置页界面（screencap 像素分析非全黑，1080x2400）。截图存 `aimemo/shots/emu_setup_20260901.png`。
+
+**结论：** 首版 debug 签名 APK 不可用（此 bug 真机同样会崩）；修复版 `app-release.apk`（75.7MB, cc.tic.einz, v1.0.0+1）为当前可用版本，模拟器运行正常。
