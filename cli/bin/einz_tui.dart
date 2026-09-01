@@ -355,9 +355,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     store.save(storePath);
   }
 
-  // 已登记但口令托管包未上传（创建者引导中断）：重启再进引导设置口令
-  if (store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
-    session.messages.add(_systemMessage(session, '检测到尚未设置托管口令，现在设置（两次输入须一致；可 Ctrl+C 稍后重启再进）'));
+  // 已登记但口令托管包未上传（创建者引导中断）：重启再进引导设置口令。
+  // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
+  if (_state!.running && store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
+    session.messages.add(_systemMessage(session, '检测到尚未设置托管口令，现在设置: '));
     _scheduleRender();
     await _setupEscrowPassphrase(store, storePath, session);
   }
