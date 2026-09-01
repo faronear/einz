@@ -1,4 +1,4 @@
-# OnlySpace Caddy 配置：TLS 自动签发 + 反向代理 + WSS 升级
+# Einz Caddy 配置：TLS 自动签发 + 反向代理 + WSS 升级
 # 把 private.example.com 替换为真实域名；Caddy 自动申请/续期证书。
 
 private.example.com {

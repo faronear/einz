@@ -1,6 +1,6 @@
 # 服务器更新流程（git push/pull 版）
 
-> **用途：** 在任意电脑上把新代码更新到 only.tic.cc 生产服务器（VPS `/opt/einz`）。
+> **用途：** 在任意电脑上把新代码更新到 only.tic.cc 生产服务器。
 > **适用：** 口令托管（KEY_ESCROW.md）、以及以后任何 Server 代码变更。
 > **原则：** 变更均向后兼容（新增表/端点，存量接口与数据不动；新表由 `CREATE TABLE IF NOT EXISTS` 启动自动创建）；server 代码构建进 Docker 镜像，**必须 `--build` 重建**。
 > 关联文档：docs/DEPLOYMENT.md §9（本章节的仓库内原版）。
@@ -33,7 +33,8 @@ cd only
 
 ```bash
 # VPS 上执行
-cd /opt/einz
+export EINZ_ROOT=/opt/einz
+cd $EINZ_ROOT
 git init
 git remote add origin https://git.tic.cc/fon/only
 git fetch origin
@@ -65,7 +66,7 @@ git push origin main
 ### 2.2 VPS：拉取 → 重建 → 验证
 
 ```bash
-cd /opt/einz
+cd $EINZ_ROOT
 git pull --ff-only
 cd deployment
 docker compose up -d --build server      # server 代码进镜像，必须 --build
@@ -99,7 +100,7 @@ dart run bin/einz.dart escrow --action download --store /tmp/b.json \
 ## 4. 回滚
 
 ```bash
-cd /opt/einz
+cd $EINZ_ROOT
 git log --oneline -5                      # 找上一版本 commit
 git checkout <上一commit> -- server/ deployment/ shared/
 cd deployment && docker compose up -d --build server

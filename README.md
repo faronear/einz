@@ -1,6 +1,6 @@
-# OnlySpace
+# Einz
 
-两个人的私密聊天与共享私人空间。E2EE、Local-First、固定两人一空间。
+两个人的私密聊天与共享私人空间。端到端加密 (E2EE)、本地优先 (Local-First)、固定两人一空间。
 
 ## 仓库结构
 
@@ -16,16 +16,16 @@ aimemo/      记忆与工作空间（productLens / projectPlan / worklog / userP
 
 ## 设计文档
 
-| 文档 | 内容 |
-| --- | --- |
-| `docs/E2EE.md` | 密钥层级、派生、配置分发、认证、轮换、恢复 |
-| `docs/PROTOCOL.md` | REST + WebSocket 协议唯一权威 |
-| `docs/DATABASE.md` | 双端 SQLite schema 与迁移 |
-| `docs/DEPLOYMENT.md` | **部署手册（从零部署 + 快速试用 + 备份恢复/撤销轮换运维 + 故障排查）** |
-| `docs/IOS.md` | **iOS 构建与真机验证指引（Mac 环境）** |
-| `docs/updateServer.md` | **服务器更新流程（git push/pull 版，另一台电脑照做即可）** |
-| `docs/KEY_ESCROW.md` | **口令托管密钥方案（`[待评审]`：换设备/朋友接入凭口令，Server 仍只见密文）** |
-| `docs/SETUP.md` | 一次性配置设计稿（命令级实作见 DEPLOYMENT.md §2/§4） |
+| 文档                   | 内容                                                                         |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `docs/E2EE.md`         | 密钥层级、派生、配置分发、认证、轮换、恢复                                   |
+| `docs/PROTOCOL.md`     | REST + WebSocket 协议唯一权威                                                |
+| `docs/DATABASE.md`     | 双端 SQLite schema 与迁移                                                    |
+| `docs/DEPLOYMENT.md`   | **部署手册（从零部署 + 快速试用 + 备份恢复/撤销轮换运维 + 故障排查）**       |
+| `docs/IOS.md`          | **iOS 构建与真机验证指引（Mac 环境）**                                       |
+| `docs/updateServer.md` | **服务器更新流程（git push/pull 版，另一台电脑照做即可）**                   |
+| `docs/KEY_ESCROW.md`   | **口令托管密钥方案（`[待评审]`：换设备/朋友接入凭口令，Server 仍只见密文）** |
+| `docs/SETUP.md`        | 一次性配置设计稿（命令级实作见 DEPLOYMENT.md §2/§4）                         |
 
 ## 快速开始（Server）
 
