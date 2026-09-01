@@ -26,12 +26,15 @@ ENABLED = true
 
 ### 1.2 生成注册令牌
 
-Gitea 管理员登录后：**站点管理（Admin Panel）→ Actions → 创建注册令牌**，得到一个 `reg_<...>` 格式的令牌（仅显示一次，妥善保存）。或命令行：
+**方式一（Web UI，推荐）：** Gitea 管理员登录后，访问 `https://git.tic.cc/-/admin/actions/runners`（站点管理 → Actions → Runners），点击**生成注册令牌**，得到一长串随机字符串（仅显示一次，妥善保存）。同一个令牌可注册多个 runner，重置后才失效。
+
+**方式二（命令行，SSH 到 Gitea 服务器）：**
 
 ```bash
-sudo -u git gitea admin user generate-access-token \
-  --username <管理员用户名> --token-name act_runner --scopes all
+sudo -u git gitea --config /etc/gitea/app.ini actions generate-runner-token
 ```
+
+> ⚠️ 注意：注册令牌是 Actions runner 专用令牌（一长串随机字符，无 `reg_` 前缀要求），**不是** API 个人访问令牌——`generate-access-token` 生成的令牌不能用于注册 runner。
 
 ### 1.3 在 iMac 2019 上安装 act_runner（OrbStack 方案）
 
