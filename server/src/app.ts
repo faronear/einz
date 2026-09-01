@@ -5,7 +5,7 @@ import { getDb, openDb } from "./db.js";
 import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment } from "./attachments.js";
-import { createInvite, enrollDevice, listDevices, revokeDevice } from "./devices.js";
+import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
@@ -145,6 +145,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // 动态登记（免认证，邀请码即准入令牌）：新设备凭邀请码登记，立即生效无需重启
     const body = await readJson(req);
     sendJson(res, 200, enrollDevice(cfg, body));
+    return;
+  }
+  if (method === "POST" && path === "/devices/name") {
+    // 更新本设备名称（已登记设备 TUI 改名后同步后台，显示层用）
+    const body = await readJson(req);
+    sendJson(res, 200, updateDeviceName(cfg, bearer(req), body));
     return;
   }
   if (method === "POST" && path === "/invites") {

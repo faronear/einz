@@ -229,3 +229,24 @@ export function createInvite(
   console.log(`[einz] 生成邀请码: person=${personId}${displayName ? `（${displayName}）` : ""} hours=${hours}`);
   return { invite_code: code, person_id: personId, expires_at: expiresAt };
 }
+
+/**
+ * POST /devices/name：更新本设备名称（已登记设备 TUI 里改名后同步到后台，显示层用）。
+ * - 认证：session token（bearer）；仅 active 设备可改自己的名称。
+ */
+export function updateDeviceName(
+  cfg: ServerConfig,
+  token: string,
+  body: unknown
+): { ok: true } {
+  const { device_id } = resolveSession(token);
+  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+
+  const b = (body ?? {}) as { device_name?: string };
+  const deviceName = (b.device_name ?? "").trim();
+  if (!deviceName) throw new ApiError("INVALID_REQUEST", "device_name 不能为空", 400);
+
+  getDb().prepare(`UPDATE devices SET device_name = ? WHERE device_id = ?`).run(deviceName, device_id);
+  console.log(`[einz] 更新设备名称: device=${device_id}（${deviceName}）`);
+  return { ok: true };
+}

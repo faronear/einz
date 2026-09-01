@@ -373,6 +373,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
+  // 已登记设备启动时把本地设备名称同步到后台（TUI 里改名后服务端 dev1 的
+  // device_name 同步更新；首设备 enroll 已带上 deviceName，此处幂等覆盖）
+  if (store.deviceId != null &&
+      store.spaceId != null &&
+      (store.deviceName?.isNotEmpty ?? false) &&
+      store.sessionToken != null &&
+      server.isNotEmpty) {
+    try {
+      await ApiClient(server).updateDeviceName(store.deviceName!, store.sessionToken!);
+    } catch (e) {
+      _state!.status = '设备名称同步失败（稍后重试）: $e';
+    }
+  }
+
   // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
   // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
   // 未接入空间（无 Space Key）时跳过——历史无法解密，且 _decrypt 会兜底占位。

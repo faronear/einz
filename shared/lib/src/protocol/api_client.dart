@@ -124,6 +124,11 @@ class ApiClient {
     return SpaceResult.fromJson(res);
   }
 
+  /// 更新本设备名称（TUI 改名后同步后台，显示层用）。
+  Future<void> updateDeviceName(String deviceName, String token) async {
+    await _post('devices/name', {'device_name': deviceName}, token: token);
+  }
+
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
   Future<void> uploadKeyEscrow(BackupFile package, String token) async {
     await _post(Api.keyEscrow, {'package': package.toJson()}, token: token);
