@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "OnlySpace 服务器（静态白名单哑转发器）",
+  "description": "Einz 服务端（静态白名单哑转发器）",
   "scripts": {
     "build": "tsc",
     "start": "node dist/app.js",

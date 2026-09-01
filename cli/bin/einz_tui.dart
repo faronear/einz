@@ -98,10 +98,10 @@ String _defaultServer() {
   return 'https://only.tic.cc';
 }
 
-/// 默认 store 目录：$HOME/.onlyspace（Windows 用 USERPROFILE）。
+/// 默认 store 目录：$HOME/.einz（Windows 用 USERPROFILE）。
 String _defaultStoreDir() {
   final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '.';
-  return '$home/.onlyspace';
+  return '$home/.einz';
 }
 
 /// 自动发现设备并返回选定的 store 路径；无可用设备返回 ''（引导 init）。
@@ -203,7 +203,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
     store = await DeviceStore.create();
-    // 自动模式（无 --store）→ 存默认目录 ~/.onlyspace/[临时].json（登记后重命名为 personA_dev1.json）
+    // 自动模式（无 --store）→ 存默认目录 ~/.einz/[临时].json（登记后重命名为 personA_dev1.json）
     if (storePath.isEmpty) {
       final dir = _defaultStoreDir();
       Directory(dir).createSync(recursive: true);
@@ -241,7 +241,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 
   // 已登记设备启动时若仍是临时名 pending.json（此前登记后未重命名——如旧版本
   // 或加载已登记 store 跳过登记的场景）——自动重命名为标准名 personId_deviceId.json，
-  // 避免 ~/.onlyspace/ 残留临时文件（与标准名副本重复）
+  // 避免 ~/.einz/ 残留临时文件（与标准名副本重复）
   if (autoStore &&
       storePath.endsWith('pending.json') &&
       store.deviceId != null &&
@@ -472,7 +472,7 @@ Future<void> main(List<String> args) async {
     return;
   }
 
-  // 无显式 --store：默认目录（~/.onlyspace）自动发现已有设备；
+  // 无显式 --store：默认目录（~/.einz）自动发现已有设备；
   // 无设备 → 引导 init（存 [device-id].json）；损坏文件自动备份 .bak 后重新初始化。
   if (!explicitStore) {
     storePath = _resolveAutoStore();
@@ -489,7 +489,7 @@ Future<void> main(List<String> args) async {
   if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
   final store = onboard.$1;
   server = onboard.$2;
-  storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.onlyspace/[device-id].json）
+  storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
 
   final session = ChatSession(store, storePath, server);
   await session.loadHistory();

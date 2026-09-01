@@ -1,4 +1,4 @@
-# OnlySpace 单机部署（productLens §13.2）：Caddy（TLS/反代）+ Node 服务
+# Einz 服务端单机部署（productLens §13.2）：Caddy（TLS/反代）+ Node 服务
 # 使用前：
 #   1. 按 docs/SETUP.md 生成 config.json（白名单），放到 ./config/config.json
 #   2. 修改 Caddyfile 中的域名

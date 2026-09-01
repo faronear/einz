@@ -1,6 +1,6 @@
 # 服务器更新流程（git push/pull 版）
 
-> **用途：** 在任意电脑上把新代码更新到 only.tic.cc 生产服务器（VPS `/opt/onlyspace`）。
+> **用途：** 在任意电脑上把新代码更新到 only.tic.cc 生产服务器（VPS `/opt/einz`）。
 > **适用：** 口令托管（KEY_ESCROW.md）、以及以后任何 Server 代码变更。
 > **原则：** 变更均向后兼容（新增表/端点，存量接口与数据不动；新表由 `CREATE TABLE IF NOT EXISTS` 启动自动创建）；server 代码构建进 Docker 镜像，**必须 `--build` 重建**。
 > 关联文档：docs/DEPLOYMENT.md §9（本章节的仓库内原版）。
@@ -33,7 +33,7 @@ cd only
 
 ```bash
 # VPS 上执行
-cd /opt/onlyspace
+cd /opt/einz
 git init
 git remote add origin https://git.tic.cc/fon/only
 git fetch origin
@@ -65,7 +65,7 @@ git push origin main
 ### 2.2 VPS：拉取 → 重建 → 验证
 
 ```bash
-cd /opt/onlyspace
+cd /opt/einz
 git pull --ff-only
 cd deployment
 docker compose up -d --build server      # server 代码进镜像，必须 --build
@@ -99,7 +99,7 @@ dart run bin/einz.dart escrow --action download --store /tmp/b.json \
 ## 4. 回滚
 
 ```bash
-cd /opt/onlyspace
+cd /opt/einz
 git log --oneline -5                      # 找上一版本 commit
 git checkout <上一commit> -- server/ deployment/ shared/
 cd deployment && docker compose up -d --build server
@@ -109,13 +109,13 @@ cd deployment && docker compose up -d --build server
 
 ## 5. 注意事项
 
-| 项 | 说明 |
-| --- | --- |
-| 存量数据 | 不受影响（messages/devices/会话等不动，新表初始为空） |
-| 白名单 | 无需改动（既有设备认证不受影响） |
-| Caddy / HTTPS | 无需改动（Caddyfile 已 assume-unchanged） |
-| 备份密钥 | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose |
-| 旧部署升级 | 若 .env 里还是旧变量名 `EINZ_BACKUP_KEY`（2026-08 前部署）：手动改名为 `EINZ_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |
-| App 侧 | 需重新安装 APK 才能启用新 UI（CLI 不受影响） |
-| 首次在 VPS 用 git | 先 `git config --global user.email/user.name`（避免提交时报错） |
-| pull 冲突 | 若 `git pull` 报冲突：多半是 Caddyfile 被误改——先 `git checkout -- deployment/Caddyfile` 还原，再 `git update-index --assume-unchanged deployment/Caddyfile` |
+| 项                | 说明                                                                                                                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 存量数据          | 不受影响（messages/devices/会话等不动，新表初始为空）                                                                                                                                          |
+| 白名单            | 无需改动（既有设备认证不受影响）                                                                                                                                                               |
+| Caddy / HTTPS     | 无需改动（Caddyfile 已 assume-unchanged）                                                                                                                                                      |
+| 备份密钥          | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose             |
+| 旧部署升级        | 若 .env 里还是旧变量名 `EINZ_BACKUP_KEY`（2026-08 前部署）：手动改名为 `EINZ_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |
+| App 侧            | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                                                                   |
+| 首次在 VPS 用 git | 先 `git config --global user.email/user.name`（避免提交时报错）                                                                                                                                |
+| pull 冲突         | 若 `git pull` 报冲突：多半是 Caddyfile 被误改——先 `git checkout -- deployment/Caddyfile` 还原，再 `git update-index --assume-unchanged deployment/Caddyfile`                                   |

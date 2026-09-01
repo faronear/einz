@@ -42,8 +42,8 @@ docker compose logs -f server   # 查看日志（启动/登记/邀请码等事�
 cd /Users/Shared/productX/only && git pull
 
 # ③ 可选：清掉旧设备身份（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
-rm -f ~/.onlyspace/*.json
-mkdir -p ~/.onlyspace
+rm -f ~/.einz/*.json
+mkdir -p ~/.einz
 ```
 
 > 💡 server 处于"未初始化"状态（0 台设备）时，业务接口（auth/发消息）会拒绝——**首个设备自举后即自动激活**，全程无需重启、无需配置文件。
@@ -56,7 +56,7 @@ mkdir -p ~/.onlyspace
 
 ```powershell
 cd 你的only目录\cli
-dart run bin/einz.dart init --store "$env:USERPROFILE\.onlyspace\b.json" --device-id dev-b1
+dart run bin/einz.dart init --store "$env:USERPROFILE\.einz\b.json" --device-id dev-b1
 # 用 TUI 引导时无需手动 init（见阶段 5）
 ```
 
@@ -83,15 +83,15 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现/创建设备
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/einz.dart init --store ~/.onlyspace/a.json --device-id dev-a1
+dart run bin/einz.dart init --store ~/.einz/a.json --device-id dev-a1
 # ① 首设备自举登记（免邀请码，成为创建者；--person 是你的名称，如 lukas）
-dart run bin/einz.dart enroll --store ~/.onlyspace/a.json \
+dart run bin/einz.dart enroll --store ~/.einz/a.json \
   --server https://only.tic.cc --person lukas [--device-name MacBook]
 # ✅ 登记成功: device_id=dev1 person_id=personA space_id=<服务端的UUID>
 # ② 上传口令托管包（store 无 Space Key 时自动生成）
-dart run bin/einz.dart auth --store ~/.onlyspace/a.json --server https://only.tic.cc
+dart run bin/einz.dart auth --store ~/.einz/a.json --server https://only.tic.cc
 dart run bin/einz.dart escrow --action upload \
-  --store ~/.onlyspace/a.json --server https://only.tic.cc --passphrase 'faronear'
+  --store ~/.einz/a.json --server https://only.tic.cc --passphrase 'faronear'
 # ✅ 口令托管包已上传
 ```
 
@@ -101,7 +101,7 @@ dart run bin/einz.dart escrow --action upload \
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/einz.dart invite --store ~/.onlyspace/a.json \
+dart run bin/einz.dart invite --store ~/.einz/a.json \
   --server https://only.tic.cc --person personB --name steffi [--hours 24]
 # ✅ 邀请码已生成（24h 有效，一次性）: XXXX-XXXXX-XXXXX-XXXXX
 # 把邀请码离线发给对方（绑定 personB=steffi；给自己加设备用 --person personA）
@@ -115,7 +115,7 @@ dart run bin/einz.dart invite --store ~/.onlyspace/a.json \
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/einz_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 下的设备
+dart run bin/einz_tui.dart   # 不传 --store：自动发现 ~/.einz/ 下的设备
 # 自动使用已有设备（a.json 或 [设备名].json），多台会列出选择
 # 启动探测 https://only.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
 # 状态栏 WS:● 在线；输入消息回车发送
@@ -127,7 +127,7 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现 ~/.onlyspace/ 下�
 
 ```powershell
 cd 你的only目录\cli
-dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.onlyspace\ 下的设备
+dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz\ 下的设备
 # 引导流程（空间已有设备 → 走邀请码登记）：
 # 引导流程（空间已有设备 → 走邀请码登记；设备身份自动生成）：
 #   你的名称（如 steffi）→ 设备名称（显示用，如 Windows）
