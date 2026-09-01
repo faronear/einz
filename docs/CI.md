@@ -4,7 +4,7 @@
 
 | 产物 | CI 平台 | 构建机 | 签名 | 前置条件 |
 | --- | --- | --- | --- | --- |
-| Android debug APK | Gitea Actions（自建 git.tic.cc） | MacBook Air（Apple Silicon + OrbStack） | debug 自动签名，无需 keystore | Gitea 启用 Actions + 注册 gitea-runner |
+| Android debug APK | Gitea Actions（自建 git.tic.cc） | Oracle Cloud 免费 ARM 服务器（2 OCPU / 12 GB，Linux + Docker） | debug 自动签名，无需 keystore | Gitea 启用 Actions + 注册 gitea-runner |
 | iOS IPA | Codemagic（云） | Codemagic 云 macOS | Apple 开发者签名 | Apple Developer 账号 + Codemagic 配置 |
 
 ---
@@ -36,27 +36,28 @@ sudo -u git gitea --config /etc/gitea/app.ini actions generate-runner-token
 
 > ⚠️ 注意：注册令牌是 Actions runner 专用令牌（一长串随机字符，无 `reg_` 前缀要求），**不是** API 个人访问令牌——`generate-access-token` 生成的令牌不能用于注册 runner。
 
-### 1.3 在 MacBook Air（Apple Silicon）上安装 gitea-runner（OrbStack 方案）
+### 1.3 在 Oracle Cloud 免费 ARM 服务器上安装 gitea-runner
 
-构建机：MacBook Air（Apple Silicon，M 系列）——本机已装 OrbStack 与 gitea-runner（v3.3.2，2026-09-01 安装于 `~/.local/bin`），以下步骤为通用记录。
+构建机：Oracle Cloud Always Free 的 ARM 实例（Ampere A1，2 OCPU / 12 GB RAM）——内存充足，2 核跑单任务构建足够；海外网络直连镜像源，无国内拉取问题。首次构建约 10–20 分钟（依赖下载 + 编译），增量 3–5 分钟。
 
-**① 安装 OrbStack**（macOS 轻量 Docker 运行时，性能优于 Docker Desktop）：
+**① 安装 Docker**（Oracle Cloud 默认镜像不含 Docker）：
 
 ```bash
-brew install orbstack      # 或官网 https://orbstack.dev 下载安装
-docker version             # 确认 Server 正常
+curl -fsSL https://get.docker.com | sh
+sudo systemctl enable --now docker
+docker version
 ```
 
-**② 下载并安装 gitea-runner**（注意：runner 项目已由 act_runner 更名为 **gitea-runner**；Apple Silicon 用 `darwin-arm64`，Intel 用 `darwin-amd64`；版本见 https://gitea.com/gitea/act_runner/releases）：
+**② 下载并安装 gitea-runner**（注意：runner 项目已由 act_runner 更名为 **gitea-runner**；Oracle ARM CPU 用 `linux-arm64`，x86 服务器用 `linux-amd64`；版本见 https://gitea.com/gitea/act_runner/releases）：
 
 ```bash
-curl -sSL -o ~/.local/bin/gitea-runner \
-  https://gitea.com/gitea/act_runner/releases/download/v3.3.2/gitea-runner-3.3.2-darwin-arm64
-chmod +x ~/.local/bin/gitea-runner
+sudo curl -sSL -o /usr/local/bin/gitea-runner \
+  https://gitea.com/gitea/act_runner/releases/download/v3.3.2/gitea-runner-3.3.2-linux-arm64
+sudo chmod +x /usr/local/bin/gitea-runner
 gitea-runner --version
 ```
 
-（Intel Mac 把 URL 中 `darwin-arm64` 换成 `darwin-amd64`；`~/.local/bin` 已在 .bashrc 的 PATH 中，无需 sudo）
+（若服务器是 x86_64，把 URL 中 `linux-arm64` 换成 `linux-amd64`）
 
 **③ 注册到 git.tic.cc**：
 
@@ -65,19 +66,34 @@ gitea-runner register --no-interactive --instance https://git.tic.cc --token <�
 # 或交互式：gitea-runner register，按提示输入地址与令牌，标签保持默认（含 ubuntu-latest）
 ```
 
-**④ 启动 daemon**（OrbStack 提供 Docker socket，gitea-runner 直接复用）：
+**④ 用 systemd 常驻**（开机自启、崩溃自动拉起）。新建 `/etc/systemd/system/gitea-runner.service`：
 
-```bash
-gitea-runner daemon
+```ini
+[Unit]
+Description=Gitea Runner
+After=docker.service
+Requires=docker.service
+
+[Service]
+ExecStart=/usr/local/bin/gitea-runner daemon
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-**⑤ 开机自启**（可选）：用 launchd 托管，新建 `~/Library/LaunchAgents/com.gitea.act-runner.plist`（`ProgramArguments` 指向 gitea-runner daemon 的完整路径，如 `~/.local/bin/gitea-runner daemon`，`RunAtLoad` 为 true），然后 `launchctl load ~/Library/LaunchAgents/com.gitea.act-runner.plist`。
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now gitea-runner
+systemctl status gitea-runner   # active (running) 即成功
+```
 
 注册时注意：
 - Gitea 地址填 `https://git.tic.cc`
 - 标签保持默认（`ubuntu-latest` 等），工作流使用 `ubuntu-latest`
-- Gitea Actions 没有远程唤醒机制：MacBook Air 休眠时不会接活，建议构建期间保持唤醒或关闭自动休眠
-- 若改用 Linux 服务器作 runner：下载 `linux-amd64` 二进制，进程托管用 systemd（官方提供 service 模板）
+- runner 基础镜像（`docker.gitea.com/runner-images`）支持 ARM 多架构，海外主机拉取很快；若个别镜像在 ARM 上异常，可把标签改为指向 `catthehacker/ubuntu:act-latest`（multi-arch）并重启
 
 ### 1.4 验证
 
@@ -85,7 +101,7 @@ gitea-runner daemon
 
 ### 1.5 Runner 网络要求与镜像
 
-构建过程需要访问：GitHub（下载 Flutter SDK、拉取公共 action、sqlite3 预编译库）、Gradle Maven 仓库、pub.dev。若 runner 机器（MacBook Air）出口受限，在 gitea-runner 环境（或 Gitea 仓库 Secrets）配置镜像变量：
+构建过程需要访问：GitHub（下载 Flutter SDK、拉取公共 action、sqlite3 预编译库）、Gradle Maven 仓库、pub.dev。**海外 runner（Oracle 服务器）直连即可，无需任何镜像配置**；仅当 runner 位于国内且出口受限时，才在 gitea-runner 环境（或 Gitea 仓库 Secrets）配置镜像变量：
 
 | 变量 | 国内镜像值 |
 | --- | --- |
