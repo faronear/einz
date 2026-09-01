@@ -5,7 +5,7 @@ import { getDb, openDb } from "./db.js";
 import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment } from "./attachments.js";
-import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName } from "./devices.js";
+import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
@@ -151,6 +151,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // 更新本设备名称（已登记设备 TUI 改名后同步后台，显示层用）
     const body = await readJson(req);
     sendJson(res, 200, updateDeviceName(cfg, bearer(req), body));
+    return;
+  }
+  if (method === "POST" && path === "/devices/person-name") {
+    // 更新本设备 person 显示名（/rename 命令，显示层用）
+    const body = await readJson(req);
+    sendJson(res, 200, updatePersonName(cfg, bearer(req), body));
     return;
   }
   if (method === "POST" && path === "/invites") {

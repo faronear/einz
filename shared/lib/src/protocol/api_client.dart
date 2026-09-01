@@ -129,6 +129,11 @@ class ApiClient {
     await _post('/devices/name', {'device_name': deviceName}, token: token);
   }
 
+  /// 更新本设备 person 显示名（/rename 命令，显示层用）。
+  Future<void> updatePersonName(String personName, String token) async {
+    await _post('/devices/person-name', {'person_name': personName}, token: token);
+  }
+
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
   Future<void> uploadKeyEscrow(BackupFile package, String token) async {
     await _post(Api.keyEscrow, {'package': package.toJson()}, token: token);

@@ -59,7 +59,7 @@ class _TuiState {
   /// 等待邀请码输入（/auth 未登记引导）：输入循环的下一次输入按邀请码处理。
   bool pendingInvite = false;
 
-  /// 等待空间加密口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
+  /// 等待私密空间口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
   bool pendingSpaceKey = false;
 
   /// person_id → display_name（GET /space 拉取，消息前缀显示 person_name 用）。
@@ -283,7 +283,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             continue;
           }
           try {
-            final r = await _busy(session, '⏳ 邀请码登记中......', () => ApiClient(server).enrollDevice(
+            final r = await _busy(session, '⏳ 邀请码验证中......', () => ApiClient(server).enrollDevice(
               deviceId: store.deviceId,
               publicKey: store.publicKey,
               inviteCode: inviteCode,
@@ -295,11 +295,11 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             store.personId = r.personId;
             store.spaceId = r.spaceId;
             store.save(storePath);
-            session.messages.add(_systemMessage(session, '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}'));
+            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，您的新设备已加入私密空间 (device=${r.deviceId} person=${r.personId})'));
             _scheduleRender();
             break;
           } catch (e2) {
-            session.messages.add(_systemMessage(session, '⚠️ 邀请码登记失败: $e2（无效/已用/过期或网络问题）'));
+            session.messages.add(_systemMessage(session, '⚠️ 邀请码验证失败: $e2（无效/已用/过期或网络问题）'));
             _scheduleRender();
           }
         }
@@ -315,12 +315,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '请输入空间加密口令:', hidden: true, required: true);
+      final passphrase = await _prompt(session, '请输入私密空间口令:', hidden: true, required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
         // （此前漏过 / 检查直接进 accessByEscrow——"口令对接中"卡住退不出）
-        session.messages.add(_systemMessage(session, '口令不能为空，请重新输入（/exit 可退出）'));
+        session.messages.add(_systemMessage(session, '私密空间口令不能为空，请重新输入（/exit 可退出）'));
         _scheduleRender();
         continue;
       }
@@ -331,19 +331,19 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           _state!.running = false;
           break; // running=false 后由 main 收尾 + 2 秒兜底退出（exit(0) 死代码已移除）
         }
-        session.messages.add(_systemMessage(session, '口令不能以 / 开头，请重新输入（/exit 可退出）'));
+        session.messages.add(_systemMessage(session, '私密空间口令不能以 / 开头，请重新输入（/exit 可退出）'));
         _scheduleRender();
         continue;
       }
       try {
-        await _busy(session, '⏳ 口令对接中......', () => session.accessByEscrow(passphrase));
-        session.messages.add(_systemMessage(session, '✅ 口令接入成功: space_id=${store.spaceId} key_version=${store.keyVersion}'));
+        await _busy(session, '⏳ 私密空间口令核对中......', () => session.accessByEscrow(passphrase));
+        session.messages.add(_systemMessage(session, '✅ 口令核对成功，您已进入我们的私密空间')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
         store.save(storePath);
         _scheduleRender();
         break;
       } catch (e3) {
-        session.messages.add(_systemMessage(session, '⚠️ 口令接入失败: $e3，请重新输入口令（口令由创建者 escrow 托管时设置）'));
+        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: $e3，请重新输入口令（口令由空间创建者 escrow 托管时设置）'));
         _scheduleRender();
       }
     }
@@ -358,7 +358,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已登记但口令托管包未上传（创建者引导中断）：重启再进引导设置口令。
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
-    session.messages.add(_systemMessage(session, '检测到尚未设置托管口令，现在设置: '));
+    session.messages.add(_systemMessage(session, '检测到尚未设置私密空间口令，现在设置: '));
     _scheduleRender();
     await _setupEscrowPassphrase(store, storePath, session);
   }
@@ -370,11 +370,11 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 未认证 → 引导认证（白名单已登记时 challenge-response 成功）
   if (store.sessionToken == null && server.isNotEmpty) {
     try {
-      await _busy(session, '⏳ 认证中......', () => session.auth());
-      session.messages.add(_systemMessage(session, '✅ 认证成功: space_id=${store.spaceId ?? '-'}'));
+      await _busy(session, '⏳ 令牌认证中......', () => session.auth());
+      session.messages.add(_systemMessage(session, '✅ 令牌认证成功'));
       _scheduleRender();
     } catch (e) {
-      session.messages.add(_systemMessage(session, '⚠️ 认证失败: $e（可进入 TUI 后用 /auth 重试）'));
+      session.messages.add(_systemMessage(session, '⚠️ 令牌认证失败: $e（可进入 TUI 后用 /auth 重试）'));
       _scheduleRender();
     }
   }
@@ -999,7 +999,7 @@ Future<void> _execCommand(String line) async {
 
   switch (cmd) {
     case '/help':
-      s.status = '命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /sync /history /attach <file> /exit';
+      s.status = '命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /rename <名字> /sync /history /attach <file> /exit';
     case '/server':
       if (arg.isEmpty) {
         s.status = '当前服务器: ${s.session.server}；用法: /server <地址>';
@@ -1022,14 +1022,14 @@ Future<void> _execCommand(String line) async {
         // 提示作为 system 消息进消息流；邀请码由输入循环接管输入——
         // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
         s.pendingInvite = true;
-        s.session.messages.add(_systemMessage(s.session, '设备尚未登记：请输入邀请码（空间创建者 /invite 获取）'));
-        s.status = '等待邀请码输入后回车…';
+        s.session.messages.add(_systemMessage(s.session, '发现未知设备，请输入私密空间邀请码（从其他已认证设备 /invite 获取）'));
+        s.status = '等待邀请码输入…';
         break;
       }
       try {
         await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
         // 认证结果作为 system 消息进消息流（不占顶部状态栏）
-        s.session.messages.add(_systemMessage(s.session, '✅ 认证成功: space_id=${s.session.store.spaceId}'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 令牌认证成功'));
         s.status = '';
         _refreshPersonNames(s); // 刷新 person 名称表（对方消息前缀显示其 person_name）
         // 认证成功后启动 WS 实时监听
@@ -1051,7 +1051,7 @@ Future<void> _execCommand(String line) async {
       }
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
-          s.session, '本设备尚未接入空间，请输入空间加密口令:'));
+          s.session, '本设备尚未认证，请输入私密空间口令:'));
       break;
     case '/sync':
       try {
@@ -1076,6 +1076,24 @@ Future<void> _execCommand(String line) async {
     case '/invite':
       // 补发邀请码：/invite [personA|personB] [对方名称]（默认 personB=邀请对方）
       await _execInvite(parts);
+    case '/rename':
+      // 重设个人显示名（person_name）：本地 + 服务端同步 + 刷新名称表
+      if (arg.isEmpty) {
+        s.status = '用法: /rename <名字>';
+      } else if (s.session.store.sessionToken == null) {
+        s.status = '未认证，请先 /auth';
+      } else {
+        try {
+          final old = s.session.store.personName ?? '(未设置)';
+          s.session.store.personName = arg;
+          s.session.store.save(s.session.storePath);
+          await ApiClient(s.session.server).updatePersonName(arg, s.session.store.sessionToken!);
+          await _refreshPersonNames(s);
+          s.status = '✅ 已重命名: $old → $arg';
+        } catch (e) {
+          s.status = '重命名失败: $e';
+        }
+      }
     case '/exit':
     case '/quit':
       s.running = false;
@@ -1093,7 +1111,7 @@ Future<void> _execInvite(List<String> parts) async {
   final s = _state!;
   final token = s.session.store.sessionToken;
   if (token == null) {
-    s.status = '未认证：先 /auth 再生成邀请码';
+    s.status = '未认证：先 /auth 刷新会话后再生成邀请码';
     return;
   }
   final personId = parts.length > 1 ? parts[1] : 'personB';
@@ -1123,7 +1141,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
   final s = _state!;
   s.pendingInvite = false;
   if (inviteCode.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '未输入邀请码，登记取消'));
+    s.session.messages.add(_systemMessage(s.session, '未输入邀请码，无法加入私密空间'));
     return;
   }
   try {
@@ -1137,11 +1155,11 @@ Future<void> _handleInviteInput(String inviteCode) async {
     s.session.store.personId = r.personId;
     s.session.store.spaceId = r.spaceId;
     s.session.store.save(s.session.storePath);
-    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，您已成功加入私密空间 (device=${r.deviceId} person=${r.personId})'));
     // 登记成功后继续认证
     try {
       await s.session.auth();
-      s.session.messages.add(_systemMessage(s.session, '✅ 认证成功: space_id=${s.session.store.spaceId}'));
+      s.session.messages.add(_systemMessage(s.session, '✅ 成功刷新会话'));
       s.status = '';
       _refreshPersonNames(s); // 刷新 person 名称表
       if (s.session.wsClient == null && s.session.hasSession) {
@@ -1155,16 +1173,16 @@ Future<void> _handleInviteInput(String inviteCode) async {
       s.status = '';
     }
   } catch (e) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 邀请码登记失败: $e（无效/已用/过期或网络问题）'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 邀请码验证失败: $e（无效/已用/过期或网络问题）'));
   }
 }
 
-/// 输入循环接管的空间加密口令接入（/space 未接入引导）：口令 → accessByEscrow。
+/// 输入循环接管的私密空间口令接入（/space 未接入引导）：口令 → accessByEscrow。
 Future<void> _handleSpaceKeyInput(String passphrase) async {
   final s = _state!;
   s.pendingSpaceKey = false;
   if (passphrase.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '未输入口令，接入取消'));
+    s.session.messages.add(_systemMessage(s.session, '未输入口令，无法进入空间'));
     return;
   }
   if (passphrase.startsWith('/')) {
@@ -1173,19 +1191,19 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
       _state!.running = false;
       return;
     }
-    s.session.messages.add(_systemMessage(s.session, '口令不能以 / 开头，接入取消（可再输 /space 重试）'));
+    s.session.messages.add(_systemMessage(s.session, '私密空间口令不能以 / 开头，接入取消（可再输 /space 重试）'));
     return;
   }
   try {
     await s.session.accessByEscrow(passphrase);
     s.session.messages.add(_systemMessage(
         s.session,
-        '✅ 口令接入成功: space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}'));
+        '✅ 口令核对成功，您已进入私密空间')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
     s.session.store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
     s.session.store.save(s.session.storePath);
   } catch (e) {
     // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令接入失败: $e（口令错误？Server 已有创建者托管包？）'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？Server 已有创建者托管包？）'));
   }
 }
 
@@ -1209,13 +1227,13 @@ Map<String, String> _probePersonNames = {};
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '设置托管口令（用于后续设备接入空间，务必牢记）：', hidden: true, required: true);
+    final p1 = await _prompt(session, '设置私密空间口令（用于后续设备进入私密空间，务必牢记）：', hidden: true, required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
-      // _busy：打包/上传期间插入"⏳ 口令打包中......"、禁止输入、隐藏光标，
+      // _busy：打包/上传期间插入"⏳ 口令正在加密打包您的空间......"、禁止输入、隐藏光标，
       // 完成后移除（替换为下方结果消息）——统一体验优化
-      await _busy(session, '⏳ 口令打包中......', () async {
+      await _busy(session, '⏳ 口令正在加密打包您的空间......', () async {
         await session.auth(); // challenge-response 认证（写入 store.sessionToken）
         await KeyEscrowService(api).upload(
           passphrase: p1,
@@ -1227,11 +1245,11 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       });
       store.escrowUploaded = true;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 口令托管包已上传: space_id=${store.spaceId}'));
+      session.messages.add(_systemMessage(session, '✅ 口令加密的私密空间托管包已上传'));
       _scheduleRender();
       return;
     } catch (e) {
-      session.messages.add(_systemMessage(session, '⚠️ 口令托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）'));
+      session.messages.add(_systemMessage(session, '⚠️ 口令加密的私密空间托管包上传失败: $e，请重新设置（或 Ctrl+C 稍后重启再进）'));
       _scheduleRender();
     }
   }

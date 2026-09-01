@@ -250,3 +250,29 @@ export function updateDeviceName(
   console.log(`[einz] 更新设备名称: device=${device_id}（${deviceName}）`);
   return { ok: true };
 }
+
+/**
+ * POST /devices/person-name：更新本设备的 person 显示名（/rename 命令，显示层用）。
+ * - 认证：session token（bearer）；仅 active 设备可改自己 person 的名称。
+ */
+export function updatePersonName(
+  cfg: ServerConfig,
+  token: string,
+  body: unknown
+): { ok: true } {
+  const { device_id } = resolveSession(token);
+  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+
+  const b = (body ?? {}) as { person_name?: string };
+  const personName = (b.person_name ?? "").trim();
+  if (!personName) throw new ApiError("INVALID_REQUEST", "person_name 不能为空", 400);
+
+  const row = getDb().prepare(`SELECT person_id FROM devices WHERE device_id = ?`).get(device_id) as
+    | { person_id: string }
+    | undefined;
+  if (!row) throw new ApiError("NOT_FOUND", "device not found", 404);
+
+  setMeta(`person_name:${row.person_id}`, personName);
+  console.log(`[einz] 更新 person 名称: person=${row.person_id}（${personName}）`);
+  return { ok: true };
+}
