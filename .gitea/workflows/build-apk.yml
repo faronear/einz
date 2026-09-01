@@ -43,6 +43,10 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # arm64 上默认 tools 包依赖 emulator（无 arm64 stable 版）会失败，
+          # 只装 platform-tools + 接受 licenses，缺的 platforms/build-tools 由 Gradle 自动补装
+          packages: 'platform-tools'
 
       - name: Flutter pub get
         working-directory: app
