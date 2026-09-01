@@ -758,3 +758,20 @@
 **修复：** `brew install-bundler-gems`（官方内部命令，按 `Gemfile.lock` 重建 vendored gems，8 个全部重装）。**验证：** `brew update`、`brew info --cask drawio`（原崩溃点）、`brew doctor`、`brew list --versions` 全部正常。
 
 **经验：** brew 半更新（git 代码已 fetch 但 gems 未重建）是常见损坏态，`install-bundler-gems` 是轻量修复手段，比重装 brew 快。另：brew 已随修复升级至 6.0.20；`brew uninstall <formula>` 遇 cask 加载错误时可用 `--formula` 参数绕过。
+
+### CI 打包方案落地与调整（2026-09-01 续）
+
+**背景：** 老板放弃在本机（macOS）打包后，CI 成为打 Android APK + iOS 的路径。方案：**APK 走 Gitea Actions**（自建 git.tic.cc，runner 机器独立于 Gitea 服务器），**iOS 走 Codemagic** 云构建（免费 500 分钟/月）。
+
+**产出（commit 147cf71 / 966b8ac / ee34be9 / 4ce8bed / 7039488）：**
+- `.gitea/workflows/build-apk.yml`：push main / v* 标签 / 手动触发 → debug 签名 APK（无需 keystore）
+- `codemagic.yaml`：iOS 构建（`flutter config --no-enable-swift-package-manager` 禁 SPM 走 CocoaPods，bundle id `cc.tic.einz`，产物 IPA）
+- `docs/CI.md`：完整指引（注册令牌生成、gitea-runner 安装、Codemagic 配置、镜像说明）
+
+**本机 runner 尝试失败（重要教训）：** 先在 MacBook Air（Apple Silicon）装 gitea-runner v3.3.2（注意：**act_runner 已更名 gitea-runner**，v0.2.x → v3.3.2，二进制名与默认镜像都变了）。构建卡在拉取基础镜像 `docker.gitea.com/runner-images:ubuntu-latest`（1.5–2 GB）：国内网络下小镜像可拉（hello-world 12s、node:20-alpine），**大镜像 300s+ 拉不完**；配置 OrbStack registry-mirrors 与 proxies（`host.orb.internal:17891`）均无效。**结论：国内网络无法跑 Docker 容器化 runner。**
+
+**调整决策：** 放弃本机 runner 并彻底清理（进程 / `~/.local/bin/gitea-runner` / `/Users/luk/Seafile/.runner` 注册文件 / 测试镜像 / `~/.orbstack/config/docker.json` 还原为 `{}`）；Gitea 侧删除旧 runner doomship.local。改用 **Oracle Cloud 免费 ARM 服务器（2 OCPU / 12 GB，海外网络）** 注册 gitea-runner（`linux-arm64` 二进制 + systemd 常驻，见 docs/CI.md §1.3）。Actions 页 `no matching online runner with label: ubuntu-latest` 警告待新 runner 上线后自动消失。
+
+**runner 磁盘占用说明：** 常驻大头是基础镜像 ~2 GB（一次下载）；每个 job 容器临时创建、结束即删；JDK/Flutter/Android SDK（~2–4 GB）在容器内每次重新下载。建议：容器挂载 `~/.gradle`、`~/.pub-cache` 跨构建复用（省时省盘）+ 定期 `docker system prune -a`。
+
+**待办：** Oracle 服务器按 §1.3 部署并跑通首次构建；挂载缓存优化（构建提速）。
