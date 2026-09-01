@@ -363,6 +363,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     await _setupEscrowPassphrase(store, storePath, session);
   }
 
+  // /exit 退出后（口令/其他引导步骤触发 running=false）：立即结束引导，
+  // 不再认证/同步/起 WS（由 main 收尾退出）
+  if (!_state!.running) return;
+
   // 未认证 → 引导认证（白名单已登记时 challenge-response 成功）
   if (store.sessionToken == null && server.isNotEmpty) {
     try {
