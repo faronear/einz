@@ -104,51 +104,24 @@ String _defaultStoreDir() {
   return '$home/.einz';
 }
 
-/// 自动发现设备并返回选定的 store 路径；无可用设备返回 ''（引导 init）。
-/// - 合法设备（DeviceStore.load 成功）→ 1 台直接用，多台列出选择；
-/// - 损坏/非 store 文件 → 自动备份为 .bak（保留现场）后继续。
+/// 解析默认 store：固定检查 ~/.einz/myeinz.json（存在且可加载则返回路径，
+/// 损坏自动备份 .bak 后返回 ''（引导 init）；不存在返回 ''。
+/// 多设备身份请用 --store 显式指定其他文件（单机默认单设备，无需扫描/选择）。
 String _resolveAutoStore() {
-  final dir = _defaultStoreDir();
-  final valid = <({String path, DeviceStore store})>[];
-  final corrupt = <String>[];
-  final d = Directory(dir);
-  if (d.existsSync()) {
-    for (final f in d.listSync().whereType<File>().where((f) => f.path.endsWith('.json'))) {
-      try {
-        valid.add((path: f.path, store: DeviceStore.load(f.path)));
-      } catch (_) {
-        corrupt.add(f.path); // 格式损坏或非 store 文件
-      }
-    }
+  final path = '${_defaultStoreDir()}/myeinz.json';
+  final f = File(path);
+  if (!f.existsSync()) return '';
+  try {
+    DeviceStore.load(path);
+    return path;
+  } catch (_) {
+    // 损坏/非 store 文件：备份保留现场后引导 init（不丢私钥数据）
+    try {
+      f.renameSync('$path.bak');
+      stdout.writeln('⚠️ $path 损坏，已备份为 .bak（可查看现场）');
+    } catch (_) {}
+    return '';
   }
-
-  // 损坏文件：提示 + 备份 .bak（保留现场，不丢私钥数据）
-  if (corrupt.isNotEmpty) {
-    stdout.writeln('⚠️ 发现损坏的设备文件: ${corrupt.map((p) => p.split('/').last).join(', ')}');
-    for (final c in corrupt) {
-      try {
-        File(c).renameSync('$c.bak');
-      } catch (_) {}
-    }
-    stdout.writeln('   已备份为 .bak（可在目录查看现场）');
-  }
-
-  if (valid.isEmpty) return ''; // 无可用设备 → _onboard 引导 init
-
-  if (valid.length == 1) {
-    stdout.writeln('✅ 使用设备: ${valid.first.store.deviceId ?? '(未登记)'}');
-    return valid.first.path;
-  }
-
-  // 多台设备：列出选择（cooked 数字选择）
-  stdout.writeln('发现 ${valid.length} 台设备:');
-  for (var i = 0; i < valid.length; i++) {
-    stdout.writeln('  ${i + 1}) ${valid[i].store.deviceId ?? '(未登记)'}');
-  }
-  stdout.write('选择 [回车=1]: ');
-  final input = (stdin.readLineSync() ?? '').trim();
-  final idx = (int.tryParse(input) ?? 1).clamp(1, valid.length);
-  return valid[idx - 1].path;
 }
 
 /// 启动探测 + 获取系统信息（GET {server}/health，3s 超时，不重试）：
@@ -203,11 +176,11 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
     store = await DeviceStore.create();
-    // 自动模式（无 --store）→ 存默认目录 ~/.einz/[临时].json（登记后重命名为 personA_dev1.json）
+    // 自动模式（无 --store）→ 存默认目录 ~/.einz/myeinz.json（固定文件名，无临时名/重命名）
     if (storePath.isEmpty) {
       final dir = _defaultStoreDir();
       Directory(dir).createSync(recursive: true);
-      storePath = '$dir/pending.json';
+      storePath = '$dir/myeinz.json';
     }
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
@@ -226,30 +199,6 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 /// 引导完成后做启动同步 + WS；全部就绪后返回。
 Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
-  final autoStore = storePath.startsWith(_defaultStoreDir());
-
-  // 自动模式：enroll 拿到规范 id 后，把设备文件重命名为 personA_dev2.json（原临时名 pending.json）
-  void renameToStandard(String personId, String deviceId) {
-    if (!autoStore) return;
-    final newPath = '${_defaultStoreDir()}/${personId}_$deviceId.json';
-    if (newPath == storePath) return;
-    if (File(newPath).existsSync()) File(newPath).deleteSync(); // 覆盖旧副本（如早期重命名残留）
-    File(storePath).renameSync(newPath);
-    storePath = newPath;
-    session.messages.add(_systemMessage(session, '💾 设备文件: $newPath'));
-  }
-
-  // 已登记设备启动时若仍是临时名 pending.json（此前登记后未重命名——如旧版本
-  // 或加载已登记 store 跳过登记的场景）——自动重命名为标准名 personId_deviceId.json，
-  // 避免 ~/.einz/ 残留临时文件（与标准名副本重复）
-  if (autoStore &&
-      storePath.endsWith('pending.json') &&
-      store.deviceId != null &&
-      store.deviceId!.isNotEmpty &&
-      store.personId != null &&
-      store.personId!.isNotEmpty) {
-    renameToStandard(store.personId!, store.deviceId!);
-  }
 
   // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
   // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
@@ -288,7 +237,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.deviceId = r.deviceId;
       store.personId = r.personId;
       store.spaceId = r.spaceId;
-      renameToStandard(r.personId, r.deviceId);
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}'));
       _scheduleRender();
@@ -345,7 +293,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             store.deviceId = r.deviceId;
             store.personId = r.personId;
             store.spaceId = r.spaceId;
-            renameToStandard(r.personId, r.deviceId);
             store.save(storePath);
             session.messages.add(_systemMessage(session, '✅ 邀请码登记成功: device=${r.deviceId} person=${r.personId}'));
             _scheduleRender();
