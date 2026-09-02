@@ -858,8 +858,16 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
   final lines = <String>[];
   for (var i = 0; i < wrapped.length; i++) {
-    if (i == wrapped.length - 1) {
-      // 末行：正文 + 1 空格 + 标签，右端贴屏缘
+    if (i == wrapped.length - 1 && wrapped.length > 1) {
+      // 长消息末行：正文左对齐到与其他行相同的左缘（左侧留白 = leftPad），
+      // 正文与标签之间用粉红空格填充，标签仍贴最右——
+      // 整行粉红连续成矩形，不与上方各行错位
+      final chunk = wrapped[i];
+      final fill = textWidth - _displayWidth(chunk);
+      lines.add(
+          '${' ' * leftPad}$_bgPink$_white$chunk${' ' * (fill < 0 ? 0 : fill)} $suffix');
+    } else if (i == wrapped.length - 1) {
+      // 单行消息：正文 + 1 空格 + 标签，整行右端贴屏缘（短消息贴右的常规形态）
       final content = '$_bgPink$_white${wrapped[i]} $suffix';
       lines.add('${' ' * (cols - _displayWidth(content))}$content');
     } else {
