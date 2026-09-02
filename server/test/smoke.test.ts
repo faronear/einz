@@ -3,7 +3,7 @@
  *
  * 模拟两台设备（Node 侧用 libsodium-wrappers 扮演客户端）：
  *   A 认证 → A 加密发送 → B 认证 → B 增量同步 → B 解密
- * 同时验证：Server 只见密文（明文不出现在任何响应与数据库）、幂等、白名单拒绝。
+ * 同时验证：Server 只见密文（明文不出现在任何响应与数据库）、幂等、未登记设备拒绝。
  *
  * 运行：npm test（需先 npm run build 生成 dist/）
  */
@@ -16,7 +16,7 @@ const sodium = require("libsodium-wrappers") as typeof import("libsodium-wrapper
 const B64 = sodium.base64_variants.ORIGINAL;
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { WebSocket } from "ws";
@@ -85,6 +85,27 @@ class TestDevice {
     this.personId = personId;
     this.keypair = sodium.crypto_box_keypair();
     this.spaceKey = spaceKey;
+  }
+
+  /** 设备动态登记（自主模式：白名单在 devices 表，POST /devices/enroll）。
+   *  首设备免邀请码自举；后续设备凭创建者邀请码。服务端可能分配规范 id
+   *  （dev1/dev2…），登记后回写 deviceId，保证后续 challenge/消息 AAD 用同一 id。 */
+  async enroll(port: number, inviteCode = ""): Promise<string> {
+    const res = await fetch(`http://127.0.0.1:${port}/devices/enroll`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        device_id: this.deviceId,
+        public_key: sodium.to_base64(this.keypair.publicKey, B64),
+        ...(inviteCode ? { invite_code: inviteCode } : {}),
+        device_name: this.deviceId,
+      }),
+    });
+    assert.equal(res.status, 200, "enroll should succeed");
+    const body = (await res.json()) as { ok: boolean; device_id: string; space_id: string };
+    assert.equal(body.ok, true, "enroll ok");
+    this.deviceId = body.device_id;
+    return body.space_id;
   }
 
   async auth(port: number): Promise<void> {
@@ -179,23 +200,11 @@ async function main(): Promise<void> {
   const devA = new TestDevice("dev-a1", "person-a", spaceKey);
   const devB = new TestDevice("dev-b1", "person-b", spaceKey);
 
-  // 生成一次性配置（config.json 白名单）
-  const config = {
-    space_id: "space-smoke-test",
-    devices: [
-      { device_id: devA.deviceId, person_id: devA.personId, public_key: sodium.to_base64(devA.keypair.publicKey, B64), status: "active" },
-      { device_id: devB.deviceId, person_id: devB.personId, public_key: sodium.to_base64(devB.keypair.publicKey, B64), status: "active" },
-    ],
-  };
-  const configPath = join(tempDir, "config.json");
-  writeFileSync(configPath, JSON.stringify(config, null, 2));
-
   const port = await freePort();
   serverProc = spawn(process.execPath, [join(ROOT, "dist/app.js")], {
     env: {
       ...process.env,
       PORT: String(port),
-      EINZ_CONFIG: configPath,
       EINZ_DB: join(tempDir, "app.db"),
       EINZ_FILES: join(tempDir, "files"),
     },
@@ -206,27 +215,39 @@ async function main(): Promise<void> {
   try {
     await waitReady(port);
 
-    // 1) 白名单外设备挑战 → 403
+    // 1) 未登记设备挑战 → 403
     const evil = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ device_id: "dev-evil" }),
     });
-    assert.equal(evil.status, 403, "non-whitelisted device must be rejected");
+    assert.equal(evil.status, 403, "non-enrolled device must be rejected");
 
-    // 2) A 认证
+    // 2) 设备登记（自主模式：白名单在 devices 表，动态登记）
+    const spaceId = await devA.enroll(port); // 首设备自举（免邀请码，成为创建者）
+    assert.ok(spaceId.length > 0, "enroll returns space_id");
+
+    // 3) A 认证
     await devA.auth(port);
 
-    // 3) A 加密发送
-    const envA = devA.encryptMessage("msg-0001", HELLO, config.space_id);
+    // 4) A 加密发送
+    const envA = devA.encryptMessage("msg-0001", HELLO, spaceId);
     const posted = await devA.postMessage(port, envA);
     assert.equal(posted.server_sequence, 1, "first message gets sequence 1");
 
-    // 4) 幂等：同 message_id 重复上传 → 不新增
+    // 5) 幂等：同 message_id 重复上传 → 不新增
     const repost = await devA.postMessage(port, envA);
     assert.equal(repost.server_sequence, 1, "duplicate message_id is idempotent");
 
-    // 5) B 认证 + 增量同步
+    // 6) B 凭邀请码登记 + 认证 + 增量同步
+    const inviteRes = await fetch(`http://127.0.0.1:${port}/invites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${devA.sessionToken}` },
+      body: JSON.stringify({ person_id: "personB", display_name: "bob" }),
+    });
+    assert.equal(inviteRes.status, 200, "invite should succeed");
+    const { invite_code } = (await inviteRes.json()) as { invite_code: string };
+    await devB.enroll(port, invite_code);
     await devB.auth(port);
     const sync1 = await devB.sync(port, 0);
     assert.equal(sync1.messages.length, 1, "B should receive exactly 1 message");
@@ -237,7 +258,7 @@ async function main(): Promise<void> {
     assert.ok(!raw.includes(HELLO), "plaintext must NOT appear in sync response");
 
     // 7) B 解密成功（端到端闭环）
-    const decrypted = devB.decryptMessage(sync1.messages[0], config.space_id);
+    const decrypted = devB.decryptMessage(sync1.messages[0], spaceId);
     assert.equal(decrypted, HELLO, "B must decrypt the message correctly");
 
     // 8) 数据库核查：messages 表只有密文，无明文
@@ -259,7 +280,7 @@ async function main(): Promise<void> {
       ws.on("message", (data) => {
         const frame = JSON.parse(data.toString());
         if (frame.type === "hello") {
-          void devB.postMessage(port, devB.encryptMessage("msg-0002", "reply from b", config.space_id));
+          void devB.postMessage(port, devB.encryptMessage("msg-0002", "reply from b", spaceId));
         } else if (frame.type === "message.new") {
           assert.equal(frame.payload.message.message_id, "msg-0002", "A should receive B's message in realtime");
           clearTimeout(timer);
@@ -317,7 +338,7 @@ async function main(): Promise<void> {
     });
     assert.deepEqual(await escrowAfter.json(), {}, "escrow cleared after delete");
 
-    console.log("✅ 冒烟测试全部通过：认证 / E2EE 密文 / 幂等 / 同步 / 白名单 / 明文隔离 / WS 实时 / 密钥托管");
+    console.log("✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管");
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，
     // 否则 app.db 句柄未释放，rmSync 会报 EBUSY。

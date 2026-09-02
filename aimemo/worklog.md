@@ -787,3 +787,14 @@
 **遗留问题（老板决策后修复）：** 老板选择**先传 blob 再发消息**方案（杜绝幽灵消息）。实现（commit 待提交）：server `attachments.message_id` 去掉外键（旧库自动重建迁移）+ `storeAttachment` 不再要求 message 先存在 + 新增 `cleanupOrphanAttachments`（孤儿窗口 10 分钟，随每小时清理任务）；cli `attachFile`/`_cmdAttach` 改为先上传 blob 再发消息；PROTOCOL.md §6.1 更新两阶段协议。验证：`dart analyze` 无问题、`tsc` 构建通过、`server/test/verify_two_phase.mjs`（新写验证脚本）四步全过——blob 先于 message 上传 200、再发消息关联成功、sync 返回 attachments_meta、孤儿清理删文件+记录且正常附件保留。
 
 **发现存量问题（与本任务无关）：** `npm test`（smoke.test.ts）基线即失败——config.ts 早已改为"自主模式"（白名单只认 devices 表动态登记，不再读 config.json），而 smoke.test.ts 仍用旧 config.json 白名单方式（dev-a1 未登记 → challenge 403）。修复需把测试改为先 POST /devices/enroll 再认证，待老板安排。
+
+### smoke 测试修复 + TUI 交互增强（2026-09-02）
+
+**老板安排（上一节遗留问题）顺手修掉 + 三个 TUI 需求（commit 待提交）：**
+
+- **smoke.test.ts 修复（存量问题）：** 改为自主模式流程——TestDevice 新增 `enroll()`（POST /devices/enroll，首设备免邀请码自举、B 凭 A 生成的邀请码登记），登记后回写服务端分配的规范 id（dev1/dev2），移除 config.json 白名单方式；AAD 的 space_id 改用 enroll 响应值。`npm test` 全绿。
+- **TUI 方向键（输入体验）：** 之前按方向键会打出 `[D[C[A[B`（ESC 序列的 `[` 与字母被当普通字符插入）。新增转义序列解析（ESC [ A/B/C/D、ESC O 变体、Home/End、Delete），跨 chunk 拼合；↑↓ 浏览输入历史（首次进入暂存草稿、↓ 越过最新恢复草稿，口令/邀请码等机密输入不进历史），←→ 移动光标、Home/End 跳首尾、Backspace 删光标前、Delete 删光标处；输入区渲染改为光标跟随（ANSI 定位到文本内偏移），并顺带修复 hiddenInput（口令）在局部重绘时泄露原文的问题。
+- **状态栏 person 名加粗：** `_personLabel` 返回 `**person** #device`，person 与 device 视觉区分。
+- **对方消息右对齐（气泡风格）：** 对方消息整块右对齐到终端右缘，正文在右、末尾附 `[who seq v]` 元数据（如 `          今天来玩 [sisi seq=31 v1]`）；自己消息与系统提示保持左对齐。
+
+**验证：** `dart analyze`（cli/shared）无问题、`npm test` 全绿、`tsc` 构建通过。

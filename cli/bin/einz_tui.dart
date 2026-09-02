@@ -47,6 +47,18 @@ class _TuiState {
   /// 输入缓冲区（逐键追加）。
   final StringBuffer input = StringBuffer();
 
+  /// 输入缓冲区光标位置（0..input.length 之间的字符偏移，供 ←→ 编辑）。
+  int cursor = 0;
+
+  /// 已提交输入历史（升序、最旧在前；供 ↑↓ 箭头浏览复用）。
+  final List<String> inputHistory = [];
+
+  /// 历史浏览下标：-1 = 未浏览（编辑当前输入）；>=0 = 正在浏览 history[index]。
+  int historyIndex = -1;
+
+  /// 进入历史浏览前暂存的当前输入草稿（↓ 越过最新一条时恢复）。
+  String historyDraft = '';
+
   /// 系统提示行（命令结果 / 错误），显示在状态栏下方。
   String status = '';
 
@@ -730,6 +742,8 @@ void _render() {
       buf.write('\r\n');
     }
   }
+  // 光标定位到输入编辑位置（与 _renderInputLine 一致，←→ 移动后光标跟随）
+  buf.write(_cursorPos(inputWrapped, top, _displayWidth(prompt), s.cursor, cols));
   if (!s.processing) buf.write(_showCursor); // 处理中（打包/上传）不显示光标（不闪烁）
 
   // 渲染可能因终端环境抛异常（如 pty 下 Dart stdout 与 stdin 共享 StreamSink，
@@ -747,6 +761,7 @@ void _render() {
 
 /// 状态条身份标签：person_name #device_name（远程名称表优先——同 person 多设备同步
 /// 显示最新名字；未拉取/未知回退本地 store，再回退规范 id）。
+/// person 名加粗、device 名常规，便于在状态栏里区分两个部分。
 String _personLabel(DeviceStore store, Map<String, String> personNames) {
   final pid = store.personId;
   final person = (pid != null ? personNames[pid] : null) ??
@@ -754,12 +769,12 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
       store.personId ??
       '-';
   final device = store.deviceName ?? store.deviceId ?? '-';
-  return '$person #$device';
+  return '${_bold}$person$_reset #$device';
 }
 
-/// 格式化消息为多行（第一行带归属前缀，续行裸正文，自动按列宽折行）。
-/// 自己的消息：绿色前缀 + 普通正文；对方消息：正文加粉红背景（一眼区分收发双方）；
-/// 系统提示（isSystem）：灰色前缀 + 普通正文（sender 显示为 system）。
+/// 格式化消息为多行（自动按列宽折行）。
+/// 自己的消息：绿色前缀 + 普通正文（左对齐）；对方消息：整块右对齐（右侧气泡风格，
+/// 正文在右、末尾附 [who seq v] 元数据）；系统提示（isSystem）：灰色前缀 + 普通正文。
 List<String> _formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
@@ -784,22 +799,27 @@ List<String> _formatMessage(ChatMessage m, int cols) {
     color = _yellow;
   }
   final seq = m.seq == null ? '' : ' seq=${m.seq}';
-  final prefix = '$color[$who$seq v${m.keyVersion}]$_reset ';
   final body = m.plain.replaceAll('\n', ' ');
-  final maxW = cols - _displayWidth(prefix);
-  final wrapped = _wrapByWidth(body, maxW);
   if (m.isMine || m.isSystem) {
-    // 自己消息与系统提示：普通正文（system 不用粉红背景）
+    // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐
+    final prefix = '$color[$who$seq v${m.keyVersion}]$_reset ';
+    final wrapped = _wrapByWidth(body, cols - _displayWidth(prefix));
     return [
       '$prefix${wrapped.first}',
       ...wrapped.skip(1).map((line) => '$line'),
     ];
   }
+  // 对方消息：整块右对齐（右侧气泡风格），正文在右、末尾附 [who seq v] 元数据，
+  // 前导空格填充到终端右缘（如：          今天来玩 [sisi seq=31 v1]）
+  final suffix = '$color[$who$seq v${m.keyVersion}]$_reset';
+  final wrapped = _wrapByWidth(body, cols - _displayWidth(suffix) - 1);
   final pink = (String line) => '$_bgPink$line$_reset';
-  return [
-    '$prefix${pink(wrapped.first)}',
-    ...wrapped.skip(1).map(pink),
-  ];
+  final lines = <String>[];
+  for (var i = 0; i < wrapped.length; i++) {
+    final content = i == wrapped.length - 1 ? '${pink(wrapped[i])} $suffix' : pink(wrapped[i]);
+    lines.add('${' ' * (cols - _displayWidth(content))}$content');
+  }
+  return lines;
 }
 
 /// 只重绘输入区（不清屏）：打字时用，避免全量 \x1B[2J 清屏打断
@@ -810,12 +830,14 @@ void _renderInputLine() {
   if (s == null) return;
   final rows = _termLines();
   final cols = _termCols();
-  final inputWrapped = _wrapInput(s.input.toString(), cols);
+  final display = s.hiddenInput ? '*' * s.input.length : s.input.toString();
+  final inputWrapped = _wrapInput(display, cols);
   if (inputWrapped.length != s.inputLines) {
     _render(); // 行数变化 → 消息区让位 → 全量重绘
     return;
   }
   final prompt = '${_cyan}you>${_reset} ';
+  final promptW = _displayWidth(prompt);
   final top = rows - inputWrapped.length + 1; // 输入区顶部行号
 
   final buf = StringBuffer();
@@ -829,6 +851,8 @@ void _renderInputLine() {
     }
     buf.write(inputWrapped[i]);
   }
+  // 光标定位到输入文本内的编辑位置（←→ 移动后终端光标跟随）
+  buf.write(_cursorPos(inputWrapped, top, promptW, s.cursor, cols));
   if (!s.processing) buf.write(_showCursor); // 处理中不显示光标（不闪烁）
   try {
     stdout.write(buf.toString());
@@ -844,6 +868,9 @@ Future<void> _runInputLoop(ChatSession session) async {
   final completer = Completer<void>();
   var busy = false;
   late final StreamSubscription<String> sub;
+  // 终端转义序列缓冲：raw 模式下方向键等到达为 ESC [ A 等多个字节（可能跨 chunk），
+  // 需在此拼合完整后再解释，避免 '[' 与字母被当成普通字符打进输入（曾显示 [D[C[A[B）。
+  var esc = '';
   // utf8.decoder：raw 模式下多字节字符（如中文）可能被拆成多个字节到达，
   // 由解码器缓冲拼合后再逐字符处理（避免中文乱码）。
   sub = stdin.transform(utf8.decoder).listen((chunk) {
@@ -852,6 +879,51 @@ Future<void> _runInputLoop(ChatSession session) async {
       if (!(_state?.running ?? false)) break;
       final code = ch.codeUnitAt(0);
       if ((_state?.processing ?? false) && code != 3) continue; // 处理中（如口令打包）：忽略输入，Ctrl+C 仍可退出
+      // —— 终端转义序列（方向键 / Home / End / Delete）——
+      if (esc.isNotEmpty || code == 27) {
+        if (esc.isEmpty) {
+          esc = '\x1B';
+          continue;
+        }
+        final seq = esc + ch;
+        if (esc == '\x1B' && (ch == '[' || ch == 'O')) {
+          esc = seq; // CSI / SS3 序列开始，等待终止字节
+          continue;
+        }
+        final isFinal = code >= 0x40 && code <= 0x7E; // CSI 终止字节
+        if (!isFinal) {
+          if (esc == '\x1B') {
+            esc = ''; // ESC 后跟非 [ / O：死亡序列，整体丢弃
+          } else if (seq.length >= 8) {
+            esc = ''; // 兜底：异常长参数序列丢弃
+          } else {
+            esc = seq; // 继续累积参数（如 ESC [ 3 ~ 的中间态）
+          }
+          continue;
+        }
+        esc = '';
+        final action = _escAction(seq);
+        if (action == null) continue; // 未知序列：整体丢弃（不进输入）
+        final s = _state!;
+        switch (action) {
+          case 'up':
+            _historyUp(s);
+          case 'down':
+            _historyDown(s);
+          case 'left':
+            if (s.cursor > 0) s.cursor--;
+          case 'right':
+            if (s.cursor < s.input.length) s.cursor++;
+          case 'home':
+            s.cursor = 0;
+          case 'end':
+            s.cursor = s.input.length;
+          case 'delete':
+            _deleteAt(s);
+        }
+        inputChanged = true;
+        continue;
+      }
       if (code == 3) {
         // Ctrl+C → 退出（先恢复终端，再取消监听，见 _restoreTerminal 注释）
         _state!.running = false;
@@ -902,6 +974,7 @@ Future<void> _runInputLoop(ChatSession session) async {
             continue;
           }
           _state!.input.clear();
+          _state!.cursor = 0;
           // 引导问答回答：提交（含留空——引导逻辑自行校验/重试）
           _state!.pendingGuideCompleter = null;
           _state!.hiddenInput = false;
@@ -926,6 +999,18 @@ Future<void> _runInputLoop(ChatSession session) async {
         }
         final line = _state!.input.toString().trim();
         _state!.input.clear();
+        _state!.cursor = 0;
+        // 输入历史（↑↓ 浏览复用）：口令/邀请码等机密输入不进历史
+        if (!_state!.hiddenInput &&
+            !_state!.pendingInvite &&
+            !_state!.pendingSpaceKey &&
+            line.isNotEmpty &&
+            (_state!.inputHistory.isEmpty || _state!.inputHistory.last != line)) {
+          _state!.inputHistory.add(line);
+          if (_state!.inputHistory.length > 200) _state!.inputHistory.removeAt(0);
+        }
+        _state!.historyIndex = -1;
+        _state!.historyDraft = '';
         if (line.isEmpty) {
           inputChanged = true; // 清空输入行，等待下方统一重绘
           continue;
@@ -956,17 +1041,13 @@ Future<void> _runInputLoop(ChatSession session) async {
         continue;
       }
       if (code == 127 || code == 8) {
-        // 退格
-        final cur = _state!.input.toString();
-        if (cur.isNotEmpty) {
-          _state!.input.clear();
-          _state!.input.write(cur.substring(0, cur.length - 1));
-        }
+        // 退格：删除光标前一个字符（支持光标中途编辑）
+        _backspaceAt(_state!);
         inputChanged = true;
         continue;
       }
       if (code >= 32) {
-        _state!.input.writeCharCode(code);
+        _insertAtCursor(_state!, ch);
         inputChanged = true;
       }
     }
@@ -983,6 +1064,102 @@ Future<void> _runInputLoop(ChatSession session) async {
     }
   });
   await completer.future;
+}
+
+/// 解释终端转义序列 → 动作（方向键 / Home / End / Delete）；未知序列返回 null（整体丢弃）。
+String? _escAction(String seq) {
+  return switch (seq) {
+    '\x1B[A' || '\x1BOA' => 'up',
+    '\x1B[B' || '\x1BOB' => 'down',
+    '\x1B[C' || '\x1BOC' => 'right',
+    '\x1B[D' || '\x1BOD' => 'left',
+    '\x1B[H' => 'home',
+    '\x1B[F' => 'end',
+    '\x1B[3~' => 'delete',
+    _ => null,
+  };
+}
+
+/// 在光标处插入字符（光标右移；StringBuffer 无 insert，重建字符串）。
+void _insertAtCursor(_TuiState s, String ch) {
+  final str = s.input.toString();
+  s.input.clear();
+  s.input.write(str.substring(0, s.cursor));
+  s.input.write(ch);
+  s.input.write(str.substring(s.cursor));
+  s.cursor++;
+}
+
+/// 退格：删除光标前一个字符（光标左移）。
+void _backspaceAt(_TuiState s) {
+  if (s.cursor <= 0) return;
+  final str = s.input.toString();
+  s.input.clear();
+  s.input.write(str.substring(0, s.cursor - 1));
+  s.input.write(str.substring(s.cursor));
+  s.cursor--;
+}
+
+/// Delete：删除光标处字符（光标不动）。
+void _deleteAt(_TuiState s) {
+  if (s.cursor >= s.input.length) return;
+  final str = s.input.toString();
+  s.input.clear();
+  s.input.write(str.substring(0, s.cursor));
+  s.input.write(str.substring(s.cursor + 1));
+}
+
+/// 把输入替换为指定文本（光标移到末尾）。
+void _setInput(_TuiState s, String text) {
+  s.input.clear();
+  s.input.write(text);
+  s.cursor = text.length;
+}
+
+/// ↑：浏览更旧的历史。首次进入历史时暂存当前输入草稿（供 ↓ 恢复）。
+void _historyUp(_TuiState s) {
+  if (s.inputHistory.isEmpty) return;
+  if (s.historyIndex == -1) {
+    s.historyDraft = s.input.toString();
+    s.historyIndex = s.inputHistory.length - 1;
+  } else if (s.historyIndex > 0) {
+    s.historyIndex--;
+  } else {
+    return; // 已到最旧一条
+  }
+  _setInput(s, s.inputHistory[s.historyIndex]);
+}
+
+/// ↓：浏览更新的历史；越过最新一条后恢复进入历史前的草稿。
+void _historyDown(_TuiState s) {
+  if (s.historyIndex == -1) return;
+  if (s.historyIndex < s.inputHistory.length - 1) {
+    s.historyIndex++;
+    _setInput(s, s.inputHistory[s.historyIndex]);
+  } else {
+    s.historyIndex = -1;
+    _setInput(s, s.historyDraft);
+  }
+}
+
+/// 输入光标 ANSI 定位序列：按输入文本内偏移 offset 找到所在行/列。
+/// 第 0 行行首有 prompt（promptW 列），续行行首 6 空格缩进；列钳制在终端宽度内。
+String _cursorPos(List<String> wrapped, int top, int promptW, int offset, int cols) {
+  var remaining = offset;
+  for (var i = 0; i < wrapped.length; i++) {
+    final lineLen = wrapped[i].length;
+    if (remaining > lineLen) {
+      remaining -= lineLen;
+      continue;
+    }
+    final lead = i == 0 ? promptW : 6;
+    var col = lead + remaining;
+    if (col > cols) col = cols;
+    return '\x1B[${top + i};${col}H';
+  }
+  // 兜底（offset 超出文本长度，理论不发生）：落到最后一行行首
+  final last = wrapped.length - 1;
+  return '\x1B[${top + last};1H';
 }
 
 Future<void> _sendText(String text) async {
