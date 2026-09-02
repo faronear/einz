@@ -1156,22 +1156,28 @@ void _historyDown(_TuiState s) {
 
 /// 输入光标 ANSI 定位序列：按输入文本内偏移 offset 找到所在行/列。
 /// 第 0 行行首有 prompt（promptW 列），续行行首 6 空格缩进；列钳制在终端宽度内。
+/// offset 是 UTF-16 代码单元偏移，但列位置必须按**显示宽度**换算——全角字符
+/// （中文等）占 2 列，若直接用代码单元数当列偏移，光标会落在全角字符中间。
 String _cursorPos(List<String> wrapped, int top, int promptW, int offset, int cols) {
-  var remaining = offset;
+  var consumed = 0; // 已跨过的输入文本代码单元数
   for (var i = 0; i < wrapped.length; i++) {
-    final lineLen = wrapped[i].length;
-    if (remaining > lineLen) {
-      remaining -= lineLen;
-      continue;
-    }
+    final line = wrapped[i];
     final lead = i == 0 ? promptW : 6;
-    var col = lead + remaining + 1; // +1：光标位于已渲染文本之后一列
-    if (col > cols) col = cols;
-    return '\x1B[${top + i};${col}H';
+    if (offset < consumed + line.length) {
+      final within = offset - consumed; // 本行内光标前的代码单元数
+      var col = lead + _displayWidth(line.substring(0, within)) + 1;
+      if (col > cols) col = cols;
+      return '\x1B[${top + i};${col}H';
+    }
+    consumed += line.length;
   }
-  // 兜底（offset 超出文本长度，理论不发生）：落到最后一行行首
+  // offset 落在最后一行末尾（或折行边界后移到下一行）：
+  // 光标位于整块输入文本之后一列
   final last = wrapped.length - 1;
-  return '\x1B[${top + last};1H';
+  final lead = last == 0 ? promptW : 6;
+  var col = lead + _displayWidth(wrapped[last]) + 1;
+  if (col > cols) col = cols;
+  return '\x1B[${top + last};${col}H';
 }
 
 Future<void> _sendText(String text) async {
