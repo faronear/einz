@@ -842,15 +842,13 @@ List<String> _formatMessage(ChatMessage m, int cols) {
     ];
   }
   // 对方消息：整块右对齐（右侧气泡风格），整条内容品红底——正文白字、
-  // [人名 时间] 黑字（跟在末行文末，与正文留 3 列空隙，不贴字）；
-  // 前导留白不上色（保持右对齐气泡感）
-  const labelGap = 3; // 正文与末尾标签的空隙列数
+  // [人名 时间] 黑字；前导留白不上色（保持右对齐气泡感）
   final suffix = '$_black[$who $time]$_reset';
-  final wrapped = _wrapByWidth(body, cols - _displayWidth(suffix) - labelGap);
+  final wrapped = _wrapByWidth(body, cols - _displayWidth(suffix) - 1);
   final lines = <String>[];
   for (var i = 0; i < wrapped.length; i++) {
     final content = i == wrapped.length - 1
-        ? '$_bgPink$_white${wrapped[i]}${' ' * labelGap}$suffix'
+        ? '$_bgPink$_white${wrapped[i]} $suffix'
         : '$_bgPink$_white${wrapped[i]}$_reset';
     lines.add('${' ' * (cols - _displayWidth(content))}$content');
   }
