@@ -4,6 +4,7 @@
 // 解密 / UUIDv7 全部集中于此，供 TUI 界面（einz_tui.dart）复用。
 // 定位不变：测试端明文落盘（同 store.dart），不上生产。
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -54,6 +55,16 @@ class ChatSession {
   /// 断线开始时间（WS 处于 connecting/reconnecting 时记录；connected 时清空）。
   /// 供 UI 状态栏显示"已断线 Ns"。
   DateTime? wsDownSince;
+
+  /// 自动补拉周期：WS 推送可能丢帧、断线期间的消息不会回放，定时增量拉取兜底
+  /// （同时顺带补发离线发送队列）。
+  static const autoSyncInterval = Duration(seconds: 30);
+
+  /// 周期兜底同步定时器（startWs 启动，stopWs 取消）。
+  Timer? _autoSyncTimer;
+
+  /// 后台同步并发保护（断线重连快路径 + 周期兜底共用，避免并发 sync）。
+  bool _autoSyncing = false;
 
   /// 当前 WS 状态（无连接时为 stopped）。
   WsStatus get wsStatus => wsClient?.status ?? WsStatus.stopped;
@@ -254,10 +265,13 @@ class ChatSession {
 
   /// 启动 WS 实时监听（message.new → 落盘 + 解密 + 追加展示缓存）。
   /// 收到 [onEvent]（已处理完消息后）回调，UI 据此重绘；
-  /// [onStatus]（连接状态变化）回调同样转发，UI 据此刷新状态栏。
+  /// [onStatus]（连接状态变化）回调同样转发，UI 据此刷新状态栏；
+  /// [onAutoSync]（后台自动补拉完成后，携带新增条数）回调——断线重连与周期兜底
+  /// 拉到的漏发消息已追加进展示缓存，UI 据此重绘（无需改状态栏）。
   void startWs({
     required void Function(ChatMessage msg) onMessage,
     void Function(WsStatus status)? onStatus,
+    void Function(int added)? onAutoSync,
   }) {
     if (server.isEmpty || store.sessionToken == null) return;
     wsClient = WsClient(
@@ -291,6 +305,7 @@ class ChatSession {
       },
       onStatus: (status) {
         // 维护断线时间：connected 清空，connecting/reconnecting 首次进入时记录
+        final wasDown = wsDownSince != null;
         switch (status) {
           case WsStatus.connected:
             wsDownSince = null;
@@ -300,15 +315,43 @@ class ChatSession {
           case WsStatus.stopped:
             break;
         }
+        // 断线后重连成功：立即补拉断线期间漏掉的消息（快路径；
+        // 周期兜底定时器在下方，双保险防漏）
+        if (status == WsStatus.connected && wasDown) {
+          _autoSync(onAutoSync: onAutoSync);
+        }
         onStatus?.call(status);
       },
     );
     wsClient!.start();
+    // 周期兜底同步：WS 推送丢帧/断线不回放漏消息时，定时增量拉取补齐
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = Timer.periodic(autoSyncInterval, (_) {
+      if (wsClient != null) _autoSync(onAutoSync: onAutoSync);
+    });
   }
 
   void stopWs() {
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = null;
     wsClient?.stop();
     wsClient = null;
+  }
+
+  /// 后台自动补拉（断线重连快路径 / 周期兜底共用）：增量同步 + 顺带补发离线队列，
+  /// 完成后回调 [onAutoSync]。并发保护：同一时间只跑一个；网络异常静默，
+  /// 等下一轮定时器或下次重连再试。
+  Future<void> _autoSync({void Function(int added)? onAutoSync}) async {
+    if (_autoSyncing) return;
+    _autoSyncing = true;
+    try {
+      final fresh = await sync();
+      onAutoSync?.call(fresh.length);
+    } catch (_) {
+      // 静默：后台补拉失败不打扰用户
+    } finally {
+      _autoSyncing = false;
+    }
   }
 
   /// 上传附件（PROTOCOL.md §6.1，两阶段先传后链）：加密文件 → 先上传密文 blob →

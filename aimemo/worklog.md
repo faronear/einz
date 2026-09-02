@@ -800,3 +800,18 @@
 **验证：** `dart analyze`（cli/shared）无问题、`npm test` 全绿、`tsc` 构建通过。
 
 **光标定位修复（同日跟进）：** 方向键功能上真机后老板反馈"输入文字紧贴 you>，但光标在固定隔开一段距离处"。根因有二：① `_displayWidth` 不剥除 ANSI 转义字节，`you>` prompt（含色码）被算成 14 列（实际 5 列）→ 光标定位到固定偏移处（同时使折行宽度、右对齐填充都偏窄，一并修复）；② `_cursorPos` 列公式差一列（光标应在已渲染文本之后）。修复：`_displayWidth` 跳过 `\x1B[...m` 序列；光标列 = lead + offset + 1。`dart analyze` 无问题。
+
+**全角光标修复（同日跟进）：** 中文输入时光标落在字符一半处——`_cursorPos` 用 UTF-16 代码单元数当列偏移，全角字符占 2 列。改为行内列 = 行首偏移 + `_displayWidth(光标前文本)` + 1，折行边界光标落到下一行行首。`dart analyze` 无问题。
+
+### 自动补拉：断线后/周期同步兜底（2026-09-02）
+
+**背景：** 老板反馈 A 发消息给 B 时若 B 临时断线，过后 B 收不到，必须手动 /sync。根因：WS 重连只重连、不回放断线期间的消息（hello 帧无 replay，消息只推送给已连接设备），chat_core 的 `onStatus` 只记录断线时间不触发补拉。
+
+**实现（commit 待提交）：** `ChatSession.startWs` 新增可选 `onAutoSync` 回调 + 两种补拉：
+- **重连快路径**：`onStatus` 里记录 wasDown，WS 从断线转 connected 时立即后台 `sync()` 补拉缺口；
+- **周期兜底**：`autoSyncInterval = 30s` 定时器增量拉取（WS 推送丢帧/断线不回放都兜住，顺带补发离线发送队列），`stopWs` 取消。
+并发保护 `_autoSyncing`；网络异常静默等下轮。TUI 4 处 `startWs` 调用点接 `onAutoSync: (_) => _render()`（静默重绘，不占状态栏）。
+
+**验证：** `dart analyze` 无问题；双端断线场景（probe 常驻 A + kill server 8s + B 发消息 + A 重连）probe 日志确认 `reconnecting×5 → connected → AUTOSYNC added=1 → FOUND-VIA-AUTOSYNC`（无需 /sync）。测试脚本 `cli/test/auto_sync_probe.dart` + `auto_sync_check.sh`（编排脚本在本工具非交互环境有进程回收挂起问题，真实终端可用）。
+
+**测试环境踩坑（demo 是自主模式前遗留）：** store-b.space_id 被旧 import 写死 space-demo 与登记的真实 space_id 不一致 → AAD 解密失败，需对齐双端 space_id；setup.sh 重跑会用 import 重置 space_id 故不能复用；server.pid 缺失时 stop.sh 空转，需 pkill。

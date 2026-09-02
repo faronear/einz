@@ -226,10 +226,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       stderr.writeln('⚠️ 名称处理异常: $e'); // 防崩 + 可诊断
     }
   }
-  // 设备名称（显示用，如 MacBook，回车不设置）——仅新设备（未登记）首次配置时询问；
+  // 设备名称（如 MacBook，回车不设置，以后可修改）——仅新设备（未登记）首次配置时询问；
   // 已登记设备重启不再重复询问（首次跳过则一直不设，状态条回退规范 id dev1）
   if (store.deviceId == null && (store.deviceName == null || store.deviceName!.isEmpty)) {
-    final name = await _prompt(session, '设备名称（显示用，如 MacBook，回车不设置）');
+    final name = await _prompt(session, '设备名称（如 MacBook，回车不设置，以后可修改）');
     if (name.isNotEmpty) {
       store.deviceName = name;
     }
@@ -271,7 +271,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           final aName = _probePersonNames['personA'] ?? '未设置';
           final bName = _probePersonNames['personB'] ?? '';
           final bShow = bName.isEmpty ? '未设置' : bName;
-          final choice = await _prompt(session, '你是第一个人（personA：$aName）还是第二个人（personB：$bShow）？输入 1 或 2');
+          final choice = await _prompt(session, '你是空间创建人（$aName）还是第二个人（personB：$bShow）？输入 1 或 2');
           if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
           if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
           session.messages.add(_systemMessage(session, '请输入 1（第一个人 personA）或 2（第二个人 personB）'));
@@ -307,7 +307,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             store.personId = r.personId;
             store.spaceId = r.spaceId;
             store.save(storePath);
-            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，您的新设备已加入私密空间 (device=${r.deviceId} person=${r.personId})'));
+            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，您的新设备已加入私密空间'));
             _scheduleRender();
             break;
           } catch (e2) {
@@ -349,13 +349,13 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       }
       try {
         await _busy(session, '⏳ 私密空间口令核对中......', () => session.accessByEscrow(passphrase));
-        session.messages.add(_systemMessage(session, '✅ 口令核对成功，您已进入我们的私密空间')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
+        session.messages.add(_systemMessage(session, '✅ 口令核对成功，您已进入自己的私密空间')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
         store.save(storePath);
         _scheduleRender();
         break;
       } catch (e3) {
-        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: $e3，请重新输入口令（口令由空间创建者 escrow 托管时设置）'));
+        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: $e3，请重新输入口令（由私密空间第一创建者设置）'));
         _scheduleRender();
       }
     }
@@ -424,6 +424,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     session.startWs(
       onMessage: (_) => _scheduleRender(),
       onStatus: (_) => _scheduleRender(),
+      onAutoSync: (_) => _scheduleRender(),
     );
   }
   _scheduleRender();
@@ -1214,7 +1215,7 @@ Future<void> _execCommand(String line) async {
           s.session.store.server = arg; // 持久化新地址
           s.session.store.save(s.session.storePath);
           if (s.session.wsClient == null && s.session.hasSession) {
-            s.session.startWs(onMessage: (_) => _render(), onStatus: (_) => _render());
+            s.session.startWs(onMessage: (_) => _render(), onStatus: (_) => _render(), onAutoSync: (_) => _render());
           }
           s.status = '✅ 已切换服务器并认证: $arg';
         } catch (e) {
@@ -1233,19 +1234,20 @@ Future<void> _execCommand(String line) async {
       }
       try {
         await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
-        // 认证结果作为 system 消息进消息流（不占顶部状态栏）
-        s.session.messages.add(_systemMessage(s.session, '✅ 令牌认证成功'));
+        // 验活结果作为 system 消息进消息流（不占顶部状态栏）
+        s.session.messages.add(_systemMessage(s.session, '✅ 令牌验活成功'));
         s.status = '';
         _refreshPersonNames(s); // 刷新 person 名称表（对方消息前缀显示其 person_name）
-        // 认证成功后启动 WS 实时监听
+        // 验活成功后启动 WS 实时监听
         if (s.session.wsClient == null && s.session.hasSession) {
           s.session.startWs(
             onMessage: (_) => _render(),
             onStatus: (_) => _render(),
+            onAutoSync: (_) => _render(),
           );
         }
       } catch (e) {
-        s.session.messages.add(_systemMessage(s.session, '⚠️ 认证失败: $e'));
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 令牌验活失败: $e'));
         s.status = '';
       }
     case '/space':
@@ -1286,7 +1288,7 @@ Future<void> _execCommand(String line) async {
       if (arg.isEmpty) {
         s.status = '用法: /rename <名字>';
       } else if (s.session.store.sessionToken == null) {
-        s.status = '未认证，请先 /auth';
+        s.status = '未验活，请先 /auth';
       } else {
         try {
           final old = s.session.store.personName ?? '(未设置)';
@@ -1304,7 +1306,7 @@ Future<void> _execCommand(String line) async {
       if (arg.isEmpty) {
         s.status = '用法: /device <设备名>';
       } else if (s.session.store.sessionToken == null) {
-        s.status = '未认证，请先 /auth';
+        s.status = '未验活，请先 /auth';
       } else {
         try {
           final old = s.session.store.deviceName ?? '(未设置)';
@@ -1328,12 +1330,12 @@ Future<void> _execCommand(String line) async {
 }
 
 /// /invite [personA|personB] [对方名称]：补发一次性邀请码（默认 personB=邀请对方，
-/// 给第二使用者；personA=给自己加新设备）。需先 /auth 认证。
+/// 给第二使用者；personA=给自己加新设备）。需先 /auth 验活。
 Future<void> _execInvite(List<String> parts) async {
   final s = _state!;
   final token = s.session.store.sessionToken;
   if (token == null) {
-    s.status = '未认证：先 /auth 刷新会话后再生成邀请码';
+    s.status = '未验活：先 /auth 刷新会话后再生成邀请码';
     return;
   }
   final personId = parts.length > 1 ? parts[1] : 'personB';
@@ -1358,7 +1360,7 @@ Future<void> _execInvite(List<String> parts) async {
   }
 }
 
-/// 输入循环接管的邀请码登记（/auth 未登记引导）：登记 → system 消息结果 → 认证 → WS。
+/// 输入循环接管的邀请码登记（/auth 未登记引导）：认证登记 → system 消息结果 → 验活 → WS。
 Future<void> _handleInviteInput(String inviteCode) async {
   final s = _state!;
   s.pendingInvite = false;
@@ -1388,10 +1390,11 @@ Future<void> _handleInviteInput(String inviteCode) async {
         s.session.startWs(
           onMessage: (_) => _render(),
           onStatus: (_) => _render(),
+          onAutoSync: (_) => _render(),
         );
       }
     } catch (e) {
-      s.session.messages.add(_systemMessage(s.session, '⚠️ 认证失败: $e'));
+      s.session.messages.add(_systemMessage(s.session, '⚠️ 令牌验活失败: $e'));
       s.status = '';
     }
   } catch (e) {
@@ -1456,7 +1459,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       // _busy：打包/上传期间插入"⏳ 口令正在加密打包您的空间......"、禁止输入、隐藏光标，
       // 完成后移除（替换为下方结果消息）——统一体验优化
       await _busy(session, '⏳ 口令正在加密打包您的空间......', () async {
-        await session.auth(); // challenge-response 认证（写入 store.sessionToken）
+        await session.auth(); // challenge-response 验活（写入 store.sessionToken）
         await KeyEscrowService(api).upload(
           passphrase: p1,
           spaceKeyB64: store.spaceKey!,
