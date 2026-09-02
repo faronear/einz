@@ -29,6 +29,8 @@ const _green = '$_esc[32m';
 const _yellow = '$_esc[33m';
 const _cyan = '$_esc[36m';
 const _gray = '$_esc[90m';
+const _black = '$_esc[30m'; // 黑字（粉红底上的对方标签：人名/时间戳）
+const _white = '$_esc[97m'; // 亮白字（粉红底上的对方消息正文）
 const _bold = '$_esc[1m';
 const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息正文底色（区分收发双方）
 
@@ -837,14 +839,15 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       ...wrapped.skip(1).map((line) => '$line'),
     ];
   }
-  // 对方消息：整块右对齐（右侧气泡风格），正文在右、末尾附 [who 时间] 标签，
-  // 前导空格填充到终端右缘（如：          今天来玩 [sisi 20260902-143001]）
-  final suffix = '$color[$who $time]$_reset';
+  // 对方消息：整块右对齐（右侧气泡风格），整条内容粉红底——正文亮白字、
+  // [人名 时间] 黑字；前导留白不上色（保持右对齐气泡感）
+  final suffix = '$_black[$who $time]$_reset';
   final wrapped = _wrapByWidth(body, cols - _displayWidth(suffix) - 1);
-  final pink = (String line) => '$_bgPink$line$_reset';
   final lines = <String>[];
   for (var i = 0; i < wrapped.length; i++) {
-    final content = i == wrapped.length - 1 ? '${pink(wrapped[i])} $suffix' : pink(wrapped[i]);
+    final content = i == wrapped.length - 1
+        ? '$_bgPink$_white${wrapped[i]} $suffix'
+        : '$_bgPink$_white${wrapped[i]}$_reset';
     lines.add('${' ' * (cols - _displayWidth(content))}$content');
   }
   return lines;
