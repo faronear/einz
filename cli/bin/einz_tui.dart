@@ -706,9 +706,9 @@ void _render() {
       '${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
     WsStatus.stopped => '${_gray}○ 离线${_reset}',
   };
-  // 各片段用灰色竖线分隔：Einz TUI | ● 在线 | person #device | 临时通知
+  // 各片段用灰色竖线分隔：Einz TUI | person #device | ● 在线 | 临时通知
   final sep = '${_gray}|${_reset}';
-  buf.write('${_bold}Einz TUI${_reset} $sep $wsName $sep ${_personLabel(s.session.store, s.personNames)}');
+  buf.write('${_bold}Einz TUI${_reset} $sep ${_personLabel(s.session.store, s.personNames)} $sep $wsName');
   if (s.status.isNotEmpty) {
     buf.write(' $sep ${_gray}${s.status}${_reset}');
   }
