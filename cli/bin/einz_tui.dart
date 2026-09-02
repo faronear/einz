@@ -831,10 +831,12 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   final body = m.plain.replaceAll('\n', ' ');
   if (m.isMine || m.isSystem) {
     // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐。
-    // 续行缩进 prefix 宽度，与第一行正文左缘对齐（否则续行顶格，视觉上从第二行起错位）
+    // 正文右侧预留 rightMargin 列边距，不顶满最右（与对方消息的视觉留白平衡）；
+    // 续行缩进 prefix 宽度，与第一行正文左缘对齐
+    const rightMargin = 4;
     final prefix = '$color[$who $time]$_reset ';
     final prefixW = _displayWidth(prefix);
-    final wrapped = _wrapByWidth(body, cols - prefixW);
+    final wrapped = _wrapByWidth(body, cols - prefixW - rightMargin);
     final indent = ' ' * prefixW;
     return [
       '$prefix${wrapped.first}',
