@@ -829,14 +829,16 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   }
   final time = _timeLabel(m.createdAt);
   final body = m.plain.replaceAll('\n', ' ');
+  // 双方消息的外侧留白（同为 16 列）：我方正文右侧 / 对方正文左侧；
+  // 保证对方正文起点不比我方正文（前缀之后）更靠左
+  const sideMargin = 16;
   if (m.isMine || m.isSystem) {
     // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐。
-    // 正文右侧预留 rightMargin 列边距，不顶满最右（与对方消息的视觉留白平衡）；
+    // 正文右侧预留 sideMargin 列边距，不顶满最右（与对方消息的视觉留白平衡）；
     // 续行缩进 prefix 宽度，与第一行正文左缘对齐
-    const rightMargin = 15; // 与对方消息左侧留白同宽
     final prefix = '$color[$who $time]$_reset ';
     final prefixW = _displayWidth(prefix);
-    final wrapped = _wrapByWidth(body, cols - prefixW - rightMargin);
+    final wrapped = _wrapByWidth(body, cols - prefixW - sideMargin);
     final indent = ' ' * prefixW;
     return [
       '$prefix${wrapped.first}',
@@ -846,13 +848,25 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   // 对方消息：整块右对齐（右侧气泡风格），整条内容品红底——正文白字、
   // [人名 时间] 黑字；前导留白不上色（保持右对齐气泡感）
   final suffix = '$_black[$who $time]$_reset';
-  final wrapped = _wrapByWidth(body, cols - _displayWidth(suffix) - 1);
+  final suffixW = _displayWidth(suffix);
+  // 正文每行同时保留：左侧 sideMargin 列留白（不顶左边框）+ 右侧标签栏；
+  // 标签栏宽 = "空格+标签"（标签宽+1），使续行正文右缘与末行标签起点对齐
+  // （末行正文与标签之间有一个空格，若只空标签宽则续行会多伸 1 列）
+  final lane = suffixW + 1; // 右侧标签栏宽（含标签前一个空格）
+  final leftPad = sideMargin; // 左侧留白 = 我方正文右侧留白（16 列）
+  final textWidth = cols - lane - leftPad;
+  final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
   final lines = <String>[];
   for (var i = 0; i < wrapped.length; i++) {
-    final content = i == wrapped.length - 1
-        ? '$_bgPink$_white${wrapped[i]} $suffix'
-        : '$_bgPink$_white${wrapped[i]}$_reset';
-    lines.add('${' ' * (cols - _displayWidth(content))}$content');
+    if (i == wrapped.length - 1) {
+      // 末行：正文 + 1 空格 + 标签，右端贴屏缘
+      final content = '$_bgPink$_white${wrapped[i]} $suffix';
+      lines.add('${' ' * (cols - _displayWidth(content))}$content');
+    } else {
+      // 非末行：固定左侧留白，正文右端自然停在标签栏前（右侧留白 = 标签宽）
+      final content = '$_bgPink$_white${wrapped[i]}$_reset';
+      lines.add('${' ' * leftPad}$content');
+    }
   }
   return lines;
 }
