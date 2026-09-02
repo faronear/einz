@@ -148,7 +148,12 @@
 ```
 
 - 只接受加密 blob；Server 校验 `size` 与 `sha256` 后落盘。
-- 上传前必须先有对应 message（先 POST /messages 再传附件）。
+- **两阶段上传（先 blob 后消息）**：客户端先 `POST /attachments` 上传 blob（此时对应
+  message 可尚不存在，Server 不要求 message 先存在），blob 就位后再 `POST /messages`
+  建立关联。避免"消息已广播但对端 blob 缺失"：消息一旦上链就会被 WS 推送/同步到对端，
+  若 blob 后传失败对端将看到打不开的附件。
+- 孤儿清理：blob 已传但消息未发出（上传成功后 `POST /messages` 失败）的孤儿附件，
+  超过 10 分钟仍无对应 message 时由 Server 定期清理（随每小时清理任务）。
 
 ### 6.2 下载 GET /attachments/:id
 

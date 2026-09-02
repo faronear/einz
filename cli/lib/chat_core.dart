@@ -311,7 +311,9 @@ class ChatSession {
     wsClient = null;
   }
 
-  /// 上传附件（PROTOCOL.md §6.1）：加密文件 → 发附件消息（正文为描述）→ 上传密文 blob。
+  /// 上传附件（PROTOCOL.md §6.1，两阶段先传后链）：加密文件 → 先上传密文 blob →
+  /// 再发附件消息（正文为描述）。blob 就位后才发消息，避免"消息已广播但对端 blob
+  /// 缺失"的幽灵消息；blob 已传但消息发送失败时，孤儿 blob 由服务端定期清理。
   /// 返回 (messageId, attachmentId, caption)。
   Future<({String messageId, String attachmentId, String caption})> attachFile(
     String filePath, {
@@ -338,7 +340,7 @@ class ChatSession {
       keyVersion: store.keyVersion,
     );
 
-    // 2) 先发附件消息（正文为描述文本，密文上链）
+    // 2) 先上传附件 blob（Server 校验 size + sha256；对应 message 此时可尚不存在）
     final env = await encryptMessage(
       plaintext: cap,
       spaceKey: base64Decode(store.spaceKey!),
@@ -350,9 +352,6 @@ class ChatSession {
       keyVersion: store.keyVersion,
     );
     final api = ApiClient(server);
-    final msg = await _withAutoAuth((token) => api.postMessage(env, token));
-
-    // 3) 再上传附件 blob（Server 校验 size + sha256）
     final att = await _withAutoAuth((token) => api.postAttachment(
           messageId: messageId,
           attachmentId: attachmentId,
@@ -363,6 +362,9 @@ class ChatSession {
           blob: enc.cipher,
           token: token,
         ));
+
+    // 3) 再发附件消息（正文为描述文本，密文上链）
+    final msg = await _withAutoAuth((token) => api.postMessage(env, token));
 
     // 4) 落盘：附件元数据 + 消息历史 + 推进锚点
     store.upsertAttachment(

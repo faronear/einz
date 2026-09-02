@@ -596,8 +596,9 @@ Future<void> _cmdHistory(ArgResults opts) async {
   stdout.writeln('ℹ️  共 ${envs.length} 条本地消息');
 }
 
-/// 上传附件：本地文件加密 → 先发一条附件消息（type=image/video/voice）→
-/// 再上传密文 blob（PROTOCOL.md §6.1：必须先有对应 message）。
+/// 上传附件：本地文件加密 → 先上传密文 blob → 再发附件消息（type=image/video/voice）。
+/// 两阶段先传后链（PROTOCOL.md §6.1）：blob 就位后才发消息，避免"消息已广播但对端
+/// blob 缺失"的幽灵消息；消息发送失败时孤儿 blob 由服务端定期清理。
 Future<void> _cmdAttach(ArgResults opts) async {
   final path = _require(opts, 'store');
   final store = DeviceStore.load(path);
@@ -627,7 +628,7 @@ Future<void> _cmdAttach(ArgResults opts) async {
     keyVersion: store.keyVersion,
   );
 
-  // 2) 先发附件消息（正文为描述文本，密文上链）
+  // 2) 先上传附件 blob（Server 校验 size + sha256；对应 message 此时可尚不存在）
   final env = await encryptMessage(
     plaintext: caption,
     spaceKey: base64Decode(store.spaceKey!),
@@ -638,9 +639,6 @@ Future<void> _cmdAttach(ArgResults opts) async {
     keyVersion: store.keyVersion,
   );
   final api = ApiClient(server);
-  final msg = await api.postMessage(env, store.sessionToken!);
-
-  // 3) 再上传附件 blob（Server 校验 size + sha256）
   final att = await api.postAttachment(
     messageId: messageId,
     attachmentId: attachmentId,
@@ -651,6 +649,9 @@ Future<void> _cmdAttach(ArgResults opts) async {
     blob: enc.cipher,
     token: store.sessionToken!,
   );
+
+  // 3) 再发附件消息（正文为描述文本，密文上链）
+  final msg = await api.postMessage(env, store.sessionToken!);
 
   // 4) 落盘：附件元数据 + 消息历史 + 推进锚点
   store.upsertAttachment(

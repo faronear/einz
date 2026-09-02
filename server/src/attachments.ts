@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { join, resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db.js";
@@ -55,8 +55,6 @@ export function storeAttachment(
   assertSafeId(meta.message_id, "message_id");
 
   const db = getDb();
-  const msg = db.prepare(`SELECT message_id FROM messages WHERE message_id = ?`).get(meta.message_id);
-  if (!msg) throw new ApiError("INVALID_REQUEST", "message not found", 400);
 
   if (blob.length !== meta.size) throw new ApiError("INVALID_REQUEST", "size mismatch", 400);
   const sha = createHash("sha256").update(blob).digest("base64");
@@ -110,4 +108,31 @@ export function attachmentsForMessages(messageIds: string[]): AttachmentMeta[] {
        FROM attachments WHERE message_id IN (${placeholders})`
     )
     .all(...messageIds) as AttachmentMeta[];
+}
+
+/** 孤儿附件窗口：两阶段上传（先 blob 后 message，PROTOCOL.md §6.1）正常间隔毫秒级，
+ *  超过该窗口仍无对应 message 的 blob 视为孤儿（blob 已传但消息未发出/发送失败）。 */
+const ORPHAN_WINDOW_MS = 10 * 60 * 1000;
+
+/** 清理孤儿附件（无对应 message 且超过窗口期的 blob：删文件 + 删记录），返回清理数量。
+ *  随 cleanupExpired 每小时定期调用。 */
+export function cleanupOrphanAttachments(): number {
+  const db = getDb();
+  const cutoff = Date.now() - ORPHAN_WINDOW_MS;
+  const orphans = db
+    .prepare(
+      `SELECT attachment_id, storage_path FROM attachments a
+       WHERE a.created_at < ? AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.message_id = a.message_id)`
+    )
+    .all(cutoff) as { attachment_id: string; storage_path: string }[];
+  for (const o of orphans) {
+    const full = join(FILES_ROOT, o.storage_path);
+    try {
+      if (existsSync(full)) rmSync(full, { force: true });
+    } catch {
+      // 文件已缺失则跳过（记录仍删）
+    }
+    db.prepare(`DELETE FROM attachments WHERE attachment_id = ?`).run(o.attachment_id);
+  }
+  return orphans.length;
 }

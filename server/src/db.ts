@@ -42,7 +42,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/app.
 
     CREATE TABLE IF NOT EXISTS attachments (
       attachment_id TEXT PRIMARY KEY,
-      message_id    TEXT NOT NULL REFERENCES messages(message_id),
+      message_id    TEXT NOT NULL,
       space_id      TEXT NOT NULL,
       key_version   INTEGER NOT NULL,
       size          INTEGER NOT NULL,
@@ -108,6 +108,32 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/app.
     db.exec(`ALTER TABLE devices ADD COLUMN device_name TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
+  }
+  // 迁移：attachments.message_id 去掉外键（两阶段上传：blob 可先于 message 存在，
+  // PROTOCOL.md §6.1）。SQLite 无法 ALTER 删除外键，检测到旧 schema 则重建表。
+  const attFks = db.pragma("foreign_key_list(attachments)") as unknown as Array<{ table: string }>;
+  if (attFks.some((f) => f.table === "messages")) {
+    db.pragma("foreign_keys = OFF");
+    db.exec(`
+      BEGIN;
+      CREATE TABLE attachments_new (
+        attachment_id TEXT PRIMARY KEY,
+        message_id    TEXT NOT NULL,
+        space_id      TEXT NOT NULL,
+        key_version   INTEGER NOT NULL,
+        size          INTEGER NOT NULL,
+        sha256        TEXT NOT NULL,
+        nonce         TEXT NOT NULL,
+        storage_path  TEXT NOT NULL,
+        created_at    INTEGER NOT NULL
+      );
+      INSERT INTO attachments_new SELECT attachment_id, message_id, space_id, key_version, size, sha256, nonce, storage_path, created_at FROM attachments;
+      DROP TABLE attachments;
+      ALTER TABLE attachments_new RENAME TO attachments;
+      CREATE INDEX idx_attachments_msg ON attachments (message_id);
+      COMMIT;
+    `);
+    db.pragma("foreign_keys = ON");
   }
   return db;
 }

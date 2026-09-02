@@ -4,7 +4,7 @@ import { loadConfig, type ServerConfig } from "./config.js";
 import { getDb, openDb } from "./db.js";
 import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
-import { getAttachmentBlob, storeAttachment } from "./attachments.js";
+import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./attachments.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
@@ -243,8 +243,11 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
   res.end(JSON.stringify(data));
 }
 
-// 定期清理过期 challenge/session
-setInterval(cleanupExpired, 60 * 60 * 1000).unref();
+// 定期清理过期 challenge/session 与孤儿附件（两阶段上传失败残留的 blob）
+setInterval(() => {
+  cleanupExpired();
+  cleanupOrphanAttachments();
+}, 60 * 60 * 1000).unref();
 
 server.listen(PORT, () => {
   console.log(`[einz] server listening on :${PORT} space=${cfg.space_id}`);

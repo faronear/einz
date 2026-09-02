@@ -783,3 +783,7 @@
 - 状态栏各片段改用灰色竖线 `|` 分隔，去掉 `WS:` 前缀，身份片段 `person@device` → `person #device`，最终样式：`Einz TUI | ● 在线 | steffi #macbook | 临时通知`；同步更新 docs/ONBOARDING.md。
 - `/help` 与裸 `/` 的命令列表改为 system 消息进消息流（随消息区滚动），不再占用顶部状态栏通知。
 - **附件上传修复：** `/attach <file>` 报 `HandshakeException: Connection terminated during handshake`——根因是 `ApiClient.postAttachment`/`getAttachment` 未套 `_withRetry`（其余请求都有），大 blob 上传耗时长、网络抖动/握手中断时直接失败且不重试。修复：shared `api_client.dart` 两方法套 `_withRetry`（3 次退避重试，与设计注释"翻墙/网络抖动下的间歇性握手失败不致命"一致；server 端只在收到完整 body 且 size/sha256 校验通过后落盘，重试幂等安全）。
+
+**遗留问题（老板决策后修复）：** 老板选择**先传 blob 再发消息**方案（杜绝幽灵消息）。实现（commit 待提交）：server `attachments.message_id` 去掉外键（旧库自动重建迁移）+ `storeAttachment` 不再要求 message 先存在 + 新增 `cleanupOrphanAttachments`（孤儿窗口 10 分钟，随每小时清理任务）；cli `attachFile`/`_cmdAttach` 改为先上传 blob 再发消息；PROTOCOL.md §6.1 更新两阶段协议。验证：`dart analyze` 无问题、`tsc` 构建通过、`server/test/verify_two_phase.mjs`（新写验证脚本）四步全过——blob 先于 message 上传 200、再发消息关联成功、sync 返回 attachments_meta、孤儿清理删文件+记录且正常附件保留。
+
+**发现存量问题（与本任务无关）：** `npm test`（smoke.test.ts）基线即失败——config.ts 早已改为"自主模式"（白名单只认 devices 表动态登记，不再读 config.json），而 smoke.test.ts 仍用旧 config.json 白名单方式（dev-a1 未登记 → challenge 403）。修复需把测试改为先 POST /devices/enroll 再认证，待老板安排。
