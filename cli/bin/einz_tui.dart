@@ -240,7 +240,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 
   // 设备登记：未登记才 enroll（首设备自举 / 凭邀请码加入）——已登记设备（重启
   // 进入）跳过 enroll，直接走认证/TUI（否则服务端 activeCount>0 会误判"空间
-  // 已有设备"要求邀请码，创建者自己被挡在门外）
+  // 已有设备"要求邀请码，发起者自己被挡在门外）
   if (server.isNotEmpty && (store.deviceId == null || store.spaceId == null)) {
     try {
       final r = await _busy(session, '⏳ 设备登记中......', () => ApiClient(server).enrollDevice(
@@ -253,9 +253,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.personId = r.personId;
       store.spaceId = r.spaceId;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 首设备自举成功（你是空间创建者）: device=${r.deviceId} person=${r.personId}'));
+      session.messages.add(_systemMessage(session, '✅ 首设备自举成功（你是私密空间发起者）: device=${r.deviceId} person=${r.personId}'));
       _scheduleRender();
-      // 创建者：生成 Space Key + 上传口令托管包（两次确认，机密 *）
+      // 发起者：生成 Space Key + 上传口令托管包（两次确认，机密 *）
       final sk = await generateSpaceKey();
       store.spaceKey = base64Encode(sk);
       store.save(storePath);
@@ -270,18 +270,17 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         String? chosenPerson;
         while (true) {
           if (!_state!.running) break;
-          final aName = _probePersonNames['personA'] ?? '未设置';
+          final aName = _probePersonNames['personA'] ?? '';
           final bName = _probePersonNames['personB'] ?? '';
-          final bShow = bName.isEmpty ? '未设置' : bName;
-          final choice = await _prompt(session, '你是私密空间创建人（$aName）还是（personB：$bShow）？输入 1 或 2');
+          final choice = await _prompt(session, '你是 1）发起者 $aName 还是 2）配对者 $bName？输入 1 或 2');
           if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
           if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
-          session.messages.add(_systemMessage(session, '请输入 1（第一个人 personA）或 2（第二个人 personB）'));
+          session.messages.add(_systemMessage(session, '请输入 1（发起者 $aName）或 2（配对者）'));
           _scheduleRender();
         }
         if (chosenPerson == 'personB' && (_probePersonNames['personB'] ?? '').isEmpty) {
           // personB 还没有名称——要求输入显示名
-          final name = await _prompt(session, 'personB 还没有名称，请输入显示名（如 steffi）：');
+          final name = await _prompt(session, '你还没有设置名字，请输入您的名字（例如 steffi）：');
           if (name.isNotEmpty) store.personName = name;
         } else if (chosenPerson == 'personA') {
           store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
@@ -357,7 +356,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         _scheduleRender();
         break;
       } catch (e3) {
-        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: $e3，请重新输入口令（由私密空间第一创建者设置）'));
+        session.messages.add(_systemMessage(session, '⚠️ 口令核对失败: $e3，请重新输入口令（由私密空间发起者设置）'));
         _scheduleRender();
       }
     }
@@ -369,7 +368,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     store.save(storePath);
   }
 
-  // 已登记但口令托管包未上传（创建者引导中断）：重启再进引导设置口令。
+  // 已登记但口令托管包未上传（发起者引导中断）：重启再进引导设置口令。
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
     session.messages.add(_systemMessage(session, '检测到尚未设置私密空间口令，现在设置: '));
@@ -831,12 +830,15 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   final time = _timeLabel(m.createdAt);
   final body = m.plain.replaceAll('\n', ' ');
   if (m.isMine || m.isSystem) {
-    // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐
+    // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐。
+    // 续行缩进 prefix 宽度，与第一行正文左缘对齐（否则续行顶格，视觉上从第二行起错位）
     final prefix = '$color[$who $time]$_reset ';
-    final wrapped = _wrapByWidth(body, cols - _displayWidth(prefix));
+    final prefixW = _displayWidth(prefix);
+    final wrapped = _wrapByWidth(body, cols - prefixW);
+    final indent = ' ' * prefixW;
     return [
       '$prefix${wrapped.first}',
-      ...wrapped.skip(1).map((line) => '$line'),
+      ...wrapped.skip(1).map((line) => '$indent$line'),
     ];
   }
   // 对方消息：整块右对齐（右侧气泡风格），整条内容品红底——正文白字、
@@ -1446,7 +1448,7 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
     s.session.store.save(s.session.storePath);
   } catch (e) {
     // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？Server 已有创建者托管包？）'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？私密空间已有口令托管包？）'));
   }
 }
 
