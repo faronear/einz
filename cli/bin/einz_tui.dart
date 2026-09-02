@@ -271,7 +271,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           final aName = _probePersonNames['personA'] ?? '未设置';
           final bName = _probePersonNames['personB'] ?? '';
           final bShow = bName.isEmpty ? '未设置' : bName;
-          final choice = await _prompt(session, '你是空间创建人（$aName）还是第二个人（personB：$bShow）？输入 1 或 2');
+          final choice = await _prompt(session, '你是私密空间创建人（$aName）还是（personB：$bShow）？输入 1 或 2');
           if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
           if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
           session.messages.add(_systemMessage(session, '请输入 1（第一个人 personA）或 2（第二个人 personB）'));
@@ -785,9 +785,16 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
   return '${_bold}$person$_reset #$device';
 }
 
+/// 消息时间标签：本地时间 YYYYMMDD-HHMMSS（如 20260902-143001）。
+String _timeLabel(int createdAt) {
+  final t = DateTime.fromMillisecondsSinceEpoch(createdAt);
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${t.year}${two(t.month)}${two(t.day)}-${two(t.hour)}${two(t.minute)}${two(t.second)}';
+}
+
 /// 格式化消息为多行（自动按列宽折行）。
 /// 自己的消息：绿色前缀 + 普通正文（左对齐）；对方消息：整块右对齐（右侧气泡风格，
-/// 正文在右、末尾附 [who seq v] 元数据）；系统提示（isSystem）：灰色前缀 + 普通正文。
+/// 正文在右、末尾附 [who 时间] 标签）；系统提示（isSystem）：灰色前缀 + 普通正文。
 List<String> _formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
@@ -811,20 +818,20 @@ List<String> _formatMessage(ChatMessage m, int cols) {
         : '对方';
     color = _yellow;
   }
-  final seq = m.seq == null ? '' : ' seq=${m.seq}';
+  final time = _timeLabel(m.createdAt);
   final body = m.plain.replaceAll('\n', ' ');
   if (m.isMine || m.isSystem) {
     // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐
-    final prefix = '$color[$who$seq v${m.keyVersion}]$_reset ';
+    final prefix = '$color[$who $time]$_reset ';
     final wrapped = _wrapByWidth(body, cols - _displayWidth(prefix));
     return [
       '$prefix${wrapped.first}',
       ...wrapped.skip(1).map((line) => '$line'),
     ];
   }
-  // 对方消息：整块右对齐（右侧气泡风格），正文在右、末尾附 [who seq v] 元数据，
-  // 前导空格填充到终端右缘（如：          今天来玩 [sisi seq=31 v1]）
-  final suffix = '$color[$who$seq v${m.keyVersion}]$_reset';
+  // 对方消息：整块右对齐（右侧气泡风格），正文在右、末尾附 [who 时间] 标签，
+  // 前导空格填充到终端右缘（如：          今天来玩 [sisi 20260902-143001]）
+  final suffix = '$color[$who $time]$_reset';
   final wrapped = _wrapByWidth(body, cols - _displayWidth(suffix) - 1);
   final pink = (String line) => '$_bgPink$line$_reset';
   final lines = <String>[];
