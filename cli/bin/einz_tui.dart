@@ -1003,7 +1003,13 @@ Future<void> _execCommand(String line) async {
 
   switch (cmd) {
     case '/help':
-      s.status = '命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /rename <名字> /device <设备名> /sync /history /attach <file> /exit';
+    case '/':
+      // 命令列表作为 system 消息进消息流（随消息区滚动，不占顶部状态栏）
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '可用命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /rename <名字> /device <设备名> /sync /history /attach <file> /exit',
+      ));
+      s.status = '';
     case '/server':
       if (arg.isEmpty) {
         s.status = '当前服务器: ${s.session.server}；用法: /server <地址>';
