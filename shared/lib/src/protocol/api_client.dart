@@ -153,6 +153,7 @@ class ApiClient {
   }
 
   /// 上传附件密文 blob（PROTOCOL.md §6.1）：元数据走 x-attachment-meta 头，body 为密文。
+  /// 大 blob 上传耗时更长，更易受网络抖动/握手中断影响，故同样套 _withRetry 重试。
   Future<Map<String, dynamic>> postAttachment({
     required String messageId,
     required String attachmentId,
@@ -162,51 +163,55 @@ class ApiClient {
     required String nonce,
     required Uint8List blob,
     required String token,
-  }) async {
-    final client = _client;
-    try {
-      final req = await client.postUrl(Uri.parse('$baseUrl${Api.attachments}'));
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      req.headers.set('x-attachment-meta', jsonEncode({
-        'message_id': messageId,
-        'attachment_id': attachmentId,
-        'key_version': keyVersion,
-        'size': size,
-        'sha256': sha256,
-        'nonce': nonce,
-      }));
-      req.headers.contentType = ContentType.binary;
-      req.add(blob);
-      final res = await req.close();
-      final text = await res.transform(utf8.decoder).join();
-      if (res.statusCode >= 400) {
-        throw _errorFrom(res.statusCode, text);
+  }) {
+    return _withRetry(() async {
+      final client = _client;
+      try {
+        final req = await client.postUrl(Uri.parse('$baseUrl${Api.attachments}'));
+        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        req.headers.set('x-attachment-meta', jsonEncode({
+          'message_id': messageId,
+          'attachment_id': attachmentId,
+          'key_version': keyVersion,
+          'size': size,
+          'sha256': sha256,
+          'nonce': nonce,
+        }));
+        req.headers.contentType = ContentType.binary;
+        req.add(blob);
+        final res = await req.close();
+        final text = await res.transform(utf8.decoder).join();
+        if (res.statusCode >= 400) {
+          throw _errorFrom(res.statusCode, text);
+        }
+        return jsonDecode(text) as Map<String, dynamic>;
+      } finally {
+        client.close(force: true);
       }
-      return jsonDecode(text) as Map<String, dynamic>;
-    } finally {
-      client.close(force: true);
-    }
+    });
   }
 
   /// 下载附件密文 blob（PROTOCOL.md §6.2）。
-  Future<Uint8List> getAttachment(String attachmentId, String token) async {
-    final client = _client;
-    try {
-      final req = await client.getUrl(Uri.parse('$baseUrl${Api.attachments}/$attachmentId'));
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      final res = await req.close();
-      if (res.statusCode >= 400) {
-        final text = await res.transform(utf8.decoder).join();
-        throw _errorFrom(res.statusCode, text);
+  Future<Uint8List> getAttachment(String attachmentId, String token) {
+    return _withRetry(() async {
+      final client = _client;
+      try {
+        final req = await client.getUrl(Uri.parse('$baseUrl${Api.attachments}/$attachmentId'));
+        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        final res = await req.close();
+        if (res.statusCode >= 400) {
+          final text = await res.transform(utf8.decoder).join();
+          throw _errorFrom(res.statusCode, text);
+        }
+        final builder = BytesBuilder(copy: false);
+        await for (final chunk in res) {
+          builder.add(chunk);
+        }
+        return builder.takeBytes();
+      } finally {
+        client.close(force: true);
       }
-      final builder = BytesBuilder(copy: false);
-      await for (final chunk in res) {
-        builder.add(chunk);
-      }
-      return builder.takeBytes();
-    } finally {
-      client.close(force: true);
-    }
+    });
   }
 
   Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(

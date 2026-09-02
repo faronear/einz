@@ -775,3 +775,11 @@
 **runner 磁盘占用说明：** 常驻大头是基础镜像 ~2 GB（一次下载）；每个 job 容器临时创建、结束即删；JDK/Flutter/Android SDK（~2–4 GB）在容器内每次重新下载。建议：容器挂载 `~/.gradle`、`~/.pub-cache` 跨构建复用（省时省盘）+ 定期 `docker system prune -a`。
 
 **待办：** Oracle 服务器按 §1.3 部署并跑通首次构建；挂载缓存优化（构建提速）。
+
+### TUI 状态栏美化与附件上传修复（2026-09-02）
+
+**产出（commit 7cd948f / ed12b3a / 601397b / a3784f2 / 待提交）：**
+
+- 状态栏各片段改用灰色竖线 `|` 分隔，去掉 `WS:` 前缀，身份片段 `person@device` → `person #device`，最终样式：`Einz TUI | ● 在线 | steffi #macbook | 临时通知`；同步更新 docs/ONBOARDING.md。
+- `/help` 与裸 `/` 的命令列表改为 system 消息进消息流（随消息区滚动），不再占用顶部状态栏通知。
+- **附件上传修复：** `/attach <file>` 报 `HandshakeException: Connection terminated during handshake`——根因是 `ApiClient.postAttachment`/`getAttachment` 未套 `_withRetry`（其余请求都有），大 blob 上传耗时长、网络抖动/握手中断时直接失败且不重试。修复：shared `api_client.dart` 两方法套 `_withRetry`（3 次退避重试，与设计注释"翻墙/网络抖动下的间歇性握手失败不致命"一致；server 端只在收到完整 body 且 size/sha256 校验通过后落盘，重试幂等安全）。
