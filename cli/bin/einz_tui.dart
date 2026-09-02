@@ -785,11 +785,19 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
   return '${_bold}$person$_reset #$device';
 }
 
-/// 消息时间标签：本地时间 HH:MM（如 14:30）。
+/// 消息时间标签（本地时间，参照渲染时刻）：
+/// 今天 → HH:MM（如 14:30）；跨天（同年）→ MM月DD号 HH:MM（如 9月2号 14:30）；
+/// 跨年 → 再补年份（如 2026年9月2号 14:30）。
 String _timeLabel(int createdAt) {
   final t = DateTime.fromMillisecondsSinceEpoch(createdAt);
+  final now = DateTime.now();
   String two(int n) => n.toString().padLeft(2, '0');
-  return '${two(t.hour)}:${two(t.minute)}';
+  final hm = '${two(t.hour)}:${two(t.minute)}';
+  final sameDay = t.year == now.year && t.month == now.month && t.day == now.day;
+  if (sameDay) return hm;
+  final md = '${t.month}月${t.day}号';
+  if (t.year == now.year) return '$md $hm';
+  return '${t.year}年$md $hm';
 }
 
 /// 格式化消息为多行（自动按列宽折行）。
