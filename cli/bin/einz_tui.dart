@@ -682,7 +682,7 @@ void _render() {
       '${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
     WsStatus.stopped => '${_gray}○ 离线${_reset}',
   };
-  // 各片段用灰色竖线分隔：Einz TUI | ● 在线 | person@device | 临时通知
+  // 各片段用灰色竖线分隔：Einz TUI | ● 在线 | person #device | 临时通知
   final sep = '${_gray}|${_reset}';
   buf.write('${_bold}Einz TUI${_reset} $sep $wsName $sep ${_personLabel(s.session.store, s.personNames)}');
   if (s.status.isNotEmpty) {
@@ -745,7 +745,7 @@ void _render() {
   }
 }
 
-/// 状态条身份标签：person_name@device_name（远程名称表优先——同 person 多设备同步
+/// 状态条身份标签：person_name #device_name（远程名称表优先——同 person 多设备同步
 /// 显示最新名字；未拉取/未知回退本地 store，再回退规范 id）。
 String _personLabel(DeviceStore store, Map<String, String> personNames) {
   final pid = store.personId;
@@ -754,7 +754,7 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
       store.personId ??
       '-';
   final device = store.deviceName ?? store.deviceId ?? '-';
-  return '$person@$device';
+  return '$person #$device';
 }
 
 /// 格式化消息为多行（第一行带归属前缀，续行裸正文，自动按列宽折行）。
