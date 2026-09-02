@@ -22,6 +22,23 @@ void main() {
     expect(decoded.spaceId, 'space-demo');
   });
 
+  test('encode/decode 往返：含邀请码', () {
+    final info = JoinInfo(spaceId: 'space-demo', passphrase: '123456', inviteCode: 'ABC-xyz-987');
+    final raw = info.encode();
+    expect(raw, 'einz-join-v1?space=space-demo&p=123456&i=ABC-xyz-987');
+    final decoded = JoinInfo.decode(raw);
+    expect(decoded, isNotNull);
+    expect(decoded!.inviteCode, 'ABC-xyz-987');
+  });
+
+  test('旧格式（无邀请码）解码兼容：inviteCode 为 null', () {
+    final decoded = JoinInfo.decode('einz-join-v1?space=space-demo&p=123456');
+    expect(decoded, isNotNull);
+    expect(decoded!.spaceId, 'space-demo');
+    expect(decoded.passphrase, '123456');
+    expect(decoded.inviteCode, isNull);
+  });
+
   test('格式不符返回 null', () {
     expect(JoinInfo.decode('https://einz.tic.cc/foo'), isNull);
     expect(JoinInfo.decode('einz-join-v1?space=only'), isNull); // 缺 p

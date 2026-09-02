@@ -828,3 +828,26 @@
 - 新增 `_backfillTimestamps()` 存量自愈：检测到坏时间戳（<1e11，1973 年前）时全量拉取服务端消息、按 message_id 幂等覆盖为真实 created_at，随后 `loadHistory()` 重建展示缓存让当前会话立即正确；失败静默下次再试。
 
 **验证：** `dart analyze` 无问题；`cli/test/timestamp_check.dart`（自包含：脚本内拉起 server 子进程，不依赖后台进程）——store-a 原有坏数据（ca=1,2,3,13,14,15）已被 sync 治愈；再故意改坏一条（ca=7）后重跑，回填为真实值 1788325059952 ✅。
+
+### App 端启动流程自动化（去掉 config.json 白名单，2026-09-02）
+
+**背景：** 服务端早已全自动登记（devices 表 enroll：首设备免邀请码自举、之后凭邀请码；challenge 校验 devices 表），但 App 启动向导还停留在旧时代——从不调用 enrollDevice，仍要求用户把公钥手动加进服务器 config.json 白名单并重启，再粘贴 sealed 副本。
+
+**调研结论：** shared 的 ApiClient 已具备 enrollDevice/challenge/verify/createInvite/KeyEscrowService 全部能力，无需改 shared 协议与 server；enrollDevice 对已 active 设备幂等 → 存量设备无迁移负担。App 流程唯一缺口 = 认证前缺少 enroll 步骤、deviceId/spaceId 用了本地临时值而非登记返回值。
+
+**设计（老板拍板）：** Android + iOS 一起改（纯 Flutter 层同构）；对方加入的邀请码打包进分享二维码（一键加入）。
+
+**实现（纯 Flutter/App + shared 一处）：**
+- shared JoinInfo 扩展可选 inviteCode（`&i=` 参数，旧格式无码仍可解码，兼容）；新增 3 个编解码单测。
+- setup_page.dart 向导改造：
+  - create：白名单步骤 → **登记设备（自动自举）**；失败（服务器已有空间）提示改用"加入"向导；分享步骤先"生成邀请码（personB）"再展示含邀请码+口令的二维码，可重新生成；
+  - join：加入页新增邀请码字段，扫码自动填入（含新码）；PIN 步先凭邀请码 enroll 再认证再拉托管；
+  - advanced（sealed 导入）：同样先凭邀请码 enroll；
+  - 认证（challenge）一律用登记返回的真实 deviceId；escrow/分享用登记返回的真实 spaceId（弃 space-demo 默认值）；_finish 进聊天页用登记值。
+  - 新增 SetupPage 测试注入 enrollOverride/createInviteOverride（与既有 probeServer/db 同模式）。
+- l10n zh/en ARB 同步（删白名单文案、新增登记/邀请码文案），flutter gen-l10n 重新生成。
+- golden 测试：白名单步骤用例 → 登记步骤；1.1.3–1.1.6 改走"登记→口令→PIN→分享（生成邀请码）→完成"新流程（注入 fake enroll/invite）；1.3.2 sealed 新增邀请码输入框 → 全部重刷图片。
+
+**验证：** flutter analyze 仅剩预存 info（ws_realtime_service）；`flutter test` 39/39 全绿 ✅（golden 12 项先 --update-goldens 重刷再全量比对通过）。
+
+**测试踩坑：** create 流程 step2 登记是网络步，旧 golden 纯"下一步"走法断链——必须注入 enroll 才能走到口令/PIN/分享/完成步骤；widget 测试无真实 sodium/DB 限制同前（LocalDatabase.forTesting + probeServer 注入）。

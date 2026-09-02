@@ -44,7 +44,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setupPageInstructions =>
-      '1) 生成设备密钥 → 公钥加入服务器白名单（config.json）并重启\n2) 粘贴对方用你公钥密封的 Space Key 副本 → 认证';
+      '1) 生成设备密钥 → 自动登记入网（无需任何白名单）\n2) 创建或加入私密空间 → 设置启动锁';
 
   @override
   String get setupPageDeviceIdLabel => '设备 ID';
@@ -60,7 +60,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupPageKeyInfo(String deviceId, String publicKey) {
-    return '设备 ID: $deviceId\n公钥: $publicKey\n（把公钥加入 config.json 后重启服务器）';
+    return '设备 ID: $deviceId\n公钥: $publicKey\n（下一步将自动登记设备，无需任何白名单）';
   }
 
   @override
@@ -155,7 +155,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepDevice => '设备名称';
 
   @override
-  String get wizardStepWhitelist => '加入服务器白名单';
+  String get wizardStepEnroll => '登记设备';
 
   @override
   String get wizardStepPassphrase => '设置接入口令';
@@ -179,7 +179,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageKeyGenerated => '✅ 密钥已生成';
 
   @override
-  String get wizardWhitelistHint => '把下方公钥加入服务器白名单（config.json）并重启，然后继续';
+  String get wizardEnrollHint =>
+      '服务器已全自动登记（无需手动白名单）。点击下方登记本设备——若这是服务器的第一台设备，将自动创建私密空间。';
+
+  @override
+  String get wizardEnrollAction => '登记本设备';
+
+  @override
+  String get wizardEnrollDoneStatus => '✅ 登记成功，可继续';
+
+  @override
+  String wizardEnrollDone(String deviceId, String spaceId) {
+    return '✅ 登记成功\n设备: $deviceId\n空间: $spaceId';
+  }
+
+  @override
+  String get wizardEnrollExists =>
+      '该服务器已有空间（由其他设备创建）。请改用“加入”向导，凭对方提供的一次性邀请码加入。';
+
+  @override
+  String get wizardEnrollGoJoin => '改用“加入”向导';
+
+  @override
+  String wizardEnrollFailed(String error) {
+    return '❌ 登记失败: $error';
+  }
+
+  @override
+  String get wizardEnrollFirst => '⚠️ 请先完成设备登记（点上方按钮）';
 
   @override
   String get wizardPassphraseHint => '对方凭此口令加入——下一步将生成二维码分享给对方';
@@ -191,10 +218,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDoneText => '✅ 设置完成！';
 
   @override
-  String get wizardShareHint => '对方扫码或粘贴下方信息即可加入';
+  String get wizardShareHint => '对方扫码或粘贴下方信息即可一键加入（含一次性邀请码）';
 
   @override
-  String get wizardJoinHint => '扫描对方发的二维码，或粘贴对方发给你的加入信息';
+  String get wizardShareGenInvite => '生成邀请码并显示二维码';
+
+  @override
+  String get wizardShareRegenerate => '重新生成';
+
+  @override
+  String get wizardShareInviteNote => '邀请码一次性有效、24 小时过期——过期可在已登录设备的聊天页重新生成。';
+
+  @override
+  String wizardShareInviteFailed(String error) {
+    return '❌ 邀请码生成失败: $error';
+  }
+
+  @override
+  String get wizardJoinHint => '扫描对方的二维码（含邀请码与口令）即可一键加入；也可粘贴文本或手动填写下方信息';
 
   @override
   String setupPageKeyGenFailed(String error) {
@@ -216,7 +257,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEscrowGenKeyFirst => '⚠️ 请先生成设备密钥（①），并把公钥加入服务器白名单';
 
   @override
-  String get setupPageEscrowFillAll => '⚠️ 请填写 Space ID 与接入口令';
+  String get setupPageEscrowFillAll => '⚠️ 请填写 Space ID、接入口令与邀请码';
+
+  @override
+  String get setupPageInviteLabel => '邀请码（一次性）';
+
+  @override
+  String get setupPageInviteHint => '扫码后自动填入；手动加入时粘贴对方提供的一次性邀请码';
+
+  @override
+  String get setupPageNeedInvite => '⚠️ 请填写一次性邀请码（由已认证设备生成）';
 
   @override
   String get setupPageNoEscrow => '❌ Server 无口令托管包（请先在对端设置接入口令）';

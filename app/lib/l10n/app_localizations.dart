@@ -167,7 +167,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageInstructions.
   ///
   /// In en, this message translates to:
-  /// **'1) Generate device key → add the public key to the server whitelist (config.json) and restart\n2) Paste the Space Key sealed with your public key → authenticate'**
+  /// **'1) Generate device key → the device registers automatically (no whitelist needed)\n2) Create or join the private space → set up the app lock'**
   String get setupPageInstructions;
 
   /// No description provided for @setupPageDeviceIdLabel.
@@ -197,7 +197,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageKeyInfo.
   ///
   /// In en, this message translates to:
-  /// **'Device ID: {deviceId}\nPublic key: {publicKey}\n(Add the public key to config.json and restart the server)'**
+  /// **'Device ID: {deviceId}\nPublic key: {publicKey}\n(The device will register automatically on the next step — no whitelist needed)'**
   String setupPageKeyInfo(String deviceId, String publicKey);
 
   /// No description provided for @setupPageGenerateKey.
@@ -374,11 +374,11 @@ abstract class AppLocalizations {
   /// **'Device name'**
   String get wizardStepDevice;
 
-  /// No description provided for @wizardStepWhitelist.
+  /// No description provided for @wizardStepEnroll.
   ///
   /// In en, this message translates to:
-  /// **'Server whitelist'**
-  String get wizardStepWhitelist;
+  /// **'Register device'**
+  String get wizardStepEnroll;
 
   /// No description provided for @wizardStepPassphrase.
   ///
@@ -422,11 +422,53 @@ abstract class AppLocalizations {
   /// **'✅ Key generated'**
   String get setupPageKeyGenerated;
 
-  /// No description provided for @wizardWhitelistHint.
+  /// No description provided for @wizardEnrollHint.
   ///
   /// In en, this message translates to:
-  /// **'Add the public key below to the server whitelist (config.json) and restart, then continue.'**
-  String get wizardWhitelistHint;
+  /// **'Registration is fully automatic now (no manual whitelist). Tap below to register this device — the first device on the server auto-creates the private space.'**
+  String get wizardEnrollHint;
+
+  /// No description provided for @wizardEnrollAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Register this device'**
+  String get wizardEnrollAction;
+
+  /// No description provided for @wizardEnrollDoneStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Registered — continue'**
+  String get wizardEnrollDoneStatus;
+
+  /// No description provided for @wizardEnrollDone.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Registered\nDevice: {deviceId}\nSpace: {spaceId}'**
+  String wizardEnrollDone(String deviceId, String spaceId);
+
+  /// No description provided for @wizardEnrollExists.
+  ///
+  /// In en, this message translates to:
+  /// **'This server already hosts a space (created by another device). Switch to the Join flow and use the one-time invite code from your partner.'**
+  String get wizardEnrollExists;
+
+  /// No description provided for @wizardEnrollGoJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Join flow'**
+  String get wizardEnrollGoJoin;
+
+  /// No description provided for @wizardEnrollFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'❌ Registration failed: {error}'**
+  String wizardEnrollFailed(String error);
+
+  /// No description provided for @wizardEnrollFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ Register the device first (tap the button above)'**
+  String get wizardEnrollFirst;
 
   /// No description provided for @wizardPassphraseHint.
   ///
@@ -449,13 +491,37 @@ abstract class AppLocalizations {
   /// No description provided for @wizardShareHint.
   ///
   /// In en, this message translates to:
-  /// **'Your partner scans this code or pastes the info to join.'**
+  /// **'Your partner scans this code or pastes the info to join in one tap (includes the one-time invite code).'**
   String get wizardShareHint;
+
+  /// No description provided for @wizardShareGenInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate invite & show QR'**
+  String get wizardShareGenInvite;
+
+  /// No description provided for @wizardShareRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate'**
+  String get wizardShareRegenerate;
+
+  /// No description provided for @wizardShareInviteNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The invite code is single-use and expires in 24h — regenerate it from the chat page if needed.'**
+  String get wizardShareInviteNote;
+
+  /// No description provided for @wizardShareInviteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'❌ Invite generation failed: {error}'**
+  String wizardShareInviteFailed(String error);
 
   /// No description provided for @wizardJoinHint.
   ///
   /// In en, this message translates to:
-  /// **'Scan the QR code from your partner, or paste the join info they sent you.'**
+  /// **'Scan your partner\'s QR code (it carries the invite code & passphrase) to join in one tap; you can also paste the text or fill in the fields below.'**
   String get wizardJoinHint;
 
   /// No description provided for @setupPageKeyGenFailed.
@@ -491,8 +557,26 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageEscrowFillAll.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Fill in Space ID and the access passphrase'**
+  /// **'⚠️ Fill in the Space ID, access passphrase and invite code'**
   String get setupPageEscrowFillAll;
+
+  /// No description provided for @setupPageInviteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code (one-time)'**
+  String get setupPageInviteLabel;
+
+  /// No description provided for @setupPageInviteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Filled in automatically after scanning; paste the invite code when joining manually'**
+  String get setupPageInviteHint;
+
+  /// No description provided for @setupPageNeedInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ Enter the one-time invite code (generated by an authenticated device)'**
+  String get setupPageNeedInvite;
 
   /// No description provided for @setupPageNoEscrow.
   ///

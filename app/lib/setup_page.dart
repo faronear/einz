@@ -16,14 +16,16 @@ import 'l10n/app_localizations.dart';
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间 / 高级导入 sealed。
 enum _WizardRole { create, join, advanced }
 
-/// 设置页：一次性配置（生成设备身份 → 登记白名单 → 导入 Space Key → 认证）。
+/// 设置页：一次性配置（生成设备身份 → 自动登记入网 → 获得 Space Key → 设置启动锁）。
 ///
-/// 与 CLI 的 init/pubkey/import/auth 流程对齐（docs/DEPLOYMENT.md §4）：
-/// 1. 生成 X25519 身份密钥（私钥留在 App 内；公钥需加入服务器白名单 config.json 并重启）
-/// 2. 导入 Space Key：粘贴 sealed 密封副本（base64，由对方用本公钥 seal），或直接粘贴明文 base64
-/// 3. challenge-response 认证，拿到 session_token
+/// 服务器登记已全自动化（对齐 TUI/CLI 的 enroll 流程，不再需要 config.json 白名单）：
+/// - create（第一个使用者）：首设备免邀请码自举登记 → 设接入口令托管 Space Key →
+///   分享二维码（含 spaceId+口令+一次性邀请码，对方扫码一键加入）；
+/// - join：扫码/粘贴加入信息（含邀请码）→ 凭邀请码登记 → 口令托管拉取 Space Key；
+/// - advanced：sealed 密封副本导入（同样先凭邀请码登记）。
+/// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {
-  const SetupPage({super.key, this.db, this.probeServer});
+  const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride});
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -31,15 +33,22 @@ class SetupPage extends StatefulWidget {
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 ServerSettings.probe。
   final Future<bool> Function(String server)? probeServer;
 
+  /// 测试注入：登记设备（生产走真实 ApiClient.enrollDevice；注入后不发起网络请求）。
+  final Future<EnrollResult> Function(String? inviteCode)? enrollOverride;
+
+  /// 测试注入：生成邀请码（生产走真实 ApiClient.createInvite）。
+  final Future<InviteResult> Function(String personId)? createInviteOverride;
+
   @override
   State<SetupPage> createState() => _SetupPageState();
 }
 
 class _SetupPageState extends State<SetupPage> {
   final _deviceId = TextEditingController(text: 'dev-mobile');
-  final _spaceId = TextEditingController(text: 'space-demo');
+  final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _sealedKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
+  final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
   final _serverController = TextEditingController();
 
   // 服务器地址：默认 einz.tic.cc，探测失败时引导输入并持久化（降低小白负担）
@@ -55,12 +64,23 @@ class _SetupPageState extends State<SetupPage> {
   String? _status;
   bool _busy = false;
 
+  /// 设备登记结果（服务端分配的真实 deviceId/personId/spaceId）。
+  /// 认证（challenge）与进聊天页一律用它，不用本地临时 deviceId。
+  EnrollResult? _enroll;
+
+  /// create 分享页生成的对方（personB）邀请码。
+  String? _partnerInvite;
+
+  /// create 自举失败（服务器已有空间设备）时为 true → 展示改用"加入"的引导。
+  bool _bootstrapFailed = false;
+
   @override
   void dispose() {
     _deviceId.dispose();
     _spaceId.dispose();
     _sealedKey.dispose();
     _escrowPassphrase.dispose();
+    _inviteCode.dispose();
     _serverController.dispose();
     super.dispose();
   }
@@ -214,7 +234,7 @@ class _SetupPageState extends State<SetupPage> {
       case _WizardRole.create:
         switch (_step) {
           case 1: return l10n.wizardStepDevice;
-          case 2: return l10n.wizardStepWhitelist;
+          case 2: return l10n.wizardStepEnroll;
           case 3: return l10n.wizardStepPassphrase;
           case 4: return l10n.wizardStepPin;
           case 5: return l10n.wizardStepShare;
@@ -285,19 +305,31 @@ class _SetupPageState extends State<SetupPage> {
       setState(() => _status = l10n.setupPageGenKeyFirst);
       return;
     }
+    if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
+      setState(() => _status = l10n.wizardEnrollFirst);
+      return;
+    }
     if (_role == _WizardRole.create && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
       setState(() => _status = l10n.setupPageNeedPassphrase);
       return;
     }
     if (_role == _WizardRole.join &&
         _step == 2 &&
-        (_spaceId.text.trim().isEmpty || _escrowPassphrase.text.trim().isEmpty)) {
+        (_spaceId.text.trim().isEmpty ||
+            _escrowPassphrase.text.trim().isEmpty ||
+            _inviteCode.text.trim().isEmpty)) {
       setState(() => _status = l10n.setupPageEscrowFillAll);
       return;
     }
-    if (_role == _WizardRole.advanced && _step == 2 && _sealedKey.text.trim().isEmpty) {
-      setState(() => _status = l10n.setupPagePasteSealed);
-      return;
+    if (_role == _WizardRole.advanced && _step == 2) {
+      if (_sealedKey.text.trim().isEmpty) {
+        setState(() => _status = l10n.setupPagePasteSealed);
+        return;
+      }
+      if (_inviteCode.text.trim().isEmpty) {
+        setState(() => _status = l10n.setupPageNeedInvite);
+        return;
+      }
     }
     setState(() {
       if (_step < _stepCount - 1) _step++;
@@ -319,7 +351,7 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepDevice();
           case 2:
-            return _buildStepWhitelist();
+            return _buildStepEnroll();
           case 3:
             return _buildStepPassphrase();
           case 4:
@@ -390,10 +422,11 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 辅助：认证 / PIN 设置 / 进聊天页 ----
 
   /// challenge-response 认证，返回 session（PROTOCOL.md §4）。
-  Future<SessionResult> _authenticate(DeviceKeyPair kp) async {
+  /// [enrolledDeviceId] 用登记后服务端分配的真实 id（challenge 要求设备已入网）。
+  Future<SessionResult> _authenticate(DeviceKeyPair kp, String enrolledDeviceId) async {
     final s = await sodium();
     final api = ApiClient(_server);
-    final challenge = await api.challenge(kp.deviceId);
+    final challenge = await api.challenge(enrolledDeviceId);
     final opened = await sealOpen(
       s,
       base64Decode(challenge.sealedChallenge),
@@ -401,6 +434,27 @@ class _SetupPageState extends State<SetupPage> {
       kp.privateKey,
     );
     return api.verify(challenge.challengeId, base64Encode(opened));
+  }
+
+  /// 登记设备：create=首设备免邀请码自举；join/advanced=凭一次性邀请码。
+  /// 成功 → 记录 [_enroll]（真实 deviceId/personId/spaceId）并同步 spaceId。
+  Future<void> _enrollDevice(String? inviteCode) async {
+    final kp = _keyPair;
+    if (kp == null) return;
+    final r = widget.enrollOverride != null
+        ? await widget.enrollOverride!(inviteCode)
+        : await ApiClient(_server).enrollDevice(
+            deviceId: null, // 服务端分配规范 id（dev1/dev2…），以登记返回为准
+            publicKey: kp.publicKeyB64,
+            inviteCode: inviteCode,
+            deviceName: _deviceId.text.trim(),
+          );
+    if (!mounted) return;
+    setState(() {
+      _enroll = r;
+      _spaceId.text = r.spaceId;
+      _bootstrapFailed = false;
+    });
   }
 
   /// 设置启动锁对话框（PIN 两次确认 → 恢复码展示）→ 返回是否完成。
@@ -431,27 +485,29 @@ class _SetupPageState extends State<SetupPage> {
     return ok ?? false;
   }
 
-  /// 完成动作：进入聊天页（create/join/advanced 填充数据后统一调用）。
+  /// 完成动作：进入聊天页（create/join/advanced 填充数据后统一调用；
+  /// deviceId/spaceId 一律用登记后服务端返回的真实值）。
   void _finish() {
     final kp = _keyPair;
+    final enroll = _enroll;
     final sk = _spaceKey;
     final token = _sessionToken;
-    if (kp == null || sk == null || token == null) return;
+    if (kp == null || enroll == null || sk == null || token == null) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
         server: _server,
         spaceId: _spaceId.text.trim(),
-        deviceId: kp.deviceId,
+        deviceId: enroll.deviceId,
         spaceKey: sk,
         keyVersion: 1,
         token: token,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
-        reauth: () async => (await _authenticate(kp)).sessionToken,
+        reauth: () async => (await _authenticate(kp, enroll.deviceId)).sessionToken,
       ),
     ));
   }
 
-  // ---- 场景 A（create）：设备名 → 白名单 → 口令 → PIN → 分享 → 完成 ----
+  // ---- 场景 A（create）：设备名 → 登记（自动自举）→ 口令 → PIN → 分享 → 完成 ----
 
   /// 步骤 1：设备名称 + 生成设备密钥（生成结果在本页明确反馈）。
   Widget _buildStepDevice() {
@@ -517,27 +573,79 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 步骤 2：白名单确认（展示公钥，用户去 VPS 添加后继续）。
-  Widget _buildStepWhitelist() {
+  /// 步骤 2（create）：登记设备（全自动，替代旧版手动加 config.json 白名单）。
+  Widget _buildStepEnroll() {
     final l10n = AppLocalizations.of(context)!;
-    final kp = _keyPair;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardWhitelistHint, style: const TextStyle(fontSize: 14)),
+        Text(l10n.wizardEnrollHint, style: const TextStyle(fontSize: 14)),
         const SizedBox(height: 12),
-        if (kp != null)
+        FilledButton(
+          onPressed: _busy ? null : _runBootstrap,
+          child: Text(l10n.wizardEnrollAction),
+        ),
+        if (_enroll != null) ...[
+          const SizedBox(height: 12),
           Card(
+            color: Colors.green.shade50,
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: SelectableText(
-                l10n.setupPageKeyInfo(kp.deviceId, kp.publicKeyB64),
+                l10n.wizardEnrollDone(_enroll!.deviceId, _enroll!.spaceId),
                 style: const TextStyle(fontSize: 12),
               ),
             ),
           ),
+        ],
+        if (_bootstrapFailed) ...[
+          const SizedBox(height: 12),
+          Card(
+            color: Colors.amber.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(l10n.wizardEnrollExists, style: const TextStyle(fontSize: 13)),
+                  const SizedBox(height: 8),
+                  FilledButton.tonal(
+                    onPressed: () => _selectRole(_WizardRole.join),
+                    child: Text(l10n.wizardEnrollGoJoin),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
     );
+  }
+
+  /// create：首设备自举登记（免邀请码）。服务器已有空间（他人创建）时
+  /// 服务端拒绝自举 → 提示改用"加入"向导。
+  Future<void> _runBootstrap() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    try {
+      await _enrollDevice(null);
+      if (!mounted) return;
+      setState(() => _status = AppLocalizations.of(context)!.wizardEnrollDoneStatus);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _bootstrapFailed = e.code == 'INVALID_REQUEST';
+        _status = AppLocalizations.of(context)!.wizardEnrollFailed('$e');
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = AppLocalizations.of(context)!.wizardEnrollFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// 步骤 3：设置接入口令（对方凭它加入）。
@@ -592,10 +700,10 @@ class _SetupPageState extends State<SetupPage> {
     try {
       // 1) 随机生成 Space Key（CSPRNG 32B，仅首次）
       _spaceKey ??= Uint8List.fromList(List.generate(32, (_) => Random.secure().nextInt(256)));
-      // 2) 认证（缓存 session）
+      // 2) 认证（缓存 session；用登记后服务端分配的真实 deviceId）
       var token = _sessionToken;
       if (token == null) {
-        final session = await _authenticate(kp);
+        final session = await _authenticate(kp, _enroll!.deviceId);
         token = session.sessionToken;
         _sessionToken = token;
       }
@@ -624,12 +732,29 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 步骤 5：二维码加入信息分享（对方扫码/复制口令接入）。
+  /// 步骤 5（create）：分享加入信息——二维码/文本含 spaceId + 口令 +
+  /// 一次性邀请码（先点按钮生成邀请码，再展示二维码；对方扫码即一键加入）。
   Widget _buildStepShare() {
     final l10n = AppLocalizations.of(context)!;
+    final enroll = _enroll;
+    final code = _partnerInvite;
+    if (code == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.wizardShareHint, style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: _busy ? null : _generatePartnerInvite,
+            child: Text(l10n.wizardShareGenInvite),
+          ),
+        ],
+      );
+    }
     final info = JoinInfo(
-      spaceId: _spaceId.text.trim(),
+      spaceId: enroll?.spaceId ?? _spaceId.text.trim(),
       passphrase: _escrowPassphrase.text.trim(),
+      inviteCode: code,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -638,20 +763,73 @@ class _SetupPageState extends State<SetupPage> {
         const SizedBox(height: 12),
         Center(child: QrImageView(data: info.encode(), version: QrVersions.auto, size: 180)),
         const SizedBox(height: 12),
+        SelectableText('${l10n.setupPageInviteLabel}: $code',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         SelectableText(l10n.joinDialogSpace(info.spaceId), style: const TextStyle(fontSize: 12)),
         SelectableText(l10n.joinDialogPassphrase(info.passphrase),
             style: const TextStyle(fontSize: 12)),
+        Text(l10n.wizardShareInviteNote,
+            style: const TextStyle(fontSize: 11, color: Colors.grey)),
         const SizedBox(height: 12),
-        FilledButton.tonal(
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: info.encode()));
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(l10n.joinDialogCopied)));
-          },
-          child: Text(l10n.joinDialogCopy),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            FilledButton.tonal(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: info.encode()));
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(l10n.joinDialogCopied)));
+              },
+              child: Text(l10n.joinDialogCopy),
+            ),
+            TextButton(
+              onPressed: _busy ? null : _generatePartnerInvite,
+              child: Text(l10n.wizardShareRegenerate),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  /// create：为对方（personB）生成一次性邀请码（POST /invites，需已认证 token）。
+  Future<void> _generatePartnerInvite() async {
+    final kp = _keyPair;
+    final enroll = _enroll;
+    if (kp == null || enroll == null) return;
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    try {
+      final InviteResult r;
+      if (widget.createInviteOverride != null) {
+        r = await widget.createInviteOverride!('personB');
+      } else {
+        var token = _sessionToken;
+        if (token == null) {
+          final s = await _authenticate(kp, enroll.deviceId);
+          token = s.sessionToken;
+          _sessionToken = token;
+        }
+        r = await ApiClient(_server).createInvite(token: token!, personId: 'personB');
+      }
+      if (!mounted) return;
+      setState(() => _partnerInvite = r.inviteCode);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.httpStatus == 401 && _sessionToken != null) {
+        _sessionToken = null; // token 过期：重新认证后再试一次
+        await _generatePartnerInvite();
+        return;
+      }
+      setState(() => _status = AppLocalizations.of(context)!.wizardShareInviteFailed('$e'));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = AppLocalizations.of(context)!.wizardShareInviteFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// 完成页（create/join/advanced 共用）：底部"完成"按钮 → _finish 进聊天页。
@@ -706,11 +884,20 @@ class _SetupPageState extends State<SetupPage> {
             border: const OutlineInputBorder(),
           ),
         ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _inviteCode,
+          decoration: InputDecoration(
+            labelText: l10n.setupPageInviteLabel,
+            hintText: l10n.setupPageInviteHint,
+            border: const OutlineInputBorder(),
+          ),
+        ),
       ],
     );
   }
 
-  /// 扫码加入：扫描 A 的二维码 → 自动填入空间 ID 与口令。
+  /// 扫码加入：扫描 A 的二维码 → 自动填入空间 ID、口令与邀请码。
   Future<void> _scanJoinCode() async {
     final l10n = AppLocalizations.of(context)!;
     final info = await Navigator.of(context).push<JoinInfo>(
@@ -719,6 +906,7 @@ class _SetupPageState extends State<SetupPage> {
     if (info == null || !mounted) return;
     _spaceId.text = info.spaceId;
     _escrowPassphrase.text = info.passphrase;
+    _inviteCode.text = info.inviteCode ?? '';
     setState(() => _status = null);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.scanJoinFound)));
   }
@@ -738,7 +926,13 @@ class _SetupPageState extends State<SetupPage> {
       _status = null;
     });
     try {
-      final session = await _authenticate(kp);
+      // 1) 凭邀请码登记（码绑定 person，服务端分配真实 deviceId）
+      if (_enroll == null) {
+        await _enrollDevice(_inviteCode.text.trim());
+      }
+      final enroll = _enroll!;
+      // 2) 认证（用登记后的真实 deviceId）
+      final session = await _authenticate(kp, enroll.deviceId);
       _sessionToken = session.sessionToken;
       final escrow = KeyEscrowService(ApiClient(_server));
       final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
@@ -753,7 +947,7 @@ class _SetupPageState extends State<SetupPage> {
       final ok = await _setupLockAndEnter(
         server: _server,
         spaceId: payload.spaceId,
-        deviceId: kp.deviceId,
+        deviceId: enroll.deviceId,
         spaceKeyB64: payload.spaceKeyB64,
         keyVersion: payload.keyVersion,
         token: session.sessionToken,
@@ -777,6 +971,7 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 场景 C（advanced）：sealed 导入 ----
 
   /// 步骤 2（advanced）：粘贴 sealed 密钥副本（对方用本设备公钥密封）。
+  /// 同时需填写一次性邀请码（非首台设备必须凭码登记后才能认证）。
   Widget _buildStepSealed() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -788,6 +983,15 @@ class _SetupPageState extends State<SetupPage> {
           decoration: InputDecoration(
             labelText: l10n.setupPageSealedKeyLabel,
             hintText: l10n.setupPageSealedKeyHint,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _inviteCode,
+          decoration: InputDecoration(
+            labelText: l10n.setupPageInviteLabel,
+            hintText: l10n.setupPageInviteHint,
             border: const OutlineInputBorder(),
           ),
         ),
@@ -809,6 +1013,11 @@ class _SetupPageState extends State<SetupPage> {
       _status = null;
     });
     try {
+      // 0) 凭邀请码登记（第二台及以上设备必须；码绑定 person）
+      if (_enroll == null) {
+        await _enrollDevice(_inviteCode.text.trim());
+      }
+      final enroll = _enroll!;
       // 1) 解封 Space Key（本设备私钥解开）
       final s = await sodium();
       final spaceKey = await sealOpen(
@@ -817,16 +1026,16 @@ class _SetupPageState extends State<SetupPage> {
         kp.publicKey,
         kp.privateKey,
       );
-      // 2) 认证
-      final session = await _authenticate(kp);
+      // 2) 认证（用登记后的真实 deviceId）
+      final session = await _authenticate(kp, enroll.deviceId);
       _sessionToken = session.sessionToken;
       _spaceKey = spaceKey;
       if (!mounted) return;
       // 3) 设置 PIN → 完成步骤
       final ok = await _setupLockAndEnter(
         server: _server,
-        spaceId: _spaceId.text.trim(),
-        deviceId: kp.deviceId,
+        spaceId: enroll.spaceId,
+        deviceId: enroll.deviceId,
         spaceKeyB64: base64Encode(spaceKey),
         keyVersion: 1,
         token: session.sessionToken,

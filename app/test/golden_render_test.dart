@@ -98,9 +98,20 @@ void main() {
     // 生成密钥类截图含随机公钥 → 全量测试时跳过像素比较
     goldenFileComparator = _SkipListGoldenComparator(
       goldenFileComparator,
-      {'setup_step1.1.1_keygen.png', 'setup_step1.1.2_whitelist.png'},
+      {'setup_step1.1.1_keygen.png'},
     );
   });
+
+  // 测试注入：登记（真实路径走 ApiClient.enrollDevice；此处绕开网络，返回固定结果）。
+  Future<EnrollResult> _fakeEnroll(String? inviteCode) async =>
+      const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test');
+
+  // 测试注入：生成邀请码（真实路径走 ApiClient.createInvite）。
+  Future<InviteResult> _fakeInvite(String personId) async => InviteResult(
+        inviteCode: 'invite-test-123',
+        personId: personId,
+        expiresAt: DateTime.now().millisecondsSinceEpoch + 86400000,
+      );
 
   testWidgets('golden: 首页-角色选择（1）', (WidgetTester tester) async {
     _usePhoneSize(tester);
@@ -183,14 +194,23 @@ void main() {
 
   // ---------- 向导步骤渲染（真实交互路径走到目标步骤再截图）----------
 
-  Future<void> pumpSetup(WidgetTester tester) async {
+  Future<void> pumpSetup(
+    WidgetTester tester, {
+    Future<EnrollResult> Function(String? inviteCode)? enroll,
+    Future<InviteResult> Function(String personId)? invite,
+  }) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
-      home: SetupPage(db: db, probeServer: (_) async => true),
+      home: SetupPage(
+        db: db,
+        probeServer: (_) async => true,
+        enrollOverride: enroll,
+        createInviteOverride: invite,
+      ),
     ));
     await tester.pumpAndSettle();
   }
@@ -220,21 +240,23 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.1_keygen.png'));
   });
 
-  testWidgets('golden: 向导1.1.2-白名单步骤（create）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.1.2-登记设备步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.2_whitelist.png'));
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.2_enroll.png'));
   });
 
   testWidgets('golden: 向导1.1.3-接入口令步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
+    await pumpSetup(tester, enroll: _fakeEnroll);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登记本设备'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
@@ -244,9 +266,11 @@ void main() {
 
   testWidgets('golden: 向导1.1.4-PIN 步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
+    await pumpSetup(tester, enroll: _fakeEnroll);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登记本设备'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
@@ -259,9 +283,11 @@ void main() {
 
   testWidgets('golden: 向导1.1.5-二维码分享步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
+    await pumpSetup(tester, enroll: _fakeEnroll, invite: _fakeInvite);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登记本设备'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
@@ -270,18 +296,30 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
+    // 生成邀请码后展示含邀请码的二维码（注入绕开网络）
+    await tester.tap(find.text('生成邀请码并显示二维码'));
+    await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.5_share.png'));
   });
 
   testWidgets('golden: 向导1.1.6-完成步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
+    await pumpSetup(tester, enroll: _fakeEnroll);
     await enterCreateWithKey(tester);
-    for (var i = 0; i < 4; i++) {
-      await tester.tap(find.text('下一步'));
-      await tester.pumpAndSettle();
-    }
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登记本设备'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '123456');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));
   });
