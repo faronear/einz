@@ -676,13 +676,13 @@ void _render() {
   // 状态栏（第 1 行）：WS 红绿灯状态（绿=在线，红=断线重连，黄=连接中，灰=离线）
   final ws = s.session.wsStatus;
   final wsName = switch (ws) {
-    WsStatus.connected => 'WS:${_green}● 在线${_reset}',
-    WsStatus.connecting => 'WS:${_yellow}↻ 连接中${_reset}',
+    WsStatus.connected => '${_green}● 在线${_reset}',
+    WsStatus.connecting => '${_yellow}↻ 连接中${_reset}',
     WsStatus.reconnecting =>
-      'WS:${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
-    WsStatus.stopped => 'WS:${_gray}○ 离线${_reset}',
+      '${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
+    WsStatus.stopped => '${_gray}○ 离线${_reset}',
   };
-  // 各片段用灰色竖线分隔：Einz TUI | WS:● 在线 | person@device | 临时通知
+  // 各片段用灰色竖线分隔：Einz TUI | ● 在线 | person@device | 临时通知
   final sep = '${_gray}|${_reset}';
   buf.write('${_bold}Einz TUI${_reset} $sep $wsName $sep ${_personLabel(s.session.store, s.personNames)}');
   if (s.status.isNotEmpty) {
