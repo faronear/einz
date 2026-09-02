@@ -552,7 +552,19 @@ void _exitRaw() {
 /// 用于截断防超宽换行（终端按显示列数折行，Dart 的 String.length 是 UTF-16 计数）。
 int _displayWidth(String s) {
   var w = 0;
-  for (final r in s.runes) {
+  final it = s.runes.iterator;
+  while (it.moveNext()) {
+    final r = it.current;
+    if (r == 0x1B) {
+      // ANSI 转义序列（\x1B[...m 等）不计入显示宽度：跳过直到终止字节（0x40-0x7E）。
+      // '[' 是 CSI 引入符，其后是参数字节（0x20-0x3F），最后以字母终止。
+      while (it.moveNext()) {
+        final c = it.current;
+        if (c == 0x5B) continue; // CSI 引入符
+        if (c >= 0x40 && c <= 0x7E) break; // 终止字节（字母）
+      }
+      continue;
+    }
     final wide = (r >= 0x1100 && r <= 0x115F) || // 谚文字母
         (r >= 0x2E80 && r <= 0xA4CF) || // CJK 部首/笔画/注音/假名/谚文/汉字等
         (r >= 0xAC00 && r <= 0xD7A3) || // 谚文音节
@@ -1153,7 +1165,7 @@ String _cursorPos(List<String> wrapped, int top, int promptW, int offset, int co
       continue;
     }
     final lead = i == 0 ? promptW : 6;
-    var col = lead + remaining;
+    var col = lead + remaining + 1; // +1：光标位于已渲染文本之后一列
     if (col > cols) col = cols;
     return '\x1B[${top + i};${col}H';
   }
