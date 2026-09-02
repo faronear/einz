@@ -841,16 +841,23 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       ...wrapped.skip(1).map((line) => '$indent$line'),
     ];
   }
-  // 对方消息：整块右对齐（右侧气泡风格），整条内容品红底——正文白字、
-  // [人名 时间] 黑字；前导留白不上色（保持右对齐气泡感）
-  final suffix = '$_black[$who $time]$_reset';
-  final wrapped = _wrapByWidth(body, cols - _displayWidth(suffix) - 1);
+  // 对方消息：镜像"我"的结构（标签在前 + 续行对齐正文），整块贴屏幕右缘。
+  // 块内整条品红底：标签黑字、正文白字；块内为标签预留等宽空白，
+  // 使续行正文左缘与第一行正文对齐（不再和时间戳挤在一行）。
+  final whoTime = '[$who $time]';
+  final labelW = _displayWidth(whoTime) + 1; // 标签 + 尾部一个空格
+  final chunks = _wrapByWidth(body, cols - labelW - 1);
+  var maxW = labelW;
+  for (final c in chunks) {
+    final w = labelW + _displayWidth(c);
+    if (w > maxW) maxW = w;
+  }
+  final margin = cols - maxW > 0 ? cols - maxW : 0; // 整块右对齐的左侧留白
+  final indent = ' ' * labelW; // 续行占位：与标签等宽
   final lines = <String>[];
-  for (var i = 0; i < wrapped.length; i++) {
-    final content = i == wrapped.length - 1
-        ? '$_bgPink$_white${wrapped[i]} $suffix'
-        : '$_bgPink$_white${wrapped[i]}$_reset';
-    lines.add('${' ' * (cols - _displayWidth(content))}$content');
+  for (var i = 0; i < chunks.length; i++) {
+    final lead = i == 0 ? '$_black$whoTime ' : indent;
+    lines.add('${' ' * margin}$_bgPink$lead$_white${chunks[i]}$_reset');
   }
   return lines;
 }
