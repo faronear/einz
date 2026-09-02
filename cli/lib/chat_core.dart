@@ -229,7 +229,9 @@ class ChatSession {
       final result = await _withAutoAuth((token) => api.sync(token, after: cursor));
       for (final env in result.messages) {
         final seq = env.serverSequence ?? cursor;
-        store.upsertHistory(env, serverSequence: seq, createdAt: seq);
+        // 关键：用服务端下发的真实 created_at 落盘（旧版本误存 seq/0 →
+        // 重启后时间显示 1970；服务端 sync 响应始终携带 created_at）
+        store.upsertHistory(env, serverSequence: seq, createdAt: env.createdAt ?? seq);
         added.add(env);
         cursor = seq;
       }
@@ -238,6 +240,17 @@ class ChatSession {
       if (!result.hasMore || result.messages.isEmpty) break;
     }
     store.save(storePath);
+
+    // 存量修复（尽力而为）：旧版本曾把 created_at 落成 server_sequence 或 0，
+    // 重启后时间标签显示 1970。检测到坏时间戳（< 1973 年）时全量拉取服务端消息，
+    // 按 message_id 幂等覆盖为真实 created_at，并重建展示缓存让当前会话立即正确。
+    try {
+      if (await _backfillTimestamps()) {
+        await loadHistory();
+      }
+    } catch (_) {
+      // 忽略：网络异常时下次 sync 再试，不影响本次增量结果
+    }
 
     await flushPending();
 
@@ -263,6 +276,34 @@ class ChatSession {
     return fresh;
   }
 
+  /// 存量时间戳修复：本地历史里 created_at 疑似为序号或 0（< 1973 年，旧版本
+  /// sync/WS 落盘 bug 所致）时，全量拉取服务端消息，按 message_id 幂等覆盖为
+  /// 真实 created_at（服务端始终保存真实时间）。返回是否发生过修复。
+  Future<bool> _backfillTimestamps() async {
+    const minPlausible = 100000000000; // 1973-03 之前的毫秒时间戳视为坏值
+    final bad = store.history.any((m) => (m['created_at'] as int? ?? 0) < minPlausible);
+    if (!bad) return false;
+    final api = ApiClient(server);
+    var cursor = 0;
+    var repaired = false;
+    while (true) {
+      final result = await _withAutoAuth((token) => api.sync(token, after: cursor));
+      for (final env in result.messages) {
+        final seq = env.serverSequence ?? cursor;
+        final createdAt = env.createdAt;
+        if (createdAt != null && createdAt >= minPlausible) {
+          store.upsertHistory(env, serverSequence: seq, createdAt: createdAt);
+          repaired = true;
+        }
+        cursor = seq;
+      }
+      if (result.lastSequence > cursor) cursor = result.lastSequence;
+      if (!result.hasMore || result.messages.isEmpty) break;
+    }
+    if (repaired) store.save(storePath);
+    return repaired;
+  }
+
   /// 启动 WS 实时监听（message.new → 落盘 + 解密 + 追加展示缓存）。
   /// 收到 [onEvent]（已处理完消息后）回调，UI 据此重绘；
   /// [onStatus]（连接状态变化）回调同样转发，UI 据此刷新状态栏；
@@ -285,7 +326,7 @@ class ChatSession {
       onEvent: (event) async {
         if (event is WsMessageNewEvent) {
           final env = event.message;
-          store.upsertHistory(env, serverSequence: event.serverSequence, createdAt: env.createdAt ?? 0);
+          store.upsertHistory(env, serverSequence: event.serverSequence, createdAt: env.createdAt ?? event.serverSequence);
           store.advanceAnchor(event.serverSequence);
           store.save(storePath);
           final plain = await _decrypt(env);

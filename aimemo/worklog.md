@@ -815,3 +815,16 @@
 **验证：** `dart analyze` 无问题；双端断线场景（probe 常驻 A + kill server 8s + B 发消息 + A 重连）probe 日志确认 `reconnecting×5 → connected → AUTOSYNC added=1 → FOUND-VIA-AUTOSYNC`（无需 /sync）。测试脚本 `cli/test/auto_sync_probe.dart` + `auto_sync_check.sh`（编排脚本在本工具非交互环境有进程回收挂起问题，真实终端可用）。
 
 **测试环境踩坑（demo 是自主模式前遗留）：** store-b.space_id 被旧 import 写死 space-demo 与登记的真实 space_id 不一致 → AAD 解密失败，需对齐双端 space_id；setup.sh 重跑会用 import 重置 space_id 故不能复用；server.pid 缺失时 stop.sh 空转，需 pkill。
+
+### 重启后消息时间显示 1970 修复（2026-09-02）
+
+**背景：** 老板反馈重启 TUI 后近一半消息时间显示 `19700101-080000`，且发送时显示正常时间的消息重启后也变 1970。
+
+**根因（实证）：** 客户端落盘 created_at 选错值——`chat_core.sync()` 用 `createdAt: seq`（server_sequence 序号）落盘，覆盖了服务端响应携带的真实时间戳（store-a 历史里 seq=1,2,3 / 13,14,15 的 created_at 正是 1,2,3 / 13,14,15）；WS 路径兜底 `env.createdAt ?? 0`（缺省落 0，即精确的 19700101-080000）。重启后 `loadHistory` 用落盘的坏值 → 显示 1970。发送路径（flushPending）落盘真实时间、且发送不推进锚点，下次 sync 会把自己刚发的消息重新拉回并以 seq 覆盖 → "发送时正常、重启后变 1970"。（einz.dart 的 `_syncIncremental` 一直用 `env.createdAt!`，无此问题。）
+
+**修复（chat_core.dart）：**
+- `sync()` 增量落盘改 `createdAt: env.createdAt ?? seq`（服务端始终携带真实 created_at）；
+- WS 兜底改 `env.createdAt ?? event.serverSequence`（不再落 0）；
+- 新增 `_backfillTimestamps()` 存量自愈：检测到坏时间戳（<1e11，1973 年前）时全量拉取服务端消息、按 message_id 幂等覆盖为真实 created_at，随后 `loadHistory()` 重建展示缓存让当前会话立即正确；失败静默下次再试。
+
+**验证：** `dart analyze` 无问题；`cli/test/timestamp_check.dart`（自包含：脚本内拉起 server 子进程，不依赖后台进程）——store-a 原有坏数据（ca=1,2,3,13,14,15）已被 sync 治愈；再故意改坏一条（ca=7）后重跑，回填为真实值 1788325059952 ✅。
