@@ -73,12 +73,10 @@ case "${1:-setup}" in
     ;;
   build)
     ensure_image
-    STAMP="$(date +%y%m%d%H%M)"
-    OUT="einz-tui-${STAMP}-linux"
-    echo "==> 容器内 AOT 编译（dart:stable，含 libsodium）→ cli/build/${OUT}"
-    run_container -i sh -c "mkdir -p build && dart compile exe bin/einz_tui.dart -o build/${OUT}"
-    echo "✅ 编译完成: cli/build/${OUT}"
-    echo "   拷贝到目标机后需安装 libsodium（Debian/Ubuntu: sudo apt install libsodium23）"
+    echo "==> 容器内执行 cli/build.sh（AOT 编译 → cli/build/einz-tui-<时间戳>-linux）…"
+    # 复用 build.sh 单一实现（挂载仓库内 /app/cli/build.sh）：自动探测容器 dart、
+    # 按平台命名、输出到挂载目录 cli/build/，产物直达宿主
+    run_container -i bash build.sh
     ;;
   setup | update | "")
     setup

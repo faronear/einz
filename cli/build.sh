@@ -68,7 +68,12 @@ case "$PLATFORM" in
   Darwin)
     if ls /opt/homebrew/lib/libsodium.* >/dev/null 2>&1 || ls /usr/local/lib/libsodium.* >/dev/null 2>&1; then has_libsodium=1; fi ;;
   Linux)
-    if ldconfig -p 2>/dev/null | grep -qi 'libsodium\.so'; then has_libsodium=1; fi ;;
+    # ldconfig 在精简容器里可能不存在：退化为直接检查常见安装路径
+    if command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -qi 'libsodium\.so'; then
+      has_libsodium=1
+    elif [ -e /usr/lib/x86_64-linux-gnu/libsodium.so ] || [ -e /usr/local/lib/libsodium.so ] || [ -e /usr/lib/libsodium.so ]; then
+      has_libsodium=1
+    fi ;;
   MINGW*|MSYS*|CYGWIN*)
     if ls libsodium.dll >/dev/null 2>&1; then has_libsodium=1; fi ;;
 esac
