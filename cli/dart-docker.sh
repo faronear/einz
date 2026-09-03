@@ -5,7 +5,7 @@
 #   ./cli/dart-docker.sh            # 一键 setup：git pull + 构建 dart-sodium 镜像 + 校验 libsodium
 #   ./cli/dart-docker.sh tui        # 进入聊天 TUI（交互；镜像缺失会自动先构建）
 #   ./cli/dart-docker.sh dartc <参数>   # 容器内 dart 子命令（如 sync / attach / compile）
-#   ./cli/dart-docker.sh build      # 容器内编译 Linux TUI 产物 → cli/build/einz-tui-<时间戳>-linux
+#   ./cli/dart-docker.sh build      # 容器内编译 Linux TUI 产物 → cli/build/einz-tui-<架构>-linux-<yymmddhhmm>
 #
 # 说明：
 #   - 镜像 dart-sodium = dart:stable + libsodium（TUI FFI 必需），由 cli/Dockerfile.dev 构建；
@@ -56,7 +56,7 @@ setup() {
   echo "✅ 全部就绪。日常只需："
   echo "   进聊天：    $0 tui"
   echo "   容器 dart： $0 dartc <参数>   （例：$0 dartc run bin/einz.dart sync …）"
-  echo "   编 Linux 产物：$0 build   （产物在 cli/build/einz-tui-<时间戳>-linux）"
+  echo "   编 Linux 产物：$0 build   （产物在 cli/build/einz-tui-<架构>-linux-<yymmddhhmm>）"
   echo "   升级 SDK：  $0    （重新执行一键 setup）"
 }
 

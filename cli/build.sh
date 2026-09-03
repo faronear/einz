@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ein-tui 一键编译脚本：把 einz_tui.dart AOT 编译成免 Dart 运行时的原生可执行文件。
 #
-# 用法:   ./build.sh [输出文件名]      （产物统一放 cli/build/；默认文件名带时间戳：
-#                                        cli/build/einz-tui-<yymmddhhmm>-<平台>，便于新旧对比）
-# 平台:   在当前操作系统上编译（Dart 官方不支持交叉编译）：
-#           Linux 上编译 → Linux 可执行文件；macOS 上编译 → mac 可执行文件；
-#           Windows（git-bash/MSYS）编译 → .exe。x64/arm64 随当前机器而定。
+# 用法:   ./build.sh [输出文件名]      （产物统一放 cli/build/；默认文件名含架构-系统-时间戳：
+#                                        cli/build/einz-tui-<架构>-<系统>-<yymmddhhmm>，如 einz-tui-x64-linux-2609032201）
+# 平台/架构: 在当前操作系统与架构上编译（Dart 官方不支持交叉编译）：产物只能在
+#            对应架构+系统的机器上运行（arm64 产物跑 arm64 机，x64 产物跑 x64 机），
+#            架构与系统名已写入文件名便于区分；Windows（git-bash/MSYS）产物带 .exe。
 # 依赖:   运行时唯一系统依赖是 libsodium（package:sodium 走 FFI），
 #           目标机也要装（见编译后提示）；其余全为纯 Dart，无其他依赖。
-# 运行:   ./einz-tui-<平台> --store <路径> --server <url>   （TUI 需真实终端）
+# 运行:   ./einz-tui-<架构>-<系统>-<yymmddhhmm> --store <路径> --server <url>   （TUI 需真实终端）
 set -euo pipefail
 # 强制 C locale：非 C locale 下 bash 会把 $VAR 后紧跟的非 ASCII 字节并入变量名
 # （曾致 "$OUT（…"、"$DART）…" 报 unbound variable）；C locale 下变量名只认 ASCII
@@ -23,13 +23,24 @@ mkdir -p "$OUT_DIR"
 # 发版时更新，不适合做日常产物标识）；旧产物不删除，可并排对比
 STAMP="$(date +%y%m%d%H%M)"
 
+# 架构：产物只在对应架构上运行（arm64 ↔ 苹果 M 系/ARM 云主机；x64 ↔ Intel/AMD）
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64 | amd64)    ARCH_NAME="x64" ;;
+  aarch64 | arm64)   ARCH_NAME="arm64" ;;
+  i386 | i686 | x86) ARCH_NAME="x86" ;;
+  armv7l | armhf)    ARCH_NAME="arm" ;;
+  *)                 ARCH_NAME="$ARCH" ;;
+esac
+
 PLATFORM="$(uname -s)"
 case "$PLATFORM" in
-  Darwin)               NAME="${1:-einz-tui-${STAMP}-macos}" ;;
-  Linux)                NAME="${1:-einz-tui-${STAMP}-linux}" ;;
-  MINGW*|MSYS*|CYGWIN*) NAME="${1:-einz-tui-${STAMP}.exe}" ;;
-  *)                    NAME="${1:-einz-tui-${STAMP}}" ;;
+  Darwin)               OS_NAME="macos";   EXT="" ;;
+  Linux)                OS_NAME="linux";   EXT="" ;;
+  MINGW*|MSYS*|CYGWIN*) OS_NAME="windows"; EXT=".exe" ;;
+  *)                    OS_NAME="$(printf '%s' "$PLATFORM" | tr '[:upper:]' '[:lower:]')"; EXT="" ;;
 esac
+NAME="${1:-einz-tui-${ARCH_NAME}-${OS_NAME}-${STAMP}${EXT}}"
 OUT="$OUT_DIR/$NAME"
 
 # ---- 定位 dart（Linux 常不在 PATH：~/dart-sdk、flutter 自带、apt 安装） ----
