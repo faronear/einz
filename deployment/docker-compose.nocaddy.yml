@@ -1,0 +1,38 @@
+# Einz 服务端单机部署 —— 无内置 Caddy 版（方案 B）
+# 适用：宿主机已运行系统级 Caddy（systemd），由系统 Caddy 做总入口反代到
+#       本服务的 127.0.0.1:3000；本 compose 不启动 Caddy 容器、不占用宿主
+#       80/443（与 deployment/docker-compose.yml 内置 Caddy 版二选一，
+#       两者端口互不冲突，可在同一台机器上并存而不打架）。
+#
+# 使用前：
+#   1. 按 docs/SETUP.md 生成 config.json（白名单），放到 ./config/config.json
+#   2. 系统级 Caddy（如 /etc/caddy/Caddyfile）配置站点，例如：
+#        private.example.com {
+#            reverse_proxy 127.0.0.1:3000
+#            encode gzip
+#            header {
+#                Strict-Transport-Security "max-age=31536000; includeSubDomains"
+#                X-Content-Type-Options "nosniff"
+#            }
+#        }
+#      （Caddy 自动申请/续期 TLS；WS 升级由 reverse_proxy 自动处理）
+#   3. 启动：docker compose -f deployment/docker-compose.nocaddy.yml up -d
+services:
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - EINZ_CONFIG=/config/config.json
+      - EINZ_DB=/data/app.db
+      - EINZ_FILES=/data/files
+      # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
+      # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore）。
+      - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
+    ports:
+      - "127.0.0.1:3000:3000" # 仅宿主回环可见：系统级 Caddy 反代到这里，不对外直开
+    volumes:
+      - ./config:/config:ro
+      - ./data:/data
