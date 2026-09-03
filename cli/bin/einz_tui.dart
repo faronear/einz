@@ -279,12 +279,14 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         String? chosenPerson;
         while (true) {
           if (!_state!.running) break;
-          final aName = _probePersonNames['personA'] ?? '';
-          final bName = _probePersonNames['personB'] ?? '尚未加入';
-          final choice = await _prompt(session, '❓ 如果你是空间发起者 $aName，请输入 1；如果你是 $bName，请输入 2');
+          // 名称缺失时回退显示规范 id（如 personB 未设用户名 → "如果你是 personB"，
+          // 而非误导性的"尚未加入"——对方可能已在空间、只是在添加新设备）
+          final aName = _probePersonNames['personA'] ?? 'personA';
+          final bName = _probePersonNames['personB'] ?? 'personB';
+          final choice = await _prompt(session, '❓ 如果你是空间创建者 $aName，请输入 1；如果你是 $bName，请输入 2');
           if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
           if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
-          session.messages.add(_systemMessage(session, '请输入 1 ($aName) 或 2 ($bName)'));
+          session.messages.add(_systemMessage(session, '❓ 请输入 1 ($aName) 或 2 ($bName)'));
           _scheduleRender();
         }
         if (chosenPerson == 'personB' && (_probePersonNames['personB'] ?? '').isEmpty) {
@@ -341,7 +343,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 请输入私密空间口令:', required: true);
+      final passphrase = await _prompt(session, '❓ 请输入安全口令，即可解密你们的私密空间内容', required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
@@ -363,7 +365,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       }
       try {
         await _busy(session, '⏳ 私密空间口令核对中......', () => session.accessByEscrow(passphrase));
-        session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备能够存取私密内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
+        session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备能够解密私密空间内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         session.messages.add(_systemMessage(session, '----------------'));
         session.messages.add(_systemMessage(session, '您已成功加入了私密空间。输入 /help 查看快捷命令。立刻开始点对点加密聊天吧！'));
         session.messages.add(_systemMessage(session, '================'));
@@ -1342,7 +1344,7 @@ Future<void> _execCommand(String line) async {
       }
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
-          s.session, '❓ 请输入内容安全口令，用于访问私密空间里的内容'));
+          s.session, '❓ 请输入内容安全口令，即可解密你们的私密空间内容'));
       break;
     case '/sync':
       try {
@@ -1491,7 +1493,7 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
   final s = _state!;
   s.pendingSpaceKey = false;
   if (passphrase.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '未输入口令，无法存取私密内容'));
+    s.session.messages.add(_systemMessage(s.session, '未输入口令，无法存取私密空间内容'));
     return;
   }
   if (passphrase.startsWith('/')) {
@@ -1507,7 +1509,7 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
     await s.session.accessByEscrow(passphrase);
     s.session.messages.add(_systemMessage(
         s.session,
-        '✅ 口令核对成功，本设备能够存取私密内容')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
+        '✅ 口令核对成功，本设备能够存取私密空间内容')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
     s.session.store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
     s.session.store.save(s.session.storePath);
   } catch (e) {
@@ -1536,7 +1538,7 @@ Map<String, String> _probePersonNames = {};
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 请输入内容保密口令（务必牢记，严禁泄漏！请分享给您的唯一伴侣用于解密你们的私密空间内容）', required: true);
+    final p1 = await _prompt(session, '❓ 请输入内容安全口令（务必牢记，严禁泄漏！请分享给您的唯一伴侣用于解密你们的私密空间内容）', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
