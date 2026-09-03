@@ -864,3 +864,13 @@
 - 输入回调整体包 try/catch：未捕获异常 → `_inputLoopCrash()`（先 `_restoreTerminal()` 恢复 echo，再报错退出），不再残留不回显终端。
 
 **验证：** dart analyze 无问题；新增 `cli/test/guide_crash_check.py`（pty 驱动：全新 store → 引导问答发 '/' 回车 → 发 'x'）——修复后进程存活、无 RangeError、/exit 正常退出 ✅。
+
+### 引导中 /exit 未立即中断（2026-09-03）
+
+**现象（老板）：** 新设备引导"请输入设备名称"问答输 /exit，仍继续输出"系统将为您自动设置本设备名称"→"设备与空间绑定中"后才退出。
+
+**根因：** /exit（及 Ctrl+C）路径只 `_abortPendingGuide()`（以空串 complete 当前 _prompt）并置 running=false，但 _runGuide 把空串当"用户跳过"继续执行后续线性步骤（自动名提示、store.save、enroll 绑定、口令托管等）；仅部分循环处有 `!running` 守卫，靠 2 秒延迟 exit(0) 兜底。
+
+**修复（einz_tui.dart _runGuide）：** 在人物名、设备名两处 prompt 后立即 `if (!_state!.running) return;`；绑定成功后、发起者口令托管流程前再加守卫；catch 的"绑定失败"else 分支同样守卫（中断时不输出噪音）。
+
+**验证：** dart analyze 无问题；新增 cli/test/guide_exit_check.py（pty 复现老板步骤）——/exit 后进程立即退出、无后续引导提示 ✅。

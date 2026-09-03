@@ -218,13 +218,14 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
   if ((store.personName == null || store.personName!.isEmpty) && _probePersonNames.isEmpty) {
     final name = await _prompt(session, '❓ 请输入您的名字（例如 Lukas，或者直接回车先跳过）');
+    if (!_state!.running) return; // /exit 或 Ctrl+C：立即结束引导，不再输出后续提示
     try {
       if (name.isNotEmpty) {
         store.personName = name;
         session.messages.add(_systemMessage(session, '✅ 您已设置您的名字: $name, 您可随时 /rename 进行修改。'));
         _scheduleRender();
       }else {
-        session.messages.add(_systemMessage(session, '✅ 您没有设置您的名字，由系统为您自动设置，您可随时 /rename 进行修改。'));
+        session.messages.add(_systemMessage(session, '✅ 系统将为您自动设置一个名字，您可随时 /rename 进行修改。'));
       }
       session.messages.add(_systemMessage(session, '----------------'));
     } catch (e) {
@@ -235,11 +236,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已登记设备重启不再重复询问（首次跳过则一直不设，状态条回退规范 id dev1）
   if (store.deviceId == null && (store.deviceName == null || store.deviceName!.isEmpty)) {
     final name = await _prompt(session, '❓ 请输入设备名称（例如 MacBook，或者直接回车先跳过）');
+    if (!_state!.running) return; // 退出中（/exit 已置 running=false，_prompt 返回空串）：不再"自动设置设备名/绑定"，直接结束引导
     if (name.isNotEmpty) {
       store.deviceName = name;
       session.messages.add(_systemMessage(session, '✅ 您已设置设备名称: $name, 您可随时 /device 进行修改。'));
     } else {
-      session.messages.add(_systemMessage(session, '✅ 您没有设置设备名称，由系统为您自动设置, 您可随时 /device 进行修改。'));
+      session.messages.add(_systemMessage(session, '✅ 系统将为您自动设置本设备名称, 您可随时 /device 进行修改。'));
     }
     session.messages.add(_systemMessage(session, '----------------'));
   }
@@ -263,6 +265,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       session.messages.add(_systemMessage(session, '✅ 第一个设备成功绑定到您的私密空间！'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
+      if (!_state!.running) return; // 绑定期间被 /exit 或 Ctrl+C 中断：不再生成口令托管等
       // 发起者：生成 Space Key + 上传口令托管包（两次确认，机密 *）
       final sk = await generateSpaceKey();
       store.spaceKey = base64Encode(sk);
@@ -331,6 +334,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           }
         }
       } else {
+        if (!_state!.running) return; // 退出中：不输出"绑定失败"噪音，直接结束引导
         session.messages.add(_systemMessage(session, '⚠️ 第一个设备绑定失败。'));
         session.messages.add(_systemMessage(session, '----------------'));
         _scheduleRender();
