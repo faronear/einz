@@ -1,6 +1,11 @@
 # einz 开发/运行用 dart 容器：dart:stable + libsodium（TUI FFI 运行时必需，
 # 官方 dart:stable 镜像不带该系统库，dart run 会报"无法加载 libsodium"）。
 #
+# 注意：必须装 libsodium-dev（而非仅 libsodium23）——sodium FFI 探测的是
+# 未版本化的 libsodium.so（/usr/lib/x86_64-linux-gnu/libsodium.so 等），
+# 而 libsodium23 只提供带版本的 libsodium.so.23，缺 dev 包的符号链接
+# 仍会报"无法加载 libsodium"。
+#
 # 构建（仓库根执行，一条命令）：
 #   docker build -f cli/Dockerfile.dev -t einz-dart .
 # 升级 dart 后重建（先拉新版基础镜像再 --pull 重建）：
@@ -10,5 +15,5 @@
 
 FROM dart:stable
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libsodium23 \
+ && apt-get install -y --no-install-recommends libsodium23 libsodium-dev \
  && rm -rf /var/lib/apt/lists/*
