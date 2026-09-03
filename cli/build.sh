@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ein-tui 一键编译脚本：把 einz_tui.dart AOT 编译成免 Dart 运行时的原生可执行文件。
 #
-# 用法:   ./build.sh [输出文件名]      （产物统一放 cli/build/；默认 cli/build/einz-tui-<平台>）
+# 用法:   ./build.sh [输出文件名]      （产物统一放 cli/build/；默认文件名带版本号：
+#                                        cli/build/einz-tui-<版本>-<平台>，便于新旧对比）
 # 平台:   在当前操作系统上编译（Dart 官方不支持交叉编译）：
 #           Linux 上编译 → Linux 可执行文件；macOS 上编译 → mac 可执行文件；
 #           Windows（git-bash/MSYS）编译 → .exe。x64/arm64 随当前机器而定。
@@ -18,12 +19,16 @@ cd "$DIR"
 OUT_DIR="$DIR/build" # 产物统一目录（勿提交，见 .gitignore）
 mkdir -p "$OUT_DIR"
 
+# 版本号：取 cli/pubspec.yaml 的 version 写入产物文件名（便于新旧版本对比）
+VERSION="$(sed -n 's/^version: *//p' pubspec.yaml | head -1 | tr -d '[:space:]')"
+[ -n "$VERSION" ] || VERSION="dev"
+
 PLATFORM="$(uname -s)"
 case "$PLATFORM" in
-  Darwin)               NAME="${1:-einz-tui-macos}" ;;
-  Linux)                NAME="${1:-einz-tui-linux}" ;;
-  MINGW*|MSYS*|CYGWIN*) NAME="${1:-einz-tui.exe}" ;;
-  *)                    NAME="${1:-einz-tui}" ;;
+  Darwin)               NAME="${1:-einz-tui-${VERSION}-macos}" ;;
+  Linux)                NAME="${1:-einz-tui-${VERSION}-linux}" ;;
+  MINGW*|MSYS*|CYGWIN*) NAME="${1:-einz-tui-${VERSION}.exe}" ;;
+  *)                    NAME="${1:-einz-tui-${VERSION}}" ;;
 esac
 OUT="$OUT_DIR/$NAME"
 
