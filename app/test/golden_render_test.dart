@@ -103,11 +103,11 @@ void main() {
   });
 
   // 测试注入：登记（真实路径走 ApiClient.enrollDevice；此处绕开网络，返回固定结果）。
-  Future<EnrollResult> _fakeEnroll(String? inviteCode) async =>
+  Future<EnrollResult> fakeEnroll(String? inviteCode) async =>
       const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test');
 
   // 测试注入：生成邀请码（真实路径走 ApiClient.createInvite）。
-  Future<InviteResult> _fakeInvite(String personId) async => InviteResult(
+  Future<InviteResult> fakeInvite(String personId) async => InviteResult(
         inviteCode: 'invite-test-123',
         personId: personId,
         expiresAt: DateTime.now().millisecondsSinceEpoch + 86400000,
@@ -252,7 +252,7 @@ void main() {
 
   testWidgets('golden: 向导1.1.3-接入口令步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: _fakeEnroll);
+    await pumpSetup(tester, enroll: fakeEnroll);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
@@ -266,7 +266,7 @@ void main() {
 
   testWidgets('golden: 向导1.1.4-PIN 步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: _fakeEnroll);
+    await pumpSetup(tester, enroll: fakeEnroll);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
@@ -283,7 +283,7 @@ void main() {
 
   testWidgets('golden: 向导1.1.5-二维码分享步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: _fakeEnroll, invite: _fakeInvite);
+    await pumpSetup(tester, enroll: fakeEnroll, invite: fakeInvite);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
@@ -305,7 +305,7 @@ void main() {
 
   testWidgets('golden: 向导1.1.6-完成步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: _fakeEnroll);
+    await pumpSetup(tester, enroll: fakeEnroll);
     await enterCreateWithKey(tester);
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();

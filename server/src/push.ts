@@ -61,7 +61,7 @@ export function getSpace(
   const devices = getDb()
     .prepare(`SELECT device_id, person_id, status, last_seen FROM devices WHERE status = 'active'`)
     .all();
-  // person 名称表：meta person_name:personA → display_name（创建者/邀请时设置，显示层用）
+  // person 名称表：meta person_name:personA → person_name（创建者/邀请时设置，显示层用）
   const personNames: Record<string, string> = {};
   for (const r of getDb()
     .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_name:%'`)

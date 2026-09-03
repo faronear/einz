@@ -69,7 +69,7 @@ export function enrollDevice(
     device_id?: string;
     public_key?: string;
     invite_code?: string;
-    display_name?: string;
+    person_name?: string;
     device_name?: string;
     person_id?: string;
   };
@@ -81,7 +81,7 @@ export function enrollDevice(
   const now = Date.now();
 
   // 0) 首设备自举：空间 0 台 active 设备 → 免邀请码，登记为创建者。
-  //    person 用规范 id（personA），自定义名称（display_name，如 lukas）存 meta 名称表
+  //    person 用规范 id（personA），自定义名称（person_name，如 lukas）存 meta 名称表
   const activeCount = (db.prepare(`SELECT COUNT(*) AS c FROM devices WHERE status = 'active'`).get() as { c: number }).c;
   if (activeCount === 0) {
     if (!publicKey) {
@@ -91,7 +91,7 @@ export function enrollDevice(
     const assignedId = assignDeviceId(deviceId); // 首个设备 → dev1（规范 id）
     const deviceName = (b.device_name ?? "").trim() || assignedId;
     const personId = "personA";
-    const displayName = (b.display_name ?? "").trim() || "personA";
+    const personName = (b.person_name ?? "").trim() || "personA";
     const existing = db.prepare(`SELECT status FROM devices WHERE device_id = ?`).get(assignedId) as
       | { status: string }
       | undefined;
@@ -103,8 +103,8 @@ export function enrollDevice(
         .run(assignedId, personId, publicKey, deviceName, now);
     }
     setMeta("creator_person_id", personId); // 创建者标记（规范 id）
-    setMeta(`person_name:${personId}`, displayName); // 名称表：personA → lukas
-    console.log(`[einz] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${displayName}，空间创建者）`);
+    setMeta(`person_name:${personId}`, personName); // 名称表：personA → lukas
+    console.log(`[einz] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${personName}，空间创建者）`);
     return { ok: true, device_id: assignedId, person_id: personId, space_id: cfg.space_id };
   }
 
@@ -165,9 +165,9 @@ export function enrollDevice(
       .run(assignedId, personId, publicKey, deviceName, now);
   }
   // 登记时设置/更新 person_name（后续设备引导时用户选择的身份名称）
-  const displayName = (b.display_name ?? "").trim();
-  if (displayName) {
-    setMeta(`person_name:${personId}`, displayName);
+  const personName = (b.person_name ?? "").trim();
+  if (personName) {
+    setMeta(`person_name:${personId}`, personName);
   }
 
   // 4) 标记邀请码已用（一次性）
@@ -191,12 +191,12 @@ export function createInvite(
   const { device_id: callerId } = resolveSession(token);
   if (!isActiveDevice(cfg, callerId)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
 
-  const b = (body ?? {}) as { person_id?: string; display_name?: string; hours?: number };
+  const b = (body ?? {}) as { person_id?: string; person_name?: string; hours?: number };
   const personId = (b.person_id ?? "").trim();
   if (personId !== "personA" && personId !== "personB") {
     throw new ApiError("INVALID_REQUEST", "person_id 必须是规范 id: personA 或 personB", 400);
   }
-  const displayName = (b.display_name ?? "").trim();
+  const personName = (b.person_name ?? "").trim();
   const hours = Math.min(Math.max(Math.floor(b.hours ?? 24), 1), 168);
 
   const db = getDb();
@@ -218,15 +218,15 @@ export function createInvite(
     throw new ApiError("FORBIDDEN", "空间最多两个 person（当前已满）", 403);
   }
   // 名称表：新 person 首次被邀请时记录自定义名称（如 personB → steffi）
-  if (displayName) {
-    setMeta(`person_name:${personId}`, displayName);
+  if (personName) {
+    setMeta(`person_name:${personId}`, personName);
   }
 
   const code = genInviteCode();
   const expiresAt = Date.now() + hours * 3600_000;
   db.prepare(`INSERT INTO invites (invite_code, person_id, status, created_at, expires_at) VALUES (?, ?, 'pending', ?, ?)`)
     .run(code, personId, Date.now(), expiresAt);
-  console.log(`[einz] 生成邀请码: person=${personId}${displayName ? `（${displayName}）` : ""} hours=${hours}`);
+  console.log(`[einz] 生成邀请码: person=${personId}${personName ? `（${personName}）` : ""} hours=${hours}`);
   return { invite_code: code, person_id: personId, expires_at: expiresAt };
 }
 

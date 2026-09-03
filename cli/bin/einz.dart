@@ -225,19 +225,19 @@ Future<void> _cmdEnroll(ArgResults opts) async {
   final store = DeviceStore.load(path);
   final server = _require(opts, 'server');
   final inviteCode = opts['invite-code'] as String?;
-  final displayName = opts['person'] as String?; // 你的名称（如 lukas），enroll 后写入 store
+  final personName = opts['person'] as String?; // 你的名称（如 lukas），enroll 后写入 store
   final deviceName = opts['device-name'] as String?;
   final r = await ApiClient(server).enrollDevice(
     deviceId: store.deviceId,
     publicKey: store.publicKey,
     inviteCode: inviteCode,
-    displayName: displayName,
+    personName: personName,
     deviceName: deviceName,
   );
   // 登记响应带回服务端分配的规范 id：更新 store（deviceId=devN、personId=personA/B）
   store.deviceId = r.deviceId;
   store.personId = r.personId;
-  if (displayName != null && displayName.isNotEmpty) store.personName = displayName;
+  if (personName != null && personName.isNotEmpty) store.personName = personName;
   if (deviceName != null && deviceName.isNotEmpty) store.deviceName = deviceName;
   store.spaceId = r.spaceId;
   store.save(path);
@@ -266,7 +266,7 @@ Future<void> _cmdInvite(ArgResults opts) async {
   final r = await ApiClient(server).createInvite(
     token: store.sessionToken!,
     personId: personId,
-    displayName: name,
+    personName: name,
     hours: hours,
   );
   stdout.writeln('✅ 邀请码已生成（${hours}h 有效，一次性）: ${r.inviteCode}');

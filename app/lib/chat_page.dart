@@ -286,7 +286,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final r = await api.createInvite(
         token: widget.token,
         personId: personId,
-        displayName: name.isEmpty ? null : name,
+        personName: name.isEmpty ? null : name,
       );
       if (!mounted) return;
       await showDialog<void>(

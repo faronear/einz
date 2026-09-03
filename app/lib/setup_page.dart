@@ -812,7 +812,7 @@ class _SetupPageState extends State<SetupPage> {
           token = s.sessionToken;
           _sessionToken = token;
         }
-        r = await ApiClient(_server).createInvite(token: token!, personId: 'personB');
+        r = await ApiClient(_server).createInvite(token: token, personId: 'personB');
       }
       if (!mounted) return;
       setState(() => _partnerInvite = r.inviteCode);

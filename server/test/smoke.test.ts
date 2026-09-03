@@ -243,7 +243,7 @@ async function main(): Promise<void> {
     const inviteRes = await fetch(`http://127.0.0.1:${port}/invites`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${devA.sessionToken}` },
-      body: JSON.stringify({ person_id: "personB", display_name: "bob" }),
+      body: JSON.stringify({ person_id: "personB", person_name: "bob" }),
     });
     assert.equal(inviteRes.status, 200, "invite should succeed");
     const { invite_code } = (await inviteRes.json()) as { invite_code: string };

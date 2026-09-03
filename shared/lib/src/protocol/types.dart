@@ -112,7 +112,7 @@ class SpaceResult {
   final String spaceId;
   final List<SpaceDevice> devices;
 
-  /// person_id → display_name（创建者/邀请时设置，显示层用）。
+  /// person_id → person_name（创建者/邀请时设置，显示层用）。
   final Map<String, String> personNames;
 
   factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(

@@ -64,7 +64,7 @@ class ApiClient {
     String? deviceId,
     required String publicKey,
     String? inviteCode,
-    String? displayName,
+    String? personName,
     String? deviceName,
     String? personId,
   }) async {
@@ -74,7 +74,7 @@ class ApiClient {
         if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
         'public_key': publicKey,
         if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
-        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (personName != null && personName.isNotEmpty) 'person_name': personName,
         if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
         if (personId != null && personId.isNotEmpty) 'person_id': personId,
       },
@@ -87,14 +87,14 @@ class ApiClient {
   Future<InviteResult> createInvite({
     required String token,
     required String personId,
-    String? displayName,
+    String? personName,
     int hours = 24,
   }) async {
     final res = await _post(
       Api.invites,
       {
         'person_id': personId,
-        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (personName != null && personName.isNotEmpty) 'person_name': personName,
         'hours': hours,
       },
       token: token,
