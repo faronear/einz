@@ -279,10 +279,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         String? chosenPerson;
         while (true) {
           if (!_state!.running) break;
-          // 名称缺失时回退显示规范 id（如 personB 未设用户名 → "如果你是 personB"，
-          // 而非误导性的"尚未加入"——对方可能已在空间、只是在添加新设备）
-          final aName = _probePersonNames['personA'] ?? 'personA';
-          final bName = _probePersonNames['personB'] ?? 'personB';
+          // 名称直接读服务端名称表：登记未设用户名时后台已默认落规范 id，
+          // 故必有值；前端不硬编码 personB/personA（避免与库内实际名称脱节）
+          final aName = _probePersonNames['personA'] ?? '';
+          final bName = _probePersonNames['personB'] ?? '';
           final choice = await _prompt(session, '❓ 如果你是空间创建者 $aName，请输入 1；如果你是 $bName，请输入 2');
           if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
           if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
