@@ -492,7 +492,9 @@ class ChatSession {
     if (lower.endsWith('.m4a') || lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.aac')) {
       return 'voice';
     }
-    return 'other';
+    // 未知扩展名（txt/pdf/zip/doc…）归通用 file 类型：服务端消息类型白名单
+    // （text/image/video/voice/audio/file/system）含 file，任意文件可上传
+    return 'file';
   }
 
   /// 按 key_version 选密钥解密（轮换后旧消息用归档密钥）。

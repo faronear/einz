@@ -35,7 +35,7 @@ Future<void> main(List<String> args) async {
     ..addOption('sealed-file', help: '导入的密封 Space Key 文件（import 用）')
     ..addOption('after', help: '同步起点 server_sequence（默认: 本地锚点 last_server_sequence）')
     ..addOption('file', help: '要上传的本地文件路径（attach 用）')
-    ..addOption('type', help: '附件类型: image|video|voice（attach 用，默认按扩展名推断）')
+    ..addOption('type', help: '附件类型: image|video|voice|file（attach 用，默认按扩展名推断）')
     ..addOption('caption', help: '附件消息描述文本（attach 用，默认文件名）')
     ..addOption('attachment-id', help: '要下载的附件 ID（fetch 用）')
     ..addOption('out', help: '下载输出的本地文件路径（fetch 用）/ 备份输出文件（backup 用）')
@@ -672,19 +672,29 @@ Future<void> _cmdAttach(ArgResults opts) async {
   stdout.writeln('   密文 ${enc.size} 字节，sha256=${enc.sha256.substring(0, 16)}…');
 }
 
-/// 推断附件类型：显式指定优先，否则按扩展名（默认 image）。
+/// 推断附件类型：显式指定优先，否则按扩展名（image/video/voice，未知归 file）。
 String _inferAttachmentType(String? explicit, String fileName) {
   if (explicit != null) {
-    const allowed = {'image', 'video', 'voice'};
-    if (!allowed.contains(explicit)) throw StateError('--type 只能是 image|video|voice');
+    const allowed = {'image', 'video', 'voice', 'file'};
+    if (!allowed.contains(explicit)) throw StateError('--type 只能是 image|video|voice|file');
     return explicit;
+  }
+  final lower = fileName.toLowerCase();
+  if (lower.endsWith('.png') ||
+      lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.gif') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.heic')) {
+    return 'image';
   }
   final ext = fileName.split('.').last.toLowerCase();
   const videoExt = {'mp4', 'mov', 'mkv', 'avi', 'webm'};
   const voiceExt = {'mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac'};
   if (videoExt.contains(ext)) return 'video';
   if (voiceExt.contains(ext)) return 'voice';
-  return 'image';
+  // 未知扩展名（txt/pdf/zip/doc…）归通用 file 类型（服务端白名单含 file）
+  return 'file';
 }
 
 /// 实时监听：连接 WS 接收 message.new，实时落盘历史并解密打印。
