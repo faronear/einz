@@ -89,8 +89,9 @@ class TestDevice {
 
   /** 设备动态登记（自主模式：白名单在 devices 表，POST /devices/enroll）。
    *  首设备免邀请码自举；后续设备凭创建者邀请码。服务端可能分配规范 id
-   *  （dev1/dev2…），登记后回写 deviceId，保证后续 challenge/消息 AAD 用同一 id。 */
-  async enroll(port: number, inviteCode = ""): Promise<string> {
+   *  （dev1/dev2…），登记后回写 deviceId，保证后续 challenge/消息 AAD 用同一 id。
+   *  [personName] 可选自定义用户名（如 luk）；不传则验证服务端默认落规范 id。 */
+  async enroll(port: number, inviteCode = "", personName = ""): Promise<string> {
     const res = await fetch(`http://127.0.0.1:${port}/devices/enroll`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -98,6 +99,7 @@ class TestDevice {
         device_id: this.deviceId,
         public_key: sodium.to_base64(this.keypair.publicKey, B64),
         ...(inviteCode ? { invite_code: inviteCode } : {}),
+        ...(personName ? { person_name: personName } : {}),
         device_name: this.deviceId,
       }),
     });
@@ -338,7 +340,74 @@ async function main(): Promise<void> {
     });
     assert.deepEqual(await escrowAfter.json(), {}, "escrow cleared after delete");
 
-    console.log("✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管");
+    // 12) 名称默认值：person 未设用户名登记时，服务端默认落规范 id（/health 可查）
+    //     （独立服务器验证：A 设名 luk；B 全程无名 → 期望 person_names={A:luk,B:personB}）
+    const tempDir2 = mkdtempSync(join(tmpdir(), "einz-name-default-"));
+    const port2 = await freePort();
+    let serverProc2: ChildProcess | null = null;
+    try {
+      serverProc2 = spawn(process.execPath, [join(ROOT, "dist/app.js")], {
+        env: {
+          ...process.env,
+          PORT: String(port2),
+          EINZ_DB: join(tempDir2, "app.db"),
+          EINZ_FILES: join(tempDir2, "files"),
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      serverProc2.stderr?.on("data", (d) => process.stderr.write(`[server2] ${d}`));
+      await waitReady(port2);
+
+      const devA2 = new TestDevice("dev-a2", "person-a", sodium.randombytes_buf(32));
+      const devB2 = new TestDevice("dev-b2", "person-b", sodium.randombytes_buf(32));
+      await devA2.enroll(port2, "", "luk"); // 首设备自举并设用户名 luk
+      await devA2.auth(port2);
+
+      // 邀请 personB（不预设名称）
+      const inviteRes2 = await fetch(`http://127.0.0.1:${port2}/invites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${devA2.sessionToken}` },
+        body: JSON.stringify({ person_id: "personB" }),
+      });
+      assert.equal(inviteRes2.status, 200, "invite personB should succeed");
+      const { invite_code: inviteCode2 } = (await inviteRes2.json()) as { invite_code: string };
+
+      // B 登记且不传用户名 → 服务端应默认 person_name = 规范 id
+      await devB2.enroll(port2, inviteCode2);
+      const healthRes2 = await fetch(`http://127.0.0.1:${port2}/health`);
+      assert.equal(healthRes2.status, 200, "health should be reachable");
+      const health2 = (await healthRes2.json()) as { person_names: Record<string, string> };
+      assert.deepEqual(
+        health2.person_names,
+        { personA: "luk", personB: "personB" },
+        "未设用户名登记后 /health 名称表应含默认规范 id（personB）"
+      );
+    } finally {
+      await new Promise<void>((done) => {
+        if (!serverProc2 || serverProc2.exitCode !== null) {
+          done();
+          return;
+        }
+        const timer = setTimeout(() => {
+          serverProc2?.kill("SIGKILL");
+          done();
+        }, 3000);
+        serverProc2.once("exit", () => {
+          clearTimeout(timer);
+          done();
+        });
+      });
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(tempDir2, { recursive: true, force: true });
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+    }
+
+    console.log("✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 名称默认值");
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，
     // 否则 app.db 句柄未释放，rmSync 会报 EBUSY。

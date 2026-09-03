@@ -164,10 +164,15 @@ export function enrollDevice(
     db.prepare(`INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at) VALUES (?, ?, ?, 'active', ?, ?)`)
       .run(assignedId, personId, publicKey, deviceName, now);
   }
-  // 登记时设置/更新 person_name（后续设备引导时用户选择的身份名称）
+  // 登记时设置/更新 person_name（后续设备引导时用户选择的身份名称）。
+  // 未提供自定义名时默认落规范 id（如 personB → personB），保证 /health 名称表
+  // 始终有值（_probePersonNames['personB'] 可检测到）——但已有名称
+  // （如邀请时预设的 steffi）不会被默认值覆盖
   const personName = (b.person_name ?? "").trim();
   if (personName) {
     setMeta(`person_name:${personId}`, personName);
+  } else if (!getMeta(`person_name:${personId}`)) {
+    setMeta(`person_name:${personId}`, personId);
   }
 
   // 4) 标记邀请码已用（一次性）
