@@ -1474,13 +1474,15 @@ Future<void> _execOpen(List<String> parts) async {
   if (idx > withAtt.length) idx = withAtt.length;
   final target = withAtt[idx - 1];
   final store = s.session.store;
-  // 缺附件元数据（WS 实时收到后通常还没 sync）：自动补拉一次再试
+  // 缺附件元数据（WS 实时收到时锚点已推进，普通增量 sync 不会重发该消息的
+  // attachments_meta——它只随当页消息下发）：从目标消息之前定向重拉一次
   if (store.attachmentMetaByMessage(target.env.messageId) == null) {
-    s.status = '⏳ 正在同步附件元数据……';
+    s.status = '⏳ 正在定向补拉附件元数据……';
+    final seq = target.env.serverSequence;
     try {
-      await s.session.sync();
+      await s.session.sync(from: (seq == null || seq < 1) ? null : seq - 1);
     } catch (_) {
-      // 同步失败不阻断：openAttachment 仍会给出明确报错
+      // 同步失败不阻断：下方仍会给明确提示
     }
   }
   if (store.attachmentMetaByMessage(target.env.messageId) == null) {

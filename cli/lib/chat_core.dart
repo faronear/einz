@@ -218,13 +218,16 @@ class ChatSession {
 
   /// 增量同步：从本地锚点拉取，落盘历史，返回新增消息（解密后已追加展示缓存）。
   /// 同时补发离线队列。
-  Future<List<ChatMessage>> sync() async {
+  /// [from]：定向补拉起点（覆盖本地锚点，不倒退锚点）——WS 实时收到消息时
+  /// 锚点已推进，普通增量 sync 不会重发已收消息；需要其附件元数据
+  /// （attachments_meta 只随当页消息下发）时，从目标消息之前重拉即可补上。
+  Future<List<ChatMessage>> sync({int? from}) async {
     if (server.isEmpty) throw StateError('缺少服务器地址（--server）');
     store.requireSpace();
     store.requireSession();
     final api = ApiClient(server);
 
-    var cursor = store.lastServerSequence;
+    var cursor = from ?? store.lastServerSequence;
     final added = <MessageEnvelope>[];
     while (true) {
       final result = await _withAutoAuth((token) => api.sync(token, after: cursor));
