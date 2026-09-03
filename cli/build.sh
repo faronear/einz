@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ein-tui 一键编译脚本：把 einz_tui.dart AOT 编译成免 Dart 运行时的原生可执行文件。
 #
-# 用法:   ./build.sh [输出文件名]      （产物统一放 cli/build/；默认文件名含架构-系统-时间戳：
-#                                        cli/build/einz-tui-<架构>-<系统>-<yymmddhhmm>，如 einz-tui-x64-linux-2609032201）
-# 平台/架构: 在当前操作系统与架构上编译（Dart 官方不支持交叉编译）：产物只能在
-#            对应架构+系统的机器上运行（arm64 产物跑 arm64 机，x64 产物跑 x64 机），
-#            架构与系统名已写入文件名便于区分；Windows（git-bash/MSYS）产物带 .exe。
+# 用法:   ./build.sh [输出文件名]      （产物统一放 cli/build/；默认文件名含系统-架构-时间戳：
+#                                        cli/build/einz-tui-<系统>-<架构>-<yymmddhhmm>，如 einz-tui-linux-x64-2609032201）
+# 平台/架构: 操作系统优先于架构排序（不同系统产物互不兼容：Mach-O/ELF/PE）：
+#            产物只能在对应系统+架构上运行，系统与架构已写入文件名便于区分；
+#            Windows（git-bash/MSYS）产物带 .exe。Dart 官方不支持交叉编译。
 # 依赖:   运行时唯一系统依赖是 libsodium（package:sodium 走 FFI），
 #           目标机也要装（见编译后提示）；其余全为纯 Dart，无其他依赖。
-# 运行:   ./einz-tui-<架构>-<系统>-<yymmddhhmm> --store <路径> --server <url>   （TUI 需真实终端）
+# 运行:   ./einz-tui-<系统>-<架构>-<yymmddhhmm> --store <路径> --server <url>   （TUI 需真实终端）
 set -euo pipefail
 # 强制 C locale：非 C locale 下 bash 会把 $VAR 后紧跟的非 ASCII 字节并入变量名
 # （曾致 "$OUT（…"、"$DART）…" 报 unbound variable）；C locale 下变量名只认 ASCII
@@ -40,7 +40,7 @@ case "$PLATFORM" in
   MINGW*|MSYS*|CYGWIN*) OS_NAME="windows"; EXT=".exe" ;;
   *)                    OS_NAME="$(printf '%s' "$PLATFORM" | tr '[:upper:]' '[:lower:]')"; EXT="" ;;
 esac
-NAME="${1:-einz-tui-${ARCH_NAME}-${OS_NAME}-${STAMP}${EXT}}"
+NAME="${1:-einz-tui-${OS_NAME}-${ARCH_NAME}-${STAMP}${EXT}}"
 OUT="$OUT_DIR/$NAME"
 
 # ---- 定位 dart（Linux 常不在 PATH：~/dart-sdk、flutter 自带、apt 安装） ----
