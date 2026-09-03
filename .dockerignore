@@ -1,0 +1,9 @@
+# Docker 构建上下文精简：仅需 cli/ + shared/ 的源码与 pubspec
+.git
+.atomcode/
+aimemo/
+cli/build/
+**/node_modules/
+**/dist/
+**/.dart_tool/
+**/build/

@@ -1,0 +1,22 @@
+# ein-tui Linux 产物构建镜像（适配甲骨文云美国区等可直连 pub.dev 的环境，无需镜像源）。
+#
+# 构建（在仓库根目录执行）：
+#   docker build -f cli/Dockerfile.build -t einz-builder .
+#
+# 取产物（落盘到宿主 cli/build/）：
+#   mkdir -p cli/build
+#   docker run --rm -v "$PWD/cli/build":/out einz-builder \
+#       cp /app/cli/build/einz-tui-linux /out/
+#
+# 目标 Debian 主机上运行（需 libsodium 系统库）：
+#   sudo apt install libsodium23
+#   ./einz-tui-linux --store <store 路径> --server <服务器地址>
+
+FROM dart:stable
+WORKDIR /app
+# 整个仓库作为构建上下文：cli 通过 path 依赖本仓库的 ../shared（见 cli/pubspec.yaml）
+COPY . .
+WORKDIR /app/cli
+RUN dart pub get
+# AOT 原生编译（免 Dart 运行时）；编译阶段无需 libsodium——它由运行时 FFI 动态加载
+RUN mkdir -p build && dart compile exe bin/einz_tui.dart -o build/einz-tui-linux
