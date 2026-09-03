@@ -2,9 +2,9 @@
 # Einz 一键开发/运行（docker 容器化 dart）——无需系统装 dart、无需 source、无需记命令。
 #
 # 用法（在仓库任意位置执行即可，脚本自动定位仓库根）：
-#   ./cli/einz-dev.sh            # 一键 setup：git pull + 构建 einz-dart 镜像 + 校验 libsodium
-#   ./cli/einz-dev.sh tui        # 进入聊天 TUI（交互；镜像缺失会自动先构建）
-#   ./cli/einz-dev.sh dartc <参数>   # 容器内 dart 子命令（如 sync / attach / compile）
+#   ./cli/einz-linux.sh            # 一键 setup：git pull + 构建 einz-dart 镜像 + 校验 libsodium
+#   ./cli/einz-linux.sh tui        # 进入聊天 TUI（交互；镜像缺失会自动先构建）
+#   ./cli/einz-linux.sh dartc <参数>   # 容器内 dart 子命令（如 sync / attach / compile）
 #
 # 说明：
 #   - 镜像 einz-dart = dart:stable + libsodium（TUI FFI 必需），由 cli/Dockerfile.dev 构建；
