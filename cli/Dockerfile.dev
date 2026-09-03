@@ -16,4 +16,6 @@
 FROM dart:stable
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libsodium23 libsodium-dev \
+ && ln -sf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/local/lib/libsodium.so \
+ && ln -sf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/lib/libsodium.so \
  && rm -rf /var/lib/apt/lists/*
