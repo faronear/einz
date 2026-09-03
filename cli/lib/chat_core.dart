@@ -405,10 +405,11 @@ class ChatSession {
   }) async {
     store.requireSpace();
     store.requireSession();
-    final file = File(filePath);
-    if (!file.existsSync()) throw StateError('文件不存在: $filePath');
+    final resolved = _expandUserHome(filePath);
+    final file = File(resolved);
+    if (!file.existsSync()) throw StateError('文件不存在: $filePath（已展开为 $resolved）');
     final fileBytes = file.readAsBytesSync();
-    final fileName = file.path.split(RegExp(r'[\\/]')).last;
+    final fileName = resolved.split(RegExp(r'[\\/]')).last;
 
     final messageId = await _uuidv7();
     final attachmentId = await _uuidv7();
@@ -552,4 +553,21 @@ class ChatSession {
     final tHex = t.toRadixString(16).padLeft(12, '0');
     return '${tHex.substring(0, 8)}-${tHex.substring(8)}-7${hex.substring(0, 3)}-9${hex.substring(3, 7)}-${hex.substring(7)}';
   }
+}
+
+/// 展开路径开头的 ~（家目录）：TUI/CLI 内用户输入的路径不经 shell 展开，
+/// File('~/v.jpg') 会被当字面量（CWD 下名为 ~ 的目录）→ 文件不存在而失败。
+/// 仅处理 ~ 与 ~/（~user 形式需解析 passwd，不支持）；Windows 兼容 USERPROFILE。
+String _expandUserHome(String path) {
+  if (path == '~') return _homeDir();
+  if (path.startsWith('~/') || path.startsWith('~\\')) {
+    return '${_homeDir()}${path.substring(1)}';
+  }
+  return path;
+}
+
+String _homeDir() {
+  return Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'] ??
+      Directory.current.path;
 }
