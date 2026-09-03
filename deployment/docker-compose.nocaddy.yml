@@ -1,7 +1,7 @@
 # Einz 服务端单机部署 —— 无内置 Caddy 版（方案 B）
 # 适用：宿主机已运行系统级 Caddy（systemd），由系统 Caddy 做总入口反代到
 #       本服务的 127.0.0.1:3000；本 compose 不启动 Caddy 容器、不占用宿主
-#       80/443（与 deployment/docker-compose.yml 内置 Caddy 版二选一，
+#       80/443（与 deployment/docker-compose.withcaddy.yml 内置 Caddy 版二选一，
 #       两者端口互不冲突，可在同一台机器上并存而不打架）。
 #
 # 使用前：

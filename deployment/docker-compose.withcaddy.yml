@@ -1,4 +1,7 @@
 # Einz 服务端单机部署（productLens §13.2）：Caddy（TLS/反代）+ Node 服务
+# 本文件为模板：真正部署时按需拷贝为 docker-compose.yml 使用
+#   （cp docker-compose.withcaddy.yml docker-compose.yml）；
+#   另有无内置 Caddy 的 docker-compose.nocaddy.yml（由系统级 Caddy 反代）可选。
 # 使用前：
 #   1. 按 docs/SETUP.md 生成 config.json（白名单），放到 ./config/config.json
 #   2. 修改 Caddyfile 中的域名

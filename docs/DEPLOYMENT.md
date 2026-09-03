@@ -153,7 +153,8 @@ dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 
 ```text
 deployment/
 ├── Caddyfile             # 域名 + TLS 自动签发 + 反代 + WSS 升级
-├── docker-compose.yml    # caddy + server 两个服务
+├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server 两个服务（部署时拷贝为 docker-compose.yml）
+├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000（可选）
 ├── config/config.json    # 白名单（禁止提交 Git；由 2.2 生成后拷入）
 └── data/                 # 数据卷映射：app.db + files/ + backups/
 ```
