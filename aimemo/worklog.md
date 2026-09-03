@@ -851,3 +851,16 @@
 **验证：** flutter analyze 仅剩预存 info（ws_realtime_service）；`flutter test` 39/39 全绿 ✅（golden 12 项先 --update-goldens 重刷再全量比对通过）。
 
 **测试踩坑：** create 流程 step2 登记是网络步，旧 golden 纯"下一步"走法断链——必须注入 enroll 才能走到口令/PIN/分享/完成步骤；widget 测试无真实 sodium/DB 限制同前（LocalDatabase.forTesting + probeServer 注入）。
+
+### TUI 引导阶段 '/' 后输入崩溃修复（2026-09-02）
+
+**现象（老板）：** 新设备引导（消息流问答）中输 '/' 回车（提示"引导中仅支持 /exit 退出（输入未提交）"）后再输入任意字符 → `RangeError (end): Only valid value is 0: 1` 崩溃，且回到 shell 后输入不回显。
+
+**根因（代码定位）：** 引导问答的 '/' 分支与"必填留空"分支只 `input.clear()` **未复位 cursor**（回车前 cursor=1，清空后 input 长度 0）→ 下一字符进 `_insertAtCursor` 执行 `str.substring(0, cursor)` = `substring(0,1)` 于空串 → RangeError。崩溃走 unhandled async exception，`_restoreTerminal()` 未执行 → 终端残留 raw 模式（无回显）。
+
+**修复（einz_tui.dart）：**
+- 两处引导分支 `input.clear()` 后补 `_state.cursor = 0`；
+- `_insertAtCursor` 加防御钳制（cursor 超界时 clamp 回 [0, len]），杜绝同类不一致再崩；
+- 输入回调整体包 try/catch：未捕获异常 → `_inputLoopCrash()`（先 `_restoreTerminal()` 恢复 echo，再报错退出），不再残留不回显终端。
+
+**验证：** dart analyze 无问题；新增 `cli/test/guide_crash_check.py`（pty 驱动：全新 store → 引导问答发 '/' 回车 → 发 'x'）——修复后进程存活、无 RangeError、/exit 正常退出 ✅。
