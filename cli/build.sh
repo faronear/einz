@@ -9,6 +9,9 @@
 #           目标机也要装（见编译后提示）；其余全为纯 Dart，无其他依赖。
 # 运行:   ./einz-tui-<平台> --store <路径> --server <url>   （TUI 需真实终端）
 set -euo pipefail
+# 强制 C locale：非 C locale 下 bash 会把 $VAR 后紧跟的非 ASCII 字节并入变量名
+# （曾致 "$OUT（…"、"$DART）…" 报 unbound variable）；C locale 下变量名只认 ASCII
+export LC_ALL=C
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
@@ -24,8 +27,32 @@ case "$PLATFORM" in
 esac
 OUT="$OUT_DIR/$NAME"
 
-echo "==> 编译 einz_tui.dart → ${OUT}（AOT 原生，免 Dart 运行时）"
-dart compile exe bin/einz_tui.dart -o "$OUT"
+# ---- 定位 dart（Linux 常不在 PATH：~/dart-sdk、flutter 自带、apt 安装） ----
+DART="$(command -v dart || true)"
+if [ -z "$DART" ]; then
+  for cand in \
+    "$HOME/dart-sdk/bin/dart" \
+    "$HOME/flutter/bin/cache/dart-sdk/bin/dart" \
+    /usr/lib/dart/bin/dart \
+    /opt/dart-sdk/bin/dart; do
+    if [ -x "$cand" ]; then DART="$cand"; break; fi
+  done
+fi
+if [ -z "$DART" ] && command -v flutter >/dev/null 2>&1; then
+  DART="$(dirname "$(command -v flutter)")/cache/dart-sdk/bin/dart"
+  [ -x "$DART" ] || DART=""
+fi
+if [ -z "$DART" ]; then
+  echo "❌ 未找到 dart 命令。请先安装 Dart SDK，再运行本脚本："
+  echo "   方案A（官方一键）: curl -fsSL https://dart.dev/install.sh | bash"
+  echo "   方案B（Debian/Ubuntu）: sudo apt install dart   （需先按 https://dart.dev/get-dart 添加 Google 仓库）"
+  echo "   方案C（已有 Flutter）: 把 flutter/bin/cache/dart-sdk/bin 加入 PATH"
+  echo "   安装后重开终端（或 source ~/.bashrc）让 PATH 生效"
+  exit 1
+fi
+
+echo "==> 编译 einz_tui.dart → ${OUT}（AOT 原生，免 Dart 运行时；dart: ${DART}）"
+"$DART" compile exe bin/einz_tui.dart -o "$OUT"
 echo ""
 echo "✅ 编译成功: ${OUT}（$(du -h "$OUT" | cut -f1)）"
 echo ""
