@@ -7,15 +7,15 @@
 # 仍会报"无法加载 libsodium"。
 #
 # 构建（仓库根执行，一条命令）：
-#   docker build -f cli/Dockerfile.dev -t einz-dart .
+#   docker build -f cli/Dockerfile.dev -t dart-sodium .
 # 升级 dart 后重建（先拉新版基础镜像再 --pull 重建）：
-#   docker pull dart:stable && docker build --pull -f cli/Dockerfile.dev -t einz-dart .
-# 之后 source cli/dart-container.sh 会自动优先使用 einz-dart 镜像
+#   docker pull dart:stable && docker build --pull -f cli/Dockerfile.dev -t dart-sodium .
+# 之后 source cli/dart-container.sh 会自动优先使用 dart-sodium 镜像
 # （也可设 EINZ_DART_IMAGE=<镜像> 覆盖）。
 
 FROM dart:stable
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libsodium23 libsodium-dev \
- && ln -sf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/local/lib/libsodium.so \
- && ln -sf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/lib/libsodium.so \
- && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends libsodium23 libsodium-dev \
+  && ln -sf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/local/lib/libsodium.so \
+  && ln -sf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/lib/libsodium.so \
+  && rm -rf /var/lib/apt/lists/*

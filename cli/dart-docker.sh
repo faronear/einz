@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Einz 一键开发/运行（docker 容器化 dart）——无需系统装 dart、无需 source、无需记命令。
+# 一键开发/运行（docker 容器化 dart）——无需系统装 dart、无需 source、无需记命令。
 #
 # 用法（在仓库任意位置执行即可，脚本自动定位仓库根）：
-#   ./cli/dart-docker.sh            # 一键 setup：git pull + 构建 einz-dart 镜像 + 校验 libsodium
+#   ./cli/dart-docker.sh            # 一键 setup：git pull + 构建 dart-sodium 镜像 + 校验 libsodium
 #   ./cli/dart-docker.sh tui        # 进入聊天 TUI（交互；镜像缺失会自动先构建）
 #   ./cli/dart-docker.sh dartc <参数>   # 容器内 dart 子命令（如 sync / attach / compile）
 #   ./cli/dart-docker.sh build      # 容器内编译 Linux TUI 产物 → cli/build/einz-tui-<时间戳>-linux
 #
 # 说明：
-#   - 镜像 einz-dart = dart:stable + libsodium（TUI FFI 必需），由 cli/Dockerfile.dev 构建；
+#   - 镜像 dart-sodium = dart:stable + libsodium（TUI FFI 必需），由 cli/Dockerfile.dev 构建；
 #   - 代码改动无需重建镜像（仓库整体挂载 /app，dart run 即最新代码）；
 #     只有升级 dart SDK 或换镜像才需要重新 setup；
 #   - 身份/密钥持久化：宿主 ~/.einz ↔ 容器 /tmp/.einz；pub 缓存 ~/.pub-cache 同挂；
@@ -18,7 +18,7 @@ export LC_ALL=C # 防非 C locale 下 "$VAR" 后紧跟中文被并入变量名
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # 本脚本目录 = cli/
 ROOT="$(cd "$DIR/.." && pwd)"                        # 仓库根
-IMG="${EINZ_DART_IMAGE:-einz-dart}"
+IMG="${EINZ_DART_IMAGE:-dart-sodium}"
 
 run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
   local tty="$1"
