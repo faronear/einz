@@ -845,9 +845,9 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   }
   final time = _timeLabel(m.createdAt);
   final body = m.plain.replaceAll('\n', ' ');
-  // 双方消息的外侧留白（同为 16 列）：我方正文右侧 / 对方正文左侧；
+  // 双方消息的外侧留白（同为 8 列）：我方正文右侧 / 对方正文左侧；
   // 保证对方正文起点不比我方正文（前缀之后）更靠左
-  const sideMargin = 16;
+  const sideMargin = 8;
   if (m.isMine || m.isSystem) {
     // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐。
     // 正文右侧预留 sideMargin 列边距，不顶满最右（与对方消息的视觉留白平衡）；
@@ -869,7 +869,7 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   // 标签栏宽 = "空格+标签"（标签宽+1），使续行正文右缘与末行标签起点对齐
   // （末行正文与标签之间有一个空格，若只空标签宽则续行会多伸 1 列）
   final lane = suffixW + 1; // 右侧标签栏宽（含标签前一个空格）
-  final leftPad = sideMargin; // 左侧留白 = 我方正文右侧留白（16 列）
+  final leftPad = sideMargin; // 左侧留白 = 我方正文右侧留白（8 列）
   final textWidth = cols - lane - leftPad;
   final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
   final lines = <String>[];
