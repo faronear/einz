@@ -282,7 +282,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           // 名称直接读服务端名称表：登记未设用户名时后台已默认落规范 id，
           // 故必有值；前端不硬编码 personB/personA（避免与库内实际名称脱节）
           final aName = _probePersonNames['personA'] ?? '';
-          final bName = _probePersonNames['personB'] ?? '';
+          final bName = _probePersonNames['personB'] ?? '尚未加入';
           final choice = await _prompt(session, '❓ 如果你是空间创建者 $aName，请输入 1；如果你是 $bName，请输入 2');
           if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
           if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
@@ -367,7 +367,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         await _busy(session, '⏳ 私密空间口令核对中......', () => session.accessByEscrow(passphrase));
         session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备能够解密私密空间内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         session.messages.add(_systemMessage(session, '----------------'));
-        session.messages.add(_systemMessage(session, '您已成功加入了私密空间。输入 /help 查看快捷命令。立刻开始点对点加密聊天吧！'));
+        session.messages.add(_systemMessage(session, '🎉 您已成功加入了私密空间。输入 /help 查看快捷命令。立刻开始点对点加密聊天吧！'));
         session.messages.add(_systemMessage(session, '================'));
         store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
         store.save(storePath);
@@ -1285,7 +1285,7 @@ Future<void> _execCommand(String line) async {
       // 命令列表作为 system 消息进消息流（随消息区滚动，不占顶部状态栏）
       s.session.messages.add(_systemMessage(
         s.session,
-        '可用命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /rename <名字> /device <设备名> /sync /history /attach <file> /exit',
+        '可用命令: /auth [server] /server <地址> /space /invite [personA|personB] [名称] /rename <名字> /device <设备名> /sync /history /attach <file> /open [序号] /exit',
       ));
       s.status = '';
     case '/server':
@@ -1361,9 +1361,9 @@ Future<void> _execCommand(String line) async {
       } else {
         try {
           final r = await s.session.attachFile(arg);
-          s.status = '✅ 附件已上传: ${r.caption} (id=${r.attachmentId.substring(0, 8)})';
+          s.session.messages.add(_systemMessage(s.session, '✅ 附件已上传: ${r.caption} (id=${r.attachmentId.substring(0, 8)})'));
         } catch (e) {
-          s.status = '附件上传失败，请稍后再试。 $e';
+          s.session.messages.add(_systemMessage(s.session, '❌ 附件上传失败，可能有路径或文件类型出错，请检查再试。'));
         }
       }
     case '/invite':
@@ -1404,6 +1404,9 @@ Future<void> _execCommand(String line) async {
           s.status = '设备名更新失败: $e';
         }
       }
+    case '/open':
+      // 打开附件到系统应用：/open [序号]（序号从最新倒数，1=最近一条带附件消息）
+      await _execOpen(parts);
     case '/exit':
     case '/quit':
       s.running = false;
@@ -1443,6 +1446,40 @@ Future<void> _execInvite(List<String> parts) async {
     s.status = ''; // 反馈在消息区（邀请码本身），状态栏保持干净
   } catch (e) {
     s.status = '❌ 邀请码生成失败: $e';
+  }
+}
+
+/// /open [序号]：从最新往前找带附件元数据的消息，下载解密后用系统默认应用打开。
+/// 序号从最新倒数（1=最近一条）；不带参默认 1。无附件/越界时给提示。
+Future<void> _execOpen(List<String> parts) async {
+  final s = _state!;
+  var idx = 1;
+  if (parts.length > 1) {
+    idx = int.tryParse(parts[1]) ?? 1;
+    if (idx < 1) idx = 1;
+  }
+  final withAtt = <ChatMessage>[];
+  for (final m in s.session.messages.reversed) {
+    if (m.isSystem) continue;
+    if (s.session.store.attachmentMetaByMessage(m.env.messageId) != null) {
+      withAtt.add(m);
+    }
+  }
+  if (withAtt.isEmpty) {
+    s.session.messages.add(_systemMessage(
+        s.session, '没有带附件的消息（上传用 /attach <file>，收对方附件请先 /sync）'));
+    return;
+  }
+  if (idx > withAtt.length) idx = withAtt.length;
+  final target = withAtt[idx - 1];
+  try {
+    s.status = '⏳ 下载附件中（${target.plain}）……';
+    final path = await s.session.openAttachment(target);
+    s.session.messages
+        .add(_systemMessage(s.session, '✅ 已用系统应用打开附件（${target.plain}）'));
+    s.status = '附件缓存: $path';
+  } catch (e) {
+    s.status = '打开附件失败: $e';
   }
 }
 

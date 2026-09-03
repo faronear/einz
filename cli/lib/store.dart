@@ -282,5 +282,13 @@ class DeviceStore {
     return null;
   }
 
+  /// 按 message_id 查询附件元数据（一条消息至多一个附件；不存在返回 null）。
+  Map<String, dynamic>? attachmentMetaByMessage(String messageId) {
+    for (final a in attachments) {
+      if (a['message_id'] == messageId) return a;
+    }
+    return null;
+  }
+
   int get attachmentCount => attachments.length;
 }

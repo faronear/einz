@@ -8,6 +8,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:einz_shared/einz_shared.dart';
 import 'package:einz_cli/store.dart';
 
@@ -237,6 +238,19 @@ class ChatSession {
       }
       if (result.lastSequence > cursor) cursor = result.lastSequence;
       store.advanceAnchor(result.lastSequence);
+      // 附件元数据落盘（供 /open 解密：nonce/sha256/key_version 必需，
+      // PROTOCOL.md §5.2 attachments_meta）——收到的附件消息同样要能打开
+      for (final meta in result.attachmentsMeta) {
+        store.upsertAttachment(
+          attachmentId: meta['attachment_id'] as String,
+          messageId: meta['message_id'] as String,
+          keyVersion: meta['key_version'] as int,
+          size: meta['size'] as int,
+          sha256: meta['sha256'] as String,
+          nonce: meta['nonce'] as String,
+          createdAt: meta['created_at'] as int,
+        );
+      }
       if (!result.hasMore || result.messages.isEmpty) break;
     }
     store.save(storePath);
@@ -473,6 +487,63 @@ class ChatSession {
     );
     _sortMessages();
     return (messageId: messageId, attachmentId: attachmentId, caption: cap);
+  }
+
+  /// 打开某条消息的附件（/open）：按 message_id 定位附件元数据 → 下载密文 blob
+  /// → 校验 sha256 → 解密 → 写入缓存文件 → 系统默认应用打开（macOS open /
+  /// Linux xdg-open）。返回本地缓存路径（无打开器的平台仅保存，由界面提示）。
+  Future<String> openAttachment(ChatMessage msg) async {
+    store.requireSpace();
+    store.requireSession();
+    final meta = store.attachmentMetaByMessage(msg.env.messageId);
+    if (meta == null) {
+      throw StateError('该消息没有附件元数据（对方发来的附件请先 /sync 拉取）');
+    }
+    final attachmentId = meta['attachment_id'] as String;
+    final api = ApiClient(server);
+    final blob = await _withAutoAuth((token) => api.getAttachment(attachmentId, token));
+    // 校验密文完整性（sha256 与元数据一致，PROTOCOL.md §6.1；编码同为 base64）
+    final actual = base64Encode(crypto.sha256.convert(blob).bytes);
+    if (actual != meta['sha256']) {
+      throw StateError('附件密文 sha256 校验失败（传输损坏或被篡改）');
+    }
+    final plain = await decryptAttachment(
+      cipherText: blob,
+      nonce: base64Decode(meta['nonce'] as String),
+      spaceKey: base64Decode(store.spaceKey!),
+      attachmentId: attachmentId,
+      spaceId: store.spaceId!,
+      keyVersion: meta['key_version'] as int,
+    );
+    // 缓存目录 ~/.einz/cache；扩展名优先取 caption 里的文件名，其次按消息类型兜底
+    final home = Platform.environment['HOME'] ??
+        Platform.environment['USERPROFILE'] ??
+        Directory.current.path;
+    final cacheDir = Directory('$home/.einz/cache')..createSync(recursive: true);
+    final extMatch = RegExp(r'\.([A-Za-z0-9]{1,8})$').firstMatch(msg.plain);
+    final ext = extMatch?.group(1)?.toLowerCase() ??
+        switch (msg.env.type) {
+          'image' => 'jpg',
+          'video' => 'mp4',
+          'voice' || 'audio' => 'm4a',
+          'text' => 'txt',
+          _ => 'bin',
+        };
+    final outPath = '${cacheDir.path}/${attachmentId.substring(0, 8)}.$ext';
+    File(outPath).writeAsBytesSync(plain);
+    // 系统默认应用打开（图片/音视频由系统查看器/播放器接管）
+    final opener = Platform.isMacOS
+        ? 'open'
+        : Platform.isLinux
+            ? 'xdg-open'
+            : null;
+    if (opener != null) {
+      final pr = await Process.run(opener, [outPath]);
+      if (pr.exitCode != 0) {
+        throw StateError('打开失败（$opener 退出码 ${pr.exitCode}），文件已保存: $outPath');
+      }
+    }
+    return outPath;
   }
 
   /// 按扩展名推断附件类型（与 einz.dart 的 _inferAttachmentType 一致）。
