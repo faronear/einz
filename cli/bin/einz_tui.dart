@@ -1449,8 +1449,10 @@ Future<void> _execInvite(List<String> parts) async {
   }
 }
 
-/// /open [序号]：从最新往前找带附件元数据的消息，下载解密后用系统默认应用打开。
-/// 序号从最新倒数（1=最近一条）；不带参默认 1。无附件/越界时给提示。
+/// /open [序号]：从最新往前找带附件的消息，下载解密后用系统默认应用打开。
+/// 序号从最新倒数（1=最近一条；不带参默认 1）。附件消息按 env.type 判定
+/// （image/video/voice/audio/file）——WS 实时收到的附件消息可能还没落附件
+/// 元数据，此时先自动补一次 sync 再尝试打开。
 Future<void> _execOpen(List<String> parts) async {
   final s = _state!;
   var idx = 1;
@@ -1458,20 +1460,34 @@ Future<void> _execOpen(List<String> parts) async {
     idx = int.tryParse(parts[1]) ?? 1;
     if (idx < 1) idx = 1;
   }
+  const attachTypes = {'image', 'video', 'voice', 'audio', 'file'};
   final withAtt = <ChatMessage>[];
   for (final m in s.session.messages.reversed) {
     if (m.isSystem) continue;
-    if (s.session.store.attachmentMetaByMessage(m.env.messageId) != null) {
-      withAtt.add(m);
-    }
+    if (attachTypes.contains(m.env.type)) withAtt.add(m);
   }
   if (withAtt.isEmpty) {
     s.session.messages.add(_systemMessage(
-        s.session, '没有带附件的消息（上传用 /attach <file>，收对方附件请先 /sync）'));
+        s.session, '没有带附件的消息（上传用 /attach <file>）'));
     return;
   }
   if (idx > withAtt.length) idx = withAtt.length;
   final target = withAtt[idx - 1];
+  final store = s.session.store;
+  // 缺附件元数据（WS 实时收到后通常还没 sync）：自动补拉一次再试
+  if (store.attachmentMetaByMessage(target.env.messageId) == null) {
+    s.status = '⏳ 正在同步附件元数据……';
+    try {
+      await s.session.sync();
+    } catch (_) {
+      // 同步失败不阻断：openAttachment 仍会给出明确报错
+    }
+  }
+  if (store.attachmentMetaByMessage(target.env.messageId) == null) {
+    s.session.messages.add(_systemMessage(s.session,
+        '⚠️ 附件元数据尚未就绪（对方的上传可能未完成或本机未同步成功），请稍后再 /open'));
+    return;
+  }
   try {
     s.status = '⏳ 下载附件中（${target.plain}）……';
     final path = await s.session.openAttachment(target);
