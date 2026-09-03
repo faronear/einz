@@ -5,6 +5,7 @@
 #   ./cli/einz-linux.sh            # 一键 setup：git pull + 构建 einz-dart 镜像 + 校验 libsodium
 #   ./cli/einz-linux.sh tui        # 进入聊天 TUI（交互；镜像缺失会自动先构建）
 #   ./cli/einz-linux.sh dartc <参数>   # 容器内 dart 子命令（如 sync / attach / compile）
+#   ./cli/einz-linux.sh build      # 容器内编译 Linux TUI 产物 → cli/build/einz-tui-<时间戳>-linux
 #
 # 说明：
 #   - 镜像 einz-dart = dart:stable + libsodium（TUI FFI 必需），由 cli/Dockerfile.dev 构建；
@@ -55,6 +56,7 @@ setup() {
   echo "✅ 全部就绪。日常只需："
   echo "   进聊天：    $0 tui"
   echo "   容器 dart： $0 dartc <参数>   （例：$0 dartc run bin/einz.dart sync …）"
+  echo "   编 Linux 产物：$0 build   （产物在 cli/build/einz-tui-<时间戳>-linux）"
   echo "   升级 SDK：  $0    （重新执行一键 setup）"
 }
 
@@ -69,11 +71,20 @@ case "${1:-setup}" in
     ensure_image
     run_container -i dart "$@"
     ;;
+  build)
+    ensure_image
+    STAMP="$(date +%y%m%d%H%M)"
+    OUT="einz-tui-${STAMP}-linux"
+    echo "==> 容器内 AOT 编译（dart:stable，含 libsodium）→ cli/build/${OUT}"
+    run_container -i sh -c "mkdir -p build && dart compile exe bin/einz_tui.dart -o build/${OUT}"
+    echo "✅ 编译完成: cli/build/${OUT}"
+    echo "   拷贝到目标机后需安装 libsodium（Debian/Ubuntu: sudo apt install libsodium23）"
+    ;;
   setup | update | "")
     setup
     ;;
   *)
-    echo "用法: $0 [tui|dartc <参数>|setup]" >&2
+    echo "用法: $0 [tui|dartc <参数>|build|setup]" >&2
     exit 1
     ;;
 esac
