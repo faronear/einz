@@ -73,7 +73,7 @@ case "${1:-setup}" in
     ;;
   build)
     ensure_image
-    echo "==> 容器内执行 cli/build.sh（AOT 编译 → cli/build/einz-tui-<时间戳>-linux）…"
+    echo "==> 容器内执行 cli/build.sh（AOT 编译 → cli/build/einz-tui-linux-<芯片架构>-<时间戳>）…"
     # 复用 build.sh 单一实现（挂载仓库内 /app/cli/build.sh）：自动探测容器 dart、
     # 按平台命名、输出到挂载目录 cli/build/，产物直达宿主
     run_container -i bash build.sh
