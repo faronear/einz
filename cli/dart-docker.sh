@@ -18,7 +18,7 @@ export LC_ALL=C # 防非 C locale 下 "$VAR" 后紧跟中文被并入变量名
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # 本脚本目录 = cli/
 ROOT="$(cd "$DIR/.." && pwd)"                        # 仓库根
-IMG="${EINZ_DART_IMAGE:-dart-sodium}"
+IMG="${DART_IMAGE:-dart-sodium}"
 
 run_container() { # $1: '-it' 或 '-i'；其余为容器内命令
   local tty="$1"

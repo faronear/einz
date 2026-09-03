@@ -11,7 +11,7 @@
 # 升级 dart 后重建（先拉新版基础镜像再 --pull 重建）：
 #   docker pull dart:stable && docker build --pull -f cli/Dockerfile.dev -t dart-sodium .
 # 之后 source cli/dart-container.sh 会自动优先使用 dart-sodium 镜像
-# （也可设 EINZ_DART_IMAGE=<镜像> 覆盖）。
+# （也可设 DART_IMAGE=<镜像> 覆盖）。
 
 FROM dart:stable
 RUN apt-get update \
