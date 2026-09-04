@@ -15,9 +15,12 @@ Pod::Spec.new do |s|
   s.platform         = :ios, '12.0'
 
   s.vendored_frameworks = 'libsodium.xcframework'
-  s.pod_target_xcconfig = {
-    'OTHER_LDFLAGS[sdk=iphoneos*]' => '$(inherited) -force_load "$(PODS_ROOT)/libsodium/libsodium.xcframework/ios-arm64/libsodium.a"',
-    'OTHER_LDFLAGS[sdk=iphonesimulator*]' => '$(inherited) -force_load "$(PODS_ROOT)/libsodium/libsodium.xcframework/ios-arm64_x86_64-simulator/libsodium.a"',
+  # 注意：必须用 user_target_xcconfig（作用于 Runner 链接步骤），
+  # pod_target_xcconfig 只作用于 pod 自身 target，-force_load 不会进 Runner 链接。
+  # 本地 pod 路径：Runner 的 PODS_ROOT=${SRCROOT}/Pods，本 pod 在 ${PODS_ROOT}/../Libraries。
+  s.user_target_xcconfig = {
+    'OTHER_LDFLAGS[sdk=iphoneos*]' => '$(inherited) -force_load "${PODS_ROOT}/../Libraries/libsodium.xcframework/ios-arm64/libsodium.a"',
+    'OTHER_LDFLAGS[sdk=iphonesimulator*]' => '$(inherited) -force_load "${PODS_ROOT}/../Libraries/libsodium.xcframework/ios-arm64_x86_64-simulator/libsodium.a"',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
   }
 end

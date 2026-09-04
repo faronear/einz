@@ -48,14 +48,14 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
-  file_picker_darwin: 5c32d1a83c7cd2e4e2d2eaea629cf830b3b5dc49
+  file_picker_darwin: 4c2b9a50ea44cb3b071381ea0cf48591bdd80251
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
-  libsodium: 5aa367f19e4c349df356067886e21c6034debb0e
+  libsodium: a8be4d4dc598ca2fcadc4ff29ec7b940e2747a5b
   mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
   record_ios: 390a30c7caaf8b5d0fb1cb1d2fd5064b48b4520c
   video_player_avfoundation: 3453f792138786248960ca029747fcd9f318ef52
 
-PODFILE CHECKSUM: 12c1c4fb0e405568cb95a1a8f76a8b2131d9a100
+PODFILE CHECKSUM: cafd3f9336b017977e9d90b3da29e58517b16820
 
 COCOAPODS: 1.16.2
