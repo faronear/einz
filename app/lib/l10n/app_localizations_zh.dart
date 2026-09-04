@@ -50,6 +50,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageDeviceIdLabel => '设备 ID';
 
   @override
+  String get setupPageDeviceIdHint => '例如 MacBook（可选，之后可改）';
+
+  @override
   String get setupPageSpaceIdLabel => 'Space ID';
 
   @override

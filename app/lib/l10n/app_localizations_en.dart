@@ -50,6 +50,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageDeviceIdLabel => 'Device ID';
 
   @override
+  String get setupPageDeviceIdHint =>
+      'e.g. MacBook (optional, can change later)';
+
+  @override
   String get setupPageSpaceIdLabel => 'Space ID';
 
   @override

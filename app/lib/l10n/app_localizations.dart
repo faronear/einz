@@ -176,6 +176,12 @@ abstract class AppLocalizations {
   /// **'Device ID'**
   String get setupPageDeviceIdLabel;
 
+  /// No description provided for @setupPageDeviceIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. MacBook (optional, can change later)'**
+  String get setupPageDeviceIdHint;
+
   /// No description provided for @setupPageSpaceIdLabel.
   ///
   /// In en, this message translates to:

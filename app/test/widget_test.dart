@@ -33,7 +33,7 @@ void main() {
     expect(find.text('高级：导入 sealed 密钥副本'), findsOneWidget);
   });
 
-  testWidgets('角色分流：点"创建新空间"进入设备名称步骤，未生成密钥点下一步提示先生成',
+  testWidgets('角色分流：点"创建新空间"进入设备名称步骤，主按钮融合"下一步"',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp());
 
@@ -43,12 +43,11 @@ void main() {
     // 页眉（AppBar）固定显示所选角色名；步骤标题移到 body 上方
     expect(find.text('创建新空间'), findsOneWidget); // AppBar
     expect(find.text('设备名称'), findsOneWidget); // body 上方步骤标题
+    // 融合按钮：步骤 1 只有"① 生成设备密钥"主按钮，无底部独立"下一步"
     expect(find.text('① 生成设备密钥'), findsOneWidget);
-
-    // 未生成设备密钥点"下一步" → 提示先生成
-    await tester.tap(find.text('下一步'));
-    await tester.pump();
-    expect(find.text('⚠️ 先生成设备密钥'), findsOneWidget);
+    expect(find.text('下一步'), findsNothing);
+    // 底部保留"上一步"（可返回角色选择）
+    expect(find.text('上一步'), findsOneWidget);
   });
 
   testWidgets('角色分流：点"加入对方空间"进入设备名称步骤（页眉切换）', (WidgetTester tester) async {

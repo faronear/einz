@@ -13,6 +13,7 @@
   "setupPageHeading": "One-time setup",
   "setupPageInstructions": "1) Generate device key → the device registers automatically (no whitelist needed)\n2) Create or join the private space → set up the app lock",
   "setupPageDeviceIdLabel": "Device ID",
+  "setupPageDeviceIdHint": "e.g. MacBook (optional, can change later)",
   "setupPageSpaceIdLabel": "Space ID",
   "setupPageSealedKeyLabel": "Sealed Space Key (base64)",
   "setupPageSealedKeyHint": "Paste the sealed copy (contents of sealed-*.txt)",

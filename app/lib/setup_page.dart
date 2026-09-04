@@ -199,9 +199,11 @@ class _SetupPageState extends State<SetupPage> {
                 children: [
                   TextButton(onPressed: _backStep, child: Text(l10n.wizardBack)),
                   const Spacer(),
-                  if (_step < _stepCount - 1)
+                  // 步骤 1（设备名称）的"下一步"已融合进主按钮（生成密钥后自动进入下一页）；
+                  // 仅步骤 2+ 显示底部下一步，末步显示完成。
+                  if (_step > 1 && _step < _stepCount - 1)
                     FilledButton(onPressed: _nextStep, child: Text(l10n.wizardNext))
-                  else
+                  else if (_step == _stepCount - 1)
                     FilledButton(onPressed: _finish, child: Text(l10n.wizardDone)),
                 ],
               ),
@@ -510,6 +512,7 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 场景 A（create）：设备名 → 登记（自动自举）→ 口令 → PIN → 分享 → 完成 ----
 
   /// 步骤 1：设备名称 + 生成设备密钥（生成结果在本页明确反馈）。
+  /// 融合按钮：点击生成密钥并自动进入下一步（对齐 TUI 引导"输入名称即继续"的线性流程）。
   Widget _buildStepDevice() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -519,13 +522,16 @@ class _SetupPageState extends State<SetupPage> {
           controller: _deviceId,
           decoration: InputDecoration(
             labelText: l10n.setupPageDeviceIdLabel,
+            hintText: l10n.setupPageDeviceIdHint,
             border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: _busy ? null : _generateKeyPair,
-          child: Text(l10n.setupPageGenerateKey),
+          onPressed: _busy ? null : _generateKeyAndNext,
+          child: _busy
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(_keyPair != null ? l10n.wizardNext : l10n.setupPageGenerateKey),
         ),
         if (_keyPair != null) ...[
           const SizedBox(height: 12),
@@ -550,6 +556,17 @@ class _SetupPageState extends State<SetupPage> {
         ],
       ],
     );
+  }
+
+  /// 融合按钮：未生成密钥 → 生成后自动进入下一步；已生成（返回本步）→ 直接下一步。
+  Future<void> _generateKeyAndNext() async {
+    if (_busy) return;
+    if (_keyPair == null) {
+      await _generateKeyPair();
+      if (!mounted) return;
+    }
+    if (_keyPair == null) return; // 生成失败：留在本页展示错误
+    _nextStep();
   }
 
   Future<void> _generateKeyPair() async {
