@@ -199,9 +199,11 @@ class _SetupPageState extends State<SetupPage> {
                 children: [
                   TextButton(onPressed: _backStep, child: Text(l10n.wizardBack)),
                   const Spacer(),
-                  // 步骤 1（设备名称）的"下一步"已融合进主按钮（生成密钥后自动进入下一页）；
-                  // 仅步骤 2+ 显示底部下一步，末步显示完成。
-                  if (_step > 1 && _step < _stepCount - 1)
+                  // 步骤 1（设备名称）与 create 步骤 2（登记）的"下一步"已融合进主按钮
+                  // （动作成功后自动进入下一页）；其余步骤显示底部下一步，末步显示完成。
+                  if (_step > 1 &&
+                      _step < _stepCount - 1 &&
+                      !(_role == _WizardRole.create && _step == 2))
                     FilledButton(onPressed: _nextStep, child: Text(l10n.wizardNext))
                   else if (_step == _stepCount - 1)
                     FilledButton(onPressed: _finish, child: Text(l10n.wizardDone)),
@@ -599,8 +601,10 @@ class _SetupPageState extends State<SetupPage> {
         Text(l10n.wizardEnrollHint, style: const TextStyle(fontSize: 14)),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: _busy ? null : _runBootstrap,
-          child: Text(l10n.wizardEnrollAction),
+          onPressed: _busy ? null : _runBootstrapAndNext,
+          child: _busy
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(l10n.wizardEnrollAction),
         ),
         if (_enroll != null) ...[
           const SizedBox(height: 12),
@@ -663,6 +667,14 @@ class _SetupPageState extends State<SetupPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// 融合按钮：登记成功后自动进入下一步（口令步骤）；失败留在本页展示错误/改用加入。
+  Future<void> _runBootstrapAndNext() async {
+    if (_busy) return;
+    await _runBootstrap();
+    if (!mounted) return;
+    if (_enroll != null && !_bootstrapFailed) _nextStep();
   }
 
   /// 步骤 3：设置接入口令（对方凭它加入）。

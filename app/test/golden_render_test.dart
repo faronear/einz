@@ -252,9 +252,7 @@ void main() {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
     await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.3_passphrase.png'));
@@ -264,9 +262,7 @@ void main() {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
     await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456');
     await tester.tap(find.text('下一步'));
@@ -279,9 +275,7 @@ void main() {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll, invite: fakeInvite);
     await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456');
     await tester.tap(find.text('下一步'));
@@ -299,9 +293,7 @@ void main() {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
     await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456');
     await tester.tap(find.text('下一步'));
