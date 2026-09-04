@@ -47,5 +47,11 @@ app.*.map.json
 # 签名密钥（禁止提交）
 /android/key.properties
 
+# flutter create 生成的平台噪音（项目只需 ios/android；勿提交 linux/macos/web/windows）
+/linux/
+/macos/
+/web/
+/windows/
+
 # Widget Preview related
 .widget_preview/
