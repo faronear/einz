@@ -888,3 +888,21 @@
 **配置文件角色澄清（防混淆）：** 两个 config.json 含义不同——① `server/config/config.json` 白名单**已废弃**（2026-09-02 起自主模式：server 首启自动生成 space_id 存 db meta，白名单 = devices 表动态登记，首设备免邀请码自举、之后凭邀请码；ONBOARDING.md §0）；② `cli/config.json` = `{"server": "https://einz.tic.cc"}` 是 **TUI 默认服务器地址**（可本地改，优先级低于 `--server` 参数与 store 持久化值），不是公钥白名单。
 
 **验证：** 宿主 `~/` 下目录容器枚举正常。老板实测：`git clone` 到 `~/einz` 后 `./cli/dart-docker.sh tui` **运行成功**（noowners 卷解决方案确认有效）；测试完成即删除 `~/einz`——**日常开发仍留在原路径 `/Volumes/repodisk/productX/einz`**，除非再遇 Docker 枚举类问题才考虑迁移到 `~/`。
+
+### iOS 模拟器构建与启动验证（2026-09-04，iMac）
+
+**背景：** 老板在 iMac 上首次尝试 iOS 本地构建（`flutter create . --platforms=ios,android` 在 app/ 内，仓库根无污染）。初始 `flutter run` 报 "No supported devices connected"，排查链：iPhone 已 USB 识别但 **unpaired（code -29）** 或 **未开开发者模式（code -27）**——设备侧问题，真机验证后置；先走模拟器验证构建。
+
+**环境修复：**
+- **CocoaPods 未装** → `brew install cocoapods`（1.16.2_2），并 `flutter config --no-enable-swift-package-manager`（项目 Podfile 含本地 libsodium pod，禁 SPM，见 docs/IOS.md §1）。
+- **Xcode 16.1 无 iOS 18.1 平台**（只有 iOS 17.4 运行时）→ `flutter build` 预检 `-destination generic/platform=iOS` 失败 "Unable to find a destination"（iOS 18.1 is not installed）。`xcodebuild -downloadPlatform iOS` 下载 8.59G（Apple CDN 中国直连 ~6-10MB/s，无需翻墙），安装后模拟器构建即通。
+- **sqlite3 native assets 从 GitHub 下载预编译库超时**（`SocketException: Operation timed out, github.com`）——重试时 GitHub 可达后通过；若再遇可考虑翻墙或 sqlite3 hook 备选方案（pub.dev hook-topic）。
+
+**验证结果：** `flutter build ios --simulator --debug` ✅ 编译通过（含 libsodium pod 链接，`✓ Built build/ios/iphonesimulator/Runner.app`）；iPhone 16（iOS 18.1）模拟器 `flutter run` 启动成功（Dart VM Service 就绪、进程存活），截图确认首屏渲染。
+
+**遗留：**
+1. `flutter run` 启动早期出现 `SqliteException(5): database is locked` 未处理异常一次，未阻塞启动，待观察是否复现。
+2. 真机验证（任务 #7）后置：iPhone 配对（Xcode Devices 窗口 Pair + 手机确认）、XR 需开「设置→隐私与安全性→开发者模式」、Xcode Accounts 登录 Apple ID 选 Personal Team（当前 `0 valid identities`）。
+3. iOS 17.4 模拟器运行时已删除（释放 ~6.7G，仅留 18.1）；iPhone 15 等 17.4 模拟器设备随运行时移除而不可用。
+
+**环境现状（iMac）：** Xcode 16.1 + iOS 18.1 运行时、CocoaPods 1.16.2、Flutter 3.47.2（禁 SPM）、Dart 3.13.2、Node 23.5.0、libsodium 1.0.22（brew）；Android SDK 缺 cmdline-tools（Android 侧待办，见 flutter doctor）。
