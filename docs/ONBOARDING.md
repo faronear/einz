@@ -7,6 +7,28 @@
 
 ---
 
+## 新机环境准备（换电脑 / 从零搭建）
+
+| 依赖 | 版本要求 | 安装方式（macOS） | 备注 |
+| --- | --- | --- | --- |
+| Node.js | ≥ 22 | `brew install node` | Server 运行时 |
+| Dart SDK | 3.x（实测 3.13.2） | `brew install dart-sdk` | **公式名是 dart-sdk 不是 dart** |
+| libsodium | 最新（实测 1.0.22） | `brew install libsodium` | shared/CLI 加密依赖；非标准路径需设 `LIBSODIUM_PATH`（见下） |
+| Flutter SDK | 3.x stable | 见下"Flutter 安装" | app 端 |
+
+- Homebrew 路径：**Intel Mac** 为 `/usr/local`，**Apple Silicon** 为 `/opt/homebrew`；`pkg-config --modversion libsodium` 可验证。
+- **Flutter 安装（中国网络镜像）**：Google storage 与 GitHub 不可达时使用镜像 `storage.flutter-io.cn`（如 `flutter_macos_arm64_3.47.2-stable.zip`，注意选对 arm64 / x64 包），解压到 `~/development/flutter` 并加 PATH；需 ≥9GB 磁盘空闲。
+- **Docker 容器化开发（`cli/dart-docker.sh`）注意**：仓库所在卷必须能被 Docker 枚举目录。macOS 上外部 APFS 卷（挂载标志 `noowners`，如 `/Volumes/xxx`）Docker 无法枚举目录（`dart run` 报 `PathAccessException: Operation not permitted`）——**把仓库放到 `~/` 下（如 `git clone ... ~/einz`）**，符号链接不能解决。
+
+**开发侧踩坑补充（改 server/shared 代码时勿回退）：**
+
+1. **base64 变体**：libsodium-wrappers 默认 URL-safe 无填充；协议统一**标准 base64 + 填充**（`ORIGINAL` 变体）——server/src/crypto.ts 与测试统一显式 `sodium.base64_variants.ORIGINAL`。
+2. **sync 响应必须补 `v:1`**（PROTOCOL.md §5.2）：`v` 是协议常量未入库，漏了客户端解析崩溃。
+3. **npm 依赖**：`libsodium-wrappers` 的 ESM 入口在 Node ESM 下损坏（缺 libsodium.mjs），server 统一用 `createRequire` 强制加载 CJS 构建。
+4. **LIBSODIUM_PATH**：shared 加载 libsodium 优先环境变量 `LIBSODIUM_PATH`，其次 macOS Homebrew 路径；非标准路径安装（含 Windows DLL）必须显式设置（见 DEPLOYMENT.md）。
+
+---
+
 ## 术语速览
 
 | 概念                      | 说明                                                                                                                                                                         |

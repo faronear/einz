@@ -874,3 +874,17 @@
 **修复（einz_tui.dart _runGuide）：** 在人物名、设备名两处 prompt 后立即 `if (!_state!.running) return;`；绑定成功后、发起者口令托管流程前再加守卫；catch 的"绑定失败"else 分支同样守卫（中断时不输出噪音）。
 
 **验证：** dart analyze 无问题；新增 cli/test/guide_exit_check.py（pty 复现老板步骤）——/exit 后进程立即退出、无后续引导提示 ✅。
+
+### 换机到 iMac 2019 + Docker 目录枚举问题（2026-09-04）
+
+**背景：** 老板从 MacBook Air（性能不足）切换到 **iMac 2019（Intel x86_64，64GB）** 作为主力开发机，新机需重装开发环境（Node / Dart / libsodium / Flutter，见 docs/ONBOARDING.md「新机环境准备」，原 HANDOFF.md 精华已迁入后删除）。已记录至 aimemo/userProfile.md 设备信息。
+
+**Docker 挂载外部卷无法枚举目录（本次核心坑）：** `./cli/dart-docker.sh tui` 报 `PathAccessException: Directory listing failed, path = '/app/cli/bin/' (OS Error: Operation not permitted, errno = 1)`。
+
+- 根因：仓库位于外部 APFS 卷 `/Volumes/repodisk`（挂载标志 `noowners`），Docker Desktop（gRPC-FUSE/virtiofs）对此类卷**只能按路径打开单个文件、无法枚举目录**（`ls 具体文件` 可以，`ls 目录` 一律 EPERM）。已验证：容器里枚举 `~/` 下目录正常，枚举 `/Volumes/repodisk` 下任何目录（含新建测试目录）都失败——与仓库内容无关，是卷的问题。
+- 符号链接**不解决**（已实测）：`ln -s /Volumes/repodisk ~/.dtest_link` 后容器内 `ls /app/.dtest_link/...` 仍失败——FUSE 在宿主侧解析链接后还是要枚举 noowners 卷目录。
+- **解决方案：仓库必须物理位于 Docker 可枚举的卷上**（如 `~/`）。本次：提交并推送 `7cc4437` 到远程 `origin`（git.tic.cc/fon/einz，仓库已有远程，HANDOFF §1 的 bundle 搬运方式已过时）→ 老板 `git clone ... ~/einz` 后在该路径开发。换机后 clone 需补：`cli/config.json`（服务器地址，非白名单，见下）、`deployment/.env`（备份密钥）等本机专属文件。
+
+**配置文件角色澄清（防混淆）：** 两个 config.json 含义不同——① `server/config/config.json` 白名单**已废弃**（2026-09-02 起自主模式：server 首启自动生成 space_id 存 db meta，白名单 = devices 表动态登记，首设备免邀请码自举、之后凭邀请码；ONBOARDING.md §0）；② `cli/config.json` = `{"server": "https://einz.tic.cc"}` 是 **TUI 默认服务器地址**（可本地改，优先级低于 `--server` 参数与 store 持久化值），不是公钥白名单。
+
+**验证：** 宿主 `~/` 下目录容器枚举正常；`dart-docker.sh` 相关路径问题在 clone 到 `~/einz` 后由老板自行验证（本机 `~/` 实验已证明可行）。
