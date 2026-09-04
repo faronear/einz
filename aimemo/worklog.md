@@ -887,4 +887,4 @@
 
 **配置文件角色澄清（防混淆）：** 两个 config.json 含义不同——① `server/config/config.json` 白名单**已废弃**（2026-09-02 起自主模式：server 首启自动生成 space_id 存 db meta，白名单 = devices 表动态登记，首设备免邀请码自举、之后凭邀请码；ONBOARDING.md §0）；② `cli/config.json` = `{"server": "https://einz.tic.cc"}` 是 **TUI 默认服务器地址**（可本地改，优先级低于 `--server` 参数与 store 持久化值），不是公钥白名单。
 
-**验证：** 宿主 `~/` 下目录容器枚举正常；`dart-docker.sh` 相关路径问题在 clone 到 `~/einz` 后由老板自行验证（本机 `~/` 实验已证明可行）。
+**验证：** 宿主 `~/` 下目录容器枚举正常。老板实测：`git clone` 到 `~/einz` 后 `./cli/dart-docker.sh tui` **运行成功**（noowners 卷解决方案确认有效）；测试完成即删除 `~/einz`——**日常开发仍留在原路径 `/Volumes/repodisk/productX/einz`**，除非再遇 Docker 枚举类问题才考虑迁移到 `~/`。
