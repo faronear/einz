@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 
@@ -40,6 +41,7 @@ class ChatPage extends StatefulWidget {
     this.api,
     this.enableWs = true,
     this.reauth,
+    this.escrowPassphrase,
   });
 
   final String server;
@@ -48,6 +50,10 @@ class ChatPage extends StatefulWidget {
   final Uint8List spaceKey;
   final int keyVersion;
   final String token;
+
+  /// 接入口令（escrow，向导设置后随锁包传入）：生成邀请码时编入 JoinInfo，
+  /// 对方扫码即可一键加入（含 spaceId + 口令 + 邀请码）。
+  final String? escrowPassphrase;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -226,11 +232,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 邀请设备：生成一次性邀请码（POST /invites，需已认证）。
-  /// personB=邀请对方加入；personA=给自己加新设备；对方名称可填显示名（存 server 名称表）。
+  /// 邀请设备：直接生成一次性邀请码（POST /invites，需已认证）。
+  /// 不做 personA/personB 区分、不询问对方名字——默认给尚未加入的对方（personB），
+  /// 生成后展示号码 + 二维码（JoinInfo 含 spaceId+口令+邀请码，对方扫码一键加入）。
   Future<void> _showInviteDialog() async {
-    String personId = 'personB';
-    final nameController = TextEditingController();
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -244,24 +249,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
               const SizedBox(height: 4),
               const Text('生成一次性邀请码（24h 有效，登记即用）'),
-              const SizedBox(height: 12),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'personB', label: Text('对方（personB）')),
-                  ButtonSegment(value: 'personA', label: Text('自己加设备（personA）')),
-                ],
-                selected: {personId},
-                onSelectionChanged: (s) => personId = s.first,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: '对方名称（可选，如 steffi）',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -282,20 +269,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (confirmed != true) return;
     try {
       final api = widget.api ?? ApiClient(widget.server);
-      final name = nameController.text.trim();
-      final r = await api.createInvite(
-        token: widget.token,
-        personId: personId,
-        personName: name.isEmpty ? null : name,
-      );
+      final r = await api.createInvite(token: widget.token, personId: 'personB');
       if (!mounted) return;
+      final passphrase = widget.escrowPassphrase?.trim() ?? '';
+      final info = JoinInfo(
+        spaceId: widget.spaceId,
+        passphrase: passphrase,
+        inviteCode: r.inviteCode,
+      );
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('邀请码已生成'),
-          content: SelectableText(r.inviteCode,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (passphrase.isNotEmpty) ...[
+                Center(child: QrImageView(data: info.encode(), version: QrVersions.auto, size: 160)),
+                const SizedBox(height: 12),
+              ],
+              SelectableText(r.inviteCode,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1)),
+              if (passphrase.isNotEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text('对方扫码即可一键加入',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () async {

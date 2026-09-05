@@ -73,6 +73,7 @@ class _LockPageState extends State<LockPage> {
         spaceKey: base64Decode(payload.spaceKeyB64),
         keyVersion: payload.keyVersion,
         token: payload.token ?? '',
+        escrowPassphrase: payload.escrowPassphrase,
       ),
     ));
   }
