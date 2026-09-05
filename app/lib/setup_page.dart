@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 import 'chat_page.dart';
@@ -48,6 +49,7 @@ class SetupPage extends StatefulWidget {
 
 class _SetupPageState extends State<SetupPage> {
   final _deviceId = TextEditingController(text: 'dev-mobile');
+  String? _autoDeviceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
   final _personName = TextEditingController(); // 首设备：第一个用户的名字
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _sealedKey = TextEditingController();
@@ -187,16 +189,25 @@ class _SetupPageState extends State<SetupPage> {
       appBar: AppBar(
         title: Text(_appBarTitle(l10n)),
         actions: [
-          // 高级入口（sealed 导入）常驻菜单：探测自动判定角色后依然可达
+          // 高级入口（sealed 导入 / 全丢恢复）常驻菜单：探测自动判定角色后依然可达
           PopupMenuButton<String>(
             tooltip: l10n.wizardRoleAdvanced,
             onSelected: (value) {
-              if (value == 'sealed') _selectRole(_WizardRole.advanced);
+              // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
+              Future<void>.delayed(const Duration(milliseconds: 300), () {
+                if (!mounted) return;
+                if (value == 'sealed') _selectRole(_WizardRole.advanced);
+                if (value == 'recover') _showRecoverDialog();
+              });
             },
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'sealed',
                 child: Text(l10n.wizardRoleAdvanced),
+              ),
+              PopupMenuItem(
+                value: 'recover',
+                child: Text(l10n.wizardRecoverTitle),
               ),
             ],
           ),
@@ -576,6 +587,65 @@ class _SetupPageState extends State<SetupPage> {
     return api.verify(challenge.challengeId, base64Encode(opened));
   }
 
+  /// 全丢恢复：弹窗粘贴备份文本 + 输入口令 → 本地解密 Space Key →
+  /// 服务端凭口令重置空间（/recover，撤销全部设备）→ 本设备首设备自举 → PIN 步骤。
+  Future<void> _showRecoverDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _RecoverDialog(
+        server: _server,
+        onRecovered: _applyRecovered,
+      ),
+    );
+  }
+
+  /// 恢复成功回调：用备份解出的 Space Key 重建本设备（首设备自举登记 + 认证），
+  /// 然后跳到 PIN 步骤完成设置（_runPinSetup 会复用已解出的 _spaceKey）。
+  Future<void> _applyRecovered({
+    required String spaceKeyB64,
+    required String spaceId,
+    required int keyVersion,
+  }) async {
+    if (!mounted) return;
+    setState(() {
+      _spaceKey = base64Decode(spaceKeyB64);
+      _spaceId.text = spaceId;
+      _role = _WizardRole.create; // 空间已被 /recover 重置 → 本设备即首设备
+      _step = 4; // 直接到 PIN 步骤（登记/认证由本回调完成）
+      _status = AppLocalizations.of(context)!.wizardRecoverEnrolling;
+    });
+    try {
+      // 1) 首设备自举（服务端 activeCount=0 → 免邀请码）
+      if (_enroll == null) {
+        await _enrollDevice(null);
+      }
+      final kp = _keyPair;
+      if (kp == null || _enroll == null) return;
+      // 2) 认证（用登记后的真实 deviceId）
+      final session = await _authenticate(kp, _enroll!.deviceId);
+      _sessionToken = session.sessionToken;
+      if (!mounted) return;
+      setState(() => _status = AppLocalizations.of(context)!.wizardRecoverDone);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
+    }
+  }
+
+  /// 登记用默认设备名：设备型号（device_info_plus，如 "iPhone 15 Pro" /
+  /// "SM-S918B"）；平台通道不可用（widget 测试等）时回退 'dev-mobile'。
+  Future<String> _autoDeviceName() async {
+    if (_autoDeviceNameCache != null) return _autoDeviceNameCache!;
+    var name = 'dev-mobile';
+    try {
+      final info = await DeviceInfoPlugin().deviceInfo;
+      final model = (info as dynamic).model?.toString().trim();
+      if (model != null && model.isNotEmpty) name = model;
+    } catch (_) {}
+    _autoDeviceNameCache = name;
+    return name;
+  }
+
   /// 登记设备：create=首设备免邀请码自举；join/advanced=凭一次性邀请码。
   /// 成功 → 记录 [_enroll]（真实 deviceId/personId/spaceId）并同步 spaceId。
   Future<void> _enrollDevice(String? inviteCode) async {
@@ -589,7 +659,7 @@ class _SetupPageState extends State<SetupPage> {
             inviteCode: inviteCode,
             personName: _personName.text.trim(), // 首设备：第一个用户的名字；后续设备按需
             personId: _chosenPerson, // join：用户选择的身份（personA/personB）
-            deviceName: _deviceId.text.trim(),
+            deviceName: await _autoDeviceName(), // 自动填设备型号（产品决定：不再询问）
           );
     if (!mounted) return;
     setState(() {
@@ -1176,5 +1246,125 @@ class _SetupPageState extends State<SetupPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+}
+
+/// 全丢恢复弹窗：粘贴备份文本 + 输入口令 → 校验格式 → 本地解密（口令错即失败）→
+/// 调服务端 /recover 凭口令重置空间 → 回调向导应用恢复数据（登记/认证在向导侧）。
+class _RecoverDialog extends StatefulWidget {
+  const _RecoverDialog({required this.server, required this.onRecovered});
+
+  final String server;
+
+  /// 恢复成功回调（向导侧 _applyRecovered：登记 + 认证 + 跳 PIN 步骤）。
+  final Future<void> Function({
+    required String spaceKeyB64,
+    required String spaceId,
+    required int keyVersion,
+  }) onRecovered;
+
+  @override
+  State<_RecoverDialog> createState() => _RecoverDialogState();
+}
+
+class _RecoverDialogState extends State<_RecoverDialog> {
+  final _backupCtrl = TextEditingController();
+  final _passphraseCtrl = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _backupCtrl.dispose();
+    _passphraseCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _recover() async {
+    final l10n = AppLocalizations.of(context)!;
+    final backupText = _backupCtrl.text.trim();
+    final passphrase = _passphraseCtrl.text.trim();
+    if (!backupText.startsWith(kBackupExportPrefix)) {
+      setState(() => _error = l10n.wizardRecoverInvalidFormat);
+      return;
+    }
+    if (passphrase.isEmpty) {
+      setState(() => _error = l10n.setupPageNeedPassphrase);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      // 1) 本地解密备份（口令错误/损坏 → FormatException → 不触网）
+      final b64 = backupText.substring(kBackupExportPrefix.length);
+      final file = BackupFile.fromJson(
+          jsonDecode(utf8.decode(base64Decode(b64))) as Map<String, dynamic>);
+      final plain = await decryptBackup(file: file, recoveryCode: passphrase);
+      final json = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
+      // 2) 服务端凭口令重置空间（口令正确才可能走到这里；错误 → ApiException 403）
+      await ApiClient(widget.server).recoverSpace(passphrase);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await widget.onRecovered(
+        spaceKeyB64: json['space_key'] as String,
+        spaceId: json['space_id'] as String,
+        keyVersion: (json['key_version'] as num?)?.toInt() ?? 1,
+      );
+    } on FormatException {
+      if (!mounted) return;
+      setState(() => _error = l10n.wizardRecoverBadPassphrase);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = l10n.wizardRecoverFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.wizardRecoverTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.wizardRecoverHint,
+              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _backupCtrl,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: l10n.wizardRecoverBackupLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _passphraseCtrl,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: l10n.wizardRecoverPassphraseLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
+        FilledButton(
+          onPressed: _busy ? null : _recover,
+          child: Text(l10n.wizardRecoverStart),
+        ),
+      ],
+    );
   }
 }
