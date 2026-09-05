@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:sodium/sodium_sumo.dart';
+
 import '../protocol/api_client.dart';
+import '../sodium.dart';
 import 'backup.dart';
 
 /// 口令托管密钥（KEY_ESCROW.md §4）。
@@ -43,7 +46,7 @@ class KeyEscrowService {
     );
   }
 
-  /// 一键：口令加密 + 上传托管。
+  /// 一键：口令加密 + 上传托管（附口令 argon2id 哈希，供服务端 /recover 恢复校验）。
   Future<void> upload({
     required String passphrase,
     required String spaceKeyB64,
@@ -52,7 +55,20 @@ class KeyEscrowService {
     required String token,
   }) async {
     final pkg = await createPackage(passphrase: passphrase, spaceKeyB64: spaceKeyB64, spaceId: spaceId, keyVersion: keyVersion);
-    await api.uploadKeyEscrow(pkg, token);
+    final hash = await hashPassphrase(passphrase);
+    await api.uploadKeyEscrow(pkg, token, passphraseHash: hash);
+  }
+
+  /// 口令 argon2id 哈希字符串（crypto_pwhash_str，自含盐）。
+  /// 仅用于服务端"口令是否匹配"验证，不用于任何密钥派生。
+  /// （sodium ≥2.3.1：pwhash 相关移入 crypto.pwhash 子对象，str 生成密码哈希串）
+  Future<String> hashPassphrase(String passphrase) async {
+    final s = await SodiumSumoInit.init2(loadDynamicLibrary);
+    return s.crypto.pwhash.str(
+      password: passphrase,
+      opsLimit: s.crypto.pwhash.opsLimitModerate,
+      memLimit: s.crypto.pwhash.memLimitModerate,
+    );
   }
 
   /// 一键：拉取 + 口令解密；未托管或无口令错误时：

@@ -14,6 +14,10 @@ import '../sodium.dart';
 
 const String kBackupFormat = 'einz-backup-v1';
 
+/// 导出的密钥备份文本前缀（app「导出密钥备份」生成；恢复时据此识别）。
+/// 格式：`EINZ-BACKUP:` + base64(BackupFile JSON)——口令加密的 Space Key 包。
+const String kBackupExportPrefix = 'EINZ-BACKUP:';
+
 /// 获取 SodiumSumo 实例（pwhash/Argon2id 只在 sumo 构建中提供）。
 Future<SodiumSumo> _sumo() => SodiumSumoInit.init2(loadDynamicLibrary);
 
@@ -296,7 +300,7 @@ Future<Uint8List> deriveBackupKey({
   required Uint8List salt,
 }) async {
   final s = await _sumo();
-  final key = s.crypto.pwhash(
+  final key = s.crypto.pwhash.call(
     outLen: 32,
     password: Int8List.fromList(utf8.encode(recoveryCode)),
     salt: salt,
