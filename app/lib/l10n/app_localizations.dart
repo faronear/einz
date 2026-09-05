@@ -740,11 +740,17 @@ abstract class AppLocalizations {
   /// **'Invite code'**
   String get chatPageMenuInvite;
 
-  /// No description provided for @chatPageMenuPin.
+  /// No description provided for @chatPagePinSet.
   ///
   /// In en, this message translates to:
-  /// **'Device PIN'**
-  String get chatPageMenuPin;
+  /// **'PIN: set'**
+  String get chatPagePinSet;
+
+  /// No description provided for @chatPagePinUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN: not set'**
+  String get chatPagePinUnset;
 
   /// No description provided for @chatPageBurnHeading.
   ///

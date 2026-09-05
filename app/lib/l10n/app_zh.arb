@@ -164,7 +164,8 @@
     }
   },
   "chatPageMenuInvite": "邀请码",
-  "chatPageMenuPin": "本机 PIN",
+  "chatPagePinSet": "PIN: 已设置",
+  "chatPagePinUnset": "PIN: 未设置",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}

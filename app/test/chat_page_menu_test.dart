@@ -1,4 +1,4 @@
-// 回归测试：顶栏菜单 → 本机 PIN → 返回 不应触发
+// 回归测试：顶栏菜单 → PIN 菜单项 → 返回 不应触发
 // `InheritedElement.debugDeactivated` 的 `_dependents.isEmpty` 断言崩溃
 // （MenuRoute 与 DialogRoute 在 Overlay 中交叉卸载导致，见 git 记录）。
 
@@ -62,8 +62,8 @@ void main() {
     // 打开顶栏菜单
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    // 点"本机 PIN"菜单项
-    await tester.tap(find.text('本机 PIN'));
+    // 点"PIN: 未设置"菜单项
+    await tester.tap(find.text('PIN: 未设置'));
     await tester.pumpAndSettle();
     // 弹窗应出现（设置启动锁）
     expect(find.text('设置启动锁'), findsOneWidget);
@@ -98,10 +98,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → 本机 PIN
+    // 打开菜单 → PIN 菜单项
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('本机 PIN'));
+    await tester.tap(find.text('PIN: 未设置'));
     await tester.pumpAndSettle();
     expect(find.text('设置启动锁'), findsOneWidget);
 

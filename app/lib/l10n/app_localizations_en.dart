@@ -386,7 +386,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuInvite => 'Invite code';
 
   @override
-  String get chatPageMenuPin => 'Device PIN';
+  String get chatPagePinSet => 'PIN: set';
+
+  @override
+  String get chatPagePinUnset => 'PIN: not set';
 
   @override
   String get chatPageBurnHeading => 'Burn-after (only affects this device)';

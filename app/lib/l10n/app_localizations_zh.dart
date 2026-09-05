@@ -360,7 +360,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuInvite => '邀请码';
 
   @override
-  String get chatPageMenuPin => '本机 PIN';
+  String get chatPagePinSet => 'PIN: 已设置';
+
+  @override
+  String get chatPagePinUnset => 'PIN: 未设置';
 
   @override
   String get chatPageBurnHeading => '阅后即焚（仅本设备生效）';

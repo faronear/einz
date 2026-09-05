@@ -94,6 +94,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _recordingPath;
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
+  bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
 
   /// 阅后即焚档位文案（l10n 映射）。
@@ -137,6 +138,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
     _loadBurnLabel();
+    _refreshPinStatus();
     // 每 3 秒轮询同步（WS 连接成功后降频为 30s 兜底；断开恢复高频——见 _onWsStatusChanged）
     _restartTicker(const Duration(seconds: 3));
     _registerPushToken();
@@ -308,13 +310,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 卸载同步释放，避免"点设置后 dispose 竞态"（TextField 卸载动画中向已销毁
     // controller 加 listener → debugAssertNotDisposed / _dependents.isEmpty 红屏，
     // 2026-09-05 真机定位）。
-    await showDialog<void>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => _SetLockDialog(
         payload: payload,
         db: widget.db ?? LocalDatabase(),
       ),
     );
+    if (ok == true && mounted) {
+      setState(() => _hasPin = true); // 设置成功：菜单项刷新为「PIN: 已设置」
+    }
+  }
+
+  /// 刷新本机 PIN 状态（菜单项「PIN: 已设置/未设置」；initState 时读取）。
+  Future<void> _refreshPinStatus() async {
+    final has = await AppLockService(widget.db ?? LocalDatabase()).isSetup;
+    if (!mounted || has == _hasPin) return;
+    setState(() => _hasPin = has);
   }
 
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
@@ -964,7 +976,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: Text(l10n.chatPageMenuBurn(_burnOptionLabel(_burnSeconds, l10n))),
                 ),
                 PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
-                PopupMenuItem(value: 'pin', child: Text(l10n.chatPageMenuPin)),
+                PopupMenuItem(
+                  value: 'pin',
+                  child: Text(_hasPin ? l10n.chatPagePinSet : l10n.chatPagePinUnset),
+                ),
               ];
             },
           ),
@@ -1095,7 +1110,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       final messenger = ScaffoldMessenger.of(context);
       await AppLockService(widget.db).setPin(pin, payload: widget.payload);
       if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
       messenger.showSnackBar(SnackBar(content: Text(l10n.chatPageSetLockDone)));
     } catch (e) {
       if (!mounted) return; // 弹窗可能已被关闭（barrier/返回），避免 setState on disposed
