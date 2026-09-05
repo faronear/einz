@@ -86,10 +86,18 @@ class _StartupGateState extends State<StartupGate> {
   }
 
   Future<void> _check() async {
-    final lock = AppLockService(LocalDatabase());
-    final hasLock = await lock.isSetup;
-    if (!mounted) return;
-    setState(() => _locked = hasLock);
+    try {
+      final lock = AppLockService(LocalDatabase());
+      final hasLock = await lock.isSetup;
+      if (!mounted) return;
+      setState(() => _locked = hasLock);
+    } catch (e) {
+      // 本地锁查询失败（如 SQLite 锁竞争/初始化异常）→ 降级为"未设置锁"进设置向导，
+      // 避免无限停留在启动转环页（main 加载页无错误出口）
+      debugPrint('StartupGate 锁状态查询失败，降级为未配置: $e');
+      if (!mounted) return;
+      setState(() => _locked = false);
+    }
   }
 
   @override

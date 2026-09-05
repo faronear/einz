@@ -138,8 +138,14 @@ class _SetupPageState extends State<SetupPage> {
           _step = 1;
         }
       });
-    } catch (_) {
-      // 测试环境无 path_provider/数据库实现 → 跳过探测（保持默认服务器，零打扰）
+    } catch (e) {
+      // 数据库/探测初始化异常（如 SQLite 锁竞争）→ 标记探测失败（可见），
+      // 避免无限停留在检测页转环；用户可输入服务器地址重试。
+      if (!mounted) return;
+      setState(() {
+        _probeFailed = true;
+        _status = '初始化失败: $e';
+      });
     }
   }
 
