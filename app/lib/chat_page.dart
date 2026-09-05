@@ -992,16 +992,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             icon: const Icon(Icons.more_vert),
             tooltip: '菜单 / More',
             onSelected: (value) {
-              switch (value) {
-                case 'locale':
-                  _showLocalePicker();
-                case 'burn':
-                  _showBurnPicker();
-                case 'invite':
-                  _showInviteDialog();
-                case 'pin':
-                  _showSetLockDialog();
-              }
+              // 修复（2026-09-05）：不能在菜单 pop 动画未完成时立即打开新 route——
+              // MenuRoute 与 DialogRoute 会在 Overlay 中交叉卸载，触发
+              // InheritedElement.debugDeactivated 的 _dependents.isEmpty 断言崩溃
+              // （真机 vsync 下必现，widget 测试帧驱动掩盖）。等菜单完全关闭再打开。
+              Future<void>.delayed(const Duration(milliseconds: 300), () {
+                if (!mounted) return;
+                switch (value) {
+                  case 'locale':
+                    _showLocalePicker();
+                  case 'burn':
+                    _showBurnPicker();
+                  case 'invite':
+                    _showInviteDialog();
+                  case 'pin':
+                    _showSetLockDialog();
+                }
+              });
             },
             itemBuilder: (context) {
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名

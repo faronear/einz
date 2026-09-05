@@ -1,0 +1,71 @@
+// 回归测试：顶栏菜单 → 本机 PIN → 返回 不应触发
+// `InheritedElement.debugDeactivated` 的 `_dependents.isEmpty` 断言崩溃
+// （MenuRoute 与 DialogRoute 在 Overlay 中交叉卸载导致，见 git 记录）。
+
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:einz/chat_page.dart';
+import 'package:einz/data/local_database.dart';
+import 'package:einz/l10n/app_localizations.dart';
+import 'package:einz_shared/einz_shared.dart';
+
+/// 最小 fake ApiClient：sync 返回空消息页（只测菜单交互，不涉网络）。
+class _FakeApi extends ApiClient {
+  _FakeApi() : super('http://fake');
+
+  @override
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+    String token, {
+    int after = 0,
+    int limit = 100,
+  }) async {
+    return (
+      messages: <MessageEnvelope>[],
+      attachmentsMeta: <Map<String, dynamic>>[],
+      lastSequence: 0,
+      hasMore: false,
+    );
+  }
+}
+
+void main() {
+  testWidgets('顶栏菜单→本机PIN→返回 不崩溃（_dependents.isEmpty 回归）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false, // 测试环境不连真实 WS
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 打开顶栏菜单
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    // 点"本机 PIN"菜单项
+    await tester.tap(find.text('本机 PIN'));
+    await tester.pumpAndSettle();
+    // 弹窗应出现（设置启动锁）
+    expect(find.text('设置启动锁'), findsOneWidget);
+    // 返回：模拟系统返回键（与真机"返回"一致；barrier/取消按钮均走 Navigator.pop）
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    // 不应有任何异常（复现 _dependents.isEmpty 崩溃则此处失败）
+    expect(tester.takeException(), isNull);
+  });
+}
