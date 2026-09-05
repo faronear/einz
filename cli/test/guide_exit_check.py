@@ -5,7 +5,8 @@
 # 才退出；修复后：立即结束，不再输出后续引导提示。
 import os, pty, subprocess, select, time, sys
 
-CLI = '/Users/Shared/productX/einz/cli'
+# 仓库已从 /Users/Shared/productX/einz 迁移；由脚本位置推导 cli 目录，避免硬编码旧路径
+CLI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STORE = '/tmp/einz_guide_exit.json'
 
 def start_tui():

@@ -183,8 +183,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   }
 
   if (store == null) {
-    stdout.writeln('=== Einz 私密空间：新设备向导 ===');
-    _guidanceNotes.add('=== Einz 私密空间：新设备向导 ===');
+    stdout.writeln('=== 欢迎来到 Einz 唯一空间，您的绝对私密领地！ ===');
+    _guidanceNotes.add('=== 欢迎来到 Einz 唯一空间，您的绝对私密领地！ ===');
+    stdout.writeln('=== 当前设备尚未进行加密，请跟随提示进行设置 ===');
+    _guidanceNotes.add('=== 当前设备尚未进行加密，请跟随提示进行设置 ===');
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
     store = await DeviceStore.create();
@@ -196,8 +198,8 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     }
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
-    stdout.writeln('✅ 设备凭证已生成，公钥为：');
-    _guidanceNotes.add('✅ 设备凭证已生成，公钥为：');
+    stdout.writeln('✅ 新设备加密凭证已生成，公钥为：');
+    _guidanceNotes.add('✅ 新设备凭证已生成，公钥为：');
     stdout.writeln('   ${store.publicKey}');
     _guidanceNotes.add('   ${store.publicKey}');
     stdout.writeln('----------------');
@@ -213,6 +215,33 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 /// 引导完成后做启动同步 + WS；全部就绪后返回。
 Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
+
+  // 身份选择（仅后续设备、未登记的新设备）：先问是第一还是第二个人（personA/personB），
+  // 按需设置名字——与首设备"先名字后设备名"的顺序对齐（此前是先问设备名再问身份）。
+  // 首设备（探测无 person 名称表）跳过此步，直接走下方"你的名称"询问。
+  String? chosenPerson;
+  if (store.deviceId == null && _probePersonNames.isNotEmpty) {
+    final aName = _probePersonNames['personA'] ?? '';
+    final bName = _probePersonNames['personB'] ?? '尚未加入的伴侣';
+    while (true) {
+      if (!_state!.running) return; // /exit 或 Ctrl+C：立即结束引导
+      final choice = await _prompt(session, '❓ 如果你是空间创建者 $aName，请输入 1；如果你是 $bName，请输入 2');
+      if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
+      if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
+      session.messages.add(_systemMessage(session, '❓ 请输入 1 ($aName) 或 2 ($bName)'));
+      _scheduleRender();
+    }
+    if (chosenPerson == 'personB' && (_probePersonNames['personB'] ?? '').isEmpty) {
+      // personB 还没有名称——要求输入显示名
+      final name = await _prompt(session, '❓ 请输入你的名字（例如 Steffi，或者直接回车先跳过，以后可随时修改）：');
+      if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
+      if (name.isNotEmpty) store.personName = name;
+    } else if (chosenPerson == 'personA') {
+      store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
+    }
+    session.messages.add(_systemMessage(session, '----------------'));
+    _scheduleRender();
+  }
 
   // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
   // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
@@ -277,30 +306,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     } catch (e) {
       if (e is ApiException && e.code == 'INVALID_REQUEST') {
         _scheduleRender();
-        // 身份选择：询问用户是第一个人 personA 还是第二个人 personB（显示名称；
-        // personB 名称为空则要求输入）
-        String? chosenPerson;
-        while (true) {
-          if (!_state!.running) break;
-          // 名称直接读服务端名称表：登记未设用户名时后台已默认落规范 id，
-          // 故必有值；前端不硬编码 personB/personA（避免与库内实际名称脱节）
-          final aName = _probePersonNames['personA'] ?? '';
-          final bName = _probePersonNames['personB'] ?? '尚未加入';
-          final choice = await _prompt(session, '❓ 如果你是空间创建者 $aName，请输入 1；如果你是 $bName，请输入 2');
-          if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
-          if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
-          session.messages.add(_systemMessage(session, '❓ 请输入 1 ($aName) 或 2 ($bName)'));
-          _scheduleRender();
-        }
-        if (chosenPerson == 'personB' && (_probePersonNames['personB'] ?? '').isEmpty) {
-          // personB 还没有名称——要求输入显示名
-          final name = await _prompt(session, '❓ 请输入你的名字（例如 Steffi，或者直接回车先跳过，以后可随时修改）：');
-          if (name.isNotEmpty) store.personName = name;
-        } else if (chosenPerson == 'personA') {
-          store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
-        }
-        session.messages.add(_systemMessage(session, '----------------'));
-        // 邀请码重试循环：输错/留空反复要求重输，直到登记成功（成功才结束引导）
+        // 身份已在引导开头选定（chosenPerson）；此处只做邀请码重试循环：
+        // 输错/留空反复要求重输，直到登记成功（成功才结束引导）
         while (true) {
           if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
           final inviteCode = await _prompt(session, '❓ 输入邀请码（由任意一个已认证设备提供）加入私密空间:');

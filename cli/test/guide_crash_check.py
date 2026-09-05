@@ -5,7 +5,8 @@
 # 修复后：进程存活、无 RangeError、输入正常回显，/exit 可退出。
 import os, pty, subprocess, select, time, sys
 
-CLI = '/Users/Shared/productX/einz/cli'
+# 仓库已从 /Users/Shared/productX/einz 迁移；由脚本位置推导 cli 目录，避免硬编码旧路径
+CLI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STORE = '/tmp/einz_guide_repro.json'
 
 def start_tui():
