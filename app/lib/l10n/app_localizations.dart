@@ -488,12 +488,6 @@ abstract class AppLocalizations {
   /// **'App lock'**
   String get wizardStepPin;
 
-  /// No description provided for @wizardStepShare.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite your partner'**
-  String get wizardStepShare;
-
   /// No description provided for @wizardStepJoin.
   ///
   /// In en, this message translates to:
@@ -583,36 +577,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'✅ Setup complete!'**
   String get wizardDoneText;
-
-  /// No description provided for @wizardShareHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Your partner scans this code or pastes the info to join in one tap (includes the one-time invite code).'**
-  String get wizardShareHint;
-
-  /// No description provided for @wizardShareGenInvite.
-  ///
-  /// In en, this message translates to:
-  /// **'Generate invite & show QR'**
-  String get wizardShareGenInvite;
-
-  /// No description provided for @wizardShareRegenerate.
-  ///
-  /// In en, this message translates to:
-  /// **'Regenerate'**
-  String get wizardShareRegenerate;
-
-  /// No description provided for @wizardShareInviteNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The invite code is single-use and expires in 24h — regenerate it from the chat page if needed.'**
-  String get wizardShareInviteNote;
-
-  /// No description provided for @wizardShareInviteFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'❌ Invite generation failed: {error}'**
-  String wizardShareInviteFailed(String error);
 
   /// No description provided for @wizardJoinHint.
   ///

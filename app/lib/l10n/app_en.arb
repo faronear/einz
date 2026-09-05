@@ -81,7 +81,6 @@
   "wizardStepEnroll": "Register device",
   "wizardStepPassphrase": "Access passphrase",
   "wizardStepPin": "App lock",
-  "wizardStepShare": "Invite your partner",
   "wizardStepJoin": "Join space",
   "wizardStepSealed": "Import sealed key",
   "wizardStepDone": "Complete",
@@ -108,16 +107,6 @@
   "wizardPassphraseHint": "Your partner joins with this passphrase — share it via QR code on the next step.",
   "wizardPinHint": "You'll enter this PIN at every startup to unlock.",
   "wizardDoneText": "✅ Setup complete!",
-  "wizardShareHint": "Your partner scans this code or pastes the info to join in one tap (includes the one-time invite code).",
-  "wizardShareGenInvite": "Generate invite & show QR",
-  "wizardShareRegenerate": "Regenerate",
-  "wizardShareInviteNote": "The invite code is single-use and expires in 24h — regenerate it from the chat page if needed.",
-  "wizardShareInviteFailed": "❌ Invite generation failed: {error}",
-  "@wizardShareInviteFailed": {
-    "placeholders": {
-      "error": {"type": "String"}
-    }
-  },
   "wizardJoinHint": "Scan your partner's QR code (it carries the invite code & passphrase) to join in one tap; you can also paste the text or fill in the fields below.",
   "setupPageKeyGenFailed": "❌ Key generation failed: {error}",
   "@setupPageKeyGenFailed": {

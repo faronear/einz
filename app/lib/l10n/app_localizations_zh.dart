@@ -214,9 +214,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepPin => '设置启动锁';
 
   @override
-  String get wizardStepShare => '邀请对方加入';
-
-  @override
   String get wizardStepJoin => '加入空间';
 
   @override
@@ -266,23 +263,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardDoneText => '✅ 设置完成！';
-
-  @override
-  String get wizardShareHint => '对方扫码或粘贴下方信息即可一键加入（含一次性邀请码）';
-
-  @override
-  String get wizardShareGenInvite => '生成邀请码并显示二维码';
-
-  @override
-  String get wizardShareRegenerate => '重新生成';
-
-  @override
-  String get wizardShareInviteNote => '邀请码一次性有效、24 小时过期——过期可在已登录设备的聊天页重新生成。';
-
-  @override
-  String wizardShareInviteFailed(String error) {
-    return '❌ 邀请码生成失败: $error';
-  }
 
   @override
   String get wizardJoinHint => '扫描对方的二维码（含邀请码与口令）即可一键加入；也可粘贴文本或手动填写下方信息';

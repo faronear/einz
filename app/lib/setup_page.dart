@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:einz_shared/einz_shared.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'chat_page.dart';
 import 'data/app_lock.dart';
@@ -83,9 +82,6 @@ class _SetupPageState extends State<SetupPage> {
   /// 设备登记结果（服务端分配的真实 deviceId/personId/spaceId）。
   /// 认证（challenge）与进聊天页一律用它，不用本地临时 deviceId。
   EnrollResult? _enroll;
-
-  /// create 分享页生成的对方（personB）邀请码。
-  String? _partnerInvite;
 
   /// create 自举失败（服务器已有空间设备）时为 true → 展示改用"加入"的引导。
   bool _bootstrapFailed = false;
@@ -299,7 +295,7 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 6; // name/device/passphrase/pin/share/done
+        return 5; // name/device/passphrase/pin/done（分享页已移除：邀请码改为聊天页随用随生成）
       case _WizardRole.join:
         return 6; // identity/device/invite/passphrase/pin/done
       case _WizardRole.advanced:
@@ -319,7 +315,6 @@ class _SetupPageState extends State<SetupPage> {
           case 2: return l10n.wizardStepDevice;
           case 3: return l10n.wizardStepPassphrase;
           case 4: return l10n.wizardStepPin;
-          case 5: return l10n.wizardStepShare;
           default: return l10n.wizardStepDone;
         }
       case _WizardRole.join:
@@ -502,8 +497,6 @@ class _SetupPageState extends State<SetupPage> {
             return _buildStepPassphrase();
           case 4:
             return _buildStepPin();
-          case 5:
-            return _buildStepShare();
           default:
             return _buildStepDone();
         }
@@ -987,106 +980,6 @@ class _SetupPageState extends State<SetupPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  /// 步骤 5（create）：分享加入信息——二维码/文本含 spaceId + 口令 +
-  /// 一次性邀请码（先点按钮生成邀请码，再展示二维码；对方扫码即一键加入）。
-  Widget _buildStepShare() {
-    final l10n = AppLocalizations.of(context)!;
-    final enroll = _enroll;
-    final code = _partnerInvite;
-    if (code == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(l10n.wizardShareHint, style: const TextStyle(fontSize: 14)),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: _busy ? null : _generatePartnerInvite,
-            child: Text(l10n.wizardShareGenInvite),
-          ),
-        ],
-      );
-    }
-    final info = JoinInfo(
-      spaceId: enroll?.spaceId ?? _spaceId.text.trim(),
-      passphrase: _escrowPassphrase.text.trim(),
-      inviteCode: code,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(l10n.wizardShareHint, style: const TextStyle(fontSize: 14)),
-        const SizedBox(height: 12),
-        Center(child: QrImageView(data: info.encode(), version: QrVersions.auto, size: 180)),
-        const SizedBox(height: 12),
-        SelectableText('${l10n.setupPageInviteLabel}: $code',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-        SelectableText(l10n.joinDialogSpace(info.spaceId), style: const TextStyle(fontSize: 12)),
-        SelectableText(l10n.joinDialogPassphrase(info.passphrase),
-            style: const TextStyle(fontSize: 12)),
-        Text(l10n.wizardShareInviteNote,
-            style: const TextStyle(fontSize: 11, color: Colors.grey)),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            FilledButton.tonal(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: info.encode()));
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text(l10n.joinDialogCopied)));
-              },
-              child: Text(l10n.joinDialogCopy),
-            ),
-            TextButton(
-              onPressed: _busy ? null : _generatePartnerInvite,
-              child: Text(l10n.wizardShareRegenerate),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// create：为对方（personB）生成一次性邀请码（POST /invites，需已认证 token）。
-  Future<void> _generatePartnerInvite() async {
-    final kp = _keyPair;
-    final enroll = _enroll;
-    if (kp == null || enroll == null) return;
-    setState(() {
-      _busy = true;
-      _status = null;
-    });
-    try {
-      final InviteResult r;
-      if (widget.createInviteOverride != null) {
-        r = await widget.createInviteOverride!('personB');
-      } else {
-        var token = _sessionToken;
-        if (token == null) {
-          final s = await _authenticate(kp, enroll.deviceId);
-          token = s.sessionToken;
-          _sessionToken = token;
-        }
-        r = await ApiClient(_server).createInvite(token: token, personId: 'personB');
-      }
-      if (!mounted) return;
-      setState(() => _partnerInvite = r.inviteCode);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      if (e.httpStatus == 401 && _sessionToken != null) {
-        _sessionToken = null; // token 过期：重新认证后再试一次
-        await _generatePartnerInvite();
-        return;
-      }
-      setState(() => _status = AppLocalizations.of(context)!.wizardShareInviteFailed('$e'));
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _status = AppLocalizations.of(context)!.wizardShareInviteFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

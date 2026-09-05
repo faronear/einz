@@ -228,9 +228,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardStepPin => 'App lock';
 
   @override
-  String get wizardStepShare => 'Invite your partner';
-
-  @override
   String get wizardStepJoin => 'Join space';
 
   @override
@@ -283,25 +280,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardDoneText => '✅ Setup complete!';
-
-  @override
-  String get wizardShareHint =>
-      'Your partner scans this code or pastes the info to join in one tap (includes the one-time invite code).';
-
-  @override
-  String get wizardShareGenInvite => 'Generate invite & show QR';
-
-  @override
-  String get wizardShareRegenerate => 'Regenerate';
-
-  @override
-  String get wizardShareInviteNote =>
-      'The invite code is single-use and expires in 24h — regenerate it from the chat page if needed.';
-
-  @override
-  String wizardShareInviteFailed(String error) {
-    return '❌ Invite generation failed: $error';
-  }
 
   @override
   String get wizardJoinHint =>

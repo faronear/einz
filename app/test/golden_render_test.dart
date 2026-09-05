@@ -111,13 +111,6 @@ void main() {
   Future<EnrollResult> fakeEnroll(String? inviteCode) async =>
       const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test');
 
-  // 测试注入：生成邀请码（真实路径走 ApiClient.createInvite）。
-  Future<InviteResult> fakeInvite(String personId) async => InviteResult(
-        inviteCode: 'invite-test-123',
-        personId: personId,
-        expiresAt: DateTime.now().millisecondsSinceEpoch + 86400000,
-      );
-
   // 测试注入：认证（真实路径走 ApiClient.challenge/verify；此处绕开网络）。
   Future<SessionResult> fakeAuth(DeviceKeyPair kp, String enrolledDeviceId) async =>
       SessionResult(sessionToken: 'tok-fake', spaceId: 'space-test', expiresIn: 86400);
@@ -273,27 +266,6 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.4_pin.png'));
   });
 
-  testWidgets('golden: 向导1.1.5-二维码分享步骤（create）', (WidgetTester tester) async {
-    _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: fakeEnroll, invite: fakeInvite, auth: fakeAuth);
-    await tester.tap(find.text('下一步')); // 名字 → 设备名
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // 设备名 → 自动登记 → 口令
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '123456'); // 口令
-    await tester.tap(find.text('下一步'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('跳过')); // 确认暂不设置 → 分享
-    await tester.pumpAndSettle();
-    // 生成邀请码后展示含邀请码的二维码（注入绕开网络）
-    await tester.tap(find.text('生成邀请码并显示二维码'));
-    await tester.pumpAndSettle();
-    await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.5_share.png'));
-  });
-
   testWidgets('golden: 向导1.1.6-完成步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll, auth: fakeAuth);
@@ -306,9 +278,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
     await tester.pumpAndSettle();
-    await tester.tap(find.text('跳过')); // 确认暂不设置 → 分享
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // 分享 → 完成
+    await tester.tap(find.text('跳过')); // 确认暂不设置 → 完成页（分享页已移除）
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));

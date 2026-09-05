@@ -236,37 +236,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 不做 personA/personB 区分、不询问对方名字——默认给尚未加入的对方（personB），
   /// 生成后展示号码 + 二维码（JoinInfo 含 spaceId+口令+邀请码，对方扫码一键加入）。
   Future<void> _showInviteDialog() async {
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('邀请设备',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-              const SizedBox(height: 4),
-              const Text('生成一次性邀请码（24h 有效，登记即用）'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text('取消')),
-                  FilledButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      child: const Text('生成邀请码')),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (confirmed != true) return;
+    // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"邀请设备"确认窗）
     try {
       final api = widget.api ?? ApiClient(widget.server);
       final r = await api.createInvite(token: widget.token, personId: 'personB');
