@@ -277,7 +277,9 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // PIN → 分享
+    await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('跳过')); // 确认暂不设置 → 分享
     await tester.pumpAndSettle();
     // 生成邀请码后展示含邀请码的二维码（注入绕开网络）
     await tester.tap(find.text('生成邀请码并显示二维码'));
@@ -296,7 +298,9 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // PIN → 分享
+    await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('跳过')); // 确认暂不设置 → 分享
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步')); // 分享 → 完成
     await tester.pumpAndSettle();

@@ -51,6 +51,8 @@ class _SetupPageState extends State<SetupPage> {
   final _escrowPassphrase = TextEditingController();
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
+  String? _pinError; // PIN 步骤红色提示（输入框下方）
+  bool _pinSkipped = false; // 用户确认"暂不设置"：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
   final _serverController = TextEditingController();
 
@@ -413,6 +415,55 @@ class _SetupPageState extends State<SetupPage> {
         setState(() => _status = l10n.setupPageNeedInvite);
         return;
       }
+    }
+    // PIN 步骤（create=4 / join=5 / advanced=3）：底部"下一步"触发校验/跳过确认。
+    // 有效 PIN → 设锁后推进；两空 → 弹窗确认"暂不设置"；其余 → 输入框下方红色提示。
+    final isPinStep = (_role == _WizardRole.create && _step == 4) ||
+        (_role == _WizardRole.join && _step == 5) ||
+        (_role == _WizardRole.advanced && _step == 3);
+    if (isPinStep) {
+      final pin = _pin.text;
+      final confirm = _confirm.text;
+      if (pin.isEmpty && confirm.isEmpty) {
+        // 两空：确认是否暂不设置
+        final skip = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.setupPageSkipPinTitle),
+            content: Text(l10n.setupPageSkipPinMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(l10n.skip),
+              ),
+            ],
+          ),
+        );
+        if (skip != true) return; // 取消：留在本页
+        _pinSkipped = true;
+      } else if (pin.length < 4) {
+        setState(() => _pinError = l10n.setPinDialogPinTooShort);
+        return;
+      } else if (pin != confirm) {
+        setState(() => _pinError = l10n.setPinDialogPinMismatch);
+        return;
+      } else {
+        _pinSkipped = false;
+      }
+      setState(() => _pinError = null);
+      // 执行对应 _run*（内部完成前置：登记/认证/Space Key；有效 PIN 则设锁）
+      if (_role == _WizardRole.create) {
+        await _runPinSetup();
+      } else if (_role == _WizardRole.join) {
+        await _runJoinAccess();
+      } else {
+        await _runSealedImport();
+      }
+      return; // _run* 内部推进 _step
     }
     // create 步骤 2（设备名）→ 自动自举登记（对齐 TUI"设备与空间绑定中"），成功才进口令步骤
     if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
@@ -827,10 +878,9 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 步骤 4：设置启动锁（内嵌表单：PIN 两次确认 → 提交；不再弹窗、无恢复码）。
+  /// 步骤 4：设置启动锁（内嵌表单：PIN 两次确认，提交走底部"下一步"校验/跳过）。
   Widget _buildStepPin() {
     final l10n = AppLocalizations.of(context)!;
-    final isCreate = _role == _WizardRole.create;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -855,15 +905,11 @@ class _SetupPageState extends State<SetupPage> {
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _busy
-              ? null
-              : (isCreate
-                  ? _runPinSetup
-                  : (_role == _WizardRole.join ? _runJoinAccess : _runSealedImport)),
-          child: Text(l10n.setPinDialogSetPin),
-        ),
+        if (_pinError != null) ...[
+          const SizedBox(height: 8),
+          Text(_pinError!,
+              style: const TextStyle(color: Colors.red, fontSize: 13)),
+        ],
       ],
     );
   }
@@ -886,7 +932,15 @@ class _SetupPageState extends State<SetupPage> {
         token = session.sessionToken;
         _sessionToken = token;
       }
-      // 3) 设置 PIN（含接入口令 → 上传托管）
+      // 3) 设置 PIN（含接入口令 → 上传托管）；确认"暂不设置"时跳过设锁，直接进分享
+      if (_pinSkipped) {
+        if (!mounted) return;
+        setState(() {
+          _step = 5;
+          _status = null;
+        });
+        return;
+      }
       final ok = await _setupLockAndEnter(
         server: _server,
         spaceId: _spaceId.text.trim(),
@@ -1059,6 +1113,14 @@ class _SetupPageState extends State<SetupPage> {
       _spaceKey = base64Decode(payload.spaceKeyB64);
       _spaceId.text = payload.spaceId;
       if (!mounted) return;
+      // 3) 设置 PIN；确认"暂不设置"时跳过设锁，直接进完成页
+      if (_pinSkipped) {
+        setState(() {
+          _step = _stepCount; // join 完成页（第 6 步）
+          _status = null;
+        });
+        return;
+      }
       final ok = await _setupLockAndEnter(
         server: _server,
         spaceId: payload.spaceId,
@@ -1146,7 +1208,14 @@ class _SetupPageState extends State<SetupPage> {
       _sessionToken = session.sessionToken;
       _spaceKey = spaceKey;
       if (!mounted) return;
-      // 3) 设置 PIN → 完成步骤
+      // 3) 设置 PIN；确认"暂不设置"时跳过设锁，直接进完成页
+      if (_pinSkipped) {
+        setState(() {
+          _step = 4;
+          _status = null;
+        });
+        return;
+      }
       final ok = await _setupLockAndEnter(
         server: _server,
         spaceId: enroll.spaceId,

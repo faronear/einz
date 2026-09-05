@@ -148,6 +148,8 @@
   "setPinDialogPinLabel": "PIN（至少 4 位）",
   "setPinDialogConfirmLabel": "确认 PIN",
   "setPinDialogSetPin": "设置 PIN",
+  "setupPageSkipPinTitle": "暂不设置启动锁？",
+  "setupPageSkipPinMessage": "不设启动锁则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？",
   "setPinDialogPinTooShort": "PIN 至少 4 位",
   "setPinDialogPinMismatch": "两次输入的 PIN 不一致",
   "setPinDialogSetupFailed": "设置失败: {error}",

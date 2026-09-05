@@ -336,6 +336,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogSetPin => '设置 PIN';
 
   @override
+  String get setupPageSkipPinTitle => '暂不设置启动锁？';
+
+  @override
+  String get setupPageSkipPinMessage => '不设启动锁则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
+
+  @override
   String get setPinDialogPinTooShort => 'PIN 至少 4 位';
 
   @override
