@@ -373,6 +373,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'App lock set — PIN required at next launch';
 
   @override
+  String chatPageMenuLocale(String value) {
+    return 'Language: $value';
+  }
+
+  @override
+  String chatPageMenuBurn(String value) {
+    return 'Burn-after-read: $value';
+  }
+
+  @override
+  String get chatPageMenuInvite => 'Invite code';
+
+  @override
+  String get chatPageMenuPin => 'Device PIN';
+
+  @override
   String get chatPageBurnHeading => 'Burn-after (only affects this device)';
 
   @override

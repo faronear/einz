@@ -987,25 +987,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       appBar: AppBar(
         title: Text('Einz · ${widget.spaceId}'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.language),
-            tooltip: 'Language / 语言',
-            onPressed: _showLocalePicker,
-          ),
-          IconButton(
-            icon: const Icon(Icons.timer_outlined),
-            tooltip: l10n.chatPageBurnTooltip(_burnOptionLabel(_burnSeconds, l10n)),
-            onPressed: _showBurnPicker,
-          ),
-          IconButton(
-            icon: const Icon(Icons.group_add),
-            tooltip: '邀请设备 / Invite',
-            onPressed: _showInviteDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.lock_outline),
-            tooltip: l10n.chatPageSetLockTooltip,
-            onPressed: _showSetLockDialog,
+          // 顶栏统一入口：语言/阅后即焚/邀请码/本机 PIN（显示各功能当前值）
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: '菜单 / More',
+            onSelected: (value) {
+              switch (value) {
+                case 'locale':
+                  _showLocalePicker();
+                case 'burn':
+                  _showBurnPicker();
+                case 'invite':
+                  _showInviteDialog();
+                case 'pin':
+                  _showSetLockDialog();
+              }
+            },
+            itemBuilder: (context) {
+              // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
+              final langCode = Localizations.localeOf(context).languageCode;
+              return [
+                PopupMenuItem(
+                  value: 'locale',
+                  child: Text(l10n.chatPageMenuLocale(kLocaleLabels[langCode] ?? langCode)),
+                ),
+                PopupMenuItem(
+                  value: 'burn',
+                  child: Text(l10n.chatPageMenuBurn(_burnOptionLabel(_burnSeconds, l10n))),
+                ),
+                PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
+                PopupMenuItem(value: 'pin', child: Text(l10n.chatPageMenuPin)),
+              ];
+            },
           ),
         ],
       ),

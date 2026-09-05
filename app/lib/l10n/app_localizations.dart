@@ -722,6 +722,30 @@ abstract class AppLocalizations {
   /// **'App lock set — PIN required at next launch'**
   String get chatPageSetLockDone;
 
+  /// No description provided for @chatPageMenuLocale.
+  ///
+  /// In en, this message translates to:
+  /// **'Language: {value}'**
+  String chatPageMenuLocale(String value);
+
+  /// No description provided for @chatPageMenuBurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Burn-after-read: {value}'**
+  String chatPageMenuBurn(String value);
+
+  /// No description provided for @chatPageMenuInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code'**
+  String get chatPageMenuInvite;
+
+  /// No description provided for @chatPageMenuPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Device PIN'**
+  String get chatPageMenuPin;
+
   /// No description provided for @chatPageBurnHeading.
   ///
   /// In en, this message translates to:

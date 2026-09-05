@@ -347,6 +347,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockDone => '启动锁已设置，下次启动需 PIN 解锁';
 
   @override
+  String chatPageMenuLocale(String value) {
+    return '界面语言：$value';
+  }
+
+  @override
+  String chatPageMenuBurn(String value) {
+    return '阅后即焚：$value';
+  }
+
+  @override
+  String get chatPageMenuInvite => '邀请码';
+
+  @override
+  String get chatPageMenuPin => '本机 PIN';
+
+  @override
   String get chatPageBurnHeading => '阅后即焚（仅本设备生效）';
 
   @override

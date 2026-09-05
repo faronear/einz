@@ -151,6 +151,20 @@
   "chatPageSetLockTitle": "Set app lock",
   "chatPageSetLockTooltip": "Set app lock",
   "chatPageSetLockDone": "App lock set — PIN required at next launch",
+  "chatPageMenuLocale": "Language: {value}",
+  "@chatPageMenuLocale": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageMenuBurn": "Burn-after-read: {value}",
+  "@chatPageMenuBurn": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageMenuInvite": "Invite code",
+  "chatPageMenuPin": "Device PIN",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}

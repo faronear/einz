@@ -151,6 +151,20 @@
   "chatPageSetLockTitle": "设置启动锁",
   "chatPageSetLockTooltip": "设置启动锁",
   "chatPageSetLockDone": "启动锁已设置，下次启动需 PIN 解锁",
+  "chatPageMenuLocale": "界面语言：{value}",
+  "@chatPageMenuLocale": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageMenuBurn": "阅后即焚：{value}",
+  "@chatPageMenuBurn": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageMenuInvite": "邀请码",
+  "chatPageMenuPin": "本机 PIN",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}
