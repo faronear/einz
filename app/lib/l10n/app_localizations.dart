@@ -686,30 +686,6 @@ abstract class AppLocalizations {
   /// **'❌ Passphrase join failed: {error}'**
   String setupPageEscrowFailed(String error);
 
-  /// No description provided for @setPinDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Set up app lock'**
-  String get setPinDialogTitle;
-
-  /// No description provided for @setPinDialogRecoveryTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Save recovery code'**
-  String get setPinDialogRecoveryTitle;
-
-  /// No description provided for @setPinDialogEnterChat.
-  ///
-  /// In en, this message translates to:
-  /// **'I saved it, enter chat'**
-  String get setPinDialogEnterChat;
-
-  /// No description provided for @setPinDialogIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'You must enter the PIN at every startup to view messages; the Space Key is encrypted with the PIN.'**
-  String get setPinDialogIntro;
-
   /// No description provided for @setPinDialogPinLabel.
   ///
   /// In en, this message translates to:
@@ -721,18 +697,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm PIN'**
   String get setPinDialogConfirmLabel;
-
-  /// No description provided for @setPinDialogEscrowLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Access passphrase (optional, for joining on new devices)'**
-  String get setPinDialogEscrowLabel;
-
-  /// No description provided for @setPinDialogEscrowHelper.
-  ///
-  /// In en, this message translates to:
-  /// **'Key escrow: the server only stores ciphertext, it cannot be opened without the passphrase (KEY_ESCROW.md)'**
-  String get setPinDialogEscrowHelper;
 
   /// No description provided for @setPinDialogSetPin.
   ///
@@ -757,30 +721,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Setup failed: {error}'**
   String setPinDialogSetupFailed(String error);
-
-  /// No description provided for @setPinDialogEscrowUploaded.
-  ///
-  /// In en, this message translates to:
-  /// **'✅ Access passphrase uploaded to escrow (join with it on new devices)'**
-  String get setPinDialogEscrowUploaded;
-
-  /// No description provided for @setPinDialogEscrowUploadFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Escrow upload failed: {error} (you can retry later in chat)'**
-  String setPinDialogEscrowUploadFailed(String error);
-
-  /// No description provided for @setPinDialogRecoveryIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Save the following recovery code offline (use it to unlock if the PIN is lost):'**
-  String get setPinDialogRecoveryIntro;
-
-  /// No description provided for @setPinDialogRecoveryWarning.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep the recovery code and PIN separately; if you lose the code and forget the PIN, you cannot unlock.'**
-  String get setPinDialogRecoveryWarning;
 
   /// No description provided for @chatPageLocaleSwitched.
   ///
@@ -1022,30 +962,6 @@ abstract class AppLocalizations {
   /// **'Unlock'**
   String get lockPageUnlock;
 
-  /// No description provided for @lockPageUseRecovery.
-  ///
-  /// In en, this message translates to:
-  /// **'Forgot PIN? Use recovery code'**
-  String get lockPageUseRecovery;
-
-  /// No description provided for @lockPageRecoveryLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'12-word recovery code'**
-  String get lockPageRecoveryLabel;
-
-  /// No description provided for @lockPageRecoveryUnlock.
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock with recovery code'**
-  String get lockPageRecoveryUnlock;
-
-  /// No description provided for @lockPageBackToPin.
-  ///
-  /// In en, this message translates to:
-  /// **'Back to PIN'**
-  String get lockPageBackToPin;
-
   /// No description provided for @lockPageTooManyAttempts.
   ///
   /// In en, this message translates to:
@@ -1057,12 +973,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock failed: {error}'**
   String lockPageUnlockFailed(String error);
-
-  /// No description provided for @lockPageRecoveryFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovery failed: {error}'**
-  String lockPageRecoveryFailed(String error);
 }
 
 class _AppLocalizationsDelegate

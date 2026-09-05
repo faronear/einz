@@ -327,29 +327,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setPinDialogTitle => '设置启动锁';
-
-  @override
-  String get setPinDialogRecoveryTitle => '保存恢复码';
-
-  @override
-  String get setPinDialogEnterChat => '我已保存，进入聊天';
-
-  @override
-  String get setPinDialogIntro => '每次启动需输入 PIN 才能查看消息；Space Key 将被 PIN 加密保护。';
-
-  @override
   String get setPinDialogPinLabel => 'PIN（至少 4 位）';
 
   @override
   String get setPinDialogConfirmLabel => '确认 PIN';
-
-  @override
-  String get setPinDialogEscrowLabel => '接入口令（可选，换设备凭它接入）';
-
-  @override
-  String get setPinDialogEscrowHelper =>
-      '口令托管：Server 只存密文，无口令解不开（KEY_ESCROW.md）';
 
   @override
   String get setPinDialogSetPin => '设置 PIN';
@@ -364,20 +345,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String setPinDialogSetupFailed(String error) {
     return '设置失败: $error';
   }
-
-  @override
-  String get setPinDialogEscrowUploaded => '✅ 接入口令已上传托管（换设备可凭口令接入）';
-
-  @override
-  String setPinDialogEscrowUploadFailed(String error) {
-    return '⚠️ 托管上传失败: $error（可稍后在聊天页重试）';
-  }
-
-  @override
-  String get setPinDialogRecoveryIntro => '请离线保存以下恢复码（PIN 丢失时用它解锁）：';
-
-  @override
-  String get setPinDialogRecoveryWarning => '恢复码与 PIN 分开保存；丢失恢复码且忘记 PIN 将无法解锁。';
 
   @override
   String chatPageLocaleSwitched(String label) {
@@ -524,18 +491,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lockPageUnlock => '解锁';
 
   @override
-  String get lockPageUseRecovery => '忘记 PIN？使用恢复码';
-
-  @override
-  String get lockPageRecoveryLabel => '12 词恢复码';
-
-  @override
-  String get lockPageRecoveryUnlock => '用恢复码解锁';
-
-  @override
-  String get lockPageBackToPin => '返回输入 PIN';
-
-  @override
   String lockPageTooManyAttempts(int seconds) {
     return '尝试次数过多，请 $seconds 秒后再试';
   }
@@ -543,10 +498,5 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String lockPageUnlockFailed(String error) {
     return '解锁失败: $error';
-  }
-
-  @override
-  String lockPageRecoveryFailed(String error) {
-    return '恢复失败: $error';
   }
 }

@@ -145,14 +145,8 @@
       "error": {"type": "String"}
     }
   },
-  "setPinDialogTitle": "Set up app lock",
-  "setPinDialogRecoveryTitle": "Save recovery code",
-  "setPinDialogEnterChat": "I saved it, enter chat",
-  "setPinDialogIntro": "You must enter the PIN at every startup to view messages; the Space Key is encrypted with the PIN.",
   "setPinDialogPinLabel": "PIN (at least 4 characters)",
   "setPinDialogConfirmLabel": "Confirm PIN",
-  "setPinDialogEscrowLabel": "Access passphrase (optional, for joining on new devices)",
-  "setPinDialogEscrowHelper": "Key escrow: the server only stores ciphertext, it cannot be opened without the passphrase (KEY_ESCROW.md)",
   "setPinDialogSetPin": "Set PIN",
   "setPinDialogPinTooShort": "PIN must be at least 4 characters",
   "setPinDialogPinMismatch": "The two PINs do not match",
@@ -162,15 +156,6 @@
       "error": {"type": "String"}
     }
   },
-  "setPinDialogEscrowUploaded": "✅ Access passphrase uploaded to escrow (join with it on new devices)",
-  "setPinDialogEscrowUploadFailed": "⚠️ Escrow upload failed: {error} (you can retry later in chat)",
-  "@setPinDialogEscrowUploadFailed": {
-    "placeholders": {
-      "error": {"type": "String"}
-    }
-  },
-  "setPinDialogRecoveryIntro": "Save the following recovery code offline (use it to unlock if the PIN is lost):",
-  "setPinDialogRecoveryWarning": "Keep the recovery code and PIN separately; if you lose the code and forget the PIN, you cannot unlock.",
   "chatPageLocaleSwitched": "Switched to {label}",
   "@chatPageLocaleSwitched": {
     "placeholders": {
@@ -271,10 +256,6 @@
   },
   "lockPagePinLabel": "PIN",
   "lockPageUnlock": "Unlock",
-  "lockPageUseRecovery": "Forgot PIN? Use recovery code",
-  "lockPageRecoveryLabel": "12-word recovery code",
-  "lockPageRecoveryUnlock": "Unlock with recovery code",
-  "lockPageBackToPin": "Back to PIN",
   "lockPageTooManyAttempts": "Too many attempts, try again in {seconds}s",
   "@lockPageTooManyAttempts": {
     "placeholders": {
@@ -283,12 +264,6 @@
   },
   "lockPageUnlockFailed": "Unlock failed: {error}",
   "@lockPageUnlockFailed": {
-    "placeholders": {
-      "error": {"type": "String"}
-    }
-  },
-  "lockPageRecoveryFailed": "Recovery failed: {error}",
-  "@lockPageRecoveryFailed": {
     "placeholders": {
       "error": {"type": "String"}
     }

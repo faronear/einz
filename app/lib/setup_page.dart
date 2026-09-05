@@ -49,6 +49,8 @@ class _SetupPageState extends State<SetupPage> {
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _sealedKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
+  final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
+  final _confirm = TextEditingController();
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
   final _serverController = TextEditingController();
 
@@ -89,6 +91,8 @@ class _SetupPageState extends State<SetupPage> {
     _spaceId.dispose();
     _sealedKey.dispose();
     _escrowPassphrase.dispose();
+    _pin.dispose();
+    _confirm.dispose();
     _inviteCode.dispose();
     _serverController.dispose();
     super.dispose();
@@ -258,10 +262,16 @@ class _SetupPageState extends State<SetupPage> {
               Text(_status!, style: const TextStyle(fontSize: 13)),
               const SizedBox(height: 8),
             ],
-            if (_role != null && _step > 0)
+            // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
+            // 此时也有"下一步"可回到步骤 1，杜绝无路可走）
+            if (_role != null)
               Row(
                 children: [
-                  TextButton(onPressed: _backStep, child: Text(l10n.wizardBack)),
+                  // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）
+                  TextButton(
+                    onPressed: _step > 1 ? _backStep : null,
+                    child: Text(l10n.wizardBack),
+                  ),
                   const Spacer(),
                   // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
                   // 完成页（_step == _stepCount）显示"完成"。
@@ -417,7 +427,9 @@ class _SetupPageState extends State<SetupPage> {
 
   void _backStep() {
     setState(() {
-      if (_step > 0) _step--;
+      // 步骤 1 即向导第一页（create=名字 / join=身份 / advanced=设备名）；
+      // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
+      if (_step > 1) _step--;
     });
   }
 
@@ -535,7 +547,9 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// 设置启动锁对话框（PIN 两次确认 → 恢复码展示）→ 返回是否完成。
+  /// 设置启动锁：内嵌表单直接执行（不再弹窗、无恢复码）——
+  /// 校验 PIN 两次一致 → AppLockService.setPin 加密 Space Key 包 →
+  /// 上传口令托管包（失败不阻塞）→ 返回是否完成。
   Future<bool> _setupLockAndEnter({
     required String server,
     required String spaceId,
@@ -545,22 +559,54 @@ class _SetupPageState extends State<SetupPage> {
     required String token,
     String? escrowPassphrase,
   }) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => SetPinDialog(
-        payload: AppLockPayload(
-          server: server,
-          spaceId: spaceId,
-          deviceId: deviceId,
-          spaceKeyB64: spaceKeyB64,
-          keyVersion: keyVersion,
-          token: token,
-          escrowPassphrase: escrowPassphrase,
-        ),
-      ),
-    );
-    return ok ?? false;
+    final l10n = AppLocalizations.of(context)!;
+    final pin = _pin.text;
+    if (pin.length < 4) {
+      setState(() => _status = l10n.setPinDialogPinTooShort);
+      return false;
+    }
+    if (pin != _confirm.text) {
+      setState(() => _status = l10n.setPinDialogPinMismatch);
+      return false;
+    }
+    try {
+      final payload = AppLockPayload(
+        server: server,
+        spaceId: spaceId,
+        deviceId: deviceId,
+        spaceKeyB64: spaceKeyB64,
+        keyVersion: keyVersion,
+        token: token,
+        escrowPassphrase: escrowPassphrase,
+      );
+      await AppLockService(widget.db ?? LocalDatabase()).setPin(pin, payload: payload);
+      final pass = escrowPassphrase?.trim() ?? '';
+      if (pass.isNotEmpty) {
+        await _uploadEscrow(pass, payload);
+      }
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() => _status = l10n.setPinDialogSetupFailed('$e'));
+      return false;
+    }
+  }
+
+  /// 口令加密 Space Key 包并上传托管（Server 只存密文；失败静默，不阻塞进入聊天）。
+  Future<void> _uploadEscrow(String passphrase, AppLockPayload payload) async {
+    try {
+      final api = ApiClient(payload.server);
+      final escrow = KeyEscrowService(api);
+      await escrow.upload(
+        passphrase: passphrase,
+        spaceKeyB64: payload.spaceKeyB64,
+        spaceId: payload.spaceId,
+        keyVersion: payload.keyVersion,
+        token: payload.token ?? '',
+      );
+    } catch (_) {
+      // 托管上传失败不阻塞：下次解锁（_syncEscrow）或 rotate 时会重试
+    }
   }
 
   /// 完成动作：进入聊天页（create/join/advanced 填充数据后统一调用；
@@ -781,7 +827,7 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 步骤 4：设置 PIN（按角色分发：create 生成密钥 / join 凭口令接入 / advanced sealed 导入）。
+  /// 步骤 4：设置启动锁（内嵌表单：PIN 两次确认 → 提交；不再弹窗、无恢复码）。
   Widget _buildStepPin() {
     final l10n = AppLocalizations.of(context)!;
     final isCreate = _role == _WizardRole.create;
@@ -789,6 +835,26 @@ class _SetupPageState extends State<SetupPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(l10n.wizardPinHint, style: const TextStyle(fontSize: 14)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _pin,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: l10n.setPinDialogPinLabel,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _confirm,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: l10n.setPinDialogConfirmLabel,
+            border: const OutlineInputBorder(),
+          ),
+        ),
         const SizedBox(height: 12),
         FilledButton(
           onPressed: _busy
@@ -1102,180 +1168,5 @@ class _SetupPageState extends State<SetupPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-}
-
-/// 设置启动锁对话框（两段式）：
-/// 阶段 1：输入 PIN（两次确认）→ AppLockService.setPin 加密 Space Key 包；
-/// 阶段 2：展示 12 词恢复码（PIN 丢失兑底），确认已保存后关闭并进入聊天页。
-class SetPinDialog extends StatefulWidget {
-  const SetPinDialog({super.key, required this.payload});
-
-  final AppLockPayload payload;
-
-  @override
-  State<SetPinDialog> createState() => _SetPinDialogState();
-}
-
-class _SetPinDialogState extends State<SetPinDialog> {
-  final _pin = TextEditingController();
-  final _confirm = TextEditingController();
-  late final AppLockService _lock;
-  bool _stage2 = false;
-  bool _busy = false;
-  String? _error;
-  String? _recoveryCode;
-  String? _escrowStatus;
-
-  @override
-  void initState() {
-    super.initState();
-    _lock = AppLockService(LocalDatabase());
-  }
-
-  @override
-  void dispose() {
-    _pin.dispose();
-    _confirm.dispose();
-    super.dispose();
-  }
-
-  Future<void> _setup() async {
-    final pin = _pin.text;
-    if (pin.length < 4) {
-      setState(() => _error = AppLocalizations.of(context)!.setPinDialogPinTooShort);
-      return;
-    }
-    if (pin != _confirm.text) {
-      setState(() => _error = AppLocalizations.of(context)!.setPinDialogPinMismatch);
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      // 接入口令在向导前序步骤已设置（create/join 必填步骤），经 payload 传入；
-      // dialog 不再重复询问（避免"可选口令"的语义混乱）。
-      final escrowPass = widget.payload.escrowPassphrase?.trim() ?? '';
-      final payload = AppLockPayload(
-        server: widget.payload.server,
-        spaceId: widget.payload.spaceId,
-        deviceId: widget.payload.deviceId,
-        spaceKeyB64: widget.payload.spaceKeyB64,
-        keyVersion: widget.payload.keyVersion,
-        token: widget.payload.token,
-        escrowPassphrase: escrowPass.isEmpty ? null : escrowPass,
-      );
-      final code = await _lock.setPin(pin, payload: payload);
-      if (escrowPass.isNotEmpty) {
-        await _uploadEscrow(escrowPass, payload);
-      }
-      if (!mounted) return;
-      setState(() {
-        _recoveryCode = code;
-        _stage2 = true;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = AppLocalizations.of(context)!.setPinDialogSetupFailed('$e'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  /// 口令加密 Space Key 包并上传托管（Server 只存密文；失败不阻塞进入聊天）。
-  Future<void> _uploadEscrow(String passphrase, AppLockPayload payload) async {
-    final l10n = AppLocalizations.of(context)!; // await 前取，避免跨 async gap 用 context
-    try {
-      final api = ApiClient(payload.server);
-      final escrow = KeyEscrowService(api);
-      await escrow.upload(
-        passphrase: passphrase,
-        spaceKeyB64: payload.spaceKeyB64,
-        spaceId: payload.spaceId,
-        keyVersion: payload.keyVersion,
-        token: payload.token ?? '',
-      );
-      _escrowStatus = l10n.setPinDialogEscrowUploaded;
-    } catch (e) {
-      _escrowStatus = l10n.setPinDialogEscrowUploadFailed('$e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return AlertDialog(
-      title: Text(_stage2 ? l10n.setPinDialogRecoveryTitle : l10n.setPinDialogTitle),
-      content: _stage2 ? _buildRecovery() : _buildPinForm(),
-      actions: [
-        if (!_stage2)
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.skip)),
-        if (_stage2)
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.setPinDialogEnterChat),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildPinForm() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(l10n.setPinDialogIntro),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _pin,
-          obscureText: true,
-          decoration: InputDecoration(labelText: l10n.setPinDialogPinLabel, border: const OutlineInputBorder()),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _confirm,
-          obscureText: true,
-          decoration: InputDecoration(labelText: l10n.setPinDialogConfirmLabel, border: const OutlineInputBorder()),
-        ),
-        if (_error != null) ...[
-          const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-        ],
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _busy ? null : _setup,
-          child: _busy
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(l10n.setPinDialogSetPin),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecovery() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(l10n.setPinDialogRecoveryIntro, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        Card(
-          color: Colors.amber.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: SelectableText(_recoveryCode ?? '', style: const TextStyle(fontSize: 14)),
-          ),
-        ),
-        if (_escrowStatus != null) ...[
-          const SizedBox(height: 8),
-          Text(_escrowStatus!, style: const TextStyle(fontSize: 12)),
-        ],
-        const SizedBox(height: 8),
-        Text(l10n.setPinDialogRecoveryWarning,
-            style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ],
-    );
   }
 }

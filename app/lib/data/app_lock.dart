@@ -21,7 +21,6 @@ class AppLockService {
   static const int lockSeconds = 30;
 
   static const _kPackage = 'app_lock.package';
-  static const _kRecovery = 'app_lock.recovery';
   static const _kAttempts = 'app_lock.attempts';
   static const _kLockedUntil = 'app_lock.locked_until';
 
@@ -31,27 +30,22 @@ class AppLockService {
   /// 清除本地锁与密钥包（设备被撤销时调用：回到未配置状态，防止残留密钥）。
   Future<void> clear() async {
     await (db.delete(db.appState)
-          ..where((s) => s.key.isIn({_kPackage, _kRecovery, _kAttempts, _kLockedUntil})))
+          ..where((s) => s.key.isIn({_kPackage, _kAttempts, _kLockedUntil})))
         .go();
   }
 
-  /// 设置 PIN 并加密保存 Space Key 包；返回 12 词恢复码（用户需离线保存）。
-  Future<String> setPin(String pin, {required AppLockPayload payload}) async {
+  /// 设置 PIN 并加密保存 Space Key 包（老板决策：不再生成 12 词恢复码）。
+  /// 注意：PIN 丢失则本设备 Space Key 包无法解密（无恢复副本，纯本地）。
+  Future<void> setPin(String pin, {required AppLockPayload payload}) async {
     final bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload.toJson())));
     final pkg = await encryptBackup(payload: bytes, recoveryCode: pin);
 
-    // 恢复码兑底：同一 payload 用恢复码再加密一份
-    final recoveryCode = await generateRecoveryCode();
-    final recPkg = await encryptBackup(payload: bytes, recoveryCode: recoveryCode);
-
     await _set(_kPackage, jsonEncode(pkg.toJson()));
-    await _set(_kRecovery, jsonEncode(recPkg.toJson()));
     await _set(_kAttempts, '0');
     await _set(_kLockedUntil, '0');
-    return recoveryCode;
   }
 
-  /// 用 PIN 解锁：解密 Space Key 包；PIN 错误抛 [AppLockException]，锁定中抛 [AppLockLockedException]。
+  /// 恢复码兑底已删除（老板决策）：PIN 丢失即无法解锁本设备密钥包。
   Future<AppLockPayload> unlock(String pin) async {
     await _ensureNotLocked();
     final raw = await _get(_kPackage);
@@ -63,20 +57,6 @@ class AppLockService {
     } on FormatException {
       await _registerFailure();
       throw const AppLockException('PIN 错误');
-    }
-  }
-
-  /// 恢复码兑底：PIN 丢失时用 12 词恢复码解密（E2EE.md §10）。
-  Future<AppLockPayload> unlockWithRecovery(String recoveryCode) async {
-    final raw = await _get(_kRecovery);
-    if (raw == null) throw const AppLockException('无恢复副本');
-    try {
-      final plain = await decryptBackup(file: BackupFile.fromJson(jsonDecode(raw)), recoveryCode: recoveryCode);
-      await _set(_kAttempts, '0');
-      await _set(_kLockedUntil, '0');
-      return AppLockPayload.fromJson(jsonDecode(utf8.decode(plain)));
-    } on FormatException {
-      throw const AppLockException('恢复码错误');
     }
   }
 

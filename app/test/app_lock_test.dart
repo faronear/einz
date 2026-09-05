@@ -1,4 +1,5 @@
-// AppLockService 单测：drift 内存库，验证 PIN 设置/解锁、错误计数锁定、恢复码兑底。
+// AppLockService 单测：drift 内存库，验证 PIN 设置/解锁、错误计数锁定。
+// 恢复码功能已按老板决策删除（不再生成/兑底）。
 //
 // 需要 LIBSODIUM_PATH 指向 libsodium.dll（与 shared 单测一致）。
 
@@ -36,8 +37,7 @@ void main() {
 
   test('设置 PIN 后 isSetup=true，正确 PIN 解锁返回原 payload', () async {
     expect(await lock.isSetup, false);
-    final recovery = await lock.setPin('1234', payload: payload);
-    expect(recovery.split(' ').length, 12, reason: '恢复码应为 12 词');
+    await lock.setPin('1234', payload: payload);
 
     expect(await lock.isSetup, true);
     final unlocked = await lock.unlock('1234');
@@ -74,21 +74,5 @@ void main() {
     expect(await lock.isSetup, false, reason: 'clear 后应回到未配置状态');
     await expectLater(lock.unlock('1234'), throwsA(isA<AppLockException>()),
         reason: '锁包已删，原 PIN 不应再能解锁');
-  });
-
-  test('恢复码兑底：PIN 丢失时用恢复码解锁成功，错误恢复码被拒', () async {
-    final recovery = await lock.setPin('1234', payload: payload);
-    // 用错误 PIN 触发锁定也无妨：恢复码不受锁定限制
-    for (var i = 0; i < 5; i++) {
-      await expectLater(lock.unlock('0000'), throwsA(isA<AppLockException>()));
-    }
-    await expectLater(
-      lock.unlockWithRecovery('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon'),
-      throwsA(isA<AppLockException>()),
-    );
-    final unlocked = await lock.unlockWithRecovery(recovery);
-    expect(unlocked.spaceKeyB64, 'dGhlLXNwYWNlLWtleQ==');
-    // 解锁成功后锁定应被清除
-    expect(await lock.remainingLockSeconds, 0);
   });
 }

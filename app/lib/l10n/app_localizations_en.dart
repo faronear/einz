@@ -353,31 +353,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setPinDialogTitle => 'Set up app lock';
-
-  @override
-  String get setPinDialogRecoveryTitle => 'Save recovery code';
-
-  @override
-  String get setPinDialogEnterChat => 'I saved it, enter chat';
-
-  @override
-  String get setPinDialogIntro =>
-      'You must enter the PIN at every startup to view messages; the Space Key is encrypted with the PIN.';
-
-  @override
   String get setPinDialogPinLabel => 'PIN (at least 4 characters)';
 
   @override
   String get setPinDialogConfirmLabel => 'Confirm PIN';
-
-  @override
-  String get setPinDialogEscrowLabel =>
-      'Access passphrase (optional, for joining on new devices)';
-
-  @override
-  String get setPinDialogEscrowHelper =>
-      'Key escrow: the server only stores ciphertext, it cannot be opened without the passphrase (KEY_ESCROW.md)';
 
   @override
   String get setPinDialogSetPin => 'Set PIN';
@@ -392,23 +371,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String setPinDialogSetupFailed(String error) {
     return 'Setup failed: $error';
   }
-
-  @override
-  String get setPinDialogEscrowUploaded =>
-      '✅ Access passphrase uploaded to escrow (join with it on new devices)';
-
-  @override
-  String setPinDialogEscrowUploadFailed(String error) {
-    return '⚠️ Escrow upload failed: $error (you can retry later in chat)';
-  }
-
-  @override
-  String get setPinDialogRecoveryIntro =>
-      'Save the following recovery code offline (use it to unlock if the PIN is lost):';
-
-  @override
-  String get setPinDialogRecoveryWarning =>
-      'Keep the recovery code and PIN separately; if you lose the code and forget the PIN, you cannot unlock.';
 
   @override
   String chatPageLocaleSwitched(String label) {
@@ -556,18 +518,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lockPageUnlock => 'Unlock';
 
   @override
-  String get lockPageUseRecovery => 'Forgot PIN? Use recovery code';
-
-  @override
-  String get lockPageRecoveryLabel => '12-word recovery code';
-
-  @override
-  String get lockPageRecoveryUnlock => 'Unlock with recovery code';
-
-  @override
-  String get lockPageBackToPin => 'Back to PIN';
-
-  @override
   String lockPageTooManyAttempts(int seconds) {
     return 'Too many attempts, try again in ${seconds}s';
   }
@@ -575,10 +525,5 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String lockPageUnlockFailed(String error) {
     return 'Unlock failed: $error';
-  }
-
-  @override
-  String lockPageRecoveryFailed(String error) {
-    return 'Recovery failed: $error';
   }
 }
