@@ -1114,7 +1114,6 @@ class SetPinDialog extends StatefulWidget {
 class _SetPinDialogState extends State<SetPinDialog> {
   final _pin = TextEditingController();
   final _confirm = TextEditingController();
-  final _escrowPassphrase = TextEditingController();
   late final AppLockService _lock;
   bool _stage2 = false;
   bool _busy = false;
@@ -1132,7 +1131,6 @@ class _SetPinDialogState extends State<SetPinDialog> {
   void dispose() {
     _pin.dispose();
     _confirm.dispose();
-    _escrowPassphrase.dispose();
     super.dispose();
   }
 
@@ -1151,8 +1149,9 @@ class _SetPinDialogState extends State<SetPinDialog> {
       _error = null;
     });
     try {
-      final escrowPass = _escrowPassphrase.text.trim();
-      // 接入口令（与 App 锁 PIN 区分，KEY_ESCROW.md）：非空则一并加密保存
+      // 接入口令在向导前序步骤已设置（create/join 必填步骤），经 payload 传入；
+      // dialog 不再重复询问（避免"可选口令"的语义混乱）。
+      final escrowPass = widget.payload.escrowPassphrase?.trim() ?? '';
       final payload = AppLockPayload(
         server: widget.payload.server,
         spaceId: widget.payload.spaceId,
@@ -1233,16 +1232,6 @@ class _SetPinDialogState extends State<SetPinDialog> {
           controller: _confirm,
           obscureText: true,
           decoration: InputDecoration(labelText: l10n.setPinDialogConfirmLabel, border: const OutlineInputBorder()),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _escrowPassphrase,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: l10n.setPinDialogEscrowLabel,
-            helperText: l10n.setPinDialogEscrowHelper,
-            border: const OutlineInputBorder(),
-          ),
         ),
         if (_error != null) ...[
           const SizedBox(height: 8),
