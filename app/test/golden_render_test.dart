@@ -3,8 +3,9 @@
 //
 // 运行：flutter test --update-goldens test/golden_render_test.dart
 // 产物：test/goldens/{setup_step1_*,lock_page,chat_page}.png
-// 向导步骤编号规则（老板确认）：1=首页角色选择；1.1/1.2/1.3=create/join/advanced
-// 三个并列分流；分流内按页面出现顺序 1.1.1、1.1.2、…（如 1.1.1_device=create 设备名）。
+// 向导步骤编号规则（老板确认，2026-09-05 对齐 TUI 重构后）：
+// 1=检测页；1.1/1.2/1.3=create/join/advanced 三条自动判定流程；
+// 分流内按页面出现顺序 1.1.1、1.1.2、…（如 1.1.1_name=create 你的名字）。
 //
 // 说明：golden 测试默认 Ahem 字体（中文显示为方块），此处加载系统中文字体
 // （macOS Hiragino / Windows simhei / Linux Noto，见 _loadChineseFont）
@@ -67,7 +68,7 @@ void _usePhoneSize(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
-/// 跳过像素比较的 golden 列表：生成密钥类截图含真实随机公钥
+/// 跳过像素比较的 golden 列表：设备名步骤含真实随机公钥
 /// （sodium 2.x Randombytes 无 setImplementation 可注入），像素必然不同；
 /// 截图仍随 --update-goldens 生成，供人工审核，仅全量测试时跳过比较。
 class _SkipListGoldenComparator implements GoldenFileComparator {
@@ -95,10 +96,14 @@ void main() {
   setUpAll(() async {
     await _loadChineseFont();
     await sodium();
-    // 生成密钥类截图含随机公钥 → 全量测试时跳过像素比较
+    // 设备名步骤含随机公钥 → 全量测试时跳过像素比较
     goldenFileComparator = _SkipListGoldenComparator(
       goldenFileComparator,
-      {'setup_step1.1.1_keygen.png'},
+      {
+        'setup_step1.1.2_device.png',
+        'setup_step1.2.2_device.png',
+        'setup_step1.3.1_device.png',
+      },
     );
   });
 
@@ -113,7 +118,7 @@ void main() {
         expiresAt: DateTime.now().millisecondsSinceEpoch + 86400000,
       );
 
-  testWidgets('golden: 首页-角色选择（1）', (WidgetTester tester) async {
+  testWidgets('golden: 检测页（服务器不可达）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -121,10 +126,10 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
-      home: SetupPage(db: db, probeServer: (_) async => true),
+      home: SetupPage(db: db, probeServer: (_) async => (false, <String, String>{})),
     ));
     await tester.pump();
-    await expectLater(find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1_roles.png'));
+    await expectLater(find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1_detect.png'));
   });
 
   testWidgets('golden: 锁屏页 LockPage', (WidgetTester tester) async {
@@ -194,8 +199,12 @@ void main() {
 
   // ---------- 向导步骤渲染（真实交互路径走到目标步骤再截图）----------
 
+  /// 启动 SetupPage。probeNames 空=首设备（create）；非空=后续设备（join）。
+  /// probeOk=false 模拟服务器不可达（检测页）。
   Future<void> pumpSetup(
     WidgetTester tester, {
+    Map<String, String> probeNames = const {},
+    bool probeOk = true,
     Future<EnrollResult> Function(String? inviteCode)? enroll,
     Future<InviteResult> Function(String personId)? invite,
   }) async {
@@ -207,7 +216,7 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => true,
+        probeServer: (_) async => (probeOk, probeNames),
         enrollOverride: enroll,
         createInviteOverride: invite,
       ),
@@ -215,44 +224,30 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// 创建路径：进入向导并生成设备密钥（真实 sodium 生成）。
-  Future<void> enterCreateWithKey(WidgetTester tester) async {
-    await tester.tap(find.text('我是第一个使用者，创建新空间'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('① 生成设备密钥'));
-    await tester.pumpAndSettle();
-  }
+  // ---- create（首设备：探测空名称表 → 自动建钥 → 名字 → 设备名 → …）----
 
-  testWidgets('golden: 向导1.1.1-设备名称步骤（create）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.1.1-你的名字步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
-    await tester.tap(find.text('我是第一个使用者，创建新空间'));
-    await tester.pumpAndSettle();
+    await pumpSetup(tester); // 空名称表 → create，自动进入步骤 1
     await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.1_device.png'));
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.1_name.png'));
   });
 
-  testWidgets('golden: 向导1.1.1-生成密钥后自动进入登记步骤（create）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.1.2-设备名称步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
-    await enterCreateWithKey(tester);
-    // 融合按钮：生成密钥后自动进入下一步（登记步骤），无需再点"下一步"
-    expect(find.text('登记本设备'), findsOneWidget);
-  });
-
-  testWidgets('golden: 向导1.1.2-登记设备步骤（create）', (WidgetTester tester) async {
-    _usePhoneSize(tester);
-    await pumpSetup(tester);
-    await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
+    await pumpSetup(tester); // create 步骤 1（名字，可跳过）
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
     await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.2_enroll.png'));
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.2_device.png'));
   });
 
   testWidgets('golden: 向导1.1.3-接入口令步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
-    await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
+    await tester.tap(find.text('下一步')); // 名字 → 设备名
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步')); // 设备名 → 自动登记 → 口令
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.3_passphrase.png'));
@@ -261,10 +256,11 @@ void main() {
   testWidgets('golden: 向导1.1.4-PIN 步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
-    await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
+    await tester.tap(find.text('下一步')); // 名字 → 设备名
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '123456');
+    await tester.tap(find.text('下一步')); // 设备名 → 自动登记 → 口令
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     await expectLater(
@@ -274,13 +270,14 @@ void main() {
   testWidgets('golden: 向导1.1.5-二维码分享步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll, invite: fakeInvite);
-    await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
+    await tester.tap(find.text('下一步')); // 名字 → 设备名
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '123456');
+    await tester.tap(find.text('下一步')); // 设备名 → 自动登记 → 口令
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('下一步')); // PIN → 分享
     await tester.pumpAndSettle();
     // 生成邀请码后展示含邀请码的二维码（注入绕开网络）
     await tester.tap(find.text('生成邀请码并显示二维码'));
@@ -292,42 +289,77 @@ void main() {
   testWidgets('golden: 向导1.1.6-完成步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
-    await enterCreateWithKey(tester); // 生成密钥后已自动进入登记步骤
-    await tester.tap(find.text('登记本设备')); // 登记成功自动进入口令步骤
+    await tester.tap(find.text('下一步')); // 名字 → 设备名
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '123456');
+    await tester.tap(find.text('下一步')); // 设备名 → 自动登记 → 口令
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('下一步')); // PIN → 分享
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('下一步')); // 分享 → 完成
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));
   });
 
-  testWidgets('golden: 向导1.2.2-加入步骤（join）', (WidgetTester tester) async {
+  // ---- join（后续设备：探测到 personA → 身份 → 设备名 → 邀请码 → …）----
+
+  testWidgets('golden: 向导1.2.1-身份选择步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
-    await tester.tap(find.text('我要加入对方的空间'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('① 生成设备密钥'));
-    await tester.pumpAndSettle(); // 生成后自动进入加入步骤
+    await pumpSetup(tester, probeNames: {'personA': 'Lukas'}); // 非空 → join 步骤 1
     await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.2_join.png'));
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.1_identity.png'));
   });
 
-  testWidgets('golden: 向导1.3.2-高级 sealed 步骤（advanced）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.2.2-设备名称步骤（join）', (WidgetTester tester) async {
+    _usePhoneSize(tester);
+    await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
+    await tester.tap(find.textContaining('第一个用户（创建者）')); // 选身份
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await expectLater(
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.2_device.png'));
+  });
+
+  testWidgets('golden: 向导1.2.3-邀请码步骤（join）', (WidgetTester tester) async {
+    _usePhoneSize(tester);
+    await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
+    await tester.tap(find.textContaining('第一个用户（创建者）')); // 选身份
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步')); // 身份 → 设备名
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步')); // 设备名 → 邀请码
+    await tester.pumpAndSettle();
+    await expectLater(
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
+  });
+
+  // ---- advanced（sealed 导入：AppBar 菜单入口）----
+
+  testWidgets('golden: 向导1.3.1-设备名称步骤（advanced）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester);
-    // 展开折叠入口（此刻只有一个同名文本：ExpansionTile 标题）
+    // 从 AppBar 常驻菜单进入高级（sealed 导入）流程
+    await tester.tap(find.byTooltip('高级：导入 sealed 密钥副本'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('高级：导入 sealed 密钥副本'));
     await tester.pumpAndSettle();
-    // 展开后的角色卡（ListTile 列表最后一个）
-    await tester.tap(find.byType(ListTile).last);
+    await expectLater(
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_device.png'));
+  });
+
+  testWidgets('golden: 向导1.3.2-sealed 步骤（advanced）', (WidgetTester tester) async {
+    _usePhoneSize(tester);
+    await pumpSetup(tester);
+    await tester.tap(find.byTooltip('高级：导入 sealed 密钥副本'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('① 生成设备密钥'));
-    await tester.pumpAndSettle(); // 生成后自动进入 sealed 步骤
+    await tester.tap(find.text('高级：导入 sealed 密钥副本'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步')); // 设备名 → sealed
+    await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.2_sealed.png'));
   });

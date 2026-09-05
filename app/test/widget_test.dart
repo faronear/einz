@@ -1,7 +1,9 @@
 // Einz 设置向导 widget 测试。
 //
 // 直接渲染 SetupPage 验证向导流程（不经过 StartupGate——它依赖真实
-// drift 数据库初始化；不触发密钥生成按钮，避免在测试环境加载 libsodium）。
+// drift 数据库初始化）。新流程（2026-09-05，对齐 TUI）：探测服务器 →
+// 自动判定身份（person 名称表空=首设备 create，非空=后续设备 join）→
+// 自动生成密钥 → 按角色进入对应步骤序列。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -10,56 +12,62 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
+import 'package:einz_shared/einz_shared.dart';
 
 void main() {
-  Widget wrapApp() {
+  setUpAll(() async {
+    await sodium(); // 自动建钥需要 libsodium（macOS 经 LIBSODIUM_PATH/brew 可用）
+  });
+
+  Widget wrapApp({Map<String, String> probeNames = const {}, bool probeOk = true}) {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
-      home: SetupPage(db: db, probeServer: (_) async => true),
+      home: SetupPage(
+        db: db,
+        probeServer: (_) async => (probeOk, probeNames),
+      ),
     );
   }
 
-  testWidgets('设置向导首屏：角色选择', (WidgetTester tester) async {
-    await tester.pumpWidget(wrapApp());
-
-    // 标题在 AppBar 与页面内各出现一次
-    expect(find.text('选择你的情况'), findsWidgets);
-    expect(find.text('我是第一个使用者，创建新空间'), findsOneWidget);
-    expect(find.text('我要加入对方的空间'), findsOneWidget);
-    expect(find.text('高级：导入 sealed 密钥副本'), findsOneWidget);
-  });
-
-  testWidgets('角色分流：点"创建新空间"进入设备名称步骤，主按钮融合"下一步"',
+  testWidgets('首设备：探测空名称表 → 自动进入"你的名字"步骤（无角色选择/密钥按钮）',
       (WidgetTester tester) async {
-    await tester.pumpWidget(wrapApp());
-
-    await tester.tap(find.text('我是第一个使用者，创建新空间'));
+    await tester.pumpWidget(wrapApp()); // probeNames 空 → create
     await tester.pumpAndSettle();
 
-    // 页眉（AppBar）固定显示所选角色名；步骤标题移到 body 上方
-    expect(find.text('创建新空间'), findsOneWidget); // AppBar
-    expect(find.text('设备名称'), findsOneWidget); // body 上方步骤标题
-    // 融合按钮：步骤 1 只有"① 生成设备密钥"主按钮，无底部独立"下一步"
-    expect(find.text('① 生成设备密钥'), findsOneWidget);
-    expect(find.text('下一步'), findsNothing);
-    // 底部保留"上一步"（可返回角色选择）
+    // 新流程：不再有角色选择页，也没有"生成设备密钥"按钮
+    expect(find.text('我是第一个使用者，创建新空间'), findsNothing);
+    expect(find.text('① 生成设备密钥'), findsNothing);
+    // 自动进入 create 步骤 1：你的名字
+    expect(find.text('你的名字'), findsWidgets); // 步骤标题 + 输入框 label
+    // 底部保留"上一步"（可返回检测页）与"下一步"
     expect(find.text('上一步'), findsOneWidget);
+    expect(find.text('下一步'), findsOneWidget);
   });
 
-  testWidgets('角色分流：点"加入对方空间"进入设备名称步骤（页眉切换）', (WidgetTester tester) async {
-    await tester.pumpWidget(wrapApp());
-
-    await tester.tap(find.text('我要加入对方的空间'));
+  testWidgets('后续设备：探测到 personA → 自动进入"你的身份"步骤', (WidgetTester tester) async {
+    await tester.pumpWidget(wrapApp(probeNames: {'personA': 'Lukas'})); // 非空 → join
     await tester.pumpAndSettle();
 
-    // 页眉切换为"加入你的空间"
-    expect(find.text('加入你的空间'), findsOneWidget);
-    expect(find.text('设备名称'), findsOneWidget);
-    // 底部导航有"上一步"（可返回角色选择）
-    expect(find.text('上一步'), findsOneWidget);
+    expect(find.text('你的身份'), findsWidgets); // 步骤标题
+    expect(find.textContaining('第一个用户（创建者）'), findsOneWidget);
+    expect(find.textContaining('第二个用户（伴侣）'), findsOneWidget);
+    // 未选身份点"下一步" → 提示先选
+    await tester.tap(find.text('下一步'));
+    await tester.pump();
+    expect(find.textContaining('请先选择你的身份'), findsOneWidget);
+  });
+
+  testWidgets('探测失败：显示服务器输入引导与 sealed 高级入口', (WidgetTester tester) async {
+    await tester.pumpWidget(wrapApp(probeOk: false));
+    await tester.pumpAndSettle();
+
+    // 顶部琥珀卡片 + 检测页两处都含"无法连接服务器"，精确匹配检测页完整文案
+    expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsOneWidget);
+    // sealed 高级入口在 AppBar 常驻菜单（tooltip）
+    expect(find.byTooltip('高级：导入 sealed 密钥副本'), findsOneWidget);
   });
 }

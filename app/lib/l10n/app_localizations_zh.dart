@@ -128,6 +128,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleTitle => '选择你的情况';
 
   @override
+  String get wizardDetectTitle => '正在检测服务器状态…';
+
+  @override
+  String get wizardDetectHint => '自动判断你是第几个用户（首个设备将创建空间）';
+
+  @override
+  String get wizardDetectFailed => '无法连接服务器，请在上方输入地址后重试';
+
+  @override
+  String get wizardNameHint => '这是你的第一个设备，先告诉我们要怎么称呼你（之后可随时 /改名）。';
+
+  @override
+  String get wizardNameLabel => '你的名字';
+
+  @override
+  String get wizardNameHintInput => '例如 Lukas（可选，之后可改）';
+
+  @override
+  String get wizardIdentityHint => '这个空间已有用户——请选择你的身份：';
+
+  @override
+  String get wizardIdentityCreator => '第一个用户（创建者）';
+
+  @override
+  String get wizardIdentityPartner => '第二个用户（伴侣）';
+
+  @override
+  String get wizardIdentityFirst => '⚠️ 请先选择你的身份（创建者或伴侣）';
+
+  @override
+  String get wizardInviteHint => '输入对方提供的一次性邀请码（由创建者 /invite 生成，24 小时内有效）';
+
+  @override
   String get wizardRoleCreate => '我是第一个使用者，创建新空间';
 
   @override
@@ -156,6 +189,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardStepDevice => '设备名称';
+
+  @override
+  String get wizardStepName => '你的名字';
+
+  @override
+  String get wizardStepIdentity => '你的身份';
+
+  @override
+  String get wizardStepInvite => '输入邀请码';
 
   @override
   String get wizardStepEnroll => '登记设备';

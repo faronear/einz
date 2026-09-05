@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'local_database.dart';
@@ -29,16 +30,22 @@ class ServerSettings {
         .insertOnConflictUpdate(AppStateCompanion.insert(key: _kKey, value: server));
   }
 
-  /// 快速健康探测（GET {server}/health，3s 超时）：能连（HTTP 200）→ true。
-  static Future<bool> probe(String server) async {
+  /// 快速健康探测（GET {server}/health，3s 超时）。
+  /// 返回 (能连, person 名称表)——person 名称表为空 = 服务器还没有任何用户
+  /// （首设备场景）；非空 = 已有用户（后续设备场景）。对齐 TUI _probeServer。
+  static Future<(bool, Map<String, String>)> probe(String server) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
     try {
       final req = await client.getUrl(Uri.parse('$server/health'));
       final res = await req.close();
-      await res.drain<void>();
-      return res.statusCode == 200;
+      final body = await res.transform(utf8.decoder).join();
+      if (res.statusCode != 200) return (false, <String, String>{});
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      final raw = json['person_names'] as Map<String, dynamic>? ?? <String, dynamic>{};
+      final names = <String, String>{for (final e in raw.entries) e.key: e.value as String};
+      return (true, names);
     } catch (_) {
-      return false;
+      return (false, <String, String>{});
     } finally {
       client.close(force: true);
     }

@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -31,7 +30,8 @@ class SetupPage extends StatefulWidget {
   final LocalDatabase? db;
 
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 ServerSettings.probe。
-  final Future<bool> Function(String server)? probeServer;
+  /// 返回 (能连, person 名称表)——空表=首设备（create），非空=后续设备（join）。
+  final Future<(bool, Map<String, String>)> Function(String server)? probeServer;
 
   /// 测试注入：登记设备（生产走真实 ApiClient.enrollDevice；注入后不发起网络请求）。
   final Future<EnrollResult> Function(String? inviteCode)? enrollOverride;
@@ -45,6 +45,7 @@ class SetupPage extends StatefulWidget {
 
 class _SetupPageState extends State<SetupPage> {
   final _deviceId = TextEditingController(text: 'dev-mobile');
+  final _personName = TextEditingController(); // 首设备：第一个用户的名字
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _sealedKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -64,6 +65,13 @@ class _SetupPageState extends State<SetupPage> {
   String? _status;
   bool _busy = false;
 
+  /// 探测到的 person 名称表（服务端 /health 返回）：
+  /// 空 = 服务器还没有任何用户（首设备场景）；非空 = 已有用户（后续设备场景）。
+  Map<String, String> _personNames = <String, String>{};
+
+  /// 后续设备引导中选择的身份（personA/personB；null = 首设备自举或未选）。
+  String? _chosenPerson;
+
   /// 设备登记结果（服务端分配的真实 deviceId/personId/spaceId）。
   /// 认证（challenge）与进聊天页一律用它，不用本地临时 deviceId。
   EnrollResult? _enroll;
@@ -77,6 +85,7 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     _deviceId.dispose();
+    _personName.dispose();
     _spaceId.dispose();
     _sealedKey.dispose();
     _escrowPassphrase.dispose();
@@ -89,22 +98,45 @@ class _SetupPageState extends State<SetupPage> {
   void initState() {
     super.initState();
     _initServer();
+    _autoGenerateKey(); // 对齐 TUI：本地无设备记录即自动生成公私钥，无需用户点按钮
+  }
+
+  /// 自动生成设备密钥（本地无记录时调用；不阻塞 UI，完成后刷新设备名步骤）。
+  Future<void> _autoGenerateKey() async {
+    if (_keyPair != null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final pair = await DeviceKeyPair.generate(deviceId: _deviceId.text.trim());
+      if (!mounted) return;
+      setState(() => _keyPair = pair);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// 服务器地址初始化：读持久化值（无则默认 einz.tic.cc）→ 快速探测。
-  /// 能连 → 零打扰（不显示任何 UI）；无法连接 → 显示输入框引导覆盖（降低小白负担）。
+  /// 能连 → 按 person 名称表自动判定角色（空=首设备 create，非空=后续设备 join）；
+  /// 无法连接 → 显示输入框引导覆盖（降低小白负担）。
   Future<void> _initServer() async {
     try {
       final db = widget.db ?? LocalDatabase();
       final settings = ServerSettings(db);
       final saved = await settings.load();
       final probe = widget.probeServer ?? ServerSettings.probe;
-      final ok = await probe(saved);
+      final (ok, names) = await probe(saved);
       if (!mounted) return;
       setState(() {
         _server = saved;
         _probeFailed = !ok;
         _serverController.text = saved;
+        _personNames = names;
+        if (ok && _role == null) {
+          _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
+          _step = 1;
+        }
       });
     } catch (_) {
       // 测试环境无 path_provider/数据库实现 → 跳过探测（保持默认服务器，零打扰）
@@ -116,11 +148,16 @@ class _SetupPageState extends State<SetupPage> {
     final input = _serverController.text.trim();
     if (input.isEmpty) return;
     final probe = widget.probeServer ?? ServerSettings.probe;
-    final ok = await probe(input);
+    final (ok, names) = await probe(input);
     if (!mounted) return;
     setState(() {
       _server = input;
       _probeFailed = !ok;
+      _personNames = names;
+      if (ok && _role == null) {
+        _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
+        _step = 1;
+      }
     });
     if (ok) {
       await ServerSettings(widget.db ?? LocalDatabase()).save(input);
@@ -135,7 +172,24 @@ class _SetupPageState extends State<SetupPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(_appBarTitle(l10n))),
+      appBar: AppBar(
+        title: Text(_appBarTitle(l10n)),
+        actions: [
+          // 高级入口（sealed 导入）常驻菜单：探测自动判定角色后依然可达
+          PopupMenuButton<String>(
+            tooltip: l10n.wizardRoleAdvanced,
+            onSelected: (value) {
+              if (value == 'sealed') _selectRole(_WizardRole.advanced);
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'sealed',
+                child: Text(l10n.wizardRoleAdvanced),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -199,13 +253,11 @@ class _SetupPageState extends State<SetupPage> {
                 children: [
                   TextButton(onPressed: _backStep, child: Text(l10n.wizardBack)),
                   const Spacer(),
-                  // 步骤 1（设备名称）与 create 步骤 2（登记）的"下一步"已融合进主按钮
-                  // （动作成功后自动进入下一页）；其余步骤显示底部下一步，末步显示完成。
-                  if (_step > 1 &&
-                      _step < _stepCount - 1 &&
-                      !(_role == _WizardRole.create && _step == 2))
+                  // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
+                  // 完成页（_step == _stepCount）显示"完成"。
+                  if (_step < _stepCount)
                     FilledButton(onPressed: _nextStep, child: Text(l10n.wizardNext))
-                  else if (_step == _stepCount - 1)
+                  else
                     FilledButton(onPressed: _finish, child: Text(l10n.wizardDone)),
                 ],
               ),
@@ -217,15 +269,15 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---------- 向导框架 ----------
 
-  /// 步骤总数（按角色：create=7 / join=5 / advanced=5；未选角色=1）。
+  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / advanced=sealed）。
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 7; // role/device/whitelist/passphrase/pin/share/done
+        return 6; // name/device/passphrase/pin/share/done
       case _WizardRole.join:
-        return 5; // role/device/join/pin/done
+        return 6; // identity/device/invite/passphrase/pin/done
       case _WizardRole.advanced:
-        return 5; // role/device/sealed/pin/done
+        return 4; // device/sealed/pin/done
       case null:
         return 1;
     }
@@ -237,8 +289,8 @@ class _SetupPageState extends State<SetupPage> {
     switch (_role!) {
       case _WizardRole.create:
         switch (_step) {
-          case 1: return l10n.wizardStepDevice;
-          case 2: return l10n.wizardStepEnroll;
+          case 1: return l10n.wizardStepName;
+          case 2: return l10n.wizardStepDevice;
           case 3: return l10n.wizardStepPassphrase;
           case 4: return l10n.wizardStepPin;
           case 5: return l10n.wizardStepShare;
@@ -246,9 +298,11 @@ class _SetupPageState extends State<SetupPage> {
         }
       case _WizardRole.join:
         switch (_step) {
-          case 1: return l10n.wizardStepDevice;
-          case 2: return l10n.wizardStepJoin;
-          case 3: return l10n.wizardStepPin;
+          case 1: return l10n.wizardStepIdentity;
+          case 2: return l10n.wizardStepDevice;
+          case 3: return l10n.wizardStepInvite;
+          case 4: return l10n.wizardStepPassphrase;
+          case 5: return l10n.wizardStepPin;
           default: return l10n.wizardStepDone;
         }
       case _WizardRole.advanced:
@@ -302,27 +356,32 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  void _nextStep() {
+  /// join 步骤 1：选择身份（personA=创建者 / personB=伴侣），留在 join 流程继续。
+  /// 与 TUI 引导一致：先定身份（并按需设置名字），再问设备名、邀请码、口令。
+  void _selectIdentity(String person) {
+    setState(() {
+      _chosenPerson = person;
+      _status = null;
+    });
+  }
+
+  Future<void> _nextStep() async {
     final l10n = AppLocalizations.of(context)!;
     // 按步骤前置校验（每步只要求一个信息）
-    if (_step == 1 && _keyPair == null) {
-      setState(() => _status = l10n.setupPageGenKeyFirst);
+    if (_role == _WizardRole.join && _step == 1 && _chosenPerson == null) {
+      setState(() => _status = l10n.wizardIdentityFirst);
       return;
     }
-    if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
-      setState(() => _status = l10n.wizardEnrollFirst);
+    if (_role == _WizardRole.join && _step == 3 && _inviteCode.text.trim().isEmpty) {
+      setState(() => _status = l10n.setupPageNeedInvite);
       return;
     }
     if (_role == _WizardRole.create && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
       setState(() => _status = l10n.setupPageNeedPassphrase);
       return;
     }
-    if (_role == _WizardRole.join &&
-        _step == 2 &&
-        (_spaceId.text.trim().isEmpty ||
-            _escrowPassphrase.text.trim().isEmpty ||
-            _inviteCode.text.trim().isEmpty)) {
-      setState(() => _status = l10n.setupPageEscrowFillAll);
+    if (_role == _WizardRole.join && _step == 4 && _escrowPassphrase.text.trim().isEmpty) {
+      setState(() => _status = l10n.setupPageNeedPassphrase);
       return;
     }
     if (_role == _WizardRole.advanced && _step == 2) {
@@ -335,8 +394,14 @@ class _SetupPageState extends State<SetupPage> {
         return;
       }
     }
+    // create 步骤 2（设备名）→ 自动自举登记（对齐 TUI"设备与空间绑定中"），成功才进口令步骤
+    if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
+      await _runBootstrap();
+      if (!mounted) return;
+      if (_enroll == null) return; // 自举失败：留在本步展示错误/改用加入
+    }
     setState(() {
-      if (_step < _stepCount - 1) _step++;
+      if (_step < _stepCount) _step++; // done 页 = _stepCount（如 create/join 第 6 步）
     });
   }
 
@@ -348,14 +413,14 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 按角色+步骤分发到对应步骤页。
   Widget _buildStep() {
-    if (_role == null || _step == 0) return _buildChooseRole();
+    if (_role == null || _step == 0) return _buildDetectAndSealed();
     switch (_role!) {
       case _WizardRole.create:
         switch (_step) {
           case 1:
-            return _buildStepDevice();
+            return _buildStepName();
           case 2:
-            return _buildStepEnroll();
+            return _buildStepDevice();
           case 3:
             return _buildStepPassphrase();
           case 4:
@@ -368,10 +433,14 @@ class _SetupPageState extends State<SetupPage> {
       case _WizardRole.join:
         switch (_step) {
           case 1:
-            return _buildStepDevice();
+            return _buildStepIdentity();
           case 2:
-            return _buildStepJoin();
+            return _buildStepDevice();
           case 3:
+            return _buildStepInvite();
+          case 4:
+            return _buildStepPassphrase();
+          case 5:
             return _buildStepPin();
           default:
             return _buildStepDone();
@@ -390,36 +459,29 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 第 0 步：角色选择（创建 / 加入 / 高级折叠）。
-  Widget _buildChooseRole() {
+  /// 第 0 步（角色未判定时）：显示探测状态（sealed 高级入口在 AppBar 菜单，常驻可达）。
+  /// 角色由服务器探测自动判定（person 名称表空=首设备 create，非空=后续设备 join），
+  /// 不再让用户手动选择。
+  Widget _buildDetectAndSealed() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardRoleTitle,
+        Text(l10n.wizardDetectTitle,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 16),
-        _roleCard(l10n.wizardRoleCreate, Icons.add_circle_outline, _WizardRole.create),
         const SizedBox(height: 8),
-        _roleCard(l10n.wizardRoleJoin, Icons.qr_code_scanner, _WizardRole.join),
-        const SizedBox(height: 8),
-        ExpansionTile(
-          title: Text(l10n.wizardRoleAdvanced, style: const TextStyle(fontSize: 14)),
-          children: [
-            _roleCard(l10n.wizardRoleAdvanced, Icons.key, _WizardRole.advanced),
-          ],
-        ),
+        Text(_probeFailed ? l10n.wizardDetectFailed : l10n.wizardDetectHint,
+            style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        const SizedBox(height: 12),
+        if (!_probeFailed) ...[
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        ],
       ],
-    );
-  }
-
-  Widget _roleCard(String text, IconData icon, _WizardRole role) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(text),
-        onTap: () => _selectRole(role),
-      ),
     );
   }
 
@@ -451,6 +513,8 @@ class _SetupPageState extends State<SetupPage> {
             deviceId: null, // 服务端分配规范 id（dev1/dev2…），以登记返回为准
             publicKey: kp.publicKeyB64,
             inviteCode: inviteCode,
+            personName: _personName.text.trim(), // 首设备：第一个用户的名字；后续设备按需
+            personId: _chosenPerson, // join：用户选择的身份（personA/personB）
             deviceName: _deviceId.text.trim(),
           );
     if (!mounted) return;
@@ -511,10 +575,98 @@ class _SetupPageState extends State<SetupPage> {
     ));
   }
 
-  // ---- 场景 A（create）：设备名 → 登记（自动自举）→ 口令 → PIN → 分享 → 完成 ----
+  // ---- 场景 A（create）：名字 → 设备名 → 口令 → PIN → 分享 → 完成 ----
 
-  /// 步骤 1：设备名称 + 生成设备密钥（生成结果在本页明确反馈）。
-  /// 融合按钮：点击生成密钥并自动进入下一步（对齐 TUI 引导"输入名称即继续"的线性流程）。
+  /// 步骤 1（create）：第一个用户的名字（对齐 TUI 引导问答顺序：先名字后设备名）。
+  Widget _buildStepName() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l10n.wizardNameHint, style: const TextStyle(fontSize: 14)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _personName,
+          decoration: InputDecoration(
+            labelText: l10n.wizardNameLabel,
+            hintText: l10n.wizardNameHintInput,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---- 场景 B（join）：身份 → 设备名 → 邀请码 → 口令 → PIN → 完成 ----
+
+  /// 步骤 1（join）：你是第一个用户（创建者 personA）还是第二个（伴侣 personB）。
+  /// 与 TUI 引导顺序一致：先定身份（并按需设置名字），再问设备名。
+  Widget _buildStepIdentity() {
+    final l10n = AppLocalizations.of(context)!;
+    final aName = _personNames['personA'] ?? '';
+    final bName = _personNames['personB'] ?? '尚未加入的伴侣';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l10n.wizardIdentityHint, style: const TextStyle(fontSize: 14)),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: Icon(Icons.person),
+            title: Text('1 · ${l10n.wizardIdentityCreator}（$aName）'),
+            selected: _chosenPerson == 'personA',
+            onTap: () => _selectIdentity('personA'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: Icon(Icons.group),
+            title: Text('2 · ${l10n.wizardIdentityPartner}（$bName）'),
+            selected: _chosenPerson == 'personB',
+            onTap: () => _selectIdentity('personB'),
+          ),
+        ),
+        if (_chosenPerson == 'personB' && bName.isEmpty) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _personName,
+            decoration: InputDecoration(
+              labelText: l10n.wizardNameLabel,
+              hintText: l10n.wizardNameHintInput,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 步骤 3（join）：输入一次性邀请码（创建者 /invite 生成，24h 有效）。
+  Widget _buildStepInvite() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l10n.wizardInviteHint, style: const TextStyle(fontSize: 14)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _inviteCode,
+          decoration: InputDecoration(
+            labelText: l10n.setupPageInviteLabel,
+            hintText: l10n.setupPageInviteHint,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 登记设备：create=首设备免邀请码自举；join/advanced=凭一次性邀请码。
+  /// 成功 → 记录 [_enroll]（真实 deviceId/personId/spaceId）并同步 spaceId。
+  /// 设备名称步骤（create=步骤2 / join=步骤2 / advanced=步骤1）。
+  /// 密钥已由 [_autoGenerateKey] 自动生成（对齐 TUI），此处只填设备名；
+  /// create 自举失败时展示"改用加入"引导（服务器已有空间的竞态兜底）。
   Widget _buildStepDevice() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -527,13 +679,6 @@ class _SetupPageState extends State<SetupPage> {
             hintText: l10n.setupPageDeviceIdHint,
             border: const OutlineInputBorder(),
           ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _busy ? null : _generateKeyAndNext,
-          child: _busy
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(_keyPair != null ? l10n.wizardNext : l10n.setupPageGenerateKey),
         ),
         if (_keyPair != null) ...[
           const SizedBox(height: 12),
@@ -556,70 +701,7 @@ class _SetupPageState extends State<SetupPage> {
             ),
           ),
         ],
-      ],
-    );
-  }
-
-  /// 融合按钮：未生成密钥 → 生成后自动进入下一步；已生成（返回本步）→ 直接下一步。
-  Future<void> _generateKeyAndNext() async {
-    if (_busy) return;
-    if (_keyPair == null) {
-      await _generateKeyPair();
-      if (!mounted) return;
-    }
-    if (_keyPair == null) return; // 生成失败：留在本页展示错误
-    _nextStep();
-  }
-
-  Future<void> _generateKeyPair() async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _status = null;
-    });
-    try {
-      final pair = await DeviceKeyPair.generate(deviceId: _deviceId.text.trim());
-      if (!mounted) return;
-      setState(() {
-        _keyPair = pair;
-        _status = AppLocalizations.of(context)!.setupPageKeyGenerated;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  /// 步骤 2（create）：登记设备（全自动，替代旧版手动加 config.json 白名单）。
-  Widget _buildStepEnroll() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(l10n.wizardEnrollHint, style: const TextStyle(fontSize: 14)),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _busy ? null : _runBootstrapAndNext,
-          child: _busy
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(l10n.wizardEnrollAction),
-        ),
-        if (_enroll != null) ...[
-          const SizedBox(height: 12),
-          Card(
-            color: Colors.green.shade50,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: SelectableText(
-                l10n.wizardEnrollDone(_enroll!.deviceId, _enroll!.spaceId),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-          ),
-        ],
-        if (_bootstrapFailed) ...[
+        if (_role == _WizardRole.create && _bootstrapFailed) ...[
           const SizedBox(height: 12),
           Card(
             color: Colors.amber.shade50,
@@ -667,14 +749,6 @@ class _SetupPageState extends State<SetupPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  /// 融合按钮：登记成功后自动进入下一步（口令步骤）；失败留在本页展示错误/改用加入。
-  Future<void> _runBootstrapAndNext() async {
-    if (_busy) return;
-    await _runBootstrap();
-    if (!mounted) return;
-    if (_enroll != null && !_bootstrapFailed) _nextStep();
   }
 
   /// 步骤 3：设置接入口令（对方凭它加入）。
@@ -875,79 +949,15 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  // ---- 场景 B（join）：扫码/口令加入 ----
+  // ---- 场景 B（join）：身份 → 设备名 → 邀请码 → 口令 → PIN → 完成 ----
 
-  /// 步骤 2（join）：扫码或粘贴加入信息（自动填入空间 ID 与口令）。
-  Widget _buildStepJoin() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(l10n.wizardJoinHint, style: const TextStyle(fontSize: 14)),
-        const SizedBox(height: 12),
-        FilledButton.tonal(
-          onPressed: _busy ? null : _scanJoinCode,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.qr_code_scanner),
-              const SizedBox(width: 8),
-              Text(l10n.scanJoinTitle),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _spaceId,
-          decoration: InputDecoration(
-            labelText: l10n.setupPageSpaceIdLabel,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _escrowPassphrase,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: l10n.setupPageEscrowLabel,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _inviteCode,
-          decoration: InputDecoration(
-            labelText: l10n.setupPageInviteLabel,
-            hintText: l10n.setupPageInviteHint,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 扫码加入：扫描 A 的二维码 → 自动填入空间 ID、口令与邀请码。
-  Future<void> _scanJoinCode() async {
-    final l10n = AppLocalizations.of(context)!;
-    final info = await Navigator.of(context).push<JoinInfo>(
-      MaterialPageRoute(builder: (_) => const _JoinScanPage()),
-    );
-    if (info == null || !mounted) return;
-    _spaceId.text = info.spaceId;
-    _escrowPassphrase.text = info.passphrase;
-    _inviteCode.text = info.inviteCode ?? '';
-    setState(() => _status = null);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.scanJoinFound)));
-  }
-
-  /// join：认证 → 拉取口令托管包 → 口令解密出 Space Key → 设置 PIN → 完成步骤。
+  /// join：凭邀请码登记 → 认证 → 拉取口令托管包 → 口令解密出 Space Key → 设置 PIN → 完成。
   Future<void> _runJoinAccess() async {
     final kp = _keyPair;
     if (kp == null) return;
-    final spaceId = _spaceId.text.trim();
     final passphrase = _escrowPassphrase.text.trim();
-    if (spaceId.isEmpty || passphrase.isEmpty) {
-      setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFillAll);
+    if (passphrase.isEmpty) {
+      setState(() => _status = AppLocalizations.of(context)!.setupPageNeedPassphrase);
       return;
     }
     setState(() {
@@ -985,7 +995,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (ok) {
         setState(() {
-          _step = 4;
+          _step = _stepCount; // join 完成页（第 6 步）
           _status = null;
         });
       }
@@ -1267,57 +1277,6 @@ class _SetPinDialogState extends State<SetPinDialog> {
         Text(l10n.setPinDialogRecoveryWarning,
             style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
-    );
-  }
-}
-
-/// 扫码加入页（B 端）：MobileScanner 懒构造——进入页面才实例化
-/// （widget 测试不进入此页，不触碰原生相机通道）。
-class _JoinScanPage extends StatefulWidget {
-  const _JoinScanPage();
-
-  @override
-  State<_JoinScanPage> createState() => _JoinScanPageState();
-}
-
-class _JoinScanPageState extends State<_JoinScanPage> {
-  late final MobileScannerController _controller = MobileScannerController();
-  bool _handled = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onDetect(BarcodeCapture capture) {
-    if (_handled) return;
-    for (final b in capture.barcodes) {
-      final raw = b.rawValue;
-      if (raw == null) continue;
-      final info = JoinInfo.decode(raw);
-      if (info != null) {
-        _handled = true;
-        Navigator.of(context).pop(info);
-        return;
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.scanJoinTitle)),
-      body: Column(
-        children: [
-          Expanded(child: MobileScanner(controller: _controller, onDetect: _onDetect)),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(l10n.scanJoinHint, style: const TextStyle(fontSize: 13)),
-          ),
-        ],
-      ),
     );
   }
 }
