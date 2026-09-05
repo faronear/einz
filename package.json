@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "server-new-local": "cd server && rm -fr data/app.db* && npm run start",
-    "server-new": "cd deployment; git pull; rm -fr data/app.db*; docker compose up -d --build server; docker compose logs -f server",
+    "server-new": "cd deployment; git pull; rm -fr data/app.db*; docker compose down; docker compose up -d; docker compose logs -f server",
     "tui1-new-local": "cd cli && rm -f demo/s1.json && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
     "tui1-local": "cd cli && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
     "tui2-new-local": "cd cli && rm -f demo/s2.json && dart run bin/einz_tui.dart --store demo/s2.json --server http://localhost:3000",
