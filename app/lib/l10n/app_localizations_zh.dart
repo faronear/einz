@@ -131,6 +131,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectTitle => '正在检测服务器状态…';
 
   @override
+  String setupPageServerBar(Object server) {
+    return '服务器：$server';
+  }
+
+  @override
   String get wizardDetectHint => '自动判断你是第几个用户（首个设备将创建空间）';
 
   @override

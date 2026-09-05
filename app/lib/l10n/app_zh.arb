@@ -54,6 +54,7 @@
   "scanJoinFound": "已识别加入信息，空间与口令已自动填入",
   "wizardRoleTitle": "选择你的情况",
   "wizardDetectTitle": "正在检测服务器状态…",
+  "setupPageServerBar": "服务器：{server}",
   "wizardDetectHint": "自动判断你是第几个用户（首个设备将创建空间）",
   "wizardDetectFailed": "无法连接服务器，请在上方输入地址后重试",
   "wizardNameHint": "这是你的第一个设备，先告诉我们要怎么称呼你（之后可随时 /改名）。",

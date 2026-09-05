@@ -195,6 +195,10 @@ class _SetupPageState extends State<SetupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 当前服务器地址：每个页面顶部常驻显示（AppBar 标题正下方）
+            Text(l10n.setupPageServerBar(_server),
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
             // 服务器探测失败 → 顶部引导卡片（能连时完全不显示，零打扰）
             if (_probeFailed) ...[
               Card(

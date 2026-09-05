@@ -54,6 +54,7 @@
   "scanJoinFound": "Join info recognized — space & passphrase filled in",
   "wizardRoleTitle": "How do you want to set up?",
   "wizardDetectTitle": "Checking server status…",
+  "setupPageServerBar": "Server: {server}",
   "wizardDetectHint": "We'll detect whether you're the first user (first device creates the space)",
   "wizardDetectFailed": "Cannot reach server — enter the address above and retry",
   "wizardNameHint": "This is your first device. Tell us what to call you (you can rename anytime).",
