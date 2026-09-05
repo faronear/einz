@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
+import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
@@ -30,6 +31,10 @@ class _FakeApi extends ApiClient {
 }
 
 void main() {
+  setUpAll(() async {
+    await sodium(); // setPin 的 Argon2id/XChaCha20 需要 libsodium
+  });
+
   testWidgets('顶栏菜单→本机PIN→返回 不崩溃（_dependents.isEmpty 回归）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -67,5 +72,52 @@ void main() {
     await tester.pumpAndSettle();
     // 不应有任何异常（复现 _dependents.isEmpty 崩溃则此处失败）
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('本机PIN→输入有效PIN→点设置 不崩溃且锁已落盘', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 打开菜单 → 本机 PIN
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('本机 PIN'));
+    await tester.pumpAndSettle();
+    expect(find.text('设置启动锁'), findsOneWidget);
+
+    // 输入有效 PIN（两次一致）——限定在弹窗内查找，避免匹配聊天页消息输入框
+    final pinFields =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(pinFields.at(0), '123456');
+    await tester.enterText(pinFields.at(1), '123456');
+    // 点"设置 PIN"
+    await tester.tap(find.text('设置 PIN'));
+    await tester.pumpAndSettle();
+
+    // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
+    expect(tester.takeException(), isNull);
+    // 弹窗应已关闭，锁已落盘
+    expect(find.text('设置启动锁'), findsNothing);
+    expect(await AppLockService(db).isSetup, true);
   });
 }

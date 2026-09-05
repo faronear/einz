@@ -295,10 +295,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 补设/重设启动锁（跳过 PIN 后某天想设置时用；复用 PIN 表单）。
   /// 用当前会话的 Space Key 包 setPin 加密落盘（内部会清掉明文副本）。
   Future<void> _showSetLockDialog() async {
-    final l10n = AppLocalizations.of(context)!;
-    final pinCtrl = TextEditingController();
-    final confirmCtrl = TextEditingController();
-    String? error;
     final payload = AppLockPayload(
       server: widget.server,
       spaceId: widget.spaceId,
@@ -308,72 +304,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       token: widget.token,
       escrowPassphrase: widget.escrowPassphrase,
     );
+    // 弹窗内容抽为 _SetLockDialog（StatefulWidget）：controller 生命周期随 State
+    // 卸载同步释放，避免"点设置后 dispose 竞态"（TextField 卸载动画中向已销毁
+    // controller 加 listener → debugAssertNotDisposed / _dependents.isEmpty 红屏，
+    // 2026-09-05 真机定位）。
     await showDialog<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(l10n.chatPageSetLockTitle),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: pinCtrl,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.setPinDialogPinLabel,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: confirmCtrl,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.setPinDialogConfirmLabel,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              if (error != null) ...[
-                const SizedBox(height: 8),
-                Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.cancel)),
-            FilledButton(
-              onPressed: () async {
-                final pin = pinCtrl.text;
-                if (pin.length < 4) {
-                  setDialogState(() => error = l10n.setPinDialogPinTooShort);
-                  return;
-                }
-                if (pin != confirmCtrl.text) {
-                  setDialogState(() => error = l10n.setPinDialogPinMismatch);
-                  return;
-                }
-                try {
-                  // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
-                  final messenger = ScaffoldMessenger.of(context);
-                  await AppLockService(widget.db ?? LocalDatabase()).setPin(pin, payload: payload);
-                  if (!ctx.mounted) return;
-                  Navigator.of(ctx).pop();
-                  messenger.showSnackBar(
-                      SnackBar(content: Text(l10n.chatPageSetLockDone)));
-                } catch (e) {
-                  setDialogState(() => error = l10n.setPinDialogSetupFailed('$e'));
-                }
-              },
-              child: Text(l10n.setPinDialogSetPin),
-            ),
-          ],
-        ),
+      builder: (_) => _SetLockDialog(
+        payload: payload,
+        db: widget.db ?? LocalDatabase(),
       ),
     );
-    pinCtrl.dispose();
-    confirmCtrl.dispose();
   }
 
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
@@ -1109,6 +1050,96 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 补设/重设启动锁弹窗（StatefulWidget）：controller 生命周期随 State 卸载同步释放，
+/// 避免"点设置后 dispose 竞态"（TextField 卸载动画中向已销毁 controller 加 listener
+/// → debugAssertNotDisposed / _dependents.isEmpty 红屏，2026-09-05 真机定位）。
+class _SetLockDialog extends StatefulWidget {
+  const _SetLockDialog({required this.payload, required this.db});
+
+  final AppLockPayload payload;
+  final LocalDatabase db;
+
+  @override
+  State<_SetLockDialog> createState() => _SetLockDialogState();
+}
+
+class _SetLockDialogState extends State<_SetLockDialog> {
+  final _pinCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _pinCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
+    final pin = _pinCtrl.text;
+    if (pin.length < 4) {
+      setState(() => _error = l10n.setPinDialogPinTooShort);
+      return;
+    }
+    if (pin != _confirmCtrl.text) {
+      setState(() => _error = l10n.setPinDialogPinMismatch);
+      return;
+    }
+    try {
+      // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
+      final messenger = ScaffoldMessenger.of(context);
+      await AppLockService(widget.db).setPin(pin, payload: widget.payload);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(SnackBar(content: Text(l10n.chatPageSetLockDone)));
+    } catch (e) {
+      if (!mounted) return; // 弹窗可能已被关闭（barrier/返回），避免 setState on disposed
+      setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.chatPageSetLockTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _pinCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.setPinDialogPinLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _confirmCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.setPinDialogConfirmLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
+        FilledButton(onPressed: _submit, child: Text(l10n.setPinDialogSetPin)),
+      ],
     );
   }
 }
