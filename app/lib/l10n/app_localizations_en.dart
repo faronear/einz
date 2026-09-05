@@ -385,6 +385,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageSetLockTitle => 'Set app lock';
+
+  @override
+  String get chatPageSetLockTooltip => 'Set app lock';
+
+  @override
+  String get chatPageSetLockDone =>
+      'App lock set — PIN required at next launch';
+
+  @override
   String get chatPageBurnHeading => 'Burn-after (only affects this device)';
 
   @override

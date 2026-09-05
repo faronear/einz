@@ -75,4 +75,39 @@ void main() {
     await expectLater(lock.unlock('1234'), throwsA(isA<AppLockException>()),
         reason: '锁包已删，原 PIN 不应再能解锁');
   });
+
+  test('跳过 PIN：savePlain 后 hasConfig=true、loadPlain 返回 payload，明文不算设锁', () async {
+    expect(await lock.hasConfig, false);
+    await lock.savePlain(payload);
+    expect(await lock.hasConfig, true, reason: '跳过 PIN 也算已配置（下次直接进聊天）');
+    expect(await lock.isSetup, false, reason: '明文不算设锁（仍需走免打扰路径）');
+
+    final loaded = await lock.loadPlain();
+    expect(loaded, isNotNull);
+    expect(loaded!.spaceId, 'space-test');
+    expect(loaded.spaceKeyB64, 'dGhlLXNwYWNlLWtleQ==');
+  });
+
+  test('补设 PIN 后明文副本清除：setPin 覆盖 savePlain', () async {
+    await lock.savePlain(payload);
+    expect(await lock.loadPlain(), isNotNull);
+
+    await lock.setPin('1234', payload: payload);
+    expect(await lock.isSetup, true);
+    expect(await lock.loadPlain(), isNull, reason: 'setPin 后不应再保留明文副本');
+    // 之后只能 PIN 解锁（无锁路径不再可用）
+    final unlocked = await lock.unlock('1234');
+    expect(unlocked.spaceId, 'space-test');
+  });
+
+  test('clearPlain / clear：清除明文配置后 hasConfig=false', () async {
+    await lock.savePlain(payload);
+    expect(await lock.hasConfig, true);
+    await lock.clearPlain();
+    expect(await lock.hasConfig, false, reason: 'clearPlain 只清无锁配置');
+
+    await lock.savePlain(payload);
+    await lock.clear();
+    expect(await lock.hasConfig, false, reason: 'clear 清空全部（含明文）');
+  });
 }

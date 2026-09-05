@@ -322,6 +322,90 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 补设/重设启动锁（跳过 PIN 后某天想设置时用；复用 PIN 表单）。
+  /// 用当前会话的 Space Key 包 setPin 加密落盘（内部会清掉明文副本）。
+  Future<void> _showSetLockDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final pinCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    String? error;
+    final payload = AppLockPayload(
+      server: widget.server,
+      spaceId: widget.spaceId,
+      deviceId: widget.deviceId,
+      spaceKeyB64: base64Encode(widget.spaceKey),
+      keyVersion: widget.keyVersion,
+      token: widget.token,
+      escrowPassphrase: widget.escrowPassphrase,
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(l10n.chatPageSetLockTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: pinCtrl,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: l10n.setPinDialogPinLabel,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmCtrl,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: l10n.setPinDialogConfirmLabel,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.cancel)),
+            FilledButton(
+              onPressed: () async {
+                final pin = pinCtrl.text;
+                if (pin.length < 4) {
+                  setDialogState(() => error = l10n.setPinDialogPinTooShort);
+                  return;
+                }
+                if (pin != confirmCtrl.text) {
+                  setDialogState(() => error = l10n.setPinDialogPinMismatch);
+                  return;
+                }
+                try {
+                  // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
+                  final messenger = ScaffoldMessenger.of(context);
+                  await AppLockService(widget.db ?? LocalDatabase()).setPin(pin, payload: payload);
+                  if (!ctx.mounted) return;
+                  Navigator.of(ctx).pop();
+                  messenger.showSnackBar(
+                      SnackBar(content: Text(l10n.chatPageSetLockDone)));
+                } catch (e) {
+                  setDialogState(() => error = l10n.setPinDialogSetupFailed('$e'));
+                }
+              },
+              child: Text(l10n.setPinDialogSetPin),
+            ),
+          ],
+        ),
+      ),
+    );
+    pinCtrl.dispose();
+    confirmCtrl.dispose();
+  }
+
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
   Future<void> _showBurnPicker() async {
     final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
@@ -947,6 +1031,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             icon: const Icon(Icons.group_add),
             tooltip: '邀请设备 / Invite',
             onPressed: _showInviteDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.lock_outline),
+            tooltip: l10n.chatPageSetLockTooltip,
+            onPressed: _showSetLockDialog,
           ),
         ],
       ),

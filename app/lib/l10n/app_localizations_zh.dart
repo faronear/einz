@@ -358,6 +358,15 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageSetLockTitle => '设置启动锁';
+
+  @override
+  String get chatPageSetLockTooltip => '设置启动锁';
+
+  @override
+  String get chatPageSetLockDone => '启动锁已设置，下次启动需 PIN 解锁';
+
+  @override
   String get chatPageBurnHeading => '阅后即焚（仅本设备生效）';
 
   @override

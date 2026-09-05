@@ -740,6 +740,24 @@ abstract class AppLocalizations {
   /// **'Switched to {label}'**
   String chatPageLocaleSwitched(String label);
 
+  /// No description provided for @chatPageSetLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set app lock'**
+  String get chatPageSetLockTitle;
+
+  /// No description provided for @chatPageSetLockTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Set app lock'**
+  String get chatPageSetLockTooltip;
+
+  /// No description provided for @chatPageSetLockDone.
+  ///
+  /// In en, this message translates to:
+  /// **'App lock set — PIN required at next launch'**
+  String get chatPageSetLockDone;
+
   /// No description provided for @chatPageBurnHeading.
   ///
   /// In en, this message translates to:

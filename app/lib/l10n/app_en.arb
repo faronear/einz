@@ -159,6 +159,9 @@
     }
   },
   "chatPageLocaleSwitched": "Switched to {label}",
+  "chatPageSetLockTitle": "Set app lock",
+  "chatPageSetLockTooltip": "Set app lock",
+  "chatPageSetLockDone": "App lock set — PIN required at next launch",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}

@@ -159,6 +159,9 @@
     }
   },
   "chatPageLocaleSwitched": "已切换：{label}",
+  "chatPageSetLockTitle": "设置启动锁",
+  "chatPageSetLockTooltip": "设置启动锁",
+  "chatPageSetLockDone": "启动锁已设置，下次启动需 PIN 解锁",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}

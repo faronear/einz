@@ -24,7 +24,7 @@ enum _WizardRole { create, join, advanced }
 /// - advanced：sealed 密封副本导入（同样先凭邀请码登记）。
 /// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {
-  const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride});
+  const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride, this.authOverride});
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -38,6 +38,10 @@ class SetupPage extends StatefulWidget {
 
   /// 测试注入：生成邀请码（生产走真实 ApiClient.createInvite）。
   final Future<InviteResult> Function(String personId)? createInviteOverride;
+
+  /// 测试注入：challenge-response 认证（生产走真实 ApiClient.challenge/verify；
+  /// 注入后不发起网络请求，供 golden 走 PIN/跳过路径）。
+  final Future<SessionResult> Function(DeviceKeyPair kp, String enrolledDeviceId)? authOverride;
 
   @override
   State<SetupPage> createState() => _SetupPageState();
@@ -563,6 +567,10 @@ class _SetupPageState extends State<SetupPage> {
   /// challenge-response 认证，返回 session（PROTOCOL.md §4）。
   /// [enrolledDeviceId] 用登记后服务端分配的真实 id（challenge 要求设备已入网）。
   Future<SessionResult> _authenticate(DeviceKeyPair kp, String enrolledDeviceId) async {
+    // 测试注入优先（golden 走 PIN/跳过路径时避免真实网络请求）
+    if (widget.authOverride != null) {
+      return widget.authOverride!(kp, enrolledDeviceId);
+    }
     final s = await sodium();
     final api = ApiClient(_server);
     final challenge = await api.challenge(enrolledDeviceId);
@@ -599,8 +607,8 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 设置启动锁：内嵌表单直接执行（不再弹窗、无恢复码）——
-  /// 校验 PIN 两次一致 → AppLockService.setPin 加密 Space Key 包 →
-  /// 上传口令托管包（失败不阻塞）→ 返回是否完成。
+  /// 校验 PIN 两次一致 → AppLockService.setPin 加密 Space Key 包 → 返回是否完成。
+  /// （口令托管上传已与 PIN 解耦：由各 _run* 在设锁/跳过之前统一上传，见 _runPinSetup）
   Future<bool> _setupLockAndEnter({
     required String server,
     required String spaceId,
@@ -631,10 +639,6 @@ class _SetupPageState extends State<SetupPage> {
         escrowPassphrase: escrowPassphrase,
       );
       await AppLockService(widget.db ?? LocalDatabase()).setPin(pin, payload: payload);
-      final pass = escrowPassphrase?.trim() ?? '';
-      if (pass.isNotEmpty) {
-        await _uploadEscrow(pass, payload);
-      }
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -932,9 +936,32 @@ class _SetupPageState extends State<SetupPage> {
         token = session.sessionToken;
         _sessionToken = token;
       }
-      // 3) 设置 PIN（含接入口令 → 上传托管）；确认"暂不设置"时跳过设锁，直接进分享
+      // 3) 口令托管上传（与 PIN 无关：设锁或跳过都必须传，否则同伴无法凭口令加入）
+      final pass = _escrowPassphrase.text.trim();
+      if (pass.isNotEmpty) {
+        final escrowPayload = AppLockPayload(
+          server: _server,
+          spaceId: _spaceId.text.trim(),
+          deviceId: kp.deviceId,
+          spaceKeyB64: base64Encode(_spaceKey!),
+          keyVersion: 1,
+          token: token,
+          escrowPassphrase: pass,
+        );
+        await _uploadEscrow(pass, escrowPayload);
+      }
+      // 4) 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
       if (_pinSkipped) {
         if (!mounted) return;
+        await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
+          server: _server,
+          spaceId: _spaceId.text.trim(),
+          deviceId: kp.deviceId,
+          spaceKeyB64: base64Encode(_spaceKey!),
+          keyVersion: 1,
+          token: token,
+          escrowPassphrase: pass,
+        ));
         setState(() {
           _step = 5;
           _status = null;
@@ -948,7 +975,7 @@ class _SetupPageState extends State<SetupPage> {
         spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: 1,
         token: token,
-        escrowPassphrase: _escrowPassphrase.text.trim(),
+        escrowPassphrase: pass,
       );
       if (!mounted) return;
       if (ok) {
@@ -1113,8 +1140,18 @@ class _SetupPageState extends State<SetupPage> {
       _spaceKey = base64Decode(payload.spaceKeyB64);
       _spaceId.text = payload.spaceId;
       if (!mounted) return;
-      // 3) 设置 PIN；确认"暂不设置"时跳过设锁，直接进完成页
+      // 3) 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
       if (_pinSkipped) {
+        if (!mounted) return;
+        await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
+          server: _server,
+          spaceId: payload.spaceId,
+          deviceId: enroll.deviceId,
+          spaceKeyB64: payload.spaceKeyB64,
+          keyVersion: payload.keyVersion,
+          token: session.sessionToken,
+          escrowPassphrase: passphrase,
+        ));
         setState(() {
           _step = _stepCount; // join 完成页（第 6 步）
           _status = null;
@@ -1208,8 +1245,17 @@ class _SetupPageState extends State<SetupPage> {
       _sessionToken = session.sessionToken;
       _spaceKey = spaceKey;
       if (!mounted) return;
-      // 3) 设置 PIN；确认"暂不设置"时跳过设锁，直接进完成页
+      // 3) 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
       if (_pinSkipped) {
+        if (!mounted) return;
+        await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
+          server: _server,
+          spaceId: enroll.spaceId,
+          deviceId: enroll.deviceId,
+          spaceKeyB64: base64Encode(spaceKey),
+          keyVersion: 1,
+          token: session.sessionToken,
+        ));
         setState(() {
           _step = 4;
           _status = null;

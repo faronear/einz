@@ -23,14 +23,45 @@ class AppLockService {
   static const _kPackage = 'app_lock.package';
   static const _kAttempts = 'app_lock.attempts';
   static const _kLockedUntil = 'app_lock.locked_until';
+  static const _kPlain = 'app_lock.plain'; // 跳过 PIN：明文 Space Key 包（仅本设备）
+  static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
 
-  /// 是否已设置启动锁。
+  /// 是否已设置启动锁（有 PIN 加密的密钥包）。
   Future<bool> get isSetup async => await _get(_kPackage) != null;
+
+  /// 本设备是否已配置（设锁或跳过均算；StartupGate 据此决定直接进聊天）。
+  Future<bool> get hasConfig async =>
+      await isSetup || await loadPlain() != null;
+
+  /// 明文保存 Space Key 包（跳过 PIN 场景）：无锁包但有此明文时，
+  /// 下次启动直接进聊天（免打扰），直到用户在聊天页补设 PIN。
+  Future<void> savePlain(AppLockPayload payload) async {
+    await _set(_kPlain, jsonEncode(payload.toJson()));
+    await _set(_kSkipped, '1');
+  }
+
+  /// 读取明文 Space Key 包（跳过 PIN 的无锁配置）；不存在返回 null。
+  Future<AppLockPayload?> loadPlain() async {
+    final raw = await _get(_kPlain);
+    if (raw == null) return null;
+    try {
+      return AppLockPayload.fromJson(jsonDecode(raw));
+    } catch (_) {
+      return null; // 明文损坏视为未配置（宁可重新引导）
+    }
+  }
+
+  /// 清除无锁配置（补设 PIN 成功后调用：不再保留明文副本）。
+  Future<void> clearPlain() async {
+    await (db.delete(db.appState)
+          ..where((s) => s.key.isIn({_kPlain, _kSkipped})))
+        .go();
+  }
 
   /// 清除本地锁与密钥包（设备被撤销时调用：回到未配置状态，防止残留密钥）。
   Future<void> clear() async {
     await (db.delete(db.appState)
-          ..where((s) => s.key.isIn({_kPackage, _kAttempts, _kLockedUntil})))
+          ..where((s) => s.key.isIn({_kPackage, _kAttempts, _kLockedUntil, _kPlain, _kSkipped})))
         .go();
   }
 
@@ -43,6 +74,7 @@ class AppLockService {
     await _set(_kPackage, jsonEncode(pkg.toJson()));
     await _set(_kAttempts, '0');
     await _set(_kLockedUntil, '0');
+    await clearPlain(); // 补设 PIN 后不再保留明文副本
   }
 
   /// 恢复码兑底已删除（老板决策）：PIN 丢失即无法解锁本设备密钥包。

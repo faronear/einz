@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
+import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
@@ -68,7 +71,8 @@ class _EinzAppState extends State<EinzApp> {
   }
 }
 
-/// 启动门：读取本地锁状态决定首屏（锁屏页 or 设置页）。
+/// 启动门：三分支——有锁包 → 锁屏页；无锁但有明文配置（跳过 PIN）→ 直接进聊天；
+/// 都无 → 设置页。
 class StartupGate extends StatefulWidget {
   const StartupGate({super.key});
 
@@ -77,7 +81,8 @@ class StartupGate extends StatefulWidget {
 }
 
 class _StartupGateState extends State<StartupGate> {
-  bool? _locked;
+  bool? _hasLock; // 有 PIN 加密锁包
+  AppLockPayload? _plain; // 无锁配置（跳过 PIN 的明文 payload）
 
   @override
   void initState() {
@@ -89,23 +94,45 @@ class _StartupGateState extends State<StartupGate> {
     try {
       final lock = AppLockService(LocalDatabase());
       final hasLock = await lock.isSetup;
+      // 无锁包时读明文配置（跳过 PIN 的无锁场景：下次启动直接进聊天）
+      final plain = hasLock ? null : await lock.loadPlain();
       if (!mounted) return;
-      setState(() => _locked = hasLock);
+      setState(() {
+        _hasLock = hasLock;
+        _plain = plain;
+      });
     } catch (e) {
-      // 本地锁查询失败（如 SQLite 锁竞争/初始化异常）→ 降级为"未设置锁"进设置向导，
+      // 本地锁查询失败（如 SQLite 锁竞争/初始化异常）→ 降级为"未配置"进设置向导，
       // 避免无限停留在启动转环页（main 加载页无错误出口）
       debugPrint('StartupGate 锁状态查询失败，降级为未配置: $e');
       if (!mounted) return;
-      setState(() => _locked = false);
+      setState(() {
+        _hasLock = false;
+        _plain = null;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_locked == null) {
+    if (_hasLock == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return _locked! ? const LockPage() : const SetupPage();
+    if (_hasLock!) return const LockPage();
+    final plain = _plain;
+    if (plain != null) {
+      // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰
+      return ChatPage(
+        server: plain.server,
+        spaceId: plain.spaceId,
+        deviceId: plain.deviceId,
+        spaceKey: base64Decode(plain.spaceKeyB64),
+        keyVersion: plain.keyVersion,
+        token: plain.token ?? '',
+        escrowPassphrase: plain.escrowPassphrase,
+      );
+    }
+    return const SetupPage();
   }
 }
 
