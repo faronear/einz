@@ -225,6 +225,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
 
+  // 已撤销设备：不登记/不认证/不同步/不起 WS——仅提示 + 可 /exit（输入循环已限制）
+  if (_revoked) return;
+
   // 身份选择（仅后续设备、未登记的新设备）：先问是第一还是第二个人（personA/personB），
   // 按需设置名字——与首设备"先名字后设备名"的顺序对齐（此前是先问设备名再问身份）。
   // 首设备（探测无 person 名称表）跳过此步，直接走下方"你的名称"询问。
@@ -440,6 +443,15 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       session.messages.add(_systemMessage(session, '✅ 机密对话线路激活成功'));
       _scheduleRender();
     } catch (e) {
+      if (e is ApiException && e.code == 'FORBIDDEN') {
+        // 挑战被服务端拒绝（设备已被撤销）→ 进入"仅可退出"模式并结束引导；
+        // 清空可能已加载的本地历史，消息流只保留提示条
+        _revoked = true;
+        session.messages.clear();
+        session.messages.add(_systemMessage(session, _revokedBanner));
+        _scheduleRender();
+        return; // 不再同步/起 WS
+      }
       session.messages.add(_systemMessage(session, '⚠️ 机密对话线路激活失败。可进入 TUI 后用 /auth 重试'));
       _scheduleRender();
     }
@@ -527,14 +539,30 @@ Future<void> main(List<String> args) async {
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
 
+  // 启动自检：设备是否已被撤销（/recover 或 /revoke）——已撤销不得显示本地
+  // 历史、不得发送，仅可 /exit 退出；会话被清（/recover）→ 清 token 走挑战
+  // 重认证（挑战 403 由引导识别为 revoked）
+  final probe = await _probeRevoked(store, server);
+  _revoked = probe == 1;
+  if (probe == 2) {
+    store.sessionToken = null;
+    store.save(storePath);
+  }
+
   final session = ChatSession(store, storePath, server);
-  await session.loadHistory();
+  if (!_revoked) {
+    await session.loadHistory();
+  }
   // 引导阶段提示（自举/托管/邀请码指引）作为 system 消息进入对话流——
   // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
   for (final note in _guidanceNotes) {
     session.messages.add(_systemMessage(session, note));
   }
   _guidanceNotes.clear();
+  if (_revoked) {
+    // 已撤销：消息流仅保留提示条（本地历史不加载不显示）
+    session.messages.add(_systemMessage(session, _revokedBanner));
+  }
   _state = _TuiState(session);
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 person_name）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
@@ -752,15 +780,18 @@ void _render() {
   buf.write(_hideCursor);
   buf.write(_clearHome);
 
-  // 状态栏（第 1 行）：WS 红绿灯状态（绿=在线，红=断线重连，黄=连接中，灰=离线）
+  // 状态栏（第 1 行）：WS 红绿灯状态（绿=在线，红=断线重连，黄=连接中，灰=离线）；
+  // 已撤销设备固定显示撤销提示（不再显示"断线重连中"）
   final ws = s.session.wsStatus;
-  final wsName = switch (ws) {
-    WsStatus.connected => '${_green}● 在线${_reset}',
-    WsStatus.connecting => '${_yellow}↻ 连接中${_reset}',
-    WsStatus.reconnecting =>
-      '${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
-    WsStatus.stopped => '${_gray}○ 离线${_reset}',
-  };
+  final wsName = _revoked
+      ? '${_gray}✗ 设备已被撤销（仅可 /exit）${_reset}'
+      : switch (ws) {
+          WsStatus.connected => '${_green}● 在线${_reset}',
+          WsStatus.connecting => '${_yellow}↻ 连接中${_reset}',
+          WsStatus.reconnecting =>
+            '${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
+          WsStatus.stopped => '${_gray}○ 离线${_reset}',
+        };
   // 各片段用灰色竖线分隔：Einz TUI | person #device | ● 在线 | 临时通知
   final sep = '${_gray}|${_reset}';
   buf.write('${_bold}Einz TUI${_reset} $sep ${_personLabel(s.session.store, s.personNames)} $sep $wsName');
@@ -1128,6 +1159,12 @@ Future<void> _runInputLoop(ChatSession session) async {
           inputChanged = true; // 清空输入行，等待下方统一重绘
           continue;
         }
+        // 已撤销设备：仅放行 /exit 与 /quit；其余输入（发消息/命令）拒绝并提示
+        if (_revoked && !line.startsWith('/exit') && !line.startsWith('/quit')) {
+          session.messages.add(_systemMessage(session, _revokedBanner));
+          _scheduleRender();
+          continue;
+        }
         if (busy) continue; // 上一条命令/消息还在处理
         busy = true;
         final future = (_state!.pendingInvite)
@@ -1313,6 +1350,13 @@ Future<void> _execCommand(String line) async {
   final parts = line.split(RegExp(r'\s+'));
   final cmd = parts[0];
   final arg = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+  // 已撤销设备：仅允许 /exit（与 /quit）——其余命令拒绝（输入循环已拦截，此处双保险）
+  if (_revoked && cmd != '/exit' && cmd != '/quit') {
+    s.session.messages.add(_systemMessage(s.session, _revokedBanner));
+    s.status = '';
+    return;
+  }
 
   switch (cmd) {
     case '/help':
@@ -1622,6 +1666,32 @@ final List<String> _guidanceNotes = [];
 
 /// 启动探测获取的 person 名称表（/health 系统信息，person_id → person_name）。
 Map<String, String> _probePersonNames = {};
+
+/// 本机设备已被撤销（/recover 全丢恢复或 /revoke）→ 启动进入"仅可退出"模式：
+/// 不显示本地历史、不允许发送，输入仅放行 /exit（与 /quit）。
+bool _revoked = false;
+
+/// revoked 提示（产品文案）。
+const String _revokedBanner = '当前设备已被撤销，您只能 /exit 退出';
+
+/// 启动自检结果：0=正常/离线（可看本地历史）；1=设备已被撤销；2=会话已失效
+/// （/recover 会 DELETE sessions，缓存 token 死 → 401）需清除 token 走引导
+/// 挑战重认证——挑战阶段若设备已撤销会 403（由引导兜底识别为 revoked）。
+Future<int> _probeRevoked(DeviceStore store, String server) async {
+  if (store.deviceId == null || store.spaceId == null || store.sessionToken == null) {
+    return 0;
+  }
+  try {
+    await ApiClient(server).getSpace(store.sessionToken!);
+    return 0; // 200：设备 active（会话有效）
+  } on ApiException catch (e) {
+    if (e.code == 'FORBIDDEN') return 1; // 设备 revoked（/revoke 单撤时会话仍在）
+    if (e.code == 'UNAUTHORIZED') return 2; // 会话被清/过期：清除 token 重认证
+    return 0;
+  } catch (_) {
+    return 0; // 网络异常：保持离线查看历史的现状能力
+  }
+}
 
 /// 全丢恢复（开发运维专用；闭环——仅凭 escrow 口令，无需 EINZ-BACKUP 文本）：
 /// 输入 escrow 口令 → 服务端 /recover 凭口令重置（撤销全部设备/会话/邀请码）
