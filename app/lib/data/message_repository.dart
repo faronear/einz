@@ -468,6 +468,34 @@ class MessageRepository {
         );
   }
 
+  /// 导入归档恢复的历史消息（chat_page「从完整备份恢复」）：逐条按 env 落库
+  /// （messageId 幂等，已存在仅刷新 server_sequence/status），附件元数据补写
+  /// local_attachments。status 按 sender 归属：'me'（本设备发送）→ sent，否则
+  /// delivered。
+  Future<void> importArchiveHistory(List<Map<String, dynamic>> history) async {
+    for (final entry in history) {
+      final env = MessageEnvelope.fromJson(
+          (entry['env'] as Map).cast<String, dynamic>());
+      final sender = entry['sender'] as String? ?? 'peer';
+      final att = entry['attachment'] as Map<String, dynamic>?;
+      await _insertLocal(
+        env,
+        status: sender == 'me' ? 'sent' : 'delivered',
+        expiresAt: entry['expiresAt'] as int?,
+      );
+      if (att != null) {
+        await _insertAttachmentMeta({
+          'attachment_id': att['attachment_id'],
+          'message_id': env.messageId,
+          'key_version': att['key_version'],
+          'size': att['size'],
+          'sha256': att['sha256'],
+          'nonce': att['nonce'],
+        });
+      }
+    }
+  }
+
   Future<void> _markSent(String messageId, int serverSequence, int createdAt) async {
     await (db.update(db.localMessages)..where((m) => m.messageId.equals(messageId))).write(
       LocalMessagesCompanion(

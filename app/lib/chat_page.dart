@@ -42,6 +42,7 @@ class ChatPage extends StatefulWidget {
     this.enableWs = true,
     this.reauth,
     this.escrowPassphrase,
+    this.initialHistory,
   });
 
   final String server;
@@ -54,6 +55,10 @@ class ChatPage extends StatefulWidget {
   /// 接入口令（escrow，向导设置后随锁包传入）：生成邀请码时编入 JoinInfo，
   /// 对方扫码即可一键加入（含 spaceId + 口令 + 邀请码）。
   final String? escrowPassphrase;
+
+  /// 归档恢复的历史消息（「从完整备份恢复」导入；map 形态与导出归档的
+  /// history 条目一致：env/plaintext/sender/attachment/expiresAt）。
+  final List<Map<String, dynamic>>? initialHistory;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -135,6 +140,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       settings: BurnAfterSettings(db),
       reauth: widget.reauth,
     );
+    // 归档恢复（「从完整备份恢复」）：先于 _loadInitial/同步把历史落库（messageId
+    // 幂等去重，sync 不会重复）
+    final initHistory = widget.initialHistory;
+    if (initHistory != null && initHistory.isNotEmpty) {
+      _repo.importArchiveHistory(initHistory);
+    }
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
     _loadBurnLabel();
@@ -329,15 +340,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() => _hasPin = has);
   }
 
-  /// 导出密钥备份（预防全丢）：弹窗输入口令 → 口令加密 Space Key 包（与 escrow
-  /// 同格式）→ 生成可粘贴/保存的备份文本，离线保管。
+  /// 导出完整备份（归档）：口令加密 {空间密钥 + 设备信息 + 全部聊天历史（含
+  /// 附件元数据）} → 可粘贴/保存的归档文本，离线保管（防设备/服务器全丢）。
   Future<void> _showExportBackupDialog() async {
     await showDialog<void>(
       context: context,
       builder: (_) => _ExportBackupDialog(
+        deviceId: widget.deviceId,
         spaceKeyB64: base64Encode(widget.spaceKey),
         spaceId: widget.spaceId,
         keyVersion: widget.keyVersion,
+        historyLoader: _repo.history,
       ),
     );
   }
@@ -1175,19 +1188,27 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   }
 }
 
-/// 导出密钥备份弹窗（StatefulWidget）：输入口令 → 口令加密 Space Key 包
-/// （与 escrow 同格式，encryptBackup）→ 生成可粘贴/保存的备份文本，离线保管。
-/// 备份文本 = `EINZ-BACKUP:` + base64(BackupFile JSON)；恢复时（向导）据此识别。
+/// 导出完整备份（归档）弹窗（StatefulWidget）：输入口令 → 口令加密
+/// {device_id, space_id, key_version, space_key, history（全部聊天历史：
+/// env 密文信封 + 明文 + 附件元数据 + 阅后即焚到期）} → 生成可粘贴/保存的
+/// 归档文本，离线保管。归档文本 = `EINZ-BACKUP:` + base64(BackupFile JSON)，
+/// 恢复时（向导恢复对话框）粘贴此文本 + 口令整体恢复本机数据。
 class _ExportBackupDialog extends StatefulWidget {
   const _ExportBackupDialog({
+    required this.deviceId,
     required this.spaceKeyB64,
     required this.spaceId,
     required this.keyVersion,
+    required this.historyLoader,
   });
 
+  final String deviceId;
   final String spaceKeyB64;
   final String spaceId;
   final int keyVersion;
+
+  /// 读取本机全部聊天历史（解密为明文，含附件元数据）——归档数据源。
+  final Future<List<HistoryMessage>> Function() historyLoader;
 
   @override
   State<_ExportBackupDialog> createState() => _ExportBackupDialogState();
@@ -1217,10 +1238,24 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
       _error = null;
     });
     try {
+      // 归档 = 空间密钥 + 设备信息 + 全部聊天历史（env 密文信封 + 明文 +
+      // 附件元数据 + 阅后即焚到期）——口令加密，离线保管；全丢时可整体恢复
+      final history = await widget.historyLoader();
       final payload = Uint8List.fromList(utf8.encode(jsonEncode({
-        'space_key': widget.spaceKeyB64,
+        'device_id': widget.deviceId,
         'space_id': widget.spaceId,
         'key_version': widget.keyVersion,
+        'space_key': widget.spaceKeyB64,
+        'history': [
+          for (final m in history)
+            {
+              'env': m.env.toJson(),
+              'plaintext': m.plaintext,
+              'sender': m.sender,
+              if (m.attachment != null) 'attachment': m.attachment,
+              if (m.expiresAt != null) 'expiresAt': m.expiresAt,
+            },
+        ],
       })));
       final file = await encryptBackup(payload: payload, recoveryCode: passphrase);
       final text = kBackupExportPrefix +

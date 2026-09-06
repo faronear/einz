@@ -407,19 +407,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardRecoverHint.
   ///
   /// In en, this message translates to:
-  /// **'Lost all devices? Paste the exported key backup (starts with EINZ-BACKUP:) and the passphrase; a correct passphrase resets the space and restores this device'**
+  /// **'Lost all devices? Enter the passphrase set when enabling key escrow; a correct passphrase resets the space and restores this device (no backup text needed)'**
   String get wizardRecoverHint;
-
-  /// No description provided for @wizardRecoverBackupLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Backup text (starts with EINZ-BACKUP:)'**
-  String get wizardRecoverBackupLabel;
 
   /// No description provided for @wizardRecoverPassphraseLabel.
   ///
   /// In en, this message translates to:
-  /// **'Backup passphrase'**
+  /// **'Passphrase'**
   String get wizardRecoverPassphraseLabel;
 
   /// No description provided for @wizardRecoverStart.
@@ -428,17 +422,47 @@ abstract class AppLocalizations {
   /// **'Restore'**
   String get wizardRecoverStart;
 
-  /// No description provided for @wizardRecoverInvalidFormat.
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid backup format (must start with EINZ-BACKUP:)'**
-  String get wizardRecoverInvalidFormat;
-
   /// No description provided for @wizardRecoverBadPassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Wrong passphrase or corrupted backup'**
+  /// **'Wrong passphrase, or this space has no escrow passphrase uploaded'**
   String get wizardRecoverBadPassphrase;
+
+  /// No description provided for @wizardRecoverArchiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from full backup (archive)'**
+  String get wizardRecoverArchiveTitle;
+
+  /// No description provided for @wizardRecoverArchiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the exported full-backup text and enter the archive passphrase to restore the space key and chat history (server must be reachable)'**
+  String get wizardRecoverArchiveHint;
+
+  /// No description provided for @wizardRecoverArchiveTextLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive text (starts with EINZ-BACKUP:)'**
+  String get wizardRecoverArchiveTextLabel;
+
+  /// No description provided for @wizardRecoverArchivePassphraseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive passphrase'**
+  String get wizardRecoverArchivePassphraseLabel;
+
+  /// No description provided for @wizardRecoverArchiveStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore archive'**
+  String get wizardRecoverArchiveStart;
+
+  /// No description provided for @wizardRecoverArchiveBad.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong archive passphrase or corrupted archive'**
+  String get wizardRecoverArchiveBad;
 
   /// No description provided for @wizardRecoverFailed.
   ///
@@ -785,31 +809,31 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuExport.
   ///
   /// In en, this message translates to:
-  /// **'Export key backup'**
+  /// **'Export full backup'**
   String get chatPageMenuExport;
 
   /// No description provided for @chatPageExportTitle.
   ///
   /// In en, this message translates to:
-  /// **'Export key backup'**
+  /// **'Export full backup (archive)'**
   String get chatPageExportTitle;
 
   /// No description provided for @chatPageExportPassphraseLabel.
   ///
   /// In en, this message translates to:
-  /// **'Backup passphrase (encrypts the backup; keep separate)'**
+  /// **'Archive passphrase (encrypts the archive; keep it separate from the text)'**
   String get chatPageExportPassphraseLabel;
 
   /// No description provided for @chatPageExportGenerate.
   ///
   /// In en, this message translates to:
-  /// **'Generate backup'**
+  /// **'Generate archive'**
   String get chatPageExportGenerate;
 
   /// No description provided for @chatPageExportGenerated.
   ///
   /// In en, this message translates to:
-  /// **'Encrypted backup text (keep offline, separate from the passphrase):'**
+  /// **'Encrypted archive text (keep offline, separate from the passphrase):'**
   String get chatPageExportGenerated;
 
   /// No description provided for @chatPageExportCopy.
@@ -821,13 +845,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageExportCopied.
   ///
   /// In en, this message translates to:
-  /// **'Backup text copied'**
+  /// **'Archive text copied'**
   String get chatPageExportCopied;
 
   /// No description provided for @chatPageExportHint.
   ///
   /// In en, this message translates to:
-  /// **'If all devices are lost: restore with this backup + passphrase (requires server escrow)'**
+  /// **'Encrypted archive of the space key and all chat history (incl. attachment info); restore everything if devices are lost or when switching to a new device'**
   String get chatPageExportHint;
 
   /// No description provided for @chatPagePinSet.

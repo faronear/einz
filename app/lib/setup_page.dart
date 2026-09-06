@@ -587,17 +587,23 @@ class _SetupPageState extends State<SetupPage> {
     return api.verify(challenge.challengeId, base64Encode(opened));
   }
 
-  /// 全丢恢复：弹窗粘贴备份文本 + 输入口令 → 本地解密 Space Key →
-  /// 服务端凭口令重置空间（/recover，撤销全部设备）→ 本设备首设备自举 → PIN 步骤。
+  /// 全丢恢复：弹窗输入 escrow 口令 → 服务端凭口令重置空间（/recover，撤销
+  /// 全部设备）并返回托管包 → 解出 Space Key → 本设备首设备自举 → PIN 步骤；
+  /// 折叠区可选「从完整备份恢复」（归档文本 + 归档口令，本地重建密钥与历史）。
   Future<void> _showRecoverDialog() async {
     await showDialog<void>(
       context: context,
       builder: (_) => _RecoverDialog(
         server: _server,
         onRecovered: _applyRecovered,
+        onArchiveRestored: _applyArchiveRestored,
       ),
     );
   }
+
+  /// 归档恢复暂存的历史（「从完整备份恢复」解出；进入聊天页时经
+  /// ChatPage.initialHistory 落库，messageId 幂等）。
+  List<Map<String, dynamic>>? _importedHistory;
 
   /// 恢复成功回调：用备份解出的 Space Key 重建本设备（首设备自举登记 + 认证），
   /// 然后跳到 PIN 步骤完成设置（_runPinSetup 会复用已解出的 _spaceKey）。
@@ -630,6 +636,23 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       setState(() => _status = AppLocalizations.of(context)!.setupPageKeyGenFailed('$e'));
     }
+  }
+
+  /// 归档恢复回调（对话框「从完整备份恢复」）：归档含空间密钥 + 全量历史——
+  /// 历史暂存 [_importedHistory]（进入聊天页时落库），密钥身份恢复照常复用
+  /// [_applyRecovered]（登记 + 认证 + 跳 PIN；需服务器可达）。
+  Future<void> _applyArchiveRestored({
+    required String spaceKeyB64,
+    required String spaceId,
+    required int keyVersion,
+    required List<Map<String, dynamic>> history,
+  }) async {
+    _importedHistory = history;
+    await _applyRecovered(
+      spaceKeyB64: spaceKeyB64,
+      spaceId: spaceId,
+      keyVersion: keyVersion,
+    );
   }
 
   /// 登记用默认设备名：设备型号（device_info_plus，如 "iPhone 15 Pro" /
@@ -743,6 +766,7 @@ class _SetupPageState extends State<SetupPage> {
         spaceKey: sk,
         keyVersion: 1,
         token: token,
+        initialHistory: _importedHistory,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
         reauth: () async => (await _authenticate(kp, enroll.deviceId)).sessionToken,
       ),
@@ -1228,10 +1252,14 @@ class _SetupPageState extends State<SetupPage> {
   }
 }
 
-/// 全丢恢复弹窗：粘贴备份文本 + 输入口令 → 校验格式 → 本地解密（口令错即失败）→
-/// 调服务端 /recover 凭口令重置空间 → 回调向导应用恢复数据（登记/认证在向导侧）。
+/// 全丢恢复弹窗：输入 escrow 口令（主路径：/recover 重置 + 托管包解密）；折叠区
+/// 粘贴归档文本 + 归档口令（本地重建密钥与历史）→ 回调向导应用恢复数据。
 class _RecoverDialog extends StatefulWidget {
-  const _RecoverDialog({required this.server, required this.onRecovered});
+  const _RecoverDialog({
+    required this.server,
+    required this.onRecovered,
+    required this.onArchiveRestored,
+  });
 
   final String server;
 
@@ -1242,29 +1270,88 @@ class _RecoverDialog extends StatefulWidget {
     required int keyVersion,
   }) onRecovered;
 
+  /// 归档恢复回调（向导侧 _applyArchiveRestored：暂存历史 + 复用 _applyRecovered）。
+  final Future<void> Function({
+    required String spaceKeyB64,
+    required String spaceId,
+    required int keyVersion,
+    required List<Map<String, dynamic>> history,
+  }) onArchiveRestored;
+
   @override
   State<_RecoverDialog> createState() => _RecoverDialogState();
 }
 
 class _RecoverDialogState extends State<_RecoverDialog> {
-  final _backupCtrl = TextEditingController();
   final _passphraseCtrl = TextEditingController();
+  final _archiveCtrl = TextEditingController();
+  final _archivePassphraseCtrl = TextEditingController();
   bool _busy = false;
+  bool _showArchive = false;
   String? _error;
 
   @override
   void dispose() {
-    _backupCtrl.dispose();
     _passphraseCtrl.dispose();
+    _archiveCtrl.dispose();
+    _archivePassphraseCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _recover() async {
     final l10n = AppLocalizations.of(context)!;
-    final backupText = _backupCtrl.text.trim();
     final passphrase = _passphraseCtrl.text.trim();
-    if (!backupText.startsWith(kBackupExportPrefix)) {
-      setState(() => _error = l10n.wizardRecoverInvalidFormat);
+    if (passphrase.isEmpty) {
+      setState(() => _error = l10n.setupPageNeedPassphrase);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      // 服务端凭口令重置空间（撤销全部设备）并返回 escrow 密文包——同一口令
+      // 本地解出 Space Key（纯口令闭环，与 TUI 一致；口令错 → 403，不触网解包）
+      final pkg = await ApiClient(widget.server).recoverSpace(passphrase);
+      if (pkg == null) {
+        if (!mounted) return;
+        setState(() => _error = l10n.wizardRecoverBadPassphrase);
+        return;
+      }
+      final plain = await decryptBackup(file: pkg, recoveryCode: passphrase);
+      final json = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await widget.onRecovered(
+        spaceKeyB64: json['space_key'] as String,
+        spaceId: json['space_id'] as String,
+        keyVersion: (json['key_version'] as num?)?.toInt() ?? 1,
+      );
+    } on FormatException {
+      if (!mounted) return;
+      setState(() => _error = l10n.wizardRecoverBadPassphrase);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.code == 'FORBIDDEN'
+          ? l10n.wizardRecoverBadPassphrase
+          : l10n.wizardRecoverFailed(e.code));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = l10n.wizardRecoverFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 归档恢复（「从完整备份恢复」折叠区）：粘贴 EINZ-BACKUP: 归档文本 +
+  /// 归档口令 → 本地解密 → 校验含 history → 回调向导（_applyArchiveRestored）。
+  /// 归档口令为导出时自设（与 escrow 口令无关，纯离线物）。
+  Future<void> _restoreFromArchive() async {
+    final l10n = AppLocalizations.of(context)!;
+    final text = _archiveCtrl.text.trim();
+    final passphrase = _archivePassphraseCtrl.text.trim();
+    if (!text.startsWith(kBackupExportPrefix)) {
+      setState(() => _error = l10n.wizardRecoverArchiveBad);
       return;
     }
     if (passphrase.isEmpty) {
@@ -1276,24 +1363,23 @@ class _RecoverDialogState extends State<_RecoverDialog> {
       _error = null;
     });
     try {
-      // 1) 本地解密备份（口令错误/损坏 → FormatException → 不触网）
-      final b64 = backupText.substring(kBackupExportPrefix.length);
+      final b64 = text.substring(kBackupExportPrefix.length);
       final file = BackupFile.fromJson(
           jsonDecode(utf8.decode(base64Decode(b64))) as Map<String, dynamic>);
       final plain = await decryptBackup(file: file, recoveryCode: passphrase);
       final json = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
-      // 2) 服务端凭口令重置空间（口令正确才可能走到这里；错误 → ApiException 403）
-      await ApiClient(widget.server).recoverSpace(passphrase);
+      final history = (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       if (!mounted) return;
       Navigator.of(context).pop();
-      await widget.onRecovered(
+      await widget.onArchiveRestored(
         spaceKeyB64: json['space_key'] as String,
         spaceId: json['space_id'] as String,
         keyVersion: (json['key_version'] as num?)?.toInt() ?? 1,
+        history: history,
       );
     } on FormatException {
       if (!mounted) return;
-      setState(() => _error = l10n.wizardRecoverBadPassphrase);
+      setState(() => _error = l10n.wizardRecoverArchiveBad);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = l10n.wizardRecoverFailed('$e'));
@@ -1315,22 +1401,47 @@ class _RecoverDialogState extends State<_RecoverDialog> {
               style: const TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 12),
           TextField(
-            controller: _backupCtrl,
-            maxLines: 3,
-            decoration: InputDecoration(
-              labelText: l10n.wizardRecoverBackupLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
             controller: _passphraseCtrl,
             obscureText: true,
+            autofocus: true,
             decoration: InputDecoration(
               labelText: l10n.wizardRecoverPassphraseLabel,
               border: const OutlineInputBorder(),
             ),
+            onSubmitted: (_) {
+              if (!_busy) _recover();
+            },
           ),
+          const SizedBox(height: 8),
+          // 归档恢复（可选折叠）：完整备份文本 + 归档口令（导出时自设）
+          TextButton(
+            onPressed: () => setState(() => _showArchive = !_showArchive),
+            child: Text(l10n.wizardRecoverArchiveTitle),
+          ),
+          if (_showArchive) ...[
+            TextField(
+              controller: _archiveCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: l10n.wizardRecoverArchiveTextLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _archivePassphraseCtrl,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: l10n.wizardRecoverArchivePassphraseLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: _busy ? null : _restoreFromArchive,
+              child: Text(l10n.wizardRecoverArchiveStart),
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),

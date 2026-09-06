@@ -14,8 +14,9 @@ import '../sodium.dart';
 
 const String kBackupFormat = 'einz-backup-v1';
 
-/// 导出的密钥备份文本前缀（app「导出密钥备份」生成；恢复时据此识别）。
-/// 格式：`EINZ-BACKUP:` + base64(BackupFile JSON)——口令加密的 Space Key 包。
+/// 口令加密文本前缀：`EINZ-BACKUP:` + base64(BackupFile JSON)。用于两类
+/// 口令加密载体：① escrow 托管包 / /recover 返回包（Space Key 包，纯口令
+/// 恢复用）；② app「导出完整备份」的归档文本（Space Key + 全量聊天历史）。
 const String kBackupExportPrefix = 'EINZ-BACKUP:';
 
 /// 获取 SodiumSumo 实例（pwhash/Argon2id 只在 sumo 构建中提供）。
