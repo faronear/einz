@@ -57,15 +57,15 @@ export function uploadKeyEscrow(cfg: ServerConfig, token: string, body: unknown)
  * 口令用上传时存的 argon2id 哈希验证；通过后撤销全部 active 设备（空间重置），
  * 新设备可再次首设备自举。安全边界：口令即空间级管理员密钥，须妥善保管。
  */
-export async function recoverSpace(cfg: ServerConfig, body: unknown): Promise<{ ok: true; revoked: number }> {
+export async function recoverSpace(cfg: ServerConfig, body: unknown): Promise<{ ok: true; revoked: number; package?: unknown }> {
   const passphrase = (body as { passphrase?: unknown })?.passphrase;
   if (typeof passphrase !== "string" || passphrase.length === 0) {
     throw new ApiError("INVALID_REQUEST", "passphrase 必填", 400);
   }
   const db = getDb();
   const row = db
-    .prepare(`SELECT passphrase_hash FROM key_escrow WHERE space_id = ?`)
-    .get(cfg.space_id) as { passphrase_hash: string | null } | undefined;
+    .prepare(`SELECT passphrase_hash, package FROM key_escrow WHERE space_id = ?`)
+    .get(cfg.space_id) as { passphrase_hash: string | null; package: string | null } | undefined;
   if (!row || !row.passphrase_hash) {
     throw new ApiError("FORBIDDEN", "该空间未托管口令（escrow 未上传），无法恢复", 403);
   }
@@ -80,7 +80,12 @@ export async function recoverSpace(cfg: ServerConfig, body: unknown): Promise<{ 
   db.prepare(`DELETE FROM sessions`).run();
   db.prepare(`DELETE FROM push_tokens`).run();
   db.prepare(`DELETE FROM invites`).run();
-  return { ok: true, revoked };
+
+  // 闭环：口令正确即空间主人——顺带返回 escrow 密文包，新设备凭同一口令解出
+  // Space Key（不再依赖预先导出的 EINZ-BACKUP 文本）。包本身口令加密，与
+  // GET /key-escrow 同构；未托管包（理论边界）时省略该字段。
+  const pkg = row.package ? (JSON.parse(row.package) as unknown) : undefined;
+  return { ok: true, revoked, ...(pkg !== undefined ? { package: pkg } : {}) };
 }
 
 /** GET /key-escrow：拉取密文包（无包时返回空对象）。 */

@@ -157,9 +157,13 @@ class ApiClient {
   }
 
   /// 全丢恢复（免认证）：凭 escrow 口令验证后撤销全部设备（空间重置），
-  /// 之后新设备可再次首设备自举。
-  Future<void> recoverSpace(String passphrase) async {
-    await _post(Api.recover, {'passphrase': passphrase}, withToken: false);
+  /// 并返回 escrow 密文包——同一口令可本地解出 Space Key（无需预先导出的
+  /// EINZ-BACKUP 文本，闭环）；未托管包（理论边界）时返回 null。
+  Future<BackupFile?> recoverSpace(String passphrase) async {
+    final res = await _post(Api.recover, {'passphrase': passphrase}, withToken: false);
+    final pkg = res['package'];
+    if (pkg == null) return null;
+    return BackupFile.fromJson(pkg as Map<String, dynamic>);
   }
 
   /// 上传附件密文 blob（PROTOCOL.md §6.1）：元数据走 x-attachment-meta 头，body 为密文。

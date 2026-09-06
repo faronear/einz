@@ -432,9 +432,11 @@ async function main(): Promise<void> {
       body: JSON.stringify({ passphrase: recoverPass }),
     });
     assert.equal(recoverOk.status, 200, "correct passphrase should reset the space");
-    const recoverBody = (await recoverOk.json()) as { ok: boolean; revoked: number };
+    const recoverBody = (await recoverOk.json()) as { ok: boolean; revoked: number; package?: typeof escrowPkg };
     assert.equal(recoverBody.ok, true, "recover should return ok");
     assert.ok(recoverBody.revoked >= 2, "all active devices (A+B) should be revoked");
+    assert.equal(recoverBody.package?.ciphertext, escrowPkg.ciphertext,
+      "recover should return the escrow package so the passphrase holder can recover the Space Key without a pre-exported backup");
 
     const recDb = new Database(join(tempDir, "einz.sqlite.db"), { readonly: true });
     const recActive = (recDb.prepare(`SELECT COUNT(*) AS n FROM devices WHERE status = 'active'`).get() as { n: number }).n;
