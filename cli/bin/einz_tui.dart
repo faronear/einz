@@ -1731,28 +1731,11 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       store.personId = null;
       store.sessionToken = null;
       store.escrowUploaded = true; // 托管包仍在服务器（口令未变），不再要求重传
-      // 身份沿用：恢复者通常是原第一/第二所有者之一——按 1/2 选择后直接沿用
-      // 该原 owner 的 person_name（显示名表在 /recover 后仍在服务端，未清）
+      // 恢复后首设备固定登记为新空间 personA/dev1（服务端自举规则，与恢复者
+      // 原是 1 还是 2 无关）→ 不询问身份，直接沿用 personA 的显示名
+      //（/recover 不清 person_names 表）；personA 未命名过则留空（显示回退）
       final aName = _probePersonNames['personA'] ?? '';
-      final bName = _probePersonNames['personB'] ?? '尚未加入的伴侣';
-      String? chosen;
-      while (true) {
-        if (!_state!.running) return false;
-        final answer = await _prompt(session, '❓ 恢复本空间设备：若您是原第一创建者 $aName，请输入 1；若您是原第二所有者 $bName，请输入 2');
-        if (!_state!.running) return false;
-        if (answer == '1' || answer.toLowerCase() == 'persona') { chosen = 'personA'; break; }
-        if (answer == '2' || answer.toLowerCase() == 'personb') { chosen = 'personB'; break; }
-        session.messages.add(_systemMessage(session, '❓ 请输入 1 ($aName) 或 2 ($bName)'));
-        _scheduleRender();
-      }
-      final originalName = _probePersonNames[chosen] ?? '';
-      if (originalName.isNotEmpty) {
-        store.personName = originalName; // 沿用原 owner 显示名
-      } else {
-        final name = (await _prompt(session, '❓ 请输入你的名字（$chosen 尚未设置显示名，可回车先跳过，稍后 /rename）')).trim();
-        if (!_state!.running) return false;
-        store.personName = name.isEmpty ? null : name;
-      }
+      store.personName = aName.isNotEmpty ? aName : null;
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 全丢恢复成功：空间已重置，即将以创建者身份重新登记（历史密文可继续解密）'));
       session.messages.add(_systemMessage(session, '----------------'));
