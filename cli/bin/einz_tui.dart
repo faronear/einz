@@ -166,9 +166,6 @@ Future<(bool, Map<String, String>)> _probeServer(String server) async {
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
-  stdout.writeln('=== Einz 私密领地 ===');
-  _guidanceNotes.add('=== Einz 私密领地 ===');
-
   // ① 服务器地址：--server 参数 > store 持久化值 > config 默认（cli/config.json）> 硬编码
   if (server.isEmpty) {
     final saved = store?.server;
@@ -179,13 +176,16 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   final (probeOk, probeNames) = await _probeServer(server);
   _probePersonNames = probeNames;
   if (!probeOk) {
-    stdout.writeln('⚠️ 无法连接服务器 $server（/health 探测失败）');
-    stdout.write('输入新服务器地址（回车沿用 $server）: ');
+    stdout.writeln('❌ 无法连接服务器 $server（/health 探测失败）');
+    stdout.write('❓ 输入新服务器地址（回车沿用 $server）: ');
     final input = (stdin.readLineSync() ?? '').trim();
     if (input.isNotEmpty) server = input;
   }
 
   if (store == null) {
+    stdout.writeln('=== Einz 私密领地 ===');
+    _guidanceNotes.add('=== Einz 私密领地 ===');
+
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
     store = await DeviceStore.create();
@@ -286,6 +286,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     _scheduleRender();
   }
 
+  // 第二用户预置名（仅首设备新空间时询问；回车跳过 → 服务端落默认 personB）：
+  // 登记（enroll 自举）时随请求提交，后续设备启动引导即可按名称表选身份。
+  String? partnerPresetName;
   // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
   // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
   if ((store.personName == null || store.personName!.isEmpty) && _probePersonNames.isEmpty) {
@@ -298,6 +301,17 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         _scheduleRender();
       }else {
         session.messages.add(_systemMessage(session, '✅ 系统将为您自动设置一个名字，您可随时 /rename 进行修改。'));
+      }
+      // 第二用户名字（回车跳过 → 后台默认 personB）
+      final partnerName = (await _prompt(session, '❓ 第二用户的名字（例如 Steffi；直接回车则后台默认设为 personB）')).trim();
+      if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
+      if (partnerName.isNotEmpty) {
+        partnerPresetName = partnerName;
+        session.messages.add(_systemMessage(session, '✅ 已为第二用户预置名字: $partnerName（其加入时仍可自行修改）'));
+        _scheduleRender();
+      } else {
+        session.messages.add(_systemMessage(session, '✅ 第二用户暂用默认名 personB（加入引导时可选择并修改）'));
+        _scheduleRender();
       }
       session.messages.add(_systemMessage(session, '----------------'));
     } catch (e) {
@@ -315,6 +329,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         deviceId: store.deviceId,
         publicKey: store.publicKey,
         personName: store.personName,
+        partnerName: partnerPresetName,
         deviceName: store.deviceName,
       ));
       store.deviceId = r.deviceId;
@@ -1809,7 +1824,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 请设置内容安全口令（务必牢记，严禁泄漏！请将口令分享给您的伴侣）', required: true);
+    final p1 = await _prompt(session, '❓ 请设置内容安全口令（务必牢记，严禁泄漏！您仅可将口令分享给您的伴侣）', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
