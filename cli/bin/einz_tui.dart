@@ -162,7 +162,7 @@ Future<(bool, Map<String, String>)> _probeServer(String server) async {
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
 /// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
-/// sealed 导入时置 exitCode=1（main 据此退出，提示用户改用 einz.dart import）。
+/// key envelope 导入时置 exitCode=1（main 据此退出，提示用户改用 einz.dart import）。
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
@@ -228,8 +228,27 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 身份选择（仅后续设备、未登记的新设备）：先问是第一还是第二个人（personA/personB），
   // 按需设置名字——与首设备"先名字后设备名"的顺序对齐（此前是先问设备名再问身份）。
   // 首设备（探测无 person 名称表）跳过此步，直接走下方"你的名称"询问。
+  // 全丢恢复入口（开发运维专用；App 已实现同款）：全新设备 + 空间已有成员
+  // （探测名称表非空）+ 本机无 Space Key → 可选"r 全丢恢复"——粘贴 EINZ-BACKUP:
+  // 密钥备份文本 + 口令 → 服务端 /recover 重置空间 → 本机以创建者身份重建。
+  var recovered = false;
+  if (store.deviceId == null && store.spaceKey == null && _probePersonNames.isNotEmpty) {
+    while (true) {
+      if (!_state!.running) return;
+      final ans = await _prompt(session, '❓ 若空间成员设备全部丢失、且你持有密钥备份（$kBackupExportPrefix 开头），输入 r 进入全丢恢复；直接回车则正常加入');
+      if (!_state!.running) return;
+      if (ans.trim().toLowerCase() == 'r') {
+        recovered = await _runRecoverAsCreator(session, store, storePath, server);
+        if (recovered) break; // 恢复成功：跳过身份/名字问答，直接走登记（首设备自举）
+        // 恢复未成功：循环可重试，或回车走正常加入
+      } else {
+        break;
+      }
+    }
+  }
+
   String? chosenPerson;
-  if (store.deviceId == null && _probePersonNames.isNotEmpty) {
+  if (!recovered && store.deviceId == null && _probePersonNames.isNotEmpty) {
     final aName = _probePersonNames['personA'] ?? '';
     final bName = _probePersonNames['personB'] ?? '尚未加入的伴侣';
     while (true) {
@@ -293,15 +312,19 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.personId = r.personId;
       store.spaceId = r.spaceId;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 您的设备已成功登记。'));
-      session.messages.add(_systemMessage(session, '----------------'));
+      // 20260906 luk: 现在已经在设备创建公私钥的同时设置了设备名称，只要静悄悄的 enroll 即可，否则下面的提示显得突然（因为没有一个要求输入设备名称的过程了），因此注释掉。
+      // session.messages.add(_systemMessage(session, '✅ 您的设备已成功登记。'));
+      // session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
       if (!_state!.running) return; // 绑定期间被 /exit 或 Ctrl+C 中断：不再生成口令托管等
-      // 发起者：生成 Space Key + 上传口令托管包（两次确认，机密 *）
-      final sk = await generateSpaceKey();
-      store.spaceKey = base64Encode(sk);
-      store.save(storePath);
-      await _setupEscrowPassphrase(store, storePath, session);
+      // 发起者首次创建：生成 Space Key + 上传口令托管包（两次确认，机密 *）。
+      // 全丢恢复后跳过此段：spaceKey 已由备份解出、托管包与口令未变（不重传）
+      if (store.spaceKey == null) {
+        final sk = await generateSpaceKey();
+        store.spaceKey = base64Encode(sk);
+        store.save(storePath);
+        await _setupEscrowPassphrase(store, storePath, session);
+      }
       _scheduleRender();
     } catch (e) {
       if (e is ApiException && e.code == 'INVALID_REQUEST') {
@@ -1598,6 +1621,78 @@ final List<String> _guidanceNotes = [];
 
 /// 启动探测获取的 person 名称表（/health 系统信息，person_id → person_name）。
 Map<String, String> _probePersonNames = {};
+
+/// 全丢恢复（开发运维专用，App 同款逻辑的 TUI 版）：
+/// 粘贴 EINZ-BACKUP: 密钥备份文本 + 输入口令 → 本地解密出 Space Key（口令错
+/// 不触网）→ 服务端 /recover 凭口令重置（撤销全部设备/会话/邀请码）→ 本机写入
+/// 恢复的 Space Key/space_id/key_version，置 escrowUploaded（托管包未变不重传），
+/// 以创建者身份重新首设备自举（enroll/auth 由引导后续步骤完成）。
+/// 成功返回 true；失败提示后可重试（口令/备份错误循环内重新输入）。
+Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String storePath, String server) async {
+  while (true) {
+    if (!_state!.running) return false;
+    final backupText = (await _prompt(session, '❓ 粘贴密钥备份文本（$kBackupExportPrefix 开头，一行；输 q 取消）：', required: true)).trim();
+    if (!_state!.running) return false;
+    if (backupText.toLowerCase() == 'q') {
+      session.messages.add(_systemMessage(session, '已取消全丢恢复'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+      return false;
+    }
+    if (!backupText.startsWith(kBackupExportPrefix)) {
+      session.messages.add(_systemMessage(session, '⚠️ 备份文本应以 $kBackupExportPrefix 开头，请重新粘贴'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+      continue;
+    }
+    final passphrase = await _prompt(session, '❓ 输入口令（解开备份并重置空间；必须是当初 escrow 上传/备份导出时同一个口令）：', hidden: true, required: true);
+    if (!_state!.running) return false;
+    try {
+      // 1) 本地解密（口令错/损坏 → FormatException，不触网）
+      final b64 = backupText.substring(kBackupExportPrefix.length);
+      final file = BackupFile.fromJson(jsonDecode(utf8.decode(base64Decode(b64))) as Map<String, dynamic>);
+      final plain = await decryptBackup(file: file, recoveryCode: passphrase);
+      final json = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
+      // 2) 服务端凭口令重置空间（口令与服务端 passphrase_hash 不符 → 403 FORBIDDEN）
+      await ApiClient(server).recoverSpace(passphrase);
+      // 3) 本机写入恢复密钥；设备/会话待下方 enroll（activeCount=0 首设备自举）+ auth 重建
+      store.spaceKey = json['space_key'] as String;
+      store.spaceId = json['space_id'] as String;
+      store.keyVersion = (json['key_version'] as num?)?.toInt() ?? 1;
+      store.deviceId = null;
+      store.personId = null;
+      store.sessionToken = null;
+      store.escrowUploaded = true; // 托管包仍在服务器（口令未变），不再要求重传
+      if (store.personName == null || store.personName!.isEmpty) {
+        final fallback = _probePersonNames['personA'] ?? '';
+        final hint = fallback.isEmpty ? '回车用默认' : '回车沿用 $fallback';
+        final name = (await _prompt(session, '❓ 请输入创建者名字（恢复后作为 personA 显示名，$hint）')).trim();
+        if (!_state!.running) return false;
+        store.personName = name.isNotEmpty ? name : (fallback.isNotEmpty ? fallback : null);
+      }
+      store.save(storePath);
+      session.messages.add(_systemMessage(session, '✅ 全丢恢复成功：空间已重置，即将以创建者身份重新登记（历史密文可继续解密）'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+      return true;
+    } on FormatException {
+      session.messages.add(_systemMessage(session, '⚠️ 口令错误或备份损坏，请重新输入'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+    } on ApiException catch (e) {
+      final hint = e.code == 'FORBIDDEN'
+          ? '口令与服务器托管不符，或该空间未托管口令（escrow 未上传）'
+          : '服务端重置失败（${e.code}）';
+      session.messages.add(_systemMessage(session, '⚠️ $hint，请重新输入'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+    } catch (e) {
+      session.messages.add(_systemMessage(session, '⚠️ 恢复失败: $e，请重试（或输 q 取消）'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+    }
+  }
+}
 
 /// 设置托管口令（单次输入：口令不在消息流回显，留空回车由输入循环拦截不提交、
 /// 继续输入；成功标记 store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
