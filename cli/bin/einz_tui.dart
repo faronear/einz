@@ -733,7 +733,7 @@ int _termCols() {
 
 /// 输入内容折行：每行最大宽度 = cols - prompt 显示宽度（最后一行行首带 prompt）。
 List<String> _wrapInput(String input, int cols) {
-  final prompt = '${_cyan}you>${_reset} ';
+  final prompt = '${_cyan}[我]${_reset} ';
   return _wrapByWidth(input, cols - _displayWidth(prompt));
 }
 
@@ -830,7 +830,7 @@ void _render() {
   // 与 _renderInputLine 的定位计算完全一致——否则消息少时输入区被画在
   // 屏幕中间，与局部重绘的底部定位不一致 → you> 跳动、上下重复。
   // 逐行定位 + 清行（\x1B[K），避免残留旧行。
-  final prompt = '${_cyan}you>${_reset} ';
+  final prompt = '${_cyan}[我]${_reset} ';
   final top = rows - inputWrapped.length + 1;
   for (var i = 0; i < inputWrapped.length; i++) {
     buf.write('\x1B[${top + i};1H'); // 定位输入区各行第 1 列
@@ -838,7 +838,7 @@ void _render() {
     if (i == 0) {
       buf.write(prompt);
     } else {
-      buf.write('      '); // 缩进对齐 prompt（'you> ' 宽度）
+      buf.write('      '); // 续行缩进（与 prompt '[我] ' 同宽，双宽字符按 5 列对齐）
     }
     buf.write(inputWrapped[i]);
     if (i < inputWrapped.length - 1) {
@@ -977,7 +977,7 @@ void _renderInputLine() {
     _render(); // 行数变化 → 消息区让位 → 全量重绘
     return;
   }
-  final prompt = '${_cyan}you>${_reset} ';
+  final prompt = '${_cyan}[我]${_reset} ';
   final promptW = _displayWidth(prompt);
   final top = rows - inputWrapped.length + 1; // 输入区顶部行号
 
