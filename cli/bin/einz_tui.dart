@@ -295,7 +295,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已有设备"要求邀请码，发起者自己被挡在门外）
   if (server.isNotEmpty && (store.deviceId == null || store.spaceId == null)) {
     try {
-      final r = await _busy(session, '⏳ 设备与空间绑定中......', () => ApiClient(server).enrollDevice(
+      final r = await _busy(session, '⏳ 设备登记中......', () => ApiClient(server).enrollDevice(
         deviceId: store.deviceId,
         publicKey: store.publicKey,
         personName: store.personName,
@@ -305,7 +305,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.personId = r.personId;
       store.spaceId = r.spaceId;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 您的设备已成功绑定到您的私密领地！'));
+      session.messages.add(_systemMessage(session, '✅ 您的设备已成功登记。'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
       if (!_state!.running) return; // 绑定期间被 /exit 或 Ctrl+C 中断：不再生成口令托管等
@@ -314,8 +314,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.spaceKey = base64Encode(sk);
       store.save(storePath);
       await _setupEscrowPassphrase(store, storePath, session);
-      session.messages.add(_systemMessage(session, '🎉 您的私密领地创建成功！输入 /invite 生成邀请码，邀请你的唯一伴侣加入吧！'));
-      session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
     } catch (e) {
       if (e is ApiException && e.code == 'INVALID_REQUEST') {
@@ -368,7 +366,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 请输入安全口令，即可解密你们的私密领地内容', required: true);
+      final passphrase = await _prompt(session, '❓ 请输入安全口令，才能查看您的私密领地内容', required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
