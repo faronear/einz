@@ -257,7 +257,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     final bName = _probePersonNames['personB'] ?? '尚未加入的伴侣';
     while (true) {
       if (!_state!.running) return; // /exit 或 Ctrl+C：立即结束引导
-      final choice = await _prompt(session, '❓ 如果你是空间创建者 $aName，请输入 1；如果你是 $bName，请输入 2');
+      final choice = await _prompt(session, '❓ 如果你是第一创建者 $aName，请输入 1；如果你是 $bName，请输入 2');
       if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
       if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
       session.messages.add(_systemMessage(session, '❓ 请输入 1 ($aName) 或 2 ($bName)'));
@@ -439,8 +439,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 未认证 → 引导认证（白名单已登记时 challenge-response 成功）
   if (store.sessionToken == null && server.isNotEmpty) {
     try {
-      await _busy(session, '⏳ 机密对话线路激活中......', () => session.auth());
-      session.messages.add(_systemMessage(session, '✅ 机密对话线路激活成功'));
+      await _busy(session, '⏳ 机密线路激活中......', () => session.auth());
+      session.messages.add(_systemMessage(session, '✅ 机密线路激活成功'));
       _scheduleRender();
     } catch (e) {
       if (e is ApiException && e.code == 'FORBIDDEN') {
@@ -452,7 +452,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         _scheduleRender();
         return; // 不再同步/起 WS
       }
-      session.messages.add(_systemMessage(session, '⚠️ 机密对话线路激活失败。可进入 TUI 后用 /auth 重试'));
+      session.messages.add(_systemMessage(session, '⚠️ 机密线路激活失败。可进入 TUI 后用 /auth 重试'));
       _scheduleRender();
     }
   }
@@ -1400,7 +1400,7 @@ Future<void> _execCommand(String line) async {
       try {
         await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
         // 激活结果作为 system 消息进消息流（不占顶部状态栏）
-        s.session.messages.add(_systemMessage(s.session, '✅ 机密对话线路激活成功'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 机密线路激活成功'));
         s.status = '';
         _refreshPersonNames(s); // 刷新 person 名称表（对方消息前缀显示其 person_name）
         // 激活成功后启动 WS 实时监听
@@ -1412,7 +1412,7 @@ Future<void> _execCommand(String line) async {
           );
         }
       } catch (e) {
-        s.session.messages.add(_systemMessage(s.session, '⚠️ 机密对话线路激活失败，请稍后再试 /auth'));
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 机密线路激活失败，请稍后再试 /auth'));
         s.status = '';
       }
     case '/space':
@@ -1614,7 +1614,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
         );
       }
     } catch (e) {
-      s.session.messages.add(_systemMessage(s.session, '⚠️ 机密对话线路激活失败: $e'));
+      s.session.messages.add(_systemMessage(s.session, '⚠️ 机密线路激活失败: $e'));
       s.status = '';
     }
   } catch (e) {
@@ -1731,12 +1731,27 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       store.personId = null;
       store.sessionToken = null;
       store.escrowUploaded = true; // 托管包仍在服务器（口令未变），不再要求重传
-      if (store.personName == null || store.personName!.isEmpty) {
-        final fallback = _probePersonNames['personA'] ?? '';
-        final hint = fallback.isEmpty ? '回车用默认' : '回车沿用 $fallback';
-        final name = (await _prompt(session, '❓ 请输入创建者名字（恢复后作为 personA 显示名，$hint）')).trim();
+      // 身份沿用：恢复者通常是原第一/第二所有者之一——按 1/2 选择后直接沿用
+      // 该原 owner 的 person_name（显示名表在 /recover 后仍在服务端，未清）
+      final aName = _probePersonNames['personA'] ?? '';
+      final bName = _probePersonNames['personB'] ?? '尚未加入的伴侣';
+      String? chosen;
+      while (true) {
         if (!_state!.running) return false;
-        store.personName = name.isNotEmpty ? name : (fallback.isNotEmpty ? fallback : null);
+        final answer = await _prompt(session, '❓ 恢复本空间设备：若您是原第一创建者 $aName，请输入 1；若您是原第二所有者 $bName，请输入 2');
+        if (!_state!.running) return false;
+        if (answer == '1' || answer.toLowerCase() == 'persona') { chosen = 'personA'; break; }
+        if (answer == '2' || answer.toLowerCase() == 'personb') { chosen = 'personB'; break; }
+        session.messages.add(_systemMessage(session, '❓ 请输入 1 ($aName) 或 2 ($bName)'));
+        _scheduleRender();
+      }
+      final originalName = _probePersonNames[chosen] ?? '';
+      if (originalName.isNotEmpty) {
+        store.personName = originalName; // 沿用原 owner 显示名
+      } else {
+        final name = (await _prompt(session, '❓ 请输入你的名字（$chosen 尚未设置显示名，可回车先跳过，稍后 /rename）')).trim();
+        if (!_state!.running) return false;
+        store.personName = name.isEmpty ? null : name;
       }
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 全丢恢复成功：空间已重置，即将以创建者身份重新登记（历史密文可继续解密）'));
