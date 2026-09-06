@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { argon2id, argon2Verify } from "hash-wasm";
 
 // libsodium-wrappers 的 ESM 入口（dist/modules-esm）在 Node ESM 下损坏（缺 libsodium.mjs），
 // 统一用 CJS 构建（dist/modules/libsodium-wrappers.js）。
@@ -50,4 +51,31 @@ export function constantTimeEqualB64(a: string, b: string): boolean {
   let diff = 0;
   for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
   return diff === 0;
+}
+
+/**
+ * 口令 argon2id 哈希（PHC 编码 `$argon2id$…`，与客户端 sodium pwhashStr 同格式）。
+ * 仅用于"口令是否匹配"的服务端验证（恢复接口 /recover），不用于任何密钥派生。
+ * libsodium-wrappers 不暴露 pwhash API，这里用纯 wasm 的 hash-wasm（参数≈MODERATE）。
+ */
+export async function pwhashStr(passphrase: string): Promise<string> {
+  const salt = await randomBytes(16);
+  return argon2id({
+    password: passphrase,
+    salt,
+    parallelism: 1,
+    iterations: 3,
+    memorySize: 65536, // 64 MiB（≈ libsodium OPSLIMIT_MODERATE / MEMLIMIT_MODERATE）
+    hashLength: 32,
+    outputType: "encoded",
+  });
+}
+
+/** 验证口令是否匹配哈希（PHC 格式，兼容客户端 sodium 生成的 $argon2id$ 哈希）。 */
+export async function pwhashStrVerify(hashed: string, passphrase: string): Promise<boolean> {
+  try {
+    return await argon2Verify({ password: passphrase, hash: hashed });
+  } catch {
+    return false;
+  }
 }

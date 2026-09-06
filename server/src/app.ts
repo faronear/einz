@@ -7,7 +7,7 @@ import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./attachments.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
-import { deleteKeyEscrow, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
+import { deleteKeyEscrow, getKeyEscrow, recoverSpace, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -199,6 +199,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/key-escrow") {
     const body = await readJson(req);
     sendJson(res, 200, uploadKeyEscrow(cfg, bearer(req), body));
+    return;
+  }
+  if (method === "POST" && path === "/recover") {
+    // 全丢恢复（免认证）：凭 escrow 口令验证后撤销全部设备，新设备可重新首设备自举
+    const body = await readJson(req);
+    sendJson(res, 200, await recoverSpace(cfg, body));
     return;
   }
   if (method === "GET" && path === "/key-escrow") {

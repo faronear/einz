@@ -189,12 +189,6 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
     store = await DeviceStore.create();
-    // 设备默认名与公私钥生成同步设置（宿主机名去 .local；可随时 /device 修改）——
-    // store 为空即生成身份并命名，不拖到引导阶段（产品决定）
-    final autoName = _defaultDeviceName();
-    if (autoName.isNotEmpty) {
-      store.deviceName = autoName;
-    }
     // 自动模式（无 --store）→ 存默认目录 ~/.einz/myeinz.json（固定文件名，无临时名/重命名）
     if (storePath.isEmpty) {
       final dir = _defaultStoreDir();
@@ -207,10 +201,6 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     _guidanceNotes.add('✅ 新设备加密凭证已生成，公钥为：');
     stdout.writeln('   ${store.publicKey}');
     _guidanceNotes.add('   ${store.publicKey}');
-    if (autoName.isNotEmpty) {
-      stdout.writeln('✅ 已设置默认设备名称: $autoName（可随时 /device 修改）');
-      _guidanceNotes.add('✅ 已设置默认设备名称: $autoName（可随时 /device 修改）');
-    }
     stdout.writeln('----------------');
     _guidanceNotes.add('----------------');
   }
@@ -276,17 +266,18 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       stderr.writeln('⚠️ 名称处理异常'); // 防崩 + 可诊断
     }
   }
-  // 设备名称兜底：默认名已在新设备 store 创建时（_onboard，生成公私钥同步）设置；
-  // 此处仅为旧版本/其他工具创建的存量 store（deviceName 仍空且未登记）补设默认名，
-  // 避免登记后状态条回退 devN。已登记设备不改名；hostname 异常回退空（服务端 devN 兜底）
+  // 设备名称（如 MacBook，回车不设置，以后可修改）——仅新设备（未登记）首次配置时询问；
+  // 已登记设备重启不再重复询问（首次跳过则一直不设，状态条回退规范 id dev1）
   if (store.deviceId == null && (store.deviceName == null || store.deviceName!.isEmpty)) {
-    final auto = _defaultDeviceName();
-    if (auto.isNotEmpty) {
-      store.deviceName = auto;
-      session.messages.add(_systemMessage(session, '✅ 已自动设置设备名称: $auto（可随时 /device 修改）'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
+    final name = await _prompt(session, '❓ 请输入设备名称（例如 MacBook，或者直接回车先跳过）');
+    if (!_state!.running) return; // 退出中（/exit 已置 running=false，_prompt 返回空串）：不再"自动设置设备名/绑定"，直接结束引导
+    if (name.isNotEmpty) {
+      store.deviceName = name;
+      session.messages.add(_systemMessage(session, '✅ 您已设置设备名称: $name, 您可随时 /device 进行修改。'));
+    } else {
+      session.messages.add(_systemMessage(session, '✅ 系统将为您自动设置本设备名称, 您可随时 /device 进行修改。'));
     }
+    session.messages.add(_systemMessage(session, '----------------'));
   }
   store.save(storePath);
 
@@ -1703,21 +1694,4 @@ void _abortPendingGuide() {
   if (c != null && !c.isCompleted) c.complete('');
   _state?.pendingGuideCompleter = null;
   _state?.hiddenInput = false;
-}
-
-/// 新设备的默认名称：宿主机名去 .local 后缀（Platform.localHostname 形如
-/// 'lukde-MacBook-Pro.local'）并截断到 32 字符；异常/空值/localhost 回退
-/// 空串（不设置 deviceName，由服务端用规范 id devN 兜底）。
-String _defaultDeviceName() {
-  try {
-    var name = Platform.localHostname.trim();
-    if (name.toLowerCase() == 'localhost') return '';
-    if (name.endsWith('.local')) {
-      name = name.substring(0, name.length - '.local'.length);
-    }
-    name = name.trim();
-    return name.length > 32 ? name.substring(0, 32) : name;
-  } catch (_) {
-    return '';
-  }
 }

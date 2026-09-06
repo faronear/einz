@@ -20,6 +20,7 @@ class Api {
   static const pushRegister = '/push/register';
   static const space = '/space';
   static const keyEscrow = '/key-escrow';
+  static const recover = '/recover'; // 全丢恢复（免认证，凭 escrow 口令重置空间）
 }
 
 /// 认证挑战结果。

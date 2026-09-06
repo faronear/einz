@@ -13,7 +13,7 @@ class FakeApi extends ApiClient {
   bool deleted = false;
 
   @override
-  Future<void> uploadKeyEscrow(BackupFile package, String token) async {
+  Future<void> uploadKeyEscrow(BackupFile package, String token, {String? passphraseHash}) async {
     stored = package;
   }
 
@@ -89,5 +89,15 @@ void main() {
     await escrow.remove('tok');
     expect(api.deleted, true);
     expect(await escrow.fetch(passphrase: '口令', token: 'tok'), isNull);
+  });
+
+  test(r'hashPassphrase：生成 argon2id 哈希（$argon2id$ 前缀），不同口令哈希不同', () async {
+    final escrow = KeyEscrowService(FakeApi());
+    final h1 = await escrow.hashPassphrase('pass-123');
+    final h2 = await escrow.hashPassphrase('other-456');
+    // crypto_pwhash_str 自含随机盐：同口令两次也不同，只断言前缀与区分度
+    expect(h1.startsWith(r'$argon2id$'), isTrue, reason: '应为 libsodium argon2id 哈希格式');
+    expect(h1.length, greaterThan(50), reason: '哈希字符串应含完整参数头与哈希值');
+    expect(h1, isNot(h2), reason: '不同口令生成的哈希应不同');
   });
 }

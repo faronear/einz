@@ -47,6 +47,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '1) 生成设备密钥 → 自动登记入网（无需任何白名单）\n2) 创建或加入私密空间 → 设置启动锁';
 
   @override
+  String get setupPageDeviceIdLabel => '设备 ID';
+
+  @override
+  String get setupPageDeviceIdHint => '例如 MacBook（可选，之后可改）';
+
+  @override
   String get setupPageSpaceIdLabel => 'Space ID';
 
   @override
@@ -169,39 +175,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleAdvanced => '高级：导入 sealed 密钥副本';
 
   @override
-  String get wizardRecoverTitle => '从备份恢复';
-
-  @override
-  String get wizardRecoverHint =>
-      '全部设备丢失？粘贴导出的密钥备份（EINZ-BACKUP: 开头）并输入口令；口令正确将重置空间并恢复本设备';
-
-  @override
-  String get wizardRecoverBackupLabel => '备份文本（EINZ-BACKUP: 开头）';
-
-  @override
-  String get wizardRecoverPassphraseLabel => '备份口令';
-
-  @override
-  String get wizardRecoverStart => '恢复';
-
-  @override
-  String get wizardRecoverInvalidFormat => '备份格式无效（需以 EINZ-BACKUP: 开头）';
-
-  @override
-  String get wizardRecoverBadPassphrase => '口令错误或备份损坏';
-
-  @override
-  String wizardRecoverFailed(String error) {
-    return '恢复失败: $error';
-  }
-
-  @override
-  String get wizardRecoverEnrolling => '正在登记本设备…';
-
-  @override
-  String get wizardRecoverDone => '✅ 已恢复：本设备已入网，请设置 PIN 完成';
-
-  @override
   String get wizardAppBarCreate => '创建新空间';
 
   @override
@@ -218,6 +191,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardDone => '完成';
+
+  @override
+  String get wizardStepDevice => '设备名称';
 
   @override
   String get wizardStepName => '你的名字';
@@ -382,30 +358,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageMenuInvite => '邀请码';
-
-  @override
-  String get chatPageMenuExport => '导出密钥备份';
-
-  @override
-  String get chatPageExportTitle => '导出密钥备份';
-
-  @override
-  String get chatPageExportPassphraseLabel => '备份口令（加密备份文件；与备份分开保管）';
-
-  @override
-  String get chatPageExportGenerate => '生成备份';
-
-  @override
-  String get chatPageExportGenerated => '加密备份文本（请与口令分开离线保存）：';
-
-  @override
-  String get chatPageExportCopy => '复制';
-
-  @override
-  String get chatPageExportCopied => '备份文本已复制';
-
-  @override
-  String get chatPageExportHint => '全部设备丢失时：用此备份 + 口令恢复（需服务端已托管口令）';
 
   @override
   String get chatPagePinSet => 'PIN: 已设置';

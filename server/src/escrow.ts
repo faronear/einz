@@ -1,6 +1,7 @@
 import { getDb } from "./db.js";
 import { ApiError, resolveSession } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
+import { pwhashStrVerify } from "./crypto.js";
 
 /**
  * 口令托管密钥（KEY_ESCROW.md §4）：Server 只托管"被口令加密的 Space Key 包"，
@@ -27,20 +28,59 @@ function parsePackage(raw: unknown): EscrowPackage {
   return p as unknown as EscrowPackage;
 }
 
-/** POST /key-escrow：上传/更新密文包（UPSERT，按 space 一份）。 */
+/** POST /key-escrow：上传/更新密文包（UPSERT，按 space 一份）。
+ *  可选附 `passphrase_hash`（argon2id，恢复接口 /recover 校验口令用）。 */
 export function uploadKeyEscrow(cfg: ServerConfig, token: string, body: unknown): { ok: true } {
   const { device_id } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
 
   const pkg = parsePackage((body as { package?: unknown })?.package);
+  const passphraseHash = (body as { passphrase_hash?: unknown })?.passphrase_hash;
+  if (passphraseHash !== undefined && (typeof passphraseHash !== "string" || passphraseHash.length === 0)) {
+    throw new ApiError("INVALID_REQUEST", "invalid passphrase_hash", 400);
+  }
   getDb()
     .prepare(
-      `INSERT INTO key_escrow (space_id, package, updated_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(space_id) DO UPDATE SET package = excluded.package, updated_at = excluded.updated_at`
+      `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(space_id) DO UPDATE SET
+         package = excluded.package,
+         passphrase_hash = excluded.passphrase_hash,
+         updated_at = excluded.updated_at`
     )
-    .run(cfg.space_id, JSON.stringify(pkg), Date.now());
+    .run(cfg.space_id, JSON.stringify(pkg), passphraseHash ?? null, Date.now());
   return { ok: true };
+}
+
+/**
+ * POST /recover：全丢恢复（免认证——新设备尚未登记，凭"escrow 口令"作为管理员凭据）。
+ * 口令用上传时存的 argon2id 哈希验证；通过后撤销全部 active 设备（空间重置），
+ * 新设备可再次首设备自举。安全边界：口令即空间级管理员密钥，须妥善保管。
+ */
+export async function recoverSpace(cfg: ServerConfig, body: unknown): Promise<{ ok: true; revoked: number }> {
+  const passphrase = (body as { passphrase?: unknown })?.passphrase;
+  if (typeof passphrase !== "string" || passphrase.length === 0) {
+    throw new ApiError("INVALID_REQUEST", "passphrase 必填", 400);
+  }
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT passphrase_hash FROM key_escrow WHERE space_id = ?`)
+    .get(cfg.space_id) as { passphrase_hash: string | null } | undefined;
+  if (!row || !row.passphrase_hash) {
+    throw new ApiError("FORBIDDEN", "该空间未托管口令（escrow 未上传），无法恢复", 403);
+  }
+  if (!(await pwhashStrVerify(row.passphrase_hash, passphrase))) {
+    throw new ApiError("FORBIDDEN", "口令错误", 403);
+  }
+
+  // 撤销全部 active 设备 + 清会话/推送令牌/邀请码 → 空间回到"空"状态，新设备可首设备自举
+  const revoked = db
+    .prepare(`UPDATE devices SET status = 'revoked', last_seen = ? WHERE status = 'active'`)
+    .run(Date.now()).changes;
+  db.prepare(`DELETE FROM sessions`).run();
+  db.prepare(`DELETE FROM push_tokens`).run();
+  db.prepare(`DELETE FROM invites`).run();
+  return { ok: true, revoked };
 }
 
 /** GET /key-escrow：拉取密文包（无包时返回空对象）。 */

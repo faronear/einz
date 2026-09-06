@@ -47,6 +47,13 @@ class AppLocalizationsEn extends AppLocalizations {
       '1) Generate device key → the device registers automatically (no whitelist needed)\n2) Create or join the private space → set up the app lock';
 
   @override
+  String get setupPageDeviceIdLabel => 'Device ID';
+
+  @override
+  String get setupPageDeviceIdHint =>
+      'e.g. MacBook (optional, can change later)';
+
+  @override
   String get setupPageSpaceIdLabel => 'Space ID';
 
   @override
@@ -182,43 +189,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleAdvanced => 'Advanced: import a sealed key copy';
 
   @override
-  String get wizardRecoverTitle => 'Restore from backup';
-
-  @override
-  String get wizardRecoverHint =>
-      'Lost all devices? Paste the exported key backup (starts with EINZ-BACKUP:) and the passphrase; a correct passphrase resets the space and restores this device';
-
-  @override
-  String get wizardRecoverBackupLabel =>
-      'Backup text (starts with EINZ-BACKUP:)';
-
-  @override
-  String get wizardRecoverPassphraseLabel => 'Backup passphrase';
-
-  @override
-  String get wizardRecoverStart => 'Restore';
-
-  @override
-  String get wizardRecoverInvalidFormat =>
-      'Invalid backup format (must start with EINZ-BACKUP:)';
-
-  @override
-  String get wizardRecoverBadPassphrase =>
-      'Wrong passphrase or corrupted backup';
-
-  @override
-  String wizardRecoverFailed(String error) {
-    return 'Restore failed: $error';
-  }
-
-  @override
-  String get wizardRecoverEnrolling => 'Enrolling this device…';
-
-  @override
-  String get wizardRecoverDone =>
-      '✅ Restored: device enrolled — set a PIN to finish';
-
-  @override
   String get wizardAppBarCreate => 'Create a new space';
 
   @override
@@ -235,6 +205,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardDone => 'Done';
+
+  @override
+  String get wizardStepDevice => 'Device name';
 
   @override
   String get wizardStepName => 'Your name';
@@ -411,33 +384,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMenuInvite => 'Invite code';
-
-  @override
-  String get chatPageMenuExport => 'Export key backup';
-
-  @override
-  String get chatPageExportTitle => 'Export key backup';
-
-  @override
-  String get chatPageExportPassphraseLabel =>
-      'Backup passphrase (encrypts the backup; keep separate)';
-
-  @override
-  String get chatPageExportGenerate => 'Generate backup';
-
-  @override
-  String get chatPageExportGenerated =>
-      'Encrypted backup text (keep offline, separate from the passphrase):';
-
-  @override
-  String get chatPageExportCopy => 'Copy';
-
-  @override
-  String get chatPageExportCopied => 'Backup text copied';
-
-  @override
-  String get chatPageExportHint =>
-      'If all devices are lost: restore with this backup + passphrase (requires server escrow)';
 
   @override
   String get chatPagePinSet => 'PIN: set';

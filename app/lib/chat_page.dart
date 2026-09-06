@@ -329,6 +329,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() => _hasPin = has);
   }
 
+  /// 导出密钥备份（预防全丢）：弹窗输入口令 → 口令加密 Space Key 包（与 escrow
+  /// 同格式）→ 生成可粘贴/保存的备份文本，离线保管。
+  Future<void> _showExportBackupDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ExportBackupDialog(
+        spaceKeyB64: base64Encode(widget.spaceKey),
+        spaceId: widget.spaceId,
+        keyVersion: widget.keyVersion,
+      ),
+    );
+  }
+
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
   Future<void> _showBurnPicker() async {
     final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
@@ -960,6 +973,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _showInviteDialog();
                   case 'pin':
                     _showSetLockDialog();
+                  case 'export':
+                    _showExportBackupDialog();
                 }
               });
             },
@@ -980,6 +995,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'pin',
                   child: Text(_hasPin ? l10n.chatPagePinSet : l10n.chatPagePinUnset),
                 ),
+                PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
               ];
             },
           ),
@@ -1154,6 +1170,130 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
         FilledButton(onPressed: _submit, child: Text(l10n.setPinDialogSetPin)),
+      ],
+    );
+  }
+}
+
+/// 导出密钥备份弹窗（StatefulWidget）：输入口令 → 口令加密 Space Key 包
+/// （与 escrow 同格式，encryptBackup）→ 生成可粘贴/保存的备份文本，离线保管。
+/// 备份文本 = `EINZ-BACKUP:` + base64(BackupFile JSON)；恢复时（向导）据此识别。
+class _ExportBackupDialog extends StatefulWidget {
+  const _ExportBackupDialog({
+    required this.spaceKeyB64,
+    required this.spaceId,
+    required this.keyVersion,
+  });
+
+  final String spaceKeyB64;
+  final String spaceId;
+  final int keyVersion;
+
+  @override
+  State<_ExportBackupDialog> createState() => _ExportBackupDialogState();
+}
+
+class _ExportBackupDialogState extends State<_ExportBackupDialog> {
+  final _passphraseCtrl = TextEditingController();
+  bool _busy = false;
+  String? _error;
+  String? _backupText;
+
+  @override
+  void dispose() {
+    _passphraseCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _generate() async {
+    final l10n = AppLocalizations.of(context)!;
+    final passphrase = _passphraseCtrl.text.trim();
+    if (passphrase.isEmpty) {
+      setState(() => _error = l10n.setupPageNeedPassphrase);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final payload = Uint8List.fromList(utf8.encode(jsonEncode({
+        'space_key': widget.spaceKeyB64,
+        'space_id': widget.spaceId,
+        'key_version': widget.keyVersion,
+      })));
+      final file = await encryptBackup(payload: payload, recoveryCode: passphrase);
+      final text = kBackupExportPrefix +
+          base64Encode(utf8.encode(jsonEncode(file.toJson())));
+      if (!mounted) return;
+      setState(() => _backupText = text);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = l10n.setupPageKeyGenFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final text = _backupText;
+    return AlertDialog(
+      title: Text(l10n.chatPageExportTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (text == null) ...[
+            TextField(
+              controller: _passphraseCtrl,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: l10n.chatPageExportPassphraseLabel,
+                border: const OutlineInputBorder(),
+              ),
+              onSubmitted: (_) {
+                if (!_busy) _generate();
+              },
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+            ],
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _busy ? null : _generate,
+              child: Text(l10n.chatPageExportGenerate),
+            ),
+          ] else ...[
+            Text(l10n.chatPageExportGenerated,
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: SingleChildScrollView(
+                child: SelectableText(text,
+                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(l10n.chatPageExportHint,
+                style: const TextStyle(fontSize: 11, color: Colors.orange)),
+            const SizedBox(height: 8),
+            FilledButton.tonal(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: text));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.chatPageExportCopied)));
+              },
+              child: Text(l10n.chatPageExportCopy),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
       ],
     );
   }
