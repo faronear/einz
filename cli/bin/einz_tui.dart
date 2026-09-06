@@ -252,7 +252,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       }
     } else if (chosenPerson == 'personA') {
       store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
-      session.messages.add(_systemMessage(session, '✅ 欢迎 $aName 的新设备加入！'));
+      session.messages.add(_systemMessage(session, '✅ 欢迎 $aName 登记您的新设备！'));
     }
     session.messages.add(_systemMessage(session, '----------------'));
     _scheduleRender();
@@ -274,18 +274,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       session.messages.add(_systemMessage(session, '----------------'));
     } catch (e) {
       stderr.writeln('⚠️ 名称处理异常'); // 防崩 + 可诊断
-    }
-  }
-  // 设备名称兜底：默认名已在新设备 store 创建时（_onboard，生成公私钥同步）设置；
-  // 此处仅为旧版本/其他工具创建的存量 store（deviceName 仍空且未登记）补设默认名，
-  // 避免登记后状态条回退 devN。已登记设备不改名；hostname 异常回退空（服务端 devN 兜底）
-  if (store.deviceId == null && (store.deviceName == null || store.deviceName!.isEmpty)) {
-    final auto = _defaultDeviceName();
-    if (auto.isNotEmpty) {
-      store.deviceName = auto;
-      session.messages.add(_systemMessage(session, '✅ 已自动设置设备名称: $auto（可随时 /device 修改）'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
     }
   }
   store.save(storePath);
@@ -1636,7 +1624,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 口令加密的私密领地托管包已上传'));
       session.messages.add(_systemMessage(session, '----------------'));
-      session.messages.add(_systemMessage(session, '🎉 您的私密领地创建成功！输入 /invite 生成邀请码，邀请你的唯一伴侣加入吧！'));
+      session.messages.add(_systemMessage(session, '🎉 您的私密领地已成功建立！输入 /invite 生成邀请码，邀请你的唯一伴侣加入吧！'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return;
