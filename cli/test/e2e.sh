@@ -48,7 +48,7 @@ dart run bin/einz.dart import \
 
 echo "==> 4. 启动 Server（临时白名单 $WORK/config.json）"
 (cd "$ROOT/server" && EINZ_CONFIG="$WORK/config.json" \
-  EINZ_DB="$WORK/app.db" \
+  EINZ_DB="$WORK/einz.sqlite.db" \
   EINZ_FILES="$WORK/files" \
   PORT="$PORT" node dist/app.js >"$WORK/server.log" 2>&1) &
 SERVER_PID=$!
@@ -83,7 +83,7 @@ else
 fi
 node -e "
 const Database = require('$ROOT_WIN/server/node_modules/better-sqlite3');
-const db = new Database('$WORK_WIN/app.db', { readonly: true });
+const db = new Database('$WORK_WIN/einz.sqlite.db', { readonly: true });
 const rows = db.prepare('SELECT ciphertext FROM messages').all();
 if (rows.length === 0) { console.error('❌ 数据库无消息'); process.exit(1); }
 const all = JSON.stringify(rows);

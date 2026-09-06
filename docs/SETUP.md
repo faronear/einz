@@ -122,7 +122,7 @@ docker compose up -d --build
 | 白名单生效 | 用未登记公钥的设备请求 `/auth/challenge` | 403 |
 | 认证闭环 | A 完成 challenge-response | 拿到 session_token |
 | E2EE 闭环 | A 发密文 → B 同步 → B 解密 | 明文只在两端 |
-| Server 无明文 | 检查 `data/app.db` 的 messages 表 | 只有 ciphertext |
+| Server 无明文 | 检查 `data/einz.sqlite.db` 的 messages 表 | 只有 ciphertext |
 | 恢复码 | 导出备份并尝试导入 | 可恢复 |
 
 > 端到端自动化验证已由 `server/test/smoke.test.ts` 覆盖（认证 / E2EE 密文 / 幂等 / 同步 / 白名单 / 明文隔离 / WS 实时）。
@@ -144,7 +144,7 @@ docker compose up -d --build
 
 ### 备份（运维）
 
-- 定期备份 `deployment/data/`（app.db 用 SQLite Backup API，禁止直接复制运行中的 db）+ 加密文件目录（DATABASE.md §6）。
+- 定期备份 `deployment/data/`（einz.sqlite.db 用 SQLite Backup API，禁止直接复制运行中的 db）+ 加密文件目录（DATABASE.md §6）。
 
 ---
 

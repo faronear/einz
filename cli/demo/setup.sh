@@ -41,7 +41,7 @@ if kill -0 "$(cat demo/server.pid 2>/dev/null)" 2>/dev/null; then
   echo "    server 已在运行"
 else
   (cd "$ROOT/../server" && EINZ_CONFIG="$DEMO/config.json" \
-    EINZ_DB="$DEMO/app.db" \
+    EINZ_DB="$DEMO/einz.sqlite.db" \
     EINZ_FILES="$DEMO/files" \
     PORT="$PORT" nohup node dist/app.js >"$DEMO/server.log" 2>&1 & echo $! > "$DEMO/server.pid")
   for i in $(seq 1 30); do

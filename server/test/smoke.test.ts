@@ -22,6 +22,7 @@ import { join, resolve } from "node:path";
 import { WebSocket } from "ws";
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
+import { pwhashStr } from "../src/crypto.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const HELLO = "hello b, this is a secret message ❤️";
@@ -207,7 +208,7 @@ async function main(): Promise<void> {
     env: {
       ...process.env,
       PORT: String(port),
-      EINZ_DB: join(tempDir, "app.db"),
+      EINZ_DB: join(tempDir, "einz.sqlite.db"),
       EINZ_FILES: join(tempDir, "files"),
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -264,7 +265,7 @@ async function main(): Promise<void> {
     assert.equal(decrypted, HELLO, "B must decrypt the message correctly");
 
     // 8) 数据库核查：messages 表只有密文，无明文
-    const db = new Database(join(tempDir, "app.db"), { readonly: true });
+    const db = new Database(join(tempDir, "einz.sqlite.db"), { readonly: true });
     const row = db.prepare(`SELECT ciphertext FROM messages WHERE message_id = 'msg-0001'`).get() as { ciphertext: string };
     assert.ok(row.ciphertext.length > 0, "ciphertext stored");
     assert.ok(!row.ciphertext.includes(HELLO), "DB must not contain plaintext");
@@ -325,7 +326,7 @@ async function main(): Promise<void> {
     const escrowNoAuth = await fetch(`http://127.0.0.1:${port}/key-escrow`);
     assert.equal(escrowNoAuth.status, 401, "missing token must be rejected");
 
-    const escrowDb = new Database(join(tempDir, "app.db"), { readonly: true });
+    const escrowDb = new Database(join(tempDir, "einz.sqlite.db"), { readonly: true });
     const escrowRow = escrowDb.prepare(`SELECT package FROM key_escrow`).get() as { package: string };
     assert.ok(escrowRow.package.includes(escrowPkg.ciphertext), "package stored verbatim (server must not parse content)");
     escrowDb.close();
@@ -350,7 +351,7 @@ async function main(): Promise<void> {
         env: {
           ...process.env,
           PORT: String(port2),
-          EINZ_DB: join(tempDir2, "app.db"),
+          EINZ_DB: join(tempDir2, "einz.sqlite.db"),
           EINZ_FILES: join(tempDir2, "files"),
         },
         stdio: ["ignore", "pipe", "pipe"],
@@ -407,10 +408,43 @@ async function main(): Promise<void> {
       }
     }
 
+    // 12) 全丢恢复 /recover（免认证）：上传带口令哈希的 escrow → 错误口令 403 →
+    //     正确口令 200 撤销全部设备 → devices 全 revoked（空间可重新首设备自举）
+    const recoverPass = "recover-pass-123";
+    const recoverHash = await pwhashStr(recoverPass);
+    const escrowRec = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${devA.sessionToken}` },
+      body: JSON.stringify({ package: escrowPkg, passphrase_hash: recoverHash }),
+    });
+    assert.equal(escrowRec.status, 200, "escrow upload with passphrase_hash should succeed");
+
+    const recoverBad = await fetch(`http://127.0.0.1:${port}/recover`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: "wrong-pass" }),
+    });
+    assert.equal(recoverBad.status, 403, "wrong passphrase must be rejected");
+
+    const recoverOk = await fetch(`http://127.0.0.1:${port}/recover`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: recoverPass }),
+    });
+    assert.equal(recoverOk.status, 200, "correct passphrase should reset the space");
+    const recoverBody = (await recoverOk.json()) as { ok: boolean; revoked: number };
+    assert.equal(recoverBody.ok, true, "recover should return ok");
+    assert.ok(recoverBody.revoked >= 2, "all active devices (A+B) should be revoked");
+
+    const recDb = new Database(join(tempDir, "einz.sqlite.db"), { readonly: true });
+    const recActive = (recDb.prepare(`SELECT COUNT(*) AS n FROM devices WHERE status = 'active'`).get() as { n: number }).n;
+    assert.equal(recActive, 0, "no active devices left after recover");
+    recDb.close();
+
     console.log("✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 名称默认值");
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，
-    // 否则 app.db 句柄未释放，rmSync 会报 EBUSY。
+    // 否则 einz.sqlite.db 句柄未释放，rmSync 会报 EBUSY。
     await new Promise<void>((done) => {
       if (!serverProc || serverProc.exitCode !== null) {
         done();

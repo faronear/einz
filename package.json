@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "server-new-local": "cd server && rm -fr data/app.db* && npm run start",
-    "server-new": "cd deployment; git pull; rm -fr data/app.db*; docker compose down; docker compose up -d; docker compose logs -f server",
+    "server-new-local": "cd server && rm -fr data/einz.sqlite.db* && npm run dev",
+    "server-new": "cd deployment; git pull; rm -fr data/einz.sqlite.db*; docker compose down; docker compose up -d; docker compose logs -f server",
+    "app-new": "xcrun simctl uninstall booted cc.tic.einz; cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --pid-file /tmp/einz_flutter.pid",
+    "app": "cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --pid-file /tmp/einz_flutter.pid",
     "tui1-new-local": "cd cli && rm -f demo/s1.json && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
     "tui1-local": "cd cli && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
     "tui2-new-local": "cd cli && rm -f demo/s2.json && dart run bin/einz_tui.dart --store demo/s2.json --server http://localhost:3000",

@@ -32,7 +32,7 @@ start_server() {
   # 用 exec 替换 subshell 为 node，使 $! 直接是 node 进程（Git Bash 下 kill subshell 杀不掉子进程）
   (cd "$ROOT/server" && exec env \
     EINZ_CONFIG="$WORK/config.json" \
-    EINZ_DB="$WORK/app.db" \
+    EINZ_DB="$WORK/einz.sqlite.db" \
     EINZ_FILES="$WORK/files" \
     PORT="$PORT" node dist/app.js >"$WORK/server.log" 2>&1) &
   SERVER_PID=$!
@@ -86,7 +86,7 @@ step "6. Server 明文隔离检查（DB 与 files/ 均不应出现明文）"
 python - "$(cygpath -m "$WORK")" "$MESSAGE" <<'EOF'
 import json, os, sqlite3, sys
 work, secret = sys.argv[1], sys.argv[2]
-db = sqlite3.connect(os.path.join(work, 'app.db'))
+db = sqlite3.connect(os.path.join(work, 'einz.sqlite.db'))
 rows = db.execute("SELECT attachment_id, message_id, size, sha256, nonce FROM attachments").fetchall()
 assert len(rows) == 1, f"期望 1 条附件元数据，实际 {len(rows)}"
 print("✅ attachments 表 1 条元数据，无明文（sha256/nonce 均不含明文）")

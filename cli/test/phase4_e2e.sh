@@ -34,7 +34,7 @@ start_server() {
   # exec 替换 subshell 为 node，使 $! 直接是 node 进程（Git Bash 下 kill subshell 杀不掉子进程）
   (cd "$ROOT/server" && exec env \
     EINZ_CONFIG="$WORK/config.json" \
-    EINZ_DB="$WORK/app.db" \
+    EINZ_DB="$WORK/einz.sqlite.db" \
     EINZ_FILES="$WORK/files" \
     PORT="$PORT" node dist/app.js >"$WORK/server.log" 2>&1) &
   SERVER_PID=$!

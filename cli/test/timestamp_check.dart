@@ -18,7 +18,7 @@ Future<void> main() async {
 
   // 1) 拉起临时 server（子进程，结束时杀掉）
   final proc = await Process.start('node', ['dist/app.js'], workingDirectory: serverDir, environment: {
-    'EINZ_DB': '$rootDir/cli/demo/app.db',
+    'EINZ_DB': '$rootDir/cli/demo/einz.sqlite.db',
     'EINZ_FILES': '$rootDir/cli/demo/files',
     'PORT': '$port',
   });

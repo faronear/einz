@@ -156,7 +156,7 @@ deployment/
 ├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server 两个服务（部署时拷贝为 docker-compose.yml）
 ├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000（可选）
 ├── config/config.json    # 白名单（禁止提交 Git；由 2.2 生成后拷入）
-└── data/                 # 数据卷映射：app.db + files/ + backups/
+└── data/                 # 数据卷映射：einz.sqlite.db + files/ + backups/
 ```
 
 前置：一台 VPS（域名 DNS 指向它，开放 80/443）、Docker + Compose。
@@ -200,7 +200,7 @@ CLI 设备改用 `--server https://<你的域名>` 即可远程使用（WS 地�
 
 | 项        | 位置（容器内）           | 说明                                         |
 | --------- | ------------------------ | -------------------------------------------- |
-| `app.db`  | `/data/app.db`           | SQLite（消息密文、设备表、会话、push token） |
+| `einz.sqlite.db`  | `/data/einz.sqlite.db` | SQLite（消息密文、设备表、会话、push token） |
 | 附件 blob | `/data/files/`           | 密文文件，按 attachment_id 前 2 位分片       |
 | 备份产物  | `/data/backups/`         | `npm run backup` 的加密归档                  |
 | 白名单    | `/config/config.json`    | 只读挂载，启动时加载                         |
@@ -232,13 +232,13 @@ cd server   # 或 docker compose exec server npm run backup
 # 备份（需 EINZ_DB_BACKUP_KEY，base64 32B）
 export EINZ_DB_BACKUP_KEY="<部署时生成的密钥>"
 npm run backup -- --verify
-# 产物：data/backups/backup-<ts>.json（AES-256-GCM 加密的 app.db + files/ + config.json）
+# 产物：data/backups/backup-<ts>.json（AES-256-GCM 加密的 einz.sqlite.db + files/ + config.json）
 
 # 恢复（覆盖当前数据，先停服务再执行）
 npm run restore -- data/backups/backup-<ts>.json
 ```
 
-- **为什么用 SQLite Backup API**：`app.db` 运行中直接复制可能损坏；Backup API 在线备份安全（DATABASE.md §6）。
+- **为什么用 SQLite Backup API**：`einz.sqlite.db` 运行中直接复制可能损坏；Backup API 在线备份安全（DATABASE.md §6）。
 - **演练建议**：定期执行"备份 → 删除 data → 恢复 → 重启验证消息仍在"（Phase 4 已提供完整演练流程，见 `cli/test/phase4_e2e.sh` 段 7–8 及 worklog）。
 - **备份密钥保管**：与服务器数据分开存放（如密码管理器）；丢失密钥 = 备份不可恢复。
 
@@ -282,7 +282,7 @@ dart run bin/einz.dart import \
 
 | 数据                           | 手段                                    | 频率建议        |
 | ------------------------------ | --------------------------------------- | --------------- |
-| Server app.db + files + config | `npm run backup`（加密归档到 backups/） | 每日（可 cron） |
+| Server einz.sqlite.db + files + config | `npm run backup`（加密归档到 backups/） | 每日（可 cron） |
 | 客户端密钥 + 历史              | `backup` 命令（恢复码加密）             | 每次重大变更后  |
 | 恢复码 / 备份密钥              | 离线多份                                | 永久            |
 

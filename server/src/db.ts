@@ -9,7 +9,7 @@ let db: Database.Database | null = null;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** 打开（或创建）SQLite，按 DATABASE.md §2 建表。 */
-export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/app.db")): Database.Database {
+export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz.sqlite.db")): Database.Database {
   mkdirSync(dirname(path), { recursive: true });
   db = new Database(path);
   db.pragma("journal_mode = WAL");
@@ -61,9 +61,10 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/app.
     );
 
     CREATE TABLE IF NOT EXISTS key_escrow (
-      space_id   TEXT PRIMARY KEY,
-      package    TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
+      space_id        TEXT PRIMARY KEY,
+      package         TEXT NOT NULL,
+      passphrase_hash TEXT,
+      updated_at      INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS challenges (
@@ -106,6 +107,12 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/app.
   // 迁移：devices 表补充 device_name（设备名称，显示层用）
   try {
     db.exec(`ALTER TABLE devices ADD COLUMN device_name TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：key_escrow 表补充 passphrase_hash（口令哈希，恢复接口验证用；存量库 ALTER）
+  try {
+    db.exec(`ALTER TABLE key_escrow ADD COLUMN passphrase_hash TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }

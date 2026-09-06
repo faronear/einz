@@ -1,7 +1,7 @@
 /**
  * Server 备份与恢复（DATABASE.md §6）
  *
- * 备份 = app.db（SQLite 官方 Backup API 在线备份，禁止直接复制正在写入的 db）
+ * 备份 = einz.sqlite.db（SQLite 官方 Backup API 在线备份，禁止直接复制正在写入的 db）
  *       + /data/files/（附件密文 blob）+ config.json（白名单）
  * 产物 = 单文件，AES-256-GCM 加密归档到 <data>/backups/。
  *
@@ -19,7 +19,7 @@ const FORMAT = "einz-server-backup-v1";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 export interface BackupPaths {
-  db: string; // app.db 路径
+  db: string; // einz.sqlite.db 路径
   files: string; // 附件根目录
   config: string; // config.json 路径
   dataDir: string; // <data>/ 根目录（backups/ 也在这里）
@@ -27,7 +27,7 @@ export interface BackupPaths {
 
 /** 从环境变量解析备份路径（与 app.ts / db.ts 默认值一致）。 */
 export function resolveBackupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
-  const db = env.EINZ_DB ?? resolve(HERE, "../data/app.db");
+  const db = env.EINZ_DB ?? resolve(HERE, "../data/einz.sqlite.db");
   const files = env.EINZ_FILES ?? resolve(HERE, "../data/files");
   const config = env.EINZ_CONFIG ?? resolve(HERE, "../config/config.json");
   const dataDir = resolve(dirname(db));
@@ -63,7 +63,7 @@ export async function createBackup(paths = resolveBackupPaths()): Promise<string
   const backupsDir = join(paths.dataDir, "backups");
   mkdirSync(backupsDir, { recursive: true });
 
-  // 1) SQLite 官方 Backup API 在线备份 app.db（读写中也可安全备份）
+  // 1) SQLite 官方 Backup API 在线备份 einz.sqlite.db（读写中也可安全备份）
   const tmpDb = join(paths.dataDir, `backup-db-${now}.tmp`);
   const db = new Database(paths.db, { readonly: true });
   try {
@@ -104,7 +104,7 @@ export async function createBackup(paths = resolveBackupPaths()): Promise<string
   return outPath;
 }
 
-/** 从加密备份恢复：解密 → 写回 app.db / files/ / config.json。 */
+/** 从加密备份恢复：解密 → 写回 einz.sqlite.db / files/ / config.json。 */
 export function restoreBackup(backupPath: string, paths = resolveBackupPaths()): void {
   const key = backupKey();
   const file = JSON.parse(readFileSync(backupPath, "utf8")) as {

@@ -15,7 +15,7 @@ services:
     environment:
       - PORT=3000
       - EINZ_CONFIG=/config/config.json
-      - EINZ_DB=/data/app.db
+      - EINZ_DB=/data/einz.sqlite.db
       - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
       # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore，

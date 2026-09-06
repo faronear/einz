@@ -54,7 +54,7 @@ function main() {
         env: {
           ...process.env,
           PORT: String(port),
-          EINZ_DB: join(tempDir, "app.db"),
+          EINZ_DB: join(tempDir, "einz.sqlite.db"),
           EINZ_FILES: filesDir,
         },
         stdio: ["ignore", "ignore", "pipe"],
@@ -168,7 +168,7 @@ function main() {
 
       // 回拨 created_at 到孤儿窗口之外（>10 分钟），再触发清理
       const Database = require("better-sqlite3");
-      const db = new Database(join(tempDir, "app.db"));
+      const db = new Database(join(tempDir, "einz.sqlite.db"));
       db.prepare("UPDATE attachments SET created_at = ? WHERE attachment_id = ?").run(Date.now() - 20 * 60 * 1000, orphanId);
       db.close();
 
@@ -178,12 +178,12 @@ function main() {
       // 直接在进程内调用 dist 里的清理函数（EINZ_FILES 指向同一目录）
       process.env.EINZ_FILES = filesDir;
       const { openDb, getDb } = await import(`${pathToFileURL(join(ROOT, "dist/db.js")).href}`);
-      openDb(join(tempDir, "app.db"));
+      openDb(join(tempDir, "einz.sqlite.db"));
       const { cleanupOrphanAttachments } = await import(`${pathToFileURL(join(ROOT, "dist/attachments.js")).href}`);
       const removed = cleanupOrphanAttachments();
       assert.equal(removed, 1, "exactly 1 orphan cleaned");
       assert.ok(!existsSync(orphanFile), "orphan blob file removed");
-      const db2 = new Database(join(tempDir, "app.db"), { readonly: true });
+      const db2 = new Database(join(tempDir, "einz.sqlite.db"), { readonly: true });
       const row = db2.prepare("SELECT COUNT(*) AS c FROM attachments WHERE attachment_id = ?").get(orphanId);
       assert.equal(row.c, 0, "orphan row removed");
       // 正常关联的附件必须保留

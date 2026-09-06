@@ -25,7 +25,7 @@ EOF
 
 ensure_server() {
   if ! curl -s -o /dev/null --max-time 1 "$SERVER/devices" 2>/dev/null; then
-    (cd "$ROOT/../server" && EINZ_DB="$ROOT/demo/app.db" \
+    (cd "$ROOT/../server" && EINZ_DB="$ROOT/demo/einz.sqlite.db" \
       EINZ_FILES="$ROOT/demo/files" \
       PORT=3901 nohup node dist/app.js >"$ROOT/demo/server.log" 2>&1 & echo $! > "$ROOT/demo/server.pid")
     for i in $(seq 1 40); do curl -s -o /dev/null "$SERVER/devices" && break; sleep 0.3; done
