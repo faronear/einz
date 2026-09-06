@@ -65,6 +65,7 @@ class ApiClient {
     required String publicKey,
     String? inviteCode,
     String? personName,
+    String? partnerName,
     String? deviceName,
     String? personId,
   }) async {
@@ -75,6 +76,7 @@ class ApiClient {
         'public_key': publicKey,
         if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
         if (personName != null && personName.isNotEmpty) 'person_name': personName,
+        if (partnerName != null && partnerName.isNotEmpty) 'partner_name': partnerName,
         if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
         if (personId != null && personId.isNotEmpty) 'person_id': personId,
       },

@@ -70,6 +70,7 @@ export function enrollDevice(
     public_key?: string;
     invite_code?: string;
     person_name?: string;
+    partner_name?: string;
     device_name?: string;
     person_id?: string;
   };
@@ -104,7 +105,11 @@ export function enrollDevice(
     }
     setMeta("creator_person_id", personId); // 创建者标记（规范 id）
     setMeta(`person_name:${personId}`, personName); // 名称表：personA → lukas
-    console.log(`[einz] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${personName}，空间创建者）`);
+    // 第二用户预置名（首设备创建时可选询问；跳过/未提供 → 落规范默认 personB，
+    // 后续设备启动引导即可按名称表直接选 personA/personB 身份）
+    const partnerName = (b.partner_name ?? "").trim();
+    setMeta("person_name:personB", partnerName || "personB");
+    console.log(`[einz] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${personName}，空间创建者）partner=${partnerName || "personB"}`);
     return { ok: true, device_id: assignedId, person_id: personId, space_id: cfg.space_id };
   }
 

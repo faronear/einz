@@ -408,6 +408,63 @@ async function main(): Promise<void> {
       }
     }
 
+    // 12a) 第二用户预置名（首设备自举附 partner_name）：A 自举带 partner_name='steffi'
+    //      → 名称表 personB=steffi（后续设备引导可直接按名称选身份）；
+    //      跳过（不传 partner_name）→ 服务端落默认 personB（上一用例 12 已覆盖：
+    //      最终名称表 {A:luk, B:personB}）
+    const tempDir3 = mkdtempSync(join(tmpdir(), "einz-partner-"));
+    const port3 = await freePort();
+    let serverProc3: ChildProcess | null = null;
+    try {
+      serverProc3 = spawn(process.execPath, [join(ROOT, "dist/app.js")], {
+        env: {
+          ...process.env,
+          PORT: String(port3),
+          EINZ_DB: join(tempDir3, "einz.sqlite.db"),
+          EINZ_FILES: join(tempDir3, "files"),
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      serverProc3.stderr?.on("data", (d) => process.stderr.write(`[server3] ${d}`));
+      await waitReady(port3);
+
+      const partnerPk = sodium.to_base64(sodium.randombytes_buf(32), B64);
+      const enrollPartner = await fetch(`http://127.0.0.1:${port3}/devices/enroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ public_key: partnerPk, person_name: "luk", partner_name: "steffi" }),
+      });
+      assert.equal(enrollPartner.status, 200, "self-bootstrap with partner_name should succeed");
+      const health3 = (await (await fetch(`http://127.0.0.1:${port3}/health`)).json()) as {
+        person_names: Record<string, string>;
+      };
+      assert.deepEqual(health3.person_names, { personA: "luk", personB: "steffi" },
+        "partner_name preset should land on personB name table");
+    } finally {
+      await new Promise<void>((done) => {
+        if (!serverProc3 || serverProc3.exitCode !== null) {
+          done();
+          return;
+        }
+        const timer = setTimeout(() => {
+          serverProc3?.kill("SIGKILL");
+          done();
+        }, 3000);
+        serverProc3.once("exit", () => {
+          clearTimeout(timer);
+          done();
+        });
+      });
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(tempDir3, { recursive: true, force: true });
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+    }
+
     // 12) 全丢恢复 /recover（免认证）：上传带口令哈希的 escrow → 错误口令 403 →
     //     正确口令 200 撤销全部设备 → devices 全 revoked（空间可重新首设备自举）
     const recoverPass = "recover-pass-123";
