@@ -12,7 +12,7 @@ import 'data/local_database.dart';
 import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
 
-/// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间 / 高级导入 sealed。
+/// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间 / 高级导入密钥信封。
 enum _WizardRole { create, join, advanced }
 
 /// 设置页：一次性配置（生成设备身份 → 自动登记入网 → 获得 Space Key → 设置启动锁）。
@@ -21,7 +21,7 @@ enum _WizardRole { create, join, advanced }
 /// - create（第一个使用者）：首设备免邀请码自举登记 → 设接入口令托管 Space Key →
 ///   分享二维码（含 spaceId+口令+一次性邀请码，对方扫码一键加入）；
 /// - join：扫码/粘贴加入信息（含邀请码）→ 凭邀请码登记 → 口令托管拉取 Space Key；
-/// - advanced：sealed 密封副本导入（同样先凭邀请码登记）。
+/// - advanced：密钥信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
 /// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride, this.authOverride, this.keyPairOverride});
@@ -55,7 +55,7 @@ class _SetupPageState extends State<SetupPage> {
   String? _autoDeviceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
   final _personName = TextEditingController(); // 首设备：第一个用户的名字
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
-  final _sealedKey = TextEditingController();
+  final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
@@ -95,7 +95,7 @@ class _SetupPageState extends State<SetupPage> {
   void dispose() {
     _personName.dispose();
     _spaceId.dispose();
-    _sealedKey.dispose();
+    _envelopeKey.dispose();
     _escrowPassphrase.dispose();
     _pin.dispose();
     _confirm.dispose();
@@ -197,20 +197,20 @@ class _SetupPageState extends State<SetupPage> {
       appBar: AppBar(
         title: Text(_appBarTitle(l10n)),
         actions: [
-          // 高级入口（sealed 导入 / 全丢恢复）常驻菜单：探测自动判定角色后依然可达
+          // 高级入口（密钥信封导入 / 全丢恢复）常驻菜单：探测自动判定角色后依然可达
           PopupMenuButton<String>(
             tooltip: l10n.wizardRoleAdvanced,
             onSelected: (value) {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
               Future<void>.delayed(const Duration(milliseconds: 300), () {
                 if (!mounted) return;
-                if (value == 'sealed') _selectRole(_WizardRole.advanced);
+                if (value == 'envelope') _selectRole(_WizardRole.advanced);
                 if (value == 'recover') _showRecoverDialog();
               });
             },
             itemBuilder: (context) => [
               PopupMenuItem(
-                value: 'sealed',
+                value: 'envelope',
                 child: Text(l10n.wizardRoleAdvanced),
               ),
               PopupMenuItem(
@@ -310,7 +310,7 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---------- 向导框架 ----------
 
-  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / advanced=sealed）。
+  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / advanced=密钥信封）。
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
@@ -318,7 +318,7 @@ class _SetupPageState extends State<SetupPage> {
       case _WizardRole.join:
         return 5; // identity/invite/passphrase/pin/done
       case _WizardRole.advanced:
-        return 3; // sealed/pin/done
+        return 3; // envelope/pin/done
       case null:
         return 1;
     }
@@ -345,7 +345,7 @@ class _SetupPageState extends State<SetupPage> {
         }
       case _WizardRole.advanced:
         switch (_step) {
-          case 1: return l10n.wizardStepSealed;
+          case 1: return l10n.wizardStepEnvelope;
           case 2: return l10n.wizardStepPin;
           default: return l10n.wizardStepDone;
         }
@@ -422,8 +422,8 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     if (_role == _WizardRole.advanced && _step == 1) {
-      if (_sealedKey.text.trim().isEmpty) {
-        setState(() => _status = l10n.setupPagePasteSealed);
+      if (_envelopeKey.text.trim().isEmpty) {
+        setState(() => _status = l10n.setupPagePasteEnvelope);
         return;
       }
       if (_inviteCode.text.trim().isEmpty) {
@@ -476,7 +476,7 @@ class _SetupPageState extends State<SetupPage> {
       } else if (_role == _WizardRole.join) {
         await _runJoinAccess();
       } else {
-        await _runSealedImport();
+        await _runEnvelopeImport();
       }
       return; // _run* 内部推进 _step
     }
@@ -494,7 +494,7 @@ class _SetupPageState extends State<SetupPage> {
 
   void _backStep() {
     setState(() {
-      // 步骤 1 即向导第一页（create=名字 / join=身份 / advanced=sealed）；
+      // 步骤 1 即向导第一页（create=名字 / join=身份 / advanced=密钥信封）；
       // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
       if (_step > 1) _step--;
     });
@@ -502,7 +502,7 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 按角色+步骤分发到对应步骤页。
   Widget _buildStep() {
-    if (_role == null || _step == 0) return _buildDetectAndSealed();
+    if (_role == null || _step == 0) return _buildDetectAndEnvelope();
     switch (_role!) {
       case _WizardRole.create:
         switch (_step) {
@@ -531,7 +531,7 @@ class _SetupPageState extends State<SetupPage> {
       case _WizardRole.advanced:
         switch (_step) {
           case 1:
-            return _buildStepSealed();
+            return _buildStepEnvelope();
           case 2:
             return _buildStepPin();
           default:
@@ -540,10 +540,10 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 第 0 步（角色未判定时）：显示探测状态（sealed 高级入口在 AppBar 菜单，常驻可达）。
+  /// 第 0 步（角色未判定时）：显示探测状态（密钥信封高级入口在 AppBar 菜单，常驻可达）。
   /// 角色由服务器探测自动判定（person 名称表空=首设备 create，非空=后续设备 join），
   /// 不再让用户手动选择。
-  Widget _buildDetectAndSealed() {
+  Widget _buildDetectAndEnvelope() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1124,21 +1124,21 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  // ---- 场景 C（advanced）：sealed 导入 ----
+  // ---- 场景 C（advanced）：密钥信封导入 ----
 
-  /// 步骤 1（advanced）：粘贴 sealed 密钥副本（对方用本设备公钥密封）。
+  /// 步骤 1（advanced）：粘贴密钥信封（对方用本设备公钥密封的 Space Key）。
   /// 同时需填写一次性邀请码（非首台设备必须凭码登记后才能认证）。
-  Widget _buildStepSealed() {
+  Widget _buildStepEnvelope() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
-          controller: _sealedKey,
+          controller: _envelopeKey,
           maxLines: 3,
           decoration: InputDecoration(
-            labelText: l10n.setupPageSealedKeyLabel,
-            hintText: l10n.setupPageSealedKeyHint,
+            labelText: l10n.setupPageEnvelopeKeyLabel,
+            hintText: l10n.setupPageEnvelopeKeyHint,
             border: const OutlineInputBorder(),
           ),
         ),
@@ -1155,13 +1155,13 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// advanced：解封 sealed Space Key → 认证 → 设置 PIN → 完成步骤。
-  Future<void> _runSealedImport() async {
+  /// advanced：解封密钥信封 → 认证 → 设置 PIN → 完成步骤。
+  Future<void> _runEnvelopeImport() async {
     final kp = _keyPair;
     if (kp == null) return;
-    final sealedRaw = _sealedKey.text.trim();
-    if (sealedRaw.isEmpty) {
-      setState(() => _status = AppLocalizations.of(context)!.setupPagePasteSealed);
+    final envelopeRaw = _envelopeKey.text.trim();
+    if (envelopeRaw.isEmpty) {
+      setState(() => _status = AppLocalizations.of(context)!.setupPagePasteEnvelope);
       return;
     }
     setState(() {
@@ -1178,7 +1178,7 @@ class _SetupPageState extends State<SetupPage> {
       final s = await sodium();
       final spaceKey = await sealOpen(
         s,
-        base64Decode(sealedRaw),
+        base64Decode(envelopeRaw),
         kp.publicKey,
         kp.privateKey,
       );

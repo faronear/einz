@@ -38,12 +38,12 @@ dart run bin/einz.dart config \
   --peer-pubkey "$PUB_B" \
   --space-id "space-e2e" \
   --out-config "$WORK/config.json" \
-  --out-sealed-peer "$WORK/sealed-b.txt"
+  --out-envelope-peer "$WORK/envelope-b.txt"
 
 echo "==> 3. import（B 导入密封 Space Key 并解封）"
 dart run bin/einz.dart import \
   --store "$WORK/store-b.json" \
-  --sealed-file "$WORK/sealed-b.txt" \
+  --envelope-file "$WORK/envelope-b.txt" \
   --space-id "space-e2e"
 
 echo "==> 4. 启动 Server（临时白名单 $WORK/config.json）"

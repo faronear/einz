@@ -2,7 +2,7 @@
 # 脚本（setup/run_a/run_b/stop）与 .gitignore 本身入库。
 s*.json
 config.json
-sealed-*.txt
+envelope-*.txt
 app.db*
 *.pid
 server.log

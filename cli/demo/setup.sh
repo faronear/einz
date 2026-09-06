@@ -25,16 +25,16 @@ echo "    A=$PUB_A"
 echo "    B=$PUB_B"
 
 echo "==> 2. config（A 生成 Space Key + 密封给 B + 白名单 config.json）"
-[ -f demo/config.json ] && [ -f demo/sealed-b.txt ] || \
+[ -f demo/config.json ] && [ -f demo/envelope-b.txt ] || \
   dart run bin/einz.dart config \
     --store demo/store-a.json \
     --peer-pubkey "$PUB_B" \
     --space-id space-demo \
     --out-config demo/config.json \
-    --out-sealed-peer demo/sealed-b.txt >/dev/null
+    --out-envelope-peer demo/envelope-b.txt >/dev/null
 
 echo "==> 3. import（B 导入密封 Space Key）"
-[ -f demo/store-b.json ] && dart run bin/einz.dart import --store demo/store-b.json --sealed-file demo/sealed-b.txt --space-id space-demo >/dev/null
+[ -f demo/store-b.json ] && dart run bin/einz.dart import --store demo/store-b.json --envelope-file demo/envelope-b.txt --space-id space-demo >/dev/null
 
 echo "==> 4. 启动临时 server（后台，端口 ${PORT}）"
 if kill -0 "$(cat demo/server.pid 2>/dev/null)" 2>/dev/null; then

@@ -50,10 +50,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageSpaceIdLabel => 'Space ID';
 
   @override
-  String get setupPageSealedKeyLabel => '密封的 Space Key（base64）';
+  String get setupPageEnvelopeKeyLabel => '密钥信封（base64）';
 
   @override
-  String get setupPageSealedKeyHint => '粘贴 sealed 副本（sealed-*.txt 内容）';
+  String get setupPageEnvelopeKeyHint => '粘贴密钥信封（envelope-*.txt 内容）';
 
   @override
   String setupPageKeyInfo(String deviceId, String publicKey) {
@@ -73,7 +73,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEscrowHelper => '口令托管：Server 只存密文（KEY_ESCROW.md）';
 
   @override
-  String get setupPageEscrowAccess => '③ 凭口令接入（无需 sealed 副本）';
+  String get setupPageEscrowAccess => '③ 凭口令接入（无需信封副本）';
 
   @override
   String get setupPageGenerateSpaceKey => '自建空间（一键生成 Space Key）';
@@ -166,7 +166,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleJoin => '我要加入对方的空间';
 
   @override
-  String get wizardRoleAdvanced => '高级：导入 sealed 密钥副本';
+  String get wizardRoleAdvanced => '高级：导入密钥信封';
 
   @override
   String get wizardRecoverTitle => '从备份恢复';
@@ -208,7 +208,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardAppBarJoin => '加入你的空间';
 
   @override
-  String get wizardAppBarAdvanced => '导入 sealed 密钥';
+  String get wizardAppBarAdvanced => '导入密钥信封';
 
   @override
   String get wizardNext => '下一步';
@@ -241,7 +241,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepJoin => '加入空间';
 
   @override
-  String get wizardStepSealed => '导入 sealed 密钥';
+  String get wizardStepEnvelope => '导入密钥信封';
 
   @override
   String get wizardStepDone => '完成';
@@ -300,7 +300,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageGenKeyFirst => '⚠️ 先生成设备密钥';
 
   @override
-  String get setupPagePasteSealed => '⚠️ 请粘贴密封的 Space Key 副本（base64）';
+  String get setupPagePasteEnvelope => '⚠️ 请粘贴密钥信封（base64）';
 
   @override
   String setupPageImportFailed(String error) {

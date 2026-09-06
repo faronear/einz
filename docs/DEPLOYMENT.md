@@ -71,16 +71,16 @@ dart run bin/einz.dart init --store "$W/b.json" --device-id dev-b1
 
 # 2) 取 B 的公钥，A 侧生成 Space Key 并输出：
 #    - config.json（服务器白名单 + space_id）
-#    - sealed-b.txt（密封给 B 的 Space Key 副本）
+#    - envelope-b.txt（密钥信封：密封给 B 的 Space Key 副本）
 PUB_B="$(dart run bin/einz.dart pubkey --store "$W/b.json")"
 dart run bin/einz.dart config \
   --store "$W/a.json" --peer-pubkey "$PUB_B" \
   --space-id "space-demo" \
-  --out-config "$W/config.json" --out-sealed-peer "$W/sealed-b.txt"
+  --out-config "$W/config.json" --out-envelope-peer "$W/envelope-b.txt"
 
-# 3) B 导入密封副本，解出 Space Key
+# 3) B 导入密钥信封，解出 Space Key
 dart run bin/einz.dart import \
-  --store "$W/b.json" --sealed-file "$W/sealed-b.txt" --space-id "space-demo"
+  --store "$W/b.json" --envelope-file "$W/envelope-b.txt" --space-id "space-demo"
 ```
 
 产物（**config.json 禁止提交 Git**，私钥/恢复码离线保管）：
@@ -88,7 +88,7 @@ dart run bin/einz.dart import \
 | 产物                      | 内容                               | 去向                              |
 | ------------------------- | ---------------------------------- | --------------------------------- |
 | `$W/config.json`          | space_id + A/B 白名单              | 服务器`server/config/config.json` |
-| `$W/sealed-b.txt`         | 密封 Space Key（仅 B 可解）        | 导入 B 后删除                     |
+| `$W/envelope-b.txt`       | 密钥信封（密封 Space Key，仅 B 可解）  | 导入 B 后删除                     |
 | `$W/a.json` / `$W/b.json` | 设备 store（身份密钥 + Space Key） | 本机保存                          |
 
 ### 2.3 启动服务器并双端收发
@@ -129,8 +129,8 @@ dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `init --store <s> --device-id <id>`                                                             | 生成本机身份密钥对                                             |
 | `pubkey --store <s>`                                                                            | 导出公钥（base64）                                             |
-| `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-sealed-peer <f>` | 生成 Space Key + 白名单 + 密封副本                             |
-| `import --store <s> --sealed-file <f> --space-id <id> [--key-version N]`                        | 导入密封副本（轮换导入用 --key-version）                       |
+| `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-envelope-peer <f>` | 生成 Space Key + 白名单 + 密钥信封                            |
+| `import --store <s> --envelope-file <f> --space-id <id> [--key-version N]`                     | 导入密钥信封（轮换导入用 --key-version）                       |
 | `auth --store <s> --server <url>`                                                               | challenge-response 认证，拿 session_token                      |
 | `send --store <s> --server <url> --message <文本>`                                              | 加密发送（先入队，失败自动补发；`--server` 可省略=纯离线入队） |
 | `sync --store <s> --server <url> [--after N]`                                                   | 增量同步（翻页拉全量 → 落库 → 推进锚点 → 补发队列）            |
@@ -138,7 +138,7 @@ dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 
 | `attach --store <s> --server <url> --file <p> [--type image\|video\|voice] [--caption <t>]`     | 附件加密上传                                                   |
 | `fetch --store <s> --server <url> --attachment-id <id> [--out <p>]`                             | 附件下载解密                                                   |
 | `history --store <s>`                                                                           | 解密本地历史（按 key_version 选密钥）                          |
-| `rotate --store <s> --peer-pubkey <b64> --out-sealed-peer <f>`                                  | 轮换 Space Key（key_version+1，旧密钥归档）                    |
+| `rotate --store <s> --peer-pubkey <b64> --out-envelope-peer <f>`                               | 轮换 Space Key（key_version+1，旧密钥归档）                    |
 | `backup --store <s> --out <f>`                                                                  | 本地加密备份（生成 12 词恢复码）                               |
 | `restore --in <f> --recovery-code <12词> [--store <s>]`                                         | 恢复码解密还原                                                 |
 
@@ -215,7 +215,7 @@ SETUP.md §3 的设计流程已由 CLI 实现（2.2 已演示）。要点重申�
 1. **身份密钥**：`init` 生成 X25519 密钥对，私钥只留在设备 store。
 2. **Space Key 分发**：`config` 生成 32B 随机 Space Key，分别 `crypto_box_seal` 给 A/B——只有对应设备能解开（E2EE.md §7.1）。
 3. **白名单登记**：`config.json`（space_id + devices）放进服务器后启动；`syncWhitelistToDb` 会在启动时登记进 devices 表，撤销状态不被覆盖（Phase 4 加固）。
-4. **导入与销毁**：`import` 解封后删除密封副本临时文件。
+4. **导入与销毁**：`import` 解封后删除密钥信封临时文件。
 5. **恢复码**：`backup` 命令会生成 12 词恢复码（E2EE.md §10），**离线保存多份，Server 不接触**。
 
 > 安全操作建议：密钥生成/密封/导入在受控环境进行；`config.json`、设备私钥、恢复码三者分开存放——任一单独泄露都不足以解密历史消息。
@@ -266,11 +266,11 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
 
 # 2) 剩余设备 A 收到 key.rotation 通知 → 立即轮换（key_version+1，旧密钥归档）
 dart run bin/einz.dart rotate \
-  --store "$W/a.json" --peer-pubkey "$PUB_B" --out-sealed-peer "$W/sealed-v2.txt"
+  --store "$W/a.json" --peer-pubkey "$PUB_B" --out-envelope-peer "$W/envelope-v2.txt"
 
 # 3) 若 B 是误撤（仍可信）：B 导入新版本密钥（旧密钥自动归档）
 dart run bin/einz.dart import \
-  --store "$W/b.json" --sealed-file "$W/sealed-v2.txt" --space-id "space-demo" --key-version 2
+  --store "$W/b.json" --envelope-file "$W/envelope-v2.txt" --space-id "space-demo" --key-version 2
 
 # 4) 服务器 config.json 移除被撤销设备 → 重启服务器生效
 ```

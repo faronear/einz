@@ -299,17 +299,17 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
   });
 
-  // ---- advanced（sealed 导入：AppBar 菜单入口）----
+  // ---- advanced（密钥信封导入：AppBar 菜单入口）----
 
-  testWidgets('golden: 向导1.3.1-sealed 步骤（advanced）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.3.1-密钥信封步骤（advanced）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester);
-    // 从 AppBar 常驻菜单进入高级（sealed 导入）流程；advanced 首步即 sealed（设备名步骤已移除）
-    await tester.tap(find.byTooltip('高级：导入 sealed 密钥副本'));
+    // 从 AppBar 常驻菜单进入高级（密钥信封导入）流程；advanced 首步即密钥信封（设备名步骤已移除）
+    await tester.tap(find.byTooltip('高级：导入密钥信封'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('高级：导入 sealed 密钥副本'));
+    await tester.tap(find.text('高级：导入密钥信封'));
     await tester.pumpAndSettle();
     await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_sealed.png'));
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_envelope.png'));
   });
 }

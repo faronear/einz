@@ -14,8 +14,8 @@ import 'package:einz_cli/store.dart';
 ///   dart run bin/einz.dart init --store store-a.json --device-id dev-a1
 ///   dart run bin/einz.dart pubkey --store store-a.json
 ///   dart run bin/einz.dart config --store store-a.json --peer-pubkey <B公钥> \
-///       --space-id space-1 --out-config config.json --out-sealed-peer sealed-b.json
-///   dart run bin/einz.dart import --store store-b.json --sealed-file sealed-b.json --space-id space-1
+///       --space-id space-1 --out-config config.json --out-envelope-peer envelope-b.json
+///   dart run bin/einz.dart import --store store-b.json --envelope-file envelope-b.json --space-id space-1
 ///   dart run bin/einz.dart auth --store store-a.json --server http://localhost:3000
 ///   dart run bin/einz.dart send --store store-a.json --server ... --message "你好"
 ///   dart run bin/einz.dart sync --store store-b.json --server ...
@@ -29,10 +29,10 @@ Future<void> main(List<String> args) async {
     ..addOption('peer-pubkey', help: '对方设备公钥（base64，config 用）')
     ..addOption('space-id', help: 'Space ID')
     ..addOption('out-config', help: '输出服务器 config.json 路径')
-    ..addOption('out-sealed-peer', help: '输出给对方设备的密封 Space Key 文件')
+    ..addOption('out-envelope-peer', help: '输出给对方设备的密封 Space Key 文件')
     ..addOption('person', help: '创建者 person id（config 用，默认 person-a）')
     ..addOption('peer-person', help: '对方 person id（config 用，默认 person-b）')
-    ..addOption('sealed-file', help: '导入的密封 Space Key 文件（import 用）')
+    ..addOption('envelope-file', help: '导入的密封 Space Key 文件（import 用）')
     ..addOption('after', help: '同步起点 server_sequence（默认: 本地锚点 last_server_sequence）')
     ..addOption('file', help: '要上传的本地文件路径（attach 用）')
     ..addOption('type', help: '附件类型: image|video|voice|file（attach 用，默认按扩展名推断）')
@@ -133,11 +133,11 @@ Future<void> _cmdConfig(ArgResults opts) async {
   final peerPubkey = _require(opts, 'peer-pubkey');
   final spaceId = _require(opts, 'space-id');
   final outConfig = opts['out-config'] as String?;
-  final outSealedPeer = opts['out-sealed-peer'] as String?;
+  final outEnvelopePeer = opts['out-envelope-peer'] as String?;
 
   final s = await sodium();
   final spaceKey = await generateSpaceKey();
-  final sealedPeer = await sealFor(s, base64Decode(peerPubkey), spaceKey);
+  final envelopePeer = await sealFor(s, base64Decode(peerPubkey), spaceKey);
 
   // 写入本机 Space Key（测试存储）
   store.spaceKey = base64Encode(spaceKey);
@@ -168,9 +168,9 @@ Future<void> _cmdConfig(ArgResults opts) async {
   }
 
   // 对方的密封 Space Key 文件
-  if (outSealedPeer != null) {
-    File(outSealedPeer).writeAsStringSync(base64Encode(sealedPeer));
-    stdout.writeln('✅ 对方密封副本已写入: $outSealedPeer');
+  if (outEnvelopePeer != null) {
+    File(outEnvelopePeer).writeAsStringSync(base64Encode(envelopePeer));
+    stdout.writeln('✅ 对方密钥信封已写入: $outEnvelopePeer');
   }
   stdout.writeln('✅ Space Key 已生成并密封（key_version=1）');
 }
@@ -178,13 +178,13 @@ Future<void> _cmdConfig(ArgResults opts) async {
 Future<void> _cmdImport(ArgResults opts) async {
   final path = _require(opts, 'store');
   final store = DeviceStore.load(path);
-  final sealedFile = _require(opts, 'sealed-file');
+  final envelopeFile = _require(opts, 'envelope-file');
   final spaceId = _require(opts, 'space-id');
   final keyVersion = int.tryParse(opts['key-version'] as String? ?? '1') ?? 1;
   final s = await sodium();
 
-  final sealed = base64Decode(File(sealedFile).readAsStringSync().trim());
-  final opened = await sealOpen(s, sealed, store.publicKeyBytes, store.privateKeyBytes);
+  final envelope = base64Decode(File(envelopeFile).readAsStringSync().trim());
+  final opened = await sealOpen(s, envelope, store.publicKeyBytes, store.privateKeyBytes);
 
   // 轮换导入（--key-version > 当前）：旧密钥归档（E2EE.md §9.2），写入新版本密钥
   if (keyVersion > store.keyVersion && store.spaceKey != null) {
@@ -536,7 +536,7 @@ Future<void> _cmdRestore(ArgResults opts) async {
   }
 }
 
-/// 用本机已持有的 Space Key 密封给新设备公钥，输出 sealed 副本（一次性配置：
+/// 用本机已持有的 Space Key 密封给新设备公钥，输出密钥信封（一次性配置：
 /// 把已有 Space Key 分发给新加入的设备，如 App 真机）。E2EE.md §7。
 Future<void> _cmdSeal(ArgResults opts) async {
   final path = _require(opts, 'store');
@@ -546,29 +546,29 @@ Future<void> _cmdSeal(ArgResults opts) async {
   final out = _require(opts, 'out');
 
   final s = await sodium();
-  final sealed = await sealFor(s, base64Decode(peerPubkey), base64Decode(store.spaceKey!));
-  File(out).writeAsStringSync(base64Encode(sealed));
+  final envelope = await sealFor(s, base64Decode(peerPubkey), base64Decode(store.spaceKey!));
+  File(out).writeAsStringSync(base64Encode(envelope));
   stdout.writeln('✅ 已用本机 Space Key（v${store.keyVersion}）密封给目标设备公钥');
   stdout.writeln('   副本已写入: $out（对方用 import 或 App 粘贴导入）');
 }
 
 /// Space Key 轮换（E2EE.md §9.1）：当前密钥归档（key_version+1），生成新密钥，
-/// seal 给对方设备，写 sealed 文件。对方用 `import --key-version N` 导入并归档旧密钥。
+/// seal 给对方设备，写密钥信封文件。对方用 `import --key-version N` 导入并归档旧密钥。
 Future<void> _cmdRotate(ArgResults opts) async {
   final path = _require(opts, 'store');
   final store = DeviceStore.load(path);
   store.requireSpace();
   final peerPubkey = _require(opts, 'peer-pubkey');
-  final outSealedPeer = _require(opts, 'out-sealed-peer');
+  final outEnvelopePeer = _require(opts, 'out-envelope-peer');
 
   final s = await sodium();
   final newKeyB64 = await store.rotateSpaceKey();
-  final sealedPeer = await sealFor(s, base64Decode(peerPubkey), base64Decode(newKeyB64));
-  File(outSealedPeer).writeAsStringSync(base64Encode(sealedPeer));
+  final envelopePeer = await sealFor(s, base64Decode(peerPubkey), base64Decode(newKeyB64));
+  File(outEnvelopePeer).writeAsStringSync(base64Encode(envelopePeer));
 
   store.save(path);
   stdout.writeln('✅ Space Key 已轮换: key_version=${store.keyVersion}（旧版本已归档）');
-  stdout.writeln('   对方密封副本已写入: $outSealedPeer（对方执行 import --key-version ${store.keyVersion}）');
+  stdout.writeln('   对方密封副本已写入: $outEnvelopePeer（对方执行 import --key-version ${store.keyVersion}）');
 }
 
 /// 解密本地消息历史（不依赖 Server）：按每条消息的 key_version 选密钥，
@@ -747,7 +747,7 @@ Future<void> _cmdListen(ArgResults opts) async {
           case 'key.rotation':
             final payload = frame['payload'] as Map<String, dynamic>;
             stdout.writeln('🔑 收到 Space Key 轮换通知: 建议 key_version=${payload['key_version']}');
-            stdout.writeln('   请执行 rotate --peer-pubkey <对方公钥> --out-sealed-peer <文件> 后 import');
+            stdout.writeln('   请执行 rotate --peer-pubkey <对方公钥> --out-envelope-peer <文件> 后 import');
           case 'device.revoked':
             final payload = frame['payload'] as Map<String, dynamic>;
             stdout.writeln('🚫 本设备已被撤销: device_id=${payload['device_id']}');

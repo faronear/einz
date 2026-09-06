@@ -55,9 +55,9 @@ step "2. config（A 生成 Space Key + 白名单）+ import（B）"
 dart run bin/einz.dart config \
   --store "$WORK/store-a.json" --peer-pubkey "$PUB_B" \
   --space-id "space-p2" \
-  --out-config "$WORK/config.json" --out-sealed-peer "$WORK/sealed-b.txt" >/dev/null
+  --out-config "$WORK/config.json" --out-envelope-peer "$WORK/envelope-b.txt" >/dev/null
 dart run bin/einz.dart import \
-  --store "$WORK/store-b.json" --sealed-file "$WORK/sealed-b.txt" --space-id "space-p2" >/dev/null
+  --store "$WORK/store-b.json" --envelope-file "$WORK/envelope-b.txt" --space-id "space-p2" >/dev/null
 
 step "3. 启动 Server + 双端认证"
 start_server

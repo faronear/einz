@@ -50,11 +50,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageSpaceIdLabel => 'Space ID';
 
   @override
-  String get setupPageSealedKeyLabel => 'Sealed Space Key (base64)';
+  String get setupPageEnvelopeKeyLabel => 'Key envelope (base64)';
 
   @override
-  String get setupPageSealedKeyHint =>
-      'Paste the sealed copy (contents of sealed-*.txt)';
+  String get setupPageEnvelopeKeyHint =>
+      'Paste the key envelope (contents of envelope-*.txt)';
 
   @override
   String setupPageKeyInfo(String deviceId, String publicKey) {
@@ -77,7 +77,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupPageEscrowAccess =>
-      '③ Join with passphrase (no sealed copy needed)';
+      '③ Join with passphrase (no envelope needed)';
 
   @override
   String get setupPageGenerateSpaceKey => 'Create space (one-tap generate key)';
@@ -179,7 +179,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleJoin => 'I want to join an existing space';
 
   @override
-  String get wizardRoleAdvanced => 'Advanced: import a sealed key copy';
+  String get wizardRoleAdvanced => 'Advanced: import a key envelope';
 
   @override
   String get wizardRecoverTitle => 'Restore from backup';
@@ -225,7 +225,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardAppBarJoin => 'Join your partner\'s space';
 
   @override
-  String get wizardAppBarAdvanced => 'Import sealed key';
+  String get wizardAppBarAdvanced => 'Import key envelope';
 
   @override
   String get wizardNext => 'Next';
@@ -258,7 +258,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardStepJoin => 'Join space';
 
   @override
-  String get wizardStepSealed => 'Import sealed key';
+  String get wizardStepEnvelope => 'Import key envelope';
 
   @override
   String get wizardStepDone => 'Complete';
@@ -321,8 +321,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageGenKeyFirst => '⚠️ Generate the device key first';
 
   @override
-  String get setupPagePasteSealed =>
-      '⚠️ Paste the sealed Space Key copy (base64)';
+  String get setupPagePasteEnvelope => '⚠️ Paste the key envelope (base64)';
 
   @override
   String setupPageImportFailed(String error) {

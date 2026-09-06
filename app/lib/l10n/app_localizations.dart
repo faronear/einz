@@ -176,17 +176,17 @@ abstract class AppLocalizations {
   /// **'Space ID'**
   String get setupPageSpaceIdLabel;
 
-  /// No description provided for @setupPageSealedKeyLabel.
+  /// No description provided for @setupPageEnvelopeKeyLabel.
   ///
   /// In en, this message translates to:
-  /// **'Sealed Space Key (base64)'**
-  String get setupPageSealedKeyLabel;
+  /// **'Key envelope (base64)'**
+  String get setupPageEnvelopeKeyLabel;
 
-  /// No description provided for @setupPageSealedKeyHint.
+  /// No description provided for @setupPageEnvelopeKeyHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste the sealed copy (contents of sealed-*.txt)'**
-  String get setupPageSealedKeyHint;
+  /// **'Paste the key envelope (contents of envelope-*.txt)'**
+  String get setupPageEnvelopeKeyHint;
 
   /// No description provided for @setupPageKeyInfo.
   ///
@@ -221,7 +221,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageEscrowAccess.
   ///
   /// In en, this message translates to:
-  /// **'③ Join with passphrase (no sealed copy needed)'**
+  /// **'③ Join with passphrase (no envelope needed)'**
   String get setupPageEscrowAccess;
 
   /// No description provided for @setupPageGenerateSpaceKey.
@@ -395,7 +395,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardRoleAdvanced.
   ///
   /// In en, this message translates to:
-  /// **'Advanced: import a sealed key copy'**
+  /// **'Advanced: import a key envelope'**
   String get wizardRoleAdvanced;
 
   /// No description provided for @wizardRecoverTitle.
@@ -473,7 +473,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardAppBarAdvanced.
   ///
   /// In en, this message translates to:
-  /// **'Import sealed key'**
+  /// **'Import key envelope'**
   String get wizardAppBarAdvanced;
 
   /// No description provided for @wizardNext.
@@ -536,11 +536,11 @@ abstract class AppLocalizations {
   /// **'Join space'**
   String get wizardStepJoin;
 
-  /// No description provided for @wizardStepSealed.
+  /// No description provided for @wizardStepEnvelope.
   ///
   /// In en, this message translates to:
-  /// **'Import sealed key'**
-  String get wizardStepSealed;
+  /// **'Import key envelope'**
+  String get wizardStepEnvelope;
 
   /// No description provided for @wizardStepDone.
   ///
@@ -638,11 +638,11 @@ abstract class AppLocalizations {
   /// **'⚠️ Generate the device key first'**
   String get setupPageGenKeyFirst;
 
-  /// No description provided for @setupPagePasteSealed.
+  /// No description provided for @setupPagePasteEnvelope.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Paste the sealed Space Key copy (base64)'**
-  String get setupPagePasteSealed;
+  /// **'⚠️ Paste the key envelope (base64)'**
+  String get setupPagePasteEnvelope;
 
   /// No description provided for @setupPageImportFailed.
   ///

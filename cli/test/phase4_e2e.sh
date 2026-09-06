@@ -66,9 +66,9 @@ PUB_B="$(dart run bin/einz.dart pubkey --store "$WORK/b.json")"
 dart run bin/einz.dart config \
   --store "$WORK/a.json" --peer-pubkey "$PUB_B" \
   --space-id "space-p4" \
-  --out-config "$WORK/config.json" --out-sealed-peer "$WORK/sealed-v1.txt" >/dev/null
+  --out-config "$WORK/config.json" --out-envelope-peer "$WORK/envelope-v1.txt" >/dev/null
 dart run bin/einz.dart import \
-  --store "$WORK/b.json" --sealed-file "$WORK/sealed-v1.txt" --space-id "space-p4" >/dev/null
+  --store "$WORK/b.json" --envelope-file "$WORK/envelope-v1.txt" --space-id "space-p4" >/dev/null
 
 step "2. 启动 Server + 双端认证 + A 发 v1 消息"
 start_server
@@ -101,7 +101,7 @@ echo "$B_AUTH" | grep -qE "FORBIDDEN|403|白名单" \
 step "5. 【段 B】A 轮换 Space Key（v1→v2，归档 v1）并 seal 给 B"
 dart run bin/einz.dart rotate \
   --store "$WORK/a.json" --peer-pubkey "$PUB_B" \
-  --out-sealed-peer "$WORK/sealed-v2.txt" 2>&1 | grep -q "key_version=2" \
+  --out-envelope-peer "$WORK/envelope-v2.txt" 2>&1 | grep -q "key_version=2" \
   && echo "✅ A 轮换成功（key_version=2，v1 已归档）" \
   || { echo "❌ A 轮换失败"; exit 1; }
 
