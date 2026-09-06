@@ -12,8 +12,8 @@ import 'data/local_database.dart';
 import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
 
-/// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间 / 高级导入密钥信封。
-enum _WizardRole { create, join, advanced }
+/// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间 / 线下导入密钥信封。
+enum _WizardRole { create, join, offline }
 
 /// 设置页：一次性配置（生成设备身份 → 自动登记入网 → 获得 Space Key → 设置启动锁）。
 ///
@@ -21,7 +21,7 @@ enum _WizardRole { create, join, advanced }
 /// - create（第一个使用者）：首设备免邀请码自举登记 → 设接入口令托管 Space Key →
 ///   分享二维码（含 spaceId+口令+一次性邀请码，对方扫码一键加入）；
 /// - join：扫码/粘贴加入信息（含邀请码）→ 凭邀请码登记 → 口令托管拉取 Space Key；
-/// - advanced：密钥信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
+/// - offline：密钥信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
 /// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride, this.authOverride, this.keyPairOverride});
@@ -197,21 +197,21 @@ class _SetupPageState extends State<SetupPage> {
       appBar: AppBar(
         title: Text(_appBarTitle(l10n)),
         actions: [
-          // 高级入口（密钥信封导入 / 全丢恢复）常驻菜单：探测自动判定角色后依然可达
+          // 线下入口（密钥信封导入 / 全丢恢复）常驻菜单：探测自动判定角色后依然可达
           PopupMenuButton<String>(
-            tooltip: l10n.wizardRoleAdvanced,
+            tooltip: l10n.wizardRoleOffline,
             onSelected: (value) {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
               Future<void>.delayed(const Duration(milliseconds: 300), () {
                 if (!mounted) return;
-                if (value == 'envelope') _selectRole(_WizardRole.advanced);
+                if (value == 'envelope') _selectRole(_WizardRole.offline);
                 if (value == 'recover') _showRecoverDialog();
               });
             },
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'envelope',
-                child: Text(l10n.wizardRoleAdvanced),
+                child: Text(l10n.wizardRoleOffline),
               ),
               PopupMenuItem(
                 value: 'recover',
@@ -310,14 +310,14 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---------- 向导框架 ----------
 
-  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / advanced=密钥信封）。
+  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / offline=密钥信封）。
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
         return 4; // name/passphrase/pin/done（设备名自动设置，输入步骤已移除）
       case _WizardRole.join:
         return 5; // identity/invite/passphrase/pin/done
-      case _WizardRole.advanced:
+      case _WizardRole.offline:
         return 3; // envelope/pin/done
       case null:
         return 1;
@@ -343,7 +343,7 @@ class _SetupPageState extends State<SetupPage> {
           case 4: return l10n.wizardStepPin;
           default: return l10n.wizardStepDone;
         }
-      case _WizardRole.advanced:
+      case _WizardRole.offline:
         switch (_step) {
           case 1: return l10n.wizardStepEnvelope;
           case 2: return l10n.wizardStepPin;
@@ -360,8 +360,8 @@ class _SetupPageState extends State<SetupPage> {
         return l10n.wizardAppBarCreate;
       case _WizardRole.join:
         return l10n.wizardAppBarJoin;
-      case _WizardRole.advanced:
-        return l10n.wizardAppBarAdvanced;
+      case _WizardRole.offline:
+        return l10n.wizardAppBarOffline;
     }
   }
 
@@ -421,7 +421,7 @@ class _SetupPageState extends State<SetupPage> {
       setState(() => _status = l10n.setupPageNeedPassphrase);
       return;
     }
-    if (_role == _WizardRole.advanced && _step == 1) {
+    if (_role == _WizardRole.offline && _step == 1) {
       if (_envelopeKey.text.trim().isEmpty) {
         setState(() => _status = l10n.setupPagePasteEnvelope);
         return;
@@ -431,11 +431,11 @@ class _SetupPageState extends State<SetupPage> {
         return;
       }
     }
-    // PIN 步骤（create=3 / join=4 / advanced=2）：底部"下一步"触发校验/跳过确认。
+    // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
     // 有效 PIN → 设锁后推进；两空 → 弹窗确认"暂不设置"；其余 → 输入框下方红色提示。
     final isPinStep = (_role == _WizardRole.create && _step == 3) ||
         (_role == _WizardRole.join && _step == 4) ||
-        (_role == _WizardRole.advanced && _step == 2);
+        (_role == _WizardRole.offline && _step == 2);
     if (isPinStep) {
       final pin = _pin.text;
       final confirm = _confirm.text;
@@ -494,7 +494,7 @@ class _SetupPageState extends State<SetupPage> {
 
   void _backStep() {
     setState(() {
-      // 步骤 1 即向导第一页（create=名字 / join=身份 / advanced=密钥信封）；
+      // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密钥信封）；
       // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
       if (_step > 1) _step--;
     });
@@ -528,7 +528,7 @@ class _SetupPageState extends State<SetupPage> {
           default:
             return _buildStepDone();
         }
-      case _WizardRole.advanced:
+      case _WizardRole.offline:
         switch (_step) {
           case 1:
             return _buildStepEnvelope();
@@ -540,7 +540,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 第 0 步（角色未判定时）：显示探测状态（密钥信封高级入口在 AppBar 菜单，常驻可达）。
+  /// 第 0 步（角色未判定时）：显示探测状态（密钥信封线下入口在 AppBar 菜单，常驻可达）。
   /// 角色由服务器探测自动判定（person 名称表空=首设备 create，非空=后续设备 join），
   /// 不再让用户手动选择。
   Widget _buildDetectAndEnvelope() {
@@ -646,7 +646,7 @@ class _SetupPageState extends State<SetupPage> {
     return name;
   }
 
-  /// 登记设备：create=首设备免邀请码自举；join/advanced=凭一次性邀请码。
+  /// 登记设备：create=首设备免邀请码自举；join/offline=凭一次性邀请码。
   /// 成功 → 记录 [_enroll]（真实 deviceId/personId/spaceId）并同步 spaceId。
   Future<void> _enrollDevice(String? inviteCode) async {
     final kp = _keyPair;
@@ -727,7 +727,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 完成动作：进入聊天页（create/join/advanced 填充数据后统一调用；
+  /// 完成动作：进入聊天页（create/join/offline 填充数据后统一调用；
   /// deviceId/spaceId 一律用登记后服务端返回的真实值）。
   void _finish() {
     final kp = _keyPair;
@@ -1034,7 +1034,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 完成页（create/join/advanced 共用）：底部"完成"按钮 → _finish 进聊天页。
+  /// 完成页（create/join/offline 共用）：底部"完成"按钮 → _finish 进聊天页。
   Widget _buildStepDone() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -1124,9 +1124,9 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  // ---- 场景 C（advanced）：密钥信封导入 ----
+  // ---- 场景 C（offline）：密钥信封导入 ----
 
-  /// 步骤 1（advanced）：粘贴密钥信封（对方用本设备公钥密封的 Space Key）。
+  /// 步骤 1（offline）：粘贴密钥信封（对方用本设备公钥密封的 Space Key）。
   /// 同时需填写一次性邀请码（非首台设备必须凭码登记后才能认证）。
   Widget _buildStepEnvelope() {
     final l10n = AppLocalizations.of(context)!;
@@ -1155,7 +1155,7 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// advanced：解封密钥信封 → 认证 → 设置 PIN → 完成步骤。
+  /// offline：解封密钥信封 → 认证 → 设置 PIN → 完成步骤。
   Future<void> _runEnvelopeImport() async {
     final kp = _keyPair;
     if (kp == null) return;
@@ -1199,7 +1199,7 @@ class _SetupPageState extends State<SetupPage> {
           token: session.sessionToken,
         ));
         setState(() {
-          _step = _stepCount; // advanced 完成页（新编号 3）
+          _step = _stepCount; // offline 完成页（新编号 3）
           _status = null;
         });
         return;
@@ -1215,7 +1215,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (ok) {
         setState(() {
-          _step = _stepCount; // advanced 完成页（新编号 3）
+          _step = _stepCount; // offline 完成页（新编号 3）
           _status = null;
         });
       }

@@ -61,13 +61,13 @@ void main() {
     expect(find.textContaining('请先选择你的身份'), findsOneWidget);
   });
 
-  testWidgets('探测失败：显示服务器输入引导与密钥信封高级入口', (WidgetTester tester) async {
+  testWidgets('探测失败：显示服务器输入引导与密钥信封线下入口', (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(probeOk: false));
     await tester.pumpAndSettle();
 
     // 顶部琥珀卡片 + 检测页两处都含"无法连接服务器"，精确匹配检测页完整文案
     expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsOneWidget);
-    // 密钥信封高级入口在 AppBar 常驻菜单（tooltip）
-    expect(find.byTooltip('高级：导入密钥信封'), findsOneWidget);
+    // 密钥信封线下入口在 AppBar 常驻菜单（tooltip）
+    expect(find.byTooltip('线下：导入密钥信封'), findsOneWidget);
   });
 }

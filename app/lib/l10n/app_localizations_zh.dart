@@ -166,7 +166,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleJoin => '我要加入对方的空间';
 
   @override
-  String get wizardRoleAdvanced => '高级：导入密钥信封';
+  String get wizardRoleOffline => '线下：导入密钥信封';
 
   @override
   String get wizardRecoverTitle => '从备份恢复';
@@ -208,7 +208,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardAppBarJoin => '加入你的空间';
 
   @override
-  String get wizardAppBarAdvanced => '导入密钥信封';
+  String get wizardAppBarOffline => '导入密钥信封';
 
   @override
   String get wizardNext => '下一步';

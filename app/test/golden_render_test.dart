@@ -4,7 +4,7 @@
 // 运行：flutter test --update-goldens test/golden_render_test.dart
 // 产物：test/goldens/{setup_step1_*,lock_page,chat_page}.png
 // 向导步骤编号规则（老板确认，2026-09-05 对齐 TUI 重构后）：
-// 1=检测页；1.1/1.2/1.3=create/join/advanced 三条自动判定流程；
+// 1=检测页；1.1/1.2/1.3=create/join/offline 三条自动判定流程；
 // 分流内按页面出现顺序 1.1.1、1.1.2、…（如 1.1.1_name=create 你的名字）。
 //
 // 说明：golden 测试默认 Ahem 字体（中文显示为方块），此处加载系统中文字体
@@ -299,15 +299,15 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
   });
 
-  // ---- advanced（密钥信封导入：AppBar 菜单入口）----
+  // ---- offline（密钥信封导入：AppBar 菜单入口）----
 
-  testWidgets('golden: 向导1.3.1-密钥信封步骤（advanced）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.3.1-密钥信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester);
-    // 从 AppBar 常驻菜单进入高级（密钥信封导入）流程；advanced 首步即密钥信封（设备名步骤已移除）
-    await tester.tap(find.byTooltip('高级：导入密钥信封'));
+    // 从 AppBar 常驻菜单进入高级（密钥信封导入）流程；offline 首步即密钥信封（设备名步骤已移除）
+    await tester.tap(find.byTooltip('线下：导入密钥信封'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('高级：导入密钥信封'));
+    await tester.tap(find.text('线下：导入密钥信封'));
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_envelope.png'));

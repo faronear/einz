@@ -392,11 +392,11 @@ abstract class AppLocalizations {
   /// **'I want to join an existing space'**
   String get wizardRoleJoin;
 
-  /// No description provided for @wizardRoleAdvanced.
+  /// No description provided for @wizardRoleOffline.
   ///
   /// In en, this message translates to:
-  /// **'Advanced: import a key envelope'**
-  String get wizardRoleAdvanced;
+  /// **'Offline: import a key envelope'**
+  String get wizardRoleOffline;
 
   /// No description provided for @wizardRecoverTitle.
   ///
@@ -470,11 +470,11 @@ abstract class AppLocalizations {
   /// **'Join your partner\'s space'**
   String get wizardAppBarJoin;
 
-  /// No description provided for @wizardAppBarAdvanced.
+  /// No description provided for @wizardAppBarOffline.
   ///
   /// In en, this message translates to:
   /// **'Import key envelope'**
-  String get wizardAppBarAdvanced;
+  String get wizardAppBarOffline;
 
   /// No description provided for @wizardNext.
   ///

@@ -179,7 +179,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleJoin => 'I want to join an existing space';
 
   @override
-  String get wizardRoleAdvanced => 'Advanced: import a key envelope';
+  String get wizardRoleOffline => 'Offline: import a key envelope';
 
   @override
   String get wizardRecoverTitle => 'Restore from backup';
@@ -225,7 +225,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardAppBarJoin => 'Join your partner\'s space';
 
   @override
-  String get wizardAppBarAdvanced => 'Import key envelope';
+  String get wizardAppBarOffline => 'Import key envelope';
 
   @override
   String get wizardNext => 'Next';
