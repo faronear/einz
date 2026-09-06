@@ -189,6 +189,12 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
     store = await DeviceStore.create();
+    // 设备默认名与公私钥生成同步设置（宿主机名去 .local；可随时 /device 修改）——
+    // store 为空即生成身份并命名，不拖到引导阶段（产品决定）
+    final autoName = _defaultDeviceName();
+    if (autoName.isNotEmpty) {
+      store.deviceName = autoName;
+    }
     // 自动模式（无 --store）→ 存默认目录 ~/.einz/myeinz.json（固定文件名，无临时名/重命名）
     if (storePath.isEmpty) {
       final dir = _defaultStoreDir();
@@ -201,6 +207,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     _guidanceNotes.add('✅ 新设备加密凭证已生成，公钥为：');
     stdout.writeln('   ${store.publicKey}');
     _guidanceNotes.add('   ${store.publicKey}');
+    if (autoName.isNotEmpty) {
+      stdout.writeln('✅ 已设置默认设备名称: $autoName（可随时 /device 修改）');
+      _guidanceNotes.add('✅ 已设置默认设备名称: $autoName（可随时 /device 修改）');
+    }
     stdout.writeln('----------------');
     _guidanceNotes.add('----------------');
   }
@@ -266,18 +276,17 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       stderr.writeln('⚠️ 名称处理异常'); // 防崩 + 可诊断
     }
   }
-  // 设备名称（如 MacBook，回车不设置，以后可修改）——仅新设备（未登记）首次配置时询问；
-  // 已登记设备重启不再重复询问（首次跳过则一直不设，状态条回退规范 id dev1）
+  // 设备名称兜底：默认名已在新设备 store 创建时（_onboard，生成公私钥同步）设置；
+  // 此处仅为旧版本/其他工具创建的存量 store（deviceName 仍空且未登记）补设默认名，
+  // 避免登记后状态条回退 devN。已登记设备不改名；hostname 异常回退空（服务端 devN 兜底）
   if (store.deviceId == null && (store.deviceName == null || store.deviceName!.isEmpty)) {
-    final name = await _prompt(session, '❓ 请输入设备名称（例如 MacBook，或者直接回车先跳过）');
-    if (!_state!.running) return; // 退出中（/exit 已置 running=false，_prompt 返回空串）：不再"自动设置设备名/绑定"，直接结束引导
-    if (name.isNotEmpty) {
-      store.deviceName = name;
-      session.messages.add(_systemMessage(session, '✅ 您已设置设备名称: $name, 您可随时 /device 进行修改。'));
-    } else {
-      session.messages.add(_systemMessage(session, '✅ 系统将为您自动设置本设备名称, 您可随时 /device 进行修改。'));
+    final auto = _defaultDeviceName();
+    if (auto.isNotEmpty) {
+      store.deviceName = auto;
+      session.messages.add(_systemMessage(session, '✅ 已自动设置设备名称: $auto（可随时 /device 修改）'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
     }
-    session.messages.add(_systemMessage(session, '----------------'));
   }
   store.save(storePath);
 
@@ -296,7 +305,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.personId = r.personId;
       store.spaceId = r.spaceId;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 第一个设备成功绑定到您的私密领地！'));
+      session.messages.add(_systemMessage(session, '✅ 您的设备已成功绑定到您的私密领地！'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
       if (!_state!.running) return; // 绑定期间被 /exit 或 Ctrl+C 中断：不再生成口令托管等
@@ -305,7 +314,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.spaceKey = base64Encode(sk);
       store.save(storePath);
       await _setupEscrowPassphrase(store, storePath, session);
-      session.messages.add(_systemMessage(session, '🎉 您的唯一创建成功！输入 /invite 生成邀请码，邀请你的唯一伴侣加入吧！'));
+      session.messages.add(_systemMessage(session, '🎉 您的私密领地创建成功！输入 /invite 生成邀请码，邀请你的唯一伴侣加入吧！'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
     } catch (e) {
@@ -1609,7 +1618,7 @@ Map<String, String> _probePersonNames = {};
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 请输入内容安全口令（务必牢记，严禁泄漏！请分享给您的唯一伴侣用于解密私密领地内容）', required: true);
+    final p1 = await _prompt(session, '❓ 请设置内容安全口令（务必牢记，严禁泄漏！请分享给您的唯一伴侣用于解密私密领地内容）', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
@@ -1629,7 +1638,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 口令加密的私密领地托管包已上传'));
       session.messages.add(_systemMessage(session, '----------------'));
-      session.messages.add(_systemMessage(session, '🎉 您的唯一创建成功！输入 /invite 生成邀请码，邀请你的唯一伴侣加入吧！'));
+      session.messages.add(_systemMessage(session, '🎉 您的私密领地创建成功！输入 /invite 生成邀请码，邀请你的唯一伴侣加入吧！'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return;
@@ -1694,4 +1703,21 @@ void _abortPendingGuide() {
   if (c != null && !c.isCompleted) c.complete('');
   _state?.pendingGuideCompleter = null;
   _state?.hiddenInput = false;
+}
+
+/// 新设备的默认名称：宿主机名去 .local 后缀（Platform.localHostname 形如
+/// 'lukde-MacBook-Pro.local'）并截断到 32 字符；异常/空值/localhost 回退
+/// 空串（不设置 deviceName，由服务端用规范 id devN 兜底）。
+String _defaultDeviceName() {
+  try {
+    var name = Platform.localHostname.trim();
+    if (name.toLowerCase() == 'localhost') return '';
+    if (name.endsWith('.local')) {
+      name = name.substring(0, name.length - '.local'.length);
+    }
+    name = name.trim();
+    return name.length > 32 ? name.substring(0, 32) : name;
+  } catch (_) {
+    return '';
+  }
 }

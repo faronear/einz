@@ -170,18 +170,6 @@ abstract class AppLocalizations {
   /// **'1) Generate device key → the device registers automatically (no whitelist needed)\n2) Create or join the private space → set up the app lock'**
   String get setupPageInstructions;
 
-  /// No description provided for @setupPageDeviceIdLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Device ID'**
-  String get setupPageDeviceIdLabel;
-
-  /// No description provided for @setupPageDeviceIdHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. MacBook (optional, can change later)'**
-  String get setupPageDeviceIdHint;
-
   /// No description provided for @setupPageSpaceIdLabel.
   ///
   /// In en, this message translates to:
@@ -410,6 +398,66 @@ abstract class AppLocalizations {
   /// **'Advanced: import a sealed key copy'**
   String get wizardRoleAdvanced;
 
+  /// No description provided for @wizardRecoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from backup'**
+  String get wizardRecoverTitle;
+
+  /// No description provided for @wizardRecoverHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost all devices? Paste the exported key backup (starts with EINZ-BACKUP:) and the passphrase; a correct passphrase resets the space and restores this device'**
+  String get wizardRecoverHint;
+
+  /// No description provided for @wizardRecoverBackupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup text (starts with EINZ-BACKUP:)'**
+  String get wizardRecoverBackupLabel;
+
+  /// No description provided for @wizardRecoverPassphraseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup passphrase'**
+  String get wizardRecoverPassphraseLabel;
+
+  /// No description provided for @wizardRecoverStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get wizardRecoverStart;
+
+  /// No description provided for @wizardRecoverInvalidFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid backup format (must start with EINZ-BACKUP:)'**
+  String get wizardRecoverInvalidFormat;
+
+  /// No description provided for @wizardRecoverBadPassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong passphrase or corrupted backup'**
+  String get wizardRecoverBadPassphrase;
+
+  /// No description provided for @wizardRecoverFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed: {error}'**
+  String wizardRecoverFailed(String error);
+
+  /// No description provided for @wizardRecoverEnrolling.
+  ///
+  /// In en, this message translates to:
+  /// **'Enrolling this device…'**
+  String get wizardRecoverEnrolling;
+
+  /// No description provided for @wizardRecoverDone.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Restored: device enrolled — set a PIN to finish'**
+  String get wizardRecoverDone;
+
   /// No description provided for @wizardAppBarCreate.
   ///
   /// In en, this message translates to:
@@ -445,12 +493,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get wizardDone;
-
-  /// No description provided for @wizardStepDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'Device name'**
-  String get wizardStepDevice;
 
   /// No description provided for @wizardStepName.
   ///
@@ -739,6 +781,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invite code'**
   String get chatPageMenuInvite;
+
+  /// No description provided for @chatPageMenuExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export key backup'**
+  String get chatPageMenuExport;
+
+  /// No description provided for @chatPageExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export key backup'**
+  String get chatPageExportTitle;
+
+  /// No description provided for @chatPageExportPassphraseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup passphrase (encrypts the backup; keep separate)'**
+  String get chatPageExportPassphraseLabel;
+
+  /// No description provided for @chatPageExportGenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate backup'**
+  String get chatPageExportGenerate;
+
+  /// No description provided for @chatPageExportGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted backup text (keep offline, separate from the passphrase):'**
+  String get chatPageExportGenerated;
+
+  /// No description provided for @chatPageExportCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get chatPageExportCopy;
+
+  /// No description provided for @chatPageExportCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup text copied'**
+  String get chatPageExportCopied;
+
+  /// No description provided for @chatPageExportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If all devices are lost: restore with this backup + passphrase (requires server escrow)'**
+  String get chatPageExportHint;
 
   /// No description provided for @chatPagePinSet.
   ///
