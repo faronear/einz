@@ -647,6 +647,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePinUnset => 'PIN: not set';
 
   @override
+  String get chatPageMenuLocaleLabel => 'Language';
+
+  @override
+  String get chatPageMenuBurnLabel => 'Burn-after-read';
+
+  @override
+  String get chatPageMenuMyNameLabel => 'My name';
+
+  @override
+  String get chatPageMenuDeviceNameLabel => 'Device name';
+
+  @override
+  String get chatPagePinLabel => 'PIN';
+
+  @override
+  String get chatPagePinSetValue => 'Set';
+
+  @override
+  String get chatPagePinUnsetValue => 'Not set';
+
+  @override
   String get chatPageBurnHeading => 'Burn-after (only affects this device)';
 
   @override

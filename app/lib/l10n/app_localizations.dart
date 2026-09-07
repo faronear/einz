@@ -1190,6 +1190,48 @@ abstract class AppLocalizations {
   /// **'PIN: not set'**
   String get chatPagePinUnset;
 
+  /// No description provided for @chatPageMenuLocaleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get chatPageMenuLocaleLabel;
+
+  /// No description provided for @chatPageMenuBurnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Burn-after-read'**
+  String get chatPageMenuBurnLabel;
+
+  /// No description provided for @chatPageMenuMyNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'My name'**
+  String get chatPageMenuMyNameLabel;
+
+  /// No description provided for @chatPageMenuDeviceNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name'**
+  String get chatPageMenuDeviceNameLabel;
+
+  /// No description provided for @chatPagePinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get chatPagePinLabel;
+
+  /// No description provided for @chatPagePinSetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get chatPagePinSetValue;
+
+  /// No description provided for @chatPagePinUnsetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get chatPagePinUnsetValue;
+
   /// No description provided for @chatPageBurnHeading.
   ///
   /// In en, this message translates to:

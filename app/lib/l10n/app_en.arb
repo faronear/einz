@@ -274,6 +274,13 @@
   "chatPageExportHint": "Encrypted archive of the space key and all chat history (incl. attachment info); restore everything if devices are lost or when switching to a new device",
   "chatPagePinSet": "PIN: set",
   "chatPagePinUnset": "PIN: not set",
+  "chatPageMenuLocaleLabel": "Language",
+  "chatPageMenuBurnLabel": "Burn-after-read",
+  "chatPageMenuMyNameLabel": "My name",
+  "chatPageMenuDeviceNameLabel": "Device name",
+  "chatPagePinLabel": "PIN",
+  "chatPagePinSetValue": "Set",
+  "chatPagePinUnsetValue": "Not set",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}

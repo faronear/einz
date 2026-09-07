@@ -605,6 +605,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinUnset => 'PIN: 未设置';
 
   @override
+  String get chatPageMenuLocaleLabel => '界面语言';
+
+  @override
+  String get chatPageMenuBurnLabel => '阅后即焚';
+
+  @override
+  String get chatPageMenuMyNameLabel => '我的名字';
+
+  @override
+  String get chatPageMenuDeviceNameLabel => '设备名称';
+
+  @override
+  String get chatPagePinLabel => 'PIN';
+
+  @override
+  String get chatPagePinSetValue => '已设置';
+
+  @override
+  String get chatPagePinUnsetValue => '未设置';
+
+  @override
   String get chatPageBurnHeading => '阅后即焚（仅本设备生效）';
 
   @override

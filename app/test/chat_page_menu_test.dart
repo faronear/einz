@@ -80,14 +80,14 @@ void main() {
     // 菜单应包含各功能项（含「导出完整备份」与「修改口令」）
     expect(find.text('导出完整备份'), findsOneWidget);
     // 我的名字/设备名称（未传 → 显示「未设置」）+ 退出应用
-    expect(find.text('我的名字: 未设置'), findsOneWidget);
-    expect(find.text('设备名称: 未设置'), findsOneWidget);
+    expect(find.text('我的名字'), findsOneWidget);
+    expect(find.text('设备名称'), findsOneWidget);
     expect(find.text('退出应用'), findsOneWidget);
     expect(find.text('头像'), findsOneWidget); // 头像菜单项
     expect(find.text('修改口令'), findsOneWidget);
-    expect(find.text('PIN: 未设置'), findsOneWidget);
+    expect(find.text('PIN'), findsOneWidget);
     // 点"PIN: 未设置"菜单项
-    await tester.tap(find.text('PIN: 未设置'));
+    await tester.tap(find.text('PIN'));
     await tester.pumpAndSettle();
     // 弹窗应出现（设置启动锁）
     expect(find.text('设置 PIN 锁屏密码'), findsOneWidget);
@@ -125,7 +125,7 @@ void main() {
     // 打开菜单 → PIN 菜单项
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN: 未设置'));
+    await tester.tap(find.text('PIN'));
     await tester.pumpAndSettle();
     expect(find.text('设置 PIN 锁屏密码'), findsOneWidget);
 
@@ -287,7 +287,7 @@ void main() {
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两个输入框都不输入 = 设为空）
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN: 未设置'));
+    await tester.tap(find.text('PIN'));
     await tester.pumpAndSettle();
     expect(find.text('设置 PIN 锁屏密码'), findsOneWidget); // 弹窗标题
     // 两空点「设置 PIN」→ 先弹显性确认对话框（防误触——老板要求）
@@ -333,7 +333,7 @@ void main() {
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两空）→ 点「设置 PIN」→ 确认弹窗
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN: 未设置'));
+    await tester.tap(find.text('PIN'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('设置 PIN'));
     await tester.pumpAndSettle();
@@ -449,10 +449,10 @@ void main() {
     // initState loadProfile 补名（personB——顶部条/菜单显示）
     expect(find.text('personB'), findsWidgets);
 
-    // 菜单 → 修改我的名字（菜单项文本：我的名字: personB）→ 输入新名字 → 保存
+    // 菜单 → 修改我的名字（菜单项标签：我的名字）→ 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('我的名字: personB'));
+    await tester.tap(find.text('我的名字'));
     await tester.pumpAndSettle();
     final renameField =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));

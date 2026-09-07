@@ -1234,29 +1234,54 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               return [
                 PopupMenuItem(
                   value: 'locale',
-                  child: Text(l10n.chatPageMenuLocale(kLocaleLabels[langCode] ?? langCode)),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuLocaleLabel),
+                      const Spacer(),
+                      Text(kLocaleLabels[langCode] ?? langCode),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'burn',
-                  child: Text(l10n.chatPageMenuBurn(_burnOptionLabel(_burnSeconds, l10n))),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuBurnLabel),
+                      const Spacer(),
+                      Text(_burnOptionLabel(_burnSeconds, l10n)),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
                 PopupMenuItem(
                   value: 'pin',
-                  child: Text(_hasPin ? l10n.chatPagePinSet : l10n.chatPagePinUnset),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPagePinLabel),
+                      const Spacer(),
+                      Text(_hasPin ? l10n.chatPagePinSetValue : l10n.chatPagePinUnsetValue),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
                 PopupMenuItem(value: 'passphrase', child: Text(l10n.chatPageMenuChangePassphrase)),
                 const PopupMenuDivider(),
                 PopupMenuItem(
                   value: 'name',
-                  child: Text(l10n.chatPageMenuMyName(
-                      _myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName)),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuMyNameLabel),
+                      const Spacer(),
+                      Text(_myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'avatar',
                   child: Row(
                     children: [
+                      Expanded(child: Text(l10n.chatPageMenuAvatar)),
+                      const SizedBox(width: 10),
                       CircleAvatar(
                         radius: 12,
                         backgroundImage:
@@ -1265,15 +1290,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             ? const Icon(Icons.person, size: 16)
                             : null,
                       ),
-                      const SizedBox(width: 10),
-                      Text(l10n.chatPageMenuAvatar),
                     ],
                   ),
                 ),
                 PopupMenuItem(
                   value: 'devname',
-                  child: Text(l10n.chatPageMenuDeviceName(
-                      _myDeviceName.isEmpty ? l10n.chatPageNameUnset : _myDeviceName)),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuDeviceNameLabel),
+                      const Spacer(),
+                      Text(_myDeviceName.isEmpty ? l10n.chatPageNameUnset : _myDeviceName),
+                    ],
+                  ),
                 ),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: 'exit', child: Text(l10n.chatPageMenuExit)),

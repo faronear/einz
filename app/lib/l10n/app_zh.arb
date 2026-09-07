@@ -274,6 +274,13 @@
   "chatPageExportHint": "包含空间密钥与全部聊天历史（含附件信息）的加密归档；设备全部丢失或换新机时可整体恢复",
   "chatPagePinSet": "PIN: 已设置",
   "chatPagePinUnset": "PIN: 未设置",
+  "chatPageMenuLocaleLabel": "界面语言",
+  "chatPageMenuBurnLabel": "阅后即焚",
+  "chatPageMenuMyNameLabel": "我的名字",
+  "chatPageMenuDeviceNameLabel": "设备名称",
+  "chatPagePinLabel": "PIN",
+  "chatPagePinSetValue": "已设置",
+  "chatPagePinUnsetValue": "未设置",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}
