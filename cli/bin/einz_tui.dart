@@ -196,7 +196,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   if (!probeOk) {
     stdout.writeln('❌ 无法连接服务器 $server（/health 探测失败）');
     stdout.write('❓ 输入新服务器地址（回车沿用 $server）: ');
-    final input = (stdin.readLineSync() ?? '').trim();
+    final input = (_readLineCompat() ?? '').trim();
     if (input.isNotEmpty) server = input;
   }
 
@@ -273,6 +273,19 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
 }
 
 /// 启动进对话前：store 已设 PIN 则校验解锁（错误重试，/exit 可退出）；未设直接进。
+/// 同步读一行（兼容 \r / \n / \r\n）：部分终端回车只发 \r，readLineSync 在
+/// macOS/Linux 上单独 \r 不算行结束会挂起等 \n（表现"需按两次回车"）；
+/// 逐字节读到任一换行符即返回。EOF 返回 null。
+String? _readLineCompat() {
+  final buf = StringBuffer();
+  while (true) {
+    final b = stdin.readByteSync();
+    if (b < 0) return buf.isEmpty ? null : buf.toString(); // EOF
+    if (b == 10 || b == 13) return buf.toString(); // \n 或 \r 均算行结束
+    buf.writeCharCode(b);
+  }
+}
+
 Future<void> _unlockPin(ChatSession session) async {
   final hash = session.store.pinHash;
   if (hash == null) return; // 未设置：直接进入
@@ -282,12 +295,13 @@ Future<void> _unlockPin(ChatSession session) async {
   while (_state!.running) {
     session.messages.add(_systemMessage(session, '❓ 请输入 PIN 解锁:'));
     _render(); // 同步渲染提示（_scheduleRender 异步——readLineSync 阻塞期间不会执行）
-    final line = stdin.readLineSync();
+    final line = _readLineCompat();
     if (line == null) {
       _state!.running = false; // EOF（终端关闭/重定向）：退出
       return;
     }
     final pin = line.trim();
+    if (pin.isEmpty) continue; // 空行（如 CRLF 残留 \n）：跳过，不判错
     if (pin == '/exit' || pin == '/quit') {
       _state!.running = false;
       return;
