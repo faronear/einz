@@ -315,6 +315,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your partner joins with this passphrase — share it via QR code on the next step.';
 
   @override
+  String get wizardSwitchToEnvelope =>
+      'Import sealed key envelope instead (offline)';
+
+  @override
   String get wizardPinHint =>
       'You\'ll enter this PIN at every startup to unlock.';
 

@@ -632,6 +632,12 @@ abstract class AppLocalizations {
   /// **'Your partner joins with this passphrase — share it via QR code on the next step.'**
   String get wizardPassphraseHint;
 
+  /// No description provided for @wizardSwitchToEnvelope.
+  ///
+  /// In en, this message translates to:
+  /// **'Import sealed key envelope instead (offline)'**
+  String get wizardSwitchToEnvelope;
+
   /// No description provided for @wizardPinHint.
   ///
   /// In en, this message translates to:

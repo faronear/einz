@@ -299,15 +299,15 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
   });
 
-  // ---- offline（密钥信封导入：AppBar 菜单入口）----
+  // ---- offline（密钥信封导入：口令页次级入口，不再走 AppBar 菜单）----
 
   testWidgets('golden: 向导1.3.1-密钥信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester);
-    // 从 AppBar 常驻菜单进入高级（密钥信封导入）流程；offline 首步即密钥信封（设备名步骤已移除）
-    await tester.tap(find.byTooltip('线下：导入密钥信封'));
+    await pumpSetup(tester, enroll: fakeEnroll); // 空名称表 → create，自动进入步骤 1
+    await tester.tap(find.text('下一步')); // 名字 → 自动登记 → 口令页
     await tester.pumpAndSettle();
-    await tester.tap(find.text('线下：导入密钥信封'));
+    // 口令页底部「改用密封密钥信封导入」→ offline 首步即密钥信封粘贴页
+    await tester.tap(find.text('改用密封密钥信封导入（离线）'));
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_envelope.png'));

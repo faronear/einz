@@ -230,22 +230,18 @@ class _SetupPageState extends State<SetupPage> {
       appBar: AppBar(
         title: Text(_appBarTitle(l10n)),
         actions: [
-          // 线下入口（密钥信封导入 / 全丢恢复）常驻菜单：探测自动判定角色后依然可达
+          // 全丢恢复入口常驻菜单：探测自动判定角色后依然可达
+          // （密钥信封导入已移入口令页次级入口，不再放全局菜单）
           PopupMenuButton<String>(
             tooltip: l10n.wizardRoleOffline,
             onSelected: (value) {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
               Future<void>.delayed(const Duration(milliseconds: 300), () {
                 if (!mounted) return;
-                if (value == 'envelope') _selectRole(_WizardRole.offline);
                 if (value == 'recover') _showRecoverDialog();
               });
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'envelope',
-                child: Text(l10n.wizardRoleOffline),
-              ),
               PopupMenuItem(
                 value: 'recover',
                 child: Text(l10n.wizardRecoverTitle),
@@ -573,7 +569,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 第 0 步（角色未判定时）：显示探测状态（密钥信封线下入口在 AppBar 菜单，常驻可达）。
+  /// 第 0 步（角色未判定时）：显示探测状态（密钥信封导入在口令页有次级入口）。
   /// 角色由服务器探测自动判定（person 名称表空=首设备 create，非空=后续设备 join），
   /// 不再让用户手动选择。
   Widget _buildDetectAndEnvelope() {
@@ -976,6 +972,14 @@ class _SetupPageState extends State<SetupPage> {
             labelText: l10n.setupPageEscrowLabel,
             border: const OutlineInputBorder(),
           ),
+        ),
+        const SizedBox(height: 16),
+        // 密钥信封导入与口令同属 Space Key 交换方式：不用口令的用户可从这里
+        // 切换到信封导入流程（offline 首步即信封粘贴页，凭邀请码登记后解封）。
+        TextButton.icon(
+          onPressed: () => _selectRole(_WizardRole.offline),
+          icon: const Icon(Icons.mail_outline, size: 18),
+          label: Text(l10n.wizardSwitchToEnvelope),
         ),
       ],
     );

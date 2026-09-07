@@ -121,6 +121,7 @@
   },
   "wizardEnrollFirst": "⚠️ 请先完成设备登记（点上方按钮）",
   "wizardPassphraseHint": "对方凭此口令加入——下一步将生成二维码分享给对方",
+  "wizardSwitchToEnvelope": "改用密封密钥信封导入（离线）",
   "wizardPinHint": "每次启动需输入此 PIN 解锁",
   "wizardDoneText": "✅ 设置完成！",
   "wizardJoinHint": "扫描对方的二维码（含邀请码与口令）即可一键加入；也可粘贴文本或手动填写下方信息",

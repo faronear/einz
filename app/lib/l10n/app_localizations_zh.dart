@@ -296,6 +296,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对方凭此口令加入——下一步将生成二维码分享给对方';
 
   @override
+  String get wizardSwitchToEnvelope => '改用密封密钥信封导入（离线）';
+
+  @override
   String get wizardPinHint => '每次启动需输入此 PIN 解锁';
 
   @override
