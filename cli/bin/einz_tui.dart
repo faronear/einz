@@ -259,7 +259,8 @@ Future<bool> _verifyPin(String hash, String pin) async {
 /// 入网最后一步：询问设置 PIN 锁屏（直接回车跳过 = 不设置；之后可用 /pin 设置）。
 Future<void> _askSetPin(ChatSession session, String storePath) async {
   if (!_state!.running) return;
-  final pin = await _prompt(session, '❓ 设置 PIN 锁屏（可留空跳过，之后可用 /pin 设置）:', hidden: true);
+  // 明文输入（与解锁一致——引导中也可输入 /exit）
+  final pin = await _prompt(session, '❓ 设置 PIN 锁屏（可留空跳过，之后可用 /pin 设置）:', hidden: false);
   if (!_state!.running) return;
   if (pin.isEmpty) {
     session.messages.add(_systemMessage(session, '⚠️ 已跳过设置 PIN（未设置）'));
@@ -1722,15 +1723,10 @@ Future<void> _execCommand(String line) async {
           final last = d['last_seen'];
           final online = (last is num) && (now - last < 60 * 1000);
           final since = (last is num) ? _fmtTime(last.toInt()) : '-';
-          final pub = (d['public_key'] as String? ?? '');
-          final pubShort = pub.length >= 8
-              ? '${pub.substring(0, 4)}…${pub.substring(pub.length - 4)}'
-              : pub;
           final displayName = devName.isNotEmpty ? devName : devId; // dev name，backup id
           final personName = s.personNames[person] ?? person; // person name，backup id
           final tag = devId == myId ? '本机' : (online ? '在线' : '离线');
           sb.write('\n  ${online ? '🟢' : '⚪'} $displayName [$personName] $tag (since $since)');
-          if (pubShort.isNotEmpty) sb.write(' [$pubShort]');
         }
         s.session.messages.add(_systemMessage(s.session, sb.toString()));
       } catch (e) {
