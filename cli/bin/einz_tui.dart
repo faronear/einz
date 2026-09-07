@@ -276,7 +276,8 @@ Future<void> _unlockPin(ChatSession session) async {
   final hash = session.store.pinHash;
   if (hash == null) return; // 未设置：直接进入
   while (_state!.running) {
-    final pin = await _prompt(session, '❓ 请输入 PIN 解锁:', hidden: true, required: true);
+    // 明文输入（不星号遮挡）：解锁时仍可输入 /exit 退出，需看到实际内容
+    final pin = await _prompt(session, '❓ 请输入 PIN 解锁:', hidden: false, required: true);
     if (!_state!.running) return;
     // argon2id str 哈希自含盐：strVerify 返回错误消息（空 = 验证通过）
     if (await _verifyPin(hash, pin)) {
