@@ -908,6 +908,78 @@ abstract class AppLocalizations {
   /// **'Change passphrase'**
   String get chatPageMenuChangePassphrase;
 
+  /// No description provided for @chatPageMenuMyName.
+  ///
+  /// In en, this message translates to:
+  /// **'My name: {value}'**
+  String chatPageMenuMyName(String value);
+
+  /// No description provided for @chatPageMenuDeviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name: {value}'**
+  String chatPageMenuDeviceName(String value);
+
+  /// No description provided for @chatPageNameUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'Unset'**
+  String get chatPageNameUnset;
+
+  /// No description provided for @chatPageMenuExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit app'**
+  String get chatPageMenuExit;
+
+  /// No description provided for @chatPageRenameNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change my name'**
+  String get chatPageRenameNameTitle;
+
+  /// No description provided for @chatPageRenameNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New name'**
+  String get chatPageRenameNameLabel;
+
+  /// No description provided for @chatPageRenameDeviceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change device name'**
+  String get chatPageRenameDeviceTitle;
+
+  /// No description provided for @chatPageRenameDeviceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New device name'**
+  String get chatPageRenameDeviceLabel;
+
+  /// No description provided for @chatPageRenameFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename failed: {error}'**
+  String chatPageRenameFailed(String error);
+
+  /// No description provided for @chatPageExitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit app?'**
+  String get chatPageExitTitle;
+
+  /// No description provided for @chatPageExitMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ll return to the lock screen and need your PIN to unlock and re-authenticate.'**
+  String get chatPageExitMessage;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
   /// No description provided for @chatPageChangePassphraseTitle.
   ///
   /// In en, this message translates to:

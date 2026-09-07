@@ -68,6 +68,10 @@ void main() {
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（含「导出完整备份」与「修改口令」）
     expect(find.text('导出完整备份'), findsOneWidget);
+    // 我的名字/设备名称（未传 → 显示「未设置」）+ 退出应用
+    expect(find.text('我的名字: 未设置'), findsOneWidget);
+    expect(find.text('设备名称: 未设置'), findsOneWidget);
+    expect(find.text('退出应用'), findsOneWidget);
     expect(find.text('修改口令'), findsOneWidget);
     expect(find.text('PIN: 未设置'), findsOneWidget);
     // 点"PIN: 未设置"菜单项

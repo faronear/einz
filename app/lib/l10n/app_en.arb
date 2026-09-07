@@ -202,6 +202,33 @@
   "chatPageStatusOnline": "Online",
   "chatPageStatusOffline": "Offline",
   "chatPageMenuChangePassphrase": "Change passphrase",
+  "chatPageMenuMyName": "My name: {value}",
+  "@chatPageMenuMyName": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageMenuDeviceName": "Device name: {value}",
+  "@chatPageMenuDeviceName": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageNameUnset": "Unset",
+  "chatPageMenuExit": "Exit app",
+  "chatPageRenameNameTitle": "Change my name",
+  "chatPageRenameNameLabel": "New name",
+  "chatPageRenameDeviceTitle": "Change device name",
+  "chatPageRenameDeviceLabel": "New device name",
+  "chatPageRenameFailed": "Rename failed: {error}",
+  "@chatPageRenameFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageExitTitle": "Exit app?",
+  "chatPageExitMessage": "You'll return to the lock screen and need your PIN to unlock and re-authenticate.",
+  "save": "Save",
   "chatPageChangePassphraseTitle": "Change passphrase",
   "chatPageChangePassphraseOldLabel": "Current passphrase",
   "chatPageChangePassphraseNewLabel": "New passphrase",

@@ -43,6 +43,8 @@ class ChatPage extends StatefulWidget {
     this.reauth,
     this.escrowPassphrase,
     this.initialHistory,
+    this.personName, // 我的名字（登记时设置；菜单显示/修改）
+    this.deviceName, // 我的设备名（登记时自动获取；菜单显示/修改）
   });
 
   final String server;
@@ -59,6 +61,12 @@ class ChatPage extends StatefulWidget {
   /// 归档恢复的历史消息（「从完整备份恢复」导入；map 形态与导出归档的
   /// history 条目一致：env/plaintext/sender/attachment/expiresAt）。
   final List<Map<String, dynamic>>? initialHistory;
+
+  /// 我的名字（向导登记时设置；顶栏菜单显示/修改，服务端同步）。
+  final String? personName;
+
+  /// 我的设备名（向导登记时自动获取设备型号；顶栏菜单显示/修改，服务端同步）。
+  final String? deviceName;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -101,6 +109,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
+  late String _myPersonName; // 我的名字（菜单显示；改名后 setState 刷新）
+  late String _myDeviceName; // 我的设备名（菜单显示；改名后 setState 刷新）
 
   /// 阅后即焚档位文案（l10n 映射）。
   String _burnOptionLabel(int seconds, AppLocalizations l10n) {
@@ -127,6 +137,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _myPersonName = widget.personName ?? '';
+    _myDeviceName = widget.deviceName ?? '';
     WidgetsBinding.instance.addObserver(this);
     final db = widget.db ?? LocalDatabase();
     _repo = MessageRepository(
@@ -372,6 +384,74 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (changed == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(AppLocalizations.of(context)!.chatPageChangePassphraseDone)));
+    }
+  }
+
+  /// 修改我的名字/设备名称（服务端同步 + 本地刷新菜单显示）。
+  Future<void> _showRenameDialog({required bool renameDevice}) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ctrl = TextEditingController(text: renameDevice ? _myDeviceName : _myPersonName);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(renameDevice ? l10n.chatPageRenameDeviceTitle : l10n.chatPageRenameNameTitle),
+        content: TextField(
+          controller: ctrl,
+          decoration: InputDecoration(
+            labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          FilledButton(
+            onPressed: () async {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              try {
+                final api = widget.api ?? ApiClient(widget.server);
+                if (renameDevice) {
+                  await api.updateDeviceName(name, widget.token);
+                  _myDeviceName = name;
+                } else {
+                  await api.updatePersonName(name, widget.token);
+                  _myPersonName = name;
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop(true);
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text(l10n.chatPageRenameFailed('$e'))));
+                }
+              }
+            },
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
+  }
+
+  /// 退出应用（等价 TUI /exit）：确认后回到锁屏（LockPage），下次解锁重新认证。
+  Future<void> _showExitAppDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final exit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.chatPageExitTitle),
+        content: Text(l10n.chatPageExitMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+        ],
+      ),
+    );
+    if (exit == true && mounted) {
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => LockPage(db: widget.db ?? LocalDatabase())));
     }
   }
 
@@ -1030,6 +1110,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _showExportBackupDialog();
                   case 'passphrase':
                     _showChangePassphraseDialog();
+                  case 'name':
+                    _showRenameDialog(renameDevice: false);
+                  case 'devname':
+                    _showRenameDialog(renameDevice: true);
+                  case 'exit':
+                    _showExitAppDialog();
                 }
               });
             },
@@ -1052,6 +1138,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
                 PopupMenuItem(value: 'passphrase', child: Text(l10n.chatPageMenuChangePassphrase)),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'name',
+                  child: Text(l10n.chatPageMenuMyName(
+                      _myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName)),
+                ),
+                PopupMenuItem(
+                  value: 'devname',
+                  child: Text(l10n.chatPageMenuDeviceName(
+                      _myDeviceName.isEmpty ? l10n.chatPageNameUnset : _myDeviceName)),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(value: 'exit', child: Text(l10n.chatPageMenuExit)),
               ];
             },
           ),

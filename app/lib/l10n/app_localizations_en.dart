@@ -484,6 +484,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuChangePassphrase => 'Change passphrase';
 
   @override
+  String chatPageMenuMyName(String value) {
+    return 'My name: $value';
+  }
+
+  @override
+  String chatPageMenuDeviceName(String value) {
+    return 'Device name: $value';
+  }
+
+  @override
+  String get chatPageNameUnset => 'Unset';
+
+  @override
+  String get chatPageMenuExit => 'Exit app';
+
+  @override
+  String get chatPageRenameNameTitle => 'Change my name';
+
+  @override
+  String get chatPageRenameNameLabel => 'New name';
+
+  @override
+  String get chatPageRenameDeviceTitle => 'Change device name';
+
+  @override
+  String get chatPageRenameDeviceLabel => 'New device name';
+
+  @override
+  String chatPageRenameFailed(String error) {
+    return 'Rename failed: $error';
+  }
+
+  @override
+  String get chatPageExitTitle => 'Exit app?';
+
+  @override
+  String get chatPageExitMessage =>
+      'You\'ll return to the lock screen and need your PIN to unlock and re-authenticate.';
+
+  @override
+  String get save => 'Save';
+
+  @override
   String get chatPageChangePassphraseTitle => 'Change passphrase';
 
   @override

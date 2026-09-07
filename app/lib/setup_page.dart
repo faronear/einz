@@ -81,6 +81,7 @@ class _SetupPageState extends State<SetupPage> {
   Uint8List? _spaceKey;
   String? _sessionToken;
   int _joinKeyVersion = 1; // join 口令验证时记录的 Space Key 版本（_verifyJoinPassphrase 填充）
+  String _myDeviceName = ''; // 登记时的设备名（进聊天页显示/修改用）
   String? _status;
   bool _busy = false;
 
@@ -783,7 +784,9 @@ class _SetupPageState extends State<SetupPage> {
             inviteCode: inviteCode,
             personName: _personName.text.trim(), // 首设备：第一个用户的名字；后续设备按需
             personId: _chosenPerson, // join：用户选择的身份（personA/personB）
-            deviceName: await _autoDeviceName(), // 自动填设备型号（产品决定：不再询问）
+            // 自动填设备型号（产品决定：不再询问）；同步保存供进聊天页显示/修改。
+            // 只在真实登记分支计算（测试注入 enrollOverride 时不调 device_info）
+            deviceName: (_myDeviceName = await _autoDeviceName()),
           );
     if (!mounted) return;
     setState(() {
@@ -867,6 +870,10 @@ class _SetupPageState extends State<SetupPage> {
         spaceKey: sk,
         keyVersion: 1,
         token: token,
+        personName: _role == _WizardRole.create
+            ? _personName.text.trim()
+            : (_personNames[_chosenPerson] ?? ''),
+        deviceName: _myDeviceName,
         initialHistory: _importedHistory,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
         reauth: () async => (await _authenticate(kp, enroll.deviceId)).sessionToken,

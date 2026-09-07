@@ -202,6 +202,33 @@
   "chatPageStatusOnline": "在线",
   "chatPageStatusOffline": "离线",
   "chatPageMenuChangePassphrase": "修改口令",
+  "chatPageMenuMyName": "我的名字: {value}",
+  "@chatPageMenuMyName": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageMenuDeviceName": "设备名称: {value}",
+  "@chatPageMenuDeviceName": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "chatPageNameUnset": "未设置",
+  "chatPageMenuExit": "退出应用",
+  "chatPageRenameNameTitle": "修改我的名字",
+  "chatPageRenameNameLabel": "新名字",
+  "chatPageRenameDeviceTitle": "修改设备名称",
+  "chatPageRenameDeviceLabel": "新设备名",
+  "chatPageRenameFailed": "修改失败: {error}",
+  "@chatPageRenameFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageExitTitle": "退出应用？",
+  "chatPageExitMessage": "将回到锁屏，下次需输入 PIN 解锁并重新认证。",
+  "save": "保存",
   "chatPageChangePassphraseTitle": "修改口令",
   "chatPageChangePassphraseOldLabel": "旧口令",
   "chatPageChangePassphraseNewLabel": "新口令",

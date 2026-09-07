@@ -450,6 +450,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuChangePassphrase => '修改口令';
 
   @override
+  String chatPageMenuMyName(String value) {
+    return '我的名字: $value';
+  }
+
+  @override
+  String chatPageMenuDeviceName(String value) {
+    return '设备名称: $value';
+  }
+
+  @override
+  String get chatPageNameUnset => '未设置';
+
+  @override
+  String get chatPageMenuExit => '退出应用';
+
+  @override
+  String get chatPageRenameNameTitle => '修改我的名字';
+
+  @override
+  String get chatPageRenameNameLabel => '新名字';
+
+  @override
+  String get chatPageRenameDeviceTitle => '修改设备名称';
+
+  @override
+  String get chatPageRenameDeviceLabel => '新设备名';
+
+  @override
+  String chatPageRenameFailed(String error) {
+    return '修改失败: $error';
+  }
+
+  @override
+  String get chatPageExitTitle => '退出应用？';
+
+  @override
+  String get chatPageExitMessage => '将回到锁屏，下次需输入 PIN 解锁并重新认证。';
+
+  @override
+  String get save => '保存';
+
+  @override
   String get chatPageChangePassphraseTitle => '修改口令';
 
   @override
