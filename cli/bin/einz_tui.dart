@@ -997,6 +997,18 @@ String _peerDeviceLabel(_TuiState s) {
   return s.deviceNames[devId] ?? devId;
 }
 
+/// last_seen 毫秒 → 时间文本：今天 HH:mm / 昨天 HH:mm / M/d HH:mm。
+String _fmtTime(int ms) {
+  final t = DateTime.fromMillisecondsSinceEpoch(ms);
+  final now = DateTime.now();
+  final hhmm =
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  if (t.year == now.year && t.month == now.month && t.day == now.day) return hhmm;
+  final y = now.subtract(const Duration(days: 1));
+  if (t.year == y.year && t.month == y.month && t.day == y.day) return '昨天 $hhmm';
+  return '${t.month}/${t.day} $hhmm';
+}
+
 /// 对端上下线广播（Server 推送——立即更新对方在线状态，不等轮询）。
 void _onPeerStatus(WsPeerStatusEvent event) {
   final s = _state;
@@ -1704,15 +1716,19 @@ Future<void> _execCommand(String line) async {
         final sb = StringBuffer('📱 设备列表：');
         for (final d in devices) {
           final devId = (d['device_id'] ?? '-') as String;
+          final devName = (d['device_name'] as String? ?? '');
           final person = (d['person_id'] ?? '-') as String;
           final last = d['last_seen'];
           final online = (last is num) && (now - last < 60 * 1000);
+          final since = (last is num) ? _fmtTime(last.toInt()) : '-';
           final pub = (d['public_key'] as String? ?? '');
           final pubShort = pub.length >= 8
               ? '${pub.substring(0, 4)}…${pub.substring(pub.length - 4)}'
               : pub;
+          final displayName = devName.isNotEmpty ? devName : devId; // dev name，backup id
+          final personName = s.personNames[person] ?? person; // person name，backup id
           final tag = devId == myId ? '本机' : (online ? '在线' : '离线');
-          sb.write('\n  ${online ? '🟢' : '⚪'} $devId [$person] $tag');
+          sb.write('\n  ${online ? '🟢' : '⚪'} $displayName [$personName] $tag (since $since)');
           if (pubShort.isNotEmpty) sb.write(' [$pubShort]');
         }
         s.session.messages.add(_systemMessage(s.session, sb.toString()));
