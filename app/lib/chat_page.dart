@@ -45,6 +45,7 @@ class ChatPage extends StatefulWidget {
     this.initialHistory,
     this.personName, // 我的名字（登记时设置；菜单显示/修改）
     this.deviceName, // 我的设备名（登记时自动获取；菜单显示/修改）
+    this.personId, // 我的 personId（头像上传/获取用）
   });
 
   final String server;
@@ -67,6 +68,9 @@ class ChatPage extends StatefulWidget {
 
   /// 我的设备名（向导登记时自动获取设备型号；顶栏菜单显示/修改，服务端同步）。
   final String? deviceName;
+
+  /// 我的 personId（向导登记时确定；头像上传/消息身份标识用）。
+  final String? personId;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -111,6 +115,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
   late String _myPersonName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myDeviceName; // 我的设备名（菜单显示；改名后 setState 刷新）
+  Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
 
   /// 阅后即焚档位文案（l10n 映射）。
   String _burnOptionLabel(int seconds, AppLocalizations l10n) {
@@ -139,6 +144,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     super.initState();
     _myPersonName = widget.personName ?? '';
     _myDeviceName = widget.deviceName ?? '';
+    _loadMyAvatar();
     WidgetsBinding.instance.addObserver(this);
     final db = widget.db ?? LocalDatabase();
     _repo = MessageRepository(
@@ -384,6 +390,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (changed == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(AppLocalizations.of(context)!.chatPageChangePassphraseDone)));
+    }
+  }
+
+  /// 加载我的头像（异步；未设置/失败 → 保持默认图标）。
+  Future<void> _loadMyAvatar() async {
+    final pid = widget.personId;
+    if (pid == null || pid.isEmpty) return;
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      final bytes = await api.getAvatar(pid);
+      if (bytes != null && mounted) setState(() => _myAvatarBytes = bytes);
+    } catch (_) {
+      // 网络失败：保持默认图标
+    }
+  }
+
+  /// 修改我的头像：选图 → 上传服务端（per-person 覆盖）→ 本地缓存刷新菜单显示。
+  Future<void> _showAvatarUpload() async {
+    final l10n = AppLocalizations.of(context)!;
+    final picked = await FilePicker.pickFiles(type: FileType.image);
+    if (picked.isEmpty) return;
+    final file = picked.first;
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty || bytes.length > 2 * 1024 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.chatPageAvatarTooLarge)));
+      }
+      return;
+    }
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      await api.uploadAvatar(bytes, widget.token);
+      if (!mounted) return;
+      setState(() => _myAvatarBytes = bytes);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.chatPageAvatarUploaded)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.chatPageAvatarFailed('$e'))));
     }
   }
 
@@ -1112,6 +1159,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _showChangePassphraseDialog();
                   case 'name':
                     _showRenameDialog(renameDevice: false);
+                  case 'avatar':
+                    _showAvatarUpload();
                   case 'devname':
                     _showRenameDialog(renameDevice: true);
                   case 'exit':
@@ -1145,6 +1194,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       _myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName)),
                 ),
                 PopupMenuItem(
+                  value: 'avatar',
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundImage:
+                            _myAvatarBytes != null ? MemoryImage(_myAvatarBytes!) : null,
+                        child: _myAvatarBytes == null
+                            ? const Icon(Icons.person, size: 16)
+                            : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(l10n.chatPageMenuAvatar),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
                   value: 'devname',
                   child: Text(l10n.chatPageMenuDeviceName(
                       _myDeviceName.isEmpty ? l10n.chatPageNameUnset : _myDeviceName)),
@@ -1168,26 +1234,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 final mine = m.sender == 'me';
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: mine ? Colors.indigo.shade100 : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (m.expiresAt != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: Text(l10n.chatPageBurnBadge,
-                                style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                          ),
-                        _buildMessageContent(m),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 每条消息前放置发送者头像（点击有头像时放大全屏查看）
+                      if (!mine)
+                        _MessageAvatar(
+                            personId: m.env.senderPersonId, server: widget.server, api: widget.api),
+                      const SizedBox(width: 6),
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: mine ? Colors.indigo.shade100 : Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (m.expiresAt != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text(l10n.chatPageBurnBadge,
+                                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                              ),
+                            _buildMessageContent(m),
+                          ],
+                        ),
+                      ),
+                      if (mine) ...[
+                        const SizedBox(width: 6),
+                        _MessageAvatar(
+                            personId: m.env.senderPersonId, server: widget.server, api: widget.api),
                       ],
-                    ),
+                    ],
                   ),
                 );
               },
@@ -1624,4 +1705,86 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
 /// 尚未托管口令（服务器无 escrow 包）。
 class _NoEscrowException implements Exception {
   const _NoEscrowException();
+}
+
+/// 消息发送者头像：按 personId 从服务端加载（静态缓存避免重复请求），
+/// 未设置/加载失败显示默认图标；点击有头像时放大到全屏查看。
+class _MessageAvatar extends StatefulWidget {
+  const _MessageAvatar({this.personId, required this.server, this.api});
+
+  final String? personId;
+  final String server;
+  final ApiClient? api;
+
+  @override
+  State<_MessageAvatar> createState() => _MessageAvatarState();
+}
+
+class _MessageAvatarState extends State<_MessageAvatar> {
+  static final Map<String, Uint8List> _cache = {}; // personId → 头像 bytes
+
+  Uint8List? get _bytes => widget.personId == null ? null : _cache[widget.personId];
+
+  @override
+  void initState() {
+    super.initState();
+    final pid = widget.personId;
+    if (pid != null && !_cache.containsKey(pid)) {
+      _load(pid);
+    }
+  }
+
+  Future<void> _load(String personId) async {
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      final bytes = await api.getAvatar(personId);
+      if (bytes != null && mounted) {
+        _cache[personId] = bytes;
+        setState(() {});
+      }
+    } catch (_) {
+      // 网络失败：保持默认图标
+    }
+  }
+
+  /// 全屏查看头像（黑底大图 + 右上角关闭）。
+  void _showFullscreen() {
+    final bytes = _bytes;
+    if (bytes == null) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            Positioned.fill(child: Image.memory(bytes, fit: BoxFit.contain)),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _bytes;
+    return GestureDetector(
+      onTap: bytes != null ? _showFullscreen : null,
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: Colors.grey.shade300,
+        backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+        child: bytes == null ? const Icon(Icons.person, size: 18) : null,
+      ),
+    );
+  }
 }

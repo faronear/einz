@@ -203,6 +203,15 @@
   "chatPageStatusOffline": "离线",
   "chatPageMenuChangePassphrase": "修改口令",
   "chatPageMenuMyName": "我的名字: {value}",
+  "chatPageMenuAvatar": "头像",
+  "chatPageAvatarUploaded": "✅ 头像已更新",
+  "chatPageAvatarTooLarge": "图片过大（最大 2MB）",
+  "chatPageAvatarFailed": "头像上传失败: {error}",
+  "@chatPageAvatarFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "@chatPageMenuMyName": {
     "placeholders": {
       "value": {"type": "String"}

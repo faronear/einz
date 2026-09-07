@@ -914,6 +914,30 @@ abstract class AppLocalizations {
   /// **'My name: {value}'**
   String chatPageMenuMyName(String value);
 
+  /// No description provided for @chatPageMenuAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar'**
+  String get chatPageMenuAvatar;
+
+  /// No description provided for @chatPageAvatarUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Avatar updated'**
+  String get chatPageAvatarUploaded;
+
+  /// No description provided for @chatPageAvatarTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Image too large (max 2MB)'**
+  String get chatPageAvatarTooLarge;
+
+  /// No description provided for @chatPageAvatarFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar upload failed: {error}'**
+  String chatPageAvatarFailed(String error);
+
   /// No description provided for @chatPageMenuDeviceName.
   ///
   /// In en, this message translates to:

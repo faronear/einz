@@ -136,6 +136,16 @@ class ApiClient {
     await _post('/devices/person-name', {'person_name': personName}, token: token);
   }
 
+  /// 上传本人头像（raw 图片 bytes，服务端按 person 存储覆盖）。
+  Future<void> uploadAvatar(Uint8List bytes, String token) async {
+    await _postBytes('/avatar', bytes, token: token);
+  }
+
+  /// 获取指定 person 的头像 bytes；未设置返回 null。
+  Future<Uint8List?> getAvatar(String personId) async {
+    return _getBytes('/avatar/$personId');
+  }
+
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
   /// 上传口令托管密文包；可选附口令 argon2id 哈希（服务端 /recover 恢复校验用）。
   Future<void> uploadKeyEscrow(BackupFile package, String token, {String? passphraseHash}) async {
@@ -282,6 +292,51 @@ class ApiClient {
           throw _errorFrom(res.statusCode, text);
         }
         return jsonDecode(text) as Map<String, dynamic>;
+      } finally {
+        client.close(force: true);
+      }
+    });
+  }
+
+  /// raw bytes 上传（头像等二进制）：image/png + Bearer token。
+  Future<void> _postBytes(String path, Uint8List bytes, {String? token}) {
+    return _withRetry(() async {
+      final client = _client;
+      try {
+        final req = await client.postUrl(Uri.parse('$baseUrl$path'));
+        req.headers.contentType = ContentType('image', 'png');
+        if (token != null) {
+          req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        }
+        req.add(bytes);
+        final res = await req.close();
+        final text = await res.transform(utf8.decoder).join();
+        if (res.statusCode >= 400) {
+          throw _errorFrom(res.statusCode, text);
+        }
+      } finally {
+        client.close(force: true);
+      }
+    });
+  }
+
+  /// raw bytes 获取（头像等）：404 = 未设置 → null。
+  Future<Uint8List?> _getBytes(String path) {
+    return _withRetry(() async {
+      final client = _client;
+      try {
+        final req = await client.getUrl(Uri.parse('$baseUrl$path'));
+        final res = await req.close();
+        if (res.statusCode == 404) return null; // 未设置
+        if (res.statusCode >= 400) {
+          final text = await res.transform(utf8.decoder).join();
+          throw _errorFrom(res.statusCode, text);
+        }
+        final builder = BytesBuilder();
+        await for (final chunk in res) {
+          builder.add(chunk);
+        }
+        return builder.takeBytes();
       } finally {
         client.close(force: true);
       }

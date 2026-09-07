@@ -203,6 +203,15 @@
   "chatPageStatusOffline": "Offline",
   "chatPageMenuChangePassphrase": "Change passphrase",
   "chatPageMenuMyName": "My name: {value}",
+  "chatPageMenuAvatar": "Avatar",
+  "chatPageAvatarUploaded": "✅ Avatar updated",
+  "chatPageAvatarTooLarge": "Image too large (max 2MB)",
+  "chatPageAvatarFailed": "Avatar upload failed: {error}",
+  "@chatPageAvatarFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "@chatPageMenuMyName": {
     "placeholders": {
       "value": {"type": "String"}

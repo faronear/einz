@@ -72,6 +72,7 @@ void main() {
     expect(find.text('我的名字: 未设置'), findsOneWidget);
     expect(find.text('设备名称: 未设置'), findsOneWidget);
     expect(find.text('退出应用'), findsOneWidget);
+    expect(find.text('头像'), findsOneWidget); // 头像菜单项
     expect(find.text('修改口令'), findsOneWidget);
     expect(find.text('PIN: 未设置'), findsOneWidget);
     // 点"PIN: 未设置"菜单项

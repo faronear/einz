@@ -455,6 +455,20 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageMenuAvatar => '头像';
+
+  @override
+  String get chatPageAvatarUploaded => '✅ 头像已更新';
+
+  @override
+  String get chatPageAvatarTooLarge => '图片过大（最大 2MB）';
+
+  @override
+  String chatPageAvatarFailed(String error) {
+    return '头像上传失败: $error';
+  }
+
+  @override
   String chatPageMenuDeviceName(String value) {
     return '设备名称: $value';
   }

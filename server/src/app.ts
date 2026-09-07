@@ -5,6 +5,7 @@ import { getDb, openDb } from "./db.js";
 import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./attachments.js";
+import { getAvatar, storeAvatar } from "./avatars.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, getKeyEscrow, recoverSpace, uploadKeyEscrow } from "./escrow.js";
@@ -136,6 +137,27 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const token = bearer(req);
     const blob = getAttachmentBlob(cfg, token, attMatch[1]);
     res.writeHead(200, { "Content-Type": "application/octet-stream" });
+    res.end(blob);
+    return;
+  }
+
+  // 头像（per-person）：上传（token 认证，写本人头像文件）/ 获取（公开，404=未设置）
+  if (method === "POST" && path === "/avatar") {
+    const token = bearer(req);
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const blob = Buffer.concat(chunks);
+    sendJson(res, 200, storeAvatar(cfg, token, blob));
+    return;
+  }
+  const avatarMatch = path.match(/^\/avatar\/([^/]+)$/);
+  if (method === "GET" && avatarMatch) {
+    const blob = getAvatar(decodeURIComponent(avatarMatch[1]));
+    if (blob == null) {
+      sendJson(res, 404, { error: { code: "AVATAR_NOT_FOUND", message: "no avatar set" } });
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "image/png" });
     res.end(blob);
     return;
   }

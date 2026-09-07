@@ -489,6 +489,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageMenuAvatar => 'Avatar';
+
+  @override
+  String get chatPageAvatarUploaded => '✅ Avatar updated';
+
+  @override
+  String get chatPageAvatarTooLarge => 'Image too large (max 2MB)';
+
+  @override
+  String chatPageAvatarFailed(String error) {
+    return 'Avatar upload failed: $error';
+  }
+
+  @override
   String chatPageMenuDeviceName(String value) {
     return 'Device name: $value';
   }
