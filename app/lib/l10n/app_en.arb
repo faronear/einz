@@ -51,6 +51,12 @@
   "scanJoinHint": "Scan your partner's join QR code",
   "scanJoinFound": "Join info recognized — space & passphrase filled in",
   "wizardRoleTitle": "How do you want to set up?",
+  "wizardMenuLocale": "Language: {value}",
+  "@wizardMenuLocale": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
   "wizardDetectTitle": "Checking server status…",
   "setupPageServerBar": "Server: {server}",
   "wizardDetectHint": "We'll detect whether you're the first user (first device creates the space)",

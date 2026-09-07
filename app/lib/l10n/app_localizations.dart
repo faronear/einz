@@ -308,6 +308,12 @@ abstract class AppLocalizations {
   /// **'How do you want to set up?'**
   String get wizardRoleTitle;
 
+  /// No description provided for @wizardMenuLocale.
+  ///
+  /// In en, this message translates to:
+  /// **'Language: {value}'**
+  String wizardMenuLocale(String value);
+
   /// No description provided for @wizardDetectTitle.
   ///
   /// In en, this message translates to:

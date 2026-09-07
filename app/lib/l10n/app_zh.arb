@@ -51,6 +51,12 @@
   "scanJoinHint": "扫描对方的加入二维码",
   "scanJoinFound": "已识别加入信息，空间与口令已自动填入",
   "wizardRoleTitle": "选择你的情况",
+  "wizardMenuLocale": "语言: {value}",
+  "@wizardMenuLocale": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
   "wizardDetectTitle": "正在检测服务器状态…",
   "setupPageServerBar": "服务器：{server}",
   "wizardDetectHint": "自动判断你是第几个用户（首个设备将创建空间）",
@@ -120,7 +126,7 @@
     }
   },
   "wizardEnrollFirst": "⚠️ 请先完成设备登记（点上方按钮）",
-  "wizardPassphraseHint": "对方凭此口令加入——下一步将生成二维码分享给对方",
+  "wizardPassphraseHint": "分享给您的伴侣，凭此口令才能查看你们的私密领地",
   "wizardSwitchToEnvelope": "改用密封密钥信封导入（离线）",
   "wizardPinHint": "每次启动需输入此 PIN 解锁",
   "wizardDoneText": "✅ 设置完成！",

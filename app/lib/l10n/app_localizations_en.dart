@@ -129,6 +129,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleTitle => 'How do you want to set up?';
 
   @override
+  String wizardMenuLocale(String value) {
+    return 'Language: $value';
+  }
+
+  @override
   String get wizardDetectTitle => 'Checking server status…';
 
   @override

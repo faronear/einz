@@ -10,6 +10,7 @@ import 'package:einz_shared/einz_shared.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'data/locale_settings.dart';
 import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
 
@@ -243,15 +244,24 @@ class _SetupPageState extends State<SetupPage> {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
               Future<void>.delayed(const Duration(milliseconds: 300), () {
                 if (!mounted) return;
+                if (value == 'locale') _showLocalePicker();
                 if (value == 'recover') _showRecoverDialog();
               });
             },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'recover',
-                child: Text(l10n.wizardRecoverTitle),
-              ),
-            ],
+            itemBuilder: (context) {
+              // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
+              final langCode = Localizations.localeOf(context).languageCode;
+              return [
+                PopupMenuItem(
+                  value: 'locale',
+                  child: Text(l10n.wizardMenuLocale(kLocaleLabels[langCode] ?? langCode)),
+                ),
+                PopupMenuItem(
+                  value: 'recover',
+                  child: Text(l10n.wizardRecoverTitle),
+                ),
+              ];
+            },
           ),
         ],
       ),
@@ -319,7 +329,9 @@ class _SetupPageState extends State<SetupPage> {
             ],
             // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
             // 此时也有"下一步"可回到步骤 1，杜绝无路可走）
-            if (_role != null)
+            // join 步骤 1（身份选择）例外：点卡片即自动前进，整行按钮隐藏
+            // （不显示误配的"下一步/完成"，避免与自动前进语义冲突）
+            if (_role != null && !(_role == _WizardRole.join && _step == 1))
               Row(
                 children: [
                   // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）
@@ -330,7 +342,8 @@ class _SetupPageState extends State<SetupPage> {
                   const Spacer(),
                   // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
                   // 完成页（_step == _stepCount）显示"完成"。
-                  if (_step < _stepCount)
+                  // join 步骤 1（身份选择）例外：点卡片即自动前进，无需"下一步"。
+                  if (_step < _stepCount && !(_role == _WizardRole.join && _step == 1))
                     FilledButton(onPressed: _nextStep, child: Text(l10n.wizardNext))
                   else
                     FilledButton(onPressed: _finish, child: Text(l10n.wizardDone)),
@@ -427,11 +440,12 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// join 步骤 1：选择身份（personA=创建者 / personB=伴侣），留在 join 流程继续。
-  /// 与 TUI 引导一致：先定身份（并按需设置名字），再问设备名、邀请码、口令。
+  /// join 步骤 1：选择身份（personA=创建者 / personB=伴侣），点击卡片即自动进入
+  /// 邀请码步骤（不再需要「下一步」按钮）；名字按需设置后留在 join 流程继续。
   void _selectIdentity(String person) {
     setState(() {
       _chosenPerson = person;
+      _step = 2; // 点卡片直接进邀请码页
       _status = null;
     });
   }
@@ -460,10 +474,7 @@ class _SetupPageState extends State<SetupPage> {
         setState(() => _status = l10n.setupPagePasteEnvelope);
         return;
       }
-      if (_inviteCode.text.trim().isEmpty) {
-        setState(() => _status = l10n.setupPageNeedInvite);
-        return;
-      }
+      // 邀请码沿用 join 步骤 2 已填值（offline 从 join 口令页切换进入）
     }
     // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
     // 有效 PIN → 设锁后推进；两空 → 弹窗确认"暂不设置"；其余 → 输入框下方红色提示。
@@ -619,6 +630,40 @@ class _SetupPageState extends State<SetupPage> {
       kp.privateKey,
     );
     return api.verify(challenge.challengeId, base64Encode(opened));
+  }
+
+  /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效——
+  /// localeNotifier 通知 EinzApp 重建 MaterialApp，整个向导刷新）。
+  Future<void> _showLocalePicker() async {
+    final settings = LocaleSettings(widget.db ?? LocalDatabase());
+    final current = await settings.load();
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('界面语言 / Language', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            for (final option in kLocaleOptions)
+              ListTile(
+                title: Text(kLocaleLabels[option]!),
+                trailing: option == current ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(ctx).pop(option),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    await settings.save(picked);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!))),
+    );
   }
 
   /// 全丢恢复：弹窗输入 escrow 口令 → 服务端凭口令重置空间（/recover，撤销
@@ -1210,15 +1255,8 @@ class _SetupPageState extends State<SetupPage> {
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _inviteCode,
-          decoration: InputDecoration(
-            labelText: l10n.setupPageInviteLabel,
-            hintText: l10n.setupPageInviteHint,
-            border: const OutlineInputBorder(),
-          ),
-        ),
+        // 邀请码已在 join 步骤 2 提供（offline 从 join 口令页切换进入时沿用
+        // 已填邀请码登记），此页不再重复显示输入框
       ],
     );
   }

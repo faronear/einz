@@ -122,6 +122,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleTitle => '选择你的情况';
 
   @override
+  String wizardMenuLocale(String value) {
+    return '语言: $value';
+  }
+
+  @override
   String get wizardDetectTitle => '正在检测服务器状态…';
 
   @override
@@ -293,7 +298,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnrollFirst => '⚠️ 请先完成设备登记（点上方按钮）';
 
   @override
-  String get wizardPassphraseHint => '对方凭此口令加入——下一步将生成二维码分享给对方';
+  String get wizardPassphraseHint => '分享给您的伴侣，凭此口令才能查看你们的私密领地';
 
   @override
   String get wizardSwitchToEnvelope => '改用密封密钥信封导入（离线）';
