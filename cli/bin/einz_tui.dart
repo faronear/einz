@@ -42,9 +42,12 @@ const _showCursor = '$_esc[?25h';
 
 /// 全局界面状态（单会话 TUI，简化处理）。
 class _TuiState {
-  _TuiState(this.session);
+  _TuiState(this.session, this.storePath);
 
   final ChatSession session;
+
+  /// 存储文件路径（/pin 设置后保存用）。
+  final String storePath;
 
   /// 输入缓冲区（逐键追加）。
   final StringBuffer input = StringBuffer();
@@ -92,6 +95,9 @@ class _TuiState {
 }
 
 _TuiState? _state;
+
+/// 本次运行是否刚完成入网（create/join/口令接入）：是则进对话前询问设置 PIN。
+bool _onboarded = false;
 
 /// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
 Timer? _resizeTimer;
@@ -222,6 +228,55 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 /// 引导任务（与输入循环并发）：登记/接入/口令问答在 TUI 消息流中进行——
 /// 提示作为 system 消息（_prompt），回答走 you> 输入行（机密口令回显 *）。
 /// 引导完成后做启动同步 + WS；全部就绪后返回。
+/// PIN 哈希（argon2id str，自含盐）——与 escrow 口令哈希同一算法（pwhash 需 sumo 构建）。
+Future<String> _hashPin(String pin) async {
+  final s = await SodiumSumoInit.init2(loadDynamicLibrary);
+  return s.crypto.pwhash.str(
+    password: pin,
+    opsLimit: s.crypto.pwhash.opsLimitModerate,
+    memLimit: s.crypto.pwhash.memLimitModerate,
+  );
+}
+
+/// 校验 PIN：strVerify 返回 bool（true = 验证通过）。
+Future<bool> _verifyPin(String hash, String pin) async {
+  final s = await SodiumSumoInit.init2(loadDynamicLibrary);
+  return s.crypto.pwhash.strVerify(passwordHash: hash, password: pin);
+}
+
+/// 入网最后一步：询问设置 PIN 锁屏（直接回车跳过 = 不设置；之后可用 /pin 设置）。
+Future<void> _askSetPin(ChatSession session, String storePath) async {
+  if (!_state!.running) return;
+  final pin = await _prompt(session, '❓ 设置 PIN 锁屏（可留空跳过，之后可用 /pin 设置）:', hidden: true);
+  if (!_state!.running) return;
+  if (pin.isEmpty) {
+    session.messages.add(_systemMessage(session, '已跳过设置 PIN（未设置）'));
+  } else {
+    session.store.pinHash = await _hashPin(pin);
+    session.store.save(storePath);
+    session.messages.add(_systemMessage(session, '✅ PIN 锁屏已设置'));
+  }
+  _scheduleRender();
+}
+
+/// 启动进对话前：store 已设 PIN 则校验解锁（错误重试，/exit 可退出）；未设直接进。
+Future<void> _unlockPin(ChatSession session) async {
+  final hash = session.store.pinHash;
+  if (hash == null) return; // 未设置：直接进入
+  while (_state!.running) {
+    final pin = await _prompt(session, '❓ 请输入 PIN 解锁:', hidden: true, required: true);
+    if (!_state!.running) return;
+    // argon2id str 哈希自含盐：strVerify 返回错误消息（空 = 验证通过）
+    if (await _verifyPin(hash, pin)) {
+      session.messages.add(_systemMessage(session, '✅ PIN 验证通过'));
+      _scheduleRender();
+      return;
+    }
+    session.messages.add(_systemMessage(session, '⚠️ PIN 错误，请重新输入（/exit 可退出）'));
+    _scheduleRender();
+  }
+}
+
 Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
 
@@ -349,6 +404,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         store.spaceKey = base64Encode(sk);
         store.save(storePath);
         await _setupEscrowPassphrase(store, storePath, session);
+        _onboarded = true; // 首设备入网完成
       }
       _scheduleRender();
     } catch (e) {
@@ -378,6 +434,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             store.personId = r.personId;
             store.spaceId = r.spaceId;
             store.save(storePath);
+            _onboarded = true; // 新设备入网完成
             session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，您的新设备已绑定到您的私密领地。'));
             session.messages.add(_systemMessage(session, '----------------'));
             _scheduleRender();
@@ -430,6 +487,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         session.messages.add(_systemMessage(session, '================'));
         store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
         store.save(storePath);
+        _onboarded = true; // 第二设备口令接入完成
         _scheduleRender();
         break;
       } catch (e3) {
@@ -504,6 +562,13 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     } catch (e) {
       _state!.status = '启动同步跳过: $e（可稍后 /sync）';
     }
+  }
+
+  // PIN 锁屏：本次刚入网 → 询问设置（可空跳过）；重启 → 校验解锁（未设直接进）
+  if (_onboarded) {
+    await _askSetPin(session, storePath);
+  } else {
+    await _unlockPin(session);
   }
 
   // 启动 WS 实时监听（已激活且配置了 server 时）；新消息到达或连接状态变化即重绘
@@ -584,7 +649,7 @@ Future<void> main(List<String> args) async {
     // 已撤销：消息流仅保留提示条（本地历史不加载不显示）
     session.messages.add(_systemMessage(session, _revokedBanner));
   }
-  _state = _TuiState(session);
+  _state = _TuiState(session, storePath);
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
 
@@ -1496,6 +1561,21 @@ Future<void> _execCommand(String line) async {
         break;
       }
       await _changeEscrowPassphrase(s.session.store, s.session);
+      break;
+    case '/pin':
+      // PIN 锁屏：/pin 显示状态、/pin <PIN> 设置、/pin '' 重置为空
+      if (arg.isEmpty) {
+        s.session.messages.add(_systemMessage(s.session,
+            s.session.store.pinHash == null ? 'PIN 锁屏：未设置' : 'PIN 锁屏：已设置'));
+      } else if (arg == "''") {
+        s.session.store.pinHash = null;
+        s.session.store.save(s.storePath);
+        s.session.messages.add(_systemMessage(s.session, 'PIN 已重置为空（未设置）'));
+      } else {
+        s.session.store.pinHash = await _hashPin(arg);
+        s.session.store.save(s.storePath);
+        s.session.messages.add(_systemMessage(s.session, 'PIN 已设置'));
+      }
       break;
     case '/sync':
       try {

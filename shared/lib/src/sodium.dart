@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:sodium/sodium.dart';
 
+export 'package:sodium/sodium_sumo.dart' show SodiumSumoInit; // pwhash（Argon2id）需 sumo 构建
+
 Sodium? _sodium;
 
 /// 返回全局唯一的 [Sodium] 实例（懒加载，幂等）。

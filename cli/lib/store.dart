@@ -25,6 +25,7 @@ class DeviceStore {
     this.keyVersion = 1,
     this.sessionToken,
     this.server,
+    this.pinHash,
     this.lastServerSequence = 0,
     this.escrowUploaded = false,
     List<String>? pending,
@@ -47,6 +48,7 @@ class DeviceStore {
   int keyVersion;
   String? sessionToken;
   String? server; // 服务器地址（TUI 引导确认后持久化，多终端无需重复输入）
+  String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
   int lastServerSequence;
 
   /// 创建者口令托管包是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
@@ -87,6 +89,7 @@ class DeviceStore {
         'server': server,
         'last_server_sequence': lastServerSequence,
         'escrow_uploaded': escrowUploaded,
+        'pin_hash': pinHash,
         'pending': pending,
         'history': history,
         'attachments': attachments,
@@ -107,6 +110,7 @@ class DeviceStore {
         server: json['server'] as String?,
         lastServerSequence: (json['last_server_sequence'] as int?) ?? 0,
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
+        pinHash: json['pin_hash'] as String?,
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],

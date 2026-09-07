@@ -11,5 +11,5 @@ export 'src/protocol/api_client.dart';
 export 'src/protocol/join_info.dart';
 export 'src/protocol/types.dart';
 export 'src/protocol/ws_client.dart';
-export 'src/sodium.dart' show sodium, loadDynamicLibrary, resetSodium;
+export 'src/sodium.dart' show sodium, loadDynamicLibrary, resetSodium, SodiumSumoInit;
 export 'src/sync/sync_state.dart';

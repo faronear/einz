@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:sodium/sodium_sumo.dart';
-
 import '../protocol/api_client.dart';
 import '../sodium.dart';
 import 'backup.dart';
