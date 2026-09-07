@@ -52,6 +52,12 @@ class _TuiState {
   /// 对方是否在线（listDevices last_seen<60s 轮询 + peer.online/offline 广播更新）。
   bool peerOnline = false;
 
+  /// 设备名映射（device_id → device_name——listDevices 轮询更新；顶部条对方 #设备名）。
+  final Map<String, String> deviceNames = {};
+
+  /// 对方当前在线设备的 device_id（listDevices 轮询记录；无消息时顶部条兜底显示）。
+  String? peerDeviceId;
+
   /// 输入缓冲区（逐键追加）。
   final StringBuffer input = StringBuffer();
 
@@ -888,9 +894,10 @@ void _render() {
   // 各片段用灰色竖线分隔：Einz TUI | ● 我名字 #设备 | ● 对方名字 | 临时通知
   final sep = '${_gray}|${_reset}';
   final peerName = _peerNameOf(s);
+  final peerDevice = _peerDeviceLabel(s);
   final peerDot = s.peerOnline ? '${_green}●${_reset}' : '${_gray}○${_reset}';
   buf.write(
-      '${_bold}Einz TUI${_reset} $sep $mySegment $sep $peerDot $peerName');
+      '${_bold}Einz TUI${_reset} $sep $mySegment $sep $peerDot $peerName #$peerDevice');
   if (s.status.isNotEmpty) {
     buf.write(' $sep ${_gray}${s.status}${_reset}');
   }
@@ -976,6 +983,20 @@ String _peerNameOf(_TuiState s) {
   return s.personNames[peerPid] ?? partnerPresetName ?? '-';
 }
 
+/// 对方设备名：对方最新一条消息的 senderDeviceId → 设备名映射 → device_id → '-'
+/// （无消息时用对方当前在线设备兜底——老板需求：多设备取最新一条消息的设备）。
+String _peerDeviceLabel(_TuiState s) {
+  String? senderId;
+  for (final msg in s.session.messages.reversed) {
+    if (msg.isMine || msg.isSystem) continue;
+    senderId = msg.env.senderDeviceId;
+    break;
+  }
+  final devId = senderId ?? s.peerDeviceId;
+  if (devId == null) return '-';
+  return s.deviceNames[devId] ?? devId;
+}
+
 /// 对端上下线广播（Server 推送——立即更新对方在线状态，不等轮询）。
 void _onPeerStatus(WsPeerStatusEvent event) {
   final s = _state;
@@ -1004,6 +1025,23 @@ Future<void> _refreshPeerOnline() async {
       if (last is! num) return false;
       return now - last < 60 * 1000;
     });
+    // 顺带维护设备名映射与对方在线设备（顶部条对方 #设备名）
+    final myPid = s.session.store.personId;
+    s.deviceNames.clear();
+    String? onlinePeerDevice;
+    for (final d in devices) {
+      final devId = (d['device_id'] as String?) ?? '';
+      final devName = (d['device_name'] as String?) ?? '';
+      if (devId.isNotEmpty && devName.isNotEmpty) s.deviceNames[devId] = devName;
+      if (devId != myId) {
+        final last = d['last_seen'];
+        final isOnline = (last is num) && (now - last < 60 * 1000);
+        if (isOnline && d['person_id'] != myPid && onlinePeerDevice == null) {
+          onlinePeerDevice = devId;
+        }
+      }
+    }
+    s.peerDeviceId = onlinePeerDevice;
     if (online != s.peerOnline) {
       s.peerOnline = online;
       _render();
@@ -1516,7 +1554,43 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
+        '/attach <file>',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
         '/auth [server] :: 激活机密线路',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/device <设备名> :: 修改设备名称',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/devices :: 查看设备列表（含设备公钥缩写）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/exit :: 立刻退出',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/history',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/invite :: 生成邀请码，把新设备绑定到私密领地',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/passphrase :: 修改内容密保口令',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/pin <PIN> :: 查看状态、设置或清空 PIN',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/rename <名字> :: 修改我的名字',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -1528,43 +1602,11 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/passphrase :: 修改内容密保口令',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/invite :: 生成邀请码，把新设备绑定到私密领地',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/rename <名字> :: 修改我的名字',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/devices :: 查看设备列表（含设备公钥缩写）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/device <设备名> :: 修改设备名称',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
         '/sync :: 同步最新消息流',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/history',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/attach <file>',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
         '/open [序号] :: 打开上面第 [序号] 个附件',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/exit :: 立刻退出',
       ));
       s.status = '';
     case '/server':
