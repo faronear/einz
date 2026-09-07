@@ -49,6 +49,9 @@ class _TuiState {
   /// 存储文件路径（/pin 设置后保存用）。
   final String storePath;
 
+  /// 对方是否在线（listDevices last_seen<60s 轮询 + peer.online/offline 广播更新）。
+  bool peerOnline = false;
+
   /// 输入缓冲区（逐键追加）。
   final StringBuffer input = StringBuffer();
 
@@ -95,6 +98,9 @@ class _TuiState {
 }
 
 _TuiState? _state;
+
+/// 第二用户预置名（首设备 create 时询问；顶部条对方名字兜底显示）。
+String? partnerPresetName;
 
 /// 本次运行是否刚完成入网（create/join/口令接入）：是则进对话前询问设置 PIN。
 bool _onboarded = false;
@@ -343,7 +349,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 
   // 第二用户预置名（仅首设备新空间时询问；回车跳过 → 服务端落默认 personB）：
   // 登记（enroll 自举）时随请求提交，后续设备启动引导即可按名称表选身份。
-  String? partnerPresetName;
   // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
   // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
   if ((store.personName == null || store.personName!.isEmpty) && _probePersonNames.isEmpty) {
@@ -577,6 +582,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       onMessage: (_) => _scheduleRender(),
       onStatus: (_) => _scheduleRender(),
       onAutoSync: (_) => _scheduleRender(),
+      onPeerStatus: _onPeerStatus,
     );
   }
   _scheduleRender();
@@ -650,6 +656,7 @@ Future<void> main(List<String> args) async {
     session.messages.add(_systemMessage(session, _revokedBanner));
   }
   _state = _TuiState(session, storePath);
+  _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
 
@@ -878,9 +885,13 @@ void _render() {
             '${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
           WsStatus.stopped => '${_gray}○ 离线${_reset}',
         };
-  // 各片段用灰色竖线分隔：Einz TUI | person #device | ● 在线 | 临时通知
+  // 各片段用灰色竖线分隔：Einz TUI | person #device | ● 在线 | ● 对方名字 | 临时通知
   final sep = '${_gray}|${_reset}';
-  buf.write('${_bold}Einz TUI${_reset} $sep ${_personLabel(s.session.store, s.personNames)} $sep $wsName');
+  final peerName = _peerNameOf(s);
+  final peerDot = s.peerOnline ? '${_green}●${_reset}' : '${_gray}○${_reset}';
+  buf.write(
+      '${_bold}Einz TUI${_reset} $sep ${_personLabel(s.session.store, s.personNames)} '
+      '$sep $wsName $sep $peerDot $peerName');
   if (s.status.isNotEmpty) {
     buf.write(' $sep ${_gray}${s.status}${_reset}');
   }
@@ -954,6 +965,63 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
       '-';
   final device = store.deviceName ?? store.deviceId ?? '-';
   return '${_bold}$person$_reset #$device';
+}
+
+/// 对方显示名：探测名表（personA/personB）→ 首设备预置名 → '-'。
+String _peerNameOf(_TuiState s) {
+  final myPid = s.session.store.personId;
+  if (myPid == null) {
+    return s.personNames.values.isNotEmpty ? s.personNames.values.first : '-';
+  }
+  final peerPid = myPid == 'personA' ? 'personB' : 'personA';
+  return s.personNames[peerPid] ?? partnerPresetName ?? '-';
+}
+
+/// 对端上下线广播（Server 推送——立即更新对方在线状态，不等轮询）。
+void _onPeerStatus(WsPeerStatusEvent event) {
+  final s = _state;
+  if (s == null) return;
+  final online = event.type == kWsTypePeerOnline;
+  if (online != s.peerOnline) {
+    s.peerOnline = online;
+    _render();
+  }
+}
+
+/// 查询对方在线状态（listDevices last_seen<60s——同 App 判定），更新顶部条。
+Future<void> _refreshPeerOnline() async {
+  final s = _state;
+  if (s == null) return;
+  final server = s.session.store.server ?? '';
+  final token = s.session.store.sessionToken;
+  if (server.isEmpty || token == null) return;
+  try {
+    final devices = await ApiClient(server).listDevices(token);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final myId = s.session.store.deviceId;
+    final online = devices.any((d) {
+      if (d['device_id'] == myId) return false; // 自己不算
+      final last = d['last_seen'];
+      if (last is! num) return false;
+      return now - last < 60 * 1000;
+    });
+    if (online != s.peerOnline) {
+      s.peerOnline = online;
+      _render();
+    }
+  } catch (_) {
+    // 查询失败保持上次状态（断网/未认证）
+  }
+}
+
+Timer? _peerTimer;
+
+/// 启动对方在线轮询（初始一次 + 每 30s 兜底；退出由 exit 兜底，无需清理）。
+void _startPeerPolling() {
+  _peerTimer?.cancel();
+  _refreshPeerOnline();
+  _peerTimer =
+      Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
 }
 
 /// 消息时间标签（本地时间，参照渲染时刻）：

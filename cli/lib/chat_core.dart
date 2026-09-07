@@ -330,6 +330,7 @@ class ChatSession {
     required void Function(ChatMessage msg) onMessage,
     void Function(WsStatus status)? onStatus,
     void Function(int added)? onAutoSync,
+    void Function(WsPeerStatusEvent event)? onPeerStatus,
   }) {
     if (server.isEmpty || store.sessionToken == null) return;
     wsClient = WsClient(
@@ -359,6 +360,9 @@ class ChatSession {
           _appendDedup(msg);
           _sortMessages();
           onMessage(msg);
+        }
+        if (event is WsPeerStatusEvent) {
+          onPeerStatus?.call(event);
         }
       },
       onStatus: (status) {
