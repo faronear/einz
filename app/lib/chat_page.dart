@@ -506,7 +506,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ),
     );
-    ctrl.dispose();
+    // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖
+    // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
+    Future<void>.delayed(const Duration(milliseconds: 400), ctrl.dispose);
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
   }
 

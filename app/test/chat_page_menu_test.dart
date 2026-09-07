@@ -28,6 +28,11 @@ class _FakeApi extends ApiClient {
       hasMore: false,
     );
   }
+
+  @override
+  Future<void> updatePersonName(String personName, String token) async {
+    // 改名成功（无网络，供保存路径测试）
+  }
 }
 
 void main() {
@@ -134,5 +139,45 @@ void main() {
     // 弹窗应已关闭，锁已落盘
     expect(find.text('设置启动锁'), findsNothing);
     expect(await AppLockService(db).isSetup, true);
+  });
+
+  testWidgets('改名对话框保存后无红屏（controller 延迟 dispose）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 打开菜单 → 点「我的名字」（未传 personName → 显示"我的名字: 未设置"）
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('我的名字'));
+    await tester.pumpAndSettle();
+    // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）
+    await tester.enterText(find.byType(TextField).last, '新名字');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    // 推进虚拟时间触发 400ms 延迟 dispose（TextField 已卸载 → 不再触发红屏断言）
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+    // 顶部条我的名字已刷新为新名字
+    expect(find.text('新名字'), findsOneWidget);
   });
 }
