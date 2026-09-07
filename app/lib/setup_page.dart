@@ -353,10 +353,10 @@ class _SetupPageState extends State<SetupPage> {
                     child: Text(l10n.wizardBack),
                   ),
                   const Spacer(),
-                  // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
-                  // 完成页（_step == _stepCount）显示"完成"。
+                  // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记；
+                  // PIN 页 = 最后一步（_step == _stepCount），完成停留本页弹窗）。
                   // join 步骤 1（身份选择）例外：点卡片即自动前进，无需"下一步"。
-                  if (_step < _stepCount && !(_role == _WizardRole.join && _step == 1))
+                  if (_step <= _stepCount && !(_role == _WizardRole.join && _step == 1))
                     FilledButton(onPressed: _nextStep, child: Text(l10n.wizardNext))
                   else
                     FilledButton(onPressed: _finish, child: Text(l10n.wizardDone)),
@@ -374,11 +374,11 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 5; // name/peerName/passphrase/pin/done（设备名自动设置，输入步骤已移除）
+        return 4; // name/peerName/passphrase/pin（完成页已删除——完成停留 PIN 页弹窗）
       case _WizardRole.join:
-        return 5; // identity/invite/passphrase/pin/done
+        return 4; // identity/invite/passphrase/pin
       case _WizardRole.offline:
-        return 3; // envelope/pin/done
+        return 2; // envelope/pin
       case null:
         return 1;
     }
@@ -394,7 +394,7 @@ class _SetupPageState extends State<SetupPage> {
           case 2: return l10n.wizardStepPeerName;
           case 3: return l10n.wizardStepPassphrase;
           case 4: return l10n.wizardStepPin;
-          default: return l10n.wizardStepDone;
+          default: return l10n.wizardStepPin;
         }
       case _WizardRole.join:
         switch (_step) {
@@ -402,13 +402,13 @@ class _SetupPageState extends State<SetupPage> {
           case 2: return l10n.wizardStepInvite;
           case 3: return l10n.wizardStepJoinPassphrase; // join 口令页：验证接入口令
           case 4: return l10n.wizardStepPin;
-          default: return l10n.wizardStepDone;
+          default: return l10n.wizardStepPin;
         }
       case _WizardRole.offline:
         switch (_step) {
           case 1: return l10n.wizardStepEnvelope;
           case 2: return l10n.wizardStepPin;
-          default: return l10n.wizardStepDone;
+          default: return l10n.wizardStepPin;
         }
     }
   }
@@ -601,7 +601,7 @@ class _SetupPageState extends State<SetupPage> {
           case 4:
             return _buildStepPin();
           default:
-            return _buildStepDone();
+            return const SizedBox.shrink();
         }
       case _WizardRole.join:
         switch (_step) {
@@ -614,7 +614,7 @@ class _SetupPageState extends State<SetupPage> {
           case 4:
             return _buildStepPin();
           default:
-            return _buildStepDone();
+            return const SizedBox.shrink();
         }
       case _WizardRole.offline:
         switch (_step) {
@@ -623,7 +623,7 @@ class _SetupPageState extends State<SetupPage> {
           case 2:
             return _buildStepPin();
           default:
-            return _buildStepDone();
+            return const SizedBox.shrink();
         }
     }
   }
@@ -1241,10 +1241,9 @@ class _SetupPageState extends State<SetupPage> {
   /// 向导完成：推进到完成步骤并弹出欢迎对话框（唯一「开始聊天」按钮 → 消息流页）。
   void _completeWizard() {
     setState(() {
-      _step = _stepCount;
       _status = null;
     });
-    // 下一帧弹窗（等 done 步骤渲染完成再盖对话框）
+    // 停留当前页（PIN 页）直接弹窗——不再跳"完成"页（老板决策：完成页可删除）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _showWelcomeDialog();
     });
@@ -1273,21 +1272,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 向导完成页（done 步骤）：被欢迎对话框盖住，仅作为弹窗背后的内容兜底。
-  Widget _buildStepDone() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(l10n.wizardDoneText,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.green)),
-        const SizedBox(height: 8),
-        Text(l10n.setupPageTitle, style: const TextStyle(fontSize: 13, color: Colors.grey)),
-      ],
-    );
-  }
-
-  // ---- 场景 B（join）：身份 → 邀请码 → 口令 → PIN → 完成 ----
+  // ---- 场景 B（join）：身份 → 邀请码 → 口令 → PIN ----
 
   /// join：凭邀请码登记 → 认证 → 拉取口令托管包 → 口令解密出 Space Key → 设置 PIN → 完成。
   /// join 邀请码页（步骤 2）「验证邀请码」：凭码登记（服务端校验，无效码抛错）

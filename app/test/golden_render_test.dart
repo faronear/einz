@@ -281,7 +281,7 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.4_pin.png'));
   });
 
-  testWidgets('golden: 向导1.1.6-完成步骤（create）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.1.7-欢迎弹窗（create 完成停留 PIN 页）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll, auth: fakeAuth);
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
@@ -295,10 +295,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
     await tester.pumpAndSettle();
-    await tester.tap(find.text('跳过')); // 确认暂不设置 → 完成页（分享页已移除）
+    await tester.tap(find.text('跳过')); // 完成：停留 PIN 页直接弹欢迎对话框
     await tester.pumpAndSettle();
     await expectLater(
-        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.7_welcome.png'));
   });
 
   testWidgets('向导完成：弹出欢迎对话框（欢迎词 + 唯一「开始聊天」按钮）', (WidgetTester tester) async {
