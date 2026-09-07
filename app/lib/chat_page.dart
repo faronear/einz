@@ -511,6 +511,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   await api.updatePersonName(name, widget.token);
                   _myPersonName = name;
                 }
+                // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
+                // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
+                // app 菜单改名后退出重进回到 personB）
+                await _saveProfile();
                 if (ctx.mounted) Navigator.of(ctx).pop(true);
               } catch (e) {
                 if (ctx.mounted) {
@@ -528,6 +532,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
     Future<void>.delayed(const Duration(milliseconds: 400), ctrl.dispose);
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
+  }
+
+  /// 同步当前名字到本地 profile（改名/改设备名后调用——重启从 profile 恢复）。
+  Future<void> _saveProfile() async {
+    await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
+      personName: _myPersonName,
+      peerName: _peerName,
+      deviceName: _myDeviceName,
+    );
   }
 
   /// 退出应用（等价 TUI /exit）：确认后回到锁屏（LockPage），下次解锁重新认证。

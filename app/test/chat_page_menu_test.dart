@@ -420,4 +420,69 @@ void main() {
     expect(find.text('修改口令'), findsWidgets); // 改口令弹窗未关闭
     expect(find.text('修改内容密保口令？'), findsNothing);
   });
+
+  testWidgets('菜单改名后写 profile（重启后从 profile 恢复新名字）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+    // 预置 profile（向导完成时的旧名 personB——老板实测场景）
+    await AppLockService(db).saveProfile(personName: 'personB', peerName: 'TUI', deviceName: 'iPhone');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-b',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    // initState loadProfile 补名（personB——顶部条/菜单显示）
+    expect(find.text('personB'), findsWidgets);
+
+    // 菜单 → 修改我的名字（菜单项文本：我的名字: personB）→ 输入新名字 → 保存
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('我的名字: personB'));
+    await tester.pumpAndSettle();
+    final renameField =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(renameField, 'Steffi');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    // profile 应已更新（改名后 _saveProfile 写入）
+    final p = await AppLockService(db).loadProfile();
+    expect(p['personName'], 'Steffi', reason: '改名应同步写本地 profile');
+
+    // 模拟重启：新 ChatPage 实例（不带名字）→ 从 profile 恢复新名字
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-b',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Steffi'), findsWidgets, reason: '重启后应从 profile 恢复新名字');
+    expect(find.text('personB'), findsNothing, reason: '不应回到旧名 personB');
+  });
 }
