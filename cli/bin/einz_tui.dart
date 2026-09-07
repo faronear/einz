@@ -577,11 +577,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // PIN 锁屏：本次刚入网 → 询问设置（可空跳过）；重启 → 校验解锁（未设直接进）
+  // PIN 锁屏：本次刚入网 → 询问设置（可空跳过）；重启解锁已由 main 在
+  // loadHistory 前处理（_unlockPin）——此处不再重复
   if (_onboarded) {
     await _askSetPin(session, storePath);
-  } else {
-    await _unlockPin(session);
   }
 
   // 启动 WS 实时监听（已激活且配置了 server 时）；新消息到达或连接状态变化即重绘
@@ -650,6 +649,11 @@ Future<void> main(List<String> args) async {
   }
 
   final session = ChatSession(store, storePath, server);
+  // PIN 锁屏：已有 PIN 时先解锁（历史消息在解锁前不加载/不显示——防消息泄漏；
+  // 刚入网的 _askSetPin 仍在 _runGuide 内处理）
+  if (!_revoked && store.pinHash != null) {
+    await _unlockPin(session);
+  }
   if (!_revoked) {
     await session.loadHistory();
   }
