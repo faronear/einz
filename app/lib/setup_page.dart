@@ -874,6 +874,9 @@ class _SetupPageState extends State<SetupPage> {
             ? _personName.text.trim()
             : (_personNames[_chosenPerson] ?? ''),
         personId: enroll.personId,
+        peerName: _role == _WizardRole.create
+            ? (_personNames['personB'] ?? '')
+            : (_personNames[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
         deviceName: _myDeviceName,
         initialHistory: _importedHistory,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token

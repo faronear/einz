@@ -62,6 +62,8 @@ void main() {
     // 抬头为品牌名+slogan（不显示空间 ID）；enableWs:false → 红绿灯显示离线
     expect(find.text('EINZ 私密领地'), findsOneWidget);
     expect(find.text('离线'), findsOneWidget);
+    // 对话顶部条：双方名字占位「未设置」（未传 personName/peerName → 各显示一个）
+    expect(find.text('未设置'), findsNWidgets(2));
 
     // 打开顶栏菜单
     await tester.tap(find.byIcon(Icons.more_vert));

@@ -46,6 +46,7 @@ class ChatPage extends StatefulWidget {
     this.personName, // 我的名字（登记时设置；菜单显示/修改）
     this.deviceName, // 我的设备名（登记时自动获取；菜单显示/修改）
     this.personId, // 我的 personId（头像上传/获取用）
+    this.peerName, // 对方名字（setup 探测传入；对话顶部条显示）
   });
 
   final String server;
@@ -71,6 +72,9 @@ class ChatPage extends StatefulWidget {
 
   /// 我的 personId（向导登记时确定；头像上传/消息身份标识用）。
   final String? personId;
+
+  /// 对方名字（向导探测时确定；对话顶部条显示，无则占位）。
+  final String? peerName;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -116,6 +120,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _myPersonName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myDeviceName; // 我的设备名（菜单显示；改名后 setState 刷新）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
+  late String _peerName; // 对方名字（对话顶部条显示）
+  bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
+  Timer? _peerTicker; // 对方在线轮询（30s）
 
   /// 阅后即焚档位文案（l10n 映射）。
   String _burnOptionLabel(int seconds, AppLocalizations l10n) {
@@ -144,7 +151,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     super.initState();
     _myPersonName = widget.personName ?? '';
     _myDeviceName = widget.deviceName ?? '';
+    _peerName = widget.peerName ?? '';
     _loadMyAvatar();
+    _refreshPeerOnline();
+    _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
     WidgetsBinding.instance.addObserver(this);
     final db = widget.db ?? LocalDatabase();
     _repo = MessageRepository(
@@ -222,6 +232,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final online = _ws?.connected.value ?? false;
     _restartTicker(online ? const Duration(seconds: 30) : const Duration(seconds: 3));
     if (mounted) setState(() {}); // 刷新标题红绿灯（在线绿/离线红）
+    _refreshPeerOnline(); // 连接恢复时顺带刷新对方在线状态
   }
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
@@ -393,6 +404,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 对方在线判定：非本设备 last_seen 距今 < 60s（30s 轮询 + WS 状态变化时刷新）。
+  Future<void> _refreshPeerOnline() async {
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      final devices = await api.listDevices(widget.token);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final peer = devices.where((d) => d['device_id'] != widget.deviceId).toList();
+      final online = peer.isNotEmpty && peer.any((d) {
+        final last = d['last_seen'];
+        if (last is! num) return false;
+        return now - last < 60 * 1000;
+      });
+      if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
+    } catch (_) {
+      // 网络失败：保持上次状态
+    }
+  }
+
   /// 加载我的头像（异步；未设置/失败 → 保持默认图标）。
   Future<void> _loadMyAvatar() async {
     final pid = widget.personId;
@@ -561,6 +590,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _peerTicker?.cancel();
     _ws?.connected.removeListener(_onWsStatusChanged);
     _ws?.stop();
     _scrollController.dispose();
@@ -1224,6 +1254,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
+          // 对话顶部：双方名字 + 各自在线状态（对方左 / 我右，与消息对齐一致）
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // 对方（左）：名字 + 在线圆点（last_seen 距今 <60s 判定）
+                Row(
+                  children: [
+                    Icon(Icons.circle, size: 8, color: _peerOnline ? Colors.green : Colors.red),
+                    const SizedBox(width: 6),
+                    Text(_peerName.isEmpty ? l10n.chatPageNameUnset : _peerName,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+                // 我的（右）：名字 + 在线圆点（WS 连接状态）
+                Row(
+                  children: [
+                    Text(_myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    const SizedBox(width: 6),
+                    Icon(Icons.circle, size: 8,
+                        color: (_ws?.connected.value ?? false) ? Colors.green : Colors.red),
+                  ],
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,

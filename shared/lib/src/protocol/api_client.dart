@@ -126,6 +126,12 @@ class ApiClient {
     return SpaceResult.fromJson(res);
   }
 
+  /// 设备列表（含 last_seen 活跃时间戳（毫秒）；对方在线状态判定用）。
+  Future<List<Map<String, dynamic>>> listDevices(String token) async {
+    final res = await _get('/devices', token: token);
+    return (res['devices'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
   /// 更新本设备名称（TUI 改名后同步后台，显示层用）。
   Future<void> updateDeviceName(String deviceName, String token) async {
     await _post('/devices/name', {'device_name': deviceName}, token: token);
