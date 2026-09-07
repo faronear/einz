@@ -668,6 +668,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 新消息（接收/发送）后滚动到底：让最新消息显示在最下方（老板要求"总是"）。
+  /// post-frame 里执行（ListView 重建后 maxScrollExtent 才有效）。
+  void _scrollToLatest() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   Future<void> _refresh() async {
     try {
       await _repo.sync();
@@ -684,6 +697,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final existing = {for (final m in _messages) m.env.messageId};
         _messages.addAll(fresh.where((f) => !existing.contains(f.env.messageId)));
       });
+      _scrollToLatest(); // 新消息（接收/发送）后滚动到底
     } catch (_) {
       // 网络抖动忽略，下次轮询重试
     }
@@ -1294,6 +1308,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Container(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        // 气泡最大宽度 = 屏幕 75%：长文本在此约束下自动换行
+                        // （否则 Row(min) 给 Text 无界宽度 → 长消息挤在一行溢出屏幕）
+                        constraints: BoxConstraints(
+                            maxWidth: MediaQuery.sizeOf(context).width * 0.75),
                         decoration: BoxDecoration(
                           color: mine ? Colors.indigo.shade100 : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(12),
