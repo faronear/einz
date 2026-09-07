@@ -247,7 +247,7 @@
     }
   },
   "chatPageExitTitle": "退出应用？",
-  "chatPageExitMessage": "将彻底关闭应用，下次启动需输入 PIN 解锁。",
+  "chatPageExitMessage": "将彻底关闭应用。",
   "save": "保存",
   "chatPageChangePassphraseTitle": "修改口令",
   "chatPageChangePassphraseOldLabel": "旧口令",

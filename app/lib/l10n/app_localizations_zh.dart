@@ -536,7 +536,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageExitTitle => '退出应用？';
 
   @override
-  String get chatPageExitMessage => '将彻底关闭应用，下次启动需输入 PIN 解锁。';
+  String get chatPageExitMessage => '将彻底关闭应用。';
 
   @override
   String get save => '保存';

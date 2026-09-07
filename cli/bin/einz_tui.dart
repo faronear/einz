@@ -1540,6 +1540,10 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
+        '/devices :: 查看设备列表（含设备公钥缩写）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
         '/device <设备名> :: 修改设备名称',
       ));
       s.session.messages.add(_systemMessage(
@@ -1642,6 +1646,36 @@ Future<void> _execCommand(String line) async {
         s.session.store.pinHash = await _hashPin(arg);
         s.session.store.save(s.storePath);
         s.session.messages.add(_systemMessage(s.session, '✅ PIN 已设置'));
+      }
+      break;
+    case '/devices':
+      try {
+        final server = s.session.store.server ?? '';
+        final token = s.session.store.sessionToken;
+        if (server.isEmpty || token == null) {
+          s.session.messages.add(_systemMessage(s.session, '⚠️ 未连接（缺少 server/token）'));
+          break;
+        }
+        final devices = await ApiClient(server).listDevices(token);
+        final myId = s.session.store.deviceId;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final sb = StringBuffer('📱 设备列表：');
+        for (final d in devices) {
+          final devId = (d['device_id'] ?? '-') as String;
+          final person = (d['person_id'] ?? '-') as String;
+          final last = d['last_seen'];
+          final online = (last is num) && (now - last < 60 * 1000);
+          final pub = (d['public_key'] as String? ?? '');
+          final pubShort = pub.length >= 8
+              ? '${pub.substring(0, 4)}…${pub.substring(pub.length - 4)}'
+              : pub;
+          final tag = devId == myId ? '本机' : (online ? '在线' : '离线');
+          sb.write('\n  ${online ? '🟢' : '⚪'} $devId [$person] $tag');
+          if (pubShort.isNotEmpty) sb.write(' [$pubShort]');
+        }
+        s.session.messages.add(_systemMessage(s.session, sb.toString()));
+      } catch (e) {
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 获取设备列表失败: $e'));
       }
       break;
     case '/sync':

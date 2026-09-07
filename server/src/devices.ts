@@ -29,7 +29,7 @@ export function listDevices(cfg: ServerConfig, token: string): { devices: unknow
   touchLastSeen(device_id);
 
   const rows = getDb()
-    .prepare(`SELECT device_id, person_id, status, last_seen FROM devices ORDER BY created_at`)
+    .prepare(`SELECT device_id, person_id, status, last_seen, public_key FROM devices ORDER BY created_at`)
     .all();
   return { devices: rows };
 }

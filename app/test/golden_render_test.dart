@@ -368,7 +368,7 @@ void main() {
     await tester.pumpAndSettle();
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
     expect(find.text('退出应用？'), findsOneWidget);
-    expect(find.text('将彻底关闭应用，下次启动需输入 PIN 解锁。'), findsOneWidget);
+    expect(find.text('将彻底关闭应用。'), findsOneWidget);
     // 点取消关闭弹窗（不触发 exit）
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
