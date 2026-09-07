@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -67,6 +68,7 @@ class _SetupPageState extends State<SetupPage> {
   // 服务器地址：默认 einz.tic.cc，探测失败时引导输入并持久化（降低小白负担）
   String _server = kEinzServer;
   bool _probeFailed = false;
+  Timer? _probeRetryTimer; // 探测失败后的自动重试定时器（连上即停止并自动进入）
 
   // 向导状态：角色分流 + 步骤索引 + 跨步骤共享数据
   _WizardRole? _role;
@@ -101,6 +103,7 @@ class _SetupPageState extends State<SetupPage> {
     _confirm.dispose();
     _inviteCode.dispose();
     _serverController.dispose();
+    _probeRetryTimer?.cancel();
     super.dispose();
   }
 
@@ -162,13 +165,43 @@ class _SetupPageState extends State<SetupPage> {
         _probeFailed = true;
         _status = '初始化失败: $e';
       });
+      _startProbeRetry(); // 启动自动重试：一旦连上自动进入，不必等用户手动输地址
     }
+  }
+
+  /// 探测失败后启动自动重试：每 4 秒重新探测，一旦成功即停止并自动进入向导。
+  void _startProbeRetry() {
+    _probeRetryTimer?.cancel();
+    _probeRetryTimer = Timer.periodic(const Duration(seconds: 4), (_) => _reprobe());
+  }
+
+  /// 周期性重试探测：成功 → 停止重试并自动进入（复用 _initServer 的角色判定）。
+  Future<void> _reprobe() async {
+    if (_busy || !mounted) return;
+    final probe = widget.probeServer ?? ServerSettings.probe;
+    final (ok, names) = await probe(_server);
+    if (!mounted) return;
+    if (ok) {
+      _probeRetryTimer?.cancel();
+      _probeRetryTimer = null;
+      setState(() {
+        _probeFailed = false;
+        _personNames = names;
+        if (_role == null) {
+          _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
+          _step = 1;
+        }
+      });
+    }
+    // 失败：保持失败提示，等待下一轮重试（不 setState，避免每 4 秒重建一次）
   }
 
   /// 保存用户输入的服务器地址并重新探测。
   Future<void> _saveServer() async {
     final input = _serverController.text.trim();
     if (input.isEmpty) return;
+    _probeRetryTimer?.cancel(); // 用户提交新地址 → 停止自动重试循环，立即探测
+    _probeRetryTimer = null;
     final probe = widget.probeServer ?? ServerSettings.probe;
     final (ok, names) = await probe(input);
     if (!mounted) return;
