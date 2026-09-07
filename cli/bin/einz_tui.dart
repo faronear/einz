@@ -649,6 +649,9 @@ Future<void> main(List<String> args) async {
   }
 
   final session = ChatSession(store, storePath, server);
+  // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
+  // _state 赋值之后（否则 Null check 崩溃——2026-09-08 老板实测）
+  _state = _TuiState(session, storePath);
   // PIN 锁屏：已有 PIN 时先解锁（历史消息在解锁前不加载/不显示——防消息泄漏；
   // 刚入网的 _askSetPin 仍在 _runGuide 内处理）
   if (!_revoked && store.pinHash != null) {
@@ -667,7 +670,6 @@ Future<void> main(List<String> args) async {
     // 已撤销：消息流仅保留提示条（本地历史不加载不显示）
     session.messages.add(_systemMessage(session, _revokedBanner));
   }
-  _state = _TuiState(session, storePath);
   _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
