@@ -455,7 +455,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageClearLockMessage =>
-      '两个 PIN 输入框均为空——确定要清除启动锁吗？清除后下次启动直接进入聊天。';
+      '两个 PIN 输入框均为空——确定要清除锁屏密码吗？清除后下次启动直接进入聊天。';
 
   @override
   String chatPageMenuLocale(String value) {

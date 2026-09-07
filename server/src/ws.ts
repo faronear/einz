@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { resolveSession } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
 import type { MessageEnvelope } from "./messages.js";
+import { getDb } from "./db.js";
 
 interface Conn {
   ws: WebSocket;
@@ -15,6 +16,16 @@ const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1
 /** 当前在线 WS 连接数（/health 健康检查用）。 */
 export function wsConnCount(): number {
   return conns.size;
+}
+
+/** 向其他设备广播 peer 上下线事件（App 实时更新对方在线状态——TUI 退出立即变红）。 */
+function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer.offline"): void {
+  for (const [deviceId, conn] of conns) {
+    if (deviceId === exceptDeviceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(JSON.stringify({ id: 0, type, payload: { device_id: exceptDeviceId } }));
+    }
+  }
 }
 
 /** 注册 WS 服务（PROTOCOL.md §8）。 */
@@ -47,6 +58,9 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
 
     const conn: Conn = { ws, deviceId, alive: true };
     conns.set(deviceId, conn);
+    // WS 连接 = 在线：刷新 last_seen（App 判定对方在线）
+    getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(Date.now(), deviceId);
+    broadcastPeerStatus(deviceId, "peer.online");
     console.log(`[req] WS /ws connect device=${deviceId} total=${conns.size}`);
 
     ws.send(JSON.stringify({ id: 1, type: "hello", payload: { device_id: deviceId, space_id: cfg.space_id } }));
@@ -68,6 +82,9 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
 
     ws.on("close", () => {
       if (conns.get(deviceId) === conn) conns.delete(deviceId);
+      // WS 断开 = 离线：last_seen 置 0（App 判定离线）+ 广播对方下线（App 立即变红）
+      getDb().prepare(`UPDATE devices SET last_seen = 0 WHERE device_id = ?`).run(deviceId);
+      broadcastPeerStatus(deviceId, "peer.offline");
       console.log(`[req] WS /ws disconnect device=${deviceId} total=${conns.size}`);
     });
   });
@@ -82,6 +99,8 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
       }
       conn.alive = false;
       conn.ws.ping();
+      // 心跳存活 = 在线中：刷新 last_seen（避免运行超 60s 被 App 误判离线）
+      getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(Date.now(), deviceId);
     }
   }, 30_000);
   wss.on("close", () => clearInterval(heartbeat));

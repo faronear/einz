@@ -242,6 +242,8 @@ wss://host/ws?pv=1&token=<session_token>
 | S→C | `delivery` | `{ "message_id": "…", "status": "delivered" }` | 投递状态 |
 | S→C | `key.rotation` | `{ "key_version": 2 }` | 触发客户端执行 Space Key 轮换 |
 | S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话 |
+| S→C | `peer.online` | `{ "device_id": "dev1" }` | 对端设备上线（WS 连接建立时广播） |
+| S→C | `peer.offline` | `{ "device_id": "dev1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态） |
 
 ### 8.3 顺序与重连
 

@@ -202,8 +202,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ws.start(
         onMessageNew: () => _refresh(),
         onDeviceRevoked: _onDeviceRevoked,
+        onPeerStatus: _onPeerStatus,
       );
     }
+  }
+
+  /// 对端上下线（Server 广播——立即更新对方在线状态，不等 30s 轮询）。
+  void _onPeerStatus(WsPeerStatusEvent event) {
+    if (event.deviceId == widget.deviceId) return; // 本设备自身的事件忽略
+    final online = event.type == kWsTypePeerOnline;
+    if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
   }
 
   /// 本设备被撤销（Server 广播 device.revoked）：清理本地数据（锁包+消息库）

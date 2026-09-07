@@ -9,6 +9,8 @@ const String kWsTypeHello = 'hello';
 const String kWsTypeMessageNew = 'message.new';
 const String kWsTypeKeyRotation = 'key.rotation';
 const String kWsTypeDeviceRevoked = 'device.revoked';
+const String kWsTypePeerOnline = 'peer.online';
+const String kWsTypePeerOffline = 'peer.offline';
 
 /// WS 连接状态（App 据此切换轮询策略：connected → 降频兜底，断开 → 恢复高频轮询）。
 enum WsStatus { stopped, connecting, connected, reconnecting }
@@ -50,6 +52,13 @@ class WsKeyRotationEvent extends WsEvent {
 /// device.revoked：本设备被撤销（Server 发帧后主动断开）。
 class WsDeviceRevokedEvent extends WsEvent {
   const WsDeviceRevokedEvent({required super.type, required this.deviceId});
+
+  final String deviceId;
+}
+
+/// peer.online/peer.offline：对端设备上下线通知（App 实时更新对方在线状态）。
+class WsPeerStatusEvent extends WsEvent {
+  const WsPeerStatusEvent({required super.type, required this.deviceId});
 
   final String deviceId;
 }
@@ -186,6 +195,13 @@ class WsClient {
           break;
         case kWsTypeDeviceRevoked:
           onEvent?.call(WsDeviceRevokedEvent(
+            type: type,
+            deviceId: payload['device_id'] as String? ?? '',
+          ));
+          break;
+        case kWsTypePeerOnline:
+        case kWsTypePeerOffline:
+          onEvent?.call(WsPeerStatusEvent(
             type: type,
             deviceId: payload['device_id'] as String? ?? '',
           ));

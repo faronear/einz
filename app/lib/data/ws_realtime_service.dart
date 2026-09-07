@@ -33,10 +33,18 @@ class WsRealtimeService {
   /// 本设备被撤销回调（Server 广播 device.revoked——App 应清理本地数据并强制登出）。
   void Function()? onDeviceRevoked;
 
+  /// 对端上下线回调（Server 广播 peer.online/peer.offline——App 实时更新对方在线状态）。
+  void Function(WsPeerStatusEvent event)? onPeerStatus;
+
   /// 建立连接（自动重连直到 [stop]）。
-  void start({void Function()? onMessageNew, void Function()? onDeviceRevoked}) {
+  void start({
+    void Function()? onMessageNew,
+    void Function()? onDeviceRevoked,
+    void Function(WsPeerStatusEvent event)? onPeerStatus,
+  }) {
     this.onMessageNew = onMessageNew;
     this.onDeviceRevoked = onDeviceRevoked;
+    this.onPeerStatus = onPeerStatus;
     _client = WsClient(
       server: server,
       token: _token,
@@ -48,6 +56,7 @@ class WsRealtimeService {
       onEvent: (e) {
         if (e is WsMessageNewEvent) this.onMessageNew?.call();
         if (e is WsDeviceRevokedEvent) this.onDeviceRevoked?.call();
+        if (e is WsPeerStatusEvent) this.onPeerStatus?.call(e);
       },
       onStatus: (s) => connected.value = s == WsStatus.connected,
     )..start();
