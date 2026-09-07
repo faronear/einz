@@ -475,6 +475,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'App lock set — PIN required at next launch';
 
   @override
+  String get chatPageSetLockConfirmTitle => 'Set app lock?';
+
+  @override
+  String get chatPageSetLockConfirmMessage =>
+      'Set the app lock? You\'ll need to enter the PIN at every launch.';
+
+  @override
   String get chatPageSetLockCleared =>
       'App lock cleared (enter directly at next launch)';
 
@@ -584,6 +591,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseMismatch => 'New passphrases do not match';
+
+  @override
+  String get chatPageChangePassphraseConfirmTitle =>
+      'Change escrow passphrase?';
+
+  @override
+  String get chatPageChangePassphraseConfirmMessage =>
+      'Change the escrow passphrase? You\'ll need the new passphrase to decrypt content.';
 
   @override
   String get chatPageChangePassphraseOldWrong => 'Wrong current passphrase';

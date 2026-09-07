@@ -250,7 +250,7 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
   final pin = await _prompt(session, '❓ 设置 PIN 锁屏（可留空跳过，之后可用 /pin 设置）:', hidden: true);
   if (!_state!.running) return;
   if (pin.isEmpty) {
-    session.messages.add(_systemMessage(session, '已跳过设置 PIN（未设置）'));
+    session.messages.add(_systemMessage(session, '⚠️ 已跳过设置 PIN（未设置）'));
   } else {
     session.store.pinHash = await _hashPin(pin);
     session.store.save(storePath);
@@ -1566,15 +1566,15 @@ Future<void> _execCommand(String line) async {
       // PIN 锁屏：/pin 显示状态、/pin <PIN> 设置、/pin '' 重置为空
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session,
-            s.session.store.pinHash == null ? 'PIN 锁屏：未设置' : 'PIN 锁屏：已设置'));
+            s.session.store.pinHash == null ? '⚠️ PIN 锁屏：未设置' : '✅PIN 锁屏：已设置'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
-        s.session.messages.add(_systemMessage(s.session, 'PIN 已重置为空（未设置）'));
+        s.session.messages.add(_systemMessage(s.session, '⚠️ PIN 已重置为空（未设置）'));
       } else {
         s.session.store.pinHash = await _hashPin(arg);
         s.session.store.save(s.storePath);
-        s.session.messages.add(_systemMessage(s.session, 'PIN 已设置'));
+        s.session.messages.add(_systemMessage(s.session, '✅ PIN 已设置'));
       }
       break;
     case '/sync':

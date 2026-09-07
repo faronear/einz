@@ -441,6 +441,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockDone => 'PIN 锁屏密码已设置，下次启动需解锁';
 
   @override
+  String get chatPageSetLockConfirmTitle => '设置 PIN 锁屏？';
+
+  @override
+  String get chatPageSetLockConfirmMessage =>
+      '确定要设置 PIN 锁屏吗？设置后每次启动需输入 PIN 解锁。';
+
+  @override
   String get chatPageSetLockCleared => '已清除 PIN 锁屏（下次启动直接进入）';
 
   @override
@@ -548,6 +555,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseMismatch => '两次输入的新口令不一致';
+
+  @override
+  String get chatPageChangePassphraseConfirmTitle => '修改内容密保口令？';
+
+  @override
+  String get chatPageChangePassphraseConfirmMessage =>
+      '确定要修改内容密保口令吗？修改后需用新口令解密内容密文。';
 
   @override
   String get chatPageChangePassphraseOldWrong => '旧口令错误';

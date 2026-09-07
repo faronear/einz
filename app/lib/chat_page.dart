@@ -1475,9 +1475,23 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       setState(() => _error = l10n.setPinDialogPinMismatch);
       return;
     }
+    // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
+    final messenger = ScaffoldMessenger.of(context);
+    // 显性确认：设置/重设 PIN 锁屏（防误触——与设空清除的确认弹窗对称）
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.chatPageSetLockConfirmTitle),
+        content: Text(l10n.chatPageSetLockConfirmMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
+        ],
+      ),
+    );
+    if (confirmed != true) return; // 取消：留在本弹窗（不设置）
     try {
-      // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
-      final messenger = ScaffoldMessenger.of(context);
       await AppLockService(widget.db).setPin(pin, payload: widget.payload);
       if (!mounted) return;
       Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
@@ -1726,6 +1740,20 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.chatPageChangePassphraseMismatch);
       return;
     }
+    // 显性确认：修改内容密保口令（防误触——老板要求）
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.chatPageChangePassphraseConfirmTitle),
+        content: Text(l10n.chatPageChangePassphraseConfirmMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
+        ],
+      ),
+    );
+    if (confirmed != true) return; // 取消：留在本弹窗（不修改）
     setState(() {
       _busy = true;
       _error = null;

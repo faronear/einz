@@ -134,8 +134,11 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(pinFields.at(0), '123456');
     await tester.enterText(pinFields.at(1), '123456');
-    // 点"设置 PIN"
+    // 点"设置 PIN"→ 先弹显性确认对话框（设非空 PIN 也要求确认）
     await tester.tap(find.text('设置 PIN'));
+    await tester.pumpAndSettle();
+    expect(find.text('设置 PIN 锁屏？'), findsOneWidget); // 确认弹窗标题
+    await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
 
     // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
@@ -342,5 +345,79 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('设置 PIN 锁屏密码'), findsOneWidget); // 设置弹窗未关闭
     expect(find.text('已清除 PIN 锁屏（下次启动直接进入）'), findsNothing);
+  });
+
+  testWidgets('解锁重进：ChatPage 不带名字时从 profile 恢复顶部条名字', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 模拟向导完成时已写入 profile（setup _finish 的 saveProfile）
+    await AppLockService(db).saveProfile(personName: 'Lukas', peerName: 'Steffi', deviceName: 'iPhone');
+
+    // 不带 personName/peerName——模拟 PIN 解锁重进（lock_page._enterChat 不传名字）
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    // 顶部条应恢复两个人的名字（loadProfile 补名）
+    expect(find.text('Lukas'), findsOneWidget, reason: '本人名字应从 profile 恢复（顶部条右侧）');
+    expect(find.text('Steffi'), findsOneWidget, reason: '对方名字应从 profile 恢复（顶部条左侧）');
+  });
+
+  testWidgets('修改口令：提交前弹显性确认（取消不执行）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 打开菜单 → 修改口令
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('修改口令'));
+    await tester.pumpAndSettle();
+    // 输入新口令 + 确认（匹配）；旧口令留空（确认弹窗在校验后、旧口令验证前）
+    final fields =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(fields.at(1), 'newpass');
+    await tester.enterText(fields.at(2), 'newpass');
+    // 提交（按钮文本与弹窗标题同为"修改口令"——用 FilledButton 精确定位）
+    await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
+    await tester.pumpAndSettle();
+    expect(find.text('修改内容密保口令？'), findsOneWidget); // 显性确认弹窗
+    // 点取消 → 不执行修改（改口令弹窗仍在）
+    final confirmDialog = find.byType(AlertDialog).last;
+    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
+    await tester.pumpAndSettle();
+    expect(find.text('修改口令'), findsWidgets); // 改口令弹窗未关闭
+    expect(find.text('修改内容密保口令？'), findsNothing);
   });
 }

@@ -896,6 +896,18 @@ abstract class AppLocalizations {
   /// **'App lock set — PIN required at next launch'**
   String get chatPageSetLockDone;
 
+  /// No description provided for @chatPageSetLockConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set app lock?'**
+  String get chatPageSetLockConfirmTitle;
+
+  /// No description provided for @chatPageSetLockConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the app lock? You\'ll need to enter the PIN at every launch.'**
+  String get chatPageSetLockConfirmMessage;
+
   /// No description provided for @chatPageSetLockCleared.
   ///
   /// In en, this message translates to:
@@ -1087,6 +1099,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New passphrases do not match'**
   String get chatPageChangePassphraseMismatch;
+
+  /// No description provided for @chatPageChangePassphraseConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change escrow passphrase?'**
+  String get chatPageChangePassphraseConfirmTitle;
+
+  /// No description provided for @chatPageChangePassphraseConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the escrow passphrase? You\'ll need the new passphrase to decrypt content.'**
+  String get chatPageChangePassphraseConfirmMessage;
 
   /// No description provided for @chatPageChangePassphraseOldWrong.
   ///

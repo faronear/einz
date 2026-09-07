@@ -898,14 +898,16 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 完成动作：进入聊天页（create/join/offline 填充数据后统一调用；
   /// deviceId/spaceId 一律用登记后服务端返回的真实值）。
-  void _finish() {
+  Future<void> _finish() async {
     final kp = _keyPair;
     final enroll = _enroll;
     final sk = _spaceKey;
     final token = _sessionToken;
     if (kp == null || enroll == null || sk == null || token == null) return;
-    // 名字持久化：PIN 解锁/重启后 ChatPage 恢复显示（AppLockPayload 不含名字）
-    unawaited(AppLockService(widget.db ?? LocalDatabase()).saveProfile(
+    // 名字持久化：PIN 解锁/重启后 ChatPage 恢复显示（AppLockPayload 不含名字）。
+    // await 确保 profile 写入完成后再进聊天（消除 unawaited 竞态——2026-09-07
+    // 老板实测：设 PIN 重启解锁后顶部条丢名字）
+    await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
       personName: _role == _WizardRole.create
           ? _personName.text.trim()
           : (_personNames[_chosenPerson] ?? ''),
@@ -913,7 +915,8 @@ class _SetupPageState extends State<SetupPage> {
           ? _peerNameCtrl.text.trim()
           : (_personNames[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
       deviceName: _myDeviceName,
-    ));
+    );
+    if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
         server: _server,
@@ -1279,7 +1282,7 @@ class _SetupPageState extends State<SetupPage> {
       ),
     );
     if (start == true && mounted) {
-      _finish(); // 进入消息流页面
+      unawaited(_finish()); // 进入消息流页面（fire-and-forget：await profile 写入后导航）
     }
   }
 
