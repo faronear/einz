@@ -317,7 +317,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('跳过')); // 完成 → 欢迎对话框自动弹出
     await tester.pumpAndSettle();
-    expect(find.text('🎉 您已成功创建1+1领地'), findsOneWidget); // 对话框标题（create）
+    expect(find.text('🎉 成功创建我的领地'), findsOneWidget); // 对话框标题（create）
     expect(find.text('一切就绪！仅限你和 TA，所有消息端到端加密，确保绝对隐私，开始聊天吧。'), findsOneWidget);
     expect(find.text('开始聊天'), findsOneWidget); // 唯一按钮（点外面不关闭）
   });
@@ -356,5 +356,22 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_envelope.png'));
+  });
+
+  testWidgets('向导 ⋯ 菜单：退出应用确认弹窗（不触发 exit）', (WidgetTester tester) async {
+    await pumpSetup(tester, keyPair: _goldenKeyPair); // 空名称表 → create 向导
+    await tester.pumpAndSettle();
+    // 打开右上角 ⋯ 菜单（语言 / 恢复 / 退出应用）
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('退出应用'));
+    await tester.pumpAndSettle();
+    // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
+    expect(find.text('退出应用？'), findsOneWidget);
+    expect(find.text('将彻底关闭应用，下次启动需输入 PIN 解锁。'), findsOneWidget);
+    // 点取消关闭弹窗（不触发 exit）
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('退出应用？'), findsNothing);
   });
 }

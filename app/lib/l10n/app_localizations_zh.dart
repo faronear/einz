@@ -340,10 +340,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDoneText => '✅ 设置完成！';
 
   @override
-  String get welcomeDialogTitleCreate => '🎉 您已成功创建1+1领地';
+  String get welcomeDialogTitleCreate => '🎉 成功创建我的领地';
 
   @override
-  String get welcomeDialogTitleJoin => '🎉 您已成功认领1+1领地';
+  String get welcomeDialogTitleJoin => '🎉 成功认领我的领地';
 
   @override
   String get welcomeDialogMessage => '一切就绪！仅限你和 TA，所有消息端到端加密，确保绝对隐私，开始聊天吧。';

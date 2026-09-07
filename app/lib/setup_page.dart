@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show exit;
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -253,6 +254,7 @@ class _SetupPageState extends State<SetupPage> {
                 if (!mounted) return;
                 if (value == 'locale') _showLocalePicker();
                 if (value == 'recover') _showRecoverDialog();
+                if (value == 'exit') _showExitAppDialog();
               });
             },
             itemBuilder: (context) {
@@ -266,6 +268,10 @@ class _SetupPageState extends State<SetupPage> {
                 PopupMenuItem(
                   value: 'recover',
                   child: Text(l10n.wizardRecoverTitle),
+                ),
+                PopupMenuItem(
+                  value: 'exit',
+                  child: Text(l10n.chatPageMenuExit),
                 ),
               ];
             },
@@ -667,6 +673,27 @@ class _SetupPageState extends State<SetupPage> {
       kp.privateKey,
     );
     return api.verify(challenge.challengeId, base64Encode(opened));
+  }
+
+  /// 退出应用（等价 TUI /exit；向导任意页面可经 ⋯ 菜单退出）：
+  /// 确认后彻底关闭应用（不再回 LockPage——未设 PIN 时锁屏不应激活）。
+  Future<void> _showExitAppDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.chatPageExitTitle),
+        content: Text(l10n.chatPageExitMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+        ],
+      ),
+    );
+    if (shouldExit == true) {
+      exit(0);
+    }
   }
 
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效——
