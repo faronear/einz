@@ -873,25 +873,24 @@ void _render() {
   buf.write(_hideCursor);
   buf.write(_clearHome);
 
-  // 状态栏（第 1 行）：WS 红绿灯状态（绿=在线，红=断线重连，黄=连接中，灰=离线）；
-  // 已撤销设备固定显示撤销提示（不再显示"断线重连中"）
+  // 状态栏（第 1 行）：我的灯（绿●=在线，红✗=断线重连，黄↻=连接中，灰○=离线）
+  // 放我的名字前面；已撤销设备固定显示撤销提示（不再显示"断线重连中"）
   final ws = s.session.wsStatus;
-  final wsName = _revoked
+  final myDot = switch (ws) {
+    WsStatus.connected => '${_green}●${_reset}',
+    WsStatus.connecting => '${_yellow}↻${_reset}',
+    WsStatus.reconnecting => '${_red}✗${_reset}',
+    WsStatus.stopped => '${_gray}○${_reset}',
+  };
+  final mySegment = _revoked
       ? '${_gray}✗ 设备已被撤销（仅可 /exit）${_reset}'
-      : switch (ws) {
-          WsStatus.connected => '${_green}● 在线${_reset}',
-          WsStatus.connecting => '${_yellow}↻ 连接中${_reset}',
-          WsStatus.reconnecting =>
-            '${_red}✗ 断线重连中 (${s.session.wsDownSeconds}s)${_reset}',
-          WsStatus.stopped => '${_gray}○ 离线${_reset}',
-        };
-  // 各片段用灰色竖线分隔：Einz TUI | person #device | ● 在线 | ● 对方名字 | 临时通知
+      : '$myDot ${_personLabel(s.session.store, s.personNames)}';
+  // 各片段用灰色竖线分隔：Einz TUI | ● 我名字 #设备 | ● 对方名字 | 临时通知
   final sep = '${_gray}|${_reset}';
   final peerName = _peerNameOf(s);
   final peerDot = s.peerOnline ? '${_green}●${_reset}' : '${_gray}○${_reset}';
   buf.write(
-      '${_bold}Einz TUI${_reset} $sep ${_personLabel(s.session.store, s.personNames)} '
-      '$sep $wsName $sep $peerDot $peerName');
+      '${_bold}Einz TUI${_reset} $sep $mySegment $sep $peerDot $peerName');
   if (s.status.isNotEmpty) {
     buf.write(' $sep ${_gray}${s.status}${_reset}');
   }
