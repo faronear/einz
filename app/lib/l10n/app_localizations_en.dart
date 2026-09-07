@@ -360,6 +360,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPagePasteEnvelope => '⚠️ Paste the key envelope (base64)';
 
   @override
+  String get wizardEnvelopeWrong =>
+      'Invalid key envelope: make sure the full sealed key copy from the other device is pasted';
+
+  @override
   String setupPageImportFailed(String error) {
     return '❌ Import/authentication failed: $error';
   }

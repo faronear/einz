@@ -493,6 +493,10 @@ class _SetupPageState extends State<SetupPage> {
         return;
       }
       // 邀请码沿用 join 步骤 2 已填值（offline 从 join 口令页切换进入）
+      // 信封必须有效（本设备私钥解封成功）才放行——不留到 PIN 页才验证
+      final ok = await _verifyEnvelope();
+      if (!mounted) return;
+      if (!ok) return;
     }
     // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
     // 有效 PIN → 设锁后推进；两空 → 弹窗确认"暂不设置"；其余 → 输入框下方红色提示。
@@ -1342,26 +1346,26 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// offline：解封密钥信封 → 认证 → 设置 PIN → 完成步骤。
-  Future<void> _runEnvelopeImport() async {
+  /// offline 信封页（步骤 1）「验证密钥信封」：登记 → 用本设备私钥解封信封——
+  /// 解出合法 Space Key 才放行进 PIN 步骤；无效信封提示并停留本页。
+  Future<bool> _verifyEnvelope() async {
     final kp = _keyPair;
-    if (kp == null) return;
+    if (kp == null) return false;
     final envelopeRaw = _envelopeKey.text.trim();
     if (envelopeRaw.isEmpty) {
       setState(() => _status = AppLocalizations.of(context)!.setupPagePasteEnvelope);
-      return;
+      return false;
     }
     setState(() {
       _busy = true;
       _status = null;
     });
     try {
-      // 0) 凭邀请码登记（第二台及以上设备必须；码绑定 person）
+      // 1) 凭邀请码登记（offline 从 join 口令页切换进入时已登记，跳过）
       if (_enroll == null) {
         await _enrollDevice(_inviteCode.text.trim());
       }
-      final enroll = _enroll!;
-      // 1) 解封 Space Key（本设备私钥解开）
+      // 2) 用本设备私钥解封 Space Key：解密失败 = 信封无效 → 不通过
       final s = await sodium();
       final spaceKey = await sealOpen(
         s,
@@ -1369,48 +1373,60 @@ class _SetupPageState extends State<SetupPage> {
         kp.publicKey,
         kp.privateKey,
       );
-      // 2) 认证（用登记后的真实 deviceId）
+      _spaceKey = spaceKey;
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() => _status = AppLocalizations.of(context)!.wizardEnvelopeWrong);
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// offline：信封已在信封页（步骤 1）验证解封（_verifyEnvelope），
+  /// 这里仅认证/设锁/完成（Space Key 已存 _spaceKey）。
+  Future<void> _runEnvelopeImport() async {
+    final kp = _keyPair;
+    if (kp == null) return;
+    final enroll = _enroll!;
+    // 认证（用登记后的真实 deviceId；信封页验证时未认证则这里补上）
+    if (_sessionToken == null) {
       final session = await _authenticate(kp, enroll.deviceId);
       _sessionToken = session.sessionToken;
-      _spaceKey = spaceKey;
+    }
+    if (!mounted) return;
+    // 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
+    if (_pinSkipped) {
       if (!mounted) return;
-      // 3) 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
-      if (_pinSkipped) {
-        if (!mounted) return;
-        await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
-          server: _server,
-          spaceId: enroll.spaceId,
-          deviceId: enroll.deviceId,
-          spaceKeyB64: base64Encode(spaceKey),
-          keyVersion: 1,
-          token: session.sessionToken,
-        ));
-        setState(() {
-          _step = _stepCount; // offline 完成页（新编号 3）
-          _status = null;
-        });
-        return;
-      }
-      final ok = await _setupLockAndEnter(
+      await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
         server: _server,
         spaceId: enroll.spaceId,
         deviceId: enroll.deviceId,
-        spaceKeyB64: base64Encode(spaceKey),
+        spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: 1,
-        token: session.sessionToken,
-      );
-      if (!mounted) return;
-      if (ok) {
-        setState(() {
-          _step = _stepCount; // offline 完成页（新编号 3）
-          _status = null;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _status = AppLocalizations.of(context)!.setupPageImportFailed('$e'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
+        token: _sessionToken!,
+      ));
+      setState(() {
+        _step = _stepCount; // offline 完成页（新编号 3）
+        _status = null;
+      });
+      return;
+    }
+    final ok = await _setupLockAndEnter(
+      server: _server,
+      spaceId: enroll.spaceId,
+      deviceId: enroll.deviceId,
+      spaceKeyB64: base64Encode(_spaceKey!),
+      keyVersion: 1,
+      token: _sessionToken!,
+    );
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        _step = _stepCount; // offline 完成页（新编号 3）
+        _status = null;
+      });
     }
   }
 }

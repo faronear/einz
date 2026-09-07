@@ -336,6 +336,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPagePasteEnvelope => '⚠️ 请粘贴密钥信封（base64）';
 
   @override
+  String get wizardEnvelopeWrong => '密钥信封无效：请确认对方「导出密封密钥信封」的完整内容已粘贴';
+
+  @override
   String setupPageImportFailed(String error) {
     return '❌ 导入/认证失败: $error';
   }

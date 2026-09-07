@@ -704,6 +704,12 @@ abstract class AppLocalizations {
   /// **'⚠️ Paste the key envelope (base64)'**
   String get setupPagePasteEnvelope;
 
+  /// No description provided for @wizardEnvelopeWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid key envelope: make sure the full sealed key copy from the other device is pasted'**
+  String get wizardEnvelopeWrong;
+
   /// No description provided for @setupPageImportFailed.
   ///
   /// In en, this message translates to:

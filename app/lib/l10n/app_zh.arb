@@ -143,6 +143,7 @@
   },
   "setupPageGenKeyFirst": "⚠️ 先生成设备密钥",
   "setupPagePasteEnvelope": "⚠️ 请粘贴密钥信封（base64）",
+  "wizardEnvelopeWrong": "密钥信封无效：请确认对方「导出密封密钥信封」的完整内容已粘贴",
   "setupPageImportFailed": "❌ 导入/认证失败: {error}",
   "@setupPageImportFailed": {
     "placeholders": {

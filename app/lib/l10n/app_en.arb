@@ -143,6 +143,7 @@
   },
   "setupPageGenKeyFirst": "⚠️ Generate the device key first",
   "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
+  "wizardEnvelopeWrong": "Invalid key envelope: make sure the full sealed key copy from the other device is pasted",
   "setupPageImportFailed": "❌ Import/authentication failed: {error}",
   "@setupPageImportFailed": {
     "placeholders": {
