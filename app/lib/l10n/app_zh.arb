@@ -190,6 +190,7 @@
   "chatPageSetLockTitle": "设置 PIN 锁屏密码",
   "chatPageSetLockTooltip": "设置 PIN 锁屏密码",
   "chatPageSetLockDone": "PIN 锁屏密码已设置，下次启动需解锁",
+  "chatPageSetLockCleared": "已清除 PIN 锁屏（下次启动直接进入）",
   "chatPageMenuLocale": "界面语言：{value}",
   "@chatPageMenuLocale": {
     "placeholders": {

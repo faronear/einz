@@ -896,6 +896,12 @@ abstract class AppLocalizations {
   /// **'App lock set — PIN required at next launch'**
   String get chatPageSetLockDone;
 
+  /// No description provided for @chatPageSetLockCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'App lock cleared (enter directly at next launch)'**
+  String get chatPageSetLockCleared;
+
   /// No description provided for @chatPageMenuLocale.
   ///
   /// In en, this message translates to:

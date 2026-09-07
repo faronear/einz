@@ -66,6 +66,13 @@ class AppLockService {
         .go();
   }
 
+  /// 取消启动锁（"设为空"）：删除加密包，保留明文配置（Space Key 仍可进聊天）。
+  Future<void> clearPackage() async {
+    await (db.delete(db.appState)
+          ..where((s) => s.key.equals(_kPackage)))
+        .go();
+  }
+
   /// 修改 escrow 口令后同步本地明文配置（跳过 PIN 场景）。
   /// 设 PIN 场景（加密包）因无 PIN 可用不动锁包——由 lock_page._syncEscrow
   /// 的上传前口令验证保护，防止旧口令覆盖新托管包。

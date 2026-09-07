@@ -1437,6 +1437,21 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     final pin = _pinCtrl.text;
+    // 两空 = 设为空：取消启动锁（Space Key 转明文保存，与向导"暂不设置"一致）
+    if (pin.isEmpty && _confirmCtrl.text.isEmpty) {
+      try {
+        final messenger = ScaffoldMessenger.of(context);
+        await AppLockService(widget.db).savePlain(widget.payload);
+        await AppLockService(widget.db).clearPackage();
+        if (!mounted) return;
+        Navigator.of(context).pop(true); // 菜单刷新「PIN: 未设置」
+        messenger.showSnackBar(SnackBar(content: Text(l10n.chatPageSetLockCleared)));
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
+      }
+      return;
+    }
     if (pin.length < 4) {
       setState(() => _error = l10n.setPinDialogPinTooShort);
       return;

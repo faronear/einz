@@ -475,6 +475,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'App lock set — PIN required at next launch';
 
   @override
+  String get chatPageSetLockCleared =>
+      'App lock cleared (enter directly at next launch)';
+
+  @override
   String chatPageMenuLocale(String value) {
     return 'Language: $value';
   }

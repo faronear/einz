@@ -256,4 +256,46 @@ void main() {
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.focusNode!.hasFocus, isTrue);
   });
+
+  testWidgets('设置 PIN 两空提交 = 设为空（不报"至少4位"，转明文取消锁）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两个输入框都不输入 = 设为空）
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PIN: 未设置'));
+    await tester.pumpAndSettle();
+    expect(find.text('设置 PIN 锁屏密码'), findsOneWidget); // 弹窗标题
+    // 两空直接点「设置 PIN」→ 不报"PIN 至少4位"，而是取消锁（转明文）
+    await tester.tap(find.text('设置 PIN'));
+    await tester.pumpAndSettle();
+    expect(find.text('PIN 至少4位'), findsNothing);
+    expect(find.text('已清除 PIN 锁屏（下次启动直接进入）'), findsOneWidget); // SnackBar
+    // 弹窗已关闭；无加密包（isSetup false），明文配置仍在（hasConfig true）
+    expect(find.text('设置 PIN 锁屏密码'), findsNothing);
+    final lock = AppLockService(db);
+    expect(await lock.isSetup, false, reason: '两空提交不设加密锁');
+    expect(await lock.hasConfig, true, reason: 'Space Key 明文保留（下次启动直接进入）');
+  });
 }
