@@ -144,6 +144,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameHint => '这是你的第一个设备，先告诉我们要怎么称呼你（之后可随时 /改名）。';
 
   @override
+  String get wizardStepPeerName => '对方的名字';
+
+  @override
+  String get wizardPeerNameHint => '这是你的伴侣（第二个用户），告诉我们怎么称呼 TA（之后可随时修改）。';
+
+  @override
+  String get wizardPeerNameLabel => '对方的名字';
+
+  @override
+  String get wizardPeerNameHintInput => '例如 Steffi';
+
+  @override
+  String get wizardNameRequired => '请先输入你的名字';
+
+  @override
+  String get wizardPeerNameRequired => '请先输入对方的名字';
+
+  @override
   String get wizardNameLabel => '你的名字';
 
   @override

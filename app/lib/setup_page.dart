@@ -59,6 +59,7 @@ class SetupPage extends StatefulWidget {
 class _SetupPageState extends State<SetupPage> {
   String? _autoDeviceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
   final _personName = TextEditingController(); // 首设备：第一个用户的名字
+  final _peerNameCtrl = TextEditingController(); // create：对方（伴侣）的名字（必填）
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -102,6 +103,7 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     _personName.dispose();
+    _peerNameCtrl.dispose();
     _spaceId.dispose();
     _envelopeKey.dispose();
     _escrowPassphrase.dispose();
@@ -366,7 +368,7 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 4; // name/passphrase/pin/done（设备名自动设置，输入步骤已移除）
+        return 5; // name/peerName/passphrase/pin/done（设备名自动设置，输入步骤已移除）
       case _WizardRole.join:
         return 5; // identity/invite/passphrase/pin/done
       case _WizardRole.offline:
@@ -383,8 +385,9 @@ class _SetupPageState extends State<SetupPage> {
       case _WizardRole.create:
         switch (_step) {
           case 1: return l10n.wizardStepName;
-          case 2: return l10n.wizardStepPassphrase;
-          case 3: return l10n.wizardStepPin;
+          case 2: return l10n.wizardStepPeerName;
+          case 3: return l10n.wizardStepPassphrase;
+          case 4: return l10n.wizardStepPin;
           default: return l10n.wizardStepDone;
         }
       case _WizardRole.join:
@@ -458,6 +461,15 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _nextStep() async {
     final l10n = AppLocalizations.of(context)!;
     // 按步骤前置校验（每步只要求一个信息）
+    // create 步骤 1（本人）与步骤 2（对方）的名字均不允许空白跳过
+    if (_role == _WizardRole.create && _step == 1 && _personName.text.trim().isEmpty) {
+      setState(() => _status = l10n.wizardNameRequired);
+      return;
+    }
+    if (_role == _WizardRole.create && _step == 2 && _peerNameCtrl.text.trim().isEmpty) {
+      setState(() => _status = l10n.wizardPeerNameRequired);
+      return;
+    }
     if (_role == _WizardRole.join && _step == 1 && _chosenPerson == null) {
       setState(() => _status = l10n.wizardIdentityFirst);
       return;
@@ -473,7 +485,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (!ok) return;
     }
-    if (_role == _WizardRole.create && _step == 2 && _escrowPassphrase.text.trim().isEmpty) {
+    if (_role == _WizardRole.create && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
       setState(() => _status = l10n.setupPageNeedPassphrase);
       return;
     }
@@ -501,7 +513,7 @@ class _SetupPageState extends State<SetupPage> {
     }
     // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
     // 有效 PIN → 设锁后推进；两空 → 弹窗确认"暂不设置"；其余 → 输入框下方红色提示。
-    final isPinStep = (_role == _WizardRole.create && _step == 3) ||
+    final isPinStep = (_role == _WizardRole.create && _step == 4) ||
         (_role == _WizardRole.join && _step == 4) ||
         (_role == _WizardRole.offline && _step == 2);
     if (isPinStep) {
@@ -548,9 +560,9 @@ class _SetupPageState extends State<SetupPage> {
       }
       return; // _run* 内部推进 _step
     }
-    // create 步骤 1（名字）→ 自动自举登记（原设备名步骤的触发点；设备名已自动
-    // 设置不再询问），成功才进口令步骤
-    if (_role == _WizardRole.create && _step == 1 && _enroll == null) {
+    // create 步骤 2（对方名字）→ 自动自举登记（登记时上传本人+对方名字；
+    // 设备名已自动设置不再询问），成功才进口令步骤
+    if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
       await _runBootstrap();
       if (!mounted) return;
       if (_enroll == null) return; // 自举失败：留在本步展示错误/改用加入
@@ -577,8 +589,10 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepName();
           case 2:
-            return _buildStepPassphrase();
+            return _buildStepPeerName();
           case 3:
+            return _buildStepPassphrase();
+          case 4:
             return _buildStepPin();
           default:
             return _buildStepDone();
@@ -783,6 +797,7 @@ class _SetupPageState extends State<SetupPage> {
             publicKey: kp.publicKeyB64,
             inviteCode: inviteCode,
             personName: _personName.text.trim(), // 首设备：第一个用户的名字；后续设备按需
+            partnerName: _peerNameCtrl.text.trim(), // create：对方（伴侣）的名字（必填）；join 时为空被服务端忽略
             personId: _chosenPerson, // join：用户选择的身份（personA/personB）
             // 自动填设备型号（产品决定：不再询问）；同步保存供进聊天页显示/修改。
             // 只在真实登记分支计算（测试注入 enrollOverride 时不调 device_info）
@@ -875,7 +890,7 @@ class _SetupPageState extends State<SetupPage> {
             : (_personNames[_chosenPerson] ?? ''),
         personId: enroll.personId,
         peerName: _role == _WizardRole.create
-            ? (_personNames['personB'] ?? '')
+            ? _peerNameCtrl.text.trim()
             : (_personNames[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
         deviceName: _myDeviceName,
         initialHistory: _importedHistory,
@@ -1041,6 +1056,26 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 设置接入口令（create=步骤2 / join=步骤3；对方凭它加入）。
+  /// create 步骤 2：对方（伴侣）的名字（必填——不允许空白跳过）。
+  Widget _buildStepPeerName() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l10n.wizardPeerNameHint, style: const TextStyle(fontSize: 14)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _peerNameCtrl,
+          decoration: InputDecoration(
+            labelText: l10n.wizardPeerNameLabel,
+            hintText: l10n.wizardPeerNameHintInput,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStepPassphrase() {
     final l10n = AppLocalizations.of(context)!;
     return Column(

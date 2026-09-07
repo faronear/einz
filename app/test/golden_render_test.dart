@@ -242,10 +242,24 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.1_name.png'));
   });
 
+  testWidgets('golden: 向导1.1.2-对方名字步骤（create）', (WidgetTester tester) async {
+    _usePhoneSize(tester);
+    await pumpSetup(tester, keyPair: _goldenKeyPair); // 空名称表 → create，自动进入步骤 1
+    await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
+    await tester.tap(find.text('下一步')); // 名字 → 对方名字页
+    await tester.pumpAndSettle();
+    await expectLater(
+        find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.2_peer_name.png'));
+  });
+
   testWidgets('golden: 向导1.1.3-接入口令步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
-    await tester.tap(find.text('下一步')); // 名字 → 自动登记 → 口令
+    await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
+    await tester.tap(find.text('下一步')); // 名字 → 对方名字页
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.3_passphrase.png'));
@@ -254,7 +268,11 @@ void main() {
   testWidgets('golden: 向导1.1.4-PIN 步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll);
-    await tester.tap(find.text('下一步')); // 名字 → 自动登记 → 口令
+    await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
+    await tester.tap(find.text('下一步')); // 名字 → 对方名字页
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
@@ -266,7 +284,11 @@ void main() {
   testWidgets('golden: 向导1.1.6-完成步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll, auth: fakeAuth);
-    await tester.tap(find.text('下一步')); // 名字 → 自动登记 → 口令
+    await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
+    await tester.tap(find.text('下一步')); // 名字 → 对方名字页
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
@@ -282,7 +304,11 @@ void main() {
   testWidgets('向导完成：弹出欢迎对话框（欢迎词 + 唯一「开始聊天」按钮）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, enroll: fakeEnroll, auth: fakeAuth);
-    await tester.tap(find.text('下一步')); // 名字 → 自动登记 → 口令
+    await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
+    await tester.tap(find.text('下一步')); // 名字 → 对方名字页
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));

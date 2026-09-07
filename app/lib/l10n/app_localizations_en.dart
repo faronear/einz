@@ -154,6 +154,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is your first device. Tell us what to call you (you can rename anytime).';
 
   @override
+  String get wizardStepPeerName => 'Partner\'s name';
+
+  @override
+  String get wizardPeerNameHint =>
+      'This is your partner (second user) — how should we call them? You can change it later.';
+
+  @override
+  String get wizardPeerNameLabel => 'Partner\'s name';
+
+  @override
+  String get wizardPeerNameHintInput => 'e.g. Steffi';
+
+  @override
+  String get wizardNameRequired => 'Please enter your name first';
+
+  @override
+  String get wizardPeerNameRequired => 'Please enter your partner\'s name';
+
+  @override
   String get wizardNameLabel => 'Your name';
 
   @override

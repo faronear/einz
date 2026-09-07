@@ -344,6 +344,42 @@ abstract class AppLocalizations {
   /// **'This is your first device. Tell us what to call you (you can rename anytime).'**
   String get wizardNameHint;
 
+  /// No description provided for @wizardStepPeerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner\'s name'**
+  String get wizardStepPeerName;
+
+  /// No description provided for @wizardPeerNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your partner (second user) — how should we call them? You can change it later.'**
+  String get wizardPeerNameHint;
+
+  /// No description provided for @wizardPeerNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner\'s name'**
+  String get wizardPeerNameLabel;
+
+  /// No description provided for @wizardPeerNameHintInput.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Steffi'**
+  String get wizardPeerNameHintInput;
+
+  /// No description provided for @wizardNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your name first'**
+  String get wizardNameRequired;
+
+  /// No description provided for @wizardPeerNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your partner\'s name'**
+  String get wizardPeerNameRequired;
+
   /// No description provided for @wizardNameLabel.
   ///
   /// In en, this message translates to:
