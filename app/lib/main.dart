@@ -60,7 +60,38 @@ class _EinzAppState extends State<EinzApp> {
     return MaterialApp(
       title: 'Einz',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFE07856), // 陶土橙：优雅文艺的暖色调（Between 式，克制的醒目）
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFFBF7F2), // 暖白纸感背景
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFFBF7F2),
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF3E3630)),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          labelStyle: const TextStyle(fontSize: 16, color: Color(0xFF6E6259)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE3D9D0)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE07856), width: 1.6),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(96, 50),
+            textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
       ),
       // l10n：中英文资源 + 跟随系统/手动覆盖（locale=null 时跟随系统）
       localizationsDelegates: AppLocalizations.localizationsDelegates,

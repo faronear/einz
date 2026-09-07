@@ -301,6 +301,7 @@ class _SetupPageState extends State<SetupPage> {
                       const SizedBox(height: 8),
                       TextField(
                         controller: _serverController,
+                        style: const TextStyle(fontSize: 18),
                         decoration: const InputDecoration(
                           labelText: '服务器地址',
                           hintText: 'https://...',
@@ -323,9 +324,9 @@ class _SetupPageState extends State<SetupPage> {
               const SizedBox(height: 16),
               // 本页功能标题（AppBar 只显示所选角色名，见 _appBarTitle）
               Text(_stepTitle(l10n),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600)),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
@@ -637,7 +638,7 @@ class _SetupPageState extends State<SetupPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(l10n.wizardDetectTitle,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Text(_probeFailed ? l10n.wizardDetectFailed : l10n.wizardDetectHint,
             style: const TextStyle(fontSize: 13, color: Colors.grey)),
@@ -949,10 +950,11 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardNameHint, style: const TextStyle(fontSize: 14)),
+        Text(l10n.wizardNameHint, style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         TextField(
           controller: _personName,
+          style: const TextStyle(fontSize: 18),
           decoration: InputDecoration(
             labelText: l10n.wizardNameLabel,
             hintText: l10n.wizardNameHintInput,
@@ -1015,7 +1017,7 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardIdentityHint, style: const TextStyle(fontSize: 14)),
+        Text(l10n.wizardIdentityHint, style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         Card(
           child: ListTile(
@@ -1038,6 +1040,7 @@ class _SetupPageState extends State<SetupPage> {
           const SizedBox(height: 12),
           TextField(
             controller: _personName,
+            style: const TextStyle(fontSize: 18),
             decoration: InputDecoration(
               labelText: l10n.wizardNameLabel,
               hintText: l10n.wizardNameHintInput,
@@ -1055,10 +1058,11 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardInviteHint, style: const TextStyle(fontSize: 14)),
+        Text(l10n.wizardInviteHint, style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         TextField(
           controller: _inviteCode,
+          style: const TextStyle(fontSize: 18),
           decoration: InputDecoration(
             labelText: l10n.setupPageInviteLabel,
             hintText: l10n.setupPageInviteHint,
@@ -1102,10 +1106,11 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardPeerNameHint, style: const TextStyle(fontSize: 14)),
+        Text(l10n.wizardPeerNameHint, style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         TextField(
           controller: _peerNameCtrl,
+          style: const TextStyle(fontSize: 18),
           decoration: InputDecoration(
             labelText: l10n.wizardPeerNameLabel,
             hintText: l10n.wizardPeerNameHintInput,
@@ -1122,10 +1127,11 @@ class _SetupPageState extends State<SetupPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(_role == _WizardRole.join ? l10n.wizardJoinPassphraseHint : l10n.wizardPassphraseHint,
-            style: const TextStyle(fontSize: 14)),
+            style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         TextField(
           controller: _escrowPassphrase,
+          style: const TextStyle(fontSize: 18),
           obscureText: true,
           decoration: InputDecoration(
             labelText: l10n.setupPageEscrowLabel,
@@ -1152,10 +1158,11 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardPinHint, style: const TextStyle(fontSize: 14)),
+        Text(l10n.wizardPinHint, style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         TextField(
           controller: _pin,
+          style: const TextStyle(fontSize: 18),
           obscureText: true,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
@@ -1166,6 +1173,7 @@ class _SetupPageState extends State<SetupPage> {
         const SizedBox(height: 8),
         TextField(
           controller: _confirm,
+          style: const TextStyle(fontSize: 18),
           obscureText: true,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
@@ -1421,6 +1429,7 @@ class _SetupPageState extends State<SetupPage> {
       children: [
         TextField(
           controller: _envelopeKey,
+          style: const TextStyle(fontSize: 18),
           maxLines: 3,
           decoration: InputDecoration(
             labelText: l10n.setupPageEnvelopeKeyLabel,
@@ -1682,6 +1691,7 @@ class _RecoverDialogState extends State<_RecoverDialog> {
           const SizedBox(height: 12),
           TextField(
             controller: _passphraseCtrl,
+            style: const TextStyle(fontSize: 18),
             obscureText: true,
             autofocus: true,
             decoration: InputDecoration(
@@ -1701,6 +1711,7 @@ class _RecoverDialogState extends State<_RecoverDialog> {
           if (_showArchive) ...[
             TextField(
               controller: _archiveCtrl,
+              style: const TextStyle(fontSize: 18),
               maxLines: 3,
               decoration: InputDecoration(
                 labelText: l10n.wizardRecoverArchiveTextLabel,
@@ -1710,6 +1721,7 @@ class _RecoverDialogState extends State<_RecoverDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _archivePassphraseCtrl,
+              style: const TextStyle(fontSize: 18),
               obscureText: true,
               decoration: InputDecoration(
                 labelText: l10n.wizardRecoverArchivePassphraseLabel,
