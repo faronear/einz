@@ -1778,7 +1778,13 @@ Future<void> _execCommand(String line) async {
     case '/rename':
       // 重设个人显示名（personName）：本地 + 服务端同步 + 刷新名称表
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session, '修改本人名字。用法: /rename <名字>'));
+        // 先输出当前名字（状态），再给出详细用法
+        final current = s.session.store.personName ??
+            s.personNames[s.session.store.personId] ??
+            '(未设置)';
+        s.session.messages.add(_systemMessage(s.session, '当前名字: $current'));
+        s.session.messages.add(
+            _systemMessage(s.session, '用法: /rename <名字> —— 修改我的显示名字（如 /rename Lukas）'));
       } else if (s.session.store.sessionToken == null) {
         s.status = '会话未激活，请先 /auth';
       } else {
