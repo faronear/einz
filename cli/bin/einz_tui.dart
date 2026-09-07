@@ -1796,7 +1796,12 @@ Future<void> _execCommand(String line) async {
     case '/device':
       // 重设本设备名称（deviceName）：本地 + 服务端同步
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session, '用法: /device <设备名>'));
+        // 先打印当前设备名，再给出详细用法
+        final current =
+            s.session.store.deviceName ?? s.session.store.deviceId ?? '(未设置)';
+        s.session.messages.add(_systemMessage(s.session, '当前设备名: $current'));
+        s.session.messages.add(
+            _systemMessage(s.session, '用法: /device <设备名> —— 修改本设备名称（如 /device MyMac）'));
       } else if (s.session.store.sessionToken == null) {
         s.status = '会话未激活，请先 /auth';
       } else {
