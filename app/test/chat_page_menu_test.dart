@@ -222,4 +222,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('退出应用？'), findsNothing);
   });
+
+  testWidgets('回车发送后输入框焦点保持（与图标发送一致）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 聚焦输入框并输入文本
+    await tester.enterText(find.byType(TextField), '你好');
+    // 回车发送（模拟键盘 done 动作——触发 onSubmitted）
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    // 焦点应保持在输入框（回车发送后 requestFocus 补回）
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.focusNode!.hasFocus, isTrue);
+  });
 }

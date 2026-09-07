@@ -96,6 +96,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late final MessageRepository _repo;
   final _input = TextEditingController();
+  final _inputFocusNode = FocusNode(); // 回车发送后重新聚焦（与图标发送一致保持焦点）
   final _lockTimer = LockTimer();
   // 插件懒构造：AudioRecorder()/AudioPlayer() 构造即触发原生平台通道，
   // 仅在实际录音/播放时才实例化（widget 测试环境无原生实现，渲染路径不触碰）。
@@ -606,6 +607,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _ws?.stop();
     _scrollController.dispose();
     _input.dispose();
+    _inputFocusNode.dispose();
     super.dispose();
   }
 
@@ -1386,8 +1388,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Expanded(
                     child: TextField(
                       controller: _input,
+                      focusNode: _inputFocusNode,
                       decoration: InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
-                      onSubmitted: (_) => _send(),
+                      // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
+                      onSubmitted: (_) {
+                        _send();
+                        _inputFocusNode.requestFocus();
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
