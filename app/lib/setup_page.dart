@@ -1079,7 +1079,6 @@ class _SetupPageState extends State<SetupPage> {
     try {
       await _enrollDevice(null);
       if (!mounted) return;
-      setState(() => _status = AppLocalizations.of(context)!.wizardEnrollDoneStatus);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {

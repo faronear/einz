@@ -686,12 +686,6 @@ abstract class AppLocalizations {
   /// **'Register this device'**
   String get wizardEnrollAction;
 
-  /// No description provided for @wizardEnrollDoneStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'✅ Registered — continue'**
-  String get wizardEnrollDoneStatus;
-
   /// No description provided for @wizardEnrollDone.
   ///
   /// In en, this message translates to:
@@ -931,6 +925,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set app lock'**
   String get chatPageSetLockTitle;
+
+  /// No description provided for @chatPageSetLockClearHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank and submit to clear PIN'**
+  String get chatPageSetLockClearHint;
 
   /// No description provided for @chatPageSetLockTooltip.
   ///

@@ -2,7 +2,7 @@ import { randomInt } from "node:crypto";
 import { getDb, getMeta, setMeta } from "./db.js";
 import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, getDevice, type ServerConfig } from "./config.js";
-import { broadcastProfileUpdated } from "./ws.js";
+import { broadcastProfileUpdated, getConnectedAt } from "./ws.js";
 
 /** 邀请码字符集（去易混字符 0/O/1/I）与格式：5 字符一组，共 4 组。 */
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -31,8 +31,15 @@ export function listDevices(cfg: ServerConfig, token: string): { devices: unknow
 
   const rows = getDb()
     .prepare(`SELECT device_id, person_id, status, last_seen, public_key, device_name FROM devices ORDER BY created_at`)
-    .all();
-  return { devices: rows };
+    .all() as {
+    device_id: string;
+    person_id: string;
+    status: string;
+    last_seen: number | null;
+    public_key: string;
+    device_name: string;
+  }[];
+  return { devices: rows.map((r) => ({ ...r, connected_at: getConnectedAt(r.device_id) })) };
 }
 
 /** DELETE /devices/:id：撤销设备（白名单移除 + 清 Push Token + 触发密钥轮换，PROTOCOL.md §7.2）。 */

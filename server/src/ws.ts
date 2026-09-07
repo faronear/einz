@@ -9,6 +9,7 @@ interface Conn {
   ws: WebSocket;
   deviceId: string;
   alive: boolean;
+  connectedAt: number; // 本次 WS 连接建立时刻（ms）——/devices 显示"上线时间"
 }
 
 const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1：每设备至多 1 条连接）
@@ -16,6 +17,11 @@ const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1
 /** 当前在线 WS 连接数（/health 健康检查用）。 */
 export function wsConnCount(): number {
   return conns.size;
+}
+
+/** 设备当前 WS 连接的建立时刻（ms；离线设备返回 null）。 */
+export function getConnectedAt(deviceId: string): number | null {
+  return conns.get(deviceId)?.connectedAt ?? null;
 }
 
 /** 向其他设备广播 peer 上下线事件（App 实时更新对方在线状态——TUI 退出立即变红）。 */
@@ -81,7 +87,7 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
     const old = conns.get(deviceId);
     if (old) old.ws.close(4408, "duplicate connection");
 
-    const conn: Conn = { ws, deviceId, alive: true };
+    const conn: Conn = { ws, deviceId, alive: true, connectedAt: Date.now() };
     conns.set(deviceId, conn);
     // WS 连接 = 在线：刷新 last_seen（App 判定对方在线）
     getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(Date.now(), deviceId);

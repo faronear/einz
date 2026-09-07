@@ -320,9 +320,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnrollAction => '登记本设备';
 
   @override
-  String get wizardEnrollDoneStatus => '✅ 登记成功，可继续';
-
-  @override
   String wizardEnrollDone(String deviceId, String spaceId) {
     return '✅ 登记成功\n设备: $deviceId\n空间: $spaceId';
   }
@@ -457,6 +454,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageSetLockTitle => '设置 PIN 锁屏密码';
+
+  @override
+  String get chatPageSetLockClearHint => '可留空直接提交，即可清空 PIN';
 
   @override
   String get chatPageSetLockTooltip => '设置 PIN 锁屏密码';

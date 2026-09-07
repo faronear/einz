@@ -338,9 +338,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardEnrollAction => 'Register this device';
 
   @override
-  String get wizardEnrollDoneStatus => '✅ Registered — continue';
-
-  @override
   String wizardEnrollDone(String deviceId, String spaceId) {
     return '✅ Registered\nDevice: $deviceId\nSpace: $spaceId';
   }
@@ -490,6 +487,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockTitle => 'Set app lock';
+
+  @override
+  String get chatPageSetLockClearHint => 'Leave blank and submit to clear PIN';
 
   @override
   String get chatPageSetLockTooltip => 'Set app lock';

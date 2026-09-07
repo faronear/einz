@@ -124,7 +124,6 @@
   "setupPageKeyGenerated": "✅ 密钥已生成",
   "wizardEnrollHint": "服务器已全自动登记（无需手动白名单）。点击下方登记本设备——若这是服务器的第一台设备，将自动创建私密空间。",
   "wizardEnrollAction": "登记本设备",
-  "wizardEnrollDoneStatus": "✅ 登记成功，可继续",
   "wizardEnrollDone": "✅ 登记成功\n设备: {deviceId}\n空间: {spaceId}",
   "@wizardEnrollDone": {
     "placeholders": {
@@ -196,6 +195,7 @@
   },
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置 PIN 锁屏密码",
+  "chatPageSetLockClearHint": "可留空直接提交，即可清空 PIN",
   "chatPageSetLockTooltip": "设置 PIN 锁屏密码",
   "chatPageSetLockDone": "PIN 锁屏密码已设置，下次启动需解锁",
   "chatPageSetLockConfirmTitle": "设置 PIN 锁屏？",

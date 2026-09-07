@@ -124,7 +124,6 @@
   "setupPageKeyGenerated": "✅ Key generated",
   "wizardEnrollHint": "Registration is fully automatic now (no manual whitelist). Tap below to register this device — the first device on the server auto-creates the private space.",
   "wizardEnrollAction": "Register this device",
-  "wizardEnrollDoneStatus": "✅ Registered — continue",
   "wizardEnrollDone": "✅ Registered\nDevice: {deviceId}\nSpace: {spaceId}",
   "@wizardEnrollDone": {
     "placeholders": {
@@ -196,6 +195,7 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set app lock",
+  "chatPageSetLockClearHint": "Leave blank and submit to clear PIN",
   "chatPageSetLockTooltip": "Set app lock",
   "chatPageSetLockDone": "App lock set — PIN required at next launch",
   "chatPageSetLockConfirmTitle": "Set app lock?",

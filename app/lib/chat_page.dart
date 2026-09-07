@@ -1620,6 +1620,15 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 提示：可留空直接提交，即可清空 PIN（大标题下、输入框上方——老板要求）
+          Text(
+            l10n.chatPageSetLockClearHint,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 10),
           TextField(
             controller: _pinCtrl,
             obscureText: true,

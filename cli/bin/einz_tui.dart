@@ -1777,8 +1777,12 @@ Future<void> _execCommand(String line) async {
           final devName = (d['device_name'] as String? ?? '');
           final person = (d['person_id'] ?? '-') as String;
           final last = d['last_seen'];
+          final connectedAt = d['connected_at'];
           final online = (last is num) && (now - last < 60 * 1000);
-          final since = (last is num) ? _fmtTime(last.toInt()) : '-';
+          // 在线设备显示本次上线时刻（connected_at）；离线设备用 last_seen 兜底
+          final since = (connectedAt is num)
+              ? _fmtTime(connectedAt.toInt())
+              : ((last is num) ? _fmtTime(last.toInt()) : '-');
           final displayName = devName.isNotEmpty ? devName : devId; // dev name，backup id
           final personName = s.personNames[person] ?? person; // person name，backup id
           final tag = devId == myId ? '本机' : (online ? '在线' : '离线');
