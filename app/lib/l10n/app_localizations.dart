@@ -638,6 +638,18 @@ abstract class AppLocalizations {
   /// **'Your partner joins with this passphrase — share it via QR code on the next step.'**
   String get wizardPassphraseHint;
 
+  /// No description provided for @wizardJoinPassphraseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify the entry passphrase: enter the exact passphrase the first device created to join'**
+  String get wizardJoinPassphraseHint;
+
+  /// No description provided for @wizardJoinPassphraseWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong passphrase: check the exact one the first device created'**
+  String get wizardJoinPassphraseWrong;
+
   /// No description provided for @wizardSwitchToEnvelope.
   ///
   /// In en, this message translates to:

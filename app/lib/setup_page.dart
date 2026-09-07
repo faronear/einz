@@ -26,7 +26,7 @@ enum _WizardRole { create, join, offline }
 /// - offline：密钥信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
 /// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {
-  const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride, this.authOverride, this.keyPairOverride});
+  const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride, this.authOverride, this.keyPairOverride, this.escrowOverride});
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -48,6 +48,9 @@ class SetupPage extends StatefulWidget {
   /// 测试注入：固定设备密钥对（golden 稳定性——名字步骤的密钥信息卡渲染公钥，
   /// 需确定性内容；生产传 null 则自动生成）。
   final DeviceKeyPair? keyPairOverride;
+
+  /// 测试注入：替换 escrow 服务（join 口令验证；fake 可模拟口令对/错/未托管）。
+  final KeyEscrowService Function(String server)? escrowOverride;
 
   @override
   State<SetupPage> createState() => _SetupPageState();
@@ -77,6 +80,7 @@ class _SetupPageState extends State<SetupPage> {
   DeviceKeyPair? _keyPair;
   Uint8List? _spaceKey;
   String? _sessionToken;
+  int _joinKeyVersion = 1; // join 口令验证时记录的 Space Key 版本（_verifyJoinPassphrase 填充）
   String? _status;
   bool _busy = false;
 
@@ -468,6 +472,13 @@ class _SetupPageState extends State<SetupPage> {
     if (_role == _WizardRole.join && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
       setState(() => _status = l10n.setupPageNeedPassphrase);
       return;
+    }
+    // join 口令页（步骤 3）：输入口令必须与首台设备创建时一致（解密 escrow
+    // 托管包成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
+    if (_role == _WizardRole.join && _step == 3) {
+      final verified = await _verifyJoinPassphrase();
+      if (!mounted) return;
+      if (!verified) return;
     }
     if (_role == _WizardRole.offline && _step == 1) {
       if (_envelopeKey.text.trim().isEmpty) {
@@ -1013,7 +1024,8 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardPassphraseHint, style: const TextStyle(fontSize: 14)),
+        Text(_role == _WizardRole.join ? l10n.wizardJoinPassphraseHint : l10n.wizardPassphraseHint,
+            style: const TextStyle(fontSize: 14)),
         const SizedBox(height: 12),
         TextField(
           controller: _escrowPassphrase,
@@ -1164,13 +1176,15 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 场景 B（join）：身份 → 邀请码 → 口令 → PIN → 完成 ----
 
   /// join：凭邀请码登记 → 认证 → 拉取口令托管包 → 口令解密出 Space Key → 设置 PIN → 完成。
-  Future<void> _runJoinAccess() async {
+  /// join 口令页（步骤 3）「验证接入口令」：登记 → 认证 → fetch escrow 托管包 →
+  /// 用输入口令解密——口令与首台设备创建时一致（解密成功）才放行进 PIN 步骤。
+  Future<bool> _verifyJoinPassphrase() async {
     final kp = _keyPair;
-    if (kp == null) return;
+    if (kp == null) return false;
     final passphrase = _escrowPassphrase.text.trim();
     if (passphrase.isEmpty) {
       setState(() => _status = AppLocalizations.of(context)!.setupPageNeedPassphrase);
-      return;
+      return false;
     }
     setState(() {
       _busy = true;
@@ -1185,55 +1199,68 @@ class _SetupPageState extends State<SetupPage> {
       // 2) 认证（用登记后的真实 deviceId）
       final session = await _authenticate(kp, enroll.deviceId);
       _sessionToken = session.sessionToken;
-      final escrow = KeyEscrowService(ApiClient(_server));
+      // 3) fetch 托管包并用输入口令解密：口令错 → FormatException → 不通过
+      final escrow = widget.escrowOverride?.call(_server) ?? KeyEscrowService(ApiClient(_server));
       final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
+      if (!mounted) return false;
       if (payload == null) {
-        if (!mounted) return;
         setState(() => _status = AppLocalizations.of(context)!.setupPageNoEscrow);
-        return;
+        return false;
       }
       _spaceKey = base64Decode(payload.spaceKeyB64);
       _spaceId.text = payload.spaceId;
-      if (!mounted) return;
-      // 3) 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
-      if (_pinSkipped) {
-        if (!mounted) return;
-        await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
-          server: _server,
-          spaceId: payload.spaceId,
-          deviceId: enroll.deviceId,
-          spaceKeyB64: payload.spaceKeyB64,
-          keyVersion: payload.keyVersion,
-          token: session.sessionToken,
-          escrowPassphrase: passphrase,
-        ));
-        setState(() {
-          _step = _stepCount; // join 完成页（第 6 步）
-          _status = null;
-        });
-        return;
-      }
-      final ok = await _setupLockAndEnter(
-        server: _server,
-        spaceId: payload.spaceId,
-        deviceId: enroll.deviceId,
-        spaceKeyB64: payload.spaceKeyB64,
-        keyVersion: payload.keyVersion,
-        token: session.sessionToken,
-        escrowPassphrase: passphrase,
-      );
-      if (!mounted) return;
-      if (ok) {
-        setState(() {
-          _step = _stepCount; // join 完成页（第 6 步）
-          _status = null;
-        });
-      }
+      _joinKeyVersion = payload.keyVersion;
+      return true;
+    } on FormatException {
+      if (!mounted) return false;
+      setState(() => _status = AppLocalizations.of(context)!.wizardJoinPassphraseWrong);
+      return false;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFailed('$e'));
+      return false;
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _runJoinAccess() async {
+    final kp = _keyPair;
+    if (kp == null) return;
+    // 口令已在口令页（步骤 3）验证通过（_verifyJoinPassphrase），这里仅设锁/完成
+    final passphrase = _escrowPassphrase.text.trim();
+    if (_pinSkipped) {
+      if (!mounted) return;
+      await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
+        server: _server,
+        spaceId: _spaceId.text,
+        deviceId: _enroll!.deviceId,
+        spaceKeyB64: base64Encode(_spaceKey!),
+        keyVersion: _joinKeyVersion,
+        token: _sessionToken!,
+        escrowPassphrase: passphrase,
+      ));
+      setState(() {
+        _step = _stepCount; // join 完成页
+        _status = null;
+      });
+      return;
+    }
+    final ok = await _setupLockAndEnter(
+      server: _server,
+      spaceId: _spaceId.text,
+      deviceId: _enroll!.deviceId,
+      spaceKeyB64: base64Encode(_spaceKey!),
+      keyVersion: _joinKeyVersion,
+      token: _sessionToken!,
+      escrowPassphrase: passphrase,
+    );
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        _step = _stepCount; // join 完成页
+        _status = null;
+      });
     }
   }
 

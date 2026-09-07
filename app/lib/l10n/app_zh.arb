@@ -127,6 +127,8 @@
   },
   "wizardEnrollFirst": "⚠️ 请先完成设备登记（点上方按钮）",
   "wizardPassphraseHint": "分享给您的伴侣，凭此口令才能查看你们的私密领地",
+  "wizardJoinPassphraseHint": "验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入",
+  "wizardJoinPassphraseWrong": "口令错误：请确认首台设备创建时设置的口令",
   "wizardSwitchToEnvelope": "改用密封密钥信封导入（离线）",
   "wizardSwitchToPassphrase": "切换到输入口令",
   "wizardPinHint": "每次启动需输入此 PIN 解锁",

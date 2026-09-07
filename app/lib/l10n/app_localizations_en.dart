@@ -320,6 +320,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your partner joins with this passphrase — share it via QR code on the next step.';
 
   @override
+  String get wizardJoinPassphraseHint =>
+      'Verify the entry passphrase: enter the exact passphrase the first device created to join';
+
+  @override
+  String get wizardJoinPassphraseWrong =>
+      'Wrong passphrase: check the exact one the first device created';
+
+  @override
   String get wizardSwitchToEnvelope =>
       'Import sealed key envelope instead (offline)';
 

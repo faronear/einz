@@ -127,6 +127,8 @@
   },
   "wizardEnrollFirst": "⚠️ Register the device first (tap the button above)",
   "wizardPassphraseHint": "Your partner joins with this passphrase — share it via QR code on the next step.",
+  "wizardJoinPassphraseHint": "Verify the entry passphrase: enter the exact passphrase the first device created to join",
+  "wizardJoinPassphraseWrong": "Wrong passphrase: check the exact one the first device created",
   "wizardSwitchToEnvelope": "Import sealed key envelope instead (offline)",
   "wizardSwitchToPassphrase": "Use passphrase instead",
   "wizardPinHint": "You'll enter this PIN at every startup to unlock.",

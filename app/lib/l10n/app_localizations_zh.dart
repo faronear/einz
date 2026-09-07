@@ -301,6 +301,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '分享给您的伴侣，凭此口令才能查看你们的私密领地';
 
   @override
+  String get wizardJoinPassphraseHint => '验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入';
+
+  @override
+  String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
+
+  @override
   String get wizardSwitchToEnvelope => '改用密封密钥信封导入（离线）';
 
   @override
