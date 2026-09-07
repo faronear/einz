@@ -27,10 +27,12 @@ class _FakeEscrow extends KeyEscrowService {
   }
 }
 
-/// 打开 join 向导并走到口令页（身份卡片自动进邀请码页 → 填邀请码 → 口令页）。
-Future<void> pumpToJoinPassphrase(
+/// 打开 join 向导并走到邀请码页（身份卡片自动进邀请码页）。
+/// enroll 可注入错误 fake（模拟无效邀请码）；默认成功登记。
+Future<void> pumpToJoinInvite(
   WidgetTester tester, {
-  required String correctPass,
+  Future<EnrollResult> Function(String? inviteCode)? enroll,
+  String correctPass = '正确口令-abc',
   EscrowPayload? payload,
 }) async {
   final db = LocalDatabase.forTesting(NativeDatabase.memory());
@@ -42,8 +44,9 @@ Future<void> pumpToJoinPassphrase(
     home: SetupPage(
       db: db,
       probeServer: (_) async => (true, const {'personA': 'Lukas'}),
-      enrollOverride: (_) async =>
-          const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
+      enrollOverride: enroll ??
+          (_) async =>
+              const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
       authOverride: (kp, id) async =>
           SessionResult(sessionToken: 'tok', spaceId: 'space-test', expiresIn: 3600),
       escrowOverride: (server) => _FakeEscrow(correctPass, payload),
@@ -52,12 +55,22 @@ Future<void> pumpToJoinPassphrase(
   await tester.pumpAndSettle();
   await tester.tap(find.textContaining('第一个用户（创建者）')); // 身份（自动进邀请码页）
   await tester.pumpAndSettle();
+}
+
+/// 走到口令页：邀请码页填码 → 下一步（验证邀请码）→ 口令页。
+Future<void> pumpToJoinPassphrase(
+  WidgetTester tester, {
+  required String correctPass,
+  EscrowPayload? payload,
+}) async {
+  await pumpToJoinInvite(tester, correctPass: correctPass, payload: payload);
   await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle();
-  // 口令页应为「验证」语义
+  // 口令页应为「验证」语义：标题与提示都是验证措辞
+  expect(find.text('验证接入口令'), findsOneWidget); // 标题
   expect(find.text('验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入'),
-      findsOneWidget);
+      findsOneWidget); // hint
 }
 
 void main() {
@@ -91,5 +104,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入'),
         findsOneWidget, reason: '未托管时停留口令页');
+  });
+
+  testWidgets('错误邀请码：提示无效并停留邀请码页（不进口令页）', (WidgetTester tester) async {
+    await pumpToJoinInvite(tester, enroll: (_) async => throw Exception('invite invalid'));
+    await tester.enterText(find.byType(TextField), '错误邀请码');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('邀请码无效'), findsOneWidget, reason: '无效码必须被拦截并提示');
+    expect(find.text('输入邀请码'), findsWidgets, reason: '应停留在邀请码页');
+    expect(find.text('验证接入口令'), findsNothing, reason: '不应进入口令页');
+  });
+
+  testWidgets('正确邀请码：放行到「验证接入口令」页', (WidgetTester tester) async {
+    await pumpToJoinInvite(tester); // 默认成功登记
+    await tester.enterText(find.byType(TextField), '正确邀请码');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('验证接入口令'), findsOneWidget, reason: '有效码应放行进口令页');
   });
 }

@@ -253,6 +253,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepPassphrase => '设置接入口令';
 
   @override
+  String get wizardStepJoinPassphrase => '验证接入口令';
+
+  @override
   String get wizardStepPin => '设置启动锁';
 
   @override
@@ -351,6 +354,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setupPageNeedInvite => '⚠️ 请填写一次性邀请码（由已认证设备生成）';
+
+  @override
+  String get wizardInviteWrong => '邀请码无效：请确认首台设备「邀请新设备加入」生成的邀请码，或让其重新生成一个';
 
   @override
   String get setupPageNoEscrow => '❌ Server 无口令托管包（请先在对端设置接入口令）';

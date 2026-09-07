@@ -390,7 +390,7 @@ class _SetupPageState extends State<SetupPage> {
         switch (_step) {
           case 1: return l10n.wizardStepIdentity;
           case 2: return l10n.wizardStepInvite;
-          case 3: return l10n.wizardStepPassphrase;
+          case 3: return l10n.wizardStepJoinPassphrase; // join 口令页：验证接入口令
           case 4: return l10n.wizardStepPin;
           default: return l10n.wizardStepDone;
         }
@@ -464,6 +464,13 @@ class _SetupPageState extends State<SetupPage> {
     if (_role == _WizardRole.join && _step == 2 && _inviteCode.text.trim().isEmpty) {
       setState(() => _status = l10n.setupPageNeedInvite);
       return;
+    }
+    // join 邀请码页（步骤 2）：邀请码必须有效（服务端登记成功）才放行——
+    // 与口令页一样即时验证，不留到口令页才登记/校验
+    if (_role == _WizardRole.join && _step == 2) {
+      final ok = await _verifyInviteCode();
+      if (!mounted) return;
+      if (!ok) return;
     }
     if (_role == _WizardRole.create && _step == 2 && _escrowPassphrase.text.trim().isEmpty) {
       setState(() => _status = l10n.setupPageNeedPassphrase);
@@ -1176,6 +1183,34 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 场景 B（join）：身份 → 邀请码 → 口令 → PIN → 完成 ----
 
   /// join：凭邀请码登记 → 认证 → 拉取口令托管包 → 口令解密出 Space Key → 设置 PIN → 完成。
+  /// join 邀请码页（步骤 2）「验证邀请码」：凭码登记（服务端校验，无效码抛错）
+  /// ——登记成功（= 邀请码有效）才放行到口令页，错误码提示并停留本页。
+  Future<bool> _verifyInviteCode() async {
+    final kp = _keyPair;
+    if (kp == null) return false;
+    final code = _inviteCode.text.trim();
+    if (code.isEmpty) {
+      setState(() => _status = AppLocalizations.of(context)!.setupPageNeedInvite);
+      return false;
+    }
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    try {
+      if (_enroll == null) {
+        await _enrollDevice(code);
+      }
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() => _status = AppLocalizations.of(context)!.wizardInviteWrong);
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   /// join 口令页（步骤 3）「验证接入口令」：登记 → 认证 → fetch escrow 托管包 →
   /// 用输入口令解密——口令与首台设备创建时一致（解密成功）才放行进 PIN 步骤。
   Future<bool> _verifyJoinPassphrase() async {

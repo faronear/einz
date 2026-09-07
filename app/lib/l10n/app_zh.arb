@@ -102,6 +102,7 @@
   "wizardStepInvite": "输入邀请码",
   "wizardStepEnroll": "登记设备",
   "wizardStepPassphrase": "设置接入口令",
+  "wizardStepJoinPassphrase": "验证接入口令",
   "wizardStepPin": "设置启动锁",
   "wizardStepJoin": "加入空间",
   "wizardStepEnvelope": "导入密钥信封",
@@ -153,6 +154,7 @@
   "setupPageInviteLabel": "邀请码（一次性）",
   "setupPageInviteHint": "扫码后自动填入；手动加入时粘贴对方提供的一次性邀请码",
   "setupPageNeedInvite": "⚠️ 请填写一次性邀请码（由已认证设备生成）",
+  "wizardInviteWrong": "邀请码无效：请确认首台设备「邀请新设备加入」生成的邀请码，或让其重新生成一个",
   "setupPageNoEscrow": "❌ Server 无口令托管包（请先在对端设置接入口令）",
   "setupPageEscrowFailed": "❌ 口令接入失败: {error}",
   "@setupPageEscrowFailed": {
