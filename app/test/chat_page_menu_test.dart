@@ -59,6 +59,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
+    // 抬头为品牌名+slogan（不显示空间 ID）；enableWs:false → 红绿灯显示离线
+    expect(find.text('EINZ 私密领地'), findsOneWidget);
+    expect(find.text('离线'), findsOneWidget);
+
     // 打开顶栏菜单
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();

@@ -345,6 +345,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardDoneText => '✅ Setup complete!';
 
   @override
+  String get welcomeDialogTitleCreate => '🎉 Welcome to your private space';
+
+  @override
+  String get welcomeDialogTitleJoin => '🎉 Welcome to the space';
+
+  @override
+  String get welcomeDialogMessage =>
+      'All set! Messages are end-to-end encrypted and visible only to you two. Start chatting!';
+
+  @override
+  String get welcomeDialogStart => 'Start chatting';
+
+  @override
   String get wizardJoinHint =>
       'Scan your partner\'s QR code (it carries the invite code & passphrase) to join in one tap; you can also paste the text or fill in the fields below.';
 
@@ -457,6 +470,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMenuExport => 'Export full backup';
+
+  @override
+  String get chatPageTitleBrand => 'EINZ Private Space';
+
+  @override
+  String get chatPageStatusOnline => 'Online';
+
+  @override
+  String get chatPageStatusOffline => 'Offline';
 
   @override
   String get chatPageMenuChangePassphrase => 'Change passphrase';

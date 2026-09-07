@@ -322,6 +322,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDoneText => '✅ 设置完成！';
 
   @override
+  String get welcomeDialogTitleCreate => '🎉 欢迎创建专属空间';
+
+  @override
+  String get welcomeDialogTitleJoin => '🎉 欢迎加入空间';
+
+  @override
+  String get welcomeDialogMessage => '一切就绪！消息端到端加密，只有你们两人能看，开始聊天吧。';
+
+  @override
+  String get welcomeDialogStart => '开始聊天';
+
+  @override
   String get wizardJoinHint => '扫描对方的二维码（含邀请码与口令）即可一键加入；也可粘贴文本或手动填写下方信息';
 
   @override
@@ -424,6 +436,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageMenuExport => '导出完整备份';
+
+  @override
+  String get chatPageTitleBrand => 'EINZ 私密领地';
+
+  @override
+  String get chatPageStatusOnline => '在线';
+
+  @override
+  String get chatPageStatusOffline => '离线';
 
   @override
   String get chatPageMenuChangePassphrase => '修改口令';

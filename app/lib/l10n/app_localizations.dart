@@ -680,6 +680,30 @@ abstract class AppLocalizations {
   /// **'✅ Setup complete!'**
   String get wizardDoneText;
 
+  /// No description provided for @welcomeDialogTitleCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'🎉 Welcome to your private space'**
+  String get welcomeDialogTitleCreate;
+
+  /// No description provided for @welcomeDialogTitleJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'🎉 Welcome to the space'**
+  String get welcomeDialogTitleJoin;
+
+  /// No description provided for @welcomeDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'All set! Messages are end-to-end encrypted and visible only to you two. Start chatting!'**
+  String get welcomeDialogMessage;
+
+  /// No description provided for @welcomeDialogStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start chatting'**
+  String get welcomeDialogStart;
+
   /// No description provided for @wizardJoinHint.
   ///
   /// In en, this message translates to:
@@ -859,6 +883,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export full backup'**
   String get chatPageMenuExport;
+
+  /// No description provided for @chatPageTitleBrand.
+  ///
+  /// In en, this message translates to:
+  /// **'EINZ Private Space'**
+  String get chatPageTitleBrand;
+
+  /// No description provided for @chatPageStatusOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get chatPageStatusOnline;
+
+  /// No description provided for @chatPageStatusOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get chatPageStatusOffline;
 
   /// No description provided for @chatPageMenuChangePassphrase.
   ///

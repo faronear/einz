@@ -279,6 +279,23 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));
   });
 
+  testWidgets('向导完成：弹出欢迎对话框（欢迎词 + 唯一「开始聊天」按钮）', (WidgetTester tester) async {
+    _usePhoneSize(tester);
+    await pumpSetup(tester, enroll: fakeEnroll, auth: fakeAuth);
+    await tester.tap(find.text('下一步')); // 名字 → 自动登记 → 口令
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '123456'); // 口令
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('跳过')); // 完成 → 欢迎对话框自动弹出
+    await tester.pumpAndSettle();
+    expect(find.text('🎉 欢迎创建专属空间'), findsOneWidget); // 对话框标题（create）
+    expect(find.text('一切就绪！消息端到端加密，只有你们两人能看，开始聊天吧。'), findsOneWidget);
+    expect(find.text('开始聊天'), findsOneWidget); // 唯一按钮（点外面不关闭）
+  });
+
   // ---- join（后续设备：探测到 personA → 身份 → 邀请码 → …）----
 
   testWidgets('golden: 向导1.2.1-身份选择步骤（join）', (WidgetTester tester) async {

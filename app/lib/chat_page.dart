@@ -203,6 +203,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void _onWsStatusChanged() {
     final online = _ws?.connected.value ?? false;
     _restartTicker(online ? const Duration(seconds: 30) : const Duration(seconds: 3));
+    if (mounted) setState(() {}); // 刷新标题红绿灯（在线绿/离线红）
   }
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
@@ -983,7 +984,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Einz · ${widget.spaceId}'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 抬头只显示品牌名+slogan（不暴露空间 ID，对普通用户无意义）
+            Text(l10n.chatPageTitleBrand, style: const TextStyle(fontSize: 17)),
+            // 红绿灯：WS 实时连接状态（绿=在线 / 红=离线），断线自动重连
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.circle, size: 10,
+                    color: (_ws?.connected.value ?? false) ? Colors.green : Colors.red),
+                const SizedBox(width: 4),
+                Text((_ws?.connected.value ?? false)
+                        ? l10n.chatPageStatusOnline
+                        : l10n.chatPageStatusOffline,
+                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              ],
+            ),
+          ],
+        ),
         actions: [
           // 顶栏统一入口：语言/阅后即焚/邀请码/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(

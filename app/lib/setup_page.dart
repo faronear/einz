@@ -1140,10 +1140,7 @@ class _SetupPageState extends State<SetupPage> {
           token: token,
           escrowPassphrase: pass,
         ));
-        setState(() {
-          _step = _stepCount; // create 完成页（新编号 4）
-          _status = null;
-        });
+        _completeWizard();
         return;
       }
       final ok = await _setupLockAndEnter(
@@ -1157,10 +1154,7 @@ class _SetupPageState extends State<SetupPage> {
       );
       if (!mounted) return;
       if (ok) {
-        setState(() {
-          _step = _stepCount; // create 完成页（新编号 4）
-          _status = null;
-        });
+        _completeWizard();
       }
     } catch (e) {
       if (!mounted) return;
@@ -1171,6 +1165,42 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 完成页（create/join/offline 共用）：底部"完成"按钮 → _finish 进聊天页。
+  /// 向导完成：推进到完成步骤并弹出欢迎对话框（唯一「开始聊天」按钮 → 消息流页）。
+  void _completeWizard() {
+    setState(() {
+      _step = _stepCount;
+      _status = null;
+    });
+    // 下一帧弹窗（等 done 步骤渲染完成再盖对话框）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showWelcomeDialog();
+    });
+  }
+
+  /// 完成弹窗：致欢迎词，唯一「开始聊天」按钮（点外面不关闭）→ 进入消息流页。
+  Future<void> _showWelcomeDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final isCreate = _role == _WizardRole.create;
+    final start = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // 只有一个按钮：开始聊天
+      builder: (ctx) => AlertDialog(
+        title: Text(isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
+        content: Text(l10n.welcomeDialogMessage),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.welcomeDialogStart),
+          ),
+        ],
+      ),
+    );
+    if (start == true && mounted) {
+      _finish(); // 进入消息流页面
+    }
+  }
+
+  /// 向导完成页（done 步骤）：被欢迎对话框盖住，仅作为弹窗背后的内容兜底。
   Widget _buildStepDone() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -1279,10 +1309,7 @@ class _SetupPageState extends State<SetupPage> {
         token: _sessionToken!,
         escrowPassphrase: passphrase,
       ));
-      setState(() {
-        _step = _stepCount; // join 完成页
-        _status = null;
-      });
+      _completeWizard();
       return;
     }
     final ok = await _setupLockAndEnter(
@@ -1296,10 +1323,7 @@ class _SetupPageState extends State<SetupPage> {
     );
     if (!mounted) return;
     if (ok) {
-      setState(() {
-        _step = _stepCount; // join 完成页
-        _status = null;
-      });
+      _completeWizard();
     }
   }
 
@@ -1407,10 +1431,7 @@ class _SetupPageState extends State<SetupPage> {
         keyVersion: 1,
         token: _sessionToken!,
       ));
-      setState(() {
-        _step = _stepCount; // offline 完成页（新编号 3）
-        _status = null;
-      });
+      _completeWizard();
       return;
     }
     final ok = await _setupLockAndEnter(
@@ -1423,10 +1444,7 @@ class _SetupPageState extends State<SetupPage> {
     );
     if (!mounted) return;
     if (ok) {
-      setState(() {
-        _step = _stepCount; // offline 完成页（新编号 3）
-        _status = null;
-      });
+      _completeWizard();
     }
   }
 }
