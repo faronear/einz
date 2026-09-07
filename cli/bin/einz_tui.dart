@@ -276,18 +276,31 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
 Future<void> _unlockPin(ChatSession session) async {
   final hash = session.store.pinHash;
   if (hash == null) return; // 未设置：直接进入
+  // 解锁在 main 中提前于输入循环（_runInputLoop）——不能走 _prompt
+  // （completer 由输入循环 complete，此时尚未启动会永久挂起——老板实测
+  // "提示后直接退出"）：改为同步读行（明文 echo；可输入 /exit 退出）
   while (_state!.running) {
-    // 明文输入（不星号遮挡）：解锁时仍可输入 /exit 退出，需看到实际内容
-    final pin = await _prompt(session, '❓ 请输入 PIN 解锁:', hidden: false, required: true);
+    session.messages.add(_systemMessage(session, '❓ 请输入 PIN 解锁:'));
+    _render(); // 同步渲染提示（_scheduleRender 异步——readLineSync 阻塞期间不会执行）
+    final line = stdin.readLineSync();
+    if (line == null) {
+      _state!.running = false; // EOF（终端关闭/重定向）：退出
+      return;
+    }
+    final pin = line.trim();
+    if (pin == '/exit' || pin == '/quit') {
+      _state!.running = false;
+      return;
+    }
     if (!_state!.running) return;
     // argon2id str 哈希自含盐：strVerify 返回错误消息（空 = 验证通过）
     if (await _verifyPin(hash, pin)) {
       session.messages.add(_systemMessage(session, '✅ PIN 验证通过'));
-      _scheduleRender();
+      _render();
       return;
     }
     session.messages.add(_systemMessage(session, '⚠️ PIN 错误，请重新输入（/exit 可退出）'));
-    _scheduleRender();
+    _render();
   }
 }
 
