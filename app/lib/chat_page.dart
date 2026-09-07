@@ -1619,6 +1619,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       title: Text(l10n.chatPageSetLockTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start, // 小字/输入框与大标题左对齐（老板要求）
         children: [
           // 提示：可留空直接提交，即可清空 PIN（大标题下、输入框上方——老板要求）
           Text(
