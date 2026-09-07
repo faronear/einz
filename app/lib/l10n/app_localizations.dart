@@ -818,6 +818,66 @@ abstract class AppLocalizations {
   /// **'Export full backup'**
   String get chatPageMenuExport;
 
+  /// No description provided for @chatPageMenuChangePassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Change passphrase'**
+  String get chatPageMenuChangePassphrase;
+
+  /// No description provided for @chatPageChangePassphraseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change passphrase'**
+  String get chatPageChangePassphraseTitle;
+
+  /// No description provided for @chatPageChangePassphraseOldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current passphrase'**
+  String get chatPageChangePassphraseOldLabel;
+
+  /// No description provided for @chatPageChangePassphraseNewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New passphrase'**
+  String get chatPageChangePassphraseNewLabel;
+
+  /// No description provided for @chatPageChangePassphraseConfirmLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm new passphrase'**
+  String get chatPageChangePassphraseConfirmLabel;
+
+  /// No description provided for @chatPageChangePassphraseMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'New passphrases do not match'**
+  String get chatPageChangePassphraseMismatch;
+
+  /// No description provided for @chatPageChangePassphraseOldWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong current passphrase'**
+  String get chatPageChangePassphraseOldWrong;
+
+  /// No description provided for @chatPageChangePassphraseNoEscrow.
+  ///
+  /// In en, this message translates to:
+  /// **'No passphrase set (nothing to change)'**
+  String get chatPageChangePassphraseNoEscrow;
+
+  /// No description provided for @chatPageChangePassphraseDone.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Passphrase updated (new devices must use it)'**
+  String get chatPageChangePassphraseDone;
+
+  /// No description provided for @chatPageChangePassphraseFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to change passphrase: {error}'**
+  String chatPageChangePassphraseFailed(String error);
+
   /// No description provided for @chatPageExportTitle.
   ///
   /// In en, this message translates to:

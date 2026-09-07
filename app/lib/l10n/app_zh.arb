@@ -182,6 +182,21 @@
   },
   "chatPageMenuInvite": "邀请码",
   "chatPageMenuExport": "导出完整备份",
+  "chatPageMenuChangePassphrase": "修改口令",
+  "chatPageChangePassphraseTitle": "修改口令",
+  "chatPageChangePassphraseOldLabel": "旧口令",
+  "chatPageChangePassphraseNewLabel": "新口令",
+  "chatPageChangePassphraseConfirmLabel": "确认新口令",
+  "chatPageChangePassphraseMismatch": "两次输入的新口令不一致",
+  "chatPageChangePassphraseOldWrong": "旧口令错误",
+  "chatPageChangePassphraseNoEscrow": "尚未设置口令（无托管包可修改）",
+  "chatPageChangePassphraseDone": "✅ 口令已修改（新设备加入时请使用新口令）",
+  "chatPageChangePassphraseFailed": "修改口令失败: {error}",
+  "@chatPageChangePassphraseFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "chatPageExportTitle": "导出完整备份（归档）",
   "chatPageExportPassphraseLabel": "归档口令（加密归档文件；请与归档文本分开保管）",
   "chatPageExportGenerate": "生成归档",

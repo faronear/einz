@@ -355,6 +355,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 修改口令（escrow 托管口令，空间级）：旧口令验证 → 新口令重加密上传 → 本地同步。
+  Future<void> _showChangePassphraseDialog() async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ChangePassphraseDialog(
+        server: widget.server,
+        spaceKeyB64: base64Encode(widget.spaceKey),
+        spaceId: widget.spaceId,
+        keyVersion: widget.keyVersion,
+        token: widget.token,
+        db: widget.db ?? LocalDatabase(),
+      ),
+    );
+    if (changed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context)!.chatPageChangePassphraseDone)));
+    }
+  }
+
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
   Future<void> _showBurnPicker() async {
     final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
@@ -988,6 +1007,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _showSetLockDialog();
                   case 'export':
                     _showExportBackupDialog();
+                  case 'passphrase':
+                    _showChangePassphraseDialog();
                 }
               });
             },
@@ -1009,6 +1030,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   child: Text(_hasPin ? l10n.chatPagePinSet : l10n.chatPagePinUnset),
                 ),
                 PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
+                PopupMenuItem(value: 'passphrase', child: Text(l10n.chatPageMenuChangePassphrase)),
               ];
             },
           ),
@@ -1332,4 +1354,154 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
       ],
     );
   }
+}
+
+/// 修改口令弹窗（StatefulWidget）：旧口令验证（fetch 托管包解密）→
+/// 新口令重加密上传（含新 argon2id 哈希）→ 本地明文 payload 同步更新。
+class _ChangePassphraseDialog extends StatefulWidget {
+  const _ChangePassphraseDialog({
+    required this.server,
+    required this.spaceKeyB64,
+    required this.spaceId,
+    required this.keyVersion,
+    required this.token,
+    required this.db,
+  });
+
+  final String server;
+  final String spaceKeyB64;
+  final String spaceId;
+  final int keyVersion;
+  final String token;
+  final LocalDatabase db;
+
+  @override
+  State<_ChangePassphraseDialog> createState() => _ChangePassphraseDialogState();
+}
+
+class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
+  final _oldCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _oldCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
+    final oldPass = _oldCtrl.text.trim();
+    final newPass = _newCtrl.text.trim();
+    final confirm = _confirmCtrl.text.trim();
+    if (newPass.isEmpty) {
+      setState(() => _error = l10n.setupPageNeedPassphrase);
+      return;
+    }
+    if (newPass != confirm) {
+      setState(() => _error = l10n.chatPageChangePassphraseMismatch);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final api = ApiClient(widget.server);
+      final escrow = KeyEscrowService(api);
+      // 1) 验证旧口令：必须能解开服务器当前托管包
+      final file = await api.getKeyEscrow(widget.token);
+      if (file == null) {
+        throw const _NoEscrowException();
+      }
+      try {
+        await escrow.openPackage(passphrase: oldPass, file: file);
+      } on FormatException {
+        if (!mounted) return;
+        setState(() => _error = l10n.chatPageChangePassphraseOldWrong);
+        return;
+      }
+      // 2) 新口令重加密 + 上传（含新哈希）
+      await escrow.upload(
+        passphrase: newPass,
+        spaceKeyB64: widget.spaceKeyB64,
+        spaceId: widget.spaceId,
+        keyVersion: widget.keyVersion,
+        token: widget.token,
+      );
+      // 3) 本地明文 payload 同步（跳过 PIN 场景；设 PIN 场景由 _syncEscrow 保护）
+      await AppLockService(widget.db).updateEscrowPassphrase(newPass);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on _NoEscrowException {
+      if (!mounted) return;
+      setState(() => _error = l10n.chatPageChangePassphraseNoEscrow);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = l10n.chatPageChangePassphraseFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.chatPageChangePassphraseTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _oldCtrl,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: l10n.chatPageChangePassphraseOldLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _newCtrl,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: l10n.chatPageChangePassphraseNewLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _confirmCtrl,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: l10n.chatPageChangePassphraseConfirmLabel,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
+        FilledButton(
+          onPressed: _busy ? null : _submit,
+          child: Text(l10n.chatPageChangePassphraseTitle),
+        ),
+      ],
+    );
+  }
+}
+
+/// 尚未托管口令（服务器无 escrow 包）。
+class _NoEscrowException implements Exception {
+  const _NoEscrowException();
 }

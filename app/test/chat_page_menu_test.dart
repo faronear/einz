@@ -62,8 +62,9 @@ void main() {
     // 打开顶栏菜单
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    // 菜单应包含各功能项（含「导出完整备份」）
+    // 菜单应包含各功能项（含「导出完整备份」与「修改口令」）
     expect(find.text('导出完整备份'), findsOneWidget);
+    expect(find.text('修改口令'), findsOneWidget);
     expect(find.text('PIN: 未设置'), findsOneWidget);
     // 点"PIN: 未设置"菜单项
     await tester.tap(find.text('PIN: 未设置'));

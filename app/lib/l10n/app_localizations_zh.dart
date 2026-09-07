@@ -403,6 +403,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuExport => '导出完整备份';
 
   @override
+  String get chatPageMenuChangePassphrase => '修改口令';
+
+  @override
+  String get chatPageChangePassphraseTitle => '修改口令';
+
+  @override
+  String get chatPageChangePassphraseOldLabel => '旧口令';
+
+  @override
+  String get chatPageChangePassphraseNewLabel => '新口令';
+
+  @override
+  String get chatPageChangePassphraseConfirmLabel => '确认新口令';
+
+  @override
+  String get chatPageChangePassphraseMismatch => '两次输入的新口令不一致';
+
+  @override
+  String get chatPageChangePassphraseOldWrong => '旧口令错误';
+
+  @override
+  String get chatPageChangePassphraseNoEscrow => '尚未设置口令（无托管包可修改）';
+
+  @override
+  String get chatPageChangePassphraseDone => '✅ 口令已修改（新设备加入时请使用新口令）';
+
+  @override
+  String chatPageChangePassphraseFailed(String error) {
+    return '修改口令失败: $error';
+  }
+
+  @override
   String get chatPageExportTitle => '导出完整备份（归档）';
 
   @override

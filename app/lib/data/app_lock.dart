@@ -65,6 +65,23 @@ class AppLockService {
         .go();
   }
 
+  /// 修改 escrow 口令后同步本地明文配置（跳过 PIN 场景）。
+  /// 设 PIN 场景（加密包）因无 PIN 可用不动锁包——由 lock_page._syncEscrow
+  /// 的上传前口令验证保护，防止旧口令覆盖新托管包。
+  Future<void> updateEscrowPassphrase(String passphrase) async {
+    final plain = await loadPlain();
+    if (plain == null) return;
+    await savePlain(AppLockPayload(
+      server: plain.server,
+      spaceKeyB64: plain.spaceKeyB64,
+      spaceId: plain.spaceId,
+      deviceId: plain.deviceId,
+      keyVersion: plain.keyVersion,
+      token: plain.token,
+      escrowPassphrase: passphrase,
+    ));
+  }
+
   /// 设置 PIN 并加密保存 Space Key 包（老板决策：不再生成 12 词恢复码）。
   /// 注意：PIN 丢失则本设备 Space Key 包无法解密（无恢复副本，纯本地）。
   Future<void> setPin(String pin, {required AppLockPayload payload}) async {

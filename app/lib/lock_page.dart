@@ -83,7 +83,18 @@ class _LockPageState extends State<LockPage> {
     if (pass == null || pass.isEmpty || token == null || token.isEmpty) return;
     unawaited(() async {
       try {
-        final escrow = KeyEscrowService(ApiClient(payload.server));
+        final api = ApiClient(payload.server);
+        final escrow = KeyEscrowService(api);
+        // 上传前校验：本地口令必须能解开服务器当前托管包，否则跳过重传——
+        // 口令已修改但本机锁包未同步时，防止旧口令覆盖新托管包
+        final current = await api.getKeyEscrow(token);
+        if (current != null) {
+          try {
+            await escrow.openPackage(passphrase: pass, file: current);
+          } on FormatException {
+            return; // 本地口令与服务器包不匹配：不覆盖
+          }
+        }
         await escrow.upload(
           passphrase: pass,
           spaceKeyB64: payload.spaceKeyB64,

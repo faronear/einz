@@ -1396,6 +1396,10 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
+        '/passphrase :: 修改内容密保口令',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
         '/invite :: 生成邀请码，邀请新设备加入领地',
       ));
       s.session.messages.add(_systemMessage(
@@ -1484,6 +1488,14 @@ Future<void> _execCommand(String line) async {
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
           s.session, '❓ 请输入内容密保口令，即可解密您的私密领地内容'));
+      break;
+    case '/passphrase':
+      // 修改内容密保口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
+      if (s.session.store.spaceKey == null || s.session.store.sessionToken == null) {
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 请先 /auth 激活线路、/space 接入领地后再修改口令'));
+        break;
+      }
+      await _changeEscrowPassphrase(s.session.store, s.session);
       break;
     case '/sync':
       try {
@@ -1816,6 +1828,65 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       session.messages.add(_systemMessage(session, '⚠️ 恢复失败: $e，请重试（或输 q 取消）'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
+    }
+  }
+}
+
+/// 修改托管口令（/passphrase）：旧口令验证（fetch 托管包解密）→
+/// 新口令重加密上传（含新 argon2id 哈希）。口令输入不回显（hidden）。
+Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) async {
+  final api = ApiClient(session.server);
+  final escrow = KeyEscrowService(api);
+  // 1) 旧口令验证：必须能解开服务器当前托管包
+  while (true) {
+    if (!_state!.running) return; // 已退出
+    final oldPass = await _prompt(session, '❓ 请输入当前内容密保口令（用于验证）：', hidden: true, required: true);
+    if (oldPass.isEmpty) continue;
+    try {
+      final file = await api.getKeyEscrow(store.sessionToken!);
+      if (file == null) {
+        session.messages.add(_systemMessage(session, '⚠️ 尚未设置托管口令，无需修改（/space 可查看接入状态）'));
+        return;
+      }
+      try {
+        await escrow.openPackage(passphrase: oldPass, file: file);
+      } on FormatException {
+        session.messages.add(_systemMessage(session, '⚠️ 旧口令错误，请重新输入（或 /exit 退出）'));
+        continue;
+      }
+      break; // 旧口令验证通过
+    } catch (e) {
+      session.messages.add(_systemMessage(session, '⚠️ 读取托管包失败: $e，请稍后再试'));
+      return;
+    }
+  }
+  // 2) 新口令（两次输入一致）
+  while (true) {
+    if (!_state!.running) return;
+    final p1 = await _prompt(session, '❓ 请输入新内容密保口令（务必牢记，严禁泄漏！）：', hidden: true, required: true);
+    if (p1.isEmpty) continue;
+    final p2 = await _prompt(session, '❓ 请再次输入新口令确认：', hidden: true, required: true);
+    if (p1 != p2) {
+      session.messages.add(_systemMessage(session, '⚠️ 两次输入不一致，请重新设置'));
+      continue;
+    }
+    // 3) 新口令重加密上传（含新哈希；_busy 期间禁止输入）
+    try {
+      await _busy(session, '⏳ 正在用新口令重新加密托管包......', () async {
+        await escrow.upload(
+          passphrase: p1,
+          spaceKeyB64: store.spaceKey!,
+          spaceId: store.spaceId!,
+          keyVersion: store.keyVersion,
+          token: store.sessionToken!,
+        );
+      });
+      session.messages.add(_systemMessage(session, '✅ 口令已修改（新设备加入时请使用新口令）'));
+      _scheduleRender();
+      return;
+    } catch (e) {
+      session.messages.add(_systemMessage(session, '⚠️ 修改口令失败: $e，请稍后再试'));
+      return;
     }
   }
 }

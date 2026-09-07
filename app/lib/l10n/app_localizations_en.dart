@@ -432,6 +432,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuExport => 'Export full backup';
 
   @override
+  String get chatPageMenuChangePassphrase => 'Change passphrase';
+
+  @override
+  String get chatPageChangePassphraseTitle => 'Change passphrase';
+
+  @override
+  String get chatPageChangePassphraseOldLabel => 'Current passphrase';
+
+  @override
+  String get chatPageChangePassphraseNewLabel => 'New passphrase';
+
+  @override
+  String get chatPageChangePassphraseConfirmLabel => 'Confirm new passphrase';
+
+  @override
+  String get chatPageChangePassphraseMismatch => 'New passphrases do not match';
+
+  @override
+  String get chatPageChangePassphraseOldWrong => 'Wrong current passphrase';
+
+  @override
+  String get chatPageChangePassphraseNoEscrow =>
+      'No passphrase set (nothing to change)';
+
+  @override
+  String get chatPageChangePassphraseDone =>
+      '✅ Passphrase updated (new devices must use it)';
+
+  @override
+  String chatPageChangePassphraseFailed(String error) {
+    return 'Failed to change passphrase: $error';
+  }
+
+  @override
   String get chatPageExportTitle => 'Export full backup (archive)';
 
   @override

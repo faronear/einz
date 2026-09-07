@@ -182,6 +182,21 @@
   },
   "chatPageMenuInvite": "Invite code",
   "chatPageMenuExport": "Export full backup",
+  "chatPageMenuChangePassphrase": "Change passphrase",
+  "chatPageChangePassphraseTitle": "Change passphrase",
+  "chatPageChangePassphraseOldLabel": "Current passphrase",
+  "chatPageChangePassphraseNewLabel": "New passphrase",
+  "chatPageChangePassphraseConfirmLabel": "Confirm new passphrase",
+  "chatPageChangePassphraseMismatch": "New passphrases do not match",
+  "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
+  "chatPageChangePassphraseNoEscrow": "No passphrase set (nothing to change)",
+  "chatPageChangePassphraseDone": "✅ Passphrase updated (new devices must use it)",
+  "chatPageChangePassphraseFailed": "Failed to change passphrase: {error}",
+  "@chatPageChangePassphraseFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "chatPageExportTitle": "Export full backup (archive)",
   "chatPageExportPassphraseLabel": "Archive passphrase (encrypts the archive; keep it separate from the text)",
   "chatPageExportGenerate": "Generate archive",
