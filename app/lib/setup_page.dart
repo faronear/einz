@@ -1257,8 +1257,27 @@ class _SetupPageState extends State<SetupPage> {
         ),
         // 邀请码已在 join 步骤 2 提供（offline 从 join 口令页切换进入时沿用
         // 已填邀请码登记），此页不再重复显示输入框
+        const SizedBox(height: 16),
+        // 与口令页的「改用密封密钥信封导入」对称：口令/信封是平行方案可互切；
+        // 切回口令页保留已输入的口令与邀请码，任一完成都进入 PIN 步骤
+        TextButton.icon(
+          onPressed: _switchToPassphrase,
+          icon: const Icon(Icons.password, size: 18),
+          label: Text(l10n.wizardSwitchToPassphrase),
+        ),
       ],
     );
+  }
+
+  /// 从密钥信封页切回「验证口令」页（join 步骤 3）。
+  /// 不能用 _selectRole（它会重置 _step=1 回身份页）；直接切角色+步骤，
+  /// 已输入的邀请码/口令保留，任一方案完成都进入 PIN 步骤。
+  void _switchToPassphrase() {
+    setState(() {
+      _role = _WizardRole.join;
+      _step = 3; // join 口令页
+      _status = null;
+    });
   }
 
   /// offline：解封密钥信封 → 认证 → 设置 PIN → 完成步骤。

@@ -304,6 +304,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToEnvelope => '改用密封密钥信封导入（离线）';
 
   @override
+  String get wizardSwitchToPassphrase => '切换到输入口令';
+
+  @override
   String get wizardPinHint => '每次启动需输入此 PIN 解锁';
 
   @override

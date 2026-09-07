@@ -324,6 +324,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Import sealed key envelope instead (offline)';
 
   @override
+  String get wizardSwitchToPassphrase => 'Use passphrase instead';
+
+  @override
   String get wizardPinHint =>
       'You\'ll enter this PIN at every startup to unlock.';
 

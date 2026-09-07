@@ -644,6 +644,12 @@ abstract class AppLocalizations {
   /// **'Import sealed key envelope instead (offline)'**
   String get wizardSwitchToEnvelope;
 
+  /// No description provided for @wizardSwitchToPassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Use passphrase instead'**
+  String get wizardSwitchToPassphrase;
+
   /// No description provided for @wizardPinHint.
   ///
   /// In en, this message translates to:

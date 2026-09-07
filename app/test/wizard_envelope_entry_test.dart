@@ -60,4 +60,18 @@ void main() {
     expect(find.text('改用密封密钥信封导入（离线）'), findsOneWidget,
         reason: 'join 用户可用对端导出的信封替代口令获取 Space Key');
   });
+
+  testWidgets('口令页 ↔ 信封页可互切（任一完成都进 PIN）', (WidgetTester tester) async {
+    await pumpToPassphrase(tester, probeNames: const {'personA': 'Lukas'}, join: true);
+    // 口令页 → 切换入口 → 信封页（信封页有对称的「切换到输入口令」链接）
+    await tester.tap(find.text('改用密封密钥信封导入（离线）'));
+    await tester.pumpAndSettle();
+    expect(find.text('切换到输入口令'), findsOneWidget,
+        reason: '信封页应提供切回口令页的对称链接（后悔可返回）');
+    // 信封页 → 切回口令页（保留已输邀请码/口令，任一方案完成都进 PIN）
+    await tester.tap(find.text('切换到输入口令'));
+    await tester.pumpAndSettle();
+    expect(find.text('改用密封密钥信封导入（离线）'), findsOneWidget,
+        reason: '应回到口令页，两个平行方案可自由互切');
+  });
 }
