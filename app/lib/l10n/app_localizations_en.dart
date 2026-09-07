@@ -554,7 +554,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageExitMessage =>
-      'You\'ll return to the lock screen and need your PIN to unlock and re-authenticate.';
+      'The app will close completely; you\'ll need your PIN to unlock next time.';
 
   @override
   String get save => 'Save';
@@ -756,6 +756,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lockPagePinLabel => 'PIN';
+
+  @override
+  String get lockPageNoPinSet =>
+      'No app lock set (the lock screen only activates when a PIN is set)';
 
   @override
   String get lockPageUnlock => 'Unlock';

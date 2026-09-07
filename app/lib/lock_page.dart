@@ -33,11 +33,17 @@ class _LockPageState extends State<LockPage> {
   String? _error;
   int _lockSeconds = 0;
   Timer? _ticker;
+  bool _noLock = false; // 未设置 PIN（无锁包）：锁屏不激活
 
   @override
   void initState() {
     super.initState();
     _lock = AppLockService(widget.db ?? LocalDatabase());
+    // 锁屏仅在设置过 PIN（有锁包）时激活：无锁包（向导跳过 PIN 的明文配置）
+    // 不显示解锁表单，避免"无法解锁、跳不出去"的死锁
+    _lock.isSetup.then((ok) {
+      if (mounted && !ok) setState(() => _noLock = true);
+    });
     _refreshLockSeconds();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _refreshLockSeconds());
   }
@@ -136,6 +142,25 @@ class _LockPageState extends State<LockPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    // 未设置 PIN（无锁包）：锁屏不激活——提示原因，不显示解锁表单
+    if (_noLock) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.lockPageTitle)),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.lock_open, size: 56),
+              const SizedBox(height: 12),
+              Text(l10n.lockPageNoPinSet,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16)),
+            ],
+          ),
+        ),
+      );
+    }
     final locked = _lockSeconds > 0;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.lockPageTitle)),

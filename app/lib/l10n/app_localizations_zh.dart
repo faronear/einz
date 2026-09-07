@@ -518,7 +518,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageExitTitle => '退出应用？';
 
   @override
-  String get chatPageExitMessage => '将回到锁屏，下次需输入 PIN 解锁并重新认证。';
+  String get chatPageExitMessage => '将彻底关闭应用，下次启动需输入 PIN 解锁。';
 
   @override
   String get save => '保存';
@@ -714,6 +714,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get lockPagePinLabel => 'PIN';
+
+  @override
+  String get lockPageNoPinSet => '尚未设置启动锁（PIN 为空时锁屏不启用）';
 
   @override
   String get lockPageUnlock => '解锁';

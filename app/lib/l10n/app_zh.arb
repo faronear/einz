@@ -242,7 +242,7 @@
     }
   },
   "chatPageExitTitle": "退出应用？",
-  "chatPageExitMessage": "将回到锁屏，下次需输入 PIN 解锁并重新认证。",
+  "chatPageExitMessage": "将彻底关闭应用，下次启动需输入 PIN 解锁。",
   "save": "保存",
   "chatPageChangePassphraseTitle": "修改口令",
   "chatPageChangePassphraseOldLabel": "旧口令",
@@ -365,6 +365,7 @@
     }
   },
   "lockPagePinLabel": "PIN",
+  "lockPageNoPinSet": "尚未设置启动锁（PIN 为空时锁屏不启用）",
   "lockPageUnlock": "解锁",
   "lockPageTooManyAttempts": "尝试次数过多，请 {seconds} 秒后再试",
   "@lockPageTooManyAttempts": {

@@ -515,7 +515,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 退出应用（等价 TUI /exit）：确认后回到锁屏（LockPage），下次解锁重新认证。
   Future<void> _showExitAppDialog() async {
     final l10n = AppLocalizations.of(context)!;
-    final exit = await showDialog<bool>(
+    final shouldExit = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
@@ -527,9 +527,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ),
     );
-    if (exit == true && mounted) {
-      Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => LockPage(db: widget.db ?? LocalDatabase())));
+    if (shouldExit == true) {
+      // 彻底关闭应用（等价 TUI /exit；不再回 LockPage——未设 PIN 时锁屏不应激活）
+      exit(0);
     }
   }
 

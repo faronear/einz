@@ -1031,7 +1031,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageExitMessage.
   ///
   /// In en, this message translates to:
-  /// **'You\'ll return to the lock screen and need your PIN to unlock and re-authenticate.'**
+  /// **'The app will close completely; you\'ll need your PIN to unlock next time.'**
   String get chatPageExitMessage;
 
   /// No description provided for @save.
@@ -1375,6 +1375,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'PIN'**
   String get lockPagePinLabel;
+
+  /// No description provided for @lockPageNoPinSet.
+  ///
+  /// In en, this message translates to:
+  /// **'No app lock set (the lock screen only activates when a PIN is set)'**
+  String get lockPageNoPinSet;
 
   /// No description provided for @lockPageUnlock.
   ///

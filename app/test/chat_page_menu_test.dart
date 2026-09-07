@@ -180,4 +180,42 @@ void main() {
     // 顶部条我的名字已刷新为新名字
     expect(find.text('新名字'), findsOneWidget);
   });
+
+  testWidgets('退出应用：确认弹窗显示（不触发 exit）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 打开菜单 → 点「退出应用」
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('退出应用'));
+    await tester.pumpAndSettle();
+    // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
+    expect(find.text('退出应用？'), findsOneWidget);
+    expect(find.text('将彻底关闭应用，下次启动需输入 PIN 解锁。'), findsOneWidget);
+    // 点取消关闭弹窗（不触发 exit）
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('退出应用？'), findsNothing);
+  });
 }

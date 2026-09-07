@@ -242,7 +242,7 @@
     }
   },
   "chatPageExitTitle": "Exit app?",
-  "chatPageExitMessage": "You'll return to the lock screen and need your PIN to unlock and re-authenticate.",
+  "chatPageExitMessage": "The app will close completely; you'll need your PIN to unlock next time.",
   "save": "Save",
   "chatPageChangePassphraseTitle": "Change passphrase",
   "chatPageChangePassphraseOldLabel": "Current passphrase",
@@ -365,6 +365,7 @@
     }
   },
   "lockPagePinLabel": "PIN",
+  "lockPageNoPinSet": "No app lock set (the lock screen only activates when a PIN is set)",
   "lockPageUnlock": "Unlock",
   "lockPageTooManyAttempts": "Too many attempts, try again in {seconds}s",
   "@lockPageTooManyAttempts": {
