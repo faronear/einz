@@ -157,6 +157,9 @@ class _SetupPageState extends State<SetupPage> {
           _step = 1;
         }
       });
+      // 服务端未就绪（probe 正常返回 ok=false，不抛异常）：启动自动重试，
+      // 一旦就绪自动进入向导（不必等用户手动输地址）
+      if (!ok) _startProbeRetry();
     } catch (e) {
       // 数据库/探测初始化异常（如 SQLite 锁竞争）→ 标记探测失败（可见），
       // 避免无限停留在检测页转环；用户可输入服务器地址重试。
@@ -216,6 +219,8 @@ class _SetupPageState extends State<SetupPage> {
     });
     if (ok) {
       await ServerSettings(widget.db ?? LocalDatabase()).save(input);
+    } else {
+      _startProbeRetry(); // 新地址仍连不上：恢复自动重试，就绪后自动进入
     }
   }
 
