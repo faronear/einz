@@ -42,6 +42,7 @@ class ChatPage extends StatefulWidget {
     this.enableWs = true,
     this.reauth,
     this.escrowPassphrase,
+    this.escrowUpdatedAt,
     this.initialHistory,
     this.personName, // 我的名字（登记时设置；菜单显示/修改）
     this.deviceName, // 我的设备名（登记时自动获取；菜单显示/修改）
@@ -59,6 +60,10 @@ class ChatPage extends StatefulWidget {
   /// 接入口令（escrow，向导设置后随锁包传入）：生成邀请码时编入 JoinInfo，
   /// 对方扫码即可一键加入（含 spaceId + 口令 + 邀请码）。
   final String? escrowPassphrase;
+
+  /// 本端已知的服务端口令更新时间（ms）：启动/上线时与服务器对比，
+  /// 服务器更新 = 离线期间口令被重设（弹窗要求重新验证新口令）。
+  final int? escrowUpdatedAt;
 
   /// 归档恢复的历史消息（「从完整备份恢复」导入；map 形态与导出归档的
   /// history 条目一致：env/plaintext/sender/attachment/expiresAt）。
@@ -123,6 +128,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
+  int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查后更新）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
   /// 阅后即焚档位文案（l10n 映射）。
@@ -203,6 +209,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         onMessageNew: () => _refresh(),
         onDeviceRevoked: _onDeviceRevoked,
         onPeerStatus: _onPeerStatus,
+        onPassphraseRotated: _onPassphraseRotated,
+        onProfileUpdated: _onProfileUpdated,
       );
     }
   }
@@ -212,6 +220,58 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (event.deviceId == widget.deviceId) return; // 本设备自身的事件忽略
     final online = event.type == kWsTypePeerOnline;
     if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
+  }
+
+  /// 空间口令被重设（Server 广播 passphrase.rotated）：弹窗要求重新验证新口令。
+  void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
+    if (!mounted) return;
+    _showReverifyPassphraseDialog();
+  }
+
+  /// 对方改名（Server 广播 profile.updated）：立即更新顶部条对方名。
+  void _onProfileUpdated(WsProfileUpdatedEvent event) {
+    final name = event.personName;
+    if (name == null || name.isEmpty || !mounted) return;
+    setState(() => _peerName = name);
+  }
+
+  /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
+  /// 服务器更新 = 口令已重设（补上错过的广播）→ 弹窗重新验证。
+  Future<void> _checkEscrowRotated() async {
+    if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      final snap = await api.getKeyEscrow(widget.token);
+      final serverAt = snap.updatedAt;
+      final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
+      if (serverAt != null && knownAt != null && serverAt > knownAt) {
+        if (mounted) _showReverifyPassphraseDialog();
+      }
+    } catch (_) {
+      // 查询失败（网络/未托管）静默：不打断正常使用
+    }
+  }
+
+  /// 弹窗：输入新口令重新验证（被动更新——口令被对方重设后的同步入口）。
+  Future<void> _showReverifyPassphraseDialog() async {
+    final result = await showDialog<({String passphrase, int? updatedAt})>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ReverifyPassphraseDialog(
+        server: widget.server,
+        token: widget.token,
+        api: widget.api,
+      ),
+    );
+    if (result == null || !mounted) return;
+    // 验证通过：更新本端已知口令 + 服务端更新时间（持久化——重启后不再重复弹窗）
+    _escrowUpdatedAt = result.updatedAt;
+    await AppLockService(widget.db ?? LocalDatabase())
+        .updateEscrowPassphrase(result.passphrase, updatedAt: result.updatedAt);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowResynced)),
+    );
   }
 
   /// 本设备被撤销（Server 广播 device.revoked）：清理本地数据（锁包+消息库）
@@ -251,6 +311,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _restartTicker(online ? const Duration(seconds: 30) : const Duration(seconds: 3));
     if (mounted) setState(() {}); // 刷新标题红绿灯（在线绿/离线红）
     _refreshPeerOnline(); // 连接恢复时顺带刷新对方在线状态
+    if (online) _checkEscrowRotated(); // 上线补查：离线期间口令被重设则弹窗
   }
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
@@ -1738,6 +1799,104 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
   }
 }
 
+/// 口令被对方重设后的重新验证弹窗（被动更新）：输入新口令 → 能解开服务器
+/// 当前托管包（验证通过）→ 返回新口令与 updated_at（调用方持久化本端口令）。
+class _ReverifyPassphraseDialog extends StatefulWidget {
+  const _ReverifyPassphraseDialog({
+    required this.server,
+    required this.token,
+    this.api,
+  });
+
+  final String server;
+  final String token;
+  final ApiClient? api;
+
+  @override
+  State<_ReverifyPassphraseDialog> createState() =>
+      _ReverifyPassphraseDialogState();
+}
+
+class _ReverifyPassphraseDialogState extends State<_ReverifyPassphraseDialog> {
+  final _passCtrl = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
+    final pass = _passCtrl.text.trim();
+    if (pass.isEmpty) {
+      setState(() => _error = l10n.setupPageNeedPassphrase);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      final snap = await api.getKeyEscrow(widget.token);
+      final file = snap.file;
+      if (file == null) {
+        setState(() => _error = l10n.chatPageEscrowRotatedNoEscrow);
+        return;
+      }
+      // 能解开服务器当前托管包 = 口令正确（验证通过）
+      await KeyEscrowService(api).openPackage(passphrase: pass, file: file);
+      if (!mounted) return;
+      Navigator.of(context).pop((passphrase: pass, updatedAt: snap.updatedAt));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = l10n.chatPageEscrowRotatedInvalid);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.chatPageEscrowRotatedTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(l10n.chatPageEscrowRotatedMessage),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passCtrl,
+            obscureText: true,
+            autofocus: true,
+            onSubmitted: (_) => _submit(),
+            decoration: InputDecoration(labelText: l10n.chatPageEscrowRotatedLabel),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _submit,
+          child: Text(l10n.chatPageEscrowRotatedVerify),
+        ),
+      ],
+    );
+  }
+}
+
 /// 修改口令弹窗（StatefulWidget）：旧口令验证（fetch 托管包解密）→
 /// 新口令重加密上传（含新 argon2id 哈希）→ 本地明文 payload 同步更新。
 class _ChangePassphraseDialog extends StatefulWidget {
@@ -1811,7 +1970,8 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       final api = ApiClient(widget.server);
       final escrow = KeyEscrowService(api);
       // 1) 验证旧口令：必须能解开服务器当前托管包
-      final file = await api.getKeyEscrow(widget.token);
+      final snap = await api.getKeyEscrow(widget.token);
+      final file = snap.file;
       if (file == null) {
         throw const _NoEscrowException();
       }

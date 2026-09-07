@@ -76,7 +76,8 @@ class KeyEscrowService {
     required String passphrase,
     required String token,
   }) async {
-    final file = await api.getKeyEscrow(token);
+    final snap = await api.getKeyEscrow(token);
+    final file = snap.file;
     if (file == null) return null;
     return openPackage(passphrase: passphrase, file: file);
   }

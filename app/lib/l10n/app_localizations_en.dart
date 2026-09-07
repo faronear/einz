@@ -671,6 +671,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePinUnset => 'PIN: not set';
 
   @override
+  String get chatPageEscrowRotatedTitle => 'Passphrase updated';
+
+  @override
+  String get chatPageEscrowRotatedMessage =>
+      'Your partner reset the passphrase. Enter the new one to sync this device';
+
+  @override
+  String get chatPageEscrowRotatedLabel => 'New passphrase';
+
+  @override
+  String get chatPageEscrowRotatedVerify => 'Verify & sync';
+
+  @override
+  String get chatPageEscrowRotatedNoEscrow => 'No passphrase escrow on server';
+
+  @override
+  String get chatPageEscrowRotatedInvalid => 'Incorrect passphrase, try again';
+
+  @override
+  String get chatPageEscrowResynced => '✅ New passphrase synced';
+
+  @override
   String get chatPageMenuLocaleLabel => 'Language';
 
   @override

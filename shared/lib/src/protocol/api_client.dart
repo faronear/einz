@@ -162,11 +162,15 @@ class ApiClient {
   }
 
   /// 拉取口令托管密文包；未托管时返回 null。
-  Future<BackupFile?> getKeyEscrow(String token) async {
+  /// 下载口令托管密文包（含服务端 updated_at——客户端用于"口令是否被重设"的
+  /// 离线补查：本端记录的上次时间 < updated_at → 口令已重设）。
+  Future<({BackupFile? file, int? updatedAt})> getKeyEscrow(String token) async {
     final res = await _get(Api.keyEscrow, token: token);
     final pkg = res['package'];
-    if (pkg == null) return null;
-    return BackupFile.fromJson(pkg as Map<String, dynamic>);
+    return (
+      file: pkg == null ? null : BackupFile.fromJson(pkg as Map<String, dynamic>),
+      updatedAt: res['updated_at'] as int?,
+    );
   }
 
   /// 清除口令托管密文包。

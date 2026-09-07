@@ -11,6 +11,8 @@ const String kWsTypeKeyRotation = 'key.rotation';
 const String kWsTypeDeviceRevoked = 'device.revoked';
 const String kWsTypePeerOnline = 'peer.online';
 const String kWsTypePeerOffline = 'peer.offline';
+const String kWsTypePassphraseRotated = 'passphrase.rotated';
+const String kWsTypeProfileUpdated = 'profile.updated';
 
 /// WS 连接状态（App 据此切换轮询策略：connected → 降频兜底，断开 → 恢复高频轮询）。
 enum WsStatus { stopped, connecting, connected, reconnecting }
@@ -61,6 +63,29 @@ class WsPeerStatusEvent extends WsEvent {
   const WsPeerStatusEvent({required super.type, required this.deviceId});
 
   final String deviceId;
+}
+
+/// passphrase.rotated：空间口令已被重设（对端应重新验证新口令）。
+class WsPassphraseRotatedEvent extends WsEvent {
+  const WsPassphraseRotatedEvent({required super.type, required this.deviceId});
+
+  final String deviceId;
+}
+
+/// profile.updated：对端改名/改设备名（App/TUI 立即更新对方名称）。
+class WsProfileUpdatedEvent extends WsEvent {
+  const WsProfileUpdatedEvent({
+    required super.type,
+    required this.deviceId,
+    this.personId,
+    this.personName,
+    this.deviceName,
+  });
+
+  final String deviceId;
+  final String? personId;
+  final String? personName;
+  final String? deviceName;
 }
 
 /// WS 实时客户端：连接 / 事件回调 / 自动重连（指数退避，上限 30s）。
@@ -204,6 +229,21 @@ class WsClient {
           onEvent?.call(WsPeerStatusEvent(
             type: type,
             deviceId: payload['device_id'] as String? ?? '',
+          ));
+          break;
+        case kWsTypePassphraseRotated:
+          onEvent?.call(WsPassphraseRotatedEvent(
+            type: type,
+            deviceId: payload['device_id'] as String? ?? '',
+          ));
+          break;
+        case kWsTypeProfileUpdated:
+          onEvent?.call(WsProfileUpdatedEvent(
+            type: type,
+            deviceId: payload['device_id'] as String? ?? '',
+            personId: payload['person_id'] as String?,
+            personName: payload['person_name'] as String?,
+            deviceName: payload['device_name'] as String?,
           ));
           break;
       }

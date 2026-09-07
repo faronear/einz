@@ -603,6 +603,13 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       onStatus: (_) => _scheduleRender(),
       onAutoSync: (_) => _scheduleRender(),
       onPeerStatus: _onPeerStatus,
+      onPassphraseRotated: (_) {
+        // 空间口令已被对方重设：提示（下次 /space 或 /passphrase 用新口令）
+        _state?.session.messages.add(_systemMessage(_state!.session,
+            '⚠️ 对方已重设内容密保口令——下次 /space 接入或 /passphrase 修改请使用新口令'));
+        _scheduleRender();
+      },
+      onProfileUpdated: _onProfileUpdated,
     );
   }
   _scheduleRender();
@@ -684,6 +691,7 @@ Future<void> main(List<String> args) async {
     session.messages.add(_systemMessage(session, _revokedBanner));
   }
   _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
+  _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则提示
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
 
@@ -1028,6 +1036,19 @@ String _fmtTime(int ms) {
   final y = now.subtract(const Duration(days: 1));
   if (t.year == y.year && t.month == y.month && t.day == y.day) return '昨天 $hhmm';
   return '${t.month}/${t.day} $hhmm';
+}
+
+/// 对方改名/改设备名（Server 广播 profile.updated）：立即更新名称映射。
+void _onProfileUpdated(WsProfileUpdatedEvent e) {
+  final s = _state;
+  if (s == null) return;
+  if (e.personId != null && e.personName != null && e.personName!.isNotEmpty) {
+    s.personNames[e.personId!] = e.personName!;
+  }
+  if (e.deviceName != null && e.deviceName!.isNotEmpty) {
+    s.deviceNames[e.deviceId] = e.deviceName!;
+  }
+  _scheduleRender();
 }
 
 /// 对端上下线广播（Server 推送——立即更新对方在线状态，不等轮询）。
@@ -2116,6 +2137,26 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
 
 /// 修改托管口令（/passphrase）：旧口令验证（fetch 托管包解密）→
 /// 新口令重加密上传（含新 argon2id 哈希）。口令输入不回显（hidden）。
+/// 上线补查：离线期间口令被重设（服务端 updated_at 更新）→ 提示使用新口令。
+Future<void> _checkEscrowRotated(ChatSession session) async {
+  final store = session.store;
+  final server = store.server ?? '';
+  final token = store.sessionToken;
+  if (server.isEmpty || token == null) return;
+  try {
+    final snap = await ApiClient(server).getKeyEscrow(token);
+    final serverAt = snap.updatedAt;
+    final knownAt = store.escrowUpdatedAt;
+    if (serverAt != null && knownAt != null && serverAt > knownAt) {
+      session.messages.add(_systemMessage(session,
+          '⚠️ 离线期间内容密保口令已被重设——下次 /space 接入或 /passphrase 修改请使用新口令'));
+      _scheduleRender();
+    }
+  } catch (_) {
+    // 查询失败静默（网络/未托管）
+  }
+}
+
 Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) async {
   final api = ApiClient(session.server);
   final escrow = KeyEscrowService(api);
@@ -2125,7 +2166,8 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
     final oldPass = await _prompt(session, '❓ 请输入当前内容密保口令（用于验证）：', hidden: true, required: true);
     if (oldPass.isEmpty) continue;
     try {
-      final file = await api.getKeyEscrow(store.sessionToken!);
+      final snap = await api.getKeyEscrow(store.sessionToken!);
+      final file = snap.file;
       if (file == null) {
         session.messages.add(_systemMessage(session, '⚠️ 尚未设置托管口令，无需修改（/space 可查看接入状态）'));
         return;
@@ -2163,6 +2205,14 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
           token: store.sessionToken!,
         );
       });
+      // 记录本端已知口令更新时间（上传成功后服务端 updated_at 已刷新）
+      try {
+        final snap2 = await api.getKeyEscrow(store.sessionToken!);
+        store.escrowUpdatedAt = snap2.updatedAt;
+        store.save(session.storePath);
+      } catch (_) {
+        // 记录失败不影响结果（下次上线补查再对比）
+      }
       session.messages.add(_systemMessage(session, '✅ 口令已修改（新设备绑定时请使用新口令）'));
       _scheduleRender();
       return;

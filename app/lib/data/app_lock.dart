@@ -76,7 +76,7 @@ class AppLockService {
   /// 修改 escrow 口令后同步本地明文配置（跳过 PIN 场景）。
   /// 设 PIN 场景（加密包）因无 PIN 可用不动锁包——由 lock_page._syncEscrow
   /// 的上传前口令验证保护，防止旧口令覆盖新托管包。
-  Future<void> updateEscrowPassphrase(String passphrase) async {
+  Future<void> updateEscrowPassphrase(String passphrase, {int? updatedAt}) async {
     final plain = await loadPlain();
     if (plain == null) return;
     await savePlain(AppLockPayload(
@@ -87,6 +87,7 @@ class AppLockService {
       keyVersion: plain.keyVersion,
       token: plain.token,
       escrowPassphrase: passphrase,
+      escrowUpdatedAt: updatedAt ?? plain.escrowUpdatedAt,
     ));
   }
 
@@ -191,6 +192,7 @@ class AppLockPayload {
     this.keyVersion = 1,
     this.token,
     this.escrowPassphrase,
+    this.escrowUpdatedAt,
   });
 
   final String server;
@@ -204,6 +206,10 @@ class AppLockPayload {
   /// 同样受 PIN 加密保护；解锁/认证成功时用于自动重传托管包（rotate 后同步）。
   final String? escrowPassphrase;
 
+  /// 本端已知的服务端口令更新时间（ms）：上线时与服务器对比，
+  /// 服务器更新 = 离线期间口令被重设（应弹窗重新验证）。
+  final int? escrowUpdatedAt;
+
   Map<String, dynamic> toJson() => {
         'server': server,
         'space_key': spaceKeyB64,
@@ -212,6 +218,7 @@ class AppLockPayload {
         'key_version': keyVersion,
         'token': token,
         'escrow_passphrase': escrowPassphrase,
+        'escrow_updated_at': escrowUpdatedAt,
       };
 
   factory AppLockPayload.fromJson(Map<String, dynamic> json) => AppLockPayload(
@@ -222,6 +229,7 @@ class AppLockPayload {
         keyVersion: (json['key_version'] as int?) ?? 1,
         token: json['token'] as String?,
         escrowPassphrase: json['escrow_passphrase'] as String?,
+        escrowUpdatedAt: json['escrow_updated_at'] as int?,
       );
 }
 

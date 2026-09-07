@@ -2,6 +2,7 @@ import { getDb } from "./db.js";
 import { ApiError, resolveSession } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
 import { pwhashStrVerify } from "./crypto.js";
+import { broadcastPassphraseRotated } from "./ws.js";
 
 /**
  * 口令托管密钥（KEY_ESCROW.md §4）：Server 只托管"被口令加密的 Space Key 包"，
@@ -39,6 +40,12 @@ export function uploadKeyEscrow(cfg: ServerConfig, token: string, body: unknown)
   if (passphraseHash !== undefined && (typeof passphraseHash !== "string" || passphraseHash.length === 0)) {
     throw new ApiError("INVALID_REQUEST", "invalid passphrase_hash", 400);
   }
+  // 口令已重设（passphrase_hash 与旧值不同）→ 通知其余在线设备重新验证
+  const prevRow = getDb()
+    .prepare(`SELECT passphrase_hash FROM key_escrow WHERE space_id = ?`)
+    .get(cfg.space_id) as { passphrase_hash: string | null } | undefined;
+  const hashVal = passphraseHash ?? null;
+  const rotated = prevRow !== undefined && prevRow.passphrase_hash !== hashVal;
   getDb()
     .prepare(
       `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
@@ -49,6 +56,7 @@ export function uploadKeyEscrow(cfg: ServerConfig, token: string, body: unknown)
          updated_at = excluded.updated_at`
     )
     .run(cfg.space_id, JSON.stringify(pkg), passphraseHash ?? null, Date.now());
+  if (rotated) broadcastPassphraseRotated(device_id);
   return { ok: true };
 }
 
@@ -89,14 +97,14 @@ export async function recoverSpace(cfg: ServerConfig, body: unknown): Promise<{ 
 }
 
 /** GET /key-escrow：拉取密文包（无包时返回空对象）。 */
-export function getKeyEscrow(cfg: ServerConfig, token: string): { package?: EscrowPackage } {
+export function getKeyEscrow(cfg: ServerConfig, token: string): { package?: EscrowPackage; updated_at?: number } {
   const { device_id } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
 
-  const row = getDb().prepare(`SELECT package FROM key_escrow WHERE space_id = ?`).get(cfg.space_id) as
-    | { package: string }
+  const row = getDb().prepare(`SELECT package, updated_at FROM key_escrow WHERE space_id = ?`).get(cfg.space_id) as
+    | { package: string; updated_at: number }
     | undefined;
-  return row ? { package: JSON.parse(row.package) as EscrowPackage } : {};
+  return row ? { package: JSON.parse(row.package) as EscrowPackage, updated_at: row.updated_at } : {};
 }
 
 /** DELETE /key-escrow：清除密文包。 */

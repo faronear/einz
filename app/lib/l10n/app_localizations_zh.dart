@@ -629,6 +629,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinUnset => 'PIN: 未设置';
 
   @override
+  String get chatPageEscrowRotatedTitle => '内容密保口令已更新';
+
+  @override
+  String get chatPageEscrowRotatedMessage => '对方已重设内容密保口令，请输入新口令以同步本机';
+
+  @override
+  String get chatPageEscrowRotatedLabel => '新口令';
+
+  @override
+  String get chatPageEscrowRotatedVerify => '验证并同步';
+
+  @override
+  String get chatPageEscrowRotatedNoEscrow => '服务器尚未托管密保口令';
+
+  @override
+  String get chatPageEscrowRotatedInvalid => '口令不正确，请重新输入';
+
+  @override
+  String get chatPageEscrowResynced => '✅ 已同步新口令';
+
+  @override
   String get chatPageMenuLocaleLabel => '界面语言';
 
   @override

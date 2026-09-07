@@ -18,7 +18,8 @@ class FakeApi extends ApiClient {
   }
 
   @override
-  Future<BackupFile?> getKeyEscrow(String token) async => stored;
+  Future<({BackupFile? file, int? updatedAt})> getKeyEscrow(String token) async =>
+      (file: stored, updatedAt: null);
 
   @override
   Future<void> deleteKeyEscrow(String token) async {

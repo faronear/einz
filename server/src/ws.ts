@@ -28,6 +28,31 @@ function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer
   }
 }
 
+/** 空间口令已被重设：通知其余在线设备重新验证（App 弹窗 / TUI 提示）。 */
+export function broadcastPassphraseRotated(exceptDeviceId: string): void {
+  for (const [deviceId, conn] of conns) {
+    if (deviceId === exceptDeviceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(
+        JSON.stringify({ id: 0, type: "passphrase.rotated", payload: { device_id: exceptDeviceId } })
+      );
+    }
+  }
+}
+
+/** 改名/改设备名：通知其余在线设备立即更新对方名称（App/TUI 顶部条）。 */
+export function broadcastProfileUpdated(
+  exceptDeviceId: string,
+  payload: { person_id?: string; device_id: string; person_name?: string; device_name?: string }
+): void {
+  for (const [deviceId, conn] of conns) {
+    if (deviceId === exceptDeviceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(JSON.stringify({ id: 0, type: "profile.updated", payload }));
+    }
+  }
+}
+
 /** 注册 WS 服务（PROTOCOL.md §8）。 */
 export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
   wss.on("connection", (ws, req) => {

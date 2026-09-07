@@ -1238,6 +1238,48 @@ abstract class AppLocalizations {
   /// **'PIN: not set'**
   String get chatPagePinUnset;
 
+  /// No description provided for @chatPageEscrowRotatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase updated'**
+  String get chatPageEscrowRotatedTitle;
+
+  /// No description provided for @chatPageEscrowRotatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your partner reset the passphrase. Enter the new one to sync this device'**
+  String get chatPageEscrowRotatedMessage;
+
+  /// No description provided for @chatPageEscrowRotatedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New passphrase'**
+  String get chatPageEscrowRotatedLabel;
+
+  /// No description provided for @chatPageEscrowRotatedVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify & sync'**
+  String get chatPageEscrowRotatedVerify;
+
+  /// No description provided for @chatPageEscrowRotatedNoEscrow.
+  ///
+  /// In en, this message translates to:
+  /// **'No passphrase escrow on server'**
+  String get chatPageEscrowRotatedNoEscrow;
+
+  /// No description provided for @chatPageEscrowRotatedInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect passphrase, try again'**
+  String get chatPageEscrowRotatedInvalid;
+
+  /// No description provided for @chatPageEscrowResynced.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ New passphrase synced'**
+  String get chatPageEscrowResynced;
+
   /// No description provided for @chatPageMenuLocaleLabel.
   ///
   /// In en, this message translates to:

@@ -77,6 +77,7 @@ class _LockPageState extends State<LockPage> {
         keyVersion: payload.keyVersion,
         token: payload.token ?? '',
         escrowPassphrase: payload.escrowPassphrase,
+        escrowUpdatedAt: payload.escrowUpdatedAt,
       ),
     ));
   }
@@ -93,7 +94,8 @@ class _LockPageState extends State<LockPage> {
         final escrow = KeyEscrowService(api);
         // 上传前校验：本地口令必须能解开服务器当前托管包，否则跳过重传——
         // 口令已修改但本机锁包未同步时，防止旧口令覆盖新托管包
-        final current = await api.getKeyEscrow(token);
+        final snap = await api.getKeyEscrow(token);
+        final current = snap.file;
         if (current != null) {
           try {
             await escrow.openPackage(passphrase: pass, file: current);

@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { getDb, getMeta, setMeta } from "./db.js";
 import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, getDevice, type ServerConfig } from "./config.js";
+import { broadcastProfileUpdated } from "./ws.js";
 
 /** 邀请码字符集（去易混字符 0/O/1/I）与格式：5 字符一组，共 4 组。 */
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -258,6 +259,7 @@ export function updateDeviceName(
 
   getDb().prepare(`UPDATE devices SET device_name = ? WHERE device_id = ?`).run(deviceName, device_id);
   console.log(`[einz] 更新设备名称: device=${device_id}（${deviceName}）`);
+  broadcastProfileUpdated(device_id, { device_id, device_name: deviceName });
   return { ok: true };
 }
 
@@ -284,5 +286,6 @@ export function updatePersonName(
 
   setMeta(`person_name:${row.person_id}`, personName);
   console.log(`[einz] 更新 person 名称: person=${row.person_id}（${personName}）`);
+  broadcastProfileUpdated(device_id, { device_id, person_id: row.person_id, person_name: personName });
   return { ok: true };
 }

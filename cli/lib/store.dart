@@ -26,6 +26,7 @@ class DeviceStore {
     this.sessionToken,
     this.server,
     this.pinHash,
+    this.escrowUpdatedAt,
     this.lastServerSequence = 0,
     this.escrowUploaded = false,
     List<String>? pending,
@@ -49,6 +50,7 @@ class DeviceStore {
   String? sessionToken;
   String? server; // 服务器地址（TUI 引导确认后持久化，多终端无需重复输入）
   String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
+  int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
   int lastServerSequence;
 
   /// 创建者口令托管包是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
@@ -90,6 +92,7 @@ class DeviceStore {
         'last_server_sequence': lastServerSequence,
         'escrow_uploaded': escrowUploaded,
         'pin_hash': pinHash,
+        'escrow_updated_at': escrowUpdatedAt,
         'pending': pending,
         'history': history,
         'attachments': attachments,
@@ -111,6 +114,7 @@ class DeviceStore {
         lastServerSequence: (json['last_server_sequence'] as int?) ?? 0,
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pinHash: json['pin_hash'] as String?,
+        escrowUpdatedAt: json['escrow_updated_at'] as int?,
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],

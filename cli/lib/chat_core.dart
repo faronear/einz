@@ -331,6 +331,8 @@ class ChatSession {
     void Function(WsStatus status)? onStatus,
     void Function(int added)? onAutoSync,
     void Function(WsPeerStatusEvent event)? onPeerStatus,
+    void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
+    void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
   }) {
     if (server.isEmpty || store.sessionToken == null) return;
     wsClient = WsClient(
@@ -363,6 +365,12 @@ class ChatSession {
         }
         if (event is WsPeerStatusEvent) {
           onPeerStatus?.call(event);
+        }
+        if (event is WsPassphraseRotatedEvent) {
+          onPassphraseRotated?.call(event);
+        }
+        if (event is WsProfileUpdatedEvent) {
+          onProfileUpdated?.call(event);
         }
       },
       onStatus: (status) {
