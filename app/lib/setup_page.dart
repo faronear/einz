@@ -979,13 +979,15 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         const SizedBox(height: 16),
-        // 密钥信封导入与口令同属 Space Key 交换方式：不用口令的用户可从这里
-        // 切换到信封导入流程（offline 首步即信封粘贴页，凭邀请码登记后解封）。
-        TextButton.icon(
-          onPressed: () => _selectRole(_WizardRole.offline),
-          icon: const Icon(Icons.mail_outline, size: 18),
-          label: Text(l10n.wizardSwitchToEnvelope),
-        ),
+        // 密钥信封导入与口令同属 Space Key 交换方式：仅 join（第二/三台设备）
+        // 可用——信封是对端设备导出的密封密钥，首设备（create）没有对端设备，
+        // 也无邀请码，故不显示此入口
+        if (_role == _WizardRole.join)
+          TextButton.icon(
+            onPressed: () => _selectRole(_WizardRole.offline),
+            icon: const Icon(Icons.mail_outline, size: 18),
+            label: Text(l10n.wizardSwitchToEnvelope),
+          ),
       ],
     );
   }
