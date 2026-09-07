@@ -1143,27 +1143,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 抬头只显示品牌名+slogan（不暴露空间 ID，对普通用户无意义）
-            Text(l10n.chatPageTitleBrand, style: const TextStyle(fontSize: 17)),
-            // 红绿灯：WS 实时连接状态（绿=在线 / 红=离线），断线自动重连
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.circle, size: 10,
-                    color: (_ws?.connected.value ?? false) ? Colors.green : Colors.red),
-                const SizedBox(width: 4),
-                Text((_ws?.connected.value ?? false)
-                        ? l10n.chatPageStatusOnline
-                        : l10n.chatPageStatusOffline,
-                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              ],
-            ),
-          ],
-        ),
+        // 抬头只显示品牌名+slogan（不暴露空间 ID，对普通用户无意义）；
+        // 在线状态由对话顶部条双灯呈现（「我的」灯三态：灰=未连接服务/绿=已连接/红=断线）
+        title: Text(l10n.chatPageTitleBrand, style: const TextStyle(fontSize: 17)),
         actions: [
           // 顶栏统一入口：语言/阅后即焚/邀请码/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(
@@ -1276,14 +1258,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                   ],
                 ),
-                // 我的（右）：名字 + 在线圆点（WS 连接状态）
+                // 我的（右）：名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线）
                 Row(
                   children: [
                     Text(_myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName,
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                     const SizedBox(width: 6),
                     Icon(Icons.circle, size: 8,
-                        color: (_ws?.connected.value ?? false) ? Colors.green : Colors.red),
+                        color: _ws == null
+                            ? Colors.grey
+                            : (_ws!.connected.value ? Colors.green : Colors.red)),
                   ],
                 ),
               ],

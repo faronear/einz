@@ -33,7 +33,7 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
     ),
   ));
   await tester.pumpAndSettle();
-  await tester.tap(find.textContaining('第一个用户（创建者）')); // 身份（自动进邀请码页）
+  await tester.tap(find.textContaining('领地创建者')); // 身份（自动进邀请码页）
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码
   await tester.tap(find.text('下一步')); // 邀请码验证 → 口令页
@@ -57,7 +57,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('密钥信封无效'), findsOneWidget, reason: '无效信封必须被拦截并提示');
     expect(find.text('导入密钥信封'), findsWidgets, reason: '应停留在信封页');
-    expect(find.text('设置启动锁'), findsNothing, reason: '不应进入 PIN 页');
+    expect(find.text('PIN 锁屏密码'), findsNothing, reason: '不应进入 PIN 页');
   });
 
   testWidgets('有效密钥信封：解封成功放行到 PIN 页', (WidgetTester tester) async {
@@ -67,6 +67,6 @@ void main() {
     await tester.enterText(find.byType(TextField), base64Encode(envelope));
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('设置启动锁'), findsWidgets, reason: '有效信封应放行到 PIN 步骤');
+    expect(find.text('PIN 锁屏密码'), findsWidgets, reason: '有效信封应放行到 PIN 步骤');
   });
 }

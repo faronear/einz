@@ -53,7 +53,7 @@ Future<void> pumpToJoinInvite(
     ),
   ));
   await tester.pumpAndSettle();
-  await tester.tap(find.textContaining('第一个用户（创建者）')); // 身份（自动进邀请码页）
+  await tester.tap(find.textContaining('领地创建者')); // 身份（自动进邀请码页）
   await tester.pumpAndSettle();
 }
 
@@ -68,8 +68,8 @@ Future<void> pumpToJoinPassphrase(
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle();
   // 口令页应为「验证」语义：标题与提示都是验证措辞
-  expect(find.text('验证接入口令'), findsOneWidget); // 标题
-  expect(find.text('验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入'),
+  expect(find.text('验证密保口令'), findsOneWidget); // 标题
+  expect(find.text('输入密保口令（如不知道，请询问领地创建人）'),
       findsOneWidget); // hint
 }
 
@@ -84,9 +84,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('口令错误：请确认首台设备创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
-    expect(find.text('验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入'),
+    expect(find.text('输入密保口令（如不知道，请询问领地创建人）'),
         findsOneWidget, reason: '应停留在口令页');
-    expect(find.text('设置启动锁'), findsNothing, reason: '不应进入 PIN 页');
+    expect(find.text('PIN 锁屏密码'), findsNothing, reason: '不应进入 PIN 页');
   });
 
   testWidgets('正确口令：通过验证进入 PIN 页', (WidgetTester tester) async {
@@ -94,7 +94,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('设置启动锁'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
+    expect(find.text('PIN 锁屏密码'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
   });
 
   testWidgets('未托管口令（服务器无 escrow 包）：提示并停留', (WidgetTester tester) async {
@@ -102,7 +102,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入'),
+    expect(find.text('输入密保口令（如不知道，请询问领地创建人）'),
         findsOneWidget, reason: '未托管时停留口令页');
   });
 
@@ -112,8 +112,8 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.textContaining('邀请码无效'), findsOneWidget, reason: '无效码必须被拦截并提示');
-    expect(find.text('输入邀请码'), findsWidgets, reason: '应停留在邀请码页');
-    expect(find.text('验证接入口令'), findsNothing, reason: '不应进入口令页');
+    expect(find.text('验证邀请码'), findsWidgets, reason: '应停留在邀请码页');
+    expect(find.text('验证密保口令'), findsNothing, reason: '不应进入口令页');
   });
 
   testWidgets('正确邀请码：放行到「验证接入口令」页', (WidgetTester tester) async {
@@ -121,6 +121,6 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确邀请码');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('验证接入口令'), findsOneWidget, reason: '有效码应放行进口令页');
+    expect(find.text('验证密保口令'), findsOneWidget, reason: '有效码应放行进口令页');
   });
 }

@@ -64,9 +64,13 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 抬头为品牌名+slogan（不显示空间 ID）；enableWs:false → 红绿灯显示离线
-    expect(find.text('EINZ 私密领地'), findsOneWidget);
-    expect(find.text('离线'), findsOneWidget);
+    // 抬头为品牌名+slogan（不显示空间 ID）；红绿灯已移入顶部条「我的」灯三态
+    // （enableWs:false → ws 未建立 → 我的灯为灰色「未连接服务」）
+    expect(find.text('EINZ 1+1 私密领地'), findsOneWidget);
+    expect(find.text('离线'), findsNothing); // AppBar 红绿灯文字已随红绿灯移除
+    // 顶部条「我的」灯三态：未连接服务（ws null）→ 灰色
+    final myDot = tester.widget<Icon>(find.byIcon(Icons.circle).last);
+    expect(myDot.color, Colors.grey);
     // 对话顶部条：双方名字占位「未设置」（未传 personName/peerName → 各显示一个）
     expect(find.text('未设置'), findsNWidgets(2));
 
@@ -86,7 +90,7 @@ void main() {
     await tester.tap(find.text('PIN: 未设置'));
     await tester.pumpAndSettle();
     // 弹窗应出现（设置启动锁）
-    expect(find.text('设置启动锁'), findsOneWidget);
+    expect(find.text('设置 PIN 锁屏密码'), findsOneWidget);
     // 返回：模拟系统返回键（与真机"返回"一致；barrier/取消按钮均走 Navigator.pop）
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -123,7 +127,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('PIN: 未设置'));
     await tester.pumpAndSettle();
-    expect(find.text('设置启动锁'), findsOneWidget);
+    expect(find.text('设置 PIN 锁屏密码'), findsOneWidget);
 
     // 输入有效 PIN（两次一致）——限定在弹窗内查找，避免匹配聊天页消息输入框
     final pinFields =
@@ -137,7 +141,7 @@ void main() {
     // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
     expect(tester.takeException(), isNull);
     // 弹窗应已关闭，锁已落盘
-    expect(find.text('设置启动锁'), findsNothing);
+    expect(find.text('设置 PIN 锁屏密码'), findsNothing);
     expect(await AppLockService(db).isSetup, true);
   });
 

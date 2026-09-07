@@ -183,8 +183,8 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   }
 
   if (store == null) {
-    stdout.writeln('=== Einz 私密领地 ===');
-    _guidanceNotes.add('=== Einz 私密领地 ===');
+    stdout.writeln('=== Einz 1+1 私密领地 ===');
+    _guidanceNotes.add('=== Einz 1+1 私密领地 ===');
 
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
@@ -244,7 +244,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       if (ans.trim().toLowerCase() == 'r') {
         recovered = await _runRecoverAsCreator(session, store, storePath, server);
         if (recovered) break; // 恢复成功：跳过身份/名字问答，直接走登记（首设备自举）
-        // 恢复未成功：循环可重试，或回车走正常加入
+        // 恢复未成功：循环可重试，或回车走正常路线
       } else {
         break;
       }
@@ -276,11 +276,11 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         }
       } else {
         store.personName = _probePersonNames['personB'];
-        session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 登记新设备 ${store.deviceName}'));
+        session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 绑定新设备 ${store.deviceName}'));
       }
     } else if (chosenPerson == 'personA') {
       store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
-      session.messages.add(_systemMessage(session, '✅ 欢迎 $aName 登记新设备 ${store.deviceName}'));
+      session.messages.add(_systemMessage(session, '✅ 欢迎 $aName 绑定新设备 ${store.deviceName}'));
     }
     session.messages.add(_systemMessage(session, '----------------'));
     _scheduleRender();
@@ -321,7 +321,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   }
   store.save(storePath);
 
-  // 设备登记：未登记才 enroll（首设备自举 / 凭邀请码加入）——已登记设备（重启
+  // 设备登记：未登记才 enroll（首设备自举 / 凭邀请码绑定）——已登记设备（重启
   // 进入）跳过 enroll，直接走认证/TUI（否则服务端 activeCount>0 会误判"空间
   // 已有设备"要求邀请码，发起者自己被挡在门外）
   if (server.isNotEmpty && (store.deviceId == null || store.spaceId == null)) {
@@ -358,10 +358,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         // 输错/留空反复要求重输，直到登记成功（成功才结束引导）
         while (true) {
           if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
-          final inviteCode = await _prompt(session, '❓ 输入邀请码（由任意一个已认证设备提供）加入私密领地:');
+          final inviteCode = await _prompt(session, '❓ 输入邀请码（由任意一个已绑定设备生成）:');
           if (!_state!.running) break; // 退出中（/exit 逃生门已触发）——立即结束引导，不进登记
           if (inviteCode.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 未输入邀请码，请重新输入:'));
+            session.messages.add(_systemMessage(session, '⚠️ 您尚未提供邀请码，请重新输入:'));
             _scheduleRender();
             continue;
           }
@@ -378,7 +378,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             store.personId = r.personId;
             store.spaceId = r.spaceId;
             store.save(storePath);
-            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，您的新设备已加入私密领地。'));
+            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，您的新设备已绑定到您的私密领地。'));
             session.messages.add(_systemMessage(session, '----------------'));
             _scheduleRender();
             break;
@@ -397,7 +397,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // 已登记但未接入空间（加入者无 Space Key，如重启的第二设备）：自动进入口令
+  // 已绑定但未进入空间（无 Space Key，如重启的第二设备）：自动进入口令
   // 接入流程（输错反复重输直到成功——成功获得 Space Key 才能收发密文）
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
@@ -1400,7 +1400,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: 生成邀请码，邀请新设备加入领地',
+        '/invite :: 生成邀请码，把新设备绑定到私密领地',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -1657,7 +1657,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
   final s = _state!;
   s.pendingInvite = false;
   if (inviteCode.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 未输入邀请码，无法加入私密领地'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供邀请码，无法绑定到私密领地'));
     return;
   }
   try {
@@ -1671,7 +1671,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
     s.session.store.personId = r.personId;
     s.session.store.spaceId = r.spaceId;
     s.session.store.save(s.session.storePath);
-    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，您已成功加入私密领地 (device=${r.deviceId} person=${r.personId})'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，您的 ${s.session.store.deviceName} 已成功绑定到私密领地。'));
     // 登记成功后继续认证
     try {
       await s.session.auth();
@@ -1867,7 +1867,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
     if (p1.isEmpty) continue;
     final p2 = await _prompt(session, '❓ 请再次输入新口令确认：', hidden: true, required: true);
     if (p1 != p2) {
-      session.messages.add(_systemMessage(session, '⚠️ 两次输入不一致，请重新设置'));
+      session.messages.add(_systemMessage(session, '⚠️ 两次输入的口令不一致，请重新设置'));
       continue;
     }
     // 3) 新口令重加密上传（含新哈希；_busy 期间禁止输入）
@@ -1881,7 +1881,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
           token: store.sessionToken!,
         );
       });
-      session.messages.add(_systemMessage(session, '✅ 口令已修改（新设备加入时请使用新口令）'));
+      session.messages.add(_systemMessage(session, '✅ 口令已修改（新设备绑定时请使用新口令）'));
       _scheduleRender();
       return;
     } catch (e) {
@@ -1896,7 +1896,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 请设置内容密保口令（务必牢记，严禁泄漏！您仅可将口令分享给您的伴侣）：', required: true);
+    final p1 = await _prompt(session, '❓ 请设置内容密保口令（务必牢记，严禁泄漏！您仅可将口令分享给您的伴侣）:', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
@@ -1914,14 +1914,14 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       });
       store.escrowUploaded = true;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 口令加密的私密领地托管包已上传'));
+      session.messages.add(_systemMessage(session, '✅ 口令加密的密钥托管包已上传'));
       session.messages.add(_systemMessage(session, '----------------'));
-      session.messages.add(_systemMessage(session, '🎉 您的私密领地已成功建立！输入 /invite 生成邀请码，邀请你的伴侣加入吧！'));
+      session.messages.add(_systemMessage(session, '🎉 您的私密领地已成功建立！输入 /invite 生成邀请码，邀请你的伴侣快来聊天吧！'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return;
     } catch (e) {
-      session.messages.add(_systemMessage(session, '⚠️ 口令加密的私密领地托管包上传失败: $e，请重新设置'));
+      session.messages.add(_systemMessage(session, '⚠️ 口令加密的密钥托管包上传失败: $e，请重新设置'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
     } 

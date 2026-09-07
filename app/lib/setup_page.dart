@@ -971,7 +971,7 @@ class _SetupPageState extends State<SetupPage> {
   Widget _buildStepIdentity() {
     final l10n = AppLocalizations.of(context)!;
     final aName = _personNames['personA'] ?? '';
-    final bName = _personNames['personB'] ?? '尚未加入的伴侣';
+    final bName = _personNames['personB'] ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -980,7 +980,7 @@ class _SetupPageState extends State<SetupPage> {
         Card(
           child: ListTile(
             leading: Icon(Icons.person),
-            title: Text('1 · ${l10n.wizardIdentityCreator}（$aName）'),
+            title: Text('$aName (${l10n.wizardIdentityCreator})'),
             selected: _chosenPerson == 'personA',
             onTap: () => _selectIdentity('personA'),
           ),
@@ -989,7 +989,7 @@ class _SetupPageState extends State<SetupPage> {
         Card(
           child: ListTile(
             leading: Icon(Icons.group),
-            title: Text('2 · ${l10n.wizardIdentityPartner}（$bName）'),
+            title: Text('$bName (${l10n.wizardIdentityPartner})'),
             selected: _chosenPerson == 'personB',
             onTap: () => _selectIdentity('personB'),
           ),

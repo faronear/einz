@@ -53,15 +53,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('你的身份'), findsWidgets); // 步骤标题
-    expect(find.textContaining('第一个用户（创建者）'), findsOneWidget);
-    expect(find.textContaining('第二个用户（伴侣）'), findsOneWidget);
+    expect(find.textContaining('创建者'), findsOneWidget);
+    expect(find.textContaining('共有者'), findsOneWidget);
     // join step1 无「下一步」/「完成」按钮：点卡片即自动前进（老板 UX 决策）
     expect(find.text('下一步'), findsNothing);
     expect(find.text('完成'), findsNothing);
     // 点身份卡片 → 自动进入邀请码页
-    await tester.tap(find.textContaining('第一个用户（创建者）'));
+    await tester.tap(find.textContaining('创建者'));
     await tester.pumpAndSettle();
-    expect(find.text('输入邀请码'), findsWidgets); // 邀请码页步骤标题
+    expect(find.text('验证邀请码'), findsWidgets); // 邀请码页步骤标题
   });
 
   testWidgets('探测失败：显示服务器输入引导与密钥信封线下入口', (WidgetTester tester) async {

@@ -44,7 +44,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setupPageInstructions =>
-      '1) 生成设备密钥 → 自动登记入网（无需任何白名单）\n2) 创建或加入私密空间 → 设置启动锁';
+      '1) 生成设备密钥 → 自动登记入网（无需任何白名单）\n2) 创建或加入私密空间 → 设置 PIN 锁屏密码';
 
   @override
   String get setupPageSpaceIdLabel => 'Space ID';
@@ -67,7 +67,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageImportAuth => '② 导入并认证';
 
   @override
-  String get setupPageEscrowLabel => '接入口令（新设备凭它接入，可跳过）';
+  String get setupPageEscrowLabel => '密保口令';
 
   @override
   String get setupPageEscrowHelper => '口令托管：Server 只存密文（KEY_ESCROW.md）';
@@ -141,13 +141,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '无法连接服务器，请在上方输入地址后重试';
 
   @override
-  String get wizardNameHint => '这是你的第一个设备，先告诉我们要怎么称呼你（之后可随时 /改名）。';
+  String get wizardNameHint => '请输入您的名字（将来您可以随时修改）。';
 
   @override
   String get wizardStepPeerName => '对方的名字';
 
   @override
-  String get wizardPeerNameHint => '这是你的伴侣（第二个用户），告诉我们怎么称呼 TA（之后可随时修改）。';
+  String get wizardPeerNameHint => '一个领地里只能有两个人。请问您的伴侣的名字？（将来 TA 可以随时修改）';
 
   @override
   String get wizardPeerNameLabel => '对方的名字';
@@ -165,22 +165,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameLabel => '你的名字';
 
   @override
-  String get wizardNameHintInput => '例如 Lukas（可选，之后可改）';
+  String get wizardNameHintInput => '例如 Lukas';
 
   @override
-  String get wizardIdentityHint => '这个空间已有用户——请选择你的身份：';
+  String get wizardIdentityHint => '一个领地只有两个人。请问你是';
 
   @override
-  String get wizardIdentityCreator => '第一个用户（创建者）';
+  String get wizardIdentityCreator => '领地创建者';
 
   @override
-  String get wizardIdentityPartner => '第二个用户（伴侣）';
+  String get wizardIdentityPartner => '领地共有者';
 
   @override
   String get wizardIdentityFirst => '⚠️ 请先选择你的身份（创建者或伴侣）';
 
   @override
-  String get wizardInviteHint => '输入对方提供的一次性邀请码（由创建者 /invite 生成，24 小时内有效）';
+  String get wizardInviteHint => '输入邀请码（由任意一个已绑定设备生成，24 小时内一次性有效）';
 
   @override
   String get wizardRoleCreate => '我是第一个使用者，创建新空间';
@@ -232,16 +232,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardRecoverEnrolling => '正在登记本设备…';
+  String get wizardRecoverEnrolling => '正在绑定本设备…';
 
   @override
-  String get wizardRecoverDone => '✅ 已恢复：本设备已入网，请设置 PIN 完成';
+  String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置 PIN 锁屏密码';
 
   @override
-  String get wizardAppBarCreate => '创建新空间';
+  String get wizardAppBarCreate => '创建我的私密领地';
 
   @override
-  String get wizardAppBarJoin => '加入你的空间';
+  String get wizardAppBarJoin => '认领我的私密领地';
 
   @override
   String get wizardAppBarOffline => '导入密钥信封';
@@ -262,19 +262,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepIdentity => '你的身份';
 
   @override
-  String get wizardStepInvite => '输入邀请码';
+  String get wizardStepInvite => '验证邀请码';
 
   @override
   String get wizardStepEnroll => '登记设备';
 
   @override
-  String get wizardStepPassphrase => '设置接入口令';
+  String get wizardStepPassphrase => '设置密保口令';
 
   @override
-  String get wizardStepJoinPassphrase => '验证接入口令';
+  String get wizardStepJoinPassphrase => '验证密保口令';
 
   @override
-  String get wizardStepPin => '设置启动锁';
+  String get wizardStepPin => 'PIN 锁屏密码';
 
   @override
   String get wizardStepJoin => '加入空间';
@@ -319,10 +319,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnrollFirst => '⚠️ 请先完成设备登记（点上方按钮）';
 
   @override
-  String get wizardPassphraseHint => '分享给您的伴侣，凭此口令才能查看你们的私密领地';
+  String get wizardPassphraseHint => '请设置内容密保口令（务必牢记，严禁泄漏！您仅可将口令分享给您的伴侣）:';
 
   @override
-  String get wizardJoinPassphraseHint => '验证接入口令：输入首台设备创建时设置的口令，必须完全一致才能加入';
+  String get wizardJoinPassphraseHint => '输入密保口令（如不知道，请询问领地创建人）';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
@@ -340,13 +340,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDoneText => '✅ 设置完成！';
 
   @override
-  String get welcomeDialogTitleCreate => '🎉 欢迎创建专属空间';
+  String get welcomeDialogTitleCreate => '🎉 您已成功创建1+1领地';
 
   @override
-  String get welcomeDialogTitleJoin => '🎉 欢迎加入空间';
+  String get welcomeDialogTitleJoin => '🎉 您已成功认领1+1领地';
 
   @override
-  String get welcomeDialogMessage => '一切就绪！消息端到端加密，只有你们两人能看，开始聊天吧。';
+  String get welcomeDialogMessage => '一切就绪！仅限你和 TA，所有消息端到端加密，确保绝对隐私，开始聊天吧。';
 
   @override
   String get welcomeDialogStart => '开始聊天';
@@ -389,7 +389,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageNeedInvite => '⚠️ 请填写一次性邀请码（由已认证设备生成）';
 
   @override
-  String get wizardInviteWrong => '邀请码无效：请确认首台设备「邀请新设备加入」生成的邀请码，或让其重新生成一个';
+  String get wizardInviteWrong => '邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码';
 
   @override
   String get setupPageNoEscrow => '❌ Server 无口令托管包（请先在对端设置接入口令）';
@@ -409,10 +409,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogSetPin => '设置 PIN';
 
   @override
-  String get setupPageSkipPinTitle => '暂不设置启动锁？';
+  String get setupPageSkipPinTitle => '暂不设置 PIN 锁屏密码？';
 
   @override
-  String get setupPageSkipPinMessage => '不设启动锁则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
+  String get setupPageSkipPinMessage =>
+      '不设 PIN 锁屏密码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 4 位';
@@ -431,13 +432,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageSetLockTitle => '设置启动锁';
+  String get chatPageSetLockTitle => '设置 PIN 锁屏密码';
 
   @override
-  String get chatPageSetLockTooltip => '设置启动锁';
+  String get chatPageSetLockTooltip => '设置 PIN 锁屏密码';
 
   @override
-  String get chatPageSetLockDone => '启动锁已设置，下次启动需 PIN 解锁';
+  String get chatPageSetLockDone => 'PIN 锁屏密码已设置，下次启动需解锁';
 
   @override
   String chatPageMenuLocale(String value) {
@@ -456,7 +457,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuExport => '导出完整备份';
 
   @override
-  String get chatPageTitleBrand => 'EINZ 私密领地';
+  String get chatPageTitleBrand => 'EINZ 1+1 私密领地';
 
   @override
   String get chatPageStatusOnline => '在线';
@@ -716,7 +717,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lockPagePinLabel => 'PIN';
 
   @override
-  String get lockPageNoPinSet => '尚未设置启动锁（PIN 为空时锁屏不启用）';
+  String get lockPageNoPinSet => '尚未设置 PIN 锁屏密码（PIN 为空时不启用）';
 
   @override
   String get lockPageUnlock => '解锁';
