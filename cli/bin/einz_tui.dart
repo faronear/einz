@@ -1643,12 +1643,12 @@ Future<void> _execCommand(String line) async {
       ));
       s.status = '';
     case '/server':
+      // 无参数：先输出当前服务器（状态），再给出详细用法
       if (arg.isEmpty) {
+        s.session.messages.add(_systemMessage(s.session, '当前服务器: ${s.session.server}'));
         s.session.messages.add(_systemMessage(
-        s.session,
-        '当前服务器: ${s.session.server}；用法: /server <地址>',
-      ));
-      s.status = '';
+            s.session, '用法: /server <地址> —— 切换并激活服务器（如 /server https://einz.tic.cc）'));
+        s.status = '';
       } else {
         try {
           await s.session.auth(serverOverride: arg);
@@ -1672,8 +1672,17 @@ Future<void> _execCommand(String line) async {
         s.status = '⌛️ 等待邀请码输入…';
         break;
       }
+      // 无参数：先输出当前登录状态，再给出详细用法（激活需带服务器地址）
+      if (arg.isEmpty) {
+        final authed = s.session.store.sessionToken != null;
+        s.session.messages.add(_systemMessage(
+            s.session, authed ? '✅ 登录状态: 已激活机密线路' : '⚠️ 登录状态: 未激活机密线路'));
+        s.session.messages.add(_systemMessage(
+            s.session, '用法: /auth <服务器地址> —— 激活机密线路（如 /auth https://einz.tic.cc）'));
+        break;
+      }
       try {
-        await s.session.auth(serverOverride: arg.isEmpty ? null : arg);
+        await s.session.auth(serverOverride: arg);
         // 激活结果作为 system 消息进消息流（不占顶部状态栏）
         s.session.messages.add(_systemMessage(s.session, '✅ 机密线路激活成功，全世界只有您和对方能够查看信息。'));
         s.status = '';
@@ -1691,11 +1700,15 @@ Future<void> _execCommand(String line) async {
         s.status = '';
       }
     case '/space':
-      // 重新接入空间（口令托管）：未接入时引导输入口令，已接入则提示
+      // 重新接入空间（口令托管）：无参数先输出当前空间状态，再给出用法；
+      // 未接入时继续引导输入口令
       if (s.session.hasSpace) {
-        s.session.messages.add(_systemMessage(s.session, '✅ 已接入您的私密领地'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 当前空间: 已接入您的私密领地'));
+        s.session.messages.add(_systemMessage(s.session, '用法: /space —— 重新接入时输入内容密保口令'));
         break;
       }
+      s.session.messages.add(_systemMessage(s.session, '⚠️ 当前空间: 未接入私密领地'));
+      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入内容密保口令，解密您的私密领地内容'));
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
           s.session, '❓ 请输入内容密保口令，即可解密您的私密领地内容'));
@@ -1713,6 +1726,9 @@ Future<void> _execCommand(String line) async {
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session,
             s.session.store.pinHash == null ? '⚠️ PIN 锁屏：未设置' : '✅ PIN 锁屏：已设置'));
+        // 先输出状态，再给出详细用法
+        s.session.messages.add(_systemMessage(s.session,
+            '用法: /pin <PIN> —— 设置锁屏 PIN（如 /pin 123456）；/pin \'\' 重置为空（取消锁屏）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
