@@ -277,6 +277,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepPin => 'PIN 锁屏密码';
 
   @override
+  String get wizardStepShortName => '名字';
+
+  @override
+  String get wizardStepShortPeerName => '对方名字';
+
+  @override
+  String get wizardStepShortPassphrase => '口令';
+
+  @override
+  String get wizardStepShortPin => 'PIN';
+
+  @override
+  String get wizardStepShortDone => '完成';
+
+  @override
+  String get wizardStepShortIdentity => '身份';
+
+  @override
+  String get wizardStepShortInvite => '验证码';
+
+  @override
+  String get wizardStepShortEnvelope => '信封';
+
+  @override
   String get wizardStepJoin => '加入空间';
 
   @override

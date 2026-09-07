@@ -320,12 +320,6 @@ class _SetupPageState extends State<SetupPage> {
               const SizedBox(height: 12),
             ],
             _buildProgressDots(),
-            if (_role != null && _step > 0) ...[
-              const SizedBox(height: 16),
-              // 本页功能标题（AppBar 只显示所选角色名，见 _appBarTitle）
-              Text(_stepTitle(l10n),
-                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600)),
-            ],
             const SizedBox(height: 20),
             Expanded(
               child: AnimatedSwitcher(
@@ -385,45 +379,46 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 步骤标题（body 上方；AppBar 只显示所选角色名，见 _appBarTitle）。
-  String _stepTitle(AppLocalizations l10n) {
+  /// 当前步骤的简化短名（AppBar 大标题后拼接："认领我的私密领地：身份"）。
+  String _stepShortTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardRoleTitle;
     switch (_role!) {
       case _WizardRole.create:
         switch (_step) {
-          case 1: return l10n.wizardStepName;
-          case 2: return l10n.wizardStepPeerName;
-          case 3: return l10n.wizardStepPassphrase;
-          case 4: return l10n.wizardStepPin;
-          default: return l10n.wizardStepDone;
+          case 1: return l10n.wizardStepShortName;
+          case 2: return l10n.wizardStepShortPeerName;
+          case 3: return l10n.wizardStepShortPassphrase;
+          case 4: return l10n.wizardStepShortPin;
+          default: return l10n.wizardStepShortDone;
         }
       case _WizardRole.join:
         switch (_step) {
-          case 1: return l10n.wizardStepIdentity;
-          case 2: return l10n.wizardStepInvite;
-          case 3: return l10n.wizardStepJoinPassphrase; // join 口令页：验证接入口令
-          case 4: return l10n.wizardStepPin;
-          default: return l10n.wizardStepDone;
+          case 1: return l10n.wizardStepShortIdentity;
+          case 2: return l10n.wizardStepShortInvite;
+          case 3: return l10n.wizardStepShortPassphrase;
+          case 4: return l10n.wizardStepShortPin;
+          default: return l10n.wizardStepShortDone;
         }
       case _WizardRole.offline:
         switch (_step) {
-          case 1: return l10n.wizardStepEnvelope;
-          case 2: return l10n.wizardStepPin;
-          default: return l10n.wizardStepDone;
+          case 1: return l10n.wizardStepShortEnvelope;
+          case 2: return l10n.wizardStepShortPin;
+          default: return l10n.wizardStepShortDone;
         }
     }
   }
 
-  /// 页眉标题（AppBar）：固定显示所选角色名（第 0 步未选角色时显示引导语）。
+  /// 页眉标题（AppBar）：大标题 + "：" + 当前步骤简化短名
+  /// （如「认领我的私密领地：身份」；第 0 步未选角色时显示引导语）。
   String _appBarTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardRoleTitle;
     switch (_role!) {
       case _WizardRole.create:
-        return l10n.wizardAppBarCreate;
+        return '${l10n.wizardAppBarCreate}：${_stepShortTitle(l10n)}';
       case _WizardRole.join:
-        return l10n.wizardAppBarJoin;
+        return '${l10n.wizardAppBarJoin}：${_stepShortTitle(l10n)}';
       case _WizardRole.offline:
-        return l10n.wizardAppBarOffline;
+        return '${l10n.wizardAppBarOffline}：${_stepShortTitle(l10n)}';
     }
   }
 

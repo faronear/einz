@@ -295,6 +295,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardStepPin => 'App lock';
 
   @override
+  String get wizardStepShortName => 'Name';
+
+  @override
+  String get wizardStepShortPeerName => 'Peer name';
+
+  @override
+  String get wizardStepShortPassphrase => 'Passphrase';
+
+  @override
+  String get wizardStepShortPin => 'PIN';
+
+  @override
+  String get wizardStepShortDone => 'Done';
+
+  @override
+  String get wizardStepShortIdentity => 'Identity';
+
+  @override
+  String get wizardStepShortInvite => 'Invite code';
+
+  @override
+  String get wizardStepShortEnvelope => 'Envelope';
+
+  @override
   String get wizardStepJoin => 'Join space';
 
   @override

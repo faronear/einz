@@ -70,7 +70,7 @@ class _EinzAppState extends State<EinzApp> {
           elevation: 0,
           centerTitle: false,
           titleTextStyle: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF3E3630)),
+              fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF3E3630)),
         ),
         inputDecorationTheme: InputDecorationTheme(
           labelStyle: const TextStyle(fontSize: 16, color: Color(0xFF6E6259)),

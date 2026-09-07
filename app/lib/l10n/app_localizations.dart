@@ -602,6 +602,54 @@ abstract class AppLocalizations {
   /// **'App lock'**
   String get wizardStepPin;
 
+  /// No description provided for @wizardStepShortName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get wizardStepShortName;
+
+  /// No description provided for @wizardStepShortPeerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Peer name'**
+  String get wizardStepShortPeerName;
+
+  /// No description provided for @wizardStepShortPassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase'**
+  String get wizardStepShortPassphrase;
+
+  /// No description provided for @wizardStepShortPin.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get wizardStepShortPin;
+
+  /// No description provided for @wizardStepShortDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get wizardStepShortDone;
+
+  /// No description provided for @wizardStepShortIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get wizardStepShortIdentity;
+
+  /// No description provided for @wizardStepShortInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code'**
+  String get wizardStepShortInvite;
+
+  /// No description provided for @wizardStepShortEnvelope.
+  ///
+  /// In en, this message translates to:
+  /// **'Envelope'**
+  String get wizardStepShortEnvelope;
+
   /// No description provided for @wizardStepJoin.
   ///
   /// In en, this message translates to:
