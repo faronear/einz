@@ -904,6 +904,16 @@ class _SetupPageState extends State<SetupPage> {
     final sk = _spaceKey;
     final token = _sessionToken;
     if (kp == null || enroll == null || sk == null || token == null) return;
+    // 名字持久化：PIN 解锁/重启后 ChatPage 恢复显示（AppLockPayload 不含名字）
+    unawaited(AppLockService(widget.db ?? LocalDatabase()).saveProfile(
+      personName: _role == _WizardRole.create
+          ? _personName.text.trim()
+          : (_personNames[_chosenPerson] ?? ''),
+      peerName: _role == _WizardRole.create
+          ? _peerNameCtrl.text.trim()
+          : (_personNames[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
+      deviceName: _myDeviceName,
+    ));
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
         server: _server,

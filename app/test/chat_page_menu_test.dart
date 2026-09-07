@@ -71,8 +71,8 @@ void main() {
     // 顶部条「我的」灯三态：未连接服务（ws null）→ 灰色
     final myDot = tester.widget<Icon>(find.byIcon(Icons.circle).last);
     expect(myDot.color, Colors.grey);
-    // 对话顶部条：双方名字占位「未设置」（未传 personName/peerName → 各显示一个）
-    expect(find.text('未设置'), findsNWidgets(2));
+    // 对话顶部条：名字为空时不显示文本（未传 personName/peerName → 只留在线圆点）
+    expect(find.text('未设置'), findsNothing);
 
     // 打开顶栏菜单
     await tester.tap(find.byIcon(Icons.more_vert));

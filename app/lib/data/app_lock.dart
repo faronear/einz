@@ -25,6 +25,7 @@ class AppLockService {
   static const _kLockedUntil = 'app_lock.locked_until';
   static const _kPlain = 'app_lock.plain'; // 跳过 PIN：明文 Space Key 包（仅本设备）
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
+  static const _kProfile = 'app_lock.profile'; // JSON: {personName, peerName, deviceName}
 
   /// 是否已设置启动锁（有 PIN 加密的密钥包）。
   Future<bool> get isSetup async => await _get(_kPackage) != null;
@@ -140,6 +141,36 @@ class AppLockService {
     await (db.into(db.appState)).insertOnConflictUpdate(
       AppStateCompanion.insert(key: key, value: value),
     );
+  }
+
+  /// 用户资料（名字）持久化：向导完成时保存，PIN 解锁/重启后 ChatPage 恢复显示。
+  /// （名字不在 AppLockPayload 里——解锁构造 ChatPage 时无法获得，故单独存。）
+  Future<void> saveProfile({
+    required String personName,
+    required String peerName,
+    required String deviceName,
+  }) async {
+    await _set(_kProfile, jsonEncode({
+      'personName': personName,
+      'peerName': peerName,
+      'deviceName': deviceName,
+    }));
+  }
+
+  /// 读回保存的资料（键缺失返回空串——解锁场景 ChatPage 空名时恢复）。
+  Future<Map<String, String>> loadProfile() async {
+    final raw = await _get(_kProfile);
+    if (raw == null) return const {};
+    try {
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      return {
+        'personName': (m['personName'] as String?) ?? '',
+        'peerName': (m['peerName'] as String?) ?? '',
+        'deviceName': (m['deviceName'] as String?) ?? '',
+      };
+    } catch (_) {
+      return const {};
+    }
   }
 }
 

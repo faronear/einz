@@ -157,6 +157,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
     WidgetsBinding.instance.addObserver(this);
     final db = widget.db ?? LocalDatabase();
+    // 名字未由向导传入（如 PIN 解锁后重启进聊天）→ 从本地 profile 恢复
+    AppLockService(db).loadProfile().then((p) {
+      if (!mounted) return;
+      setState(() {
+        if (_myPersonName.isEmpty) _myPersonName = p['personName'] ?? '';
+        if (_myDeviceName.isEmpty) _myDeviceName = p['deviceName'] ?? '';
+        if (_peerName.isEmpty) _peerName = p['peerName'] ?? '';
+      });
+    });
     _repo = MessageRepository(
       db: db,
       api: widget.api ?? ApiClient(widget.server),
@@ -1263,21 +1272,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // 对方（左）：名字 + 在线圆点（last_seen 距今 <60s 判定）
+                // 对方（左）：在线圆点 + 名字（名字为空则不显示文本，只留圆点）
                 Row(
                   children: [
                     Icon(Icons.circle, size: 8, color: _peerOnline ? Colors.green : Colors.red),
-                    const SizedBox(width: 6),
-                    Text(_peerName.isEmpty ? l10n.chatPageNameUnset : _peerName,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    if (_peerName.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(_peerName,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    ],
                   ],
                 ),
-                // 我的（右）：名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线）
+                // 我的（右）：名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
+                // 名字为空则不显示文本，只留圆点）
                 Row(
                   children: [
-                    Text(_myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                    const SizedBox(width: 6),
+                    if (_myPersonName.isNotEmpty) ...[
+                      Text(_myPersonName,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      const SizedBox(width: 6),
+                    ],
                     Icon(Icons.circle, size: 8,
                         color: _ws == null
                             ? Colors.grey

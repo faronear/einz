@@ -110,4 +110,16 @@ void main() {
     await lock.clear();
     expect(await lock.hasConfig, false, reason: 'clear 清空全部（含明文）');
   });
+
+  test('saveProfile/loadProfile：资料（名字）持久化存取', () async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    expect(await lock.loadProfile(), isEmpty, reason: '未保存时返回空');
+    await lock.saveProfile(personName: 'Lukas', peerName: 'Steffi', deviceName: 'iPhone');
+    final p = await lock.loadProfile();
+    expect(p['personName'], 'Lukas');
+    expect(p['peerName'], 'Steffi');
+    expect(p['deviceName'], 'iPhone');
+  });
 }
