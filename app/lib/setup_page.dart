@@ -353,10 +353,10 @@ class _SetupPageState extends State<SetupPage> {
                     child: Text(l10n.wizardBack),
                   ),
                   const Spacer(),
-                  // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记；
-                  // PIN 页 = 最后一步（_step == _stepCount），完成停留本页弹窗）。
+                  // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
+                  // 完成页（_step == _stepCount）显示"完成"。
                   // join 步骤 1（身份选择）例外：点卡片即自动前进，无需"下一步"。
-                  if (_step <= _stepCount && !(_role == _WizardRole.join && _step == 1))
+                  if (_step < _stepCount && !(_role == _WizardRole.join && _step == 1))
                     FilledButton(onPressed: _nextStep, child: Text(l10n.wizardNext))
                   else
                     FilledButton(onPressed: _finish, child: Text(l10n.wizardDone)),
@@ -374,11 +374,11 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 4; // name/peerName/passphrase/pin（完成页已删除——完成停留 PIN 页弹窗）
+        return 5; // name/peerName/passphrase/pin/done（设备名自动设置，输入步骤已移除）
       case _WizardRole.join:
-        return 4; // identity/invite/passphrase/pin
+        return 5; // identity/invite/passphrase/pin/done
       case _WizardRole.offline:
-        return 2; // envelope/pin
+        return 3; // envelope/pin/done
       case null:
         return 1;
     }
@@ -394,7 +394,7 @@ class _SetupPageState extends State<SetupPage> {
           case 2: return l10n.wizardStepPeerName;
           case 3: return l10n.wizardStepPassphrase;
           case 4: return l10n.wizardStepPin;
-          default: return l10n.wizardStepPin;
+          default: return l10n.wizardStepDone;
         }
       case _WizardRole.join:
         switch (_step) {
@@ -402,13 +402,13 @@ class _SetupPageState extends State<SetupPage> {
           case 2: return l10n.wizardStepInvite;
           case 3: return l10n.wizardStepJoinPassphrase; // join 口令页：验证接入口令
           case 4: return l10n.wizardStepPin;
-          default: return l10n.wizardStepPin;
+          default: return l10n.wizardStepDone;
         }
       case _WizardRole.offline:
         switch (_step) {
           case 1: return l10n.wizardStepEnvelope;
           case 2: return l10n.wizardStepPin;
-          default: return l10n.wizardStepPin;
+          default: return l10n.wizardStepDone;
         }
     }
   }
@@ -601,7 +601,7 @@ class _SetupPageState extends State<SetupPage> {
           case 4:
             return _buildStepPin();
           default:
-            return const SizedBox.shrink();
+            return _buildStepDone();
         }
       case _WizardRole.join:
         switch (_step) {
@@ -614,7 +614,7 @@ class _SetupPageState extends State<SetupPage> {
           case 4:
             return _buildStepPin();
           default:
-            return const SizedBox.shrink();
+            return _buildStepDone();
         }
       case _WizardRole.offline:
         switch (_step) {
@@ -623,7 +623,7 @@ class _SetupPageState extends State<SetupPage> {
           case 2:
             return _buildStepPin();
           default:
-            return const SizedBox.shrink();
+            return _buildStepDone();
         }
     }
   }
@@ -1251,9 +1251,10 @@ class _SetupPageState extends State<SetupPage> {
   /// 向导完成：推进到完成步骤并弹出欢迎对话框（唯一「开始聊天」按钮 → 消息流页）。
   void _completeWizard() {
     setState(() {
+      _step = _stepCount;
       _status = null;
     });
-    // 停留当前页（PIN 页）直接弹窗——不再跳"完成"页（老板决策：完成页可删除）
+    // 下一帧弹窗（等 done 步骤渲染完成再盖对话框）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _showWelcomeDialog();
     });
@@ -1280,6 +1281,17 @@ class _SetupPageState extends State<SetupPage> {
     if (start == true && mounted) {
       _finish(); // 进入消息流页面
     }
+  }
+
+  /// 向导完成页（done 步骤）：纯色背景无文字（老板要求"已完成、已结束"的
+  /// 独立欢迎页面）——被欢迎对话框盖住，仅作为弹窗背后的页面呈现。
+  Widget _buildStepDone() {
+    // 纯色块占视口 60%（滚动容器内无法无限铺满——固定高度纯色背景）
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.6,
+      width: double.infinity,
+      child: const ColoredBox(color: Color(0xFFE8F5E9)), // 浅绿（完成语义）
+    );
   }
 
   // ---- 场景 B（join）：身份 → 邀请码 → 口令 → PIN ----
