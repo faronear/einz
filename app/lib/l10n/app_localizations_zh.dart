@@ -444,6 +444,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockCleared => '已清除 PIN 锁屏（下次启动直接进入）';
 
   @override
+  String get chatPageClearLockTitle => '清除 PIN 锁屏？';
+
+  @override
+  String get chatPageClearLockMessage =>
+      '两个 PIN 输入框均为空——确定要清除启动锁吗？清除后下次启动直接进入聊天。';
+
+  @override
   String chatPageMenuLocale(String value) {
     return '界面语言：$value';
   }

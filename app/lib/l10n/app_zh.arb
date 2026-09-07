@@ -191,6 +191,8 @@
   "chatPageSetLockTooltip": "设置 PIN 锁屏密码",
   "chatPageSetLockDone": "PIN 锁屏密码已设置，下次启动需解锁",
   "chatPageSetLockCleared": "已清除 PIN 锁屏（下次启动直接进入）",
+  "chatPageClearLockTitle": "清除 PIN 锁屏？",
+  "chatPageClearLockMessage": "两个 PIN 输入框均为空——确定要清除启动锁吗？清除后下次启动直接进入聊天。",
   "chatPageMenuLocale": "界面语言：{value}",
   "@chatPageMenuLocale": {
     "placeholders": {

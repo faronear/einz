@@ -479,6 +479,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'App lock cleared (enter directly at next launch)';
 
   @override
+  String get chatPageClearLockTitle => 'Clear app lock?';
+
+  @override
+  String get chatPageClearLockMessage =>
+      'Both PIN fields are empty — clear the app lock? You\'ll enter directly at next launch.';
+
+  @override
   String chatPageMenuLocale(String value) {
     return 'Language: $value';
   }

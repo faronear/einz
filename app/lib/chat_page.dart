@@ -1439,8 +1439,23 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     final pin = _pinCtrl.text;
     // 两空 = 设为空：取消启动锁（Space Key 转明文保存，与向导"暂不设置"一致）
     if (pin.isEmpty && _confirmCtrl.text.isEmpty) {
+      // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
+      final messenger = ScaffoldMessenger.of(context);
+      // 显性确认：清除 PIN 锁屏（防误触——两空提交前必须弹窗确认）
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.chatPageClearLockTitle),
+          content: Text(l10n.chatPageClearLockMessage),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
+          ],
+        ),
+      );
+      if (confirmed != true) return; // 取消：留在本弹窗（不执行清除）
       try {
-        final messenger = ScaffoldMessenger.of(context);
         await AppLockService(widget.db).savePlain(widget.payload);
         await AppLockService(widget.db).clearPackage();
         if (!mounted) return;

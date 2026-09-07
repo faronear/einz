@@ -191,6 +191,8 @@
   "chatPageSetLockTooltip": "Set app lock",
   "chatPageSetLockDone": "App lock set — PIN required at next launch",
   "chatPageSetLockCleared": "App lock cleared (enter directly at next launch)",
+  "chatPageClearLockTitle": "Clear app lock?",
+  "chatPageClearLockMessage": "Both PIN fields are empty — clear the app lock? You'll enter directly at next launch.",
   "chatPageMenuLocale": "Language: {value}",
   "@chatPageMenuLocale": {
     "placeholders": {
