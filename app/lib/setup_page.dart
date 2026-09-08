@@ -343,6 +343,13 @@ class _SetupPageState extends State<SetupPage> {
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
+                // 顶部锚定：默认 AnimatedSwitcher 用 Stack alignment.center 会把
+                // 输入表单垂直居中在页面正中——改为 topCenter 让表单贴着进度条，
+                // 键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白，输入区不被顶起
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: [...previousChildren, ?currentChild],
+                ),
                 child: KeyedSubtree(
                   key: ValueKey('$_role-$_step'),
                   child: SingleChildScrollView(child: _buildStep()),
