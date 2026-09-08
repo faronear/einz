@@ -374,17 +374,17 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
         if (name.isNotEmpty) { 
           store.personName = name;
-          session.messages.add(_systemMessage(session, '✅ 欢迎 $name 来到私密领地！'));
+          session.messages.add(_systemMessage(session, '✅ 欢迎 $name 来到秘境！'));
         }else {
-          session.messages.add(_systemMessage(session, '✅ 欢迎来到私密领地！'));
+          session.messages.add(_systemMessage(session, '✅ 欢迎来到秘境！'));
         }
       } else {
         store.personName = _probePersonNames['personB'];
-        session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到私密领地！'));
+        session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到秘境！'));
       }
     } else if (chosenPerson == 'personA') {
       store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
-      session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到私密领地！'));
+      session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到秘境！'));
     }
     session.messages.add(_systemMessage(session, '----------------'));
     _scheduleRender();
@@ -483,7 +483,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             store.spaceId = r.spaceId;
             store.save(storePath);
             _onboarded = true; // 新设备入网完成
-            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，您的新设备已绑定到您的私密领地。'));
+            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，新设备已绑定到秘境。'));
             session.messages.add(_systemMessage(session, '----------------'));
             _scheduleRender();
             break;
@@ -507,7 +507,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 请输入内容密保口令，才能查看您的私密领地内容：', required: true);
+      final passphrase = await _prompt(session, '❓ 请输入内容密保口令，才能查看秘境内容：', required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
@@ -529,9 +529,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       }
       try {
         await _busy(session, '⏳ 内容密保口令核对中......', () => session.accessByEscrow(passphrase));
-        session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备有权查看私密领地内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
+        session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备有权查看秘境内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         session.messages.add(_systemMessage(session, '----------------'));
-        session.messages.add(_systemMessage(session, '🎉 您已成功进入了私密领地。输入 /help 可查看快捷命令。立刻开始点对点加密聊天吧！'));
+        session.messages.add(_systemMessage(session, '🎉 成功进入了秘境！输入 /help 可查看快捷命令。立刻开始点对点加密聊天吧！'));
         session.messages.add(_systemMessage(session, '================'));
         store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
         store.save(storePath);
@@ -1661,7 +1661,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: 生成邀请码，把新设备绑定到私密领地',
+        '/invite :: 生成邀请码，把新设备绑定到秘境',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -1681,7 +1681,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/space :: 查看当前接入的私密领地',
+        '/space :: 查看当前接入的秘境',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -1718,7 +1718,7 @@ Future<void> _execCommand(String line) async {
         // 提示作为 system 消息进消息流；邀请码由输入循环接管输入——
         // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
         s.pendingInvite = true;
-        s.session.messages.add(_systemMessage(s.session, '❓ 发现未知设备，请输入私密领地邀请码（从其他已认证设备 /invite 获取）'));
+        s.session.messages.add(_systemMessage(s.session, '❓ 发现未知设备，请输入秘境邀请码（从其他已认证设备 /invite 获取）'));
         s.status = '⌛️ 等待邀请码输入…';
         break;
       }
@@ -1753,15 +1753,15 @@ Future<void> _execCommand(String line) async {
       // 重新接入空间（口令托管）：无参数先输出当前空间状态，再给出用法；
       // 未接入时继续引导输入口令
       if (s.session.hasSpace) {
-        s.session.messages.add(_systemMessage(s.session, '✅ 当前空间: 已接入您的私密领地'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 当前设备已接入秘境'));
         s.session.messages.add(_systemMessage(s.session, '用法: /space —— 重新接入时输入内容密保口令'));
         break;
       }
-      s.session.messages.add(_systemMessage(s.session, '⚠️ 当前空间: 未接入私密领地'));
-      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入内容密保口令，解密您的私密领地内容'));
+      s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未接入秘境'));
+      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入内容密保口令，解密您的秘境内容'));
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
-          s.session, '❓ 请输入内容密保口令，即可解密您的私密领地内容'));
+          s.session, '❓ 请输入内容密保口令，即可解密您的秘境内容'));
       break;
     case '/passphrase':
       // 修改内容密保口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
@@ -1993,7 +1993,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
   final s = _state!;
   s.pendingInvite = false;
   if (inviteCode.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供邀请码，无法绑定到私密领地'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供邀请码，无法绑定到秘境'));
     return;
   }
   try {
@@ -2007,7 +2007,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
     s.session.store.personId = r.personId;
     s.session.store.spaceId = r.spaceId;
     s.session.store.save(s.session.storePath);
-    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，新设备 ${s.session.store.deviceName} 已成功绑定到私密领地。'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，新设备 ${s.session.store.deviceName} 已成功绑定到秘境。'));
     // 登记成功后继续认证
     try {
       await s.session.auth();
@@ -2035,7 +2035,7 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
   final s = _state!;
   s.pendingSpaceKey = false;
   if (passphrase.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '未输入口令，无法存取私密领地内容'));
+    s.session.messages.add(_systemMessage(s.session, '未输入口令，无法存取秘境内容'));
     return;
   }
   if (passphrase.startsWith('/')) {
@@ -2051,12 +2051,12 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
     await s.session.accessByEscrow(passphrase);
     s.session.messages.add(_systemMessage(
         s.session,
-        '✅ 口令核对成功，本设备能够访问私密领地内容')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
+        '✅ 口令核对成功，本设备能够访问秘境内容')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
     s.session.store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
     s.session.store.save(s.session.storePath);
   } catch (e) {
     // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？私密领地已有口令密保箱？）'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？秘境已有口令密保箱？）'));
   }
 }
 
@@ -2145,7 +2145,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       final aName = _probePersonNames['personA'] ?? '';
       store.personName = aName.isNotEmpty ? aName : null;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 私密领地重置成功，即将以创建者身份重新登记（历史密文可继续解密）'));
+      session.messages.add(_systemMessage(session, '✅ 秘境重置成功，即将以创建者身份重新登记（历史密文可继续解密）'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return true;
@@ -2285,7 +2285,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 口令密保箱已上传'));
       session.messages.add(_systemMessage(session, '----------------'));
-      session.messages.add(_systemMessage(session, '🎉 您的私密领地已成功建立！输入 /invite 生成邀请码，邀请你的伴侣快来聊天吧！'));
+      session.messages.add(_systemMessage(session, '🎉 秘境已成功建立！输入 /invite 生成邀请码，邀请你的伴侣快来聊天吧！'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return;

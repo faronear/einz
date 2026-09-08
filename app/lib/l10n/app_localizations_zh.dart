@@ -66,7 +66,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
 
   @override
-  String get wizardPeerNameHint => '一个秘境仅限两人。TA 的名字是？（将来可以随时修改）';
+  String get wizardPeerNameHint => '一个秘境仅限两人。填写 TA 的名字（将来可以随时修改）：';
 
   @override
   String get wizardPeerNameLabel => 'TA 的名字';
@@ -78,7 +78,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameRequired => '输入我的名字';
 
   @override
-  String get wizardPeerNameRequired => '输入 TA 的名字';
+  String get wizardPeerNameRequired => '填写 TA 的名字';
 
   @override
   String get wizardNameLabel => '我的名字';
@@ -87,7 +87,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameHintInput => '例如 Lukas';
 
   @override
-  String get wizardIdentityHint => '一个秘境仅限两人。我是';
+  String get wizardIdentityHint => '一个秘境仅限两人。填写我的名字：';
 
   @override
   String get wizardIdentityCreator => '领地创建者';
@@ -261,7 +261,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageInviteHint => '扫码后自动填入；手动加入时粘贴对方提供的一次性邀请码';
 
   @override
-  String get setupPageNeedInvite => '⚠️ 请填写一次性邀请码（由已认证设备生成）';
+  String get setupPageNeedInvite => '⚠️ 填写一次性邀请码（由已认证设备生成）';
 
   @override
   String get wizardInviteWrong => '邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码';
@@ -382,10 +382,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageExitTitle => '退出应用？';
+  String get chatPageExitTitle => '退出秘境？';
 
   @override
-  String get chatPageExitMessage => '将彻底关闭应用。';
+  String get chatPageExitMessage => '将在本设备上退出 Einz 秘境。';
 
   @override
   String get save => '保存';

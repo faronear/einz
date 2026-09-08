@@ -157,7 +157,7 @@
 | Server   | 新增 `key_escrow` 表 + 3 个端点（~/40 行）；不解析包内容                             | 小     |
 | shared   | 无新密码学（复用 backup.dart）；可能加一个 `KeyEscrowService` 封装（上传/拉取/解密） | 小     |
 | CLI      | 新增 `escrow upload/download` 命令（便于老板先用 CLI 验证）                          | 小     |
-| App      | 设置页加"接入口令"输入；新设备接入流程第⑤步；rotate 后自动重传                       | 中     |
+| App      | 设置页加"密保口令"；新设备接入流程第⑤步；rotate 后自动重传                           | 中     |
 | 协议文档 | PROTOCOL.md 增补 §7.4                                                                | 小     |
 
 **明确不改**：消息加解密、同步/锚点、白名单、WS 推送、备份格式——全部保持现状。

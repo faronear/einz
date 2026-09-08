@@ -844,7 +844,7 @@ class _SetupPageState extends State<SetupPage> {
       _spaceId.text = r.spaceId;
       _bootstrapFailed = false;
     });
-    // 底部状态通知：新设备已绑定到私密领地（老板要求——enroll 成功后显示）
+    // 底部状态通知：新设备已绑定到秘境（老板要求——enroll 成功后显示）
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context)!.setupEnrollBoundNotice)),
     );
