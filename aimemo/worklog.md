@@ -1152,3 +1152,22 @@ App 用户太危险，**仅限 TUI**。密保信封导入（join 口令页「改
 （golden 按政策跳过）。
 
 **不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。
+
+## 2026-09-08 会话：新设备向导 ⋯ 菜单与对话页一致化
+
+**任务（老板要求）：** 新设备向导（setup_page）右上角可展开菜单应与对话页菜单一致：
+标签靠左、内容靠右（如「界面语言    中文」）、标签用淡灰（onSurfaceVariant）。
+
+**实现（对齐 chat_page/lock_page 菜单样式）：**
+- setup_page ⋯ 菜单 locale 项：`Text(wizardMenuLocale(...))` 改为
+  `Row[Text(chatPageMenuLocaleLabel, labelStyle) + Spacer + Text(kLocaleLabels[...])]`
+- exit 项补 labelStyle（此前无淡色）；locale 与 exit 之间加 PopupMenuDivider（与
+  lock_page/chat_page 分隔一致）；itemBuilder 内定义 labelStyle
+- `wizardMenuLocale` ARB 键（"语言: {value}"）改后无引用 → zh/en 删除 + gen-l10n 重生成
+- golden_render_test 过时注释「语言 / 恢复 / 退出」→「语言 / 退出」（恢复已移除）
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；widget/setup_join_passphrase/
+setup_envelope_verify/wizard_envelope_entry/setup_probe_retry/chat_page_menu/lock_page
+25 项全过（golden 按政策跳过）。
+
+**不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。

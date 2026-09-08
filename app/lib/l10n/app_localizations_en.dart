@@ -52,11 +52,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardStartTitle => 'Finding EINZ';
 
   @override
-  String wizardMenuLocale(String value) {
-    return 'Language: $value';
-  }
-
-  @override
   String get wizardDetectTitle => 'Checking server status…';
 
   @override

@@ -49,11 +49,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStartTitle => '寻找秘境...';
 
   @override
-  String wizardMenuLocale(String value) {
-    return '语言: $value';
-  }
-
-  @override
   String get wizardDetectTitle => '正在检测服务器状态…';
 
   @override

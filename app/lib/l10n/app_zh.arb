@@ -13,12 +13,6 @@
   "setupPageNeedPassphrase": "⚠️ 先在上方填写密保口令（对方凭它解密消息）",
   "setupEnrollBoundNotice": "🎉 新设备已成功绑定",
   "wizardStartTitle": "寻找秘境...",
-  "wizardMenuLocale": "语言: {value}",
-  "@wizardMenuLocale": {
-    "placeholders": {
-      "value": {"type": "String"}
-    }
-  },
   "wizardDetectTitle": "正在检测服务器状态…",
   "wizardDetectHint": "自动判断你是第几个用户（首个设备将创建空间）",
   "wizardDetectFailed": "无法连接服务器，请在上方输入地址后重试",

@@ -176,12 +176,6 @@ abstract class AppLocalizations {
   /// **'Finding EINZ'**
   String get wizardStartTitle;
 
-  /// No description provided for @wizardMenuLocale.
-  ///
-  /// In en, this message translates to:
-  /// **'Language: {value}'**
-  String wizardMenuLocale(String value);
-
   /// No description provided for @wizardDetectTitle.
   ///
   /// In en, this message translates to:

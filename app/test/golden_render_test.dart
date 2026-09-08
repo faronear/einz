@@ -374,7 +374,7 @@ void main() {
   testWidgets('向导 ⋯ 菜单：退出秘境确认弹窗（不触发 exit）', (WidgetTester tester) async {
     await pumpSetup(tester, keyPair: _goldenKeyPair); // 空名称表 → create 向导
     await tester.pumpAndSettle();
-    // 打开右上角 ⋯ 菜单（语言 / 恢复 / 退出秘境）
+    // 打开右上角 ⋯ 菜单（语言 / 退出秘境）
     await tester.tap(find.byType(PopupMenuButton<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('退出秘境'));

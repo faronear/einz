@@ -272,16 +272,26 @@ class _SetupPageState extends State<SetupPage> {
               });
             },
             itemBuilder: (context) {
+              // 行内左侧标签用稍淡色，与右侧当前值文字（默认 onSurface 深色）区分
+              final labelStyle =
+                  TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
               final langCode = Localizations.localeOf(context).languageCode;
               return [
                 PopupMenuItem(
                   value: 'locale',
-                  child: Text(l10n.wizardMenuLocale(kLocaleLabels[langCode] ?? langCode)),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuLocaleLabel, style: labelStyle),
+                      const Spacer(),
+                      Text(kLocaleLabels[langCode] ?? langCode),
+                    ],
+                  ),
                 ),
+                const PopupMenuDivider(),
                 PopupMenuItem(
                   value: 'exit',
-                  child: Text(l10n.chatPageMenuExit),
+                  child: Text(l10n.chatPageMenuExit, style: labelStyle),
                 ),
               ];
             },

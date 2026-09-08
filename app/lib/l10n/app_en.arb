@@ -13,12 +13,6 @@
   "setupPageNeedPassphrase": "⚠️ Set an access passphrase above first (your partner joins with it)",
   "setupEnrollBoundNotice": "New device bound to my private space",
   "wizardStartTitle": "Finding EINZ",
-  "wizardMenuLocale": "Language: {value}",
-  "@wizardMenuLocale": {
-    "placeholders": {
-      "value": {"type": "String"}
-    }
-  },
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "We'll detect whether you're the first user (first device creates the space)",
   "wizardDetectFailed": "Cannot reach server — enter the address above and retry",
