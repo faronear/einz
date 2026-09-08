@@ -508,7 +508,7 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     // join 口令页（步骤 3）：输入口令必须与首台设备创建时一致（解密 escrow
-    // 托管包成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
+    // 口令密保箱成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
     if (_role == _WizardRole.join && _step == 3) {
       final verified = await _verifyJoinPassphrase();
       if (!mounted) return;
@@ -739,7 +739,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 全丢恢复：弹窗输入 escrow 口令 → 服务端凭口令重置空间（/recover，撤销
-  /// 全部设备）并返回托管包 → 解出 Space Key → 本设备首设备自举 → PIN 步骤；
+  /// 全部设备）并返回口令密保箱 → 解出 Space Key → 本设备首设备自举 → PIN 步骤；
   /// 折叠区可选「从完整备份恢复」（归档文本 + 归档口令，本地重建密钥与历史）。
   Future<void> _showRecoverDialog() async {
     await showDialog<void>(
@@ -1297,7 +1297,7 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN ----
 
-  /// join：凭邀请码登记 → 认证 → 拉取口令托管包 → 口令解密出 Space Key → 设置 PIN → 完成。
+  /// join：凭邀请码登记 → 认证 → 拉取口令密保箱 → 口令解密出 Space Key → 设置 PIN → 完成。
   /// join 邀请码页（步骤 2）「验证邀请码」：凭码登记（服务端校验，无效码抛错）
   /// ——登记成功（= 邀请码有效）才放行到口令页，错误码提示并停留本页。
   Future<bool> _verifyInviteCode() async {
@@ -1326,7 +1326,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// join 口令页（步骤 3）「验证接入口令」：登记 → 认证 → fetch escrow 托管包 →
+  /// join 口令页（步骤 3）「验证接入口令」：登记 → 认证 → fetch escrow 口令密保箱 →
   /// 用输入口令解密——口令与首台设备创建时一致（解密成功）才放行进 PIN 步骤。
   Future<bool> _verifyJoinPassphrase() async {
     final kp = _keyPair;
@@ -1349,7 +1349,7 @@ class _SetupPageState extends State<SetupPage> {
       // 2) 认证（用登记后的真实 deviceId）
       final session = await _authenticate(kp, enroll.deviceId);
       _sessionToken = session.sessionToken;
-      // 3) fetch 托管包并用输入口令解密：口令错 → FormatException → 不通过
+      // 3) fetch 口令密保箱并用输入口令解密：口令错 → FormatException → 不通过
       final escrow = widget.escrowOverride?.call(_server) ?? KeyEscrowService(ApiClient(_server));
       final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
       if (!mounted) return false;
@@ -1531,7 +1531,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 }
 
-/// 全丢恢复弹窗：输入 escrow 口令（主路径：/recover 重置 + 托管包解密）；折叠区
+/// 全丢恢复弹窗：输入 escrow 口令（主路径：/recover 重置 + 口令密保箱解密）；折叠区
 /// 粘贴归档文本 + 归档口令（本地重建密钥与历史）→ 回调向导应用恢复数据。
 class _RecoverDialog extends StatefulWidget {
   const _RecoverDialog({

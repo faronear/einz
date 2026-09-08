@@ -53,7 +53,7 @@ class DeviceStore {
   int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
   int lastServerSequence;
 
-  /// 创建者口令托管包是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
+  /// 创建者口令密保箱是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
   bool escrowUploaded;
 
   /// 离线发送队列：MessageEnvelope 的 JSON 字符串（已加密，落盘安全）。

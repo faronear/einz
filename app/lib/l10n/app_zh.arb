@@ -40,7 +40,7 @@
   "wizardRecoverHint": "全部设备丢失？输入当初设置口令托管时的内容安全口令；口令正确将重置空间并恢复本设备（无需备份文本）",
   "wizardRecoverPassphraseLabel": "口令",
   "wizardRecoverStart": "恢复",
-  "wizardRecoverBadPassphrase": "口令错误，或未上传口令托管包",
+  "wizardRecoverBadPassphrase": "口令错误，或未上传口令密保箱",
   "wizardRecoverArchiveTitle": "从完整备份恢复（归档）",
   "wizardRecoverArchiveHint": "粘贴导出的完整备份文本并输入归档口令，恢复空间密钥与聊天历史（需服务器可达）",
   "wizardRecoverArchiveTextLabel": "归档文本（EINZ-BACKUP: 开头）",
@@ -105,7 +105,7 @@
   "setupPageInviteHint": "扫码后自动填入；手动加入时粘贴对方提供的一次性邀请码",
   "setupPageNeedInvite": "⚠️ 请填写一次性邀请码（由已认证设备生成）",
   "wizardInviteWrong": "邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码",
-  "setupPageNoEscrow": "❌ Server 无口令托管包（请先在对端设置接入口令）",
+  "setupPageNoEscrow": "❌ Server 无口令密保箱（请先在对端设置接入口令）",
   "setupPageEscrowFailed": "❌ 口令接入失败: {error}",
   "@setupPageEscrowFailed": {
     "placeholders": {
@@ -170,7 +170,7 @@
   "chatPageChangePassphraseConfirmTitle": "修改内容密保口令？",
   "chatPageChangePassphraseConfirmMessage": "确定要修改内容密保口令吗？修改后需用新口令解密内容密文。",
   "chatPageChangePassphraseOldWrong": "旧口令错误",
-  "chatPageChangePassphraseNoEscrow": "尚未设置口令（无托管包可修改）",
+  "chatPageChangePassphraseNoEscrow": "尚未设置口令（无口令密保箱可修改）",
   "chatPageChangePassphraseDone": "✅ 口令已修改（新设备加入时请使用新口令）",
   "chatPageChangePassphraseFailed": "修改口令失败: {error}",
   "@chatPageChangePassphraseFailed": {

@@ -83,7 +83,7 @@ class _LockPageState extends State<LockPage> {
     ));
   }
 
-  /// rotate 后同步：解锁成功时用最新 Space Key 重传口令托管包
+  /// rotate 后同步：解锁成功时用最新 Space Key 重传口令密保箱
   /// （KEY_ESCROW.md §7，失败静默，下次解锁自动重试）。
   void _syncEscrow(AppLockPayload payload) {
     final pass = payload.escrowPassphrase;
@@ -93,8 +93,8 @@ class _LockPageState extends State<LockPage> {
       try {
         final api = ApiClient(payload.server);
         final escrow = KeyEscrowService(api);
-        // 上传前校验：本地口令必须能解开服务器当前托管包，否则跳过重传——
-        // 口令已修改但本机锁包未同步时，防止旧口令覆盖新托管包
+        // 上传前校验：本地口令必须能解开服务器当前口令密保箱，否则跳过重传——
+        // 口令已修改但本机锁包未同步时，防止旧口令覆盖新口令密保箱
         final snap = await api.getKeyEscrow(token);
         final current = snap.file;
         if (current != null) {
@@ -126,7 +126,7 @@ class _LockPageState extends State<LockPage> {
     try {
       final payload = await _lock.unlock(_pin.text);
       if (!mounted) return;
-      _syncEscrow(payload); // rotate 后同步：重传口令托管包
+      _syncEscrow(payload); // rotate 后同步：重传口令密保箱
       _enterChat(payload);
     } on AppLockLockedException catch (e) {
       if (!mounted) return;

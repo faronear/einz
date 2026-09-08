@@ -180,7 +180,7 @@ class ApiClient {
 
   /// 全丢恢复（免认证）：凭 escrow 口令验证后撤销全部设备（空间重置），
   /// 并返回 escrow 密文包——同一口令可本地解出 Space Key（无需预先导出的
-  /// EINZ-BACKUP 文本，闭环）；未托管包（理论边界）时返回 null。
+  /// EINZ-BACKUP 文本，闭环）；未托管口令密保箱（理论边界）时返回 null。
   Future<BackupFile?> recoverSpace(String passphrase) async {
     final res = await _post(Api.recover, {'passphrase': passphrase}, withToken: false);
     final pkg = res['package'];

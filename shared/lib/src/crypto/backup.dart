@@ -15,7 +15,7 @@ import '../sodium.dart';
 const String kBackupFormat = 'einz-backup-v1';
 
 /// 口令加密文本前缀：`EINZ-BACKUP:` + base64(BackupFile JSON)。用于两类
-/// 口令加密载体：① escrow 托管包 / /recover 返回包（Space Key 包，纯口令
+/// 口令加密载体：① escrow 口令密保箱 / /recover 返回包（Space Key 包，纯口令
 /// 恢复用）；② app「导出完整备份」的归档文本（Space Key + 全量聊天历史）。
 const String kBackupExportPrefix = 'EINZ-BACKUP:';
 

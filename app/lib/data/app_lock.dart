@@ -75,7 +75,7 @@ class AppLockService {
 
   /// 修改 escrow 口令后同步本地明文配置（跳过 PIN 场景）。
   /// 设 PIN 场景（加密包）因无 PIN 可用不动锁包——由 lock_page._syncEscrow
-  /// 的上传前口令验证保护，防止旧口令覆盖新托管包。
+  /// 的上传前口令验证保护，防止旧口令覆盖新口令密保箱。
   Future<void> updateEscrowPassphrase(String passphrase, {int? updatedAt}) async {
     final plain = await loadPlain();
     if (plain == null) return;
@@ -203,7 +203,7 @@ class AppLockPayload {
   final String? token;
 
   /// 口令托管（KEY_ESCROW.md）的接入口令：与 App 锁 PIN 区分，
-  /// 同样受 PIN 加密保护；解锁/认证成功时用于自动重传托管包（rotate 后同步）。
+  /// 同样受 PIN 加密保护；解锁/认证成功时用于自动重传口令密保箱（rotate 后同步）。
   final String? escrowPassphrase;
 
   /// 本端已知的服务端口令更新时间（ms）：上线时与服务器对比，

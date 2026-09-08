@@ -1800,7 +1800,7 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
   }
 }
 
-/// 修改口令弹窗（StatefulWidget）：旧口令验证（fetch 托管包解密）→
+/// 修改口令弹窗（StatefulWidget）：旧口令验证（fetch 口令密保箱解密）→
 /// 新口令重加密上传（含新 argon2id 哈希）→ 本地明文 payload 同步更新。
 class _ChangePassphraseDialog extends StatefulWidget {
   const _ChangePassphraseDialog({
@@ -1872,7 +1872,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     try {
       final api = ApiClient(widget.server);
       final escrow = KeyEscrowService(api);
-      // 1) 验证旧口令：必须能解开服务器当前托管包
+      // 1) 验证旧口令：必须能解开服务器当前口令密保箱
       final snap = await api.getKeyEscrow(widget.token);
       final file = snap.file;
       if (file == null) {

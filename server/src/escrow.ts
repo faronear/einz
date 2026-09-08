@@ -96,7 +96,7 @@ export async function recoverSpace (
     | { passphrase_hash: string | null; package: string | null }
     | undefined
   if (!row || !row.passphrase_hash) {
-    throw new ApiError('FORBIDDEN', '未上传口令托管包，无法恢复', 403)
+    throw new ApiError('FORBIDDEN', '未上传口令密保箱，无法恢复', 403)
   }
   if (!(await pwhashStrVerify(row.passphrase_hash, passphrase))) {
     throw new ApiError('FORBIDDEN', '口令错误', 403)
@@ -114,7 +114,7 @@ export async function recoverSpace (
 
   // 闭环：口令正确即空间主人——顺带返回 escrow 密文包，新设备凭同一口令解出
   // Space Key（不再依赖预先导出的 EINZ-BACKUP 文本）。包本身口令加密，与
-  // GET /key-escrow 同构；未托管包（理论边界）时省略该字段。
+  // GET /key-escrow 同构；未托管口令密保箱（理论边界）时省略该字段。
   const pkg = row.package ? (JSON.parse(row.package) as unknown) : undefined
   return { ok: true, revoked, ...(pkg !== undefined ? { package: pkg } : {}) }
 }

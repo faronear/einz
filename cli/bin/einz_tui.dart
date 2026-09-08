@@ -337,7 +337,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 首设备（探测无 person 名称表）跳过此步，直接走下方"你的名称"询问。
   // 全丢恢复入口（开发运维专用；闭环：仅凭 escrow 口令即可）：全新设备 +
   // 空间已有成员（探测名称表非空）+ 本机无 Space Key → 可选"r 全丢恢复"——
-  // 输入 escrow 口令 → 服务端 /recover 重置空间并返回托管包 → 本机解出
+  // 输入 escrow 口令 → 服务端 /recover 重置空间并返回口令密保箱 → 本机解出
   // Space Key、以创建者身份重建（无需预先导出的 EINZ-BACKUP 文本）。
   var recovered = false;
   if (store.deviceId == null && store.spaceKey == null && _probePersonNames.isNotEmpty) {
@@ -445,8 +445,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
       if (!_state!.running) return; // 绑定期间被 /exit 或 Ctrl+C 中断：不再生成口令托管等
-      // 发起者首次创建：生成 Space Key + 上传口令托管包（两次确认，机密 *）。
-      // 全丢恢复后跳过此段：spaceKey 已由备份解出、托管包与口令未变（不重传）
+      // 发起者首次创建：生成 Space Key + 上传口令密保箱（两次确认，机密 *）。
+      // 全丢恢复后跳过此段：spaceKey 已由备份解出、口令密保箱与口令未变（不重传）
       if (store.spaceKey == null) {
         final sk = await generateSpaceKey();
         store.spaceKey = base64Encode(sk);
@@ -533,7 +533,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         session.messages.add(_systemMessage(session, '----------------'));
         session.messages.add(_systemMessage(session, '🎉 您已成功进入了私密领地。输入 /help 可查看快捷命令。立刻开始点对点加密聊天吧！'));
         session.messages.add(_systemMessage(session, '================'));
-        store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
+        store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
         store.save(storePath);
         _onboarded = true; // 第二设备口令接入完成
         _scheduleRender();
@@ -551,7 +551,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     store.save(storePath);
   }
 
-  // 已登记但口令托管包未上传（发起者引导中断）：重启再进引导设置口令。
+  // 已登记但口令密保箱未上传（发起者引导中断）：重启再进引导设置口令。
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
     session.messages.add(_systemMessage(session, '检测到尚未设置您的领地口令，现在设置: '));
@@ -2052,11 +2052,11 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
     s.session.messages.add(_systemMessage(
         s.session,
         '✅ 口令核对成功，本设备能够访问私密领地内容')); // （space_id=${s.session.store.spaceId} key_version=${s.session.store.keyVersion}）
-    s.session.store.escrowUploaded = true; // 已通过托管包接入（托管就绪），不再要求设置托管口令
+    s.session.store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
     s.session.store.save(s.session.storePath);
   } catch (e) {
     // accessByEscrow 抛 StateError（Error 子类），on Exception 捕获不到
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？私密领地已有口令托管包？）'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 口令核对失败: $e（口令错误？私密领地已有口令密保箱？）'));
   }
 }
 
@@ -2104,7 +2104,7 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
 /// 全丢恢复（开发运维专用；闭环——仅凭 escrow 口令，无需 EINZ-BACKUP 文本）：
 /// 输入 escrow 口令 → 服务端 /recover 凭口令重置（撤销全部设备/会话/邀请码）
 /// 并返回 escrow 密文包 → 用同一口令 decryptBackup 本地解出 Space Key → 本机
-/// 写入恢复密钥/space_id/key_version，置 escrowUploaded（托管包未变不重传），
+/// 写入恢复密钥/space_id/key_version，置 escrowUploaded（口令密保箱未变不重传），
 /// 以创建者身份重新首设备自举（enroll/auth 由引导后续步骤完成）。
 /// 口令错误 → 服务端先校验后重置（403，未撤销任何设备），失败提示后可重试。
 Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String storePath, String server) async {
@@ -2123,7 +2123,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       //    未撤销任何设备；未托管 → pkg 为 null）
       final pkg = await ApiClient(server).recoverSpace(passphrase);
       if (pkg == null) {
-        session.messages.add(_systemMessage(session, '⚠️ 未上传口令托管包，无法恢复'));
+        session.messages.add(_systemMessage(session, '⚠️ 未上传口令密保箱，无法恢复'));
         session.messages.add(_systemMessage(session, '----------------'));
         _scheduleRender();
         continue;
@@ -2138,7 +2138,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       store.deviceId = null;
       store.personId = null;
       store.sessionToken = null;
-      store.escrowUploaded = true; // 托管包仍在服务器（口令未变），不再要求重传
+      store.escrowUploaded = true; // 口令密保箱仍在服务器（口令未变），不再要求重传
       // 恢复后首设备固定登记为新空间 personA/dev1（服务端自举规则，与恢复者
       // 原是 1 还是 2 无关）→ 不询问身份，直接沿用 personA 的显示名
       //（/recover 不清 person_names 表）；personA 未命名过则留空（显示回退）
@@ -2150,12 +2150,12 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       _scheduleRender();
       return true;
     } on FormatException {
-      session.messages.add(_systemMessage(session, '⚠️ 口令无法解开托管包（异常），请重新输入'));
+      session.messages.add(_systemMessage(session, '⚠️ 口令无法解开口令密保箱（异常），请重新输入'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
     } on ApiException catch (e) {
       final hint = e.code == 'FORBIDDEN'
-          ? '口令与服务器托管不符，或未上传口令托管包'
+          ? '口令与服务器托管不符，或未上传口令密保箱'
           : '服务端恢复失败（${e.code}）';
       session.messages.add(_systemMessage(session, '⚠️ $hint，请重新输入'));
       session.messages.add(_systemMessage(session, '----------------'));
@@ -2168,7 +2168,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
   }
 }
 
-/// 修改托管口令（/passphrase）：旧口令验证（fetch 托管包解密）→
+/// 修改托管口令（/passphrase）：旧口令验证（fetch 口令密保箱解密）→
 /// 新口令重加密上传（含新 argon2id 哈希）。口令输入不回显（hidden）。
 /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
 /// 服务器更新 = 口令已重设——系统消息通知（插入消息流，不弹窗）。
@@ -2197,7 +2197,7 @@ Future<void> _checkEscrowRotated(ChatSession session) async {
 Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) async {
   final api = ApiClient(session.server);
   final escrow = KeyEscrowService(api);
-  // 1) 旧口令验证：必须能解开服务器当前托管包
+  // 1) 旧口令验证：必须能解开服务器当前口令密保箱
   while (true) {
     if (!_state!.running) return; // 已退出
     final oldPass = await _prompt(session, '❓ 请输入当前内容密保口令（用于验证）：', hidden: true, required: true);
@@ -2217,7 +2217,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
       }
       break; // 旧口令验证通过
     } catch (e) {
-      session.messages.add(_systemMessage(session, '⚠️ 读取托管包失败: $e，请稍后再试'));
+      session.messages.add(_systemMessage(session, '⚠️ 读取口令密保箱失败: $e，请稍后再试'));
       return;
     }
   }
@@ -2233,7 +2233,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
     }
     // 3) 新口令重加密上传（含新哈希；_busy 期间禁止输入）
     try {
-      await _busy(session, '⏳ 正在用新口令重新加密托管包......', () async {
+      await _busy(session, '⏳ 正在用新口令重新加密口令密保箱......', () async {
         await escrow.upload(
           passphrase: p1,
           spaceKeyB64: store.spaceKey!,
@@ -2283,14 +2283,14 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       });
       store.escrowUploaded = true;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 口令加密的密钥托管包已上传'));
+      session.messages.add(_systemMessage(session, '✅ 口令密保箱已上传'));
       session.messages.add(_systemMessage(session, '----------------'));
       session.messages.add(_systemMessage(session, '🎉 您的私密领地已成功建立！输入 /invite 生成邀请码，邀请你的伴侣快来聊天吧！'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return;
     } catch (e) {
-      session.messages.add(_systemMessage(session, '⚠️ 口令加密的密钥托管包上传失败: $e，请重新设置'));
+      session.messages.add(_systemMessage(session, '⚠️ 口令密保箱上传失败: $e，请重新设置'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
     } 

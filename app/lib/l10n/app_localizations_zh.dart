@@ -118,7 +118,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRecoverStart => '恢复';
 
   @override
-  String get wizardRecoverBadPassphrase => '口令错误，或未上传口令托管包';
+  String get wizardRecoverBadPassphrase => '口令错误，或未上传口令密保箱';
 
   @override
   String get wizardRecoverArchiveTitle => '从完整备份恢复（归档）';
@@ -267,7 +267,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardInviteWrong => '邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码';
 
   @override
-  String get setupPageNoEscrow => '❌ Server 无口令托管包（请先在对端设置接入口令）';
+  String get setupPageNoEscrow => '❌ Server 无口令密保箱（请先在对端设置接入口令）';
 
   @override
   String setupPageEscrowFailed(String error) {
@@ -416,7 +416,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseOldWrong => '旧口令错误';
 
   @override
-  String get chatPageChangePassphraseNoEscrow => '尚未设置口令（无托管包可修改）';
+  String get chatPageChangePassphraseNoEscrow => '尚未设置口令（无口令密保箱可修改）';
 
   @override
   String get chatPageChangePassphraseDone => '✅ 口令已修改（新设备加入时请使用新口令）';

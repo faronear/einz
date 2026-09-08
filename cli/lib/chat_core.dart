@@ -138,15 +138,15 @@ class ChatSession {
   }
 
   /// 凭口令接入（escrow download，KEY_ESCROW.md §4）：先认证拿到 token，
-  /// 再从 Server 拉取口令托管包解出 Space Key 写回 store。
+  /// 再从 Server 拉取口令密保箱解出 Space Key 写回 store。
   /// 新设备接入无需对方公钥（与 App「加入」流程一致）；口令错误抛 [FormatException]。
   Future<void> accessByEscrow(String passphrase) async {
-    await auth(); // 拉取托管包需要 session_token
+    await auth(); // 拉取口令密保箱需要 session_token
     final api = ApiClient(server);
     final escrow = KeyEscrowService(api);
     final payload = await escrow.fetch(passphrase: passphrase, token: store.sessionToken!);
     if (payload == null) {
-      throw StateError('Server 无口令托管包（请先在对端执行 escrow upload）');
+      throw StateError('Server 无口令密保箱（请先在对端执行 escrow upload）');
     }
     // 写回 store（参照 import 的归档逻辑：新版本 > 当前时归档旧密钥）
     if (payload.keyVersion > store.keyVersion && store.spaceKey != null) {

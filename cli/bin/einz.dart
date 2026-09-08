@@ -244,7 +244,7 @@ Future<void> _cmdEnroll(ArgResults opts) async {
   final isBootstrap = inviteCode == null || inviteCode.isEmpty;
   stdout.writeln('✅ 登记成功: device_id=${r.deviceId} person_id=${r.personId} space_id=${r.spaceId}');
   if (isBootstrap) {
-    stdout.writeln('   （首设备自举：你是空间创建者，可 escrow upload 上传托管包、invite 生成邀请码）');
+    stdout.writeln('   （首设备自举：你是空间创建者，可 escrow upload 上传口令密保箱、invite 生成邀请码）');
   }
 }
 
@@ -309,10 +309,10 @@ Future<void> _cmdEscrowUpload(ArgResults opts) async {
     keyVersion: store.keyVersion,
     token: session.sessionToken,
   );
-  stdout.writeln('✅ 口令托管包已上传（Server 只存密文）: space_id=${store.spaceId}');
+  stdout.writeln('✅ 口令密保箱已上传（Server 只存密文）: space_id=${store.spaceId}');
 }
 
-/// escrow download：拉取口令托管包并解出 Space Key 写回 store。
+/// escrow download：拉取口令密保箱并解出 Space Key 写回 store。
 /// 新设备接入：init（生成身份）→ 白名单登记 → escrow download（凭口令）→ send/sync。
 Future<void> _cmdEscrowDownload(ArgResults opts) async {
   final path = _require(opts, 'store');
@@ -334,7 +334,7 @@ Future<void> _cmdEscrowDownload(ArgResults opts) async {
   final escrow = KeyEscrowService(api);
   final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
   if (payload == null) {
-    stdout.writeln('⚠️ Server 无口令托管包（请先在对端执行 escrow upload）');
+    stdout.writeln('⚠️ Server 无口令密保箱（请先在对端执行 escrow upload）');
     return;
   }
 
@@ -346,7 +346,7 @@ Future<void> _cmdEscrowDownload(ArgResults opts) async {
   store.spaceId = payload.spaceId;
   store.keyVersion = payload.keyVersion;
   store.save(path);
-  stdout.writeln('✅ 口令托管包已解出 Space Key: space_id=${payload.spaceId} key_version=${payload.keyVersion}');
+  stdout.writeln('✅ 口令密保箱已解出 Space Key: space_id=${payload.spaceId} key_version=${payload.keyVersion}');
 }
 
 Future<void> _cmdSend(ArgResults opts) async {

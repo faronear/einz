@@ -82,11 +82,11 @@ class KeyEscrowService {
     return openPackage(passphrase: passphrase, file: file);
   }
 
-  /// 清除托管包。
+  /// 清除口令密保箱。
   Future<void> remove(String token) => api.deleteKeyEscrow(token);
 }
 
-/// 从口令托管包解出的 Space Key 信息。
+/// 从口令密保箱解出的 Space Key 信息。
 class EscrowPayload {
   const EscrowPayload({
     required this.spaceKeyB64,

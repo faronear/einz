@@ -86,11 +86,11 @@ curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 cd /Users/Shared/productX/only/cli
 dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
   --server https://einz.tic.cc --passphrase "你的接入口令"
-# 期望：✅ 口令托管包已上传
+# 期望：✅ 口令密保箱已上传
 
 dart run bin/einz.dart escrow --action download --store /tmp/b.json \
   --server https://einz.tic.cc --passphrase "你的接入口令"
-# 期望：✅ 口令托管包已解出 Space Key
+# 期望：✅ 口令密保箱已解出 Space Key
 ```
 
 > `/tmp/a.json`/`/tmp/b.json` 为设备 store 文件路径（本机 /tmp/ 或按需生成：`init` 后 `config`/`import`）。
