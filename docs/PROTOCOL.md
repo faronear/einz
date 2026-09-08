@@ -244,7 +244,7 @@ wss://host/ws?pv=1&token=<session_token>
 | S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话 |
 | S→C | `peer.online` | `{ "device_id": "dev1" }` | 对端设备上线（WS 连接建立时广播） |
 | S→C | `peer.offline` | `{ "device_id": "dev1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态） |
-| S→C | `passphrase.rotated` | `{ "device_id": "dev1" }` | 空间口令已被重设（对端应重新验证新口令；离线设备上线时经 GET /key-escrow 的 `updated_at` 对比补查） |
+| S→C | `passphrase.rotated` | `{ "device_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成邀请码/改口令时按需检测 updated_at 再要求输入新口令） |
 
 ### 8.3 顺序与重连
 

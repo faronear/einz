@@ -1244,6 +1244,12 @@ abstract class AppLocalizations {
   /// **'Passphrase updated'**
   String get chatPageEscrowRotatedTitle;
 
+  /// No description provided for @chatPageEscrowRotatedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Your partner reset the passphrase — you will be asked for the new one when creating invites or changing it'**
+  String get chatPageEscrowRotatedNotice;
+
   /// No description provided for @chatPageEscrowRotatedMessage.
   ///
   /// In en, this message translates to:

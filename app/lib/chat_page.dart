@@ -129,6 +129,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查后更新）
+  String? _escrowPassphrase; // 本端口令缓存（弹窗验证后更新——邀请码编入用）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
   /// 阅后即焚档位文案（l10n 映射）。
@@ -222,10 +223,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
   }
 
-  /// 空间口令被重设（Server 广播 passphrase.rotated）：弹窗要求重新验证新口令。
+  /// 空间口令被重设（Server 广播 passphrase.rotated）：只发通知不弹窗——
+  /// 生成邀请码/修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
     if (!mounted) return;
-    _showReverifyPassphraseDialog();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowRotatedNotice)),
+    );
   }
 
   /// 对方改名（Server 广播 profile.updated）：立即更新顶部条对方名。
@@ -236,7 +240,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
-  /// 服务器更新 = 口令已重设（补上错过的广播）→ 弹窗重新验证。
+  /// 服务器更新 = 口令已重设——只发通知不弹窗（生成邀请码/改口令时按需才要求）。
   Future<void> _checkEscrowRotated() async {
     if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
     try {
@@ -245,15 +249,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final serverAt = snap.updatedAt;
       final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
       if (serverAt != null && knownAt != null && serverAt > knownAt) {
-        if (mounted) _showReverifyPassphraseDialog();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowRotatedNotice)),
+        );
       }
     } catch (_) {
       // 查询失败（网络/未托管）静默：不打断正常使用
     }
   }
 
-  /// 弹窗：输入新口令重新验证（被动更新——口令被对方重设后的同步入口）。
-  Future<void> _showReverifyPassphraseDialog() async {
+  /// 弹窗：输入新口令重新验证（按需——生成邀请码检测到口令过时后触发）。
+  /// 验证通过返回新口令与 updated_at（调用方用于生成邀请码）。
+  Future<({String passphrase, int? updatedAt})?> _showReverifyPassphraseDialog() async {
     final result = await showDialog<({String passphrase, int? updatedAt})>(
       context: context,
       barrierDismissible: false,
@@ -263,15 +271,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         api: widget.api,
       ),
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) return null;
     // 验证通过：更新本端已知口令 + 服务端更新时间（持久化——重启后不再重复弹窗）
     _escrowUpdatedAt = result.updatedAt;
+    _escrowPassphrase = result.passphrase;
     await AppLockService(widget.db ?? LocalDatabase())
         .updateEscrowPassphrase(result.passphrase, updatedAt: result.updatedAt);
-    if (!mounted) return;
+    if (!mounted) return null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowResynced)),
     );
+    return result;
   }
 
   /// 本设备被撤销（Server 广播 device.revoked）：清理本地数据（锁包+消息库）
@@ -311,7 +321,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _restartTicker(online ? const Duration(seconds: 30) : const Duration(seconds: 3));
     if (mounted) setState(() {}); // 刷新标题红绿灯（在线绿/离线红）
     _refreshPeerOnline(); // 连接恢复时顺带刷新对方在线状态
-    if (online) _checkEscrowRotated(); // 上线补查：离线期间口令被重设则弹窗
+    if (online) _checkEscrowRotated(); // 上线补查：离线期间口令被重设则发通知
   }
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
@@ -361,9 +371,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"邀请设备"确认窗）
     try {
       final api = widget.api ?? ApiClient(widget.server);
+      // 按需检测：口令是否已被对方重设（服务端 updated_at > 本端已知）——
+      // 过时则先弹验证框输入新口令，确保邀请码编入新口令
+      final snap = await api.getKeyEscrow(widget.token);
+      final serverAt = snap.updatedAt;
+      final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
+      if (serverAt != null && knownAt != null && serverAt > knownAt) {
+        final result = await _showReverifyPassphraseDialog();
+        if (result == null || !mounted) return; // 取消：不生成（避免无效邀请码）
+      }
       final r = await api.createInvite(token: widget.token, personId: 'personB');
       if (!mounted) return;
-      final passphrase = widget.escrowPassphrase?.trim() ?? '';
+      final passphrase = (_escrowPassphrase ?? widget.escrowPassphrase)?.trim() ?? '';
       final info = JoinInfo(
         spaceId: widget.spaceId,
         passphrase: passphrase,

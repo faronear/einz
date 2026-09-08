@@ -618,9 +618,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       onAutoSync: (_) => _scheduleRender(),
       onPeerStatus: _onPeerStatus,
       onPassphraseRotated: (_) {
-        // 空间口令已被对方重设：提示（下次 /space 或 /passphrase 用新口令）
+        // 口令被对方重设：只发通知不弹窗（生成邀请码/改口令时按需要求新口令）
         _state?.session.messages.add(_systemMessage(_state!.session,
-            '⚠️ 对方已重设内容密保口令——下次 /space 接入或 /passphrase 修改请使用新口令'));
+            '⚠️ 对方已重设内容密保口令——生成邀请码或修改口令时将要求输入新口令'));
         _scheduleRender();
       },
       onProfileUpdated: _onProfileUpdated,
@@ -705,7 +705,7 @@ Future<void> main(List<String> args) async {
     session.messages.add(_systemMessage(session, _revokedBanner));
   }
   _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
-  _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则提示
+  _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
 
@@ -2155,7 +2155,8 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
 
 /// 修改托管口令（/passphrase）：旧口令验证（fetch 托管包解密）→
 /// 新口令重加密上传（含新 argon2id 哈希）。口令输入不回显（hidden）。
-/// 上线补查：离线期间口令被重设（服务端 updated_at 更新）→ 提示使用新口令。
+/// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
+/// 服务器更新 = 口令已重设——系统消息通知（插入消息流，不弹窗）。
 Future<void> _checkEscrowRotated(ChatSession session) async {
   final store = session.store;
   final server = store.server ?? '';
@@ -2167,7 +2168,7 @@ Future<void> _checkEscrowRotated(ChatSession session) async {
     final knownAt = store.escrowUpdatedAt;
     if (serverAt != null && knownAt != null && serverAt > knownAt) {
       session.messages.add(_systemMessage(session,
-          '⚠️ 离线期间内容密保口令已被重设——下次 /space 接入或 /passphrase 修改请使用新口令'));
+          '⚠️ 离线期间内容密保口令已被重设——生成邀请码或修改口令时将要求输入新口令'));
       _scheduleRender();
     }
   } catch (_) {

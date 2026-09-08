@@ -36,7 +36,7 @@ class WsRealtimeService {
   /// 对端上下线回调（Server 广播 peer.online/peer.offline——App 实时更新对方在线状态）。
   void Function(WsPeerStatusEvent event)? onPeerStatus;
 
-  /// 口令被重设回调（Server 广播 passphrase.rotated——App 弹窗要求重新验证新口令）。
+  /// 口令被重设回调（Server 广播 passphrase.rotated——App 只发通知，不弹窗）。
   void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated;
 
   /// 对方改名/改设备名回调（Server 广播 profile.updated——App 立即更新对方名）。

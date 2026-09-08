@@ -65,7 +65,7 @@ class WsPeerStatusEvent extends WsEvent {
   final String deviceId;
 }
 
-/// passphrase.rotated：空间口令已被重设（对端应重新验证新口令）。
+/// passphrase.rotated：空间口令已被重设（客户端收到后只发通知，不弹窗）。
 class WsPassphraseRotatedEvent extends WsEvent {
   const WsPassphraseRotatedEvent({required super.type, required this.deviceId});
 

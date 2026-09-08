@@ -40,7 +40,7 @@ export function uploadKeyEscrow(cfg: ServerConfig, token: string, body: unknown)
   if (passphraseHash !== undefined && (typeof passphraseHash !== "string" || passphraseHash.length === 0)) {
     throw new ApiError("INVALID_REQUEST", "invalid passphrase_hash", 400);
   }
-  // 口令已重设（passphrase_hash 与旧值不同）→ 通知其余在线设备重新验证
+  // 口令已重设（passphrase_hash 与旧值不同）→ 通知其余在线设备（客户端只发通知不弹窗）
   const prevRow = getDb()
     .prepare(`SELECT passphrase_hash FROM key_escrow WHERE space_id = ?`)
     .get(cfg.space_id) as { passphrase_hash: string | null } | undefined;

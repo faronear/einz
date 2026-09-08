@@ -283,6 +283,7 @@
   "chatPagePinSet": "PIN: set",
   "chatPagePinUnset": "PIN: not set",
   "chatPageEscrowRotatedTitle": "Passphrase updated",
+  "chatPageEscrowRotatedNotice": "Your partner reset the passphrase — you will be asked for the new one when creating invites or changing it",
   "chatPageEscrowRotatedMessage": "Your partner reset the passphrase. Enter the new one to sync this device",
   "chatPageEscrowRotatedLabel": "New passphrase",
   "chatPageEscrowRotatedVerify": "Verify & sync",

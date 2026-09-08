@@ -283,6 +283,7 @@
   "chatPagePinSet": "PIN: 已设置",
   "chatPagePinUnset": "PIN: 未设置",
   "chatPageEscrowRotatedTitle": "内容密保口令已更新",
+  "chatPageEscrowRotatedNotice": "对方已重设内容密保口令——生成邀请码或修改口令时将要求输入新口令",
   "chatPageEscrowRotatedMessage": "对方已重设内容密保口令，请输入新口令以同步本机",
   "chatPageEscrowRotatedLabel": "新口令",
   "chatPageEscrowRotatedVerify": "验证并同步",

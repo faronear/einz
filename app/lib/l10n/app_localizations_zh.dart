@@ -632,6 +632,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEscrowRotatedTitle => '内容密保口令已更新';
 
   @override
+  String get chatPageEscrowRotatedNotice => '对方已重设内容密保口令——生成邀请码或修改口令时将要求输入新口令';
+
+  @override
   String get chatPageEscrowRotatedMessage => '对方已重设内容密保口令，请输入新口令以同步本机';
 
   @override

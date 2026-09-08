@@ -34,7 +34,7 @@ function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer
   }
 }
 
-/** 空间口令已被重设：通知其余在线设备重新验证（App 弹窗 / TUI 提示）。 */
+/** 空间口令已被重设：通知其余在线设备（客户端收到后只发通知不弹窗）。 */
 export function broadcastPassphraseRotated(exceptDeviceId: string): void {
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;

@@ -674,6 +674,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEscrowRotatedTitle => 'Passphrase updated';
 
   @override
+  String get chatPageEscrowRotatedNotice =>
+      'Your partner reset the passphrase — you will be asked for the new one when creating invites or changing it';
+
+  @override
   String get chatPageEscrowRotatedMessage =>
       'Your partner reset the passphrase. Enter the new one to sync this device';
 
