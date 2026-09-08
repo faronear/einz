@@ -262,7 +262,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardAppBarCreate => 'Einz Space at Creating';
 
   @override
-  String get wizardAppBarJoin => 'Eins Space at Joining';
+  String get wizardAppBarJoin => 'Einz Space at Joining';
 
   @override
   String get wizardAppBarOffline => 'Import key envelope';
@@ -408,6 +408,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String setupPageKeyGenFailed(String error) {
     return '❌ Key generation failed: $error';
   }
+
+  @override
+  String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override
   String get setupPageGenKeyFirst => '⚠️ Generate the device key first';

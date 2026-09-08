@@ -82,7 +82,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageNeedPassphrase => '⚠️ 请先在上方填写接入口令（对方凭它接入）';
 
   @override
-  String get setupEnrollBoundNotice => '新设备已绑定到我的私密领地';
+  String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
 
   @override
   String get joinDialogTitle => '邀请对方加入';
@@ -343,7 +343,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnrollFirst => '⚠️ 请先完成设备登记（点上方按钮）';
 
   @override
-  String get wizardPassphraseHint => '请设置内容密保口令（务必牢记，严禁泄漏！您仅可将口令分享给您的伴侣）:';
+  String get wizardPassphraseHint => '设置内容密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:';
 
   @override
   String get wizardJoinPassphraseHint => '输入密保口令（如不知道，请询问领地创建人）';
@@ -376,12 +376,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogStart => '开始聊天';
 
   @override
-  String get wizardJoinHint => '扫描对方的二维码（含邀请码与口令）即可一键加入；也可粘贴文本或手动填写下方信息';
+  String get wizardJoinHint => '扫描二维邀请码；也可粘贴文本或手动填写下方信息';
 
   @override
   String setupPageKeyGenFailed(String error) {
     return '❌ 密钥生成失败: $error';
   }
+
+  @override
+  String get setupPageInitFailed => '初始化失败，正在自动重试…';
 
   @override
   String get setupPageGenKeyFirst => '⚠️ 先生成设备密钥';

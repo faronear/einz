@@ -29,7 +29,7 @@
   "setupPageEscrowAccess": "③ 凭口令接入（无需信封副本）",
   "setupPageGenerateSpaceKey": "自建空间（一键生成 Space Key）",
   "setupPageNeedPassphrase": "⚠️ 请先在上方填写接入口令（对方凭它接入）",
-  "setupEnrollBoundNotice": "新设备已绑定到我的私密领地",
+  "setupEnrollBoundNotice": "🎉 新设备已成功绑定",
   "joinDialogTitle": "邀请对方加入",
   "joinDialogHint": "对方安装 App 后点“③ 凭口令接入”，扫码或粘贴下方信息即可加入",
   "joinDialogSpace": "空间: {spaceId}",
@@ -141,7 +141,7 @@
     }
   },
   "wizardEnrollFirst": "⚠️ 请先完成设备登记（点上方按钮）",
-  "wizardPassphraseHint": "请设置内容密保口令（务必牢记，严禁泄漏！您仅可将口令分享给您的伴侣）:",
+  "wizardPassphraseHint": "设置内容密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:",
   "wizardJoinPassphraseHint": "输入密保口令（如不知道，请询问领地创建人）",
   "wizardJoinPassphraseWrong": "口令错误：请确认首台设备创建时设置的口令",
   "wizardSwitchToEnvelope": "改用密封密钥信封导入（离线）",
@@ -152,12 +152,16 @@
   "welcomeDialogTitleJoin": "🎉 成功认领我的领地",
   "welcomeDialogMessage": "一切就绪！仅限你和 TA，所有消息端到端加密，确保绝对隐私，开始聊天吧。",
   "welcomeDialogStart": "开始聊天",
-  "wizardJoinHint": "扫描对方的二维码（含邀请码与口令）即可一键加入；也可粘贴文本或手动填写下方信息",
+  "wizardJoinHint": "扫描二维邀请码；也可粘贴文本或手动填写下方信息",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
     "placeholders": {
       "error": {"type": "String"}
     }
+  },
+  "setupPageInitFailed": "初始化失败，正在自动重试…",
+  "@setupPageInitFailed": {
+    "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示——不展示技术细节（如 SqliteException），自动重试中"
   },
   "setupPageGenKeyFirst": "⚠️ 先生成设备密钥",
   "setupPagePasteEnvelope": "⚠️ 请粘贴密钥信封（base64）",

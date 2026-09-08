@@ -172,10 +172,13 @@ class _SetupPageState extends State<SetupPage> {
     } catch (e) {
       // 数据库/探测初始化异常（如 SQLite 锁竞争）→ 标记探测失败（可见），
       // 避免无限停留在检测页转环；用户可输入服务器地址重试。
+      // 注意：技术细节（如 SqliteException）不展示给用户（老板要求）——
+      // 本地库已配 busy_timeout/WAL 容错，此处只给友好提示 + 自动重试。
       if (!mounted) return;
+      debugPrint('Einz setup init failed: $e');
       setState(() {
         _probeFailed = true;
-        _status = '初始化失败: $e';
+        _status = AppLocalizations.of(context)!.setupPageInitFailed;
       });
       _startProbeRetry(); // 启动自动重试：一旦连上自动进入，不必等用户手动输地址
     }

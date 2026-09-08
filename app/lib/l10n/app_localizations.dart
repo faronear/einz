@@ -533,13 +533,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardAppBarCreate.
   ///
   /// In en, this message translates to:
-  /// **'Create a new space'**
+  /// **'Einz Space at Creating'**
   String get wizardAppBarCreate;
 
   /// No description provided for @wizardAppBarJoin.
   ///
   /// In en, this message translates to:
-  /// **'Join your partner\'s space'**
+  /// **'Einz Space at Joining'**
   String get wizardAppBarJoin;
 
   /// No description provided for @wizardAppBarOffline.
@@ -799,6 +799,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'❌ Key generation failed: {error}'**
   String setupPageKeyGenFailed(String error);
+
+  /// Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying
+  ///
+  /// In en, this message translates to:
+  /// **'Initialization failed, retrying…'**
+  String get setupPageInitFailed;
 
   /// No description provided for @setupPageGenKeyFirst.
   ///
