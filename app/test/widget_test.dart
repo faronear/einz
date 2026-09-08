@@ -42,7 +42,7 @@ void main() {
     expect(find.text('我是第一个使用者，创建新空间'), findsNothing);
     expect(find.text('① 生成设备密钥'), findsNothing);
     // 自动进入 create 步骤 1（AppBar 组合标题；输入框 label 是「我的名字」）
-    expect(find.text('Einz 秘境：创建中：我'), findsWidgets); // AppBar 标题
+    expect(find.text('Einz 秘境'), findsWidgets); // AppBar 标题
     // 底部保留"上一步"（可返回检测页）与"下一步"
     expect(find.text('上一步'), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);

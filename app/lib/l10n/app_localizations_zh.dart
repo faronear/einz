@@ -52,7 +52,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '无法连接服务器，请在上方输入地址后重试';
 
   @override
-  String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
+  String get wizardNameHint => '填写我的名字（将来可以随时修改）。';
 
   @override
   String get wizardPeerNameHint => '填写伴侣的名字（将来可以随时修改）：';
@@ -82,16 +82,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardIdentityFirst => '⚠️ 选择我的身份';
 
   @override
-  String get wizardInviteHint => '输入邀请码（由任意一个已绑定设备生成，24 小时内一次性有效）';
+  String get wizardInviteHint => '邀请码可由任意一个已绑定设备生成，24 小时内一次性有效。';
 
   @override
   String get wizardRoleOffline => '导入线下密保信封';
 
   @override
-  String get wizardAppBarCreate => 'Einz 秘境：创建中';
+  String get wizardAppBarCreate => 'Einz 秘境';
 
   @override
-  String get wizardAppBarJoin => 'Einz 秘境：认领中';
+  String get wizardAppBarJoin => 'Einz 秘境';
 
   @override
   String get wizardAppBarOffline => '导入密保信封';
@@ -142,10 +142,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint => '设置密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:';
+  String get wizardPassphraseHint => '对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
-  String get wizardJoinPassphraseHint => '输入密保口令（如不知道，请询问秘境伴侣）';
+  String get wizardJoinPassphraseHint => '对所有消息进行加密、解密。如还不知道口令，询问秘境伴侣。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
