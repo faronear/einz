@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../brand_logo.dart';
+
 OverlayEntry? _currentEntry;
 Timer? _dismissTimer;
 
@@ -94,7 +96,6 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Positioned(
       top: 0,
       left: 0,
@@ -112,20 +113,66 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
               ).animate(_slide),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                child: Material(
-                  color: scheme.inverseSurface,
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Text(
-                      widget.message,
-                      style: TextStyle(
-                        color: scheme.onInverseSurface,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    // Einz 粉蓝品牌渐变：图标天蓝（左上）→ 图标粉（右下）
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0x8CFFFFFF), // 半透明白细边（浅粉白背景上描出卡片）
+                      width: 1,
+                    ),
+                    // 粉调柔投影：浅粉白纸感背景下自然浮起
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0x59D6529C), // 粉强调 35% alpha
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
                       ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    child: Row(
+                      children: [
+                        // 白色圆角徽章 + 品牌 Logo
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.all(Radius.circular(9)),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(3),
+                            child: BrandLogo(size: 22, radius: 6),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            widget.message,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3,
+                              shadows: [
+                                Shadow(
+                                  color: Color(0x33000000),
+                                  offset: Offset(0, 1),
+                                  blurRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

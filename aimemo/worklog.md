@@ -1110,3 +1110,20 @@ setup_join_passphrase/setup_envelope_verify/ws_realtime/widget_test 23 项全过
 （golden 按政策跳过）。
 
 **不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（老板本地测试配置，照旧跳过）。
+
+## 2026-09-08 会话：顶部通知品牌化（粉蓝渐变 + Logo 徽章）
+
+**任务：** 老板要求顶部通知更有特色：用 Einz 粉蓝主题色、通知前放 Logo，自行设计。
+
+**设计（top_notice.dart 重构 _TopNoticeBanner.build）：**
+- 卡片主体：**天蓝 #3BAFFD → 粉 #D6529C 对角渐变**（左上→右下，品牌双色）
+- 左侧**白色圆角徽章 + BrandLogo(22)（assets/logo.png 粉蓝图标，复用 brand_logo.dart）**
+- 白字加粗 + 轻微文字阴影（粉端对比度兜底），最多 3 行省略号
+- 半透明白细边（浅粉白背景上描边）+ **粉调柔投影**（#D6529C 35% alpha）
+- 圆角 14；动画/4s 自动消失/点击关闭/替换旧条逻辑不变
+- 色值用具 alpha 的 const（0x59D6529C / 0x8CFFFFFF），不依赖 withValues/withOpacity
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；chat_page_menu/lock_page/
+setup_join_passphrase/setup_envelope_verify 18 项全过（golden 按政策跳过）。
+
+**不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。
