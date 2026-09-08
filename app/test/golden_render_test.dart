@@ -261,6 +261,9 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
+    // enroll 成功的 SnackBar 停留 4 秒：等其消失，截图不含临时通知
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.3_passphrase.png'));
   });
@@ -273,6 +276,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
+    await tester.pumpAndSettle();
+    // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡「下一步」且截图不含临时通知
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
@@ -289,6 +295,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
+    await tester.pumpAndSettle();
+    // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡后续「下一步」
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
@@ -309,6 +318,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
+    await tester.pumpAndSettle();
+    // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡后续「下一步」
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));

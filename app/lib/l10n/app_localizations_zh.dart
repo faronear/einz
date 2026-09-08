@@ -241,10 +241,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置 PIN 锁屏密码';
 
   @override
-  String get wizardAppBarCreate => '创建我的私密领地';
+  String get wizardAppBarCreate => 'Einz 密境创建中';
 
   @override
-  String get wizardAppBarJoin => '认领我的私密领地';
+  String get wizardAppBarJoin => 'Einz 密境认领中';
 
   @override
   String get wizardAppBarOffline => '导入密钥信封';

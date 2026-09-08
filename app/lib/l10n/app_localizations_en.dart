@@ -259,10 +259,10 @@ class AppLocalizationsEn extends AppLocalizations {
       '✅ Restored: device enrolled — set a PIN to finish';
 
   @override
-  String get wizardAppBarCreate => 'Create a new space';
+  String get wizardAppBarCreate => 'Einz Space at Creating';
 
   @override
-  String get wizardAppBarJoin => 'Join your partner\'s space';
+  String get wizardAppBarJoin => 'Eins Space at Joining';
 
   @override
   String get wizardAppBarOffline => 'Import key envelope';

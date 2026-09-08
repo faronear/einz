@@ -379,7 +379,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 当前步骤的简化短名（AppBar 大标题后拼接："认领我的私密领地：身份"）。
+  /// 当前步骤的简化短名（AppBar 大标题后拼接："Einz 密境认领中：身份"）。
   String _stepShortTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardRoleTitle;
     switch (_role!) {
@@ -409,7 +409,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 页眉标题（AppBar）：大标题 + "：" + 当前步骤简化短名
-  /// （如「认领我的私密领地：身份」；第 0 步未选角色时显示引导语）。
+  /// （如「Einz 密境认领中：身份」；第 0 步未选角色时显示引导语）。
   String _appBarTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardRoleTitle;
     switch (_role!) {
@@ -832,6 +832,10 @@ class _SetupPageState extends State<SetupPage> {
       _spaceId.text = r.spaceId;
       _bootstrapFailed = false;
     });
+    // 底部状态通知：新设备已绑定到私密领地（老板要求——enroll 成功后显示）
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.setupEnrollBoundNotice)),
+    );
   }
 
   /// 设置启动锁：内嵌表单直接执行（不再弹窗、无恢复码）——

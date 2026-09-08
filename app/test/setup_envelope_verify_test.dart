@@ -40,6 +40,9 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
   await tester.pumpAndSettle();
   await tester.tap(find.text('改用密封密钥信封导入（离线）')); // 口令页 → 信封页
   await tester.pumpAndSettle();
+  // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡底部「下一步」按钮
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
 }
 
 void main() {
