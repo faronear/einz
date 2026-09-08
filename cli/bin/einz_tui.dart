@@ -371,7 +371,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     if (chosenPerson == 'personB') {
       if ((_probePersonNames['personB'] ?? '').isEmpty) {
         // personB 还没有名称——要求输入显示名
-        final name = await _prompt(session, '❓ 输入我的名字（例如 Steffi，或者直接回车先跳过，以后可随时修改）：');
+        final name = await _prompt(session, '❓ 输入我的名字（例如 Alice，或者直接回车先跳过，以后可随时修改）：');
         if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
         if (name.isNotEmpty) { 
           store.personName = name;
@@ -408,7 +408,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       }
       // 第二用户名字（回车跳过 → 后台默认 personB）
       session.messages.add(_systemMessage(session, '----------------'));
-      final partnerName = (await _prompt(session, '❓ 输入伴侣的名字（例如 Steffi，或者直接回车先跳过）:')).trim();
+      final partnerName = (await _prompt(session, '❓ 输入伴侣的名字（例如 Alice，或者直接回车先跳过）:')).trim();
       if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
       if (partnerName.isNotEmpty) {
         partnerPresetName = partnerName;

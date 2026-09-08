@@ -259,7 +259,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.enterText(find.byType(TextField), 'Alice'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     // enroll 成功的 SnackBar 停留 4 秒：等其消失，截图不含临时通知
@@ -275,7 +275,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.enterText(find.byType(TextField), 'Alice'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡「下一步」且截图不含临时通知
@@ -294,7 +294,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.enterText(find.byType(TextField), 'Alice'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡后续「下一步」
@@ -317,7 +317,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Steffi'); // 对方名字（必填）
+    await tester.enterText(find.byType(TextField), 'Alice'); // 对方名字（必填）
     await tester.tap(find.text('下一步')); // 自动登记 → 口令页
     await tester.pumpAndSettle();
     // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡后续「下一步」

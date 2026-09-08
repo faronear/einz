@@ -807,7 +807,7 @@
 
 **产出（commit 7cd948f / ed12b3a / 601397b / a3784f2 / 待提交）：**
 
-- 状态栏各片段改用灰色竖线 `|` 分隔，去掉 `WS:` 前缀，身份片段 `person@device` → `person #device`，最终样式：`Einz TUI | ● 在线 | steffi #macbook | 临时通知`；同步更新 docs/ONBOARDING.md。
+- 状态栏各片段改用灰色竖线 `|` 分隔，去掉 `WS:` 前缀，身份片段 `person@device` → `person #device`，最终样式：`Einz TUI | ● 在线 | Alice #macbook | 临时通知`；同步更新 docs/ONBOARDING.md。
 - `/help` 与裸 `/` 的命令列表改为 system 消息进消息流（随消息区滚动），不再占用顶部状态栏通知。
 - **附件上传修复：** `/attach <file>` 报 `HandshakeException: Connection terminated during handshake`——根因是 `ApiClient.postAttachment`/`getAttachment` 未套 `_withRetry`（其余请求都有），大 blob 上传耗时长、网络抖动/握手中断时直接失败且不重试。修复：shared `api_client.dart` 两方法套 `_withRetry`（3 次退避重试，与设计注释"翻墙/网络抖动下的间歇性握手失败不致命"一致；server 端只在收到完整 body 且 size/sha256 校验通过后落盘，重试幂等安全）。
 
@@ -1053,11 +1053,11 @@
 
 ## 2026-09-08 会话：锁屏页顶栏 ⋯ 菜单（语言/退出）+ 身份卡片显示优化 + 文案统一提交
 
-**任务：** ① 重启后输入 PIN 解锁的 LockPage 也要有右上角展开菜单（对齐新设备向导），含「界面语言 + 退出」；② 菜单样式对齐对话页：标签靠左、当前值靠右（如「界面语言    中文」），标签用 onSurfaceVariant 淡灰；③ 老板在暂停期间自改的文案（wizardRoleTitle→wizardStartTitle「寻找秘境...」、密保口令措辞统一、领地创建者/共有者→秘境创建者/共有者、cli 同步等）一并提交；④ setup_page 身份卡片：有名字显示名字，无名字才显示身份标签本身。
+**任务：** ① 重启后输入 PIN 解锁的 LockPage 也要有右上角展开菜单（对齐新设备向导），含「界面语言 + 退出」；② 菜单样式对齐对话页：标签靠左、当前值靠右（如「界面语言 中文」），标签用 onSurfaceVariant 淡灰；③ 老板在暂停期间自改的文案（wizardRoleTitle→wizardStartTitle「寻找秘境...」、密保口令措辞统一、领地创建者/共有者→秘境创建者/共有者、cli 同步等）一并提交；④ setup_page 身份卡片：有名字显示名字，无名字才显示身份标签本身。
 
 **实现：**
 
-- `lock_page.dart`：新增 `_buildMenu`（PopupMenuButton：语言行「界面语言 中文」= Row 标签淡灰 + Spacer + 当前值；退出行；中间 PopupMenuDivider）、`_showLocalePicker`（复用 LocaleSettings 底部弹层，即时生效）、`_showExitAppDialog`（确认后 exit(0)）；两个 Scaffold（正常解锁表单 + _noLock 兜底页）AppBar 均挂 ⋯ 菜单；onSelected 沿用 300ms 延迟防 MenuRoute/DialogRoute 交叉卸载断言
+- `lock_page.dart`：新增 `_buildMenu`（PopupMenuButton：语言行「界面语言 中文」= Row 标签淡灰 + Spacer + 当前值；退出行；中间 PopupMenuDivider）、`_showLocalePicker`（复用 LocaleSettings 底部弹层，即时生效）、`_showExitAppDialog`（确认后 exit(0)）；两个 Scaffold（正常解锁表单 + \_noLock 兜底页）AppBar 均挂 ⋯ 菜单；onSelected 沿用 300ms 延迟防 MenuRoute/DialogRoute 交叉卸载断言
 - `setup_page.dart` 身份卡片：`title: Text(aName.isEmpty ? wizardIdentityCreator : aName)`（bName 同）；不再拼接「名字 (身份)」
 - 测试同步：widget_test/setup_probe_retry_test 的「Einz 秘境：创建中：名字」→「创建中：我」（老板文案 名字→我）；4 个测试文件 5 处 `find.textContaining('秘境创建者')` → `find.text('Lukas')`（身份卡有名字只显名字）；golden_render_test 退出弹窗断言「将彻底关闭应用。」→「将在本设备上退出 Einz 秘境。」（HEAD 已过期，顺手修）
 
@@ -1077,6 +1077,7 @@
 TUI/App 双路误报（离线补查 `serverAt > knownAt` 也误触发）。
 
 **实现（显式 rotated 标记，服务端不再比对哈希）：**
+
 - `server/src/escrow.ts`：`rotated: true`（仅"修改口令"流程发送）才推进 `updated_at` +
   广播 `passphrase.rotated`；普通重传（首次设口令/解锁同步）保留原 `updated_at`、不广播
 - shared：`ApiClient.uploadKeyEscrow` / `KeyEscrowService.upload` 增加 `rotated` 透传
@@ -1115,7 +1116,8 @@ setup_join_passphrase/setup_envelope_verify/ws_realtime/widget_test 23 项全过
 
 **任务：** 老板要求顶部通知更有特色：用 Einz 粉蓝主题色、通知前放 Logo，自行设计。
 
-**设计（top_notice.dart 重构 _TopNoticeBanner.build）：**
+**设计（top_notice.dart 重构 \_TopNoticeBanner.build）：**
+
 - 卡片主体：**天蓝 #3BAFFD → 粉 #D6529C 对角渐变**（左上→右下，品牌双色）
 - 左侧**白色圆角徽章 + BrandLogo(22)（assets/logo.png 粉蓝图标，复用 brand_logo.dart）**
 - 白字加粗 + 轻微文字阴影（粉端对比度兜底），最多 3 行省略号
@@ -1136,10 +1138,11 @@ App 用户太危险，**仅限 TUI**。密保信封导入（join 口令页「改
 经老板拍板**保留**（属于"添加新设备"的离线路径）。
 
 **已移除（App）：**
-- chat_page：菜单「导出完整备份」+ _ExportBackupDialog 整类 + _showExportBackupDialog +
+
+- chat_page：菜单「导出完整备份」+ \_ExportBackupDialog 整类 + \_showExportBackupDialog +
   ChatPage.initialHistory / importArchiveHistory 归档历史管线（死代码）
-- setup_page：⋯ 菜单「从备份恢复」入口 + _RecoverDialog 整类（escrow 口令重置 + 折叠区
-  归档恢复）+ _showRecoverDialog / _applyRecovered / _applyArchiveRestored / _importedHistory
+- setup_page：⋯ 菜单「从备份恢复」入口 + \_RecoverDialog 整类（escrow 口令重置 + 折叠区
+  归档恢复）+ \_showRecoverDialog / \_applyRecovered / \_applyArchiveRestored / \_importedHistory
 - l10n：app_zh/en.arb 删除 23 个键（wizardRecover* + chatPageExport* + chatPageMenuExport）
   → flutter gen-l10n 重新生成（0 残留）
 - 测试：chat_page_menu_test 去掉「导出完整备份」断言
@@ -1156,9 +1159,10 @@ App 用户太危险，**仅限 TUI**。密保信封导入（join 口令页「改
 ## 2026-09-08 会话：新设备向导 ⋯ 菜单与对话页一致化
 
 **任务（老板要求）：** 新设备向导（setup_page）右上角可展开菜单应与对话页菜单一致：
-标签靠左、内容靠右（如「界面语言    中文」）、标签用淡灰（onSurfaceVariant）。
+标签靠左、内容靠右（如「界面语言 中文」）、标签用淡灰（onSurfaceVariant）。
 
 **实现（对齐 chat_page/lock_page 菜单样式）：**
+
 - setup_page ⋯ 菜单 locale 项：`Text(wizardMenuLocale(...))` 改为
   `Row[Text(chatPageMenuLocaleLabel, labelStyle) + Spacer + Text(kLocaleLabels[...])]`
 - exit 项补 labelStyle（此前无淡色）；locale 与 exit 之间加 PopupMenuDivider（与
@@ -1179,10 +1183,11 @@ setup_envelope_verify/wizard_envelope_entry/setup_probe_retry/chat_page_menu/loc
 阴影在粉蓝渐变上形成的细线观感）移除。
 
 **实现：**
+
 - setup_page `_buildStepIdentity`：Card+ListTile 上下排列 → `Row[Expanded(左卡),
-  SizedBox(12), Expanded(右卡)]`；新增 `_buildIdentityCard`：品牌色背景（左天蓝
+SizedBox(12), Expanded(右卡)]`；新增 `_buildIdentityCard`：品牌色背景（左天蓝
   #3BAFFD / 右粉 #D6529C，与 Logo/顶部通知同色系）+ 白字图标标签 + 选中白色粗边框
-  + 对勾（未选中 circle_outlined 占位保持等高）
+  - 对勾（未选中 circle_outlined 占位保持等高）
 - **溢出修复（模拟器黄色条纹 "Bottom overflowed by 8.0 pixels"）**：根因 = Row
   `crossAxisAlignment: stretch` 在垂直 SingleChildScrollView（高度无界 h=Infinity）
   下给子项传无限高度 → 非法约束崩溃/溢出；移除 stretch + 压缩卡片高度（padding
@@ -1202,14 +1207,15 @@ setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
 直接在终端提示"本设备已被撤销。"后退出。
 
 **实现（cli/bin/einz_tui.dart）：**
+
 - 启动自检 `_probeRevoked` 返回 1（getSpace 403）→ 直接提示"本设备已被撤销。"后
   exit(0)（此刻仍在 cooked 模式，无需恢复终端）
 - 引导认证挑战 403（设备已撤销；/recover、/revoke 会删会话 → 先走 probe==2 清
   token → 挑战 403 兜底识别）→ `_restoreTerminal()` 后清屏提示并 exit(0)
 - 提示写 stderr：pty 下退出瞬间 stdout flush 未决时 write 抛 "StreamSink is
-  bound to a stream"（与 _printFarewell 同款场景，stderr 是独立 sink 必达）
-- 移除 `_revoked`/"仅可退出"模式全部死代码（_runGuide 守卫、main 历史守卫、
-  状态栏、输入循环/命令拦截、_revokedBanner）
+  bound to a stream"（与 \_printFarewell 同款场景，stderr 是独立 sink 必达）
+- 移除 `_revoked`/"仅可退出"模式全部死代码（\_runGuide 守卫、main 历史守卫、
+  状态栏、输入循环/命令拦截、\_revokedBanner）
 
 **回归测试：** cli/test/revoked_check.py 重写（原测试文案已过时）：首设备入网
 （适配现行问答：输入我的名字/伴侣名字/设置密保口令/设置锁屏码）→ /recover →
@@ -1226,6 +1232,7 @@ setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
 输出"本设备已被撤销。"并退出。
 
 **实现：**
+
 - `cli/lib/chat_core.dart`：`startWs` 增加 `onRevoked` 回调，透传
   `WsDeviceRevokedEvent`（共享包 ws_client.dart 已解析该帧）
 - `cli/bin/einz_tui.dart`：新增 `_exitRevoked()`（恢复终端 + stderr 提示 + exit，
@@ -1240,13 +1247,14 @@ setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
 
 **验证：** dart analyze 0 issue；server tsc 构建通过；revoked_check.py 全过。
 
-## 2026-09-08 会话：App 认证 403（设备被撤销）→ 走 _onDeviceRevoked
+## 2026-09-08 会话：App 认证 403（设备被撤销）→ 走 \_onDeviceRevoked
 
-**任务（老板要求）：** 补一个：认证 403 时也走 _onDeviceRevoked（此前只覆盖 WS
+**任务（老板要求）：** 补一个：认证 403 时也走 \_onDeviceRevoked（此前只覆盖 WS
 广播 device.revoked；后台错过广播时 WS 会因 token 失效反复重连，认证 403 无
 撤销处理）。
 
 **实现（app/lib/chat_page.dart）：**
+
 - 新增 `_reauthWithRevokedFallback()`：包装 `widget.reauth`，捕获
   `ApiException code == 'FORBIDDEN'`（challenge-response 被服务端拒绝 = 设备已
   撤销）→ `await _onDeviceRevoked()`（清理锁包/消息库 → 顶部通知 → 回设置页）；
@@ -1266,6 +1274,7 @@ chat_page_menu/message_repository 测试全过；widget_test 有 1 个既有失�
 LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，顶部无菜单。
 
 **设计（app/lib/setup_page.dart）：**
+
 - `build()` 顶层分流：`_role == null`（角色未判定）→ 新增 `_buildSplashScreen()`
   全屏品牌启动屏：粉蓝渐变（天蓝 #3BAFFD → 粉 #D6529C，同顶部通知渐变）+
   上方白色圆角徽章大 LOGO（BrandLogo 96）+ 正中白色旋转图标 + 状态文案；
@@ -1275,6 +1284,7 @@ LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，�
 - 删除死代码：`_serverController`、`_saveServer()`、失败输入框 Card
 
 **其他：**
+
 - main.dart StartupGate 加载页同步品牌化（渐变 + LOGO 72 + 旋转图标），
   需 import brand_logo.dart
 - l10n：wizardDetectFailed 更新 zh/en（5 个文件：2 arb + 3 dart）
@@ -1291,6 +1301,7 @@ LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，�
 老板反馈：断线时启动屏只显示左侧一大半渐变，右侧全白（页面停留久才暴露）。
 
 **根因（查 Flutter SDK 源码确认）：**
+
 - Scaffold body 约束是宽松的（`_BodyBoxConstraints` 只传 maxWidth/maxHeight，
   minWidth/minHeight 默认 0）
 - 现代 Flutter `RenderProxyBoxMixin._computeSize`：尺寸 = child 尺寸
@@ -1315,6 +1326,7 @@ LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，�
 非旋转对称，旋转动画清晰可见。
 
 **实现（app/lib/brand_logo.dart）：**
+
 - 新增 `SpinningBrandLogo`：`RotationTransition` + `AnimationController`
   `..repeat()` 无限顺时针旋转 `BrandLogo`（size/radius/duration 可配）
 - 启动屏（检测页）：去掉「白色徽章大 LOGO + spinner」，改为单个旋转 logo
@@ -1332,13 +1344,14 @@ LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，�
 不属于向导，进度圆点应减少一个。
 
 **向导页渐变（app/lib/setup_page.dart build）：**
+
 - AppBar 加 `flexibleSpace` 渐变（AppBar 区域含状态栏同款渐变）
 - body 改为渐变 `Container` + `SafeArea`（与首屏同款 LinearGradient）
 - 步骤内容包白色圆角内容卡（白底圆角 20 + 柔和投影）——表单可读性 + 品牌层次
 - 底部「上一步」TextButton 改白色（渐变上可读）；进度圆点改白色系
 - 步骤页内红字错误提示、身份卡片（左蓝右粉）在白卡内不受影响
 
-**圆点减一（_buildProgressDots）：** 原 `total = _stepCount` 且 `i <= _step`
+**圆点减一（\_buildProgressDots）：** 原 `total = _stepCount` 且 `i <= _step`
 点亮导致 i=0 恒亮（被感知为首屏圆点）。改为 `total = _stepCount - 1`、
 点亮条件 `i + 1 <= _step`——create/join 5→4 个、offline 3→2 个，圆点只
 代表向导内部步骤；`_stepCount` 本身不动（导航/完成判定仍用它）。
@@ -1357,6 +1370,7 @@ golden 保持红不重刷。
 AppBar 底边已到粉色、body 顶部还是天蓝，衔接处颜色跳变。
 
 **修复（app/lib/setup_page.dart）：**
+
 - `extendBodyBehindAppBar: true` + AppBar `backgroundColor: transparent`——
   body 渐变容器延伸到屏幕顶部（含 AppBar 与状态栏区域），整屏共用同一个
   渐变矩形，无缝衔接
@@ -1373,6 +1387,7 @@ AppBar 底边已到粉色、body 顶部还是天蓝，衔接处颜色跳变。
 老板要求：完成页那块浅绿色背景去掉——现在已有更好看的粉蓝渐变背景。
 
 **修改（app/lib/setup_page.dart）：**
+
 - `_buildStepDone` 不再渲染 60% 高的浅绿纯色块（原"完成语义"背景），
   返回 `SizedBox.shrink()`——欢迎对话框盖住全页
 - 白色内容卡在完成页（`_step >= _stepCount`）跳过：done 页不包白卡，
@@ -1380,4 +1395,3 @@ AppBar 底边已到粉色、body 顶部还是天蓝，衔接处颜色跳变。
 
 **验证：** analyze 0 error；setup_probe_retry_test 通过；done 步骤 golden
 渲染正常（无崩溃）、失配保持红不重刷。
-

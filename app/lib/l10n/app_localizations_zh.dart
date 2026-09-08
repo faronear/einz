@@ -58,7 +58,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameHint => '填写伴侣的名字（将来可以随时修改）：';
 
   @override
-  String get wizardPeerNameHintInput => '例如 Steffi';
+  String get wizardPeerNameHintInput => '例如 Alice';
 
   @override
   String get wizardNameRequired => '填写我的名字';

@@ -16,7 +16,7 @@
   "wizardDetectFailed": "Cannot reach server — retrying automatically…",
   "wizardNameHint": "This is your first device. Tell us what to call you (you can rename anytime).",
   "wizardPeerNameHint": "This is your partner (second user) — how should we call them? You can change it later.",
-  "wizardPeerNameHintInput": "e.g. Steffi",
+  "wizardPeerNameHintInput": "e.g. Alice",
   "wizardNameRequired": "Please enter your name first",
   "wizardPeerNameRequired": "Please enter your partner's name",
   "wizardNameHintInput": "e.g. Lukas (optional, change later)",

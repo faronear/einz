@@ -47,7 +47,7 @@ Future<void> main(List<String> args) async {
     ..addOption('invite-code', help: '邀请码（enroll 用；留空=首设备自举，登记为创建者）')
     ..addOption('hours', help: '邀请码有效期小时数（invite 用，默认 24）')
     ..addOption('device-name', help: '设备自定义名称（enroll 用，显示层，如 MacBook）')
-    ..addOption('name', help: '对方自定义名称（invite 用，如 steffi；person_id 为规范 id）');
+    ..addOption('name', help: '对方自定义名称（invite 用，如 Alice；person_id 为规范 id）');
   final cmd = args.isEmpty ? 'help' : args.first;
   final rest = args.length > 1 ? args.sublist(1) : <String>[];
   final opts = parser.parse(rest);

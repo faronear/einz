@@ -16,7 +16,7 @@
   "wizardDetectFailed": "暂时无法连接服务器，正在自动重试…",
   "wizardNameHint": "请输入我的名字（将来可以随时修改）。",
   "wizardPeerNameHint": "填写伴侣的名字（将来可以随时修改）：",
-  "wizardPeerNameHintInput": "例如 Steffi",
+  "wizardPeerNameHintInput": "例如 Alice",
   "wizardNameRequired": "填写我的名字",
   "wizardPeerNameRequired": "填写伴侣的名字",
   "wizardNameHintInput": "例如 Lukas",

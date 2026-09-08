@@ -197,7 +197,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPeerNameHintInput.
   ///
   /// In en, this message translates to:
-  /// **'e.g. Steffi'**
+  /// **'e.g. Alice'**
   String get wizardPeerNameHintInput;
 
   /// No description provided for @wizardNameRequired.

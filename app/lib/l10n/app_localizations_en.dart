@@ -64,7 +64,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is your partner (second user) — how should we call them? You can change it later.';
 
   @override
-  String get wizardPeerNameHintInput => 'e.g. Steffi';
+  String get wizardPeerNameHintInput => 'e.g. Alice';
 
   @override
   String get wizardNameRequired => 'Please enter your name first';

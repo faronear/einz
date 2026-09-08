@@ -352,7 +352,7 @@ void main() {
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
     // 模拟向导完成时已写入 profile（setup _finish 的 saveProfile）
-    await AppLockService(db).saveProfile(personName: 'Lukas', peerName: 'Steffi', deviceName: 'iPhone');
+    await AppLockService(db).saveProfile(personName: 'Lukas', peerName: 'Alice', deviceName: 'iPhone');
 
     // 不带 personName/peerName——模拟 PIN 解锁重进（lock_page._enterChat 不传名字）
     await tester.pumpWidget(MaterialApp(
@@ -374,7 +374,7 @@ void main() {
     await tester.pumpAndSettle();
     // 顶部条应恢复两个人的名字（loadProfile 补名）
     expect(find.text('Lukas'), findsOneWidget, reason: '本人名字应从 profile 恢复（顶部条右侧）');
-    expect(find.text('Steffi'), findsOneWidget, reason: '对方名字应从 profile 恢复（顶部条左侧）');
+    expect(find.text('Alice'), findsOneWidget, reason: '对方名字应从 profile 恢复（顶部条左侧）');
   });
 
   testWidgets('修改口令：提交前弹显性确认（取消不执行）', (WidgetTester tester) async {
@@ -456,13 +456,13 @@ void main() {
     await tester.pumpAndSettle();
     final renameField =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    await tester.enterText(renameField, 'Steffi');
+    await tester.enterText(renameField, 'Alice');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
     // profile 应已更新（改名后 _saveProfile 写入）
     final p = await AppLockService(db).loadProfile();
-    expect(p['personName'], 'Steffi', reason: '改名应同步写本地 profile');
+    expect(p['personName'], 'Alice', reason: '改名应同步写本地 profile');
 
     // 模拟重启：新 ChatPage 实例（不带名字）→ 从 profile 恢复新名字
     await tester.pumpWidget(MaterialApp(
@@ -482,7 +482,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    expect(find.text('Steffi'), findsWidgets, reason: '重启后应从 profile 恢复新名字');
+    expect(find.text('Alice'), findsWidgets, reason: '重启后应从 profile 恢复新名字');
     expect(find.text('personB'), findsNothing, reason: '不应回到旧名 personB');
   });
 }

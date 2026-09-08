@@ -31,15 +31,15 @@
 
 ## 术语速览
 
-| 概念                      | 说明                                                                                                                                                                         |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **space_id**              | 空间唯一标识（UUID）。**server 首启自动生成并持久化**（db meta 表），`/health` 可查看；登记响应会带回给客户端                                                                |
-| **Space Key**             | 32B 随机空间密钥（端到端加密用），创建者生成，对方凭口令从口令密保箱获取                                                                                                     |
-| **口令（passphrase）**    | 创建者 escrow upload 时设定，对方凭它解出 Space Key。**别和邀请码混淆**                                                                                                      |
-| **邀请码（invite_code）** | 一次性（默认 24h 有效），创建者生成、白名单外新设备登记用                                                                                                                    |
-| **person id**             | 后台规范 id（personA / personB，服务端分配）；自定义名称（如`lukas` / `steffi`）存名称表用于显示；"自己/对方"按规范 id 判断；一个空间最多两个 person（同 person 多设备允许） |
-| **自举（bootstrap）**     | 空间 0 台设备时，第一个登记的设备免邀请码自动成为**创建者**（拥有生成邀请码权限）                                                                                            |
-| **白名单**                | 数据库 devices 表（动态登记，运行时可写，**无需 config.json 种子**）；撤销（revoked）实时生效                                                                                |
+| 概念                      | 说明                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **space_id**              | 空间唯一标识（UUID）。**server 首启自动生成并持久化**（db meta 表），`/health` 可查看；登记响应会带回给客户端                                                               |
+| **Space Key**             | 32B 随机空间密钥（端到端加密用），创建者生成，对方凭口令从口令密保箱获取                                                                                                    |
+| **口令（passphrase）**    | 创建者 escrow upload 时设定，对方凭它解出 Space Key。**别和邀请码混淆**                                                                                                     |
+| **邀请码（invite_code）** | 一次性（默认 24h 有效），创建者生成、白名单外新设备登记用                                                                                                                   |
+| **person id**             | 后台规范 id（personA / personB，服务端分配）；自定义名称（如`lukas` / `Alice`）存名称表用于显示；"自己/对方"按规范 id 判断；一个空间最多两个 person（同 person 多设备允许） |
+| **自举（bootstrap）**     | 空间 0 台设备时，第一个登记的设备免邀请码自动成为**创建者**（拥有生成邀请码权限）                                                                                           |
+| **白名单**                | 数据库 devices 表（动态登记，运行时可写，**无需 config.json 种子**）；撤销（revoked）实时生效                                                                               |
 
 ---
 
@@ -97,7 +97,7 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现/创建设备
 #   ✅ 首设备自举成功（你是空间创建者，分配为 dev1 / personA）
 #   设置托管口令:（如 faronear，对方凭它接入）
 #   ✅ 口令密保箱已上传
-#   对方名称（如 steffi）→ ✅ 邀请码已生成（发给对方，绑定 personB）
+#   对方名称（如 Alice）→ ✅ 邀请码已生成（发给对方，绑定 personB）
 # 直接进入 TUI，状态栏 ● 在线
 ```
 
@@ -124,9 +124,9 @@ dart run bin/einz.dart escrow --action upload \
 ```bash
 cd /Users/Shared/productX/only/cli
 dart run bin/einz.dart invite --store ~/.einz/a.json \
-  --server https://einz.tic.cc --person personB --name steffi [--hours 24]
+  --server https://einz.tic.cc --person personB --name Alice [--hours 24]
 # ✅ 邀请码已生成（24h 有效，一次性）: XXXX-XXXXX-XXXXX-XXXXX
-# 把邀请码离线发给对方（绑定 personB=steffi；给自己加设备用 --person personA）
+# 把邀请码离线发给对方（绑定 personB=Alice；给自己加设备用 --person personA）
 ```
 
 > TUI 方式创建空间时**已自动生成**邀请码（阶段 2 引导里打印），此命令用于之后随时补发。权限：任一 active 设备均可生成（第一/第二使用者都能邀请自己的其他设备）。
@@ -152,7 +152,7 @@ cd 你的only目录\cli
 dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz\ 下的设备
 # 引导流程（空间已有设备 → 走邀请码登记）：
 # 引导流程（空间已有设备 → 走邀请码登记；设备凭证自动生成）：
-#   身份名字（如 steffi）→ 设备名称（显示用，如 Windows）
+#   身份名字（如 Alice）→ 设备名称（显示用，如 Windows）
 #   ⚠️ 自举失败（空间已有创建者）→ 输入邀请码: XXXX-XXXXX-XXXXX-XXXXX
 #   ✅ 邀请码登记成功（分配为 dev2 / personB）
 #   无 Space Key → 问"接入方式" → 回车=1 口令接入
@@ -160,7 +160,7 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz
 #   ✅ 口令认证成功 → 认证成功 → 进入 TUI
 ```
 
-> 同一人加第二台设备：TUI 引导时名称填**相同值**（如 steffi）、邀请码再生成一个即可（同 person 多设备不受两 person 上限影响）。
+> 同一人加第二台设备：TUI 引导时名称填**相同值**（如 Alice）、邀请码再生成一个即可（同 person 多设备不受两 person 上限影响）。
 
 ---
 
