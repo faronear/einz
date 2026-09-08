@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:einz_shared/einz_shared.dart';
 
+import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
@@ -246,7 +247,16 @@ class _SetupPageState extends State<SetupPage> {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_appBarTitle(l10n)),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(_appBarTitle(l10n), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
         actions: [
           // 全丢恢复入口常驻菜单：探测自动判定角色后依然可达
           // （密保信封导入已移入口令页次级入口，不再放全局菜单）

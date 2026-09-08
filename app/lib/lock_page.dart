@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:einz_shared/einz_shared.dart';
 
+import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
@@ -171,8 +172,8 @@ class _LockPageState extends State<LockPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.lock_outline, size: 56),
-            const SizedBox(height: 12),
+            const Center(child: BrandLogo(size: 72, radius: 16)),
+            const SizedBox(height: 16),
             Text(l10n.lockPagePinPrompt,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),

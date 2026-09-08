@@ -82,6 +82,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # 品牌 Logo（粉蓝图标 1024 母版，同时是各平台启动图标的生成源）
+  assets:
+    - assets/logo.png
+
 # sqlite3 原生库：用 sqlite3 包默认的捆绑预编译库（构建时从 GitHub releases
 # 下载并打入 APK）。曾配置 source: system 依赖系统 SQLite，但 Android 系统
 # 不提供 libsqlite3.so，启动即 dlopen 失败崩溃（2026-09-01 模拟器黑屏定位）。

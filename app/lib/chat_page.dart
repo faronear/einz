@@ -13,6 +13,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 
+import 'brand_logo.dart';
 import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
@@ -1228,7 +1229,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       appBar: AppBar(
         // 抬头只显示品牌名+slogan（不暴露空间 ID，对普通用户无意义）；
         // 在线状态由对话顶部条双灯呈现（「我的」灯三态：灰=未连接服务/绿=已连接/红=断线）
-        title: Text(l10n.chatPageTitleBrand, style: const TextStyle(fontSize: 17)),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(l10n.chatPageTitleBrand,
+                  style: const TextStyle(fontSize: 17),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
         actions: [
           // 顶栏统一入口：语言/阅后即焚/邀请码/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(

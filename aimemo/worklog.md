@@ -990,3 +990,14 @@
 **验证：** app flutter analyze 0 issue（仅 1 既有 info lint，非本次引入）。golden 政策不变：主题色改动使 golden 失配 → 保持红不重刷（老板既定决策 2026-09-08）。启动图标为原生资源改动，需完整重建/重装才能在桌面看到新图标（热重启不刷新 launcher icon）。
 
 **备注：** 应用内 UI 原本无 Logo 展示位（logo.svg 仅设计源，未被任何页面引用）；如需在锁屏/设置/聊天页头展示新 Logo，可作为后续 UI 任务单独排期。
+
+## 2026-09-08 会话：应用内展示新 Logo（对话页/向导页标题左侧 + PIN 解锁页）
+
+**背景：** 老板要求把新粉蓝 Logo 放进 UI：对话页、向导页的顶部标题左侧，PIN 解锁页找合适位置。
+
+**实现：**
+- `pubspec.yaml` 注册 `assets/logo.png`；新增共用组件 `app/lib/brand_logo.dart`（`BrandLogo`：ClipRRect 圆角 + Image.asset，按展示尺寸 cacheWidth 降采样解码，避免顶栏小图解码 1024 大图）
+- 对话页 `chat_page.dart`、向导页 `setup_page.dart`：AppBar 标题改为 `Row[BrandLogo(28) + 10px + Flexible(Text, ellipsis)]`（无 leading，Logo 贴标题左侧；长标题自动省略防溢出）
+- PIN 解锁页 `lock_page.dart`：解锁表单顶部原 56px `Icons.lock_outline` 占位图换成居中 `BrandLogo(72, r16)`；「未设置 PIN」的 noLock 提示分支保留 lock_open 图标（有语义：说明为何不显示解锁表单）
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；widget/chat_page_menu/lock_page/wizard_envelope_entry 4 个文件 17 项非 golden 测试全过。golden 失配保持红不重刷（既有决策；本次新增图片渲染亦在 golden 覆盖内，预期失配）。
