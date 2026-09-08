@@ -366,17 +366,17 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
         if (name.isNotEmpty) { 
           store.personName = name;
-          session.messages.add(_systemMessage(session, '✅ 欢迎 $name 来到你的私密领地！'));
+          session.messages.add(_systemMessage(session, '✅ 欢迎 $name 来到私密领地！'));
         }else {
-          session.messages.add(_systemMessage(session, '✅ 欢迎来到你的私密领地！'));
+          session.messages.add(_systemMessage(session, '✅ 欢迎来到私密领地！'));
         }
       } else {
         store.personName = _probePersonNames['personB'];
-        session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 绑定新设备 ${store.deviceName}'));
+        session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到私密领地！'));
       }
     } else if (chosenPerson == 'personA') {
       store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
-      session.messages.add(_systemMessage(session, '✅ 欢迎 $aName 绑定新设备 ${store.deviceName}'));
+      session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到私密领地！'));
     }
     session.messages.add(_systemMessage(session, '----------------'));
     _scheduleRender();
@@ -421,7 +421,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已有设备"要求邀请码，发起者自己被挡在门外）
   if (server.isNotEmpty && (store.deviceId == null || store.spaceId == null)) {
     try {
-      final r = await _busy(session, '⏳ 设备登记中......', () => ApiClient(server).enrollDevice(
+      final r = await _busy(session, '⏳ 设备绑定中......', () => ApiClient(server).enrollDevice(
         deviceId: store.deviceId,
         publicKey: store.publicKey,
         personName: store.personName,
@@ -432,6 +432,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.personId = r.personId;
       store.spaceId = r.spaceId;
       store.save(storePath);
+      // 登记成功系统通知（老板要求：设备信息上传后台登记后显示）
+      session.messages.add(_systemMessage(session, '✅ 新设备已绑定到我的私密领地'));
       // 20260906 luk: 现在已经在设备创建公私钥的同时设置了设备名称，只要静悄悄的 enroll 即可，否则下面的提示显得突然（因为没有一个要求输入设备名称的过程了），因此注释掉。
       // session.messages.add(_systemMessage(session, '✅ 您的设备已成功登记。'));
       // session.messages.add(_systemMessage(session, '----------------'));
@@ -1992,7 +1994,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
     s.session.store.personId = r.personId;
     s.session.store.spaceId = r.spaceId;
     s.session.store.save(s.session.storePath);
-    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，您的 ${s.session.store.deviceName} 已成功绑定到私密领地。'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，新设备 ${s.session.store.deviceName} 已成功绑定到私密领地。'));
     // 登记成功后继续认证
     try {
       await s.session.auth();
