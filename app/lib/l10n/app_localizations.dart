@@ -188,12 +188,6 @@ abstract class AppLocalizations {
   /// **'Paste the key envelope (contents of envelope-*.txt)'**
   String get setupPageEnvelopeKeyHint;
 
-  /// No description provided for @setupPageKeyInfo.
-  ///
-  /// In en, this message translates to:
-  /// **'Device ID: {deviceId}\nPublic key: {publicKey}\n(The device will register automatically on the next step — no whitelist needed)'**
-  String setupPageKeyInfo(String deviceId, String publicKey);
-
   /// No description provided for @setupPageGenerateKey.
   ///
   /// In en, this message translates to:
@@ -673,12 +667,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Complete'**
   String get wizardStepDone;
-
-  /// No description provided for @setupPageKeyGenerated.
-  ///
-  /// In en, this message translates to:
-  /// **'✅ Key generated'**
-  String get setupPageKeyGenerated;
 
   /// No description provided for @wizardEnrollHint.
   ///

@@ -56,11 +56,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEnvelopeKeyHint => '粘贴密钥信封（envelope-*.txt 内容）';
 
   @override
-  String setupPageKeyInfo(String deviceId, String publicKey) {
-    return '设备 ID: $deviceId\n公钥: $publicKey\n（下一步将自动登记设备，无需任何白名单）';
-  }
-
-  @override
   String get setupPageGenerateKey => '① 生成设备密钥';
 
   @override
@@ -311,9 +306,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardStepDone => '完成';
-
-  @override
-  String get setupPageKeyGenerated => '✅ 密钥已生成';
 
   @override
   String get wizardEnrollHint =>

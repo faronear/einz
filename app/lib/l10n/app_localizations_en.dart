@@ -57,11 +57,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Paste the key envelope (contents of envelope-*.txt)';
 
   @override
-  String setupPageKeyInfo(String deviceId, String publicKey) {
-    return 'Device ID: $deviceId\nPublic key: $publicKey\n(The device will register automatically on the next step — no whitelist needed)';
-  }
-
-  @override
   String get setupPageGenerateKey => '① Generate device key';
 
   @override
@@ -329,9 +324,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardStepDone => 'Complete';
-
-  @override
-  String get setupPageKeyGenerated => '✅ Key generated';
 
   @override
   String get wizardEnrollHint =>

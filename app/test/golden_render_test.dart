@@ -25,8 +25,9 @@ import 'package:einz/lock_page.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz_shared/einz_shared.dart';
 
-// golden 固定设备密钥对：名字步骤的密钥信息卡渲染公钥，真实随机密钥会使
+// golden 固定设备密钥对：登记/认证等步骤需要确定性密钥，真实随机密钥会使
 // golden 每次渲染不同而失配；测试注入固定值保证确定性。
+// （名字步骤的密钥信息卡已移除——技术细节不展示给用户。）
 final DeviceKeyPair _goldenKeyPair = DeviceKeyPair(
   deviceId: 'dev-golden',
   publicKey: Uint8List(32),

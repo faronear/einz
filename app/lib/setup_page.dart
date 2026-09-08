@@ -46,8 +46,8 @@ class SetupPage extends StatefulWidget {
   /// 注入后不发起网络请求，供 golden 走 PIN/跳过路径）。
   final Future<SessionResult> Function(DeviceKeyPair kp, String enrolledDeviceId)? authOverride;
 
-  /// 测试注入：固定设备密钥对（golden 稳定性——名字步骤的密钥信息卡渲染公钥，
-  /// 需确定性内容；生产传 null 则自动生成）。
+  /// 测试注入：固定设备密钥对（登记/认证需要确定性密钥；生产传 null 则自动生成。
+  /// 名字步骤的密钥信息卡已移除——技术细节不展示给用户）。
   final DeviceKeyPair? keyPairOverride;
 
   /// 测试注入：替换 escrow 服务（join 口令验证；fake 可模拟口令对/错/未托管）。
@@ -945,8 +945,9 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---- 场景 A（create）：名字 → 口令 → PIN → 完成（设备名已自动设置，不再询问） ----
 
-  /// 步骤 1（create）：第一个用户的名字；密钥已由 [_autoGenerateKey] 自动生成，
-  /// 展示密钥信息；"下一步"触发自举登记（设备名已自动设置，不再单独询问）。
+  /// 步骤 1（create）：第一个用户的名字；密钥已由 [_autoGenerateKey] 自动生成
+  /// （不展示密钥信息——技术细节，小白用户不需要看）；"下一步"触发自举登记
+  /// （设备名已自动设置，不再单独询问）。
   Widget _buildStepName() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -963,27 +964,6 @@ class _SetupPageState extends State<SetupPage> {
             border: const OutlineInputBorder(),
           ),
         ),
-        if (_keyPair != null) ...[
-          const SizedBox(height: 12),
-          Card(
-            color: Colors.green.shade50,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(l10n.setupPageKeyGenerated,
-                      style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.green)),
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    l10n.setupPageKeyInfo(_keyPair!.deviceId, _keyPair!.publicKeyB64),
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
         if (_role == _WizardRole.create && _bootstrapFailed) ...[
           const SizedBox(height: 12),
           Card(

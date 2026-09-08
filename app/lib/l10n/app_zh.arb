@@ -15,13 +15,6 @@
   "setupPageSpaceIdLabel": "Space ID",
   "setupPageEnvelopeKeyLabel": "密钥信封（base64）",
   "setupPageEnvelopeKeyHint": "粘贴密钥信封（envelope-*.txt 内容）",
-  "setupPageKeyInfo": "设备 ID: {deviceId}\n公钥: {publicKey}\n（下一步将自动登记设备，无需任何白名单）",
-  "@setupPageKeyInfo": {
-    "placeholders": {
-      "deviceId": {"type": "String"},
-      "publicKey": {"type": "String"}
-    }
-  },
   "setupPageGenerateKey": "① 生成设备密钥",
   "setupPageImportAuth": "② 导入并认证",
   "setupPageEscrowLabel": "密保口令",
@@ -122,7 +115,6 @@
   "wizardStepJoin": "加入空间",
   "wizardStepEnvelope": "导入密钥信封",
   "wizardStepDone": "完成",
-  "setupPageKeyGenerated": "✅ 密钥已生成",
   "wizardEnrollHint": "服务器已全自动登记（无需手动白名单）。点击下方登记本设备——若这是服务器的第一台设备，将自动创建私密空间。",
   "wizardEnrollAction": "登记本设备",
   "wizardEnrollDone": "✅ 登记成功\n设备: {deviceId}\n空间: {spaceId}",
