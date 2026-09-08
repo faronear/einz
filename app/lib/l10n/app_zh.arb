@@ -154,6 +154,8 @@
   "@setupPageInitFailed": {
     "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示——不展示技术细节（如 SqliteException），自动重试中"
   },
+  "startupInitFailed": "启动初始化失败，配置未丢失，请重试",
+  "startupInitRetry": "重试",
   "setupPageGenKeyFirst": "⚠️ 先生成设备密钥",
   "setupPagePasteEnvelope": "⚠️ 请粘贴密保信封（base64）",
   "wizardEnvelopeWrong": "密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴",

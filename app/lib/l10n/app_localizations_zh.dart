@@ -374,6 +374,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageInitFailed => '初始化失败，正在自动重试…';
 
   @override
+  String get startupInitFailed => '启动初始化失败，配置未丢失，请重试';
+
+  @override
+  String get startupInitRetry => '重试';
+
+  @override
   String get setupPageGenKeyFirst => '⚠️ 先生成设备密钥';
 
   @override

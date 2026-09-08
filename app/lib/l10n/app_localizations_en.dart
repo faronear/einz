@@ -400,6 +400,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override
+  String get startupInitFailed => 'Startup initialization failed — your data is safe, please retry';
+
+  @override
+  String get startupInitRetry => 'Retry';
+
+  @override
   String get setupPageGenKeyFirst => '⚠️ Generate the device key first';
 
   @override

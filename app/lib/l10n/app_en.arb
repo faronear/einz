@@ -154,6 +154,8 @@
   "@setupPageInitFailed": {
     "description": "Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying"
   },
+  "startupInitFailed": "Startup initialization failed — your data is safe, please retry",
+  "startupInitRetry": "Retry",
   "setupPageGenKeyFirst": "⚠️ Generate the device key first",
   "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
   "wizardEnvelopeWrong": "Invalid key envelope: make sure the full sealed key copy from the other device is pasted",

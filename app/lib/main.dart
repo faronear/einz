@@ -114,6 +114,8 @@ class StartupGate extends StatefulWidget {
 class _StartupGateState extends State<StartupGate> {
   bool? _hasLock; // 有 PIN 加密锁包
   AppLockPayload? _plain; // 无锁配置（跳过 PIN 的明文 payload）
+  String? _initError; // 本地库查询持续失败（重试耗尽）→ 展示重试页（不误进向导）
+  int _retryCount = 0;
 
   @override
   void initState() {
@@ -131,22 +133,58 @@ class _StartupGateState extends State<StartupGate> {
       setState(() {
         _hasLock = hasLock;
         _plain = plain;
+        _initError = null;
       });
     } catch (e) {
-      // 本地锁查询失败（如 SQLite 锁竞争/初始化异常）→ 降级为"未配置"进设置向导，
-      // 避免无限停留在启动转环页（main 加载页无错误出口）
-      debugPrint('StartupGate 锁状态查询失败，降级为未配置: $e');
+      // 本地锁查询失败（如 SQLite 锁竞争/初始化竞态——热重启、异常退出后偶发）。
+      // 不能降级为"未配置"进设置向导：数据仍在，向导会让用户误以为设备被清空
+      // （且重走向导会重复登记设备）。改为短暂延迟后自动重试；重试耗尽仍失败
+      // 则展示"重试"错误页（保留数据，不丢配置）。
+      debugPrint('StartupGate 锁状态查询失败（第 ${_retryCount + 1} 次）: $e');
       if (!mounted) return;
-      setState(() {
-        _hasLock = false;
-        _plain = null;
-      });
+      if (_retryCount < 4) {
+        _retryCount++;
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (mounted) _check();
+      } else {
+        setState(() => _initError = AppLocalizations.of(context)!.startupInitFailed);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_hasLock == null) {
+      if (_initError != null) {
+        // 本地库持续失败：展示重试页（不误进向导——配置未丢失）
+        final l10n = AppLocalizations.of(context)!;
+        return Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 56),
+                  const SizedBox(height: 12),
+                  Text(_initError!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15)),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: () {
+                      setState(() {
+                        _initError = null;
+                        _retryCount = 0;
+                      });
+                      _check();
+                    },
+                    child: Text(l10n.startupInitRetry),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_hasLock!) return const LockPage();
