@@ -1355,11 +1355,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
-                PopupMenuItem(value: 'passphrase', child: Text(l10n.chatPageMenuChangePassphrase)),
-                PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
+                PopupMenuItem(
+                  value: 'invite',
+                  child: Text(l10n.chatPageMenuInvite, style: labelStyle),
+                ),
+                PopupMenuItem(
+                  value: 'passphrase',
+                  child: Text(l10n.chatPageMenuChangePassphrase, style: labelStyle),
+                ),
+                PopupMenuItem(
+                  value: 'export',
+                  child: Text(l10n.chatPageMenuExport, style: labelStyle),
+                ),
                 const PopupMenuDivider(),
-                PopupMenuItem(value: 'exit', child: Text(l10n.chatPageMenuExit)),
+                PopupMenuItem(
+                  value: 'exit',
+                  child: Text(l10n.chatPageMenuExit, style: labelStyle),
+                ),
               ];
             },
           ),
