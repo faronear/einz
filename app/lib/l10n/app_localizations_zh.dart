@@ -58,7 +58,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '无法连接服务器，请在上方输入地址后重试';
 
   @override
-  String get wizardNameHint => '填写我的名字（将来可以随时修改）。';
+  String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
 
   @override
   String get wizardPeerNameHint => '填写伴侣的名字（将来可以随时修改）：';
