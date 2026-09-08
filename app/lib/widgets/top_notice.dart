@@ -162,13 +162,6 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               height: 1.3,
-                              shadows: [
-                                Shadow(
-                                  color: Color(0x33000000),
-                                  offset: Offset(0, 1),
-                                  blurRadius: 2,
-                                ),
-                              ],
                             ),
                           ),
                         ),
