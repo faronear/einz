@@ -31,13 +31,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skip => '跳过';
 
   @override
-  String get setupPageEnvelopeKeyLabel => '密保信封（base64）';
-
-  @override
   String get setupPageEnvelopeKeyHint => '粘贴密保信封（envelope-*.txt 内容）';
-
-  @override
-  String get setupPageEscrowLabel => '密保口令';
 
   @override
   String get setupPageNeedPassphrase => '⚠️ 先在上方填写密保口令（对方凭它解密消息）';
@@ -64,9 +58,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameHint => '填写伴侣的名字（将来可以随时修改）：';
 
   @override
-  String get wizardPeerNameLabel => '伴侣的名字';
-
-  @override
   String get wizardPeerNameHintInput => '例如 Steffi';
 
   @override
@@ -74,9 +65,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardPeerNameRequired => '填写伴侣的名字';
-
-  @override
-  String get wizardNameLabel => '我的名字';
 
   @override
   String get wizardNameHintInput => '例如 Lukas';
@@ -116,27 +104,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardDone => '完成';
-
-  @override
-  String get wizardStepShortName => '我';
-
-  @override
-  String get wizardStepShortPeerName => '伴侣';
-
-  @override
-  String get wizardStepShortPassphrase => '口令';
-
-  @override
-  String get wizardStepShortPin => '锁屏码';
-
-  @override
-  String get wizardStepShortDone => '完成';
-
-  @override
-  String get wizardStepShortIdentity => '身份';
-
-  @override
-  String get wizardStepShortInvite => '邀请码';
 
   @override
   String get wizardStepShortEnvelope => '密保信封';
@@ -223,9 +190,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardEnvelopeWrong => '密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴';
-
-  @override
-  String get setupPageInviteLabel => '邀请码（一次性）';
 
   @override
   String get setupPageInviteHint => '粘贴或输入邀请码';

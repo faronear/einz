@@ -337,9 +337,9 @@ class _SetupPageState extends State<SetupPage> {
               const SizedBox(height: 12),
             ],
             _buildProgressDots(),
-            // 输入区贴着进度条（顶部锚定：键盘弹出时 resizeToAvoidBottomInset
+            // 进度条与输入区之间留白（顶部锚定：键盘弹出时 resizeToAvoidBottomInset
             // 只收缩底部空白并把底部导航顶到键盘上方——输入区不会被覆盖/压缩）
-            const SizedBox(height: 12),
+            const SizedBox(height: 28),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
@@ -407,46 +407,16 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 当前步骤的简化短名（AppBar 系列标题：本页主题，例如："Einz 秘境：认领中：邀请码"）。
-  String _stepShortTitle(AppLocalizations l10n) {
-    if (_role == null || _step == 0) return l10n.wizardStartTitle;
-    switch (_role!) {
-      case _WizardRole.create:
-        switch (_step) {
-          case 1: return l10n.wizardStepShortName;
-          case 2: return l10n.wizardStepShortPeerName;
-          case 3: return l10n.wizardStepShortPassphrase;
-          case 4: return l10n.wizardStepShortPin;
-          default: return l10n.wizardStepShortDone;
-        }
-      case _WizardRole.join:
-        switch (_step) {
-          case 1: return l10n.wizardStepShortIdentity;
-          case 2: return l10n.wizardStepShortInvite;
-          case 3: return l10n.wizardStepShortPassphrase;
-          case 4: return l10n.wizardStepShortPin;
-          default: return l10n.wizardStepShortDone;
-        }
-      case _WizardRole.offline:
-        switch (_step) {
-          case 1: return l10n.wizardStepShortEnvelope;
-          case 2: return l10n.wizardStepShortPin;
-          default: return l10n.wizardStepShortDone;
-        }
-    }
-  }
-
-  /// 页眉标题（AppBar）：系列标题 + "：" + 当前步骤主题
-  /// （如「Einz 秘境认领中：邀请码」；第 0 步未选角色时显示引导语）。
+  /// 页眉标题（AppBar）：系列标题（如「Einz 秘境：认领中」；第 0 步未选角色时显示引导语）。
   String _appBarTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardStartTitle;
     switch (_role!) {
       case _WizardRole.create:
-        return '${l10n.wizardAppBarCreate}：${_stepShortTitle(l10n)}';
+        return l10n.wizardAppBarCreate;
       case _WizardRole.join:
-        return '${l10n.wizardAppBarJoin}：${_stepShortTitle(l10n)}';
+        return l10n.wizardAppBarJoin;
       case _WizardRole.offline:
-        return '${l10n.wizardAppBarOffline}：${_stepShortTitle(l10n)}';
+        return l10n.wizardAppBarOffline;
     }
   }
 
@@ -617,7 +587,7 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// 归一化的向导输入步骤页头：大标题（大号醒目）+ 解释说明（较小较淡）。
+  /// 归一化的向导输入步骤页头：大标题（大号醒目，水平居中）+ 解释说明（较小较淡，左对齐）。
   /// 全向导各输入页统一用此头部，保证视觉与结构一致。
   Widget _stepHeader(String title, String hint) {
     return Column(
@@ -625,6 +595,7 @@ class _SetupPageState extends State<SetupPage> {
       children: [
         Text(
           title,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w700,

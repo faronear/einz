@@ -140,23 +140,11 @@ abstract class AppLocalizations {
   /// **'Skip'**
   String get skip;
 
-  /// No description provided for @setupPageEnvelopeKeyLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Key envelope (base64)'**
-  String get setupPageEnvelopeKeyLabel;
-
   /// No description provided for @setupPageEnvelopeKeyHint.
   ///
   /// In en, this message translates to:
   /// **'Paste the key envelope (contents of envelope-*.txt)'**
   String get setupPageEnvelopeKeyHint;
-
-  /// No description provided for @setupPageEscrowLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Access passphrase (new devices can join with it, optional)'**
-  String get setupPageEscrowLabel;
 
   /// No description provided for @setupPageNeedPassphrase.
   ///
@@ -206,12 +194,6 @@ abstract class AppLocalizations {
   /// **'This is your partner (second user) — how should we call them? You can change it later.'**
   String get wizardPeerNameHint;
 
-  /// No description provided for @wizardPeerNameLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Partner\'s name'**
-  String get wizardPeerNameLabel;
-
   /// No description provided for @wizardPeerNameHintInput.
   ///
   /// In en, this message translates to:
@@ -229,12 +211,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please enter your partner\'s name'**
   String get wizardPeerNameRequired;
-
-  /// No description provided for @wizardNameLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'My name'**
-  String get wizardNameLabel;
 
   /// No description provided for @wizardNameHintInput.
   ///
@@ -313,48 +289,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get wizardDone;
-
-  /// No description provided for @wizardStepShortName.
-  ///
-  /// In en, this message translates to:
-  /// **'Name'**
-  String get wizardStepShortName;
-
-  /// No description provided for @wizardStepShortPeerName.
-  ///
-  /// In en, this message translates to:
-  /// **'Peer name'**
-  String get wizardStepShortPeerName;
-
-  /// No description provided for @wizardStepShortPassphrase.
-  ///
-  /// In en, this message translates to:
-  /// **'Passphrase'**
-  String get wizardStepShortPassphrase;
-
-  /// No description provided for @wizardStepShortPin.
-  ///
-  /// In en, this message translates to:
-  /// **'PIN'**
-  String get wizardStepShortPin;
-
-  /// No description provided for @wizardStepShortDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get wizardStepShortDone;
-
-  /// No description provided for @wizardStepShortIdentity.
-  ///
-  /// In en, this message translates to:
-  /// **'Identity'**
-  String get wizardStepShortIdentity;
-
-  /// No description provided for @wizardStepShortInvite.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite code'**
-  String get wizardStepShortInvite;
 
   /// No description provided for @wizardStepShortEnvelope.
   ///
@@ -517,12 +451,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid key envelope: make sure the full sealed key copy from the other device is pasted'**
   String get wizardEnvelopeWrong;
-
-  /// No description provided for @setupPageInviteLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite code (one-time)'**
-  String get setupPageInviteLabel;
 
   /// No description provided for @setupPageInviteHint.
   ///

@@ -31,15 +31,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skip => 'Skip';
 
   @override
-  String get setupPageEnvelopeKeyLabel => 'Key envelope (base64)';
-
-  @override
   String get setupPageEnvelopeKeyHint =>
       'Paste the key envelope (contents of envelope-*.txt)';
-
-  @override
-  String get setupPageEscrowLabel =>
-      'Access passphrase (new devices can join with it, optional)';
 
   @override
   String get setupPageNeedPassphrase =>
@@ -71,9 +64,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is your partner (second user) — how should we call them? You can change it later.';
 
   @override
-  String get wizardPeerNameLabel => 'Partner\'s name';
-
-  @override
   String get wizardPeerNameHintInput => 'e.g. Steffi';
 
   @override
@@ -81,9 +71,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardPeerNameRequired => 'Please enter your partner\'s name';
-
-  @override
-  String get wizardNameLabel => 'My name';
 
   @override
   String get wizardNameHintInput => 'e.g. Lukas (optional, change later)';
@@ -125,27 +112,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardDone => 'Done';
-
-  @override
-  String get wizardStepShortName => 'Name';
-
-  @override
-  String get wizardStepShortPeerName => 'Peer name';
-
-  @override
-  String get wizardStepShortPassphrase => 'Passphrase';
-
-  @override
-  String get wizardStepShortPin => 'PIN';
-
-  @override
-  String get wizardStepShortDone => 'Done';
-
-  @override
-  String get wizardStepShortIdentity => 'Identity';
-
-  @override
-  String get wizardStepShortInvite => 'Invite code';
 
   @override
   String get wizardStepShortEnvelope => 'Envelope';
@@ -240,9 +206,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get wizardEnvelopeWrong =>
       'Invalid key envelope: make sure the full sealed key copy from the other device is pasted';
-
-  @override
-  String get setupPageInviteLabel => 'Invite code (one-time)';
 
   @override
   String get setupPageInviteHint => 'Paste or type the invite code';
