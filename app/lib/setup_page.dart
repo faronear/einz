@@ -224,6 +224,16 @@ class _SetupPageState extends State<SetupPage> {
     if (_role == null) return _buildSplashScreen(l10n);
     return Scaffold(
       appBar: AppBar(
+        // 与首屏启动屏同款粉蓝渐变：AppBar 区域（含状态栏）也呈渐变，视觉连续
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+            ),
+          ),
+        ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -274,62 +284,96 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildProgressDots(),
-            // 进度条与输入区之间留白约等于大标题（30 号字，行高≈36px）的两倍
-            // （顶部锚定：键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白
-            // 并把底部导航顶到键盘上方——输入区不会被覆盖/压缩）
-            const SizedBox(height: 72),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                // 顶部锚定：默认 AnimatedSwitcher 用 Stack alignment.center 会把
-                // 输入表单垂直居中在页面正中——改为 topCenter 让表单贴着进度条，
-                // 键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白，输入区不被顶起
-                layoutBuilder: (currentChild, previousChildren) => Stack(
-                  alignment: Alignment.topCenter,
-                  children: [...previousChildren, ?currentChild],
-                ),
-                child: KeyedSubtree(
-                  key: ValueKey('$_role-$_step'),
-                  child: SingleChildScrollView(child: _buildStep()),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            // 后台报告的错误提示（红字；本地校验错误见输入框下方）
-            if (_status != null) ...[
-              Text(_status!,
-                  style: const TextStyle(color: Colors.red, fontSize: 14)),
-              const SizedBox(height: 8),
-            ],
-            // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
-            // 此时也有"下一步"可回到步骤 1，杜绝无路可走）
-            // join 步骤 1（身份选择）例外：点卡片即自动前进，整行按钮隐藏
-            // （不显示误配的"下一步/完成"，避免与自动前进语义冲突）
-            if (_role != null && !(_role == _WizardRole.join && _step == 1))
-              Row(
-                children: [
-                  // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）
-                  TextButton(
-                    onPressed: _step > 1 ? _backStep : null,
-                    child: Text(l10n.wizardBack),
+      body: Container(
+        // 与首屏启动屏同款粉蓝渐变（老板决策 2026-09-08：向导页沿用品牌渐变）
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildProgressDots(),
+                // 进度条与输入区之间留白约等于大标题（30 号字，行高≈36px）的两倍
+                // （顶部锚定：键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白
+                // 并把底部导航顶到键盘上方——输入区不会被覆盖/压缩）
+                const SizedBox(height: 72),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    // 顶部锚定：默认 AnimatedSwitcher 用 Stack alignment.center 会把
+                    // 输入表单垂直居中在页面正中——改为 topCenter 让表单贴着进度条，
+                    // 键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白，输入区不被顶起
+                    layoutBuilder: (currentChild, previousChildren) => Stack(
+                      alignment: Alignment.topCenter,
+                      children: [...previousChildren, ?currentChild],
+                    ),
+                    child: KeyedSubtree(
+                      key: ValueKey('$_role-$_step'),
+                      // 渐变背景上的白色内容卡：表单可读性 + 品牌层次
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x33000000), // 柔和投影（渐变上浮起）
+                              blurRadius: 24,
+                              offset: Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(20),
+                        child: SingleChildScrollView(child: _buildStep()),
+                      ),
+                    ),
                   ),
-                  const Spacer(),
-                  // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
-                  // 完成页（_step == _stepCount）显示"完成"。
-                  // join 步骤 1（身份选择）例外：点卡片即自动前进，无需"下一步"。
-                  if (_step < _stepCount && !(_role == _WizardRole.join && _step == 1))
-                    FilledButton(onPressed: _nextStep, child: Text(l10n.wizardNext))
-                  else
-                    FilledButton(onPressed: _finish, child: Text(l10n.wizardDone)),
+                ),
+                const SizedBox(height: 8),
+                // 后台报告的错误提示（红字；本地校验错误见输入框下方）
+                if (_status != null) ...[
+                  Text(_status!,
+                      style: const TextStyle(color: Colors.red, fontSize: 14)),
+                  const SizedBox(height: 8),
                 ],
-              ),
-          ],
+                // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
+                // 此时也有"下一步"可回到步骤 1，杜绝无路可走）
+                // join 步骤 1（身份选择）例外：点卡片即自动前进，整行按钮隐藏
+                // （不显示误配的"下一步/完成"，避免与自动前进语义冲突）
+                if (_role != null && !(_role == _WizardRole.join && _step == 1))
+                  Row(
+                    children: [
+                      // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）
+                      TextButton(
+                        onPressed: _step > 1 ? _backStep : null,
+                        // 渐变上白字（不可用时白色半透明）
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          disabledForegroundColor: Colors.white54,
+                        ),
+                        child: Text(l10n.wizardBack),
+                      ),
+                      const Spacer(),
+                      // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
+                      // 完成页（_step == _stepCount）显示"完成"。
+                      // join 步骤 1（身份选择）例外：点卡片即自动前进，无需"下一步"。
+                      if (_step < _stepCount && !(_role == _WizardRole.join && _step == 1))
+                        FilledButton(
+                            onPressed: _nextStep, child: Text(l10n.wizardNext))
+                      else
+                        FilledButton(
+                            onPressed: _finish, child: Text(l10n.wizardDone)),
+                    ],
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -364,9 +408,10 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 进度圆点指示器。
+  /// 进度圆点指示器：只表示向导内部步骤——首屏服务器检测集成在启动屏完成，
+  /// 不属于向导，因此圆点数 = 向导步骤数 - 1（老板决策 2026-09-08）。
   Widget _buildProgressDots() {
-    final total = _stepCount;
+    final total = _stepCount - 1; // 去掉首屏（检测）对应的圆点
     if (total <= 1) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -378,7 +423,8 @@ class _SetupPageState extends State<SetupPage> {
             margin: const EdgeInsets.symmetric(horizontal: 3),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: i <= _step ? Colors.indigo : Colors.grey.shade300,
+              // 渐变背景上的白色圆点（已完成纯白 / 未到白色半透明）
+              color: i + 1 <= _step ? Colors.white : Colors.white54,
             ),
           ),
       ],

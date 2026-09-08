@@ -1305,3 +1305,46 @@ LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，�
 分析——右上角由白 (254,247,255) 变为渐变过渡色 (87,158,235)，四角均为
 渐变；golden 保持红不重刷。
 
+## 2026-09-08 启动屏「LOGO + 加载图标」二合一——嵌套圆环旋转动画（commit 467224c）
+
+老板提议：把 logo 的两个嵌套圆环直接做成旋转动画，首屏不再需要单独 LOGO
+徽章 + 旋转图标，二合一。
+
+**logo 结构分析（python 解码 PNG + 旋转对称性检测）：** 蓝环（有粗细变化/
+缺口）与粉环嵌套交错，90° 旋转差异均值 78、180° 88.5（满值 255）——明显
+非旋转对称，旋转动画清晰可见。
+
+**实现（app/lib/brand_logo.dart）：**
+- 新增 `SpinningBrandLogo`：`RotationTransition` + `AnimationController`
+  `..repeat()` 无限顺时针旋转 `BrandLogo`（size/radius/duration 可配）
+- 启动屏（检测页）：去掉「白色徽章大 LOGO + spinner」，改为单个旋转 logo
+  居中（SpinningBrandLogo size 96）+ 状态文案
+- StartupGate 加载页同步二合一（size 72）
+
+**验证：** analyze 0 error；setup_probe_retry_test 通过；重渲染截图像素
+确认渐变铺满、文案布局正常。注：golden 测试 pump 一帧后 Image.asset 异步
+未加载（截图中央无 logo 图像），属 flutter_test 环境行为，真机正常；临时
+调试测试验证旋转时 runAsync/toImage 在 fake clock 下死锁超时，已删除。
+
+## 2026-09-08 向导页沿用粉蓝渐变 + 进度圆点减一
+
+老板要求：新设备向导页也保留首屏的粉蓝渐变背景；服务器检测集成在首屏完成、
+不属于向导，进度圆点应减少一个。
+
+**向导页渐变（app/lib/setup_page.dart build）：**
+- AppBar 加 `flexibleSpace` 渐变（AppBar 区域含状态栏同款渐变）
+- body 改为渐变 `Container` + `SafeArea`（与首屏同款 LinearGradient）
+- 步骤内容包白色圆角内容卡（白底圆角 20 + 柔和投影）——表单可读性 + 品牌层次
+- 底部「上一步」TextButton 改白色（渐变上可读）；进度圆点改白色系
+- 步骤页内红字错误提示、身份卡片（左蓝右粉）在白卡内不受影响
+
+**圆点减一（_buildProgressDots）：** 原 `total = _stepCount` 且 `i <= _step`
+点亮导致 i=0 恒亮（被感知为首屏圆点）。改为 `total = _stepCount - 1`、
+点亮条件 `i + 1 <= _step`——create/join 5→4 个、offline 3→2 个，圆点只
+代表向导内部步骤；`_stepCount` 本身不动（导航/完成判定仍用它）。
+
+**验证：** analyze 0 error；setup_probe_retry_test 通过；重渲染 create 步骤
+1 截图像素分析——四角与 AppBar 区域均为渐变、白色内容卡存在、圆点 4 个
+（x=173/187/201/215，第 1 个纯白=已完成、后 3 个半透明白=未到）；
+golden 保持红不重刷。
+
