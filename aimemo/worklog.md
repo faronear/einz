@@ -939,3 +939,16 @@
 3. iOS 17.4 模拟器运行时已删除（释放 ~6.7G，仅留 18.1）；iPhone 15 等 17.4 模拟器设备随运行时移除而不可用。
 
 **环境现状（iMac）：** Xcode 16.1 + iOS 18.1 运行时、CocoaPods 1.16.2、Flutter 3.47.2（禁 SPM）、Dart 3.13.2、Node 23.5.0、libsodium 1.0.22（brew）；Android SDK 缺 cmdline-tools（Android 侧待办，见 flutter doctor）。
+
+## 2026-09-08 会话：启动门误进向导根因 + l10n 一致性修复
+
+**bug 调查：重启 App 再次进入新设备向导（疑与输错 PIN 有关）**
+- 结论：输错 PIN **不会**删除本地 store——`AppLockService.unlock` 失败只计尝试次数/锁定 30s；chat/setup 的「退出应用」确认只调 `exit(0)` 不清数据；全 app 唯一清数据路径是 `_onDeviceRevoked`（仅服务端 device.revoked 广播触发，即 /revoke 或 /recover 全丢恢复）
+- 真凶：`StartupGate._check()` 在本地库查询异常（SQLite 锁竞争/热重启残留连接）时 catch 降级为「未配置」→ 直接进新设备向导（数据未丢只是误导向，且重走向导会重复登记设备）
+- 修复（41b98b3）：启动门瞬态失败自动重试 4 次（1s 间隔）→ 仍失败显示「启动初始化失败，配置未丢失，请重试」错误页（含重试按钮），不再自动进向导
+
+**l10n 一致性修复（79f2e8f）**
+- 244ab3d 文案 commit 造成 ARB/生成文件/测试三方不一致（AppBar 标题冒号版 vs 无冒号、身份 vs 身份名字、PIN vs PIN 锁屏码、我的设备 vs 设备名称），widget/join/envelope 测试红
+- 老板决策：以 ARB 为准（文案不动）→ `flutter gen-l10n` 重新生成 + 修正 6 个测试文件 35 处断言匹配实际渲染；非 golden 测试 25 项全过
+- golden：10 个 PNG 因文案渲染变化失配（0.44%~2.70%），老板决策**暂不重刷**（golden 测试保持红，作为文案变更标记，待批准后随时重刷）
+- 待确认：ARB `wizardSwitchToPassphrase` = 「该用线上密保口令」疑似「改用」笔误
