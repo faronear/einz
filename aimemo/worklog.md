@@ -971,3 +971,22 @@
 **验证：** shared dart analyze 0 issue + dart test 24 全过；app flutter analyze 仅 1 既有 info lint（ws_realtime_service.dart，非本次引入）；chat_page_menu/widget/setup_join_passphrase/setup_envelope 20 项全过。golden 失配为既有已知问题（2026-09-08 早前文案 commit 造成，老板已决策暂不重刷），本次改动不在 golden 覆盖路径内。
 
 **遗留：** join 端扫码功能（scanJoin 文案）仍未实现——二维码现在只装邀请码，未来若做扫码只需解析纯邀请码文本。
+
+## 2026-09-08 会话：新 Logo（粉蓝图标）替换品牌 + 应用粉蓝主色调
+
+**背景：** 老板提供 AI 生成新 Logo（`/Users/luk/Downloads/已生成图像 1 (5).png`，1254×1254 RGB 无透明），要求 ① 作为 app 的 Logo ② 取图标里的粉蓝配色作 app 主色调。
+
+**图标配色提取**（sips 转 BMP + 纯 Python 聚类；本环境无 PIL 且 pip 被 PEP 668 限制）：
+- 粉系：浅粉底 #FDD6ED/#FDC1E5（占比 ~70%），粉强调 #FB89CD
+- 蓝系：天蓝 #3BAFFD、浅蓝 #7BCDFC、深蓝 #2271F7
+- 空间结构：整幅以浅粉渐变为主，中部偏下为蓝色图形（约 20×20 网格 6-14 行中列），四角近白
+
+**实现：**
+- 全平台图标以 1024 母版（`assets/logo.png`，品牌源文件）经 `sips -z` 生成替换：Android 5 个 mipmap（48/72/96/144/192）、iOS AppIcon 15 张（20~1024 全档，含 83.5@2x=167）；macOS/web（favicon 16 + icons 192/512/maskable）本地同样替换但**不入 git**（项目约定只跟踪 ios/android，见 app/.gitignore）
+- `app/lib/main.dart` 粉蓝主题：seed 天蓝 #3BAFFD（派生 primary 保持深蓝对比达标）；`copyWith` 注入粉系（secondary #D6529C、secondaryContainer #FDD6ED 浅粉底、tertiary #2271F7 深蓝）+ 浅粉表面族（surface #FFF8FB / container 粉白渐变）；scaffold/appbar 背景 #F4FAFF 浅蓝白 → #FFF5FA 浅粉白；输入框描边 #D9E6F5→#E9D5E0、聚焦边 #4FC3F7→#3BAFFD
+- `web/manifest.json` theme_color/background_color #0175C2 → #3BAFFD/#FFF5FA（本地生效，gitignored）
+- 旧 `assets/logo.svg` 未删除（git 历史/潜在回退参考）
+
+**验证：** app flutter analyze 0 issue（仅 1 既有 info lint，非本次引入）。golden 政策不变：主题色改动使 golden 失配 → 保持红不重刷（老板既定决策 2026-09-08）。启动图标为原生资源改动，需完整重建/重装才能在桌面看到新图标（热重启不刷新 launcher icon）。
+
+**备注：** 应用内 UI 原本无 Logo 展示位（logo.svg 仅设计源，未被任何页面引用）；如需在锁屏/设置/聊天页头展示新 Logo，可作为后续 UI 任务单独排期。

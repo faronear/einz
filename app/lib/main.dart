@@ -61,12 +61,29 @@ class _EinzAppState extends State<EinzApp> {
       title: 'Einz',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4FC3F7), // 天蓝：明亮快乐（logo 同色系——两环嵌套的天蓝环）
+          // 新 Logo（粉蓝图标）里的天蓝作种子：派生 primary 保持深蓝，交互对比达标
+          seedColor: const Color(0xFF3BAFFD),
           brightness: Brightness.light,
+        ).copyWith(
+          // 粉蓝主色调：叠加 Logo 的粉系强调 + 浅粉表面，主操作色仍为深蓝
+          secondary: const Color(0xFFD6529C), // 粉强调（图标粉环同系）
+          onSecondary: Colors.white,
+          secondaryContainer: const Color(0xFFFDD6ED), // 图标浅粉底
+          onSecondaryContainer: const Color(0xFF6E2050),
+          tertiary: const Color(0xFF2271F7), // 图标深蓝
+          onTertiary: Colors.white,
+          tertiaryContainer: const Color(0xFFDCE9F8),
+          onTertiaryContainer: const Color(0xFF0B2C54),
+          surface: const Color(0xFFFFF8FB), // 浅粉白基调表面
+          surfaceContainerLowest: const Color(0xFFFFFFFF),
+          surfaceContainerLow: const Color(0xFFFFF4F9),
+          surfaceContainer: const Color(0xFFFEF0F6),
+          surfaceContainerHigh: const Color(0xFFFCEBF2),
+          surfaceContainerHighest: const Color(0xFFFAE4EE),
         ),
-        scaffoldBackgroundColor: const Color(0xFFF4FAFF), // 浅蓝白纸感背景（明亮）
+        scaffoldBackgroundColor: const Color(0xFFFFF5FA), // 浅粉白纸感背景（图标浅粉底同系）
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF4FAFF),
+          backgroundColor: Color(0xFFFFF5FA),
           elevation: 0,
           centerTitle: false,
           titleTextStyle: TextStyle(
@@ -78,11 +95,11 @@ class _EinzAppState extends State<EinzApp> {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFD9E6F5)),
+            borderSide: const BorderSide(color: Color(0xFFE9D5E0)), // 浅粉描边（粉蓝）
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF4FC3F7), width: 1.6),
+            borderSide: const BorderSide(color: Color(0xFF3BAFFD), width: 1.6), // 图标天蓝
           ),
         ),
         filledButtonTheme: FilledButtonThemeData(
