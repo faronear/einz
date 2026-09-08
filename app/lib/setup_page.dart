@@ -337,9 +337,10 @@ class _SetupPageState extends State<SetupPage> {
               const SizedBox(height: 12),
             ],
             _buildProgressDots(),
-            // 进度条与输入区之间留白（顶部锚定：键盘弹出时 resizeToAvoidBottomInset
-            // 只收缩底部空白并把底部导航顶到键盘上方——输入区不会被覆盖/压缩）
-            const SizedBox(height: 28),
+            // 进度条与输入区之间留白约等于大标题（30 号字，行高≈36px）的两倍
+            // （顶部锚定：键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白
+            // 并把底部导航顶到键盘上方——输入区不会被覆盖/压缩）
+            const SizedBox(height: 72),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
