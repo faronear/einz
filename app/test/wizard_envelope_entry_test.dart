@@ -63,13 +63,13 @@ void main() {
 
   testWidgets('口令页 ↔ 信封页可互切（任一完成都进 PIN）', (WidgetTester tester) async {
     await pumpToPassphrase(tester, probeNames: const {'personA': 'Lukas'}, join: true);
-    // 口令页 → 切换入口 → 信封页（信封页有对称的「该用线上密保口令」链接）
+    // 口令页 → 切换入口 → 信封页（信封页有对称的「改用线上密保口令」链接）
     await tester.tap(find.text('改用线下密保信封'));
     await tester.pumpAndSettle();
-    expect(find.text('该用线上密保口令'), findsOneWidget,
+    expect(find.text('改用线上密保口令'), findsOneWidget,
         reason: '信封页应提供切回口令页的对称链接（后悔可返回）');
     // 信封页 → 切回口令页（保留已输邀请码/口令，任一方案完成都进 PIN）
-    await tester.tap(find.text('该用线上密保口令'));
+    await tester.tap(find.text('改用线上密保口令'));
     await tester.pumpAndSettle();
     expect(find.text('改用线下密保信封'), findsOneWidget,
         reason: '应回到口令页，两个平行方案可自由互切');

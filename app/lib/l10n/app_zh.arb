@@ -136,7 +136,7 @@
   "wizardJoinPassphraseHint": "输入密保口令（如不知道，请询问领地创建人）",
   "wizardJoinPassphraseWrong": "口令错误：请确认首台设备创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
-  "wizardSwitchToPassphrase": "该用线上密保口令",
+  "wizardSwitchToPassphrase": "改用线上密保口令",
   "wizardPinHint": "每次启动需输入此 PIN 解锁",
   "wizardDoneText": "✅ 设置完成！",
   "welcomeDialogTitleCreate": "🎉 成功创建我的领地",

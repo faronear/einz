@@ -342,7 +342,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToEnvelope => '改用线下密保信封';
 
   @override
-  String get wizardSwitchToPassphrase => '该用线上密保口令';
+  String get wizardSwitchToPassphrase => '改用线上密保口令';
 
   @override
   String get wizardPinHint => '每次启动需输入此 PIN 解锁';
