@@ -1253,7 +1253,7 @@ class _SetupPageState extends State<SetupPage> {
         final escrowPayload = AppLockPayload(
           server: _server,
           spaceId: _spaceId.text.trim(),
-          deviceId: kp.deviceId,
+          deviceId: _enroll!.deviceId,
           spaceKeyB64: base64Encode(_spaceKey!),
           keyVersion: 1,
           token: token,
@@ -1267,7 +1267,7 @@ class _SetupPageState extends State<SetupPage> {
         await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
           server: _server,
           spaceId: _spaceId.text.trim(),
-          deviceId: kp.deviceId,
+          deviceId: _enroll!.deviceId,
           spaceKeyB64: base64Encode(_spaceKey!),
           keyVersion: 1,
           token: token,
@@ -1279,7 +1279,7 @@ class _SetupPageState extends State<SetupPage> {
       final ok = await _setupLockAndEnter(
         server: _server,
         spaceId: _spaceId.text.trim(),
-        deviceId: kp.deviceId,
+        deviceId: _enroll!.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: 1,
         token: token,

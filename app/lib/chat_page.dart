@@ -1401,6 +1401,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               itemBuilder: (context, i) {
                 final m = _messages[i];
                 final mine = m.sender == 'me';
+                // 头像 personId：信封字段优先，缺失（旧版附件/语音消息）用设备映射兜底
+                final avatarPersonId =
+                    m.env.senderPersonId ?? _repo.personIdOfDevice(m.env.senderDeviceId);
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Row(
@@ -1409,7 +1412,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 每条消息前放置发送者头像（点击有头像时放大全屏查看）
                       if (!mine)
                         _MessageAvatar(
-                            personId: m.env.senderPersonId, server: widget.server, api: widget.api),
+                            personId: avatarPersonId, server: widget.server, api: widget.api),
                       const SizedBox(width: 6),
                       Container(
                         margin: const EdgeInsets.symmetric(vertical: 4),
@@ -1439,7 +1442,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       if (mine) ...[
                         const SizedBox(width: 6),
                         _MessageAvatar(
-                            personId: m.env.senderPersonId, server: widget.server, api: widget.api),
+                            personId: avatarPersonId, server: widget.server, api: widget.api),
                       ],
                     ],
                   ),

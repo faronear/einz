@@ -111,6 +111,9 @@ class MessageRepository {
     return senderDeviceId == deviceId;
   }
 
+  /// 设备 → 用户（person_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPersonId）。
+  String? personIdOfDevice(String deviceId) => _personByDevice[deviceId];
+
   /// 当前同步锚点（本地库 sync_state）。
   Future<int> get lastSequence async {
     final row = await (db.select(db.syncState)
@@ -177,6 +180,7 @@ class MessageRepository {
       spaceKey: spaceKey,
       spaceId: spaceId,
       senderDeviceId: deviceId,
+      senderPersonId: _personByDevice[deviceId],
       messageId: messageId,
       type: type,
       keyVersion: keyVersion,
