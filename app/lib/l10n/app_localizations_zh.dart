@@ -58,22 +58,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '无法连接服务器，请在上方输入地址后重试';
 
   @override
-  String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
+  String get wizardNameHint => '填写我的名字（将来可以随时修改）。';
 
   @override
-  String get wizardPeerNameHint => '一个秘境仅限两人。填写 TA 的名字（将来可以随时修改）：';
+  String get wizardPeerNameHint => '填写伴侣的名字（将来可以随时修改）：';
 
   @override
-  String get wizardPeerNameLabel => 'TA 的名字';
+  String get wizardPeerNameLabel => '伴侣的名字';
 
   @override
   String get wizardPeerNameHintInput => '例如 Steffi';
 
   @override
-  String get wizardNameRequired => '输入我的名字';
+  String get wizardNameRequired => '填写我的名字';
 
   @override
-  String get wizardPeerNameRequired => '输入 TA 的名字';
+  String get wizardPeerNameRequired => '填写伴侣的名字';
 
   @override
   String get wizardNameLabel => '我的名字';
@@ -82,7 +82,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameHintInput => '例如 Lukas';
 
   @override
-  String get wizardIdentityHint => '一个秘境仅限两人。填写我的名字：';
+  String get wizardIdentityHint => '一个秘境仅限两人。我是：';
 
   @override
   String get wizardIdentityCreator => '秘境创建者';
