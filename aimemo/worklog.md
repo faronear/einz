@@ -1239,3 +1239,69 @@ setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
   wait_text 会让第一次吞掉绿点渲染 → 单次 wait 同时校验「🎉 一切就绪」+ 绿点
 
 **验证：** dart analyze 0 issue；server tsc 构建通过；revoked_check.py 全过。
+
+## 2026-09-08 会话：App 认证 403（设备被撤销）→ 走 _onDeviceRevoked
+
+**任务（老板要求）：** 补一个：认证 403 时也走 _onDeviceRevoked（此前只覆盖 WS
+广播 device.revoked；后台错过广播时 WS 会因 token 失效反复重连，认证 403 无
+撤销处理）。
+
+**实现（app/lib/chat_page.dart）：**
+- 新增 `_reauthWithRevokedFallback()`：包装 `widget.reauth`，捕获
+  `ApiException code == 'FORBIDDEN'`（challenge-response 被服务端拒绝 = 设备已
+  撤销）→ `await _onDeviceRevoked()`（清理锁包/消息库 → 顶部通知 → 回设置页）；
+  其他异常原样抛出
+- 两处 reauth 接线点改用包装（widget.reauth 为空时保持透传 null）：
+  MessageRepository（请求 401 自动续期）与 WsRealtimeService（WS 4401 续期）
+- 403 覆盖路径：WS 4401 → reauth → 挑战 403；请求 401 → reauth → 挑战 403
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；ws_realtime_service/
+chat_page_menu/message_repository 测试全过；widget_test 有 1 个既有失败
+（「Einz 秘境：认领中：身份」期望文本在现行代码/l10n 已不存在——老板并行 WIP
+的 UI 改造遗留，与本次改动无关，未处理）。
+
+## 2026-09-08 检测页重设计为品牌启动屏（commit 284c1ca）
+
+老板要求：首页（检测服务器状态）作为启动屏幕页，突出粉蓝配色，页面上方放
+LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，顶部无菜单。
+
+**设计（app/lib/setup_page.dart）：**
+- `build()` 顶层分流：`_role == null`（角色未判定）→ 新增 `_buildSplashScreen()`
+  全屏品牌启动屏：粉蓝渐变（天蓝 #3BAFFD → 粉 #D6529C，同顶部通知渐变）+
+  上方白色圆角徽章大 LOGO（BrandLogo 96）+ 正中白色旋转图标 + 状态文案；
+  无 AppBar/菜单/服务器输入框
+- 失败态不展示输入框：探测失败文案改为「暂时无法连接服务器，正在自动重试…」，
+  由既有 4 秒自动重试兜底（就绪即自动进入向导），spinner 持续旋转
+- 删除死代码：`_serverController`、`_saveServer()`、失败输入框 Card
+
+**其他：**
+- main.dart StartupGate 加载页同步品牌化（渐变 + LOGO 72 + 旋转图标），
+  需 import brand_logo.dart
+- l10n：wizardDetectFailed 更新 zh/en（5 个文件：2 arb + 3 dart）
+- setup_probe_retry_test 适配：失败态 spinner 常转 → 有限 pump 替代
+  pumpAndSettle（否则无限动画超时）
+- golden 政策：检测页/向导 golden 全部失配保持红，不重刷（向导步骤失配
+  叠加老板并行文案改动影响）
+
+**验证：** flutter analyze 0 error（仅 1 既有 info）；setup_probe_retry_test
+通过；golden 失配保持红（政策）。
+
+## 2026-09-08 启动屏渐变铺满全屏修复（commit aafad56）
+
+老板反馈：断线时启动屏只显示左侧一大半渐变，右侧全白（页面停留久才暴露）。
+
+**根因（查 Flutter SDK 源码确认）：**
+- Scaffold body 约束是宽松的（`_BodyBoxConstraints` 只传 maxWidth/maxHeight，
+  minWidth/minHeight 默认 0）
+- 现代 Flutter `RenderProxyBoxMixin._computeSize`：尺寸 = child 尺寸
+  （`constraints.constrain(childSize)`），不是撑满 biggest
+- 启动屏渐变 Container 无 alignment → 缩到 Column 宽度 = 最宽文案
+  （断线失败文案「暂时无法连接服务器，正在自动重试…」≈260px = 屏幕 2/3）
+
+**修复：** 渐变 Container 加 `alignment: Alignment.topCenter`——内部 Align
+撑满全屏 → 渐变 DecoratedBox 铺满整页，内容布局不变。
+
+**验证：** analyze 0 error；setup_probe_retry_test 通过；重渲染截图像素
+分析——右上角由白 (254,247,255) 变为渐变过渡色 (87,158,235)，四角均为
+渐变；golden 保持红不重刷。
+
