@@ -24,7 +24,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 无锁包 → 显示"未设置 PIN 锁屏"提示（不激活锁屏）
-    expect(find.text('尚未设置 PIN 锁屏码（为空时不启用）'), findsOneWidget);
+    expect(find.text('尚未设置锁屏码（为空时不启用）'), findsOneWidget);
     // 不显示解锁输入框与解锁按钮（避免死锁）
     expect(find.byType(TextField), findsNothing);
     expect(find.text('解锁'), findsNothing);

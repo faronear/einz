@@ -943,12 +943,14 @@
 ## 2026-09-08 会话：启动门误进向导根因 + l10n 一致性修复
 
 **bug 调查：重启 App 再次进入新设备向导（疑与输错 PIN 有关）**
+
 - 结论：输错 PIN **不会**删除本地 store——`AppLockService.unlock` 失败只计尝试次数/锁定 30s；chat/setup 的「退出应用」确认只调 `exit(0)` 不清数据；全 app 唯一清数据路径是 `_onDeviceRevoked`（仅服务端 device.revoked 广播触发，即 /revoke 或 /recover 全丢恢复）
 - 真凶：`StartupGate._check()` 在本地库查询异常（SQLite 锁竞争/热重启残留连接）时 catch 降级为「未配置」→ 直接进新设备向导（数据未丢只是误导向，且重走向导会重复登记设备）
 - 修复（41b98b3）：启动门瞬态失败自动重试 4 次（1s 间隔）→ 仍失败显示「启动初始化失败，配置未丢失，请重试」错误页（含重试按钮），不再自动进向导
 
 **l10n 一致性修复（79f2e8f）**
-- 244ab3d 文案 commit 造成 ARB/生成文件/测试三方不一致（AppBar 标题冒号版 vs 无冒号、身份 vs 身份名字、PIN vs PIN 锁屏码、我的设备 vs 设备名称），widget/join/envelope 测试红
+
+- 244ab3d 文案 commit 造成 ARB/生成文件/测试三方不一致（AppBar 标题冒号版 vs 无冒号、身份 vs 身份名字、PIN vs 锁屏码、我的设备 vs 设备名称），widget/join/envelope 测试红
 - 老板决策：以 ARB 为准（文案不动）→ `flutter gen-l10n` 重新生成 + 修正 6 个测试文件 35 处断言匹配实际渲染；非 golden 测试 25 项全过
 - golden：10 个 PNG 因文案渲染变化失配（0.44%~2.70%），老板决策**暂不重刷**（golden 测试保持红，作为文案变更标记，待批准后随时重刷）
 - 待确认：ARB `wizardSwitchToPassphrase` = 「该用线上密保口令」疑似「改用」笔误
@@ -958,10 +960,12 @@
 **背景：** 老板指出 App 邀请码二维码（JoinInfo `einz-join-v1?space=&p=&i=`）含**明文口令**不安全，决定降级到 B 方案——与 TUI 完全一致：邀请码分享不再携带口令，口令由加入方另行输入。
 
 **设计（老板拍板 2026-09-08）：**
+
 - 二维码保留，内容改为**纯邀请码**（扫码=输入邀请码；无口令无风险）；彻底去掉含口令字段的 JoinInfo 分享格式
 - 口令被重设的通知机制保留并完善：WS 广播 passphrase.rotated（在线 App SnackBar / TUI 系统消息）+ 上线/重连补查（对比 getKeyEscrow updated_at，已改则发一次通知）
 
 **实现：**
+
 - `app/lib/chat_page.dart` `_showInviteDialog`：删除生成前的口令过时校验（getKeyEscrow 对比 + 重验证弹窗）与口令编入；二维码 = 纯邀请码；提示文案改「对方扫码或输入此邀请码加入，加入时需另行输入口令」
 - 删除死代码：`_showReverifyPassphraseDialog` + `_ReverifyPassphraseDialog` 类 + `_escrowPassphrase` 缓存 state（邀请码编入口令的唯一用途）；保留 widget.escrowPassphrase（补设锁/改口令用）与 `_escrowUpdatedAt`（上线补查对比用）
 - `shared`：删除 `JoinInfo` 类/export/单测（生产代码已无解析者；join 向导只接收邀请码文本）
@@ -977,11 +981,13 @@
 **背景：** 老板提供 AI 生成新 Logo（`/Users/luk/Downloads/已生成图像 1 (5).png`，1254×1254 RGB 无透明），要求 ① 作为 app 的 Logo ② 取图标里的粉蓝配色作 app 主色调。
 
 **图标配色提取**（sips 转 BMP + 纯 Python 聚类；本环境无 PIL 且 pip 被 PEP 668 限制）：
+
 - 粉系：浅粉底 #FDD6ED/#FDC1E5（占比 ~70%），粉强调 #FB89CD
 - 蓝系：天蓝 #3BAFFD、浅蓝 #7BCDFC、深蓝 #2271F7
 - 空间结构：整幅以浅粉渐变为主，中部偏下为蓝色图形（约 20×20 网格 6-14 行中列），四角近白
 
 **实现：**
+
 - 全平台图标以 1024 母版（`assets/logo.png`，品牌源文件）经 `sips -z` 生成替换：Android 5 个 mipmap（48/72/96/144/192）、iOS AppIcon 15 张（20~1024 全档，含 83.5@2x=167）；macOS/web（favicon 16 + icons 192/512/maskable）本地同样替换但**不入 git**（项目约定只跟踪 ios/android，见 app/.gitignore）
 - `app/lib/main.dart` 粉蓝主题：seed 天蓝 #3BAFFD（派生 primary 保持深蓝对比达标）；`copyWith` 注入粉系（secondary #D6529C、secondaryContainer #FDD6ED 浅粉底、tertiary #2271F7 深蓝）+ 浅粉表面族（surface #FFF8FB / container 粉白渐变）；scaffold/appbar 背景 #F4FAFF 浅蓝白 → #FFF5FA 浅粉白；输入框描边 #D9E6F5→#E9D5E0、聚焦边 #4FC3F7→#3BAFFD
 - `web/manifest.json` theme_color/background_color #0175C2 → #3BAFFD/#FFF5FA（本地生效，gitignored）
@@ -996,6 +1002,7 @@
 **背景：** 老板要求把新粉蓝 Logo 放进 UI：对话页、向导页的顶部标题左侧，PIN 解锁页找合适位置。
 
 **实现：**
+
 - `pubspec.yaml` 注册 `assets/logo.png`；新增共用组件 `app/lib/brand_logo.dart`（`BrandLogo`：ClipRRect 圆角 + Image.asset，按展示尺寸 cacheWidth 降采样解码，避免顶栏小图解码 1024 大图）
 - 对话页 `chat_page.dart`、向导页 `setup_page.dart`：AppBar 标题改为 `Row[BrandLogo(28) + 10px + Flexible(Text, ellipsis)]`（无 leading，Logo 贴标题左侧；长标题自动省略防溢出）
 - PIN 解锁页 `lock_page.dart`：解锁表单顶部原 56px `Icons.lock_outline` 占位图换成居中 `BrandLogo(72, r16)`；「未设置 PIN」的 noLock 提示分支保留 lock_open 图标（有语义：说明为何不显示解锁表单）

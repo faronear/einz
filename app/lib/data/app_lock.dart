@@ -107,14 +107,14 @@ class AppLockService {
   Future<AppLockPayload> unlock(String pin) async {
     await _ensureNotLocked();
     final raw = await _get(_kPackage);
-    if (raw == null) throw const AppLockException('尚未设置 PIN 锁屏码');
+    if (raw == null) throw const AppLockException('尚未设置锁屏码');
     try {
       final plain = await decryptBackup(file: BackupFile.fromJson(jsonDecode(raw)), recoveryCode: pin);
       await _set(_kAttempts, '0');
       return AppLockPayload.fromJson(jsonDecode(utf8.decode(plain)));
     } on FormatException {
       await _registerFailure();
-      throw const AppLockException('PIN 锁屏码 错误');
+      throw const AppLockException('锁屏码 错误');
     }
   }
 

@@ -54,7 +54,7 @@
     }
   },
   "wizardRecoverEnrolling": "正在绑定本设备…",
-  "wizardRecoverDone": "✅ 已恢复：本设备已绑定，请设置 PIN 锁屏码",
+  "wizardRecoverDone": "✅ 已恢复：本设备已绑定，请设置 锁屏码",
   "wizardAppBarCreate": "Einz 秘境：创建中",
   "wizardAppBarJoin": "Einz 秘境：认领中",
   "wizardAppBarOffline": "导入密保信封",
@@ -64,7 +64,7 @@
   "wizardStepShortName": "名字",
   "wizardStepShortPeerName": "对方名字",
   "wizardStepShortPassphrase": "口令",
-  "wizardStepShortPin": "PIN 锁屏码",
+  "wizardStepShortPin": "锁屏码",
   "wizardStepShortDone": "完成",
   "wizardStepShortIdentity": "身份",
   "wizardStepShortInvite": "邀请码",
@@ -115,8 +115,8 @@
   "setPinDialogPinLabel": "PIN（至少 4 位）",
   "setPinDialogConfirmLabel": "确认 PIN",
   "setPinDialogSetPin": "设置 PIN",
-  "setupPageSkipPinTitle": "暂不设置 PIN 锁屏码？",
-  "setupPageSkipPinMessage": "不设 PIN 锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？",
+  "setupPageSkipPinTitle": "暂不设置 锁屏码？",
+  "setupPageSkipPinMessage": "不设 锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？",
   "setPinDialogPinTooShort": "PIN 至少 4 位",
   "setPinDialogPinMismatch": "两次输入的 PIN 不一致",
   "setPinDialogSetupFailed": "设置失败: {error}",
@@ -126,9 +126,9 @@
     }
   },
   "chatPageLocaleSwitched": "已切换：{label}",
-  "chatPageSetLockTitle": "设置 PIN 锁屏码",
+  "chatPageSetLockTitle": "设置 锁屏码",
   "chatPageSetLockClearHint": "可留空直接提交，即可清空 PIN",
-  "chatPageSetLockDone": "PIN 锁屏码已设置，下次启动需解锁",
+  "chatPageSetLockDone": "锁屏码已设置，下次启动需解锁",
   "chatPageSetLockConfirmTitle": "设置 PIN 锁屏？",
   "chatPageSetLockConfirmMessage": "确定要设置 PIN 锁屏吗？设置后每次启动需输入 PIN 解锁。",
   "chatPageSetLockCleared": "已清除 PIN 锁屏（下次启动直接进入）",
@@ -190,7 +190,7 @@
   "chatPageMenuBurnLabel": "阅后即焚",
   "chatPageMenuMyNameLabel": "我的名字",
   "chatPageMenuDeviceNameLabel": "我的设备",
-  "chatPagePinLabel": "PIN 锁屏码",
+  "chatPagePinLabel": "锁屏码",
   "chatPagePinSetValue": "已设置",
   "chatPagePinUnsetValue": "未设置",
   "@chatPageLocaleSwitched": {
@@ -284,8 +284,8 @@
       "seconds": {"type": "int"}
     }
   },
-  "lockPagePinLabel": "PIN 锁屏码",
-  "lockPageNoPinSet": "尚未设置 PIN 锁屏码（为空时不启用）",
+  "lockPagePinLabel": "锁屏码",
+  "lockPageNoPinSet": "尚未设置 锁屏码（为空时不启用）",
   "lockPageUnlock": "解锁",
   "lockPageTooManyAttempts": "尝试次数过多，请 {seconds} 秒后再试",
   "@lockPageTooManyAttempts": {

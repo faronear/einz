@@ -89,7 +89,7 @@ void main() {
         reason: '错误口令必须被拦截并提示');
     expect(find.text('输入密保口令（如不知道，请询问领地创建人）'),
         findsOneWidget, reason: '应停留在口令页');
-    expect(find.text('Einz 秘境：认领中：PIN 锁屏码'), findsNothing, reason: '不应进入 PIN 页');
+    expect(find.text('Einz 秘境：认领中：锁屏码'), findsNothing, reason: '不应进入 PIN 页');
   });
 
   testWidgets('正确口令：通过验证进入 PIN 页', (WidgetTester tester) async {
@@ -97,7 +97,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('Einz 秘境：认领中：PIN 锁屏码'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
+    expect(find.text('Einz 秘境：认领中：锁屏码'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
   });
 
   testWidgets('未托管口令（服务器无 escrow 包）：提示并停留', (WidgetTester tester) async {

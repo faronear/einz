@@ -85,12 +85,12 @@ void main() {
     expect(find.text('退出应用'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text('修改口令'), findsOneWidget);
-    expect(find.text('PIN 锁屏码'), findsOneWidget);
+    expect(find.text('锁屏码'), findsOneWidget);
     // 点"PIN: 未设置"菜单项
-    await tester.tap(find.text('PIN 锁屏码'));
+    await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
     // 弹窗应出现（设置启动锁）
-    expect(find.text('设置 PIN 锁屏码'), findsOneWidget);
+    expect(find.text('设置 锁屏码'), findsOneWidget);
     // 返回：模拟系统返回键（与真机"返回"一致；barrier/取消按钮均走 Navigator.pop）
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -125,9 +125,9 @@ void main() {
     // 打开菜单 → PIN 菜单项
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN 锁屏码'));
+    await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
-    expect(find.text('设置 PIN 锁屏码'), findsOneWidget);
+    expect(find.text('设置 锁屏码'), findsOneWidget);
 
     // 输入有效 PIN（两次一致）——限定在弹窗内查找，避免匹配聊天页消息输入框
     final pinFields =
@@ -144,7 +144,7 @@ void main() {
     // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
     expect(tester.takeException(), isNull);
     // 弹窗应已关闭，锁已落盘
-    expect(find.text('设置 PIN 锁屏码'), findsNothing);
+    expect(find.text('设置 锁屏码'), findsNothing);
     expect(await AppLockService(db).isSetup, true);
   });
 
@@ -219,7 +219,7 @@ void main() {
     await tester.pumpAndSettle();
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
     expect(find.text('退出秘境？'), findsOneWidget);
-    expect(find.text('将彻底关闭应用。'), findsOneWidget);
+    expect(find.text('将在本设备上退出 Einz 秘境。'), findsOneWidget);
     // 点取消关闭弹窗（不触发 exit）
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
@@ -287,9 +287,9 @@ void main() {
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两个输入框都不输入 = 设为空）
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN 锁屏码'));
+    await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
-    expect(find.text('设置 PIN 锁屏码'), findsOneWidget); // 弹窗标题
+    expect(find.text('设置 锁屏码'), findsOneWidget); // 弹窗标题
     // 两空点「设置 PIN」→ 先弹显性确认对话框（防误触——老板要求）
     await tester.tap(find.text('设置 PIN'));
     await tester.pumpAndSettle();
@@ -300,7 +300,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('已清除 PIN 锁屏（下次启动直接进入）'), findsOneWidget); // SnackBar
     // 弹窗已关闭；无加密包（isSetup false），明文配置仍在（hasConfig true）
-    expect(find.text('设置 PIN 锁屏码'), findsNothing);
+    expect(find.text('设置 锁屏码'), findsNothing);
     final lock = AppLockService(db);
     expect(await lock.isSetup, false, reason: '两空提交不设加密锁');
     expect(await lock.hasConfig, true, reason: 'Space Key 明文保留（下次启动直接进入）');
@@ -333,7 +333,7 @@ void main() {
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两空）→ 点「设置 PIN」→ 确认弹窗
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN 锁屏码'));
+    await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('设置 PIN'));
     await tester.pumpAndSettle();
@@ -343,7 +343,7 @@ void main() {
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
     await tester.pumpAndSettle();
-    expect(find.text('设置 PIN 锁屏码'), findsOneWidget); // 设置弹窗未关闭
+    expect(find.text('设置 锁屏码'), findsOneWidget); // 设置弹窗未关闭
     expect(find.text('已清除 PIN 锁屏（下次启动直接进入）'), findsNothing);
   });
 

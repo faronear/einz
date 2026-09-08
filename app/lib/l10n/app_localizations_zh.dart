@@ -148,7 +148,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRecoverEnrolling => '正在绑定本设备…';
 
   @override
-  String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置 PIN 锁屏码';
+  String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置 锁屏码';
 
   @override
   String get wizardAppBarCreate => 'Einz 秘境：创建中';
@@ -178,7 +178,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepShortPassphrase => '口令';
 
   @override
-  String get wizardStepShortPin => 'PIN 锁屏码';
+  String get wizardStepShortPin => '锁屏码';
 
   @override
   String get wizardStepShortDone => '完成';
@@ -284,11 +284,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogSetPin => '设置 PIN';
 
   @override
-  String get setupPageSkipPinTitle => '暂不设置 PIN 锁屏码？';
+  String get setupPageSkipPinTitle => '暂不设置 锁屏码？';
 
   @override
   String get setupPageSkipPinMessage =>
-      '不设 PIN 锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
+      '不设 锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 4 位';
@@ -307,13 +307,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageSetLockTitle => '设置 PIN 锁屏码';
+  String get chatPageSetLockTitle => '设置 锁屏码';
 
   @override
   String get chatPageSetLockClearHint => '可留空直接提交，即可清空 PIN';
 
   @override
-  String get chatPageSetLockDone => 'PIN 锁屏码已设置，下次启动需解锁';
+  String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
 
   @override
   String get chatPageSetLockConfirmTitle => '设置 PIN 锁屏？';
@@ -463,7 +463,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuDeviceNameLabel => '我的设备';
 
   @override
-  String get chatPagePinLabel => 'PIN 锁屏码';
+  String get chatPagePinLabel => '锁屏码';
 
   @override
   String get chatPagePinSetValue => '已设置';
@@ -600,10 +600,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get lockPagePinLabel => 'PIN 锁屏码';
+  String get lockPagePinLabel => '锁屏码';
 
   @override
-  String get lockPageNoPinSet => '尚未设置 PIN 锁屏码（为空时不启用）';
+  String get lockPageNoPinSet => '尚未设置锁屏码（为空时不启用）';
 
   @override
   String get lockPageUnlock => '解锁';
