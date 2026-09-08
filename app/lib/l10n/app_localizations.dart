@@ -98,12 +98,6 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
-  /// No description provided for @appTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Einz'**
-  String get appTitle;
-
   /// No description provided for @cancel.
   ///
   /// In en, this message translates to:
@@ -140,41 +134,11 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
-  /// No description provided for @loading.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading...'**
-  String get loading;
-
   /// No description provided for @skip.
   ///
   /// In en, this message translates to:
   /// **'Skip'**
   String get skip;
-
-  /// No description provided for @setupPageTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Einz · Device Setup'**
-  String get setupPageTitle;
-
-  /// No description provided for @setupPageHeading.
-  ///
-  /// In en, this message translates to:
-  /// **'One-time setup'**
-  String get setupPageHeading;
-
-  /// No description provided for @setupPageInstructions.
-  ///
-  /// In en, this message translates to:
-  /// **'1) Generate device key → the device registers automatically (no whitelist needed)\n2) Create or join the private space → set up the app lock'**
-  String get setupPageInstructions;
-
-  /// No description provided for @setupPageSpaceIdLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Space ID'**
-  String get setupPageSpaceIdLabel;
 
   /// No description provided for @setupPageEnvelopeKeyLabel.
   ///
@@ -188,41 +152,11 @@ abstract class AppLocalizations {
   /// **'Paste the key envelope (contents of envelope-*.txt)'**
   String get setupPageEnvelopeKeyHint;
 
-  /// No description provided for @setupPageGenerateKey.
-  ///
-  /// In en, this message translates to:
-  /// **'① Generate device key'**
-  String get setupPageGenerateKey;
-
-  /// No description provided for @setupPageImportAuth.
-  ///
-  /// In en, this message translates to:
-  /// **'② Import & authenticate'**
-  String get setupPageImportAuth;
-
   /// No description provided for @setupPageEscrowLabel.
   ///
   /// In en, this message translates to:
   /// **'Access passphrase (new devices can join with it, optional)'**
   String get setupPageEscrowLabel;
-
-  /// No description provided for @setupPageEscrowHelper.
-  ///
-  /// In en, this message translates to:
-  /// **'Key escrow: the server only stores ciphertext (KEY_ESCROW.md)'**
-  String get setupPageEscrowHelper;
-
-  /// No description provided for @setupPageEscrowAccess.
-  ///
-  /// In en, this message translates to:
-  /// **'③ Join with passphrase (no envelope needed)'**
-  String get setupPageEscrowAccess;
-
-  /// No description provided for @setupPageGenerateSpaceKey.
-  ///
-  /// In en, this message translates to:
-  /// **'Create space (one-tap generate key)'**
-  String get setupPageGenerateSpaceKey;
 
   /// No description provided for @setupPageNeedPassphrase.
   ///
@@ -235,72 +169,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New device bound to my private space'**
   String get setupEnrollBoundNotice;
-
-  /// No description provided for @joinDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite your partner'**
-  String get joinDialogTitle;
-
-  /// No description provided for @joinDialogHint.
-  ///
-  /// In en, this message translates to:
-  /// **'They install the app, tap ③ Join with passphrase, then scan this code or paste the info below.'**
-  String get joinDialogHint;
-
-  /// No description provided for @joinDialogSpace.
-  ///
-  /// In en, this message translates to:
-  /// **'Space: {spaceId}'**
-  String joinDialogSpace(String spaceId);
-
-  /// No description provided for @joinDialogPassphrase.
-  ///
-  /// In en, this message translates to:
-  /// **'Passphrase: {passphrase}'**
-  String joinDialogPassphrase(String passphrase);
-
-  /// No description provided for @joinDialogCopy.
-  ///
-  /// In en, this message translates to:
-  /// **'Copy join info'**
-  String get joinDialogCopy;
-
-  /// No description provided for @joinDialogCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Join info copied — send it to your partner'**
-  String get joinDialogCopied;
-
-  /// No description provided for @joinDialogContinue.
-  ///
-  /// In en, this message translates to:
-  /// **'I shared it, enter chat'**
-  String get joinDialogContinue;
-
-  /// No description provided for @scanJoinTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan to join'**
-  String get scanJoinTooltip;
-
-  /// No description provided for @scanJoinTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan to join'**
-  String get scanJoinTitle;
-
-  /// No description provided for @scanJoinHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan your partner\'s join QR code'**
-  String get scanJoinHint;
-
-  /// No description provided for @scanJoinFound.
-  ///
-  /// In en, this message translates to:
-  /// **'Join info recognized — space & passphrase filled in'**
-  String get scanJoinFound;
 
   /// No description provided for @wizardRoleTitle.
   ///
@@ -337,12 +205,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This is your first device. Tell us what to call you (you can rename anytime).'**
   String get wizardNameHint;
-
-  /// No description provided for @wizardStepPeerName.
-  ///
-  /// In en, this message translates to:
-  /// **'Partner\'s name'**
-  String get wizardStepPeerName;
 
   /// No description provided for @wizardPeerNameHint.
   ///
@@ -415,18 +277,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter the one-time invite code from the creator (generated by /invite, valid 24h)'**
   String get wizardInviteHint;
-
-  /// No description provided for @wizardRoleCreate.
-  ///
-  /// In en, this message translates to:
-  /// **'I\'m the first user — create a new space'**
-  String get wizardRoleCreate;
-
-  /// No description provided for @wizardRoleJoin.
-  ///
-  /// In en, this message translates to:
-  /// **'I want to join an existing space'**
-  String get wizardRoleJoin;
 
   /// No description provided for @wizardRoleOffline.
   ///
@@ -554,48 +404,6 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get wizardDone;
 
-  /// No description provided for @wizardStepName.
-  ///
-  /// In en, this message translates to:
-  /// **'Your name'**
-  String get wizardStepName;
-
-  /// No description provided for @wizardStepIdentity.
-  ///
-  /// In en, this message translates to:
-  /// **'Your identity'**
-  String get wizardStepIdentity;
-
-  /// No description provided for @wizardStepInvite.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter invite code'**
-  String get wizardStepInvite;
-
-  /// No description provided for @wizardStepEnroll.
-  ///
-  /// In en, this message translates to:
-  /// **'Register device'**
-  String get wizardStepEnroll;
-
-  /// No description provided for @wizardStepPassphrase.
-  ///
-  /// In en, this message translates to:
-  /// **'Access passphrase'**
-  String get wizardStepPassphrase;
-
-  /// No description provided for @wizardStepJoinPassphrase.
-  ///
-  /// In en, this message translates to:
-  /// **'Verify entry passphrase'**
-  String get wizardStepJoinPassphrase;
-
-  /// No description provided for @wizardStepPin.
-  ///
-  /// In en, this message translates to:
-  /// **'App lock'**
-  String get wizardStepPin;
-
   /// No description provided for @wizardStepShortName.
   ///
   /// In en, this message translates to:
@@ -644,42 +452,6 @@ abstract class AppLocalizations {
   /// **'Envelope'**
   String get wizardStepShortEnvelope;
 
-  /// No description provided for @wizardStepJoin.
-  ///
-  /// In en, this message translates to:
-  /// **'Join space'**
-  String get wizardStepJoin;
-
-  /// No description provided for @wizardStepEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'Import key envelope'**
-  String get wizardStepEnvelope;
-
-  /// No description provided for @wizardStepDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Complete'**
-  String get wizardStepDone;
-
-  /// No description provided for @wizardEnrollHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Registration is fully automatic now (no manual whitelist). Tap below to register this device — the first device on the server auto-creates the private space.'**
-  String get wizardEnrollHint;
-
-  /// No description provided for @wizardEnrollAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Register this device'**
-  String get wizardEnrollAction;
-
-  /// No description provided for @wizardEnrollDone.
-  ///
-  /// In en, this message translates to:
-  /// **'✅ Registered\nDevice: {deviceId}\nSpace: {spaceId}'**
-  String wizardEnrollDone(String deviceId, String spaceId);
-
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
@@ -697,12 +469,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'❌ Registration failed: {error}'**
   String wizardEnrollFailed(String error);
-
-  /// No description provided for @wizardEnrollFirst.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Register the device first (tap the button above)'**
-  String get wizardEnrollFirst;
 
   /// No description provided for @wizardPassphraseHint.
   ///
@@ -740,12 +506,6 @@ abstract class AppLocalizations {
   /// **'You\'ll enter this PIN at every startup to unlock.'**
   String get wizardPinHint;
 
-  /// No description provided for @wizardDoneText.
-  ///
-  /// In en, this message translates to:
-  /// **'✅ Setup complete!'**
-  String get wizardDoneText;
-
   /// No description provided for @welcomeDialogTitleCreate.
   ///
   /// In en, this message translates to:
@@ -769,12 +529,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start chatting'**
   String get welcomeDialogStart;
-
-  /// No description provided for @wizardJoinHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan your partner\'s QR code (it carries the invite code & passphrase) to join in one tap; you can also paste the text or fill in the fields below.'**
-  String get wizardJoinHint;
 
   /// No description provided for @setupPageKeyGenFailed.
   ///
@@ -800,12 +554,6 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get startupInitRetry;
 
-  /// No description provided for @setupPageGenKeyFirst.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Generate the device key first'**
-  String get setupPageGenKeyFirst;
-
   /// No description provided for @setupPagePasteEnvelope.
   ///
   /// In en, this message translates to:
@@ -817,24 +565,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid key envelope: make sure the full sealed key copy from the other device is pasted'**
   String get wizardEnvelopeWrong;
-
-  /// No description provided for @setupPageImportFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'❌ Import/authentication failed: {error}'**
-  String setupPageImportFailed(String error);
-
-  /// No description provided for @setupPageEscrowGenKeyFirst.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Generate the device key first (①) and add its public key to the server whitelist'**
-  String get setupPageEscrowGenKeyFirst;
-
-  /// No description provided for @setupPageEscrowFillAll.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Fill in the Space ID, access passphrase and invite code'**
-  String get setupPageEscrowFillAll;
 
   /// No description provided for @setupPageInviteLabel.
   ///
@@ -938,12 +668,6 @@ abstract class AppLocalizations {
   /// **'Leave blank and submit to clear PIN'**
   String get chatPageSetLockClearHint;
 
-  /// No description provided for @chatPageSetLockTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Set app lock'**
-  String get chatPageSetLockTooltip;
-
   /// No description provided for @chatPageSetLockDone.
   ///
   /// In en, this message translates to:
@@ -980,18 +704,6 @@ abstract class AppLocalizations {
   /// **'Both PIN fields are empty — clear the app lock? You\'ll enter directly at next launch.'**
   String get chatPageClearLockMessage;
 
-  /// No description provided for @chatPageMenuLocale.
-  ///
-  /// In en, this message translates to:
-  /// **'Language: {value}'**
-  String chatPageMenuLocale(String value);
-
-  /// No description provided for @chatPageMenuBurn.
-  ///
-  /// In en, this message translates to:
-  /// **'Burn-after-read: {value}'**
-  String chatPageMenuBurn(String value);
-
   /// No description provided for @chatPageMenuInvite.
   ///
   /// In en, this message translates to:
@@ -1010,29 +722,11 @@ abstract class AppLocalizations {
   /// **'EINZ Private Space'**
   String get chatPageTitleBrand;
 
-  /// No description provided for @chatPageStatusOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'Online'**
-  String get chatPageStatusOnline;
-
-  /// No description provided for @chatPageStatusOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Offline'**
-  String get chatPageStatusOffline;
-
   /// No description provided for @chatPageMenuChangePassphrase.
   ///
   /// In en, this message translates to:
   /// **'Change passphrase'**
   String get chatPageMenuChangePassphrase;
-
-  /// No description provided for @chatPageMenuMyName.
-  ///
-  /// In en, this message translates to:
-  /// **'My name: {value}'**
-  String chatPageMenuMyName(String value);
 
   /// No description provided for @chatPageMenuAvatar.
   ///
@@ -1057,12 +751,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Avatar upload failed: {error}'**
   String chatPageAvatarFailed(String error);
-
-  /// No description provided for @chatPageMenuDeviceName.
-  ///
-  /// In en, this message translates to:
-  /// **'Device name: {value}'**
-  String chatPageMenuDeviceName(String value);
 
   /// No description provided for @chatPageNameUnset.
   ///
@@ -1232,65 +920,11 @@ abstract class AppLocalizations {
   /// **'Encrypted archive of the space key and all chat history (incl. attachment info); restore everything if devices are lost or when switching to a new device'**
   String get chatPageExportHint;
 
-  /// No description provided for @chatPagePinSet.
-  ///
-  /// In en, this message translates to:
-  /// **'PIN: set'**
-  String get chatPagePinSet;
-
-  /// No description provided for @chatPagePinUnset.
-  ///
-  /// In en, this message translates to:
-  /// **'PIN: not set'**
-  String get chatPagePinUnset;
-
-  /// No description provided for @chatPageEscrowRotatedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Passphrase updated'**
-  String get chatPageEscrowRotatedTitle;
-
   /// No description provided for @chatPageEscrowRotatedNotice.
   ///
   /// In en, this message translates to:
   /// **'Your partner reset the passphrase — you will be asked for the new one when creating invites or changing it'**
   String get chatPageEscrowRotatedNotice;
-
-  /// No description provided for @chatPageEscrowRotatedMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Your partner reset the passphrase. Enter the new one to sync this device'**
-  String get chatPageEscrowRotatedMessage;
-
-  /// No description provided for @chatPageEscrowRotatedLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'New passphrase'**
-  String get chatPageEscrowRotatedLabel;
-
-  /// No description provided for @chatPageEscrowRotatedVerify.
-  ///
-  /// In en, this message translates to:
-  /// **'Verify & sync'**
-  String get chatPageEscrowRotatedVerify;
-
-  /// No description provided for @chatPageEscrowRotatedNoEscrow.
-  ///
-  /// In en, this message translates to:
-  /// **'No passphrase escrow on server'**
-  String get chatPageEscrowRotatedNoEscrow;
-
-  /// No description provided for @chatPageEscrowRotatedInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Incorrect passphrase, try again'**
-  String get chatPageEscrowRotatedInvalid;
-
-  /// No description provided for @chatPageEscrowResynced.
-  ///
-  /// In en, this message translates to:
-  /// **'✅ New passphrase synced'**
-  String get chatPageEscrowResynced;
 
   /// No description provided for @chatPageMenuLocaleLabel.
   ///
@@ -1351,12 +985,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Messages will be auto-deleted after {duration}'**
   String chatPageBurnWillDelete(String duration);
-
-  /// No description provided for @chatPageBurnTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Burn-after: {label}'**
-  String chatPageBurnTooltip(String label);
 
   /// No description provided for @chatPageBurnBadge.
   ///

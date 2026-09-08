@@ -1,49 +1,17 @@
 {
   "@@locale": "zh",
-  "appTitle": "Einz",
   "cancel": "取消",
   "ok": "确定",
   "send": "发送",
   "confirm": "确认",
   "delete": "删除",
   "settings": "设置",
-  "loading": "加载中…",
   "skip": "跳过",
-  "setupPageTitle": "Einz · 设备配置",
-  "setupPageHeading": "一次性配置",
-  "setupPageInstructions": "1) 生成设备密钥 → 自动登记入网（无需任何白名单）\n2) 创建或加入私密空间 → 设置 PIN 锁屏码",
-  "setupPageSpaceIdLabel": "Space ID",
   "setupPageEnvelopeKeyLabel": "密保信封（base64）",
   "setupPageEnvelopeKeyHint": "粘贴密保信封（envelope-*.txt 内容）",
-  "setupPageGenerateKey": "① 生成设备密钥",
-  "setupPageImportAuth": "② 导入并认证",
   "setupPageEscrowLabel": "密保口令",
-  "setupPageEscrowHelper": "口令托管：Server 只存密文（KEY_ESCROW.md）",
-  "setupPageEscrowAccess": "③ 凭口令接入（无需信封副本）",
-  "setupPageGenerateSpaceKey": "自建空间（一键生成 Space Key）",
   "setupPageNeedPassphrase": "⚠️ 请先在上方填写接入口令（对方凭它接入）",
   "setupEnrollBoundNotice": "🎉 新设备已成功绑定",
-  "joinDialogTitle": "邀请对方加入",
-  "joinDialogHint": "对方安装 App 后点“③ 凭口令接入”，扫码或粘贴下方信息即可加入",
-  "joinDialogSpace": "空间: {spaceId}",
-  "@joinDialogSpace": {
-    "placeholders": {
-      "spaceId": {"type": "String"}
-    }
-  },
-  "joinDialogPassphrase": "口令: {passphrase}",
-  "@joinDialogPassphrase": {
-    "placeholders": {
-      "passphrase": {"type": "String"}
-    }
-  },
-  "joinDialogCopy": "复制加入信息",
-  "joinDialogCopied": "加入信息已复制，发给对方即可",
-  "joinDialogContinue": "我已分享，进入聊天",
-  "scanJoinTooltip": "扫码加入",
-  "scanJoinTitle": "扫码加入",
-  "scanJoinHint": "扫描对方的加入二维码",
-  "scanJoinFound": "已识别加入信息，空间与口令已自动填入",
   "wizardRoleTitle": "选择你的情况",
   "wizardMenuLocale": "语言: {value}",
   "@wizardMenuLocale": {
@@ -55,7 +23,6 @@
   "wizardDetectHint": "自动判断你是第几个用户（首个设备将创建空间）",
   "wizardDetectFailed": "无法连接服务器，请在上方输入地址后重试",
   "wizardNameHint": "请输入我的名字（将来可以随时修改）。",
-  "wizardStepPeerName": "TA 的名字",
   "wizardPeerNameHint": "一个秘境仅限两人。TA 的名字是？（将来可以随时修改）",
   "wizardPeerNameLabel": "TA 的名字",
   "wizardPeerNameHintInput": "例如 Steffi",
@@ -68,8 +35,6 @@
   "wizardIdentityPartner": "领地共有者",
   "wizardIdentityFirst": "⚠️ 选择我的身份",
   "wizardInviteHint": "输入邀请码（由任意一个已绑定设备生成，24 小时内一次性有效）",
-  "wizardRoleCreate": "我是第一个使用者，创建新空间",
-  "wizardRoleJoin": "我要认领我的私密领地",
   "wizardRoleOffline": "导入线下密保信封",
   "wizardRecoverTitle": "从备份恢复",
   "wizardRecoverHint": "全部设备丢失？输入当初设置口令托管时的内容安全口令；口令正确将重置空间并恢复本设备（无需备份文本）",
@@ -96,13 +61,6 @@
   "wizardNext": "下一步",
   "wizardBack": "上一步",
   "wizardDone": "完成",
-  "wizardStepName": "你的名字",
-  "wizardStepIdentity": "你的身份",
-  "wizardStepInvite": "验证邀请码",
-  "wizardStepEnroll": "登记设备",
-  "wizardStepPassphrase": "设置密保口令",
-  "wizardStepJoinPassphrase": "验证密保口令",
-  "wizardStepPin": "PIN 锁屏码",
   "wizardStepShortName": "名字",
   "wizardStepShortPeerName": "对方名字",
   "wizardStepShortPassphrase": "口令",
@@ -111,18 +69,6 @@
   "wizardStepShortIdentity": "身份",
   "wizardStepShortInvite": "邀请码",
   "wizardStepShortEnvelope": "密保信封",
-  "wizardStepJoin": "加入空间",
-  "wizardStepEnvelope": "导入密保信封",
-  "wizardStepDone": "完成",
-  "wizardEnrollHint": "服务器已全自动登记（无需手动白名单）。点击下方登记本设备——若这是服务器的第一台设备，将自动创建私密空间。",
-  "wizardEnrollAction": "登记本设备",
-  "wizardEnrollDone": "✅ 登记成功\n设备: {deviceId}\n空间: {spaceId}",
-  "@wizardEnrollDone": {
-    "placeholders": {
-      "deviceId": {"type": "String"},
-      "spaceId": {"type": "String"}
-    }
-  },
   "wizardEnrollExists": "该服务器已有空间（由其他设备创建）。请改用“加入”向导，凭对方提供的一次性邀请码加入。",
   "wizardEnrollGoJoin": "改用“加入”向导",
   "wizardEnrollFailed": "❌ 登记失败: {error}",
@@ -131,19 +77,16 @@
       "error": {"type": "String"}
     }
   },
-  "wizardEnrollFirst": "⚠️ 请先完成设备登记（点上方按钮）",
   "wizardPassphraseHint": "设置内容密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:",
   "wizardJoinPassphraseHint": "输入密保口令（如不知道，请询问领地创建人）",
   "wizardJoinPassphraseWrong": "口令错误：请确认首台设备创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
   "wizardSwitchToPassphrase": "改用线上密保口令",
   "wizardPinHint": "每次启动需输入此 PIN 解锁",
-  "wizardDoneText": "✅ 设置完成！",
   "welcomeDialogTitleCreate": "🎉 成功创建我的领地",
   "welcomeDialogTitleJoin": "🎉 成功认领我的领地",
   "welcomeDialogMessage": "一切就绪！仅限你和 TA，所有消息端到端加密，确保绝对隐私，开始聊天吧。",
   "welcomeDialogStart": "开始聊天",
-  "wizardJoinHint": "扫描二维邀请码；也可粘贴文本或手动填写下方信息",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
     "placeholders": {
@@ -156,17 +99,8 @@
   },
   "startupInitFailed": "启动初始化失败，配置未丢失，请重试",
   "startupInitRetry": "重试",
-  "setupPageGenKeyFirst": "⚠️ 先生成设备密钥",
   "setupPagePasteEnvelope": "⚠️ 请粘贴密保信封（base64）",
   "wizardEnvelopeWrong": "密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴",
-  "setupPageImportFailed": "❌ 导入/认证失败: {error}",
-  "@setupPageImportFailed": {
-    "placeholders": {
-      "error": {"type": "String"}
-    }
-  },
-  "setupPageEscrowGenKeyFirst": "⚠️ 请先生成设备密钥（①），并把公钥加入服务器白名单",
-  "setupPageEscrowFillAll": "⚠️ 请填写 Space ID、接入口令与邀请码",
   "setupPageInviteLabel": "邀请码（一次性）",
   "setupPageInviteHint": "扫码后自动填入；手动加入时粘贴对方提供的一次性邀请码",
   "setupPageNeedInvite": "⚠️ 请填写一次性邀请码（由已认证设备生成）",
@@ -194,32 +128,16 @@
   "chatPageLocaleSwitched": "已切换：{label}",
   "chatPageSetLockTitle": "设置 PIN 锁屏码",
   "chatPageSetLockClearHint": "可留空直接提交，即可清空 PIN",
-  "chatPageSetLockTooltip": "设置 PIN 锁屏码",
   "chatPageSetLockDone": "PIN 锁屏码已设置，下次启动需解锁",
   "chatPageSetLockConfirmTitle": "设置 PIN 锁屏？",
   "chatPageSetLockConfirmMessage": "确定要设置 PIN 锁屏吗？设置后每次启动需输入 PIN 解锁。",
   "chatPageSetLockCleared": "已清除 PIN 锁屏（下次启动直接进入）",
   "chatPageClearLockTitle": "清除 PIN 锁屏？",
   "chatPageClearLockMessage": "两个 PIN 输入框均为空——确定要清除锁屏码吗？清除后下次启动直接进入聊天。",
-  "chatPageMenuLocale": "界面语言：{value}",
-  "@chatPageMenuLocale": {
-    "placeholders": {
-      "value": {"type": "String"}
-    }
-  },
-  "chatPageMenuBurn": "阅后即焚：{value}",
-  "@chatPageMenuBurn": {
-    "placeholders": {
-      "value": {"type": "String"}
-    }
-  },
   "chatPageMenuInvite": "邀请码",
   "chatPageMenuExport": "导出完整备份",
   "chatPageTitleBrand": "Einz 秘境",
-  "chatPageStatusOnline": "在线",
-  "chatPageStatusOffline": "离线",
   "chatPageMenuChangePassphrase": "修改口令",
-  "chatPageMenuMyName": "我的名字: {value}",
   "chatPageMenuAvatar": "我的头像",
   "chatPageAvatarUploaded": "✅ 头像已更新",
   "chatPageAvatarTooLarge": "图片过大（最大 2MB）",
@@ -227,17 +145,6 @@
   "@chatPageAvatarFailed": {
     "placeholders": {
       "error": {"type": "String"}
-    }
-  },
-  "@chatPageMenuMyName": {
-    "placeholders": {
-      "value": {"type": "String"}
-    }
-  },
-  "chatPageMenuDeviceName": "设备名称: {value}",
-  "@chatPageMenuDeviceName": {
-    "placeholders": {
-      "value": {"type": "String"}
     }
   },
   "chatPageNameUnset": "未设置",
@@ -278,16 +185,7 @@
   "chatPageExportCopy": "复制",
   "chatPageExportCopied": "归档文本已复制",
   "chatPageExportHint": "包含空间密钥与全部聊天历史（含附件信息）的加密归档；设备全部丢失或换新机时可整体恢复",
-  "chatPagePinSet": "PIN: 已设置",
-  "chatPagePinUnset": "PIN: 未设置",
-  "chatPageEscrowRotatedTitle": "内容密保口令已更新",
   "chatPageEscrowRotatedNotice": "对方已重设内容密保口令——生成邀请码或修改口令时将要求输入新口令",
-  "chatPageEscrowRotatedMessage": "对方已重设内容密保口令，请输入新口令以同步本机",
-  "chatPageEscrowRotatedLabel": "新口令",
-  "chatPageEscrowRotatedVerify": "验证并同步",
-  "chatPageEscrowRotatedNoEscrow": "服务器尚未托管密保口令",
-  "chatPageEscrowRotatedInvalid": "口令不正确，请重新输入",
-  "chatPageEscrowResynced": "✅ 已同步新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuBurnLabel": "阅后即焚",
   "chatPageMenuMyNameLabel": "我的名字",
@@ -306,12 +204,6 @@
   "@chatPageBurnWillDelete": {
     "placeholders": {
       "duration": {"type": "String"}
-    }
-  },
-  "chatPageBurnTooltip": "阅后即焚：{label}",
-  "@chatPageBurnTooltip": {
-    "placeholders": {
-      "label": {"type": "String"}
     }
   },
   "chatPageBurnBadge": "⏱ 阅后即焚",

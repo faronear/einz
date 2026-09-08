@@ -10,9 +10,6 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'Einz';
-
-  @override
   String get cancel => '取消';
 
   @override
@@ -31,23 +28,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings => '设置';
 
   @override
-  String get loading => '加载中…';
-
-  @override
   String get skip => '跳过';
-
-  @override
-  String get setupPageTitle => 'Einz · 设备配置';
-
-  @override
-  String get setupPageHeading => '一次性配置';
-
-  @override
-  String get setupPageInstructions =>
-      '1) 生成设备密钥 → 自动登记入网（无需任何白名单）\n2) 创建或加入私密空间 → 设置 PIN 锁屏码';
-
-  @override
-  String get setupPageSpaceIdLabel => 'Space ID';
 
   @override
   String get setupPageEnvelopeKeyLabel => '密保信封（base64）';
@@ -56,65 +37,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEnvelopeKeyHint => '粘贴密保信封（envelope-*.txt 内容）';
 
   @override
-  String get setupPageGenerateKey => '① 生成设备密钥';
-
-  @override
-  String get setupPageImportAuth => '② 导入并认证';
-
-  @override
   String get setupPageEscrowLabel => '密保口令';
-
-  @override
-  String get setupPageEscrowHelper => '口令托管：Server 只存密文（KEY_ESCROW.md）';
-
-  @override
-  String get setupPageEscrowAccess => '③ 凭口令接入（无需信封副本）';
-
-  @override
-  String get setupPageGenerateSpaceKey => '自建空间（一键生成 Space Key）';
 
   @override
   String get setupPageNeedPassphrase => '⚠️ 请先在上方填写接入口令（对方凭它接入）';
 
   @override
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
-
-  @override
-  String get joinDialogTitle => '邀请对方加入';
-
-  @override
-  String get joinDialogHint => '对方安装 App 后点“③ 凭口令接入”，扫码或粘贴下方信息即可加入';
-
-  @override
-  String joinDialogSpace(String spaceId) {
-    return '空间: $spaceId';
-  }
-
-  @override
-  String joinDialogPassphrase(String passphrase) {
-    return '口令: $passphrase';
-  }
-
-  @override
-  String get joinDialogCopy => '复制加入信息';
-
-  @override
-  String get joinDialogCopied => '加入信息已复制，发给对方即可';
-
-  @override
-  String get joinDialogContinue => '我已分享，进入聊天';
-
-  @override
-  String get scanJoinTooltip => '扫码加入';
-
-  @override
-  String get scanJoinTitle => '扫码加入';
-
-  @override
-  String get scanJoinHint => '扫描对方的加入二维码';
-
-  @override
-  String get scanJoinFound => '已识别加入信息，空间与口令已自动填入';
 
   @override
   String get wizardRoleTitle => '选择你的情况';
@@ -135,9 +64,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
-
-  @override
-  String get wizardStepPeerName => 'TA 的名字';
 
   @override
   String get wizardPeerNameHint => '一个秘境仅限两人。TA 的名字是？（将来可以随时修改）';
@@ -174,12 +100,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardInviteHint => '输入邀请码（由任意一个已绑定设备生成，24 小时内一次性有效）';
-
-  @override
-  String get wizardRoleCreate => '我是第一个使用者，创建新空间';
-
-  @override
-  String get wizardRoleJoin => '我要认领我的私密领地';
 
   @override
   String get wizardRoleOffline => '导入线下密保信封';
@@ -249,27 +169,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDone => '完成';
 
   @override
-  String get wizardStepName => '你的名字';
-
-  @override
-  String get wizardStepIdentity => '你的身份';
-
-  @override
-  String get wizardStepInvite => '验证邀请码';
-
-  @override
-  String get wizardStepEnroll => '登记设备';
-
-  @override
-  String get wizardStepPassphrase => '设置密保口令';
-
-  @override
-  String get wizardStepJoinPassphrase => '验证密保口令';
-
-  @override
-  String get wizardStepPin => 'PIN 锁屏码';
-
-  @override
   String get wizardStepShortName => '名字';
 
   @override
@@ -294,27 +193,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepShortEnvelope => '密保信封';
 
   @override
-  String get wizardStepJoin => '加入空间';
-
-  @override
-  String get wizardStepEnvelope => '导入密保信封';
-
-  @override
-  String get wizardStepDone => '完成';
-
-  @override
-  String get wizardEnrollHint =>
-      '服务器已全自动登记（无需手动白名单）。点击下方登记本设备——若这是服务器的第一台设备，将自动创建私密空间。';
-
-  @override
-  String get wizardEnrollAction => '登记本设备';
-
-  @override
-  String wizardEnrollDone(String deviceId, String spaceId) {
-    return '✅ 登记成功\n设备: $deviceId\n空间: $spaceId';
-  }
-
-  @override
   String get wizardEnrollExists =>
       '该服务器已有空间（由其他设备创建）。请改用“加入”向导，凭对方提供的一次性邀请码加入。';
 
@@ -325,9 +203,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String wizardEnrollFailed(String error) {
     return '❌ 登记失败: $error';
   }
-
-  @override
-  String get wizardEnrollFirst => '⚠️ 请先完成设备登记（点上方按钮）';
 
   @override
   String get wizardPassphraseHint => '设置内容密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:';
@@ -348,9 +223,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPinHint => '每次启动需输入此 PIN 解锁';
 
   @override
-  String get wizardDoneText => '✅ 设置完成！';
-
-  @override
   String get welcomeDialogTitleCreate => '🎉 成功创建我的领地';
 
   @override
@@ -361,9 +233,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get welcomeDialogStart => '开始聊天';
-
-  @override
-  String get wizardJoinHint => '扫描二维邀请码；也可粘贴文本或手动填写下方信息';
 
   @override
   String setupPageKeyGenFailed(String error) {
@@ -380,24 +249,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupInitRetry => '重试';
 
   @override
-  String get setupPageGenKeyFirst => '⚠️ 先生成设备密钥';
-
-  @override
   String get setupPagePasteEnvelope => '⚠️ 请粘贴密保信封（base64）';
 
   @override
   String get wizardEnvelopeWrong => '密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴';
-
-  @override
-  String setupPageImportFailed(String error) {
-    return '❌ 导入/认证失败: $error';
-  }
-
-  @override
-  String get setupPageEscrowGenKeyFirst => '⚠️ 请先生成设备密钥（①），并把公钥加入服务器白名单';
-
-  @override
-  String get setupPageEscrowFillAll => '⚠️ 请填写 Space ID、接入口令与邀请码';
 
   @override
   String get setupPageInviteLabel => '邀请码（一次性）';
@@ -458,9 +313,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockClearHint => '可留空直接提交，即可清空 PIN';
 
   @override
-  String get chatPageSetLockTooltip => '设置 PIN 锁屏码';
-
-  @override
   String get chatPageSetLockDone => 'PIN 锁屏码已设置，下次启动需解锁';
 
   @override
@@ -481,16 +333,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '两个 PIN 输入框均为空——确定要清除锁屏码吗？清除后下次启动直接进入聊天。';
 
   @override
-  String chatPageMenuLocale(String value) {
-    return '界面语言：$value';
-  }
-
-  @override
-  String chatPageMenuBurn(String value) {
-    return '阅后即焚：$value';
-  }
-
-  @override
   String get chatPageMenuInvite => '邀请码';
 
   @override
@@ -500,18 +342,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTitleBrand => 'Einz 秘境';
 
   @override
-  String get chatPageStatusOnline => '在线';
-
-  @override
-  String get chatPageStatusOffline => '离线';
-
-  @override
   String get chatPageMenuChangePassphrase => '修改口令';
-
-  @override
-  String chatPageMenuMyName(String value) {
-    return '我的名字: $value';
-  }
 
   @override
   String get chatPageMenuAvatar => '我的头像';
@@ -525,11 +356,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String chatPageAvatarFailed(String error) {
     return '头像上传失败: $error';
-  }
-
-  @override
-  String chatPageMenuDeviceName(String value) {
-    return '设备名称: $value';
   }
 
   @override
@@ -622,34 +448,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageExportHint => '包含空间密钥与全部聊天历史（含附件信息）的加密归档；设备全部丢失或换新机时可整体恢复';
 
   @override
-  String get chatPagePinSet => 'PIN: 已设置';
-
-  @override
-  String get chatPagePinUnset => 'PIN: 未设置';
-
-  @override
-  String get chatPageEscrowRotatedTitle => '内容密保口令已更新';
-
-  @override
   String get chatPageEscrowRotatedNotice => '对方已重设内容密保口令——生成邀请码或修改口令时将要求输入新口令';
-
-  @override
-  String get chatPageEscrowRotatedMessage => '对方已重设内容密保口令，请输入新口令以同步本机';
-
-  @override
-  String get chatPageEscrowRotatedLabel => '新口令';
-
-  @override
-  String get chatPageEscrowRotatedVerify => '验证并同步';
-
-  @override
-  String get chatPageEscrowRotatedNoEscrow => '服务器尚未托管密保口令';
-
-  @override
-  String get chatPageEscrowRotatedInvalid => '口令不正确，请重新输入';
-
-  @override
-  String get chatPageEscrowResynced => '✅ 已同步新口令';
 
   @override
   String get chatPageMenuLocaleLabel => '界面语言';
@@ -681,11 +480,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String chatPageBurnWillDelete(String duration) {
     return '消息将在 $duration 后自动删除';
-  }
-
-  @override
-  String chatPageBurnTooltip(String label) {
-    return '阅后即焚：$label';
   }
 
   @override
