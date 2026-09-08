@@ -622,13 +622,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (session.hasSession && server.isNotEmpty) {
     session.startWs(
       onMessage: (_) => _scheduleRender(),
-      onStatus: (_) => _scheduleRender(),
+      onStatus: (_) {
+        _scheduleRender();
+        // 重连/上线补查：对齐 App——每次 WS 变为 connected 都探测口令是否被重设
+        final s = _state;
+        if (s != null && s.session.wsStatus == WsStatus.connected) {
+          _checkEscrowRotated(s.session);
+        }
+      },
       onAutoSync: (_) => _scheduleRender(),
       onPeerStatus: _onPeerStatus,
       onPassphraseRotated: (_) {
-        // 口令被对方重设：只发通知不弹窗（生成邀请码/改口令时按需要求新口令）
+        // 口令被对方重设：只发通知不弹窗（接入 /space 或修改 /passphrase 时使用新口令）
         _state?.session.messages.add(_systemMessage(_state!.session,
-            '⚠️ 对方已重设内容密保口令——生成邀请码或修改口令时将要求输入新口令'));
+            '⚠️ 对方已重设内容密保口令——接入或修改口令时请使用新口令'));
         _scheduleRender();
       },
       onProfileUpdated: _onProfileUpdated,
@@ -2176,7 +2183,10 @@ Future<void> _checkEscrowRotated(ChatSession session) async {
     final knownAt = store.escrowUpdatedAt;
     if (serverAt != null && knownAt != null && serverAt > knownAt) {
       session.messages.add(_systemMessage(session,
-          '⚠️ 离线期间内容密保口令已被重设——生成邀请码或修改口令时将要求输入新口令'));
+          '⚠️ 离线期间内容密保口令已被重设——接入（/space）或修改（/passphrase）时请使用新口令'));
+      // 记录本端已知更新时间（防 WS 重连/重复补查刷屏；下次真正重设再通知）
+      store.escrowUpdatedAt = serverAt;
+      store.save(session.storePath);
       _scheduleRender();
     }
   } catch (_) {

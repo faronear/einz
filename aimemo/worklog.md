@@ -952,3 +952,22 @@
 - 老板决策：以 ARB 为准（文案不动）→ `flutter gen-l10n` 重新生成 + 修正 6 个测试文件 35 处断言匹配实际渲染；非 golden 测试 25 项全过
 - golden：10 个 PNG 因文案渲染变化失配（0.44%~2.70%），老板决策**暂不重刷**（golden 测试保持红，作为文案变更标记，待批准后随时重刷）
 - 待确认：ARB `wizardSwitchToPassphrase` = 「该用线上密保口令」疑似「改用」笔误
+
+## 2026-09-08 会话：邀请码降级 B（二维码不再含明文口令）
+
+**背景：** 老板指出 App 邀请码二维码（JoinInfo `einz-join-v1?space=&p=&i=`）含**明文口令**不安全，决定降级到 B 方案——与 TUI 完全一致：邀请码分享不再携带口令，口令由加入方另行输入。
+
+**设计（老板拍板 2026-09-08）：**
+- 二维码保留，内容改为**纯邀请码**（扫码=输入邀请码；无口令无风险）；彻底去掉含口令字段的 JoinInfo 分享格式
+- 口令被重设的通知机制保留并完善：WS 广播 passphrase.rotated（在线 App SnackBar / TUI 系统消息）+ 上线/重连补查（对比 getKeyEscrow updated_at，已改则发一次通知）
+
+**实现：**
+- `app/lib/chat_page.dart` `_showInviteDialog`：删除生成前的口令过时校验（getKeyEscrow 对比 + 重验证弹窗）与口令编入；二维码 = 纯邀请码；提示文案改「对方扫码或输入此邀请码加入，加入时需另行输入口令」
+- 删除死代码：`_showReverifyPassphraseDialog` + `_ReverifyPassphraseDialog` 类 + `_escrowPassphrase` 缓存 state（邀请码编入口令的唯一用途）；保留 widget.escrowPassphrase（补设锁/改口令用）与 `_escrowUpdatedAt`（上线补查对比用）
+- `shared`：删除 `JoinInfo` 类/export/单测（生产代码已无解析者；join 向导只接收邀请码文本）
+- `cli/bin/einz_tui.dart`：WS onStatus 变为 connected 时再次 `_checkEscrowRotated`（对齐 App 的重连补查）；补查/广播通知后更新 `store.escrowUpdatedAt` 并 save（防消息流重复刷屏）；通知文案更新（接入/space 或修改 /passphrase 时使用新口令）
+- `docs/KEY_ESCROW.md` §12.2/12.3：三通道改为两通道，记录降级 B 决策
+
+**验证：** shared dart analyze 0 issue + dart test 24 全过；app flutter analyze 仅 1 既有 info lint（ws_realtime_service.dart，非本次引入）；chat_page_menu/widget/setup_join_passphrase/setup_envelope 20 项全过。golden 失配为既有已知问题（2026-09-08 早前文案 commit 造成，老板已决策暂不重刷），本次改动不在 golden 覆盖路径内。
+
+**遗留：** join 端扫码功能（scanJoin 文案）仍未实现——二维码现在只装邀请码，未来若做扫码只需解析纯邀请码文本。

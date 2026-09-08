@@ -22,8 +22,9 @@ enum _WizardRole { create, join, offline }
 ///
 /// 服务器登记已全自动化（对齐 TUI/CLI 的 enroll 流程，不再需要 config.json 白名单）：
 /// - create（第一个使用者）：首设备免邀请码自举登记 → 设接入口令托管 Space Key →
-///   分享二维码（含 spaceId+口令+一次性邀请码，对方扫码一键加入）；
-/// - join：扫码/粘贴加入信息（含邀请码）→ 凭邀请码登记 → 口令托管拉取 Space Key；
+///   登记完成进聊天页（邀请码由聊天页顶栏生成，二维码只含邀请码、不编口令——
+///   降级 B，与 TUI 一致；口令由加入方另行输入）；
+/// - join：输入邀请码 → 凭邀请码登记 → 口令托管拉取 Space Key；
 /// - offline：密保信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
 /// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {

@@ -57,12 +57,12 @@ class ChatPage extends StatefulWidget {
   final int keyVersion;
   final String token;
 
-  /// 接入口令（escrow，向导设置后随锁包传入）：生成邀请码时编入 JoinInfo，
-  /// 对方扫码即可一键加入（含 spaceId + 口令 + 邀请码）。
+  /// 接入口令（escrow，向导设置后随锁包传入）：补设锁/改口令等场景使用；
+  /// 邀请码分享不编入口令（降级 B，与 TUI 一致）。
   final String? escrowPassphrase;
 
   /// 本端已知的服务端口令更新时间（ms）：启动/上线时与服务器对比，
-  /// 服务器更新 = 离线期间口令被重设（弹窗要求重新验证新口令）。
+  /// 服务器更新 = 离线期间口令被重设（只发通知，不弹窗）。
   final int? escrowUpdatedAt;
 
   /// 归档恢复的历史消息（「从完整备份恢复」导入；map 形态与导出归档的
@@ -128,8 +128,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
-  int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查后更新）
-  String? _escrowPassphrase; // 本端口令缓存（弹窗验证后更新——邀请码编入用）
+  int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
   /// 阅后即焚档位文案（l10n 映射）。
@@ -224,7 +223,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 空间口令被重设（Server 广播 passphrase.rotated）：只发通知不弹窗——
-  /// 生成邀请码/修改口令时（按需）才要求输入新口令。
+  /// 修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -240,7 +239,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
-  /// 服务器更新 = 口令已重设——只发通知不弹窗（生成邀请码/改口令时按需才要求）。
+  /// 服务器更新 = 口令已重设——只发通知不弹窗（修改口令时按需才要求输入新口令）。
   Future<void> _checkEscrowRotated() async {
     if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
     try {
@@ -257,31 +256,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (_) {
       // 查询失败（网络/未托管）静默：不打断正常使用
     }
-  }
-
-  /// 弹窗：输入新口令重新验证（按需——生成邀请码检测到口令过时后触发）。
-  /// 验证通过返回新口令与 updated_at（调用方用于生成邀请码）。
-  Future<({String passphrase, int? updatedAt})?> _showReverifyPassphraseDialog() async {
-    final result = await showDialog<({String passphrase, int? updatedAt})>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _ReverifyPassphraseDialog(
-        server: widget.server,
-        token: widget.token,
-        api: widget.api,
-      ),
-    );
-    if (result == null || !mounted) return null;
-    // 验证通过：更新本端已知口令 + 服务端更新时间（持久化——重启后不再重复弹窗）
-    _escrowUpdatedAt = result.updatedAt;
-    _escrowPassphrase = result.passphrase;
-    await AppLockService(widget.db ?? LocalDatabase())
-        .updateEscrowPassphrase(result.passphrase, updatedAt: result.updatedAt);
-    if (!mounted) return null;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowResynced)),
-    );
-    return result;
   }
 
   /// 本设备被撤销（Server 广播 device.revoked）：清理本地数据（锁包+消息库）
@@ -366,28 +340,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 邀请设备：直接生成一次性邀请码（POST /invites，需已认证）。
   /// 不做 personA/personB 区分、不询问对方名字——默认给尚未加入的对方（personB），
-  /// 生成后展示号码 + 二维码（JoinInfo 含 spaceId+口令+邀请码，对方扫码一键加入）。
+  /// 生成后展示号码 + 二维码（内容 = 纯邀请码，不编入口令——与 TUI 一致，
+  /// 口令由对方加入时另行输入）。
   Future<void> _showInviteDialog() async {
     // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"邀请设备"确认窗）
     try {
       final api = widget.api ?? ApiClient(widget.server);
-      // 按需检测：口令是否已被对方重设（服务端 updated_at > 本端已知）——
-      // 过时则先弹验证框输入新口令，确保邀请码编入新口令
-      final snap = await api.getKeyEscrow(widget.token);
-      final serverAt = snap.updatedAt;
-      final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
-      if (serverAt != null && knownAt != null && serverAt > knownAt) {
-        final result = await _showReverifyPassphraseDialog();
-        if (result == null || !mounted) return; // 取消：不生成（避免无效邀请码）
-      }
       final r = await api.createInvite(token: widget.token, personId: 'personB');
       if (!mounted) return;
-      final passphrase = (_escrowPassphrase ?? widget.escrowPassphrase)?.trim() ?? '';
-      final info = JoinInfo(
-        spaceId: widget.spaceId,
-        passphrase: passphrase,
-        inviteCode: r.inviteCode,
-      );
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -395,19 +355,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (passphrase.isNotEmpty) ...[
-                Center(child: QrImageView(data: info.encode(), version: QrVersions.auto, size: 160)),
-                const SizedBox(height: 12),
-              ],
+              Center(child: QrImageView(data: r.inviteCode, version: QrVersions.auto, size: 160)),
+              const SizedBox(height: 12),
               SelectableText(r.inviteCode,
                   style: const TextStyle(
                       fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1)),
-              if (passphrase.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Text('对方扫码即可一键加入',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ),
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text('对方扫码或输入此邀请码加入，加入时需另行输入口令',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ),
             ],
           ),
           actions: [
@@ -1825,104 +1782,6 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
-      ],
-    );
-  }
-}
-
-/// 口令被对方重设后的重新验证弹窗（被动更新）：输入新口令 → 能解开服务器
-/// 当前托管包（验证通过）→ 返回新口令与 updated_at（调用方持久化本端口令）。
-class _ReverifyPassphraseDialog extends StatefulWidget {
-  const _ReverifyPassphraseDialog({
-    required this.server,
-    required this.token,
-    this.api,
-  });
-
-  final String server;
-  final String token;
-  final ApiClient? api;
-
-  @override
-  State<_ReverifyPassphraseDialog> createState() =>
-      _ReverifyPassphraseDialogState();
-}
-
-class _ReverifyPassphraseDialogState extends State<_ReverifyPassphraseDialog> {
-  final _passCtrl = TextEditingController();
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _passCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final l10n = AppLocalizations.of(context)!;
-    final pass = _passCtrl.text.trim();
-    if (pass.isEmpty) {
-      setState(() => _error = l10n.setupPageNeedPassphrase);
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final api = widget.api ?? ApiClient(widget.server);
-      final snap = await api.getKeyEscrow(widget.token);
-      final file = snap.file;
-      if (file == null) {
-        setState(() => _error = l10n.chatPageEscrowRotatedNoEscrow);
-        return;
-      }
-      // 能解开服务器当前托管包 = 口令正确（验证通过）
-      await KeyEscrowService(api).openPackage(passphrase: pass, file: file);
-      if (!mounted) return;
-      Navigator.of(context).pop((passphrase: pass, updatedAt: snap.updatedAt));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _error = l10n.chatPageEscrowRotatedInvalid);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return AlertDialog(
-      title: Text(l10n.chatPageEscrowRotatedTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(l10n.chatPageEscrowRotatedMessage),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _passCtrl,
-            obscureText: true,
-            autofocus: true,
-            onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(labelText: l10n.chatPageEscrowRotatedLabel),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: _busy ? null : _submit,
-          child: Text(l10n.chatPageEscrowRotatedVerify),
-        ),
       ],
     );
   }
