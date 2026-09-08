@@ -13,7 +13,8 @@ class FakeApi extends ApiClient {
   bool deleted = false;
 
   @override
-  Future<void> uploadKeyEscrow(BackupFile package, String token, {String? passphraseHash}) async {
+  Future<void> uploadKeyEscrow(BackupFile package, String token,
+      {String? passphraseHash, bool rotated = false}) async {
     stored = package;
   }
 

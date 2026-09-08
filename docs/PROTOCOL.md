@@ -199,6 +199,8 @@
 ```json
 // POST /key-escrow（上传/更新，按 space 一份，UPSERT）
 { "package": { "format": "backup-v1", "salt": "b64", "nonce": "b64", "ciphertext": "b64" } }
+// 可选附 passphrase_hash（argon2id，/recover 恢复校验用）与 rotated
+{ "package": { "…" }, "passphrase_hash": "…", "rotated": true }
 // 响应 200
 { "ok": true }
 

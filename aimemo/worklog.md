@@ -1064,3 +1064,31 @@
 **验证：** flutter analyze 0 issue（仅 1 既有 info lint）；全部功能测试通过（含 lock_page/menu/join/envelope/probe_retry/widget/invite_dialog）；11 个 golden 像素失配保持红不重刷（政策：禁止 --update-goldens；本轮文案 + 身份卡 + 锁屏 ⋯ 图标均影响渲染，需老板定夺是否后续统一重刷）。
 
 **不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（老板本地测试配置，注释「不要 commit」，照旧跳过）。
+
+## 2026-09-08 会话：口令"重设"误报修复（对方只是重启输 PIN 却收到"已重设密保口令"）
+
+**背景：** 老板报告：对方没有改口令，只是 APP 重启输入 PIN 解锁，TUI 却收到系统消息
+「⚠️ 对方已重设密保口令——接入或修改口令时请使用新口令」。
+
+**根因：** `KeyEscrowService.hashPassphrase` 用 libsodium `crypto_pwhash_str`（**自含随机盐**），
+同一口令每次生成的哈希串都不同。服务端 `uploadKeyEscrow` 原凭
+`prevRow.passphrase_hash !== hashVal` 判定"口令被重设"——只要有旧行必误判。而 App 每次
+重启解锁都会 `lock_page._syncEscrow` 重传密保箱 → 实时广播 + `updated_at` 推进 → 对方
+TUI/App 双路误报（离线补查 `serverAt > knownAt` 也误触发）。
+
+**实现（显式 rotated 标记，服务端不再比对哈希）：**
+- `server/src/escrow.ts`：`rotated: true`（仅"修改口令"流程发送）才推进 `updated_at` +
+  广播 `passphrase.rotated`；普通重传（首次设口令/解锁同步）保留原 `updated_at`、不广播
+- shared：`ApiClient.uploadKeyEscrow` / `KeyEscrowService.upload` 增加 `rotated` 透传
+- App 改口令弹窗传 `rotated: true`，成功后回传服务端 `updated_at` 记录本端已知时间
+  （防下次补查误报"自己刚改的口令"）；`_checkEscrowRotated` 命中后记录已知时间防刷屏
+- App `lock_page._syncEscrow`：服务器包已不旧于本端（`openPackage` 解出 keyVersion 比对，
+  同/更高则跳过）→ 重启解锁不再无谓重传
+- TUI `/passphrase` 传 `rotated: true`；docs（KEY_ESCROW.md §12 / PROTOCOL.md §7.4）同步
+
+**验证：** server `npm run build` + `npm test` 全过（**需 Node ≥20.11：`import.meta.dirname`，
+本机默认 v18.12.1 跑不了，`nvm use 22` 即可**）；shared `dart test` 24 项全过；app 相关
+flutter test（lock_page/setup_join_passphrase/chat_page_menu/ws_realtime）18 项全过；
+cli `dart analyze` 0 issue。
+
+**不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（老板本地测试配置，照旧跳过）。

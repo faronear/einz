@@ -45,16 +45,18 @@ class KeyEscrowService {
   }
 
   /// 一键：口令加密 + 上传托管（附口令 argon2id 哈希，供服务端 /recover 恢复校验）。
+  /// [rotated] 仅"修改口令"流程置 true（服务端广播口令重设通知）；普通重传保持 false。
   Future<void> upload({
     required String passphrase,
     required String spaceKeyB64,
     required String spaceId,
     required int keyVersion,
     required String token,
+    bool rotated = false,
   }) async {
     final pkg = await createPackage(passphrase: passphrase, spaceKeyB64: spaceKeyB64, spaceId: spaceId, keyVersion: keyVersion);
     final hash = await hashPassphrase(passphrase);
-    await api.uploadKeyEscrow(pkg, token, passphraseHash: hash);
+    await api.uploadKeyEscrow(pkg, token, passphraseHash: hash, rotated: rotated);
   }
 
   /// 口令 argon2id 哈希字符串（crypto_pwhash_str，自含盐）。

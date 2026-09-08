@@ -54,23 +54,45 @@ export function uploadKeyEscrow (
   ) {
     throw new ApiError('INVALID_REQUEST', 'invalid passphrase_hash', 400)
   }
-  // 口令已重设（passphrase_hash 与旧值不同）→ 通知其余在线设备（客户端只发通知不弹窗）
-  const prevRow = getDb()
-    .prepare(`SELECT passphrase_hash FROM key_escrow WHERE space_id = ?`)
-    .get(cfg.space_id) as { passphrase_hash: string | null } | undefined
-  const hashVal = passphraseHash ?? null
-  const rotated = prevRow !== undefined && prevRow.passphrase_hash !== hashVal
-  getDb()
-    .prepare(
-      `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(space_id) DO UPDATE SET
-         package = excluded.package,
-         passphrase_hash = excluded.passphrase_hash,
-         updated_at = excluded.updated_at`
-    )
-    .run(cfg.space_id, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
-  if (rotated) broadcastPassphraseRotated(device_id)
+  // 口令"真正被重设"由客户端显式声明（rotated: true，仅"修改口令"流程发送）。
+  // 不可凭 passphrase_hash 比对判定：该哈希是自含随机盐的 argon2id 串
+  // （crypto_pwhash_str），同一口令每次上传串都不同，比对必然误判"已重设"。
+  // 普通重传（首次设口令/解锁同步等）不得广播，也不得推进 updated_at——
+  // 否则对方每次重启解锁都会触发误报（实时广播 + 离线补查双误报）。
+  const rotated = (body as { rotated?: unknown })?.rotated === true
+  const hasPrev =
+    getDb()
+      .prepare(`SELECT 1 FROM key_escrow WHERE space_id = ?`)
+      .get(cfg.space_id) !== undefined
+  if (rotated) {
+    // 真正重设：推进 updated_at（离线补查凭它识别）+ 通知其余在线设备
+    getDb()
+      .prepare(
+        `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(space_id) DO UPDATE SET
+           package = excluded.package,
+           passphrase_hash = excluded.passphrase_hash,
+           updated_at = excluded.updated_at`
+      )
+      .run(cfg.space_id, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
+    broadcastPassphraseRotated(device_id)
+  } else if (!hasPrev) {
+    // 首次托管：写入 updated_at 作为基线（后续真正重设才可对比），不广播
+    getDb()
+      .prepare(
+        `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(cfg.space_id, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
+  } else {
+    // 普通重传（同口令刷新包/哈希）：保留原 updated_at，不广播
+    getDb()
+      .prepare(
+        `UPDATE key_escrow SET package = ?, passphrase_hash = ? WHERE space_id = ?`
+      )
+      .run(JSON.stringify(pkg), passphraseHash ?? null, cfg.space_id)
+  }
   return { ok: true }
 }
 

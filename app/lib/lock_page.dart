@@ -101,7 +101,11 @@ class _LockPageState extends State<LockPage> {
         final current = snap.file;
         if (current != null) {
           try {
-            await escrow.openPackage(passphrase: pass, file: current);
+            final serverPayload =
+                await escrow.openPackage(passphrase: pass, file: current);
+            // 服务器包已不旧于本端（同口令 + 同/更高 keyVersion）→ 无需重传，
+            // 避免每次重启解锁都刷 updated_at / 哈希，触发对方"口令被重设"误报
+            if (serverPayload.keyVersion >= payload.keyVersion) return;
           } on FormatException {
             return; // 本地口令与服务器包不匹配：不覆盖
           }

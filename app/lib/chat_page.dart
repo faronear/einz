@@ -253,6 +253,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowRotatedNotice)),
         );
+        _escrowUpdatedAt = serverAt; // 记录已知时间（防 WS 重连/重复补查刷屏）
       }
     } catch (_) {
       // 查询失败（网络/未托管）静默：不打断正常使用
@@ -454,6 +455,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         keyVersion: widget.keyVersion,
         token: widget.token,
         db: widget.db ?? LocalDatabase(),
+        onPassphraseUpdated: (updatedAt) {
+          if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
+        },
       ),
     );
     if (changed == true && mounted) {
@@ -1832,6 +1836,7 @@ class _ChangePassphraseDialog extends StatefulWidget {
     required this.keyVersion,
     required this.token,
     required this.db,
+    required this.onPassphraseUpdated,
   });
 
   final String server;
@@ -1840,6 +1845,9 @@ class _ChangePassphraseDialog extends StatefulWidget {
   final int keyVersion;
   final String token;
   final LocalDatabase db;
+
+  /// 上传成功后回传服务端 updated_at（聊天页记录已知时间，防下次补查误报自己改了口令）。
+  final ValueChanged<int?> onPassphraseUpdated;
 
   @override
   State<_ChangePassphraseDialog> createState() => _ChangePassphraseDialogState();
@@ -1907,16 +1915,26 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         setState(() => _error = l10n.chatPageChangePassphraseOldWrong);
         return;
       }
-      // 2) 新口令重加密 + 上传（含新哈希）
+      // 2) 新口令重加密 + 上传（rotated: true → 服务端广播口令重设通知并推进 updated_at）
       await escrow.upload(
         passphrase: newPass,
         spaceKeyB64: widget.spaceKeyB64,
         spaceId: widget.spaceId,
         keyVersion: widget.keyVersion,
         token: widget.token,
+        rotated: true,
       );
-      // 3) 本地明文 payload 同步（跳过 PIN 场景；设 PIN 场景由 _syncEscrow 保护）
-      await AppLockService(widget.db).updateEscrowPassphrase(newPass);
+      // 3) 本地明文 payload 同步（跳过 PIN 场景；设 PIN 场景由 _syncEscrow 保护）。
+      //    同步本端已知口令更新时间，避免下次上线补查误报"对方重设"（其实是自己刚改的）
+      int? serverUpdatedAt;
+      try {
+        serverUpdatedAt = (await api.getKeyEscrow(widget.token)).updatedAt;
+      } catch (_) {
+        // 记录失败不影响结果（下次上线补查再对比）
+      }
+      await AppLockService(widget.db)
+          .updateEscrowPassphrase(newPass, updatedAt: serverUpdatedAt);
+      widget.onPassphraseUpdated(serverUpdatedAt); // 聊天页记录已知时间
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on _NoEscrowException {

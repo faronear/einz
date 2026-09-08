@@ -154,10 +154,14 @@ class ApiClient {
 
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
   /// 上传口令托管密文包；可选附口令 argon2id 哈希（服务端 /recover 恢复校验用）。
-  Future<void> uploadKeyEscrow(BackupFile package, String token, {String? passphraseHash}) async {
+  /// [rotated] 仅"修改口令"流程置 true——服务端据此推进 updated_at 并广播
+  /// passphrase.rotated；普通重传（首次设口令/解锁同步）保持 false，不得误报。
+  Future<void> uploadKeyEscrow(BackupFile package, String token,
+      {String? passphraseHash, bool rotated = false}) async {
     await _post(Api.keyEscrow, {
       'package': package.toJson(),
       if (passphraseHash != null) 'passphrase_hash': passphraseHash,
+      if (rotated) 'rotated': true,
     }, token: token);
   }
 

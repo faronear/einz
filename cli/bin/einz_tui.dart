@@ -272,9 +272,9 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
     session.store.save(storePath);
     session.messages.add(_systemMessage(session, '✅ PIN 锁屏已设置'));
   }
-  session.messages.add(_systemMessage(session, '----------------'));
-  session.messages.add(_systemMessage(session, '🎉 秘境已成功建立！输入 /invite 生成邀请码，邀请我的秘境伴侣快来聊天吧！'));
+  session.messages.add(_systemMessage(session, '🎉 成功进入了秘境！输入 /help 查看快捷命令，输入 /invite 邀请伴侣。立刻开始点对点加密聊天吧！'));
   session.messages.add(_systemMessage(session, '================'));
+
   _scheduleRender();
 }
 
@@ -534,8 +534,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         await _busy(session, '⏳ 密保口令核对中......', () => session.accessByEscrow(passphrase));
         session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备有权查看秘境内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         session.messages.add(_systemMessage(session, '----------------'));
-        session.messages.add(_systemMessage(session, '🎉 成功进入了秘境！输入 /help 可查看快捷命令。立刻开始点对点加密聊天吧！'));
-        session.messages.add(_systemMessage(session, '================'));
         store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
         store.save(storePath);
         _onboarded = true; // 第二设备口令接入完成
@@ -1726,7 +1724,7 @@ Future<void> _execCommand(String line) async {
         // 提示作为 system 消息进消息流；邀请码由输入循环接管输入——
         // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
         s.pendingInvite = true;
-        s.session.messages.add(_systemMessage(s.session, '❓ 发现未知设备，请输入秘境邀请码（从其他已认证设备 /invite 获取）'));
+        s.session.messages.add(_systemMessage(s.session, '❓ 发现新设备，请输入秘境邀请码（由其他已认证设备生成'));
         s.status = '⌛️ 等待邀请码输入…';
         break;
       }
@@ -2153,7 +2151,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       final aName = _probePersonNames['personA'] ?? '';
       store.personName = aName.isNotEmpty ? aName : null;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 秘境重置成功，即将以创建者身份重新登记（历史密文可继续解密）'));
+      session.messages.add(_systemMessage(session, '✅ 秘境重置成功，即将重新绑定设备（历史密文可继续解密）'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return true;
@@ -2248,6 +2246,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
           spaceId: store.spaceId!,
           keyVersion: store.keyVersion,
           token: store.sessionToken!,
+          rotated: true, // 真正重设：服务端广播口令重设通知 + 推进 updated_at
         );
       });
       // 记录本端已知口令更新时间（上传成功后服务端 updated_at 已刷新）
