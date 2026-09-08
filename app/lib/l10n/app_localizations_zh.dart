@@ -361,7 +361,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageNameUnset => '未设置';
 
   @override
-  String get chatPageMenuExit => '退出应用';
+  String get chatPageMenuExit => '退出秘境';
 
   @override
   String get chatPageRenameNameTitle => '修改我的名字';

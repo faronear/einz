@@ -683,7 +683,7 @@ class _SetupPageState extends State<SetupPage> {
     return api.verify(challenge.challengeId, base64Encode(opened));
   }
 
-  /// 退出应用（等价 TUI /exit；向导任意页面可经 ⋯ 菜单退出）：
+  /// 退出秘境（等价 TUI /exit；向导任意页面可经 ⋯ 菜单退出）：
   /// 确认后彻底关闭应用（不再回 LockPage——未设 PIN 时锁屏不应激活）。
   Future<void> _showExitAppDialog() async {
     final l10n = AppLocalizations.of(context)!;

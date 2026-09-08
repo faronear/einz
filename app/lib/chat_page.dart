@@ -581,7 +581,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 退出应用（等价 TUI /exit）：确认后回到锁屏（LockPage），下次解锁重新认证。
+  /// 退出秘境（等价 TUI /exit）：确认后回到锁屏（LockPage），下次解锁重新认证。
   Future<void> _showExitAppDialog() async {
     final l10n = AppLocalizations.of(context)!;
     final shouldExit = await showDialog<bool>(

@@ -79,10 +79,10 @@ void main() {
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（含「导出完整备份」与「密保口令」）
     expect(find.text('导出完整备份'), findsOneWidget);
-    // 我的名字/设备名称（未传 → 显示「未设置」）+ 退出应用
+    // 我的名字/设备名称（未传 → 显示「未设置」）+ 退出秘境
     expect(find.text('我的名字'), findsOneWidget);
     expect(find.text('我的设备'), findsOneWidget);
-    expect(find.text('退出应用'), findsOneWidget);
+    expect(find.text('退出秘境'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text('密保口令'), findsOneWidget);
     expect(find.text('锁屏码'), findsOneWidget);
@@ -188,7 +188,7 @@ void main() {
     expect(find.text('新名字'), findsOneWidget);
   });
 
-  testWidgets('退出应用：确认弹窗显示（不触发 exit）', (WidgetTester tester) async {
+  testWidgets('退出秘境：确认弹窗显示（不触发 exit）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -212,10 +212,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → 点「退出应用」
+    // 打开菜单 → 点「退出秘境」
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('退出应用'));
+    await tester.tap(find.text('退出秘境'));
     await tester.pumpAndSettle();
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
     expect(find.text('退出秘境？'), findsOneWidget);

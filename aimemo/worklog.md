@@ -944,7 +944,7 @@
 
 **bug 调查：重启 App 再次进入新设备向导（疑与输错 PIN 有关）**
 
-- 结论：输错 PIN **不会**删除本地 store——`AppLockService.unlock` 失败只计尝试次数/锁定 30s；chat/setup 的「退出应用」确认只调 `exit(0)` 不清数据；全 app 唯一清数据路径是 `_onDeviceRevoked`（仅服务端 device.revoked 广播触发，即 /revoke 或 /recover 全丢恢复）
+- 结论：输错 PIN **不会**删除本地 store——`AppLockService.unlock` 失败只计尝试次数/锁定 30s；chat/setup 的「退出秘境」确认只调 `exit(0)` 不清数据；全 app 唯一清数据路径是 `_onDeviceRevoked`（仅服务端 device.revoked 广播触发，即 /revoke 或 /recover 全丢恢复）
 - 真凶：`StartupGate._check()` 在本地库查询异常（SQLite 锁竞争/热重启残留连接）时 catch 降级为「未配置」→ 直接进新设备向导（数据未丢只是误导向，且重走向导会重复登记设备）
 - 修复（41b98b3）：启动门瞬态失败自动重试 4 次（1s 间隔）→ 仍失败显示「启动初始化失败，配置未丢失，请重试」错误页（含重试按钮），不再自动进向导
 
@@ -1012,9 +1012,11 @@
 ## 2026-09-08 会话：对话页菜单标签淡化 + 与老板并发文案改名的协调收尾
 
 **菜单样式（本次任务）：**
+
 - 对话页右上角菜单行内左侧标签（我的名字/我的设备/语言/阅后即焚/锁屏码等 6 行）改用 `colorScheme.onSurfaceVariant` 稍淡色，与右侧当前值文字（默认 onSurface 深色）区分；纯动作项（邀请码/导出等无右值）保持原样
 
 **并发协调记录：**
+
 - 老板同一工作区同步改文案（「PIN 锁屏码」→「锁屏码」，含 ARB/生成文件/app_lock 异常串/lock+setup+menu 测试断言），其 WIP 中间态曾致 4 个 PIN 测试瞬红——A/B（stash 我的改动）证实与我的菜单样式无关，根因是 ARB 改名后测试断言未同步 + 未提交的生成文件中间态
 - chat_page_menu_test 退出弹窗断言同步 523d25a 新文案（「将彻底关闭应用。」→「将在本设备上退出 Einz 秘境。」）
 - 老板选择「我代为分两个 commit 收尾」：① b579172 文案批次（含 test 文件锁屏码断言与退出断言）② 本次样式（chat_page.dart + 本条注记）
@@ -1025,6 +1027,7 @@
 **背景：** 老板指出「PIN 锁屏码」机械删除后残留空格文案（如「设置 锁屏码」），要求修复；并要求把菜单第二组顺序调整为：界面语言/阅后即焚/锁屏码/邀请码/密保口令/导出完整备份。
 
 **实现：**
+
 - `app_zh.arb` 5 处空格清理：wizardRecoverDone（请设置锁屏码）、setupPageSkipPinTitle（暂不设置锁屏码？）、setupPageSkipPinMessage（不设锁屏码则…）、chatPageSetLockTitle（设置锁屏码）、lockPageNoPinSet（尚未设置锁屏码（为空时不启用）），`flutter gen-l10n` 重新生成；chat_page_menu_test 6 处断言同步去空格
 - 菜单第二组 PopupMenuItem 重排为 locale→burn→pin→invite→passphrase→export（锁屏码移到邀请码前、密保口令在导出前）
 - 菜单标签 `chatPageMenuChangePassphrase`：修改口令 → 密保口令（与 627e76c 口令密保箱、确认弹窗「修改内容密保口令？」命名方向一致）；chat_page_menu_test 菜单项断言/点击同步
