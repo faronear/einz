@@ -52,7 +52,6 @@
     }
   },
   "wizardDetectTitle": "正在检测服务器状态…",
-  "setupPageServerBar": "服务器：{server}",
   "wizardDetectHint": "自动判断你是第几个用户（首个设备将创建空间）",
   "wizardDetectFailed": "无法连接服务器，请在上方输入地址后重试",
   "wizardNameHint": "请输入您的名字（将来您可以随时修改）。",

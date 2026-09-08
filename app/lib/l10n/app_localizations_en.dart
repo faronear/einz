@@ -135,11 +135,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardDetectTitle => 'Checking server status…';
 
   @override
-  String setupPageServerBar(Object server) {
-    return 'Server: $server';
-  }
-
-  @override
   String get wizardDetectHint =>
       'We\'ll detect whether you\'re the first user (first device creates the space)';
 

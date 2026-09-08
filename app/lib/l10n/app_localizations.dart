@@ -320,12 +320,6 @@ abstract class AppLocalizations {
   /// **'Checking server status…'**
   String get wizardDetectTitle;
 
-  /// No description provided for @setupPageServerBar.
-  ///
-  /// In en, this message translates to:
-  /// **'Server: {server}'**
-  String setupPageServerBar(Object server);
-
   /// No description provided for @wizardDetectHint.
   ///
   /// In en, this message translates to:

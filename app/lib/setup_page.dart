@@ -286,10 +286,6 @@ class _SetupPageState extends State<SetupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 当前服务器地址：每个页面顶部常驻显示（AppBar 标题正下方）
-            Text(l10n.setupPageServerBar(_server),
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 8),
             // 服务器探测失败 → 顶部引导卡片（能连时完全不显示，零打扰）
             if (_probeFailed) ...[
               Card(
@@ -323,7 +319,9 @@ class _SetupPageState extends State<SetupPage> {
               const SizedBox(height: 12),
             ],
             _buildProgressDots(),
-            const SizedBox(height: 20),
+            // 输入区贴着进度条（顶部锚定：键盘弹出时 resizeToAvoidBottomInset
+            // 只收缩底部空白并把底部导航顶到键盘上方——输入区不会被覆盖/压缩）
+            const SizedBox(height: 12),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
