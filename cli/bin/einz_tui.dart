@@ -334,7 +334,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 
   // 身份选择（仅后续设备、未登记的新设备）：先问是第一还是第二个人（personA/personB），
   // 按需设置名字——与首设备"先名字后设备名"的顺序对齐（此前是先问设备名再问身份）。
-  // 首设备（探测无 person 名称表）跳过此步，直接走下方"你的名称"询问。
+  // 首设备（探测无 person 名称表）跳过此步，直接走下方"身份名字"询问。
   // 全丢恢复入口（开发运维专用；闭环：仅凭 escrow 口令即可）：全新设备 +
   // 空间已有成员（探测名称表非空）+ 本机无 Space Key → 可选"r 全丢恢复"——
   // 输入 escrow 口令 → 服务端 /recover 重置空间并返回口令密保箱 → 本机解出
@@ -370,7 +370,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     if (chosenPerson == 'personB') {
       if ((_probePersonNames['personB'] ?? '').isEmpty) {
         // personB 还没有名称——要求输入显示名
-        final name = await _prompt(session, '❓ 请输入你的名字（例如 Steffi，或者直接回车先跳过，以后可随时修改）：');
+        final name = await _prompt(session, '❓ 请输入我的名字（例如 Steffi，或者直接回车先跳过，以后可随时修改）：');
         if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
         if (name.isNotEmpty) { 
           store.personName = name;
@@ -392,29 +392,29 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 
   // 第二用户预置名（仅首设备新空间时询问；回车跳过 → 服务端落默认 personB）：
   // 登记（enroll 自举）时随请求提交，后续设备启动引导即可按名称表选身份。
-  // 你的名称（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
+  // 我的名字（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
   // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
   if ((store.personName == null || store.personName!.isEmpty) && _probePersonNames.isEmpty) {
-    final name = await _prompt(session, '❓ 请输入您的名字（例如 Lukas，或者直接回车先跳过）:');
+    final name = await _prompt(session, '❓ 输入我的名字（例如 Lukas，或者直接回车先跳过）:');
     if (!_state!.running) return; // /exit 或 Ctrl+C：立即结束引导，不再输出后续提示
     try {
       if (name.isNotEmpty) {
         store.personName = name;
-        session.messages.add(_systemMessage(session, '✅ 您已设置您的名字: $name （您可随时 /rename 进行修改）'));
+        session.messages.add(_systemMessage(session, '✅ 已设置我的名字: $name （可随时 /rename 进行修改）'));
         _scheduleRender();
       }else {
-        session.messages.add(_systemMessage(session, '✅ 系统将为您自动预设一个名字，您可随时 /rename 进行修改。'));
+        session.messages.add(_systemMessage(session, '✅ 系统为我自动预设一个名字，我可随时 /rename 进行修改。'));
       }
       // 第二用户名字（回车跳过 → 后台默认 personB）
       session.messages.add(_systemMessage(session, '----------------'));
-      final partnerName = (await _prompt(session, '❓ 请输入您的伴侣的名字（例如 Steffi，或者直接回车先跳过）:')).trim();
+      final partnerName = (await _prompt(session, '❓ 请输入TA的名字（例如 Steffi，或者直接回车先跳过）:')).trim();
       if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
       if (partnerName.isNotEmpty) {
         partnerPresetName = partnerName;
-        session.messages.add(_systemMessage(session, '✅ 您已为您的伴侣设置名字: $partnerName（您的伴侣进入领地后可以自行修改）'));
+        session.messages.add(_systemMessage(session, '✅ 已为TA设置名字: $partnerName（TA进入秘境后可以自行修改）'));
         _scheduleRender();
       } else {
-        session.messages.add(_systemMessage(session, '✅ 系统将为您的伴侣自动预设一个名字，您的伴侣进入领地后可随时 /rename 进行修改。'));
+        session.messages.add(_systemMessage(session, '✅ 系统将为TA自动预设一个名字，等TA进入秘境后可随时 /rename 进行修改。'));
         _scheduleRender();
       }
       session.messages.add(_systemMessage(session, '----------------'));
@@ -554,7 +554,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已登记但口令密保箱未上传（发起者引导中断）：重启再进引导设置口令。
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
-    session.messages.add(_systemMessage(session, '检测到尚未设置您的领地口令，现在设置: '));
+    session.messages.add(_systemMessage(session, '检测到尚未设置内容密保口令，现在设置: '));
     _scheduleRender();
     await _setupEscrowPassphrase(store, storePath, session);
   }
@@ -1758,10 +1758,10 @@ Future<void> _execCommand(String line) async {
         break;
       }
       s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未接入秘境'));
-      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入内容密保口令，解密您的秘境内容'));
+      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入内容密保口令，解密我的秘境内容'));
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
-          s.session, '❓ 请输入内容密保口令，即可解密您的秘境内容'));
+          s.session, '❓ 输入内容密保口令，即可解密我的秘境内容'));
       break;
     case '/passphrase':
       // 修改内容密保口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
@@ -2269,9 +2269,9 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
-      // _busy：打包/上传期间插入"⏳ 口令正在加密打包您的空间......"、禁止输入、隐藏光标，
+      // _busy：打包/上传期间插入"⏳ 口令正在加密打包我的空间......"、禁止输入、隐藏光标，
       // 完成后移除（替换为下方结果消息）——统一体验优化
-      await _busy(session, '⏳ 口令正在加密打包您的领地密钥......', () async {
+      await _busy(session, '⏳ 正在加密我的口令密保箱......', () async {
         await session.auth(); // challenge-response 激活（写入 store.sessionToken）
         await KeyEscrowService(api).upload(
           passphrase: p1,
@@ -2285,7 +2285,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 口令密保箱已上传'));
       session.messages.add(_systemMessage(session, '----------------'));
-      session.messages.add(_systemMessage(session, '🎉 秘境已成功建立！输入 /invite 生成邀请码，邀请你的伴侣快来聊天吧！'));
+      session.messages.add(_systemMessage(session, '🎉 秘境已成功建立！输入 /invite 生成邀请码，邀请我的秘境伴侣快来聊天吧！'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return;

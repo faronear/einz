@@ -93,7 +93,7 @@ cd /Users/Shared/productX/only/cli
 dart run bin/einz_tui.dart   # 不传 --store：自动发现/创建设备
 # 引导流程：
 # 引导流程（设备凭证自动生成，登记后由服务端分配 dev1 等规范 id）：
-#   你的名称（如 lukas）→ 设备名称（显示用，如 MacBook）
+#   我的名称（如 lukas）→ 设备名称（显示用，如 MacBook）
 #   ✅ 首设备自举成功（你是空间创建者，分配为 dev1 / personA）
 #   设置托管口令:（如 faronear，对方凭它接入）
 #   ✅ 口令密保箱已上传
@@ -152,7 +152,7 @@ cd 你的only目录\cli
 dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz\ 下的设备
 # 引导流程（空间已有设备 → 走邀请码登记）：
 # 引导流程（空间已有设备 → 走邀请码登记；设备凭证自动生成）：
-#   你的名称（如 steffi）→ 设备名称（显示用，如 Windows）
+#   身份名字（如 steffi）→ 设备名称（显示用，如 Windows）
 #   ⚠️ 自举失败（空间已有创建者）→ 输入邀请码: XXXX-XXXXX-XXXXX-XXXXX
 #   ✅ 邀请码登记成功（分配为 dev2 / personB）
 #   无 Space Key → 问"接入方式" → 回车=1 口令接入

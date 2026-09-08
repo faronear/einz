@@ -12,7 +12,7 @@
   "setupPageEscrowLabel": "密保口令",
   "setupPageNeedPassphrase": "⚠️ 先在上方填写密保口令（对方凭它解密消息）",
   "setupEnrollBoundNotice": "🎉 新设备已成功绑定",
-  "wizardRoleTitle": "选择你的情况",
+  "wizardRoleTitle": "选择我是谁",
   "wizardMenuLocale": "语言: {value}",
   "@wizardMenuLocale": {
     "placeholders": {

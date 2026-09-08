@@ -5,7 +5,7 @@
 // 产物：test/goldens/{setup_step1_*,lock_page,chat_page}.png
 // 向导步骤编号规则（老板确认，2026-09-05 对齐 TUI 重构后）：
 // 1=检测页；1.1/1.2/1.3=create/join/offline 三条自动判定流程；
-// 分流内按页面出现顺序 1.1.1、1.1.2、…（如 1.1.1_name=create 你的名字）。
+// 分流内按页面出现顺序 1.1.1、1.1.2、…（如 1.1.1_name=create 身份名字）。
 //
 // 说明：golden 测试默认 Ahem 字体（中文显示为方块），此处加载系统中文字体
 // （macOS Hiragino / Windows simhei / Linux Noto，见 _loadChineseFont）
@@ -236,7 +236,7 @@ void main() {
 
   // ---- create（首设备：探测空名称表 → 自动建钥 → 名字 → 设备名 → …）----
 
-  testWidgets('golden: 向导1.1.1-你的名字步骤（create）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.1.1-身份名字步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, keyPair: _goldenKeyPair); // 空名称表 → create，自动进入步骤 1
     await expectLater(

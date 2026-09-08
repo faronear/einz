@@ -46,7 +46,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
 
   @override
-  String get wizardRoleTitle => '选择你的情况';
+  String get wizardRoleTitle => '选择我是谁';
 
   @override
   String wizardMenuLocale(String value) {

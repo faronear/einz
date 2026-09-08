@@ -225,7 +225,7 @@ Future<void> _cmdEnroll(ArgResults opts) async {
   final store = DeviceStore.load(path);
   final server = _require(opts, 'server');
   final inviteCode = opts['invite-code'] as String?;
-  final personName = opts['person'] as String?; // 你的名称（如 lukas），enroll 后写入 store
+  final personName = opts['person'] as String?; // 身份名字（如 lukas），enroll 后写入 store
   final deviceName = opts['device-name'] as String?;
   final r = await ApiClient(server).enrollDevice(
     deviceId: store.deviceId,
