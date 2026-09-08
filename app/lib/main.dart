@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
@@ -202,7 +203,44 @@ class _StartupGateState extends State<StartupGate> {
           ),
         );
       }
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        // 启动加载：品牌渐变 + LOGO + 旋转图标（与检测页启动屏同系，秒级闪现）
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.all(Radius.circular(21)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(8),
+                    child: BrandLogo(size: 72, radius: 18),
+                  ),
+                ),
+                SizedBox(height: 28),
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
     if (_hasLock!) return const LockPage();
     final plain = _plain;

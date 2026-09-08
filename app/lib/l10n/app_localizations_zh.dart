@@ -49,10 +49,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectHint => '自动判断你是第几个用户（首个设备将创建空间）';
 
   @override
-  String get wizardDetectFailed => '无法连接服务器，请在上方输入地址后重试';
+  String get wizardDetectFailed => '暂时无法连接服务器，正在自动重试…';
 
   @override
-  String get wizardNameHint => '填写我的名字（将来可以随时修改）。';
+  String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
 
   @override
   String get wizardPeerNameHint => '填写伴侣的名字（将来可以随时修改）：';
@@ -160,13 +160,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPinHint => '每次启动需输入此 PIN 解锁';
 
   @override
-  String get welcomeDialogTitleCreate => '🎉 成功创建我的领地';
+  String get welcomeDialogTitleCreate => '🎉 一切就绪！';
 
   @override
-  String get welcomeDialogTitleJoin => '🎉 成功认领我的领地';
+  String get welcomeDialogTitleJoin => '🎉 一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '一切就绪！仅限你和 TA，所有消息端到端加密，确保绝对隐私，开始聊天吧。';
+  String get welcomeDialogMessage => '仅限你和伴侣。所有消息端到端加密，确保绝对隐私，开始聊天吧。';
 
   @override
   String get welcomeDialogStart => '开始聊天';
@@ -227,7 +227,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageSkipPinTitle => '暂不设置锁屏码？';
 
   @override
-  String get setupPageSkipPinMessage => '不设锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
+  String get setupPageSkipPinMessage => '不设置锁屏码，则本应用启动时可以直接进入对话，容易被窃取隐私。确定跳过吗？';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 4 位';

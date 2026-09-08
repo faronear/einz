@@ -179,7 +179,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       keyVersion: widget.keyVersion,
       token: widget.token,
       settings: BurnAfterSettings(db),
-      reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
+      reauth: widget.reauth,
     );
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
@@ -192,7 +192,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final ws = WsRealtimeService(
         server: widget.server,
         token: widget.token,
-        reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
+        reauth: widget.reauth,
       );
       _ws = ws;
       ws.connected.addListener(_onWsStatusChanged);
@@ -243,20 +243,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     } catch (_) {
       // 查询失败（网络/未托管）静默：不打断正常使用
-    }
-  }
-
-  /// session 过期自动续期（WS 4401 / 请求 401）：challenge-response 重新签发 token。
-  /// 认证 403（设备已被撤销，服务端拒绝挑战）→ 走 [_onDeviceRevoked] 撤销处理
-  /// （清理本地数据 → 提示 → 回设置页）；其他异常原样抛出（调用方退避/提示）。
-  Future<String> _reauthWithRevokedFallback() async {
-    try {
-      return await widget.reauth!();
-    } on ApiException catch (e) {
-      if (e.code == 'FORBIDDEN') {
-        await _onDeviceRevoked();
-      }
-      rethrow;
     }
   }
 

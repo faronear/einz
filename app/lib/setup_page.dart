@@ -72,9 +72,8 @@ class _SetupPageState extends State<SetupPage> {
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户确认"暂不设置"：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
-  final _serverController = TextEditingController();
 
-  // 服务器地址：默认 einz.tic.cc，探测失败时引导输入并持久化（降低小白负担）
+  // 服务器地址：默认 einz.tic.cc；探测失败由自动重试兜底（启动屏不展示输入框）
   String _server = kEinzServer;
   bool _probeFailed = false;
   Timer? _probeRetryTimer; // 探测失败后的自动重试定时器（连上即停止并自动进入）
@@ -115,7 +114,6 @@ class _SetupPageState extends State<SetupPage> {
     _pin.dispose();
     _confirm.dispose();
     _inviteCode.dispose();
-    _serverController.dispose();
     _probeRetryTimer?.cancel();
     super.dispose();
   }
@@ -163,7 +161,6 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _server = saved;
         _probeFailed = !ok;
-        _serverController.text = saved;
         _personNames = names;
         if (ok && _role == null) {
           _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
@@ -215,31 +212,6 @@ class _SetupPageState extends State<SetupPage> {
     // 失败：保持失败提示，等待下一轮重试（不 setState，避免每 4 秒重建一次）
   }
 
-  /// 保存用户输入的服务器地址并重新探测。
-  Future<void> _saveServer() async {
-    final input = _serverController.text.trim();
-    if (input.isEmpty) return;
-    _probeRetryTimer?.cancel(); // 用户提交新地址 → 停止自动重试循环，立即探测
-    _probeRetryTimer = null;
-    final probe = widget.probeServer ?? ServerSettings.probe;
-    final (ok, names) = await probe(input);
-    if (!mounted) return;
-    setState(() {
-      _server = input;
-      _probeFailed = !ok;
-      _personNames = names;
-      if (ok && _role == null) {
-        _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
-        _step = 1;
-      }
-    });
-    if (ok) {
-      await ServerSettings(widget.db ?? LocalDatabase()).save(input);
-    } else {
-      _startProbeRetry(); // 新地址仍连不上：恢复自动重试，就绪后自动进入
-    }
-  }
-
   // 旧版四路径方法（_generateKey/_importAndAuth/_generateSpaceKeyAndAuth/
   // _escrowAccess 等）已重构为向导步骤（_buildStep* 系列，见下方各场景实现），
   // 认证/托管/二维码逻辑按步骤迁移重建。
@@ -247,6 +219,9 @@ class _SetupPageState extends State<SetupPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    // 角色未判定（正在检测服务器状态）：品牌启动屏——全屏粉蓝渐变 + 上方大 LOGO
+    // + 正中旋转图标 + 状态文案；无 AppBar/菜单/服务器输入框（老板决策 2026-09-08）。
+    if (_role == null) return _buildSplashScreen(l10n);
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -304,38 +279,6 @@ class _SetupPageState extends State<SetupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 服务器探测失败 → 顶部引导卡片（能连时完全不显示，零打扰）
-            if (_probeFailed) ...[
-              Card(
-                color: Colors.amber.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('⚠️ 无法连接服务器 $_server（/health 探测失败）',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _serverController,
-                        style: const TextStyle(fontSize: 18),
-                        decoration: const InputDecoration(
-                          labelText: '服务器地址',
-                          hintText: 'https://...',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _busy ? null : _saveServer,
-                        child: const Text('保存并重试'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
             _buildProgressDots(),
             // 进度条与输入区之间留白约等于大标题（30 号字，行高≈36px）的两倍
             // （顶部锚定：键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白
@@ -671,6 +614,71 @@ class _SetupPageState extends State<SetupPage> {
             return _buildStepDone();
         }
     }
+  }
+
+  /// 启动屏（角色未判定时的检测页）：全屏粉蓝品牌渐变 + 上方大 LOGO 徽章 +
+  /// 正中旋转图标 + 状态文案。无 AppBar/菜单/服务器输入框——探测失败时由
+  /// 自动重试兜底（每 4 秒重探，就绪即自动进入向导），全程零打扰。
+  Widget _buildSplashScreen(AppLocalizations l10n) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          // Einz 粉蓝品牌渐变：天蓝（左上）→ 粉（右下），与顶部通知/Logo 同系
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+              // 上方：白色圆角徽章 + 大 LOGO（粉蓝图标在渐变上清晰凸显）
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x40000000), // 深色 25% 柔投影（渐变背景上浮起）
+                      blurRadius: 24,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: BrandLogo(size: 96, radius: 24),
+                ),
+              ),
+              const Spacer(flex: 3),
+              // 正中：旋转图标（检测中/失败自动重试期间持续旋转）
+              const SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3.5,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // 状态文案：检测中提示 / 失败（自动重试中）提示
+              Text(
+                _probeFailed ? l10n.wizardDetectFailed : l10n.wizardDetectTitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(flex: 2),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 第 0 步（角色未判定时）：显示探测状态（密保信封导入在口令页有次级入口）。

@@ -179,7 +179,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardDetectFailed.
   ///
   /// In en, this message translates to:
-  /// **'Cannot reach server — enter the address above and retry'**
+  /// **'Cannot reach server — retrying automatically…'**
   String get wizardDetectFailed;
 
   /// No description provided for @wizardNameHint.
@@ -257,13 +257,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardAppBarCreate.
   ///
   /// In en, this message translates to:
-  /// **'Einz Space at Creating'**
+  /// **'Einz Space'**
   String get wizardAppBarCreate;
 
   /// No description provided for @wizardAppBarJoin.
   ///
   /// In en, this message translates to:
-  /// **'Einz Space at Joining'**
+  /// **'Einz Space'**
   String get wizardAppBarJoin;
 
   /// No description provided for @wizardAppBarOffline.

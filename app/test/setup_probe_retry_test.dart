@@ -29,17 +29,20 @@ void main() {
         },
       ),
     ));
-    await tester.pumpAndSettle();
-
-    // 首次探测失败 → 检测页显示失败提示（自动重试已启动，等待周期触发）
-    expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsOneWidget);
+    // 首次探测失败 → 启动屏显示失败提示（自动重试已启动，等待周期触发）。
+    // 注意：启动屏失败态仍显示旋转图标（自动重试中）→ 不能用 pumpAndSettle
+    // （无限动画永不 settle），用有限 pump 推进。
+    await tester.pump(); // probe future 完成 → setState → 启动屏失败态
+    await tester.pump(); // 渲染启动屏新帧
+    expect(find.text('暂时无法连接服务器，正在自动重试…'), findsOneWidget);
     expect(probeCalls, 1);
 
     // 4 秒重试周期触发 → 第二次探测成功 → 自动进入 create 步骤 1（名字页）
     await tester.pump(const Duration(seconds: 4));
+    await tester.pump(); // _reprobe future 完成 → 角色判定 → 进入向导
     await tester.pumpAndSettle();
     expect(probeCalls, greaterThanOrEqualTo(2), reason: '应已自动重新探测');
-    expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsNothing,
+    expect(find.text('暂时无法连接服务器，正在自动重试…'), findsNothing,
         reason: '失败提示应消失（已连上）');
     // create 步骤 1 的 AppBar 组合标题（输入框 label 为「我的名字」）
     expect(find.text('Einz 秘境'), findsWidgets, reason: '应自动进入向导名字页');

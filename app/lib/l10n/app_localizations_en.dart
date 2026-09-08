@@ -53,7 +53,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardDetectFailed =>
-      'Cannot reach server — enter the address above and retry';
+      'Cannot reach server — retrying automatically…';
 
   @override
   String get wizardNameHint =>
@@ -96,10 +96,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleOffline => 'Offline: import a key envelope';
 
   @override
-  String get wizardAppBarCreate => 'Einz Space at Creating';
+  String get wizardAppBarCreate => 'Einz Space';
 
   @override
-  String get wizardAppBarJoin => 'Einz Space at Joining';
+  String get wizardAppBarJoin => 'Einz Space';
 
   @override
   String get wizardAppBarOffline => 'Import key envelope';
