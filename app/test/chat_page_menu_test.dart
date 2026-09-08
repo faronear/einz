@@ -85,9 +85,9 @@ void main() {
     expect(find.text('退出应用'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text('修改口令'), findsOneWidget);
-    expect(find.text('PIN'), findsOneWidget);
+    expect(find.text('PIN 锁屏码'), findsOneWidget);
     // 点"PIN: 未设置"菜单项
-    await tester.tap(find.text('PIN'));
+    await tester.tap(find.text('PIN 锁屏码'));
     await tester.pumpAndSettle();
     // 弹窗应出现（设置启动锁）
     expect(find.text('设置 PIN 锁屏码'), findsOneWidget);
@@ -125,7 +125,7 @@ void main() {
     // 打开菜单 → PIN 菜单项
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN'));
+    await tester.tap(find.text('PIN 锁屏码'));
     await tester.pumpAndSettle();
     expect(find.text('设置 PIN 锁屏码'), findsOneWidget);
 
@@ -287,7 +287,7 @@ void main() {
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两个输入框都不输入 = 设为空）
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN'));
+    await tester.tap(find.text('PIN 锁屏码'));
     await tester.pumpAndSettle();
     expect(find.text('设置 PIN 锁屏码'), findsOneWidget); // 弹窗标题
     // 两空点「设置 PIN」→ 先弹显性确认对话框（防误触——老板要求）
@@ -333,7 +333,7 @@ void main() {
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两空）→ 点「设置 PIN」→ 确认弹窗
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PIN'));
+    await tester.tap(find.text('PIN 锁屏码'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('设置 PIN'));
     await tester.pumpAndSettle();

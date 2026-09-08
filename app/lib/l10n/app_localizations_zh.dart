@@ -134,7 +134,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '无法连接服务器，请在上方输入地址后重试';
 
   @override
-  String get wizardNameHint => '输入我的名字（将来可以随时修改）。';
+  String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
 
   @override
   String get wizardStepPeerName => 'TA 的名字';
@@ -231,10 +231,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置 PIN 锁屏码';
 
   @override
-  String get wizardAppBarCreate => 'Einz 秘境创建中';
+  String get wizardAppBarCreate => 'Einz 秘境：创建中';
 
   @override
-  String get wizardAppBarJoin => 'Einz 秘境认领中';
+  String get wizardAppBarJoin => 'Einz 秘境：认领中';
 
   @override
   String get wizardAppBarOffline => '导入密保信封';
@@ -279,7 +279,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepShortPassphrase => '口令';
 
   @override
-  String get wizardStepShortPin => 'PIN';
+  String get wizardStepShortPin => 'PIN 锁屏码';
 
   @override
   String get wizardStepShortDone => '完成';
@@ -342,7 +342,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToEnvelope => '改用线下密保信封';
 
   @override
-  String get wizardSwitchToPassphrase => '改用线上密保口令';
+  String get wizardSwitchToPassphrase => '该用线上密保口令';
 
   @override
   String get wizardPinHint => '每次启动需输入此 PIN 解锁';
@@ -661,10 +661,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMyNameLabel => '我的名字';
 
   @override
-  String get chatPageMenuDeviceNameLabel => '设备名称';
+  String get chatPageMenuDeviceNameLabel => '我的设备';
 
   @override
-  String get chatPagePinLabel => 'PIN';
+  String get chatPagePinLabel => 'PIN 锁屏码';
 
   @override
   String get chatPagePinSetValue => '已设置';
@@ -806,7 +806,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get lockPagePinLabel => 'PIN';
+  String get lockPagePinLabel => 'PIN 锁屏码';
 
   @override
   String get lockPageNoPinSet => '尚未设置 PIN 锁屏码（为空时不启用）';

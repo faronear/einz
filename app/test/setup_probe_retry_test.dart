@@ -41,7 +41,7 @@ void main() {
     expect(probeCalls, greaterThanOrEqualTo(2), reason: '应已自动重新探测');
     expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsNothing,
         reason: '失败提示应消失（已连上）');
-    // 「你的名字」同时出现在步骤标题与 AppBar 标题，断言至少存在即可
-    expect(find.text('你的名字'), findsWidgets, reason: '应自动进入向导名字页');
+    // create 步骤 1 的 AppBar 组合标题（输入框 label 为「我的名字」）
+    expect(find.text('Einz 秘境：创建中：名字'), findsWidgets, reason: '应自动进入向导名字页');
   });
 }

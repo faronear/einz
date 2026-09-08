@@ -400,7 +400,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override
-  String get startupInitFailed => 'Startup initialization failed — your data is safe, please retry';
+  String get startupInitFailed =>
+      'Startup initialization failed — your data is safe, please retry';
 
   @override
   String get startupInitRetry => 'Retry';

@@ -59,8 +59,8 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.textContaining('密保信封无效'), findsOneWidget, reason: '无效信封必须被拦截并提示');
-    expect(find.text('导入密保信封：信封'), findsWidgets, reason: '应停留在信封页');
-    expect(find.text('导入密保信封：PIN'), findsNothing, reason: '不应进入 PIN 页');
+    expect(find.text('导入密保信封：密保信封'), findsWidgets, reason: '应停留在信封页');
+    expect(find.text('导入密保信封：PIN 锁屏码'), findsNothing, reason: '不应进入 PIN 页');
   });
 
   testWidgets('有效密保信封：解封成功放行到 PIN 页', (WidgetTester tester) async {
@@ -70,6 +70,6 @@ void main() {
     await tester.enterText(find.byType(TextField), base64Encode(envelope));
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('导入密保信封：PIN'), findsWidgets, reason: '有效信封应放行到 PIN 步骤');
+    expect(find.text('导入密保信封：PIN 锁屏码'), findsWidgets, reason: '有效信封应放行到 PIN 步骤');
   });
 }

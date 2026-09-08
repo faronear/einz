@@ -788,13 +788,13 @@ abstract class AppLocalizations {
   /// **'Initialization failed, retrying…'**
   String get setupPageInitFailed;
 
-  /// Startup initialization still failing after auto-retries — data is safe, user can tap to retry.
+  /// No description provided for @startupInitFailed.
   ///
   /// In en, this message translates to:
   /// **'Startup initialization failed — your data is safe, please retry'**
   String get startupInitFailed;
 
-  /// Retry button label for the startup error page.
+  /// No description provided for @startupInitRetry.
   ///
   /// In en, this message translates to:
   /// **'Retry'**

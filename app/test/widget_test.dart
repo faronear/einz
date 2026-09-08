@@ -41,8 +41,8 @@ void main() {
     // 新流程：不再有角色选择页，也没有"生成设备密钥"按钮
     expect(find.text('我是第一个使用者，创建新空间'), findsNothing);
     expect(find.text('① 生成设备密钥'), findsNothing);
-    // 自动进入 create 步骤 1：你的名字
-    expect(find.text('你的名字'), findsWidgets); // 步骤标题 + 输入框 label
+    // 自动进入 create 步骤 1（AppBar 组合标题；输入框 label 是「我的名字」）
+    expect(find.text('Einz 秘境：创建中：名字'), findsWidgets); // AppBar 标题
     // 底部保留"上一步"（可返回检测页）与"下一步"
     expect(find.text('上一步'), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);
@@ -52,7 +52,7 @@ void main() {
     await tester.pumpWidget(wrapApp(probeNames: {'personA': 'Lukas'})); // 非空 → join
     await tester.pumpAndSettle();
 
-    expect(find.text('Einz 秘境认领中：身份名字'), findsWidgets); // AppBar 大标题 + 简化短名
+    expect(find.text('Einz 秘境：认领中：身份'), findsWidgets); // AppBar 大标题 + 简化短名
     expect(find.textContaining('创建者'), findsOneWidget);
     expect(find.textContaining('共有者'), findsOneWidget);
     // join step1 无「下一步」/「完成」按钮：点卡片即自动前进（老板 UX 决策）
@@ -61,7 +61,7 @@ void main() {
     // 点身份卡片 → 自动进入邀请码页
     await tester.tap(find.textContaining('创建者'));
     await tester.pumpAndSettle();
-    expect(find.text('Einz 秘境认领中：邀请码'), findsWidgets); // 邀请码页步骤标题
+    expect(find.text('Einz 秘境：认领中：邀请码'), findsWidgets); // 邀请码页步骤标题
   });
 
   testWidgets('探测失败：显示服务器输入引导与导入线下密保信封入口', (WidgetTester tester) async {
