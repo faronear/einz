@@ -1281,13 +1281,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             itemBuilder: (context) {
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
               final langCode = Localizations.localeOf(context).languageCode;
+              // 行内左侧标签用稍淡色，与右侧当前值文字（默认 onSurface 深色）区分
+              final labelStyle =
+                  TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
               return [
                 // 「我的」组（关于我的信息）置顶：名字/头像/设备名称
                 PopupMenuItem(
                   value: 'name',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuMyNameLabel),
+                      Text(l10n.chatPageMenuMyNameLabel, style: labelStyle),
                       const Spacer(),
                       Text(_myPersonName.isEmpty ? l10n.chatPageNameUnset : _myPersonName),
                     ],
@@ -1297,7 +1300,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'avatar',
                   child: Row(
                     children: [
-                      Expanded(child: Text(l10n.chatPageMenuAvatar)),
+                      Expanded(child: Text(l10n.chatPageMenuAvatar, style: labelStyle)),
                       const SizedBox(width: 10),
                       CircleAvatar(
                         radius: 12,
@@ -1314,7 +1317,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'devname',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuDeviceNameLabel),
+                      Text(l10n.chatPageMenuDeviceNameLabel, style: labelStyle),
                       const Spacer(),
                       Text(_myDeviceName.isEmpty ? l10n.chatPageNameUnset : _myDeviceName),
                     ],
@@ -1326,7 +1329,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'locale',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuLocaleLabel),
+                      Text(l10n.chatPageMenuLocaleLabel, style: labelStyle),
                       const Spacer(),
                       Text(kLocaleLabels[langCode] ?? langCode),
                     ],
@@ -1336,7 +1339,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'burn',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuBurnLabel),
+                      Text(l10n.chatPageMenuBurnLabel, style: labelStyle),
                       const Spacer(),
                       Text(_burnOptionLabel(_burnSeconds, l10n)),
                     ],
@@ -1347,7 +1350,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'pin',
                   child: Row(
                     children: [
-                      Text(l10n.chatPagePinLabel),
+                      Text(l10n.chatPagePinLabel, style: labelStyle),
                       const Spacer(),
                       Text(_hasPin ? l10n.chatPagePinSetValue : l10n.chatPagePinUnsetValue),
                     ],

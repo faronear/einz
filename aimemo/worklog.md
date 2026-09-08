@@ -1008,3 +1008,14 @@
 - PIN 解锁页 `lock_page.dart`：解锁表单顶部原 56px `Icons.lock_outline` 占位图换成居中 `BrandLogo(72, r16)`；「未设置 PIN」的 noLock 提示分支保留 lock_open 图标（有语义：说明为何不显示解锁表单）
 
 **验证：** flutter analyze 0 issue（仅 1 既有 info lint）；widget/chat_page_menu/lock_page/wizard_envelope_entry 4 个文件 17 项非 golden 测试全过。golden 失配保持红不重刷（既有决策；本次新增图片渲染亦在 golden 覆盖内，预期失配）。
+
+## 2026-09-08 会话：对话页菜单标签淡化 + 与老板并发文案改名的协调收尾
+
+**菜单样式（本次任务）：**
+- 对话页右上角菜单行内左侧标签（我的名字/我的设备/语言/阅后即焚/锁屏码等 6 行）改用 `colorScheme.onSurfaceVariant` 稍淡色，与右侧当前值文字（默认 onSurface 深色）区分；纯动作项（邀请码/导出等无右值）保持原样
+
+**并发协调记录：**
+- 老板同一工作区同步改文案（「PIN 锁屏码」→「锁屏码」，含 ARB/生成文件/app_lock 异常串/lock+setup+menu 测试断言），其 WIP 中间态曾致 4 个 PIN 测试瞬红——A/B（stash 我的改动）证实与我的菜单样式无关，根因是 ARB 改名后测试断言未同步 + 未提交的生成文件中间态
+- chat_page_menu_test 退出弹窗断言同步 523d25a 新文案（「将彻底关闭应用。」→「将在本设备上退出 Einz 秘境。」）
+- 老板选择「我代为分两个 commit 收尾」：① b579172 文案批次（含 test 文件锁屏码断言与退出断言）② 本次样式（chat_page.dart + 本条注记）
+- `server_settings.dart` 的 `kEinzServer = http://localhost:3000` 为老板本地测试配置（源码注释「不要 commit」），始终不入库
