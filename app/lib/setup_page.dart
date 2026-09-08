@@ -622,6 +622,11 @@ class _SetupPageState extends State<SetupPage> {
   Widget _buildSplashScreen(AppLocalizations l10n) {
     return Scaffold(
       body: Container(
+        // alignment 使内部 Align 撑满全屏 → 渐变 DecoratedBox 铺满整页。
+        // （Scaffold body 是宽松约束，RenderProxyBox 尺寸 = child 尺寸；若不加
+        // alignment，渐变容器会缩到 Column 宽度 = 最宽文案，右侧露出背景——
+        // 修复 2026-09-08：断线时失败文案最长，左侧一大半渐变 + 右侧全白）
+        alignment: Alignment.topCenter,
         decoration: const BoxDecoration(
           // Einz 粉蓝品牌渐变：天蓝（左上）→ 粉（右下），与顶部通知/Logo 同系
           gradient: LinearGradient(
