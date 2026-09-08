@@ -638,36 +638,11 @@ class _SetupPageState extends State<SetupPage> {
         child: SafeArea(
           child: Column(
             children: [
-              const Spacer(flex: 2),
-              // 上方：白色圆角徽章 + 大 LOGO（粉蓝图标在渐变上清晰凸显）
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x40000000), // 深色 25% 柔投影（渐变背景上浮起）
-                      blurRadius: 24,
-                      offset: Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: BrandLogo(size: 96, radius: 24),
-                ),
-              ),
               const Spacer(flex: 3),
-              // 正中：旋转图标（检测中/失败自动重试期间持续旋转）
-              const SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3.5,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 20),
+              // 正中：旋转的嵌套圆环 Logo——品牌展示与加载指示二合一，
+              // 替代原「大 LOGO 徽章 + 旋转图标」（老板决策 2026-09-08）
+              const SpinningBrandLogo(size: 96, radius: 24),
+              const SizedBox(height: 24),
               // 状态文案：检测中提示 / 失败（自动重试中）提示
               Text(
                 _probeFailed ? l10n.wizardDetectFailed : l10n.wizardDetectTitle,
