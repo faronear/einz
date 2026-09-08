@@ -933,7 +933,8 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN → 完成 ----
 
   /// 步骤 1（join）：你是第一个用户（创建者 personA）还是第二个（伴侣 personB）。
-  /// 与 TUI 引导顺序一致：先定身份（并按需设置名字）。
+  /// 与 TUI 引导顺序一致：先定身份（并按需设置名字）。身份卡片**左右并排**：
+  /// 左蓝（personA 天蓝）/ 右粉（personB 粉强调），与品牌 Logo/顶部通知同色系。
   Widget _buildStepIdentity() {
     final l10n = AppLocalizations.of(context)!;
     final aName = _personNames['personA'] ?? '';
@@ -943,23 +944,28 @@ class _SetupPageState extends State<SetupPage> {
       children: [
         Text(l10n.wizardIdentityHint, style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading: Icon(Icons.person),
-            // 有名字显示名字，无名字（未登记）显示身份标签本身
-            title: Text(aName.isEmpty ? l10n.wizardIdentityCreator : aName),
-            selected: _chosenPerson == 'personA',
-            onTap: () => _selectIdentity('personA'),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: ListTile(
-            leading: Icon(Icons.group),
-            title: Text(bName.isEmpty ? l10n.wizardIdentityPartner : bName),
-            selected: _chosenPerson == 'personB',
-            onTap: () => _selectIdentity('personB'),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildIdentityCard(
+                icon: Icons.person,
+                label: aName.isEmpty ? l10n.wizardIdentityCreator : aName,
+                color: const Color(0xFF3BAFFD), // 左：品牌天蓝
+                selected: _chosenPerson == 'personA',
+                onTap: () => _selectIdentity('personA'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildIdentityCard(
+                icon: Icons.group,
+                label: bName.isEmpty ? l10n.wizardIdentityPartner : bName,
+                color: const Color(0xFFD6529C), // 右：品牌粉
+                selected: _chosenPerson == 'personB',
+                onTap: () => _selectIdentity('personB'),
+              ),
+            ),
+          ],
         ),
         if (_chosenPerson == 'personB' && bName.isEmpty) ...[
           const SizedBox(height: 12),
@@ -974,6 +980,56 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ],
       ],
+    );
+  }
+
+  /// join 身份选择卡片：品牌色背景 + 白字图标/标签；选中加白色粗边框 + 对勾。
+  Widget _buildIdentityCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color,
+      elevation: 2,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: selected ? Border.all(color: Colors.white, width: 3) : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 28),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Icon(
+                selected ? Icons.check_circle : Icons.circle_outlined,
+                color: selected ? Colors.white : Colors.white70,
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

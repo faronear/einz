@@ -1171,3 +1171,27 @@ setup_envelope_verify/wizard_envelope_entry/setup_probe_retry/chat_page_menu/loc
 25 项全过（golden 按政策跳过）。
 
 **不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。
+
+## 2026-09-08 会话：join 身份卡片左右并排（左蓝右粉）+ 顶部通知文字去阴影
+
+**任务（老板要求）：** ① 后续设备加入时的用户身份选择，两张卡片**左右并排**（原来上下
+排列），左侧蓝色背景、右侧粉色背景；② 顶部通知文字下方的"两条彩色下划线"（实为白字
+阴影在粉蓝渐变上形成的细线观感）移除。
+
+**实现：**
+- setup_page `_buildStepIdentity`：Card+ListTile 上下排列 → `Row[Expanded(左卡),
+  SizedBox(12), Expanded(右卡)]`；新增 `_buildIdentityCard`：品牌色背景（左天蓝
+  #3BAFFD / 右粉 #D6529C，与 Logo/顶部通知同色系）+ 白字图标标签 + 选中白色粗边框
+  + 对勾（未选中 circle_outlined 占位保持等高）
+- **溢出修复（模拟器黄色条纹 "Bottom overflowed by 8.0 pixels"）**：根因 = Row
+  `crossAxisAlignment: stretch` 在垂直 SingleChildScrollView（高度无界 h=Infinity）
+  下给子项传无限高度 → 非法约束崩溃/溢出；移除 stretch + 压缩卡片高度（padding
+  18→12、图标 32→28、对勾 18→16）
+- top_notice：TextStyle 删 `shadows`（黑 20% 偏移 1px 阴影在渐变上像下划线，
+  多行消息即"两条"）；文字阴影本为粉端对比兜底，删后白字仍可读
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；widget_test/
+setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
+（溢出修复前 10 项红）、chat_page_menu_test 10 项全过（通知改动）（golden 按政策跳过）。
+
+**不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。
