@@ -854,12 +854,6 @@ abstract class AppLocalizations {
   /// **'Recording failed: {error}'**
   String chatPageVoiceFailed(String error);
 
-  /// No description provided for @chatPageRecordingHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Recording… release to send'**
-  String get chatPageRecordingHint;
-
   /// No description provided for @chatPageLongPressToRecord.
   ///
   /// In en, this message translates to:

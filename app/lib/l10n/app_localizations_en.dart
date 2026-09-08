@@ -443,9 +443,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageRecordingHint => 'Recording… release to send';
-
-  @override
   String get chatPageLongPressToRecord => 'Long press to record';
 
   @override

@@ -189,7 +189,6 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageRecordingHint": "录音中…松开发送",
   "chatPageLongPressToRecord": "长按即可录音",
   "chatPageInputHint": "输入消息…",
   "chatPageAudioMetaMissing": "音频附件元数据缺失",

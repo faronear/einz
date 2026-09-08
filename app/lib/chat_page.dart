@@ -1638,7 +1638,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     onPressed: _showAttachmentSheet,
                     icon: const Icon(Icons.add_circle_outline),
                   ),
-                  // 语音：点按=「长按即可录音」提示；长按=开始录音（输入框变录音条）
+                  // 语音：点按=「长按即可录音」提示；长按=开始录音（输入框原地变录音条）
                   Tooltip(
                     key: _voiceTooltipKey,
                     message: l10n.chatPageLongPressToRecord,
@@ -1657,12 +1657,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                  if (_inputMode == _InputMode.recording)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Text(l10n.chatPageRecordingHint,
-                          style: const TextStyle(color: Colors.red, fontSize: 12)),
-                    ),
                   Expanded(
                     child: _inputMode == _InputMode.text
                         ? TextField(
@@ -2021,7 +2015,8 @@ class _NoEscrowException implements Exception {
   const _NoEscrowException();
 }
 
-/// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值。
+/// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值；
+/// 按可用宽度只渲染能放下的条数（取尾部最新采样），窄屏也不会顶出屏幕。
 class _WaveformBars extends StatelessWidget {
   const _WaveformBars({required this.samples, required this.color});
 
@@ -2030,21 +2025,27 @@ class _WaveformBars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        for (final sample in samples)
-          Container(
-            width: 3,
-            height: 8 + sample * 22,
-            margin: const EdgeInsets.symmetric(horizontal: 1.5),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(1.5),
+    return LayoutBuilder(builder: (context, constraints) {
+      const step = 6.0; // 每根条占宽：3px 本体 + 1.5px 边距 ×2
+      final maxBars = (constraints.maxWidth / step).floor();
+      final count = maxBars <= 0 ? 0 : (samples.length < maxBars ? samples.length : maxBars);
+      final shown = count <= 0 ? const <double>[] : samples.sublist(samples.length - count);
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          for (final sample in shown)
+            Container(
+              width: 3,
+              height: 8 + sample * 22,
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
             ),
-          ),
-      ],
-    );
+        ],
+      );
+    });
   }
 }
 
