@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "server-new-local": "cd server && rm -fr data/einz.sqlite.db* && npm run dev",
-    "server-new": "cd deployment; git pull; rm -fr data/einz.sqlite.db*; docker compose down; docker compose up -d; docker compose logs -f server",
-    "app-new": "xcrun simctl uninstall booted cc.tic.einz; cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --pid-file /tmp/einz_flutter.pid",
+    "server-local": "cd server && npm run dev",
+    "server-new": "cd deployment; git pull; rm -fr data/einz.sqlite.db*; docker compose up -d --build server; docker compose down; docker compose up -d; docker compose logs -f server",
+    "ios-boot": "xcrun simctl boot 720C22F9-D844-44EE-BDA6-87900913A39B; open -a Simulator; xcrun simctl list devices | grep -i booted",
+    "ios-new": "xcrun simctl uninstall booted cc.tic.einz; cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --pid-file /tmp/einz_flutter.pid",
     "app": "cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --pid-file /tmp/einz_flutter.pid",
     "tui1-new-local": "cd cli && rm -f demo/s1.json && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
     "tui1-local": "cd cli && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
