@@ -314,22 +314,26 @@ class _SetupPageState extends State<SetupPage> {
                     ),
                     child: KeyedSubtree(
                       key: ValueKey('$_role-$_step'),
-                      // 渐变背景上的白色内容卡：表单可读性 + 品牌层次
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x33000000), // 柔和投影（渐变上浮起）
-                              blurRadius: 24,
-                              offset: Offset(0, 10),
+                      // 渐变背景上的白色内容卡：表单可读性 + 品牌层次。
+                      // 完成页（done 步骤）例外：不包白卡——直接呈现粉蓝渐变
+                      // 背景（欢迎对话框盖住全页，老板决策 2026-09-08）
+                      child: _step >= _stepCount
+                          ? SingleChildScrollView(child: _buildStep())
+                          : Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x33000000), // 柔和投影（渐变上浮起）
+                                    blurRadius: 24,
+                                    offset: Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(20),
+                              child: SingleChildScrollView(child: _buildStep()),
                             ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(20),
-                        child: SingleChildScrollView(child: _buildStep()),
-                      ),
                     ),
                   ),
                 ),
@@ -1329,15 +1333,10 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 向导完成页（done 步骤）：纯色背景无文字（老板要求"已完成、已结束"的
-  /// 独立欢迎页面）——被欢迎对话框盖住，仅作为弹窗背后的页面呈现。
+  /// 向导完成页（done 步骤）：无独立内容——欢迎对话框盖住全页，背景直接
+  /// 呈现粉蓝渐变（原浅绿色块已去掉：渐变背景更贴合品牌，老板决策 2026-09-08）。
   Widget _buildStepDone() {
-    // 纯色块占视口 60%（滚动容器内无法无限铺满——固定高度纯色背景）
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.6,
-      width: double.infinity,
-      child: const ColoredBox(color: Color(0xFFE8F5E9)), // 浅绿（完成语义）
-    );
+    return const SizedBox.shrink();
   }
 
   // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN ----
