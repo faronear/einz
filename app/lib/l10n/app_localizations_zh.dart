@@ -105,51 +105,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleOffline => '导入线下密保信封';
 
   @override
-  String get wizardRecoverTitle => '从备份恢复';
-
-  @override
-  String get wizardRecoverHint => '全部设备丢失？输入密保口令，即可重置整个秘境并重新绑定本设备';
-
-  @override
-  String get wizardRecoverPassphraseLabel => '口令';
-
-  @override
-  String get wizardRecoverStart => '恢复';
-
-  @override
-  String get wizardRecoverBadPassphrase => '口令错误，或未上传口令密保箱';
-
-  @override
-  String get wizardRecoverArchiveTitle => '从完整备份恢复（归档）';
-
-  @override
-  String get wizardRecoverArchiveHint =>
-      '粘贴导出的完整备份文本并输入归档口令，恢复空间密钥与聊天历史（需服务器可达）';
-
-  @override
-  String get wizardRecoverArchiveTextLabel => '归档文本（EINZ-BACKUP: 开头）';
-
-  @override
-  String get wizardRecoverArchivePassphraseLabel => '归档口令';
-
-  @override
-  String get wizardRecoverArchiveStart => '恢复归档';
-
-  @override
-  String get wizardRecoverArchiveBad => '归档口令错误或备份损坏';
-
-  @override
-  String wizardRecoverFailed(String error) {
-    return '恢复失败: $error';
-  }
-
-  @override
-  String get wizardRecoverEnrolling => '正在绑定本设备…';
-
-  @override
-  String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置锁屏码';
-
-  @override
   String get wizardAppBarCreate => 'Einz 秘境：创建中';
 
   @override
@@ -334,9 +289,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuInvite => '邀请码';
 
   @override
-  String get chatPageMenuExport => '导出完整备份';
-
-  @override
   String get chatPageTitleBrand => 'Einz 秘境';
 
   @override
@@ -423,27 +375,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String chatPageChangePassphraseFailed(String error) {
     return '修改口令失败: $error';
   }
-
-  @override
-  String get chatPageExportTitle => '导出完整备份（归档）';
-
-  @override
-  String get chatPageExportPassphraseLabel => '归档口令（加密归档文件；请与归档文本分开保管）';
-
-  @override
-  String get chatPageExportGenerate => '生成归档';
-
-  @override
-  String get chatPageExportGenerated => '加密归档文本（请与口令分开离线保存）：';
-
-  @override
-  String get chatPageExportCopy => '复制';
-
-  @override
-  String get chatPageExportCopied => '归档文本已复制';
-
-  @override
-  String get chatPageExportHint => '包含空间密钥与全部聊天历史（含附件信息）的加密归档；设备全部丢失或换新机时可整体恢复';
 
   @override
   String get chatPageEscrowRotatedNotice => '对方已重设密保口令——生成邀请码或修改口令时将要求输入新口令';

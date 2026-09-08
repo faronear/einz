@@ -115,56 +115,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleOffline => 'Offline: import a key envelope';
 
   @override
-  String get wizardRecoverTitle => 'Restore from backup';
-
-  @override
-  String get wizardRecoverHint =>
-      'Lost all devices? Enter the passphrase set when enabling key escrow; a correct passphrase resets the space and restores this device (no backup text needed)';
-
-  @override
-  String get wizardRecoverPassphraseLabel => 'Passphrase';
-
-  @override
-  String get wizardRecoverStart => 'Restore';
-
-  @override
-  String get wizardRecoverBadPassphrase =>
-      'Wrong passphrase, or this space has no escrow passphrase uploaded';
-
-  @override
-  String get wizardRecoverArchiveTitle => 'Restore from full backup (archive)';
-
-  @override
-  String get wizardRecoverArchiveHint =>
-      'Paste the exported full-backup text and enter the archive passphrase to restore the space key and chat history (server must be reachable)';
-
-  @override
-  String get wizardRecoverArchiveTextLabel =>
-      'Archive text (starts with EINZ-BACKUP:)';
-
-  @override
-  String get wizardRecoverArchivePassphraseLabel => 'Archive passphrase';
-
-  @override
-  String get wizardRecoverArchiveStart => 'Restore archive';
-
-  @override
-  String get wizardRecoverArchiveBad =>
-      'Wrong archive passphrase or corrupted archive';
-
-  @override
-  String wizardRecoverFailed(String error) {
-    return 'Restore failed: $error';
-  }
-
-  @override
-  String get wizardRecoverEnrolling => 'Enrolling this device…';
-
-  @override
-  String get wizardRecoverDone =>
-      '✅ Restored: device enrolled — set a PIN to finish';
-
-  @override
   String get wizardAppBarCreate => 'Einz Space at Creating';
 
   @override
@@ -364,9 +314,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuInvite => 'Invite code';
 
   @override
-  String get chatPageMenuExport => 'Export full backup';
-
-  @override
   String get chatPageTitleBrand => 'EINZ Private Space';
 
   @override
@@ -457,30 +404,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String chatPageChangePassphraseFailed(String error) {
     return 'Failed to change passphrase: $error';
   }
-
-  @override
-  String get chatPageExportTitle => 'Export full backup (archive)';
-
-  @override
-  String get chatPageExportPassphraseLabel =>
-      'Archive passphrase (encrypts the archive; keep it separate from the text)';
-
-  @override
-  String get chatPageExportGenerate => 'Generate archive';
-
-  @override
-  String get chatPageExportGenerated =>
-      'Encrypted archive text (keep offline, separate from the passphrase):';
-
-  @override
-  String get chatPageExportCopy => 'Copy';
-
-  @override
-  String get chatPageExportCopied => 'Archive text copied';
-
-  @override
-  String get chatPageExportHint =>
-      'Encrypted archive of the space key and all chat history (incl. attachment info); restore everything if devices are lost or when switching to a new device';
 
   @override
   String get chatPageEscrowRotatedNotice =>

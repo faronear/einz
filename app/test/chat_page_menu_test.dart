@@ -77,8 +77,8 @@ void main() {
     // 打开顶栏菜单
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    // 菜单应包含各功能项（含「导出完整备份」与「密保口令」）
-    expect(find.text('导出完整备份'), findsOneWidget);
+    // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
+    expect(find.text('密保口令'), findsOneWidget);
     // 我的名字/设备名称（未传 → 显示「未设置」）+ 退出秘境
     expect(find.text('我的名字'), findsOneWidget);
     expect(find.text('我的设备'), findsOneWidget);

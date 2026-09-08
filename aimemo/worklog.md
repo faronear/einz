@@ -1127,3 +1127,28 @@ setup_join_passphrase/setup_envelope_verify/ws_realtime/widget_test 23 项全过
 setup_join_passphrase/setup_envelope_verify 18 项全过（golden 按政策跳过）。
 
 **不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。
+
+## 2026-09-08 会话：App 彻底取消备份/恢复，/recover 仅限 TUI
+
+**背景（老板决策）：** 从 App 彻底取消「备份和恢复」功能——设备丢失用"添加新设备"解决；
+双方设备全丢 = 放弃空间，无需恢复。全丢恢复（仅凭口令召回所有设备、重置整个空间）对
+App 用户太危险，**仅限 TUI**。密保信封导入（join 口令页「改用线下密保信封」离线接入）
+经老板拍板**保留**（属于"添加新设备"的离线路径）。
+
+**已移除（App）：**
+- chat_page：菜单「导出完整备份」+ _ExportBackupDialog 整类 + _showExportBackupDialog +
+  ChatPage.initialHistory / importArchiveHistory 归档历史管线（死代码）
+- setup_page：⋯ 菜单「从备份恢复」入口 + _RecoverDialog 整类（escrow 口令重置 + 折叠区
+  归档恢复）+ _showRecoverDialog / _applyRecovered / _applyArchiveRestored / _importedHistory
+- l10n：app_zh/en.arb 删除 23 个键（wizardRecover* + chatPageExport* + chatPageMenuExport）
+  → flutter gen-l10n 重新生成（0 残留）
+- 测试：chat_page_menu_test 去掉「导出完整备份」断言
+
+**保留：** TUI/CLI `/recover`、backup/restore 与 Server /recover 端点不变；App 新设备接入
+= 邀请码 / 口令 / 密保信封。docs：KEY_ESCROW.md 新增 §13 决策记录、PROTOCOL.md §7.4 注明
+/recover 仅 TUI。
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；13 个测试文件 53 项全过
+（golden 按政策跳过）。
+
+**不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。

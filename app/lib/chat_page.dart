@@ -45,7 +45,6 @@ class ChatPage extends StatefulWidget {
     this.reauth,
     this.escrowPassphrase,
     this.escrowUpdatedAt,
-    this.initialHistory,
     this.personName, // 我的名字（登记时设置；菜单显示/修改）
     this.deviceName, // 我的设备名（登记时自动获取；菜单显示/修改）
     this.personId, // 我的 personId（头像上传/获取用）
@@ -66,10 +65,6 @@ class ChatPage extends StatefulWidget {
   /// 本端已知的服务端口令更新时间（ms）：启动/上线时与服务器对比，
   /// 服务器更新 = 离线期间口令被重设（只发通知，不弹窗）。
   final int? escrowUpdatedAt;
-
-  /// 归档恢复的历史消息（「从完整备份恢复」导入；map 形态与导出归档的
-  /// history 条目一致：env/plaintext/sender/attachment/expiresAt）。
-  final List<Map<String, dynamic>>? initialHistory;
 
   /// 我的名字（向导登记时设置；顶栏菜单显示/修改，服务端同步）。
   final String? personName;
@@ -186,12 +181,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       settings: BurnAfterSettings(db),
       reauth: widget.reauth,
     );
-    // 归档恢复（「从完整备份恢复」）：先于 _loadInitial/同步把历史落库（messageId
-    // 幂等去重，sync 不会重复）
-    final initHistory = widget.initialHistory;
-    if (initHistory != null && initHistory.isNotEmpty) {
-      _repo.importArchiveHistory(initHistory);
-    }
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
     _loadBurnLabel();
@@ -418,21 +407,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final has = await AppLockService(widget.db ?? LocalDatabase()).isSetup;
     if (!mounted || has == _hasPin) return;
     setState(() => _hasPin = has);
-  }
-
-  /// 导出完整备份（归档）：口令加密 {空间密钥 + 设备信息 + 全部聊天历史（含
-  /// 附件元数据）} → 可粘贴/保存的归档文本，离线保管（防设备/服务器全丢）。
-  Future<void> _showExportBackupDialog() async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _ExportBackupDialog(
-        deviceId: widget.deviceId,
-        spaceKeyB64: base64Encode(widget.spaceKey),
-        spaceId: widget.spaceId,
-        keyVersion: widget.keyVersion,
-        historyLoader: _repo.history,
-      ),
-    );
   }
 
   /// 修改口令（escrow 托管口令，空间级）：旧口令验证 → 新口令重加密上传 → 本地同步。
@@ -1248,8 +1222,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _showInviteDialog();
                   case 'pin':
                     _showSetLockDialog();
-                  case 'export':
-                    _showExportBackupDialog();
                   case 'passphrase':
                     _showChangePassphraseDialog();
                   case 'name':
@@ -1347,10 +1319,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 PopupMenuItem(
                   value: 'passphrase',
                   child: Text(l10n.chatPageMenuChangePassphrase, style: labelStyle),
-                ),
-                PopupMenuItem(
-                  value: 'export',
-                  child: Text(l10n.chatPageMenuExport, style: labelStyle),
                 ),
                 const PopupMenuDivider(),
                 PopupMenuItem(
@@ -1649,151 +1617,6 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
         FilledButton(onPressed: _submit, child: Text(l10n.setPinDialogSetPin)),
-      ],
-    );
-  }
-}
-
-/// 导出完整备份（归档）弹窗（StatefulWidget）：输入口令 → 口令加密
-/// {device_id, space_id, key_version, space_key, history（全部聊天历史：
-/// env 密文信封 + 明文 + 附件元数据 + 阅后即焚到期）} → 生成可粘贴/保存的
-/// 归档文本，离线保管。归档文本 = `EINZ-BACKUP:` + base64(BackupFile JSON)，
-/// 恢复时（向导恢复对话框）粘贴此文本 + 口令整体恢复本机数据。
-class _ExportBackupDialog extends StatefulWidget {
-  const _ExportBackupDialog({
-    required this.deviceId,
-    required this.spaceKeyB64,
-    required this.spaceId,
-    required this.keyVersion,
-    required this.historyLoader,
-  });
-
-  final String deviceId;
-  final String spaceKeyB64;
-  final String spaceId;
-  final int keyVersion;
-
-  /// 读取本机全部聊天历史（解密为明文，含附件元数据）——归档数据源。
-  final Future<List<HistoryMessage>> Function() historyLoader;
-
-  @override
-  State<_ExportBackupDialog> createState() => _ExportBackupDialogState();
-}
-
-class _ExportBackupDialogState extends State<_ExportBackupDialog> {
-  final _passphraseCtrl = TextEditingController();
-  bool _busy = false;
-  String? _error;
-  String? _backupText;
-
-  @override
-  void dispose() {
-    _passphraseCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _generate() async {
-    final l10n = AppLocalizations.of(context)!;
-    final passphrase = _passphraseCtrl.text.trim();
-    if (passphrase.isEmpty) {
-      setState(() => _error = l10n.setupPageNeedPassphrase);
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      // 归档 = 空间密钥 + 设备信息 + 全部聊天历史（env 密文信封 + 明文 +
-      // 附件元数据 + 阅后即焚到期）——口令加密，离线保管；全丢时可整体恢复
-      final history = await widget.historyLoader();
-      final payload = Uint8List.fromList(utf8.encode(jsonEncode({
-        'device_id': widget.deviceId,
-        'space_id': widget.spaceId,
-        'key_version': widget.keyVersion,
-        'space_key': widget.spaceKeyB64,
-        'history': [
-          for (final m in history)
-            {
-              'env': m.env.toJson(),
-              'plaintext': m.plaintext,
-              'sender': m.sender,
-              if (m.attachment != null) 'attachment': m.attachment,
-              if (m.expiresAt != null) 'expiresAt': m.expiresAt,
-            },
-        ],
-      })));
-      final file = await encryptBackup(payload: payload, recoveryCode: passphrase);
-      final text = kBackupExportPrefix +
-          base64Encode(utf8.encode(jsonEncode(file.toJson())));
-      if (!mounted) return;
-      setState(() => _backupText = text);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = l10n.setupPageKeyGenFailed('$e'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final text = _backupText;
-    return AlertDialog(
-      title: Text(l10n.chatPageExportTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (text == null) ...[
-            TextField(
-              controller: _passphraseCtrl,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: l10n.chatPageExportPassphraseLabel,
-                border: const OutlineInputBorder(),
-              ),
-              onSubmitted: (_) {
-                if (!_busy) _generate();
-              },
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-            ],
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: _busy ? null : _generate,
-              child: Text(l10n.chatPageExportGenerate),
-            ),
-          ] else ...[
-            Text(l10n.chatPageExportGenerated,
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: SingleChildScrollView(
-                child: SelectableText(text,
-                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(l10n.chatPageExportHint,
-                style: const TextStyle(fontSize: 11, color: Colors.orange)),
-            const SizedBox(height: 8),
-            FilledButton.tonal(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: text));
-                showTopNotice(context, l10n.chatPageExportCopied);
-              },
-              child: Text(l10n.chatPageExportCopy),
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
       ],
     );
   }
