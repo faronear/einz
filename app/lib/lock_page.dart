@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show exit;
 
 import 'package:flutter/material.dart';
 import 'package:einz_shared/einz_shared.dart';
@@ -8,6 +9,7 @@ import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'data/locale_settings.dart';
 import 'l10n/app_localizations.dart';
 
 /// 锁屏页：输入 PIN 解密 Space Key 包 → 进入聊天页。
@@ -142,13 +144,111 @@ class _LockPageState extends State<LockPage> {
     }
   }
 
+  /// 顶栏 ⋯：语言切换 + 退出应用（与对话页菜单同款布局：标签靠左、
+  /// 当前值靠右，标签用 onSurfaceVariant 淡色）。
+  Widget _buildMenu(AppLocalizations l10n) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert),
+      tooltip: '菜单 / More',
+      onSelected: (value) {
+        // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言崩溃）
+        Future<void>.delayed(const Duration(milliseconds: 300), () {
+          if (!mounted) return;
+          if (value == 'locale') _showLocalePicker();
+          if (value == 'exit') _showExitAppDialog();
+        });
+      },
+      itemBuilder: (context) {
+        // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
+        final langCode = Localizations.localeOf(context).languageCode;
+        // 行内左侧标签用稍淡色，与右侧当前值文字（默认 onSurface 深色）区分
+        final labelStyle =
+            TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
+        return [
+          PopupMenuItem(
+            value: 'locale',
+            child: Row(
+              children: [
+                Text(l10n.chatPageMenuLocaleLabel, style: labelStyle),
+                const Spacer(),
+                Text(kLocaleLabels[langCode] ?? langCode),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            value: 'exit',
+            child: Text(l10n.chatPageMenuExit, style: labelStyle),
+          ),
+        ];
+      },
+    );
+  }
+
+  /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效——
+  /// localeNotifier 通知 EinzApp 重建 MaterialApp，锁屏页语言随之刷新）。
+  Future<void> _showLocalePicker() async {
+    final settings = LocaleSettings(widget.db ?? LocalDatabase());
+    final current = await settings.load();
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('界面语言 / Language', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            for (final option in kLocaleOptions)
+              ListTile(
+                title: Text(kLocaleLabels[option]!),
+                trailing: option == current ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(ctx).pop(option),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    await settings.save(picked);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!))),
+    );
+  }
+
+  /// 退出应用（等价 TUI /exit）：确认后彻底关闭（锁屏页无聊天可回，不回任何页）。
+  Future<void> _showExitAppDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.chatPageExitTitle),
+        content: Text(l10n.chatPageExitMessage),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.chatPageMenuExit)),
+        ],
+      ),
+    );
+    if (shouldExit == true) {
+      exit(0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     // 未设置 PIN（无锁包）：锁屏不激活——提示原因，不显示解锁表单
     if (_noLock) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.lockPageTitle)),
+        appBar: AppBar(
+          title: Text(l10n.lockPageTitle),
+          actions: [_buildMenu(l10n)],
+        ),
         body: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -166,7 +266,10 @@ class _LockPageState extends State<LockPage> {
     }
     final locked = _lockSeconds > 0;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.lockPageTitle)),
+      appBar: AppBar(
+        title: Text(l10n.lockPageTitle),
+        actions: [_buildMenu(l10n)],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(

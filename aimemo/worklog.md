@@ -1030,11 +1030,11 @@
 
 - `app_zh.arb` 5 处空格清理：wizardRecoverDone（请设置锁屏码）、setupPageSkipPinTitle（暂不设置锁屏码？）、setupPageSkipPinMessage（不设锁屏码则…）、chatPageSetLockTitle（设置锁屏码）、lockPageNoPinSet（尚未设置锁屏码（为空时不启用）），`flutter gen-l10n` 重新生成；chat_page_menu_test 6 处断言同步去空格
 - 菜单第二组 PopupMenuItem 重排为 locale→burn→pin→invite→passphrase→export（锁屏码移到邀请码前、密保口令在导出前）
-- 菜单标签 `chatPageMenuChangePassphrase`：修改口令 → 密保口令（与 627e76c 口令密保箱、确认弹窗「修改内容密保口令？」命名方向一致）；chat_page_menu_test 菜单项断言/点击同步
+- 菜单标签 `chatPageMenuChangePassphrase`：修改口令 → 密保口令（与 627e76c 口令密保箱、确认弹窗「修改密保口令？」命名方向一致）；chat_page_menu_test 菜单项断言/点击同步
 
 **验证：** flutter analyze 0 issue（仅 1 既有 info lint）；chat_page_menu/lock_page/setup_envelope_verify/setup_join_passphrase 4 文件 18 项全过。
 
-**遗留提示：** 改口令弹窗（chatPageChangePassphraseTitle 等）标题与按钮仍为「修改口令」，与菜单「密保口令」不一致；确认弹窗已是「修改内容密保口令？」。如需全套统一为「密保口令」措辞，另行排期。
+**遗留提示：** 改口令弹窗（chatPageChangePassphraseTitle 等）标题与按钮仍为「修改口令」，与菜单「密保口令」不一致；确认弹窗已是「修改密保口令？」。如需全套统一为「密保口令」措辞，另行排期。
 
 ## 2026-09-08 会话：邀请码弹窗修复（弹窗不显示 + 二维码从未可见）
 
@@ -1050,3 +1050,17 @@
 **验证：** flutter analyze 仅剩 1 条既有 info lint（ws_realtime_service.dart prefer_initializing_formals，存量不动）；回归测试通过。`server_settings.dart` 本地 localhost 配置照旧不入库。
 
 **经验教训（跨项目可复用）：** 任何放在 AlertDialog/SimpleDialog（内部 IntrinsicWidth）里的内容，都不能含 LayoutBuilder / ListView / PageView / SingleChildScrollView / 自定义不支持固有尺寸的 RenderBox——首帧必然抛固有尺寸异常。QrImageView 的 LayoutBuilder 是 qr_flutter 4.x 的已知坑。
+
+## 2026-09-08 会话：锁屏页顶栏 ⋯ 菜单（语言/退出）+ 身份卡片显示优化 + 文案统一提交
+
+**任务：** ① 重启后输入 PIN 解锁的 LockPage 也要有右上角展开菜单（对齐新设备向导），含「界面语言 + 退出」；② 菜单样式对齐对话页：标签靠左、当前值靠右（如「界面语言    中文」），标签用 onSurfaceVariant 淡灰；③ 老板在暂停期间自改的文案（wizardRoleTitle→wizardStartTitle「寻找秘境...」、密保口令措辞统一、领地创建者/共有者→秘境创建者/共有者、cli 同步等）一并提交；④ setup_page 身份卡片：有名字显示名字，无名字才显示身份标签本身。
+
+**实现：**
+
+- `lock_page.dart`：新增 `_buildMenu`（PopupMenuButton：语言行「界面语言 中文」= Row 标签淡灰 + Spacer + 当前值；退出行；中间 PopupMenuDivider）、`_showLocalePicker`（复用 LocaleSettings 底部弹层，即时生效）、`_showExitAppDialog`（确认后 exit(0)）；两个 Scaffold（正常解锁表单 + _noLock 兜底页）AppBar 均挂 ⋯ 菜单；onSelected 沿用 300ms 延迟防 MenuRoute/DialogRoute 交叉卸载断言
+- `setup_page.dart` 身份卡片：`title: Text(aName.isEmpty ? wizardIdentityCreator : aName)`（bName 同）；不再拼接「名字 (身份)」
+- 测试同步：widget_test/setup_probe_retry_test 的「Einz 秘境：创建中：名字」→「创建中：我」（老板文案 名字→我）；4 个测试文件 5 处 `find.textContaining('秘境创建者')` → `find.text('Lukas')`（身份卡有名字只显名字）；golden_render_test 退出弹窗断言「将彻底关闭应用。」→「将在本设备上退出 Einz 秘境。」（HEAD 已过期，顺手修）
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；全部功能测试通过（含 lock_page/menu/join/envelope/probe_retry/widget/invite_dialog）；11 个 golden 像素失配保持红不重刷（政策：禁止 --update-goldens；本轮文案 + 身份卡 + 锁屏 ⋯ 图标均影响渲染，需老板定夺是否后续统一重刷）。
+
+**不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（老板本地测试配置，注释「不要 commit」，照旧跳过）。

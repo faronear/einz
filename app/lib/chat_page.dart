@@ -365,7 +365,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1)),
               const Padding(
                 padding: EdgeInsets.only(top: 6),
-                child: Text('对方扫码或输入此邀请码加入，加入时需另行输入口令',
+                child: Text('扫码或填写以上邀请码加入，即可绑定新设备到秘境',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ],
@@ -1868,7 +1868,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.chatPageChangePassphraseMismatch);
       return;
     }
-    // 显性确认：修改内容密保口令（防误触——老板要求）
+    // 显性确认：修改密保口令（防误触——老板要求）
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,

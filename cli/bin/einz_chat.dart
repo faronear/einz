@@ -261,7 +261,7 @@ Future<void> _printEnvelope(DeviceStore store, MessageEnvelope env) async {
   final isMine = env.senderPersonId != null && store.personId != null
       ? env.senderPersonId == store.personId
       : env.senderDeviceId == store.deviceId;
-  final sender = isMine ? '我' : '对方';
+  final sender = isMine ? '我' : '你';
   final color = isMine ? _green : _yellow;
   final seq = env.serverSequence;
   final seqTag = seq == null ? '未同步' : 'seq=$seq';

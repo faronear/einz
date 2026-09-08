@@ -12,7 +12,7 @@
   "setupPageEscrowLabel": "Access passphrase (new devices can join with it, optional)",
   "setupPageNeedPassphrase": "⚠️ Set an access passphrase above first (your partner joins with it)",
   "setupEnrollBoundNotice": "New device bound to my private space",
-  "wizardRoleTitle": "How do you want to set up?",
+  "wizardStartTitle": "Finding EINZ",
   "wizardMenuLocale": "Language: {value}",
   "@wizardMenuLocale": {
     "placeholders": {
@@ -28,7 +28,7 @@
   "wizardPeerNameHintInput": "e.g. Steffi",
   "wizardNameRequired": "Please enter your name first",
   "wizardPeerNameRequired": "Please enter your partner's name",
-  "wizardNameLabel": "Your name",
+  "wizardNameLabel": "My name",
   "wizardNameHintInput": "e.g. Lukas (optional, change later)",
   "wizardIdentityHint": "This space already has users — choose your identity:",
   "wizardIdentityCreator": "First user (creator)",

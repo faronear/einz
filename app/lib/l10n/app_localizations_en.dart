@@ -49,7 +49,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupEnrollBoundNotice => 'New device bound to my private space';
 
   @override
-  String get wizardRoleTitle => 'How do you want to set up?';
+  String get wizardStartTitle => 'Finding EINZ';
 
   @override
   String wizardMenuLocale(String value) {
@@ -88,7 +88,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardPeerNameRequired => 'Please enter your partner\'s name';
 
   @override
-  String get wizardNameLabel => 'Your name';
+  String get wizardNameLabel => 'My name';
 
   @override
   String get wizardNameHintInput => 'e.g. Lukas (optional, change later)';

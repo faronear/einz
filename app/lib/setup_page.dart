@@ -393,7 +393,7 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 当前步骤的简化短名（AppBar 系列标题：本页主题，例如："Einz 秘境：认领中：邀请码"）。
   String _stepShortTitle(AppLocalizations l10n) {
-    if (_role == null || _step == 0) return l10n.wizardRoleTitle;
+    if (_role == null || _step == 0) return l10n.wizardStartTitle;
     switch (_role!) {
       case _WizardRole.create:
         switch (_step) {
@@ -423,7 +423,7 @@ class _SetupPageState extends State<SetupPage> {
   /// 页眉标题（AppBar）：系列标题 + "：" + 当前步骤主题
   /// （如「Einz 秘境认领中：邀请码」；第 0 步未选角色时显示引导语）。
   String _appBarTitle(AppLocalizations l10n) {
-    if (_role == null || _step == 0) return l10n.wizardRoleTitle;
+    if (_role == null || _step == 0) return l10n.wizardStartTitle;
     switch (_role!) {
       case _WizardRole.create:
         return '${l10n.wizardAppBarCreate}：${_stepShortTitle(l10n)}';
@@ -683,7 +683,7 @@ class _SetupPageState extends State<SetupPage> {
     return api.verify(challenge.challengeId, base64Encode(opened));
   }
 
-  /// 退出秘境（等价 TUI /exit；向导任意页面可经 ⋯ 菜单退出）：
+  /// 退出应用（等价 TUI /exit；向导任意页面可经 ⋯ 菜单退出）：
   /// 确认后彻底关闭应用（不再回 LockPage——未设 PIN 时锁屏不应激活）。
   Future<void> _showExitAppDialog() async {
     final l10n = AppLocalizations.of(context)!;
@@ -844,7 +844,7 @@ class _SetupPageState extends State<SetupPage> {
       _spaceId.text = r.spaceId;
       _bootstrapFailed = false;
     });
-    // 底部状态通知：新设备已绑定到秘境（老板要求——enroll 成功后显示）
+    // 底部状态通知：新设备已绑定到私密领地（老板要求——enroll 成功后显示）
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context)!.setupEnrollBoundNotice)),
     );
@@ -1013,7 +1013,8 @@ class _SetupPageState extends State<SetupPage> {
         Card(
           child: ListTile(
             leading: Icon(Icons.person),
-            title: Text('$aName (${l10n.wizardIdentityCreator})'),
+            // 有名字显示名字，无名字（未登记）显示身份标签本身
+            title: Text(aName.isEmpty ? l10n.wizardIdentityCreator : aName),
             selected: _chosenPerson == 'personA',
             onTap: () => _selectIdentity('personA'),
           ),
@@ -1022,7 +1023,7 @@ class _SetupPageState extends State<SetupPage> {
         Card(
           child: ListTile(
             leading: Icon(Icons.group),
-            title: Text('$bName (${l10n.wizardIdentityPartner})'),
+            title: Text(bName.isEmpty ? l10n.wizardIdentityPartner : bName),
             selected: _chosenPerson == 'personB',
             onTap: () => _selectIdentity('personB'),
           ),

@@ -36,7 +36,7 @@ Future<void> pumpToPassphrase(
 
   if (join) {
     // join：身份名字（自动进邀请码页）→ 邀请码（填值）→ 口令页
-    await tester.tap(find.textContaining('领地创建者'));
+    await tester.tap(find.text('Lukas'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'INVITE-ABC');
     await tester.tap(find.text('下一步'));

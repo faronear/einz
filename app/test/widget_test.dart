@@ -33,7 +33,7 @@ void main() {
     );
   }
 
-  testWidgets('首设备：探测空名称表 → 自动进入"你的名字"步骤（无角色选择/密钥按钮）',
+  testWidgets('首设备：探测空名称表 → 自动进入"我的名字"步骤（无角色选择/密钥按钮）',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp()); // probeNames 空 → create
     await tester.pumpAndSettle();
@@ -42,7 +42,7 @@ void main() {
     expect(find.text('我是第一个使用者，创建新空间'), findsNothing);
     expect(find.text('① 生成设备密钥'), findsNothing);
     // 自动进入 create 步骤 1（AppBar 组合标题；输入框 label 是「我的名字」）
-    expect(find.text('Einz 秘境：创建中：名字'), findsWidgets); // AppBar 标题
+    expect(find.text('Einz 秘境：创建中：我'), findsWidgets); // AppBar 标题
     // 底部保留"上一步"（可返回检测页）与"下一步"
     expect(find.text('上一步'), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);
@@ -53,13 +53,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Einz 秘境：认领中：身份'), findsWidgets); // AppBar 大标题 + 简化短名
-    expect(find.textContaining('创建者'), findsOneWidget);
+    // 有名字的身份卡片直接显示名字（无名字才显示身份标签本身）
+    expect(find.text('Lukas'), findsOneWidget);
     expect(find.textContaining('共有者'), findsOneWidget);
     // join step1 无「下一步」/「完成」按钮：点卡片即自动前进（老板 UX 决策）
     expect(find.text('下一步'), findsNothing);
     expect(find.text('完成'), findsNothing);
     // 点身份卡片 → 自动进入邀请码页
-    await tester.tap(find.textContaining('创建者'));
+    await tester.tap(find.text('Lukas'));
     await tester.pumpAndSettle();
     expect(find.text('Einz 秘境：认领中：邀请码'), findsWidgets); // 邀请码页步骤标题
   });

@@ -33,7 +33,7 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
     ),
   ));
   await tester.pumpAndSettle();
-  await tester.tap(find.textContaining('领地创建者')); // 身份（自动进邀请码页）
+  await tester.tap(find.text('Lukas')); // 身份（自动进邀请码页）
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码
   await tester.tap(find.text('下一步')); // 邀请码验证 → 口令页

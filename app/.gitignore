@@ -55,3 +55,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# golden 测试失败自动生成的比对产物（勿提交）
+/test/failures/

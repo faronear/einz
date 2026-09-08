@@ -412,13 +412,13 @@ void main() {
     // 提交（按钮文本与弹窗标题同为"修改口令"——用 FilledButton 精确定位）
     await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
     await tester.pumpAndSettle();
-    expect(find.text('修改内容密保口令？'), findsOneWidget); // 显性确认弹窗
+    expect(find.text('修改密保口令？'), findsOneWidget); // 显性确认弹窗
     // 点取消 → 不执行修改（改口令弹窗仍在）
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
     await tester.pumpAndSettle();
     expect(find.text('修改口令'), findsWidgets); // 改口令弹窗未关闭
-    expect(find.text('修改内容密保口令？'), findsNothing);
+    expect(find.text('修改密保口令？'), findsNothing);
   });
 
   testWidgets('菜单改名后写 profile（重启后从 profile 恢复新名字）', (WidgetTester tester) async {

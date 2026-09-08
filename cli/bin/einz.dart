@@ -427,7 +427,7 @@ Future<void> _cmdSync(ArgResults opts) async {
       spaceKey: base64Decode(keyB64),
       spaceId: store.spaceId!,
     );
-    final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
+    final sender = env.senderDeviceId == store.deviceId ? '我' : '你';
     stdout.writeln('[$sender seq=${env.serverSequence} v${env.keyVersion}] $plain');
   }
 
@@ -590,7 +590,7 @@ Future<void> _cmdHistory(ArgResults opts) async {
       spaceKey: base64Decode(keyB64),
       spaceId: store.spaceId!,
     );
-    final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
+    final sender = env.senderDeviceId == store.deviceId ? '我' : '你';
     stdout.writeln('[$sender seq=${env.serverSequence ?? '-'} v${env.keyVersion}] $plain');
   }
   stdout.writeln('ℹ️  共 ${envs.length} 条本地消息');
@@ -742,7 +742,7 @@ Future<void> _cmdListen(ArgResults opts) async {
               spaceKey: base64Decode(keyB64),
               spaceId: store.spaceId!,
                     );
-            final sender = env.senderDeviceId == store.deviceId ? '我' : '对方';
+            final sender = env.senderDeviceId == store.deviceId ? '我' : '你';
             stdout.writeln('[$sender seq=$seq v${env.keyVersion}] $plain');
           case 'key.rotation':
             final payload = frame['payload'] as Map<String, dynamic>;

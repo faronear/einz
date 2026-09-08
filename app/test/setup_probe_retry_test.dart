@@ -42,6 +42,6 @@ void main() {
     expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsNothing,
         reason: '失败提示应消失（已连上）');
     // create 步骤 1 的 AppBar 组合标题（输入框 label 为「我的名字」）
-    expect(find.text('Einz 秘境：创建中：名字'), findsWidgets, reason: '应自动进入向导名字页');
+    expect(find.text('Einz 秘境：创建中：我'), findsWidgets, reason: '应自动进入向导名字页');
   });
 }

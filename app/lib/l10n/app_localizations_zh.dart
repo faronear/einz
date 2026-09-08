@@ -46,7 +46,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
 
   @override
-  String get wizardRoleTitle => '选择我是谁';
+  String get wizardStartTitle => '寻找秘境...';
 
   @override
   String wizardMenuLocale(String value) {
@@ -90,10 +90,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardIdentityHint => '一个秘境仅限两人。填写我的名字：';
 
   @override
-  String get wizardIdentityCreator => '领地创建者';
+  String get wizardIdentityCreator => '秘境创建者';
 
   @override
-  String get wizardIdentityPartner => '领地共有者';
+  String get wizardIdentityPartner => '秘境共有者';
 
   @override
   String get wizardIdentityFirst => '⚠️ 选择我的身份';
@@ -108,8 +108,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRecoverTitle => '从备份恢复';
 
   @override
-  String get wizardRecoverHint =>
-      '全部设备丢失？输入当初设置口令托管时的内容安全口令；口令正确将重置空间并恢复本设备（无需备份文本）';
+  String get wizardRecoverHint => '全部设备丢失？输入密保口令，即可重置整个秘境并重新绑定本设备';
 
   @override
   String get wizardRecoverPassphraseLabel => '口令';
@@ -169,10 +168,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDone => '完成';
 
   @override
-  String get wizardStepShortName => '名字';
+  String get wizardStepShortName => '我';
 
   @override
-  String get wizardStepShortPeerName => '对方名字';
+  String get wizardStepShortPeerName => '伴侣';
 
   @override
   String get wizardStepShortPassphrase => '口令';
@@ -205,10 +204,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint => '设置内容密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:';
+  String get wizardPassphraseHint => '设置密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:';
 
   @override
-  String get wizardJoinPassphraseHint => '输入密保口令（如不知道，请询问领地创建人）';
+  String get wizardJoinPassphraseHint => '输入密保口令（如不知道，请询问秘境伴侣）';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
@@ -258,7 +257,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageInviteLabel => '邀请码（一次性）';
 
   @override
-  String get setupPageInviteHint => '扫码后自动填入；手动加入时粘贴对方提供的一次性邀请码';
+  String get setupPageInviteHint => '';
 
   @override
   String get setupPageNeedInvite => '⚠️ 填写一次性邀请码（由已认证设备生成）';
@@ -405,11 +404,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseMismatch => '两次输入的新口令不一致';
 
   @override
-  String get chatPageChangePassphraseConfirmTitle => '修改内容密保口令？';
+  String get chatPageChangePassphraseConfirmTitle => '修改密保口令？';
 
   @override
   String get chatPageChangePassphraseConfirmMessage =>
-      '确定要修改内容密保口令吗？修改后需用新口令解密内容密文。';
+      '确定要修改密保口令吗？修改后需用新口令解密内容密文。';
 
   @override
   String get chatPageChangePassphraseOldWrong => '旧口令错误';
@@ -447,7 +446,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageExportHint => '包含空间密钥与全部聊天历史（含附件信息）的加密归档；设备全部丢失或换新机时可整体恢复';
 
   @override
-  String get chatPageEscrowRotatedNotice => '对方已重设内容密保口令——生成邀请码或修改口令时将要求输入新口令';
+  String get chatPageEscrowRotatedNotice => '对方已重设密保口令——生成邀请码或修改口令时将要求输入新口令';
 
   @override
   String get chatPageMenuLocaleLabel => '界面语言';

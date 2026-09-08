@@ -170,11 +170,11 @@ abstract class AppLocalizations {
   /// **'New device bound to my private space'**
   String get setupEnrollBoundNotice;
 
-  /// No description provided for @wizardRoleTitle.
+  /// No description provided for @wizardStartTitle.
   ///
   /// In en, this message translates to:
-  /// **'How do you want to set up?'**
-  String get wizardRoleTitle;
+  /// **'Finding EINZ'**
+  String get wizardStartTitle;
 
   /// No description provided for @wizardMenuLocale.
   ///
@@ -239,7 +239,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'Your name'**
+  /// **'My name'**
   String get wizardNameLabel;
 
   /// No description provided for @wizardNameHintInput.

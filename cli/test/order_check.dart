@@ -52,7 +52,7 @@ bool checkOrder(ChatSession s, String name) {
   var ok = true;
   for (final m in msgs) {
     final seq = m.seq;
-    final who = m.isMine ? '我' : '对方';
+    final who = m.isMine ? '我' : '你';
     print('  seq=${seq} $who v${m.keyVersion} ${m.plain}');
     if (seq == null) {
       print('  ⚠️  seq=null（离线未同步？在线场景不应出现）');

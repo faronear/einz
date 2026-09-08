@@ -347,7 +347,7 @@ void main() {
   testWidgets('golden: 向导1.2.3-邀请码步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
-    await tester.tap(find.textContaining('领地创建者')); // 选身份（自动进邀请码页）
+    await tester.tap(find.text('Lukas')); // 选身份（自动进邀请码页）
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
@@ -359,7 +359,7 @@ void main() {
     _usePhoneSize(tester);
     // 信封入口仅 join（第二/三台设备）口令页显示：探测到 personA → 身份（自动进邀请码）→ 口令页
     await pumpSetup(tester, probeNames: {'personA': 'Lukas'}, enroll: fakeEnroll);
-    await tester.tap(find.textContaining('领地创建者')); // 选身份（自动进邀请码页）
+    await tester.tap(find.text('Lukas')); // 选身份（自动进邀请码页）
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码（校验非空）
     await tester.tap(find.text('下一步')); // 邀请码 → 口令页
@@ -381,7 +381,7 @@ void main() {
     await tester.pumpAndSettle();
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
     expect(find.text('退出秘境？'), findsOneWidget);
-    expect(find.text('将彻底关闭应用。'), findsOneWidget);
+    expect(find.text('将在本设备上退出 Einz 秘境。'), findsOneWidget);
     // 点取消关闭弹窗（不触发 exit）
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();

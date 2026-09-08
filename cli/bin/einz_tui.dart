@@ -85,7 +85,7 @@ class _TuiState {
   /// 等待邀请码输入（/auth 未登记引导）：输入循环的下一次输入按邀请码处理。
   bool pendingInvite = false;
 
-  /// 等待内容密保口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
+  /// 等待密保口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
   bool pendingSpaceKey = false;
 
   /// person_id → personName（GET /space 拉取，消息前缀显示 personName 用）。
@@ -272,6 +272,9 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
     session.store.save(storePath);
     session.messages.add(_systemMessage(session, '✅ PIN 锁屏已设置'));
   }
+  session.messages.add(_systemMessage(session, '----------------'));
+  session.messages.add(_systemMessage(session, '🎉 秘境已成功建立！输入 /invite 生成邀请码，邀请我的秘境伴侣快来聊天吧！'));
+  session.messages.add(_systemMessage(session, '================'));
   _scheduleRender();
 }
 
@@ -507,12 +510,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 请输入内容密保口令，才能查看秘境内容：', required: true);
+      final passphrase = await _prompt(session, '❓ 请输入密保口令，才能查看秘境内容：', required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
         // （此前漏过 / 检查直接进 accessByEscrow——"口令对接中"卡住退不出）
-        session.messages.add(_systemMessage(session, '⚠️ 内容密保口令不能为空，请重新输入（/exit 可退出）'));
+        session.messages.add(_systemMessage(session, '⚠️ 密保口令不能为空，请重新输入（/exit 可退出）'));
         _scheduleRender();
         continue;
       }
@@ -523,12 +526,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           _state!.running = false;
           break; // running=false 后由 main 收尾 + 2 秒兜底退出（exit(0) 死代码已移除）
         }
-        session.messages.add(_systemMessage(session, '⚠️ 内容密保口令不能以 / 开头，请重新输入（/exit 可退出）'));
+        session.messages.add(_systemMessage(session, '⚠️ 密保口令不能以 / 开头，请重新输入（/exit 可退出）'));
         _scheduleRender();
         continue;
       }
       try {
-        await _busy(session, '⏳ 内容密保口令核对中......', () => session.accessByEscrow(passphrase));
+        await _busy(session, '⏳ 密保口令核对中......', () => session.accessByEscrow(passphrase));
         session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备有权查看秘境内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         session.messages.add(_systemMessage(session, '----------------'));
         session.messages.add(_systemMessage(session, '🎉 成功进入了秘境！输入 /help 可查看快捷命令。立刻开始点对点加密聊天吧！'));
@@ -554,7 +557,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已登记但口令密保箱未上传（发起者引导中断）：重启再进引导设置口令。
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
-    session.messages.add(_systemMessage(session, '检测到尚未设置内容密保口令，现在设置: '));
+    session.messages.add(_systemMessage(session, '检测到尚未设置密保口令，现在设置: '));
     _scheduleRender();
     await _setupEscrowPassphrase(store, storePath, session);
   }
@@ -635,7 +638,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       onPassphraseRotated: (_) {
         // 口令被对方重设：只发通知不弹窗（接入 /space 或修改 /passphrase 时使用新口令）
         _state?.session.messages.add(_systemMessage(_state!.session,
-            '⚠️ 对方已重设内容密保口令——接入或修改口令时请使用新口令'));
+            '⚠️ 对方已重设密保口令——接入或修改口令时请使用新口令'));
         _scheduleRender();
       },
       onProfileUpdated: _onProfileUpdated,
@@ -1665,7 +1668,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/passphrase :: 修改内容密保口令',
+        '/passphrase :: 修改密保口令',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -1754,17 +1757,17 @@ Future<void> _execCommand(String line) async {
       // 未接入时继续引导输入口令
       if (s.session.hasSpace) {
         s.session.messages.add(_systemMessage(s.session, '✅ 当前设备已接入秘境'));
-        s.session.messages.add(_systemMessage(s.session, '用法: /space —— 重新接入时输入内容密保口令'));
+        s.session.messages.add(_systemMessage(s.session, '用法: /space —— 重新接入时输入密保口令'));
         break;
       }
       s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未接入秘境'));
-      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入内容密保口令，解密我的秘境内容'));
+      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入密保口令，解密我的秘境内容'));
       s.pendingSpaceKey = true;
       s.session.messages.add(_systemMessage(
-          s.session, '❓ 输入内容密保口令，即可解密我的秘境内容'));
+          s.session, '❓ 输入密保口令，即可解密我的秘境内容'));
       break;
     case '/passphrase':
-      // 修改内容密保口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
+      // 修改密保口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
       if (s.session.store.spaceKey == null || s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 请先 /auth 激活线路、/space 接入领地后再修改口令'));
         break;
@@ -2030,7 +2033,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
   }
 }
 
-/// 输入循环接管的内容密保口令接入（/space 未接入引导）：口令 → accessByEscrow。
+/// 输入循环接管的密保口令接入（/space 未接入引导）：口令 → accessByEscrow。
 Future<void> _handleSpaceKeyInput(String passphrase) async {
   final s = _state!;
   s.pendingSpaceKey = false;
@@ -2044,7 +2047,7 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
       _state!.running = false;
       return;
     }
-    s.session.messages.add(_systemMessage(s.session, '内容密保口令不能以 / 开头，接入取消（可再输 /space 重试）'));
+    s.session.messages.add(_systemMessage(s.session, '密保口令不能以 / 开头，接入取消（可再输 /space 重试）'));
     return;
   }
   try {
@@ -2110,7 +2113,7 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
 Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String storePath, String server) async {
   while (true) {
     if (!_state!.running) return false;
-    final passphrase = await _prompt(session, '❓ 输入 escrow 口令（当初设置内容密保口令时已上传托管；输 q 取消）：', hidden: true, required: true);
+    final passphrase = await _prompt(session, '❓ 输入 escrow 口令（当初设置密保口令时已上传托管；输 q 取消）：', hidden: true, required: true);
     if (!_state!.running) return false;
     if (passphrase.toLowerCase() == 'q') {
       session.messages.add(_systemMessage(session, '已取消全丢恢复'));
@@ -2183,7 +2186,7 @@ Future<void> _checkEscrowRotated(ChatSession session) async {
     final knownAt = store.escrowUpdatedAt;
     if (serverAt != null && knownAt != null && serverAt > knownAt) {
       session.messages.add(_systemMessage(session,
-          '⚠️ 离线期间内容密保口令已被重设——接入（/space）或修改（/passphrase）时请使用新口令'));
+          '⚠️ 离线期间密保口令已被重设——接入（/space）或修改（/passphrase）时请使用新口令'));
       // 记录本端已知更新时间（防 WS 重连/重复补查刷屏；下次真正重设再通知）
       store.escrowUpdatedAt = serverAt;
       store.save(session.storePath);
@@ -2200,7 +2203,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   // 1) 旧口令验证：必须能解开服务器当前口令密保箱
   while (true) {
     if (!_state!.running) return; // 已退出
-    final oldPass = await _prompt(session, '❓ 请输入当前内容密保口令（用于验证）：', hidden: true, required: true);
+    final oldPass = await _prompt(session, '❓ 请输入当前密保口令（用于验证）：', hidden: true, required: true);
     if (oldPass.isEmpty) continue;
     try {
       final snap = await api.getKeyEscrow(store.sessionToken!);
@@ -2224,7 +2227,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   // 2) 新口令（两次输入一致）
   while (true) {
     if (!_state!.running) return;
-    final p1 = await _prompt(session, '❓ 请输入新内容密保口令（务必牢记，严禁泄漏！）：', hidden: true, required: true);
+    final p1 = await _prompt(session, '❓ 请输入新密保口令（务必牢记，严禁泄漏！）：', hidden: true, required: true);
     if (p1.isEmpty) continue;
     final p2 = await _prompt(session, '❓ 请再次输入新口令确认：', hidden: true, required: true);
     if (p1 != p2) {
@@ -2265,7 +2268,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 设置内容密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
+    final p1 = await _prompt(session, '❓ 设置密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
@@ -2285,8 +2288,6 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       store.save(storePath);
       session.messages.add(_systemMessage(session, '✅ 口令密保箱已上传'));
       session.messages.add(_systemMessage(session, '----------------'));
-      session.messages.add(_systemMessage(session, '🎉 秘境已成功建立！输入 /invite 生成邀请码，邀请我的秘境伴侣快来聊天吧！'));
-      session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return;
     } catch (e) {
