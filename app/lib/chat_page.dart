@@ -356,7 +356,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(child: QrImageView(data: r.inviteCode, version: QrVersions.auto, size: 160)),
+              // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
+              // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
+              Center(child: _InviteQrCode(data: r.inviteCode)),
               const SizedBox(height: 12),
               SelectableText(r.inviteCode,
                   style: const TextStyle(
@@ -2058,6 +2060,38 @@ class _MessageAvatarState extends State<_MessageAvatar> {
         backgroundImage: bytes != null ? MemoryImage(bytes) : null,
         child: bytes == null ? const Icon(Icons.person, size: 18) : null,
       ),
+    );
+  }
+}
+
+/// 邀请码二维码（自绘，替代 QrImageView）。
+///
+/// QrImageView（qr_flutter 4.1.0）两个坑（2026-09-08 老板真机报告：生成邀请码
+/// 时屏幕变暗但弹窗不出现；且弹窗里的二维码从未显示）：
+/// 1. 内部无条件包 LayoutBuilder，而 AlertDialog 用 IntrinsicWidth 包裹内容做
+///    固有尺寸测量 → performLayout 抛 "LayoutBuilder does not support returning
+///    intrinsic dimensions"（Flutter issue #46063 同款签名）→ 弹窗首帧布局中断，
+///    遮罩变暗、内容不显示；
+/// 2. 其绘制面 CustomPaint 无显式尺寸、被内部 Padding 松约束包裹 → 实际 0x0，
+///    QrPainter.paint 直接 return，二维码不可见。
+/// 这里直接用 QrCode + QrPainter 自绘：无 LayoutBuilder（固有测量安全）、
+/// 显式 SizedBox 定尺寸（必定可见）。
+class _InviteQrCode extends StatelessWidget {
+  const _InviteQrCode({required this.data});
+
+  /// 邀请码（服务端固定 20 字符 + 分隔符，QR 容量绰绰有余，不会超长）。
+  final String data;
+
+  @override
+  Widget build(BuildContext context) {
+    final qr = QrCode.fromData(
+      data: data,
+      errorCorrectLevel: QrErrorCorrectLevel.L,
+    );
+    return SizedBox(
+      width: 160,
+      height: 160,
+      child: CustomPaint(painter: QrPainter.withQr(qr: qr)),
     );
   }
 }
