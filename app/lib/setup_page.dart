@@ -15,6 +15,7 @@ import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
+import 'widgets/top_notice.dart';
 
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
 enum _WizardRole { create, join, offline }
@@ -733,9 +734,7 @@ class _SetupPageState extends State<SetupPage> {
     if (picked == null) return;
     await settings.save(picked);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!))),
-    );
+    showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
   /// 全丢恢复：弹窗输入 escrow 口令 → 服务端凭口令重置空间（/recover，撤销
@@ -844,10 +843,8 @@ class _SetupPageState extends State<SetupPage> {
       _spaceId.text = r.spaceId;
       _bootstrapFailed = false;
     });
-    // 底部状态通知：新设备已绑定到私密领地（老板要求——enroll 成功后显示）
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.setupEnrollBoundNotice)),
-    );
+    // 顶部状态通知：新设备已绑定到私密领地（老板要求——enroll 成功后显示）
+    showTopNotice(context, AppLocalizations.of(context)!.setupEnrollBoundNotice);
   }
 
   /// 设置启动锁：内嵌表单直接执行（不再弹窗、无恢复码）——

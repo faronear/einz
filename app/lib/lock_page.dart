@@ -11,6 +11,7 @@ import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'l10n/app_localizations.dart';
+import 'widgets/top_notice.dart';
 
 /// 锁屏页：输入 PIN 解密 Space Key 包 → 进入聊天页。
 /// 连续错误锁定倒计时（恢复码功能已按老板决策删除）。
@@ -218,9 +219,7 @@ class _LockPageState extends State<LockPage> {
     if (picked == null) return;
     await settings.save(picked);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!))),
-    );
+    showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
   /// 退出应用（等价 TUI /exit）：确认后彻底关闭（锁屏页无聊天可回，不回任何页）。

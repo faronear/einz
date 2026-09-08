@@ -1092,3 +1092,21 @@ flutter test（lock_page/setup_join_passphrase/chat_page_menu/ws_realtime）18 �
 cli `dart analyze` 0 issue。
 
 **不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（老板本地测试配置，照旧跳过）。
+
+## 2026-09-08 会话：App 通知从底部 SnackBar 改为顶部通知条
+
+**背景：** 老板要求：底部 SnackBar 会遮挡输入框等底部功能按钮，改为屏幕顶部显示。
+
+**实现：** 新增 `app/lib/widgets/top_notice.dart`：`showTopNotice(context, 文案)` 用根
+Overlay 贴顶显示（SafeArea + 下滑入场/上滑退场动画 + 4s 自动消失 + 点击提前关闭 +
+重复调用替换旧条）；异步间隙/路由 pop 后显示用 `showTopNoticeOn(overlay, 文案)`
+（await 前同步捕获 `Overlay.of(context, rootOverlay: true)`，绕开
+use_build_context_synchronously）。替换 chat_page（26 处，含 SetPin 弹窗两处 messenger
+捕获改 overlay）、lock_page（1 处语言切换）、setup_page（2 处：语言切换 + enroll 绑定通知）。
+测试只断言文案文本出现、无 byType(SnackBar) 断言，不受影响；等通知消失的 pump(5s) 依旧兼容。
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；chat_page_menu/lock_page/
+setup_join_passphrase/setup_envelope_verify/ws_realtime/widget_test 23 项全过
+（golden 按政策跳过）。
+
+**不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（老板本地测试配置，照旧跳过）。

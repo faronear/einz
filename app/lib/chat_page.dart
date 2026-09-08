@@ -24,6 +24,7 @@ import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
+import 'widgets/top_notice.dart';
 
 /// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
 enum _AttachmentKind { photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
@@ -227,9 +228,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowRotatedNotice)),
-    );
+    showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice);
   }
 
   /// 对方改名（Server 广播 profile.updated）：立即更新顶部条对方名。
@@ -250,9 +249,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
       if (serverAt != null && knownAt != null && serverAt > knownAt) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageEscrowRotatedNotice)),
-        );
+        showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice);
         _escrowUpdatedAt = serverAt; // 记录已知时间（防 WS 重连/重复补查刷屏）
       }
     } catch (_) {
@@ -276,9 +273,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 清理失败不阻塞登出（尽力清除）
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageDeviceRevoked)),
-    );
+    showTopNotice(context, AppLocalizations.of(context)!.chatPageDeviceRevoked);
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const SetupPage()),
       (route) => false,
@@ -335,9 +330,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (picked == null) return;
     await settings.save(picked);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!))),
-    );
+    showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
   /// 邀请设备：直接生成一次性邀请码（POST /invites，需已认证）。
@@ -376,8 +369,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: r.inviteCode));
                 if (!ctx.mounted) return;
-                ScaffoldMessenger.of(ctx)
-                    .showSnackBar(const SnackBar(content: Text('邀请码已复制')));
+                showTopNotice(ctx, '邀请码已复制');
                 Navigator.of(ctx).pop();
               },
               child: const Text('复制'),
@@ -389,8 +381,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('邀请码生成失败: $e')));
+      showTopNotice(context, '邀请码生成失败: $e');
     }
   }
 
@@ -461,8 +452,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
     );
     if (changed == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(AppLocalizations.of(context)!.chatPageChangePassphraseDone)));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageChangePassphraseDone);
     }
   }
 
@@ -511,8 +501,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty || bytes.length > 2 * 1024 * 1024) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l10n.chatPageAvatarTooLarge)));
+        showTopNotice(context, l10n.chatPageAvatarTooLarge);
       }
       return;
     }
@@ -521,12 +510,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await api.uploadAvatar(bytes, widget.token);
       if (!mounted) return;
       setState(() => _myAvatarBytes = bytes);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.chatPageAvatarUploaded)));
+      showTopNotice(context, l10n.chatPageAvatarUploaded);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.chatPageAvatarFailed('$e'))));
+      showTopNotice(context, l10n.chatPageAvatarFailed('$e'));
     }
   }
 
@@ -567,8 +554,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 if (ctx.mounted) Navigator.of(ctx).pop(true);
               } catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: Text(l10n.chatPageRenameFailed('$e'))));
+                  showTopNotice(ctx, l10n.chatPageRenameFailed('$e'));
                 }
               }
             },
@@ -644,12 +630,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await settings.save(seconds);
     if (!mounted) return;
     setState(() => _burnSeconds = seconds);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(seconds == 0
-            ? l10n.chatPageBurnOff
-            : l10n.chatPageBurnWillDelete(_burnOptionLabel(seconds, l10n))),
-      ),
+    showTopNotice(
+      context,
+      seconds == 0
+          ? l10n.chatPageBurnOff
+          : l10n.chatPageBurnWillDelete(_burnOptionLabel(seconds, l10n)),
     );
   }
 
@@ -793,8 +778,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageSendFailed('$e'))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
     }
   }
 
@@ -811,8 +795,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVoiceStartFailed('$e'))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceStartFailed('$e'));
     }
   }
 
@@ -839,8 +822,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVoiceFailed('$e'))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
     }
   }
 
@@ -857,8 +839,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageAudioMetaMissing)));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioMetaMissing);
       return;
     }
     // 正在播放同一条 → 停止
@@ -887,8 +868,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (e) {
       if (!mounted) return;
       setState(() => _playingMessageId = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
     }
   }
 
@@ -999,8 +979,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageSendFailed('$e'))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
     }
   }
 
@@ -1027,8 +1006,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVideoMetaMissing)));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageVideoMetaMissing);
       return;
     }
     VideoPlayerController? controller;
@@ -1077,8 +1055,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (e) {
       await controller?.dispose();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageVideoPlayFailed('$e'))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageVideoPlayFailed('$e'));
     }
   }
 
@@ -1209,8 +1186,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageAttachmentMetaMissing)));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageAttachmentMetaMissing);
       return;
     }
     try {
@@ -1224,12 +1200,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final file = File('${dir.path}/${m.plaintext}');
       await file.writeAsBytes(bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.chatPageSaved(file.path))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageSaved(file.path));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.chatPageDownloadFailed('$e'))));
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageDownloadFailed('$e'));
     }
   }
 
@@ -1566,8 +1540,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     final pin = _pinCtrl.text;
     // 两空 = 设为空：取消启动锁（Space Key 转明文保存，与向导"暂不设置"一致）
     if (pin.isEmpty && _confirmCtrl.text.isEmpty) {
-      // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
-      final messenger = ScaffoldMessenger.of(context);
+      // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
+      final overlay = Overlay.of(context, rootOverlay: true);
       // 显性确认：清除 PIN 锁屏（防误触——两空提交前必须弹窗确认）
       final confirmed = await showDialog<bool>(
         context: context,
@@ -1587,7 +1561,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         await AppLockService(widget.db).clearPackage();
         if (!mounted) return;
         Navigator.of(context).pop(true); // 菜单刷新「PIN: 未设置」
-        messenger.showSnackBar(SnackBar(content: Text(l10n.chatPageSetLockCleared)));
+        showTopNoticeOn(overlay, l10n.chatPageSetLockCleared);
       } catch (e) {
         if (!mounted) return;
         setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
@@ -1602,8 +1576,8 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       setState(() => _error = l10n.setPinDialogPinMismatch);
       return;
     }
-    // async gap 前同步捕获 messenger，避免 use_build_context_synchronously
-    final messenger = ScaffoldMessenger.of(context);
+    // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
+    final overlay = Overlay.of(context, rootOverlay: true);
     // 显性确认：设置/重设 PIN 锁屏（防误触——与设空清除的确认弹窗对称）
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1622,7 +1596,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       await AppLockService(widget.db).setPin(pin, payload: widget.payload);
       if (!mounted) return;
       Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
-      messenger.showSnackBar(SnackBar(content: Text(l10n.chatPageSetLockDone)));
+      showTopNoticeOn(overlay, l10n.chatPageSetLockDone);
     } catch (e) {
       if (!mounted) return; // 弹窗可能已被关闭（barrier/返回），避免 setState on disposed
       setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
@@ -1811,8 +1785,7 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
             FilledButton.tonal(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: text));
-                ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.chatPageExportCopied)));
+                showTopNotice(context, l10n.chatPageExportCopied);
               },
               child: Text(l10n.chatPageExportCopy),
             ),
