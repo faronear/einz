@@ -791,6 +791,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   Future<void> _startVoice() async {
     if (_inputMode == _InputMode.recording) return;
+    // 录音时收起键盘（输入框被录音条覆盖，键盘占屏无意义）
+    FocusManager.instance.primaryFocus?.unfocus();
     try {
       // 重新录音（预览态再长按）：先清掉上一次未发送的临时文件
       final old = _recordingPath;
@@ -948,12 +950,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   List<double> _voiceLastSamples(int n) =>
       _voiceSamples.length <= n ? _voiceSamples : _voiceSamples.sublist(_voiceSamples.length - n);
 
-  /// 录音条（替换文字输入框）：录音中=实时波形+计时；预览态=冻结波形+试听/取消。
+  /// 录音条（覆盖在文字输入框上）：录音中=实时波形+计时；预览态=冻结波形+试听/取消。
+  /// 由外部 Stack 给定与输入框完全一致的行高（移除固定高度，随约束填充）。
   Widget _buildVoiceBar() {
     final recording = _inputMode == _InputMode.recording;
     final elapsed = '${_recordSeconds ~/ 60}:${(_recordSeconds % 60).toString().padLeft(2, '0')}';
     return Container(
-      height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: recording ? Colors.red.shade50 : Colors.grey.shade100,
@@ -1658,19 +1660,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   Expanded(
-                    child: _inputMode == _InputMode.text
-                        ? TextField(
-                            controller: _input,
-                            focusNode: _inputFocusNode,
-                            decoration:
-                                InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
-                            // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
-                            onSubmitted: (_) {
-                              _send();
-                              _inputFocusNode.requestFocus();
-                            },
-                          )
-                        : _buildVoiceBar(),
+                    // Stack：文字输入框始终占位（行高恒定，切换录音条时按钮不浮动），
+                    // 录音/预览时录音条 Positioned.fill 覆盖其上（与输入框严格同高）
+                    child: Stack(
+                      children: [
+                        TextField(
+                          controller: _input,
+                          focusNode: _inputFocusNode,
+                          decoration:
+                              InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
+                          // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
+                          onSubmitted: (_) {
+                            _send();
+                            _inputFocusNode.requestFocus();
+                          },
+                        ),
+                        if (_inputMode != _InputMode.text)
+                          Positioned.fill(child: _buildVoiceBar()),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 8),
                   // 发送键：文字态发文字；预览态发录音；录音中禁用
