@@ -1688,16 +1688,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     // 录音/预览时录音条 Positioned.fill 覆盖其上（与输入框严格同高）
                     child: Stack(
                       children: [
-                        TextField(
-                          controller: _input,
-                          focusNode: _inputFocusNode,
-                          decoration:
-                              InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
-                          // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
-                          onSubmitted: (_) {
-                            _send();
-                            _inputFocusNode.requestFocus();
-                          },
+                        // 录音条覆盖时完全隐藏输入框（maintainSize 保持占位高度，
+                        // 行高/按钮位置不变；避免圆角录音条透出输入框边角）
+                        Visibility(
+                          visible: _inputMode == _InputMode.text,
+                          maintainState: true,
+                          maintainSize: true,
+                          maintainAnimation: true,
+                          child: TextField(
+                            controller: _input,
+                            focusNode: _inputFocusNode,
+                            decoration:
+                                InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
+                            // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
+                            onSubmitted: (_) {
+                              _send();
+                              _inputFocusNode.requestFocus();
+                            },
+                          ),
                         ),
                         if (_inputMode != _InputMode.text)
                           // 长按手势挂在常驻的 GestureDetector 上：提示态长按开始录音，
