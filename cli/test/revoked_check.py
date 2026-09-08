@@ -97,15 +97,24 @@ def main():
         if '设置锁屏码' not in out:
             print('❌ 未到锁屏码问答'); print(out[-500:]); return 1
         send(m1, '\r')  # 锁屏码：跳过（不设置）
-        out = wait_text(m1, '🎉 一切就绪')
+        # 一次等待同时收集：入网完成 + WS 连上（状态栏绿点 \x1b[32m●）。
+        # 不能分两次 wait_text——pty 缓冲会把相邻多次渲染一起吐出，第一次
+        # wait 可能连带吞掉绿点渲染，第二次 wait 就永远等不到（20s 静默）。
+        out = wait_text(m1, '\x1b[32m●', timeout=25)
         if '🎉 一切就绪' not in out:
-            print('❌ 第一设备未完成入网'); print(out[-500:]); return 1
-        send(m1, '/exit\r')
-        time.sleep(2)
-        kill_proc(p1, m1)
-        print('✅ 第一设备入网并进入在线')
+            print('❌ 第一设备未完成入网'); print(repr(out[-500:])); return 1
+        if '\x1b[32m●' not in out:
+            import json as _json
+            try:
+                st = _json.load(open(store))
+            except Exception as _e:
+                st = {'read_err': str(_e)}
+            print(f'❌ 第一设备 WS 未连上 (poll={p1.poll()} len={len(out)})')
+            print('session_token set:', st.get('session_token') is not None, 'space_id:', st.get('space_id'), 'device_id:', st.get('device_id'))
+            print(repr(out[-800:])); return 1
+        print('✅ 第一设备入网并保持在线（WS 已连接）')
 
-        # 3) /recover 撤销全部设备
+        # 3) /recover 撤销全部设备 → 在线 TUI 应收到 device.revoked 广播并自动退出
         import urllib.request as ur
         req = ur.Request(f'http://127.0.0.1:{port}/recover',
                          data=b'{"passphrase":"pass-123"}',
@@ -114,7 +123,19 @@ def main():
             body = r.read().decode()
         if 'revoked' not in body:
             print('❌ /recover 未成功'); print(body); return 1
-        print('✅ /recover 已撤销设备')
+        out = wait_text(m1, '本设备已被撤销', timeout=15)
+        if '本设备已被撤销。' not in out:
+            print('❌ 在线 TUI 未收到撤销广播'); print(out[-800:]); return 1
+        # 进程应自行退出（无需 /exit）
+        deadline = time.time() + 8
+        while time.time() < deadline and p1.poll() is None:
+            drain(m1, 0.4)
+        exited = p1.poll() is not None
+        if not exited:
+            p1.kill()
+            print('❌ 在线 TUI 收到广播后未自动退出'); return 1
+        kill_proc(p1, m1)
+        print('✅ /recover 撤销 → 在线 TUI 提示后自动退出')
 
         # 4) 第一设备重启 → 不进 TUI：终端直接提示"本设备已被撤销。"并自动退出
         m2, p2 = start_tui(store, port)

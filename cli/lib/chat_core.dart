@@ -333,6 +333,7 @@ class ChatSession {
     void Function(WsPeerStatusEvent event)? onPeerStatus,
     void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
     void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
+    void Function(WsDeviceRevokedEvent event)? onRevoked,
   }) {
     if (server.isEmpty || store.sessionToken == null) return;
     wsClient = WsClient(
@@ -371,6 +372,10 @@ class ChatSession {
         }
         if (event is WsProfileUpdatedEvent) {
           onProfileUpdated?.call(event);
+        }
+        if (event is WsDeviceRevokedEvent) {
+          // 本设备已被撤销（Server 发帧后随即断开）：UI 应立即提示并退出
+          onRevoked?.call(event);
         }
       },
       onStatus: (status) {

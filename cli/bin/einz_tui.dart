@@ -573,15 +573,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     } catch (e) {
       if (e is ApiException && e.code == 'FORBIDDEN') {
         // 挑战被服务端拒绝（设备已被撤销）→ 不进 TUI：恢复终端、提示后直接退出
-        // （此刻输入循环已在 raw 模式；先恢复 termios 再退出，见 _restoreTerminal 注释）
-        _restoreTerminal();
-        // pty 下 stdout/stdin 共享 fd，退出瞬间 flush 未决时 stdout.write 会抛
-        // "StreamSink is bound to a stream"——改用独立 sink 的 stderr，提示必达
-        try {
-          stderr.write('$_clearHome本设备已被撤销。\n');
-          stderr.flush();
-        } catch (_) {}
-        exit(0);
+        _exitRevoked();
       }
       session.messages.add(_systemMessage(session, '⚠️ 机密线路激活失败。可进入 TUI 后用 /auth 重试'));
       _scheduleRender();
@@ -643,6 +635,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         _scheduleRender();
       },
       onProfileUpdated: _onProfileUpdated,
+      onRevoked: _onWsRevoked,
     );
   }
   _scheduleRender();
@@ -790,6 +783,18 @@ void _restoreTerminal() {
 
 void _exitRaw() {
   _restoreTerminal();
+}
+
+/// 设备已被撤销（引导挑战 403 / 在线 WS 广播 device.revoked）→ 恢复终端、
+/// 提示后立即退出。提示写 stderr：pty 下退出瞬间 stdout flush 未决时
+/// stdout.write 会抛 "StreamSink is bound to a stream"——stderr 独立 sink 必达。
+void _exitRevoked() {
+  _restoreTerminal();
+  try {
+    stderr.write('$_clearHome本设备已被撤销。\n');
+    stderr.flush();
+  } catch (_) {}
+  exit(0);
 }
 
 // ---------- 渲染 ----------
@@ -1082,6 +1087,12 @@ void _onProfileUpdated(WsProfileUpdatedEvent e) {
     s.deviceNames[e.deviceId] = e.deviceName!;
   }
   _scheduleRender();
+}
+
+/// 在线期间收到 device.revoked（被 /revoke 或 /recover 撤销）→ 立刻回命令行：
+/// 恢复终端、提示"本设备已被撤销。"后退出。
+void _onWsRevoked(WsDeviceRevokedEvent event) {
+  _exitRevoked();
 }
 
 /// 对端上下线广播（Server 推送——立即更新对方在线状态，不等轮询）。
@@ -1701,7 +1712,8 @@ Future<void> _execCommand(String line) async {
           s.session.store.server = arg; // 持久化新地址
           s.session.store.save(s.session.storePath);
           if (s.session.wsClient == null && s.session.hasSession) {
-            s.session.startWs(onMessage: (_) => _render(), onStatus: (_) => _render(), onAutoSync: (_) => _render());
+            s.session.startWs(onMessage: (_) => _render(), onStatus: (_) => _render(), onAutoSync: (_) => _render(),
+              onRevoked: _onWsRevoked);
           }
           s.status = '✅ 已切换服务器并激活: $arg';
         } catch (e) {
@@ -1739,6 +1751,7 @@ Future<void> _execCommand(String line) async {
             onMessage: (_) => _render(),
             onStatus: (_) => _render(),
             onAutoSync: (_) => _render(),
+            onRevoked: _onWsRevoked,
           );
         }
       } catch (e) {
@@ -2015,6 +2028,7 @@ Future<void> _handleInviteInput(String inviteCode) async {
           onMessage: (_) => _render(),
           onStatus: (_) => _render(),
           onAutoSync: (_) => _render(),
+          onRevoked: _onWsRevoked,
         );
       }
     } catch (e) {

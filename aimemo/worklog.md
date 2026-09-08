@@ -1219,3 +1219,23 @@ setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
 
 **备注：** 撤销最快也在引导认证 403 时检出（probe==2 先行），TUI 会有极短闪烁
 （网络往返 <1s）后清屏退出。
+
+## 2026-09-08 会话：在线 TUI 收到撤销广播立即提示退出（承接上一条撤销退出改动）
+
+**任务（老板要求）：** 被撤销后，在线的 TUI 收到 ws 广播应当立刻返回命令行界面，
+输出"本设备已被撤销。"并退出。
+
+**实现：**
+- `cli/lib/chat_core.dart`：`startWs` 增加 `onRevoked` 回调，透传
+  `WsDeviceRevokedEvent`（共享包 ws_client.dart 已解析该帧）
+- `cli/bin/einz_tui.dart`：新增 `_exitRevoked()`（恢复终端 + stderr 提示 + exit，
+  与引导 403 路径共用）；新增 `_onWsRevoked` 接线全部 4 处 startWs（引导启动、
+  /server 切换、/auth 激活、邀请码登记）
+- `server/src/escrow.ts`：`recoverSpace` 撤销全部设备后，向在线旧设备逐个广播
+  `device.revoked`（原只有 DELETE /devices/:id 单撤路径有广播；/recover 时在线
+  TUI 的 WS 会保持连接收不到通知）
+- 测试：revoked_check.py 改为「首设备保持在线 → /recover → 断言在线 TUI 提示并
+  自动退出」+ 重启退出场景。踩坑：pty 缓冲一次吐出相邻多次渲染，分两次
+  wait_text 会让第一次吞掉绿点渲染 → 单次 wait 同时校验「🎉 一切就绪」+ 绿点
+
+**验证：** dart analyze 0 issue；server tsc 构建通过；revoked_check.py 全过。

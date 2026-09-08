@@ -2,7 +2,7 @@ import { getDb } from './db.js'
 import { ApiError, resolveSession } from './auth.js'
 import { isActiveDevice, type ServerConfig } from './config.js'
 import { pwhashStrVerify } from './crypto.js'
-import { broadcastPassphraseRotated } from './ws.js'
+import { broadcastPassphraseRotated, notifyRevoked } from './ws.js'
 
 /**
  * 口令托管密钥（KEY_ESCROW.md §4）：Server 只托管"被口令加密的 Space Key 包"，
@@ -125,6 +125,9 @@ export async function recoverSpace (
   }
 
   // 撤销全部 active 设备 + 清会话/推送令牌/邀请码 → 空间回到"空"状态，新设备可首设备自举
+  const actives = db
+    .prepare(`SELECT device_id FROM devices WHERE status = 'active'`)
+    .all() as { device_id: string }[]
   const revoked = db
     .prepare(
       `UPDATE devices SET status = 'revoked', last_seen = ? WHERE status = 'active'`
@@ -133,6 +136,9 @@ export async function recoverSpace (
   db.prepare(`DELETE FROM sessions`).run()
   db.prepare(`DELETE FROM push_tokens`).run()
   db.prepare(`DELETE FROM invites`).run()
+  // 在线旧设备立即收到 device.revoked（发帧后服务端关连接）→ 客户端提示退出；
+  // 恢复方是尚未登记的新设备（无 WS 连接），不受影响。
+  for (const { device_id } of actives) notifyRevoked(device_id)
 
   // 闭环：口令正确即空间主人——顺带返回 escrow 密文包，新设备凭同一口令解出
   // Space Key（不再依赖预先导出的 EINZ-BACKUP 文本）。包本身口令加密，与
