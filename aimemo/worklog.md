@@ -1348,3 +1348,23 @@ LOGO，检测期间正中显示旋转图标，取消服务器地址输入框，�
 （x=173/187/201/215，第 1 个纯白=已完成、后 3 个半透明白=未到）；
 golden 保持红不重刷。
 
+## 2026-09-08 修复向导页抬头栏/正文渐变突变
+
+老板反馈：向导页顶部抬头栏（有 logo）与下方有明显背景突变。
+
+**根因：** 之前 AppBar 用 `flexibleSpace` 渐变——渐变矩形是 AppBar 自己的
+小区域（0..56px 高），与 body 的渐变矩形（AppBar 下方全屏）坐标系不同；
+AppBar 底边已到粉色、body 顶部还是天蓝，衔接处颜色跳变。
+
+**修复（app/lib/setup_page.dart）：**
+- `extendBodyBehindAppBar: true` + AppBar `backgroundColor: transparent`——
+  body 渐变容器延伸到屏幕顶部（含 AppBar 与状态栏区域），整屏共用同一个
+  渐变矩形，无缝衔接
+- Column 顶部加 `SizedBox(height: kToolbarHeight)`：AppBar 浮动于渐变上，
+  内容从工具栏高度下方开始（避免与抬头 logo/标题重叠）；顺带修正了真机上
+  SafeArea 多余顶部 padding 的问题（extend 场景 SafeArea 才是正确用法）
+
+**验证：** analyze 0 error；setup_probe_retry_test 通过；重渲染 create 步骤
+1 截图像素分析——衔接处（y=54 与 y=58 同 x）平均色差 1.4（<20 无突变），
+四角渐变正常；golden 保持红不重刷。
+

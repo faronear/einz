@@ -223,17 +223,12 @@ class _SetupPageState extends State<SetupPage> {
     // + 正中旋转图标 + 状态文案；无 AppBar/菜单/服务器输入框（老板决策 2026-09-08）。
     if (_role == null) return _buildSplashScreen(l10n);
     return Scaffold(
+      // AppBar 透明并浮在渐变上：body 渐变容器延伸到屏幕顶部（含 AppBar 与
+      // 状态栏区域），整屏共用同一个渐变矩形——修复之前 AppBar flexibleSpace
+      // 与 body 各自独立渐变导致的抬头栏/正文衔接处颜色突变
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        // 与首屏启动屏同款粉蓝渐变：AppBar 区域（含状态栏）也呈渐变，视觉连续
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
-            ),
-          ),
-        ),
+        backgroundColor: Colors.transparent, // 露出 body 延伸上来的渐变
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -299,6 +294,9 @@ class _SetupPageState extends State<SetupPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // extendBodyBehindAppBar 下 AppBar 浮动于渐变上：内容从工具栏
+                // 高度下方开始（避免与抬头 logo/标题重叠）
+                const SizedBox(height: kToolbarHeight),
                 _buildProgressDots(),
                 // 进度条与输入区之间留白约等于大标题（30 号字，行高≈36px）的两倍
                 // （顶部锚定：键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白
