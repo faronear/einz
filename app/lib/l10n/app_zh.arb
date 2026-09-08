@@ -189,7 +189,7 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageLongPressToRecord": "长按即可录音",
+  "chatPageLongPressToRecord": "长按开始录音",
   "chatPageInputHint": "输入消息…",
   "chatPageAudioMetaMissing": "音频附件元数据缺失",
   "chatPageAudioPlayFailed": "音频播放失败: {error}",

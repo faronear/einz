@@ -29,9 +29,10 @@ import 'widgets/top_notice.dart';
 /// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
 enum _AttachmentKind { photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
 
-/// 输入区模式：text=文字输入框；recording=按住录音中（输入框变录音条，波形实时）；
-/// preview=松手后预览态（试听/取消，发送复用右侧发送键）。
-enum _InputMode { text, recording, preview }
+/// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
+/// 点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态（试听/取消，
+/// 发送复用右侧发送键）。
+enum _InputMode { text, hint, recording, preview }
 
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
@@ -118,14 +119,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _hasMoreOlder = true;
   bool _loadingOlder = false;
   static const int _pageSize = 50;
-  _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/录音中/预览）
+  _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
   StreamSubscription<Amplitude>? _ampSub; // 录音振幅流订阅（波形驱动）
   Timer? _recordTimer; // 录音秒数计时（60s 上限自动停）
   int _recordSeconds = 0;
   bool _previewPlaying = false; // 预览态试听播放中
-  final _voiceTooltipKey = GlobalKey<TooltipState>(); // 点按麦克风的「长按即可录音」提示
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
@@ -782,11 +782,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  // ---------- 语音：点按提示 / 长按录音（输入框变录音条）→ 松手预览（试听/取消）→ 发送 ----------
+  // ---------- 语音：点击麦克风切提示态 → 长按提示态录音条录音 → 松手预览（试听/取消）→ 发送 ----------
 
-  /// 点按麦克风：在麦克风上方短暂提示「长按即可录音」（manual Tooltip，约 2s 自动消失）。
-  void _showVoiceHint() {
-    _voiceTooltipKey.currentState?.ensureTooltipVisible();
+  /// 语音入口按钮点击：文字态=切提示态；提示/预览态=回文字态；录音中无操作。
+  void _onVoiceEntryTap() {
+    if (_inputMode == _InputMode.text) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() => _inputMode = _InputMode.hint);
+    } else if (_inputMode == _InputMode.hint) {
+      setState(() => _inputMode = _InputMode.text);
+    } else if (_inputMode == _InputMode.preview) {
+      unawaited(_cancelVoice());
+    }
+    // recording：手势在录音条上，入口按钮不可达，无操作
+  }
+
+  /// 语音入口按钮图标：文字态=麦克风；提示/预览态=键盘；录音中=红色麦克风。
+  IconData _voiceEntryIcon() {
+    switch (_inputMode) {
+      case _InputMode.text:
+        return Icons.mic_none;
+      case _InputMode.hint:
+      case _InputMode.preview:
+        return Icons.keyboard_alt_outlined;
+      case _InputMode.recording:
+        return Icons.mic;
+    }
   }
 
   Future<void> _startVoice() async {
@@ -950,10 +971,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   List<double> _voiceLastSamples(int n) =>
       _voiceSamples.length <= n ? _voiceSamples : _voiceSamples.sublist(_voiceSamples.length - n);
 
-  /// 录音条（覆盖在文字输入框上）：录音中=实时波形+计时；预览态=冻结波形+试听/取消。
+  /// 录音条（覆盖在文字输入框上）：提示态=「长按开始录音」文字（无波形）；
+  /// 录音中=实时波形+计时；预览态=冻结波形+试听/取消。
   /// 由外部 Stack 给定与输入框完全一致的行高（移除固定高度，随约束填充）。
   Widget _buildVoiceBar() {
     final recording = _inputMode == _InputMode.recording;
+    final preview = _inputMode == _InputMode.preview;
     final elapsed = '${_recordSeconds ~/ 60}:${(_recordSeconds % 60).toString().padLeft(2, '0')}';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -975,26 +998,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     child: _WaveformBars(samples: _voiceLastSamples(40), color: Colors.red)),
               ],
             )
-          : Row(
-              children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 22,
-                  icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
-                      color: Theme.of(context).colorScheme.primary),
-                  onPressed: _playVoicePreview,
+          : preview
+              ? Row(
+                  children: [
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 22,
+                      icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
+                          color: Theme.of(context).colorScheme.primary),
+                      onPressed: _playVoicePreview,
+                    ),
+                    Expanded(
+                        child: _WaveformBars(
+                            samples: _voiceLastSamples(40), color: Colors.grey.shade600)),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 22,
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: _cancelVoice,
+                    ),
+                  ],
+                )
+              : Row(
+                  // 提示态：文字说明版录音条（无波形），长按开始录音
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.mic, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 6),
+                    Text(
+                      AppLocalizations.of(context)!.chatPageLongPressToRecord,
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                    ),
+                  ],
                 ),
-                Expanded(
-                    child:
-                        _WaveformBars(samples: _voiceLastSamples(40), color: Colors.grey.shade600)),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 22,
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                  onPressed: _cancelVoice,
-                ),
-              ],
-            ),
     );
   }
 
@@ -1640,24 +1676,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     onPressed: _showAttachmentSheet,
                     icon: const Icon(Icons.add_circle_outline),
                   ),
-                  // 语音：点按=「长按即可录音」提示；长按=开始录音（输入框原地变录音条）
-                  Tooltip(
-                    key: _voiceTooltipKey,
-                    message: l10n.chatPageLongPressToRecord,
-                    triggerMode: TooltipTriggerMode.manual,
-                    showDuration: const Duration(seconds: 2),
-                    child: GestureDetector(
-                      onTap: _showVoiceHint,
-                      onLongPressStart: (_) => _startVoice(),
-                      onLongPressEnd: (_) => _stopVoice(),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Icon(
-                          _inputMode == _InputMode.recording ? Icons.mic : Icons.mic_none,
-                          color: _inputMode == _InputMode.recording ? Colors.red : null,
-                        ),
-                      ),
-                    ),
+                  // 语音入口：文字态=麦克风（点击切提示态）；提示/预览态=键盘（点击回文字态）；
+                  // 录音中=红色麦克风（手势在录音条上）
+                  IconButton(
+                    icon: Icon(_voiceEntryIcon(),
+                        color: _inputMode == _InputMode.recording ? Colors.red : null),
+                    onPressed: _onVoiceEntryTap,
                   ),
                   Expanded(
                     // Stack：文字输入框始终占位（行高恒定，切换录音条时按钮不浮动），
@@ -1676,16 +1700,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           },
                         ),
                         if (_inputMode != _InputMode.text)
-                          Positioned.fill(child: _buildVoiceBar()),
+                          // 长按手势挂在常驻的 GestureDetector 上：提示态长按开始录音，
+                          // 进入录音态后此层不重建，松手能正常触发停止
+                          Positioned.fill(
+                            child: GestureDetector(
+                              onLongPressStart: (_) => _startVoice(),
+                              onLongPressEnd: (_) => _stopVoice(),
+                              child: _buildVoiceBar(),
+                            ),
+                          ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // 发送键：文字态发文字；预览态发录音；录音中禁用
+                  // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发内容）
                   IconButton.filled(
                     onPressed: _inputMode == _InputMode.preview
                         ? _sendVoice
-                        : (_inputMode == _InputMode.recording ? null : _send),
+                        : (_inputMode == _InputMode.text ? _send : null),
                     icon: const Icon(Icons.send),
                   ),
                 ],
