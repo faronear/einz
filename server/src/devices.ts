@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { getDb, getMeta, setMeta } from "./db.js";
-import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
+import { ApiError, resolveSession } from "./auth.js";
 import { isActiveDevice, getDevice, type ServerConfig } from "./config.js";
 import { broadcastProfileUpdated, getConnectedAt } from "./ws.js";
 
@@ -23,11 +23,12 @@ function assignDeviceId(clientId: string): string {
   return `dev${(maxRow.m ?? 0) + 1}`;
 }
 
-/** GET /devices：设备列表（含 person 映射）。 */
+/** GET /devices：设备列表（含 person 映射）。
+ *  注意：不在本接口刷新调用方 last_seen——last_seen 只由 WS 连接/心跳/断开维护，
+ *  否则任何轮询客户端都会让自己"永远新鲜"（对方误判在线，见 chat_page 在线判定）。 */
 export function listDevices(cfg: ServerConfig, token: string): { devices: unknown[] } {
   const { device_id } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
-  touchLastSeen(device_id);
 
   const rows = getDb()
     .prepare(`SELECT device_id, person_id, status, last_seen, public_key, device_name FROM devices ORDER BY created_at`)

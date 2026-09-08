@@ -462,7 +462,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 对方在线判定：非本设备 last_seen 距今 < 60s（30s 轮询 + WS 状态变化时刷新）。
+  /// 对方在线判定：对方有实时 WS 连接（connected_at 非 null）= 在线；
+  /// 旧服务器无 connected_at 字段时退回 last_seen 距今 < 60s 兜底
+  /// （30s 轮询 + WS 状态变化时刷新）。
   Future<void> _refreshPeerOnline() async {
     try {
       final api = widget.api ?? ApiClient(widget.server);
@@ -470,6 +472,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final now = DateTime.now().millisecondsSinceEpoch;
       final peer = devices.where((d) => d['device_id'] != widget.deviceId).toList();
       final online = peer.isNotEmpty && peer.any((d) {
+        // 实时 WS 连接 = 真在线（server 重启/未入网时立即准确）；last_seen 会被
+        // 轮询 touchLastSeen 持续刷新，不能代表实时连接（修复"未入网却显示绿灯"）。
+        if (d.containsKey('connected_at')) return d['connected_at'] != null;
         final last = d['last_seen'];
         if (last is! num) return false;
         return now - last < 60 * 1000;

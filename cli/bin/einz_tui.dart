@@ -1105,8 +1105,11 @@ Future<void> _refreshPeerOnline() async {
     final devices = await ApiClient(server).listDevices(token);
     final now = DateTime.now().millisecondsSinceEpoch;
     final myId = s.session.store.deviceId;
+    // 对方在线 = 有实时 WS 连接（connected_at 非 null）；旧服务器无该字段时退回
+    // last_seen<60s（last_seen 会被轮询 touchLastSeen 持续刷新，不代表实时连接）
     final online = devices.any((d) {
       if (d['device_id'] == myId) return false; // 自己不算
+      if (d.containsKey('connected_at')) return d['connected_at'] != null;
       final last = d['last_seen'];
       if (last is! num) return false;
       return now - last < 60 * 1000;
@@ -1120,8 +1123,10 @@ Future<void> _refreshPeerOnline() async {
       final devName = (d['device_name'] as String?) ?? '';
       if (devId.isNotEmpty && devName.isNotEmpty) s.deviceNames[devId] = devName;
       if (devId != myId) {
-        final last = d['last_seen'];
-        final isOnline = (last is num) && (now - last < 60 * 1000);
+        final isOnline = d.containsKey('connected_at')
+            ? d['connected_at'] != null
+            : (d['last_seen'] is num) &&
+                (now - (d['last_seen'] as num) < 60 * 1000);
         if (isOnline && d['person_id'] != myPid && onlinePeerDevice == null) {
           onlinePeerDevice = devId;
         }
