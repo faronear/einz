@@ -82,6 +82,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageNeedPassphrase => '⚠️ 请先在上方填写接入口令（对方凭它接入）';
 
   @override
+  String get setupEnrollBoundNotice => '新设备已绑定到我的私密领地';
+
+  @override
   String get joinDialogTitle => '邀请对方加入';
 
   @override

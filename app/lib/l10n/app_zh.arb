@@ -29,6 +29,7 @@
   "setupPageEscrowAccess": "③ 凭口令接入（无需信封副本）",
   "setupPageGenerateSpaceKey": "自建空间（一键生成 Space Key）",
   "setupPageNeedPassphrase": "⚠️ 请先在上方填写接入口令（对方凭它接入）",
+  "setupEnrollBoundNotice": "新设备已绑定到我的私密领地",
   "joinDialogTitle": "邀请对方加入",
   "joinDialogHint": "对方安装 App 后点“③ 凭口令接入”，扫码或粘贴下方信息即可加入",
   "joinDialogSpace": "空间: {spaceId}",

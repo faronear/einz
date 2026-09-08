@@ -87,6 +87,9 @@ class AppLocalizationsEn extends AppLocalizations {
       '⚠️ Set an access passphrase above first (your partner joins with it)';
 
   @override
+  String get setupEnrollBoundNotice => 'New device bound to my private space';
+
+  @override
   String get joinDialogTitle => 'Invite your partner';
 
   @override

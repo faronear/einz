@@ -29,6 +29,7 @@
   "setupPageEscrowAccess": "③ Join with passphrase (no envelope needed)",
   "setupPageGenerateSpaceKey": "Create space (one-tap generate key)",
   "setupPageNeedPassphrase": "⚠️ Set an access passphrase above first (your partner joins with it)",
+  "setupEnrollBoundNotice": "New device bound to my private space",
   "joinDialogTitle": "Invite your partner",
   "joinDialogHint": "They install the app, tap ③ Join with passphrase, then scan this code or paste the info below.",
   "joinDialogSpace": "Space: {spaceId}",

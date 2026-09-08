@@ -236,6 +236,12 @@ abstract class AppLocalizations {
   /// **'⚠️ Set an access passphrase above first (your partner joins with it)'**
   String get setupPageNeedPassphrase;
 
+  /// No description provided for @setupEnrollBoundNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'New device bound to my private space'**
+  String get setupEnrollBoundNotice;
+
   /// No description provided for @joinDialogTitle.
   ///
   /// In en, this message translates to:
