@@ -427,6 +427,7 @@ Einz 的数据具有长期价值，备份是 V1 必须项。备份内容：
 Internet ──► Caddy（HTTPS/WSS、证书、反代）──► Node.js（SQLite + 加密文件）
 ```
 
+- 使用 nodejs v22 (`nvm use 22 && npm i`)
 - 单机 Docker Compose 管理；生产环境强制 HTTPS/WSS，禁止 HTTP/WS。
 - 生产 Secret（APNs/FCM 凭证、Server secret、签名 Key 等）禁止提交 Git。
 
