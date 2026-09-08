@@ -198,6 +198,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     stdout.write('❓ 输入新服务器地址（回车沿用 $server）: ');
     final input = (_readLineCompat() ?? '').trim();
     if (input.isNotEmpty) server = input;
+    // 同上：readByteSync 后 stdout 共享 sink 被绑定，紧随的 writeln 会丢失
+    // （如上方"已生成凭证/公钥"首启输出）——让步一个事件循环轮次恢复可写。
+    await Future<void>.delayed(Duration.zero);
   }
 
   if (store == null) {
@@ -226,8 +229,8 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     stdout.writeln('   ${store.publicKey}');
     _guidanceNotes.add('   ${store.publicKey}');
     if (autoName.isNotEmpty) {
-      stdout.writeln('✅ 已设置默认设备名称: $autoName（可随时 /device 修改）');
-      _guidanceNotes.add('✅ 已设置默认设备名称: $autoName（可随时 /device 修改）');
+      stdout.writeln('✅ 默认设备名称: $autoName（可随时 /device 修改）');
+      _guidanceNotes.add('✅ 默认设备名称: $autoName（可随时 /device 修改）');
     }
     stdout.writeln('----------------');
     _guidanceNotes.add('----------------');
@@ -300,6 +303,11 @@ Future<void> _unlockPin(ChatSession session) async {
       _state!.running = false; // EOF（终端关闭/重定向）：退出
       return;
     }
+    // readByteSync 之后紧随的 stdout.write 会同步抛 "StreamSink is bound to a
+    // stream"（Dart 已知行为：阻塞读会绑定 stdin/stdout 共享的 StreamSink），
+    // 被 _render 的 try-catch 吞掉 → 错误反馈渲染丢失，界面"冻结"到下一次
+    // 输入才出现（老板实测）。让步一个事件循环轮次（Timer）恢复可写再渲染。
+    await Future<void>.delayed(Duration.zero);
     final pin = line.trim();
     if (pin.isEmpty) continue; // 空行（如 CRLF 残留 \n）：跳过，不判错
     if (pin == '/exit' || pin == '/quit') {
@@ -433,10 +441,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.spaceId = r.spaceId;
       store.save(storePath);
       // 登记成功系统通知（老板要求：设备信息上传后台登记后显示）
-      session.messages.add(_systemMessage(session, '✅ 新设备已绑定到我的私密领地'));
-      // 20260906 luk: 现在已经在设备创建公私钥的同时设置了设备名称，只要静悄悄的 enroll 即可，否则下面的提示显得突然（因为没有一个要求输入设备名称的过程了），因此注释掉。
-      // session.messages.add(_systemMessage(session, '✅ 您的设备已成功登记。'));
-      // session.messages.add(_systemMessage(session, '----------------'));
+      session.messages.add(_systemMessage(session, '🎉 新设备已成功绑定'));
+      session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
       if (!_state!.running) return; // 绑定期间被 /exit 或 Ctrl+C 中断：不再生成口令托管等
       // 发起者首次创建：生成 Space Key + 上传口令托管包（两次确认，机密 *）。
@@ -2249,7 +2255,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 请设置内容密保口令（务必牢记，严禁泄漏！您仅可将口令分享给您的伴侣）:', required: true);
+    final p1 = await _prompt(session, '❓ 设置内容密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     try {
       final api = ApiClient(session.server);
