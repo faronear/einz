@@ -1239,3 +1239,23 @@ setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
   wait_text 会让第一次吞掉绿点渲染 → 单次 wait 同时校验「🎉 一切就绪」+ 绿点
 
 **验证：** dart analyze 0 issue；server tsc 构建通过；revoked_check.py 全过。
+
+## 2026-09-08 会话：App 认证 403（设备被撤销）→ 走 _onDeviceRevoked
+
+**任务（老板要求）：** 补一个：认证 403 时也走 _onDeviceRevoked（此前只覆盖 WS
+广播 device.revoked；后台错过广播时 WS 会因 token 失效反复重连，认证 403 无
+撤销处理）。
+
+**实现（app/lib/chat_page.dart）：**
+- 新增 `_reauthWithRevokedFallback()`：包装 `widget.reauth`，捕获
+  `ApiException code == 'FORBIDDEN'`（challenge-response 被服务端拒绝 = 设备已
+  撤销）→ `await _onDeviceRevoked()`（清理锁包/消息库 → 顶部通知 → 回设置页）；
+  其他异常原样抛出
+- 两处 reauth 接线点改用包装（widget.reauth 为空时保持透传 null）：
+  MessageRepository（请求 401 自动续期）与 WsRealtimeService（WS 4401 续期）
+- 403 覆盖路径：WS 4401 → reauth → 挑战 403；请求 401 → reauth → 挑战 403
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；ws_realtime_service/
+chat_page_menu/message_repository 测试全过；widget_test 有 1 个既有失败
+（「Einz 秘境：认领中：身份」期望文本在现行代码/l10n 已不存在——老板并行 WIP
+的 UI 改造遗留，与本次改动无关，未处理）。
