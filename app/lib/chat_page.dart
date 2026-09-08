@@ -1312,40 +1312,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
               final langCode = Localizations.localeOf(context).languageCode;
               return [
-                PopupMenuItem(
-                  value: 'locale',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuLocaleLabel),
-                      const Spacer(),
-                      Text(kLocaleLabels[langCode] ?? langCode),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'burn',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuBurnLabel),
-                      const Spacer(),
-                      Text(_burnOptionLabel(_burnSeconds, l10n)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
-                PopupMenuItem(
-                  value: 'pin',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPagePinLabel),
-                      const Spacer(),
-                      Text(_hasPin ? l10n.chatPagePinSetValue : l10n.chatPagePinUnsetValue),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
-                PopupMenuItem(value: 'passphrase', child: Text(l10n.chatPageMenuChangePassphrase)),
-                const PopupMenuDivider(),
+                // 「我的」组（关于我的信息）置顶：名字/头像/设备名称
                 PopupMenuItem(
                   value: 'name',
                   child: Row(
@@ -1383,6 +1350,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+                const PopupMenuDivider(),
+                // 系统设置组：语言/阅后即焚/邀请/PIN/导出/口令
+                PopupMenuItem(
+                  value: 'locale',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuLocaleLabel),
+                      const Spacer(),
+                      Text(kLocaleLabels[langCode] ?? langCode),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'burn',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuBurnLabel),
+                      const Spacer(),
+                      Text(_burnOptionLabel(_burnSeconds, l10n)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
+                PopupMenuItem(
+                  value: 'pin',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPagePinLabel),
+                      const Spacer(),
+                      Text(_hasPin ? l10n.chatPagePinSetValue : l10n.chatPagePinUnsetValue),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
+                PopupMenuItem(value: 'passphrase', child: Text(l10n.chatPageMenuChangePassphrase)),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: 'exit', child: Text(l10n.chatPageMenuExit)),
               ];
