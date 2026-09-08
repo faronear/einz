@@ -1676,12 +1676,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     onPressed: _showAttachmentSheet,
                     icon: const Icon(Icons.add_circle_outline),
                   ),
-                  // 语音入口：文字态=麦克风（点击切提示态）；提示/预览态=键盘（点击回文字态）；
-                  // 录音中=红色麦克风（手势在录音条上）
-                  IconButton(
-                    icon: Icon(_voiceEntryIcon(),
-                        color: _inputMode == _InputMode.recording ? Colors.red : null),
-                    onPressed: _onVoiceEntryTap,
+                  // 语音入口：点按=切提示态/回文字态；长按=直接开始录音（与长按录音条等价）
+                  GestureDetector(
+                    onLongPressStart: (_) => _startVoice(),
+                    onLongPressEnd: (_) => _stopVoice(),
+                    child: IconButton(
+                      icon: Icon(_voiceEntryIcon(),
+                          color: _inputMode == _InputMode.recording ? Colors.red : null),
+                      onPressed: _onVoiceEntryTap,
+                    ),
                   ),
                   Expanded(
                     // Stack：文字输入框始终占位（行高恒定，切换录音条时按钮不浮动），
