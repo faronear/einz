@@ -61,28 +61,28 @@ class _EinzAppState extends State<EinzApp> {
       title: 'Einz',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE07856), // 陶土橙：优雅文艺的暖色调（Between 式，克制的醒目）
+          seedColor: const Color(0xFF4FC3F7), // 天蓝：明亮快乐（logo 同色系——两环嵌套的天蓝环）
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFFBF7F2), // 暖白纸感背景
+        scaffoldBackgroundColor: const Color(0xFFF4FAFF), // 浅蓝白纸感背景（明亮）
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFFBF7F2),
+          backgroundColor: Color(0xFFF4FAFF),
           elevation: 0,
           centerTitle: false,
           titleTextStyle: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF3E3630)),
+              fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF33415A)),
         ),
         inputDecorationTheme: InputDecorationTheme(
-          labelStyle: const TextStyle(fontSize: 16, color: Color(0xFF6E6259)),
+          labelStyle: const TextStyle(fontSize: 16, color: Color(0xFF5C6B82)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFE3D9D0)),
+            borderSide: const BorderSide(color: Color(0xFFD9E6F5)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFE07856), width: 1.6),
+            borderSide: const BorderSide(color: Color(0xFF4FC3F7), width: 1.6),
           ),
         ),
         filledButtonTheme: FilledButtonThemeData(
