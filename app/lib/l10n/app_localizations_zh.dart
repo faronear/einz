@@ -40,7 +40,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEscrowLabel => '密保口令';
 
   @override
-  String get setupPageNeedPassphrase => '⚠️ 请先在上方填写接入口令（对方凭它接入）';
+  String get setupPageNeedPassphrase => '⚠️ 先在上方填写密保口令（对方凭它解密消息）';
 
   @override
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
@@ -78,7 +78,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameRequired => '输入我的名字';
 
   @override
-  String get wizardPeerNameRequired => '填写 TA 的名字';
+  String get wizardPeerNameRequired => '输入 TA 的名字';
 
   @override
   String get wizardNameLabel => '我的名字';
@@ -148,7 +148,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRecoverEnrolling => '正在绑定本设备…';
 
   @override
-  String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置 锁屏码';
+  String get wizardRecoverDone => '✅ 已恢复：本设备已绑定，请设置锁屏码';
 
   @override
   String get wizardAppBarCreate => 'Einz 秘境：创建中';
@@ -284,11 +284,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogSetPin => '设置 PIN';
 
   @override
-  String get setupPageSkipPinTitle => '暂不设置 锁屏码？';
+  String get setupPageSkipPinTitle => '暂不设置锁屏码？';
 
   @override
-  String get setupPageSkipPinMessage =>
-      '不设 锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
+  String get setupPageSkipPinMessage => '不设锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 4 位';
@@ -307,7 +306,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageSetLockTitle => '设置 锁屏码';
+  String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
   String get chatPageSetLockClearHint => '可留空直接提交，即可清空 PIN';
@@ -342,7 +341,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTitleBrand => 'Einz 秘境';
 
   @override
-  String get chatPageMenuChangePassphrase => '修改口令';
+  String get chatPageMenuChangePassphrase => '密保口令';
 
   @override
   String get chatPageMenuAvatar => '我的头像';

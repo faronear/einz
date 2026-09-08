@@ -54,7 +54,7 @@
     }
   },
   "wizardRecoverEnrolling": "正在绑定本设备…",
-  "wizardRecoverDone": "✅ 已恢复：本设备已绑定，请设置 锁屏码",
+  "wizardRecoverDone": "✅ 已恢复：本设备已绑定，请设置锁屏码",
   "wizardAppBarCreate": "Einz 秘境：创建中",
   "wizardAppBarJoin": "Einz 秘境：认领中",
   "wizardAppBarOffline": "导入密保信封",
@@ -115,8 +115,8 @@
   "setPinDialogPinLabel": "PIN（至少 4 位）",
   "setPinDialogConfirmLabel": "确认 PIN",
   "setPinDialogSetPin": "设置 PIN",
-  "setupPageSkipPinTitle": "暂不设置 锁屏码？",
-  "setupPageSkipPinMessage": "不设 锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？",
+  "setupPageSkipPinTitle": "暂不设置锁屏码？",
+  "setupPageSkipPinMessage": "不设锁屏码则本设备密钥包不会加密保存，重启后需重新设置。确定跳过？",
   "setPinDialogPinTooShort": "PIN 至少 4 位",
   "setPinDialogPinMismatch": "两次输入的 PIN 不一致",
   "setPinDialogSetupFailed": "设置失败: {error}",
@@ -126,7 +126,7 @@
     }
   },
   "chatPageLocaleSwitched": "已切换：{label}",
-  "chatPageSetLockTitle": "设置 锁屏码",
+  "chatPageSetLockTitle": "设置锁屏码",
   "chatPageSetLockClearHint": "可留空直接提交，即可清空 PIN",
   "chatPageSetLockDone": "锁屏码已设置，下次启动需解锁",
   "chatPageSetLockConfirmTitle": "设置 PIN 锁屏？",
@@ -137,7 +137,7 @@
   "chatPageMenuInvite": "邀请码",
   "chatPageMenuExport": "导出完整备份",
   "chatPageTitleBrand": "Einz 秘境",
-  "chatPageMenuChangePassphrase": "修改口令",
+  "chatPageMenuChangePassphrase": "密保口令",
   "chatPageMenuAvatar": "我的头像",
   "chatPageAvatarUploaded": "✅ 头像已更新",
   "chatPageAvatarTooLarge": "图片过大（最大 2MB）",
@@ -285,7 +285,7 @@
     }
   },
   "lockPagePinLabel": "锁屏码",
-  "lockPageNoPinSet": "尚未设置 锁屏码（为空时不启用）",
+  "lockPageNoPinSet": "尚未设置锁屏码（为空时不启用）",
   "lockPageUnlock": "解锁",
   "lockPageTooManyAttempts": "尝试次数过多，请 {seconds} 秒后再试",
   "@lockPageTooManyAttempts": {

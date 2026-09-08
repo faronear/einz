@@ -1345,7 +1345,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
                 PopupMenuItem(
                   value: 'pin',
                   child: Row(
@@ -1356,8 +1355,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
+                PopupMenuItem(value: 'invite', child: Text(l10n.chatPageMenuInvite)),
                 PopupMenuItem(value: 'passphrase', child: Text(l10n.chatPageMenuChangePassphrase)),
+                PopupMenuItem(value: 'export', child: Text(l10n.chatPageMenuExport)),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: 'exit', child: Text(l10n.chatPageMenuExit)),
               ];

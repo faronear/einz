@@ -1019,3 +1019,16 @@
 - chat_page_menu_test 退出弹窗断言同步 523d25a 新文案（「将彻底关闭应用。」→「将在本设备上退出 Einz 秘境。」）
 - 老板选择「我代为分两个 commit 收尾」：① b579172 文案批次（含 test 文件锁屏码断言与退出断言）② 本次样式（chat_page.dart + 本条注记）
 - `server_settings.dart` 的 `kEinzServer = http://localhost:3000` 为老板本地测试配置（源码注释「不要 commit」），始终不入库
+
+## 2026-09-08 会话：锁屏码文案空格清理 + 对话页菜单第二组重排
+
+**背景：** 老板指出「PIN 锁屏码」机械删除后残留空格文案（如「设置 锁屏码」），要求修复；并要求把菜单第二组顺序调整为：界面语言/阅后即焚/锁屏码/邀请码/密保口令/导出完整备份。
+
+**实现：**
+- `app_zh.arb` 5 处空格清理：wizardRecoverDone（请设置锁屏码）、setupPageSkipPinTitle（暂不设置锁屏码？）、setupPageSkipPinMessage（不设锁屏码则…）、chatPageSetLockTitle（设置锁屏码）、lockPageNoPinSet（尚未设置锁屏码（为空时不启用）），`flutter gen-l10n` 重新生成；chat_page_menu_test 6 处断言同步去空格
+- 菜单第二组 PopupMenuItem 重排为 locale→burn→pin→invite→passphrase→export（锁屏码移到邀请码前、密保口令在导出前）
+- 菜单标签 `chatPageMenuChangePassphrase`：修改口令 → 密保口令（与 627e76c 口令密保箱、确认弹窗「修改内容密保口令？」命名方向一致）；chat_page_menu_test 菜单项断言/点击同步
+
+**验证：** flutter analyze 0 issue（仅 1 既有 info lint）；chat_page_menu/lock_page/setup_envelope_verify/setup_join_passphrase 4 文件 18 项全过。
+
+**遗留提示：** 改口令弹窗（chatPageChangePassphraseTitle 等）标题与按钮仍为「修改口令」，与菜单「密保口令」不一致；确认弹窗已是「修改内容密保口令？」。如需全套统一为「密保口令」措辞，另行排期。
