@@ -1395,3 +1395,39 @@ AppBar 底边已到粉色、body 顶部还是天蓝，衔接处颜色跳变。
 
 **验证：** analyze 0 error；setup_probe_retry_test 通过；done 步骤 golden
 渲染正常（无崩溃）、失配保持红不重刷。
+
+## 2026-09-09 语音录音波形遮罩
+
+**需求：** 按住麦克风按钮录音时，页面中央显示正在录音的波形图。
+
+**实现（commit 0fe560d）：**
+- 新增 `app/lib/widgets/recording_overlay.dart`：真实振幅驱动（record 插件
+  `onAmplitudeChanged(70ms)`，dBFS -50~0 归一化 + 一阶平滑），波形条 + 录音时长 + 提示文案。
+- `chat_page.dart`：开始录音时取振幅流存 `_amplitudeStream`，停止时置空；
+  body 包 Stack，`_recording` 时中央挂遮罩（IgnorePointer 不挡操作）。
+
+**要点/坑：**
+- `dart format` 会把 chat_page.dart 整体重排（594 行噪音）——该文件并非 format-clean，
+  已恢复 HEAD 重做最小 diff；本项目大文件慎跑 dart format。
+- 测试环境无原生录音，遮罩仅在 `_recording` 时挂载，渲染路径不触碰 AudioRecorder，测试安全。
+- widget_test 2 个探测类失败为环境既有问题（stash 验证与 HEAD 一致）。
+
+## 2026-09-09 修复：重启后旧消息错位 + 附件消息缺头像（commit 6120230）
+
+**症状：** app 首设备入网发消息（语音+文字）→ 退出重开 → 全部旧消息变成对方（左对齐）；
+新发的消息又正常。另：语音消息不带头像。
+
+**根因1（错位）：** create 流程 `_runPinSetup` 把 AppLockPayload 三处（escrow 上传/
+savePlain/setPin）存了占位 deviceId `kp.deviceId`（'dev-mobile'），而首次进聊天 `_finish`
+用的是登记真实 id（dev1）→ 重启后 main/LockPage 用占位 id 自识别 → `_isSamePerson` 设备映射
+查不到自己 → 降级 device 维度比较 → 旧消息 senderDeviceId(dev1) != 当前(dev-mobile) 全判 peer。
+修：三处改用 `_enroll!.deviceId`（与 join/offline 一致）。
+
+**根因2（无头像）：** `sendAttachment` 构造信封漏传 `senderPersonId`（send() 文字有传）。
+修：补传 + 渲染侧兜底 `personIdOfDevice()`（旧消息也能恢复头像）。
+
+**教训：** 设备身份必须统一用服务端登记返回值，本地占位 id 只能用于生成密钥对时
+的临时 key 参数；持久化（AppLockPayload）不得存占位 id。
+
+**验证：** analyze 通过；message_repository/app_lock/chat_page_menu 测试全过；
+setup 相关 7 个失败经 stash 基线确认系既有环境问题，与本次无关。

@@ -24,11 +24,14 @@ import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
-import 'widgets/recording_overlay.dart';
 import 'widgets/top_notice.dart';
 
 /// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
 enum _AttachmentKind { photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
+
+/// 输入区模式：text=文字输入框；recording=按住录音中（输入框变录音条，波形实时）；
+/// preview=松手后预览态（试听/取消，发送复用右侧发送键）。
+enum _InputMode { text, recording, preview }
 
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
@@ -115,9 +118,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _hasMoreOlder = true;
   bool _loadingOlder = false;
   static const int _pageSize = 50;
-  bool _recording = false;
-  String? _recordingPath;
-  Stream<Amplitude>? _amplitudeStream; // 录音实时振幅流（页面中央波形遮罩订阅）
+  _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/录音中/预览）
+  String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
+  final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
+  StreamSubscription<Amplitude>? _ampSub; // 录音振幅流订阅（波形驱动）
+  Timer? _recordTimer; // 录音秒数计时（60s 上限自动停）
+  int _recordSeconds = 0;
+  bool _previewPlaying = false; // 预览态试听播放中
+  final _voiceTooltipKey = GlobalKey<TooltipState>(); // 点按麦克风的「长按即可录音」提示
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
@@ -648,6 +656,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _peerTicker?.cancel();
+    _recordTimer?.cancel();
+    _ampSub?.cancel();
     _ws?.connected.removeListener(_onWsStatusChanged);
     _ws?.stop();
     _scrollController.dispose();
@@ -772,18 +782,52 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  // ---------- 语音：按住录音 → 加密上传（type=voice）→ 发送 ----------
+  // ---------- 语音：点按提示 / 长按录音（输入框变录音条）→ 松手预览（试听/取消）→ 发送 ----------
+
+  /// 点按麦克风：在麦克风上方短暂提示「长按即可录音」（manual Tooltip，约 2s 自动消失）。
+  void _showVoiceHint() {
+    _voiceTooltipKey.currentState?.ensureTooltipVisible();
+  }
 
   Future<void> _startVoice() async {
-    if (_recording) return;
+    if (_inputMode == _InputMode.recording) return;
     try {
+      // 重新录音（预览态再长按）：先清掉上一次未发送的临时文件
+      final old = _recordingPath;
+      if (old != null) {
+        final of = File(old);
+        if (await of.exists()) await of.delete().catchError((_) => of);
+        _recordingPath = null;
+      }
+      // 试听/消息播放与录音互斥
+      _previewPlaying = false;
+      if (_playingMessageId != null) _playingMessageId = null;
+      await _player?.stop();
       final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await (_recorder ??= AudioRecorder()).start(const RecordConfig(), path: path);
-      // 取振幅流（record 插件内部定时轮询，无订阅者时不做事），供波形遮罩实时驱动
-      _amplitudeStream = _recorder?.onAmplitudeChanged(const Duration(milliseconds: 70));
+      // 振幅流：实时驱动录音条波形（record 插件内部无订阅者时不做事）
+      _voiceSamples.clear();
+      _recordSeconds = 0;
+      _ampSub?.cancel();
+      _ampSub = _recorder!
+          .onAmplitudeChanged(const Duration(milliseconds: 70))
+          .listen((amplitude) {
+        if (!mounted || _inputMode != _InputMode.recording) return;
+        final raw = ((amplitude.current + 50) / 50).clamp(0.06, 1.0);
+        setState(() {
+          final last = _voiceSamples.isNotEmpty ? _voiceSamples.last : raw;
+          _voiceSamples.add((last * 0.4 + raw * 0.6).clamp(0.06, 1.0));
+        });
+      });
       setState(() {
-        _recording = true;
+        _inputMode = _InputMode.recording;
         _recordingPath = path;
+      });
+      // 60s 上限：到点自动停（进预览态），防误触长时间录音
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || _inputMode != _InputMode.recording) return;
+        setState(() => _recordSeconds++);
+        if (_recordSeconds >= 60) _stopVoice();
       });
     } catch (e) {
       if (!mounted) return;
@@ -791,32 +835,165 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 松手 / 60s 到点：停录音 → 文件有效进预览态（不自动发送），空录音直接取消回输入框。
   Future<void> _stopVoice() async {
-    if (!_recording) return;
+    if (_inputMode != _InputMode.recording) return;
     final path = _recordingPath;
-    setState(() {
-      _recording = false;
-      _recordingPath = null;
-      _amplitudeStream = null;
-    });
+    _recordTimer?.cancel();
+    _recordTimer = null;
+    await _ampSub?.cancel();
+    _ampSub = null;
     try {
       await _recorder?.stop();
+      var ok = false;
       if (path != null) {
         final f = File(path);
-        if (await f.exists() && await f.length() > 0) {
-          await _repo.sendAttachment(
-            fileBytes: await f.readAsBytes(),
-            fileName: 'voice.m4a',
-            type: 'voice',
-          );
-          await _refresh();
-        }
-        await f.delete().catchError((_) => f);
+        ok = await f.exists() && await f.length() > 0;
       }
+      if (!mounted) return;
+      setState(() {
+        _inputMode = ok ? _InputMode.preview : _InputMode.text;
+        if (!ok) _recordingPath = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _inputMode = _InputMode.text;
+        _recordingPath = null;
+      });
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
+    }
+  }
+
+  /// 预览态发送（右侧发送键）：加密上传（type=voice）→ 恢复文字输入框。
+  Future<void> _sendVoice() async {
+    if (_inputMode != _InputMode.preview) return;
+    final path = _recordingPath;
+    if (path == null) return;
+    try {
+      final f = File(path);
+      if (!await f.exists() || await f.length() == 0) {
+        if (!mounted) return;
+        setState(() {
+          _inputMode = _InputMode.text;
+          _recordingPath = null;
+          _voiceSamples.clear();
+        });
+        return;
+      }
+      await _repo.sendAttachment(
+        fileBytes: await f.readAsBytes(),
+        fileName: 'voice.m4a',
+        type: 'voice',
+      );
+      await f.delete().catchError((_) => f);
+      if (!mounted) return;
+      setState(() {
+        _inputMode = _InputMode.text;
+        _recordingPath = null;
+        _voiceSamples.clear();
+      });
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
     }
+  }
+
+  /// 预览态取消：删临时文件，恢复文字输入框。
+  Future<void> _cancelVoice() async {
+    if (_inputMode != _InputMode.preview) return;
+    final path = _recordingPath;
+    _previewPlaying = false;
+    await _player?.stop();
+    if (!mounted) return;
+    setState(() {
+      _inputMode = _InputMode.text;
+      _recordingPath = null;
+      _voiceSamples.clear();
+    });
+    if (path != null) {
+      final f = File(path);
+      if (await f.exists()) await f.delete().catchError((_) => f);
+    }
+  }
+
+  /// 预览态试听：点播放/暂停切换（与消息播放互斥）。
+  Future<void> _playVoicePreview() async {
+    final path = _recordingPath;
+    if (path == null || !await File(path).exists()) return;
+    final player = _player ??= AudioPlayer();
+    if (_previewPlaying) {
+      await player.stop();
+      if (mounted) setState(() => _previewPlaying = false);
+      return;
+    }
+    if (_playingMessageId != null && mounted) setState(() => _playingMessageId = null);
+    try {
+      setState(() => _previewPlaying = true);
+      await player.stop();
+      await player.play(DeviceFileSource(path));
+      // 播完自动复位播放图标
+      unawaited(player.onPlayerComplete.first.then((_) {
+        if (mounted) setState(() => _previewPlaying = false);
+      }));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _previewPlaying = false);
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
+    }
+  }
+
+  /// 最近 [n] 个波形采样（录音中滚动窗口，预览态冻结尾部）。
+  List<double> _voiceLastSamples(int n) =>
+      _voiceSamples.length <= n ? _voiceSamples : _voiceSamples.sublist(_voiceSamples.length - n);
+
+  /// 录音条（替换文字输入框）：录音中=实时波形+计时；预览态=冻结波形+试听/取消。
+  Widget _buildVoiceBar() {
+    final recording = _inputMode == _InputMode.recording;
+    final elapsed = '${_recordSeconds ~/ 60}:${(_recordSeconds % 60).toString().padLeft(2, '0')}';
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: recording ? Colors.red.shade50 : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: recording ? Colors.red.shade200 : Colors.grey.shade300),
+      ),
+      child: recording
+          ? Row(
+              children: [
+                const Icon(Icons.mic, size: 16, color: Colors.red),
+                const SizedBox(width: 8),
+                Text(elapsed,
+                    style: const TextStyle(
+                        color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: _WaveformBars(samples: _voiceLastSamples(40), color: Colors.red)),
+              ],
+            )
+          : Row(
+              children: [
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 22,
+                  icon: Icon(_previewPlaying ? Icons.stop_circle : Icons.play_circle,
+                      color: Theme.of(context).colorScheme.primary),
+                  onPressed: _playVoicePreview,
+                ),
+                Expanded(
+                    child:
+                        _WaveformBars(samples: _voiceLastSamples(40), color: Colors.grey.shade600)),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 22,
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: _cancelVoice,
+                ),
+              ],
+            ),
+    );
   }
 
   // ---------- 音频播放（语音/音频文件共用）：下载解密 → 临时文件 → audioplayers ----------
@@ -843,6 +1020,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     try {
       final player = _player ??= AudioPlayer();
+      _previewPlaying = false; // 与预览态试听互斥
       setState(() => _playingMessageId = m.env.messageId);
       final bytes = await _repo.fetchAttachment(
         attachmentId: att['attachment_id'] as String,
@@ -1460,50 +1638,60 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     onPressed: _showAttachmentSheet,
                     icon: const Icon(Icons.add_circle_outline),
                   ),
-                  // 语音：按住说话（松开发送）
-                  GestureDetector(
-                    onLongPressStart: (_) => _startVoice(),
-                    onLongPressEnd: (_) => _stopVoice(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(
-                        _recording ? Icons.mic : Icons.mic_none,
-                        color: _recording ? Colors.red : null,
+                  // 语音：点按=「长按即可录音」提示；长按=开始录音（输入框变录音条）
+                  Tooltip(
+                    key: _voiceTooltipKey,
+                    message: l10n.chatPageLongPressToRecord,
+                    triggerMode: TooltipTriggerMode.manual,
+                    showDuration: const Duration(seconds: 2),
+                    child: GestureDetector(
+                      onTap: _showVoiceHint,
+                      onLongPressStart: (_) => _startVoice(),
+                      onLongPressEnd: (_) => _stopVoice(),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          _inputMode == _InputMode.recording ? Icons.mic : Icons.mic_none,
+                          color: _inputMode == _InputMode.recording ? Colors.red : null,
+                        ),
                       ),
                     ),
                   ),
-                  if (_recording)
+                  if (_inputMode == _InputMode.recording)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: Text(l10n.chatPageRecordingHint,
                           style: const TextStyle(color: Colors.red, fontSize: 12)),
                     ),
                   Expanded(
-                    child: TextField(
-                      controller: _input,
-                      focusNode: _inputFocusNode,
-                      decoration: InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
-                      // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
-                      onSubmitted: (_) {
-                        _send();
-                        _inputFocusNode.requestFocus();
-                      },
-                    ),
+                    child: _inputMode == _InputMode.text
+                        ? TextField(
+                            controller: _input,
+                            focusNode: _inputFocusNode,
+                            decoration:
+                                InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
+                            // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
+                            onSubmitted: (_) {
+                              _send();
+                              _inputFocusNode.requestFocus();
+                            },
+                          )
+                        : _buildVoiceBar(),
                   ),
                   const SizedBox(width: 8),
-                  IconButton.filled(onPressed: _send, icon: const Icon(Icons.send)),
+                  // 发送键：文字态发文字；预览态发录音；录音中禁用
+                  IconButton.filled(
+                    onPressed: _inputMode == _InputMode.preview
+                        ? _sendVoice
+                        : (_inputMode == _InputMode.recording ? null : _send),
+                    icon: const Icon(Icons.send),
+                  ),
                 ],
               ),
             ),
           ),
         ],
       ),
-      // 录音中：页面中央波形遮罩（真实振幅驱动；IgnorePointer 不挡操作）
-      if (_recording && _amplitudeStream != null)
-        RecordingOverlay(
-          amplitudeStream: _amplitudeStream!,
-          hintText: l10n.chatPageRecordingHint,
-        ),
       ],
       ),
     );
@@ -1831,6 +2019,33 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
 /// 尚未托管口令（服务器无 escrow 包）。
 class _NoEscrowException implements Exception {
   const _NoEscrowException();
+}
+
+/// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值。
+class _WaveformBars extends StatelessWidget {
+  const _WaveformBars({required this.samples, required this.color});
+
+  final List<double> samples;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (final sample in samples)
+          Container(
+            width: 3,
+            height: 8 + sample * 22,
+            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(1.5),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 /// 消息发送者头像：按 personId 从服务端加载（静态缓存避免重复请求），

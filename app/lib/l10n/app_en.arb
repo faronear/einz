@@ -190,6 +190,7 @@
     }
   },
   "chatPageRecordingHint": "Recording… release to send",
+  "chatPageLongPressToRecord": "Long press to record",
   "chatPageInputHint": "Type a message…",
   "chatPageAudioMetaMissing": "Audio attachment metadata missing",
   "chatPageAudioPlayFailed": "Audio playback failed: {error}",

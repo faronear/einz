@@ -34,7 +34,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEnvelopeKeyHint => '粘贴密保信封（envelope-*.txt 内容）';
 
   @override
-  String get setupPageNeedPassphrase => '⚠️ 先在上方填写密保口令（对方凭它解密消息）';
+  String get setupPageNeedPassphrase => '⚠️ 先在上方填写密保口令';
 
   @override
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
@@ -118,10 +118,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleInvite => '邀请码';
 
   @override
-  String get wizardTitlePassphrase => '密保口令';
+  String get wizardTitlePassphrase => '设置密保口令';
 
   @override
-  String get wizardTitlePin => '锁屏码';
+  String get wizardTitlePin => '设置锁屏码';
 
   @override
   String get wizardTitleEnvelope => '密保信封';
@@ -166,7 +166,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogTitleJoin => '🎉 一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '仅限你和伴侣。所有消息端到端加密，确保绝对隐私，开始聊天吧。';
+  String get welcomeDialogMessage => '秘境仅限两人。所有消息端到端加密，确保绝对隐私，开始聊天吧。';
 
   @override
   String get welcomeDialogStart => '开始聊天';
@@ -227,7 +227,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageSkipPinTitle => '暂不设置锁屏码？';
 
   @override
-  String get setupPageSkipPinMessage => '不设置锁屏码，则本应用启动时可以直接进入对话，容易被窃取隐私。确定跳过吗？';
+  String get setupPageSkipPinMessage => '如果不设锁屏码，本应用启动时将直接进入对话，容易被窃取隐私。确定跳过吗？';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 4 位';
@@ -417,6 +417,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageRecordingHint => '录音中…松开发送';
+
+  @override
+  String get chatPageLongPressToRecord => '长按即可录音';
 
   @override
   String get chatPageInputHint => '输入消息…';

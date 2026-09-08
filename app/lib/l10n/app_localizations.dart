@@ -860,6 +860,12 @@ abstract class AppLocalizations {
   /// **'Recording… release to send'**
   String get chatPageRecordingHint;
 
+  /// No description provided for @chatPageLongPressToRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Long press to record'**
+  String get chatPageLongPressToRecord;
+
   /// No description provided for @chatPageInputHint.
   ///
   /// In en, this message translates to:
