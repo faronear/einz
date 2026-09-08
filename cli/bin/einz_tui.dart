@@ -224,13 +224,13 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     }
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
-    stdout.writeln('✅ 新设备加密凭证已生成，公钥为：');
-    _guidanceNotes.add('✅ 新设备加密凭证已生成，公钥为：');
+    stdout.writeln('✅ 新设备凭证已生成，公钥为：');
+    _guidanceNotes.add('✅ 新设备凭证已生成，公钥为：');
     stdout.writeln('   ${store.publicKey}');
     _guidanceNotes.add('   ${store.publicKey}');
     if (autoName.isNotEmpty) {
-      stdout.writeln('✅ 默认设备名称: $autoName（可随时 /device 修改）');
-      _guidanceNotes.add('✅ 默认设备名称: $autoName（可随时 /device 修改）');
+      stdout.writeln('✅ 默认设备名称: $autoName');
+      _guidanceNotes.add('✅ 默认设备名称: $autoName');
     }
     stdout.writeln('----------------');
     _guidanceNotes.add('----------------');
@@ -259,20 +259,21 @@ Future<bool> _verifyPin(String hash, String pin) async {
   return s.crypto.pwhash.strVerify(passwordHash: hash, password: pin);
 }
 
-/// 入网最后一步：询问设置 PIN 锁屏（直接回车跳过 = 不设置；之后可用 /pin 设置）。
+/// 入网最后一步：询问设置 锁屏码（直接回车跳过 = 不设置；以后可以 /pin 设置）。
 Future<void> _askSetPin(ChatSession session, String storePath) async {
   if (!_state!.running) return;
   // 明文输入（与解锁一致——引导中也可输入 /exit）
-  final pin = await _prompt(session, '❓ 设置 PIN 锁屏（可留空跳过，之后可用 /pin 设置）:', hidden: false);
+  final pin = await _prompt(session, '❓ 设置锁屏码（可留空跳过，以后可用 /pin 重设）:', hidden: false);
   if (!_state!.running) return;
   if (pin.isEmpty) {
-    session.messages.add(_systemMessage(session, '⚠️ 已跳过设置 PIN（未设置）'));
+    session.messages.add(_systemMessage(session, '⚠️ 没有设置锁屏码'));
   } else {
     session.store.pinHash = await _hashPin(pin);
     session.store.save(storePath);
-    session.messages.add(_systemMessage(session, '✅ PIN 锁屏已设置'));
+    session.messages.add(_systemMessage(session, '✅ 锁屏码已设置'));
   }
-  session.messages.add(_systemMessage(session, '🎉 成功进入了秘境！输入 /help 查看快捷命令，输入 /invite 邀请伴侣。立刻开始点对点加密聊天吧！'));
+  session.messages.add(_systemMessage(session, '----------------'));
+  session.messages.add(_systemMessage(session, '🎉 一切就绪！输入 /help 查看快捷命令，输入 /invite 邀请伴侣。立刻开始私密聊天吧！'));
   session.messages.add(_systemMessage(session, '================'));
 
   _scheduleRender();
@@ -299,7 +300,7 @@ Future<void> _unlockPin(ChatSession session) async {
   // （completer 由输入循环 complete，此时尚未启动会永久挂起——老板实测
   // "提示后直接退出"）：改为同步读行（明文 echo；可输入 /exit 退出）
   while (_state!.running) {
-    session.messages.add(_systemMessage(session, '❓ 请输入 PIN 解锁:'));
+    session.messages.add(_systemMessage(session, '❓ 输入锁屏码:'));
     _render(); // 同步渲染提示（_scheduleRender 异步——readLineSync 阻塞期间不会执行）
     final line = _readLineCompat();
     if (line == null) {
@@ -320,20 +321,17 @@ Future<void> _unlockPin(ChatSession session) async {
     if (!_state!.running) return;
     // argon2id str 哈希自含盐：strVerify 返回错误消息（空 = 验证通过）
     if (await _verifyPin(hash, pin)) {
-      session.messages.add(_systemMessage(session, '✅ PIN 验证通过'));
+      session.messages.add(_systemMessage(session, '✅ 锁屏码验证通过'));
       _render();
       return;
     }
-    session.messages.add(_systemMessage(session, '⚠️ PIN 错误，请重新输入（/exit 可退出）'));
+    session.messages.add(_systemMessage(session, '⚠️ 锁屏码验证错误，请重新输入（/exit 可退出）'));
     _render();
   }
 }
 
 Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
-
-  // 已撤销设备：不登记/不认证/不同步/不起 WS——仅提示 + 可 /exit（输入循环已限制）
-  if (_revoked) return;
 
   // 身份选择（仅后续设备、未登记的新设备）：先问是第一还是第二个人（personA/personB），
   // 按需设置名字——与首设备"先名字后设备名"的顺序对齐（此前是先问设备名再问身份）。
@@ -346,7 +344,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.deviceId == null && store.spaceKey == null && _probePersonNames.isNotEmpty) {
     while (true) {
       if (!_state!.running) return;
-      final ans = await _prompt(session, '❓ 若所有成员的已登记设备全部丢失，可输入 r 重置所有设备，或者直接回车则正常添加新设备');
+      final ans = await _prompt(session, '❗️❗️❗️ 若所有已登记设备全部丢失，可输入 r 重置所有设备，或者直接回车则正常添加新设备');
       if (!_state!.running) return;
       if (ans.trim().toLowerCase() == 'r') {
         recovered = await _runRecoverAsCreator(session, store, storePath, server);
@@ -364,16 +362,16 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     final bName = _probePersonNames['personB'] ?? '';
     while (true) {
       if (!_state!.running) return; // /exit 或 Ctrl+C：立即结束引导
-      final choice = await _prompt(session, '❓ 如果你是 $aName，请输入 1；如果你是 $bName，请输入 2');
+      final choice = await _prompt(session, '❓ 如果你是 $aName，输入 1；如果你是 $bName，输入 2');
       if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
       if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
-      session.messages.add(_systemMessage(session, '❓ 请输入 1 ($aName) 或 2 ($bName)'));
+      session.messages.add(_systemMessage(session, '❓ 输入 1 ($aName) 或 2 ($bName)'));
       _scheduleRender();
     }
     if (chosenPerson == 'personB') {
       if ((_probePersonNames['personB'] ?? '').isEmpty) {
         // personB 还没有名称——要求输入显示名
-        final name = await _prompt(session, '❓ 请输入我的名字（例如 Steffi，或者直接回车先跳过，以后可随时修改）：');
+        final name = await _prompt(session, '❓ 输入我的名字（例如 Steffi，或者直接回车先跳过，以后可随时修改）：');
         if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
         if (name.isNotEmpty) { 
           store.personName = name;
@@ -410,14 +408,14 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       }
       // 第二用户名字（回车跳过 → 后台默认 personB）
       session.messages.add(_systemMessage(session, '----------------'));
-      final partnerName = (await _prompt(session, '❓ 请输入TA的名字（例如 Steffi，或者直接回车先跳过）:')).trim();
+      final partnerName = (await _prompt(session, '❓ 输入伴侣的名字（例如 Steffi，或者直接回车先跳过）:')).trim();
       if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
       if (partnerName.isNotEmpty) {
         partnerPresetName = partnerName;
-        session.messages.add(_systemMessage(session, '✅ 已为TA设置名字: $partnerName（TA进入秘境后可以自行修改）'));
+        session.messages.add(_systemMessage(session, '✅ 已为伴侣设置名字: $partnerName（以后可以 /rename 自行修改）'));
         _scheduleRender();
       } else {
-        session.messages.add(_systemMessage(session, '✅ 系统将为TA自动预设一个名字，等TA进入秘境后可随时 /rename 进行修改。'));
+        session.messages.add(_systemMessage(session, '✅ 系统将为伴侣自动预设一个名字，以后可以 /rename 自行修改。'));
         _scheduleRender();
       }
       session.messages.add(_systemMessage(session, '----------------'));
@@ -486,7 +484,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
             store.spaceId = r.spaceId;
             store.save(storePath);
             _onboarded = true; // 新设备入网完成
-            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功，新设备已绑定到秘境。'));
+            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功'));
+            session.messages.add(_systemMessage(session, '----------------'));
+            session.messages.add(_systemMessage(session, '🎉 新设备已成功绑定'));
             session.messages.add(_systemMessage(session, '----------------'));
             _scheduleRender();
             break;
@@ -510,7 +510,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 请输入密保口令，才能查看秘境内容：', required: true);
+      final passphrase = await _prompt(session, '❓ 输入密保口令，才能查看秘境内容：', required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
@@ -568,17 +568,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.sessionToken == null && server.isNotEmpty) {
     try {
       await _busy(session, '⏳ 机密线路激活中......', () => session.auth());
-      session.messages.add(_systemMessage(session, '✅ 机密线路激活成功，全世界只有您和对方能够查看信息。'));
+      session.messages.add(_systemMessage(session, '✅ 机密线路激活成功。'));
       _scheduleRender();
     } catch (e) {
       if (e is ApiException && e.code == 'FORBIDDEN') {
-        // 挑战被服务端拒绝（设备已被撤销）→ 进入"仅可退出"模式并结束引导；
-        // 清空可能已加载的本地历史，消息流只保留提示条
-        _revoked = true;
-        session.messages.clear();
-        session.messages.add(_systemMessage(session, _revokedBanner));
-        _scheduleRender();
-        return; // 不再同步/起 WS
+        // 挑战被服务端拒绝（设备已被撤销）→ 不进 TUI：恢复终端、提示后直接退出
+        // （此刻输入循环已在 raw 模式；先恢复 termios 再退出，见 _restoreTerminal 注释）
+        _restoreTerminal();
+        // pty 下 stdout/stdin 共享 fd，退出瞬间 flush 未决时 stdout.write 会抛
+        // "StreamSink is bound to a stream"——改用独立 sink 的 stderr，提示必达
+        try {
+          stderr.write('$_clearHome本设备已被撤销。\n');
+          stderr.flush();
+        } catch (_) {}
+        exit(0);
       }
       session.messages.add(_systemMessage(session, '⚠️ 机密线路激活失败。可进入 TUI 后用 /auth 重试'));
       _scheduleRender();
@@ -613,7 +616,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // PIN 锁屏：本次刚入网 → 询问设置（可空跳过）；重启解锁已由 main 在
+  // 锁屏码：本次刚入网 → 询问设置（可空跳过）；重启解锁已由 main 在
   // loadHistory 前处理（_unlockPin）——此处不再重复
   if (_onboarded) {
     await _askSetPin(session, storePath);
@@ -688,11 +691,19 @@ Future<void> main(List<String> args) async {
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
 
-  // 启动自检：设备是否已被撤销（/recover 或 /revoke）——已撤销不得显示本地
-  // 历史、不得发送，仅可 /exit 退出；会话被清（/recover）→ 清 token 走挑战
-  // 重认证（挑战 403 由引导识别为 revoked）
+  // 启动自检：设备是否已被撤销（/recover 或 /revoke）——已撤销不进 TUI：
+  // 终端直接提示"本设备已被撤销。"后退出（不渲染界面、不加载历史）。
+  // 会话被清（/recover 会 DELETE sessions）→ 清 token 走挑战重认证；挑战 403
+  // （设备已撤销）由引导识别后同样提示退出（见 _runGuide）。
   final probe = await _probeRevoked(store, server);
-  _revoked = probe == 1;
+  if (probe == 1) {
+    // 尚未进 raw/输入循环；用 stderr 与 403 路径保持一致（终端同样可见）
+    try {
+      stderr.writeln('本设备已被撤销。');
+      stderr.flush();
+    } catch (_) {}
+    exit(0);
+  }
   if (probe == 2) {
     store.sessionToken = null;
     store.save(storePath);
@@ -702,24 +713,18 @@ Future<void> main(List<String> args) async {
   // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
   // _state 赋值之后（否则 Null check 崩溃——2026-09-08 老板实测）
   _state = _TuiState(session, storePath);
-  // PIN 锁屏：已有 PIN 时先解锁（历史消息在解锁前不加载/不显示——防消息泄漏；
+  // 锁屏码：已有 PIN 时先解锁（历史消息在解锁前不加载/不显示——防消息泄漏；
   // 刚入网的 _askSetPin 仍在 _runGuide 内处理）
-  if (!_revoked && store.pinHash != null) {
+  if (store.pinHash != null) {
     await _unlockPin(session);
   }
-  if (!_revoked) {
-    await session.loadHistory();
-  }
+  await session.loadHistory();
   // 引导阶段提示（自举/托管/邀请码指引）作为 system 消息进入对话流——
   // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
   for (final note in _guidanceNotes) {
     session.messages.add(_systemMessage(session, note));
   }
   _guidanceNotes.clear();
-  if (_revoked) {
-    // 已撤销：消息流仅保留提示条（本地历史不加载不显示）
-    session.messages.add(_systemMessage(session, _revokedBanner));
-  }
   _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
   _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
@@ -947,9 +952,7 @@ void _render() {
     WsStatus.reconnecting => '${_red}✗${_reset}',
     WsStatus.stopped => '${_gray}○${_reset}',
   };
-  final mySegment = _revoked
-      ? '${_gray}✗ 设备已被撤销（仅可 /exit）${_reset}'
-      : '$myDot ${_personLabel(s.session.store, s.personNames)}';
+  final mySegment = '$myDot ${_personLabel(s.session.store, s.personNames)}';
   // 各片段用灰色竖线分隔：Einz TUI | ● 我名字 #设备 | ● 对方名字 | 临时通知
   final sep = '${_gray}|${_reset}';
   final peerName = _peerNameOf(s);
@@ -1434,12 +1437,6 @@ Future<void> _runInputLoop(ChatSession session) async {
           inputChanged = true; // 清空输入行，等待下方统一重绘
           continue;
         }
-        // 已撤销设备：仅放行 /exit 与 /quit；其余输入（发消息/命令）拒绝并提示
-        if (_revoked && !line.startsWith('/exit') && !line.startsWith('/quit')) {
-          session.messages.add(_systemMessage(session, _revokedBanner));
-          _scheduleRender();
-          continue;
-        }
         if (busy) continue; // 上一条命令/消息还在处理
         busy = true;
         final future = (_state!.pendingInvite)
@@ -1626,13 +1623,6 @@ Future<void> _execCommand(String line) async {
   final cmd = parts[0];
   final arg = parts.length > 1 ? parts.sublist(1).join(' ') : '';
 
-  // 已撤销设备：仅允许 /exit（与 /quit）——其余命令拒绝（输入循环已拦截，此处双保险）
-  if (_revoked && cmd != '/exit' && cmd != '/quit') {
-    s.session.messages.add(_systemMessage(s.session, _revokedBanner));
-    s.status = '';
-    return;
-  }
-
   switch (cmd) {
     case '/help':
     case '/':
@@ -1675,7 +1665,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/pin <PIN> :: 查看状态、设置或清空 PIN',
+        '/pin <PIN> :: 查看状态、设置或清空锁屏码',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -1724,7 +1714,7 @@ Future<void> _execCommand(String line) async {
         // 提示作为 system 消息进消息流；邀请码由输入循环接管输入——
         // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
         s.pendingInvite = true;
-        s.session.messages.add(_systemMessage(s.session, '❓ 发现新设备，请输入秘境邀请码（由其他已认证设备生成'));
+        s.session.messages.add(_systemMessage(s.session, '❓ 输入秘境邀请码（由其他已认证设备生成'));
         s.status = '⌛️ 等待邀请码输入…';
         break;
       }
@@ -1732,7 +1722,7 @@ Future<void> _execCommand(String line) async {
       if (arg.isEmpty) {
         final authed = s.session.store.sessionToken != null;
         s.session.messages.add(_systemMessage(
-            s.session, authed ? '✅ 登录状态: 已激活机密线路' : '⚠️ 登录状态: 未激活机密线路'));
+            s.session, authed ? '✅ 在线状态：已激活机密线路' : '⚠️ 在线状态: 未激活机密线路'));
         s.session.messages.add(_systemMessage(
             s.session, '用法: /auth <服务器地址> —— 激活机密线路（如 /auth https://einz.tic.cc）'));
         break;
@@ -1740,7 +1730,7 @@ Future<void> _execCommand(String line) async {
       try {
         await s.session.auth(serverOverride: arg);
         // 激活结果作为 system 消息进消息流（不占顶部状态栏）
-        s.session.messages.add(_systemMessage(s.session, '✅ 机密线路激活成功，全世界只有您和对方能够查看信息。'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 成功激活机密线路。'));
         s.status = '';
         _refreshPersonNames(s); // 刷新 person 名称表（对方消息前缀显示其 personName）
         // 激活成功后启动 WS 实时监听
@@ -1778,21 +1768,21 @@ Future<void> _execCommand(String line) async {
       await _changeEscrowPassphrase(s.session.store, s.session);
       break;
     case '/pin':
-      // PIN 锁屏：/pin 显示状态、/pin <PIN> 设置、/pin '' 重置为空
+      // 锁屏码：/pin 显示状态、/pin <PIN> 设置、/pin '' 重置为空
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session,
-            s.session.store.pinHash == null ? '⚠️ PIN 锁屏：未设置' : '✅ PIN 锁屏：已设置'));
+            s.session.store.pinHash == null ? '⚠️ 锁屏码：未设置' : '✅ 锁屏码：已设置'));
         // 先输出状态，再给出详细用法
         s.session.messages.add(_systemMessage(s.session,
-            '用法: /pin <PIN> —— 设置锁屏 PIN（如 /pin 123456）；/pin \'\' 重置为空（取消锁屏）'));
+            '用法: /pin <PIN> —— 设置锁屏码（如 /pin 123456）；/pin \'\' 重置为空（取消锁屏吗）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
-        s.session.messages.add(_systemMessage(s.session, '⚠️ PIN 已重置为空（未设置）'));
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 锁屏码已重置为空（未设置）'));
       } else {
         s.session.store.pinHash = await _hashPin(arg);
         s.session.store.save(s.storePath);
-        s.session.messages.add(_systemMessage(s.session, '✅ PIN 已设置'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 锁屏码已设置'));
       }
       break;
     case '/devices':
@@ -2081,13 +2071,6 @@ final List<String> _guidanceNotes = [];
 /// 启动探测获取的 person 名称表（/health 系统信息，person_id → personName）。
 Map<String, String> _probePersonNames = {};
 
-/// 本机设备已被撤销（/recover 全丢恢复或 /revoke）→ 启动进入"仅可退出"模式：
-/// 不显示本地历史、不允许发送，输入仅放行 /exit（与 /quit）。
-bool _revoked = false;
-
-/// revoked 提示（产品文案）。
-const String _revokedBanner = '当前设备已被撤销，您只能 /exit 退出';
-
 /// 启动自检结果：0=正常/离线（可看本地历史）；1=设备已被撤销；2=会话已失效
 /// （/recover 会 DELETE sessions，缓存 token 死 → 401）需清除 token 走引导
 /// 挑战重认证——挑战阶段若设备已撤销会 403（由引导兜底识别为 revoked）。
@@ -2116,10 +2099,10 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
 Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String storePath, String server) async {
   while (true) {
     if (!_state!.running) return false;
-    final passphrase = await _prompt(session, '❓ 输入 escrow 口令（当初设置密保口令时已上传托管；输 q 取消）：', hidden: true, required: true);
+    final passphrase = await _prompt(session, '❓ 输入密保口令，才能打开密钥保管箱；输入 q 取消）：', hidden: true, required: true);
     if (!_state!.running) return false;
     if (passphrase.toLowerCase() == 'q') {
-      session.messages.add(_systemMessage(session, '已取消全丢恢复'));
+      session.messages.add(_systemMessage(session, '已取消'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
       return false;
@@ -2151,7 +2134,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       final aName = _probePersonNames['personA'] ?? '';
       store.personName = aName.isNotEmpty ? aName : null;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 秘境重置成功，即将重新绑定设备（历史密文可继续解密）'));
+      session.messages.add(_systemMessage(session, '✅ 秘境重置成功，即将作为 $aName 重新绑定当前设备'));
       session.messages.add(_systemMessage(session, '================'));
       _scheduleRender();
       return true;
@@ -2206,13 +2189,13 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   // 1) 旧口令验证：必须能解开服务器当前口令密保箱
   while (true) {
     if (!_state!.running) return; // 已退出
-    final oldPass = await _prompt(session, '❓ 请输入当前密保口令（用于验证）：', hidden: true, required: true);
+    final oldPass = await _prompt(session, '❓ 验证老密保口令：', hidden: false, required: true);
     if (oldPass.isEmpty) continue;
     try {
       final snap = await api.getKeyEscrow(store.sessionToken!);
       final file = snap.file;
       if (file == null) {
-        session.messages.add(_systemMessage(session, '⚠️ 尚未设置托管口令，无需修改（/space 可查看接入状态）'));
+        session.messages.add(_systemMessage(session, '⚠️ 尚未设置密保口令，无需修改（/space 可查看接入状态）'));
         return;
       }
       try {
@@ -2230,13 +2213,13 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   // 2) 新口令（两次输入一致）
   while (true) {
     if (!_state!.running) return;
-    final p1 = await _prompt(session, '❓ 请输入新密保口令（务必牢记，严禁泄漏！）：', hidden: true, required: true);
+    final p1 = await _prompt(session, '❓ 设置新密保口令（务必牢记，严禁泄漏！）：', hidden: false, required: true);
     if (p1.isEmpty) continue;
-    final p2 = await _prompt(session, '❓ 请再次输入新口令确认：', hidden: true, required: true);
-    if (p1 != p2) {
-      session.messages.add(_systemMessage(session, '⚠️ 两次输入的口令不一致，请重新设置'));
-      continue;
-    }
+    // final p2 = await _prompt(session, '❓ 请再次输入新口令确认：', hidden: false, required: true);
+    // if (p1 != p2) {
+    //   session.messages.add(_systemMessage(session, '⚠️ 两次输入的口令不一致，请重新设置'));
+    //   continue;
+    // }
     // 3) 新口令重加密上传（含新哈希；_busy 期间禁止输入）
     try {
       await _busy(session, '⏳ 正在用新口令重新加密口令密保箱......', () async {

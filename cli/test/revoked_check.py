@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-# revoked 场景回归：第一设备入网 → /recover 撤销全部 → 第一设备重启应进入
-# "仅可退出"模式：不显示历史、显示"当前设备已被撤销，您只能 /exit 退出"、
-# 普通输入被拒（仅 /exit 放行）。
+# revoked 场景回归：第一设备入网 → /recover 撤销全部 → 第一设备重启应直接在
+# 终端提示"本设备已被撤销。"并自动退出（不再进入 TUI，无"仅可退出"模式）。
 import os, pty, subprocess, select, time, sys, socket, tempfile, shutil
 
 ROOT = '/Users/Shared/productX/einz'
@@ -51,9 +50,16 @@ def start_tui(store, port):
     os.close(slave)
     return master, p
 
+def kill_proc(p, m):
+    if p.poll() is None:
+        p.kill()
+    try: os.close(m)
+    except OSError: pass
+
 def main():
     port = free_port()
     server = None
+    spawned = []  # 记录已启动的 TUI 进程，失败路径兜底清理
     try:
         # 1) 临时服务器
         server = subprocess.Popen(
@@ -74,23 +80,29 @@ def main():
 
         # 2) 第一设备入网（首设备自举 + 设置 escrow 口令 pass-123）
         m1, p1 = start_tui(store, port)
-        out = wait_text(m1, '请输入您的名字')
-        if '请输入您的名字' not in out:
+        spawned.append((m1, p1))
+        out = wait_text(m1, '输入我的名字')
+        if '输入我的名字' not in out:
             print('❌ 未到名字问答'); print(out[-500:]); return 1
         send(m1, 'luk\r')
-        out = wait_text(m1, '请设置内容安全口令')
-        if '请设置内容安全口令' not in out:
+        out = wait_text(m1, '输入伴侣的名字')
+        if '输入伴侣的名字' not in out:
+            print('❌ 未到伴侣名字问答'); print(out[-500:]); return 1
+        send(m1, '\r')  # 伴侣名字：跳过（默认 personB）
+        out = wait_text(m1, '设置密保口令')
+        if '设置密保口令' not in out:
             print('❌ 未到 escrow 口令问答'); print(out[-500:]); return 1
         send(m1, 'pass-123\r')
-        out = wait_text(m1, '● 在线')
-        if '● 在线' not in out:
-            print('❌ 第一设备未进入在线状态'); print(out[-500:]); return 1
+        out = wait_text(m1, '设置锁屏码')
+        if '设置锁屏码' not in out:
+            print('❌ 未到锁屏码问答'); print(out[-500:]); return 1
+        send(m1, '\r')  # 锁屏码：跳过（不设置）
+        out = wait_text(m1, '🎉 一切就绪')
+        if '🎉 一切就绪' not in out:
+            print('❌ 第一设备未完成入网'); print(out[-500:]); return 1
         send(m1, '/exit\r')
         time.sleep(2)
-        if p1.poll() is None:
-            p1.kill()
-        try: os.close(m1)
-        except OSError: pass
+        kill_proc(p1, m1)
         print('✅ 第一设备入网并进入在线')
 
         # 3) /recover 撤销全部设备
@@ -104,34 +116,30 @@ def main():
             print('❌ /recover 未成功'); print(body); return 1
         print('✅ /recover 已撤销设备')
 
-        # 4) 第一设备重启 → 应进入"仅可退出"模式
+        # 4) 第一设备重启 → 不进 TUI：终端直接提示"本设备已被撤销。"并自动退出
         m2, p2 = start_tui(store, port)
-        out = wait_text(m2, '当前设备已被撤销')
-        if '当前设备已被撤销，您只能 /exit 退出' not in out:
+        spawned.append((m2, p2))
+        out = wait_text(m2, '本设备已被撤销')
+        if '本设备已被撤销。' not in out:
             print('❌ 未显示撤销提示'); print(out[-800:]); return 1
-        if '设备已被撤销' not in out:
-            print('❌ 状态栏未显示撤销态'); print(out[-500:])
-        # 4a) 普通输入应被拒绝（再次出现提示，而不是发送成功）
-        n_before = out.count('当前设备已被撤销')
-        send(m2, 'hello 世界\r')
-        out += wait_text(m2, '当前设备已被撤销', timeout=8)
-        n_after = out.count('当前设备已被撤销')
-        if n_after <= n_before:
-            print('❌ 普通输入未被拒绝（无重复提示）'); print(out[-600:]); return 1
-        print('✅ 普通输入被拒绝（提示重复出现）')
-        # 4b) /exit 可退出
-        send(m2, '/exit\r')
+        # 进程应自行退出（无需 /exit）
         deadline = time.time() + 8
         while time.time() < deadline and p2.poll() is None:
             drain(m2, 0.4)
         exited = p2.poll() is not None
         if not exited:
             p2.kill()
-            print('❌ /exit 未能退出'); return 1
-        print('✅ /exit 正常退出')
+            print('❌ 撤销设备未自动退出'); return 1
+        kill_proc(p2, m2)
+        print('✅ 撤销设备提示后自动退出')
         print('🎉 revoked 场景全部通过')
         return 0
     finally:
+        for m, p in spawned:
+            if p.poll() is None:
+                p.kill()
+            try: os.close(m)
+            except OSError: pass
         if server:
             server.terminate()
             try: server.wait(timeout=5)

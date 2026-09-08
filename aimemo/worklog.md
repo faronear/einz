@@ -1195,3 +1195,27 @@ setup_join_passphrase/setup_envelope_verify/wizard_envelope_entry 13 项全过
 （溢出修复前 10 项红）、chat_page_menu_test 10 项全过（通知改动）（golden 按政策跳过）。
 
 **不入库：** `server_settings.dart` 的 `kEinzServer = http://localhost:3000`（照旧跳过）。
+
+## 2026-09-08 会话：TUI 被撤销设备启动直接提示退出（不再进入 TUI）
+
+**任务（老板要求）：** 当前设备已被 revoked 时，启动 einz_tui.dart 不再进入 TUI 界面，
+直接在终端提示"本设备已被撤销。"后退出。
+
+**实现（cli/bin/einz_tui.dart）：**
+- 启动自检 `_probeRevoked` 返回 1（getSpace 403）→ 直接提示"本设备已被撤销。"后
+  exit(0)（此刻仍在 cooked 模式，无需恢复终端）
+- 引导认证挑战 403（设备已撤销；/recover、/revoke 会删会话 → 先走 probe==2 清
+  token → 挑战 403 兜底识别）→ `_restoreTerminal()` 后清屏提示并 exit(0)
+- 提示写 stderr：pty 下退出瞬间 stdout flush 未决时 write 抛 "StreamSink is
+  bound to a stream"（与 _printFarewell 同款场景，stderr 是独立 sink 必达）
+- 移除 `_revoked`/"仅可退出"模式全部死代码（_runGuide 守卫、main 历史守卫、
+  状态栏、输入循环/命令拦截、_revokedBanner）
+
+**回归测试：** cli/test/revoked_check.py 重写（原测试文案已过时）：首设备入网
+（适配现行问答：输入我的名字/伴侣名字/设置密保口令/设置锁屏码）→ /recover →
+重启断言"本设备已被撤销。"并自动退出。
+
+**验证：** dart analyze 0 issue；`python3 test/revoked_check.py` 全过。
+
+**备注：** 撤销最快也在引导认证 403 时检出（probe==2 先行），TUI 会有极短闪烁
+（网络往返 <1s）后清屏退出。
