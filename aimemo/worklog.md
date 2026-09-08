@@ -1035,3 +1035,18 @@
 **验证：** flutter analyze 0 issue（仅 1 既有 info lint）；chat_page_menu/lock_page/setup_envelope_verify/setup_join_passphrase 4 文件 18 项全过。
 
 **遗留提示：** 改口令弹窗（chatPageChangePassphraseTitle 等）标题与按钮仍为「修改口令」，与菜单「密保口令」不一致；确认弹窗已是「修改内容密保口令？」。如需全套统一为「密保口令」措辞，另行排期。
+
+## 2026-09-08 会话：邀请码弹窗修复（弹窗不显示 + 二维码从未可见）
+
+**老板真机报告：** app 使用一段时间后点菜单生成邀请码，经常整个屏幕变暗但弹窗不出现；flutter run 报 RenderIntrinsicWidth / RenderBox was not laid out 连锁异常（异常原文开头被截断）。另补充：弹窗里从未见过二维码。
+
+**根因（双重，已用 widget 测试复现确认，e07c9d6）：**
+
+1. 弹窗内容用 `QrImageView`（qr_flutter 4.1.0）——其内部**无条件包 LayoutBuilder**（qr_image_view.dart build），而 AlertDialog 内部用 **IntrinsicWidth** 包裹内容做固有尺寸测量 → 弹窗首帧 performLayout 抛 `LayoutBuilder does not support returning intrinsic dimensions`（Flutter issue #46063 同款签名），整个弹窗子树未布局 → 遮罩变暗、弹窗不出现。时序相关性：IntrinsicWidth 仅在松约束相位触发测量，真机 vsync 下偶发命中 → "使用一段时间后经常"。
+2. `_QrContentView` 的绘制面 CustomPaint **无显式尺寸**且被内部 Padding 松约束包裹 → 实际 0x0，`QrPainter.paint` 直接 return（"[QR] WARN: width or height is zero"）→ 即使弹窗正常也看不到二维码。
+
+**修复：** chat_page.dart 新增私有 `_InviteQrCode`（`QrCode.fromData` + `QrPainter.withQr` 自绘，SizedBox 160x160 显式定尺寸），无 LayoutBuilder、必定可见；不用 `package:qr` 直引（qr_flutter 已 re-export，避免 unnecessary_import lint）。新增真实路径回归测试 `app/test/invite_dialog_layout_test.dart`：开菜单→邀请码→断言首帧无异常、弹窗内容齐全、二维码 160x160 可见。
+
+**验证：** flutter analyze 仅剩 1 条既有 info lint（ws_realtime_service.dart prefer_initializing_formals，存量不动）；回归测试通过。`server_settings.dart` 本地 localhost 配置照旧不入库。
+
+**经验教训（跨项目可复用）：** 任何放在 AlertDialog/SimpleDialog（内部 IntrinsicWidth）里的内容，都不能含 LayoutBuilder / ListView / PageView / SingleChildScrollView / 自定义不支持固有尺寸的 RenderBox——首帧必然抛固有尺寸异常。QrImageView 的 LayoutBuilder 是 qr_flutter 4.x 的已知坑。
