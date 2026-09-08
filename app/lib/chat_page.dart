@@ -24,6 +24,7 @@ import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
+import 'widgets/recording_overlay.dart';
 import 'widgets/top_notice.dart';
 
 /// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
@@ -116,6 +117,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   static const int _pageSize = 50;
   bool _recording = false;
   String? _recordingPath;
+  Stream<Amplitude>? _amplitudeStream; // 录音实时振幅流（页面中央波形遮罩订阅）
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
@@ -777,6 +779,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     try {
       final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await (_recorder ??= AudioRecorder()).start(const RecordConfig(), path: path);
+      // 取振幅流（record 插件内部定时轮询，无订阅者时不做事），供波形遮罩实时驱动
+      _amplitudeStream = _recorder?.onAmplitudeChanged(const Duration(milliseconds: 70));
       setState(() {
         _recording = true;
         _recordingPath = path;
@@ -793,6 +797,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() {
       _recording = false;
       _recordingPath = null;
+      _amplitudeStream = null;
     });
     try {
       await _recorder?.stop();
@@ -1344,8 +1349,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
+          Column(
+            children: [
           // 对话顶部：双方名字 + 各自在线状态（对方左 / 我右，与消息对齐一致）
           Container(
             width: double.infinity,
@@ -1487,6 +1494,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
         ],
+      ),
+      // 录音中：页面中央波形遮罩（真实振幅驱动；IgnorePointer 不挡操作）
+      if (_recording && _amplitudeStream != null)
+        RecordingOverlay(
+          amplitudeStream: _amplitudeStream!,
+          hintText: l10n.chatPageRecordingHint,
+        ),
+      ],
       ),
     );
   }
