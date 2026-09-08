@@ -87,7 +87,8 @@ class _SetupPageState extends State<SetupPage> {
   String? _sessionToken;
   int _joinKeyVersion = 1; // join 口令验证时记录的 Space Key 版本（_verifyJoinPassphrase 填充）
   String _myDeviceName = ''; // 登记时的设备名（进聊天页显示/修改用）
-  String? _status;
+  String? _status; // 后台报告的错误提示（红字，显示在底部按钮下方）
+  String? _localError; // 本地校验错误提示（红字，显示在输入框下方）
   bool _busy = false;
 
   /// 探测到的 person 名称表（服务端 /health 返回）：
@@ -349,8 +350,10 @@ class _SetupPageState extends State<SetupPage> {
               ),
             ),
             const SizedBox(height: 8),
+            // 后台报告的错误提示（红字；本地校验错误见输入框下方）
             if (_status != null) ...[
-              Text(_status!, style: const TextStyle(fontSize: 13)),
+              Text(_status!,
+                  style: const TextStyle(color: Colors.red, fontSize: 14)),
               const SizedBox(height: 8),
             ],
             // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
@@ -465,6 +468,7 @@ class _SetupPageState extends State<SetupPage> {
     setState(() {
       _role = role;
       _step = 1;
+      _localError = null;
     });
   }
 
@@ -475,29 +479,33 @@ class _SetupPageState extends State<SetupPage> {
       _chosenPerson = person;
       _step = 2; // 点卡片直接进邀请码页
       _status = null;
+      _localError = null;
     });
   }
 
   Future<void> _nextStep() async {
     final l10n = AppLocalizations.of(context)!;
-    // 按步骤前置校验（每步只要求一个信息）
+    // 按步骤前置校验（每步只要求一个信息）——本地可检测的错误 → _localError
+    // （红字显示在输入框下方）；后台/网络错误 → _status（红字显示在按钮下方）
     // create 步骤 1（本人）与步骤 2（对方）的名字均不允许空白跳过
     if (_role == _WizardRole.create && _step == 1 && _personName.text.trim().isEmpty) {
-      setState(() => _status = l10n.wizardNameRequired);
+      setState(() => _localError = l10n.wizardNameRequired);
       return;
     }
     if (_role == _WizardRole.create && _step == 2 && _peerNameCtrl.text.trim().isEmpty) {
-      setState(() => _status = l10n.wizardPeerNameRequired);
+      setState(() => _localError = l10n.wizardPeerNameRequired);
       return;
     }
     if (_role == _WizardRole.join && _step == 1 && _chosenPerson == null) {
-      setState(() => _status = l10n.wizardIdentityFirst);
+      setState(() => _localError = l10n.wizardIdentityFirst);
       return;
     }
     if (_role == _WizardRole.join && _step == 2 && _inviteCode.text.trim().isEmpty) {
-      setState(() => _status = l10n.setupPageNeedInvite);
+      setState(() => _localError = l10n.setupPageNeedInvite);
       return;
     }
+    // 本地校验全部通过 → 清除本地错误提示
+    setState(() => _localError = null);
     // join 邀请码页（步骤 2）：邀请码必须有效（服务端登记成功）才放行——
     // 与口令页一样即时验证，不留到口令页才登记/校验
     if (_role == _WizardRole.join && _step == 2) {
@@ -506,11 +514,11 @@ class _SetupPageState extends State<SetupPage> {
       if (!ok) return;
     }
     if (_role == _WizardRole.create && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
-      setState(() => _status = l10n.setupPageNeedPassphrase);
+      setState(() => _localError = l10n.setupPageNeedPassphrase);
       return;
     }
     if (_role == _WizardRole.join && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
-      setState(() => _status = l10n.setupPageNeedPassphrase);
+      setState(() => _localError = l10n.setupPageNeedPassphrase);
       return;
     }
     // join 口令页（步骤 3）：输入口令必须与首台设备创建时一致（解密 escrow
@@ -522,7 +530,7 @@ class _SetupPageState extends State<SetupPage> {
     }
     if (_role == _WizardRole.offline && _step == 1) {
       if (_envelopeKey.text.trim().isEmpty) {
-        setState(() => _status = l10n.setupPagePasteEnvelope);
+        setState(() => _localError = l10n.setupPagePasteEnvelope);
         return;
       }
       // 邀请码沿用 join 步骤 2 已填值（offline 从 join 口令页切换进入）
@@ -597,7 +605,51 @@ class _SetupPageState extends State<SetupPage> {
       // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密保信封）；
       // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
       if (_step > 1) _step--;
+      _localError = null;
+      _status = null;
     });
+  }
+
+  /// 归一化的向导输入步骤页头：大标题（大号醒目）+ 解释说明（较小较淡）。
+  /// 全向导各输入页统一用此头部，保证视觉与结构一致。
+  Widget _stepHeader(String title, String hint) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          hint,
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  /// 本地校验错误提示（红字，显示在输入框下方、按钮上方）。
+  Widget _localErrorHint(String error) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Text(
+        error,
+        style: const TextStyle(
+          color: Colors.red,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 
   /// 按角色+步骤分发到对应步骤页。
@@ -895,17 +947,16 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardNameHint, style: const TextStyle(fontSize: 16)),
-        const SizedBox(height: 12),
+        _stepHeader(l10n.wizardTitleName, l10n.wizardNameHint),
         TextField(
           controller: _personName,
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(fontSize: 20),
           decoration: InputDecoration(
-            labelText: l10n.wizardNameLabel,
             hintText: l10n.wizardNameHintInput,
             border: const OutlineInputBorder(),
           ),
         ),
+        if (_localError != null) _localErrorHint(_localError!),
         if (_role == _WizardRole.create && _bootstrapFailed) ...[
           const SizedBox(height: 12),
           Card(
@@ -942,8 +993,7 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardIdentityHint, style: const TextStyle(fontSize: 16)),
-        const SizedBox(height: 12),
+        _stepHeader(l10n.wizardTitleIdentity, l10n.wizardIdentityHint),
         Row(
           children: [
             Expanded(
@@ -967,13 +1017,13 @@ class _SetupPageState extends State<SetupPage> {
             ),
           ],
         ),
+        if (_localError != null) _localErrorHint(_localError!),
         if (_chosenPerson == 'personB' && bName.isEmpty) ...[
           const SizedBox(height: 12),
           TextField(
             controller: _personName,
-            style: const TextStyle(fontSize: 18),
+            style: const TextStyle(fontSize: 20),
             decoration: InputDecoration(
-              labelText: l10n.wizardNameLabel,
               hintText: l10n.wizardNameHintInput,
               border: const OutlineInputBorder(),
             ),
@@ -1039,17 +1089,16 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardInviteHint, style: const TextStyle(fontSize: 16)),
-        const SizedBox(height: 12),
+        _stepHeader(l10n.wizardTitleInvite, l10n.wizardInviteHint),
         TextField(
           controller: _inviteCode,
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(fontSize: 20),
           decoration: InputDecoration(
-            labelText: l10n.setupPageInviteLabel,
             hintText: l10n.setupPageInviteHint,
             border: const OutlineInputBorder(),
           ),
         ),
+        if (_localError != null) _localErrorHint(_localError!),
       ],
     );
   }
@@ -1086,17 +1135,16 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardPeerNameHint, style: const TextStyle(fontSize: 16)),
-        const SizedBox(height: 12),
+        _stepHeader(l10n.wizardTitlePeerName, l10n.wizardPeerNameHint),
         TextField(
           controller: _peerNameCtrl,
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(fontSize: 20),
           decoration: InputDecoration(
-            labelText: l10n.wizardPeerNameLabel,
             hintText: l10n.wizardPeerNameHintInput,
             border: const OutlineInputBorder(),
           ),
         ),
+        if (_localError != null) _localErrorHint(_localError!),
       ],
     );
   }
@@ -1106,18 +1154,19 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(_role == _WizardRole.join ? l10n.wizardJoinPassphraseHint : l10n.wizardPassphraseHint,
-            style: const TextStyle(fontSize: 16)),
-        const SizedBox(height: 12),
+        _stepHeader(
+          l10n.wizardTitlePassphrase,
+          _role == _WizardRole.join ? l10n.wizardJoinPassphraseHint : l10n.wizardPassphraseHint,
+        ),
         TextField(
           controller: _escrowPassphrase,
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(fontSize: 20),
           obscureText: true,
-          decoration: InputDecoration(
-            labelText: l10n.setupPageEscrowLabel,
-            border: const OutlineInputBorder(),
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
           ),
         ),
+        if (_localError != null) _localErrorHint(_localError!),
         const SizedBox(height: 16),
         // 密保信封导入与口令同属 Space Key 交换方式：仅 join（第二/三台设备）
         // 可用——信封是对端设备导出的密封密钥，首设备（create）没有对端设备，
@@ -1138,34 +1187,29 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.wizardPinHint, style: const TextStyle(fontSize: 16)),
-        const SizedBox(height: 12),
+        _stepHeader(l10n.wizardTitlePin, l10n.wizardPinHint),
         TextField(
           controller: _pin,
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            labelText: l10n.setPinDialogPinLabel,
+            hintText: l10n.setPinDialogPinHint,
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         TextField(
           controller: _confirm,
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            labelText: l10n.setPinDialogConfirmLabel,
+            hintText: l10n.setPinDialogConfirmHint,
             border: const OutlineInputBorder(),
           ),
         ),
-        if (_pinError != null) ...[
-          const SizedBox(height: 8),
-          Text(_pinError!,
-              style: const TextStyle(color: Colors.red, fontSize: 13)),
-        ],
+        if (_pinError != null) _localErrorHint(_pinError!),
       ],
     );
   }
@@ -1295,7 +1339,7 @@ class _SetupPageState extends State<SetupPage> {
     if (kp == null) return false;
     final code = _inviteCode.text.trim();
     if (code.isEmpty) {
-      setState(() => _status = AppLocalizations.of(context)!.setupPageNeedInvite);
+      setState(() => _localError = AppLocalizations.of(context)!.setupPageNeedInvite);
       return false;
     }
     setState(() {
@@ -1323,7 +1367,7 @@ class _SetupPageState extends State<SetupPage> {
     if (kp == null) return false;
     final passphrase = _escrowPassphrase.text.trim();
     if (passphrase.isEmpty) {
-      setState(() => _status = AppLocalizations.of(context)!.setupPageNeedPassphrase);
+      setState(() => _localError = AppLocalizations.of(context)!.setupPageNeedPassphrase);
       return false;
     }
     setState(() {
@@ -1407,16 +1451,16 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _stepHeader(l10n.wizardTitleEnvelope, l10n.setupPageEnvelopeKeyHint),
         TextField(
           controller: _envelopeKey,
           style: const TextStyle(fontSize: 18),
           maxLines: 3,
-          decoration: InputDecoration(
-            labelText: l10n.setupPageEnvelopeKeyLabel,
-            hintText: l10n.setupPageEnvelopeKeyHint,
-            border: const OutlineInputBorder(),
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
           ),
         ),
+        if (_localError != null) _localErrorHint(_localError!),
         // 邀请码已在 join 步骤 2 提供（offline 从 join 口令页切换进入时沿用
         // 已填邀请码登记），此页不再重复显示输入框
         const SizedBox(height: 16),
@@ -1439,6 +1483,7 @@ class _SetupPageState extends State<SetupPage> {
       _role = _WizardRole.join;
       _step = 3; // join 口令页
       _status = null;
+      _localError = null;
     });
   }
 
@@ -1449,7 +1494,7 @@ class _SetupPageState extends State<SetupPage> {
     if (kp == null) return false;
     final envelopeRaw = _envelopeKey.text.trim();
     if (envelopeRaw.isEmpty) {
-      setState(() => _status = AppLocalizations.of(context)!.setupPagePasteEnvelope);
+      setState(() => _localError = AppLocalizations.of(context)!.setupPagePasteEnvelope);
       return false;
     }
     setState(() {

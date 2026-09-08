@@ -89,8 +89,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardNameHintInput => 'e.g. Lukas (optional, change later)';
 
   @override
-  String get wizardIdentityHint =>
-      'This space already has users — choose your identity:';
+  String get wizardIdentityHint => 'This space is limited to two people.';
 
   @override
   String get wizardIdentityCreator => 'First user (creator)';
@@ -150,6 +149,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardStepShortEnvelope => 'Envelope';
+
+  @override
+  String get wizardTitleName => 'My name';
+
+  @override
+  String get wizardTitlePeerName => 'Partner\'s name';
+
+  @override
+  String get wizardTitleInvite => 'Invite code';
+
+  @override
+  String get wizardTitlePassphrase => 'Passphrase';
+
+  @override
+  String get wizardTitlePin => 'Screen lock PIN';
+
+  @override
+  String get wizardTitleEnvelope => 'Key envelope';
+
+  @override
+  String get wizardTitleIdentity => 'I am';
 
   @override
   String get wizardEnrollExists =>
@@ -225,8 +245,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageInviteLabel => 'Invite code (one-time)';
 
   @override
-  String get setupPageInviteHint =>
-      'Filled in automatically after scanning; paste the invite code when joining manually';
+  String get setupPageInviteHint => 'Paste or type the invite code';
 
   @override
   String get setupPageNeedInvite =>
@@ -249,7 +268,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogPinLabel => 'PIN (at least 4 characters)';
 
   @override
+  String get setPinDialogPinHint => 'At least 4 digits';
+
+  @override
   String get setPinDialogConfirmLabel => 'Confirm PIN';
+
+  @override
+  String get setPinDialogConfirmHint => 'Type it again to confirm';
 
   @override
   String get setPinDialogSetPin => 'Set PIN';

@@ -245,7 +245,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardIdentityHint.
   ///
   /// In en, this message translates to:
-  /// **'This space already has users — choose your identity:'**
+  /// **'This space is limited to two people.'**
   String get wizardIdentityHint;
 
   /// No description provided for @wizardIdentityCreator.
@@ -361,6 +361,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Envelope'**
   String get wizardStepShortEnvelope;
+
+  /// No description provided for @wizardTitleName.
+  ///
+  /// In en, this message translates to:
+  /// **'My name'**
+  String get wizardTitleName;
+
+  /// No description provided for @wizardTitlePeerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner\'s name'**
+  String get wizardTitlePeerName;
+
+  /// No description provided for @wizardTitleInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code'**
+  String get wizardTitleInvite;
+
+  /// No description provided for @wizardTitlePassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase'**
+  String get wizardTitlePassphrase;
+
+  /// No description provided for @wizardTitlePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen lock PIN'**
+  String get wizardTitlePin;
+
+  /// No description provided for @wizardTitleEnvelope.
+  ///
+  /// In en, this message translates to:
+  /// **'Key envelope'**
+  String get wizardTitleEnvelope;
+
+  /// No description provided for @wizardTitleIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'I am'**
+  String get wizardTitleIdentity;
 
   /// No description provided for @wizardEnrollExists.
   ///
@@ -485,7 +527,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageInviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Filled in automatically after scanning; paste the invite code when joining manually'**
+  /// **'Paste or type the invite code'**
   String get setupPageInviteHint;
 
   /// No description provided for @setupPageNeedInvite.
@@ -518,11 +560,23 @@ abstract class AppLocalizations {
   /// **'PIN (at least 4 characters)'**
   String get setPinDialogPinLabel;
 
+  /// No description provided for @setPinDialogPinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 4 digits'**
+  String get setPinDialogPinHint;
+
   /// No description provided for @setPinDialogConfirmLabel.
   ///
   /// In en, this message translates to:
   /// **'Confirm PIN'**
   String get setPinDialogConfirmLabel;
+
+  /// No description provided for @setPinDialogConfirmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type it again to confirm'**
+  String get setPinDialogConfirmHint;
 
   /// No description provided for @setPinDialogSetPin.
   ///

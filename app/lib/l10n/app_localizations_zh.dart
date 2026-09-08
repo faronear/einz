@@ -82,7 +82,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameHintInput => '例如 Lukas';
 
   @override
-  String get wizardIdentityHint => '一个秘境仅限两人。我是：';
+  String get wizardIdentityHint => '一个秘境仅限两人。';
 
   @override
   String get wizardIdentityCreator => '秘境创建者';
@@ -140,6 +140,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardStepShortEnvelope => '密保信封';
+
+  @override
+  String get wizardTitleName => '我的名字';
+
+  @override
+  String get wizardTitlePeerName => '伴侣名字';
+
+  @override
+  String get wizardTitleInvite => '邀请码';
+
+  @override
+  String get wizardTitlePassphrase => '密保口令';
+
+  @override
+  String get wizardTitlePin => '锁屏码';
+
+  @override
+  String get wizardTitleEnvelope => '密保信封';
+
+  @override
+  String get wizardTitleIdentity => '我是';
 
   @override
   String get wizardEnrollExists =>
@@ -207,7 +228,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageInviteLabel => '邀请码（一次性）';
 
   @override
-  String get setupPageInviteHint => '';
+  String get setupPageInviteHint => '粘贴或输入邀请码';
 
   @override
   String get setupPageNeedInvite => '⚠️ 填写一次性邀请码（由已认证设备生成）';
@@ -227,7 +248,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogPinLabel => 'PIN（至少 4 位）';
 
   @override
+  String get setPinDialogPinHint => '至少 4 位数字';
+
+  @override
   String get setPinDialogConfirmLabel => '确认 PIN';
+
+  @override
+  String get setPinDialogConfirmHint => '再输一遍以确认';
 
   @override
   String get setPinDialogSetPin => '设置 PIN';
