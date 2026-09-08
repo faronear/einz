@@ -9,12 +9,12 @@
 
 ## 新机环境准备（换电脑 / 从零搭建）
 
-| 依赖 | 版本要求 | 安装方式（macOS） | 备注 |
-| --- | --- | --- | --- |
-| Node.js | ≥ 22 | `brew install node` | Server 运行时 |
-| Dart SDK | 3.x（实测 3.13.2） | `brew install dart-sdk` | **公式名是 dart-sdk 不是 dart** |
-| libsodium | 最新（实测 1.0.22） | `brew install libsodium` | shared/CLI 加密依赖；非标准路径需设 `LIBSODIUM_PATH`（见下） |
-| Flutter SDK | 3.x stable | 见下"Flutter 安装" | app 端 |
+| 依赖        | 版本要求            | 安装方式（macOS）        | 备注                                                         |
+| ----------- | ------------------- | ------------------------ | ------------------------------------------------------------ |
+| Node.js     | ≥ 22                | `brew install node`      | Server 运行时                                                |
+| Dart SDK    | 3.x（实测 3.13.2）  | `brew install dart-sdk`  | **公式名是 dart-sdk 不是 dart**                              |
+| libsodium   | 最新（实测 1.0.22） | `brew install libsodium` | shared/CLI 加密依赖；非标准路径需设 `LIBSODIUM_PATH`（见下） |
+| Flutter SDK | 3.x stable          | 见下"Flutter 安装"       | app 端                                                       |
 
 - Homebrew 路径：**Intel Mac** 为 `/usr/local`，**Apple Silicon** 为 `/opt/homebrew`；`pkg-config --modversion libsodium` 可验证。
 - **Flutter 安装（中国网络镜像）**：Google storage 与 GitHub 不可达时使用镜像 `storage.flutter-io.cn`（如 `flutter_macos_arm64_3.47.2-stable.zip`，注意选对 arm64 / x64 包），解压到 `~/development/flutter` 并加 PATH；需 ≥9GB 磁盘空闲。
@@ -63,7 +63,7 @@ docker compose logs -f server   # 查看日志（启动/登记/邀请码等事�
 # ② 本机（Mac）：拉最新代码
 cd /Users/Shared/productX/only && git pull
 
-# ③ 可选：清掉旧设备身份（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
+# ③ 可选：清掉旧设备凭证（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
 rm -f ~/.einz/*.json
 mkdir -p ~/.einz
 ```
@@ -72,7 +72,7 @@ mkdir -p ~/.einz
 
 ---
 
-## 阶段 1：B 端（Windows）生成设备身份
+## 阶段 1：B 端（Windows）生成设备凭证
 
 > 身份必须在 B 自己的机器上生成（私钥留本机）。**也可以跳过本阶段**——B 直接用 TUI 引导，登记时自动生成身份。
 
@@ -92,7 +92,7 @@ dart run bin/einz.dart init --store "$env:USERPROFILE\.einz\b.json" --device-id 
 cd /Users/Shared/productX/only/cli
 dart run bin/einz_tui.dart   # 不传 --store：自动发现/创建设备
 # 引导流程：
-# 引导流程（设备身份自动生成，登记后由服务端分配 dev1 等规范 id）：
+# 引导流程（设备凭证自动生成，登记后由服务端分配 dev1 等规范 id）：
 #   你的名称（如 lukas）→ 设备名称（显示用，如 MacBook）
 #   ✅ 首设备自举成功（你是空间创建者，分配为 dev1 / personA）
 #   设置托管口令:（如 faronear，对方凭它接入）
@@ -151,7 +151,7 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现 ~/.einz/ 下的设�
 cd 你的only目录\cli
 dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz\ 下的设备
 # 引导流程（空间已有设备 → 走邀请码登记）：
-# 引导流程（空间已有设备 → 走邀请码登记；设备身份自动生成）：
+# 引导流程（空间已有设备 → 走邀请码登记；设备凭证自动生成）：
 #   你的名称（如 steffi）→ 设备名称（显示用，如 Windows）
 #   ⚠️ 自举失败（空间已有创建者）→ 输入邀请码: XXXX-XXXXX-XXXXX-XXXXX
 #   ✅ 邀请码登记成功（分配为 dev2 / personB）

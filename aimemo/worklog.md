@@ -18,12 +18,12 @@
 
 **老板决策（2026-08-28）：**
 
-| 决策点 | 结论 |
-| --- | --- |
-| 恢复模型 | V1 纯本地备份+恢复码（模型 A），架构预留服务器托管（模型 B） |
-| 多设备 | Person≠Device 分开建模，V1 一人一机，预留扩展 |
-| 技术栈 | **放弃 UniApp**，改用 **Flutter**（dart:ffi 绑原生 libsodium，无 WebView 中间层；flutter_secure_storage / drift / camera 生态成熟） |
-| 文档 | 确认按新结构大幅重写，统一命名 Einz |
+| 决策点   | 结论                                                                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 恢复模型 | V1 纯本地备份+恢复码（模型 A），架构预留服务器托管（模型 B）                                                                        |
+| 多设备   | Person≠Device 分开建模，V1 一人一机，预留扩展                                                                                       |
+| 技术栈   | **放弃 UniApp**，改用 **Flutter**（dart:ffi 绑原生 libsodium，无 WebView 中间层；flutter_secure_storage / drift / camera 生态成熟） |
+| 文档     | 确认按新结构大幅重写，统一命名 Einz                                                                                                 |
 
 **产出：**
 
@@ -49,11 +49,11 @@
 
 **老板决策（第二轮）：**
 
-| 决策点 | 结论 |
-| --- | --- |
-| 配对方案 | **一次性人工配置**（静态白名单，删除配对流程） |
+| 决策点     | 结论                                            |
+| ---------- | ----------------------------------------------- |
+| 配对方案   | **一次性人工配置**（静态白名单，删除配对流程）  |
 | 多设备预留 | **保留**（Person≠Device 建模不变，V1 一人一机） |
-| 文档更新 | 先 commit 当前状态，再更新文档 |
+| 文档更新   | 先 commit 当前状态，再更新文档                  |
 
 **产出：**
 
@@ -73,10 +73,10 @@
 
 **老板决策（第三轮）：**
 
-| 决策点 | 结论 |
-| --- | --- |
-| Web 客户端 | **不做**（破坏 E2EE 信任模型，明确写入非目标） |
-| 电脑端 | 暂缓（V2 再评估：CLI 加 TUI 升级，或 Flutter 桌面端） |
+| 决策点     | 结论                                                    |
+| ---------- | ------------------------------------------------------- |
+| Web 客户端 | **不做**（破坏 E2EE 信任模型，明确写入非目标）          |
+| 电脑端     | 暂缓（V2 再评估：CLI 加 TUI 升级，或 Flutter 桌面端）   |
 | CLI 测试端 | **Dart CLI + `shared/` 核心包**，Phase 0–4 作为测试驱动 |
 
 **产出：**
@@ -264,13 +264,13 @@
 
 **P2 修复（5 项）：**
 
-| 发现 | 修复 |
-| --- | --- |
-| 撤销后不关闭被撤销设备的 WS | `notifyRevoked` 发帧后 `close(4403)` + 移出 conns（否则 revoked 设备继续收新消息解密） |
-| app `_uuidv7` 时间戳伪随机 + 格式非法 | 改 `Random.secure()` CSPRNG + 正确 8-4-4-4-12 UUIDv7 |
-| `MessageRepository.history()` 固定密钥解密 | 注入 `archivedKeys`（key_version→密钥），按 `env.keyVersion` 选密钥（对齐 CLI `spaceKeyForVersion`）；缺密钥时抛明确 StateError |
-| 发送推进锚点跳过未同步历史 | **锚点只在 /sync 响应推进**：`_markSent`/CLI `_flushPending` 不再推进（PROTOCOL.md §5.2），避免新设备未同步先发消息 → 对方历史被永久跳过 |
-| `x-attachment-meta` 缺失/坏 JSON → 500 | 显式校验 → 400 INVALID_REQUEST（协议 §9） |
+| 发现                                       | 修复                                                                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 撤销后不关闭被撤销设备的 WS                | `notifyRevoked` 发帧后 `close(4403)` + 移出 conns（否则 revoked 设备继续收新消息解密）                                                   |
+| app `_uuidv7` 时间戳伪随机 + 格式非法      | 改 `Random.secure()` CSPRNG + 正确 8-4-4-4-12 UUIDv7                                                                                     |
+| `MessageRepository.history()` 固定密钥解密 | 注入 `archivedKeys`（key_version→密钥），按 `env.keyVersion` 选密钥（对齐 CLI `spaceKeyForVersion`）；缺密钥时抛明确 StateError          |
+| 发送推进锚点跳过未同步历史                 | **锚点只在 /sync 响应推进**：`_markSent`/CLI `_flushPending` 不再推进（PROTOCOL.md §5.2），避免新设备未同步先发消息 → 对方历史被永久跳过 |
+| `x-attachment-meta` 缺失/坏 JSON → 500     | 显式校验 → 400 INVALID_REQUEST（协议 §9）                                                                                                |
 
 **P3 修复（3 项）：** `decryptMessage` 移除死参数 keyVersion（AAD 用 env.keyVersion，误导调用方；全部调用方同步更新）；历史排序 null-last（未同步排最后，app + CLI store 双修）；Gradle 腾讯云镜像加 `distributionSha256Sum`（官方 9.3.1-all checksum，防供应链）；顺带 main.dart `_generateDeviceKey` 加 mounted 检查（防 setState-after-dispose）。
 
@@ -399,16 +399,19 @@
 **依赖**（pubspec 新增）：`image_picker ^1.2.3`（拍照/拍摄/相册）、`record ^7.1.1`（录音）、`audioplayers ^6.8.1`（语音播放）、`video_player ^2.14.0`（视频播放）。
 
 **MessageRepository**（app/lib/data/message_repository.dart）：
+
 - `sendAttachment({fileBytes, fileName, type, caption})`：encryptAttachment 加密 blob → `api.postAttachment`（/attachments，x-attachment-meta 带 sha256/nonce/size）→ 发 caption 消息（type 标记）→ 本地附件元数据落库；无 token 时消息入 pending（v1 附件 blob 不做离线补传）
 - `history()` 扩展：按 message_id 关联 local_attachments，返回附件元数据
 - `fetchAttachment({attachmentId, keyVersion, sha256, nonce})`：下载密文 → decryptAttachment（AEAD + sha256 校验）
 
 **chat_page**（语音/图像/视频三类 UI）：
+
 - 语音：输入区 mic 图标**按住说话**（GestureDetector 长按 → record 录音到临时 m4a → 松开 `sendAttachment(type: voice)`）→ 接收渲染播放条（点击 `fetchAttachment` 解密 → 临时文件 → audioplayers 播放，onPlayerComplete 复位）
 - 图像：附件 sheet（拍照/相册图片）→ pickImage(maxWidth:1600) → `sendAttachment(type: image)` → 接收缩略图（FutureBuilder 下载解密 → Image.memory，`_imageCache` 防重复下载）→ 点击全屏（InteractiveViewer）
 - 视频：sheet（拍摄视频/相册视频，pickVideo maxDuration 1min）→ `sendAttachment(type: video)` → 接收播放按钮（下载解密 → video_player 对话框播放）
 
 **排障记录（关键）：**
+
 - `AudioRecorder()`/`AudioPlayer()` **构造即触发原生平台通道** → widget 测试 MissingPluginException → 改为**懒构造**（仅录音/播放时 `??=` 实例化），渲染路径不触碰平台通道
 - golden ChatPage 基准图更新（新增 mic/+ 按钮后界面变化）；flutter test failures 产物不入库（rm 清理）
 
@@ -423,6 +426,7 @@
 **协议层：** `shared kMessageTypes` 与 `server/src/messages.ts ALLOWED_TYPES` 同步加 `audio`/`file`（Server 有独立白名单校验，漏改会拒绝消息——已同步 + npm run build 过）。
 
 **chat_page：**
+
 - 附件 sheet 扩至 **6 项**（拍照/相册图片/拍摄视频/相册视频/音频文件/任意文件），新增 `_AttachmentKind` 枚举（顶层，Dart 不允许类内 enum）
 - **file_picker 12.x API 大改**（排障关键）：`FilePicker` 为 `abstract final class`，**无 `platform` 静态成员**；`pickFiles()` 返回 `List<PlatformFile>`（非 FilePickerResult）；`PlatformFile` **无 `bytes` getter**（`withData` 已废弃），用异步 `readAsBytes()`；`name` 非空（`?? 兜底` 是死代码）
 - audio 消息：与 voice 共用播放条（`_playAudioMessage` 泛化，临时文件扩展名按类型：voice→m4a、audio→原扩展名）；file 消息：文件卡片（📄 文件名 + 大小格式化 + 下载保存到应用文档目录 path_provider）
@@ -434,11 +438,12 @@
 
 **遗留：** 文件附件下载保存到应用文档目录（用户可经文件管理器访问）；大文件上传未做进度条/断点（v1 内存读取）。
 
-### 多设备身份判断修复（person_id，2026-08-29）
+### 多设备凭证判断修复（person_id，2026-08-29）
 
 **背景：** 老板询问"A 设备发的消息，A 的其他设备上线后能否获得"——确认同步机制已支持（sync 按 space 维度 + 锚点只在 sync 推进），但发现**显示语义瑕疵**：sender 判断基于 device_id，同用户另一设备（dev-a2）的消息在 dev-a 上显示为"对方"（气泡方向错）。阅后即焚计划的"自己的消息"语义需要 person 维度。老板决定先单独修复。
 
 **实现：**
+
 - `shared`：`SpaceDevice`/`SpaceResult`（GET /space 返回 device_id→person_id 映射，const 构造）+ ApiClient.getSpace；测试 `get_space_test.dart`（本地 HttpServer 模拟 /space，2 项）
 - `app`：MessageRepository 加 `refreshDeviceMap()`（getSpace 缓存）+ `_isSamePerson()`（**person 优先、映射缺失降级 device**）；history() 的 sender 判断改 `_isSamePerson`；chat_page `_refresh` 先拉映射再读历史
 - 测试：message_repository_test 加 person 判断用例（FakeApi.getSpace override：dev-a/dev-a2→person-a、dev-b→person-b，dev-a2 的消息显示 me、dev-b 显示 peer）
@@ -454,6 +459,7 @@
 **最终语义（多轮澄清后）：** 服务器**不记录**阅后即焚状态——每台设备按自己的设置（分钟/小时/天，默认无限）管理**自己本地**副本的删除。设置、计时、删除全部纯本地，**Server 零改动**。
 
 **实现：**
+
 - `data/burn_after_settings.dart`：`kBurnAfterOptions`（无限/1分/5分/30分/1小时/1天/7天）+ `BurnAfterSettings`（app_state 存取，load/save）
 - `local_database.dart`：local_messages 加 `burn_after_seconds`（默认 0）+ `expires_at`（可空）；**schemaVersion 1→2** + MigrationStrategy `m.addColumn(localMessages, ...)`（drift 2.34.3 正确 API；TableMigration 需 TableInfo 不行）
 - `message_repository.dart`：`_burnState()`（设置快照：burn + expiresAt）；send/sync 落库写新字段（**消息到达本设备时的设置快照**）；`purgeExpired(now)` 删除到期消息 + 关联附件（可注入 now 测试）；history 返回带 expiresAt
@@ -461,6 +467,7 @@
 - 测试：`burn_after_settings_test.dart`（默认 0/往返/关闭，3 项）+ message_repository_test 加 purgeExpired 用例（+59s 不删、+61s 删）
 
 **排障记录（关键）：**
+
 - **中文路径 build_runner 失败**（AOT 编译写入 .dart_tool 报错）→ 外部目录 `D:\build-onlyspace\onlyspace\app`（无中文路径、依赖已解析）跑 `dart run build_runner` 生成 g.dart 拷回仓库；**PATH 的独立 dart 3.12.2 不满足 pubspec ^3.13.2**，需用 Flutter 自带 dart（3.13.2）跑
 - drift 2.34.3 迁移：`TableMigration(LocalMessages())` 类型错误（需 TableInfo）→ 用 `m.addColumn(localMessages, localMessages.xxx)`（生成表 getter，正确 API）
 
@@ -470,9 +477,10 @@
 
 ### 聊天分页加载优化（UI 懒渲染 + 增量刷新；2026-08-29）
 
-**背景：** 老板问"新设备初次载入历史是否有分页"——确认拉取层有分页（sync 翻页 100/页 + has_more），但 UI 层无分页（history() 全量渲染 + 每次 _refresh 全量 setState）。老板要求立即优化。
+**背景：** 老板问"新设备初次载入历史是否有分页"——确认拉取层有分页（sync 翻页 100/页 + has_more），但 UI 层无分页（history() 全量渲染 + 每次 \_refresh 全量 setState）。老板要求立即优化。
 
 **实现：**
+
 - `message_repository.dart`：
   - `typedef HistoryMessage`（env/plaintext/sender/attachment/expiresAt）替代长 record 类型
   - `history()` 重构（提取 `_rowsToHistory` 公共解密方法）
@@ -493,14 +501,16 @@
 **背景：** 老板问"目前有多语言界面吗？至少需要英文、中文"——现状：全部硬编码中文（chat_page 590 行/setup_page 387/lock_page 160/main 39 行含中文），无任何 i18n 基础设施。老板确认决策：**官方 l10n + 跟随系统/手动覆盖 + 分批（先核心：设置页+聊天页）**。
 
 **基础设施：**
+
 - pubspec 加 `flutter_localizations` + `intl: any` + `generate: true`；`l10n.yaml`（arb-dir: lib/l10n，template: app_en.arb）
-- `lib/l10n/app_en.arb` + `app_zh.arb`：各 60+ 键（通用 9 + setupPage.* 18 + setPinDialog.* 12 + chatPage.* 27 + burnOption.* 7），占位符用 `{name}` + `@key.placeholders`
+- `lib/l10n/app_en.arb` + `app_zh.arb`：各 60+ 键（通用 9 + setupPage._ 18 + setPinDialog._ 12 + chatPage._ 27 + burnOption._ 7），占位符用 `{name}` + `@key.placeholders`
 - gen-l10n 生成 `lib/l10n/app_localizations*.dart`（**入库**，generate: true 时 pub get 自动生成）
 - `data/locale_settings.dart`：LocaleSettings（app_state locale：system/zh/en）+ `localeNotifier`（ValueNotifier，切换即时生效）
 - `main.dart` EinzApp 改 StatefulWidget：MaterialApp 加 `localizationsDelegates/supportedLocales/locale`（null=跟随系统；手动选择 zh/en 覆盖）
 
 **文案抽取（核心工作量）：**
-- setup_page.dart：~30 处（build UI + 状态消息 + SetPinDialog 全部）——`AppLocalizations.of(context)!` 替换；**async 方法 await 后取 l10n 会触发 use_build_context_synchronously lint → 在 await 前取局部变量**（_uploadEscrow 排障）
+
+- setup_page.dart：~30 处（build UI + 状态消息 + SetPinDialog 全部）——`AppLocalizations.of(context)!` 替换；**async 方法 await 后取 l10n 会触发 use_build_context_synchronously lint → 在 await 前取局部变量**（\_uploadEscrow 排障）
 - chat_page.dart：~35 处（SnackBar 错误/附件 sheet 6 项/播放错误/输入区/阅后即焚档位）——**阅后即焚档位标签改 `_burnSeconds`（存秒数）+ `_burnOptionLabel(seconds, l10n)` switch 映射**（原存中文 key 无法国际化）；附件选择弹层、🌐/⏱ 弹层用 l10n
 - golden/widget 测试：MaterialApp 补 `localizationsDelegates + locale: Locale('zh')`（页面用 AppLocalizations.of 需要；基准图是中文渲染）；ChatPage golden 0.05% 像素差 → `--update-goldens`
 
@@ -511,6 +521,7 @@
 ### 多语言第二批（lock_page 全量抽取；2026-08-29）
 
 **内容：**
+
 - ARB 加 `lockPage.*` 12 键（中英双语，含 int 占位符：`lockPageLockedSeconds(seconds)`/`lockPageTooManyAttempts(seconds)`、String 错误参数）
 - lock_page.dart 12 处替换：AppBar title、PIN 提示、锁定倒计时 label（三目：locked ? LockedSeconds : PinLabel）、解锁/恢复码入口按钮、错误消息（TooManyAttempts/UnlockFailed/RecoveryFailed）；**AppLockException 的 e.message 来自 app_lock.dart（业务消息，非本页字面量），保留原样**
 - main.dart 确认**无 UI 中文文案**（`title: 'Einz'` 英文，39 行中文均为注释）→ 无需替换
@@ -524,9 +535,10 @@
 **背景：** 老板问"上线后还是每 3 秒轮询吗？换成 WS 就实时了吗？"——回答：Server WS 早已就绪（ws.ts 广播 message.new），CLI 有 listen，但 **App 未接入**（仍 3s 轮询）。老板要求开发。
 
 **实现：**
+
 - `shared/lib/src/protocol/ws_client.dart`（新）：`WsClient` + `WsEvent` 模型（sealed：WsHelloEvent/WsMessageNewEvent/WsKeyRotationEvent/WsDeviceRevokedEvent）；**指数退避重连**（1/2/4/8/16/30s 上限）直到 stop；token URL 编码（PROTOCOL.md §8.1）；状态回调（stopped/connecting/connected/reconnecting）；未知帧忽略（协议向前兼容）
 - `app/lib/data/ws_realtime_service.dart`（新）：封装 WsClient → `connected` ValueNotifier + `onMessageNew` 回调（chat_page 收到 message.new 立即增量刷新）
-- `chat_page.dart`：initState 启动 WS（`enableWs` 参数——**测试环境关闭，避免真实连接/重连 Timer 挂起**）；`_restartTicker` 动态切换轮询间隔：**WS 在线 → 30s 兜底；断开 → 恢复 3s**（_onWsStatusChanged 监听 connected）；dispose 清理
+- `chat_page.dart`：initState 启动 WS（`enableWs` 参数——**测试环境关闭，避免真实连接/重连 Timer 挂起**）；`_restartTicker` 动态切换轮询间隔：**WS 在线 → 30s 兜底；断开 → 恢复 3s**（\_onWsStatusChanged 监听 connected）；dispose 清理
 - 测试：`shared/test/ws_client_test.dart`（本地 HttpServer + WebSocketTransformer 模拟 /ws：hello/connected、message.new 解析、key.rotation、未知帧忽略、断开→reconnecting→重连成功，5 项）；`app/test/ws_realtime_service_test.dart`（message.new → onMessageNew + connected 状态，1 项）
 
 **验证：** shared dart test **23 项全过**（+5）、app flutter test **26 项全过**（+1）；analyze 无问题；golden 不变（渲染结构未动）。
@@ -540,6 +552,7 @@
 **背景：** 老板要求做 device.revoked（撤销强制登出）+ 询问 key.rotation。**key.rotation 说明**：Space Key 轮换目前是 CLI 离线流程（rotate → 密封给对方 → import），Server 广播仅通知性；App 密钥管理固定 keyVersion=1、无导入流程 → 收到 key.rotation 暂无实际动作，**本次不处理**。
 
 **实现：**
+
 - `WsRealtimeService`：加 `onDeviceRevoked` 回调（onEvent 分发 WsDeviceRevokedEvent）
 - `AppLockService.clear()`：删除锁包 4 个 key（app_lock.package/recovery/attempts/locked_until）——设备撤销后回到未配置状态，防止残留密钥
 - `chat_page._onDeviceRevoked()`：停轮询/WS → 清理本地（AppLockService.clear + 清空 localMessages/localAttachments/syncState）→ SnackBar 提示（新增 l10n 键 chatPageDeviceRevoked）→ `pushAndRemoveUntil` 强制回 SetupPage（清空导航栈）；清理失败不阻塞登出（尽力清除）
@@ -554,6 +567,7 @@
 **背景：** 老板指出 `backup key`（实为口令派生机制，非独立实体）与 `EINZ_BACKUP_KEY`（Server env）命名易混淆。老板确认方案：**改 Server env 名 + 文档对照表**；backup.dart 保持原名。
 
 **改动：**
+
 - `EINZ_BACKUP_KEY` → `EINZ_DB_BACKUP_KEY`（全库同步）：
   - `server/src/backup.ts`（注释 + process.env 读取 + 2 错误消息）
   - `server/scripts/backup.ts`（注释）
@@ -572,8 +586,9 @@
 **背景：** 老板要求 App 支持自生成 Space Key——第一个使用者（老板，技术型）纯 App 完成建空间，第二个使用者（小白）零门槛加入。决策：**A 端一键生成 + 二维码分享 + 白名单保持手动**。
 
 **实现：**
+
 - `shared/lib/src/protocol/join_info.dart`（新）：`JoinInfo`（`onlyspace-join-v1?space=<spaceId>&p=<passphrase>`，口令 URL 编码防特殊字符）+ `decode` null 安全；3 单测（往返/特殊字符中文口令/格式不符）
-- `setup_page` A 端：新增**"自建空间（一键生成 Space Key）"**按钮（与③凭口令接入并列）→ `_generateSpaceKeyAndAuth()`：`Random.secure()` 生成 32B Space Key（**shared sodium 无 randombytes 暴露，用 Dart CSPRNG**）→ challenge-response 认证 → SetPinDialog（口令托管复用）→ `_showJoinInfoDialog()`（**QrImageView 二维码** + 口令/空间文本 + 一键复制 joinDialog.* 键）→ 确认进聊天页；未生成密钥/未填口令分别提示
+- `setup_page` A 端：新增**"自建空间（一键生成 Space Key）"**按钮（与③凭口令接入并列）→ `_generateSpaceKeyAndAuth()`：`Random.secure()` 生成 32B Space Key（**shared sodium 无 randombytes 暴露，用 Dart CSPRNG**）→ challenge-response 认证 → SetPinDialog（口令托管复用）→ `_showJoinInfoDialog()`（**QrImageView 二维码** + 口令/空间文本 + 一键复制 joinDialog.\* 键）→ 确认进聊天页；未生成密钥/未填口令分别提示
 - `setup_page` B 端：口令输入框 📷 suffixIcon → `_scanJoinCode()` → `_JoinScanPage`（**MobileScanner 懒构造**——进入页面才实例化，widget 测试不触碰原生相机通道；扫到 onlyspace-join-v1 自动填 spaceId/口令 → scanJoinFound 提示）
 - 依赖：`qr_flutter 4.1.0`（纯 Dart 绘制，测试环境安全）+ `mobile_scanner 7.4.0`（相机权限拍照时已配置，Android CAMERA/iOS NSCameraUsageDescription 复用）
 - 测试：widget_test 加"自建空间入口"用例（**ensureVisible 滚动修复**——按钮在 ListView 视口外 tap 命中失败）；flutter test **29 项全过** + setup golden 更新（新增按钮/suffixIcon）
@@ -587,15 +602,16 @@
 **背景：** 老板审核截图时提出关键交互批评：①"生成设备密钥"点击后无明确结果反馈；②"导入并认证"与"自建空间/凭口令接入"四个功能并列但无前后关系，易混淆；③ 建议**分步向导、每页只收集一个信息**。决策确认：**先选角色再进向导 + sealed 保留折叠入口**。
 
 **重构（setup_page 大改）：**
+
 - **第 0 步角色选择**：我是第一个使用者（创建新空间）/ 我要加入现有空间 / 高级 sealed（ExpansionTile 折叠）
-- **创建（create）7 步**：设备名+生成密钥（**本页 Card 明确显示"✅ 密钥已生成"+ 设备 ID/公钥，回应反馈缺失批评**）→ 白名单确认（展示公钥，用户 VPS 添加后继续）→ 接入口令 → PIN（_runPinSetup：生成 Space Key + 认证 + SetPinDialog）→ 二维码分享（QrImageView + 一键复制）→ 完成
-- **加入（join）5 步**：设备名 → 扫码/粘贴加入信息（_buildStepJoin：📷 扫码自动填 + 手动输入）→ PIN（_runJoinAccess：认证 → 托管拉取 → 口令解密）→ 完成
-- **高级（advanced）5 步**：设备名 → sealed 粘贴（_buildStepSealed）→ PIN（_runSealedImport：解封 → 认证）→ 完成
-- 框架：_WizardRole 枚举 + 步骤状态机（_step/_stepCount/_stepTitle/_buildStep）+ 进度圆点 + 底部上一步/下一步/完成 + AnimatedSwitcher；共享状态（_keyPair/_spaceKey/_sessionToken）；_nextStep 按 (role, step) 前置校验（每步一个信息未填即提示）；_authenticate 提取公共认证
+- **创建（create）7 步**：设备名+生成密钥（**本页 Card 明确显示"✅ 密钥已生成"+ 设备 ID/公钥，回应反馈缺失批评**）→ 白名单确认（展示公钥，用户 VPS 添加后继续）→ 接入口令 → PIN（\_runPinSetup：生成 Space Key + 认证 + SetPinDialog）→ 二维码分享（QrImageView + 一键复制）→ 完成
+- **加入（join）5 步**：设备名 → 扫码/粘贴加入信息（\_buildStepJoin：📷 扫码自动填 + 手动输入）→ PIN（\_runJoinAccess：认证 → 托管拉取 → 口令解密）→ 完成
+- **高级（advanced）5 步**：设备名 → sealed 粘贴（\_buildStepSealed）→ PIN（\_runSealedImport：解封 → 认证）→ 完成
+- 框架：\_WizardRole 枚举 + 步骤状态机（\_step/\_stepCount/\_stepTitle/\_buildStep）+ 进度圆点 + 底部上一步/下一步/完成 + AnimatedSwitcher；共享状态（\_keyPair/\_spaceKey/\_sessionToken）；\_nextStep 按 (role, step) 前置校验（每步一个信息未填即提示）；\_authenticate 提取公共认证
 - l10n：wizardRole*/wizardStep*/wizard 提示键 + setupPageKeyGenerated（中英，zh/en 键一致性 diff 校验）
 - 测试：widget_test 重写 3 用例（首屏角色选择/创建分流+未生成密钥提示/加入分流）；golden setup_page 更新（向导首屏）；flutter test **30 项全过**
 
-**排障：** ① 重构期字段重复定义（旧字段残留）与 _finish 重复（框架空实现 vs 新实现）→ 清理；② `FilledButton.tonal.icon` 不存在（API 无组合）→ tonal + Row；③ widget_test"选择你的情况"在 AppBar 与 body 各一次 → findsWidgets。
+**排障：** ① 重构期字段重复定义（旧字段残留）与 \_finish 重复（框架空实现 vs 新实现）→ 清理；② `FilledButton.tonal.icon` 不存在（API 无组合）→ tonal + Row；③ widget_test"选择你的情况"在 AppBar 与 body 各一次 → findsWidgets。
 
 **老板反馈落实：** 生成密钥后本页明确展示结果 ✅；每页一个输入 ✅；步骤前后关系清晰（进度圆点 + 步骤标题 + 上一步/下一步）✅；sealed 技术路径保留在折叠入口 ✅。
 
@@ -612,7 +628,7 @@
 - **App 侧修复（Windows 产物在 macOS 的适配）**：
   1. `e2e.sh` cygpath 是 Windows 专用 → 加 `command -v cygpath` 判断跨平台；
   2. `app/pubspec.yaml` 加 sqlite3 `hooks: source: system`（否则 flutter test 尝试从 GitHub 下载预编译 sqlite3 原生库，国内网络必失败）；
-  3. `golden_render_test.dart` 字体加载硬编码 `C:\Windows\Fonts\simhei.ttf` → 改为跨平台候选（macOS Hiragino/STHeiti / Windows simhei / Linux Noto）；goldens 基准图在 macOS 重新生成（--update-goldens，含新 setup_step_*.png）；
+  3. `golden_render_test.dart` 字体加载硬编码 `C:\Windows\Fonts\simhei.ttf` → 改为跨平台候选（macOS Hiragino/STHeiti / Windows simhei / Linux Noto）；goldens 基准图在 macOS 重新生成（--update-goldens，含新 setup*step*\*.png）；
   4. `widget_test.dart` `_wrap` lint 修复（no_leading_underscores_for_local_identifiers）。
 
 **遗留：** app 的 Android SDK / Xcode 工具链未装（flutter doctor 有警告），真机构建验证留待 Phase 3 移动端；goldens 已按 macOS 平台重新生成入库。
@@ -624,6 +640,7 @@
 **编号规则（老板确认）：** 页面层级用 `.` 分隔；并列分流同层按数字顺序。映射：`setup_step1_roles.png`（1=首页角色选择）、`setup_step1.1.x_*`（create 分流）、`setup_step1.2.x_*`（join 分流）、`setup_step1.3.x_*`（advanced 分流），分流内按出现顺序（如 1.1.1_device=设备名、1.1.2_whitelist=白名单…）。
 
 **实现：**
+
 - setup_page.dart：新增 `_appBarTitle`（按角色返回 wizardAppBarCreate/Join/Advanced，第 0 步仍显示引导语）；AppBar 改用角色名；步骤标题 `_stepTitle` 移到 body 进度圆点下方（20px w600）
 - l10n：新增 `wizardAppBarCreate/Join/Advanced` 三键（zh/en），gen-l10n 重新生成
 - golden 文件：10 个 git mv 重命名（含 setup_page.png → setup_step1_roles.png）；golden_render_test.dart 用例名与 matchesGoldenFile 路径全部同步（含 skip 列表 keygen/whitelist 新名）
@@ -636,12 +653,14 @@
 **背景：** 老板把项目目录从 `/Users/Shared/product-产品/only` 手动重命名为 `/Users/Shared/productX/only`，重启 atom 后找不到原来的 session（session 按工作目录哈希分桶存储，旧桶 202a4f4986bdf4ed 不再被新路径命中）。另核实：`/Users/Shared/only` 并不存在，实际路径以 `/Users/Shared/productX/only` 为准。
 
 **session 找回（atom 侧，~/.atomcode/sessions/）：**
+
 - session 存储机制：`~/.atomcode/sessions/<工作目录hash>/` 分桶，会话 meta 的 `working_dir` 字段决定归属；`~/.atomcode/history-v2/<hash>/entries.jsonl` 存历史提问索引。
 - 迁移动作：把旧桶 `202a4f4986bdf4ed`（product-产品/only，3 个会话：623c51f8 架构重构讨论、9b00b45c fork、ce33edfe 空会话）与 `dac869ed60aeec99`（productAll/only，1 个会话 9182817b，上次改名遗留）下的会话文件全部移入新桶 `36c61259c00d9bf2`，并将这些 meta 的 `working_dir` 更新为 `/Users/Shared/productX/only`；history-v2 的 entries.jsonl 一并合并。
 - 备份：迁移前已打包 `~/.atomcode/backup-sessions-20260830.tar.gz`（sessions + history-v2）。
 - 效果：在 `/Users/Shared/productX/only` 启动 atom 后 `/resume` 即可看到全部历史会话（Einz 架构设计重构讨论等）。
 
 **项目内文档同步（以实际路径为准）：**
+
 - `docs/DEPLOYMENT.md`、`docs/IOS.md`、`docs/updateServer.md`、`docs/HANDOFF.md` 中的 `cd /Users/Shared/product-产品/only` 全部改为 `/Users/Shared/productX/only`。
 - `app/android/gradle.properties` 注释同步（现路径 productX 已是 ASCII，保留 overridePathCheck 开关防未来非 ASCII 路径）。
 - `aimemo/worklog.md` 旧条目与 `notes/cli-config.md`（Windows 机器历史命令）为历史记录，未改写。
@@ -659,6 +678,7 @@
 5. **构建验证**：`flutter build ios --debug --no-codesign` 首次跑超 300s（pod install + Xcode 编译），第二次增量完成 → **`✓ Built build/ios/iphoneos/Runner.app`（arm64）**。
 
 **当前 iOS 环境状态：**
+
 - Flutter 3.47.2（`~/development/flutter`，需 export PATH）；Xcode 26.3 + iOS 26.2 SDK + 模拟器运行时 26.3；CocoaPods 1.16.2（brew）
 - Bundle ID 目前 `com.example.onlyspace`，真机签名需改为唯一值（如 `com.tic.onlyspace`），Team 选 Apple ID（免费账号可真机调试；APNs 推送需付费账号 99$/年，当前跳过，`server/src/push.ts` 为日志占位，WS/轮询兜底）
 - ⚠️ 磁盘仅剩 ~1.7Gi：后续构建/Archive 失败先清 `~/Library/Developer/Xcode/DerivedData`
@@ -669,6 +689,7 @@
 **背景：** 老板想给 Einz 做一个类似 Claude Code 的终端界面。经分析：项目已有 `cli/`（子命令式测试端，send/sync/attach/backup 全能力）+ `shared/`（纯 Dart 加密与同步协议），缺的是交互层。定方案：A = Dart 原生 TUI（分栏、光标控制），B = 轻量 REPL（stdin 循环 + 彩色输出，能收能发）。**老板选先做 B 验证交互。**
 
 **实现（新文件 `cli/bin/onlyspace_chat.dart`，278 行）：**
+
 - 启动即增量同步历史；直接输入文本即发送；发送后自动 sync（能立即看到对方回复）
 - 命令：`/auth [server]`（challenge→sealOpen→verify 认证）、`/sync`、`/history`、`/help`、`/exit`
 - ANSI 彩色输出：我=绿、对方=黄、系统=灰、错误=红；`_uuidv7` 与 onlyspace.dart 一致
@@ -677,18 +698,20 @@
 
 **验证：** `dart analyze` 无问题（修 1 个 unused import）；临时 server + 双端设备冒烟**双向收发全过**：A REPL 发 → B REPL 同步解密 ✅；B REPL 回 → A REPL 同步解密 ✅。
 
-**后续（方案 A 升级，待老板定）：** 分栏 TUI（消息区+输入区+状态栏）、后台 WS 实时监听（复用 _cmdListen 逻辑）、附件收发入口。桌面 GUI 版另议（Flutter Desktop 复用 ~95% 现有代码）。
+**后续（方案 A 升级，待老板定）：** 分栏 TUI（消息区+输入区+状态栏）、后台 WS 实时监听（复用 \_cmdListen 逻辑）、附件收发入口。桌面 GUI 版另议（Flutter Desktop 复用 ~95% 现有代码）。
 
 ### CLI 交互式聊天 TUI（方案 A 升级完成，2026-08-30）
 
 **背景：** 老板体验方案 B（REPL）后决定升级方案 A：分栏 TUI + WS 实时接收 + 附件收发。调研结论：shared 的 `WsClient`（回调式 onEvent/onStatus + 指数退避重连）已导出可复用；pub 缓存无 TUI 库且国内网络下载不稳 → **手写 ANSI 渲染（零新依赖）**。
 
 **实现：**
+
 - `cli/lib/chat_core.dart`（255 行）：从 onlyspace_chat.dart 提炼业务核心 `ChatSession`（认证/发送/补发/增量同步/历史/解密/UUIDv7 + 消息缓存），新增 `attachFile`（PROTOCOL.md §6.1 附件上传全流程）与 WS 实时监听（message.new → 落盘 + 解密 + 追加缓存）
 - `cli/bin/onlyspace_tui.dart`（314 行）：分栏 TUI——顶部状态栏（设备/空间/WS 状态●↻○）、中间消息区（滚动）、底部输入行；`stdin.listen` + utf8.decoder 逐键（raw 模式，Ctrl+C 退出）；命令 `/auth /sync /history /attach <file> /help /exit`；WS 状态变化与新消息即重绘
 - `demo/run_a.sh` / `run_b.sh` 切到 TUI；新增 `cli/test/tui_smoke.py` 冒烟脚本
 
 **踩坑与修复（Dart pty 环境已知行为，真实终端无碍）：**
+
 1. `readByteSync` 在 pty 下与 `stdout.write` 冲突（"StreamSink is bound to a stream"）→ 改 `stdin.listen` + utf8.decoder（顺带解决中文逐字节乱码）
 2. `stdout.terminalLines/Columns` 在 pty 下抛异常 → try-catch 兜底 24/80
 3. 渲染失败会崩进程 → try-catch 兜底（业务逻辑不受影响）
@@ -704,11 +727,13 @@
 **背景：** 新项目环境（Windows 无 Flutter/JDK，Android SDK 在 `D:\Android\Sdk` 已齐备：platforms 33/35/36、build-tools 35/36、ndk 28.2）。老板拍板：debug 签名、包名 `cc.tic.einz`、单文件全架构 APK。
 
 **环境搭建（工具链装在 `D:\devtools`）：**
+
 - Flutter 3.47.2（stable，Dart 3.13.2，满足 pubspec.lock 的 flutter>=3.44/dart>=3.13.2）。**踩坑：** 腾讯 flutter_infra_release 镜像只有版本清单（releases_linux.json 等 200），无 Windows 实体包（全 404）；官方 GCS 实体包正确 URL 是 `https://storage.googleapis.com/flutter_infra_release/releases/<archive>`（archive 路径带 `stable/windows/` 前缀，**不是** `flutter/<version>/windows-x64/`）。清华 flutter 镜像同样 404。
 - JDK 21（Adoptium，清华镜像 `OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip`）——AGP 9.1.0 需要 JBR/JDK 17+，21 兼容。
 - 构建脚本固化在 `D:\devtools\run_apk_build.sh`（export FLUTTER_ROOT/JAVA_HOME/ANDROID_HOME 后 `flutter build apk --release`），下次重建直接跑它。
 
 **构建问题与修复：**
+
 1. **Kotlin 增量编译跨盘符失败**：pub 缓存在 C 盘、项目在 D 盘，Kotlin daemon 关缓存时报 `this and base files have different roots: C:\Users\...\Pub\Cache\... and D:\Seafile\einz\app\android` → `gradle.properties` 加 `kotlin.incremental=false` + 清 `app/build/android_file_picker/kotlin` 残留缓存后一次通过。
 2. **后台构建被杀**：bash 工具里 `nohup … &` 启动的进程在工具调用返回时被回收 → 只能前台跑，单次 300s 超时；首次失败后依赖已下载完，续跑 213s 完成。
 
@@ -725,6 +750,7 @@
 **发现真 bug（APK 在 Android 上无法启动）：** 首版 APK 装模拟器后黑屏，logcat 显示 `dlopen failed: library "libsqlite3.so" not found`（drift 初始化）。根因：`app/pubspec.yaml` 配了 `hooks: user_defines: sqlite3: source: system`（原意是桌面/测试环境走系统 SQLite 免下载），但 **Android 系统不提供 libsqlite3.so**，应用启动即崩。该配置对 Android 是错误方向。
 
 **修复（pubspec.yaml 一处）：**
+
 - 删除 `source: system` → sqlite3 包按默认捆绑预编译 `.so` 打入 APK（构建时从 GitHub releases 下载，本机代理可达，83s 重建成功；APK 70.8→75.7MB，三 ABI 均有 libsqlite3.so）
 - 顺带修复 `uses-material-design: true` 被错误缩进进 `hooks:` 块下的 YAML 结构错误（构建日志 MaterialIcons 字体缺失警告即此因），移回 `flutter:` 块
 - `sqlite3_flutter_libs 0.6.0+eol` 是 EOL 空壳包（无原生库），由 drift_flutter 强制引入，保留不动
@@ -764,7 +790,8 @@
 **背景：** 老板放弃在本机（macOS）打包后，CI 成为打 Android APK + iOS 的路径。方案：**APK 走 Gitea Actions**（自建 git.tic.cc，runner 机器独立于 Gitea 服务器），**iOS 走 Codemagic** 云构建（免费 500 分钟/月）。
 
 **产出（commit 147cf71 / 966b8ac / ee34be9 / 4ce8bed / 7039488）：**
-- `.gitea/workflows/build-apk.yml`：push main / v* 标签 / 手动触发 → debug 签名 APK（无需 keystore）
+
+- `.gitea/workflows/build-apk.yml`：push main / v\* 标签 / 手动触发 → debug 签名 APK（无需 keystore）
 - `codemagic.yaml`：iOS 构建（`flutter config --no-enable-swift-package-manager` 禁 SPM 走 CocoaPods，bundle id `cc.tic.einz`，产物 IPA）
 - `docs/CI.md`：完整指引（注册令牌生成、gitea-runner 安装、Codemagic 配置、镜像说明）
 
@@ -808,9 +835,10 @@
 **背景：** 老板反馈 A 发消息给 B 时若 B 临时断线，过后 B 收不到，必须手动 /sync。根因：WS 重连只重连、不回放断线期间的消息（hello 帧无 replay，消息只推送给已连接设备），chat_core 的 `onStatus` 只记录断线时间不触发补拉。
 
 **实现（commit 待提交）：** `ChatSession.startWs` 新增可选 `onAutoSync` 回调 + 两种补拉：
+
 - **重连快路径**：`onStatus` 里记录 wasDown，WS 从断线转 connected 时立即后台 `sync()` 补拉缺口；
 - **周期兜底**：`autoSyncInterval = 30s` 定时器增量拉取（WS 推送丢帧/断线不回放都兜住，顺带补发离线发送队列），`stopWs` 取消。
-并发保护 `_autoSyncing`；网络异常静默等下轮。TUI 4 处 `startWs` 调用点接 `onAutoSync: (_) => _render()`（静默重绘，不占状态栏）。
+  并发保护 `_autoSyncing`；网络异常静默等下轮。TUI 4 处 `startWs` 调用点接 `onAutoSync: (_) => _render()`（静默重绘，不占状态栏）。
 
 **验证：** `dart analyze` 无问题；双端断线场景（probe 常驻 A + kill server 8s + B 发消息 + A 重连）probe 日志确认 `reconnecting×5 → connected → AUTOSYNC added=1 → FOUND-VIA-AUTOSYNC`（无需 /sync）。测试脚本 `cli/test/auto_sync_probe.dart` + `auto_sync_check.sh`（编排脚本在本工具非交互环境有进程回收挂起问题，真实终端可用）。
 
@@ -823,6 +851,7 @@
 **根因（实证）：** 客户端落盘 created_at 选错值——`chat_core.sync()` 用 `createdAt: seq`（server_sequence 序号）落盘，覆盖了服务端响应携带的真实时间戳（store-a 历史里 seq=1,2,3 / 13,14,15 的 created_at 正是 1,2,3 / 13,14,15）；WS 路径兜底 `env.createdAt ?? 0`（缺省落 0，即精确的 19700101-080000）。重启后 `loadHistory` 用落盘的坏值 → 显示 1970。发送路径（flushPending）落盘真实时间、且发送不推进锚点，下次 sync 会把自己刚发的消息重新拉回并以 seq 覆盖 → "发送时正常、重启后变 1970"。（einz.dart 的 `_syncIncremental` 一直用 `env.createdAt!`，无此问题。）
 
 **修复（chat_core.dart）：**
+
 - `sync()` 增量落盘改 `createdAt: env.createdAt ?? seq`（服务端始终携带真实 created_at）；
 - WS 兜底改 `env.createdAt ?? event.serverSequence`（不再落 0）；
 - 新增 `_backfillTimestamps()` 存量自愈：检测到坏时间戳（<1e11，1973 年前）时全量拉取服务端消息、按 message_id 幂等覆盖为真实 created_at，随后 `loadHistory()` 重建展示缓存让当前会话立即正确；失败静默下次再试。
@@ -838,12 +867,13 @@
 **设计（老板拍板）：** Android + iOS 一起改（纯 Flutter 层同构）；对方加入的邀请码打包进分享二维码（一键加入）。
 
 **实现（纯 Flutter/App + shared 一处）：**
+
 - shared JoinInfo 扩展可选 inviteCode（`&i=` 参数，旧格式无码仍可解码，兼容）；新增 3 个编解码单测。
 - setup_page.dart 向导改造：
   - create：白名单步骤 → **登记设备（自动自举）**；失败（服务器已有空间）提示改用"加入"向导；分享步骤先"生成邀请码（personB）"再展示含邀请码+口令的二维码，可重新生成；
   - join：加入页新增邀请码字段，扫码自动填入（含新码）；PIN 步先凭邀请码 enroll 再认证再拉托管；
   - advanced（sealed 导入）：同样先凭邀请码 enroll；
-  - 认证（challenge）一律用登记返回的真实 deviceId；escrow/分享用登记返回的真实 spaceId（弃 space-demo 默认值）；_finish 进聊天页用登记值。
+  - 认证（challenge）一律用登记返回的真实 deviceId；escrow/分享用登记返回的真实 spaceId（弃 space-demo 默认值）；\_finish 进聊天页用登记值。
   - 新增 SetupPage 测试注入 enrollOverride/createInviteOverride（与既有 probeServer/db 同模式）。
 - l10n zh/en ARB 同步（删白名单文案、新增登记/邀请码文案），flutter gen-l10n 重新生成。
 - golden 测试：白名单步骤用例 → 登记步骤；1.1.3–1.1.6 改走"登记→口令→PIN→分享（生成邀请码）→完成"新流程（注入 fake enroll/invite）；1.3.2 sealed 新增邀请码输入框 → 全部重刷图片。
@@ -859,6 +889,7 @@
 **根因（代码定位）：** 引导问答的 '/' 分支与"必填留空"分支只 `input.clear()` **未复位 cursor**（回车前 cursor=1，清空后 input 长度 0）→ 下一字符进 `_insertAtCursor` 执行 `str.substring(0, cursor)` = `substring(0,1)` 于空串 → RangeError。崩溃走 unhandled async exception，`_restoreTerminal()` 未执行 → 终端残留 raw 模式（无回显）。
 
 **修复（einz_tui.dart）：**
+
 - 两处引导分支 `input.clear()` 后补 `_state.cursor = 0`；
 - `_insertAtCursor` 加防御钳制（cursor 超界时 clamp 回 [0, len]），杜绝同类不一致再崩；
 - 输入回调整体包 try/catch：未捕获异常 → `_inputLoopCrash()`（先 `_restoreTerminal()` 恢复 echo，再报错退出），不再残留不回显终端。
@@ -869,9 +900,9 @@
 
 **现象（老板）：** 新设备引导"请输入设备名称"问答输 /exit，仍继续输出"系统将为您自动设置本设备名称"→"设备与空间绑定中"后才退出。
 
-**根因：** /exit（及 Ctrl+C）路径只 `_abortPendingGuide()`（以空串 complete 当前 _prompt）并置 running=false，但 _runGuide 把空串当"用户跳过"继续执行后续线性步骤（自动名提示、store.save、enroll 绑定、口令托管等）；仅部分循环处有 `!running` 守卫，靠 2 秒延迟 exit(0) 兜底。
+**根因：** /exit（及 Ctrl+C）路径只 `_abortPendingGuide()`（以空串 complete 当前 \_prompt）并置 running=false，但 \_runGuide 把空串当"用户跳过"继续执行后续线性步骤（自动名提示、store.save、enroll 绑定、口令托管等）；仅部分循环处有 `!running` 守卫，靠 2 秒延迟 exit(0) 兜底。
 
-**修复（einz_tui.dart _runGuide）：** 在人物名、设备名两处 prompt 后立即 `if (!_state!.running) return;`；绑定成功后、发起者口令托管流程前再加守卫；catch 的"绑定失败"else 分支同样守卫（中断时不输出噪音）。
+**修复（einz_tui.dart \_runGuide）：** 在人物名、设备名两处 prompt 后立即 `if (!_state!.running) return;`；绑定成功后、发起者口令托管流程前再加守卫；catch 的"绑定失败"else 分支同样守卫（中断时不输出噪音）。
 
 **验证：** dart analyze 无问题；新增 cli/test/guide_exit_check.py（pty 复现老板步骤）——/exit 后进程立即退出、无后续引导提示 ✅。
 
@@ -894,6 +925,7 @@
 **背景：** 老板在 iMac 上首次尝试 iOS 本地构建（`flutter create . --platforms=ios,android` 在 app/ 内，仓库根无污染）。初始 `flutter run` 报 "No supported devices connected"，排查链：iPhone 已 USB 识别但 **unpaired（code -29）** 或 **未开开发者模式（code -27）**——设备侧问题，真机验证后置；先走模拟器验证构建。
 
 **环境修复：**
+
 - **CocoaPods 未装** → `brew install cocoapods`（1.16.2_2），并 `flutter config --no-enable-swift-package-manager`（项目 Podfile 含本地 libsodium pod，禁 SPM，见 docs/IOS.md §1）。
 - **Xcode 16.1 无 iOS 18.1 平台**（只有 iOS 17.4 运行时）→ `flutter build` 预检 `-destination generic/platform=iOS` 失败 "Unable to find a destination"（iOS 18.1 is not installed）。`xcodebuild -downloadPlatform iOS` 下载 8.59G（Apple CDN 中国直连 ~6-10MB/s，无需翻墙），安装后模拟器构建即通。
 - **sqlite3 native assets 从 GitHub 下载预编译库超时**（`SocketException: Operation timed out, github.com`）——重试时 GitHub 可达后通过；若再遇可考虑翻墙或 sqlite3 hook 备选方案（pub.dev hook-topic）。
@@ -901,6 +933,7 @@
 **验证结果：** `flutter build ios --simulator --debug` ✅ 编译通过（含 libsodium pod 链接，`✓ Built build/ios/iphonesimulator/Runner.app`）；iPhone 16（iOS 18.1）模拟器 `flutter run` 启动成功（Dart VM Service 就绪、进程存活），截图确认首屏渲染。
 
 **遗留：**
+
 1. `flutter run` 启动早期出现 `SqliteException(5): database is locked` 未处理异常一次，未阻塞启动，待观察是否复现。
 2. 真机验证（任务 #7）后置：iPhone 配对（Xcode Devices 窗口 Pair + 手机确认）、XR 需开「设置→隐私与安全性→开发者模式」、Xcode Accounts 登录 Apple ID 选 Personal Team（当前 `0 valid identities`）。
 3. iOS 17.4 模拟器运行时已删除（释放 ~6.7G，仅留 18.1）；iPhone 15 等 17.4 模拟器设备随运行时移除而不可用。

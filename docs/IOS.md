@@ -58,6 +58,7 @@ flutter run -d <模拟器设备ID>
 ```
 
 **libsodium 加载验证**（App 打开后看日志）：进入聊天页前会调用 `sodium()`（`DynamicLibrary.process()` 解析静态链接符号）。若报"无法加载 libsodium"：
+
 - 确认 Pods 已安装（`flutter build ios` 会自动 `pod install`；也可手动 `cd ios && pod install`）
 - 确认 `Podfile.lock` 中出现 `- libsodium (1.0.20)`
 - release 构建若符号被 strip：在 Xcode 工程 Build Settings → `Other Linker Flags` 追加 `-Wl,-export_dynamic`（保持 libsodium 符号可见）
@@ -71,15 +72,17 @@ open ios/Runner.xcworkspace      # Xcode 打开（注意是 .xcworkspace，含 P
 ```
 
 Xcode 内配置（Target `Runner` → Signing & Capabilities）：
+
 1. **Team**：选择你的 Apple ID 团队（免费账号选 Personal Team；会生成开发签名）
 2. **Bundle Identifier**：改为唯一值，如 `com.tic.einz`（免费账号 bundle id 会被追加 team 前缀，正常）
 3. 若需推送：添加 **Push Notifications** capability（需付费账号；暂无则跳过，WS/轮询兜底不受影响）
 4. 点击 **Run ▶**（连上 iPhone，首次需在手机"设置 → 通用 → VPN与设备管理"信任开发者证书）
 
 真机验证清单：
+
 - [ ] App 启动 → 设置页（设备配置）渲染正常
 - [ ] 生成设备密钥 → 公钥展示
-- [ ] 粘贴密钥信封 → 认证成功 → 进入聊天页
+- [ ] 粘贴密保信封 → 认证成功 → 进入聊天页
 - [ ] 发送消息 → 对方设备（另一台手机/CLI）同步收到明文
 - [ ] 附件上传 → 下载解密一致（相机/麦克风/相册权限弹窗出现）
 - [ ] APNs：付费账号配置后，杀进程状态下对方发消息能收到"有新消息"提示（无正文）
@@ -99,13 +102,13 @@ Xcode 内配置（Target `Runner` → Signing & Capabilities）：
 
 ## 5. 已知点与常见问题
 
-| 现象 | 处理 |
-| --- | --- |
+| 现象                                             | 处理                                                                          |
+| ------------------------------------------------ | ----------------------------------------------------------------------------- |
 | `pod install` 未执行 / Podfile.lock 无 libsodium | `flutter config --no-enable-swift-package-manager` 后重新 `flutter build ios` |
-| libsodium 加载失败 | 见 §2 验证项：检查 Pods、`-Wl,-export_dynamic` |
-| 免费账号无法真机运行 | 手机信任开发者证书；或改用付费账号 |
-| 推送收不到 | APNs 需付费账号 + capability + APNs 密钥（Server 侧）；WS/轮询兜底不受影响 |
-| 中文路径构建问题 | macOS 无此问题；Windows 侧继续用外部临时构建 |
+| libsodium 加载失败                               | 见 §2 验证项：检查 Pods、`-Wl,-export_dynamic`                                |
+| 免费账号无法真机运行                             | 手机信任开发者证书；或改用付费账号                                            |
+| 推送收不到                                       | APNs 需付费账号 + capability + APNs 密钥（Server 侧）；WS/轮询兜底不受影响    |
+| 中文路径构建问题                                 | macOS 无此问题；Windows 侧继续用外部临时构建                                  |
 
 ---
 

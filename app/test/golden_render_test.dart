@@ -353,9 +353,9 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
   });
 
-  // ---- offline（密钥信封导入：口令页次级入口，不再走 AppBar 菜单）----
+  // ---- offline（密保信封导入：口令页次级入口，不再走 AppBar 菜单）----
 
-  testWidgets('golden: 向导1.3.1-密钥信封步骤（offline）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.3.1-密保信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     // 信封入口仅 join（第二/三台设备）口令页显示：探测到 personA → 身份（自动进邀请码）→ 口令页
     await pumpSetup(tester, probeNames: {'personA': 'Lukas'}, enroll: fakeEnroll);
@@ -364,8 +364,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码（校验非空）
     await tester.tap(find.text('下一步')); // 邀请码 → 口令页
     await tester.pumpAndSettle();
-    // 口令页底部「改用密封密钥信封导入」→ offline 首步即密钥信封粘贴页
-    await tester.tap(find.text('改用密封密钥信封导入（离线）'));
+    // 口令页底部「改用线下密保信封」→ offline 首步即密保信封粘贴页
+    await tester.tap(find.text('改用线下密保信封'));
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_envelope.png'));

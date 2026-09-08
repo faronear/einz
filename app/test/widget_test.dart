@@ -48,11 +48,11 @@ void main() {
     expect(find.text('下一步'), findsOneWidget);
   });
 
-  testWidgets('后续设备：探测到 personA → 自动进入"你的身份"步骤', (WidgetTester tester) async {
+  testWidgets('后续设备：探测到 personA → 自动进入"我的名字"步骤', (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(probeNames: {'personA': 'Lukas'})); // 非空 → join
     await tester.pumpAndSettle();
 
-    expect(find.text('Einz 密境认领中：身份'), findsWidgets); // AppBar 大标题 + 简化短名
+    expect(find.text('Einz 秘境认领中：身份名字'), findsWidgets); // AppBar 大标题 + 简化短名
     expect(find.textContaining('创建者'), findsOneWidget);
     expect(find.textContaining('共有者'), findsOneWidget);
     // join step1 无「下一步」/「完成」按钮：点卡片即自动前进（老板 UX 决策）
@@ -61,16 +61,16 @@ void main() {
     // 点身份卡片 → 自动进入邀请码页
     await tester.tap(find.textContaining('创建者'));
     await tester.pumpAndSettle();
-    expect(find.text('Einz 密境认领中：验证码'), findsWidgets); // 邀请码页步骤标题
+    expect(find.text('Einz 秘境认领中：邀请码'), findsWidgets); // 邀请码页步骤标题
   });
 
-  testWidgets('探测失败：显示服务器输入引导与密钥信封线下入口', (WidgetTester tester) async {
+  testWidgets('探测失败：显示服务器输入引导与导入线下密保信封入口', (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(probeOk: false));
     await tester.pumpAndSettle();
 
     // 顶部琥珀卡片 + 检测页两处都含"无法连接服务器"，精确匹配检测页完整文案
     expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsOneWidget);
-    // 密钥信封线下入口在 AppBar 常驻菜单（tooltip）
-    expect(find.byTooltip('线下：导入密钥信封'), findsOneWidget);
+    // 导入线下密保信封入口在 AppBar 常驻菜单（tooltip）
+    expect(find.byTooltip('导入线下密保信封'), findsOneWidget);
   });
 }

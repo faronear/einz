@@ -68,7 +68,7 @@ Future<void> pumpToJoinPassphrase(
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle();
   // 口令页应为「验证」语义：标题与提示都是验证措辞
-  expect(find.text('Einz 密境认领中：口令'), findsOneWidget); // 标题
+  expect(find.text('Einz 秘境认领中：口令'), findsOneWidget); // 标题
   expect(find.text('输入密保口令（如不知道，请询问领地创建人）'),
       findsOneWidget); // hint
   // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡底部「下一步」按钮
@@ -89,7 +89,7 @@ void main() {
         reason: '错误口令必须被拦截并提示');
     expect(find.text('输入密保口令（如不知道，请询问领地创建人）'),
         findsOneWidget, reason: '应停留在口令页');
-    expect(find.text('Einz 密境认领中：PIN'), findsNothing, reason: '不应进入 PIN 页');
+    expect(find.text('Einz 秘境认领中：PIN'), findsNothing, reason: '不应进入 PIN 页');
   });
 
   testWidgets('正确口令：通过验证进入 PIN 页', (WidgetTester tester) async {
@@ -97,7 +97,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('Einz 密境认领中：PIN'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
+    expect(find.text('Einz 秘境认领中：PIN'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
   });
 
   testWidgets('未托管口令（服务器无 escrow 包）：提示并停留', (WidgetTester tester) async {
@@ -115,8 +115,8 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.textContaining('邀请码无效'), findsOneWidget, reason: '无效码必须被拦截并提示');
-    expect(find.text('Einz 密境认领中：验证码'), findsWidgets, reason: '应停留在邀请码页');
-    expect(find.text('Einz 密境认领中：口令'), findsNothing, reason: '不应进入口令页');
+    expect(find.text('Einz 秘境认领中：邀请码'), findsWidgets, reason: '应停留在邀请码页');
+    expect(find.text('Einz 秘境认领中：口令'), findsNothing, reason: '不应进入口令页');
   });
 
   testWidgets('正确邀请码：放行到「验证接入口令」页', (WidgetTester tester) async {
@@ -124,6 +124,6 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确邀请码');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('Einz 密境认领中：口令'), findsOneWidget, reason: '有效码应放行进口令页');
+    expect(find.text('Einz 秘境认领中：口令'), findsOneWidget, reason: '有效码应放行进口令页');
   });
 }

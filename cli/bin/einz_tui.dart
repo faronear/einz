@@ -138,7 +138,7 @@ String _defaultStoreDir() {
 
 /// 解析默认 store：固定检查 ~/.einz/myeinz.json（存在且可加载则返回路径，
 /// 损坏自动备份 .bak 后返回 ''（引导 init）；不存在返回 ''。
-/// 多设备身份请用 --store 显式指定其他文件（单机默认单设备，无需扫描/选择）。
+/// 多设备凭证请用 --store 显式指定其他文件（单机默认单设备，无需扫描/选择）。
 String _resolveAutoStore() {
   final path = '${_defaultStoreDir()}/myeinz.json';
   final f = File(path);
@@ -204,8 +204,8 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   }
 
   if (store == null) {
-    stdout.writeln('=== Einz 1+1 私密领地 ===');
-    _guidanceNotes.add('=== Einz 1+1 私密领地 ===');
+    stdout.writeln('=== Einz 秘境 ===');
+    _guidanceNotes.add('=== Einz 秘境 ===');
 
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
@@ -672,7 +672,7 @@ Future<void> main(List<String> args) async {
   // 进程 255 崩溃（已实测定位）。残留场景较少见（真实终端进程退出后由 shell 接管
   // termios），不做启动时强制恢复；退出路径 _exitRaw 已保证正常恢复。
 
-  // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成设备身份；
+  // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成设备凭证；
   // 无 Space Key → 口令接入（escrow）；未激活 → auth。全部就绪后才进入 TUI。
   final onboard = await _onboard(storePath, server);
   if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
@@ -2116,7 +2116,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       //    未撤销任何设备；未托管 → pkg 为 null）
       final pkg = await ApiClient(server).recoverSpace(passphrase);
       if (pkg == null) {
-        session.messages.add(_systemMessage(session, '⚠️ 该空间未托管口令（escrow 未上传），无法恢复'));
+        session.messages.add(_systemMessage(session, '⚠️ 未上传口令托管包，无法恢复'));
         session.messages.add(_systemMessage(session, '----------------'));
         _scheduleRender();
         continue;
@@ -2148,7 +2148,7 @@ Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String
       _scheduleRender();
     } on ApiException catch (e) {
       final hint = e.code == 'FORBIDDEN'
-          ? '口令与服务器托管不符，或该空间未托管口令（escrow 未上传）'
+          ? '口令与服务器托管不符，或未上传口令托管包'
           : '服务端恢复失败（${e.code}）';
       session.messages.add(_systemMessage(session, '⚠️ $hint，请重新输入'));
       session.messages.add(_systemMessage(session, '----------------'));

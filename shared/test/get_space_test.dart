@@ -1,5 +1,5 @@
 // ApiClient.getSpace 单测：本地 HttpServer 模拟 /space 响应，
-// 验证 SpaceResult 解析（device_id → person_id 映射，多设备身份语义）。
+// 验证 SpaceResult 解析（device_id → person_id 映射，多设备凭证语义）。
 
 import 'dart:convert';
 import 'dart:io';

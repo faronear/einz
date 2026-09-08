@@ -13,7 +13,7 @@
 **目标：**
 
 - Server 永远只接触密文与元数据，无法读取消息正文、图片、视频、语音、笔记。
-- 设备身份 = 密码学公钥；私钥永不离开设备。
+- 设备凭证 = 密码学公钥；私钥永不离开设备。
 - 固定两人一空间（静态白名单），无动态配对。
 
 **范围外（明确不做）：**
@@ -28,14 +28,14 @@
 
 **唯一库：libsodium。** 客户端（Flutter/CLI）经 `sodium_libs`（dart:ffi）；服务端（Node.js）用对应绑定。
 
-| 用途 | 原语 | libsodium 函数 |
-| --- | --- | --- |
-| 设备身份密钥 | X25519 密钥对 | `crypto_box_keypair` |
+| 用途                       | 原语                                         | libsodium 函数                             |
+| -------------------------- | -------------------------------------------- | ------------------------------------------ |
+| 设备凭证密钥               | X25519 密钥对                                | `crypto_box_keypair`                       |
 | Space Key 包装（配置分发） | 匿名发送方加密（X25519 + XSalsa20-Poly1305） | `crypto_box_seal` / `crypto_box_seal_open` |
-| 消息/附件加密 | XChaCha20-Poly1305（AEAD） | `crypto_aead_xchacha20poly1305_ietf_*` |
-| 密钥派生（消息/附件） | 带密钥 BLAKE2b-256 | `crypto_generichash`（keyed 模式） |
-| 恢复码派生备份密钥 | Argon2id | `crypto_pwhash` |
-| 随机数 | CSPRNG | `randombytes_buf` |
+| 消息/附件加密              | XChaCha20-Poly1305（AEAD）                   | `crypto_aead_xchacha20poly1305_ietf_*`     |
+| 密钥派生（消息/附件）      | 带密钥 BLAKE2b-256                           | `crypto_generichash`（keyed 模式）         |
+| 恢复码派生备份密钥         | Argon2id                                     | `crypto_pwhash`                            |
+| 随机数                     | CSPRNG                                       | `randombytes_buf`                          |
 
 **禁止：** 自研算法、自定义 construction、使用密码学原语做非标准组合、nonce 复用。
 
@@ -57,12 +57,12 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 
 **生命周期：**
 
-| 密钥 | 生成时机 | 销毁 | 轮换 |
-| --- | --- | --- | --- |
-| Device Identity Key | 设备首次启动 | 随设备撤销废弃 | 换机时重新生成（§10） |
-| Space Key | 一次性配置阶段 | 设备撤销时（§9） | 撤销触发 `key_version` 递增 |
-| Message Key | 每条消息发送时派生 | 用完即弃（不持久化） | 无 |
-| Attachment Key | 每个附件加密时派生 | 用完即弃 | 无 |
+| 密钥                | 生成时机           | 销毁                 | 轮换                        |
+| ------------------- | ------------------ | -------------------- | --------------------------- |
+| Device Identity Key | 设备首次启动       | 随设备撤销废弃       | 换机时重新生成（§10）       |
+| Space Key           | 一次性配置阶段     | 设备撤销时（§9）     | 撤销触发 `key_version` 递增 |
+| Message Key         | 每条消息发送时派生 | 用完即弃（不持久化） | 无                          |
+| Attachment Key      | 每个附件加密时派生 | 用完即弃             | 无                          |
 
 **要点：**
 
@@ -126,15 +126,15 @@ BackupKey = crypto_pwhash(
 }
 ```
 
-| 字段 | 说明 |
-| --- | --- |
-| `v` | 协议版本（=1） |
-| `type` | text / image / video / voice / system |
-| `key_version` | 加密所用 Space Key 版本（解密时选择归档密钥） |
-| `message_id` | UUIDv7，派生 Message Key 的输入之一 |
-| `sender_device_id` | 发送设备 |
-| `nonce` | 24 字节随机 nonce，**每条消息重新生成，禁止复用** |
-| `ciphertext` | AEAD 密文（含 16 字节 tag） |
+| 字段               | 说明                                              |
+| ------------------ | ------------------------------------------------- |
+| `v`                | 协议版本（=1）                                    |
+| `type`             | text / image / video / voice / system             |
+| `key_version`      | 加密所用 Space Key 版本（解密时选择归档密钥）     |
+| `message_id`       | UUIDv7，派生 Message Key 的输入之一               |
+| `sender_device_id` | 发送设备                                          |
+| `nonce`            | 24 字节随机 nonce，**每条消息重新生成，禁止复用** |
+| `ciphertext`       | AEAD 密文（含 16 字节 tag）                       |
 
 ### 5.2 加密过程
 
@@ -203,8 +203,14 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
   "space_id": "UUIDv7",
   "key_version": 1,
   "sealed_space_keys": [
-    { "device_id": "dev-a1", "sealed": "base64(crypto_box_seal(SpaceKey, pubKeyA))" },
-    { "device_id": "dev-b1", "sealed": "base64(crypto_box_seal(SpaceKey, pubKeyB))" }
+    {
+      "device_id": "dev-a1",
+      "sealed": "base64(crypto_box_seal(SpaceKey, pubKeyA))"
+    },
+    {
+      "device_id": "dev-b1",
+      "sealed": "base64(crypto_box_seal(SpaceKey, pubKeyB))"
+    }
   ]
 }
 ```
@@ -233,8 +239,18 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
 {
   "space_id": "UUIDv7",
   "devices": [
-    { "device_id": "dev-a1", "person_id": "person-a", "public_key": "base64(X25519公钥)", "status": "active" },
-    { "device_id": "dev-b1", "person_id": "person-b", "public_key": "base64(X25519公钥)", "status": "active" }
+    {
+      "device_id": "dev-a1",
+      "person_id": "person-a",
+      "public_key": "base64(X25519公钥)",
+      "status": "active"
+    },
+    {
+      "device_id": "dev-b1",
+      "person_id": "person-b",
+      "public_key": "base64(X25519公钥)",
+      "status": "active"
+    }
   ]
 }
 ```
@@ -243,7 +259,7 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
 
 ### 7.4 两种密钥分发方案：seal 密封交换 vs escrow 口令托管
 
-系统提供**两条并列的 Space Key 分发路径**，按场景选用；app 默认走 escrow，seal 为线下/CLI 路径。
+系统提供**两条并列的 Space Key 分发路径**，按场景选用；默认走 escrow，可选 sealed envelope 为线下/CLI 路径。
 
 **方案一：seal 密封交换（§7.1-7.2，CLI `config`/`import`、app「线下导入」）**
 
@@ -266,17 +282,17 @@ B（白名单内设备）拉取密文包 → 用同一口令解密得 Space Key
 - Server 只存被口令加密的包（`{format,salt,nonce,ciphertext}`），无口令解不开。
 - 安全边界：依赖**口令强度** + 口令的离线告知渠道。
 
-**为什么 app 默认走 escrow：** 首设备初次创建空间时**不存在第二个使用者的公钥**，无法 seal；
+**为什么默认走 escrow：** 首设备初次创建空间时**不存在第二个使用者的公钥**，无法 seal；
 口令托管只要求一个口令，公钥可事后补（加入白名单是独立环节），对小白最友好。
-seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「线下导入」选项。
+seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线下导入」选项。
 
-| 维度 | seal 密封交换 | escrow 口令托管 |
-| --- | --- | --- |
-| 前置条件 | 双方公钥已互知 | 无（仅需口令） |
-| 密钥传递途径 | 离线文件/二维码，**不经 Server** | 口令加密包**托管 Server** |
-| Server 泄露影响 | 无（sealed 副本不在 Server） | 拿到密文包，无口令解不开 |
-| 安全边界 | 对方私钥保管 | 口令强度 + 离线告知渠道 |
-| 使用方 | CLI / app 线下导入 | **app 默认**（创建/加入） |
+| 维度            | seal 密封交换                    | escrow 口令托管           |
+| --------------- | -------------------------------- | ------------------------- |
+| 前置条件        | 双方公钥已互知                   | 无（仅需口令）            |
+| 密钥传递途径    | 离线文件/二维码，**不经 Server** | 口令加密包**托管 Server** |
+| Server 泄露影响 | 无（sealed 副本不在 Server）     | 拿到密文包，无口令解不开  |
+| 安全边界        | 对方私钥保管                     | 口令强度 + 离线告知渠道   |
+| 使用方          | CLI / app 线下导入               | **app 默认**（创建/加入） |
 
 > 两者均不替代设备白名单：无论哪条路径，B 都需先被 A 加入 VPS `config.json`（§7.3）才能认证与拉取。
 
@@ -292,20 +308,21 @@ seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「线下�
 
 **双重关卡**：拿到口令 ≠ 能接入——攻击者还需让设备进入白名单（A 手动改 VPS，可拦截）。
 
-| 关卡 | 作用 | 控制者 |
-| --- | --- | --- |
+| 关卡                           | 作用                   | 控制者                 |
+| ------------------------------ | ---------------------- | ---------------------- |
 | 设备白名单（`isActiveDevice`） | 能否认证 / 拉取 escrow | A 手动维护 config.json |
-| 口令（Argon2id 解密密文包） | 能否解出 Space Key | A 离线告知 |
+| 口令（Argon2id 解密密文包）    | 能否解出 Space Key     | A 离线告知             |
 
 **口令泄漏应对（按严重程度递进）：**
 
-| 级别 | 措施 | 操作 | 适用 |
-| --- | --- | --- | --- |
-| 轻 | 换口令 | 新口令重新加密包并 `POST /key-escrow` 覆盖（UPSERT 最新者胜），旧口令立即失效；CLI `escrow upload` 可随时重传 | 口令可能外泄、设备面可控 |
-| 重 | 轮换 Space Key（§9） | 轮换后旧密文包作废（解出的是旧密钥），客户端**自动**用新 Space Key 重传密文包（app `_syncEscrow`） | 怀疑密钥已实际落入他人之手 |
-| 定向 | 撤销设备（§9.3） | `device.revoked` 踢出白名单并通知其清理本地数据 | 已知攻击设备已加入白名单 |
+| 级别 | 措施                 | 操作                                                                                                          | 适用                       |
+| ---- | -------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| 轻   | 换口令               | 新口令重新加密包并 `POST /key-escrow` 覆盖（UPSERT 最新者胜），旧口令立即失效；CLI `escrow upload` 可随时重传 | 口令可能外泄、设备面可控   |
+| 重   | 轮换 Space Key（§9） | 轮换后旧密文包作废（解出的是旧密钥），客户端**自动**用新 Space Key 重传密文包（app `_syncEscrow`）            | 怀疑密钥已实际落入他人之手 |
+| 定向 | 撤销设备（§9.3）     | `device.revoked` 踢出白名单并通知其清理本地数据                                                               | 已知攻击设备已加入白名单   |
 
 **风险点：**
+
 - **口令共享**：双方同一口令，无法区分"A/B 的口令"；私用两人场景可接受，但应**区别于 App 锁 PIN**。
 - **口令即权限**（KEY_ESCROW.md §6）：口令熵要足够（Argon2id 慢哈希兜底暴力破解）；口令丢失用 12 词恢复码互补兜底。
 
@@ -371,7 +388,7 @@ Client                     Server
 ```json
 {
   "current": { "key_version": 2, "space_key": "…" },
-  "archived": [ { "key_version": 1, "space_key": "…" } ]
+  "archived": [{ "key_version": 1, "space_key": "…" }]
 }
 ```
 
@@ -418,11 +435,11 @@ Client                     Server
 
 ### 11.1 前向保密决策（ADR 关联：productLens §15）
 
-| 决策点 | 结论 | 理由 |
-| --- | --- | --- |
-| 消息密钥生成 | **简单派生**（Space Key → 每消息派生），不做双棘轮 | 私钥在 Keychain/Keystore 难以提取；两人固定空间无高频密钥协商；复杂度与收益不成比例 |
-| 代价 | 若 Space Key 泄露，历史消息可解 | 已接受；通过密钥轮换 + 安全存储缓解 |
-| 未来路径 | 如未来需要，可在 `key_version` 机制上叠加棘轮，不破坏现有密文格式 | 留有余地 |
+| 决策点       | 结论                                                              | 理由                                                                                |
+| ------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 消息密钥生成 | **简单派生**（Space Key → 每消息派生），不做双棘轮                | 私钥在 Keychain/Keystore 难以提取；两人固定空间无高频密钥协商；复杂度与收益不成比例 |
+| 代价         | 若 Space Key 泄露，历史消息可解                                   | 已接受；通过密钥轮换 + 安全存储缓解                                                 |
+| 未来路径     | 如未来需要，可在 `key_version` 机制上叠加棘轮，不破坏现有密文格式 | 留有余地                                                                            |
 
 ### 11.2 禁止清单（密码学专属）
 
@@ -438,11 +455,11 @@ Client                     Server
 
 Einz 涉及多个"密钥"概念，命名与用途对照如下：
 
-| 名称 | 实体类型 | 用途 | 谁持有 |
-| --- | --- | --- | --- |
-| **Space Key** | 32B 对称密钥 | 消息/附件 E2EE 加密（§5/§6）；key_version 轮换 + 归档（§9.2） | 双方设备（App 锁 PIN 包 / 口令托管保管） |
-| **口令派生密钥** | 无独立实体（口令经 Argon2id 派生，§4.3） | CLI backup/restore 备份文件、App 锁 PIN/恢复码、口令托管包加密（三处复用 backup.dart） | 口令持有者（恢复码 / PIN / 接入口令） |
-| **EINZ_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B） | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文） | 部署者（deployment/.env，gitignore 保护） |
+| 名称                   | 实体类型                                 | 用途                                                                                   | 谁持有                                    |
+| ---------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **Space Key**          | 32B 对称密钥                             | 消息/附件 E2EE 加密（§5/§6）；key_version 轮换 + 归档（§9.2）                          | 双方设备（App 锁 PIN 包 / 口令托管保管）  |
+| **口令派生密钥**       | 无独立实体（口令经 Argon2id 派生，§4.3） | CLI backup/restore 备份文件、App 锁 PIN/恢复码、口令托管包加密（三处复用 backup.dart） | 口令持有者（恢复码 / PIN / 接入口令）     |
+| **EINZ_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B）        | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文）                 | 部署者（deployment/.env，gitignore 保护） |
 
 > 注：Server 备份密钥 2026-08 起从 `EINZ_BACKUP_KEY` 更名为 `EINZ_DB_BACKUP_KEY`，
 > 避免与 CLI 的 backup（口令派生）概念混淆；旧部署升级需同步改 `.env` 变量名（docs/updateServer.md §5）。

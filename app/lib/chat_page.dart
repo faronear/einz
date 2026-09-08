@@ -1416,7 +1416,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ],
                 ),
-                // 我的（右）：名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
+                // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
                 // 名字为空则不显示文本，只留圆点）
                 Row(
                   children: [

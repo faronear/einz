@@ -5,7 +5,7 @@ import 'package:sodium/sodium.dart';
 
 import '../sodium.dart';
 
-/// X25519 设备身份密钥对（E2EE.md §3）。
+/// X25519 设备凭证密钥对（E2EE.md §3）。
 class DeviceKeyPair {
   DeviceKeyPair({required this.deviceId, required this.publicKey, required this.privateKey});
 

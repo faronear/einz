@@ -85,7 +85,7 @@ class MessageRepository {
     }
   }
 
-  /// 设备 → 用户（person_id）映射（GET /space 缓存，多设备身份语义）。
+  /// 设备 → 用户（person_id）映射（GET /space 缓存，多设备凭证语义）。
   /// 用于判断消息是否"同一个人"发送：同 person 不同设备显示为 'me'。
   final Map<String, String> _personByDevice = {};
 

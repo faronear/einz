@@ -58,7 +58,7 @@ dart pub get
 > macOS/Linux 提示：若 CLI 报 libsodium 加载失败，先设置
 > `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"`（Homebrew 安装一般自动探测，无需设置）。
 
-### 2.2 生成两台设备身份 + 一次性配置（白名单 + Space Key 分发）
+### 2.2 生成两台设备凭证 + 一次性配置（白名单 + Space Key 分发）
 
 CLI 命令（在 `cli/` 目录，下面 `$W` 是临时工作目录，如 `/tmp/einz-trial`）：
 
@@ -71,25 +71,25 @@ dart run bin/einz.dart init --store "$W/b.json" --device-id dev-b1
 
 # 2) 取 B 的公钥，A 侧生成 Space Key 并输出：
 #    - config.json（服务器白名单 + space_id）
-#    - envelope-b.txt（密钥信封：密封给 B 的 Space Key 副本）
+#    - envelope-b.txt（密保信封：密封给 B 的 Space Key 副本）
 PUB_B="$(dart run bin/einz.dart pubkey --store "$W/b.json")"
 dart run bin/einz.dart config \
   --store "$W/a.json" --peer-pubkey "$PUB_B" \
   --space-id "space-demo" \
   --out-config "$W/config.json" --out-envelope-peer "$W/envelope-b.txt"
 
-# 3) B 导入密钥信封，解出 Space Key
+# 3) B 导入密保信封，解出 Space Key
 dart run bin/einz.dart import \
   --store "$W/b.json" --envelope-file "$W/envelope-b.txt" --space-id "space-demo"
 ```
 
 产物（**config.json 禁止提交 Git**，私钥/恢复码离线保管）：
 
-| 产物                      | 内容                               | 去向                              |
-| ------------------------- | ---------------------------------- | --------------------------------- |
-| `$W/config.json`          | space_id + A/B 白名单              | 服务器`server/config/config.json` |
-| `$W/envelope-b.txt`       | 密钥信封（密封 Space Key，仅 B 可解）  | 导入 B 后删除                     |
-| `$W/a.json` / `$W/b.json` | 设备 store（身份密钥 + Space Key） | 本机保存                          |
+| 产物                      | 内容                                  | 去向                              |
+| ------------------------- | ------------------------------------- | --------------------------------- |
+| `$W/config.json`          | space_id + A/B 白名单                 | 服务器`server/config/config.json` |
+| `$W/envelope-b.txt`       | 密保信封（密封 Space Key，仅 B 可解） | 导入 B 后删除                     |
+| `$W/a.json` / `$W/b.json` | 设备 store（身份密钥 + Space Key）    | 本机保存                          |
 
 ### 2.3 启动服务器并双端收发
 
@@ -125,22 +125,22 @@ dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 
 
 **CLI 命令总览：**
 
-| 命令                                                                                            | 用途                                                           |
-| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `init --store <s> --device-id <id>`                                                             | 生成本机身份密钥对                                             |
-| `pubkey --store <s>`                                                                            | 导出公钥（base64）                                             |
-| `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-envelope-peer <f>` | 生成 Space Key + 白名单 + 密钥信封                            |
-| `import --store <s> --envelope-file <f> --space-id <id> [--key-version N]`                     | 导入密钥信封（轮换导入用 --key-version）                       |
-| `auth --store <s> --server <url>`                                                               | challenge-response 认证，拿 session_token                      |
-| `send --store <s> --server <url> --message <文本>`                                              | 加密发送（先入队，失败自动补发；`--server` 可省略=纯离线入队） |
-| `sync --store <s> --server <url> [--after N]`                                                   | 增量同步（翻页拉全量 → 落库 → 推进锚点 → 补发队列）            |
-| `listen --store <s> --server <url>`                                                             | WS 实时接收 message.new（断线 2s 重连，重连前先 /sync 补齐）   |
-| `attach --store <s> --server <url> --file <p> [--type image\|video\|voice] [--caption <t>]`     | 附件加密上传                                                   |
-| `fetch --store <s> --server <url> --attachment-id <id> [--out <p>]`                             | 附件下载解密                                                   |
-| `history --store <s>`                                                                           | 解密本地历史（按 key_version 选密钥）                          |
-| `rotate --store <s> --peer-pubkey <b64> --out-envelope-peer <f>`                               | 轮换 Space Key（key_version+1，旧密钥归档）                    |
-| `backup --store <s> --out <f>`                                                                  | 本地加密备份（生成 12 词恢复码）                               |
-| `restore --in <f> --recovery-code <12词> [--store <s>]`                                         | 恢复码解密还原                                                 |
+| 命令                                                                                              | 用途                                                           |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `init --store <s> --device-id <id>`                                                               | 生成本机身份密钥对                                             |
+| `pubkey --store <s>`                                                                              | 导出公钥（base64）                                             |
+| `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-envelope-peer <f>` | 生成 Space Key + 白名单 + 密保信封                             |
+| `import --store <s> --envelope-file <f> --space-id <id> [--key-version N]`                        | 导入密保信封（轮换导入用 --key-version）                       |
+| `auth --store <s> --server <url>`                                                                 | challenge-response 认证，拿 session_token                      |
+| `send --store <s> --server <url> --message <文本>`                                                | 加密发送（先入队，失败自动补发；`--server` 可省略=纯离线入队） |
+| `sync --store <s> --server <url> [--after N]`                                                     | 增量同步（翻页拉全量 → 落库 → 推进锚点 → 补发队列）            |
+| `listen --store <s> --server <url>`                                                               | WS 实时接收 message.new（断线 2s 重连，重连前先 /sync 补齐）   |
+| `attach --store <s> --server <url> --file <p> [--type image\|video\|voice] [--caption <t>]`       | 附件加密上传                                                   |
+| `fetch --store <s> --server <url> --attachment-id <id> [--out <p>]`                               | 附件下载解密                                                   |
+| `history --store <s>`                                                                             | 解密本地历史（按 key_version 选密钥）                          |
+| `rotate --store <s> --peer-pubkey <b64> --out-envelope-peer <f>`                                  | 轮换 Space Key（key_version+1，旧密钥归档）                    |
+| `backup --store <s> --out <f>`                                                                    | 本地加密备份（生成 12 词恢复码）                               |
+| `restore --in <f> --recovery-code <12词> [--store <s>]`                                           | 恢复码解密还原                                                 |
 
 > 其余部分（生产部署 / 备份恢复 / 撤销轮换 / 安全边界 / 故障排查）见下节。
 
@@ -198,13 +198,13 @@ CLI 设备改用 `--server https://<你的域名>` 即可远程使用（WS 地�
 
 ### 3.4 端口与数据目录
 
-| 项        | 位置（容器内）           | 说明                                         |
-| --------- | ------------------------ | -------------------------------------------- |
-| `einz.sqlite.db`  | `/data/einz.sqlite.db` | SQLite（消息密文、设备表、会话、push token） |
-| 附件 blob | `/data/files/`           | 密文文件，按 attachment_id 前 2 位分片       |
-| 备份产物  | `/data/backups/`         | `npm run backup` 的加密归档                  |
-| 白名单    | `/config/config.json`    | 只读挂载，启动时加载                         |
-| 服务端口  | `3000`（expose，仅内网） | 由 Caddy 反代对外                            |
+| 项               | 位置（容器内）           | 说明                                         |
+| ---------------- | ------------------------ | -------------------------------------------- |
+| `einz.sqlite.db` | `/data/einz.sqlite.db`   | SQLite（消息密文、设备表、会话、push token） |
+| 附件 blob        | `/data/files/`           | 密文文件，按 attachment_id 前 2 位分片       |
+| 备份产物         | `/data/backups/`         | `npm run backup` 的加密归档                  |
+| 白名单           | `/config/config.json`    | 只读挂载，启动时加载                         |
+| 服务端口         | `3000`（expose，仅内网） | 由 Caddy 反代对外                            |
 
 ---
 
@@ -215,7 +215,7 @@ SETUP.md §3 的设计流程已由 CLI 实现（2.2 已演示）。要点重申�
 1. **身份密钥**：`init` 生成 X25519 密钥对，私钥只留在设备 store。
 2. **Space Key 分发**：`config` 生成 32B 随机 Space Key，分别 `crypto_box_seal` 给 A/B——只有对应设备能解开（E2EE.md §7.1）。
 3. **白名单登记**：`config.json`（space_id + devices）放进服务器后启动；`syncWhitelistToDb` 会在启动时登记进 devices 表，撤销状态不被覆盖（Phase 4 加固）。
-4. **导入与销毁**：`import` 解封后删除密钥信封临时文件。
+4. **导入与销毁**：`import` 解封后删除密保信封临时文件。
 5. **恢复码**：`backup` 命令会生成 12 词恢复码（E2EE.md §10），**离线保存多份，Server 不接触**。
 
 > 安全操作建议：密钥生成/密封/导入在受控环境进行；`config.json`、设备私钥、恢复码三者分开存放——任一单独泄露都不足以解密历史消息。
@@ -280,11 +280,11 @@ dart run bin/einz.dart import \
 
 ### 5.4 数据目录备份策略（汇总）
 
-| 数据                           | 手段                                    | 频率建议        |
-| ------------------------------ | --------------------------------------- | --------------- |
+| 数据                                   | 手段                                    | 频率建议        |
+| -------------------------------------- | --------------------------------------- | --------------- |
 | Server einz.sqlite.db + files + config | `npm run backup`（加密归档到 backups/） | 每日（可 cron） |
-| 客户端密钥 + 历史              | `backup` 命令（恢复码加密）             | 每次重大变更后  |
-| 恢复码 / 备份密钥              | 离线多份                                | 永久            |
+| 客户端密钥 + 历史                      | `backup` 命令（恢复码加密）             | 每次重大变更后  |
+| 恢复码 / 备份密钥                      | 离线多份                                | 永久            |
 
 ---
 

@@ -15,16 +15,16 @@ import 'data/locale_settings.dart';
 import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
 
-/// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间 / 线下导入密钥信封。
+/// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
 enum _WizardRole { create, join, offline }
 
-/// 设置页：一次性配置（生成设备身份 → 自动登记入网 → 获得 Space Key → 设置启动锁）。
+/// 设置页：一次性配置（生成设备凭证 → 自动登记入网 → 获得 Space Key → 设置启动锁）。
 ///
 /// 服务器登记已全自动化（对齐 TUI/CLI 的 enroll 流程，不再需要 config.json 白名单）：
 /// - create（第一个使用者）：首设备免邀请码自举登记 → 设接入口令托管 Space Key →
 ///   分享二维码（含 spaceId+口令+一次性邀请码，对方扫码一键加入）；
 /// - join：扫码/粘贴加入信息（含邀请码）→ 凭邀请码登记 → 口令托管拉取 Space Key；
-/// - offline：密钥信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
+/// - offline：密保信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
 /// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride, this.authOverride, this.keyPairOverride, this.escrowOverride});
@@ -248,7 +248,7 @@ class _SetupPageState extends State<SetupPage> {
         title: Text(_appBarTitle(l10n)),
         actions: [
           // 全丢恢复入口常驻菜单：探测自动判定角色后依然可达
-          // （密钥信封导入已移入口令页次级入口，不再放全局菜单）
+          // （密保信封导入已移入口令页次级入口，不再放全局菜单）
           PopupMenuButton<String>(
             tooltip: l10n.wizardRoleOffline,
             onSelected: (value) {
@@ -366,7 +366,7 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---------- 向导框架 ----------
 
-  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / offline=密钥信封）。
+  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / offline=密保信封）。
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
@@ -380,7 +380,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 当前步骤的简化短名（AppBar 大标题后拼接："Einz 密境认领中：身份"）。
+  /// 当前步骤的简化短名（AppBar 系列标题：本页主题，例如："Einz 秘境：认领中：邀请码"）。
   String _stepShortTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardRoleTitle;
     switch (_role!) {
@@ -409,8 +409,8 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 页眉标题（AppBar）：大标题 + "：" + 当前步骤简化短名
-  /// （如「Einz 密境认领中：身份」；第 0 步未选角色时显示引导语）。
+  /// 页眉标题（AppBar）：系列标题 + "：" + 当前步骤主题
+  /// （如「Einz 秘境认领中：邀请码」；第 0 步未选角色时显示引导语）。
   String _appBarTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardRoleTitle;
     switch (_role!) {
@@ -577,7 +577,7 @@ class _SetupPageState extends State<SetupPage> {
 
   void _backStep() {
     setState(() {
-      // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密钥信封）；
+      // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密保信封）；
       // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
       if (_step > 1) _step--;
     });
@@ -625,7 +625,7 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 第 0 步（角色未判定时）：显示探测状态（密钥信封导入在口令页有次级入口）。
+  /// 第 0 步（角色未判定时）：显示探测状态（密保信封导入在口令页有次级入口）。
   /// 角色由服务器探测自动判定（person 名称表空=首设备 create，非空=后续设备 join），
   /// 不再让用户手动选择。
   Widget _buildDetectAndEnvelope() {
@@ -941,7 +941,7 @@ class _SetupPageState extends State<SetupPage> {
     ));
   }
 
-  // ---- 场景 A（create）：名字 → 口令 → PIN → 完成（设备名已自动设置，不再询问） ----
+  // ---- 场景 A（create）：身份名字 → 口令 → PIN → 完成（设备名已自动设置，不再询问） ----
 
   /// 步骤 1（create）：第一个用户的名字；密钥已由 [_autoGenerateKey] 自动生成
   /// （不展示密钥信息——技术细节，小白用户不需要看）；"下一步"触发自举登记
@@ -986,7 +986,7 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  // ---- 场景 B（join）：身份 → 邀请码 → 口令 → PIN → 完成 ----
+  // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN → 完成 ----
 
   /// 步骤 1（join）：你是第一个用户（创建者 personA）还是第二个（伴侣 personB）。
   /// 与 TUI 引导顺序一致：先定身份（并按需设置名字）。
@@ -1118,7 +1118,7 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         const SizedBox(height: 16),
-        // 密钥信封导入与口令同属 Space Key 交换方式：仅 join（第二/三台设备）
+        // 密保信封导入与口令同属 Space Key 交换方式：仅 join（第二/三台设备）
         // 可用——信封是对端设备导出的密封密钥，首设备（create）没有对端设备，
         // 也无邀请码，故不显示此入口
         if (_role == _WizardRole.join)
@@ -1284,7 +1284,7 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  // ---- 场景 B（join）：身份 → 邀请码 → 口令 → PIN ----
+  // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN ----
 
   /// join：凭邀请码登记 → 认证 → 拉取口令托管包 → 口令解密出 Space Key → 设置 PIN → 完成。
   /// join 邀请码页（步骤 2）「验证邀请码」：凭码登记（服务端校验，无效码抛错）
@@ -1397,9 +1397,9 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  // ---- 场景 C（offline）：密钥信封导入 ----
+  // ---- 场景 C（offline）：密保信封导入 ----
 
-  /// 步骤 1（offline）：粘贴密钥信封（对方用本设备公钥密封的 Space Key）。
+  /// 步骤 1（offline）：粘贴密保信封（对方用本设备公钥密封的 Space Key）。
   /// 同时需填写一次性邀请码（非首台设备必须凭码登记后才能认证）。
   Widget _buildStepEnvelope() {
     final l10n = AppLocalizations.of(context)!;
@@ -1419,7 +1419,7 @@ class _SetupPageState extends State<SetupPage> {
         // 邀请码已在 join 步骤 2 提供（offline 从 join 口令页切换进入时沿用
         // 已填邀请码登记），此页不再重复显示输入框
         const SizedBox(height: 16),
-        // 与口令页的「改用密封密钥信封导入」对称：口令/信封是平行方案可互切；
+        // 与口令页的「改用线下密保信封导入」对称：口令/信封是平行方案可互切；
         // 切回口令页保留已输入的口令与邀请码，任一完成都进入 PIN 步骤
         TextButton.icon(
           onPressed: _switchToPassphrase,
@@ -1430,7 +1430,7 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 从密钥信封页切回「验证口令」页（join 步骤 3）。
+  /// 从密保信封页切回「验证口令」页（join 步骤 3）。
   /// 不能用 _selectRole（它会重置 _step=1 回身份页）；直接切角色+步骤，
   /// 已输入的邀请码/口令保留，任一方案完成都进入 PIN 步骤。
   void _switchToPassphrase() {
@@ -1441,7 +1441,7 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// offline 信封页（步骤 1）「验证密钥信封」：登记 → 用本设备私钥解封信封——
+  /// offline 信封页（步骤 1）「验证密保信封」：登记 → 用本设备私钥解封信封——
   /// 解出合法 Space Key 才放行进 PIN 步骤；无效信封提示并停留本页。
   Future<bool> _verifyEnvelope() async {
     final kp = _keyPair;

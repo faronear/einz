@@ -84,7 +84,7 @@ class InviteResult {
 }
 
 /// 空间设备信息（GET /space 返回）：device_id → person_id 映射，
-/// 用于判断消息是否"同一个人"发送（多设备身份语义，PROTOCOL.md §7.3）。
+/// 用于判断消息是否"同一个人"发送（多设备凭证语义，PROTOCOL.md §7.3）。
 class SpaceDevice {
   const SpaceDevice({
     required this.deviceId,

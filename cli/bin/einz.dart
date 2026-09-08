@@ -170,7 +170,7 @@ Future<void> _cmdConfig(ArgResults opts) async {
   // 对方的密封 Space Key 文件
   if (outEnvelopePeer != null) {
     File(outEnvelopePeer).writeAsStringSync(base64Encode(envelopePeer));
-    stdout.writeln('✅ 对方密钥信封已写入: $outEnvelopePeer');
+    stdout.writeln('✅ 对方密保信封已写入: $outEnvelopePeer');
   }
   stdout.writeln('✅ Space Key 已生成并密封（key_version=1）');
 }
@@ -532,11 +532,11 @@ Future<void> _cmdRestore(ArgResults opts) async {
       archivedSpaceKeys: (data['archived_space_keys'] as List?)?.cast<Map<String, dynamic>>() ?? [],
     );
     restored.save(outPath);
-    stdout.writeln('✅ 已恢复设备存储: $outPath（历史 ${restored.historyCount} 条 + 队列 ${restored.pendingCount} 条；提示：设备身份需重新 init 并登记白名单）');
+    stdout.writeln('✅ 已恢复设备存储: $outPath（历史 ${restored.historyCount} 条 + 队列 ${restored.pendingCount} 条；提示：设备凭证需重新 init 并登记白名单）');
   }
 }
 
-/// 用本机已持有的 Space Key 密封给新设备公钥，输出密钥信封（一次性配置：
+/// 用本机已持有的 Space Key 密封给新设备公钥，输出密保信封（一次性配置：
 /// 把已有 Space Key 分发给新加入的设备，如 App 真机）。E2EE.md §7。
 Future<void> _cmdSeal(ArgResults opts) async {
   final path = _require(opts, 'store');
@@ -553,7 +553,7 @@ Future<void> _cmdSeal(ArgResults opts) async {
 }
 
 /// Space Key 轮换（E2EE.md §9.1）：当前密钥归档（key_version+1），生成新密钥，
-/// seal 给对方设备，写密钥信封文件。对方用 `import --key-version N` 导入并归档旧密钥。
+/// seal 给对方设备，写密保信封文件。对方用 `import --key-version N` 导入并归档旧密钥。
 Future<void> _cmdRotate(ArgResults opts) async {
   final path = _require(opts, 'store');
   final store = DeviceStore.load(path);
