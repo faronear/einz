@@ -1208,58 +1208,85 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _buildGenderButton(
+        // 卡片左右外缘与表单标签/输入框对齐（Column stretch 满宽布局，槽位各半宽）；
+        // Stack 布局 + 被选中的最后绘制：选中卡片横向扩展时覆盖相邻未选中卡片
+        SizedBox(
+          height: 80,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final half = (c.maxWidth - 12) / 2; // 两卡各占半宽，中间留 12 空隙
+              Widget slot(Widget child, bool left) => Positioned(
+                    left: left ? 0 : half + 12,
+                    width: half,
+                    top: 0,
+                    bottom: 0,
+                    child: child,
+                  );
+              final maleBtn = _buildGenderButton(
                 label: maleLabel,
                 icon: Icons.male,
                 color: const Color(0xFF3BAFFD), // 左：品牌天蓝
                 selected: selected == 'male',
+                alignment: Alignment.centerLeft, // 锚左外缘：选中向右扩展覆盖粉色卡
                 onTap: () => onChanged(selected == 'male' ? null : 'male'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildGenderButton(
+              );
+              final femaleBtn = _buildGenderButton(
                 label: femaleLabel,
                 icon: Icons.female,
                 color: const Color(0xFFD6529C), // 右：品牌粉
                 selected: selected == 'female',
+                alignment: Alignment.centerRight, // 锚右外缘：选中向左扩展覆盖蓝色卡
                 onTap: () => onChanged(selected == 'female' ? null : 'female'),
-              ),
-            ),
-          ],
+              );
+              // 被选中的最后绘制：横向扩展时压在相邻未选中卡片之上
+              final children = selected == 'male'
+                  ? [slot(femaleBtn, false), slot(maleBtn, true)]
+                  : [slot(maleBtn, true), slot(femaleBtn, false)];
+              return Stack(clipBehavior: Clip.none, children: children);
+            },
+          ),
         ),
       ],
     );
   }
 
-  /// 单个性别按钮：品牌色背景 + 白字图标/标签；选中放大 + 白粗边框，未选中半透明。
+  /// 单个性别按钮：品牌色背景 + 白字图标/标签；选中放大 + 横向扩展（锚点在外侧，
+  /// 覆盖相邻未选中卡片）+ 阴影；未选中压缩半透明。
   Widget _buildGenderButton({
     required String label,
     required IconData icon,
     required Color color,
     required bool selected,
+    required Alignment alignment, // 缩放锚点：靠外侧边，选中时向相邻卡片扩展
     required VoidCallback onTap,
   }) {
-    return AnimatedScale(
-      // 选中放大 + 未选中压缩，对比夸张醒目（老板要求：要够夸张）
-      scale: selected ? 1.3 : 0.8,
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: selected ? 1 : 0),
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
+      // 未选中（t=0）：整体压缩 0.9；选中（t=1）：纵向放大 1.15 + 横向扩展 1.35，
+      // 锚点在外侧 → 选中卡片覆盖相邻未选中卡片
+      builder: (context, t, child) => Transform(
+        alignment: alignment,
+        transform: Matrix4.diagonal3Values(
+          0.9 + 0.45 * t,
+          0.9 + 0.25 * t,
+          1,
+        ),
+        child: child,
+      ),
       child: Material(
         color: selected ? color : color.withValues(alpha: 0.35),
-        elevation: selected ? 3 : 0,
+        elevation: selected ? 4 : 0,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Container(
+            alignment: Alignment.center, // 卡片撑满槽位后内容垂直居中
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: selected ? Border.all(color: Colors.white, width: 3) : null,
+              borderRadius: BorderRadius.circular(14), // 无描边（老板：白边累赘），选中靠阴影+放大区分
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
