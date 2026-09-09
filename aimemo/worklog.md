@@ -1464,7 +1464,7 @@ golden 未触碰（plain 默认像素级不变）。
 **老板反馈：** 对话页渐变效果不如向导好看——标题栏（logo/Einz 秘境/菜单）没被渐变
 覆盖；渐变被底下输入栏截断；要求输入栏在该风格下不顶左右两头。
 
-**实现（commit 待填）：**
+**实现（commit b03e1de）：**
 - `chat_page.dart` gradient 风格对齐向导做法：`extendBodyBehindAppBar: true` +
   AppBar 透明——渐变延伸到状态栏/标题栏（全屏自然过渡）；内容从工具栏高度下方
   开始（`MediaQuery.paddingOf.top + kToolbarHeight` 顶部留白，同向导
