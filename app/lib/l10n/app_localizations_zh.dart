@@ -340,6 +340,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameEmptyError => '名称不能为空';
 
   @override
+  String get chatPageRenameNameEmptyError => '名字不能为空';
+
+  @override
   String get chatPageCopy => '复制';
 
   @override

@@ -363,6 +363,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRenameEmptyError => 'Name cannot be empty';
 
   @override
+  String get chatPageRenameNameEmptyError => 'Name cannot be empty';
+
+  @override
   String get chatPageCopy => 'Copy';
 
   @override

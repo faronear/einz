@@ -624,8 +624,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             onPressed: () async {
               final name = ctrl.text.trim();
               if (name.isEmpty) {
-                // 空/全空格：红字警示并停留（不再静默跳过）
-                nameError.value = l10n.chatPageRenameEmptyError;
+                // 空/全空格：红字警示并停留（不再静默跳过）；人名与设备名各用各的提示
+                nameError.value = renameDevice
+                    ? l10n.chatPageRenameEmptyError
+                    : l10n.chatPageRenameNameEmptyError;
                 return;
               }
               try {

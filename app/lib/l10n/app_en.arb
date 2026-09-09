@@ -133,6 +133,7 @@
   "chatPageRenameDeviceTitle": "Device name",
   "chatPageRenameDeviceLabel": "Device name",
   "chatPageRenameEmptyError": "Name cannot be empty",
+  "chatPageRenameNameEmptyError": "Name cannot be empty",
   "chatPageCopy": "Copy",
   "chatPageCopied": "Copied",
   "chatPageRenameFailed": "Rename failed: {error}",

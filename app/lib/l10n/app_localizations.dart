@@ -728,6 +728,12 @@ abstract class AppLocalizations {
   /// **'Name cannot be empty'**
   String get chatPageRenameEmptyError;
 
+  /// No description provided for @chatPageRenameNameEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Name cannot be empty'**
+  String get chatPageRenameNameEmptyError;
+
   /// No description provided for @chatPageCopy.
   ///
   /// In en, this message translates to:

@@ -133,6 +133,7 @@
   "chatPageRenameDeviceTitle": "我的设备信息",
   "chatPageRenameDeviceLabel": "设备名称",
   "chatPageRenameEmptyError": "名称不能为空",
+  "chatPageRenameNameEmptyError": "名字不能为空",
   "chatPageCopy": "复制",
   "chatPageCopied": "已复制",
   "chatPageRenameFailed": "修改失败: {error}",

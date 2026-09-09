@@ -603,12 +603,12 @@ void main() {
     await tester.enterText(dialogField, '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.text('名称不能为空'), findsOneWidget, reason: '空名字保存应红字警示');
+    expect(find.text('名字不能为空'), findsOneWidget, reason: '空名字保存应红字警示（人名专用提示）');
 
     // 填写即消红字 → 保存成功关窗
     await tester.enterText(dialogField, 'Lukas');
     await tester.pumpAndSettle();
-    expect(find.text('名称不能为空'), findsNothing, reason: '开始填写后红字应消失');
+    expect(find.text('名字不能为空'), findsNothing, reason: '开始填写后红字应消失');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
