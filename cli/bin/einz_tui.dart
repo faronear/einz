@@ -1828,15 +1828,15 @@ Future<void> _execCommand(String line) async {
         }
         s.session.messages.add(_systemMessage(s.session, sb.toString()));
       } catch (e) {
-        s.session.messages.add(_systemMessage(s.session, '⚠️ 获取设备列表失败: $e'));
+        s.session.messages.add(_systemMessage(s.session, '❌ 获取设备列表失败: $e'));
       }
       break;
     case '/sync':
       try {
         final fresh = await s.session.sync();
-        s.status = '同步完成: 新增=${fresh.length} 队列剩余=${s.session.store.pendingCount}';
+        s.session.messages.add(_systemMessage(s.session, '✅ 消息已同步: 新增=${fresh.length}，队列剩余=${s.session.store.pendingCount}'));
       } catch (e) {
-        s.status = '同步失败，请稍后再试一试';
+        s.session.messages.add(_systemMessage(s.session, '❌ 同步失败，请稍后再试一试'));
       }
     case '/history':
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));

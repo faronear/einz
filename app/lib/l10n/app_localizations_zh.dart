@@ -121,10 +121,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardStepShortEnvelope => '密保信封';
 
   @override
-  String get wizardTitleName => '我的名字';
+  String get wizardTitleName => '关于我';
 
   @override
-  String get wizardTitlePeerName => '伴侣名字';
+  String get wizardTitlePeerName => '关于 TA';
 
   @override
   String get wizardTitleInvite => '邀请码';

@@ -434,7 +434,7 @@ Future<void> _cmdSync(ArgResults opts) async {
   // 3) 补发离线队列（网络已恢复时）
   final flushed = await _flushPending(store, path, server);
   stdout.writeln(
-      'ℹ️  同步完成: last_sequence=${store.lastServerSequence} 新增=${added.length} 补发=$flushed 队列剩余=${store.pendingCount}');
+      '✅ 消息已同步: last_sequence=${store.lastServerSequence} 新增=${added.length} 补发=$flushed 队列剩余=${store.pendingCount}');
 }
 
 /// 下载附件：GET /attachments/:id → 校验密文 sha256 → 解密 → 写本地文件。
