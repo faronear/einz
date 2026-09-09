@@ -166,7 +166,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
-  String get wizardJoinPassphraseHint => '对所有消息进行加密、解密。如还不知道口令，询问秘境伴侣。';
+  String get wizardJoinPassphraseHint => '用于对所有消息进行加密、解密。如果不知道口令，请询问秘境里的唯一伴侣。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
@@ -178,7 +178,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToPassphrase => '改用线上密保口令';
 
   @override
-  String get wizardPinHint => '每次启动需输入此 PIN 解锁';
+  String get wizardPinHint => '本设备专用的锁屏密码。每次启动应用，需输入锁屏码才能进入秘境。';
 
   @override
   String get welcomeDialogTitleCreate => '🎉 一切就绪！';
@@ -187,7 +187,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogTitleJoin => '🎉 一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '秘境里只有俩人，所有消息端到端加密，确保绝对隐私！进入秘境，开始聊天吧。';
+  String get welcomeDialogMessage => '仅限两人，所有消息端到端加密，确保绝对隐私！进入秘境，开始聊天吧。';
 
   @override
   String get welcomeDialogStart => '进入秘境';
