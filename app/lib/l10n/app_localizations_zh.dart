@@ -443,6 +443,28 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageActionDelete => '删除';
+
+  @override
+  String get chatPageActionQuote => '引用';
+
+  @override
+  String get chatPageDeleteConfirmTitle => '删除消息';
+
+  @override
+  String get chatPageDeleteConfirmMessage =>
+      '删除后仅在本机消失，对方设备不受影响，且无法恢复。确定删除这条消息吗？';
+
+  @override
+  String get chatPageDeleteCancel => '取消';
+
+  @override
+  String get chatPageDeleteConfirmOk => '删除';
+
+  @override
+  String chatPageQuoteBanner(String preview) => '引用：$preview';
+
+  @override
   String chatPageSendFailed(String error) {
     return '发送失败: $error';
   }

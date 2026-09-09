@@ -471,6 +471,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageActionDelete => 'Delete';
+
+  @override
+  String get chatPageActionQuote => 'Quote';
+
+  @override
+  String get chatPageDeleteConfirmTitle => 'Delete message';
+
+  @override
+  String get chatPageDeleteConfirmMessage =>
+      'It will disappear only on this device; the other side is unaffected, and this cannot be undone. Delete this message?';
+
+  @override
+  String get chatPageDeleteCancel => 'Cancel';
+
+  @override
+  String get chatPageDeleteConfirmOk => 'Delete';
+
+  @override
+  String chatPageQuoteBanner(String preview) => 'Quote: $preview';
+
+  @override
   String chatPageSendFailed(String error) {
     return 'Send failed: $error';
   }

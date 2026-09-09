@@ -138,6 +138,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _previewPlaying = false; // 预览态试听播放中
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
+  HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   late String _uiStyle; // 当前界面风格（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
@@ -975,14 +976,129 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty) return;
+    final quote = _quoteTarget;
     _input.clear();
+    setState(() => _quoteTarget = null);
     try {
-      await _repo.send(text);
+      await _repo.send(
+        text,
+        quote: quote == null
+            ? null
+            : {
+                'messageId': quote.env.messageId,
+                'preview': _quotePreview(quote.plaintext),
+              },
+      );
       await _refresh();
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
     }
+  }
+
+  // ---------- 长按消息操作：引用 / 删除（2 人世界不做转发） ----------
+
+  /// 长按消息弹出操作菜单：引用 / 删除。
+  Future<void> _showMessageActions(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.format_quote),
+              title: Text(l10n.chatPageActionQuote),
+              onTap: () => Navigator.of(ctx).pop('quote'),
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: Colors.red.shade400),
+              title: Text(l10n.chatPageActionDelete,
+                  style: TextStyle(color: Colors.red.shade400)),
+              onTap: () => Navigator.of(ctx).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'delete') {
+      await _deleteMessage(m);
+    } else if (action == 'quote') {
+      setState(() => _quoteTarget = m);
+      _inputFocusNode.requestFocus();
+    }
+  }
+
+  /// 删除消息：确认弹窗 → 本机彻底删除（重启不显示；对方设备不受影响）。
+  Future<void> _deleteMessage(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.chatPageDeleteConfirmTitle),
+        content: Text(l10n.chatPageDeleteConfirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.chatPageDeleteCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.chatPageDeleteConfirmOk),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _repo.deleteMessage(m.env.messageId);
+    if (!mounted) return;
+    setState(() => _messages.removeWhere((x) => x.env.messageId == m.env.messageId));
+  }
+
+  /// 引用预览截断（60 字内）。
+  String _quotePreview(String text) {
+    final t = text.trim();
+    return t.length > 60 ? '${t.substring(0, 60)}…' : t;
+  }
+
+  /// 输入栏引用条：被引用消息预览 + 取消按钮。
+  Widget _buildQuoteBanner(HistoryMessage quote) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: _uiStyle == 'gradient' ? Colors.white : const Color(0xFFFCEBF2),
+        borderRadius: BorderRadius.circular(12),
+        border: const Border(left: BorderSide(color: Color(0xFF3BAFFD), width: 3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.format_quote,
+              size: 14, color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              l10n.chatPageQuoteBanner(_quotePreview(quote.plaintext)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700),
+            ),
+          ),
+          InkWell(
+            onTap: () => setState(() => _quoteTarget = null),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 16),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ---------- 语音：点击麦克风切提示态 → 长按提示态录音条录音 → 松手预览（试听/取消）→ 发送 ----------
@@ -1913,59 +2029,91 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         _MessageAvatar(
                             personId: avatarPersonId, server: widget.server, api: widget.api),
                       const SizedBox(width: 6),
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        // 气泡最大宽度 = 屏幕 75%：长文本在此约束下自动换行
-                        // （否则 Row(min) 给 Text 无界宽度 → 长消息挤在一行溢出屏幕）
-                        constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.75),
-                        decoration: BoxDecoration(
-                          // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）
-                          color: _bubbleColor(mine: mine),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DefaultTextStyle.merge(
-                          // gradient 深色气泡下文字/图标改白色（醒目，老板要求）；
-                          // plain 浅色气泡不合并颜色（保持默认深色文字/图标）
-                          style: TextStyle(
-                              color: _uiStyle == 'gradient' ? Colors.white : null),
-                          child: IconTheme.merge(
-                            data: IconThemeData(
+                      GestureDetector(
+                        onLongPress: () => _showMessageActions(m),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          // 气泡最大宽度 = 屏幕 75%：长文本在此约束下自动换行
+                          // （否则 Row(min) 给 Text 无界宽度 → 长消息挤在一行溢出屏幕）
+                          constraints: BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width * 0.75),
+                          decoration: BoxDecoration(
+                            // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）
+                            color: _bubbleColor(mine: mine),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: DefaultTextStyle.merge(
+                            // gradient 深色气泡下文字/图标改白色（醒目，老板要求）；
+                            // plain 浅色气泡不合并颜色（保持默认深色文字/图标）
+                            style: TextStyle(
                                 color: _uiStyle == 'gradient' ? Colors.white : null),
-                            child: Column(
-                              crossAxisAlignment: mine
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 2),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(_messageTimeLabel(m),
-                                          style: TextStyle(
-                                              fontSize: 10,
-                                              color: _uiStyle == 'gradient'
-                                                  ? Colors.white70
-                                                  : Colors.grey)),
-                                      if (m.expiresAt != null) ...[
-                                        const SizedBox(width: 4),
-                                        const Icon(Icons.schedule, size: 11),
-                                        const SizedBox(width: 2),
-                                        Text(_burnDurationLabel(m.burnAfterSeconds),
+                            child: IconTheme.merge(
+                              data: IconThemeData(
+                                  color: _uiStyle == 'gradient' ? Colors.white : null),
+                              child: Column(
+                                crossAxisAlignment: mine
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 2),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(_messageTimeLabel(m),
                                             style: TextStyle(
                                                 fontSize: 10,
                                                 color: _uiStyle == 'gradient'
                                                     ? Colors.white70
                                                     : Colors.grey)),
+                                        if (m.expiresAt != null) ...[
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.schedule, size: 11),
+                                          const SizedBox(width: 2),
+                                          Text(_burnDurationLabel(m.burnAfterSeconds),
+                                              style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: _uiStyle == 'gradient'
+                                                      ? Colors.white70
+                                                      : Colors.grey)),
+                                        ],
                                       ],
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                _buildMessageContent(m),
-                              ],
+                                  if (m.quote != null)
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      constraints: BoxConstraints(
+                                          maxWidth:
+                                              MediaQuery.sizeOf(context).width * 0.55),
+                                      decoration: BoxDecoration(
+                                        color: _uiStyle == 'gradient'
+                                            ? Colors.white12
+                                            : Colors.black.withValues(alpha: 0.06),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: const Border(
+                                            left: BorderSide(
+                                                color: Color(0xFF3BAFFD), width: 3)),
+                                      ),
+                                      child: Text(
+                                        _quotePreview(
+                                            m.quote!['preview'] as String? ?? ''),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: _uiStyle == 'gradient'
+                                                ? Colors.white70
+                                                : Colors.grey.shade700),
+                                      ),
+                                    ),
+                                  _buildMessageContent(m),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -2009,67 +2157,73 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               padding: _uiStyle == 'gradient'
                   ? const EdgeInsets.fromLTRB(12, 4, 12, 8)
                   : const EdgeInsets.all(8),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 附件：拍照 / 相册（图像、视频共用入口）
-                  IconButton(
-                    onPressed: _showAttachmentSheet,
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                  // 语音入口：点按=切提示态/回文字态；长按=直接开始录音（与长按录音条等价）
-                  GestureDetector(
-                    onLongPressStart: (_) => _startVoice(),
-                    onLongPressEnd: (_) => _stopVoice(),
-                    child: IconButton(
-                      icon: Icon(_voiceEntryIcon(),
-                          color: _inputMode == _InputMode.recording ? Colors.red : null),
-                      onPressed: _onVoiceEntryTap,
-                    ),
-                  ),
-                  Expanded(
-                    // Stack：文字输入框始终占位（行高恒定，切换录音条时按钮不浮动），
-                    // 录音/预览时录音条 Positioned.fill 覆盖其上（与输入框严格同高）
-                    child: Stack(
-                      children: [
-                        // 录音条覆盖时完全隐藏输入框（maintainSize 保持占位高度，
-                        // 行高/按钮位置不变；避免圆角录音条透出输入框边角）
-                        Visibility(
-                          visible: _inputMode == _InputMode.text,
-                          maintainState: true,
-                          maintainSize: true,
-                          maintainAnimation: true,
-                          child: TextField(
-                            controller: _input,
-                            focusNode: _inputFocusNode,
-                            decoration:
-                                InputDecoration(hintText: l10n.chatPageInputHint, isDense: true),
-                            // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
-                            onSubmitted: (_) {
-                              _send();
-                              _inputFocusNode.requestFocus();
-                            },
-                          ),
+                  if (_quoteTarget != null) _buildQuoteBanner(_quoteTarget!),
+                  Row(
+                    children: [
+                      // 附件：拍照 / 相册（图像、视频共用入口）
+                      IconButton(
+                        onPressed: _showAttachmentSheet,
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
+                      // 语音入口：点按=切提示态/回文字态；长按=直接开始录音（与长按录音条等价）
+                      GestureDetector(
+                        onLongPressStart: (_) => _startVoice(),
+                        onLongPressEnd: (_) => _stopVoice(),
+                        child: IconButton(
+                          icon: Icon(_voiceEntryIcon(),
+                              color: _inputMode == _InputMode.recording ? Colors.red : null),
+                          onPressed: _onVoiceEntryTap,
                         ),
-                        if (_inputMode != _InputMode.text)
-                          // 长按手势挂在常驻的 GestureDetector 上：提示态长按开始录音，
-                          // 进入录音态后此层不重建，松手能正常触发停止
-                          Positioned.fill(
-                            child: GestureDetector(
-                              onLongPressStart: (_) => _startVoice(),
-                              onLongPressEnd: (_) => _stopVoice(),
-                              child: _buildVoiceBar(),
+                      ),
+                      Expanded(
+                        // Stack：文字输入框始终占位（行高恒定，切换录音条时按钮不浮动），
+                        // 录音/预览时录音条 Positioned.fill 覆盖其上（与输入框严格同高）
+                        child: Stack(
+                          children: [
+                            // 录音条覆盖时完全隐藏输入框（maintainSize 保持占位高度，
+                            // 行高/按钮位置不变；避免圆角录音条透出输入框边角）
+                            Visibility(
+                              visible: _inputMode == _InputMode.text,
+                              maintainState: true,
+                              maintainSize: true,
+                              maintainAnimation: true,
+                              child: TextField(
+                                controller: _input,
+                                focusNode: _inputFocusNode,
+                                decoration: InputDecoration(
+                                    hintText: l10n.chatPageInputHint, isDense: true),
+                                // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
+                                onSubmitted: (_) {
+                                  _send();
+                                  _inputFocusNode.requestFocus();
+                                },
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发内容）
-                  IconButton.filled(
-                    onPressed: _inputMode == _InputMode.preview
-                        ? _sendVoice
-                        : (_inputMode == _InputMode.text ? _send : null),
-                    icon: const Icon(Icons.send),
+                            if (_inputMode != _InputMode.text)
+                              // 长按手势挂在常驻的 GestureDetector 上：提示态长按开始录音，
+                              // 进入录音态后此层不重建，松手能正常触发停止
+                              Positioned.fill(
+                                child: GestureDetector(
+                                  onLongPressStart: (_) => _startVoice(),
+                                  onLongPressEnd: (_) => _stopVoice(),
+                                  child: _buildVoiceBar(),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发内容）
+                      IconButton.filled(
+                        onPressed: _inputMode == _InputMode.preview
+                            ? _sendVoice
+                            : (_inputMode == _InputMode.text ? _send : null),
+                        icon: const Icon(Icons.send),
+                      ),
+                    ],
                   ),
                 ],
               ),

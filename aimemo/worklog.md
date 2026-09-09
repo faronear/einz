@@ -1583,3 +1583,31 @@ HH:MM、当年 mm-dd HH:MM、跨年 yyyy-mm-dd HH:MM；阅后即焚消息再附�
 prefer_initializing_formals，与本次无关）。老板侧热重启（ios-reload / USR2）后
 可看效果。
 
+## 2026-09-09 长按消息菜单：删除 / 引用 + 附件消息阅后即焚修复
+
+**老板要求（2026-09-09）：** 1) 长按消息弹菜单：删除、转发——2 人世界没有转发，改为
+「引用」；2) 删除 = 只在本机删除，重启也不显示（经确认：要确认弹窗）；3) 老板实测
+图片/录音/视频/文件消息对阅后即焚免疫，要求同样受控。
+
+**删除实现：** repo 新增 `deleteMessage(messageId)`——与 purgeExpired 同款彻底删行
+（local_attachments + local_messages 一起删，非标记不可见）。重启不显示：同步锚点
+只向前推进，已删序号不在增量拉取范围，WS 只推新消息，均不会重拉。长按气泡 →
+showModalBottomSheet（引用/删除）→ 删除弹确认框（文案说明仅本机消失、对方不受
+影响、不可恢复）→ 删行 + setState 移除。
+
+**引用实现（关键协议决策）：** 调研确认 server 的 validateEnvelope 是白名单重建
+信封（未知字段被丢弃）→ 引用快照不能放信封字段，改放**加密载荷内**：载荷从裸文本
+变为 `{"plaintext":…, "quote":{messageId, preview}}` JSON（仅引用消息才包装；
+AEAD 密文对 Server 完全不透明，无 server/shared 改动）。repo `send()` 加可选
+quote 参数；`_rowsToHistory` 解密后解析包装（裸文本向后兼容）。UI：长按→引用→
+输入栏上方引用条（预览 60 字截断 + 关闭按钮）→ 发送携带 → 气泡内渲染引用块
+（左侧天蓝竖条 + 预览，最多 2 行）；被引消息删除/焚毁后引用块仍可显示（快照）。
+
+**附件阅后即焚修复：** `sendAttachment` 落库漏带 `_burnState()`（文本消息 send()
+一直带着）→ 本端附件副本永久保留。修复：落库时补 burnAfterSeconds/expiresAt，
+发送端附件消息与文本消息同样受控（接收端 sync 路径本来就有）。
+
+**验证：** flutter analyze 仅剩 1 条既有 info（ws_realtime_service 无关）；
+message_repository_test 新增 2 用例（引用载荷往返还原、deleteMessage 彻底删除）
+共 11 个全过。golden 政策不变：chat_page golden 若失配保持红不重刷。
+

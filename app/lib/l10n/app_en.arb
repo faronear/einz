@@ -185,6 +185,18 @@
       "duration": {"type": "String"}
     }
   },
+  "chatPageActionDelete": "Delete",
+  "chatPageActionQuote": "Quote",
+  "chatPageDeleteConfirmTitle": "Delete message",
+  "chatPageDeleteConfirmMessage": "It will disappear only on this device; the other side is unaffected, and this cannot be undone. Delete this message?",
+  "chatPageDeleteCancel": "Cancel",
+  "chatPageDeleteConfirmOk": "Delete",
+  "chatPageQuoteBanner": "Quote: {preview}",
+  "@chatPageQuoteBanner": {
+    "placeholders": {
+      "preview": {"type": "String"}
+    }
+  },
   "chatPageSendFailed": "Send failed: {error}",
   "@chatPageSendFailed": {
     "placeholders": {

@@ -11,7 +11,8 @@ import 'local_database.dart';
 /// sender=身份判断（'me'/'peer'，person 维度）、attachment=附件元数据、
 /// expiresAt=阅后即焚到期时间（null=永久）、createdAt=发送时间戳（毫秒，
 /// 落盘值，未同步消息为本地发送时间）、burnAfterSeconds=焚毁时长（秒，
-/// 归档恢复缺快照时按 到期-创建 反推）。
+/// 归档恢复缺快照时按 到期-创建 反推）、quote=引用快照（{messageId, preview}，
+/// 密文载荷内传输，null=非引用消息）。
 typedef HistoryMessage = ({
   MessageEnvelope env,
   String plaintext,
@@ -19,7 +20,8 @@ typedef HistoryMessage = ({
   Map<String, dynamic>? attachment,
   int? expiresAt,
   int createdAt,
-  int burnAfterSeconds
+  int burnAfterSeconds,
+  Map<String, dynamic>? quote
 });
 
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
@@ -127,11 +129,17 @@ class MessageRepository {
   }
 
   /// 发送一条消息：加密 → 落库（pending）→ 尝试立即上传；失败留队。
+  /// [quote] 引用快照（{messageId, preview}）时载荷包装为 JSON（密文内传输）。
   /// 返回 message_id。
-  Future<String> send(String plaintext, {String type = 'text'}) async {
+  Future<String> send(String plaintext, {String type = 'text', Map<String, dynamic>? quote}) async {
     final messageId = _uuidv7();
+    // 引用消息：载荷 = {"plaintext":…, "quote":…} JSON（AEAD 密文内，Server 不可见；
+    // 旧客户端/CLI 未识别时按整段 JSON 文本展示，仅影响引用消息）
+    final payload = quote == null
+        ? plaintext
+        : jsonEncode({'plaintext': plaintext, 'quote': quote});
     final env = await encryptMessage(
-      plaintext: plaintext,
+      plaintext: payload,
       spaceKey: spaceKey,
       spaceId: spaceId,
       senderDeviceId: deviceId,
@@ -189,7 +197,9 @@ class MessageRepository {
       type: type,
       keyVersion: keyVersion,
     );
-    await _insertLocal(env, status: 'pending');
+    // 附件消息同样受阅后即焚控制（此前漏带焚毁状态 → 本端副本永久保留）
+    final bs = await _burnState();
+    await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
 
     final t = token;
     if (t != null) {
@@ -238,6 +248,13 @@ class MessageRepository {
       deleted++;
     }
     return deleted;
+  }
+
+  /// 删除本机一条消息（本地彻底删除，Server 不参与；附件元数据一并删除）。
+  /// 重启后不显示，增量同步不会重拉（锚点只向前推进，已删序号不在拉取范围）。
+  Future<void> deleteMessage(String messageId) async {
+    await (db.delete(db.localAttachments)..where((a) => a.messageId.equals(messageId))).go();
+    await (db.delete(db.localMessages)..where((m) => m.messageId.equals(messageId))).go();
   }
 
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
@@ -373,11 +390,26 @@ class MessageRepository {
       if (key == null) {
         throw StateError('缺少 key_version=${env.keyVersion} 的 Space Key，无法解密历史消息（需导入归档密钥）');
       }
-      final plain = await decryptMessage(
+      final raw = await decryptMessage(
         env: env,
         spaceKey: key,
         spaceId: spaceId,
       );
+      // 引用载荷为 {"plaintext":…, "quote":…} JSON；旧版消息为裸文本
+      var plain = raw;
+      Map<String, dynamic>? quote;
+      if (raw.startsWith('{')) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map<String, dynamic> && decoded['plaintext'] is String) {
+            plain = decoded['plaintext'] as String;
+            final q = decoded['quote'];
+            if (q is Map<String, dynamic>) quote = q;
+          }
+        } catch (_) {
+          // 裸文本恰好以 { 开头：按旧版处理
+        }
+      }
       final att = await (db.select(db.localAttachments)
             ..where((a) => a.messageId.equals(env.messageId)))
           .getSingleOrNull();
@@ -400,6 +432,7 @@ class MessageRepository {
         burnAfterSeconds: row.burnAfterSeconds > 0
             ? row.burnAfterSeconds
             : (row.expiresAt == null ? 0 : max(1, row.expiresAt! - row.createdAt)),
+        quote: quote,
       ));
     }
     return out;

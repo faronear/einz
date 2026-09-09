@@ -304,6 +304,47 @@ void main() {
     expect(await repo.sync(), 1);
     expect(await repo.sync(), 0, reason: '锚点已到 1，二次 sync 应无新增');
   });
+
+  test('引用消息：send 携带 quote → 历史解密还原 plaintext + quote 快照', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+
+    final mid = await repo.send(
+      '这是回复',
+      quote: {
+        'messageId': 'msg-origin',
+        'preview': '被引用的原文内容',
+      },
+    );
+    expect(api.posted.length, 1);
+
+    final hist = await repo.history();
+    expect(hist.single.env.messageId, mid);
+    expect(hist.single.plaintext, '这是回复', reason: '明文应剥离引用包装');
+    expect(hist.single.quote, isNotNull, reason: '引用快照应随载荷解密还原');
+    expect(hist.single.quote!['messageId'], 'msg-origin');
+    expect(hist.single.quote!['preview'], '被引用的原文内容');
+
+    // 兼容性：无 quote 的普通消息 quote 字段为 null、明文原样
+    final mid2 = await repo.send('普通消息');
+    final normal = (await repo.history()).firstWhere((h) => h.env.messageId == mid2);
+    expect(normal.quote, isNull);
+    expect(normal.plaintext, '普通消息');
+  });
+
+  test('deleteMessage：本机彻底删除（重启不显示；附件元数据一并清除）', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    final keep = await repo.send('保留的消息');
+    final del = await repo.send('要删除的消息');
+    expect((await repo.history()).length, 2);
+
+    await repo.deleteMessage(del);
+
+    final hist = await repo.history();
+    expect(hist.length, 1);
+    expect(hist.single.env.messageId, keep, reason: '删除后仅剩保留消息');
+  });
 }
 
 /// 用 shared 加密构造一个服务端返回的信封（含 server_sequence/created_at）。

@@ -920,6 +920,48 @@ abstract class AppLocalizations {
   /// **'Messages will be auto-deleted after {duration}'**
   String chatPageBurnWillDelete(String duration);
 
+  /// No description provided for @chatPageActionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatPageActionDelete;
+
+  /// No description provided for @chatPageActionQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote'**
+  String get chatPageActionQuote;
+
+  /// No description provided for @chatPageDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message'**
+  String get chatPageDeleteConfirmTitle;
+
+  /// No description provided for @chatPageDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'It will disappear only on this device; the other side is unaffected, and this cannot be undone. Delete this message?'**
+  String get chatPageDeleteConfirmMessage;
+
+  /// No description provided for @chatPageDeleteCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get chatPageDeleteCancel;
+
+  /// No description provided for @chatPageDeleteConfirmOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatPageDeleteConfirmOk;
+
+  /// No description provided for @chatPageQuoteBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote: {preview}'**
+  String chatPageQuoteBanner(String preview);
+
   /// No description provided for @chatPageSendFailed.
   ///
   /// In en, this message translates to:
