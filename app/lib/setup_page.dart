@@ -383,9 +383,12 @@ class _SetupPageState extends State<SetupPage> {
                 if (_role != null && !(_role == _WizardRole.join && _step == 1))
                   Row(
                     children: [
-                      // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）
+                      // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）；
+                      // 信封页（offline 步骤 1）例外：允许回退到前面的邀请码页（join 步骤 2）
                       TextButton(
-                        onPressed: _step > 1 ? _backStep : null,
+                        onPressed: (_step > 1 || (_role == _WizardRole.offline && _step == 1))
+                            ? _backStep
+                            : null,
                         // 渐变上白字（不可用时白色半透明）
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white,
@@ -651,6 +654,16 @@ class _SetupPageState extends State<SetupPage> {
 
   void _backStep() {
     setState(() {
+      // 信封页（offline 步骤 1）「上一步」：回到前面的邀请码页（join 步骤 2）——
+      // 信封是口令的平行替代（同处口令位），回退语义等同从口令页上一步
+      // （老板要求 2026-09-09：信封页的上一步也要能点）
+      if (_role == _WizardRole.offline && _step == 1) {
+        _role = _preEnvelopeRole; // 进入信封页前必为 join
+        _step = 2; // join 邀请码页
+        _localError = null;
+        _status = null;
+        return;
+      }
       // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密保信封）；
       // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
       if (_step > 1) _step--;

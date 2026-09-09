@@ -69,4 +69,14 @@ void main() {
     expect(find.text('验证密保口令'), findsOneWidget, reason: '应回到口令页（join 验证标题）');
     expect(find.text('改用线下密保信封'), findsOneWidget, reason: '口令页应仍可再切回信封');
   });
+
+  testWidgets('信封页「上一步」可点：回到验证邀请码页', (WidgetTester tester) async {
+    await pumpToEnvelope(tester, kp: kp);
+    // 信封页「上一步」不应禁用：点击回到前面的邀请码页（join 步骤 2，与口令位同位置）
+    await tester.tap(find.text('上一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('验证邀请码'), findsOneWidget, reason: '上一步应回到邀请码页（验证邀请码标题）');
+    expect(find.byType(TextField), findsOneWidget, reason: '邀请码输入框应可见');
+    expect(find.text('密保信封'), findsNothing, reason: '不应停留在信封页');
+  });
 }
