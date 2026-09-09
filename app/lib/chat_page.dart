@@ -539,6 +539,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final pubKeyCtrl = TextEditingController(
       text: widget.publicKeyB64 ?? l10n.chatPageDevicePublicKeyFailed,
     );
+    // 性别只读展示（我的个人资料弹窗）：框内显示 男/女，随对话框关闭释放
+    final genderCtrl = TextEditingController(
+      text: _myGender == 'female'
+          ? l10n.wizardGenderFemale
+          : _myGender == 'male'
+              ? l10n.wizardGenderMale
+              : '',
+    );
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
     final saved = await showDialog<bool>(
@@ -607,38 +615,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
             ),
-            // 我的个人资料弹窗：名字框下显示性别——只显示本人性别的图标
-            // （男天蓝/女品牌粉；未登记性别时不显示图标）。性别行做成与名字
-            // 输入框等高同宽的展示容器（对称协调），「性别」标签用特别字体
-            // （品牌粉+加粗+字距，老板要求 2026-09-09）
+            // 我的个人资料弹窗：性别用与名字输入框同款组件（只读）——「性别」标签
+            // 在边框左上角（同「我的名字」），框内显示 男/女 + 性别图标
+            // （老板要求 2026-09-09）
             if (!renameDevice) ...[
               const SizedBox(height: 12),
-              Container(
-                height: 56, // 与默认 TextField 等高，视觉均衡
-                decoration: BoxDecoration(
-                  border: Border.all(color: Theme.of(context).colorScheme.outline),
-                  borderRadius: BorderRadius.circular(4), // 与 OutlineInputBorder 一致
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Text(
-                      l10n.chatPageGenderLabel,
-                      // 「性别」标签用标签色（与输入框 label 同色），特别字体仅体现在
-                      // 加粗/字距（老板要求 2026-09-09：不是粉红色）
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        letterSpacing: 4,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (_myGender == 'male')
-                      const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 26)
-                    else if (_myGender == 'female')
-                      const Icon(Icons.female, color: Color(0xFFD6529C), size: 26),
-                  ],
+              TextFormField(
+                controller: genderCtrl,
+                readOnly: true,
+                style: const TextStyle(fontSize: 16),
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageGenderLabel,
+                  border: const OutlineInputBorder(), // 与名字输入框同款边框
+                  // 只读展示：不加背景色（沿用弹窗背景），与白底可编辑的名字输入框区分
+                  suffixIcon: _myGender == 'male'
+                      ? const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 24)
+                      : _myGender == 'female'
+                          ? const Icon(Icons.female, color: Color(0xFFD6529C), size: 24)
+                          : null,
                 ),
               ),
             ],
@@ -686,6 +680,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
       pubKeyCtrl.dispose();
+      genderCtrl.dispose();
       nameError.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字

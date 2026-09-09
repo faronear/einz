@@ -182,8 +182,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('我的身份'));
     await tester.pumpAndSettle();
-    // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）
-    await tester.enterText(find.byType(TextField).last, '新名字');
+    // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
+    // 弹窗内含两个输入框：可编辑名字在前、只读性别在后 → 取 .first
+    await tester.enterText(
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
+        '新名字');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     // 推进虚拟时间触发 400ms 延迟 dispose（TextField 已卸载 → 不再触发红屏断言）
@@ -459,8 +462,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('我的身份'));
     await tester.pumpAndSettle();
-    final renameField =
-        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    final renameField = find
+        .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
+        .first; // 弹窗内可编辑名字框在前、只读性别框在后
     await tester.enterText(renameField, 'Alice');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
@@ -600,9 +604,11 @@ void main() {
     final maleIcon = tester.widget<Icon>(find.byIcon(Icons.male));
     expect(maleIcon.color, const Color(0xFF3BAFFD), reason: '本人为男：显示天蓝色男图标');
 
-    // 清空名字 → 保存 → 红字警示并停留
-    final dialogField =
-        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    // 清空名字 → 保存 → 红字警示并停留（弹窗内含两个输入框：可编辑名字在前、
+    // 只读性别在后 → 取 .first）
+    final dialogField = find
+        .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
+        .first;
     await tester.enterText(dialogField, '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
