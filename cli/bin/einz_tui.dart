@@ -1705,7 +1705,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/passphrase :: 修改密保口令',
+        '/passphrase [random] :: 修改密保口令；random 生成随机 12 词恢复码',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -1806,6 +1806,13 @@ Future<void> _execCommand(String line) async {
           s.session, '❓ 输入密保口令，即可解密我的秘境内容'));
       break;
     case '/passphrase':
+      // /passphrase random：生成随机 12 词助记词恢复码（离线保存，Server 不接触）
+      if (arg.trim() == 'random') {
+        final code = await generateRecoveryCode();
+        s.session.messages.add(_systemMessage(
+            s.session, '🎲 随机恢复码（12 词助记词，请离线妥善保存，Server 不接触）：\n$code'));
+        break;
+      }
       // 修改密保口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
       if (s.session.store.spaceKey == null || s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 请先 /auth 激活线路、/space 接入领地后再修改口令'));
