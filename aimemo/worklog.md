@@ -1476,4 +1476,23 @@ golden 未触碰（plain 默认像素级不变）。
 （gradient 下 Scaffold 延伸到 AppBar 后 / AppBar 透明 / 输入栏圆角条，切回纯色全部
 恢复）+ chat_page_menu 12 用例全过。
 
+## 2026-09-09 修复：渐变风格下输入栏上方消息被截断（SafeArea 顶部 inset 空隙）
+
+**老板实测：** 切到渐变背景后，输入框上方约 2 个输入框高度的区域只有渐变背景过渡，
+消息到不了那里（被截断）。
+
+**根因（widget 测试复现定位，空隙实测 115px）：** 输入栏包在 `SafeArea` 里（默认
+四边都应用 MediaQuery padding）。`extendBodyBehindAppBar` 下 Scaffold 给 body 的
+`MediaQuery.padding.top` = 状态栏 + kToolbarHeight（真机约 115px，测试注入 59+56），
+SafeArea 把它全垫在输入栏上方 → 消息列表底部停在输入栏上方 115px 处（plain 风格
+同样存在较小的同类空隙，只是背景无渐变不易察觉）。
+
+**修复（commit 待填）：** 输入栏 SafeArea 加 `top: false`（底部 inset 保留防 Home 条
+遮挡）；两风格统一——消息列表直达输入栏，plain 原有的小空隙一并消除（像素变化极小）。
+
+**验证：** 新增回归用例（模拟真机 insets 59/34：断言消息列表底部 == 输入栏顶部，
+修复前失败/修复后通过）；analyze 通过；ui_style_switch_test 3 用例 + chat_page_menu
+12 用例全过。
+
+
 

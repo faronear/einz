@@ -152,4 +152,54 @@ void main() {
     await tester.pumpAndSettle();
     expect(gradientBackground, findsOneWidget, reason: '重启后应从持久化恢复渐变风格');
   });
+
+  testWidgets('渐变风格下输入栏上方无截断空隙（消息列表直达输入栏）', (WidgetTester tester) async {
+    // 模拟真机 insets（状态栏 59 / 底部 Home 条 34）：SafeArea 会应用 MediaQuery 顶部
+    // inset——输入栏如果保留 top inset，消息列表底部会停在输入栏上方约一屏高的空隙处，
+    // 渐变透出但消息到不了（老板实测：约 2 个输入框高度的截断区）
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: Builder(
+        builder: (context) {
+          final mq = MediaQuery.of(context);
+          return MediaQuery(
+            data: mq.copyWith(
+              padding: const EdgeInsets.only(top: 59, bottom: 34),
+            ),
+            child: ChatPage(
+              server: 'https://einz.tic.cc',
+              spaceId: 'space-demo',
+              deviceId: 'dev-a',
+              spaceKey: spaceKey,
+              keyVersion: 1,
+              token: 'tok',
+              db: db,
+              api: _FakeApi(),
+              enableWs: false,
+            ),
+          );
+        },
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 切到渐变风格
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('界面风格'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('渐变粉蓝 / Gradient'));
+    await tester.pumpAndSettle();
+
+    // 消息列表底部应直达输入栏顶部（无 SafeArea 顶部 inset 造成的空隙）
+    final listRect = tester.getRect(find.byType(ListView).first);
+    final pillRect = tester.getRect(inputPill);
+    expect(listRect.bottom, closeTo(pillRect.top, 0.5),
+        reason: '消息列表应直达输入栏，输入栏上方不应有渐变截断空隙');
+  });
 }

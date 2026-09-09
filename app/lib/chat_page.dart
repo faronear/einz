@@ -1885,6 +1885,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
           SafeArea(
+            // 输入栏锚定在屏幕底部：必须去掉顶部 inset——extendBodyBehindAppBar 下
+            // Scaffold 给 body 的 MediaQuery.padding.top 含「状态栏 + 工具栏」高度
+            // （真机约 115px），SafeArea 默认会把它全垫在输入栏上方，造成约 2 个
+            // 输入框高度的渐变空隙、消息列表被截断（老板实测 2026-09-09）。
+            // 底部 inset 保留（Home 条防遮挡）。
+            top: false,
             child: Container(
               // gradient 风格：输入栏不顶左右两头——悬浮圆角白条（渐变从两侧/底部
               // 透出，同向导白卡在渐变上的层次）；plain 风格保持原样（全宽透明）
