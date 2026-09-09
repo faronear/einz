@@ -73,7 +73,8 @@ class _TuiState {
   /// 进入历史浏览前暂存的当前输入草稿（↓ 越过最新一条时恢复）。
   String historyDraft = '';
 
-  /// 系统提示行（命令结果 / 错误），显示在状态栏下方。
+  /// 滚动通知（发送结果 / 同步进度 / 下载进度等瞬时状态），显示在屏幕底部
+  /// 专门的状态行（[我] 输入区下方）；一次性结果/错误走消息流 system 消息。
   String status = '';
 
   /// 输入区当前折行行数（>=1）：超长输入自动多行时消息区动态让位。
@@ -884,6 +885,22 @@ List<String> _wrapByWidth(String s, int maxWidth) {
   return result;
 }
 
+/// 按显示宽度把 [s] 截断到不超过 [maxWidth]（末尾加省略号 …）。
+/// 底部状态行用：单行通知超宽时截断，避免撑破屏幕布局。
+String _truncateByWidth(String s, int maxWidth) {
+  if (maxWidth <= 0 || _displayWidth(s) <= maxWidth) return s;
+  final buf = StringBuffer();
+  var w = 0;
+  for (final r in s.runes) {
+    final ch = String.fromCharCode(r);
+    final cw = _displayWidth(ch);
+    if (w + cw > maxWidth - 1) break; // 预留 1 列给省略号
+    buf.write(ch);
+    w += cw;
+  }
+  return '$buf…';
+}
+
 /// 终端行数（非终端/pty 下 terminalLines 可能抛异常，兜底 24）。
 /// 终端行数：stty size 优先（真实终端尺寸最可靠，raw 模式/stdout.terminalLines
 /// 失效时仍准确——此前兜底 24 与用户实际行数不符时渲染定位超出屏幕导致滚动、
@@ -975,7 +992,7 @@ void _render() {
   final display = s.hiddenInput ? '*' * s.input.length : s.input.toString();
   final inputWrapped = _wrapInput(display, cols);
   s.inputLines = inputWrapped.length;
-  final msgArea = rows - 1 - s.inputLines; // 顶部状态栏 1 行 + 输入区 N 行
+  final msgArea = rows - 2 - s.inputLines; // 顶部标题栏 1 行 + 底部状态行 1 行 + 输入区 N 行
 
   final buf = StringBuffer();
   buf.write(_hideCursor);
@@ -991,16 +1008,13 @@ void _render() {
     WsStatus.stopped => '${_gray}○${_reset}',
   };
   final mySegment = '$myDot ${_personLabel(s.session.store, s.personNames)}';
-  // 各片段用灰色竖线分隔：Einz TUI | ● 我名字 #设备 | ● 对方名字 | 临时通知
+  // 各片段用灰色竖线分隔：Einz TUI | ● 我名字 #设备 | ● 对方名字（临时通知已移到底部状态行）
   final sep = '${_gray}|${_reset}';
   final peerName = _peerNameOf(s);
   final peerDevice = _peerDeviceLabel(s);
   final peerDot = s.peerOnline ? '${_green}●${_reset}' : '${_gray}○${_reset}';
   buf.write(
       '${_bold}Einz TUI${_reset} $sep $mySegment $sep $peerDot $peerName #$peerDevice');
-  if (s.status.isNotEmpty) {
-    buf.write(' $sep ${_gray}${s.status}${_reset}');
-  }
   buf.write('\r\n');
 
   // 消息区：从下往上堆叠——最新消息紧贴输入条（输入条上方），旧消息向上滚出，
@@ -1011,7 +1025,7 @@ void _render() {
   }
   final start = lines.length > msgArea ? lines.length - msgArea : 0;
   final visible = lines.sublist(start);
-  final bottom = rows - s.inputLines; // 输入条上方第一行（消息区底部）
+  final bottom = rows - s.inputLines - 1; // 输入条上方第一行（消息区底部）
   // 先清空整个消息区（第 2 行到输入行上方）：连续渲染时旧行残留可能覆盖新消息
   // （表现为"连续两个 system 消息第二个不显示"）
   for (var r = 2; r < bottom; r++) {
@@ -1024,12 +1038,12 @@ void _render() {
     row--;
   }
 
-  // 输入区：**固定屏幕底部**（top = rows - inputLines + 1），
+  // 输入区：**固定屏幕底部上方一行**（top = rows - inputLines），最底一行留给状态行，
   // 与 _renderInputLine 的定位计算完全一致——否则消息少时输入区被画在
   // 屏幕中间，与局部重绘的底部定位不一致 → you> 跳动、上下重复。
   // 逐行定位 + 清行（\x1B[K），避免残留旧行。
   final prompt = '${_cyan}[我]${_reset} ';
-  final top = rows - inputWrapped.length + 1;
+  final top = rows - inputWrapped.length; // 输入区顶部行号（状态行占最底一行）
   for (var i = 0; i < inputWrapped.length; i++) {
     buf.write('\x1B[${top + i};1H'); // 定位输入区各行第 1 列
     buf.write('\x1B[K'); // 清除该行
@@ -1042,6 +1056,16 @@ void _render() {
     if (i < inputWrapped.length - 1) {
       buf.write('\r\n');
     }
+  }
+
+  // 底部状态行（屏幕最底一行）：滚动通知（发送结果/同步进度/下载进度等瞬时状态）
+  // 独占整行显示，不再与顶部标题栏挤在一起；空状态显示常用命令提示。
+  buf.write('\x1B[$rows;1H\x1B[K');
+  if (s.status.isNotEmpty) {
+    buf.write('${_gray}⚙ ${_truncateByWidth(s.status, cols - 4)}${_reset}');
+  } else {
+    buf.write(_truncateByWidth(
+        '${_gray}⚙ /help 查看命令 /invite 邀请伴侣 /attach 发送文件${_reset}', cols));
   }
   // 光标定位到输入编辑位置（与 _renderInputLine 一致，←→ 移动后光标跟随）
   buf.write(_cursorPos(inputWrapped, top, _displayWidth(prompt), s.cursor, cols));
@@ -1301,7 +1325,7 @@ void _renderInputLine() {
   }
   final prompt = '${_cyan}[我]${_reset} ';
   final promptW = _displayWidth(prompt);
-  final top = rows - inputWrapped.length + 1; // 输入区顶部行号
+  final top = rows - inputWrapped.length; // 输入区顶部行号（状态行占最底一行）
 
   final buf = StringBuffer();
   for (var i = 0; i < inputWrapped.length; i++) {
@@ -1748,9 +1772,11 @@ Future<void> _execCommand(String line) async {
             s.session.startWs(onMessage: (_) => _render(), onStatus: (_) => _render(), onAutoSync: (_) => _render(),
               onRevoked: _onWsRevoked);
           }
-          s.status = '✅ 已切换服务器并激活: $arg';
+          s.session.messages.add(_systemMessage(s.session, '✅ 已切换服务器并激活: $arg'));
+          s.status = ''; // 一次性结果进消息流，清掉旧瞬时通知
         } catch (e) {
-          s.status = '切换服务器失败: $e';
+          s.session.messages.add(_systemMessage(s.session, '⚠️ 切换服务器失败: $e'));
+          s.status = '';
         }
       }
     case '/auth':
@@ -1905,7 +1931,8 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(
             _systemMessage(s.session, '用法: /rename <名字> —— 修改我的显示名字（如 /rename Lukas）'));
       } else if (s.session.store.sessionToken == null) {
-        s.status = '会话未激活，请先 /auth';
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
+        s.status = '';
       } else {
         try {
           final old = s.session.store.personName ?? '(未设置)';
@@ -1929,7 +1956,8 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(
             _systemMessage(s.session, '用法: /device <设备名> —— 修改本设备名称（如 /device MyMac）'));
       } else if (s.session.store.sessionToken == null) {
-        s.status = '会话未激活，请先 /auth';
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
+        s.status = '';
       } else {
         try {
           final old = s.session.store.deviceName ?? '(未设置)';
@@ -1961,7 +1989,8 @@ Future<void> _execInvite(List<String> parts) async {
   final s = _state!;
   final token = s.session.store.sessionToken;
   if (token == null) {
-    s.status = '会话未激活：先 /auth 激活会话后再生成邀请码';
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活：先 /auth 激活会话后再生成邀请码'));
+    s.status = '';
     return;
   }
   final personId = parts.length > 1 ? parts[1] : 'personB';
@@ -1982,7 +2011,8 @@ Future<void> _execInvite(List<String> parts) async {
     s.session.messages.add(_systemMessage(s.session, '✅ 邀请码（24 小时内一次性有效）: ${r.inviteCode}'));
     s.status = ''; // 反馈在消息区（邀请码本身），状态栏保持干净
   } catch (e) {
-    s.status = '❌ 邀请码生成失败: $e';
+    s.session.messages.add(_systemMessage(s.session, '❌ 邀请码生成失败: $e'));
+    s.status = '';
   }
 }
 
@@ -2032,9 +2062,11 @@ Future<void> _execOpen(List<String> parts) async {
     final path = await s.session.openAttachment(target);
     s.session.messages
         .add(_systemMessage(s.session, '✅ 已用系统应用打开附件（${target.plain}）'));
-    s.status = '附件缓存: $path';
+    s.session.messages.add(_systemMessage(s.session, '📁 附件缓存: $path'));
+    s.status = ''; // 下载进度通知退场，结果已在消息区
   } catch (e) {
-    s.status = '打开附件失败: $e';
+    s.session.messages.add(_systemMessage(s.session, '❌ 打开附件失败: $e'));
+    s.status = '';
   }
 }
 
