@@ -1329,10 +1329,19 @@ String _timeLabel(int createdAt) {
   return '${t.year}-$md $hm';
 }
 
+/// 按性别表取消息气泡背景色：男蓝 / 女品红 / 性别未知青绿（2026-09-10 老板要求）。
+/// 兼容服务端两种取值：App 提交规范 male/female，旧 TUI 提交过中文 男/女。
+String _genderBubble(String? rawGender) {
+  if (rawGender == 'male' || rawGender == '男') return _bgBlue;
+  if (rawGender == 'female' || rawGender == '女') return _bgPink;
+  return _bgTeal;
+}
+
 /// 格式化消息为多行（自动按列宽折行）。
 /// 自己的消息：性别气泡，整块右对齐（右侧气泡风格，正文在右、末尾附 [我 时间] 标签），
-/// 背景按我的性别配色；对方消息：黄色前缀 + 普通正文（左对齐）；
-/// 系统提示（isSystem）：灰色前缀 + 普通正文（左对齐）。
+/// 背景按我的性别配色；对方消息：性别气泡，整块左对齐（左侧气泡风格，[对方名 时间]
+/// 黑字标签嵌在气泡左缘、正文在右），背景按对方性别配色；系统提示（isSystem）：
+/// 灰色前缀 + 普通正文（左对齐）。
 List<String> _formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
@@ -1356,9 +1365,9 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   // 双方消息的外侧留白（同为 8 列）：对方正文右侧 / 我方气泡左侧；
   // 保证对方正文起点不比我方正文（前缀之后）更靠左
   const sideMargin = 8;
-  if (m.isSystem || !m.isMine) {
-    // 系统提示与对方消息：前缀 + 普通正文（system 不用彩色气泡背景），左对齐。
-    // 正文右侧预留 sideMargin 列边距，不顶满最右（与我方气泡的视觉留白平衡）；
+  if (m.isSystem) {
+    // 系统提示：灰色前缀 + 普通正文，左对齐（信息流提示，不参与左右分栏）。
+    // 正文右侧预留 sideMargin 列边距，不顶满最右（与两侧气泡的视觉留白平衡）；
     // 续行缩进 prefix 宽度，与第一行正文左缘对齐
     final prefix = '$color[$who $time]$_reset ';
     final prefixW = _displayWidth(prefix);
@@ -1368,6 +1377,39 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       '$prefix${wrapped.first}',
       ...wrapped.skip(1).map((line) => '$indent$line'),
     ];
+  }
+  if (!m.isMine) {
+    // 对方消息：左侧性别气泡——背景按对方性别配色（男蓝/女品红/未知青绿），
+    // [who 时间] 黑字标签嵌在气泡左缘、正文白字；气泡矩形 col 1 → cols - rightPad，
+    // 与右侧我方气泡（col 9 → cols）左右对称
+    final bubbleBackground =
+        _genderBubble(_state?.personGenders[m.env.senderPersonId]);
+    final label = '[$who $time]';
+    final labelW = _displayWidth(label);
+    final lane = labelW + 1; // 气泡内左侧标签栏宽（含标签后一个空格）
+    final rightPad = sideMargin; // 右侧留白 = 我方气泡左侧留白（8 列）
+    final textWidth = cols - lane - rightPad;
+    final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
+    final lines = <String>[];
+    for (var i = 0; i < wrapped.length; i++) {
+      if (i == wrapped.length - 1 && wrapped.length > 1) {
+        // 长消息末行：标签（黑字）嵌在气泡左缘，正文白字 + 背景色填充到右留白前——
+        // 整行背景矩形与其他行完全对齐
+        final chunk = wrapped[i];
+        final fill = textWidth - _displayWidth(chunk);
+        lines.add(
+            '$bubbleBackground$_black$label$_white $chunk${' ' * (fill < 0 ? 0 : fill)}$_reset');
+      } else if (i == wrapped.length - 1) {
+        // 单行消息：标签 + 1 空格 + 正文，整行贴左（短消息贴左的常规形态）
+        final content = '$bubbleBackground$_black$label$_white ${wrapped[i]}$_reset';
+        lines.add(content);
+      } else {
+        // 非末行：气泡内左侧标签栏留空（背景色空格），正文右端停在右留白前
+        final content = '$bubbleBackground$_white${' ' * lane}${wrapped[i]}$_reset';
+        lines.add(content);
+      }
+    }
+    return lines;
   }
   // 我的消息：整块右对齐（右侧气泡风格），背景按我的性别配色——男蓝、女品红、
   // 性别未知（旧空间未登记/尚未拉取）青绿底；正文白字、[我 时间] 黑字；
