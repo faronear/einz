@@ -9,7 +9,7 @@
 #   3) B 发送 → A(TUI) 保持运行，store-a 历史出现 B 消息（WS 实时接收落盘 OK）
 import os, pty, subprocess, select, time, sys, json, re
 
-CLI = '/Users/Shared/productX/only/cli'
+CLI = '/Users/luk/einz/cli'
 SERVER = 'http://127.0.0.1:3901'
 STORE_A = os.path.join(CLI, 'demo/store-a.json')
 STORE_B = os.path.join(CLI, 'demo/store-b.json')
