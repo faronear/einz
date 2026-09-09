@@ -1244,8 +1244,8 @@ class _SetupPageState extends State<SetupPage> {
     required VoidCallback onTap,
   }) {
     return AnimatedScale(
-      // 选中放大 + 未选中压缩，拉开对比（老板要求：选中要醒目）
-      scale: selected ? 1.15 : 0.9,
+      // 选中放大 + 未选中压缩，对比夸张醒目（老板要求：要够夸张）
+      scale: selected ? 1.3 : 0.8,
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
       child: Material(
