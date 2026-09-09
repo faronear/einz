@@ -854,6 +854,18 @@ abstract class AppLocalizations {
   /// **'Language'**
   String get chatPageMenuLocaleLabel;
 
+  /// No description provided for @chatPageMenuStyleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface style'**
+  String get chatPageMenuStyleLabel;
+
+  /// No description provided for @chatPageStyleSheetClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get chatPageStyleSheetClose;
+
   /// No description provided for @chatPageMenuBurnLabel.
   ///
   /// In en, this message translates to:

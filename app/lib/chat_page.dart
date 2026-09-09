@@ -20,11 +20,13 @@ import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/message_repository.dart';
+import 'data/ui_style_settings.dart';
 import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 import 'widgets/top_notice.dart';
+import 'widgets/ui_style_picker.dart';
 
 /// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
 enum _AttachmentKind { photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
@@ -136,6 +138,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _previewPlaying = false; // 预览态试听播放中
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
+  late String _uiStyle; // 当前界面风格（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
   late String _myPersonName; // 我的名字（菜单显示；改名后 setState 刷新）
@@ -209,6 +212,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _scrollController.addListener(_maybeLoadOlder);
     _loadBurnLabel();
     _refreshPinStatus();
+    // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
+    // 随后用持久化值校正（_loadUiStyle 异步）
+    _uiStyle = uiStyleNotifier.value;
+    _loadUiStyle(); // 恢复界面风格（plain/gradient，默认素雅纯色）
+    // 风格切换即时生效（弹窗不关闭也能预览）：notifier 通知 → 重建背景
+    uiStyleNotifier.addListener(_onUiStyleChanged);
     // 每 3 秒轮询同步（WS 连接成功后降频为 30s 兜底；断开恢复高频——见 _onWsStatusChanged）
     _restartTicker(const Duration(seconds: 3));
     _registerPushToken();
@@ -358,6 +367,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await settings.save(picked);
     if (!mounted) return;
     showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
+  }
+
+  /// 加载持久化的界面风格（默认素雅纯色，保留原有视觉效果）。
+  Future<void> _loadUiStyle() async {
+    final s = UiStyleSettings(widget.db ?? LocalDatabase());
+    final style = await s.load();
+    if (mounted) setState(() => _uiStyle = style);
+  }
+
+  /// 风格切换通知（弹窗内点选即触发）：立即重建背景与菜单当前值。
+  void _onUiStyleChanged() {
+    if (mounted) setState(() => _uiStyle = uiStyleNotifier.value);
+  }
+
+  /// 顶栏 🎨：切换界面风格（素雅纯色/渐变粉蓝）。弹窗内点选即生效且不关闭，
+  /// 用户不离开弹窗即可预览大致效果（右上角 ✕ 或下滑关闭）。
+  Future<void> _showStylePicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => UiStylePickerSheet(
+        settings: UiStyleSettings(widget.db ?? LocalDatabase()),
+      ),
+    );
   }
 
   /// 邀请设备：直接生成一次性邀请码（POST /invites，需已认证）。
@@ -790,6 +822,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    uiStyleNotifier.removeListener(_onUiStyleChanged);
     _ticker?.cancel();
     _peerTicker?.cancel();
     _recordTimer?.cancel();
@@ -1594,6 +1627,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 switch (value) {
                   case 'locale':
                     _showLocalePicker();
+                  case 'style':
+                    _showStylePicker();
                   case 'burn':
                     _showBurnPicker();
                   case 'invite':
@@ -1671,6 +1706,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 PopupMenuItem(
+                  value: 'style',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuStyleLabel, style: labelStyle),
+                      const Spacer(),
+                      Text(kUiStyleLabels[_uiStyle] ?? ''),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
                   value: 'burn',
                   child: Row(
                     children: [
@@ -1710,6 +1755,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
       body: Stack(
         children: [
+          // 界面风格背景层：gradient=品牌粉蓝渐变（首屏/向导同款）；plain=不铺
+          // 背景（露出 Scaffold 浅粉白纸感底色，与原有视觉效果完全一致）
+          if (_uiStyle == 'gradient')
+            const Positioned.fill(
+              child: DecoratedBox(
+                // Key 供测试精确断言聊天页背景（弹窗预览图也有渐变，需区分）
+                key: ValueKey('chatPageGradientBackground'),
+                decoration: BoxDecoration(gradient: kBrandGradient),
+              ),
+            ),
           Column(
             children: [
           // 对话顶部：双方名字 + 各自在线状态（对方左 / 我右，与消息对齐一致）
@@ -1717,8 +1772,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+              // gradient 风格下半透明白：渐变从顶部条后透出，文字仍清晰可读
+              color: _uiStyle == 'gradient'
+                  ? Colors.white.withValues(alpha: 0.45)
+                  : Colors.grey.shade50,
+              border: Border(
+                bottom: BorderSide(
+                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade300,
+                ),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1811,7 +1873,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
           SafeArea(
-            child: Padding(
+            child: Container(
+              // gradient 风格下半透明白底：输入文字/按钮在渐变上仍清晰可读；
+              // plain 风格保持透明（原有视觉效果）
+              color: _uiStyle == 'gradient'
+                  ? Colors.white.withValues(alpha: 0.55)
+                  : Colors.transparent,
               padding: const EdgeInsets.all(8),
               child: Row(
                 children: [

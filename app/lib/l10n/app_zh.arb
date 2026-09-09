@@ -164,6 +164,8 @@
   },
   "chatPageEscrowRotatedNotice": "对方已重设密保口令——生成邀请码或修改口令时将要求输入新口令",
   "chatPageMenuLocaleLabel": "界面语言",
+  "chatPageMenuStyleLabel": "界面风格",
+  "chatPageStyleSheetClose": "关闭",
   "chatPageMenuBurnLabel": "阅后即焚",
   "chatPageMenuMyNameLabel": "我的身份",
   "chatPageMenuDeviceNameLabel": "我的设备",

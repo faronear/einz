@@ -408,6 +408,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuLocaleLabel => '界面语言';
 
   @override
+  String get chatPageMenuStyleLabel => '界面风格';
+
+  @override
+  String get chatPageStyleSheetClose => '关闭';
+
+  @override
   String get chatPageMenuBurnLabel => '阅后即焚';
 
   @override

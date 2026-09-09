@@ -436,6 +436,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuLocaleLabel => 'Language';
 
   @override
+  String get chatPageMenuStyleLabel => 'Interface style';
+
+  @override
+  String get chatPageStyleSheetClose => 'Close';
+
+  @override
   String get chatPageMenuBurnLabel => 'Burn-after-read';
 
   @override

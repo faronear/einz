@@ -164,6 +164,8 @@
   },
   "chatPageEscrowRotatedNotice": "Your partner reset the passphrase — you will be asked for the new one when creating invites or changing it",
   "chatPageMenuLocaleLabel": "Language",
+  "chatPageMenuStyleLabel": "Interface style",
+  "chatPageStyleSheetClose": "Close",
   "chatPageMenuBurnLabel": "Burn-after-read",
   "chatPageMenuMyNameLabel": "My name",
   "chatPageMenuDeviceNameLabel": "Device name",

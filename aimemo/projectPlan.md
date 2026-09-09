@@ -6,7 +6,7 @@
 - **产品：** Einz — 两个人的私密聊天与共享私人空间
 - **部署形态：** 固定两人一空间、不分发（静态白名单，无动态配对）
 - **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.1）
-- **最后更新：** 2026-08-28
+- **最后更新：** 2026-09-09
 
 ---
 
@@ -78,6 +78,7 @@
 - [x] **自建空间 + 二维码加入（降小白门槛）**：shared 加 einz-join-v1?space=&p= 格式，URL 编码口令，decode null 安全）+ 3 单测；setup_page A 端新增"自建空间（一键生成 Space Key）"（Random.secure 生成 32B → 认证 → SetPinDialog/口令托管 → 二维码对话框 QrImageView + 一键复制 joinDialog.\*）；B 端口令输入框 📷 扫码入口（mobile_scanner 7.4.0 懒构造 \_JoinScanPage，扫到 einz-join-v1 自动填 spaceId/口令）；依赖 qr_flutter 4.1.0 + mobile_scanner（相机权限拍照时已配置，复用）；Server 零改动；widget 测试加"自建空间入口"用例（ensureVisible 滚动）；flutter test 29 项全过 + setup golden 更新；**白名单保持手动（B 公钥 → A 加 VPS config.json）**
 - [x] **配置页分步向导重构（交互优化）**：SetupPage 重构为向导——第 0 步角色选择（创建新空间/加入现有空间/高级 sealed 折叠）；创建 7 步（设备名+生成密钥**本页明确反馈结果** → 白名单确认 → 接入口令 → PIN → 二维码分享 → 完成）、加入 5 步（设备名 → 扫码/口令加入 → PIN → 完成）、高级 5 步（设备名 → sealed 导入 → PIN → 完成）；每步只收集一个信息 + 底部上一步/下一步/完成 + 进度圆点 + 步骤标题（wizardStep\* 键）；\_nextStep 按步骤前置校验；\_authenticate/\_setupLockAndEnter/\_runPinSetup/\_runJoinAccess/\_runSealedImport 复用原认证/托管/sealed 逻辑；widget_test 向导 3 用例 + golden 更新 + flutter test 30 项全过
 - [x] **邀请码降级 B（二维码不再含明文口令）**：老板拍板（2026-09-08）——App 邀请码二维码由 JoinInfo（spaceId+口令+邀请码 一键加入）降级为与 TUI 一致：二维码只含纯邀请码，口令由加入方另行输入；shared 删除 JoinInfo 类/export/单测；删除 App 生成邀请码时的口令过时校验与重验证弹窗（死代码）；口令重设通知保留并完善：App 每次 WS online 补查（原有）+ TUI 新增 WS 重连补查（onStatus connected，对齐 App）+ 补查/广播通知后更新 escrowUpdatedAt 防刷屏；docs/KEY_ESCROW.md §12 同步；验证 shared 24 + app 20 全过（golden 保持红：既有文案失配，老板决策暂不考虑 golden）
+- [x] **界面风格切换（素雅纯色 / 渐变粉蓝）**：菜单「界面语言」下新增「界面风格」，弹窗内每风格一张预览图+一句描述，点选即生效且不关窗（不离开弹窗预览效果）；UiStyleSettings（app_state key='ui_style'，默认 plain 保留原视觉效果）+ uiStyleNotifier 即时生效；chat_page 背景按风格渲染（gradient 用首屏/向导同款品牌渐变，顶部条/输入区半透明白）；ARB 加 2 键；新增 ui_style_switch_test 2 用例 + chat_page_menu 12 用例全过
 - [ ] 真机验证（需 Android 真机/模拟器 + FCM 之外的推送场景）——待环境就绪
 - [ ] iOS 真机构建/签名/Ad Hoc（docs/IOS.md §3–§4）——待 Mac + Apple 付费账号（APNs 暂无账号，WS/轮询兜底）
 

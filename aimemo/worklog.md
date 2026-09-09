@@ -1431,3 +1431,31 @@ savePlain/setPin）存了占位 deviceId `kp.deviceId`（'dev-mobile'），而�
 
 **验证：** analyze 通过；message_repository/app_lock/chat_page_menu 测试全过；
 setup 相关 7 个失败经 stash 基线确认系既有环境问题，与本次无关。
+
+## 2026-09-09 界面风格切换（素雅纯色 / 渐变粉蓝）
+
+**需求：** 保留现有视觉效果；新增一种风格——把首屏/向导的粉蓝渐变背景用到对话页；
+菜单「界面语言」下新增「界面风格」，弹窗内每风格 = 一张预览图 + 一句描述，
+点选即立刻生效且不关窗（用户不离开弹窗即可预览大致效果）。
+
+**实现（commit 待填）：**
+- 新增 `app/lib/data/ui_style_settings.dart`：`kUiStyleOptions`（plain/gradient）、
+  双语标签/描述、品牌渐变常量 `kBrandGradient`（与首屏/向导同款
+  [3BAFFD→D6529C topLeft→bottomRight]）、`uiStyleNotifier`（即时生效通知）、
+  `UiStyleSettings`（app_state key='ui_style'，默认 plain）。
+- 新增 `app/lib/widgets/ui_style_picker.dart`：`UiStylePickerSheet` 弹层——
+  每风格一张程序化绘制的迷你聊天页预览图（纯色/渐变 + 左右两枚迷你气泡）+
+  名称 + 一句描述；点选即保存并通知（弹窗保持打开，选中态/聊天页背景同步刷新），
+  右上角 ✕ 或下滑关闭（与语言弹窗"点选即关"不同——风格需要边看边试）。
+- `chat_page.dart`：菜单「界面语言」下新增「界面风格」（显示当前值）；
+  `_uiStyle` 状态 + notifier 监听（initState 同步取值防首帧 LateInit，异步加载
+  持久化值校正）；body 背景按风格渲染——gradient 铺品牌渐变（Key
+  chatPageGradientBackground 供测试定位），顶部在线状态条/输入区改半透明白
+  （渐变透出且文字可读）；plain 保持原样（像素级不变，golden 不受影响）。
+- l10n：ARB 加 `chatPageMenuStyleLabel`（界面风格/Interface style）+
+  `chatPageStyleSheetClose`（关闭/Close），gen-l10n 重新生成。
+
+**验证：** analyze 通过（仅 1 条存量 info）；新增 `test/ui_style_switch_test.dart`
+2 用例（点选即生效且不关窗 + 持久化恢复）+ chat_page_menu 12 用例全过；
+golden 未触碰（plain 默认像素级不变）。
+
