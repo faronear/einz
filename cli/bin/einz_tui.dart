@@ -33,7 +33,7 @@ const _black = '$_esc[30m'; // 黑字（粉红底上的对方标签：人名/时
 const _white = '$_esc[97m'; // 亮白字（粉红底上的对方消息正文）
 const _bold = '$_esc[1m';
 const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息整条底色（最初方案；macOS Terminal 效果好）
-const _bgDeepBlue = '$_esc[48;2;34;113;247m'; // 深蓝背景 #2271F7（Einz 主题色）：标题栏/底部状态行整行底色
+const _bgBlack = '$_esc[40m'; // 黑色背景：标题栏/底部状态行整行底色
 
 // \x1B[2J 清屏 + \x1B[3J 清除回滚缓冲 + \x1B[H 光标回家：全屏重绘应用（类似 vim/htop）
 // 不保留滚动历史——否则每次渲染的内容在终端回滚缓冲里累积成"重复渲染"
@@ -1007,7 +1007,7 @@ void _render() {
   buf.write(_hideCursor);
   buf.write(_clearHome);
 
-  // 顶部标题栏（第 1 行）：深蓝背景整行（Einz 主题色 #2271F7）+ 白色文字，
+  // 顶部标题栏（第 1 行）：黑色背景整行 + 白色文字，
   // 与消息流明显区分；我的灯（绿●=在线，红✗=断线重连，黄↻=连接中，白○=离线）。
   // 状态灯颜色序列后立即回到白字（不 reset，背景持续），整行铺满后统一 reset。
   final ws = s.session.wsStatus;
@@ -1023,7 +1023,7 @@ void _render() {
   final titleText = '${_bold}Einz TUI$_white'
       ' | $myDot ${_personLabel(s.session.store, s.personNames)}'
       ' | $peerDot $peerName #$peerDevice';
-  buf.write(_barLine(_bgDeepBlue, titleText, cols));
+  buf.write(_barLine(_bgBlack, titleText, cols));
   buf.write('\r\n');
 
   // 消息区：从下往上堆叠——最新消息紧贴输入条（输入条上方），旧消息向上滚出，
@@ -1067,16 +1067,16 @@ void _render() {
     }
   }
 
-  // 底部状态行（屏幕最底一行）：深蓝背景整行 + 白色文字（与顶部标题栏同风格），
+  // 底部状态行（屏幕最底一行）：黑色背景整行 + 白色文字（与顶部标题栏同风格），
   // 滚动通知（发送结果/同步进度/下载进度等瞬时状态）独占整行显示；
   // 空状态显示常用命令提示。
   buf.write('\x1B[$rows;1H\x1B[K');
   if (s.status.isNotEmpty) {
     buf.write(
-        _barLine(_bgDeepBlue, '⚙ ${_truncateByWidth(s.status, cols - 4)}', cols));
+        _barLine(_bgBlack, '⚙ ${_truncateByWidth(s.status, cols - 4)}', cols));
   } else {
     buf.write(_barLine(
-        _bgDeepBlue,
+        _bgBlack,
         '⚙ ${_truncateByWidth('/help 查看命令 /invite 邀请伴侣 /attach 发送文件', cols - 4)}',
         cols));
   }
