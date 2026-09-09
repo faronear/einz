@@ -1113,7 +1113,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 输入栏引用条：被引用消息预览 + 取消按钮。
   Widget _buildQuoteBanner(HistoryMessage quote) {
-    final l10n = AppLocalizations.of(context)!;
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1129,7 +1128,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              l10n.chatPageQuoteBanner(_quotePreview(quote.plaintext)),
+              // 双引号图标已足够表达引用，不再加「引用：」前缀（老板要求 2026-09-09）
+              _quotePreview(quote.plaintext),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

@@ -1771,3 +1771,13 @@ chat_initial_scroll + setup_probe_retry + chat_page_menu 15/15 全过。golden
 **验证：** chat_initial_scroll_test 3/3 全过（新增用例：固定序号 fake 模拟真实
 Server——无新消息时不拉回底部、新消息到达后拉到底）；dart analyze 仅 1 条
 既有 info。
+## 2026-09-09 输入栏引用条去掉「引用：」前缀（双引号图标已足够）
+
+**老板要求（2026-09-09）：** 选择引用后，输入框上方的引用框里，双引号图标后
+有「引用：」标签——删除，双引号图标足够表达这是引用内容。
+
+**实现：** `_buildQuoteBanner` 文本直接显示 `_quotePreview(quote.plaintext)`，
+不再套 `chatPageQuoteBanner`（原「引用：{preview}」）；清理该 l10n 死代码
+（abstract/zh/en/两 arb 共 5 处）。引用框蓝色左边框保留（老板未要求删）。
+
+**验证：** 残留引用检查干净；dart analyze 仅 1 条既有 info。

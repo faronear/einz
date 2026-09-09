@@ -191,12 +191,6 @@
   "chatPageDeleteConfirmMessage": "删除后仅在本机消失，对方设备不受影响，且无法恢复。确定删除这条消息吗？",
   "chatPageDeleteCancel": "取消",
   "chatPageDeleteConfirmOk": "删除",
-  "chatPageQuoteBanner": "引用：{preview}",
-  "@chatPageQuoteBanner": {
-    "placeholders": {
-      "preview": {"type": "String"}
-    }
-  },
   "chatPageSendFailed": "发送失败: {error}",
   "@chatPageSendFailed": {
     "placeholders": {

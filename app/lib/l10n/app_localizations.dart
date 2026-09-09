@@ -956,12 +956,6 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get chatPageDeleteConfirmOk;
 
-  /// No description provided for @chatPageQuoteBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Quote: {preview}'**
-  String chatPageQuoteBanner(String preview);
-
   /// No description provided for @chatPageSendFailed.
   ///
   /// In en, this message translates to:

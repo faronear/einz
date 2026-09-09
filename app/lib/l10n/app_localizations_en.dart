@@ -490,11 +490,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageDeleteConfirmOk => 'Delete';
 
   @override
-  String chatPageQuoteBanner(String preview) {
-    return 'Quote: $preview';
-  }
-
-  @override
   String chatPageSendFailed(String error) {
     return 'Send failed: $error';
   }
