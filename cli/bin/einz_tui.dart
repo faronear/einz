@@ -108,6 +108,11 @@ _TuiState? _state;
 /// 第二用户预置名（首设备 create 时询问；顶部条对方名字兜底显示）。
 String? partnerPresetName;
 
+/// 首设备 create 时询问的性别（我的/伴侣）：仅接受 男/女（否则重新询问），
+/// 登记时随名字一并提交服务端（person_gender/partner_gender）。
+String? myGender;
+String? partnerGender;
+
 /// 本次运行是否刚完成入网（create/join/口令接入）：是则进对话前询问设置 PIN。
 bool _onboarded = false;
 
@@ -406,6 +411,19 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       }else {
         session.messages.add(_systemMessage(session, '✅ 系统为我自动预设一个名字，我可随时 /rename 进行修改。'));
       }
+      // 我的性别（必选：仅接受 男/女，否则重新询问——与 App 向导一致）
+      while (myGender == null) {
+        final g = (await _prompt(session, '❓ 输入我的性别（男/女）:')).trim();
+        if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
+        if (g == '男' || g == '女') {
+          myGender = g;
+          session.messages.add(_systemMessage(session, '✅ 已设置我的性别: $g'));
+          _scheduleRender();
+        } else {
+          session.messages.add(_systemMessage(session, '⚠️ 性别仅接受「男」或「女」，请重新输入'));
+          _scheduleRender();
+        }
+      }
       // 第二用户名字（回车跳过 → 后台默认 personB）
       session.messages.add(_systemMessage(session, '----------------'));
       final partnerName = (await _prompt(session, '❓ 输入伴侣的名字（例如 Alice，或者直接回车先跳过）:')).trim();
@@ -417,6 +435,19 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       } else {
         session.messages.add(_systemMessage(session, '✅ 系统将为伴侣自动预设一个名字，以后可以 /rename 自行修改。'));
         _scheduleRender();
+      }
+      // 伴侣性别（必选：仅接受 男/女，否则重新询问——与 App 向导一致）
+      while (partnerGender == null) {
+        final g = (await _prompt(session, '❓ 输入伴侣的性别（男/女）:')).trim();
+        if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
+        if (g == '男' || g == '女') {
+          partnerGender = g;
+          session.messages.add(_systemMessage(session, '✅ 已设置伴侣性别: $g'));
+          _scheduleRender();
+        } else {
+          session.messages.add(_systemMessage(session, '⚠️ 性别仅接受「男」或「女」，请重新输入'));
+          _scheduleRender();
+        }
       }
       session.messages.add(_systemMessage(session, '----------------'));
     } catch (e) {
@@ -435,6 +466,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         publicKey: store.publicKey,
         personName: store.personName,
         partnerName: partnerPresetName,
+        personGender: myGender,
+        partnerGender: partnerGender,
         deviceName: store.deviceName,
       ));
       store.deviceId = r.deviceId;
