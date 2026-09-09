@@ -58,6 +58,9 @@ void main() {
     // 有名字的身份卡片直接显示名字（无名字才显示身份标签本身）
     expect(find.text('Lukas'), findsOneWidget);
     expect(find.textContaining('共有者'), findsOneWidget);
+    // 身份卡头像为性别图标（男 ♂ / 女 ♀，非角色小人图标；性别未知回退 personA♂/personB♀）
+    expect(find.byIcon(Icons.male), findsOneWidget);
+    expect(find.byIcon(Icons.female), findsOneWidget);
     // join step1 无「下一步」/「完成」按钮：点卡片即自动前进（老板 UX 决策）
     expect(find.text('下一步'), findsNothing);
     expect(find.text('完成'), findsNothing);

@@ -649,6 +649,9 @@ class _SetupPageState extends State<SetupPage> {
       // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密保信封）；
       // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
       if (_step > 1) _step--;
+      // 回到身份选择页（join 步骤 1）时清除已选身份——否则 _selectIdentity 的
+      // 防重复保护会拦截后续点击，点卡不再前进（老板实测 2026-09-09）
+      if (_role == _WizardRole.join && _step == 1) _chosenPerson = null;
       _localError = null;
       _status = null;
     });
@@ -1114,7 +1117,7 @@ class _SetupPageState extends State<SetupPage> {
         _stepHeader(l10n.wizardTitleIdentity, l10n.wizardIdentityHint),
         _buildCardPair(
           leftCard: _buildSelectableCard(
-            icon: Icons.person,
+            icon: _identityCardIcon('personA'),
             label: aName.isEmpty ? l10n.wizardIdentityCreator : aName,
             color: _identityCardColor('personA'),
             selected: _chosenPerson == 'personA',
@@ -1122,7 +1125,7 @@ class _SetupPageState extends State<SetupPage> {
             onTap: () => _selectIdentity('personA'),
           ),
           rightCard: _buildSelectableCard(
-            icon: Icons.group,
+            icon: _identityCardIcon('personB'),
             label: bName.isEmpty ? l10n.wizardIdentityPartner : bName,
             color: _identityCardColor('personB'),
             selected: _chosenPerson == 'personB',
@@ -1144,6 +1147,15 @@ class _SetupPageState extends State<SetupPage> {
     if (gender == 'female') return const Color(0xFFD6529C); // 品牌粉
     if (gender == 'male') return const Color(0xFF3BAFFD); // 品牌天蓝
     return personId == 'personA' ? const Color(0xFF3BAFFD) : const Color(0xFFD6529C);
+  }
+
+  /// 身份卡片头像图标：按服务端性别——男 ♂ / 女 ♀（与卡片配色同源，不再用
+  /// 角色小人图标）；性别未知回退 personA ♂ / personB ♀（老板要求 2026-09-09）。
+  IconData _identityCardIcon(String personId) {
+    final gender = _personGenders[personId];
+    if (gender == 'female') return Icons.female;
+    if (gender == 'male') return Icons.male;
+    return personId == 'personA' ? Icons.male : Icons.female;
   }
 
   /// 步骤 3（join）：输入一次性邀请码（创建者 /invite 生成，24h 有效）。
@@ -1286,7 +1298,7 @@ class _SetupPageState extends State<SetupPage> {
     required bool rightSelected,
   }) {
     return SizedBox(
-      height: 80,
+      height: 92, // 卡片增高：容纳放大后的名字（20 号）+ 头像图标，防内容溢出（老板要求字号放大）
       child: LayoutBuilder(
         builder: (context, c) {
           final half = (c.maxWidth - 12) / 2; // 两卡各占半宽，中间留 12 空隙
@@ -1355,8 +1367,8 @@ class _SetupPageState extends State<SetupPage> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 20, // 名字字号放大（老板要求：放大再放大）
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
