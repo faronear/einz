@@ -9,6 +9,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:einz/brand_logo.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
@@ -70,14 +71,19 @@ void main() {
     expect(find.text('验证邀请码'), findsWidgets); // 邀请码页步骤标题（join=验证套）
   });
 
-  testWidgets('探测失败：启动屏显示失败提示并自动重试（无输入框/信封入口）', (WidgetTester tester) async {
+  testWidgets('探测失败：启动屏保持旋转 Logo、无失败文字并自动重试（无输入框/信封入口）',
+      (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(probeOk: false));
     // 启动屏失败态仍显示旋转图标（自动重试中）→ 不能用 pumpAndSettle
     // （无限动画永不 settle），用有限 pump 推进（同 setup_probe_retry_test）
     await tester.pump(); // probe future 完成 → setState → 启动屏失败态
     await tester.pump(); // 渲染启动屏新帧
 
-    expect(find.text('暂时无法连接服务器，正在自动重试…'), findsOneWidget);
+    // 品牌启动屏保持旋转 Logo、不显示失败文字（老板要求 2026-09-09 保持简洁优美）
+    expect(find.byType(SpinningBrandLogo), findsOneWidget,
+        reason: '启动屏旋转 Logo 应保持显示（自动重试中）');
+    expect(find.text('暂时无法连接服务器，正在自动重试…'), findsNothing,
+        reason: '启动屏不显示失败文字（2026-09-09 起删除）');
     // 品牌启动屏无 AppBar/菜单/服务器输入框：不显示离线信封入口（菜单已移除）
     expect(find.byTooltip('导入线下密保信封'), findsNothing);
   });

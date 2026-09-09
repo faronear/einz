@@ -1886,3 +1886,25 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 - 我的分支：非末行新增 `fill = (cols - leftPad) - bodyW` 背景色填充，各行右缘统一对齐 col cols。
 
 **验证：** dart analyze 通过。老板确认后提交（本条目随提交落库）。
+## 2026-09-10 启动链首帧回归修复：StartupGate 加载屏渐变缩成左侧细条
+
+**老板反馈：** app 打开时第一个画面只有左侧约 1/3 是渐变粉蓝背景 + Logo，右侧
+2/3 全白，持续约 0.5 秒后跳变到全屏——要求开屏就是全屏背景 + Logo。
+
+**根因（main.dart StartupGate 加载屏）：** commit 3474618（2026-09-09）把
+`Center(child: SpinningBrandLogo(72))` 改为 `SafeArea(Column(Spacer, Logo 96,
+Spacer))` 以统一启动链布局，但外层仍是无 alignment 的 `DecoratedBox`——Scaffold
+body 是宽松约束，RenderProxyBox 尺寸 = child 尺寸，渐变缩到 Column 宽度
+（96px Logo）→ 左侧一条渐变 + 右侧露白（theme scaffold 浅粉白 #FFF5FA）。
+Center 会撑满宽松约束，Column 不会，改动引入了回归。加载屏仅在 `_check()`
+（SQLite 查询约 0.5s）期间可见，随后切入 setup 检测页（该页有 alignment 修复，
+全屏）——正是「0.5s 左侧 1/3 → 跳变全屏」的成因。
+
+**修复：** StartupGate 渐变容器改 `Container` + `alignment: Alignment.topCenter`
+（与 setup_page._buildSplashScreen 同款已验证写法，aafad56），宽松/紧约束下
+都撑满全屏；启动链三段（原生屏→StartupGate→检测页）恢复无尺寸跳变。
+
+**测试：** 顺带修复 3474618 遗留的陈旧断言——widget_test「探测失败」用例仍断言
+已删除的失败文字（`暂时无法连接服务器…`），改为断言新行为（旋转 Logo 保持 +
+无失败文字，与 setup_probe_retry_test 一致）。setup_probe_retry + widget_test
+4/4 全过；flutter analyze 0 issue。已 USR2 热重启供老板确认。

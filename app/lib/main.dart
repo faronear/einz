@@ -203,12 +203,18 @@ class _StartupGateState extends State<StartupGate> {
           ),
         );
       }
-      return const Scaffold(
+      return Scaffold(
         // 启动加载：旋转 Logo 与检测页同款布局（上半部、96px、无文字）——
         // 原生启动屏 → StartupGate → 检测页全程定格，无尺寸/位置跳变
         // （老板要求 2026-09-09：开屏就确定显示的位置）
-        body: DecoratedBox(
-          decoration: BoxDecoration(
+        body: Container(
+          // 渐变容器必须撑满全屏：Scaffold body 是宽松约束，Container 无
+          // alignment 时（RenderProxyBox 尺寸 = child 尺寸）会缩到子项
+          // Column 宽度 = 96px Logo —— 开屏约 0.5s 只显示左侧一条渐变 +
+          // 右侧白底，随后才跳到检测页全屏（2026-09-10 老板反馈复现；
+          // 与 setup_page._buildSplashScreen 同款修复，aafad56）
+          alignment: Alignment.topCenter,
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
