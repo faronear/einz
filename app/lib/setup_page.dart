@@ -1301,13 +1301,14 @@ class _SetupPageState extends State<SetupPage> {
         ),
         if (_localError != null) _localErrorHint(_localError!),
         const SizedBox(height: 16),
-        // 密保信封与口令是平行方案，可自由互切：信封页导入对端设备导出的密封
-        // 密钥（首台 create 无对端设备时按需准备，随时可切回口令页）
-        TextButton.icon(
-          onPressed: _openEnvelopeImport,
-          icon: const Icon(Icons.mail_outline, size: 18),
-          label: Text(l10n.wizardSwitchToEnvelope),
-        ),
+        // 密保信封与口令是平行方案，可互切：但仅后续设备（join）适用——
+        // 全系统首台设备没有对端设备可导出密封信封，故不显示该入口
+        if (_role == _WizardRole.join)
+          TextButton.icon(
+            onPressed: _openEnvelopeImport,
+            icon: const Icon(Icons.mail_outline, size: 18),
+            label: Text(l10n.wizardSwitchToEnvelope),
+          ),
       ],
     );
   }
