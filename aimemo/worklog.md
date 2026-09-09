@@ -1630,3 +1630,26 @@ message_repository_test 新增 2 用例（引用载荷往返还原、deleteMessa
 setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%，
 换图所致）、chat_page（11.77%，上轮时间标注所致）、lock_page（1.12%）与
 向导各步骤（98%+，风格改版遗留）保持红不重刷。
+## 2026-09-09 修复：引用消息重启后显示原始 JSON（{plaintext:…} 泄漏）
+
+**老板报告（2026-09-09）：** 引用另一条消息发出去后，退出并重新打开 app，
+看到被引用的消息以纯文本 `{plaintext:'…',quote:{…}}` 展示。
+
+**排查（实证优先）：**
+- 先怀疑 repo 解析链路，写了复现测试「send → 服务端回拉（_markSent 不推进
+  锚点，重启 sync 会把消息再拉回）→ 重新读取历史」——**12/12 全过**：app 侧
+  `_rowsToHistory` 对引用包装的解析是确定性的，密文落盘稳定，重启前后不可能
+  一个解析成功一个失败。
+- 结论：能显示原始 JSON 的，一定是**没有解析引用包装的客户端**。确认 CLI 的
+  `_decrypt()` 直接返回 `decryptMessage` 原文——TUI 把引用消息整段 JSON 当
+  明文展示；同理旧版本 app 构建（无解析代码）也会这样。
+
+**修复（cli/lib/chat_core.dart）：** `_decrypt` 加与 app 侧同款的包装解析
+（`raw.startsWith('{')` → jsonDecode → 取 `plaintext` 字段；裸文本以 { 开头时
+按原文展示），TUI 只展示正文不渲染引用块。app 侧当前构建无需改（已证正确）。
+
+**验证：** app analyze 仅 1 条既有 info；cli analyze 0 issue；message_repository_test
+12 个全过（含新增「重启后引用消息不显示原始 JSON」回归用例）。
+
+**待老板确认：** 若看到 JSON 的端是 app，多半是**旧构建**（需重装/重建）或 CLI
+（本次已修）；两种都不是的话提供截图，我再继续查。

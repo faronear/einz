@@ -590,14 +590,28 @@ class ChatSession {
 
   /// 按 key_version 选密钥解密（轮换后旧消息用归档密钥）。
   /// 设备未接入空间（spaceKey 为 null）时返回占位文本，避免 sync/WS 解密崩溃。
+  /// 引用消息载荷为 {"plaintext":…, "quote":…} JSON（app 引用功能）；TUI 只展示正文，
+  /// 不做引用块渲染，但不能再把整段 JSON 当明文显示。
   Future<String> _decrypt(MessageEnvelope env) async {
     final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey;
     if (keyB64 == null) return '（未接入空间，无法解密）';
-    return decryptMessage(
+    final raw = await decryptMessage(
       env: env,
       spaceKey: base64Decode(keyB64),
       spaceId: store.spaceId!,
     );
+    // 引用载荷为 {"plaintext":…, "quote":…} JSON；旧版消息为裸文本
+    if (raw.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic> && decoded['plaintext'] is String) {
+          return decoded['plaintext'] as String;
+        }
+      } catch (_) {
+        // 裸文本恰好以 { 开头：按原文展示
+      }
+    }
+    return raw;
   }
 
   void _appendDecrypted(

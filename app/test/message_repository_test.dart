@@ -3,6 +3,7 @@
 //
 // 需要 LIBSODIUM_PATH 指向 libsodium.dll（与 shared 单测一致）。
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:drift/native.dart';
@@ -344,6 +345,34 @@ void main() {
     final hist = await repo.history();
     expect(hist.length, 1);
     expect(hist.single.env.messageId, keep, reason: '删除后仅剩保留消息');
+  });
+
+  test('重启后引用消息不显示原始 JSON（send → 服务端回拉 → 重新读取历史）', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    final mid = await repo.send(
+      '这是回复',
+      quote: {'messageId': 'q-1', 'preview': '被引用的原文'},
+    );
+    // 发送后立即显示正常
+    expect((await repo.history()).single.plaintext, '这是回复');
+
+    // 重启场景：_markSent 不推进锚点 → sync 会把这条消息从服务端再拉回来
+    final row = await (db.select(db.localMessages)..where((m) => m.messageId.equals(mid))).getSingle();
+    final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
+    api.pages.add((
+      messages: [env],
+      attachmentsMeta: <Map<String, dynamic>>[],
+      lastSequence: 1,
+      hasMore: false,
+    ));
+    await repo.sync(); // 等价重启后 _loadInitial 里的 sync
+
+    final hist = await repo.history();
+    expect(hist.single.env.messageId, mid);
+    expect(hist.single.plaintext, '这是回复', reason: '重启后引用消息不应显示为原始 JSON');
+    expect(hist.single.quote, isNotNull);
+    expect(hist.single.quote!['messageId'], 'q-1');
   });
 }
 
