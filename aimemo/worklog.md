@@ -1675,3 +1675,23 @@ setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%�
 
 **验证：** 像素检查四角 alpha=0、内容居中；dart analyze 仅 1 条既有 info；
 检测页行为测试通过。golden 政策不变（检测页 golden 已红，不重刷）。
+## 2026-09-09 修复：发了几条引用消息后，重启 app 不再自动跳到底部
+
+**老板报告（2026-09-09）：** 引用消息重启显示正常了（上一轮已修），但发了
+几条带引用的消息后重启 app，又不能自动跳到最新消息了（此前 68e9c6d 修过：
+首次载入 `_scrollToLatest(animate: false)` 直接跳底部）。
+
+**根因（复现实证）：** `_loadInitial` 首帧 `jumpTo(position.maxScrollExtent)`
+——**懒构建列表首帧的 maxScrollExtent 是估算值**（未构建条目按平均高度估算）。
+末尾几条是引用消息（引用块使气泡明显更高）时，估算偏低 → 一次 jumpTo 停在
+半路（真实底部在下）；WS 在线时 ticker 不轮询、也没有新消息追加，无人纠正。
+普通消息场景高度均匀，估算≈真实，所以一直没暴露。新增复现用例（55 普通 +
+末尾 5 条引用载荷消息）修复前失败、修复后通过。
+
+**修复（chat_page）：** 首次跳转改走 `_jumpToBottom()`——jumpTo 会触发目标
+附近条目补建、extent 变准，post-frame 检查 extent 仍在增长（>target+1）就
+再跳一次，逐帧校正直到贴底（depth≤5 防极端死循环）；新消息到达的平滑滚动
+（animate: true）路径不变。
+
+**验证：** chat_initial_scroll_test 两个用例全过（原 60 条普通 + 新增引用
+场景）；dart analyze 仅 1 条既有 info（ws_realtime_service）。

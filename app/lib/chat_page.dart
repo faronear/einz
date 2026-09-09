@@ -946,7 +946,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           curve: Curves.easeOut,
         );
       } else {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        _jumpToBottom();
+      }
+    });
+  }
+
+  /// 直接跳到列表底部。懒构建列表首帧的 maxScrollExtent 是**估算值**——末尾是
+  /// 引用消息（气泡更高）时真实 extent 更大、估算偏低，一次 jumpTo 会停在半路
+  /// （老板实测 2026-09-09：发了几条引用后重启不能自动跳到底）。跳转会触发
+  /// 目标附近条目补建、extent 变准，逐帧校正直到贴底（depth 上限防极端死循环）。
+  void _jumpToBottom([int depth = 0]) {
+    if (!mounted || !_scrollController.hasClients || depth > 5) return;
+    final target = _scrollController.position.maxScrollExtent;
+    _scrollController.jumpTo(target);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (_scrollController.position.maxScrollExtent > target + 1) {
+        _jumpToBottom(depth + 1);
       }
     });
   }
