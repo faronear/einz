@@ -85,7 +85,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardGenderRequired => '请选择性别';
 
   @override
-  String get wizardIdentityHint => '一个秘境仅限两人。';
+  String get wizardIdentityHint => '一个秘境仅限两人，请选择身份';
 
   @override
   String get wizardIdentityCreator => '秘境创建者';

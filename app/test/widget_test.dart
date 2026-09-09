@@ -28,7 +28,7 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => (probeOk, probeNames),
+        probeServer: (_) async => (probeOk, probeNames, <String, String>{}),
       ),
     );
   }
@@ -53,6 +53,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('我是'), findsWidgets); // 身份步骤标题
+    // 点击卡片即前进（无「下一步」/对勾）：身份页不应出现 checkbox 图标
+    expect(find.byIcon(Icons.check_circle), findsNothing);
     // 有名字的身份卡片直接显示名字（无名字才显示身份标签本身）
     expect(find.text('Lukas'), findsOneWidget);
     expect(find.textContaining('共有者'), findsOneWidget);

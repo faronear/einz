@@ -132,7 +132,7 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
-      home: SetupPage(db: db, probeServer: (_) async => (false, <String, String>{})),
+      home: SetupPage(db: db, probeServer: (_) async => (false, <String, String>{}, <String, String>{})),
     ));
     await tester.pump();
     await expectLater(find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1_detect.png'));
@@ -224,7 +224,7 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => (probeOk, probeNames),
+        probeServer: (_) async => (probeOk, probeNames, <String, String>{}),
         enrollOverride: enroll,
         createInviteOverride: invite,
         authOverride: auth,

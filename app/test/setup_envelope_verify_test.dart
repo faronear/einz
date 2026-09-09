@@ -24,7 +24,7 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, const {'personA': 'Lukas'}),
+      probeServer: (_) async => (true, const {'personA': 'Lukas'}, const <String, String>{}),
       enrollOverride: (_) async =>
           const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
       authOverride: (kp, id) async =>

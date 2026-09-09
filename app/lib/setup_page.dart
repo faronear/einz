@@ -36,8 +36,9 @@ class SetupPage extends StatefulWidget {
   final LocalDatabase? db;
 
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 ServerSettings.probe。
-  /// 返回 (能连, person 名称表)——空表=首设备（create），非空=后续设备（join）。
-  final Future<(bool, Map<String, String>)> Function(String server)? probeServer;
+  /// 返回 (能连, person 名称表, person 性别表)——名称表空=首设备（create），
+  /// 非空=后续设备（join）；性别表供 join 身份卡配色（男蓝/女粉）。
+  final Future<(bool, Map<String, String>, Map<String, String>)> Function(String server)? probeServer;
 
   /// 测试注入：登记设备（生产走真实 ApiClient.enrollDevice；注入后不发起网络请求）。
   final Future<EnrollResult> Function(String? inviteCode)? enrollOverride;
@@ -96,6 +97,10 @@ class _SetupPageState extends State<SetupPage> {
   /// 探测到的 person 名称表（服务端 /health 返回）：
   /// 空 = 服务器还没有任何用户（首设备场景）；非空 = 已有用户（后续设备场景）。
   Map<String, String> _personNames = <String, String>{};
+
+  /// 探测到的 person 性别表（服务端 /health 返回 person_genders）：
+  /// 空 = 服务器尚未登记性别；join 身份卡按性别配色（男蓝/女粉，同性别同色）。
+  Map<String, String> _personGenders = <String, String>{};
 
   /// 后续设备引导中选择的身份（personA/personB；null = 首设备自举或未选）。
   String? _chosenPerson;
@@ -163,12 +168,13 @@ class _SetupPageState extends State<SetupPage> {
       final settings = ServerSettings(db);
       final saved = await settings.load();
       final probe = widget.probeServer ?? ServerSettings.probe;
-      final (ok, names) = await probe(saved);
+      final (ok, names, genders) = await probe(saved);
       if (!mounted) return;
       setState(() {
         _server = saved;
         _probeFailed = !ok;
         _personNames = names;
+        _personGenders = genders;
         if (ok && _role == null) {
           _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
           _step = 1;
@@ -202,7 +208,7 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _reprobe() async {
     if (_busy || !mounted) return;
     final probe = widget.probeServer ?? ServerSettings.probe;
-    final (ok, names) = await probe(_server);
+    final (ok, names, genders) = await probe(_server);
     if (!mounted) return;
     if (ok) {
       _probeRetryTimer?.cancel();
@@ -210,6 +216,7 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _probeFailed = false;
         _personNames = names;
+        _personGenders = genders;
         if (_role == null) {
           _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
           _step = 1;
@@ -449,15 +456,20 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// join 步骤 1：选择身份（personA=创建者 / personB=伴侣），点击卡片即自动进入
-  /// 邀请码步骤（不再需要「下一步」按钮）；名字按需设置后留在 join 流程继续。
+  /// join 步骤 1：选择身份（personA=创建者 / personB=伴侣），点击卡片先播放
+  /// 选中动画（放大+横向扩展覆盖另一张卡，450ms 与卡片渐变同长）再进邀请码页
+  /// （不再需要「下一步」按钮）。
   void _selectIdentity(String person) {
+    if (_chosenPerson != null) return; // 动画播放中/已选：防重复触发
     setState(() {
       _chosenPerson = person;
-      _step = 2; // 点卡片直接进邀请码页
       _status = null;
       _localError = null;
       _genderError = null;
+    });
+    Future<void>.delayed(const Duration(milliseconds: 450), () {
+      if (!mounted || _chosenPerson != person) return;
+      setState(() => _step = 2); // 动画结束后自动进邀请码页
     });
   }
 
@@ -1040,8 +1052,8 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN → 完成 ----
 
   /// 步骤 1（join）：你是第一个用户（创建者 personA）还是第二个（伴侣 personB）。
-  /// 与 TUI 引导顺序一致：先定身份（并按需设置名字）。身份卡片**左右并排**：
-  /// 左蓝（personA 天蓝）/ 右粉（personB 粉强调），与品牌 Logo/顶部通知同色系。
+  /// 身份卡片**左右并排**、点卡片即选中（动画后自动进邀请码页）——点击即前进，
+  /// 故无对勾/描边（冗余）；卡片颜色按服务端性别：男蓝/女粉，同性别同色。
   Widget _buildStepIdentity() {
     final l10n = AppLocalizations.of(context)!;
     final aName = _personNames['personA'] ?? '';
@@ -1050,93 +1062,38 @@ class _SetupPageState extends State<SetupPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _stepHeader(l10n.wizardTitleIdentity, l10n.wizardIdentityHint),
-        Row(
-          children: [
-            Expanded(
-              child: _buildIdentityCard(
-                icon: Icons.person,
-                label: aName.isEmpty ? l10n.wizardIdentityCreator : aName,
-                color: const Color(0xFF3BAFFD), // 左：品牌天蓝
-                selected: _chosenPerson == 'personA',
-                onTap: () => _selectIdentity('personA'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildIdentityCard(
-                icon: Icons.group,
-                label: bName.isEmpty ? l10n.wizardIdentityPartner : bName,
-                color: const Color(0xFFD6529C), // 右：品牌粉
-                selected: _chosenPerson == 'personB',
-                onTap: () => _selectIdentity('personB'),
-              ),
-            ),
-          ],
+        _buildCardPair(
+          leftCard: _buildSelectableCard(
+            icon: Icons.person,
+            label: aName.isEmpty ? l10n.wizardIdentityCreator : aName,
+            color: _identityCardColor('personA'),
+            selected: _chosenPerson == 'personA',
+            alignment: Alignment.centerLeft, // 锚左外缘：选中向右扩展覆盖粉色卡
+            onTap: () => _selectIdentity('personA'),
+          ),
+          rightCard: _buildSelectableCard(
+            icon: Icons.group,
+            label: bName.isEmpty ? l10n.wizardIdentityPartner : bName,
+            color: _identityCardColor('personB'),
+            selected: _chosenPerson == 'personB',
+            alignment: Alignment.centerRight, // 锚右外缘：选中向左扩展覆盖蓝色卡
+            onTap: () => _selectIdentity('personB'),
+          ),
+          leftSelected: _chosenPerson == 'personA',
+          rightSelected: _chosenPerson == 'personB',
         ),
         if (_localError != null) _localErrorHint(_localError!),
-        if (_chosenPerson == 'personB' && bName.isEmpty) ...[
-          const SizedBox(height: 12),
-          TextField(
-            controller: _personName,
-            style: const TextStyle(fontSize: 20),
-            decoration: InputDecoration(
-              hintText: l10n.wizardNameHintInput,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-        ],
       ],
     );
   }
 
-  /// join 身份选择卡片：品牌色背景 + 白字图标/标签；选中加白色粗边框 + 对勾。
-  Widget _buildIdentityCard({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: color,
-      elevation: 2,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: selected ? Border.all(color: Colors.white, width: 3) : null,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Icon(
-                selected ? Icons.check_circle : Icons.circle_outlined,
-                color: selected ? Colors.white : Colors.white70,
-                size: 16,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  /// 身份卡片配色：按服务端性别（person_genders）——男天蓝/女品牌粉；
+  /// 性别未知（旧空间未登记）回退默认 personA 蓝 / personB 粉；同性别自然同色。
+  Color _identityCardColor(String personId) {
+    final gender = _personGenders[personId];
+    if (gender == 'female') return const Color(0xFFD6529C); // 品牌粉
+    if (gender == 'male') return const Color(0xFF3BAFFD); // 品牌天蓝
+    return personId == 'personA' ? const Color(0xFF3BAFFD) : const Color(0xFFD6529C);
   }
 
   /// 步骤 3（join）：输入一次性邀请码（创建者 /invite 生成，24h 有效）。
@@ -1217,8 +1174,8 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 性别选择：左蓝（男）/右粉（女）两个按钮，与品牌色一致；
-  /// 选中者放大（AnimatedScale）+ 白粗边框，未选中半透明。
+  /// 性别选择：左蓝（男）/右粉（女）两个卡片，与品牌色一致；选中者放大 +
+  /// 横向扩展覆盖相邻卡（_buildCardPair），未选中压缩半透明。
   Widget _buildGenderSelector({
     required String? selected, // 'male' / 'female'；null = 未选
     required String label,
@@ -1237,51 +1194,64 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         const SizedBox(height: 8),
-        // 卡片左右外缘与表单标签/输入框对齐（Column stretch 满宽布局，槽位各半宽）；
-        // Stack 布局 + 被选中的最后绘制：选中卡片横向扩展时覆盖相邻未选中卡片
-        SizedBox(
-          height: 80,
-          child: LayoutBuilder(
-            builder: (context, c) {
-              final half = (c.maxWidth - 12) / 2; // 两卡各占半宽，中间留 12 空隙
-              Widget slot(Widget child, bool left) => Positioned(
-                    left: left ? 0 : half + 12,
-                    width: half,
-                    top: 0,
-                    bottom: 0,
-                    child: child,
-                  );
-              final maleBtn = _buildGenderButton(
-                label: maleLabel,
-                icon: Icons.male,
-                color: const Color(0xFF3BAFFD), // 左：品牌天蓝
-                selected: selected == 'male',
-                alignment: Alignment.centerLeft, // 锚左外缘：选中向右扩展覆盖粉色卡
-                onTap: () => onChanged(selected == 'male' ? null : 'male'),
-              );
-              final femaleBtn = _buildGenderButton(
-                label: femaleLabel,
-                icon: Icons.female,
-                color: const Color(0xFFD6529C), // 右：品牌粉
-                selected: selected == 'female',
-                alignment: Alignment.centerRight, // 锚右外缘：选中向左扩展覆盖蓝色卡
-                onTap: () => onChanged(selected == 'female' ? null : 'female'),
-              );
-              // 被选中的最后绘制：横向扩展时压在相邻未选中卡片之上
-              final children = selected == 'male'
-                  ? [slot(femaleBtn, false), slot(maleBtn, true)]
-                  : [slot(maleBtn, true), slot(femaleBtn, false)];
-              return Stack(clipBehavior: Clip.none, children: children);
-            },
+        _buildCardPair(
+          leftCard: _buildSelectableCard(
+            label: maleLabel,
+            icon: Icons.male,
+            color: const Color(0xFF3BAFFD), // 左：品牌天蓝
+            selected: selected == 'male',
+            alignment: Alignment.centerLeft, // 锚左外缘：选中向右扩展覆盖粉色卡
+            onTap: () => onChanged(selected == 'male' ? null : 'male'),
           ),
+          rightCard: _buildSelectableCard(
+            label: femaleLabel,
+            icon: Icons.female,
+            color: const Color(0xFFD6529C), // 右：品牌粉
+            selected: selected == 'female',
+            alignment: Alignment.centerRight, // 锚右外缘：选中向左扩展覆盖蓝色卡
+            onTap: () => onChanged(selected == 'female' ? null : 'female'),
+          ),
+          leftSelected: selected == 'male',
+          rightSelected: selected == 'female',
         ),
       ],
     );
   }
 
-  /// 单个性别按钮：品牌色背景 + 白字图标/标签；选中放大 + 横向扩展（锚点在外侧，
+  /// 双卡片选择容器：两卡各占半宽（中间留 12 空隙，左右外缘与表单标签/输入框
+  /// 对齐）；被选中的卡片最后绘制——选中卡片以非等比 Transform 从外缘锚点横向
+  /// 扩展覆盖相邻未选中卡片（性别选择与身份选择共用）。
+  Widget _buildCardPair({
+    required Widget leftCard,
+    required Widget rightCard,
+    required bool leftSelected,
+    required bool rightSelected,
+  }) {
+    return SizedBox(
+      height: 80,
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final half = (c.maxWidth - 12) / 2; // 两卡各占半宽，中间留 12 空隙
+          Widget slot(Widget child, bool left) => Positioned(
+                left: left ? 0 : half + 12,
+                width: half,
+                top: 0,
+                bottom: 0,
+                child: child,
+              );
+          // 被选中的最后绘制：横向扩展时压在相邻未选中卡片之上
+          final children = leftSelected
+              ? [slot(rightCard, false), slot(leftCard, true)]
+              : [slot(leftCard, true), slot(rightCard, false)];
+          return Stack(clipBehavior: Clip.none, children: children);
+        },
+      ),
+    );
+  }
+
+  /// 可选中卡片：品牌色背景 + 白字图标/标签；选中放大 + 横向扩展（锚点在外侧，
   /// 覆盖相邻未选中卡片）+ 阴影；未选中压缩半透明；切换时大小/颜色/阴影渐变。
-  Widget _buildGenderButton({
+  Widget _buildSelectableCard({
     required String label,
     required IconData icon,
     required Color color,
@@ -1322,6 +1292,9 @@ class _SetupPageState extends State<SetupPage> {
                   const SizedBox(height: 4),
                   Text(
                     label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 15,

@@ -25,7 +25,7 @@ void main() {
         // 第一次探测失败（服务端不可达），之后成功（服务器就绪）
         probeServer: (_) async {
           probeCalls++;
-          return (probeCalls > 1, <String, String>{});
+          return (probeCalls > 1, <String, String>{}, <String, String>{});
         },
       ),
     ));

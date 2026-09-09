@@ -25,7 +25,7 @@ Future<void> pumpToPassphrase(
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, probeNames),
+      probeServer: (_) async => (true, probeNames, <String, String>{}),
       // create 名字页下一步触发自动登记（_runBootstrap），需返回成功结果；
       // join 走到口令页前不登记，此 fake 不会被调用也无妨
       enrollOverride: (_) async =>
@@ -70,7 +70,7 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => (true, <String, String>{}),
+        probeServer: (_) async => (true, <String, String>{}, <String, String>{}),
         // 步骤 1 放行后自动登记（_runBootstrap）需要成功结果
         enrollOverride: (_) async =>
             const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
