@@ -140,6 +140,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
   late String _myPersonName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myDeviceName; // 我的设备名（菜单显示；改名后 setState 刷新）
+  late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
@@ -173,6 +174,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     super.initState();
     _myPersonName = widget.personName ?? '';
     _myDeviceName = widget.deviceName ?? '';
+    _myGender = ''; // 个人资料弹窗性别图标：由 profile 恢复（向导完成时写入）
     _peerName = widget.peerName ?? '';
     _loadMyAvatar();
     _refreshPeerOnline();
@@ -186,6 +188,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_myPersonName.isEmpty) _myPersonName = p['personName'] ?? '';
         if (_myDeviceName.isEmpty) _myDeviceName = p['deviceName'] ?? '';
         if (_peerName.isEmpty) _peerName = p['peerName'] ?? '';
+        if (_myGender.isEmpty) _myGender = p['myGender'] ?? '';
       });
     });
     _repo = MessageRepository(
@@ -592,6 +595,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
             ),
+            // 我的个人资料弹窗：名字框下显示性别男女彩色图标（本人高亮，另一个淡化）
+            if (!renameDevice) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    l10n.chatPageGenderLabel,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.male,
+                    color: const Color(0xFF3BAFFD) // 品牌天蓝
+                        .withValues(alpha: _myGender == 'male' ? 1 : 0.35),
+                    size: _myGender == 'male' ? 26 : 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.female,
+                    color: const Color(0xFFD6529C) // 品牌粉
+                        .withValues(alpha: _myGender == 'female' ? 1 : 0.35),
+                    size: _myGender == 'female' ? 26 : 24,
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
         actions: [
@@ -644,6 +676,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       personName: _myPersonName,
       peerName: _peerName,
       deviceName: _myDeviceName,
+      myGender: _myGender,
     );
   }
 

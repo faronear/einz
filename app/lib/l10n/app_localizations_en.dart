@@ -338,10 +338,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuExit => 'Exit app';
 
   @override
-  String get chatPageRenameNameTitle => 'Change my name';
+  String get chatPageRenameNameTitle => 'My profile';
 
   @override
-  String get chatPageRenameNameLabel => 'New name';
+  String get chatPageRenameNameLabel => 'My name';
+
+  @override
+  String get chatPageGenderLabel => 'Gender';
 
   @override
   String get chatPageRenameDeviceTitle => 'Device name';

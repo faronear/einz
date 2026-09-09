@@ -554,4 +554,63 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('我的设备'), findsNothing, reason: '保存成功应关闭弹窗');
   });
+
+  testWidgets('我的个人资料弹窗：标题/标签新文案、名字框下性别图标高亮、空名保存红字', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+    // 预置 profile 带本人性别（模拟向导完成时写入）
+    await AppLockService(db).saveProfile(
+        personName: 'Lukas', peerName: 'Alice', deviceName: 'Phone', myGender: 'male');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync + profile load 完成
+
+    // 菜单 → 我的名字（打开个人资料弹窗）
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('我的名字'));
+    await tester.pumpAndSettle();
+
+    // 标题「我的个人资料」、输入框标签「我的名字」、名字框下性别彩色图标（男高亮）
+    expect(find.text('我的个人资料'), findsOneWidget, reason: '弹窗标题应为「我的个人资料」');
+    expect(find.text('我的名字'), findsWidgets, reason: '输入框标签应为「我的名字」');
+    expect(find.text('性别'), findsOneWidget, reason: '名字框下应显示性别标签');
+    final maleIcon = tester.widget<Icon>(find.byIcon(Icons.male));
+    expect(maleIcon.color, const Color(0xFF3BAFFD), reason: '本人为男：男图标应为天蓝色高亮');
+
+    // 清空名字 → 保存 → 红字警示并停留
+    final dialogField =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(dialogField, '');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('名称不能为空'), findsOneWidget, reason: '空名字保存应红字警示');
+
+    // 填写即消红字 → 保存成功关窗
+    await tester.enterText(dialogField, 'Lukas');
+    await tester.pumpAndSettle();
+    expect(find.text('名称不能为空'), findsNothing, reason: '开始填写后红字应消失');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+    expect(find.text('我的个人资料'), findsNothing, reason: '保存成功应关闭弹窗');
+  });
 }

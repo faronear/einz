@@ -316,10 +316,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuExit => '退出秘境';
 
   @override
-  String get chatPageRenameNameTitle => '修改我的名字';
+  String get chatPageRenameNameTitle => '我的个人资料';
 
   @override
-  String get chatPageRenameNameLabel => '新名字';
+  String get chatPageRenameNameLabel => '我的名字';
+
+  @override
+  String get chatPageGenderLabel => '性别';
 
   @override
   String get chatPageRenameDeviceTitle => '我的设备';

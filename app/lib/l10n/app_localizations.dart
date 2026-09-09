@@ -683,14 +683,20 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameNameTitle.
   ///
   /// In en, this message translates to:
-  /// **'Change my name'**
+  /// **'My profile'**
   String get chatPageRenameNameTitle;
 
   /// No description provided for @chatPageRenameNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'New name'**
+  /// **'My name'**
   String get chatPageRenameNameLabel;
+
+  /// No description provided for @chatPageGenderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Gender'**
+  String get chatPageGenderLabel;
 
   /// No description provided for @chatPageRenameDeviceTitle.
   ///

@@ -983,6 +983,10 @@ class _SetupPageState extends State<SetupPage> {
           ? _peerNameCtrl.text.trim()
           : (_personNames[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
       deviceName: _myDeviceName,
+      // 本人性别：create=向导所选；join=服务端性别表（与身份卡配色同源）
+      myGender: _role == _WizardRole.create
+          ? (_myGender ?? '')
+          : (_personGenders[_chosenPerson] ?? ''),
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     Navigator.of(context).pushReplacement(MaterialPageRoute(
