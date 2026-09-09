@@ -88,7 +88,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardGenderRequired => '请选择性别';
 
   @override
-  String get wizardIdentityHint => '秘境仅限两人，请选择身份';
+  String get wizardIdentityHint => '秘境仅限两人，选择我的身份';
 
   @override
   String get wizardIdentityCreator => '秘境创建者';
@@ -347,6 +347,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageCopied => '已复制';
+
+  @override
+  String get chatPageEdit => '编辑';
 
   @override
   String chatPageRenameFailed(String error) {

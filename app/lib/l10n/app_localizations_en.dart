@@ -372,6 +372,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageCopied => 'Copied';
 
   @override
+  String get chatPageEdit => 'Edit';
+
+  @override
   String chatPageRenameFailed(String error) {
     return 'Rename failed: $error';
   }

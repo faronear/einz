@@ -386,7 +386,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1)),
               const Padding(
                 padding: EdgeInsets.only(top: 6),
-                child: Text('扫码或填写以上邀请码加入，即可绑定新设备到秘境',
+                child: Text('使用以上邀请码，即可绑定新设备到同一个秘境。',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ],
@@ -549,6 +549,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
+    // 名字/设备名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
+    final editing = ValueNotifier<bool>(false);
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -585,19 +587,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 12),
             ],
-            TextField(
-              controller: ctrl,
-              decoration: InputDecoration(
-                labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
-                border: const OutlineInputBorder(),
-                // 可编辑字段：白底暗示可编辑（老板要求 2026-09-09）
-                filled: true,
-                fillColor: Colors.white,
+            // 名字/设备名输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+            // 白底可编辑、按钮消失（老板要求 2026-09-09）
+            ValueListenableBuilder<bool>(
+              valueListenable: editing,
+              builder: (_, isEditing, _) => TextField(
+                controller: ctrl,
+                readOnly: !isEditing,
+                decoration: InputDecoration(
+                  labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
+                  border: const OutlineInputBorder(),
+                  filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
+                  fillColor: Colors.white,
+                  suffixIcon: isEditing
+                      ? null
+                      : IconButton(
+                          tooltip: l10n.chatPageEdit,
+                          icon: const Icon(Icons.edit, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => editing.value = true,
+                        ),
+                ),
+                // 开始填写即清除空名警示（与向导输入框一致）
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
               ),
-              // 开始填写即清除空名警示（与向导输入框一致）
-              onChanged: (_) {
-                if (nameError.value != null) nameError.value = null;
-              },
             ),
             ValueListenableBuilder<String?>(
               valueListenable: nameError,
@@ -682,6 +697,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       pubKeyCtrl.dispose();
       genderCtrl.dispose();
       nameError.dispose();
+      editing.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
   }

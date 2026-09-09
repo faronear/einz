@@ -184,6 +184,9 @@ void main() {
     await tester.pumpAndSettle();
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
     // 弹窗内含两个输入框：可编辑名字在前、只读性别在后 → 取 .first
+    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
     await tester.enterText(
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
         '新名字');
@@ -465,6 +468,8 @@ void main() {
     final renameField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first; // 弹窗内可编辑名字框在前、只读性别框在后
+    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
+    await tester.pumpAndSettle();
     await tester.enterText(renameField, 'Alice');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
@@ -539,6 +544,10 @@ void main() {
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .last;
+    expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
+    await tester.tap(find.byIcon(Icons.edit)); // 点编辑 → 白底可编辑、按钮消失
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('名称不能为空'), findsOneWidget, reason: '空设备名保存应红字警示');
@@ -609,6 +618,8 @@ void main() {
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first;
+    await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
+    await tester.pumpAndSettle();
     await tester.enterText(dialogField, '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();

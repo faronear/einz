@@ -746,6 +746,12 @@ abstract class AppLocalizations {
   /// **'Copied'**
   String get chatPageCopied;
 
+  /// No description provided for @chatPageEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get chatPageEdit;
+
   /// No description provided for @chatPageRenameFailed.
   ///
   /// In en, this message translates to:
