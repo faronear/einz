@@ -1494,5 +1494,32 @@ SafeArea 把它全垫在输入栏上方 → 消息列表底部停在输入栏上
 修复前失败/修复后通过）；analyze 通过；ui_style_switch_test 3 用例 + chat_page_menu
 12 用例全过。
 
+## 2026-09-09 状态条悬浮圆角 + 气泡深色白字（渐变风格）
+
+**老板要求（2026-09-09）：**
+1. 顶部两人在线状态条目前左右顶到头、截断背景——改成与输入条一样：不顶左右两头、
+   四角有弧度、悬浮在背景上。
+2. 渐变背景下消息气泡浅 tint 与背景区分不足——气泡底色改深粉（女）/深蓝（男），
+   字体改白色，更醒目。
+
+**实现（commit 待填）：**
+- 状态条 gradient 改悬浮圆角条：横向 12 边距 + 圆角 24 + 半透明白 85% + 柔和投影
+  （与输入条同款样式，Key `chatPageStatusBar`）；plain 保持全宽浅灰条（像素不变）。
+- 气泡底色 `_bubbleColor` gradient 分支：男 → 品牌深蓝 `#2271F7`、女 → 深粉
+  `#B83D80`（品牌粉加深，白字对比度约 5:1）、性别未登记本人深蓝/对方石板灰
+  `#64748B`；plain 分支不变（浅 tint）。
+- 气泡内容包 `DefaultTextStyle.merge` + `IconTheme.merge`：gradient 下文字/图标白色，
+  plain 下不合并（保持深色）；次要灰字（阅后即焚徽标/文件大小）gradient 下改
+  `white70`。
+
+**要点/坑：** 本机 Flutter 的 `DefaultTextStyle.merge`/`IconTheme.merge` 是
+`style:`/`data:` + `child:` 命名参数（无 `context:`），初次误加 `context:` 触发
+analyze 报错；`IconThemeData(color: null)` 合并时保留祖先色（plain 安全）。
+
+**验证：** analyze 通过；ui_style_switch_test 4 用例（新增状态条圆角断言 + 气泡
+深色/白字断言，FakeApi 扩展支持编排加密消息 + getSpace）+ chat_page_menu 12 +
+chat_bubble_gender_test 1 全过。
+
+
 
 

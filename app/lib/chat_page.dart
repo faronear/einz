@@ -1482,8 +1482,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 消息气泡底色：按发言人性别——男天蓝 / 女品牌粉（浅色 tint 便于阅读）；
   /// 性别未登记（旧配置）回退原默认色（本人 indigo.shade100 / 对方 grey.shade200）。
+  /// gradient 风格改用深色气泡（男深蓝 #2271F7 / 女深粉 #B83D80，白字醒目——
+  /// 浅 tint 在渐变背景上区分度不足，老板要求 2026-09-09）。
   Color _bubbleColor({required bool mine}) {
     final gender = mine ? _myGender : _peerGender;
+    if (_uiStyle == 'gradient') {
+      if (gender == 'female') return const Color(0xFFB83D80); // 深粉（品牌粉加深）
+      if (gender == 'male') return const Color(0xFF2271F7); // 品牌深蓝
+      return mine ? const Color(0xFF2271F7) : const Color(0xFF64748B); // 性别未登记
+    }
     if (gender == 'female') return const Color(0xFFD6529C).withValues(alpha: 0.18);
     if (gender == 'male') return const Color(0xFF3BAFFD).withValues(alpha: 0.18);
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
@@ -1551,7 +1558,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('📄 ${m.plaintext}', overflow: TextOverflow.ellipsis),
-              Text(_formatSize(size), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              Text(_formatSize(size),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey)),
             ],
           ),
         ),
@@ -1781,18 +1791,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               children: [
           // 对话顶部：双方名字 + 各自在线状态（对方左 / 我右，与消息对齐一致）
           Container(
+            key: const ValueKey('chatPageStatusBar'),
             width: double.infinity,
+            // gradient 风格：状态条与输入条同款——不顶左右两头、悬浮圆角（渐变两侧
+            // 透出，同输入条样式）；plain 风格保持原样（全宽浅灰条）
+            margin: _uiStyle == 'gradient'
+                ? const EdgeInsets.fromLTRB(12, 4, 12, 6)
+                : EdgeInsets.zero,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              // gradient 风格下半透明白：渐变从顶部条后透出，文字仍清晰可读
               color: _uiStyle == 'gradient'
-                  ? Colors.white.withValues(alpha: 0.45)
+                  ? Colors.white.withValues(alpha: 0.85)
                   : Colors.grey.shade50,
-              border: Border(
-                bottom: BorderSide(
-                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade300,
-                ),
-              ),
+              borderRadius: _uiStyle == 'gradient' ? BorderRadius.circular(24) : null,
+              border: _uiStyle == 'gradient'
+                  ? null
+                  : Border(
+                      bottom: BorderSide(color: Colors.grey.shade300),
+                    ),
+              boxShadow: _uiStyle == 'gradient'
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x26000000), // 柔和投影（渐变上浮起）
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ]
+                  : null,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1859,18 +1884,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           color: _bubbleColor(mine: mine),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Column(
-                          crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (m.expiresAt != null)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: Text(l10n.chatPageBurnBadge,
-                                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                              ),
-                            _buildMessageContent(m),
-                          ],
+                        child: DefaultTextStyle.merge(
+                          // gradient 深色气泡下文字/图标改白色（醒目，老板要求）；
+                          // plain 浅色气泡不合并颜色（保持默认深色文字/图标）
+                          style: TextStyle(
+                              color: _uiStyle == 'gradient' ? Colors.white : null),
+                          child: IconTheme.merge(
+                            data: IconThemeData(
+                                color: _uiStyle == 'gradient' ? Colors.white : null),
+                            child: Column(
+                              crossAxisAlignment: mine
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (m.expiresAt != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 2),
+                                    child: Text(l10n.chatPageBurnBadge,
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            color: _uiStyle == 'gradient'
+                                                ? Colors.white70
+                                                : Colors.grey)),
+                                  ),
+                                _buildMessageContent(m),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                       if (mine) ...[
@@ -1892,6 +1933,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 底部 inset 保留（Home 条防遮挡）。
             top: false,
             child: Container(
+              key: const ValueKey('chatPageInputBar'),
               // gradient 风格：输入栏不顶左右两头——悬浮圆角白条（渐变从两侧/底部
               // 透出，同向导白卡在渐变上的层次）；plain 风格保持原样（全宽透明）
               color: _uiStyle == 'gradient' ? null : Colors.transparent,
