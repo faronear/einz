@@ -988,8 +988,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       child: recording
           ? Row(
               children: [
-                const Icon(Icons.mic, size: 16, color: Colors.red),
-                const SizedBox(width: 8),
                 Text(elapsed,
                     style: const TextStyle(
                         color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600)),
