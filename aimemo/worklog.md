@@ -1530,7 +1530,7 @@ chat_bubble_gender_test 1 全过。
 ticker 轮询/WS message.new）里调用——所以首屏停在顶部，等第一个 ticker 触发才
 滚到底，正好是老板看到的现象。
 
-**修复（commit 待填）：** `_loadInitial` setState 后调用
+**修复（commit 68e9c6d）：** `_loadInitial` setState 后调用
 `_scrollToLatest(animate: false)`——首次载入直接跳转到底部（进入即见最新，不播
 从顶部飞过的动画）；`_scrollToLatest` 加 `{bool animate = true}` 参数（新消息到达
 仍走 250ms 平滑滚动，行为不变）。
