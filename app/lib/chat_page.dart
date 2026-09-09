@@ -559,34 +559,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 我的设备弹窗：公钥只读展示——textarea 样式，边框左上角「公钥」标签，
-            // 右侧拷贝按钮；灰底暗示只读，与白底可编辑的设备名称形成对比
-            // （老板要求 2026-09-09）
-            if (renameDevice) ...[
-              TextFormField(
-                controller: pubKeyCtrl,
-                readOnly: true,
-                maxLines: 2,
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.grey),
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageDevicePublicKeyLabel,
-                  border: const OutlineInputBorder(),
-                  // 公钥只读：不加背景色，沿用弹窗背景（可编辑的设备名称才是白底）
-                  suffixIcon: IconButton(
-                    tooltip: l10n.chatPageCopy,
-                    icon: const Icon(Icons.copy, size: 18),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: widget.publicKeyB64 == null
-                        ? null
-                        : () {
-                            Clipboard.setData(ClipboardData(text: widget.publicKeyB64!));
-                            showTopNotice(ctx, l10n.chatPageCopied);
-                          },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
             // 名字/设备名输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
             // 白底可编辑、按钮消失（老板要求 2026-09-09）
             ValueListenableBuilder<bool>(
@@ -630,6 +602,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
             ),
+            // 我的设备弹窗：公钥只读展示——放在设备名称之后（textarea 样式，边框
+            // 左上角「公钥」标签，右侧拷贝按钮；只读不加背景色，沿用弹窗背景）
+            if (renameDevice) ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: pubKeyCtrl,
+                readOnly: true,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.grey),
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageDevicePublicKeyLabel,
+                  border: const OutlineInputBorder(),
+                  // 公钥只读：不加背景色，沿用弹窗背景（可编辑的设备名称才是白底）
+                  suffixIcon: IconButton(
+                    tooltip: l10n.chatPageCopy,
+                    icon: const Icon(Icons.copy, size: 18),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: widget.publicKeyB64 == null
+                        ? null
+                        : () {
+                            Clipboard.setData(ClipboardData(text: widget.publicKeyB64!));
+                            showTopNotice(ctx, l10n.chatPageCopied);
+                          },
+                  ),
+                ),
+              ),
+            ],
             // 我的个人资料弹窗：性别用与名字输入框同款组件（只读）——「性别」标签
             // 在边框左上角（同「我的名字」），框内显示 男/女 + 性别图标
             // （老板要求 2026-09-09）

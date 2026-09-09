@@ -534,7 +534,7 @@ void main() {
 
     // 标题「我的设备信息」；公钥只读展示（左上角「公钥」标签 + 值）+ 复制按钮；输入框标签「设备名称」
     expect(find.text('我的设备信息'), findsOneWidget, reason: '弹窗标题应为「我的设备信息」');
-    expect(find.text('公钥'), findsOneWidget, reason: '公钥框左上角应有「公钥」标签');
+    expect(find.text('设备公钥'), findsOneWidget, reason: '公钥框左上角应有「公钥」标签');
     expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
     expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥框右侧应有复制按钮');
     expect(find.text('设备名称'), findsWidgets, reason: '输入框标签应为「设备名称」');
@@ -543,7 +543,7 @@ void main() {
     // 可编辑设备名在后 → 取 .last
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
-        .last;
+        .first; // 设备名称已排到公钥之前：可编辑设备名框在前、只读公钥在后
     expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
     await tester.tap(find.byIcon(Icons.edit)); // 点编辑 → 白底可编辑、按钮消失
     await tester.pumpAndSettle();
