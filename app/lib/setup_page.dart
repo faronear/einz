@@ -475,53 +475,73 @@ class _SetupPageState extends State<SetupPage> {
 
   Future<void> _nextStep() async {
     final l10n = AppLocalizations.of(context)!;
-    // 按步骤前置校验（每步只要求一个信息）——本地可检测的错误 → _localError
-    // （红字显示在输入框下方）；后台/网络错误 → _status（红字显示在按钮下方）
-    // create 步骤 1（本人）与步骤 2（对方）的名字均不允许空白跳过
-    if (_role == _WizardRole.create && _step == 1 && _personName.text.trim().isEmpty) {
-      setState(() => _localError = l10n.wizardNameRequired);
-      return;
-    }
-    if (_role == _WizardRole.create && _step == 2 && _peerNameCtrl.text.trim().isEmpty) {
-      setState(() => _localError = l10n.wizardPeerNameRequired);
-      return;
-    }
-    // 性别必选：create 步骤 1/2 未选性别不放行（红字提醒在选项卡下方）
-    if (_role == _WizardRole.create && _step == 1 && _myGender == null) {
-      setState(() => _genderError = l10n.wizardGenderRequired);
-      return;
-    }
-    if (_role == _WizardRole.create && _step == 2 && _peerGender == null) {
-      setState(() => _genderError = l10n.wizardGenderRequired);
-      return;
-    }
-    if (_role == _WizardRole.join && _step == 1 && _chosenPerson == null) {
-      setState(() => _localError = l10n.wizardIdentityFirst);
-      return;
-    }
-    if (_role == _WizardRole.join && _step == 2 && _inviteCode.text.trim().isEmpty) {
-      setState(() => _localError = l10n.setupPageNeedInvite);
-      return;
-    }
-    // 本地校验全部通过 → 清除本地错误提示
+    // 每轮「下一步」：先把所有红字清空，再统一检查当前页所有输入元素——名字/性别
+    // 等各自独立提示（不因第一个未过就跳过其余）；本地可检测的错误 → _localError/
+    // _genderError/_pinError（红字在输入框/选项卡下方）；后台/网络错误 → _status
+    // （红字在按钮下方）。旧错误一律不残留（老板要求 2026-09-09）。
     setState(() {
       _localError = null;
       _genderError = null;
+      _pinError = null;
+      _status = null;
     });
+    // ---- 本地校验：收集当前页所有失败，任一失败即停留本页 ----
+    String? localError;
+    String? genderError;
+    var invalid = false;
+    // create 步骤 1/2（本人/对方）：名字与性别都必填，各自提示
+    if (_role == _WizardRole.create && _step == 1) {
+      if (_personName.text.trim().isEmpty) {
+        localError = l10n.wizardNameRequired;
+        invalid = true;
+      }
+      if (_myGender == null) {
+        genderError = l10n.wizardGenderRequired;
+        invalid = true;
+      }
+    }
+    if (_role == _WizardRole.create && _step == 2) {
+      if (_peerNameCtrl.text.trim().isEmpty) {
+        localError = l10n.wizardPeerNameRequired;
+        invalid = true;
+      }
+      if (_peerGender == null) {
+        genderError = l10n.wizardGenderRequired;
+        invalid = true;
+      }
+    }
+    if (_role == _WizardRole.join && _step == 1 && _chosenPerson == null) {
+      localError = l10n.wizardIdentityFirst;
+      invalid = true;
+    }
+    if (_role == _WizardRole.join && _step == 2 && _inviteCode.text.trim().isEmpty) {
+      localError = l10n.setupPageNeedInvite;
+      invalid = true;
+    }
+    if ((_role == _WizardRole.create || _role == _WizardRole.join) &&
+        _step == 3 &&
+        _escrowPassphrase.text.trim().isEmpty) {
+      localError = l10n.setupPageNeedPassphrase;
+      invalid = true;
+    }
+    if (_role == _WizardRole.offline && _step == 1 && _envelopeKey.text.trim().isEmpty) {
+      localError = l10n.setupPagePasteEnvelope;
+      invalid = true;
+    }
+    if (invalid) {
+      setState(() {
+        _localError = localError;
+        _genderError = genderError;
+      });
+      return;
+    }
+    // ---- 后台即时校验（失败停留本页；错误走 _status 红字） ----
     // join 邀请码页（步骤 2）：邀请码必须有效（服务端登记成功）才放行——
     // 与口令页一样即时验证，不留到口令页才登记/校验
     if (_role == _WizardRole.join && _step == 2) {
       final ok = await _verifyInviteCode();
       if (!mounted) return;
       if (!ok) return;
-    }
-    if (_role == _WizardRole.create && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
-      setState(() => _localError = l10n.setupPageNeedPassphrase);
-      return;
-    }
-    if (_role == _WizardRole.join && _step == 3 && _escrowPassphrase.text.trim().isEmpty) {
-      setState(() => _localError = l10n.setupPageNeedPassphrase);
-      return;
     }
     // join 口令页（步骤 3）：输入口令必须与首台设备创建时一致（解密 escrow
     // 口令密保箱成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
@@ -530,13 +550,9 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (!verified) return;
     }
+    // offline 信封页（步骤 1）：信封必须有效（本设备私钥解封成功）才放行——
+    // 不留到 PIN 页才验证（邀请码沿用 join 步骤 2 已填值）
     if (_role == _WizardRole.offline && _step == 1) {
-      if (_envelopeKey.text.trim().isEmpty) {
-        setState(() => _localError = l10n.setupPagePasteEnvelope);
-        return;
-      }
-      // 邀请码沿用 join 步骤 2 已填值（offline 从 join 口令页切换进入）
-      // 信封必须有效（本设备私钥解封成功）才放行——不留到 PIN 页才验证
       final ok = await _verifyEnvelope();
       if (!mounted) return;
       if (!ok) return;
@@ -1007,6 +1023,10 @@ class _SetupPageState extends State<SetupPage> {
         TextField(
           controller: _personName,
           style: const TextStyle(fontSize: 20),
+          // 开始填写即清除「名字为空」红字（不依赖再点下一步）
+          onChanged: (_) {
+            if (_localError != null) setState(() => _localError = null);
+          },
           decoration: InputDecoration(
             hintText: l10n.wizardNameHintInput,
             border: const OutlineInputBorder(),
@@ -1106,6 +1126,10 @@ class _SetupPageState extends State<SetupPage> {
         TextField(
           controller: _inviteCode,
           style: const TextStyle(fontSize: 20),
+          // 开始填写即清除「邀请码为空」红字（不依赖再点下一步）
+          onChanged: (_) {
+            if (_localError != null) setState(() => _localError = null);
+          },
           decoration: InputDecoration(
             hintText: l10n.setupPageInviteHint,
             border: const OutlineInputBorder(),
@@ -1152,6 +1176,10 @@ class _SetupPageState extends State<SetupPage> {
         TextField(
           controller: _peerNameCtrl,
           style: const TextStyle(fontSize: 20),
+          // 开始填写即清除「伴侣名字为空」红字（不依赖再点下一步）
+          onChanged: (_) {
+            if (_localError != null) setState(() => _localError = null);
+          },
           decoration: InputDecoration(
             hintText: l10n.wizardPeerNameHintInput,
             border: const OutlineInputBorder(),
@@ -1324,6 +1352,10 @@ class _SetupPageState extends State<SetupPage> {
           controller: _escrowPassphrase,
           style: const TextStyle(fontSize: 20),
           obscureText: true,
+          // 开始填写即清除「口令为空」红字（不依赖再点下一步）
+          onChanged: (_) {
+            if (_localError != null) setState(() => _localError = null);
+          },
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
           ),
@@ -1354,6 +1386,10 @@ class _SetupPageState extends State<SetupPage> {
           style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
+          // 开始填写即清除 PIN 红字（不依赖再点下一步）
+          onChanged: (_) {
+            if (_pinError != null) setState(() => _pinError = null);
+          },
           decoration: InputDecoration(
             hintText: l10n.setPinDialogPinHint,
             border: const OutlineInputBorder(),
@@ -1365,6 +1401,10 @@ class _SetupPageState extends State<SetupPage> {
           style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
+          // 开始填写即清除 PIN 红字（不依赖再点下一步）
+          onChanged: (_) {
+            if (_pinError != null) setState(() => _pinError = null);
+          },
           decoration: InputDecoration(
             hintText: l10n.setPinDialogConfirmHint,
             border: const OutlineInputBorder(),
@@ -1620,6 +1660,10 @@ class _SetupPageState extends State<SetupPage> {
           controller: _envelopeKey,
           style: const TextStyle(fontSize: 18),
           maxLines: 3,
+          // 开始填写即清除「信封为空」红字（不依赖再点下一步）
+          onChanged: (_) {
+            if (_localError != null) setState(() => _localError = null);
+          },
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
           ),

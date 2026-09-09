@@ -61,7 +61,7 @@ void main() {
         reason: 'join 用户可用对端导出的信封替代口令获取 Space Key');
   });
 
-  testWidgets('create 步骤 1：性别未选点「下一步」→ 红字提醒并停留，选中后放行', (WidgetTester tester) async {
+  testWidgets('create 步骤 1：名字/性别缺一不可——双红字同显、填写即消、选中放行', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await tester.pumpWidget(MaterialApp(
@@ -77,12 +77,18 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    // 只填名字不选性别 → 下一步被拦截：红字提醒出现在选项卡下方
+    // 名字与性别都未填：点下一步 → 两项红字同时出现（统一检查，不因首个失败跳过其余）
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('填写我的名字'), findsOneWidget, reason: '名字必填：未填应红字提醒');
+    expect(find.text('请选择性别'), findsOneWidget, reason: '性别必选：未选应红字提醒');
+    expect(find.text('关于我'), findsOneWidget, reason: '应停留在步骤 1（我的名字页）');
+    // 只填名字：旧「名字为空」红字不残留（每轮先清 + 填写即消），性别红字保留
     await tester.enterText(find.byType(TextField), 'Lukas');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('请选择性别'), findsOneWidget, reason: '性别必选：未选应红字提醒');
-    expect(find.text('关于我'), findsOneWidget, reason: '应停留在步骤 1（我的名字页）');
+    expect(find.text('填写我的名字'), findsNothing, reason: '名字已填：旧红字不应残留');
+    expect(find.text('请选择性别'), findsOneWidget, reason: '性别仍未选，红字保留');
     // 选中「男」后下一步 → 放行进入步骤 2（伴侣页）
     await tester.tap(find.byIcon(Icons.male));
     await tester.pumpAndSettle();
