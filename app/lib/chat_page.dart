@@ -595,7 +595,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
             ),
-            // 我的个人资料弹窗：名字框下显示性别男女彩色图标（本人高亮，另一个淡化）
+            // 我的个人资料弹窗：名字框下显示性别——只显示本人性别的图标
+            // （男天蓝/女品牌粉；未登记性别时不显示图标，老板要求 2026-09-09）
             if (!renameDevice) ...[
               const SizedBox(height: 12),
               Row(
@@ -608,19 +609,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Icon(
-                    Icons.male,
-                    color: const Color(0xFF3BAFFD) // 品牌天蓝
-                        .withValues(alpha: _myGender == 'male' ? 1 : 0.35),
-                    size: _myGender == 'male' ? 26 : 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.female,
-                    color: const Color(0xFFD6529C) // 品牌粉
-                        .withValues(alpha: _myGender == 'female' ? 1 : 0.35),
-                    size: _myGender == 'female' ? 26 : 24,
-                  ),
+                  if (_myGender == 'male')
+                    const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 26)
+                  else if (_myGender == 'female')
+                    const Icon(Icons.female, color: Color(0xFFD6529C), size: 26),
                 ],
               ),
             ],

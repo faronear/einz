@@ -592,8 +592,10 @@ void main() {
     expect(find.text('我的个人资料'), findsOneWidget, reason: '弹窗标题应为「我的个人资料」');
     expect(find.text('我的名字'), findsWidgets, reason: '输入框标签应为「我的名字」');
     expect(find.text('性别'), findsOneWidget, reason: '名字框下应显示性别标签');
+    expect(find.byIcon(Icons.female), findsNothing,
+        reason: '只显示本人性别图标，不应显示女图标');
     final maleIcon = tester.widget<Icon>(find.byIcon(Icons.male));
-    expect(maleIcon.color, const Color(0xFF3BAFFD), reason: '本人为男：男图标应为天蓝色高亮');
+    expect(maleIcon.color, const Color(0xFF3BAFFD), reason: '本人为男：显示天蓝色男图标');
 
     // 清空名字 → 保存 → 红字警示并停留
     final dialogField =
