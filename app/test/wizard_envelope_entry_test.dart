@@ -61,17 +61,34 @@ void main() {
         reason: 'join 用户可用对端导出的信封替代口令获取 Space Key');
   });
 
-  testWidgets('口令页 ↔ 信封页可互切（任一完成都进 PIN）', (WidgetTester tester) async {
-    await pumpToPassphrase(tester, probeNames: const {'personA': 'Lukas'}, join: true);
-    // 口令页 → 切换入口 → 信封页（信封页有对称的「改用线上密保口令」链接）
-    await tester.tap(find.text('改用线下密保信封'));
+  testWidgets('create 步骤 1：性别未选点「下一步」→ 红字提醒并停留，选中后放行', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: SetupPage(
+        db: db,
+        probeServer: (_) async => (true, <String, String>{}),
+        // 步骤 1 放行后自动登记（_runBootstrap）需要成功结果
+        enrollOverride: (_) async =>
+            const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
+      ),
+    ));
     await tester.pumpAndSettle();
-    expect(find.text('改用线上密保口令'), findsOneWidget,
-        reason: '信封页应提供切回口令页的对称链接（后悔可返回）');
-    // 信封页 → 切回口令页（保留已输邀请码/口令，任一方案完成都进 PIN）
-    await tester.tap(find.text('改用线上密保口令'));
+    // 只填名字不选性别 → 下一步被拦截：红字提醒出现在选项卡下方
+    await tester.enterText(find.byType(TextField), 'Lukas');
+    await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('改用线下密保信封'), findsOneWidget,
-        reason: '应回到口令页，两个平行方案可自由互切');
+    expect(find.text('请选择性别'), findsOneWidget, reason: '性别必选：未选应红字提醒');
+    expect(find.text('关于我'), findsOneWidget, reason: '应停留在步骤 1（我的名字页）');
+    // 选中「男」后下一步 → 放行进入步骤 2（伴侣页）
+    await tester.tap(find.byIcon(Icons.male));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('请选择性别'), findsNothing, reason: '选中性别后提醒应消失');
+    expect(find.text('关于伴侣'), findsOneWidget, reason: '应进入步骤 2（伴侣名字页）');
   });
 }

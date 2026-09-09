@@ -242,6 +242,12 @@ abstract class AppLocalizations {
   /// **'Female'**
   String get wizardGenderFemale;
 
+  /// No description provided for @wizardGenderRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a gender'**
+  String get wizardGenderRequired;
+
   /// No description provided for @wizardIdentityHint.
   ///
   /// In en, this message translates to:

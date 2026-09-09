@@ -66,6 +66,7 @@ class _SetupPageState extends State<SetupPage> {
   final _peerNameCtrl = TextEditingController(); // create：对方（伴侣）的名字（必填）
   String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 person_name 同步服务端）
   String? _peerGender; // create 步骤 2：伴侣性别（'male'/'female'）
+  String? _genderError; // 性别未选提醒（红字显示在选项卡下方；选中即清除）
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -444,6 +445,7 @@ class _SetupPageState extends State<SetupPage> {
       _role = role;
       _step = 1;
       _localError = null;
+      _genderError = null;
     });
   }
 
@@ -455,6 +457,7 @@ class _SetupPageState extends State<SetupPage> {
       _step = 2; // 点卡片直接进邀请码页
       _status = null;
       _localError = null;
+      _genderError = null;
     });
   }
 
@@ -471,6 +474,15 @@ class _SetupPageState extends State<SetupPage> {
       setState(() => _localError = l10n.wizardPeerNameRequired);
       return;
     }
+    // 性别必选：create 步骤 1/2 未选性别不放行（红字提醒在选项卡下方）
+    if (_role == _WizardRole.create && _step == 1 && _myGender == null) {
+      setState(() => _genderError = l10n.wizardGenderRequired);
+      return;
+    }
+    if (_role == _WizardRole.create && _step == 2 && _peerGender == null) {
+      setState(() => _genderError = l10n.wizardGenderRequired);
+      return;
+    }
     if (_role == _WizardRole.join && _step == 1 && _chosenPerson == null) {
       setState(() => _localError = l10n.wizardIdentityFirst);
       return;
@@ -480,7 +492,10 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     // 本地校验全部通过 → 清除本地错误提示
-    setState(() => _localError = null);
+    setState(() {
+      _localError = null;
+      _genderError = null;
+    });
     // join 邀请码页（步骤 2）：邀请码必须有效（服务端登记成功）才放行——
     // 与口令页一样即时验证，不留到口令页才登记/校验
     if (_role == _WizardRole.join && _step == 2) {
@@ -986,8 +1001,12 @@ class _SetupPageState extends State<SetupPage> {
           label: l10n.wizardMyGenderLabel,
           maleLabel: l10n.wizardGenderMale,
           femaleLabel: l10n.wizardGenderFemale,
-          onChanged: (g) => setState(() => _myGender = g),
+          onChanged: (g) => setState(() {
+            _myGender = g;
+            _genderError = null; // 选中即清除未选提醒
+          }),
         ),
+        if (_genderError != null) _localErrorHint(_genderError!), // 性别必选：未选红字提醒
         if (_role == _WizardRole.create && _bootstrapFailed) ...[
           const SizedBox(height: 12),
           Card(
@@ -1182,8 +1201,12 @@ class _SetupPageState extends State<SetupPage> {
           label: l10n.wizardPeerGenderLabel,
           maleLabel: l10n.wizardGenderMale,
           femaleLabel: l10n.wizardGenderFemale,
-          onChanged: (g) => setState(() => _peerGender = g),
+          onChanged: (g) => setState(() {
+            _peerGender = g;
+            _genderError = null; // 选中即清除未选提醒
+          }),
         ),
+        if (_genderError != null) _localErrorHint(_genderError!), // 性别必选：未选红字提醒
       ],
     );
   }

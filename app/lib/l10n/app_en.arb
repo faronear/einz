@@ -24,6 +24,7 @@
   "wizardPeerGenderLabel": "Partner's gender",
   "wizardGenderMale": "Male",
   "wizardGenderFemale": "Female",
+  "wizardGenderRequired": "Please select a gender",
   "wizardIdentityHint": "This space is limited to two people.",
   "wizardIdentityCreator": "First user (creator)",
   "wizardIdentityPartner": "Second user (partner)",

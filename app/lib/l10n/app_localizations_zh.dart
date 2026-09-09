@@ -52,10 +52,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '暂时无法连接服务器，正在自动重试…';
 
   @override
-  String get wizardNameHint => '请输入我的名字（将来可以随时修改）。';
+  String get wizardNameHint => '我的名字（将来可以随时修改）。';
 
   @override
-  String get wizardPeerNameHint => '填写伴侣的名字（将来可以随时修改）：';
+  String get wizardPeerNameHint => '伴侣的名字（将来可以随时修改）：';
 
   @override
   String get wizardPeerNameHintInput => '例如 Alice';
@@ -80,6 +80,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardGenderFemale => '女';
+
+  @override
+  String get wizardGenderRequired => '请选择性别';
 
   @override
   String get wizardIdentityHint => '一个秘境仅限两人。';
@@ -124,7 +127,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleName => '关于我';
 
   @override
-  String get wizardTitlePeerName => '关于 TA';
+  String get wizardTitlePeerName => '关于伴侣';
 
   @override
   String get wizardTitleInvite => '邀请码';

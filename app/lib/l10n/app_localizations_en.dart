@@ -88,6 +88,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardGenderFemale => 'Female';
 
   @override
+  String get wizardGenderRequired => 'Please select a gender';
+
+  @override
   String get wizardIdentityHint => 'This space is limited to two people.';
 
   @override
