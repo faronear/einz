@@ -52,7 +52,7 @@ void main() {
     await tester.pumpWidget(wrapApp(probeNames: {'personA': 'Lukas'})); // 非空 → join
     await tester.pumpAndSettle();
 
-    expect(find.text('Einz 秘境：认领中：身份'), findsWidgets); // AppBar 大标题 + 简化短名
+    expect(find.text('我是'), findsWidgets); // 身份步骤标题
     // 有名字的身份卡片直接显示名字（无名字才显示身份标签本身）
     expect(find.text('Lukas'), findsOneWidget);
     expect(find.textContaining('共有者'), findsOneWidget);
@@ -62,16 +62,18 @@ void main() {
     // 点身份卡片 → 自动进入邀请码页
     await tester.tap(find.text('Lukas'));
     await tester.pumpAndSettle();
-    expect(find.text('Einz 秘境：认领中：邀请码'), findsWidgets); // 邀请码页步骤标题
+    expect(find.text('邀请码'), findsWidgets); // 邀请码页步骤标题
   });
 
-  testWidgets('探测失败：显示服务器输入引导与导入线下密保信封入口', (WidgetTester tester) async {
+  testWidgets('探测失败：启动屏显示失败提示并自动重试（无输入框/信封入口）', (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(probeOk: false));
-    await tester.pumpAndSettle();
+    // 启动屏失败态仍显示旋转图标（自动重试中）→ 不能用 pumpAndSettle
+    // （无限动画永不 settle），用有限 pump 推进（同 setup_probe_retry_test）
+    await tester.pump(); // probe future 完成 → setState → 启动屏失败态
+    await tester.pump(); // 渲染启动屏新帧
 
-    // 顶部琥珀卡片 + 检测页两处都含"无法连接服务器"，精确匹配检测页完整文案
-    expect(find.text('无法连接服务器，请在上方输入地址后重试'), findsOneWidget);
-    // 导入线下密保信封入口在 AppBar 常驻菜单（tooltip）
-    expect(find.byTooltip('导入线下密保信封'), findsOneWidget);
+    expect(find.text('暂时无法连接服务器，正在自动重试…'), findsOneWidget);
+    // 品牌启动屏无 AppBar/菜单/服务器输入框：不显示离线信封入口（菜单已移除）
+    expect(find.byTooltip('导入线下密保信封'), findsNothing);
   });
 }
