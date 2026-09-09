@@ -173,6 +173,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 消息发送时间标注：当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM。
+  String _messageTimeLabel(HistoryMessage m) {
+    final local = DateTime.fromMillisecondsSinceEpoch(m.createdAt).toLocal();
+    final now = DateTime.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    if (local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day) {
+      return '${two(local.hour)}:${two(local.minute)}';
+    }
+    if (local.year == now.year) {
+      return '${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
+    }
+    return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
+  }
+
+  /// 阅后即焚时长紧凑标注（1m / 5m / 30m / 1h / 1d / 7d）。
+  String _burnDurationLabel(int seconds) {
+    if (seconds <= 0) return '';
+    if (seconds % 86400 == 0) return '${seconds ~/ 86400}d';
+    if (seconds % 3600 == 0) return '${seconds ~/ 3600}h';
+    if (seconds % 60 == 0) return '${seconds ~/ 60}m';
+    return '${seconds}s';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1219,7 +1244,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _playAudioMessage(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) async {
+      HistoryMessage m) async {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
@@ -1372,7 +1397,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 视频消息：播放按钮 + 说明文字；点击下载解密后全屏播放。
   Widget _buildVideo(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
+      HistoryMessage m) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1387,7 +1412,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _playVideo(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) async {
+      HistoryMessage m) async {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
@@ -1446,7 +1471,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 图片消息：下载解密 → 缩略展示；点击全屏查看。
   Widget _buildImage(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
+      HistoryMessage m) {
     final att = m.attachment;
     if (att == null) return Text('📷 ${m.plaintext}');
     final future = _imageCache.putIfAbsent(
@@ -1478,12 +1503,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 全屏查看图片（黑底大图 + 双指缩放 + 右上角关闭，与头像全屏一致）。
   void _showFullImage(Uint8List bytes) {
     showDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => Dialog(
-        child: InteractiveViewer(
-          child: Image.memory(bytes, fit: BoxFit.contain),
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1507,7 +1550,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 消息内容按类型渲染（text 文本 / voice、audio 播放条 / image、video、file 各自卡片）。
   Widget _buildMessageContent(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
+      HistoryMessage m) {
     switch (m.env.type) {
       case 'voice':
       case 'audio':
@@ -1525,7 +1568,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 音频消息（语音/音频文件共用）：播放条；点击下载解密后播放。
   Widget _buildAudioBar(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
+      HistoryMessage m) {
     final playing = _playingMessageId == m.env.messageId;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1551,7 +1594,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 文件消息：文件卡片（文件名 + 大小 + 下载保存）。
   Widget _buildFileCard(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
+      HistoryMessage m) {
     final size = (m.attachment?['size'] as int?) ?? 0;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1586,7 +1629,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 下载并保存文件附件到应用文档目录（captain=文件名）。
   Future<void> _downloadFile(
-      ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) async {
+      HistoryMessage m) async {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
@@ -1896,16 +1939,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   : CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (m.expiresAt != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 2),
-                                    child: Text(l10n.chatPageBurnBadge,
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            color: _uiStyle == 'gradient'
-                                                ? Colors.white70
-                                                : Colors.grey)),
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(_messageTimeLabel(m),
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: _uiStyle == 'gradient'
+                                                  ? Colors.white70
+                                                  : Colors.grey)),
+                                      if (m.expiresAt != null) ...[
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.schedule, size: 11),
+                                        const SizedBox(width: 2),
+                                        Text(_burnDurationLabel(m.burnAfterSeconds),
+                                            style: TextStyle(
+                                                fontSize: 10,
+                                                color: _uiStyle == 'gradient'
+                                                    ? Colors.white70
+                                                    : Colors.grey)),
+                                      ],
+                                    ],
                                   ),
+                                ),
                                 _buildMessageContent(m),
                               ],
                             ),

@@ -471,9 +471,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageBurnBadge => '⏱ Burn-after';
-
-  @override
   String chatPageSendFailed(String error) {
     return 'Send failed: $error';
   }

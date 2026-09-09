@@ -1558,3 +1558,28 @@ chat_bubble_gender 全过（共 18 项）。
 
 
 
+## 2026-09-09 消息时间标注 + 图片黑底全屏（chat_page 两处 UI 改进）
+
+**老板要求（2026-09-09）：** 1) 点击消息流里图片全屏时，要和点击头像一样用纯黑
+背景遮罩（不要半透明），看图片才好看；2) 每条消息上部标注发送时间——当天
+HH:MM、当年 mm-dd HH:MM、跨年 yyyy-mm-dd HH:MM；阅后即焚消息再附加时钟图标 +
+焚毁时长（1m/5m/30m/1h/1d/7d 紧凑格式），去掉原来的「⏱ 阅后即焚」字样徽标。
+
+**实现：**
+- HistoryMessage typedef 新增 createdAt（落盘发送时间戳，未同步消息为本地发送
+  时间）+ burnAfterSeconds（焚毁时长快照）；`_rowsToHistory` 填充，归档恢复缺
+  快照时按 到期-创建 反推（dart:math max 保底 1s）。
+- chat_page：气泡顶部统一渲染时间行（`_messageTimeLabel`：同天 HH:MM / 同年
+  mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM）；阅后即焚消息追加 Icons.schedule +
+  `_burnDurationLabel`（按 60/3600/86400 整除推导 m/h/d）；原内联 record 签名
+  的 8 处函数改收 HistoryMessage（typedef 加字段后类型不同，必须同步）。
+- `_showFullImage` 改黑底全屏（Dialog backgroundColor: Colors.black +
+  insetPadding zero + 右上角关闭按钮，与 _MessageAvatar 全屏一致；保留
+  InteractiveViewer 双指缩放）。视频全屏弹窗未动（老板只要求图片）。
+- l10n 清理 chatPageBurnBadge 死代码（app_zh/en.arb + app_localizations 三个
+  dart 文件共 5 处）。
+
+**验证：** `dart analyze` 通过，仅剩 1 条既有 info（ws_realtime_service 的
+prefer_initializing_formals，与本次无关）。老板侧热重启（ios-reload / USR2）后
+可看效果。
+

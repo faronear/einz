@@ -920,12 +920,6 @@ abstract class AppLocalizations {
   /// **'Messages will be auto-deleted after {duration}'**
   String chatPageBurnWillDelete(String duration);
 
-  /// No description provided for @chatPageBurnBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'⏱ Burn-after'**
-  String get chatPageBurnBadge;
-
   /// No description provided for @chatPageSendFailed.
   ///
   /// In en, this message translates to:

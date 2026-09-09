@@ -9,13 +9,17 @@ import 'local_database.dart';
 
 /// 历史消息记录（UI 渲染单元）：env=密文信封、plaintext=明文、
 /// sender=身份判断（'me'/'peer'，person 维度）、attachment=附件元数据、
-/// expiresAt=阅后即焚到期时间（null=永久）。
+/// expiresAt=阅后即焚到期时间（null=永久）、createdAt=发送时间戳（毫秒，
+/// 落盘值，未同步消息为本地发送时间）、burnAfterSeconds=焚毁时长（秒，
+/// 归档恢复缺快照时按 到期-创建 反推）。
 typedef HistoryMessage = ({
   MessageEnvelope env,
   String plaintext,
   String sender,
   Map<String, dynamic>? attachment,
-  int? expiresAt
+  int? expiresAt,
+  int createdAt,
+  int burnAfterSeconds
 });
 
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
@@ -391,6 +395,11 @@ class MessageRepository {
                 'nonce': att.nonce,
               },
         expiresAt: row.expiresAt,
+        createdAt: row.createdAt,
+        // 焚毁时长：优先本机落盘快照；归档恢复（快照缺失）按 到期-创建 反推
+        burnAfterSeconds: row.burnAfterSeconds > 0
+            ? row.burnAfterSeconds
+            : (row.expiresAt == null ? 0 : max(1, row.expiresAt! - row.createdAt)),
       ));
     }
     return out;

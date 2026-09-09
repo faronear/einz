@@ -443,9 +443,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageBurnBadge => '⏱ 阅后即焚';
-
-  @override
   String chatPageSendFailed(String error) {
     return '发送失败: $error';
   }

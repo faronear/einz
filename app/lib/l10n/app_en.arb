@@ -185,7 +185,6 @@
       "duration": {"type": "String"}
     }
   },
-  "chatPageBurnBadge": "⏱ Burn-after",
   "chatPageSendFailed": "Send failed: {error}",
   "@chatPageSendFailed": {
     "placeholders": {
