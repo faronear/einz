@@ -1380,8 +1380,8 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   }
   if (!m.isMine) {
     // 对方消息：左侧性别气泡——背景按对方性别配色（男蓝/女品红/未知青绿），
-    // [who 时间] 黑字标签嵌在气泡左缘、正文白字；气泡矩形 col 1 → cols - rightPad，
-    // 与右侧我方气泡（col 9 → cols）左右对称
+    // [who 时间] 黑字标签嵌在气泡左缘（首行，长消息标签跟首行文字走）、正文白字；
+    // 气泡矩形 col 1 → cols - rightPad，与右侧我方气泡（col 9 → cols）左右对称
     final bubbleBackground =
         _genderBubble(_state?.personGenders[m.env.senderPersonId]);
     final label = '[$who $time]';
@@ -1392,21 +1392,18 @@ List<String> _formatMessage(ChatMessage m, int cols) {
     final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
     final lines = <String>[];
     for (var i = 0; i < wrapped.length; i++) {
-      if (i == wrapped.length - 1 && wrapped.length > 1) {
-        // 长消息末行：标签（黑字）嵌在气泡左缘，正文白字 + 背景色填充到右留白前——
-        // 整行背景矩形与其他行完全对齐
-        final chunk = wrapped[i];
+      final chunk = wrapped[i];
+      if (i == 0) {
+        // 首行（含单行消息）：标签（黑字）嵌在气泡左缘，正文白字 + 背景色填充到
+        // 右留白前——整行背景矩形与其他行完全对齐
         final fill = textWidth - _displayWidth(chunk);
         lines.add(
             '$bubbleBackground$_black$label$_white $chunk${' ' * (fill < 0 ? 0 : fill)}$_reset');
-      } else if (i == wrapped.length - 1) {
-        // 单行消息：标签 + 1 空格 + 正文，整行贴左（短消息贴左的常规形态）
-        final content = '$bubbleBackground$_black$label$_white ${wrapped[i]}$_reset';
-        lines.add(content);
       } else {
-        // 非末行：气泡内左侧标签栏留空（背景色空格），正文右端停在右留白前
-        final content = '$bubbleBackground$_white${' ' * lane}${wrapped[i]}$_reset';
-        lines.add(content);
+        // 其余行（含末行）：气泡内左侧标签栏留空（背景色空格），正文右端补齐到右留白前
+        final fill = textWidth - _displayWidth(chunk);
+        lines.add(
+            '$bubbleBackground$_white${' ' * lane}$chunk${' ' * (fill < 0 ? 0 : fill)}$_reset');
       }
     }
     return lines;
@@ -1448,8 +1445,11 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       final content = '$partnerBackground$_white${wrapped[i]} $suffix';
       lines.add('${' ' * (cols - _displayWidth(content))}$content');
     } else {
-      // 非末行：固定左侧留白，正文右端自然停在标签栏前（右侧留白 = 标签宽）
-      final content = '$partnerBackground$_white${wrapped[i]}$_reset';
+      // 非末行：固定左侧留白，正文 + 背景色填充到整行右缘（col cols）——
+      // 标签栏所在的右侧留白一并上色，避免中英文折行宽度差造成气泡右缘锯齿
+      final fill = (cols - leftPad) - _displayWidth(wrapped[i]);
+      final content =
+          '$partnerBackground$_white${wrapped[i]}${' ' * (fill < 0 ? 0 : fill)}$_reset';
       lines.add('${' ' * leftPad}$content');
     }
   }
