@@ -932,6 +932,27 @@ String _barLine(String colorSeq, String text, int cols) {
   return '$content${pad > 0 ? ' ' * pad : ''}$_reset';
 }
 
+/// 三段式标题栏拼装：左段贴左缘、右段贴右缘、中段在剩余空白里居中；
+/// 三段放不下时先弃中段（左右仍贴边），左右也放不下时截断右段保左段完整。
+/// 各段可含 ANSI 颜色（_displayWidth 会跳过转义序列）；返回已铺满整行的成品。
+String _titleBarThree(String left, String center, String right, int cols) {
+  final lw = _displayWidth(left);
+  final rw = _displayWidth(right);
+  final cw = _displayWidth(center);
+  final gap = cols - lw - rw; // 左右贴边后中段可用的列数
+  final String content;
+  if (gap >= cw) {
+    final side = (gap - cw) ~/ 2; // 中段两侧平分剩余空白
+    content = '$left${' ' * side}$center${' ' * (gap - cw - side)}$right';
+  } else if (gap >= 0) {
+    content = '$left${' ' * gap}$right';
+  } else {
+    final remain = cols - lw;
+    content = '$left${remain > 0 ? _truncateByWidth(right, remain) : ''}';
+  }
+  return _barLine(_bgBlack, content, cols);
+}
+
 /// 终端行数（非终端/pty 下 terminalLines 可能抛异常，兜底 24）。
 /// 终端行数：stty size 优先（真实终端尺寸最可靠，raw 模式/stdout.terminalLines
 /// 失效时仍准确——此前兜底 24 与用户实际行数不符时渲染定位超出屏幕导致滚动、
@@ -1042,10 +1063,15 @@ void _render() {
   final peerName = _peerNameOf(s);
   final peerDevice = _peerDeviceLabel(s);
   final peerDot = s.peerOnline ? '$_green●$_white' : '${_white}○';
-  final titleText = '${_bold}Einz TUI$_white'
-      ' | $myDot ${_personLabel(s.session.store, s.personNames)}'
-      ' | $peerDot $peerName #$peerDevice';
-  buf.write(_barLine(_bgBlack, titleText, cols));
+  // 三段式标题栏：我的状态贴左缘、对方状态贴右缘、品牌名 "Einz TUI" 居中
+  // （窄终端放不下三段时先弃中段，再不行截断右段，保左段完整）。
+  final titleText = _titleBarThree(
+    '$myDot ${_personLabel(s.session.store, s.personNames)}',
+    '${_bold}Einz TUI$_white',
+    '$peerDot $peerName #$peerDevice',
+    cols,
+  );
+  buf.write(titleText);
   buf.write('\r\n');
 
   // 消息区：从下往上堆叠——最新消息紧贴输入条（输入条上方），旧消息向上滚出。
