@@ -1540,6 +1540,20 @@ ticker 轮询/WS message.new）里调用——所以首屏停在顶部，等第�
 chat_initial_scroll + chat_page_menu 12 + ui_style_switch 4 + chat_bubble_gender 1 +
 invite_dialog_layout + widget_test 全过。
 
+## 2026-09-09 素雅纯色风格的双人状态条也改悬浮圆角
+
+**老板要求（2026-09-09）：** 渐变风格里双人状态条的悬浮效果改造得很好——素雅纯色
+风格的状态条也这样改造：左右不要顶边、做成悬浮圆角。
+
+**实现（commit 待填）：** 状态条样式从"按风格条件化"改为**两风格统一**——
+去掉全部 `_uiStyle == 'gradient'` 条件分支：横向 12 边距 + 圆角 24 + 半透明白
+85% + 柔和投影（与渐变风格一致）；plain 下不再使用全宽浅灰条 + 底边框。
+
+**验证：** analyze 通过；ui_style_switch_test 断言更新（默认素雅纯色/切回纯色
+状态下状态条均为圆角 24）+ chat_page_menu 12 + chat_initial_scroll +
+chat_bubble_gender 全过（共 18 项）。
+
+
 
 
 

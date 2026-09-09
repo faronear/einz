@@ -1799,34 +1799,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: Column(
               children: [
           // 对话顶部：双方名字 + 各自在线状态（对方左 / 我右，与消息对齐一致）
+          // 两风格统一悬浮圆角条：不顶左右两头、四角有弧度、浮在背景上（老板要求
+          // 2026-09-09——素雅纯色风格与渐变风格一致）
           Container(
             key: const ValueKey('chatPageStatusBar'),
             width: double.infinity,
-            // gradient 风格：状态条与输入条同款——不顶左右两头、悬浮圆角（渐变两侧
-            // 透出，同输入条样式）；plain 风格保持原样（全宽浅灰条）
-            margin: _uiStyle == 'gradient'
-                ? const EdgeInsets.fromLTRB(12, 4, 12, 6)
-                : EdgeInsets.zero,
+            margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: _uiStyle == 'gradient'
-                  ? Colors.white.withValues(alpha: 0.85)
-                  : Colors.grey.shade50,
-              borderRadius: _uiStyle == 'gradient' ? BorderRadius.circular(24) : null,
-              border: _uiStyle == 'gradient'
-                  ? null
-                  : Border(
-                      bottom: BorderSide(color: Colors.grey.shade300),
-                    ),
-              boxShadow: _uiStyle == 'gradient'
-                  ? const [
-                      BoxShadow(
-                        color: Color(0x26000000), // 柔和投影（渐变上浮起）
-                        blurRadius: 12,
-                        offset: Offset(0, 4),
-                      ),
-                    ]
-                  : null,
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x26000000), // 柔和投影（背景上浮起）
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

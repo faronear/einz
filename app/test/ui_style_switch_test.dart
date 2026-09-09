@@ -100,8 +100,10 @@ void main() {
   testWidgets('界面风格弹窗：两风格+描述展示；点选即生效且不关窗；持久化', (WidgetTester tester) async {
     final db = await pumpChatPage(tester);
 
-    // 默认素雅纯色：无渐变背景层
+    // 默认素雅纯色：无渐变背景层；状态条已是悬浮圆角（两风格统一，老板要求）
     expect(gradientBackground, findsNothing, reason: '默认纯色风格不应有渐变背景');
+    expect(barDecoration(tester, statusBar)?.borderRadius, BorderRadius.circular(24),
+        reason: '默认素雅纯色风格的状态条也应为悬浮圆角（不顶左右两头）');
 
     // 打开菜单 → 界面风格
     await tester.tap(find.byIcon(Icons.more_vert));
@@ -146,8 +148,8 @@ void main() {
     final scaffoldAfter = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffoldAfter.extendBodyBehindAppBar, isFalse, reason: '切回纯色后恢复原有布局（body 不从 AppBar 后延伸）');
     expect(barDecoration(tester, inputBar), isNull, reason: '切回纯色后输入栏恢复全宽透明');
-    expect(barDecoration(tester, statusBar)?.color, Colors.grey.shade50,
-        reason: '切回纯色后状态条恢复全宽浅灰');
+    expect(barDecoration(tester, statusBar)?.borderRadius, BorderRadius.circular(24),
+        reason: '切回纯色后状态条仍为悬浮圆角（两风格统一）');
     expect(await settings.load(), 'plain');
 
     // 右上角 ✕ 关闭弹窗
