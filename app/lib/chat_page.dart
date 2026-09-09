@@ -940,11 +940,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       if (animate) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+        _scrollController
+            .animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+            )
+            .then((_) => _jumpToBottom()); // 动画落点可能偏短（懒加载估算）：校正贴底
       } else {
         _jumpToBottom();
       }
@@ -977,6 +979,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
       await _repo.refreshDeviceMap();
       if (!mounted) return;
+      // 实际新增的消息（去重后）：只有它们才需要拉到底部
+      final existing = {for (final m in _messages) m.env.messageId};
+      final added = fresh.where((f) => !existing.contains(f.env.messageId)).toList();
       setState(() {
         // 到期消息就地标记为已焚毁（墓碑；不再从列表移除——不打破历史流水）
         _messages = [
@@ -986,10 +991,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             else
               m,
         ];
-        final existing = {for (final m in _messages) m.env.messageId};
-        _messages.addAll(fresh.where((f) => !existing.contains(f.env.messageId)));
+        _messages.addAll(added);
       });
-      _scrollToLatest(); // 新消息（接收/发送）后滚动到底
+      // 仅当确实有新消息才滚动到底——自动 sync 没发现新消息时不动滚动位置
+      // （用户可能在往上看历史；老板要求 2026-09-09：除非刚启动/发现新消息/
+      // 收到新消息，否则不拉到最下面；启动路径 _loadInitial 保持无条件跳底）
+      if (added.isNotEmpty) _scrollToLatest();
     } catch (_) {
       // 网络抖动忽略，下次轮询重试
     }
@@ -2142,9 +2149,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               ? Colors.white12
                                               : Colors.black.withValues(alpha: 0.06),
                                           borderRadius: BorderRadius.circular(8),
-                                          border: const Border(
-                                              left: BorderSide(
-                                                  color: Color(0xFF3BAFFD), width: 3)),
                                         ),
                                         child: Text(
                                           _quotePreview(

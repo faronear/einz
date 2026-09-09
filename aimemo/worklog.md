@@ -1750,3 +1750,24 @@ Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检�
 **验证：** dart analyze 仅 1 条既有 info；message_repository_test 12/12 全过；
 chat_initial_scroll + setup_probe_retry + chat_page_menu 15/15 全过。golden
 政策不变（chat_page golden 失配保持红不重刷）。
+## 2026-09-09 自动 sync 无新消息时不拉到底 + 引用块去掉蓝边
+
+**老板要求（2026-09-09）：** 1) 自动 sync 没发现新消息时，不要把消息流拉到最
+下面（用户可能在往上翻历史）——除非刚启动、sync 发现新消息、或收到发来的
+新消息，才拉到底；2) 引用块灰框左侧那条带弧度的蓝边没必要，删掉蓝边（阴影
+可以有）。
+
+**实现：**
+- `_refresh`：先算出实际新增消息 `added`（historySince 结果去重），仅当
+  `added.isNotEmpty` 才 `_scrollToLatest()`——ticker 轮询/WS 断线重连等无新
+  消息的自动 sync 不再打扰用户的滚动位置；发送消息、收到新消息仍会拉到底；
+  启动路径 `_loadInitial` 保持无条件跳底。
+- 顺带修复新用例暴露的问题：`_scrollToLatest` 动画路径（animateTo）落点可能
+  因懒加载 extent 估算偏短，动画结束后 `.then((_) => _jumpToBottom())` 校正
+  贴底（估算准确时是无操作）。
+- 引用块（气泡内）去掉左侧蓝色竖条（border: left BorderSide #3BAFFD），保留
+  灰底+圆角。
+
+**验证：** chat_initial_scroll_test 3/3 全过（新增用例：固定序号 fake 模拟真实
+Server——无新消息时不拉回底部、新消息到达后拉到底）；dart analyze 仅 1 条
+既有 info。

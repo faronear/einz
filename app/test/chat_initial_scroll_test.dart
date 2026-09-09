@@ -52,6 +52,47 @@ class _FakeApi extends ApiClient {
   }
 }
 
+/// 固定序号 fake：每次 sync 返回相同消息、相同 server_sequence（模拟真实
+/// Server 行为）——重复 sync 不产生新消息，用于「自动 sync 无新消息时不
+/// 滚动到底」测试。
+class _FixedSeqApi extends ApiClient {
+  _FixedSeqApi(this.messages) : super('http://fake');
+
+  final List<MessageEnvelope> messages;
+
+  @override
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+    String token, {
+    int after = 0,
+    int limit = 100,
+  }) async {
+    final withSeq = <MessageEnvelope>[
+      for (var i = 0; i < messages.length; i++)
+        MessageEnvelope.fromJson({
+          ...messages[i].toJson(),
+          'server_sequence': i + 1,
+        }),
+    ];
+    final page = withSeq.where((e) => (e.serverSequence ?? 0) > after).toList();
+    return (
+      messages: page,
+      attachmentsMeta: <Map<String, dynamic>>[],
+      lastSequence: withSeq.length,
+      hasMore: false,
+    );
+  }
+
+  @override
+  Future<SpaceResult> getSpace(String token) async {
+    return SpaceResult(
+      spaceId: 'space-test',
+      devices: const [
+        SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+      ],
+    );
+  }
+}
+
 void main() {
   setUpAll(() async {
     await sodium();
@@ -148,5 +189,73 @@ void main() {
     expect(position.pixels, closeTo(position.maxScrollExtent, 1.0),
         reason: '末尾有引用消息时首屏仍应滚动到列表底部');
     expect(find.text('引用回复 60'), findsOneWidget, reason: '最新引用消息应显示在首屏');
+  });
+
+  testWidgets('自动 sync 无新消息时不滚动到底；发现新消息时才拉到底部', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 40 条消息（≤ 首屏页 50，全部加载）；固定序号 fake 重复 sync 无新消息
+    final msgs = <MessageEnvelope>[];
+    for (var i = 1; i <= 40; i++) {
+      msgs.add(await encryptMessage(
+        plaintext: '消息 $i',
+        spaceKey: spaceKey,
+        spaceId: 'space-test',
+        senderDeviceId: 'dev-a',
+        messageId: 'msg-$i',
+        keyVersion: 1,
+      ));
+    }
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FixedSeqApi(msgs),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    final position = tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+    expect(position.pixels, closeTo(position.maxScrollExtent, 1.0), reason: '首屏应在底部');
+
+    // 用户向上翻看历史（离开底部）
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 400));
+    await tester.pump();
+    expect(position.pixels, lessThan(position.maxScrollExtent - 1),
+        reason: '应已离开底部（正在看历史）');
+
+    // 自动 sync 周期触发，但服务端没有新消息 → 不应拉回底部
+    await tester.pump(const Duration(seconds: 4)); // ticker 3s 触发 _refresh
+    await tester.pump(); // 消化 sync future
+    await tester.pump();
+    expect(position.pixels, lessThan(position.maxScrollExtent - 1),
+        reason: '自动 sync 无新消息时不应把用户拉回底部');
+
+    // 服务端来了新消息 → 应拉到底部
+    msgs.add(await encryptMessage(
+      plaintext: '新消息 41',
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      senderDeviceId: 'dev-a',
+      messageId: 'msg-41',
+      keyVersion: 1,
+    ));
+    await tester.pump(const Duration(seconds: 4)); // 下一个 ticker 周期
+    await tester.pump(); // 消化 sync future
+    await tester.pump();
+    await tester.pumpAndSettle(); // 平滑滚动动画结束
+    expect(position.pixels, closeTo(position.maxScrollExtent, 1.0),
+        reason: '发现新消息应拉到底部');
   });
 }
