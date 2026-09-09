@@ -1596,7 +1596,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
+      // gradient 风格：body 延伸到 AppBar 之后，AppBar 透明浮在渐变上（同向导全屏
+      // 渐变做法）；plain 风格保持原有布局（AppBar 浅粉底，body 从其下方开始）
+      extendBodyBehindAppBar: _uiStyle == 'gradient',
       appBar: AppBar(
+        backgroundColor: _uiStyle == 'gradient' ? Colors.transparent : null,
         // 抬头只显示品牌名+slogan（不暴露空间 ID，对普通用户无意义）；
         // 在线状态由对话顶部条双灯呈现（「我的」灯三态：灰=未连接服务/绿=已连接/红=断线）
         title: Row(
@@ -1765,8 +1769,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 decoration: BoxDecoration(gradient: kBrandGradient),
               ),
             ),
-          Column(
-            children: [
+          // gradient 风格：body 延伸到 AppBar 之后——内容从工具栏高度下方开始
+          // （避免与浮动 AppBar 重叠；同向导 SizedBox(kToolbarHeight) 做法）
+          Padding(
+            padding: EdgeInsets.only(
+              top: _uiStyle == 'gradient'
+                  ? MediaQuery.paddingOf(context).top + kToolbarHeight
+                  : 0,
+            ),
+            child: Column(
+              children: [
           // 对话顶部：双方名字 + 各自在线状态（对方左 / 我右，与消息对齐一致）
           Container(
             width: double.infinity,
@@ -1874,12 +1886,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
           SafeArea(
             child: Container(
-              // gradient 风格下半透明白底：输入文字/按钮在渐变上仍清晰可读；
-              // plain 风格保持透明（原有视觉效果）
-              color: _uiStyle == 'gradient'
-                  ? Colors.white.withValues(alpha: 0.55)
-                  : Colors.transparent,
-              padding: const EdgeInsets.all(8),
+              // gradient 风格：输入栏不顶左右两头——悬浮圆角白条（渐变从两侧/底部
+              // 透出，同向导白卡在渐变上的层次）；plain 风格保持原样（全宽透明）
+              color: _uiStyle == 'gradient' ? null : Colors.transparent,
+              decoration: _uiStyle == 'gradient'
+                  ? BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x26000000), // 柔和投影（渐变上浮起）
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    )
+                  : null,
+              padding: _uiStyle == 'gradient'
+                  ? const EdgeInsets.fromLTRB(12, 4, 12, 8)
+                  : const EdgeInsets.all(8),
               child: Row(
                 children: [
                   // 附件：拍照 / 相册（图像、视频共用入口）
@@ -1946,9 +1971,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           ),
+              ],
+            ),
+          ),
         ],
-      ),
-      ],
       ),
     );
   }

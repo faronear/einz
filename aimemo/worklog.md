@@ -1459,3 +1459,21 @@ setup 相关 7 个失败经 stash 基线确认系既有环境问题，与本次�
 2 用例（点选即生效且不关窗 + 持久化恢复）+ chat_page_menu 12 用例全过；
 golden 未触碰（plain 默认像素级不变）。
 
+## 2026-09-09 对话页渐变背景全屏化（对齐向导）
+
+**老板反馈：** 对话页渐变效果不如向导好看——标题栏（logo/Einz 秘境/菜单）没被渐变
+覆盖；渐变被底下输入栏截断；要求输入栏在该风格下不顶左右两头。
+
+**实现（commit 待填）：**
+- `chat_page.dart` gradient 风格对齐向导做法：`extendBodyBehindAppBar: true` +
+  AppBar 透明——渐变延伸到状态栏/标题栏（全屏自然过渡）；内容从工具栏高度下方
+  开始（`MediaQuery.paddingOf.top + kToolbarHeight` 顶部留白，同向导
+  `SizedBox(kToolbarHeight)`，避免与浮动 AppBar 重叠、列表也不会滚到 AppBar 后）。
+- 输入栏改悬浮圆角条：不顶左右两头（横向 12 边距 + 圆角 24），半透明白 85% +
+  柔和投影（同向导白卡在渐变上的层次）；plain 风格保持原样（全宽透明，像素级不变）。
+
+**验证：** analyze 通过（仅 1 条存量 info）；`ui_style_switch_test` 扩断言
+（gradient 下 Scaffold 延伸到 AppBar 后 / AppBar 透明 / 输入栏圆角条，切回纯色全部
+恢复）+ chat_page_menu 12 用例全过。
+
+

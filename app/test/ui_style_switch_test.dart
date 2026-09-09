@@ -65,6 +65,13 @@ void main() {
   // 聊天页背景渐变层定位器（Key 区分：弹窗预览图也有渐变但无此 Key）
   final gradientBackground = find.byKey(const ValueKey('chatPageGradientBackground'));
 
+  /// 输入栏悬浮圆角条（gradient 风格专属形态：半透明白 + 圆角 24，不顶左右两头）。
+  final inputPill = find.byWidgetPredicate((w) =>
+      w is Container &&
+      w.decoration is BoxDecoration &&
+      (w.decoration as BoxDecoration).color == Colors.white.withValues(alpha: 0.85) &&
+      (w.decoration as BoxDecoration).borderRadius == BorderRadius.circular(24));
+
   testWidgets('界面风格弹窗：两风格+描述展示；点选即生效且不关窗；持久化', (WidgetTester tester) async {
     final db = await pumpChatPage(tester);
 
@@ -91,6 +98,13 @@ void main() {
     expect(find.text('界面风格 / Interface style'), findsOneWidget, reason: '点选后弹窗应保持打开（预览不关窗）');
     expect(gradientBackground, findsOneWidget, reason: '点选渐变后聊天页背景应切换为渐变');
 
+    // 全屏渐变（同向导）：body 延伸到 AppBar 之后、AppBar 透明、输入栏为悬浮圆角条
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.extendBodyBehindAppBar, isTrue, reason: '渐变风格下 body 应延伸到 AppBar 之后（全屏渐变）');
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.backgroundColor, Colors.transparent, reason: '渐变风格下 AppBar 应透明（露出渐变）');
+    expect(inputPill, findsOneWidget, reason: '渐变风格下输入栏应为不顶左右两头的悬浮圆角条');
+
     // 持久化：已保存为 gradient
     final settings = UiStyleSettings(db);
     expect(await settings.load(), 'gradient', reason: '风格选择应持久化到本地');
@@ -100,6 +114,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('界面风格 / Interface style'), findsOneWidget);
     expect(gradientBackground, findsNothing, reason: '切回纯色后渐变背景应移除');
+    final scaffoldAfter = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffoldAfter.extendBodyBehindAppBar, isFalse, reason: '切回纯色后恢复原有布局（body 不从 AppBar 后延伸）');
+    expect(inputPill, findsNothing, reason: '切回纯色后输入栏恢复全宽透明');
     expect(await settings.load(), 'plain');
 
     // 右上角 ✕ 关闭弹窗
