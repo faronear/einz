@@ -34,6 +34,7 @@ const _white = '$_esc[97m'; // 亮白字（对方彩色底上的消息正文）
 const _bold = '$_esc[1m';
 const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息整条底色（最初方案；macOS Terminal 效果好）
 const _bgBlue = '$_esc[104m'; // 亮蓝背景：男性对方消息整条底色
+const _bgTeal = '$_esc[48;5;37m'; // 青绿背景（256 色 #00AFAF）：性别未知的对方消息整条底色
 const _bgBlack = '$_esc[40m'; // 黑色背景：标题栏/底部状态行整行底色
 
 // \x1B[2J 清屏 + \x1B[3J 清除回滚缓冲 + \x1B[H 光标回家：全屏重绘应用（类似 vim/htop）
@@ -105,7 +106,7 @@ class _TuiState {
   /// person_id → personName（GET /space 拉取，消息前缀显示 personName 用）。
   Map<String, String> personNames = {};
 
-  /// person_id → gender（GET /space 拉取，对方消息背景色用）。
+  /// person_id → gender（GET /health、/space 拉取，对方消息背景色用）。
   Map<String, String> personGenders = {};
 
   /// 引导问答等待类型（非 null 时输入循环的下一次输入按此问答处理）。
@@ -129,6 +130,15 @@ String? partnerPresetName;
 /// 登记时随名字一并提交服务端（person_gender/partner_gender）。
 String? myGender;
 String? partnerGender;
+
+/// 性别提交规范化：中文 男/女 → 服务端规范值 male/female（与 App 一致；
+/// 服务端 meta person_gender:* 以 male/female 为规范，旧 TUI 直传中文导致
+/// 渲染端按 'male' 匹配不上——2026-09-10 修复）。未知返回 null（服务端不落 meta）。
+String? _genderCode(String? zh) => switch (zh) {
+      '男' => 'male',
+      '女' => 'female',
+      _ => null,
+    };
 
 /// 本次运行是否刚完成入网（create/join/口令接入）：是则进对话前询问设置 PIN。
 bool _onboarded = false;
@@ -179,22 +189,27 @@ String _resolveAutoStore() {
 }
 
 /// 启动探测 + 获取系统信息（GET {server}/health，3s 超时，不重试）：
-/// 能连（HTTP 200）→ (true, personNames)；连接失败/超时 → (false, {})。
-/// 探测顺带取回 person 名称表（消息前缀显示 personName，一举两得）；
+/// 能连（HTTP 200）→ (true, personNames, personGenders)；连接失败/超时 → (false, {}, {})。
+/// 探测顺带取回 person 名称表（消息前缀显示 personName）与性别表
+/// （对方消息背景色按性别蓝/粉/青绿），一举两得；
 /// 不用 ApiClient（其 connectionTimeout 10s + 3 次重试，探测太慢）。
-Future<(bool, Map<String, String>)> _probeServer(String server) async {
+Future<(bool, Map<String, String>, Map<String, String>)> _probeServer(String server) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();
     final body = await res.transform(utf8.decoder).join();
-    if (res.statusCode != 200) return (false, <String, String>{});
+    if (res.statusCode != 200) {
+      return (false, <String, String>{}, <String, String>{});
+    }
     final json = jsonDecode(body) as Map<String, dynamic>;
     final raw = json['person_names'] as Map<String, dynamic>? ?? <String, dynamic>{};
     final names = <String, String>{for (final e in raw.entries) e.key: e.value as String};
-    return (true, names);
+    final rawGenders = json['person_genders'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    final genders = <String, String>{for (final e in rawGenders.entries) e.key: e.value as String};
+    return (true, names, genders);
   } catch (_) {
-    return (false, <String, String>{});
+    return (false, <String, String>{}, <String, String>{});
   } finally {
     client.close(force: true);
   }
@@ -213,8 +228,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   }
   // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（回车沿用当前值）
   // 探测顺带取回 person 名称表（系统信息），供消息前缀显示 personName
-  final (probeOk, probeNames) = await _probeServer(server);
+  final (probeOk, probeNames, probeGenders) = await _probeServer(server);
   _probePersonNames = probeNames;
+  _probePersonGenders = probeGenders;
   if (!probeOk) {
     stdout.writeln('❌ 无法连接服务器 $server（/health 探测失败）');
     stdout.write('❓ 输入新服务器地址（回车沿用 $server）: ');
@@ -483,8 +499,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         publicKey: store.publicKey,
         personName: store.personName,
         partnerName: partnerPresetName,
-        personGender: myGender,
-        partnerGender: partnerGender,
+        personGender: _genderCode(myGender),
+        partnerGender: _genderCode(partnerGender),
         deviceName: store.deviceName,
       ));
       store.deviceId = r.deviceId;
@@ -771,6 +787,7 @@ Future<void> main(List<String> args) async {
   _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
   _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
   _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
+  _state!.personGenders = Map.of(_probePersonGenders); // 启动探测的性别表（首屏即按性别配色）
   _refreshPersonNames(_state!); // 认证后刷新（保持最新）
 
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
@@ -1350,11 +1367,19 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       ...wrapped.skip(1).map((line) => '$indent$line'),
     ];
   }
-  // 对方消息：整块右对齐（右侧气泡风格），男性蓝底、女性品红底——正文白字、
-  // [人名 时间] 黑字；前导留白不上色（保持右对齐气泡感）
-  final partnerBackground = _state?.personGenders[m.env.senderPersonId] == 'male'
-      ? _bgBlue
-      : _bgPink;
+  // 对方消息：整块右对齐（右侧气泡风格），背景按对方性别配色——男蓝、女品红、
+  // 性别未知（旧空间未登记/尚未拉取）青绿底；正文白字、[人名 时间] 黑字；
+  // 前导留白不上色（保持右对齐气泡感）。
+  // 兼容服务端两种取值：App 提交规范 male/female，旧 TUI 提交过中文 男/女。
+  final rawGender = _state?.personGenders[m.env.senderPersonId];
+  final String partnerBackground;
+  if (rawGender == 'male' || rawGender == '男') {
+    partnerBackground = _bgBlue;
+  } else if (rawGender == 'female' || rawGender == '女') {
+    partnerBackground = _bgPink;
+  } else {
+    partnerBackground = _bgTeal; // 性别未知：青绿底（2026-09-10 老板要求）
+  }
   final suffix = '$_black[$who $time]$_reset';
   final suffixW = _displayWidth(suffix);
   // 正文每行同时保留：左侧 sideMargin 列留白（不顶左边框）+ 右侧标签栏；
@@ -1368,8 +1393,8 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   for (var i = 0; i < wrapped.length; i++) {
     if (i == wrapped.length - 1 && wrapped.length > 1) {
       // 长消息末行：正文左对齐到与其他行相同的左缘（左侧留白 = leftPad），
-      // 正文与标签之间用粉红空格填充，标签仍贴最右——
-      // 整行粉红连续成矩形，不与上方各行错位
+      // 正文与标签之间用背景色空格填充，标签仍贴最右——
+      // 整行背景色连续成矩形，不与上方各行错位
       final chunk = wrapped[i];
       final fill = textWidth - _displayWidth(chunk);
       lines.add(
@@ -2275,6 +2300,9 @@ final List<String> _guidanceNotes = [];
 
 /// 启动探测获取的 person 名称表（/health 系统信息，person_id → personName）。
 Map<String, String> _probePersonNames = {};
+
+/// 启动探测获取的 person 性别表（/health 系统信息，person_id → male/female）。
+Map<String, String> _probePersonGenders = {};
 
 /// 启动自检结果：0=正常/离线（可看本地历史）；1=设备已被撤销；2=会话已失效
 /// （/recover 会 DELETE sessions，缓存 token 死 → 401）需清除 token 走引导

@@ -1790,3 +1790,19 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 性别，并按消息 `senderPersonId` 选择男性亮蓝底或默认亮品红底；未知性别继续回退粉红色，兼容旧空间。
 
 **验证：** `dart analyze bin/einz_tui.dart ../shared` 通过；shared `dart test` 24/24 通过。
+
+## 2026-09-10 CLI/TUI 性别配色收尾：规范值 + 青绿兜底 + 探测带性别
+
+**背景：** 老板自查 2026-09-09 的性别配色实现，发现不周到之处并交由我实施服务端性别表方案。
+
+**修复（cli/bin/einz_tui.dart）：**
+1. **提交规范化**：旧 TUI 引导直传中文 男/女 到服务端 meta（App 传 male/female），
+   渲染端按 `'male'` 匹配不上 → 新增 `_genderCode()` 提交时转 male/female（与 App/服务端规范一致）。
+2. **渲染兼容两值**：`male`/`female` 与旧数据 男/女 都能识别——男蓝 `_bgBlue`(104m)、
+   女粉 `_bgPink`(105m)。
+3. **性别未知回退青绿**（老板要求）：新增 `_bgTeal`(256 色 48;5;37 ≈ #00AFAF)。
+4. **探测带性别**：`_probeServer`(/health) 与启动时一并取回 `person_genders` 种入
+   `_TuiState.personGenders`（此前仅 /space 刷新才有性别，首屏及刷新失败时无性别表）。
+
+**验证：** `dart analyze`（cli + shared）通过；本机起 demo server + pty 启动 TUI，
+标题栏三段式布局正常渲染、新探测代码不崩溃（demo store 在本机未认证，进入引导属环境状态，非本次改动）。
