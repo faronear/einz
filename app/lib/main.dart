@@ -223,7 +223,11 @@ class _StartupGateState extends State<StartupGate> {
     if (_hasLock!) return const LockPage();
     final plain = _plain;
     if (plain != null) {
-      // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰
+      // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰；
+      // 从明文配置恢复设备密钥对 → 注入 reauth（会话过期自动续期）
+      final reauth = (plain.publicKeyB64 != null && plain.privateKeyB64 != null)
+          ? () => reauthFromPayload(plain)
+          : null;
       return ChatPage(
         server: plain.server,
         spaceId: plain.spaceId,
@@ -232,6 +236,9 @@ class _StartupGateState extends State<StartupGate> {
         keyVersion: plain.keyVersion,
         token: plain.token ?? '',
         escrowPassphrase: plain.escrowPassphrase,
+        reauth: reauth,
+        publicKeyB64: plain.publicKeyB64,
+        privateKeyB64: plain.privateKeyB64,
       );
     }
     return const SetupPage();

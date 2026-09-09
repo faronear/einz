@@ -64,7 +64,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameRequired => '填写我的名字';
 
   @override
-  String get wizardPeerNameRequired => '填写伴侣的名字';
+  String get wizardPeerNameRequired => '填写秘境伴侣的名字';
 
   @override
   String get wizardNameHintInput => '例如 Lukas';
@@ -496,6 +496,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageDeviceRevoked => '设备已被撤销，本地数据已清除，请重新配置';
+
+  @override
+  String get chatPageDevicePublicKeyLabel => '公钥';
+
+  @override
+  String get chatPageDevicePublicKeyFailed => '未记录';
 
   @override
   String get burnOptionUnlimited => '无限';

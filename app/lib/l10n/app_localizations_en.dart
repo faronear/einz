@@ -526,6 +526,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Device revoked — local data cleared, please set up again';
 
   @override
+  String get chatPageDevicePublicKeyLabel => 'Public key';
+
+  @override
+  String get chatPageDevicePublicKeyFailed => 'Not recorded';
+
+  @override
   String get burnOptionUnlimited => 'Unlimited';
 
   @override

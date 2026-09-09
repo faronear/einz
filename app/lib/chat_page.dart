@@ -54,6 +54,8 @@ class ChatPage extends StatefulWidget {
     this.deviceName, // 我的设备名（登记时自动获取；菜单显示/修改）
     this.personId, // 我的 personId（头像上传/获取用）
     this.peerName, // 对方名字（setup 探测传入；对话顶部条显示）
+    this.publicKeyB64, // 设备公钥（b64，随锁包持久化；弹窗展示用）
+    this.privateKeyB64, // 设备私钥（b64，随锁包持久化；补设锁写入新锁包）
   });
 
   final String server;
@@ -82,6 +84,12 @@ class ChatPage extends StatefulWidget {
 
   /// 对方名字（向导探测时确定；对话顶部条显示，无则占位）。
   final String? peerName;
+
+  /// 设备 X25519 公钥（b64，随锁包持久化）：「我的设备」弹窗展示用。
+  final String? publicKeyB64;
+
+  /// 设备 X25519 私钥（b64，随锁包持久化）：补设锁/改口令时写入新锁包。
+  final String? privateKeyB64;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -409,6 +417,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       keyVersion: widget.keyVersion,
       token: widget.token,
       escrowPassphrase: widget.escrowPassphrase,
+      publicKeyB64: widget.publicKeyB64,
+      privateKeyB64: widget.privateKeyB64,
     );
     // 弹窗内容抽为 _SetLockDialog（StatefulWidget）：controller 生命周期随 State
     // 卸载同步释放，避免"点设置后 dispose 竞态"（TextField 卸载动画中向已销毁
@@ -523,12 +533,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(renameDevice ? l10n.chatPageRenameDeviceTitle : l10n.chatPageRenameNameTitle),
-        content: TextField(
-          controller: ctrl,
-          decoration: InputDecoration(
-            labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
-            border: const OutlineInputBorder(),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: ctrl,
+              decoration: InputDecoration(
+                labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            // 我的设备弹窗：展示本机公钥（随锁包持久化，本地直接读取；旧包无 → 兜底）
+            if (renameDevice) ...[
+              const SizedBox(height: 12),
+              SelectableText(
+                '${l10n.chatPageDevicePublicKeyLabel}: '
+                '${widget.publicKeyB64 ?? l10n.chatPageDevicePublicKeyFailed}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey, fontFamily: 'monospace'),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),

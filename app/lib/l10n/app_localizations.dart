@@ -998,6 +998,18 @@ abstract class AppLocalizations {
   /// **'Device revoked — local data cleared, please set up again'**
   String get chatPageDeviceRevoked;
 
+  /// No description provided for @chatPageDevicePublicKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key'**
+  String get chatPageDevicePublicKeyLabel;
+
+  /// No description provided for @chatPageDevicePublicKeyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not recorded'**
+  String get chatPageDevicePublicKeyFailed;
+
   /// No description provided for @burnOptionUnlimited.
   ///
   /// In en, this message translates to:

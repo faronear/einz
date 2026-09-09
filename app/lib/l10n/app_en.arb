@@ -238,6 +238,8 @@
     }
   },
   "chatPageDeviceRevoked": "Device revoked — local data cleared, please set up again",
+  "chatPageDevicePublicKeyLabel": "Public key",
+  "chatPageDevicePublicKeyFailed": "Not recorded",
   "burnOptionUnlimited": "Unlimited",
   "burnOption1Minute": "1 minute",
   "burnOption5Minutes": "5 minutes",

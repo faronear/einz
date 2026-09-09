@@ -193,6 +193,8 @@ class AppLockPayload {
     this.token,
     this.escrowPassphrase,
     this.escrowUpdatedAt,
+    this.publicKeyB64,
+    this.privateKeyB64,
   });
 
   final String server;
@@ -210,6 +212,11 @@ class AppLockPayload {
   /// 服务器更新 = 离线期间口令被重设（应弹窗重新验证）。
   final int? escrowUpdatedAt;
 
+  /// 设备 X25519 密钥对（b64）：随锁包持久化——重启后 challenge-response
+  /// 重新认证（reauth）需用私钥签名；「我的设备」弹窗展示公钥。旧包无此字段。
+  final String? publicKeyB64;
+  final String? privateKeyB64;
+
   Map<String, dynamic> toJson() => {
         'server': server,
         'space_key': spaceKeyB64,
@@ -219,6 +226,8 @@ class AppLockPayload {
         'token': token,
         'escrow_passphrase': escrowPassphrase,
         'escrow_updated_at': escrowUpdatedAt,
+        'device_public_key': publicKeyB64,
+        'device_private_key': privateKeyB64,
       };
 
   factory AppLockPayload.fromJson(Map<String, dynamic> json) => AppLockPayload(
@@ -230,7 +239,29 @@ class AppLockPayload {
         token: json['token'] as String?,
         escrowPassphrase: json['escrow_passphrase'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
+        publicKeyB64: json['device_public_key'] as String?,
+        privateKeyB64: json['device_private_key'] as String?,
       );
+}
+
+/// 用锁包里的设备密钥对完成 challenge-response 重新认证（重启后 reauth 用：
+/// 会话过期 401/4401 时自动续期）。锁包无密钥对（旧包）时抛 [StateError]。
+Future<String> reauthFromPayload(AppLockPayload payload) async {
+  final pub = payload.publicKeyB64;
+  final priv = payload.privateKeyB64;
+  if (pub == null || priv == null || pub.isEmpty || priv.isEmpty) {
+    throw StateError('锁包无设备密钥对');
+  }
+  final s = await sodium();
+  final api = ApiClient(payload.server);
+  final challenge = await api.challenge(payload.deviceId);
+  final opened = await sealOpen(
+    s,
+    base64Decode(challenge.sealedChallenge),
+    base64Decode(pub),
+    base64Decode(priv),
+  );
+  return (await api.verify(challenge.challengeId, base64Encode(opened))).sessionToken;
 }
 
 class AppLockException implements Exception {

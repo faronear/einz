@@ -71,7 +71,11 @@ class _LockPageState extends State<LockPage> {
       Navigator.of(context).pop();
       return;
     }
-    // 冷启动锁屏：解锁成功进入聊天页
+    // 冷启动锁屏：解锁成功进入聊天页；从锁包恢复设备密钥对 → 注入 reauth
+    // （会话过期 401/4401 时 challenge-response 重新签发 token；旧包无密钥 → null）
+    final reauth = (payload.publicKeyB64 != null && payload.privateKeyB64 != null)
+        ? () => reauthFromPayload(payload)
+        : null;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
         server: payload.server,
@@ -82,6 +86,9 @@ class _LockPageState extends State<LockPage> {
         token: payload.token ?? '',
         escrowPassphrase: payload.escrowPassphrase,
         escrowUpdatedAt: payload.escrowUpdatedAt,
+        reauth: reauth,
+        publicKeyB64: payload.publicKeyB64,
+        privateKeyB64: payload.privateKeyB64,
       ),
     ));
   }

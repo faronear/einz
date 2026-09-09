@@ -18,7 +18,7 @@
   "wizardPeerNameHint": "伴侣的名字（将来可以随时修改）：",
   "wizardPeerNameHintInput": "例如 Alice",
   "wizardNameRequired": "填写我的名字",
-  "wizardPeerNameRequired": "填写伴侣的名字",
+  "wizardPeerNameRequired": "填写秘境伴侣的名字",
   "wizardNameHintInput": "例如 Lukas",
   "wizardMyGenderLabel": "我的性别",
   "wizardPeerGenderLabel": "伴侣性别",
@@ -238,6 +238,8 @@
     }
   },
   "chatPageDeviceRevoked": "设备已被撤销，本地数据已清除，请重新配置",
+  "chatPageDevicePublicKeyLabel": "公钥",
+  "chatPageDevicePublicKeyFailed": "未记录",
   "burnOptionUnlimited": "无限",
   "burnOption1Minute": "1 分钟",
   "burnOption5Minutes": "5 分钟",
