@@ -158,12 +158,14 @@ class AppLockService {
     required String peerName,
     required String deviceName,
     String myGender = '', // 本人性别（male/female；个人资料弹窗图标展示用）
+    String peerGender = '', // 对方性别（male/female；消息气泡配色用）
   }) async {
     await _set(_kProfile, jsonEncode({
       'personName': personName,
       'peerName': peerName,
       'deviceName': deviceName,
       'myGender': myGender,
+      'peerGender': peerGender,
     }));
   }
 
@@ -178,6 +180,7 @@ class AppLockService {
         'peerName': (m['peerName'] as String?) ?? '',
         'deviceName': (m['deviceName'] as String?) ?? '',
         'myGender': (m['myGender'] as String?) ?? '',
+        'peerGender': (m['peerGender'] as String?) ?? '',
       };
     } catch (_) {
       return const {};

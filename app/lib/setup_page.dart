@@ -1034,6 +1034,10 @@ class _SetupPageState extends State<SetupPage> {
       myGender: _role == _WizardRole.create
           ? (_myGender ?? '')
           : (_personGenders[_chosenPerson] ?? ''),
+      // 对方性别：create=向导所选伴侣性别；join=另一人（消息气泡配色用）
+      peerGender: _role == _WizardRole.create
+          ? (_peerGender ?? '')
+          : (_personGenders[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     Navigator.of(context).pushReplacement(MaterialPageRoute(

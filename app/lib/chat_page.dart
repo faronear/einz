@@ -141,6 +141,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _myPersonName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myDeviceName; // 我的设备名（菜单显示；改名后 setState 刷新）
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
+  late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
@@ -175,6 +176,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _myPersonName = widget.personName ?? '';
     _myDeviceName = widget.deviceName ?? '';
     _myGender = ''; // 个人资料弹窗性别图标：由 profile 恢复（向导完成时写入）
+    _peerGender = ''; // 消息气泡配色：由 profile 恢复（向导完成时写入）
     _peerName = widget.peerName ?? '';
     _loadMyAvatar();
     _refreshPeerOnline();
@@ -189,6 +191,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_myDeviceName.isEmpty) _myDeviceName = p['deviceName'] ?? '';
         if (_peerName.isEmpty) _peerName = p['peerName'] ?? '';
         if (_myGender.isEmpty) _myGender = p['myGender'] ?? '';
+        if (_peerGender.isEmpty) _peerGender = p['peerGender'] ?? '';
       });
     });
     _repo = MessageRepository(
@@ -691,6 +694,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       peerName: _peerName,
       deviceName: _myDeviceName,
       myGender: _myGender,
+      peerGender: _peerGender,
     );
   }
 
@@ -1429,6 +1433,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 消息气泡底色：按发言人性别——男天蓝 / 女品牌粉（浅色 tint 便于阅读）；
+  /// 性别未登记（旧配置）回退原默认色（本人 indigo.shade100 / 对方 grey.shade200）。
+  Color _bubbleColor({required bool mine}) {
+    final gender = mine ? _myGender : _peerGender;
+    if (gender == 'female') return const Color(0xFFD6529C).withValues(alpha: 0.18);
+    if (gender == 'male') return const Color(0xFF3BAFFD).withValues(alpha: 0.18);
+    return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
+  }
+
   /// 消息内容按类型渲染（text 文本 / voice、audio 播放条 / image、video、file 各自卡片）。
   Widget _buildMessageContent(
       ({MessageEnvelope env, String plaintext, String sender, Map<String, dynamic>? attachment, int? expiresAt}) m) {
@@ -1754,7 +1767,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         constraints: BoxConstraints(
                             maxWidth: MediaQuery.sizeOf(context).width * 0.75),
                         decoration: BoxDecoration(
-                          color: mine ? Colors.indigo.shade100 : Colors.grey.shade200,
+                          // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）
+                          color: _bubbleColor(mine: mine),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
