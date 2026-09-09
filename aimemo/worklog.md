@@ -1487,7 +1487,7 @@ golden 未触碰（plain 默认像素级不变）。
 SafeArea 把它全垫在输入栏上方 → 消息列表底部停在输入栏上方 115px 处（plain 风格
 同样存在较小的同类空隙，只是背景无渐变不易察觉）。
 
-**修复（commit 待填）：** 输入栏 SafeArea 加 `top: false`（底部 inset 保留防 Home 条
+**修复（commit 0c105f2）：** 输入栏 SafeArea 加 `top: false`（底部 inset 保留防 Home 条
 遮挡）；两风格统一——消息列表直达输入栏，plain 原有的小空隙一并消除（像素变化极小）。
 
 **验证：** 新增回归用例（模拟真机 insets 59/34：断言消息列表底部 == 输入栏顶部，
