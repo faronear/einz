@@ -722,17 +722,17 @@ abstract class AppLocalizations {
   /// **'Device name'**
   String get chatPageRenameDeviceLabel;
 
-  /// No description provided for @chatPageRenameEmptyError.
+  /// No description provided for @chatPageRenameDeviceEmptyError.
   ///
   /// In en, this message translates to:
   /// **'Name cannot be empty'**
-  String get chatPageRenameEmptyError;
+  String get chatPageRenameDeviceEmptyError;
 
-  /// No description provided for @chatPageRenameNameEmptyError.
+  /// No description provided for @chatPageRenameMyselfEmptyError.
   ///
   /// In en, this message translates to:
   /// **'Name cannot be empty'**
-  String get chatPageRenameNameEmptyError;
+  String get chatPageRenameMyselfEmptyError;
 
   /// No description provided for @chatPageCopy.
   ///

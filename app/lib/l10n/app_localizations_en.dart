@@ -360,10 +360,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRenameDeviceLabel => 'Device name';
 
   @override
-  String get chatPageRenameEmptyError => 'Name cannot be empty';
+  String get chatPageRenameDeviceEmptyError => 'Name cannot be empty';
 
   @override
-  String get chatPageRenameNameEmptyError => 'Name cannot be empty';
+  String get chatPageRenameMyselfEmptyError => 'Name cannot be empty';
 
   @override
   String get chatPageCopy => 'Copy';

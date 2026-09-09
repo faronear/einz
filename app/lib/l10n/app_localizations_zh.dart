@@ -337,10 +337,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameDeviceLabel => '设备名称';
 
   @override
-  String get chatPageRenameEmptyError => '名称不能为空';
+  String get chatPageRenameDeviceEmptyError => '名称不能为空';
 
   @override
-  String get chatPageRenameNameEmptyError => '名字不能为空';
+  String get chatPageRenameMyselfEmptyError => '名字不能为空';
 
   @override
   String get chatPageCopy => '复制';
