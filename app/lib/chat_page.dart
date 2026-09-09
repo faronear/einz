@@ -143,6 +143,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
   final GlobalKey _jumpTargetKey = GlobalKey();
   String? _jumpTargetId;
+  // 跳转后短暂高亮目标消息（背景色高亮，不改气泡尺寸）：messageId + 定时清除
+  String? _highlightMessageId;
+  Timer? _highlightTimer;
   late String _uiStyle; // 当前界面风格（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
@@ -856,6 +859,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _ticker?.cancel();
     _peerTicker?.cancel();
     _recordTimer?.cancel();
+    _highlightTimer?.cancel(); // 跳转高亮定时清除（防 dispose 后 setState）
     _ampSub?.cancel();
     _ws?.connected.removeListener(_onWsStatusChanged);
     _ws?.stop();
@@ -1004,11 +1008,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() => _jumpTargetId = messageId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
-      // 第一步：按平均高度估算跳转（触发目标附近条目构建）
+      // 先立即设置高亮：目标已构建（视口/预构建区）即刻生效；目标很远时由
+      // 后续 jumpTo 触发的构建按 _highlightMessageId 应用高亮。不能放进嵌套
+      // post-frame——目标已在视口时 jumpTo 是 no-op 不调度新帧，嵌套回调
+      // 永不执行（2026-09-10 测试暴露的真机同类 bug）
+      _highlightTimer?.cancel();
+      setState(() => _highlightMessageId = messageId);
+      _highlightTimer = Timer(const Duration(milliseconds: 1600), () {
+        if (mounted) setState(() => _highlightMessageId = null);
+      });
+      // 定位：按平均高度估算跳转（触发目标附近条目构建）
       final estimated = (index * 120.0)
           .clamp(0.0, _scrollController.position.maxScrollExtent);
       _scrollController.jumpTo(estimated);
-      // 第二步：目标项已构建 → GlobalKey 精确校正（居中显示）
+      // 目标项已构建 → GlobalKey 精确校正（居中显示；目标已在视口时 jumpTo
+      // no-op、无新帧，此回调不执行，但目标本就可见无需校正）
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final ctx = _jumpTargetKey.currentContext;
@@ -1763,6 +1777,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
   }
 
+  /// 跳转目标短暂高亮色（老板要求 2026-09-10）：只换背景色、不改边框——
+  /// 边框 0→有 会改变气泡尺寸。gradient 深色气泡（白字）在原色上提亮 30%
+  /// 保证白字可读；plain 浅 tint 气泡用品牌浅粉实底（视觉明显区分）。
+  Color _highlightColor({required Color base}) {
+    if (_uiStyle == 'gradient') {
+      return Color.lerp(base, Colors.white, 0.30)!;
+    }
+    return const Color(0xFFFDD6ED);
+  }
+
   /// 消息内容按类型渲染（text 文本 / voice、audio 播放条 / image、video、file 各自卡片）。
   Widget _buildMessageContent(
       HistoryMessage m) {
@@ -2133,7 +2157,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // 其余项无 key，不阻碍懒构建回收
                         key: m.env.messageId == _jumpTargetId ? _jumpTargetKey : null,
                         onLongPress: () => _showMessageActions(m),
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeOut,
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           // 气泡最大宽度 = 屏幕 75%：长文本在此约束下自动换行
@@ -2141,8 +2167,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           constraints: BoxConstraints(
                               maxWidth: MediaQuery.sizeOf(context).width * 0.75),
                           decoration: BoxDecoration(
-                            // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）
-                            color: _bubbleColor(mine: mine),
+                            // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）；
+                            // 跳转目标短暂高亮只换背景色（尺寸不变，老板要求 2026-09-10）
+                            color: m.env.messageId == _highlightMessageId
+                                ? _highlightColor(base: _bubbleColor(mine: mine))
+                                : _bubbleColor(mine: mine),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: DefaultTextStyle.merge(

@@ -1028,7 +1028,7 @@
 
 **实现：**
 
-- `app_zh.arb` 5 处空格清理：wizardRecoverDone（请设置锁屏码）、setupPageSkipPinTitle（暂不设置锁屏码？）、setupPageSkipPinMessage（不设锁屏码则…）、chatPageSetLockTitle（设置锁屏码）、lockPageNoPinSet（尚未设置锁屏码（为空时不启用）），`flutter gen-l10n` 重新生成；chat_page_menu_test 6 处断言同步去空格
+- `app_zh.arb` 5 处空格清理：wizardRecoverDone（请设置锁屏码）、setupPageSkipPinTitle（不设置锁屏码？）、setupPageSkipPinMessage（不设锁屏码则…）、chatPageSetLockTitle（设置锁屏码）、lockPageNoPinSet（尚未设置锁屏码（为空时不启用）），`flutter gen-l10n` 重新生成；chat_page_menu_test 6 处断言同步去空格
 - 菜单第二组 PopupMenuItem 重排为 locale→burn→pin→invite→passphrase→export（锁屏码移到邀请码前、密保口令在导出前）
 - 菜单标签 `chatPageMenuChangePassphrase`：修改口令 → 密保口令（与 627e76c 口令密保箱、确认弹窗「修改密保口令？」命名方向一致）；chat_page_menu_test 菜单项断言/点击同步
 
@@ -1401,12 +1401,14 @@ AppBar 底边已到粉色、body 顶部还是天蓝，衔接处颜色跳变。
 **需求：** 按住麦克风按钮录音时，页面中央显示正在录音的波形图。
 
 **实现（commit 0fe560d）：**
+
 - 新增 `app/lib/widgets/recording_overlay.dart`：真实振幅驱动（record 插件
   `onAmplitudeChanged(70ms)`，dBFS -50~0 归一化 + 一阶平滑），波形条 + 录音时长 + 提示文案。
 - `chat_page.dart`：开始录音时取振幅流存 `_amplitudeStream`，停止时置空；
   body 包 Stack，`_recording` 时中央挂遮罩（IgnorePointer 不挡操作）。
 
 **要点/坑：**
+
 - `dart format` 会把 chat_page.dart 整体重排（594 行噪音）——该文件并非 format-clean，
   已恢复 HEAD 重做最小 diff；本项目大文件慎跑 dart format。
 - 测试环境无原生录音，遮罩仅在 `_recording` 时挂载，渲染路径不触碰 AudioRecorder，测试安全。
@@ -1439,6 +1441,7 @@ setup 相关 7 个失败经 stash 基线确认系既有环境问题，与本次�
 点选即立刻生效且不关窗（用户不离开弹窗即可预览大致效果）。
 
 **实现（commit eed4f2d）：**
+
 - 新增 `app/lib/data/ui_style_settings.dart`：`kUiStyleOptions`（plain/gradient）、
   双语标签/描述、品牌渐变常量 `kBrandGradient`（与首屏/向导同款
   [3BAFFD→D6529C topLeft→bottomRight]）、`uiStyleNotifier`（即时生效通知）、
@@ -1465,6 +1468,7 @@ golden 未触碰（plain 默认像素级不变）。
 覆盖；渐变被底下输入栏截断；要求输入栏在该风格下不顶左右两头。
 
 **实现（commit b03e1de）：**
+
 - `chat_page.dart` gradient 风格对齐向导做法：`extendBodyBehindAppBar: true` +
   AppBar 透明——渐变延伸到状态栏/标题栏（全屏自然过渡）；内容从工具栏高度下方
   开始（`MediaQuery.paddingOf.top + kToolbarHeight` 顶部留白，同向导
@@ -1497,12 +1501,14 @@ SafeArea 把它全垫在输入栏上方 → 消息列表底部停在输入栏上
 ## 2026-09-09 状态条悬浮圆角 + 气泡深色白字（渐变风格）
 
 **老板要求（2026-09-09）：**
+
 1. 顶部两人在线状态条目前左右顶到头、截断背景——改成与输入条一样：不顶左右两头、
    四角有弧度、悬浮在背景上。
 2. 渐变背景下消息气泡浅 tint 与背景区分不足——气泡底色改深粉（女）/深蓝（男），
    字体改白色，更醒目。
 
 **实现（commit 8d3e528）：**
+
 - 状态条 gradient 改悬浮圆角条：横向 12 边距 + 圆角 24 + 半透明白 85% + 柔和投影
   （与输入条同款样式，Key `chatPageStatusBar`）；plain 保持全宽浅灰条（像素不变）。
 - 气泡底色 `_bubbleColor` gradient 分支：男 → 品牌深蓝 `#2271F7`、女 → 深粉
@@ -1553,11 +1559,6 @@ invite_dialog_layout + widget_test 全过。
 状态下状态条均为圆角 24）+ chat_page_menu 12 + chat_initial_scroll +
 chat_bubble_gender 全过（共 18 项）。
 
-
-
-
-
-
 ## 2026-09-09 消息时间标注 + 图片黑底全屏（chat_page 两处 UI 改进）
 
 **老板要求（2026-09-09）：** 1) 点击消息流里图片全屏时，要和点击头像一样用纯黑
@@ -1566,6 +1567,7 @@ HH:MM、当年 mm-dd HH:MM、跨年 yyyy-mm-dd HH:MM；阅后即焚消息再附�
 焚毁时长（1m/5m/30m/1h/1d/7d 紧凑格式），去掉原来的「⏱ 阅后即焚」字样徽标。
 
 **实现：**
+
 - HistoryMessage typedef 新增 createdAt（落盘发送时间戳，未同步消息为本地发送
   时间）+ burnAfterSeconds（焚毁时长快照）；`_rowsToHistory` 填充，归档恢复缺
   快照时按 到期-创建 反推（dart:math max 保底 1s）。
@@ -1574,7 +1576,7 @@ HH:MM、当年 mm-dd HH:MM、跨年 yyyy-mm-dd HH:MM；阅后即焚消息再附�
   `_burnDurationLabel`（按 60/3600/86400 整除推导 m/h/d）；原内联 record 签名
   的 8 处函数改收 HistoryMessage（typedef 加字段后类型不同，必须同步）。
 - `_showFullImage` 改黑底全屏（Dialog backgroundColor: Colors.black +
-  insetPadding zero + 右上角关闭按钮，与 _MessageAvatar 全屏一致；保留
+  insetPadding zero + 右上角关闭按钮，与 \_MessageAvatar 全屏一致；保留
   InteractiveViewer 双指缩放）。视频全屏弹窗未动（老板只要求图片）。
 - l10n 清理 chatPageBurnBadge 死代码（app_zh/en.arb + app_localizations 三个
   dart 文件共 5 处）。
@@ -1618,6 +1620,7 @@ message_repository_test 新增 2 用例（引用载荷往返还原、deleteMessa
 （圆角方框版 logo.png 旋转）。
 
 **实现：**
+
 - 抠图：无 PIL/ImageMagick，用 node + pngjs 写 chroma-key 脚本（/tmp/einz_imgtool/
   chroma.js）：按亮度软阈值（22/40）+ 饱和度保护把黑底变为透明（保留光晕），
   输出 app/assets/spinnerLogo.png（1254×1254 RGBA，已注册 pubspec）。
@@ -1630,13 +1633,15 @@ message_repository_test 新增 2 用例（引用载荷往返还原、deleteMessa
 setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%，
 换图所致）、chat_page（11.77%，上轮时间标注所致）、lock_page（1.12%）与
 向导各步骤（98%+，风格改版遗留）保持红不重刷。
+
 ## 2026-09-09 修复：引用消息重启后显示原始 JSON（{plaintext:…} 泄漏）
 
 **老板报告（2026-09-09）：** 引用另一条消息发出去后，退出并重新打开 app，
 看到被引用的消息以纯文本 `{plaintext:'…',quote:{…}}` 展示。
 
 **排查（实证优先）：**
-- 先怀疑 repo 解析链路，写了复现测试「send → 服务端回拉（_markSent 不推进
+
+- 先怀疑 repo 解析链路，写了复现测试「send → 服务端回拉（\_markSent 不推进
   锚点，重启 sync 会把消息再拉回）→ 重新读取历史」——**12/12 全过**：app 侧
   `_rowsToHistory` 对引用包装的解析是确定性的，密文落盘稳定，重启前后不可能
   一个解析成功一个失败。
@@ -1653,13 +1658,14 @@ setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%�
 
 **待老板确认：** 若看到 JSON 的端是 app，多半是**旧构建**（需重装/重建）或 CLI
 （本次已修）；两种都不是的话提供截图，我再继续查。
+
 ## 2026-09-09 修复：首屏旋转 logo 出现 "Einz" 文字 + 四角残留（换透明底素材）
 
 **老板报告（2026-09-09）：** 换用透明背景 logo（Image #2）后，首屏旋转 logo
-有两个问题：1) 里面为何有 "Einz" 文字？给的 logo 是透明背景两个嵌套圆环；
-2) 旋转的正方形四周露出 4 个角（像正方形抠掉圆后剩的角）。
+有两个问题：1) 里面为何有 "Einz" 文字？给的 logo 是透明背景两个嵌套圆环；2) 旋转的正方形四周露出 4 个角（像正方形抠掉圆后剩的角）。
 
 **根因（像素级分析，node+pngjs inspect）：**
+
 - 上一版 `spinnerLogo.png` 是我从 `logo-bgBlack.png`（1254×1254 黑底）chroma-key
   抠出来的：**黑底源图本身就含 "Einz" 文字**（顶部 0-12% / 底部 68-94% 高度带
   有内容像素）且四角非纯黑（暗角 alpha ~57，抠图阈值没切掉）→ 文字和 4 个角
@@ -1668,6 +1674,7 @@ setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%�
   （包围盒 1220×820）、无文字条带——干净。
 
 **修复：** `spinnerLogo.png` 直接原样替换为透明版（不做抠图/裁剪）：
+
 - 试过居中裁方 1024×1024，发现会**切掉左右环边缘**（横版双环 1220px 宽 > 1024），
   弃用；
 - 用 1536×1024 原图 + 控件侧 `BoxFit.contain`（方形画布内留白居中）→ 旋转零
@@ -1675,6 +1682,7 @@ setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%�
 
 **验证：** 像素检查四角 alpha=0、内容居中；dart analyze 仅 1 条既有 info；
 检测页行为测试通过。golden 政策不变（检测页 golden 已红，不重刷）。
+
 ## 2026-09-09 修复：发了几条引用消息后，重启 app 不再自动跳到底部
 
 **老板报告（2026-09-09）：** 引用消息重启显示正常了（上一轮已修），但发了
@@ -1695,6 +1703,7 @@ setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%�
 
 **验证：** chat_initial_scroll_test 两个用例全过（原 60 条普通 + 新增引用
 场景）；dart analyze 仅 1 条既有 info（ws_realtime_service）。
+
 ## 2026-09-09 首屏视觉统一：无小→大跳变、Logo 移上半部、去掉服务器文字
 
 **老板要求（2026-09-09）：** 1) 刚打开时先显示小 logo、再跳变成更大的旋转 logo
@@ -1702,11 +1711,12 @@ setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%�
 应在屏幕上半部分；3) 不需要显示「服务器找不到」类文字，保持简洁优美。
 
 **定位：** 启动链三段都有问题——iOS 原生启动屏显示小 LaunchImage（168×185
-居中，白底）；StartupGate 显示 72px 居中 spinner；setup 检测页（_buildSplashScreen）
+居中，白底）；StartupGate 显示 72px 居中 spinner；setup 检测页（\_buildSplashScreen）
 Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检测服务器
 状态…/暂时无法连接服务器，正在自动重试…」文字。
 
 **实现：**
+
 - iOS LaunchScreen.storyboard：移除 LaunchImage 小图（原生启动屏空白，宁缺毋滥）；
 - main.dart StartupGate：改与检测页同款布局（96px + 上半部 Spacer 2:3），
   原生屏→StartupGate→检测页全程同尺寸同位置，无跳变；
@@ -1717,6 +1727,7 @@ Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检�
 
 **验证：** dart analyze 仅 1 条既有 info；setup_probe_retry + chat_initial_scroll
 （2 个滚动用例）全过。golden 政策不变（setup_step1_detect 失配保持红不重刷）。
+
 ## 2026-09-09 引用块移到消息正文下方（气泡内顺序调整）
 
 **老板要求（2026-09-09）：** 被引用的消息（引用块）现在显示在消息正文上面，
@@ -1727,6 +1738,7 @@ Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检�
 对接收方显示同步生效（同一渲染路径）。
 
 **验证：** dart analyze 仅 1 条既有 info（ws_realtime_service，与本次无关）。
+
 ## 2026-09-09 删除/阅后即焚改本地墓碑：内容隐藏、记录保留（不打破历史流水）
 
 **老板决策（2026-09-09）：** 想清楚了——阅后即焚和手动删除都改**本地标记**，
@@ -1734,9 +1746,10 @@ Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检�
 的记录还在（不打破消息历史流水，只隐藏内容）。
 
 **实现：**
+
 - 数据层：local_messages 加 `deleted_at` 可空列（v3 迁移，build_runner 重生成
   g.dart）；NULL=正常，非空=本机已删除/已焚毁。
-- repo：`HistoryMessage` 加 `deleted` 字段（_rowsToHistory 按 deletedAt 填充）；
+- repo：`HistoryMessage` 加 `deleted` 字段（\_rowsToHistory 按 deletedAt 填充）；
   `deleteMessage`→`tombstoneMessage`、`purgeExpired`→`tombstoneExpired`
   （都改为只置 deletedAt，行与附件保留；已墓碑不重复标记）；
   `_flushPending`/`pendingCount` 跳过墓碑行（已删的未发送消息不再补发）。
@@ -1750,6 +1763,7 @@ Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检�
 **验证：** dart analyze 仅 1 条既有 info；message_repository_test 12/12 全过；
 chat_initial_scroll + setup_probe_retry + chat_page_menu 15/15 全过。golden
 政策不变（chat_page golden 失配保持红不重刷）。
+
 ## 2026-09-09 自动 sync 无新消息时不拉到底 + 引用块去掉蓝边
 
 **老板要求（2026-09-09）：** 1) 自动 sync 没发现新消息时，不要把消息流拉到最
@@ -1758,6 +1772,7 @@ chat_initial_scroll + setup_probe_retry + chat_page_menu 15/15 全过。golden
 可以有）。
 
 **实现：**
+
 - `_refresh`：先算出实际新增消息 `added`（historySince 结果去重），仅当
   `added.isNotEmpty` 才 `_scrollToLatest()`——ticker 轮询/WS 断线重连等无新
   消息的自动 sync 不再打扰用户的滚动位置；发送消息、收到新消息仍会拉到底；
@@ -1771,6 +1786,7 @@ chat_initial_scroll + setup_probe_retry + chat_page_menu 15/15 全过。golden
 **验证：** chat_initial_scroll_test 3/3 全过（新增用例：固定序号 fake 模拟真实
 Server——无新消息时不拉回底部、新消息到达后拉到底）；dart analyze 仅 1 条
 既有 info。
+
 ## 2026-09-09 输入栏引用条去掉「引用：」前缀（双引号图标已足够）
 
 **老板要求（2026-09-09）：** 选择引用后，输入框上方的引用框里，双引号图标后
@@ -1796,6 +1812,7 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 **背景：** 老板自查 2026-09-09 的性别配色实现，发现不周到之处并交由我实施服务端性别表方案。
 
 **修复（cli/bin/einz_tui.dart）：**
+
 1. **提交规范化**：旧 TUI 引导直传中文 男/女 到服务端 meta（App 传 male/female），
    渲染端按 `'male'` 匹配不上 → 新增 `_genderCode()` 提交时转 male/female（与 App/服务端规范一致）。
 2. **渲染兼容两值**：`male`/`female` 与旧数据 男/女 都能识别——男蓝 `_bgBlue`(104m)、
@@ -1813,6 +1830,7 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 同步互换（对方贴左、我的贴右）；按对方性别配色不变。
 
 **实现（cli/bin/einz_tui.dart）：**
+
 1. **我的消息**：绿色前缀 + 普通正文，整块右对齐（每行右缘对齐 cols-8，8 列右留白镜像原左侧布局）。
 2. **对方消息**：气泡镜像到左侧——`[who 时间]` 标签贴最左、彩色底正文居右，矩形气泡
    （col 10+suffixW → cols-8 各行列一致），性别配色（男蓝/女粉/未知青绿）不变；
@@ -1832,6 +1850,7 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 纯文本（不加气泡）；对方消息=左侧保留性别气泡（标签贴左）。
 
 **定位的问题（cli/bin/einz_tui.dart）：**
+
 1. 我的消息原实现把 [我 时间] 放行首再右对齐——长消息首行起点落回左缘、短消息
    标签飘在中间，左右观感不一致 → 改为**标签贴右缘**（末行末尾 `body [我 时间]`），
    所有行右缘统一对齐 cols-8。
@@ -1861,6 +1880,7 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 **老板要求：** 在严格互换插槽基础上，对方消息也加上按性别配色的气泡效果。
 
 **实现（cli/bin/einz_tui.dart）：**
+
 - 新增 `_genderBubble(rawGender)` 辅助：男蓝 / 女品红 / 未知青绿（兼容 male/female 与旧中文 男/女）；
 - 对方消息从"黄色前缀纯文本"改为**左侧性别气泡**：`[对方名 时间]` 黑字标签嵌在气泡
   左缘、正文白字，气泡矩形 col 1 → cols-8（右侧留白 8 列），与右侧我方气泡
@@ -1875,17 +1895,20 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 ## 2026-09-10 CLI/TUI 气泡细节调整：对方标签移首行 + 我的气泡右缘补齐
 
 **老板要求：**
+
 1. 对方（左侧）长消息的 `[名字 时间]` 标签从末行开头改到**首行开头**（我的右侧消息标签在末行是对的，不动）；
 2. 我的（右侧）长消息气泡**包含右侧留白**——此前非末行只给正文上背景色，中英文折行宽度差
    造成右缘锯齿；改为正文 + 背景色填充到整行右缘（col cols），与末行（标签本就在背景色上贴右）
    一致，整块成为右侧实心矩形，与左侧对方气泡（col 1 → cols-8）对称。
 
 **实现（cli/bin/einz_tui.dart）：**
+
 - 对方分支：标签渲染从 `i == last` 移到 `i == 0`（首行，含单行）；其余行（含末行）标签栏留空
   并补齐到右留白前，矩形保持完整；
 - 我的分支：非末行新增 `fill = (cols - leftPad) - bodyW` 背景色填充，各行右缘统一对齐 col cols。
 
 **验证：** dart analyze 通过。老板确认后提交（本条目随提交落库）。
+
 ## 2026-09-10 启动链首帧回归修复：StartupGate 加载屏渐变缩成左侧细条
 
 **老板反馈：** app 打开时第一个画面只有左侧约 1/3 是渐变粉蓝背景 + Logo，右侧
@@ -1901,10 +1924,36 @@ Center 会撑满宽松约束，Column 不会，改动引入了回归。加载屏
 全屏）——正是「0.5s 左侧 1/3 → 跳变全屏」的成因。
 
 **修复：** StartupGate 渐变容器改 `Container` + `alignment: Alignment.topCenter`
-（与 setup_page._buildSplashScreen 同款已验证写法，aafad56），宽松/紧约束下
+（与 setup_page.\_buildSplashScreen 同款已验证写法，aafad56），宽松/紧约束下
 都撑满全屏；启动链三段（原生屏→StartupGate→检测页）恢复无尺寸跳变。
 
 **测试：** 顺带修复 3474618 遗留的陈旧断言——widget_test「探测失败」用例仍断言
 已删除的失败文字（`暂时无法连接服务器…`），改为断言新行为（旋转 Logo 保持 +
 无失败文字，与 setup_probe_retry_test 一致）。setup_probe_retry + widget_test
 4/4 全过；flutter analyze 0 issue。已 USR2 热重启供老板确认。
+## 2026-09-10 点击引用卡跳转原消息 + 目标短暂高亮
+
+**老板要求（2026-09-10）：** 1) 点击消息内引用卡跳转到原消息位置；2) 跳转后
+短暂高亮目标——老板指出边框 0→有会改气泡尺寸，用背景色高亮更稳。
+
+**实现（chat_page）：**
+- 引用卡（气泡内引用块）包 GestureDetector onTap → `_jumpToMessage`：
+  目标未加载（UI 分页懒加载只渲染最近一页）时先 `sequenceOfMessage`（repo
+  新增：按 messageId 查 serverSequence）往前分页补载直到覆盖目标；定位用
+  「估算 jumpTo 触发目标附近构建 → 目标 GlobalKey ensureVisible 居中校正」。
+  目标 GlobalKey 仅跳转目标持有，不阻碍懒回收。
+- 高亮：气泡 Container → AnimatedContainer（350ms 过渡），只换背景色——
+  gradient 深色气泡（白字）原色提亮 30%；plain 浅 tint 气泡用品牌浅粉
+  #FDD6ED；1.6s 后 Timer 恢复（dispose cancel）。
+- **坑（真机同类 bug，widget 测试暴露）**：高亮 setState 原放在嵌套第二个
+  post-frame 回调里——目标已在视口时 jumpTo 是 no-op 不调度新帧，`pump()`
+  只在 hasScheduledFrame 时才处理帧，嵌套回调永不执行、高亮不生效。改为在
+  第一个 post-frame 回调里立即置高亮（目标未构建时由后续构建按
+  _highlightMessageId 应用），ensureVisible 校正保留在嵌套回调。
+
+**老板决策（墓碑/抹除语义）：** 原消息被删除/焚毁（本地墓碑）时仍可跳转——
+meta（时间信息）仍在消息流，用户可能对上下文感兴趣（现状即正确）；未来实现
+彻底抹除功能时，抹除消息不跳转，改为顶栏通知「已抹除无法跳转」。
+
+**验证：** flutter analyze 0 issue；chat_initial_scroll（含新高亮用例 4/4）、
+chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热重启。

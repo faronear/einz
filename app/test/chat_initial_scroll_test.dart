@@ -1,6 +1,7 @@
 // 回归测试：进入对话页首屏即应滚动到最新消息（列表底部）——
 // 老板实测（2026-09-09）：刚进对话页停在最早消息处，要等几秒 ticker 自动刷新
 // 才滚到最新；应首次载入时就定位到底部。
+// 另含：点击引用卡跳转到原消息并短暂高亮（老板要求 2026-09-10）。
 
 import 'dart:convert';
 
@@ -257,5 +258,77 @@ void main() {
     await tester.pumpAndSettle(); // 平滑滚动动画结束
     expect(position.pixels, closeTo(position.maxScrollExtent, 1.0),
         reason: '发现新消息应拉到底部');
+  });
+
+  testWidgets('点击引用卡跳转到原消息并短暂高亮（背景色高亮、定时恢复）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 5 条消息（≤ 首屏页 50，全部加载）：msg-5 引用 msg-2（点击目标已在列表）
+    final msgs = <MessageEnvelope>[];
+    for (var i = 1; i <= 5; i++) {
+      final payload = i == 5
+          ? jsonEncode({
+              'plaintext': '引用回复 5',
+              'quote': {'messageId': 'msg-2', 'preview': '预览：原始消息 2'},
+            })
+          : '原始消息 $i';
+      msgs.add(await encryptMessage(
+        plaintext: payload,
+        spaceKey: spaceKey,
+        spaceId: 'space-test',
+        senderDeviceId: 'dev-a',
+        messageId: 'msg-$i',
+        keyVersion: 1,
+      ));
+    }
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(msgs),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    // 点击引用卡（msg-5 气泡内的引用块预览）
+    await tester.tap(find.text('预览：原始消息 2'));
+    // 逐帧推进：帧1=_jumpToMessage setState(jumpTargetId)；帧2=post-frame 回调1
+    // （jumpTo）+ 帧末；帧3=post-frame 回调2（ensureVisible + 高亮 setState）
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400)); // 高亮过渡动画帧
+
+    // 原消息 msg-2 的气泡应高亮（plain 风格高亮色 = 品牌浅粉 #FDD6ED）
+    final bubble = find
+        .ancestor(
+            of: find.text('原始消息 2'), matching: find.byType(AnimatedContainer))
+        .first;
+    expect(bubble, findsOneWidget, reason: '应能定位到原消息气泡');
+    final highlighted =
+        tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration;
+    expect(highlighted.color, const Color(0xFFFDD6ED),
+        reason: '跳转目标气泡应短暂高亮（品牌浅粉背景）');
+
+    // 1.6s 定时清除后恢复原气泡色（plain 未登记性别 = indigo.shade100）
+    await tester.pump(const Duration(milliseconds: 1600));
+    await tester.pump(); // Timer 回调 setState 渲染
+    final restored =
+        tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration;
+    expect(restored.color, Colors.indigo.shade100,
+        reason: '高亮应定时恢复原气泡色');
   });
 }
