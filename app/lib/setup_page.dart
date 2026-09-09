@@ -1251,7 +1251,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 单个性别按钮：品牌色背景 + 白字图标/标签；选中放大 + 横向扩展（锚点在外侧，
-  /// 覆盖相邻未选中卡片）+ 阴影；未选中压缩半透明。
+  /// 覆盖相邻未选中卡片）+ 阴影；未选中压缩半透明；切换时大小/颜色/阴影渐变。
   Widget _buildGenderButton({
     required String label,
     required IconData icon,
@@ -1262,46 +1262,45 @@ class _SetupPageState extends State<SetupPage> {
   }) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: selected ? 1 : 0),
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-      // 未选中（t=0）：整体压缩 0.9；选中（t=1）：纵向放大 1.15 + 横向扩展 1.35，
-      // 锚点在外侧 → 选中卡片覆盖相邻未选中卡片
-      builder: (context, t, child) => Transform(
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeInOutCubic,
+      // 未选中（t=0）→ 选中（t=1）整体渐变：大小（0.9 → 纵向 1.15 + 横向 1.35）、
+      // 颜色（半透明 → 不透明）、阴影（0 → 4）同步缓动；锚点在外侧覆盖相邻卡片
+      builder: (context, t, _) => Transform(
         alignment: alignment,
         transform: Matrix4.diagonal3Values(
           0.9 + 0.45 * t,
           0.9 + 0.25 * t,
           1,
         ),
-        child: child,
-      ),
-      child: Material(
-        color: selected ? color : color.withValues(alpha: 0.35),
-        elevation: selected ? 4 : 0,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onTap,
+        child: Material(
+          color: Color.lerp(color.withValues(alpha: 0.35), color, t),
+          elevation: 4 * t,
           borderRadius: BorderRadius.circular(14),
-          child: Container(
-            alignment: Alignment.center, // 卡片撑满槽位后内容垂直居中
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14), // 无描边（老板：白边累赘），选中靠阴影+放大区分
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: Colors.white, size: 26),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              alignment: Alignment.center, // 卡片撑满槽位后内容垂直居中
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14), // 无描边（老板：白边累赘），选中靠阴影+放大区分
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: Colors.white, size: 26),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
