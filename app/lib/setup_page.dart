@@ -346,18 +346,32 @@ class _SetupPageState extends State<SetupPage> {
                                 ],
                               ),
                               padding: const EdgeInsets.all(20),
-                              child: SingleChildScrollView(child: _buildStep()),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: SingleChildScrollView(child: _buildStep()),
+                                  ),
+                                  // 后台报告的错误提示（红字）固定在卡片最下方：
+                                  // 白底上清晰可读（渐变背景上对比不足看不清，老板要求 2026-09-09）
+                                  if (_status != null) ...[
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _status!,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                // 后台报告的错误提示（红字；本地校验错误见输入框下方）
-                if (_status != null) ...[
-                  Text(_status!,
-                      style: const TextStyle(color: Colors.red, fontSize: 14)),
-                  const SizedBox(height: 8),
-                ],
                 // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
                 // 此时也有"下一步"可回到步骤 1，杜绝无路可走）
                 // join 步骤 1（身份选择）例外：点卡片即自动前进，整行按钮隐藏
