@@ -561,8 +561,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 decoration: InputDecoration(
                   labelText: l10n.chatPageDevicePublicKeyLabel,
                   border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: Colors.grey.shade100, // 只读灰底：与可编辑白底区分
+                  // 公钥只读：不加背景色，沿用弹窗背景（可编辑的设备名称才是白底）
                   suffixIcon: IconButton(
                     tooltip: l10n.chatPageCopy,
                     icon: const Icon(Icons.copy, size: 18),
@@ -583,6 +582,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               decoration: InputDecoration(
                 labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
                 border: const OutlineInputBorder(),
+                // 可编辑字段：白底暗示可编辑（老板要求 2026-09-09）
+                filled: true,
+                fillColor: Colors.white,
               ),
               // 开始填写即清除空名警示（与向导输入框一致）
               onChanged: (_) {
@@ -622,10 +624,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   children: [
                     Text(
                       l10n.chatPageGenderLabel,
-                      style: const TextStyle(
+                      // 「性别」标签用标签色（与输入框 label 同色），特别字体仅体现在
+                      // 加粗/字距（老板要求 2026-09-09：不是粉红色）
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFFD6529C), // 品牌粉
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         letterSpacing: 4,
                       ),
                     ),
