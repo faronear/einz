@@ -532,6 +532,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showRenameDialog({required bool renameDevice}) async {
     final l10n = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: renameDevice ? _myDeviceName : _myPersonName);
+    // 公钥只读展示（我的设备弹窗）：静态文本控制器，随对话框关闭释放
+    final pubKeyCtrl = TextEditingController(
+      text: widget.publicKeyB64 ?? l10n.chatPageDevicePublicKeyFailed,
+    );
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
     final saved = await showDialog<bool>(
@@ -542,18 +546,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 我的设备弹窗：公钥置顶 + 复制按钮（随锁包持久化，本地读取；旧包无 → 兜底）
+            // 我的设备弹窗：公钥只读展示——textarea 样式，边框左上角「公钥」标签，
+            // 右侧拷贝按钮；灰底暗示只读，与白底可编辑的设备名称形成对比
+            // （老板要求 2026-09-09）
             if (renameDevice) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: SelectableText(
-                      '${l10n.chatPageDevicePublicKeyLabel}: '
-                      '${widget.publicKeyB64 ?? l10n.chatPageDevicePublicKeyFailed}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey, fontFamily: 'monospace'),
-                    ),
-                  ),
-                  IconButton(
+              TextFormField(
+                controller: pubKeyCtrl,
+                readOnly: true,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.grey),
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageDevicePublicKeyLabel,
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey.shade100, // 只读灰底：与可编辑白底区分
+                  suffixIcon: IconButton(
                     tooltip: l10n.chatPageCopy,
                     icon: const Icon(Icons.copy, size: 18),
                     visualDensity: VisualDensity.compact,
@@ -564,7 +571,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             showTopNotice(ctx, l10n.chatPageCopied);
                           },
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 12),
             ],
@@ -596,24 +603,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
             ),
             // 我的个人资料弹窗：名字框下显示性别——只显示本人性别的图标
-            // （男天蓝/女品牌粉；未登记性别时不显示图标，老板要求 2026-09-09）
+            // （男天蓝/女品牌粉；未登记性别时不显示图标）。性别行做成与名字
+            // 输入框等高同宽的展示容器（对称协调），「性别」标签用特别字体
+            // （品牌粉+加粗+字距，老板要求 2026-09-09）
             if (!renameDevice) ...[
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Text(
-                    l10n.chatPageGenderLabel,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+              Container(
+                height: 56, // 与默认 TextField 等高，视觉均衡
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  borderRadius: BorderRadius.circular(4), // 与 OutlineInputBorder 一致
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      l10n.chatPageGenderLabel,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFD6529C), // 品牌粉
+                        letterSpacing: 4,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  if (_myGender == 'male')
-                    const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 26)
-                  else if (_myGender == 'female')
-                    const Icon(Icons.female, color: Color(0xFFD6529C), size: 26),
-                ],
+                    const Spacer(),
+                    if (_myGender == 'male')
+                      const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 26)
+                    else if (_myGender == 'female')
+                      const Icon(Icons.female, color: Color(0xFFD6529C), size: 26),
+                  ],
+                ),
               ),
             ],
           ],
@@ -659,6 +678,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
+      pubKeyCtrl.dispose();
       nameError.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字

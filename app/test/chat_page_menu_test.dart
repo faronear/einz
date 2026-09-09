@@ -523,15 +523,18 @@ void main() {
     await tester.tap(find.text('我的设备'));
     await tester.pumpAndSettle();
 
-    // 标题「我的设备信息」；公钥置顶 + 复制按钮；输入框标签「设备名称」
+    // 标题「我的设备信息」；公钥只读展示（左上角「公钥」标签 + 值）+ 复制按钮；输入框标签「设备名称」
     expect(find.text('我的设备信息'), findsOneWidget, reason: '弹窗标题应为「我的设备信息」');
-    expect(find.text('公钥: dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥应显示在弹窗顶部');
-    expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥旁应有复制按钮');
+    expect(find.text('公钥'), findsOneWidget, reason: '公钥框左上角应有「公钥」标签');
+    expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
+    expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥框右侧应有复制按钮');
     expect(find.text('设备名称'), findsWidgets, reason: '输入框标签应为「设备名称」');
 
-    // 空名点保存 → 红字警示并停留（不静默）
-    final dialogField = find.descendant(
-        of: find.byType(AlertDialog), matching: find.byType(TextField));
+    // 空名点保存 → 红字警示并停留（不静默）；对话框含两个输入框：只读公钥在前、
+    // 可编辑设备名在后 → 取 .last
+    final dialogField = find
+        .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
+        .last;
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('名称不能为空'), findsOneWidget, reason: '空设备名保存应红字警示');
