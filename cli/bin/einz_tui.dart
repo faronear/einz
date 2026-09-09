@@ -1080,12 +1080,13 @@ void _render() {
   final peerName = _peerNameOf(s);
   final peerDevice = _peerDeviceLabel(s);
   final peerDot = s.peerOnline ? '$_green●$_white' : '${_white}○';
-  // 三段式标题栏：我的状态贴左缘、对方状态贴右缘、品牌名 "Einz TUI" 居中
+  // 三段式标题栏：对方状态贴左缘、我的状态贴右缘（与消息左右分栏一致——
+  // 对方消息在左、我的消息在右）、品牌名 "Einz TUI" 居中
   // （窄终端放不下三段时先弃中段，再不行截断右段，保左段完整）。
   final titleText = _titleBarThree(
-    '$myDot ${_personLabel(s.session.store, s.personNames)}',
-    '${_bold}Einz TUI$_white',
     '$peerDot $peerName #$peerDevice',
+    '${_bold}Einz TUI$_white',
+    '$myDot ${_personLabel(s.session.store, s.personNames)}',
     cols,
   );
   buf.write(titleText);
@@ -1314,8 +1315,8 @@ void _startPeerPolling() {
 }
 
 /// 消息时间标签（本地时间，参照渲染时刻）：
-/// 今天 → HH:MM（如 14:30）；跨天（同年）→ MM月DD号 HH:MM（如 9月2号 14:30）；
-/// 跨年 → 再补年份（如 2026年9月2号 14:30）。
+/// 今天 → HH:MM（如 14:30）；跨天（同年）→ MM-DD HH:MM（如 09-02 14:30）；
+/// 跨年 → 再补年份（如 2026-09-02 14:30）。
 String _timeLabel(int createdAt) {
   final t = DateTime.fromMillisecondsSinceEpoch(createdAt);
   final now = DateTime.now();
@@ -1323,14 +1324,15 @@ String _timeLabel(int createdAt) {
   final hm = '${two(t.hour)}:${two(t.minute)}';
   final sameDay = t.year == now.year && t.month == now.month && t.day == now.day;
   if (sameDay) return hm;
-  final md = '${t.month}月${t.day}号';
+  final md = '${two(t.month)}-${two(t.day)}';
   if (t.year == now.year) return '$md $hm';
-  return '${t.year}年$md $hm';
+  return '${t.year}-$md $hm';
 }
 
 /// 格式化消息为多行（自动按列宽折行）。
-/// 自己的消息：绿色前缀 + 普通正文（左对齐）；对方消息：整块右对齐（右侧气泡风格，
-/// 正文在右、末尾附 [who 时间] 标签）；系统提示（isSystem）：灰色前缀 + 普通正文。
+/// 自己的消息：性别气泡，整块右对齐（右侧气泡风格，正文在右、末尾附 [我 时间] 标签），
+/// 背景按我的性别配色；对方消息：黄色前缀 + 普通正文（左对齐）；
+/// 系统提示（isSystem）：灰色前缀 + 普通正文（左对齐）。
 List<String> _formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
@@ -1351,12 +1353,12 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   }
   final time = _timeLabel(m.createdAt);
   final body = m.plain.replaceAll('\n', ' ');
-  // 双方消息的外侧留白（同为 8 列）：我方正文右侧 / 对方正文左侧；
+  // 双方消息的外侧留白（同为 8 列）：对方正文右侧 / 我方气泡左侧；
   // 保证对方正文起点不比我方正文（前缀之后）更靠左
   const sideMargin = 8;
-  if (m.isMine || m.isSystem) {
-    // 自己消息与系统提示：前缀 + 普通正文（system 不用粉红背景），左对齐。
-    // 正文右侧预留 sideMargin 列边距，不顶满最右（与对方消息的视觉留白平衡）；
+  if (m.isSystem || !m.isMine) {
+    // 系统提示与对方消息：前缀 + 普通正文（system 不用彩色气泡背景），左对齐。
+    // 正文右侧预留 sideMargin 列边距，不顶满最右（与我方气泡的视觉留白平衡）；
     // 续行缩进 prefix 宽度，与第一行正文左缘对齐
     final prefix = '$color[$who $time]$_reset ';
     final prefixW = _displayWidth(prefix);
@@ -1367,8 +1369,8 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       ...wrapped.skip(1).map((line) => '$indent$line'),
     ];
   }
-  // 对方消息：整块右对齐（右侧气泡风格），背景按对方性别配色——男蓝、女品红、
-  // 性别未知（旧空间未登记/尚未拉取）青绿底；正文白字、[人名 时间] 黑字；
+  // 我的消息：整块右对齐（右侧气泡风格），背景按我的性别配色——男蓝、女品红、
+  // 性别未知（旧空间未登记/尚未拉取）青绿底；正文白字、[我 时间] 黑字；
   // 前导留白不上色（保持右对齐气泡感）。
   // 兼容服务端两种取值：App 提交规范 male/female，旧 TUI 提交过中文 男/女。
   final rawGender = _state?.personGenders[m.env.senderPersonId];
@@ -1386,7 +1388,7 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   // 标签栏宽 = "空格+标签"（标签宽+1），使续行正文右缘与末行标签起点对齐
   // （末行正文与标签之间有一个空格，若只空标签宽则续行会多伸 1 列）
   final lane = suffixW + 1; // 右侧标签栏宽（含标签前一个空格）
-  final leftPad = sideMargin; // 左侧留白 = 我方正文右侧留白（8 列）
+  final leftPad = sideMargin; // 左侧留白 = 对方正文右侧留白（8 列）
   final textWidth = cols - lane - leftPad;
   final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
   final lines = <String>[];
