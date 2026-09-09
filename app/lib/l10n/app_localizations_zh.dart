@@ -34,7 +34,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEnvelopeKeyHint => '粘贴密保信封（envelope-*.txt 内容）';
 
   @override
-  String get setupPageNeedPassphrase => '⚠️ 先在上方填写密保口令';
+  String get setupPageNeedPassphrase => '❗️ 必须设置密保口令';
 
   @override
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
@@ -52,10 +52,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '暂时无法连接服务器，正在自动重试…';
 
   @override
-  String get wizardNameHint => '我的名字（将来可以随时修改）。';
+  String get wizardNameHint => '我的名字（以后可以随时修改）';
 
   @override
-  String get wizardPeerNameHint => '伴侣的名字（将来可以随时修改）：';
+  String get wizardPeerNameHint => '伴侣的名字（以后可以随时修改）';
 
   @override
   String get wizardPeerNameHintInput => '例如 Alice';
@@ -64,7 +64,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameRequired => '填写我的名字';
 
   @override
-  String get wizardPeerNameRequired => '填写秘境伴侣的名字';
+  String get wizardPeerNameRequired => '填写我的秘境伴侣的名字';
 
   @override
   String get wizardNameHintInput => '例如 Lukas';
@@ -85,7 +85,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardGenderRequired => '请选择性别';
 
   @override
-  String get wizardIdentityHint => '一个秘境仅限两人，请选择身份';
+  String get wizardIdentityHint => '秘境仅限两人，请选择身份';
 
   @override
   String get wizardIdentityCreator => '秘境创建者';
@@ -181,10 +181,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogTitleJoin => '🎉 一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '秘境仅限两人。所有消息端到端加密，确保绝对隐私，开始聊天吧。';
+  String get welcomeDialogMessage => '秘境里只有俩人，所有消息端到端加密，确保绝对隐私！进入秘境，开始聊天吧。';
 
   @override
-  String get welcomeDialogStart => '开始聊天';
+  String get welcomeDialogStart => '进入秘境';
 
   @override
   String setupPageKeyGenFailed(String error) {
@@ -322,10 +322,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameNameLabel => '新名字';
 
   @override
-  String get chatPageRenameDeviceTitle => '修改设备名称';
+  String get chatPageRenameDeviceTitle => '我的设备';
 
   @override
-  String get chatPageRenameDeviceLabel => '新设备名';
+  String get chatPageRenameDeviceLabel => '设备名称';
+
+  @override
+  String get chatPageRenameEmptyError => '名称不能为空';
+
+  @override
+  String get chatPageCopy => '复制';
+
+  @override
+  String get chatPageCopied => '已复制';
 
   @override
   String chatPageRenameFailed(String error) {

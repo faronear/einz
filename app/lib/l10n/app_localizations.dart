@@ -695,14 +695,32 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameDeviceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Change device name'**
+  /// **'Device name'**
   String get chatPageRenameDeviceTitle;
 
   /// No description provided for @chatPageRenameDeviceLabel.
   ///
   /// In en, this message translates to:
-  /// **'New device name'**
+  /// **'Device name'**
   String get chatPageRenameDeviceLabel;
+
+  /// No description provided for @chatPageRenameEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Name cannot be empty'**
+  String get chatPageRenameEmptyError;
+
+  /// No description provided for @chatPageCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get chatPageCopy;
+
+  /// No description provided for @chatPageCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get chatPageCopied;
 
   /// No description provided for @chatPageRenameFailed.
   ///

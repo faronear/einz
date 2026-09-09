@@ -33,6 +33,11 @@ class _FakeApi extends ApiClient {
   Future<void> updatePersonName(String personName, String token) async {
     // 改名成功（无网络，供保存路径测试）
   }
+
+  @override
+  Future<void> updateDeviceName(String deviceName, String token) async {
+    // 改设备名成功（无网络，供保存路径测试）
+  }
 }
 
 void main() {
@@ -484,5 +489,69 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Alice'), findsWidgets, reason: '重启后应从 profile 恢复新名字');
     expect(find.text('personB'), findsNothing, reason: '不应回到旧名 personB');
+  });
+
+  testWidgets('我的设备弹窗：标题与菜单一致、公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        publicKeyB64: 'dGVzdC1wdWJrZXk=',
+        privateKeyB64: 'dGVzdC1wcml2a2V5',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 菜单 → 我的设备
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('我的设备'));
+    await tester.pumpAndSettle();
+
+    // 标题与菜单同名「我的设备」；公钥置顶 + 复制按钮；输入框标签「设备名称」
+    expect(find.text('我的设备'), findsOneWidget, reason: '弹窗标题应与菜单一致');
+    expect(find.text('公钥: dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥应显示在弹窗顶部');
+    expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥旁应有复制按钮');
+    expect(find.text('设备名称'), findsWidgets, reason: '输入框标签应为「设备名称」');
+
+    // 空名点保存 → 红字警示并停留（不静默）
+    final dialogField = find.descendant(
+        of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('名称不能为空'), findsOneWidget, reason: '空设备名保存应红字警示');
+
+    // 全空格同样警示
+    await tester.enterText(dialogField, '   ');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('名称不能为空'), findsOneWidget, reason: '全空格设备名保存应红字警示');
+
+    // 开始填写即消红字
+    await tester.enterText(dialogField, '我的手机');
+    await tester.pumpAndSettle();
+    expect(find.text('名称不能为空'), findsNothing, reason: '开始填写后红字应消失');
+
+    // 有效名称 → 保存成功关闭弹窗（400ms 延迟 dispose 不红屏）
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+    expect(find.text('我的设备'), findsNothing, reason: '保存成功应关闭弹窗');
   });
 }

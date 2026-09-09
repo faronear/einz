@@ -529,6 +529,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showRenameDialog({required bool renameDevice}) async {
     final l10n = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: renameDevice ? _myDeviceName : _myPersonName);
+    // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
+    final nameError = ValueNotifier<String?>(null);
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -537,22 +539,59 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 我的设备弹窗：公钥置顶 + 复制按钮（随锁包持久化，本地读取；旧包无 → 兜底）
+            if (renameDevice) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      '${l10n.chatPageDevicePublicKeyLabel}: '
+                      '${widget.publicKeyB64 ?? l10n.chatPageDevicePublicKeyFailed}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey, fontFamily: 'monospace'),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.chatPageCopy,
+                    icon: const Icon(Icons.copy, size: 18),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: widget.publicKeyB64 == null
+                        ? null
+                        : () {
+                            Clipboard.setData(ClipboardData(text: widget.publicKeyB64!));
+                            showTopNotice(ctx, l10n.chatPageCopied);
+                          },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
             TextField(
               controller: ctrl,
               decoration: InputDecoration(
                 labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
                 border: const OutlineInputBorder(),
               ),
+              // 开始填写即清除空名警示（与向导输入框一致）
+              onChanged: (_) {
+                if (nameError.value != null) nameError.value = null;
+              },
             ),
-            // 我的设备弹窗：展示本机公钥（随锁包持久化，本地直接读取；旧包无 → 兜底）
-            if (renameDevice) ...[
-              const SizedBox(height: 12),
-              SelectableText(
-                '${l10n.chatPageDevicePublicKeyLabel}: '
-                '${widget.publicKeyB64 ?? l10n.chatPageDevicePublicKeyFailed}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey, fontFamily: 'monospace'),
-              ),
-            ],
+            ValueListenableBuilder<String?>(
+              valueListenable: nameError,
+              builder: (_, err, _) => err == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        err,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+            ),
           ],
         ),
         actions: [
@@ -560,7 +599,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           FilledButton(
             onPressed: () async {
               final name = ctrl.text.trim();
-              if (name.isEmpty) return;
+              if (name.isEmpty) {
+                // 空/全空格：红字警示并停留（不再静默跳过）
+                nameError.value = l10n.chatPageRenameEmptyError;
+                return;
+              }
               try {
                 final api = widget.api ?? ApiClient(widget.server);
                 if (renameDevice) {
@@ -588,7 +631,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖
     // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
-    Future<void>.delayed(const Duration(milliseconds: 400), ctrl.dispose);
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      ctrl.dispose();
+      nameError.dispose();
+    });
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
   }
 

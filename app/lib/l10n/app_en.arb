@@ -127,8 +127,11 @@
   "chatPageMenuExit": "Exit app",
   "chatPageRenameNameTitle": "Change my name",
   "chatPageRenameNameLabel": "New name",
-  "chatPageRenameDeviceTitle": "Change device name",
-  "chatPageRenameDeviceLabel": "New device name",
+  "chatPageRenameDeviceTitle": "Device name",
+  "chatPageRenameDeviceLabel": "Device name",
+  "chatPageRenameEmptyError": "Name cannot be empty",
+  "chatPageCopy": "Copy",
+  "chatPageCopied": "Copied",
   "chatPageRenameFailed": "Rename failed: {error}",
   "@chatPageRenameFailed": {
     "placeholders": {
