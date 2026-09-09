@@ -371,6 +371,16 @@ class MessageRepository {
     return _rowsToHistory(rows.reversed.toList());
   }
 
+  /// 按 messageId 查 serverSequence（点击引用卡跳转定位用；消息不存在/未同步
+  /// 返回 null）。
+  Future<int?> sequenceOfMessage(String messageId) async {
+    final row = await (db.select(db.localMessages)
+          ..where((m) =>
+              m.spaceId.equals(spaceId) & m.messageId.equals(messageId)))
+        .getSingleOrNull();
+    return row?.serverSequence;
+  }
+
   /// 分页读取比 [afterSequence] 更新的消息（含未同步 pending），增量刷新追加用。
   Future<List<HistoryMessage>> historySince({required int afterSequence}) async {
     final rows = await (db.select(db.localMessages)

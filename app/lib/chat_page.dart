@@ -139,6 +139,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _playingMessageId;
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
+  // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
+  // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
+  final GlobalKey _jumpTargetKey = GlobalKey();
+  String? _jumpTargetId;
   late String _uiStyle; // 当前界面风格（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
@@ -966,6 +970,53 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (_scrollController.position.maxScrollExtent > target + 1) {
         _jumpToBottom(depth + 1);
       }
+    });
+  }
+
+  /// 点击引用卡跳转到原消息位置（老板要求 2026-09-10）。
+  ///
+  /// 原消息可能在已加载列表外（UI 分页懒加载只渲染最近一页）——先按 messageId
+  /// 查 serverSequence，往前分页加载直到覆盖目标，再定位。定位用「估算 jumpTo
+  /// 触发目标附近构建 → 目标项 GlobalKey ensureVisible 精确校正」两步（懒构建
+  /// 下远处 item 无元素，直接 ensureVisible 会找不到）。
+  Future<void> _jumpToMessage(String messageId) async {
+    if (messageId.isEmpty || !mounted) return;
+    var index = _messages.indexWhere((m) => m.env.messageId == messageId);
+    if (index < 0) {
+      // 目标未加载：往前分页补载直到覆盖目标（或历史已到顶）
+      final targetSeq = await _repo.sequenceOfMessage(messageId);
+      if (targetSeq == null) return; // 原消息不存在（非本空间/已清理）
+      while (index < 0 && mounted) {
+        final first = _messages.isEmpty ? null : _messages.first.env.serverSequence;
+        if (first == null || first <= targetSeq) break;
+        final older = await _repo.historyBefore(beforeSequence: first, limit: _pageSize);
+        if (older.isEmpty) break;
+        if (!mounted) return;
+        setState(() {
+          _messages = [...older, ..._messages];
+          _hasMoreOlder = older.length >= _pageSize;
+        });
+        index = _messages.indexWhere((m) => m.env.messageId == messageId);
+      }
+      if (index < 0) return;
+    }
+    if (!mounted) return;
+    setState(() => _jumpTargetId = messageId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      // 第一步：按平均高度估算跳转（触发目标附近条目构建）
+      final estimated = (index * 120.0)
+          .clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.jumpTo(estimated);
+      // 第二步：目标项已构建 → GlobalKey 精确校正（居中显示）
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final ctx = _jumpTargetKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx,
+              duration: const Duration(milliseconds: 300), alignment: 0.5);
+        }
+      });
     });
   }
 
@@ -2078,6 +2129,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             personId: avatarPersonId, server: widget.server, api: widget.api),
                       const SizedBox(width: 6),
                       GestureDetector(
+                        // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
+                        // 其余项无 key，不阻碍懒构建回收
+                        key: m.env.messageId == _jumpTargetId ? _jumpTargetKey : null,
                         onLongPress: () => _showMessageActions(m),
                         child: Container(
                           margin: const EdgeInsets.symmetric(vertical: 4),
@@ -2136,30 +2190,37 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     _buildMessageContent(m),
                                     // 被引用的消息放在正文下方（老板要求 2026-09-09：
                                     // 引用块应在消息正文下面，而不是上面）
+                                    // 点击引用卡跳转到原消息位置（老板要求 2026-09-10）
                                     if (m.quote != null)
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 4),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 4),
-                                        constraints: BoxConstraints(
-                                            maxWidth:
-                                                MediaQuery.sizeOf(context).width * 0.55),
-                                        decoration: BoxDecoration(
-                                          color: _uiStyle == 'gradient'
-                                              ? Colors.white12
-                                              : Colors.black.withValues(alpha: 0.06),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          _quotePreview(
-                                              m.quote!['preview'] as String? ?? ''),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              color: _uiStyle == 'gradient'
-                                                  ? Colors.white70
-                                                  : Colors.grey.shade700),
+                                      GestureDetector(
+                                        onTap: () => _jumpToMessage(
+                                            m.quote!['messageId'] as String? ?? ''),
+                                        child: Container(
+                                          margin: const EdgeInsets.only(top: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          constraints: BoxConstraints(
+                                              maxWidth: MediaQuery.sizeOf(context)
+                                                      .width *
+                                                  0.55),
+                                          decoration: BoxDecoration(
+                                            color: _uiStyle == 'gradient'
+                                                ? Colors.white12
+                                                : Colors.black
+                                                    .withValues(alpha: 0.06),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            _quotePreview(
+                                                m.quote!['preview'] as String? ?? ''),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: _uiStyle == 'gradient'
+                                                    ? Colors.white70
+                                                    : Colors.grey.shade700),
+                                          ),
                                         ),
                                       ),
                                   ],
@@ -2317,7 +2378,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     final pin = _pinCtrl.text;
-    // 两空 = 设为空：取消启动锁（Space Key 转明文保存，与向导"暂不设置"一致）
+    // 两空 = 设为空：取消启动锁（Space Key 转明文保存，与向导"不设置锁屏码"一致）
     if (pin.isEmpty && _confirmCtrl.text.isEmpty) {
       // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
       final overlay = Overlay.of(context, rootOverlay: true);
