@@ -2098,9 +2098,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       ],
                                     ),
                                   ),
+                                  _buildMessageContent(m),
+                                  // 被引用的消息放在正文下方（老板要求 2026-09-09：
+                                  // 引用块应在消息正文下面，而不是上面）
                                   if (m.quote != null)
                                     Container(
-                                      margin: const EdgeInsets.only(bottom: 4),
+                                      margin: const EdgeInsets.only(top: 4),
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 4),
                                       constraints: BoxConstraints(
@@ -2127,7 +2130,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 : Colors.grey.shade700),
                                       ),
                                     ),
-                                  _buildMessageContent(m),
                                 ],
                               ),
                             ),

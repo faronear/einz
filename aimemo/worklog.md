@@ -1717,3 +1717,13 @@ Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检�
 
 **验证：** dart analyze 仅 1 条既有 info；setup_probe_retry + chat_initial_scroll
 （2 个滚动用例）全过。golden 政策不变（setup_step1_detect 失配保持红不重刷）。
+## 2026-09-09 引用块移到消息正文下方（气泡内顺序调整）
+
+**老板要求（2026-09-09）：** 被引用的消息（引用块）现在显示在消息正文上面，
+应放在正文**下面**。
+
+**实现（chat_page 气泡 Column）：** 子项顺序由「时间行 → 引用块 → 正文」改为
+「时间行 → 正文 → 引用块」，引用块外边距 bottom:4 改 top:4（与正文分隔）。
+对接收方显示同步生效（同一渲染路径）。
+
+**验证：** dart analyze 仅 1 条既有 info（ws_realtime_service，与本次无关）。
