@@ -1438,7 +1438,7 @@ setup 相关 7 个失败经 stash 基线确认系既有环境问题，与本次�
 菜单「界面语言」下新增「界面风格」，弹窗内每风格 = 一张预览图 + 一句描述，
 点选即立刻生效且不关窗（用户不离开弹窗即可预览大致效果）。
 
-**实现（commit 待填）：**
+**实现（commit eed4f2d）：**
 - 新增 `app/lib/data/ui_style_settings.dart`：`kUiStyleOptions`（plain/gradient）、
   双语标签/描述、品牌渐变常量 `kBrandGradient`（与首屏/向导同款
   [3BAFFD→D6529C topLeft→bottomRight]）、`uiStyleNotifier`（即时生效通知）、
