@@ -215,7 +215,7 @@ class _StartupGateState extends State<StartupGate> {
             ),
           ),
           child: Center(
-            child: SpinningBrandLogo(size: 72, radius: 18),
+            child: SpinningBrandLogo(size: 72),
           ),
         ),
       );

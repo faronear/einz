@@ -1611,3 +1611,22 @@ quote 参数；`_rowsToHistory` 解密后解析包装（裸文本向后兼容）
 message_repository_test 新增 2 用例（引用载荷往返还原、deleteMessage 彻底删除）
 共 11 个全过。golden 政策不变：chat_page golden 若失配保持红不重刷。
 
+## 2026-09-09 首屏旋转加载换成 3D 双环渲染图（老板提供新素材）
+
+**老板要求（2026-09-09）：** 用新图（logo/logo-bgBlack.png，1254×1254 黑底
+粉蓝 3D 双环渲染）作为打开应用首屏上的旋转等待按钮，取代原来我自己抠图的
+（圆角方框版 logo.png 旋转）。
+
+**实现：**
+- 抠图：无 PIL/ImageMagick，用 node + pngjs 写 chroma-key 脚本（/tmp/einz_imgtool/
+  chroma.js）：按亮度软阈值（22/40）+ 饱和度保护把黑底变为透明（保留光晕），
+  输出 app/assets/spinnerLogo.png（1254×1254 RGBA，已注册 pubspec）。
+- SpinningBrandLogo 改用 spinnerLogo.png + RotationTransition 无限旋转，去掉
+  ClipRRect 圆角（透明底不再需要）；移除 radius 参数，同步 main.dart 启动屏
+  （size 72）与 setup_page 检测页（size 96）两处调用点。
+- 静态小 Logo（BrandLogo/assets/logo.png）不动——顶栏、锁屏、通知条照旧。
+
+**验证：** dart analyze 0 新问题（仅 1 条既有 info）；检测页行为测试
+setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%，
+换图所致）、chat_page（11.77%，上轮时间标注所致）、lock_page（1.12%）与
+向导各步骤（98%+，风格改版遗留）保持红不重刷。

@@ -785,7 +785,7 @@ class _SetupPageState extends State<SetupPage> {
               const Spacer(flex: 3),
               // 正中：旋转的嵌套圆环 Logo——品牌展示与加载指示二合一，
               // 替代原「大 LOGO 徽章 + 旋转图标」（老板决策 2026-09-08）
-              const SpinningBrandLogo(size: 96, radius: 24),
+              const SpinningBrandLogo(size: 96),
               const SizedBox(height: 24),
               // 状态文案：检测中提示 / 失败（自动重试中）提示
               Text(

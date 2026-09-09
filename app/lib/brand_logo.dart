@@ -26,21 +26,19 @@ class BrandLogo extends StatelessWidget {
   }
 }
 
-/// 旋转中的品牌 Logo：两个嵌套圆环持续旋转（启动屏「LOGO + 加载图标」二合一）。
+/// 旋转中的品牌 Logo：3D 双环渲染图持续旋转（启动屏「LOGO + 加载图标」二合一）。
 ///
-/// 用 [RotationTransition] 让 [BrandLogo] 绕自身中心无限顺时针旋转。Logo 并非
-/// 旋转对称（蓝环有粗细变化/缺口、粉环嵌套交错——分析确认 90° 差异均值 78），
-/// 因此旋转动画清晰可见，兼具品牌展示与加载指示两种功能。
+/// 用 [RotationTransition] 让 assets/spinnerLogo.png（粉蓝双环 3D 渲染，黑底
+/// 已抠为透明、带光晕）绕自身中心无限顺时针旋转。图形旋转非对称（粉环/蓝环
+/// 交织方向明确），旋转动画清晰可见，兼具品牌展示与加载指示两种功能。
 class SpinningBrandLogo extends StatefulWidget {
   const SpinningBrandLogo({
     super.key,
     this.size = 96,
-    this.radius = 24,
     this.duration = const Duration(seconds: 3),
   });
 
   final double size;
-  final double radius;
 
   /// 旋转一圈的时长（越小转得越快）。
   final Duration duration;
@@ -64,9 +62,16 @@ class _SpinningBrandLogoState extends State<SpinningBrandLogo>
 
   @override
   Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return RotationTransition(
       turns: _controller,
-      child: BrandLogo(size: widget.size, radius: widget.radius),
+      child: Image.asset(
+        'assets/spinnerLogo.png',
+        width: widget.size,
+        height: widget.size,
+        fit: BoxFit.contain,
+        cacheWidth: (widget.size * dpr).round(),
+      ),
     );
   }
 }
