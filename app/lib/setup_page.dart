@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:einz_shared/einz_shared.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'brand_logo.dart';
 import 'chat_page.dart';
@@ -1186,11 +1187,29 @@ class _SetupPageState extends State<SetupPage> {
           decoration: InputDecoration(
             hintText: l10n.setupPageInviteHint,
             border: const OutlineInputBorder(),
+            // 扫码填入邀请码（老板要求 2026-09-10）：扫中后自动填入并自动下一步
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: l10n.setupPageScanInvite,
+              onPressed: _scanInviteCode,
+            ),
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
       ],
     );
+  }
+
+  /// 邀请码页扫码入口（老板要求 2026-09-10）：扫码后自动填入邀请码并自动
+  /// 下一步（复用「下一步」的服务端校验——码无效则提示并停留本页）。
+  Future<void> _scanInviteCode() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const _InviteScannerPage()),
+    );
+    if (code == null || code.trim().isEmpty || !mounted) return;
+    _inviteCode.text = code.trim();
+    if (_localError != null) setState(() => _localError = null);
+    await _nextStep();
   }
 
   /// create：首设备自举登记（免邀请码）。服务器已有空间（他人创建）时
@@ -1802,5 +1821,64 @@ class _SetupPageState extends State<SetupPage> {
     if (ok) {
       _completeWizard();
     }
+  }
+}
+
+/// 邀请码扫码页：全屏相机预览，识别到二维码即返回其内容（自动填入与自动
+/// 下一步由调用方 [_SetupPageState._scanInviteCode] 完成）。识别后立即关闭，
+/// 未识别到时右上角 ✕ 取消返回。
+class _InviteScannerPage extends StatefulWidget {
+  const _InviteScannerPage();
+
+  @override
+  State<_InviteScannerPage> createState() => _InviteScannerPageState();
+}
+
+class _InviteScannerPageState extends State<_InviteScannerPage> {
+  bool _resolved = false; // 防抖：连续帧重复识别只回传一次
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_resolved) return;
+    for (final barcode in capture.barcodes) {
+      final value = barcode.rawValue;
+      if (value != null && value.trim().isNotEmpty) {
+        _resolved = true;
+        Navigator.of(context).pop(value.trim());
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(l10n.setupPageScanInvite),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: l10n.cancel,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: MobileScanner(onDetect: _onDetect),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              l10n.setupPageScannerHint,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

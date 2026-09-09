@@ -31,7 +31,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skip => '跳过';
 
   @override
-  String get setupPageEnvelopeKeyHint => '粘贴密保信封（envelope-*.txt 内容）';
+  String get setupPageEnvelopeKeyHint => '粘贴线下交接的密保信封';
 
   @override
   String get setupPageNeedPassphrase => '❗️ 必须设置密保口令';
@@ -49,7 +49,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectTitle => '正在检测服务器状态…';
 
   @override
-  String get wizardDetectHint => '自动判断你是第几个用户（首个设备将创建空间）';
+  String get wizardDetectHint => '自动判断是否全秘境里的首个设备';
 
   @override
   String get wizardDetectFailed => '暂时无法连接服务器，正在自动重试…';
@@ -124,7 +124,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDone => '完成';
 
   @override
-  String get wizardStepShortEnvelope => '密保信封';
+  String get wizardStepShortEnvelope => '解析密保信封';
 
   @override
   String get wizardTitleName => '关于我';
@@ -145,7 +145,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitlePin => '设置锁屏码';
 
   @override
-  String get wizardTitleEnvelope => '密保信封';
+  String get wizardTitleEnvelope => '解析密保信封';
 
   @override
   String get wizardTitleIdentity => '我是';
@@ -213,10 +213,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnvelopeWrong => '密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴';
 
   @override
-  String get setupPageInviteHint => '粘贴或输入邀请码';
+  String get setupPageInviteHint => '输入邀请码';
 
   @override
   String get setupPageNeedInvite => '⚠️ 填写一次性邀请码';
+
+  @override
+  String get setupPageScanInvite => '扫码填入邀请码';
+
+  @override
+  String get setupPageScannerHint => '将邀请码二维码对准取景框';
 
   @override
   String get wizardInviteWrong => '邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码';
