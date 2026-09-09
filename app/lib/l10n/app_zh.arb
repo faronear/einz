@@ -245,8 +245,8 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageDeviceRevoked": "设备已被撤销，本地数据已清除，请重新配置",
-  "chatPageDevicePublicKeyLabel": "公钥",
+  "chatPageDeviceRevoked": "本设备已被撤销，本地数据已清除，请重新配置",
+  "chatPageDevicePublicKeyLabel": "设备公钥",
   "chatPageDevicePublicKeyFailed": "未记录",
   "burnOptionUnlimited": "无限",
   "burnOption1Minute": "1 分钟",

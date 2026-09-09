@@ -519,10 +519,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageDeviceRevoked => '设备已被撤销，本地数据已清除，请重新配置';
+  String get chatPageDeviceRevoked => '本设备已被撤销，本地数据已清除，请重新配置';
 
   @override
-  String get chatPageDevicePublicKeyLabel => '公钥';
+  String get chatPageDevicePublicKeyLabel => '设备公钥';
 
   @override
   String get chatPageDevicePublicKeyFailed => '未记录';
