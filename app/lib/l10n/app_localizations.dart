@@ -326,12 +326,6 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get wizardDone;
 
-  /// No description provided for @wizardStepShortEnvelope.
-  ///
-  /// In en, this message translates to:
-  /// **'Envelope'**
-  String get wizardStepShortEnvelope;
-
   /// No description provided for @wizardTitleName.
   ///
   /// In en, this message translates to:

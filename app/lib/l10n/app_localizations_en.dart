@@ -133,9 +133,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardDone => 'Done';
 
   @override
-  String get wizardStepShortEnvelope => 'Envelope';
-
-  @override
   String get wizardTitleName => 'My name';
 
   @override

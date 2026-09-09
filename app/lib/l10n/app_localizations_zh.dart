@@ -124,9 +124,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDone => '完成';
 
   @override
-  String get wizardStepShortEnvelope => '解析密保信封';
-
-  @override
   String get wizardTitleName => '关于我';
 
   @override
