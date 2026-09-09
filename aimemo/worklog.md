@@ -1781,3 +1781,12 @@ Server——无新消息时不拉回底部、新消息到达后拉到底）；da
 （abstract/zh/en/两 arb 共 5 处）。引用框蓝色左边框保留（老板未要求删）。
 
 **验证：** 残留引用检查干净；dart analyze 仅 1 条既有 info。
+
+## 2026-09-09 CLI/TUI 对方消息按性别配色
+
+**老板要求：** 对方为男性时使用蓝色消息背景；女性保持现有粉红消息背景。
+
+**实现：** `SpaceResult` 解析服务端 `person_genders`，TUI 刷新空间信息时缓存
+性别，并按消息 `senderPersonId` 选择男性亮蓝底或默认亮品红底；未知性别继续回退粉红色，兼容旧空间。
+
+**验证：** `dart analyze bin/einz_tui.dart ../shared` 通过；shared `dart test` 24/24 通过。

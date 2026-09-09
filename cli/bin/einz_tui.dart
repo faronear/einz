@@ -29,10 +29,11 @@ const _green = '$_esc[32m';
 const _yellow = '$_esc[33m';
 const _cyan = '$_esc[36m';
 const _gray = '$_esc[90m';
-const _black = '$_esc[30m'; // 黑字（粉红底上的对方标签：人名/时间戳）
-const _white = '$_esc[97m'; // 亮白字（粉红底上的对方消息正文）
+const _black = '$_esc[30m'; // 黑字（对方彩色底上的标签：人名/时间戳）
+const _white = '$_esc[97m'; // 亮白字（对方彩色底上的消息正文）
 const _bold = '$_esc[1m';
 const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息整条底色（最初方案；macOS Terminal 效果好）
+const _bgBlue = '$_esc[104m'; // 亮蓝背景：男性对方消息整条底色
 const _bgBlack = '$_esc[40m'; // 黑色背景：标题栏/底部状态行整行底色
 
 // \x1B[2J 清屏 + \x1B[3J 清除回滚缓冲 + \x1B[H 光标回家：全屏重绘应用（类似 vim/htop）
@@ -103,6 +104,9 @@ class _TuiState {
 
   /// person_id → personName（GET /space 拉取，消息前缀显示 personName 用）。
   Map<String, String> personNames = {};
+
+  /// person_id → gender（GET /space 拉取，对方消息背景色用）。
+  Map<String, String> personGenders = {};
 
   /// 引导问答等待类型（非 null 时输入循环的下一次输入按此问答处理）。
   String? pendingGuidance;
@@ -1320,8 +1324,11 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       ...wrapped.skip(1).map((line) => '$indent$line'),
     ];
   }
-  // 对方消息：整块右对齐（右侧气泡风格），整条内容品红底——正文白字、
+  // 对方消息：整块右对齐（右侧气泡风格），男性蓝底、女性品红底——正文白字、
   // [人名 时间] 黑字；前导留白不上色（保持右对齐气泡感）
+  final partnerBackground = _state?.personGenders[m.env.senderPersonId] == 'male'
+      ? _bgBlue
+      : _bgPink;
   final suffix = '$_black[$who $time]$_reset';
   final suffixW = _displayWidth(suffix);
   // 正文每行同时保留：左侧 sideMargin 列留白（不顶左边框）+ 右侧标签栏；
@@ -1340,14 +1347,14 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       final chunk = wrapped[i];
       final fill = textWidth - _displayWidth(chunk);
       lines.add(
-          '${' ' * leftPad}$_bgPink$_white$chunk${' ' * (fill < 0 ? 0 : fill)} $suffix');
+          '${' ' * leftPad}$partnerBackground$_white$chunk${' ' * (fill < 0 ? 0 : fill)} $suffix');
     } else if (i == wrapped.length - 1) {
       // 单行消息：正文 + 1 空格 + 标签，整行右端贴屏缘（短消息贴右的常规形态）
-      final content = '$_bgPink$_white${wrapped[i]} $suffix';
+      final content = '$partnerBackground$_white${wrapped[i]} $suffix';
       lines.add('${' ' * (cols - _displayWidth(content))}$content');
     } else {
       // 非末行：固定左侧留白，正文右端自然停在标签栏前（右侧留白 = 标签宽）
-      final content = '$_bgPink$_white${wrapped[i]}$_reset';
+      final content = '$partnerBackground$_white${wrapped[i]}$_reset';
       lines.add('${' ' * leftPad}$content');
     }
   }
@@ -2465,6 +2472,8 @@ Future<void> _refreshPersonNames(_TuiState s) async {
   try {
     final r = await ApiClient(s.session.server).getSpace(token);
     s.personNames = r.personNames;
+    s.personGenders = r.personGenders;
+    _scheduleRender();
   } catch (_) {
     // 拉取失败不影响聊天（前缀回退"我/对方"）
   }

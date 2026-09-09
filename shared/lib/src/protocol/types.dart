@@ -108,7 +108,12 @@ class SpaceDevice {
 
 /// 空间信息（GET /space 响应）。
 class SpaceResult {
-  const SpaceResult({required this.spaceId, required this.devices, this.personNames = const {}});
+  const SpaceResult({
+    required this.spaceId,
+    required this.devices,
+    this.personNames = const {},
+    this.personGenders = const {},
+  });
 
   final String spaceId;
   final List<SpaceDevice> devices;
@@ -116,12 +121,17 @@ class SpaceResult {
   /// person_id → person_name（创建者/邀请时设置，显示层用）。
   final Map<String, String> personNames;
 
+  /// person_id → gender（male/female，显示层用）。
+  final Map<String, String> personGenders;
+
   factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(
         spaceId: json['space_id'] as String,
         devices: (json['devices'] as List)
             .map((d) => SpaceDevice.fromJson(d as Map<String, dynamic>))
             .toList(),
         personNames: (json['person_names'] as Map<String, dynamic>? ?? {})
+            .map((k, v) => MapEntry(k, v as String)),
+        personGenders: (json['person_genders'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as String)),
       );
 }
