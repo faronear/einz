@@ -99,6 +99,10 @@ class _SetupPageState extends State<SetupPage> {
   /// 后续设备引导中选择的身份（personA/personB；null = 首设备自举或未选）。
   String? _chosenPerson;
 
+  /// 进入密保信封页（offline）前的角色：切回口令页时恢复来源
+  /// （create 回步骤 2 / join 回步骤 3），实现口令⇄信封自由互切。
+  _WizardRole _preEnvelopeRole = _WizardRole.join;
+
   /// 设备登记结果（服务端分配的真实 deviceId/personId/spaceId）。
   /// 认证（challenge）与进聊天页一律用它，不用本地临时 deviceId。
   EnrollResult? _enroll;
@@ -1297,15 +1301,13 @@ class _SetupPageState extends State<SetupPage> {
         ),
         if (_localError != null) _localErrorHint(_localError!),
         const SizedBox(height: 16),
-        // 密保信封导入与口令同属 Space Key 交换方式：仅 join（第二/三台设备）
-        // 可用——信封是对端设备导出的密封密钥，首设备（create）没有对端设备，
-        // 也无邀请码，故不显示此入口
-        if (_role == _WizardRole.join)
-          TextButton.icon(
-            onPressed: () => _selectRole(_WizardRole.offline),
-            icon: const Icon(Icons.mail_outline, size: 18),
-            label: Text(l10n.wizardSwitchToEnvelope),
-          ),
+        // 密保信封与口令是平行方案，可自由互切：信封页导入对端设备导出的密封
+        // 密钥（首台 create 无对端设备时按需准备，随时可切回口令页）
+        TextButton.icon(
+          onPressed: _openEnvelopeImport,
+          icon: const Icon(Icons.mail_outline, size: 18),
+          label: Text(l10n.wizardSwitchToEnvelope),
+        ),
       ],
     );
   }
@@ -1599,13 +1601,25 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 从密保信封页切回「验证口令」页（join 步骤 3）。
+  /// 从口令页切到密保信封页（offline 步骤 1）：记录来源角色/步骤，便于
+  /// 信封页「改用线上密保口令」切回原地（create 步骤 2 / join 步骤 3）。
+  /// 不用 _selectRole（它重置步骤到目标角色步骤 1 且不记来源）。
+  void _openEnvelopeImport() {
+    setState(() {
+      _preEnvelopeRole = _role ?? _WizardRole.join; // 口令页可见时角色必已判定
+      _role = _WizardRole.offline;
+      _step = 1;
+      _localError = null;
+    });
+  }
+
+  /// 从密保信封页切回「口令」页（回到进入信封页前的角色：create 步骤 2 / join 步骤 3）。
   /// 不能用 _selectRole（它会重置 _step=1 回身份页）；直接切角色+步骤，
   /// 已输入的邀请码/口令保留，任一方案完成都进入 PIN 步骤。
   void _switchToPassphrase() {
     setState(() {
-      _role = _WizardRole.join;
-      _step = 3; // join 口令页
+      _role = _preEnvelopeRole;
+      _step = _preEnvelopeRole == _WizardRole.create ? 2 : 3;
       _status = null;
       _localError = null;
     });
