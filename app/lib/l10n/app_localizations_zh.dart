@@ -216,7 +216,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageInviteHint => '粘贴或输入邀请码';
 
   @override
-  String get setupPageNeedInvite => '⚠️ 填写一次性邀请码（由已认证设备生成）';
+  String get setupPageNeedInvite => '⚠️ 填写一次性邀请码';
 
   @override
   String get wizardInviteWrong => '邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码';

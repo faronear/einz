@@ -80,7 +80,7 @@
   "setupPagePasteEnvelope": "⚠️ 请粘贴密保信封（base64）",
   "wizardEnvelopeWrong": "密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴",
   "setupPageInviteHint": "粘贴或输入邀请码",
-  "setupPageNeedInvite": "⚠️ 填写一次性邀请码（由已认证设备生成）",
+  "setupPageNeedInvite": "⚠️ 填写一次性邀请码",
   "wizardInviteWrong": "邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码",
   "setupPageNoEscrow": "❌ Server 无口令密保箱（请先在对端设置接入口令）",
   "setupPageEscrowFailed": "❌ 口令接入失败: {error}",
