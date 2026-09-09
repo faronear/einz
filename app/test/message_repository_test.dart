@@ -132,7 +132,7 @@ void main() {
     expect(byMsg['msg-b-1'], 'peer', reason: '对方设备消息显示为 peer');
   });
 
-  test('purgeExpired：到期消息本地删除，未到期保留（阅后即焚）', () async {
+  test('tombstoneExpired：到期消息打墓碑（记录保留、内容隐藏），未到期不动', () async {
     final api = FakeApi();
     final settings = BurnAfterSettings(db);
     final repo = MessageRepository(
@@ -150,14 +150,20 @@ void main() {
     final hist = await repo.history();
     expect(hist.single.env.messageId, mid);
     expect(hist.single.expiresAt, isNotNull, reason: '阅后即焚消息应带到期时间');
+    expect(hist.single.deleted, isFalse);
 
     final now = DateTime.now().millisecondsSinceEpoch;
-    // 未到期（+59s）：不删除
-    expect(await repo.purgeExpired(now: now + 59 * 1000), 0);
-    expect((await repo.history()).length, 1);
-    // 到期（+61s）：删除
-    expect(await repo.purgeExpired(now: now + 61 * 1000), 1);
-    expect((await repo.history()).length, 0, reason: '到期消息应被本地删除');
+    // 未到期（+59s）：不打标记
+    expect(await repo.tombstoneExpired(now: now + 59 * 1000), 0);
+    expect((await repo.history()).single.deleted, isFalse);
+    // 到期（+61s）：打墓碑——记录保留、deleted 标记（不打破历史流水）
+    expect(await repo.tombstoneExpired(now: now + 61 * 1000), 1);
+    final burned = await repo.history();
+    expect(burned.length, 1, reason: '焚毁后记录应保留（内容隐藏、时间+时钟+时长保留）');
+    expect(burned.single.deleted, isTrue, reason: '焚毁消息应标记为已删除（内容隐藏）');
+    expect(burned.single.expiresAt, isNotNull, reason: '焚毁记录的时间+时钟+时长保留');
+    // 已墓碑的不重复标记
+    expect(await repo.tombstoneExpired(now: now + 61 * 1000), 0);
   });
 
   test('分页：historyRecent 最近 N 条升序 / historyBefore 更早 / historySince 新增', () async {
@@ -333,18 +339,28 @@ void main() {
     expect(normal.plaintext, '普通消息');
   });
 
-  test('deleteMessage：本机彻底删除（重启不显示；附件元数据一并清除）', () async {
+  test('tombstoneMessage：本机墓碑（记录保留、deleted 标记、重启后仍隐藏）', () async {
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');
     final keep = await repo.send('保留的消息');
     final del = await repo.send('要删除的消息');
     expect((await repo.history()).length, 2);
 
-    await repo.deleteMessage(del);
+    await repo.tombstoneMessage(del);
 
     final hist = await repo.history();
-    expect(hist.length, 1);
-    expect(hist.single.env.messageId, keep, reason: '删除后仅剩保留消息');
+    expect(hist.length, 2, reason: '墓碑不删行——消息记录仍在（不打破历史流水）');
+    expect(hist.singleWhere((h) => h.env.messageId == del).deleted, isTrue,
+        reason: '被删消息应标记 deleted（内容隐藏）');
+    expect(hist.singleWhere((h) => h.env.messageId == keep).deleted, isFalse,
+        reason: '未删消息不受影响');
+
+    // 模拟重启（新 repo 实例重读同一库）：记录仍在、deleted 标记保留
+    final repo2 = makeRepo(api, token: 'tok');
+    final hist2 = await repo2.history();
+    expect(hist2.length, 2, reason: '重启后记录仍在');
+    expect(hist2.singleWhere((h) => h.env.messageId == del).deleted, isTrue,
+        reason: '重启后墓碑标记保留（内容仍隐藏）');
   });
 
   test('重启后引用消息不显示原始 JSON（send → 服务端回拉 → 重新读取历史）', () async {

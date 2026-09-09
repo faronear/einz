@@ -1727,3 +1727,26 @@ Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检�
 对接收方显示同步生效（同一渲染路径）。
 
 **验证：** dart analyze 仅 1 条既有 info（ws_realtime_service，与本次无关）。
+## 2026-09-09 删除/阅后即焚改本地墓碑：内容隐藏、记录保留（不打破历史流水）
+
+**老板决策（2026-09-09）：** 想清楚了——阅后即焚和手动删除都改**本地标记**，
+不再彻底删行。被删/被焚的消息在界面上显示为：内容为空，但时间+时钟+时长
+的记录还在（不打破消息历史流水，只隐藏内容）。
+
+**实现：**
+- 数据层：local_messages 加 `deleted_at` 可空列（v3 迁移，build_runner 重生成
+  g.dart）；NULL=正常，非空=本机已删除/已焚毁。
+- repo：`HistoryMessage` 加 `deleted` 字段（_rowsToHistory 按 deletedAt 填充）；
+  `deleteMessage`→`tombstoneMessage`、`purgeExpired`→`tombstoneExpired`
+  （都改为只置 deletedAt，行与附件保留；已墓碑不重复标记）；
+  `_flushPending`/`pendingCount` 跳过墓碑行（已删的未发送消息不再补发）。
+- chat_page：删除确认后调 tombstoneMessage + 列表就地标记 `_asDeleted` 副本
+  （不再 removeWhere）；`_refresh`/`_loadInitial` 到期消息就地标记为已焚毁
+  （不再移出列表）；气泡渲染 `if (!m.deleted)` 才显示正文+引用块——墓碑消息
+  只剩时间行（含时钟+时长），内容为空。
+- 测试：tombstoneExpired（到期打标记、未到期不动、不重复标记）、tombstoneMessage
+  （记录保留、deleted 标记、模拟重启后仍隐藏）替代原彻底删除断言。
+
+**验证：** dart analyze 仅 1 条既有 info；message_repository_test 12/12 全过；
+chat_initial_scroll + setup_probe_retry + chat_page_menu 15/15 全过。golden
+政策不变（chat_page golden 失配保持红不重刷）。

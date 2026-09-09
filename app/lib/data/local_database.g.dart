@@ -148,6 +148,17 @@ class $LocalMessagesTable extends LocalMessages
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAt = GeneratedColumn<int>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     messageId,
@@ -163,6 +174,7 @@ class $LocalMessagesTable extends LocalMessages
     localCreatedAt,
     burnAfterSeconds,
     expiresAt,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -284,6 +296,12 @@ class $LocalMessagesTable extends LocalMessages
         expiresAt.isAcceptableOrUnknown(data['expires_at']!, _expiresAtMeta),
       );
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -345,6 +363,10 @@ class $LocalMessagesTable extends LocalMessages
         DriftSqlType.int,
         data['${effectivePrefix}expires_at'],
       ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -368,6 +390,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   final int localCreatedAt;
   final int burnAfterSeconds;
   final int? expiresAt;
+  final int? deletedAt;
   const LocalMessage({
     required this.messageId,
     required this.spaceId,
@@ -382,6 +405,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     required this.localCreatedAt,
     required this.burnAfterSeconds,
     this.expiresAt,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -402,6 +426,9 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     map['burn_after_seconds'] = Variable<int>(burnAfterSeconds);
     if (!nullToAbsent || expiresAt != null) {
       map['expires_at'] = Variable<int>(expiresAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<int>(deletedAt);
     }
     return map;
   }
@@ -425,6 +452,9 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       expiresAt: expiresAt == null && nullToAbsent
           ? const Value.absent()
           : Value(expiresAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -447,6 +477,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       localCreatedAt: serializer.fromJson<int>(json['localCreatedAt']),
       burnAfterSeconds: serializer.fromJson<int>(json['burnAfterSeconds']),
       expiresAt: serializer.fromJson<int?>(json['expiresAt']),
+      deletedAt: serializer.fromJson<int?>(json['deletedAt']),
     );
   }
   @override
@@ -466,6 +497,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       'localCreatedAt': serializer.toJson<int>(localCreatedAt),
       'burnAfterSeconds': serializer.toJson<int>(burnAfterSeconds),
       'expiresAt': serializer.toJson<int?>(expiresAt),
+      'deletedAt': serializer.toJson<int?>(deletedAt),
     };
   }
 
@@ -483,6 +515,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     int? localCreatedAt,
     int? burnAfterSeconds,
     Value<int?> expiresAt = const Value.absent(),
+    Value<int?> deletedAt = const Value.absent(),
   }) => LocalMessage(
     messageId: messageId ?? this.messageId,
     spaceId: spaceId ?? this.spaceId,
@@ -499,6 +532,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     localCreatedAt: localCreatedAt ?? this.localCreatedAt,
     burnAfterSeconds: burnAfterSeconds ?? this.burnAfterSeconds,
     expiresAt: expiresAt.present ? expiresAt.value : this.expiresAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   LocalMessage copyWithCompanion(LocalMessagesCompanion data) {
     return LocalMessage(
@@ -527,6 +561,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           ? data.burnAfterSeconds.value
           : this.burnAfterSeconds,
       expiresAt: data.expiresAt.present ? data.expiresAt.value : this.expiresAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -545,7 +580,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           ..write('status: $status, ')
           ..write('localCreatedAt: $localCreatedAt, ')
           ..write('burnAfterSeconds: $burnAfterSeconds, ')
-          ..write('expiresAt: $expiresAt')
+          ..write('expiresAt: $expiresAt, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
@@ -565,6 +601,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     localCreatedAt,
     burnAfterSeconds,
     expiresAt,
+    deletedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -582,7 +619,8 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           other.status == this.status &&
           other.localCreatedAt == this.localCreatedAt &&
           other.burnAfterSeconds == this.burnAfterSeconds &&
-          other.expiresAt == this.expiresAt);
+          other.expiresAt == this.expiresAt &&
+          other.deletedAt == this.deletedAt);
 }
 
 class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
@@ -599,6 +637,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
   final Value<int> localCreatedAt;
   final Value<int> burnAfterSeconds;
   final Value<int?> expiresAt;
+  final Value<int?> deletedAt;
   final Value<int> rowid;
   const LocalMessagesCompanion({
     this.messageId = const Value.absent(),
@@ -614,6 +653,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     this.localCreatedAt = const Value.absent(),
     this.burnAfterSeconds = const Value.absent(),
     this.expiresAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalMessagesCompanion.insert({
@@ -630,6 +670,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     required int localCreatedAt,
     this.burnAfterSeconds = const Value.absent(),
     this.expiresAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : messageId = Value(messageId),
        spaceId = Value(spaceId),
@@ -654,6 +695,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     Expression<int>? localCreatedAt,
     Expression<int>? burnAfterSeconds,
     Expression<int>? expiresAt,
+    Expression<int>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -670,6 +712,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
       if (localCreatedAt != null) 'local_created_at': localCreatedAt,
       if (burnAfterSeconds != null) 'burn_after_seconds': burnAfterSeconds,
       if (expiresAt != null) 'expires_at': expiresAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -688,6 +731,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     Value<int>? localCreatedAt,
     Value<int>? burnAfterSeconds,
     Value<int?>? expiresAt,
+    Value<int?>? deletedAt,
     Value<int>? rowid,
   }) {
     return LocalMessagesCompanion(
@@ -704,6 +748,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
       localCreatedAt: localCreatedAt ?? this.localCreatedAt,
       burnAfterSeconds: burnAfterSeconds ?? this.burnAfterSeconds,
       expiresAt: expiresAt ?? this.expiresAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -750,6 +795,9 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     if (expiresAt.present) {
       map['expires_at'] = Variable<int>(expiresAt.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -772,6 +820,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
           ..write('localCreatedAt: $localCreatedAt, ')
           ..write('burnAfterSeconds: $burnAfterSeconds, ')
           ..write('expiresAt: $expiresAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2085,6 +2134,7 @@ typedef $$LocalMessagesTableCreateCompanionBuilder =
       required int localCreatedAt,
       Value<int> burnAfterSeconds,
       Value<int?> expiresAt,
+      Value<int?> deletedAt,
       Value<int> rowid,
     });
 typedef $$LocalMessagesTableUpdateCompanionBuilder =
@@ -2102,6 +2152,7 @@ typedef $$LocalMessagesTableUpdateCompanionBuilder =
       Value<int> localCreatedAt,
       Value<int> burnAfterSeconds,
       Value<int?> expiresAt,
+      Value<int?> deletedAt,
       Value<int> rowid,
     });
 
@@ -2211,6 +2262,11 @@ class $$LocalMessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> localAttachmentsRefs(
     Expression<bool> Function($$LocalAttachmentsTableFilterComposer f) f,
   ) {
@@ -2310,6 +2366,11 @@ class $$LocalMessagesTableOrderingComposer
     column: $table.expiresAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalMessagesTableAnnotationComposer
@@ -2371,6 +2432,9 @@ class $$LocalMessagesTableAnnotationComposer
 
   GeneratedColumn<int> get expiresAt =>
       $composableBuilder(column: $table.expiresAt, builder: (column) => column);
+
+  GeneratedColumn<int> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 
   Expression<T> localAttachmentsRefs<T extends Object>(
     Expression<T> Function($$LocalAttachmentsTableAnnotationComposer a) f,
@@ -2441,6 +2505,7 @@ class $$LocalMessagesTableTableManager
                 Value<int> localCreatedAt = const Value.absent(),
                 Value<int> burnAfterSeconds = const Value.absent(),
                 Value<int?> expiresAt = const Value.absent(),
+                Value<int?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalMessagesCompanion(
                 messageId: messageId,
@@ -2456,6 +2521,7 @@ class $$LocalMessagesTableTableManager
                 localCreatedAt: localCreatedAt,
                 burnAfterSeconds: burnAfterSeconds,
                 expiresAt: expiresAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2473,6 +2539,7 @@ class $$LocalMessagesTableTableManager
                 required int localCreatedAt,
                 Value<int> burnAfterSeconds = const Value.absent(),
                 Value<int?> expiresAt = const Value.absent(),
+                Value<int?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalMessagesCompanion.insert(
                 messageId: messageId,
@@ -2488,12 +2555,13 @@ class $$LocalMessagesTableTableManager
                 localCreatedAt: localCreatedAt,
                 burnAfterSeconds: burnAfterSeconds,
                 expiresAt: expiresAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$LocalMessagesTable, LocalMessage>(table),
                   $$LocalMessagesTableReferences(db, table, e),
                 ),
               )
@@ -2876,7 +2944,7 @@ class $$LocalAttachmentsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$LocalAttachmentsTable, LocalAttachment>(table),
                   $$LocalAttachmentsTableReferences(db, table, e),
                 ),
               )
@@ -3057,7 +3125,16 @@ class $$SyncStateTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$SyncStateTable, SyncStateData>(table),
+                  BaseReferences<
+                    _$LocalDatabase,
+                    $SyncStateTable,
+                    SyncStateData
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -3233,7 +3310,16 @@ class $$DraftsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$DraftsTable, Draft>(table),
+                  BaseReferences<_$LocalDatabase, $DraftsTable, Draft>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -3361,7 +3447,16 @@ class $$AppStateTableTableManager
             Value<int> rowid = const Value.absent(),
           }) => AppStateCompanion.insert(key: key, value: value, rowid: rowid),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$AppStateTable, AppStateData>(table),
+                  BaseReferences<_$LocalDatabase, $AppStateTable, AppStateData>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),

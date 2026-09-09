@@ -462,7 +462,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageDeleteConfirmOk => '删除';
 
   @override
-  String chatPageQuoteBanner(String preview) => '引用：$preview';
+  String chatPageQuoteBanner(String preview) {
+    return '引用：$preview';
+  }
 
   @override
   String chatPageSendFailed(String error) {

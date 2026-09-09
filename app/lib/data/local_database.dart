@@ -29,6 +29,9 @@ class LocalMessages extends Table {
   // 阅后即焚（纯本地，每设备独立）：到达本设备时的设置快照 + 到期时间戳
   IntColumn get burnAfterSeconds => integer().withDefault(const Constant(0))(); // 0=无限
   IntColumn get expiresAt => integer().nullable()(); // NULL/0=永久；非空=到期时间戳
+  // 本地墓碑（纯本地）：非空 = 本机已删除/已焚毁——内容隐藏、时间+焚毁记录保留
+  // （老板决策 2026-09-09：不打破消息历史流水，只隐藏内容）
+  IntColumn get deletedAt => integer().nullable()(); // NULL=正常；非空=删除时间戳
 
   @override
   Set<Column> get primaryKey => {messageId};
@@ -85,7 +88,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -94,6 +97,11 @@ class LocalDatabase extends _$LocalDatabase {
             // v2：local_messages 加阅后即焚列（burn_after_seconds 默认 0、expires_at 可空）
             await m.addColumn(localMessages, localMessages.burnAfterSeconds);
             await m.addColumn(localMessages, localMessages.expiresAt);
+          }
+          if (from < 3) {
+            // v3：local_messages 加本地墓碑列（deleted_at 可空）——删除/焚毁改为
+            // 打标记（内容隐藏、记录保留），不再彻底删行（老板决策 2026-09-09）
+            await m.addColumn(localMessages, localMessages.deletedAt);
           }
         },
       );

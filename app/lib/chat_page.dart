@@ -879,7 +879,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _loadInitial() async {
     try {
       await _repo.sync();
-      await _repo.purgeExpired();
+      await _repo.tombstoneExpired();
       await _repo.refreshDeviceMap();
       final recent = await _repo.historyRecent(limit: _pageSize);
       if (!mounted) return;
@@ -971,15 +971,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     try {
       await _repo.sync();
       final now = DateTime.now().millisecondsSinceEpoch;
-      // 阅后即焚：删除本设备已到期的消息（纯本地）
-      await _repo.purgeExpired(now: now);
+      // 阅后即焚：到期消息打本地墓碑（内容隐藏、时间+时钟+时长记录保留，纯本地）
+      await _repo.tombstoneExpired(now: now);
       // 增量刷新：只取比已加载最新更晚的消息追加（不重建全量列表）
       final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
       await _repo.refreshDeviceMap();
       if (!mounted) return;
       setState(() {
-        // 移除本设备已到期的消息（与 purgeExpired 同一标准）
-        _messages.removeWhere((m) => m.expiresAt != null && m.expiresAt! <= now);
+        // 到期消息就地标记为已焚毁（墓碑；不再从列表移除——不打破历史流水）
+        _messages = [
+          for (final m in _messages)
+            if (m.expiresAt != null && m.expiresAt! <= now && !m.deleted)
+              _asDeleted(m)
+            else
+              m,
+        ];
         final existing = {for (final m in _messages) m.env.messageId};
         _messages.addAll(fresh.where((f) => !existing.contains(f.env.messageId)));
       });
@@ -1047,7 +1053,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 删除消息：确认弹窗 → 本机彻底删除（重启不显示；对方设备不受影响）。
+  /// 记录副本：标记为已删除/已焚毁（墓碑，内容隐藏、时间+焚毁记录保留）。
+  HistoryMessage _asDeleted(HistoryMessage m) => (
+        env: m.env,
+        plaintext: m.plaintext,
+        sender: m.sender,
+        attachment: m.attachment,
+        expiresAt: m.expiresAt,
+        createdAt: m.createdAt,
+        burnAfterSeconds: m.burnAfterSeconds,
+        quote: m.quote,
+        deleted: true,
+      );
+
+  /// 删除消息：确认弹窗 → 本机打墓碑标记（内容隐藏、时间+焚毁记录保留；
+  /// 对方设备不受影响；重启后记录仍在、内容仍隐藏）。
   Future<void> _deleteMessage(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -1068,9 +1088,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await _repo.deleteMessage(m.env.messageId);
+    await _repo.tombstoneMessage(m.env.messageId);
     if (!mounted) return;
-    setState(() => _messages.removeWhere((x) => x.env.messageId == m.env.messageId));
+    setState(() {
+      _messages = [
+        for (final x in _messages)
+          if (x.env.messageId == m.env.messageId) _asDeleted(x) else x,
+      ];
+    });
   }
 
   /// 引用预览截断（60 字内）。
@@ -2098,38 +2123,42 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       ],
                                     ),
                                   ),
-                                  _buildMessageContent(m),
-                                  // 被引用的消息放在正文下方（老板要求 2026-09-09：
-                                  // 引用块应在消息正文下面，而不是上面）
-                                  if (m.quote != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 4),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      constraints: BoxConstraints(
-                                          maxWidth:
-                                              MediaQuery.sizeOf(context).width * 0.55),
-                                      decoration: BoxDecoration(
-                                        color: _uiStyle == 'gradient'
-                                            ? Colors.white12
-                                            : Colors.black.withValues(alpha: 0.06),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: const Border(
-                                            left: BorderSide(
-                                                color: Color(0xFF3BAFFD), width: 3)),
+                                  // 墓碑消息（已删除/已焚毁）：只保留时间（+时钟+时长）
+                                  // 记录，正文与引用块隐藏（老板决策 2026-09-09）
+                                  if (!m.deleted) ...[
+                                    _buildMessageContent(m),
+                                    // 被引用的消息放在正文下方（老板要求 2026-09-09：
+                                    // 引用块应在消息正文下面，而不是上面）
+                                    if (m.quote != null)
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        constraints: BoxConstraints(
+                                            maxWidth:
+                                                MediaQuery.sizeOf(context).width * 0.55),
+                                        decoration: BoxDecoration(
+                                          color: _uiStyle == 'gradient'
+                                              ? Colors.white12
+                                              : Colors.black.withValues(alpha: 0.06),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: const Border(
+                                              left: BorderSide(
+                                                  color: Color(0xFF3BAFFD), width: 3)),
+                                        ),
+                                        child: Text(
+                                          _quotePreview(
+                                              m.quote!['preview'] as String? ?? ''),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: _uiStyle == 'gradient'
+                                                  ? Colors.white70
+                                                  : Colors.grey.shade700),
+                                        ),
                                       ),
-                                      child: Text(
-                                        _quotePreview(
-                                            m.quote!['preview'] as String? ?? ''),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: _uiStyle == 'gradient'
-                                                ? Colors.white70
-                                                : Colors.grey.shade700),
-                                      ),
-                                    ),
+                                  ],
                                 ],
                               ),
                             ),

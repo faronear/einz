@@ -12,7 +12,8 @@ import 'local_database.dart';
 /// expiresAt=阅后即焚到期时间（null=永久）、createdAt=发送时间戳（毫秒，
 /// 落盘值，未同步消息为本地发送时间）、burnAfterSeconds=焚毁时长（秒，
 /// 归档恢复缺快照时按 到期-创建 反推）、quote=引用快照（{messageId, preview}，
-/// 密文载荷内传输，null=非引用消息）。
+/// 密文载荷内传输，null=非引用消息）、deleted=本机墓碑（true=已删除/已焚毁，
+/// UI 只显示时间+焚毁记录、隐藏内容——老板决策 2026-09-09）。
 typedef HistoryMessage = ({
   MessageEnvelope env,
   String plaintext,
@@ -21,7 +22,8 @@ typedef HistoryMessage = ({
   int? expiresAt,
   int createdAt,
   int burnAfterSeconds,
-  Map<String, dynamic>? quote
+  Map<String, dynamic>? quote,
+  bool deleted
 });
 
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
@@ -234,27 +236,33 @@ class MessageRepository {
     return messageId;
   }
 
-  /// 删除本设备上已到期的阅后即焚消息（纯本地，Server 不参与）。
-  /// [now] 可注入测试（毫秒时间戳）；返回删除条数。
-  Future<int> purgeExpired({int? now}) async {
+  /// 本设备上已到期的阅后即焚消息打**本地墓碑**（纯本地，Server 不参与）：
+  /// 只置 deletedAt，行与附件保留——UI 隐藏内容、保留时间+时钟+时长记录
+  /// （老板决策 2026-09-09，替代原来的到期删行）。已墓碑的不重复标记。
+  /// [now] 可注入测试（毫秒时间戳）；返回本次新标记条数。
+  Future<int> tombstoneExpired({int? now}) async {
     final t = now ?? DateTime.now().millisecondsSinceEpoch;
     final expired = await (db.select(db.localMessages)
-          ..where((m) => m.expiresAt.isNotNull() & m.expiresAt.isSmallerOrEqualValue(t)))
+          ..where((m) =>
+              m.deletedAt.isNull() &
+              m.expiresAt.isNotNull() &
+              m.expiresAt.isSmallerOrEqualValue(t)))
         .get();
-    var deleted = 0;
     for (final row in expired) {
-      await (db.delete(db.localAttachments)..where((a) => a.messageId.equals(row.messageId))).go();
-      await (db.delete(db.localMessages)..where((m) => m.messageId.equals(row.messageId))).go();
-      deleted++;
+      await (db.update(db.localMessages)..where((m) => m.messageId.equals(row.messageId))).write(
+        LocalMessagesCompanion(deletedAt: Value(t)),
+      );
     }
-    return deleted;
+    return expired.length;
   }
 
-  /// 删除本机一条消息（本地彻底删除，Server 不参与；附件元数据一并删除）。
-  /// 重启后不显示，增量同步不会重拉（锚点只向前推进，已删序号不在拉取范围）。
-  Future<void> deleteMessage(String messageId) async {
-    await (db.delete(db.localAttachments)..where((a) => a.messageId.equals(messageId))).go();
-    await (db.delete(db.localMessages)..where((m) => m.messageId.equals(messageId))).go();
+  /// 删除本机一条消息（**本地墓碑**，Server 不参与）：只置 deletedAt 标记，
+  /// 行与附件元数据保留——UI 隐藏内容但保留时间+焚毁记录，不打破历史流水
+  /// （老板决策 2026-09-09，替代原来的彻底删行；重启后记录仍在、内容仍隐藏）。
+  Future<void> tombstoneMessage(String messageId) async {
+    await (db.update(db.localMessages)..where((m) => m.messageId.equals(messageId))).write(
+      LocalMessagesCompanion(deletedAt: Value(DateTime.now().millisecondsSinceEpoch)),
+    );
   }
 
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
@@ -298,7 +306,7 @@ class MessageRepository {
     if (t == null) return 0;
 
     final rows = await (db.select(db.localMessages)
-          ..where((m) => m.status.equals('pending')))
+          ..where((m) => m.status.equals('pending') & m.deletedAt.isNull()))
         .get();
     var flushed = 0;
     for (final row in rows) {
@@ -433,6 +441,7 @@ class MessageRepository {
             ? row.burnAfterSeconds
             : (row.expiresAt == null ? 0 : max(1, row.expiresAt! - row.createdAt)),
         quote: quote,
+        deleted: row.deletedAt != null,
       ));
     }
     return out;
@@ -470,7 +479,8 @@ class MessageRepository {
   Future<int> get pendingCount async {
     final count = await (db.selectOnly(db.localMessages)
           ..addColumns([db.localMessages.messageId.count()])
-          ..where(db.localMessages.status.equals('pending')))
+          ..where(db.localMessages.status.equals('pending') &
+              db.localMessages.deletedAt.isNull()))
         .getSingle();
     return count.read(db.localMessages.messageId.count()) ?? 0;
   }
