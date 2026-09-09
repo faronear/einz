@@ -81,6 +81,17 @@ class _TuiState {
   /// 输入区当前折行行数（>=1）：超长输入自动多行时消息区动态让位。
   int inputLines = 1;
 
+  /// 消息区滚动窗口顶部在全部消息行中的下标（0 = 最旧；= lastMaxStart 即贴底/最新）。
+  /// PgUp/PgDn 与滚轮翻页时调整；新消息到达时若贴底则跟随底部，否则停留在当前浏览位置。
+  int scrollTop = 0;
+
+  /// 上次渲染时的最大窗口顶部下标（lines.length - msgArea 的下界钳制值，最小 0）。
+  /// -1 = 尚未渲染过（首次渲染强制贴底）；渲染时据此判断"上次是否贴底"以决定跟随。
+  int lastMaxStart = -1;
+
+  /// 上次渲染时的消息区行数（翻页步长：一屏 = lastMsgArea 行）。
+  int lastMsgArea = 0;
+
   /// 退出标志。
   bool running = true;
 
@@ -814,6 +825,11 @@ void _restoreTerminal() {
     stdout.write('\x1B[?25h');
     stdout.flush().ignore();
   } catch (_) {}
+  // 关闭终端鼠标事件（_runInputLoop 启用的滚轮报告），退出后终端恢复常态
+  try {
+    stdout.write('\x1B[?1000l\x1B[?1006l');
+    stdout.flush().ignore();
+  } catch (_) {}
 }
 
 void _exitRaw() {
@@ -1028,14 +1044,25 @@ void _render() {
   buf.write(_barLine(_bgBlack, titleText, cols));
   buf.write('\r\n');
 
-  // 消息区：从下往上堆叠——最新消息紧贴输入条（输入条上方），旧消息向上滚出，
-  // 消息量变化时消息流固定在底部堆叠，避免跳来跳去
+  // 消息区：从下往上堆叠——最新消息紧贴输入条（输入条上方），旧消息向上滚出。
+  // 滚动窗口由 scrollTop 决定：贴底（scrollTop == lastMaxStart）时跟随最新，
+  // 翻页浏览（PgUp/PgDn/滚轮）时停留在浏览位置，新消息到达不打断（自动跟随
+  // 只发生在贴底状态）。
   final lines = <String>[];
   for (final m in s.session.messages) {
     lines.addAll(_formatMessage(m, cols));
   }
-  final start = lines.length > msgArea ? lines.length - msgArea : 0;
-  final visible = lines.sublist(start);
+  final maxStart = lines.length > msgArea ? lines.length - msgArea : 0;
+  if (s.scrollTop >= s.lastMaxStart) {
+    s.scrollTop = maxStart; // 上次贴底（或首次渲染）：跟随到底部
+  } else if (s.scrollTop > maxStart) {
+    s.scrollTop = maxStart; // 消息变少导致越界：钳制回底部
+  }
+  s.lastMaxStart = maxStart;
+  s.lastMsgArea = msgArea;
+  final end =
+      s.scrollTop + msgArea < lines.length ? s.scrollTop + msgArea : lines.length;
+  final visible = lines.sublist(s.scrollTop, end);
   final bottom = rows - s.inputLines - 1; // 输入条上方第一行（消息区底部）
   // 先清空整个消息区（第 2 行到输入行上方）：连续渲染时旧行残留可能覆盖新消息
   // （表现为"连续两个 system 消息第二个不显示"）
@@ -1073,7 +1100,10 @@ void _render() {
   // 滚动通知（发送结果/同步进度/下载进度等瞬时状态）独占整行显示；
   // 空状态显示常用命令提示。
   buf.write('\x1B[$rows;1H\x1B[K');
-  if (s.status.isNotEmpty) {
+  if (s.scrollTop < s.lastMaxStart) {
+    // 历史浏览模式：正在看更早的消息（未贴底），提示翻页键；到底后自动回正常状态
+    buf.write(_barLine(_bgBlack, '📜 历史浏览（PgUp/PgDn 或滚轮翻页，翻到底自动回到最新）', cols));
+  } else if (s.status.isNotEmpty) {
     buf.write(
         _barLine(_bgBlack, '⚙ ${_truncateByWidth(s.status, cols - 4)}', cols));
   } else {
@@ -1367,6 +1397,13 @@ void _renderInputLine() {
 // （Dart 已知行为），故改用 stdin.listen 异步字节流 + busy 锁防并发。
 Future<void> _runInputLoop(ChatSession session) async {
   _enterRaw();
+  // 启用终端鼠标事件（滚轮翻页用）：1000 = 按钮事件（按下/释放），1006 = SGR
+  // 数字编码（坐标/按钮为纯 ASCII，与下方 CSI 累积解析器兼容）。终端不支持时
+  // 静默忽略，不影响键盘操作。
+  try {
+    stdout.write('\x1B[?1000h\x1B[?1006h');
+    stdout.flush().ignore();
+  } catch (_) {}
   final completer = Completer<void>();
   var busy = false;
   late final StreamSubscription<String> sub;
@@ -1397,8 +1434,8 @@ Future<void> _runInputLoop(ChatSession session) async {
         if (!isFinal) {
           if (esc == '\x1B') {
             esc = ''; // ESC 后跟非 [ / O：死亡序列，整体丢弃
-          } else if (seq.length >= 8) {
-            esc = ''; // 兜底：异常长参数序列丢弃
+          } else if (seq.length >= 32) {
+            esc = ''; // 兜底：异常长参数序列丢弃（上限放宽以容纳 SGR 鼠标序列）
           } else {
             esc = seq; // 继续累积参数（如 ESC [ 3 ~ 的中间态）
           }
@@ -1423,6 +1460,14 @@ Future<void> _runInputLoop(ChatSession session) async {
             s.cursor = s.input.length;
           case 'delete':
             _deleteAt(s);
+          case 'pgup':
+            _scrollMessages(s, -s.lastMsgArea > 0 ? -s.lastMsgArea : -1);
+          case 'pgdn':
+            _scrollMessages(s, s.lastMsgArea > 0 ? s.lastMsgArea : 1);
+          case 'wheelup':
+            _scrollMessages(s, -3); // 滚轮上滚：向上翻 3 行
+          case 'wheeldown':
+            _scrollMessages(s, 3); // 滚轮下滚：向下翻 3 行
         }
         inputChanged = true;
         continue;
@@ -1585,8 +1630,21 @@ void _inputLoopCrash(Object e, StackTrace st) {
   exit(1);
 }
 
-/// 解释终端转义序列 → 动作（方向键 / Home / End / Delete）；未知序列返回 null（整体丢弃）。
+/// 解释终端转义序列 → 动作（方向键 / Home / End / Delete / PgUp / PgDn / 滚轮）；
+/// 未知序列返回 null（整体丢弃）。
 String? _escAction(String seq) {
+  // SGR 鼠标滚轮事件（配合 \x1B[?1000h\x1B[?1006h 启用）：ESC [ < b ; x ; y M/m。
+  // b = 64 上滚、65 下滚（可叠加修饰键位：+4 Shift、+8 Alt、+16 Ctrl）；
+  // 只处理按下事件（M 结尾），释放事件（m）忽略，避免一次滚轮翻两倍。
+  final wheelRe = RegExp(r'^\x1B\[<(\d+);\d+;\d+M$');
+  final wheel = wheelRe.firstMatch(seq);
+  if (wheel != null) {
+    final b = int.parse(wheel.group(1)!);
+    final base = b & ~0x1C; // 去掉 Shift/Alt/Ctrl 修饰位
+    if (base == 64) return 'wheelup';
+    if (base == 65) return 'wheeldown';
+    return null; // 其他鼠标事件（点击/移动）：忽略
+  }
   return switch (seq) {
     '\x1B[A' || '\x1BOA' => 'up',
     '\x1B[B' || '\x1BOB' => 'down',
@@ -1595,8 +1653,20 @@ String? _escAction(String seq) {
     '\x1B[H' => 'home',
     '\x1B[F' => 'end',
     '\x1B[3~' => 'delete',
+    '\x1B[5~' => 'pgup',
+    '\x1B[6~' => 'pgdn',
     _ => null,
   };
+}
+
+/// 消息区翻页：delta 为正 = 向下翻（向最新），为负 = 向上翻（向更旧）。
+/// 直接调整 scrollTop（渲染时按 lastMaxStart 钳制并做贴底跟随）；翻到底
+/// （scrollTop 达到 lastMaxStart）即恢复贴底，此后新消息自动跟随。
+void _scrollMessages(_TuiState s, int delta) {
+  final maxStart = s.lastMaxStart < 0 ? 0 : s.lastMaxStart;
+  final target = s.scrollTop + delta;
+  s.scrollTop = target < 0 ? 0 : (target > maxStart ? maxStart : target);
+  _render(); // 翻页立即重绘（_render 内部 try-catch 兜底）
 }
 
 /// 在光标处插入字符（光标右移；StringBuffer 无 insert，重建字符串）。
