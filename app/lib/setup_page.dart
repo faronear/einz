@@ -444,8 +444,13 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 进度圆点指示器：只表示向导内部步骤——首屏服务器检测集成在启动屏完成，
   /// 不属于向导，因此圆点数 = 向导步骤数 - 1（老板决策 2026-09-08）。
+  /// 信封模式（offline）是 join 流程内口令页的平行替代：进度条按 join 展示，
+  /// 信封与口令处于同一位置（join 步骤 3），不缩成 2 点（老板要求 2026-09-09）。
   Widget _buildProgressDots() {
-    final total = _stepCount - 1; // 去掉首屏（检测）对应的圆点
+    // offline 的角色/步映射：1→3（口令位=信封位）、2→4（PIN）、3→5（完成）
+    final progressRole = _role == _WizardRole.offline ? _WizardRole.join : _role;
+    final progressStep = _role == _WizardRole.offline ? _step + 2 : _step;
+    final total = (progressRole == null ? 1 : 5) - 1; // create/join 同为 5 步
     if (total <= 1) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -458,7 +463,7 @@ class _SetupPageState extends State<SetupPage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               // 渐变背景上的白色圆点（已完成纯白 / 未到白色半透明）
-              color: i + 1 <= _step ? Colors.white : Colors.white54,
+              color: i + 1 <= progressStep ? Colors.white : Colors.white54,
             ),
           ),
       ],
