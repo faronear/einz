@@ -233,9 +233,9 @@ class _SetupPageState extends State<SetupPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    // 角色未判定（正在检测服务器状态）：品牌启动屏——全屏粉蓝渐变 + 上方大 LOGO
-    // + 正中旋转图标 + 状态文案；无 AppBar/菜单/服务器输入框（老板决策 2026-09-08）。
-    if (_role == null) return _buildSplashScreen(l10n);
+    // 角色未判定（正在检测服务器状态）：品牌启动屏——全屏粉蓝渐变 + 上半部
+    // 旋转 Logo（无文字）；无 AppBar/菜单/服务器输入框（老板决策 2026-09-08）。
+    if (_role == null) return _buildSplashScreen();
     return Scaffold(
       // AppBar 透明并浮在渐变上：body 渐变容器延伸到屏幕顶部（含 AppBar 与
       // 状态栏区域），整屏共用同一个渐变矩形——修复之前 AppBar flexibleSpace
@@ -760,16 +760,16 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 启动屏（角色未判定时的检测页）：全屏粉蓝品牌渐变 + 上方大 LOGO 徽章 +
-  /// 正中旋转图标 + 状态文案。无 AppBar/菜单/服务器输入框——探测失败时由
-  /// 自动重试兜底（每 4 秒重探，就绪即自动进入向导），全程零打扰。
-  Widget _buildSplashScreen(AppLocalizations l10n) {
+  /// 启动屏（角色未判定时的检测页）：全屏粉蓝品牌渐变 + 上半部旋转 Logo。
+  /// 无 AppBar/菜单/服务器输入框，也不显示检测/失败文字（老板要求 2026-09-09：
+  /// 保持简洁优美，位置固定在屏幕上半部分）——探测失败由自动重试兜底
+  /// （每 4 秒重探，就绪即自动进入向导），全程零打扰。
+  Widget _buildSplashScreen() {
     return Scaffold(
       body: Container(
         // alignment 使内部 Align 撑满全屏 → 渐变 DecoratedBox 铺满整页。
         // （Scaffold body 是宽松约束，RenderProxyBox 尺寸 = child 尺寸；若不加
-        // alignment，渐变容器会缩到 Column 宽度 = 最宽文案，右侧露出背景——
-        // 修复 2026-09-08：断线时失败文案最长，左侧一大半渐变 + 右侧全白）
+        // alignment，渐变容器会缩到 Column 宽度，右侧露出背景）
         alignment: Alignment.topCenter,
         decoration: const BoxDecoration(
           // Einz 粉蓝品牌渐变：天蓝（左上）→ 粉（右下），与顶部通知/Logo 同系
@@ -782,22 +782,11 @@ class _SetupPageState extends State<SetupPage> {
         child: SafeArea(
           child: Column(
             children: [
-              const Spacer(flex: 3),
-              // 正中：旋转的嵌套圆环 Logo——品牌展示与加载指示二合一，
-              // 替代原「大 LOGO 徽章 + 旋转图标」（老板决策 2026-09-08）
-              const SpinningBrandLogo(size: 96),
-              const SizedBox(height: 24),
-              // 状态文案：检测中提示 / 失败（自动重试中）提示
-              Text(
-                _probeFailed ? l10n.wizardDetectFailed : l10n.wizardDetectTitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              // 上半部（约 40% 高度）：旋转 Logo——品牌展示与加载指示二合一，
+              // 与 main.dart StartupGate 同尺寸同位置，开屏即定格无跳变
               const Spacer(flex: 2),
+              const SpinningBrandLogo(size: 96),
+              const Spacer(flex: 3),
             ],
           ),
         ),

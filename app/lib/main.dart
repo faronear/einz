@@ -204,8 +204,9 @@ class _StartupGateState extends State<StartupGate> {
         );
       }
       return const Scaffold(
-        // 启动加载：旋转的嵌套圆环 Logo——品牌展示与加载指示二合一
-        // （与检测页启动屏同系，秒级闪现）
+        // 启动加载：旋转 Logo 与检测页同款布局（上半部、96px、无文字）——
+        // 原生启动屏 → StartupGate → 检测页全程定格，无尺寸/位置跳变
+        // （老板要求 2026-09-09：开屏就确定显示的位置）
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -214,8 +215,14 @@ class _StartupGateState extends State<StartupGate> {
               colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
             ),
           ),
-          child: Center(
-            child: SpinningBrandLogo(size: 72),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Spacer(flex: 2),
+                SpinningBrandLogo(size: 96),
+                Spacer(flex: 3),
+              ],
+            ),
           ),
         ),
       );

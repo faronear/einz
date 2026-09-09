@@ -1695,3 +1695,25 @@ setup_probe_retry_test 通过。golden 政策不变：setup_step1_detect（100%�
 
 **验证：** chat_initial_scroll_test 两个用例全过（原 60 条普通 + 新增引用
 场景）；dart analyze 仅 1 条既有 info（ws_realtime_service）。
+## 2026-09-09 首屏视觉统一：无小→大跳变、Logo 移上半部、去掉服务器文字
+
+**老板要求（2026-09-09）：** 1) 刚打开时先显示小 logo、再跳变成更大的旋转 logo
+——不要跳，开屏就定格（否则宁愿不显示小的）；2) logo 位置在屏幕偏下方不对，
+应在屏幕上半部分；3) 不需要显示「服务器找不到」类文字，保持简洁优美。
+
+**定位：** 启动链三段都有问题——iOS 原生启动屏显示小 LaunchImage（168×185
+居中，白底）；StartupGate 显示 72px 居中 spinner；setup 检测页（_buildSplashScreen）
+Spacer(3):Spacer(2) 把 96px spinner 压到约 60% 高度 + 下方「正在检测服务器
+状态…/暂时无法连接服务器，正在自动重试…」文字。
+
+**实现：**
+- iOS LaunchScreen.storyboard：移除 LaunchImage 小图（原生启动屏空白，宁缺毋滥）；
+- main.dart StartupGate：改与检测页同款布局（96px + 上半部 Spacer 2:3），
+  原生屏→StartupGate→检测页全程同尺寸同位置，无跳变；
+- setup `_buildSplashScreen`：Spacer 改 2:3（约 40% 高度，上半部），删除状态
+  文字（wizardDetectTitle/Failed），探测失败仍由 4 秒自动重试兜底；
+- setup_probe_retry_test 同步更新：断言启动屏保持旋转 Logo 且无失败文字、
+  进入向导后启动屏消失（不再依赖旧失败文案）。
+
+**验证：** dart analyze 仅 1 条既有 info；setup_probe_retry + chat_initial_scroll
+（2 个滚动用例）全过。golden 政策不变（setup_step1_detect 失配保持红不重刷）。
