@@ -1,9 +1,7 @@
-// offline 密保信封验证回归测试：信封页（步骤 1）必须即时验证信封——
-// 用本设备私钥解封成功（得到合法 Space Key）才放行进 PIN 步骤；
-// 无效信封提示并停留信封页（不得"随便输入都能过"）。
-
-import 'dart:convert'; // base64Encode
-import 'dart:typed_data'; // Uint8List
+// offline 密保信封页回归测试：信封页（步骤 1）的出口行为——
+// 1)「下一步」= 回到前面的邀请码页（join 步骤 2），重走登记流程
+//    （老板 2026-09-09 决策：信封页不再验证信封推进，由邀请码入口承担登记）；
+// 2)「改用线上密保口令」= 回到口令页，口令⇄信封自由互切。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -49,27 +47,26 @@ void main() {
   late final DeviceKeyPair kp;
 
   setUpAll(() async {
-    // 真实密钥对：sealFor/sealOpen 需要合法 x25519 密钥（全零 32B 仅可渲染不可加解密）
+    // 真实密钥对：向导 keyPairOverride 需要合法 x25519 密钥
     kp = await DeviceKeyPair.generate(deviceId: 'dev1');
   });
 
-  testWidgets('无效密保信封：提示无效并停留信封页（不进入 PIN 页）', (WidgetTester tester) async {
+  testWidgets('信封页「下一步」回到邀请码页（不验证信封推进）', (WidgetTester tester) async {
     await pumpToEnvelope(tester, kp: kp);
-    await tester.enterText(find.byType(TextField), '不是合法信封');
+    // 信封页不管输入什么（甚至为空），「下一步」都应回到邀请码页重走登记
+    await tester.enterText(find.byType(TextField), '随便粘贴的内容');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('密保信封无效'), findsOneWidget, reason: '无效信封必须被拦截并提示');
-    expect(find.text('密保信封'), findsWidgets, reason: '应停留在信封页');
-    expect(find.text('设置锁屏码'), findsNothing, reason: '不应进入 PIN 页');
+    expect(find.text('验证邀请码'), findsOneWidget, reason: '应回到邀请码页（验证邀请码标题）');
+    expect(find.byType(TextField), findsOneWidget, reason: '邀请码输入框应可见');
+    expect(find.text('密保信封'), findsNothing, reason: '不应停留在信封页');
   });
 
-  testWidgets('有效密保信封：解封成功放行到 PIN 页', (WidgetTester tester) async {
-    final s = await sodium();
-    final envelope = await sealFor(s, kp.publicKey, Uint8List(32)); // Space Key 32B
+  testWidgets('信封页「改用线上密保口令」回到口令页（互切保留已填值）', (WidgetTester tester) async {
     await pumpToEnvelope(tester, kp: kp);
-    await tester.enterText(find.byType(TextField), base64Encode(envelope));
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text('改用线上密保口令'));
     await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsWidgets, reason: '有效信封应放行到 PIN 步骤');
+    expect(find.text('验证密保口令'), findsOneWidget, reason: '应回到口令页（join 验证标题）');
+    expect(find.text('改用线下密保信封'), findsOneWidget, reason: '口令页应仍可再切回信封');
   });
 }

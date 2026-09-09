@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'⚠️ Set an access passphrase above first (your partner joins with it)'**
   String get setupPageNeedPassphrase;
 
+  /// No description provided for @wizardJoinPassphraseRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'❗️ Enter the passphrase to verify'**
+  String get wizardJoinPassphraseRequired;
+
   /// No description provided for @setupEnrollBoundNotice.
   ///
   /// In en, this message translates to:
@@ -341,7 +347,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardTitleInvite.
   ///
   /// In en, this message translates to:
-  /// **'Invite code'**
+  /// **'Verify invite code'**
   String get wizardTitleInvite;
 
   /// No description provided for @wizardTitlePassphrase.
@@ -349,6 +355,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Passphrase'**
   String get wizardTitlePassphrase;
+
+  /// No description provided for @wizardJoinPassphraseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify passphrase'**
+  String get wizardJoinPassphraseTitle;
 
   /// No description provided for @wizardTitlePin.
   ///

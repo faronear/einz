@@ -39,6 +39,10 @@ class AppLocalizationsEn extends AppLocalizations {
       '⚠️ Set an access passphrase above first (your partner joins with it)';
 
   @override
+  String get wizardJoinPassphraseRequired =>
+      '❗️ Enter the passphrase to verify';
+
+  @override
   String get setupEnrollBoundNotice => 'New device bound to my private space';
 
   @override
@@ -138,10 +142,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitlePeerName => 'Partner\'s name';
 
   @override
-  String get wizardTitleInvite => 'Invite code';
+  String get wizardTitleInvite => 'Verify invite code';
 
   @override
   String get wizardTitlePassphrase => 'Passphrase';
+
+  @override
+  String get wizardJoinPassphraseTitle => 'Verify passphrase';
 
   @override
   String get wizardTitlePin => 'Screen lock PIN';

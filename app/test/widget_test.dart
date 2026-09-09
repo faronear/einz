@@ -64,7 +64,7 @@ void main() {
     // 点身份卡片 → 自动进入邀请码页
     await tester.tap(find.text('Lukas'));
     await tester.pumpAndSettle();
-    expect(find.text('邀请码'), findsWidgets); // 邀请码页步骤标题
+    expect(find.text('验证邀请码'), findsWidgets); // 邀请码页步骤标题（join=验证套）
   });
 
   testWidgets('探测失败：启动屏显示失败提示并自动重试（无输入框/信封入口）', (WidgetTester tester) async {

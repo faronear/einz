@@ -521,7 +521,10 @@ class _SetupPageState extends State<SetupPage> {
     if ((_role == _WizardRole.create || _role == _WizardRole.join) &&
         _step == 3 &&
         _escrowPassphrase.text.trim().isEmpty) {
-      localError = l10n.setupPageNeedPassphrase;
+      // 两套错误提示：首设备「必须设置」/ 后续设备「验证」语气（老板要求）
+      localError = _role == _WizardRole.join
+          ? l10n.wizardJoinPassphraseRequired
+          : l10n.setupPageNeedPassphrase;
       invalid = true;
     }
     if (_role == _WizardRole.offline && _step == 1 && _envelopeKey.text.trim().isEmpty) {
@@ -550,12 +553,17 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (!verified) return;
     }
-    // offline 信封页（步骤 1）：信封必须有效（本设备私钥解封成功）才放行——
-    // 不留到 PIN 页才验证（邀请码沿用 join 步骤 2 已填值）
+    // offline 信封页（步骤 1）「下一步」= 回到前面的邀请码页（join 步骤 2）：
+    // 进入信封页前必为 join（入口仅在 join 口令页显示）；回邀请码页重走登记，
+    // 信封⇄口令互切仍由页内「改用线上密保口令」承担（老板要求 2026-09-09）
     if (_role == _WizardRole.offline && _step == 1) {
-      final ok = await _verifyEnvelope();
-      if (!mounted) return;
-      if (!ok) return;
+      setState(() {
+        _role = _preEnvelopeRole;
+        _step = 2; // join 邀请码页
+        _status = null;
+        _localError = null;
+      });
+      return;
     }
     // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
     // 有效 PIN → 设锁后推进；两空 → 弹窗确认"暂不设置"；其余 → 输入框下方红色提示。
@@ -1348,8 +1356,9 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 两套标题：首设备「设置密保口令」/ 后续设备「验证密保口令」（老板要求）
         _stepHeader(
-          l10n.wizardTitlePassphrase,
+          _role == _WizardRole.join ? l10n.wizardJoinPassphraseTitle : l10n.wizardTitlePassphrase,
           _role == _WizardRole.join ? l10n.wizardJoinPassphraseHint : l10n.wizardPassphraseHint,
         ),
         TextField(
@@ -1571,7 +1580,7 @@ class _SetupPageState extends State<SetupPage> {
     if (kp == null) return false;
     final passphrase = _escrowPassphrase.text.trim();
     if (passphrase.isEmpty) {
-      setState(() => _localError = AppLocalizations.of(context)!.setupPageNeedPassphrase);
+      setState(() => _localError = AppLocalizations.of(context)!.wizardJoinPassphraseRequired);
       return false;
     }
     setState(() {
@@ -1711,46 +1720,7 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// offline 信封页（步骤 1）「验证密保信封」：登记 → 用本设备私钥解封信封——
-  /// 解出合法 Space Key 才放行进 PIN 步骤；无效信封提示并停留本页。
-  Future<bool> _verifyEnvelope() async {
-    final kp = _keyPair;
-    if (kp == null) return false;
-    final envelopeRaw = _envelopeKey.text.trim();
-    if (envelopeRaw.isEmpty) {
-      setState(() => _localError = AppLocalizations.of(context)!.setupPagePasteEnvelope);
-      return false;
-    }
-    setState(() {
-      _busy = true;
-      _status = null;
-    });
-    try {
-      // 1) 凭邀请码登记（offline 从 join 口令页切换进入时已登记，跳过）
-      if (_enroll == null) {
-        await _enrollDevice(_inviteCode.text.trim());
-      }
-      // 2) 用本设备私钥解封 Space Key：解密失败 = 信封无效 → 不通过
-      final s = await sodium();
-      final spaceKey = await sealOpen(
-        s,
-        base64Decode(envelopeRaw),
-        kp.publicKey,
-        kp.privateKey,
-      );
-      _spaceKey = spaceKey;
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      setState(() => _status = AppLocalizations.of(context)!.wizardEnvelopeWrong);
-      return false;
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  /// offline：信封已在信封页（步骤 1）验证解封（_verifyEnvelope），
-  /// 这里仅认证/设锁/完成（Space Key 已存 _spaceKey）。
+  /// offline：信封导入路径——认证/设锁/完成（Space Key 已存 _spaceKey）。
   Future<void> _runEnvelopeImport() async {
     final kp = _keyPair;
     if (kp == null) return;

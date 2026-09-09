@@ -37,6 +37,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageNeedPassphrase => '❗️ 必须设置密保口令';
 
   @override
+  String get wizardJoinPassphraseRequired => '❗️ 请输入密保口令进行验证';
+
+  @override
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
 
   @override
@@ -130,10 +133,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitlePeerName => '关于伴侣';
 
   @override
-  String get wizardTitleInvite => '邀请码';
+  String get wizardTitleInvite => '验证邀请码';
 
   @override
   String get wizardTitlePassphrase => '设置密保口令';
+
+  @override
+  String get wizardJoinPassphraseTitle => '验证密保口令';
 
   @override
   String get wizardTitlePin => '设置锁屏码';
@@ -325,7 +331,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
-  String get chatPageRenameDeviceTitle => '我的设备';
+  String get chatPageRenameDeviceTitle => '我的设备信息';
 
   @override
   String get chatPageRenameDeviceLabel => '设备名称';
@@ -399,7 +405,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuBurnLabel => '阅后即焚';
 
   @override
-  String get chatPageMenuMyNameLabel => '我的名字';
+  String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
   String get chatPageMenuDeviceNameLabel => '我的设备';

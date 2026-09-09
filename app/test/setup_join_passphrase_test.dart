@@ -68,7 +68,7 @@ Future<void> pumpToJoinPassphrase(
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle();
   // 口令页应为「验证」语义：标题与提示都是验证措辞
-  expect(find.text('设置密保口令'), findsOneWidget); // 标题
+  expect(find.text('验证密保口令'), findsOneWidget); // 标题（join=验证套，create=设置套）
   expect(find.text('对所有消息进行加密、解密。如还不知道口令，询问秘境伴侣。'),
       findsOneWidget); // hint
   // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡底部「下一步」按钮
@@ -115,15 +115,15 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.textContaining('邀请码无效'), findsOneWidget, reason: '无效码必须被拦截并提示');
-    expect(find.text('邀请码'), findsWidgets, reason: '应停留在邀请码页');
-    expect(find.text('设置密保口令'), findsNothing, reason: '不应进入口令页');
+    expect(find.text('验证邀请码'), findsWidgets, reason: '应停留在邀请码页');
+    expect(find.text('验证密保口令'), findsNothing, reason: '不应进入口令页');
   });
 
-  testWidgets('正确邀请码：放行到「验证接入口令」页', (WidgetTester tester) async {
+  testWidgets('正确邀请码：放行到「验证密保口令」页', (WidgetTester tester) async {
     await pumpToJoinInvite(tester); // 默认成功登记
     await tester.enterText(find.byType(TextField), '正确邀请码');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('设置密保口令'), findsOneWidget, reason: '有效码应放行进口令页');
+    expect(find.text('验证密保口令'), findsOneWidget, reason: '有效码应放行进口令页');
   });
 }

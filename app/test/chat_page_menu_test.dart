@@ -84,8 +84,8 @@ void main() {
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     expect(find.text('密保口令'), findsOneWidget);
-    // 我的名字/设备名称（未传 → 显示「未设置」）+ 退出秘境
-    expect(find.text('我的名字'), findsOneWidget);
+    // 我的身份/设备名称（未传 → 显示「未设置」）+ 退出秘境
+    expect(find.text('我的身份'), findsOneWidget);
     expect(find.text('我的设备'), findsOneWidget);
     expect(find.text('退出秘境'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
@@ -177,10 +177,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → 点「我的名字」（未传 personName → 显示"我的名字: 未设置"）
+    // 打开菜单 → 点「我的身份」（未传 personName → 显示"我的身份: 未设置"）
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('我的名字'));
+    await tester.tap(find.textContaining('我的身份'));
     await tester.pumpAndSettle();
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）
     await tester.enterText(find.byType(TextField).last, '新名字');
@@ -454,10 +454,10 @@ void main() {
     // initState loadProfile 补名（personB——顶部条/菜单显示）
     expect(find.text('personB'), findsWidgets);
 
-    // 菜单 → 修改我的名字（菜单项标签：我的名字）→ 输入新名字 → 保存
+    // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('我的名字'));
+    await tester.tap(find.text('我的身份'));
     await tester.pumpAndSettle();
     final renameField =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
@@ -491,7 +491,7 @@ void main() {
     expect(find.text('personB'), findsNothing, reason: '不应回到旧名 personB');
   });
 
-  testWidgets('我的设备弹窗：标题与菜单一致、公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
+  testWidgets('我的设备弹窗：标题「我的设备信息」、公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -523,8 +523,8 @@ void main() {
     await tester.tap(find.text('我的设备'));
     await tester.pumpAndSettle();
 
-    // 标题与菜单同名「我的设备」；公钥置顶 + 复制按钮；输入框标签「设备名称」
-    expect(find.text('我的设备'), findsOneWidget, reason: '弹窗标题应与菜单一致');
+    // 标题「我的设备信息」；公钥置顶 + 复制按钮；输入框标签「设备名称」
+    expect(find.text('我的设备信息'), findsOneWidget, reason: '弹窗标题应为「我的设备信息」');
     expect(find.text('公钥: dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥应显示在弹窗顶部');
     expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥旁应有复制按钮');
     expect(find.text('设备名称'), findsWidgets, reason: '输入框标签应为「设备名称」');
@@ -552,7 +552,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('我的设备'), findsNothing, reason: '保存成功应关闭弹窗');
+    expect(find.text('我的设备信息'), findsNothing, reason: '保存成功应关闭弹窗');
   });
 
   testWidgets('我的个人资料弹窗：标题/标签新文案、名字框下性别图标高亮、空名保存红字', (WidgetTester tester) async {
@@ -582,10 +582,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync + profile load 完成
 
-    // 菜单 → 我的名字（打开个人资料弹窗）
+    // 菜单 → 我的身份（打开个人资料弹窗）
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('我的名字'));
+    await tester.tap(find.text('我的身份'));
     await tester.pumpAndSettle();
 
     // 标题「我的个人资料」、输入框标签「我的名字」、名字框下性别彩色图标（男高亮）
