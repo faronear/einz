@@ -1520,6 +1520,27 @@ analyze 报错；`IconThemeData(color: null)` 合并时保留祖先色（plain �
 深色/白字断言，FakeApi 扩展支持编排加密消息 + getSpace）+ chat_page_menu 12 +
 chat_bubble_gender_test 1 全过。
 
+## 2026-09-09 修复：进入对话页首屏未滚到最新消息
+
+**老板实测：** 刚打开 app 进对话页，列表停在最早消息处（顶部）；等几秒到一分钟
+（ticker 自动刷新）才滚到最新消息。应在刚进入时就同步并显示最新。
+
+**根因：** `_loadInitial`（首次载入：sync → purgeExpired → historyRecent 最近一页
+50 条 → setState）**没有滚动到底**；`_scrollToLatest()` 只在 `_refresh()`（3s/30s
+ticker 轮询/WS message.new）里调用——所以首屏停在顶部，等第一个 ticker 触发才
+滚到底，正好是老板看到的现象。
+
+**修复（commit 待填）：** `_loadInitial` setState 后调用
+`_scrollToLatest(animate: false)`——首次载入直接跳转到底部（进入即见最新，不播
+从顶部飞过的动画）；`_scrollToLatest` 加 `{bool animate = true}` 参数（新消息到达
+仍走 250ms 平滑滚动，行为不变）。
+
+**验证：** 新增 `test/chat_initial_scroll_test.dart` 回归用例（60 条消息，断言首屏
+滚动位置 == 列表底部 + 最新消息可见；修复前失败/修复后通过）；analyze 通过；
+chat_initial_scroll + chat_page_menu 12 + ui_style_switch 4 + chat_bubble_gender 1 +
+invite_dialog_layout + widget_test 全过。
+
+
 
 
 

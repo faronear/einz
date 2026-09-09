@@ -858,6 +858,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final recent = await _repo.historyRecent(limit: _pageSize);
       if (!mounted) return;
       setState(() => _messages = recent);
+      // 首次载入即定位到最新消息（老板实测 2026-09-09：原来停在最早消息处，
+      // 要等 ticker 自动刷新才滚到底）——直接跳转不播动画，进入即见最新
+      _scrollToLatest(animate: false);
     } catch (_) {
       // 网络抖动忽略：保持空列表，等 ticker 重试
     }
@@ -903,16 +906,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 新消息（接收/发送）后滚动到底：让最新消息显示在最下方（老板要求"总是"）。
+  /// 滚动到底部：让最新消息显示在最下方（老板要求"总是"）。
+  /// [animate] 为 false 时直接跳转（首次载入用——进入聊天页应立即看到最新，
+  /// 不播从顶部一路飞过的动画）；新消息到达用默认平滑滚动。
   /// post-frame 里执行（ListView 重建后 maxScrollExtent 才有效）。
-  void _scrollToLatest() {
+  void _scrollToLatest({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
+      if (animate) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
     });
   }
 
