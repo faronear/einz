@@ -51,11 +51,11 @@ export function sendPushHint(spaceId: string, exceptDeviceId: string): void {
   }
 }
 
-/** GET /space：空间信息（space_id + 成员设备 + person 名称表）。 */
+/** GET /space：空间信息（space_id + 成员设备 + person 名称/性别表）。 */
 export function getSpace(
   cfg: ServerConfig,
   token: string
-): { space_id: string; devices: unknown[]; person_names: Record<string, string> } {
+): { space_id: string; devices: unknown[]; person_names: Record<string, string>; person_genders: Record<string, string> } {
   const { device_id } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   const devices = getDb()
@@ -68,5 +68,12 @@ export function getSpace(
     .all() as { key: string; value: string }[]) {
     personNames[r.key.slice("person_name:".length)] = r.value;
   }
-  return { space_id: cfg.space_id, devices, person_names: personNames };
+  // person 性别表（meta person_gender:*，male/female）：随名称表一并下发
+  const personGenders: Record<string, string> = {};
+  for (const r of getDb()
+    .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_gender:%'`)
+    .all() as { key: string; value: string }[]) {
+    personGenders[r.key.slice("person_gender:".length)] = r.value;
+  }
+  return { space_id: cfg.space_id, devices, person_names: personNames, person_genders: personGenders };
 }

@@ -64,6 +64,8 @@ class _SetupPageState extends State<SetupPage> {
   String? _autoDeviceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
   final _personName = TextEditingController(); // 首设备：第一个用户的名字
   final _peerNameCtrl = TextEditingController(); // create：对方（伴侣）的名字（必填）
+  String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 person_name 同步服务端）
+  String? _peerGender; // create 步骤 2：伴侣性别（'male'/'female'）
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -837,6 +839,8 @@ class _SetupPageState extends State<SetupPage> {
             personName: _personName.text.trim(), // 首设备：第一个用户的名字；后续设备按需
             partnerName: _peerNameCtrl.text.trim(), // create：对方（伴侣）的名字（必填）；join 时为空被服务端忽略
             personId: _chosenPerson, // join：用户选择的身份（personA/personB）
+            personGender: _myGender, // create 步骤 1：我的性别（male/female）；join 时为空被服务端忽略
+            partnerGender: _peerGender, // create 步骤 2：伴侣性别（male/female）
             // 自动填设备型号（产品决定：不再询问）；同步保存供进聊天页显示/修改。
             // 只在真实登记分支计算（测试注入 enrollOverride 时不调 device_info）
             deviceName: (_myDeviceName = await _autoDeviceName()),
@@ -972,6 +976,14 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
+        const SizedBox(height: 20),
+        _buildGenderSelector(
+          selected: _myGender,
+          label: l10n.wizardMyGenderLabel,
+          maleLabel: l10n.wizardGenderMale,
+          femaleLabel: l10n.wizardGenderFemale,
+          onChanged: (g) => setState(() => _myGender = g),
+        ),
         if (_role == _WizardRole.create && _bootstrapFailed) ...[
           const SizedBox(height: 12),
           Card(
@@ -1160,10 +1172,112 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
+        const SizedBox(height: 20),
+        _buildGenderSelector(
+          selected: _peerGender,
+          label: l10n.wizardPeerGenderLabel,
+          maleLabel: l10n.wizardGenderMale,
+          femaleLabel: l10n.wizardGenderFemale,
+          onChanged: (g) => setState(() => _peerGender = g),
+        ),
       ],
     );
   }
 
+  /// 性别选择：左蓝（男）/右粉（女）两个按钮，与品牌色一致；
+  /// 选中者放大（AnimatedScale）+ 白粗边框，未选中半透明。
+  Widget _buildGenderSelector({
+    required String? selected, // 'male' / 'female'；null = 未选
+    required String label,
+    required String maleLabel,
+    required String femaleLabel,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildGenderButton(
+                label: maleLabel,
+                icon: Icons.male,
+                color: const Color(0xFF3BAFFD), // 左：品牌天蓝
+                selected: selected == 'male',
+                onTap: () => onChanged(selected == 'male' ? null : 'male'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildGenderButton(
+                label: femaleLabel,
+                icon: Icons.female,
+                color: const Color(0xFFD6529C), // 右：品牌粉
+                selected: selected == 'female',
+                onTap: () => onChanged(selected == 'female' ? null : 'female'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 单个性别按钮：品牌色背景 + 白字图标/标签；选中放大 + 白粗边框，未选中半透明。
+  Widget _buildGenderButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return AnimatedScale(
+      scale: selected ? 1.06 : 1.0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      child: Material(
+        color: selected ? color : color.withValues(alpha: 0.35),
+        elevation: selected ? 3 : 0,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: selected ? Border.all(color: Colors.white, width: 3) : null,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white, size: 26),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 设置接入口令（create=步骤2 / join=步骤3；对方凭它加入）。
   Widget _buildStepPassphrase() {
     final l10n = AppLocalizations.of(context)!;
     return Column(

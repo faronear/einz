@@ -66,6 +66,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       .all() as { key: string; value: string }[]) {
       personNames[r.key.slice("person_name:".length)] = r.value;
     }
+    // person 性别表（meta person_gender:*，male/female）：随名称表一并下发
+    const personGenders: Record<string, string> = {};
+    for (const r of getDb()
+      .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_gender:%'`)
+      .all() as { key: string; value: string }[]) {
+      personGenders[r.key.slice("person_gender:".length)] = r.value;
+    }
     sendJson(res, 200, {
       status: "ok",
       version: SERVER_VERSION,
@@ -74,6 +81,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       ws_clients: wsConnCount(),
       messages_count: msgCount,
       person_names: personNames,
+      person_genders: personGenders,
     });
     return;
   }

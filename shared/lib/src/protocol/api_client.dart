@@ -66,6 +66,8 @@ class ApiClient {
     String? inviteCode,
     String? personName,
     String? partnerName,
+    String? personGender,
+    String? partnerGender,
     String? deviceName,
     String? personId,
   }) async {
@@ -77,6 +79,8 @@ class ApiClient {
         if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
         if (personName != null && personName.isNotEmpty) 'person_name': personName,
         if (partnerName != null && partnerName.isNotEmpty) 'partner_name': partnerName,
+        if (personGender != null && personGender.isNotEmpty) 'person_gender': personGender,
+        if (partnerGender != null && partnerGender.isNotEmpty) 'partner_gender': partnerGender,
         if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
         if (personId != null && personId.isNotEmpty) 'person_id': personId,
       },

@@ -107,6 +107,8 @@ export function enrollDevice (
     invite_code?: string
     person_name?: string
     partner_name?: string
+    person_gender?: string
+    partner_gender?: string
     device_name?: string
     person_id?: string
   }
@@ -146,10 +148,15 @@ export function enrollDevice (
     }
     setMeta('creator_person_id', personId) // 创建者标记（规范 id）
     setMeta(`person_name:${personId}`, personName) // 名称表：personA → lukas
+    // 性别表（meta person_gender:*，male/female；未提供不落 meta，/health 不下发）
+    const personGender = (b.person_gender ?? '').trim()
+    if (personGender) setMeta(`person_gender:${personId}`, personGender)
     // 第二用户预置名（首设备创建时可选询问；跳过/未提供 → 落规范默认 personB，
     // 后续设备启动引导即可按名称表直接选 personA/personB 身份）
     const partnerName = (b.partner_name ?? '').trim()
     setMeta('person_name:personB', partnerName || 'personB')
+    const partnerGender = (b.partner_gender ?? '').trim()
+    if (partnerGender) setMeta('person_gender:personB', partnerGender)
     console.log(
       `[einz] 首设备自举成功: device=${assignedId}（${deviceName}）person=${personId}（${personName}，空间创建者）partner=${
         partnerName || 'personB'

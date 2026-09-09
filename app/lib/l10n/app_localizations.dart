@@ -218,6 +218,30 @@ abstract class AppLocalizations {
   /// **'e.g. Lukas (optional, change later)'**
   String get wizardNameHintInput;
 
+  /// No description provided for @wizardMyGenderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your gender'**
+  String get wizardMyGenderLabel;
+
+  /// No description provided for @wizardPeerGenderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner\'s gender'**
+  String get wizardPeerGenderLabel;
+
+  /// No description provided for @wizardGenderMale.
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get wizardGenderMale;
+
+  /// No description provided for @wizardGenderFemale.
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get wizardGenderFemale;
+
   /// No description provided for @wizardIdentityHint.
   ///
   /// In en, this message translates to:

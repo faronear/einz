@@ -76,6 +76,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardNameHintInput => 'e.g. Lukas (optional, change later)';
 
   @override
+  String get wizardMyGenderLabel => 'Your gender';
+
+  @override
+  String get wizardPeerGenderLabel => 'Partner\'s gender';
+
+  @override
+  String get wizardGenderMale => 'Male';
+
+  @override
+  String get wizardGenderFemale => 'Female';
+
+  @override
   String get wizardIdentityHint => 'This space is limited to two people.';
 
   @override

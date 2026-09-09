@@ -70,6 +70,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameHintInput => '例如 Lukas';
 
   @override
+  String get wizardMyGenderLabel => '我的性别';
+
+  @override
+  String get wizardPeerGenderLabel => '伴侣性别';
+
+  @override
+  String get wizardGenderMale => '男';
+
+  @override
+  String get wizardGenderFemale => '女';
+
+  @override
   String get wizardIdentityHint => '一个秘境仅限两人。';
 
   @override
