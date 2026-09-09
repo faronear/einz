@@ -904,8 +904,10 @@ String _truncateByWidth(String s, int maxWidth) {
 
 /// 把 [text] 用 [colorSeq] 着色并铺满整行（补空格到 [cols]），末尾统一 reset。
 /// 标题栏/底部状态行用：整行背景色连续覆盖，避免中间 reset 打断导致底色只盖半行。
+/// 统一强制白色前景——黑底行不能依赖终端默认前景色（macOS Terminal/iTerm2
+/// 默认前景为黑，黑底黑字看不见；VSCode 默认浅灰才恰好可见）。
 String _barLine(String colorSeq, String text, int cols) {
-  final content = '$colorSeq$text';
+  final content = '$colorSeq$_white$text';
   final pad = cols - _displayWidth(content);
   return '$content${pad > 0 ? ' ' * pad : ''}$_reset';
 }
