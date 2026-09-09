@@ -348,12 +348,16 @@ class _SetupPageState extends State<SetupPage> {
                               padding: const EdgeInsets.all(20),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                                // 卡片按内容自适应高度，不预先拉长（老板要求 2026-09-09）：
+                                // 有后台报错时卡片仅多出一行红字，Flexible 保证内容超高时
+                                // 仍可滚动而不溢出
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Expanded(
+                                  Flexible(
                                     child: SingleChildScrollView(child: _buildStep()),
                                   ),
                                   // 后台报告的错误提示（红字）固定在卡片最下方：
-                                  // 白底上清晰可读（渐变背景上对比不足看不清，老板要求 2026-09-09）
+                                  // 白底上清晰可读（渐变背景上对比不足看不清）
                                   if (_status != null) ...[
                                     const SizedBox(height: 12),
                                     Text(
