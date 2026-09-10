@@ -36,6 +36,9 @@ const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息整条底色（�
 const _bgBlue = '$_esc[104m'; // 亮蓝背景：男性对方消息整条底色
 const _bgTeal = '$_esc[48;5;37m'; // 青绿背景（256 色 #00AFAF）：性别未知的对方消息整条底色
 const _bgBlack = '$_esc[40m'; // 黑色背景：标题栏/底部状态行整行底色
+const _fgBlue = '$_esc[94m'; // 亮蓝字：男性气泡框线（与 _bgBlue 同色系，黑底可见）
+const _fgPink = '$_esc[95m'; // 亮品红字：女性气泡框线（与 _bgPink 同色系）
+const _fgTeal = '$_esc[38;5;37m'; // 青绿字：性别未知气泡框线（与 _bgTeal 同色系）
 
 // \x1B[2J 清屏 + \x1B[3J 清除回滚缓冲 + \x1B[H 光标回家：全屏重绘应用（类似 vim/htop）
 // 不保留滚动历史——否则每次渲染的内容在终端回滚缓冲里累积成"重复渲染"
@@ -1367,12 +1370,22 @@ String _genderBubble(String? rawGender) {
   return _bgTeal;
 }
 
+/// 按性别表取气泡框线前景色（与 _genderBubble 背景同色系；黑底上用亮色才可见）：
+/// 男亮蓝 / 女亮品红 / 未知青绿。兼容服务端两种取值（male/female 与旧中文 男/女）。
+String _genderBorderFg(String? rawGender) {
+  if (rawGender == 'male' || rawGender == '男') return _fgBlue;
+  if (rawGender == 'female' || rawGender == '女') return _fgPink;
+  return _fgTeal;
+}
+
 /// 格式化消息为多行（自动按列宽折行）。
 /// 自己的消息：性别气泡，整块从左侧 8 列留白起铺满屏缘（长短消息左缘统一对齐）——
 /// 长消息正文在左；单行短消息正文右对齐、贴着末尾 [我 时间] 标签（标签贴最右）。
 /// 背景按我的性别配色；对方消息：性别气泡，整块左对齐（左侧气泡风格，[对方名 时间]
 /// 黑字标签嵌在气泡左缘、正文在右），背景按对方性别配色；系统提示（isSystem）：
 /// 灰色前缀 + 普通正文（左对齐）。
+/// 双方气泡上下各加一行同色系角标框线（╭─╮ / ╰─╯，老板 2026-09-10 选定方案 3），
+/// 区分同一人相邻消息的边界；系统提示无气泡、不加框线。
 List<String> _formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
@@ -1437,7 +1450,16 @@ List<String> _formatMessage(ChatMessage m, int cols) {
             '$bubbleBackground$_white${' ' * lane}$chunk${' ' * (fill < 0 ? 0 : fill)}$_reset');
       }
     }
-    return lines;
+    // 气泡上下加角标框线（老板 2026-09-10 选定方案 3；不好看可换方案 1 纯实线）：
+    // 与气泡底色同色系的亮色字 ╭─╮ / ╰─╯，随气泡宽度（col 1 → cols-rightPad）
+    final borderW = cols - rightPad - 2; // 角标占 2 列
+    final borderFg = _genderBorderFg(_state?.personGenders[m.env.senderPersonId]);
+    final bar = '─' * (borderW > 0 ? borderW : 0);
+    return [
+      '$borderFg╭$bar╮$_reset',
+      ...lines,
+      '$borderFg╰$bar╯$_reset',
+    ];
   }
   // 我的消息：气泡整块从左侧 sideMargin 列留白起铺满到屏缘（右侧区域气泡风格——
   // 长短消息左缘统一对齐；长消息正文在左，单行短消息正文右对齐贴着 [我 时间] 标签、
@@ -1488,7 +1510,16 @@ List<String> _formatMessage(ChatMessage m, int cols) {
       lines.add('${' ' * leftPad}$content');
     }
   }
-  return lines;
+  // 我的消息同样加角标框线：从 leftPad 列起铺满到屏缘（随气泡宽度）
+  final borderW = cols - leftPad - 2;
+  final borderFg = _genderBorderFg(rawGender);
+  final bar = '─' * (borderW > 0 ? borderW : 0);
+  final pad = ' ' * leftPad;
+  return [
+    '$pad$borderFg╭$bar╮$_reset',
+    ...lines,
+    '$pad$borderFg╰$bar╯$_reset',
+  ];
 }
 
 /// 只重绘输入区（不清屏）：打字时用，避免全量 \x1B[2J 清屏打断
