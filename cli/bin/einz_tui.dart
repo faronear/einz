@@ -461,31 +461,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           _scheduleRender();
         }
       }
-      // 第二用户名字（回车跳过 → 后台默认 personB）
+      // Multiverse：create 不再填写伴侣名字/性别（对方加入时自填，与 App 向导一致）
       session.messages.add(_systemMessage(session, '----------------'));
-      final partnerName = (await _prompt(session, '❓ 输入伴侣的名字（例如 Alice，或者直接回车先跳过）:')).trim();
-      if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
-      if (partnerName.isNotEmpty) {
-        partnerPresetName = partnerName;
-        session.messages.add(_systemMessage(session, '✅ 已为伴侣设置名字: $partnerName（以后可以 /myname 自行修改）'));
-        _scheduleRender();
-      } else {
-        session.messages.add(_systemMessage(session, '✅ 系统将为伴侣自动预设一个名字，以后可以 /myname 自行修改。'));
-        _scheduleRender();
-      }
-      // 伴侣性别（必选：仅接受 男/女，否则重新询问——与 App 向导一致）
-      while (partnerGender == null) {
-        final g = (await _prompt(session, '❓ 输入伴侣的性别（男/女）:')).trim();
-        if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
-        if (g == '男' || g == '女') {
-          partnerGender = g;
-          session.messages.add(_systemMessage(session, '✅ 已设置伴侣性别: $g'));
-          _scheduleRender();
-        } else {
-          session.messages.add(_systemMessage(session, '⚠️ 性别仅接受「男」或「女」，请重新输入'));
-          _scheduleRender();
-        }
-      }
       session.messages.add(_systemMessage(session, '----------------'));
     } catch (e) {
       stderr.writeln('⚠️ 名称处理异常'); // 防崩 + 可诊断

@@ -84,11 +84,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await readJson(req);
     const r = await createSpace(
       body?.space_id == null ? undefined : String(body.space_id),
-      body?.displayName == null ? undefined : String(body.displayName),
-      body?.sealedSpaceKey,
-      body?.escrowPassphrase == null ? undefined : String(body.escrowPassphrase),
-      body?.publicKey == null ? undefined : String(body.publicKey),
-      body?.deviceName == null ? undefined : String(body.deviceName),
+      body?.display_name == null ? undefined : String(body.display_name),
+      body?.sealed_space_key,
+      body?.escrow_passphrase == null ? undefined : String(body.escrow_passphrase),
+      body?.public_key == null ? undefined : String(body.public_key),
+      body?.device_name == null ? undefined : String(body.device_name),
     );
     sendJson(res, 201, r);
     return;
@@ -108,9 +108,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await readJson(req);
     const r = joinSpace(
       String(body?.token ?? ""),
-      String(body?.publicKey ?? ""),
-      body?.deviceName == null ? undefined : String(body.deviceName),
-      body?.displayName == null ? undefined : String(body.displayName),
+      String(body?.public_key ?? ""),
+      body?.device_name == null ? undefined : String(body.device_name),
+      body?.display_name == null ? undefined : String(body.display_name),
       body?.gender == null ? undefined : String(body.gender),
     );
     sendJson(res, 200, r);
