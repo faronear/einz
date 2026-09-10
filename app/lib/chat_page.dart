@@ -143,8 +143,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 阻碍懒回收）+ 目标 messageId（itemBuilder 按需挂 key）
   final GlobalKey _jumpTargetKey = GlobalKey();
   String? _jumpTargetId;
-  // 跳转后短暂高亮目标消息（背景色高亮，不改气泡尺寸）：messageId + 定时清除
+  // 跳转后目标消息边框闪烁（老板要求 2026-09-10：背景高亮色与被引用作者的
+  // 对方气泡色混淆，改用边框闪烁）：messageId + 闪烁开关 + 定时序列
   String? _highlightMessageId;
+  bool _highlightFlashOn = false;
   Timer? _highlightTimer;
   late String _uiStyle; // 当前界面风格（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
@@ -1008,14 +1010,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() => _jumpTargetId = messageId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
-      // 先立即设置高亮：目标已构建（视口/预构建区）即刻生效；目标很远时由
-      // 后续 jumpTo 触发的构建按 _highlightMessageId 应用高亮。不能放进嵌套
+      // 先立即启动边框闪烁：目标已构建（视口/预构建区）即刻生效；目标很远时
+      // 由后续 jumpTo 触发的构建按 _highlightMessageId 应用。不能放进嵌套
       // post-frame——目标已在视口时 jumpTo 是 no-op 不调度新帧，嵌套回调
-      // 永不执行（2026-09-10 测试暴露的真机同类 bug）
+      // 永不执行（2026-09-10 测试暴露的真机同类 bug）。
+      // 闪烁节奏：350ms 周期开关 4 次（亮-灭-亮-灭），约 1.4s 结束清除。
       _highlightTimer?.cancel();
-      setState(() => _highlightMessageId = messageId);
-      _highlightTimer = Timer(const Duration(milliseconds: 1600), () {
-        if (mounted) setState(() => _highlightMessageId = null);
+      setState(() {
+        _highlightMessageId = messageId;
+        _highlightFlashOn = true;
+      });
+      var flips = 0;
+      _highlightTimer = Timer.periodic(const Duration(milliseconds: 350), (t) {
+        flips++;
+        if (!mounted) {
+          t.cancel();
+          return;
+        }
+        if (flips >= 4) {
+          t.cancel();
+          setState(() {
+            _highlightMessageId = null;
+            _highlightFlashOn = false;
+          });
+          return;
+        }
+        setState(() => _highlightFlashOn = !_highlightFlashOn);
       });
       // 定位：按平均高度估算跳转（触发目标附近条目构建）
       final estimated = (index * 120.0)
@@ -1836,16 +1856,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
   }
 
-  /// 跳转目标短暂高亮色（老板要求 2026-09-10）：只换背景色、不改边框——
-  /// 边框 0→有 会改变气泡尺寸。gradient 深色气泡（白字）在原色上提亮 30%
-  /// 保证白字可读；plain 浅 tint 气泡用品牌浅粉实底（视觉明显区分）。
-  Color _highlightColor({required Color base}) {
-    if (_uiStyle == 'gradient') {
-      return Color.lerp(base, Colors.white, 0.30)!;
-    }
-    return const Color(0xFFFDD6ED);
-  }
-
   /// 消息内容按类型渲染（text 文本 / voice、audio 播放条 / image、video、file 各自卡片）。
   Widget _buildMessageContent(
       HistoryMessage m) {
@@ -2227,11 +2237,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               maxWidth: MediaQuery.sizeOf(context).width * 0.75),
                           decoration: BoxDecoration(
                             // 气泡底色按发言人性别：男天蓝 / 女品牌粉（老板要求 2026-09-09）；
-                            // 跳转目标短暂高亮只换背景色（尺寸不变，老板要求 2026-09-10）
-                            color: m.env.messageId == _highlightMessageId
-                                ? _highlightColor(base: _bubbleColor(mine: mine))
-                                : _bubbleColor(mine: mine),
+                            // 跳转目标边框闪烁：琥珀实线 2px（不撞任何性别气泡色系；
+                            // border 绘制在边界内，不改变气泡布局尺寸）
+                            color: _bubbleColor(mine: mine),
                             borderRadius: BorderRadius.circular(12),
+                            border: (m.env.messageId == _highlightMessageId &&
+                                    _highlightFlashOn)
+                                ? Border.all(color: const Color(0xFFFFC107), width: 2)
+                                : null,
                           ),
                           child: DefaultTextStyle.merge(
                             // gradient 深色气泡下文字/图标改白色（醒目，老板要求）；

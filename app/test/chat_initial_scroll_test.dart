@@ -260,7 +260,7 @@ void main() {
         reason: '发现新消息应拉到底部');
   });
 
-  testWidgets('点击引用卡跳转到原消息并短暂高亮（背景色高亮、定时恢复）',
+  testWidgets('点击引用卡跳转原消息并边框闪烁（琥珀 2px，结束后消失）',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -306,29 +306,31 @@ void main() {
     // 点击引用卡（msg-5 气泡内的引用块预览）
     await tester.tap(find.text('预览：原始消息 2'));
     // 逐帧推进：帧1=_jumpToMessage setState(jumpTargetId)；帧2=post-frame 回调1
-    // （jumpTo）+ 帧末；帧3=post-frame 回调2（ensureVisible + 高亮 setState）
+    // （jumpTo + 启动闪烁 setState）；帧3=渲染闪烁起始帧。
+    // 注意：不能 pump(duration)——闪烁 Timer 周期 350ms，推进时钟会触发
+    // 开关切换，断言"亮起"必须在时钟推进前完成。
     await tester.pump();
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400)); // 高亮过渡动画帧
 
-    // 原消息 msg-2 的气泡应高亮（plain 风格高亮色 = 品牌浅粉 #FDD6ED）
+    // 原消息 msg-2 的气泡应带琥珀闪烁边框（border 绘制在边界内、不改尺寸）
     final bubble = find
         .ancestor(
             of: find.text('原始消息 2'), matching: find.byType(AnimatedContainer))
         .first;
     expect(bubble, findsOneWidget, reason: '应能定位到原消息气泡');
-    final highlighted =
+    final flashing =
         tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration;
-    expect(highlighted.color, const Color(0xFFFDD6ED),
-        reason: '跳转目标气泡应短暂高亮（品牌浅粉背景）');
+    expect(flashing.border, isNotNull, reason: '跳转目标气泡应显示闪烁边框');
+    expect(flashing.border!.top.width, 2, reason: '闪烁边框应为 2px');
+    expect(flashing.border!.top.color, const Color(0xFFFFC107),
+        reason: '闪烁边框应为琥珀色（不撞性别气泡色系）');
 
-    // 1.6s 定时清除后恢复原气泡色（plain 未登记性别 = indigo.shade100）
+    // 闪烁序列结束（4 次 350ms 开关 ≈1.4s）后边框消失
     await tester.pump(const Duration(milliseconds: 1600));
-    await tester.pump(); // Timer 回调 setState 渲染
+    await tester.pump(); // 结束 setState 渲染
     final restored =
         tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration;
-    expect(restored.color, Colors.indigo.shade100,
-        reason: '高亮应定时恢复原气泡色');
+    expect(restored.border, isNull, reason: '闪烁结束后边框应消失');
   });
 }

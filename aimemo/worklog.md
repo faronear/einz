@@ -2134,3 +2134,20 @@ ESC[22m（代码级确认）。pty 自动验证受限（TUI 交互终端检测�
 start，遮罩点击关窗）。
 
 **验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过；已热重启。
+## 2026-09-10 引用跳转高亮改为边框闪烁（背景色与被引用作者对方气泡色混淆）
+
+**老板反馈：** 跳转目标用的背景高亮色正好是被引用作者的对方气泡颜色（plain
+浅粉 #FDD6ED ≈ 女气泡浅粉、gradient 提亮蓝 ≈ 男气泡天蓝），混淆；改用
+边框闪烁试试。
+
+**实现（chat_page）：** 移除背景高亮（删 _highlightColor，气泡 color 恢复纯
+_bubbleColor）；跳转目标气泡加琥珀实线边框（#FFC107，不撞任何性别气泡色系）
+2px，350ms 周期开关 4 次（亮-灭-亮-灭，约 1.4s）后消失——Timer.periodic 序列，
+dispose cancel。border 绘制在边界内，不改变气泡布局尺寸（此前"边框会改尺寸"
+的注释判断不准确，已修正）。
+
+**测试：** chat_initial_scroll 用例改为断言边框：跳转后 bubble.border 非 null
+（2px 琥珀）、闪烁序列结束（推进 1.6s）后 border null。注意断言"亮起"须在
+时钟推进前（350ms 周期会被 pump(duration) 触发切换）。
+
+**验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
