@@ -51,14 +51,14 @@ Future<void> pumpToPassphrase(
 void main() {
   testWidgets('首设备 create 口令页：不显示信封导入入口', (WidgetTester tester) async {
     await pumpToPassphrase(tester, probeNames: const {});
-    expect(find.text('改用线下密保信封'), findsNothing,
+    expect(find.byIcon(Icons.mail_outline), findsNothing,
         reason: '首设备没有对端设备导出的信封，不应提供信封导入入口');
   });
 
   testWidgets('后续设备 join 口令页：显示信封导入入口', (WidgetTester tester) async {
     await pumpToPassphrase(tester, probeNames: const {'personA': 'Lukas'}, join: true);
-    expect(find.text('改用线下密保信封'), findsOneWidget,
-        reason: 'join 用户可用对端导出的信封替代口令获取 Space Key');
+    expect(find.byIcon(Icons.mail_outline), findsOneWidget,
+        reason: 'join 用户可用对端导出的信封替代口令获取 Space Key（标题行右上角切换图标）');
   });
 
   testWidgets('create 步骤 1：名字/性别缺一不可——双红字同显、填写即消、选中放行', (WidgetTester tester) async {

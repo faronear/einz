@@ -36,7 +36,7 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
   await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码
   await tester.tap(find.text('下一步')); // 邀请码验证 → 口令页
   await tester.pumpAndSettle();
-  await tester.tap(find.text('改用线下密保信封')); // 口令页 → 信封页
+  await tester.tap(find.byIcon(Icons.mail_outline)); // 口令页 → 信封页（标题行右上角切换图标）
   await tester.pumpAndSettle();
   // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡底部「下一步」按钮
   await tester.pump(const Duration(seconds: 5));
@@ -64,10 +64,10 @@ void main() {
 
   testWidgets('信封页「改用线上密保口令」回到口令页（互切保留已填值）', (WidgetTester tester) async {
     await pumpToEnvelope(tester, kp: kp);
-    await tester.tap(find.text('改用线上密保口令'));
+    await tester.tap(find.byIcon(Icons.password)); // 信封页 → 口令页（右上角切换图标）
     await tester.pumpAndSettle();
     expect(find.text('验证密保口令'), findsOneWidget, reason: '应回到口令页（join 验证标题）');
-    expect(find.text('改用线下密保信封'), findsOneWidget, reason: '口令页应仍可再切回信封');
+    expect(find.byIcon(Icons.mail_outline), findsOneWidget, reason: '口令页应仍可再切回信封');
   });
 
   testWidgets('信封页「上一步」可点：回到验证邀请码页', (WidgetTester tester) async {

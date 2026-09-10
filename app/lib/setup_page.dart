@@ -1416,10 +1416,29 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 两套标题：首设备「设置密保口令」/ 后续设备「验证密保口令」（老板要求）
-        _stepHeader(
-          _role == _WizardRole.join ? l10n.wizardJoinPassphraseTitle : l10n.wizardTitlePassphrase,
-          _role == _WizardRole.join ? l10n.wizardJoinPassphraseHint : l10n.wizardPassphraseHint,
+        // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
+        // 文字链接；仅后续设备 join 适用——首台设备无对端可导出密封信封）
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 两套标题：首设备「设置密保口令」/ 后续设备「验证密保口令」（老板要求）
+            Expanded(
+              child: _stepHeader(
+                _role == _WizardRole.join
+                    ? l10n.wizardJoinPassphraseTitle
+                    : l10n.wizardTitlePassphrase,
+                _role == _WizardRole.join
+                    ? l10n.wizardJoinPassphraseHint
+                    : l10n.wizardPassphraseHint,
+              ),
+            ),
+            if (_role == _WizardRole.join)
+              IconButton(
+                tooltip: l10n.wizardSwitchToEnvelope,
+                icon: const Icon(Icons.mail_outline),
+                onPressed: _openEnvelopeImport,
+              ),
+          ],
         ),
         TextField(
           controller: _escrowPassphrase,
@@ -1434,15 +1453,6 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
-        const SizedBox(height: 16),
-        // 密保信封与口令是平行方案，可互切：但仅后续设备（join）适用——
-        // 全系统首台设备没有对端设备可导出密封信封，故不显示该入口
-        if (_role == _WizardRole.join)
-          TextButton.icon(
-            onPressed: _openEnvelopeImport,
-            icon: const Icon(Icons.mail_outline, size: 18),
-            label: Text(l10n.wizardSwitchToEnvelope),
-          ),
       ],
     );
   }
@@ -1728,7 +1738,22 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _stepHeader(l10n.wizardTitleEnvelope, l10n.setupPageEnvelopeKeyHint),
+        // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
+        // 文字链接；切回口令页保留已输入的口令与邀请码，任一完成都进入 PIN 步骤）
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _stepHeader(
+                  l10n.wizardTitleEnvelope, l10n.setupPageEnvelopeKeyHint),
+            ),
+            IconButton(
+              tooltip: l10n.wizardSwitchToPassphrase,
+              icon: const Icon(Icons.password),
+              onPressed: _switchToPassphrase,
+            ),
+          ],
+        ),
         TextField(
           controller: _envelopeKey,
           style: const TextStyle(fontSize: 18),
@@ -1742,16 +1767,6 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
-        // 邀请码已在 join 步骤 2 提供（offline 从 join 口令页切换进入时沿用
-        // 已填邀请码登记），此页不再重复显示输入框
-        const SizedBox(height: 16),
-        // 与口令页的「改用线下密保信封导入」对称：口令/信封是平行方案可互切；
-        // 切回口令页保留已输入的口令与邀请码，任一完成都进入 PIN 步骤
-        TextButton.icon(
-          onPressed: _switchToPassphrase,
-          icon: const Icon(Icons.password, size: 18),
-          label: Text(l10n.wizardSwitchToPassphrase),
-        ),
       ],
     );
   }

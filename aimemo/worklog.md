@@ -2231,3 +2231,19 @@ kToolbarHeight + 8，再叠加内层 Padding top 8，DecoratedBox 背景实际�
 Padding top 8 → 0（背景贴 Positioned top，与状态条同高开始往下绘制）。
 
 **验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过；已热重启。
+## 2026-09-10 口令/信封互切改为表单右上角切换图标（替代下方文字链接）
+
+**老板要求：** 新设备向导口令页⇄信封页互切，由下方文字链接改为表单右上角
+切换图标（类似手机/邮件登录互换、二维码/输入框登录互换）。
+
+**实现（setup_page）：** 口令页（join）与信封页标题行包 Row：左侧 Expanded
+原 _stepHeader，右侧右上角 IconButton——口令页 Icons.mail_outline（tooltip
+改用线下密保信封，onPressed _openEnvelopeImport）、信封页 Icons.password
+（tooltip 改用线上密保口令，onPressed _switchToPassphrase）；删除两页下方
+TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不变。
+
+**测试：** wizard_envelope_entry 与 setup_envelope_verify 断言由 find.text(链接)
+改为 find.byIcon（create 无图标 / join 有图标 / tap 图标互切）。
+
+**验证：** flutter analyze 0 issue；setup_join_passphrase + wizard_envelope_entry
++ setup_envelope_verify + widget_test 14/14 全过；已热重启。
