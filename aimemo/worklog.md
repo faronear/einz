@@ -2373,3 +2373,45 @@ cfg.space_id，行为不变）。
 **验证：** npm run build 0 错；npm test 全绿（冒烟 v1 兼容 + 双 Space 隔离）。
 **踩坑：** messages 全局 UNIQUE(server_sequence) 与按空间递增冲突 → 复合唯一 +
 重建迁移；TS18047（回调内引用模块级 db 丢非 null 推断）→ 改 for 循环。已提交。
+
+## 2026-09-10 Multiverse U2-U4 + 收尾
+
+### U2 密钥分发闭环（已提交 2fd6050）
+- escrow.ts 导出 parsePackage；createSpace 支持 sealedSpaceKey+escrowPassphrase
+  成对写入 key_escrow（argon2id）
+- 新端点 POST /spaces/{id}/key-escrow（口令验证返回密封包，UPSERT 上传）
+- 踩坑：3999 残留进程致假 404
+
+### U3 App 向导接线（已提交 c399ff1）
+- 入口页（探测后停留新建/加入选择；修复 build 启动屏条件回归——
+  `_role == null && !_probeDone`，否则探测成功仍卡启动屏）
+- join：token preflight（首次通过停留显示空间确认卡片，再次点下一步放行）→
+  名字页（自填名字+性别）→ 口令 escrow 取钥 → PIN
+- create：客户端生成 space_id/Space Key + 口令 sealed 包随 POST /spaces 提交
+  （服务端接受客户端 space_id）；完成页欢迎对话框展示邀请链接（复制分享）
+- 清理 v1 遗留（personA/B 身份卡体系、邀请码页、伴侣名字页、_enrollDevice）
+- 测试注入：preflightOverride/joinOverride/createOverride；42 个测试全绿
+- golden 失配保持红不重刷（老板政策）
+- 踩坑：join step1 按钮被 v1 身份卡"自动前进"例外隐藏、_backStep offline 回退
+  旧位置、fake escrow 非法 base64（salt='s'）、测试漏 setUpAll(sodium)
+
+### U4 CLI 对齐（已提交 2efad8c + feb749e）
+- DeviceStore +spaceAddress（旧 store 自动迁移）；探测对齐 protocol_version/capabilities
+- 未绑定引导提示 /space create | /space join；移除 v1 伴侣名字/性别询问
+- /space create：客户端生成 space_id/Space Key + sealed 包 → POST /spaces →
+  打印空间地址 + 24h 一次性邀请链接
+- /space join：preflight → join（设备登记+签发 session）→ 口令 escrow 取钥；
+  /space address 显示地址
+- 提取 _activateAfterBind（create/join 命令与启动引导共用：同步+设锁+WS）
+- server join 响应补 spaceAddress；**路由字段名统一下划线**（public_key/
+  display_name/sealed_space_key/escrow_passphrase/device_name）——真实 HTTP 级
+  bug，U3 全走 fake/函数直调未暴露，CLI pty e2e 复现并修复
+- 验收：CLI pty e2e 全通（A /space create → B /space join，空间地址一致，
+  含口令 escrow 取钥；脚本 aimemo/cliMultiverseE2E.py 可复用）
+
+### 其他
+- git 历史修复：远程 origin/main 停在 78d3b41（本地 main 的 v1 commit 未 push）
+  → `git push origin main`（78d3b41..26d4c23）；feature/multiverse 首次 push 远程备份
+- 迁移脚本按老板指示取消（老版本未正式上线，无需 legacy 迁移）
+- 老板 iPhone 安装试用成功（方案 B：flutter build ios --release + Xcode
+  Build/Install + 信任开发者证书）
