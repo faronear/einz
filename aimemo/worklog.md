@@ -2016,3 +2016,33 @@ chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热�
 **验证：** dart analyze 0 issue；demo server + pty 复现：选择前标题栏
 「○ 对方 #- … ○ - #doomship」，选择 personA(Lukas) 后「○ Alice #- …
 ○ Lukas #doomship」，两侧不再同人。已提交。
+
+## 2026-09-10 CLI/TUI 标题栏改三段 1/3 布局：左右状态段截断 + 品牌固定居中
+
+**老板要求：** 标题栏左右两段的在线状态各自长度上限为全宽 1/3 - 1 字符，超出
+截断成一个 … 符号；品牌名 "Einz TUI" 放在中间 1/3 的正中，窗口拉伸时保持在
+中央不变。
+
+**实现（cli/bin/einz_tui.dart）：**
+
+- `_titleBarThree` 重写：`sideMax = cols ~/ 3 - 1` 截断左右段（复用
+  `_truncateByWidth`），品牌名起点 `centerPos = (cols - cw) ~/ 2`（屏幕正中
+  = 中间 1/3 的正中），左段贴左缘、品牌居中、右段贴右缘；超窄终端（左右段与
+  品牌重叠）时弃品牌保左右段。
+
+**顺带修复根因（`_truncateByWidth` 对 ANSI 输入的计宽 bug）：** 该函数逐 rune
+调 `_displayWidth` 时，转义序列的 `[97m` 等字节被按普通字符计宽（单个 `\x1B`
+返回 0，其后字符失去转义上下文）——彩色输入 `"○ - #doomship"` 限 9 列被错误
+截成 `"○ - …"`（截断预算被 4 字节转义吃掉）。标题栏是它首次接收带 ANSI 的输入
+（此前只有状态行纯文本）。改为循环内原样复制整段转义序列、不计宽度。
+
+**验证：** dart analyze 0 issue；独立脚本 + pty 实抓：120 列品牌起始列 56（期望
+56）、右段完整；30 列品牌起始列 11（期望 11）、右段正确截断为 `"○ - #doo…"`。
+
+## 2026-09-10 CLI/TUI 引导阶段标题栏对方占位：'对方' → '?'
+
+**老板要求：** 引导阶段（确认对方是谁以前）标题栏不要写"对方"，用 `?` 代替。
+`_peerNameOf` 的 `personId` 为空分支返回 `'?'`（消息区未知发送者仍显示"对方"，
+不受影响）。
+
+**验证：** dart analyze 0 issue；pty 实抓标题栏左段 `"○ ? #-"`。

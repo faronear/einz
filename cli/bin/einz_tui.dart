@@ -931,11 +931,27 @@ List<String> _wrapByWidth(String s, int maxWidth) {
 
 /// 按显示宽度把 [s] 截断到不超过 [maxWidth]（末尾加省略号 …）。
 /// 底部状态行用：单行通知超宽时截断，避免撑破屏幕布局。
+/// ANSI 转义序列不计宽度、原样复制整段（此前逐 rune 调 _displayWidth 会把
+/// 转义序列的 [97m 等字节按普通字符计宽，标题栏彩色段截断预算被吃掉——
+/// "○ - #doomship" 限 9 列被截成 "○ - …" 的根因）。
 String _truncateByWidth(String s, int maxWidth) {
   if (maxWidth <= 0 || _displayWidth(s) <= maxWidth) return s;
   final buf = StringBuffer();
   var w = 0;
-  for (final r in s.runes) {
+  final it = s.runes.iterator;
+  while (it.moveNext()) {
+    final r = it.current;
+    if (r == 0x1B) {
+      // 转义序列：连同整段（到终止字节）原样复制，不占显示宽度
+      buf.writeCharCode(r);
+      while (it.moveNext()) {
+        final c = it.current;
+        buf.writeCharCode(c);
+        if (c == 0x5B) continue; // CSI 引入符
+        if (c >= 0x40 && c <= 0x7E) break; // 终止字节（字母）
+      }
+      continue;
+    }
     final ch = String.fromCharCode(r);
     final cw = _displayWidth(ch);
     if (w + cw > maxWidth - 1) break; // 预留 1 列给省略号
@@ -955,23 +971,28 @@ String _barLine(String colorSeq, String text, int cols) {
   return '$content${pad > 0 ? ' ' * pad : ''}$_reset';
 }
 
-/// 三段式标题栏拼装：左段贴左缘、右段贴右缘、中段在剩余空白里居中；
-/// 三段放不下时先弃中段（左右仍贴边），左右也放不下时截断右段保左段完整。
+/// 三段式标题栏拼装：左右在线状态段各自贴缘，长度上限为全宽 1/3 - 1 字符
+/// （超出截断成 … 符号）；品牌名居中于屏幕正中（即中间 1/3 的正中），
+/// 窗口拉伸时左右段随上限同步扩展、品牌始终保持在中央。
 /// 各段可含 ANSI 颜色（_displayWidth 会跳过转义序列）；返回已铺满整行的成品。
+/// 超窄终端（左右段与品牌重叠）时弃品牌，保左右段。
 String _titleBarThree(String left, String center, String right, int cols) {
-  final lw = _displayWidth(left);
-  final rw = _displayWidth(right);
+  final sideMax = cols ~/ 3 - 1; // 每侧状态区上限：全宽 1/3 - 1 字符
+  final leftT = _truncateByWidth(left, sideMax);
+  final rightT = _truncateByWidth(right, sideMax);
+  final lw = _displayWidth(leftT);
+  final rw = _displayWidth(rightT);
   final cw = _displayWidth(center);
-  final gap = cols - lw - rw; // 左右贴边后中段可用的列数
+  final centerPos = (cols - cw) ~/ 2; // 品牌名起点：屏幕正中（中间 1/3 的正中）
   final String content;
-  if (gap >= cw) {
-    final side = (gap - cw) ~/ 2; // 中段两侧平分剩余空白
-    content = '$left${' ' * side}$center${' ' * (gap - cw - side)}$right';
-  } else if (gap >= 0) {
-    content = '$left${' ' * gap}$right';
+  if (centerPos >= lw && centerPos + cw <= cols - rw) {
+    // 常规：左段贴左缘、品牌居中、右段贴右缘，中间以空格补齐
+    content =
+        '$leftT${' ' * (centerPos - lw)}$center${' ' * ((cols - rw) - (centerPos + cw))}$rightT';
   } else {
-    final remain = cols - lw;
-    content = '$left${remain > 0 ? _truncateByWidth(right, remain) : ''}';
+    // 超窄终端：左右段之间放不下品牌——弃品牌，左右仍贴缘
+    final gap = cols - lw - rw;
+    content = '$leftT${gap > 0 ? ' ' * gap : ''}$rightT';
   }
   return _barLine(_bgBlack, content, cols);
 }
@@ -1199,11 +1220,11 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
 /// 对方显示名：探测名表（personA/personB）→ 首设备预置名 → '-'。
 /// 本设备身份未确认（新设备引导中/未登记，personId 为空）时对方是谁不确定——
 /// 不猜测名称表第一项（此前会把 personA 的名字当成对方展示，引导中左右两侧
-/// 甚至显示同一个人——老板实测反馈），改为中性占位「对方」。
+/// 甚至显示同一个人——老板实测反馈），显示中性占位「?」（老板要求，不写"对方"）。
 String _peerNameOf(_TuiState s) {
   final myPid = s.session.store.personId;
   if (myPid == null) {
-    return '对方';
+    return '?';
   }
   final peerPid = myPid == 'personA' ? 'personB' : 'personA';
   return s.personNames[peerPid] ?? partnerPresetName ?? '-';
