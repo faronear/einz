@@ -1987,3 +1987,32 @@ chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热�
 **效果：** 短消息「hi」显示为：col 8 起整块背景色气泡铺满屏缘，右侧「hi [我 时间]」。
 
 **验证：** dart analyze 0 issue；已提交。
+
+## 2026-09-10 CLI/TUI 新设备引导标题栏：身份确认前不再猜测对方名字
+
+**老板反馈：** 新设备引导在确认身份（输入 1/2 选择是 personA 还是 personB）之前，
+标题栏左侧就显示了一个名字（personA 的名字）；若随后选择了就是这个名字的身份，
+标题栏左右两侧变成同一个人。
+
+**根因（demo server + pty 复现确认）：**
+
+1. `_peerNameOf` 在 `store.personId == null`（身份未确认/未登记）时返回
+   `personNames.values.first`——把名称表第一项（通常 personA）当对方展示，纯猜测
+   （复现：选择前标题栏左段「○ Lukas #-」）；
+2. 选择身份后 `store.personName` 立即设为所选名字（右侧标题栏随之显示所选名字），
+   但 `store.personId` 要等 enroll 返回才设置——期间左侧仍显示猜测名 →
+   「左右两侧都是同一个人」（复现：选择 personA 后左「○ Lukas #-」右
+   「○ Lukas #doomship」）。
+
+**修复（cli/bin/einz_tui.dart）：**
+
+- `_peerNameOf`：`personId` 为空时返回中性占位「对方」（与消息区未知发送者
+  「对方」一致），不再猜测名称表第一项；
+- `_runGuide`：身份一旦选定（输入 1/2 确认）立即 `store.personId = chosenPerson`
+  并落盘——标题栏随即显示正确的对方（左）/自己（右），无需等 enroll 完成
+  （enroll 请求本就携带 `personId: chosenPerson`，服务端返回同值，本地提前设置
+  仅影响显示层）。恢复路径（personId 置空重登记）不受影响。
+
+**验证：** dart analyze 0 issue；demo server + pty 复现：选择前标题栏
+「○ 对方 #- … ○ - #doomship」，选择 personA(Lukas) 后「○ Alice #- …
+○ Lukas #doomship」，两侧不再同人。已提交。

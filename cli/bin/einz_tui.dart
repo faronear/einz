@@ -406,6 +406,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       session.messages.add(_systemMessage(session, '❓ 输入 1 ($aName) 或 2 ($bName)'));
       _scheduleRender();
     }
+    // 身份一旦选定（输入 1/2 确认），立即本地记录 personId——标题栏随即显示
+    // 正确的对方（左）/自己（右）。此前等 enroll 返回后才设置，绑定期间
+    // personId 仍为空：左侧继续显示名称表第一项（猜测），与右侧刚设的
+    // 自己名字相同——"左右两侧都是同一个人"（老板实测反馈）。
+    store.personId = chosenPerson;
+    store.save(storePath);
     if (chosenPerson == 'personB') {
       if ((_probePersonNames['personB'] ?? '').isEmpty) {
         // personB 还没有名称——要求输入显示名
@@ -1191,10 +1197,13 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
 }
 
 /// 对方显示名：探测名表（personA/personB）→ 首设备预置名 → '-'。
+/// 本设备身份未确认（新设备引导中/未登记，personId 为空）时对方是谁不确定——
+/// 不猜测名称表第一项（此前会把 personA 的名字当成对方展示，引导中左右两侧
+/// 甚至显示同一个人——老板实测反馈），改为中性占位「对方」。
 String _peerNameOf(_TuiState s) {
   final myPid = s.session.store.personId;
   if (myPid == null) {
-    return s.personNames.values.isNotEmpty ? s.personNames.values.first : '-';
+    return '对方';
   }
   final peerPid = myPid == 'personA' ? 'personB' : 'personA';
   return s.personNames[peerPid] ?? partnerPresetName ?? '-';
