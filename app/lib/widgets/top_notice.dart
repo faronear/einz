@@ -100,10 +100,11 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      // 覆盖在对话顶部「双方在线状态条」上（老板要求 2026-09-10）——不盖顶栏
-      // 标题（含菜单按钮会被暂时遮挡）；顶栏之下第一条即状态条，top 显式避开
-      // 状态栏 + 工具栏高度（不用 SafeArea，否则会再加一遍状态栏内边距）
-      top: MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
+      // 完全覆盖对话顶部「双方在线状态条」（老板要求 2026-09-10）：top 与状态条
+      // 同高开始（padding.top + kToolbarHeight + 4 = 状态条 margin top）——此前
+      // top +8 再叠加内层 Padding top 8，背景从状态条中部开始、只遮下半部分。
+      // 不用 SafeArea（top 已显式避开状态栏，避免重复内边距）。
+      top: MediaQuery.paddingOf(context).top + kToolbarHeight + 4,
       left: 0,
       right: 0,
       child: GestureDetector(
@@ -116,7 +117,8 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
               end: Offset.zero,
             ).animate(_slide),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              // top 0：背景贴 Positioned top，与状态条同高开始往下绘制
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   // 简化视觉（老板要求 2026-09-10）：清淡浅粉白底，不用粉蓝

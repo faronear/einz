@@ -2217,3 +2217,17 @@ Scaffold 纸感底）；描边半透明白 → 浅粉 #E9D5E0（同输入框描�
 
 **验证：** dart format + flutter analyze 0 issue；chat_page_menu 13/13 全过
 （覆盖语言切换触发 showTopNotice 路径）；已热重启。
+## 2026-09-10 通知条完全覆盖在线状态条（与状态条同高开始绘制）
+
+**老板反馈：** 通知条仍偏下，只遮住在线状态栏下半部分；要求完全覆盖——和
+在线状态栏同一高度开始往下绘制。
+
+**根因（widgets/top_notice.dart）：** Positioned top = padding.top +
+kToolbarHeight + 8，再叠加内层 Padding top 8，DecoratedBox 背景实际从
++16 开始；状态条顶部在 +4（margin top 4）——背景比状态条顶部低 12px，
+状态条高度约 30px，只遮住下半部分。
+
+**修复：** Positioned top 改 +4（= 状态条 margin top，两种风格一致）；外层
+Padding top 8 → 0（背景贴 Positioned top，与状态条同高开始往下绘制）。
+
+**验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过；已热重启。
