@@ -734,16 +734,21 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       _scheduleRender();
     }
   }
-  // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）
+  // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）。
+  // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (myGender == null) {
-    final g = (await _prompt(session, '❓ 我的性别（男/女）:')).trim();
+    final g = (await _prompt(session, '❓ 我的性别（输入 1 代表男，2 代表女）:')).trim();
     if (!_state!.running) return;
-    if (g == '男' || g == '女') {
-      myGender = g;
-      session.messages.add(_systemMessage(session, '✅ 已设置我的性别: $g'));
+    if (g == '1') {
+      myGender = '男';
+      session.messages.add(_systemMessage(session, '✅ 已设置我的性别: 男'));
+      _scheduleRender();
+    } else if (g == '2') {
+      myGender = '女';
+      session.messages.add(_systemMessage(session, '✅ 已设置我的性别: 女'));
       _scheduleRender();
     } else {
-      session.messages.add(_systemMessage(session, '⚠️ 性别仅接受「男」或「女」，请重新输入'));
+      session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
       _scheduleRender();
     }
   }
@@ -758,11 +763,19 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     _scheduleRender();
   }
   String partnerGender;
+  // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (true) {
-    partnerGender = (await _prompt(session, '❓ 伴侣的性别（男/女，必选）:')).trim();
+    partnerGender = (await _prompt(session, '❓ 伴侣的性别（输入 1 代表男，2 代表女）:')).trim();
     if (!_state!.running) return;
-    if (partnerGender == '男' || partnerGender == '女') break;
-    session.messages.add(_systemMessage(session, '⚠️ 伴侣性别仅接受「男」或「女」'));
+    if (partnerGender == '1') {
+      partnerGender = '男';
+      break;
+    }
+    if (partnerGender == '2') {
+      partnerGender = '女';
+      break;
+    }
+    session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
     _scheduleRender();
   }
   final passphrase = (await _prompt(session, '❓ 设置密保口令（对方凭口令加入；可留空跳过）:', hidden: true)).trim();
