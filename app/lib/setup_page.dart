@@ -1433,10 +1433,10 @@ class _SetupPageState extends State<SetupPage> {
               ),
             ),
             if (_role == _WizardRole.join)
-              IconButton(
+              _DogEarSwitch(
+                icon: Icons.mail_outline,
                 tooltip: l10n.wizardSwitchToEnvelope,
-                icon: const Icon(Icons.mail_outline),
-                onPressed: _openEnvelopeImport,
+                onTap: _openEnvelopeImport,
               ),
           ],
         ),
@@ -1747,10 +1747,10 @@ class _SetupPageState extends State<SetupPage> {
               child: _stepHeader(
                   l10n.wizardTitleEnvelope, l10n.setupPageEnvelopeKeyHint),
             ),
-            IconButton(
+            _DogEarSwitch(
+              icon: Icons.password,
               tooltip: l10n.wizardSwitchToPassphrase,
-              icon: const Icon(Icons.password),
-              onPressed: _switchToPassphrase,
+              onTap: _switchToPassphrase,
             ),
           ],
         ),
@@ -1896,4 +1896,75 @@ class _InviteScannerPageState extends State<_InviteScannerPage> {
       ),
     );
   }
+}
+
+/// 表单右上角「折角切换块」（老板要求 2026-09-10）：右上角斜切（狗耳朵折角），
+/// 折角背后露出品牌粉——类似登录页手机/邮件登录互换、二维码/输入框登录互换的
+/// 切换样式，比纯图标更生动。
+class _DogEarSwitch extends StatelessWidget {
+  const _DogEarSwitch({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  static const double _cut = 14; // 折角斜切边长（等腰直角三角形）
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Stack(
+            children: [
+              // 折角背面：斜切三角形区域露出品牌粉（折角翻起效果）
+              const Positioned.fill(child: ColoredBox(color: Color(0xFFD6529C))),
+              // 主体矩形：右上角斜切，白底细描边 + 切换图标居中
+              Positioned.fill(
+                child: ClipPath(
+                  clipper: const _DogEarClipper(_cut),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFE9D5E0)),
+                    ),
+                    child: Icon(icon, size: 22, color: const Color(0xFF33415A)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 右上角斜切（狗耳朵/折角）路径：右上角切掉边长 [cut] 的等腰直角三角形。
+class _DogEarClipper extends CustomClipper<Path> {
+  const _DogEarClipper(this.cut);
+
+  final double cut;
+
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width - cut, 0)
+      ..lineTo(size.width, cut)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(_DogEarClipper oldClipper) => oldClipper.cut != cut;
 }

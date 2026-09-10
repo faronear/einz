@@ -2247,3 +2247,27 @@ TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不�
 
 **验证：** flutter analyze 0 issue；setup_join_passphrase + wizard_envelope_entry
 + setup_envelope_verify + widget_test 14/14 全过；已热重启。
+## 2026-09-10 口令/信封切换图标升级为「折角」视觉效果
+
+**老板要求：** 表单右上角切换图标要有折角视觉效果，折角背后是切换图标——
+更生动形象，也是很多 app/网站的登录方式切换做法。
+
+**实现（setup_page）：** 新增 `_DogEarSwitch`：40×40 方块，右上角斜切（
+`_DogEarClipper` 切掉边长 14 的等腰直角三角形），折角背后露出品牌粉
+（#D6529C 底层），主体白底细描边（#E9D5E0）+ 居中切换图标（深蓝灰
+#33415A），Tooltip 保留原文案；口令页（mail_outline → 信封）/信封页
+（password → 口令）的 IconButton 替换为 _DogEarSwitch，互切逻辑不变。
+
+**验证：** flutter analyze 0 issue；setup_join_passphrase + wizard_envelope_entry
++ setup_envelope_verify + widget_test 14/14 全过（find.byIcon 断言不受影响）；
+已热重启。
+
+## 2026-09-10 TUI /rename 命令改名 /myname（不保留兼容旧名）
+
+**老板要求：** TUI 的 /rename 改成 /myname；补充要求不保留兼容旧名。
+
+**实现（cli/bin/einz_tui.dart）：** 命令解析 case '/myname'（删除 /rename
+兼容分支）；帮助列表与 4 处引导文案同步 /myname <名字>；文档无 /rename
+引用。cli/build 旧编译产物含旧字符串（gitignore 不入库，重新构建自动更新）。
+
+**验证：** dart analyze（cli + shared）0 issue；源码/文档 grep 无 /rename 残留。
