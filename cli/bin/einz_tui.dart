@@ -1338,10 +1338,10 @@ String _genderBubble(String? rawGender) {
 }
 
 /// 格式化消息为多行（自动按列宽折行）。
-/// 自己的消息：性别气泡，整块右对齐（右侧气泡风格，正文在右、末尾附 [我 时间] 标签），
-/// 背景按我的性别配色；对方消息：性别气泡，整块左对齐（左侧气泡风格，[对方名 时间]
-/// 黑字标签嵌在气泡左缘、正文在右），背景按对方性别配色；系统提示（isSystem）：
-/// 灰色前缀 + 普通正文（左对齐）。
+/// 自己的消息：性别气泡，整块从左侧 8 列留白起铺满屏缘（正文在左、末尾 [我 时间]
+/// 标签贴最右，长短消息左缘统一对齐），背景按我的性别配色；对方消息：性别气泡，
+/// 整块左对齐（左侧气泡风格，[对方名 时间] 黑字标签嵌在气泡左缘、正文在右），背景
+/// 按对方性别配色；系统提示（isSystem）：灰色前缀 + 普通正文（左对齐）。
 List<String> _formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
@@ -1408,9 +1408,9 @@ List<String> _formatMessage(ChatMessage m, int cols) {
     }
     return lines;
   }
-  // 我的消息：整块右对齐（右侧气泡风格），背景按我的性别配色——男蓝、女品红、
-  // 性别未知（旧空间未登记/尚未拉取）青绿底；正文白字、[我 时间] 黑字；
-  // 前导留白不上色（保持右对齐气泡感）。
+  // 我的消息：气泡整块从左侧 sideMargin 列留白起铺满到屏缘（右侧区域气泡风格——
+  // 长短消息左缘统一对齐，正文在左、[我 时间] 标签贴最右），背景按我的性别配色——
+  // 男蓝、女品红、性别未知（旧空间未登记/尚未拉取）青绿底；前导留白不上色。
   // 兼容服务端两种取值：App 提交规范 male/female，旧 TUI 提交过中文 男/女。
   final rawGender = _state?.personGenders[m.env.senderPersonId];
   final String partnerBackground;
@@ -1432,18 +1432,14 @@ List<String> _formatMessage(ChatMessage m, int cols) {
   final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
   final lines = <String>[];
   for (var i = 0; i < wrapped.length; i++) {
-    if (i == wrapped.length - 1 && wrapped.length > 1) {
-      // 长消息末行：正文左对齐到与其他行相同的左缘（左侧留白 = leftPad），
-      // 正文与标签之间用背景色空格填充，标签仍贴最右——
-      // 整行背景色连续成矩形，不与上方各行错位
+    if (i == wrapped.length - 1) {
+      // 末行（含单行短消息）：正文左对齐到与其他行相同的左缘（左侧留白 = leftPad），
+      // 正文与标签之间用背景色空格填充、标签贴最右——整行背景色连续成矩形，
+      // 短消息不再按正文长度右对齐（气泡左缘与长消息统一对齐，消除锯齿）
       final chunk = wrapped[i];
       final fill = textWidth - _displayWidth(chunk);
       lines.add(
           '${' ' * leftPad}$partnerBackground$_white$chunk${' ' * (fill < 0 ? 0 : fill)} $suffix');
-    } else if (i == wrapped.length - 1) {
-      // 单行消息：正文 + 1 空格 + 标签，整行右端贴屏缘（短消息贴右的常规形态）
-      final content = '$partnerBackground$_white${wrapped[i]} $suffix';
-      lines.add('${' ' * (cols - _displayWidth(content))}$content');
     } else {
       // 非末行：固定左侧留白，正文 + 背景色填充到整行右缘（col cols）——
       // 标签栏所在的右侧留白一并上色，避免中英文折行宽度差造成气泡右缘锯齿

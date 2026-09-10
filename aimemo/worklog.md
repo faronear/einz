@@ -1957,3 +1957,18 @@ meta（时间信息）仍在消息流，用户可能对上下文感兴趣（现�
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll（含新高亮用例 4/4）、
 chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热重启。
+
+## 2026-09-10 CLI/TUI 我的短消息气泡统一左对齐（8 列留白起铺满屏缘）
+
+**老板要求：** 我的（右侧）消息——长消息气泡已左对齐至 8 列留白（col 8 → cols），
+但短消息气泡仍按正文长度整行右对齐贴屏缘，左缘参差有锯齿；要求短消息气泡同样
+左对齐至留白 8 字符到边，让我的长短消息气泡统一对齐（对方左侧气泡一直是对称的
+整块矩形，无此问题）。
+
+**实现（cli/bin/einz_tui.dart `_formatMessage` 我的分支）：** 删除单行消息的
+「整行右端贴屏缘」特例（`' ' * (cols - contentW)` 右对齐），末行分支条件由
+`i == wrapped.length - 1 && wrapped.length > 1` 简化为 `i == wrapped.length - 1`
+统一处理（含单行）——正文左对齐至 leftPad(8)、背景色空格填充至 textWidth、
+[我 时间] 标签贴最右，整行背景矩形与长消息各行完全一致。对方分支不受影响。
+
+**验证：** dart analyze 0 issue；已提交。
