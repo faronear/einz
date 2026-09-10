@@ -405,7 +405,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEscrowRotatedNotice => '对方已重设密保口令——生成邀请码或修改口令时将要求输入新口令';
+  String get chatPageEscrowRotatedNotice => '其他设备已重设密保口令，本设备将解除绑定的秘境';
 
   @override
   String get chatPageMenuLocaleLabel => '界面语言';
