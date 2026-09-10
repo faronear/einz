@@ -2119,3 +2119,18 @@ ESC[32m 标准绿）——不是颜色不同，而是**中段品牌名 "Einz TUI
 **验证：** dart analyze（cli + shared）0 issue；修复后右段绿点前 SGR 序列含
 ESC[22m（代码级确认）。pty 自动验证受限（TUI 交互终端检测拒绝伪 pty），
 亮度一致需老板在真实终端重启 TUI 肉眼确认。
+## 2026-09-10 长按菜单预览行对齐修复：我的靠右/对方靠左
+
+**老板反馈：** 弹窗顶部简略消息气泡在消息短时被居中显示，视觉效果不稳定；
+要求与消息流一致——对方靠左、我靠右。
+
+**修复（chat_page _buildMessagePreviewRow）：** Row 由 mainAxisSize.min（短消息
+整行收缩被 sheet 居中）改为 max + mainAxisAlignment（我的 end / 对方 start）；
+长消息 Flexible 撑满截断行为不变。Row 加 ValueKey('messagePreviewRow') 供测试
+断言（项目 key 惯例）。
+
+**测试：** chat_page_menu_test 的 _FakeApi 支持可选消息列表；新增用例「长按菜单
+预览行对齐：我的消息靠右、对方消息靠左」（长按我的消息 → end、长按对方消息 →
+start，遮罩点击关窗）。
+
+**验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过；已热重启。

@@ -1131,6 +1131,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 长按菜单顶部的消息预览行：发言人头像 + 按性别气泡风格的正文。
   /// 正文单行截断不溢出（老板要求 2026-09-10）；头像左右位置与消息流一致
   /// （我的在右、对方在左）；附件消息无正文时显示消息类型作占位。
+  /// Row 撑满整行并按消息流对齐（对方靠左、我的靠右）——此前 mainAxisSize.min
+  /// 短消息整行收缩被弹窗居中，长消息撑满贴边，视觉效果不稳定（老板要求
+  /// 2026-09-10 修复）。
   Widget _buildMessagePreviewRow(HistoryMessage m) {
     final mine = m.sender == 'me';
     final avatarPersonId =
@@ -1140,7 +1143,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        key: const ValueKey('messagePreviewRow'), // 测试断言对齐用（项目惯例）
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment:
+            mine ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!mine) ...[
             _MessageAvatar(

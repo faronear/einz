@@ -11,9 +11,12 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 
-/// 最小 fake ApiClient：sync 返回空消息页（只测菜单交互，不涉网络）。
+/// 最小 fake ApiClient：sync 返回编排好的加密消息（模拟 Server 分配
+/// server_sequence；默认空——只测菜单交互，不涉网络）。
 class _FakeApi extends ApiClient {
-  _FakeApi() : super('http://fake');
+  _FakeApi({this.messages = const []}) : super('http://fake');
+
+  final List<MessageEnvelope> messages;
 
   @override
   Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
@@ -21,10 +24,18 @@ class _FakeApi extends ApiClient {
     int after = 0,
     int limit = 100,
   }) async {
+    var seq = after;
+    final withSeq = <MessageEnvelope>[
+      for (final env in messages)
+        () {
+          seq++;
+          return MessageEnvelope.fromJson({...env.toJson(), 'server_sequence': seq});
+        }(),
+    ];
     return (
-      messages: <MessageEnvelope>[],
+      messages: withSeq,
       attachmentsMeta: <Map<String, dynamic>>[],
-      lastSequence: 0,
+      lastSequence: seq,
       hasMore: false,
     );
   }
@@ -634,5 +645,71 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
     expect(find.text('我的个人资料'), findsNothing, reason: '保存成功应关闭弹窗');
+  });
+
+  testWidgets('长按菜单预览行对齐：我的消息靠右、对方消息靠左', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi(messages: [
+      await encryptMessage(
+        plaintext: '我的消息',
+        spaceKey: spaceKey,
+        spaceId: 'space-demo',
+        senderDeviceId: 'dev-a', // 本人
+        messageId: 'msg-1',
+        keyVersion: 1,
+      ),
+      await encryptMessage(
+        plaintext: '对方消息',
+        spaceKey: spaceKey,
+        spaceId: 'space-demo',
+        senderDeviceId: 'dev-b', // 对方
+        messageId: 'msg-2',
+        keyVersion: 1,
+      ),
+    ]);
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    // 长按我的消息 → 弹窗预览行靠右（与消息流一致）
+    await tester.longPress(find.text('我的消息'));
+    await tester.pumpAndSettle();
+    final mineRow =
+        tester.widget<Row>(find.byKey(const ValueKey('messagePreviewRow')));
+    expect(mineRow.mainAxisAlignment, MainAxisAlignment.end,
+        reason: '我的消息预览行应靠右对齐');
+    expect(find.text('引用'), findsOneWidget, reason: '菜单应已弹出');
+    // 关闭弹窗（点击遮罩）
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+
+    // 长按对方消息 → 预览行靠左
+    await tester.longPress(find.text('对方消息'));
+    await tester.pumpAndSettle();
+    final peerRow =
+        tester.widget<Row>(find.byKey(const ValueKey('messagePreviewRow')));
+    expect(peerRow.mainAxisAlignment, MainAxisAlignment.start,
+        reason: '对方消息预览行应靠左对齐');
+    // 关闭弹窗，避免测试结束时挂起的 Route
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
   });
 }
