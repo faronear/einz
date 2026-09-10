@@ -21,6 +21,11 @@ class Api {
   static const space = '/space';
   static const keyEscrow = '/key-escrow';
   static const recover = '/recover'; // 全丢恢复（免认证，凭 escrow 口令重置空间）
+  // Multiverse：空间创建/加入（PROTOCOL_MULTIVERSE.md §4）
+  static const spaces = '/spaces';
+  static const spaceJoinPreflight = '/spaces/join/preflight';
+  static const spaceJoin = '/spaces/join';
+  static const spaceLookup = '/spaces/lookup';
 }
 
 /// 认证挑战结果。
@@ -65,6 +70,92 @@ class EnrollResult {
         deviceId: json['device_id'] as String,
         personId: json['person_id'] as String,
         spaceId: json['space_id'] as String,
+      );
+}
+
+/// Multiverse：join token preflight 结果（POST /spaces/join/preflight 返回，
+/// 验 token 不消费——空间公开信息供客户端确认，PROTOCOL_MULTIVERSE.md §5）。
+class SpaceJoinPreflight {
+  const SpaceJoinPreflight({
+    required this.spaceId,
+    required this.displayName,
+    required this.status,
+    required this.memberCount,
+  });
+
+  final String spaceId;
+  final String? displayName;
+  final String status;
+  final int memberCount;
+
+  factory SpaceJoinPreflight.fromJson(Map<String, dynamic> json) =>
+      SpaceJoinPreflight(
+        spaceId: json['spaceId'] as String,
+        displayName: json['displayName'] as String?,
+        status: json['status'] as String,
+        memberCount: json['memberCount'] as int,
+      );
+}
+
+/// Multiverse：加入结果（POST /spaces/join 返回——设备已登记、session 已签发，
+/// 绑定该 Space，PROTOCOL_MULTIVERSE.md §4.1）。
+class SpaceJoinResult {
+  const SpaceJoinResult({
+    required this.spaceId,
+    required this.personId,
+    required this.partnerSlot,
+    required this.sessionToken,
+    required this.deviceId,
+  });
+
+  final String spaceId;
+  final String personId;
+  final int partnerSlot;
+  final String sessionToken;
+  final String deviceId;
+
+  factory SpaceJoinResult.fromJson(Map<String, dynamic> json) => SpaceJoinResult(
+        spaceId: json['spaceId'] as String,
+        personId: json['personId'] as String,
+        partnerSlot: json['partnerSlot'] as int,
+        sessionToken: json['sessionToken'] as String,
+        deviceId: json['deviceId'] as String,
+      );
+}
+
+/// Multiverse：创建结果（POST /spaces 返回——创建者设备已登记、session 已签发，
+/// 绑定该 Space，PROTOCOL_MULTIVERSE.md §4.1）。
+class SpaceCreateResult {
+  const SpaceCreateResult({
+    required this.spaceId,
+    required this.spaceAddress,
+    required this.joinToken,
+    required this.link,
+    required this.expiresAt,
+    required this.deviceId,
+    required this.creatorPersonId,
+    required this.sessionToken,
+  });
+
+  final String spaceId;
+  final String spaceAddress;
+  final String joinToken;
+  final String link;
+  final int expiresAt;
+  final String deviceId;
+  final String creatorPersonId;
+  final String sessionToken;
+
+  factory SpaceCreateResult.fromJson(Map<String, dynamic> json) =>
+      SpaceCreateResult(
+        spaceId: json['spaceId'] as String,
+        spaceAddress: json['spaceAddress'] as String,
+        joinToken: json['joinToken'] as String,
+        link: json['link'] as String,
+        expiresAt: json['expiresAt'] as int,
+        deviceId: json['deviceId'] as String,
+        creatorPersonId: json['creatorPersonId'] as String,
+        sessionToken: json['sessionToken'] as String,
       );
 }
 

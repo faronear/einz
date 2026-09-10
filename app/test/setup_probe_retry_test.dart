@@ -26,7 +26,7 @@ void main() {
         // 第一次探测失败（服务端不可达），之后成功（服务器就绪）
         probeServer: (_) async {
           probeCalls++;
-          return (probeCalls > 1, <String, String>{}, <String, String>{});
+          return (probeCalls > 1, 'v2-multiverse', const <String>[]);
         },
       ),
     ));
@@ -39,15 +39,17 @@ void main() {
         reason: '启动屏不显示失败文字（保持简洁优美，老板要求 2026-09-09）');
     expect(probeCalls, 1);
 
-    // 4 秒重试周期触发 → 第二次探测成功 → 自动进入 create 步骤 1（名字页）
+    // 4 秒重试周期触发 → 第二次探测成功 → 自动进入空间入口页（Multiverse：
+    // 不再自动判定 create/join，由用户选择新建/加入）
     await tester.pump(const Duration(seconds: 4));
-    await tester.pump(); // _reprobe future 完成 → 角色判定 → 进入向导
+    await tester.pump(); // _reprobe future 完成 → 入口页
     await tester.pumpAndSettle();
     expect(probeCalls, greaterThanOrEqualTo(2), reason: '应已自动重新探测');
     expect(find.text('暂时无法连接服务器，正在自动重试…'), findsNothing,
         reason: '启动屏始终无失败文字');
     expect(find.byType(SpinningBrandLogo), findsNothing, reason: '进入向导后启动屏应消失');
-    // create 步骤 1 的 AppBar 组合标题（输入框 label 为「我的名字」）
-    expect(find.text('Einz 秘境'), findsWidgets, reason: '应自动进入向导名字页');
+    // 空间入口页（新建私密空间 / 输入邀请链接或代码加入）
+    expect(find.text('新建私密空间'), findsOneWidget, reason: '应自动进入空间入口页');
+    expect(find.text('输入邀请链接或代码加入'), findsOneWidget);
   });
 }

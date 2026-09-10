@@ -31,23 +31,24 @@ class ServerSettings {
   }
 
   /// 快速健康探测（GET {server}/health，3s 超时）。
-  /// 返回 (能连, person 名称表, person 性别表)——名称表为空 = 服务器还没有任何
-  /// 用户（首设备场景）；非空 = 已有用户（后续设备场景）。对齐 TUI _probeServer。
-  static Future<(bool, Map<String, String>, Map<String, String>)> probe(String server) async {
+  /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回全局
+  /// person 表（PROTOCOL_MULTIVERSE.md §4.1）；协议版本用于旧服务器提示
+  /// （不支持 spaces 的旧 Server 明确升级提示，§8.1）。
+  static Future<(bool, String, List<String>)> probe(String server) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
     try {
       final req = await client.getUrl(Uri.parse('$server/health'));
       final res = await req.close();
       final body = await res.transform(utf8.decoder).join();
-      if (res.statusCode != 200) return (false, <String, String>{}, <String, String>{});
+      if (res.statusCode != 200) return (false, '', const <String>[]);
       final json = jsonDecode(body) as Map<String, dynamic>;
-      final rawNames = json['person_names'] as Map<String, dynamic>? ?? <String, dynamic>{};
-      final names = <String, String>{for (final e in rawNames.entries) e.key: e.value as String};
-      final rawGenders = json['person_genders'] as Map<String, dynamic>? ?? <String, dynamic>{};
-      final genders = <String, String>{for (final e in rawGenders.entries) e.key: e.value as String};
-      return (true, names, genders);
+      final pv = json['protocol_version'] as String? ?? '';
+      final caps = (json['capabilities'] as List<dynamic>? ?? const [])
+          .map((e) => e as String)
+          .toList();
+      return (true, pv, caps);
     } catch (_) {
-      return (false, <String, String>{}, <String, String>{});
+      return (false, '', const <String>[]);
     } finally {
       client.close(force: true);
     }

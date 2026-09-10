@@ -1,6 +1,7 @@
 // join 接入口令验证回归测试：口令页必须是「验证」语义——
 // 输入口令必须与首台设备创建时一致（解密 escrow 口令密保箱成功）才放行进 PIN 步骤；
 // 错误口令提示并停留口令页（不得"随便输都能过"）。
+// Multiverse（2026-09-10）：join 流程 = 入口页 → token（preflight）→ 名字 → 口令。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +12,7 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 
-/// 假 escrow：口令匹配返回 payload，不匹配抛 FormatException（模拟 decryptBackup 失败），
+/// 假 escrow：口令匹配返回 payload，不匹配抛 FormatException（模拟解密失败），
 /// payload 为 null 表示未托管。
 class _FakeEscrow extends KeyEscrowService {
   _FakeEscrow(this.correctPass, this.payload) : super(ApiClient('http://fake'));
@@ -20,18 +21,31 @@ class _FakeEscrow extends KeyEscrowService {
   final EscrowPayload? payload;
 
   @override
-  Future<EscrowPayload?> fetch({required String passphrase, required String token}) async {
+  Future<BackupFile?> fetchSpaceEscrow(String spaceId, String passphrase) async {
     if (payload == null) return null;
     if (passphrase != correctPass) throw const FormatException('口令错误');
-    return payload;
+    // salt/nonce/ciphertext 必须是合法 base64（BackupFile.fromJson 会解码校验）
+    return BackupFile.fromJson(const {
+      'format': 'einz-backup-v1',
+      'salt': 'c2FsdA==',
+      'nonce': 'bm9uY2U=',
+      'ciphertext': 'Y2lwaGVy',
+    });
+  }
+
+  @override
+  Future<EscrowPayload> openPackage(
+      {required String passphrase, required BackupFile file}) async {
+    if (passphrase != correctPass) throw const FormatException('口令错误');
+    return payload!;
   }
 }
 
-/// 打开 join 向导并走到邀请码页（身份卡片自动进邀请码页）。
-/// enroll 可注入错误 fake（模拟无效邀请码）；默认成功登记。
-Future<void> pumpToJoinInvite(
+/// 打开 join 向导并走到 token 页（入口页 → 加入）。
+Future<void> pumpToJoinToken(
   WidgetTester tester, {
-  Future<EnrollResult> Function(String? inviteCode)? enroll,
+  Future<SpaceJoinPreflight> Function(String token)? preflight,
+  Future<SpaceJoinResult> Function(String token)? join,
   String correctPass = '正确口令-abc',
   EscrowPayload? payload,
 }) async {
@@ -43,40 +57,59 @@ Future<void> pumpToJoinInvite(
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, const {'personA': 'Lukas'}, const <String, String>{}),
-      enrollOverride: enroll ??
-          (_) async =>
-              const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
-      authOverride: (kp, id) async =>
-          SessionResult(sessionToken: 'tok', spaceId: 'space-test', expiresIn: 3600),
+      probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+      preflightOverride: preflight ??
+          (token) async => const SpaceJoinPreflight(
+              spaceId: 'space-test',
+              displayName: 'Lukas',
+              status: 'waiting',
+              memberCount: 1),
+      joinOverride: join ??
+          (token) async => const SpaceJoinResult(
+              spaceId: 'space-test',
+              personId: 'personB',
+              partnerSlot: 1,
+              sessionToken: 'tok',
+              deviceId: 'dev2'),
       escrowOverride: (server) => _FakeEscrow(correctPass, payload),
     ),
   ));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Lukas')); // 身份（自动进邀请码页）
+  await tester.tap(find.text('输入邀请链接或代码加入')); // 入口页 → 加入
   await tester.pumpAndSettle();
 }
 
-/// 走到口令页：邀请码页填码 → 下一步（验证邀请码）→ 口令页。
+/// 走到口令页：token（preflight）→ 名字（填名字+性别）→ 口令页。
 Future<void> pumpToJoinPassphrase(
   WidgetTester tester, {
   required String correctPass,
   EscrowPayload? payload,
 }) async {
-  await pumpToJoinInvite(tester, correctPass: correctPass, payload: payload);
-  await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码
-  await tester.tap(find.text('下一步'));
+  await pumpToJoinToken(tester, correctPass: correctPass, payload: payload);
+  await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
+  await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
   await tester.pumpAndSettle();
+  await tester.tap(find.text('下一步')); // 再次：放行到名字页
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField), 'Bob');
+  await tester.tap(find.byIcon(Icons.male)); // 选性别男
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('下一步'));
+  await tester.pumpAndSettle(); // → 口令页
   // 口令页应为「验证」语义：标题与提示都是验证措辞
   expect(find.text('验证密保口令'), findsOneWidget); // 标题（join=验证套，create=设置套）
   expect(find.text('用于对所有消息进行加密、解密。如果不知道口令，请询问秘境里的唯一伴侣。'),
       findsOneWidget); // hint
-  // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡底部「下一步」按钮
+  // join 提交（POST /spaces/join）成功后若出 SnackBar 停留 4 秒：等其消失避免遮挡
   await tester.pump(const Duration(seconds: 5));
   await tester.pumpAndSettle();
 }
 
 void main() {
+  setUpAll(() async {
+    await sodium(); // 自动建钥需要 libsodium（macOS 经 LIBSODIUM_PATH/brew 可用）
+  });
+
   final payload =
       const EscrowPayload(spaceKeyB64: 'a2V5', spaceId: 'space-test', keyVersion: 1);
 
@@ -109,21 +142,25 @@ void main() {
         findsOneWidget, reason: '未托管时停留口令页');
   });
 
-  testWidgets('错误邀请码：提示无效并停留邀请码页（不进口令页）', (WidgetTester tester) async {
-    await pumpToJoinInvite(tester, enroll: (_) async => throw Exception('invite invalid'));
-    await tester.enterText(find.byType(TextField), '错误邀请码');
+  testWidgets('错误 token：提示无效并停留 token 页（不进口令页）', (WidgetTester tester) async {
+    await pumpToJoinToken(tester,
+        preflight: (_) async => throw ApiException('TOKEN_INVALID', 'invalid'));
+    await tester.enterText(find.byType(TextField), '错误TOKEN');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('邀请码无效'), findsOneWidget, reason: '无效码必须被拦截并提示');
-    expect(find.text('验证邀请码'), findsWidgets, reason: '应停留在邀请码页');
+    expect(find.text('邀请链接无效'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
+    expect(find.text('输入邀请链接'), findsWidgets, reason: '应停留在 token 页');
     expect(find.text('验证密保口令'), findsNothing, reason: '不应进入口令页');
   });
 
-  testWidgets('正确邀请码：放行到「验证密保口令」页', (WidgetTester tester) async {
-    await pumpToJoinInvite(tester); // 默认成功登记
-    await tester.enterText(find.byType(TextField), '正确邀请码');
-    await tester.tap(find.text('下一步'));
+  testWidgets('正确 token：preflight 通过 → 空间确认卡片 → 名字页', (WidgetTester tester) async {
+    await pumpToJoinToken(tester); // 默认 preflight 成功
+    await tester.enterText(find.byType(TextField), '正确TOKEN');
+    await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
     await tester.pumpAndSettle();
-    expect(find.text('验证密保口令'), findsOneWidget, reason: '有效码应放行进口令页');
+    expect(find.text('加入 Lukas 的空间'), findsOneWidget, reason: '有效 token 应显示空间确认卡片');
+    await tester.tap(find.text('下一步')); // 再次：放行到名字页
+    await tester.pumpAndSettle();
+    expect(find.text('关于我'), findsOneWidget, reason: '确认空间后应放行到名字页');
   });
 }

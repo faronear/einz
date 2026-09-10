@@ -71,6 +71,11 @@ class KeyEscrowService {
     );
   }
 
+  /// Multiverse：按空间口令取 Space Key 密封包（委托 ApiClient.fetchSpaceEscrow；
+  /// 测试可 override——与 v1 fetch 同注入边界）。
+  Future<BackupFile?> fetchSpaceEscrow(String spaceId, String passphrase) =>
+      api.fetchSpaceEscrow(spaceId, passphrase);
+
   /// 一键：拉取 + 口令解密；未托管或无口令错误时：
   /// - 未托管（Server 无包）返回 null；
   /// - 口令错误抛 [FormatException]。

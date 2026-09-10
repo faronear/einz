@@ -195,6 +195,62 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get setupEntryTitle => '开始使用 Einz';
+
+  @override
+  String get setupEntryHint => '创建只有两个人的私密空间，或通过邀请链接加入';
+
+  @override
+  String get setupEntryCreate => '新建私密空间';
+
+  @override
+  String get setupEntryJoin => '输入邀请链接或代码加入';
+
+  @override
+  String get setupEntryLegacyServer => '服务器版本过低，请升级后再使用';
+
+  @override
+  String get setupTokenTitle => '输入邀请链接';
+
+  @override
+  String get setupTokenHint => '向创建者索取一次性邀请链接或代码';
+
+  @override
+  String get setupTokenInputHint => '粘贴邀请链接或代码';
+
+  @override
+  String get setupTokenNeedInput => '请输入邀请链接或代码';
+
+  @override
+  String get setupTokenInvalid => '邀请链接无效';
+
+  @override
+  String get setupTokenExpired => '邀请链接已过期';
+
+  @override
+  String get setupTokenUsed => '邀请链接已被使用';
+
+  @override
+  String get setupTokenSpaceFull => '空间已满';
+
+  @override
+  String setupTokenSpaceInfo(String name) {
+    return '加入 $name 的空间';
+  }
+
+  @override
+  String get setupTokenSpacePrivate => '加入私密空间（等待第二位成员）';
+
+  @override
+  String get setupCreateShareTitle => '邀请对方加入（24 小时内有效）';
+
+  @override
+  String get setupCreateCopy => '复制邀请链接';
+
+  @override
+  String get setupCreateCopied => '已复制';
+
+  @override
   String get setupPageInitFailed => '初始化失败，正在自动重试…';
 
   @override

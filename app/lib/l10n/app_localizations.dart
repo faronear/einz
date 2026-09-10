@@ -458,6 +458,114 @@ abstract class AppLocalizations {
   /// **'❌ Key generation failed: {error}'**
   String setupPageKeyGenFailed(String error);
 
+  /// No description provided for @setupEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started with Einz'**
+  String get setupEntryTitle;
+
+  /// No description provided for @setupEntryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a private space for two, or join via an invite link'**
+  String get setupEntryHint;
+
+  /// No description provided for @setupEntryCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a private space'**
+  String get setupEntryCreate;
+
+  /// No description provided for @setupEntryJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Join with an invite link or code'**
+  String get setupEntryJoin;
+
+  /// No description provided for @setupEntryLegacyServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server version too old, please upgrade'**
+  String get setupEntryLegacyServer;
+
+  /// No description provided for @setupTokenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter invite link'**
+  String get setupTokenTitle;
+
+  /// No description provided for @setupTokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the creator for a one-time invite link or code'**
+  String get setupTokenHint;
+
+  /// No description provided for @setupTokenInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the invite link or code'**
+  String get setupTokenInputHint;
+
+  /// No description provided for @setupTokenNeedInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the invite link or code'**
+  String get setupTokenNeedInput;
+
+  /// No description provided for @setupTokenInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid invite link'**
+  String get setupTokenInvalid;
+
+  /// No description provided for @setupTokenExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite link expired'**
+  String get setupTokenExpired;
+
+  /// No description provided for @setupTokenUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite link already used'**
+  String get setupTokenUsed;
+
+  /// No description provided for @setupTokenSpaceFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Space is full'**
+  String get setupTokenSpaceFull;
+
+  /// No description provided for @setupTokenSpaceInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Join {name}\'s space'**
+  String setupTokenSpaceInfo(String name);
+
+  /// No description provided for @setupTokenSpacePrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Join a private space (waiting for the second member)'**
+  String get setupTokenSpacePrivate;
+
+  /// No description provided for @setupCreateShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite your partner (valid for 24h)'**
+  String get setupCreateShareTitle;
+
+  /// No description provided for @setupCreateCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy invite link'**
+  String get setupCreateCopy;
+
+  /// No description provided for @setupCreateCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get setupCreateCopied;
+
   /// Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying
   ///
   /// In en, this message translates to:

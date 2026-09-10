@@ -10,7 +10,7 @@ import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, recoverSpace, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
-import { createJoinToken, createSpace, joinSpace, lookupSpace } from "./spaces.js";
+import { createJoinToken, createSpace, joinSpace, lookupSpace, preflightJoin } from "./spaces.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
@@ -83,9 +83,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/spaces") {
     const body = await readJson(req);
     const r = await createSpace(
+      body?.space_id == null ? undefined : String(body.space_id),
       body?.displayName == null ? undefined : String(body.displayName),
       body?.sealedSpaceKey,
       body?.escrowPassphrase == null ? undefined : String(body.escrowPassphrase),
+      body?.publicKey == null ? undefined : String(body.publicKey),
+      body?.deviceName == null ? undefined : String(body.deviceName),
     );
     sendJson(res, 201, r);
     return;
@@ -95,10 +98,18 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     sendJson(res, 200, r);
     return;
   }
+  if (method === "POST" && path === "/spaces/join/preflight") {
+    const body = await readJson(req);
+    const r = preflightJoin(String(body?.token ?? ""));
+    sendJson(res, 200, r);
+    return;
+  }
   if (method === "POST" && path === "/spaces/join") {
     const body = await readJson(req);
     const r = joinSpace(
       String(body?.token ?? ""),
+      String(body?.publicKey ?? ""),
+      body?.deviceName == null ? undefined : String(body.deviceName),
       body?.displayName == null ? undefined : String(body.displayName),
       body?.gender == null ? undefined : String(body.gender),
     );

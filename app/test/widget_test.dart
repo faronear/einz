@@ -1,9 +1,9 @@
 // Einz 设置向导 widget 测试。
 //
 // 直接渲染 SetupPage 验证向导流程（不经过 StartupGate——它依赖真实
-// drift 数据库初始化）。新流程（2026-09-05，对齐 TUI）：探测服务器 →
-// 自动判定身份（person 名称表空=首设备 create，非空=后续设备 join）→
-// 自动生成密钥 → 按角色进入对应步骤序列。
+// drift 数据库初始化）。Multiverse 流程（2026-09-10）：探测服务器 →
+// 空间入口页（新建/加入选择）→ create：名字→口令→PIN；join：
+// token（preflight）→名字→口令→PIN。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +20,10 @@ void main() {
     await sodium(); // 自动建钥需要 libsodium（macOS 经 LIBSODIUM_PATH/brew 可用）
   });
 
-  Widget wrapApp({Map<String, String> probeNames = const {}, bool probeOk = true}) {
+  Widget wrapApp({
+    bool probeOk = true,
+    Future<SpaceJoinPreflight> Function(String token)? preflightOverride,
+  }) {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     return MaterialApp(
@@ -29,46 +32,71 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => (probeOk, probeNames, <String, String>{}),
+        probeServer: (_) async => (probeOk, 'v2-multiverse', const <String>[]),
+        preflightOverride: preflightOverride,
       ),
     );
   }
 
-  testWidgets('首设备：探测空名称表 → 自动进入"我的名字"步骤（无角色选择/密钥按钮）',
+  testWidgets('探测成功 → 空间入口页：新建私密空间 / 输入邀请链接或代码加入',
       (WidgetTester tester) async {
-    await tester.pumpWidget(wrapApp()); // probeNames 空 → create
+    await tester.pumpWidget(wrapApp());
     await tester.pumpAndSettle();
 
-    // 新流程：不再有角色选择页，也没有"生成设备密钥"按钮
-    expect(find.text('我是第一个使用者，创建新空间'), findsNothing);
-    expect(find.text('① 生成设备密钥'), findsNothing);
-    // 自动进入 create 步骤 1（AppBar 组合标题；输入框 label 是「我的名字」）
-    expect(find.text('Einz 秘境'), findsWidgets); // AppBar 标题
-    // 底部保留"上一步"（可返回检测页）与"下一步"
-    expect(find.text('上一步'), findsOneWidget);
+    // Multiverse：探测成功后显示空间入口页（不再自动判定 create/join）
+    expect(find.text('新建私密空间'), findsOneWidget);
+    expect(find.text('输入邀请链接或代码加入'), findsOneWidget);
+    // 启动屏已消失
+    expect(find.byType(SpinningBrandLogo), findsNothing);
+  });
+
+  testWidgets('入口页选「新建私密空间」→ 我的名字步骤', (WidgetTester tester) async {
+    await tester.pumpWidget(wrapApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('新建私密空间'));
+    await tester.pumpAndSettle();
+
+    // 进入 create 名字步骤（AppBar 标题 + 输入框 hint「我的名字（以后可以随时修改）」）
+    expect(find.text('Einz 秘境'), findsWidgets);
+    expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);
   });
 
-  testWidgets('后续设备：探测到 personA → 自动进入"我的名字"步骤', (WidgetTester tester) async {
-    await tester.pumpWidget(wrapApp(probeNames: {'personA': 'Lukas'})); // 非空 → join
+  testWidgets('入口页选「输入邀请链接或代码加入」→ token 页（粘贴/扫码）',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrapApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('我是'), findsWidgets); // 身份步骤标题
-    // 点击卡片即前进（无「下一步」/对勾）：身份页不应出现 checkbox 图标
-    expect(find.byIcon(Icons.check_circle), findsNothing);
-    // 有名字的身份卡片直接显示名字（无名字才显示身份标签本身）
-    expect(find.text('Lukas'), findsOneWidget);
-    expect(find.textContaining('共有者'), findsOneWidget);
-    // 身份卡头像为性别图标（男 ♂ / 女 ♀，非角色小人图标；性别未知回退 personA♂/personB♀）
-    expect(find.byIcon(Icons.male), findsOneWidget);
-    expect(find.byIcon(Icons.female), findsOneWidget);
-    // join step1 无「下一步」/「完成」按钮：点卡片即自动前进（老板 UX 决策）
-    expect(find.text('下一步'), findsNothing);
-    expect(find.text('完成'), findsNothing);
-    // 点身份卡片 → 自动进入邀请码页
-    await tester.tap(find.text('Lukas'));
+    await tester.tap(find.text('输入邀请链接或代码加入'));
     await tester.pumpAndSettle();
-    expect(find.text('验证邀请码'), findsWidgets); // 邀请码页步骤标题（join=验证套）
+
+    // join token 输入页（粘贴邀请链接或代码 + 扫码）
+    expect(find.text('输入邀请链接'), findsOneWidget);
+    expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
+  });
+
+  testWidgets('join：token 校验通过（preflight）→ 空间确认卡片显示',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrapApp(
+      preflightOverride: (token) async => const SpaceJoinPreflight(
+        spaceId: 'space-test',
+        displayName: 'Lukas',
+        status: 'waiting',
+        memberCount: 1,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('输入邀请链接或代码加入'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'TOKEN-1');
+    await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 停留显示空间确认卡片
+    await tester.pumpAndSettle();
+    // 空间确认卡片显示（加入创建者的空间）；再次点「下一步」才放行到名字页
+    expect(find.text('加入 Lukas 的空间'), findsOneWidget);
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('关于我'), findsOneWidget, reason: '确认空间后应放行到名字页');
   });
 
   testWidgets('探测失败：启动屏保持旋转 Logo、无失败文字并自动重试（无输入框/信封入口）',

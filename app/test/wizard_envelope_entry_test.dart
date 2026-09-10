@@ -11,10 +11,11 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 
-/// 打开向导并走到口令页。probeNames 空=create（首设备），非空=join（后续设备）。
+/// 打开向导并走到口令页。join=true 走 Multiverse join 路径（入口页 → token
+/// preflight → 名字 → 口令）；false=create（首设备，名字页——createSpace 无
+/// fake 注入，名字页下一步即红字拦截，断言只查"无信封入口"仍成立）。
 Future<void> pumpToPassphrase(
   WidgetTester tester, {
-  required Map<String, String> probeNames,
   bool join = false,
 }) async {
   final db = LocalDatabase.forTesting(NativeDatabase.memory());
@@ -25,8 +26,28 @@ Future<void> pumpToPassphrase(
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, probeNames, <String, String>{}),
-      // create 名字页下一步触发自动登记（_runBootstrap），需返回成功结果；
+      probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+      // Multiverse join：token 校验（preflight）用 fake——默认走真实 ApiClient
+      preflightOverride: join
+          ? (token) async => const SpaceJoinPreflight(
+              spaceId: 'space-test',
+              displayName: 'Lukas',
+              status: 'waiting',
+              memberCount: 1,
+            )
+          : null,
+      // create 名字页下一步触发 Multiverse 创建（_runBootstrap → POST /spaces），
+      // 需 createOverride fake 返回成功结果才能放行到口令页
+      createOverride: () async => const SpaceCreateResult(
+        spaceId: 'space-test',
+        spaceAddress: '0x00',
+        joinToken: 'tok-1',
+        link: 'https://einz.tic.cc/join/tok-1',
+        expiresAt: 9999999999,
+        deviceId: 'dev1',
+        creatorPersonId: 'personA',
+        sessionToken: 'tok',
+      ),
       // join 走到口令页前不登记，此 fake 不会被调用也无妨
       enrollOverride: (_) async =>
           const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
@@ -35,28 +56,40 @@ Future<void> pumpToPassphrase(
   await tester.pumpAndSettle();
 
   if (join) {
-    // join：身份名字（自动进邀请码页）→ 邀请码（填值）→ 口令页
-    await tester.tap(find.text('Lukas'));
+    // join：入口页 → 加入 → token 页（preflight 通过）→ 名字页（填名字+性别）→ 口令页
+    await tester.tap(find.text('输入邀请链接或代码加入'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'INVITE-ABC');
+    await tester.enterText(find.byType(TextField), 'TOKEN-1');
+    await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步')); // 再次：放行到名字页
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Bob');
+    await tester.tap(find.byIcon(Icons.male)); // 选性别男
+    await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(); // → 口令页
   } else {
-    // create：身份名字 → 自动登记 → 口令页
-    await tester.tap(find.text('下一步'));
+    // create：入口页 → 新建 → 名字页（填名字+性别）→ 口令页（createOverride 提交放行）
+    await tester.tap(find.text('新建私密空间'));
     await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Lukas');
+    await tester.tap(find.byIcon(Icons.male)); // 选性别男
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle(); // 名字页放行（Multiverse create 提交）→ 口令页
   }
 }
 
 void main() {
   testWidgets('首设备 create 口令页：不显示信封导入入口', (WidgetTester tester) async {
-    await pumpToPassphrase(tester, probeNames: const {});
+    await pumpToPassphrase(tester);
     expect(find.byIcon(Icons.mail_outline), findsNothing,
         reason: '首设备没有对端设备导出的信封，不应提供信封导入入口');
   });
 
   testWidgets('后续设备 join 口令页：显示信封导入入口', (WidgetTester tester) async {
-    await pumpToPassphrase(tester, probeNames: const {'personA': 'Lukas'}, join: true);
+    await pumpToPassphrase(tester, join: true);
     expect(find.byIcon(Icons.mail_outline), findsOneWidget,
         reason: 'join 用户可用对端导出的信封替代口令获取 Space Key（标题行右上角切换图标）');
   });
@@ -70,12 +103,24 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => (true, <String, String>{}, <String, String>{}),
-        // 步骤 1 放行后自动登记（_runBootstrap）需要成功结果
-        enrollOverride: (_) async =>
-            const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
+        probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+        // 步骤 1 放行后触发 Multiverse 创建（_runBootstrap → POST /spaces），
+        // 需 createOverride fake 返回成功结果才能放行到口令页
+        createOverride: () async => const SpaceCreateResult(
+          spaceId: 'space-test',
+          spaceAddress: '0x00',
+          joinToken: 'tok-1',
+          link: 'https://einz.tic.cc/join/tok-1',
+          expiresAt: 9999999999,
+          deviceId: 'dev1',
+          creatorPersonId: 'personA',
+          sessionToken: 'tok',
+        ),
       ),
     ));
+    await tester.pumpAndSettle();
+    // Multiverse：探测成功 → 空间入口页 → 新建 → 名字页（步骤 1）
+    await tester.tap(find.text('新建私密空间'));
     await tester.pumpAndSettle();
     // 名字与性别都未填：点下一步 → 两项红字同时出现（统一检查，不因首个失败跳过其余）
     await tester.tap(find.text('下一步'));
@@ -95,6 +140,6 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.text('请选择性别'), findsNothing, reason: '选中性别后提醒应消失');
-    expect(find.text('关于伴侣'), findsOneWidget, reason: '应进入步骤 2（伴侣名字页）');
+    expect(find.text('设置密保口令'), findsOneWidget, reason: '应进入步骤 2（口令页，Multiverse create 无伴侣页）');
   });
 }

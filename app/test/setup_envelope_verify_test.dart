@@ -12,7 +12,7 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 
-/// 走到信封页：join 身份（自动进邀请码页）→ 邀请码 → 口令页 → 切「改用线下密保信封」。
+/// 走到信封页：入口页 → 加入 → token（preflight）→ 名字 → 口令页 → 切「改用线下密保信封」。
 Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) async {
   final db = LocalDatabase.forTesting(NativeDatabase.memory());
   addTearDown(db.close);
@@ -22,7 +22,10 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, const {'personA': 'Lukas'}, const <String, String>{}),
+      probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+      // Multiverse join：token 校验（preflight）用 fake
+      preflightOverride: (token) async => const SpaceJoinPreflight(
+          spaceId: 'space-test', displayName: 'Lukas', status: 'waiting', memberCount: 1),
       enrollOverride: (_) async =>
           const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
       authOverride: (kp, id) async =>
@@ -31,11 +34,19 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
     ),
   ));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Lukas')); // 身份（自动进邀请码页）
+  // Multiverse join：入口页 → 加入 → token（preflight 通过）→ 名字 → 口令页
+  await tester.tap(find.text('输入邀请链接或代码加入'));
   await tester.pumpAndSettle();
-  await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码
-  await tester.tap(find.text('下一步')); // 邀请码验证 → 口令页
+  await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
+  await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
   await tester.pumpAndSettle();
+  await tester.tap(find.text('下一步')); // 再次：放行到名字页
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField), 'Bob');
+  await tester.tap(find.byIcon(Icons.male)); // 选性别男
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('下一步'));
+  await tester.pumpAndSettle(); // → 口令页
   await tester.tap(find.byIcon(Icons.mail_outline)); // 口令页 → 信封页（标题行右上角切换图标）
   await tester.pumpAndSettle();
   // enroll 成功的 SnackBar 停留 4 秒：等其消失，避免遮挡底部「下一步」按钮
@@ -51,14 +62,13 @@ void main() {
     kp = await DeviceKeyPair.generate(deviceId: 'dev1');
   });
 
-  testWidgets('信封页「下一步」回到邀请码页（不验证信封推进）', (WidgetTester tester) async {
+  testWidgets('信封页「下一步」回到 join 口令页（不验证信封推进）', (WidgetTester tester) async {
     await pumpToEnvelope(tester, kp: kp);
-    // 信封页不管输入什么（甚至为空），「下一步」都应回到邀请码页重走登记
+    // 信封页不管输入什么（甚至为空），「下一步」都应回到 join 口令页
     await tester.enterText(find.byType(TextField), '随便粘贴的内容');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('验证邀请码'), findsOneWidget, reason: '应回到邀请码页（验证邀请码标题）');
-    expect(find.byType(TextField), findsOneWidget, reason: '邀请码输入框应可见');
+    expect(find.text('验证密保口令'), findsOneWidget, reason: '应回到 join 口令页');
     expect(find.text('解析密保信封'), findsNothing, reason: '不应停留在信封页');
   });
 
@@ -70,13 +80,13 @@ void main() {
     expect(find.byIcon(Icons.mail_outline), findsOneWidget, reason: '口令页应仍可再切回信封');
   });
 
-  testWidgets('信封页「上一步」可点：回到验证邀请码页', (WidgetTester tester) async {
+  testWidgets('信封页「上一步」可点：回到 join 口令页', (WidgetTester tester) async {
     await pumpToEnvelope(tester, kp: kp);
-    // 信封页「上一步」不应禁用：点击回到前面的邀请码页（join 步骤 2，与口令位同位置）
+    // 信封页「上一步」不应禁用：点击回到 join 口令页（步骤 3，信封入口所在位置）
     await tester.tap(find.text('上一步'));
     await tester.pumpAndSettle();
-    expect(find.text('验证邀请码'), findsOneWidget, reason: '上一步应回到邀请码页（验证邀请码标题）');
-    expect(find.byType(TextField), findsOneWidget, reason: '邀请码输入框应可见');
+    expect(find.text('验证密保口令'), findsOneWidget, reason: '上一步应回到 join 口令页（验证密保口令标题）');
+    expect(find.byType(TextField), findsOneWidget, reason: '口令输入框应可见');
     expect(find.text('解析密保信封'), findsNothing, reason: '不应停留在信封页');
   });
 }

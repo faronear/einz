@@ -89,6 +89,80 @@ class ApiClient {
     return EnrollResult.fromJson(res);
   }
 
+  /// Multiverse：join token 轻量校验（不消费），返回空间公开信息供确认
+  /// （POST /spaces/join/preflight，PROTOCOL_MULTIVERSE.md §5——App 向导
+  /// 第一步 fail-fast：无效/过期/已用/已满在此拦截）。
+  Future<SpaceJoinPreflight> preflightJoin(String token) async {
+    final res = await _post(
+      Api.spaceJoinPreflight,
+      {'token': token},
+      withToken: false,
+    );
+    return SpaceJoinPreflight.fromJson(res);
+  }
+
+  /// Multiverse：加入空间（POST /spaces/join——设备登记 + session 签发，绑定该
+  /// Space，PROTOCOL_MULTIVERSE.md §4.1）。
+  Future<SpaceJoinResult> joinSpace({
+    required String token,
+    required String publicKey,
+    String? deviceName,
+    String? displayName,
+    String? gender,
+  }) async {
+    final res = await _post(
+      Api.spaceJoin,
+      {
+        'token': token,
+        'public_key': publicKey,
+        if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
+        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
+      },
+      withToken: false,
+    );
+    return SpaceJoinResult.fromJson(res);
+  }
+
+  /// Multiverse：创建空间（POST /spaces——创建者设备登记 + session + 首个
+  /// join token，PROTOCOL_MULTIVERSE.md §4.1）。
+  Future<SpaceCreateResult> createSpace({
+    String? spaceId,
+    String? displayName,
+    BackupFile? sealedSpaceKey,
+    String? escrowPassphrase,
+    String? publicKey,
+    String? deviceName,
+  }) async {
+    final res = await _post(
+      Api.spaces,
+      {
+        if (spaceId != null && spaceId.isNotEmpty) 'space_id': spaceId,
+        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (sealedSpaceKey != null) 'sealed_space_key': sealedSpaceKey.toJson(),
+        if (escrowPassphrase != null && escrowPassphrase.isNotEmpty)
+          'escrow_passphrase': escrowPassphrase,
+        if (publicKey != null && publicKey.isNotEmpty) 'public_key': publicKey,
+        if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
+      },
+      withToken: false,
+    );
+    return SpaceCreateResult.fromJson(res);
+  }
+
+  /// Multiverse：按空间口令取回 Space Key 密封包（POST /spaces/{id}/key-escrow，
+  /// 口令正确才返回，PROTOCOL_MULTIVERSE.md §4.2——join 方取钥，不撤销设备）。
+  Future<BackupFile?> fetchSpaceEscrow(String spaceId, String passphrase) async {
+    final res = await _post(
+      '/spaces/$spaceId/key-escrow',
+      {'passphrase': passphrase},
+      withToken: false,
+    );
+    final pkg = res['package'] as Map<String, dynamic>?;
+    if (pkg == null) return null;
+    return BackupFile.fromJson(pkg);
+  }
+
   /// 生成邀请码（POST /invites，需认证 token）：person_id 为规范 id（personA/personB）。
   Future<InviteResult> createInvite({
     required String token,

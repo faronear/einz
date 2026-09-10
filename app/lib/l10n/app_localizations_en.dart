@@ -210,6 +210,65 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get setupEntryTitle => 'Get started with Einz';
+
+  @override
+  String get setupEntryHint =>
+      'Create a private space for two, or join via an invite link';
+
+  @override
+  String get setupEntryCreate => 'Create a private space';
+
+  @override
+  String get setupEntryJoin => 'Join with an invite link or code';
+
+  @override
+  String get setupEntryLegacyServer => 'Server version too old, please upgrade';
+
+  @override
+  String get setupTokenTitle => 'Enter invite link';
+
+  @override
+  String get setupTokenHint =>
+      'Ask the creator for a one-time invite link or code';
+
+  @override
+  String get setupTokenInputHint => 'Paste the invite link or code';
+
+  @override
+  String get setupTokenNeedInput => 'Enter the invite link or code';
+
+  @override
+  String get setupTokenInvalid => 'Invalid invite link';
+
+  @override
+  String get setupTokenExpired => 'Invite link expired';
+
+  @override
+  String get setupTokenUsed => 'Invite link already used';
+
+  @override
+  String get setupTokenSpaceFull => 'Space is full';
+
+  @override
+  String setupTokenSpaceInfo(String name) {
+    return 'Join $name\'s space';
+  }
+
+  @override
+  String get setupTokenSpacePrivate =>
+      'Join a private space (waiting for the second member)';
+
+  @override
+  String get setupCreateShareTitle => 'Invite your partner (valid for 24h)';
+
+  @override
+  String get setupCreateCopy => 'Copy invite link';
+
+  @override
+  String get setupCreateCopied => 'Copied';
+
+  @override
   String get setupPageInitFailed => 'Initialization failed, retrying…';
 
   @override

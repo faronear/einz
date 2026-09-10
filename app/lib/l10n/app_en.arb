@@ -70,6 +70,29 @@
       "error": {"type": "String"}
     }
   },
+  "setupEntryTitle": "Get started with Einz",
+  "setupEntryHint": "Create a private space for two, or join via an invite link",
+  "setupEntryCreate": "Create a private space",
+  "setupEntryJoin": "Join with an invite link or code",
+  "setupEntryLegacyServer": "Server version too old, please upgrade",
+  "setupTokenTitle": "Enter invite link",
+  "setupTokenHint": "Ask the creator for a one-time invite link or code",
+  "setupTokenInputHint": "Paste the invite link or code",
+  "setupTokenNeedInput": "Enter the invite link or code",
+  "setupTokenInvalid": "Invalid invite link",
+  "setupTokenExpired": "Invite link expired",
+  "setupTokenUsed": "Invite link already used",
+  "setupTokenSpaceFull": "Space is full",
+  "setupTokenSpaceInfo": "Join {name}'s space",
+  "@setupTokenSpaceInfo": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "setupTokenSpacePrivate": "Join a private space (waiting for the second member)",
+  "setupCreateShareTitle": "Invite your partner (valid for 24h)",
+  "setupCreateCopy": "Copy invite link",
+  "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",
   "@setupPageInitFailed": {
     "description": "Friendly message when startup initialization (local database / server probe) fails — hides technical details (e.g. SqliteException), auto-retrying"

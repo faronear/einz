@@ -70,6 +70,29 @@
       "error": {"type": "String"}
     }
   },
+  "setupEntryTitle": "开始使用 Einz",
+  "setupEntryHint": "创建只有两个人的私密空间，或通过邀请链接加入",
+  "setupEntryCreate": "新建私密空间",
+  "setupEntryJoin": "输入邀请链接或代码加入",
+  "setupEntryLegacyServer": "服务器版本过低，请升级后再使用",
+  "setupTokenTitle": "输入邀请链接",
+  "setupTokenHint": "向创建者索取一次性邀请链接或代码",
+  "setupTokenInputHint": "粘贴邀请链接或代码",
+  "setupTokenNeedInput": "请输入邀请链接或代码",
+  "setupTokenInvalid": "邀请链接无效",
+  "setupTokenExpired": "邀请链接已过期",
+  "setupTokenUsed": "邀请链接已被使用",
+  "setupTokenSpaceFull": "空间已满",
+  "setupTokenSpaceInfo": "加入 {name} 的空间",
+  "@setupTokenSpaceInfo": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "setupTokenSpacePrivate": "加入私密空间（等待第二位成员）",
+  "setupCreateShareTitle": "邀请对方加入（24 小时内有效）",
+  "setupCreateCopy": "复制邀请链接",
+  "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
   "@setupPageInitFailed": {
     "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示——不展示技术细节（如 SqliteException），自动重试中"

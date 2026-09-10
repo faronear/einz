@@ -31,15 +31,36 @@ enum _WizardRole { create, join, offline }
 /// - offline：密保信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
 /// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
 class SetupPage extends StatefulWidget {
-  const SetupPage({super.key, this.db, this.probeServer, this.enrollOverride, this.createInviteOverride, this.authOverride, this.keyPairOverride, this.escrowOverride});
+  const SetupPage({
+    super.key,
+    this.db,
+    this.probeServer,
+    this.preflightOverride,
+    this.joinOverride,
+    this.createOverride,
+    this.enrollOverride,
+    this.createInviteOverride,
+    this.authOverride,
+    this.keyPairOverride,
+    this.escrowOverride,
+  });
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
 
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 ServerSettings.probe。
-  /// 返回 (能连, person 名称表, person 性别表)——名称表空=首设备（create），
-  /// 非空=后续设备（join）；性别表供 join 身份卡配色（男蓝/女粉）。
-  final Future<(bool, Map<String, String>, Map<String, String>)> Function(String server)? probeServer;
+  /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 person 表，
+  /// 角色改由空间入口页让用户选择。
+  final Future<(bool, String, List<String>)> Function(String server)? probeServer;
+
+  /// Multiverse join preflight 注入（测试用；默认真实 ApiClient.preflightJoin）。
+  final Future<SpaceJoinPreflight> Function(String token)? preflightOverride;
+
+  /// Multiverse join 提交注入（测试用；默认真实 ApiClient.joinSpace）。
+  final Future<SpaceJoinResult> Function(String token)? joinOverride;
+
+  /// Multiverse create 提交注入（测试用；默认真实 ApiClient.createSpace）。
+  final Future<SpaceCreateResult> Function()? createOverride;
 
   /// 测试注入：登记设备（生产走真实 ApiClient.enrollDevice；注入后不发起网络请求）。
   final Future<EnrollResult> Function(String? inviteCode)? enrollOverride;
@@ -65,9 +86,7 @@ class SetupPage extends StatefulWidget {
 class _SetupPageState extends State<SetupPage> {
   String? _autoDeviceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
   final _personName = TextEditingController(); // 首设备：第一个用户的名字
-  final _peerNameCtrl = TextEditingController(); // create：对方（伴侣）的名字（必填）
   String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 person_name 同步服务端）
-  String? _peerGender; // create 步骤 2：伴侣性别（'male'/'female'）
   String? _genderError; // 性别未选提醒（红字显示在选项卡下方；选中即清除）
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
@@ -77,10 +96,16 @@ class _SetupPageState extends State<SetupPage> {
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户确认"不设置锁屏码"：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
+  // Multiverse join：preflight 验证通过的 token 与空间确认信息（token 页显示）
+  String _joinToken = '';
+  String? _joinSpaceName;
+  String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
 
   // 服务器地址：默认 einz.tic.cc；探测失败由自动重试兜底（启动屏不展示输入框）
   String _server = kEinzServer;
   bool _probeFailed = false;
+  bool _probeDone = false; // 探测已成功（区分"探测中"与"已就绪"——入口页显示条件）
+  bool _legacyServer = false; // Multiverse：服务器协议版本不支持 spaces（旧 v1 服务器）
   Timer? _probeRetryTimer; // 探测失败后的自动重试定时器（连上即停止并自动进入）
 
   // 向导状态：角色分流 + 步骤索引 + 跨步骤共享数据
@@ -90,21 +115,9 @@ class _SetupPageState extends State<SetupPage> {
   Uint8List? _spaceKey;
   String? _sessionToken;
   int _joinKeyVersion = 1; // join 口令验证时记录的 Space Key 版本（_verifyJoinPassphrase 填充）
-  String _myDeviceName = ''; // 登记时的设备名（进聊天页显示/修改用）
   String? _status; // 后台报告的错误提示（红字，显示在底部按钮下方）
   String? _localError; // 本地校验错误提示（红字，显示在输入框下方）
   bool _busy = false;
-
-  /// 探测到的 person 名称表（服务端 /health 返回）：
-  /// 空 = 服务器还没有任何用户（首设备场景）；非空 = 已有用户（后续设备场景）。
-  Map<String, String> _personNames = <String, String>{};
-
-  /// 探测到的 person 性别表（服务端 /health 返回 person_genders）：
-  /// 空 = 服务器尚未登记性别；join 身份卡按性别配色（男蓝/女粉，同性别同色）。
-  Map<String, String> _personGenders = <String, String>{};
-
-  /// 后续设备引导中选择的身份（personA/personB；null = 首设备自举或未选）。
-  String? _chosenPerson;
 
   /// 进入密保信封页（offline）前的角色：切回口令页时恢复来源
   /// （create 回步骤 2 / join 回步骤 3），实现口令⇄信封自由互切。
@@ -120,7 +133,6 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     _personName.dispose();
-    _peerNameCtrl.dispose();
     _spaceId.dispose();
     _envelopeKey.dispose();
     _escrowPassphrase.dispose();
@@ -161,7 +173,9 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 服务器地址初始化：读持久化值（无则默认 einz.tic.cc）→ 快速探测。
-  /// 能连 → 按 person 名称表自动判定角色（空=首设备 create，非空=后续设备 join）；
+  /// Multiverse：探测成功不再按 /health person 表自动判定 create/join——停留
+  /// 在空间入口页由用户选择（新建空间 / 输入邀请链接加入）；旧服务器
+  /// （protocol_version 非 multiverse）标记 _legacyServer 提示升级。
   /// 无法连接 → 显示输入框引导覆盖（降低小白负担）。
   Future<void> _initServer() async {
     try {
@@ -169,16 +183,15 @@ class _SetupPageState extends State<SetupPage> {
       final settings = ServerSettings(db);
       final saved = await settings.load();
       final probe = widget.probeServer ?? ServerSettings.probe;
-      final (ok, names, genders) = await probe(saved);
+      final (ok, pv, caps) = await probe(saved);
       if (!mounted) return;
       setState(() {
         _server = saved;
         _probeFailed = !ok;
-        _personNames = names;
-        _personGenders = genders;
+        _probeDone = ok;
+        _legacyServer = ok && !pv.contains('multiverse');
         if (ok && _role == null) {
-          _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
-          _step = 1;
+          _step = 0; // 入口页（角色由用户选择）
         }
       });
       // 服务端未就绪（probe 正常返回 ok=false，不抛异常）：启动自动重试，
@@ -209,19 +222,16 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _reprobe() async {
     if (_busy || !mounted) return;
     final probe = widget.probeServer ?? ServerSettings.probe;
-    final (ok, names, genders) = await probe(_server);
+    final (ok, pv, caps) = await probe(_server);
     if (!mounted) return;
     if (ok) {
       _probeRetryTimer?.cancel();
       _probeRetryTimer = null;
       setState(() {
         _probeFailed = false;
-        _personNames = names;
-        _personGenders = genders;
-        if (_role == null) {
-          _role = names.isEmpty ? _WizardRole.create : _WizardRole.join;
-          _step = 1;
-        }
+        _probeDone = true;
+        _legacyServer = !pv.contains('multiverse');
+        if (_role == null) _step = 0; // 入口页（角色由用户选择）
       });
     }
     // 失败：保持失败提示，等待下一轮重试（不 setState，避免每 4 秒重建一次）
@@ -234,9 +244,11 @@ class _SetupPageState extends State<SetupPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    // 角色未判定（正在检测服务器状态）：品牌启动屏——全屏粉蓝渐变 + 上半部
-    // 旋转 Logo（无文字）；无 AppBar/菜单/服务器输入框（老板决策 2026-09-08）。
-    if (_role == null) return _buildSplashScreen();
+    // 探测中/失败（角色未判定）→ 品牌启动屏——全屏粉蓝渐变 + 上半部旋转 Logo
+    // （无文字）；无 AppBar/菜单/服务器输入框（老板决策 2026-09-08）。
+    // 探测成功但角色未选（Multiverse 入口页）不在此列——走下方 Scaffold，
+    // 由 _buildStep 显示空间入口页（新建/加入选择）。
+    if (_role == null && !_probeDone) return _buildSplashScreen();
     return Scaffold(
       // AppBar 透明并浮在渐变上：body 渐变容器延伸到屏幕顶部（含 AppBar 与
       // 状态栏区域），整屏共用同一个渐变矩形——修复之前 AppBar flexibleSpace
@@ -378,10 +390,10 @@ class _SetupPageState extends State<SetupPage> {
                 ),
                 const SizedBox(height: 8),
                 // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
-                // 此时也有"下一步"可回到步骤 1，杜绝无路可走）
-                // join 步骤 1（身份选择）例外：点卡片即自动前进，整行按钮隐藏
-                // （不显示误配的"下一步/完成"，避免与自动前进语义冲突）
-                if (_role != null && !(_role == _WizardRole.join && _step == 1))
+                // 此时也有"下一步"可回到步骤 1，杜绝无路可走）。
+                // Multiverse join 步骤 1（token 页）也显示"下一步"——触发 preflight
+                // 校验（v1 身份卡点击自动前进的例外已随身份页删除而移除）。
+                if (_role != null)
                   Row(
                     children: [
                       // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）；
@@ -400,8 +412,7 @@ class _SetupPageState extends State<SetupPage> {
                       const Spacer(),
                       // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
                       // 完成页（_step == _stepCount）显示"完成"。
-                      // join 步骤 1（身份选择）例外：点卡片即自动前进，无需"下一步"。
-                      if (_step < _stepCount && !(_role == _WizardRole.join && _step == 1))
+                      if (_step < _stepCount)
                         FilledButton(
                             onPressed: _nextStep, child: Text(l10n.wizardNext))
                       else
@@ -483,23 +494,6 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// join 步骤 1：选择身份（personA=创建者 / personB=伴侣），点击卡片先播放
-  /// 选中动画（放大+横向扩展覆盖另一张卡，450ms 与卡片渐变同长）再进邀请码页
-  /// （不再需要「下一步」按钮）。
-  void _selectIdentity(String person) {
-    if (_chosenPerson != null) return; // 动画播放中/已选：防重复触发
-    setState(() {
-      _chosenPerson = person;
-      _status = null;
-      _localError = null;
-      _genderError = null;
-    });
-    Future<void>.delayed(const Duration(milliseconds: 450), () {
-      if (!mounted || _chosenPerson != person) return;
-      setState(() => _step = 2); // 动画结束后自动进邀请码页
-    });
-  }
-
   Future<void> _nextStep() async {
     final l10n = AppLocalizations.of(context)!;
     // 每轮「下一步」：先把所有红字清空，再统一检查当前页所有输入元素——名字/性别
@@ -516,8 +510,9 @@ class _SetupPageState extends State<SetupPage> {
     String? localError;
     String? genderError;
     var invalid = false;
-    // create 步骤 1/2（本人/对方）：名字与性别都必填，各自提示
-    if (_role == _WizardRole.create && _step == 1) {
+    // 身份页（create 步骤 1 / join 步骤 2 共用的名字+性别页）：名字与性别都必填
+    if ((_role == _WizardRole.create && _step == 1) ||
+        (_role == _WizardRole.join && _step == 2)) {
       if (_personName.text.trim().isEmpty) {
         localError = l10n.wizardNameRequired;
         invalid = true;
@@ -527,32 +522,15 @@ class _SetupPageState extends State<SetupPage> {
         invalid = true;
       }
     }
-    if (_role == _WizardRole.create && _step == 2) {
-      if (_peerNameCtrl.text.trim().isEmpty) {
-        localError = l10n.wizardPeerNameRequired;
+    if ((_role == _WizardRole.create && _step == 2) ||
+        (_role == _WizardRole.join && _step == 3)) {
+      if (_escrowPassphrase.text.trim().isEmpty) {
+        // 两套错误提示：首设备「必须设置」/ 后续设备「验证」语气（老板要求）
+        localError = _role == _WizardRole.join
+            ? l10n.wizardJoinPassphraseRequired
+            : l10n.setupPageNeedPassphrase;
         invalid = true;
       }
-      if (_peerGender == null) {
-        genderError = l10n.wizardGenderRequired;
-        invalid = true;
-      }
-    }
-    if (_role == _WizardRole.join && _step == 1 && _chosenPerson == null) {
-      localError = l10n.wizardIdentityFirst;
-      invalid = true;
-    }
-    if (_role == _WizardRole.join && _step == 2 && _inviteCode.text.trim().isEmpty) {
-      localError = l10n.setupPageNeedInvite;
-      invalid = true;
-    }
-    if ((_role == _WizardRole.create || _role == _WizardRole.join) &&
-        _step == 3 &&
-        _escrowPassphrase.text.trim().isEmpty) {
-      // 两套错误提示：首设备「必须设置」/ 后续设备「验证」语气（老板要求）
-      localError = _role == _WizardRole.join
-          ? l10n.wizardJoinPassphraseRequired
-          : l10n.setupPageNeedPassphrase;
-      invalid = true;
     }
     if (_role == _WizardRole.offline && _step == 1 && _envelopeKey.text.trim().isEmpty) {
       localError = l10n.setupPagePasteEnvelope;
@@ -566,12 +544,18 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     // ---- 后台即时校验（失败停留本页；错误走 _status 红字） ----
-    // join 邀请码页（步骤 2）：邀请码必须有效（服务端登记成功）才放行——
-    // 与口令页一样即时验证，不留到口令页才登记/校验
-    if (_role == _WizardRole.join && _step == 2) {
-      final ok = await _verifyInviteCode();
-      if (!mounted) return;
-      if (!ok) return;
+    // Multiverse join 第一步（token 页）：token 必须有效（preflight 不消费）
+    // 才放行——与口令页一样即时验证，不留到提交才校验。首次校验通过后
+    // 停留 token 页显示空间确认卡片（让用户看清加入哪个空间），
+    // 再次点「下一步」才放行到名字页。
+    if (_role == _WizardRole.join && _step == 1) {
+      if (_joinToken.isEmpty) {
+        final ok = await _verifyJoinToken();
+        if (!mounted) return;
+        if (!ok) return;
+        setState(() {}); // 卡片已显示（_joinToken 已设）；停留本页等用户确认空间
+        return;
+      }
     }
     // join 口令页（步骤 3）：输入口令必须与首台设备创建时一致（解密 escrow
     // 口令密保箱成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
@@ -580,13 +564,12 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (!verified) return;
     }
-    // offline 信封页（步骤 1）「下一步」= 回到前面的邀请码页（join 步骤 2）：
-    // 进入信封页前必为 join（入口仅在 join 口令页显示）；回邀请码页重走登记，
-    // 信封⇄口令互切仍由页内「改用线上密保口令」承担（老板要求 2026-09-09）
+    // offline 信封页（步骤 1）「下一步」= 回到 join 口令页（步骤 3，信封入口
+    // 所在位置）：信封⇄口令互切仍由页内「改用线上密保口令」承担（老板要求 2026-09-09）
     if (_role == _WizardRole.offline && _step == 1) {
       setState(() {
         _role = _preEnvelopeRole;
-        _step = 2; // join 邀请码页
+        _step = 3; // join 口令页
         _status = null;
         _localError = null;
       });
@@ -594,7 +577,7 @@ class _SetupPageState extends State<SetupPage> {
     }
     // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
     // 有效 PIN → 设锁后推进；两空 → 弹窗确认"不设置锁屏码"；其余 → 输入框下方红色提示。
-    final isPinStep = (_role == _WizardRole.create && _step == 4) ||
+    final isPinStep = (_role == _WizardRole.create && _step == 3) ||
         (_role == _WizardRole.join && _step == 4) ||
         (_role == _WizardRole.offline && _step == 2);
     if (isPinStep) {
@@ -655,12 +638,12 @@ class _SetupPageState extends State<SetupPage> {
 
   void _backStep() {
     setState(() {
-      // 信封页（offline 步骤 1）「上一步」：回到前面的邀请码页（join 步骤 2）——
-      // 信封是口令的平行替代（同处口令位），回退语义等同从口令页上一步
-      // （老板要求 2026-09-09：信封页的上一步也要能点）
+      // 信封页（offline 步骤 1）「上一步」：回到 join 口令页（步骤 3，信封入口
+      // 所在位置）——信封是口令的平行替代（同处口令位），与「下一步」回退
+      // 语义一致（老板要求 2026-09-09：信封页的上一步也要能点）
       if (_role == _WizardRole.offline && _step == 1) {
         _role = _preEnvelopeRole; // 进入信封页前必为 join
-        _step = 2; // join 邀请码页
+        _step = 3; // join 口令页
         _localError = null;
         _status = null;
         return;
@@ -668,9 +651,6 @@ class _SetupPageState extends State<SetupPage> {
       // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密保信封）；
       // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
       if (_step > 1) _step--;
-      // 回到身份选择页（join 步骤 1）时清除已选身份——否则 _selectIdentity 的
-      // 防重复保护会拦截后续点击，点卡不再前进（老板实测 2026-09-09）
-      if (_role == _WizardRole.join && _step == 1) _chosenPerson = null;
       _localError = null;
       _status = null;
     });
@@ -721,17 +701,18 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 按角色+步骤分发到对应步骤页。
   Widget _buildStep() {
-    if (_role == null || _step == 0) return _buildDetectAndEnvelope();
+    if (_role == null || _step == 0) {
+      // Multiverse：探测成功后（角色未选）显示空间入口页；探测中/失败显示启动屏
+      return (_probeDone && !_probeFailed) ? _buildStepEntry() : _buildDetectAndEnvelope();
+    }
     switch (_role!) {
       case _WizardRole.create:
         switch (_step) {
           case 1:
             return _buildStepName();
           case 2:
-            return _buildStepPeerName();
-          case 3:
             return _buildStepPassphrase();
-          case 4:
+          case 3:
             return _buildStepPin();
           default:
             return _buildStepDone();
@@ -739,9 +720,9 @@ class _SetupPageState extends State<SetupPage> {
       case _WizardRole.join:
         switch (_step) {
           case 1:
-            return _buildStepIdentity();
+            return _buildStepJoinToken();
           case 2:
-            return _buildStepInvite();
+            return _buildStepName();
           case 3:
             return _buildStepPassphrase();
           case 4:
@@ -759,6 +740,54 @@ class _SetupPageState extends State<SetupPage> {
             return _buildStepDone();
         }
     }
+  }
+
+  /// 空间入口页（Multiverse：探测成功且角色未选时的第一页，老板 2026-09-10
+  /// 确认）：「新建私密空间」/「输入邀请链接或 token 加入现有空间」；
+  /// 旧服务器（不支持 spaces）顶部显示升级提示。
+  Widget _buildStepEntry() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_legacyServer)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFE8E8),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              l10n.setupEntryLegacyServer,
+              style: const TextStyle(color: Color(0xFFB3261E), fontSize: 13),
+            ),
+          ),
+        _stepHeader(l10n.setupEntryTitle, l10n.setupEntryHint),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () => setState(() {
+            _role = _WizardRole.create;
+            _step = 1;
+          }),
+          icon: const Icon(Icons.add_circle_outline),
+          label: Text(l10n.setupEntryCreate),
+          style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16)),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () => setState(() {
+            _role = _WizardRole.join;
+            _step = 1;
+          }),
+          icon: const Icon(Icons.login),
+          label: Text(l10n.setupEntryJoin),
+          style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16)),
+        ),
+      ],
+    );
   }
 
   /// 启动屏（角色未判定时的检测页）：全屏粉蓝品牌渐变 + 上半部旋转 Logo。
@@ -909,36 +938,6 @@ class _SetupPageState extends State<SetupPage> {
     return name;
   }
 
-  /// 登记设备：create=首设备免邀请码自举；join/offline=凭一次性邀请码。
-  /// 成功 → 记录 [_enroll]（真实 deviceId/personId/spaceId）并同步 spaceId。
-  Future<void> _enrollDevice(String? inviteCode) async {
-    final kp = _keyPair;
-    if (kp == null) return;
-    final r = widget.enrollOverride != null
-        ? await widget.enrollOverride!(inviteCode)
-        : await ApiClient(_server).enrollDevice(
-            deviceId: null, // 服务端分配规范 id（dev1/dev2…），以登记返回为准
-            publicKey: kp.publicKeyB64,
-            inviteCode: inviteCode,
-            personName: _personName.text.trim(), // 首设备：第一个用户的名字；后续设备按需
-            partnerName: _peerNameCtrl.text.trim(), // create：对方（伴侣）的名字（必填）；join 时为空被服务端忽略
-            personId: _chosenPerson, // join：用户选择的身份（personA/personB）
-            personGender: _myGender, // create 步骤 1：我的性别（male/female）；join 时为空被服务端忽略
-            partnerGender: _peerGender, // create 步骤 2：伴侣性别（male/female）
-            // 自动填设备型号（产品决定：不再询问）；同步保存供进聊天页显示/修改。
-            // 只在真实登记分支计算（测试注入 enrollOverride 时不调 device_info）
-            deviceName: (_myDeviceName = await _autoDeviceName()),
-          );
-    if (!mounted) return;
-    setState(() {
-      _enroll = r;
-      _spaceId.text = r.spaceId;
-      _bootstrapFailed = false;
-    });
-    // 顶部状态通知：新设备已绑定到私密领地（老板要求——enroll 成功后显示）
-    showTopNotice(context, AppLocalizations.of(context)!.setupEnrollBoundNotice);
-  }
-
   /// 设置启动锁：内嵌表单直接执行（不再弹窗、无恢复码）——
   /// 校验 PIN 两次一致 → AppLockService.setPin 加密 Space Key 包 → 返回是否完成。
   /// （口令托管上传已与 PIN 解耦：由各 _run* 在设锁/跳过之前统一上传，见 _runPinSetup）
@@ -984,23 +983,6 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 口令加密 Space Key 包并上传托管（Server 只存密文；失败静默，不阻塞进入聊天）。
-  Future<void> _uploadEscrow(String passphrase, AppLockPayload payload) async {
-    try {
-      final api = ApiClient(payload.server);
-      final escrow = KeyEscrowService(api);
-      await escrow.upload(
-        passphrase: passphrase,
-        spaceKeyB64: payload.spaceKeyB64,
-        spaceId: payload.spaceId,
-        keyVersion: payload.keyVersion,
-        token: payload.token ?? '',
-      );
-    } catch (_) {
-      // 托管上传失败不阻塞：下次解锁（_syncEscrow）或 rotate 时会重试
-    }
-  }
-
   /// 完成动作：进入聊天页（create/join/offline 填充数据后统一调用；
   /// deviceId/spaceId 一律用登记后服务端返回的真实值）。
   Future<void> _finish() async {
@@ -1009,25 +991,19 @@ class _SetupPageState extends State<SetupPage> {
     final sk = _spaceKey;
     final token = _sessionToken;
     if (kp == null || enroll == null || sk == null || token == null) return;
+    final deviceName = await _autoDeviceName(); // 设备型号（async 主体内计算，避免在 builder 闭包 await）
     // 名字持久化：PIN 解锁/重启后 ChatPage 恢复显示（AppLockPayload 不含名字）。
     // await 确保 profile 写入完成后再进聊天（消除 unawaited 竞态——2026-09-07
     // 老板实测：设 PIN 重启解锁后顶部条丢名字）
     await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
-      personName: _role == _WizardRole.create
-          ? _personName.text.trim()
-          : (_personNames[_chosenPerson] ?? ''),
-      peerName: _role == _WizardRole.create
-          ? _peerNameCtrl.text.trim()
-          : (_personNames[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
-      deviceName: _myDeviceName,
-      // 本人性别：create=向导所选；join=服务端性别表（与身份卡配色同源）
-      myGender: _role == _WizardRole.create
-          ? (_myGender ?? '')
-          : (_personGenders[_chosenPerson] ?? ''),
-      // 对方性别：create=向导所选伴侣性别；join=另一人（消息气泡配色用）
-      peerGender: _role == _WizardRole.create
-          ? (_peerGender ?? '')
-          : (_personGenders[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
+      personName: _personName.text.trim(),
+      // 对方名字：join=创建者名字（preflight 空间显示名）；create=对方未加入，留空
+      peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : '',
+      deviceName: deviceName,
+      // 本人性别：create/join 均为向导自填（Multiverse：双方各自输入名字/性别）
+      myGender: _myGender ?? '',
+      // 对方性别：无公开渠道（气泡配色回退默认）
+      peerGender: '',
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -1038,14 +1014,11 @@ class _SetupPageState extends State<SetupPage> {
         spaceKey: sk,
         keyVersion: 1,
         token: token,
-        personName: _role == _WizardRole.create
-            ? _personName.text.trim()
-            : (_personNames[_chosenPerson] ?? ''),
+        personName: _personName.text.trim(),
         personId: enroll.personId,
-        peerName: _role == _WizardRole.create
-            ? _peerNameCtrl.text.trim()
-            : (_personNames[_chosenPerson == 'personA' ? 'personB' : 'personA'] ?? ''),
-        deviceName: _myDeviceName,
+        // 对方名字：join=创建者名字（preflight 空间显示名）；create=对方未加入，留空
+        peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : '',
+        deviceName: deviceName,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
@@ -1114,80 +1087,26 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN → 完成 ----
-
-  /// 步骤 1（join）：你是第一个用户（创建者 personA）还是第二个（伴侣 personB）。
-  /// 身份卡片**左右并排**、点卡片即选中（动画后自动进邀请码页）——点击即前进，
-  /// 故无对勾/描边（冗余）；卡片颜色按服务端性别：男蓝/女粉，同性别同色。
-  Widget _buildStepIdentity() {
-    final l10n = AppLocalizations.of(context)!;
-    final aName = _personNames['personA'] ?? '';
-    final bName = _personNames['personB'] ?? '';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _stepHeader(l10n.wizardTitleIdentity, l10n.wizardIdentityHint),
-        _buildCardPair(
-          leftCard: _buildSelectableCard(
-            icon: _identityCardIcon('personA'),
-            label: aName.isEmpty ? l10n.wizardIdentityCreator : aName,
-            color: _identityCardColor('personA'),
-            selected: _chosenPerson == 'personA',
-            alignment: Alignment.centerLeft, // 锚左外缘：选中向右扩展覆盖粉色卡
-            onTap: () => _selectIdentity('personA'),
-          ),
-          rightCard: _buildSelectableCard(
-            icon: _identityCardIcon('personB'),
-            label: bName.isEmpty ? l10n.wizardIdentityPartner : bName,
-            color: _identityCardColor('personB'),
-            selected: _chosenPerson == 'personB',
-            alignment: Alignment.centerRight, // 锚右外缘：选中向左扩展覆盖蓝色卡
-            onTap: () => _selectIdentity('personB'),
-          ),
-          leftSelected: _chosenPerson == 'personA',
-          rightSelected: _chosenPerson == 'personB',
-        ),
-        if (_localError != null) _localErrorHint(_localError!),
-      ],
-    );
-  }
-
-  /// 身份卡片配色：按服务端性别（person_genders）——男天蓝/女品牌粉；
-  /// 性别未知（旧空间未登记）回退默认 personA 蓝 / personB 粉；同性别自然同色。
-  Color _identityCardColor(String personId) {
-    final gender = _personGenders[personId];
-    if (gender == 'female') return const Color(0xFFD6529C); // 品牌粉
-    if (gender == 'male') return const Color(0xFF3BAFFD); // 品牌天蓝
-    return personId == 'personA' ? const Color(0xFF3BAFFD) : const Color(0xFFD6529C);
-  }
-
-  /// 身份卡片头像图标：按服务端性别——男 ♂ / 女 ♀（与卡片配色同源，不再用
-  /// 角色小人图标）；性别未知回退 personA ♂ / personB ♀（老板要求 2026-09-09）。
-  IconData _identityCardIcon(String personId) {
-    final gender = _personGenders[personId];
-    if (gender == 'female') return Icons.female;
-    if (gender == 'male') return Icons.male;
-    return personId == 'personA' ? Icons.male : Icons.female;
-  }
-
-  /// 步骤 3（join）：输入一次性邀请码（创建者 /invite 生成，24h 有效）。
-  Widget _buildStepInvite() {
+  /// 步骤 1（join，Multiverse）：输入邀请链接或 token（粘贴/扫码）。
+  /// 验证通过（preflight 不消费）后显示空间确认卡片（空间名 + 等待状态——
+  /// 老板 2026-09-10 确认的流程第①/②步）。
+  Widget _buildStepJoinToken() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _stepHeader(l10n.wizardTitleInvite, l10n.wizardInviteHint),
+        _stepHeader(l10n.setupTokenTitle, l10n.setupTokenHint),
         TextField(
           controller: _inviteCode,
           style: const TextStyle(fontSize: 20),
-          // 开始填写即清除「邀请码为空」红字（不依赖再点下一步）
+          // 开始填写即清除红字（不依赖再点下一步）
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
           },
           decoration: InputDecoration(
-            hintText: l10n.setupPageInviteHint,
+            hintText: l10n.setupTokenInputHint,
             border: const OutlineInputBorder(),
-            // 扫码填入邀请码（老板要求 2026-09-10）：扫中后自动填入并自动下一步
+            // 扫码填入邀请链接/token（扫中后自动填入并自动下一步验证）
             suffixIcon: IconButton(
               icon: const Icon(Icons.qr_code_scanner),
               tooltip: l10n.setupPageScanInvite,
@@ -1196,8 +1115,89 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
+        // 空间确认反馈（preflight 通过后显示）：空间名 + 等待状态
+        if (_joinToken.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF4FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF3BAFFD)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.verified_user, color: Color(0xFF2271F7)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _joinSpaceName == null || _joinSpaceName!.isEmpty
+                        ? l10n.setupTokenSpacePrivate
+                        : l10n.setupTokenSpaceInfo(_joinSpaceName!),
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
+  }
+
+  /// join 第一步 token 校验：POST /spaces/join/preflight（不消费 token）。
+  /// 成功 → 记录空间信息（空间确认反馈）并放行；失败 → 错误码映射红字
+  /// （TOKEN_INVALID/EXPIRED/USED/SPACE_FULL，PROTOCOL_MULTIVERSE.md §6），停留本页。
+  Future<bool> _verifyJoinToken() async {
+    final raw = _inviteCode.text.trim();
+    if (raw.isEmpty) {
+      setState(() => _localError = AppLocalizations.of(context)!.setupTokenNeedInput);
+      return false;
+    }
+    // 兼容完整邀请链接：https://einz.tic.cc/join/<token> → 提取 token
+    final token = raw.contains('/join/') ? raw.split('/join/').last.trim() : raw;
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    try {
+      final pre = await (widget.preflightOverride?.call(token) ??
+          ApiClient(_server).preflightJoin(token));
+      if (!mounted) return false;
+      setState(() {
+        _joinToken = token;
+        _joinSpaceName = pre.displayName;
+        _localError = null;
+      });
+      return true;
+    } on ApiException catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        _joinToken = '';
+        _localError = _tokenErrorText(e.code);
+      });
+      return false;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() => _status = AppLocalizations.of(context)!.setupPageInitFailed);
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 错误码 → 中文提示（PROTOCOL_MULTIVERSE.md §6 错误码表）。
+  String _tokenErrorText(String code) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (code) {
+      case 'TOKEN_EXPIRED':
+        return l10n.setupTokenExpired;
+      case 'TOKEN_USED':
+        return l10n.setupTokenUsed;
+      case 'SPACE_FULL':
+        return l10n.setupTokenSpaceFull;
+      default:
+        return l10n.setupTokenInvalid;
+    }
   }
 
   /// 邀请码页扫码入口（老板要求 2026-09-10）：扫码后自动填入邀请码并自动
@@ -1212,8 +1212,21 @@ class _SetupPageState extends State<SetupPage> {
     await _nextStep();
   }
 
-  /// create：首设备自举登记（免邀请码）。服务器已有空间（他人创建）时
-  /// 服务端拒绝自举 → 提示改用"加入"向导。
+  /// 客户端生成 space_id（UUIDv4，协议 §3.4：space_id/space_key 由客户端生成——
+  /// 口令密封包内容需含 space_id）。
+  String _newSpaceId() {
+    final r = Random.secure();
+    final b = List<int>.generate(16, (_) => r.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40; // version 4
+    b[8] = (b[8] & 0x3f) | 0x80; // variant 10xx
+    final hex = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  /// create：Multiverse 创建空间（POST /spaces：创建者登记 + session + 首个
+  /// join token 一并返回）。Space Key 由客户端生成，用口令加密成 sealed 包
+  /// 随创建提交（服务端只存密文）；创建者可立即进聊天。
   Future<void> _runBootstrap() async {
     if (_busy) return;
     setState(() {
@@ -1221,8 +1234,38 @@ class _SetupPageState extends State<SetupPage> {
       _status = null;
     });
     try {
-      await _enrollDevice(null);
+      final kp = _keyPair;
+      if (kp == null) return;
+      // 客户端生成 space_id + Space Key（协议 §3.4）
+      final spaceId = _newSpaceId();
+      _spaceKey ??= Uint8List.fromList(List.generate(32, (_) => Random.secure().nextInt(256)));
+      final api = ApiClient(_server);
+      final passphrase = _escrowPassphrase.text.trim();
+      final sealed = passphrase.isEmpty
+          ? null
+          : await KeyEscrowService(api).createPackage(
+              passphrase: passphrase,
+              spaceKeyB64: base64Encode(_spaceKey!),
+              spaceId: spaceId,
+              keyVersion: 1,
+            );
+      final created = await (widget.createOverride?.call() ??
+          api.createSpace(
+            spaceId: spaceId,
+            displayName: _personName.text.trim(),
+            sealedSpaceKey: sealed,
+            escrowPassphrase: passphrase.isEmpty ? null : passphrase,
+            publicKey: kp.publicKeyB64,
+            deviceName: await _autoDeviceName(),
+          ));
       if (!mounted) return;
+      _sessionToken = created.sessionToken;
+      _enroll = EnrollResult(
+        deviceId: created.deviceId,
+        personId: created.creatorPersonId,
+        spaceId: created.spaceId,
+      );
+      _createLink = created.link; // 完成页展示空间邀请链接
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1235,43 +1278,6 @@ class _SetupPageState extends State<SetupPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  /// 设置接入口令（create=步骤2 / join=步骤3；对方凭它加入）。
-  /// create 步骤 2：对方（伴侣）的名字（必填——不允许空白跳过）。
-  Widget _buildStepPeerName() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _stepHeader(l10n.wizardTitlePeerName, l10n.wizardPeerNameHint),
-        TextField(
-          controller: _peerNameCtrl,
-          style: const TextStyle(fontSize: 20),
-          // 开始填写即清除「伴侣名字为空」红字（不依赖再点下一步）
-          onChanged: (_) {
-            if (_localError != null) setState(() => _localError = null);
-          },
-          decoration: InputDecoration(
-            hintText: l10n.wizardPeerNameHintInput,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        if (_localError != null) _localErrorHint(_localError!),
-        const SizedBox(height: 20),
-        _buildGenderSelector(
-          selected: _peerGender,
-          label: l10n.wizardPeerGenderLabel,
-          maleLabel: l10n.wizardGenderMale,
-          femaleLabel: l10n.wizardGenderFemale,
-          onChanged: (g) => setState(() {
-            _peerGender = g;
-            _genderError = null; // 选中即清除未选提醒
-          }),
-        ),
-        if (_genderError != null) _localErrorHint(_genderError!), // 性别必选：未选红字提醒
-      ],
-    );
   }
 
   /// 性别选择：左蓝（男）/右粉（女）两个卡片，与品牌色一致；选中者放大 +
@@ -1516,20 +1522,9 @@ class _SetupPageState extends State<SetupPage> {
         token = session.sessionToken;
         _sessionToken = token;
       }
-      // 3) 口令托管上传（与 PIN 无关：设锁或跳过都必须传，否则同伴无法凭口令加入）
+      // 3) 口令（Multiverse：sealed 包已随 POST /spaces 提交，无需再上传托管；
+      // 口令仅用于 AppLockPayload 持久化）
       final pass = _escrowPassphrase.text.trim();
-      if (pass.isNotEmpty) {
-        final escrowPayload = AppLockPayload(
-          server: _server,
-          spaceId: _spaceId.text.trim(),
-          deviceId: _enroll!.deviceId,
-          spaceKeyB64: base64Encode(_spaceKey!),
-          keyVersion: 1,
-          token: token,
-          escrowPassphrase: pass,
-        );
-        await _uploadEscrow(pass, escrowPayload);
-      }
       // 4) 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
       if (_pinSkipped) {
         if (!mounted) return;
@@ -1592,7 +1587,47 @@ class _SetupPageState extends State<SetupPage> {
       barrierDismissible: false, // 只有一个按钮：开始聊天
       builder: (ctx) => AlertDialog(
         title: Text(isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
-        content: Text(l10n.welcomeDialogMessage),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.welcomeDialogMessage),
+            // Multiverse：create 完成后展示空间邀请链接（分享给伴侣加入）
+            if (isCreate && _createLink != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                l10n.setupCreateShareTitle,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _createLink!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF2271F7)),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: l10n.setupCreateCopy,
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _createLink!));
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.setupCreateCopied),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -1614,37 +1649,9 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN ----
 
-  /// join：凭邀请码登记 → 认证 → 拉取口令密保箱 → 口令解密出 Space Key → 设置 PIN → 完成。
-  /// join 邀请码页（步骤 2）「验证邀请码」：凭码登记（服务端校验，无效码抛错）
-  /// ——登记成功（= 邀请码有效）才放行到口令页，错误码提示并停留本页。
-  Future<bool> _verifyInviteCode() async {
-    final kp = _keyPair;
-    if (kp == null) return false;
-    final code = _inviteCode.text.trim();
-    if (code.isEmpty) {
-      setState(() => _localError = AppLocalizations.of(context)!.setupPageNeedInvite);
-      return false;
-    }
-    setState(() {
-      _busy = true;
-      _status = null;
-    });
-    try {
-      if (_enroll == null) {
-        await _enrollDevice(code);
-      }
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      setState(() => _status = AppLocalizations.of(context)!.wizardInviteWrong);
-      return false;
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  /// join 口令页（步骤 3）「验证接入口令」：登记 → 认证 → fetch escrow 口令密保箱 →
-  /// 用输入口令解密——口令与首台设备创建时一致（解密成功）才放行进 PIN 步骤。
+  /// join 口令页（步骤 3）「验证接入口令」：join 提交（POST /spaces/join——
+  /// 设备登记 + session 签发）→ 口令 escrow 取 Space Key，口令与首台设备创建时
+  /// 一致（解密成功）才放行进 PIN 步骤。
   Future<bool> _verifyJoinPassphrase() async {
     final kp = _keyPair;
     if (kp == null) return false;
@@ -1658,24 +1665,38 @@ class _SetupPageState extends State<SetupPage> {
       _status = null;
     });
     try {
-      // 1) 凭邀请码登记（码绑定 person，服务端分配真实 deviceId）
-      if (_enroll == null) {
-        await _enrollDevice(_inviteCode.text.trim());
-      }
-      final enroll = _enroll!;
-      // 2) 认证（用登记后的真实 deviceId）
-      final session = await _authenticate(kp, enroll.deviceId);
-      _sessionToken = session.sessionToken;
-      // 3) fetch 口令密保箱并用输入口令解密：口令错 → FormatException → 不通过
-      final escrow = widget.escrowOverride?.call(_server) ?? KeyEscrowService(ApiClient(_server));
-      final payload = await escrow.fetch(passphrase: passphrase, token: session.sessionToken);
+      // Multiverse：join 提交（POST /spaces/join——设备登记 + session 签发，
+      // 绑定该 Space；token 已在第一步 preflight 验证，此处真正消费）
+      final api = ApiClient(_server);
+      final join = await (widget.joinOverride?.call(_joinToken) ??
+          api.joinSpace(
+            token: _joinToken,
+            publicKey: kp.publicKeyB64,
+            displayName: _personName.text.trim(),
+            gender: _myGender,
+            deviceName: await _autoDeviceName(),
+          ));
       if (!mounted) return false;
-      if (payload == null) {
+      _sessionToken = join.sessionToken;
+      _enroll = EnrollResult(
+        deviceId: join.deviceId,
+        personId: join.personId,
+        spaceId: join.spaceId,
+      );
+      // 口令取 Space Key（POST /spaces/{id}/key-escrow——口令正确才返回；
+      // escrowOverride 可注入 fake，与 v1 fetch 同边界）
+      final file = await (widget.escrowOverride?.call(_server) ?? KeyEscrowService(api))
+          .fetchSpaceEscrow(join.spaceId, passphrase);
+      if (!mounted) return false;
+      if (file == null) {
         setState(() => _status = AppLocalizations.of(context)!.setupPageNoEscrow);
         return false;
       }
+      final payload = await (widget.escrowOverride?.call(_server) ?? KeyEscrowService(api))
+          .openPackage(passphrase: passphrase, file: file);
+      if (!mounted) return false;
       _spaceKey = base64Decode(payload.spaceKeyB64);
-      _spaceId.text = payload.spaceId;
+      _spaceId.text = join.spaceId;
       _joinKeyVersion = payload.keyVersion;
       return true;
     } on FormatException {
