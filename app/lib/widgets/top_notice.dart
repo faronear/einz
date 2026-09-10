@@ -18,8 +18,11 @@ void showTopNotice(
   String message, {
   Duration duration = const Duration(seconds: 4),
 }) {
-  showTopNoticeOn(Overlay.of(context, rootOverlay: true), message,
-      duration: duration);
+  showTopNoticeOn(
+    Overlay.of(context, rootOverlay: true),
+    message,
+    duration: duration,
+  );
 }
 
 /// 向指定（根）Overlay 显示顶部通知；重复调用替换当前显示中的通知。
@@ -97,73 +100,75 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: 0,
+      // 覆盖在对话顶部「双方在线状态条」上（老板要求 2026-09-10）——不盖顶栏
+      // 标题（含菜单按钮会被暂时遮挡）；顶栏之下第一条即状态条，top 显式避开
+      // 状态栏 + 工具栏高度（不用 SafeArea，否则会再加一遍状态栏内边距）
+      top: MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
       left: 0,
       right: 0,
-      child: SafeArea(
-        bottom: false,
-        child: GestureDetector(
-          onTap: _dismiss,
-          child: FadeTransition(
-            opacity: _slide,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, -1),
-                end: Offset.zero,
-              ).animate(_slide),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    // 简化视觉（老板要求 2026-09-10）：清淡浅粉白底，不用粉蓝
-                    // 渐变；浅粉细描边 + 淡灰影浮起，不抢眼
-                    color: const Color(0xFFFFF5FA), // 浅粉白纸感（同 Scaffold 背景）
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFE9D5E0), // 浅粉描边（同输入框描边）
-                      width: 1,
+      child: GestureDetector(
+        onTap: _dismiss,
+        child: FadeTransition(
+          opacity: _slide,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, -1),
+              end: Offset.zero,
+            ).animate(_slide),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  // 简化视觉（老板要求 2026-09-10）：清淡浅粉白底，不用粉蓝
+                  // 渐变；浅粉细描边 + 淡灰影浮起，不抢眼
+                  color: const Color(0xFFFFF5FA), // 浅粉白纸感（同 Scaffold 背景）
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFE9D5E0), // 浅粉描边（同输入框描边）
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0x1F33415A), // 淡灰影（12% 深蓝灰）
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0x1F33415A), // 淡灰影（12% 深蓝灰）
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      // 白色圆角徽章 + 品牌 Logo
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.all(Radius.circular(9)),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(3),
+                          child: BrandLogo(size: 22, radius: 6),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.message,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          // 深蓝灰常规字重（清淡底上可读；不加粗、无任何装饰）
+                          style: const TextStyle(
+                            color: Color(0xFF33415A),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            height: 1.3,
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    child: Row(
-                      children: [
-                        // 白色圆角徽章 + 品牌 Logo
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.all(Radius.circular(9)),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(3),
-                            child: BrandLogo(size: 22, radius: 6),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            widget.message,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            // 深蓝灰常规字重（清淡底上可读；不加粗、无任何装饰）
-                            style: const TextStyle(
-                              color: Color(0xFF33415A),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),

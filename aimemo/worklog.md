@@ -2205,3 +2205,15 @@ Scaffold 纸感底）；描边半透明白 → 浅粉 #E9D5E0（同输入框描�
 
 **验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过（覆盖语言切换
 触发 showTopNotice 的路径）；已热重启。
+## 2026-09-10 顶部通知条下移到双方在线状态条上（不再遮顶栏菜单按钮）
+
+**老板反馈：** 通知条盖在顶栏标题上会暂时遮挡菜单按钮；建议覆盖在两人在线
+状态条上。
+
+**实现（widgets/top_notice.dart）：** Positioned top 由 0 改为
+`MediaQuery.paddingOf(context).top + kToolbarHeight + 8`（AppBar 之下第一条
+即状态条，左右 margin 12 与状态条对齐）；去掉 SafeArea 层（top 已显式避开
+状态栏，SafeArea 会再加一遍状态栏内边距）。通知条仍贴顶下滑入场。
+
+**验证：** dart format + flutter analyze 0 issue；chat_page_menu 13/13 全过
+（覆盖语言切换触发 showTopNotice 路径）；已热重启。
