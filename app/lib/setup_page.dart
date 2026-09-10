@@ -75,7 +75,7 @@ class _SetupPageState extends State<SetupPage> {
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
   String? _pinError; // PIN 步骤红色提示（输入框下方）
-  bool _pinSkipped = false; // 用户确认"暂不设置"：跳过 setPin，仍完成前置并进下一步
+  bool _pinSkipped = false; // 用户确认"不设置锁屏码"：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
 
   // 服务器地址：默认 einz.tic.cc；探测失败由自动重试兜底（启动屏不展示输入框）
@@ -593,7 +593,7 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
-    // 有效 PIN → 设锁后推进；两空 → 弹窗确认"暂不设置"；其余 → 输入框下方红色提示。
+    // 有效 PIN → 设锁后推进；两空 → 弹窗确认"不设置锁屏码"；其余 → 输入框下方红色提示。
     final isPinStep = (_role == _WizardRole.create && _step == 4) ||
         (_role == _WizardRole.join && _step == 4) ||
         (_role == _WizardRole.offline && _step == 2);
@@ -601,7 +601,7 @@ class _SetupPageState extends State<SetupPage> {
       final pin = _pin.text;
       final confirm = _confirm.text;
       if (pin.isEmpty && confirm.isEmpty) {
-        // 两空：确认是否暂不设置
+        // 两空：确认是否不设置锁屏码
         final skip = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -1520,7 +1520,7 @@ class _SetupPageState extends State<SetupPage> {
         );
         await _uploadEscrow(pass, escrowPayload);
       }
-      // 4) 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
+      // 4) 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
       if (_pinSkipped) {
         if (!mounted) return;
         await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
@@ -1791,7 +1791,7 @@ class _SetupPageState extends State<SetupPage> {
       _sessionToken = session.sessionToken;
     }
     if (!mounted) return;
-    // 设置 PIN；确认"暂不设置"时跳过设锁：明文持久化配置（下次启动直接进聊天）
+    // 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
     if (_pinSkipped) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(

@@ -95,7 +95,7 @@
   "setPinDialogConfirmLabel": "确认 PIN",
   "setPinDialogConfirmHint": "再输一遍以确认",
   "setPinDialogSetPin": "设置 PIN",
-  "setupPageSkipPinTitle": "暂不设置锁屏码？",
+  "setupPageSkipPinTitle": "不设置锁屏码？",
   "setupPageSkipPinMessage": "如果不设锁屏码，本应用启动时将直接进入对话，容易被窃取隐私。确定跳过吗？",
   "setPinDialogPinTooShort": "PIN 至少 4 位",
   "setPinDialogPinMismatch": "两次输入的 PIN 不一致",

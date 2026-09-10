@@ -248,7 +248,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogSetPin => '设置 PIN';
 
   @override
-  String get setupPageSkipPinTitle => '暂不设置锁屏码？';
+  String get setupPageSkipPinTitle => '不设置锁屏码？';
 
   @override
   String get setupPageSkipPinMessage => '如果不设锁屏码，本应用启动时将直接进入对话，容易被窃取隐私。确定跳过吗？';

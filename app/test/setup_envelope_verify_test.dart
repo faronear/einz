@@ -59,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('验证邀请码'), findsOneWidget, reason: '应回到邀请码页（验证邀请码标题）');
     expect(find.byType(TextField), findsOneWidget, reason: '邀请码输入框应可见');
-    expect(find.text('密保信封'), findsNothing, reason: '不应停留在信封页');
+    expect(find.text('解析密保信封'), findsNothing, reason: '不应停留在信封页');
   });
 
   testWidgets('信封页「改用线上密保口令」回到口令页（互切保留已填值）', (WidgetTester tester) async {
@@ -77,6 +77,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('验证邀请码'), findsOneWidget, reason: '上一步应回到邀请码页（验证邀请码标题）');
     expect(find.byType(TextField), findsOneWidget, reason: '邀请码输入框应可见');
-    expect(find.text('密保信封'), findsNothing, reason: '不应停留在信封页');
+    expect(find.text('解析密保信封'), findsNothing, reason: '不应停留在信封页');
   });
 }

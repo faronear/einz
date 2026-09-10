@@ -303,9 +303,9 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
+    await tester.tap(find.text('下一步')); // PIN → 弹"不设置"确认框
     await tester.pumpAndSettle();
-    await tester.tap(find.text('跳过')); // 确认暂不设置 → 完成页（纯色无文字）
+    await tester.tap(find.text('跳过')); // 确认不设置 → 完成页（纯色无文字）
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));
@@ -326,7 +326,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // PIN → 弹"暂不设置"确认框
+    await tester.tap(find.text('下一步')); // PIN → 弹"不设置"确认框
     await tester.pumpAndSettle();
     await tester.tap(find.text('跳过')); // 完成 → 欢迎对话框自动弹出
     await tester.pumpAndSettle();
