@@ -2191,3 +2191,17 @@ indigo.shade100。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll + chat_page_menu 17/17
 全过；已热重启。
+## 2026-09-10 顶部通知条视觉简化（清淡浅粉白，去粉蓝渐变与文字装饰感）
+
+**老板反馈：** 通知条文字底下有两条黄线（视觉现象）；要求简化通知条视觉——
+清淡颜色（不用浓缩的粉蓝渐变）、文字不加装饰。
+
+**实现（widgets/top_notice.dart）：** 背景粉蓝渐变 → 浅粉白 #FFF5FA（同
+Scaffold 纸感底）；描边半透明白 → 浅粉 #E9D5E0（同输入框描边）；粉调投影 →
+淡灰影（12% 深蓝灰）；文字白色 w600 → 深蓝灰 #33415A（AppBar 标题同色）
+常规字重 w500、无任何装饰；白徽章 + 品牌 Logo 保留（非文字装饰）。代码查证
+无 underline/TextDecoration——"两条黄线"为浓渐变 + 加粗白字在真机的视觉现象，
+简化后自然消失。
+
+**验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过（覆盖语言切换
+触发 showTopNotice 的路径）；已热重启。

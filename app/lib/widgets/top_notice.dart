@@ -115,23 +115,19 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    // Einz 粉蓝品牌渐变：图标天蓝（左上）→ 图标粉（右下）
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
-                    ),
+                    // 简化视觉（老板要求 2026-09-10）：清淡浅粉白底，不用粉蓝
+                    // 渐变；浅粉细描边 + 淡灰影浮起，不抢眼
+                    color: const Color(0xFFFFF5FA), // 浅粉白纸感（同 Scaffold 背景）
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0x8CFFFFFF), // 半透明白细边（浅粉白背景上描出卡片）
+                      color: const Color(0xFFE9D5E0), // 浅粉描边（同输入框描边）
                       width: 1,
                     ),
-                    // 粉调柔投影：浅粉白纸感背景下自然浮起
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0x59D6529C), // 粉强调 35% alpha
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+                        color: const Color(0x1F33415A), // 淡灰影（12% 深蓝灰）
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
@@ -157,10 +153,11 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                             widget.message,
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
+                            // 深蓝灰常规字重（清淡底上可读；不加粗、无任何装饰）
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFF33415A),
                               fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w500,
                               height: 1.3,
                             ),
                           ),
