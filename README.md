@@ -36,3 +36,18 @@ cp config/config.json.example config/config.json   # 填入两台设备公钥
 npm install
 npm run dev
 ```
+
+## 本地开发配置（App）
+
+本地调试不想连生产服务器（如连本机 `http://localhost:3000`）时，**不要直接改
+`app/lib/data/server_settings.dart`**——用 gitignore 的本机配置覆盖：
+
+```bash
+cd app
+cp local_config.example.json local_config.json   # 按需修改里面的 kEinzServer
+flutter run --dart-define-from-file=local_config.json   # 或 ./scripts/run_app.sh
+```
+
+- `app/local_config.json` **不入 git**（已 .gitignore）——覆盖 `kEinzServer` 等启动参数（`String.fromEnvironment`），不污染 commit
+- 便捷入口：`./scripts/run_app.sh run -d <UDID>` / `./scripts/run_app.sh build ios --release`（自动带上本机配置）
+- 服务端对应：`server/config.json` 的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）

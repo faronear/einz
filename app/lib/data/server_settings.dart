@@ -4,7 +4,12 @@ import 'dart:io';
 import 'local_database.dart';
 
 /// 默认服务器地址（产品部署域名固定）。
-const String kEinzServer = 'https://einz.tic.cc';
+///
+/// 本地开发用 app/local_config.json（gitignore，见 local_config.example.json）
+/// 覆盖：flutter run/build 加 --dart-define-from-file=local_config.json，
+/// 例如 {"kEinzServer": "http://localhost:3000"}——无需直接改本文件、不污染 commit。
+const String kEinzServer =
+    String.fromEnvironment('kEinzServer', defaultValue: 'https://einz.tic.cc');
 
 /// 服务器地址设置（存本设备 app_state，key='server'）。
 ///

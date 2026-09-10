@@ -2468,3 +2468,13 @@ cfg.space_id，行为不变）。
 - 客户端：CLI/App 新建时收到该错误码显示禁止信息（App 加 l10n wizardSpaceLimit）
 - 验证：curl 实测 maxSpaces=1 时空间 1=201、空间 2=409 SPACE_LIMIT_REACHED；
   cli/shared analyze 0 issue、App analyze 0 error（仅既有 info）
+
+### App 本地配置机制（gitignore 的 local_config.json + --dart-define-from-file）
+- server_settings.dart 的 kEinzServer 改 String.fromEnvironment('kEinzServer',
+  defaultValue: 'https://einz.tic.cc')——移除老板的 localhost 注释行（覆盖走配置）
+- app/local_config.json（gitignore）+ local_config.example.json（模板，入 git）：
+  {"kEinzServer": "http://localhost:3000"}——flutter run/build 加
+  --dart-define-from-file=local_config.json 即覆盖——不再直接改代码、不污染 commit
+- scripts/run_app.sh：透传 flutter 命令 + local_config.json 存在则自动加参数
+- README 加「本地开发配置（App）」说明
+- 验证：不带 define → https://einz.tic.cc；带 local_config.json → localhost:3000 ✓
