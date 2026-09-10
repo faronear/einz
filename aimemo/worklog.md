@@ -2178,3 +2178,16 @@ indigo.shade100。
 **测试：** 恢复断言 pump 2100ms → 1300ms（Timer 1200ms 后清除）。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
+## 2026-09-10 高亮节奏再调（1.5s/0s/1.5s）+ 菜单安全分组分隔线
+
+**老板要求：** 1) 高亮渐变 1.5 秒、停留 0 秒、褪回 1.5 秒；2) 菜单里界面风格
+与阅后即焚之间加分隔线（下面的是安全相关设置，参照我的设备与界面语言之间）。
+
+**实现（chat_page）：**
+- 高亮节奏：AnimatedContainer duration 800 → 1500ms；清除 Timer 1200 → 1500ms
+  （渐变完成立即褪回，停留 0s，总 3s）；测试恢复断言 pump 1600ms。
+- 菜单：style（界面风格）项后插入 PopupMenuDivider，分隔 burn（阅后即焚）及
+  其后的 PIN/邀请/口令等安全相关项。
+
+**验证：** flutter analyze 0 issue；chat_initial_scroll + chat_page_menu 17/17
+全过；已热重启。
