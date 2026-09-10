@@ -492,13 +492,19 @@ async function main (): Promise<void> {
       await devB2.enroll(port2, inviteCode2)
       const healthRes2 = await fetch(`http://127.0.0.1:${port2}/health`)
       assert.equal(healthRes2.status, 200, 'health should be reachable')
-      const health2 = (await healthRes2.json()) as {
-        person_names: Record<string, string>
-      }
-      assert.deepEqual(
-        health2.person_names,
-        { personA: 'luk', personB: 'personB' },
-        '未设用户名登记后 /health 名称表应含默认规范 id（personB）'
+      const health2 = (await healthRes2.json()) as Record<string, unknown>
+      // Multiverse：/health 不再返回全局 person 表（避免跨空间泄漏成员元数据，
+      // PROTOCOL_MULTIVERSE.md §4.1）——登记默认名的验证改查 db meta
+      assert.equal('person_names' in health2, false, 'Multiverse /health 不应返回 person_names')
+      const db2 = new Database(join(tempDir2, 'einz.sqlite.db'))
+      const nameRow2 = db2
+        .prepare(`SELECT value FROM meta WHERE key = 'person_name:personB'`)
+        .get() as { value: string } | undefined
+      db2.close()
+      assert.equal(
+        nameRow2?.value,
+        'personB',
+        '未设用户名登记后 meta 应含默认规范 id（personB）'
       )
     } finally {
       await new Promise<void>(done => {
@@ -567,12 +573,17 @@ async function main (): Promise<void> {
       )
       const health3 = (await (
         await fetch(`http://127.0.0.1:${port3}/health`)
-      ).json()) as {
-        person_names: Record<string, string>
-      }
-      assert.deepEqual(
-        health3.person_names,
-        { personA: 'luk', personB: 'Alice' },
+      ).json()) as Record<string, unknown>
+      // Multiverse：/health 不再返回全局 person 表，partner_name 落位的验证改查 db meta
+      assert.equal('person_names' in health3, false, 'Multiverse /health 不应返回 person_names')
+      const db3 = new Database(join(tempDir3, 'einz.sqlite.db'))
+      const nameRow3 = db3
+        .prepare(`SELECT value FROM meta WHERE key = 'person_name:personB'`)
+        .get() as { value: string } | undefined
+      db3.close()
+      assert.equal(
+        nameRow3?.value,
+        'Alice',
         'partner_name preset should land on personB name table'
       )
     } finally {

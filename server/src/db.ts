@@ -96,6 +96,39 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- Multiverse（v2）：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3）
+    CREATE TABLE IF NOT EXISTS spaces (
+      space_id         TEXT PRIMARY KEY,
+      space_address    TEXT NOT NULL UNIQUE,
+      space_public_key TEXT NOT NULL UNIQUE,
+      display_name     TEXT,
+      status           TEXT NOT NULL DEFAULT 'waiting',  -- waiting | active | archived
+      created_at       INTEGER NOT NULL,
+      updated_at       INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS space_members (
+      space_id     TEXT NOT NULL REFERENCES spaces(space_id),
+      person_id    TEXT NOT NULL,
+      partner_slot INTEGER NOT NULL,
+      display_name TEXT,
+      gender       TEXT,
+      status       TEXT NOT NULL DEFAULT 'active',
+      joined_at    INTEGER NOT NULL,
+      PRIMARY KEY (space_id, person_id),
+      UNIQUE (space_id, partner_slot)
+    );
+
+    CREATE TABLE IF NOT EXISTS join_tokens (
+      space_id          TEXT NOT NULL REFERENCES spaces(space_id),
+      token_hash        TEXT PRIMARY KEY,
+      created_by_device TEXT NOT NULL,
+      expires_at        INTEGER NOT NULL,
+      used_at           INTEGER,
+      created_at        INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_join_tokens_space ON join_tokens (space_id, used_at);
   `);
 
   // 迁移：messages 表补充 sender_person_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
@@ -142,6 +175,8 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     `);
     db.pragma("foreign_keys = ON");
   }
+  // Multiverse：schema version 标记（首次启动写入 2，后续保持；供能力探测与迁移）
+  db.prepare(`INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '2')`).run();
   return db;
 }
 

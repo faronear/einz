@@ -10,6 +10,10 @@ export interface DeviceConfig {
 
 export interface ServerConfig {
   space_id: string;
+  /** Multiverse：协议版本（v1-single-space 迁移期保留 space_id 兼容，见 PROTOCOL_MULTIVERSE.md） */
+  protocol_version: string;
+  /** Multiverse：能力清单（随端点实现逐步扩展） */
+  capabilities: string[];
 }
 
 /** 加载服务配置：space_id 持久化在 db meta 表（首启自动生成 UUID，之后不变）。
@@ -17,11 +21,16 @@ export interface ServerConfig {
  *  （POST /devices/enroll：第一个设备免邀请码自举为创建者，之后设备凭邀请码加入）。 */
 export function loadConfig(): ServerConfig {
   const existing = getMeta("space_id");
-  if (existing) return { space_id: existing };
-  const spaceId = randomUUID();
-  setMeta("space_id", spaceId);
-  console.log(`[einz] 首次启动：已生成 space_id=${spaceId}（持久化在 db meta，可在 /health 查看）`);
-  return { space_id: spaceId };
+  const spaceId = existing ?? randomUUID();
+  if (!existing) {
+    setMeta("space_id", spaceId);
+    console.log(`[einz] 首次启动：已生成 space_id=${spaceId}（持久化在 db meta，可在 /health 查看）`);
+  }
+  return {
+    space_id: spaceId,
+    protocol_version: "v2-multiverse",
+    capabilities: ["spaces", "join-tokens"],
+  };
 }
 
 /**

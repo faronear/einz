@@ -2293,3 +2293,34 @@ TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不�
 **验证：** flutter analyze 0 issue；chat_page_menu + message_repository +
 chat_initial_scroll 29/29 全过；未提交等老板检查后提交（2026-09-10 老板
 确认提交）。
+
+## 2026-09-10 Multiverse（多重宇宙）Server 多租户骨架（feature/multiverse 分支）
+
+**背景：** 老板决定 v2 升级改名为 Multiverse（多重宇宙）；先建 Server 多租户
+骨架（docs/PROTOCOL_MULTIVERSE.md §3/§4）。加入授权模型已拍板：token 门禁
+（24h 一次性、只存 hash）+ 口令 escrow（沿用 v1）+ 满员事务约束；不做创建者
+确认（模型 B）。
+
+**实现（server/）：**
+- `db.ts`：新增 `spaces`/`space_members`/`join_tokens` 三表 + 索引；首次启动
+  写 `meta.schema_version=2`。
+- `config.ts`：ServerConfig 增加 `protocol_version="v2-multiverse"` 与
+  `capabilities=["spaces","join-tokens"]`（space_id 保留为 legacy 兼容）。
+- `app.ts`：/health 只返回协议版本/能力/legacy 概览，**不再返回全局
+  person_names/person_genders**（多空间防泄漏成员元数据）；新增 4 个路由：
+  POST /spaces、GET /spaces/lookup、POST /spaces/join、
+  POST /spaces/{id}/join-tokens。
+- 新 `spaces.ts`：createSpace（创建者=成员0、返回首个 token）、lookupSpace
+  （最小公开信息）、joinSpace（事务消费 token：未用/未过期/未满员→插第二成员
+  →满员转 active）、createJoinToken；base58url 32B 随机 token（e1_ 前缀）、
+  SHA-256 存 hash、24h TTL；space_address 暂为随机 hex 占位（正式版 Keccak-256
+  + EIP-55 派生，U2 补）。
+- `test/smoke.test.ts`：两处 /health person_names 断言改为 Multiverse 语义
+  （断言 /health 不含 person_names + 改查 db meta 验证登记默认名）。
+
+**验证（注意 Node 版本）：** better-sqlite3 原生模块为 Node 22（ABI 127）编译，
+**测试/运行必须用 v22**（系统默认 v18 加载失败；v20 也不匹配）。
+`npm run build`（tsc）0 错；`npm test`（v22）冒烟全绿；手动 e2e 8 步全过：
+health 能力 ✓ 创建空间 ✓ lookup 1/2 ✓ 伙伴加入 ✓ TOKEN_USED ✓
+TOKEN_INVALID ✓ 满员生成新 token ✓ 新 token 加入 → SPACE_FULL ✓。
+已提交到 feature/multiverse 分支。

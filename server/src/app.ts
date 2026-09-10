@@ -10,6 +10,7 @@ import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, getKeyEscrow, recoverSpace, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
+import { createJoinToken, createSpace, joinSpace, lookupSpace } from "./spaces.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
@@ -59,30 +60,53 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const msgCount = (getDb()
       .prepare(`SELECT COUNT(*) AS n FROM messages`)
       .get() as { n: number }).n;
-    // person 名称表（meta person_name:*，显示层用）：启动探测时一并下发
-    const personNames: Record<string, string> = {};
-    for (const r of getDb()
-      .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_name:%'`)
-      .all() as { key: string; value: string }[]) {
-      personNames[r.key.slice("person_name:".length)] = r.value;
-    }
-    // person 性别表（meta person_gender:*，male/female）：随名称表一并下发
-    const personGenders: Record<string, string> = {};
-    for (const r of getDb()
-      .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_gender:%'`)
-      .all() as { key: string; value: string }[]) {
-      personGenders[r.key.slice("person_gender:".length)] = r.value;
-    }
+    // Multiverse：/health 只报告服务健康、协议版本与能力，不再返回全局
+    // person 名称/性别表（多空间下避免跨空间泄漏成员元数据；空间状态由
+    // 受保护 API 获取，见 PROTOCOL_MULTIVERSE.md §4.1）
     sendJson(res, 200, {
       status: "ok",
+      protocol_version: cfg.protocol_version,
       version: SERVER_VERSION,
       uptime_sec: Math.floor(process.uptime()),
-      space_id: cfg.space_id,
+      capabilities: cfg.capabilities,
+      legacy: {
+        space_id: cfg.space_id,
+        messages_count: msgCount,
+      },
       ws_clients: wsConnCount(),
-      messages_count: msgCount,
-      person_names: personNames,
-      person_genders: personGenders,
     });
+    return;
+  }
+
+  // Multiverse：多租户空间（骨架，成员认证由 U1 Space-scoped session 补齐；
+  // 见 docs/PROTOCOL_MULTIVERSE.md §4）
+  if (method === "POST" && path === "/spaces") {
+    const body = await readJson(req);
+    const r = createSpace(
+      body?.displayName == null ? undefined : String(body.displayName),
+    );
+    sendJson(res, 201, r);
+    return;
+  }
+  if (method === "GET" && path === "/spaces/lookup") {
+    const r = lookupSpace(url.searchParams.get("address") ?? undefined);
+    sendJson(res, 200, r);
+    return;
+  }
+  if (method === "POST" && path === "/spaces/join") {
+    const body = await readJson(req);
+    const r = joinSpace(
+      String(body?.token ?? ""),
+      body?.displayName == null ? undefined : String(body.displayName),
+      body?.gender == null ? undefined : String(body.gender),
+    );
+    sendJson(res, 200, r);
+    return;
+  }
+  if (method === "POST" && path.startsWith("/spaces/") && path.endsWith("/join-tokens")) {
+    const spaceId = path.slice("/spaces/".length, -"/join-tokens".length);
+    const r = createJoinToken(spaceId);
+    sendJson(res, 201, r);
     return;
   }
 
