@@ -34,6 +34,7 @@ Future<void> pumpToPassphrase(
               displayName: 'Lukas',
               status: 'waiting',
               memberCount: 1,
+              slots: const [],
             )
           : null,
       // create 名字页下一步触发 Multiverse 创建（_runBootstrap → POST /spaces），

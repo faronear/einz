@@ -109,6 +109,7 @@ class ApiClient {
     String? deviceName,
     String? displayName,
     String? gender,
+    int? partnerSlot,
   }) async {
     final res = await _post(
       Api.spaceJoin,
@@ -118,6 +119,7 @@ class ApiClient {
         if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
         if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
         if (gender != null && gender.isNotEmpty) 'gender': gender,
+        if (partnerSlot != null) 'partner_slot': partnerSlot,
       },
       withToken: false,
     );
@@ -125,10 +127,14 @@ class ApiClient {
   }
 
   /// Multiverse：创建空间（POST /spaces——创建者设备登记 + session + 首个
-  /// join token，PROTOCOL_MULTIVERSE.md §4.1）。
+  /// join token，PROTOCOL_MULTIVERSE.md §4.1）。partnerName/partnerGender 为
+  /// 第二人（伴侣）的名字/性别（create 时预置两身份，join 按身份选择）。
   Future<SpaceCreateResult> createSpace({
     String? spaceId,
     String? displayName,
+    String? gender,
+    String? partnerName,
+    String? partnerGender,
     BackupFile? sealedSpaceKey,
     String? escrowPassphrase,
     String? publicKey,
@@ -139,6 +145,10 @@ class ApiClient {
       {
         if (spaceId != null && spaceId.isNotEmpty) 'space_id': spaceId,
         if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
+        if (partnerName != null && partnerName.isNotEmpty) 'partner_name': partnerName,
+        if (partnerGender != null && partnerGender.isNotEmpty)
+          'partner_gender': partnerGender,
         if (sealedSpaceKey != null) 'sealed_space_key': sealedSpaceKey.toJson(),
         if (escrowPassphrase != null && escrowPassphrase.isNotEmpty)
           'escrow_passphrase': escrowPassphrase,

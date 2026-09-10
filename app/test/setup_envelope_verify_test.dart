@@ -25,7 +25,8 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
       probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
       // Multiverse join：token 校验（preflight）用 fake
       preflightOverride: (token) async => const SpaceJoinPreflight(
-          spaceId: 'space-test', displayName: 'Lukas', status: 'waiting', memberCount: 1),
+          spaceId: 'space-test', displayName: 'Lukas', status: 'waiting', memberCount: 1,
+          slots: const []),
       enrollOverride: (_) async =>
           const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
       authOverride: (kp, id) async =>

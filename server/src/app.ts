@@ -85,6 +85,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const r = await createSpace(
       body?.space_id == null ? undefined : String(body.space_id),
       body?.display_name == null ? undefined : String(body.display_name),
+      body?.gender == null ? undefined : String(body.gender),
+      body?.partner_name == null ? undefined : String(body.partner_name),
+      body?.partner_gender == null ? undefined : String(body.partner_gender),
       body?.sealed_space_key,
       body?.escrow_passphrase == null ? undefined : String(body.escrow_passphrase),
       body?.public_key == null ? undefined : String(body.public_key),
@@ -112,6 +115,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       body?.device_name == null ? undefined : String(body.device_name),
       body?.display_name == null ? undefined : String(body.display_name),
       body?.gender == null ? undefined : String(body.gender),
+      body?.partner_slot == null ? undefined : Number(body.partner_slot),
     );
     sendJson(res, 200, r);
     return;

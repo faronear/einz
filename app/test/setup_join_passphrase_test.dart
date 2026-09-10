@@ -63,7 +63,8 @@ Future<void> pumpToJoinToken(
               spaceId: 'space-test',
               displayName: 'Lukas',
               status: 'waiting',
-              memberCount: 1),
+              memberCount: 1,
+              slots: const []),
       joinOverride: join ??
           (token) async => const SpaceJoinResult(
               spaceId: 'space-test',

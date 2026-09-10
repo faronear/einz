@@ -2422,3 +2422,18 @@ cfg.space_id，行为不变）。
 - _spaceCreate 加性别询问（本地记录；create 暂不提交——服务端无 gender 通道）
 - pty e2e 脚本适配新引导序列（aimemo/cliMultiverseE2E.py），create→join 全通
 - 踩坑：_spaceJoin 无性别询问（仅 create 有）——脚本别等「我的性别」
+
+### U4 身份选择定稿（老板 2026-09-10）
+- create 录入两人身份：我的名字/性别 + 伴侣名字（必填）/伴侣性别（必填）
+  ——服务端 createSpace 预置两 slot（creator active + partner pending）
+- join 改为「选择是哪一个用户」（preflight 返回 slots：编号/名字/性别/状态）
+  ——加入者可能是第二人（选 1），也可能是第一人的其他设备（选 0，同身份
+  多设备共享 person_id）；不再自填名字
+- 服务端：preflightJoin 返回 slots（移除 SPACE_FULL——多设备语义）；
+  joinSpace 加 partnerSlot（绑定指定 slot，slot 行 person_id 为身份锚点，
+  首个加入的设备生成、多设备复用）
+- db：space_members 的 person_id/joined_at 允许 NULL（伴侣预置行未加入）
+- e2e 三设备验证：A create（伴侣流程）→ B 选 1（第二人）→ C 选 0（第一人
+  其他设备，curl join-tokens 生成第二个 token）——地址一致，PASS
+- 踩坑：space_members NOT NULL 约束与预置 NULL 冲突（create 500）；渲染
+  wrap 截断长地址（C 的 spaceId 改从 store 文件读，不依赖 lookup）

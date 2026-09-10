@@ -52,6 +52,9 @@ export function newJoinToken(
 export async function createSpace(
   clientSpaceId?: string,
   displayName?: string,
+  gender?: string,
+  partnerName?: string,
+  partnerGender?: string,
   sealedSpaceKey?: unknown,
   escrowPassphrase?: string,
   publicKey?: string,
@@ -84,10 +87,19 @@ export async function createSpace(
   const creatorPersonId = randomUUID();
   getDb()
     .prepare(
-      `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, status, joined_at)
-       VALUES (?, ?, 0, ?, 'active', ?)`,
+      `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
+       VALUES (?, ?, 0, ?, ?, 'active', ?)`,
     )
-    .run(spaceId, creatorPersonId, displayName ?? null, now);
+    .run(spaceId, creatorPersonId, displayName ?? null, gender ?? null, now);
+  // 伴侣（第二人）预置：名字/性别必填（老板 2026-09-10 定稿——create 时录入两人
+  // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，person_id 由
+  // 首个加入该 slot 的设备生成。
+  getDb()
+    .prepare(
+      `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
+       VALUES (?, NULL, 1, ?, ?, 'pending', NULL)`,
+    )
+    .run(spaceId, partnerName ?? null, partnerGender ?? null);
   // U2：Space Key 口令密封包（可选；成对提供时写入 key_escrow）
   if (sealedSpaceKey != null || (escrowPassphrase != null && escrowPassphrase.length > 0)) {
     if (sealedSpaceKey == null) {
@@ -162,7 +174,13 @@ export function lookupSpace(
  *  返回空间公开信息供客户端确认（PROTOCOL_MULTIVERSE.md §5 ①/② fail-fast）。 */
 export function preflightJoin(
   token: string,
-): { spaceId: string; displayName: string | null; status: string; memberCount: number } {
+): {
+  spaceId: string;
+  displayName: string | null;
+  status: string;
+  memberCount: number;
+  slots: { slot: number; displayName: string | null; gender: string | null; status: string }[];
+} {
   const hash = createHash("sha256").update(token).digest("hex");
   const tk = getDb()
     .prepare(`SELECT space_id, expires_at, used_at FROM join_tokens WHERE token_hash = ?`)
@@ -176,13 +194,28 @@ export function preflightJoin(
   if (!sp || (sp.status !== "waiting" && sp.status !== "active")) {
     throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
   }
-  const memberCount = (
-    getDb()
-      .prepare(`SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND status = 'active'`)
-      .get(tk.space_id) as { n: number }
-  ).n;
-  if (memberCount >= 2) throw new ApiError("SPACE_FULL", "space is full", 409);
-  return { spaceId: tk.space_id, displayName: sp.display_name, status: sp.status, memberCount };
+  // 成员（两身份 slot）公开信息：join 时客户端据此展示「选择是哪一个用户」——
+  // 加入者可能是第二人，也可能是第一人的其他设备（老板 2026-09-10 定稿）
+  const members = getDb()
+    .prepare(
+      `SELECT partner_slot, display_name, gender, status FROM space_members
+       WHERE space_id = ? ORDER BY partner_slot`,
+    )
+    .all(tk.space_id) as {
+    partner_slot: number;
+    display_name: string | null;
+    gender: string | null;
+    status: string;
+  }[];
+  const slots = members.map((m) => ({
+    slot: m.partner_slot,
+    displayName: m.display_name,
+    gender: m.gender,
+    status: m.status,
+  }));
+  const memberCount = slots.filter((s) => s.status === "active").length;
+  // 多设备语义（同一身份可多台设备）：不再有「满」——身份由加入者选择
+  return { spaceId: tk.space_id, displayName: sp.display_name, status: sp.status, memberCount, slots };
 }
 
 /** 加入 Space：事务内消费 token（未用/未过期/未满员）并插入第二位成员；
@@ -194,6 +227,7 @@ export function joinSpace(
   deviceName?: string,
   displayName?: string,
   gender?: string,
+  partnerSlot?: number,
 ): { spaceId: string; personId: string; partnerSlot: number; sessionToken: string; spaceAddress: string } {
   if (publicKey.length === 0) {
     throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入设备公钥）", 400);
@@ -213,32 +247,44 @@ export function joinSpace(
     if (!sp || (sp.status !== "waiting" && sp.status !== "active")) {
       throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
     }
-    const cnt = (
+    // 身份 slot：加入者选择（0=第一人/创建者，1=第二人/伴侣）；缺省第二人。
+    // 同一身份可有多台设备（创建者换设备加入选 0）——不再有「满」。
+    const slot = partnerSlot === 0 || partnerSlot === 1 ? partnerSlot : 1;
+    let member = getDb()
+      .prepare(`SELECT person_id, status FROM space_members WHERE space_id = ? AND partner_slot = ?`)
+      .get(tk.space_id, slot) as { person_id: string | null; status: string } | undefined;
+    if (!member) {
+      // 容错：slot 行缺失（理论上 create 已预置两身份）→ 补建
       getDb()
-        .prepare(`SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND status = 'active'`)
-        .get(tk.space_id) as { n: number }
-    ).n;
-    if (cnt >= 2) throw new ApiError("SPACE_FULL", "space is full", 409);
-    // 一次性：先标记 token 已用，再插入成员（同事务，防并发双加入）
+        .prepare(
+          `INSERT INTO space_members (space_id, person_id, partner_slot, status, joined_at)
+           VALUES (?, NULL, ?, 'active', ?)`,
+        )
+        .run(tk.space_id, slot, Date.now());
+      member = { person_id: null, status: "active" };
+    }
+    let personId = member.person_id;
+    if (personId == null) {
+      // 该身份首次加入：生成 person_id 并激活
+      personId = randomUUID();
+      getDb()
+        .prepare(
+          `UPDATE space_members SET person_id = ?, status = 'active', joined_at = ?
+           WHERE space_id = ? AND partner_slot = ?`,
+        )
+        .run(personId, Date.now(), tk.space_id, slot);
+    } else if (member.status !== "active") {
+      getDb()
+        .prepare(
+          `UPDATE space_members SET status = 'active', joined_at = ? WHERE space_id = ? AND partner_slot = ?`,
+        )
+        .run(Date.now(), tk.space_id, slot);
+    }
+    // 一次性：先标记 token 已用，再插设备（同事务，防并发双加入）
     getDb()
       .prepare(`UPDATE join_tokens SET used_at = ? WHERE token_hash = ?`)
       .run(Date.now(), hash);
-    const slot = (
-      getDb()
-        .prepare(`SELECT MAX(partner_slot) AS m FROM space_members WHERE space_id = ?`)
-        .get(tk.space_id) as { m: number | null }
-    ).m ?? -1;
-    const personId = randomUUID();
-    getDb()
-      .prepare(
-        `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
-         VALUES (?, ?, ?, ?, ?, 'active', ?)`,
-      )
-      .run(tk.space_id, personId, slot + 1, displayName ?? null, gender ?? null, Date.now());
-    getDb()
-      .prepare(`UPDATE spaces SET status = 'active', updated_at = ? WHERE space_id = ?`)
-      .run(Date.now(), tk.space_id);
-    // U3：加入设备登记（服务端分配 device_id UUID）+ 签发绑定该 Space 的 session
+    // 加入设备登记（同一身份多设备共享 person_id）+ 签发绑定该 Space 的 session
     const deviceId = randomUUID();
     getDb()
       .prepare(
@@ -253,7 +299,10 @@ export function joinSpace(
          VALUES (?, ?, ?, ?, ?)`,
       )
       .run(sessionToken, deviceId, tk.space_id, Date.now() + SESSION_TTL_MS, Date.now());
-    return { spaceId: tk.space_id, personId, partnerSlot: slot + 1, sessionToken, deviceId, spaceAddress: sp.space_address };
+    getDb()
+      .prepare(`UPDATE spaces SET status = 'active', updated_at = ? WHERE space_id = ?`)
+      .run(Date.now(), tk.space_id);
+    return { spaceId: tk.space_id, personId, partnerSlot: slot, sessionToken, deviceId, spaceAddress: sp.space_address };
   });
   return doJoin();
 }

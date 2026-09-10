@@ -84,6 +84,7 @@ void main() {
         displayName: 'Lukas',
         status: 'waiting',
         memberCount: 1,
+        slots: const [],
       ),
     ));
     await tester.pumpAndSettle();

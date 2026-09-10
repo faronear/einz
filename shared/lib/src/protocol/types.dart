@@ -75,18 +75,44 @@ class EnrollResult {
 
 /// Multiverse：join token preflight 结果（POST /spaces/join/preflight 返回，
 /// 验 token 不消费——空间公开信息供客户端确认，PROTOCOL_MULTIVERSE.md §5）。
+/// Multiverse：join preflight 返回的成员身份信息（create 时预置两身份 slot；
+/// join 时客户端据此展示「选择是哪一个用户」——加入者可能是第二人，也可能
+/// 是第一人的其他设备，不能靠名字判别身份，老板 2026-09-10 定稿）。
+class SpaceMemberSlot {
+  const SpaceMemberSlot({
+    required this.slot,
+    required this.displayName,
+    required this.gender,
+    required this.status,
+  });
+
+  final int slot;
+  final String? displayName;
+  final String? gender;
+  final String status;
+
+  factory SpaceMemberSlot.fromJson(Map<String, dynamic> json) => SpaceMemberSlot(
+        slot: json['slot'] as int,
+        displayName: json['displayName'] as String?,
+        gender: json['gender'] as String?,
+        status: json['status'] as String,
+      );
+}
+
 class SpaceJoinPreflight {
   const SpaceJoinPreflight({
     required this.spaceId,
     required this.displayName,
     required this.status,
     required this.memberCount,
+    required this.slots,
   });
 
   final String spaceId;
   final String? displayName;
   final String status;
   final int memberCount;
+  final List<SpaceMemberSlot> slots;
 
   factory SpaceJoinPreflight.fromJson(Map<String, dynamic> json) =>
       SpaceJoinPreflight(
@@ -94,6 +120,9 @@ class SpaceJoinPreflight {
         displayName: json['displayName'] as String?,
         status: json['status'] as String,
         memberCount: json['memberCount'] as int,
+        slots: (json['slots'] as List<dynamic>? ?? const [])
+            .map((e) => SpaceMemberSlot.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
 

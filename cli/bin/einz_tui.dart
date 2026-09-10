@@ -742,6 +742,24 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       _scheduleRender();
     }
   }
+  // 伴侣（第二人）名字/性别必填（老板 2026-09-10 定稿——create 录入两人身份，
+  // join 时按身份选择而非自填名字）
+  String partnerName;
+  while (true) {
+    partnerName = (await _prompt(session, '❓ 伴侣的名字（必填）:')).trim();
+    if (!_state!.running) return;
+    if (partnerName.isNotEmpty) break;
+    session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
+    _scheduleRender();
+  }
+  String partnerGender;
+  while (true) {
+    partnerGender = (await _prompt(session, '❓ 伴侣的性别（男/女，必选）:')).trim();
+    if (!_state!.running) return;
+    if (partnerGender == '男' || partnerGender == '女') break;
+    session.messages.add(_systemMessage(session, '⚠️ 伴侣性别仅接受「男」或「女」'));
+    _scheduleRender();
+  }
   final passphrase = (await _prompt(session, '❓ 设置密保口令（对方凭口令加入；可留空跳过）:', hidden: true)).trim();
   if (!_state!.running) return;
   try {
@@ -761,6 +779,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     final created = await _busy(session, '⏳ 创建空间中......', () => api.createSpace(
       spaceId: spaceId,
       displayName: displayName,
+      gender: myGender,
+      partnerName: partnerName,
+      partnerGender: partnerGender,
       sealedSpaceKey: sealed,
       escrowPassphrase: passphrase.isEmpty ? null : passphrase,
       publicKey: store.publicKey,
@@ -810,18 +831,39 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     final pre = await _busy(session, '⏳ 校验邀请中......', () => api.preflightJoin(token));
     session.messages.add(_systemMessage(
         session, '🔍 将加入空间「${pre.displayName ?? '私密空间'}」（成员 ${pre.memberCount}/2）'));
-    var displayName = store.personName ?? '';
-    if (displayName.isEmpty) {
-      displayName = (await _prompt(session, '❓ 我的名字（空间显示名）:')).trim();
-      if (!_state!.running) return;
-      if (displayName.isEmpty) displayName = '成员';
+    // 展示 create 时预置的两身份——加入者可能是第二人，也可能是第一人的其他
+    // 设备，不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）
+    final slots = pre.slots;
+    if (slots.isEmpty) {
+      session.messages.add(_systemMessage(session, '⚠️ 该空间未预置成员身份，无法加入'));
+      return;
     }
+    for (final s in slots) {
+      session.messages.add(_systemMessage(session,
+          '  ${s.slot}）${s.displayName ?? '（未命名）'}'
+          '${s.gender != null ? '（${s.gender}）' : ''}'
+          '${s.status == 'active' ? ' —— 已在线' : ''}'));
+    }
+    var chosenSlot = -1;
+    final validSlots = slots.map((s) => s.slot).toList();
+    while (chosenSlot < 0) {
+      final choice = (await _prompt(session, '❓ 你是哪一个用户？（输入编号 ${validSlots.join('/')}）')).trim();
+      if (!_state!.running) return;
+      final n = int.tryParse(choice);
+      if (n != null && validSlots.contains(n)) {
+        chosenSlot = n;
+        break;
+      }
+      session.messages.add(_systemMessage(session, '⚠️ 请输入正确的用户编号（${validSlots.join('/')}）'));
+      _scheduleRender();
+    }
+    final myName = slots.firstWhere((s) => s.slot == chosenSlot).displayName;
     final passphrase = (await _prompt(session, '❓ 输入空间密保口令（创建者设置时需一致）:', hidden: true)).trim();
     if (!_state!.running) return;
     final join = await _busy(session, '⏳ 加入中......', () => api.joinSpace(
       token: token,
       publicKey: store.publicKey,
-      displayName: displayName,
+      partnerSlot: chosenSlot,
       deviceName: store.deviceName,
     ));
     // 口令取 Space Key（口令错 → FormatException → 提示）
@@ -838,7 +880,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     store.sessionToken = join.sessionToken;
     store.deviceId = join.deviceId;
     store.personId = join.personId;
-    store.personName = displayName;
+    store.personName = myName ?? '成员';
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 已加入空间「${pre.displayName ?? ''}」！地址: ${join.spaceAddress}'));
     _onboarded = true;

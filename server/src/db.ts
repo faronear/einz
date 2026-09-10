@@ -113,12 +113,15 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     CREATE TABLE IF NOT EXISTS space_members (
       space_id     TEXT NOT NULL REFERENCES spaces(space_id),
-      person_id    TEXT NOT NULL,
+      -- person_id 是身份锚点（同一身份多设备共享）；伴侣（partner_slot=1）
+      -- 预置时尚未加入 → 为 NULL，由首个加入该 slot 的设备生成（老板定稿）
+      person_id    TEXT,
       partner_slot INTEGER NOT NULL,
       display_name TEXT,
       gender       TEXT,
       status       TEXT NOT NULL DEFAULT 'active',
-      joined_at    INTEGER NOT NULL,
+      -- 伴侣预置行未加入 → joined_at 为 NULL，激活时写入
+      joined_at    INTEGER,
       PRIMARY KEY (space_id, person_id),
       UNIQUE (space_id, partner_slot)
     );
