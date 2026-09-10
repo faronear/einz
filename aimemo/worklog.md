@@ -2166,3 +2166,15 @@ AnimatedContainer 350ms 渐变出现、保持 2s 后恢复原色（渐变返回�
 indigo.shade100。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
+## 2026-09-10 引用跳转高亮动画节奏调整：0.8s 渐变 + 0.4s 停留 + 0.8s 渐变回
+
+**老板要求：** 变化过程慢一点、停留短一点——渐变成橘黄 0.8 秒、停留 0.4 秒、
+渐变回去 0.8 秒（总 2 秒）。
+
+**实现（chat_page）：** 气泡 AnimatedContainer duration 350ms → 800ms（渐变；
+出现与返回共用）；清除 Timer 2000ms → 1200ms（800ms 渐变 + 400ms 停留后触发
+清除，随后 800ms 渐变返回原色）。总时长不变仍约 2s。
+
+**测试：** 恢复断言 pump 2100ms → 1300ms（Timer 1200ms 后清除）。
+
+**验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。

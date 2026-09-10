@@ -1014,10 +1014,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 后续 jumpTo 触发的构建按 _highlightMessageId 应用。不能放进嵌套
       // post-frame——目标已在视口时 jumpTo 是 no-op 不调度新帧，嵌套回调
       // 永不执行（2026-09-10 测试暴露的真机同类 bug）。
-      // 高亮保持 2s 后恢复原色（AnimatedContainer 350ms 过渡渐变返回）。
+      // 节奏（老板要求 2026-09-10）：渐变 0.8s + 停留 0.4s 后触发清除
+      // （清除后 AnimatedContainer 再渐变 0.8s 回原色，总时长 2s）。
       _highlightTimer?.cancel();
       setState(() => _highlightMessageId = messageId);
-      _highlightTimer = Timer(const Duration(milliseconds: 2000), () {
+      _highlightTimer = Timer(const Duration(milliseconds: 1200), () {
         if (mounted) setState(() => _highlightMessageId = null);
       });
       // 定位：按平均高度估算跳转（触发目标附近条目构建）
@@ -2210,7 +2211,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         key: m.env.messageId == _jumpTargetId ? _jumpTargetKey : null,
                         onLongPress: () => _showMessageActions(m),
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 350),
+                          // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 0.8s、
+                          // 停留 0.4s、渐变回去 0.8s——duration 800ms 管渐变
+                          duration: const Duration(milliseconds: 800),
                           curve: Curves.easeOut,
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

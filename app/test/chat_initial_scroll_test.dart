@@ -323,8 +323,9 @@ void main() {
     expect(highlighted.color, const Color(0xFFFF9800),
         reason: '跳转目标气泡应短暂高亮（显眼橘黄背景）');
 
-    // 2s 定时清除后恢复原气泡色（plain 未登记性别 = indigo.shade100）
-    await tester.pump(const Duration(milliseconds: 2100));
+    // 渐变 0.8s + 停留 0.4s（Timer 1200ms）后清除，恢复原气泡色
+    // （plain 未登记性别 = indigo.shade100）
+    await tester.pump(const Duration(milliseconds: 1300));
     await tester.pump(); // Timer 回调 setState 渲染
     final restored =
         tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration;
