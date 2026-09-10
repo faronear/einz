@@ -2415,3 +2415,10 @@ cfg.space_id，行为不变）。
 - 迁移脚本按老板指示取消（老版本未正式上线，无需 legacy 迁移）
 - 老板 iPhone 安装试用成功（方案 B：flutter build ios --release + Xcode
   Build/Install + 信任开发者证书）
+
+### U4 引导改造（老板 2026-09-10 定稿）
+- 未绑定设备引导第一步改为「选择 加入伴侣的秘境（join）/ 创建新秘境（create）」
+  （对齐 App 入口页）——create→名字/性别→口令创建；join→token→名字/口令加入
+- _spaceCreate 加性别询问（本地记录；create 暂不提交——服务端无 gender 通道）
+- pty e2e 脚本适配新引导序列（aimemo/cliMultiverseE2E.py），create→join 全通
+- 踩坑：_spaceJoin 无性别询问（仅 create 有）——脚本别等「我的性别」

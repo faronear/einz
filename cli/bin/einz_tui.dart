@@ -435,49 +435,40 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 
   // 第二用户预置名（仅首设备新空间时询问；回车跳过 → 服务端落默认 personB）：
   // 登记（enroll 自举）时随请求提交，后续设备启动引导即可按名称表选身份。
-  // 我的名字（显示层，如 lukas）：消息流问答（留空回车则不设置）——仅新空间
-  // 首设备（探测无 person 名称表）；后续设备改为引导时选择 personA/personB 身份
-  if ((store.personName == null || store.personName!.isEmpty) && _probePersonNames.isEmpty) {
-    final name = await _prompt(session, '❓ 输入我的名字（例如 Lukas，或者直接回车先跳过）:');
-    if (!_state!.running) return; // /exit 或 Ctrl+C：立即结束引导，不再输出后续提示
-    try {
-      if (name.isNotEmpty) {
-        store.personName = name;
-        session.messages.add(_systemMessage(session, '✅ 已设置我的名字: $name （可随时 /myname 进行修改）'));
-        _scheduleRender();
-      }else {
-        session.messages.add(_systemMessage(session, '✅ 系统为我自动预设一个名字，我可随时 /myname 进行修改。'));
-      }
-      // 我的性别（必选：仅接受 男/女，否则重新询问——与 App 向导一致）
-      while (myGender == null) {
-        final g = (await _prompt(session, '❓ 输入我的性别（男/女）:')).trim();
-        if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
-        if (g == '男' || g == '女') {
-          myGender = g;
-          session.messages.add(_systemMessage(session, '✅ 已设置我的性别: $g'));
-          _scheduleRender();
-        } else {
-          session.messages.add(_systemMessage(session, '⚠️ 性别仅接受「男」或「女」，请重新输入'));
-          _scheduleRender();
-        }
-      }
-      // Multiverse：create 不再填写伴侣名字/性别（对方加入时自填，与 App 向导一致）
-      session.messages.add(_systemMessage(session, '----------------'));
-      session.messages.add(_systemMessage(session, '----------------'));
-    } catch (e) {
-      stderr.writeln('⚠️ 名称处理异常'); // 防崩 + 可诊断
-    }
-  }
   store.save(storePath);
 
-  // Multiverse：未绑定空间的新设备不再走 v1 设备登记（enrollDevice 已随多租户
-  // 改造失效）——改用 /space create（新建）或 /space join <邀请链接>（加入），
-  // 命令内部完成服务端登记 + Space Key 获取/生成。已绑定设备（重启）跳过。
+  // Multiverse：未绑定空间的新设备第一步选择「加入伴侣的秘境」/「创建新秘境」
+  //（对齐 App 入口页，老板 2026-09-10）——create→名字/性别→口令创建；
+  // join→token→名字/口令加入。已绑定设备（重启）跳过。
   if (store.spaceKey == null) {
-    session.messages.add(_systemMessage(session,
-        '⚠️ 尚未绑定空间：输入 /space create 新建私密空间，或 /space join <邀请链接> 加入已有空间'));
-    session.messages.add(_systemMessage(session, '----------------'));
-    _scheduleRender();
+    while (true) {
+      if (!_state!.running) return;
+      final choice = (await _prompt(
+              session, '❓ 你是要加入伴侣的秘境，还是创建新秘境？（输入 join 加入 / create 创建）'))
+          .trim()
+          .toLowerCase();
+      if (!_state!.running) return;
+      if (choice == 'create' || choice == '1') {
+        await _spaceCreate(session, store, storePath);
+        if (_onboarded) break; // 创建成功进入会话
+        continue; // 创建失败：循环可重试
+      }
+      if (choice == 'join' || choice == '2') {
+        final token = (await _prompt(session, '❓ 粘贴伴侣的邀请链接或 token:')).trim();
+        if (!_state!.running) return;
+        if (token.isEmpty) {
+          session.messages.add(_systemMessage(session, '⚠️ 请粘贴邀请链接或 token'));
+          _scheduleRender();
+          continue;
+        }
+        await _spaceJoin(session, store, storePath, token);
+        if (_onboarded) break; // 加入成功进入会话
+        continue; // 加入失败：循环可重试
+      }
+      session.messages.add(
+          _systemMessage(session, '⚠️ 请输入 create（创建新秘境）或 join（加入伴侣的秘境）'));
+      _scheduleRender();
+    }
     return;
   }
 
@@ -737,6 +728,19 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     displayName = (await _prompt(session, '❓ 我的名字（空间显示名）:')).trim();
     if (!_state!.running) return;
     if (displayName.isEmpty) displayName = '创建者';
+  }
+  // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）
+  while (myGender == null) {
+    final g = (await _prompt(session, '❓ 我的性别（男/女）:')).trim();
+    if (!_state!.running) return;
+    if (g == '男' || g == '女') {
+      myGender = g;
+      session.messages.add(_systemMessage(session, '✅ 已设置我的性别: $g'));
+      _scheduleRender();
+    } else {
+      session.messages.add(_systemMessage(session, '⚠️ 性别仅接受「男」或「女」，请重新输入'));
+      _scheduleRender();
+    }
   }
   final passphrase = (await _prompt(session, '❓ 设置密保口令（对方凭口令加入；可留空跳过）:', hidden: true)).trim();
   if (!_state!.running) return;
