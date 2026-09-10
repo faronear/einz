@@ -2103,3 +2103,19 @@ chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热�
 
 **验证：** flutter analyze 0 issue；chat_page_menu + chat_bubble_gender 13/13
 全过；已热重启。
+## 2026-09-10 TUI 标题栏左右在线绿灯亮度不一致修复
+
+**老板反馈：** TUI 标题栏左侧（对方）在线绿灯不如右侧（我的）明亮，是否用了
+不同颜色？
+
+**根因（cli/bin/einz_tui.dart）：** 左右灯串完全相同（`$_green●$_white`，都是
+ESC[32m 标准绿）——不是颜色不同，而是**中段品牌名 "Einz TUI" 用了
+`_bold`（ESC[1m）后只切白字（ESC[97m）没关闭粗体**，bold 状态泄漏到右段，
+终端把右段绿点按亮绿（≈92）渲染 → 右侧更明亮。
+
+**修复：** 中段改为 `'${_bold}Einz TUI\x1B[22m$_white'`——品牌名 bold 展示后
+立即 ESC[22m（normal intensity）关闭粗体再继续，左右绿点同为标准绿。
+
+**验证：** dart analyze（cli + shared）0 issue；修复后右段绿点前 SGR 序列含
+ESC[22m（代码级确认）。pty 自动验证受限（TUI 交互终端检测拒绝伪 pty），
+亮度一致需老板在真实终端重启 TUI 肉眼确认。

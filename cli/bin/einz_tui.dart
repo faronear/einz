@@ -1112,7 +1112,10 @@ void _render() {
   // （窄终端放不下三段时先弃中段，再不行截断右段，保左段完整）。
   final titleText = _titleBarThree(
     '$peerDot $peerName #$peerDevice',
-    '${_bold}Einz TUI$_white',
+    // 品牌名 bold 展示后必须关闭粗体（ESC[22m）再继续——否则 bold 状态泄漏到
+    // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
+    // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
+    '${_bold}Einz TUI\x1B[22m$_white',
     '$myDot ${_personLabel(s.session.store, s.personNames)}',
     cols,
   );
