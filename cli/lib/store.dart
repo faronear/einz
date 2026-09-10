@@ -22,6 +22,7 @@ class DeviceStore {
     this.deviceName,
     this.spaceKey,
     this.spaceId,
+    this.spaceAddress,
     this.keyVersion = 1,
     this.sessionToken,
     this.server,
@@ -46,6 +47,7 @@ class DeviceStore {
   String? deviceName; // 设备自定义名称（如 MacBook），显示层用
   String? spaceKey; // base64，config/import 后填充
   String? spaceId;
+  String? spaceAddress; // 空间地址（Multiverse create/join 后填充；旧 store 迁移后为 null）
   int keyVersion;
   String? sessionToken;
   String? server; // 服务器地址（TUI 引导确认后持久化，多终端无需重复输入）
@@ -86,6 +88,7 @@ class DeviceStore {
         'device_name': deviceName,
         'space_key': spaceKey,
         'space_id': spaceId,
+        'space_address': spaceAddress,
         'key_version': keyVersion,
         'session_token': sessionToken,
         'server': server,
@@ -108,6 +111,7 @@ class DeviceStore {
         deviceName: json['device_name'] as String?,
         spaceKey: json['space_key'] as String?,
         spaceId: json['space_id'] as String?,
+        spaceAddress: json['space_address'] as String?,
         keyVersion: (json['key_version'] as int?) ?? 1,
         sessionToken: json['session_token'] as String?,
         server: json['server'] as String?,

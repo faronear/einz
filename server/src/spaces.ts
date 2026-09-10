@@ -194,7 +194,7 @@ export function joinSpace(
   deviceName?: string,
   displayName?: string,
   gender?: string,
-): { spaceId: string; personId: string; partnerSlot: number; sessionToken: string } {
+): { spaceId: string; personId: string; partnerSlot: number; sessionToken: string; spaceAddress: string } {
   if (publicKey.length === 0) {
     throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入设备公钥）", 400);
   }
@@ -208,8 +208,8 @@ export function joinSpace(
 
   const doJoin = getDb().transaction(() => {
     const sp = getDb()
-      .prepare(`SELECT status FROM spaces WHERE space_id = ?`)
-      .get(tk.space_id) as { status: string } | undefined;
+      .prepare(`SELECT status, space_address FROM spaces WHERE space_id = ?`)
+      .get(tk.space_id) as { status: string; space_address: string } | undefined;
     if (!sp || (sp.status !== "waiting" && sp.status !== "active")) {
       throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
     }
@@ -253,7 +253,7 @@ export function joinSpace(
          VALUES (?, ?, ?, ?, ?)`,
       )
       .run(sessionToken, deviceId, tk.space_id, Date.now() + SESSION_TTL_MS, Date.now());
-    return { spaceId: tk.space_id, personId, partnerSlot: slot + 1, sessionToken, deviceId };
+    return { spaceId: tk.space_id, personId, partnerSlot: slot + 1, sessionToken, deviceId, spaceAddress: sp.space_address };
   });
   return doJoin();
 }

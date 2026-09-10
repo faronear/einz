@@ -106,6 +106,7 @@ class SpaceJoinResult {
     required this.partnerSlot,
     required this.sessionToken,
     required this.deviceId,
+    required this.spaceAddress,
   });
 
   final String spaceId;
@@ -113,6 +114,7 @@ class SpaceJoinResult {
   final int partnerSlot;
   final String sessionToken;
   final String deviceId;
+  final String spaceAddress;
 
   factory SpaceJoinResult.fromJson(Map<String, dynamic> json) => SpaceJoinResult(
         spaceId: json['spaceId'] as String,
@@ -120,6 +122,7 @@ class SpaceJoinResult {
         partnerSlot: json['partnerSlot'] as int,
         sessionToken: json['sessionToken'] as String,
         deviceId: json['deviceId'] as String,
+        spaceAddress: json['spaceAddress'] as String,
       );
 }
 

@@ -70,7 +70,8 @@ Future<void> pumpToJoinToken(
               personId: 'personB',
               partnerSlot: 1,
               sessionToken: 'tok',
-              deviceId: 'dev2'),
+              deviceId: 'dev2',
+              spaceAddress: '0x00'),
       escrowOverride: (server) => _FakeEscrow(correctPass, payload),
     ),
   ));

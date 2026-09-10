@@ -16,6 +16,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:einz_shared/einz_shared.dart';
 import 'package:einz_cli/store.dart';
@@ -188,28 +189,27 @@ String _resolveAutoStore() {
   }
 }
 
-/// 启动探测 + 获取系统信息（GET {server}/health，3s 超时，不重试）：
-/// 能连（HTTP 200）→ (true, personNames, personGenders)；连接失败/超时 → (false, {}, {})。
-/// 探测顺带取回 person 名称表（消息前缀显示 personName）与性别表
-/// （对方消息背景色按性别蓝/粉/青绿），一举两得；
-/// 不用 ApiClient（其 connectionTimeout 10s + 3 次重试，探测太慢）。
-Future<(bool, Map<String, String>, Map<String, String>)> _probeServer(String server) async {
+/// 启动探测（GET {server}/health，3s 超时，不重试）：
+/// 能连（HTTP 200）→ (true, 协议版本, 能力清单)；连接失败/超时 → (false, '', [])。
+/// Multiverse：/health 不再返回全局 person 表——person 名字改由空间成员信息提供，
+/// 消息前缀用本地 store 的名字（自己/对方由空间成员填充）。
+Future<(bool, String, List<String>)> _probeServer(String server) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();
     final body = await res.transform(utf8.decoder).join();
     if (res.statusCode != 200) {
-      return (false, <String, String>{}, <String, String>{});
+      return (false, '', const <String>[]);
     }
     final json = jsonDecode(body) as Map<String, dynamic>;
-    final raw = json['person_names'] as Map<String, dynamic>? ?? <String, dynamic>{};
-    final names = <String, String>{for (final e in raw.entries) e.key: e.value as String};
-    final rawGenders = json['person_genders'] as Map<String, dynamic>? ?? <String, dynamic>{};
-    final genders = <String, String>{for (final e in rawGenders.entries) e.key: e.value as String};
-    return (true, names, genders);
+    final pv = json['protocol_version'] as String? ?? '';
+    final caps = (json['capabilities'] as List<dynamic>? ?? const [])
+        .map((e) => e as String)
+        .toList();
+    return (true, pv, caps);
   } catch (_) {
-    return (false, <String, String>{}, <String, String>{});
+    return (false, '', const <String>[]);
   } finally {
     client.close(force: true);
   }
@@ -227,10 +227,8 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     server = (saved != null && saved.isNotEmpty) ? saved : _defaultServer();
   }
   // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（回车沿用当前值）
-  // 探测顺带取回 person 名称表（系统信息），供消息前缀显示 personName
-  final (probeOk, probeNames, probeGenders) = await _probeServer(server);
-  _probePersonNames = probeNames;
-  _probePersonGenders = probeGenders;
+  // Multiverse：/health 不再返回全局 person 表（名称表保留为空，消息前缀用本地名字）
+  final (probeOk, _, _) = await _probeServer(server);
   if (!probeOk) {
     stdout.writeln('❌ 无法连接服务器 $server（/health 探测失败）');
     stdout.write('❓ 输入新服务器地址（回车沿用 $server）: ');
@@ -495,6 +493,17 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   }
   store.save(storePath);
 
+  // Multiverse：未绑定空间的新设备不再走 v1 设备登记（enrollDevice 已随多租户
+  // 改造失效）——改用 /space create（新建）或 /space join <邀请链接>（加入），
+  // 命令内部完成服务端登记 + Space Key 获取/生成。已绑定设备（重启）跳过。
+  if (store.spaceKey == null) {
+    session.messages.add(_systemMessage(session,
+        '⚠️ 尚未绑定空间：输入 /space create 新建私密空间，或 /space join <邀请链接> 加入已有空间'));
+    session.messages.add(_systemMessage(session, '----------------'));
+    _scheduleRender();
+    return;
+  }
+
   // 设备登记：未登记才 enroll（首设备自举 / 凭邀请码绑定）——已登记设备（重启
   // 进入）跳过 enroll，直接走认证/TUI（否则服务端 activeCount>0 会误判"空间
   // 已有设备"要求邀请码，发起者自己被挡在门外）
@@ -652,6 +661,13 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
+  // 绑定空间后激活会话（同步设备名 → 增量同步 → 设锁屏码 → 启动 WS）——
+  // Multiverse：/space create、/space join 命令绑定成功后与启动引导共用
+  await _activateAfterBind(session, store, storePath, server);
+}
+
+/// 绑定空间后激活会话：同步设备名 → 增量同步 →（新入网）设锁屏码 → 启动 WS。
+Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String storePath, String server) async {
   // 已登记设备启动时把本地设备名称同步到后台（TUI 里改名后服务端 dev1 的
   // deviceName 同步更新；首设备 enroll 已带上 deviceName，此处幂等覆盖）
   if (store.deviceId != null &&
@@ -711,6 +727,149 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     );
   }
   _scheduleRender();
+}
+
+/// 客户端生成 space_id（UUIDv4，协议 §3.4：space_id/space_key 由客户端生成——
+/// 口令密封包内容需含 space_id）。
+String _newCliSpaceId() {
+  final r = Random.secure();
+  final b = List<int>.generate(16, (_) => r.nextInt(256));
+  b[6] = (b[6] & 0x0f) | 0x40; // version 4
+  b[8] = (b[8] & 0x3f) | 0x80; // variant 10xx
+  final hex = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+      '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+}
+
+/// Multiverse：/space create 新建空间（POST /spaces——创建者登记 + session +
+/// 首个 join token 一并返回；Space Key 由客户端生成，口令加密 sealed 包随
+/// 创建提交，服务端只存密文）。
+Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePath) async {
+  final server = store.server;
+  if (server == null || server.isEmpty) {
+    session.messages.add(_systemMessage(session, '⚠️ 未配置服务器地址（引导时输入）'));
+    return;
+  }
+  if (store.spaceKey != null) {
+    session.messages.add(
+        _systemMessage(session, '✅ 当前设备已绑定空间（一设备一空间，不重复创建）——/space address 查看'));
+    return;
+  }
+  var displayName = store.personName ?? '';
+  if (displayName.isEmpty) {
+    displayName = (await _prompt(session, '❓ 我的名字（空间显示名）:')).trim();
+    if (!_state!.running) return;
+    if (displayName.isEmpty) displayName = '创建者';
+  }
+  final passphrase = (await _prompt(session, '❓ 设置密保口令（对方凭口令加入；可留空跳过）:', hidden: true)).trim();
+  if (!_state!.running) return;
+  try {
+    final s = await sodium();
+    final spaceKeyB64 = base64Encode(s.randombytes.buf(32));
+    final spaceId = _newCliSpaceId();
+    final api = ApiClient(server);
+    BackupFile? sealed;
+    if (passphrase.isNotEmpty) {
+      sealed = await KeyEscrowService(api).createPackage(
+        passphrase: passphrase,
+        spaceKeyB64: spaceKeyB64,
+        spaceId: spaceId,
+        keyVersion: 1,
+      );
+    }
+    final created = await _busy(session, '⏳ 创建空间中......', () => api.createSpace(
+      spaceId: spaceId,
+      displayName: displayName,
+      sealedSpaceKey: sealed,
+      escrowPassphrase: passphrase.isEmpty ? null : passphrase,
+      publicKey: store.publicKey,
+      deviceName: store.deviceName,
+    ));
+    store.spaceId = created.spaceId;
+    store.spaceAddress = created.spaceAddress;
+    store.spaceKey = spaceKeyB64;
+    store.sessionToken = created.sessionToken;
+    store.deviceId = created.deviceId;
+    store.personId = created.creatorPersonId;
+    store.personName = displayName;
+    store.save(storePath);
+    session.messages.add(_systemMessage(session, '🎉 空间已创建！地址: ${created.spaceAddress}'));
+    session.messages.add(_systemMessage(session, '📎 邀请链接（24 小时有效、仅可用一次）：\n${created.link}'));
+    session.messages.add(_systemMessage(session, '✅ 对端输入 /space join <链接>（或 App 粘贴链接）即可加入'));
+    _onboarded = true;
+    _scheduleRender();
+    await _activateAfterBind(session, store, storePath, server);
+  } catch (e) {
+    session.messages.add(_systemMessage(session, '⚠️ 创建空间失败: $e'));
+    _scheduleRender();
+  }
+}
+
+/// Multiverse：/space join <链接或 token> 加入已有空间（preflight 校验 →
+/// join 设备登记 + 签发绑定 Space 的 session → 口令 escrow 取 Space Key）。
+Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath, String input) async {
+  final server = store.server;
+  if (server == null || server.isEmpty) {
+    session.messages.add(_systemMessage(session, '⚠️ 未配置服务器地址（引导时输入）'));
+    return;
+  }
+  if (store.spaceKey != null) {
+    session.messages.add(
+        _systemMessage(session, '✅ 当前设备已绑定空间（一设备一空间，不重复加入）——/space address 查看'));
+    return;
+  }
+  // 兼容完整邀请链接：https://host/join/<token> → 提取 token
+  final token = input.contains('/join/') ? input.split('/join/').last.trim() : input.trim();
+  if (token.isEmpty) {
+    session.messages.add(_systemMessage(session, '用法: /space join <邀请链接或 token>'));
+    return;
+  }
+  try {
+    final api = ApiClient(server);
+    final pre = await _busy(session, '⏳ 校验邀请中......', () => api.preflightJoin(token));
+    session.messages.add(_systemMessage(
+        session, '🔍 将加入空间「${pre.displayName ?? '私密空间'}」（成员 ${pre.memberCount}/2）'));
+    var displayName = store.personName ?? '';
+    if (displayName.isEmpty) {
+      displayName = (await _prompt(session, '❓ 我的名字（空间显示名）:')).trim();
+      if (!_state!.running) return;
+      if (displayName.isEmpty) displayName = '成员';
+    }
+    final passphrase = (await _prompt(session, '❓ 输入空间密保口令（创建者设置时需一致）:', hidden: true)).trim();
+    if (!_state!.running) return;
+    final join = await _busy(session, '⏳ 加入中......', () => api.joinSpace(
+      token: token,
+      publicKey: store.publicKey,
+      displayName: displayName,
+      deviceName: store.deviceName,
+    ));
+    // 口令取 Space Key（口令错 → FormatException → 提示）
+    final file = await api.fetchSpaceEscrow(join.spaceId, passphrase);
+    if (file == null) {
+      session.messages.add(
+          _systemMessage(session, '⚠️ 该空间未托管口令密保箱，无法凭口令加入（创建者创建时未设口令）'));
+      return;
+    }
+    final payload = await KeyEscrowService(api).openPackage(passphrase: passphrase, file: file);
+    store.spaceId = join.spaceId;
+    store.spaceAddress = join.spaceAddress;
+    store.spaceKey = payload.spaceKeyB64;
+    store.sessionToken = join.sessionToken;
+    store.deviceId = join.deviceId;
+    store.personId = join.personId;
+    store.personName = displayName;
+    store.save(storePath);
+    session.messages.add(_systemMessage(session, '🎉 已加入空间「${pre.displayName ?? ''}」！地址: ${join.spaceAddress}'));
+    _onboarded = true;
+    _scheduleRender();
+    await _activateAfterBind(session, store, storePath, server);
+  } on FormatException {
+    session.messages.add(_systemMessage(session, '⚠️ 口令错误：请确认与创建者设置的口令一致'));
+    _scheduleRender();
+  } catch (e) {
+    session.messages.add(_systemMessage(session, '⚠️ 加入空间失败: $e'));
+    _scheduleRender();
+  }
 }
 
 Future<void> main(List<String> args) async {
@@ -2050,18 +2209,53 @@ Future<void> _execCommand(String line) async {
         s.status = '';
       }
     case '/space':
-      // 重新接入空间（口令托管）：无参数先输出当前空间状态，再给出用法；
-      // 未接入时继续引导输入口令
-      if (s.session.hasSpace) {
-        s.session.messages.add(_systemMessage(s.session, '✅ 当前设备已接入秘境'));
-        s.session.messages.add(_systemMessage(s.session, '用法: /space —— 重新接入时输入密保口令'));
+      // Multiverse：空间绑定命令——一设备一空间。
+      // /space（无参）显示状态与用法；/space address 显示空间地址；
+      // /space create 新建空间（生成 Space Key + 口令密封包，打印邀请链接）；
+      // /space join <邀请链接或 token> 加入已有空间（preflight → join → 口令取钥）
+      if (arg.trim().isEmpty) {
+        final addr = s.session.store.spaceAddress;
+        if (s.session.hasSpace) {
+          s.session.messages.add(_systemMessage(s.session,
+              '✅ 当前设备已接入空间${addr != null ? '（地址: $addr）' : ''}'));
+          s.session.messages.add(_systemMessage(
+              s.session, '用法: /space address | /space create | /space join <邀请链接或 token>'));
+        } else {
+          s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未绑定空间'));
+          s.session.messages.add(_systemMessage(
+              s.session, '用法: /space create 新建私密空间；/space join <邀请链接或 token> 加入已有空间'));
+        }
         break;
       }
-      s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未接入秘境'));
-      s.session.messages.add(_systemMessage(s.session, '用法: /space —— 输入密保口令，解密我的秘境内容'));
-      s.pendingSpaceKey = true;
-      s.session.messages.add(_systemMessage(
-          s.session, '❓ 输入密保口令，即可解密我的秘境内容'));
+      {
+        final parts = arg.trim().split(RegExp(r'\s+'));
+        final sub = parts.first;
+        if (sub == 'address') {
+          final addr = s.session.store.spaceAddress;
+          if (addr == null || addr.isEmpty) {
+            s.session.messages.add(
+                _systemMessage(s.session, '⚠️ 尚未绑定空间（无空间地址）——/space create 或 /space join 后可见'));
+          } else {
+            s.session.messages.add(_systemMessage(s.session, '📍 空间地址: $addr'));
+          }
+          break;
+        }
+        if (sub == 'create') {
+          await _spaceCreate(s.session, s.session.store, s.storePath);
+          break;
+        }
+        if (sub == 'join') {
+          final rest = arg.trim().substring('join'.length).trim();
+          if (rest.isEmpty) {
+            s.session.messages.add(_systemMessage(s.session, '用法: /space join <邀请链接或 token>'));
+            break;
+          }
+          await _spaceJoin(s.session, s.session.store, s.storePath, rest);
+          break;
+        }
+        s.session.messages.add(
+            _systemMessage(s.session, '未知子命令: $sub —— 用法: /space [address|create|join <链接>]'));
+      }
       break;
     case '/passphrase':
       // /passphrase random：生成随机 12 词助记词恢复码（离线保存，Server 不接触）
