@@ -18,7 +18,7 @@ export interface EscrowPackage {
 }
 
 /** 校验包结构（仅字段类型，不解析内容）。 */
-function parsePackage (raw: unknown): EscrowPackage {
+export function parsePackage (raw: unknown): EscrowPackage {
   if (typeof raw !== 'object' || raw === null)
     throw new ApiError('INVALID_REQUEST', 'invalid key-escrow package', 400)
   const p = raw as Record<string, unknown>
@@ -177,5 +177,67 @@ export function deleteKeyEscrow (
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
 
   getDb().prepare(`DELETE FROM key_escrow WHERE space_id = ?`).run(cfg.space_id)
+  return { ok: true }
+}
+
+/**
+ * Multiverse：按空间读写口令托管包（POST /spaces/{spaceId}/key-escrow，
+ * PROTOCOL_MULTIVERSE.md §4.2）：
+ * - 上传/更新：{ package, passphrase_hash? }（沿用 v1 upload 语义，按 spaceId 隔离）；
+ * - 取包：{ passphrase } → argon2id 校验口令，正确才返回密封包（区别于 /recover
+ *   的"全丢重置"语义——加入方取钥不撤销任何设备）。
+ * 骨架阶段无 session 认证，成员权限由 U1 Space-scoped session 补齐。
+ */
+export async function escrowForSpace (
+  spaceId: string,
+  body: unknown
+): Promise<{ ok: true } | { ok: true; package: EscrowPackage }> {
+  const sp = getDb()
+    .prepare(`SELECT 1 FROM spaces WHERE space_id = ?`)
+    .get(spaceId)
+  if (!sp) throw new ApiError('SPACE_NOT_FOUND', 'space not found', 404)
+
+  const b = (body ?? {}) as Record<string, unknown>
+  if (b.passphrase != null) {
+    // 取包：验证口令（口令即"拿到 Space Key 的凭证"，与 v1 recover 同边界）
+    const row = getDb()
+      .prepare(`SELECT passphrase_hash, package FROM key_escrow WHERE space_id = ?`)
+      .get(spaceId) as
+      | { passphrase_hash: string | null; package: string | null }
+      | undefined
+    if (!row || !row.package) {
+      throw new ApiError('ESCROW_VERIFY_FAILED', 'no escrow package', 404)
+    }
+    if (typeof b.passphrase !== 'string' || b.passphrase.length === 0) {
+      throw new ApiError('INVALID_REQUEST', 'passphrase 必填', 400)
+    }
+    if (
+      !row.passphrase_hash ||
+      !(await pwhashStrVerify(row.passphrase_hash, b.passphrase))
+    ) {
+      throw new ApiError('ESCROW_VERIFY_FAILED', '口令错误', 401)
+    }
+    return { ok: true, package: JSON.parse(row.package) as EscrowPackage }
+  }
+
+  // 上传/更新（UPSERT，最新者胜——与 v1 upload 一致）
+  const pkg = parsePackage(b.package)
+  const passphraseHash = b.passphrase_hash
+  if (
+    passphraseHash !== undefined &&
+    (typeof passphraseHash !== 'string' || passphraseHash.length === 0)
+  ) {
+    throw new ApiError('INVALID_REQUEST', 'invalid passphrase_hash', 400)
+  }
+  getDb()
+    .prepare(
+      `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(space_id) DO UPDATE SET
+         package = excluded.package,
+         passphrase_hash = excluded.passphrase_hash,
+         updated_at = excluded.updated_at`
+    )
+    .run(spaceId, JSON.stringify(pkg), (passphraseHash as string) ?? null, Date.now())
   return { ok: true }
 }

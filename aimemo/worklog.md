@@ -2324,3 +2324,24 @@ chat_initial_scroll 29/29 全过；未提交等老板检查后提交（2026-09-1
 health 能力 ✓ 创建空间 ✓ lookup 1/2 ✓ 伙伴加入 ✓ TOKEN_USED ✓
 TOKEN_INVALID ✓ 满员生成新 token ✓ 新 token 加入 → SPACE_FULL ✓。
 已提交到 feature/multiverse 分支。
+
+## 2026-09-10 Multiverse U2 密钥分发闭环（create 带钥 + 口令 escrow 取包）
+
+**目标：** 把 join 流程补成"能解密"的完整闭环——create 时创建者提交口令加密的
+Space Key 密封包（escrow 按空间隔离），加入方凭同一口令取回 Space Key。
+
+**实现（server/，feature/multiverse 分支）：**
+- `escrow.ts`：`parsePackage` 加 export；新增 `escrowForSpace(spaceId, body)`：
+  取包（{passphrase} → argon2id 校验（pwhashStrVerify），正确才返回密封包，
+  区别于 /recover 的"全丢重置"——取钥不撤销设备）/ 上传更新（UPSERT，沿用
+  v1 upload 语义）。
+- `spaces.ts`：`createSpace` 变 async，新增 `sealedSpaceKey`（EscrowPackage 结构
+  校验）+ `escrowPassphrase`（pwhashStr 哈希）成对参数——成对提供时写
+  key_escrow（space_id 为新空间）。
+- `app.ts`：POST /spaces 路由传参；新增 POST /spaces/{spaceId}/key-escrow 路由。
+
+**验证：** npm run build 0 错；npm test（v22）冒烟全绿；手动 e2e：create 带
+sealedSpaceKey+口令 ✓ join ✓ 正确口令取回 Space Key 密封包 ✓ 错误口令
+ESCROW_VERIFY_FAILED ✓ 无 escrow 空间取包失败 ✓。**踩坑：3999 端口残留
+server 进程导致 EADDRINUSE 与请求打到旧进程（假 404）——先 lsof -ti:3999
+清理再测**。已提交。

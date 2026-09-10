@@ -1,6 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getDb } from "./db.js";
 import { ApiError } from "./auth.js";
+import { pwhashStr } from "./crypto.js";
+import { parsePackage, type EscrowPackage } from "./escrow.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
 // 骨架阶段说明：
@@ -42,11 +44,15 @@ export function newJoinToken(
   return { token, hash, expiresAt };
 }
 
-/** 创建 Space（首设备自举；sealedSpaceKey 等 E2EE 字段由 U2 补齐）：创建者为
- *  第一位成员（partner_slot 0），返回首个 join token 供分享。 */
-export function createSpace(
+/** 创建 Space（首设备自举）：创建者为第一位成员（partner_slot 0），返回首个
+ *  join token 供分享。U2 密钥分发：可一并提交"口令加密的 Space Key 密封包"
+ *  （escrow，按空间隔离）——后续加入方凭同一口令从 key-escrow 取回 Space Key
+ *  （PROTOCOL_MULTIVERSE.md §5 ④）。sealedSpaceKey 与 escrowPassphrase 需成对。 */
+export async function createSpace(
   displayName?: string,
-): { spaceId: string; spaceAddress: string; joinToken: string; link: string; expiresAt: number } {
+  sealedSpaceKey?: unknown,
+  escrowPassphrase?: string,
+): Promise<{ spaceId: string; spaceAddress: string; joinToken: string; link: string; expiresAt: number }> {
   const spaceId = randomUUID();
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
   const spaceAddress = "0x" + randomBytes(20).toString("hex");
@@ -64,6 +70,27 @@ export function createSpace(
        VALUES (?, ?, 0, ?, 'active', ?)`,
     )
     .run(spaceId, randomUUID(), displayName ?? null, now);
+  // U2：Space Key 口令密封包（可选；成对提供时写入 key_escrow）
+  if (sealedSpaceKey != null || (escrowPassphrase != null && escrowPassphrase.length > 0)) {
+    if (sealedSpaceKey == null) {
+      throw new ApiError(
+        "INVALID_REQUEST",
+        "sealedSpaceKey 与 escrowPassphrase 需同时提供",
+        400,
+      );
+    }
+    const pkg = parsePackage(sealedSpaceKey) as EscrowPackage;
+    const passphraseHash =
+      escrowPassphrase != null && escrowPassphrase.length > 0
+        ? await pwhashStr(escrowPassphrase)
+        : null;
+    getDb()
+      .prepare(
+        `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(spaceId, JSON.stringify(pkg), passphraseHash, now);
+  }
   const t = newJoinToken(spaceId, "creator");
   return {
     spaceId,

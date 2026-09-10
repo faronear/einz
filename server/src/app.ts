@@ -8,7 +8,7 @@ import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./
 import { getAvatar, storeAvatar } from "./avatars.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
-import { deleteKeyEscrow, getKeyEscrow, recoverSpace, uploadKeyEscrow } from "./escrow.js";
+import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, recoverSpace, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
 import { createJoinToken, createSpace, joinSpace, lookupSpace } from "./spaces.js";
 
@@ -82,8 +82,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // 见 docs/PROTOCOL_MULTIVERSE.md §4）
   if (method === "POST" && path === "/spaces") {
     const body = await readJson(req);
-    const r = createSpace(
+    const r = await createSpace(
       body?.displayName == null ? undefined : String(body.displayName),
+      body?.sealedSpaceKey,
+      body?.escrowPassphrase == null ? undefined : String(body.escrowPassphrase),
     );
     sendJson(res, 201, r);
     return;
@@ -107,6 +109,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const spaceId = path.slice("/spaces/".length, -"/join-tokens".length);
     const r = createJoinToken(spaceId);
     sendJson(res, 201, r);
+    return;
+  }
+  if (method === "POST" && path.startsWith("/spaces/") && path.endsWith("/key-escrow")) {
+    const spaceId = path.slice("/spaces/".length, -"/key-escrow".length);
+    const body = await readJson(req);
+    const r = await escrowForSpace(spaceId, body);
+    sendJson(res, 200, r);
     return;
   }
 
