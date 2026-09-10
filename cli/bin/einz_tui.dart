@@ -1127,7 +1127,9 @@ void _render() {
   final msgs = s.session.messages;
   for (var i = 0; i < msgs.length; i++) {
     lines.addAll(_formatMessage(msgs[i], cols));
-    if (i < msgs.length - 1) lines.add(''); // 消息之间空行隔开（末条后不插）
+    // 每条消息（含末条）后都插一个空行：消息之间靠空行隔开，末条的空行
+    // 给底部 [我] 输入区留出呼吸空间（老板要求——末条不插会让输入框紧贴末条）
+    lines.add('');
   }
   final maxStart = lines.length > msgArea ? lines.length - msgArea : 0;
   if (s.scrollTop >= s.lastMaxStart) {
@@ -1375,9 +1377,9 @@ String _genderBubble(String? rawGender) {
 /// 背景按我的性别配色；对方消息：性别气泡，整块左对齐（左侧气泡风格，[对方名 时间]
 /// 黑字标签嵌在气泡左缘、正文在右），背景按对方性别配色；系统提示（isSystem）：
 /// 灰色前缀 + 普通正文（左对齐）。
-/// 双方气泡下方的同色实线分割线改回空行（老板 2026-09-10 第三版：`─` 线视觉干扰，
-/// 干脆用空行隔开），区分同一人相邻消息的边界；空行由渲染层在消息之间插入
-/// （末条消息后不插）；系统提示消息同样参与空行分隔。
+/// 相邻消息之间以空行隔开（老板 2026-09-10 定版：`─` 线视觉干扰，改空行），
+/// 区分同一人相邻消息的边界；空行由渲染层在每条消息（含末条）后插入——
+/// 末条后的空行给底部 [我] 输入区留出呼吸空间；系统提示消息同样参与分隔。
 List<String> _formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
