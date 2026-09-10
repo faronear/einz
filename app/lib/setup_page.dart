@@ -1412,7 +1412,10 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       setState(() {
         _bootstrapFailed = e.code == 'INVALID_REQUEST';
-        _status = AppLocalizations.of(context)!.wizardEnrollFailed('$e');
+        // 空间数量上限：明确禁止提示（config.json maxSpaces——老板 2026-09-10）
+        _status = e.code == 'SPACE_LIMIT_REACHED'
+            ? AppLocalizations.of(context)!.wizardSpaceLimit
+            : AppLocalizations.of(context)!.wizardEnrollFailed('$e');
       });
     } catch (e) {
       if (!mounted) return;

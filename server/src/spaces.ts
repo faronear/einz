@@ -3,11 +3,12 @@ import { getDb } from "./db.js";
 import { ApiError } from "./auth.js";
 import { pwhashStr, toB64 } from "./crypto.js";
 import { parsePackage, type EscrowPackage } from "./escrow.js";
+import { deriveSpaceAddress } from "./address.js";
+import { loadConfig } from "./config.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
-// 骨架阶段说明：
-// - space_address 为随机 hex 占位（正式版由 space_public_key 经 Keccak-256 +
-//   EIP-55 派生，见 PROTOCOL_MULTIVERSE.md §1.3）；
+// - space_address 由 space_public_key（创建者公钥）经 Keccak-256 + EIP-55 派生
+//   （见 PROTOCOL_MULTIVERSE.md §1.3；地址只定位不授权）；
 // - join token 授权语义完整（一次性、24h、只存 SHA-256 hash）；
 // - 成员数事务约束完整（并发加入只有一个成功）；
 // - 端点的成员认证（Space-scoped session）由 U1 补齐，骨架暂免鉴权。
@@ -74,9 +75,23 @@ export async function createSpace(
   const spaceId = (clientSpaceId != null && clientSpaceId.trim().length > 0)
     ? clientSpaceId.trim()
     : randomUUID();
+  // 空间数量上限（config.json 的 maxSpaces：0=不限；≥1 时现有空间数 ≥ 上限即
+  // 禁止新建并返回 SPACE_LIMIT_REACHED——maxSpaces=1 即退回 v1 单空间模式，
+  // 老板 2026-09-10）
+  const cfg = loadConfig();
+  if (cfg.max_spaces > 0) {
+    const cnt = (getDb().prepare(`SELECT COUNT(*) AS n FROM spaces`).get() as { n: number }).n;
+    if (cnt >= cfg.max_spaces) {
+      throw new ApiError("SPACE_LIMIT_REACHED", "空间数量已达上限（maxSpaces）", 409);
+    }
+  }
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
-  const spaceAddress = "0x" + randomBytes(20).toString("hex");
-  const spacePublicKey = "pending:" + randomUUID();
+  const spacePublicKey = publicKey ?? "pending:" + randomUUID();
+  // 地址 = Keccak-256(space_public_key) 后 20 字节 + EIP-55（确定性；公钥缺失回退随机）
+  const spaceAddress = await deriveSpaceAddress(
+    spacePublicKey,
+    "0x" + randomBytes(20).toString("hex"),
+  );
   const now = Date.now();
   getDb()
     .prepare(

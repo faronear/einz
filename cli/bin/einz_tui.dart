@@ -802,7 +802,12 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     _scheduleRender();
     await _activateAfterBind(session, store, storePath, server);
   } catch (e) {
-    session.messages.add(_systemMessage(session, '⚠️ 创建空间失败: $e'));
+    // 空间数量上限：明确禁止提示（config.json maxSpaces——老板 2026-09-10）
+    if (e is ApiException && e.code == 'SPACE_LIMIT_REACHED') {
+      session.messages.add(_systemMessage(session, '⚠️ 空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间'));
+    } else {
+      session.messages.add(_systemMessage(session, '⚠️ 创建空间失败: $e'));
+    }
     _scheduleRender();
   }
 }

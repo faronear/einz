@@ -145,6 +145,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSlotRequired => '请选择你的身份';
 
   @override
+  String get wizardSpaceLimit => '空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间';
+
+  @override
   String get wizardTitleInvite => '验证邀请码';
 
   @override

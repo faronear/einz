@@ -45,6 +45,7 @@
   "wizardJoinNoSlots": "No member identities preset in this space — cannot join",
   "wizardSlotOnline": "online",
   "wizardSlotRequired": "Please pick your identity",
+  "wizardSpaceLimit": "Space limit reached (server maxSpaces) — cannot create a new space now",
   "wizardTitleInvite": "Verify invite code",
   "wizardTitlePassphrase": "Passphrase",
   "wizardJoinPassphraseTitle": "Verify passphrase",

@@ -368,6 +368,12 @@ abstract class AppLocalizations {
   /// **'Please pick your identity'**
   String get wizardSlotRequired;
 
+  /// No description provided for @wizardSpaceLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Space limit reached (server maxSpaces) — cannot create a new space now'**
+  String get wizardSpaceLimit;
+
   /// No description provided for @wizardTitleInvite.
   ///
   /// In en, this message translates to:

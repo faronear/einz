@@ -156,6 +156,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardSlotRequired => 'Please pick your identity';
 
   @override
+  String get wizardSpaceLimit =>
+      'Space limit reached (server maxSpaces) — cannot create a new space now';
+
+  @override
   String get wizardTitleInvite => 'Verify invite code';
 
   @override

@@ -45,6 +45,7 @@
   "wizardJoinNoSlots": "该空间未预置成员身份，无法加入",
   "wizardSlotOnline": "已在线",
   "wizardSlotRequired": "请选择你的身份",
+  "wizardSpaceLimit": "空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间",
   "wizardTitleInvite": "验证邀请码",
   "wizardTitlePassphrase": "设置密保口令",
   "wizardJoinPassphraseTitle": "验证密保口令",

@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { getDb, getMeta, setMeta } from "./db.js";
+
+const HERE = resolve(import.meta.dirname ?? process.cwd());
 
 export interface DeviceConfig {
   device_id: string;
@@ -14,11 +18,32 @@ export interface ServerConfig {
   protocol_version: string;
   /** Multiverse：能力清单（随端点实现逐步扩展） */
   capabilities: string[];
+  /** 空间数量上限（config.json 的 maxSpaces：0=不限；1=单空间即退回 v1 模式；n=最多 n 个）。 */
+  max_spaces: number;
+}
+
+/** 读取 config.json（server/config.json）——服务端每次启动读取一次（改配置需
+ *  重启生效；文件缺失或解析失败按默认值处理）。当前支持字段：maxSpaces。 */
+let fileConfigCache: { maxSpaces?: number } | null = null;
+function readFileConfig(): { maxSpaces?: number } {
+  if (fileConfigCache != null) return fileConfigCache;
+  const path = resolve(HERE, "../config.json");
+  if (existsSync(path)) {
+    try {
+      fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as { maxSpaces?: number };
+    } catch (e) {
+      console.warn(`[einz] config.json 解析失败（按默认配置继续）: ${e}`);
+      fileConfigCache = {};
+    }
+  } else {
+    fileConfigCache = {};
+  }
+  return fileConfigCache;
 }
 
 /** 加载服务配置：space_id 持久化在 db meta 表（首启自动生成 UUID，之后不变）。
- *  不再读取 config.json——自主模式：白名单完全靠动态登记
- *  （POST /devices/enroll：第一个设备免邀请码自举为创建者，之后设备凭邀请码加入）。 */
+ *  白名单完全靠动态登记（POST /devices/enroll：第一个设备免邀请码自举为创建者，
+ *  之后设备凭邀请码加入）。maxSpaces 来自 config.json（每次启动读取）。 */
 export function loadConfig(): ServerConfig {
   const existing = getMeta("space_id");
   const spaceId = existing ?? randomUUID();
@@ -26,10 +51,14 @@ export function loadConfig(): ServerConfig {
     setMeta("space_id", spaceId);
     console.log(`[einz] 首次启动：已生成 space_id=${spaceId}（持久化在 db meta，可在 /health 查看）`);
   }
+  const fc = readFileConfig();
+  const maxSpaces =
+    typeof fc.maxSpaces === "number" && fc.maxSpaces >= 0 ? Math.floor(fc.maxSpaces) : 0;
   return {
     space_id: spaceId,
     protocol_version: "v2-multiverse",
     capabilities: ["spaces", "join-tokens"],
+    max_spaces: maxSpaces,
   };
 }
 

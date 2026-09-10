@@ -2451,3 +2451,20 @@ cfg.space_id，行为不变）。
   伴侣页步骤），17 个测试全绿；analyze 0 error
 - 页面设计沿用 v1（名字页/伴侣页：TextField + 性别卡片选择；身份选择页：
   卡片列表点选）
+
+### #3 space_address 落地（Keccak-256 + EIP-55）
+- 新增 server/src/address.ts：toEip55（EIP-55 checksum 编码）+ deriveSpaceAddress
+  （Keccak-256(space_public_key 字节) 后 20 字节 → EIP-55 地址——确定性）
+- 用已有 hash-wasm 依赖的 keccak（无需新增依赖）
+- createSpace：space_public_key = 创建者公钥（base64，原"pending:"占位）；
+  space_address = 派生地址（公钥缺失回退随机——兼容）
+- 验证：地址格式 0x+40hex（含 EIP-55 大写）✓ 确定性 ✓ 旧空间兼容（冒烟/隔离全绿）
+
+### #4 空间数上限（config.json maxSpaces，老板 2026-09-10 方案）
+- server/config.json：maxSpaces（0=不限默认；1=单空间即 v1 模式；n=最多 n 个）
+- config.ts：启动读取一次（readFileConfig 缓存——改配置需重启）；loadConfig 返回
+  max_spaces
+- createSpace：现有空间数 ≥ maxSpaces → 409 SPACE_LIMIT_REACHED
+- 客户端：CLI/App 新建时收到该错误码显示禁止信息（App 加 l10n wizardSpaceLimit）
+- 验证：curl 实测 maxSpaces=1 时空间 1=201、空间 2=409 SPACE_LIMIT_REACHED；
+  cli/shared analyze 0 issue、App analyze 0 error（仅既有 info）
