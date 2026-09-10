@@ -2090,3 +2090,16 @@ chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热�
 （含末条）后无条件 `lines.add('')`。
 
 **验证：** dart analyze 0 issue；已提交。
+## 2026-09-10 长按消息菜单顶部加消息预览行（头像 + 按性别气泡风格正文）
+
+**老板要求：** 对话页长按消息弹出的菜单顶部加一行：发言人头像 + 该消息正文
+（截取到行末不溢出）；该行使用消息流里的按性别区分的气泡风格。
+
+**实现（chat_page）：** `_showMessageActions` 菜单 Column 顶部插入
+`_buildMessagePreviewRow`：头像（`_MessageAvatar`，我的在右/对方在左，与消息流
+一致）+ `_bubbleColor(mine)` 按性别气泡底色的正文（maxLines 1 + ellipsis 单行
+截断；gradient 风格白字/plain 深字随气泡）；附件消息无正文时显示消息类型
+（image/video/voice/file）作占位。
+
+**验证：** flutter analyze 0 issue；chat_page_menu + chat_bubble_gender 13/13
+全过；已热重启。

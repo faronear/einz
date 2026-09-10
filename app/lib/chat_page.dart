@@ -1101,6 +1101,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
+            // 老板要求 2026-09-10）
+            _buildMessagePreviewRow(m),
             ListTile(
               leading: const Icon(Icons.format_quote),
               title: Text(l10n.chatPageActionQuote),
@@ -1123,6 +1126,56 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       setState(() => _quoteTarget = m);
       _inputFocusNode.requestFocus();
     }
+  }
+
+  /// 长按菜单顶部的消息预览行：发言人头像 + 按性别气泡风格的正文。
+  /// 正文单行截断不溢出（老板要求 2026-09-10）；头像左右位置与消息流一致
+  /// （我的在右、对方在左）；附件消息无正文时显示消息类型作占位。
+  Widget _buildMessagePreviewRow(HistoryMessage m) {
+    final mine = m.sender == 'me';
+    final avatarPersonId =
+        m.env.senderPersonId ?? _repo.personIdOfDevice(m.env.senderDeviceId);
+    final preview = m.plaintext.trim();
+    final text = preview.isEmpty ? m.env.type : preview;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!mine) ...[
+            _MessageAvatar(
+                personId: avatarPersonId, server: widget.server, api: widget.api),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                // 与消息流一致：按发言人性别配色（男天蓝 / 女品牌粉）
+                color: _bubbleColor(mine: mine),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: DefaultTextStyle.merge(
+                style: TextStyle(
+                  color: _uiStyle == 'gradient' ? Colors.white : null,
+                  fontSize: 14,
+                ),
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ),
+          if (mine) ...[
+            const SizedBox(width: 8),
+            _MessageAvatar(
+                personId: avatarPersonId, server: widget.server, api: widget.api),
+          ],
+        ],
+      ),
+    );
   }
 
   /// 记录副本：标记为已删除/已焚毁（墓碑，内容隐藏、时间+焚毁记录保留）。
