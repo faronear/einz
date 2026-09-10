@@ -445,10 +445,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     try {
       if (name.isNotEmpty) {
         store.personName = name;
-        session.messages.add(_systemMessage(session, '✅ 已设置我的名字: $name （可随时 /rename 进行修改）'));
+        session.messages.add(_systemMessage(session, '✅ 已设置我的名字: $name （可随时 /myname 进行修改）'));
         _scheduleRender();
       }else {
-        session.messages.add(_systemMessage(session, '✅ 系统为我自动预设一个名字，我可随时 /rename 进行修改。'));
+        session.messages.add(_systemMessage(session, '✅ 系统为我自动预设一个名字，我可随时 /myname 进行修改。'));
       }
       // 我的性别（必选：仅接受 男/女，否则重新询问——与 App 向导一致）
       while (myGender == null) {
@@ -469,10 +469,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       if (!_state!.running) return; // /exit 或 Ctrl+C：结束引导
       if (partnerName.isNotEmpty) {
         partnerPresetName = partnerName;
-        session.messages.add(_systemMessage(session, '✅ 已为伴侣设置名字: $partnerName（以后可以 /rename 自行修改）'));
+        session.messages.add(_systemMessage(session, '✅ 已为伴侣设置名字: $partnerName（以后可以 /myname 自行修改）'));
         _scheduleRender();
       } else {
-        session.messages.add(_systemMessage(session, '✅ 系统将为伴侣自动预设一个名字，以后可以 /rename 自行修改。'));
+        session.messages.add(_systemMessage(session, '✅ 系统将为伴侣自动预设一个名字，以后可以 /myname 自行修改。'));
         _scheduleRender();
       }
       // 伴侣性别（必选：仅接受 男/女，否则重新询问——与 App 向导一致）
@@ -1969,7 +1969,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/rename <名字> :: 修改我的名字',
+        '/myname <名字> :: 修改我的名字',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2152,7 +2152,8 @@ Future<void> _execCommand(String line) async {
     case '/invite':
       // 补发邀请码：/invite [personA|personB] [对方名称]（默认 personB=邀请对方）
       await _execInvite(parts);
-    case '/rename':
+    case '/myname':
+    case '/rename': // 旧命令兼容（2026-09-10 改名为 /myname）
       // 重设个人显示名（personName）：本地 + 服务端同步 + 刷新名称表
       if (arg.isEmpty) {
         // 先输出当前名字（状态），再给出详细用法
@@ -2161,7 +2162,7 @@ Future<void> _execCommand(String line) async {
             '(未设置)';
         s.session.messages.add(_systemMessage(s.session, '当前名字: $current'));
         s.session.messages.add(
-            _systemMessage(s.session, '用法: /rename <名字> —— 修改我的显示名字（如 /rename Lukas）'));
+            _systemMessage(s.session, '用法: /myname <名字> —— 修改我的显示名字（如 /myname Lukas）'));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
