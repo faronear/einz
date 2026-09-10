@@ -18,8 +18,10 @@ export interface SessionResult {
   expires_in: number;
 }
 
-/** 阶段 1：生成密封 challenge（PROTOCOL.md §3）。仅白名单内 active 设备可发起。 */
-export async function createChallenge(cfg: ServerConfig, deviceId: string): Promise<ChallengeResult> {
+/** 阶段 1：生成密封 challenge（PROTOCOL.md §3）。仅白名单内 active 设备可发起。
+ *  Multiverse：可选目标 spaceId（记录到 challenge，随后随 session 绑定；不带则
+ *  legacy 回落——存量 v1 客户端行为不变）。 */
+export async function createChallenge(cfg: ServerConfig, deviceId: string, spaceId?: string): Promise<ChallengeResult> {
   if (!isActiveDevice(cfg, deviceId)) {
     throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   }
@@ -30,20 +32,21 @@ export async function createChallenge(cfg: ServerConfig, deviceId: string): Prom
 
   getDb()
     .prepare(
-      `INSERT INTO challenges (challenge_id, device_id, challenge, expires_at, used)
-       VALUES (?, ?, ?, ?, 0)`
+      `INSERT INTO challenges (challenge_id, device_id, space_id, challenge, expires_at, used)
+       VALUES (?, ?, ?, ?, ?, 0)`
     )
-    .run(challengeId, deviceId, toB64(challenge), Date.now() + CHALLENGE_TTL_MS);
+    .run(challengeId, deviceId, spaceId ?? null, toB64(challenge), Date.now() + CHALLENGE_TTL_MS);
 
   return { challenge_id: challengeId, sealed_challenge: sealed, expires_in: CHALLENGE_TTL_MS / 1000 };
 }
 
-/** 阶段 2：校验明文并签发 session（PROTOCOL.md §3）。challenge 一次性。 */
+/** 阶段 2：校验明文并签发 session（PROTOCOL.md §3）。challenge 一次性。
+ *  Multiverse：session 绑定 challenge 记录的目标 Space（NULL → legacy cfg.space_id）。 */
 export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintextB64: string): SessionResult {
   const row = getDb()
     .prepare(`SELECT * FROM challenges WHERE challenge_id = ?`)
     .get(challengeId) as
-    | { challenge_id: string; device_id: string; challenge: string; expires_at: number; used: number }
+    | { challenge_id: string; device_id: string; space_id: string | null; challenge: string; expires_at: number; used: number }
     | undefined;
 
   if (!row) throw new ApiError("INVALID_REQUEST", "unknown challenge", 400);
@@ -65,24 +68,26 @@ export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintex
   // session_token 用 Node crypto 同步生成（无需 await）
   const sessionToken = toB64(new Uint8Array(nodeRandomBytes(32)));
   const now = Date.now();
+  const sessionSpaceId = row.space_id ?? cfg.space_id; // legacy 回落
   db.prepare(
-    `INSERT INTO sessions (session_token, device_id, expires_at, created_at) VALUES (?, ?, ?, ?)`
-  ).run(sessionToken, row.device_id, now + SESSION_TTL_MS, now);
+    `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`
+  ).run(sessionToken, row.device_id, sessionSpaceId, now + SESSION_TTL_MS, now);
 
-  return { session_token: sessionToken, space_id: cfg.space_id, expires_in: SESSION_TTL_MS / 1000 };
+  return { session_token: sessionToken, space_id: sessionSpaceId, expires_in: SESSION_TTL_MS / 1000 };
 }
 
-/** 通过 session_token 解析设备。 */
-export function resolveSession(token: string): { device_id: string } {
+/** 通过 session_token 解析设备（Multiverse：附带 session 绑定的 space_id，
+ *  NULL=ALTER 前的 legacy 存量会话，调用方按需回落）。 */
+export function resolveSession(token: string): { device_id: string; space_id: string | null } {
   const row = getDb()
-    .prepare(`SELECT device_id, expires_at FROM sessions WHERE session_token = ?`)
-    .get(token) as { device_id: string; expires_at: number } | undefined;
+    .prepare(`SELECT device_id, space_id, expires_at FROM sessions WHERE session_token = ?`)
+    .get(token) as { device_id: string; space_id: string | null; expires_at: number } | undefined;
   if (!row) throw new ApiError("UNAUTHORIZED", "invalid session", 401);
   if (row.expires_at < Date.now()) {
     getDb().prepare(`DELETE FROM sessions WHERE session_token = ?`).run(token);
     throw new ApiError("UNAUTHORIZED", "session expired", 401);
   }
-  return { device_id: row.device_id };
+  return { device_id: row.device_id, space_id: row.space_id };
 }
 
 export function touchLastSeen(deviceId: string): void {

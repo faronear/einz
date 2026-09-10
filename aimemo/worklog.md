@@ -2345,3 +2345,31 @@ sealedSpaceKey+口令 ✓ join ✓ 正确口令取回 Space Key 密封包 ✓ �
 ESCROW_VERIFY_FAILED ✓ 无 escrow 空间取包失败 ✓。**踩坑：3999 端口残留
 server 进程导致 EADDRINUSE 与请求打到旧进程（假 404）——先 lsof -ti:3999
 清理再测**。已提交。
+
+## 2026-09-10 Multiverse U1 租户隔离（session 绑定 Space + 消息按空间隔离）
+
+**目标：** 多租户实质——设备认证绑定 Space，消息读写与 WS 广播按 Space 隔离，
+跨空间互不可见；v1 客户端兼容（challenge 不带 space_id → legacy 回落
+cfg.space_id，行为不变）。
+
+**实现（server/，feature/multiverse 分支）：**
+- `db.ts`：sessions/challenges 加 `space_id` 列（CREATE + ALTER 迁移）；messages
+  `server_sequence` 由全局 UNIQUE 改 `UNIQUE(space_id, server_sequence)`（存量库
+  检测旧单列唯一自动索引 → 重建表，复合唯一不触发循环重建）。
+- `auth.ts`：createChallenge 可选 spaceId（写入 challenges）；verifyChallenge 的
+  session 绑定 `row.space_id ?? cfg.space_id`（legacy 回落）；resolveSession 返回
+  `{ device_id, space_id }`。
+- `messages.ts`：postMessage/syncMessages 按 session.space_id 回落值过滤；幂等检查
+  加 space 条件；server_sequence 按 Space 独立递增。
+- `ws.ts`：Conn 加 spaceId（attachWs 时绑定）；广播（peer 状态/passphrase 重设/
+  profile 更新/key 轮换）只发同 Space 连接（sameSpace 从发起方 conn 取，发起方
+  离线不广播）；broadcastNewMessage 按消息落库 space 分组（发信方可能无 WS）；
+  close 先广播离线再删连接。
+- `app.ts`：/auth/challenge 透传 space_id。
+- 新测试 `test/two_space_isolation.test.ts`：双 Space 隔离验收（A 绑 spaceA 发消息，
+  B 绑 spaceB 同步为空；反向亦然；两空间 sequence 各自从 1 起）；package.json
+  test 脚本串联冒烟 + 隔离测试。
+
+**验证：** npm run build 0 错；npm test 全绿（冒烟 v1 兼容 + 双 Space 隔离）。
+**踩坑：** messages 全局 UNIQUE(server_sequence) 与按空间递增冲突 → 复合唯一 +
+重建迁移；TS18047（回调内引用模块级 db 丢非 null 推断）→ 改 for 循环。已提交。

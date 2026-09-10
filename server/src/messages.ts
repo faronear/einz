@@ -50,11 +50,14 @@ function validateEnvelope(body: unknown): MessageEnvelope {
   };
 }
 
-/** POST /messages：持久化密文并分配 server_sequence；同一 message_id 幂等（PROTOCOL.md §5.1）。 */
+/** POST /messages：持久化密文并分配 server_sequence；同一 message_id 幂等（PROTOCOL.md §5.1）。
+ *  Multiverse：写入 session 绑定的 Space（legacy 回落 cfg.space_id），幂等与
+ *  server_sequence 均按 Space 隔离（PROTOCOL_MULTIVERSE.md §3.6）。 */
 export function postMessage(cfg: ServerConfig, token: string, body: unknown): { message_id: string; server_sequence: number; created_at: number } {
-  const { device_id } = resolveSession(token);
+  const { device_id, space_id: sessionSpace } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
+  const spaceId = sessionSpace ?? cfg.space_id; // legacy 回落
 
   const env = validateEnvelope(body);
   if (env.sender_device_id !== device_id) {
@@ -63,21 +66,22 @@ export function postMessage(cfg: ServerConfig, token: string, body: unknown): { 
 
   const db = getDb();
   const existing = db
-    .prepare(`SELECT server_sequence, created_at FROM messages WHERE message_id = ?`)
-    .get(env.message_id) as { server_sequence: number; created_at: number } | undefined;
+    .prepare(`SELECT server_sequence, created_at FROM messages WHERE message_id = ? AND space_id = ?`)
+    .get(env.message_id, spaceId) as { server_sequence: number; created_at: number } | undefined;
   if (existing) {
     return { message_id: env.message_id, server_sequence: existing.server_sequence, created_at: existing.created_at };
   }
 
   const now = Date.now();
+  // Multiverse：server_sequence 按 Space 独立递增（不是全局）
   const nextSeq = db
-    .prepare(`SELECT COALESCE(MAX(server_sequence), 0) + 1 AS next FROM messages`)
-    .get() as { next: number };
+    .prepare(`SELECT COALESCE(MAX(server_sequence), 0) + 1 AS next FROM messages WHERE space_id = ?`)
+    .get(spaceId) as { next: number };
 
   db.prepare(
     `INSERT INTO messages (message_id, space_id, sender_device_id, sender_person_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(env.message_id, cfg.space_id, env.sender_device_id, env.sender_person_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
+  ).run(env.message_id, spaceId, env.sender_device_id, env.sender_person_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
 
   return { message_id: env.message_id, server_sequence: nextSeq.next, created_at: now };
 }
@@ -89,9 +93,10 @@ export function syncMessages(
   after: number,
   limit: number
 ): { messages: StoredMessage[]; attachments_meta: AttachmentMeta[]; last_sequence: number; has_more: boolean } {
-  const { device_id } = resolveSession(token);
+  const { device_id, space_id: sessionSpace } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
+  const spaceId = sessionSpace ?? cfg.space_id; // legacy 回落
 
   const safeLimit = Math.min(Math.max(limit, 1), 500);
   const db = getDb();
@@ -101,7 +106,7 @@ export function syncMessages(
        FROM messages WHERE space_id = ? AND server_sequence > ?
        ORDER BY server_sequence ASC LIMIT ?`
     )
-    .all(cfg.space_id, after, safeLimit + 1) as StoredMessage[];
+    .all(spaceId, after, safeLimit + 1) as StoredMessage[];
 
   // v 是协议常量（未入库），同步响应需补齐（PROTOCOL.md §5.2）
   const withVersion: StoredMessage[] = rows.map((r) => ({ ...r, v: 1 }));

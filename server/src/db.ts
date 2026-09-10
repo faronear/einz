@@ -35,8 +35,9 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       key_version      INTEGER NOT NULL,
       nonce            TEXT NOT NULL,
       ciphertext       TEXT NOT NULL,
-      server_sequence  INTEGER NOT NULL UNIQUE,
-      created_at       INTEGER NOT NULL
+      server_sequence  INTEGER NOT NULL,
+      created_at       INTEGER NOT NULL,
+      UNIQUE (space_id, server_sequence)  -- Multiverse：序号按 Space 独立递增
     );
     CREATE INDEX IF NOT EXISTS idx_messages_seq ON messages (space_id, server_sequence);
 
@@ -70,6 +71,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     CREATE TABLE IF NOT EXISTS challenges (
       challenge_id TEXT PRIMARY KEY,
       device_id    TEXT NOT NULL,
+      space_id     TEXT,  -- Multiverse：目标 Space（NULL=legacy v1 认证）
       challenge    TEXT NOT NULL,
       expires_at   INTEGER NOT NULL,
       used         INTEGER NOT NULL DEFAULT 0
@@ -88,6 +90,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     CREATE TABLE IF NOT EXISTS sessions (
       session_token TEXT PRIMARY KEY,
       device_id     TEXT NOT NULL,
+      space_id      TEXT,  -- Multiverse：绑定 Space（NULL=legacy v1 会话）
       expires_at    INTEGER NOT NULL,
       created_at    INTEGER NOT NULL
     );
@@ -148,6 +151,59 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     db.exec(`ALTER TABLE key_escrow ADD COLUMN passphrase_hash TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
+  }
+  // 迁移：sessions/challenges 补 space_id（Multiverse：session 绑定 Space；存量库 ALTER）
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN space_id TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  try {
+    db.exec(`ALTER TABLE challenges ADD COLUMN space_id TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：messages.server_sequence 由全局 UNIQUE 改为 (space_id, server_sequence)
+  // 复合唯一（Multiverse：序号按 Space 独立递增，PROTOCOL_MULTIVERSE.md §3.6）。
+  // SQLite 无法 ALTER 删除 UNIQUE，检测到旧的"单列 server_sequence 唯一自动索引"
+  // 则重建表（重建后的复合唯一不满足该检测，不会循环重建）。
+  {
+    const indexes = db.pragma("index_list(messages)") as unknown as Array<{ name: string; unique: number }>;
+    // 用 for 循环而非回调：回调内引用模块级 `db` 会丢非 null 推断（TS18047）
+    let hasOldSeqUnique = false;
+    for (const i of indexes) {
+      if (!i.name.startsWith("sqlite_autoindex_messages_") || i.unique !== 1) continue;
+      const cols = db.pragma(`index_info(${JSON.stringify(i.name)})`) as unknown as Array<{ name: string }>;
+      if (cols.length === 1 && cols[0].name === "server_sequence") {
+        hasOldSeqUnique = true;
+        break;
+      }
+    }
+    if (hasOldSeqUnique) {
+      db.pragma("foreign_keys = OFF");
+      db.exec(`
+        BEGIN;
+        CREATE TABLE messages_new (
+          message_id       TEXT PRIMARY KEY,
+          space_id         TEXT NOT NULL,
+          sender_device_id TEXT NOT NULL,
+          sender_person_id TEXT,
+          type             TEXT NOT NULL,
+          key_version      INTEGER NOT NULL,
+          nonce            TEXT NOT NULL,
+          ciphertext       TEXT NOT NULL,
+          server_sequence  INTEGER NOT NULL,
+          created_at       INTEGER NOT NULL,
+          UNIQUE (space_id, server_sequence)
+        );
+        INSERT INTO messages_new SELECT message_id, space_id, sender_device_id, sender_person_id, type, key_version, nonce, ciphertext, server_sequence, created_at FROM messages;
+        DROP TABLE messages;
+        ALTER TABLE messages_new RENAME TO messages;
+        CREATE INDEX idx_messages_seq ON messages (space_id, server_sequence);
+        COMMIT;
+      `);
+      db.pragma("foreign_keys = ON");
+    }
   }
   // 迁移：attachments.message_id 去掉外键（两阶段上传：blob 可先于 message 存在，
   // PROTOCOL.md §6.1）。SQLite 无法 ALTER 删除外键，检测到旧 schema 则重建表。

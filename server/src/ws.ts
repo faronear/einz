@@ -8,6 +8,7 @@ import { getDb } from "./db.js";
 interface Conn {
   ws: WebSocket;
   deviceId: string;
+  spaceId: string; // Multiverse：连接绑定的 Space（legacy 回落 cfg.space_id）
   alive: boolean;
   connectedAt: number; // 本次 WS 连接建立时刻（ms）——/devices 显示"上线时间"
 }
@@ -24,10 +25,18 @@ export function getConnectedAt(deviceId: string): number | null {
   return conns.get(deviceId)?.connectedAt ?? null;
 }
 
-/** 向其他设备广播 peer 上下线事件（App 实时更新对方在线状态——TUI 退出立即变红）。 */
+/** 广播只发给与发起方同一 Space 的在线设备（Multiverse：跨空间不推送；
+ *  发起方不在线（无连接）时不广播）。 */
+function sameSpace(exceptDeviceId: string): string | null {
+  return conns.get(exceptDeviceId)?.spaceId ?? null;
+}
+
 function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer.offline"): void {
+  const spaceId = sameSpace(exceptDeviceId);
+  if (spaceId == null) return;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
+    if (conn.spaceId !== spaceId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(JSON.stringify({ id: 0, type, payload: { device_id: exceptDeviceId } }));
     }
@@ -36,8 +45,11 @@ function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer
 
 /** 空间口令已被重设：通知其余在线设备（客户端收到后只发通知不弹窗）。 */
 export function broadcastPassphraseRotated(exceptDeviceId: string): void {
+  const spaceId = sameSpace(exceptDeviceId);
+  if (spaceId == null) return;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
+    if (conn.spaceId !== spaceId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(
         JSON.stringify({ id: 0, type: "passphrase.rotated", payload: { device_id: exceptDeviceId } })
@@ -51,8 +63,11 @@ export function broadcastProfileUpdated(
   exceptDeviceId: string,
   payload: { person_id?: string; device_id: string; person_name?: string; device_name?: string }
 ): void {
+  const spaceId = sameSpace(exceptDeviceId);
+  if (spaceId == null) return;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
+    if (conn.spaceId !== spaceId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(JSON.stringify({ id: 0, type: "profile.updated", payload }));
     }
@@ -72,8 +87,12 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
     }
 
     let deviceId: string;
+    let spaceId: string;
     try {
-      deviceId = resolveSession(token ?? "").device_id;
+      const sess = resolveSession(token ?? "");
+      deviceId = sess.device_id;
+      // Multiverse：WS 绑定 session 的 Space（legacy 回落 cfg.space_id）
+      spaceId = sess.space_id ?? cfg.space_id;
     } catch {
       ws.close(4401, "UNAUTHORIZED");
       return;
@@ -87,14 +106,14 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
     const old = conns.get(deviceId);
     if (old) old.ws.close(4408, "duplicate connection");
 
-    const conn: Conn = { ws, deviceId, alive: true, connectedAt: Date.now() };
+    const conn: Conn = { ws, deviceId, spaceId, alive: true, connectedAt: Date.now() };
     conns.set(deviceId, conn);
     // WS 连接 = 在线：刷新 last_seen（App 判定对方在线）
     getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(Date.now(), deviceId);
     broadcastPeerStatus(deviceId, "peer.online");
-    console.log(`[req] WS /ws connect device=${deviceId} total=${conns.size}`);
+    console.log(`[req] WS /ws connect device=${deviceId} space=${spaceId} total=${conns.size}`);
 
-    ws.send(JSON.stringify({ id: 1, type: "hello", payload: { device_id: deviceId, space_id: cfg.space_id } }));
+    ws.send(JSON.stringify({ id: 1, type: "hello", payload: { device_id: deviceId, space_id: spaceId } }));
 
     ws.on("message", (data) => {
       try {
@@ -112,10 +131,11 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
     });
 
     ws.on("close", () => {
-      if (conns.get(deviceId) === conn) conns.delete(deviceId);
-      // WS 断开 = 离线：last_seen 置 0（App 判定离线）+ 广播对方下线（App 立即变红）
-      getDb().prepare(`UPDATE devices SET last_seen = 0 WHERE device_id = ?`).run(deviceId);
+      // 先广播离线（peer 广播按发起方空间分组，此时 conn 还在 conns）再删除
       broadcastPeerStatus(deviceId, "peer.offline");
+      if (conns.get(deviceId) === conn) conns.delete(deviceId);
+      // WS 断开 = 离线：last_seen 置 0（App 判定离线）
+      getDb().prepare(`UPDATE devices SET last_seen = 0 WHERE device_id = ?`).run(deviceId);
       console.log(`[req] WS /ws disconnect device=${deviceId} total=${conns.size}`);
     });
   });
@@ -137,10 +157,16 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
   wss.on("close", () => clearInterval(heartbeat));
 }
 
-/** 向对端广播新消息（先持久化后广播，PROTOCOL.md §8.3）。 */
+/** 向对端广播新消息（先持久化后广播，PROTOCOL.md §8.3）。
+ *  Multiverse：按消息落库的 Space 分组（发信方可能无 WS 连接，故查库而非取 conn）。 */
 export function broadcastNewMessage(exceptDeviceId: string, message: MessageEnvelope & { server_sequence: number; created_at: number }): void {
+  const row = getDb()
+    .prepare(`SELECT space_id FROM messages WHERE message_id = ?`)
+    .get(message.message_id) as { space_id: string } | undefined;
+  if (!row) return;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
+    if (conn.spaceId !== row.space_id) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(
         JSON.stringify({
@@ -165,10 +191,14 @@ export function notifyRevoked(deviceId: string): void {
   conns.delete(deviceId);
 }
 
-/** 通知剩余设备执行 Space Key 轮换（PROTOCOL.md §8.2 key.rotation）。 */
+/** 通知剩余设备执行 Space Key 轮换（PROTOCOL.md §8.2 key.rotation）。
+ *  Multiverse：仅同 Space 的在线设备（发起方无 WS 连接时不广播）。 */
 export function notifyKeyRotation(exceptDeviceId: string, keyVersion: number): void {
+  const spaceId = sameSpace(exceptDeviceId);
+  if (spaceId == null) return;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
+    if (conn.spaceId !== spaceId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(JSON.stringify({ id: 0, type: "key.rotation", payload: { key_version: keyVersion } }));
     }

@@ -123,7 +123,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/auth/challenge") {
     const body = await readJson(req);
     const deviceId = String(body?.device_id ?? "");
-    const result = await createChallenge(cfg, deviceId);
+    // Multiverse：可选 target space（记录到 challenge→session；不带则 legacy 回落）
+    const spaceId = body?.space_id == null ? undefined : String(body.space_id);
+    const result = await createChallenge(cfg, deviceId, spaceId);
     sendJson(res, 200, result);
     return;
   }
