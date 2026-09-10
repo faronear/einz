@@ -2153,7 +2153,6 @@ Future<void> _execCommand(String line) async {
       // 补发邀请码：/invite [personA|personB] [对方名称]（默认 personB=邀请对方）
       await _execInvite(parts);
     case '/myname':
-    case '/rename': // 旧命令兼容（2026-09-10 改名为 /myname）
       // 重设个人显示名（personName）：本地 + 服务端同步 + 刷新名称表
       if (arg.isEmpty) {
         // 先输出当前名字（状态），再给出详细用法
