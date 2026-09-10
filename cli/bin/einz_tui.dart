@@ -725,9 +725,14 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   }
   var displayName = store.personName ?? '';
   if (displayName.isEmpty) {
-    displayName = (await _prompt(session, '❓ 我的名字（空间显示名）:')).trim();
-    if (!_state!.running) return;
-    if (displayName.isEmpty) displayName = '创建者';
+    // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）
+    while (true) {
+      displayName = (await _prompt(session, '❓ 我的名字（空间显示名，必填）:')).trim();
+      if (!_state!.running) return;
+      if (displayName.isNotEmpty) break;
+      session.messages.add(_systemMessage(session, '⚠️ 名字必填，请输入'));
+      _scheduleRender();
+    }
   }
   // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）
   while (myGender == null) {
