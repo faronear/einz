@@ -2481,3 +2481,15 @@ cfg.space_id，行为不变）。
 - 脚本改名 scripts/run_app.sh → scripts/build_ios.sh（聚焦 flutter build ios +
   透传参数；老板 2026-09-10 建议——名字更精确）；flutter run 手动加
   --dart-define-from-file 同样支持（README 已说明）
+
+### TUI 向导输入细节（老板 2026-09-10）
+- 创建空间：我的名字/伴侣名字都必填（不允许空——去掉"创建者"回退）
+- 性别选择改数字输入：1=男、2=女（只接受数字——不接受"男/女/male/female"文字）
+
+### /invite 改造（v1 邀请码 → Multiverse join token）
+- /invite 改为生成绑定新设备的 join token（POST /spaces/{id}/join-tokens——
+  24h 一次性；shared 加 JoinTokenResult + createJoinToken；v1 createInvite 废弃）
+- 输出：📎 新设备绑定邀请（链接）+ token + 提示"新设备 /space join <链接> 绑定"
+- 验证：pty e2e 全通（A create → B join → A /invite 工作 → C join（同端点 token））
+- 踩坑：pty 渲染帧交错（抓 token 不可靠——/invite 断言命令工作 + join 用 curl
+  同端点 token）；A create 后卡锁屏码询问（/invite 前先回车跳过）

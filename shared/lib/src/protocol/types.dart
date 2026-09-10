@@ -192,6 +192,25 @@ class SpaceCreateResult {
 }
 
 /// 邀请码生成结果（POST /invites 返回，创建者调用）。
+/// Multiverse：POST /spaces/{id}/join-tokens 生成的绑定新设备的邀请（24h 一次性）。
+class JoinTokenResult {
+  const JoinTokenResult({
+    required this.joinToken,
+    required this.link,
+    required this.expiresAt,
+  });
+
+  final String joinToken;
+  final String link;
+  final int expiresAt;
+
+  factory JoinTokenResult.fromJson(Map<String, dynamic> json) => JoinTokenResult(
+        joinToken: json['joinToken'] as String,
+        link: json['link'] as String,
+        expiresAt: json['expiresAt'] as int,
+      );
+}
+
 class InviteResult {
   const InviteResult({required this.inviteCode, required this.personId, required this.expiresAt});
 

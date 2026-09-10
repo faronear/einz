@@ -152,7 +152,7 @@ def main():
     name, out, _ = read_until(m_a, [
         ("ask_gender", re.compile(r"我的性别")),
     ], prefix="A")
-    send(m_a, "男\r")
+    send(m_a, "1\r")  # 我的性别：1=男（数字输入——老板定稿）
     name, out, _ = read_until(m_a, [
         ("ask_partner_name", re.compile(r"伴侣的名字")),
     ], prefix="A")
@@ -160,7 +160,7 @@ def main():
     name, out, _ = read_until(m_a, [
         ("ask_partner_gender", re.compile(r"伴侣的性别")),
     ], prefix="A")
-    send(m_a, "女\r")
+    send(m_a, "2\r")  # 伴侣性别：2=女（数字输入——老板定稿）
     name, out, _ = read_until(m_a, [
         ("ask_passphrase", re.compile(r"设置密保口令")),
     ], prefix="A")
@@ -189,8 +189,19 @@ def main():
     p_b, m_b, addr_b = join_flow("B", STORE_B, token1, slot=1)
 
     # ---------- 设备 C：第一人的其他设备（选身份 0 = Lukas）----------
-    # A 创建时的 token1 已被 B 消费——经 join-tokens 端点再生成一个。
-    # spaceId 从 A 的 store 文件读取（权威来源，不依赖渲染/URL 的地址抓取）。
+    # 验证 /invite 命令工作（输出新设备绑定邀请——渲染帧交错导致抓 token 不可靠，
+    # 故 join 用同端点 curl 生成的 token 验证 join 链路——createJoinToken 同一端点）。
+    # A create 后可能卡在锁屏码询问（_askSetPin——onboarded=true）：先回车跳过
+    send(m_a, "\r")
+    send(m_a, "/invite\r")
+    name, out3, _ = read_until(m_a, [
+        ("invite", re.compile(r"新设备绑定邀请")),
+        ("fail", re.compile(r"邀请生成失败")),
+    ], timeout=20, prefix="A-invite")
+    if name != "invite":
+        print("FAIL A: /invite 未生成绑定邀请。输出:\n", out3[-600:])
+        sys.exit(1)
+    print("A: /invite 命令工作（生成新设备绑定邀请）")
     with open(STORE_A) as f:
         store_a = json.load(f)
     req = urllib.request.Request(
@@ -199,7 +210,7 @@ def main():
     with urllib.request.urlopen(req, timeout=5) as r:
         t2 = json.load(r)
     token2 = t2["joinToken"]
-    print("C: 生成第二个 token =", token2)
+    print("C: 生成新 token =", token2)
     p_c, m_c, addr_c = join_flow("C", STORE_C, token2, slot=0)
 
     # ---------- 断言 ----------

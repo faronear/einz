@@ -2390,8 +2390,10 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/invite':
-      // 补发邀请码：/invite [personA|personB] [对方名称]（默认 personB=邀请对方）
-      await _execInvite(parts);
+      // Multiverse：生成绑定新设备的邀请（join token——24h 一次性；v1 邀请码
+      // 已废弃——新设备用 /space join <链接或 token> 绑定）
+      await _execInvite();
+      break;
     case '/myname':
       // 重设个人显示名（personName）：本地 + 服务端同步 + 刷新名称表
       if (arg.isEmpty) {
@@ -2457,33 +2459,24 @@ Future<void> _execCommand(String line) async {
 
 /// /invite [personA|personB] [对方名称]：补发一次性邀请码（默认 personB=邀请对方，
 /// 给第二使用者；personA=给自己加新设备）。需先 /auth 激活。
-Future<void> _execInvite(List<String> parts) async {
+Future<void> _execInvite() async {
   final s = _state!;
-  final token = s.session.store.sessionToken;
-  if (token == null) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活：先 /auth 激活会话后再生成邀请码'));
+  final store = s.session.store;
+  if (store.spaceKey == null || store.spaceId == null) {
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 尚未绑定空间（先 /space create 或 /space join）'));
     s.status = '';
     return;
   }
-  final personId = parts.length > 1 ? parts[1] : 'personB';
-  if (personId != 'personA' && personId != 'personB') {
-    s.session.messages.add(_systemMessage(s.session, '用法: /invite [personA|personB] [对方名称]（默认 personB）'));
-    return;
-  }
-  final name = parts.length > 2 ? parts.sublist(2).join(' ') : null;
   try {
-    final api = ApiClient(s.session.server);
-    final r = await _busy(s.session, '⏳ 邀请码生成中......', () => api.createInvite(
-      token: token,
-      personId: personId,
-      personName: name,
-      hours: 24,
-    ));
-    // 邀请码作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
-    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码（24 小时内一次性有效）: ${r.inviteCode}'));
-    s.status = ''; // 反馈在消息区（邀请码本身），状态栏保持干净
+    final api = ApiClient(store.server ?? '');
+    final r = await _busy(s.session, '⏳ 邀请生成中......', () => api.createJoinToken(store.spaceId!));
+    // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
+    s.session.messages.add(_systemMessage(s.session, '📎 新设备绑定邀请（24 小时有效、仅可用一次）：\n${r.link}'));
+    s.session.messages.add(_systemMessage(s.session, '   token: ${r.joinToken}'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 新设备输入 /space join <链接或 token> 即可绑定'));
+    s.status = ''; // 反馈在消息区，状态栏保持干净
   } catch (e) {
-    s.session.messages.add(_systemMessage(s.session, '❌ 邀请码生成失败: $e'));
+    s.session.messages.add(_systemMessage(s.session, '❌ 邀请生成失败: $e'));
     s.status = '';
   }
 }

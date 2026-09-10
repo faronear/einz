@@ -160,6 +160,17 @@ class ApiClient {
     return SpaceCreateResult.fromJson(res);
   }
 
+  /// Multiverse：生成绑定新设备的邀请（POST /spaces/{id}/join-tokens——
+  /// 24h 一次性 token，新设备 /space join 绑定；服务端不要求认证）。
+  Future<JoinTokenResult> createJoinToken(String spaceId) async {
+    final res = await _post(
+      '/spaces/$spaceId/join-tokens',
+      const {},
+      withToken: false,
+    );
+    return JoinTokenResult.fromJson(res);
+  }
+
   /// Multiverse：按空间口令取回 Space Key 密封包（POST /spaces/{id}/key-escrow，
   /// 口令正确才返回，PROTOCOL_MULTIVERSE.md §4.2——join 方取钥，不撤销设备）。
   Future<BackupFile?> fetchSpaceEscrow(String spaceId, String passphrase) async {
