@@ -45,9 +45,10 @@ npm run dev
 ```bash
 cd app
 cp local_config.example.json local_config.json   # 按需修改里面的 kEinzServer
-flutter run --dart-define-from-file=local_config.json   # 或 ./scripts/run_app.sh
+flutter run --dart-define-from-file=local_config.json   # flutter run/build 都支持此参数
 ```
 
 - `app/local_config.json` **不入 git**（已 .gitignore）——覆盖 `kEinzServer` 等启动参数（`String.fromEnvironment`），不污染 commit
-- 便捷入口：`./scripts/run_app.sh run -d <UDID>` / `./scripts/run_app.sh build ios --release`（自动带上本机配置）
+- 打包入口：`./scripts/build_ios.sh [--release ...]`（自动带上本机配置——聚焦 iOS 构建）
+- 调试入口：`flutter run --dart-define-from-file=local_config.json -d <UDID>`（run 同样支持，手动加参数即可）
 - 服务端对应：`server/config.json` 的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）

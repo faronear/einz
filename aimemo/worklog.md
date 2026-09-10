@@ -2478,3 +2478,6 @@ cfg.space_id，行为不变）。
 - scripts/run_app.sh：透传 flutter 命令 + local_config.json 存在则自动加参数
 - README 加「本地开发配置（App）」说明
 - 验证：不带 define → https://einz.tic.cc；带 local_config.json → localhost:3000 ✓
+- 脚本改名 scripts/run_app.sh → scripts/build_ios.sh（聚焦 flutter build ios +
+  透传参数；老板 2026-09-10 建议——名字更精确）；flutter run 手动加
+  --dart-define-from-file 同样支持（README 已说明）
