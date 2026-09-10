@@ -2272,6 +2272,18 @@ TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不�
 
 **验证：** dart analyze（cli + shared）0 issue；源码/文档 grep 无 /rename 残留。
 
+## 2026-09-10 iOS 真机安装排障：SPM 残留引用 + Xcode 版本过旧
+
+**背景：** 老板在 iMac（macOS 15.7.7，Xcode 16.1，Flutter 3.47.2）上尝试把 Einz 装到 iPhone 11（iOS 26.3）。付费开发者账号已过期未续费，但**免费 Personal Team 即可真机调试**（7 天重签限制；APNs/分发仍需付费）。
+
+**排障过程：**
+1. **Xcode 16.1 太旧**：最高只支持 iOS 18.1 设备，带不动 iOS 26.3 真机 → 需 App Store 升级 Xcode 26.x（macOS 15.7.7 满足要求）。
+2. **误跑模拟器**：状态栏 "Paused Runner on iPhone 16 Pro" = 旧模拟器调试会话残留（之前启动过 iPhone 16 Simulator）。Cmd+7 停掉旧会话、下拉框选回真机即可。
+3. **构建失败 "Missing package product 'FlutterGeneratedPluginSwiftPackage'"**：根因是仓库提交的 `Runner.xcodeproj` 残留 Flutter 3.35+ 默认 SPM 生成工程时的 **8 处 Swift Package 引用**，而工程实际走 CocoaPods（docs/IOS.md 要求 `--no-enable-swift-package-manager`，libsodium 本地 pod）。禁用 SPM **不会**自动清除已提交的 pbxproj 引用。
+4. **修复**：从 pbxproj 删除 `XCLocalSwiftPackageReference` / `XCSwiftPackageProductDependency` / `packageReferences` / `packageProductDependencies` / PBXBuildFile+PBXFileReference+Group+Frameworks 共 8 处；plutil -lint 通过、grep 0 残留；`flutter build ios --debug --no-codesign` 构建成功（✓ Built build/ios/iphoneos/Runner.app）。仓库与 build 机副本（`/Volumes/repodisk/productX/einz`）两份均已修复。
+
+**待老板执行：** 升级 Xcode → 手机开开发者模式（设置→隐私与安全性）→ Xcode 选 Personal Team → Run ▶；首次信任开发者证书。APNs/Ad Hoc 仍需付费账号（docs/IOS.md §4）。
+
 ## 2026-09-10 长按消息菜单「阅后即焚」——单条消息可设/调整/取消 burn
 
 **老板要求：** 长按消息菜单加「阅后即焚」项，点击打开与右上角菜单同款的档位

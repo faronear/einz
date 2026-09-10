@@ -108,7 +108,8 @@ Xcode 内配置（Target `Runner` → Signing & Capabilities）：
 | libsodium 加载失败                               | 见 §2 验证项：检查 Pods、`-Wl,-export_dynamic`                                |
 | 免费账号无法真机运行                             | 手机信任开发者证书；或改用付费账号                                            |
 | 推送收不到                                       | APNs 需付费账号 + capability + APNs 密钥（Server 侧）；WS/轮询兜底不受影响    |
-| 中文路径构建问题                                 | macOS 无此问题；Windows 侧继续用外部临时构建                                  |
+| 中文路径构建问题 | macOS 无此问题；Windows 侧继续用外部临时构建 |
+| "Missing package product 'FlutterGeneratedPluginSwiftPackage'" | 仓库 pbxproj 曾由 Flutter SPM（3.35+ 默认开启）生成过 Swift Package 引用，禁用 SPM 后残留导致构建失败；已随仓库修复（8 处引用全删）。旧副本请拉取最新代码，或手工删除 `XCLocalSwiftPackageReference` / `XCSwiftPackageProductDependency` / `packageReferences` / `packageProductDependencies` 相关段落 |
 
 ---
 
