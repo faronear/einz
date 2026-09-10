@@ -381,6 +381,29 @@ class MessageRepository {
     return row?.serverSequence;
   }
 
+  /// 设置本机单条消息的阅后即焚（长按菜单「阅后即焚」用，纯本地，仅对未
+  /// 墓碑消息）：更新 burnAfterSeconds 与到期时间戳——burn<=0 表示取消
+  /// （expiresAt=null 无限期），>0 表示新设/调整（expiresAt=now+burn）；
+  /// 到期由 tombstoneExpired 统一打墓碑。返回是否找到并设置成功。
+  Future<bool> setMessageBurn(String messageId, int burnSeconds) async {
+    final row = await (db.select(db.localMessages)
+          ..where((m) =>
+              m.spaceId.equals(spaceId) &
+              m.messageId.equals(messageId) &
+              m.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (row == null) return false;
+    final expiresAt = burnSeconds > 0
+        ? DateTime.now().millisecondsSinceEpoch + burnSeconds * 1000
+        : null;
+    await (db.update(db.localMessages)..where((m) => m.messageId.equals(messageId)))
+        .write(LocalMessagesCompanion(
+      burnAfterSeconds: Value(burnSeconds),
+      expiresAt: Value(expiresAt),
+    ));
+    return true;
+  }
+
   /// 分页读取比 [afterSequence] 更新的消息（含未同步 pending），增量刷新追加用。
   Future<List<HistoryMessage>> historySince({required int afterSequence}) async {
     final rows = await (db.select(db.localMessages)

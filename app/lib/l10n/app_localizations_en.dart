@@ -469,6 +469,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageBurnOff => 'Burn-after is off (messages are kept forever)';
 
   @override
+  String get chatPageBurnFailed => 'Failed to set burn-after-reading';
+
+  @override
   String chatPageBurnWillDelete(String duration) {
     return 'Messages will be auto-deleted after $duration';
   }
@@ -478,6 +481,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageActionQuote => 'Quote';
+
+  @override
+  String get chatPageActionBurn => 'Burn after reading';
 
   @override
   String get chatPageDeleteConfirmTitle => 'Delete message';

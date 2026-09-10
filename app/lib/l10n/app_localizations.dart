@@ -920,6 +920,12 @@ abstract class AppLocalizations {
   /// **'Burn-after is off (messages are kept forever)'**
   String get chatPageBurnOff;
 
+  /// No description provided for @chatPageBurnFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to set burn-after-reading'**
+  String get chatPageBurnFailed;
+
   /// No description provided for @chatPageBurnWillDelete.
   ///
   /// In en, this message translates to:
@@ -937,6 +943,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quote'**
   String get chatPageActionQuote;
+
+  /// No description provided for @chatPageActionBurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Burn after reading'**
+  String get chatPageActionBurn;
 
   /// No description provided for @chatPageDeleteConfirmTitle.
   ///

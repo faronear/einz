@@ -180,6 +180,7 @@
   },
   "chatPageBurnHeading": "阅后即焚（仅本设备生效）",
   "chatPageBurnOff": "阅后即焚已关闭（消息永久保留）",
+  "chatPageBurnFailed": "设置阅后即焚失败",
   "chatPageBurnWillDelete": "消息将在 {duration} 后自动删除",
   "@chatPageBurnWillDelete": {
     "placeholders": {
@@ -188,6 +189,7 @@
   },
   "chatPageActionDelete": "删除",
   "chatPageActionQuote": "引用",
+  "chatPageActionBurn": "阅后即焚",
   "chatPageDeleteConfirmTitle": "删除消息",
   "chatPageDeleteConfirmMessage": "删除后仅在本机消失，对方设备不受影响，且无法恢复。确定删除这条消息吗？",
   "chatPageDeleteCancel": "取消",

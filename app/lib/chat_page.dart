@@ -800,11 +800,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置）。
-  Future<void> _showBurnPicker() async {
-    final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
-    final current = await settings.load();
-    if (!mounted) return;
+  /// 阅后即焚档位选择弹窗（右上角菜单全局 / 长按菜单单条消息共用）：
+  /// 返回选中秒数（null=取消）；[current] 为当前值（右侧勾选标记）。
+  Future<int?> _pickBurnSeconds({required int current}) async {
     final l10n = AppLocalizations.of(context)!;
     final picked = await showModalBottomSheet<String>(
       context: context,
@@ -814,7 +812,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text(l10n.chatPageBurnHeading, style: const TextStyle(fontWeight: FontWeight.w600)),
+              child: Text(l10n.chatPageBurnHeading,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
             for (final entry in kBurnAfterOptions.entries)
               ListTile(
@@ -826,11 +825,57 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       ),
     );
-    if (picked == null) return;
-    final seconds = int.parse(picked);
+    return picked == null ? null : int.parse(picked);
+  }
+
+  /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置，发送新消息时生效）。
+  Future<void> _showBurnPicker() async {
+    final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
+    final current = await settings.load();
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final seconds = await _pickBurnSeconds(current: current);
+    if (seconds == null || !mounted) return;
     await settings.save(seconds);
     if (!mounted) return;
     setState(() => _burnSeconds = seconds);
+    showTopNotice(
+      context,
+      seconds == 0
+          ? l10n.chatPageBurnOff
+          : l10n.chatPageBurnWillDelete(_burnOptionLabel(seconds, l10n)),
+    );
+  }
+
+  /// 长按菜单「阅后即焚」：选择档位后应用到被点击的这条消息（本机生效，
+  /// 纯本地；老板要求 2026-09-10）。可选「无限」取消已有阅后即焚、选档位
+  /// 新设或调整；到期由 repo.tombstoneExpired 统一打墓碑。
+  Future<void> _setMessageBurn(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    final seconds = await _pickBurnSeconds(current: m.burnAfterSeconds);
+    if (seconds == null || !mounted) return;
+    final ok = await _repo.setMessageBurn(m.env.messageId, seconds);
+    if (!mounted) return;
+    if (!ok) {
+      showTopNotice(context, l10n.chatPageBurnFailed);
+      return;
+    }
+    // 就地更新列表里该消息的 burn 状态（倒计时即刻生效，不用整表刷新）
+    final expiresAt = seconds > 0
+        ? DateTime.now().millisecondsSinceEpoch + seconds * 1000
+        : null;
+    setState(() {
+      _messages = [
+        for (final x in _messages)
+          if (x.env.messageId == m.env.messageId)
+            (env: x.env, plaintext: x.plaintext, sender: x.sender,
+                attachment: x.attachment, expiresAt: expiresAt,
+                createdAt: x.createdAt, burnAfterSeconds: seconds,
+                quote: x.quote, deleted: x.deleted)
+          else
+            x,
+      ];
+    });
     showTopNotice(
       context,
       seconds == 0
@@ -1113,6 +1158,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               title: Text(l10n.chatPageActionQuote),
               onTap: () => Navigator.of(ctx).pop('quote'),
             ),
+            // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
+            ListTile(
+              leading: const Icon(Icons.timer_outlined),
+              title: Text(l10n.chatPageActionBurn),
+              onTap: () => Navigator.of(ctx).pop('burn'),
+            ),
             ListTile(
               leading: Icon(Icons.delete_outline, color: Colors.red.shade400),
               title: Text(l10n.chatPageActionDelete,
@@ -1129,6 +1180,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (action == 'quote') {
       setState(() => _quoteTarget = m);
       _inputFocusNode.requestFocus();
+    } else if (action == 'burn') {
+      await _setMessageBurn(m);
     }
   }
 

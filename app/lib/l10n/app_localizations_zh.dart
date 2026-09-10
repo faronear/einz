@@ -441,6 +441,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageBurnOff => '阅后即焚已关闭（消息永久保留）';
 
   @override
+  String get chatPageBurnFailed => '设置阅后即焚失败';
+
+  @override
   String chatPageBurnWillDelete(String duration) {
     return '消息将在 $duration 后自动删除';
   }
@@ -450,6 +453,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageActionQuote => '引用';
+
+  @override
+  String get chatPageActionBurn => '阅后即焚';
 
   @override
   String get chatPageDeleteConfirmTitle => '删除消息';

@@ -2271,3 +2271,25 @@ TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不�
 引用。cli/build 旧编译产物含旧字符串（gitignore 不入库，重新构建自动更新）。
 
 **验证：** dart analyze（cli + shared）0 issue；源码/文档 grep 无 /rename 残留。
+
+## 2026-09-10 长按消息菜单「阅后即焚」——单条消息可设/调整/取消 burn
+
+**老板要求：** 长按消息菜单加「阅后即焚」项，点击打开与右上角菜单同款的档位
+弹窗，应用到被点击的这条消息（本机生效纯本地）；可给未设置的消息添加、
+调整已设置的、选「无限」取消已有阅后即焚。
+
+**实现：**
+- `message_repository.dart` 新增 `setMessageBurn(messageId, burnSeconds)`：
+  更新 burnAfterSeconds + expiresAt（burn<=0 → expiresAt=null 无限/取消；
+  >0 → now+burn），仅对未墓碑消息，返回是否成功。
+- `chat_page.dart`：把档位选择弹窗抽为公共 `_pickBurnSeconds(current)`（全局
+  /单条共用，当前值右侧勾选）；`_showBurnPicker`（全局设置）改用公共弹窗；
+  新增 `_setMessageBurn(m)`（选档后调 repo、就地重建该消息 record 使倒计时
+  即刻生效、通知提示）；长按菜单在引用与删除之间加「阅后即焚」项
+  （Icons.timer_outlined，pop('burn')），action 分支调 `_setMessageBurn`。
+- l10n：新增 `chatPageActionBurn`（阅后即焚 / Burn after reading）、
+  `chatPageBurnFailed`（设置阅后即焚失败）并 gen-l10n。
+
+**验证：** flutter analyze 0 issue；chat_page_menu + message_repository +
+chat_initial_scroll 29/29 全过；未提交等老板检查后提交（2026-09-10 老板
+确认提交）。

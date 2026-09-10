@@ -180,6 +180,7 @@
   },
   "chatPageBurnHeading": "Burn-after (only affects this device)",
   "chatPageBurnOff": "Burn-after is off (messages are kept forever)",
+  "chatPageBurnFailed": "Failed to set burn-after-reading",
   "chatPageBurnWillDelete": "Messages will be auto-deleted after {duration}",
   "@chatPageBurnWillDelete": {
     "placeholders": {
@@ -188,6 +189,7 @@
   },
   "chatPageActionDelete": "Delete",
   "chatPageActionQuote": "Quote",
+  "chatPageActionBurn": "Burn after reading",
   "chatPageDeleteConfirmTitle": "Delete message",
   "chatPageDeleteConfirmMessage": "It will disappear only on this device; the other side is unaffected, and this cannot be undone. Delete this message?",
   "chatPageDeleteCancel": "Cancel",
