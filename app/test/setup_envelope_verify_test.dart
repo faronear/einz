@@ -26,7 +26,10 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
       // Multiverse join：token 校验（preflight）用 fake
       preflightOverride: (token) async => const SpaceJoinPreflight(
           spaceId: 'space-test', displayName: 'Lukas', status: 'waiting', memberCount: 1,
-          slots: const []),
+          slots: [
+            SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
+            SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
+          ]),
       enrollOverride: (_) async =>
           const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
       authOverride: (kp, id) async =>
@@ -35,16 +38,15 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
     ),
   ));
   await tester.pumpAndSettle();
-  // Multiverse join：入口页 → 加入 → token（preflight 通过）→ 名字 → 口令页
+  // Multiverse join：入口页 → 加入 → token（preflight 通过）→ 身份选择 → 口令页
   await tester.tap(find.text('输入邀请链接或代码加入'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
   await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
   await tester.pumpAndSettle();
-  await tester.tap(find.text('下一步')); // 再次：放行到名字页
+  await tester.tap(find.text('下一步')); // 再次：放行到身份选择页
   await tester.pumpAndSettle();
-  await tester.enterText(find.byType(TextField), 'Bob');
-  await tester.tap(find.byIcon(Icons.male)); // 选性别男
+  await tester.tap(find.textContaining('Alice')); // 选第二人（伴侣）
   await tester.pumpAndSettle();
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle(); // → 口令页

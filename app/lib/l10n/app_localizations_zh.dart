@@ -130,6 +130,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitlePeerName => '关于伴侣';
 
   @override
+  String get wizardTitleJoinIdentity => '你是哪一个用户？';
+
+  @override
+  String get wizardJoinIdentityHint => '选择你的身份（创建时已录入两人）——第一人的其他设备请选第一个人';
+
+  @override
+  String get wizardJoinNoSlots => '该空间未预置成员身份，无法加入';
+
+  @override
+  String get wizardSlotOnline => '已在线';
+
+  @override
+  String get wizardSlotRequired => '请选择你的身份';
+
+  @override
   String get wizardTitleInvite => '验证邀请码';
 
   @override

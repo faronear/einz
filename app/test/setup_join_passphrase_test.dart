@@ -64,7 +64,10 @@ Future<void> pumpToJoinToken(
               displayName: 'Lukas',
               status: 'waiting',
               memberCount: 1,
-              slots: const []),
+              slots: [
+                SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
+                SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
+              ]),
       joinOverride: join ??
           (token) async => const SpaceJoinResult(
               spaceId: 'space-test',
@@ -81,7 +84,7 @@ Future<void> pumpToJoinToken(
   await tester.pumpAndSettle();
 }
 
-/// 走到口令页：token（preflight）→ 名字（填名字+性别）→ 口令页。
+/// 走到口令页：token（preflight）→ 身份选择（选第二人 Alice）→ 口令页。
 Future<void> pumpToJoinPassphrase(
   WidgetTester tester, {
   required String correctPass,
@@ -91,10 +94,11 @@ Future<void> pumpToJoinPassphrase(
   await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
   await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
   await tester.pumpAndSettle();
-  await tester.tap(find.text('下一步')); // 再次：放行到名字页
+  await tester.tap(find.text('下一步')); // 再次：放行到身份选择页
   await tester.pumpAndSettle();
-  await tester.enterText(find.byType(TextField), 'Bob');
-  await tester.tap(find.byIcon(Icons.male)); // 选性别男
+  // 身份选择（老板定稿：join 不再自填名字——选择是哪一个用户）
+  expect(find.text('你是哪一个用户？'), findsOneWidget); // 身份选择页标题
+  await tester.tap(find.textContaining('Alice')); // 选第二人（伴侣）
   await tester.pumpAndSettle();
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle(); // → 口令页
@@ -155,14 +159,16 @@ void main() {
     expect(find.text('验证密保口令'), findsNothing, reason: '不应进入口令页');
   });
 
-  testWidgets('正确 token：preflight 通过 → 空间确认卡片 → 名字页', (WidgetTester tester) async {
+  testWidgets('正确 token：preflight 通过 → 空间确认卡片 → 身份选择页', (WidgetTester tester) async {
     await pumpToJoinToken(tester); // 默认 preflight 成功
     await tester.enterText(find.byType(TextField), '正确TOKEN');
     await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
     await tester.pumpAndSettle();
     expect(find.text('加入 Lukas 的空间'), findsOneWidget, reason: '有效 token 应显示空间确认卡片');
-    await tester.tap(find.text('下一步')); // 再次：放行到名字页
+    await tester.tap(find.text('下一步')); // 再次：放行到身份选择页
     await tester.pumpAndSettle();
-    expect(find.text('关于我'), findsOneWidget, reason: '确认空间后应放行到名字页');
+    expect(find.text('你是哪一个用户？'), findsOneWidget, reason: '确认空间后应放行到身份选择页');
+    expect(find.textContaining('Lukas'), findsOneWidget, reason: '身份选择页展示第一人');
+    expect(find.textContaining('Alice'), findsOneWidget, reason: '身份选择页展示第二人');
   });
 }

@@ -88,6 +88,12 @@ class _SetupPageState extends State<SetupPage> {
   final _personName = TextEditingController(); // 首设备：第一个用户的名字
   String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 person_name 同步服务端）
   String? _genderError; // 性别未选提醒（红字显示在选项卡下方；选中即清除）
+  final _partnerNameCtrl = TextEditingController(); // create 步骤 2：伴侣（第二人）名字（必填）
+  String? _partnerGender; // create 步骤 2：伴侣性别（'male'/'female'，必选）
+  String? _partnerGenderError; // 伴侣性别未选提醒
+  List<SpaceMemberSlot> _joinSlots = const []; // join：preflight 返回的两身份 slot（身份选择页展示）
+  int? _chosenSlot; // join 步骤 2：所选身份（0=第一人/创建者，1=第二人/伴侣）
+  String? _slotError; // 身份未选提醒
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -434,7 +440,7 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 5; // name/peerName/passphrase/pin/done（设备名自动设置，输入步骤已移除）
+        return 6; // name/partner/passphrase/pin/done（伴侣名字/性别必填，老板 2026-09-10 定稿）
       case _WizardRole.join:
         return 5; // identity/invite/passphrase/pin/done
       case _WizardRole.offline:
@@ -510,9 +516,8 @@ class _SetupPageState extends State<SetupPage> {
     String? localError;
     String? genderError;
     var invalid = false;
-    // 身份页（create 步骤 1 / join 步骤 2 共用的名字+性别页）：名字与性别都必填
-    if ((_role == _WizardRole.create && _step == 1) ||
-        (_role == _WizardRole.join && _step == 2)) {
+    // 名字+性别页（create 步骤 1——Multiverse join 改为身份选择页，不再自填名字）
+    if (_role == _WizardRole.create && _step == 1) {
       if (_personName.text.trim().isEmpty) {
         localError = l10n.wizardNameRequired;
         invalid = true;
@@ -522,7 +527,28 @@ class _SetupPageState extends State<SetupPage> {
         invalid = true;
       }
     }
-    if ((_role == _WizardRole.create && _step == 2) ||
+    // 身份选择页（join 步骤 2）：必须选择是哪一个用户（老板 2026-09-10 定稿）
+    String? slotError;
+    if (_role == _WizardRole.join && _step == 2) {
+      if (_chosenSlot == null) {
+        slotError = l10n.wizardSlotRequired;
+        invalid = true;
+      }
+    }
+    // 伴侣页（create 步骤 2）：名字与性别都必填（老板 2026-09-10 定稿——
+    // create 录入两人身份，join 时按身份选择而非自填名字）
+    String? partnerGenderError;
+    if (_role == _WizardRole.create && _step == 2) {
+      if (_partnerNameCtrl.text.trim().isEmpty) {
+        localError = l10n.wizardPeerNameRequired;
+        invalid = true;
+      }
+      if (_partnerGender == null) {
+        partnerGenderError = l10n.wizardGenderRequired;
+        invalid = true;
+      }
+    }
+    if ((_role == _WizardRole.create && _step == 3) ||
         (_role == _WizardRole.join && _step == 3)) {
       if (_escrowPassphrase.text.trim().isEmpty) {
         // 两套错误提示：首设备「必须设置」/ 后续设备「验证」语气（老板要求）
@@ -540,6 +566,8 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _localError = localError;
         _genderError = genderError;
+        _partnerGenderError = partnerGenderError;
+        _slotError = slotError;
       });
       return;
     }
@@ -577,7 +605,7 @@ class _SetupPageState extends State<SetupPage> {
     }
     // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
     // 有效 PIN → 设锁后推进；两空 → 弹窗确认"不设置锁屏码"；其余 → 输入框下方红色提示。
-    final isPinStep = (_role == _WizardRole.create && _step == 3) ||
+    final isPinStep = (_role == _WizardRole.create && _step == 4) ||
         (_role == _WizardRole.join && _step == 4) ||
         (_role == _WizardRole.offline && _step == 2);
     if (isPinStep) {
@@ -624,9 +652,9 @@ class _SetupPageState extends State<SetupPage> {
       }
       return; // _run* 内部推进 _step
     }
-    // create 步骤 2（对方名字）→ 自动自举登记（登记时上传本人+对方名字；
-    // 设备名已自动设置不再询问），成功才进口令步骤
-    if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
+    // create 步骤 3（口令页）→ 自动自举登记（登记时上传本人+伴侣名字/性别；
+    // 设备名已自动设置不再询问），成功才进口令之后的 PIN 步骤
+    if (_role == _WizardRole.create && _step == 3 && _enroll == null) {
       await _runBootstrap();
       if (!mounted) return;
       if (_enroll == null) return; // 自举失败：留在本步展示错误/改用加入
@@ -711,8 +739,10 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepName();
           case 2:
-            return _buildStepPassphrase();
+            return _buildStepPartner();
           case 3:
+            return _buildStepPassphrase();
+          case 4:
             return _buildStepPin();
           default:
             return _buildStepDone();
@@ -722,7 +752,7 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepJoinToken();
           case 2:
-            return _buildStepName();
+            return _buildStepJoinIdentity();
           case 3:
             return _buildStepPassphrase();
           case 4:
@@ -996,12 +1026,13 @@ class _SetupPageState extends State<SetupPage> {
     // await 确保 profile 写入完成后再进聊天（消除 unawaited 竞态——2026-09-07
     // 老板实测：设 PIN 重启解锁后顶部条丢名字）
     await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
-      personName: _personName.text.trim(),
-      // 对方名字：join=创建者名字（preflight 空间显示名）；create=对方未加入，留空
-      peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : '',
+      // 本人名字：join=所选身份（create 预置）；create=自填
+      personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
+      // 对方名字：join=创建者名字（preflight 空间显示名）；create=伴侣名字（预置）
+      peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : _partnerNameCtrl.text.trim(),
       deviceName: deviceName,
-      // 本人性别：create/join 均为向导自填（Multiverse：双方各自输入名字/性别）
-      myGender: _myGender ?? '',
+      // 本人性别：join=所选身份性别；create=自填
+      myGender: _role == _WizardRole.join ? _joinSelectedGender : (_myGender ?? ''),
       // 对方性别：无公开渠道（气泡配色回退默认）
       peerGender: '',
     );
@@ -1014,10 +1045,10 @@ class _SetupPageState extends State<SetupPage> {
         spaceKey: sk,
         keyVersion: 1,
         token: token,
-        personName: _personName.text.trim(),
+        personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
         personId: enroll.personId,
-        // 对方名字：join=创建者名字（preflight 空间显示名）；create=对方未加入，留空
-        peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : '',
+        // 对方名字：join=创建者名字（preflight 空间显示名）；create=伴侣名字（预置）
+        peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : _partnerNameCtrl.text.trim(),
         deviceName: deviceName,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
@@ -1085,6 +1116,112 @@ class _SetupPageState extends State<SetupPage> {
         ],
       ],
     );
+  }
+
+  /// 步骤 2（create，Multiverse）：伴侣（第二人）的名字/性别——必填（老板
+  /// 2026-09-10 定稿：create 录入两人身份，join 时按身份选择而非自填名字）。
+  Widget _buildStepPartner() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(l10n.wizardTitlePeerName, l10n.wizardPeerNameHint),
+        TextField(
+          controller: _partnerNameCtrl,
+          style: const TextStyle(fontSize: 20),
+          onChanged: (_) {
+            if (_localError != null) setState(() => _localError = null);
+          },
+          decoration: InputDecoration(
+            hintText: l10n.wizardPeerNameHintInput,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        if (_localError != null) _localErrorHint(_localError!),
+        const SizedBox(height: 20),
+        _buildGenderSelector(
+          selected: _partnerGender,
+          label: l10n.wizardPeerGenderLabel,
+          maleLabel: l10n.wizardGenderMale,
+          femaleLabel: l10n.wizardGenderFemale,
+          onChanged: (g) => setState(() {
+            _partnerGender = g;
+            _partnerGenderError = null; // 选中即清除未选提醒
+          }),
+        ),
+        if (_partnerGenderError != null) _localErrorHint(_partnerGenderError!),
+      ],
+    );
+  }
+
+  /// 步骤 2（join，Multiverse）：选择「你是哪一个用户」——create 已录入两人
+  /// 身份（preflight slots），加入者可能是第二人，也可能是第一人的其他设备，
+  /// 不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）。
+  Widget _buildStepJoinIdentity() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(l10n.wizardTitleJoinIdentity, l10n.wizardJoinIdentityHint),
+        if (_joinSlots.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Text(
+              l10n.wizardJoinNoSlots,
+              style: const TextStyle(fontSize: 14),
+            ),
+          )
+        else
+          for (final s in _joinSlots)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildSelectableCard(
+                label: '${s.displayName ?? '（未命名）'}'
+                    '${s.gender != null ? '（${_genderDisplay(s.gender!)}）' : ''}'
+                    '${s.status == 'active' ? ' ${l10n.wizardSlotOnline}' : ''}',
+                icon: s.slot == 0 ? Icons.person : Icons.person_outline,
+                color: const Color(0xFF3BAFFD),
+                selected: _chosenSlot == s.slot,
+                alignment: Alignment.center,
+                onTap: () => setState(() {
+                  _chosenSlot = s.slot;
+                  _slotError = null; // 选中即清除未选提醒
+                }),
+              ),
+            ),
+        if (_slotError != null) _localErrorHint(_slotError!),
+      ],
+    );
+  }
+
+  /// 服务端 gender 兼容中英文代码（CLI 传'男/女'、App 传'male/female'）→ 显示中文。
+  String _genderDisplay(String g) =>
+      (g == 'male' || g == '男') ? '男' : (g == 'female' || g == '女') ? '女' : g;
+
+  /// join 所选身份（create 预置）的名字——本人在消息流里的显示名。
+  String get _joinSelectedName {
+    if (_chosenSlot == null) return '';
+    for (final s in _joinSlots) {
+      if (s.slot == _chosenSlot) return s.displayName ?? '';
+    }
+    return '';
+  }
+
+  /// join 所选身份的性别（服务端中英文 → App 'male'/'female'，气泡配色用）。
+  String get _joinSelectedGender {
+    if (_chosenSlot == null) return '';
+    for (final s in _joinSlots) {
+      if (s.slot == _chosenSlot) {
+        final g = s.gender;
+        if (g == null || g.isEmpty) return '';
+        return (g == 'male' || g == '男')
+            ? 'male'
+            : (g == 'female' || g == '女')
+                ? 'female'
+                : g;
+      }
+    }
+    return '';
   }
 
   /// 步骤 1（join，Multiverse）：输入邀请链接或 token（粘贴/扫码）。
@@ -1166,6 +1303,8 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _joinToken = token;
         _joinSpaceName = pre.displayName;
+        _joinSlots = pre.slots; // 身份选择页（步骤 2）展示两身份
+        _chosenSlot = null; // 换 token 后重置身份选择
         _localError = null;
       });
       return true;
@@ -1253,6 +1392,9 @@ class _SetupPageState extends State<SetupPage> {
           api.createSpace(
             spaceId: spaceId,
             displayName: _personName.text.trim(),
+            gender: _myGender,
+            partnerName: _partnerNameCtrl.text.trim(),
+            partnerGender: _partnerGender,
             sealedSpaceKey: sealed,
             escrowPassphrase: passphrase.isEmpty ? null : passphrase,
             publicKey: kp.publicKeyB64,
@@ -1672,8 +1814,7 @@ class _SetupPageState extends State<SetupPage> {
           api.joinSpace(
             token: _joinToken,
             publicKey: kp.publicKeyB64,
-            displayName: _personName.text.trim(),
-            gender: _myGender,
+            partnerSlot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
             deviceName: await _autoDeviceName(),
           ));
       if (!mounted) return false;

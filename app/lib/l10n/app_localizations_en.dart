@@ -139,6 +139,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitlePeerName => 'Partner\'s name';
 
   @override
+  String get wizardTitleJoinIdentity => 'Which user are you?';
+
+  @override
+  String get wizardJoinIdentityHint =>
+      'Pick your identity (both were set at creation) — a second device of user 1 should pick user 1';
+
+  @override
+  String get wizardJoinNoSlots =>
+      'No member identities preset in this space — cannot join';
+
+  @override
+  String get wizardSlotOnline => 'online';
+
+  @override
+  String get wizardSlotRequired => 'Please pick your identity';
+
+  @override
   String get wizardTitleInvite => 'Verify invite code';
 
   @override

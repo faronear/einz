@@ -34,7 +34,10 @@ Future<void> pumpToPassphrase(
               displayName: 'Lukas',
               status: 'waiting',
               memberCount: 1,
-              slots: const [],
+              slots: [
+                SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
+                SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
+              ],
             )
           : null,
       // create 名字页下一步触发 Multiverse 创建（_runBootstrap → POST /spaces），
@@ -57,28 +60,32 @@ Future<void> pumpToPassphrase(
   await tester.pumpAndSettle();
 
   if (join) {
-    // join：入口页 → 加入 → token 页（preflight 通过）→ 名字页（填名字+性别）→ 口令页
+    // join：入口页 → 加入 → token 页（preflight 通过）→ 身份选择页（选第二人）→ 口令页
     await tester.tap(find.text('输入邀请链接或代码加入'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
     await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // 再次：放行到名字页
+    await tester.tap(find.text('下一步')); // 再次：放行到身份选择页
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Bob');
-    await tester.tap(find.byIcon(Icons.male)); // 选性别男
+    await tester.tap(find.textContaining('Alice')); // 选第二人（伴侣）
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle(); // → 口令页
   } else {
-    // create：入口页 → 新建 → 名字页（填名字+性别）→ 口令页（createOverride 提交放行）
+    // create：入口页 → 新建 → 名字页（填名字+性别）→ 伴侣页（填名字+性别）→ 口令页
     await tester.tap(find.text('新建私密空间'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Lukas');
     await tester.tap(find.byIcon(Icons.male)); // 选性别男
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
-    await tester.pumpAndSettle(); // 名字页放行（Multiverse create 提交）→ 口令页
+    await tester.pumpAndSettle(); // → 伴侣页
+    await tester.enterText(find.byType(TextField), 'Alice');
+    await tester.tap(find.byIcon(Icons.female)); // 选伴侣性别女
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle(); // → 口令页
   }
 }
 
@@ -141,6 +148,7 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.text('请选择性别'), findsNothing, reason: '选中性别后提醒应消失');
-    expect(find.text('设置密保口令'), findsOneWidget, reason: '应进入步骤 2（口令页，Multiverse create 无伴侣页）');
+    expect(find.text('关于伴侣'), findsOneWidget,
+        reason: '应进入步骤 2（伴侣页——名字/性别必填，老板 2026-09-10 定稿）');
   });
 }

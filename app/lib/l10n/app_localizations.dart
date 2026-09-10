@@ -338,6 +338,36 @@ abstract class AppLocalizations {
   /// **'Partner\'s name'**
   String get wizardTitlePeerName;
 
+  /// No description provided for @wizardTitleJoinIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Which user are you?'**
+  String get wizardTitleJoinIdentity;
+
+  /// No description provided for @wizardJoinIdentityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick your identity (both were set at creation) — a second device of user 1 should pick user 1'**
+  String get wizardJoinIdentityHint;
+
+  /// No description provided for @wizardJoinNoSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'No member identities preset in this space — cannot join'**
+  String get wizardJoinNoSlots;
+
+  /// No description provided for @wizardSlotOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'online'**
+  String get wizardSlotOnline;
+
+  /// No description provided for @wizardSlotRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please pick your identity'**
+  String get wizardSlotRequired;
+
   /// No description provided for @wizardTitleInvite.
   ///
   /// In en, this message translates to:

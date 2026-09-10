@@ -84,7 +84,10 @@ void main() {
         displayName: 'Lukas',
         status: 'waiting',
         memberCount: 1,
-        slots: const [],
+        slots: [
+          SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
+          SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
+        ],
       ),
     ));
     await tester.pumpAndSettle();
@@ -93,11 +96,11 @@ void main() {
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
     await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 停留显示空间确认卡片
     await tester.pumpAndSettle();
-    // 空间确认卡片显示（加入创建者的空间）；再次点「下一步」才放行到名字页
+    // 空间确认卡片显示（加入创建者的空间）；再次点「下一步」才放行到身份选择页
     expect(find.text('加入 Lukas 的空间'), findsOneWidget);
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('关于我'), findsOneWidget, reason: '确认空间后应放行到名字页');
+    expect(find.text('你是哪一个用户？'), findsOneWidget, reason: '确认空间后应放行到身份选择页');
   });
 
   testWidgets('探测失败：启动屏保持旋转 Logo、无失败文字并自动重试（无输入框/信封入口）',

@@ -2437,3 +2437,17 @@ cfg.space_id，行为不变）。
   其他设备，curl join-tokens 生成第二个 token）——地址一致，PASS
 - 踩坑：space_members NOT NULL 约束与预置 NULL 冲突（create 500）；渲染
   wrap 截断长地址（C 的 spaceId 改从 store 文件读，不依赖 lookup）
+
+### App 同步身份选择方案（老板 2026-09-10 确认：与 v1 一致）
+- create 流程加伴侣页（步骤 2）：伴侣名字（必填）/伴侣性别（必选）——复用 v1
+  键（wizardTitlePeerName/wizardPeerNameHint 等，U3 清理后为死键）；createSpace
+  提交 gender/partnerName/partnerGender；stepCount 5→6；_finish 对方名=伴侣名字
+- join 流程名字页改为身份选择页（步骤 2）：preflight slots 展示两身份卡片
+  （编号/名字/性别/状态，点选）→ joinSpace 提交 partnerSlot；不再自填名字；
+  本人名字/性别取所选身份（服务端中英文 gender → App 'male'/'female' 归一）
+- 新增 l10n 键：wizardTitleJoinIdentity/wizardJoinIdentityHint/
+  wizardJoinNoSlots/wizardSlotOnline/wizardSlotRequired（zh/en）
+- 测试适配：4 个测试文件（fake slots 两身份 + join 身份选择步骤 + create
+  伴侣页步骤），17 个测试全绿；analyze 0 error
+- 页面设计沿用 v1（名字页/伴侣页：TextField + 性别卡片选择；身份选择页：
+  卡片列表点选）
