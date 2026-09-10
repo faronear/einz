@@ -2151,3 +2151,18 @@ dispose cancel。border 绘制在边界内，不改变气泡布局尺寸（此�
 时钟推进前（350ms 周期会被 pump(duration) 触发切换）。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
+## 2026-09-10 引用跳转高亮改回背景色（显眼橘黄 #FF9800，2s 恢复）
+
+**老板反馈：** 边框闪烁方案实测闪烁期间气泡尺寸变化（此前"border 绘制在边界
+内不影响尺寸"的判断在 AnimatedContainer 动画下不成立）；改回背景色渐变方案，
+总时长 2 秒，颜色用显眼橘黄（不与性别气泡色系混淆——之前品牌浅粉 #FDD6ED
+与女气泡浅粉、提亮蓝与男气泡天蓝撞色）。
+
+**实现（chat_page）：** 移除边框（_highlightFlashOn/琥珀 Border 全删）；气泡
+高亮背景改 `Color(0xFFFF9800)`（Material orange，白字/深字都可读），置高亮后
+AnimatedContainer 350ms 渐变出现、保持 2s 后恢复原色（渐变返回）。
+
+**测试：** chat_initial_scroll 用例断言高亮背景 #FF9800、pump 2100ms 后恢复
+indigo.shade100。
+
+**验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
