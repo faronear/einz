@@ -464,9 +464,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null) {
     while (true) {
       if (!_state!.running) return;
-      session.messages.add(_systemMessage(session, '❓ 秘境入口'));
-      session.messages.add(_systemMessage(session, '   c: 创建秘境'));
-      session.messages.add(_systemMessage(session, '   j: 加入秘境'));
+      // 一条系统消息内多行（\n 分隔）：整体被消息间空行隔开、又不会
+      // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）
+      session.messages
+          .add(_systemMessage(session, '❓ 秘境入口\n   c: 创建秘境\n   j: 加入秘境'));
       final choice = (await _prompt(
               session, '请选择:'))
           .trim()
@@ -1013,6 +1014,9 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
 }
 
 Future<void> main(List<String> args) async {
+  // 单测守卫：设 EINZ_UNITTEST=1 时仅加载符号、不启动交互 TUI（测试 formatMessage 等
+  // 纯函数用）。保持一行、无副作用，便于测试 import 本文件
+  if (Platform.environment['EINZ_UNITTEST'] == '1') return;
   await sodium();
 
   var storePath = '';
@@ -1428,7 +1432,7 @@ void _render() {
   final lines = <String>[];
   final msgs = s.session.messages;
   for (var i = 0; i < msgs.length; i++) {
-    lines.addAll(_formatMessage(msgs[i], cols));
+    lines.addAll(formatMessage(msgs[i], cols));
     // 每条消息（含末条）后都插一个空行：消息之间靠空行隔开，末条的空行
     // 给底部 [我] 输入区留出呼吸空间（老板要求——末条不插会让输入框紧贴末条）
     lines.add('');
@@ -1694,7 +1698,7 @@ String _genderBubble(String? rawGender) {
 /// 相邻消息之间以空行隔开（老板 2026-09-10 定版：`─` 线视觉干扰，改空行），
 /// 区分同一人相邻消息的边界；空行由渲染层在每条消息（含末条）后插入——
 /// 末条后的空行给底部 [我] 输入区留出呼吸空间；系统提示消息同样参与分隔。
-List<String> _formatMessage(ChatMessage m, int cols) {
+List<String> formatMessage(ChatMessage m, int cols) {
   final String who;
   final String color;
   if (m.isSystem) {
@@ -1713,22 +1717,36 @@ List<String> _formatMessage(ChatMessage m, int cols) {
     color = _yellow;
   }
   final time = _timeLabel(m.createdAt);
-  final body = m.plain.replaceAll('\n', ' ');
+  // 系统消息保留显式换行（支持一条消息内多行——老板 2026-09-11：把一段提示
+  // 分成多行显示，又能被消息间的空行整体隔开）；双方消息正文按空格折叠换行
+  final body = m.isSystem ? m.plain : m.plain.replaceAll('\n', ' ');
   // 双方消息的外侧留白（同为 8 列）：对方正文右侧 / 我方气泡左侧；
   // 保证对方正文起点不比我方正文（前缀之后）更靠左
   const sideMargin = 8;
   if (m.isSystem) {
     // 系统提示：灰色前缀 + 普通正文，左对齐（信息流提示，不参与左右分栏）。
     // 正文右侧预留 sideMargin 列边距，不顶满最右（与两侧气泡的视觉留白平衡）；
-    // 续行缩进 prefix 宽度，与第一行正文左缘对齐
+    // 续行缩进 prefix 宽度，与第一行正文左缘对齐。正文保留显式 \n：每条物理行
+    // 单独换行渲染（前缀只出现在第一条物理行，其余缩进对齐），空物理行保留为
+    // 空白行——这样一条消息可显示成多行，又被消息间空行整体隔开
     final prefix = '$color[$who $time]$_reset ';
     final prefixW = _displayWidth(prefix);
-    final wrapped = _wrapByWidth(body, cols - prefixW - sideMargin);
     final indent = ' ' * prefixW;
-    return [
-      '$prefix${wrapped.first}',
-      ...wrapped.skip(1).map((line) => '$indent$line'),
-    ];
+    final out = <String>[];
+    final segments = body.split('\n');
+    for (var si = 0; si < segments.length; si++) {
+      final wrapped = _wrapByWidth(segments[si], cols - prefixW - sideMargin);
+      if (si == 0) {
+        out.add('$prefix${wrapped.first}');
+        out.addAll(wrapped.skip(1).map((line) => '$indent$line'));
+      } else if (wrapped.isEmpty) {
+        out.add(indent); // 用户显式空行（连续 \n\n）：保留为空白行
+      } else {
+        out.add('$indent${wrapped.first}');
+        out.addAll(wrapped.skip(1).map((line) => '$indent$line'));
+      }
+    }
+    return out;
   }
   if (!m.isMine) {
     // 对方消息：左侧性别气泡——背景按对方性别配色（男蓝/女品红/未知青绿），

@@ -2787,3 +2787,26 @@ personId**（AppLockPayload 也没这个字段），而 `_refreshProfileFromServ
 **回归测试 app/test/chat_profile_refresh_test.dart：** 预置旧快照（Alice-老名字）
 + 无 personId 构造 ChatPage + fake /space 返回新名 → 断言顶部条显示新名、旧名消失、
   profile 已回写（含性别）。去掉 deviceId 反查后该用例正确失败。
+
+## 2026-09-11 TUI 系统消息支持一条消息内多行
+**老板诉求：** 想把一段提示分成多行（如秘境入口菜单），但不想拆成多条 system 消息
+（否则被消息间空行分开、丢失"整体感"）。
+
+**根因：** `formatMessage`（bin/einz_tui.dart:1716）对**所有**消息做
+`m.plain.replaceAll('\n',' ')`，把显式换行折叠成空格——所以即使同一条消息里
+写 `\n` 也只渲染成一行。数据模型（ChatMessage.plain）本就支持多行（邀请链接消息
+已用 `\n`）。
+
+**修复：**
+- 系统消息保留显式换行：`final body = m.isSystem ? m.plain : m.plain.replaceAll('\n',' ')`
+- 系统分支按 `\n` 拆物理行：首物理行带 `[system 时间]` 前缀，其余缩进对齐；空物理行
+  （连续 `\n\n`）保留为空白行；每条物理行各自折行
+- 把 `_formatMessage` 改名公开 `formatMessage`（便于单测）；main 加
+  `EINZ_UNITTEST=1` 守卫，避免 import 本文件时启动交互 TUI
+- 顺手把秘境入口三连发 _systemMessage 合并成一条多行消息做示范
+
+**回归测试 cli/test/format_message_test.dart：** 5 例（多行独立渲染/前缀仅首行、
+显式空行保留、不再折叠、长行折行续行缩进、多物理行各自折行）；把 body 改回
+"统一折叠换行"后其中 3 例正确失败。
+
+**验证：** dart analyze 无 issue；EINZ_UNITTEST=1 dart test 全绿。
