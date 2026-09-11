@@ -182,7 +182,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseHint =>
-      '口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问秘境里的唯一伴侣。';
+      '口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问伴侣。。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';

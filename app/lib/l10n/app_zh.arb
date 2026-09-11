@@ -61,7 +61,7 @@
     }
   },
   "wizardPassphraseHint": "对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
-  "wizardJoinPassphraseHint": "口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问秘境里的唯一伴侣。",
+  "wizardJoinPassphraseHint": "口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问伴侣。。",
   "wizardJoinPassphraseWrong": "口令错误：请确认首台设备创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
   "wizardSwitchToPassphrase": "改用线上密保口令",
