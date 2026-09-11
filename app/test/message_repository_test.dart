@@ -424,6 +424,53 @@ void main() {
     final plain = await repo.attachmentBytes(hist.single.attachment!);
     expect(plain, bytes, reason: '本地密文应能解密回原始字节（可直接渲染）');
   });
+
+  test('单条消息阅后即焚只作用于该消息：不改全局设置、不污染后续新消息', () async {
+    // 回归：长按单条消息设阅后即焚不应变成全局（否则后续新收消息也被焚）。
+    // 验证 setMessageBurn 只写该 messageId 行，全局 BurnAfterSettings 不动，
+    // 后续 sync 的新消息沿用全局(0)。
+    final api = FakeApi();
+    final settings = BurnAfterSettings(db);
+    final repo = MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      settings: settings,
+      token: 'tok',
+    );
+    expect(await settings.load(), 0, reason: '初始全局应为无限(0)');
+
+    // 先同步来一条消息 A（对方发送）
+    final envA = await _makeEnv(spaceKey, 'dev-b', 'msg-a', '旧消息');
+    api.pages.add((messages: [envA],
+        attachmentsMeta: const [], lastSequence: 1, hasMore: false));
+    await repo.sync();
+    expect((await repo.history()).singleWhere((h) => h.env.messageId == 'msg-a').burnAfterSeconds, 0);
+
+    // 对 A 长按设单条阅后即焚 = 60s
+    expect(await repo.setMessageBurn('msg-a', 60), isTrue);
+
+    // 关键断言 1：全局设置未被单条设置污染
+    expect(await settings.load(), 0, reason: '单条设置不应改写全局阅后即焚');
+    // 关键断言 2：仅 A 被焚
+    final after = await repo.history();
+    expect(after.singleWhere((h) => h.env.messageId == 'msg-a').burnAfterSeconds, 60,
+        reason: '被长按的消息应带 burn=60');
+
+    // 后续新消息 B 到达（对方新发）
+    final envB = await _makeEnv(spaceKey, 'dev-b', 'msg-b', '新消息');
+    api.pages.add((messages: [envB],
+        attachmentsMeta: const [], lastSequence: 2, hasMore: false));
+    await repo.sync();
+    final hist = await repo.history();
+    final a = hist.singleWhere((h) => h.env.messageId == 'msg-a');
+    final b = hist.singleWhere((h) => h.env.messageId == 'msg-b');
+    expect(a.burnAfterSeconds, 60, reason: 'A 的单条焚毁保留');
+    expect(b.burnAfterSeconds, 0, reason: '后续新消息应沿用全局(0)，不被 A 的单条设置污染');
+  });
 }
 
 /// 用 shared 加密构造一个服务端返回的信封（含 server_sequence/created_at）。
