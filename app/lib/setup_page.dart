@@ -1064,8 +1064,10 @@ class _SetupPageState extends State<SetupPage> {
       deviceName: deviceName,
       // 本人性别：join=所选身份性别；create=自填
       myGender: _role == _WizardRole.join ? _joinSelectedGender : (_myGender ?? ''),
-      // 对方性别：无公开渠道（气泡配色回退默认）
-      peerGender: '',
+      // 对方性别：join=另一个身份 slot 的性别；create=向导所选伴侣性别
+      // （v1 语义；v2 曾写死空串 → 对方气泡一律灰色——老板 2026-09-11）
+      peerGender:
+          _role == _WizardRole.join ? _joinPeerGender : (_partnerGender ?? ''),
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -1262,19 +1264,29 @@ class _SetupPageState extends State<SetupPage> {
     return '';
   }
 
+  /// 性别归一（服务端 'male'/'female' 或中文 '男'/'女' → App 'male'/'female'）。
+  static String _normalizeGender(String? g) {
+    if (g == null || g.isEmpty) return '';
+    if (g == 'male' || g == '男') return 'male';
+    if (g == 'female' || g == '女') return 'female';
+    return g;
+  }
+
   /// join 所选身份的性别（服务端中英文 → App 'male'/'female'，气泡配色用）。
   String get _joinSelectedGender {
     if (_chosenSlot == null) return '';
     for (final s in _joinSlots) {
-      if (s.slot == _chosenSlot) {
-        final g = s.gender;
-        if (g == null || g.isEmpty) return '';
-        return (g == 'male' || g == '男')
-            ? 'male'
-            : (g == 'female' || g == '女')
-                ? 'female'
-                : g;
-      }
+      if (s.slot == _chosenSlot) return _normalizeGender(s.gender);
+    }
+    return '';
+  }
+
+  /// join 时对方（另一个身份 slot）的性别——消息气泡配色用（v1 语义：
+  /// join=另一人的性别；此前 v2 写死空串 → 对方气泡一律灰色回退）。
+  String get _joinPeerGender {
+    if (_chosenSlot == null) return '';
+    for (final s in _joinSlots) {
+      if (s.slot != _chosenSlot) return _normalizeGender(s.gender);
     }
     return '';
   }

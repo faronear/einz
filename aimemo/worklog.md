@@ -2703,3 +2703,37 @@ pty TUI → 走完 名字/性别/伴侣名/伴侣性别 → 口令留空回车 �
 2. pty 抓邀请链接会因终端折行被截断（抓到的 token 哈希与服务端不符 → preflight
    400）→ 改走 POST /spaces/{id}/join-tokens 生成（与设备 C 同一做法）
 3. 端口改可用 `EINZ_E2E_PORT` 覆盖（3999 常被占用，不必去杀别人的实例）
+
+## 2026-09-11 App：头像上传后不即时更新（含对方）+ 消息气泡一方灰色
+
+### 1) 头像换后要重启才更新（老板反馈，v1 不会）
+**根因：** `_MessageAvatarState._cache` 是 **static**（personId → bytes），且只在
+`!_cache.containsKey(pid)` 时才加载 → 上传后消息流里的头像永不失效，只有重启
+（新进程、缓存为空）才会拉到新图。菜单里的 `_myAvatarBytes` 倒是即时更新的
+（所以看起来"只有消息流不更新"）。
+
+**修复：**
+- 服务端 `POST /avatar` 后广播 `profile.updated`（复用改名已有的广播，带
+  person_id）→ 伴侣及本人其他设备在线时立即重拉
+- App：`_MessageAvatarState` 加静态 `invalidated` 通知 + `invalidate(personId)`；
+  上传成功后、`_onProfileUpdated`（收到广播）时调用 → 在树上的头像重拉覆盖缓存
+  （不清空旧值，避免闪成默认图标）
+
+### 2) 消息气泡一方灰色（老板反馈：v1 按性别蓝/粉，v2 一方灰）
+**根因：** `setup_page.dart` 的 `_finish()` 把 profile 的 `peerGender` **写死 ''**
+（注释"无公开渠道"）→ 对方性别永远未知 → `_bubbleColor` 走未知性别回退灰/蓝。
+v1 是写真实值（create=伴侣性别，join=另一人 `_personGenders[另一 person]`），
+Multiverse 重写时丢了。
+
+**修复两层：**
+- `setup_page`：create 用 `_partnerGender`；join 新增 `_joinPeerGender`（另一 slot
+  的性别，复用新的 `_normalizeGender` 归一）
+- `chat_page`：新增 `_refreshGendersFromServer()`（GET /space 的 personGenders）——
+  已入网的老设备 profile 里仍是空值，靠启动 + `profile.updated` 时补齐自愈
+  （对齐 CLI 的 _refreshPersonNames）
+
+**验证：** server tsc + npm test 全绿；app flutter analyze 仅既有 info；
+flutter test 失败项与基线一致（15，无新增）；气泡/菜单相关 14 项全过。
+
+**待老板处理：** 头像广播在服务端，本机 server 需重启、生产需部署才生效
+（App 侧的即时刷新不依赖服务端，上传后本端立刻更新）。

@@ -2,14 +2,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { WebSocketServer } from "ws";
 import { loadConfig, type ServerConfig } from "./config.js";
 import { getDb, openDb } from "./db.js";
-import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
+import { cleanupExpired, ApiError, createChallenge, resolveSession, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
 import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./attachments.js";
 import { getAvatar, storeAvatar } from "./avatars.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, recoverSpace, uploadKeyEscrow } from "./escrow.js";
-import { attachWs, broadcastNewMessage, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
+import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
 import { createJoinToken, createSpace, joinSpace, lookupSpace, preflightJoin } from "./spaces.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -246,10 +246,15 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // 头像（per-person）：上传（token 认证，写本人头像文件）/ 获取（公开，404=未设置）
   if (method === "POST" && path === "/avatar") {
     const token = bearer(req);
+    const { device_id } = resolveSession(token);
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     const blob = Buffer.concat(chunks);
-    sendJson(res, 200, storeAvatar(cfg, token, blob));
+    const stored = storeAvatar(cfg, token, blob);
+    // 广播：伴侣（及本人其他设备）在线时立即重拉头像——否则要等重启 App
+    // （客户端静态缓存只在进程内失效——老板 2026-09-11）
+    broadcastProfileUpdated(device_id, { device_id, person_id: stored.person_id });
+    sendJson(res, 200, stored);
     return;
   }
   const avatarMatch = path.match(/^\/avatar\/([^/]+)$/);

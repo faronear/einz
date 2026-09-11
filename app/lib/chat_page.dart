@@ -233,6 +233,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_myGender.isEmpty) _myGender = p['myGender'] ?? '';
         if (_peerGender.isEmpty) _peerGender = p['peerGender'] ?? '';
       });
+      // 本机快照缺性别（v2 早期把对方性别写死空串）→ 从服务端补齐，否则气泡
+      // 回退灰色（老板 2026-09-11：气泡按性别区分蓝/粉）
+      if (_myGender.isEmpty || _peerGender.isEmpty) _refreshGendersFromServer();
     });
     _repo = MessageRepository(
       db: db,
@@ -290,11 +293,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice);
   }
 
-  /// 对方改名（Server 广播 profile.updated）：立即更新顶部条对方名。
+  /// 对方改名/换头像（Server 广播 profile.updated）：立即更新顶部条对方名；
+  /// 头像则让缓存失效重拉（广播由改名或 POST /avatar 触发）。
   void _onProfileUpdated(WsProfileUpdatedEvent event) {
+    // 头像：无论改名还是换头像都刷一次（同一 per-person 头像文件可能已变）
+    _MessageAvatarState.invalidate(event.personId);
+    if (_myGender.isEmpty || _peerGender.isEmpty) _refreshGendersFromServer();
     final name = event.personName;
     if (name == null || name.isEmpty || !mounted) return;
     setState(() => _peerName = name);
+  }
+
+  /// 从服务端补齐双方性别（GET /space 的 personGenders）：本机 profile 快照可能
+  /// 缺对方性别（v2 早期写死空串）→ 消息气泡回退灰色。启动与收到对方
+  /// profile.updated 时调用（对齐 CLI 的 _refreshPersonNames）。
+  Future<void> _refreshGendersFromServer() async {
+    if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
+    final mine = widget.personId;
+    if (mine == null || mine.isEmpty) return;
+    try {
+      final api = widget.api ?? ApiClient(widget.server);
+      final space = await api.getSpace(widget.token);
+      final myG = space.personGenders[mine] ?? '';
+      var peerG = '';
+      for (final entry in space.personGenders.entries) {
+        if (entry.key != mine) {
+          peerG = entry.value;
+          break;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        if (myG.isNotEmpty) _myGender = myG;
+        if (peerG.isNotEmpty) _peerGender = peerG;
+      });
+    } catch (_) {
+      // 网络失败：保持快照值（下次刷新再试）
+    }
   }
 
   /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
@@ -637,6 +672,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final api = widget.api ?? ApiClient(widget.server);
       await api.uploadAvatar(bytes, widget.token);
       if (!mounted) return;
+      // 消息流里的头像走静态缓存：主动失效才会重拉（否则要重启才更新）
+      _MessageAvatarState.invalidate(widget.personId);
       setState(() => _myAvatarBytes = bytes);
       showTopNotice(context, l10n.chatPageAvatarUploaded);
     } catch (e) {
@@ -2888,6 +2925,16 @@ class _MessageAvatar extends StatefulWidget {
 class _MessageAvatarState extends State<_MessageAvatar> {
   static final Map<String, Uint8List> _cache = {}; // personId → 头像 bytes
 
+  /// 头像失效广播（personId）：通知当前在树上的头像重拉——否则静态缓存只在
+  /// 进程内有效，换了头像要重启 App 才看得到（老板 2026-09-11）。
+  static final ValueNotifier<String?> invalidated = ValueNotifier<String?>(null);
+
+  /// 让某人的头像失效：上传本人头像 / 收到对方 profile.updated 时调用。
+  static void invalidate(String? personId) {
+    if (personId == null || personId.isEmpty) return;
+    invalidated.value = personId;
+  }
+
   Uint8List? get _bytes => widget.personId == null ? null : _cache[widget.personId];
 
   @override
@@ -2897,6 +2944,19 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     if (pid != null && !_cache.containsKey(pid)) {
       _load(pid);
     }
+    invalidated.addListener(_onInvalidated);
+  }
+
+  @override
+  void dispose() {
+    invalidated.removeListener(_onInvalidated);
+    super.dispose();
+  }
+
+  void _onInvalidated() {
+    final pid = widget.personId;
+    if (pid == null || invalidated.value != pid) return;
+    _load(pid); // 覆盖旧缓存后再 setState（不先清空——避免闪成默认图标）
   }
 
   Future<void> _load(String personId) async {
