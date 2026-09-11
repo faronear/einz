@@ -427,15 +427,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 邀请设备：直接生成一次性邀请码（POST /invites，需已认证）。
-  /// 不做 personA/personB 区分、不询问对方名字——默认给尚未加入的对方（personB），
-  /// 生成后展示号码 + 二维码（内容 = 纯邀请码，不编入口令——与 TUI 一致，
-  /// 口令由对方加入时另行输入）。
+  /// 邀请设备：生成一次性 join token（POST /spaces/{id}/join-tokens，Multiverse
+  /// v2，24h 一次性、免认证；旧 v1 createInvite 已废弃，不再生成 v1 邀请码）。
+  /// 二维码与展示内容 = 邀请链接（`https://einz.tic.cc/join/<token>`），对方 App/
+  /// CLI 可扫码或粘贴链接加入；口令由对方加入时另行输入（降级 B，与 TUI 一致）。
   Future<void> _showInviteDialog() async {
     // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"邀请设备"确认窗）
     try {
       final api = widget.api ?? ApiClient(widget.server);
-      final r = await api.createInvite(token: widget.token, personId: 'personB');
+      final r = await api.createJoinToken(widget.spaceId);
       if (!mounted) return;
       await showDialog<void>(
         context: context,
@@ -446,14 +446,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             children: [
               // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
               // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
-              Center(child: _InviteQrCode(data: r.inviteCode)),
+              Center(child: _InviteQrCode(data: r.link)),
               const SizedBox(height: 12),
-              SelectableText(r.inviteCode,
+              SelectableText(r.link,
                   style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1)),
+                      fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+              const SizedBox(height: 6),
+              SelectableText(r.joinToken,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey, letterSpacing: 0.5)),
               const Padding(
                 padding: EdgeInsets.only(top: 6),
-                child: Text('使用以上邀请码，即可绑定新设备到同一个秘境。',
+                child: Text('扫描或复制以上链接（或邀请码），即可绑定新设备到同一个秘境（24 小时有效，仅一次）。',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ],
@@ -461,9 +464,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           actions: [
             TextButton(
               onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: r.inviteCode));
+                await Clipboard.setData(ClipboardData(text: r.link));
                 if (!ctx.mounted) return;
-                showTopNotice(ctx, '邀请码已复制');
+                showTopNotice(ctx, '邀请链接已复制');
                 Navigator.of(ctx).pop();
               },
               child: const Text('复制'),
@@ -2949,7 +2952,8 @@ class _MessageAvatarState extends State<_MessageAvatar> {
 class _InviteQrCode extends StatelessWidget {
   const _InviteQrCode({required this.data});
 
-  /// 邀请码（服务端固定 20 字符 + 分隔符，QR 容量绰绰有余，不会超长）。
+  /// 二维码内容：邀请链接（`https://einz.tic.cc/join/<token>`，约 80 字符；
+  /// QR 容量绰绰有余，不会超长）。
   final String data;
 
   @override

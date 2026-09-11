@@ -45,15 +45,10 @@ class _InviteFakeApi extends ApiClient {
   }
 
   @override
-  Future<InviteResult> createInvite({
-    required String token,
-    required String personId,
-    String? personName,
-    int hours = 24,
-  }) async =>
-      const InviteResult(
-        inviteCode: 'ABCDE-FGHJK-LMNPQ-RSTUV',
-        personId: 'personB',
+  Future<JoinTokenResult> createJoinToken(String spaceId) async =>
+      const JoinTokenResult(
+        joinToken: 'e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
+        link: 'https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
         expiresAt: 0,
       );
 }
@@ -85,7 +80,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('邀请码'));
     // 菜单 pop 后延迟 300ms 才打开弹窗（chat_page onSelected 设计），
-    // 随后 createInvite（fake 瞬时返回）→ showDialog
+    // 随后 createJoinToken（fake 瞬时返回）→ showDialog
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(); // 弹窗首帧（原 bug：此帧抛固有尺寸异常 → 遮罩变暗）
     expect(tester.takeException(), isNull,
@@ -94,7 +89,10 @@ void main() {
 
     // 弹窗内容齐全
     expect(find.text('邀请码已生成'), findsOneWidget);
-    expect(find.text('ABCDE-FGHJK-LMNPQ-RSTUV'), findsWidgets); // 邀请码号码（SelectableText）
+    // 邀请链接（SelectableText 主展示）+ token（次级小字）
+    expect(find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
+        findsWidgets);
+    expect(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), findsWidgets);
 
     // 二维码真实可见（原 bug：CustomPaint 绘制面 0x0，从未显示）
     final qrPaint = find.byWidgetPredicate(
