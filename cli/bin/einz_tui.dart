@@ -466,10 +466,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       if (!_state!.running) return;
       // 一条系统消息内多行（\n 分隔）：整体被消息间空行隔开、又不会
       // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）
-      session.messages
-          .add(_systemMessage(session, '❓ 秘境入口\n   c: 创建秘境\n   j: 加入秘境'));
       final choice = (await _prompt(
-              session, '请选择:'))
+              session, '❓ 选择秘境入口\n   c: 创建秘境\n   j: 加入秘境'))
           .trim()
           .toLowerCase();
       if (!_state!.running) return;
@@ -778,10 +776,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）。
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (myGender == null) {
-    session.messages.add(_systemMessage(session, '❓ 我的性别'));
-    session.messages.add(_systemMessage(session, '   1: 男'));
-    session.messages.add(_systemMessage(session, '   2: 女'));
-    final g = (await _prompt(session, '❓ 请选择:')).trim();
+    final g = (await _prompt(session, '❓ 我的性别是\n  1: 男\n  2: 女')).trim();
     if (!_state!.running) return;
     if (g == '1') {
       myGender = '男';
@@ -791,6 +786,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     } else if (g == '2') {
       myGender = '女';
       session.messages.add(_systemMessage(session, '✅ 女'));
+      session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
     } else {
       session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
@@ -822,10 +818,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   String partnerGender;
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (true) {
-    session.messages.add(_systemMessage(session, '❓ 伴侣的性别'));
-    session.messages.add(_systemMessage(session, '   1: 男'));
-    session.messages.add(_systemMessage(session, '   2: 女'));
-    partnerGender = (await _prompt(session, '❓ 请选择:')).trim();
+    partnerGender = (await _prompt(session, '❓ 伴侣的性别是\n  1: 男\n  2: 女')).trim();
     if (!_state!.running) return;
     if (partnerGender == '1') {
       partnerGender = '男';
@@ -865,7 +858,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       spaceId: spaceId,
       keyVersion: 1,
     );
-    session.messages.add(_systemMessage(session, '✅ 口令密保箱已打包。请将口令通过安全的方式分享给秘境伴侣，即可共享私密。'));
+    session.messages.add(_systemMessage(session, '✅ 口令已设置。请将口令通过安全的方式分享给秘境伴侣。'));
     session.messages.add(_systemMessage(session, '----------------'));
     final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
       spaceId: spaceId,
