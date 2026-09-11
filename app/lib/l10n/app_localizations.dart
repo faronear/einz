@@ -509,13 +509,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryCreate.
   ///
   /// In en, this message translates to:
-  /// **'Create a space'**
+  /// **'Create'**
   String get setupEntryCreate;
 
   /// No description provided for @setupEntryJoin.
   ///
   /// In en, this message translates to:
-  /// **'Join a space'**
+  /// **'Join'**
   String get setupEntryJoin;
 
   /// No description provided for @setupEntryLegacyServer.
