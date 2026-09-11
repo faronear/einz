@@ -210,6 +210,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '${seconds}s';
   }
 
+  /// 阅后即焚「设置（修改）时间」紧凑标注（HH:MM）。由到期时间戳反推：
+  /// setMessageBurn 设 expiresAt = 设置时刻 + 时长，故 设置时刻 = expiresAt - 时长。
+  /// 出/入站消息均如此（发送时 also expiresAt = now + 时长），因此即「倒计时起点」。
+  String _burnSetTimeLabel(int? expiresAt, int burnSeconds) {
+    if (expiresAt == null || burnSeconds <= 0) return '';
+    final t = DateTime.fromMillisecondsSinceEpoch(expiresAt - burnSeconds * 1000);
+    final hh = t.hour.toString().padLeft(2, '0');
+    final mm = t.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  /// 阅后即焚时钟标签：⏰ <设置(修改)时间>+<时长>，如 ⏰ 20:47+5m。
+  String _burnTagLabel(int? expiresAt, int burnSeconds) {
+    final setTime = _burnSetTimeLabel(expiresAt, burnSeconds);
+    final dur = _burnDurationLabel(burnSeconds);
+    return setTime.isNotEmpty ? '$setTime+$dur' : dur;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2397,7 +2415,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           const SizedBox(width: 4),
                                           const Icon(Icons.schedule, size: 11),
                                           const SizedBox(width: 2),
-                                          Text(_burnDurationLabel(m.burnAfterSeconds),
+                                          // 时钟标签：⏰ <设置(修改)时间>+<时长>，如 ⏰ 20:47+5m
+                                          Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds),
                                               style: TextStyle(
                                                   fontSize: 10,
                                                   color: _uiStyle == 'gradient'
