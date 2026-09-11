@@ -1181,8 +1181,11 @@ class _SetupPageState extends State<SetupPage> {
   /// 步骤 2（join，Multiverse）：选择「你是哪一个用户」——create 已录入两人
   /// 身份（preflight slots），加入者可能是第二人，也可能是第一人的其他设备，
   /// 不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）。
+  /// 样式沿用 v1 性别选择卡（老板 2026-09-11）：左右双卡片、粉蓝表性别、
+  /// 男女图标 + 各自名字、无在线状态、选中放大覆盖相邻未选中卡。
   Widget _buildStepJoinIdentity() {
     final l10n = AppLocalizations.of(context)!;
+    final pair = _joinSlots.length == 2; // 恰好两位成员 → v1 左右双卡片
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1195,32 +1198,53 @@ class _SetupPageState extends State<SetupPage> {
               style: const TextStyle(fontSize: 14),
             ),
           )
-        else
+        else if (pair) ...[
+          const SizedBox(height: 4),
+          _buildCardPair(
+            leftCard: _buildSlotCard(_joinSlots[0],
+                alignment: Alignment.centerLeft), // 锚左外缘：选中向右扩展覆盖右侧卡
+            rightCard: _buildSlotCard(_joinSlots[1],
+                alignment: Alignment.centerRight), // 锚右外缘：选中向左扩展覆盖左侧卡
+            leftSelected: _chosenSlot == _joinSlots[0].slot,
+            rightSelected: _chosenSlot == _joinSlots[1].slot,
+          ),
+        ] else
           for (final s in _joinSlots)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _buildSelectableCard(
-                label: '${s.displayName ?? '（未命名）'}'
-                    '${s.gender != null ? '（${_genderDisplay(s.gender!)}）' : ''}'
-                    '${s.status == 'active' ? ' ${l10n.wizardSlotOnline}' : ''}',
-                icon: s.slot == 0 ? Icons.person : Icons.person_outline,
-                color: const Color(0xFF3BAFFD),
-                selected: _chosenSlot == s.slot,
-                alignment: Alignment.center,
-                onTap: () => setState(() {
-                  _chosenSlot = s.slot;
-                  _slotError = null; // 选中即清除未选提醒
-                }),
-              ),
+              child: _buildSlotCard(s, alignment: Alignment.center),
             ),
         if (_slotError != null) _localErrorHint(_slotError!),
       ],
     );
   }
 
-  /// 服务端 gender 兼容中英文代码（CLI 传'男/女'、App 传'male/female'）→ 显示中文。
-  String _genderDisplay(String g) =>
-      (g == 'male' || g == '男') ? '男' : (g == 'female' || g == '女') ? '女' : g;
+  /// 身份卡（v1 样式）：性别色 + 男女图标 + 名字（无在线状态、无性别后缀）。
+  Widget _buildSlotCard(SpaceMemberSlot s, {required Alignment alignment}) {
+    final style = _slotStyle(s);
+    return _buildSelectableCard(
+      label: s.displayName ?? '（未命名）',
+      icon: style.$1,
+      color: style.$2,
+      selected: _chosenSlot == s.slot,
+      alignment: alignment,
+      onTap: () => setState(() {
+        _chosenSlot = s.slot;
+        _slotError = null; // 选中即清除未选提醒
+      }),
+    );
+  }
+
+  /// slot → (图标, 颜色)：按性别映射——男=天蓝+male 图标、女=品牌粉+female 图标；
+  /// 性别缺失时按位次兜底（slot 0=创建者→男蓝，slot 1=第二人→女粉）。
+  (IconData, Color) _slotStyle(SpaceMemberSlot s) {
+    final g = s.gender; // 局部变量才能被空安全提升（getter 不可提升）
+    final female = (g == 'female' || g == '女') ||
+        ((g == null || g.isEmpty) && s.slot == 1);
+    return female
+        ? (Icons.female, const Color(0xFFD6529C))
+        : (Icons.male, const Color(0xFF3BAFFD));
+  }
 
   /// join 所选身份（create 预置）的名字——本人在消息流里的显示名。
   String get _joinSelectedName {
