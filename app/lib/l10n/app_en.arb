@@ -119,14 +119,15 @@
       "error": {"type": "String"}
     }
   },
-  "setPinDialogPinLabel": "PIN (at least 4 characters)",
-  "setPinDialogPinHint": "At least 4 digits",
+  "setPinDialogPinLabel": "PIN (at least 6 digits)",
+  "setPinDialogPinHint": "At least 6 digits",
   "setPinDialogConfirmLabel": "Confirm PIN",
   "setPinDialogConfirmHint": "Type it again to confirm",
   "setPinDialogSetPin": "Set PIN",
   "setupPageSkipPinTitle": "Skip app lock?",
   "setupPageSkipPinMessage": "Without the app lock the Space Key package won't be encrypted on this device; you'll need to set it up again after restart. Skip anyway?",
-  "setPinDialogPinTooShort": "PIN must be at least 4 characters",
+  "setPinDialogPinTooShort": "PIN must be at least 6 digits",
+  "setPinDialogPinDigitsOnly": "PIN can contain digits only",
   "setPinDialogPinMismatch": "The two PINs do not match",
   "setPinDialogSetupFailed": "Setup failed: {error}",
   "@setPinDialogSetupFailed": {

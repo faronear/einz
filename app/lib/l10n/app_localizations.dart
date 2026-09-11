@@ -677,13 +677,13 @@ abstract class AppLocalizations {
   /// No description provided for @setPinDialogPinLabel.
   ///
   /// In en, this message translates to:
-  /// **'PIN (at least 4 characters)'**
+  /// **'PIN (at least 6 digits)'**
   String get setPinDialogPinLabel;
 
   /// No description provided for @setPinDialogPinHint.
   ///
   /// In en, this message translates to:
-  /// **'At least 4 digits'**
+  /// **'At least 6 digits'**
   String get setPinDialogPinHint;
 
   /// No description provided for @setPinDialogConfirmLabel.
@@ -719,8 +719,14 @@ abstract class AppLocalizations {
   /// No description provided for @setPinDialogPinTooShort.
   ///
   /// In en, this message translates to:
-  /// **'PIN must be at least 4 characters'**
+  /// **'PIN must be at least 6 digits'**
   String get setPinDialogPinTooShort;
+
+  /// No description provided for @setPinDialogPinDigitsOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN can contain digits only'**
+  String get setPinDialogPinDigitsOnly;
 
   /// No description provided for @setPinDialogPinMismatch.
   ///

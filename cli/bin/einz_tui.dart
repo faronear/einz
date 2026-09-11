@@ -278,6 +278,17 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 /// 提示作为 system 消息（_prompt），回答走 you> 输入行（机密口令回显 *）。
 /// 引导完成后做启动同步 + WS；全部就绪后返回。
 /// PIN 哈希（argon2id str，自含盐）——与 escrow 口令哈希同一算法（pwhash 需 sumo 构建）。
+/// 锁屏码规则（老板 2026-09-11 定稿：与 App 一致——只允许数字，至少
+/// [_kPinMinLength] 位；6 位数字约 20 bit，明显强于 4 位的 13 bit）。
+const int _kPinMinLength = 6;
+
+/// 锁屏码校验：合法返回 null，否则返回错误说明（供设置/修改处提示重输）。
+String? _pinError(String pin) {
+  if (!RegExp(r'^\d+$').hasMatch(pin)) return '锁屏码只能是数字';
+  if (pin.length < _kPinMinLength) return '锁屏码至少 $_kPinMinLength 位数字';
+  return null;
+}
+
 Future<String> _hashPin(String pin) async {
   final s = await SodiumSumoInit.init2(loadDynamicLibrary);
   return s.crypto.pwhash.str(
@@ -297,14 +308,26 @@ Future<bool> _verifyPin(String hash, String pin) async {
 Future<void> _askSetPin(ChatSession session, String storePath) async {
   if (!_state!.running) return;
   // 明文输入（与解锁一致——引导中也可输入 /exit）
-  final pin = await _prompt(session, '❓ 设置锁屏码（以后每次进入秘境需要输入锁屏码。也可暂时留空跳过，以后用 /pin 重设）:', hidden: false);
-  if (!_state!.running) return;
-  if (pin.isEmpty) {
-    session.messages.add(_systemMessage(session, '⚠️ 没有设置锁屏码'));
-  } else {
+  while (true) {
+    if (!_state!.running) return;
+    final pin = await _prompt(session,
+        '❓ 设置锁屏码（$_kPinMinLength 位数字。以后每次进入秘境需要输入；也可暂时留空跳过，以后用 /pin 重设）:',
+        hidden: false);
+    if (!_state!.running) return;
+    if (pin.isEmpty) {
+      session.messages.add(_systemMessage(session, '⚠️ 没有设置锁屏码'));
+      break;
+    }
+    final err = _pinError(pin);
+    if (err != null) {
+      session.messages.add(_systemMessage(session, '⚠️ $err（留空可跳过）'));
+      _scheduleRender();
+      continue;
+    }
     session.store.pinHash = await _hashPin(pin);
     session.store.save(storePath);
     session.messages.add(_systemMessage(session, '✅ 锁屏码已设置'));
+    break;
   }
   session.messages.add(_systemMessage(session, '----------------'));
   session.messages.add(_systemMessage(session, '🎉 一切就绪！输入 /help 查看快捷命令，输入 /invite 邀请伴侣。立刻开始私密聊天吧！'));
@@ -942,8 +965,17 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     final myName = slots.firstWhere((s) => s.slot == chosenSlot).displayName;
     session.messages.add(_systemMessage(session, '✅ 我是 ${myName}'));
     session.messages.add(_systemMessage(session, '----------------'));
-    final passphrase = (await _prompt(session, '❓ 验证密保口令:', hidden: true)).trim();
-    if (!_state!.running) return;
+    // 口令必填：留空会先 joinSpace（服务端已登记）再取不到 Space Key 就 return，
+    // 设备卡在"已登记但无密钥"的坏状态——故在加入前就拦住（老板 2026-09-11）
+    String passphrase;
+    while (true) {
+      if (!_state!.running) return;
+      passphrase =
+          (await _prompt(session, '❓ 验证密保口令:', hidden: true, required: true))
+              .trim();
+      if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
+      break;
+    }
     final join = await _busy(session, '⏳ 正在加入秘境...', () => api.joinSpace(
       token: token,
       publicKey: store.publicKey,
@@ -2399,12 +2431,17 @@ Future<void> _execCommand(String line) async {
             s.session.store.pinHash == null ? '⚠️ 锁屏码：未设置' : '✅ 锁屏码：已设置'));
         // 先输出状态，再给出详细用法
         s.session.messages.add(_systemMessage(s.session,
-            '用法: /pin <PIN> —— 设置锁屏码（如 /pin 123456）；/pin \'\' 重置为空（取消锁屏吗）'));
+            '用法: /pin <PIN> —— 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）；/pin \'\' 重置为空（取消锁屏码）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
         s.session.messages.add(_systemMessage(s.session, '⚠️ 锁屏码已重置为空（未设置）'));
       } else {
+        final err = _pinError(arg);
+        if (err != null) {
+          s.session.messages.add(_systemMessage(s.session, '⚠️ $err（/pin \'\' 可取消锁屏码）'));
+          break;
+        }
         s.session.store.pinHash = await _hashPin(arg);
         s.session.store.save(s.storePath);
         s.session.messages.add(_systemMessage(s.session, '✅ 锁屏码已设置'));

@@ -2569,7 +2569,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       }
       return;
     }
-    if (pin.length < 4) {
+    if (!AppLockService.isPinDigitsOnly(pin)) {
+      setState(() => _error = l10n.setPinDialogPinDigitsOnly);
+      return;
+    }
+    if (pin.length < AppLockService.pinMinLength) {
       setState(() => _error = l10n.setPinDialogPinTooShort);
       return;
     }

@@ -628,7 +628,10 @@ class _SetupPageState extends State<SetupPage> {
         );
         if (skip != true) return; // 取消：留在本页
         _pinSkipped = true;
-      } else if (pin.length < 4) {
+      } else if (!AppLockService.isPinDigitsOnly(pin)) {
+        setState(() => _pinError = l10n.setPinDialogPinDigitsOnly);
+        return;
+      } else if (pin.length < AppLockService.pinMinLength) {
         setState(() => _pinError = l10n.setPinDialogPinTooShort);
         return;
       } else if (pin != confirm) {
@@ -1008,7 +1011,11 @@ class _SetupPageState extends State<SetupPage> {
   }) async {
     final l10n = AppLocalizations.of(context)!;
     final pin = _pin.text;
-    if (pin.length < 4) {
+    if (!AppLockService.isPinDigitsOnly(pin)) {
+      setState(() => _status = l10n.setPinDialogPinDigitsOnly);
+      return false;
+    }
+    if (pin.length < AppLockService.pinMinLength) {
       setState(() => _status = l10n.setPinDialogPinTooShort);
       return false;
     }

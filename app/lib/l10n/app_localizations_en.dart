@@ -333,10 +333,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setPinDialogPinLabel => 'PIN (at least 4 characters)';
+  String get setPinDialogPinLabel => 'PIN (at least 6 digits)';
 
   @override
-  String get setPinDialogPinHint => 'At least 4 digits';
+  String get setPinDialogPinHint => 'At least 6 digits';
 
   @override
   String get setPinDialogConfirmLabel => 'Confirm PIN';
@@ -355,7 +355,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Without the app lock the Space Key package won\'t be encrypted on this device; you\'ll need to set it up again after restart. Skip anyway?';
 
   @override
-  String get setPinDialogPinTooShort => 'PIN must be at least 4 characters';
+  String get setPinDialogPinTooShort => 'PIN must be at least 6 digits';
+
+  @override
+  String get setPinDialogPinDigitsOnly => 'PIN can contain digits only';
 
   @override
   String get setPinDialogPinMismatch => 'The two PINs do not match';

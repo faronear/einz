@@ -308,10 +308,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setPinDialogPinLabel => 'PIN（至少 4 位）';
+  String get setPinDialogPinLabel => 'PIN（至少 6 位数字）';
 
   @override
-  String get setPinDialogPinHint => '至少 4 位数字';
+  String get setPinDialogPinHint => '至少 6 位数字';
 
   @override
   String get setPinDialogConfirmLabel => '确认 PIN';
@@ -329,7 +329,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageSkipPinMessage => '如果不设锁屏码，本应用启动时将直接进入对话，容易被窃取隐私。确定跳过吗？';
 
   @override
-  String get setPinDialogPinTooShort => 'PIN 至少 4 位';
+  String get setPinDialogPinTooShort => 'PIN 至少 6 位数字';
+
+  @override
+  String get setPinDialogPinDigitsOnly => 'PIN 只能是数字';
 
   @override
   String get setPinDialogPinMismatch => '两次输入的 PIN 不一致';

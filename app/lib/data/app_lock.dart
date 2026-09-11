@@ -20,6 +20,14 @@ class AppLockService {
   static const int maxAttempts = 5;
   static const int lockSeconds = 30;
 
+  /// 锁屏码规则（老板 2026-09-11 定稿：与 CLI 一致——只允许数字，至少
+  /// [pinMinLength] 位；6 位数字约 20 bit，明显强于 4 位的 13 bit）。
+  /// 仅约束设置/修改；已有更短的旧 PIN 解锁不受影响。
+  static const int pinMinLength = 6;
+
+  /// 锁屏码是否只含数字（键盘为数字键盘，但可粘贴/外接键盘输入字母——需显式校验）。
+  static bool isPinDigitsOnly(String pin) => RegExp(r'^\d+$').hasMatch(pin);
+
   static const _kPackage = 'app_lock.package';
   static const _kAttempts = 'app_lock.attempts';
   static const _kLockedUntil = 'app_lock.locked_until';
