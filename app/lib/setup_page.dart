@@ -102,10 +102,14 @@ class _SetupPageState extends State<SetupPage> {
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户确认"不设置锁屏码"：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
-  // 键盘遮挡处理（方案 2）：点「下一步」先收键盘，再把性别红字警告滚入可见区，
-  // 确保用户看得到并知道怎么改。iOS/Android 通用：仅用 Flutter 框架 API
-  // Scrollable.ensureVisible / FocusScope.unfocus，依赖 Scaffold 的
-  // resizeToAvoidBottomInset——Android 已配 adjustResize，行为同 iOS。
+  // 键盘遮挡处理：
+  // 方案 1（聚焦即滚出性别卡）：名字/伴侣名输入框聚焦时把性别卡滚入可见区；
+  // 方案 2（点下一步收键盘并滚到警告）：_nextStep 先收键盘再把红字警告滚入可见区。
+  // 均 iOS/Android 通用：仅用 Flutter 框架 API Scrollable.ensureVisible /
+  // FocusScope.unfocus，依赖 Scaffold 的 resizeToAvoidBottomInset——
+  // Android 已配 adjustResize，行为同 iOS。
+  final _nameFocus = FocusNode();
+  final _partnerNameFocus = FocusNode();
   final _myGenderRevealKey = GlobalKey();
   final _partnerGenderRevealKey = GlobalKey();
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
@@ -145,6 +149,8 @@ class _SetupPageState extends State<SetupPage> {
 
   @override
   void dispose() {
+    _nameFocus.dispose();
+    _partnerNameFocus.dispose();
     _personName.dispose();
     _spaceId.dispose();
     _envelopeKey.dispose();
@@ -159,6 +165,9 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void initState() {
     super.initState();
+    // 方案 1：名字/伴侣名输入框聚焦时，键盘升起后把性别卡滚入可见区（见 _revealGender）
+    _nameFocus.addListener(_onNameFocusChange);
+    _partnerNameFocus.addListener(_onPartnerNameFocusChange);
     _initServer();
     _autoGenerateKey(); // 对齐 TUI：本地无设备记录即自动生成公私钥，无需用户点按钮
   }
@@ -504,6 +513,16 @@ class _SetupPageState extends State<SetupPage> {
       _localError = null;
       _genderError = null;
     });
+  }
+
+  // 方案 1：名字/伴侣名输入框聚焦（键盘升起）后，把性别卡滚入可见区。
+  // alignment=1.0 让性别卡贴着可见区底部、名字框尽量留在顶部，小屏两者都可见。
+  void _onNameFocusChange() {
+    if (_nameFocus.hasFocus) _revealGender(_myGenderRevealKey, 1.0);
+  }
+
+  void _onPartnerNameFocusChange() {
+    if (_partnerNameFocus.hasFocus) _revealGender(_partnerGenderRevealKey, 1.0);
   }
 
   // 把指定 key 的控件滚入最近滚动视图的可见区；延迟一拍等键盘收起动画结束再算视口
@@ -1140,6 +1159,7 @@ class _SetupPageState extends State<SetupPage> {
         _stepHeader(l10n.wizardTitleName, l10n.wizardNameHint),
         TextField(
           controller: _personName,
+          focusNode: _nameFocus, // 方案 1：聚焦时滚出性别卡
           style: const TextStyle(fontSize: 20),
           // 开始填写即清除「名字为空」红字（不依赖再点下一步）
           onChanged: (_) {
@@ -1206,6 +1226,7 @@ class _SetupPageState extends State<SetupPage> {
         _stepHeader(l10n.wizardTitlePeerName, l10n.wizardPeerNameHint),
         TextField(
           controller: _partnerNameCtrl,
+          focusNode: _partnerNameFocus, // 方案 1：聚焦时滚出性别卡
           style: const TextStyle(fontSize: 20),
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
