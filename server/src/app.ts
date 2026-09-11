@@ -18,6 +18,15 @@ const SERVER_VERSION = "1.0.0";
 openDb(); // 先开库（所有路由依赖 db 就绪）
 const cfg: ServerConfig = loadConfig();
 
+/** 邀请链接 base：按请求真实地址（Host + x-forwarded-proto）生成——TUI
+ *  --server http://localhost:3000 / app local_config.json 覆盖服务器地址时，
+ *  邀请链接与客户端实际使用的服务器一致（不再硬编码 einz.tic.cc，2026-09-11）。 */
+function requestBaseUrl(req: IncomingMessage): string {
+  const proto = String(req.headers["x-forwarded-proto"] ?? "http").split(",")[0].trim();
+  const host = req.headers.host ?? `localhost:${PORT}`;
+  return `${proto}://${host}`;
+}
+
 const server = createServer(async (req, res) => {
   const start = Date.now();
   // 请求/响应日志（pm2 log 式）：方法、路径、状态码、耗时；响应体不入日志（避免泄露密文）
@@ -126,6 +135,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       body?.escrow_passphrase == null ? undefined : String(body.escrow_passphrase),
       body?.public_key == null ? undefined : String(body.public_key),
       body?.device_name == null ? undefined : String(body.device_name),
+      requestBaseUrl(req), // 邀请链接按请求真实 Host 生成
     );
     sendJson(res, 201, r);
     return;
@@ -156,7 +166,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "POST" && path.startsWith("/spaces/") && path.endsWith("/join-tokens")) {
     const spaceId = path.slice("/spaces/".length, -"/join-tokens".length);
-    const r = createJoinToken(spaceId);
+    const r = createJoinToken(spaceId, requestBaseUrl(req));
     sendJson(res, 201, r);
     return;
   }

@@ -51,7 +51,9 @@ Multiverse 的目标是让一个 Server 承载多个 Space（每个 Space 始终
 
 ### 2.2 深链与 App 内输入
 
-- 分享链接（二维码内码即此链接或纯 token）：`https://einz.tic.cc/join/<token>`
+- 分享链接（二维码内码即此链接或纯 token）：`https://einz.tic.cc/join/<token>`——
+  host 由服务端按请求真实地址生成（Host + x-forwarded-proto），本地/自建服务器时
+  与实际访问地址一致（如 `http://localhost:3000/join/<token>`），不硬编码（2026-09-11）；
 - App 加入页输入框**同时接受**完整链接与纯 token（App 解析出 token 部分）；
   另有扫码入口（复用现有 mobile_scanner）。
 - 系统深链（`einz://join/<token>` / universal link）列为上架后增强，MVP 不做。

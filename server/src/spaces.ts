@@ -16,7 +16,9 @@ import { loadConfig } from "./config.js";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const TOKEN_TTL_MS = 24 * 3600 * 1000; // token 默认 24h（老板 2026-09-10 拍板）
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // join 签发 session 有效期（同 v1）
-const JOIN_LINK_PREFIX = "https://einz.tic.cc/join/";
+// 邀请链接 base（兜底值）：正常由服务端按请求真实 Host 生成（TUI --server /
+// app local_config.json 覆盖服务器地址时链接同步正确，老板 2026-09-11）
+const DEFAULT_LINK_BASE = "https://einz.tic.cc";
 
 /** base58url 编码（无歧义字符集；32B 随机数 → 43~44 字符）。 */
 function base58url(bytes: Buffer): string {
@@ -70,6 +72,7 @@ export async function createSpace(
   escrowPassphrase?: string,
   publicKey?: string,
   deviceName?: string,
+  baseUrl?: string, // 邀请链接 base（按请求真实 Host 生成，2026-09-11）
 ): Promise<{
   spaceId: string;
   spaceAddress: string;
@@ -171,7 +174,7 @@ export async function createSpace(
     spaceId,
     spaceAddress,
     joinToken: t.token,
-    link: JOIN_LINK_PREFIX + t.token,
+    link: (baseUrl ?? DEFAULT_LINK_BASE) + "/join/" + t.token,
     expiresAt: t.expiresAt,
     deviceId,
     creatorPersonId,
@@ -335,9 +338,10 @@ export function joinSpace(
 /** 生成一次性邀请 token（骨架：成员认证由 U1 Space-scoped session 补齐）。 */
 export function createJoinToken(
   spaceId: string,
+  baseUrl?: string, // 邀请链接 base（按请求真实 Host 生成，2026-09-11）
 ): { joinToken: string; link: string; expiresAt: number } {
   const sp = getDb().prepare(`SELECT 1 FROM spaces WHERE space_id = ?`).get(spaceId);
   if (!sp) throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
   const t = newJoinToken(spaceId, "member");
-  return { joinToken: t.token, link: JOIN_LINK_PREFIX + t.token, expiresAt: t.expiresAt };
+  return { joinToken: t.token, link: (baseUrl ?? DEFAULT_LINK_BASE) + "/join/" + t.token, expiresAt: t.expiresAt };
 }
