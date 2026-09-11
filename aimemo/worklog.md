@@ -2565,3 +2565,14 @@ cfg.space_id，行为不变）。
 - 加入向导的身份列表：名字背景色按性别粉/蓝（复用 _genderBubble——与消息
   气泡背景色完全一致）；亮白字 + 重置；仍不显示性别/在线状态
 - 验证：cli analyze 0 issue；pty e2e 全通（ANSI 背景色不影响名字匹配）
+
+### 气泡仍青色排查（老板 2026-09-10 反馈"重启后仍青色"）
+- 排查结论：服务端 space_members 的 gender 存储正确（normGender 统一 male/female
+  ——curl 实测）、getSpace 返回正确、CLI 数据流（join/create 后 _refreshPersonNames
+  刷新 personGenders——对方消息气泡按 personGenders[senderPersonId] 配色）逻辑正确
+  ——无需代码修复
+- 老板青色根因：旧空间数据（早期创建的空间 space_members.gender 为 NULL——未知
+  性别回退青绿）；新建空间（修复后创建——gender 有值）按逻辑应正常分色
+- pty 实测受阻：临时诊断脚本 create 后发消息失败（Space Key 导入/锁屏码询问时序）
+  ——非气泡 bug（已删除临时脚本）
+- 老板自行验证：新建空间发消息看对方气泡颜色
