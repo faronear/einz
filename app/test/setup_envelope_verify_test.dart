@@ -42,9 +42,7 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
   await tester.tap(find.text('加入秘境'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
-  await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('下一步')); // 再次：放行到身份选择页
+  await tester.tap(find.text('下一步')); // preflight 通过 → 直接进身份选择页（不再显示确认卡片）
   await tester.pumpAndSettle();
   await tester.tap(find.textContaining('Alice')); // 选第二人（伴侣）
   await tester.pumpAndSettle();

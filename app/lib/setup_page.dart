@@ -102,7 +102,8 @@ class _SetupPageState extends State<SetupPage> {
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户确认"不设置锁屏码"：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
-  // Multiverse join：preflight 验证通过的 token 与空间确认信息（token 页显示）
+  // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
+  // 空间显示名（进入聊天页的对方名字）
   String _joinToken = '';
   String? _joinSpaceName;
   String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
@@ -572,17 +573,13 @@ class _SetupPageState extends State<SetupPage> {
     }
     // ---- 后台即时校验（失败停留本页；错误走 _status 红字） ----
     // Multiverse join 第一步（token 页）：token 必须有效（preflight 不消费）
-    // 才放行——与口令页一样即时验证，不留到提交才校验。首次校验通过后
-    // 停留 token 页显示空间确认卡片（让用户看清加入哪个空间），
-    // 再次点「下一步」才放行到名字页。
+    // 才放行——每次点「下一步」都按当前输入重新校验（从后面页面回退到本页后，
+    // 即使输入文字被修改也会重发后台检查，老板 2026-09-11）；通过直接进下一页，
+    // 不再停留显示空间确认卡片
     if (_role == _WizardRole.join && _step == 1) {
-      if (_joinToken.isEmpty) {
-        final ok = await _verifyJoinToken();
-        if (!mounted) return;
-        if (!ok) return;
-        setState(() {}); // 卡片已显示（_joinToken 已设）；停留本页等用户确认空间
-        return;
-      }
+      final ok = await _verifyJoinToken();
+      if (!mounted) return;
+      if (!ok) return;
     }
     // join 口令页（步骤 3）：输入口令必须与首台设备创建时一致（解密 escrow
     // 口令密保箱成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
@@ -1252,8 +1249,8 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 步骤 1（join，Multiverse）：输入邀请链接或 token（粘贴/扫码）。
-  /// 验证通过（preflight 不消费）后显示空间确认卡片（空间名 + 等待状态——
-  /// 老板 2026-09-10 确认的流程第①/②步）。
+  /// 「下一步」每次按当前输入 preflight 校验：通过直接进下一页，失败红字停留
+  /// （不再显示空间确认卡片，老板 2026-09-11）。
   Widget _buildStepJoinToken() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -1279,38 +1276,15 @@ class _SetupPageState extends State<SetupPage> {
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
-        // 空间确认反馈（preflight 通过后显示）：空间名 + 等待状态
-        if (_joinToken.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 16),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF4FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF3BAFFD)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.verified_user, color: Color(0xFF2271F7)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _joinSpaceName == null || _joinSpaceName!.isEmpty
-                        ? l10n.setupTokenSpacePrivate
-                        : l10n.setupTokenSpaceInfo(_joinSpaceName!),
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
       ],
     );
   }
 
   /// join 第一步 token 校验：POST /spaces/join/preflight（不消费 token）。
-  /// 成功 → 记录空间信息（空间确认反馈）并放行；失败 → 错误码映射红字
-  /// （TOKEN_INVALID/EXPIRED/USED/SPACE_FULL，PROTOCOL_MULTIVERSE.md §6），停留本页。
+  /// 成功 → 记录 token/身份 slots（供后续步骤与最终 join 提交）并放行；失败 →
+  /// 错误码映射红字（TOKEN_INVALID/EXPIRED/USED/SPACE_FULL，
+  /// PROTOCOL_MULTIVERSE.md §6），停留本页。displayName 保留为进入聊天页的
+  /// 对方名字（peerName，不再是确认卡片文案）。
   Future<bool> _verifyJoinToken() async {
     final raw = _inviteCode.text.trim();
     if (raw.isEmpty) {

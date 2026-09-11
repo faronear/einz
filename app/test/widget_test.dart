@@ -76,7 +76,7 @@ void main() {
     expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
   });
 
-  testWidgets('join：token 校验通过（preflight）→ 空间确认卡片显示',
+  testWidgets('join：token 校验通过（preflight）→ 直接进入身份选择页',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(
       preflightOverride: (token) async => const SpaceJoinPreflight(
@@ -94,13 +94,10 @@ void main() {
     await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
-    await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 停留显示空间确认卡片
+    await tester.tap(find.text('下一步')); // preflight 通过 → 直接进下一页（不再停留显示确认卡片）
     await tester.pumpAndSettle();
-    // 空间确认卡片显示（加入创建者的空间）；再次点「下一步」才放行到身份选择页
-    expect(find.text('加入 Lukas 的空间'), findsOneWidget);
-    await tester.tap(find.text('下一步'));
-    await tester.pumpAndSettle();
-    expect(find.text('你是哪一个用户？'), findsOneWidget, reason: '确认空间后应放行到身份选择页');
+    expect(find.text('加入 Lukas 的空间'), findsNothing, reason: '不再显示空间确认卡片');
+    expect(find.text('你是哪一个用户？'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
   });
 
   testWidgets('探测失败：启动屏保持旋转 Logo、无失败文字并自动重试（无输入框/信封入口）',
