@@ -46,7 +46,7 @@ export function storeAttachment(
   meta: { message_id: string; attachment_id: string; key_version: number; size: number; sha256: string; nonce: string },
   blob: Buffer
 ): { attachment_id: string; storage_path: string; created_at: number } {
-  const { device_id } = resolveSession(token);
+  const { device_id, space_id: sessionSpace } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
 
@@ -70,11 +70,11 @@ export function storeAttachment(
   writeFileSync(full, blob, { flag: "wx" });
 
   const now = Date.now();
-  // v2 多空间：附件归属消息所在空间（不再用全局 cfg.space_id——服务端已无全局 space）
-  const msg = db
-    .prepare(`SELECT space_id FROM messages WHERE message_id = ?`)
-    .get(meta.message_id) as { space_id: string | null } | undefined;
-  const spaceId = msg?.space_id ?? null;
+  // v2 多空间：附件归属取会话绑定的 Space（同 postMessage）。
+  // 注意：两阶段上传（PROTOCOL.md §6.1）先传 blob 后发消息——此刻 messages
+  // 行尚不存在，不能从消息反查 space_id（否则 NULL 落入 NOT NULL 列 → 500，
+  // 上传失败 → 发送端气泡回退「📎 文件名」、接收端 /sync 无附件元数据）。
+  const spaceId = sessionSpace ?? "";
   db.prepare(
     `INSERT INTO attachments (attachment_id, message_id, space_id, key_version, size, sha256, nonce, storage_path, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`

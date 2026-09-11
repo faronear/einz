@@ -188,7 +188,19 @@ class MessageRepository {
       keyVersion: keyVersion,
     );
 
-    // 2) 发送 caption 消息（type 标记，供接收端渲染）
+    // 2) 本地附件元数据 + 密文副本即时落库（上传前）——发送端气泡不依赖上传结果，
+    //    上传/发送失败也能直接显示图片视频（老板 2026-09-11）
+    await _insertAttachmentMeta({
+      'attachment_id': attachmentId,
+      'message_id': messageId,
+      'key_version': keyVersion,
+      'size': enc.size,
+      'sha256': enc.sha256,
+      'nonce': base64Encode(enc.nonce),
+      'local_cipher': enc.cipher,
+    });
+
+    // 3) 发送 caption 消息（type 标记，供接收端渲染）
     final env = await encryptMessage(
       plaintext: plain,
       spaceKey: spaceKey,
@@ -206,7 +218,7 @@ class MessageRepository {
     final t = token;
     if (t != null) {
       try {
-        // 3) 上传密文 blob（x-attachment-meta 头带元数据）
+        // 4) 上传密文 blob（x-attachment-meta 头带元数据）
         await _withAutoAuth((tok) => api.postAttachment(
               messageId: messageId,
               attachmentId: attachmentId,
@@ -217,19 +229,9 @@ class MessageRepository {
               blob: enc.cipher,
               token: tok,
             ));
-        // 4) 发消息
+        // 5) 发消息
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
-        // 5) 本地附件元数据落库（供历史渲染关联）
-        await _insertAttachmentMeta({
-          'attachment_id': attachmentId,
-          'message_id': messageId,
-          'key_version': keyVersion,
-          'size': enc.size,
-          'sha256': enc.sha256,
-          'nonce': base64Encode(enc.nonce),
-          'local_cipher': enc.cipher, // 发送端本地密文副本：上传中/失败后也能即时显示
-        });
       } on Exception {
         // 失败：消息留 pending（补发时消息会重发，但附件 blob 未上传 v1 不自动补传）
       }

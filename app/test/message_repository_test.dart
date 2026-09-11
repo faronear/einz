@@ -26,6 +26,9 @@ class FakeApi extends ApiClient {
   /// 编排的 /space 设备列表（person 映射测试用）。
   List<SpaceDevice> spaceDevices = [];
 
+  /// 是否让附件上传抛异常（模拟服务端 500 等上传失败）。
+  bool failAttachmentUpload = false;
+
   @override
   Future<SpaceResult> getSpace(String token) async {
     return SpaceResult(spaceId: 'space-test', devices: spaceDevices);
@@ -35,6 +38,21 @@ class FakeApi extends ApiClient {
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
     posted.add(env.messageId);
     return PostMessageResult(messageId: env.messageId, serverSequence: posted.length, createdAt: 1000);
+  }
+
+  @override
+  Future<Map<String, dynamic>> postAttachment({
+    required String messageId,
+    required String attachmentId,
+    required int keyVersion,
+    required int size,
+    required String sha256,
+    required String nonce,
+    required Uint8List blob,
+    required String token,
+  }) async {
+    if (failAttachmentUpload) throw Exception('attachment upload failed');
+    return {'attachment_id': attachmentId, 'storage_path': '01/$attachmentId', 'created_at': 1000};
   }
 
   @override
@@ -389,6 +407,22 @@ void main() {
     expect(hist.single.plaintext, '这是回复', reason: '重启后引用消息不应显示为原始 JSON');
     expect(hist.single.quote, isNotNull);
     expect(hist.single.quote!['messageId'], 'q-1');
+  });
+
+  test('附件：上传失败也保留本地密文元数据（发送端气泡直接显示图片）', () async {
+    // 回归：附件元数据原在上传+发送成功后才落库 → 服务端 500（v2 附件链路断裂）
+    // 时本地无元数据 → 气泡回退「📎 文件名」，图片/视频不再直接显示。
+    final api = FakeApi()..failAttachmentUpload = true;
+    final repo = makeRepo(api, token: 'tok');
+    final bytes = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10]); // PNG magic
+
+    await repo.sendAttachment(fileBytes: bytes, fileName: 'image.jpg', type: 'image');
+
+    final hist = await repo.history();
+    expect(hist.length, 1);
+    expect(hist.single.attachment, isNotNull, reason: '上传失败也应保留本地附件元数据');
+    final plain = await repo.attachmentBytes(hist.single.attachment!);
+    expect(plain, bytes, reason: '本地密文应能解密回原始字节（可直接渲染）');
   });
 }
 

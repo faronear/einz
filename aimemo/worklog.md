@@ -2630,3 +2630,46 @@ GET /space 新名。未修复 dist 上此用例正确失败（能抓住该 bug�
 
 **验证：** server tsc 0 issue；npm test 全绿（冒烟含新 12b + 双空间隔离）；
 Node 需 ≥20.11（import.meta.dirname——本机默认 18.12 跑不了，用 nvm v22）。
+
+## 2026-09-11 附件链路断裂：图片/视频回退「📎 文件名」+ CLI /open 报元数据未就绪
+
+**老板反馈：** v1 App 上传图片后在消息流直接显示图片；v2 App 只显示「别针图标 +
+图片文件名」（等同语音消息的说明文字）。v2 TUI `/open` 报 `[system] ⚠ 附件元数据
+尚未就绪`。两条线索指向附件上传/元数据链路断裂。
+
+**根因（服务端，500）：** v2 移除全局 space_id（2026-09-10 落地）时，
+`storeAttachment` 改为从 messages 表反查归属空间：
+`SELECT space_id FROM messages WHERE message_id = ?` → 但协议是**两阶段上传**
+（PROTOCOL.md §6.1：先传 blob 后发消息），传 blob 时消息尚未入库 → `space_id=null`
+→ 写入 `attachments.space_id NOT NULL` 列 → `SQLITE_CONSTRAINT_NOTNULL` → 500。
+blob 已写盘（`writeFileSync` 在 INSERT 之前）→ 现场证据：`server/data/files/01/`
+有 36 个孤儿 blob，`attachments` 表 0 行。
+- App 侧：`postAttachment` 抛异常 → 本地附件元数据不落库 → 气泡回退「📎 文件名」；
+  消息已在 pending 队列 → 后续 `_flushPending` 补发成功（消息在、附件不在）。
+- CLI 侧：服务端无 attachments 行 → `/sync` 的 `attachments_meta` 为空 → `/open`
+  报元数据未就绪。
+
+**实测复现（curl 打本地 3000）：** message_id 未入库 → 500；同一 message_id
+已入库 → 200。
+
+**修复：**
+1. `server/src/attachments.ts`：附件归属改取会话绑定的 Space（`resolveSession` 的
+   space_id，与 `postMessage` 一致），不再从消息反查；legacy 回落空串。
+2. `app/lib/data/message_repository.dart`：附件元数据 + 本地密文副本改为**加密后
+   立即落库**（原在上传+发送成功后才落库）→ 上传/发送失败时发送端气泡仍能直接
+   渲染图片视频。
+
+**回归测试（两条，均在未修复产物上验证为失败）：**
+- `server/test/smoke.test.ts` 12c：独立服务器 → 创建空间 → 先传 blob（message 未
+  入库）应 200 → 再发 image 消息 → `/sync` 返回 attachments_meta → 下载字节一致。
+  未修复 dist 上正确报 `NOT NULL constraint failed: attachments.space_id` / 500。
+- `app/test/message_repository_test.dart`：附件上传失败（fake 抛异常）时本地元数据
+  仍在且本地密文可解密回原始字节。回滚仓库改动后该用例正确失败。
+
+**验证：** server `npm run build` + `npm test` 全绿（冒烟含 12c + 双空间隔离）；
+App `flutter analyze` 仅剩既有 info；`flutter test` 全量 70 通过 / 15 失败
+（golden 失配等，**与改动前基线一致**，无新增失败）。
+
+**待老板处理：** 本机 3000 端口的服务器进程仍是旧 dist，**需重启**才生效；
+生产（einz.tic.cc）需重新部署。历史遗留孤儿 blob（files/01 下 36 个、无 DB 行、
+nonce 不可知）无法恢复成可解密附件，可择机清理。

@@ -8,6 +8,7 @@
  * 运行：npm test（需先 npm run build 生成 dist/）
  */
 import { createRequire } from 'node:module'
+import { createHash } from 'node:crypto'
 // libsodium-wrappers 的 ESM 入口在 Node ESM 下损坏，统一用 CJS 构建（同 server/src/crypto.ts）。
 const require = createRequire(import.meta.url)
 const sodium =
@@ -707,6 +708,140 @@ async function main (): Promise<void> {
       for (let attempt = 0; attempt < 5; attempt++) {
         try {
           rmSync(tempDir4, { recursive: true, force: true })
+          break
+        } catch {
+          await new Promise(r => setTimeout(r, 200))
+        }
+      }
+    }
+
+    // 12c) 两阶段附件上传回归（PROTOCOL.md §6.1：先传 blob 后发消息）——
+    //      v2 移除全局 space_id 后 storeAttachment 一度改从 messages 反查归属
+    //      空间，但传 blob 时消息尚未入库 → NULL 落入 attachments.space_id
+    //      (NOT NULL) → 500 → 发送端气泡回退「📎 文件名」、接收端 /sync 拿不到
+    //      attachments_meta（CLI /open 报「附件元数据尚未就绪」）。
+    //      验证：blob 200 → 消息入库 → /sync 返回元数据 → 下载字节一致。
+    const tempDir5 = mkdtempSync(join(tmpdir(), 'einz-attach-'))
+    const port5 = await freePort()
+    let serverProc5: ChildProcess | null = null
+    try {
+      serverProc5 = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
+        env: {
+          ...process.env,
+          PORT: String(port5),
+          EINZ_DB: join(tempDir5, 'einz.sqlite.db'),
+          EINZ_FILES: join(tempDir5, 'files')
+        },
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+      serverProc5.stderr?.on('data', d =>
+        process.stderr.write(`[server5] ${d}`)
+      )
+      await waitReady(port5)
+
+      const creatorPk5 = sodium.to_base64(sodium.randombytes_buf(32), B64)
+      const create5 = await fetch(`http://127.0.0.1:${port5}/spaces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: 'luk',
+          public_key: creatorPk5,
+          device_name: 'dev-a'
+        })
+      })
+      assert.equal(create5.status, 201, 'create space should succeed')
+      const created5 = (await create5.json()) as {
+        spaceId: string
+        deviceId: string
+        sessionToken: string
+      }
+      const auth5 = { Authorization: `Bearer ${created5.sessionToken}` }
+
+      const blob = Buffer.from('einz two-phase attachment payload ❤️')
+      const messageId5 = '01a0ffff-aaaa-7bbb-9ccc-0123456789ab'
+      const attachmentId5 = '01a0ffff-bbbb-7ccc-9ddd-0123456789ab'
+      const up5 = await fetch(`http://127.0.0.1:${port5}/attachments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          Authorization: `Bearer ${created5.sessionToken}`,
+          'x-attachment-meta': JSON.stringify({
+            message_id: messageId5,
+            attachment_id: attachmentId5,
+            key_version: 1,
+            size: blob.length,
+            sha256: createHash('sha256').update(blob).digest('base64'),
+            nonce: sodium.to_base64(sodium.randombytes_buf(24), B64)
+          })
+        },
+        body: blob
+      })
+      assert.equal(
+        up5.status,
+        200,
+        'two-phase upload (blob before message) must succeed'
+      )
+
+      const msg5 = await fetch(`http://127.0.0.1:${port5}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${created5.sessionToken}`
+        },
+        body: JSON.stringify({
+          v: 1,
+          type: 'image',
+          key_version: 1,
+          message_id: messageId5,
+          sender_device_id: created5.deviceId,
+          nonce: sodium.to_base64(sodium.randombytes_buf(24), B64),
+          ciphertext: sodium.to_base64(sodium.randombytes_buf(32), B64)
+        })
+      })
+      assert.equal(msg5.status, 200, 'post image message should succeed')
+
+      const sync5 = await fetch(`http://127.0.0.1:${port5}/sync?after=0`, {
+        headers: auth5
+      })
+      const syncBody5 = (await sync5.json()) as {
+        attachments_meta: { attachment_id: string; message_id: string }[]
+      }
+      assert.ok(
+        syncBody5.attachments_meta.some(
+          a =>
+            a.attachment_id === attachmentId5 && a.message_id === messageId5
+        ),
+        '/sync must return attachments_meta so peers can download'
+      )
+
+      const dl5 = await fetch(
+        `http://127.0.0.1:${port5}/attachments/${attachmentId5}`,
+        { headers: auth5 }
+      )
+      assert.equal(dl5.status, 200, 'attachment download should succeed')
+      assert.deepEqual(
+        Buffer.from(await dl5.arrayBuffer()),
+        blob,
+        'downloaded blob must match uploaded bytes'
+      )
+    } finally {
+      await new Promise<void>(done => {
+        if (!serverProc5 || serverProc5.exitCode !== null) {
+          done()
+          return
+        }
+        const timer = setTimeout(() => {
+          serverProc5?.kill('SIGKILL')
+          done()
+        }, 3000)
+        serverProc5.once('exit', () => {
+          clearTimeout(timer)
+          done()
+        })
+      })
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(tempDir5, { recursive: true, force: true })
           break
         } catch {
           await new Promise(r => setTimeout(r, 200))
