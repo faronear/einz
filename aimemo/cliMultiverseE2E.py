@@ -27,7 +27,11 @@ import sys
 import time
 
 CLI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cli")
-SERVER = "http://localhost:3999"
+# 端口可用 EINZ_E2E_PORT 覆盖（默认 3999 被占用时换一个，避免误杀别人的实例）
+SERVER = os.environ.get(
+    "EINZ_E2E_SERVER",
+    f"http://localhost:{os.environ.get('EINZ_E2E_PORT', '3999')}",
+)
 STORE_A = "/tmp/einz-e2e-a.json"
 STORE_B = "/tmp/einz-e2e-b.json"
 STORE_C = "/tmp/einz-e2e-c.json"
@@ -85,7 +89,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
     返回加入成功后的累计输出。"""
     p, m = spawn_tui(store)
     name, out, _ = read_until(m, [
-        ("ask_choice", re.compile(r"创建新秘境")),
+        ("ask_choice", re.compile(r"创建秘境")),
         ("fail", re.compile(r"无法连接服务器|未检测到交互终端")),
     ], prefix=label)
     if name != "ask_choice":
@@ -93,7 +97,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         sys.exit(1)
     send(m, "J\r")  # 输入 J（join）——大小写均可
     name, out, _ = read_until(m, [
-        ("ask_token", re.compile(r"粘贴伴侣的邀请链接或 token")),
+        ("ask_token", re.compile(r"输入邀请码")),
     ], prefix=label)
     if wrong_token:
         send(m, wrong_token + "\r")
@@ -101,13 +105,13 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         # 消息区（重绘再现），不可用作"回到首问"信号——若真的回到首问，
         # 重输 token 提示等不到（read_until 超时）即失败
         name, out, _ = read_until(m, [
-            ("rejected", re.compile(r"加入空间失败|邀请码验证失败")),
+            ("rejected", re.compile(r"加入秘境失败|邀请码验证失败|邀请码无效")),
         ], prefix=label)
         if name != "rejected":
             print(f"FAIL {label}: 错误 token 未被拒绝。输出:\n", out[-600:])
             sys.exit(1)
         name, out, _ = read_until(m, [
-            ("ask_token_again", re.compile(r"粘贴伴侣的邀请链接或 token")),
+            ("ask_token_again", re.compile(r"输入邀请码")),
         ], prefix=label)
         if name != "ask_token_again":
             print(f"FAIL {label}: 被拒后未直接重输 token（回到首问？）。输出:\n", out[-600:])
@@ -125,19 +129,19 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         time.sleep(2.0)
     send(m, token + "\r")
     name, out, _ = read_until(m, [
-        ("ask_slot", re.compile(r"你是哪一个用户")),
-        ("joined", re.compile(r"已加入空间")),
-        ("fail", re.compile(r"加入空间失败")),
+        ("ask_slot", re.compile(r"我是谁")),
+        ("joined", re.compile(r"成功加入秘境")),
+        ("fail", re.compile(r"加入秘境失败")),
     ], prefix=label)
     if name == "ask_slot":
         send(m, identity_name + "\r")  # 输入完整名字选择身份（老板 2026-09-10——不再输编号）
         name, out, _ = read_until(m, [
-            ("ask_passphrase", re.compile(r"输入空间密保口令")),
+            ("ask_passphrase", re.compile(r"验证密保口令")),
         ], prefix=label)
         send(m, "abc123\r")
         name, out, _ = read_until(m, [
-            ("joined", re.compile(r"已加入空间")),
-            ("fail", re.compile(r"加入空间失败|口令错误")),
+            ("joined", re.compile(r"成功加入秘境")),
+            ("fail", re.compile(r"加入秘境失败|口令错误|找不到受托管")),
         ], prefix=label)
     if name != "joined":
         print(f"FAIL {label}: 加入未成功。输出:\n", out[-1000:])
@@ -168,7 +172,7 @@ def main():
     # ---------- 设备 A：输入 C（create，伴侣名字/性别必填）----------
     p_a, m_a = spawn_tui(STORE_A)
     name, out, _ = read_until(m_a, [
-        ("ask_choice", re.compile(r"创建新秘境")),
+        ("ask_choice", re.compile(r"创建秘境")),
         ("fail", re.compile(r"无法连接服务器|未检测到交互终端")),
     ], prefix="A")
     if name != "ask_choice":
@@ -196,24 +200,31 @@ def main():
     ], prefix="A")
     send(m_a, "abc123\r")
     name, out, _ = read_until(m_a, [
-        ("created", re.compile(r"空间已创建")),
+        ("created", re.compile(r"成功创建秘境")),
         ("fail", re.compile(r"创建空间失败")),
     ], prefix="A")
     if name != "created":
         print("FAIL A: 空间创建未成功。输出:\n", out[-1000:])
         sys.exit(1)
-    _, out2, _ = read_until(m_a, [
-        ("token", re.compile(r"e1_[A-Za-z0-9_-]+")),
-    ], timeout=15, prefix="A-token")
-    out = out + out2
-    m_link = re.search(r"(e1_[A-Za-z0-9_-]+)", out)
     m_addr = re.search(r"地址: (0x[0-9a-fA-F]+)", out)
-    if not m_link or not m_addr:
-        print("FAIL A: 未抓到邀请 token 或地址。输出:\n", out[-1000:])
+    if not m_addr:
+        print("FAIL A: 未抓到空间地址。输出:\n", out[-1000:])
         sys.exit(1)
-    token1 = m_link.group(1)
     addr_a = m_addr.group(1)
-    print("A: 空间创建成功, 地址 =", addr_a, ", token1 =", token1)
+    print("A: 空间创建成功, 地址 =", addr_a)
+
+    # join token 走服务端接口生成：pty 里抓邀请链接会被终端按宽度折行截断
+    #（实测抓到的 token 哈希与服务端不符 → preflight 400），不可靠。
+    def new_join_token():
+        with open(STORE_A) as f:
+            store_a = json.load(f)
+        req = urllib.request.Request(
+            SERVER + "/spaces/" + store_a["space_id"] + "/join-tokens", method="POST")
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return json.load(r)["joinToken"]
+
+    token1 = new_join_token()
+    print("B: 生成 token =", token1)
 
     # ---------- 设备 B：第二人加入（选身份 1 = Alice）----------
     # B1：错误 token 被拒后直接重输验证（会话到此退出——不 join）
@@ -236,14 +247,7 @@ def main():
         print("FAIL A: /invite 未生成绑定邀请。输出:\n", out3[-600:])
         sys.exit(1)
     print("A: /invite 命令工作（生成新设备绑定邀请）")
-    with open(STORE_A) as f:
-        store_a = json.load(f)
-    req = urllib.request.Request(
-        SERVER + "/spaces/" + store_a["space_id"] + "/join-tokens", method="POST"
-    )
-    with urllib.request.urlopen(req, timeout=5) as r:
-        t2 = json.load(r)
-    token2 = t2["joinToken"]
+    token2 = new_join_token()
     print("C: 生成新 token =", token2)
     p_c, m_c, addr_c = join_flow("C", STORE_C, token2, identity_name="Lukas")
 

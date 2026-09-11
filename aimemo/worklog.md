@@ -2673,3 +2673,33 @@ App `flutter analyze` 仅剩既有 info；`flutter test` 全量 70 通过 / 15 �
 **待老板处理：** 本机 3000 端口的服务器进程仍是旧 dist，**需重启**才生效；
 生产（einz.tic.cc）需重新部署。历史遗留孤儿 blob（files/01 下 36 个、无 DB 行、
 nonce 不可知）无法恢复成可解密附件，可择机清理。
+
+## 2026-09-11 TUI 创建空间：口令可留空直接通过（老板反馈，已修）
+
+**老板反馈：** `einz_tui.dart` 的 /space create 引导里，口令不输入也能通过并创建成功。
+
+**根因：** `_spaceCreate` 的口令是一次性 `_prompt`（未传 `required`），空串直接提交；
+且 `if (passphrase.isNotEmpty)` 才打包 sealed 包、`escrowPassphrase` 传 null——
+留空 = 不建密保箱也能创建（伴侣凭口令加入的链路直接缺失）。
+
+**修复：** 改为必填循环（对齐既有 `_setupEscrowPassphrase` 的口令模式）：
+`required: true`（输入循环拦截留空回车，提示「此项不能为空」）+ 空串 `continue` 兜底
++ `!_state!.running` 时 return（/exit 逃生门）。口令必有值后，sealed 包不再条件创建，
+`escrowPassphrase` 直接传 passphrase（去掉 isEmpty 分支）。
+
+**回归测试（cli/test/create_passphrase_required_check.py，新增）：** 临时服务器 +
+pty TUI → 走完 名字/性别/伴侣名/伴侣性别 → 口令留空回车 → 断言提示「此项不能为空」
+且未进入创建 → 补输口令 → 断言「成功创建秘境」。未修复代码上正确失败
+（实测直接输出「🎉 成功创建秘境」）。
+
+**验证：** cli `dart analyze` 0 issue；新脚本通过；三设备 e2e
+（aimemo/cliMultiverseE2E.py）全通——A 创建（口令 abc123）→ B 选身份 Alice
+凭同一口令加入（证明必填口令产出的密保箱可用）→ C 同身份多设备加入，地址一致。
+
+**顺带修 e2e 脚本两处老化：**
+1. TUI 文案变了导致匹配不到（创建新秘境→创建秘境、粘贴邀请链接→输入邀请码、
+   你是哪一个用户→我是谁、已加入空间→成功加入秘境、输入空间密保口令→验证密保口令、
+   加入空间失败→加入秘境失败、空间已创建→成功创建秘境）
+2. pty 抓邀请链接会因终端折行被截断（抓到的 token 哈希与服务端不符 → preflight
+   400）→ 改走 POST /spaces/{id}/join-tokens 生成（与设备 C 同一做法）
+3. 端口改可用 `EINZ_E2E_PORT` 覆盖（3999 常被占用，不必去杀别人的实例）

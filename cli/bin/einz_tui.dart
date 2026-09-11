@@ -818,22 +818,29 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
     _scheduleRender();
   }
-  final passphrase = (await _prompt(session, '❓ 设置密保口令:', hidden: false)).trim();
-  if (!_state!.running) return;
+  // 密保口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让伴侣无法
+  // 凭口令加入、本机也没有口令密保箱可用）
+  String passphrase;
+  while (true) {
+    if (!_state!.running) return; // 口令阶段 /exit：不继续创建
+    passphrase = (await _prompt(session,
+            '❓ 设置密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:',
+            required: true))
+        .trim();
+    if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
+    break;
+  }
   try {
     final s = await sodium();
     final spaceKeyB64 = base64Encode(s.randombytes.buf(32));
     final spaceId = _newCliSpaceId();
     final api = ApiClient(server);
-    BackupFile? sealed;
-    if (passphrase.isNotEmpty) {
-      sealed = await KeyEscrowService(api).createPackage(
-        passphrase: passphrase,
-        spaceKeyB64: spaceKeyB64,
-        spaceId: spaceId,
-        keyVersion: 1,
-      );
-    }
+    final sealed = await KeyEscrowService(api).createPackage(
+      passphrase: passphrase,
+      spaceKeyB64: spaceKeyB64,
+      spaceId: spaceId,
+      keyVersion: 1,
+    );
     session.messages.add(_systemMessage(session, '✅ 口令密保箱已打包。请将口令通过安全的方式分享给秘境伴侣，即可共享私密。'));
     session.messages.add(_systemMessage(session, '----------------'));
     final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
@@ -843,7 +850,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       partnerName: partnerName,
       partnerGender: _genderCode(partnerGender),
       sealedSpaceKey: sealed,
-      escrowPassphrase: passphrase.isEmpty ? null : passphrase,
+      escrowPassphrase: passphrase,
       publicKey: store.publicKey,
       deviceName: store.deviceName,
     ));
