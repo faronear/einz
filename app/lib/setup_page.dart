@@ -809,7 +809,8 @@ class _SetupPageState extends State<SetupPage> {
           ),
         _stepHeader(l10n.setupEntryTitle, l10n.setupEntryHint),
         const SizedBox(height: 12),
-        // 左右两张卡片：创建（品牌蓝 + 加号图标）/ 加入（品牌粉 + 门图标）
+        // 左右两张卡片：创建（品牌蓝 + 锤子图标）/ 加入（品牌粉 + 门图标）；
+        // 创建不用加号（易与"加入"混淆，老板 2026-09-11 改为工具/建造语义图标）
         // 注意：不能用 crossAxisAlignment.stretch——入口页包在 SingleChildScrollView
         // 里（高度无界），stretch 会抛 "BoxConstraints forces an infinite height"
         // 导致卡片不渲染（2026-09-11 真机报告）；等高由 _EntryCard 固定高度保证
@@ -817,7 +818,7 @@ class _SetupPageState extends State<SetupPage> {
           children: [
             Expanded(
               child: _EntryCard(
-                icon: Icons.add_circle_outline,
+                icon: Icons.build_outlined,
                 label: l10n.setupEntryCreate,
                 backgroundColor: const Color(0xFFE3F2FD),
                 accentColor: const Color(0xFF2271F7),
