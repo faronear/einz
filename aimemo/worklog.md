@@ -2560,3 +2560,8 @@ cfg.space_id，行为不变）。
   全过、pty e2e 全通
 - 踩坑：push.ts 注释里 person_name:*/person_gender:* 的 */ 截断注释块（TS1109）
   ——改写措辞避免 */ 序列
+
+### TUI 身份选择列表：名字背景色按性别（老板 2026-09-10）
+- 加入向导的身份列表：名字背景色按性别粉/蓝（复用 _genderBubble——与消息
+  气泡背景色完全一致）；亮白字 + 重置；仍不显示性别/在线状态
+- 验证：cli analyze 0 issue；pty e2e 全通（ANSI 背景色不影响名字匹配）

@@ -876,8 +876,11 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
       return;
     }
     for (final s in slots) {
-      // 只显示名字（不显示性别/在线状态——老板 2026-09-10）
-      session.messages.add(_systemMessage(session, '  ${s.displayName ?? '（未命名）'}'));
+      // 名字背景色按性别（粉/蓝——复用 _genderBubble 与消息气泡背景色一致；
+      // 不显示性别/在线状态——老板 2026-09-10）
+      final bg = _genderBubble(s.gender);
+      session.messages.add(
+          _systemMessage(session, '  $bg$_white${s.displayName ?? '（未命名）'}$_reset'));
     }
     var chosenSlot = -1;
     while (chosenSlot < 0) {
