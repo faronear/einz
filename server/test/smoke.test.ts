@@ -277,7 +277,9 @@ async function main (): Promise<void> {
 
     // 2) 设备登记（自主模式：白名单在 devices 表，动态登记）
     const spaceId = await devA.enroll(port) // 首设备自举（免邀请码，成为创建者）
-    assert.ok(spaceId.length > 0, 'enroll returns space_id')
+    // Multiverse：enroll 不再返回全局 space_id（0ac9372——空间由 /spaces
+    // create/join 建立并经 session 绑定）；E2EE 派生与消息落库均用空串一致回落
+    assert.equal(spaceId, '', 'multiverse enroll 返回空 space_id（无全局空间）')
 
     // 3) A 认证
     await devA.auth(port)
@@ -604,6 +606,107 @@ async function main (): Promise<void> {
       for (let attempt = 0; attempt < 5; attempt++) {
         try {
           rmSync(tempDir3, { recursive: true, force: true })
+          break
+        } catch {
+          await new Promise(r => setTimeout(r, 200))
+        }
+      }
+    }
+
+    // 12b) 改名后名称表即时更新（回归：90ec740 把 getSpace 改读 space_members，
+    //      但 updatePersonName 仍只写 meta → GET /space 返回旧名——TUI 右上角自己
+    //      的名字不刷新、对方改名后我方名称表被旧值覆盖）。验证：创建空间 →
+    //      GET /space 旧名 → 改名 → GET /space 新名。
+    const tempDir4 = mkdtempSync(join(tmpdir(), 'einz-rename-'))
+    const port4 = await freePort()
+    let serverProc4: ChildProcess | null = null
+    try {
+      serverProc4 = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
+        env: {
+          ...process.env,
+          PORT: String(port4),
+          EINZ_DB: join(tempDir4, 'einz.sqlite.db'),
+          EINZ_FILES: join(tempDir4, 'files')
+        },
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+      serverProc4.stderr?.on('data', d =>
+        process.stderr.write(`[server4] ${d}`)
+      )
+      await waitReady(port4)
+
+      const creatorPk = sodium.to_base64(sodium.randombytes_buf(32), B64)
+      const create = await fetch(`http://127.0.0.1:${port4}/spaces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: 'luk',
+          public_key: creatorPk,
+          device_name: 'dev-a'
+        })
+      })
+      assert.equal(create.status, 201, 'create space should succeed')
+      const created = (await create.json()) as {
+        spaceId: string
+        creatorPersonId: string
+        sessionToken: string
+      }
+
+      const before = await fetch(`http://127.0.0.1:${port4}/space`, {
+        headers: { Authorization: `Bearer ${created.sessionToken}` }
+      })
+      assert.equal(before.status, 200, 'get space should succeed')
+      const beforeBody = (await before.json()) as {
+        person_names: Record<string, string>
+      }
+      assert.equal(
+        beforeBody.person_names[created.creatorPersonId],
+        'luk',
+        'create 后名称表应为创建名'
+      )
+
+      // /myname 改名 → GET /space 必须返回新名（meta 与 space_members 同步）
+      const rename = await fetch(
+        `http://127.0.0.1:${port4}/devices/person-name`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${created.sessionToken}`
+          },
+          body: JSON.stringify({ person_name: 'lukas' })
+        }
+      )
+      assert.equal(rename.status, 200, 'rename should succeed')
+      const after = await fetch(`http://127.0.0.1:${port4}/space`, {
+        headers: { Authorization: `Bearer ${created.sessionToken}` }
+      })
+      const afterBody = (await after.json()) as {
+        person_names: Record<string, string>
+      }
+      assert.equal(
+        afterBody.person_names[created.creatorPersonId],
+        'lukas',
+        '改名后 GET /space 名称表应即时反映新名'
+      )
+    } finally {
+      await new Promise<void>(done => {
+        if (!serverProc4 || serverProc4.exitCode !== null) {
+          done()
+          return
+        }
+        const timer = setTimeout(() => {
+          serverProc4?.kill('SIGKILL')
+          done()
+        }, 3000)
+        serverProc4.once('exit', () => {
+          clearTimeout(timer)
+          done()
+        })
+      })
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(tempDir4, { recursive: true, force: true })
           break
         } catch {
           await new Promise(r => setTimeout(r, 200))

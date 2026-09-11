@@ -393,7 +393,7 @@ export function updatePersonName (
   token: string,
   body: unknown
 ): { ok: true } {
-  const { device_id } = resolveSession(token)
+  const { device_id, space_id } = resolveSession(token)
   if (!isActiveDevice(cfg, device_id))
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
 
@@ -408,6 +408,14 @@ export function updatePersonName (
   if (!row) throw new ApiError('NOT_FOUND', 'device not found', 404)
 
   setMeta(`person_name:${row.person_id}`, personName)
+  // v2：名称表同步 space_members.display_name——GET /space 从该表读名称
+  // （90ec740 起不再读 meta）。漏同步则改名后名称表仍是旧名：自己右上角名字
+  // 不刷新、对方改名后我方名称表被旧值覆盖（回归 v1 的单一数据源一致性）。
+  if (space_id != null && row.person_id) {
+    getDb()
+      .prepare(`UPDATE space_members SET display_name = ? WHERE space_id = ? AND person_id = ?`)
+      .run(personName, space_id, row.person_id)
+  }
   console.log(
     `[einz] 更新 person 名称: person=${row.person_id}（${personName}）`
   )

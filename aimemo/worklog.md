@@ -2599,3 +2599,34 @@ cfg.space_id，行为不变）。
      personGenders——第二人性别创建时就写入 space_members（slot 预置），join 后
      person_id 落位 getSpace 即可返回——第一个消息前就知道（老板诉求）
 - 验证：cli analyze 0 issue；pty e2e 全通（create→join→多设备地址一致）
+
+## 2026-09-11 TUI /myname 改名后名称不刷新——服务端 meta/space_members 脱节
+
+**老板反馈：** TUI 里 /myname 改名成功后，右上角自己的名字不变；对方 TUI 左上角
+我的新名字正确（WS 广播）；但对方自己也 /myname 后，它右上角自己的名字也不变，
+且左上角我的新名字又变回老名。v1 TUI 全部正确。
+
+**根因（服务端，非 TUI）：** 90ec740 把 GET /space 的名称表从 meta 改为读
+space_members（v2 成员表——create/join 写入 display_name），但 POST
+/devices/person-name（改名端点）仍只写 meta `person_name:*`——两表脱节：
+- 改名者自身刷新（/myname 后 _refreshPersonNames）拉到的是 space_members 旧名，
+  而 TUI 标题栏右段优先取远程名称表（_personLabel 的 personNames[pid] 先于本地
+  store.personName）→ 右上角不刷新
+- 对方 /myname 后的同名刷新把 WS 已更新的新名覆盖回 space_members 里的旧值 →
+  我方名字"变回老名"
+- v1 正确因为 v1 的 getSpace 与改名都走 meta（单一数据源）
+
+**修复（server/src/devices.ts updatePersonName）：** 改名时同步
+`UPDATE space_members SET display_name = ? WHERE space_id = ? AND person_id = ?`
+（session 的 space_id + 设备 person_id）——恢复单一数据源一致性，TUI 渲染逻辑零改动。
+
+**回归测试（server/test/smoke.test.ts 12b）：** 独立服务器 POST /spaces（带
+public_key 创建者）→ GET /space 旧名 → POST /devices/person-name 改名 →
+GET /space 新名。未修复 dist 上此用例正确失败（能抓住该 bug）。
+
+**顺带修复存量测试破损：** smoke.test.ts 第 280 行断言 enroll 返回非空 space_id
+——0ac9372 起 enroll 返回 ""（无全局空间，空间经 session 绑定），主流程其余部分
+用空串一致回落仍全通过 → 断言改为 `assert.equal(spaceId, '', ...)`。
+
+**验证：** server tsc 0 issue；npm test 全绿（冒烟含新 12b + 双空间隔离）；
+Node 需 ≥20.11（import.meta.dirname——本机默认 18.12 跑不了，用 nvm v22）。
