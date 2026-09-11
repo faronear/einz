@@ -810,8 +810,10 @@ class _SetupPageState extends State<SetupPage> {
         _stepHeader(l10n.setupEntryTitle, l10n.setupEntryHint),
         const SizedBox(height: 12),
         // 左右两张卡片：创建（品牌蓝 + 加号图标）/ 加入（品牌粉 + 门图标）
+        // 注意：不能用 crossAxisAlignment.stretch——入口页包在 SingleChildScrollView
+        // 里（高度无界），stretch 会抛 "BoxConstraints forces an infinite height"
+        // 导致卡片不渲染（2026-09-11 真机报告）；等高由 _EntryCard 固定高度保证
         Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: _EntryCard(
@@ -2183,23 +2185,26 @@ class _EntryCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 44, color: accentColor),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: accentColor,
+        child: SizedBox(
+          height: 132,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 44, color: accentColor),
+                const SizedBox(height: 12),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: accentColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
