@@ -293,13 +293,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardAppBarCreate.
   ///
   /// In en, this message translates to:
-  /// **'Einz Space'**
+  /// **'Create a space'**
   String get wizardAppBarCreate;
 
   /// No description provided for @wizardAppBarJoin.
   ///
   /// In en, this message translates to:
-  /// **'Einz Space'**
+  /// **'Join a space'**
   String get wizardAppBarJoin;
 
   /// No description provided for @wizardAppBarOffline.

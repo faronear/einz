@@ -106,10 +106,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardRoleOffline => '导入线下密保信封';
 
   @override
-  String get wizardAppBarCreate => 'Einz 秘境';
+  String get wizardAppBarCreate => '创建秘境';
 
   @override
-  String get wizardAppBarJoin => 'Einz 秘境';
+  String get wizardAppBarJoin => '加入秘境';
 
   @override
   String get wizardAppBarOffline => '导入密保信封';

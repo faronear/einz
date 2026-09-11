@@ -115,10 +115,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardRoleOffline => 'Offline: import a key envelope';
 
   @override
-  String get wizardAppBarCreate => 'Einz Space';
+  String get wizardAppBarCreate => 'Create a space';
 
   @override
-  String get wizardAppBarJoin => 'Einz Space';
+  String get wizardAppBarJoin => 'Join a space';
 
   @override
   String get wizardAppBarOffline => 'Import key envelope';
