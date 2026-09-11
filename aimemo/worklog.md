@@ -2737,3 +2737,35 @@ flutter test 失败项与基线一致（15，无新增）；气泡/菜单相关 
 
 **待老板处理：** 头像广播在服务端，本机 server 需重启、生产需部署才生效
 （App 侧的即时刷新不依赖服务端，上传后本端立刻更新）。
+
+## 2026-09-11 改名后对方（TUI）名字不更新 + App 重启又变回旧名
+
+**老板反馈：** App 改名字 → TUI 左侧对方名字不变；直到对方在自己 TUI 里改一次名
+才纠正；且 App 下次重启又显示老的对方名字。
+
+**根因两层：**
+1. **服务端广播依赖发起方 WS 在线**（主因）：`broadcastProfileUpdated` 用
+   `sameSpace(exceptDeviceId)` = `conns.get(发起方)?.spaceId`——发起方自己没有 WS
+   连接（移动端切后台/断线）就**一条都不发**。实测（Node 探针 + 临时服务器）：
+   A 不连 WS 改名 → B 只收到 hello，无 profile.updated；A 连上 WS → B 收到。
+   （GET /space 已返回新名，所以只要 TUI 自己刷新就能对——但 TUI 只在特定时机刷）
+2. **App 名称只信本地快照**：App 没有像 CLI 那样启动时拉 `GET /space` 的名称表
+   （CLI 有 `_refreshPersonNames`）→ 重启后 profile 里仍是入网时的旧名字，且收不到
+   广播就永远不更新。
+
+**修复：**
+- `server/src/ws.ts`：新增 `spaceOfDevice()`——发起方在线用其连接，不在线回退查
+  sessions 表（最新非空 space_id）；`broadcastProfileUpdated` /
+  `broadcastPassphraseRotated` 改用它
+- `app/lib/chat_page.dart`：`_refreshGendersFromServer` 升级为
+  `_refreshProfileFromServer`（名字 + 性别一起以服务端为准），启动时无条件调用、
+  收到 profile.updated 时也调用
+
+**回归测试 server smoke 12d：** 独立服务器 → A create、B join → 仅 B 连 WS →
+A 不连 WS 改名 → 断言 B 收到 profile.updated（person_id + 新名）。把 dist 回退成
+"只认发起方在线连接"后该用例正确失败（profile.updated not received）。
+
+**验证：** server npm test 全绿（含 12c/12d）；app flutter analyze 仅既有 info、
+flutter test 失败项与基线一致（15，无新增）。
+
+**待老板处理：** 广播在服务端——本机 server 需重启、生产需部署才生效。

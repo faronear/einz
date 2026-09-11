@@ -849,6 +849,138 @@ async function main (): Promise<void> {
       }
     }
 
+    // 12d) 改名广播不得依赖发起方 WS 在线（回归：broadcastProfileUpdated 此前用
+    //      sameSpace(发起方) —— 只认发起方的在线连接，移动端切后台/断线就一条
+    //      都不发 → 对端（TUI）一直显示旧名字，只有对方自己改名才纠正）。
+    //      验证：B 连 WS 在线，A **不连 WS** 改名 → B 仍收到 profile.updated。
+    const tempDir6 = mkdtempSync(join(tmpdir(), 'einz-profile-bc-'))
+    const port6 = await freePort()
+    let serverProc6: ChildProcess | null = null
+    try {
+      serverProc6 = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
+        env: {
+          ...process.env,
+          PORT: String(port6),
+          EINZ_DB: join(tempDir6, 'einz.sqlite.db'),
+          EINZ_FILES: join(tempDir6, 'files')
+        },
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+      serverProc6.stderr?.on('data', d =>
+        process.stderr.write(`[server6] ${d}`)
+      )
+      await waitReady(port6)
+
+      const create6 = await fetch(`http://127.0.0.1:${port6}/spaces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: 'alice',
+          public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
+          device_name: 'dev-a'
+        })
+      })
+      assert.equal(create6.status, 201, 'create space should succeed')
+      const a6 = (await create6.json()) as {
+        spaceId: string
+        creatorPersonId: string
+        sessionToken: string
+      }
+      const tk6 = await fetch(
+        `http://127.0.0.1:${port6}/spaces/${a6.spaceId}/join-tokens`,
+        { method: 'POST' }
+      )
+      const { joinToken } = (await tk6.json()) as { joinToken: string }
+      const join6 = await fetch(`http://127.0.0.1:${port6}/spaces/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: joinToken,
+          public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
+          device_name: 'dev-b'
+        })
+      })
+      assert.equal(join6.status, 200, 'join should succeed')
+      const b6 = (await join6.json()) as { sessionToken: string }
+
+      // B 在线（WS）；A 始终不连 WS
+      const ws6 = new WebSocket(
+        `ws://127.0.0.1:${port6}/ws?pv=1&token=${encodeURIComponent(
+          b6.sessionToken
+        )}`
+      )
+      const got = new Promise<Record<string, string>>((done, fail) => {
+        const timer = setTimeout(
+          () => fail(new Error('profile.updated not received')),
+          8000
+        )
+        ws6.on('message', data => {
+          const frame = JSON.parse(data.toString()) as {
+            type: string
+            payload?: Record<string, string>
+          }
+          if (frame.type === 'profile.updated') {
+            clearTimeout(timer)
+            done(frame.payload ?? {})
+          }
+        })
+        ws6.on('error', e => {
+          clearTimeout(timer)
+          fail(e)
+        })
+      })
+      await new Promise<void>(done => ws6.on('open', () => done()))
+
+      const rename6 = await fetch(
+        `http://127.0.0.1:${port6}/devices/person-name`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${a6.sessionToken}`
+          },
+          body: JSON.stringify({ person_name: 'alice-new' })
+        }
+      )
+      assert.equal(rename6.status, 200, 'rename should succeed')
+
+      const payload6 = await got
+      assert.equal(
+        payload6.person_id,
+        a6.creatorPersonId,
+        'broadcast must carry the renamed person_id'
+      )
+      assert.equal(
+        payload6.person_name,
+        'alice-new',
+        'broadcast must carry the new person_name'
+      )
+      ws6.close()
+    } finally {
+      await new Promise<void>(done => {
+        if (!serverProc6 || serverProc6.exitCode !== null) {
+          done()
+          return
+        }
+        const timer = setTimeout(() => {
+          serverProc6?.kill('SIGKILL')
+          done()
+        }, 3000)
+        serverProc6.once('exit', () => {
+          clearTimeout(timer)
+          done()
+        })
+      })
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(tempDir6, { recursive: true, force: true })
+          break
+        } catch {
+          await new Promise(r => setTimeout(r, 200))
+        }
+      }
+    }
+
     // 12) 全丢恢复 /recover（免认证）：上传带口令哈希的 escrow → 错误口令 403 →
     //     正确口令 200 撤销全部设备 → devices 全 revoked（空间可重新首设备自举）
     const recoverPass = 'recover-pass-123'

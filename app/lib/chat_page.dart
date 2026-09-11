@@ -233,9 +233,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_myGender.isEmpty) _myGender = p['myGender'] ?? '';
         if (_peerGender.isEmpty) _peerGender = p['peerGender'] ?? '';
       });
-      // 本机快照缺性别（v2 早期把对方性别写死空串）→ 从服务端补齐，否则气泡
-      // 回退灰色（老板 2026-09-11：气泡按性别区分蓝/粉）
-      if (_myGender.isEmpty || _peerGender.isEmpty) _refreshGendersFromServer();
+      // 快照可能过期（对方改名 / v2 早期把对方性别写死空串）→ 以服务端为准校正
+      // 名字与性别（老板 2026-09-11：App 重启后一直显示旧的对方名字）
+      _refreshProfileFromServer();
     });
     _repo = MessageRepository(
       db: db,
@@ -298,16 +298,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void _onProfileUpdated(WsProfileUpdatedEvent event) {
     // 头像：无论改名还是换头像都刷一次（同一 per-person 头像文件可能已变）
     _MessageAvatarState.invalidate(event.personId);
-    if (_myGender.isEmpty || _peerGender.isEmpty) _refreshGendersFromServer();
+    _refreshProfileFromServer();
     final name = event.personName;
     if (name == null || name.isEmpty || !mounted) return;
     setState(() => _peerName = name);
   }
 
-  /// 从服务端补齐双方性别（GET /space 的 personGenders）：本机 profile 快照可能
-  /// 缺对方性别（v2 早期写死空串）→ 消息气泡回退灰色。启动与收到对方
-  /// profile.updated 时调用（对齐 CLI 的 _refreshPersonNames）。
-  Future<void> _refreshGendersFromServer() async {
+  /// 从服务端校正双方名字与性别（GET /space 的 personNames/personGenders）。
+  /// 本机 profile 只是入网时的快照：对方改名后若没收到广播（或广播前就重启），
+  /// App 会一直显示旧名字（老板 2026-09-11 实测）；性别同理（v2 早期把对方性别
+  /// 写死空串 → 气泡回退灰色）。启动与收到 profile.updated 时调用
+  /// （对齐 CLI 的 _refreshPersonNames）。
+  Future<void> _refreshProfileFromServer() async {
     if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
     final mine = widget.personId;
     if (mine == null || mine.isEmpty) return;
@@ -316,14 +318,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final space = await api.getSpace(widget.token);
       final myG = space.personGenders[mine] ?? '';
       var peerG = '';
-      for (final entry in space.personGenders.entries) {
-        if (entry.key != mine) {
-          peerG = entry.value;
-          break;
-        }
+      var peerName = '';
+      for (final entry in space.personNames.entries) {
+        if (entry.key == mine) continue;
+        peerName = entry.value;
+        peerG = space.personGenders[entry.key] ?? '';
+        break;
       }
+      final myName = space.personNames[mine] ?? '';
       if (!mounted) return;
       setState(() {
+        if (myName.isNotEmpty) _myPersonName = myName;
+        if (peerName.isNotEmpty) _peerName = peerName;
         if (myG.isNotEmpty) _myGender = myG;
         if (peerG.isNotEmpty) _peerGender = peerG;
       });

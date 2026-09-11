@@ -31,6 +31,22 @@ function sameSpace(exceptDeviceId: string): string | null {
   return conns.get(exceptDeviceId)?.spaceId ?? null;
 }
 
+/** 发起方设备所属 Space：优先其在线连接；**不在线时回退查 sessions**
+ *  （同一设备可能有多条历史会话——取最新的非空 space_id）。
+ *  背景：广播此前只认发起方的在线连接（sameSpace），发起方 WS 不在（移动端切
+ *  后台/断线）就一条都不发 → 对端改名/换头像后 TUI 一直显示旧名
+ *  （老板 2026-09-11 实测）。 */
+function spaceOfDevice(deviceId: string): string | null {
+  const online = conns.get(deviceId)?.spaceId;
+  if (online != null && online !== "") return online;
+  const row = getDb()
+    .prepare(
+      `SELECT space_id FROM sessions WHERE device_id = ? AND space_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(deviceId) as { space_id: string } | undefined;
+  return row?.space_id ?? null;
+}
+
 function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer.offline"): void {
   const spaceId = sameSpace(exceptDeviceId);
   if (spaceId == null) return;
@@ -45,7 +61,7 @@ function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer
 
 /** 空间口令已被重设：通知其余在线设备（客户端收到后只发通知不弹窗）。 */
 export function broadcastPassphraseRotated(exceptDeviceId: string): void {
-  const spaceId = sameSpace(exceptDeviceId);
+  const spaceId = spaceOfDevice(exceptDeviceId);
   if (spaceId == null) return;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
@@ -63,7 +79,7 @@ export function broadcastProfileUpdated(
   exceptDeviceId: string,
   payload: { person_id?: string; device_id: string; person_name?: string; device_name?: string }
 ): void {
-  const spaceId = sameSpace(exceptDeviceId);
+  const spaceId = spaceOfDevice(exceptDeviceId);
   if (spaceId == null) return;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
