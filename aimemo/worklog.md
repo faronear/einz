@@ -2515,3 +2515,11 @@ cfg.space_id，行为不变）。
 - .gitignore 顺带清理 deployment/config/config.json（v1 部署残留——目录已不存在）
 - 验证：tsc OK；maxSpaces=1 从 einz_server_config.json 生效（curl 空间 2=409）；
   git check-ignore 生效（新配置文件不入 git）
+
+### TUI 引导首问改 C/J 输入（老板 2026-09-10）
+- 引导第一步：创建新秘境（输入 C 或 create）/ 加入老秘境（输入 J 或 join）——
+  大小写均可（既有 toLowerCase 归一）；保留 1/2 数字兼容；无效提示同步更新
+- pty e2e 脚本同步：等特提示改"创建新秘境"、发送改 C/J、注释/描述更新；
+  cli/test 的 guide 脚本确认无影响（不涉及该提示/输入）
+- 验证：cli analyze 0 issue；pty e2e 全通（A 输 C 创建 → B 输 J 加入 → A /invite
+  → C 输 J 加入，地址一致）

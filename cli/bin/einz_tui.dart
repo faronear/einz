@@ -444,16 +444,16 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     while (true) {
       if (!_state!.running) return;
       final choice = (await _prompt(
-              session, '❓ 你是要加入伴侣的秘境，还是创建新秘境？（输入 join 加入 / create 创建）'))
+              session, '❓ 创建新秘境（输入 C 或 create），或者加入老秘境（输入 J 或 join）？'))
           .trim()
           .toLowerCase();
       if (!_state!.running) return;
-      if (choice == 'create' || choice == '1') {
+      if (choice == 'c' || choice == 'create' || choice == '1') {
         await _spaceCreate(session, store, storePath);
         if (_onboarded) break; // 创建成功进入会话
         continue; // 创建失败：循环可重试
       }
-      if (choice == 'join' || choice == '2') {
+      if (choice == 'j' || choice == 'join' || choice == '2') {
         final token = (await _prompt(session, '❓ 粘贴伴侣的邀请链接或 token:')).trim();
         if (!_state!.running) return;
         if (token.isEmpty) {
@@ -466,7 +466,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         continue; // 加入失败：循环可重试
       }
       session.messages.add(
-          _systemMessage(session, '⚠️ 请输入 create（创建新秘境）或 join（加入伴侣的秘境）'));
+          _systemMessage(session, '⚠️ 请输入 C 或 create（创建新秘境），或 J 或 join（加入老秘境）'));
       _scheduleRender();
     }
     return;

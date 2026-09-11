@@ -8,11 +8,11 @@
 用法：
   python3 aimemo/cliMultiverseE2E.py
 
-流程（2026-09-10 老板定稿引导：第一步选择「加入伴侣的秘境/创建新秘境」；
-      create 录入两人名字/性别；join 按身份选择而非自填名字）：
-  设备 A：选择 create → 名字 Lukas → 性别 男 → 伴侣名字 Alice → 伴侣性别 女
+流程（2026-09-10 老板定稿引导：第一步输入 C/create（创建）或 J/join（加入），
+      大小写均可；create 录入两人名字/性别；join 按身份选择而非自填名字）：
+  设备 A：输入 C → 名字 Lukas → 性别 男 → 伴侣名字 Alice → 伴侣性别 女
           → 口令 abc123 → 抓邀请 token
-  设备 B：选择 join → 粘贴 token → 选择身份 1（第二人 Alice）→ 口令 → 加入成功
+  设备 B：输入 J → 粘贴 token → 选择身份 1（第二人 Alice）→ 口令 → 加入成功
   设备 C：第一人的其他设备——curl 生成第二个 token → 选择身份 0（第一人 Lukas）
           → 口令 → 加入成功（验证「同身份多设备」）
   断言：B/C 的空间地址与 A 一致。
@@ -79,17 +79,17 @@ def send(master, text):
 
 
 def join_flow(label, store, token, slot):
-    """通用 join 流程：选择 join → 粘贴 token → 选身份 → 口令 → 加入。
+    """通用 join 流程：输入 J（join）→ 粘贴 token → 选身份 → 口令 → 加入。
     返回加入成功后的累计输出。"""
     p, m = spawn_tui(store)
     name, out, _ = read_until(m, [
-        ("ask_choice", re.compile(r"你是要加入伴侣的秘境")),
+        ("ask_choice", re.compile(r"创建新秘境")),
         ("fail", re.compile(r"无法连接服务器|未检测到交互终端")),
     ], prefix=label)
     if name != "ask_choice":
         print(f"FAIL {label}: 未等到创建/加入选择。输出:\n", out[-800:])
         sys.exit(1)
-    send(m, "join\r")
+    send(m, "J\r")  # 输入 J（join）——大小写均可
     name, out, _ = read_until(m, [
         ("ask_token", re.compile(r"粘贴伴侣的邀请链接或 token")),
     ], prefix=label)
@@ -135,16 +135,16 @@ def main():
         print("FAIL: server 未就绪（请先起 PORT=3999 的 server）")
         sys.exit(1)
 
-    # ---------- 设备 A：create（伴侣名字/性别必填）----------
+    # ---------- 设备 A：输入 C（create，伴侣名字/性别必填）----------
     p_a, m_a = spawn_tui(STORE_A)
     name, out, _ = read_until(m_a, [
-        ("ask_choice", re.compile(r"你是要加入伴侣的秘境")),
+        ("ask_choice", re.compile(r"创建新秘境")),
         ("fail", re.compile(r"无法连接服务器|未检测到交互终端")),
     ], prefix="A")
     if name != "ask_choice":
         print("FAIL A: 未等到创建/加入选择。输出:\n", out[-800:])
         sys.exit(1)
-    send(m_a, "create\r")
+    send(m_a, "C\r")  # 输入 C（create）——大小写均可
     name, out, _ = read_until(m_a, [
         ("ask_name", re.compile(r"我的名字")),
     ], prefix="A")
