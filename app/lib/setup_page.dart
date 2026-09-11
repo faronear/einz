@@ -102,6 +102,12 @@ class _SetupPageState extends State<SetupPage> {
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户确认"不设置锁屏码"：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
+  // 键盘遮挡处理（方案 2）：点「下一步」先收键盘，再把性别红字警告滚入可见区，
+  // 确保用户看得到并知道怎么改。iOS/Android 通用：仅用 Flutter 框架 API
+  // Scrollable.ensureVisible / FocusScope.unfocus，依赖 Scaffold 的
+  // resizeToAvoidBottomInset——Android 已配 adjustResize，行为同 iOS。
+  final _myGenderRevealKey = GlobalKey();
+  final _partnerGenderRevealKey = GlobalKey();
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
   // 空间显示名（进入聊天页的对方名字）
   String _joinToken = '';
@@ -500,8 +506,36 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
+  // 把指定 key 的控件滚入最近滚动视图的可见区；延迟一拍等键盘收起动画结束再算视口
+  // （键盘收起后 Scaffold 视口变高，才能把红字警告完整露出来）。
+  void _revealGender(GlobalKey key, [double alignment = 0.0]) {
+    Future.delayed(const Duration(milliseconds: 320), () {
+      if (!mounted) return;
+      final ctx = key.currentContext;
+      if (ctx == null) return;
+      // ctx 在延迟后才从 key.currentContext 取得（已越过键盘收起的异步间隙），
+      // 且已校验 mounted，使用安全；下方 // ignore 仅为消除 lint 误报。
+      // ignore: use_build_context_synchronously
+      Scrollable.ensureVisible(ctx, alignment: alignment, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+    });
+  }
+
+  // 校验失败停留本页时：把当前页的性别红字警告滚入可见区（见 _nextStep 已先收键盘）。
+  void _revealCurrentGenderError() {
+    GlobalKey? key;
+    if (_role == _WizardRole.create && _step == 1) {
+      key = _myGenderRevealKey;
+    } else if (_role == _WizardRole.create && _step == 2) {
+      key = _partnerGenderRevealKey;
+    }
+    if (key != null) _revealGender(key);
+  }
+
   Future<void> _nextStep() async {
     final l10n = AppLocalizations.of(context)!;
+    // 先收起键盘：整页（含性别卡与红字警告）完整露出，避免警告被键盘遮挡，
+    // 也保证下方 _revealCurrentGenderError 能把警告滚入变高后的可见区。
+    FocusScope.of(context).unfocus();
     // 每轮「下一步」：先把所有红字清空，再统一检查当前页所有输入元素——名字/性别
     // 等各自独立提示（不因第一个未过就跳过其余）；本地可检测的错误 → _localError/
     // _genderError/_pinError（红字在输入框/选项卡下方）；后台/网络错误 → _status
@@ -569,6 +603,8 @@ class _SetupPageState extends State<SetupPage> {
         _partnerGenderError = partnerGenderError;
         _slotError = slotError;
       });
+      // 性别未选等红字警告：滚入可见区（键盘已收起，整页露出，用户看得到该怎么改）
+      _revealCurrentGenderError();
       return;
     }
     // ---- 后台即时校验（失败停留本页；错误走 _status 红字） ----
@@ -1116,17 +1152,26 @@ class _SetupPageState extends State<SetupPage> {
         ),
         if (_localError != null) _localErrorHint(_localError!),
         const SizedBox(height: 20),
-        _buildGenderSelector(
-          selected: _myGender,
-          label: l10n.wizardMyGenderLabel,
-          maleLabel: l10n.wizardGenderMale,
-          femaleLabel: l10n.wizardGenderFemale,
-          onChanged: (g) => setState(() {
-            _myGender = g;
-            _genderError = null; // 选中即清除未选提醒
-          }),
+        Container(
+          key: _myGenderRevealKey, // 校验失败红字警告滚入可见区的锚点
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildGenderSelector(
+                selected: _myGender,
+                label: l10n.wizardMyGenderLabel,
+                maleLabel: l10n.wizardGenderMale,
+                femaleLabel: l10n.wizardGenderFemale,
+                onChanged: (g) => setState(() {
+                  _myGender = g;
+                  _genderError = null; // 选中即清除未选提醒
+                }),
+              ),
+              if (_genderError != null)
+                _localErrorHint(_genderError!), // 性别必选：未选红字提醒
+            ],
+          ),
         ),
-        if (_genderError != null) _localErrorHint(_genderError!), // 性别必选：未选红字提醒
         if (_role == _WizardRole.create && _bootstrapFailed) ...[
           const SizedBox(height: 12),
           Card(
@@ -1172,17 +1217,25 @@ class _SetupPageState extends State<SetupPage> {
         ),
         if (_localError != null) _localErrorHint(_localError!),
         const SizedBox(height: 20),
-        _buildGenderSelector(
-          selected: _partnerGender,
-          label: l10n.wizardPeerGenderLabel,
-          maleLabel: l10n.wizardGenderMale,
-          femaleLabel: l10n.wizardGenderFemale,
-          onChanged: (g) => setState(() {
-            _partnerGender = g;
-            _partnerGenderError = null; // 选中即清除未选提醒
-          }),
+        Container(
+          key: _partnerGenderRevealKey, // 校验失败红字警告滚入可见区的锚点
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildGenderSelector(
+                selected: _partnerGender,
+                label: l10n.wizardPeerGenderLabel,
+                maleLabel: l10n.wizardGenderMale,
+                femaleLabel: l10n.wizardGenderFemale,
+                onChanged: (g) => setState(() {
+                  _partnerGender = g;
+                  _partnerGenderError = null; // 选中即清除未选提醒
+                }),
+              ),
+              if (_partnerGenderError != null) _localErrorHint(_partnerGenderError!),
+            ],
+          ),
         ),
-        if (_partnerGenderError != null) _localErrorHint(_partnerGenderError!),
       ],
     );
   }
