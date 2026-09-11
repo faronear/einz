@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:einz/brand_logo.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
@@ -28,5 +29,9 @@ void main() {
     // 不显示解锁输入框与解锁按钮（避免死锁）
     expect(find.byType(TextField), findsNothing);
     expect(find.text('解锁'), findsNothing);
+    // Logo 只在标题栏左侧（与其他页面一致）：页面中间不再放大 Logo
+    final logos = tester.widgetList<BrandLogo>(find.byType(BrandLogo)).toList();
+    expect(logos.length, 1);
+    expect(logos.single.size, 28, reason: '只剩标题栏 28 的小 Logo，中间 72 的大图已移除');
   });
 }

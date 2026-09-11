@@ -256,7 +256,18 @@ class _LockPageState extends State<LockPage> {
     if (_noLock) {
       return Scaffold(
         appBar: AppBar(
-          title: Text(l10n.lockPageTitle),
+          // 与其他页面一致：Logo 在标题栏左侧 + 标题（页面中间不再放大 Logo）
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const BrandLogo(),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(l10n.lockPageTitle,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
           actions: [_buildMenu(l10n)],
         ),
         body: Padding(
@@ -277,7 +288,18 @@ class _LockPageState extends State<LockPage> {
     final locked = _lockSeconds > 0;
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.lockPageTitle),
+        // 与其他页面一致：Logo 在标题栏左侧 + 标题（页面中间不再放大 Logo）
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(l10n.lockPageTitle,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
         actions: [_buildMenu(l10n)],
       ),
       body: Padding(
@@ -285,8 +307,6 @@ class _LockPageState extends State<LockPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Center(child: BrandLogo(size: 72, radius: 16)),
-            const SizedBox(height: 16),
             Text(l10n.lockPagePinPrompt,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
