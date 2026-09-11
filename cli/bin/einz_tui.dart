@@ -811,9 +811,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     final created = await _busy(session, '⏳ 创建空间中......', () => api.createSpace(
       spaceId: spaceId,
       displayName: displayName,
-      gender: myGender,
+      gender: _genderCode(myGender), // 中文 → male/female（与 enroll 一致——老板 2026-09-10）
       partnerName: partnerName,
-      partnerGender: partnerGender,
+      partnerGender: _genderCode(partnerGender),
       sealedSpaceKey: sealed,
       escrowPassphrase: passphrase.isEmpty ? null : passphrase,
       publicKey: store.publicKey,
@@ -1455,8 +1455,13 @@ String _peerNameOf(_TuiState s) {
   if (myPid == null) {
     return '?';
   }
-  final peerPid = myPid == 'personA' ? 'personB' : 'personA';
-  return s.personNames[peerPid] ?? partnerPresetName ?? '-';
+  // v2：对方 = personNames 里非我的 personId（空间两人——多设备同身份共享同一
+  // personId；不再用 v1 的 personA/personB 假 id 查询——老板 2026-09-10 反馈
+  // 一直显示 '-'）
+  for (final entry in s.personNames.entries) {
+    if (entry.key != myPid) return entry.value;
+  }
+  return partnerPresetName ?? '-';
 }
 
 /// 对方设备名：对方最新一条消息的 senderDeviceId → 设备名映射 → device_id → '-'

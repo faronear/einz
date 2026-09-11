@@ -50,6 +50,16 @@ export function newJoinToken(
  *  join token 供分享。U2 密钥分发：可一并提交"口令加密的 Space Key 密封包"
  *  （escrow，按空间隔离）——后续加入方凭同一口令从 key-escrow 取回 Space Key
  *  （PROTOCOL_MULTIVERSE.md §5 ④）。sealedSpaceKey 与 escrowPassphrase 需成对。 */
+/** 性别归一：统一存 male/female（接受中文/英文——老板 2026-09-10：前后端 id
+ *  写法不匹配导致气泡全青色；非法值丢弃不入库）。 */
+function normGender(g?: string): string | undefined {
+  if (g == null) return undefined;
+  const v = g.trim();
+  if (v === "男" || v === "male") return "male";
+  if (v === "女" || v === "female") return "female";
+  return undefined;
+}
+
 export async function createSpace(
   clientSpaceId?: string,
   displayName?: string,
@@ -105,7 +115,7 @@ export async function createSpace(
       `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
        VALUES (?, ?, 0, ?, ?, 'active', ?)`,
     )
-    .run(spaceId, creatorPersonId, displayName ?? null, gender ?? null, now);
+    .run(spaceId, creatorPersonId, displayName ?? null, normGender(gender) ?? null, now);
   // 伴侣（第二人）预置：名字/性别必填（老板 2026-09-10 定稿——create 时录入两人
   // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，person_id 由
   // 首个加入该 slot 的设备生成。
@@ -114,7 +124,7 @@ export async function createSpace(
       `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
        VALUES (?, NULL, 1, ?, ?, 'pending', NULL)`,
     )
-    .run(spaceId, partnerName ?? null, partnerGender ?? null);
+    .run(spaceId, partnerName ?? null, normGender(partnerGender) ?? null);
   // U2：Space Key 口令密封包（可选；成对提供时写入 key_escrow）
   if (sealedSpaceKey != null || (escrowPassphrase != null && escrowPassphrase.length > 0)) {
     if (sealedSpaceKey == null) {

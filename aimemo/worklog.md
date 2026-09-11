@@ -2545,3 +2545,18 @@ cfg.space_id，行为不变）。
   C=Lukas）
 - 验证：cli analyze 0 issue、App analyze 0 error（仅既有 info）、改名相关
   测试 15 个全过、pty e2e 全通（B/C 输名字选身份）
+
+### 修复：标题栏对方名字 '-' + 气泡全青色（老板 2026-09-10 反馈）
+- Bug1 根因：a) CLI _peerNameOf 硬编码 v1 假 id（personA/personB）查 personNames
+  （v2 personId 是 UUID——查不到）；b) 服务端 getSpace 读 v1 的 meta
+  person_name:*（v2 成员数据在 space_members——拉空）
+  修复：_peerNameOf 改为 personNames 找非我 personId；服务端 getSpace 改从
+  space_members 读 display_name/gender（按 person_id），space_id 从 session 取
+- Bug2 根因：CLI createSpace 直传中文 gender（'男'/'女'）——服务端原样存——
+  App 判断 'male'/'female' 不匹配（气泡全青色）
+  修复：服务端 normGender 统一存 male/female（createSpace 两处 INSERT 归一）；
+  CLI createSpace 提交走 _genderCode 转换（与 enroll 一致）
+- 验证：cli analyze 0 issue、server tsc OK、App analyze 0 error、App 气泡测试
+  全过、pty e2e 全通
+- 踩坑：push.ts 注释里 person_name:*/person_gender:* 的 */ 截断注释块（TS1109）
+  ——改写措辞避免 */ 序列

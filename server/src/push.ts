@@ -51,29 +51,28 @@ export function sendPushHint(spaceId: string, exceptDeviceId: string): void {
   }
 }
 
-/** GET /space：空间信息（space_id + 成员设备 + person 名称/性别表）。 */
+/** GET /space：空间信息（space_id + 成员设备 + person 名称/性别表）。
+ *  v2：名称/性别从 space_members 表读（display_name/gender——create/join 写入），
+ *  不再读 v1 的 meta person_name:* 与 person_gender:* 键（v2 不写 meta——老板 2026-09-10
+ *  反馈：标题栏对方名字一直 '-'、气泡全青色）。 */
 export function getSpace(
   cfg: ServerConfig,
   token: string
 ): { space_id: string; devices: unknown[]; person_names: Record<string, string>; person_genders: Record<string, string> } {
-  const { device_id } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+  const sess = resolveSession(token);
+  if (!isActiveDevice(cfg, sess.device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   const devices = getDb()
     .prepare(`SELECT device_id, person_id, status, last_seen FROM devices WHERE status = 'active'`)
     .all();
-  // person 名称表：meta person_name:personA → person_name（创建者/邀请时设置，显示层用）
+  // v2：成员名称/性别表（space_members——按 person_id；同一身份多设备共享）
   const personNames: Record<string, string> = {};
-  for (const r of getDb()
-    .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_name:%'`)
-    .all() as { key: string; value: string }[]) {
-    personNames[r.key.slice("person_name:".length)] = r.value;
-  }
-  // person 性别表（meta person_gender:*，male/female）：随名称表一并下发
   const personGenders: Record<string, string> = {};
-  for (const r of getDb()
-    .prepare(`SELECT key, value FROM meta WHERE key LIKE 'person_gender:%'`)
-    .all() as { key: string; value: string }[]) {
-    personGenders[r.key.slice("person_gender:".length)] = r.value;
+  const members = getDb()
+    .prepare(`SELECT person_id, display_name, gender FROM space_members WHERE space_id = ? AND person_id IS NOT NULL`)
+    .all(sess.space_id) as { person_id: string; display_name: string | null; gender: string | null }[];
+  for (const m of members) {
+    if (m.display_name != null) personNames[m.person_id] = m.display_name;
+    if (m.gender != null) personGenders[m.person_id] = m.gender;
   }
-  return { space_id: "", devices, person_names: personNames, person_genders: personGenders };
+  return { space_id: sess.space_id ?? "", devices, person_names: personNames, person_genders: personGenders };
 }
