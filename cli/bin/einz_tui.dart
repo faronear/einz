@@ -698,6 +698,10 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
       onRevoked: _onWsRevoked,
     );
   }
+  // 认证后立即拉取 person 名称/性别表（向导刚结束时 token 才就绪——启动时
+  // main 的刷新会因 token 未就绪失败静默；此处补齐——否则向导结束直接发消息
+  // 时对方气泡按未知性别回退青绿——老板 2026-09-10 实测）
+  await _refreshPersonNames(_state!);
   _scheduleRender();
 }
 

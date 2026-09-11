@@ -2576,3 +2576,13 @@ cfg.space_id，行为不变）。
 - pty 实测受阻：临时诊断脚本 create 后发消息失败（Space Key 导入/锁屏码询问时序）
   ——非气泡 bug（已删除临时脚本）
 - 老板自行验证：新建空间发消息看对方气泡颜色
+
+### 气泡青色真因更正：认证后未刷新 person 性别表（老板 2026-09-10 实测推翻旧结论）
+- 老板实测：新建/加入向导刚结束直接发消息仍青色；/exit 重进后双色正常——非遗留
+  数据（server-new-local 已删旧库）——是 CLI 认证成功后未及时拉取 person 名称/性别表
+- 真因：main 启动初始化（1022）调 _refreshPersonNames 时 token 未就绪（向导前）——
+  getSpace 失败静默，personGenders 空；_activateAfterBind（join/create 认证绑定，
+  835/931）认证成功后没有再刷新——向导结束直接发消息 → 对方气泡未知性别回退青绿
+- 修复：_activateAfterBind 收尾加 `await _refreshPersonNames(_state!)`（WS 启动、
+  渲染前——join/create/启动所有认证路径统一刷新；getSpace 有 try-catch 兜底）
+- 验证：cli analyze 0 issue；pty e2e 全通（create→join→多设备地址一致）
