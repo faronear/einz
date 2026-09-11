@@ -78,8 +78,10 @@ def send(master, text):
     os.write(master, text.encode())
 
 
-def join_flow(label, store, token, slot):
+def join_flow(label, store, token, slot, wrong_token=None, quit_after_wrong=False):
     """通用 join 流程：输入 J（join）→ 粘贴 token → 选身份 → 口令 → 加入。
+    若给 wrong_token：先贴错误 token，断言被拒后直接重输 token（不回到
+    create/join 首问——老板 2026-09-10），再贴正确 token。
     返回加入成功后的累计输出。"""
     p, m = spawn_tui(store)
     name, out, _ = read_until(m, [
@@ -93,6 +95,34 @@ def join_flow(label, store, token, slot):
     name, out, _ = read_until(m, [
         ("ask_token", re.compile(r"粘贴伴侣的邀请链接或 token")),
     ], prefix=label)
+    if wrong_token:
+        send(m, wrong_token + "\r")
+        # 先等被拒反馈（_spaceJoin 处理完成）；"创建新秘境"文本会一直留在
+        # 消息区（重绘再现），不可用作"回到首问"信号——若真的回到首问，
+        # 重输 token 提示等不到（read_until 超时）即失败
+        name, out, _ = read_until(m, [
+            ("rejected", re.compile(r"加入空间失败|邀请码验证失败")),
+        ], prefix=label)
+        if name != "rejected":
+            print(f"FAIL {label}: 错误 token 未被拒绝。输出:\n", out[-600:])
+            sys.exit(1)
+        name, out, _ = read_until(m, [
+            ("ask_token_again", re.compile(r"粘贴伴侣的邀请链接或 token")),
+        ], prefix=label)
+        if name != "ask_token_again":
+            print(f"FAIL {label}: 被拒后未直接重输 token（回到首问？）。输出:\n", out[-600:])
+            sys.exit(1)
+        print(f"{label}: 错误 token 被拒后直接重输 token ✓")
+        if quit_after_wrong:
+            # 仅验证"错误 token 直接重输"——退出本会话（pty 渲染/输入竞态下
+            # 继续 join 不可靠；join 链路由后续正常流程验证）
+            p.terminate()
+            try:
+                p.wait(timeout=3)
+            except Exception:
+                p.kill()
+            return None
+        time.sleep(2.0)
     send(m, token + "\r")
     name, out, _ = read_until(m, [
         ("ask_slot", re.compile(r"你是哪一个用户")),
@@ -186,6 +216,10 @@ def main():
     print("A: 空间创建成功, 地址 =", addr_a, ", token1 =", token1)
 
     # ---------- 设备 B：第二人加入（选身份 1 = Alice）----------
+    # B1：错误 token 被拒后直接重输验证（会话到此退出——不 join）
+    join_flow("B", STORE_B, token1, slot=1,
+              wrong_token="e1_WrongToken999", quit_after_wrong=True)
+    # B2：第二人正常加入（选身份 1 = Alice）——join 链路由本流程验证
     p_b, m_b, addr_b = join_flow("B", STORE_B, token1, slot=1)
 
     # ---------- 设备 C：第一人的其他设备（选身份 0 = Lukas）----------

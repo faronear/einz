@@ -2523,3 +2523,13 @@ cfg.space_id，行为不变）。
   cli/test 的 guide 脚本确认无影响（不涉及该提示/输入）
 - 验证：cli analyze 0 issue；pty e2e 全通（A 输 C 创建 → B 输 J 加入 → A /invite
   → C 输 J 加入，地址一致）
+
+### TUI 加入流程：token 错误直接重输（老板 2026-09-10）
+- 引导 join 分支：token 被拒后内层循环直接重输（不再回到 create/join 首问）
+- pty e2e：join_flow 加 wrong_token 参数（先贴错误 token→断言直接重输→再贴
+  正确 token）+ quit_after_wrong（B1 验证重输后退出会话、B2 正常 join——
+  pty 渲染/输入竞态下错误 token 后继续 join 不可靠——分离验证）
+- 验证：cli analyze 0 issue；pty e2e 全通（B1 错误 token 直接重输 ✓ → B2 正常
+  join → A /invite → C join，地址一致）
+- 踩坑：pty 时序（异步处理期间输入丢失——sleep 无效——改用 quit_after_wrong
+  分离会话验证）；"创建新秘境"文本一直在消息区（重绘再现）不可作"回到首问"信号

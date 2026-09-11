@@ -454,16 +454,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         continue; // 创建失败：循环可重试
       }
       if (choice == 'j' || choice == 'join' || choice == '2') {
-        final token = (await _prompt(session, '❓ 粘贴伴侣的邀请链接或 token:')).trim();
-        if (!_state!.running) return;
-        if (token.isEmpty) {
-          session.messages.add(_systemMessage(session, '⚠️ 请粘贴邀请链接或 token'));
-          _scheduleRender();
-          continue;
+        // 加入流程：token 错误被拒后直接重输 token（不回到 create/join 首问——
+        // 老板 2026-09-10）
+        while (true) {
+          final token = (await _prompt(session, '❓ 粘贴伴侣的邀请链接或 token:')).trim();
+          if (!_state!.running) return;
+          if (token.isEmpty) {
+            session.messages.add(_systemMessage(session, '⚠️ 请粘贴邀请链接或 token'));
+            _scheduleRender();
+            continue;
+          }
+          await _spaceJoin(session, store, storePath, token);
+          if (_onboarded) break; // 加入成功进入会话
         }
-        await _spaceJoin(session, store, storePath, token);
-        if (_onboarded) break; // 加入成功进入会话
-        continue; // 加入失败：循环可重试
+        if (_onboarded) break; // 跳出外层引导循环进入会话
       }
       session.messages.add(
           _systemMessage(session, '⚠️ 请输入 C 或 create（创建新秘境），或 J 或 join（加入老秘境）'));
