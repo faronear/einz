@@ -2769,3 +2769,21 @@ A 不连 WS 改名 → 断言 B 收到 profile.updated（person_id + 新名）�
 flutter test 失败项与基线一致（15，无新增）。
 
 **待老板处理：** 广播在服务端——本机 server 需重启、生产需部署才生效。
+
+### 续：App 重启仍显示旧名（二修——重启路径没有 personId）
+**老板复测：** 服务端/App 重启后，TUI(A) 改名 → App 立刻看到（广播已通）；但 App
+重启又是 A 的老名字。
+
+**二次根因：** 重启路径（PIN 解锁）在 `main.dart:244` 构造 ChatPage 时**不传
+personId**（AppLockPayload 也没这个字段），而 `_refreshProfileFromServer` 开头
+`if (personId 为空) return` → 校正直接跳过，只剩本地旧快照。
+
+**修复：**
+- personId 为空时从 `/space` 的 devices 表按 `widget.deviceId` 反查"我是谁"
+  （不改 AppLockPayload 结构）
+- 校正结果回写本地 profile（`saveProfile`）——下次离线启动也正确（setState 只覆盖
+  非空值，不会把已有名字写成空）
+
+**回归测试 app/test/chat_profile_refresh_test.dart：** 预置旧快照（Alice-老名字）
++ 无 personId 构造 ChatPage + fake /space 返回新名 → 断言顶部条显示新名、旧名消失、
+  profile 已回写（含性别）。去掉 deviceId 反查后该用例正确失败。

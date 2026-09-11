@@ -311,11 +311,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// （对齐 CLI 的 _refreshPersonNames）。
   Future<void> _refreshProfileFromServer() async {
     if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
-    final mine = widget.personId;
-    if (mine == null || mine.isEmpty) return;
     try {
       final api = widget.api ?? ApiClient(widget.server);
       final space = await api.getSpace(widget.token);
+      // 重启（PIN 解锁）路径不传 personId（main.dart 只还原明文 payload）——
+      // 从 /space 的设备表里按 deviceId 反查，否则拿不到"我"，校正无从下手
+      var mine = widget.personId;
+      if (mine == null || mine.isEmpty) {
+        for (final d in space.devices) {
+          if (d.deviceId == widget.deviceId) {
+            mine = d.personId;
+            break;
+          }
+        }
+      }
+      if (mine == null || mine.isEmpty) return;
       final myG = space.personGenders[mine] ?? '';
       var peerG = '';
       var peerName = '';
@@ -333,6 +343,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (myG.isNotEmpty) _myGender = myG;
         if (peerG.isNotEmpty) _peerGender = peerG;
       });
+      // 校正结果回写本地快照：否则下次启动（尤其离线）又用回入网时的旧值
+      // （setState 只覆盖非空值，故不会把已有名字写成空）
+      await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
+        personName: _myPersonName,
+        peerName: _peerName,
+        deviceName: _myDeviceName,
+        myGender: _myGender,
+        peerGender: _peerGender,
+      );
     } catch (_) {
       // 网络失败：保持快照值（下次刷新再试）
     }
