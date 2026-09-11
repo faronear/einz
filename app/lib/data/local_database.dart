@@ -46,6 +46,7 @@ class LocalAttachments extends Table {
   TextColumn get sha256 => text()();
   TextColumn get nonce => text()();
   TextColumn get localPath => text().nullable()(); // 解密缓存路径（App 私有目录）
+  BlobColumn get localCipher => blob().nullable()(); // 发送端本地密文副本：即时显示/离线兜底
   TextColumn get status => text().withDefault(const Constant('pending'))(); // pending|uploaded|downloaded
 
   @override
@@ -88,7 +89,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +103,11 @@ class LocalDatabase extends _$LocalDatabase {
             // v3：local_messages 加本地墓碑列（deleted_at 可空）——删除/焚毁改为
             // 打标记（内容隐藏、记录保留），不再彻底删行（老板决策 2026-09-09）
             await m.addColumn(localMessages, localMessages.deletedAt);
+          }
+          if (from < 4) {
+            // v4：local_attachments 加本地密文副本列（发送端即时显示/离线兜底，
+            // 图片视频直接展示，老板 2026-09-11）
+            await m.addColumn(localAttachments, localAttachments.localCipher);
           }
         },
       );

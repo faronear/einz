@@ -228,6 +228,7 @@ class MessageRepository {
           'size': enc.size,
           'sha256': enc.sha256,
           'nonce': base64Encode(enc.nonce),
+          'local_cipher': enc.cipher, // 发送端本地密文副本：上传中/失败后也能即时显示
         });
       } on Exception {
         // 失败：消息留 pending（补发时消息会重发，但附件 blob 未上传 v1 不自动补传）
@@ -466,6 +467,7 @@ class MessageRepository {
                 'size': att.size,
                 'sha256': att.sha256,
                 'nonce': att.nonce,
+                if (att.localCipher != null) 'local_cipher': att.localCipher,
               },
         expiresAt: row.expiresAt,
         createdAt: row.createdAt,
@@ -478,6 +480,31 @@ class MessageRepository {
       ));
     }
     return out;
+  }
+
+  /// 附件明文：发送端优先本地密文副本（local_cipher）解密——上传完成前/失败后
+  /// 也能即时显示（图片视频直接展示，老板 2026-09-11）；无本地副本（接收端）
+  /// 走服务端拉取。
+  Future<Uint8List> attachmentBytes(Map<String, dynamic> att) async {
+    final local = att['local_cipher'];
+    if (local is Uint8List && local.isNotEmpty) {
+      final key = _keyForVersion(att['key_version'] as int);
+      if (key == null) throw StateError('缺少 key_version=${att['key_version']} 的 Space Key');
+      return decryptAttachment(
+        cipherText: local,
+        nonce: base64Decode(att['nonce'] as String),
+        spaceKey: key,
+        attachmentId: att['attachment_id'] as String,
+        spaceId: spaceId,
+        keyVersion: att['key_version'] as int,
+      );
+    }
+    return fetchAttachment(
+      attachmentId: att['attachment_id'] as String,
+      keyVersion: att['key_version'] as int,
+      sha256: att['sha256'] as String,
+      nonce: base64Decode(att['nonce'] as String),
+    );
   }
 
   /// 下载并解密附件密文（校验 sha256 + AEAD 解密，PROTOCOL.md §6.2）。
@@ -624,6 +651,10 @@ class MessageRepository {
           size: Value(meta['size'] as int),
           sha256: Value(meta['sha256'] as String),
           nonce: Value(meta['nonce'] as String),
+          // 同步响应不带 local_cipher：Value.absent() 保留本地已有副本，不覆盖
+          localCipher: meta['local_cipher'] == null
+              ? const Value.absent()
+              : Value(meta['local_cipher'] as Uint8List),
         ),
       );
       return;
@@ -636,6 +667,8 @@ class MessageRepository {
             size: meta['size'] as int,
             sha256: meta['sha256'] as String,
             nonce: meta['nonce'] as String,
+            // 可空列 insert 参数为 Value<T>：同步响应无 local_cipher 时写 NULL
+            localCipher: Value(meta['local_cipher'] as Uint8List?),
           ),
         );
   }

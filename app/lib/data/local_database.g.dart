@@ -907,6 +907,18 @@ class $LocalAttachmentsTable extends LocalAttachments
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _localCipherMeta = const VerificationMeta(
+    'localCipher',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> localCipher =
+      GeneratedColumn<Uint8List>(
+        'local_cipher',
+        aliasedName,
+        true,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -926,6 +938,7 @@ class $LocalAttachmentsTable extends LocalAttachments
     sha256,
     nonce,
     localPath,
+    localCipher,
     status,
   ];
   @override
@@ -997,6 +1010,15 @@ class $LocalAttachmentsTable extends LocalAttachments
         localPath.isAcceptableOrUnknown(data['local_path']!, _localPathMeta),
       );
     }
+    if (data.containsKey('local_cipher')) {
+      context.handle(
+        _localCipherMeta,
+        localCipher.isAcceptableOrUnknown(
+          data['local_cipher']!,
+          _localCipherMeta,
+        ),
+      );
+    }
     if (data.containsKey('status')) {
       context.handle(
         _statusMeta,
@@ -1040,6 +1062,10 @@ class $LocalAttachmentsTable extends LocalAttachments
         DriftSqlType.string,
         data['${effectivePrefix}local_path'],
       ),
+      localCipher: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}local_cipher'],
+      ),
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -1061,6 +1087,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
   final String sha256;
   final String nonce;
   final String? localPath;
+  final Uint8List? localCipher;
   final String status;
   const LocalAttachment({
     required this.attachmentId,
@@ -1070,6 +1097,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     required this.sha256,
     required this.nonce,
     this.localPath,
+    this.localCipher,
     required this.status,
   });
   @override
@@ -1083,6 +1111,9 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     map['nonce'] = Variable<String>(nonce);
     if (!nullToAbsent || localPath != null) {
       map['local_path'] = Variable<String>(localPath);
+    }
+    if (!nullToAbsent || localCipher != null) {
+      map['local_cipher'] = Variable<Uint8List>(localCipher);
     }
     map['status'] = Variable<String>(status);
     return map;
@@ -1099,6 +1130,9 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
       localPath: localPath == null && nullToAbsent
           ? const Value.absent()
           : Value(localPath),
+      localCipher: localCipher == null && nullToAbsent
+          ? const Value.absent()
+          : Value(localCipher),
       status: Value(status),
     );
   }
@@ -1116,6 +1150,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
       sha256: serializer.fromJson<String>(json['sha256']),
       nonce: serializer.fromJson<String>(json['nonce']),
       localPath: serializer.fromJson<String?>(json['localPath']),
+      localCipher: serializer.fromJson<Uint8List?>(json['localCipher']),
       status: serializer.fromJson<String>(json['status']),
     );
   }
@@ -1130,6 +1165,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
       'sha256': serializer.toJson<String>(sha256),
       'nonce': serializer.toJson<String>(nonce),
       'localPath': serializer.toJson<String?>(localPath),
+      'localCipher': serializer.toJson<Uint8List?>(localCipher),
       'status': serializer.toJson<String>(status),
     };
   }
@@ -1142,6 +1178,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     String? sha256,
     String? nonce,
     Value<String?> localPath = const Value.absent(),
+    Value<Uint8List?> localCipher = const Value.absent(),
     String? status,
   }) => LocalAttachment(
     attachmentId: attachmentId ?? this.attachmentId,
@@ -1151,6 +1188,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     sha256: sha256 ?? this.sha256,
     nonce: nonce ?? this.nonce,
     localPath: localPath.present ? localPath.value : this.localPath,
+    localCipher: localCipher.present ? localCipher.value : this.localCipher,
     status: status ?? this.status,
   );
   LocalAttachment copyWithCompanion(LocalAttachmentsCompanion data) {
@@ -1166,6 +1204,9 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
       sha256: data.sha256.present ? data.sha256.value : this.sha256,
       nonce: data.nonce.present ? data.nonce.value : this.nonce,
       localPath: data.localPath.present ? data.localPath.value : this.localPath,
+      localCipher: data.localCipher.present
+          ? data.localCipher.value
+          : this.localCipher,
       status: data.status.present ? data.status.value : this.status,
     );
   }
@@ -1180,6 +1221,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
           ..write('sha256: $sha256, ')
           ..write('nonce: $nonce, ')
           ..write('localPath: $localPath, ')
+          ..write('localCipher: $localCipher, ')
           ..write('status: $status')
           ..write(')'))
         .toString();
@@ -1194,6 +1236,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     sha256,
     nonce,
     localPath,
+    $driftBlobEquality.hash(localCipher),
     status,
   );
   @override
@@ -1207,6 +1250,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
           other.sha256 == this.sha256 &&
           other.nonce == this.nonce &&
           other.localPath == this.localPath &&
+          $driftBlobEquality.equals(other.localCipher, this.localCipher) &&
           other.status == this.status);
 }
 
@@ -1218,6 +1262,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
   final Value<String> sha256;
   final Value<String> nonce;
   final Value<String?> localPath;
+  final Value<Uint8List?> localCipher;
   final Value<String> status;
   final Value<int> rowid;
   const LocalAttachmentsCompanion({
@@ -1228,6 +1273,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     this.sha256 = const Value.absent(),
     this.nonce = const Value.absent(),
     this.localPath = const Value.absent(),
+    this.localCipher = const Value.absent(),
     this.status = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1239,6 +1285,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     required String sha256,
     required String nonce,
     this.localPath = const Value.absent(),
+    this.localCipher = const Value.absent(),
     this.status = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : attachmentId = Value(attachmentId),
@@ -1255,6 +1302,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     Expression<String>? sha256,
     Expression<String>? nonce,
     Expression<String>? localPath,
+    Expression<Uint8List>? localCipher,
     Expression<String>? status,
     Expression<int>? rowid,
   }) {
@@ -1266,6 +1314,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
       if (sha256 != null) 'sha256': sha256,
       if (nonce != null) 'nonce': nonce,
       if (localPath != null) 'local_path': localPath,
+      if (localCipher != null) 'local_cipher': localCipher,
       if (status != null) 'status': status,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1279,6 +1328,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     Value<String>? sha256,
     Value<String>? nonce,
     Value<String?>? localPath,
+    Value<Uint8List?>? localCipher,
     Value<String>? status,
     Value<int>? rowid,
   }) {
@@ -1290,6 +1340,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
       sha256: sha256 ?? this.sha256,
       nonce: nonce ?? this.nonce,
       localPath: localPath ?? this.localPath,
+      localCipher: localCipher ?? this.localCipher,
       status: status ?? this.status,
       rowid: rowid ?? this.rowid,
     );
@@ -1319,6 +1370,9 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     if (localPath.present) {
       map['local_path'] = Variable<String>(localPath.value);
     }
+    if (localCipher.present) {
+      map['local_cipher'] = Variable<Uint8List>(localCipher.value);
+    }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
@@ -1338,6 +1392,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
           ..write('sha256: $sha256, ')
           ..write('nonce: $nonce, ')
           ..write('localPath: $localPath, ')
+          ..write('localCipher: $localCipher, ')
           ..write('status: $status, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2627,6 +2682,7 @@ typedef $$LocalAttachmentsTableCreateCompanionBuilder =
       required String sha256,
       required String nonce,
       Value<String?> localPath,
+      Value<Uint8List?> localCipher,
       Value<String> status,
       Value<int> rowid,
     });
@@ -2639,6 +2695,7 @@ typedef $$LocalAttachmentsTableUpdateCompanionBuilder =
       Value<String> sha256,
       Value<String> nonce,
       Value<String?> localPath,
+      Value<Uint8List?> localCipher,
       Value<String> status,
       Value<int> rowid,
     });
@@ -2714,6 +2771,11 @@ class $$LocalAttachmentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<Uint8List> get localCipher => $composableBuilder(
+    column: $table.localCipher,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnFilters(column),
@@ -2782,6 +2844,11 @@ class $$LocalAttachmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<Uint8List> get localCipher => $composableBuilder(
+    column: $table.localCipher,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -2841,6 +2908,11 @@ class $$LocalAttachmentsTableAnnotationComposer
 
   GeneratedColumn<String> get localPath =>
       $composableBuilder(column: $table.localPath, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get localCipher => $composableBuilder(
+    column: $table.localCipher,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -2906,6 +2978,7 @@ class $$LocalAttachmentsTableTableManager
                 Value<String> sha256 = const Value.absent(),
                 Value<String> nonce = const Value.absent(),
                 Value<String?> localPath = const Value.absent(),
+                Value<Uint8List?> localCipher = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalAttachmentsCompanion(
@@ -2916,6 +2989,7 @@ class $$LocalAttachmentsTableTableManager
                 sha256: sha256,
                 nonce: nonce,
                 localPath: localPath,
+                localCipher: localCipher,
                 status: status,
                 rowid: rowid,
               ),
@@ -2928,6 +3002,7 @@ class $$LocalAttachmentsTableTableManager
                 required String sha256,
                 required String nonce,
                 Value<String?> localPath = const Value.absent(),
+                Value<Uint8List?> localCipher = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalAttachmentsCompanion.insert(
@@ -2938,6 +3013,7 @@ class $$LocalAttachmentsTableTableManager
                 sha256: sha256,
                 nonce: nonce,
                 localPath: localPath,
+                localCipher: localCipher,
                 status: status,
                 rowid: rowid,
               ),

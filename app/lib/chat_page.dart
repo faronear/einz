@@ -122,6 +122,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _picker = ImagePicker();
   // 图片解密缓存（messageId → Future<bytes>），避免重复下载解密。
   final Map<String, Future<Uint8List>> _imageCache = {};
+  // 视频解密缓存（messageId → Future<bytes>），内联预览用（避免重复解密）。
+  final Map<String, Future<Uint8List>> _videoCache = {};
   List<HistoryMessage> _messages = [];
   Timer? _ticker;
   // 分页加载（UI 懒渲染）：上滑到顶部加载更早历史；ticker 只增量追加新增
@@ -1795,93 +1797,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   // ---------- 视频：下载解密 → 临时文件 → video_player 播放 ----------
 
-  /// 视频消息：播放按钮 + 说明文字；点击下载解密后全屏播放。
+  /// 视频消息：内联预览（首帧 + 播放按钮），点击全屏播放；发送端本地密文
+  /// 即时显示、接收端服务端拉取（老板 2026-09-11：改回直接显示）。
   Widget _buildVideo(
       HistoryMessage m) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.play_circle),
-          onPressed: () => _playVideo(m),
-          visualDensity: VisualDensity.compact,
-        ),
-        Text('🎬 ${m.plaintext}'),
-      ],
+    final att = m.attachment;
+    if (att == null) return Text('🎬 ${m.plaintext}');
+    final future = _videoCache.putIfAbsent(
+      m.env.messageId,
+      () => _attachmentBytes(m),
+    );
+    return FutureBuilder<Uint8List>(
+      future: future,
+      builder: (context, snap) {
+        if (snap.hasData) {
+          return _VideoPreview(bytes: snap.data!);
+        }
+        if (snap.hasError) {
+          return Text('🎬 ${m.plaintext}');
+        }
+        return const SizedBox(
+            width: 60, height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+      },
     );
   }
 
-  Future<void> _playVideo(
-      HistoryMessage m) async {
+  /// 附件明文：发送端优先本地密文解密（上传完成前/失败后也能即时显示），
+  /// 无本地密文（接收端）走服务端拉取。
+  Future<Uint8List> _attachmentBytes(HistoryMessage m) {
     final att = m.attachment;
-    if (att == null) {
-      if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageVideoMetaMissing);
-      return;
-    }
-    VideoPlayerController? controller;
-    try {
-      final bytes = await _repo.fetchAttachment(
-        attachmentId: att['attachment_id'] as String,
-        keyVersion: att['key_version'] as int,
-        sha256: att['sha256'] as String,
-        nonce: base64Decode(att['nonce'] as String),
-      );
-      final tmp = File('${Directory.systemTemp.path}/einz_video_${m.env.messageId}.mp4');
-      await tmp.writeAsBytes(bytes);
-      controller = VideoPlayerController.file(tmp);
-      await controller.initialize();
-      if (!mounted) {
-        await controller.dispose();
-        return;
-      }
-      await controller.play();
-      if (!mounted) {
-        await controller.dispose();
-        return;
-      }
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => Dialog(
-          child: Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: controller!.value.aspectRatio,
-                child: VideoPlayer(controller),
-              ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(ctx).pop(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-      await controller.dispose();
-    } catch (e) {
-      await controller?.dispose();
-      if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageVideoPlayFailed('$e'));
-    }
+    if (att == null) throw StateError('附件元数据缺失');
+    return _repo.attachmentBytes(att);
   }
 
-  /// 图片消息：下载解密 → 缩略展示；点击全屏查看。
+  /// 图片消息：本地密文（发送端即时显示/上传失败兜底）或服务端拉取 →
+  /// 缩略展示；点击全屏查看。
   Widget _buildImage(
       HistoryMessage m) {
     final att = m.attachment;
     if (att == null) return Text('📷 ${m.plaintext}');
     final future = _imageCache.putIfAbsent(
       m.env.messageId,
-      () => _repo.fetchAttachment(
-        attachmentId: att['attachment_id'] as String,
-        keyVersion: att['key_version'] as int,
-        sha256: att['sha256'] as String,
-        nonce: base64Decode(att['nonce'] as String),
-      ),
+      () => _attachmentBytes(m),
     );
     return FutureBuilder<Uint8List>(
       future: future,
@@ -3023,5 +2980,106 @@ class _InviteQrCode extends StatelessWidget {
       height: 160,
       child: CustomPaint(painter: QrPainter.withQr(qr: qr)),
     );
+  }
+}
+
+/// 视频消息内联预览：暂停态显示首帧 + 播放按钮；点击全屏播放。
+/// 发送端本地密文即时显示（上传完成前/失败后也能看），接收端服务端拉取
+/// （老板 2026-09-11：改回 v1 直接显示视频）。
+class _VideoPreview extends StatefulWidget {
+  const _VideoPreview({required this.bytes});
+
+  final Uint8List bytes;
+
+  @override
+  State<_VideoPreview> createState() => _VideoPreviewState();
+}
+
+class _VideoPreviewState extends State<_VideoPreview> {
+  VideoPlayerController? _controller;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final tmp = File(
+          '${Directory.systemTemp.path}/einz_preview_${DateTime.now().microsecondsSinceEpoch}.mp4');
+      await tmp.writeAsBytes(widget.bytes);
+      final c = VideoPlayerController.file(tmp);
+      await c.initialize();
+      if (!mounted) {
+        await c.dispose();
+        return;
+      }
+      setState(() => _controller = c);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _controller;
+    if (_failed || c == null) {
+      return const SizedBox(width: 180, height: 100);
+    }
+    return GestureDetector(
+      onTap: () => _playFullscreen(c),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 180,
+          height: 180,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              VideoPlayer(c), // 暂停态显示首帧
+              const Center(
+                child: Icon(Icons.play_circle_fill, size: 44, color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _playFullscreen(VideoPlayerController c) async {
+    await c.seekTo(Duration.zero);
+    await c.play();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Stack(
+          children: [
+            AspectRatio(
+              aspectRatio: c.value.aspectRatio,
+              child: VideoPlayer(c),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await c.pause();
   }
 }
