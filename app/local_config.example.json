@@ -1,3 +1,4 @@
 {
+  "_about": "flutter run/build --dart-define-from-file=<configFileName.json>, 可覆盖掉 server_settings.dart 里的 String.fromEnvironment('kEinzServer', defaultValue: 'https://einz.tic.cc')",
   "kEinzServer": "http://localhost:3000"
 }
