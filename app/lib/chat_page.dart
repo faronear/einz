@@ -731,6 +731,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     : l10n.chatPageRenameMyselfEmptyError;
                 return;
               }
+              // 不允许改成与对方相同的名字（老板 2026-09-10）
+              if (!renameDevice && widget.peerName != null && name == widget.peerName) {
+                nameError.value = l10n.chatPageRenameSameAsPeerError;
+                return;
+              }
               try {
                 final api = widget.api ?? ApiClient(widget.server);
                 if (renameDevice) {

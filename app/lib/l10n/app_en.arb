@@ -164,6 +164,7 @@
   "chatPageRenameDeviceLabel": "Device name",
   "chatPageRenameDeviceEmptyError": "Name cannot be empty",
   "chatPageRenameMyselfEmptyError": "Name cannot be empty",
+  "chatPageRenameSameAsPeerError": "Cannot use the same name as your partner, please pick another",
   "chatPageCopy": "Copy",
   "chatPageCopied": "Copied",
   "chatPageEdit": "Edit",

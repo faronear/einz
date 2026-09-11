@@ -449,6 +449,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRenameMyselfEmptyError => 'Name cannot be empty';
 
   @override
+  String get chatPageRenameSameAsPeerError =>
+      'Cannot use the same name as your partner, please pick another';
+
+  @override
   String get chatPageCopy => 'Copy';
 
   @override

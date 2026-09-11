@@ -164,6 +164,7 @@
   "chatPageRenameDeviceLabel": "设备名称",
   "chatPageRenameDeviceEmptyError": "名称不能为空",
   "chatPageRenameMyselfEmptyError": "名字不能为空",
+  "chatPageRenameSameAsPeerError": "不能与对方同名，请换个名字",
   "chatPageCopy": "复制",
   "chatPageCopied": "已复制",
   "chatPageEdit": "编辑",

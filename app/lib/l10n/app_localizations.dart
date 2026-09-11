@@ -884,6 +884,12 @@ abstract class AppLocalizations {
   /// **'Name cannot be empty'**
   String get chatPageRenameMyselfEmptyError;
 
+  /// No description provided for @chatPageRenameSameAsPeerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot use the same name as your partner, please pick another'**
+  String get chatPageRenameSameAsPeerError;
+
   /// No description provided for @chatPageCopy.
   ///
   /// In en, this message translates to:

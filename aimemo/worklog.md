@@ -2533,3 +2533,15 @@ cfg.space_id，行为不变）。
   join → A /invite → C join，地址一致）
 - 踩坑：pty 时序（异步处理期间输入丢失——sleep 无效——改用 quit_after_wrong
   分离会话验证）；"创建新秘境"文本一直在消息区（重绘再现）不可作"回到首问"信号
+
+### 名字语义对齐（老板 2026-09-10）
+- TUI 身份选择：改为输入完整名字（不再输编号 0/1）——提示只显示名字
+  （不显示性别/在线状态）；名字精确匹配（不匹配/同名区分报错）
+- TUI 创建空间：伴侣名字不能与我的名字相同（报错重输）
+- 改名重名：TUI /myname 与 App 菜单改名——不能改成与对方相同的名字
+  （TUI 用 personNames 非我 personId；App 用 widget.peerName——新 l10n
+  chatPageRenameSameAsPeerError）
+- pty e2e：join_flow 的 slot 参数改 identity_name（输名字选身份——B=Alice、
+  C=Lukas）
+- 验证：cli analyze 0 issue、App analyze 0 error（仅既有 info）、改名相关
+  测试 15 个全过、pty e2e 全通（B/C 输名字选身份）

@@ -420,6 +420,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameMyselfEmptyError => '名字不能为空';
 
   @override
+  String get chatPageRenameSameAsPeerError => '不能与对方同名，请换个名字';
+
+  @override
   String get chatPageCopy => '复制';
 
   @override

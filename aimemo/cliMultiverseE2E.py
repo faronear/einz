@@ -78,8 +78,8 @@ def send(master, text):
     os.write(master, text.encode())
 
 
-def join_flow(label, store, token, slot, wrong_token=None, quit_after_wrong=False):
-    """通用 join 流程：输入 J（join）→ 粘贴 token → 选身份 → 口令 → 加入。
+def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_wrong=False):
+    """通用 join 流程：输入 J（join）→ 粘贴 token → 输入名字选身份 → 口令 → 加入。
     若给 wrong_token：先贴错误 token，断言被拒后直接重输 token（不回到
     create/join 首问——老板 2026-09-10），再贴正确 token。
     返回加入成功后的累计输出。"""
@@ -130,7 +130,7 @@ def join_flow(label, store, token, slot, wrong_token=None, quit_after_wrong=Fals
         ("fail", re.compile(r"加入空间失败")),
     ], prefix=label)
     if name == "ask_slot":
-        send(m, str(slot) + "\r")
+        send(m, identity_name + "\r")  # 输入完整名字选择身份（老板 2026-09-10——不再输编号）
         name, out, _ = read_until(m, [
             ("ask_passphrase", re.compile(r"输入空间密保口令")),
         ], prefix=label)
@@ -217,10 +217,10 @@ def main():
 
     # ---------- 设备 B：第二人加入（选身份 1 = Alice）----------
     # B1：错误 token 被拒后直接重输验证（会话到此退出——不 join）
-    join_flow("B", STORE_B, token1, slot=1,
+    join_flow("B", STORE_B, token1, identity_name="Alice",
               wrong_token="e1_WrongToken999", quit_after_wrong=True)
     # B2：第二人正常加入（选身份 1 = Alice）——join 链路由本流程验证
-    p_b, m_b, addr_b = join_flow("B", STORE_B, token1, slot=1)
+    p_b, m_b, addr_b = join_flow("B", STORE_B, token1, identity_name="Alice")
 
     # ---------- 设备 C：第一人的其他设备（选身份 0 = Lukas）----------
     # 验证 /invite 命令工作（输出新设备绑定邀请——渲染帧交错导致抓 token 不可靠，
@@ -245,7 +245,7 @@ def main():
         t2 = json.load(r)
     token2 = t2["joinToken"]
     print("C: 生成新 token =", token2)
-    p_c, m_c, addr_c = join_flow("C", STORE_C, token2, slot=0)
+    p_c, m_c, addr_c = join_flow("C", STORE_C, token2, identity_name="Lukas")
 
     # ---------- 断言 ----------
     ok_b = (addr_b or "")[:20] == addr_a[:20]

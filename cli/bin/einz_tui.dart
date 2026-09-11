@@ -762,9 +762,19 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   while (true) {
     partnerName = (await _prompt(session, '❓ 伴侣的名字（必填）:')).trim();
     if (!_state!.running) return;
-    if (partnerName.isNotEmpty) break;
-    session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
-    _scheduleRender();
+    if (partnerName.isEmpty) {
+      session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
+      _scheduleRender();
+      continue;
+    }
+    // 不允许和第一人同名（老板 2026-09-10）
+    if (partnerName == displayName) {
+      session.messages.add(
+          _systemMessage(session, '⚠️ 伴侣名字不能与我的名字相同（$displayName），请重新输入'));
+      _scheduleRender();
+      continue;
+    }
+    break;
   }
   String partnerGender;
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
@@ -866,22 +876,25 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
       return;
     }
     for (final s in slots) {
-      session.messages.add(_systemMessage(session,
-          '  ${s.slot}）${s.displayName ?? '（未命名）'}'
-          '${s.gender != null ? '（${s.gender}）' : ''}'
-          '${s.status == 'active' ? ' —— 已在线' : ''}'));
+      // 只显示名字（不显示性别/在线状态——老板 2026-09-10）
+      session.messages.add(_systemMessage(session, '  ${s.displayName ?? '（未命名）'}'));
     }
     var chosenSlot = -1;
-    final validSlots = slots.map((s) => s.slot).toList();
     while (chosenSlot < 0) {
-      final choice = (await _prompt(session, '❓ 你是哪一个用户？（输入编号 ${validSlots.join('/')}）')).trim();
+      final choice = (await _prompt(
+              session, '❓ 你是哪一个用户？（请完整输入列表中的名字）'))
+          .trim();
       if (!_state!.running) return;
-      final n = int.tryParse(choice);
-      if (n != null && validSlots.contains(n)) {
-        chosenSlot = n;
+      final matches = <int>[];
+      for (final s in slots) {
+        if (s.displayName == choice) matches.add(s.slot);
+      }
+      if (matches.length == 1) {
+        chosenSlot = matches.first;
         break;
       }
-      session.messages.add(_systemMessage(session, '⚠️ 请输入正确的用户编号（${validSlots.join('/')}）'));
+      session.messages.add(_systemMessage(session,
+          matches.isEmpty ? '⚠️ 名字不匹配，请完整输入列表中的名字' : '⚠️ 存在同名成员，无法选择——请先让对方改名'));
       _scheduleRender();
     }
     final myName = slots.firstWhere((s) => s.slot == chosenSlot).displayName;
@@ -2412,15 +2425,25 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
       } else {
-        try {
-          final old = s.session.store.personName ?? '(未设置)';
-          s.session.store.personName = arg;
-          s.session.store.save(s.session.storePath);
-          await ApiClient(s.session.server).updatePersonName(arg, s.session.store.sessionToken!);
-          await _refreshPersonNames(s);
-          s.session.messages.add(_systemMessage(s.session, '✅ 已重命名: $old → $arg'));
-        } catch (e) {
-          s.session.messages.add(_systemMessage(s.session, '❌ 重命名失败: $e'));
+        // 不允许改成与对方相同的名字（老板 2026-09-10）
+        final peerNames = s.personNames.entries
+            .where((e) => e.key != s.session.store.personId)
+            .map((e) => e.value)
+            .toList();
+        if (peerNames.contains(arg)) {
+          s.session.messages.add(_systemMessage(s.session, '⚠️ 名字不能与对方相同（$arg），请换个名字'));
+          s.status = '';
+        } else {
+          try {
+            final old = s.session.store.personName ?? '(未设置)';
+            s.session.store.personName = arg;
+            s.session.store.save(s.session.storePath);
+            await ApiClient(s.session.server).updatePersonName(arg, s.session.store.sessionToken!);
+            await _refreshPersonNames(s);
+            s.session.messages.add(_systemMessage(s.session, '✅ 已重命名: $old → $arg'));
+          } catch (e) {
+            s.session.messages.add(_systemMessage(s.session, '❌ 重命名失败: $e'));
+          }
         }
       }
     case '/device':
