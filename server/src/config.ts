@@ -20,12 +20,13 @@ export interface ServerConfig {
   max_spaces: number;
 }
 
-/** 读取 config.json（server/config.json）——服务端每次启动读取一次（改配置需
- *  重启生效；文件缺失或解析失败按默认值处理）。当前支持字段：maxSpaces。 */
+/** 读取 einz_server_config.json（server/einz_server_config.json——本机配置不入
+ *  git）——服务端每次启动读取一次（改配置需重启生效；文件缺失或解析失败按默认值
+ *  处理）。当前支持字段：maxSpaces。 */
 let fileConfigCache: { maxSpaces?: number } | null = null;
 function readFileConfig(): { maxSpaces?: number } {
   if (fileConfigCache != null) return fileConfigCache;
-  const path = resolve(HERE, "../config.json");
+  const path = resolve(HERE, "../einz_server_config.json");
   if (existsSync(path)) {
     try {
       fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as { maxSpaces?: number };

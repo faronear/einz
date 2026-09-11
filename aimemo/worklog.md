@@ -2506,3 +2506,12 @@ cfg.space_id，行为不变）。
   /health 无 legacy/space_id；pty e2e 全通（A create → B join → A /invite → C join）
 - 踩坑：search_replace 替换文本带 // 注释会破坏表达式语法（escrow.ts TS1005——
   替换文本改纯 "" 修复）
+
+### server 配置文件改名（老板 2026-09-10）
+- 删除过时的 server/config/config.json.example（v1 白名单/space_id 模板——v2
+  白名单靠动态登记；README 快速开始同步改 v2 方式）
+- server/config.json → server/einz_server_config.json（gitignore 不入 git——存
+  maxSpaces）；config.ts 的 readFileConfig 路径同步改名；README 引用更新
+- .gitignore 顺带清理 deployment/config/config.json（v1 部署残留——目录已不存在）
+- 验证：tsc OK；maxSpaces=1 从 einz_server_config.json 生效（curl 空间 2=409）；
+  git check-ignore 生效（新配置文件不入 git）

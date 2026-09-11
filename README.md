@@ -32,10 +32,12 @@ aimemo/      记忆与工作空间（productLens / projectPlan / worklog / userP
 
 ```bash
 cd server
-cp config/config.json.example config/config.json   # 填入两台设备公钥
 npm install
 npm run dev
 ```
+
+可选：`server/einz_server_config.json`（本机配置，不入 git）里的 `maxSpaces`
+（0=不限 / 1=单空间 / n=上限，改后重启生效）。
 
 ## 本地开发配置（App）
 
@@ -51,4 +53,4 @@ flutter run --dart-define-from-file=local_config.json   # flutter run/build 都�
 - `app/local_config.json` **不入 git**（已 .gitignore）——覆盖 `kEinzServer` 等启动参数（`String.fromEnvironment`），不污染 commit
 - 打包入口：`./scripts/build_ios.sh [--release ...]`（自动带上本机配置——聚焦 iOS 构建）
 - 调试入口：`flutter run --dart-define-from-file=local_config.json -d <UDID>`（run 同样支持，手动加参数即可）
-- 服务端对应：`server/config.json` 的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）
+- 服务端对应：`server/einz_server_config.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）
