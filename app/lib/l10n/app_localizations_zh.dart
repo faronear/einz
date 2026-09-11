@@ -31,7 +31,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skip => '跳过';
 
   @override
-  String get setupPageEnvelopeKeyHint => '粘贴线下交接的密保信封';
+  String get setupPageEnvelopeKeyHint => '密保信封是通过不对称加密，进行线下交接的一段文本。请联系秘境伴侣获取。';
 
   @override
   String get setupPageNeedPassphrase => '❗️ 必须设置密保口令';
@@ -43,7 +43,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
 
   @override
-  String get wizardStartTitle => '寻找秘境...';
+  String get wizardStartTitle => '秘境入口';
 
   @override
   String get wizardDetectTitle => '正在检测服务器状态…';
@@ -61,7 +61,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameHint => '伴侣的名字（以后可以随时修改）';
 
   @override
-  String get wizardPeerNameHintInput => '例如 Alice';
+  String get wizardPeerNameHintInput => '伴侣常用的名字';
 
   @override
   String get wizardNameRequired => '填写我的名字';
@@ -70,7 +70,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameRequired => '填写我的秘境伴侣的名字';
 
   @override
-  String get wizardNameHintInput => '例如 Lukas';
+  String get wizardNameHintInput => '输入我常用的名字';
 
   @override
   String get wizardMyGenderLabel => '我的性别';
@@ -130,10 +130,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitlePeerName => '关于伴侣';
 
   @override
-  String get wizardTitleJoinIdentity => '你是哪一个用户？';
+  String get wizardTitleJoinIdentity => '选择身份';
 
   @override
-  String get wizardJoinIdentityHint => '选择你的身份（创建时已录入两人）——第一人的其他设备请选第一个人';
+  String get wizardJoinIdentityHint => '一个秘境仅限两人，选择我的名字。';
 
   @override
   String get wizardJoinNoSlots => '该空间未预置成员身份，无法加入';
@@ -142,7 +142,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSlotOnline => '已在线';
 
   @override
-  String get wizardSlotRequired => '请选择你的身份';
+  String get wizardSlotRequired => '必须选择一个身份';
 
   @override
   String get wizardSpaceLimit => '空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间';
@@ -181,7 +181,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
-  String get wizardJoinPassphraseHint => '用于对所有消息进行加密、解密。如果不知道口令，请询问秘境里的唯一伴侣。';
+  String get wizardJoinPassphraseHint =>
+      '口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问秘境里的唯一伴侣。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
@@ -213,10 +214,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupEntryTitle => '开始使用 Einz';
+  String get setupEntryTitle => '选择秘境入口';
 
   @override
-  String get setupEntryHint => '创建只有两个人的私密空间，或通过邀请链接加入';
+  String get setupEntryHint => '秘境是仅限两人的私密世界，可以从头创建，或者受邀加入。';
 
   @override
   String get setupEntryCreate => '创建秘境';
@@ -228,16 +229,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryLegacyServer => '服务器版本过低，请升级后再使用';
 
   @override
-  String get setupTokenTitle => '输入邀请链接';
+  String get setupTokenTitle => '验证邀请码';
 
   @override
-  String get setupTokenHint => '向创建者索取一次性邀请链接或代码';
+  String get setupTokenHint => '填写邀请码，24小时内一次性有效';
 
   @override
-  String get setupTokenInputHint => '粘贴邀请链接或代码';
+  String get setupTokenInputHint => '邀请链接或代码';
 
   @override
-  String get setupTokenNeedInput => '请输入邀请链接或代码';
+  String get setupTokenNeedInput => '必须填写邀请链接或代码';
 
   @override
   String get setupTokenInvalid => '邀请链接无效';
@@ -296,14 +297,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageScannerHint => '将邀请码二维码对准取景框';
 
   @override
-  String get wizardInviteWrong => '邀请码无效：请使用任意一个已绑定设备生成的24小时一次性邀请码';
+  String get wizardInviteWrong => '邀请码无效。请使用任意一个已绑定设备生成的24小时一次性邀请码。';
 
   @override
-  String get setupPageNoEscrow => '❌ Server 无口令密保箱（请先在对端设置接入口令）';
+  String get setupPageNoEscrow => '❌ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。';
 
   @override
   String setupPageEscrowFailed(String error) {
-    return '❌ 口令接入失败: $error';
+    return '❌ 口令验证失败。请询问秘境伴侣获得口令。';
   }
 
   @override

@@ -97,7 +97,7 @@ void main() {
     await tester.tap(find.text('下一步')); // preflight 通过 → 直接进下一页（不再停留显示确认卡片）
     await tester.pumpAndSettle();
     expect(find.text('加入 Lukas 的空间'), findsNothing, reason: '不再显示空间确认卡片');
-    expect(find.text('你是哪一个用户？'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
+    expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
   });
 
   testWidgets('探测失败：启动屏保持旋转 Logo、无失败文字并自动重试（无输入框/信封入口）',

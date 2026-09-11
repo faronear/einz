@@ -95,14 +95,14 @@ Future<void> pumpToJoinPassphrase(
   await tester.tap(find.text('下一步')); // preflight 通过 → 直接进身份选择页（不再显示确认卡片）
   await tester.pumpAndSettle();
   // 身份选择（老板定稿：join 不再自填名字——选择是哪一个用户）
-  expect(find.text('你是哪一个用户？'), findsOneWidget); // 身份选择页标题
+  expect(find.text('选择身份'), findsOneWidget); // 身份选择页标题
   await tester.tap(find.textContaining('Alice')); // 选第二人（伴侣）
   await tester.pumpAndSettle();
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle(); // → 口令页
   // 口令页应为「验证」语义：标题与提示都是验证措辞
   expect(find.text('验证密保口令'), findsOneWidget); // 标题（join=验证套，create=设置套）
-  expect(find.text('用于对所有消息进行加密、解密。如果不知道口令，请询问秘境里的唯一伴侣。'),
+  expect(find.text('口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问秘境里的唯一伴侣。'),
       findsOneWidget); // hint
   // join 提交（POST /spaces/join）成功后若出 SnackBar 停留 4 秒：等其消失避免遮挡
   await tester.pump(const Duration(seconds: 5));
@@ -124,7 +124,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('口令错误：请确认首台设备创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
-    expect(find.text('用于对所有消息进行加密、解密。如果不知道口令，请询问秘境里的唯一伴侣。'),
+    expect(find.text('口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问秘境里的唯一伴侣。'),
         findsOneWidget, reason: '应停留在口令页');
     expect(find.text('设置锁屏码'), findsNothing, reason: '不应进入 PIN 页');
   });
@@ -142,7 +142,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('用于对所有消息进行加密、解密。如果不知道口令，请询问秘境里的唯一伴侣。'),
+    expect(find.text('口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问秘境里的唯一伴侣。'),
         findsOneWidget, reason: '未托管时停留口令页');
   });
 
@@ -162,7 +162,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确TOKEN');
     await tester.tap(find.text('下一步')); // preflight 通过 → 直接进下一页
     await tester.pumpAndSettle();
-    expect(find.text('你是哪一个用户？'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
+    expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
     expect(find.text('加入 Lukas 的空间'), findsNothing, reason: '不再显示空间确认卡片');
     expect(find.textContaining('Lukas'), findsOneWidget, reason: '身份选择页展示第一人');
     expect(find.textContaining('Alice'), findsOneWidget, reason: '身份选择页展示第二人');

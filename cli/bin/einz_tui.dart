@@ -411,7 +411,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     if (chosenPerson == 'personB') {
       if ((_probePersonNames['personB'] ?? '').isEmpty) {
         // personB 还没有名称——要求输入显示名
-        final name = await _prompt(session, '❓ 输入我的名字（例如 Alice，或者直接回车先跳过，以后可随时修改）：');
+        final name = await _prompt(session, '❓ 输入我的名字（也可直接回车先跳过，以后可随时修改）:');
         if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
         if (name.isNotEmpty) { 
           store.personName = name;
@@ -441,7 +441,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null) {
     while (true) {
       if (!_state!.running) return;
-      session.messages.add(_systemMessage(session, '❓ 秘境之道'));
+      session.messages.add(_systemMessage(session, '❓ 秘境入口'));
       session.messages.add(_systemMessage(session, '   c: 创建秘境'));
       session.messages.add(_systemMessage(session, '   j: 加入秘境'));
       final choice = (await _prompt(
@@ -947,7 +947,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     final file = await api.fetchSpaceEscrow(join.spaceId, passphrase);
     if (file == null) {
       session.messages.add(
-          _systemMessage(session, '⚠️ 找不到受托管的口令密保箱，秘境创建者未设口令，无法凭口令加入。'));
+          _systemMessage(session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
       return;
     }
     final payload = await KeyEscrowService(api).openPackage(passphrase: passphrase, file: file);

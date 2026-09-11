@@ -1178,7 +1178,7 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 步骤 2（join，Multiverse）：选择「你是哪一个用户」——create 已录入两人
+  /// 步骤 2（join，Multiverse）：选择「选择身份」——create 已录入两人
   /// 身份（preflight slots），加入者可能是第二人，也可能是第一人的其他设备，
   /// 不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）。
   /// 样式沿用 v1 性别选择卡（老板 2026-09-11）：左右双卡片、粉蓝表性别、
