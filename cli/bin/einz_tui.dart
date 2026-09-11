@@ -677,7 +677,7 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
   // 启动 WS 实时监听（已激活且配置了 server 时）；新消息到达或连接状态变化即重绘
   if (session.hasSession && server.isNotEmpty) {
     session.startWs(
-      onMessage: (_) => _scheduleRender(),
+      onMessage: (_) => _refreshGenderForLatest(_state!),
       onStatus: (_) {
         _scheduleRender();
         // 重连/上线补查：对齐 App——每次 WS 变为 connected 都探测口令是否被重设
@@ -686,7 +686,7 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
           _checkEscrowRotated(s.session);
         }
       },
-      onAutoSync: (_) => _scheduleRender(),
+      onAutoSync: (_) => _refreshGenderForLatest(_state!),
       onPeerStatus: _onPeerStatus,
       onPassphraseRotated: (_) {
         // 口令被对方重设：只发通知不弹窗（接入 /space 或修改 /passphrase 时使用新口令）
@@ -1524,6 +1524,13 @@ void _onPeerStatus(WsPeerStatusEvent event) {
   if (online != s.peerOnline) {
     s.peerOnline = online;
     _render();
+    // 对方上线（join 后新成员在线）→ 立即刷新 person 名称/性别表：第二人的
+    // 性别创建时就已写入 space_members（slot 预置），join 后 person_id 落位，
+    // getSpace 即可返回——不必等收到第一条消息才按需刷新
+    // （老板 2026-09-10："第二人的性别创建时就设置，应该第一个消息之前就知道"）
+    if (online) {
+      _refreshPersonNames(s);
+    }
   }
 }
 
@@ -2235,7 +2242,7 @@ Future<void> _execCommand(String line) async {
           s.session.store.server = arg; // 持久化新地址
           s.session.store.save(s.session.storePath);
           if (s.session.wsClient == null && s.session.hasSession) {
-            s.session.startWs(onMessage: (_) => _render(), onStatus: (_) => _render(), onAutoSync: (_) => _render(),
+            s.session.startWs(onMessage: (_) => _refreshGenderForLatest(_state!), onStatus: (_) => _render(), onAutoSync: (_) => _refreshGenderForLatest(_state!),
               onRevoked: _onWsRevoked);
           }
           s.session.messages.add(_systemMessage(s.session, '✅ 已切换服务器并激活: $arg'));
@@ -2273,9 +2280,9 @@ Future<void> _execCommand(String line) async {
         // 激活成功后启动 WS 实时监听
         if (s.session.wsClient == null && s.session.hasSession) {
           s.session.startWs(
-            onMessage: (_) => _render(),
+            onMessage: (_) => _refreshGenderForLatest(_state!),
             onStatus: (_) => _render(),
-            onAutoSync: (_) => _render(),
+            onAutoSync: (_) => _refreshGenderForLatest(_state!),
             onRevoked: _onWsRevoked,
           );
         }
@@ -2602,9 +2609,9 @@ Future<void> _handleInviteInput(String inviteCode) async {
       _refreshPersonNames(s); // 刷新 person 名称表
       if (s.session.wsClient == null && s.session.hasSession) {
         s.session.startWs(
-          onMessage: (_) => _render(),
+          onMessage: (_) => _refreshGenderForLatest(_state!),
           onStatus: (_) => _render(),
-          onAutoSync: (_) => _render(),
+          onAutoSync: (_) => _refreshGenderForLatest(_state!),
           onRevoked: _onWsRevoked,
         );
       }
@@ -2877,6 +2884,25 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       _scheduleRender();
     } 
   }
+}
+
+/// 收到对方消息后按需刷新 person 名称/性别表：新成员 join 后本端仍是加入时的
+/// 快照（无后来加入的发送者）——不刷新则对方气泡按未知性别回退青绿
+/// （老板 2026-09-10：同性别空间第二人发消息，对方 TUI 收到青色）。
+Future<void> _refreshGenderForLatest(_TuiState s) async {
+  final msgs = s.session.messages;
+  for (var i = msgs.length - 1; i >= 0; i--) {
+    final m = msgs[i];
+    if (m.isSystem) continue;
+    final pid = m.env.senderPersonId;
+    if (pid != null && pid != s.session.store.personId) {
+      if (!s.personGenders.containsKey(pid)) {
+        await _refreshPersonNames(s);
+      }
+      break;
+    }
+  }
+  _scheduleRender();
 }
 
 /// 拉取空间 person 名称表（GET /space）到缓存（认证后调用；失败静默——

@@ -2586,3 +2586,16 @@ cfg.space_id，行为不变）。
 - 修复：_activateAfterBind 收尾加 `await _refreshPersonNames(_state!)`（WS 启动、
   渲染前——join/create/启动所有认证路径统一刷新；getSpace 有 try-catch 兜底）
 - 验证：cli analyze 0 issue；pty e2e 全通（create→join→多设备地址一致）
+
+### 同性别空间收消息青色：收消息方 personGenders 快照缺新成员（老板 2026-09-10）
+- 现象：两人同性别——第二人 join 后发消息，对方 TUI 收到青色；男女组合正常
+- 真因：收消息路径（WS onMessage/sync）不刷新 personGenders——第一人快照是加入时
+  的（无后来 join 的第二人——person_id 当时为 NULL）；服务端 getSpace 的
+  `AND person_id IS NOT NULL` 过滤掉未加入成员——收到第二人消息时查不到性别→青绿
+- 修复两层：
+  1) 按需刷新：新增 _refreshGenderForLatest——所有 startWs 的 onMessage/onAutoSync
+     回调统一接入——收到对方消息缺发送者性别则 await _refreshPersonNames 再重绘
+  2) 上线刷新：_onPeerStatus 对方上线（online 状态变化）时刷新 personNames/
+     personGenders——第二人性别创建时就写入 space_members（slot 预置），join 后
+     person_id 落位 getSpace 即可返回——第一个消息前就知道（老板诉求）
+- 验证：cli analyze 0 issue；pty e2e 全通（create→join→多设备地址一致）
