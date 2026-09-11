@@ -402,12 +402,11 @@ class _SetupPageState extends State<SetupPage> {
                 if (_role != null)
                   Row(
                     children: [
-                      // 步骤 1 已是第一页：禁用"上一步"（避免退到检测页死胡同）；
-                      // 信封页（offline 步骤 1）例外：允许回退到前面的邀请码页（join 步骤 2）
+                      // 第 1 页（选择页）无上一步；步骤 1（create=关于我 / join=邀请码）
+                      // 起可回退——步骤 1 回到第 1 页选择页（老板 2026-09-11）；
+                      // 信封页（offline 步骤 1）回退到 join 口令页（_backStep 内处理）
                       TextButton(
-                        onPressed: (_step > 1 || (_role == _WizardRole.offline && _step == 1))
-                            ? _backStep
-                            : null,
+                        onPressed: _step >= 1 ? _backStep : null,
                         // 渐变上白字（不可用时白色半透明）
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white,
@@ -463,16 +462,16 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 进度圆点指示器：只表示向导内部步骤——首屏服务器检测集成在启动屏完成，
-  /// 不属于向导，因此圆点数 = 向导步骤数 - 1（老板决策 2026-09-08）。
+  /// 进度圆点指示器：共 5 点 = 第 1 页空间入口页（角色选择）+ 4 个向导内容步骤
+  /// （create/join 内容步数相同；老板 2026-09-11：入口页也计为一个点，且第 2 页
+  /// 可"上一步"返回选择页）。角色未选（入口页）时同样显示，仅首点亮。
   /// 信封模式（offline）是 join 流程内口令页的平行替代：进度条按 join 展示，
   /// 信封与口令处于同一位置（join 步骤 3），不缩成 2 点（老板要求 2026-09-09）。
   Widget _buildProgressDots() {
     // offline 的角色/步映射：1→3（口令位=信封位）、2→4（PIN）、3→5（完成）
-    final progressRole = _role == _WizardRole.offline ? _WizardRole.join : _role;
     final progressStep = _role == _WizardRole.offline ? _step + 2 : _step;
-    final total = (progressRole == null ? 1 : 5) - 1; // create/join 同为 5 步
-    if (total <= 1) return const SizedBox.shrink();
+    // 圆点 i 对应页面 _step == i（i=0 为入口页）：已到达（含当前）纯白，未到半透明
+    const total = 5;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -484,7 +483,7 @@ class _SetupPageState extends State<SetupPage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               // 渐变背景上的白色圆点（已完成纯白 / 未到白色半透明）
-              color: i + 1 <= progressStep ? Colors.white : Colors.white54,
+              color: i <= progressStep ? Colors.white : Colors.white54,
             ),
           ),
       ],
@@ -676,8 +675,23 @@ class _SetupPageState extends State<SetupPage> {
         _status = null;
         return;
       }
-      // 步骤 1 即向导第一页（create=名字 / join=身份 / offline=密保信封）；
-      // 不允许退到第 0 步检测页（角色判定前的过渡页，无操作出口，会形成死胡同）
+      // 各角色步骤 1（create=关于我 / join=邀请码）：回到第 1 页空间入口页
+      // （清空角色重新选择创建/加入；join 的 token 相关状态一并重置，避免
+      // 换角色/重进后残留旧 token 直接跳过校验）
+      if (_step == 1) {
+        _role = null;
+        _step = 0;
+        _joinToken = '';
+        _joinSpaceName = null;
+        _joinSlots = const [];
+        _chosenSlot = null;
+        _slotError = null;
+        _createLink = null;
+        _localError = null;
+        _status = null;
+        return;
+      }
+      // 步骤 2 及以上：逐级回退（create=名字 / join=身份 / offline=密保信封）
       if (_step > 1) _step--;
       _localError = null;
       _status = null;
@@ -773,7 +787,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 空间入口页（Multiverse：探测成功且角色未选时的第一页，老板 2026-09-10
-  /// 确认）：「新建私密空间」/「输入邀请链接或 token 加入现有空间」；
+  /// 确认）：「创建秘境」/「加入秘境」左右两张卡片（2026-09-11 改左右布局）；
   /// 旧服务器（不支持 spaces）顶部显示升级提示。
   Widget _buildStepEntry() {
     final l10n = AppLocalizations.of(context)!;
@@ -795,26 +809,36 @@ class _SetupPageState extends State<SetupPage> {
           ),
         _stepHeader(l10n.setupEntryTitle, l10n.setupEntryHint),
         const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: () => setState(() {
-            _role = _WizardRole.create;
-            _step = 1;
-          }),
-          icon: const Icon(Icons.add_circle_outline),
-          label: Text(l10n.setupEntryCreate),
-          style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16)),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: () => setState(() {
-            _role = _WizardRole.join;
-            _step = 1;
-          }),
-          icon: const Icon(Icons.login),
-          label: Text(l10n.setupEntryJoin),
-          style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16)),
+        // 左右两张卡片：创建（品牌蓝 + 加号图标）/ 加入（品牌粉 + 门图标）
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _EntryCard(
+                icon: Icons.add_circle_outline,
+                label: l10n.setupEntryCreate,
+                backgroundColor: const Color(0xFFE3F2FD),
+                accentColor: const Color(0xFF2271F7),
+                onTap: () => setState(() {
+                  _role = _WizardRole.create;
+                  _step = 1;
+                }),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _EntryCard(
+                icon: Icons.door_front_door_outlined,
+                label: l10n.setupEntryJoin,
+                backgroundColor: const Color(0xFFFDD6ED),
+                accentColor: const Color(0xFFD6529C),
+                onTap: () => setState(() {
+                  _role = _WizardRole.join;
+                  _step = 1;
+                }),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -2132,4 +2156,53 @@ class _DogEarClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(_DogEarClipper oldClipper) => oldClipper.cut != cut;
+}
+
+/// 空间入口页的选择卡片：大图标 + 名称，点按选择「创建秘境 / 加入秘境」。
+/// 浅色品牌底 + 品牌色图标/文字，两张卡片左右并排（老板 2026-09-11）。
+class _EntryCard extends StatelessWidget {
+  const _EntryCard({
+    required this.icon,
+    required this.label,
+    required this.backgroundColor,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color backgroundColor;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 44, color: accentColor),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: accentColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

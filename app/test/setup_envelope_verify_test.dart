@@ -39,7 +39,7 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
   ));
   await tester.pumpAndSettle();
   // Multiverse join：入口页 → 加入 → token（preflight 通过）→ 身份选择 → 口令页
-  await tester.tap(find.text('输入邀请链接或代码加入'));
+  await tester.tap(find.text('加入秘境'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
   await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）

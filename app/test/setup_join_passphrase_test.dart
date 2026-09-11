@@ -80,7 +80,7 @@ Future<void> pumpToJoinToken(
     ),
   ));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('输入邀请链接或代码加入')); // 入口页 → 加入
+  await tester.tap(find.text('加入秘境')); // 入口页 → 加入
   await tester.pumpAndSettle();
 }
 

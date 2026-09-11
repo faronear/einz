@@ -38,23 +38,23 @@ void main() {
     );
   }
 
-  testWidgets('探测成功 → 空间入口页：新建私密空间 / 输入邀请链接或代码加入',
+  testWidgets('探测成功 → 空间入口页：创建秘境 / 加入秘境',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp());
     await tester.pumpAndSettle();
 
     // Multiverse：探测成功后显示空间入口页（不再自动判定 create/join）
-    expect(find.text('新建私密空间'), findsOneWidget);
-    expect(find.text('输入邀请链接或代码加入'), findsOneWidget);
+    expect(find.text('创建秘境'), findsOneWidget);
+    expect(find.text('加入秘境'), findsOneWidget);
     // 启动屏已消失
     expect(find.byType(SpinningBrandLogo), findsNothing);
   });
 
-  testWidgets('入口页选「新建私密空间」→ 我的名字步骤', (WidgetTester tester) async {
+  testWidgets('入口页选「创建秘境」→ 我的名字步骤', (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('新建私密空间'));
+    await tester.tap(find.text('创建秘境'));
     await tester.pumpAndSettle();
 
     // 进入 create 名字步骤（AppBar 标题 + 输入框 hint「我的名字（以后可以随时修改）」）
@@ -63,12 +63,12 @@ void main() {
     expect(find.text('下一步'), findsOneWidget);
   });
 
-  testWidgets('入口页选「输入邀请链接或代码加入」→ token 页（粘贴/扫码）',
+  testWidgets('入口页选「加入秘境」→ token 页（粘贴/扫码）',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('输入邀请链接或代码加入'));
+    await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
 
     // join token 输入页（粘贴邀请链接或代码 + 扫码）
@@ -91,7 +91,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('输入邀请链接或代码加入'));
+    await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
     await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 停留显示空间确认卡片

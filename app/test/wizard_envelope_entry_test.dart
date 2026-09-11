@@ -61,7 +61,7 @@ Future<void> pumpToPassphrase(
 
   if (join) {
     // join：入口页 → 加入 → token 页（preflight 通过）→ 身份选择页（选第二人）→ 口令页
-    await tester.tap(find.text('输入邀请链接或代码加入'));
+    await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
     await tester.tap(find.text('下一步')); // 首次：preflight 校验 → 空间确认卡片（停留）
@@ -74,7 +74,7 @@ Future<void> pumpToPassphrase(
     await tester.pumpAndSettle(); // → 口令页
   } else {
     // create：入口页 → 新建 → 名字页（填名字+性别）→ 伴侣页（填名字+性别）→ 口令页
-    await tester.tap(find.text('新建私密空间'));
+    await tester.tap(find.text('创建秘境'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Lukas');
     await tester.tap(find.byIcon(Icons.male)); // 选性别男
@@ -128,7 +128,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     // Multiverse：探测成功 → 空间入口页 → 新建 → 名字页（步骤 1）
-    await tester.tap(find.text('新建私密空间'));
+    await tester.tap(find.text('创建秘境'));
     await tester.pumpAndSettle();
     // 名字与性别都未填：点下一步 → 两项红字同时出现（统一检查，不因首个失败跳过其余）
     await tester.tap(find.text('下一步'));

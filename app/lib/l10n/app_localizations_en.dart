@@ -238,10 +238,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create a private space for two, or join via an invite link';
 
   @override
-  String get setupEntryCreate => 'Create a private space';
+  String get setupEntryCreate => 'Create a space';
 
   @override
-  String get setupEntryJoin => 'Join with an invite link or code';
+  String get setupEntryJoin => 'Join a space';
 
   @override
   String get setupEntryLegacyServer => 'Server version too old, please upgrade';

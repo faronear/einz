@@ -48,8 +48,8 @@ void main() {
     expect(find.text('暂时无法连接服务器，正在自动重试…'), findsNothing,
         reason: '启动屏始终无失败文字');
     expect(find.byType(SpinningBrandLogo), findsNothing, reason: '进入向导后启动屏应消失');
-    // 空间入口页（新建私密空间 / 输入邀请链接或代码加入）
-    expect(find.text('新建私密空间'), findsOneWidget, reason: '应自动进入空间入口页');
-    expect(find.text('输入邀请链接或代码加入'), findsOneWidget);
+    // 空间入口页（创建秘境 / 加入秘境）
+    expect(find.text('创建秘境'), findsOneWidget, reason: '应自动进入空间入口页');
+    expect(find.text('加入秘境'), findsOneWidget);
   });
 }

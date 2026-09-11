@@ -219,10 +219,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryHint => '创建只有两个人的私密空间，或通过邀请链接加入';
 
   @override
-  String get setupEntryCreate => '新建私密空间';
+  String get setupEntryCreate => '创建秘境';
 
   @override
-  String get setupEntryJoin => '输入邀请链接或代码加入';
+  String get setupEntryJoin => '加入秘境';
 
   @override
   String get setupEntryLegacyServer => '服务器版本过低，请升级后再使用';
