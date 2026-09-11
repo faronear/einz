@@ -91,8 +91,8 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
     try {
       const sess = resolveSession(token ?? "");
       deviceId = sess.device_id;
-      // Multiverse：WS 绑定 session 的 Space（legacy 回落 cfg.space_id）
-      spaceId = sess.space_id ?? cfg.space_id;
+      // Multiverse：WS 绑定 session 的 Space（legacy 无空间 → 空串）
+      spaceId = sess.space_id ?? "";
     } catch {
       ws.close(4401, "UNAUTHORIZED");
       return;

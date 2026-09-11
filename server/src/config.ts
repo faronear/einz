@@ -1,7 +1,6 @@
-import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getDb, getMeta, setMeta } from "./db.js";
+import { getDb } from "./db.js";
 
 const HERE = resolve(import.meta.dirname ?? process.cwd());
 
@@ -13,8 +12,7 @@ export interface DeviceConfig {
 }
 
 export interface ServerConfig {
-  space_id: string;
-  /** Multiverse：协议版本（v1-single-space 迁移期保留 space_id 兼容，见 PROTOCOL_MULTIVERSE.md） */
+  /** Multiverse：协议版本（v2-multiverse，见 PROTOCOL_MULTIVERSE.md） */
   protocol_version: string;
   /** Multiverse：能力清单（随端点实现逐步扩展） */
   capabilities: string[];
@@ -41,21 +39,14 @@ function readFileConfig(): { maxSpaces?: number } {
   return fileConfigCache;
 }
 
-/** 加载服务配置：space_id 持久化在 db meta 表（首启自动生成 UUID，之后不变）。
- *  白名单完全靠动态登记（POST /devices/enroll：第一个设备免邀请码自举为创建者，
- *  之后设备凭邀请码加入）。maxSpaces 来自 config.json（每次启动读取）。 */
+/** 加载服务配置：v2 Multiverse 下空间由客户端 POST /spaces 创建——服务端不再
+ *  持有/生成全局 space_id（老板 2026-09-10）；白名单靠动态登记；maxSpaces
+ *  来自 config.json（每次启动读取）。 */
 export function loadConfig(): ServerConfig {
-  const existing = getMeta("space_id");
-  const spaceId = existing ?? randomUUID();
-  if (!existing) {
-    setMeta("space_id", spaceId);
-    console.log(`[einz] 首次启动：已生成 space_id=${spaceId}（持久化在 db meta，可在 /health 查看）`);
-  }
   const fc = readFileConfig();
   const maxSpaces =
     typeof fc.maxSpaces === "number" && fc.maxSpaces >= 0 ? Math.floor(fc.maxSpaces) : 0;
   return {
-    space_id: spaceId,
     protocol_version: "v2-multiverse",
     capabilities: ["spaces", "join-tokens"],
     max_spaces: maxSpaces,

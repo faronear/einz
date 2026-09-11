@@ -63,7 +63,7 @@ export function uploadKeyEscrow (
   const hasPrev =
     getDb()
       .prepare(`SELECT 1 FROM key_escrow WHERE space_id = ?`)
-      .get(cfg.space_id) !== undefined
+      .get("") !== undefined
   if (rotated) {
     // 真正重设：推进 updated_at（离线补查凭它识别）+ 通知其余在线设备
     getDb()
@@ -75,7 +75,7 @@ export function uploadKeyEscrow (
            passphrase_hash = excluded.passphrase_hash,
            updated_at = excluded.updated_at`
       )
-      .run(cfg.space_id, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
+      .run("", JSON.stringify(pkg), passphraseHash ?? null, Date.now())
     broadcastPassphraseRotated(device_id)
   } else if (!hasPrev) {
     // 首次托管：写入 updated_at 作为基线（后续真正重设才可对比），不广播
@@ -84,14 +84,14 @@ export function uploadKeyEscrow (
         `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
          VALUES (?, ?, ?, ?)`
       )
-      .run(cfg.space_id, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
+      .run("", JSON.stringify(pkg), passphraseHash ?? null, Date.now())
   } else {
     // 普通重传（同口令刷新包/哈希）：保留原 updated_at，不广播
     getDb()
       .prepare(
         `UPDATE key_escrow SET package = ?, passphrase_hash = ? WHERE space_id = ?`
       )
-      .run(JSON.stringify(pkg), passphraseHash ?? null, cfg.space_id)
+      .run(JSON.stringify(pkg), passphraseHash ?? null, "")
   }
   return { ok: true }
 }
@@ -114,7 +114,7 @@ export async function recoverSpace (
     .prepare(
       `SELECT passphrase_hash, package FROM key_escrow WHERE space_id = ?`
     )
-    .get(cfg.space_id) as
+    .get("") as
     | { passphrase_hash: string | null; package: string | null }
     | undefined
   if (!row || !row.passphrase_hash) {
@@ -158,7 +158,7 @@ export function getKeyEscrow (
 
   const row = getDb()
     .prepare(`SELECT package, updated_at FROM key_escrow WHERE space_id = ?`)
-    .get(cfg.space_id) as { package: string; updated_at: number } | undefined
+    .get("") as { package: string; updated_at: number } | undefined
   return row
     ? {
         package: JSON.parse(row.package) as EscrowPackage,
@@ -176,7 +176,7 @@ export function deleteKeyEscrow (
   if (!isActiveDevice(cfg, device_id))
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
 
-  getDb().prepare(`DELETE FROM key_escrow WHERE space_id = ?`).run(cfg.space_id)
+  getDb().prepare(`DELETE FROM key_escrow WHERE space_id = ?`).run("")
   return { ok: true }
 }
 

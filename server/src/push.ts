@@ -75,5 +75,5 @@ export function getSpace(
     .all() as { key: string; value: string }[]) {
     personGenders[r.key.slice("person_gender:".length)] = r.value;
   }
-  return { space_id: cfg.space_id, devices, person_names: personNames, person_genders: personGenders };
+  return { space_id: "", devices, person_names: personNames, person_genders: personGenders };
 }

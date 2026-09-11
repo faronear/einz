@@ -41,7 +41,8 @@ export async function createChallenge(cfg: ServerConfig, deviceId: string, space
 }
 
 /** 阶段 2：校验明文并签发 session（PROTOCOL.md §3）。challenge 一次性。
- *  Multiverse：session 绑定 challenge 记录的目标 Space（NULL → legacy cfg.space_id）。 */
+ *  Multiverse：session 绑定 challenge 记录的目标 Space（NULL → session 无空间，
+ *  legacy 客户端不带 space_id——v2 下客户端必带）。 */
 export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintextB64: string): SessionResult {
   const row = getDb()
     .prepare(`SELECT * FROM challenges WHERE challenge_id = ?`)
@@ -68,7 +69,7 @@ export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintex
   // session_token 用 Node crypto 同步生成（无需 await）
   const sessionToken = toB64(new Uint8Array(nodeRandomBytes(32)));
   const now = Date.now();
-  const sessionSpaceId = row.space_id ?? cfg.space_id; // legacy 回落
+  const sessionSpaceId = row.space_id ?? ""; // v2：challenge 必带目标 Space（legacy 无空间 → 空串）
   db.prepare(
     `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`
   ).run(sessionToken, row.device_id, sessionSpaceId, now + SESSION_TTL_MS, now);

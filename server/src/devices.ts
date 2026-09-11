@@ -166,7 +166,7 @@ export function enrollDevice (
       ok: true,
       device_id: assignedId,
       person_id: personId,
-      space_id: cfg.space_id
+      space_id: "" // v2：服务端无全局 space（空间由客户端 create/join 建立，登记后经 session 绑定）
     }
   }
 
@@ -280,7 +280,7 @@ export function enrollDevice (
     ok: true,
     device_id: assignedId,
     person_id: personId,
-    space_id: cfg.space_id
+    space_id: "" // v2：服务端无全局 space（空间由客户端 create/join 建立，登记后经 session 绑定）
   }
 }
 

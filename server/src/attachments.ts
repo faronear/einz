@@ -70,10 +70,15 @@ export function storeAttachment(
   writeFileSync(full, blob, { flag: "wx" });
 
   const now = Date.now();
+  // v2 多空间：附件归属消息所在空间（不再用全局 cfg.space_id——服务端已无全局 space）
+  const msg = db
+    .prepare(`SELECT space_id FROM messages WHERE message_id = ?`)
+    .get(meta.message_id) as { space_id: string | null } | undefined;
+  const spaceId = msg?.space_id ?? null;
   db.prepare(
     `INSERT INTO attachments (attachment_id, message_id, space_id, key_version, size, sha256, nonce, storage_path, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(meta.attachment_id, meta.message_id, cfg.space_id, meta.key_version, meta.size, meta.sha256, meta.nonce, storagePath, now);
+  ).run(meta.attachment_id, meta.message_id, spaceId, meta.key_version, meta.size, meta.sha256, meta.nonce, storagePath, now);
 
   return { attachment_id: meta.attachment_id, storage_path: storagePath, created_at: now };
 }

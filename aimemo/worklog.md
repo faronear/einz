@@ -2493,3 +2493,16 @@ cfg.space_id，行为不变）。
 - 验证：pty e2e 全通（A create → B join → A /invite 工作 → C join（同端点 token））
 - 踩坑：pty 渲染帧交错（抓 token 不可靠——/invite 断言命令工作 + join 用 curl
   同端点 token）；A create 后卡锁屏码询问（/invite 前先回车跳过）
+
+### 落地页 + v2 服务端去全局 space_id（老板 2026-09-10）
+- 落地页：GET /join/<token> 返回静态 HTML 指引页（品牌风格卡片——"这是 Einz
+  私密空间邀请，请用 App 加入" + 显示邀请码；token 正则校验非法 404）——
+  解决浏览器打开邀请链接 404 断裂
+- space_id 移除：v2 下空间由客户端 POST /spaces 创建——服务端不再生成/持久化
+  全局 space_id（loadConfig 去掉 getMeta/setMeta；health legacy 块、启动日志、
+  attachments/escrow/messages/push/ws/devices 的 cfg.space_id 引用全部清理——
+  legacy 回落改空串、附件归属从消息查、escrow v1 函数冻结空串）
+- 验证：tsc OK；启动日志无"已生成 space_id"；/join 返回 200 HTML；
+  /health 无 legacy/space_id；pty e2e 全通（A create → B join → A /invite → C join）
+- 踩坑：search_replace 替换文本带 // 注释会破坏表达式语法（escrow.ts TS1005——
+  替换文本改纯 "" 修复）

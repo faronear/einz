@@ -15,7 +15,7 @@ import { createJoinToken, createSpace, joinSpace, lookupSpace, preflightJoin } f
 const PORT = Number(process.env.PORT ?? 3000);
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
 const SERVER_VERSION = "1.0.0";
-openDb(); // 先开库：loadConfig 需要从 db meta 读/生成 space_id
+openDb(); // 先开库（所有路由依赖 db 就绪）
 const cfg: ServerConfig = loadConfig();
 
 const server = createServer(async (req, res) => {
@@ -69,12 +69,46 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       version: SERVER_VERSION,
       uptime_sec: Math.floor(process.uptime()),
       capabilities: cfg.capabilities,
-      legacy: {
-        space_id: cfg.space_id,
-        messages_count: msgCount,
-      },
+      messages_count: msgCount,
       ws_clients: wsConnCount(),
     });
+    return;
+  }
+  // 落地页：邀请链接（https://einz.tic.cc/join/<token>）在浏览器打开时显示指引页
+  // （无 web 客户端——告诉用户这是 Einz 私密空间邀请、用 App 加入；老板 2026-09-10）
+  if (method === "GET" && path.startsWith("/join/")) {
+    const token = path.slice("/join/".length);
+    if (!/^[A-Za-z0-9_-]+$/.test(token)) {
+      sendJson(res, 404, { error: { code: "NOT_FOUND", message: "not found" } });
+      return;
+    }
+    const page = `<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Einz 私密空间邀请</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FFF5FA;color:#33415A;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
+  .card{max-width:480px;background:#fff;border:1px solid #E9D5E0;border-radius:16px;padding:32px;box-shadow:0 4px 16px rgba(51,65,90,.08);text-align:center}
+  h1{font-size:20px;color:#2271F7;margin:0 0 12px}
+  p{font-size:14px;line-height:1.7;margin:8px 0}
+  .token{display:inline-block;margin:16px 0 4px;padding:10px 16px;background:#FDD6ED;color:#D6529C;border-radius:10px;font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all}
+  .hint{font-size:12px;color:#8a93a6}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>💌 Einz 私密空间邀请</h1>
+  <p>这是一份 <strong>Einz</strong>（双人私密加密聊天空间）的加入邀请。</p>
+  <p>请使用 Einz App 打开本链接，或在 App 中加入时粘贴下面的邀请码：</p>
+  <div class="token">${token}</div>
+  <p class="hint">邀请码 24 小时内有效、仅可使用一次。</p>
+</div>
+</body>
+</html>`;
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(page);
     return;
   }
 
@@ -336,5 +370,5 @@ setInterval(() => {
 }, 60 * 60 * 1000).unref();
 
 server.listen(PORT, () => {
-  console.log(`[einz] server listening on :${PORT} space=${cfg.space_id}`);
+  console.log(`[einz] server listening on :${PORT}`);
 });

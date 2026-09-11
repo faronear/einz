@@ -57,7 +57,7 @@ export function postMessage(cfg: ServerConfig, token: string, body: unknown): { 
   const { device_id, space_id: sessionSpace } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
-  const spaceId = sessionSpace ?? cfg.space_id; // legacy 回落
+  const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
 
   const env = validateEnvelope(body);
   if (env.sender_device_id !== device_id) {
@@ -96,7 +96,7 @@ export function syncMessages(
   const { device_id, space_id: sessionSpace } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
-  const spaceId = sessionSpace ?? cfg.space_id; // legacy 回落
+  const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
 
   const safeLimit = Math.min(Math.max(limit, 1), 500);
   const db = getDb();
