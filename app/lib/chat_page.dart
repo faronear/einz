@@ -1491,6 +1491,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (_inputMode != _InputMode.preview) return;
     final path = _recordingPath;
     if (path == null) return;
+    // 语音文字说明带录音秒数（老板 2026-09-11）：caption 随消息同步，接收端
+    // 同样显示（如「语音（12 秒）」）；须在 await 前取好（避免 async gap 用 context）
+    final caption =
+        '${AppLocalizations.of(context)!.chatPageVoiceLabel}（$_recordSeconds 秒）';
     try {
       final f = File(path);
       if (!await f.exists() || await f.length() == 0) {
@@ -1506,6 +1510,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         fileBytes: await f.readAsBytes(),
         fileName: 'voice.m4a',
         type: 'voice',
+        caption: caption,
       );
       await f.delete().catchError((_) => f);
       if (!mounted) return;
@@ -1978,13 +1983,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             playing
                 ? AppLocalizations.of(context)!.chatPagePlaying
                 : (m.env.type == 'voice'
-                    ? '🎤 ${AppLocalizations.of(context)!.chatPageVoiceLabel}'
+                    ? '🎤 ${_voiceMessageLabel(m)}'
                     : '🎵 ${m.plaintext}'),
             overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
     );
+  }
+
+  /// 语音消息文字说明：优先显示消息自带说明（新版带秒数，如「语音（12 秒）」）；
+  /// 旧消息 plaintext 以「🎤 」开头（sendAttachment 旧默认），去掉前缀避免与
+  /// 渲染端 🎤 重复；空则回退 l10n 标签。
+  String _voiceMessageLabel(HistoryMessage m) {
+    final t = m.plaintext.trim();
+    if (t.isEmpty) return AppLocalizations.of(context)!.chatPageVoiceLabel;
+    return t.startsWith('🎤 ') ? t.substring(2) : t;
   }
 
   /// 文件消息：文件卡片（文件名 + 大小 + 下载保存）。
