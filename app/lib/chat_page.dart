@@ -448,12 +448,54 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
               Center(child: _InviteQrCode(data: r.link)),
               const SizedBox(height: 12),
-              SelectableText(r.link,
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
-              const SizedBox(height: 6),
-              SelectableText(r.joinToken,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey, letterSpacing: 0.5)),
+              // 邀请链接 + 拷贝图标（点击即复制，弹窗不关闭——根 Overlay 通知
+              // 在弹窗之上可见，老板 2026-09-11）
+              Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(r.link,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    color: const Color(0xFF2271F7),
+                    tooltip: '复制邀请链接',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: r.link));
+                      if (!ctx.mounted) return;
+                      showTopNotice(ctx, '邀请链接已复制');
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              // 单独 token + 拷贝图标
+              Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(r.joinToken,
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.grey, letterSpacing: 0.5)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    color: Colors.grey,
+                    tooltip: '复制邀请码',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: r.joinToken));
+                      if (!ctx.mounted) return;
+                      showTopNotice(ctx, '邀请码已复制');
+                    },
+                  ),
+                ],
+              ),
               const Padding(
                 padding: EdgeInsets.only(top: 6),
                 child: Text('扫描或复制以上链接（或邀请码），即可绑定新设备到同一个秘境（24 小时有效，仅一次）。',
