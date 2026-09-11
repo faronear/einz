@@ -260,13 +260,11 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     }
     store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
     store.save(storePath);
-    stdout.writeln('✅ 新设备凭证已生成，公钥为：');
-    _guidanceNotes.add('✅ 新设备凭证已生成，公钥为：');
-    stdout.writeln('   ${store.publicKey}');
-    _guidanceNotes.add('   ${store.publicKey}');
+    stdout.writeln('✅ 新设备公钥已生成: ${store.publicKey}');
+    _guidanceNotes.add('✅ 新设备公钥已生成: ${store.publicKey}');
     if (autoName.isNotEmpty) {
-      stdout.writeln('✅ 默认设备名称: $autoName');
-      _guidanceNotes.add('✅ 默认设备名称: $autoName');
+      stdout.writeln('✅ 新设备默认名称: $autoName');
+      _guidanceNotes.add('✅ 新设备默认名称: $autoName');
     }
     stdout.writeln('----------------');
     _guidanceNotes.add('----------------');
@@ -299,7 +297,7 @@ Future<bool> _verifyPin(String hash, String pin) async {
 Future<void> _askSetPin(ChatSession session, String storePath) async {
   if (!_state!.running) return;
   // 明文输入（与解锁一致——引导中也可输入 /exit）
-  final pin = await _prompt(session, '❓ 设置锁屏码（可留空跳过，以后可用 /pin 重设）:', hidden: false);
+  final pin = await _prompt(session, '❓ 设置锁屏码（以后每次进入秘境需要输入锁屏码。也可暂时留空跳过，以后用 /pin 重设）:', hidden: false);
   if (!_state!.running) return;
   if (pin.isEmpty) {
     session.messages.add(_systemMessage(session, '⚠️ 没有设置锁屏码'));
@@ -443,24 +441,31 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null) {
     while (true) {
       if (!_state!.running) return;
+      session.messages.add(_systemMessage(session, '❓ 秘境之道'));
+      session.messages.add(_systemMessage(session, '   c: 创建秘境'));
+      session.messages.add(_systemMessage(session, '   j: 加入秘境'));
       final choice = (await _prompt(
-              session, '❓ 创建新秘境（输入 C 或 create），或者加入老秘境（输入 J 或 join）？'))
+              session, '请选择:'))
           .trim()
           .toLowerCase();
       if (!_state!.running) return;
       if (choice == 'c' || choice == 'create' || choice == '1') {
+        session.messages.add(_systemMessage(session, '✅ 创建秘境'));
+        session.messages.add(_systemMessage(session, '----------------'));
         await _spaceCreate(session, store, storePath);
         if (_onboarded) break; // 创建成功进入会话
         continue; // 创建失败：循环可重试
       }
       if (choice == 'j' || choice == 'join' || choice == '2') {
+        session.messages.add(_systemMessage(session, '✅ 加入秘境'));
+        session.messages.add(_systemMessage(session, '----------------'));
         // 加入流程：token 错误被拒后直接重输 token（不回到 create/join 首问——
         // 老板 2026-09-10）
         while (true) {
-          final token = (await _prompt(session, '❓ 粘贴伴侣的邀请链接或 token:')).trim();
+          final token = (await _prompt(session, '❓ 输入邀请码:')).trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 请粘贴邀请链接或 token'));
+            session.messages.add(_systemMessage(session, '⚠️ 必须输入邀请码！可从任意一台已绑定的设备生成邀请码.'));
             _scheduleRender();
             continue;
           }
@@ -470,7 +475,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         if (_onboarded) break; // 跳出外层引导循环进入会话
       }
       session.messages.add(
-          _systemMessage(session, '⚠️ 请输入 C 或 create（创建新秘境），或 J 或 join（加入老秘境）'));
+          _systemMessage(session, '⚠️ 请输入 c（创建秘境），或 j（加入秘境）'));
       _scheduleRender();
     }
     return;
@@ -735,25 +740,33 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   if (displayName.isEmpty) {
     // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）
     while (true) {
-      displayName = (await _prompt(session, '❓ 我的名字（空间显示名，必填）:')).trim();
+      displayName = (await _prompt(session, '❓ 我的名字（后期可改）:')).trim();
       if (!_state!.running) return;
-      if (displayName.isNotEmpty) break;
-      session.messages.add(_systemMessage(session, '⚠️ 名字必填，请输入'));
+      if (displayName.isNotEmpty) {
+        session.messages.add(_systemMessage(session, '✅ ${displayName}'));
+        session.messages.add(_systemMessage(session, '----------------'));
+        break;
+      }
+      session.messages.add(_systemMessage(session, '❌ 名字必填，请输入'));
       _scheduleRender();
     }
   }
   // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）。
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (myGender == null) {
-    final g = (await _prompt(session, '❓ 我的性别（输入 1 代表男，2 代表女）:')).trim();
+    session.messages.add(_systemMessage(session, '❓ 我的性别'));
+    session.messages.add(_systemMessage(session, '   1: 男'));
+    session.messages.add(_systemMessage(session, '   2: 女'));
+    final g = (await _prompt(session, '❓ 请选择:')).trim();
     if (!_state!.running) return;
     if (g == '1') {
       myGender = '男';
-      session.messages.add(_systemMessage(session, '✅ 已设置我的性别: 男'));
+      session.messages.add(_systemMessage(session, '✅ 男'));
+      session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
     } else if (g == '2') {
       myGender = '女';
-      session.messages.add(_systemMessage(session, '✅ 已设置我的性别: 女'));
+      session.messages.add(_systemMessage(session, '✅ 女'));
       _scheduleRender();
     } else {
       session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
@@ -764,7 +777,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   // join 时按身份选择而非自填名字）
   String partnerName;
   while (true) {
-    partnerName = (await _prompt(session, '❓ 伴侣的名字（必填）:')).trim();
+    partnerName = (await _prompt(session, '❓ 伴侣的名字（后期可改）:')).trim();
     if (!_state!.running) return;
     if (partnerName.isEmpty) {
       session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
@@ -778,25 +791,34 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       _scheduleRender();
       continue;
     }
+    session.messages.add(_systemMessage(session, '✅ ${partnerName}'));
+    session.messages.add(_systemMessage(session, '----------------'));
     break;
   }
   String partnerGender;
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (true) {
-    partnerGender = (await _prompt(session, '❓ 伴侣的性别（输入 1 代表男，2 代表女）:')).trim();
+    session.messages.add(_systemMessage(session, '❓ 伴侣的性别'));
+    session.messages.add(_systemMessage(session, '   1: 男'));
+    session.messages.add(_systemMessage(session, '   2: 女'));
+    partnerGender = (await _prompt(session, '❓ 请选择:')).trim();
     if (!_state!.running) return;
     if (partnerGender == '1') {
       partnerGender = '男';
+      session.messages.add(_systemMessage(session, '✅ ${partnerGender}'));
+      session.messages.add(_systemMessage(session, '----------------'));
       break;
     }
     if (partnerGender == '2') {
       partnerGender = '女';
+      session.messages.add(_systemMessage(session, '✅ ${partnerGender}'));
+      session.messages.add(_systemMessage(session, '----------------'));
       break;
     }
     session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
     _scheduleRender();
   }
-  final passphrase = (await _prompt(session, '❓ 设置密保口令（对方凭口令加入；可留空跳过）:', hidden: true)).trim();
+  final passphrase = (await _prompt(session, '❓ 设置密保口令:', hidden: false)).trim();
   if (!_state!.running) return;
   try {
     final s = await sodium();
@@ -812,7 +834,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
         keyVersion: 1,
       );
     }
-    final created = await _busy(session, '⏳ 创建空间中......', () => api.createSpace(
+    session.messages.add(_systemMessage(session, '✅ 口令密保箱已打包。请将口令通过安全的方式分享给秘境伴侣，即可共享私密。'));
+    session.messages.add(_systemMessage(session, '----------------'));
+    final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
       spaceId: spaceId,
       displayName: displayName,
       gender: _genderCode(myGender), // 中文 → male/female（与 enroll 一致——老板 2026-09-10）
@@ -831,9 +855,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     store.personId = created.creatorPersonId;
     store.personName = displayName;
     store.save(storePath);
-    session.messages.add(_systemMessage(session, '🎉 空间已创建！地址: ${created.spaceAddress}'));
+    session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
     session.messages.add(_systemMessage(session, '📎 邀请链接（24 小时有效、仅可用一次）：\n${created.link}'));
-    session.messages.add(_systemMessage(session, '✅ 对端输入 /space join <链接>（或 App 粘贴链接）即可加入'));
+    session.messages.add(_systemMessage(session, '----------------'));
     _onboarded = true;
     _scheduleRender();
     await _activateAfterBind(session, store, storePath, server);
@@ -870,8 +894,10 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
   try {
     final api = ApiClient(server);
     final pre = await _busy(session, '⏳ 校验邀请中......', () => api.preflightJoin(token));
+    session.messages.add(_systemMessage(session, '✅ 邀请码验证通过'));
+    session.messages.add(_systemMessage(session, '----------------'));
     session.messages.add(_systemMessage(
-        session, '🔍 将加入空间「${pre.displayName ?? '私密空间'}」（成员 ${pre.memberCount}/2）'));
+        session, '✅✅✅ 即将加入秘境！'));
     // 展示 create 时预置的两身份——加入者可能是第二人，也可能是第一人的其他
     // 设备，不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）
     final slots = pre.slots;
@@ -879,6 +905,8 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
       session.messages.add(_systemMessage(session, '⚠️ 该空间未预置成员身份，无法加入'));
       return;
     }
+    session.messages.add(_systemMessage(session, '❓ 我是谁'));
+    session.messages.add(_systemMessage(session, '----------------'));
     for (final s in slots) {
       // 名字背景色按性别（粉/蓝——复用 _genderBubble 与消息气泡背景色一致；
       // 不显示性别/在线状态——老板 2026-09-10）
@@ -889,7 +917,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     var chosenSlot = -1;
     while (chosenSlot < 0) {
       final choice = (await _prompt(
-              session, '❓ 你是哪一个用户？（请完整输入列表中的名字）'))
+              session, '❓ 完整输入我的名字（注意大小写）:'))
           .trim();
       if (!_state!.running) return;
       final matches = <int>[];
@@ -905,9 +933,11 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
       _scheduleRender();
     }
     final myName = slots.firstWhere((s) => s.slot == chosenSlot).displayName;
-    final passphrase = (await _prompt(session, '❓ 输入空间密保口令（创建者设置时需一致）:', hidden: true)).trim();
+    session.messages.add(_systemMessage(session, '✅ 我是 ${myName}'));
+    session.messages.add(_systemMessage(session, '----------------'));
+    final passphrase = (await _prompt(session, '❓ 验证密保口令:', hidden: true)).trim();
     if (!_state!.running) return;
-    final join = await _busy(session, '⏳ 加入中......', () => api.joinSpace(
+    final join = await _busy(session, '⏳ 正在加入秘境...', () => api.joinSpace(
       token: token,
       publicKey: store.publicKey,
       partnerSlot: chosenSlot,
@@ -917,7 +947,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     final file = await api.fetchSpaceEscrow(join.spaceId, passphrase);
     if (file == null) {
       session.messages.add(
-          _systemMessage(session, '⚠️ 该空间未托管口令密保箱，无法凭口令加入（创建者创建时未设口令）'));
+          _systemMessage(session, '⚠️ 找不到受托管的口令密保箱，秘境创建者未设口令，无法凭口令加入。'));
       return;
     }
     final payload = await KeyEscrowService(api).openPackage(passphrase: passphrase, file: file);
@@ -929,7 +959,8 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     store.personId = join.personId;
     store.personName = myName ?? '成员';
     store.save(storePath);
-    session.messages.add(_systemMessage(session, '🎉 已加入空间「${pre.displayName ?? ''}」！地址: ${join.spaceAddress}'));
+    session.messages.add(_systemMessage(session, '🎉 成功加入秘境！地址: ${join.spaceAddress}'));
+    session.messages.add(_systemMessage(session, '----------------'));
     _onboarded = true;
     _scheduleRender();
     await _activateAfterBind(session, store, storePath, server);
@@ -937,7 +968,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     session.messages.add(_systemMessage(session, '⚠️ 口令错误：请确认与创建者设置的口令一致'));
     _scheduleRender();
   } catch (e) {
-    session.messages.add(_systemMessage(session, '⚠️ 加入空间失败: $e'));
+    session.messages.add(_systemMessage(session, '⚠️ 加入秘境失败: $e'));
     _scheduleRender();
   }
 }
@@ -2174,7 +2205,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/attach <file>',
+        '/attach <file> :: 上传文件',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2182,11 +2213,11 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/device <设备名> :: 修改设备名称',
+        '/device <设备名> :: 修改当前设备名称',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/devices :: 查看设备列表（含设备公钥缩写）',
+        '/devices :: 查看秘境里的设备列表',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2299,7 +2330,7 @@ Future<void> _execCommand(String line) async {
         final addr = s.session.store.spaceAddress;
         if (s.session.hasSpace) {
           s.session.messages.add(_systemMessage(s.session,
-              '✅ 当前设备已接入空间${addr != null ? '（地址: $addr）' : ''}'));
+              '✅ 当前设备已绑定到秘境${addr != null ? '（地址: $addr）' : ''}'));
           s.session.messages.add(_systemMessage(
               s.session, '用法: /space address | /space create | /space join <邀请链接或 token>'));
         } else {
@@ -2316,9 +2347,9 @@ Future<void> _execCommand(String line) async {
           final addr = s.session.store.spaceAddress;
           if (addr == null || addr.isEmpty) {
             s.session.messages.add(
-                _systemMessage(s.session, '⚠️ 尚未绑定空间（无空间地址）——/space create 或 /space join 后可见'));
+                _systemMessage(s.session, '⚠️ 尚未绑定秘境（无秘境地址）——/space create 或 /space join 后可见'));
           } else {
-            s.session.messages.add(_systemMessage(s.session, '📍 空间地址: $addr'));
+            s.session.messages.add(_systemMessage(s.session, '📍 秘境地址: $addr'));
           }
           break;
         }
@@ -2459,9 +2490,9 @@ Future<void> _execCommand(String line) async {
             s.session.store.save(s.session.storePath);
             await ApiClient(s.session.server).updatePersonName(arg, s.session.store.sessionToken!);
             await _refreshPersonNames(s);
-            s.session.messages.add(_systemMessage(s.session, '✅ 已重命名: $old → $arg'));
+            s.session.messages.add(_systemMessage(s.session, '✅ 我的名字已更新: $old → $arg'));
           } catch (e) {
-            s.session.messages.add(_systemMessage(s.session, '❌ 重命名失败: $e'));
+            s.session.messages.add(_systemMessage(s.session, '❌ 我的名字修改失败: $e'));
           }
         }
       }
@@ -2486,7 +2517,7 @@ Future<void> _execCommand(String line) async {
           await ApiClient(s.session.server).updateDeviceName(arg, s.session.store.sessionToken!);
           s.session.messages.add(_systemMessage(s.session, '✅ 设备名已更新: $old → $arg'));
         } catch (e) {
-          s.session.messages.add(_systemMessage(s.session, '❌ 设备名更新失败: $e'));
+          s.session.messages.add(_systemMessage(s.session, '❌ 设备名修改失败: $e'));
         }
       }
     case '/open':
@@ -2862,7 +2893,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       final api = ApiClient(session.server);
       // _busy：打包/上传期间插入"⏳ 口令正在加密打包我的空间......"、禁止输入、隐藏光标，
       // 完成后移除（替换为下方结果消息）——统一体验优化
-      await _busy(session, '⏳ 正在加密我的口令密保箱......', () async {
+      await _busy(session, '⏳ 正在上传托管我的口令密保箱......', () async {
         await session.auth(); // challenge-response 激活（写入 store.sessionToken）
         await KeyEscrowService(api).upload(
           passphrase: p1,
@@ -2874,7 +2905,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
       });
       store.escrowUploaded = true;
       store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 口令密保箱已上传'));
+      session.messages.add(_systemMessage(session, '✅ 口令密保箱已上传托管'));
       session.messages.add(_systemMessage(session, '----------------'));
       _scheduleRender();
       return;
