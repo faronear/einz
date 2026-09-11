@@ -1433,6 +1433,10 @@ class _SetupPageState extends State<SetupPage> {
         personId: created.creatorPersonId,
         spaceId: created.spaceId,
       );
+      // 此前 create 流程漏填 _spaceId.text（仅 join/offline 填写）→ ChatPage 拿空
+      // spaceId → 聊天页生成邀请码 POST /spaces//join-tokens 报 SPACE_NOT_FOUND
+      // （2026-09-11 老板真机报告）；与 join 对齐补填服务端返回的 spaceId
+      _spaceId.text = created.spaceId;
       _createLink = created.link; // 完成页展示空间邀请链接
     } on ApiException catch (e) {
       if (!mounted) return;
