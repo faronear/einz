@@ -2364,7 +2364,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
                         // 其余项无 key，不阻碍懒构建回收
                         key: m.env.messageId == _jumpTargetId ? _jumpTargetKey : null,
-                        onLongPress: () => _showMessageActions(m),
+                        // 墓碑消息（已删除/已焚毁）不激发长按菜单（无内容可操作）
+                        onLongPress:
+                            m.deleted ? null : () => _showMessageActions(m),
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
                           // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变
