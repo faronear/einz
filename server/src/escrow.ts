@@ -34,6 +34,21 @@ export function parsePackage (raw: unknown): EscrowPackage {
   return p as unknown as EscrowPackage
 }
 
+/**
+ * v1 三个 /key-escrow 接口（上传/拉取/删除）共用的"本会话所属空间"。
+ *
+ * 背景（老板 2026-09-12 报「App 修改口令永远提示『尚未设置口令』」）：Multiverse
+ * 的口令密保箱按 **space** 存一份（创建空间时写入 `space_id = <真实 spaceId>`；
+ * 加入方从 `POST /spaces/{id}/key-escrow` 取），而 v1 接口此前一律硬编码
+ * `space_id = ''` —— 那是一张永远不会被 Multiverse 写入的空行，于是
+ * `GET /key-escrow` 恒返回空包，App 改口令/解锁同步/口令重设检测全部失效。
+ * `resolveSession` 本来就带 `space_id`，此处直接取用即可（无 space 的 legacy
+ * 会话回落 ""，保持旧行为不变）。
+ */
+function escrowSpaceId (token: string): string {
+  return resolveSession(token).space_id ?? ''
+}
+
 /** POST /key-escrow：上传/更新密文包（UPSERT，按 space 一份）。
  *  可选附 `passphrase_hash`（argon2id，恢复接口 /recover 校验口令用）。 */
 export function uploadKeyEscrow (
@@ -44,6 +59,7 @@ export function uploadKeyEscrow (
   const { device_id } = resolveSession(token)
   if (!isActiveDevice(cfg, device_id))
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
+  const spaceId = escrowSpaceId(token)
 
   const pkg = parsePackage((body as { package?: unknown })?.package)
   const passphraseHash = (body as { passphrase_hash?: unknown })
@@ -63,7 +79,7 @@ export function uploadKeyEscrow (
   const hasPrev =
     getDb()
       .prepare(`SELECT 1 FROM key_escrow WHERE space_id = ?`)
-      .get("") !== undefined
+      .get(spaceId) !== undefined
   if (rotated) {
     // 真正重设：推进 updated_at（离线补查凭它识别）+ 通知其余在线设备
     getDb()
@@ -75,7 +91,7 @@ export function uploadKeyEscrow (
            passphrase_hash = excluded.passphrase_hash,
            updated_at = excluded.updated_at`
       )
-      .run("", JSON.stringify(pkg), passphraseHash ?? null, Date.now())
+      .run(spaceId, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
     broadcastPassphraseRotated(device_id)
   } else if (!hasPrev) {
     // 首次托管：写入 updated_at 作为基线（后续真正重设才可对比），不广播
@@ -84,14 +100,14 @@ export function uploadKeyEscrow (
         `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
          VALUES (?, ?, ?, ?)`
       )
-      .run("", JSON.stringify(pkg), passphraseHash ?? null, Date.now())
+      .run(spaceId, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
   } else {
     // 普通重传（同口令刷新包/哈希）：保留原 updated_at，不广播
     getDb()
       .prepare(
         `UPDATE key_escrow SET package = ?, passphrase_hash = ? WHERE space_id = ?`
       )
-      .run(JSON.stringify(pkg), passphraseHash ?? null, "")
+      .run(JSON.stringify(pkg), passphraseHash ?? null, spaceId)
   }
   return { ok: true }
 }
@@ -156,9 +172,10 @@ export function getKeyEscrow (
   if (!isActiveDevice(cfg, device_id))
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
 
+  const spaceId = escrowSpaceId(token)
   const row = getDb()
     .prepare(`SELECT package, updated_at FROM key_escrow WHERE space_id = ?`)
-    .get("") as { package: string; updated_at: number } | undefined
+    .get(spaceId) as { package: string; updated_at: number } | undefined
   return row
     ? {
         package: JSON.parse(row.package) as EscrowPackage,
@@ -176,7 +193,8 @@ export function deleteKeyEscrow (
   if (!isActiveDevice(cfg, device_id))
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
 
-  getDb().prepare(`DELETE FROM key_escrow WHERE space_id = ?`).run("")
+  const spaceId = escrowSpaceId(token)
+  getDb().prepare(`DELETE FROM key_escrow WHERE space_id = ?`).run(spaceId)
   return { ok: true }
 }
 
