@@ -986,6 +986,13 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
         break;
       } on ApiException catch (e) {
         if (e.code != 'ESCROW_VERIFY_FAILED') rethrow;
+        // 404 = 该空间根本没有托管口令密保箱（不是口令输错，重输也没用）→ 明确提示后
+        // 退出；401 才是口令错 → 停在口令环节重输（老板 2026-09-12）
+        if (e.httpStatus == 404) {
+          session.messages.add(_systemMessage(
+              session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
+          return;
+        }
         session.messages.add(
             _systemMessage(session, '⚠️ 口令错误，请重新输入（或输入 /exit 退出）'));
         _scheduleRender();
