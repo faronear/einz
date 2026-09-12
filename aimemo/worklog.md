@@ -3028,8 +3028,40 @@ commit `5d24df8`（创建向导）、`d9d9199`（重设弹窗）。
 
 commit `7c3bcab`。
 
-### 待确认：App 端有同源问题（未改）
-`app/lib/setup_page.dart` 的 `_runJoinAccess` 同样是「先 `joinSpace` 再
-`fetchSpaceEscrow`」，口令输错也会烧掉 token，重试时 token 已失效（向导会停在口令页
-但补发会失败）。修法同 TUI：把 `preflightJoin` 的 `pre.spaceId` 存到 state（目前只存了
-`_joinToken`/`_joinSpaceName`/`_joinSlots`），先验口令再 join。**老板未要求，暂未改动。**
+### ✅ 已解决：App 端同源问题（`b985e73`）+ 附带修掉「重输正确口令仍被拒」
+
+老板随后确认要修 App，并补充了一个更严重的症状：**口令第一次输错后，即使重输正确
+口令也一直被拒**（提示「❌ 口令验证失败。请询问秘境伴侣获得口令。」）。
+
+**两个症状同一个根因**（`app/lib/setup_page.dart` 的 `_verifyJoinPassphrase`）：
+1. 先 `joinSpace`（消费 24h 一次性 token）→ 再 `fetchSpaceEscrow` 验口令；
+2. 口令错 → 抛 `ApiException(ESCROW_VERIFY_FAILED)`，**不是** `FormatException`，
+   所以它没走"口令错误"分支，而是落到通用 `catch (e)` 打印「口令验证失败」；
+3. 第二次重输正确口令时，`joinSpace` 又被调用一次 → **token 已被消费** → 报
+   token 已用 → 再次落通用分支 → 永远失败。用户看到的就是"一直被拒绝"。
+
+**改法（与 TUI 同构）**：
+- 新增 state `_joinSpaceId`，在 `_verifyJoinToken` 里记下 `pre.spaceId`
+  （preflight 返回；`/spaces/{id}/key-escrow` 不消费 token）；`_backStep` 回第 1 页
+  时一并清空，避免残留旧 spaceId 拿旧空间验口令；
+- `_verifyJoinPassphrase` 改为 **先验口令（`fetchSpaceEscrow(_joinSpaceId, …)` +
+  `openPackage`）→ 通过后才 `joinSpace`**；全文件只有这一处 `joinSpace`（已确认
+  `_runJoinAccess` 不会重复 join）；
+- 错误分流（原来只有 `FormatException` 一条"口令错误"分支，其余全丢通用提示）：
+  - `ApiException` `ESCROW_VERIFY_FAILED` + **401** → 「口令错误」停在口令页重输；
+  - `ESCROW_VERIFY_FAILED` + **404**（空间无密保箱）→ 「找不到受托管的口令密保箱」
+    （否则用户会一直重输一个根本不存在的口令——这是新发现的死循环陷阱）；
+  - 其他 `ApiException`（如 join 时 token 已用/失效）→ 通用失败提示。
+
+**回归测试**（`app/test/setup_join_passphrase_test.dart`）：
+- `pumpToJoinPassphrase` 加可选 `join` 注入；
+- 新增用例「先输错再输对：token 只被消费一次，重输正确口令仍可加入」——fake
+  `joinSpace` 第二次调用就抛 `ApiException('TOKEN_USED')`（模拟真服务端一次性语义），
+  并断言 `joinCalls == 0`（验口令前不消费）、成功后 `joinCalls == 1`。
+- **已在旧代码上验证该用例会失败**（正是老板报的"一直被拒绝"），新代码通过；
+  该文件其余 4 条用例不变（唯一失败项「错误 token」是既有环境性失败）。
+- 全量 `flutter test` 仍是那 15 条既有失败（未增加）；`flutter analyze` 0 error。
+
+**顺带把 TUI 也补齐**（`f434401`）：TUI 之前把 `ESCROW_VERIFY_FAILED` 一律当
+"口令错误"重输——空间若无密保箱（404）就会无限循环要口令。改为按 `httpStatus`
+区分 404/401，与 App 一致。`cli/test/guide_input_rules_check.py` 3 项仍全过。
