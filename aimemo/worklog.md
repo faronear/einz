@@ -3141,8 +3141,72 @@ v1    GET  /key-escrow（App 读的就是它）   → {}                        
 
 commit `56e43fd`。**需老板重启服务端生效**（部署/重启归老板，我只交付代码）。
 
-**遗留（本次未做）**：`POST /recover`（全丢恢复）同样读 `space_id=''`，在 Multiverse
-下本就失效——是既有问题，非本次回归；要不要修需先定"无鉴权时按哪个 space 找回"的规则。
+## 2026-09-12 消息回执（已送达/已读）地基：协议 + 服务端 + App + CLI 全打通
+
+老板要求：UI 上先不表现，但**数据结构和算法现在就准备好**；选定范围 C（全链路含
+TUI 上报）。本轮**没有新增任何回执 UI**（气泡图标仍是「纸飞机=发送中 / ✓=已发送 /
+⚠️=失败」）。
+
+### 关键认知：原来的 `status` 字段承载不了回执
+`local_messages.status`（DATABASE.md 原注释 `pending|sent|delivered|read|failed`）
+**混用了两种语义**：`pending/sent/failed` 是**出站**流水线；而 `delivered` 是 sync 给
+**入站**（对方）消息写的"我收到了"标记——与"对方收到了我的消息"无关；`read` 从未写过。
+所以回执必须另起一套（本轮只在文档里澄清，未改行为）。
+
+### 模型：单调高水位（HWM），不是每条消息一行回执
+`messages.server_sequence` 已是 space 内单调，故按 `(space, person)` 存一行即可：
+- 我的消息 seq=S **已送达** ⟺ 对方 `delivered_upto_seq ≥ S`；**已读** ⟺ `read_upto_seq ≥ S`。
+- 不变式：只前进（SQL `MAX` 夹紧）；`delivered ≥ read`（读隐含送达）；夹紧到本 space
+  真实 `MAX(server_sequence)`（防客户端上报未来 seq）。
+- 按 person 记 = "该 person **至少一台**设备已收到/已读"（不保证所有设备）。
+
+### 落地
+- **服务端**（`server/src/receipts.ts` 新增）：`receipts` 表（db.ts 的 CREATE 块，
+  新表无需 ALTER）；`POST /receipts`（**单条 SQL 原子 upsert**，禁止先读后写）、
+  `GET /receipts`；`ws.ts` 新增 `broadcastReceiptUpdated`，用 **`spaceOfDevice`**
+  （带 sessions 兜底，上报设备可能没活跃 WS），不用 `sameSpace`。
+- **shared**：`Api.receipts` + `ReceiptRow`；`postReceipts`/`getReceipts`；
+  `kWsTypeReceiptUpdated` + `WsReceiptUpdatedEvent` + `_handleFrame` case（未知帧
+  本就忽略，纯增量）。**未改 `/sync` 的返回结构**（它是内联结构记录，加字段要改
+  `FakeApi.sync` 和 app 测试里 ~10 处字面量），改为 sync 后多调一次 `GET /receipts`。
+- **App**：drift 新增 `PeerReceipts` 表（`schemaVersion` 5→6 + `m.createTable`；
+  **不需要 onCreate**——默认 `createAll()` 已含新表，测试内存库自动带上；
+  `dart run build_runner build` 重新生成）；repo 增 `refreshReceipts`/
+  `upsertPeerReceipt`（单调 max）/ `peerReceipts` / 静态纯函数 `receiptOf`
+  （**不接 UI**）；`WsRealtimeService` 增 `onReceiptUpdated`；`chat_page` 落库 +
+  上报（delivered 在 sync/首屏后；read 需 `resumed` + 本页最上层 + 列表贴底 +
+  post-frame，且只统计已渲染的对方消息）。
+- **CLI**：`store.dart` 增 `lastReportedDeliveredSeq`/`lastReportedReadSeq`
+  （**仅防抖，非数据源**）+ `advanceReported()`；`chat_core` 在 sync 与 WS
+  `message.new` 后上报。
+
+### 两个实现坑（都是真 bug，已修）
+1. **防抖标记先写后发** —— 一旦 POST 失败就再也不会重报（服务端永远缺这一档）。
+   改为**成功才推进标记**（App 与 CLI 都改）。
+2. **CLI 的"已读"原定只由 WS 实时消息推进**，但 pty 端到端里 WS 分支迟迟不触发
+   （消息走 30s sync 到来）→ 已读永远不上报。改为 **sync 上屏后即上报**，与 App 的
+   "在前台 + 看到最新"同一语义（终端全程可见且总滚到底）。**这是对原方案的有意
+   偏离**，代价：离线期间的历史在下次启动同步后会被标为已读——高水位模型的固有
+   语义（主流 IM 相同）。老板若要求更严格，可退回 WS-only。
+
+### 测试
+- 服务端 `server/test/receipts.test.ts`（新增，已接入 npm test）：A 发两条 → B 上报
+  delivered→read → 断言单调夹紧、999 被夹到 2、读隐含送达、GET 回读、A 收到 WS
+  `receipt.updated`、负数入参 400。
+- App `message_repository_test.dart`：FakeApi 增 `postReceipts`/`getReceipts`；
+  新增 3 条（落库 + `receiptOf` 边界、单调不倒退、无 token 静默跳过）。
+- CLI `cli/test/receipts_check.py`（新增 pty 端到端）：两台 TUI 真实创建/加入 →
+  A 发一条 → 断言服务端 B 的回执行 `delivered ≥ read ≥ 1`。判定以**服务端**为准
+  （store 落盘会晚一拍）。
+- 回归：server 3 套全过；app 仍是 15 条既有环境性失败（未增加）；
+  `guide_input_rules_check.py` 3/3 全过；`dart analyze` / `flutter analyze` 无新增问题。
+
+### 待办 / 已知限制
+- UI 展示（双勾等）留到以后；`receiptOf` 已就位，接上即可。
+- `POST /recover`（全丢恢复）仍读 `space_id=''`（Multiverse 下本就失效，非本轮回归）。
+- 多人时需"所有其他人都已收到" = `every`（`receiptOf` 已按 this 实现）。
+
+commit：见下方「回执地基」系列提交（server / shared / app / cli / docs）。
 
 ## 2026-09-12 气泡状态小图标调整 + 修「发送后状态卡在发送中」
 
