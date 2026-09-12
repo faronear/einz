@@ -450,6 +450,23 @@ class MessageRepository {
     return _rowsToHistory(rows);
   }
 
+  /// 按 messageId 批量读取本地历史（解密）。用于把界面列表里**仍标为
+  /// pending/failed** 的消息按 id 重新对齐一次。
+  ///
+  /// 为什么需要它（老板 2026-09-12 实测：对方已收到消息，本端却一直显示"发送中"）：
+  /// [historySince] 用的是"本地已加载最大 server_sequence"这个高水位，只取 seq
+  /// 更大的行。但本机自己发的消息，seq 是 postMessage 之后才由服务端分配回填的——
+  /// 若在这之间恰好先把一条 seq 更高的对方消息并入了列表（高水位抬到本消息 seq
+  /// 之上），之后 historySince 就再也取不到本消息（seq 不大于高水位、也不再是
+  /// NULL），它的状态便永远停在 pending。按 id 兜底重读即可收敛。
+  Future<List<HistoryMessage>> historyByMessageIds(List<String> messageIds) async {
+    if (messageIds.isEmpty) return const [];
+    final rows = await (db.select(db.localMessages)
+          ..where((m) => m.spaceId.equals(spaceId) & m.messageId.isIn(messageIds)))
+        .get();
+    return _rowsToHistory(rows);
+  }
+
   /// 行 → 历史记录（解密 + 附件元数据 + person 身份 + 阅后即焚到期）。
   Future<List<HistoryMessage>> _rowsToHistory(List<LocalMessage> rows) async {
     final out = <HistoryMessage>[];

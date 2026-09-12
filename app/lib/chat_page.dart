@@ -229,7 +229,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       default: // pending（队列中/发送中）
         return Tooltip(
           message: l10n.chatPageMsgSending,
-          child: Icon(Icons.access_time, size: 11, color: subtle),
+          // 纸飞机=发送中（老板 2026-09-12；原来与阅后即焚的时钟撞字形）
+          child: Icon(Icons.send, size: 11, color: subtle),
         );
     }
   }
@@ -1143,10 +1144,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 阅后即焚：到期消息打本地墓碑（纯本地）
       await _repo.tombstoneExpired(now: now);
       final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
+      // 补偿：列表里仍标 pending/failed 的消息按 id 重读。它们的 server_sequence
+      // 是本端 postMessage 后才回填的，可能"迟到"到高水位之下——只靠 historySince
+      // 会永久漏掉，界面就一直显示"发送中"（老板 2026-09-12 实测）。
+      final inflightIds = [
+        for (final m in _messages)
+          if (!m.deleted && (m.status == 'pending' || m.status == 'failed'))
+            m.env.messageId,
+      ];
+      final inflight = await _repo.historyByMessageIds(inflightIds);
       if (!mounted) return;
-      final freshById = {for (final f in fresh) f.env.messageId: f};
+      // inflight 后写入 → 同 id 时以它为准（读得更晚，状态更准）
+      final freshById = {
+        for (final f in fresh) f.env.messageId: f,
+        for (final f in inflight) f.env.messageId: f,
+      };
       final existingIds = {for (final m in _messages) m.env.messageId};
-      final added = fresh
+      final added = freshById.values
           .where((f) => !existingIds.contains(f.env.messageId))
           .toList();
       setState(() {
@@ -2517,6 +2531,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        // 自己消息：发送状态小标放在**时间前面**（老板
+                                        // 2026-09-12：原来放末尾，会被阅后即焚标记挤到
+                                        // 中间/后面，无法一眼看出"这条发出去没"）
+                                        if (mine && !m.deleted) ...[
+                                          _buildSendStatusIcon(m),
+                                          const SizedBox(width: 4),
+                                        ],
                                         Text(_messageTimeLabel(m),
                                             style: TextStyle(
                                                 fontSize: 10,
@@ -2525,7 +2546,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                     : Colors.grey)),
                                         if (m.expiresAt != null) ...[
                                           const SizedBox(width: 4),
-                                          const Icon(Icons.schedule, size: 11),
+                                          // 沙漏=阅后即焚倒计时（老板 2026-09-12，
+                                          // 替代原来的时钟图标，避免与发送中混淆）
+                                          const _BurnHourglass(),
                                           const SizedBox(width: 2),
                                           // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
                                           // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
@@ -2536,11 +2559,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                   color: _uiStyle == 'gradient'
                                                       ? Colors.white70
                                                       : Colors.grey)),
-                                        ],
-                                        // 自己消息：发送状态小标（老板 2026-09-12）
-                                        if (mine && !m.deleted) ...[
-                                          const SizedBox(width: 4),
-                                          _buildSendStatusIcon(m),
                                         ],
                                       ],
                                     ),
@@ -3331,5 +3349,43 @@ class _VideoPreviewState extends State<_VideoPreview> {
       ),
     );
     await c.pause();
+  }
+}
+
+/// 阅后即焚「沙漏」小图标（老板 2026-09-12）：在 hourglass_top ↔ hourglass_bottom
+/// 之间缓慢翻转，暗示倒计时在流逝。
+///
+/// 说明：图标仅 11px，做"按剩余时间精确流沙"既看不清又需逐秒驱动，故用循环
+/// 翻转表达"时间在走"。颜色不指定 → 继承 IconTheme（渐变风格下为白系，与相邻
+/// 的时间/时长文字一致）。
+class _BurnHourglass extends StatefulWidget {
+  const _BurnHourglass();
+
+  @override
+  State<_BurnHourglass> createState() => _BurnHourglassState();
+}
+
+class _BurnHourglassState extends State<_BurnHourglass>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => Icon(
+        _controller.value < 0.5 ? Icons.hourglass_top : Icons.hourglass_bottom,
+        size: 11,
+      ),
+    );
   }
 }
