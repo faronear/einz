@@ -51,6 +51,6 @@ flutter run --dart-define-from-file=local_config.json   # flutter run/build 都�
 ```
 
 - `app/local_config.json` **不入 git**（已 .gitignore）——覆盖 `kEinzServer` 等启动参数（`String.fromEnvironment`），不污染 commit
-- 打包入口：`./scripts/build_ios.sh [--release ...]`（自动带上本机配置——聚焦 iOS 构建）
+- 打包入口：`npm run build-ios`（iOS release，连生产服务器 einz.tic.cc）；Android 出包用 `npm run build-apk`。本机调试带本地配置用 `npm run ios-run` / `npm run ios-run-new`（已含 `--dart-define-from-file=local_config.json`，指向 localhost:3000）。`scripts/build_ios.sh` 已移除，相关能力并入 npm 脚本。
 - 调试入口：`flutter run --dart-define-from-file=local_config.json -d <UDID>`（run 同样支持，手动加参数即可）
 - 服务端对应：`server/einz_server_config.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）
