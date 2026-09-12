@@ -3065,3 +3065,16 @@ commit `7c3bcab`。
 **顺带把 TUI 也补齐**（`f434401`）：TUI 之前把 `ESCROW_VERIFY_FAILED` 一律当
 "口令错误"重输——空间若无密保箱（404）就会无限循环要口令。改为按 `httpStatus`
 区分 404/401，与 App 一致。`cli/test/guide_input_rules_check.py` 3 项仍全过。
+
+### 再修一处同源隐患（`3728b84`）：PIN 页退回口令页再前进会重复消费 token
+
+改完上面后又发现一条可达路径：口令验过 → join 成功 → 进 PIN 页 → 点「上一步」退回
+口令页 → 再点「下一步」，`_verifyJoinPassphrase` 会**再次调用 joinSpace**，而 token
+已消费 → 撞"token 已用"→ 又是那个「口令验证失败」死胡同。
+
+- 改法：新增 state `_joinedToken` / `_joinedSlot`，记录已成功 join 的 token+身份；
+  若 `_sessionToken`/`_spaceKey` 已有且 token+身份都没变，则**跳过 joinSpace**
+  （`_spaceId` 直接用 preflight 的 spaceId，与 join 返回的是同一个）。
+  换 token（`_verifyJoinToken`）或退回第 1 页（`_backStep`）时一并清空该标记。
+- 新增用例「PIN 页退回口令页再前进：不重复消费 token（仍能进 PIN 页）」：
+  fake joinSpace 第二次调用即抛 `TOKEN_USED`，断言 `joinCalls == 1` 且仍能进 PIN 页。
