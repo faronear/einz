@@ -661,6 +661,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get burnOption7Days => '7 天';
 
   @override
+  String get burnOption30Days => '30 天';
+
+  @override
   String get lockPageTitle => '秘境已锁定';
 
   @override

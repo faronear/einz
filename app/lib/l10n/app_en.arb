@@ -296,6 +296,7 @@
   "burnOption1Hour": "1 hour",
   "burnOption1Day": "1 day",
   "burnOption7Days": "7 days",
+  "burnOption30Days": "30 days",
   "lockPageTitle": "Einz Locked",
   "lockPagePinPrompt": "Enter PIN to unlock",
   "lockPageLockedSeconds": "Locked for {seconds} seconds",

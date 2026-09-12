@@ -180,6 +180,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         return l10n.burnOption1Day;
       case 604800:
         return l10n.burnOption7Days;
+      case 2592000:
+        return l10n.burnOption30Days;
       default:
         return '$seconds s';
     }
