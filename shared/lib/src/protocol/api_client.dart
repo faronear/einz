@@ -368,6 +368,36 @@ class ApiClient {
     );
   }
 
+  /// 上报自己的送达/已读高水位（服务端只前进，且读隐含送达）。
+  /// 两个参数都可缺省；返回服务端夹紧后的当前值。
+  Future<({int deliveredUptoSeq, int readUptoSeq})> postReceipts(
+    String token, {
+    int? deliveredUptoSeq,
+    int? readUptoSeq,
+  }) async {
+    final res = await _post(
+      Api.receipts,
+      {
+        if (deliveredUptoSeq != null) 'delivered_upto_seq': deliveredUptoSeq,
+        if (readUptoSeq != null) 'read_upto_seq': readUptoSeq,
+      },
+      token: token,
+    );
+    return (
+      deliveredUptoSeq: (res['delivered_upto_seq'] as int?) ?? 0,
+      readUptoSeq: (res['read_upto_seq'] as int?) ?? 0,
+    );
+  }
+
+  /// 拉取本 space 全部回执行（重连/补拉用）。
+  Future<List<ReceiptRow>> getReceipts(String token) async {
+    final res = await _get(Api.receipts, token: token);
+    return (res['receipts'] as List? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(ReceiptRow.fromJson)
+        .toList();
+  }
+
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body,
       {String? token, bool withToken = true}) {
     return _withRetry(() async {

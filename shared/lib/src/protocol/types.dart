@@ -26,6 +26,8 @@ class Api {
   static const spaceJoinPreflight = '/spaces/join/preflight';
   static const spaceJoin = '/spaces/join';
   static const spaceLookup = '/spaces/lookup';
+  // 消息回执（已送达/已读）单调高水位（POST 上报 / GET 回读）
+  static const receipts = '/receipts';
 }
 
 /// 认证挑战结果。
@@ -290,6 +292,32 @@ class PostMessageResult {
         messageId: json['message_id'] as String,
         serverSequence: json['server_sequence'] as int,
         createdAt: json['created_at'] as int,
+      );
+}
+
+/// 消息回执（已送达/已读）单调高水位，按 (space, person) 一行。
+///
+/// 语义：我的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
+/// `readUptoSeq ≥ S`。按 person 记 → "该 person 至少一台设备已收到/已读"
+/// （不保证其所有设备）。回执只前进，且 `deliveredUptoSeq ≥ readUptoSeq`。
+class ReceiptRow {
+  ReceiptRow({
+    required this.personId,
+    required this.deliveredUptoSeq,
+    required this.readUptoSeq,
+    required this.updatedAt,
+  });
+
+  final String personId;
+  final int deliveredUptoSeq;
+  final int readUptoSeq;
+  final int updatedAt;
+
+  factory ReceiptRow.fromJson(Map<String, dynamic> json) => ReceiptRow(
+        personId: json['person_id'] as String,
+        deliveredUptoSeq: (json['delivered_upto_seq'] as int?) ?? 0,
+        readUptoSeq: (json['read_upto_seq'] as int?) ?? 0,
+        updatedAt: (json['updated_at'] as int?) ?? 0,
       );
 }
 

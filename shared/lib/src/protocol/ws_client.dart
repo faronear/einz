@@ -13,6 +13,7 @@ const String kWsTypePeerOnline = 'peer.online';
 const String kWsTypePeerOffline = 'peer.offline';
 const String kWsTypePassphraseRotated = 'passphrase.rotated';
 const String kWsTypeProfileUpdated = 'profile.updated';
+const String kWsTypeReceiptUpdated = 'receipt.updated';
 
 /// WS 连接状态（App 据此切换轮询策略：connected → 降频兜底，断开 → 恢复高频轮询）。
 enum WsStatus { stopped, connecting, connected, reconnecting }
@@ -86,6 +87,20 @@ class WsProfileUpdatedEvent extends WsEvent {
   final String? personId;
   final String? personName;
   final String? deviceName;
+}
+
+/// 对方回执（已送达/已读）更新：单调高水位，按 person 一行。
+class WsReceiptUpdatedEvent extends WsEvent {
+  const WsReceiptUpdatedEvent({
+    required super.type,
+    required this.personId,
+    required this.deliveredUptoSeq,
+    required this.readUptoSeq,
+  });
+
+  final String personId;
+  final int deliveredUptoSeq;
+  final int readUptoSeq;
 }
 
 /// WS 实时客户端：连接 / 事件回调 / 自动重连（指数退避，上限 30s）。
@@ -244,6 +259,14 @@ class WsClient {
             personId: payload['person_id'] as String?,
             personName: payload['person_name'] as String?,
             deviceName: payload['device_name'] as String?,
+          ));
+          break;
+        case kWsTypeReceiptUpdated:
+          onEvent?.call(WsReceiptUpdatedEvent(
+            type: type,
+            personId: payload['person_id'] as String? ?? '',
+            deliveredUptoSeq: (payload['delivered_upto_seq'] as int?) ?? 0,
+            readUptoSeq: (payload['read_upto_seq'] as int?) ?? 0,
           ));
           break;
       }
