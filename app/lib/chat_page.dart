@@ -943,8 +943,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final picked = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        // ListView 而非 Column：档位变多时超出屏幕可滚动，避免底部溢出
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
             Padding(
               padding: const EdgeInsets.all(12),
