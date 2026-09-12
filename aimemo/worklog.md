@@ -2891,3 +2891,54 @@ SDK 元数据对不上、扩展级别 framework 可能骗过 AGP 的 API 上限�
   diff 嘈杂，弃用；`onTapOutside` 一行动作、覆盖范围还更全。
 
 commit `71477b1`（仅 `app/lib/chat_page.dart`）。
+
+## 2026-09-12 发送「即时上屏」优化（乐观 UI + 本地优先 + 状态指示）
+
+### 问题定位（不是单纯网速）
+老板反馈「按发送后消息要过好一会儿才出现在消息流」。查链路发现：`_send()`（chat_page）
+先 `await _repo.send()`（内含 `api.postMessage` 网络往返），再 `await _refresh()`——
+而 `_refresh()` 开头就 `await _repo.sync()`（`api.sync` 循环 + `_flushPending` 又一次
+POST），最后才读本地库上屏。但 `send()` 其实早已把消息写进本地库
+（`_insertLocal(status:'pending')`，毫秒级）。**结论：UI 被绑死在「上传+同步」多个网络
+往返之后，无论服务端多快都要等 2+ 次 RTT**。方案：把「上屏」与网络解耦。老板选定
+「1 乐观回显 + 2 本地优先刷新 + 3 状态指示（含失败重发）」全套。
+
+### 落地
+1. **乐观回显**：`MessageRepository.send()` / `sendAttachment()` 新增可选回调
+   `onPersisted(messageId)`，在 `_insertLocal` 之后、网络上传之前 await 调用（try/catch
+   包裹，回调异常绝不影响发送）。聊天页传 `onPersisted: (_) => _refreshLocal()`，
+   pending 气泡立即画出。附件在 `_insertLocal`（含附件元数据）之后回调，图片/视频可即时显示。
+2. **本地优先刷新**：新增 `ChatPageState._refreshLocal()`（纯本地：`tombstoneExpired`
+   + `historySince`），合并语义为「按 messageId 就地替换（刷新 pending→sent/failed 状态）
+   + 新 id 追加 + 墓碑单调」；有 `_initialLoaded` 守卫（未加载时 `_lastLoadedSequence=0`
+   会全量解密）。`_refresh()` 改为「先本地 → 再 sync → 再本地」；`_loadInitial()` 先
+   `historyRecent` 秒开，再 sync 覆盖。
+3. **状态指示 + 失败重发**：`HistoryMessage` 加 `status`（取自 `row.status`）；自己消息
+   时间行显示 🕓发送中 / ✓已发送 / ⚠️发送失败（红色，点按 `retryMessage` 重发）。
+   `send()` 仅在**有 token 且 postMessage 抛错**时标 `failed`（离线无 token 保持 pending，
+   保留离线入队）；附件 blob 上传失败不标 failed（v1 不补传附件）。`failed` **不**
+   自动重试（避免坏消息每 tick 刷屏），靠用户点按。新增 l10n 键
+   `chatPageMsgSending/Sent/Failed`（en+zh，已 `flutter gen-l10n`）。
+4. **顺带修 bug**：`_rowsToHistory` 现在从 `row.server_sequence` **回填** envelope——
+   此前本机发送的消息存的是落盘时的 ciphertext（无 seq），`_markSent` 只写列，导致
+   `env.serverSequence` 恒为 null，连累 `_lastLoadedSequence`、`_loadOlder`、
+   `_jumpToMessage`（自己消息在列表头时误判「没有更早历史」）。一并修好，也顺带把
+   增量刷新从「每次全量解密」降为「只取新增/pending」。
+
+### 验证
+- `app/test/message_repository_test.dart`：FakeApi 加 `failPostMessage`；新增 5 条用例
+  （failed 状态 / retryMessage 回填 seq / onPersisted 早于上传 / 附件回调 / 自己消息
+  sync 后 status+seq）。**19/19 通过**。
+- `flutter analyze lib` 无 error（仅 1 条既有 info）。
+- 全量 `flutter test`：15 条失败均为**既有环境性失败**（golden 像素差 + 向导/入口页
+  用例），已用干净 HEAD worktree 复现同样 15 条，确认与本改动无关；聊天页相关的
+  widget 测试（chat_initial_scroll / chat_page_menu / chat_bubble_gender）全过。
+
+### 决策点（重要）
+- `failed` 只对 postMessage 生效、且不自动重试——意味「短暂网络抖动」也会显示 ⚠️
+  需用户点一下。老板若觉得吵，可改成「failed 也纳入 `_flushPending` 自动补发」。
+- `_lastLoadedSequence` 的修复顺带修了分页/跳转的两个潜在 bug，但属行为变化，需真机
+  回归「上滑加载更早历史」「点引用卡跳转」。
+
+commit `730d6da`（app 源码 + 测试 + l10n 我的 hunk；老板在 `app_zh.arb` /
+`app_localizations_zh.dart` 里未提交的 `wizardPinHint` 改动**未**一并提交）。
