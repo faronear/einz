@@ -150,7 +150,7 @@
   "chatPageClearLockMessage": "Both PIN fields empty — clear the app lock? You'll enter directly next time.",
   "chatPageMenuInvite": "Invite code",
   "chatPageTitleBrand": "EINZ Private Space",
-  "chatPageMenuChangePassphrase": "Change passphrase",
+  "chatPageMenuChangePassphrase": "Passphrase",
   "chatPageMenuAvatar": "Avatar",
   "chatPageAvatarUploaded": "✅ Avatar updated",
   "chatPageAvatarTooLarge": "Image too large (max 2MB)",

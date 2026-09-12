@@ -187,7 +187,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseTooShort => '口令不得少于 8 位';
 
   @override
-  String get wizardPassphraseConfirmHint => '请再次输入口令';
+  String get wizardPassphraseConfirmHint => '再输一次以确认';
 
   @override
   String get wizardPassphraseMismatch => '两次输入的口令不一致';
@@ -328,7 +328,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogConfirmLabel => '确认 PIN';
 
   @override
-  String get setPinDialogConfirmHint => '再输一遍以确认';
+  String get setPinDialogConfirmHint => '再输一次以确认';
 
   @override
   String get setPinDialogSetPin => '设置 PIN';

@@ -833,7 +833,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuChangePassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Change passphrase'**
+  /// **'Passphrase'**
   String get chatPageMenuChangePassphrase;
 
   /// No description provided for @chatPageMenuAvatar.
