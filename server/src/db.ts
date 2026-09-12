@@ -135,6 +135,19 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       created_at        INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_join_tokens_space ON join_tokens (space_id, used_at);
+
+    -- 消息回执（已送达/已读）单调高水位：按 (space, person) 一行。
+    -- 语义：我的消息 seq=S 已送达 ⟺ 对方 delivered_upto_seq ≥ S；已读 ⟺ read_upto_seq ≥ S。
+    -- 按 person 记 → "该 person 至少一台设备已收到/已读"（不保证所有设备）。
+    -- 不变式：只前进；delivered_upto_seq ≥ read_upto_seq（读隐含送达）。
+    CREATE TABLE IF NOT EXISTS receipts (
+      space_id           TEXT NOT NULL,
+      person_id          TEXT NOT NULL,
+      delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
+      read_upto_seq      INTEGER NOT NULL DEFAULT 0,
+      updated_at         INTEGER NOT NULL,
+      PRIMARY KEY (space_id, person_id)
+    );
   `);
 
   // 迁移：messages 表补充 sender_person_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）

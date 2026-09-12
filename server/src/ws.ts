@@ -74,6 +74,24 @@ export function broadcastPassphraseRotated(exceptDeviceId: string): void {
   }
 }
 
+/** 消息回执（已送达/已读）更新：通知同 Space 的其他设备。
+ *  用 spaceOfDevice（带 sessions 兜底）——上报设备可能没有活跃 WS 连接
+ *  （移动端切后台后仍在同步）。 */
+export function broadcastReceiptUpdated(
+  exceptDeviceId: string,
+  payload: { person_id: string; delivered_upto_seq: number; read_upto_seq: number }
+): void {
+  const spaceId = spaceOfDevice(exceptDeviceId);
+  if (spaceId == null) return;
+  for (const [deviceId, conn] of conns) {
+    if (deviceId === exceptDeviceId) continue;
+    if (conn.spaceId !== spaceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(JSON.stringify({ id: 0, type: "receipt.updated", payload }));
+    }
+  }
+}
+
 /** 改名/改设备名：通知其余在线设备立即更新对方名称（App/TUI 顶部条）。 */
 export function broadcastProfileUpdated(
   exceptDeviceId: string,

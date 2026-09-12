@@ -4,6 +4,7 @@ import { loadConfig, type ServerConfig } from "./config.js";
 import { getDb, openDb } from "./db.js";
 import { cleanupExpired, ApiError, createChallenge, resolveSession, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
+import { getReceipts, postReceipts } from "./receipts.js";
 import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./attachments.js";
 import { getAvatar, storeAvatar } from "./avatars.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
@@ -211,6 +212,16 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const after = Number(url.searchParams.get("after") ?? 0);
     const limit = Number(url.searchParams.get("limit") ?? 100);
     sendJson(res, 200, syncMessages(cfg, token, after, limit));
+    return;
+  }
+  // 消息回执（已送达/已读）：单调高水位，按 (space, person) 一行
+  if (method === "POST" && path === "/receipts") {
+    const body = await readJson(req);
+    sendJson(res, 200, postReceipts(cfg, bearer(req), body));
+    return;
+  }
+  if (method === "GET" && path === "/receipts") {
+    sendJson(res, 200, getReceipts(cfg, bearer(req)));
     return;
   }
 
