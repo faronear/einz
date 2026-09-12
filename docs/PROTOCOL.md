@@ -70,6 +70,8 @@
 | POST | /push/register | 注册 Push Token | Bearer |
 | DELETE | /push/register | 注销 Push Token | Bearer |
 | GET | /space | 空间信息（space_id、成员设备） | Bearer |
+| POST | /receipts | 上报自己的送达/已读高水位（§5.4） | Bearer |
+| GET | /receipts | 拉取本 space 全部回执行（§5.4） | Bearer |
 
 > V1 无用户账号、无动态配对、无空间管理 REST（配置在安装阶段完成，productLens §9.3）。
 
@@ -124,6 +126,64 @@
 
 - `server_sequence` 是**每个 Space 内**单调递增的全局序号，**不使用时间戳**排序（E2EE.md/产品文档 §9.2）。
 - Server 先持久化（分配序号）→ 再广播给对端 WS / 触发推送（§8）。
+
+### 5.4 消息回执（已送达 / 已读）
+
+回执**不是逐条 ACK**，而是按 `(space_id, person_id)` 存一条**单调高水位（HWM）**：
+
+```sql
+receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
+  PRIMARY KEY (space_id, person_id)
+```
+
+推导（客户端）：我的消息 `seq = S` ——
+
+- **已送达** ⟺ 对方 `delivered_upto_seq ≥ S`
+- **已读** ⟺ 对方 `read_upto_seq ≥ S`
+
+不变式（**服务端强保证**，客户端无需信任对端）：
+
+- 只前进：upsert 用 `MAX(...)`，回退的上报被忽略。
+- `delivered_upto_seq ≥ read_upto_seq`：读隐含送达。
+- 夹紧到本 space 真实 `MAX(server_sequence)`，防止有 bug 的客户端上报未来序号。
+
+语义取舍（明确）：
+
+- 按 **person** 记 → "该 person **至少一台**设备已收到/已读"，不保证其所有设备。
+- HWM 是粗粒度：`read_upto_seq = N` 会把发送方所有 ≤N 的消息一并标为已读
+  （与主流 IM 一致）。因此**上报侧必须严格把关**（见下），否则会虚标。
+
+#### POST /receipts（上报自己的高水位）
+
+```json
+// 请求（两个字段都可缺省，未给的视为 0）
+{ "delivered_upto_seq": 12, "read_upto_seq": 10 }
+// 响应（服务端夹紧后的当前值）
+{ "delivered_upto_seq": 12, "read_upto_seq": 10 }
+```
+
+#### GET /receipts（拉取本 space 全部回执行）
+
+```json
+{ "receipts": [ { "person_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10, "updated_at": 1789215936509 } ] }
+```
+
+重连/补拉用；实时路径是 WS `receipt.updated`（§8）。
+
+#### 上报时机（决定会不会虚标）
+
+- **已送达**：本设备确实收到了 → `delivered_upto_seq = 本端同步锚点`。
+  含首屏/断线回填，安全（"收到"是客观事实）。
+- **已读**：只在用户真的看到时上报。
+  - App：`AppLifecycleState.resumed` **且**聊天页是最上层 **且**列表贴底，
+    且只统计**已渲染到屏幕上**的对方消息（post-frame 判定，不用 DB 最大值）。
+  - CLI/TUI：终端全程可见且总滚到最新，故 sync/WS 上屏后即上报（与 App 的
+    "在前台 + 看到最新"同一语义）。代价：离线期间的历史在下次启动同步后会被
+    标为已读——高水位模型的固有语义（主流 IM 相同）。
+- 单调 + 本地防抖：未前进就不发；重复上报因服务端夹紧是幂等 no-op。
+
+> 当前状态：回执已在协议/服务端/两端客户端打通并落库，但 **UI 暂不展示**
+> （气泡状态图标仍只有「发送中 / 已发送 / 失败」三种），展示待后续启用。
 
 ---
 
@@ -242,7 +302,7 @@ wss://host/ws?pv=1&token=<session_token>
 | S→C | `message.new` | `{ "message": {…信封…}, "server_sequence": 105 }` | 对端新消息（已持久化后广播） |
 | C→S | `ping` / S→C `pong` | — | 心跳（30s 间隔） |
 | S→C | `sync.advance` | `{ "last_sequence": 105 }` | 提示有新数据，可拉 /sync |
-| S→C | `delivery` | `{ "message_id": "…", "status": "delivered" }` | 投递状态 |
+| S→C | `receipt.updated` | `{ "person_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
 | S→C | `key.rotation` | `{ "key_version": 2 }` | 触发客户端执行 Space Key 轮换 |
 | S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话 |
 | S→C | `peer.online` | `{ "device_id": "dev1" }` | 对端设备上线（WS 连接建立时广播） |

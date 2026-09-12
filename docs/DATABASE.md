@@ -81,8 +81,19 @@ CREATE TABLE challenges (
 CREATE TABLE sessions (
     session_token TEXT PRIMARY KEY,
     device_id     TEXT NOT NULL,
+    space_id      TEXT,                    -- Multiverse：会话绑定空间（v1 legacy 为 NULL）
     expires_at    INTEGER NOT NULL,
     created_at    INTEGER NOT NULL
+);
+
+-- 消息回执（已送达/已读）单调高水位，按 (space, person) 一行（PROTOCOL.md §5.4）
+CREATE TABLE receipts (
+    space_id           TEXT NOT NULL,
+    person_id          TEXT NOT NULL,
+    delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
+    read_upto_seq      INTEGER NOT NULL DEFAULT 0,
+    updated_at         INTEGER NOT NULL,
+    PRIMARY KEY (space_id, person_id)
 );
 ```
 
@@ -91,6 +102,9 @@ CREATE TABLE sessions (
 - `messages.server_sequence` 全局唯一（UNIQUE）：Server 分配即锁定，用于 `/sync?after=`。
 - 附件必须先有 message（外键约束）。
 - `challenges` / `sessions` 是短期数据：定期清理过期行（如每小时一次）。
+- `receipts` 只前进：上报用 `MAX()` upsert（回退值被忽略），且
+  `delivered_upto_seq ≥ read_upto_seq`（读隐含送达），并夹紧到本 space 真实
+  `MAX(server_sequence)`。按 person 记 = "该 person 至少一台设备已收到/已读"。
 
 ---
 
@@ -110,7 +124,12 @@ CREATE TABLE local_messages (
     ciphertext       TEXT NOT NULL,
     server_sequence  INTEGER,              -- NULL = 尚未同步（pending 或失败）
     created_at       INTEGER NOT NULL,
-    status           TEXT NOT NULL DEFAULT 'pending',  -- pending|sent|delivered|read|failed
+    -- **出站流水线**语义：pending|sent|failed
+    --   pending = 本地队列/发送中；sent = 服务端已收下；failed = 发送失败（可重发）
+    -- 注意：sync() 会把**入站**（对方）消息写成 'delivered'——那是历史遗留的
+    --   "我收到了"标记，与"对方收到了我的消息"无关；真正的送达/已读回执不在这
+    --   张表里，见下方 peer_receipts 与服务端 receipts（PROTOCOL.md §5.4）。
+    status           TEXT NOT NULL DEFAULT 'pending',
     local_created_at INTEGER NOT NULL
 );
 
@@ -132,6 +151,16 @@ CREATE TABLE local_attachments (
 CREATE TABLE sync_state (
     space_id             TEXT PRIMARY KEY,
     last_server_sequence INTEGER NOT NULL DEFAULT 0
+);
+
+-- 对方回执（已送达/已读）单调高水位（App v6 起；本协议只落库，UI 暂不展示）
+CREATE TABLE peer_receipts (
+    space_id           TEXT NOT NULL,
+    person_id          TEXT NOT NULL,      -- 对方身份锚点（同人多设备共享一行）
+    delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
+    read_upto_seq      INTEGER NOT NULL DEFAULT 0,
+    updated_at         INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (space_id, person_id)
 );
 
 -- 草稿
