@@ -2942,3 +2942,24 @@ POST），最后才读本地库上屏。但 `send()` 其实早已把消息写进
 
 commit `730d6da`（app 源码 + 测试 + l10n 我的 hunk；老板在 `app_zh.arb` /
 `app_localizations_zh.dart` 里未提交的 `wizardPinHint` 改动**未**一并提交）。
+
+## 2026-09-12 创建向导：口令需二次输入确认
+
+- 现象：`create`（首台设备）向导的「设置密保口令」页只有一个输入框，输一次就过；
+  口令错了再也进不去（无二次确认）。`join` 是验证已有口令，无需确认。
+- 改法（`app/lib/setup_page.dart`）：
+  - 新增 `_escrowPassphraseConfirm` 控制器（含 dispose）；
+  - `_buildStepPassphrase` 仅在 `_role == create` 时渲染第二个口令框（obscure，
+    hint=「请再次输入口令」）；
+  - `_nextStep` 本地校验：create 且口令非空但两次 `trim()` 不一致 → 红字
+    「两次输入的口令不一致」并停留本页；一致才放行进 PIN 步骤。
+- l10n：新增 `wizardPassphraseConfirmHint` / `wizardPassphraseMismatch`（en+zh，
+  已 `flutter gen-l10n`）。
+- 测试：`app/test/wizard_envelope_entry_test.dart` 新增 3 条——create 页两个输入框、
+  join 页一个、create 不一致拦截 / 一致放行（复用该文件已有的 `pumpToPassphrase`）。
+  该文件 6/6 通过；全量 `flutter test` 仍是那 15 条既有环境性失败（未增加）。
+- 注意：golden `setup_step1.1.3_passphrase.png`（create 口令页）因多了确认框已过期，
+  下次 `--update-goldens` 时需一并更新；本机 golden 本来就整体失配（环境/字体），
+  故未单独重生。
+
+commit `af51c16`。
