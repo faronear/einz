@@ -3078,3 +3078,22 @@ commit `7c3bcab`。
   换 token（`_verifyJoinToken`）或退回第 1 页（`_backStep`）时一并清空该标记。
 - 新增用例「PIN 页退回口令页再前进：不重复消费 token（仍能进 PIN 页）」：
   fake joinSpace 第二次调用即抛 `TOKEN_USED`，断言 `joinCalls == 1` 且仍能进 PIN 页。
+
+### 邀请码（token）验证通过后即锁定（`8fe58fa`）
+
+老板随后指出：join 第 1 步「验证邀请码」一旦成功，就该把输入框变成**不可编辑**，
+并且之后回到该页再点「下一步」**不要再校验邀请码**——因为 token 已被 joinSpace
+消费，重校验必然失败，等于把已经验过口令的用户卡死在第一步。
+
+- 新增 state `_joinTokenVerified`：`_verifyJoinToken` 成功置 true、ApiException 置
+  false；回入口页重选角色（`_backStep` 的 `_step == 1` 分支）时清空。
+- `_buildStepJoinToken`：`readOnly: _joinTokenVerified` + 灰底（`filled`/`fillColor`），
+  并禁用扫码按钮（否则扫一下就会覆盖已验证的 token）。
+- `_nextStep`：join 第 1 步的校验条件改为 `&& !_joinTokenVerified`——**只校验一次**。
+  （注意：这推翻了 2026-09-11 定的"每次点下一步都按当前输入重校验"——那条在
+  "token 会被消费"的前提下是错的；已在代码注释里写明原因。）
+- **口令页（第 3 步）保持每次「下一步」都发后台重新验证口令**（老板明确要求）。
+  它安全：`fetchSpaceEscrow` + `openPackage` 不消耗任何东西；被跳过的是 `joinSpace`。
+- 新增用例「邀请码验证通过后即锁定：退回本页再前进不重复校验」：fake preflight
+  第二次调用即抛 `TOKEN_USED`，断言 `preflightCalls == 1`、退回后输入框
+  `readOnly == true`、再前进直接放行。**已验证该用例在改动前会失败。**
