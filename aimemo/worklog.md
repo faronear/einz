@@ -2991,3 +2991,45 @@ commit `5d24df8`（创建向导）、`d9d9199`（重设弹窗）。
 > （未提交），故只单独提交了本段追加；老板的重排改动仍在工作区未提交。同理
 > `app_zh.arb` / `app_localizations_zh.dart` 里老板的文案微调（「再输一次以确认」）
 > 也未并入上述提交，已原样保留在工作区。
+
+## 2026-09-12 TUI 加入秘境：口令错被踢回邀请码（真因：先 join 烧了 token）
+
+- **现象（老板反馈）**：`/space join` 走到「验证密保口令」，输错一次 →
+  `⚠️ 加入秘境失败: ApiException(ESCROW_VERIFY_FAILED): 口令错误`，随后回到
+  `❓ 输入邀请码:`，而刚被接受的邀请码已作废、不能再用。
+- **真因（不是"提示文案"问题）**：`_spaceJoin` 的调用顺序是 **先 `joinSpace`
+  后验口令**。`joinSpace` 会消费 24h 一次性的 join token；口令错时异常（`ApiException`
+  `ESCROW_VERIFY_FAILED`，注意它**不是** `FormatException`，所以没走"口令错误"分支，
+  而是落到通用 `catch (e)` 打印「加入秘境失败」后 return）——token 已烧、流程已退出，
+  于是回到邀请码。**输几次错口令就废几个 token。**
+- **改法（`cli/bin/einz_tui.dart` 的 `_spaceJoin`）**：改为**先验口令再 join**——
+  用 `preflightJoin` 已返回的 `pre.spaceId` 调 `POST /spaces/{id}/key-escrow`
+  （`fetchSpaceEscrow`，**不消费 token**，服务端只校验 space 存在 + argon2id 比对）；
+  并把 `openPackage` 一并放进校验循环（口令对但包不匹配也当口令错误）。
+  - 捕获 `ApiException` 且 `code == 'ESCROW_VERIFY_FAILED'`、以及 `FormatException`
+    → 提示「口令错误，请重新输入（或输入 /exit 退出）」**后 continue 重问**；
+  - 其他 `ApiException` 一律 `rethrow` 交给外层通用失败分支；
+  - 只有验过口令才调用 `joinSpace`（token 全程只消费一次）；
+  - `/exit` 逃生门保留：输入循环置 `_state.running=false` 并中止 pending prompt，
+    循环顶部 `if (!_state!.running) return;` 退出。
+- **服务端契约（已核对）**：`server/src/escrow.ts` 的 `escrowForSpace` 只查 space 是否
+  存在，**无 session/成员鉴权**——所以"未加入先验口令"是允许的；口令错 → 401
+  `ESCROW_VERIFY_FAILED`，无密保箱 → 404 同码（后者仍按原样提示后 return，不重试）。
+- **回归测试**：`cli/test/guide_input_rules_check.py` 的 join 段改为
+  「留空拦下 → **故意输错** → 必须停在口令环节且不能出现"加入秘境失败"/"输入邀请码"
+  → 同一个 token 补输正确口令后加入成功」。
+  - 已在**旧代码**上跑过一次确认能复现老板报的现象（输出正是
+    `⚠️ 加入秘境失败: ApiException(ESCROW_VERIFY_FAILED): 口令错误` + `❓ 输入邀请码:`）；
+    新代码 3 项全过。
+  - 顺带修了该脚本两处**过期断言**：锁屏码成功提示已由「锁屏码已设置」改为
+    「✅ 锁屏码 🔢 已设置」（含 emoji 且渲染插 ANSI 着色，无法整串匹配），改用全 TUI
+    唯一的 `🔢` 作判定锚点——否则脚本卡在这里、根本跑不到 join 段。
+- `dart analyze bin/einz_tui.dart` 0 issue。
+
+commit `7c3bcab`。
+
+### 待确认：App 端有同源问题（未改）
+`app/lib/setup_page.dart` 的 `_runJoinAccess` 同样是「先 `joinSpace` 再
+`fetchSpaceEscrow`」，口令输错也会烧掉 token，重试时 token 已失效（向导会停在口令页
+但补发会失败）。修法同 TUI：把 `preflightJoin` 的 `pre.spaceId` 存到 state（目前只存了
+`_joinToken`/`_joinSpaceName`/`_joinSlots`），先验口令再 join。**老板未要求，暂未改动。**
