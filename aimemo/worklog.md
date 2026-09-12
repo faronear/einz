@@ -2870,3 +2870,24 @@ SDK 元数据对不上、扩展级别 framework 可能骗过 AGP 的 API 上限�
 - 产物：`app/build/app/outputs/flutter-apk/app-release.apk`（直接侧载给朋友，非 Play 商店）。
 - 注意：release 构建**绝不**加 `--dart-define-from-file=local_config.json`（会指向 localhost
   开发服务器）。keystore/key.properties 是 gitignore 的本地文件，换机需一并带走并备份。
+
+## 2026-09-12 App 聊天页两处观感修正（老板反馈）
+
+### 1) 视频全屏：半透明遮罩 → 纯黑铺满（对齐图片）
+- 现象：点图片全屏是纯黑背景很显眼；点视频全屏却是默认 `Dialog`——四周露出
+  半透明 barrier、视频缩在圆角小卡里，观感不统一。
+- 改法：`_VideoPreview._playFullscreen` 的 `Dialog` 加 `backgroundColor: Colors.black`
+  + `insetPadding: EdgeInsets.zero`，内部改 `Positioned.fill > Center > AspectRatio`
+  按原比例居中，与 `_showFullImage` 完全一致；`barrierDismissible: true` 保持点空白关闭。
+- 位置：`app/lib/chat_page.dart` 的 `_VideoPreviewState._playFullscreen`。
+
+### 2) 发送后键盘常驻：点输入框外任意处收起
+- 现象：发送消息后虚拟键盘不自动收起，挡住消息流下半屏，想多看消息得手动按返回键。
+- 改法：给聊天页输入 `TextField` 加 `onTapOutside: (_) => FocusManager.instance
+  .primaryFocus?.unfocus()`。移动端 `TextField.onTapOutside` 默认不处理焦点（这正是
+  键盘不收起的原因），显式 unfocus 即可：点消息列表/空白/其他控件都会收键盘。
+- 位置：`app/lib/chat_page.dart` 输入栏内 `TextField`（约 2568 行）。
+- 说明：曾试过用 `GestureDetector` 包住 `ListView`，但会把整段列表缩进改动一大片、
+  diff 嘈杂，弃用；`onTapOutside` 一行动作、覆盖范围还更全。
+
+commit `71477b1`（仅 `app/lib/chat_page.dart`）。
