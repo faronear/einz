@@ -311,7 +311,7 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
   while (true) {
     if (!_state!.running) return;
     final pin = await _prompt(session,
-        '❓ 设置锁屏码（$_kPinMinLength 位数字。以后每次进入秘境需要输入；也可暂时留空跳过，以后用 /pin 重设）:',
+        '❓ 设置锁屏码（$_kPinMinLength 位数字。以后每次进入秘境需要解锁；也可暂时留空跳过，以后随时用 /pin 重设）:',
         hidden: false);
     if (!_state!.running) return;
     if (pin.isEmpty) {
@@ -326,7 +326,7 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
     }
     session.store.pinHash = await _hashPin(pin);
     session.store.save(storePath);
-    session.messages.add(_systemMessage(session, '✅ 锁屏码已设置'));
+    session.messages.add(_systemMessage(session, '✅ 锁屏码 🔢 已设置'));
     break;
   }
   session.messages.add(_systemMessage(session, '----------------'));
@@ -858,7 +858,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       spaceId: spaceId,
       keyVersion: 1,
     );
-    session.messages.add(_systemMessage(session, '✅ 口令已设置。请将口令通过安全的方式分享给秘境伴侣。'));
+    session.messages.add(_systemMessage(session, '✅ 口令已设置。请将口令通过安全的方式分享给伴侣。'));
     session.messages.add(_systemMessage(session, '----------------'));
     final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
       spaceId: spaceId,
@@ -880,7 +880,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     store.personName = displayName;
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
-    session.messages.add(_systemMessage(session, '📎 邀请链接（24 小时有效、仅可用一次）：\n${created.link}'));
+    // session.messages.add(_systemMessage(session, '📎 邀请新设备（24 小时有效、仅可用一次）：\n ${created.link}\n🛡️  ${created.joinToken}''));
     session.messages.add(_systemMessage(session, '----------------'));
     _onboarded = true;
     _scheduleRender();
@@ -2603,9 +2603,7 @@ Future<void> _execInvite() async {
     final api = ApiClient(store.server ?? '');
     final r = await _busy(s.session, '⏳ 邀请生成中......', () => api.createJoinToken(store.spaceId!));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
-    s.session.messages.add(_systemMessage(s.session, '📎 新设备绑定邀请（24 小时有效、仅可用一次）：\n${r.link}'));
-    s.session.messages.add(_systemMessage(s.session, '   token: ${r.joinToken}'));
-    s.session.messages.add(_systemMessage(s.session, '✅ 新设备输入 /space join <链接或 token> 即可绑定'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 邀请新设备，24 小时内一次性有效：\n📎 ${r.link}\n🛡️  ${r.joinToken}'));
     s.status = ''; // 反馈在消息区，状态栏保持干净
   } catch (e) {
     s.session.messages.add(_systemMessage(s.session, '❌ 邀请生成失败: $e'));
