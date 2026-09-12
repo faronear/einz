@@ -3097,3 +3097,49 @@ commit `7c3bcab`。
 - 新增用例「邀请码验证通过后即锁定：退回本页再前进不重复校验」：fake preflight
   第二次调用即抛 `TOKEN_USED`，断言 `preflightCalls == 1`、退回后输入框
   `readOnly == true`、再前进直接放行。**已验证该用例在改动前会失败。**
+
+## 2026-09-12 App「修改口令」恒报「尚未设置口令（无口令密保箱可修改）」——真因在服务端
+
+**症状**：`chat_page.dart` 的改口令弹窗，无论输入什么都红字提示"尚未设置口令"。
+
+**真因不是改口令页面，是 v1 与 Multiverse 的密保箱存了两套地方**：
+- Multiverse 的口令密保箱按 **space** 存：`key_escrow WHERE space_id = <真实 spaceId>`
+  （创建空间时由 `POST /spaces` 写入；加入方从 `POST /spaces/{id}/key-escrow` 取）。
+- 但服务端 v1 三接口 `uploadKeyEscrow` / `getKeyEscrow` / `deleteKeyEscrow`
+  （`server/src/escrow.ts`）此前一律**硬编码 `space_id = ''`**——那是永远不会被
+  Multiverse 写入的空行。于是 `getKeyEscrow` 恒返回 `{}`，App 拿到 `file == null`
+  → 无条件抛 `_NoEscrowException` → "尚未设置口令"。
+
+**实测复现**（起真服务端 + curl）：
+```
+创建空间（带口令托管）                    → spaceId=283b09b2-...
+space 级 POST /spaces/{id}/key-escrow     → {"ok":true,"package":{...}}   ✅
+v1    GET  /key-escrow（App 读的就是它）   → {}                            ❌
+```
+
+**连带影响（同一根因，四处全坏）**：
+- `chat_page.dart:2952` 改口令读取 → 症状本身
+- `chat_page.dart:2965` 改口令上传 → 写到 `space_id=''`，**加入方拉到的仍是旧口令**
+- `chat_page.dart:419` 口令重设检测（读 `updatedAt`）→ 检测不到对方重设
+- `lock_page.dart:108/121` 解锁后 `_syncEscrow` → 读写错行
+
+**改法（选项 A，老板选定）**：`resolveSession()` 本来就返回 `space_id`，提取一个
+`escrowSpaceId(token)` helper（无 space 的 legacy 会话回落 `""`，保持旧行为），
+三个 v1 接口的 `""` 全部换成它。**App 一行未改**，四处同时修好。
+- 关键判断：没有让 App 改用 space 级接口——`POST /spaces/{id}/key-escrow`
+  **无鉴权**（`app.ts:173` 未调 `resolveSession`），任何人知道 spaceId 就能覆盖
+  密保箱把人锁死；且它不支持 `rotated` 广播。v1 接口带 session 鉴权+设备白名单，
+  改它才是对的。
+
+**验证**：
+- `npm run build`（tsc）已重编 `server/dist`（dist 未纳入 git，不产生提交噪音）。
+- `npm test`（smoke + two_space_isolation）全过——说明 legacy 无 space 会话的
+  `""` 回落没被破坏。
+- 复跑同一组 curl：v1 `GET /key-escrow` 现在返回包；`rotated:true` 上传后包被替换、
+  `updated_at` 推进；DB 里只有一行且 `space_id` 为真实 spaceId（无残留空行）。
+- `cli/test/guide_input_rules_check.py` 复跑 3 项全过（join 链路未受影响）。
+
+commit `56e43fd`。**需老板重启服务端生效**（部署/重启归老板，我只交付代码）。
+
+**遗留（本次未做）**：`POST /recover`（全丢恢复）同样读 `space_id=''`，在 Multiverse
+下本就失效——是既有问题，非本次回归；要不要修需先定"无鉴权时按哪个 space 找回"的规则。
