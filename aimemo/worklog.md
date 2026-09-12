@@ -3143,3 +3143,46 @@ commit `56e43fd`。**需老板重启服务端生效**（部署/重启归老板�
 
 **遗留（本次未做）**：`POST /recover`（全丢恢复）同样读 `space_id=''`，在 Multiverse
 下本就失效——是既有问题，非本次回归；要不要修需先定"无鉴权时按哪个 space 找回"的规则。
+
+## 2026-09-12 气泡状态小图标调整 + 修「发送后状态卡在发送中」
+
+### 一、图标调整（老板要求）
+- **发送状态小标移到时间戳前面**（`chat_page.dart` 时间行 children 顺序改为：
+  状态标 → 时间 → 沙漏+焚毁时长）。原来放末尾，会被阅后即焚的标记插到中间/后面。
+- **阅后即焚图标改沙漏**：新增私有 `_BurnHourglass`（文件末尾），在
+  `Icons.hourglass_top ↔ hourglass_bottom` 之间缓慢翻转（`AnimationController`
+  1600ms `repeat(reverse: true)`），替掉原 `Icons.schedule`。颜色不指定 → 继承
+  IconTheme（渐变风格自动白系）。说明：11px 下做"按剩余时间精确流沙"看不清且需
+  逐秒驱动，故用循环翻转表达"时间在走"；已确认 ListView 里只有可见项在动。
+- **发送中图标改纸飞机**（`Icons.send`，11px），替掉 `Icons.access_time`——原来与
+  阅后即焚的时钟撞字形。
+- 已跑 chat 相关 4 个测试文件 23/23 通过（确认常驻动画没有卡住 `pumpAndSettle`）。
+
+### 二、修复：对方已收到，本端却一直显示「发送中」（老板实测，偶发）
+
+**真因是竞态，不是网络**：`_refreshLocal` 的增量读取
+`historySince(afterSequence: _lastLoadedSequence)` 用的是"本地已加载最大
+server_sequence"这个**高水位**，只取 seq 更大的行。而本机自己发的消息，seq 是
+`postMessage` 之后才由服务端分配回填的：
+1. 发出 A → 服务端分配 seq=11（响应在途中）；
+2. 这期间恰好先把一条 seq=12 的对方消息并入了列表 → 高水位抬到 12；
+3. `_markSent(A, 11)` 落库；
+4. 之后 `historySince(12)` 永远取不到 A（11 既不大于 12、也不再是 NULL）→ A 在
+   内存里的状态**永久停在 pending** → 纸飞机不变成对勾。重启/重新载入列表才会自愈。
+
+**改法**：
+- `message_repository.dart` 新增 `historyByMessageIds(List<String>)`（按 id 批量
+  解密读本地行）。
+- `chat_page.dart` 的 `_refreshLocal` 在增量 `historySince` 之外，额外把**列表里仍
+  标 pending/failed 的消息**按 id 重读一遍并合并（同 id 以这次读的为准）——这类
+  消息的状态一定还会变，必须无条件再对齐一次，才能不受 seq 顺序影响而收敛。
+  正常情况 inflightIds 为空，零额外查询。
+
+**回归测试**：新增 `app/test/chat_send_status_test.dart`——fake `postMessage` 故意
+返回**低于本地高水位**的 seq（对方消息 seq=10，本机发送回填 seq=5）来确定性复现
+该竞态；断言发送后气泡出现 `Icons.check`（已发送）。已把补偿代码临时禁用验证过
+该用例会失败，恢复后通过。
+
+全量 `flutter test` 仍是那 15 条既有环境性失败（未增加）；`flutter analyze` 0 error。
+
+commit `cb48948`。
