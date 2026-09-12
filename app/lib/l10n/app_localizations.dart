@@ -1136,6 +1136,24 @@ abstract class AppLocalizations {
   /// **'Send failed: {error}'**
   String chatPageSendFailed(String error);
 
+  /// No description provided for @chatPageMsgSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get chatPageMsgSending;
+
+  /// No description provided for @chatPageMsgSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get chatPageMsgSent;
+
+  /// No description provided for @chatPageMsgFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Send failed, tap to retry'**
+  String get chatPageMsgFailed;
+
   /// No description provided for @chatPageVoiceStartFailed.
   ///
   /// In en, this message translates to:

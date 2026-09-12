@@ -231,6 +231,9 @@
       "error": {"type": "String"}
     }
   },
+  "chatPageMsgSending": "发送中…",
+  "chatPageMsgSent": "已发送",
+  "chatPageMsgFailed": "发送失败，点击重试",
   "chatPageVoiceStartFailed": "录音启动失败: {error}",
   "@chatPageVoiceStartFailed": {
     "placeholders": {

@@ -29,6 +29,9 @@ class FakeApi extends ApiClient {
   /// 是否让附件上传抛异常（模拟服务端 500 等上传失败）。
   bool failAttachmentUpload = false;
 
+  /// 是否让消息发送（postMessage）抛异常（模拟发送失败）。
+  bool failPostMessage = false;
+
   @override
   Future<SpaceResult> getSpace(String token) async {
     return SpaceResult(spaceId: 'space-test', devices: spaceDevices);
@@ -36,6 +39,7 @@ class FakeApi extends ApiClient {
 
   @override
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
+    if (failPostMessage) throw Exception('post message failed');
     posted.add(env.messageId);
     return PostMessageResult(messageId: env.messageId, serverSequence: posted.length, createdAt: 1000);
   }
@@ -272,6 +276,66 @@ void main() {
     expect(await repo.lastSequence, 0, reason: 'send 不应推进锚点（锚点只随 /sync 推进）');
   });
 
+  test('发送失败：有 token 但 postMessage 抛错 → status=failed（不计入 pending）', () async {
+    final api = FakeApi()..failPostMessage = true;
+    final repo = makeRepo(api, token: 'tok');
+
+    await repo.send('会失败的消息');
+
+    final hist = await repo.history();
+    expect(hist.single.status, 'failed');
+    expect(hist.single.sender, 'me');
+    expect(await repo.pendingCount, 0, reason: 'failed 与 pending 区分：不自动重发');
+  });
+
+  test('重发：retryMessage 成功后置 sent 且回填 server_sequence', () async {
+    final api = FakeApi()..failPostMessage = true;
+    final repo = makeRepo(api, token: 'tok');
+    await repo.send('待重发');
+    final failed = (await repo.history()).single;
+    expect(failed.status, 'failed');
+
+    api.failPostMessage = false;
+    await repo.retryMessage(failed.env.messageId);
+
+    final h = (await repo.history()).single;
+    expect(h.status, 'sent');
+    expect(h.env.serverSequence, isNotNull, reason: '重发成功后 server_sequence 应回填到信封');
+    expect(api.posted.length, 1);
+  });
+
+  test('乐观回调：本地落库后、上传前触发，此时为 pending', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    String? observed;
+    var beforeUpload = false;
+
+    await repo.send('乐观回显', onPersisted: (id) async {
+      observed = (await repo.historySince(afterSequence: 0)).single.status;
+      beforeUpload = api.posted.isEmpty; // 回调时尚未 postMessage
+    });
+
+    expect(observed, 'pending', reason: '回调触发时消息应已在本地库且为 pending');
+    expect(beforeUpload, isTrue, reason: '应在上传之前回调（才能乐观回显）');
+  });
+
+  test('附件乐观回调：在 postAttachment 之前触发，且附件元数据已落库', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    var metaReady = false;
+
+    await repo.sendAttachment(
+      fileBytes: Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10]), // PNG magic
+      fileName: 'image.jpg',
+      type: 'image',
+      onPersisted: (_) async {
+        metaReady = (await repo.historySince(afterSequence: 0)).single.attachment != null;
+      },
+    );
+
+    expect(metaReady, isTrue, reason: '回调时附件元数据应已落库（图片/视频可即时显示）');
+  });
+
   test('同步：翻页拉全量落库 + attachments_meta + 锚点推进', () async {
     final api = FakeApi();
     // 两页：第 1 页 2 条 + hasMore，第 2 页 1 条
@@ -330,6 +394,22 @@ void main() {
 
     expect(await repo.sync(), 1);
     expect(await repo.sync(), 0, reason: '锚点已到 1，二次 sync 应无新增');
+  });
+
+  test('同步回来的自己消息：status=sent 且信封回填 server_sequence（分页/锚点依赖）', () async {
+    final api = FakeApi();
+    final env = await _makeEnv(spaceKey, 'dev-a', 'msg-own', '我自己发的');
+    api.pages = [
+      (messages: [env], attachmentsMeta: <Map<String, dynamic>>[], lastSequence: 1, hasMore: false),
+    ];
+    final repo = makeRepo(api, token: 'tok');
+    await repo.sync();
+
+    final h = (await repo.history()).single;
+    expect(h.sender, 'me');
+    expect(h.status, 'sent');
+    expect(h.env.serverSequence, isNotNull,
+        reason: '本机发送的消息 ciphertext 无 seq，应从列回填（否则分页/增量锚点误判）');
   });
 
   test('引用消息：send 携带 quote → 历史解密还原 plaintext + quote 快照', () async {

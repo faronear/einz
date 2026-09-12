@@ -130,6 +130,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   bool _hasMoreOlder = true;
   bool _loadingOlder = false;
+  // 首屏本地历史是否已上屏（用于守卫 _refreshLocal：未加载时 _lastLoadedSequence=0
+  // 会触发全量解密）
+  bool _initialLoaded = false;
   static const int _pageSize = 50;
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
@@ -197,6 +200,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return '${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
     }
     return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
+  }
+
+  /// 自己消息的发送状态小标：pending=发送中（时钟）/ sent=已发送（对勾）/
+  /// failed=发送失败（红色警告，点按重发）。仅自己、非墓碑消息显示（老板 2026-09-12）。
+  Widget _buildSendStatusIcon(HistoryMessage m) {
+    final l10n = AppLocalizations.of(context)!;
+    final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
+    switch (m.status) {
+      case 'failed':
+        return Tooltip(
+          message: l10n.chatPageMsgFailed,
+          child: GestureDetector(
+            onTap: () async {
+              await _repo.retryMessage(m.env.messageId);
+              await _refreshLocal();
+            },
+            child: Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
+          ),
+        );
+      case 'sent':
+      case 'delivered':
+      case 'read':
+        return Tooltip(
+          message: l10n.chatPageMsgSent,
+          child: Icon(Icons.check, size: 12, color: subtle),
+        );
+      default: // pending（队列中/发送中）
+        return Tooltip(
+          message: l10n.chatPageMsgSending,
+          child: Icon(Icons.access_time, size: 11, color: subtle),
+        );
+    }
   }
 
   /// 阅后即焚时长紧凑标注（1m / 5m / 30m / 1h / 1d / 7d）。
@@ -1007,7 +1042,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 createdAt: x.createdAt, burnAfterSeconds: seconds,
                 quote: x.quote, deleted: x.deleted,
                 // 长按手动设置（与 repo.setMessageBurn 落盘一致）；取消时无标签
-                burnManual: seconds > 0)
+                burnManual: seconds > 0, status: x.status)
           else
             x,
       ];
@@ -1066,8 +1101,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 首次载入：同步全量 → 清理到期 → 只渲染最近一页（UI 分页懒加载）。
+  /// 首次载入：先用本地缓存秒开（离线/慢网也能立刻看到历史）→ 再同步全量 →
+  /// 重新渲染最近一页（UI 分页懒加载）。
   Future<void> _loadInitial() async {
+    // 1) 本地缓存秒开（不等网络）
+    try {
+      final cached = await _repo.historyRecent(limit: _pageSize);
+      if (mounted && cached.isNotEmpty) {
+        setState(() => _messages = cached);
+        _scrollToLatest(animate: false);
+      }
+    } catch (_) {
+      // 解密失败（如缺归档密钥）忽略：继续走网络同步
+    }
+    _initialLoaded = true; // 允许 _refreshLocal 工作（此后 _lastLoadedSequence 有意义）
+
+    // 2) 同步全量 → 清理到期 → 用最新本地历史覆盖
     try {
       await _repo.sync();
       await _repo.tombstoneExpired();
@@ -1079,8 +1128,63 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 要等 ticker 自动刷新才滚到底）——直接跳转不播动画，进入即见最新
       _scrollToLatest(animate: false);
     } catch (_) {
-      // 网络抖动忽略：保持空列表，等 ticker 重试
+      // 网络抖动忽略：本地缓存已上屏，等 ticker 重试
     }
+  }
+
+  /// 纯本地增量刷新（不发网络）：把本地新增/变更的消息并入列表——发送后「乐观回显」
+  /// 与收到消息先上屏都用它，避免等 sync 网络往返（老板 2026-09-12）。
+  /// 合并语义：按 messageId 就地替换（刷新 pending→sent/failed 状态），新 id 追加；
+  /// 墓碑单调（本地已删的不会被旧读覆盖复活）；仅在有新消息时滚到底。
+  Future<void> _refreshLocal() async {
+    if (!_initialLoaded) return;
+    try {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      // 阅后即焚：到期消息打本地墓碑（纯本地）
+      await _repo.tombstoneExpired(now: now);
+      final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
+      if (!mounted) return;
+      final freshById = {for (final f in fresh) f.env.messageId: f};
+      final existingIds = {for (final m in _messages) m.env.messageId};
+      final added = fresh
+          .where((f) => !existingIds.contains(f.env.messageId))
+          .toList();
+      setState(() {
+        _messages = [
+          for (final m in _messages)
+            if (m.expiresAt != null && m.expiresAt! <= now && !m.deleted)
+              _asDeleted(m)
+            else if (!freshById.containsKey(m.env.messageId))
+              m
+            else
+              _mergeRefreshed(m, freshById[m.env.messageId]!),
+          ...added,
+        ];
+      });
+      if (added.isNotEmpty) _scrollToLatest();
+    } catch (_) {
+      // 本地读取失败忽略，下次刷新重试
+    }
+  }
+
+  /// 用本地最新一行覆盖旧记录，但墓碑单调（任一为已删即已删），避免一个早于
+  /// tombstoneMessage 发起的读晚到后把已删内容「复活」。
+  HistoryMessage _mergeRefreshed(HistoryMessage old, HistoryMessage fresh) {
+    final deleted = old.deleted || fresh.deleted;
+    if (deleted == fresh.deleted) return fresh;
+    return (
+      env: fresh.env,
+      plaintext: fresh.plaintext,
+      sender: fresh.sender,
+      attachment: fresh.attachment,
+      expiresAt: fresh.expiresAt,
+      createdAt: fresh.createdAt,
+      burnAfterSeconds: fresh.burnAfterSeconds,
+      quote: fresh.quote,
+      deleted: deleted,
+      burnManual: fresh.burnManual,
+      status: fresh.status,
+    );
   }
 
   /// 已加载列表中最新的 serverSequence（未同步=最新时返回 0）。
@@ -1219,34 +1323,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
+  /// 增量刷新：**先本地秒上屏**（_refreshLocal）→ 再网络 sync → 再本地刷新一次。
+  /// 这样收到的消息/自己的回执能立即出现，网络慢也不阻塞已到内容（老板 2026-09-12）。
   Future<void> _refresh() async {
+    await _refreshLocal();
     try {
       await _repo.sync();
-      final now = DateTime.now().millisecondsSinceEpoch;
-      // 阅后即焚：到期消息打本地墓碑（内容隐藏、时间+时钟+时长记录保留，纯本地）
-      await _repo.tombstoneExpired(now: now);
-      // 增量刷新：只取比已加载最新更晚的消息追加（不重建全量列表）
-      final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
       await _repo.refreshDeviceMap();
-      if (!mounted) return;
-      // 实际新增的消息（去重后）：只有它们才需要拉到底部
-      final existing = {for (final m in _messages) m.env.messageId};
-      final added = fresh.where((f) => !existing.contains(f.env.messageId)).toList();
-      setState(() {
-        // 到期消息就地标记为已焚毁（墓碑；不再从列表移除——不打破历史流水）
-        _messages = [
-          for (final m in _messages)
-            if (m.expiresAt != null && m.expiresAt! <= now && !m.deleted)
-              _asDeleted(m)
-            else
-              m,
-        ];
-        _messages.addAll(added);
-      });
-      // 仅当确实有新消息才滚动到底——自动 sync 没发现新消息时不动滚动位置
-      // （用户可能在往上看历史；老板要求 2026-09-09：除非刚启动/发现新消息/
-      // 收到新消息，否则不拉到最下面；启动路径 _loadInitial 保持无条件跳底）
-      if (added.isNotEmpty) _scrollToLatest();
+      await _refreshLocal();
     } catch (_) {
       // 网络抖动忽略，下次轮询重试
     }
@@ -1267,12 +1351,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 'messageId': quote.env.messageId,
                 'preview': _quotePreview(quote.plaintext),
               },
+        // 本地落库即回显 pending 气泡（乐观 UI），不等上传/sync 往返
+        onPersisted: (_) => _refreshLocal(),
       );
-      await _refresh();
+      // 上传已尝试完成：刷新状态（pending→sent/failed）
+      await _refreshLocal();
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
     }
+  }
+
+  /// 发送附件（语音/图片/视频/文件）：本地落库即回显，再刷新状态。
+  Future<void> _sendAttachmentOptimistic({
+    required Uint8List fileBytes,
+    required String fileName,
+    required String type,
+    String? caption,
+  }) async {
+    await _repo.sendAttachment(
+      fileBytes: fileBytes,
+      fileName: fileName,
+      type: type,
+      caption: caption,
+      onPersisted: (_) => _refreshLocal(),
+    );
+    await _refreshLocal();
   }
 
   // ---------- 长按消息操作：引用 / 删除（2 人世界不做转发） ----------
@@ -1391,6 +1495,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         quote: m.quote,
         deleted: true,
         burnManual: m.burnManual,
+        status: m.status,
       );
 
   /// 删除消息：确认弹窗 → 本机打墓碑标记（内容隐藏、时间+焚毁记录保留；
@@ -1595,7 +1700,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         });
         return;
       }
-      await _repo.sendAttachment(
+      await _sendAttachmentOptimistic(
         fileBytes: await f.readAsBytes(),
         fileName: 'voice.m4a',
         type: 'voice',
@@ -1608,7 +1713,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _recordingPath = null;
         _voiceSamples.clear();
       });
-      await _refresh();
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
@@ -1829,25 +1933,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (image == null) return;
           fileName = 'image.jpg';
           type = 'image';
-          await _repo.sendAttachment(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
+          await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.galleryImage:
           image = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1600);
           if (image == null) return;
           fileName = 'image.jpg';
           type = 'image';
-          await _repo.sendAttachment(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
+          await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.videoCamera:
           image = await _picker.pickVideo(source: ImageSource.camera, maxDuration: const Duration(minutes: 1));
           if (image == null) return;
           fileName = 'video.mp4';
           type = 'video';
-          await _repo.sendAttachment(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
+          await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.videoGallery:
           image = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 1));
           if (image == null) return;
           fileName = 'video.mp4';
           type = 'video';
-          await _repo.sendAttachment(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
+          await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.audioFile:
           // file_picker 12.x：静态方法直接调用，返回 List<PlatformFile>；
           // 文件内容用异步 readAsBytes()（withData 已废弃）
@@ -1856,7 +1960,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           final audio = audioFiles.first;
           final audioName = audio.name;
           final audioBytes = await audio.readAsBytes();
-          await _repo.sendAttachment(
+          await _sendAttachmentOptimistic(
             fileBytes: audioBytes,
             fileName: audioName,
             type: 'audio',
@@ -1868,14 +1972,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           final any = anyFiles.first;
           final anyName = any.name;
           final anyBytes = await any.readAsBytes();
-          await _repo.sendAttachment(
+          await _sendAttachmentOptimistic(
             fileBytes: anyBytes,
             fileName: anyName,
             type: 'file',
             caption: anyName,
           );
       }
-      await _refresh();
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
@@ -2433,6 +2536,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                   color: _uiStyle == 'gradient'
                                                       ? Colors.white70
                                                       : Colors.grey)),
+                                        ],
+                                        // 自己消息：发送状态小标（老板 2026-09-12）
+                                        if (mine && !m.deleted) ...[
+                                          const SizedBox(width: 4),
+                                          _buildSendStatusIcon(m),
                                         ],
                                       ],
                                     ),

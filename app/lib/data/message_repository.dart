@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -15,7 +16,9 @@ import 'local_database.dart';
 /// 密文载荷内传输，null=非引用消息）、deleted=本机墓碑（true=已删除/已焚毁，
 /// UI 只显示时间+焚毁记录、隐藏内容——老板决策 2026-09-09）、
 /// burnManual=该条焚毁是否由用户长按单条手动设置（true 才在气泡标注
-/// 「设置/修改时间+时长」，全局设置快照只标时长——老板 2026-09-12）。
+/// 「设置/修改时间+时长」，全局设置快照只标时长——老板 2026-09-12）、
+/// status=本地投递状态（pending=队列中/发送中、sent=已发送、failed=发送失败待重发；
+/// 仅本机自己发的消息有意义，UI 据此显示时钟/对勾/警告——老板 2026-09-12）。
 typedef HistoryMessage = ({
   MessageEnvelope env,
   String plaintext,
@@ -26,7 +29,8 @@ typedef HistoryMessage = ({
   int burnAfterSeconds,
   Map<String, dynamic>? quote,
   bool deleted,
-  bool burnManual
+  bool burnManual,
+  String status
 });
 
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
@@ -135,8 +139,16 @@ class MessageRepository {
 
   /// 发送一条消息：加密 → 落库（pending）→ 尝试立即上传；失败留队。
   /// [quote] 引用快照（{messageId, preview}）时载荷包装为 JSON（密文内传输）。
+  /// [onPersisted] 本地落库后、网络上传前回调（UI 据此「乐观回显」：立即把
+  /// pending 气泡画出来，不必等上传/sync 往返——老板 2026-09-12）；回调异常被
+  /// 吞掉，绝不影响发送本身。
   /// 返回 message_id。
-  Future<String> send(String plaintext, {String type = 'text', Map<String, dynamic>? quote}) async {
+  Future<String> send(
+    String plaintext, {
+    String type = 'text',
+    Map<String, dynamic>? quote,
+    FutureOr<void> Function(String messageId)? onPersisted,
+  }) async {
     final messageId = _uuidv7();
     // 引用消息：载荷 = {"plaintext":…, "quote":…} JSON（AEAD 密文内，Server 不可见；
     // 旧客户端/CLI 未识别时按整段 JSON 文本展示，仅影响引用消息）
@@ -155,6 +167,7 @@ class MessageRepository {
     );
     final bs = await _burnState();
     await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
+    await _notifyPersisted(onPersisted, messageId);
 
     final t = token;
     if (t != null) {
@@ -162,7 +175,9 @@ class MessageRepository {
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
       } on Exception {
-        // 网络失败：留在 pending 队列，下次 sync 自动补发
+        // 有 token 仍发失败 → 标 failed（UI 显示「发送失败」可点重发；不自动重试，
+        // 避免坏消息每 tick 刷屏）。无 token 属离线入队，保持 pending 由 sync 补发。
+        await _setStatus(messageId, 'failed');
       }
     }
     return messageId;
@@ -171,12 +186,15 @@ class MessageRepository {
   /// 发送附件消息（语音/图像/视频，PROTOCOL.md §6）：
   /// 加密文件 blob 上传 /attachments + 发送 caption 消息 + 本地附件元数据落库。
   /// 无 token 时消息入 pending 队列（附件 blob 需联网时上传，v1 不做离线附件补传）。
+  /// [onPersisted] 见 [send]：本地落库后、上传前回调，用于乐观回显（此时附件元数据
+  /// 已落库，图片/视频可直接显示）。
   /// 返回 message_id。
   Future<String> sendAttachment({
     required Uint8List fileBytes,
     required String fileName,
     required String type, // image | video | voice
     String? caption,
+    FutureOr<void> Function(String messageId)? onPersisted,
   }) async {
     final messageId = _uuidv7();
     final attachmentId = _uuidv7();
@@ -217,6 +235,7 @@ class MessageRepository {
     // 附件消息同样受阅后即焚控制（此前漏带焚毁状态 → 本端副本永久保留）
     final bs = await _burnState();
     await _insertLocal(env, status: 'pending', burnAfterSeconds: bs.burn, expiresAt: bs.expiresAt);
+    await _notifyPersisted(onPersisted, messageId);
 
     final t = token;
     if (t != null) {
@@ -236,7 +255,8 @@ class MessageRepository {
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
       } on Exception {
-        // 失败：消息留 pending（补发时消息会重发，但附件 blob 未上传 v1 不自动补传）
+        // 失败：消息留 pending（补发时消息会重发，但附件 blob 未上传 v1 不自动补传）。
+        // 不标 failed——附件 blob 本就无法自动补传，标失败会误导用户重试。
       }
     }
     return messageId;
@@ -434,7 +454,13 @@ class MessageRepository {
   Future<List<HistoryMessage>> _rowsToHistory(List<LocalMessage> rows) async {
     final out = <HistoryMessage>[];
     for (final row in rows) {
-      final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
+      // 回填 server_sequence：本机发送的消息 ciphertext 落盘时无 seq（由 _markSent
+      // 只写列），重建时以列为准，否则 env.serverSequence 恒为 null → 分页/跳转/
+      // 增量锚点（_lastLoadedSequence）误判（老板 2026-09-12）。
+      final env = MessageEnvelope.fromJson({
+        ...jsonDecode(row.ciphertext) as Map<String, dynamic>,
+        if (row.serverSequence != null) 'server_sequence': row.serverSequence,
+      });
       final key = _keyForVersion(env.keyVersion);
       if (key == null) {
         throw StateError('缺少 key_version=${env.keyVersion} 的 Space Key，无法解密历史消息（需导入归档密钥）');
@@ -485,6 +511,7 @@ class MessageRepository {
         quote: quote,
         deleted: row.deletedAt != null,
         burnManual: row.burnManual,
+        status: row.status,
       ));
     }
     return out;
@@ -630,6 +657,50 @@ class MessageRepository {
     );
     // 注意：不在这里推进锚点。锚点只在 /sync 响应时推进（P2 修复）——
     // 否则新设备未同步先发消息会跳过对方历史（PROTOCOL.md §5.2）。
+  }
+
+  /// 只改本地投递状态（pending/sent/failed）。
+  Future<void> _setStatus(String messageId, String status) async {
+    await (db.update(db.localMessages)..where((m) => m.messageId.equals(messageId))).write(
+      LocalMessagesCompanion(status: Value(status)),
+    );
+  }
+
+  /// 乐观回显回调：本地落库后、网络上传前触发；异常吞掉，绝不影响发送本身
+  /// （例如缺 key_version 时 _rowsToHistory 会抛 StateError）。
+  Future<void> _notifyPersisted(
+    FutureOr<void> Function(String messageId)? onPersisted,
+    String messageId,
+  ) async {
+    if (onPersisted == null) return;
+    try {
+      await onPersisted(messageId);
+    } catch (_) {
+      // 回调只影响 UI 即时性，失败忽略
+    }
+  }
+
+  /// 手动重发一条 failed 消息（UI 点按「发送失败」图标）：先置 pending（界面立即
+  /// 显示发送中）→ 重发 → 成功置 sent、失败回置 failed。无 token 保持 pending
+  /// （等联网后由 sync 补发）。已墓碑/不存在的消息忽略。
+  Future<void> retryMessage(String messageId) async {
+    final row = await (db.select(db.localMessages)
+          ..where((m) => m.messageId.equals(messageId) & m.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (row == null) return;
+    await _setStatus(messageId, 'pending');
+    final t = token;
+    if (t == null) return; // 离线：留 pending，联网后 sync 补发
+    final env = MessageEnvelope.fromJson({
+      ...jsonDecode(row.ciphertext) as Map<String, dynamic>,
+      if (row.serverSequence != null) 'server_sequence': row.serverSequence,
+    });
+    try {
+      final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
+      await _markSent(env.messageId, result.serverSequence, result.createdAt);
+    } on Exception {
+      await _setStatus(messageId, 'failed');
+    }
   }
 
   Future<void> _advanceAnchor(int serverSequence) async {

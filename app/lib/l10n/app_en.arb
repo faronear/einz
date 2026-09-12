@@ -231,6 +231,9 @@
       "error": {"type": "String"}
     }
   },
+  "chatPageMsgSending": "Sending…",
+  "chatPageMsgSent": "Sent",
+  "chatPageMsgFailed": "Send failed, tap to retry",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
   "@chatPageVoiceStartFailed": {
     "placeholders": {
