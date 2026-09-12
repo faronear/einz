@@ -193,7 +193,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToPassphrase => '改用线上密保口令';
 
   @override
-  String get wizardPinHint => '本设备专用的锁屏密码。每次启动应用，需输入锁屏码才能进入秘境。';
+  String get wizardPinHint => '每次启动应用，需输入锁屏码才能进入。可以先不设置，以后随时可改。';
 
   @override
   String get welcomeDialogTitleCreate => '🎉 一切就绪！';

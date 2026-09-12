@@ -65,7 +65,7 @@
   "wizardJoinPassphraseWrong": "口令错误：请确认首台设备创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
   "wizardSwitchToPassphrase": "改用线上密保口令",
-  "wizardPinHint": "本设备专用的锁屏密码。每次启动应用，需输入锁屏码才能进入秘境。",
+  "wizardPinHint": "每次启动应用，需输入锁屏码才能进入。可以先不设置，以后随时可改。",
   "welcomeDialogTitleCreate": "🎉 一切就绪！",
   "welcomeDialogTitleJoin": "🎉 一切就绪！",
   "welcomeDialogMessage": "仅限两人，所有消息端到端加密，确保绝对隐私！进入秘境，开始聊天吧。",
