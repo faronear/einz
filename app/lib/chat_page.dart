@@ -212,7 +212,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 阅后即焚「设置（修改）时间」紧凑标注（HH:MM）。由到期时间戳反推：
   /// setMessageBurn 设 expiresAt = 设置时刻 + 时长，故 设置时刻 = expiresAt - 时长。
-  /// 出/入站消息均如此（发送时 also expiresAt = now + 时长），因此即「倒计时起点」。
   String _burnSetTimeLabel(int? expiresAt, int burnSeconds) {
     if (expiresAt == null || burnSeconds <= 0) return '';
     final t = DateTime.fromMillisecondsSinceEpoch(expiresAt - burnSeconds * 1000);
@@ -221,10 +220,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '$hh:$mm';
   }
 
-  /// 阅后即焚时钟标签：⏰ <设置(修改)时间>+<时长>，如 ⏰ 20:47+5m。
-  String _burnTagLabel(int? expiresAt, int burnSeconds) {
-    final setTime = _burnSetTimeLabel(expiresAt, burnSeconds);
+  /// 阅后即焚时钟标签：只有用户长按单条消息手动设置的才标注「设置(修改)时间+时长」
+  /// （如 ⏰ 20:47+5m，便于看出倒计时起点）；由全局设置快照的只标时长（如 ⏰ 5m），
+  /// 首次接收时间已由 [m.createdAt] 的时间戳给出（老板 2026-09-12）。
+  String _burnTagLabel(int? expiresAt, int burnSeconds, {required bool manual}) {
     final dur = _burnDurationLabel(burnSeconds);
+    if (!manual) return dur;
+    final setTime = _burnSetTimeLabel(expiresAt, burnSeconds);
     return setTime.isNotEmpty ? '$setTime+$dur' : dur;
   }
 
@@ -578,7 +580,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
               const Padding(
                 padding: EdgeInsets.only(top: 6),
-                child: Text('扫描或复制以上链接（或邀请码），即可绑定新设备到同一个秘境（24 小时有效，仅一次）。',
+                child: Text('以上链接（或邀请码），即可绑定新设备到当前秘境（24 小时有效，仅一次）。',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ],
@@ -1003,7 +1005,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             (env: x.env, plaintext: x.plaintext, sender: x.sender,
                 attachment: x.attachment, expiresAt: expiresAt,
                 createdAt: x.createdAt, burnAfterSeconds: seconds,
-                quote: x.quote, deleted: x.deleted)
+                quote: x.quote, deleted: x.deleted,
+                // 长按手动设置（与 repo.setMessageBurn 落盘一致）；取消时无标签
+                burnManual: seconds > 0)
           else
             x,
       ];
@@ -1384,6 +1388,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         burnAfterSeconds: m.burnAfterSeconds,
         quote: m.quote,
         deleted: true,
+        burnManual: m.burnManual,
       );
 
   /// 删除消息：确认弹窗 → 本机打墓碑标记（内容隐藏、时间+焚毁记录保留；
@@ -2417,8 +2422,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           const SizedBox(width: 4),
                                           const Icon(Icons.schedule, size: 11),
                                           const SizedBox(width: 2),
-                                          // 时钟标签：⏰ <设置(修改)时间>+<时长>，如 ⏰ 20:47+5m
-                                          Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds),
+                                          // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
+                                          // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
+                                          Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
+                                                  manual: m.burnManual),
                                               style: TextStyle(
                                                   fontSize: 10,
                                                   color: _uiStyle == 'gradient'

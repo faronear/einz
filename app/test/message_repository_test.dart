@@ -169,6 +169,8 @@ void main() {
     expect(hist.single.env.messageId, mid);
     expect(hist.single.expiresAt, isNotNull, reason: '阅后即焚消息应带到期时间');
     expect(hist.single.deleted, isFalse);
+    expect(hist.single.burnManual, isFalse,
+        reason: '随全局设置焚毁的消息不算手动设置（气泡不标注修改时间）');
 
     final now = DateTime.now().millisecondsSinceEpoch;
     // 未到期（+59s）：不打标记
@@ -459,6 +461,8 @@ void main() {
     final after = await repo.history();
     expect(after.singleWhere((h) => h.env.messageId == 'msg-a').burnAfterSeconds, 60,
         reason: '被长按的消息应带 burn=60');
+    expect(after.singleWhere((h) => h.env.messageId == 'msg-a').burnManual, isTrue,
+        reason: '长按单独设置的消息应标记 burnManual（气泡标注修改时间）');
 
     // 后续新消息 B 到达（对方新发）
     final envB = await _makeEnv(spaceKey, 'dev-b', 'msg-b', '新消息');
@@ -469,7 +473,9 @@ void main() {
     final a = hist.singleWhere((h) => h.env.messageId == 'msg-a');
     final b = hist.singleWhere((h) => h.env.messageId == 'msg-b');
     expect(a.burnAfterSeconds, 60, reason: 'A 的单条焚毁保留');
+    expect(a.burnManual, isTrue, reason: 'A 为手动设置');
     expect(b.burnAfterSeconds, 0, reason: '后续新消息应沿用全局(0)，不被 A 的单条设置污染');
+    expect(b.burnManual, isFalse, reason: '全局设置的消息不应被标为手动');
   });
 }
 

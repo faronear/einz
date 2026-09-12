@@ -13,7 +13,9 @@ import 'local_database.dart';
 /// 落盘值，未同步消息为本地发送时间）、burnAfterSeconds=焚毁时长（秒，
 /// 归档恢复缺快照时按 到期-创建 反推）、quote=引用快照（{messageId, preview}，
 /// 密文载荷内传输，null=非引用消息）、deleted=本机墓碑（true=已删除/已焚毁，
-/// UI 只显示时间+焚毁记录、隐藏内容——老板决策 2026-09-09）。
+/// UI 只显示时间+焚毁记录、隐藏内容——老板决策 2026-09-09）、
+/// burnManual=该条焚毁是否由用户长按单条手动设置（true 才在气泡标注
+/// 「设置/修改时间+时长」，全局设置快照只标时长——老板 2026-09-12）。
 typedef HistoryMessage = ({
   MessageEnvelope env,
   String plaintext,
@@ -23,7 +25,8 @@ typedef HistoryMessage = ({
   int createdAt,
   int burnAfterSeconds,
   Map<String, dynamic>? quote,
-  bool deleted
+  bool deleted,
+  bool burnManual
 });
 
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
@@ -403,6 +406,8 @@ class MessageRepository {
         .write(LocalMessagesCompanion(
       burnAfterSeconds: Value(burnSeconds),
       expiresAt: Value(expiresAt),
+      // 标记为「用户手动设置」：气泡据此标注修改时间；取消（burn<=0）无标签故置 false
+      burnManual: Value(burnSeconds > 0),
     ));
     return true;
   }
@@ -479,6 +484,7 @@ class MessageRepository {
             : (row.expiresAt == null ? 0 : max(1, row.expiresAt! - row.createdAt)),
         quote: quote,
         deleted: row.deletedAt != null,
+        burnManual: row.burnManual,
       ));
     }
     return out;

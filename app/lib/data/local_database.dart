@@ -29,6 +29,9 @@ class LocalMessages extends Table {
   // 阅后即焚（纯本地，每设备独立）：到达本设备时的设置快照 + 到期时间戳
   IntColumn get burnAfterSeconds => integer().withDefault(const Constant(0))(); // 0=无限
   IntColumn get expiresAt => integer().nullable()(); // NULL/0=永久；非空=到期时间戳
+  // 该条焚毁是否由用户长按单条手动设置（false=来自全局设置快照）——仅手动设置的
+  // 消息气泡才标注「设置/修改时间+时长」，全局设置的只标时长
+  BoolColumn get burnManual => boolean().withDefault(const Constant(false))();
   // 本地墓碑（纯本地）：非空 = 本机已删除/已焚毁——内容隐藏、时间+焚毁记录保留
   // （老板决策 2026-09-09：不打破消息历史流水，只隐藏内容）
   IntColumn get deletedAt => integer().nullable()(); // NULL=正常；非空=删除时间戳
@@ -89,7 +92,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -108,6 +111,11 @@ class LocalDatabase extends _$LocalDatabase {
             // v4：local_attachments 加本地密文副本列（发送端即时显示/离线兜底，
             // 图片视频直接展示，老板 2026-09-11）
             await m.addColumn(localAttachments, localAttachments.localCipher);
+          }
+          if (from < 5) {
+            // v5：local_messages 加单条焚毁「是否手动设置」列（默认 false=全局设置）。
+            // 仅手动设置的消息在气泡里标注「设置(修改)时间+时长」（老板 2026-09-12）
+            await m.addColumn(localMessages, localMessages.burnManual);
           }
         },
       );
