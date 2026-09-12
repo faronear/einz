@@ -2565,6 +2565,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   _send();
                                   _inputFocusNode.requestFocus();
                                 },
+                                // 发送后键盘常驻遮挡消息流；点按输入框以外的任意处
+                                // （消息列表/空白/其他控件）收起键盘（老板要求 2026-09-12）。
+                                // 移动端默认不动 focus，需显式 unfocus。
+                                onTapOutside: (_) =>
+                                    FocusManager.instance.primaryFocus?.unfocus(),
                               ),
                             ),
                             if (_inputMode != _InputMode.text)
@@ -3180,12 +3185,21 @@ class _VideoPreviewState extends State<_VideoPreview> {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => Dialog(
+        // 与图片全屏一致：纯黑底 + 铺满全屏（老板要求 2026-09-12——
+        // 视频全屏也应是黑底大画面，而不是默认半透明遮罩下的圆角小卡）
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
         child: Stack(
           children: [
-            AspectRatio(
-              aspectRatio: c.value.aspectRatio,
-              child: VideoPlayer(c),
+            Positioned.fill(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: c.value.aspectRatio,
+                  child: VideoPlayer(c),
+                ),
+              ),
             ),
             Positioned(
               top: 8,
