@@ -22,7 +22,7 @@
   "wizardPeerNameRequired": "填写我的秘境伴侣的名字",
   "wizardNameHintInput": "输入我常用的名字",
   "wizardMyGenderLabel": "我的性别",
-  "wizardPeerGenderLabel": "伴侣性别",
+  "wizardPeerGenderLabel": "伴侣的性别",
   "wizardGenderMale": "男",
   "wizardGenderFemale": "女",
   "wizardGenderRequired": "请选择性别",
@@ -96,7 +96,7 @@
     }
   },
   "setupTokenSpacePrivate": "加入私密空间（等待第二位成员）",
-  "setupCreateShareTitle": "邀请对方加入（24 小时内有效）",
+  "setupCreateShareTitle": "转发邀请链接给伴侣",
   "setupCreateCopy": "复制邀请链接",
   "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
@@ -212,7 +212,7 @@
   "chatPageBurnHeading": "阅后即焚（仅本设备生效）",
   "chatPageBurnOff": "阅后即焚已关闭（消息永久保留）",
   "chatPageBurnFailed": "设置阅后即焚失败",
-  "chatPageBurnWillDelete": "消息将在 {duration} 后自动删除",
+  "chatPageBurnWillDelete": "新的消息将在 {duration} 后自动删除",
   "@chatPageBurnWillDelete": {
     "placeholders": {
       "duration": {"type": "String"}

@@ -36,6 +36,7 @@ migrate_working_dir/
 # 本机本地开发配置（flutter run/build --dart-define-from-file 读取；不入 git——
 # 覆盖 kEinzServer 等启动参数，模板见 local_config.example.json）
 /local_config.json
+/local_config.android.json
 
 # Symbolication related
 app.*.symbols

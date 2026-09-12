@@ -9,6 +9,8 @@
     "server-new": "cd deployment; git pull; rm -fr data/einz.sqlite.db*; docker compose up -d --build server; docker compose down; docker compose up -d; docker compose logs -f server",
     "build-ios": "cd app; flutter build ios --release",
     "build-apk": "cd app; flutter build apk --release",
+    "and-boot": " ~/Library/Android/sdk/emulator/emulator -avd einz_emu",
+    "and-run": "cd app; flutter run -d einz_emu --dart-define-from-file=local_config.android.json",
     "ios-boot": "xcrun simctl boot 720C22F9-D844-44EE-BDA6-87900913A39B; open -a Simulator; xcrun simctl list devices | grep -i booted",
     "ios-run-new": "xcrun simctl uninstall booted cc.tic.einz; cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --dart-define-from-file=local_config.json --pid-file /tmp/einz_flutter.pid",
     "ios-run": "cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --dart-define-from-file=local_config.json --pid-file /tmp/einz_flutter.pid",

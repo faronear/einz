@@ -76,7 +76,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardMyGenderLabel => '我的性别';
 
   @override
-  String get wizardPeerGenderLabel => '伴侣性别';
+  String get wizardPeerGenderLabel => '伴侣的性别';
 
   @override
   String get wizardGenderMale => '男';
@@ -261,7 +261,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenSpacePrivate => '加入私密空间（等待第二位成员）';
 
   @override
-  String get setupCreateShareTitle => '邀请对方加入（24 小时内有效）';
+  String get setupCreateShareTitle => '转发邀请链接给伴侣';
 
   @override
   String get setupCreateCopy => '复制邀请链接';
@@ -526,7 +526,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageBurnWillDelete(String duration) {
-    return '消息将在 $duration 后自动删除';
+    return '新的消息将在 $duration 后自动删除';
   }
 
   @override

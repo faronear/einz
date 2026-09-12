@@ -582,7 +582,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
               const Padding(
                 padding: EdgeInsets.only(top: 6),
-                child: Text('以上链接（或邀请码），即可绑定新设备到当前秘境（24 小时有效，仅一次）。',
+                child: Text('新设备必须验证邀请码，才能绑定到当前秘境。24 小时内一次性有效。',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ],

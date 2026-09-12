@@ -2810,3 +2810,63 @@ personId**（AppLockPayload 也没这个字段），而 `_refreshProfileFromServ
 "统一折叠换行"后其中 3 例正确失败。
 
 **验证：** dart analyze 无 issue；EINZ_UNITTEST=1 dart test 全绿。
+
+## 2026-09-12 成功构建 release APK（main 分支，Intel iMac）
+**目标：** 在 main（v1 + v2 multiverse 已 fast-forward 合并）上产出可分发的 release APK。
+
+**最终命令：**
+```
+cd app && PATH=$HOME/development/flutter/bin:$PATH JAVA_HOME=$HOME/jdk/jdk-17.0.20.1+1/Contents/Home ANDROID_HOME=$HOME/Library/Android/sdk \
+  flutter build apk --release
+```
+**结果：** BUILD_EXIT=0；产物 `app/build/app/outputs/flutter-apk/app-release.apk`（82.6MB，
+2026-09-12 10:18）。apksigner 校验：Signer#1 DN=CN=yuanjin…（release keystore，非 debug）。
+
+**构建中逐个排除的障碍：**
+1. Android 16 平台被装成 `platforms/android-36.1`（ApiLevel=36.1），AGP 要精确
+   `platforms/android-36` → 复制 `android-36.1` 为 `android-36` 并改 source.properties /
+   package.xml 的 ApiLevel 与 path 为 36。
+2. native `jni` 插件要 CMake 3.22.1，SDK 未装 → sdkmanager 安装 `cmake;3.22.1`
+   （需 Tailscale 美区出口节点绕过 GFW；JVM 代理置空避开失效的 127.0.0.1:17891）。
+3. release 签名 `storeFile` 以 :app 模块目录（android/app/）为基准解析，找不到位于
+   android/ 的 keystore → 改为 `rootProject.file(storeFile)`。`build.gradle.kts` 此修复
+   已 commit（main d293d08）。
+
+**确认 release 包干净：** 未传 `--dart-define-from-file`，故 `kEinzServer` 默认
+`https://einz.tic.cc`（生产）；`local_config.json` 被 gitignore，不进包。
+
+**待办/风险：** keystore(`android/android.keystore.jks`)+口令 `w1rO1129` 必须离线备份，
+丢失即无法给已装 APK 发更新。JDK 仍在家目录 `~/jdk`，老板曾问是否迁到 `~/development/jdk`
+（需同步 .zshrc + flutter config --jdk-dir），构建成功后可择机做。本地 commit d293d08
+尚未 push origin/main。
+
+### 补：android-36 改名 hack 已替换为官方正版平台
+原先的 `platforms;android-36` 是把 `android-36.1` 复制改名 + 改 metadata 的 hack（有隐患：
+SDK 元数据对不上、扩展级别 framework 可能骗过 AGP 的 API 上限检查导致在基础 Android 16
+设备上运行时崩溃、且不可复现）。
+实际 Google 仍单独发布基础包 `platforms;android-36`（`platform-36_r02.zip`，ApiLevel=36、
+`IsBaseSdk=true`、ExtensionLevel=17）。已 `sdkmanager "platforms;android-36"` 安装真包，
+删除 hack 备份，重新 `flutter build apk --release` 通过（BUILD_EXIT=0，APK 2026-09-12 10:46）。
+老板无需在 Android Studio 里再装 "36.0"——真包已就位。
+注：`platforms/android-37` 仍是早年从 `android-37.0` 复制的同类 hack，本项目 compileSdk=36
+未用到，暂保留无害；日后若需 API 37 同样走 `sdkmanager "platforms;android-37"` 装正版。
+
+### 补2：JDK 迁移 ~/jdk -> ~/development/jdk + 清理 android-37 废复制
+- JDK（Temurin 17.0.20.1）从 `~/jdk/jdk-17.0.20.1+1` 迁到 `~/development/jdk`
+  （即 `~/development/jdk/Contents/Home`）。`~/.zshrc` 的 JAVA_HOME 同步改；
+  `flutter config --jdk-dir` 显式设为新路径。删空 `~/jdk`。
+- 用新 JDK 重跑 `flutter build apk --release` 通过（BUILD_EXIT=0，build13）。
+- 顺手删掉 `platforms/android-37` 废复制（内容与 `android-37.0` 完全相同、metadata
+  仍写 `android-37.0`，不能满足 AGP 对 `platforms;android-37` 的查找）。结论：API 37
+  的正规基础包就是 `android-37.0`（扩展级别 0 命名），无需也不存在单独的 "android-37"。
+- 源码修复 commit `d293d08`（签名路径）已 `git push origin main`（de8fee7..d293d08）。
+
+### 补3：日后重发 APK 的正确命令
+- ❌ `flutter build android --release` 在本机 Flutter 3.47.2 不是合法命令（build 子命令
+  只有 apk/appbundle/ios 等，无 android；会报 "Could not find an option named --release"）。
+- ✅ 正确：`cd app && flutter build apk --release`。已模拟"新终端、不导出任何环境变量"
+  跑通（BUILD_EXIT=0）：flutter 在 PATH、`flutter config --jdk-dir` 已设、SDK 自动探测
+  `~/Library/Android/sdk`、本地 `android/key.properties`+`android.keystore.jks` 自动签名。
+- 产物：`app/build/app/outputs/flutter-apk/app-release.apk`（直接侧载给朋友，非 Play 商店）。
+- 注意：release 构建**绝不**加 `--dart-define-from-file=local_config.json`（会指向 localhost
+  开发服务器）。keystore/key.properties 是 gitignore 的本地文件，换机需一并带走并备份。
