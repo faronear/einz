@@ -181,6 +181,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
+  String get wizardPassphraseConfirmHint => '请再次输入口令';
+
+  @override
+  String get wizardPassphraseMismatch => '两次输入的口令不一致';
+
+  @override
   String get wizardJoinPassphraseHint => '口令是与伴侣共享的密码，用于保护聊天内容。如果不知道口令，请询问伴侣。';
 
   @override

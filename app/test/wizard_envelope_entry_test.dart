@@ -149,4 +149,37 @@ void main() {
     expect(find.text('关于伴侣'), findsOneWidget,
         reason: '应进入步骤 2（伴侣页——名字/性别必填，老板 2026-09-10 定稿）');
   });
+
+  testWidgets('create 口令页：口令需二次输入确认（两个输入框）', (WidgetTester tester) async {
+    await pumpToPassphrase(tester); // create
+    expect(find.text('设置密保口令'), findsOneWidget, reason: 'create 口令页');
+    expect(find.byType(TextField), findsNWidgets(2),
+        reason: '首台设备设置口令需输入两次（口令 + 确认）——老板 2026-09-12');
+  });
+
+  testWidgets('join 口令页：仅一个口令输入框（验证已有口令，无需确认）', (WidgetTester tester) async {
+    await pumpToPassphrase(tester, join: true);
+    expect(find.byType(TextField), findsOneWidget,
+        reason: 'join 是验证已有口令，无需二次确认');
+  });
+
+  testWidgets('create 口令页：两次不一致 → 红字拦截；一致 → 放行进 PIN 页', (WidgetTester tester) async {
+    await pumpToPassphrase(tester);
+    expect(find.byType(TextField), findsNWidgets(2));
+
+    // 两次不一致：停留本页 + 红字
+    await tester.enterText(find.byType(TextField).at(0), 'secret-1');
+    await tester.enterText(find.byType(TextField).at(1), 'secret-2');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('两次输入的口令不一致'), findsOneWidget, reason: '不一致应红字提醒');
+    expect(find.text('设置密保口令'), findsOneWidget, reason: '不一致应停留口令页');
+
+    // 改为一致：放行进入 PIN 步骤
+    await tester.enterText(find.byType(TextField).at(1), 'secret-1');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('两次输入的口令不一致'), findsNothing, reason: '一致后旧红字不应残留');
+    expect(find.text('设置锁屏码'), findsOneWidget, reason: '一致应放行进 PIN 步骤');
+  });
 }

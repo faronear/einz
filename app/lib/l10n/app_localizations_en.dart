@@ -188,6 +188,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.';
 
   @override
+  String get wizardPassphraseConfirmHint => 'Re-enter passphrase';
+
+  @override
+  String get wizardPassphraseMismatch => 'Passphrases do not match';
+
+  @override
   String get wizardJoinPassphraseHint =>
       'A password shared with your partner to protect messages. Don\'t know it? Ask your partner.';
 

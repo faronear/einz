@@ -61,6 +61,8 @@
     }
   },
   "wizardPassphraseHint": "Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.",
+  "wizardPassphraseConfirmHint": "Re-enter passphrase",
+  "wizardPassphraseMismatch": "Passphrases do not match",
   "wizardJoinPassphraseHint": "A password shared with your partner to protect messages. Don't know it? Ask your partner.",
   "wizardJoinPassphraseWrong": "Wrong passphrase: use the one set on the first device",
   "wizardSwitchToEnvelope": "Use key envelope instead (offline)",

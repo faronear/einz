@@ -97,6 +97,9 @@ class _SetupPageState extends State<SetupPage> {
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
+  // create 首台设备：口令二次确认（避免设错口令后无法再入）。join 是验证已有
+  // 口令，无需确认，故仅 create 用。
+  final _escrowPassphraseConfirm = TextEditingController();
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
   String? _pinError; // PIN 步骤红色提示（输入框下方）
@@ -155,6 +158,7 @@ class _SetupPageState extends State<SetupPage> {
     _spaceId.dispose();
     _envelopeKey.dispose();
     _escrowPassphrase.dispose();
+    _escrowPassphraseConfirm.dispose();
     _pin.dispose();
     _confirm.dispose();
     _inviteCode.dispose();
@@ -603,11 +607,17 @@ class _SetupPageState extends State<SetupPage> {
     }
     if ((_role == _WizardRole.create && _step == 3) ||
         (_role == _WizardRole.join && _step == 3)) {
-      if (_escrowPassphrase.text.trim().isEmpty) {
+      final pass = _escrowPassphrase.text.trim();
+      if (pass.isEmpty) {
         // 两套错误提示：首设备「必须设置」/ 后续设备「验证」语气（老板要求）
         localError = _role == _WizardRole.join
             ? l10n.wizardJoinPassphraseRequired
             : l10n.setupPageNeedPassphrase;
+        invalid = true;
+      } else if (_role == _WizardRole.create &&
+          _escrowPassphraseConfirm.text.trim() != pass) {
+        // 首台设备：口令需二次输入一致（老板要求 2026-09-12）
+        localError = l10n.wizardPassphraseMismatch;
         invalid = true;
       }
     }
@@ -1725,6 +1735,24 @@ class _SetupPageState extends State<SetupPage> {
             border: OutlineInputBorder(),
           ),
         ),
+        // 首台设备：口令需二次输入确认（避免设错口令后无法再入；老板要求 2026-09-12）。
+        // 后续设备是「验证」已有口令，无需确认。
+        if (_role == _WizardRole.create) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _escrowPassphraseConfirm,
+            style: const TextStyle(fontSize: 20),
+            obscureText: true,
+            // 开始填写即清除红字（不依赖再点下一步）
+            onChanged: (_) {
+              if (_localError != null) setState(() => _localError = null);
+            },
+            decoration: InputDecoration(
+              hintText: l10n.wizardPassphraseConfirmHint,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
         if (_localError != null) _localErrorHint(_localError!),
       ],
     );

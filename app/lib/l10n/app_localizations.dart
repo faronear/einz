@@ -434,6 +434,18 @@ abstract class AppLocalizations {
   /// **'Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.'**
   String get wizardPassphraseHint;
 
+  /// No description provided for @wizardPassphraseConfirmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-enter passphrase'**
+  String get wizardPassphraseConfirmHint;
+
+  /// No description provided for @wizardPassphraseMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrases do not match'**
+  String get wizardPassphraseMismatch;
+
   /// No description provided for @wizardJoinPassphraseHint.
   ///
   /// In en, this message translates to:
