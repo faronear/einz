@@ -668,16 +668,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageDevicePublicKeyFailed => 'Not recorded';
 
   @override
-  String get burnOptionUnlimited => 'Unlimited';
+  String get burnOptionKeepIndefinitely => 'Keep indefinitely';
 
   @override
   String get burnOption1Minute => '1 minute';
 
   @override
   String get burnOption5Minutes => '5 minutes';
-
-  @override
-  String get burnOption30Minutes => '30 minutes';
 
   @override
   String get burnOption1Hour => '1 hour';

@@ -639,16 +639,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageDevicePublicKeyFailed => '未记录';
 
   @override
-  String get burnOptionUnlimited => '无限';
+  String get burnOptionKeepIndefinitely => '长期保留';
 
   @override
   String get burnOption1Minute => '1 分钟';
 
   @override
   String get burnOption5Minutes => '5 分钟';
-
-  @override
-  String get burnOption30Minutes => '30 分钟';
 
   @override
   String get burnOption1Hour => '1 小时';

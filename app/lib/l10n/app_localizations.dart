@@ -1274,11 +1274,11 @@ abstract class AppLocalizations {
   /// **'Not recorded'**
   String get chatPageDevicePublicKeyFailed;
 
-  /// No description provided for @burnOptionUnlimited.
+  /// No description provided for @burnOptionKeepIndefinitely.
   ///
   /// In en, this message translates to:
-  /// **'Unlimited'**
-  String get burnOptionUnlimited;
+  /// **'Keep indefinitely'**
+  String get burnOptionKeepIndefinitely;
 
   /// No description provided for @burnOption1Minute.
   ///
@@ -1291,12 +1291,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'5 minutes'**
   String get burnOption5Minutes;
-
-  /// No description provided for @burnOption30Minutes.
-  ///
-  /// In en, this message translates to:
-  /// **'30 minutes'**
-  String get burnOption30Minutes;
 
   /// No description provided for @burnOption1Hour.
   ///
