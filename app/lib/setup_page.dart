@@ -125,6 +125,9 @@ class _SetupPageState extends State<SetupPage> {
   // token，故可在 joinSpace 之前反复试口令；joinSpace 才消费一次性 token——
   // 老板 2026-09-12：输错口令不该烧 token，也不该导致重输正确口令仍被拒）
   String? _joinSpaceId;
+  // 已成功 join 的 token + 身份（用于跳过重复 joinSpace——一次性 token 不能消费两次）
+  String? _joinedToken;
+  int? _joinedSlot;
   String? _joinSpaceName;
   String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
 
@@ -759,6 +762,8 @@ class _SetupPageState extends State<SetupPage> {
         _step = 0;
         _joinToken = '';
         _joinSpaceId = null; // 一并清：残留旧 spaceId 会拿旧空间去验口令
+        _joinedToken = null;
+        _joinedSlot = null;
         _joinSpaceName = null;
         _joinSlots = const [];
         _chosenSlot = null;
@@ -1443,6 +1448,9 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _joinToken = token;
         _joinSpaceId = pre.spaceId; // 供口令页先验口令（不消费 token）
+        // 换 token（或换身份）后，之前的"已 join"标记作废：需重新 joinSpace
+        _joinedToken = null;
+        _joinedSlot = null;
         _joinSpaceName = pre.displayName;
         _joinSlots = pre.slots; // 身份选择页（步骤 2）展示两身份
         _chosenSlot = null; // 换 token 后重置身份选择
@@ -1998,23 +2006,34 @@ class _SetupPageState extends State<SetupPage> {
       }
       final payload = await escrow.openPackage(passphrase: passphrase, file: file);
       if (!mounted) return false;
-      // 2) 口令通过 → 才 join 提交（设备登记 + session 签发，真正消费 token）
-      final join = await (widget.joinOverride?.call(_joinToken) ??
-          api.joinSpace(
-            token: _joinToken,
-            publicKey: kp.publicKeyB64,
-            partnerSlot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
-            deviceName: await _autoDeviceName(),
-          ));
-      if (!mounted) return false;
-      _sessionToken = join.sessionToken;
-      _enroll = EnrollResult(
-        deviceId: join.deviceId,
-        personId: join.personId,
-        spaceId: join.spaceId,
-      );
+      // 2) 口令通过 → 才 join 提交（设备登记 + session 签发，真正消费 token）。
+      //    已经用同一 token+身份 join 过就不再重复提交（如从 PIN 步点「上一步」
+      //    退回口令页再点「下一步」——重复 joinSpace 会撞"token 已用"而卡死）
+      final alreadyJoined = _sessionToken != null &&
+          _spaceKey != null &&
+          _joinedToken == _joinToken &&
+          _joinedSlot == _chosenSlot;
+      if (!alreadyJoined) {
+        final join = await (widget.joinOverride?.call(_joinToken) ??
+            api.joinSpace(
+              token: _joinToken,
+              publicKey: kp.publicKeyB64,
+              partnerSlot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
+              deviceName: await _autoDeviceName(),
+            ));
+        if (!mounted) return false;
+        _sessionToken = join.sessionToken;
+        _enroll = EnrollResult(
+          deviceId: join.deviceId,
+          personId: join.personId,
+          spaceId: join.spaceId,
+        );
+        _joinedToken = _joinToken;
+        _joinedSlot = _chosenSlot;
+      }
       _spaceKey = base64Decode(payload.spaceKeyB64);
-      _spaceId.text = join.spaceId;
+      // preflight 的 spaceId 与 join 返回的是同一个（此处直接用，便于跳过分支复用）
+      _spaceId.text = spaceId;
       _joinKeyVersion = payload.keyVersion;
       return true;
     } on ApiException catch (e) {

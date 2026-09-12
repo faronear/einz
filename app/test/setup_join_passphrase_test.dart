@@ -174,6 +174,38 @@ void main() {
     expect(joinCalls, 1, reason: 'token 只应被消费一次');
   });
 
+  testWidgets('PIN 页退回口令页再前进：不重复消费 token（仍能进 PIN 页）', (WidgetTester tester) async {
+    var joinCalls = 0;
+    Future<SpaceJoinResult> fakeJoin(String token) async {
+      joinCalls++;
+      if (joinCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
+      return const SpaceJoinResult(
+          spaceId: 'space-test',
+          personId: 'personB',
+          partnerSlot: 1,
+          sessionToken: 'tok',
+          deviceId: 'dev2',
+          spaceAddress: '0x00');
+    }
+
+    await pumpToJoinPassphrase(
+        tester, correctPass: '正确口令-abc', payload: payload, join: fakeJoin);
+    await tester.enterText(find.byType(TextField), '正确口令-abc');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('设置锁屏码'), findsWidgets, reason: '首次应放行进 PIN 步骤');
+    expect(joinCalls, 1);
+
+    // 退回口令页 → 再点下一步：不应再调 joinSpace（token 是一次性的）
+    await tester.tap(find.text('上一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('验证密保口令'), findsOneWidget, reason: '应退回口令页');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(joinCalls, 1, reason: '重复前进不应再消费 token');
+    expect(find.text('设置锁屏码'), findsWidgets, reason: '应再次放行进 PIN 步骤');
+  });
+
   testWidgets('未托管口令（服务器无 escrow 包）：提示并停留', (WidgetTester tester) async {
     await pumpToJoinPassphrase(tester, correctPass: '正确口令-abc', payload: null);
     await tester.enterText(find.byType(TextField), '正确口令-abc');
