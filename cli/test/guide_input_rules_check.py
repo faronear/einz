@@ -7,6 +7,9 @@
 #   3) join 口令必填：第二台设备走到「验证密保口令」留空回车 → 同样被拦住
 #      （不进入加入——否则会先 joinSpace 再取不到 Space Key，设备卡在
 #      "已登记但无密钥"的坏状态）；补输同一口令后加入成功
+#   4) join 口令输错：应停在口令环节提示重输，且**同一个** join token 仍可用
+#      （旧实现先 joinSpace 消费 token 再验口令 → 一输错就被踢回邀请码环节，
+#      已接受的 token 作废——老板 2026-09-12 反馈）
 #
 # 运行：python3 cli/test/guide_input_rules_check.py
 import json
@@ -141,6 +144,11 @@ def main():
                     break
             return out
 
+        # 文案实为「✅ 锁屏码 🔢 已设置」：中间有 emoji，且渲染会插入 ANSI 着色，
+        # 不能整串匹配——🔢 在全 TUI 仅此一处，作为"锁屏码已设置"的判定锚点。
+        def pin_set(out):
+            return '🔢' in out
+
         for wrong, expect in (
             ('abc\r', '锁屏码只能是数字'),      # 字母
             ('12345\r', '锁屏码至少 6 位数字'),  # 位数不足
@@ -150,11 +158,11 @@ def main():
                 print(f'❌ 锁屏码 {wrong.strip()!r} 未被拦住（未提示「{expect}」）')
                 print(out[-800:])
                 return 1
-            if '锁屏码已设置' in out:
+            if pin_set(out):
                 print(f'❌ 非法锁屏码 {wrong.strip()!r} 竟被接受')
                 return 1
-        out = input_until('123456\r', '锁屏码已设置')
-        if '锁屏码已设置' not in out:
+        out = input_until('123456\r', '🔢')
+        if not pin_set(out):
             print('❌ 6 位数字锁屏码未被接受')
             print(out[-800:])
             return 1
@@ -200,14 +208,29 @@ def main():
             print(out[-600:])
             return 1
 
+        # ---------- 口令错误：必须停在口令环节重输，且不能烧掉 join token ----------
+        # （旧实现：先 joinSpace 消费一次性 token 再验口令 → 失败即落到「加入秘境
+        #   失败」并退回邀请码环节，已接受的 token 作废——老板 2026-09-12 反馈）
+        send(m2, 'wrong-pass\r')
+        out = wait_text(m2, '口令错误', timeout=30)
+        if '口令错误，请重新输入' not in out:
+            print('❌ B 输错口令未被拦在口令环节（未提示重新输入）')
+            print(out[-800:])
+            return 1
+        if '加入秘境失败' in out or '输入邀请码' in out:
+            print('❌ B 输错口令竟退回邀请码环节（token 被烧掉）')
+            print(out[-800:])
+            return 1
+
+        # 同一个 token：重输正确口令 → 应加入成功（token 未被消耗）
         send(m2, 'abc123\r')
         out = wait_text(m2, '成功加入秘境', timeout=40)
         if '成功加入秘境' not in out:
-            print('❌ B 输入口令后未加入成功')
-            print(out[-600:])
+            print('❌ B 输错后重输正确口令未加入成功（token 应仍有效）')
+            print(out[-800:])
             return 1
 
-        print('✅ join：口令留空被拦下，补输后加入成功')
+        print('✅ join：口令留空被拦下、输错停在口令环节重输，补输后加入成功')
         return 0
     finally:
         for m, p in spawned:

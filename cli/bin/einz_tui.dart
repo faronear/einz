@@ -959,31 +959,50 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     final myName = slots.firstWhere((s) => s.slot == chosenSlot).displayName;
     session.messages.add(_systemMessage(session, '✅ 我是 ${myName}'));
     session.messages.add(_systemMessage(session, '----------------'));
-    // 口令必填：留空会先 joinSpace（服务端已登记）再取不到 Space Key 就 return，
-    // 设备卡在"已登记但无密钥"的坏状态——故在加入前就拦住（老板 2026-09-11）
-    String passphrase;
+    // 口令必填，且**先校验再 join**：joinSpace 会消费一次性 join token，旧实现先
+    // join（烧掉 token）再验口令——口令一错既回不到口令环节、token 也废了，用户
+    // 被踢回「输入邀请码」。改为用 preflight 已拿到的 spaceId 先调
+    // /spaces/{id}/key-escrow 验口令（不消费 token），错了就停在口令环节重输，
+    // 直到正确或 /exit（老板 2026-09-12）。
+    EscrowPayload? verified;
     while (true) {
       if (!_state!.running) return;
-      passphrase =
+      final input =
           (await _prompt(session, '❓ 验证密保口令:', hidden: true, required: true))
               .trim();
-      if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
-      break;
+      // 留空（含 /exit 中止）→ 重问；输入循环 required 已拦截留空回车
+      if (input.isEmpty) continue;
+      try {
+        final file = await _busy(session, '⏳ 核对口令中......',
+            () => api.fetchSpaceEscrow(pre.spaceId, input));
+        if (file == null) {
+          session.messages.add(_systemMessage(
+              session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
+          return;
+        }
+        // 连同解包一起验：口令对但包不匹配也按口令错误处理，避免白烧 token
+        verified =
+            await KeyEscrowService(api).openPackage(passphrase: input, file: file);
+        break;
+      } on ApiException catch (e) {
+        if (e.code != 'ESCROW_VERIFY_FAILED') rethrow;
+        session.messages.add(
+            _systemMessage(session, '⚠️ 口令错误，请重新输入（或输入 /exit 退出）'));
+        _scheduleRender();
+      } on FormatException {
+        session.messages.add(
+            _systemMessage(session, '⚠️ 口令错误，请重新输入（或输入 /exit 退出）'));
+        _scheduleRender();
+      }
     }
+    final payload = verified; // 循环内 break 前必已赋值（分析期已提升为非空）
+    // 口令已通过 → 此时才真正 join（消费 token，只做一次）
     final join = await _busy(session, '⏳ 正在加入秘境...', () => api.joinSpace(
       token: token,
       publicKey: store.publicKey,
       partnerSlot: chosenSlot,
       deviceName: store.deviceName,
     ));
-    // 口令取 Space Key（口令错 → FormatException → 提示）
-    final file = await api.fetchSpaceEscrow(join.spaceId, passphrase);
-    if (file == null) {
-      session.messages.add(
-          _systemMessage(session, '⚠️ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。'));
-      return;
-    }
-    final payload = await KeyEscrowService(api).openPackage(passphrase: passphrase, file: file);
     store.spaceId = join.spaceId;
     store.spaceAddress = join.spaceAddress;
     store.spaceKey = payload.spaceKeyB64;
