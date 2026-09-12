@@ -29,6 +29,8 @@ class DeviceStore {
     this.pinHash,
     this.escrowUpdatedAt,
     this.lastServerSequence = 0,
+    this.lastReportedDeliveredSeq = 0,
+    this.lastReportedReadSeq = 0,
     this.escrowUploaded = false,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
@@ -54,6 +56,12 @@ class DeviceStore {
   String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
   int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
   int lastServerSequence;
+
+  /// 已上报过的回执高水位（**仅用于防抖**，不是数据源——真值在服务端）。
+  /// 回执语义：我上报 delivered/read = N ⟺ 对方发来的 seq ≤ N 我均已收到/已读。
+  /// 重启后这里仍保留，可少发一次；丢失也无害（重复上报服务端单调夹紧，是 no-op）。
+  int lastReportedDeliveredSeq = 0;
+  int lastReportedReadSeq = 0;
 
   /// 创建者口令密保箱是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
   bool escrowUploaded;
@@ -93,6 +101,8 @@ class DeviceStore {
         'session_token': sessionToken,
         'server': server,
         'last_server_sequence': lastServerSequence,
+        'last_reported_delivered_seq': lastReportedDeliveredSeq,
+        'last_reported_read_seq': lastReportedReadSeq,
         'escrow_uploaded': escrowUploaded,
         'pin_hash': pinHash,
         'escrow_updated_at': escrowUpdatedAt,
@@ -116,6 +126,8 @@ class DeviceStore {
         sessionToken: json['session_token'] as String?,
         server: json['server'] as String?,
         lastServerSequence: (json['last_server_sequence'] as int?) ?? 0,
+        lastReportedDeliveredSeq: (json['last_reported_delivered_seq'] as int?) ?? 0,
+        lastReportedReadSeq: (json['last_reported_read_seq'] as int?) ?? 0,
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pinHash: json['pin_hash'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
@@ -180,6 +192,17 @@ class DeviceStore {
   void advanceAnchor(int serverSequence) {
     if (serverSequence > lastServerSequence) {
       lastServerSequence = serverSequence;
+    }
+  }
+
+  /// 记录"已上报过"的回执高水位（只前进；只用于防抖，不是数据源）。
+  /// [delivered]/[read] 可只传其一。
+  void advanceReported({int? delivered, int? read}) {
+    if (delivered != null && delivered > lastReportedDeliveredSeq) {
+      lastReportedDeliveredSeq = delivered;
+    }
+    if (read != null && read > lastReportedReadSeq) {
+      lastReportedReadSeq = read;
     }
   }
 
