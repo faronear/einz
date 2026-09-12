@@ -429,8 +429,8 @@ void main() {
     // 输入新口令 + 确认（匹配）；旧口令留空（确认弹窗在校验后、旧口令验证前）
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    await tester.enterText(fields.at(1), 'newpass');
-    await tester.enterText(fields.at(2), 'newpass');
+    await tester.enterText(fields.at(1), 'newpass1');
+    await tester.enterText(fields.at(2), 'newpass1');
     // 提交（按钮文本与弹窗标题同为"修改口令"——用 FilledButton 精确定位）
     await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
     await tester.pumpAndSettle();
@@ -441,6 +441,52 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('修改口令'), findsWidgets); // 改口令弹窗未关闭
     expect(find.text('修改密保口令？'), findsNothing);
+  });
+
+  testWidgets('修改口令：新口令不足 8 位 → 红字拦截，不弹显性确认', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('密保口令'));
+    await tester.pumpAndSettle();
+
+    // 7 位（不足 8）：点提交 → 红字拦截，不弹显性确认弹窗
+    final fields =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(fields.at(1), 'short7!');
+    await tester.enterText(fields.at(2), 'short7!');
+    await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
+    await tester.pumpAndSettle();
+    expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
+    expect(find.text('修改密保口令？'), findsNothing, reason: '校验未过不应进入显性确认');
+
+    // 补齐 8 位：放行到显性确认
+    await tester.enterText(fields.at(1), 'longpass1');
+    await tester.enterText(fields.at(2), 'longpass1');
+    await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
+    await tester.pumpAndSettle();
+    expect(find.text('口令不得少于 8 位'), findsNothing, reason: '满足长度后旧红字不应残留');
+    expect(find.text('修改密保口令？'), findsOneWidget, reason: '满足长度应进入显性确认');
   });
 
   testWidgets('菜单改名后写 profile（重启后从 profile 恢复新名字）', (WidgetTester tester) async {

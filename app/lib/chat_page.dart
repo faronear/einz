@@ -2895,6 +2895,8 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
   final _oldCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  // 与创建向导保持一致的最短口令长度（老板要求 2026-09-12）
+  static const int _passphraseMinLength = 8;
   bool _busy = false;
   String? _error;
 
@@ -2908,11 +2910,17 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
+    // 提交即清上一轮红字：否则校验通过进入显性确认弹窗时，旧错误仍残留在其背后
+    if (_error != null) setState(() => _error = null);
     final oldPass = _oldCtrl.text.trim();
     final newPass = _newCtrl.text.trim();
     final confirm = _confirmCtrl.text.trim();
     if (newPass.isEmpty) {
       setState(() => _error = l10n.setupPageNeedPassphrase);
+      return;
+    }
+    if (newPass.length < _passphraseMinLength) {
+      setState(() => _error = l10n.wizardPassphraseTooShort);
       return;
     }
     if (newPass != confirm) {
@@ -3009,6 +3017,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
             obscureText: true,
             decoration: InputDecoration(
               labelText: l10n.chatPageChangePassphraseNewLabel,
+              hintText: l10n.wizardPassphraseMinLengthHint,
               border: const OutlineInputBorder(),
             ),
           ),
