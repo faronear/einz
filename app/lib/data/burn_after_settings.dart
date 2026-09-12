@@ -5,7 +5,6 @@ import 'local_database.dart';
 const Map<String, int> kBurnAfterOptions = {
   '1 分钟': 60,
   '5 分钟': 300,
-  '30 分钟': 1800,
   '1 小时': 3600,
   '1 天': 86400,
   '7 天': 604800,
