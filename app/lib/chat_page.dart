@@ -134,6 +134,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 会触发全量解密）
   bool _initialLoaded = false;
   static const int _pageSize = 50;
+  // ---- 回执上报（已送达/已读；本轮只打通数据链路，不显示）----
+  int _lastReportedDeliveredSeq = 0; // 防抖：已上报过的送达高水位
+  int _lastReportedReadSeq = 0; // 防抖：已上报过的已读高水位
+  bool _appResumed = true; // 前台才允许把消息标为已读
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
@@ -329,6 +333,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         onPeerStatus: _onPeerStatus,
         onPassphraseRotated: _onPassphraseRotated,
         onProfileUpdated: _onProfileUpdated,
+        onReceiptUpdated: _onReceiptUpdated,
       );
     }
   }
@@ -356,6 +361,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final name = event.personName;
     if (name == null || name.isEmpty || !mounted) return;
     setState(() => _peerName = name);
+  }
+
+  /// 对方回执更新（Server 广播 receipt.updated）：落库为已送达/已读高水位。
+  /// **本轮不显示**——只为把数据打通，供将来 UI 使用（老板 2026-09-12）。
+  void _onReceiptUpdated(WsReceiptUpdatedEvent event) {
+    unawaited(_repo.upsertPeerReceipt(
+      personId: event.personId,
+      deliveredUptoSeq: event.deliveredUptoSeq,
+      readUptoSeq: event.readUptoSeq,
+    ));
   }
 
   /// 从服务端校正双方名字与性别（GET /space 的 personNames/personGenders）。
@@ -1091,6 +1106,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// App 生命周期：切后台记时，回前台超过阈值 → 覆盖锁屏（保留聊天页状态）。
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appResumed = state == AppLifecycleState.resumed; // 回执：只有前台才允许标已读
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _lockTimer.recordBackgrounded(DateTime.now());
     } else if (state == AppLifecycleState.resumed) {
@@ -1098,6 +1114,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _lockTimer.clear();
       if (relock && mounted) {
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LockPage(asOverlay: true)));
+      } else {
+        // 回到前台且未锁屏 → 用户确实在看聊天，可以把底部消息标为已读
+        _scheduleReadReport();
       }
     }
   }
@@ -1128,6 +1147,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 首次载入即定位到最新消息（老板实测 2026-09-09：原来停在最早消息处，
       // 要等 ticker 自动刷新才滚到底）——直接跳转不播动画，进入即见最新
       _scrollToLatest(animate: false);
+      // 首屏回填也应上报：本端确实"收到"了这些对方消息；若用户正盯着底部，
+      // 顺带标已读（post-frame + 贴底 + 前台三重门控在 _scheduleReadReport 内）
+      unawaited(_reportDeliveredIfAdvanced());
+      _scheduleReadReport();
     } catch (_) {
       // 网络抖动忽略：本地缓存已上屏，等 ticker 重试
     }
@@ -1176,8 +1199,65 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ];
       });
       if (added.isNotEmpty) _scrollToLatest();
+      // 回执：本端确实收到了对方的这些消息 → 上报"已送达"；有新消息且用户正看着
+      // 底部 → 顺带上报"已读"（本轮不显示，只把数据打通）
+      unawaited(_reportDeliveredIfAdvanced());
+      if (added.isNotEmpty) _scheduleReadReport();
     } catch (_) {
       // 本地读取失败忽略，下次刷新重试
+    }
+  }
+
+  /// 本端已加载的"对方消息"里最大的 serverSequence（未同步/无 seq 的忽略）。
+  int get _maxLoadedPeerSeq {
+    var maxSeq = 0;
+    for (final m in _messages) {
+      if (m.sender != 'peer') continue;
+      final s = m.env.serverSequence;
+      if (s != null && s > maxSeq) maxSeq = s;
+    }
+    return maxSeq;
+  }
+
+  /// 上报"已送达"（单调 + 防抖；失败忽略，下次会再报——重复上报服务端幂等）。
+  Future<void> _reportDeliveredIfAdvanced() async {
+    final seq = _maxLoadedPeerSeq;
+    if (seq <= _lastReportedDeliveredSeq) return;
+    // 成功才推进防抖标记：否则一次失败就再也不会重报（服务端永远缺这一档）
+    if (await _reportReceiptQuietly(deliveredUptoSeq: seq)) {
+      _lastReportedDeliveredSeq = seq;
+    }
+  }
+
+  /// 上报"已读"：**仅当** App 在前台、本页是最上层（未被锁屏/弹层盖住）、且列表
+  /// 贴底（用户确实看到了最新消息）时才报——避免把没看过的消息标已读。
+  /// post-frame 执行：setState 刚提交时布局未完成，extentAfter 不可信。
+  void _scheduleReadReport() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_appResumed) return;
+      if (ModalRoute.of(context)?.isCurrent != true) return;
+      if (!_scrollController.hasClients) return;
+      if (_scrollController.position.extentAfter > 48) return; // 上滑看历史 → 不标已读
+      final seq = _maxLoadedPeerSeq;
+      if (seq <= _lastReportedReadSeq) return;
+      // 同上：成功才推进防抖标记
+      unawaited(_reportReceiptQuietly(readUptoSeq: seq).then((ok) {
+        if (ok) _lastReportedReadSeq = seq;
+      }));
+    });
+  }
+
+  /// 上报回执；返回是否成功（失败时调用方保留重试机会）。
+  Future<bool> _reportReceiptQuietly({int? deliveredUptoSeq, int? readUptoSeq}) async {
+    try {
+      await _repo.reportReceipts(
+        deliveredUptoSeq: deliveredUptoSeq,
+        readUptoSeq: readUptoSeq,
+      );
+      return true;
+    } catch (_) {
+      // 网络抖动忽略；下次刷新会再报（单调，重复上报无害）
+      return false;
     }
   }
 

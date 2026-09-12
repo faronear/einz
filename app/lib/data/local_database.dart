@@ -76,6 +76,22 @@ class Drafts extends Table {
   Set<Column> get primaryKey => {messageId};
 }
 
+/// 对方消息回执（已送达/已读）单调高水位，按 (space, person) 一行。
+///
+/// 语义：我发的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
+/// `readUptoSeq ≥ S`。按 person 记 → "该 person 至少一台设备已收到/已读"。
+/// 目前只落库供将来 UI 使用（本轮不显示）。
+class PeerReceipts extends Table {
+  TextColumn get spaceId => text()();
+  TextColumn get personId => text()();
+  IntColumn get deliveredUptoSeq => integer().withDefault(const Constant(0))();
+  IntColumn get readUptoSeq => integer().withDefault(const Constant(0))();
+  IntColumn get updatedAt => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {spaceId, personId};
+}
+
 /// 本地应用状态（设置等）。
 class AppState extends Table {
   TextColumn get key => text()();
@@ -85,14 +101,14 @@ class AppState extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [LocalMessages, LocalAttachments, SyncState, Drafts, AppState])
+@DriftDatabase(tables: [LocalMessages, LocalAttachments, SyncState, Drafts, AppState, PeerReceipts])
 class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(_openConnection());
 
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -116,6 +132,10 @@ class LocalDatabase extends _$LocalDatabase {
             // v5：local_messages 加单条焚毁「是否手动设置」列（默认 false=全局设置）。
             // 仅手动设置的消息在气泡里标注「设置(修改)时间+时长」（老板 2026-09-12）
             await m.addColumn(localMessages, localMessages.burnManual);
+          }
+          if (from < 6) {
+            // v6：新增 peer_receipts 表（对方已送达/已读高水位；本轮只落库不显示）
+            await m.createTable(peerReceipts);
           }
         },
       );

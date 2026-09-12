@@ -323,7 +323,81 @@ class MessageRepository {
 
     // 补发离线队列
     await _flushPending();
+    // 拉取对方回执（已送达/已读）高水位：为将来 UI 准备，失败不影响同步
+    try {
+      await refreshReceipts();
+    } catch (_) {
+      // 网络抖动忽略，下次 sync 再拉
+    }
     return added;
+  }
+
+  /// 上报自己的送达/已读高水位（服务端只前进；本端也应只在前进时调用）。
+  Future<void> reportReceipts({int? deliveredUptoSeq, int? readUptoSeq}) async {
+    final t = token;
+    if (t == null) return;
+    if (deliveredUptoSeq == null && readUptoSeq == null) return;
+    await _withAutoAuth((tok) => api.postReceipts(
+          tok,
+          deliveredUptoSeq: deliveredUptoSeq,
+          readUptoSeq: readUptoSeq,
+        ));
+  }
+
+  /// 拉取本 space 全部回执行并落库（重连/补拉用；WS `receipt.updated` 是实时路径）。
+  Future<void> refreshReceipts() async {
+    final t = token;
+    if (t == null) return;
+    final rows = await _withAutoAuth((tok) => api.getReceipts(tok));
+    for (final r in rows) {
+      await upsertPeerReceipt(
+        personId: r.personId,
+        deliveredUptoSeq: r.deliveredUptoSeq,
+        readUptoSeq: r.readUptoSeq,
+        updatedAt: r.updatedAt,
+      );
+    }
+  }
+
+  /// 落库一条对方回执（单调只前进——陈旧的重放不会把高水位拉低）。
+  /// 对方可能有多台设备，任一设备上报即代表该 person；这里取 max 合并。
+  Future<void> upsertPeerReceipt({
+    required String personId,
+    required int deliveredUptoSeq,
+    required int readUptoSeq,
+    int updatedAt = 0,
+  }) async {
+    final existing = await (db.select(db.peerReceipts)
+          ..where((r) => r.spaceId.equals(spaceId) & r.personId.equals(personId)))
+        .getSingleOrNull();
+    await db.into(db.peerReceipts).insertOnConflictUpdate(PeerReceiptsCompanion.insert(
+          spaceId: spaceId,
+          personId: personId,
+          deliveredUptoSeq:
+              Value(max(existing?.deliveredUptoSeq ?? 0, deliveredUptoSeq)),
+          readUptoSeq: Value(max(existing?.readUptoSeq ?? 0, readUptoSeq)),
+          updatedAt: Value(updatedAt > 0
+              ? updatedAt
+              : DateTime.now().millisecondsSinceEpoch),
+        ));
+  }
+
+  /// 本 space 的对方回执行（仅 peer person——本端自己从不写这张表）。
+  Future<List<PeerReceipt>> peerReceipts() async {
+    return (db.select(db.peerReceipts)..where((r) => r.spaceId.equals(spaceId))).get();
+  }
+
+  /// 推导自己某条消息的回执状态（纯函数，便于单测；**本轮不接 UI**）。
+  ///
+  /// [seq] 为该消息的 server_sequence（未同步 → null）。规则：所有 peer person 都
+  /// `readUptoSeq ≥ seq` → `'read'`；都 `deliveredUptoSeq ≥ seq` → `'delivered'`；
+  /// 否则 `null`（即仅 `sent`）。2 人空间下 peers 只有一行，`every` 等价于唯一对方；
+  /// 多人时 `every` = "所有其他人都已收到"，语义更严格（正确）。
+  static String? receiptOf(int? seq, List<PeerReceipt> peers) {
+    if (seq == null || peers.isEmpty) return null;
+    if (peers.every((p) => p.readUptoSeq >= seq)) return 'read';
+    if (peers.every((p) => p.deliveredUptoSeq >= seq)) return 'delivered';
+    return null;
   }
 
   /// 补发 pending 队列（成功后置 sent 并推进锚点）。

@@ -42,6 +42,9 @@ class WsRealtimeService {
   /// 对方改名/改设备名回调（Server 广播 profile.updated——App 立即更新对方名）。
   void Function(WsProfileUpdatedEvent event)? onProfileUpdated;
 
+  /// 对方回执更新回调（Server 广播 receipt.updated——已送达/已读高水位）。
+  void Function(WsReceiptUpdatedEvent event)? onReceiptUpdated;
+
   /// 建立连接（自动重连直到 [stop]）。
   void start({
     void Function()? onMessageNew,
@@ -49,12 +52,14 @@ class WsRealtimeService {
     void Function(WsPeerStatusEvent event)? onPeerStatus,
     void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
     void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
+    void Function(WsReceiptUpdatedEvent event)? onReceiptUpdated,
   }) {
     this.onMessageNew = onMessageNew;
     this.onDeviceRevoked = onDeviceRevoked;
     this.onPeerStatus = onPeerStatus;
     this.onPassphraseRotated = onPassphraseRotated;
     this.onProfileUpdated = onProfileUpdated;
+    this.onReceiptUpdated = onReceiptUpdated;
     _client = WsClient(
       server: server,
       token: _token,
@@ -69,6 +74,7 @@ class WsRealtimeService {
         if (e is WsPeerStatusEvent) this.onPeerStatus?.call(e);
         if (e is WsPassphraseRotatedEvent) this.onPassphraseRotated?.call(e);
         if (e is WsProfileUpdatedEvent) this.onProfileUpdated?.call(e);
+        if (e is WsReceiptUpdatedEvent) this.onReceiptUpdated?.call(e);
       },
       onStatus: (s) => connected.value = s == WsStatus.connected,
     )..start();

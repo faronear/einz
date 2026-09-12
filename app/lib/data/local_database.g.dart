@@ -2202,6 +2202,378 @@ class AppStateCompanion extends UpdateCompanion<AppStateData> {
   }
 }
 
+class $PeerReceiptsTable extends PeerReceipts
+    with TableInfo<$PeerReceiptsTable, PeerReceipt> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PeerReceiptsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _spaceIdMeta = const VerificationMeta(
+    'spaceId',
+  );
+  @override
+  late final GeneratedColumn<String> spaceId = GeneratedColumn<String>(
+    'space_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deliveredUptoSeqMeta = const VerificationMeta(
+    'deliveredUptoSeq',
+  );
+  @override
+  late final GeneratedColumn<int> deliveredUptoSeq = GeneratedColumn<int>(
+    'delivered_upto_seq',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _readUptoSeqMeta = const VerificationMeta(
+    'readUptoSeq',
+  );
+  @override
+  late final GeneratedColumn<int> readUptoSeq = GeneratedColumn<int>(
+    'read_upto_seq',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    spaceId,
+    personId,
+    deliveredUptoSeq,
+    readUptoSeq,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'peer_receipts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PeerReceipt> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('space_id')) {
+      context.handle(
+        _spaceIdMeta,
+        spaceId.isAcceptableOrUnknown(data['space_id']!, _spaceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_spaceIdMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('delivered_upto_seq')) {
+      context.handle(
+        _deliveredUptoSeqMeta,
+        deliveredUptoSeq.isAcceptableOrUnknown(
+          data['delivered_upto_seq']!,
+          _deliveredUptoSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('read_upto_seq')) {
+      context.handle(
+        _readUptoSeqMeta,
+        readUptoSeq.isAcceptableOrUnknown(
+          data['read_upto_seq']!,
+          _readUptoSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {spaceId, personId};
+  @override
+  PeerReceipt map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PeerReceipt(
+      spaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}space_id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      deliveredUptoSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}delivered_upto_seq'],
+      )!,
+      readUptoSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}read_upto_seq'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PeerReceiptsTable createAlias(String alias) {
+    return $PeerReceiptsTable(attachedDatabase, alias);
+  }
+}
+
+class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
+  final String spaceId;
+  final String personId;
+  final int deliveredUptoSeq;
+  final int readUptoSeq;
+  final int updatedAt;
+  const PeerReceipt({
+    required this.spaceId,
+    required this.personId,
+    required this.deliveredUptoSeq,
+    required this.readUptoSeq,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['space_id'] = Variable<String>(spaceId);
+    map['person_id'] = Variable<String>(personId);
+    map['delivered_upto_seq'] = Variable<int>(deliveredUptoSeq);
+    map['read_upto_seq'] = Variable<int>(readUptoSeq);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  PeerReceiptsCompanion toCompanion(bool nullToAbsent) {
+    return PeerReceiptsCompanion(
+      spaceId: Value(spaceId),
+      personId: Value(personId),
+      deliveredUptoSeq: Value(deliveredUptoSeq),
+      readUptoSeq: Value(readUptoSeq),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory PeerReceipt.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PeerReceipt(
+      spaceId: serializer.fromJson<String>(json['spaceId']),
+      personId: serializer.fromJson<String>(json['personId']),
+      deliveredUptoSeq: serializer.fromJson<int>(json['deliveredUptoSeq']),
+      readUptoSeq: serializer.fromJson<int>(json['readUptoSeq']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'spaceId': serializer.toJson<String>(spaceId),
+      'personId': serializer.toJson<String>(personId),
+      'deliveredUptoSeq': serializer.toJson<int>(deliveredUptoSeq),
+      'readUptoSeq': serializer.toJson<int>(readUptoSeq),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  PeerReceipt copyWith({
+    String? spaceId,
+    String? personId,
+    int? deliveredUptoSeq,
+    int? readUptoSeq,
+    int? updatedAt,
+  }) => PeerReceipt(
+    spaceId: spaceId ?? this.spaceId,
+    personId: personId ?? this.personId,
+    deliveredUptoSeq: deliveredUptoSeq ?? this.deliveredUptoSeq,
+    readUptoSeq: readUptoSeq ?? this.readUptoSeq,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  PeerReceipt copyWithCompanion(PeerReceiptsCompanion data) {
+    return PeerReceipt(
+      spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      deliveredUptoSeq: data.deliveredUptoSeq.present
+          ? data.deliveredUptoSeq.value
+          : this.deliveredUptoSeq,
+      readUptoSeq: data.readUptoSeq.present
+          ? data.readUptoSeq.value
+          : this.readUptoSeq,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeerReceipt(')
+          ..write('spaceId: $spaceId, ')
+          ..write('personId: $personId, ')
+          ..write('deliveredUptoSeq: $deliveredUptoSeq, ')
+          ..write('readUptoSeq: $readUptoSeq, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(spaceId, personId, deliveredUptoSeq, readUptoSeq, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PeerReceipt &&
+          other.spaceId == this.spaceId &&
+          other.personId == this.personId &&
+          other.deliveredUptoSeq == this.deliveredUptoSeq &&
+          other.readUptoSeq == this.readUptoSeq &&
+          other.updatedAt == this.updatedAt);
+}
+
+class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
+  final Value<String> spaceId;
+  final Value<String> personId;
+  final Value<int> deliveredUptoSeq;
+  final Value<int> readUptoSeq;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const PeerReceiptsCompanion({
+    this.spaceId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.deliveredUptoSeq = const Value.absent(),
+    this.readUptoSeq = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PeerReceiptsCompanion.insert({
+    required String spaceId,
+    required String personId,
+    this.deliveredUptoSeq = const Value.absent(),
+    this.readUptoSeq = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : spaceId = Value(spaceId),
+       personId = Value(personId);
+  static Insertable<PeerReceipt> custom({
+    Expression<String>? spaceId,
+    Expression<String>? personId,
+    Expression<int>? deliveredUptoSeq,
+    Expression<int>? readUptoSeq,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (spaceId != null) 'space_id': spaceId,
+      if (personId != null) 'person_id': personId,
+      if (deliveredUptoSeq != null) 'delivered_upto_seq': deliveredUptoSeq,
+      if (readUptoSeq != null) 'read_upto_seq': readUptoSeq,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PeerReceiptsCompanion copyWith({
+    Value<String>? spaceId,
+    Value<String>? personId,
+    Value<int>? deliveredUptoSeq,
+    Value<int>? readUptoSeq,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return PeerReceiptsCompanion(
+      spaceId: spaceId ?? this.spaceId,
+      personId: personId ?? this.personId,
+      deliveredUptoSeq: deliveredUptoSeq ?? this.deliveredUptoSeq,
+      readUptoSeq: readUptoSeq ?? this.readUptoSeq,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (spaceId.present) {
+      map['space_id'] = Variable<String>(spaceId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (deliveredUptoSeq.present) {
+      map['delivered_upto_seq'] = Variable<int>(deliveredUptoSeq.value);
+    }
+    if (readUptoSeq.present) {
+      map['read_upto_seq'] = Variable<int>(readUptoSeq.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeerReceiptsCompanion(')
+          ..write('spaceId: $spaceId, ')
+          ..write('personId: $personId, ')
+          ..write('deliveredUptoSeq: $deliveredUptoSeq, ')
+          ..write('readUptoSeq: $readUptoSeq, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   $LocalDatabaseManager get managers => $LocalDatabaseManager(this);
@@ -2212,6 +2584,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $SyncStateTable syncState = $SyncStateTable(this);
   late final $DraftsTable drafts = $DraftsTable(this);
   late final $AppStateTable appState = $AppStateTable(this);
+  late final $PeerReceiptsTable peerReceipts = $PeerReceiptsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2222,6 +2595,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     syncState,
     drafts,
     appState,
+    peerReceipts,
   ];
 }
 
@@ -3628,6 +4002,219 @@ typedef $$AppStateTableProcessedTableManager =
       AppStateData,
       PrefetchHooks Function()
     >;
+typedef $$PeerReceiptsTableCreateCompanionBuilder =
+    PeerReceiptsCompanion Function({
+      required String spaceId,
+      required String personId,
+      Value<int> deliveredUptoSeq,
+      Value<int> readUptoSeq,
+      Value<int> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$PeerReceiptsTableUpdateCompanionBuilder =
+    PeerReceiptsCompanion Function({
+      Value<String> spaceId,
+      Value<String> personId,
+      Value<int> deliveredUptoSeq,
+      Value<int> readUptoSeq,
+      Value<int> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$PeerReceiptsTableFilterComposer
+    extends Composer<_$LocalDatabase, $PeerReceiptsTable> {
+  $$PeerReceiptsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get spaceId => $composableBuilder(
+    column: $table.spaceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deliveredUptoSeq => $composableBuilder(
+    column: $table.deliveredUptoSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get readUptoSeq => $composableBuilder(
+    column: $table.readUptoSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PeerReceiptsTableOrderingComposer
+    extends Composer<_$LocalDatabase, $PeerReceiptsTable> {
+  $$PeerReceiptsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get spaceId => $composableBuilder(
+    column: $table.spaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deliveredUptoSeq => $composableBuilder(
+    column: $table.deliveredUptoSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get readUptoSeq => $composableBuilder(
+    column: $table.readUptoSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PeerReceiptsTableAnnotationComposer
+    extends Composer<_$LocalDatabase, $PeerReceiptsTable> {
+  $$PeerReceiptsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get spaceId =>
+      $composableBuilder(column: $table.spaceId, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<int> get deliveredUptoSeq => $composableBuilder(
+    column: $table.deliveredUptoSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get readUptoSeq => $composableBuilder(
+    column: $table.readUptoSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$PeerReceiptsTableTableManager
+    extends
+        RootTableManager<
+          _$LocalDatabase,
+          $PeerReceiptsTable,
+          PeerReceipt,
+          $$PeerReceiptsTableFilterComposer,
+          $$PeerReceiptsTableOrderingComposer,
+          $$PeerReceiptsTableAnnotationComposer,
+          $$PeerReceiptsTableCreateCompanionBuilder,
+          $$PeerReceiptsTableUpdateCompanionBuilder,
+          (
+            PeerReceipt,
+            BaseReferences<_$LocalDatabase, $PeerReceiptsTable, PeerReceipt>,
+          ),
+          PeerReceipt,
+          PrefetchHooks Function()
+        > {
+  $$PeerReceiptsTableTableManager(_$LocalDatabase db, $PeerReceiptsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PeerReceiptsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PeerReceiptsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PeerReceiptsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> spaceId = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<int> deliveredUptoSeq = const Value.absent(),
+                Value<int> readUptoSeq = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PeerReceiptsCompanion(
+                spaceId: spaceId,
+                personId: personId,
+                deliveredUptoSeq: deliveredUptoSeq,
+                readUptoSeq: readUptoSeq,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String spaceId,
+                required String personId,
+                Value<int> deliveredUptoSeq = const Value.absent(),
+                Value<int> readUptoSeq = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PeerReceiptsCompanion.insert(
+                spaceId: spaceId,
+                personId: personId,
+                deliveredUptoSeq: deliveredUptoSeq,
+                readUptoSeq: readUptoSeq,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PeerReceiptsTable, PeerReceipt>(table),
+                  BaseReferences<
+                    _$LocalDatabase,
+                    $PeerReceiptsTable,
+                    PeerReceipt
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PeerReceiptsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$LocalDatabase,
+      $PeerReceiptsTable,
+      PeerReceipt,
+      $$PeerReceiptsTableFilterComposer,
+      $$PeerReceiptsTableOrderingComposer,
+      $$PeerReceiptsTableAnnotationComposer,
+      $$PeerReceiptsTableCreateCompanionBuilder,
+      $$PeerReceiptsTableUpdateCompanionBuilder,
+      (
+        PeerReceipt,
+        BaseReferences<_$LocalDatabase, $PeerReceiptsTable, PeerReceipt>,
+      ),
+      PeerReceipt,
+      PrefetchHooks Function()
+    >;
 
 class $LocalDatabaseManager {
   final _$LocalDatabase _db;
@@ -3642,4 +4229,6 @@ class $LocalDatabaseManager {
       $$DraftsTableTableManager(_db, _db.drafts);
   $$AppStateTableTableManager get appState =>
       $$AppStateTableTableManager(_db, _db.appState);
+  $$PeerReceiptsTableTableManager get peerReceipts =>
+      $$PeerReceiptsTableTableManager(_db, _db.peerReceipts);
 }

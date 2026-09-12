@@ -32,6 +32,25 @@ class FakeApi extends ApiClient {
   /// 是否让消息发送（postMessage）抛异常（模拟发送失败）。
   bool failPostMessage = false;
 
+  /// 回执：记录的上报（delivered/read 高水位）。
+  final List<({int delivered, int read})> reportedReceipts = [];
+  /// 回执：GET /receipts 编排返回值。
+  List<ReceiptRow> receiptRows = [];
+
+  @override
+  Future<({int deliveredUptoSeq, int readUptoSeq})> postReceipts(
+    String token, {
+    int? deliveredUptoSeq,
+    int? readUptoSeq,
+  }) async {
+    reportedReceipts.add((delivered: deliveredUptoSeq ?? 0, read: readUptoSeq ?? 0));
+    // 服务端只前进（此处按最后一次上报返回即可，够测试用）
+    return (deliveredUptoSeq: deliveredUptoSeq ?? 0, readUptoSeq: readUptoSeq ?? 0);
+  }
+
+  @override
+  Future<List<ReceiptRow>> getReceipts(String token) async => receiptRows;
+
   @override
   Future<SpaceResult> getSpace(String token) async {
     return SpaceResult(spaceId: 'space-test', devices: spaceDevices);
@@ -556,6 +575,53 @@ void main() {
     expect(a.burnManual, isTrue, reason: 'A 为手动设置');
     expect(b.burnAfterSeconds, 0, reason: '后续新消息应沿用全局(0)，不被 A 的单条设置污染');
     expect(b.burnManual, isFalse, reason: '全局设置的消息不应被标为手动');
+  });
+
+  // ---------- 回执（已送达/已读）地基：本轮只落库 + 推导，不显示 ----------
+
+  test('回执：sync 拉取并落库，推导 receiptOf（null/delivered/read）', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    api.receiptRows = [
+      ReceiptRow(
+          personId: 'person-b', deliveredUptoSeq: 10, readUptoSeq: 5, updatedAt: 111),
+    ];
+    await repo.sync();
+
+    final rows = await repo.peerReceipts();
+    expect(rows.single.personId, 'person-b');
+    expect(rows.single.deliveredUptoSeq, 10);
+    expect(rows.single.readUptoSeq, 5);
+
+    // 推导：seq ≤ read → read；read < seq ≤ delivered → delivered；超出 → null
+    expect(MessageRepository.receiptOf(1, rows), 'read', reason: 'seq=1 ≤ read(5) → 已读');
+    expect(MessageRepository.receiptOf(5, rows), 'read', reason: '边界：=read → 已读');
+    expect(MessageRepository.receiptOf(6, rows), 'delivered', reason: 'read < 6 ≤ delivered');
+    expect(MessageRepository.receiptOf(10, rows), 'delivered', reason: '边界：=delivered → 已送达');
+    expect(MessageRepository.receiptOf(11, rows), isNull, reason: '超出高水位 → 仅已发送');
+    expect(MessageRepository.receiptOf(null, rows), isNull, reason: '未同步的消息无回执');
+    expect(MessageRepository.receiptOf(1, const []), isNull, reason: '没有任何回执行 → null');
+  });
+
+  test('回执：单调只前进（陈旧的重放不会把高水位拉低）', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    await repo.upsertPeerReceipt(
+        personId: 'person-b', deliveredUptoSeq: 20, readUptoSeq: 10);
+    // 重放一个更旧的值（如乱序的 WS 帧/过期 GET）
+    await repo.upsertPeerReceipt(
+        personId: 'person-b', deliveredUptoSeq: 5, readUptoSeq: 1);
+    final rows = await repo.peerReceipts();
+    expect(rows.single.deliveredUptoSeq, 20, reason: '单调：不得回退');
+    expect(rows.single.readUptoSeq, 10, reason: '单调：不得回退');
+  });
+
+  test('回执：reportReceipts 走 _withAutoAuth，无 token 时静默跳过', () async {
+    final api = FakeApi();
+    final repo = makeRepo(api); // token 为 null
+    await repo.reportReceipts(deliveredUptoSeq: 3);
+    expect(api.reportedReceipts, isEmpty, reason: '无 token 不应上报');
+    expect(repo.token, isNull);
   });
 }
 
