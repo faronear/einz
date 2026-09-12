@@ -45,7 +45,8 @@ android {
                 signingConfig = signingConfigs.create("release") {
                     keyAlias = keystoreProperties.getProperty("keyAlias")
                     keyPassword = keystoreProperties.getProperty("keyPassword")
-                    storeFile = file(keystoreProperties.getProperty("storeFile"))
+                    // storeFile 与 key.properties 同目录（rootProject = android/），相对模块目录解析会多一层 app/
+                    storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                     storePassword = keystoreProperties.getProperty("storePassword")
                 }
             } else {
