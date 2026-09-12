@@ -61,6 +61,8 @@
     }
   },
   "wizardPassphraseHint": "Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.",
+  "wizardPassphraseMinLengthHint": "At least 8 characters",
+  "wizardPassphraseTooShort": "Passphrase must be at least 8 characters",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
   "wizardPassphraseMismatch": "Passphrases do not match",
   "wizardJoinPassphraseHint": "A password shared with your partner to protect messages. Don't know it? Ask your partner.",

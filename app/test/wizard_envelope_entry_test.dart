@@ -182,4 +182,26 @@ void main() {
     expect(find.text('两次输入的口令不一致'), findsNothing, reason: '一致后旧红字不应残留');
     expect(find.text('设置锁屏码'), findsOneWidget, reason: '一致应放行进 PIN 步骤');
   });
+
+  testWidgets('create 口令页：首框有最短提示，口令不足 8 位 → 红字拦截', (WidgetTester tester) async {
+    await pumpToPassphrase(tester);
+    expect(find.text('至少8位以上密码'), findsOneWidget,
+        reason: '首个口令框应有最短长度提示语');
+
+    // 7 位（不足 8）：红字拦截，停留本页
+    await tester.enterText(find.byType(TextField).at(0), '1234567');
+    await tester.enterText(find.byType(TextField).at(1), '1234567');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
+    expect(find.text('设置密保口令'), findsOneWidget, reason: '不足 8 位应停留口令页');
+
+    // 补齐 8 位：放行
+    await tester.enterText(find.byType(TextField).at(0), '12345678');
+    await tester.enterText(find.byType(TextField).at(1), '12345678');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('口令不得少于 8 位'), findsNothing, reason: '满足长度后旧红字不应残留');
+    expect(find.text('设置锁屏码'), findsOneWidget, reason: '满足长度应放行进 PIN 步骤');
+  });
 }

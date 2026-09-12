@@ -188,6 +188,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.';
 
   @override
+  String get wizardPassphraseMinLengthHint => 'At least 8 characters';
+
+  @override
+  String get wizardPassphraseTooShort =>
+      'Passphrase must be at least 8 characters';
+
+  @override
   String get wizardPassphraseConfirmHint => 'Re-enter passphrase';
 
   @override

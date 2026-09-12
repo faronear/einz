@@ -61,6 +61,8 @@
     }
   },
   "wizardPassphraseHint": "对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
+  "wizardPassphraseMinLengthHint": "至少8位以上密码",
+  "wizardPassphraseTooShort": "口令不得少于 8 位",
   "wizardPassphraseConfirmHint": "请再次输入口令",
   "wizardPassphraseMismatch": "两次输入的口令不一致",
   "wizardJoinPassphraseHint": "口令是与伴侣共享的密码，用于保护聊天内容。如果不知道口令，请询问伴侣。",

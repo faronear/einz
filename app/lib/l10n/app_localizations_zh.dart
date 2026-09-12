@@ -181,6 +181,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
+  String get wizardPassphraseMinLengthHint => '至少8位以上密码';
+
+  @override
+  String get wizardPassphraseTooShort => '口令不得少于 8 位';
+
+  @override
   String get wizardPassphraseConfirmHint => '请再次输入口令';
 
   @override

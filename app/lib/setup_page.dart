@@ -100,6 +100,9 @@ class _SetupPageState extends State<SetupPage> {
   // create 首台设备：口令二次确认（避免设错口令后无法再入）。join 是验证已有
   // 口令，无需确认，故仅 create 用。
   final _escrowPassphraseConfirm = TextEditingController();
+  // 接入口令最短长度（仅 create 设置时校验；join 是验证已有口令不限制，
+  // 避免历史短口令被新规则挡在门外——老板要求 2026-09-12）
+  static const int _passphraseMinLength = 8;
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
   String? _pinError; // PIN 步骤红色提示（输入框下方）
@@ -613,6 +616,10 @@ class _SetupPageState extends State<SetupPage> {
         localError = _role == _WizardRole.join
             ? l10n.wizardJoinPassphraseRequired
             : l10n.setupPageNeedPassphrase;
+        invalid = true;
+      } else if (_role == _WizardRole.create && pass.length < _passphraseMinLength) {
+        // 首台设备：口令不得少于 8 位（老板要求 2026-09-12）
+        localError = l10n.wizardPassphraseTooShort;
         invalid = true;
       } else if (_role == _WizardRole.create &&
           _escrowPassphraseConfirm.text.trim() != pass) {
@@ -1731,8 +1738,12 @@ class _SetupPageState extends State<SetupPage> {
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
           },
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            // 仅首台设备设置时提示最短长度（join 是验证已有口令）
+            hintText: _role == _WizardRole.create
+                ? l10n.wizardPassphraseMinLengthHint
+                : null,
+            border: const OutlineInputBorder(),
           ),
         ),
         // 首台设备：口令需二次输入确认（避免设错口令后无法再入；老板要求 2026-09-12）。

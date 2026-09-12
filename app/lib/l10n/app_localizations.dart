@@ -434,6 +434,18 @@ abstract class AppLocalizations {
   /// **'Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.'**
   String get wizardPassphraseHint;
 
+  /// No description provided for @wizardPassphraseMinLengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 8 characters'**
+  String get wizardPassphraseMinLengthHint;
+
+  /// No description provided for @wizardPassphraseTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase must be at least 8 characters'**
+  String get wizardPassphraseTooShort;
+
   /// No description provided for @wizardPassphraseConfirmHint.
   ///
   /// In en, this message translates to:
