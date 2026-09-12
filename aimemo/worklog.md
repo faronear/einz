@@ -2963,3 +2963,31 @@ commit `730d6da`（app 源码 + 测试 + l10n 我的 hunk；老板在 `app_zh.ar
   故未单独重生。
 
 commit `af51c16`。
+
+## 2026-09-12 密保口令最短 8 位（创建向导 + 事后重设，两处一致）
+
+- 老板要求：创建向导「设置密保口令」的首个输入框加提示语「至少8位以上密码」并校验
+  不得少于 8 位；进入对话界面后右上角菜单的「重设密保口令」弹窗也要同样限制。
+- **创建向导**（`app/lib/setup_page.dart`）：`_SetupPageState` 加
+  `_passphraseMinLength = 8`；首个口令框 hint 改为「至少8位以上密码」（**仅** create，
+  join 是验证已有口令不提示）；`_nextStep` 校验顺序改为 空 → 不足 8 位 → 两次不一致。
+- **重设弹窗**（`app/lib/chat_page.dart` 的 `_ChangePassphraseDialogState`）：同样加
+  `_passphraseMinLength = 8`；新口令框加 `hintText`「至少8位以上密码」；`_submit`
+  在空/不一致校验之间插入「不足 8 位 → `wizardPassphraseTooShort`」。顺带修一个小
+  体验问题：`_submit` 开头清上一轮 `_error`，否则校验通过进入显性确认弹窗时旧红字
+  仍残留在其背后。
+- **为何只 create / 重设，不限 join**：join 是「验证」已有口令，若对历史短口令也卡 8 位，
+  老空间用户会被挡在门外。此判断已写入代码注释，若老板要求 join 也卡，改一行即可。
+- l10n 复用：`wizardPassphraseMinLengthHint`（提示）/ `wizardPassphraseTooShort`
+  （「口令不得少于 8 位」，en: Passphrase must be at least 8 characters）。
+- 测试：`wizard_envelope_entry_test.dart` 新增「首框有提示 + 不足 8 位拦截 + 补齐放行」
+  （7/7 过）；`chat_page_menu_test.dart` 既有「修改口令」用例原用 7 位 `newpass` 会被
+  新规则拦住，已改用 8 位 `newpass1`，并新增「重设弹窗不足 8 位拦截」用例（21/21 过）。
+- 全量 `flutter test` 仍是那 15 条既有环境性失败（未增加）；`flutter analyze` 0 error。
+
+commit `5d24df8`（创建向导）、`d9d9199`（重设弹窗）。
+
+> 注：本段追加时工作区里老板正在对 `aimemo/worklog.md` 做一次大规模 markdown 重排
+> （未提交），故只单独提交了本段追加；老板的重排改动仍在工作区未提交。同理
+> `app_zh.arb` / `app_localizations_zh.dart` 里老板的文案微调（「再输一次以确认」）
+> 也未并入上述提交，已原样保留在工作区。
