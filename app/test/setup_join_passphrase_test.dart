@@ -89,8 +89,10 @@ Future<void> pumpToJoinPassphrase(
   WidgetTester tester, {
   required String correctPass,
   EscrowPayload? payload,
+  Future<SpaceJoinResult> Function(String token)? join,
 }) async {
-  await pumpToJoinToken(tester, correctPass: correctPass, payload: payload);
+  await pumpToJoinToken(
+      tester, correctPass: correctPass, payload: payload, join: join);
   await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
   await tester.tap(find.text('下一步')); // preflight 通过 → 直接进身份选择页（不再显示确认卡片）
   await tester.pumpAndSettle();
@@ -135,6 +137,41 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.text('设置锁屏码'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
+  });
+
+  testWidgets('先输错再输对：token 只被消费一次，重输正确口令仍可加入', (WidgetTester tester) async {
+    var joinCalls = 0;
+    // 模拟一次性 token：第二次 joinSpace 即报已使用（真实服务端行为）
+    Future<SpaceJoinResult> fakeJoin(String token) async {
+      joinCalls++;
+      if (joinCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
+      return const SpaceJoinResult(
+          spaceId: 'space-test',
+          personId: 'personB',
+          partnerSlot: 1,
+          sessionToken: 'tok',
+          deviceId: 'dev2',
+          spaceAddress: '0x00');
+    }
+
+    await pumpToJoinPassphrase(
+        tester, correctPass: '正确口令-abc', payload: payload, join: fakeJoin);
+
+    // 1) 先输错：应停在口令页，且**不能**已经消费 token
+    await tester.enterText(find.byType(TextField), '随便输入的口令');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('口令错误：请确认首台设备创建时设置的口令'), findsOneWidget,
+        reason: '错误口令必须被拦截并提示');
+    expect(joinCalls, 0, reason: '验口令之前不应消费一次性 token');
+
+    // 2) 重输正确口令：旧实现此时 joinSpace 报「token 已用」→ 永远失败
+    //    （老板 2026-09-12 反馈：一直「口令验证失败。请询问秘境伴侣获得口令。」）
+    await tester.enterText(find.byType(TextField), '正确口令-abc');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('设置锁屏码'), findsWidgets, reason: '重输正确口令应放行进 PIN 步骤');
+    expect(joinCalls, 1, reason: 'token 只应被消费一次');
   });
 
   testWidgets('未托管口令（服务器无 escrow 包）：提示并停留', (WidgetTester tester) async {

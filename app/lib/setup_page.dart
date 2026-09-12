@@ -121,6 +121,10 @@ class _SetupPageState extends State<SetupPage> {
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
   // 空间显示名（进入聊天页的对方名字）
   String _joinToken = '';
+  // preflight 返回的 spaceId：**验口令用**（POST /spaces/{id}/key-escrow 不消费
+  // token，故可在 joinSpace 之前反复试口令；joinSpace 才消费一次性 token——
+  // 老板 2026-09-12：输错口令不该烧 token，也不该导致重输正确口令仍被拒）
+  String? _joinSpaceId;
   String? _joinSpaceName;
   String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
 
@@ -754,6 +758,7 @@ class _SetupPageState extends State<SetupPage> {
         _role = null;
         _step = 0;
         _joinToken = '';
+        _joinSpaceId = null; // 一并清：残留旧 spaceId 会拿旧空间去验口令
         _joinSpaceName = null;
         _joinSlots = const [];
         _chosenSlot = null;
@@ -1437,6 +1442,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return false;
       setState(() {
         _joinToken = token;
+        _joinSpaceId = pre.spaceId; // 供口令页先验口令（不消费 token）
         _joinSpaceName = pre.displayName;
         _joinSlots = pre.slots; // 身份选择页（步骤 2）展示两身份
         _chosenSlot = null; // 换 token 后重置身份选择
@@ -1447,6 +1453,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return false;
       setState(() {
         _joinToken = '';
+        _joinSpaceId = null;
         _localError = _tokenErrorText(e.code);
       });
       return false;
@@ -1955,9 +1962,12 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---- 场景 B（join）：身份名字 → 邀请码 → 口令 → PIN ----
 
-  /// join 口令页（步骤 3）「验证接入口令」：join 提交（POST /spaces/join——
-  /// 设备登记 + session 签发）→ 口令 escrow 取 Space Key，口令与首台设备创建时
-  /// 一致（解密成功）才放行进 PIN 步骤。
+  /// join 口令页（步骤 3）「验证接入口令」：**先验口令 → 再 join 提交**。
+  /// 顺序很关键：joinSpace（POST /spaces/join）会消费 24h 一次性 token，旧实现
+  /// 先 join 再验口令 → 输错一次 token 就废了，之后即使重输正确口令也永远失败
+  /// （joinSpace 报 token 已用，落到通用分支提示「口令验证失败」——老板 2026-09-12）。
+  /// 改为用 preflight 拿到的 spaceId 先调 /spaces/{id}/key-escrow（不消费 token，
+  /// 可反复试），验过才真正 join。
   Future<bool> _verifyJoinPassphrase() async {
     final kp = _keyPair;
     if (kp == null) return false;
@@ -1966,14 +1976,29 @@ class _SetupPageState extends State<SetupPage> {
       setState(() => _localError = AppLocalizations.of(context)!.wizardJoinPassphraseRequired);
       return false;
     }
+    final spaceId = _joinSpaceId;
+    if (spaceId == null || spaceId.isEmpty) {
+      setState(() => _status = AppLocalizations.of(context)!.setupPageInitFailed);
+      return false;
+    }
     setState(() {
       _busy = true;
       _status = null;
     });
     try {
-      // Multiverse：join 提交（POST /spaces/join——设备登记 + session 签发，
-      // 绑定该 Space；token 已在第一步 preflight 验证，此处真正消费）
       final api = ApiClient(_server);
+      final escrow = widget.escrowOverride?.call(_server) ?? KeyEscrowService(api);
+      // 1) 先验口令取 Space Key（不消费 token；口令错 → ApiException
+      //    ESCROW_VERIFY_FAILED / FormatException）
+      final file = await escrow.fetchSpaceEscrow(spaceId, passphrase);
+      if (!mounted) return false;
+      if (file == null) {
+        setState(() => _status = AppLocalizations.of(context)!.setupPageNoEscrow);
+        return false;
+      }
+      final payload = await escrow.openPackage(passphrase: passphrase, file: file);
+      if (!mounted) return false;
+      // 2) 口令通过 → 才 join 提交（设备登记 + session 签发，真正消费 token）
       final join = await (widget.joinOverride?.call(_joinToken) ??
           api.joinSpace(
             token: _joinToken,
@@ -1988,22 +2013,23 @@ class _SetupPageState extends State<SetupPage> {
         personId: join.personId,
         spaceId: join.spaceId,
       );
-      // 口令取 Space Key（POST /spaces/{id}/key-escrow——口令正确才返回；
-      // escrowOverride 可注入 fake，与 v1 fetch 同边界）
-      final file = await (widget.escrowOverride?.call(_server) ?? KeyEscrowService(api))
-          .fetchSpaceEscrow(join.spaceId, passphrase);
-      if (!mounted) return false;
-      if (file == null) {
-        setState(() => _status = AppLocalizations.of(context)!.setupPageNoEscrow);
-        return false;
-      }
-      final payload = await (widget.escrowOverride?.call(_server) ?? KeyEscrowService(api))
-          .openPackage(passphrase: passphrase, file: file);
-      if (!mounted) return false;
       _spaceKey = base64Decode(payload.spaceKeyB64);
       _spaceId.text = join.spaceId;
       _joinKeyVersion = payload.keyVersion;
       return true;
+    } on ApiException catch (e) {
+      if (!mounted) return false;
+      // 口令校验失败（401）→ 停在口令页重输；"空间无密保箱"（404，同码）→ 明确
+      // 提示（否则用户会一直重输一个根本不存在的口令）；其余（如 join 时 token
+      // 已用/失效）→ 走通用失败提示
+      if (e.code == 'ESCROW_VERIFY_FAILED') {
+        setState(() => _status = e.httpStatus == 404
+            ? AppLocalizations.of(context)!.setupPageNoEscrow
+            : AppLocalizations.of(context)!.wizardJoinPassphraseWrong);
+      } else {
+        setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFailed('$e'));
+      }
+      return false;
     } on FormatException {
       if (!mounted) return false;
       setState(() => _status = AppLocalizations.of(context)!.wizardJoinPassphraseWrong);
