@@ -689,9 +689,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get burnOption7Days => '7 days';
 
   @override
-  String get burnOption30Days => '30 days';
-
-  @override
   String get lockPageTitle => 'Einz Locked';
 
   @override

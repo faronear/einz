@@ -181,8 +181,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
-  String get wizardJoinPassphraseHint =>
-      '口令是与伴侣共享的一个密码，用于保护私密信息。如果不知道口令，请询问伴侣。。';
+  String get wizardJoinPassphraseHint => '口令是与伴侣共享的密码，用于保护私密信息。如果不知道口令，请询问伴侣。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
@@ -235,19 +234,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenHint => '填写邀请码，24小时内一次性有效';
 
   @override
-  String get setupTokenInputHint => '邀请链接或代码';
+  String get setupTokenInputHint => '邀请码';
 
   @override
-  String get setupTokenNeedInput => '必须填写邀请链接或代码';
+  String get setupTokenNeedInput => '必须填写邀请码';
 
   @override
-  String get setupTokenInvalid => '邀请链接无效';
+  String get setupTokenInvalid => '无效的邀请码';
 
   @override
-  String get setupTokenExpired => '邀请链接已过期';
+  String get setupTokenExpired => '邀请码已过期';
 
   @override
-  String get setupTokenUsed => '邀请链接已被使用';
+  String get setupTokenUsed => '邀请码已被使用';
 
   @override
   String get setupTokenSpaceFull => '空间已满';
@@ -659,9 +658,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get burnOption7Days => '7 天';
-
-  @override
-  String get burnOption30Days => '30 天';
 
   @override
   String get lockPageTitle => '秘境已锁定';

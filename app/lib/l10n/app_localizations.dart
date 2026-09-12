@@ -1316,12 +1316,6 @@ abstract class AppLocalizations {
   /// **'7 days'**
   String get burnOption7Days;
 
-  /// No description provided for @burnOption30Days.
-  ///
-  /// In en, this message translates to:
-  /// **'30 days'**
-  String get burnOption30Days;
-
   /// No description provided for @lockPageTitle.
   ///
   /// In en, this message translates to:

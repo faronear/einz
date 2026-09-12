@@ -180,8 +180,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         return l10n.burnOption1Day;
       case 604800:
         return l10n.burnOption7Days;
-      case 2592000:
-        return l10n.burnOption30Days;
       default:
         return '$seconds s';
     }
@@ -1293,6 +1291,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
             // 老板要求 2026-09-10）
             _buildMessagePreviewRow(m),
+            // 与下方可点击菜单项分隔（预览行非交互，避免误触）
+            const Divider(height: 1, thickness: 1),
             ListTile(
               leading: const Icon(Icons.format_quote),
               title: Text(l10n.chatPageActionQuote),
