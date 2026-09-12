@@ -128,6 +128,10 @@ class _SetupPageState extends State<SetupPage> {
   // 已成功 join 的 token + 身份（用于跳过重复 joinSpace——一次性 token 不能消费两次）
   String? _joinedToken;
   int? _joinedSlot;
+  // 邀请码（join token）是否已通过 preflight。通过后置 true：输入框锁为只读，
+  // 且再点「下一步」不再重复校验——token 已被 joinSpace 消费，重校验必然失败
+  // （老板 2026-09-12）
+  bool _joinTokenVerified = false;
   String? _joinSpaceName;
   String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
 
@@ -652,10 +656,13 @@ class _SetupPageState extends State<SetupPage> {
     }
     // ---- 后台即时校验（失败停留本页；错误走 _status 红字） ----
     // Multiverse join 第一步（token 页）：token 必须有效（preflight 不消费）
-    // 才放行——每次点「下一步」都按当前输入重新校验（从后面页面回退到本页后，
-    // 即使输入文字被修改也会重发后台检查，老板 2026-09-11）；通过直接进下一页，
-    // 不再停留显示空间确认卡片
-    if (_role == _WizardRole.join && _step == 1) {
+    // 才放行——通过直接进下一页，不再停留显示空间确认卡片。
+    // **只校验一次**（老板 2026-09-12 改）：token 一旦通过，输入框即锁为只读，
+    // 且后续再点「下一步」不再重复校验——因为进入口令页后 joinSpace 会消费这个
+    // 一次性 token，回到本页再校验必然失败（旧行为：老板 2026-09-11 定的"每次
+    // 都按当前输入重校验"，在 token 会被消费的前提下会把用户卡死）。
+    // 注：口令页（步骤 3）不受影响——每次「下一步」都照旧发后台重新验证口令。
+    if (_role == _WizardRole.join && _step == 1 && !_joinTokenVerified) {
       final ok = await _verifyJoinToken();
       if (!mounted) return;
       if (!ok) return;
@@ -764,6 +771,7 @@ class _SetupPageState extends State<SetupPage> {
         _joinSpaceId = null; // 一并清：残留旧 spaceId 会拿旧空间去验口令
         _joinedToken = null;
         _joinedSlot = null;
+        _joinTokenVerified = false; // 回入口页重选角色：token 状态全部作废
         _joinSpaceName = null;
         _joinSlots = const [];
         _chosenSlot = null;
@@ -1404,18 +1412,26 @@ class _SetupPageState extends State<SetupPage> {
         TextField(
           controller: _inviteCode,
           style: const TextStyle(fontSize: 20),
+          // 已验证通过 → 锁为只读：token 后续会被 joinSpace 消费，回到本页再改/再校验
+          // 都会失败（老板 2026-09-12）
+          readOnly: _joinTokenVerified,
           // 开始填写即清除红字（不依赖再点下一步）
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
           },
           decoration: InputDecoration(
             hintText: l10n.setupTokenInputHint,
+            filled: _joinTokenVerified,
+            fillColor: _joinTokenVerified
+                ? Colors.grey.withValues(alpha: 0.15)
+                : null,
             border: const OutlineInputBorder(),
-            // 扫码填入邀请链接/token（扫中后自动填入并自动下一步验证）
+            // 扫码填入邀请链接/token（扫中后自动填入并自动下一步验证）；
+            // 已验证后禁止再扫（否则会覆盖已验证的 token）
             suffixIcon: IconButton(
               icon: const Icon(Icons.qr_code_scanner),
               tooltip: l10n.setupPageScanInvite,
-              onPressed: _scanInviteCode,
+              onPressed: _joinTokenVerified ? null : _scanInviteCode,
             ),
           ),
         ),
@@ -1454,6 +1470,7 @@ class _SetupPageState extends State<SetupPage> {
         _joinSpaceName = pre.displayName;
         _joinSlots = pre.slots; // 身份选择页（步骤 2）展示两身份
         _chosenSlot = null; // 换 token 后重置身份选择
+        _joinTokenVerified = true; // 已验证：输入框锁只读，且不再重复校验
         _localError = null;
       });
       return true;
@@ -1462,6 +1479,7 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _joinToken = '';
         _joinSpaceId = null;
+        _joinTokenVerified = false;
         _localError = _tokenErrorText(e.code);
       });
       return false;

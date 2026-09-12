@@ -206,6 +206,44 @@ void main() {
     expect(find.text('设置锁屏码'), findsWidgets, reason: '应再次放行进 PIN 步骤');
   });
 
+  testWidgets('邀请码验证通过后即锁定：退回本页再前进不重复校验', (WidgetTester tester) async {
+    var preflightCalls = 0;
+    Future<SpaceJoinPreflight> fakePreflight(String token) async {
+      preflightCalls++;
+      // 模拟真实服务端：token 已被 joinSpace 消费后再校验必然失败
+      if (preflightCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
+      return const SpaceJoinPreflight(
+          spaceId: 'space-test',
+          displayName: 'Lukas',
+          status: 'waiting',
+          memberCount: 1,
+          slots: [
+            SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
+            SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
+          ]);
+    }
+
+    await pumpToJoinToken(tester, preflight: fakePreflight);
+    await tester.enterText(find.byType(TextField), 'TOKEN-1');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应放行到身份选择页');
+    expect(preflightCalls, 1);
+
+    // 退回邀请码页：输入框应锁只读（防止改坏已验证的 token）
+    await tester.tap(find.text('上一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('TOKEN-1'), findsOneWidget, reason: '退回后仍显示原邀请码');
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue,
+        reason: '已验证通过的邀请码应锁为只读');
+
+    // 再点下一步：不应再发后台校验（否则 token 被消费后必然失败，把用户卡死）
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(preflightCalls, 1, reason: '已验证过就不应重复校验');
+    expect(find.text('选择身份'), findsOneWidget, reason: '应直接放行到身份选择页');
+  });
+
   testWidgets('未托管口令（服务器无 escrow 包）：提示并停留', (WidgetTester tester) async {
     await pumpToJoinPassphrase(tester, correctPass: '正确口令-abc', payload: null);
     await tester.enterText(find.byType(TextField), '正确口令-abc');
