@@ -55,7 +55,8 @@ export function constantTimeEqualB64(a: string, b: string): boolean {
 
 /**
  * 口令 argon2id 哈希（PHC 编码 `$argon2id$…`，与客户端 sodium pwhashStr 同格式）。
- * 仅用于"口令是否匹配"的服务端验证（恢复接口 /recover），不用于任何密钥派生。
+ * 仅用于"口令是否匹配"的服务端验证（加入方取口令密保箱时校验），
+ * 不用于任何密钥派生。
  * libsodium-wrappers 不暴露 pwhash API，这里用纯 wasm 的 hash-wasm（参数≈MODERATE）。
  */
 export async function pwhashStr(passphrase: string): Promise<string> {

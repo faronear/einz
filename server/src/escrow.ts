@@ -2,7 +2,7 @@ import { getDb } from './db.js'
 import { ApiError, resolveSession } from './auth.js'
 import { isActiveDevice, type ServerConfig } from './config.js'
 import { pwhashStrVerify } from './crypto.js'
-import { broadcastPassphraseRotated, notifyRevoked } from './ws.js'
+import { broadcastPassphraseRotated } from './ws.js'
 
 /**
  * 口令托管密钥（KEY_ESCROW.md §4）：Server 只托管"被口令加密的 Space Key 包"，
@@ -50,7 +50,8 @@ function escrowSpaceId (token: string): string {
 }
 
 /** POST /key-escrow：上传/更新密文包（UPSERT，按 space 一份）。
- *  可选附 `passphrase_hash`（argon2id，恢复接口 /recover 校验口令用）。 */
+ *  可选附 `passphrase_hash`（argon2id）：加入方取包时用它校验口令是否正确
+ *  （见 escrowForSpace 的 { passphrase } 分支）。 */
 export function uploadKeyEscrow (
   cfg: ServerConfig,
   token: string,
@@ -112,57 +113,6 @@ export function uploadKeyEscrow (
   return { ok: true }
 }
 
-/**
- * POST /recover：全丢恢复（免认证——新设备尚未登记，凭"escrow 口令"作为管理员凭据）。
- * 口令用上传时存的 argon2id 哈希验证；通过后撤销全部 active 设备（空间重置），
- * 新设备可再次首设备自举。安全边界：口令即空间级管理员密钥，须妥善保管。
- */
-export async function recoverSpace (
-  cfg: ServerConfig,
-  body: unknown
-): Promise<{ ok: true; revoked: number; package?: unknown }> {
-  const passphrase = (body as { passphrase?: unknown })?.passphrase
-  if (typeof passphrase !== 'string' || passphrase.length === 0) {
-    throw new ApiError('INVALID_REQUEST', 'passphrase 必填', 400)
-  }
-  const db = getDb()
-  const row = db
-    .prepare(
-      `SELECT passphrase_hash, package FROM key_escrow WHERE space_id = ?`
-    )
-    .get("") as
-    | { passphrase_hash: string | null; package: string | null }
-    | undefined
-  if (!row || !row.passphrase_hash) {
-    throw new ApiError('FORBIDDEN', '未上传口令密保箱，无法恢复', 403)
-  }
-  if (!(await pwhashStrVerify(row.passphrase_hash, passphrase))) {
-    throw new ApiError('FORBIDDEN', '口令错误', 403)
-  }
-
-  // 撤销全部 active 设备 + 清会话/推送令牌/邀请码 → 空间回到"空"状态，新设备可首设备自举
-  const actives = db
-    .prepare(`SELECT device_id FROM devices WHERE status = 'active'`)
-    .all() as { device_id: string }[]
-  const revoked = db
-    .prepare(
-      `UPDATE devices SET status = 'revoked', last_seen = ? WHERE status = 'active'`
-    )
-    .run(Date.now()).changes
-  db.prepare(`DELETE FROM sessions`).run()
-  db.prepare(`DELETE FROM push_tokens`).run()
-  db.prepare(`DELETE FROM invites`).run()
-  // 在线旧设备立即收到 device.revoked（发帧后服务端关连接）→ 客户端提示退出；
-  // 恢复方是尚未登记的新设备（无 WS 连接），不受影响。
-  for (const { device_id } of actives) notifyRevoked(device_id)
-
-  // 闭环：口令正确即空间主人——顺带返回 escrow 密文包，新设备凭同一口令解出
-  // Space Key（不再依赖预先导出的 EINZ-BACKUP 文本）。包本身口令加密，与
-  // GET /key-escrow 同构；未托管口令密保箱（理论边界）时省略该字段。
-  const pkg = row.package ? (JSON.parse(row.package) as unknown) : undefined
-  return { ok: true, revoked, ...(pkg !== undefined ? { package: pkg } : {}) }
-}
-
 /** GET /key-escrow：拉取密文包（无包时返回空对象）。 */
 export function getKeyEscrow (
   cfg: ServerConfig,
@@ -202,8 +152,8 @@ export function deleteKeyEscrow (
  * Multiverse：按空间读写口令托管包（POST /spaces/{spaceId}/key-escrow，
  * PROTOCOL_MULTIVERSE.md §4.2）：
  * - 上传/更新：{ package, passphrase_hash? }（沿用 v1 upload 语义，按 spaceId 隔离）；
- * - 取包：{ passphrase } → argon2id 校验口令，正确才返回密封包（区别于 /recover
- *   的"全丢重置"语义——加入方取钥不撤销任何设备）。
+ * - 取包：{ passphrase } → argon2id 校验口令，正确才返回密封包（加入方取钥，
+ *   不撤销任何设备、不消耗任何凭证）。
  * 骨架阶段无 session 认证，成员权限由 U1 Space-scoped session 补齐。
  */
 export async function escrowForSpace (
@@ -217,7 +167,7 @@ export async function escrowForSpace (
 
   const b = (body ?? {}) as Record<string, unknown>
   if (b.passphrase != null) {
-    // 取包：验证口令（口令即"拿到 Space Key 的凭证"，与 v1 recover 同边界）
+    // 取包：验证口令（口令即"拿到 Space Key 的凭证"）
     const row = getDb()
       .prepare(`SELECT passphrase_hash, package FROM key_escrow WHERE space_id = ?`)
       .get(spaceId) as

@@ -981,67 +981,33 @@ async function main (): Promise<void> {
       }
     }
 
-    // 12) 全丢恢复 /recover（免认证）：上传带口令哈希的 escrow → 错误口令 403 →
-    //     正确口令 200 撤销全部设备 → devices 全 revoked（空间可重新首设备自举）
-    const recoverPass = 'recover-pass-123'
-    const recoverHash = await pwhashStr(recoverPass)
+    // 12) 口令托管：上传带口令哈希的密文包，并确认 v1 的 /recover 已整体移除
+    //     （passphrase_hash 现在只用于"加入方取包时校验口令"，见 escrowForSpace）
+    const escrowPass = 'recover-pass-123'
+    const escrowHash = await pwhashStr(escrowPass)
     const escrowRec = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${devA.sessionToken}`
       },
-      body: JSON.stringify({ package: escrowPkg, passphrase_hash: recoverHash })
+      body: JSON.stringify({ package: escrowPkg, passphrase_hash: escrowHash })
     })
     assert.equal(
       escrowRec.status,
       200,
       'escrow upload with passphrase_hash should succeed'
     )
-
-    const recoverBad = await fetch(`http://127.0.0.1:${port}/recover`, {
+    const recoverGone = await fetch(`http://127.0.0.1:${port}/recover`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passphrase: 'wrong-pass' })
-    })
-    assert.equal(recoverBad.status, 403, 'wrong passphrase must be rejected')
-
-    const recoverOk = await fetch(`http://127.0.0.1:${port}/recover`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passphrase: recoverPass })
+      body: JSON.stringify({ passphrase: escrowPass })
     })
     assert.equal(
-      recoverOk.status,
-      200,
-      'correct passphrase should reset the space'
+      recoverGone.status,
+      404,
+      '/recover（全丢恢复）应已移除——该功能在 v2 无意义（见 docs/PROTOCOL.md）'
     )
-    const recoverBody = (await recoverOk.json()) as {
-      ok: boolean
-      revoked: number
-      package?: typeof escrowPkg
-    }
-    assert.equal(recoverBody.ok, true, 'recover should return ok')
-    assert.ok(
-      recoverBody.revoked >= 2,
-      'all active devices (A+B) should be revoked'
-    )
-    assert.equal(
-      recoverBody.package?.ciphertext,
-      escrowPkg.ciphertext,
-      'recover should return the escrow package so the passphrase holder can recover the Space Key without a pre-exported backup'
-    )
-
-    const recDb = new Database(join(tempDir, 'einz.sqlite.db'), {
-      readonly: true
-    })
-    const recActive = (
-      recDb
-        .prepare(`SELECT COUNT(*) AS n FROM devices WHERE status = 'active'`)
-        .get() as { n: number }
-    ).n
-    assert.equal(recActive, 0, 'no active devices left after recover')
-    recDb.close()
 
     console.log(
       '✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 名称默认值'
