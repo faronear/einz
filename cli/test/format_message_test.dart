@@ -118,4 +118,26 @@ void main() {
     expect(lines, hasLength(1));
     expect(lines[0], contains('#3 🔊 语音 18s'));
   });
+
+  test('消息标签去掉名字：对方 [时间]、我的 [时间]（无状态时）', () {
+    ChatMessage textMsg({required bool isMine}) => ChatMessage(
+          env: MessageEnvelope(
+            v: 1,
+            type: 'text',
+            keyVersion: 1,
+            messageId: isMine ? 'mine-1' : 'peer-1',
+            senderDeviceId: 'd',
+            nonce: '',
+            ciphertext: '',
+          ),
+          plain: '你好',
+          isMine: isMine,
+          createdAt: 0,
+        );
+    final peerLines = formatMessage(textMsg(isMine: false), 80);
+    expect(peerLines[0], isNot(contains('对方'))); // 对方标签不再带名字
+    expect(peerLines[0], contains('['));
+    final mineLines = formatMessage(textMsg(isMine: true), 80);
+    expect(mineLines[0], isNot(contains('我'))); // 我的标签不再带名字
+  });
 }

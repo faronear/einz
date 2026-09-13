@@ -1767,9 +1767,9 @@ Map<String, int> _attachmentNos(ChatSession? session) {
 
 /// 格式化消息为多行（自动按列宽折行）。
 /// 自己的消息：性别气泡，整块从左侧 8 列留白起铺满屏缘（长短消息左缘统一对齐）——
-/// 长消息正文在左；单行短消息正文右对齐、贴着末尾 [我 时间 状态] 标签（标签贴最右）。
-/// 背景按我的性别配色；对方消息：性别气泡，整块左对齐（左侧气泡风格，[对方名 时间]
-/// 黑字标签嵌在气泡左缘、正文在右），背景按对方性别配色；系统提示（isSystem）：
+/// 长消息正文在左；单行短消息正文右对齐、贴着末尾 [状态 时间] 标签（标签贴最右，
+/// 不带名字）。背景按我的性别配色；对方消息：性别气泡，整块左对齐（左侧气泡风格，
+/// [时间] 黑字标签嵌在气泡左缘、正文在右），背景按对方性别配色；系统提示（isSystem）：
 /// 灰色前缀 + 普通正文（左对齐）。
 /// 相邻消息之间以空行隔开（老板 2026-09-10 定版：`─` 线视觉干扰，改空行），
 /// 区分同一人相邻消息的边界；空行由渲染层在每条消息（含末条）后插入——
@@ -1777,23 +1777,6 @@ Map<String, int> _attachmentNos(ChatSession? session) {
 /// [attachmentNos]：附件消息固定序号表（渲染层每帧预计算，避免逐条全量扫描）；
 /// 省略时按当前会话现算（纯函数测试用）。
 List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmentNos}) {
-  final String who;
-  final String color;
-  if (m.isSystem) {
-    who = 'system';
-    color = _gray;
-  } else if (m.isMine) {
-    // 自己的消息：固定显示"我"（产品决定：不再显示本人名称，形如 [我 时间]）
-    who = '我';
-    color = _green;
-  } else {
-    // 对方的消息：按 senderPersonId 查名称表（未拉取/未知回退"对方"）
-    final pid = m.env.senderPersonId;
-    who = (pid != null && _state?.personNames.containsKey(pid) == true)
-        ? _state!.personNames[pid]!
-        : '对方';
-    color = _yellow;
-  }
   final time = _timeLabel(m.createdAt);
   // 系统消息保留显式换行（支持一条消息内多行——老板 2026-09-11：把一段提示
   // 分成多行显示，又能被消息间的空行整体隔开）；双方消息正文按空格折叠换行。
@@ -1823,7 +1806,7 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
     // 续行缩进 prefix 宽度，与第一行正文左缘对齐。正文保留显式 \n：每条物理行
     // 单独换行渲染（前缀只出现在第一条物理行，其余缩进对齐），空物理行保留为
     // 空白行——这样一条消息可显示成多行，又被消息间空行整体隔开
-    final prefix = '$color[$who $time]$_reset ';
+    final prefix = '$_gray[system $time]$_reset ';
     final prefixW = _displayWidth(prefix);
     final indent = ' ' * prefixW;
     final out = <String>[];
@@ -1844,11 +1827,11 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
   }
   if (!m.isMine) {
     // 对方消息：左侧性别气泡——背景按对方性别配色（男蓝/女品红/未知青绿），
-    // [who 时间] 黑字标签嵌在气泡左缘（首行，长消息标签跟首行文字走）、正文白字；
+    // [时间] 黑字标签嵌在气泡左缘（首行，长消息标签跟首行文字走）、正文白字；
     // 气泡矩形 col 1 → cols - rightPad，与右侧我方气泡（col 9 → cols）左右对称
     final bubbleBackground =
         _genderBubble(_state?.personGenders[m.env.senderPersonId]);
-    final label = '[$who $time]';
+    final label = '[$time]';
     final labelW = _displayWidth(label);
     final lane = labelW + 1; // 气泡内左侧标签栏宽（含标签后一个空格）
     final rightPad = sideMargin; // 右侧留白 = 我方气泡左侧留白（8 列）
@@ -1886,14 +1869,14 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
   } else {
     partnerBackground = _bgTeal; // 性别未知：青绿底（2026-09-10 老板要求）
   }
-  // 我的消息标签扩展为 [我 时间 状态]：pending ⋯ / sent ✓ / delivered ✓✓，
-  // 已读（read）时把状态字符标蓝——TUI 独有（App 已读只留数据档位不展示）。
+  // 我的消息标签：[状态 时间]（老板 2026-09-13：去掉名字、状态提到时间前面），
+  // 已读（read）时状态字符标蓝——TUI 独有（App 已读只留数据档位不展示）。
   final status = _state?.session.sentStatusOf(m) ?? '';
   final statusGlyph = _statusGlyph(status);
   final statusColor = status == 'read' ? _blue : _black;
   final suffix = statusGlyph.isEmpty
-      ? '$_black[$who $time]$_reset'
-      : '$_black[$who $time $statusColor$statusGlyph$_black]$_reset';
+      ? '$_black[$time]$_reset'
+      : '$_black[$statusColor$statusGlyph$_black $time]$_reset';
   final suffixW = _displayWidth(suffix);
   // 正文每行同时保留：左侧 sideMargin 列留白（不顶左边框）+ 右侧标签栏；
   // 标签栏宽 = "空格+标签"（标签宽+1），使续行正文右缘与末行标签起点对齐
