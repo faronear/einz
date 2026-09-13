@@ -4434,3 +4434,22 @@ _stepCount）不渲染底部导航；其余步骤行为不变（含 _step==0 异
 **注意：** 提交时顺带带上了老板此前未提交的 l10n 文案修订
 （wizardPassphraseHint / wizardPinHint / chatPageAudioPlayFailed——arb 为源，
 已重跑 gen-l10n 保持生成文件同步）。`flutter analyze lib test` 0 issue。UI 老板自测。
+
+### App：明文 Space Key 包迁入系统安全存储（flutter_secure_storage）
+
+**背景：** 老板要求排查本地涉密数据存放方式。结论：消息密文/锁包（设 PIN）均加密落库，
+但「跳过 PIN」场景明文 Space Key 包（含 token、escrow 口令、设备私钥）落 drift app_state
+（记忆中的待改进项），草稿明文、附件明文缓存也未覆盖。老板选定方案 1：引入
+flutter_secure_storage（Keychain/Keystore），跳过 PIN 场景密钥入 keystore。
+
+**改动：**
+- pubspec：加 `flutter_secure_storage ^11.1.1`（9.x 与 device_info_plus 13 的 win32 ^6 冲突，pub 建议升 11.x）；
+- 新建 `app/lib/data/secure_store.dart`：SecureStore 封装（统一 `einz.secure.` 前缀、
+  UnsupportedError 视为未配置、deleteAll 逐 key 删除避免误清 Keychain 全局）；
+- `app_lock.dart`：savePlain/loadPlain/clearPlain/clear 迁到 SecureStore；loadPlain
+  自动迁移旧 app_state 明文副本（读到即搬走并删库内残留）；app_state 只剩 _kSkipped 等非敏感键；
+- `app_lock_test.dart`：setUp 加 `FlutterSecureStorage.setMockInitialValues({})` 测试替身。
+
+**验证：** flutter analyze 0 issue；flutter test app_lock_test 8/8 全过。
+
+**仍明文的已知项（未在本次范围）：** 草稿表、附件解密缓存、CLI store JSON（测试工具属性）。

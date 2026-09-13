@@ -45,6 +45,7 @@ dependencies:
   drift: ^2.34.3
   drift_flutter: ^0.3.1
   sqlite3_flutter_libs: ^0.6.0+eol
+  flutter_secure_storage: ^11.1.1 # 密钥安全存储（iOS Keychain / Android Keystore，DATABASE.md §4）；11.x 兼容 win32 ^6（device_info_plus 13 约束）
   image_picker: ^1.2.3
   record: ^7.1.1
   audioplayers: ^6.8.1

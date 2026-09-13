@@ -4,6 +4,7 @@
 // 需要 LIBSODIUM_PATH 指向 libsodium.dll（与 shared 单测一致）。
 
 import 'package:drift/native.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
@@ -27,6 +28,7 @@ void main() {
   );
 
   setUp(() async {
+    FlutterSecureStorage.setMockInitialValues({}); // SecureStore（Keychain/Keystore）测试替身
     db = LocalDatabase.forTesting(NativeDatabase.memory());
     lock = AppLockService(db);
   });

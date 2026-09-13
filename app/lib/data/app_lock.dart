@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 import 'local_database.dart';
+import 'secure_store.dart';
 
 /// App 启动锁（方案 B：PIN 加密密钥，docs/APP_LOCK.md）。
 ///
@@ -12,10 +13,15 @@ import 'local_database.dart';
 ///   密文存 drift app_state；同时用 12 词恢复码再加密一份（PIN 丢失兑底）。
 /// - 每次启动：输入 PIN → 解密成功才拿到 Space Key → 进入聊天页。
 /// - 防爆破：连续错误 [maxAttempts] 次 → 锁定 [lockSeconds] 秒（纯本地，Server 不参与）。
+/// - 跳过 PIN：明文 Space Key 包存系统安全存储（Keychain/Keystore，SecureStore），
+///   不再落 SQLite（老板 2026-09-14：消除 app_state 明文密钥）。
 class AppLockService {
   AppLockService(this.db);
 
   final LocalDatabase db;
+
+  /// 明文 Space Key 包在 SecureStore 里的条目名（自动加 einz.secure. 前缀）。
+  static const _securePlain = 'app_lock.plain';
 
   static const int maxAttempts = 5;
   static const int lockSeconds = 30;
@@ -31,7 +37,7 @@ class AppLockService {
   static const _kPackage = 'app_lock.package';
   static const _kAttempts = 'app_lock.attempts';
   static const _kLockedUntil = 'app_lock.locked_until';
-  static const _kPlain = 'app_lock.plain'; // 跳过 PIN：明文 Space Key 包（仅本设备）
+  static const _kPlain = 'app_lock.plain'; // 【遗留】旧版明文包在 app_state 的键（仅迁移读取）
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
   static const _kProfile = 'app_lock.profile'; // JSON: {personName, peerName, deviceName}
 
@@ -44,17 +50,27 @@ class AppLockService {
 
   /// 明文保存 Space Key 包（跳过 PIN 场景）：无锁包但有此明文时，
   /// 下次启动直接进聊天（免打扰），直到用户在聊天页补设 PIN。
+  /// 存系统安全存储（Keychain/Keystore），SQLite 不再保留明文副本。
   Future<void> savePlain(AppLockPayload payload) async {
-    await _set(_kPlain, jsonEncode(payload.toJson()));
+    await SecureStore.write(_securePlain, jsonEncode(payload.toJson()));
     await _set(_kSkipped, '1');
+    await _deletePlainFromDb(); // 兼容：清掉旧版本可能残留的明文副本
   }
 
   /// 读取明文 Space Key 包（跳过 PIN 的无锁配置）；不存在返回 null。
+  ///
+  /// 兼容旧版：包还在 app_state（明文落 SQLite）时自动迁移到 SecureStore，
+  /// 并删除 app_state 里的明文副本；迁移失败视为未配置（宁可重新引导）。
   Future<AppLockPayload?> loadPlain() async {
-    final raw = await _get(_kPlain);
+    final raw = await SecureStore.read(_securePlain) ?? await _get(_kPlain);
     if (raw == null) return null;
     try {
-      return AppLockPayload.fromJson(jsonDecode(raw));
+      final payload = AppLockPayload.fromJson(jsonDecode(raw));
+      if (await _get(_kPlain) != null) {
+        await SecureStore.write(_securePlain, raw);
+        await _deletePlainFromDb();
+      }
+      return payload;
     } catch (_) {
       return null; // 明文损坏视为未配置（宁可重新引导）
     }
@@ -62,16 +78,22 @@ class AppLockService {
 
   /// 清除无锁配置（补设 PIN 成功后调用：不再保留明文副本）。
   Future<void> clearPlain() async {
-    await (db.delete(db.appState)
-          ..where((s) => s.key.isIn({_kPlain, _kSkipped})))
-        .go();
+    await SecureStore.delete(_securePlain);
+    await _deletePlainFromDb();
+    await (db.delete(db.appState)..where((s) => s.key.equals(_kSkipped))).go();
   }
 
   /// 清除本地锁与密钥包（设备被撤销时调用：回到未配置状态，防止残留密钥）。
   Future<void> clear() async {
+    await SecureStore.delete(_securePlain);
     await (db.delete(db.appState)
           ..where((s) => s.key.isIn({_kPackage, _kAttempts, _kLockedUntil, _kPlain, _kSkipped})))
         .go();
+  }
+
+  /// 删除 app_state 里的旧版明文包（迁移/清理用）。
+  Future<void> _deletePlainFromDb() async {
+    await (db.delete(db.appState)..where((s) => s.key.equals(_kPlain))).go();
   }
 
   /// 取消启动锁（"设为空"）：删除加密包，保留明文配置（Space Key 仍可进聊天）。
