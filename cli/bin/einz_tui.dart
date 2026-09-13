@@ -1485,8 +1485,10 @@ void _render() {
   // 只发生在贴底状态）。
   final lines = <String>[];
   final msgs = s.session.messages;
+  // 附件固定序号表每帧预计算一次（formatMessage 逐条复用，避免 O(n²) 扫描）
+  final attachmentNos = _attachmentNos(s.session);
   for (var i = 0; i < msgs.length; i++) {
-    lines.addAll(formatMessage(msgs[i], cols));
+    lines.addAll(formatMessage(msgs[i], cols, attachmentNos: attachmentNos));
     // 每条消息（含末条）后都插一个空行：消息之间靠空行隔开，末条的空行
     // 给底部 [我] 输入区留出呼吸空间（老板要求——末条不插会让输入框紧贴末条）
     lines.add('');
@@ -1770,6 +1772,24 @@ int _audioSeconds(ChatMessage m) {
   return 0;
 }
 
+/// 附件消息类型集合（/open 判定与固定序号计数共用）。
+const Set<String> _kAttachmentTypes = {'image', 'video', 'voice', 'audio', 'file'};
+
+/// 附件消息的固定序号表（messageId → 序号，1 起）：按消息流时间序从前往后数。
+/// 新附件只追加新序号、已有序号不变（时间序由 server_sequence 单调保证），重启后
+/// 按历史顺序重新算出同一序号——供 `/open <序号>` 稳定指定（老板 2026-09-13：
+/// 此前从最新倒数，每收一条新附件旧序号就变）。
+Map<String, int> _attachmentNos(ChatSession? session) {
+  final map = <String, int>{};
+  if (session == null) return map;
+  var n = 0;
+  for (final m in session.messages) {
+    if (m.isSystem || !_kAttachmentTypes.contains(m.env.type)) continue;
+    map[m.env.messageId] = ++n;
+  }
+  return map;
+}
+
 /// 格式化消息为多行（自动按列宽折行）。
 /// 自己的消息：性别气泡，整块从左侧 8 列留白起铺满屏缘（长短消息左缘统一对齐）——
 /// 长消息正文在左；单行短消息正文右对齐、贴着末尾 [我 时间 状态] 标签（标签贴最右）。
@@ -1779,7 +1799,9 @@ int _audioSeconds(ChatMessage m) {
 /// 相邻消息之间以空行隔开（老板 2026-09-10 定版：`─` 线视觉干扰，改空行），
 /// 区分同一人相邻消息的边界；空行由渲染层在每条消息（含末条）后插入——
 /// 末条后的空行给底部 [我] 输入区留出呼吸空间；系统提示消息同样参与分隔。
-List<String> formatMessage(ChatMessage m, int cols) {
+/// [attachmentNos]：附件消息固定序号表（渲染层每帧预计算，避免逐条全量扫描）；
+/// 省略时按当前会话现算（纯函数测试用）。
+List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmentNos}) {
   final String who;
   final String color;
   if (m.isSystem) {
@@ -1809,6 +1831,14 @@ List<String> formatMessage(ChatMessage m, int cols) {
   } else {
     body = m.isSystem ? m.plain : m.plain.replaceAll('\n', ' ');
   }
+  // 附件消息前缀固定序号 #N（与 /open N 对应，方便指定）——序号按时间序，
+  // 新附件只追加新号、旧的序号不变（老板 2026-09-13）。[attachmentNos] 由渲染层
+  // 每帧预计算一次（避免每条消息都全量扫描）；未传时按当前会话现算（测试用）。
+  final String displayBody;
+  final attNo = m.isSystem
+      ? null
+      : (attachmentNos ?? _attachmentNos(_state?.session))[m.env.messageId];
+  displayBody = attNo == null ? body : '#$attNo $body';
   // 双方消息的外侧留白（同为 8 列）：对方正文右侧 / 我方气泡左侧；
   // 保证对方正文起点不比我方正文（前缀之后）更靠左
   const sideMargin = 8;
@@ -1822,7 +1852,7 @@ List<String> formatMessage(ChatMessage m, int cols) {
     final prefixW = _displayWidth(prefix);
     final indent = ' ' * prefixW;
     final out = <String>[];
-    final segments = body.split('\n');
+    final segments = displayBody.split('\n');
     for (var si = 0; si < segments.length; si++) {
       final wrapped = _wrapByWidth(segments[si], cols - prefixW - sideMargin);
       if (si == 0) {
@@ -1848,7 +1878,7 @@ List<String> formatMessage(ChatMessage m, int cols) {
     final lane = labelW + 1; // 气泡内左侧标签栏宽（含标签后一个空格）
     final rightPad = sideMargin; // 右侧留白 = 我方气泡左侧留白（8 列）
     final textWidth = cols - lane - rightPad;
-    final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
+    final wrapped = _wrapByWidth(displayBody, textWidth > 0 ? textWidth : cols - lane - 1);
     final lines = <String>[];
     for (var i = 0; i < wrapped.length; i++) {
       final chunk = wrapped[i];
@@ -2410,7 +2440,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/open [序号] :: 打开上面第 [序号] 个附件',
+        '/open <序号> :: 打开带 #序号 的附件消息',
       ));
       s.status = '';
     case '/server':
@@ -2679,7 +2709,7 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/open':
-      // 打开附件到系统应用：/open [序号]（序号从最新倒数，1=最近一条带附件消息）
+      // 打开附件到系统应用：/open <序号>（序号 = 消息里显示的 #N，固定不变）
       await _execOpen(parts);
     case '/exit':
     case '/quit':
@@ -2714,10 +2744,10 @@ Future<void> _execInvite() async {
   }
 }
 
-/// /open [序号]：从最新往前找带附件的消息，下载解密后用系统默认应用打开。
-/// 序号从最新倒数（1=最近一条；不带参默认 1）。附件消息按 env.type 判定
-/// （image/video/voice/audio/file）——WS 实时收到的附件消息可能还没落附件
-/// 元数据，此时先自动补一次 sync 再尝试打开。
+/// /open <序号>：打开消息流中固定序号为 N 的附件消息（消息里显示的 `#N` 即此序号，
+/// 时间序从前往后、新附件只追加新号），下载解密后用系统默认应用打开。不带参默认 1。
+/// 附件消息按 env.type 判定（image/video/voice/audio/file）——WS 实时收到的附件消息
+/// 可能还没落附件元数据，此时先自动补一次 sync 再尝试打开。
 Future<void> _execOpen(List<String> parts) async {
   final s = _state!;
   var idx = 1;
@@ -2725,18 +2755,21 @@ Future<void> _execOpen(List<String> parts) async {
     idx = int.tryParse(parts[1]) ?? 1;
     if (idx < 1) idx = 1;
   }
-  const attachTypes = {'image', 'video', 'voice', 'audio', 'file'};
   final withAtt = <ChatMessage>[];
-  for (final m in s.session.messages.reversed) {
+  for (final m in s.session.messages) {
     if (m.isSystem) continue;
-    if (attachTypes.contains(m.env.type)) withAtt.add(m);
+    if (_kAttachmentTypes.contains(m.env.type)) withAtt.add(m);
   }
   if (withAtt.isEmpty) {
     s.session.messages.add(_systemMessage(
         s.session, '没有带附件的消息（上传用 /attach <file>）'));
     return;
   }
-  if (idx > withAtt.length) idx = withAtt.length;
+  if (idx > withAtt.length) {
+    s.session.messages.add(_systemMessage(
+        s.session, '没有 #$idx 附件消息（当前共 ${withAtt.length} 条，序号见消息里的 #N）'));
+    return;
+  }
   final target = withAtt[idx - 1];
   final store = s.session.store;
   // 缺附件元数据（WS 实时收到时锚点已推进，普通增量 sync 不会重发该消息的

@@ -3,7 +3,6 @@
 //
 // 通过 EINZ_UNITTEST=1 让 bin/einz_tui.dart 的 main 不启动交互 TUI，从而安全
 // import 其顶层纯函数。
-import 'dart:io';
 import 'package:test/test.dart';
 
 import 'package:einz_cli/chat_core.dart';
@@ -108,5 +107,15 @@ void main() {
     expect(lines, hasLength(1));
     expect(lines[0], contains('🔊 语音'));
     expect(lines[0], isNot(contains('s]'))); // 不带「 0s」
+  });
+
+  test('附件消息按固定序号表前缀 #N（与 /open N 对应）', () {
+    final lines = formatMessage(
+      voice(seconds: 18),
+      80,
+      attachmentNos: {'voice-1': 3},
+    );
+    expect(lines, hasLength(1));
+    expect(lines[0], contains('#3 🔊 语音 18s'));
   });
 }
