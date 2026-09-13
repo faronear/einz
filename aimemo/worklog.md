@@ -3756,3 +3756,30 @@ commit `cb48948`。
 
 **注意：** 默认 800x600 测试画布装不下「输入栏 + 232px 面板」，测试里要设手机尺寸
 （390x844，同 golden 测试）。
+
+## 2026-09-13 语音气泡改版：播放键 + 固定波形图 + h/m/s 时长（播放时进度扫掠）
+
+**需求：** 老板要求语音消息气泡正文从「播放键 + 🎤 + 语音（n 秒）」改成
+「播放键 + 长方形固定波形图 + 时长（h/m/s，如 3s、1m 15s）」；点击播放后波形要动起来
+——已播部分染高亮（阴影从左往右扩散）或竖线从左往右走，走完复原；若算时间比例太耗资源
+就退化成动态波浪线。
+
+**实现（`app/lib/chat_page.dart`）：**
+- 数据：语音时长一直藏在 caption 明文里（协议没给附件加 duration 字段，改协议代价大）。
+  旧格式「语音（12 秒）」→ 新格式「语音 12s」（`_sendVoice`）。接收端用
+  `_voiceDurationSeconds()` 正则 `数字 + (h|m|s|小时|分钟|分|秒)` 累加，新旧格式都能解析。
+- 展示：`_buildAudioBar` 对 `type=='voice'` 渲染 播放键 + `_VoiceWaveform` + 时长文本；
+  `type=='audio'`（音频文件，时长未知）保持原来的「播放键 + 🎵 文件名」。
+- 波形：`_VoiceWaveform`（StatefulWidget + `SingleTickerProviderStateMixin`）内部
+  `AnimationController` 走 0→1，24 根竖条由 messageId 做 FNV 哈希播种生成（同一条消息
+  形状固定，接收端拿不到对方录音振幅，只能确定性伪波形），`_WaveformPainter` 按 progress
+  给已播过的条上高亮色并在进度位置画竖线。重绘只在这个 120×28 的 CustomPaint 内。
+- 时长未知（0）时 `repeat()` 变成循环扫掠的动态波浪，兜底旧消息/异常情况。
+- 进度起点：新增 `_audioStartedMessageId`，在 `player.play()` **之后**才置位
+  （`_playingMessageId` 是点按即置，含下载解密等待期）——否则下载慢时进度条会空跑。
+- 配色：跟随气泡（`gradient` 风格用白色，否则主题 primary；未播部分 40% 透明）。
+
+**验证：** `flutter analyze lib/chat_page.dart` 无问题；`flutter test` +98 -17，
+17 个 golden 失败是改动前就有的基线漂移（非本次引入）。未引新依赖、未加 l10n 字符串。
+
+**遗留：** 输入栏录音条（录音中/预览态）仍用真实振幅波形 + `m:ss` 计时，本次未动。

@@ -171,7 +171,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Timer? _recordTimer; // 录音秒数计时（60s 上限自动停）
   int _recordSeconds = 0;
   bool _previewPlaying = false; // 预览态试听播放中
-  String? _playingMessageId;
+  String? _playingMessageId; // 播放意图（点按即置：含下载解密等待期，按钮变停止）
+  String? _audioStartedMessageId; // 音频真正出声的消息（波形进度从此刻起走，
+  // 避免下载解密期间进度条空跑——老板要求 2026-09-13）
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
@@ -1967,6 +1969,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 试听/消息播放与录音互斥
       _previewPlaying = false;
       if (_playingMessageId != null) _playingMessageId = null;
+      if (_audioStartedMessageId != null) _audioStartedMessageId = null;
       await _player?.stop();
       final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await (_recorder ??= AudioRecorder()).start(const RecordConfig(), path: path);
@@ -2035,10 +2038,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (_inputMode != _InputMode.preview) return;
     final path = _recordingPath;
     if (path == null) return;
-    // 语音文字说明带录音秒数（老板 2026-09-11）：caption 随消息同步，接收端
-    // 同样显示（如「语音（12 秒）」）；须在 await 前取好（避免 async gap 用 context）
+    // 语音文字说明带录音时长（老板 2026-09-11，2026-09-13 改 h/m/s）：caption
+    // 随消息同步，接收端同样解析（如「语音 12s」）；须在 await 前取好（避免
+    // async gap 用 context）
     final caption =
-        '${AppLocalizations.of(context)!.chatPageVoiceLabel}（$_recordSeconds 秒）';
+        '${AppLocalizations.of(context)!.chatPageVoiceLabel} ${_formatDuration(_recordSeconds)}';
     try {
       final f = File(path);
       if (!await f.exists() || await f.length() == 0) {
@@ -2197,13 +2201,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 正在播放同一条 → 停止
     if (_playingMessageId == m.env.messageId) {
       await _player?.stop();
-      if (mounted) setState(() => _playingMessageId = null);
+      if (mounted) {
+        setState(() {
+          _playingMessageId = null;
+          _audioStartedMessageId = null;
+        });
+      }
       return;
     }
     try {
       final player = _player ??= AudioPlayer();
       _previewPlaying = false; // 与预览态试听互斥
-      setState(() => _playingMessageId = m.env.messageId);
+      setState(() {
+        _playingMessageId = m.env.messageId;
+        _audioStartedMessageId = null; // 旧波形进度先复位
+      });
       final bytes = await _repo.fetchAttachment(
         attachmentId: att['attachment_id'] as String,
         keyVersion: att['key_version'] as int,
@@ -2215,12 +2227,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await tmp.writeAsBytes(bytes);
       await player.stop();
       await player.play(DeviceFileSource(tmp.path));
+      // 真正出声才开始走波形进度（此前是下载解密等待期）
+      if (mounted) setState(() => _audioStartedMessageId = m.env.messageId);
       player.onPlayerComplete.first.then((_) {
-        if (mounted) setState(() => _playingMessageId = null);
+        if (!mounted) return;
+        setState(() {
+          _playingMessageId = null;
+          _audioStartedMessageId = null;
+        });
       }).catchError((_) {});
     } catch (e) {
       if (!mounted) return;
-      setState(() => _playingMessageId = null);
+      setState(() {
+        _playingMessageId = null;
+        _audioStartedMessageId = null;
+      });
       showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
     }
   }
@@ -2475,10 +2496,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 音频消息（语音/音频文件共用）：播放条；点击下载解密后播放。
+  /// 音频消息气泡：语音=播放键 + 固定波形图 + 时长（h/m/s）；音频文件=播放键
+  /// + 文件名（时长未知，沿用文字展示）。点击下载解密后播放（老板 2026-09-13）。
   Widget _buildAudioBar(
       HistoryMessage m) {
     final playing = _playingMessageId == m.env.messageId;
+    final onBubble = _uiStyle == 'gradient'
+        ? Colors.white
+        : Theme.of(context).colorScheme.primary; // 气泡上的前景色（波形/图标）
+    if (m.env.type != 'voice') {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(playing ? Icons.stop_circle : Icons.play_circle),
+            onPressed: () => _playAudioMessage(m),
+            visualDensity: VisualDensity.compact,
+          ),
+          Flexible(
+            child: Text(
+              playing
+                  ? AppLocalizations.of(context)!.chatPagePlaying
+                  : '🎵 ${m.plaintext}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+    }
+    final seconds = _voiceDurationSeconds(m);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2487,27 +2533,51 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           onPressed: () => _playAudioMessage(m),
           visualDensity: VisualDensity.compact,
         ),
-        Flexible(
-          child: Text(
-            playing
-                ? AppLocalizations.of(context)!.chatPagePlaying
-                : (m.env.type == 'voice'
-                    ? '🎤 ${_voiceMessageLabel(m)}'
-                    : '🎵 ${m.plaintext}'),
-            overflow: TextOverflow.ellipsis,
-          ),
+        // 固定波形图：形状由 messageId 决定（同一条消息每次渲染一致），
+        // 播放时已播部分染高亮色 + 竖线从左往右走，走完复原。
+        _VoiceWaveform(
+          playing: _audioStartedMessageId == m.env.messageId,
+          durationSeconds: seconds,
+          seed: m.env.messageId,
+          activeColor: onBubble,
+          inactiveColor: onBubble.withValues(alpha: 0.4),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          seconds > 0 ? _formatDuration(seconds) : m.plaintext.trim(),
+          style: const TextStyle(fontSize: 12),
         ),
       ],
     );
   }
 
-  /// 语音消息文字说明：优先显示消息自带说明（新版带秒数，如「语音（12 秒）」）；
-  /// 旧消息 plaintext 以「🎤 」开头（sendAttachment 旧默认），去掉前缀避免与
-  /// 渲染端 🎤 重复；空则回退 l10n 标签。
-  String _voiceMessageLabel(HistoryMessage m) {
-    final t = m.plaintext.trim();
-    if (t.isEmpty) return AppLocalizations.of(context)!.chatPageVoiceLabel;
-    return t.startsWith('🎤 ') ? t.substring(2) : t;
+  /// 时长格式化：3s / 1m 15s / 1h 2m（老板要求 2026-09-13）。
+  String _formatDuration(int totalSeconds) {
+    if (totalSeconds <= 0) return '0s';
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (hours > 0) return minutes > 0 ? '${hours}h ${minutes}m' : '${hours}h';
+    if (minutes > 0) return seconds > 0 ? '${minutes}m ${seconds}s' : '${minutes}m';
+    return '${seconds}s';
+  }
+
+  /// 从语音消息明文里解析时长秒数：新版明文形如「语音 12s」/「Voice 1m 15s」，
+  /// 旧版形如「语音（12 秒）」——按 `数字 + (h|m|s|小时|分钟|分|秒)` 累加；
+  /// 解析不到返回 0（波形改用循环扫掠动画）。
+  int _voiceDurationSeconds(HistoryMessage m) {
+    var total = 0;
+    for (final match in RegExp(r'(\d+)\s*(h|m|s|小时|分钟|分|秒)').allMatches(m.plaintext)) {
+      final value = int.tryParse(match.group(1)!) ?? 0;
+      final unit = match.group(2)!;
+      final factor = switch (unit) {
+        'h' || '小时' => 3600,
+        'm' || '分' || '分钟' => 60,
+        _ => 1,
+      };
+      total += value * factor;
+    }
+    return total;
   }
 
   /// 文件消息：文件卡片（文件名 + 大小 + 下载保存）。
@@ -3465,6 +3535,164 @@ class _WaveformBars extends StatelessWidget {
       );
     });
   }
+}
+
+/// 语音气泡内的固定波形图（老板要求 2026-09-13）：长方形区域里一排等宽竖条，
+/// 条高由 [seed]（messageId）确定性生成——同一条消息每次进页面形状一致，不是
+/// 真实采样（接收端拿不到对方录音的振幅）。
+///
+/// 播放时按时间比例把已播过的条染成 [activeColor]（阴影从左往右扩散），并在
+/// 进度位置画一根竖线走过去；走完/停止即复原。时长未知（旧消息解析不到）时
+/// 改为循环扫掠的波浪动画。进度只用一个 AnimationController 的 value 驱动，
+/// 重绘范围仅限这个 120×28 的 CustomPaint。
+class _VoiceWaveform extends StatefulWidget {
+  const _VoiceWaveform({
+    required this.playing,
+    required this.durationSeconds,
+    required this.seed,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  final bool playing;
+  final int durationSeconds;
+  final String seed;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  @override
+  State<_VoiceWaveform> createState() => _VoiceWaveformState();
+}
+
+class _VoiceWaveformState extends State<_VoiceWaveform>
+    with SingleTickerProviderStateMixin {
+  static const int _barCount = 24;
+  static const double _barWidth = 3;
+  static const double _barGap = 2;
+  static const double _height = 28;
+
+  late final AnimationController _progress;
+  late final List<double> _amplitudes;
+
+  @override
+  void initState() {
+    super.initState();
+    _amplitudes = _buildAmplitudes(widget.seed);
+    _progress = AnimationController(vsync: this, duration: _animationDuration);
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _VoiceWaveform oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playing != widget.playing ||
+        oldWidget.durationSeconds != widget.durationSeconds) {
+      _sync();
+    }
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
+  }
+
+  /// 动画时长：时长已知=按时长走一遍；未知=2s 循环扫掠。
+  Duration get _animationDuration => widget.durationSeconds > 0
+      ? Duration(milliseconds: widget.durationSeconds * 1000)
+      : const Duration(seconds: 2);
+
+  void _sync() {
+    if (!widget.playing) {
+      _progress.stop();
+      _progress.value = 0;
+      return;
+    }
+    _progress.duration = _animationDuration;
+    if (widget.durationSeconds > 0) {
+      _progress.forward(from: 0);
+    } else {
+      _progress.repeat(); // 时长未知：反复扫掠（动态波浪效果）
+    }
+  }
+
+  /// 按 seed 生成竖条振幅：中间高两头低的包络 + 确定性伪随机抖动。
+  List<double> _buildAmplitudes(String seed) {
+    var hash = 2166136261; // FNV-1a 起点
+    for (final unit in seed.codeUnits) {
+      hash = (hash ^ unit) * 16777619;
+    }
+    final random = math.Random(hash & 0x7fffffff);
+    return List<double>.generate(_barCount, (index) {
+      final envelope = math.sin(math.pi * (index + 1) / (_barCount + 1));
+      return (0.35 + 0.65 * random.nextDouble()) * (0.45 + 0.55 * envelope);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _progress,
+      builder: (context, _) => CustomPaint(
+        size: Size(_barCount * (_barWidth + _barGap) - _barGap, _height),
+        painter: _WaveformPainter(
+          amplitudes: _amplitudes,
+          progress: _progress.value,
+          activeColor: widget.activeColor,
+          inactiveColor: widget.inactiveColor,
+        ),
+      ),
+    );
+  }
+}
+
+/// 波形绘制：progress 左侧的条 + 进度竖线用高亮色，其余用底色。
+class _WaveformPainter extends CustomPainter {
+  const _WaveformPainter({
+    required this.amplitudes,
+    required this.progress,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  static const double _barWidth = 3;
+  static const double _barGap = 2;
+
+  final List<double> amplitudes;
+  final double progress;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final playedTo = progress * size.width;
+    final paint = Paint()..style = PaintingStyle.fill;
+    for (var index = 0; index < amplitudes.length; index++) {
+      final left = index * (_barWidth + _barGap);
+      final height = 4 + amplitudes[index] * (size.height - 4);
+      paint.color = left + _barWidth <= playedTo ? activeColor : inactiveColor;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(left, (size.height - height) / 2, _barWidth, height),
+          const Radius.circular(1.5),
+        ),
+        paint,
+      );
+    }
+    if (progress > 0 && progress < 1) {
+      paint.color = activeColor;
+      canvas.drawRect(
+        Rect.fromLTWH((playedTo - 1).clamp(0.0, size.width - 2), 0, 2, size.height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.inactiveColor != inactiveColor;
 }
 
 /// 消息发送者头像：按 personId 从服务端加载（静态缓存避免重复请求），
