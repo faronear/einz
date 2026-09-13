@@ -1931,12 +1931,14 @@ Center 会撑满宽松约束，Column 不会，改动引入了回归。加载屏
 已删除的失败文字（`暂时无法连接服务器…`），改为断言新行为（旋转 Logo 保持 +
 无失败文字，与 setup_probe_retry_test 一致）。setup_probe_retry + widget_test
 4/4 全过；flutter analyze 0 issue。已 USR2 热重启供老板确认。
+
 ## 2026-09-10 点击引用卡跳转原消息 + 目标短暂高亮
 
 **老板要求（2026-09-10）：** 1) 点击消息内引用卡跳转到原消息位置；2) 跳转后
 短暂高亮目标——老板指出边框 0→有会改气泡尺寸，用背景色高亮更稳。
 
 **实现（chat_page）：**
+
 - 引用卡（气泡内引用块）包 GestureDetector onTap → `_jumpToMessage`：
   目标未加载（UI 分页懒加载只渲染最近一页）时先 `sequenceOfMessage`（repo
   新增：按 messageId 查 serverSequence）往前分页补载直到覆盖目标；定位用
@@ -1949,7 +1951,7 @@ Center 会撑满宽松约束，Column 不会，改动引入了回归。加载屏
   post-frame 回调里——目标已在视口时 jumpTo 是 no-op 不调度新帧，`pump()`
   只在 hasScheduledFrame 时才处理帧，嵌套回调永不执行、高亮不生效。改为在
   第一个 post-frame 回调里立即置高亮（目标未构建时由后续构建按
-  _highlightMessageId 应用），ensureVisible 校正保留在嵌套回调。
+  \_highlightMessageId 应用），ensureVisible 校正保留在嵌套回调。
 
 **老板决策（墓碑/抹除语义）：** 原消息被删除/焚毁（本地墓碑）时仍可跳转——
 meta（时间信息）仍在消息流，用户可能对上下文感兴趣（现状即正确）；未来实现
@@ -2090,6 +2092,7 @@ chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热�
 （含末条）后无条件 `lines.add('')`。
 
 **验证：** dart analyze 0 issue；已提交。
+
 ## 2026-09-10 长按消息菜单顶部加消息预览行（头像 + 按性别气泡风格正文）
 
 **老板要求：** 对话页长按消息弹出的菜单顶部加一行：发言人头像 + 该消息正文
@@ -2103,6 +2106,7 @@ chat_bubble_gender、chat_page_menu、message_repository 29/29 全过；已热�
 
 **验证：** flutter analyze 0 issue；chat_page_menu + chat_bubble_gender 13/13
 全过；已热重启。
+
 ## 2026-09-10 TUI 标题栏左右在线绿灯亮度不一致修复
 
 **老板反馈：** TUI 标题栏左侧（对方）在线绿灯不如右侧（我的）明亮，是否用了
@@ -2119,29 +2123,31 @@ ESC[32m 标准绿）——不是颜色不同，而是**中段品牌名 "Einz TUI
 **验证：** dart analyze（cli + shared）0 issue；修复后右段绿点前 SGR 序列含
 ESC[22m（代码级确认）。pty 自动验证受限（TUI 交互终端检测拒绝伪 pty），
 亮度一致需老板在真实终端重启 TUI 肉眼确认。
+
 ## 2026-09-10 长按菜单预览行对齐修复：我的靠右/对方靠左
 
 **老板反馈：** 弹窗顶部简略消息气泡在消息短时被居中显示，视觉效果不稳定；
 要求与消息流一致——对方靠左、我靠右。
 
-**修复（chat_page _buildMessagePreviewRow）：** Row 由 mainAxisSize.min（短消息
+**修复（chat_page \_buildMessagePreviewRow）：** Row 由 mainAxisSize.min（短消息
 整行收缩被 sheet 居中）改为 max + mainAxisAlignment（我的 end / 对方 start）；
 长消息 Flexible 撑满截断行为不变。Row 加 ValueKey('messagePreviewRow') 供测试
 断言（项目 key 惯例）。
 
-**测试：** chat_page_menu_test 的 _FakeApi 支持可选消息列表；新增用例「长按菜单
+**测试：** chat_page_menu_test 的 \_FakeApi 支持可选消息列表；新增用例「长按菜单
 预览行对齐：我的消息靠右、对方消息靠左」（长按我的消息 → end、长按对方消息 →
 start，遮罩点击关窗）。
 
 **验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过；已热重启。
+
 ## 2026-09-10 引用跳转高亮改为边框闪烁（背景色与被引用作者对方气泡色混淆）
 
 **老板反馈：** 跳转目标用的背景高亮色正好是被引用作者的对方气泡颜色（plain
 浅粉 #FDD6ED ≈ 女气泡浅粉、gradient 提亮蓝 ≈ 男气泡天蓝），混淆；改用
 边框闪烁试试。
 
-**实现（chat_page）：** 移除背景高亮（删 _highlightColor，气泡 color 恢复纯
-_bubbleColor）；跳转目标气泡加琥珀实线边框（#FFC107，不撞任何性别气泡色系）
+**实现（chat_page）：** 移除背景高亮（删 \_highlightColor，气泡 color 恢复纯
+\_bubbleColor）；跳转目标气泡加琥珀实线边框（#FFC107，不撞任何性别气泡色系）
 2px，350ms 周期开关 4 次（亮-灭-亮-灭，约 1.4s）后消失——Timer.periodic 序列，
 dispose cancel。border 绘制在边界内，不改变气泡布局尺寸（此前"边框会改尺寸"
 的注释判断不准确，已修正）。
@@ -2151,6 +2157,7 @@ dispose cancel。border 绘制在边界内，不改变气泡布局尺寸（此�
 时钟推进前（350ms 周期会被 pump(duration) 触发切换）。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
+
 ## 2026-09-10 引用跳转高亮改回背景色（显眼橘黄 #FF9800，2s 恢复）
 
 **老板反馈：** 边框闪烁方案实测闪烁期间气泡尺寸变化（此前"border 绘制在边界
@@ -2158,7 +2165,7 @@ dispose cancel。border 绘制在边界内，不改变气泡布局尺寸（此�
 总时长 2 秒，颜色用显眼橘黄（不与性别气泡色系混淆——之前品牌浅粉 #FDD6ED
 与女气泡浅粉、提亮蓝与男气泡天蓝撞色）。
 
-**实现（chat_page）：** 移除边框（_highlightFlashOn/琥珀 Border 全删）；气泡
+**实现（chat_page）：** 移除边框（\_highlightFlashOn/琥珀 Border 全删）；气泡
 高亮背景改 `Color(0xFFFF9800)`（Material orange，白字/深字都可读），置高亮后
 AnimatedContainer 350ms 渐变出现、保持 2s 后恢复原色（渐变返回）。
 
@@ -2166,6 +2173,7 @@ AnimatedContainer 350ms 渐变出现、保持 2s 后恢复原色（渐变返回�
 indigo.shade100。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
+
 ## 2026-09-10 引用跳转高亮动画节奏调整：0.8s 渐变 + 0.4s 停留 + 0.8s 渐变回
 
 **老板要求：** 变化过程慢一点、停留短一点——渐变成橘黄 0.8 秒、停留 0.4 秒、
@@ -2178,12 +2186,14 @@ indigo.shade100。
 **测试：** 恢复断言 pump 2100ms → 1300ms（Timer 1200ms 后清除）。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll 4/4 全过；已热重启。
+
 ## 2026-09-10 高亮节奏再调（1.5s/0s/1.5s）+ 菜单安全分组分隔线
 
 **老板要求：** 1) 高亮渐变 1.5 秒、停留 0 秒、褪回 1.5 秒；2) 菜单里界面风格
 与阅后即焚之间加分隔线（下面的是安全相关设置，参照我的设备与界面语言之间）。
 
 **实现（chat_page）：**
+
 - 高亮节奏：AnimatedContainer duration 800 → 1500ms；清除 Timer 1200 → 1500ms
   （渐变完成立即褪回，停留 0s，总 3s）；测试恢复断言 pump 1600ms。
 - 菜单：style（界面风格）项后插入 PopupMenuDivider，分隔 burn（阅后即焚）及
@@ -2191,6 +2201,7 @@ indigo.shade100。
 
 **验证：** flutter analyze 0 issue；chat_initial_scroll + chat_page_menu 17/17
 全过；已热重启。
+
 ## 2026-09-10 顶部通知条视觉简化（清淡浅粉白，去粉蓝渐变与文字装饰感）
 
 **老板反馈：** 通知条文字底下有两条黄线（视觉现象）；要求简化通知条视觉——
@@ -2205,6 +2216,7 @@ Scaffold 纸感底）；描边半透明白 → 浅粉 #E9D5E0（同输入框描�
 
 **验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过（覆盖语言切换
 触发 showTopNotice 的路径）；已热重启。
+
 ## 2026-09-10 顶部通知条下移到双方在线状态条上（不再遮顶栏菜单按钮）
 
 **老板反馈：** 通知条盖在顶栏标题上会暂时遮挡菜单按钮；建议覆盖在两人在线
@@ -2217,6 +2229,7 @@ Scaffold 纸感底）；描边半透明白 → 浅粉 #E9D5E0（同输入框描�
 
 **验证：** dart format + flutter analyze 0 issue；chat_page_menu 13/13 全过
 （覆盖语言切换触发 showTopNotice 路径）；已热重启。
+
 ## 2026-09-10 通知条完全覆盖在线状态条（与状态条同高开始绘制）
 
 **老板反馈：** 通知条仍偏下，只遮住在线状态栏下半部分；要求完全覆盖——和
@@ -2231,22 +2244,25 @@ kToolbarHeight + 8，再叠加内层 Padding top 8，DecoratedBox 背景实际�
 Padding top 8 → 0（背景贴 Positioned top，与状态条同高开始往下绘制）。
 
 **验证：** flutter analyze 0 issue；chat_page_menu 13/13 全过；已热重启。
+
 ## 2026-09-10 口令/信封互切改为表单右上角切换图标（替代下方文字链接）
 
 **老板要求：** 新设备向导口令页⇄信封页互切，由下方文字链接改为表单右上角
 切换图标（类似手机/邮件登录互换、二维码/输入框登录互换）。
 
 **实现（setup_page）：** 口令页（join）与信封页标题行包 Row：左侧 Expanded
-原 _stepHeader，右侧右上角 IconButton——口令页 Icons.mail_outline（tooltip
-改用线下密保信封，onPressed _openEnvelopeImport）、信封页 Icons.password
-（tooltip 改用线上密保口令，onPressed _switchToPassphrase）；删除两页下方
-TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不变。
+原 \_stepHeader，右侧右上角 IconButton——口令页 Icons.mail_outline（tooltip
+改用线下密保信封，onPressed \_openEnvelopeImport）、信封页 Icons.password
+（tooltip 改用线上密保口令，onPressed \_switchToPassphrase）；删除两页下方
+TextButton.icon 文字链接。互切逻辑（\_preEnvelopeRole 记来源）不变。
 
 **测试：** wizard_envelope_entry 与 setup_envelope_verify 断言由 find.text(链接)
 改为 find.byIcon（create 无图标 / join 有图标 / tap 图标互切）。
 
 **验证：** flutter analyze 0 issue；setup_join_passphrase + wizard_envelope_entry
-+ setup_envelope_verify + widget_test 14/14 全过；已热重启。
+
+- setup_envelope_verify + widget_test 14/14 全过；已热重启。
+
 ## 2026-09-10 口令/信封切换图标升级为「折角」视觉效果
 
 **老板要求：** 表单右上角切换图标要有折角视觉效果，折角背后是切换图标——
@@ -2256,11 +2272,12 @@ TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不�
 `_DogEarClipper` 切掉边长 14 的等腰直角三角形），折角背后露出品牌粉
 （#D6529C 底层），主体白底细描边（#E9D5E0）+ 居中切换图标（深蓝灰
 #33415A），Tooltip 保留原文案；口令页（mail_outline → 信封）/信封页
-（password → 口令）的 IconButton 替换为 _DogEarSwitch，互切逻辑不变。
+（password → 口令）的 IconButton 替换为 \_DogEarSwitch，互切逻辑不变。
 
 **验证：** flutter analyze 0 issue；setup_join_passphrase + wizard_envelope_entry
-+ setup_envelope_verify + widget_test 14/14 全过（find.byIcon 断言不受影响）；
-已热重启。
+
+- setup_envelope_verify + widget_test 14/14 全过（find.byIcon 断言不受影响）；
+  已热重启。
 
 ## 2026-09-10 TUI /rename 命令改名 /myname（不保留兼容旧名）
 
@@ -2279,9 +2296,10 @@ TextButton.icon 文字链接。互切逻辑（_preEnvelopeRole 记来源）不�
 调整已设置的、选「无限」取消已有阅后即焚。
 
 **实现：**
+
 - `message_repository.dart` 新增 `setMessageBurn(messageId, burnSeconds)`：
   更新 burnAfterSeconds + expiresAt（burn<=0 → expiresAt=null 无限/取消；
-  >0 → now+burn），仅对未墓碑消息，返回是否成功。
+  > 0 → now+burn），仅对未墓碑消息，返回是否成功。
 - `chat_page.dart`：把档位选择弹窗抽为公共 `_pickBurnSeconds(current)`（全局
   /单条共用，当前值右侧勾选）；`_showBurnPicker`（全局设置）改用公共弹窗；
   新增 `_setMessageBurn(m)`（选档后调 repo、就地重建该消息 record 使倒计时
@@ -2302,6 +2320,7 @@ chat_initial_scroll 29/29 全过；未提交等老板检查后提交（2026-09-1
 确认（模型 B）。
 
 **实现（server/）：**
+
 - `db.ts`：新增 `spaces`/`space_members`/`join_tokens` 三表 + 索引；首次启动
   写 `meta.schema_version=2`。
 - `config.ts`：ServerConfig 增加 `protocol_version="v2-multiverse"` 与
@@ -2312,9 +2331,9 @@ chat_initial_scroll 29/29 全过；未提交等老板检查后提交（2026-09-1
   POST /spaces/{id}/join-tokens。
 - 新 `spaces.ts`：createSpace（创建者=成员0、返回首个 token）、lookupSpace
   （最小公开信息）、joinSpace（事务消费 token：未用/未过期/未满员→插第二成员
-  →满员转 active）、createJoinToken；base58url 32B 随机 token（e1_ 前缀）、
+  →满员转 active）、createJoinToken；base58url 32B 随机 token（e1\_ 前缀）、
   SHA-256 存 hash、24h TTL；space_address 暂为随机 hex 占位（正式版 Keccak-256
-  + EIP-55 派生，U2 补）。
+  - EIP-55 派生，U2 补）。
 - `test/smoke.test.ts`：两处 /health person_names 断言改为 Multiverse 语义
   （断言 /health 不含 person_names + 改查 db meta 验证登记默认名）。
 
@@ -2331,6 +2350,7 @@ TOKEN_INVALID ✓ 满员生成新 token ✓ 新 token 加入 → SPACE_FULL ✓�
 Space Key 密封包（escrow 按空间隔离），加入方凭同一口令取回 Space Key。
 
 **实现（server/，feature/multiverse 分支）：**
+
 - `escrow.ts`：`parsePackage` 加 export；新增 `escrowForSpace(spaceId, body)`：
   取包（{passphrase} → argon2id 校验（pwhashStrVerify），正确才返回密封包，
   区别于 /recover 的"全丢重置"——取钥不撤销设备）/ 上传更新（UPSERT，沿用
@@ -2353,6 +2373,7 @@ server 进程导致 EADDRINUSE 与请求打到旧进程（假 404）——先 ls
 cfg.space_id，行为不变）。
 
 **实现（server/，feature/multiverse 分支）：**
+
 - `db.ts`：sessions/challenges 加 `space_id` 列（CREATE + ALTER 迁移）；messages
   `server_sequence` 由全局 UNIQUE 改 `UNIQUE(space_id, server_sequence)`（存量库
   检测旧单列唯一自动索引 → 重建表，复合唯一不触发循环重建）。
@@ -2377,32 +2398,35 @@ cfg.space_id，行为不变）。
 ## 2026-09-10 Multiverse U2-U4 + 收尾
 
 ### U2 密钥分发闭环（已提交 2fd6050）
+
 - escrow.ts 导出 parsePackage；createSpace 支持 sealedSpaceKey+escrowPassphrase
   成对写入 key_escrow（argon2id）
 - 新端点 POST /spaces/{id}/key-escrow（口令验证返回密封包，UPSERT 上传）
 - 踩坑：3999 残留进程致假 404
 
 ### U3 App 向导接线（已提交 c399ff1）
+
 - 入口页（探测后停留新建/加入选择；修复 build 启动屏条件回归——
   `_role == null && !_probeDone`，否则探测成功仍卡启动屏）
 - join：token preflight（首次通过停留显示空间确认卡片，再次点下一步放行）→
   名字页（自填名字+性别）→ 口令 escrow 取钥 → PIN
 - create：客户端生成 space_id/Space Key + 口令 sealed 包随 POST /spaces 提交
   （服务端接受客户端 space_id）；完成页欢迎对话框展示邀请链接（复制分享）
-- 清理 v1 遗留（personA/B 身份卡体系、邀请码页、伴侣名字页、_enrollDevice）
+- 清理 v1 遗留（personA/B 身份卡体系、邀请码页、伴侣名字页、\_enrollDevice）
 - 测试注入：preflightOverride/joinOverride/createOverride；42 个测试全绿
 - golden 失配保持红不重刷（老板政策）
-- 踩坑：join step1 按钮被 v1 身份卡"自动前进"例外隐藏、_backStep offline 回退
+- 踩坑：join step1 按钮被 v1 身份卡"自动前进"例外隐藏、\_backStep offline 回退
   旧位置、fake escrow 非法 base64（salt='s'）、测试漏 setUpAll(sodium)
 
 ### U4 CLI 对齐（已提交 2efad8c + feb749e）
+
 - DeviceStore +spaceAddress（旧 store 自动迁移）；探测对齐 protocol_version/capabilities
 - 未绑定引导提示 /space create | /space join；移除 v1 伴侣名字/性别询问
 - /space create：客户端生成 space_id/Space Key + sealed 包 → POST /spaces →
   打印空间地址 + 24h 一次性邀请链接
 - /space join：preflight → join（设备登记+签发 session）→ 口令 escrow 取钥；
   /space address 显示地址
-- 提取 _activateAfterBind（create/join 命令与启动引导共用：同步+设锁+WS）
+- 提取 \_activateAfterBind（create/join 命令与启动引导共用：同步+设锁+WS）
 - server join 响应补 spaceAddress；**路由字段名统一下划线**（public_key/
   display_name/sealed_space_key/escrow_passphrase/device_name）——真实 HTTP 级
   bug，U3 全走 fake/函数直调未暴露，CLI pty e2e 复现并修复
@@ -2410,6 +2434,7 @@ cfg.space_id，行为不变）。
   含口令 escrow 取钥；脚本 aimemo/cliMultiverseE2E.py 可复用）
 
 ### 其他
+
 - git 历史修复：远程 origin/main 停在 78d3b41（本地 main 的 v1 commit 未 push）
   → `git push origin main`（78d3b41..26d4c23）；feature/multiverse 首次 push 远程备份
 - 迁移脚本按老板指示取消（老版本未正式上线，无需 legacy 迁移）
@@ -2417,13 +2442,15 @@ cfg.space_id，行为不变）。
   Build/Install + 信任开发者证书）
 
 ### U4 引导改造（老板 2026-09-10 定稿）
+
 - 未绑定设备引导第一步改为「选择 加入伴侣的秘境（join）/ 创建新秘境（create）」
   （对齐 App 入口页）——create→名字/性别→口令创建；join→token→名字/口令加入
-- _spaceCreate 加性别询问（本地记录；create 暂不提交——服务端无 gender 通道）
+- \_spaceCreate 加性别询问（本地记录；create 暂不提交——服务端无 gender 通道）
 - pty e2e 脚本适配新引导序列（aimemo/cliMultiverseE2E.py），create→join 全通
-- 踩坑：_spaceJoin 无性别询问（仅 create 有）——脚本别等「我的性别」
+- 踩坑：\_spaceJoin 无性别询问（仅 create 有）——脚本别等「我的性别」
 
 ### U4 身份选择定稿（老板 2026-09-10）
+
 - create 录入两人身份：我的名字/性别 + 伴侣名字（必填）/伴侣性别（必填）
   ——服务端 createSpace 预置两 slot（creator active + partner pending）
 - join 改为「选择是哪一个用户」（preflight 返回 slots：编号/名字/性别/状态）
@@ -2439,9 +2466,10 @@ cfg.space_id，行为不变）。
   wrap 截断长地址（C 的 spaceId 改从 store 文件读，不依赖 lookup）
 
 ### App 同步身份选择方案（老板 2026-09-10 确认：与 v1 一致）
+
 - create 流程加伴侣页（步骤 2）：伴侣名字（必填）/伴侣性别（必选）——复用 v1
   键（wizardTitlePeerName/wizardPeerNameHint 等，U3 清理后为死键）；createSpace
-  提交 gender/partnerName/partnerGender；stepCount 5→6；_finish 对方名=伴侣名字
+  提交 gender/partnerName/partnerGender；stepCount 5→6；\_finish 对方名=伴侣名字
 - join 流程名字页改为身份选择页（步骤 2）：preflight slots 展示两身份卡片
   （编号/名字/性别/状态，点选）→ joinSpace 提交 partnerSlot；不再自填名字；
   本人名字/性别取所选身份（服务端中英文 gender → App 'male'/'female' 归一）
@@ -2453,6 +2481,7 @@ cfg.space_id，行为不变）。
   卡片列表点选）
 
 ### #3 space_address 落地（Keccak-256 + EIP-55）
+
 - 新增 server/src/address.ts：toEip55（EIP-55 checksum 编码）+ deriveSpaceAddress
   （Keccak-256(space_public_key 字节) 后 20 字节 → EIP-55 地址——确定性）
 - 用已有 hash-wasm 依赖的 keccak（无需新增依赖）
@@ -2461,6 +2490,7 @@ cfg.space_id，行为不变）。
 - 验证：地址格式 0x+40hex（含 EIP-55 大写）✓ 确定性 ✓ 旧空间兼容（冒烟/隔离全绿）
 
 ### #4 空间数上限（config.json maxSpaces，老板 2026-09-10 方案）
+
 - server/config.json：maxSpaces（0=不限默认；1=单空间即 v1 模式；n=最多 n 个）
 - config.ts：启动读取一次（readFileConfig 缓存——改配置需重启）；loadConfig 返回
   max_spaces
@@ -2470,6 +2500,7 @@ cfg.space_id，行为不变）。
   cli/shared analyze 0 issue、App analyze 0 error（仅既有 info）
 
 ### App 本地配置机制（gitignore 的 local_config.json + --dart-define-from-file）
+
 - server_settings.dart 的 kEinzServer 改 String.fromEnvironment('kEinzServer',
   defaultValue: 'https://einz.tic.cc')——移除老板的 localhost 注释行（覆盖走配置）
 - app/local_config.json（gitignore）+ local_config.example.json（模板，入 git）：
@@ -2483,10 +2514,12 @@ cfg.space_id，行为不变）。
   --dart-define-from-file 同样支持（README 已说明）
 
 ### TUI 向导输入细节（老板 2026-09-10）
+
 - 创建空间：我的名字/伴侣名字都必填（不允许空——去掉"创建者"回退）
 - 性别选择改数字输入：1=男、2=女（只接受数字——不接受"男/女/male/female"文字）
 
 ### /invite 改造（v1 邀请码 → Multiverse join token）
+
 - /invite 改为生成绑定新设备的 join token（POST /spaces/{id}/join-tokens——
   24h 一次性；shared 加 JoinTokenResult + createJoinToken；v1 createInvite 废弃）
 - 输出：📎 新设备绑定邀请（链接）+ token + 提示"新设备 /space join <链接> 绑定"
@@ -2495,6 +2528,7 @@ cfg.space_id，行为不变）。
   同端点 token）；A create 后卡锁屏码询问（/invite 前先回车跳过）
 
 ### 落地页 + v2 服务端去全局 space_id（老板 2026-09-10）
+
 - 落地页：GET /join/<token> 返回静态 HTML 指引页（品牌风格卡片——"这是 Einz
   私密空间邀请，请用 App 加入" + 显示邀请码；token 正则校验非法 404）——
   解决浏览器打开邀请链接 404 断裂
@@ -2508,6 +2542,7 @@ cfg.space_id，行为不变）。
   替换文本改纯 "" 修复）
 
 ### server 配置文件改名（老板 2026-09-10）
+
 - 删除过时的 server/config/config.json.example（v1 白名单/space_id 模板——v2
   白名单靠动态登记；README 快速开始同步改 v2 方式）
 - server/config.json → server/einz_server_config.json（gitignore 不入 git——存
@@ -2517,6 +2552,7 @@ cfg.space_id，行为不变）。
   git check-ignore 生效（新配置文件不入 git）
 
 ### TUI 引导首问改 C/J 输入（老板 2026-09-10）
+
 - 引导第一步：创建新秘境（输入 C 或 create）/ 加入老秘境（输入 J 或 join）——
   大小写均可（既有 toLowerCase 归一）；保留 1/2 数字兼容；无效提示同步更新
 - pty e2e 脚本同步：等特提示改"创建新秘境"、发送改 C/J、注释/描述更新；
@@ -2525,6 +2561,7 @@ cfg.space_id，行为不变）。
   → C 输 J 加入，地址一致）
 
 ### TUI 加入流程：token 错误直接重输（老板 2026-09-10）
+
 - 引导 join 分支：token 被拒后内层循环直接重输（不再回到 create/join 首问）
 - pty e2e：join_flow 加 wrong_token 参数（先贴错误 token→断言直接重输→再贴
   正确 token）+ quit_after_wrong（B1 验证重输后退出会话、B2 正常 join——
@@ -2535,6 +2572,7 @@ cfg.space_id，行为不变）。
   分离会话验证）；"创建新秘境"文本一直在消息区（重绘再现）不可作"回到首问"信号
 
 ### 名字语义对齐（老板 2026-09-10）
+
 - TUI 身份选择：改为输入完整名字（不再输编号 0/1）——提示只显示名字
   （不显示性别/在线状态）；名字精确匹配（不匹配/同名区分报错）
 - TUI 创建空间：伴侣名字不能与我的名字相同（报错重输）
@@ -2547,28 +2585,31 @@ cfg.space_id，行为不变）。
   测试 15 个全过、pty e2e 全通（B/C 输名字选身份）
 
 ### 修复：标题栏对方名字 '-' + 气泡全青色（老板 2026-09-10 反馈）
-- Bug1 根因：a) CLI _peerNameOf 硬编码 v1 假 id（personA/personB）查 personNames
+
+- Bug1 根因：a) CLI \_peerNameOf 硬编码 v1 假 id（personA/personB）查 personNames
   （v2 personId 是 UUID——查不到）；b) 服务端 getSpace 读 v1 的 meta
-  person_name:*（v2 成员数据在 space_members——拉空）
-  修复：_peerNameOf 改为 personNames 找非我 personId；服务端 getSpace 改从
+  person_name:\*（v2 成员数据在 space_members——拉空）
+  修复：\_peerNameOf 改为 personNames 找非我 personId；服务端 getSpace 改从
   space_members 读 display_name/gender（按 person_id），space_id 从 session 取
 - Bug2 根因：CLI createSpace 直传中文 gender（'男'/'女'）——服务端原样存——
   App 判断 'male'/'female' 不匹配（气泡全青色）
   修复：服务端 normGender 统一存 male/female（createSpace 两处 INSERT 归一）；
-  CLI createSpace 提交走 _genderCode 转换（与 enroll 一致）
+  CLI createSpace 提交走 \_genderCode 转换（与 enroll 一致）
 - 验证：cli analyze 0 issue、server tsc OK、App analyze 0 error、App 气泡测试
   全过、pty e2e 全通
-- 踩坑：push.ts 注释里 person_name:*/person_gender:* 的 */ 截断注释块（TS1109）
-  ——改写措辞避免 */ 序列
+- 踩坑：push.ts 注释里 person_name:_/person_gender:_ 的 _/ 截断注释块（TS1109）
+  ——改写措辞避免 _/ 序列
 
 ### TUI 身份选择列表：名字背景色按性别（老板 2026-09-10）
-- 加入向导的身份列表：名字背景色按性别粉/蓝（复用 _genderBubble——与消息
+
+- 加入向导的身份列表：名字背景色按性别粉/蓝（复用 \_genderBubble——与消息
   气泡背景色完全一致）；亮白字 + 重置；仍不显示性别/在线状态
 - 验证：cli analyze 0 issue；pty e2e 全通（ANSI 背景色不影响名字匹配）
 
 ### 气泡仍青色排查（老板 2026-09-10 反馈"重启后仍青色"）
+
 - 排查结论：服务端 space_members 的 gender 存储正确（normGender 统一 male/female
-  ——curl 实测）、getSpace 返回正确、CLI 数据流（join/create 后 _refreshPersonNames
+  ——curl 实测）、getSpace 返回正确、CLI 数据流（join/create 后 \_refreshPersonNames
   刷新 personGenders——对方消息气泡按 personGenders[senderPersonId] 配色）逻辑正确
   ——无需代码修复
 - 老板青色根因：旧空间数据（早期创建的空间 space_members.gender 为 NULL——未知
@@ -2578,24 +2619,26 @@ cfg.space_id，行为不变）。
 - 老板自行验证：新建空间发消息看对方气泡颜色
 
 ### 气泡青色真因更正：认证后未刷新 person 性别表（老板 2026-09-10 实测推翻旧结论）
+
 - 老板实测：新建/加入向导刚结束直接发消息仍青色；/exit 重进后双色正常——非遗留
   数据（server-new-local 已删旧库）——是 CLI 认证成功后未及时拉取 person 名称/性别表
-- 真因：main 启动初始化（1022）调 _refreshPersonNames 时 token 未就绪（向导前）——
-  getSpace 失败静默，personGenders 空；_activateAfterBind（join/create 认证绑定，
+- 真因：main 启动初始化（1022）调 \_refreshPersonNames 时 token 未就绪（向导前）——
+  getSpace 失败静默，personGenders 空；\_activateAfterBind（join/create 认证绑定，
   835/931）认证成功后没有再刷新——向导结束直接发消息 → 对方气泡未知性别回退青绿
-- 修复：_activateAfterBind 收尾加 `await _refreshPersonNames(_state!)`（WS 启动、
+- 修复：\_activateAfterBind 收尾加 `await _refreshPersonNames(_state!)`（WS 启动、
   渲染前——join/create/启动所有认证路径统一刷新；getSpace 有 try-catch 兜底）
 - 验证：cli analyze 0 issue；pty e2e 全通（create→join→多设备地址一致）
 
 ### 同性别空间收消息青色：收消息方 personGenders 快照缺新成员（老板 2026-09-10）
+
 - 现象：两人同性别——第二人 join 后发消息，对方 TUI 收到青色；男女组合正常
 - 真因：收消息路径（WS onMessage/sync）不刷新 personGenders——第一人快照是加入时
   的（无后来 join 的第二人——person_id 当时为 NULL）；服务端 getSpace 的
   `AND person_id IS NOT NULL` 过滤掉未加入成员——收到第二人消息时查不到性别→青绿
 - 修复两层：
-  1) 按需刷新：新增 _refreshGenderForLatest——所有 startWs 的 onMessage/onAutoSync
-     回调统一接入——收到对方消息缺发送者性别则 await _refreshPersonNames 再重绘
-  2) 上线刷新：_onPeerStatus 对方上线（online 状态变化）时刷新 personNames/
+  1. 按需刷新：新增 \_refreshGenderForLatest——所有 startWs 的 onMessage/onAutoSync
+     回调统一接入——收到对方消息缺发送者性别则 await \_refreshPersonNames 再重绘
+  2. 上线刷新：\_onPeerStatus 对方上线（online 状态变化）时刷新 personNames/
      personGenders——第二人性别创建时就写入 space_members（slot 预置），join 后
      person_id 落位 getSpace 即可返回——第一个消息前就知道（老板诉求）
 - 验证：cli analyze 0 issue；pty e2e 全通（create→join→多设备地址一致）
@@ -2609,8 +2652,9 @@ cfg.space_id，行为不变）。
 **根因（服务端，非 TUI）：** 90ec740 把 GET /space 的名称表从 meta 改为读
 space_members（v2 成员表——create/join 写入 display_name），但 POST
 /devices/person-name（改名端点）仍只写 meta `person_name:*`——两表脱节：
-- 改名者自身刷新（/myname 后 _refreshPersonNames）拉到的是 space_members 旧名，
-  而 TUI 标题栏右段优先取远程名称表（_personLabel 的 personNames[pid] 先于本地
+
+- 改名者自身刷新（/myname 后 \_refreshPersonNames）拉到的是 space_members 旧名，
+  而 TUI 标题栏右段优先取远程名称表（\_personLabel 的 personNames[pid] 先于本地
   store.personName）→ 右上角不刷新
 - 对方 /myname 后的同名刷新把 WS 已更新的新名覆盖回 space_members 里的旧值 →
   我方名字"变回老名"
@@ -2644,6 +2688,7 @@ Node 需 ≥20.11（import.meta.dirname——本机默认 18.12 跑不了，用 
 → 写入 `attachments.space_id NOT NULL` 列 → `SQLITE_CONSTRAINT_NOTNULL` → 500。
 blob 已写盘（`writeFileSync` 在 INSERT 之前）→ 现场证据：`server/data/files/01/`
 有 36 个孤儿 blob，`attachments` 表 0 行。
+
 - App 侧：`postAttachment` 抛异常 → 本地附件元数据不落库 → 气泡回退「📎 文件名」；
   消息已在 pending 队列 → 后续 `_flushPending` 补发成功（消息在、附件不在）。
 - CLI 侧：服务端无 attachments 行 → `/sync` 的 `attachments_meta` 为空 → `/open`
@@ -2653,6 +2698,7 @@ blob 已写盘（`writeFileSync` 在 INSERT 之前）→ 现场证据：`server/
 已入库 → 200。
 
 **修复：**
+
 1. `server/src/attachments.ts`：附件归属改取会话绑定的 Space（`resolveSession` 的
    space_id，与 `postMessage` 一致），不再从消息反查；legacy 回落空串。
 2. `app/lib/data/message_repository.dart`：附件元数据 + 本地密文副本改为**加密后
@@ -2660,6 +2706,7 @@ blob 已写盘（`writeFileSync` 在 INSERT 之前）→ 现场证据：`server/
    渲染图片视频。
 
 **回归测试（两条，均在未修复产物上验证为失败）：**
+
 - `server/test/smoke.test.ts` 12c：独立服务器 → 创建空间 → 先传 blob（message 未
   入库）应 200 → 再发 image 消息 → `/sync` 返回 attachments_meta → 下载字节一致。
   未修复 dist 上正确报 `NOT NULL constraint failed: attachments.space_id` / 500。
@@ -2684,8 +2731,9 @@ nonce 不可知）无法恢复成可解密附件，可择机清理。
 
 **修复：** 改为必填循环（对齐既有 `_setupEscrowPassphrase` 的口令模式）：
 `required: true`（输入循环拦截留空回车，提示「此项不能为空」）+ 空串 `continue` 兜底
-+ `!_state!.running` 时 return（/exit 逃生门）。口令必有值后，sealed 包不再条件创建，
-`escrowPassphrase` 直接传 passphrase（去掉 isEmpty 分支）。
+
+- `!_state!.running` 时 return（/exit 逃生门）。口令必有值后，sealed 包不再条件创建，
+  `escrowPassphrase` 直接传 passphrase（去掉 isEmpty 分支）。
 
 **回归测试（cli/test/create_passphrase_required_check.py，新增）：** 临时服务器 +
 pty TUI → 走完 名字/性别/伴侣名/伴侣性别 → 口令留空回车 → 断言提示「此项不能为空」
@@ -2697,6 +2745,7 @@ pty TUI → 走完 名字/性别/伴侣名/伴侣性别 → 口令留空回车 �
 凭同一口令加入（证明必填口令产出的密保箱可用）→ C 同身份多设备加入，地址一致。
 
 **顺带修 e2e 脚本两处老化：**
+
 1. TUI 文案变了导致匹配不到（创建新秘境→创建秘境、粘贴邀请链接→输入邀请码、
    你是哪一个用户→我是谁、已加入空间→成功加入秘境、输入空间密保口令→验证密保口令、
    加入空间失败→加入秘境失败、空间已创建→成功创建秘境）
@@ -2707,12 +2756,14 @@ pty TUI → 走完 名字/性别/伴侣名/伴侣性别 → 口令留空回车 �
 ## 2026-09-11 App：头像上传后不即时更新（含对方）+ 消息气泡一方灰色
 
 ### 1) 头像换后要重启才更新（老板反馈，v1 不会）
+
 **根因：** `_MessageAvatarState._cache` 是 **static**（personId → bytes），且只在
 `!_cache.containsKey(pid)` 时才加载 → 上传后消息流里的头像永不失效，只有重启
 （新进程、缓存为空）才会拉到新图。菜单里的 `_myAvatarBytes` 倒是即时更新的
 （所以看起来"只有消息流不更新"）。
 
 **修复：**
+
 - 服务端 `POST /avatar` 后广播 `profile.updated`（复用改名已有的广播，带
   person_id）→ 伴侣及本人其他设备在线时立即重拉
 - App：`_MessageAvatarState` 加静态 `invalidated` 通知 + `invalidate(personId)`；
@@ -2720,17 +2771,19 @@ pty TUI → 走完 名字/性别/伴侣名/伴侣性别 → 口令留空回车 �
   （不清空旧值，避免闪成默认图标）
 
 ### 2) 消息气泡一方灰色（老板反馈：v1 按性别蓝/粉，v2 一方灰）
+
 **根因：** `setup_page.dart` 的 `_finish()` 把 profile 的 `peerGender` **写死 ''**
 （注释"无公开渠道"）→ 对方性别永远未知 → `_bubbleColor` 走未知性别回退灰/蓝。
 v1 是写真实值（create=伴侣性别，join=另一人 `_personGenders[另一 person]`），
 Multiverse 重写时丢了。
 
 **修复两层：**
+
 - `setup_page`：create 用 `_partnerGender`；join 新增 `_joinPeerGender`（另一 slot
   的性别，复用新的 `_normalizeGender` 归一）
 - `chat_page`：新增 `_refreshGendersFromServer()`（GET /space 的 personGenders）——
   已入网的老设备 profile 里仍是空值，靠启动 + `profile.updated` 时补齐自愈
-  （对齐 CLI 的 _refreshPersonNames）
+  （对齐 CLI 的 \_refreshPersonNames）
 
 **验证：** server tsc + npm test 全绿；app flutter analyze 仅既有 info；
 flutter test 失败项与基线一致（15，无新增）；气泡/菜单相关 14 项全过。
@@ -2744,6 +2797,7 @@ flutter test 失败项与基线一致（15，无新增）；气泡/菜单相关 
 才纠正；且 App 下次重启又显示老的对方名字。
 
 **根因两层：**
+
 1. **服务端广播依赖发起方 WS 在线**（主因）：`broadcastProfileUpdated` 用
    `sameSpace(exceptDeviceId)` = `conns.get(发起方)?.spaceId`——发起方自己没有 WS
    连接（移动端切后台/断线）就**一条都不发**。实测（Node 探针 + 临时服务器）：
@@ -2754,6 +2808,7 @@ flutter test 失败项与基线一致（15，无新增）；气泡/菜单相关 
    广播就永远不更新。
 
 **修复：**
+
 - `server/src/ws.ts`：新增 `spaceOfDevice()`——发起方在线用其连接，不在线回退查
   sessions 表（最新非空 space_id）；`broadcastProfileUpdated` /
   `broadcastPassphraseRotated` 改用它
@@ -2771,6 +2826,7 @@ flutter test 失败项与基线一致（15，无新增）。
 **待老板处理：** 广播在服务端——本机 server 需重启、生产需部署才生效。
 
 ### 续：App 重启仍显示旧名（二修——重启路径没有 personId）
+
 **老板复测：** 服务端/App 重启后，TUI(A) 改名 → App 立刻看到（广播已通）；但 App
 重启又是 A 的老名字。
 
@@ -2779,16 +2835,19 @@ personId**（AppLockPayload 也没这个字段），而 `_refreshProfileFromServ
 `if (personId 为空) return` → 校正直接跳过，只剩本地旧快照。
 
 **修复：**
+
 - personId 为空时从 `/space` 的 devices 表按 `widget.deviceId` 反查"我是谁"
   （不改 AppLockPayload 结构）
 - 校正结果回写本地 profile（`saveProfile`）——下次离线启动也正确（setState 只覆盖
   非空值，不会把已有名字写成空）
 
 **回归测试 app/test/chat_profile_refresh_test.dart：** 预置旧快照（Alice-老名字）
-+ 无 personId 构造 ChatPage + fake /space 返回新名 → 断言顶部条显示新名、旧名消失、
+
+- 无 personId 构造 ChatPage + fake /space 返回新名 → 断言顶部条显示新名、旧名消失、
   profile 已回写（含性别）。去掉 deviceId 反查后该用例正确失败。
 
 ## 2026-09-11 TUI 系统消息支持一条消息内多行
+
 **老板诉求：** 想把一段提示分成多行（如秘境入口菜单），但不想拆成多条 system 消息
 （否则被消息间空行分开、丢失"整体感"）。
 
@@ -2798,12 +2857,13 @@ personId**（AppLockPayload 也没这个字段），而 `_refreshProfileFromServ
 已用 `\n`）。
 
 **修复：**
+
 - 系统消息保留显式换行：`final body = m.isSystem ? m.plain : m.plain.replaceAll('\n',' ')`
 - 系统分支按 `\n` 拆物理行：首物理行带 `[system 时间]` 前缀，其余缩进对齐；空物理行
   （连续 `\n\n`）保留为空白行；每条物理行各自折行
 - 把 `_formatMessage` 改名公开 `formatMessage`（便于单测）；main 加
   `EINZ_UNITTEST=1` 守卫，避免 import 本文件时启动交互 TUI
-- 顺手把秘境入口三连发 _systemMessage 合并成一条多行消息做示范
+- 顺手把秘境入口三连发 \_systemMessage 合并成一条多行消息做示范
 
 **回归测试 cli/test/format_message_test.dart：** 5 例（多行独立渲染/前缀仅首行、
 显式空行保留、不再折叠、长行折行续行缩进、多物理行各自折行）；把 body 改回
@@ -2812,17 +2872,21 @@ personId**（AppLockPayload 也没这个字段），而 `_refreshProfileFromServ
 **验证：** dart analyze 无 issue；EINZ_UNITTEST=1 dart test 全绿。
 
 ## 2026-09-12 成功构建 release APK（main 分支，Intel iMac）
+
 **目标：** 在 main（v1 + v2 multiverse 已 fast-forward 合并）上产出可分发的 release APK。
 
 **最终命令：**
+
 ```
 cd app && PATH=$HOME/development/flutter/bin:$PATH JAVA_HOME=$HOME/jdk/jdk-17.0.20.1+1/Contents/Home ANDROID_HOME=$HOME/Library/Android/sdk \
   flutter build apk --release
 ```
+
 **结果：** BUILD_EXIT=0；产物 `app/build/app/outputs/flutter-apk/app-release.apk`（82.6MB，
 2026-09-12 10:18）。apksigner 校验：Signer#1 DN=CN=yuanjin…（release keystore，非 debug）。
 
 **构建中逐个排除的障碍：**
+
 1. Android 16 平台被装成 `platforms/android-36.1`（ApiLevel=36.1），AGP 要精确
    `platforms/android-36` → 复制 `android-36.1` 为 `android-36` 并改 source.properties /
    package.xml 的 ApiLevel 与 path 为 36。
@@ -2841,6 +2905,7 @@ cd app && PATH=$HOME/development/flutter/bin:$PATH JAVA_HOME=$HOME/jdk/jdk-17.0.
 尚未 push origin/main。
 
 ### 补：android-36 改名 hack 已替换为官方正版平台
+
 原先的 `platforms;android-36` 是把 `android-36.1` 复制改名 + 改 metadata 的 hack（有隐患：
 SDK 元数据对不上、扩展级别 framework 可能骗过 AGP 的 API 上限检查导致在基础 Android 16
 设备上运行时崩溃、且不可复现）。
@@ -2852,6 +2917,7 @@ SDK 元数据对不上、扩展级别 framework 可能骗过 AGP 的 API 上限�
 未用到，暂保留无害；日后若需 API 37 同样走 `sdkmanager "platforms;android-37"` 装正版。
 
 ### 补2：JDK 迁移 ~/jdk -> ~/development/jdk + 清理 android-37 废复制
+
 - JDK（Temurin 17.0.20.1）从 `~/jdk/jdk-17.0.20.1+1` 迁到 `~/development/jdk`
   （即 `~/development/jdk/Contents/Home`）。`~/.zshrc` 的 JAVA_HOME 同步改；
   `flutter config --jdk-dir` 显式设为新路径。删空 `~/jdk`。
@@ -2862,6 +2928,7 @@ SDK 元数据对不上、扩展级别 framework 可能骗过 AGP 的 API 上限�
 - 源码修复 commit `d293d08`（签名路径）已 `git push origin main`（de8fee7..d293d08）。
 
 ### 补3：日后重发 APK 的正确命令
+
 - ❌ `flutter build android --release` 在本机 Flutter 3.47.2 不是合法命令（build 子命令
   只有 apk/appbundle/ios 等，无 android；会报 "Could not find an option named --release"）。
 - ✅ 正确：`cd app && flutter build apk --release`。已模拟"新终端、不导出任何环境变量"
@@ -2874,17 +2941,19 @@ SDK 元数据对不上、扩展级别 framework 可能骗过 AGP 的 API 上限�
 ## 2026-09-12 App 聊天页两处观感修正（老板反馈）
 
 ### 1) 视频全屏：半透明遮罩 → 纯黑铺满（对齐图片）
+
 - 现象：点图片全屏是纯黑背景很显眼；点视频全屏却是默认 `Dialog`——四周露出
   半透明 barrier、视频缩在圆角小卡里，观感不统一。
 - 改法：`_VideoPreview._playFullscreen` 的 `Dialog` 加 `backgroundColor: Colors.black`
-  + `insetPadding: EdgeInsets.zero`，内部改 `Positioned.fill > Center > AspectRatio`
-  按原比例居中，与 `_showFullImage` 完全一致；`barrierDismissible: true` 保持点空白关闭。
+  - `insetPadding: EdgeInsets.zero`，内部改 `Positioned.fill > Center > AspectRatio`
+    按原比例居中，与 `_showFullImage` 完全一致；`barrierDismissible: true` 保持点空白关闭。
 - 位置：`app/lib/chat_page.dart` 的 `_VideoPreviewState._playFullscreen`。
 
 ### 2) 发送后键盘常驻：点输入框外任意处收起
+
 - 现象：发送消息后虚拟键盘不自动收起，挡住消息流下半屏，想多看消息得手动按返回键。
 - 改法：给聊天页输入 `TextField` 加 `onTapOutside: (_) => FocusManager.instance
-  .primaryFocus?.unfocus()`。移动端 `TextField.onTapOutside` 默认不处理焦点（这正是
+.primaryFocus?.unfocus()`。移动端 `TextField.onTapOutside` 默认不处理焦点（这正是
   键盘不收起的原因），显式 unfocus 即可：点消息列表/空白/其他控件都会收键盘。
 - 位置：`app/lib/chat_page.dart` 输入栏内 `TextField`（约 2568 行）。
 - 说明：曾试过用 `GestureDetector` 包住 `ListView`，但会把整段列表缩进改动一大片、
@@ -2895,6 +2964,7 @@ commit `71477b1`（仅 `app/lib/chat_page.dart`）。
 ## 2026-09-12 发送「即时上屏」优化（乐观 UI + 本地优先 + 状态指示）
 
 ### 问题定位（不是单纯网速）
+
 老板反馈「按发送后消息要过好一会儿才出现在消息流」。查链路发现：`_send()`（chat_page）
 先 `await _repo.send()`（内含 `api.postMessage` 网络往返），再 `await _refresh()`——
 而 `_refresh()` 开头就 `await _repo.sync()`（`api.sync` 循环 + `_flushPending` 又一次
@@ -2904,15 +2974,16 @@ POST），最后才读本地库上屏。但 `send()` 其实早已把消息写进
 「1 乐观回显 + 2 本地优先刷新 + 3 状态指示（含失败重发）」全套。
 
 ### 落地
+
 1. **乐观回显**：`MessageRepository.send()` / `sendAttachment()` 新增可选回调
    `onPersisted(messageId)`，在 `_insertLocal` 之后、网络上传之前 await 调用（try/catch
    包裹，回调异常绝不影响发送）。聊天页传 `onPersisted: (_) => _refreshLocal()`，
    pending 气泡立即画出。附件在 `_insertLocal`（含附件元数据）之后回调，图片/视频可即时显示。
 2. **本地优先刷新**：新增 `ChatPageState._refreshLocal()`（纯本地：`tombstoneExpired`
-   + `historySince`），合并语义为「按 messageId 就地替换（刷新 pending→sent/failed 状态）
-   + 新 id 追加 + 墓碑单调」；有 `_initialLoaded` 守卫（未加载时 `_lastLoadedSequence=0`
-   会全量解密）。`_refresh()` 改为「先本地 → 再 sync → 再本地」；`_loadInitial()` 先
-   `historyRecent` 秒开，再 sync 覆盖。
+   - `historySince`），合并语义为「按 messageId 就地替换（刷新 pending→sent/failed 状态）
+   - 新 id 追加 + 墓碑单调」；有 `_initialLoaded` 守卫（未加载时 `_lastLoadedSequence=0`
+     会全量解密）。`_refresh()` 改为「先本地 → 再 sync → 再本地」；`_loadInitial()` 先
+     `historyRecent` 秒开，再 sync 覆盖。
 3. **状态指示 + 失败重发**：`HistoryMessage` 加 `status`（取自 `row.status`）；自己消息
    时间行显示 🕓发送中 / ✓已发送 / ⚠️发送失败（红色，点按 `retryMessage` 重发）。
    `send()` 仅在**有 token 且 postMessage 抛错**时标 `failed`（离线无 token 保持 pending，
@@ -2926,6 +2997,7 @@ POST），最后才读本地库上屏。但 `send()` 其实早已把消息写进
    增量刷新从「每次全量解密」降为「只取新增/pending」。
 
 ### 验证
+
 - `app/test/message_repository_test.dart`：FakeApi 加 `failPostMessage`；新增 5 条用例
   （failed 状态 / retryMessage 回填 seq / onPersisted 早于上传 / 附件回调 / 自己消息
   sync 后 status+seq）。**19/19 通过**。
@@ -2935,6 +3007,7 @@ POST），最后才读本地库上屏。但 `send()` 其实早已把消息写进
   widget 测试（chat_initial_scroll / chat_page_menu / chat_bubble_gender）全过。
 
 ### 决策点（重要）
+
 - `failed` 只对 postMessage 生效、且不自动重试——意味「短暂网络抖动」也会显示 ⚠️
   需用户点一下。老板若觉得吵，可改成「failed 也纳入 `_flushPending` 自动补发」。
 - `_lastLoadedSequence` 的修复顺带修了分页/跳转的两个潜在 bug，但属行为变化，需真机
@@ -2950,7 +3023,7 @@ commit `730d6da`（app 源码 + 测试 + l10n 我的 hunk；老板在 `app_zh.ar
 - 改法（`app/lib/setup_page.dart`）：
   - 新增 `_escrowPassphraseConfirm` 控制器（含 dispose）；
   - `_buildStepPassphrase` 仅在 `_role == create` 时渲染第二个口令框（obscure，
-    hint=「请再次输入口令」）；
+    hint=「再输一次以确认」）；
   - `_nextStep` 本地校验：create 且口令非空但两次 `trim()` 不一致 → 红字
     「两次输入的口令不一致」并停留本页；一致才放行进 PIN 步骤。
 - l10n：新增 `wizardPassphraseConfirmHint` / `wizardPassphraseMismatch`（en+zh，
@@ -3301,6 +3374,13 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
 - app 全量：仍是 15 条既有环境性失败（未增加）；新增/既有 status 用例 3/3 通过。
 - cli：`dart analyze` 无新增问题；`receipts_check.dart` 通过。
 - 服务端未改动。**仍需老板重启服务端**才能让回执（双勾）生效。
+
+### 待办（承接上一轮，勿丢）
+- read 的**展示**开关（老板要"做成开关、目前不显示"）——目前是"read 与 delivered
+  同图标 + `receiptOf` 已能返回 `'read'`"，做成用户可见的设置项待定。
+- 多设备下 delivered 语义仍是"该 person **至少一台**设备已收到"，不保证所有设备。
+- `retryMessage` 只重发消息信封，**不重传附件 blob**：附件类消息失败重发的完整性
+  未覆盖（既有行为，非本轮引入）。
 
 commit：见下方「回执地基」系列提交（server / shared / app / cli / docs）。
 
