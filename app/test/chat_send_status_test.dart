@@ -41,6 +41,9 @@ class _StatusFakeApi extends ApiClient {
   /// 是否让 postMessage 抛**网络类**异常（→ 保持 pending，不标 failed）。
   bool failPostMessage = false;
 
+  /// 是否让 sync 抛异常（模拟服务端不可达 → 连续失败计数/离线提示）。
+  bool failSync = false;
+
   /// 是否让 postMessage 被**服务端明确拒绝**（4xx → 应标 failed）。
   bool rejectPostMessage = false;
 
@@ -53,6 +56,7 @@ class _StatusFakeApi extends ApiClient {
     int after = 0,
     int limit = 100,
   }) async {
+    if (failSync) throw Exception('server unreachable');
     final all = [
       for (final p in peer)
         MessageEnvelope.fromJson({...p.env.toJson(), 'server_sequence': p.seq}),
@@ -361,6 +365,52 @@ void main() {
     expect(find.text('会被删除的消息'), findsNothing, reason: '墓碑应隐藏正文');
     expect(find.byIcon(Icons.check), findsOneWidget,
         reason: '墓碑不影响在途路径，状态图标仍应显示');
+  });
+
+  testWidgets('服务端不可达且有未确认消息：显示「离线 · N 条待发送」提示',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _StatusFakeApi(peer: const [], postedSeq: 1)
+      ..failPostMessage = true // 造出 pending（网络类失败保持待确认）
+      ..failSync = true; // 造出"服务端不可达"
+    await MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      token: 'tok',
+    ).send('离线时写的消息');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 首屏
+    expect(find.textContaining('待发送'), findsNothing,
+        reason: '刚开始还没失败过，不该立刻提示');
+
+    // 触发一次 ticker 轮询（3s）→ sync 失败 → 记为连接异常 → 出现提示
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('离线 · 1 条待发送'), findsOneWidget,
+        reason: '有未确认消息 + 连接异常 → 应给出明确提示');
   });
 
   testWidgets('点按小飞机：重发期间显示「加速中…」，成功后回到单勾', (WidgetTester tester) async {

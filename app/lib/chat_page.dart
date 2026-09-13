@@ -146,6 +146,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// （点的是 failed）。点按期间在图标前显示「加速中…」/「重发中…」，完成或
   /// 再次失败后清掉（老板 2026-09-13）。
   final Map<String, String> _retrying = {};
+
+  /// 还没确认（pending）的消息数：离线提示用（老板 2026-09-13）。
+  int _unsentCount = 0;
+
+  /// 连续同步失败次数：驱动 ticker 退避 + 离线提示。
+  /// 远端不可达（丢包黑洞）时单轮 refresh 可能耗 3×连接超时(10s)≈30s，
+  /// 若仍每 3s 发一轮会并发堆积 → 必须重入保护 + 退避。
+  int _consecutiveSyncFailures = 0;
+
+  /// ticker 轮询的"上一轮是否还在跑"（重入保护：避免离线时并发堆积）。
+  bool _tickerRefreshInFlight = false;
+
+  /// 当前 ticker 周期（用于判断是否需要按退避重设）。
+  Duration? _currentTickerInterval;
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
@@ -212,6 +226,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return '${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
     }
     return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
+  }
+
+  /// 离线/未送达提示条：**有 pending 消息 + 连接异常** 才显示，让"小飞机停了很久"
+  /// 这件事有明确解释（老板 2026-09-13：之前看起来像卡死）。
+  /// 连接异常的判定：WS 断开，或有连续同步失败。
+  Widget _buildOfflineHint() {
+    final troubled =
+        _consecutiveSyncFailures > 0 || (_ws != null && !_ws!.connected.value);
+    if (_unsentCount == 0 || !troubled) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFFF3E0), // 淡琥珀：提示而非报错
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Text(
+        l10n.chatPageOfflineUnsent(_unsentCount),
+        style: const TextStyle(fontSize: 12, color: Color(0xFF8A5300)),
+      ),
+    );
   }
 
   /// 自己消息的发送状态小标（老板 2026-09-12）：
@@ -380,7 +413,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 风格切换即时生效（弹窗不关闭也能预览）：notifier 通知 → 重建背景
     uiStyleNotifier.addListener(_onUiStyleChanged);
     // 每 3 秒轮询同步（WS 连接成功后降频为 30s 兜底；断开恢复高频——见 _onWsStatusChanged）
-    _restartTicker(const Duration(seconds: 3));
+    _restartTicker(_tickerInterval);
     _registerPushToken();
     if (widget.enableWs) {
       final ws = WsRealtimeService(
@@ -552,13 +585,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 重建轮询 ticker（WS 状态变化时切换间隔）。
   void _restartTicker(Duration interval) {
     _ticker?.cancel();
-    _ticker = Timer.periodic(interval, (_) => _refresh());
+    _currentTickerInterval = interval;
+    _ticker = Timer.periodic(interval, (_) => _onTick());
   }
 
   /// WS 状态变化：在线 → 降频兜底（30s）；离线 → 恢复高频轮询（3s）。
   void _onWsStatusChanged() {
     final online = _ws?.connected.value ?? false;
-    _restartTicker(online ? const Duration(seconds: 30) : const Duration(seconds: 3));
+    _restartTicker(_tickerInterval); // 基准随 WS 状态变（在线 30s / 离线 3s），再乘退避
     if (mounted) setState(() {}); // 刷新标题红绿灯（在线绿/离线红）
     _refreshPeerOnline(); // 连接恢复时顺带刷新对方在线状态
     if (online) _checkEscrowRotated(); // 上线补查：离线期间口令被重设则发通知
@@ -1272,6 +1306,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // "已读"只在 [realtime]（WS 实时到达）时才报——补拉的历史不等于人看过
       // （老板 2026-09-12）。
       unawaited(_reportDeliveredIfAdvanced());
+      unawaited(_loadUnsentCount());
       if (realtime && added.isNotEmpty) _scheduleReadReport();
     } catch (_) {
       // 本地读取失败忽略，下次刷新重试
@@ -1497,8 +1532,68 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 同步时顺带拉了对方回执（repo.sync 内）→ 载入渲染缓存
       await _loadPeerReceipts();
       await _refreshLocal(realtime: realtime);
+      _onSyncSucceeded();
     } catch (_) {
-      // 网络抖动忽略，下次轮询重试
+      // 网络抖动忽略，下次轮询重试（并按连续失败次数退避）
+      _onSyncFailed();
+    }
+  }
+
+  /// 同步成功：复位退避（周期回到基准）。
+  void _onSyncSucceeded() {
+    if (_consecutiveSyncFailures == 0) return;
+    _consecutiveSyncFailures = 0;
+    _ensureTickerInterval();
+  }
+
+  /// 同步失败：累加退避计数并重设 ticker 周期。
+  void _onSyncFailed() {
+    if (_consecutiveSyncFailures < 10) _consecutiveSyncFailures++;
+    _ensureTickerInterval();
+    if (mounted) setState(() {}); // 让离线提示及时出现
+  }
+
+  /// 基准轮询周期：WS 在线 30s（推送兜底），离线 3s（尽快恢复）。
+  Duration get _baseTickerInterval =>
+      (_ws?.connected.value ?? false)
+          ? const Duration(seconds: 30)
+          : const Duration(seconds: 3);
+
+  /// 实际轮询周期 = 基准 × 2^(连续失败次数)，上限 60s。
+  /// 目的：离线期间把"每 3s 一轮、每轮最多 30s"的请求风暴收敛为"每分钟一次"。
+  Duration get _tickerInterval {
+    if (_consecutiveSyncFailures == 0) return _baseTickerInterval;
+    final growth = 1 << _consecutiveSyncFailures.clamp(0, 5);
+    final seconds = _baseTickerInterval.inSeconds * growth;
+    return Duration(seconds: seconds.clamp(3, 60));
+  }
+
+  /// 按当前退避算出应有的周期，变了才重设 ticker。
+  void _ensureTickerInterval() {
+    if (!mounted) return;
+    final want = _tickerInterval;
+    if (_currentTickerInterval == want) return;
+    _restartTicker(want);
+  }
+
+  /// 轮询触发：**上一轮没跑完就跳过本次**（离线时单轮可能耗 30s，若不跳过会
+  /// 并发堆积大量请求，耗电/耗流量/刷日志——老板 2026-09-13 提出）。
+  void _onTick() {
+    if (_tickerRefreshInFlight) return;
+    _tickerRefreshInFlight = true;
+    _refresh().whenComplete(() {
+      _tickerRefreshInFlight = false;
+      _ensureTickerInterval();
+    });
+  }
+
+  /// 刷新"还没确认"的消息数（离线提示用；COUNT 查询，开销可忽略）。
+  Future<void> _loadUnsentCount() async {
+    try {
+      final n = await _repo.pendingCount;
+      if (mounted && n != _unsentCount) setState(() => _unsentCount = n);
+    } catch (_) {
+      // 忽略：下次刷新再取
     }
   }
 
@@ -2631,6 +2726,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ],
             ),
           ),
+          // 离线提示条（老板 2026-09-13）：只在"有还没确认的消息 **且** 连接有问题"
+          // 时出现——正常发送时 pending 只存在百毫秒，不会闪。
+          _buildOfflineHint(),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,

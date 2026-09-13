@@ -1196,6 +1196,12 @@ abstract class AppLocalizations {
   /// **'Tap to resend'**
   String get chatPageMsgFailedTap;
 
+  /// No description provided for @chatPageOfflineUnsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline · {count} unsent'**
+  String chatPageOfflineUnsent(int count);
+
   /// No description provided for @chatPageMsgResending.
   ///
   /// In en, this message translates to:

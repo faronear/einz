@@ -615,6 +615,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMsgFailedTap => 'Tap to resend';
 
   @override
+  String chatPageOfflineUnsent(int count) {
+    return 'Offline · $count unsent';
+  }
+
+  @override
   String get chatPageMsgResending => 'Resending…';
 
   @override

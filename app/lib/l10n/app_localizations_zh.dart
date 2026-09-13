@@ -586,6 +586,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMsgFailedTap => '点击重发';
 
   @override
+  String chatPageOfflineUnsent(int count) {
+    return '离线 · $count 条待发送';
+  }
+
+  @override
   String get chatPageMsgResending => '重发中…';
 
   @override

@@ -241,6 +241,12 @@
   "chatPageMsgDelivered": "已送达",
   "chatPageMsgFailed": "发送失败，点击重试",
   "chatPageMsgFailedTap": "点击重发",
+  "chatPageOfflineUnsent": "离线 · {count} 条待发送",
+  "@chatPageOfflineUnsent": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "chatPageMsgResending": "重发中…",
   "chatPageMsgSpeedingUp": "加速中…",
   "chatPageVoiceStartFailed": "录音启动失败: {error}",
