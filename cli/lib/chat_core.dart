@@ -247,8 +247,8 @@ class ChatSession {
     }
   }
 
-  /// 上报"已读"：消息已在本端上屏（TUI 全程可见）。由 sync 与 WS 实时分支调用，
-  /// 单调 + 防抖：成功才推进标记，失败下次会重报。
+  /// 上报"已读"：**仅由 WS 实时到达**（用户正看着终端）调用，补拉的历史不算
+  /// （老板 2026-09-12）。单调 + 防抖：成功才推进标记，失败下次会重报。
   Future<void> _reportReadIfAdvanced(int seq) async {
     if (seq <= store.lastReportedReadSeq) return;
     if (await _reportReceipts(readUptoSeq: seq)) {
@@ -311,13 +311,10 @@ class ChatSession {
     }
 
     await flushPending();
-    // 回执：本端已同步到 cursor（收到 + 已上屏）→ 上报"已送达"与"已读"。
-    // TUI 与 App 的"已读"语义保持一致：都是"当前在前台、最新内容已渲染"。
-    // TUI 全程可见且始终滚到最新，故 sync 后即可标已读（App 侧由"前台 + 贴底
-    // + post-frame"三重门控把关）。代价是离线期间的历史在下次启动同步后会被
-    // 标为已读——这是高水位模型的固有语义（主流 IM 相同），不是误报。
+    // 回执：本端已同步到 cursor（确实收到了这些消息）→ 上报"已送达"。
+    // **不**上报已读——补拉的历史不等于人看过（老板 2026-09-12）：已读只由 WS
+    // 实时到达（用户正看着终端）推进，见下面的 WS 分支。
     await _reportDeliveredIfAdvanced();
-    await _reportReadIfAdvanced(store.lastServerSequence);
 
     final seen = <String>{};
     final fresh = <ChatMessage>[];
