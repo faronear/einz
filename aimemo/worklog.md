@@ -4140,8 +4140,8 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 - 入网向导期（`_onboardingActive`）经 `_systemMessage` 产生的 system 消息按
   **对象引用**记入 `_onboardingNoise`（消息流会被重排，下标区间不可靠）。
 - `_activateAfterBind` 记录启动同步拉到的条数 `_startupSyncAdded`；入网收尾
-  `_finalizeOnboarding`：仅当 `_onboarded && fresh>0` 时清掉向导噪音，重新补一条
-  最终欢迎语（`_kWelcomeText`）进消息流，并同时显示在底部状态条。
+  `_finalizeOnboarding`：仅当 `_onboarded && fresh>0` 时清掉向导噪音（含向导阶段
+  那条最终欢迎语），欢迎语只输出到底部状态条，不再补进消息流（老板 2026-09-13 追加）。
 - 没拉到历史消息（如新建空间）时不动——向导日志是屏幕上唯一内容，清掉会空白。
 
 **验证：** `dart analyze`（cli）0 issue；`format_message_test` 全过。交互流程老板自测。
