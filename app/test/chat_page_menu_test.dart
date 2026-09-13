@@ -150,8 +150,8 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(pinFields.at(0), '123456');
     await tester.enterText(pinFields.at(1), '123456');
-    // 点"设置 PIN"→ 先弹显性确认对话框（设非空 PIN 也要求确认）
-    await tester.tap(find.text('设置 PIN'));
+    // 点"设置锁屏码"→ 先弹显性确认对话框（设非空 PIN 也要求确认）
+    await tester.tap(find.text('设置锁屏'));
     await tester.pumpAndSettle();
     expect(find.text('设置 PIN 锁屏？'), findsOneWidget); // 确认弹窗标题
     await tester.tap(find.text('确认'));
@@ -313,14 +313,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('设置锁屏码'), findsOneWidget); // 弹窗标题
     // 两空点「设置 PIN」→ 先弹显性确认对话框（防误触——老板要求）
-    await tester.tap(find.text('设置 PIN'));
+    await tester.tap(find.text('设置锁屏'));
     await tester.pumpAndSettle();
-    expect(find.text('清除 PIN 锁屏？'), findsOneWidget); // 确认弹窗标题
+    expect(find.text('清空锁屏码？'), findsOneWidget); // 确认弹窗标题
     expect(find.text('PIN 至少4位'), findsNothing);
     // 点「确认」→ 才执行清除锁（转明文）
     await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
-    expect(find.text('已清除 PIN 锁屏（下次启动直接进入）'), findsOneWidget); // SnackBar
+    expect(find.text('已清空锁屏码（下次启动直接进入）'), findsOneWidget); // SnackBar
     // 弹窗已关闭；无加密包（isSetup false），明文配置仍在（hasConfig true）
     expect(find.text('设置锁屏码'), findsNothing);
     final lock = AppLockService(db);
@@ -357,16 +357,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('设置 PIN'));
+    await tester.tap(find.text('设置锁屏'));
     await tester.pumpAndSettle();
-    expect(find.text('清除 PIN 锁屏？'), findsOneWidget); // 确认弹窗出现
+    expect(find.text('清空锁屏码？'), findsOneWidget); // 确认弹窗出现
     // 点「取消」→ 不执行清除：设置弹窗仍在、无 SnackBar
     // （"取消"同时存在于设置弹窗与确认弹窗——用叠在最上的确认弹窗定位）
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
     await tester.pumpAndSettle();
     expect(find.text('设置锁屏码'), findsOneWidget); // 设置弹窗未关闭
-    expect(find.text('已清除 PIN 锁屏（下次启动直接进入）'), findsNothing);
+    expect(find.text('已清空锁屏码（下次启动直接进入）'), findsNothing);
   });
 
   testWidgets('解锁重进：ChatPage 不带名字时从 profile 恢复顶部条名字', (WidgetTester tester) async {

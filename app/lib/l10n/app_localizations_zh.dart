@@ -331,7 +331,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogConfirmHint => '再输一次以确认';
 
   @override
-  String get setPinDialogSetPin => '设置 PIN';
+  String get setPinDialogSetPin => '设置锁屏';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 6 位数字';
@@ -356,27 +356,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁，更安全。也可以暂时跳过，后期可随时更改。';
+  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁，更安全。也可以留空提交，即可清空现有 PIN。';
 
   @override
   String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
 
   @override
-  String get chatPageSetLockConfirmTitle => '设置 PIN 锁屏？';
+  String get chatPageSetLockConfirmTitle => '设置锁屏码？';
 
   @override
   String get chatPageSetLockConfirmMessage =>
-      '确定要设置 PIN 锁屏吗？设置后每次启动需输入 PIN 解锁。';
+      '设置锁屏码后，每次启动需要解锁才能进入秘境，更安全。';
 
   @override
-  String get chatPageSetLockCleared => '已清除 PIN 锁屏（下次启动直接进入）';
+  String get chatPageSetLockCleared => '已清空锁屏码（下次启动直接进入）';
 
   @override
-  String get chatPageClearLockTitle => '清除 PIN 锁屏？';
+  String get chatPageClearLockTitle => '清空锁屏码？';
 
   @override
   String get chatPageClearLockMessage =>
-      '两个 PIN 输入框均为空——确定要清除锁屏码吗？清除后下次启动直接进入聊天。';
+      '确定要清空锁屏码吗？清空后下次启动直接进入秘境，请自行做好私密保护措施。';
 
   @override
   String get chatPageMenuInvite => '邀请码';

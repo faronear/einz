@@ -1,8 +1,13 @@
 // 界面渲染截图（golden）：用 flutter test 渲染界面生成 PNG，
 // 供无真机时查看 UI 效果（模拟器 screencap 的替代方案）。
 //
-// 运行：flutter test --update-goldens test/golden_render_test.dart
+// 运行（默认**全部跳过**）：flutter test -Dgolden=true test/golden_render_test.dart
+// 出图：flutter test --update-goldens -Dgolden=true test/golden_render_test.dart
 // 产物：test/goldens/{setup_step1_*,lock_page,chat_page}.png
+//
+// 默认跳过的原因（老板 2026-09-13 定）：开发期 UI 改动频繁，goldens 常红；每次
+// 失配要么排查日志、要么读 PNG 对比（读图 token 消耗极高），收益不抵成本。
+// 等 UI 冻结（发版前/集中打磨样式）再开开关一次性重生成。
 // 向导步骤编号规则（老板确认，2026-09-05 对齐 TUI 重构后）：
 // 1=检测页；1.1/1.2/1.3=create/join/offline 三条自动判定流程；
 // 分流内按页面出现顺序 1.1.1、1.1.2、…（如 1.1.1_name=create 身份名字）。
@@ -101,7 +106,15 @@ class _SkipListGoldenComparator implements GoldenFileComparator {
   Uri getTestUri(Uri golden, int? testUri) => _inner.getTestUri(golden, testUri);
 }
 
+/// goldens 开关：默认关（见文件头说明）。启用：`flutter test -Dgolden=true`。
+const bool _goldensEnabled = bool.fromEnvironment('golden');
+
 void main() {
+  if (!_goldensEnabled) {
+    test('goldens 默认跳过（加 -Dgolden=true 才真跑）', () {},
+        skip: '开发期不跑 goldens，见文件头注释');
+    return;
+  }
   setUpAll(() async {
     await _loadChineseFont();
     await sodium();

@@ -3443,7 +3443,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     if (pin.isEmpty && _confirmCtrl.text.isEmpty) {
       // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
       final overlay = Overlay.of(context, rootOverlay: true);
-      // 显性确认：清除 PIN 锁屏（防误触——两空提交前必须弹窗确认）
+      // 显性确认：清空锁屏码（防误触——两空提交前必须弹窗确认）
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -3517,7 +3517,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start, // 小字/输入框与大标题左对齐（老板要求）
         children: [
-          // 提示：设置后，每次进入秘境都要解锁，更安全。也可以暂时跳过，后期可随时更改。（大标题下、输入框上方——老板要求）
+          // 提示：设置后，每次进入秘境都要解锁，更安全。也可以留空提交，即可清空现有 PIN。（大标题下、输入框上方——老板要求）
           Text(
             l10n.chatPageSetLockClearHint,
             style: TextStyle(
