@@ -1146,9 +1146,12 @@ Future<void> main(List<String> args) async {
   _guidanceNotes.clear();
   _startPeerPolling(); // 对方在线状态：初始查询 + 30s 轮询
   _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
-  _state!.personNames = Map.of(_probePersonNames); // 启动探测的名称表（首屏即可显示 personName）
-  _state!.personGenders = Map.of(_probePersonGenders); // 启动探测的性别表（首屏即按性别配色）
-  _refreshPersonNames(_state!); // 认证后刷新（保持最新）
+  // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
+  // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
+  // 启动探测值（_probePerson*）覆盖在缓存之上（在线时更新）。
+  _state!.personNames = {...store.personNames, ..._probePersonNames};
+  _state!.personGenders = {...store.personGenders, ..._probePersonGenders};
+  _refreshPersonNames(_state!); // 认证后刷新（保持最新，并回写缓存）
 
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
   // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
@@ -1628,6 +1631,9 @@ void _onProfileUpdated(WsProfileUpdatedEvent e) {
   if (s == null) return;
   if (e.personId != null && e.personName != null && e.personName!.isNotEmpty) {
     s.personNames[e.personId!] = e.personName!;
+    // 回写本地缓存：离线启动时仍显示改名后的名字
+    s.session.store.personNames = Map.of(s.personNames);
+    s.session.store.save(s.session.storePath);
   }
   if (e.deviceName != null && e.deviceName!.isNotEmpty) {
     s.deviceNames[e.deviceId] = e.deviceName!;
@@ -3020,8 +3026,9 @@ Future<void> _refreshGenderForLatest(_TuiState s) async {
   _scheduleRender();
 }
 
-/// 拉取空间 person 名称表（GET /space）到缓存（认证后调用；失败静默——
-/// 前缀回退"我/对方"）。用于消息前缀显示 personName。
+/// 拉取空间 person 名称/性别表（GET /space）到缓存（认证后调用；失败静默——
+/// 前缀回退"我/对方"）。成功后回写 store 落盘：服务器离线启动时用缓存兜底
+/// （名字/性别不丢——老板 2026-09-13）。
 Future<void> _refreshPersonNames(_TuiState s) async {
   final token = s.session.store.sessionToken;
   if (token == null) return;
@@ -3029,10 +3036,27 @@ Future<void> _refreshPersonNames(_TuiState s) async {
     final r = await ApiClient(s.session.server).getSpace(token);
     s.personNames = r.personNames;
     s.personGenders = r.personGenders;
+    // 回写本地缓存（离线启动兜底）；只有内容变化才落盘，避免频繁刷新时反复写盘
+    final store = s.session.store;
+    if (!_sameStringMap(store.personNames, r.personNames) ||
+        !_sameStringMap(store.personGenders, r.personGenders)) {
+      store.personNames = Map.of(r.personNames);
+      store.personGenders = Map.of(r.personGenders);
+      store.save(s.session.storePath);
+    }
     _scheduleRender();
   } catch (_) {
-    // 拉取失败不影响聊天（前缀回退"我/对方"）
+    // 拉取失败不影响聊天（前缀回退"我/对方"，配色用本地缓存）
   }
+}
+
+/// 两个 String→String 映射内容是否完全一致（用于避免无变化时反复落盘）。
+bool _sameStringMap(Map<String, String> a, Map<String, String> b) {
+  if (a.length != b.length) return false;
+  for (final e in a.entries) {
+    if (b[e.key] != e.value) return false;
+  }
+  return true;
 }
 
 /// 构造一条系统提示消息（sender 显示 system，随对话流滚动，不被状态条推到窗口上方）。

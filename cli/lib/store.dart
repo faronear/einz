@@ -32,11 +32,15 @@ class DeviceStore {
     this.lastReportedDeliveredSeq = 0,
     this.lastReportedReadSeq = 0,
     this.escrowUploaded = false,
+    Map<String, String>? personNames,
+    Map<String, String>? personGenders,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
     List<Map<String, dynamic>>? attachments,
     List<Map<String, dynamic>>? archivedSpaceKeys,
-  })  : pending = pending ?? [],
+  })  : personNames = personNames ?? {},
+        personGenders = personGenders ?? {},
+        pending = pending ?? [],
         history = history ?? [],
         attachments = attachments ?? [],
         archivedSpaceKeys = archivedSpaceKeys ?? [];
@@ -65,6 +69,14 @@ class DeviceStore {
 
   /// 创建者口令密保箱是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
   bool escrowUploaded;
+
+  /// 空间成员名称缓存（person_id → personName）：GET /space 成功后落盘。
+  /// 服务器离线启动时仍能显示正确名字/对方身份（否则回退"对方"）。
+  Map<String, String> personNames;
+
+  /// 空间成员性别缓存（person_id → male/female）：同上，离线启动仍能按性别配色
+  /// （否则所有气泡回退青绿——老板 2026-09-13）。
+  Map<String, String> personGenders;
 
   /// 离线发送队列：MessageEnvelope 的 JSON 字符串（已加密，落盘安全）。
   final List<String> pending;
@@ -106,6 +118,8 @@ class DeviceStore {
         'escrow_uploaded': escrowUploaded,
         'pin_hash': pinHash,
         'escrow_updated_at': escrowUpdatedAt,
+        'person_names': personNames,
+        'person_genders': personGenders,
         'pending': pending,
         'history': history,
         'attachments': attachments,
@@ -131,6 +145,8 @@ class DeviceStore {
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pinHash: json['pin_hash'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
+        personNames: (json['person_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
+        personGenders: (json['person_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
