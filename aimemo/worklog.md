@@ -3981,3 +3981,23 @@ gradient 白 12%），只要能看出和输入区不是同一块；② 引用图
 
 **验证：** `flutter analyze lib` 只剩既有 info（ws_realtime_service）。UI 待老板自测。
 未 commit。
+
+### 追加（同日）：PIN 页去掉「不设置锁屏码」弹窗，改用按钮标签提示
+
+**老板要求：** 向导 PIN 步骤，两个输入框都空时右下按钮标签改为「跳过/Skip」；
+至少一个框有数字就回到「下一步」。不再弹二次确认弹窗——按钮标签本身就是明确提示。
+
+**改动（setup_page.dart）：**
+- 新增 `_isPinStep` / `_pinStepSkippable` 两个 getter；底部按钮包 `ListenableBuilder`
+  监听 `_pin`+`_confirm`（`Listenable.merge`），只重建按钮不重建整页。
+- `_nextStep` PIN 分支：两空 → 直接 `_pinSkipped = true` 继续；删掉 `showDialog` 确认框。
+- 测试 `golden_render_test.dart`：两处「点下一步 → 弹框 → 点跳过」改成直接点一次「跳过」。
+
+**顺手清 lint：** `ws_realtime_service.dart` 构造函数改 initializing formal
+（`required this._token`），`flutter analyze lib` 现在 0 issue。
+
+**遗留：** ① arb 的 `setupPageSkipPinTitle/Message` 两条文案已无人引用（未删，删需跑
+gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一步」，需下次
+`--update-goldens` 刷新——本机 golden 测试整文件 12/13 失败（含锁屏页/聊天页），
+确认是既有环境问题（改前 stash 复测同样失败），不是本次改动引入。
+`setup_join_passphrase_test` 的「错误 token」用例同样为既有失败。

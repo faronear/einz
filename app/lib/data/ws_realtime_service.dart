@@ -6,7 +6,7 @@ import 'package:einz_shared/einz_shared.dart';
 /// [reauth]：session 过期（WS 4401）时自动重新认证的回调（返回新 token），
 /// 供 WsClient.onUnauthorized 续期后立即重连——24h 会话过期无感恢复。
 class WsRealtimeService {
-  WsRealtimeService({required this.server, required String token, this.reauth}) : _token = token;
+  WsRealtimeService({required this.server, required this._token, this.reauth});
 
   final String server;
   String _token;

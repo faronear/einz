@@ -303,9 +303,8 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // PIN → 弹"不设置"确认框
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('跳过')); // 确认不设置 → 完成页（纯色无文字）
+    // PIN 页两个输入框都空 → 底部按钮标签即"跳过"（不再弹确认框，老板 2026-09-13）
+    await tester.tap(find.text('跳过'));
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.1.6_done.png'));
@@ -326,9 +325,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '123456'); // 口令
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步')); // PIN → 弹"不设置"确认框
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('跳过')); // 完成 → 欢迎对话框自动弹出
+    await tester.tap(find.text('跳过')); // PIN 页两空 → 底部按钮=跳过 → 完成
     await tester.pumpAndSettle();
     expect(find.text('🎉 成功创建我的领地'), findsOneWidget); // 对话框标题（create）
     expect(find.text('仅限两人，所有消息端到端加密，确保绝对隐私！进入秘境，开始聊天吧。'), findsOneWidget);

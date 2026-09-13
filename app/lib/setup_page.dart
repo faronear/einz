@@ -105,8 +105,10 @@ class _SetupPageState extends State<SetupPage> {
   static const int _passphraseMinLength = 8;
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
+  // 两个 PIN 输入框的合并监听：底部按钮据此把标签切成「跳过」（不必整页重建）
+  late final Listenable _pinInputsChanged = Listenable.merge([_pin, _confirm]);
   String? _pinError; // PIN 步骤红色提示（输入框下方）
-  bool _pinSkipped = false; // 用户确认"不设置锁屏码"：跳过 setPin，仍完成前置并进下一步
+  bool _pinSkipped = false; // 用户选择"不设置锁屏码"（底部按钮=跳过时）：跳过 setPin，仍完成前置并进下一步
   final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
   // 键盘遮挡处理：
   // 方案 1（聚焦即滚出性别卡）：名字/伴侣名输入框聚焦时把性别卡滚入可见区；
@@ -450,10 +452,18 @@ class _SetupPageState extends State<SetupPage> {
                       ),
                       const Spacer(),
                       // 所有步骤显示"下一步"（create 步骤 2 的下一步触发自动自举登记），
-                      // 完成页（_step == _stepCount）显示"完成"。
+                      // 完成页（_step == _stepCount）显示"完成"；
+                      // PIN 步骤且两个输入框都空 → 显示"跳过"（标签即提示，老板要求
+                      // 2026-09-13）——只重建按钮，不重建整页。
                       if (_step < _stepCount)
-                        FilledButton(
-                            onPressed: _nextStep, child: Text(l10n.wizardNext))
+                        ListenableBuilder(
+                          listenable: _pinInputsChanged,
+                          builder: (_, _) => FilledButton(
+                            onPressed: _nextStep,
+                            child: Text(
+                                _pinStepSkippable ? l10n.skip : l10n.wizardNext),
+                          ),
+                        )
                       else
                         FilledButton(
                             onPressed: _finish, child: Text(l10n.wizardDone)),
@@ -482,6 +492,16 @@ class _SetupPageState extends State<SetupPage> {
         return 1;
     }
   }
+
+  /// 当前是否为 PIN 步骤（create=5 / join=4 / offline=2）。
+  bool get _isPinStep =>
+      (_role == _WizardRole.create && _step == 4) ||
+      (_role == _WizardRole.join && _step == 4) ||
+      (_role == _WizardRole.offline && _step == 2);
+
+  /// PIN 步骤上「两个输入框都空」：此时底部按钮=跳过设锁（标签「跳过」），
+  /// 按钮标签本身就是提示，不再弹二次确认弹窗（老板要求 2026-09-13）。
+  bool get _pinStepSkippable => _isPinStep && _pin.text.isEmpty && _confirm.text.isEmpty;
 
   /// 页眉标题（AppBar）：系列标题（如「Einz 秘境：认领中」；第 0 步未选角色时显示引导语）。
   String _appBarTitle(AppLocalizations l10n) {
@@ -685,34 +705,13 @@ class _SetupPageState extends State<SetupPage> {
       });
       return;
     }
-    // PIN 步骤（create=3 / join=4 / offline=2）：底部"下一步"触发校验/跳过确认。
-    // 有效 PIN → 设锁后推进；两空 → 弹窗确认"不设置锁屏码"；其余 → 输入框下方红色提示。
-    final isPinStep = (_role == _WizardRole.create && _step == 4) ||
-        (_role == _WizardRole.join && _step == 4) ||
-        (_role == _WizardRole.offline && _step == 2);
-    if (isPinStep) {
+    // PIN 步骤（create=5 / join=4 / offline=2）：底部按钮触发校验。
+    // 两空 → 跳过设锁（按钮此时标签就是"跳过"，不再弹二次确认弹窗——
+    // 老板要求 2026-09-13）；有效 PIN → 设锁后推进；其余 → 输入框下方红色提示。
+    if (_isPinStep) {
       final pin = _pin.text;
       final confirm = _confirm.text;
       if (pin.isEmpty && confirm.isEmpty) {
-        // 两空：确认是否不设置锁屏码
-        final skip = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(l10n.setupPageSkipPinTitle),
-            content: Text(l10n.setupPageSkipPinMessage),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: Text(l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: Text(l10n.skip),
-              ),
-            ],
-          ),
-        );
-        if (skip != true) return; // 取消：留在本页
         _pinSkipped = true;
       } else if (!AppLockService.isPinDigitsOnly(pin)) {
         setState(() => _pinError = l10n.setPinDialogPinDigitsOnly);
