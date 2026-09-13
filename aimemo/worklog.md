@@ -3855,3 +3855,17 @@ shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未�
   临时文件扩展名恢复直接用 `m.plaintext`（明文已不再塞标注）。
 
 **验证：** `flutter analyze lib` 无新增问题；`flutter test` +98 -17（17 golden 为既有基线漂移）。
+
+### 追加（同日）：气泡不留「语音」字样 + X 取消回录音等待态
+
+**老板要求：** ① 时长未知时也**不要**在气泡里显示「语音」两字——播放键 + 波形图
+已足够表达这是录音；② 预览态点波形右侧的 X 取消后，回到**等待录音的提示态**
+（可直接再长按重录），而不是文字输入框；点发送键或键盘键才回文字输入框。
+
+**改动：**
+- `_buildAudioBar` 语音分支：时长 `>0` 才渲染文本，否则只有播放键 + 波形
+  （原来的 `Text(seconds > 0 ? … : m.plaintext)` 分支删掉）。
+- `_cancelVoice({bool backToTextInput = false})`：默认回 `_InputMode.hint` 并顺手把
+  `_recordSeconds` 归零（干净的起点）；`_onVoiceEntryTap`（键盘键）传 `true` 回文字态。
+
+**未跑测试**（老板要自己验）；`flutter analyze lib/chat_page.dart` 无问题。

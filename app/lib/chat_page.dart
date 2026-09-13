@@ -1943,7 +1943,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (_inputMode == _InputMode.hint) {
       setState(() => _inputMode = _InputMode.text);
     } else if (_inputMode == _InputMode.preview) {
-      unawaited(_cancelVoice());
+      // 键盘键=放弃录音回文字输入（与发送键一致）；X 键才回录音等待态
+      unawaited(_cancelVoice(backToTextInput: true));
     }
     // recording：手势在录音条上，入口按钮不可达，无操作
   }
@@ -2079,16 +2080,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 预览态取消：删临时文件，恢复文字输入框。
-  Future<void> _cancelVoice() async {
+  /// 预览态取消：删临时文件。默认回到**等待录音的提示态**（再长按即可重录，
+  /// 老板要求 2026-09-13）；[backToTextInput]=true 时回文字输入框（点键盘键/发送）。
+  Future<void> _cancelVoice({bool backToTextInput = false}) async {
     if (_inputMode != _InputMode.preview) return;
     final path = _recordingPath;
     _previewPlaying = false;
     await _player?.stop();
     if (!mounted) return;
     setState(() {
-      _inputMode = _InputMode.text;
+      _inputMode = backToTextInput ? _InputMode.text : _InputMode.hint;
       _recordingPath = null;
+      _recordSeconds = 0; // 提示态是干净的起点，不该留着上一次的秒数
       _voiceSamples.clear();
     });
     if (path != null) {
@@ -2578,11 +2581,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           activeColor: onBubble,
           inactiveColor: onBubble.withValues(alpha: 0.4),
         ),
-        const SizedBox(width: 6),
-        Text(
-          seconds > 0 ? _formatVoiceDuration(seconds) : m.plaintext.trim(),
-          style: const TextStyle(fontSize: 12),
-        ),
+        // 时长未知时不显示任何文字（播放键 + 波形已足够表达"这是录音"，
+        // 老板要求 2026-09-13）
+        if (seconds > 0) ...[
+          const SizedBox(width: 6),
+          Text(_formatVoiceDuration(seconds), style: const TextStyle(fontSize: 12)),
+        ],
       ],
     );
   }
