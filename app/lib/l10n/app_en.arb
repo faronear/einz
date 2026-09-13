@@ -237,6 +237,7 @@
   },
   "chatPageMsgSending": "Sending…",
   "chatPageMsgSent": "Sent",
+  "chatPageMsgDelivered": "Delivered",
   "chatPageMsgFailed": "Send failed, tap to retry",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
   "@chatPageVoiceStartFailed": {

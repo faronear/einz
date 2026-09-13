@@ -574,6 +574,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMsgSent => '已发送';
 
   @override
+  String get chatPageMsgDelivered => '已送达';
+
+  @override
   String get chatPageMsgFailed => '发送失败，点击重试';
 
   @override

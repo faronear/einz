@@ -138,6 +138,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   int _lastReportedDeliveredSeq = 0; // 防抖：已上报过的送达高水位
   int _lastReportedReadSeq = 0; // 防抖：已上报过的已读高水位
   bool _appResumed = true; // 前台才允许把消息标为已读
+  /// 对方回执（已送达/已读）本地缓存：渲染自己消息的状态标用（避免每条消息查库）。
+  List<PeerReceipt> _peerReceipts = const [];
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
@@ -206,26 +208,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
   }
 
-  /// 自己消息的发送状态小标：pending=发送中（时钟）/ sent=已发送（对勾）/
-  /// failed=发送失败（红色警告，点按重发）。仅自己、非墓碑消息显示（老板 2026-09-12）。
+  /// 自己消息的发送状态小标（老板 2026-09-12）：
+  /// - pending → 纸飞机（发送中）
+  /// - sent → 单勾（服务端已收下）
+  /// - **delivered / read → 双勾**（对方设备已收到；read 目前**不**单独区分，
+  ///   老板 2026-09-12 定：已读只留数据档位，先不展示）
+  /// - failed → 红色警告（点按重发）
+  /// 仅自己、非墓碑消息显示。
   Widget _buildSendStatusIcon(HistoryMessage m) {
     final l10n = AppLocalizations.of(context)!;
     final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
+    if (m.status == 'failed') {
+      return Tooltip(
+        message: l10n.chatPageMsgFailed,
+        child: GestureDetector(
+          onTap: () async {
+            await _repo.retryMessage(m.env.messageId);
+            await _refreshLocal();
+          },
+          child: Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
+        ),
+      );
+    }
+    // 对方已收到（delivered）/已读（read）→ 双勾。read 与 delivered 同图标：
+    // 已读暂不展示（老板 2026-09-12）。
+    final receipt = MessageRepository.receiptOf(m.env.serverSequence, _peerReceipts);
+    if (receipt != null) {
+      return Tooltip(
+        message: l10n.chatPageMsgDelivered,
+        child: Icon(Icons.done_all, size: 12, color: subtle),
+      );
+    }
     switch (m.status) {
-      case 'failed':
-        return Tooltip(
-          message: l10n.chatPageMsgFailed,
-          child: GestureDetector(
-            onTap: () async {
-              await _repo.retryMessage(m.env.messageId);
-              await _refreshLocal();
-            },
-            child: Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
-          ),
-        );
       case 'sent':
-      case 'delivered':
-      case 'read':
         return Tooltip(
           message: l10n.chatPageMsgSent,
           child: Icon(Icons.check, size: 12, color: subtle),
@@ -328,7 +343,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _ws = ws;
       ws.connected.addListener(_onWsStatusChanged);
       ws.start(
-        onMessageNew: () => _refresh(),
+        // WS 实时新消息：标记为 realtime，允许把消息标为"已读"（下面的补拉路径
+        // 只标"已送达"——老板 2026-09-12：补拉的历史不等于人看过）
+        onMessageNew: () => _refresh(realtime: true),
         onDeviceRevoked: _onDeviceRevoked,
         onPeerStatus: _onPeerStatus,
         onPassphraseRotated: _onPassphraseRotated,
@@ -366,11 +383,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方回执更新（Server 广播 receipt.updated）：落库为已送达/已读高水位。
   /// **本轮不显示**——只为把数据打通，供将来 UI 使用（老板 2026-09-12）。
   void _onReceiptUpdated(WsReceiptUpdatedEvent event) {
-    unawaited(_repo.upsertPeerReceipt(
-      personId: event.personId,
-      deliveredUptoSeq: event.deliveredUptoSeq,
-      readUptoSeq: event.readUptoSeq,
-    ));
+    unawaited(_repo
+        .upsertPeerReceipt(
+          personId: event.personId,
+          deliveredUptoSeq: event.deliveredUptoSeq,
+          readUptoSeq: event.readUptoSeq,
+        )
+        .then((_) => _loadPeerReceipts()));
   }
 
   /// 从服务端校正双方名字与性别（GET /space 的 personNames/personGenders）。
@@ -1147,10 +1166,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 首次载入即定位到最新消息（老板实测 2026-09-09：原来停在最早消息处，
       // 要等 ticker 自动刷新才滚到底）——直接跳转不播动画，进入即见最新
       _scrollToLatest(animate: false);
-      // 首屏回填也应上报：本端确实"收到"了这些对方消息；若用户正盯着底部，
-      // 顺带标已读（post-frame + 贴底 + 前台三重门控在 _scheduleReadReport 内）
+      // 首屏回填只上报"已送达"——**不**上报已读（补拉的历史不等于人看过，
+      // 老板 2026-09-12）。已读只由「WS 实时到达 + 用户前台看着」或「resume
+      // 到前台且列表贴底」推进。
       unawaited(_reportDeliveredIfAdvanced());
-      _scheduleReadReport();
+      // 载入对方回执 → 自己消息可显示双勾（sync 内已拉过，此处兜底一次）
+      unawaited(_loadPeerReceipts());
     } catch (_) {
       // 网络抖动忽略：本地缓存已上屏，等 ticker 重试
     }
@@ -1160,7 +1181,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 与收到消息先上屏都用它，避免等 sync 网络往返（老板 2026-09-12）。
   /// 合并语义：按 messageId 就地替换（刷新 pending→sent/failed 状态），新 id 追加；
   /// 墓碑单调（本地已删的不会被旧读覆盖复活）；仅在有新消息时滚到底。
-  Future<void> _refreshLocal() async {
+  Future<void> _refreshLocal({bool realtime = false}) async {
     if (!_initialLoaded) return;
     try {
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -1199,10 +1220,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ];
       });
       if (added.isNotEmpty) _scrollToLatest();
-      // 回执：本端确实收到了对方的这些消息 → 上报"已送达"；有新消息且用户正看着
-      // 底部 → 顺带上报"已读"（本轮不显示，只把数据打通）
+      // 回执：本端确实收到了对方的这些消息 → 上报"已送达"（补拉/首屏也算）。
+      // "已读"只在 [realtime]（WS 实时到达）时才报——补拉的历史不等于人看过
+      // （老板 2026-09-12）。
       unawaited(_reportDeliveredIfAdvanced());
-      if (added.isNotEmpty) _scheduleReadReport();
+      if (realtime && added.isNotEmpty) _scheduleReadReport();
     } catch (_) {
       // 本地读取失败忽略，下次刷新重试
     }
@@ -1419,14 +1441,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 增量刷新：**先本地秒上屏**（_refreshLocal）→ 再网络 sync → 再本地刷新一次。
   /// 这样收到的消息/自己的回执能立即出现，网络慢也不阻塞已到内容（老板 2026-09-12）。
-  Future<void> _refresh() async {
-    await _refreshLocal();
+  Future<void> _refresh({bool realtime = false}) async {
+    await _refreshLocal(realtime: realtime);
     try {
       await _repo.sync();
       await _repo.refreshDeviceMap();
-      await _refreshLocal();
+      // 同步时顺带拉了对方回执（repo.sync 内）→ 载入渲染缓存
+      await _loadPeerReceipts();
+      await _refreshLocal(realtime: realtime);
     } catch (_) {
       // 网络抖动忽略，下次轮询重试
+    }
+  }
+
+  /// 载入对方回执到渲染缓存（内容未变则不 setState，避免每次轮询都重建列表）。
+  Future<void> _loadPeerReceipts() async {
+    try {
+      final rows = await _repo.peerReceipts();
+      if (!mounted) return;
+      final changed = rows.length != _peerReceipts.length ||
+          Iterable.generate(rows.length).any((i) =>
+              rows[i].personId != _peerReceipts[i].personId ||
+              rows[i].deliveredUptoSeq != _peerReceipts[i].deliveredUptoSeq ||
+              rows[i].readUptoSeq != _peerReceipts[i].readUptoSeq);
+      if (changed) setState(() => _peerReceipts = rows);
+    } catch (_) {
+      // 读取失败忽略：下次刷新再载
     }
   }
 
@@ -2627,8 +2667,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         if (m.expiresAt != null) ...[
                                           const SizedBox(width: 4),
                                           // 沙漏=阅后即焚倒计时（老板 2026-09-12，
-                                          // 替代原来的时钟图标，避免与发送中混淆）
-                                          const _BurnHourglass(),
+                                          // 替代原来的时钟图标，避免与发送中混淆）；
+                                          // 已焚毁/已删除 → 静态空沙漏（不再翻转）
+                                          _BurnHourglass(burned: m.deleted),
                                           const SizedBox(width: 2),
                                           // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
                                           // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
@@ -3432,20 +3473,32 @@ class _VideoPreviewState extends State<_VideoPreview> {
   }
 }
 
-/// 阅后即焚「沙漏」小图标（老板 2026-09-12）：在 hourglass_top ↔ hourglass_bottom
-/// 之间缓慢翻转，暗示倒计时在流逝。
-///
-/// 说明：图标仅 11px，做"按剩余时间精确流沙"既看不清又需逐秒驱动，故用循环
-/// 翻转表达"时间在走"。颜色不指定 → 继承 IconTheme（渐变风格下为白系，与相邻
-/// 的时间/时长文字一致）。
-class _BurnHourglass extends StatefulWidget {
-  const _BurnHourglass();
+/// 阅后即焚「沙漏」小图标（老板 2026-09-12）：未焚毁时在 hourglass_top ↔
+/// hourglass_bottom 之间缓慢翻转，暗示倒计时在流逝；**已焚毁（[burned]）时改为
+/// 静态空沙漏**——沙漏已经漏完了，还在翻转不符合直觉（老板 2026-09-12）。
+/// 颜色不指定 → 继承 IconTheme（渐变风格下为白系，与相邻的时间/时长文字一致）。
+class _BurnHourglass extends StatelessWidget {
+  const _BurnHourglass({this.burned = false});
+
+  /// 该消息是否已被焚毁/删除（到期或手动删除）——是则显示静态空沙漏。
+  final bool burned;
 
   @override
-  State<_BurnHourglass> createState() => _BurnHourglassState();
+  Widget build(BuildContext context) {
+    // 已焚毁：静态空沙漏（不创建动画控制器，避免无谓的逐帧重建）
+    if (burned) return const Icon(Icons.hourglass_empty, size: 11);
+    return const _HourglassFlip();
+  }
 }
 
-class _BurnHourglassState extends State<_BurnHourglass>
+class _HourglassFlip extends StatefulWidget {
+  const _HourglassFlip();
+
+  @override
+  State<_HourglassFlip> createState() => _HourglassFlipState();
+}
+
+class _HourglassFlipState extends State<_HourglassFlip>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,

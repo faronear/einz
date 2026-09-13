@@ -1172,6 +1172,12 @@ abstract class AppLocalizations {
   /// **'Sent'**
   String get chatPageMsgSent;
 
+  /// No description provided for @chatPageMsgDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get chatPageMsgDelivered;
+
   /// No description provided for @chatPageMsgFailed.
   ///
   /// In en, this message translates to:

@@ -9,6 +9,7 @@
 // 修复：按 id 兜底重读仍为 pending/failed 的消息。
 // 本测试用 postMessage 返回"低于高水位"的 seq 来确定性复现该状态。
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,6 +61,18 @@ class _StatusFakeApi extends ApiClient {
           SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
         ],
       );
+
+  /// 回执：测试内不需要真网络（回执数据由测试直接种进库）。
+  @override
+  Future<List<ReceiptRow>> getReceipts(String token) async => const [];
+
+  @override
+  Future<({int deliveredUptoSeq, int readUptoSeq})> postReceipts(
+    String token, {
+    int? deliveredUptoSeq,
+    int? readUptoSeq,
+  }) async =>
+      (deliveredUptoSeq: deliveredUptoSeq ?? 0, readUptoSeq: readUptoSeq ?? 0);
 }
 
 void main() {
@@ -112,5 +125,56 @@ void main() {
     expect(find.text('你好'), findsOneWidget, reason: '乐观回显：消息应立即出现');
     expect(find.byIcon(Icons.check), findsOneWidget,
         reason: '应显示「已发送」对勾；漏读本消息时会停在 pending（无对勾）');
+  });
+
+  testWidgets('自己消息：对方已送达 → 显示双勾（read 暂不单独区分）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    // 我发的一条（senderDeviceId == 本机 → 渲染为"我的消息"），seq=1
+    final mine = await encryptMessage(
+      plaintext: '我发的',
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      senderDeviceId: 'dev-a',
+      messageId: 'mine-1',
+      keyVersion: 1,
+    );
+    final api = _StatusFakeApi(peer: [(env: mine, seq: 1)], postedSeq: 1);
+
+    // 种入对方回执：delivered=1（对方设备已收到）、read=0
+    await db.into(db.peerReceipts).insert(PeerReceiptsCompanion.insert(
+          spaceId: 'space-test',
+          personId: 'person-b',
+          deliveredUptoSeq: const Value(1),
+          readUptoSeq: const Value(0),
+          updatedAt: const Value(1),
+        ));
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('我发的'), findsOneWidget);
+    expect(find.byIcon(Icons.done_all), findsOneWidget,
+        reason: 'delivered（对方已收到）应显示双勾');
+    expect(find.byIcon(Icons.check), findsNothing,
+        reason: '有回执时不应再显示单勾');
   });
 }
