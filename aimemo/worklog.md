@@ -4359,3 +4359,19 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 `_sortMessages` 抽出 `compareChatMessages` 纯函数，同 createdAt/同 seq 时按 `order`
 决胜；`_systemMessage` 的 `message_id` 改为自增序号。新增 `chat_sort_test` 两例。
 `dart analyze` 0 issue，单测/集成测试全过。
+
+### 离线发送消息立即上屏（App 已具备、TUI 缺失）
+
+**老板反馈：** 服务器断线时，App 里发消息能立刻显示（pending），TUI 里却不行——
+要等一会儿才出现。
+
+**真因：** 乐观上屏其实早就实现了（`sendText` 会把消息 append 进 `session.messages`），
+但 TUI 只在 `_sendText` 的 `future.whenComplete` 之后才 `_render()`。而 `sendText`
+紧接着 `await flushPending()`——服务器离线时会卡在 HTTP 重试/超时上，所以消息要等
+网络返回（失败）后才被画出来。App 是本地库变更直接驱动 UI，无此问题。
+
+**改动（commit `133456c`）：** `ChatSession` 增加 `onChanged` 回调，在 `_sortMessages`
+（乐观上屏 / 同步 / WS 追加的统一收口）末尾触发；TUI 在 main 里接成 `_scheduleRender`。
+于是消息 push 进展示缓存即刻重绘，补发网络在后台进行。新增 `send_optimistic_test`
+（离线发送 → 立即上屏、pending、onChanged 已触发）。`dart analyze` 0 issue，14 例
+单测 + 集成测试全过。
