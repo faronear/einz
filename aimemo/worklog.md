@@ -4050,3 +4050,17 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 
 **验证：** `flutter analyze lib/chat_page.dart` 无问题。既有测试 `emoji_insert_test`
 按 `find.text('表情符')` 点按，卡片里 Text 仍在，不受影响（未跑，老板自测）。
+
+### 追加（同日）：附件文案精简 + 补锁屏清空文案缺括号
+
+**老板确认：** ① 长按与附件菜单都用卡片式（已完成）；② 精简过长的附件文案；
+③ 补上缺的右括号再重跑 gen-l10n。
+
+**改动（`app/lib/l10n/app_zh.arb`，重跑 `flutter gen-l10n`）：**
+- `chatPageAttachAudioFile`：`音频文件（mp3 等）` → `音频文件`（卡片窄，原文案会折行/省略）。
+- `chatPageSetLockCleared`：`已清空锁屏码（下次启动直接进入` → 补右括号 `）`。
+- 重跑后生成文件 `app_localizations_zh.dart` 一并同步了此前 arb 已改、但未重新生成的
+  几条文案（`setPinDialogSetPin`、`chatPageSetLockConfirmTitle/Message`、
+  `chatPageClearLockMessage` 等），属生成物对齐，非本次手改。英文 arb 无需改，en 生成文件无变化。
+
+**验证：** `flutter analyze lib` 0 issue。UI 老板自测。
