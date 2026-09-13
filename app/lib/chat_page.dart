@@ -219,6 +219,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
     if (m.status == 'failed') {
+      // 文字标签「点击重发」+ 红色警告图标（老板 2026-09-13 要求加显式文字：
+      // 光一个 ⚠️ 不够明确，用户看不出这能点）
       return Tooltip(
         message: l10n.chatPageMsgFailed,
         child: GestureDetector(
@@ -226,7 +228,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             await _repo.retryMessage(m.env.messageId);
             await _refreshLocal();
           },
-          child: Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.chatPageMsgFailedTap,
+                  style: TextStyle(fontSize: 10, color: Colors.red.shade600)),
+              const SizedBox(width: 2),
+              Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
+            ],
+          ),
         ),
       );
     }
@@ -2666,8 +2676,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       children: [
                                         // 自己消息：发送状态小标放在**时间前面**（老板
                                         // 2026-09-12：原来放末尾，会被阅后即焚标记挤到
-                                        // 中间/后面，无法一眼看出"这条发出去没"）
-                                        if (mine && !m.deleted) ...[
+                                        // 中间/后面，无法一眼看出"这条发出去没"）。
+                                        // 墓碑消息（删除/焚毁）**同样显示**（老板
+                                        // 2026-09-13）：删除/焚毁只是"在本设备隐藏正文"，
+                                        // 不影响消息在服务器与对方的路径——所以状态与
+                                        // 点按重发都该照旧可用。
+                                        if (mine) ...[
                                           _buildSendStatusIcon(m),
                                           const SizedBox(width: 4),
                                         ],

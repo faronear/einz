@@ -38,6 +38,9 @@ class _StatusFakeApi extends ApiClient {
   int hangPostsBefore = 0;
   int _postCalls = 0;
 
+  /// 是否让 postMessage 被**服务端明确拒绝**（4xx → 应标 failed）。
+  bool rejectPostMessage = false;
+
   @override
   Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
     String token, {
@@ -63,6 +66,9 @@ class _StatusFakeApi extends ApiClient {
   @override
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) {
     _postCalls++;
+    if (rejectPostMessage) {
+      throw ApiException('INVALID_REQUEST', 'invalid envelope', 400);
+    }
     if (_postCalls <= hangPostsBefore) {
       // 永不完成：模拟响应丢失（HTTP 层面没有超时的老行为）
       return Completer<PostMessageResult>().future;
@@ -248,5 +254,89 @@ void main() {
         reason: '重发成功后应显示单勾（已发送）');
     expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsNothing,
         reason: '不应再停留在发送中');
+  });
+
+  testWidgets('发送失败：气泡里带「点击重发」文字标签 + ⚠️ 图标', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _StatusFakeApi(peer: const [], postedSeq: 1)..rejectPostMessage = true;
+
+    // 服务端明确拒绝（4xx）→ failed
+    final seedRepo = MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      token: 'tok',
+    );
+    await seedRepo.send('会被服务端拒绝的');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('点击重发'), findsOneWidget, reason: '失败气泡应有显式文字标签');
+    expect(find.byIcon(Icons.error_outline), findsOneWidget);
+  });
+
+  testWidgets('墓碑消息（删除/焚毁）仍显示发送状态图标（删除只是本设备隐藏正文）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _StatusFakeApi(peer: const [], postedSeq: 1);
+
+    final seedRepo = MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      token: 'tok',
+    );
+    final id = await seedRepo.send('会被删除的消息'); // 正常发出 → sent
+    await seedRepo.tombstoneMessage(id); // 本地墓碑
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('会被删除的消息'), findsNothing, reason: '墓碑应隐藏正文');
+    expect(find.byIcon(Icons.check), findsOneWidget,
+        reason: '墓碑不影响在途路径，状态图标仍应显示');
   });
 }

@@ -240,6 +240,7 @@
   "chatPageMsgSendingTap": "Sending… tap to verify and resend",
   "chatPageMsgDelivered": "Delivered",
   "chatPageMsgFailed": "Send failed, tap to retry",
+  "chatPageMsgFailedTap": "Tap to resend",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
   "@chatPageVoiceStartFailed": {
     "placeholders": {

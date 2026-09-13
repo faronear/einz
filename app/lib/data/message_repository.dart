@@ -424,8 +424,10 @@ class MessageRepository {
     final t = token;
     if (t == null) return 0;
 
+    // 注意：**不排除**墓碑（删除/焚毁）——删除是"本设备隐藏正文"，不改变消息在
+    // 服务器与对方的路径（老板 2026-09-13 定），所以尚未确认的消息仍应继续补发。
     final rows = await (db.select(db.localMessages)
-          ..where((m) => m.status.equals('pending') & m.deletedAt.isNull()))
+          ..where((m) => m.status.equals('pending')))
         .get();
     var flushed = 0;
     for (final row in rows) {
@@ -689,8 +691,8 @@ class MessageRepository {
   Future<int> get pendingCount async {
     final count = await (db.selectOnly(db.localMessages)
           ..addColumns([db.localMessages.messageId.count()])
-          ..where(db.localMessages.status.equals('pending') &
-              db.localMessages.deletedAt.isNull()))
+          // 与 _flushPending 对齐：墓碑消息若仍在补发，也应计入"待发送"
+          ..where(db.localMessages.status.equals('pending')))
         .getSingle();
     return count.read(db.localMessages.messageId.count()) ?? 0;
   }
@@ -803,8 +805,9 @@ class MessageRepository {
     // "请求还在途（响应丢了），本端一直显示小飞机"，此时用户点按就是要**立刻**
     // 重发去问服务端要个结果；若因"已有请求在途"而忽略点按，就等于让用户白等
     // 到超时。并发重发是安全的：服务端按 message_id 幂等，返回同一个 seq。
+    // 不排除墓碑：墓碑消息（删除/焚毁）的状态小标仍可点按重发（见 _flushPending 注释）
     final row = await (db.select(db.localMessages)
-          ..where((m) => m.messageId.equals(messageId) & m.deletedAt.isNull()))
+          ..where((m) => m.messageId.equals(messageId)))
         .getSingleOrNull();
     if (row == null) return;
     await _setStatus(messageId, 'pending');

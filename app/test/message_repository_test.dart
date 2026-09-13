@@ -334,6 +334,23 @@ void main() {
     expect(api.posted.length, 1);
   });
 
+  test('墓碑（删除/焚毁）不阻断在途路径：pending 墓碑仍会被 sync 幂等补发', () async {
+    final api = FakeApi();
+    final offline = makeRepo(api, token: null); // 先离线入队
+    final id = await offline.send('将要被删除的消息');
+    await offline.tombstoneMessage(id); // 本地墓碑：只隐藏正文
+    expect(await offline.pendingCount, 1,
+        reason: '墓碑若仍待发送，应计入待发送（与 _flushPending 对齐）');
+
+    // 联网后 sync → 补发（服务端幂等）→ 已发送；正文在本设备仍隐藏
+    final online = makeRepo(api, token: 'tok');
+    await online.sync();
+    final h = (await online.history()).single;
+    expect(h.deleted, isTrue, reason: '本设备仍是墓碑（正文隐藏）');
+    expect(h.status, 'sent', reason: '删除只影响本设备显示，不应阻断消息在途路径');
+    expect(api.posted.length, 1, reason: '只上传一次（幂等）');
+  });
+
   test('重发：retryMessage 成功后置 sent 且回填 server_sequence', () async {
     final api = FakeApi()..rejectPostMessage = true;
     final repo = makeRepo(api, token: 'tok');

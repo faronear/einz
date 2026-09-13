@@ -583,6 +583,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMsgFailed => '发送失败，点击重试';
 
   @override
+  String get chatPageMsgFailedTap => '点击重发';
+
+  @override
   String chatPageVoiceStartFailed(String error) {
     return '录音启动失败: $error';
   }

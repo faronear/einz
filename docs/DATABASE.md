@@ -124,8 +124,12 @@ CREATE TABLE local_messages (
     ciphertext       TEXT NOT NULL,
     server_sequence  INTEGER,              -- NULL = 尚未同步（pending 或失败）
     created_at       INTEGER NOT NULL,
-    -- **出站流水线**语义：pending|sent|failed
-    --   pending = 本地队列/发送中；sent = 服务端已收下；failed = 发送失败（可重发）
+    -- **出站流水线**语义：
+    --   pending = 还没确认（离线队列 / 在途 / 响应丢失）→ 由 sync 幂等补发自动收敛
+    --   sent    = 服务端已收下（拿到 server_sequence）
+    --   failed  = **服务端明确拒绝**（4xx：信封不合法 / 未授权 / 设备被撤销）→ 需用户点按重发
+    --   注：网络异常、连接/响应超时、5xx **不**标 failed，保持 pending 自动重试；
+    --       只有服务端明确拒绝才 failed（老板 2026-09-13 定）
     -- 注意：sync() 会把**入站**（对方）消息写成 'delivered'——那是历史遗留的
     --   "我收到了"标记，与"对方收到了我的消息"无关；真正的送达/已读回执不在这
     --   张表里，见下方 peer_receipts 与服务端 receipts（PROTOCOL.md §5.4）。
@@ -134,6 +138,15 @@ CREATE TABLE local_messages (
 );
 
 CREATE INDEX idx_local_messages_seq ON local_messages (server_sequence);
+
+-- 阅后即焚 / 本地墓碑（后续版本增列）：burn_after_seconds、expires_at、
+--   burn_manual、deleted_at
+-- 语义（老板 2026-09-13 明确）：**删除/焚毁只是"在本设备隐藏正文"**——打
+--   `deleted_at` 本地墓碑、行与信封保留，不通知服务端、也不改变消息在服务器与
+--   对方那里的路径。因此：
+--   · 尚未确认（pending）的墓碑消息**仍会继续补发**，气泡里的状态小标照旧显示
+--     且可点按重发（删除不阻断在途路径）；
+--   · 焚毁时长是本机策略（收到消息时按本机设置决定），不随消息传到对方。
 
 -- 附件元数据
 CREATE TABLE local_attachments (

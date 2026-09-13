@@ -1190,6 +1190,12 @@ abstract class AppLocalizations {
   /// **'Send failed, tap to retry'**
   String get chatPageMsgFailed;
 
+  /// No description provided for @chatPageMsgFailedTap.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to resend'**
+  String get chatPageMsgFailedTap;
+
   /// No description provided for @chatPageVoiceStartFailed.
   ///
   /// In en, this message translates to:
