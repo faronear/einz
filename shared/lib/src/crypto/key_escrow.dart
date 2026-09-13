@@ -44,7 +44,8 @@ class KeyEscrowService {
     );
   }
 
-  /// 一键：口令加密 + 上传托管（附口令 argon2id 哈希，供服务端 /recover 恢复校验）。
+  /// 一键：口令加密 + 上传托管（附口令 argon2id 哈希，供服务端在校验
+  /// 「加入方取包时输入的口令」时使用）。
   /// [rotated] 仅"修改口令"流程置 true（服务端广播口令重设通知）；普通重传保持 false。
   Future<void> upload({
     required String passphrase,

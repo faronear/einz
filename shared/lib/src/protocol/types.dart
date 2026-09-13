@@ -20,7 +20,6 @@ class Api {
   static const pushRegister = '/push/register';
   static const space = '/space';
   static const keyEscrow = '/key-escrow';
-  static const recover = '/recover'; // 全丢恢复（免认证，凭 escrow 口令重置空间）
   // Multiverse：空间创建/加入（PROTOCOL_MULTIVERSE.md §4）
   static const spaces = '/spaces';
   static const spaceJoinPreflight = '/spaces/join/preflight';

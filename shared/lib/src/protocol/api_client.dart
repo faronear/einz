@@ -262,7 +262,8 @@ class ApiClient {
   }
 
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
-  /// 上传口令托管密文包；可选附口令 argon2id 哈希（服务端 /recover 恢复校验用）。
+  /// 上传口令托管密文包；可选附口令 argon2id 哈希
+  /// （服务端据它校验「加入方取包时输入的口令」是否正确）。
   /// [rotated] 仅"修改口令"流程置 true——服务端据此推进 updated_at 并广播
   /// passphrase.rotated；普通重传（首次设口令/解锁同步）保持 false，不得误报。
   Future<void> uploadKeyEscrow(BackupFile package, String token,
@@ -289,16 +290,6 @@ class ApiClient {
   /// 清除口令托管密文包。
   Future<void> deleteKeyEscrow(String token) async {
     await _delete(Api.keyEscrow, token: token);
-  }
-
-  /// 全丢恢复（免认证）：凭 escrow 口令验证后撤销全部设备（空间重置），
-  /// 并返回 escrow 密文包——同一口令可本地解出 Space Key（无需预先导出的
-  /// EINZ-BACKUP 文本，闭环）；未托管口令密保箱（理论边界）时返回 null。
-  Future<BackupFile?> recoverSpace(String passphrase) async {
-    final res = await _post(Api.recover, {'passphrase': passphrase}, withToken: false);
-    final pkg = res['package'];
-    if (pkg == null) return null;
-    return BackupFile.fromJson(pkg as Map<String, dynamic>);
   }
 
   /// 上传附件密文 blob（PROTOCOL.md §6.1）：元数据走 x-attachment-meta 头，body 为密文。
