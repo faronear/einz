@@ -723,12 +723,16 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
       },
       onProfileUpdated: _onProfileUpdated,
       onRevoked: _onWsRevoked,
+      // 对方送达/已读水位更新（receipt.updated）：重绘以刷新我发出消息的状态
+      onReceiptUpdated: () => _scheduleRender(),
     );
   }
   // 认证后立即拉取 person 名称/性别表（向导刚结束时 token 才就绪——启动时
   // main 的刷新会因 token 未就绪失败静默；此处补齐——否则向导结束直接发消息
   // 时对方气泡按未知性别回退青绿——老板 2026-09-10 实测）
   await _refreshPersonNames(_state!);
+  // 拉一次回执水位：我发出消息的 delivered 状态（单勾→双勾）首屏即正确
+  await session.refreshReceipts();
   // 入网收尾：本次入网且启动同步拉到历史消息时，清掉向导 system 噪音，
   // 让对方的预发消息不再被向导输出顶出屏幕（老板 2026-09-13）
   if (_onboarded) _finalizeOnboarding(session);
@@ -1735,9 +1739,21 @@ String _genderBubble(String? rawGender) {
   return _bgTeal;
 }
 
+/// 我发出的消息状态字符（标签后缀，只用于自己的消息）：
+/// - pending（未被服务端确认，含离线队列）→ `⋯`
+/// - sent（服务端已收下）→ `✓`
+/// - delivered（对方已送达）→ `✓✓`（与 App 双勾一致；read 暂不单独区分）
+/// 均按 1~2 列宽字符选取（避免 emoji 双宽导致气泡对不齐）。
+String _statusGlyph(String status) => switch (status) {
+      'pending' => '⋯',
+      'sent' => '✓',
+      'delivered' => '✓✓',
+      _ => '',
+    };
+
 /// 格式化消息为多行（自动按列宽折行）。
 /// 自己的消息：性别气泡，整块从左侧 8 列留白起铺满屏缘（长短消息左缘统一对齐）——
-/// 长消息正文在左；单行短消息正文右对齐、贴着末尾 [我 时间] 标签（标签贴最右）。
+/// 长消息正文在左；单行短消息正文右对齐、贴着末尾 [我 时间 状态] 标签（标签贴最右）。
 /// 背景按我的性别配色；对方消息：性别气泡，整块左对齐（左侧气泡风格，[对方名 时间]
 /// 黑字标签嵌在气泡左缘、正文在右），背景按对方性别配色；系统提示（isSystem）：
 /// 灰色前缀 + 普通正文（左对齐）。
@@ -1838,7 +1854,11 @@ List<String> formatMessage(ChatMessage m, int cols) {
   } else {
     partnerBackground = _bgTeal; // 性别未知：青绿底（2026-09-10 老板要求）
   }
-  final suffix = '$_black[$who $time]$_reset';
+  // 我的消息标签扩展为 [我 时间 状态]：pending ⋯ / sent ✓ / delivered ✓✓
+  // （状态字符宽度按 1 列计算，不占额外留白预算——见 _statusGlyph）
+  final statusGlyph = _statusGlyph(_state?.session.sentStatusOf(m) ?? '');
+  final suffix =
+      '$_black[$who $time${statusGlyph.isEmpty ? '' : ' $statusGlyph'}]$_reset';
   final suffixW = _displayWidth(suffix);
   // 正文每行同时保留：左侧 sideMargin 列留白（不顶左边框）+ 右侧标签栏；
   // 标签栏宽 = "空格+标签"（标签宽+1），使续行正文右缘与末行标签起点对齐

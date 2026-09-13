@@ -57,6 +57,11 @@ class ChatSession {
   /// 供 UI 状态栏显示"已断线 Ns"。
   DateTime? wsDownSince;
 
+  /// 对方（接收方）已送达高水位：personId → seq，只前进不倒退。
+  /// 用于推导"我发出的消息"是否已送达（delivered）。**不含本端自己那行**——
+  /// 自己的水位描述的是"我收到对方哪些消息"，与我发出的消息无关（App 同款坑）。
+  final Map<String, int> peerDeliveredUpto = {};
+
   /// 自动补拉周期：WS 推送可能丢帧、断线期间的消息不会回放，定时增量拉取兜底
   /// （同时顺带补发离线发送队列）。
   static const autoSyncInterval = Duration(seconds: 30);
@@ -81,6 +86,8 @@ class ChatSession {
   bool get hasSession => store.sessionToken != null;
 
   /// 从本地历史填充展示缓存（启动时调用，去重按 message_id）。
+  /// 未发送的离线队列（pending）也一并上屏（展示为 pending）——恢复网络补发后
+  /// 按 messageId 覆盖为 sent，与我发出的每条消息都有状态一致。
   Future<void> loadHistory() async {
     final seen = <String>{};
     messages.clear();
@@ -95,6 +102,16 @@ class ChatSession {
             : env.senderDeviceId == store.deviceId,
         createdAt: env.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         serverSequence: env.serverSequence,
+      ));
+    }
+    for (final env in store.pendingEnvelopes) {
+      if (!seen.add(env.messageId)) continue; // 已在历史（补发后落盘）的不重复
+      messages.add(ChatMessage(
+        env: env,
+        plain: await _decrypt(env),
+        isMine: true, // 离线队列里的必然是本端发出的
+        createdAt: env.createdAt ?? DateTime.now().millisecondsSinceEpoch,
+        serverSequence: null,
       ));
     }
     _sortMessages();
@@ -174,6 +191,17 @@ class ChatSession {
     store.enqueuePending(jsonEncode(env.toJson()));
     store.save(storePath);
 
+    // 立即上屏（pending）：不等服务端往返——确认后同一 messageId 覆盖为 sent。
+    // 离线/失败时留在队列里，恢复后补发并覆盖（见 flushPending）。
+    _appendDedup(ChatMessage(
+      env: env,
+      plain: text,
+      isMine: true,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      serverSequence: null,
+    ));
+    _sortMessages();
+
     if (server.isEmpty || store.sessionToken == null) {
       return false; // 离线：只入队
     }
@@ -208,6 +236,17 @@ class ChatSession {
         store.dequeuePending(env.messageId);
         store.upsertHistory(env, serverSequence: result.serverSequence, createdAt: result.createdAt);
         sent.add((env: env, serverSequence: result.serverSequence, createdAt: result.createdAt));
+        // 展示缓存里的 pending 消息覆盖为 sent（拿到真实 seq/时间，按 messageId 去重）
+        _appendDedup(ChatMessage(
+          env: env,
+          plain: await _decrypt(env),
+          isMine: env.senderPersonId != null && store.personId != null
+              ? env.senderPersonId == store.personId
+              : env.senderDeviceId == store.deviceId,
+          createdAt: result.createdAt,
+          serverSequence: result.serverSequence,
+        ));
+        _sortMessages();
       } on Exception {
         break; // 网络层问题：停止本轮，避免空转
       }
@@ -255,6 +294,37 @@ class ChatSession {
       store.advanceReported(read: seq);
       store.save(storePath);
     }
+  }
+
+  /// 拉取本 space 回执行，合并对方的已送达高水位（启动 / 重连 / 周期兜底用；
+  /// WS `receipt.updated` 是实时路径）。排除自己那一行——见 [peerDeliveredUpto]。
+  /// 网络抖动静默忽略：下次同步/重连再拉。
+  Future<void> refreshReceipts() async {
+    if (server.isEmpty || store.sessionToken == null) return;
+    try {
+      final rows = await _withAutoAuth((token) => ApiClient(server).getReceipts(token));
+      for (final r in rows) {
+        if (r.personId == store.personId) continue;
+        final cur = peerDeliveredUpto[r.personId] ?? 0;
+        if (r.deliveredUptoSeq > cur) peerDeliveredUpto[r.personId] = r.deliveredUptoSeq;
+      }
+    } catch (_) {
+      // 网络抖动忽略
+    }
+  }
+
+  /// 我发出消息的发送状态（UI 展示用）：
+  /// - `pending`：尚未被服务端确认（仍在离线队列，或还没拿到 server_sequence）
+  /// - `sent`：服务端已收下（有 server_sequence），但对方尚未确认送达
+  /// - `delivered`：对方（所有接收方）已送达高水位 ≥ 该消息 seq
+  /// 非我的消息 / 系统消息返回空串。read 暂不单独区分（与 App 一致，折叠进 delivered）。
+  String sentStatusOf(ChatMessage m) {
+    if (!m.isMine || m.isSystem) return '';
+    if (store.hasPending(m.env.messageId)) return 'pending';
+    final seq = m.seq;
+    if (seq == null) return 'pending';
+    if (peerDeliveredUpto.isEmpty) return 'sent';
+    return peerDeliveredUpto.values.every((d) => d >= seq) ? 'delivered' : 'sent';
   }
 
   /// 增量同步：从本地锚点拉取，落盘历史，返回新增消息（解密后已追加展示缓存）。
@@ -379,6 +449,7 @@ class ChatSession {
     void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
     void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
     void Function(WsDeviceRevokedEvent event)? onRevoked,
+    void Function()? onReceiptUpdated,
   }) {
     if (server.isEmpty || store.sessionToken == null) return;
     wsClient = WsClient(
@@ -419,6 +490,16 @@ class ChatSession {
         }
         if (event is WsProfileUpdatedEvent) {
           onProfileUpdated?.call(event);
+        }
+        if (event is WsReceiptUpdatedEvent) {
+          // 对方送达/已读水位更新：合并到本地（排除自己那行——见 peerDeliveredUpto）
+          if (event.personId != store.personId) {
+            final cur = peerDeliveredUpto[event.personId] ?? 0;
+            if (event.deliveredUptoSeq > cur) {
+              peerDeliveredUpto[event.personId] = event.deliveredUptoSeq;
+            }
+          }
+          onReceiptUpdated?.call();
         }
         if (event is WsDeviceRevokedEvent) {
           // 本设备已被撤销（Server 发帧后随即断开）：UI 应立即提示并退出
@@ -468,6 +549,7 @@ class ChatSession {
     _autoSyncing = true;
     try {
       final fresh = await sync();
+      await refreshReceipts(); // 顺带刷新对方送达水位（delivered 状态展示）
       onAutoSync?.call(fresh.length);
     } catch (_) {
       // 静默：后台补拉失败不打扰用户
