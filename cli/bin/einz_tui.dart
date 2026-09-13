@@ -738,7 +738,7 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
 /// 入网向导收尾（老板 2026-09-13）：本次入网且启动同步确实拉到历史消息时，
 /// 把向导期间产生的 system 噪音从消息流移除——向导输出（几十行）会把对方的
 /// 预发消息顶到屏幕上方，看起来像"join 后消息没同步"（重启后向导日志消失才看到）。
-/// 最终欢迎语重新补进消息流，并同时显示到底部状态条。没有拉到历史消息时不清理
+/// 最终欢迎语只输出到底部状态条，不再补进消息流。没有拉到历史消息时不清理
 /// （新建空间等场景，向导日志就是屏幕上的唯一内容，清掉会留下一片空白）。
 void _finalizeOnboarding(ChatSession session) {
   if (_onboardingFinalized) return;
@@ -751,8 +751,7 @@ void _finalizeOnboarding(ChatSession session) {
   final noise = _onboardingNoise.toSet();
   session.messages.removeWhere(noise.contains);
   _onboardingNoise.clear();
-  session.messages.add(_systemMessage(session, _kWelcomeText));
-  _state!.status = _kWelcomeText; // 欢迎语也输出到底部状态条
+  _state!.status = _kWelcomeText; // 欢迎语只输出到底部状态条
   _scheduleRender();
 }
 
