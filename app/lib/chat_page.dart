@@ -690,6 +690,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 说明文案作为大标题的补充说明，置于标题与二维码之间（老板 2026-09-13）
+              const Text('新设备必须验证邀请码，才能绑定到当前秘境。24 小时内一次性有效。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 12),
               // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
               // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
               Center(child: _InviteQrCode(data: r.link)),
@@ -741,11 +746,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     },
                   ),
                 ],
-              ),
-              const Padding(
-                padding: EdgeInsets.only(top: 6),
-                child: Text('新设备必须验证邀请码，才能绑定到当前秘境。24 小时内一次性有效。',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ],
           ),
