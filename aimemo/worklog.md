@@ -3833,3 +3833,25 @@ commit `cb48948`。
 shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未改动）。
 **注意：** 别同时跑两个 `flutter test`（app + shared），会互相抢资源导致 12 个
 测试文件 "loading" 失败——是并发假象，单独重跑即恢复。
+
+## 2026-09-13 录音条：计数改 00→60、试听波形加进度扫掠；删除老明文兜底
+
+**需求：** ① 录音中左侧计时由 `0:00`（分秒）改成纯秒计数 `00 … 60`（录音上限 60s）；
+② 录完的预览条里点试听，波形也要像气泡里一样有高亮从左往右移动；
+③ 老板拍板**不做老数据兼容**（产品未上线，都是内部测试），删掉从明文里正则
+抠时长的兜底逻辑。
+
+**改动（`app/lib/chat_page.dart`）：**
+- 计时：`_recordSeconds.toString().padLeft(2,'0')`（去掉分秒拼接）。
+- 预览态波形：改用 `_VoiceWaveform`（原来是不带进度的 `_WaveformBars`），
+  传**本次真实振幅采样** `_voiceSamples` + 宽度撑满（LayoutBuilder 取 maxWidth）+ 
+  `durationSeconds: _recordSeconds`；`playing: _previewPlaying`，停止/播完自动复原。
+- `_VoiceWaveform` 通用化：新增可选 `samples`（真实采样，优先于 `seed`）与 `width`
+  （竖条数按宽度算，默认 120 给气泡用，预览传可用宽度）；新增 `_resample()` 把任意
+  长度采样压成 N 根条（区间均值）。气泡仍走 seed 生成的固定波形。
+- 删除：正则抠时长的 `_parseDurationSeconds`、剥 `[3m 20s]` 尾注的 `_stripDurationTag`，
+  以及 `_audioDurationSeconds` 里的老明文分支——现在只认 meta，取不到（发送端探测
+  失败）就用播放器给的缓存值，再没有就是 0（不显示时长）。
+  临时文件扩展名恢复直接用 `m.plaintext`（明文已不再塞标注）。
+
+**验证：** `flutter analyze lib` 无新增问题；`flutter test` +98 -17（17 golden 为既有基线漂移）。

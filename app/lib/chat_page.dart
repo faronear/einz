@@ -2133,7 +2133,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildVoiceBar() {
     final recording = _inputMode == _InputMode.recording;
     final preview = _inputMode == _InputMode.preview;
-    final elapsed = '${_recordSeconds ~/ 60}:${(_recordSeconds % 60).toString().padLeft(2, '0')}';
+    // 录音上限 60s：左侧直接数秒（00 → 60），不必写成分秒（老板要求 2026-09-13）
+    final elapsed = _recordSeconds.toString().padLeft(2, '0');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -2163,8 +2164,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       onPressed: _playVoicePreview,
                     ),
                     Expanded(
-                        child: _WaveformBars(
-                            samples: _voiceLastSamples(40), color: Colors.grey.shade600)),
+                      child: LayoutBuilder(builder: (context, constraints) {
+                        // 试听：波形按进度从左往右高亮（与气泡里的语音波形一致，
+                        // 老板要求 2026-09-13）——用本次真实振幅采样，宽度撑满可用区
+                        return _VoiceWaveform(
+                          playing: _previewPlaying,
+                          durationSeconds: _recordSeconds,
+                          samples: _voiceSamples,
+                          width: constraints.maxWidth,
+                          activeColor: Theme.of(context).colorScheme.primary,
+                          inactiveColor: Colors.grey.shade400,
+                        );
+                      }),
+                    ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       iconSize: 22,
@@ -2228,8 +2240,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         sha256: att['sha256'] as String,
         nonce: base64Decode(att['nonce'] as String),
       );
-      // 音频文件明文可能残留老版时长标注（「song.mp3 [3m 20s]」），取扩展名要剥掉
-      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(_stripDurationTag(m.plaintext));
+      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
       final tmp = File('${Directory.systemTemp.path}/einz_audio_${m.env.messageId}.$ext');
       await tmp.writeAsBytes(bytes);
       await player.stop();
@@ -2592,24 +2603,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return parts.isEmpty ? '0s' : parts.join(' ');
   }
 
-  /// 音频（语音/音频文件）时长秒数：优先取载荷 meta（老板 2026-09-13 起的写法），
-  /// 其次是播放后缓存的真实值；两者都没有时兜底解析老明文
-  /// （旧版语音「语音 25s」、旧版音频文件「song.mp3 [3m 20s]」）。
+  /// 音频（语音/音频文件）时长秒数：以载荷 meta（老板 2026-09-13）为准；发送端
+  /// 探测失败时退而用播放器给的真实值（内存缓存，播放一次后才有）。
+  /// 产品未上线，不兼容老数据——取不到就是 0，气泡不显示时长。
   int _audioDurationSeconds(HistoryMessage m) {
     final fromMeta = m.meta?[kMetaAudioDurationSeconds];
     if (fromMeta is int) return fromMeta;
     if (fromMeta is num) return fromMeta.round();
-    final cached = _audioFileDurations[m.env.messageId] ?? 0;
-    if (cached > 0) return cached;
-    // 兜底：老消息把时长写在明文里（语音「语音 25s」、音频文件「song.mp3 [3m 20s]」）
-    if (m.env.type == 'voice') return _parseDurationSeconds(m.plaintext);
-    final tag = RegExp(r'\[([^\]]*)\]$').firstMatch(m.plaintext);
-    return tag == null ? 0 : _parseDurationSeconds(tag.group(1)!);
+    return _audioFileDurations[m.env.messageId] ?? 0;
   }
-
-  /// 去掉老明文末尾的时长标注（「song.mp3 [3m 20s]」→「song.mp3」）：临时文件
-  /// 扩展名要用纯文件名。
-  String _stripDurationTag(String text) => text.replaceFirst(RegExp(r'\s*\[[^\]]*\]$'), '');
 
   /// 读本地音频文件的总时长（audioplayers 设源后取时长，不播放）；失败返回 0。
   Future<int> _probeAudioDuration(Uint8List bytes) async {
@@ -2624,22 +2626,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 从文本里解析时长秒数：按 `数字 + (h|m|s|小时|分钟|分|秒)` 累加。
-  /// 语音明文形如「语音 25s」/ 旧版「语音（25 秒）」；音频文件标注形如「3m 20s」。
-  int _parseDurationSeconds(String text) {
-    var total = 0;
-    for (final match in RegExp(r'(\d+)\s*(h|m|s|小时|分钟|分|秒)').allMatches(text)) {
-      final value = int.tryParse(match.group(1)!) ?? 0;
-      final unit = match.group(2)!;
-      final factor = switch (unit) {
-        'h' || '小时' => 3600,
-        'm' || '分' || '分钟' => 60,
-        _ => 1,
-      };
-      total += value * factor;
-    }
-    return total;
-  }
 
   /// 文件消息：文件卡片（文件名 + 大小 + 下载保存）。
   Widget _buildFileCard(
@@ -3598,28 +3584,33 @@ class _WaveformBars extends StatelessWidget {
   }
 }
 
-/// 语音气泡内的固定波形图（老板要求 2026-09-13）：长方形区域里一排等宽竖条，
-/// 条高由 [seed]（messageId）确定性生成——同一条消息每次进页面形状一致，不是
-/// 真实采样（接收端拿不到对方录音的振幅）。
+/// 语音波形图（老板要求 2026-09-13）：长方形区域里一排等宽竖条。
+///
+/// 竖条振幅二选一：[samples] 给了就用真实录音采样（录音条预览态，按 [width]
+/// 重采样成对应的条数）；否则用 [seed]（气泡里的 messageId）确定性生成——
+/// 同一条消息每次进页面形状一致（接收端拿不到对方录音的振幅）。
 ///
 /// 播放时按时间比例把已播过的条染成 [activeColor]（阴影从左往右扩散），并在
-/// 进度位置画一根竖线走过去；走完/停止即复原。时长未知（旧消息解析不到）时
-/// 改为循环扫掠的波浪动画。进度只用一个 AnimationController 的 value 驱动，
-/// 重绘范围仅限这个 120×28 的 CustomPaint。
+/// 进度位置画一根竖线走过去；走完/停止即复原。时长未知时改为循环扫掠的波浪动画。
+/// 进度只用一个 AnimationController 的 value 驱动，重绘仅限这个 CustomPaint。
 class _VoiceWaveform extends StatefulWidget {
   const _VoiceWaveform({
     required this.playing,
     required this.durationSeconds,
-    required this.seed,
     required this.activeColor,
     required this.inactiveColor,
+    this.samples,
+    this.seed,
+    this.width = 120,
   });
 
   final bool playing;
   final int durationSeconds;
-  final String seed;
   final Color activeColor;
   final Color inactiveColor;
+  final List<double>? samples; // 真实振幅采样（非空时优先于 seed）
+  final String? seed;
+  final double width;
 
   @override
   State<_VoiceWaveform> createState() => _VoiceWaveformState();
@@ -3627,18 +3618,17 @@ class _VoiceWaveform extends StatefulWidget {
 
 class _VoiceWaveformState extends State<_VoiceWaveform>
     with SingleTickerProviderStateMixin {
-  static const int _barCount = 24;
   static const double _barWidth = 3;
   static const double _barGap = 2;
   static const double _height = 28;
 
   late final AnimationController _progress;
-  late final List<double> _amplitudes;
+  late List<double> _amplitudes;
 
   @override
   void initState() {
     super.initState();
-    _amplitudes = _buildAmplitudes(widget.seed);
+    _amplitudes = _resolveAmplitudes();
     _progress = AnimationController(vsync: this, duration: _animationDuration);
     _sync();
   }
@@ -3650,6 +3640,10 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
         oldWidget.durationSeconds != widget.durationSeconds) {
       _sync();
     }
+    if (oldWidget.width != widget.width ||
+        oldWidget.samples?.length != widget.samples?.length) {
+      _amplitudes = _resolveAmplitudes();
+    }
   }
 
   @override
@@ -3657,6 +3651,10 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
     _progress.dispose();
     super.dispose();
   }
+
+  /// 竖条数由宽度决定（3px 条 + 2px 间隔）。
+  int get _barCount =>
+      math.max(4, ((widget.width + _barGap) / (_barWidth + _barGap)).floor());
 
   /// 动画时长：时长已知=按时长走一遍；未知=2s 循环扫掠。
   Duration get _animationDuration => widget.durationSeconds > 0
@@ -3677,6 +3675,27 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
     }
   }
 
+  /// 竖条振幅：有真实采样就重采样到 [_barCount]，否则按 seed 确定性生成。
+  List<double> _resolveAmplitudes() {
+    final samples = widget.samples;
+    if (samples != null && samples.isNotEmpty) return _resample(samples, _barCount);
+    return _buildAmplitudes(widget.seed ?? '');
+  }
+
+  /// 把任意长度的采样压成 [count] 根条（每根取该区间的均值）。
+  List<double> _resample(List<double> samples, int count) {
+    if (samples.length == count) return samples;
+    return List<double>.generate(count, (index) {
+      final start = (index * samples.length / count).floor();
+      final end = math.max(start + 1, ((index + 1) * samples.length / count).floor());
+      var sum = 0.0;
+      for (var i = start; i < end && i < samples.length; i++) {
+        sum += samples[i];
+      }
+      return sum / (end - start);
+    });
+  }
+
   /// 按 seed 生成竖条振幅：中间高两头低的包络 + 确定性伪随机抖动。
   List<double> _buildAmplitudes(String seed) {
     var hash = 2166136261; // FNV-1a 起点
@@ -3684,8 +3703,9 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
       hash = (hash ^ unit) * 16777619;
     }
     final random = math.Random(hash & 0x7fffffff);
-    return List<double>.generate(_barCount, (index) {
-      final envelope = math.sin(math.pi * (index + 1) / (_barCount + 1));
+    final count = _barCount;
+    return List<double>.generate(count, (index) {
+      final envelope = math.sin(math.pi * (index + 1) / (count + 1));
       return (0.35 + 0.65 * random.nextDouble()) * (0.45 + 0.55 * envelope);
     });
   }
@@ -3695,7 +3715,7 @@ class _VoiceWaveformState extends State<_VoiceWaveform>
     return AnimatedBuilder(
       animation: _progress,
       builder: (context, _) => CustomPaint(
-        size: Size(_barCount * (_barWidth + _barGap) - _barGap, _height),
+        size: Size(widget.width, _height),
         painter: _WaveformPainter(
           amplitudes: _amplitudes,
           progress: _progress.value,
