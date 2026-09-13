@@ -85,6 +85,12 @@ class ChatSession {
   /// 展示缓存（按 server_sequence 升序；未同步的排最后）。
   final List<ChatMessage> messages = [];
 
+  /// 展示缓存变化回调（UI 用）：消息被乐观上屏 / 同步追加 / WS 到达时触发重绘。
+  /// 在 [_sortMessages] 末尾统一调用——这样离线发送时乐观上屏的消息能在
+  /// `flushPending()` 的网络等待**之前**就刷新到屏幕（老板 2026-09-13：App 能
+  /// 立刻显示离线消息，TUI 之前要等补发网络超时回来才显示）。
+  void Function()? onChanged;
+
   /// WS 实时监听（null = 未启动）。
   WsClient? wsClient;
 
@@ -817,6 +823,7 @@ class ChatSession {
 
   void _sortMessages() {
     messages.sort(compareChatMessages);
+    onChanged?.call(); // 通知 UI 重绘（乐观上屏 / 同步 / WS 追加后立即刷新）
   }
 
   /// 简易 UUIDv7（与 einz.dart 一致的近似实现）。

@@ -1108,6 +1108,9 @@ Future<void> main(List<String> args) async {
   // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
   // _state 赋值之后（否则 Null check 崩溃——2026-09-08 老板实测）
   _state = _TuiState(session, storePath);
+  // 展示缓存变化即重绘：离线发送时乐观上屏的消息在补发网络等待前就刷新到屏幕
+  // （老板 2026-09-13：App 能立刻显示离线消息，TUI 之前要等网络超时回来才显示）
+  session.onChanged = _scheduleRender;
   // 锁屏码：已有 PIN 时先解锁（历史消息在解锁前不加载/不显示——防消息泄漏；
   // 刚入网的 _askSetPin 仍在 _runGuide 内处理）
   if (store.pinHash != null) {
