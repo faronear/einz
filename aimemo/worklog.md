@@ -4215,3 +4215,17 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 写盘）、`profile.updated` 改名也回写；main 启动时先用本地缓存填充再叠加启动探测值。
 新增 `store_person_cache_test`（落盘往返 + 旧 store 缺字段）。`dart analyze` 0 issue。
 
+### 追加：附件消息显示固定序号 #N，/open N 按该序号打开
+
+**老板反馈：** 附件用 `/open 1/2/3` 打开，但每收一条新附件旧序号就变，无法稳定指定；
+希望附件消息显示一个固定序号。
+
+**真因：** `_execOpen` 的序号是"从最新倒数"（`messages.reversed`），新附件一来全部错位。
+
+**改动（commit `7972628`）：** 改为按消息流**时间序从前往后**编号——附件消息正文前缀
+`#N`（如 `#3 🔊 语音 18s`、`#3 📎 report.pdf`），`/open <N>` 按同一序号定位（越界给
+明确提示，不再静默钳制）。序号由 `server_sequence` 单调保证，新附件只追加新号、重启后
+按历史顺序算出同一序号。序号表在渲染层每帧预计算一次（`formatMessage` 增加可选
+`attachmentNos` 参数），避免 O(n²)。测试补 `#N` 前缀用例；顺手清掉
+`format_message_test` 的未用 import。`dart analyze` 0 issue，全部测试通过。
+
