@@ -4100,3 +4100,24 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
   修正为现标签 `'渐变粉蓝'`（label 早已是单语，属既有失配）。
 
 **验证：** `flutter analyze lib test` 0 issue。未跑测试/UI 老板自测。
+
+### 追加（同日）：聊天输入框多行自动增高（最多 8 行）
+
+**老板要求：** 原输入框单行、长文字横向滚动（不断向左推）；改为到达输入框宽度后
+自动折行、输入框自动增高，最多 8 行，超过则不再增高、转为内部上下滚动。
+
+**讨论与决策：**
+- 询问回车键行为时，老板指出微信文字态**没有**界面发送图标，发送入口是键盘右下角
+  那颗「发送」键（本质=回车发送，非换行）——我原「换行才是主流」的说法不准确。
+- 敲定：回车键=发送（键盘显示「发送」），**保留**右侧界面发送图标按钮（老板选择）。
+
+**改动（`chat_page.dart` 约 3456 行）：**
+- `minLines: 1` + `maxLines: 8` + `keyboardType: TextInputType.multiline`
+  → 自动折行增高，8 行封顶后内部纵向滚动。
+- `textInputAction: TextInputAction.send` → 回车键显示「发送」（iOS 按系统语言本地化），
+  按下触发既有 `onSubmitted` 发送，不插入换行。
+- 非文字态（录音提示/录音/预览）把隐藏输入框按 `maxLines: 1` 布局：因录音条是
+  `Positioned.fill` 且 `maintainSize` 与输入框等高，若草稿多行会让录音条撑到 8 行高；
+  草稿仍保留在 controller，切回文字态自动恢复增高。
+
+**验证：** `flutter analyze`（app）0 issue。UI 老板真机自测。commit `4e14c52`。
