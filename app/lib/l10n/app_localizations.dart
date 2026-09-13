@@ -725,7 +725,7 @@ abstract class AppLocalizations {
   /// No description provided for @setPinDialogSetPin.
   ///
   /// In en, this message translates to:
-  /// **'Set PIN'**
+  /// **'Submit'**
   String get setPinDialogSetPin;
 
   /// No description provided for @setPinDialogPinTooShort.
@@ -955,6 +955,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change passphrase'**
   String get chatPageChangePassphraseTitle;
+
+  /// No description provided for @chatPageChangePassphraseSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get chatPageChangePassphraseSubmit;
 
   /// No description provided for @chatPageChangePassphraseOldLabel.
   ///

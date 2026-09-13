@@ -150,8 +150,8 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(pinFields.at(0), '123456');
     await tester.enterText(pinFields.at(1), '123456');
-    // 点"设置锁屏码"→ 先弹显性确认对话框（设非空 PIN 也要求确认）
-    await tester.tap(find.text('设置锁屏'));
+    // 点"提交"→ 先弹显性确认对话框（设非空 PIN 也要求确认）
+    await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
     expect(find.text('设置 PIN 锁屏？'), findsOneWidget); // 确认弹窗标题
     await tester.tap(find.text('确认'));
@@ -312,8 +312,8 @@ void main() {
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
     expect(find.text('设置锁屏码'), findsOneWidget); // 弹窗标题
-    // 两空点「设置 PIN」→ 先弹显性确认对话框（防误触——老板要求）
-    await tester.tap(find.text('设置锁屏'));
+    // 两空点「提交」→ 先弹显性确认对话框（防误触——老板要求）
+    await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
     expect(find.text('清空锁屏码？'), findsOneWidget); // 确认弹窗标题
     expect(find.text('PIN 至少4位'), findsNothing);
@@ -352,12 +352,12 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两空）→ 点「设置 PIN」→ 确认弹窗
+    // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两空）→ 点「提交」→ 确认弹窗
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('设置锁屏'));
+    await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
     expect(find.text('清空锁屏码？'), findsOneWidget); // 确认弹窗出现
     // 点「取消」→ 不执行清除：设置弹窗仍在、无 SnackBar
@@ -431,8 +431,8 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(fields.at(1), 'newpass1');
     await tester.enterText(fields.at(2), 'newpass1');
-    // 提交（按钮文本与弹窗标题同为"修改口令"——用 FilledButton 精确定位）
-    await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
+    // 提交（按钮文本「修改」，弹窗标题「修改口令」）
+    await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('修改密保口令？'), findsOneWidget); // 显性确认弹窗
     // 点取消 → 不执行修改（改口令弹窗仍在）
@@ -475,7 +475,7 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(fields.at(1), 'short7!');
     await tester.enterText(fields.at(2), 'short7!');
-    await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
+    await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
     expect(find.text('修改密保口令？'), findsNothing, reason: '校验未过不应进入显性确认');
@@ -483,7 +483,7 @@ void main() {
     // 补齐 8 位：放行到显性确认
     await tester.enterText(fields.at(1), 'longpass1');
     await tester.enterText(fields.at(2), 'longpass1');
-    await tester.tap(find.widgetWithText(FilledButton, '修改口令'));
+    await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 8 位'), findsNothing, reason: '满足长度后旧红字不应残留');
     expect(find.text('修改密保口令？'), findsOneWidget, reason: '满足长度应进入显性确认');

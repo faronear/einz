@@ -352,7 +352,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogConfirmHint => 'Type it again to confirm';
 
   @override
-  String get setPinDialogSetPin => 'Set PIN';
+  String get setPinDialogSetPin => 'Submit';
 
   @override
   String get setPinDialogPinTooShort => 'PIN must be at least 6 digits';
@@ -481,6 +481,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseTitle => 'Change passphrase';
+
+  @override
+  String get chatPageChangePassphraseSubmit => 'Change';
 
   @override
   String get chatPageChangePassphraseOldLabel => 'Current passphrase';

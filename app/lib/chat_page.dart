@@ -3838,7 +3838,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
         FilledButton(
           onPressed: _busy ? null : _submit,
-          child: Text(l10n.chatPageChangePassphraseTitle),
+          child: Text(l10n.chatPageChangePassphraseSubmit),
         ),
       ],
     );

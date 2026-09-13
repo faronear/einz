@@ -4064,3 +4064,22 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
   `chatPageClearLockMessage` 等），属生成物对齐，非本次手改。英文 arb 无需改，en 生成文件无变化。
 
 **验证：** `flutter analyze lib` 0 issue。UI 老板自测。
+
+### 追加（同日）：两个弹窗按钮文案（设置锁屏码→提交、修改口令→修改）
+
+**老板要求：** ①「设置锁屏码」弹窗右下角按钮文字由「设置锁屏码」改「提交」；
+②「修改口令」弹窗右下角按钮文字由「修改口令」改「修改」（弹窗标题不变）。
+
+**改动：**
+- `app_zh.arb` / `app_en.arb`：`setPinDialogSetPin` → 「提交」/「Submit」（该 key 仅
+  `chat_page.dart:3659` 一处用于按钮，标题另用 `chatPageSetLockTitle`，不受影响）。
+- 新增 `chatPageChangePassphraseSubmit` → 「修改」/「Change」；`chat_page.dart:3841`
+  的 FilledButton 由误用标题 key `chatPageChangePassphraseTitle` 改为该新 key
+  （此前按钮与标题同文案）。重跑 `flutter gen-l10n`。
+- 测试 `chat_page_menu_test.dart` 同步：`find.text('设置锁屏')` ×3 → `'提交'`；
+  `find.widgetWithText(FilledButton, '修改口令')` ×3 → `'修改'`（含注释）。
+
+**背景：** 这些测试原本按旧按钮文案写（生成文件曾是「设置锁屏」），上一次 gen-l10n
+对齐 arb 后已失配，本次一并修正。
+
+**验证：** `flutter analyze lib test` 0 issue。未跑测试/UI 老板自测。

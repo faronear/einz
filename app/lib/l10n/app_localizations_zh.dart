@@ -331,7 +331,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogConfirmHint => '再输一次以确认';
 
   @override
-  String get setPinDialogSetPin => '设置锁屏码';
+  String get setPinDialogSetPin => '提交';
 
   @override
   String get setPinDialogPinTooShort => 'PIN 至少 6 位数字';
@@ -456,6 +456,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseTitle => '修改口令';
+
+  @override
+  String get chatPageChangePassphraseSubmit => '修改';
 
   @override
   String get chatPageChangePassphraseOldLabel => '旧口令';
