@@ -219,10 +219,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Device-specific lock PIN. Enter it each time you launch.';
 
   @override
-  String get welcomeDialogTitleCreate => '🎉 All set!';
+  String get welcomeDialogTitleCreate => 'All set!';
 
   @override
-  String get welcomeDialogTitleJoin => '🎉 All set!';
+  String get welcomeDialogTitleJoin => 'All set!';
 
   @override
   String get welcomeDialogMessage =>

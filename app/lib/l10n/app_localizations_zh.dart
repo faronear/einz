@@ -178,7 +178,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint => '对所有消息进行加密、解密。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
+  String get wizardPassphraseHint => '对所有内容进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
   String get wizardPassphraseMinLengthHint => '至少8位以上密码';
@@ -205,13 +205,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToPassphrase => '改用线上密保口令';
 
   @override
-  String get wizardPinHint => '每次启动应用，需输入锁屏码才能进入。可以先不设置，以后随时可改。';
+  String get wizardPinHint => '每次启动秘境，需输入锁屏码才能进入。当前也可先跳过，进入秘境后能够随时设置。';
 
   @override
-  String get welcomeDialogTitleCreate => '🎉 一切就绪！';
+  String get welcomeDialogTitleCreate => '一切就绪！';
 
   @override
-  String get welcomeDialogTitleJoin => '🎉 一切就绪！';
+  String get welcomeDialogTitleJoin => '一切就绪！';
 
   @override
   String get welcomeDialogMessage => '仅限两人，所有消息端到端加密，确保绝对隐私！进入秘境，开始聊天吧。';
@@ -614,7 +614,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageAudioPlayFailed(String error) {
-    return '音频播放失败: $error';
+    return '音频播放失败';
   }
 
   @override

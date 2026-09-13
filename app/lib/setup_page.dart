@@ -366,11 +366,13 @@ class _SetupPageState extends State<SetupPage> {
                 // extendBodyBehindAppBar 下 AppBar 浮动于渐变上：内容从工具栏
                 // 高度下方开始（避免与抬头 logo/标题重叠）
                 const SizedBox(height: kToolbarHeight),
-                _buildProgressDots(),
+                // 进度圆点仅向导步骤内显示；完成页（_step == _stepCount）不算进度之一
+                // （五个步骤都结束了——老板 2026-09-13）
+                if (_step < _stepCount) _buildProgressDots(),
                 // 进度条与输入区之间留白约等于大标题（30 号字，行高≈36px）的两倍
                 // （顶部锚定：键盘弹出时 resizeToAvoidBottomInset 只收缩底部空白
                 // 并把底部导航顶到键盘上方——输入区不会被覆盖/压缩）
-                const SizedBox(height: 72),
+                if (_step < _stepCount) const SizedBox(height: 72),
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
@@ -1926,7 +1928,18 @@ class _SetupPageState extends State<SetupPage> {
       context: context,
       barrierDismissible: false, // 只有一个按钮：开始聊天
       builder: (ctx) => AlertDialog(
-        title: Text(isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
+        // 标题左侧放品牌 Logo（替代通用 🎉 庆祝图标，老板 2026-09-13）
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(size: 26),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                  isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

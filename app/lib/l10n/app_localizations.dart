@@ -491,13 +491,13 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeDialogTitleCreate.
   ///
   /// In en, this message translates to:
-  /// **'🎉 All set!'**
+  /// **'All set!'**
   String get welcomeDialogTitleCreate;
 
   /// No description provided for @welcomeDialogTitleJoin.
   ///
   /// In en, this message translates to:
-  /// **'🎉 All set!'**
+  /// **'All set!'**
   String get welcomeDialogTitleJoin;
 
   /// No description provided for @welcomeDialogMessage.
