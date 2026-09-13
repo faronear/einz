@@ -431,11 +431,13 @@ class _SetupPageState extends State<SetupPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // 底部导航：角色判定后常显（含异常退到检测页 _step==0 的兜底——
+                // 底部导航：角色判定后显示（含异常退到检测页 _step==0 的兜底——
                 // 此时也有"下一步"可回到步骤 1，杜绝无路可走）。
                 // Multiverse join 步骤 1（token 页）也显示"下一步"——触发 preflight
                 // 校验（v1 身份卡点击自动前进的例外已随身份页删除而移除）。
-                if (_role != null)
+                // 完成页（_step == _stepCount）不显示：欢迎弹窗（唯一「开始聊天」
+                // 按钮）盖住全页，背后的"上一步/完成"纯属视觉干扰（老板 2026-09-13）。
+                if (_role != null && _step < _stepCount)
                   Row(
                     children: [
                       // 第 1 页（选择页）无上一步；步骤 1（create=关于我 / join=邀请码）
