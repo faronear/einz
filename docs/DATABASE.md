@@ -137,7 +137,7 @@ CREATE TABLE device_activity (
 | ----------------- | ------------------------- | ---------------------------------------------------------------------------- |
 | `auth.login`      | `POST /auth/verify`       | `expires_in`                                                                 |
 | `message.post`    | `POST /messages`          | `message_id`、`server_sequence`、`type`（**发送**证据，设备级）              |
-| `sync`            | `GET /sync`               | `after_sequence`、`last_sequence`、`received`、`has_more`、`idle`（**接收**证据） |
+| `sync`            | `GET /sync`               | `after_sequence`、`last_sequence`、`received`、`has_more`（**接收**证据）      |
 | `receipt`         | `POST /receipts`          | `reported_delivered`、`reported_read`、`delivered_upto_seq`、`read_upto_seq` |
 | `push.register`   | `POST /push/register`     | `platform`、`token_prefix`（**只落前 8 位**，不落完整推送凭证）              |
 | `push.unregister` | `DELETE /push/register`   | —                                                                            |
@@ -148,9 +148,10 @@ CREATE TABLE device_activity (
 
 **说明：**
 
-- `sync` 空闲节流：`last_sequence` 前进 → 必记；未前进 → 同一设备同一 Space
-  最多每 `EINZ_AUDIT_IDLE_SYNC_SEC`（默认 300 秒）记一条 `idle=true`。设 `0`
-  则每次轮询都记（最详尽，也最占空间）。
+- `sync` **只在 `last_sequence` 前进时记**（=真正拉到新消息）。没新结果的例行
+  轮询不产生记录——轮询频率是 App WS 在线 30s / 离线 3s 起退避到 60s、TUI 固定
+  30s，全量记录绝大部分行都是重复值。设备"还在不在"由 `connection_events` 与
+  `devices.last_seen` 负责。
 - 回执语义**未改**：`receipts` 表仍是 person 级 HWM（"该 person 至少一台设备
   已读"），`device_activity.receipt` 只是额外记下"是哪台设备上报的"。
 - 红线：审计表只记元数据，**绝不含密文 / nonce / 明文 / 完整 push token**

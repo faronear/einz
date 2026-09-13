@@ -126,17 +126,14 @@ export function logActivity(e: ActivityInput): void {
 }
 
 /**
- * sync 空闲节流窗口（秒）：同一设备同一 Space 在 last_sequence **没有前进**
- * 的情况下，多久才补记一条 idle 记录。0 = 每次轮询都记（最详尽，也最占空间）。
+ * 每设备每 Space 已记过的最高 last_sequence（进程内缓存，重启丢失只会多记一行）。
  *
- * 为什么节流：App 聊天页活跃时每 3s 轮询一次（chat_page.dart），全量记录
- * 一天就是近 3 万行/设备且全是重复值；真正有价值的是"进度前进"（=真正
- * 收到新消息），空闲轮询只需低频证明"设备还在"。
+ * 只记"进度前进"的 sync：例行轮询没拉到新消息时不产生记录
+ * （老板 2026-09-13 定）。轮询频率：App WS 在线 30s / 离线 3s 退避到 60s，
+ * TUI 固定 30s——若每次轮询都记，绝大多数行都是重复值且毫无信息量。
+ * 设备"还在不在"由 connection_events 与 devices.last_seen 负责。
  */
-const IDLE_SYNC_GAP_MS = Math.max(0, Number(process.env.EINZ_AUDIT_IDLE_SYNC_SEC ?? 300)) * 1000;
-
-/** 上次 sync 记录（进程内缓存；仅用于节流，丢掉只是多记一行）。 */
-const lastSyncByDevice = new Map<string, { atMs: number; lastSequence: number }>();
+const lastSyncByDevice = new Map<string, number>();
 
 export interface SyncActivityInput {
   deviceId: string;
@@ -153,29 +150,23 @@ export interface SyncActivityInput {
 
 /**
  * 记 sync 拉取进度（=该设备的"接收"证据）。
- * last_sequence 前进 → 必记；未前进 → 受 IDLE_SYNC_GAP_MS 节流。
+ * 仅当 last_sequence 前进（真正拉到新消息）时落一条；没新结果的例行轮询不记。
  */
 export function logSyncActivity(e: SyncActivityInput): void {
   const key = `${e.deviceId}|${normalizeSpaceId(e.spaceId)}`;
-  const atMs = Date.now();
-  const prev = lastSyncByDevice.get(key);
-  const advanced = prev == null || e.lastSequence > prev.lastSequence;
-  const idleGapElapsed = prev == null || atMs - prev.atMs >= IDLE_SYNC_GAP_MS;
-  if (!advanced && !idleGapElapsed) return;
+  // 首次：last_sequence=0（还没消息）也不记——没有"收到"发生
+  if (e.lastSequence <= (lastSyncByDevice.get(key) ?? 0)) return;
+  lastSyncByDevice.set(key, e.lastSequence);
 
-  lastSyncByDevice.set(key, { atMs, lastSequence: e.lastSequence });
   logActivity({
     deviceId: e.deviceId,
     spaceId: e.spaceId,
     kind: "sync",
-    atMs,
     detail: {
       after_sequence: e.afterSequence,
       last_sequence: e.lastSequence,
       received: e.count,
       has_more: e.hasMore,
-      // idle=true 表示这次没有拉到新消息（仅证明设备仍在轮询）
-      idle: !advanced,
     },
     meta: e.meta,
   });

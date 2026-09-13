@@ -197,6 +197,11 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
       if (!conn.alive) {
         // 心跳超时：先打标（随后的 close 事件据此记 heartbeat_timeout，并带上
         // 来源 IP/UA），再 terminate——审计需要区分"客户端主动断"与"超时失联"。
+        //
+        // 注意：这里**先**从 conns 移除，所以 close 里的 broadcastPeerStatus 会
+        // 因 sameSpace() 取不到空间而静默不发——即 peer.offline 不广播。这是
+        // 现状行为（对端靠 30s 轮询 + connected_at/last_seen 兜底，最多晚 30s
+        // 看到离线），不是 bug，别"顺手"改成先广播再删（会让在线状态抖动）。
         conn.timedOut = true;
         conn.ws.terminate();
         conns.delete(deviceId);
