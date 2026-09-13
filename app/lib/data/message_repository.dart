@@ -18,7 +18,9 @@ import 'local_database.dart';
 /// burnManual=该条焚毁是否由用户长按单条手动设置（true 才在气泡标注
 /// 「设置/修改时间+时长」，全局设置快照只标时长——老板 2026-09-12）、
 /// status=本地投递状态（pending=队列中/发送中、sent=已发送、failed=发送失败待重发；
-/// 仅本机自己发的消息有意义，UI 据此显示时钟/对勾/警告——老板 2026-09-12）。
+/// 仅本机自己发的消息有意义，UI 据此显示时钟/对勾/警告——老板 2026-09-12）、
+/// meta=载荷里的附加数据（密文内、Server 不可见；随消息同步，用于以后未知的
+/// 新数据，老板 2026-09-13 定；当前键见 kMetaAudioDurationSeconds）。
 typedef HistoryMessage = ({
   MessageEnvelope env,
   String plaintext,
@@ -30,7 +32,8 @@ typedef HistoryMessage = ({
   Map<String, dynamic>? quote,
   bool deleted,
   bool burnManual,
-  String status
+  String status,
+  Map<String, dynamic>? meta,
 });
 
 /// 客户端消息仓库：把 drift 本地库（DATABASE.md §3）与 shared 核心包
@@ -152,7 +155,8 @@ class MessageRepository {
   }
 
   /// 发送一条消息：加密 → 落库（pending）→ 尝试立即上传；失败留队。
-  /// [quote] 引用快照（{messageId, preview}）时载荷包装为 JSON（密文内传输）。
+  /// [quote] 引用快照（{messageId, preview}）、[meta] 附加数据（如音频时长秒数）
+  /// ——二者任一非空时载荷包装为 JSON（密文内传输，Server 不可见）。
   /// [onPersisted] 本地落库后、网络上传前回调（UI 据此「乐观回显」：立即把
   /// pending 气泡画出来，不必等上传/sync 往返——老板 2026-09-12）；回调异常被
   /// 吞掉，绝不影响发送本身。
@@ -161,14 +165,13 @@ class MessageRepository {
     String plaintext, {
     String type = 'text',
     Map<String, dynamic>? quote,
+    Map<String, dynamic>? meta,
     FutureOr<void> Function(String messageId)? onPersisted,
   }) async {
     final messageId = _uuidv7();
-    // 引用消息：载荷 = {"plaintext":…, "quote":…} JSON（AEAD 密文内，Server 不可见；
-    // 旧客户端/CLI 未识别时按整段 JSON 文本展示，仅影响引用消息）
-    final payload = quote == null
-        ? plaintext
-        : jsonEncode({'plaintext': plaintext, 'quote': quote});
+    // 引用/附加数据：载荷 = {"plaintext":…, "quote":…, "meta":…} JSON（AEAD 密文内，
+    // Server 不可见；旧客户端/CLI 未识别时按整段 JSON 文本展示，仅影响这类消息）
+    final payload = encodeMessagePayload(plaintext, quote: quote, meta: meta);
     final env = await encryptMessage(
       plaintext: payload,
       spaceKey: spaceKey,
@@ -213,6 +216,7 @@ class MessageRepository {
     required String fileName,
     required String type, // image | video | voice
     String? caption,
+    Map<String, dynamic>? meta, // 附加数据（如音频时长），随密文载荷同步
     FutureOr<void> Function(String messageId)? onPersisted,
   }) async {
     final messageId = _uuidv7();
@@ -240,9 +244,9 @@ class MessageRepository {
       'local_cipher': enc.cipher,
     });
 
-    // 3) 发送 caption 消息（type 标记，供接收端渲染）
+    // 3) 发送 caption 消息（type 标记，供接收端渲染；meta 随载荷一起进密文）
     final env = await encryptMessage(
-      plaintext: plain,
+      plaintext: encodeMessagePayload(plain, meta: meta),
       spaceKey: spaceKey,
       spaceId: spaceId,
       senderDeviceId: deviceId,
@@ -603,21 +607,11 @@ class MessageRepository {
         spaceKey: key,
         spaceId: spaceId,
       );
-      // 引用载荷为 {"plaintext":…, "quote":…} JSON；旧版消息为裸文本
-      var plain = raw;
-      Map<String, dynamic>? quote;
-      if (raw.startsWith('{')) {
-        try {
-          final decoded = jsonDecode(raw);
-          if (decoded is Map<String, dynamic> && decoded['plaintext'] is String) {
-            plain = decoded['plaintext'] as String;
-            final q = decoded['quote'];
-            if (q is Map<String, dynamic>) quote = q;
-          }
-        } catch (_) {
-          // 裸文本恰好以 { 开头：按旧版处理
-        }
-      }
+      // 载荷 = 裸文本 / {"plaintext":…, "quote":…, "meta":…} JSON（旧版消息为裸文本）
+      final payload = decodeMessagePayload(raw);
+      var plain = payload.plaintext;
+      final quote = payload.quote;
+      final meta = payload.meta;
       final att = await (db.select(db.localAttachments)
             ..where((a) => a.messageId.equals(env.messageId)))
           .getSingleOrNull();
@@ -645,6 +639,7 @@ class MessageRepository {
         deleted: row.deletedAt != null,
         burnManual: row.burnManual,
         status: row.status,
+        meta: meta,
       ));
     }
     return out;

@@ -8,6 +8,7 @@ export 'src/crypto/keys.dart';
 export 'src/crypto/keyring.dart';
 export 'src/crypto/message_crypto.dart';
 export 'src/protocol/api_client.dart';
+export 'src/protocol/message_payload.dart';
 export 'src/protocol/types.dart';
 export 'src/protocol/ws_client.dart';
 export 'src/sodium.dart' show sodium, loadDynamicLibrary, resetSodium, SodiumSumoInit;

@@ -3802,3 +3802,34 @@ commit `cb48948`。
   否则带标注的明文会让扩展名变成 `mp3 [3m 20s]`。
 
 **验证：** analyze 无问题；`flutter test` 仍为 +98 -17（17 个 golden 为既有基线漂移）。
+
+## 2026-09-13 协议扩展：消息密文载荷加通用 `meta` 袋（首个键 audioDurationSeconds）
+
+**背景：** 上一版把音频时长塞进明文（「song.mp3 [3m 20s]」/「语音 25s」），脏。
+老板拍板：**可以动协议，最好有个 JSON 字段，以后未知的新数据都往里放**。
+
+**三选确认（问过老板）：**
+1. 位置=**消息密文载荷内**（不是附件元数据列）→ 服务器零改动（ciphertext 从不解析），
+   时长这类内容元数据保持 E2EE，不会泄露给服务器。
+2. 键名=**扁平 + 前缀**，首个键 `audioDurationSeconds`。
+3. CLI（TUI）=**只做兼容不特意支持**（它的解码本来就忽略未知键）。
+
+**落地：**
+- 新增 `shared/lib/src/protocol/message_payload.dart`（并在 einz_shared.dart 导出）：
+  `encodeMessagePayload` / `decodeMessagePayload` + `kMetaAudioDurationSeconds`。
+  无 quote/meta 时载荷就是裸文本（与旧版字节级一致），有则包成
+  `{"plaintext":…,"quote":…,"meta":…}`。解码容忍未知键、容忍裸文本/假 JSON。
+- `app/lib/data/message_repository.dart`：`send` / `sendAttachment` 增加 `meta` 参数；
+  `HistoryMessage` 记录加 `meta` 字段；`_rowsToHistory` 解码时取出。
+- `app/lib/chat_page.dart`：语音/音频文件发送走 `meta`，**明文恢复干净**
+  （语音=「语音」、音频文件=文件名）；显示时 `_audioDurationSeconds()` 依次取
+  meta → 播放后缓存的真实值 → 老明文兜底（语音解析「语音 25s」，音频文件只认
+  `[…]` 尾注，避免把文件名里的数字当时长）。
+- `docs/PROTOCOL.md` 新增 §5.1.1：载荷形状 + meta 键登记表 + 双向兼容规则。
+- 新增 `shared/test/message_payload_test.dart`（5 例：裸文本/meta 往返/quote+meta/
+  未知键容错/假 JSON）。
+
+**验证：** app `flutter analyze` 无问题、`flutter test` +98 -17（17 golden 为既有基线漂移）；
+shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未改动）。
+**注意：** 别同时跑两个 `flutter test`（app + shared），会互相抢资源导致 12 个
+测试文件 "loading" 失败——是并发假象，单独重跑即恢复。

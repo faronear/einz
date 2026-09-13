@@ -1169,7 +1169,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 createdAt: x.createdAt, burnAfterSeconds: seconds,
                 quote: x.quote, deleted: x.deleted,
                 // 长按手动设置（与 repo.setMessageBurn 落盘一致）；取消时无标签
-                burnManual: seconds > 0, status: x.status)
+                burnManual: seconds > 0, status: x.status, meta: x.meta)
           else
             x,
       ];
@@ -1395,6 +1395,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       deleted: deleted,
       burnManual: fresh.burnManual,
       status: fresh.status,
+      meta: fresh.meta,
     );
   }
 
@@ -1723,12 +1724,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     required String fileName,
     required String type,
     String? caption,
+    Map<String, dynamic>? meta, // 附加数据（如音频时长），进密文载荷
   }) async {
     await _repo.sendAttachment(
       fileBytes: fileBytes,
       fileName: fileName,
       type: type,
       caption: caption,
+      meta: meta,
       onPersisted: (_) => _refreshLocal(),
     );
     await _refreshLocal();
@@ -1851,6 +1854,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         deleted: true,
         burnManual: m.burnManual,
         status: m.status,
+        meta: m.meta,
       );
 
   /// 删除消息：确认弹窗 → 本机打墓碑标记（内容隐藏、时间+焚毁记录保留；
@@ -2041,11 +2045,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (_inputMode != _InputMode.preview) return;
     final path = _recordingPath;
     if (path == null) return;
-    // 语音文字说明带录音时长（老板 2026-09-11，2026-09-13 改 h/m/s）：caption
-    // 随消息同步，接收端同样解析（如「语音 12s」）；须在 await 前取好（避免
-    // async gap 用 context）
-    final caption =
-        '${AppLocalizations.of(context)!.chatPageVoiceLabel} ${_formatVoiceDuration(_recordSeconds)}';
+    // 语音说明只留标签（老板 2026-09-11）；时长改走载荷 meta 同步给对端
+    // （老板 2026-09-13），明文不再塞时长。须在 await 前取好（避免 async gap 用 context）
+    final caption = AppLocalizations.of(context)!.chatPageVoiceLabel;
     try {
       final f = File(path);
       if (!await f.exists() || await f.length() == 0) {
@@ -2062,6 +2064,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         fileName: 'voice.m4a',
         type: 'voice',
         caption: caption,
+        meta: {kMetaAudioDurationSeconds: _recordSeconds},
       );
       await f.delete().catchError((_) => f);
       if (!mounted) return;
@@ -2225,8 +2228,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         sha256: att['sha256'] as String,
         nonce: base64Decode(att['nonce'] as String),
       );
-      // 音频文件明文可能带时长标注（「song.mp3 [3m 20s]」），取扩展名要用纯文件名
-      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(_audioFileInfo(m).$1);
+      // 音频文件明文可能残留老版时长标注（「song.mp3 [3m 20s]」），取扩展名要剥掉
+      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(_stripDurationTag(m.plaintext));
       final tmp = File('${Directory.systemTemp.path}/einz_audio_${m.env.messageId}.$ext');
       await tmp.writeAsBytes(bytes);
       await player.stop();
@@ -2355,16 +2358,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           final audio = audioFiles.first;
           final audioName = audio.name;
           final audioBytes = await audio.readAsBytes();
-          // 发送前读一遍时长（audioplayers 设源取总时长，不播放），附在文件名后
-          // 随消息同步，对端开箱即显示（老板要求 2026-09-13）；读不到就只发文件名
+          // 发送前读一遍时长（audioplayers 设源取总时长，不播放），放进载荷
+          // meta 随消息同步，对端开箱即显示（老板要求 2026-09-13）；读不到就不带
           final audioSeconds = await _probeAudioDuration(audioBytes);
           await _sendAttachmentOptimistic(
             fileBytes: audioBytes,
             fileName: audioName,
             type: 'audio',
-            caption: audioSeconds > 0
-                ? '$audioName [${_formatHmsDuration(audioSeconds)}]'
-                : audioName,
+            caption: audioName,
+            meta: audioSeconds > 0 ? {kMetaAudioDurationSeconds: audioSeconds} : null,
           );
         case _AttachmentKind.anyFile:
           final anyFiles = await FilePicker.pickFiles(type: FileType.any);
@@ -2523,7 +2525,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ? Colors.white
         : Theme.of(context).colorScheme.primary; // 气泡上的前景色（波形/图标）
     if (m.env.type != 'voice') {
-      final info = _audioFileInfo(m); // （显示名, 时长秒数）
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2536,19 +2537,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: Text(
               playing
                   ? AppLocalizations.of(context)!.chatPagePlaying
-                  : '🎵 ${info.$1}',
+                  : '🎵 ${m.plaintext}',
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (info.$2 > 0) ...[
+          if (_audioDurationSeconds(m) > 0) ...[
             const SizedBox(width: 6),
-            Text(_formatHmsDuration(info.$2),
+            Text(_formatHmsDuration(_audioDurationSeconds(m)),
                 style: const TextStyle(fontSize: 12)),
           ],
         ],
       );
     }
-    final seconds = _parseDurationSeconds(m.plaintext);
+    final seconds = _audioDurationSeconds(m);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2591,18 +2592,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return parts.isEmpty ? '0s' : parts.join(' ');
   }
 
-  /// 音频文件消息拆成（显示文件名, 时长秒数）：明文形如「song.mp3 [3m 20s]」
-  /// ——发送端用 audioplayers 读出时长后追加；老消息只有文件名，时长取播放后
-  /// 缓存的真实值（内存缓存，不落库：重启后再次播放才显示）。
-  (String, int) _audioFileInfo(HistoryMessage m) {
-    final text = m.plaintext;
-    final match = RegExp(r'^(.*?)\s*\[([^\]]*)\]$').firstMatch(text);
-    final name = (match?.group(1) ?? text).trim();
+  /// 音频（语音/音频文件）时长秒数：优先取载荷 meta（老板 2026-09-13 起的写法），
+  /// 其次是播放后缓存的真实值；两者都没有时兜底解析老明文
+  /// （旧版语音「语音 25s」、旧版音频文件「song.mp3 [3m 20s]」）。
+  int _audioDurationSeconds(HistoryMessage m) {
+    final fromMeta = m.meta?[kMetaAudioDurationSeconds];
+    if (fromMeta is int) return fromMeta;
+    if (fromMeta is num) return fromMeta.round();
     final cached = _audioFileDurations[m.env.messageId] ?? 0;
-    if (cached > 0) return (name.isEmpty ? text : name, cached);
-    return (name.isEmpty ? text : name,
-        match == null ? 0 : _parseDurationSeconds(match.group(2)!));
+    if (cached > 0) return cached;
+    // 兜底：老消息把时长写在明文里（语音「语音 25s」、音频文件「song.mp3 [3m 20s]」）
+    if (m.env.type == 'voice') return _parseDurationSeconds(m.plaintext);
+    final tag = RegExp(r'\[([^\]]*)\]$').firstMatch(m.plaintext);
+    return tag == null ? 0 : _parseDurationSeconds(tag.group(1)!);
   }
+
+  /// 去掉老明文末尾的时长标注（「song.mp3 [3m 20s]」→「song.mp3」）：临时文件
+  /// 扩展名要用纯文件名。
+  String _stripDurationTag(String text) => text.replaceFirst(RegExp(r'\s*\[[^\]]*\]$'), '');
 
   /// 读本地音频文件的总时长（audioplayers 设源后取时长，不播放）；失败返回 0。
   Future<int> _probeAudioDuration(Uint8List bytes) async {
