@@ -2597,7 +2597,7 @@ cfg.space_id，行为不变）。
   CLI createSpace 提交走 \_genderCode 转换（与 enroll 一致）
 - 验证：cli analyze 0 issue、server tsc OK、App analyze 0 error、App 气泡测试
   全过、pty e2e 全通
-- 踩坑：push.ts 注释里 person_name:_/person_gender:_ 的 _/ 截断注释块（TS1109）
+- 踩坑：push.ts 注释里 person*name:*/person*gender:* 的 _/ 截断注释块（TS1109）
   ——改写措辞避免 _/ 序列
 
 ### TUI 身份选择列表：名字背景色按性别（老板 2026-09-10）
@@ -3107,6 +3107,7 @@ commit `7c3bcab`。
 口令也一直被拒**（提示「❌ 口令验证失败。请询问秘境伴侣获得口令。」）。
 
 **两个症状同一个根因**（`app/lib/setup_page.dart` 的 `_verifyJoinPassphrase`）：
+
 1. 先 `joinSpace`（消费 24h 一次性 token）→ 再 `fetchSpaceEscrow` 验口令；
 2. 口令错 → 抛 `ApiException(ESCROW_VERIFY_FAILED)`，**不是** `FormatException`，
    所以它没走"口令错误"分支，而是落到通用 `catch (e)` 打印「口令验证失败」；
@@ -3114,6 +3115,7 @@ commit `7c3bcab`。
    token 已用 → 再次落通用分支 → 永远失败。用户看到的就是"一直被拒绝"。
 
 **改法（与 TUI 同构）**：
+
 - 新增 state `_joinSpaceId`，在 `_verifyJoinToken` 里记下 `pre.spaceId`
   （preflight 返回；`/spaces/{id}/key-escrow` 不消费 token）；`_backStep` 回第 1 页
   时一并清空，避免残留旧 spaceId 拿旧空间验口令；
@@ -3127,6 +3129,7 @@ commit `7c3bcab`。
   - 其他 `ApiException`（如 join 时 token 已用/失效）→ 通用失败提示。
 
 **回归测试**（`app/test/setup_join_passphrase_test.dart`）：
+
 - `pumpToJoinPassphrase` 加可选 `join` 注入；
 - 新增用例「先输错再输对：token 只被消费一次，重输正确口令仍可加入」——fake
   `joinSpace` 第二次调用就抛 `ApiException('TOKEN_USED')`（模拟真服务端一次性语义），
@@ -3176,6 +3179,7 @@ commit `7c3bcab`。
 **症状**：`chat_page.dart` 的改口令弹窗，无论输入什么都红字提示"尚未设置口令"。
 
 **真因不是改口令页面，是 v1 与 Multiverse 的密保箱存了两套地方**：
+
 - Multiverse 的口令密保箱按 **space** 存：`key_escrow WHERE space_id = <真实 spaceId>`
   （创建空间时由 `POST /spaces` 写入；加入方从 `POST /spaces/{id}/key-escrow` 取）。
 - 但服务端 v1 三接口 `uploadKeyEscrow` / `getKeyEscrow` / `deleteKeyEscrow`
@@ -3184,6 +3188,7 @@ commit `7c3bcab`。
   → 无条件抛 `_NoEscrowException` → "尚未设置口令"。
 
 **实测复现**（起真服务端 + curl）：
+
 ```
 创建空间（带口令托管）                    → spaceId=283b09b2-...
 space 级 POST /spaces/{id}/key-escrow     → {"ok":true,"package":{...}}   ✅
@@ -3191,6 +3196,7 @@ v1    GET  /key-escrow（App 读的就是它）   → {}                        
 ```
 
 **连带影响（同一根因，四处全坏）**：
+
 - `chat_page.dart:2952` 改口令读取 → 症状本身
 - `chat_page.dart:2965` 改口令上传 → 写到 `space_id=''`，**加入方拉到的仍是旧口令**
 - `chat_page.dart:419` 口令重设检测（读 `updatedAt`）→ 检测不到对方重设
@@ -3199,12 +3205,14 @@ v1    GET  /key-escrow（App 读的就是它）   → {}                        
 **改法（选项 A，老板选定）**：`resolveSession()` 本来就返回 `space_id`，提取一个
 `escrowSpaceId(token)` helper（无 space 的 legacy 会话回落 `""`，保持旧行为），
 三个 v1 接口的 `""` 全部换成它。**App 一行未改**，四处同时修好。
+
 - 关键判断：没有让 App 改用 space 级接口——`POST /spaces/{id}/key-escrow`
   **无鉴权**（`app.ts:173` 未调 `resolveSession`），任何人知道 spaceId 就能覆盖
   密保箱把人锁死；且它不支持 `rotated` 广播。v1 接口带 session 鉴权+设备白名单，
   改它才是对的。
 
 **验证**：
+
 - `npm run build`（tsc）已重编 `server/dist`（dist 未纳入 git，不产生提交噪音）。
 - `npm test`（smoke + two_space_isolation）全过——说明 legacy 无 space 会话的
   `""` 回落没被破坏。
@@ -3221,19 +3229,23 @@ TUI 上报）。本轮**没有新增任何回执 UI**（气泡图标仍是「纸
 ⚠️=失败」）。
 
 ### 关键认知：原来的 `status` 字段承载不了回执
+
 `local_messages.status`（DATABASE.md 原注释 `pending|sent|delivered|read|failed`）
 **混用了两种语义**：`pending/sent/failed` 是**出站**流水线；而 `delivered` 是 sync 给
 **入站**（对方）消息写的"我收到了"标记——与"对方收到了我的消息"无关；`read` 从未写过。
 所以回执必须另起一套（本轮只在文档里澄清，未改行为）。
 
 ### 模型：单调高水位（HWM），不是每条消息一行回执
+
 `messages.server_sequence` 已是 space 内单调，故按 `(space, person)` 存一行即可：
+
 - 我的消息 seq=S **已送达** ⟺ 对方 `delivered_upto_seq ≥ S`；**已读** ⟺ `read_upto_seq ≥ S`。
 - 不变式：只前进（SQL `MAX` 夹紧）；`delivered ≥ read`（读隐含送达）；夹紧到本 space
   真实 `MAX(server_sequence)`（防客户端上报未来 seq）。
 - 按 person 记 = "该 person **至少一台**设备已收到/已读"（不保证所有设备）。
 
 ### 落地
+
 - **服务端**（`server/src/receipts.ts` 新增）：`receipts` 表（db.ts 的 CREATE 块，
   新表无需 ALTER）；`POST /receipts`（**单条 SQL 原子 upsert**，禁止先读后写）、
   `GET /receipts`；`ws.ts` 新增 `broadcastReceiptUpdated`，用 **`spaceOfDevice`**
@@ -3254,6 +3266,7 @@ TUI 上报）。本轮**没有新增任何回执 UI**（气泡图标仍是「纸
   `message.new` 后上报。
 
 ### 两个实现坑（都是真 bug，已修）
+
 1. **防抖标记先写后发** —— 一旦 POST 失败就再也不会重报（服务端永远缺这一档）。
    改为**成功才推进标记**（App 与 CLI 都改）。
 2. **CLI 的"已读"原定只由 WS 实时消息推进**，但 pty 端到端里 WS 分支迟迟不触发
@@ -3263,6 +3276,7 @@ TUI 上报）。本轮**没有新增任何回执 UI**（气泡图标仍是「纸
    语义（主流 IM 相同）。老板若要求更严格，可退回 WS-only。
 
 ### 测试
+
 - 服务端 `server/test/receipts.test.ts`（新增，已接入 npm test）：A 发两条 → B 上报
   delivered→read → 断言单调夹紧、999 被夹到 2、读隐含送达、GET 回读、A 收到 WS
   `receipt.updated`、负数入参 400。
@@ -3279,10 +3293,12 @@ TUI 上报）。本轮**没有新增任何回执 UI**（气泡图标仍是「纸
 老板拍板三件事 + 一个新需求。
 
 ### 1. delivered 接 UI：双勾（`8e42576`）
+
 `_buildSendStatusIcon` 重写：先判 `failed`，再用
 `MessageRepository.receiptOf(m.env.serverSequence, _peerReceipts)` 推导——有回执
 （delivered **或** read）→ `Icons.done_all` 双勾 + tooltip「已送达」（新增 l10n
 key `chatPageMsgDelivered`）；无回执 → `sent` 单勾 / `pending` 纸飞机。
+
 - 新增 state `List<PeerReceipt> _peerReceipts`（渲染缓存，避免每条消息查库）；
   `_loadPeerReceipts()` 在首屏、每次 `_refresh`（sync 内已拉）、收到 WS
   `receipt.updated` 后载入，内容未变不 setState。
@@ -3290,10 +3306,12 @@ key `chatPageMsgDelivered`）；无回执 → `sent` 单勾 / `pending` 纸飞�
   "已送达 vs 已读"的区分——将来要区分只需在 `receiptOf` 返回 `'read'` 时换色。
 
 ### 2. read 判定收紧（同日，`8e42576` / `4e39f82`）
+
 老板问："消息到对方设备屏幕了，那不就肯定读了？我们也测不到眼球活动。"
 —— 讨论后确认真正边界是**"设备收到了" vs "人面前正显示着"**，且原来的实现
 （补拉即标已读）太激进：对方离线两天，一上线同步就把整段历史标成已读。
 **改法：补拉/首屏只标 delivered；read 只由"实时 + 确实在看"推进。**
+
 - App：`_refresh`/`_refreshLocal` 新增 `realtime` 参数，只有 WS `onMessageNew`
   传 true；`_loadInitial` 不再调 `_scheduleReadReport()`。resume 到前台且贴底
   仍会标已读（那确实是"人在看"）。
@@ -3301,6 +3319,7 @@ key `chatPageMsgDelivered`）；无回执 → `sent` 单勾 / `pending` 纸飞�
 - 文档 PROTOCOL §5.4 同步改写，并说明 read 当前不展示、留作开关。
 
 ### 3. flaky 测试换成确定性 Dart 版（`4e39f82`）
+
 上轮的 pty 端到端 `cli/test/receipts_check.py` 反复偶发失败：TUI 的事件循环由
 键盘驱动，WS 投递/`/sync` 触发的时机不确定（同一份代码有时 31s 通过、有时
 3.5 分钟超时）。诊断过程：手工用 B 的 token POST `/receipts` 返回 200（服务端
@@ -3312,12 +3331,14 @@ A 发一条 → B `sync()` → 断言：①`lastReportedDeliveredSeq ≥ 1` ②
 `delivered ≥ 1` 且 `read == 0`。**确定性、约 5 秒**。
 
 ### 4. 焚毁后沙漏改静态（`8e42576`）
+
 老板："阅后即焚到期被删后，沙漏仍在动，不符合直觉。"
 `_BurnHourglass` 拆成：`_BurnHourglass(burned: m.deleted)` 静态壳（已焚毁 →
 `Icons.hourglass_empty` 静态空沙漏，**不创建动画控制器**）+ `_HourglassFlip`
 （未焚毁时的翻转动画）。
 
 ### 验证
+
 - app：全量仍是 15 条既有环境性失败（未增加）；新增用例「自己消息：对方已送达
   → 显示双勾」通过；`flutter analyze` 0 error。
 - server：3 套全过（receipts 测试未受影响）。
@@ -3337,6 +3358,7 @@ A 发一条 → B `sync()` → 断言：①`lastReportedDeliveredSeq ≥ 1` ②
 （若是真的 timeout 抛异常，会走 `on Exception` → 标 `failed` ⚠️，反而能看到。）
 
 ### 改法一：加响应超时（`1b343c5`）
+
 `ApiClient.responseTimeout = 30s`，5 个 HTTP 辅助方法全部给 `req.close()`、body
 读取、字节流加上 `.timeout(responseTimeout)` → 抛 `TimeoutException` → 被
 `_withRetry` 重试（3 次）→ 仍失败则上层标 `failed`。
@@ -3345,14 +3367,16 @@ A 发一条 → B `sync()` → 断言：①`lastReportedDeliveredSeq ≥ 1` ②
 而且用户可以随时点小飞机立刻自救。
 
 ### 改法二：小飞机可点按 = 「验证并重发」（`bcb6ad8`）
+
 老板要求：点小飞机后去验证服务端是否已收到——已收到 → 变单勾；没收到 → 重发。
 **不需要新接口**：服务端 `POST /messages` **按 message_id 幂等**
 （`messages.ts` 查到已有行直接返回原 seq），所以"重发同一封"本身就是"验证"：
+
 - 服务端已存 → 返回原 seq → 转单勾（**不会产生重复消息**）
 - 服务端未存 → 本次存入 → 转单勾
 - 仍失败 → 转 ⚠️（可继续点）
-实现上就是把现有的 `retryMessage()`（原本只挂 ⚠️）也挂到 pending 的纸飞机上，
-tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是否已送达并重发"）。
+  实现上就是把现有的 `retryMessage()`（原本只挂 ⚠️）也挂到 pending 的纸飞机上，
+  tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是否已送达并重发"）。
 
 **回归测试**（`app/test/chat_send_status_test.dart`）：fake 的 `postMessage` 前 N 次
 **永不完成**（精确模拟"响应丢失"）→ 断言界面停在可点按的纸飞机 → 点按 → 断言
@@ -3361,21 +3385,25 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
 来构造（用无 token 入队会被立刻补发）。
 
 ### 顺便回答老板的问题：`failed` 在什么场景发生？
+
 `failed` **不等于**"服务器明确说没接到"，它是**客户端侧**判断，混了两类：
+
 1. **本地/网络异常**（连不上、握手失败、连接超时、响应超时）→ 服务端**可能其实
    已存**（响应丢了），客户端无从得知 → 不确定；
 2. **服务端明确报错** 4xx/5xx（401 重认证后仍失败 / 403 设备被撤销 / 400 信封不合法
    / 500）→ 确定没存。
-正因为第 1 类的不确定性，"点按重发"必须依赖**幂等**（按 message_id 去重），
-否则会产生重复消息。另注：**无 token（离线）不是 failed**，而是保持 pending
-等 sync 补发。
+   正因为第 1 类的不确定性，"点按重发"必须依赖**幂等**（按 message_id 去重），
+   否则会产生重复消息。另注：**无 token（离线）不是 failed**，而是保持 pending
+   等 sync 补发。
 
 ### 验证
+
 - app 全量：仍是 15 条既有环境性失败（未增加）；新增/既有 status 用例 3/3 通过。
 - cli：`dart analyze` 无新增问题；`receipts_check.dart` 通过。
 - 服务端未改动。**仍需老板重启服务端**才能让回执（双勾）生效。
 
 ### 待办（承接上一轮，勿丢）
+
 - read 的**展示**开关（老板要"做成开关、目前不显示"）——目前是"read 与 delivered
   同图标 + `receiptOf` 已能返回 `'read'`"，做成用户可见的设置项待定。
 - 多设备下 delivered 语义仍是"该 person **至少一台**设备已收到"，不保证所有设备。
@@ -3387,19 +3415,23 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
 老板已重启本地服务端（`localhost:3000`），**双勾回执已生效**。
 
 ### 1) pending 改为动态小飞机（`8e3a2be`）
+
 新增私有 `_SendingPlane`：`AnimationController.repeat()` + `Transform.translate`
 （左右小幅平移、上下浮动）+ `Transform.rotate`（一点俯仰），读起来像"飞行中"。
 **无障碍/测试友好**：`MediaQuery.disableAnimations` 为真时退化为静态图标——
 既尊重系统"减少动态效果"偏好，也让 `pumpAndSettle` 不被常驻动画卡住。
 
 ### 2) 点按后显示进行中文案（`8e3a2be`）
+
 `_ChatPageState` 增 `Map<String,String> _retrying`（messageId → 'speedup'/'resend'）：
+
 - 点小飞机 → 图标前显示「加速中…」；点 failed → 「重发中…」（替换「点击重发」）
 - 完成后：成功 → 单勾（文案消失）；**再次失败 → 清 busy → 换回「点击重发」**
 - 新 l10n：`chatPageMsgSpeedingUp`「加速中…」/`chatPageMsgResending`「重发中…」
   （英文 Speeding up… / Resending…）
 
 ### 3) 「服务端关掉后一直小飞机、不变 failed」——**是方案 B 的设计行为，不是 bug**
+
 老板关掉服务端、发消息、等 3 分钟，一直是小飞机。按上一轮定的方案 B：网络类失败
 （含连不上/超时）**保持 pending 自动重试**，只有服务端明确 4xx 才 failed。所以
 "不变 failed"是预期的——我们特意避免"其实会成功却标失败"的假失败。
@@ -3407,6 +3439,7 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
 （repo 测试 `网络异常 → 保持 pending … 下次 sync 幂等补发为 sent` 覆盖了这条路径）。
 
 但这暴露两个**真问题**（待老板定夺，尚未改）：
+
 - **补发路径在服务端不可达时根本不会执行**：`MessageRepository.sync()` 把
   `_flushPending()` 放在 sync 请求**成功之后**；服务端关着时 sync 必抛，补发逻辑
   一次也没跑（结果无碍——服务端回来即补发；但"重试"的语义实际上只体现在 sync 上）。
@@ -3415,6 +3448,7 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
   日志，可加失败退避。
 
 ### 测试踩坑（记下来免得再犯）
+
 - 常驻动画会让 `pumpAndSettle` 一直等到超时 → 本测试文件在 `setUp` 里用
   `FakeAccessibilityFeatures(disableAnimations: true)` 关掉动画（同时覆盖了
   reduce-motion 这条无障碍分支）。
@@ -3424,6 +3458,7 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
   改造成"网络异常（`failPostMessage`）"来制造稳定的 pending 态。
 
 ### 验证
+
 - `chat_send_status_test.dart` 7/7 通过；全量仍是 15 条既有环境性失败（未增加、无卡死）。
 - 服务端本轮未改动。
 
@@ -3433,6 +3468,7 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
 **等 TUI 也发一条**之后，App 之前那些单勾消息很快变双勾。
 
 ### 真因（我的实现 bug，`51107ae`）
+
 `GET /receipts` 返回本空间**所有人**的回执行——**包括我自己**。App 的
 `refreshReceipts()` 把整表落进 `peer_receipts`，而 `receiptOf` 用的是
 `peers.every((p) => p.deliveredUptoSeq >= seq)`：
@@ -3453,6 +3489,7 @@ delivered=5"，断言 `peerReceipts()` 只返回对方那行、seq=5 推导为 `
 跑过一遍，确认该用例会失败。
 
 ### 验证
+
 - app 全量：仍是 15 条既有环境性失败（未增加）；`message_repository_test` 25/25、
   `chat_send_status_test` 8/8 通过。
 - 服务端/CLI 本轮未改动（CLI 不拉取回执，不受此 bug 影响）。
@@ -3464,6 +3501,7 @@ delivered=5"，断言 `peerReceipts()` 只返回对方那行、seq=5 推导为 `
 目前尚未上线，**不需要考虑兼容** → 相关代码全部删除。
 
 ### 删除前的核查（比"v2 不能用"更严重）
+
 - ① 它读的是 `key_escrow WHERE space_id = ''`（v1 遗留空行），而 Multiverse 的密保箱
   存在 `space_id = <真实 spaceId>` → **它本来就永远读不到包**（线上只会 403）。
 - ② 它的撤销逻辑是**全库范围**的：`UPDATE devices … WHERE status='active'`、
@@ -3473,6 +3511,7 @@ delivered=5"，断言 `peerReceipts()` 只返回对方那行、seq=5 推导为 `
   遍历校验既慢又是免鉴权接口上的**放大攻击面**。
 
 ### 删除内容
+
 - **server**：`escrow.ts` 的 `recoverSpace()` 整体删除；`app.ts` 的 `POST /recover`
   路由与 import 删除。`passphrase_hash` **保留**（现在是"加入方取口令密保箱时校验
   口令"，见 `escrowForSpace` 的 `{passphrase}` 分支），相关注释一并改写。
@@ -3486,18 +3525,21 @@ delivered=5"，断言 `peerReceipts()` 只返回对方那行、seq=5 推导为 `
   的触发源从 `/recover` 换成正常撤销接口（见下）。
 
 ### 顺带修好一条长期失效的测试（`revoked_check.py`）
+
 它原来用 `/recover` 触发撤销，且**引导步骤还是 v1 的**（直接问"我的名字"）——
 v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）。本轮一并处理：
+
 - 引导移植到 v2 流程（入口→创建→名字/性别/伴侣→密保口令→锁屏码）；
 - 撤销改用正常接口：`DELETE /devices/:id` **不允许撤销自己**，所以先用 HTTP
   `POST /spaces/{id}/join-tokens` + `POST /spaces/join` 造出"第二台设备"，再用它的
   token 撤销 TUI 那台（保住"在线收到 device.revoked → 提示并退出"的断言）；
 - 第 4 步重启后要**先解锁**（本测试设了锁屏码）再看撤销提示；
 - 顺手修掉写死的 `ROOT='/Users/Shared/productX/einz'`（已失效），改为按 `__file__` 推导。
-**现在全绿**：`✅ 第一设备入网并保持在线` / `✅ 撤销 → 在线 TUI 提示后自动退出` /
-`✅ 撤销设备提示后自动退出` / `🎉 revoked 场景全部通过`。
+  **现在全绿**：`✅ 第一设备入网并保持在线` / `✅ 撤销 → 在线 TUI 提示后自动退出` /
+  `✅ 撤销设备提示后自动退出` / `🎉 revoked 场景全部通过`。
 
 ### 老板补充确认（保留项，勿误删）
+
 **撤销单个设备**（`DELETE /devices/:id` + `device.revoked` 广播 + 两端"提示并退出"）
 是**保留并要继续发展**的功能——以后会支持用户在界面上撤销单个设备。本轮只换了
 测试的触发源，这条链路一行未动。
@@ -3505,6 +3547,7 @@ v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）�
 所以界面上的"撤销设备"只能撤销**对方**的设备。）
 
 ### 验证
+
 - server：`npm run build` + `npm test` 三套全过（含新增的 `/recover` 404 断言）。
 - shared/cli：`dart analyze` 无新增问题。
 - app：全量仍是 15 条既有环境性失败（未增加；App 本就没有 recover 入口）。
@@ -3516,10 +3559,12 @@ v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）�
 老板两条要求（`f0696f8`）：
 
 ### 1) failed 气泡里加文字标签「点击重发」
+
 原来只有一个红色 ⚠️，不明确"这能点"。改为 `[点击重发] ⚠️`（新 l10n key
 `chatPageMsgFailedTap`；tooltip 仍是 `chatPageMsgFailed`「发送失败，点击重试」）。
 
 ### 2) 墓碑（删除/焚毁）消息不再隐藏状态图标（老板质疑，成立）
+
 老板问"出于什么考虑删掉了状态图标？保留没有坏处，甚至可以继续允许点按；删掉/焚毁
 只是本设备隐藏正文，不影响消息在途中的路径"。
 
@@ -3535,6 +3580,7 @@ v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）�
 （`tombstoneMessage` 注释一直写着「本地墓碑，Server 不参与」）自相矛盾。
 
 **改法**：
+
 - `chat_page.dart`：状态小标的渲染条件由 `mine && !m.deleted` 改为 `mine`。
 - `message_repository.dart`：`_flushPending` / `retryMessage` / `pendingCount`
   三处去掉 `deletedAt.isNull()` 过滤 → 墓碑消息若尚未确认，**继续补发**，
@@ -3544,12 +3590,14 @@ v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）�
   服务端、不改变在途路径；焚毁时长是本机策略、不随消息传输）。
 
 **测试**（新增 3 条，全过）：
+
 - repo：`墓碑（删除/焚毁）不阻断在途路径：pending 墓碑仍会被 sync 幂等补发`
   （离线入队→墓碑→`pendingCount=1`→联网 sync→`deleted=true` 且 `sent`，只上传一次）
 - widget：`发送失败：气泡里带「点击重发」文字标签 + ⚠️ 图标`
 - widget：`墓碑消息（删除/焚毁）仍显示发送状态图标`（正文隐藏、✓ 仍在）
 
 ### 验证
+
 - app：Repo 24/24、status 5/5 通过；全量仍是 15 条既有环境性失败（未增加）；
   `flutter analyze` 无新增问题（仅 1 条既有 info）。
 - 服务端本轮未改动。
@@ -3562,6 +3610,7 @@ v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）�
 **不自动重试**，用户必须手点才能纠正。
 
 ### 改法（老板选 B：既重构分类，也保留点按）
+
 1. **只有服务端明确拒绝才 failed**：`ApiException` 且 `httpStatus ∈ [400,500)`
    → `failed`（信封不合法/未授权/设备被撤销，重试也没用，必须让用户看到）。
 2. **其余（网络异常、连接/响应超时、5xx）保持 `pending`** → 交给 `_flushPending`
@@ -3576,10 +3625,12 @@ v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）�
    若因"已有请求在途"忽略点按就等于让用户白等到超时。并发重发安全（服务端幂等）。
 
 ### 澄清老板的一处说法
+
 他说"点按小飞机首先是探测服务器状态，不改变服务器"——**不完全是只读**：若服务端
 确实没有这封，那次重发**会把它写进去**。但这正是期望结果（同一封、幂等），无害。
 
 ### 测试
+
 - 改写 `message_repository_test.dart`：FakeApi 增 `rejectPostMessage`（抛 400
   ApiException）；`failPostMessage` 保留为"网络异常"。
   - 新：`服务端明确拒绝（4xx）→ failed（不计入 pending、不自动重发）`
@@ -3590,6 +3641,7 @@ v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）�
   模拟 → 点按后立即重发成功 → 单勾；顺带覆盖了"在途时点按仍生效"。
 
 ### 验证
+
 - app 全量：仍是 15 条既有环境性失败（未增加）；Repo 23/23、status 3/3 通过。
 - 服务端未改动（本轮无 server 变更）。
 - 仍未重启服务端 → 回执双勾待老板重启后生效。
@@ -3599,6 +3651,7 @@ commit：见下方「回执地基」系列提交（server / shared / app / cli /
 ## 2026-09-12 气泡状态小图标调整 + 修「发送后状态卡在发送中」
 
 ### 一、图标调整（老板要求）
+
 - **发送状态小标移到时间戳前面**（`chat_page.dart` 时间行 children 顺序改为：
   状态标 → 时间 → 沙漏+焚毁时长）。原来放末尾，会被阅后即焚的标记插到中间/后面。
 - **阅后即焚图标改沙漏**：新增私有 `_BurnHourglass`（文件末尾），在
@@ -3616,6 +3669,7 @@ commit：见下方「回执地基」系列提交（server / shared / app / cli /
 `historySince(afterSequence: _lastLoadedSequence)` 用的是"本地已加载最大
 server_sequence"这个**高水位**，只取 seq 更大的行。而本机自己发的消息，seq 是
 `postMessage` 之后才由服务端分配回填的：
+
 1. 发出 A → 服务端分配 seq=11（响应在途中）；
 2. 这期间恰好先把一条 seq=12 的对方消息并入了列表 → 高水位抬到 12；
 3. `_markSent(A, 11)` 落库；
@@ -3623,6 +3677,7 @@ server_sequence"这个**高水位**，只取 seq 更大的行。而本机自己�
    内存里的状态**永久停在 pending** → 纸飞机不变成对勾。重启/重新载入列表才会自愈。
 
 **改法**：
+
 - `message_repository.dart` 新增 `historyByMessageIds(List<String>)`（按 id 批量
   解密读本地行）。
 - `chat_page.dart` 的 `_refreshLocal` 在增量 `historySince` 之外，额外把**列表里仍
@@ -3650,13 +3705,13 @@ commit `cb48948`。
 
 ### 排查结论（改之前的事实）
 
-| 事件 | 状态 | 证据 |
-| --- | --- | --- |
-| 消息**发送** | ✅ 已是设备级 | `messages.sender_device_id`（且强校验 == session 设备，messages.ts:63） |
-| 消息**接收** | ❌ 完全没有 | `GET /sync` 只 `touchLastSeen()`，不记该设备拉到第几条 |
-| 消息**阅读** | ⚠️ 只有 person 级 | `receipts` 主键 `(space_id, person_id)`；上报时 `device_id` 到手了却只用来查 person_id，没落库（receipts.ts:76）。注释明写"该 person 至少一台设备已读" |
-| **上线/下线** | ⚠️ 只有当前状态 | `devices.last_seen` 被覆盖（连接置 now、心跳刷新、断开置 0）；在线时长/掉线次数/断线原因全无，只有 stdout 的 console.log |
-| 附件上传设备 | ❌ | `attachments` 无 device 列 |
+| 事件          | 状态              | 证据                                                                                                                                                   |
+| ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 消息**发送**  | ✅ 已是设备级     | `messages.sender_device_id`（且强校验 == session 设备，messages.ts:63）                                                                                |
+| 消息**接收**  | ❌ 完全没有       | `GET /sync` 只 `touchLastSeen()`，不记该设备拉到第几条                                                                                                 |
+| 消息**阅读**  | ⚠️ 只有 person 级 | `receipts` 主键 `(space_id, person_id)`；上报时 `device_id` 到手了却只用来查 person_id，没落库（receipts.ts:76）。注释明写"该 person 至少一台设备已读" |
+| **上线/下线** | ⚠️ 只有当前状态   | `devices.last_seen` 被覆盖（连接置 now、心跳刷新、断开置 0）；在线时长/掉线次数/断线原因全无，只有 stdout 的 console.log                               |
+| 附件上传设备  | ❌                | `attachments` 无 device 列                                                                                                                             |
 
 即：**能回答"谁发的"，回答不了"谁在哪台设备上读了"、"昨天几点在线"、"dev3 上次下线是什么时候"**。
 
@@ -3699,7 +3754,7 @@ commit `cb48948`。
   确实是**设备级**、密文与 nonce 隔离、push token 只落前缀。
 - `npm run build` + `npm test` 全绿（4 个测试文件）。
 - `npm run audit -- devices | timeline <id> | online <space> [天] | activity [n] |
-  receipts | search <id>` 六个子命令已用演示数据逐个验证。
+receipts | search <id>` 六个子命令已用演示数据逐个验证。
   **注意**：脚本用 `openDb()`（读写打开）而非 readonly。
 
 ### 追加更正（同日，老板追问后）
@@ -3719,19 +3774,20 @@ commit `cb48948`。
    `connected_at` 与 `last_seen` 都正常变 null/0，而 App 的在线判定
    （`chat_page.dart:820`）**优先看 `connected_at`**，配合 30s 的 `_peerTicker`。
    → 实际影响：异常失联时（手机断网/进电梯，TCP 无 FIN）对端最多**晚 30 秒**
-     看到离线；正常上下线完全不受影响。心跳检测本身就要 30s，体感上叠加的这
-     30s 很难分辨。
+   看到离线；正常上下线完全不受影响。心跳检测本身就要 30s，体感上叠加的这
+   30s 很难分辨。
    → 修复**不会**动到 App/TUI 代码，只动 ws.ts 一行（把 delete 从 terminate
-     之前拿掉）。真正的取舍是"要不要让在线绿灯更容易抖动"（信号短暂中断 30s
-     对方就立刻看到下线），属产品取向而非风险。
+   之前拿掉）。真正的取舍是"要不要让在线绿灯更容易抖动"（信号短暂中断 30s
+   对方就立刻看到下线），属产品取向而非风险。
    → **决定：不修**。已在该处补注释，说明这是现状行为、别"顺手改"，避免后人
-     误当 bug 修掉。要追溯靠 `connection_events.heartbeat_timeout`。
+   误当 bug 修掉。要追溯靠 `connection_events.heartbeat_timeout`。
 
 ## 2026-09-13 输入栏「+」→ 表情符：内联表情面板（微信式，零依赖）
 
 **需求：** 老板要求「+」弹窗菜单加一项「表情符」，能把表情插进正在输入的文字里。
 
 **方案（与老板确认的三选）：**
+
 1. 形态=**输入栏内联面板**（不是二级弹层）：面板挂在输入栏 Column 里、占据输入行下方，
    可边看输入框边选；打开时收起键盘（二者互斥），点输入框或面板上的键盘键回键盘。
 2. 数据=**零依赖内置精选 emoji**：不引 `emoji_picker_flutter`（需联网拉包，国内易卡），
@@ -3739,6 +3795,7 @@ commit `cb48948`。
 3. 选中后**面板不关**，可连续点选，插完光标后移。
 
 **落地：**
+
 - 新增 `app/lib/widgets/emoji_panel.dart`：`kEmojiGroups`（8 组，分类 tab 直接用代表
   emoji 当图标，省掉分类名的 l10n）、`GridView` 网格 + 底部分类条 + 退格/键盘两个键。
   面板不持有 TextEditingController，只回调字符，便于复用与测试。
@@ -3765,6 +3822,7 @@ commit `cb48948`。
 就退化成动态波浪线。
 
 **实现（`app/lib/chat_page.dart`）：**
+
 - 数据：语音时长一直藏在 caption 明文里（协议没给附件加 duration 字段，改协议代价大）。
   旧格式「语音（12 秒）」→ 新格式「语音 12s」（`_sendVoice`）。接收端用
   `_voiceDurationSeconds()` 正则 `数字 + (h|m|s|小时|分钟|分|秒)` 累加，新旧格式都能解析。
@@ -3790,6 +3848,7 @@ commit `cb48948`。
 （`3s`、`1m 15s`、`2h 5s`）。
 
 **改动：**
+
 - 拆成两个格式化函数：`_formatVoiceDuration`（只有秒）/ `_formatHmsDuration`（h/m/s，
   零部分省略）。录音 caption 仍随消息同步，对端解析显示。
 - 音频文件**发送前探测时长**：`_probeAudioDuration()` 用一次性的 audioplayers 实例
@@ -3809,12 +3868,14 @@ commit `cb48948`。
 老板拍板：**可以动协议，最好有个 JSON 字段，以后未知的新数据都往里放**。
 
 **三选确认（问过老板）：**
+
 1. 位置=**消息密文载荷内**（不是附件元数据列）→ 服务器零改动（ciphertext 从不解析），
    时长这类内容元数据保持 E2EE，不会泄露给服务器。
 2. 键名=**扁平 + 前缀**，首个键 `audioDurationSeconds`。
 3. CLI（TUI）=**只做兼容不特意支持**（它的解码本来就忽略未知键）。
 
 **落地：**
+
 - 新增 `shared/lib/src/protocol/message_payload.dart`（并在 einz_shared.dart 导出）：
   `encodeMessagePayload` / `decodeMessagePayload` + `kMetaAudioDurationSeconds`。
   无 quote/meta 时载荷就是裸文本（与旧版字节级一致），有则包成
@@ -3842,9 +3903,10 @@ shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未�
 抠时长的兜底逻辑。
 
 **改动（`app/lib/chat_page.dart`）：**
+
 - 计时：`_recordSeconds.toString().padLeft(2,'0')`（去掉分秒拼接）。
 - 预览态波形：改用 `_VoiceWaveform`（原来是不带进度的 `_WaveformBars`），
-  传**本次真实振幅采样** `_voiceSamples` + 宽度撑满（LayoutBuilder 取 maxWidth）+ 
+  传**本次真实振幅采样** `_voiceSamples` + 宽度撑满（LayoutBuilder 取 maxWidth）+
   `durationSeconds: _recordSeconds`；`playing: _previewPlaying`，停止/播完自动复原。
 - `_VoiceWaveform` 通用化：新增可选 `samples`（真实采样，优先于 `seed`）与 `width`
   （竖条数按宽度算，默认 120 给气泡用，预览传可用宽度）；新增 `_resample()` 把任意
@@ -3863,6 +3925,7 @@ shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未�
 （可直接再长按重录），而不是文字输入框；点发送键或键盘键才回文字输入框。
 
 **改动：**
+
 - `_buildAudioBar` 语音分支：时长 `>0` 才渲染文本，否则只有播放键 + 波形
   （原来的 `Text(seconds > 0 ? … : m.plaintext)` 分支删掉）。
 - `_cancelVoice({bool backToTextInput = false})`：默认回 `_InputMode.hint` 并顺手把
@@ -3877,6 +3940,7 @@ shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未�
 退化成显示类型名 `voice`）。
 
 **改动（chat_page.dart）：**
+
 - 新增 `_audioPlaybackVersion`（`ValueNotifier<int>`）：播放状态每变一次 +1。
   原因：菜单是 `showModalBottomSheet` 的独立路由，页面 `setState` **重建不到**它，
   光靠 setState 菜单里的图标/波形不会变。
@@ -3900,6 +3964,7 @@ shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未�
 发送后气泡引用框同样**波形图 + 秒数**——录音消息在任何地方外观一致。
 
 **改动（chat_page.dart）：**
+
 - 抽出 `_imageBytes(m)`（`_imageCache` 按 messageId 缓存），新增 `_buildImageThumb(m, {size})`
   （正方形 cover + 加载中转圈 + 失败破图标）；气泡 / 菜单预览行(48) / 引用块(40) /
   输入栏引用条(24) 共用。
@@ -3924,6 +3989,7 @@ info（`ws_realtime_service.dart`，与本次无关）。新增测试
 输入区）。
 
 **改动（chat_page.dart）：**
+
 - `_startVoice`：`recording || preview` 都直接 return（单一入口拦截，左侧语音入口按钮
   的长按也一并挡住），临时文件不再被删除重录。录音条外层的常驻 GestureDetector
   保持不变（提示态→录音态不重建，松手才能正常停止），只是预览态回调被忽略。
@@ -3941,6 +4007,7 @@ gradient 白 12%），只要能看出和输入区不是同一块；② 引用图
 「缩略图 + 文件名」，不要别针图标。
 
 **改动（chat_page.dart）：**
+
 - `_buildQuoteBanner`：底色换成与引用块同表达式，去掉深灰 `#3A3A3C` 与投影；内容色
   回到浅底配色（图标/文字灰、波形主色，gradient 下白70）。
 - `_quotePreview`：去掉明文自带的 📎 前缀。别针其实来自发送端给附件消息写的兜底文案
@@ -3954,6 +4021,7 @@ gradient 白 12%），只要能看出和输入区不是同一块；② 引用图
 改成顶部也用**被引消息那种灰色背景**（黑 6%）区分，前后一致协调。
 
 **改动（chat_page.dart）：**
+
 - `_showMessageActions`：删掉 `const Divider(height: 1, thickness: 1)`。
 - `_buildMessagePreviewRow`：外层 `Padding` → `Container`，加 `color: 黑 6%`；
   内边距上下对称 12/12（原 12/4，之前靠横线收口）。弹窗始终浅色主题，故不跟
@@ -3969,6 +4037,7 @@ gradient 白 12%），只要能看出和输入区不是同一块；② 引用图
 新消息不含引用，且引用条仍挂在输入框上方。
 
 **改动：**
+
 - `app/lib/data/message_repository.dart`：`sendAttachment` 新增 `quote` 命名参数，
   透传给 `encodeMessagePayload(plain, quote: quote, meta: meta)`（与 `send` 同款）。
 - `app/lib/chat_page.dart`：抽 `_takeQuoteSnapshot()`（取出 `_quoteTarget` → 生成
@@ -3988,6 +4057,7 @@ gradient 白 12%），只要能看出和输入区不是同一块；② 引用图
 至少一个框有数字就回到「下一步」。不再弹二次确认弹窗——按钮标签本身就是明确提示。
 
 **改动（setup_page.dart）：**
+
 - 新增 `_isPinStep` / `_pinStepSkippable` 两个 getter；底部按钮包 `ListenableBuilder`
   监听 `_pin`+`_confirm`（`Listenable.merge`），只重建按钮不重建整页。
 - `_nextStep` PIN 分支：两空 → 直接 `_pinSkipped = true` 继续；删掉 `showDialog` 确认框。
@@ -4020,6 +4090,7 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 向左对齐摆放。
 
 **改动（`app/lib/chat_page.dart`）：**
+
 - 新增 `_buildMessageActionGrid(List<Widget>)`：以「一行 4 个」为基准算卡片宽度
   （上限 96，避免大屏卡片被拉得过宽）；≤4 用 `Row(spaceEvenly)` 等距分布，
   `IntrinsicHeight + stretch` 让同行卡片等高；>4 按每行 4 个分块、`Row(start)`
@@ -4041,6 +4112,7 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 一并改成圆角方形卡片。
 
 **改动（`app/lib/chat_page.dart`）：**
+
 - 两个 helper 改名去「Message」限定，两处菜单共用：`_buildMessageActionGrid` →
   `_buildActionCardGrid`、`_buildMessageActionCard` → `_buildActionCard`（长按菜单调用处同步）。
 - `_showAttachmentSheet`：7 个 `ListTile`（表情符/拍照/相册图片/拍摄视频/相册视频/
@@ -4057,6 +4129,7 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 ③ 补上缺的右括号再重跑 gen-l10n。
 
 **改动（`app/lib/l10n/app_zh.arb`，重跑 `flutter gen-l10n`）：**
+
 - `chatPageAttachAudioFile`：`音频文件（mp3 等）` → `音频文件`（卡片窄，原文案会折行/省略）。
 - `chatPageSetLockCleared`：`已清空锁屏码（下次启动直接进入` → 补右括号 `）`。
 - 重跑后生成文件 `app_localizations_zh.dart` 一并同步了此前 arb 已改、但未重新生成的
@@ -4071,6 +4144,7 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 ②「修改口令」弹窗右下角按钮文字由「修改口令」改「修改」（弹窗标题不变）。
 
 **改动：**
+
 - `app_zh.arb` / `app_en.arb`：`setPinDialogSetPin` → 「提交」/「Submit」（该 key 仅
   `chat_page.dart:3659` 一处用于按钮，标题另用 `chatPageSetLockTitle`，不受影响）。
 - 新增 `chatPageChangePassphraseSubmit` → 「修改」/「Change」；`chat_page.dart:3841`
@@ -4090,6 +4164,7 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 回到对话消息页（此前是保持打开供「边看边试」，需手动 ✕/下滑关闭）。
 
 **改动：**
+
 - `widgets/ui_style_picker.dart`：`_apply` 由「已激活直接 return、否则仅保存」改为
   「非当前项才 `save`，随后 `if (mounted) Navigator.of(context).pop()`」——点选
   任意风格（含当前项）都关窗；顶部类注释同步。
@@ -4107,11 +4182,13 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 自动折行、输入框自动增高，最多 8 行，超过则不再增高、转为内部上下滚动。
 
 **讨论与决策：**
+
 - 询问回车键行为时，老板指出微信文字态**没有**界面发送图标，发送入口是键盘右下角
   那颗「发送」键（本质=回车发送，非换行）——我原「换行才是主流」的说法不准确。
 - 敲定：回车键=发送（键盘显示「发送」），**保留**右侧界面发送图标按钮（老板选择）。
 
 **改动（`chat_page.dart` 约 3456 行）：**
+
 - `minLines: 1` + `maxLines: 8` + `keyboardType: TextInputType.multiline`
   → 自动折行增高，8 行封顶后内部纵向滚动。
 - `textInputAction: TextInputAction.send` → 回车键显示「发送」（iOS 按系统语言本地化），
@@ -4129,6 +4206,7 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 才看到之前的预发消息。
 
 **定位（真实 server + 真实口令密保箱复现，直接驱动 ChatSession）：**
+
 - core 链路正常：join 后 `sync()` 返回 fresh=2，消息进 `session.messages`、
   落盘 history、锚点 0→2；第二次 sync fresh=0（锚点已推进）。
 - 真因是 **TUI 展示层**：`_sortMessages` 按时间序把对方预发消息排在**所有入网
@@ -4137,6 +4215,7 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
   重启后（向导消息本就不落盘）列表很短，消息直接可见。
 
 **改动（`cli/bin/einz_tui.dart`，commit `b38ca91`）：**
+
 - 入网向导期（`_onboardingActive`）经 `_systemMessage` 产生的 system 消息按
   **对象引用**记入 `_onboardingNoise`（消息流会被重排，下标区间不可靠）。
 - `_activateAfterBind` 记录启动同步拉到的条数 `_startupSyncAdded`；入网收尾
@@ -4154,6 +4233,7 @@ TUI 发送的消息也要**立刻进消息流**（此前只提示"已入队"却�
 pending 直到服务器恢复）。
 
 **改动 `cli/lib/chat_core.dart`：**
+
 - `peerDeliveredUpto`：对方送达高水位（`GET /receipts` + WS `receipt.updated`，
   **排除自己那行**——自己的水位是"我收到对方哪些消息"，与我的发出无关，App 同款坑）。
 - `sentStatusOf(msg)`：pending（仍在离线队列 / 无 server_sequence）/
@@ -4163,6 +4243,7 @@ pending 直到服务器恢复）。
 - `startWs` 新增 `onReceiptUpdated` 回调；`_autoSync` 顺带 `refreshReceipts()`。
 
 **改动 `cli/bin/einz_tui.dart`：**
+
 - `_statusGlyph`（⋯ / ✓ / ✓✓，按 1~2 列宽选字避免 emoji 双宽错位）；
   `formatMessage` 我发消息的标签变为 `[我 时间 状态]`。
 - 接线：`_activateAfterBind` 首屏 `refreshReceipts()`；`onReceiptUpdated` 触发重绘。
@@ -4177,8 +4258,9 @@ pending 直到服务器恢复）。
 read，TUI 里我发出的消息被已读后状态字符要**变蓝**（App 只展示到双勾，read 只落库）。
 
 **改动：** `chat_core` 增加 `peerReadUpto`（与 `peerDeliveredUpto` 同源：`GET /receipts`
-+ WS `receipt.updated`），`sentStatusOf` 增加 `read` 档位；`einz_tui` 新增 `_blue`（94）
-并把 `[我 时间 ✓✓]` 的状态字符在 read 时染亮蓝。测试补 read 用例。commit `34ecf97`。
+
+- WS `receipt.updated`），`sentStatusOf` 增加 `read` 档位；`einz_tui` 新增 `_blue`（94）
+  并把 `[我 时间 ✓✓]` 的状态字符在 read 时染亮蓝。测试补 read 用例。commit `34ecf97`。
 
 **注意：** 亮蓝字落在自己的性别气泡上——若本人性别为男（蓝色气泡），蓝字与蓝底
 对比度偏低；老板自测后如需可换亮青/加粗。当前按老板明确要求先上"蓝"。
@@ -4186,7 +4268,8 @@ read，TUI 里我发出的消息被已读后状态字符要**变蓝**（App 只�
 ### 追加：TUI 语音消息显示「🔊 语音 秒数」
 
 **老板要求：** TUI 收到语音消息目前只显示"语音"两字，要显示 喇叭/播放字符 + "语音"
-+ 秒数（例 `18s`）。
+
+- 秒数（例 `18s`）。
 
 **真因：** App 录音的明文 caption 就是 `chatPageVoiceLabel = "语音"`，时长在载荷
 meta 的 `audioDurationSeconds`（老板 2026-09-13 协议扩展）；而 CLI 的 `_decrypt`
@@ -4232,7 +4315,7 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 ### 改版：入网收尾从「清噪音」改为「欢迎辞 + 回车」切换向导态→聊天态
 
 **老板要求（2026-09-13）：** 替换此前做法。向导完成后在消息流系统致欢迎辞
-「一切就绪！输入回车，进入秘境，开始和伴侣聊天吧！」，等待用户回车（输入内容不限），
+「一切就绪！输入回车，立刻开始和伴侣聊天吧！」，等待用户回车（输入内容不限），
 回车后清空系统消息、同步用户消息到屏幕。欢迎辞不再进底部状态条——这样明确区分
 向导态与聊天态。
 
@@ -4242,6 +4325,7 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 `_startupSyncAdded` 这套向导噪音追踪机制（新做法不再需要）。
 
 **注意：**
+
 - 新建空间场景回车后聊天区为空（向导日志一并清掉）——符合"聊天态"预期，空间地址可
   `/space address` 查看。
 - 回车门期间输入以 `/` 开头仍走既有引导规则（仅 `/exit` 放行、其余提示"输入未提交"）；
@@ -4259,3 +4343,19 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 保持 `[system 时间]`。顺带移除不再需要的 `who`/`color` 分支；补标签用例。`dart analyze`
 0 issue、9 例测试全过。观感老板自测。
 
+### 消息排序加插入序号平局决胜（Dart List.sort 不稳定）
+
+**背景：** 老板报 join 向导里出现「❓ 验证密保口令」排在「✅ 我是 X」之前的错序。
+老板自测后用终端 `clear` 再跑即正常，判断多半是 VSCode 终端残留；但我排查时确认了
+一个**真实的潜在 bug**，老板决定保留修复。
+
+**真因：** Dart 的 `List.sort` **不稳定**（官方文档明确）。同毫秒创建的系统消息
+（join 向导里「✅ 我是 X」「----------------」「❓ 验证密保口令:」几乎同刻产生）在
+消息数 > 32 时会走非插入排序路径，顺序被打乱。已用确定性脚本复现（20 条对话 + 20 条
+同刻系统消息 → 旧比较器乱序）。顺带发现 `_systemMessage` 的 `message_id` 用毫秒
+时间戳，同刻会重复。
+
+**改动（commit `79e4990`）：** `ChatMessage` 增加 `order`（全局单调插入序号）；
+`_sortMessages` 抽出 `compareChatMessages` 纯函数，同 createdAt/同 seq 时按 `order`
+决胜；`_systemMessage` 的 `message_id` 改为自增序号。新增 `chat_sort_test` 两例。
+`dart analyze` 0 issue，单测/集成测试全过。
