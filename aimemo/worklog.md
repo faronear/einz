@@ -4201,3 +4201,17 @@ meta 的 `audioDurationSeconds`（老板 2026-09-13 协议扩展）；而 CLI �
 **验证：** `dart analyze`（cli）0 issue；`format_message_test`（7 例）、
 `message_status_check`、`receipts_check` 全过。观感老板自测。
 
+### 追加：成员名称/性别落盘缓存——服务器离线启动仍按性别配色
+
+**老板反馈：** 启动 TUI 时服务器离线会问新地址，仍输入老地址可强行进入，但此时
+所有消息都是青色背景（性别未知）。问"性别不能本地存一份吗"。
+
+**真因：** 名字/性别只来自 `GET /space`（需在线）；`_probePersonNames/Genders` 自
+Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.personGenders` 空 →
+气泡全回退青绿。
+
+**改动（commit `857fce7`）：** `DeviceStore` 增加 `personNames`/`personGenders`
+（JSON 落盘，缺字段按空表容错）；`_refreshPersonNames` 成功后回写缓存（内容变化才
+写盘）、`profile.updated` 改名也回写；main 启动时先用本地缓存填充再叠加启动探测值。
+新增 `store_person_cache_test`（落盘往返 + 旧 store 缺字段）。`dart analyze` 0 issue。
+
