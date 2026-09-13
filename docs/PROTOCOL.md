@@ -264,7 +264,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 ```json
 // POST /key-escrow（上传/更新，按 space 一份，UPSERT）
 { "package": { "format": "backup-v1", "salt": "b64", "nonce": "b64", "ciphertext": "b64" } }
-// 可选附 passphrase_hash（argon2id，/recover 恢复校验用）与 rotated
+// 可选附 passphrase_hash（argon2id，加入方取包时校验口令用）与 rotated
 { "package": { "…" }, "passphrase_hash": "…", "rotated": true }
 // 响应 200
 { "ok": true }
@@ -281,7 +281,14 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 - 包结构校验仅限字段类型（`format`/`salt`/`nonce`/`ciphertext` 均为非空 base64 字符串，400 拒绝坏字段）；**Server 永不解析包内容**。
 - 口令验证发生在客户端（解密失败 = 口令错，AEAD tag 校验），Server 无法限速 → 依赖 Argon2id 慢哈希 + 口令熵要求 + 客户端本地错误处理。
 - 客户端接入流程：生成身份 → 白名单登记 → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。密钥轮换后客户端解锁时自动重传新密文包（KEY_ESCROW.md §7）。
-- `/recover`（口令重置空间，撤销全部设备）**仅 TUI 客户端调用**——App 已移除该入口（2026-09-08 决策：仅凭口令召回所有设备并重置整个空间对 App 用户太危险；App 侧备份/恢复一并取消，新设备用邀请码/口令/密保信封接入）。
+- **`/recover`（全丢恢复）已整体移除**（2026-09-13，Server 端点 + TUI 入口 + 客户端方法
+  全部删除）。理由：① 它按 `space_id=''` 那一行读包，Multiverse 下本就永远读不到；
+  ② 它的撤销逻辑是**全库范围**的（`UPDATE devices … WHERE status='active'`、
+  `DELETE FROM sessions/push_tokens/invites` 都无 space 过滤）——修好 ① 反而会把该
+  服务器上**所有空间**的设备全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
+  只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方设备全丢 =
+  双方放弃该空间，重新建一个即可（v1 只有一个空间才不得不支持恢复）。
+  新设备接入仍走：邀请码 / 密保口令 / 密保信封（KEY_ESCROW.md §13）。
 
 ## 8. WebSocket（实时通道）
 
