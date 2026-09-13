@@ -4006,3 +4006,9 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 
 删 arb 中 `setupPageSkipPinTitle` / `setupPageSkipPinMessage`（中英各一条）并重跑
 `flutter gen-l10n`：只有删除、无其他重排，生成文件与 arb 同步，analyze 0 issue。
+
+### 追加（同日）：删除陈旧 goldens 截图并默认跳过
+
+- 删 `test/goldens/*.png`（12 张，9/5–9/8 生成，已落后于后续大量 UI 改动）——不入库，
+  出图时由 `--update-goldens -Dgolden=true` 重新生成（golden_render_test.dart 文件头已注明）。
+- 整文件加 `_goldensEnabled = bool.fromEnvironment('golden')` 开关，默认 skip。

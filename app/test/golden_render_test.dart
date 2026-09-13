@@ -3,7 +3,8 @@
 //
 // 运行（默认**全部跳过**）：flutter test -Dgolden=true test/golden_render_test.dart
 // 出图：flutter test --update-goldens -Dgolden=true test/golden_render_test.dart
-// 产物：test/goldens/{setup_step1_*,lock_page,chat_page}.png
+// 产物：test/goldens/**.png（**不入库**，出图时由 --update-goldens 生成；开发期
+// 已默认跳过，见下方 _goldensEnabled 开关）
 //
 // 默认跳过的原因（老板 2026-09-13 定）：开发期 UI 改动频繁，goldens 常红；每次
 // 失配要么排查日志、要么读 PNG 对比（读图 token 消耗极高），收益不抵成本。
