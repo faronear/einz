@@ -4375,3 +4375,13 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 于是消息 push 进展示缓存即刻重绘，补发网络在后台进行。新增 `send_optimistic_test`
 （离线发送 → 立即上屏、pending、onChanged 已触发）。`dart analyze` 0 issue，14 例
 单测 + 集成测试全过。
+
+### App：邀请码弹窗说明文案上移到标题与二维码之间
+
+**老板要求：** 生成邀请码弹窗里，底部说明「新设备必须验证邀请码，才能绑定到当前
+秘境。24 小时内一次性有效。」改到标题「邀请码已生成」和二维码之间，作为大标题的
+补充说明。
+
+**改动（commit `21e5506`，`app/lib/chat_page.dart` `_showInviteDialog`）：** 文案从
+`content` 末尾移到最前（标题下方、二维码上方），居中、grey 12px；底部删除原重复。
+`flutter analyze lib/chat_page.dart` 0 issue。UI 老板自测。
