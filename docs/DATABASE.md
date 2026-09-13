@@ -97,7 +97,68 @@ CREATE TABLE receipts (
 );
 ```
 
+### 2.1 审计表（只追加，永久保留）
+
+业务表只保存"当前状态"（`devices.last_seen` 会被覆盖、`receipts` 是 person 级
+高水位），无法回答"谁在哪台设备上、什么时候做了什么"。以下两张表专为此补上历史，
+**只追加、不更新、不删除**，且**不参与业务语义**——清空它们不影响聊天功能。
+
+```sql
+-- 连接事件流：WS 每次连上/断开各一行（可算在线时长、掉线次数、断线原因）
+CREATE TABLE connection_events (
+    event_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id    TEXT NOT NULL,
+    space_id     TEXT,                  -- 连接绑定的 Space（legacy 为空串）
+    event        TEXT NOT NULL,         -- connect | disconnect | heartbeat_timeout
+    at_ms        INTEGER NOT NULL,      -- 事件时刻（ms）
+    duration_ms  INTEGER,               -- disconnect/timeout 时填本次在线时长
+    close_code   INTEGER,               -- WS 关闭码（1000 正常、1006 异常、4408 被顶掉）
+    close_reason TEXT,
+    ip           TEXT,                  -- x-forwarded-for 链首（Caddy 反代）→ socket 地址
+    user_agent   TEXT
+);
+
+-- 设备活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
+CREATE TABLE device_activity (
+    activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id   TEXT NOT NULL,
+    space_id    TEXT,
+    kind        TEXT NOT NULL,
+    at_ms       INTEGER NOT NULL,
+    detail      TEXT,                   -- JSON，字段按 kind 各异（见下表）
+    ip          TEXT,
+    user_agent  TEXT
+);
+```
+
+`device_activity.kind` 一览：
+
+| kind              | 触发点                    | detail 主要字段                                                              |
+| ----------------- | ------------------------- | ---------------------------------------------------------------------------- |
+| `auth.login`      | `POST /auth/verify`       | `expires_in`                                                                 |
+| `message.post`    | `POST /messages`          | `message_id`、`server_sequence`、`type`（**发送**证据，设备级）              |
+| `sync`            | `GET /sync`               | `after_sequence`、`last_sequence`、`received`、`has_more`、`idle`（**接收**证据） |
+| `receipt`         | `POST /receipts`          | `reported_delivered`、`reported_read`、`delivered_upto_seq`、`read_upto_seq` |
+| `push.register`   | `POST /push/register`     | `platform`、`token_prefix`（**只落前 8 位**，不落完整推送凭证）              |
+| `push.unregister` | `DELETE /push/register`   | —                                                                            |
+| `device.enroll`   | `POST /devices/enroll`    | `person_id`                                                                  |
+| `device.rename`   | `POST /devices/name`      | `device_name`                                                                |
+| `person.rename`   | `POST /devices/person-name` | `person_name`                                                              |
+| `device.revoke`   | `DELETE /devices/:id`     | `target_device_id`                                                           |
+
 **说明：**
+
+- `sync` 空闲节流：`last_sequence` 前进 → 必记；未前进 → 同一设备同一 Space
+  最多每 `EINZ_AUDIT_IDLE_SYNC_SEC`（默认 300 秒）记一条 `idle=true`。设 `0`
+  则每次轮询都记（最详尽，也最占空间）。
+- 回执语义**未改**：`receipts` 表仍是 person 级 HWM（"该 person 至少一台设备
+  已读"），`device_activity.receipt` 只是额外记下"是哪台设备上报的"。
+- 红线：审计表只记元数据，**绝不含密文 / nonce / 明文 / 完整 push token**
+  （`test/audit.test.ts` 有断言守着）。
+- 查询：`npm run audit -- devices | timeline <device_id> | online <space_id> [天] |
+  activity [n] | receipts | search <device_id>`。
+
+**业务表说明：**
 
 - `messages.server_sequence` 全局唯一（UNIQUE）：Server 分配即锁定，用于 `/sync?after=`。
 - 附件必须先有 message（外键约束）。

@@ -12,6 +12,7 @@ import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
 import { createJoinToken, createSpace, joinSpace, lookupSpace, preflightJoin } from "./spaces.js";
+import { logActivity, logSyncActivity, metaOf } from "./audit.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
@@ -180,6 +181,25 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
 
   // 认证（challenge-response）
+  // 签发 session = 设备重新取得访问权（App 冷启动/会话过期重登），审计记一笔
+  if (method === "POST" && path === "/auth/verify") {
+    const body = await readJson(req);
+    const result = verifyChallenge(cfg, String(body?.challenge_id ?? ""), String(body?.challenge_plaintext ?? ""));
+    const challengeDevice = getDb()
+      .prepare(`SELECT device_id, space_id FROM challenges WHERE challenge_id = ?`)
+      .get(String(body?.challenge_id ?? "")) as { device_id: string; space_id: string | null } | undefined;
+    if (challengeDevice) {
+      logActivity({
+        deviceId: challengeDevice.device_id,
+        spaceId: result.space_id || challengeDevice.space_id,
+        kind: "auth.login",
+        detail: { expires_in: result.expires_in },
+        meta: metaOf(req),
+      });
+    }
+    sendJson(res, 200, result);
+    return;
+  }
   if (method === "POST" && path === "/auth/challenge") {
     const body = await readJson(req);
     const deviceId = String(body?.device_id ?? "");
@@ -200,24 +220,66 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/messages") {
     const body = await readJson(req);
     const token = bearer(req);
+    const sess = resolveSession(token);
     const result = postMessage(cfg, token, body);
-    const envelope = body as { sender_device_id?: string };
+    const envelope = body as { sender_device_id?: string; type?: string };
     const stored = { ...(body as object), server_sequence: result.server_sequence, created_at: result.created_at };
     broadcastNewMessage(envelope.sender_device_id ?? "", stored as never);
+    // 审计：消息「发送」证据（设备级；只记元数据，不碰密文）
+    logActivity({
+      deviceId: sess.device_id,
+      spaceId: sess.space_id,
+      kind: "message.post",
+      detail: {
+        message_id: result.message_id,
+        server_sequence: result.server_sequence,
+        type: envelope.type ?? null,
+      },
+      meta: metaOf(req),
+    });
     sendJson(res, 200, result);
     return;
   }
   if (method === "GET" && path === "/sync") {
     const token = bearer(req);
+    const sess = resolveSession(token);
     const after = Number(url.searchParams.get("after") ?? 0);
     const limit = Number(url.searchParams.get("limit") ?? 100);
-    sendJson(res, 200, syncMessages(cfg, token, after, limit));
+    const result = syncMessages(cfg, token, after, limit);
+    // 审计：消息「接收」证据（该设备拉到第几条；空闲轮询受节流，见 audit.ts）
+    logSyncActivity({
+      deviceId: sess.device_id,
+      spaceId: sess.space_id,
+      afterSequence: after,
+      lastSequence: result.last_sequence,
+      count: result.messages.length,
+      hasMore: result.has_more,
+      meta: metaOf(req),
+    });
+    sendJson(res, 200, result);
     return;
   }
   // 消息回执（已送达/已读）：单调高水位，按 (space, person) 一行
   if (method === "POST" && path === "/receipts") {
     const body = await readJson(req);
-    sendJson(res, 200, postReceipts(cfg, bearer(req), body));
+    const token = bearer(req);
+    const sess = resolveSession(token);
+    const b = (body ?? {}) as Record<string, unknown>;
+    const result = postReceipts(cfg, token, body);
+    // 审计：回执上报明细（设备级；receipts 表本身仍是 person 级 HWM，语义不变）
+    logActivity({
+      deviceId: sess.device_id,
+      spaceId: sess.space_id,
+      kind: "receipt",
+      detail: {
+        reported_delivered: b.delivered_upto_seq ?? null,
+        reported_read: b.read_upto_seq ?? null,
+        delivered_upto_seq: result.delivered_upto_seq,
+        read_upto_seq: result.read_upto_seq,
+      },
+      meta: metaOf(req),
+    });
+    sendJson(res, 200, result);
     return;
   }
   if (method === "GET" && path === "/receipts") {
@@ -284,19 +346,47 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/devices/enroll") {
     // 动态登记（免认证，邀请码即准入令牌）：新设备凭邀请码登记，立即生效无需重启
     const body = await readJson(req);
-    sendJson(res, 200, enrollDevice(cfg, body));
+    const result = enrollDevice(cfg, body);
+    logActivity({
+      deviceId: result.device_id,
+      spaceId: "",
+      kind: "device.enroll",
+      detail: { person_id: result.person_id },
+      meta: metaOf(req),
+    });
+    sendJson(res, 200, result);
     return;
   }
   if (method === "POST" && path === "/devices/name") {
     // 更新本设备名称（已登记设备 TUI 改名后同步后台，显示层用）
     const body = await readJson(req);
-    sendJson(res, 200, updateDeviceName(cfg, bearer(req), body));
+    const token = bearer(req);
+    const sess = resolveSession(token);
+    const b = (body ?? {}) as Record<string, unknown>;
+    sendJson(res, 200, updateDeviceName(cfg, token, body));
+    logActivity({
+      deviceId: sess.device_id,
+      spaceId: sess.space_id,
+      kind: "device.rename",
+      detail: { device_name: b.device_name ?? null },
+      meta: metaOf(req),
+    });
     return;
   }
   if (method === "POST" && path === "/devices/person-name") {
     // 更新本设备 person 显示名（/rename 命令，显示层用）
     const body = await readJson(req);
-    sendJson(res, 200, updatePersonName(cfg, bearer(req), body));
+    const token = bearer(req);
+    const sess = resolveSession(token);
+    const b = (body ?? {}) as Record<string, unknown>;
+    sendJson(res, 200, updatePersonName(cfg, token, body));
+    logActivity({
+      deviceId: sess.device_id,
+      spaceId: sess.space_id,
+      kind: "person.rename",
+      detail: { person_name: b.person_name ?? null },
+      meta: metaOf(req),
+    });
     return;
   }
   if (method === "POST" && path === "/invites") {
@@ -311,7 +401,17 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   const devMatch = path.match(/^\/devices\/([^/]+)$/);
   if (method === "DELETE" && devMatch) {
-    const result = revokeDevice(cfg, bearer(req), devMatch[1]);
+    const token = bearer(req);
+    const caller = resolveSession(token);
+    const result = revokeDevice(cfg, token, devMatch[1]);
+    // 审计：设备撤销（谁撤的、撤了谁）
+    logActivity({
+      deviceId: caller.device_id,
+      spaceId: caller.space_id,
+      kind: "device.revoke",
+      detail: { target_device_id: devMatch[1] },
+      meta: metaOf(req),
+    });
     notifyRevoked(devMatch[1]);
     // Space Key 轮换由剩余可信设备在客户端发起（E2EE.md §9.1）；
     // key.rotation 通知发给"除被撤销设备外"的所有剩余设备（含撤销发起者），
@@ -327,11 +427,27 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // 推送
   if (method === "POST" && path === "/push/register") {
     const body = await readJson(req);
-    sendJson(res, 200, registerPushToken(cfg, bearer(req), body));
+    const token = bearer(req);
+    const sess = resolveSession(token);
+    const b = (body ?? {}) as Record<string, unknown>;
+    sendJson(res, 200, registerPushToken(cfg, token, body));
+    // 审计：Push Token 变更（换机/重装 App 会体现为 token 变化）
+    // 只记 platform 与 token 指纹前缀，不落完整 token（避免推送凭证扩散到审计表）
+    const rawToken = typeof b.token === "string" ? b.token : "";
+    logActivity({
+      deviceId: sess.device_id,
+      spaceId: sess.space_id,
+      kind: "push.register",
+      detail: { platform: b.platform ?? null, token_prefix: rawToken.slice(0, 8) },
+      meta: metaOf(req),
+    });
     return;
   }
   if (method === "DELETE" && path === "/push/register") {
-    sendJson(res, 200, unregisterPushToken(cfg, bearer(req)));
+    const token = bearer(req);
+    const sess = resolveSession(token);
+    sendJson(res, 200, unregisterPushToken(cfg, token));
+    logActivity({ deviceId: sess.device_id, spaceId: sess.space_id, kind: "push.unregister", meta: metaOf(req) });
     return;
   }
 

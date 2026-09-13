@@ -148,6 +148,41 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       updated_at         INTEGER NOT NULL,
       PRIMARY KEY (space_id, person_id)
     );
+
+    -- ── 审计表（只追加，永久保留；供"谁在哪台设备上、什么时候做了什么"回溯）──
+    -- 不参与业务语义：删除或清空不影响聊天功能（老板 2026-09-13 要求详尽留痕）。
+
+    -- 连接事件流：WS 每次连上/断开各一行（可算在线时长、掉线次数、断线原因）
+    CREATE TABLE IF NOT EXISTS connection_events (
+      event_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id    TEXT NOT NULL,
+      space_id     TEXT,                  -- 连接绑定的 Space（legacy 为空串）
+      event        TEXT NOT NULL,         -- connect | disconnect | heartbeat_timeout
+      at_ms        INTEGER NOT NULL,      -- 事件时刻（ms）
+      duration_ms  INTEGER,               -- disconnect 时填本次在线时长
+      close_code   INTEGER,               -- WS 关闭码（1006=异常断开等）
+      close_reason TEXT,
+      ip           TEXT,                  -- 来源 IP（Caddy 反代下取 x-forwarded-for）
+      user_agent   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_conn_events_device_at ON connection_events (device_id, at_ms);
+    CREATE INDEX IF NOT EXISTS idx_conn_events_space_at  ON connection_events (space_id, at_ms);
+
+    -- 设备活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
+    -- detail 为 JSON，字段按 kind 各异（见 docs/DATABASE.md §2.1）
+    CREATE TABLE IF NOT EXISTS device_activity (
+      activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id   TEXT NOT NULL,
+      space_id    TEXT,
+      kind        TEXT NOT NULL,
+      at_ms       INTEGER NOT NULL,
+      detail      TEXT,
+      ip          TEXT,
+      user_agent  TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_dev_act_device_at ON device_activity (device_id, at_ms);
+    CREATE INDEX IF NOT EXISTS idx_dev_act_kind_at   ON device_activity (kind, at_ms);
+    CREATE INDEX IF NOT EXISTS idx_dev_act_space_at  ON device_activity (space_id, at_ms);
   `);
 
   // 迁移：messages 表补充 sender_person_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）

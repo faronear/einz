@@ -3638,3 +3638,66 @@ server_sequence"这个**高水位**，只取 seq 更大的行。而本机自己�
 全量 `flutter test` 仍是那 15 条既有环境性失败（未增加）；`flutter analyze` 0 error。
 
 commit `cb48948`。
+
+---
+
+## 2026-09-13 服务端审计日志（上下线 / 发送 / 接收 / 阅读，全设备级）
+
+### 起因
+
+老板问：每个用户在每个设备上的上线、下线，每条消息在每个设备上的发送、接收、阅读，
+服务端有没有记清楚是**在哪个设备上**发生的？希望后台记录尽可能详尽。
+
+### 排查结论（改之前的事实）
+
+| 事件 | 状态 | 证据 |
+| --- | --- | --- |
+| 消息**发送** | ✅ 已是设备级 | `messages.sender_device_id`（且强校验 == session 设备，messages.ts:63） |
+| 消息**接收** | ❌ 完全没有 | `GET /sync` 只 `touchLastSeen()`，不记该设备拉到第几条 |
+| 消息**阅读** | ⚠️ 只有 person 级 | `receipts` 主键 `(space_id, person_id)`；上报时 `device_id` 到手了却只用来查 person_id，没落库（receipts.ts:76）。注释明写"该 person 至少一台设备已读" |
+| **上线/下线** | ⚠️ 只有当前状态 | `devices.last_seen` 被覆盖（连接置 now、心跳刷新、断开置 0）；在线时长/掉线次数/断线原因全无，只有 stdout 的 console.log |
+| 附件上传设备 | ❌ | `attachments` 无 device 列 |
+
+即：**能回答"谁发的"，回答不了"谁在哪台设备上读了"、"昨天几点在线"、"dev3 上次下线是什么时候"**。
+
+### 老板拍板的方案（AskUserQuestion）
+
+1. **只加审计日志，不动 receipts 语义**——双勾判定、客户端推导、刚修好的双勾 bug 全不动；
+2. **SQLite 审计表，永久保留**（不滚动清理）；
+3. 粒度全要：上下线事件流 + 每次 sync 拉取进度 + 每次回执上报明细 + 网络层（IP/UA/push token 变更）；
+4. **暂不加 UI**，只在服务端。
+
+### 实现
+
+- `server/src/db.ts`：新增 `connection_events`（连接事件流：connect / disconnect /
+  heartbeat_timeout，带 duration_ms、close_code、ip、user_agent）与
+  `device_activity`（kind + detail JSON；含 auth.login / message.post / sync /
+  receipt / push.register / push.unregister / device.enroll / device.rename /
+  person.rename / device.revoke）。
+- `server/src/audit.ts`（新）：`logConnection` / `logActivity` / `logSyncActivity` /
+  `metaOf`（IP 取 x-forwarded-for 链首，Caddy reverse_proxy 自动写入）。
+  全部 try/catch——**审计失败只允许 console.error，绝不拖垮收发消息主流程**。
+- `ws.ts`：connect / close / 心跳超时各自落一行；`Conn` 增加 `meta` 与 `timedOut`。
+  close 码 4408 = 被同一设备的新连接顶掉（原本就有，现在留痕了）。
+- `app.ts`：HTTP 层统一记录（这里是唯一拿得到 `req` 的地方，故 IP/UA 在这一层取，
+  其他业务模块零侵入）。
+- `sync` 空闲节流：`last_sequence` 前进必记；未前进则同设备同 Space 每
+  `EINZ_AUDIT_IDLE_SYNC_SEC`（默认 300s）补一条 `idle=true`。设 `0` 即全量
+  （App 聊天页活跃时 3s 轮询一次，全量一天近 3 万行/设备且全是重复值）。
+- push token **只落前 8 位**（`token_prefix`），完整推送凭证不扩散进审计表。
+
+### 隐私红线
+
+只记元数据，绝不含密文 / nonce / 明文 / 完整 push token；`test/audit.test.ts`
+里有断言守着（哨兵密文、哨兵 nonce 都不得出现在审计表里）。依据 productLens
+§3.3「V1 不追求隐藏元数据」+ §14「日志禁止包含用户内容与密钥」。
+
+### 验证
+
+- 新增 `server/test/audit.test.ts`，已并入 `npm test`：断言一 connect 一 disconnect
+  （都带 device / space / IP / 时长 / 关闭码）、四种活动 kind 齐全、发送与回执明细
+  确实是**设备级**、密文与 nonce 隔离、push token 只落前缀。
+- `npm run build` + `npm test` 全绿（4 个测试文件）。
+- `npm run audit -- devices | timeline <id> | online <space> [天] | activity [n] |
+  receipts | search <id>` 六个子命令已用演示数据逐个验证。
+  **注意**：脚本用 `openDb()`（读写打开）而非 readonly。

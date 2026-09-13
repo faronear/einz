@@ -4,6 +4,7 @@ import { resolveSession } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
 import type { MessageEnvelope } from "./messages.js";
 import { getDb } from "./db.js";
+import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 
 interface Conn {
   ws: WebSocket;
@@ -11,6 +12,8 @@ interface Conn {
   spaceId: string; // Multiverse：连接绑定的 Space（legacy 回落 cfg.space_id）
   alive: boolean;
   connectedAt: number; // 本次 WS 连接建立时刻（ms）——/devices 显示"上线时间"
+  meta: RequestMeta; // 来源 IP / UA（建连时的 req），审计落库用
+  timedOut: boolean; // 已被心跳判定为超时（close 时据此记 heartbeat_timeout）
 }
 
 const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1：每设备至多 1 条连接）
@@ -140,10 +143,13 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
     const old = conns.get(deviceId);
     if (old) old.ws.close(4408, "duplicate connection");
 
-    const conn: Conn = { ws, deviceId, spaceId, alive: true, connectedAt: Date.now() };
+    const now = Date.now();
+    const meta = metaOf(req);
+    const conn: Conn = { ws, deviceId, spaceId, alive: true, connectedAt: now, meta, timedOut: false };
     conns.set(deviceId, conn);
     // WS 连接 = 在线：刷新 last_seen（App 判定对方在线）
-    getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(Date.now(), deviceId);
+    getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(now, deviceId);
+    logConnection({ deviceId, spaceId, event: "connect", atMs: now, meta });
     broadcastPeerStatus(deviceId, "peer.online");
     console.log(`[req] WS /ws connect device=${deviceId} space=${spaceId} total=${conns.size}`);
 
@@ -164,12 +170,23 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
       conn.alive = true;
     });
 
-    ws.on("close", () => {
+    ws.on("close", (code, reason) => {
+      const atMs = Date.now();
       // 先广播离线（peer 广播按发起方空间分组，此时 conn 还在 conns）再删除
       broadcastPeerStatus(deviceId, "peer.offline");
       if (conns.get(deviceId) === conn) conns.delete(deviceId);
       // WS 断开 = 离线：last_seen 置 0（App 判定离线）
       getDb().prepare(`UPDATE devices SET last_seen = 0 WHERE device_id = ?`).run(deviceId);
+      logConnection({
+        deviceId,
+        spaceId,
+        event: conn.timedOut ? "heartbeat_timeout" : "disconnect",
+        atMs,
+        durationMs: atMs - conn.connectedAt,
+        closeCode: typeof code === "number" ? code : null,
+        closeReason: reason?.toString("utf8") ?? null,
+        meta: conn.meta,
+      });
       console.log(`[req] WS /ws disconnect device=${deviceId} total=${conns.size}`);
     });
   });
@@ -178,6 +195,9 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
   const heartbeat = setInterval(() => {
     for (const [deviceId, conn] of conns) {
       if (!conn.alive) {
+        // 心跳超时：先打标（随后的 close 事件据此记 heartbeat_timeout，并带上
+        // 来源 IP/UA），再 terminate——审计需要区分"客户端主动断"与"超时失联"。
+        conn.timedOut = true;
         conn.ws.terminate();
         conns.delete(deviceId);
         continue;
