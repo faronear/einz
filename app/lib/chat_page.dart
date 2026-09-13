@@ -414,6 +414,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       token: widget.token,
       settings: BurnAfterSettings(db),
       reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
+      // 本端 personId（向导登记时确定）：种入归属判定映射，离线启动也能
+      // 按 person 维度分左右分栏（服务器离线拉不到 device→person 映射）
+      personId: widget.personId,
     );
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);

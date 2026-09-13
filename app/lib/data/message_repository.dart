@@ -56,7 +56,13 @@ class MessageRepository {
     this.token,
     this.settings,
     this.reauth,
-  }) : archivedKeys = archivedKeys ?? {};
+    String? personId,
+  }) : archivedKeys = archivedKeys ?? {} {
+    // 向导完成时已知本端 personId：立即种入映射，保证首帧就按 person 判定归属
+    // （离线启动时 GET /space 拉不到映射；持久化映射由 refreshDeviceMap 落盘）。
+    final pid = personId;
+    if (pid != null && pid.isNotEmpty) _personByDevice[deviceId] = pid;
+  }
 
   final LocalDatabase db;
   final ApiClient api;
@@ -121,26 +127,80 @@ class MessageRepository {
   /// 用于判断消息是否"同一个人"发送：同 person 不同设备显示为 'me'。
   final Map<String, String> _personByDevice = {};
 
+  /// device→person 映射的本地持久化键：离线启动时 GET /space 拿不到，只有靠这份
+  /// 缓存才认得出"同一身份其他设备"发来的消息（否则一律判成对方、气泡全左对齐——
+  /// 老板 2026-09-13 实测；TUI 侧因持久化 personId 而无此问题）。
+  static const _kDevicePersonMap = 'identity.device_person_map';
+
+  /// 身份缓存是否已从库里载入（首次判归属 / 发送前惰性载入一次）。
+  bool _identityLoaded = false;
+
+  /// 惰性载入持久化的 device→person 映射（离线也能用）。
+  Future<void> _ensureIdentityLoaded() async {
+    if (_identityLoaded) return;
+    _identityLoaded = true;
+    try {
+      final row = await (db.select(db.appState)
+            ..where((s) => s.key.equals(_kDevicePersonMap)))
+          .getSingleOrNull();
+      final raw = row?.value;
+      if (raw == null || raw.isEmpty) return;
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      // putIfAbsent：不覆盖构造函数种入的本端 personId（向导已知，优先采信）
+      for (final e in m.entries) {
+        _personByDevice.putIfAbsent(e.key, () => e.value as String);
+      }
+    } catch (_) {
+      // 缓存损坏：忽略（退化为 device 维度判断）
+    }
+  }
+
+  /// 持久化 device→person 映射（GET /space 成功后 / 记录本端 personId 时）。
+  Future<void> _saveIdentityMap() async {
+    if (_personByDevice.isEmpty) return;
+    try {
+      await db.into(db.appState).insertOnConflictUpdate(
+            AppStateCompanion.insert(
+              key: _kDevicePersonMap,
+              value: jsonEncode(_personByDevice),
+            ),
+          );
+    } catch (_) {
+      // 落盘失败不影响本次会话（下次联网刷新再写）
+    }
+  }
+
   /// 拉取空间设备映射（person_id）。映射缺失时 history 的 sender 判断降级为 device 维度。
   Future<void> refreshDeviceMap() async {
     final t = token;
     if (t == null) return;
     try {
       final space = await _withAutoAuth((tok) => api.getSpace(tok));
+      final seeded = _personByDevice[deviceId]; // 构造函数种入的本端 personId
       _personByDevice
         ..clear()
         ..addEntries(space.devices.map((d) => MapEntry(d.deviceId, d.personId)));
+      if (seeded != null && !_personByDevice.containsKey(deviceId)) {
+        _personByDevice[deviceId] = seeded; // 服务端列表缺本机时兜底保留
+      }
+      await _saveIdentityMap(); // 落盘：离线启动仍能按 person 判定归属
     } catch (_) {
       // 网络抖动忽略：保留旧映射（无映射时降级 device 判断）
     }
   }
 
-  /// 消息是否"同一个人"发送：优先 person 维度，映射缺失降级 device 维度。
-  bool _isSamePerson(String senderDeviceId) {
-    final my = _personByDevice[deviceId];
-    final sender = _personByDevice[senderDeviceId];
-    if (my != null && sender != null) return my == sender;
-    return senderDeviceId == deviceId;
+  /// 消息是否本端（我）发送：**优先 person 维度**——信封自带 senderPersonId，
+  /// 离线也拿得到；映射缺失再依次退到映射查表、device 维度。
+  /// （旧实现只看 device：离线映射为空时，"同一身份其他设备"发的消息会被误判成
+  /// 对方 → 气泡全左对齐——老板 2026-09-13 实测。）
+  bool _isMineMessage(MessageEnvelope env) {
+    final myPerson = _personByDevice[deviceId];
+    final senderPerson =
+        env.senderPersonId ?? _personByDevice[env.senderDeviceId];
+    if (myPerson != null && senderPerson != null) {
+      return myPerson == senderPerson;
+    }
+    return env.senderDeviceId == deviceId;
   }
 
   /// 设备 → 用户（person_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPersonId）。
@@ -169,6 +229,7 @@ class MessageRepository {
     FutureOr<void> Function(String messageId)? onPersisted,
   }) async {
     final messageId = _uuidv7();
+    await _ensureIdentityLoaded(); // 离线也要带上本端 personId（归属判定/展示用）
     // 引用/附加数据：载荷 = {"plaintext":…, "quote":…, "meta":…} JSON（AEAD 密文内，
     // Server 不可见；旧客户端/CLI 未识别时按整段 JSON 文本展示，仅影响这类消息）
     final payload = encodeMessagePayload(plaintext, quote: quote, meta: meta);
@@ -224,6 +285,7 @@ class MessageRepository {
   }) async {
     final messageId = _uuidv7();
     final attachmentId = _uuidv7();
+    await _ensureIdentityLoaded(); // 离线也要带上本端 personId（归属判定/展示用）
     final plain = caption ?? (type == 'voice' ? '🎤 语音消息' : '📎 $fileName');
 
     // 1) 加密文件（密文 + sha256 + nonce + size）
@@ -592,6 +654,7 @@ class MessageRepository {
 
   /// 行 → 历史记录（解密 + 附件元数据 + person 身份 + 阅后即焚到期）。
   Future<List<HistoryMessage>> _rowsToHistory(List<LocalMessage> rows) async {
+    await _ensureIdentityLoaded(); // 离线：用持久化的 device→person 映射判定归属
     final out = <HistoryMessage>[];
     for (final row in rows) {
       // 回填 server_sequence：本机发送的消息 ciphertext 落盘时无 seq（由 _markSent
@@ -621,7 +684,7 @@ class MessageRepository {
       out.add((
         env: env,
         plaintext: plain,
-        sender: _isSamePerson(env.senderDeviceId) ? 'me' : 'peer',
+        sender: _isMineMessage(env) ? 'me' : 'peer',
         attachment: att == null
             ? null
             : {
