@@ -38,8 +38,14 @@ class _StatusFakeApi extends ApiClient {
   int hangPostsBefore = 0;
   int _postCalls = 0;
 
+  /// 是否让 postMessage 抛**网络类**异常（→ 保持 pending，不标 failed）。
+  bool failPostMessage = false;
+
   /// 是否让 postMessage 被**服务端明确拒绝**（4xx → 应标 failed）。
   bool rejectPostMessage = false;
+
+  /// postMessage 的响应延迟（观察「加速中…/重发中…」这类进行中文案用）。
+  Duration? postMessageDelay;
 
   @override
   Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
@@ -64,11 +70,13 @@ class _StatusFakeApi extends ApiClient {
   }
 
   @override
-  Future<PostMessageResult> postMessage(MessageEnvelope env, String token) {
+  Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
+    if (postMessageDelay != null) await Future<void>.delayed(postMessageDelay!);
     _postCalls++;
     if (rejectPostMessage) {
       throw ApiException('INVALID_REQUEST', 'invalid envelope', 400);
     }
+    if (failPostMessage) throw Exception('network down');
     if (_postCalls <= hangPostsBefore) {
       // 永不完成：模拟响应丢失（HTTP 层面没有超时的老行为）
       return Completer<PostMessageResult>().future;
@@ -102,6 +110,21 @@ class _StatusFakeApi extends ApiClient {
 void main() {
   setUpAll(() async {
     await sodium();
+  });
+
+  // 关掉动画：pending 的小飞机是**常驻动画**，会让 pumpAndSettle 一直等到超时。
+  // 用系统的「减少动态效果」偏好关掉它（生产代码在 disableAnimations 时退化为
+  // 静态图标——顺带覆盖了这条无障碍路径）。
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized()
+        .platformDispatcher
+        .accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+  });
+  tearDown(() {
+    TestWidgetsFlutterBinding.ensureInitialized()
+        .platformDispatcher
+        .accessibilityFeaturesTestValue = const FakeAccessibilityFeatures();
   });
 
   testWidgets('发送后即使 seq 低于本地高水位，气泡也应从「发送中」更新为「已发送」',
@@ -338,5 +361,109 @@ void main() {
     expect(find.text('会被删除的消息'), findsNothing, reason: '墓碑应隐藏正文');
     expect(find.byIcon(Icons.check), findsOneWidget,
         reason: '墓碑不影响在途路径，状态图标仍应显示');
+  });
+
+  testWidgets('点按小飞机：重发期间显示「加速中…」，成功后回到单勾', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 用"网络异常"造出 pending（这样 ChatPage 的 _flushPending 不会把它抢先发走，
+    // 仍是待确认状态）；点按前再切成"慢 + 成功"，便于观察「加速中…」。
+    final api = _StatusFakeApi(peer: const [], postedSeq: 1)..failPostMessage = true;
+    await MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      token: 'tok',
+    ).send('待加速的消息');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsOneWidget,
+        reason: '网络异常后应停在待确认的小飞机');
+
+    // 网络恢复且响应变慢 → 点按后能观察到「加速中…」
+    api.failPostMessage = false;
+    api.postMessageDelay = const Duration(milliseconds: 60);
+    await tester.tap(find.byTooltip('发送中，点击验证是否已送达并重发'));
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(find.text('加速中…'), findsOneWidget, reason: '重发期间应显示进行中文案');
+
+    // 完成后 → 单勾，「加速中…」消失
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.text('加速中…'), findsNothing);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+  });
+
+  testWidgets('点按「点击重发」：期间显示「重发中…」，再次失败回到「点击重发」',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 注意：delay 不能在建 failed 阶段就设上——测试体内 await 到的 Future.delayed
+    // 在 FakeAsync 下不会被推进，会直接挂死。故点按前再设。
+    final api = _StatusFakeApi(peer: const [], postedSeq: 1)..rejectPostMessage = true;
+
+    // 服务端明确拒绝 → failed（气泡显示「点击重发」）
+    await MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      token: 'tok',
+    ).send('会被再次拒绝的');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.text('点击重发'), findsOneWidget);
+
+    // 让重发慢下来（仍会被拒绝）→ 点按后能观察到「重发中…」
+    api.postMessageDelay = const Duration(milliseconds: 60);
+    await tester.tap(find.text('点击重发'));
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(find.text('重发中…'), findsOneWidget, reason: '重发期间应显示进行中文案');
+
+    // 再次被拒绝 → 回到 failed → 文案换回「点击重发」
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.text('重发中…'), findsNothing);
+    expect(find.text('点击重发'), findsOneWidget, reason: '再次失败应换回「点击重发」');
   });
 }

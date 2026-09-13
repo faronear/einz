@@ -241,6 +241,8 @@
   "chatPageMsgDelivered": "已送达",
   "chatPageMsgFailed": "发送失败，点击重试",
   "chatPageMsgFailedTap": "点击重发",
+  "chatPageMsgResending": "重发中…",
+  "chatPageMsgSpeedingUp": "加速中…",
   "chatPageVoiceStartFailed": "录音启动失败: {error}",
   "@chatPageVoiceStartFailed": {
     "placeholders": {

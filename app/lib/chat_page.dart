@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
@@ -140,6 +141,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _appResumed = true; // 前台才允许把消息标为已读
   /// 对方回执（已送达/已读）本地缓存：渲染自己消息的状态标用（避免每条消息查库）。
   List<PeerReceipt> _peerReceipts = const [];
+
+  /// 正在"点按重发"的消息：messageId → 'speedup'（点的是小飞机）/ 'resend'
+  /// （点的是 failed）。点按期间在图标前显示「加速中…」/「重发中…」，完成或
+  /// 再次失败后清掉（老板 2026-09-13）。
+  final Map<String, String> _retrying = {};
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
@@ -218,20 +224,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildSendStatusIcon(HistoryMessage m) {
     final l10n = AppLocalizations.of(context)!;
     final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
+    final messageId = m.env.messageId;
+    final busy = _retrying[messageId];
+
+    // 点按重发期间的前置文案（老板 2026-09-13）：点小飞机 → 「加速中…」；
+    // 点 failed → 「重发中…」。完成后按结果回到对应状态：若又失败（服务端明确
+    // 拒绝）→ 清掉 busy → 文案回到「点击重发」。
+    final busyLabel = switch (busy) {
+      'speedup' => l10n.chatPageMsgSpeedingUp,
+      'resend' => l10n.chatPageMsgResending,
+      _ => null,
+    };
+
     if (m.status == 'failed') {
-      // 文字标签「点击重发」+ 红色警告图标（老板 2026-09-13 要求加显式文字：
-      // 光一个 ⚠️ 不够明确，用户看不出这能点）
+      // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）
       return Tooltip(
         message: l10n.chatPageMsgFailed,
         child: GestureDetector(
-          onTap: () async {
-            await _repo.retryMessage(m.env.messageId);
-            await _refreshLocal();
-          },
+          onTap: () => _tapRetryMessage(m, asResend: true),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.chatPageMsgFailedTap,
+              Text(busyLabel ?? l10n.chatPageMsgFailedTap,
                   style: TextStyle(fontSize: 10, color: Colors.red.shade600)),
               const SizedBox(width: 2),
               Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
@@ -240,6 +254,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       );
     }
+
     // 对方已收到（delivered）/已读（read）→ 双勾。read 与 delivered 同图标：
     // 已读暂不展示（老板 2026-09-12）。
     final receipt = MessageRepository.receiptOf(m.env.serverSequence, _peerReceipts);
@@ -249,31 +264,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: Icon(Icons.done_all, size: 12, color: subtle),
       );
     }
-    switch (m.status) {
-      case 'sent':
-        return Tooltip(
-          message: l10n.chatPageMsgSent,
-          child: Icon(Icons.check, size: 12, color: subtle),
-        );
-      default: // pending（队列中/发送中）
-        // 可点按：用**同一封消息重发一次**（服务端按 message_id 幂等去重）——
-        // 等价于"让我的设备去问服务端到底收到没有"：
-        //   服务端已存 → 返回原 seq → 变单勾（不会产生重复）
-        //   服务端没存 → 这次存下 → 变单勾
-        //   仍然失败 → 变 ⚠️（可继续点按重发）
-        // 场景（老板 2026-09-13 实测）：服务端其实收到了（对方已收到），但响应
-        // 在回程丢失 → 状态永远停在发送中，用户无从确认也无从重试。
-        return Tooltip(
-          message: l10n.chatPageMsgSendingTap,
-          child: GestureDetector(
-            onTap: () async {
-              await _repo.retryMessage(m.env.messageId);
-              await _refreshLocal();
-            },
-            // 纸飞机=发送中（老板 2026-09-12；原来与阅后即焚的时钟撞字形）
-            child: Icon(Icons.send, size: 11, color: subtle),
-          ),
-        );
+    if (m.status == 'sent') {
+      return Tooltip(
+        message: l10n.chatPageMsgSent,
+        child: Icon(Icons.check, size: 12, color: subtle),
+      );
+    }
+
+    // pending（还没确认）：动态小飞机 + 可点按（幂等重发＝去问服务端收到没）
+    return Tooltip(
+      message: l10n.chatPageMsgSendingTap,
+      child: GestureDetector(
+        onTap: () => _tapRetryMessage(m, asResend: false),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (busyLabel != null) ...[
+              Text(busyLabel, style: TextStyle(fontSize: 10, color: subtle)),
+              const SizedBox(width: 2),
+            ],
+            _SendingPlane(color: subtle),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 点按状态小标 → 幂等重发（服务端按 message_id 去重），期间显示进行中文案。
+  Future<void> _tapRetryMessage(HistoryMessage m, {required bool asResend}) async {
+    final messageId = m.env.messageId;
+    setState(() => _retrying[messageId] = asResend ? 'resend' : 'speedup');
+    try {
+      await _repo.retryMessage(messageId);
+      await _refreshLocal();
+    } finally {
+      if (mounted) setState(() => _retrying.remove(messageId));
     }
   }
 
@@ -3497,6 +3522,52 @@ class _VideoPreviewState extends State<_VideoPreview> {
       ),
     );
     await c.pause();
+  }
+}
+
+/// 「发送中」的**动态**小飞机（老板 2026-09-13）：轻微上下浮动 + 左右小幅平移 +
+/// 一点点俯仰，读起来像"飞行中"。原来是个静态图标，看不出"正在动"。
+///
+/// 无障碍/测试友好：`MediaQuery.disableAnimations` 为真时退化为静态图标——
+/// 既尊重"减少动态效果"的系统偏好，也让 widget 测试里的 `pumpAndSettle` 不会
+/// 被这个常驻动画卡住（常驻动画会让 pumpAndSettle 一直等到超时）。
+class _SendingPlane extends StatefulWidget {
+  const _SendingPlane({this.color});
+
+  final Color? color;
+
+  @override
+  State<_SendingPlane> createState() => _SendingPlaneState();
+}
+
+class _SendingPlaneState extends State<_SendingPlane>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = Icon(Icons.send, size: 11, color: widget.color);
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return icon;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value * 2 * math.pi;
+        return Transform.translate(
+          offset: Offset(math.sin(t) * 1.5, -math.cos(t) * 1.2),
+          child: Transform.rotate(angle: math.sin(t) * 0.15, child: child),
+        );
+      },
+      child: icon,
+    );
   }
 }
 

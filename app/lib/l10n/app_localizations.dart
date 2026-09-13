@@ -1196,6 +1196,18 @@ abstract class AppLocalizations {
   /// **'Tap to resend'**
   String get chatPageMsgFailedTap;
 
+  /// No description provided for @chatPageMsgResending.
+  ///
+  /// In en, this message translates to:
+  /// **'Resending…'**
+  String get chatPageMsgResending;
+
+  /// No description provided for @chatPageMsgSpeedingUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Speeding up…'**
+  String get chatPageMsgSpeedingUp;
+
   /// No description provided for @chatPageVoiceStartFailed.
   ///
   /// In en, this message translates to:

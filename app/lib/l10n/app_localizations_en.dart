@@ -615,6 +615,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMsgFailedTap => 'Tap to resend';
 
   @override
+  String get chatPageMsgResending => 'Resending…';
+
+  @override
+  String get chatPageMsgSpeedingUp => 'Speeding up…';
+
+  @override
   String chatPageVoiceStartFailed(String error) {
     return 'Recording start failed: $error';
   }

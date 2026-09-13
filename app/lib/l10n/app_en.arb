@@ -241,6 +241,8 @@
   "chatPageMsgDelivered": "Delivered",
   "chatPageMsgFailed": "Send failed, tap to retry",
   "chatPageMsgFailedTap": "Tap to resend",
+  "chatPageMsgResending": "Resending…",
+  "chatPageMsgSpeedingUp": "Speeding up…",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
   "@chatPageVoiceStartFailed": {
     "placeholders": {
