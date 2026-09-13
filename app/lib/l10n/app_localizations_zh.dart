@@ -621,6 +621,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageAttachEmoji => '表情符';
+
+  @override
+  String get chatPageEmojiKeyboard => '键盘';
+
+  @override
   String get chatPageAttachPhoto => '拍照';
 
   @override

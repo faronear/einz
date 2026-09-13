@@ -1250,6 +1250,18 @@ abstract class AppLocalizations {
   /// **'Audio playback failed: {error}'**
   String chatPageAudioPlayFailed(String error);
 
+  /// No description provided for @chatPageAttachEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Emoji'**
+  String get chatPageAttachEmoji;
+
+  /// No description provided for @chatPageEmojiKeyboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard'**
+  String get chatPageEmojiKeyboard;
+
   /// No description provided for @chatPageAttachPhoto.
   ///
   /// In en, this message translates to:

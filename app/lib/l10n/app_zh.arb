@@ -270,6 +270,8 @@
       "error": {"type": "String"}
     }
   },
+  "chatPageAttachEmoji": "表情符",
+  "chatPageEmojiKeyboard": "键盘",
   "chatPageAttachPhoto": "拍照",
   "chatPageAttachGalleryImage": "相册图片",
   "chatPageAttachVideoCamera": "拍摄视频",

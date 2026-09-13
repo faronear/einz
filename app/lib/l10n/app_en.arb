@@ -270,6 +270,8 @@
       "error": {"type": "String"}
     }
   },
+  "chatPageAttachEmoji": "Emoji",
+  "chatPageEmojiKeyboard": "Keyboard",
   "chatPageAttachPhoto": "Take photo",
   "chatPageAttachGalleryImage": "Gallery image",
   "chatPageAttachVideoCamera": "Record video",

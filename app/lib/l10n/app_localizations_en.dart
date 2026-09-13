@@ -650,6 +650,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageAttachEmoji => 'Emoji';
+
+  @override
+  String get chatPageEmojiKeyboard => 'Keyboard';
+
+  @override
   String get chatPageAttachPhoto => 'Take photo';
 
   @override

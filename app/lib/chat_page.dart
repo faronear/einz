@@ -26,11 +26,13 @@ import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
+import 'widgets/emoji_panel.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
 
-/// 附件类型（选择弹层返回）：图像/视频用 image_picker，音频/文件用 file_picker。
-enum _AttachmentKind { photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
+/// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
+/// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
+enum _AttachmentKind { emoji, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
 
 /// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
 /// 点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态（试听/取消，
@@ -161,6 +163,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 当前 ticker 周期（用于判断是否需要按退避重设）。
   Duration? _currentTickerInterval;
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
+  // 表情面板展开中（输入栏内联，与键盘互斥：打开时收起键盘；输入框重新获焦时自动收起）
+  bool _emojiPanelOpen = false;
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
   StreamSubscription<Amplitude>? _ampSub; // 录音振幅流订阅（波形驱动）
@@ -404,6 +408,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
+    _inputFocusNode.addListener(_onInputFocusChanged);
     _loadBurnLabel();
     _refreshPinStatus();
     // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
@@ -1198,6 +1203,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _ampSub?.cancel();
     _ws?.connected.removeListener(_onWsStatusChanged);
     _ws?.stop();
+    _scrollController.removeListener(_maybeLoadOlder);
+    _inputFocusNode.removeListener(_onInputFocusChanged);
     _scrollController.dispose();
     _input.dispose();
     _inputFocusNode.dispose();
@@ -1637,6 +1644,72 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
     }
+  }
+
+  // ---------- 表情面板：输入栏内联展开，与键盘互斥 ----------
+
+  /// 展开表情面板：先收键盘（二者互斥，否则面板被顶在键盘上方）。
+  void _openEmojiPanel() {
+    // 录音中/预览态（有未发送录音）不打断——面板只服务文字输入
+    if (_inputMode == _InputMode.recording || _inputMode == _InputMode.preview) return;
+    if (_inputMode == _InputMode.hint) setState(() => _inputMode = _InputMode.text);
+    _inputFocusNode.unfocus();
+    setState(() => _emojiPanelOpen = true);
+  }
+
+  /// 收起面板回到键盘（面板上的键盘键；点输入框走 _onInputFocusChanged 等价路径）。
+  void _closeEmojiPanel() {
+    if (!_emojiPanelOpen) return;
+    setState(() => _emojiPanelOpen = false);
+    _inputFocusNode.requestFocus();
+  }
+
+  /// 输入框重新获焦（键盘弹出）→ 自动收起面板。
+  void _onInputFocusChanged() {
+    if (_inputFocusNode.hasFocus && _emojiPanelOpen) {
+      setState(() => _emojiPanelOpen = false);
+    }
+  }
+
+  /// 在光标处插入文字（表情面板选中的 emoji）：面板展开时键盘收起、看不到光标，
+  /// 仍按当前 selection 位置插入，插完光标后移一位，可连续点选。
+  void _insertText(String insert) {
+    final old = _input.text;
+    final selection = _input.selection;
+    // 从未聚焦过时 selection 无效（offset=-1）：插到末尾
+    final start = selection.isValid ? selection.start.clamp(0, old.length) : old.length;
+    final end = selection.isValid ? selection.end.clamp(0, old.length) : old.length;
+    _setInputValue(old.replaceRange(start, end, insert), start + insert.length);
+  }
+
+  /// 退格：删光标前一个字符（emoji 多为 UTF-16 代理对，要整对删）；有选区时删选区。
+  void _deleteBackward() {
+    final old = _input.text;
+    if (old.isEmpty) return;
+    final selection = _input.selection;
+    final end = selection.isValid ? selection.end.clamp(0, old.length) : old.length;
+    if (end == 0) return;
+    final start = (selection.isValid && !selection.isCollapsed)
+        ? selection.start.clamp(0, old.length)
+        : _charStartBefore(old, end);
+    _setInputValue(old.replaceRange(start, end, ''), start);
+  }
+
+  void _setInputValue(String text, int caretOffset) {
+    _input.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: caretOffset),
+    );
+  }
+
+  /// 下标 end 前一个字符的起始位置：代理对（emoji）占 2 个 code unit。
+  int _charStartBefore(String text, int end) {
+    if (end >= 2) {
+      final high = text.codeUnitAt(end - 2);
+      final low = text.codeUnitAt(end - 1);
+      if (high >= 0xD800 && high <= 0xDBFF && low >= 0xDC00 && low <= 0xDFFF) return end - 2;
+    }
+    return end - 1;
   }
 
   /// 发送附件（语音/图片/视频/文件）：本地落库即回显，再刷新状态。
@@ -2163,6 +2236,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Icons.emoji_emotions_outlined),
+              title: Text(l10n.chatPageAttachEmoji),
+              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
+            ),
+            ListTile(
               leading: const Icon(Icons.photo_camera),
               title: Text(l10n.chatPageAttachPhoto),
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
@@ -2196,7 +2274,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       ),
     );
-    if (kind != null) await _sendMedia(kind);
+    if (kind == null) return;
+    if (kind == _AttachmentKind.emoji) {
+      _openEmojiPanel(); // 不发附件：只展开输入栏表情面板
+      return;
+    }
+    await _sendMedia(kind);
   }
 
   Future<void> _sendMedia(_AttachmentKind kind) async {
@@ -2205,6 +2288,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       String? fileName;
       String? type;
       switch (kind) {
+        case _AttachmentKind.emoji:
+          return; // 已在 _showAttachmentSheet 中分流（展开表情面板），不走上传
         case _AttachmentKind.photo:
           image = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1600);
           if (image == null) return;
@@ -2992,6 +3077,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ],
                   ),
+                  // 表情面板：展开时占据输入行下方（键盘已收起），可连续点选插入
+                  if (_emojiPanelOpen)
+                    EmojiPanel(
+                      onEmojiSelected: _insertText,
+                      onBackspace: _deleteBackward,
+                      onDismiss: _closeEmojiPanel,
+                    ),
                 ],
               ),
             ),
