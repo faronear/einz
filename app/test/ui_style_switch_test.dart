@@ -113,16 +113,16 @@ void main() {
     await tester.pumpAndSettle();
 
     // 弹窗：标题 + 两个风格（名称+描述）
-    expect(find.text('界面风格 / Interface style'), findsOneWidget);
-    expect(find.text('素雅纯色 / Plain'), findsOneWidget);
-    expect(find.text('渐变粉蓝 / Gradient'), findsOneWidget);
+    expect(find.text('界面风格'), findsOneWidget);
+    expect(find.text('素雅纯色'), findsOneWidget);
+    expect(find.text('渐变粉蓝'), findsOneWidget);
     expect(find.textContaining('浅粉纯色背景'), findsOneWidget, reason: '纯色风格应有一句描述');
     expect(find.textContaining('粉蓝渐变背景'), findsOneWidget, reason: '渐变风格应有一句描述');
 
     // 点选渐变粉蓝 → 立即生效：弹窗不关闭 + 聊天页背景出现渐变
-    await tester.tap(find.text('渐变粉蓝 / Gradient'));
+    await tester.tap(find.text('渐变粉蓝'));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格 / Interface style'), findsOneWidget, reason: '点选后弹窗应保持打开（预览不关窗）');
+    expect(find.text('界面风格'), findsOneWidget, reason: '点选后弹窗应保持打开（预览不关窗）');
     expect(gradientBackground, findsOneWidget, reason: '点选渐变后聊天页背景应切换为渐变');
 
     // 全屏渐变（同向导）：body 延伸到 AppBar 之后、AppBar 透明、状态条/输入条
@@ -141,9 +141,9 @@ void main() {
     expect(await settings.load(), 'gradient', reason: '风格选择应持久化到本地');
 
     // 再点回素雅纯色 → 渐变背景消失、弹窗仍在
-    await tester.tap(find.text('素雅纯色 / Plain'));
+    await tester.tap(find.text('素雅纯色'));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格 / Interface style'), findsOneWidget);
+    expect(find.text('界面风格'), findsOneWidget);
     expect(gradientBackground, findsNothing, reason: '切回纯色后渐变背景应移除');
     final scaffoldAfter = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffoldAfter.extendBodyBehindAppBar, isFalse, reason: '切回纯色后恢复原有布局（body 不从 AppBar 后延伸）');
@@ -155,7 +155,7 @@ void main() {
     // 右上角 ✕ 关闭弹窗
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格 / Interface style'), findsNothing, reason: '点 ✕ 后弹窗应关闭');
+    expect(find.text('界面风格'), findsNothing, reason: '点 ✕ 后弹窗应关闭');
     expect(tester.takeException(), isNull);
   });
 

@@ -56,7 +56,7 @@ class _UiStylePickerSheetState extends State<UiStylePickerSheet> {
             child: Row(
               children: [
                 const Expanded(
-                  child: Text('界面风格 / Interface style',
+                  child: Text('界面风格',
                       style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                 ),
                 IconButton(
