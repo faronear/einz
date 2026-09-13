@@ -1645,6 +1645,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             : {
                 'messageId': quote.env.messageId,
                 'preview': _quotePreview(quote.plaintext),
+                // 原消息类型：引用块据此把图片渲染成缩略图（老板要求 2026-09-13）
+                'type': quote.env.type,
+                // 语音/音频时长：引用块据此画波形 + 秒数（原消息未加载也能显示）
+                if (quote.env.type == 'voice' || quote.env.type == 'audio')
+                  'seconds': _audioDurationSeconds(quote),
               },
         // 本地落库即回显 pending 气泡（乐观 UI），不等上传/sync 往返
         onPersisted: (_) => _refreshLocal(),
@@ -1811,6 +1816,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       case 'audio':
         bubbleContent = _buildAudioBar(m, waveformWidth: 88);
         break;
+      case 'image':
+        bubbleContent = _buildImageThumb(m, size: 48);
+        break;
       default:
         bubbleContent = Text(
           preview.isEmpty ? m.env.type : preview,
@@ -1907,42 +1915,143 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 引用预览截断（60 字内）。
+  ///
+  /// 附件消息明文自带 📎 前缀（发送端的兜底文案），引用条里已有缩略图，别针图标
+  /// 重复且多余——去掉（老板要求 2026-09-13）。
   String _quotePreview(String text) {
-    final t = text.trim();
+    var t = text.trim();
+    if (t.startsWith('📎')) t = t.replaceFirst('📎', '').trim();
     return t.length > 60 ? '${t.substring(0, 60)}…' : t;
   }
 
+  /// 已加载消息里按 messageId 找原消息（引用块显示缩略图用）；未加载到返回 null
+  /// ——此时引用块退回文字预览，点它跳转会把原消息补载进来（补载后自动变缩略图）。
+  HistoryMessage? _messageById(String messageId) {
+    if (messageId.isEmpty) return null;
+    final index = _messages.indexWhere((x) => x.env.messageId == messageId);
+    return index < 0 ? null : _messages[index];
+  }
+
+  /// 语音/音频引用的只读外观：**波形图 + 秒数**（不带播放键——引用条/引用块只做
+  /// 展示）。波形与消息流气泡同源（seed=messageId，形状一致）、时长未知时不显示
+  /// 秒数，与气泡规则相同（老板要求 2026-09-13：录音消息到处一个样）。
+  Widget _buildVoiceQuoteRow({
+    required String messageId,
+    required int seconds,
+    required bool isVoice,
+    required Color color,
+    double waveformWidth = 96,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _VoiceWaveform(
+          playing: false,
+          durationSeconds: seconds,
+          seed: messageId,
+          activeColor: color,
+          inactiveColor: color.withValues(alpha: 0.4),
+          width: waveformWidth,
+        ),
+        if (seconds > 0) ...[
+          const SizedBox(width: 6),
+          Text(
+            isVoice ? _formatVoiceDuration(seconds) : _formatHmsDuration(seconds),
+            style: TextStyle(fontSize: 12, color: color),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 引用块内容：原消息是图片就显示它的缩略图、是语音/音频就显示波形图 + 秒数
+  /// （老板要求 2026-09-13），其余（含图片原消息尚未加载/无附件）沿用文字预览。
+  Widget _buildQuoteBlockContent(Map<String, dynamic> quote) {
+    final type = quote['type'] as String?;
+    if (type == 'image') {
+      final quoted = _messageById(quote['messageId'] as String? ?? '');
+      if (quoted != null) return _buildImageThumb(quoted, size: 40);
+    }
+    if (type == 'voice' || type == 'audio') {
+      final seconds =
+          (quote['seconds'] is num) ? (quote['seconds'] as num).round() : 0;
+      return _buildVoiceQuoteRow(
+        messageId: quote['messageId'] as String? ?? '',
+        seconds: seconds,
+        isVoice: type == 'voice',
+        color: _uiStyle == 'gradient'
+            ? Colors.white70
+            : Theme.of(context).colorScheme.primary,
+      );
+    }
+    return Text(
+      _quotePreview(quote['preview'] as String? ?? ''),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+          fontSize: 12,
+          color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700),
+    );
+  }
+
   /// 输入栏引用条：被引用消息预览 + 取消按钮。
+  ///
+  /// 背景色**与消息气泡里的引用框完全一致**（黑 6% 半透明 / gradient 白 12%）——
+  /// 只要能看出和周边输入区不是同一块就行，深底太突兀（老板 2026-09-13）；
+  /// 蓝色左边缘也已在同日去掉。
   Widget _buildQuoteBanner(HistoryMessage quote) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: _uiStyle == 'gradient' ? Colors.white : const Color(0xFFFCEBF2),
+        // 与气泡引用框同色（_buildQuoteBlockContent 所在的引用块）
+        color: _uiStyle == 'gradient'
+            ? Colors.white12
+            : Colors.black.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: const Border(left: BorderSide(color: Color(0xFF3BAFFD), width: 3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.format_quote,
-              size: 14, color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey),
+          // 引用图片时显示原图缩略图（否则双引号图标）——与发送后的引用块一致
+          quote.env.type == 'image'
+              ? _buildImageThumb(quote, size: 24)
+              : Icon(Icons.format_quote,
+                  size: 14,
+                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey),
           const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              // 双引号图标已足够表达引用，不再加「引用：」前缀（老板要求 2026-09-09）
-              _quotePreview(quote.plaintext),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700),
+          // 语音/音频：波形图 + 秒数（与气泡/发送后的引用块一致，不再显示「语音」
+          // 这类文字——老板要求 2026-09-13）
+          if (quote.env.type == 'voice' || quote.env.type == 'audio') ...[
+            _buildVoiceQuoteRow(
+              messageId: quote.env.messageId,
+              seconds: _audioDurationSeconds(quote),
+              isVoice: quote.env.type == 'voice',
+              color: _uiStyle == 'gradient'
+                  ? Colors.white70
+                  : Theme.of(context).colorScheme.primary,
             ),
-          ),
+            const Spacer(), // 取消按钮仍靠右（与文字引用时一致）
+          ] else
+            Expanded(
+              child: Text(
+                // 双引号图标已足够表达引用，不再加「引用：」前缀（老板要求 2026-09-09）
+                _quotePreview(quote.plaintext),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: _uiStyle == 'gradient'
+                        ? Colors.white70
+                        : Colors.grey.shade700),
+              ),
+            ),
           InkWell(
             onTap: () => setState(() => _quoteTarget = null),
-            child: const Padding(
-              padding: EdgeInsets.all(4),
-              child: Icon(Icons.close, size: 16),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.close,
+                  size: 16,
+                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey),
             ),
           ),
         ],
@@ -1980,7 +2089,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _startVoice() async {
-    if (_inputMode == _InputMode.recording) return;
+    // 预览态（刚录完、波形已冻结）不再开录：此时长按波形图/录音条什么也不做，
+    // 避免误触从头重录、冲掉刚录好的那条。只有前面的播放键和后面的 X 可点；
+    // 点 X（_cancelVoice）回到等待录音的提示态，就又能长按开录了
+    // （老板要求 2026-09-13）。
+    if (_inputMode == _InputMode.recording || _inputMode == _InputMode.preview) {
+      return;
+    }
     // 录音时收起键盘（输入框被录音条覆盖，键盘占屏无意义）
     FocusManager.instance.primaryFocus?.unfocus();
     try {
@@ -2459,18 +2574,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return _repo.attachmentBytes(att);
   }
 
+  /// 图片明文（发送端本地密文解密 / 接收端服务端拉取）：按 messageId 缓存 future，
+  /// 气泡、长按菜单预览行、引用块缩略图共用同一次加载。
+  Future<Uint8List> _imageBytes(
+      HistoryMessage m) =>
+      _imageCache.putIfAbsent(m.env.messageId, () => _attachmentBytes(m));
+
   /// 图片消息：本地密文（发送端即时显示/上传失败兜底）或服务端拉取 →
   /// 缩略展示；点击全屏查看。
   Widget _buildImage(
       HistoryMessage m) {
     final att = m.attachment;
     if (att == null) return Text('📷 ${m.plaintext}');
-    final future = _imageCache.putIfAbsent(
-      m.env.messageId,
-      () => _attachmentBytes(m),
-    );
     return FutureBuilder<Uint8List>(
-      future: future,
+      future: _imageBytes(m),
       builder: (context, snap) {
         if (snap.hasData) {
           return GestureDetector(
@@ -2515,6 +2632,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ],
         ),
       ),
+    );
+  }
+
+  /// 小尺寸图片缩略图（长按菜单预览行 / 引用块 / 输入栏引用条用）：正方形 cover
+  /// 裁剪；加载中转圈，失败（无附件/解密失败）显示破图标占位。
+  /// 老板要求 2026-09-13：引用与长按菜单里看缩略图，而不是文件名。
+  Widget _buildImageThumb(
+      HistoryMessage m, {double size = 40}) {
+    return FutureBuilder<Uint8List>(
+      future: _imageBytes(m),
+      builder: (context, snap) {
+        if (snap.hasData) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.memory(snap.data!,
+                width: size, height: size, fit: BoxFit.cover),
+          );
+        }
+        return Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: snap.hasError
+              ? Icon(Icons.broken_image_outlined,
+                  size: size * 0.5, color: Colors.grey)
+              : SizedBox(
+                  width: size * 0.45,
+                  height: size * 0.45,
+                  child: const CircularProgressIndicator(strokeWidth: 2)),
+        );
+      },
     );
   }
 
@@ -3102,17 +3254,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                     .withValues(alpha: 0.06),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
-                                          child: Text(
-                                            _quotePreview(
-                                                m.quote!['preview'] as String? ?? ''),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: _uiStyle == 'gradient'
-                                                    ? Colors.white70
-                                                    : Colors.grey.shade700),
-                                          ),
+                                          child: _buildQuoteBlockContent(m.quote!),
                                         ),
                                       ),
                                   ],
@@ -3213,7 +3355,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             ),
                             if (_inputMode != _InputMode.text)
                               // 长按手势挂在常驻的 GestureDetector 上：提示态长按开始录音，
-                              // 进入录音态后此层不重建，松手能正常触发停止
+                              // 进入录音态后此层不重建，松手能正常触发停止；预览态由
+                              // _startVoice 直接忽略（长按不重录，防误触冲掉刚录好的一条）
                               Positioned.fill(
                                 child: GestureDetector(
                                   onLongPressStart: (_) => _startVoice(),
