@@ -4146,3 +4146,28 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 
 **验证：** `dart analyze`（cli）0 issue；`format_message_test` 全过。交互流程老板自测。
 
+## 2026-09-13 TUI 发出消息显示发送状态（pending ⋯ / sent ✓ / delivered ✓✓）+ 发出即上屏
+
+**老板要求：** TUI 像 App 一样显示我发出每条消息的状态——标签扩展为
+`[名字 时间 状态]`，用特殊字符表现 pending/sent/delivered。追加：服务器离线时
+TUI 发送的消息也要**立刻进消息流**（此前只提示"已入队"却不上屏，App 则即时可见
+pending 直到服务器恢复）。
+
+**改动 `cli/lib/chat_core.dart`：**
+- `peerDeliveredUpto`：对方送达高水位（`GET /receipts` + WS `receipt.updated`，
+  **排除自己那行**——自己的水位是"我收到对方哪些消息"，与我的发出无关，App 同款坑）。
+- `sentStatusOf(msg)`：pending（仍在离线队列 / 无 server_sequence）/
+  sent（服务端已收下）/ delivered（对方水位 ≥ seq）。read 折叠进 delivered。
+- `sendText`：加密入队后**立即乐观上屏**（seq=null，pending）；`flushPending`
+  拿到真实 seq 后按 messageId 覆盖为 sent；`loadHistory` 把离线队列也上屏。
+- `startWs` 新增 `onReceiptUpdated` 回调；`_autoSync` 顺带 `refreshReceipts()`。
+
+**改动 `cli/bin/einz_tui.dart`：**
+- `_statusGlyph`（⋯ / ✓ / ✓✓，按 1~2 列宽选字避免 emoji 双宽错位）；
+  `formatMessage` 我发消息的标签变为 `[我 时间 状态]`。
+- 接线：`_activateAfterBind` 首屏 `refreshReceipts()`；`onReceiptUpdated` 触发重绘。
+
+**验证：** 新增 `cli/test/message_status_check.dart`（真实 server）——发出=sent、
+对方补拉后=delivered、离线=pending 全通过；`receipts_check` 与 `format_message_test`
+回归通过。`dart analyze` 0 issue。commit `be151e7`。交互观感老板自测。
+
