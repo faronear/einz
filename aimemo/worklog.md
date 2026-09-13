@@ -4012,3 +4012,25 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 - 删 `test/goldens/*.png`（12 张，9/5–9/8 生成，已落后于后续大量 UI 改动）——不入库，
   出图时由 `--update-goldens -Dgolden=true` 重新生成（golden_render_test.dart 文件头已注明）。
 - 整文件加 `_goldensEnabled = bool.fromEnvironment('golden')` 开关，默认 skip。
+
+### 追加（同日）：长按菜单的列表式操作项 → 圆角方形卡片
+
+**老板要求：** 长按单条消息的底部弹出菜单，操作项从列表式 `ListTile` 改成一个个
+圆角方形卡片（内含对应图标 + 文字）；一行最多 4 个，总数 ≤4 时均匀分布，>4 时
+向左对齐摆放。
+
+**改动（`app/lib/chat_page.dart`）：**
+- 新增 `_buildMessageActionGrid(List<Widget>)`：以「一行 4 个」为基准算卡片宽度
+  （上限 96，避免大屏卡片被拉得过宽）；≤4 用 `Row(spaceEvenly)` 等距分布，
+  `IntrinsicHeight + stretch` 让同行卡片等高；>4 按每行 4 个分块、`Row(start)`
+  向左对齐，块间加竖向间距。
+- 新增 `_buildMessageActionCard({icon, label, onTap, destructive})`：`Material`
+  圆角 16 底色黑 5% + `InkWell`（clipped，波纹不溢出）+ 图标 26 + 文字 12
+  （居中、最多 2 行）；`destructive` 时图标/文字用 `Colors.red.shade400`
+  （对应删除项）。
+- `_showMessageActions` 的 `builder` 去掉三个 `ListTile`，改为
+  `Padding(16,12,16,16) > _buildMessageActionGrid([引用, 阅后即焚, 删除])`；
+  顶部预览行保持原样。弹窗返回值（'quote'/'burn'/'delete'）与后续分支不变。
+
+**验证：** `flutter analyze lib/chat_page.dart` 无问题（0 issue）。UI 老板自测，
+未跑测试/未更新 goldens。既有测试只断言文案（如 `find.text('引用')`），不受影响。

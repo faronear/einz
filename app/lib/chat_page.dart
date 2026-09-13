@@ -1773,22 +1773,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 老板要求 2026-09-10）；底色与被引消息的引用块同款浅灰，代替原来
             // 的分隔横线（老板要求 2026-09-13）
             _buildMessagePreviewRow(m),
-            ListTile(
-              leading: const Icon(Icons.format_quote),
-              title: Text(l10n.chatPageActionQuote),
-              onTap: () => Navigator.of(ctx).pop('quote'),
-            ),
-            // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-            ListTile(
-              leading: const Icon(Icons.timer_outlined),
-              title: Text(l10n.chatPageActionBurn),
-              onTap: () => Navigator.of(ctx).pop('burn'),
-            ),
-            ListTile(
-              leading: Icon(Icons.delete_outline, color: Colors.red.shade400),
-              title: Text(l10n.chatPageActionDelete,
-                  style: TextStyle(color: Colors.red.shade400)),
-              onTap: () => Navigator.of(ctx).pop('delete'),
+            // 操作项改为圆角方形卡片（图标 + 文字），不再是列表式 ListTile
+            // （老板要求 2026-09-13）
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: _buildMessageActionGrid([
+                _buildMessageActionCard(
+                  icon: Icons.format_quote,
+                  label: l10n.chatPageActionQuote,
+                  onTap: () => Navigator.of(ctx).pop('quote'),
+                ),
+                // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
+                _buildMessageActionCard(
+                  icon: Icons.timer_outlined,
+                  label: l10n.chatPageActionBurn,
+                  onTap: () => Navigator.of(ctx).pop('burn'),
+                ),
+                _buildMessageActionCard(
+                  icon: Icons.delete_outline,
+                  label: l10n.chatPageActionDelete,
+                  destructive: true,
+                  onTap: () => Navigator.of(ctx).pop('delete'),
+                ),
+              ]),
             ),
           ],
         ),
@@ -1803,6 +1810,101 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (action == 'burn') {
       await _setMessageBurn(m);
     }
+  }
+
+  /// 长按菜单的操作项布局：圆角方形卡片，一行最多 4 个。总数不超过 4 个时等距
+  /// 均匀铺开；超过 4 个时每行 4 个、向左对齐（老板要求 2026-09-13）。卡片宽度
+  /// 以「一行 4 个」为基准计算并设上限，保证尺寸不随数量或屏幕宽度剧烈变化。
+  Widget _buildMessageActionGrid(List<Widget> cards) {
+    const maxPerRow = 4;
+    const spacing = 12.0;
+    const maxCardWidth = 96.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fourColumnWidth =
+            (constraints.maxWidth - spacing * (maxPerRow - 1)) / maxPerRow;
+        final cardWidth =
+            fourColumnWidth < maxCardWidth ? fourColumnWidth : maxCardWidth;
+        final items = [
+          for (final card in cards) SizedBox(width: cardWidth, child: card),
+        ];
+        if (cards.length <= maxPerRow) {
+          // 不超过 4 个：等距分布、卡片等高分栏
+          return IntrinsicHeight(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: items,
+            ),
+          );
+        }
+        // 超过 4 个：每行 4 个一组、向左对齐摆放
+        final rows = <Widget>[];
+        for (var i = 0; i < items.length; i += maxPerRow) {
+          final chunk = items.sublist(
+            i,
+            i + maxPerRow > items.length ? items.length : i + maxPerRow,
+          );
+          rows.add(IntrinsicHeight(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var j = 0; j < chunk.length; j++) ...[
+                  if (j > 0) const SizedBox(width: spacing),
+                  chunk[j],
+                ],
+              ],
+            ),
+          ));
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const SizedBox(height: spacing),
+              rows[i],
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  /// 长按菜单的操作卡片：圆角方形，内含图标与文字；destructive 用红色标示
+  /// 删除等不可逆操作。
+  Widget _buildMessageActionCard({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
+  }) {
+    final foreground = destructive ? Colors.red.shade400 : null;
+    return Material(
+      color: Colors.black.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 26, color: foreground),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: foreground),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 长按菜单顶部的消息预览行：发言人头像 + 按性别气泡风格的正文。
