@@ -3427,6 +3427,60 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
 - `chat_send_status_test.dart` 7/7 通过；全量仍是 15 条既有环境性失败（未增加、无卡死）。
 - 服务端本轮未改动。
 
+## 2026-09-13 删除 v1 遗留「全丢恢复 /recover」（老板决策：整体删掉）
+
+老板结论：**如果一个空间的所有设备都丢了，说明这两人不需要这个空间了**，需要就
+全新再建；v1 之所以要有恢复，是因为 v1 一台服务器只有一个空间、丢了没法再建。
+目前尚未上线，**不需要考虑兼容** → 相关代码全部删除。
+
+### 删除前的核查（比"v2 不能用"更严重）
+- ① 它读的是 `key_escrow WHERE space_id = ''`（v1 遗留空行），而 Multiverse 的密保箱
+  存在 `space_id = <真实 spaceId>` → **它本来就永远读不到包**（线上只会 403）。
+- ② 它的撤销逻辑是**全库范围**的：`UPDATE devices … WHERE status='active'`、
+  `DELETE FROM sessions` / `push_tokens` / `invites` 都**没有 space 过滤** → 若哪天把
+  ①顺手修好，就会撤销该服务器上**所有空间**的设备。目前是 ①的半死状态挡住了 ②。
+- ③ "仅凭口令定位空间"做不到：服务端每个 space 只存一份 argon2id 哈希（自含盐），
+  遍历校验既慢又是免鉴权接口上的**放大攻击面**。
+
+### 删除内容
+- **server**：`escrow.ts` 的 `recoverSpace()` 整体删除；`app.ts` 的 `POST /recover`
+  路由与 import 删除。`passphrase_hash` **保留**（现在是"加入方取口令密保箱时校验
+  口令"，见 `escrowForSpace` 的 `{passphrase}` 分支），相关注释一并改写。
+- **shared**：`ApiClient.recoverSpace()`、`Api.recover` 常量删除；注释同步。
+- **cli**：TUI 引导里的"输入 r 全丢恢复"入口与 `_runRecoverAsCreator()` 删除；
+  其余注释里把 `/recover` 归因改为 `/revoke`（撤销路径）。
+- **docs**：PROTOCOL.md 该条改为"已整体移除 + 三层原因"；KEY_ESCROW.md §13 重写为
+  "取消备份/恢复与全丢恢复（2026-09-08 / 2026-09-13）"，并保留 CLI 的
+  `backup`/`restore`（12 词恢复码，纯客户端）说明。
+- **测试**：smoke 的 `/recover` 用例改为断言 **404**（防回归）；`cli/test/revoked_check.py`
+  的触发源从 `/recover` 换成正常撤销接口（见下）。
+
+### 顺带修好一条长期失效的测试（`revoked_check.py`）
+它原来用 `/recover` 触发撤销，且**引导步骤还是 v1 的**（直接问"我的名字"）——
+v2 加了"选择秘境入口 j/c"后就一直失败（与本轮改动无关）。本轮一并处理：
+- 引导移植到 v2 流程（入口→创建→名字/性别/伴侣→密保口令→锁屏码）；
+- 撤销改用正常接口：`DELETE /devices/:id` **不允许撤销自己**，所以先用 HTTP
+  `POST /spaces/{id}/join-tokens` + `POST /spaces/join` 造出"第二台设备"，再用它的
+  token 撤销 TUI 那台（保住"在线收到 device.revoked → 提示并退出"的断言）；
+- 第 4 步重启后要**先解锁**（本测试设了锁屏码）再看撤销提示；
+- 顺手修掉写死的 `ROOT='/Users/Shared/productX/einz'`（已失效），改为按 `__file__` 推导。
+**现在全绿**：`✅ 第一设备入网并保持在线` / `✅ 撤销 → 在线 TUI 提示后自动退出` /
+`✅ 撤销设备提示后自动退出` / `🎉 revoked 场景全部通过`。
+
+### 老板补充确认（保留项，勿误删）
+**撤销单个设备**（`DELETE /devices/:id` + `device.revoked` 广播 + 两端"提示并退出"）
+是**保留并要继续发展**的功能——以后会支持用户在界面上撤销单个设备。本轮只换了
+测试的触发源，这条链路一行未动。
+（给未来做该功能的提醒：服务端当前禁止"撤销自己"——`cannot revoke self`, 400；
+所以界面上的"撤销设备"只能撤销**对方**的设备。）
+
+### 验证
+- server：`npm run build` + `npm test` 三套全过（含新增的 `/recover` 404 断言）。
+- shared/cli：`dart analyze` 无新增问题。
+- app：全量仍是 15 条既有环境性失败（未增加；App 本就没有 recover 入口）。
+- cli 端到端：`revoked_check.py` 全过、`guide_input_rules_check.py` 3/3、
+  `receipts_check.dart` 通过。
+
 ## 2026-09-13 失败标签显式化 + 墓碑消息保留状态与在途路径
 
 老板两条要求（`f0696f8`）：
