@@ -647,6 +647,35 @@ void main() {
     expect(MessageRepository.receiptOf(1, const []), isNull, reason: '没有任何回执行 → null');
   });
 
+  test('回执：我自己那一行不参与推导（否则我发出的消息永远停在单勾）', () async {
+    final api = FakeApi();
+    api.spaceDevices = [
+      const SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'), // 我
+      const SpaceDevice(deviceId: 'dev-b', personId: 'person-b', status: 'active'), // 对方
+    ];
+    final repo = makeRepo(api, token: 'tok');
+    await repo.refreshDeviceMap(); // 建立 device→person 映射（peerReceipts 据此排除自己）
+
+    // 我自己上报的水位很低（我只把"对方的消息"读到 seq=1），对方的 delivered 已到 5。
+    // GET /receipts 会把两行都返回，于是整张表里既有我也对方。
+    await repo.upsertPeerReceipt(
+        personId: 'person-a', deliveredUptoSeq: 1, readUptoSeq: 1);
+    await repo.upsertPeerReceipt(
+        personId: 'person-b', deliveredUptoSeq: 5, readUptoSeq: 0);
+
+    final peers = await repo.peerReceipts();
+    expect(peers.map((p) => p.personId).toList(), ['person-b'],
+        reason: 'peerReceipts 必须排除我自己那一行');
+
+    // 我发出的 seq=5：对方已收到 → delivered（不受我自己水位影响）——老板 2026-09-13 实测的 bug
+    expect(MessageRepository.receiptOf(5, peers), 'delivered');
+
+    // 反证：把整张表（含我自己那行）直接塞进去就会退化成 null（这正是 bug 的成因）
+    final all = await db.select(db.peerReceipts).get();
+    expect(MessageRepository.receiptOf(5, all), isNull,
+        reason: '整表（含自己的低水位行）会让 every 失败 → 永远单勾');
+  });
+
   test('回执：单调只前进（陈旧的重放不会把高水位拉低）', () async {
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');

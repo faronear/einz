@@ -402,16 +402,32 @@ class MessageRepository {
   }
 
   /// 本 space 的对方回执行（仅 peer person——本端自己从不写这张表）。
+  /// 对方的回执行（用于推导"我发出的消息"是否已送达/已读）。
+  ///
+  /// **必须排除我自己那一行**（老板 2026-09-13 实测的 bug）：`GET /receipts` 返回
+  /// 本空间**所有人**的行，其中包括我自己上报的高水位；而我自己的水位描述的是
+  /// "**我收到了对方哪些消息**"，与我发出的消息无关。若不排除，`receiptOf` 的
+  /// `every` 会拿我自己那条（通常远低于我最新发出的 seq）去卡，导致"对方明明已
+  /// 收到、我这边却永远单勾"；直到对方也发来一条（把我自己的水位抬上去）才变双勾。
   Future<List<PeerReceipt>> peerReceipts() async {
-    return (db.select(db.peerReceipts)..where((r) => r.spaceId.equals(spaceId))).get();
+    final rows = await (db.select(db.peerReceipts)
+          ..where((r) => r.spaceId.equals(spaceId)))
+        .get();
+    final myPersonId = _personByDevice[deviceId];
+    if (myPersonId == null) return rows;
+    return rows.where((r) => r.personId != myPersonId).toList();
   }
 
-  /// 推导自己某条消息的回执状态（纯函数，便于单测；**本轮不接 UI**）。
+  /// 推导自己某条消息的回执状态（纯函数，便于单测）。
   ///
-  /// [seq] 为该消息的 server_sequence（未同步 → null）。规则：所有 peer person 都
+  /// [seq] 为该消息的 server_sequence（未同步 → null）。规则：**所有接收方**都
   /// `readUptoSeq ≥ seq` → `'read'`；都 `deliveredUptoSeq ≥ seq` → `'delivered'`；
   /// 否则 `null`（即仅 `sent`）。2 人空间下 peers 只有一行，`every` 等价于唯一对方；
   /// 多人时 `every` = "所有其他人都已收到"，语义更严格（正确）。
+  ///
+  /// ⚠️ [peers] **必须只含接收方**（即排除我自己那一行）——用 [peerReceipts] 取值
+  /// 即可，它已做过滤；直接塞入整张表会把"我自己收到对方消息的水位"也当成条件，
+  /// 导致发出的消息永远停在单勾（见 [peerReceipts] 的说明）。
   static String? receiptOf(int? seq, List<PeerReceipt> peers) {
     if (seq == null || peers.isEmpty) return null;
     if (peers.every((p) => p.readUptoSeq >= seq)) return 'read';
