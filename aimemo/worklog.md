@@ -3701,3 +3701,58 @@ commit `cb48948`。
 - `npm run audit -- devices | timeline <id> | online <space> [天] | activity [n] |
   receipts | search <id>` 六个子命令已用演示数据逐个验证。
   **注意**：脚本用 `openDb()`（读写打开）而非 readonly。
+
+### 追加更正（同日，老板追问后）
+
+1. **sync 记录策略改了**：没有新结果的例行轮询**不再记录**（原先是每 5 分钟补一条
+   `idle=true`，已删）。只在 `last_sequence` 前进（真正拉到新消息）时落一条。
+   `EINZ_AUDIT_IDLE_SYNC_SEC` 与 `idle` 字段一并移除。commit `97a0123`。
+
+2. **轮询频率更正**（我上一轮估错了）：App 是 **WS 在线 30s / WS 离线 3s**
+   （连续失败按 2^n 退避，上限 60s），`chat_page.dart:1557-1561`；TUI 固定 30s
+   （`cli/lib/chat_core.dart:62`）。之前"聊天页活跃时 3s"是把离线补偿频率当成了
+   常态，数据量被高估约 10 倍。
+
+3. **心跳超时不广播 peer.offline——影响重估（我上一轮说过头了，已向老板更正）**：
+   `ws.ts` 心跳分支先 `conns.delete()` 再 `terminate()`，close 里的
+   `broadcastPeerStatus` 因 `sameSpace()` 取不到空间而静默 return。但
+   `connected_at` 与 `last_seen` 都正常变 null/0，而 App 的在线判定
+   （`chat_page.dart:820`）**优先看 `connected_at`**，配合 30s 的 `_peerTicker`。
+   → 实际影响：异常失联时（手机断网/进电梯，TCP 无 FIN）对端最多**晚 30 秒**
+     看到离线；正常上下线完全不受影响。心跳检测本身就要 30s，体感上叠加的这
+     30s 很难分辨。
+   → 修复**不会**动到 App/TUI 代码，只动 ws.ts 一行（把 delete 从 terminate
+     之前拿掉）。真正的取舍是"要不要让在线绿灯更容易抖动"（信号短暂中断 30s
+     对方就立刻看到下线），属产品取向而非风险。
+   → **决定：不修**。已在该处补注释，说明这是现状行为、别"顺手改"，避免后人
+     误当 bug 修掉。要追溯靠 `connection_events.heartbeat_timeout`。
+
+## 2026-09-13 输入栏「+」→ 表情符：内联表情面板（微信式，零依赖）
+
+**需求：** 老板要求「+」弹窗菜单加一项「表情符」，能把表情插进正在输入的文字里。
+
+**方案（与老板确认的三选）：**
+1. 形态=**输入栏内联面板**（不是二级弹层）：面板挂在输入栏 Column 里、占据输入行下方，
+   可边看输入框边选；打开时收起键盘（二者互斥），点输入框或面板上的键盘键回键盘。
+2. 数据=**零依赖内置精选 emoji**：不引 `emoji_picker_flutter`（需联网拉包，国内易卡），
+   自己写 8 组共 651 个常用 emoji 常量（无重复）。
+3. 选中后**面板不关**，可连续点选，插完光标后移。
+
+**落地：**
+- 新增 `app/lib/widgets/emoji_panel.dart`：`kEmojiGroups`（8 组，分类 tab 直接用代表
+  emoji 当图标，省掉分类名的 l10n）、`GridView` 网格 + 底部分类条 + 退格/键盘两个键。
+  面板不持有 TextEditingController，只回调字符，便于复用与测试。
+- `chat_page.dart`：`_AttachmentKind` 加 `emoji`（`_sendMedia` 的 switch 里显式 return，
+  不走上传）；新增 `_emojiPanelOpen` 状态；`_insertText` 按 selection 插到光标处（未聚焦过
+  时插末尾）；`_deleteBackward` 按字删——**emoji 是 UTF-16 代理对，必须整对删**，否则留乱码。
+- 打开面板前：录音中/预览态不打断（有未发送录音），提示态先切回文字态。
+- l10n：新增 `chatPageAttachEmoji`（表情符 / Emoji）、`chatPageEmojiKeyboard`（键盘 / Keyboard），
+  2 个 arb + `flutter gen-l10n` 重新生成 3 个 dart，一起提交。
+
+**验证：** `flutter analyze` 无新增问题；新增 `test/emoji_insert_test.dart`（弹层→面板→
+光标处插入 `a😄b`→退格整字删→键盘键收面板）通过；全量 `flutter test` +98 -17——
+17 个 golden 失败是**改动前就有**的基线漂移（已 stash 对比：chat_page 同为 11.78%/38783px，
+本次改动零像素差）。
+
+**注意：** 默认 800x600 测试画布装不下「输入栏 + 232px 面板」，测试里要设手机尺寸
+（390x844，同 golden 测试）。
