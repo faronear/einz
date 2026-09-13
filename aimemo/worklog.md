@@ -4034,3 +4034,19 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 
 **验证：** `flutter analyze lib/chat_page.dart` 无问题（0 issue）。UI 老板自测，
 未跑测试/未更新 goldens。既有测试只断言文案（如 `find.text('引用')`），不受影响。
+
+### 追加（同日）：输入栏「+」附件菜单也改同一套卡片
+
+**老板反馈：** 长按消息菜单之外，**输入栏最左侧「+」弹出的附件菜单**还是列表式，需
+一并改成圆角方形卡片。
+
+**改动（`app/lib/chat_page.dart`）：**
+- 两个 helper 改名去「Message」限定，两处菜单共用：`_buildMessageActionGrid` →
+  `_buildActionCardGrid`、`_buildMessageActionCard` → `_buildActionCard`（长按菜单调用处同步）。
+- `_showAttachmentSheet`：7 个 `ListTile`（表情符/拍照/相册图片/拍摄视频/相册视频/
+  音频文件/任意文件）改为 `Padding(all:16) > _buildActionCardGrid([...7 张卡片])`。
+  7 > 4，走「每行 4 个、向左对齐」分支 → 4 + 3 两行。返回的 `_AttachmentKind` 与
+  后续 `_sendMedia` 分流不变。
+
+**验证：** `flutter analyze lib/chat_page.dart` 无问题。既有测试 `emoji_insert_test`
+按 `find.text('表情符')` 点按，卡片里 Text 仍在，不受影响（未跑，老板自测）。

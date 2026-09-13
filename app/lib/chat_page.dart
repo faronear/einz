@@ -1777,19 +1777,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // （老板要求 2026-09-13）
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: _buildMessageActionGrid([
-                _buildMessageActionCard(
+              child: _buildActionCardGrid([
+                _buildActionCard(
                   icon: Icons.format_quote,
                   label: l10n.chatPageActionQuote,
                   onTap: () => Navigator.of(ctx).pop('quote'),
                 ),
                 // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-                _buildMessageActionCard(
+                _buildActionCard(
                   icon: Icons.timer_outlined,
                   label: l10n.chatPageActionBurn,
                   onTap: () => Navigator.of(ctx).pop('burn'),
                 ),
-                _buildMessageActionCard(
+                _buildActionCard(
                   icon: Icons.delete_outline,
                   label: l10n.chatPageActionDelete,
                   destructive: true,
@@ -1812,10 +1812,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 长按菜单的操作项布局：圆角方形卡片，一行最多 4 个。总数不超过 4 个时等距
+  /// 底部菜单操作项布局：圆角方形卡片，一行最多 4 个。总数不超过 4 个时等距
   /// 均匀铺开；超过 4 个时每行 4 个、向左对齐（老板要求 2026-09-13）。卡片宽度
   /// 以「一行 4 个」为基准计算并设上限，保证尺寸不随数量或屏幕宽度剧烈变化。
-  Widget _buildMessageActionGrid(List<Widget> cards) {
+  /// 长按消息菜单与输入栏「+」附件菜单共用。
+  Widget _buildActionCardGrid(List<Widget> cards) {
     const maxPerRow = 4;
     const spacing = 12.0;
     const maxCardWidth = 96.0;
@@ -1871,9 +1872,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 长按菜单的操作卡片：圆角方形，内含图标与文字；destructive 用红色标示
-  /// 删除等不可逆操作。
-  Widget _buildMessageActionCard({
+  /// 底部菜单的操作卡片：圆角方形，内含图标与文字；destructive 用红色标示
+  /// 删除等不可逆操作。长按消息菜单与输入栏「+」附件菜单共用。
+  Widget _buildActionCard({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
@@ -2536,45 +2537,45 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final kind = await showModalBottomSheet<_AttachmentKind>(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.emoji_emotions_outlined),
-              title: Text(l10n.chatPageAttachEmoji),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _buildActionCardGrid([
+            _buildActionCard(
+              icon: Icons.emoji_emotions_outlined,
+              label: l10n.chatPageAttachEmoji,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: Text(l10n.chatPageAttachPhoto),
+            _buildActionCard(
+              icon: Icons.photo_camera,
+              label: l10n.chatPageAttachPhoto,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(l10n.chatPageAttachGalleryImage),
+            _buildActionCard(
+              icon: Icons.photo_library,
+              label: l10n.chatPageAttachGalleryImage,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.galleryImage),
             ),
-            ListTile(
-              leading: const Icon(Icons.videocam),
-              title: Text(l10n.chatPageAttachVideoCamera),
+            _buildActionCard(
+              icon: Icons.videocam,
+              label: l10n.chatPageAttachVideoCamera,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoCamera),
             ),
-            ListTile(
-              leading: const Icon(Icons.movie),
-              title: Text(l10n.chatPageAttachVideoGallery),
+            _buildActionCard(
+              icon: Icons.movie,
+              label: l10n.chatPageAttachVideoGallery,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoGallery),
             ),
-            ListTile(
-              leading: const Icon(Icons.music_note),
-              title: Text(l10n.chatPageAttachAudioFile),
+            _buildActionCard(
+              icon: Icons.music_note,
+              label: l10n.chatPageAttachAudioFile,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.audioFile),
             ),
-            ListTile(
-              leading: const Icon(Icons.insert_drive_file),
-              title: Text(l10n.chatPageAttachAnyFile),
+            _buildActionCard(
+              icon: Icons.insert_drive_file,
+              label: l10n.chatPageAttachAnyFile,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.anyFile),
             ),
-          ],
+          ]),
         ),
       ),
     );
