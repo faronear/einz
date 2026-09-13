@@ -758,4 +758,67 @@ void main() {
     await tester.tapAt(const Offset(20, 20));
     await tester.pumpAndSettle();
   });
+
+  testWidgets('长按语音消息：菜单预览行显示 播放键+波形+时长 且播放键可点', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 语音消息：载荷 meta 带 25s 时长（无附件——只测菜单预览行的渲染与可点性）
+    final voice = await encryptMessage(
+      plaintext: encodeMessagePayload('', meta: {kMetaAudioDurationSeconds: 25}),
+      spaceKey: spaceKey,
+      spaceId: 'space-demo',
+      senderDeviceId: 'dev-a',
+      messageId: 'msg-voice-1',
+      keyVersion: 1,
+      type: 'voice',
+    );
+    final api = _FakeApi(messages: [voice]);
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('25s'), findsOneWidget, reason: '消息流语音气泡应显示时长');
+
+    // 长按 → 菜单预览行与消息流一致：播放键（+波形）+ 时长
+    await tester.longPress(find.text('25s'));
+    await tester.pumpAndSettle();
+    final previewRow = find.byKey(const ValueKey('messagePreviewRow'));
+    expect(
+      find.descendant(of: previewRow, matching: find.byIcon(Icons.play_circle)),
+      findsOneWidget,
+      reason: '菜单预览行应显示播放键（与消息流一致）',
+    );
+    expect(
+      find.descendant(of: previewRow, matching: find.text('25s')),
+      findsOneWidget,
+      reason: '菜单预览行应显示时长',
+    );
+    expect(find.text('voice'), findsNothing,
+        reason: '语音消息不应退化成类型占位文字');
+    // 播放键真的可点（走 _playAudioMessage：此处无附件 → 提示元数据缺失）
+    final playButton = tester.widget<IconButton>(
+        find.descendant(of: previewRow, matching: find.byType(IconButton)));
+    expect(playButton.onPressed, isNotNull, reason: '预览行播放键应可点按播放');
+
+    await tester.tapAt(const Offset(20, 20)); // 关闭弹窗
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

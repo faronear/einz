@@ -177,6 +177,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 音频文件时长（messageId → 秒）：播放时从播放器取真实值缓存，仅内存
   // ——发送端探测不到（老消息无标注）时，播放一次后才显示时长
   final Map<String, int> _audioFileDurations = {};
+  // 音频播放状态版本号：每变一次 +1。消息流气泡在本页 build 树里（setState 即可），
+  // 但长按菜单预览行在另一个路由，页面 setState 重建不到它，靠这个通知同步
+  // （老板要求 2026-09-13：菜单里也能播/停并看到波形进度）。
+  final ValueNotifier<int> _audioPlaybackVersion = ValueNotifier(0);
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
@@ -1213,6 +1217,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _scrollController.dispose();
     _input.dispose();
     _inputFocusNode.dispose();
+    _audioPlaybackVersion.dispose();
     super.dispose();
   }
 
@@ -1751,7 +1756,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
             // 老板要求 2026-09-10）
             _buildMessagePreviewRow(m),
-            // 与下方可点击菜单项分隔（预览行非交互，避免误触）
+            // 与下方可点击菜单项分隔（预览行本身除音频播放键外非交互，避免误触）
             const Divider(height: 1, thickness: 1),
             ListTile(
               leading: const Icon(Icons.format_quote),
@@ -1787,7 +1792,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 长按菜单顶部的消息预览行：发言人头像 + 按性别气泡风格的正文。
   /// 正文单行截断不溢出（老板要求 2026-09-10）；头像左右位置与消息流一致
-  /// （我的在右、对方在左）；附件消息无正文时显示消息类型作占位。
+  /// （我的在右、对方在左）；附件消息无正文时显示消息类型作占位。语音/音频文件
+  /// 消息直接复用消息流的音频条（播放键 + 波形 + 时长，可点按播放/停止，
+  /// 老板要求 2026-09-13）。
   /// Row 撑满整行并按消息流对齐（对方靠左、我的靠右）——此前 mainAxisSize.min
   /// 短消息整行收缩被弹窗居中，长消息撑满贴边，视觉效果不稳定（老板要求
   /// 2026-09-10 修复）。
@@ -1796,7 +1803,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final avatarPersonId =
         m.env.senderPersonId ?? _repo.personIdOfDevice(m.env.senderDeviceId);
     final preview = m.plaintext.trim();
-    final text = preview.isEmpty ? m.env.type : preview;
+    // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长，可点按播放
+    // （老板要求 2026-09-13）；其余类型沿用单行文本（空正文显示类型占位）。
+    final Widget bubbleContent;
+    switch (m.env.type) {
+      case 'voice':
+      case 'audio':
+        bubbleContent = _buildAudioBar(m, waveformWidth: 88);
+        break;
+      default:
+        bubbleContent = Text(
+          preview.isEmpty ? m.env.type : preview,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
@@ -1823,11 +1844,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   color: _uiStyle == 'gradient' ? Colors.white : null,
                   fontSize: 14,
                 ),
-                child: Text(
-                  text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                child: bubbleContent,
               ),
             ),
           ),
@@ -2222,18 +2239,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 正在播放同一条 → 停止
     if (_playingMessageId == m.env.messageId) {
       await _player?.stop();
-      if (mounted) {
-        setState(() {
-          _playingMessageId = null;
-          _audioStartedMessageId = null;
-        });
-      }
+      _updateAudioPlayback(() {
+        _playingMessageId = null;
+        _audioStartedMessageId = null;
+      });
       return;
     }
     try {
       final player = _player ??= AudioPlayer();
       _previewPlaying = false; // 与预览态试听互斥
-      setState(() {
+      _updateAudioPlayback(() {
         _playingMessageId = m.env.messageId;
         _audioStartedMessageId = null; // 旧波形进度先复位
       });
@@ -2249,30 +2264,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await player.stop();
       await player.play(DeviceFileSource(tmp.path));
       // 真正出声才开始走波形进度（此前是下载解密等待期）
-      if (mounted) setState(() => _audioStartedMessageId = m.env.messageId);
+      _updateAudioPlayback(() => _audioStartedMessageId = m.env.messageId);
       // 音频文件：顺手记下播放器给的真实时长（老消息/探测失败的兜底显示）
       if (m.env.type != 'voice') {
         final total = await player.getDuration();
         final seconds = total?.inSeconds ?? 0;
-        if (mounted && seconds > 0) {
-          setState(() => _audioFileDurations[m.env.messageId] = seconds);
+        if (seconds > 0) {
+          _updateAudioPlayback(() => _audioFileDurations[m.env.messageId] = seconds);
         }
       }
       player.onPlayerComplete.first.then((_) {
-        if (!mounted) return;
-        setState(() {
+        _updateAudioPlayback(() {
           _playingMessageId = null;
           _audioStartedMessageId = null;
         });
       }).catchError((_) {});
     } catch (e) {
       if (!mounted) return;
-      setState(() {
+      _updateAudioPlayback(() {
         _playingMessageId = null;
         _audioStartedMessageId = null;
       });
       showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
     }
+  }
+
+  /// 音频播放状态变更：setState 刷新本页（消息流气泡）+ 版本号 +1 通知跨路由
+  /// 监听者（长按菜单预览行）。已 dispose 则只留字段值，不触发重建。
+  void _updateAudioPlayback(void Function() update) {
+    update();
+    if (!mounted) return;
+    setState(() {});
+    _audioPlaybackVersion.value++;
   }
 
   // ---------- 图像/视频/音频/文件：选择 → 加密上传 → 发送 ----------
@@ -2532,8 +2555,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 音频气泡：语音（录音）=播放键 + 固定波形图 + 秒数（25s）；音频文件=播放键
   /// + 文件名 + h/m/s 时长（零的部分省略）。点击下载解密后播放
   /// （老板要求 2026-09-13）。
+  ///
+  /// 消息流气泡与长按菜单预览行共用（后者 [waveformWidth] 小一点，避免挤爆
+  /// 弹窗）：外层监听播放状态版本，菜单在独立路由、页面 setState 重建不到它。
   Widget _buildAudioBar(
-      HistoryMessage m) {
+      HistoryMessage m, {double waveformWidth = 120}) {
+    return ValueListenableBuilder<int>(
+      valueListenable: _audioPlaybackVersion,
+      builder: (context, _, child) =>
+          _buildAudioBarBody(m, waveformWidth: waveformWidth),
+    );
+  }
+
+  Widget _buildAudioBarBody(
+      HistoryMessage m, {required double waveformWidth}) {
     final playing = _playingMessageId == m.env.messageId;
     final onBubble = _uiStyle == 'gradient'
         ? Colors.white
@@ -2578,6 +2613,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           playing: _audioStartedMessageId == m.env.messageId,
           durationSeconds: seconds,
           seed: m.env.messageId,
+          width: waveformWidth,
           activeColor: onBubble,
           inactiveColor: onBubble.withValues(alpha: 0.4),
         ),

@@ -3869,3 +3869,25 @@ shared analyze 通过、`flutter test` +24 全绿；cli analyze 无问题（未�
   `_recordSeconds` 归零（干净的起点）；`_onVoiceEntryTap`（键盘键）传 `true` 回文字态。
 
 **未跑测试**（老板要自己验）；`flutter analyze lib/chat_page.dart` 无问题。
+
+### 追加（同日）：长按菜单顶部预览行——音频消息也能播（播放键 + 波形 + 时长）
+
+**老板要求：** 长按语音/音频消息弹出的菜单，顶部"消息简略版"要和消息流气泡一样
+显示 播放按钮 + 波形图 + 时长，并且点播放键也能播（此前只显示单行文本，语音消息
+退化成显示类型名 `voice`）。
+
+**改动（chat_page.dart）：**
+- 新增 `_audioPlaybackVersion`（`ValueNotifier<int>`）：播放状态每变一次 +1。
+  原因：菜单是 `showModalBottomSheet` 的独立路由，页面 `setState` **重建不到**它，
+  光靠 setState 菜单里的图标/波形不会变。
+- 新增 `_updateAudioPlayback(update)`：统一「改字段 + setState + 版本号+1」，
+  `_playAudioMessage` 6 处状态变更全部改走它（含 onPlayerComplete / 异常回退）。
+- `_buildAudioBar(m, {waveformWidth = 120})` 拆成外层 `ValueListenableBuilder` +
+  `_buildAudioBarBody`；菜单预览行传 `waveformWidth: 88` 避免挤爆弹窗。
+- `_buildMessagePreviewRow`：按类型分流——`voice`/`audio` 直接复用 `_buildAudioBar`
+  （同一套播放逻辑、同一波形 seed），其余类型保持单行文本占位。
+
+**验证：** `flutter analyze lib/chat_page.dart` 无问题；新增测试
+「长按语音消息：菜单预览行显示 播放键+波形+时长 且播放键可点」
+（`test/chat_page_menu_test.dart`）；`flutter test` +99 -17（17 golden 为既有基线漂移，
+与本次无关）。
