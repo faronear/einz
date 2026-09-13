@@ -1754,6 +1754,16 @@ String _statusGlyph(String status) => switch (status) {
       _ => '',
     };
 
+/// 语音/音频消息时长（秒）：取自载荷 meta（[kMetaAudioDurationSeconds]，App 录音/
+/// 发音频文件时写入）。取不到返回 0——产品未上线，不兼容老版"明文塞时长"写法
+/// （与 App 的 _audioDurationSeconds 一致）。
+int _audioSeconds(ChatMessage m) {
+  final raw = m.meta?[kMetaAudioDurationSeconds];
+  if (raw is int) return raw;
+  if (raw is num) return raw.round();
+  return 0;
+}
+
 /// 格式化消息为多行（自动按列宽折行）。
 /// 自己的消息：性别气泡，整块从左侧 8 列留白起铺满屏缘（长短消息左缘统一对齐）——
 /// 长消息正文在左；单行短消息正文右对齐、贴着末尾 [我 时间 状态] 标签（标签贴最右）。
@@ -1783,8 +1793,16 @@ List<String> formatMessage(ChatMessage m, int cols) {
   }
   final time = _timeLabel(m.createdAt);
   // 系统消息保留显式换行（支持一条消息内多行——老板 2026-09-11：把一段提示
-  // 分成多行显示，又能被消息间的空行整体隔开）；双方消息正文按空格折叠换行
-  final body = m.isSystem ? m.plain : m.plain.replaceAll('\n', ' ');
+  // 分成多行显示，又能被消息间的空行整体隔开）；双方消息正文按空格折叠换行。
+  // 语音消息特殊渲染：喇叭 + 「语音」+ 秒数（App 录音的明文 caption 只是「语音」，
+  // 时长在载荷 meta 里）——老板 2026-09-13 要求 TUI 也能一眼看出时长。
+  final String body;
+  if (!m.isSystem && m.env.type == 'voice') {
+    final seconds = _audioSeconds(m);
+    body = '🔊 语音${seconds > 0 ? ' ${seconds}s' : ''}';
+  } else {
+    body = m.isSystem ? m.plain : m.plain.replaceAll('\n', ' ');
+  }
   // 双方消息的外侧留白（同为 8 列）：对方正文右侧 / 我方气泡左侧；
   // 保证对方正文起点不比我方正文（前缀之后）更靠左
   const sideMargin = 8;

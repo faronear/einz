@@ -21,6 +21,7 @@ class ChatMessage {
     required this.createdAt,
     this.serverSequence,
     this.isSystem = false,
+    this.meta,
   });
 
   final MessageEnvelope env;
@@ -30,6 +31,10 @@ class ChatMessage {
 
   /// 系统提示消息（如邀请码、引导提示）：sender 显示为 system（不参与"我/对方"）。
   final bool isSystem;
+
+  /// 消息载荷 meta 袋（密文内 `{"plaintext":…,"meta":…}` 的 meta）：
+  /// 当前用于语音/音频时长（[kMetaAudioDurationSeconds]）。裸文本消息为 null。
+  final Map<String, dynamic>? meta;
 
   /// 显式 server 序号：本地刚发送的消息与 WS 实时消息在 env 上可能没有
   /// serverSequence（序号在应答/事件帧里），需由调用方显式传入，否则排序会错乱。
@@ -97,10 +102,11 @@ class ChatSession {
     messages.clear();
     for (final env in store.historyEnvelopes) {
       if (!seen.add(env.messageId)) continue;
-      final plain = await _decrypt(env);
+      final dec = await _decrypt(env);
       messages.add(ChatMessage(
         env: env,
-        plain: plain,
+        plain: dec.plain,
+        meta: dec.meta,
         isMine: env.senderPersonId != null && store.personId != null
             ? env.senderPersonId == store.personId
             : env.senderDeviceId == store.deviceId,
@@ -110,9 +116,11 @@ class ChatSession {
     }
     for (final env in store.pendingEnvelopes) {
       if (!seen.add(env.messageId)) continue; // 已在历史（补发后落盘）的不重复
+      final dec = await _decrypt(env);
       messages.add(ChatMessage(
         env: env,
-        plain: await _decrypt(env),
+        plain: dec.plain,
+        meta: dec.meta,
         isMine: true, // 离线队列里的必然是本端发出的
         createdAt: env.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         serverSequence: null,
@@ -241,9 +249,11 @@ class ChatSession {
         store.upsertHistory(env, serverSequence: result.serverSequence, createdAt: result.createdAt);
         sent.add((env: env, serverSequence: result.serverSequence, createdAt: result.createdAt));
         // 展示缓存里的 pending 消息覆盖为 sent（拿到真实 seq/时间，按 messageId 去重）
+        final dec = await _decrypt(env);
         _appendDedup(ChatMessage(
           env: env,
-          plain: await _decrypt(env),
+          plain: dec.plain,
+          meta: dec.meta,
           isMine: env.senderPersonId != null && store.personId != null
               ? env.senderPersonId == store.personId
               : env.senderDeviceId == store.deviceId,
@@ -400,11 +410,12 @@ class ChatSession {
     final fresh = <ChatMessage>[];
     for (final env in added) {
       if (!seen.add(env.messageId)) continue;
-      final plain = await _decrypt(env);
+      final dec = await _decrypt(env);
       final seq = env.serverSequence;
       final msg = ChatMessage(
         env: env,
-        plain: plain,
+        plain: dec.plain,
+        meta: dec.meta,
         isMine: env.senderPersonId != null && store.personId != null
             ? env.senderPersonId == store.personId
             : env.senderDeviceId == store.deviceId,
@@ -476,10 +487,11 @@ class ChatSession {
           store.upsertHistory(env, serverSequence: event.serverSequence, createdAt: env.createdAt ?? event.serverSequence);
           store.advanceAnchor(event.serverSequence);
           store.save(storePath);
-          final plain = await _decrypt(env);
+          final dec = await _decrypt(env);
           final msg = ChatMessage(
             env: env,
-            plain: plain,
+            plain: dec.plain,
+            meta: dec.meta,
             isMine: env.senderPersonId != null && store.personId != null
             ? env.senderPersonId == store.personId
             : env.senderDeviceId == store.deviceId,
@@ -731,30 +743,22 @@ class ChatSession {
     return 'file';
   }
 
-  /// 按 key_version 选密钥解密（轮换后旧消息用归档密钥）。
-  /// 设备未接入空间（spaceKey 为 null）时返回占位文本，避免 sync/WS 解密崩溃。
-  /// 引用消息载荷为 {"plaintext":…, "quote":…} JSON（app 引用功能）；TUI 只展示正文，
-  /// 不做引用块渲染，但不能再把整段 JSON 当明文显示。
-  Future<String> _decrypt(MessageEnvelope env) async {
+  /// 按 key_version 选密钥解密（轮换后旧消息用归档密钥），返回载荷解析结果
+  /// （正文 + meta）。设备未接入空间（spaceKey 为 null）时返回占位文本，避免
+  /// sync/WS 解密崩溃。
+  /// 载荷可能是裸文本，也可能是 `{"plaintext":…,"quote":…,"meta":…}` JSON
+  /// （App 引用/meta 扩展）——统一走 shared 的 [decodeMessagePayload]；TUI 不做
+  /// 引用块渲染，但 meta 要取出（如语音/音频时长 [kMetaAudioDurationSeconds]）。
+  Future<({String plain, Map<String, dynamic>? meta})> _decrypt(MessageEnvelope env) async {
     final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey;
-    if (keyB64 == null) return '（未接入空间，无法解密）';
+    if (keyB64 == null) return (plain: '（未接入空间，无法解密）', meta: null);
     final raw = await decryptMessage(
       env: env,
       spaceKey: base64Decode(keyB64),
       spaceId: store.spaceId!,
     );
-    // 引用载荷为 {"plaintext":…, "quote":…} JSON；旧版消息为裸文本
-    if (raw.startsWith('{')) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map<String, dynamic> && decoded['plaintext'] is String) {
-          return decoded['plaintext'] as String;
-        }
-      } catch (_) {
-        // 裸文本恰好以 { 开头：按原文展示
-      }
-    }
-    return raw;
+    final payload = decodeMessagePayload(raw);
+    return (plain: payload.plaintext, meta: payload.meta);
   }
 
   void _appendDecrypted(
@@ -763,10 +767,12 @@ class ChatSession {
     required bool isMine,
     required String plain,
     required int createdAt,
+    Map<String, dynamic>? meta,
   }) {
     _appendDedup(ChatMessage(
       env: env,
       plain: plain,
+      meta: meta,
       isMine: isMine,
       createdAt: createdAt,
       serverSequence: serverSequence,

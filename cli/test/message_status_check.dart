@@ -166,7 +166,26 @@ Future<int> _run() async {
       return 1;
     }
 
-    // 3) 离线发出 → pending（进入离线队列，未确认）
+    // 3) 载荷 meta 解析：手动构造一条 voice 消息（含 audioDurationSeconds）经
+    //    服务端往返 → sync 解密后 ChatMessage.meta 应带出时长（TUI 渲染喇叭+秒数）
+    final voiceEnv = await encryptMessage(
+      plaintext: encodeMessagePayload('语音', meta: {kMetaAudioDurationSeconds: 18}),
+      spaceKey: base64Decode(spaceKey),
+      spaceId: created.spaceId,
+      senderDeviceId: storeA.deviceId!,
+      senderPersonId: storeA.personId,
+      messageId: 'voice-${DateTime.now().microsecondsSinceEpoch}',
+      type: 'voice',
+    );
+    await api.postMessage(voiceEnv, storeA.sessionToken!);
+    await sessionA.sync();
+    final mv = _find(sessionA, '语音');
+    if (mv == null || mv.meta?[kMetaAudioDurationSeconds] != 18) {
+      stderr.writeln('❌ 语音 meta 时长未解析：meta=${mv?.meta}');
+      return 1;
+    }
+
+    // 4) 离线发出 → pending（进入离线队列，未确认）
     final storeOffline = DeviceStore(
       publicKey: 'pk-c',
       privateKey: 'sk-c',
@@ -188,7 +207,8 @@ Future<int> _run() async {
       return 1;
     }
 
-    stdout.writeln('✅ 消息状态：发出=sent、对方补拉后=delivered、已读=read、离线=pending');
+    stdout.writeln('✅ 消息状态：发出=sent、对方补拉后=delivered、已读=read、离线=pending；'
+        '语音 meta 时长=18s 解析通过');
     return 0;
   } finally {
     proc.kill();

@@ -79,4 +79,34 @@ void main() {
     expect(lines.length, greaterThanOrEqualTo(4));
     expect(lines.where((l) => l.contains('[system')), hasLength(1));
   });
+
+  // 语音消息（App 录音 type=voice）：明文 caption 只是「语音」，时长在载荷 meta。
+  ChatMessage voice({int? seconds}) => ChatMessage(
+        env: MessageEnvelope(
+          v: 1,
+          type: 'voice',
+          keyVersion: 1,
+          messageId: 'voice-1',
+          senderDeviceId: 'd2',
+          nonce: '',
+          ciphertext: '',
+        ),
+        plain: '语音',
+        isMine: false,
+        createdAt: 0,
+        meta: seconds == null ? null : {kMetaAudioDurationSeconds: seconds},
+      );
+
+  test('语音消息渲染为「喇叭 + 语音 + 秒数」', () {
+    final lines = formatMessage(voice(seconds: 18), 80);
+    expect(lines, hasLength(1));
+    expect(lines[0], contains('🔊 语音 18s'));
+  });
+
+  test('语音消息缺 meta 时长时不显示秒数', () {
+    final lines = formatMessage(voice(), 80);
+    expect(lines, hasLength(1));
+    expect(lines[0], contains('🔊 语音'));
+    expect(lines[0], isNot(contains('s]'))); // 不带「 0s」
+  });
 }
