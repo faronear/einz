@@ -4382,6 +4382,7 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 秘境。24 小时内一次性有效。」改到标题「邀请码已生成」和二维码之间，作为大标题的
 补充说明。
 
-**改动（commit `21e5506`，`app/lib/chat_page.dart` `_showInviteDialog`）：** 文案从
-`content` 末尾移到最前（标题下方、二维码上方），居中、grey 12px；底部删除原重复。
-`flutter analyze lib/chat_page.dart` 0 issue。UI 老板自测。
+**改动（commit `21e5506` + `63bf1ba`，`app/lib/chat_page.dart` `_showInviteDialog`）：**
+文案从 `content` 末尾移到最前（标题下方、二维码上方），grey 12px、**靠左对齐**（与弹窗
+除二维码外的其余内容一致）；底部删除原重复。`flutter analyze lib/chat_page.dart` 0 issue。
+UI 老板自测。
