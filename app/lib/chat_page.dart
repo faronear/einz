@@ -1631,26 +1631,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 取走当前引用目标并生成引用快照（同时收起输入栏引用条）。
+  /// 文字/语音/图片/视频/音频/文件**所有发送路径共用**（老板要求 2026-09-13）：
+  /// 只要引用条挂着，不论下一条新消息是什么类型，都一起提交并在气泡里呈现引用。
+  Map<String, dynamic>? _takeQuoteSnapshot() {
+    final quote = _quoteTarget;
+    if (quote == null) return null;
+    setState(() => _quoteTarget = null);
+    return {
+      'messageId': quote.env.messageId,
+      'preview': _quotePreview(quote.plaintext),
+      // 原消息类型：引用块据此把图片渲染成缩略图（老板要求 2026-09-13）
+      'type': quote.env.type,
+      // 语音/音频时长：引用块据此画波形 + 秒数（原消息未加载也能显示）
+      if (quote.env.type == 'voice' || quote.env.type == 'audio')
+        'seconds': _audioDurationSeconds(quote),
+    };
+  }
+
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty) return;
-    final quote = _quoteTarget;
+    final quote = _takeQuoteSnapshot();
     _input.clear();
-    setState(() => _quoteTarget = null);
     try {
       await _repo.send(
         text,
-        quote: quote == null
-            ? null
-            : {
-                'messageId': quote.env.messageId,
-                'preview': _quotePreview(quote.plaintext),
-                // 原消息类型：引用块据此把图片渲染成缩略图（老板要求 2026-09-13）
-                'type': quote.env.type,
-                // 语音/音频时长：引用块据此画波形 + 秒数（原消息未加载也能显示）
-                if (quote.env.type == 'voice' || quote.env.type == 'audio')
-                  'seconds': _audioDurationSeconds(quote),
-              },
+        quote: quote,
         // 本地落库即回显 pending 气泡（乐观 UI），不等上传/sync 往返
         onPersisted: (_) => _refreshLocal(),
       );
@@ -1736,11 +1743,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     String? caption,
     Map<String, dynamic>? meta, // 附加数据（如音频时长），进密文载荷
   }) async {
+    // 引用快照在此统一取走：语音/图片/视频/音频/文件全都带上（老板要求 2026-09-13），
+    // 发完引用条即收起（此前只有文字发送会带，其他类型把引用条留在了输入框上方）
+    final quote = _takeQuoteSnapshot();
     await _repo.sendAttachment(
       fileBytes: fileBytes,
       fileName: fileName,
       type: type,
       caption: caption,
+      quote: quote,
       meta: meta,
       onPersisted: (_) => _refreshLocal(),
     );
@@ -1759,10 +1770,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
-            // 老板要求 2026-09-10）
+            // 老板要求 2026-09-10）；底色与被引消息的引用块同款浅灰，代替原来
+            // 的分隔横线（老板要求 2026-09-13）
             _buildMessagePreviewRow(m),
-            // 与下方可点击菜单项分隔（预览行本身除音频播放键外非交互，避免误触）
-            const Divider(height: 1, thickness: 1),
             ListTile(
               leading: const Icon(Icons.format_quote),
               title: Text(l10n.chatPageActionQuote),
@@ -1826,8 +1836,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           overflow: TextOverflow.ellipsis,
         );
     }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    return Container(
+      // 与被引消息的引用块（气泡内 / 输入栏引用条）同款浅灰底：用底色而非横线
+      // 与下方菜单项区分（老板要求 2026-09-13）。弹窗始终跟随浅色主题，不随
+      // gradient 气泡风格变白。
+      color: Colors.black.withValues(alpha: 0.06),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         key: const ValueKey('messagePreviewRow'), // 测试断言对齐用（项目惯例）
         mainAxisSize: MainAxisSize.max,

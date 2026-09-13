@@ -3947,3 +3947,37 @@ gradient 白 12%），只要能看出和输入区不是同一块；② 引用图
   `📎 <文件名>`（不是图标控件），引用条里已有缩略图就多余了。
 
 **验证：** 老板自测。`flutter analyze lib` 只剩既有 info。
+
+### 追加（同日）：长按菜单顶部预览改用灰底，去掉分隔横线
+
+**老板要求：** 长按消息弹窗里，顶部简略消息与下方选项列表之间原来用一根横线分隔 →
+改成顶部也用**被引消息那种灰色背景**（黑 6%）区分，前后一致协调。
+
+**改动（chat_page.dart）：**
+- `_showMessageActions`：删掉 `const Divider(height: 1, thickness: 1)`。
+- `_buildMessagePreviewRow`：外层 `Padding` → `Container`，加 `color: 黑 6%`；
+  内边距上下对称 12/12（原 12/4，之前靠横线收口）。弹窗始终浅色主题，故不跟
+  gradient 走白 12%（白 12% 在浅底上等于看不见）。
+
+**验证：** 老板自测（明确要求不代测）。`flutter analyze lib/chat_page.dart` 无问题。
+未 commit，等老板确认视觉后再提。
+
+### 追加（同日）：任意类型消息都能带引用（引用条不再残留）
+
+**老板要求：** 引用消息 A 后，无论新消息 B 是文字/录音/照片/音频/视频/文件，都一起
+提交，B 气泡里呈现对 A 的引用。原状：只有文字发送带引用；转成录音态或走加号上传时
+新消息不含引用，且引用条仍挂在输入框上方。
+
+**改动：**
+- `app/lib/data/message_repository.dart`：`sendAttachment` 新增 `quote` 命名参数，
+  透传给 `encodeMessagePayload(plain, quote: quote, meta: meta)`（与 `send` 同款）。
+- `app/lib/chat_page.dart`：抽 `_takeQuoteSnapshot()`（取出 `_quoteTarget` → 生成
+  {messageId, preview, type, seconds?} 快照 → 清空引用条）；`_send()` 改用它；
+  `_sendAttachmentOptimistic()` 内部统一调用它并下传，于是语音（预览态发送键）、
+  图片（拍照/相册）、视频（拍摄/相册）、音频文件、任意文件 5 条路径全部带上引用。
+
+**说明：** 引用快照在发送开始时取走（与文字发送一致的时机），发送失败不回滚引用条；
+引用块渲染与载荷解码本来就是类型无关的，无需改渲染/协议。
+
+**验证：** `flutter analyze lib` 只剩既有 info（ws_realtime_service）。UI 待老板自测。
+未 commit。

@@ -208,6 +208,8 @@ class MessageRepository {
   /// 发送附件消息（语音/图像/视频，PROTOCOL.md §6）：
   /// 加密文件 blob 上传 /attachments + 发送 caption 消息 + 本地附件元数据落库。
   /// 无 token 时消息入 pending 队列（附件 blob 需联网时上传，v1 不做离线附件补传）。
+  /// [quote] 引用快照（{messageId, preview, type}）——任何类型的消息都可引用任何
+  /// 类型的消息（老板要求 2026-09-13），与 [send] 一致。
   /// [onPersisted] 见 [send]：本地落库后、上传前回调，用于乐观回显（此时附件元数据
   /// 已落库，图片/视频可直接显示）。
   /// 返回 message_id。
@@ -216,6 +218,7 @@ class MessageRepository {
     required String fileName,
     required String type, // image | video | voice
     String? caption,
+    Map<String, dynamic>? quote,
     Map<String, dynamic>? meta, // 附加数据（如音频时长），随密文载荷同步
     FutureOr<void> Function(String messageId)? onPersisted,
   }) async {
@@ -244,9 +247,9 @@ class MessageRepository {
       'local_cipher': enc.cipher,
     });
 
-    // 3) 发送 caption 消息（type 标记，供接收端渲染；meta 随载荷一起进密文）
+    // 3) 发送 caption 消息（type 标记，供接收端渲染；quote + meta 随载荷一起进密文）
     final env = await encryptMessage(
-      plaintext: encodeMessagePayload(plain, meta: meta),
+      plaintext: encodeMessagePayload(plain, quote: quote, meta: meta),
       spaceKey: spaceKey,
       spaceId: spaceId,
       senderDeviceId: deviceId,
