@@ -4171,3 +4171,15 @@ pending 直到服务器恢复）。
 对方补拉后=delivered、离线=pending 全通过；`receipts_check` 与 `format_message_test`
 回归通过。`dart analyze` 0 issue。commit `be151e7`。交互观感老板自测。
 
+### 追加：已读（read）标蓝——TUI 相对 App 的差异化优势
+
+**老板要求：** App 面向小白重体验；TUI 要有 App 没有的优势。既然代码已跟踪对方
+read，TUI 里我发出的消息被已读后状态字符要**变蓝**（App 只展示到双勾，read 只落库）。
+
+**改动：** `chat_core` 增加 `peerReadUpto`（与 `peerDeliveredUpto` 同源：`GET /receipts`
++ WS `receipt.updated`），`sentStatusOf` 增加 `read` 档位；`einz_tui` 新增 `_blue`（94）
+并把 `[我 时间 ✓✓]` 的状态字符在 read 时染亮蓝。测试补 read 用例。commit `34ecf97`。
+
+**注意：** 亮蓝字落在自己的性别气泡上——若本人性别为男（蓝色气泡），蓝字与蓝底
+对比度偏低；老板自测后如需可换亮青/加粗。当前按老板明确要求先上"蓝"。
+
