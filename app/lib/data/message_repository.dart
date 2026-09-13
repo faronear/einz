@@ -81,6 +81,20 @@ class MessageRepository {
   /// 会话 token（认证后注入；未认证时发送只入队不同步）。
   String? token;
 
+  /// 正在上传中的 messageId：避免同一封被并发重复上传。
+  /// （send / retryMessage / _flushPending 三条路径都可能碰到同一行，
+  /// 服务端虽按 message_id 幂等，但白发的请求也会占带宽、刷日志。
+  /// 老板 2026-09-13 允许点按小飞机后，这条并发路径变得更常见。）
+  final Set<String> _pendingUploads = {};
+
+  /// 该异常是否属于「服务端**明确拒绝**」——只有这类才该标 failed。
+  ///
+  /// 4xx = 信封不合法 / 未授权 / 设备被撤销 → 重试也不会成功，必须让用户看到。
+  /// 其余（网络异常、连接/响应超时、5xx）都属于**不确定**：服务端可能其实已存
+  /// （响应丢在回程），保持 pending 交给 [_flushPending] 幂等重试即可自动收敛。
+  static bool _isServerRejection(Object e) =>
+      e is ApiException && e.httpStatus >= 400 && e.httpStatus < 500;
+
   /// 401（session 过期）时自动重新认证的回调（由上层注入：setup_page 的
   /// challenge-response 流程），返回新 token 供 [_withAutoAuth] 重试。
   final Future<String> Function()? reauth;
@@ -171,13 +185,18 @@ class MessageRepository {
 
     final t = token;
     if (t != null) {
+      _pendingUploads.add(messageId);
       try {
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
-      } on Exception {
-        // 有 token 仍发失败 → 标 failed（UI 显示「发送失败」可点重发；不自动重试，
-        // 避免坏消息每 tick 刷屏）。无 token 属离线入队，保持 pending 由 sync 补发。
-        await _setStatus(messageId, 'failed');
+      } on Exception catch (e) {
+        // 只有**服务端明确拒绝**才标 failed；网络类失败保持 pending。
+        // （老板 2026-09-13 定：pending = "还没确认"，交给 _flushPending 幂等重试
+        //   自动收敛——服务端已存则返回原 seq、未存则本次存入，最终都变"已发送"，
+        //   用户无需手动点按；failed 只留给重试也没用的明确拒绝。）
+        if (_isServerRejection(e)) await _setStatus(messageId, 'failed');
+      } finally {
+        _pendingUploads.remove(messageId);
       }
     }
     return messageId;
@@ -410,13 +429,18 @@ class MessageRepository {
         .get();
     var flushed = 0;
     for (final row in rows) {
+      // 跳过正在上传中的（如刚点按小飞机重发的）——避免同一封并发重复上传
+      if (_pendingUploads.contains(row.messageId)) continue;
       final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
+      _pendingUploads.add(row.messageId);
       try {
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
         flushed++;
       } on Exception {
         break; // 网络层问题：停止本轮补发，下次再试
+      } finally {
+        _pendingUploads.remove(row.messageId);
       }
     }
     return flushed;
@@ -775,6 +799,10 @@ class MessageRepository {
   /// 显示发送中）→ 重发 → 成功置 sent、失败回置 failed。无 token 保持 pending
   /// （等联网后由 sync 补发）。已墓碑/不存在的消息忽略。
   Future<void> retryMessage(String messageId) async {
+    // 注意：这里**故意不检查** _pendingUploads —— 老板 2026-09-13 的场景正是
+    // "请求还在途（响应丢了），本端一直显示小飞机"，此时用户点按就是要**立刻**
+    // 重发去问服务端要个结果；若因"已有请求在途"而忽略点按，就等于让用户白等
+    // 到超时。并发重发是安全的：服务端按 message_id 幂等，返回同一个 seq。
     final row = await (db.select(db.localMessages)
           ..where((m) => m.messageId.equals(messageId) & m.deletedAt.isNull()))
         .getSingleOrNull();
@@ -786,11 +814,15 @@ class MessageRepository {
       ...jsonDecode(row.ciphertext) as Map<String, dynamic>,
       if (row.serverSequence != null) 'server_sequence': row.serverSequence,
     });
+    _pendingUploads.add(messageId);
     try {
       final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
       await _markSent(env.messageId, result.serverSequence, result.createdAt);
-    } on Exception {
-      await _setStatus(messageId, 'failed');
+    } on Exception catch (e) {
+      // 与 send 同规则：明确拒绝 → failed；其余保持 pending 等自动重试
+      await _setStatus(messageId, _isServerRejection(e) ? 'failed' : 'pending');
+    } finally {
+      _pendingUploads.remove(messageId);
     }
   }
 

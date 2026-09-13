@@ -29,8 +29,12 @@ class FakeApi extends ApiClient {
   /// 是否让附件上传抛异常（模拟服务端 500 等上传失败）。
   bool failAttachmentUpload = false;
 
-  /// 是否让消息发送（postMessage）抛异常（模拟发送失败）。
+  /// 是否让消息发送（postMessage）抛**网络类**异常（连不上/超时 →
+  /// 按新规则应保持 pending，不标 failed）。
   bool failPostMessage = false;
+
+  /// 是否让 postMessage 被**服务端明确拒绝**（4xx → 应标 failed）。
+  bool rejectPostMessage = false;
 
   /// 回执：记录的上报（delivered/read 高水位）。
   final List<({int delivered, int read})> reportedReceipts = [];
@@ -58,6 +62,9 @@ class FakeApi extends ApiClient {
 
   @override
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
+    if (rejectPostMessage) {
+      throw ApiException('INVALID_REQUEST', 'invalid envelope', 400);
+    }
     if (failPostMessage) throw Exception('post message failed');
     posted.add(env.messageId);
     return PostMessageResult(messageId: env.messageId, serverSequence: posted.length, createdAt: 1000);
@@ -295,11 +302,11 @@ void main() {
     expect(await repo.lastSequence, 0, reason: 'send 不应推进锚点（锚点只随 /sync 推进）');
   });
 
-  test('发送失败：有 token 但 postMessage 抛错 → status=failed（不计入 pending）', () async {
-    final api = FakeApi()..failPostMessage = true;
+  test('服务端明确拒绝（4xx）→ status=failed（不计入 pending，不自动重发）', () async {
+    final api = FakeApi()..rejectPostMessage = true;
     final repo = makeRepo(api, token: 'tok');
 
-    await repo.send('会失败的消息');
+    await repo.send('会被服务端拒绝的消息');
 
     final hist = await repo.history();
     expect(hist.single.status, 'failed');
@@ -307,14 +314,34 @@ void main() {
     expect(await repo.pendingCount, 0, reason: 'failed 与 pending 区分：不自动重发');
   });
 
-  test('重发：retryMessage 成功后置 sent 且回填 server_sequence', () async {
+  test('网络异常 → 保持 pending（不确定服务端是否已存），下次 sync 幂等补发为 sent', () async {
     final api = FakeApi()..failPostMessage = true;
+    final repo = makeRepo(api, token: 'tok');
+
+    await repo.send('网络抖动时的消息');
+
+    // 不确定状态：保持 pending（小飞机），并可被 _flushPending 自动重试
+    var hist = await repo.history();
+    expect(hist.single.status, 'pending',
+        reason: '网络类失败不代表服务端没收到 → 不能标 failed');
+    expect(await repo.pendingCount, 1);
+
+    // 网络恢复 → sync 自动补发（服务端幂等，重复上传不会产生重复消息）
+    api.failPostMessage = false;
+    await repo.sync();
+    hist = await repo.history();
+    expect(hist.single.status, 'sent', reason: '恢复后应自动收敛为已发送');
+    expect(api.posted.length, 1);
+  });
+
+  test('重发：retryMessage 成功后置 sent 且回填 server_sequence', () async {
+    final api = FakeApi()..rejectPostMessage = true;
     final repo = makeRepo(api, token: 'tok');
     await repo.send('待重发');
     final failed = (await repo.history()).single;
     expect(failed.status, 'failed');
 
-    api.failPostMessage = false;
+    api.rejectPostMessage = false;
     await repo.retryMessage(failed.env.messageId);
 
     final h = (await repo.history()).single;
