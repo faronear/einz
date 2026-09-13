@@ -4121,3 +4121,28 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
   草稿仍保留在 controller，切回文字态自动恢复增高。
 
 **验证：** `flutter analyze`（app）0 issue。UI 老板真机自测。commit `4e14c52`。
+
+## 2026-09-13 TUI 新设备 join 后「预发消息看不到」——真因是向导 system 噪音顶出屏幕
+
+**现象（老板）：** 新设备入网 join 走完，对方 app 里预先发的消息立刻变双勾，
+但 TUI（刚完成 join）里看不到消息，输入 `/sync` 也不显示；`/exit` 重进 TUI 后
+才看到之前的预发消息。
+
+**定位（真实 server + 真实口令密保箱复现，直接驱动 ChatSession）：**
+- core 链路正常：join 后 `sync()` 返回 fresh=2，消息进 `session.messages`、
+  落盘 history、锚点 0→2；第二次 sync fresh=0（锚点已推进）。
+- 真因是 **TUI 展示层**：`_sortMessages` 按时间序把对方预发消息排在**所有入网
+  向导 system 消息之前**，而视窗默认贴底 → 向导几十行输出把预发消息顶到屏幕上方。
+- 三个现象因此都对上：双勾=sync 已上报 delivered；`/sync` 返回 0（锚点已推进）；
+  重启后（向导消息本就不落盘）列表很短，消息直接可见。
+
+**改动（`cli/bin/einz_tui.dart`，commit `b38ca91`）：**
+- 入网向导期（`_onboardingActive`）经 `_systemMessage` 产生的 system 消息按
+  **对象引用**记入 `_onboardingNoise`（消息流会被重排，下标区间不可靠）。
+- `_activateAfterBind` 记录启动同步拉到的条数 `_startupSyncAdded`；入网收尾
+  `_finalizeOnboarding`：仅当 `_onboarded && fresh>0` 时清掉向导噪音，重新补一条
+  最终欢迎语（`_kWelcomeText`）进消息流，并同时显示在底部状态条。
+- 没拉到历史消息（如新建空间）时不动——向导日志是屏幕上唯一内容，清掉会空白。
+
+**验证：** `dart analyze`（cli）0 issue；`format_message_test` 全过。交互流程老板自测。
+
