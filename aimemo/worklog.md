@@ -4420,3 +4420,17 @@ UI 老板自测。
 `_role != null` 改为 `_role != null && _step < _stepCount`——完成页（_step ==
 _stepCount）不渲染底部导航；其余步骤行为不变（含 _step==0 异常兜底的「下一步」）。
 `flutter analyze lib test` 0 issue。UI 老板自测。
+
+### App：完成页去掉进度圆点 + 欢迎弹窗标题换品牌 Logo
+
+**老板要求：** ① 完成页背景不放五个小圆点进度条（五个步骤都结束了，完成页不属于
+进度之一）；② 欢迎弹窗标题「一切就绪！」前不要通用庆祝图标 🎉，换成我们的 Logo。
+
+**改动（commit `8d8c832`，`setup_page.dart` + l10n zh/en）：**
+- 进度圆点与其下 72px 留白仅在 `_step < _stepCount`（向导步骤内）渲染；
+- l10n `welcomeDialogTitleCreate/Join` 去掉 🎉 前缀（重跑 gen-l10n）；
+- 弹窗标题改为 Row：BrandLogo(26px) + 标题文本。
+
+**注意：** 提交时顺带带上了老板此前未提交的 l10n 文案修订
+（wizardPassphraseHint / wizardPinHint / chatPageAudioPlayFailed——arb 为源，
+已重跑 gen-l10n 保持生成文件同步）。`flutter analyze lib test` 0 issue。UI 老板自测。
