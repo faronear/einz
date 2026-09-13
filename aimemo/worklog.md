@@ -3382,6 +3382,51 @@ tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是�
 - `retryMessage` 只重发消息信封，**不重传附件 blob**：附件类消息失败重发的完整性
   未覆盖（既有行为，非本轮引入）。
 
+## 2026-09-13 动态小飞机 + 点按进行中文案（老板 3 条反馈）
+
+老板已重启本地服务端（`localhost:3000`），**双勾回执已生效**。
+
+### 1) pending 改为动态小飞机（`8e3a2be`）
+新增私有 `_SendingPlane`：`AnimationController.repeat()` + `Transform.translate`
+（左右小幅平移、上下浮动）+ `Transform.rotate`（一点俯仰），读起来像"飞行中"。
+**无障碍/测试友好**：`MediaQuery.disableAnimations` 为真时退化为静态图标——
+既尊重系统"减少动态效果"偏好，也让 `pumpAndSettle` 不被常驻动画卡住。
+
+### 2) 点按后显示进行中文案（`8e3a2be`）
+`_ChatPageState` 增 `Map<String,String> _retrying`（messageId → 'speedup'/'resend'）：
+- 点小飞机 → 图标前显示「加速中…」；点 failed → 「重发中…」（替换「点击重发」）
+- 完成后：成功 → 单勾（文案消失）；**再次失败 → 清 busy → 换回「点击重发」**
+- 新 l10n：`chatPageMsgSpeedingUp`「加速中…」/`chatPageMsgResending`「重发中…」
+  （英文 Speeding up… / Resending…）
+
+### 3) 「服务端关掉后一直小飞机、不变 failed」——**是方案 B 的设计行为，不是 bug**
+老板关掉服务端、发消息、等 3 分钟，一直是小飞机。按上一轮定的方案 B：网络类失败
+（含连不上/超时）**保持 pending 自动重试**，只有服务端明确 4xx 才 failed。所以
+"不变 failed"是预期的——我们特意避免"其实会成功却标失败"的假失败。
+**验证方式**：把服务端起回来，无需任何操作，那条消息会在下次 sync 被幂等补发并变 ✓
+（repo 测试 `网络异常 → 保持 pending … 下次 sync 幂等补发为 sent` 覆盖了这条路径）。
+
+但这暴露两个**真问题**（待老板定夺，尚未改）：
+- **补发路径在服务端不可达时根本不会执行**：`MessageRepository.sync()` 把
+  `_flushPending()` 放在 sync 请求**成功之后**；服务端关着时 sync 必抛，补发逻辑
+  一次也没跑（结果无碍——服务端回来即补发；但"重试"的语义实际上只体现在 sync 上）。
+- **离线没有任何可见提示**：小飞机看起来像"卡死"。建议加"离线/未送达 + 待发送条数"
+  的提示；另外离线时 ticker 每 3s 硬撞一次 sync（3 次内部重试 + 退避），白耗电、刷
+  日志，可加失败退避。
+
+### 测试踩坑（记下来免得再犯）
+- 常驻动画会让 `pumpAndSettle` 一直等到超时 → 本测试文件在 `setUp` 里用
+  `FakeAccessibilityFeatures(disableAnimations: true)` 关掉动画（同时覆盖了
+  reduce-motion 这条无障碍分支）。
+- **不要在 `testWidgets` 体内 `await` 依赖 `Future.delayed` 的假实现**：FakeAsync
+  不会自动推进 → 直接挂到 10 分钟超时（本轮在造 failed 消息时踩到，改成点按前才设 delay）。
+- 另一坑：用"无 token 入队"造 pending 会被 ChatPage 的 `_flushPending` 立刻发走 →
+  改造成"网络异常（`failPostMessage`）"来制造稳定的 pending 态。
+
+### 验证
+- `chat_send_status_test.dart` 7/7 通过；全量仍是 15 条既有环境性失败（未增加、无卡死）。
+- 服务端本轮未改动。
+
 ## 2026-09-13 失败标签显式化 + 墓碑消息保留状态与在途路径
 
 老板两条要求（`f0696f8`）：
