@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-# revoked 场景回归：第一设备入网 → /recover 撤销全部 → 第一设备重启应直接在
-# 终端提示"本设备已被撤销。"并自动退出（不再进入 TUI，无"仅可退出"模式）。
+# revoked 场景回归：第一设备入网 → 被撤销（用第二台设备调 DELETE /devices/:id，
+# 服务端广播 device.revoked）→ 在线 TUI 提示后自动退出；重启也直接提示并退出。
+#
+# 注：v1 的 /recover（全丢恢复）已整体移除（Multiverse 下"仅凭口令重置空间"既不
+# 安全也做不到），故改用正常的撤销接口做本测试的触发源。
 import os, pty, subprocess, select, time, sys, socket, tempfile, shutil
 
-ROOT = '/Users/Shared/productX/einz'
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CLI = f'{ROOT}/cli'
 WORK = tempfile.mkdtemp(prefix='einz-revoked-')
 
@@ -78,51 +81,76 @@ def main():
 
         store = f'{WORK}/a.json'
 
-        # 2) 第一设备入网（首设备自举 + 设置 escrow 口令 pass-123）
+        # 2) 第一设备入网（Multiverse 流程：入口 → 创建 → 名字/性别/伴侣 →
+        #    密保口令 → 锁屏码）。注：本测试原为 v1 引导流程（直接问"我的名字"），
+        #    v2 加了"选择秘境入口"后已失效，此处一并移植到当前流程。
         m1, p1 = start_tui(store, port)
         spawned.append((m1, p1))
-        out = wait_text(m1, '输入我的名字')
-        if '输入我的名字' not in out:
-            print('❌ 未到名字问答'); print(out[-500:]); return 1
-        send(m1, 'luk\r')
-        out = wait_text(m1, '输入伴侣的名字')
-        if '输入伴侣的名字' not in out:
-            print('❌ 未到伴侣名字问答'); print(out[-500:]); return 1
-        send(m1, '\r')  # 伴侣名字：跳过（默认 personB）
-        out = wait_text(m1, '设置密保口令')
+        for expect, payload in [
+            ('秘境入口', 'c\r'),
+            ('我的名字', 'luk\r'),
+            ('我的性别', '1\r'),
+            ('伴侣的名字', 'ali\r'),
+            ('伴侣的性别', '2\r'),
+        ]:
+            out = wait_text(m1, expect, timeout=30)
+            if expect not in out:
+                print(f'❌ 未到「{expect}」问答'); print(out[-600:]); return 1
+            send(m1, payload)
+
+        out = wait_text(m1, '设置密保口令', timeout=30)
         if '设置密保口令' not in out:
-            print('❌ 未到 escrow 口令问答'); print(out[-500:]); return 1
+            print('❌ 未到 escrow 口令问答'); print(out[-600:]); return 1
         send(m1, 'pass-123\r')
-        out = wait_text(m1, '设置锁屏码')
-        if '设置锁屏码' not in out:
-            print('❌ 未到锁屏码问答'); print(out[-500:]); return 1
-        send(m1, '\r')  # 锁屏码：跳过（不设置）
-        # 一次等待同时收集：入网完成 + WS 连上（状态栏绿点 \x1b[32m●）。
-        # 不能分两次 wait_text——pty 缓冲会把相邻多次渲染一起吐出，第一次
-        # wait 可能连带吞掉绿点渲染，第二次 wait 就永远等不到（20s 静默）。
-        out = wait_text(m1, '\x1b[32m●', timeout=25)
-        if '🎉 一切就绪' not in out:
-            print('❌ 第一设备未完成入网'); print(repr(out[-500:])); return 1
-        if '\x1b[32m●' not in out:
+
+        # 锁屏码：TUI 阻塞读键盘期间不重绘，提示要等下一次按键才出现 → 重发直到命中
+        out = ''
+        for _ in range(8):
+            send(m1, '123456\r')
+            out += wait_text(m1, '🔢', timeout=8)
+            if '🔢' in out:
+                break
+        if '🔢' not in out:
+            print('❌ 未设置锁屏码'); print(out[-600:]); return 1
+
+        # 入网完成 + WS 连上（绿点）。两次等待的输出都累加——pty 可能把相邻渲染
+        # 一起吐出，单看第二次 wait 的返回值未必能拿到前面的"一切就绪"。
+        seen = wait_text(m1, '一切就绪', timeout=30) + wait_text(m1, '\x1b[32m●', timeout=25)
+        if '一切就绪' not in seen:
+            print('❌ 第一设备未完成入网'); print(repr(seen[-500:])); return 1
+        if '\x1b[32m●' not in seen:
             import json as _json
             try:
                 st = _json.load(open(store))
             except Exception as _e:
                 st = {'read_err': str(_e)}
-            print(f'❌ 第一设备 WS 未连上 (poll={p1.poll()} len={len(out)})')
+            print(f'❌ 第一设备 WS 未连上 (poll={p1.poll()} len={len(seen)})')
             print('session_token set:', st.get('session_token') is not None, 'space_id:', st.get('space_id'), 'device_id:', st.get('device_id'))
-            print(repr(out[-800:])); return 1
+            print(repr(seen[-800:])); return 1
         print('✅ 第一设备入网并保持在线（WS 已连接）')
 
-        # 3) /recover 撤销全部设备 → 在线 TUI 应收到 device.revoked 广播并自动退出
-        import urllib.request as ur
-        req = ur.Request(f'http://127.0.0.1:{port}/recover',
-                         data=b'{"passphrase":"pass-123"}',
-                         headers={'Content-Type': 'application/json'}, method='POST')
-        with ur.urlopen(req) as r:
-            body = r.read().decode()
-        if 'revoked' not in body:
-            print('❌ /recover 未成功'); print(body); return 1
+        # 3) 撤销第一设备 → 在线 TUI 应收到 device.revoked 广播并自动退出。
+        #    DELETE /devices/:id 不允许撤销自己，故先用 HTTP 让"第二台设备"加入
+        #    （生成加入码 → POST /spaces/join），再用它的 token 撤销第一设备。
+        import json as _json, urllib.request as ur
+
+        def http(method, path, body=None, token=None):
+            data = _json.dumps(body).encode() if body is not None else None
+            req = ur.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method)
+            req.add_header('Content-Type', 'application/json')
+            if token:
+                req.add_header('Authorization', f'Bearer {token}')
+            with ur.urlopen(req, timeout=10) as r:
+                return _json.load(r)
+
+        st = _json.load(open(store))
+        space_id, my_token, my_device = st['space_id'], st['session_token'], st['device_id']
+        jt = http('POST', f'/spaces/{space_id}/join-tokens')['joinToken']
+        revoker = http('POST', '/spaces/join', {
+            'token': jt, 'public_key': 'pk-revoker',
+            'partner_slot': 1, 'device_name': 'revoker'})
+        http('DELETE', f'/devices/{my_device}', token=revoker['sessionToken'])
+
         out = wait_text(m1, '本设备已被撤销', timeout=15)
         if '本设备已被撤销。' not in out:
             print('❌ 在线 TUI 未收到撤销广播'); print(out[-800:]); return 1
@@ -135,12 +163,22 @@ def main():
             p1.kill()
             print('❌ 在线 TUI 收到广播后未自动退出'); return 1
         kill_proc(p1, m1)
-        print('✅ /recover 撤销 → 在线 TUI 提示后自动退出')
+        print('✅ 撤销 → 在线 TUI 提示后自动退出')
 
-        # 4) 第一设备重启 → 不进 TUI：终端直接提示"本设备已被撤销。"并自动退出
+        # 4) 第一设备重启 → 先解锁（本测试设了锁屏码），随后不进 TUI：
+        #    直接提示"本设备已被撤销。"并自动退出
         m2, p2 = start_tui(store, port)
         spawned.append((m2, p2))
-        out = wait_text(m2, '本设备已被撤销')
+        out = wait_text(m2, '输入锁屏码', timeout=30)
+        if '输入锁屏码' not in out:
+            print('❌ 重启后未到锁屏码问答'); print(out[-600:]); return 1
+        unlocked = ''
+        for _ in range(6):
+            send(m2, '123456\r')
+            unlocked += wait_text(m2, '本设备已被撤销', timeout=8)
+            if '本设备已被撤销' in unlocked:
+                break
+        out = unlocked
         if '本设备已被撤销。' not in out:
             print('❌ 未显示撤销提示'); print(out[-800:]); return 1
         # 进程应自行退出（无需 /exit）

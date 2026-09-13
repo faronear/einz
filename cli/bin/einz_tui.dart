@@ -393,28 +393,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 身份选择（仅后续设备、未登记的新设备）：先问是第一还是第二个人（personA/personB），
   // 按需设置名字——与首设备"先名字后设备名"的顺序对齐（此前是先问设备名再问身份）。
   // 首设备（探测无 person 名称表）跳过此步，直接走下方"身份名字"询问。
-  // 全丢恢复入口（开发运维专用；闭环：仅凭 escrow 口令即可）：全新设备 +
-  // 空间已有成员（探测名称表非空）+ 本机无 Space Key → 可选"r 全丢恢复"——
-  // 输入 escrow 口令 → 服务端 /recover 重置空间并返回口令密保箱 → 本机解出
-  // Space Key、以创建者身份重建（无需预先导出的 EINZ-BACKUP 文本）。
-  var recovered = false;
-  if (store.deviceId == null && store.spaceKey == null && _probePersonNames.isNotEmpty) {
-    while (true) {
-      if (!_state!.running) return;
-      final ans = await _prompt(session, '❗️❗️❗️ 若所有已登记设备全部丢失，可输入 r 重置所有设备，或者直接回车则正常添加新设备');
-      if (!_state!.running) return;
-      if (ans.trim().toLowerCase() == 'r') {
-        recovered = await _runRecoverAsCreator(session, store, storePath, server);
-        if (recovered) break; // 恢复成功：跳过身份/名字问答，直接走登记（首设备自举）
-        // 恢复未成功：循环可重试，或回车走正常路线
-      } else {
-        break;
-      }
-    }
-  }
-
   String? chosenPerson;
-  if (!recovered && store.deviceId == null && _probePersonNames.isNotEmpty) {
+  if (store.deviceId == null && _probePersonNames.isNotEmpty) {
     final aName = _probePersonNames['personA'] ?? '';
     final bName = _probePersonNames['personB'] ?? '';
     while (true) {
@@ -1078,9 +1058,9 @@ Future<void> main(List<String> args) async {
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
 
-  // 启动自检：设备是否已被撤销（/recover 或 /revoke）——已撤销不进 TUI：
+  // 启动自检：设备是否已被撤销（/revoke）——已撤销不进 TUI：
   // 终端直接提示"本设备已被撤销。"后退出（不渲染界面、不加载历史）。
-  // 会话被清（/recover 会 DELETE sessions）→ 清 token 走挑战重认证；挑战 403
+  // 会话被清（/revoke 会 DELETE 该设备的 sessions）→ 清 token 走挑战重认证；挑战 403
   // （设备已撤销）由引导识别后同样提示退出（见 _runGuide）。
   final probe = await _probeRevoked(store, server);
   if (probe == 1) {
@@ -1603,7 +1583,7 @@ void _onProfileUpdated(WsProfileUpdatedEvent e) {
   _scheduleRender();
 }
 
-/// 在线期间收到 device.revoked（被 /revoke 或 /recover 撤销）→ 立刻回命令行：
+/// 在线期间收到 device.revoked（被 /revoke 撤销）→ 立刻回命令行：
 /// 恢复终端、提示"本设备已被撤销。"后退出。
 void _onWsRevoked(WsDeviceRevokedEvent event) {
   _exitRevoked();
@@ -2783,7 +2763,7 @@ Map<String, String> _probePersonNames = {};
 Map<String, String> _probePersonGenders = {};
 
 /// 启动自检结果：0=正常/离线（可看本地历史）；1=设备已被撤销；2=会话已失效
-/// （/recover 会 DELETE sessions，缓存 token 死 → 401）需清除 token 走引导
+/// （/revoke 会 DELETE 该设备的 sessions，缓存 token 死 → 401）需清除 token 走引导
 /// 挑战重认证——挑战阶段若设备已撤销会 403（由引导兜底识别为 revoked）。
 Future<int> _probeRevoked(DeviceStore store, String server) async {
   if (store.deviceId == null || store.spaceId == null || store.sessionToken == null) {
@@ -2802,72 +2782,6 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
 }
 
 /// 全丢恢复（开发运维专用；闭环——仅凭 escrow 口令，无需 EINZ-BACKUP 文本）：
-/// 输入 escrow 口令 → 服务端 /recover 凭口令重置（撤销全部设备/会话/邀请码）
-/// 并返回 escrow 密文包 → 用同一口令 decryptBackup 本地解出 Space Key → 本机
-/// 写入恢复密钥/space_id/key_version，置 escrowUploaded（口令密保箱未变不重传），
-/// 以创建者身份重新首设备自举（enroll/auth 由引导后续步骤完成）。
-/// 口令错误 → 服务端先校验后重置（403，未撤销任何设备），失败提示后可重试。
-Future<bool> _runRecoverAsCreator(ChatSession session, DeviceStore store, String storePath, String server) async {
-  while (true) {
-    if (!_state!.running) return false;
-    final passphrase = await _prompt(session, '❓ 输入密保口令，才能打开密钥保管箱；输入 q 取消）：', hidden: true, required: true);
-    if (!_state!.running) return false;
-    if (passphrase.toLowerCase() == 'q') {
-      session.messages.add(_systemMessage(session, '已取消'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-      return false;
-    }
-    try {
-      // 1) 服务端凭口令重置空间并取回 escrow 密文包（口令错 → 403 FORBIDDEN，
-      //    未撤销任何设备；未托管 → pkg 为 null）
-      final pkg = await ApiClient(server).recoverSpace(passphrase);
-      if (pkg == null) {
-        session.messages.add(_systemMessage(session, '⚠️ 未上传口令密保箱，无法恢复'));
-        session.messages.add(_systemMessage(session, '----------------'));
-        _scheduleRender();
-        continue;
-      }
-      // 2) 本地用同一口令解包（口令已通过服务端校验，此处 decryptBackup 兜底防御）
-      final plain = await decryptBackup(file: pkg, recoveryCode: passphrase);
-      final json = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
-      // 3) 本机写入恢复密钥；设备/会话待下方 enroll（activeCount=0 首设备自举）+ auth 重建
-      store.spaceKey = json['space_key'] as String;
-      store.spaceId = json['space_id'] as String;
-      store.keyVersion = (json['key_version'] as num?)?.toInt() ?? 1;
-      store.deviceId = null;
-      store.personId = null;
-      store.sessionToken = null;
-      store.escrowUploaded = true; // 口令密保箱仍在服务器（口令未变），不再要求重传
-      // 恢复后首设备固定登记为新空间 personA/dev1（服务端自举规则，与恢复者
-      // 原是 1 还是 2 无关）→ 不询问身份，直接沿用 personA 的显示名
-      //（/recover 不清 person_names 表）；personA 未命名过则留空（显示回退）
-      final aName = _probePersonNames['personA'] ?? '';
-      store.personName = aName.isNotEmpty ? aName : null;
-      store.save(storePath);
-      session.messages.add(_systemMessage(session, '✅ 秘境重置成功，即将作为 $aName 重新绑定当前设备'));
-      session.messages.add(_systemMessage(session, '================'));
-      _scheduleRender();
-      return true;
-    } on FormatException {
-      session.messages.add(_systemMessage(session, '⚠️ 口令无法解开口令密保箱（异常），请重新输入'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-    } on ApiException catch (e) {
-      final hint = e.code == 'FORBIDDEN'
-          ? '口令与服务器托管不符，或未上传口令密保箱'
-          : '服务端恢复失败（${e.code}）';
-      session.messages.add(_systemMessage(session, '⚠️ $hint，请重新输入'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-    } catch (e) {
-      session.messages.add(_systemMessage(session, '⚠️ 恢复失败: $e，请重试（或输 q 取消）'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-    }
-  }
-}
-
 /// 修改托管口令（/passphrase）：旧口令验证（fetch 口令密保箱解密）→
 /// 新口令重加密上传（含新 argon2id 哈希）。口令输入不回显（hidden）。
 /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
