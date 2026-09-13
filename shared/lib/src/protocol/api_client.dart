@@ -18,6 +18,16 @@ class ApiClient {
   /// 瞬时网络错误自动重试次数（翻墙/网络抖动下的间歇性握手失败不致命）。
   static const retryCount = 3;
 
+  /// **响应**超时（不含建连）：建连超时见 [_client] 的 connectionTimeout。
+  ///
+  /// 为什么必须有：只设 connectionTimeout 时，若服务端已收到请求但响应在回程丢失
+  /// （或被中间设备吞掉），`req.close()`/读 body 会**永远挂住**——消息卡在
+  /// pending（发送中小飞机）不落 failed，用户既不知道成没成、也没法重试
+  /// （老板 2026-09-13 实测：对方已收到，本端一直是小飞机）。
+  /// 超时按 [TimeoutException] 抛出 → [_withRetry] 会重试，仍失败则上层标 failed。
+  /// 30s 取值偏宽松：大陆网络经代理时 RTT 可能较长，宁可慢也不要误判失败。
+  static const responseTimeout = Duration(seconds: 30);
+
   HttpClient get _client {
     final c = HttpClient();
     c.connectionTimeout = const Duration(seconds: 10);
@@ -318,8 +328,8 @@ class ApiClient {
         }));
         req.headers.contentType = ContentType.binary;
         req.add(blob);
-        final res = await req.close();
-        final text = await res.transform(utf8.decoder).join();
+        final res = await req.close().timeout(responseTimeout);
+        final text = await res.transform(utf8.decoder).join().timeout(responseTimeout);
         if (res.statusCode >= 400) {
           throw _errorFrom(res.statusCode, text);
         }
@@ -409,8 +419,8 @@ class ApiClient {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
         req.write(jsonEncode(body));
-        final res = await req.close();
-        final text = await res.transform(utf8.decoder).join();
+        final res = await req.close().timeout(responseTimeout);
+        final text = await res.transform(utf8.decoder).join().timeout(responseTimeout);
         if (res.statusCode >= 400) {
           throw _errorFrom(res.statusCode, text);
         }
@@ -429,8 +439,8 @@ class ApiClient {
         if (token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
-        final res = await req.close();
-        final text = await res.transform(utf8.decoder).join();
+        final res = await req.close().timeout(responseTimeout);
+        final text = await res.transform(utf8.decoder).join().timeout(responseTimeout);
         if (res.statusCode >= 400) {
           throw _errorFrom(res.statusCode, text);
         }
@@ -452,8 +462,8 @@ class ApiClient {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
         req.add(bytes);
-        final res = await req.close();
-        final text = await res.transform(utf8.decoder).join();
+        final res = await req.close().timeout(responseTimeout);
+        final text = await res.transform(utf8.decoder).join().timeout(responseTimeout);
         if (res.statusCode >= 400) {
           throw _errorFrom(res.statusCode, text);
         }
@@ -469,14 +479,14 @@ class ApiClient {
       final client = _client;
       try {
         final req = await client.getUrl(Uri.parse('$baseUrl$path'));
-        final res = await req.close();
+        final res = await req.close().timeout(responseTimeout);
         if (res.statusCode == 404) return null; // 未设置
         if (res.statusCode >= 400) {
-          final text = await res.transform(utf8.decoder).join();
+          final text = await res.transform(utf8.decoder).join().timeout(responseTimeout);
           throw _errorFrom(res.statusCode, text);
         }
         final builder = BytesBuilder();
-        await for (final chunk in res) {
+        await for (final chunk in res.timeout(responseTimeout)) {
           builder.add(chunk);
         }
         return builder.takeBytes();
@@ -494,8 +504,8 @@ class ApiClient {
         if (token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
-        final res = await req.close();
-        final text = await res.transform(utf8.decoder).join();
+        final res = await req.close().timeout(responseTimeout);
+        final text = await res.transform(utf8.decoder).join().timeout(responseTimeout);
         if (res.statusCode >= 400) {
           throw _errorFrom(res.statusCode, text);
         }
