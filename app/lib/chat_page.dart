@@ -3456,6 +3456,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               child: TextField(
                                 controller: _input,
                                 focusNode: _inputFocusNode,
+                                // 多行输入框：文字到达宽度后自动折行，输入框随之增高，
+                                // 最多 8 行；超过 8 行不再增高，转为内部纵向滚动
+                                // （老板要求 2026-09-13：原先单行 + 横向滚动体验差）。
+                                // 非文字态（录音提示/录音/预览）把隐藏输入框按单行布局，
+                                // 录音条 Positioned.fill 才不会跟着草稿高度撑到 8 行高
+                                // （草稿保留在 controller 里，切回文字态自动恢复增高）
+                                minLines: 1,
+                                maxLines: _inputMode == _InputMode.text ? 8 : 1,
+                                // 多行折行；回车键仍为「发送」（键盘右下角显示「发送」，
+                                // iOS 按系统语言本地化），不插入换行——与微信一致
+                                keyboardType: TextInputType.multiline,
+                                textInputAction: TextInputAction.send,
                                 decoration: InputDecoration(
                                     hintText: l10n.chatPageInputHint, isDense: true),
                                 // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
