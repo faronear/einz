@@ -25,7 +25,7 @@ const LinearGradient kBrandGradient = LinearGradient(
   colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
 );
 
-/// 界面风格切换通知：聊天页监听后即时重建（弹窗不关闭也能预览效果）。
+/// 界面风格切换通知：聊天页监听后即时重建（点选即切换，弹窗随即关闭）。
 final ValueNotifier<String> uiStyleNotifier = ValueNotifier<String>('plain');
 
 /// 界面风格偏好设置（存本设备 app_state，key='ui_style'）。

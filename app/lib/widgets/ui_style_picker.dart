@@ -5,10 +5,8 @@ import '../l10n/app_localizations.dart';
 
 /// 界面风格选择弹层：列出全部风格（目前：素雅纯色 / 渐变粉蓝），每项 = 一张
 /// 预览图 + 名称 + 一句描述；点选即保存并立即生效（uiStyleNotifier 通知聊天页
-/// 重建），弹窗保持打开——用户不离开弹窗即可看到大致效果，右上角 ✕ 或下滑关闭。
-///
-/// 与语言切换（点选即关窗）不同：风格切换需要"边看边试"，因此弹层自身监听
-/// uiStyleNotifier 刷新选中态，不随点选关闭。
+/// 重建），并立即关闭弹窗回到对话消息页（老板要求 2026-09-13；此前是保持打开
+/// 供"边看边试"，现改为选完即关）。
 class UiStylePickerSheet extends StatefulWidget {
   const UiStylePickerSheet({super.key, required this.settings});
 
@@ -40,8 +38,12 @@ class _UiStylePickerSheetState extends State<UiStylePickerSheet> {
   }
 
   Future<void> _apply(String style) async {
-    if (style == _active) return; // 已激活：不重复保存
-    await widget.settings.save(style); // 保存 → notifier 通知 → 选中态/聊天页背景刷新
+    if (style != _active) {
+      // 保存 → notifier 通知 → 聊天页背景刷新（已激活则无需重复保存）
+      await widget.settings.save(style);
+    }
+    // 点选后立即关闭弹窗，回到对话消息页（老板要求 2026-09-13）
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override

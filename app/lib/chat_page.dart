@@ -662,8 +662,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _uiStyle = uiStyleNotifier.value);
   }
 
-  /// 顶栏 🎨：切换界面风格（素雅纯色/渐变粉蓝）。弹窗内点选即生效且不关闭，
-  /// 用户不离开弹窗即可预览大致效果（右上角 ✕ 或下滑关闭）。
+  /// 顶栏 🎨：切换界面风格（素雅纯色/渐变粉蓝）。弹窗内点选即生效并立即关闭，
+  /// 回到对话消息页（老板要求 2026-09-13；此前是保持打开供边看边试）。
   Future<void> _showStylePicker() async {
     await showModalBottomSheet<void>(
       context: context,

@@ -4083,3 +4083,20 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 对齐 arb 后已失配，本次一并修正。
 
 **验证：** `flutter analyze lib test` 0 issue。未跑测试/UI 老板自测。
+
+### 追加（同日）：界面风格弹窗——点选即生效并立即关窗
+
+**老板要求：** 界面风格弹窗里点选一个风格后，除立即换肤外，还要**立即关闭弹窗**
+回到对话消息页（此前是保持打开供「边看边试」，需手动 ✕/下滑关闭）。
+
+**改动：**
+- `widgets/ui_style_picker.dart`：`_apply` 由「已激活直接 return、否则仅保存」改为
+  「非当前项才 `save`，随后 `if (mounted) Navigator.of(context).pop()`」——点选
+  任意风格（含当前项）都关窗；顶部类注释同步。
+- `data/ui_style_settings.dart`：notifier 注释去掉「弹窗不关闭也能预览」。
+- `chat_page.dart`：`_showStylePicker` 文档注释同步（点选即关）。
+- 测试 `ui_style_switch_test.dart`：用例改为断言「点选后弹窗关闭 + 换肤 + 持久化」，
+  并重开弹窗验证 ✕ 仍可关；顺带把两处失配的 `find.text('渐变粉蓝 / Gradient')`
+  修正为现标签 `'渐变粉蓝'`（label 早已是单语，属既有失配）。
+
+**验证：** `flutter analyze lib test` 0 issue。未跑测试/UI 老板自测。

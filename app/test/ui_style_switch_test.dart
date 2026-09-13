@@ -1,4 +1,4 @@
-// 回归测试：界面风格切换（菜单「界面风格」→ 弹窗 → 点选即生效且不关窗预览）。
+// 回归测试：界面风格切换（菜单「界面风格」→ 弹窗 → 点选即生效并关窗回到对话页）。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -97,7 +97,7 @@ void main() {
   BoxDecoration? barDecoration(WidgetTester tester, Finder finder) =>
       (tester.widget<Container>(finder).decoration as BoxDecoration?);
 
-  testWidgets('界面风格弹窗：两风格+描述展示；点选即生效且不关窗；持久化', (WidgetTester tester) async {
+  testWidgets('界面风格弹窗：两风格+描述展示；点选即生效并关窗；持久化', (WidgetTester tester) async {
     final db = await pumpChatPage(tester);
 
     // 默认素雅纯色：无渐变背景层；状态条已是悬浮圆角（两风格统一，老板要求）
@@ -119,10 +119,10 @@ void main() {
     expect(find.textContaining('浅粉纯色背景'), findsOneWidget, reason: '纯色风格应有一句描述');
     expect(find.textContaining('粉蓝渐变背景'), findsOneWidget, reason: '渐变风格应有一句描述');
 
-    // 点选渐变粉蓝 → 立即生效：弹窗不关闭 + 聊天页背景出现渐变
+    // 点选渐变粉蓝 → 立即生效并立即关窗回到对话页（老板要求 2026-09-13）
     await tester.tap(find.text('渐变粉蓝'));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格'), findsOneWidget, reason: '点选后弹窗应保持打开（预览不关窗）');
+    expect(find.text('界面风格'), findsNothing, reason: '点选后弹窗应立即关闭回到对话页');
     expect(gradientBackground, findsOneWidget, reason: '点选渐变后聊天页背景应切换为渐变');
 
     // 全屏渐变（同向导）：body 延伸到 AppBar 之后、AppBar 透明、状态条/输入条
@@ -140,10 +140,14 @@ void main() {
     final settings = UiStyleSettings(db);
     expect(await settings.load(), 'gradient', reason: '风格选择应持久化到本地');
 
-    // 再点回素雅纯色 → 渐变背景消失、弹窗仍在
+    // 重新打开弹窗 → 点回素雅纯色 → 关窗、渐变背景消失
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('界面风格'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('素雅纯色'));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格'), findsOneWidget);
+    expect(find.text('界面风格'), findsNothing, reason: '点选后弹窗应立即关闭');
     expect(gradientBackground, findsNothing, reason: '切回纯色后渐变背景应移除');
     final scaffoldAfter = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffoldAfter.extendBodyBehindAppBar, isFalse, reason: '切回纯色后恢复原有布局（body 不从 AppBar 后延伸）');
@@ -152,7 +156,11 @@ void main() {
         reason: '切回纯色后状态条仍为悬浮圆角（两风格统一）');
     expect(await settings.load(), 'plain');
 
-    // 右上角 ✕ 关闭弹窗
+    // 右上角 ✕ 仍可关闭弹窗（未点选任何风格时）
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('界面风格'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
     expect(find.text('界面风格'), findsNothing, reason: '点 ✕ 后弹窗应关闭');
@@ -226,7 +234,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('渐变粉蓝 / Gradient'));
+    await tester.tap(find.text('渐变粉蓝'));
     await tester.pumpAndSettle();
 
     // 消息列表底部应直达输入栏顶部（无 SafeArea 顶部 inset 造成的空隙）
@@ -291,7 +299,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('渐变粉蓝 / Gradient'));
+    await tester.tap(find.text('渐变粉蓝'));
     await tester.pumpAndSettle();
 
     // 气泡底色：本人男→深蓝、对方女→深粉（渐变下不再用浅 tint）
