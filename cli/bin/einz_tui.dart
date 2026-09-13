@@ -30,6 +30,7 @@ const _green = '$_esc[32m';
 const _yellow = '$_esc[33m';
 const _cyan = '$_esc[36m';
 const _gray = '$_esc[90m';
+const _blue = '$_esc[94m'; // 亮蓝字：我发出的消息「对方已读」状态（TUI 独有，App 不显示已读）
 const _black = '$_esc[30m'; // 黑字（对方彩色底上的标签：人名/时间戳）
 const _white = '$_esc[97m'; // 亮白字（对方彩色底上的消息正文）
 const _bold = '$_esc[1m';
@@ -1742,12 +1743,14 @@ String _genderBubble(String? rawGender) {
 /// 我发出的消息状态字符（标签后缀，只用于自己的消息）：
 /// - pending（未被服务端确认，含离线队列）→ `⋯`
 /// - sent（服务端已收下）→ `✓`
-/// - delivered（对方已送达）→ `✓✓`（与 App 双勾一致；read 暂不单独区分）
+/// - delivered（对方已送达）→ `✓✓`
+/// - read（对方已读）→ `✓✓` 并标蓝（[_blue]，TUI 独有——App 只到双勾）
 /// 均按 1~2 列宽字符选取（避免 emoji 双宽导致气泡对不齐）。
 String _statusGlyph(String status) => switch (status) {
       'pending' => '⋯',
       'sent' => '✓',
       'delivered' => '✓✓',
+      'read' => '✓✓',
       _ => '',
     };
 
@@ -1854,11 +1857,14 @@ List<String> formatMessage(ChatMessage m, int cols) {
   } else {
     partnerBackground = _bgTeal; // 性别未知：青绿底（2026-09-10 老板要求）
   }
-  // 我的消息标签扩展为 [我 时间 状态]：pending ⋯ / sent ✓ / delivered ✓✓
-  // （状态字符宽度按 1 列计算，不占额外留白预算——见 _statusGlyph）
-  final statusGlyph = _statusGlyph(_state?.session.sentStatusOf(m) ?? '');
-  final suffix =
-      '$_black[$who $time${statusGlyph.isEmpty ? '' : ' $statusGlyph'}]$_reset';
+  // 我的消息标签扩展为 [我 时间 状态]：pending ⋯ / sent ✓ / delivered ✓✓，
+  // 已读（read）时把状态字符标蓝——TUI 独有（App 已读只留数据档位不展示）。
+  final status = _state?.session.sentStatusOf(m) ?? '';
+  final statusGlyph = _statusGlyph(status);
+  final statusColor = status == 'read' ? _blue : _black;
+  final suffix = statusGlyph.isEmpty
+      ? '$_black[$who $time]$_reset'
+      : '$_black[$who $time $statusColor$statusGlyph$_black]$_reset';
   final suffixW = _displayWidth(suffix);
   // 正文每行同时保留：左侧 sideMargin 列留白（不顶左边框）+ 右侧标签栏；
   // 标签栏宽 = "空格+标签"（标签宽+1），使续行正文右缘与末行标签起点对齐

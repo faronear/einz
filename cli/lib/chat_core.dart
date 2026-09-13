@@ -62,6 +62,10 @@ class ChatSession {
   /// 自己的水位描述的是"我收到对方哪些消息"，与我发出的消息无关（App 同款坑）。
   final Map<String, int> peerDeliveredUpto = {};
 
+  /// 对方已读高水位：personId → seq，只前进不倒退（语义同 [peerDeliveredUpto]）。
+  /// 服务端保证 read ≤ delivered；TUI 据此把"已读"的消息状态字符标蓝。
+  final Map<String, int> peerReadUpto = {};
+
   /// 自动补拉周期：WS 推送可能丢帧、断线期间的消息不会回放，定时增量拉取兜底
   /// （同时顺带补发离线发送队列）。
   static const autoSyncInterval = Duration(seconds: 30);
@@ -307,6 +311,8 @@ class ChatSession {
         if (r.personId == store.personId) continue;
         final cur = peerDeliveredUpto[r.personId] ?? 0;
         if (r.deliveredUptoSeq > cur) peerDeliveredUpto[r.personId] = r.deliveredUptoSeq;
+        final curRead = peerReadUpto[r.personId] ?? 0;
+        if (r.readUptoSeq > curRead) peerReadUpto[r.personId] = r.readUptoSeq;
       }
     } catch (_) {
       // 网络抖动忽略
@@ -317,12 +323,16 @@ class ChatSession {
   /// - `pending`：尚未被服务端确认（仍在离线队列，或还没拿到 server_sequence）
   /// - `sent`：服务端已收下（有 server_sequence），但对方尚未确认送达
   /// - `delivered`：对方（所有接收方）已送达高水位 ≥ 该消息 seq
-  /// 非我的消息 / 系统消息返回空串。read 暂不单独区分（与 App 一致，折叠进 delivered）。
+  /// - `read`：对方已读高水位 ≥ 该消息 seq（TUI 用它把状态字符标蓝）
+  /// 非我的消息 / 系统消息返回空串。
   String sentStatusOf(ChatMessage m) {
     if (!m.isMine || m.isSystem) return '';
     if (store.hasPending(m.env.messageId)) return 'pending';
     final seq = m.seq;
     if (seq == null) return 'pending';
+    if (peerReadUpto.isNotEmpty && peerReadUpto.values.every((r) => r >= seq)) {
+      return 'read';
+    }
     if (peerDeliveredUpto.isEmpty) return 'sent';
     return peerDeliveredUpto.values.every((d) => d >= seq) ? 'delivered' : 'sent';
   }
@@ -497,6 +507,10 @@ class ChatSession {
             final cur = peerDeliveredUpto[event.personId] ?? 0;
             if (event.deliveredUptoSeq > cur) {
               peerDeliveredUpto[event.personId] = event.deliveredUptoSeq;
+            }
+            final curRead = peerReadUpto[event.personId] ?? 0;
+            if (event.readUptoSeq > curRead) {
+              peerReadUpto[event.personId] = event.readUptoSeq;
             }
           }
           onReceiptUpdated?.call();

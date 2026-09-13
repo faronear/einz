@@ -157,6 +157,15 @@ Future<int> _run() async {
       return 1;
     }
 
+    // 2.5) B 已读（App 在前台贴底时上报 read）→ A 刷新 → read（TUI 标蓝）
+    await api.postReceipts(storeB.sessionToken!, readUptoSeq: 1);
+    await sessionA.refreshReceipts();
+    if (sessionA.sentStatusOf(ma) != 'read') {
+      stderr.writeln('❌ 期望 read，实际 ${sessionA.sentStatusOf(ma)}'
+          '（peerReadUpto=${sessionA.peerReadUpto}）');
+      return 1;
+    }
+
     // 3) 离线发出 → pending（进入离线队列，未确认）
     final storeOffline = DeviceStore(
       publicKey: 'pk-c',
@@ -179,7 +188,7 @@ Future<int> _run() async {
       return 1;
     }
 
-    stdout.writeln('✅ 消息状态：发出=sent、对方补拉后=delivered、离线=pending');
+    stdout.writeln('✅ 消息状态：发出=sent、对方补拉后=delivered、已读=read、离线=pending');
     return 0;
   } finally {
     proc.kill();
