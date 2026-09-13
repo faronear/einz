@@ -12,6 +12,11 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:einz_shared/einz_shared.dart';
 import 'package:einz_cli/store.dart';
 
+/// 展示消息的全局插入序号（仅用于排序平局决胜）。Dart 的 `List.sort` **不稳定**，
+/// 同毫秒创建的系统消息（如 join 向导里「✅ 我是 X」「----------------」「❓ 验证密保口令:」
+/// 基本同刻产生）排序后会被打乱（老板 2026-09-13 实测：口令提示跑到"我是 X"之前）。
+int _messageOrderSeq = 0;
+
 /// 展示用消息（已解密明文 + 归属）。
 class ChatMessage {
   ChatMessage({
@@ -22,12 +27,16 @@ class ChatMessage {
     this.serverSequence,
     this.isSystem = false,
     this.meta,
-  });
+    int? order,
+  }) : order = order ?? _messageOrderSeq++;
 
   final MessageEnvelope env;
   final String plain;
   final bool isMine;
   final int createdAt;
+
+  /// 插入顺序（全局单调递增）：仅作排序平局决胜，保证同等时间戳/序号的消息稳定有序。
+  final int order;
 
   /// 系统提示消息（如邀请码、引导提示）：sender 显示为 system（不参与"我/对方"）。
   final bool isSystem;
@@ -42,6 +51,27 @@ class ChatMessage {
 
   int? get seq => serverSequence ?? env.serverSequence;
   int get keyVersion => env.keyVersion;
+}
+
+/// 展示消息排序比较器（纯函数，便于单测）：
+/// - 对话消息按 `server_sequence`（服务端分配递增）；
+/// - 系统消息（无 seq）按 `createdAt`，与对话消息混合时也按 createdAt 对齐——
+///   系统消息穿插在对话历史里、不排到末尾（否则渲染（最新在底部）会把系统消息
+///   画到最下方、对话消息反而跑到上方）；
+/// - 完全平局（同毫秒 createdAt / 同 seq）时按插入顺序 [ChatMessage.order] 决胜——
+///   Dart 的 `List.sort` **不稳定**，无此决胜会打乱同刻系统消息（老板 2026-09-13
+///   实测：join 向导里「❓ 验证密保口令」跑到「✅ 我是 X」之前）。
+int compareChatMessages(ChatMessage a, ChatMessage b) {
+  final an = a.seq;
+  final bn = b.seq;
+  final int byTime;
+  if (an == null || bn == null) {
+    byTime = a.createdAt.compareTo(b.createdAt);
+  } else {
+    byTime = an.compareTo(bn);
+  }
+  if (byTime != 0) return byTime;
+  return a.order.compareTo(b.order);
 }
 
 /// 聊天会话：封装设备状态、服务器交互与消息缓存。
@@ -786,18 +816,7 @@ class ChatSession {
   }
 
   void _sortMessages() {
-    messages.sort((a, b) {
-      final an = a.seq;
-      final bn = b.seq;
-      // 统一时间序：对话消息按 seq（服务端分配递增）；系统消息（无 seq）按
-      // createdAt，且与对话消息混合时也按 createdAt 对齐——系统消息穿插在
-      // 对话历史里、不排到末尾（否则渲染（最新在底部）会把系统消息画到最
-      // 下方、对话消息反而跑到上方）
-      if (an == null || bn == null) {
-        return a.createdAt.compareTo(b.createdAt);
-      }
-      return an.compareTo(bn);
-    });
+    messages.sort(compareChatMessages);
   }
 
   /// 简易 UUIDv7（与 einz.dart 一致的近似实现）。

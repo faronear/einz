@@ -150,7 +150,7 @@ bool _onboardingFinalized = false;
 
 /// 入网向导收尾的欢迎辞：向导完成后作为最后一条 system 消息出现，提示用户按回车
 /// 进入聊天态（回车后清空全部 system 消息、只留真实对话——老板 2026-09-13 定稿）。
-const String _kWelcomeText = '一切就绪！输入回车，进入秘境，开始和伴侣聊天吧！';
+const String _kWelcomeText = '一切就绪！输入回车，立刻开始和伴侣聊天吧！';
 
 /// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
 Timer? _resizeTimer;
@@ -732,6 +732,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   _onboardingFinalized = true;
   if (!_state!.running) return;
   // 欢迎辞即最后一条向导 system 消息；_prompt 负责渲染并等输入循环提交回车
+  session.messages.add(_systemMessage(session, '----------------'));
   await _prompt(session, _kWelcomeText);
   if (!_state!.running) return; // 回车期间 /exit：不再继续
   // 切换到聊天态：清空全部 system 消息，只留真实对话（对方预发 / 自己发出的）
@@ -1025,7 +1026,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     store.personId = join.personId;
     store.personName = myName ?? '成员';
     store.save(storePath);
-    session.messages.add(_systemMessage(session, '🎉 成功加入秘境！地址: ${join.spaceAddress}'));
+    session.messages.add(_systemMessage(session, '🎉 口令验证通过，成功加入秘境。'));
     session.messages.add(_systemMessage(session, '----------------'));
     _onboarded = true;
     _scheduleRender();
@@ -3049,6 +3050,10 @@ bool _sameStringMap(Map<String, String> a, Map<String, String> b) {
   return true;
 }
 
+/// 系统提示消息的 message_id 计数器（保证唯一——此前用毫秒时间戳，同刻会产生
+/// 重复 id，去重/删除按 id 操作时可能误伤）。
+int _systemMessageSeq = 0;
+
 /// 构造一条系统提示消息（sender 显示 system，随对话流滚动，不被状态条推到窗口上方）。
 ChatMessage _systemMessage(ChatSession session, String text) {
   return ChatMessage(
@@ -3056,7 +3061,7 @@ ChatMessage _systemMessage(ChatSession session, String text) {
       v: 1,
       type: 'text',
       keyVersion: session.store.keyVersion,
-      messageId: 'sys-${DateTime.now().millisecondsSinceEpoch}',
+      messageId: 'sys-${_systemMessageSeq++}',
       senderDeviceId: session.store.deviceId ?? '-',
       nonce: '',
       ciphertext: '',
