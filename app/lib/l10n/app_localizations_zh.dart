@@ -334,12 +334,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogSetPin => '设置 PIN';
 
   @override
-  String get setupPageSkipPinTitle => '不设置锁屏码？';
-
-  @override
-  String get setupPageSkipPinMessage => '如果不设锁屏码，本应用启动时将直接进入对话，容易被窃取隐私。确定跳过吗？';
-
-  @override
   String get setPinDialogPinTooShort => 'PIN 至少 6 位数字';
 
   @override
@@ -362,7 +356,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockClearHint => '可留空直接提交，即可清空 PIN';
+  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁，更安全。也可以暂时跳过，后期可随时更改。';
 
   @override
   String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';

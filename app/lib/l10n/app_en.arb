@@ -128,8 +128,6 @@
   "setPinDialogConfirmLabel": "Confirm PIN",
   "setPinDialogConfirmHint": "Type it again to confirm",
   "setPinDialogSetPin": "Set PIN",
-  "setupPageSkipPinTitle": "Skip app lock?",
-  "setupPageSkipPinMessage": "Without the app lock the Space Key isn't encrypted on this device. Skip anyway?",
   "setPinDialogPinTooShort": "PIN must be at least 6 digits",
   "setPinDialogPinDigitsOnly": "Digits only",
   "setPinDialogPinMismatch": "PINs do not match",

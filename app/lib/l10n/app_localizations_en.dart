@@ -355,13 +355,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogSetPin => 'Set PIN';
 
   @override
-  String get setupPageSkipPinTitle => 'Skip app lock?';
-
-  @override
-  String get setupPageSkipPinMessage =>
-      'Without the app lock the Space Key isn\'t encrypted on this device. Skip anyway?';
-
-  @override
   String get setPinDialogPinTooShort => 'PIN must be at least 6 digits';
 
   @override

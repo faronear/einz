@@ -728,18 +728,6 @@ abstract class AppLocalizations {
   /// **'Set PIN'**
   String get setPinDialogSetPin;
 
-  /// No description provided for @setupPageSkipPinTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Skip app lock?'**
-  String get setupPageSkipPinTitle;
-
-  /// No description provided for @setupPageSkipPinMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Without the app lock the Space Key isn\'t encrypted on this device. Skip anyway?'**
-  String get setupPageSkipPinMessage;
-
   /// No description provided for @setPinDialogPinTooShort.
   ///
   /// In en, this message translates to:

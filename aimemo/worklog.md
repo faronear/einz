@@ -4001,3 +4001,8 @@ gen-l10n）；② `goldens/setup_step1.1.4_pin.png` 上的按钮还是「下一�
 `--update-goldens` 刷新——本机 golden 测试整文件 12/13 失败（含锁屏页/聊天页），
 确认是既有环境问题（改前 stash 复测同样失败），不是本次改动引入。
 `setup_join_passphrase_test` 的「错误 token」用例同样为既有失败。
+
+### 追加（同日）：清掉 PIN 弹窗遗留文案
+
+删 arb 中 `setupPageSkipPinTitle` / `setupPageSkipPinMessage`（中英各一条）并重跑
+`flutter gen-l10n`：只有删除、无其他重排，生成文件与 arb 同步，analyze 0 issue。

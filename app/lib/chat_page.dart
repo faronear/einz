@@ -3517,7 +3517,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start, // 小字/输入框与大标题左对齐（老板要求）
         children: [
-          // 提示：可留空直接提交，即可清空 PIN（大标题下、输入框上方——老板要求）
+          // 提示：设置后，每次进入秘境都要解锁，更安全。也可以暂时跳过，后期可随时更改。（大标题下、输入框上方——老板要求）
           Text(
             l10n.chatPageSetLockClearHint,
             style: TextStyle(
