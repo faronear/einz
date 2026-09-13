@@ -3783,3 +3783,22 @@ commit `cb48948`。
 17 个 golden 失败是改动前就有的基线漂移（非本次引入）。未引新依赖、未加 l10n 字符串。
 
 **遗留：** 输入栏录音条（录音中/预览态）仍用真实振幅波形 + `m:ss` 计时，本次未动。
+
+### 追加（同日）：两类气泡的时长格式分开
+
+**老板澄清：** 录音气泡只用秒（`25s`）；音频文件气泡用 h/m/s，**为零的部分不显示**
+（`3s`、`1m 15s`、`2h 5s`）。
+
+**改动：**
+- 拆成两个格式化函数：`_formatVoiceDuration`（只有秒）/ `_formatHmsDuration`（h/m/s，
+  零部分省略）。录音 caption 仍随消息同步，对端解析显示。
+- 音频文件**发送前探测时长**：`_probeAudioDuration()` 用一次性的 audioplayers 实例
+  `setSource(BytesSource)` + `getDuration()`（不播放），把结果以 `文件名 [3m 20s]`
+  的形式附在 caption 里同步给对端——协议没给附件加 duration 字段，只能借明文。
+  探测失败就只发文件名。
+- 显示时 `_audioFileInfo()` 把明文拆成（文件名, 时长秒数）：优先用播放后缓存的
+  `_audioFileDurations`（内存，不落库），其次用明文标注；老消息播放一次后才显示时长。
+- 顺带修一处隐患：`_playAudioMessage` 取临时文件扩展名改用拆出来的纯文件名，
+  否则带标注的明文会让扩展名变成 `mp3 [3m 20s]`。
+
+**验证：** analyze 无问题；`flutter test` 仍为 +98 -17（17 个 golden 为既有基线漂移）。

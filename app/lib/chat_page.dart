@@ -174,6 +174,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _playingMessageId; // 播放意图（点按即置：含下载解密等待期，按钮变停止）
   String? _audioStartedMessageId; // 音频真正出声的消息（波形进度从此刻起走，
   // 避免下载解密期间进度条空跑——老板要求 2026-09-13）
+  // 音频文件时长（messageId → 秒）：播放时从播放器取真实值缓存，仅内存
+  // ——发送端探测不到（老消息无标注）时，播放一次后才显示时长
+  final Map<String, int> _audioFileDurations = {};
   int _burnSeconds = 0; // 当前阅后即焚秒数（0=无限；显示经 l10n 映射）
   HistoryMessage? _quoteTarget; // 长按「引用」选中的原消息（输入栏引用条 + 发送携带）
   // 点击引用卡跳转定位：目标消息的 GlobalKey（仅目标项持有，避免全列表 key
@@ -2042,7 +2045,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 随消息同步，接收端同样解析（如「语音 12s」）；须在 await 前取好（避免
     // async gap 用 context）
     final caption =
-        '${AppLocalizations.of(context)!.chatPageVoiceLabel} ${_formatDuration(_recordSeconds)}';
+        '${AppLocalizations.of(context)!.chatPageVoiceLabel} ${_formatVoiceDuration(_recordSeconds)}';
     try {
       final f = File(path);
       if (!await f.exists() || await f.length() == 0) {
@@ -2222,13 +2225,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         sha256: att['sha256'] as String,
         nonce: base64Decode(att['nonce'] as String),
       );
-      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+      // 音频文件明文可能带时长标注（「song.mp3 [3m 20s]」），取扩展名要用纯文件名
+      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(_audioFileInfo(m).$1);
       final tmp = File('${Directory.systemTemp.path}/einz_audio_${m.env.messageId}.$ext');
       await tmp.writeAsBytes(bytes);
       await player.stop();
       await player.play(DeviceFileSource(tmp.path));
       // 真正出声才开始走波形进度（此前是下载解密等待期）
       if (mounted) setState(() => _audioStartedMessageId = m.env.messageId);
+      // 音频文件：顺手记下播放器给的真实时长（老消息/探测失败的兜底显示）
+      if (m.env.type != 'voice') {
+        final total = await player.getDuration();
+        final seconds = total?.inSeconds ?? 0;
+        if (mounted && seconds > 0) {
+          setState(() => _audioFileDurations[m.env.messageId] = seconds);
+        }
+      }
       player.onPlayerComplete.first.then((_) {
         if (!mounted) return;
         setState(() {
@@ -2343,11 +2355,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           final audio = audioFiles.first;
           final audioName = audio.name;
           final audioBytes = await audio.readAsBytes();
+          // 发送前读一遍时长（audioplayers 设源取总时长，不播放），附在文件名后
+          // 随消息同步，对端开箱即显示（老板要求 2026-09-13）；读不到就只发文件名
+          final audioSeconds = await _probeAudioDuration(audioBytes);
           await _sendAttachmentOptimistic(
             fileBytes: audioBytes,
             fileName: audioName,
             type: 'audio',
-            caption: audioName,
+            caption: audioSeconds > 0
+                ? '$audioName [${_formatHmsDuration(audioSeconds)}]'
+                : audioName,
           );
         case _AttachmentKind.anyFile:
           final anyFiles = await FilePicker.pickFiles(type: FileType.any);
@@ -2496,8 +2513,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 音频消息气泡：语音=播放键 + 固定波形图 + 时长（h/m/s）；音频文件=播放键
-  /// + 文件名（时长未知，沿用文字展示）。点击下载解密后播放（老板 2026-09-13）。
+  /// 音频气泡：语音（录音）=播放键 + 固定波形图 + 秒数（25s）；音频文件=播放键
+  /// + 文件名 + h/m/s 时长（零的部分省略）。点击下载解密后播放
+  /// （老板要求 2026-09-13）。
   Widget _buildAudioBar(
       HistoryMessage m) {
     final playing = _playingMessageId == m.env.messageId;
@@ -2505,6 +2523,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ? Colors.white
         : Theme.of(context).colorScheme.primary; // 气泡上的前景色（波形/图标）
     if (m.env.type != 'voice') {
+      final info = _audioFileInfo(m); // （显示名, 时长秒数）
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2517,14 +2536,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: Text(
               playing
                   ? AppLocalizations.of(context)!.chatPagePlaying
-                  : '🎵 ${m.plaintext}',
+                  : '🎵 ${info.$1}',
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (info.$2 > 0) ...[
+            const SizedBox(width: 6),
+            Text(_formatHmsDuration(info.$2),
+                style: const TextStyle(fontSize: 12)),
+          ],
         ],
       );
     }
-    final seconds = _voiceDurationSeconds(m);
+    final seconds = _parseDurationSeconds(m.plaintext);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2544,30 +2568,60 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
         const SizedBox(width: 6),
         Text(
-          seconds > 0 ? _formatDuration(seconds) : m.plaintext.trim(),
+          seconds > 0 ? _formatVoiceDuration(seconds) : m.plaintext.trim(),
           style: const TextStyle(fontSize: 12),
         ),
       ],
     );
   }
 
-  /// 时长格式化：3s / 1m 15s / 1h 2m（老板要求 2026-09-13）。
-  String _formatDuration(int totalSeconds) {
-    if (totalSeconds <= 0) return '0s';
+  /// 录音时长：只用秒（25s；录音上限 60s，老板要求 2026-09-13）。
+  String _formatVoiceDuration(int totalSeconds) => '${totalSeconds}s';
+
+  /// 音频文件时长：h/m/s，为零的部分不显示（如 3s、1m 15s、2h 5s）。
+  String _formatHmsDuration(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
     final minutes = (totalSeconds % 3600) ~/ 60;
     final seconds = totalSeconds % 60;
-    if (hours > 0) return minutes > 0 ? '${hours}h ${minutes}m' : '${hours}h';
-    if (minutes > 0) return seconds > 0 ? '${minutes}m ${seconds}s' : '${minutes}m';
-    return '${seconds}s';
+    final parts = <String>[
+      if (hours > 0) '${hours}h',
+      if (minutes > 0) '${minutes}m',
+      if (seconds > 0) '${seconds}s',
+    ];
+    return parts.isEmpty ? '0s' : parts.join(' ');
   }
 
-  /// 从语音消息明文里解析时长秒数：新版明文形如「语音 12s」/「Voice 1m 15s」，
-  /// 旧版形如「语音（12 秒）」——按 `数字 + (h|m|s|小时|分钟|分|秒)` 累加；
-  /// 解析不到返回 0（波形改用循环扫掠动画）。
-  int _voiceDurationSeconds(HistoryMessage m) {
+  /// 音频文件消息拆成（显示文件名, 时长秒数）：明文形如「song.mp3 [3m 20s]」
+  /// ——发送端用 audioplayers 读出时长后追加；老消息只有文件名，时长取播放后
+  /// 缓存的真实值（内存缓存，不落库：重启后再次播放才显示）。
+  (String, int) _audioFileInfo(HistoryMessage m) {
+    final text = m.plaintext;
+    final match = RegExp(r'^(.*?)\s*\[([^\]]*)\]$').firstMatch(text);
+    final name = (match?.group(1) ?? text).trim();
+    final cached = _audioFileDurations[m.env.messageId] ?? 0;
+    if (cached > 0) return (name.isEmpty ? text : name, cached);
+    return (name.isEmpty ? text : name,
+        match == null ? 0 : _parseDurationSeconds(match.group(2)!));
+  }
+
+  /// 读本地音频文件的总时长（audioplayers 设源后取时长，不播放）；失败返回 0。
+  Future<int> _probeAudioDuration(Uint8List bytes) async {
+    final player = AudioPlayer();
+    try {
+      await player.setSource(BytesSource(bytes));
+      return (await player.getDuration())?.inSeconds ?? 0;
+    } catch (_) {
+      return 0;
+    } finally {
+      await player.dispose().catchError((_) => player);
+    }
+  }
+
+  /// 从文本里解析时长秒数：按 `数字 + (h|m|s|小时|分钟|分|秒)` 累加。
+  /// 语音明文形如「语音 25s」/ 旧版「语音（25 秒）」；音频文件标注形如「3m 20s」。
+  int _parseDurationSeconds(String text) {
     var total = 0;
-    for (final match in RegExp(r'(\d+)\s*(h|m|s|小时|分钟|分|秒)').allMatches(m.plaintext)) {
+    for (final match in RegExp(r'(\d+)\s*(h|m|s|小时|分钟|分|秒)').allMatches(text)) {
       final value = int.tryParse(match.group(1)!) ?? 0;
       final unit = match.group(2)!;
       final factor = switch (unit) {
