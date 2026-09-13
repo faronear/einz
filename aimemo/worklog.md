@@ -3252,10 +3252,55 @@ A 发一条 → B `sync()` → 断言：①`lastReportedDeliveredSeq ≥ 1` ②
   `guide_input_rules_check.py` 3/3 通过。
 - **服务端本轮无代码改动**，不需要重新部署（dist 仍是上一轮编译的）。
 
-### 待办
-- read 的**展示**开关（老板要"做成开关、目前不显示"）——目前是"同图标 +
-  `receiptOf` 已能返回 `'read'`"，真正做成用户可见的设置项待定。
-- 多设备下 delivered 语义仍是"该 person 至少一台设备"。
+## 2026-09-13 发送中卡住（小飞机不动）真因：HTTP 没有响应超时 + 小飞机可点按
+
+老板实测："点击发送 → 小飞机 → 对方已收到，但我方仍是小飞机"。他的猜测是
+"服务器收到了但我的设备没收到回执、timeout 了"。**半对**——关键差别：
+
+**真因**：`ApiClient` 只设了 `connectionTimeout`（建连 10s），**响应阶段没有任何
+超时**（`api_client.dart` 的 `_post/_get/_delete/_postBytes/_getBytes`）。
+于是"服务端已收到、但响应在回程丢失/被吞"时，`await req.close()` 与读 body
+**永久挂住** → 消息永远停在 `pending`（小飞机），既不落 failed，用户也无从重试。
+（若是真的 timeout 抛异常，会走 `on Exception` → 标 `failed` ⚠️，反而能看到。）
+
+### 改法一：加响应超时（`1b343c5`）
+`ApiClient.responseTimeout = 30s`，5 个 HTTP 辅助方法全部给 `req.close()`、body
+读取、字节流加上 `.timeout(responseTimeout)` → 抛 `TimeoutException` → 被
+`_withRetry` 重试（3 次）→ 仍失败则上层标 `failed`。
+**实测验证**（起一个只 accept、永不响应的假服务端）：91s 后抛 `TimeoutException`
+（3×30s），不再挂死。取值宽松是有意的：大陆经代理 RTT 长，宁可慢也别误判失败；
+而且用户可以随时点小飞机立刻自救。
+
+### 改法二：小飞机可点按 = 「验证并重发」（`bcb6ad8`）
+老板要求：点小飞机后去验证服务端是否已收到——已收到 → 变单勾；没收到 → 重发。
+**不需要新接口**：服务端 `POST /messages` **按 message_id 幂等**
+（`messages.ts` 查到已有行直接返回原 seq），所以"重发同一封"本身就是"验证"：
+- 服务端已存 → 返回原 seq → 转单勾（**不会产生重复消息**）
+- 服务端未存 → 本次存入 → 转单勾
+- 仍失败 → 转 ⚠️（可继续点）
+实现上就是把现有的 `retryMessage()`（原本只挂 ⚠️）也挂到 pending 的纸飞机上，
+tooltip 改为新增的 `chatPageMsgSendingTap`（"发送中，点击验证是否已送达并重发"）。
+
+**回归测试**（`app/test/chat_send_status_test.dart`）：fake 的 `postMessage` 前 N 次
+**永不完成**（精确模拟"响应丢失"）→ 断言界面停在可点按的纸飞机 → 点按 → 断言
+恰好触发一次重发且变为单勾。写这个测试时还顺带发现：ChatPage 的 `sync()` 会
+`_flushPending()` 把 pending 补发掉，所以"pending 消息"在测试里必须用挂住的请求
+来构造（用无 token 入队会被立刻补发）。
+
+### 顺便回答老板的问题：`failed` 在什么场景发生？
+`failed` **不等于**"服务器明确说没接到"，它是**客户端侧**判断，混了两类：
+1. **本地/网络异常**（连不上、握手失败、连接超时、响应超时）→ 服务端**可能其实
+   已存**（响应丢了），客户端无从得知 → 不确定；
+2. **服务端明确报错** 4xx/5xx（401 重认证后仍失败 / 403 设备被撤销 / 400 信封不合法
+   / 500）→ 确定没存。
+正因为第 1 类的不确定性，"点按重发"必须依赖**幂等**（按 message_id 去重），
+否则会产生重复消息。另注：**无 token（离线）不是 failed**，而是保持 pending
+等 sync 补发。
+
+### 验证
+- app 全量：仍是 15 条既有环境性失败（未增加）；新增/既有 status 用例 3/3 通过。
+- cli：`dart analyze` 无新增问题；`receipts_check.dart` 通过。
+- 服务端未改动。**仍需老板重启服务端**才能让回执（双勾）生效。
 
 commit：见下方「回执地基」系列提交（server / shared / app / cli / docs）。
 
