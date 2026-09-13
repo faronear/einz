@@ -4229,3 +4229,23 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 `attachmentNos` 参数），避免 O(n²)。测试补 `#N` 前缀用例；顺手清掉
 `format_message_test` 的未用 import。`dart analyze` 0 issue，全部测试通过。
 
+### 改版：入网收尾从「清噪音」改为「欢迎辞 + 回车」切换向导态→聊天态
+
+**老板要求（2026-09-13）：** 替换此前做法。向导完成后在消息流系统致欢迎辞
+「一切就绪！输入回车，进入秘境，开始和伴侣聊天吧！」，等待用户回车（输入内容不限），
+回车后清空系统消息、同步用户消息到屏幕。欢迎辞不再进底部状态条——这样明确区分
+向导态与聊天态。
+
+**改动（commit `3c8f9da`）：** `_finalizeOnboarding` 改为 async：`_prompt` 致欢迎辞并
+等回车 → `messages.removeWhere(isSystem)` 清空全部 system 消息、只留真实对话。移除
+`_askSetPin` 里的旧欢迎语，以及 `_onboardingActive`/`_onboardingNoise`/
+`_startupSyncAdded` 这套向导噪音追踪机制（新做法不再需要）。
+
+**注意：**
+- 新建空间场景回车后聊天区为空（向导日志一并清掉）——符合"聊天态"预期，空间地址可
+  `/space address` 查看。
+- 回车门期间输入以 `/` 开头仍走既有引导规则（仅 `/exit` 放行、其余提示"输入未提交"）；
+  其余任意文本/直接回车都算通过、文本不发送。
+- 既有 pty 测试 `guide_input_rules_check.py` 等不会因新增的等待而失败（它们探测到
+  「🔢 已设置」即返回，不再驱动后续输入）。
+
