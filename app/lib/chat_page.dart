@@ -20,6 +20,7 @@ import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
+import 'data/media_cache.dart';
 import 'data/message_repository.dart';
 import 'data/ui_style_settings.dart';
 import 'data/ws_realtime_service.dart';
@@ -588,6 +589,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await (db.delete(db.localAttachments)).go();
       await (db.delete(db.localMessages)).go();
       await (db.delete(db.syncState)).go();
+      await MediaCache.deleteAll(); // 媒体解密缓存一并清空
     } catch (_) {
       // 清理失败不阻塞登出（尽力清除）
     }
@@ -1263,7 +1265,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 2) 同步全量 → 清理到期 → 用最新本地历史覆盖
     try {
       await _repo.sync();
-      await _repo.tombstoneExpired();
+      // 到期焚毁：媒体缓存定点删（尽力而为、不等待——测试/主流程不被文件 I/O 阻塞）
+      for (final id in await _repo.tombstoneExpired()) {
+        unawaited(MediaCache.deleteFor(id));
+      }
       await _repo.refreshDeviceMap();
       final recent = await _repo.historyRecent(limit: _pageSize);
       if (!mounted) return;
@@ -1277,6 +1282,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       unawaited(_reportDeliveredIfAdvanced());
       // 载入对方回执 → 自己消息可显示双勾（sync 内已拉过，此处兜底一次）
       unawaited(_loadPeerReceipts());
+      // 启动孤儿清理：本地库已无对应消息的缓存 + 历史遗留 temp 文件（不阻塞首屏）
+      unawaited(_repo.allMessageIds().then(MediaCache.prune));
     } catch (_) {
       // 网络抖动忽略：本地缓存已上屏，等 ticker 重试
     }
@@ -1290,8 +1297,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!_initialLoaded) return;
     try {
       final now = DateTime.now().millisecondsSinceEpoch;
-      // 阅后即焚：到期消息打本地墓碑（纯本地）
-      await _repo.tombstoneExpired(now: now);
+      // 阅后即焚：到期消息打本地墓碑（纯本地）+ 定点删媒体解密缓存（不等待）
+      for (final id in await _repo.tombstoneExpired(now: now)) {
+        unawaited(MediaCache.deleteFor(id));
+      }
       final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
       // 补偿：列表里仍标 pending/failed 的消息按 id 重读。它们的 server_sequence
       // 是本端 postMessage 后才回填的，可能"迟到"到高水位之下——只靠 historySince
@@ -2028,6 +2037,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     if (confirmed != true || !mounted) return;
     await _repo.tombstoneMessage(m.env.messageId);
+    await MediaCache.deleteFor(m.env.messageId); // 定点删媒体解密缓存
     if (!mounted) return;
     setState(() {
       _messages = [
@@ -2490,15 +2500,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _playingMessageId = m.env.messageId;
         _audioStartedMessageId = null; // 旧波形进度先复位
       });
-      final bytes = await _repo.fetchAttachment(
-        attachmentId: att['attachment_id'] as String,
-        keyVersion: att['key_version'] as int,
-        sha256: att['sha256'] as String,
-        nonce: base64Decode(att['nonce'] as String),
-      );
       final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
-      final tmp = File('${Directory.systemTemp.path}/einz_audio_${m.env.messageId}.$ext');
-      await tmp.writeAsBytes(bytes);
+      // 解密缓存：确定性路径按 messageId 复用——重复播放不再重复下载解密落盘
+      final tmp = await MediaCache.ensure(
+        m.env.messageId,
+        ext,
+        () => _repo.fetchAttachment(
+          attachmentId: att['attachment_id'] as String,
+          keyVersion: att['key_version'] as int,
+          sha256: att['sha256'] as String,
+          nonce: base64Decode(att['nonce'] as String),
+        ),
+      );
       await player.stop();
       await player.play(DeviceFileSource(tmp.path));
       // 真正出声才开始走波形进度（此前是下载解密等待期）
@@ -2678,7 +2691,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       future: future,
       builder: (context, snap) {
         if (snap.hasData) {
-          return _VideoPreview(bytes: snap.data!);
+          return _VideoPreview(bytes: snap.data!, messageId: m.env.messageId);
         }
         if (snap.hasError) {
           return Text('🎬 ${m.plaintext}');
@@ -4236,9 +4249,10 @@ class _InviteQrCode extends StatelessWidget {
 /// 发送端本地密文即时显示（上传完成前/失败后也能看），接收端服务端拉取
 /// （老板 2026-09-11：改回 v1 直接显示视频）。
 class _VideoPreview extends StatefulWidget {
-  const _VideoPreview({required this.bytes});
+  const _VideoPreview({required this.bytes, required this.messageId});
 
   final Uint8List bytes;
+  final String messageId; // 解密缓存确定性键：重复预览复用同一缓存文件
 
   @override
   State<_VideoPreview> createState() => _VideoPreviewState();
@@ -4256,9 +4270,11 @@ class _VideoPreviewState extends State<_VideoPreview> {
 
   Future<void> _init() async {
     try {
-      final tmp = File(
-          '${Directory.systemTemp.path}/einz_preview_${DateTime.now().microsecondsSinceEpoch}.mp4');
-      await tmp.writeAsBytes(widget.bytes);
+      // 解密缓存：确定性路径按 messageId 复用（重复打开预览不再重复落盘解密）
+      final tmp = await MediaCache.pathFor(widget.messageId, 'mp4');
+      if (!await tmp.exists()) {
+        await tmp.writeAsBytes(widget.bytes, flush: true);
+      }
       final c = VideoPlayerController.file(tmp);
       await c.initialize();
       if (!mounted) {

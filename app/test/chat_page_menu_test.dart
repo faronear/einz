@@ -4,6 +4,7 @@
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
@@ -54,6 +55,11 @@ class _FakeApi extends ApiClient {
 void main() {
   setUpAll(() async {
     await sodium(); // setPin 的 Argon2id/XChaCha20 需要 libsodium
+  });
+
+  setUp(() {
+    // PIN 设置/清除走 SecureStore（Keychain/Keystore），测试环境用插件 mock
+    FlutterSecureStorage.setMockInitialValues({});
   });
 
   testWidgets('顶栏菜单→本机PIN→返回 不崩溃（_dependents.isEmpty 回归）', (WidgetTester tester) async {

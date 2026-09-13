@@ -57,8 +57,8 @@ void main() {
     await tester.tap(find.text('创建秘境'));
     await tester.pumpAndSettle();
 
-    // 进入 create 名字步骤（AppBar 标题 + 输入框 hint「我的名字（以后可以随时修改）」）
-    expect(find.text('Einz 秘境'), findsWidgets);
+    // 进入 create 名字步骤（AppBar 标题 wizardAppBarCreate + 输入框 hint「我的名字（以后可以随时修改）」）
+    expect(find.text('创建秘境'), findsWidgets);
     expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);
   });
@@ -71,8 +71,8 @@ void main() {
     await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
 
-    // join token 输入页（粘贴邀请链接或代码 + 扫码）
-    expect(find.text('输入邀请链接'), findsOneWidget);
+    // join token 输入页（标题 setupTokenTitle「验证邀请码」+ 扫码）
+    expect(find.text('验证邀请码'), findsOneWidget);
     expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
   });
 

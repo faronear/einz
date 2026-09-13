@@ -260,7 +260,7 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.text('无效的邀请码'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
-    expect(find.text('输入邀请码'), findsWidgets, reason: '应停留在 token 页');
+    expect(find.text('验证邀请码'), findsWidgets, reason: '应停留在 token 页（setupTokenTitle）');
     expect(find.text('验证密保口令'), findsNothing, reason: '不应进入口令页');
   });
 

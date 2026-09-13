@@ -4453,3 +4453,29 @@ flutter_secure_storage（Keychain/Keystore），跳过 PIN 场景密钥入 keyst
 **验证：** flutter analyze 0 issue；flutter test app_lock_test 8/8 全过。
 
 **仍明文的已知项（未在本次范围）：** 草稿表、附件解密缓存、CLI store JSON（测试工具属性）。
+
+### App：媒体解密缓存生命周期管理（方案 1+2，老板 2026-09-14 定）
+
+**背景：** 语音/视频播放器只认文件路径，旧实现每次播放都把解密明文写到
+`Directory.systemTemp`（`einz_audio_*` / `einz_preview_*`），播完不删、无限积累。
+老板问「重播是否重复解密落盘」→ 确认是浪费，选定方案 1+2：确定性路径复用 +
+生命周期管理（不做"密文缓存"方案 3——解密瞬间仍在磁盘，增益有限）。
+
+**改动：**
+- 新建 `app/lib/data/media_cache.dart`：MediaCache（确定性路径 `einz_media_<messageId>.<ext>`
+  存 App 私有缓存目录；`ensure` 已存在即复用——重复播放零解密；`deleteFor` 定点删；
+  `deleteAll` 设备撤销用；`prune` 孤儿清理含历史遗留 systemTemp 文件；全部尽力而为，
+  `_guard` 吞平台异常）；
+- `chat_page.dart`：语音播放走 `MediaCache.ensure`；视频预览传 messageId 走
+  `pathFor` 复用；删除消息/到期焚毁时 `deleteFor` 定点删；`_loadInitial` 末尾
+  fire-and-forget `prune`（不阻塞首屏）；
+- `message_repository.dart`：`tombstoneExpired` 改返回新墓碑 messageId 列表
+  （原返回条数），新增 `allMessageIds()`（孤儿清理保留名单，纯 id 查询不解密）；
+- `message_repository_test.dart`：断言同步为列表语义。
+
+**关键坑（widget 测试）：** fake-async 环境里 dart:io 真实文件 I/O 永不完成，
+`await MediaCache.*` 会把 `_loadInitial` 卡死在 setState 前 → 14 个测试红。
+修法 = 所有清理调用 `unawaited` fire-and-forget + `_guard` 吞异常；改后仅剩
+5 个既有环境失败（stash 基线验证与本次无关）。
+
+**验证：** flutter analyze 0 issue；全量测试除既有 5 项环境失败外全过。

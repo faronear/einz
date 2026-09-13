@@ -353,8 +353,9 @@ class MessageRepository {
   /// 本设备上已到期的阅后即焚消息打**本地墓碑**（纯本地，Server 不参与）：
   /// 只置 deletedAt，行与附件保留——UI 隐藏内容、保留时间+时钟+时长记录
   /// （老板决策 2026-09-09，替代原来的到期删行）。已墓碑的不重复标记。
-  /// [now] 可注入测试（毫秒时间戳）；返回本次新标记条数。
-  Future<int> tombstoneExpired({int? now}) async {
+  /// [now] 可注入测试（毫秒时间戳）；返回本次新标记的 messageId 列表
+  /// （调用方据此定点清理媒体解密缓存等关联资源）。
+  Future<List<String>> tombstoneExpired({int? now}) async {
     final t = now ?? DateTime.now().millisecondsSinceEpoch;
     final expired = await (db.select(db.localMessages)
           ..where((m) =>
@@ -367,7 +368,7 @@ class MessageRepository {
         LocalMessagesCompanion(deletedAt: Value(t)),
       );
     }
-    return expired.length;
+    return [for (final row in expired) row.messageId];
   }
 
   /// 删除本机一条消息（**本地墓碑**，Server 不参与）：只置 deletedAt 标记，
@@ -650,6 +651,14 @@ class MessageRepository {
           ..where((m) => m.spaceId.equals(spaceId) & m.messageId.isIn(messageIds)))
         .get();
     return _rowsToHistory(rows);
+  }
+
+  /// 本 space 全部消息的 messageId（媒体缓存孤儿清理的保留名单用；纯 id 查询，不解密）。
+  Future<Set<String>> allMessageIds() async {
+    final rows = await (db.select(db.localMessages)
+          ..where((m) => m.spaceId.equals(spaceId)))
+        .get();
+    return {for (final row in rows) row.messageId};
   }
 
   /// 行 → 历史记录（解密 + 附件元数据 + person 身份 + 阅后即焚到期）。

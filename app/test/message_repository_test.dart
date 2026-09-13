@@ -204,16 +204,19 @@ void main() {
 
     final now = DateTime.now().millisecondsSinceEpoch;
     // 未到期（+59s）：不打标记
-    expect(await repo.tombstoneExpired(now: now + 59 * 1000), 0);
+    expect(await repo.tombstoneExpired(now: now + 59 * 1000), isEmpty);
     expect((await repo.history()).single.deleted, isFalse);
     // 到期（+61s）：打墓碑——记录保留、deleted 标记（不打破历史流水）
-    expect(await repo.tombstoneExpired(now: now + 61 * 1000), 1);
+    final burnedIds = await repo.tombstoneExpired(now: now + 61 * 1000);
+    expect(burnedIds.length, 1);
     final burned = await repo.history();
     expect(burned.length, 1, reason: '焚毁后记录应保留（内容隐藏、时间+时钟+时长保留）');
     expect(burned.single.deleted, isTrue, reason: '焚毁消息应标记为已删除（内容隐藏）');
     expect(burned.single.expiresAt, isNotNull, reason: '焚毁记录的时间+时钟+时长保留');
+    expect(burnedIds.single, burned.single.env.messageId,
+        reason: '返回的 id 用于调用方定点清理媒体缓存等关联资源');
     // 已墓碑的不重复标记
-    expect(await repo.tombstoneExpired(now: now + 61 * 1000), 0);
+    expect(await repo.tombstoneExpired(now: now + 61 * 1000), isEmpty);
   });
 
   test('分页：historyRecent 最近 N 条升序 / historyBefore 更早 / historySince 新增', () async {
