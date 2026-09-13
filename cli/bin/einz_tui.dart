@@ -144,6 +144,24 @@ String? _genderCode(String? zh) => switch (zh) {
 /// 本次运行是否刚完成入网（create/join/口令接入）：是则进对话前询问设置 PIN。
 bool _onboarded = false;
 
+/// 入网收尾是否已执行（只跑一次——_onboarded 本运行内不再复位）。
+bool _onboardingFinalized = false;
+
+/// 是否处于入网向导：为 true 时 `_systemMessage` 产生的 system 消息计入
+/// [_onboardingNoise]（收尾时统一清掉，见 [_finalizeOnboarding]）。
+bool _onboardingActive = false;
+
+/// 入网向导期间产生的 system 消息（按对象引用记录——消息流会被 `_sortMessages`
+/// 重排，下标区间不可靠）。
+final List<ChatMessage> _onboardingNoise = [];
+
+/// 最近一次启动同步拉到的新消息条数（`_activateAfterBind` 记录）：入网收尾据此
+/// 判断是否清向导噪音——只有"入网后确实有历史消息"时才清（老板 2026-09-13）。
+int _startupSyncAdded = 0;
+
+/// 入网收尾 / 向导结束的最终欢迎语（消息流与底部状态条共用）。
+const String _kWelcomeText = '🎉 一切就绪！输入 /help 查看快捷命令，输入 /invite 邀请伴侣。立刻开始私密聊天吧！';
+
 /// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
 Timer? _resizeTimer;
 StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
@@ -330,7 +348,7 @@ Future<void> _askSetPin(ChatSession session, String storePath) async {
     break;
   }
   session.messages.add(_systemMessage(session, '----------------'));
-  session.messages.add(_systemMessage(session, '🎉 一切就绪！输入 /help 查看快捷命令，输入 /invite 邀请伴侣。立刻开始私密聊天吧！'));
+  session.messages.add(_systemMessage(session, _kWelcomeText));
   session.messages.add(_systemMessage(session, '================'));
 
   _scheduleRender();
@@ -664,9 +682,11 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
   // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
   // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
   // 未接入空间（无 Space Key）时跳过——历史无法解密，且 _decrypt 会兜底占位。
+  _startupSyncAdded = 0;
   if (session.hasSession && session.hasSpace && server.isNotEmpty) {
     try {
       final fresh = await session.sync();
+      _startupSyncAdded = fresh.length;
       if (fresh.isNotEmpty) {
         _state!.status = '启动同步：新增 ${fresh.length} 条';
       }
@@ -709,6 +729,30 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
   // main 的刷新会因 token 未就绪失败静默；此处补齐——否则向导结束直接发消息
   // 时对方气泡按未知性别回退青绿——老板 2026-09-10 实测）
   await _refreshPersonNames(_state!);
+  // 入网收尾：本次入网且启动同步拉到历史消息时，清掉向导 system 噪音，
+  // 让对方的预发消息不再被向导输出顶出屏幕（老板 2026-09-13）
+  if (_onboarded) _finalizeOnboarding(session);
+  _scheduleRender();
+}
+
+/// 入网向导收尾（老板 2026-09-13）：本次入网且启动同步确实拉到历史消息时，
+/// 把向导期间产生的 system 噪音从消息流移除——向导输出（几十行）会把对方的
+/// 预发消息顶到屏幕上方，看起来像"join 后消息没同步"（重启后向导日志消失才看到）。
+/// 最终欢迎语重新补进消息流，并同时显示到底部状态条。没有拉到历史消息时不清理
+/// （新建空间等场景，向导日志就是屏幕上的唯一内容，清掉会留下一片空白）。
+void _finalizeOnboarding(ChatSession session) {
+  if (_onboardingFinalized) return;
+  _onboardingFinalized = true;
+  _onboardingActive = false; // 之后（运行时）产生的 system 消息不再计入噪音
+  if (_startupSyncAdded <= 0) {
+    _onboardingNoise.clear();
+    return;
+  }
+  final noise = _onboardingNoise.toSet();
+  session.messages.removeWhere(noise.contains);
+  _onboardingNoise.clear();
+  session.messages.add(_systemMessage(session, _kWelcomeText));
+  _state!.status = _kWelcomeText; // 欢迎语也输出到底部状态条
   _scheduleRender();
 }
 
@@ -1086,6 +1130,10 @@ Future<void> main(List<String> args) async {
     await _unlockPin(session);
   }
   await session.loadHistory();
+  // 入网向导期标记：向导（含下方启动提示）产生的 system 消息计入噪音——
+  // 本次入网且启动同步拉到历史消息时，收尾统一清掉（见 _finalizeOnboarding）。
+  // 已绑定设备（重启，spaceKey 非空）不标记：避免误清运行期的 system 消息。
+  _onboardingActive = store.spaceKey == null;
   // 引导阶段提示（自举/托管/邀请码指引）作为 system 消息进入对话流——
   // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
   for (final note in _guidanceNotes) {
@@ -2945,8 +2993,10 @@ Future<void> _refreshPersonNames(_TuiState s) async {
 }
 
 /// 构造一条系统提示消息（sender 显示 system，随对话流滚动，不被状态条推到窗口上方）。
+/// 入网向导期间（[_onboardingActive]）产出的 system 消息会被记入 [_onboardingNoise]，
+/// 向导收尾且同步到历史消息时统一清除（见 [_finalizeOnboarding]）。
 ChatMessage _systemMessage(ChatSession session, String text) {
-  return ChatMessage(
+  final msg = ChatMessage(
     env: MessageEnvelope(
       v: 1,
       type: 'text',
@@ -2961,6 +3011,8 @@ ChatMessage _systemMessage(ChatSession session, String text) {
     isSystem: true,
     createdAt: DateTime.now().millisecondsSinceEpoch,
   );
+  if (_onboardingActive) _onboardingNoise.add(msg);
+  return msg;
 }
 
 /// 引导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
