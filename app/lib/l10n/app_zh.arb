@@ -237,6 +237,7 @@
   },
   "chatPageMsgSending": "发送中…",
   "chatPageMsgSent": "已发送",
+  "chatPageMsgSendingTap": "发送中，点击验证是否已送达并重发",
   "chatPageMsgDelivered": "已送达",
   "chatPageMsgFailed": "发送失败，点击重试",
   "chatPageVoiceStartFailed": "录音启动失败: {error}",

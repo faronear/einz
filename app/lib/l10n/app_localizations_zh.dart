@@ -574,6 +574,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMsgSent => '已发送';
 
   @override
+  String get chatPageMsgSendingTap => '发送中，点击验证是否已送达并重发';
+
+  @override
   String get chatPageMsgDelivered => '已送达';
 
   @override

@@ -1172,6 +1172,12 @@ abstract class AppLocalizations {
   /// **'Sent'**
   String get chatPageMsgSent;
 
+  /// No description provided for @chatPageMsgSendingTap.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending… tap to verify and resend'**
+  String get chatPageMsgSendingTap;
+
   /// No description provided for @chatPageMsgDelivered.
   ///
   /// In en, this message translates to:

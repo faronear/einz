@@ -603,6 +603,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMsgSent => 'Sent';
 
   @override
+  String get chatPageMsgSendingTap => 'Sending… tap to verify and resend';
+
+  @override
   String get chatPageMsgDelivered => 'Delivered';
 
   @override

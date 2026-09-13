@@ -9,12 +9,15 @@
 // 修复：按 id 兜底重读仍为 pending/failed 的消息。
 // 本测试用 postMessage 返回"低于高水位"的 seq 来确定性复现该状态。
 
+import 'dart:async';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/message_repository.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 
@@ -26,6 +29,14 @@ class _StatusFakeApi extends ApiClient {
   /// 对方消息（senderDeviceId != 本机），携带指定 server_sequence。
   final List<({MessageEnvelope env, int seq})> peer;
   final int postedSeq;
+
+  /// 已成功上传的 message_id（记录 postMessage 调用，含重发）。
+  final List<String> posted = [];
+
+  /// 前 N 次 postMessage **永不返回**（模拟"服务端已收到、但响应在回程丢失"
+  /// → 消息一直卡在 pending）。0 = 不挂。
+  int hangPostsBefore = 0;
+  int _postCalls = 0;
 
   @override
   Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
@@ -50,9 +61,16 @@ class _StatusFakeApi extends ApiClient {
   }
 
   @override
-  Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async =>
-      PostMessageResult(
-          messageId: env.messageId, serverSequence: postedSeq, createdAt: 1000);
+  Future<PostMessageResult> postMessage(MessageEnvelope env, String token) {
+    _postCalls++;
+    if (_postCalls <= hangPostsBefore) {
+      // 永不完成：模拟响应丢失（HTTP 层面没有超时的老行为）
+      return Completer<PostMessageResult>().future;
+    }
+    posted.add(env.messageId);
+    return Future.value(PostMessageResult(
+        messageId: env.messageId, serverSequence: postedSeq, createdAt: 1000));
+  }
 
   @override
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
@@ -176,5 +194,59 @@ void main() {
         reason: 'delivered（对方已收到）应显示双勾');
     expect(find.byIcon(Icons.check), findsNothing,
         reason: '有回执时不应再显示单勾');
+  });
+
+  testWidgets('点按「发送中」小飞机：重发并收敛为已发送单勾', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _StatusFakeApi(peer: const [], postedSeq: 1)
+      ..hangPostsBefore = 1; // 第一次请求永不返回（响应丢失）→ 一直显示发送中
+
+    // 先造一条 pending：无 token 的离线入队（只入本地队列，不上传）
+    final seedRepo = MessageRepository(
+      db: db,
+      api: api,
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      deviceId: 'dev-a',
+      keyVersion: 1,
+      token: null, // 无 token → 保持 pending
+    );
+    await seedRepo.send('待确认的一条');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok', // 有 token → 点按后能重发
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('待确认的一条'), findsOneWidget);
+    final plane = find.byTooltip('发送中，点击验证是否已送达并重发');
+    expect(plane, findsOneWidget, reason: 'pending 应显示可点按的小飞机');
+    expect(api.posted, isEmpty, reason: '尚未点按前不该上传');
+
+    // 点按小飞机 → 用同一封消息重发（服务端幂等）→ 变单勾
+    await tester.tap(plane);
+    await tester.pumpAndSettle();
+
+    expect(api.posted.length, 1, reason: '点按应触发一次重发');
+    expect(find.byIcon(Icons.check), findsOneWidget,
+        reason: '重发成功后应显示单勾（已发送）');
+    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsNothing,
+        reason: '不应再停留在发送中');
   });
 }

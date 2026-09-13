@@ -246,10 +246,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Icon(Icons.check, size: 12, color: subtle),
         );
       default: // pending（队列中/发送中）
+        // 可点按：用**同一封消息重发一次**（服务端按 message_id 幂等去重）——
+        // 等价于"让我的设备去问服务端到底收到没有"：
+        //   服务端已存 → 返回原 seq → 变单勾（不会产生重复）
+        //   服务端没存 → 这次存下 → 变单勾
+        //   仍然失败 → 变 ⚠️（可继续点按重发）
+        // 场景（老板 2026-09-13 实测）：服务端其实收到了（对方已收到），但响应
+        // 在回程丢失 → 状态永远停在发送中，用户无从确认也无从重试。
         return Tooltip(
-          message: l10n.chatPageMsgSending,
-          // 纸飞机=发送中（老板 2026-09-12；原来与阅后即焚的时钟撞字形）
-          child: Icon(Icons.send, size: 11, color: subtle),
+          message: l10n.chatPageMsgSendingTap,
+          child: GestureDetector(
+            onTap: () async {
+              await _repo.retryMessage(m.env.messageId);
+              await _refreshLocal();
+            },
+            // 纸飞机=发送中（老板 2026-09-12；原来与阅后即焚的时钟撞字形）
+            child: Icon(Icons.send, size: 11, color: subtle),
+          ),
         );
     }
   }
