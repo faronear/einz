@@ -3201,10 +3201,61 @@ TUI 上报）。本轮**没有新增任何回执 UI**（气泡图标仍是「纸
 - 回归：server 3 套全过；app 仍是 15 条既有环境性失败（未增加）；
   `guide_input_rules_check.py` 3/3 全过；`dart analyze` / `flutter analyze` 无新增问题。
 
-### 待办 / 已知限制
-- UI 展示（双勾等）留到以后；`receiptOf` 已就位，接上即可。
-- `POST /recover`（全丢恢复）仍读 `space_id=''`（Multiverse 下本就失效，非本轮回归）。
-- 多人时需"所有其他人都已收到" = `every`（`receiptOf` 已按 this 实现）。
+## 2026-09-12 回执第二轮：delivered 上 UI、read 收紧、沙漏静态化
+
+老板拍板三件事 + 一个新需求。
+
+### 1. delivered 接 UI：双勾（`8e42576`）
+`_buildSendStatusIcon` 重写：先判 `failed`，再用
+`MessageRepository.receiptOf(m.env.serverSequence, _peerReceipts)` 推导——有回执
+（delivered **或** read）→ `Icons.done_all` 双勾 + tooltip「已送达」（新增 l10n
+key `chatPageMsgDelivered`）；无回执 → `sent` 单勾 / `pending` 纸飞机。
+- 新增 state `List<PeerReceipt> _peerReceipts`（渲染缓存，避免每条消息查库）；
+  `_loadPeerReceipts()` 在首屏、每次 `_refresh`（sync 内已拉）、收到 WS
+  `receipt.updated` 后载入，内容未变不 setState。
+- **read 与 delivered 同图标**（老板要求 read 暂不展示），所以现在外观上没有
+  "已送达 vs 已读"的区分——将来要区分只需在 `receiptOf` 返回 `'read'` 时换色。
+
+### 2. read 判定收紧（同日，`8e42576` / `4e39f82`）
+老板问："消息到对方设备屏幕了，那不就肯定读了？我们也测不到眼球活动。"
+—— 讨论后确认真正边界是**"设备收到了" vs "人面前正显示着"**，且原来的实现
+（补拉即标已读）太激进：对方离线两天，一上线同步就把整段历史标成已读。
+**改法：补拉/首屏只标 delivered；read 只由"实时 + 确实在看"推进。**
+- App：`_refresh`/`_refreshLocal` 新增 `realtime` 参数，只有 WS `onMessageNew`
+  传 true；`_loadInitial` 不再调 `_scheduleReadReport()`。resume 到前台且贴底
+  仍会标已读（那确实是"人在看"）。
+- CLI：**撤掉**上一轮"sync 即标已读"的偏离，回到 WS-only（`sync` 只报送达）。
+- 文档 PROTOCOL §5.4 同步改写，并说明 read 当前不展示、留作开关。
+
+### 3. flaky 测试换成确定性 Dart 版（`4e39f82`）
+上轮的 pty 端到端 `cli/test/receipts_check.py` 反复偶发失败：TUI 的事件循环由
+键盘驱动，WS 投递/`/sync` 触发的时机不确定（同一份代码有时 31s 通过、有时
+3.5 分钟超时）。诊断过程：手工用 B 的 token POST `/receipts` 返回 200（服务端
+没问题）→ 说明是 pty 时序，不是产品逻辑。
+**改法**：删掉 pty 版，新增 `cli/test/receipts_check.dart`——直接构造两个
+`ChatSession`（HTTP 建空间/加入拿 space 级 session，两端共享同一个 spaceKey），
+A 发一条 → B `sync()` → 断言：①`lastReportedDeliveredSeq ≥ 1` ②
+`lastReportedReadSeq == 0`（**补拉不标已读**，正是收紧后的语义）③服务端回执行
+`delivered ≥ 1` 且 `read == 0`。**确定性、约 5 秒**。
+
+### 4. 焚毁后沙漏改静态（`8e42576`）
+老板："阅后即焚到期被删后，沙漏仍在动，不符合直觉。"
+`_BurnHourglass` 拆成：`_BurnHourglass(burned: m.deleted)` 静态壳（已焚毁 →
+`Icons.hourglass_empty` 静态空沙漏，**不创建动画控制器**）+ `_HourglassFlip`
+（未焚毁时的翻转动画）。
+
+### 验证
+- app：全量仍是 15 条既有环境性失败（未增加）；新增用例「自己消息：对方已送达
+  → 显示双勾」通过；`flutter analyze` 0 error。
+- server：3 套全过（receipts 测试未受影响）。
+- cli：`dart analyze` 无新增问题；`receipts_check.dart` 通过；TUI 回归
+  `guide_input_rules_check.py` 3/3 通过。
+- **服务端本轮无代码改动**，不需要重新部署（dist 仍是上一轮编译的）。
+
+### 待办
+- read 的**展示**开关（老板要"做成开关、目前不显示"）——目前是"同图标 +
+  `receiptOf` 已能返回 `'read'`"，真正做成用户可见的设置项待定。
+- 多设备下 delivered 语义仍是"该 person 至少一台设备"。
 
 commit：见下方「回执地基」系列提交（server / shared / app / cli / docs）。
 
