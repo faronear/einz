@@ -4183,3 +4183,21 @@ read，TUI 里我发出的消息被已读后状态字符要**变蓝**（App 只�
 **注意：** 亮蓝字落在自己的性别气泡上——若本人性别为男（蓝色气泡），蓝字与蓝底
 对比度偏低；老板自测后如需可换亮青/加粗。当前按老板明确要求先上"蓝"。
 
+### 追加：TUI 语音消息显示「🔊 语音 秒数」
+
+**老板要求：** TUI 收到语音消息目前只显示"语音"两字，要显示 喇叭/播放字符 + "语音"
++ 秒数（例 `18s`）。
+
+**真因：** App 录音的明文 caption 就是 `chatPageVoiceLabel = "语音"`，时长在载荷
+meta 的 `audioDurationSeconds`（老板 2026-09-13 协议扩展）；而 CLI 的 `_decrypt`
+此前只取 `plaintext`、把 meta 丢了。
+
+**改动（commit `320fcda`）：** `ChatMessage` 增加 `meta` 字段；`_decrypt` 改用 shared
+的 `decodeMessagePayload`（返回 plaintext+quote+meta）；`einz_tui.formatMessage` 对
+`env.type == 'voice'` 渲染为 `🔊 语音 18s`（`_audioSeconds` 取 meta，缺省只显示
+`🔊 语音`，与 App 一致不兼容老明文塞时长）。测试补语音渲染两例 + meta 经服务端
+往返解析断言。
+
+**验证：** `dart analyze`（cli）0 issue；`format_message_test`（7 例）、
+`message_status_check`、`receipts_check` 全过。观感老板自测。
+
