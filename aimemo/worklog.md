@@ -4386,3 +4386,27 @@ Multiverse 起 `/health` 不再返回、恒为空。离线启动 → `_state.per
 文案从 `content` 末尾移到最前（标题下方、二维码上方），grey 12px、**靠左对齐**（与弹窗
 除二维码外的其余内容一致）；底部删除原重复。`flutter analyze lib/chat_page.dart` 0 issue。
 UI 老板自测。
+
+### App：离线启动消息归属全判成对方（全左对齐）——改 person 维度判定
+
+**老板反馈：** 服务器离线但已有配置时，App 能直接进对话页（很好），但消息全部
+靠左对齐，像都是对方发的；TUI 离线进入则左右分列正确。
+
+**真因：** App 判定"我/对方"依赖 `GET /space` 拉的 device→person 映射，且只在
+内存、不落盘；离线时映射为空，退化成 `senderDeviceId == 本机deviceId`（device
+维度）。于是**同一身份其他设备**（换机/重装后 deviceId 变了、App+TUI 多设备）
+发的消息全被误判成对方。TUI 把 personId 持久化在 store 里、用信封
+`senderPersonId == personId` 判定，所以离线也准。
+
+**改动（commit `92d33bf`，`app/lib/data/message_repository.dart` + `chat_page.dart`）：**
+- `MessageRepository` 构造函数接收 `personId`（向导登记时已知）并种入映射；
+- `refreshDeviceMap` 成功后把映射持久化到 `app_state`，启动时惰性载入；
+- 归属判定 `_isMineMessage`：优先信封自带 `senderPersonId`（离线可得）→ 映射查表
+  → 退化 deviceId；
+- 发送前载入身份：离线发出的消息也带 `senderPersonId`（此前落成 null）。
+
+**验证：** `flutter analyze lib` 0 issue。离线归属场景老板真机自测。
+
+**附注（同日讨论）：** 老板最初想把"启动首屏"改成"有配置则展示 2 秒后强行进入"，
+经核对代码发现已配置设备本来就只做本地检查、不卡服务器探测（只有未配置向导页
+会探测+4 秒重试），故首屏逻辑无需改动。
