@@ -1,123 +1,170 @@
-# Einz — iOS 构建与真机验证指引（docs/IOS.md）
+# Einz — iOS 打包与真机安装指引（docs/IOS.md）
 
-> **状态：** v1.0（代码层就绪：Info.plist 权限、libsodium 静态库集成、APNs 注册代码；构建/签名/真机验证需在 **macOS + Xcode** 上执行，本文档逐步指引）
-> **前置：** 有 Mac（macOS 14+）、已装 Flutter 3.47+（含 Xcode 15+）、项目可从远程仓库 clone。
-
----
-
-## 0. 先完成代码同步（macOS 本机，一次）
-
-项目远程仓库：`https://git.tic.cc/fon/only`（老板自建 Gitea，私有）。
-
-- 本机需**推送一次**并让 Git 记住凭据（Personal Access Token，见 DEPLOYMENT.md §0 配置方法）：
-
-```bash
-cd /Users/Shared/productX/only
-git push -u origin main
-# 弹窗时：用户名 = AtomGit 用户名，密码 = 访问令牌（Settings → 访问令牌 生成，勾选 repo 权限）
-```
-
-- 确认推送成功后，Mac 侧拉取（见 §2）。
+> **状态：** v2.0（2026-09-14 重写，玩法 A 已实测通过：`flutter build ios --release`
+> + `devicectl` 直接安装到 iPhone 11）。
+> v1.0 里的 bundle id（`com.example.onlyspace`）、仓库地址（`git.tic.cc/fon/only`）、
+> 「当前无付费账号」等说法均已过时——以本文档为准。
 
 ---
 
-## 1. Mac 环境准备
+## 0. 当前配置速览
 
-```bash
-# 1) 检查工具链（Xcode 需 15+；首次会要求安装 Command Line Tools）
-xcode-select --install
-flutter doctor        # 期望 iOS 工具链全部 ✅（Xcode / CocoaPods）
+| 项 | 值 | 备注 |
+| --- | --- | --- |
+| Bundle ID | `cc.tic.einz` | 已配在 `app/ios/Runner.xcodeproj`（`PRODUCT_BUNDLE_IDENTIFIER`） |
+| Team ID | `37KQR6645B` | 个人团队（Leiqin Lu / `yuanjinwx@outlook.com`），已配在 `DEVELOPMENT_TEAM` |
+| 签名身份 | `Apple Development: yuanjinwx@outlook.com (K5L5J4Z8TB)` | 有效期 2026-09-10 → 2027-09-10 |
+| 生产服务器 | `https://einz.tic.cc` | 代码默认值（`app/lib/data/server_settings.dart`），真机开箱可用 |
+| 部署目标 | iOS 15.0 | |
+| 本机 Flutter | 3.47.2（`~/development/flutter`） | 需 `export PATH="$HOME/development/flutter/bin:$PATH"` |
+| SPM | **必须关闭** | `flutter config --no-enable-swift-package-manager`（本项目用 CocoaPods + 本地 libsodium pod） |
+| APNs 推送 | **未接入** | Dart 侧有注册逻辑、`AppDelegate.swift` 有 MethodChannel，但工程缺 Push Notifications capability；服务端 `sendPushHint` 仍是日志占位。不影响聊天（WS 兜底） |
 
-# 2) 若 flutter doctor 提示 CocoaPods 缺失：
-sudo gem install cocoapods
+### ⚠️ 账号级别提醒（2026-09-14 实测发现）
 
-# 3) 确认 Apple 签名信息（真机需要）：
-#    Xcode → Settings → Accounts → 登录 Apple ID（免费账号可真机调试；
-#    APNs 推送与 Ad Hoc 分发需要付费账号 99$/年，当前暂无 → 推送验证留待）
-```
+当前 team `37KQR6645B` 签发的 provisioning profile 有效期**只有 7 天**
+（2026-09-14 → 2026-09-21）——这是**免费个人团队**的特征，付费会员是 1 年。
 
-> **重要**：本工程 `app/ios/Podfile` 存在（引入本地 `libsodium` pod 静态库），Flutter 3.47 默认 Swift Package Manager 时请**强制使用 CocoaPods**：
-> `flutter config --no-enable-swift-package-manager`
+所以：**如果已续费付费会员，要确认续费的是哪个账号**。本机 keychain 里另有一张
+`Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)`（2025-07-15 已过期），以及配套的
+Ad Hoc/profile 文件（2024 年就过期了）——看起来 Faronear 公司账号才是那个"付费/机构"账号。
+若续费的是它，需要在 Xcode 登录该 Apple ID、重新生成证书与 profile，并把本工程的
+`DEVELOPMENT_TEAM` 换成 `CQ6733CTMV`。
 
----
+影响：
 
-## 2. 拉取代码并构建（无签名验证编译）
-
-```bash
-git clone https://git.tic.cc/fon/only
-cd only/app
-
-flutter pub get
-
-# 无签名构建（验证编译 + libsodium 静态链接成功）
-flutter build ios --debug --no-codesign
-# 期望：末尾 "✓ Built .../app-ios-ios.zip" 或 "Xcode build done"
-
-# 模拟器运行（可选；模拟器无 APNs）
-flutter run -d <模拟器设备ID>
-```
-
-**libsodium 加载验证**（App 打开后看日志）：进入聊天页前会调用 `sodium()`（`DynamicLibrary.process()` 解析静态链接符号）。若报"无法加载 libsodium"：
-
-- 确认 Pods 已安装（`flutter build ios` 会自动 `pod install`；也可手动 `cd ios && pod install`）
-- 确认 `Podfile.lock` 中出现 `- libsodium (1.0.20)`
-- release 构建若符号被 strip：在 Xcode 工程 Build Settings → `Other Linker Flags` 追加 `-Wl,-export_dynamic`（保持 libsodium 符号可见）
+- **玩法 A（开发安装）不受影响**——现在就能用，但 **7 天后 App 会打不开**，重跑一次玩法 A 即续期；
+- **玩法 B（Ad Hoc）必须有付费账号的 Distribution 证书**，免费个人团队做不了。
 
 ---
 
-## 3. 真机签名与运行
+## 1. 前置检查（拷进去直接跑）
 
 ```bash
-open ios/Runner.xcworkspace      # Xcode 打开（注意是 .xcworkspace，含 Pods）
+export PATH="$HOME/development/flutter/bin:$PATH"
+cd /Volumes/repodisk/productX/einz/app
+
+flutter doctor                              # iOS 工具链应为 ✅（Xcode / CocoaPods）
+flutter config --list | grep swift          # 必须 enable-swift-package-manager: false
+xcrun devicectl list devices                # 手机需为 available (paired)；拿到 UDID
+security find-identity -v -p codesigning    # 出现 "Apple Development: yuanjinwx@…" 即可签名
 ```
 
-Xcode 内配置（Target `Runner` → Signing & Capabilities）：
+手机侧一次性准备：
 
-1. **Team**：选择你的 Apple ID 团队（免费账号选 Personal Team；会生成开发签名）
-2. **Bundle Identifier**：改为唯一值，如 `com.tic.einz`（免费账号 bundle id 会被追加 team 前缀，正常）
-3. 若需推送：添加 **Push Notifications** capability（需付费账号；暂无则跳过，WS/轮询兜底不受影响）
-4. 点击 **Run ▶**（连上 iPhone，首次需在手机"设置 → 通用 → VPN与设备管理"信任开发者证书）
+1. **设置 → 隐私与安全性 → 开发者模式** 打开（需重启手机）；
+2. 首次装完 App 后若提示"不受信任的开发者"：**设置 → 通用 → VPN与设备管理 →
+   开发者 App → 信任**；
+3. 建议手机和 Mac 同 Wi-Fi（无线调试）或直接 USB 连线（更稳）。
 
-真机验证清单：
+---
+
+## 2. 玩法 A：装到自己（或伴侣）的手机 —— 最快，无需 Archive
+
+这是 2026-09-14 实测通过的路径，全程约 1–2 分钟（首次编译更久）。
+
+```bash
+export PATH="$HOME/development/flutter/bin:$PATH"
+cd /Volumes/repodisk/productX/einz/app
+
+# ① 构建 release 包（默认连生产 https://einz.tic.cc，不需要任何额外参数）
+flutter build ios --release
+#    产物：build/ios/iphoneos/Runner.app
+
+# ② 装到手机（UDID 用第 1 步 devicectl list devices 里的那一串）
+xcrun devicectl device install app \
+  --device 00008030-0005306011F9402E \
+  build/ios/iphoneos/Runner.app
+
+# ③ 命令行启动（可选）。手机必须已解锁，否则报 "device was not unlocked"
+xcrun devicectl device process launch \
+  --device 00008030-0005306011F9402E cc.tic.einz
+```
+
+> **别加** `--dart-define-from-file=local_config.ios.json`：那个文件把服务器指到
+> `http://localhost:3000`，手机连不上。真机测试就用默认的生产地址。
+> 真要临时换服务器：自己建 `local_config.json` 再
+> `flutter build ios --release --dart-define-from-file=local_config.json`。
+
+**图形界面等价做法**（想看日志/断点调试时用）：
+
+```bash
+open ios/Runner.xcworkspace     # 注意是 .xcworkspace（含 Pods），不是 .xcodeproj
+# 左上选 iPhone → 点 ▶ Run
+```
+
+---
+
+## 3. 玩法 B：Ad Hoc —— 给第二台手机装（需要付费账号）
+
+productLens 的 V1 分发方案就是这个。前提：**付费开发者账号**，且两台手机的 **UDID 都已登记**
+在 Apple Developer 后台（Certificates, Identifiers & Profiles → Devices）。
+
+```bash
+export PATH="$HOME/development/flutter/bin:$PATH"
+cd /Volumes/repodisk/productX/einz/app
+
+# ① 取两台手机的 UDID（USB 连线更稳；Finder 里点设备也能看）
+xcrun devicectl list devices
+
+# ② 确认两台 UDID 已在开发者后台登记（否则 profile 里不含这台设备，装不上）
+
+# ③ 导出 Ad Hoc IPA
+flutter build ipa --release --export-method ad-hoc
+#    产物：build/ios/ipa/*.ipa
+```
+
+装到手机（Mac + USB，手机需解锁）——`devicectl` 只吃 `.app`，所以先解包：
+
+```bash
+unzip -q build/ios/ipa/Runner.ipa -d /tmp/einz-ipa
+xcrun devicectl device install app --device <UDID> /tmp/einz-ipa/Payload/Runner.app
+```
+
+或者用图形化工具更省事：**Apple Configurator 2**（Mac App Store 免费）→ 添加 → App → 选 `.ipa`。
+
+`--export-method` 可选值：`development`（同玩法 A 但产出 IPA）、`ad-hoc`（登记设备免审核安装）、
+`app-store`（上架/TestFlight）、`enterprise`（需企业证书，本项目**明确不用**）。
+
+---
+
+## 4. 玩法 C：TestFlight / 上架 App Store —— 当前不做
+
+`aimemo/productLens.zhcn.md` §1.4/§14.1 明确「不上架 App Store、不向第三方分发」，
+所以这条路暂不推进。真要做，除命令外还需：
+
+- App Store Connect 建 App 记录（bundle id `cc.tic.einz`）；
+- 隐私政策 URL、支持 URL、各尺寸截图、年龄分级；
+- `Info.plist` 补 **`ITSAppUsesNonExemptEncryption`**（E2EE 应用必须如实申报出口合规）；
+- 过 App Review——两人私有 E2EE 应用有被 4.2（最低功能）拒审的风险。
+
+```bash
+flutter build ipa --release --export-method app-store
+# 再经 Transporter.app 或 xcrun altool 上传
+```
+
+---
+
+## 5. 常见问题
+
+| 现象 | 处理 |
+| --- | --- |
+| `Signing for "Runner" requires a development team` | Xcode → Settings → Accounts 登录 Apple ID；确认 pbxproj 里 `DEVELOPMENT_TEAM = 37KQR6645B` |
+| `No profiles for 'cc.tic.einz' were found` / profile 快过期想换新的 | 删掉 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` 里旧的 `cc.tic.einz` 文件，重跑构建让 Xcode 重新签发（2026-09-14 实测有效） |
+| 手机提示「无法验证 App」/开发者不受信任 | 设置 → 通用 → VPN与设备管理 → 信任该开发者证书 |
+| 之前好好的，App 突然打不开 | 大概率 7 天 profile 到期（免费账号）→ 重跑玩法 A 即续期 |
+| `Unable to launch … device was not, or could not be, unlocked` | 手机锁屏了，解锁后重试（**不是签名问题**） |
+| 报 `libsodium` 相关链接/加载失败 | 确认 `flutter config --no-enable-swift-package-manager`，再 `flutter build ios`（会自动 `pod install`）；release 若被 strip，Build Settings → Other Linker Flags 加 `-Wl,-export_dynamic` |
+| `pod install` 没执行 / `Podfile.lock` 里没有 libsodium | 同上，先关 SPM 再构建 |
+| 磁盘紧张 | `rm -rf ~/Library/Developer/Xcode/DerivedData`（可占数 GB） |
+
+---
+
+## 6. 真机验证清单（装完照着走一遍）
 
 - [ ] App 启动 → 设置页（设备配置）渲染正常
 - [ ] 生成设备密钥 → 公钥展示
-- [ ] 粘贴密保信封 → 认证成功 → 进入聊天页
-- [ ] 发送消息 → 对方设备（另一台手机/CLI）同步收到明文
-- [ ] 附件上传 → 下载解密一致（相机/麦克风/相册权限弹窗出现）
-- [ ] APNs：付费账号配置后，杀进程状态下对方发消息能收到"有新消息"提示（无正文）
-
----
-
-## 4. Ad Hoc 分发（付费账号，暂留待）
-
-1. Xcode → Signing & Capabilities → Team 选付费团队
-2. 添加 **Push Notifications** capability，配置 APNs 密钥（Key ID + .p8，存好供 Server 侧 APNs 下发用）
-3. 真机运行验证通过后：Product → Archive → Distribute App → **Ad Hoc**（或 Development）
-4. 导出 `.ipa`，用第三方工具（爱思助手/TestFlight 等）装到对方 iPhone
-
-> Server 侧 APNs 下发（`sendPushHint`）当前为日志占位（server/src/push.ts）；付费账号就绪后按 PROTOCOL.md §7.3 接入 apn 库（如 `@parse/node-apn`），只发 `{ type: "new_message" }` 提示，绝不携带正文。
-
----
-
-## 5. 已知点与常见问题
-
-| 现象                                             | 处理                                                                          |
-| ------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `pod install` 未执行 / Podfile.lock 无 libsodium | `flutter config --no-enable-swift-package-manager` 后重新 `flutter build ios` |
-| libsodium 加载失败                               | 见 §2 验证项：检查 Pods、`-Wl,-export_dynamic`                                |
-| 免费账号无法真机运行                             | 手机信任开发者证书；或改用付费账号                                            |
-| 推送收不到                                       | APNs 需付费账号 + capability + APNs 密钥（Server 侧）；WS/轮询兜底不受影响    |
-| 中文路径构建问题                                 | macOS 无此问题；Windows 侧继续用外部临时构建                                  |
-
----
-
-## 6. 一次全流程（快速参考）
-
-```bash
-# Mac（第一次）
-git clone https://git.tic.cc/fon/only && cd only/app
-flutter config --no-enable-swift-package-manager
-flutter pub get && flutter build ios --debug --no-codesign   # 验证编译
-open ios/Runner.xcworkspace                                  # 签名 → Run
-```
+- [ ] 创建/加入秘境（口令 + PIN）→ 进入聊天页
+- [ ] 发消息 → 对方设备（另一台手机 / CLI）同步收到明文
+- [ ] 附件：拍照/相册 → 上传 → 对方下载解密一致（会弹相机/麦克风/相册权限）
+- [ ] 杀进程后另一端发消息 → 重新打开能同步到（**APNs 未接入，不会有系统推送**）

@@ -4833,3 +4833,42 @@ Space Key，不新增权限；比 16bcdd8 的"存口令 + 解锁自动重传"更
 **验证：** cli `dart analyze` 0 / `dart test` 15 passed；app `flutter analyze` 0 /
 `flutter test` 114 passed + 1 skipped；`cliMultiverseE2E.py` pty e2e **连跑 3 次全绿**
 （含中/英探测文本），覆盖 create→join→多设备 + 两条新断言。
+
+### iOS 首次真机安装（实测通过）+ docs/IOS.md 重写为可自助操作
+
+**老板 2026-09-14：** 续费开发者账号后要求把 iOS 版装到自己手机测试，并把操作步骤与命令
+写成可自助执行的文档。
+
+**实测路径（玩法 A：开发安装，不需要 Archive）：**
+```bash
+export PATH="$HOME/development/flutter/bin:$PATH"
+cd app
+flutter build ios --release                     # 74.8s，产 build/ios/iphoneos/Runner.app（27.3MB）
+xcrun devicectl device install app \
+  --device 00008030-0005306011F9402E build/ios/iphoneos/Runner.app
+# → App installed: bundleID cc.tic.einz
+```
+- 构建自动签名成功：`Automatically signing iOS … using specified development team 37KQR6645B`
+- `devicectl … process launch` 报 `device was not, or could not be, unlocked` ——**只是手机锁屏**，
+  不是签名问题（安装本身已成功，App 图标可见）。
+- 手机为 iPhone 11（`luk_ip11_210700`，UDID `00008030-0005306011F9402E`，iOS 26.3.1），
+  已配对、无线可用；XR 那台 unavailable（未开开发者模式）。
+
+**⚠️ 重要发现：账号仍是免费个人团队级别。** 先删掉旧的 `cc.tic.einz` profile 促使重签，
+重新构建后新 profile 有效期 **2026-09-14 → 2026-09-21 仅 7 天**（免费团队特征；付费为 1 年）。
+本机 keychain 另有一张 `Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)`（2025-07-15 过期）
++ 配套 Ad Hoc/profile（2024 年即过期）——**Faronear 公司账号看起来才是那个付费/机构账号**。
+结论：老板续费的可能是另一个账号；需要确认后决定是否把工程换到 `CQ6733CTMV`（否则
+Ad Hoc 分发做不了，且 App 每 7 天需要重装续期）。已把这点写进 `docs/IOS.md` §0。
+（旧的 7 天期 profile 已备份在 `/tmp/einz-profiles-backup/`，随时可还原。）
+
+**文档：`docs/IOS.md` 重写为 v2.0**（v1.0 的 bundle id `com.example.onlyspace`、仓库
+`git.tic.cc/fon/only`、「当前无付费账号」等说法全部过时）：
+- §0 配置速览（bundle id / team / 签名身份 / 生产服务器 / SPM 必须关 / APNs 未接入）+ 账号级别提醒
+- §1 前置检查命令（flutter doctor / config / devicectl / find-identity）+ 手机侧一次性准备
+- §2 **玩法 A**（开发安装：build + install + launch，含"别用 local_config.ios.json"的坑）
+- §3 **玩法 B**（Ad Hoc：登记 UDID → `flutter build ipa --export-method ad-hoc` → 解包后
+  devicectl 安装 / Apple Configurator 2）
+- §4 玩法 C（TestFlight/上架：当前不做 + 真做要补 ITSAppUsesNonExemptEncryption 等）
+- §5 常见问题表（含 profile 7 天到期、`device was not unlocked`、libsodium、SPM 等）
+- §6 真机验证清单
