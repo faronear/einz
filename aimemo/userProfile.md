@@ -17,6 +17,18 @@
   - **开发位置决策（2026-09-04）**：日常开发留在原路径 `/Volumes/repodisk/productX/einz`；已知该卷（noowners）Docker 无法枚举目录 → `dart-docker.sh` 等容器工具需在 `~/` 下跑（实测 clone 到 `~/einz` 可运行），**仅当再遇类似 Docker 问题才迁移仓库**。
 - 旧开发机：**MacBook Air**，曾用于本项目开发（2026-08-28 ~ 08-30 期间完成环境安装与 Phase 0/1 部分验证），因性能不足已停用为主力，转作备用。
 
+## 网络环境与翻墙能力
+
+- **老板有翻墙能力，随时可开**（2026-09-14 自述）：本机装有 **Tailscale**，可开 **exit node**
+  走海外出口。需要访问海外站点/服务（含墙外自建服务）时，**直接请老板开 Tailscale exit node**，
+  不用自己绕。
+- **`git.tic.cc` 在美国机房**（自建 Gitea）→ 大陆直连**只有间歇性可用**：典型症状是
+  `LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to git.tic.cc:443`（TLS 握手阶段就被打断），
+  `curl` 得到 `http=000`，偶尔某一次能通。**push/pull/核实远端前先确认已翻墙**，
+  否则会出现"push 好像成功了但随后核实全失败"的假象。
+- 其他：海外 dev 站点常超时/被墙 → 优先走国内镜像（TUNA 等）或让老板开代理；
+  本机 brew cask 已坏，装工具优先下 tar.gz。
+
 ## 技术背景
 
 - 开发方式：**主要依赖 AI 辅助开发**（2026-08-28 自述），技术栈差异对开发速度预期影响不大。
