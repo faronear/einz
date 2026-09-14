@@ -4571,3 +4571,33 @@ projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 
 
 **验证：** server build + 4 套测试全过；shared analyze 0 issue / 26 测试；cli analyze
 0 issue / 15 测试 + 两套集成；app analyze 0 issue / 111 测试。
+
+### 第二轮清理：验收脚本全部移植 + 归档密钥层删除（无存量数据）
+
+**老板指令（2026-09-14）：** ① 把 v1 同类遗留一并修掉、移植；② **产品尚未上线、无存量
+数据，不需要考虑和历史数据的兼容性**。
+
+**提交 1（`cf50bec`）验收脚本收敛：**
+- 新增 `cli/test/_e2e_lib.sh` 共用件：`wpath`（cygpath 只有 Windows 有）、`py`
+  （macOS 只有 python3）、`field_of/token_of/id_of`（Multiverse 的 device_id/person_id
+  由服务端分配，不能用 init 传的 dev-a1/dev-b1）、`start_server/stop_server`、
+  `pair_up`（init → A 自举登记 + 口令托管 → 邀请码 → B 凭口令接入，两端同一 Space Key）、
+  `assert_contains`（避开 pipefail 下 `cmd | grep -q` 的 SIGPIPE 误判）。
+- `e2e.sh` / `phase1_e2e.sh` / `phase2_e2e.sh` 移植（原为 v1 `config` 白名单写法）；
+  `phase4_e2e.sh` 改用共用件；`auto_sync_check.sh` 改为**自包含**（不再依赖本机
+  git-ignored 的 `cli/demo/` 与硬编码端口），`auto_sync_probe.dart` 支持传 store/server。
+- 顺带修 phase1 的乱序锚点（CLI 输出已含 `v1`，旧锚点 `seq=N]` 匹配不到）。
+- **结果：5 个脚本首次全部在 macOS 上跑通。**
+
+**提交 2（`99b181e`）归档密钥层删除（依据"无存量数据，不背兼容包袱"）：**
+- 删除 `DeviceStore.archivedSpaceKeys`、`MessageRepository.archivedKeys`、
+  import/escrow-download/TUI 的"更高版本即归档旧密钥"守卫、备份载荷 `archived_space_keys`。
+- 只留 `key_version` 本身（信封/AAD 一部分；`message_crypto.dart:64`）+ 按版本取钥的收口
+  （退化为"只有当前版本可取，未知版本返回 null"）。
+- 文档同步：SECURITY.md §3.3 / E2EE.md §9.2 / DATABASE.md §4 / productLens §4.4 /
+  escrowArchivedKeys.md。
+- **验证：** cli analyze 0 / 15 测试；app analyze 0 / 115 测试；备份→恢复往返冒烟通过；
+  5 个脚本重跑全绿。
+
+**另注：** 期间另一位 agent 自行提交了 `16bcdd8`（App 改口令弹窗支持 PIN 验证）——我全程
+只用自己的文件路径提交，未触碰其改动。
