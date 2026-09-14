@@ -4944,3 +4944,27 @@ worklog 增量原样保留。
 **校正一处旧记录：** 那份 worklog 写着「Xcode 16.1 太旧、最高支持 iOS 18.1 设备，带不动 iOS 26.3
 真机，需升级 Xcode 26.x」——**实测不成立**：Xcode 16.1 对 iOS 26.3.1 的 iPhone 11，开发安装与
 Ad Hoc 安装各成功一次。
+
+### 首次全量 push（216 commit）+ 远端仓库重建的核实记录
+
+**老板 2026-09-14：** 指示 push；并说明「另一个 agent 已关闭」、「我也把 git repo 修改了地址」、
+「目前的 git.tic.cc 上还没有 einz，但可以直接 push」。
+
+**push 前的核实（按老板要求"再核实"）：**
+- `git status` 干净；无 `MERGE_HEAD`/rebase 残留；单工作树
+- 进程表里只有 **1 个** codebuddy 进程（无其它 agent 在跑）→ 与"另一个 agent 已关闭"一致
+- 最近 10 分钟被触碰的文件仅 `server/data/einz.sqlite.db-wal` 与 `cli/demo/s2.json`，
+  两者都是 gitignore 的产物，不影响提交
+
+**push 结果：** `git push origin main` → `* [new branch] main -> main`，**216 个 commit**
+（138 文件 / +18822 −2960），本地 `origin/main` 更新为 `5c38976`，领先/落后均为 0。
+`[new branch]` 不是异常——**远端仓库 `fon/einz` 尚不存在，Gitea 的 push-to-create 直接建了它**。
+
+**一个后续待确认：** push 之后 `git ls-remote` / `curl https://git.tic.cc/fon/einz` 均失败
+（`LibreSSL SSL_connect: SSL_ERROR_SYSCALL`，http=000），连续重试 3 次一致——**HTTPS 握手就打不通**，
+因此**无法二次核实远端内容**。（push 本身返回 0 且远端跟踪分支已推进，`git` 只在成功时这么做，
+故判定已落地。）老板说改了仓库地址，需确认新的 remote URL；若与
+`https://git.tic.cc/fon/einz` 不同，要更新 origin 并重推。
+
+**另：** `feature/multiverse` 已**完全并入** main（`git merge-base --is-ancestor` 通过），
+所以新仓库只有 main 也不会丢任何东西。
