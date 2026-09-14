@@ -2365,6 +2365,22 @@ Future<void> _sendText(String text) async {
   }
 }
 
+/// 后台上传附件（老板 2026-09-14）：**不 await**——回车后立即把光标交还输入行，
+/// 不等上传往返。上传耗时与文件大小/网速成正比，占住输入循环（busy）会让回车后
+/// 直到传完都打不了字（老板反馈：光标像卡在状态条上）。
+/// 乐观气泡（pending ⋯）由 [ChatSession.attachFile] 在网络之前就上屏，成功后原地
+/// 变 ✓；失败时它自行撤下气泡，这里补一条 ❌ 提示。
+Future<void> _uploadAttachmentInBackground(ChatSession session, String path) async {
+  try {
+    await session.attachFile(path);
+  } catch (e) {
+    session.messages.add(
+        _systemMessage(session, '❌ 附件上传失败，可能有路径或文件类型出错，请检查再试。'));
+  } finally {
+    _scheduleRender();
+  }
+}
+
 Future<void> _execCommand(String line) async {
   final s = _state!;
   final parts = line.split(RegExp(r'\s+'));
@@ -2634,17 +2650,10 @@ Future<void> _execCommand(String line) async {
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '用法: /attach <文件路径> [描述]'));
       } else {
-        // 附件消息已在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，
-        // 老板 2026-09-14：此前要等上传完成才进消息流，中间干等体验差）——
-        // 这里只报失败；成功不再另发 system 消息（气泡上的 ✓ 已是反馈）。
-        try {
-          s.status = '⏳ 上传附件中（$arg）……';
-          await s.session.attachFile(arg);
-          s.status = ''; // 上传进度通知退场，结果已在消息区
-        } catch (e) {
-          s.session.messages.add(_systemMessage(s.session, '❌ 附件上传失败，可能有路径或文件类型出错，请检查再试。'));
-          s.status = '';
-        }
+        // 附件消息在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，老板
+        // 2026-09-14）；这里**不 await**——回车即交还输入（否则输入循环 busy 到上传结束，
+        // 中途打不了字）；结果/失败只在消息区体现，状态栏不占（老板要求状态栏保持干净）。
+        unawaited(_uploadAttachmentInBackground(s.session, arg));
       }
     case '/invite':
       // Multiverse：生成绑定新设备的邀请（join token——24h 一次性；v1 邀请码

@@ -5098,3 +5098,28 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 气泡**内**的引用块（`_buildQuoteBlockContent`，gradient 气泡是深底）保持 white70 不变。
 
 **验证：** `flutter analyze` 无 issue。视觉/手感由老板自测（未代跑测试）。
+
+### TUI 附件上传改后台异步：回车即交还输入（老板 2026-09-14 续）
+
+**反馈（老板）：** 上一版附件能立刻上屏了，但输入光标像跑到了状态条里（那里显示"正在发送"
+提示），回车后到上传完毕前**打不了字**；要求上传做成异步——发送后立刻上屏、立刻回到可输入状态。
+
+**根因（两层）：**
+1. `/attach` 在 `_execCommand` 里 `await` 了整条上传链，输入循环的 `busy` 一直挂到上传结束；
+   期间回车会被 `if (busy) continue` 丢掉（而且那行输入在检查前已被 `input.clear()` 清掉）。
+2. 我上一版加的 `s.status = '⏳ 上传附件中（…）……'` 就挂在输入行正下方的状态行上，
+   输入行为空 + 下面一行在转圈 → 看起来"光标去了状态条"。
+
+**改法（cli/bin/einz_tui.dart）：**
+- 新增 `_uploadAttachmentInBackground(session, path)`：内部 `await attachFile` + try/catch
+  出 ❌ 提示；`/attach` 分支改成 `unawaited(_uploadAttachmentInBackground(...))` 立即返回
+  → 输入循环 `busy` 立刻复位、`_render()` 把光标放回输入行，马上可以继续打字。
+- 去掉上传期间的 `s.status` 提示：进度由消息区气泡的 `⋯ → ✓` 表达，状态栏保持干净
+  （与"普通消息那样"一致，也符合老板"反馈在消息区、状态栏保持干净"的一贯要求）。
+
+**并发影响（已确认安全）：** 连发多个附件时各自独立乐观气泡、各自 messageId；`store.save`
+是同步全量写（内存共享，不会丢）；上传期间照常发文字消息（`busy` 不占用）。若上传中 `/exit`
+或杀进程，该条附件只留在展示缓存（未入 pending 队列）——与"失败即撤下"语义一致。
+
+**验证：** `dart analyze bin lib` 无 issue；`dart test test/` 17 项全过。
+交互手感由老板自测（`cd cli && dart run bin/einz_tui.dart`）。
