@@ -5049,3 +5049,35 @@ dead-strip，导出表原样保留 → 同一个 bug 在本地"看起来正常"�
 
 **顺带说明：** APK 实际只含 **3 个 ABI**（arm64-v8a / armeabi-v7a / x86_64）——Flutter
 release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
+
+### TUI 附件上传：回车立刻进消息流（乐观上屏；老板 2026-09-14）
+
+**需求（老板）：** TUI 上传附件时，回车后要等上传完成才进消息流，中间干等的停顿体验不好；
+要求"也做成普通消息那样，回车立刻进入消息流"。
+
+**根因：** `ChatSession.attachFile` 把"加密 → 上传 blob → 发消息 → 落盘 → 上屏"串成一条
+`await` 链，展示缓存最后一步才追加。普通消息 `sendText` 早已是乐观上屏（先追加 pending，
+确认后按 messageId 覆盖为 sent），附件漏了这一步。
+
+**改法（cli/lib/chat_core.dart `attachFile`）：**
+1. 调整顺序：先装好消息信封（`encryptMessage`，与文件字节无关）→ **立即 `_appendDedup`
+   一条 pending 气泡 + `_sortMessages()` 通知 UI** → 再 `file.readAsBytes()` / 加密 /
+   上传 blob / 发消息 / 落盘。
+2. **上链顺序不变**：仍是"blob 就位才发消息"（两阶段，防幽灵消息，PROTOCOL.md §6.1）。
+3. 拿到应答后 `_appendDecrypted` 按同一 messageId 覆盖为 sent（气泡 `⋯` → `✓`）。
+4. 失败（加密/上传/发送）→ 撤掉这条乐观气泡 + rethrow。附件 blob v1 不做补传，
+   留着会误导成"已发出"。
+5. 顺带把 `readAsBytesSync` 换成 `readAsBytes`：大文件同步读会连渲染一起卡住。
+
+**TUI（cli/bin/einz_tui.dart `/attach`）：** 上传期间状态栏显示 `⏳ 上传附件中（路径）……`，
+结束清掉；**删掉原来成功后的 `✅ 附件已上传: xxx (id=…)` system 消息**——气泡上的
+`✓` 已经是反馈，与普通消息一致（若老板要保留 id 提示，回来说一声即可加回）。
+
+**验证：** 新增 `cli/test/attach_optimistic_test.dart`（2 例：上传前即上屏且状态 pending、
+失败后撤下不留假气泡；文件不存在时不上屏）+ `dart analyze lib bin` 无 issue +
+`dart test test/` 17 项全过。
+
+**顺带发现（未改，等老板定）：** `/attach` 的用法提示写的是 `/attach <文件路径> [描述]`，
+但 `attachFile(arg)` 把整个 arg 当路径、`caption` 参数从没传过——即"描述"其实不支持
+（带空格路径也因此没法和描述区分开）。要不要支持描述（如首个空格切分 / `--` 分隔），
+请老板拍板。

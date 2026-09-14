@@ -2634,11 +2634,16 @@ Future<void> _execCommand(String line) async {
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '用法: /attach <文件路径> [描述]'));
       } else {
+        // 附件消息已在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，
+        // 老板 2026-09-14：此前要等上传完成才进消息流，中间干等体验差）——
+        // 这里只报失败；成功不再另发 system 消息（气泡上的 ✓ 已是反馈）。
         try {
-          final r = await s.session.attachFile(arg);
-          s.session.messages.add(_systemMessage(s.session, '✅ 附件已上传: ${r.caption} (id=${r.attachmentId.substring(0, 8)})'));
+          s.status = '⏳ 上传附件中（$arg）……';
+          await s.session.attachFile(arg);
+          s.status = ''; // 上传进度通知退场，结果已在消息区
         } catch (e) {
           s.session.messages.add(_systemMessage(s.session, '❌ 附件上传失败，可能有路径或文件类型出错，请检查再试。'));
+          s.status = '';
         }
       }
     case '/invite':

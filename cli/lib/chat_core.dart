@@ -617,8 +617,14 @@ class ChatSession {
   }
 
   /// 上传附件（PROTOCOL.md §6.1，两阶段先传后链）：加密文件 → 先上传密文 blob →
-  /// 再发附件消息（正文为描述）。blob 就位后才发消息，避免"消息已广播但对端 blob
-  /// 缺失"的幽灵消息；blob 已传但消息发送失败时，孤儿 blob 由服务端定期清理。
+  /// 再发附件消息（正文为描述）。**上链顺序不变**：blob 就位后才发消息，避免
+  /// "消息已广播但对端 blob 缺失"的幽灵消息；blob 已传但消息发送失败时，孤儿 blob
+  /// 由服务端定期清理。
+  ///
+  /// 但**展示层不等网络**（老板 2026-09-14）：信封一装好就先乐观上屏（pending `⋯`，
+  /// 与 [sendText] 同款），加密/上传/发消息在后台继续，拿到应答后按 messageId 覆盖为
+  /// sent（`✓`）。否则大文件上传期间消息流毫无反馈，回车后要干等（体验停顿）。
+  /// 失败时撤掉这条乐观气泡并 rethrow（附件 blob v1 不做补传，留着会误导成"已发出"）。
   /// 返回 (messageId, attachmentId, caption)。
   Future<({String messageId, String attachmentId, String caption})> attachFile(
     String filePath, {
@@ -629,7 +635,6 @@ class ChatSession {
     final resolved = _expandUserHome(filePath);
     final file = File(resolved);
     if (!file.existsSync()) throw StateError('文件不存在: $filePath（已展开为 $resolved）');
-    final fileBytes = file.readAsBytesSync();
     final fileName = resolved.split(RegExp(r'[\\/]')).last;
 
     final messageId = await _uuidv7();
@@ -637,16 +642,7 @@ class ChatSession {
     final type = _inferAttachmentType(fileName);
     final cap = caption ?? '📎 $fileName';
 
-    // 1) 加密文件（密文 + 元数据）
-    final enc = await encryptAttachment(
-      fileBytes: fileBytes,
-      spaceKey: base64Decode(store.spaceKey!),
-      attachmentId: attachmentId,
-      spaceId: store.spaceId!,
-      keyVersion: store.keyVersion,
-    );
-
-    // 2) 先上传附件 blob（Server 校验 size + sha256；对应 message 此时可尚不存在）
+    // 1) 附件消息信封（正文=描述）。与文件字节无关，先装好即可上屏
     final env = await encryptMessage(
       plaintext: cap,
       spaceKey: base64Decode(store.spaceKey!),
@@ -657,42 +653,71 @@ class ChatSession {
       type: type,
       keyVersion: store.keyVersion,
     );
-    final api = ApiClient(server);
-    final att = await _withAutoAuth((token) => api.postAttachment(
-          messageId: messageId,
-          attachmentId: attachmentId,
-          keyVersion: store.keyVersion,
-          size: enc.size,
-          sha256: enc.sha256,
-          nonce: base64Encode(enc.nonce),
-          blob: enc.cipher,
-          token: token,
-        ));
 
-    // 3) 再发附件消息（正文为描述文本，密文上链）
-    final msg = await _withAutoAuth((token) => api.postMessage(env, token));
-
-    // 4) 落盘：附件元数据 + 消息历史 + 推进锚点
-    store.upsertAttachment(
-      attachmentId: attachmentId,
-      messageId: messageId,
-      keyVersion: store.keyVersion,
-      size: enc.size,
-      sha256: enc.sha256,
-      nonce: base64Encode(enc.nonce),
-      createdAt: att['created_at'] as int,
-    );
-    store.upsertHistory(env, serverSequence: msg.serverSequence, createdAt: msg.createdAt);
-    store.advanceAnchor(msg.serverSequence);
-    store.save(storePath);
-    _appendDecrypted(
-      env,
-      serverSequence: msg.serverSequence,
-      isMine: true,
+    // 2) 立即上屏（pending）：不等加密/上传往返——确认后同一 messageId 覆盖为 sent
+    _appendDedup(ChatMessage(
+      env: env,
       plain: cap,
-      createdAt: msg.createdAt,
-    );
+      isMine: true,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      serverSequence: null,
+    ));
     _sortMessages();
+
+    try {
+      // 3) 加密文件（密文 + 元数据）
+      final fileBytes = await file.readAsBytes();
+      final enc = await encryptAttachment(
+        fileBytes: fileBytes,
+        spaceKey: base64Decode(store.spaceKey!),
+        attachmentId: attachmentId,
+        spaceId: store.spaceId!,
+        keyVersion: store.keyVersion,
+      );
+
+      // 4) 先上传附件 blob（Server 校验 size + sha256；对应 message 此时可尚不存在）
+      final api = ApiClient(server);
+      final att = await _withAutoAuth((token) => api.postAttachment(
+            messageId: messageId,
+            attachmentId: attachmentId,
+            keyVersion: store.keyVersion,
+            size: enc.size,
+            sha256: enc.sha256,
+            nonce: base64Encode(enc.nonce),
+            blob: enc.cipher,
+            token: token,
+          ));
+
+      // 5) 再发附件消息（正文为描述文本，密文上链）
+      final msg = await _withAutoAuth((token) => api.postMessage(env, token));
+
+      // 6) 落盘：附件元数据 + 消息历史 + 推进锚点
+      store.upsertAttachment(
+        attachmentId: attachmentId,
+        messageId: messageId,
+        keyVersion: store.keyVersion,
+        size: enc.size,
+        sha256: enc.sha256,
+        nonce: base64Encode(enc.nonce),
+        createdAt: att['created_at'] as int,
+      );
+      store.upsertHistory(env, serverSequence: msg.serverSequence, createdAt: msg.createdAt);
+      store.advanceAnchor(msg.serverSequence);
+      store.save(storePath);
+      // 乐观气泡覆盖为 sent（_appendDecrypted 内部会 _sortMessages 通知 UI 重绘）
+      _appendDecrypted(
+        env,
+        serverSequence: msg.serverSequence,
+        isMine: true,
+        plain: cap,
+        createdAt: msg.createdAt,
+      );
+    } catch (e) {
+      // 加密/上传/发送失败：撤掉乐观气泡（blob 未就位，留着会误导成"已发出"）
+      messages.removeWhere((m) => m.env.messageId == messageId);
+      _sortMessages();
+      rethrow;
+    }
     return (messageId: messageId, attachmentId: attachmentId, caption: cap);
   }
 
