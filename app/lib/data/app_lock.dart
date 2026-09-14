@@ -302,7 +302,8 @@ class AppLockPayload {
   final String? token;
 
   /// 口令托管（KEY_ESCROW.md）的接入口令：与 App 锁 PIN 区分，
-  /// 同样受 PIN 加密保护；解锁/认证成功时用于自动重传口令密保箱（rotate 后同步）。
+  /// 同样受 PIN 加密保护；解锁/认证成功时用于**按需**重传口令密保箱
+  /// （服务器无包或本机版本更新时才传；普通重传不推进 updated_at）。
   final String? escrowPassphrase;
 
   /// 本端已知的服务端口令更新时间（ms）：上线时与服务器对比，

@@ -93,8 +93,9 @@ class _LockPageState extends State<LockPage> {
     ));
   }
 
-  /// rotate 后同步：解锁成功时用最新 Space Key 重传口令密保箱
-  /// （KEY_ESCROW.md §7，失败静默，下次解锁自动重试）。
+  /// 解锁时同步口令密保箱（KEY_ESCROW.md §7）：仅当服务器没有包、或本机版本更新时
+  /// 才重传；普通解锁会提前返回，不刷 updated_at（避免对方误报"口令被重设"）。
+  /// 失败静默，下次解锁自动重试。
   void _syncEscrow(AppLockPayload payload) {
     final pass = payload.escrowPassphrase;
     final token = payload.token;
@@ -140,7 +141,7 @@ class _LockPageState extends State<LockPage> {
     try {
       final payload = await _lock.unlock(_pin.text);
       if (!mounted) return;
-      _syncEscrow(payload); // rotate 后同步：重传口令密保箱
+      _syncEscrow(payload); // 解锁后按需同步口令密保箱（见 _syncEscrow 注释）
       _enterChat(payload);
     } on AppLockLockedException catch (e) {
       if (!mounted) return;
