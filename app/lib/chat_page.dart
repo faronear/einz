@@ -3784,7 +3784,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         throw const _NoEscrowException();
       }
       try {
-        await escrow.openPackage(passphrase: oldPass, file: file);
+        await escrow.openPackage(passphrase: oldPass, envelope: file);
       } on FormatException {
         if (!mounted) return;
         setState(() => _error = l10n.chatPageChangePassphraseOldWrong);

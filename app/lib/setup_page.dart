@@ -2036,7 +2036,7 @@ class _SetupPageState extends State<SetupPage> {
         setState(() => _status = AppLocalizations.of(context)!.setupPageNoEscrow);
         return false;
       }
-      final payload = await escrow.openPackage(passphrase: passphrase, file: file);
+      final payload = await escrow.openPackage(passphrase: passphrase, envelope: file);
       if (!mounted) return false;
       // 2) 口令通过 → 才 join 提交（设备登记 + session 签发，真正消费 token）。
       //    已经用同一 token+身份 join 过就不再重复提交（如从 PIN 步点「上一步」

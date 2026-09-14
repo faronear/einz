@@ -9,17 +9,17 @@ import 'package:test/test.dart';
 /// HTTP 端点已由 server 冒烟测试覆盖（smoke.test.ts §11）。
 class FakeApi extends ApiClient {
   FakeApi() : super('http://fake');
-  BackupFile? stored;
+  PassphraseEnvelope? stored;
   bool deleted = false;
 
   @override
-  Future<void> uploadKeyEscrow(BackupFile package, String token,
+  Future<void> uploadKeyEscrow(PassphraseEnvelope package, String token,
       {String? passphraseHash, bool rotated = false}) async {
     stored = package;
   }
 
   @override
-  Future<({BackupFile? file, int? updatedAt})> getKeyEscrow(String token) async =>
+  Future<({PassphraseEnvelope? file, int? updatedAt})> getKeyEscrow(String token) async =>
       (file: stored, updatedAt: null);
 
   @override
@@ -47,7 +47,7 @@ void main() {
     // 密文包不含明文 Space Key
     expect(pkg.ciphertext, isNot(contains('dGhlLXNwYWNlLWtleQ==')));
 
-    final opened = await escrow.openPackage(passphrase: '正确口令-abc', file: pkg);
+    final opened = await escrow.openPackage(passphrase: '正确口令-abc', envelope: pkg);
     expect(opened.spaceKeyB64, 'dGhlLXNwYWNlLWtleQ==');
     expect(opened.spaceId, 'space-test');
     expect(opened.keyVersion, 2);
@@ -62,7 +62,7 @@ void main() {
       keyVersion: 1,
     );
     await expectLater(
-      escrow.openPackage(passphrase: '错误口令', file: pkg),
+      escrow.openPackage(passphrase: '错误口令', envelope: pkg),
       throwsA(isA<FormatException>()),
     );
   });

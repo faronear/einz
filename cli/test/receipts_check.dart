@@ -112,7 +112,7 @@ Future<int> _run() async {
       displayName: 'Lukas',
       partnerName: 'Alice',
       escrowPassphrase: kPassphrase,
-      sealedSpaceKey: BackupFile(
+      sealedSpaceKey: PassphraseEnvelope(
         salt: Uint8List.fromList(List.filled(16, 1)),
         nonce: Uint8List.fromList(List.filled(24, 2)),
         ciphertext: Uint8List.fromList(List.filled(8, 3)),

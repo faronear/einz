@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import '../crypto/backup.dart';
+import '../crypto/passphrase_crypto.dart';
 import 'types.dart';
 import '../crypto/message_crypto.dart';
 
@@ -145,7 +145,7 @@ class ApiClient {
     String? gender,
     String? partnerName,
     String? partnerGender,
-    BackupFile? sealedSpaceKey,
+    PassphraseEnvelope? sealedSpaceKey,
     String? escrowPassphrase,
     String? publicKey,
     String? deviceName,
@@ -183,7 +183,7 @@ class ApiClient {
 
   /// Multiverse：按空间口令取回 Space Key 密封包（POST /spaces/{id}/key-escrow，
   /// 口令正确才返回，PROTOCOL_MULTIVERSE.md §4.2——join 方取钥，不撤销设备）。
-  Future<BackupFile?> fetchSpaceEscrow(String spaceId, String passphrase) async {
+  Future<PassphraseEnvelope?> fetchSpaceEscrow(String spaceId, String passphrase) async {
     final res = await _post(
       '/spaces/$spaceId/key-escrow',
       {'passphrase': passphrase},
@@ -191,7 +191,7 @@ class ApiClient {
     );
     final pkg = res['package'] as Map<String, dynamic>?;
     if (pkg == null) return null;
-    return BackupFile.fromJson(pkg);
+    return PassphraseEnvelope.fromJson(pkg);
   }
 
   /// 生成邀请码（POST /invites，需认证 token）：person_id 为规范 id（personA/personB）。
@@ -266,7 +266,7 @@ class ApiClient {
   /// （服务端据它校验「加入方取包时输入的口令」是否正确）。
   /// [rotated] 仅"修改口令"流程置 true——服务端据此推进 updated_at 并广播
   /// passphrase.rotated；普通重传（首次设口令/解锁同步）保持 false，不得误报。
-  Future<void> uploadKeyEscrow(BackupFile package, String token,
+  Future<void> uploadKeyEscrow(PassphraseEnvelope package, String token,
       {String? passphraseHash, bool rotated = false}) async {
     await _post(Api.keyEscrow, {
       'package': package.toJson(),
@@ -278,11 +278,11 @@ class ApiClient {
   /// 拉取口令托管密文包；未托管时返回 null。
   /// 下载口令托管密文包（含服务端 updated_at——客户端用于"口令是否被重设"的
   /// 离线补查：本端记录的上次时间 < updated_at → 口令已重设）。
-  Future<({BackupFile? file, int? updatedAt})> getKeyEscrow(String token) async {
+  Future<({PassphraseEnvelope? file, int? updatedAt})> getKeyEscrow(String token) async {
     final res = await _get(Api.keyEscrow, token: token);
     final pkg = res['package'];
     return (
-      file: pkg == null ? null : BackupFile.fromJson(pkg as Map<String, dynamic>),
+      file: pkg == null ? null : PassphraseEnvelope.fromJson(pkg as Map<String, dynamic>),
       updatedAt: res['updated_at'] as int?,
     );
   }

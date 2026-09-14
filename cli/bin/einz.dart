@@ -495,7 +495,7 @@ Future<void> _cmdBackup(ArgResults opts) async {
   });
 
   final recoveryCode = await generateRecoveryCode();
-  final file = await encryptBackup(payload: Uint8List.fromList(utf8.encode(payload)), backupCode: recoveryCode);
+  final file = await encryptWithPassphrase(payload: Uint8List.fromList(utf8.encode(payload)), passphrase: recoveryCode);
   File(outPath).writeAsStringSync(JsonEncoder.withIndent('  ').convert(file.toJson()));
 
   stdout.writeln('✅ 备份已导出: $outPath');
@@ -510,8 +510,8 @@ Future<void> _cmdRestore(ArgResults opts) async {
   final outPath = opts['store'] as String?;
 
   final raw = File(inPath).readAsStringSync();
-  final file = BackupFile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-  final plain = await decryptBackup(file: file, backupCode: recoveryCode);
+  final file = PassphraseEnvelope.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+  final plain = await decryptWithPassphrase(envelope: file, passphrase: recoveryCode);
   final data = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
 
   stdout.writeln('✅ 备份解密成功（恢复码有效）');

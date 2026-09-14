@@ -21,11 +21,11 @@ class _FakeEscrow extends KeyEscrowService {
   final EscrowPayload? payload;
 
   @override
-  Future<BackupFile?> fetchSpaceEscrow(String spaceId, String passphrase) async {
+  Future<PassphraseEnvelope?> fetchSpaceEscrow(String spaceId, String passphrase) async {
     if (payload == null) return null;
     if (passphrase != correctPass) throw const FormatException('口令错误');
-    // salt/nonce/ciphertext 必须是合法 base64（BackupFile.fromJson 会解码校验）
-    return BackupFile.fromJson(const {
+    // salt/nonce/ciphertext 必须是合法 base64（PassphraseEnvelope.fromJson 会解码校验）
+    return PassphraseEnvelope.fromJson(const {
       'format': 'einz-backup-v1',
       'salt': 'c2FsdA==',
       'nonce': 'bm9uY2U=',
@@ -35,7 +35,7 @@ class _FakeEscrow extends KeyEscrowService {
 
   @override
   Future<EscrowPayload> openPackage(
-      {required String passphrase, required BackupFile file}) async {
+      {required String passphrase, required PassphraseEnvelope envelope}) async {
     if (passphrase != correctPass) throw const FormatException('口令错误');
     return payload!;
   }

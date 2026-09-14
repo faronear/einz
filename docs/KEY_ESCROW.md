@@ -54,10 +54,10 @@
 
 | 组件       | 机制                                                                | 现有出处                                                |
 | ---------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
-| 口令派生   | Argon2id（sodium_sumo pwhash，opsLimitModerate / memLimitModerate） | `shared/lib/src/crypto/backup.dart` `deriveBackupKey()` |
-| 加密       | XChaCha20-Poly1305（AEAD，随机 nonce）                              | 同上 `encryptBackup()`                                  |
-| 密文包格式 | `{format, salt, nonce, ciphertext}`（base64）                       | 同上 `BackupFile`                                       |
-| 盐         | 每次托管随机生成（32B），防彩虹表                                   | 同上 `generateBackupSalt()`                             |
+| 口令派生   | Argon2id（sodium_sumo pwhash，opsLimitModerate / memLimitModerate） | `shared/lib/src/crypto/backup.dart` `derivePassphraseKey()` |
+| 加密       | XChaCha20-Poly1305（AEAD，随机 nonce）                              | 同上 `encryptWithPassphrase()`                                  |
+| 密文包格式 | `{format, salt, nonce, ciphertext}`（base64）                       | 同上 `PassphraseEnvelope`                                       |
+| 盐         | 每次托管随机生成（32B），防彩虹表                                   | 同上 `generatePassphraseSalt()`                             |
 
 **口令强度要求**：口令需满足最低熵（建议 ≥ 10 位混合字符，或 ≥ 5 个词）。口令不满足时客户端拒绝设置并提示。
 

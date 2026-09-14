@@ -3,20 +3,20 @@ import 'dart:typed_data';
 
 import '../protocol/api_client.dart';
 import '../sodium.dart';
-import 'backup.dart';
+import 'passphrase_crypto.dart';
 
 /// 口令托管密钥（KEY_ESCROW.md §4）。
 ///
 /// Space Key 用"口令"（Argon2id）派生密钥加密成密文包后托管到 Server——
 /// Server 存的是被口令加密的密钥，没有口令解不开；口令只留在客户端/用户脑中。
-/// 复用 backup.dart 的密码学机制（deriveBackupKey + XChaCha20-Poly1305），零新增密码学。
+/// 复用 passphrase_crypto.dart 的口令加解密构造（Argon2id + XChaCha20-Poly1305），零新增密码学。
 class KeyEscrowService {
   KeyEscrowService(this.api);
 
   final ApiClient api;
 
   /// 用口令加密 Space Key 包（`{space_key, space_id, key_version}`）。
-  Future<BackupFile> createPackage({
+  Future<PassphraseEnvelope> createPackage({
     required String passphrase,
     required String spaceKeyB64,
     required String spaceId,
@@ -27,15 +27,15 @@ class KeyEscrowService {
       'space_id': spaceId,
       'key_version': keyVersion,
     })));
-    return encryptBackup(payload: payload, backupCode: passphrase);
+    return encryptWithPassphrase(payload: payload, passphrase: passphrase);
   }
 
   /// 用口令解出 Space Key 包；口令错误抛 [FormatException]。
   Future<EscrowPayload> openPackage({
     required String passphrase,
-    required BackupFile file,
+    required PassphraseEnvelope envelope,
   }) async {
-    final plain = await decryptBackup(file: file, backupCode: passphrase);
+    final plain = await decryptWithPassphrase(envelope: envelope, passphrase: passphrase);
     final json = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
     return EscrowPayload(
       spaceKeyB64: json['space_key'] as String,
@@ -74,7 +74,7 @@ class KeyEscrowService {
 
   /// Multiverse：按空间口令取 Space Key 密封包（委托 ApiClient.fetchSpaceEscrow；
   /// 测试可 override——与 v1 fetch 同注入边界）。
-  Future<BackupFile?> fetchSpaceEscrow(String spaceId, String passphrase) =>
+  Future<PassphraseEnvelope?> fetchSpaceEscrow(String spaceId, String passphrase) =>
       api.fetchSpaceEscrow(spaceId, passphrase);
 
   /// 一键：拉取 + 口令解密；未托管或无口令错误时：
@@ -87,7 +87,7 @@ class KeyEscrowService {
     final snap = await api.getKeyEscrow(token);
     final file = snap.file;
     if (file == null) return null;
-    return openPackage(passphrase: passphrase, file: file);
+    return openPackage(passphrase: passphrase, envelope: file);
   }
 
   /// 清除口令密保箱。
