@@ -251,7 +251,7 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 | ---------- | ----------------------------------------------------------- |
 | UI 框架    | Flutter（Dart，AOT 原生编译，无 WebView）                   |
 | 加密       | `sodium_libs`（dart:ffi 绑定原生 libsodium）                |
-| 安全存储   | `flutter_secure_storage`（iOS Keychain / Android Keystore）[已实现] 跳过 PIN 场景的明文 Space Key 包经 `SecureStore` 封装（`app/lib/data/secure_store.dart`）存入；设 PIN 场景密钥包仍为 PIN 派生密钥加密后落 app_state |
+| 安全存储   | `flutter_secure_storage`（iOS Keychain / Android Keystore）[已实现] 跳过 PIN 场景的明文 Space Key 包经 `SecureStore` 封装（`app/lib/data/secure_store.dart`）存入；设 PIN 场景密钥包仍为 PIN 派生密钥加密后落 app_state。**生存周期已定（老板 2026-09-14）：卸载即重置**（沙盒标记判定全新安装并清残留）+ iOS/macOS 用 `first_unlock_this_device`（条目不随备份/换机迁移），见 `docs/DATABASE.md` §4.1 |
 | 本地数据库 | `drift`（SQLite，类型安全，支持迁移）                       |
 | 推送       | FCM（Android）/ APNs（iOS）+ `flutter_local_notifications`  |
 | 后台       | `workmanager`（同步重试、清理）                             |
