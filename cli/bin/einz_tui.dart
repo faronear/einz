@@ -2912,8 +2912,10 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
 }
 
 /// 全丢恢复（开发运维专用；闭环——仅凭 escrow 口令，无需 EINZ-BACKUP 文本）：
-/// 修改托管口令（/passphrase）：旧口令验证（fetch 口令密保箱解密）→
-/// 新口令重加密上传（含新 argon2id 哈希）。口令输入不回显（hidden）。
+/// 修改托管口令（/passphrase）：① 服务器有密保箱 → 旧口令验证（fetch 解密）→
+/// 新口令重加密上传（含新 argon2id 哈希）；② 服务器**无**密保箱（数据丢失）→
+/// 无从校验旧口令，跳过校验直接用新口令重建（与 App 同口径）。
+/// 口令输入不回显（hidden）。
 /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
 /// 服务器更新 = 口令已重设——系统消息通知（插入消息流，不弹窗）。
 Future<void> _checkEscrowRotated(ChatSession session) async {
@@ -2941,28 +2943,32 @@ Future<void> _checkEscrowRotated(ChatSession session) async {
 Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) async {
   final api = ApiClient(session.server);
   final escrow = KeyEscrowService(api);
-  // 1) 旧口令验证：必须能解开服务器当前口令密保箱
-  while (true) {
-    if (!_state!.running) return; // 已退出
-    final oldPass = await _prompt(session, '❓ 验证老密保口令：', hidden: false, required: true);
-    if (oldPass.isEmpty) continue;
-    try {
-      final snap = await api.getKeyEscrow(store.sessionToken!);
-      final file = snap.file;
-      if (file == null) {
-        session.messages.add(_systemMessage(session, '⚠️ 尚未设置密保口令，无需修改（/space 可查看接入状态）'));
-        return;
-      }
+  // 1) 先取服务端密保箱：有包 → 必须验证旧口令；无包（服务端数据丢失）→
+  //    旧口令无从校验，跳过校验直接用新口令重建（本设备已认证且持有
+  //    Space Key，重建不新增权限）——与 App 同口径。
+  PassphraseEnvelope? serverFile;
+  try {
+    serverFile = (await api.getKeyEscrow(store.sessionToken!)).file;
+  } catch (e) {
+    session.messages.add(_systemMessage(session, '⚠️ 读取口令密保箱失败: $e，请稍后再试'));
+    return;
+  }
+  if (serverFile == null) {
+    session.messages.add(
+        _systemMessage(session, '⚠️ 服务器无密保箱（可能数据丢失）——无需旧口令，将用新口令重建'));
+    _scheduleRender();
+  } else {
+    while (true) {
+      if (!_state!.running) return; // 已退出
+      final oldPass = await _prompt(session, '❓ 验证老密保口令：', hidden: false, required: true);
+      if (oldPass.isEmpty) continue;
       try {
-        await escrow.openPackage(passphrase: oldPass, envelope: file);
+        await escrow.openPackage(passphrase: oldPass, envelope: serverFile);
+        break; // 旧口令验证通过
       } on FormatException {
         session.messages.add(_systemMessage(session, '⚠️ 旧口令错误，请重新输入（或 /exit 退出）'));
         continue;
       }
-      break; // 旧口令验证通过
-    } catch (e) {
-      session.messages.add(_systemMessage(session, '⚠️ 读取口令密保箱失败: $e，请稍后再试'));
-      return;
     }
   }
   // 2) 新口令（两次输入一致）
@@ -3001,7 +3007,11 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
       } catch (_) {
         // 记录失败不影响结果（下次上线补查再对比）
       }
-      session.messages.add(_systemMessage(session, '✅ 口令已修改（新设备绑定时请使用新口令）'));
+      session.messages.add(_systemMessage(
+          session,
+          serverFile == null
+              ? '✅ 密保箱已用新口令重建（请线下告知伴侣新口令）'
+              : '✅ 口令已修改（新设备绑定时请使用新口令）'));
       _scheduleRender();
       return;
     } catch (e) {

@@ -513,8 +513,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageChangePassphraseOldWrong => 'Wrong current passphrase';
 
   @override
-  String get chatPageChangePassphraseNoEscrow =>
-      'No passphrase set (nothing to change)';
+  String get chatPageChangePassphraseRebuildTitle =>
+      'Rebuild the passphrase box?';
+
+  @override
+  String get chatPageChangePassphraseRebuildMessage =>
+      'No passphrase box was found on the server (data may have been lost). It will be rebuilt directly with the new passphrase — the current one is not required. Tell your partner the new passphrase afterwards.';
 
   @override
   String get chatPageChangePassphraseDone =>

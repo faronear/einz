@@ -1010,11 +1010,17 @@ abstract class AppLocalizations {
   /// **'Wrong current passphrase'**
   String get chatPageChangePassphraseOldWrong;
 
-  /// No description provided for @chatPageChangePassphraseNoEscrow.
+  /// No description provided for @chatPageChangePassphraseRebuildTitle.
   ///
   /// In en, this message translates to:
-  /// **'No passphrase set (nothing to change)'**
-  String get chatPageChangePassphraseNoEscrow;
+  /// **'Rebuild the passphrase box?'**
+  String get chatPageChangePassphraseRebuildTitle;
+
+  /// No description provided for @chatPageChangePassphraseRebuildMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No passphrase box was found on the server (data may have been lost). It will be rebuilt directly with the new passphrase — the current one is not required. Tell your partner the new passphrase afterwards.'**
+  String get chatPageChangePassphraseRebuildMessage;
 
   /// No description provided for @chatPageChangePassphraseDone.
   ///

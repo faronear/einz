@@ -190,7 +190,8 @@
   "chatPageChangePassphraseConfirmTitle": "Change passphrase?",
   "chatPageChangePassphraseConfirmMessage": "Change the passphrase? You'll need the new one to decrypt content.",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
-  "chatPageChangePassphraseNoEscrow": "No passphrase set (nothing to change)",
+  "chatPageChangePassphraseRebuildTitle": "Rebuild the passphrase box?",
+  "chatPageChangePassphraseRebuildMessage": "No passphrase box was found on the server (data may have been lost). It will be rebuilt directly with the new passphrase — the current one is not required. Tell your partner the new passphrase afterwards.",
   "chatPageChangePassphraseDone": "✅ Passphrase updated — tell your partner; new devices must use the new one",
   "chatPageChangePassphraseFailed": "Failed to change passphrase: {error}",
   "@chatPageChangePassphraseFailed": {

@@ -4714,10 +4714,77 @@ Argon2id 用 moderate（256 MiB/3 轮），单次验证本就昂贵——**在�
 
 **语义影响：** "服务器密保箱数据丢失→解锁自愈重传"的冷路径消失（与 TUI 一致，TUI 本就
 没有）；该场景的恢复手段 = 用 CLI/TUI 重新 `escrow upload`（用当前口令重建密保箱，无需旧口令），
-或"修改口令"流程（需记得旧口令）；全丢场景走备份恢复/恢复码。"对方重设"被动更新机制
-（passphrase.rotated 广播 + 离线补查）不受影响——它靠服务器时间戳对比，不依赖本地口令。
+或"修改口令"流程。
+**⚠️ 订正（2026-09-14 复核时发现，同日修正——见本轮末尾记录）：** 此处原写"'修改口令'
+流程（需记得旧口令）"**是错的**——当时 App/TUI 的改口令流程在"服务器无箱"时直接报错
+（App `_NoEscrowException` → "尚未设置口令（无口令密保箱可修改）"；TUI `file == null` →
+"尚未设置密保口令，无需修改" 后 return），根本走不到设新口令那步，因为它的前置条件就是
+"旧口令能解开服务器当前箱"。已实现**服务器无箱时跳过旧口令校验、直接用新口令重建**（见下），
+该表述此后成立。
+"对方重设"被动更新机制（passphrase.rotated 广播 + 离线补查）不受影响——它靠服务器时间戳
+对比，不依赖本地口令。
 
 **文档同步：** E2EE.md §7（轮换应对表：客户端不再自动重传）、PROTOCOL.md §7.4（不本地缓存
 密保口令）、KEY_ESCROW.md §12.2 注记（客户端不再缓存口令）。
 
 **验证：** flutter analyze 0 issue；chat_page_menu + app_lock + lock_page 29 项全过。
+
+### 复核 193da60（本地不缓存密保口令）→ 1 处事实错误 + SECURITY.md 三处缺口 → 实现"无箱重建"
+
+**背景（老板 2026-09-14）：** 对面 agent 提交 193da60（App 移除 `escrowPassphrase` + 解锁
+自动重传）后，老板要求复核"是否合理、是否完整"。
+
+**代码复核结论：合理且完整。** 移除面（字段 / toJson / fromJson / 两个 update 方法 /
+`_syncEscrow` / `ChatPage.escrowPassphrase` / 弹窗的 db+hasPin+PIN 框 / setup_page 4 处调用点）
+逐项对得上；全仓 grep 无遗留死引用——剩下的 `escrowPassphrase` 全是合法的（向导输入框、
+`createSpace` → `POST /spaces`、server/shared 协议字段、CLI 临时上传）；老锁包里的
+`escrow_passphrase` 被 `fromJson` 静默忽略，**不影响解锁**（口令不是锁包解密密钥，PIN 才是），
+无需迁移；`escrowUpdatedAt` 保留正确（上线补查只比对时间戳，不依赖口令）。
+独立复跑：app `flutter analyze` 0 issue / `flutter test` 113 passed + 1 skipped；cli
+`dart analyze` 0 issue。commit 声称的数字属实。
+
+**发现的事实错误（同一说法重复 4 处）：** commit 正文、KEY_ESCROW.md §12.2、PROTOCOL.md §7.4、
+`_ChangePassphraseDialog` 类注释都写"密保箱重建走**修改口令**"——**当时走不通**：
+- App：`chat_page.dart` 检出服务器无包 → 直接 `throw _NoEscrowException` → 提示"尚未设置口令
+  （无口令密保箱可修改）"，**到不了设新口令那步**；
+- TUI：`einz_tui.dart` 检出 `file == null` → "⚠️ 尚未设置密保口令，无需修改" 后 `return`。
+
+根因：改口令的**前置条件**就是"旧口令能解开服务器当前箱"，箱子没了它天然自我阻断。
+→ 该场景当时真正的唯一入口是 `cli escrow upload`（`cli/bin/einz.dart`：用本地 store 的
+Space Key + 现输口令直接覆盖上传，**不需要服务器旧包**；前提是有一台持有 store 的已登记设备）。
+
+**决策（老板拍板，2026-09-14）：** ① 全部订正 + 补文档；② 同时做**方案 B**——服务器无包时
+允许跳过旧口令校验、直接用新口令重建，把自愈拿回来且**不存任何秘密**（设备已认证且已持有
+Space Key，不新增权限；比 16bcdd8 的"存口令 + 解锁自动重传"更干净——安全面与恢复能力不再
+互斥）。
+
+**实现：**
+- **App** `_ChangePassphraseDialog._submit`：把"取密保箱"从上传前挪到**显性确认之前**——先
+  fetch 一次拿到 `file`，`rebuilding = file == null`；确认弹窗按是否重建切换标题/正文
+  （新增 l10n `chatPageChangePassphraseRebuildTitle` / `…RebuildMessage`，删除已失去意义的
+  `chatPageChangePassphraseNoEscrow`）；仅 `!rebuilding` 时才做旧口令 `openPackage` 校验；
+  上传仍带 `rotated: true`。删除 `_NoEscrowException` 类。
+- **TUI** `_changeEscrowPassphrase`：把"无箱 → 无需修改直接 return"改为"无箱 → 跳过旧口令
+  循环、进入设新口令"；改为**循环前先 fetch 一次**以决定是否需要询问旧口令；成功文案区分
+  「已修改 / 已重建」。
+- **测试**：新增「服务器无密保箱 → 跳过旧口令校验，直接用新口令重建」（断言确认文案走"重建"
+  口径、旧口令留空也放行、上传 rotated 包且仍是同一把 Space Key）；两个旧用例（提交前显性
+  确认 / 强度拦截）原来用无箱 fake（改后会落到"重建"口径）→ 改走新抽出的共享 helper
+  `_fakeWithEscrow`，顺带消除重复的造箱代码。
+
+**文档：**
+- 新增 `docs/SECURITY.md` **§4.7「服务端密保箱丢失 / 被破坏」**（表现 / 影响 / 两条重建路径 /
+  为何跳过旧口令是安全的 / 兜底）；
+- §2 控制矩阵加「客户端不缓存密保口令」行；§4.4 订正——原文"对方设备记录的仍是旧口令"**已不
+  成立**（现在**没有任何设备**记录口令，口令唯一载体是两人各自的记忆 + 被它加密的箱子）；
+  §6 残留风险加「服务端密保箱为无冗余单点」行；
+- 口径精确化：KEY_ESCROW.md §12.2、PROTOCOL.md §7.4 改为"有箱→验旧口令；无箱→跳过校验直接重建"；
+- 陈旧引用：aimemo/projectPlan.md（去掉 `_syncEscrow`/rotate 描述）、escrowArchivedKeys.md
+  （注明 `_syncEscrow` 接入点已删，恢复轮换时需重新设计）。
+
+**验证：** app `flutter analyze` 0 / `flutter test` 114 passed + 1 skipped；cli `dart analyze` 0 /
+`dart test` 15 passed。
+
+**顺带发现（未改，留待老板定）：** TUI `_changeEscrowPassphrase` 的旧口令提示传的是
+`hidden: false`（口令明文回显），而其函数注释写"口令输入不回显（hidden）"——注释与代码不符，
+且口令明文回显有肩窥风险。属既有行为，本次未动。

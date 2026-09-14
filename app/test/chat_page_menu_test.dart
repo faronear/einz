@@ -85,19 +85,26 @@ class _FakeApi extends ApiClient {
 
 // ── 修改口令：辅助（弹窗打开/输入/确认）──
 
+/// 造一个"服务器已有密保箱"的 fake：该箱用 [passphrase] 加密 [spaceKey]。
+/// 不调用（`_FakeApi()`）即模拟"服务器无密保箱"的重建路径。
+Future<_FakeApi> _fakeWithEscrow(Uint8List spaceKey, String passphrase) async =>
+    _FakeApi(
+      escrowFile: await KeyEscrowService(ApiClient('http://fake')).createPackage(
+        passphrase: passphrase,
+        spaceKeyB64: base64Encode(spaceKey),
+        spaceId: 'space-demo',
+        keyVersion: 1,
+      ),
+    );
+
 /// 聊天页 + 密保口令弹窗打开（返回 fake api 供断言）。
 /// [spaceKey] 传入以便调用方断言「上传包解出的 Space Key 一致」。
+/// [oldPassphrase] 为空 = 服务器无密保箱（走"用新口令重建"路径）。
 Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase db,
     {String? oldPassphrase, required Uint8List spaceKey}) async {
-  final escrowFile = oldPassphrase == null
-      ? null
-      : await KeyEscrowService(ApiClient('http://fake')).createPackage(
-          passphrase: oldPassphrase,
-          spaceKeyB64: base64Encode(spaceKey),
-          spaceId: 'space-demo',
-          keyVersion: 1,
-        );
-  final api = _FakeApi(escrowFile: escrowFile);
+  final api = oldPassphrase == null
+      ? _FakeApi()
+      : await _fakeWithEscrow(spaceKey, oldPassphrase);
   await tester.pumpWidget(MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -497,34 +504,12 @@ void main() {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
-    await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('zh'),
-      home: ChatPage(
-        server: 'https://einz.tic.cc',
-        spaceId: 'space-demo',
-        deviceId: 'dev-a',
-        spaceKey: spaceKey,
-        keyVersion: 1,
-        token: 'tok',
-        db: db,
-        api: _FakeApi(),
-        enableWs: false,
-      ),
-    ));
-    await tester.pump(const Duration(milliseconds: 300));
+    // 服务器已有密保箱 → 走普通"修改"口径（非重建）
+    await _openChangePassphraseDialog(tester, db,
+        oldPassphrase: 'oldpass1', spaceKey: spaceKey);
 
-    // 打开菜单 → 密保口令
-    await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('密保口令'));
-    await tester.pumpAndSettle();
-    // 输入新口令 + 确认（匹配）；旧口令留空（确认弹窗在校验后、旧口令验证前）
-    final fields =
-        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    await tester.enterText(fields.at(1), 'newpass123');
-    await tester.enterText(fields.at(2), 'newpass123');
+    // 输入新口令 + 确认（匹配）；旧口令留空（确认弹窗在旧口令验证之前）
+    await _enterDialogFields(tester, newPass: 'newpass123');
     // 提交（按钮文本「修改」，弹窗标题「修改口令」）
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
@@ -541,49 +526,25 @@ void main() {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
-    await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('zh'),
-      home: ChatPage(
-        server: 'https://einz.tic.cc',
-        spaceId: 'space-demo',
-        deviceId: 'dev-a',
-        spaceKey: spaceKey,
-        keyVersion: 1,
-        token: 'tok',
-        db: db,
-        api: _FakeApi(),
-        enableWs: false,
-      ),
-    ));
-    await tester.pump(const Duration(milliseconds: 300));
-
-    await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('密保口令'));
-    await tester.pumpAndSettle();
+    // 服务器已有密保箱 → 走普通"修改"口径（非重建）
+    await _openChangePassphraseDialog(tester, db,
+        oldPassphrase: 'oldpass1', spaceKey: spaceKey);
 
     // 7 位（不足 10）：点提交 → 红字拦截，不弹显性确认弹窗
-    final fields =
-        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    await tester.enterText(fields.at(1), 'short7!');
-    await tester.enterText(fields.at(2), 'short7!');
+    await _enterDialogFields(tester, newPass: 'short7!');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 10 位'), findsOneWidget, reason: '不足 10 位应红字提醒');
     expect(find.text('修改密保口令？'), findsNothing, reason: '校验未过不应进入显性确认');
 
     // 长度够但只有数字：同样拦截（策略：字母 + 数字）
-    await tester.enterText(fields.at(1), '1234567890');
-    await tester.enterText(fields.at(2), '1234567890');
+    await _enterDialogFields(tester, newPass: '1234567890');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令需同时包含字母与数字'), findsOneWidget, reason: '缺字母应红字提醒');
 
     // 满足策略：放行到显性确认
-    await tester.enterText(fields.at(1), 'new-pass-2026');
-    await tester.enterText(fields.at(2), 'new-pass-2026');
+    await _enterDialogFields(tester, newPass: 'new-pass-2026');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 10 位'), findsNothing, reason: '满足策略后旧红字不应残留');
@@ -971,5 +932,37 @@ void main() {
             .openPackage(passphrase: 'oldpass1', envelope: uploaded),
         throwsFormatException,
         reason: '旧口令不应再解开新密保箱');
+  });
+
+  testWidgets('改口令：服务器无密保箱 → 跳过旧口令校验，直接用新口令重建',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    // oldPassphrase 不传 → fake 的 getKeyEscrow 返回 file=null（服务端数据丢失）
+    final api = await _openChangePassphraseDialog(tester, db, spaceKey: spaceKey);
+
+    // 只填新口令（旧口令留空——用户可能已不知道旧口令）
+    await _enterDialogFields(tester, newPass: 'newpass123');
+    await tester.tap(find.widgetWithText(FilledButton, '修改'));
+    await tester.pumpAndSettle();
+
+    // 确认文案走"重建"口径，不是普通"修改密保口令？"
+    expect(find.text('重建密保箱？'), findsOneWidget, reason: '无密保箱应提示重建');
+    expect(find.text('修改密保口令？'), findsNothing);
+
+    final confirmDialog = find.byType(AlertDialog).last;
+    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
+    await tester.pumpAndSettle();
+
+    // 旧口令为空也放行：直接上传 rotated 包重建
+    expect(api.uploadedRotated, isTrue, reason: '重建同样传 rotated: true（广播口令变更）');
+    expect(api.uploadedPackage, isNotNull, reason: '应上传重建后的密保箱');
+
+    final reopened = await KeyEscrowService(ApiClient('http://fake'))
+        .openPackage(passphrase: 'newpass123', envelope: api.uploadedPackage!);
+    expect(reopened.spaceKeyB64, base64Encode(spaceKey), reason: '箱子仍是同一把 Space Key');
+    expect(find.text('修改口令'), findsNothing, reason: '成功应关闭弹窗');
   });
 }

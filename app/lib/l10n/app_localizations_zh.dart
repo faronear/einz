@@ -486,7 +486,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseOldWrong => '旧口令错误';
 
   @override
-  String get chatPageChangePassphraseNoEscrow => '尚未设置口令（无口令密保箱可修改）';
+  String get chatPageChangePassphraseRebuildTitle => '重建密保箱？';
+
+  @override
+  String get chatPageChangePassphraseRebuildMessage =>
+      '服务器上找不到密保箱（可能数据丢失）。将直接用新口令重建，无需旧口令。重建后请线下告知伴侣新口令。';
 
   @override
   String get chatPageChangePassphraseDone => '✅ 口令已修改（请告知伴侣；新设备接入需用新口令）';

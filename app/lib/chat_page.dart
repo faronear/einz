@@ -3688,9 +3688,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   }
 }
 
-/// 修改口令弹窗（StatefulWidget）：旧口令验证（fetch 口令密保箱解密）→
-/// 新口令重加密上传（含新 argon2id 哈希）。本地不落密保口令
-/// （与 TUI 对齐；服务器为唯一真相源，丢失时用户走"修改口令"手动重建）。
+/// 修改口令弹窗（StatefulWidget）。两种情形：
+/// ① 服务器有密保箱 → 旧口令验证（fetch 解密）→ 新口令重加密上传；
+/// ② 服务器**无**密保箱（数据丢失）→ 无从校验旧口令，跳过校验直接用新口令
+///    重建（设备已认证且持有 Space Key，不新增权限）。
+/// 本地一律不落密保口令（与 TUI 对齐；服务器为唯一真相源）。
 class _ChangePassphraseDialog extends StatefulWidget {
   const _ChangePassphraseDialog({
     required this.server,
@@ -3754,13 +3756,36 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.chatPageChangePassphraseMismatch);
       return;
     }
-    // 显性确认：修改密保口令（防误触——老板要求）
+    // 先取服务端密保箱状态：决定是否需要旧口令、以及确认文案。
+    // 无包（服务端数据丢失）时旧口令无从校验——直接重建，不新增权限。
+    final api = widget.api ?? ApiClient(widget.server);
+    final escrow = KeyEscrowService(api);
+    setState(() => _busy = true);
+    PassphraseEnvelope? serverFile;
+    try {
+      serverFile = (await api.getKeyEscrow(widget.token)).file;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = l10n.chatPageChangePassphraseFailed('$e');
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    final rebuilding = serverFile == null;
+    // 显性确认：修改密保口令（防误触——老板要求）；重建口径另有文案
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.chatPageChangePassphraseConfirmTitle),
-        content: Text(l10n.chatPageChangePassphraseConfirmMessage),
+        title: Text(rebuilding
+            ? l10n.chatPageChangePassphraseRebuildTitle
+            : l10n.chatPageChangePassphraseConfirmTitle),
+        content: Text(rebuilding
+            ? l10n.chatPageChangePassphraseRebuildMessage
+            : l10n.chatPageChangePassphraseConfirmMessage),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
           FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
@@ -3773,20 +3798,15 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       _error = null;
     });
     try {
-      final api = widget.api ?? ApiClient(widget.server);
-      final escrow = KeyEscrowService(api);
-      // 1) 验证旧口令：必须能解开服务器当前口令密保箱
-      final snap = await api.getKeyEscrow(widget.token);
-      final file = snap.file;
-      if (file == null) {
-        throw const _NoEscrowException();
-      }
-      try {
-        await escrow.openPackage(passphrase: oldPass, envelope: file);
-      } on FormatException {
-        if (!mounted) return;
-        setState(() => _error = l10n.chatPageChangePassphraseOldWrong);
-        return;
+      // 1) 有密保箱才校验旧口令；无包 = 重建路径，跳过校验
+      if (!rebuilding) {
+        try {
+          await escrow.openPackage(passphrase: oldPass, envelope: serverFile);
+        } on FormatException {
+          if (!mounted) return;
+          setState(() => _error = l10n.chatPageChangePassphraseOldWrong);
+          return;
+        }
       }
       // 2) 新口令重加密 + 上传（rotated: true → 服务端广播口令重设通知并推进 updated_at）
       await escrow.upload(
@@ -3808,9 +3828,6 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       widget.onPassphraseUpdated(serverUpdatedAt); // 聊天页记录已知时间
       if (!mounted) return;
       Navigator.of(context).pop(true);
-    } on _NoEscrowException {
-      if (!mounted) return;
-      setState(() => _error = l10n.chatPageChangePassphraseNoEscrow);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = l10n.chatPageChangePassphraseFailed('$e'));
@@ -3870,11 +3887,6 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       ],
     );
   }
-}
-
-/// 尚未托管口令（服务器无 escrow 包）。
-class _NoEscrowException implements Exception {
-  const _NoEscrowException();
 }
 
 /// 波形条（录音条内）：等宽竖条，高度按振幅采样归一化值；

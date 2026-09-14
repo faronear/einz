@@ -190,7 +190,8 @@
   "chatPageChangePassphraseConfirmTitle": "修改密保口令？",
   "chatPageChangePassphraseConfirmMessage": "确定要修改密保口令吗？修改后需用新口令解密内容密文。",
   "chatPageChangePassphraseOldWrong": "旧口令错误",
-  "chatPageChangePassphraseNoEscrow": "尚未设置口令（无口令密保箱可修改）",
+  "chatPageChangePassphraseRebuildTitle": "重建密保箱？",
+  "chatPageChangePassphraseRebuildMessage": "服务器上找不到密保箱（可能数据丢失）。将直接用新口令重建，无需旧口令。重建后请线下告知伴侣新口令。",
   "chatPageChangePassphraseDone": "✅ 口令已修改（请告知伴侣；新设备接入需用新口令）",
   "chatPageChangePassphraseFailed": "修改口令失败: {error}",
   "@chatPageChangePassphraseFailed": {
