@@ -4479,3 +4479,34 @@ flutter_secure_storage（Keychain/Keystore），跳过 PIN 场景密钥入 keyst
 5 个既有环境失败（stash 基线验证与本次无关）。
 
 **验证：** flutter analyze 0 issue；全量测试除既有 5 项环境失败外全过。
+
+### 复核另一个 agent 的 6 个提交（3895c4e..HEAD）→ 修 2 处
+
+**范围：** `0a69f6b` 明文 Space Key 入 SecureStore、`1638933` 媒体缓存生命周期、
+`24ba686` backupCode 改名 + 备份 payload 补 pending/归档密钥、`b3088cc` 口令加解密
+抽离 passphrase_crypto、`8a6f0fa` TUI /backup、`077ea85` 密保箱归档密钥方案文档。
+
+**实测：** shared 29/29、app 108/108（+1 skip goldens，含本次新增 3 例）、
+cli 单测 14/14 + message_status_check/receipts_check 全过、server 4 套测试全过。
+
+**修复 1（`6091bde`）：TUI 编不过。** `b3088cc` 把 `openPackage` 的 `file:` 改名
+`envelope:`，App 同步了但 TUI 两处漏改（`:994` 口令接入验包、`:2952` 改口令校旧口令）
+→ cli 4 个 analyze error。该提交自称"cli analyze 0 error"，与事实不符。
+
+**修复 2（`34fb54c`）：路径遍历。** App `MediaCache` 按 `einz_media_<messageId>.<ext>`
+拼缓存文件名，两个入参都不可信（messageId 服务器下发、ext 取自对端可控的密文正文）
+→ 对端发 caption 为 `x.mp4/../../evil` 的语音，用户点播放即写到缓存目录外。
+双层加固：server `POST /messages` 的 message_id 加路径安全字符集校验（新建
+`server/src/safeId.ts`）；app 文件名收口到纯函数 `cacheFileName/safeName`，并让
+`deleteFor/prune` 用同一套规则。测试：server +4 非法 id 用例、app +3 例。
+
+**评审意见（不阻塞）：**
+- 密保箱归档密钥方案（`escrowArchivedKeys.md`，[待评审]）方向认可；两点补充已追评到
+  文档：① `upload()` 覆盖式写包 → 归档集合可能被"缺件的设备"写小，建议先 fetch
+  再 max-union 上传（App `_syncEscrow` 本就会先 fetch 验口令，顺手即可）；② 归档密钥
+  入箱后"拿到口令 = 能解全部历史"，需与 productLens §4.4"轮换不追溯历史"的措辞对齐。
+- SecureStore 迁移有个平台差异值得记一笔：**iOS Keychain 条目在 App 卸载后仍保留**
+  （drift 库不会），卸载重装会直接读到旧配置进聊天而非重新引导；若产品上要求"卸载即
+  重置"，需要显式处理（例如登录态里记录安装标识做比对）。
+- `docs/KEY_ESCROW.md` 两处笔误：盐写 32B（实为 16B，`crypto_pwhash_SALTBYTES`）；
+  口令加解密函数出处仍标 `backup.dart`（规范位置 `passphrase_crypto.dart`）。
