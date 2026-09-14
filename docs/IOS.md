@@ -14,14 +14,14 @@
 | Bundle ID | **`cc.tic.einz.ios`** | 已配在 `app/ios/Runner.xcodeproj` |
 | Team ID | **`CQ6733CTMV`** | Faronear Co. Ltd.（**付费**账号） |
 | 签名证书 | `Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)` | SHA-1 `5914DE2D…`，2026-09-14 → **2027-09-14**；私钥 `FaronearPrikey` 在本机登录钥匙串 |
-| Ad Hoc profile | **`Einz Dist Adhoc`**（UUID `458acdea-…`） | 1 年，含 iPhone 11 + iPhone XR + 一台旧设备 |
-| App Store profile | `Einz Dist AppStoreConnect` | 1 年，**同 bundle id**（当前不上架，备用） |
+| Ad Hoc profile | **`Einz Dist Adhoc`**（UUID `458acdea-…`） | 1 年，含 iPhone 11 + iPhone XR + 一台旧设备；**已装在本机** |
+| App Store profile | `Einz Dist AppStoreConnect` | 1 年，**同 bundle id**（当前不上架，备用）；**本机尚未安装**（2026-09-14 核）——走 `appstore` 渠道前要先从开发者后台下载并放进 `~/Library/MobileDevice/Provisioning Profiles/` |
 | 证书/密钥保管位置 | `/Volumes/repodisk/simsim_key/cert-apple-苹果应用证书/20260914/` | `.p12` + `.cer` + CSR + 口令文件（`3_certpassword.simsim.js`）——**勿入 git** |
 | 生产服务器 | `https://einz.tic.cc` | 代码默认值，真机开箱可用 |
 | 部署目标 | iOS 15.0 | |
 | 本机 Flutter | 3.47.2（`~/development/flutter`） | 需 `export PATH="$HOME/development/flutter/bin:$PATH"` |
 | SPM | **必须关闭** | `flutter config --no-enable-swift-package-manager`（用 CocoaPods + 本地 libsodium pod） |
-| APNs 推送 | **未接入** | 工程缺 Push Notifications capability；服务端 `sendPushHint` 仍为日志占位。不影响聊天（WS 兜底） |
+| APNs 推送 | **未接入** | 工程缺 Push Notifications capability（无 entitlements 文件，无 `aps-environment`）；服务端 `sendPushHint` 仍为日志占位。不影响聊天（WS 兜底）。**与分发方式无关**：Ad Hoc 与 App Store 都是 production 环境，装了能力两边都能推（见 §4.2） |
 
 ### ⚠️ 与旧版的两处关键差异
 
@@ -62,6 +62,21 @@ ls ~/Library/MobileDevice/Provisioning\ Profiles/ | grep -i 458acdea   # Ad Hoc 
 ---
 
 ## 2. 玩法 A：构建 Ad Hoc IPA → 装到手机（当前主路径）
+
+### 2.1 一行命令（推荐：`app/ios/buildIos.sh`）
+
+```bash
+app/ios/buildIos.sh adhoc                 # 只打 IPA
+app/ios/buildIos.sh adhoc --install       # 打完直接装到 iPhone 11
+app/ios/buildIos.sh adhoc --install --device <UDID>   # 指定设备
+app/ios/buildIos.sh appstore              # 打 TestFlight / App Store 包（见 §4）
+```
+
+脚本会自动：找 flutter → 校验 SPM 已关 → 校验钥匙串证书 → 校验对应 profile 已装
+→ `flutter build ipa` →（可选）解包 + `devicectl` 安装 / `altool` 上传。
+缺什么它直接告诉你补哪一条命令（证书导入、profile 下载路径等）。
+
+### 2.2 手工步骤（脚本内部就是这几步）
 
 ```bash
 export PATH="$HOME/development/flutter/bin:$PATH"
@@ -116,18 +131,58 @@ Debug / Profile 配置仍是 Automatic（项目默认），用于模拟器开发
   xcodebuild -exportArchive -archivePath build/ios/archive/Runner.xcarchive \
     -exportOptionsPlist ios/exportOptionsAdhoc.plist -exportPath /tmp/adhoc-out
   ```
-- 本仓库目前只维护 `ios/exportOptionsAdhoc.plist`（`method=ad-hoc`）。要走 App Store 时再建一份
-  `method=app-store` 的 plist（profile 用 `Einz Dist AppStoreConnect`）——**bundle id 相同**，
-  所以 Ad Hoc 与将来上架是同一个 App，数据容器一致。
+- 本仓库维护两份 plist，由 `buildIos.sh <adhoc|appstore>` 选择：
+  - `ios/exportOptionsAdhoc.plist` → `method=ad-hoc`，profile `Einz Dist Adhoc`
+  - `ios/exportOptionsAppStore.plist` → `method=app-store`，profile `Einz Dist AppStoreConnect`
+  **bundle id 相同**（`cc.tic.einz.ios`），所以 Ad Hoc 与 TestFlight/上架是同一个 App，数据容器一致。
 
 ---
 
-## 4. 玩法 B：TestFlight / 上架 App Store —— 当前不做
+## 4. 玩法 B：App Store 包 + TestFlight（试用分发，不上架）
 
-`aimemo/productLens.zhcn.md` §1.4/§14.1 明确「不上架 App Store、不向第三方分发」。
-真要做还需：App Store Connect 建 App 记录、隐私政策 URL、支持 URL、截图、年龄分级，以及
-`Info.plist` 补 **`ITSAppUsesNonExemptEncryption`**（E2EE 必须如实申报出口合规）、过 App Review
-（两人私有 E2EE 应用有被 4.2「最低功能」拒审的风险）。
+> **边界**：`aimemo/productLens.zhcn.md` §1.4/§14.1 定的是「**不上架** App Store、不向第三方分发」。
+> TestFlight 只作**自己与伴侣的试用安装**不违背它；但**外部测试组**（外人可装的公开链接）
+> 属于"向第三方分发"，要老板自己拍板。
+
+### 4.1 打 App Store 包并上传
+
+```bash
+app/ios/buildIos.sh appstore                 # 只出 IPA（build/ios/ipa/einz.ipa）
+app/ios/buildIos.sh appstore --upload        # 打完上传 App Store Connect
+```
+
+上传用 App Store Connect API key（`altool`，不用密码）：
+
+```bash
+export ASC_API_KEY_ID=<Key ID>        # App Store Connect → 用户与访问 → 密钥
+export ASC_API_ISSUER=<Issuer ID>
+# 私钥 .p8 放到 ~/private_keys/AuthKey_<Key ID>.p8（altool 默认搜索位置）
+xcrun altool --upload-app -f build/ios/ipa/einz.ipa -t ios \
+  --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER"
+```
+
+前置（一次性）：① App Store Connect 建 App 记录（bundle `cc.tic.einz.ios`、名称、SKU）；
+② 开发者后台下载 `Einz Dist AppStoreConnect` 并装到本机；③ 每个构建版本回答一次
+**出口合规**（E2EE 需如实申报，`ITSAppUsesNonExemptEncryption`）。
+
+### 4.2 TestFlight 与审核、与 APNs
+
+| 测试组 | 人数 | 审核 | 说明 |
+| --- | --- | --- | --- |
+| **内部（Internal）** | ≤100（App Store Connect 团队成员） | **无审核** | 上传 + Apple 处理完（几分钟~几十分钟）即可装；最省事 |
+| **外部（External）** | ≤10,000（邮件/公开链接） | **Beta App Review**（比正式审核轻，仍是人工，首个构建必过） | 需隐私政策 URL 等元数据；4.2「最低功能」风险仍在 |
+
+- TestFlight 构建 **90 天**后过期（需重新上传）。
+- **APNs 与分发方式无关**：Ad Hoc 与 App Store 走的都是 **production** APNs
+  （`aps-environment: production`），所以"用 TestFlight 装"并不会自动带来推送。
+  推送现在缺的是两件事（补上后 Ad Hoc 包一样能收推送）：
+  1. **App ID 开 Push Notifications 能力** + 工程加 `Runner.entitlements`
+     （`aps-environment: production`）→ 重新生成 Ad Hoc/App Store profile
+     （当前工程**没有** entitlements 文件，`registerForRemoteNotifications()` 拿不到 token）；
+  2. **服务端真正发送**：`server/src/push.ts` 的 `sendPushHint` 现在只打日志（Phase 3 占位），
+     需接入 APNs Auth Key（.p8）向 `api.push.apple.com` 发送"有新消息"的无正文提示。
+  客户端其余链路已就绪：`AppDelegate` 已注册通知，`chat_page._registerPushToken()`
+  已调 `POST /push/register`，服务端已存 `push_tokens` 表。
 
 ---
 

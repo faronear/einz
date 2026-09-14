@@ -5185,3 +5185,39 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 `flutter test test/chat_page_menu_test.dart test/lock_page_test.dart` 19 项全过
 （含新增/改写 3 例：有 PIN 时旧码必填+填错+新旧相同+清空取消；无 PIN 两空提交不写盘只提示；
 改口令新旧相同不弹确认不上传）；`dart test test/` 17 项全过。
+
+### iOS 打包脚本 buildIos.sh（adhoc / appstore 双渠道）+ TestFlight 与 APNs 澄清（2026-09-14）
+
+**老板需求：** 把打包安装过程写成 script，用参数 `adhoc` / `appstore` 区分面向不同用户群的包；
+并问"如果用 App Store 包走 TestFlight 试用、不走审核，是不是就能用 APNs 了"。
+
+**新增 `app/ios/buildIos.sh`（可执行）：**
+- `buildIos.sh adhoc [--install] [--device <UDID>]`：校验 flutter → SPM 已关（未关则自动关）→
+  钥匙串有 `CQ6733CTMV` 的 Apple Distribution 证书 → 本机装有「Einz Dist Adhoc」→
+  `flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist` →
+  解包 + `xcrun devicectl device install app`（默认设备 iPhone 11 `00008030-…`）。
+- `buildIos.sh appstore [--upload]`：改用新建的 `ios/exportOptionsAppStore.plist`
+  （`method=app-store` + `Einz Dist AppStoreConnect`）；`--upload` 走
+  `xcrun altool --upload-app --apiKey/--apiIssuer`（需 `ASC_API_KEY_ID` / `ASC_API_ISSUER` 环境变量）；
+  appstore + `--install` 直接报错（App Store 包不能直装）。
+- 缺什么就打印补哪条命令（p12 导入、profile 下载路径等），失败给出常见原因。
+
+**核查发现（重要）：** docs/IOS.md §0 原写「App Store profile `Einz Dist AppStoreConnect` 1 年」，
+但**本机 Provisioning Profiles 里没有它**（只有 Ad Hoc `458acdea-…`）→ 走 appstore 渠道前必须先
+从开发者后台下载安装。已在 §0 标注"本机尚未安装"，脚本也会拦下并提示。
+
+**APNs 澄清（纠偏）：** 之前"Ad Hoc 不能用推送"的说法不准确——那是指**免费个人团队**做不了
+Push/Ad Hoc。Ad Hoc 与 App Store 都是 **production** APNs，装了能力两边都能推。TestFlight 的价值是
+分发方便（内部组**无审核**、无需登记 UDID），**不是**推送的前提。现在推送真正缺的是：
+① App ID 开 Push Notifications + 工程补 `Runner.entitlements`（`aps-environment: production`）——
+目前工程**没有** entitlements 文件；② `server/src/push.ts` 的 `sendPushHint` 仍是日志占位，
+需接 APNs Auth Key 向 `api.push.apple.com` 发无正文提示。客户端其余链路已就绪
+（AppDelegate 已注册、`POST /push/register` 已调、`push_tokens` 表已存）。
+
+**另外（老板确认）：** 覆盖安装同 bundle id（`cc.tic.einz.ios`）会复用 App 容器 → 直接进老空间、
+不换新设备身份，这是**期待行为**（只有 bundle id 变了或先卸载才会"作为新设备"）。
+**不做**"彻底重置"入口（老板：危险）。
+
+**文档：** docs/IOS.md §2 加脚本用法（手工步骤保留在 §2.2）、§3 更新两份 plist 说明、
+§4 重写为"App Store 包 + TestFlight（试用分发，不上架）"：内部/外部测试组对照（无审核 vs
+Beta App Review）、90 天过期、出口合规、APNs 两个缺口；§0 补 App Store profile 未装的备注。

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- App Store / TestFlight 导出的确定性配置（手动签名 + 显式指定证书与 profile，
+     不依赖 Xcode 是否登录了该 Apple ID）。
+     用法：flutter build ipa --release --export-options-plist=ios/exportOptionsAppStore.plist
+     ⚠️ 不要再叠加 --export-method：二者同时给 Flutter 会直接报错
+     （"--export-options-plist is not compatible with --export-method"）。
+
+     ⚠️ 与 Ad Hoc 的差别只在 method 与 provisioningProfiles：
+        - Ad Hoc    → method=ad-hoc，profile "Einz Dist Adhoc"（含设备 UDID 白名单）
+        - App Store → method=app-store，profile "Einz Dist AppStoreConnect"（无设备列表）
+    两者 bundle id 相同（cc.tic.einz.ios），所以是同一个 App、同一个数据容器。
+    App Store 包只能用 TestFlight / 上架安装，**不能**用 devicectl 直装到手机。
+
+    只导出、不重新编译时（同一个 archive 可导出多次）：
+      xcodebuild -exportArchive -archivePath build/ios/archive/Runner.xcarchive \
+        -exportOptionsPlist ios/exportOptionsAppStore.plist -exportPath /tmp/store-out -->
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>teamID</key>
+	<string>CQ6733CTMV</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>cc.tic.einz.ios</key>
+		<string>Einz Dist AppStoreConnect</string>
+	</dict>
+	<key>compileBitcode</key>
+	<false/>
+	<key>stripSwiftSymbols</key>
+	<true/>
+	<key>uploadSymbols</key>
+	<false/>
+</dict>
+</plist>
