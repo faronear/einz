@@ -156,6 +156,8 @@ flutter build ipa --release --export-method app-store
 | `Unable to launch … device was not, or could not be, unlocked` | 手机锁屏了，解锁后重试（**不是签名问题**） |
 | 报 `libsodium` 相关链接/加载失败 | 确认 `flutter config --no-enable-swift-package-manager`，再 `flutter build ios`（会自动 `pod install`）；release 若被 strip，Build Settings → Other Linker Flags 加 `-Wl,-export_dynamic` |
 | `pod install` 没执行 / `Podfile.lock` 里没有 libsodium | 同上，先关 SPM 再构建 |
+| `Missing package product 'FlutterGeneratedPluginSwiftPackage'` | 仓库 pbxproj 曾由 Flutter SPM（3.35+ 默认开启）生成过 Swift Package 引用，禁用 SPM 后残留导致构建失败；已随仓库修复（8 处引用全删）。旧副本请拉取最新代码，或手工删除 `XCLocalSwiftPackageReference` / `XCSwiftPackageProductDependency` / `packageReferences` / `packageProductDependencies` 相关段落 |
+| 杀进程后收不到消息提示 | APNs 未接入（工程缺 Push Notifications capability + 服务端 `sendPushHint` 仍是占位）→ 打开 App 时靠 WS／增量同步补齐；见 §0 |
 | 磁盘紧张 | `rm -rf ~/Library/Developer/Xcode/DerivedData`（可占数 GB） |
 
 ---
