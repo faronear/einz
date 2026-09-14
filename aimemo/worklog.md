@@ -5248,3 +5248,36 @@ SELECT p.device_id, p.platform, p.token
 
 **文档：** `aimemo/productLens.zhcn.md` §10 与"技术选型"表标注推送为 `[待评审]` 暂缓
 （含链路现状：iOS 客户端已注册、Android 无推送依赖、服务端占位且无人调用、已按 Space 收敛）。
+
+### 附件存储模式 secured / stored（老板 2026-09-14）：明文留存换取体验
+
+**痛点：** 每次打开 App，消息流里所有附件都重新下载——图片只在内存缓存
+（`_imageCache`/`_videoCache` 是 `Map<String, Future>`），进程一退就没；语音/视频只落临时
+目录（系统可清）；通用文件卡片每次点下载都重新拉。
+
+**老板拍板的取舍（放弃一部分安全换体验）：**
+- `secured`（默认，即原行为）：不留存明文，按需下载；
+- `stored`：明文长期留在本机 App 私有目录 + **不进系统备份**，消息流直接打开；
+  文件被清掉时消息上给"点击重新下载"。
+- 下载时机：**收到即自动下载并留存**（不等点开）；
+- 存放位置：iOS Application Support + `isExcludedFromBackup`，Android `noBackupFilesDir`；
+- 切回 `secured` 时**清空**已存明文（否则"安全"名不副实）。
+
+**实现（分两个提交）：**
+1. 数据层/平台层：新增 `data/attachment_storage_settings.dart`（app_state
+   `attachment_storage`，带 `attachmentStorageNotifier` 即时生效）；
+   `data/attachment_store.dart`（长期目录，复用 MediaCache 的 `einz_media_<safe(id)>.<safe(ext)>`
+   命名——safeName 白名单化防路径越出目录；`ensure/deleteFor/clear`，平台不可用静默回落）；
+   iOS `AppDelegate.swift` 与 Android `MainActivity.kt` 各加 `einz/store` MethodChannel
+   返回"不备份私有目录"（两端各约 20 行）。
+2. UI 接线：菜单「界面风格」下加「附件存储」（两个选项带说明，点选即生效）；
+   `_attachmentBytes` 改为"留存副本优先 → 否则下载 → stored 模式下顺手落盘"（图片/视频/
+   缩略图全部受益）；语音播放优先读长期目录；文件卡片在留存模式下**本机已有就直接
+   用 OpenFilex 打开**（新增 `open_filex` 依赖，安卓自带 FileProvider、iOS 走系统预览）；
+   图片/视频加载失败的位置改成可点的"点击重新下载"（清缓存 future 后重试）；
+   首屏与增量刷新后调用 `_autoStoreAttachments`（stored 模式收到即落盘，失败静默）；
+   焚毁到期 / 手动删除 / 设备撤销三处清理路径都补上 `AttachmentStore.deleteFor|clear`。
+
+**已知待办：** ① android 下有两份 MainActivity（namespace `com.example.einz` 生效，
+`cc/tic/einz` 那份是死代码，待清理）；② stored 模式首屏会后台下载整页附件（流量/存储）；
+③ 真机验证（iOS + 安卓）待老板——尤其"打开本地文件"这条链路两端都要实机试。

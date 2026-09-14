@@ -1076,6 +1076,12 @@ abstract class AppLocalizations {
   /// **'Language'**
   String get chatPageMenuLocaleLabel;
 
+  /// No description provided for @chatPageMenuAttachmentStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment storage'**
+  String get chatPageMenuAttachmentStorage;
+
   /// No description provided for @chatPageMenuStyleLabel.
   ///
   /// In en, this message translates to:
@@ -1381,6 +1387,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download failed: {error}'**
   String chatPageDownloadFailed(String error);
+
+  /// No description provided for @chatPageAttachmentTapToDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on this device — tap to download again'**
+  String get chatPageAttachmentTapToDownload;
+
+  /// No description provided for @chatPageFileOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open file: {error}'**
+  String chatPageFileOpenFailed(String error);
 
   /// No description provided for @chatPageDeviceRevoked.
   ///

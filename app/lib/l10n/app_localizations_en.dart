@@ -555,6 +555,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuLocaleLabel => 'Language';
 
   @override
+  String get chatPageMenuAttachmentStorage => 'Attachment storage';
+
+  @override
   String get chatPageMenuStyleLabel => 'Interface style';
 
   @override
@@ -726,6 +729,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String chatPageDownloadFailed(String error) {
     return 'Download failed: $error';
+  }
+
+  @override
+  String get chatPageAttachmentTapToDownload =>
+      'Not on this device — tap to download again';
+
+  @override
+  String chatPageFileOpenFailed(String error) {
+    return 'Could not open file: $error';
   }
 
   @override

@@ -206,6 +206,7 @@
   },
   "chatPageEscrowRotatedNotice": "伴侣已重设密保口令——生成邀请或再次修改时请使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
+  "chatPageMenuAttachmentStorage": "附件存储",
   "chatPageMenuStyleLabel": "界面风格",
   "chatPageStyleSheetClose": "关闭",
   "chatPageMenuBurnLabel": "阅后即焚",
@@ -308,6 +309,13 @@
   },
   "chatPageDownloadFailed": "下载失败: {error}",
   "@chatPageDownloadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageAttachmentTapToDownload": "附件不在本机，点击重新下载",
+  "chatPageFileOpenFailed": "打开文件失败: {error}",
+  "@chatPageFileOpenFailed": {
     "placeholders": {
       "error": {"type": "String"}
     }

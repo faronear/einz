@@ -9,12 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:einz_shared/einz_shared.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 
 import 'brand_logo.dart';
+import 'data/attachment_storage_settings.dart';
+import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
@@ -189,6 +192,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _highlightMessageId;
   Timer? _highlightTimer;
   late String _uiStyle; // 当前界面风格（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
+
+  /// 当前附件存储模式：'secured'=不留存明文（默认）/ 'stored'=明文留在本机、直接打开。
+  late String _attachmentStorage;
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
   late String _myPersonName; // 我的名字（菜单显示；改名后 setState 刷新）
@@ -425,6 +431,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _loadUiStyle(); // 恢复界面风格（plain/gradient，默认素雅纯色）
     // 风格切换即时生效（弹窗不关闭也能预览）：notifier 通知 → 重建背景
     uiStyleNotifier.addListener(_onUiStyleChanged);
+    _attachmentStorage = attachmentStorageNotifier.value;
+    _loadAttachmentStorage(); // 恢复附件存储模式（secured/stored，默认 secured）
+    attachmentStorageNotifier.addListener(_onAttachmentStorageChanged);
     // 每 3 秒轮询同步（WS 连接成功后降频为 30s 兜底；断开恢复高频——见 _onWsStatusChanged）
     _restartTicker(_tickerInterval);
     _registerPushToken();
@@ -585,6 +594,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await (db.delete(db.localMessages)).go();
       await (db.delete(db.syncState)).go();
       await MediaCache.deleteAll(); // 媒体解密缓存一并清空
+      await AttachmentStore.clear(); // stored 模式留存的明文一并清空
     } catch (_) {
       // 清理失败不阻塞登出（尽力清除）
     }
@@ -660,6 +670,52 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 风格切换通知（弹窗内点选即触发）：立即重建背景与菜单当前值。
   void _onUiStyleChanged() {
     if (mounted) setState(() => _uiStyle = uiStyleNotifier.value);
+  }
+
+  Future<void> _loadAttachmentStorage() async {
+    final s = AttachmentStorageSettings(widget.db ?? LocalDatabase());
+    final mode = await s.load();
+    if (mounted) setState(() => _attachmentStorage = mode);
+  }
+
+  /// 存储模式切换通知：立即重建（附件渲染改用/停用本地副本）。
+  void _onAttachmentStorageChanged() {
+    if (mounted) setState(() => _attachmentStorage = attachmentStorageNotifier.value);
+  }
+
+  /// 顶栏菜单 → 附件存储（安全 / 留存）：本设备设置，两台设备可各选各的。
+  /// 切回 secured 时**清空已留存的明文**（否则"安全"名不副实——老板 2026-09-14 定）。
+  Future<void> _showAttachmentStoragePicker() async {
+    final l10n = AppLocalizations.of(context)!;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(l10n.chatPageMenuAttachmentStorage,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            for (final mode in kAttachmentStorageOptions)
+              ListTile(
+                title: Text(kAttachmentStorageLabels[mode]!),
+                subtitle: Text(kAttachmentStorageDescriptions[mode]!),
+                trailing: mode == _attachmentStorage ? const Icon(Icons.check) : null,
+                onTap: () async {
+                  await AttachmentStorageSettings(widget.db ?? LocalDatabase()).save(mode);
+                  if (mode == 'secured') {
+                    // 切回安全模式：把本机留存的明文附件全部清除
+                    unawaited(AttachmentStore.clear());
+                  }
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 顶栏 🎨：切换界面风格（素雅纯色/渐变粉蓝）。弹窗内点选即生效并立即关闭，
@@ -1214,6 +1270,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     uiStyleNotifier.removeListener(_onUiStyleChanged);
+    attachmentStorageNotifier.removeListener(_onAttachmentStorageChanged);
     _ticker?.cancel();
     _peerTicker?.cancel();
     _recordTimer?.cancel();
@@ -1269,11 +1326,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 到期焚毁：媒体缓存定点删（尽力而为、不等待——测试/主流程不被文件 I/O 阻塞）
       for (final id in await _repo.tombstoneExpired()) {
         unawaited(MediaCache.deleteFor(id));
+        unawaited(AttachmentStore.deleteFor(id)); // stored 模式的留存明文同样要删
       }
       await _repo.refreshDeviceMap();
       final recent = await _repo.historyRecent(limit: _pageSize);
       if (!mounted) return;
       setState(() => _messages = recent);
+      // stored 模式：首屏附件的明文后台落盘（不阻塞首屏）
+      unawaited(_autoStoreAttachments(recent));
       // 首次载入即定位到最新消息（老板实测 2026-09-09：原来停在最早消息处，
       // 要等 ticker 自动刷新才滚到底）——直接跳转不播动画，进入即见最新
       _scrollToLatest(animate: false);
@@ -1301,8 +1361,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 阅后即焚：到期消息打本地墓碑（纯本地）+ 定点删媒体解密缓存（不等待）
       for (final id in await _repo.tombstoneExpired(now: now)) {
         unawaited(MediaCache.deleteFor(id));
+        unawaited(AttachmentStore.deleteFor(id));
       }
       final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
+      // stored 模式：新到附件的明文**收到即落盘**（消息流里点开就能看）
+      unawaited(_autoStoreAttachments(fresh));
       // 补偿：列表里仍标 pending/failed 的消息按 id 重读。它们的 server_sequence
       // 是本端 postMessage 后才回填的，可能"迟到"到高水位之下——只靠 historySince
       // 会永久漏掉，界面就一直显示"发送中"（老板 2026-09-12 实测）。
@@ -2039,6 +2102,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (confirmed != true || !mounted) return;
     await _repo.tombstoneMessage(m.env.messageId);
     await MediaCache.deleteFor(m.env.messageId); // 定点删媒体解密缓存
+    unawaited(AttachmentStore.deleteFor(m.env.messageId)); // 留存明文同样删
     if (!mounted) return;
     setState(() {
       _messages = [
@@ -2491,17 +2555,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _audioStartedMessageId = null; // 旧波形进度先复位
       });
       final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
-      // 解密缓存：确定性路径按 messageId 复用——重复播放不再重复下载解密落盘
-      final tmp = await MediaCache.ensure(
-        m.env.messageId,
-        ext,
-        () => _repo.fetchAttachment(
-          attachmentId: att['attachment_id'] as String,
-          keyVersion: att['key_version'] as int,
-          sha256: att['sha256'] as String,
-          nonce: base64Decode(att['nonce'] as String),
-        ),
-      );
+      Future<Uint8List> load() => _repo.fetchAttachment(
+            attachmentId: att['attachment_id'] as String,
+            keyVersion: att['key_version'] as int,
+            sha256: att['sha256'] as String,
+            nonce: base64Decode(att['nonce'] as String),
+          );
+      // 解密落盘：确定性路径按 messageId 复用——重复播放不再重复下载解密
+      // stored 模式放长期目录（跨会话保留），否则临时缓存（系统可清）
+      final tmp = (_storeAttachments
+              ? await AttachmentStore.ensure(m.env.messageId, ext, load)
+              : null) ??
+          await MediaCache.ensure(m.env.messageId, ext, load);
       await player.stop();
       await player.play(DeviceFileSource(tmp.path));
       // 真正出声才开始走波形进度（此前是下载解密等待期）
@@ -2684,7 +2749,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           return _VideoPreview(bytes: snap.data!, messageId: m.env.messageId);
         }
         if (snap.hasError) {
-          return Text('🎬 ${m.plaintext}');
+          return GestureDetector(
+            onTap: () => _retryAttachment(m),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.download_outlined, size: 16),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    AppLocalizations.of(context)!.chatPageAttachmentTapToDownload,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
         return const SizedBox(
             width: 60, height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
@@ -2694,10 +2774,54 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 附件明文：发送端优先本地密文解密（上传完成前/失败后也能即时显示），
   /// 无本地密文（接收端）走服务端拉取。
-  Future<Uint8List> _attachmentBytes(HistoryMessage m) {
+  Future<Uint8List> _attachmentBytes(HistoryMessage m) async {
     final att = m.attachment;
     if (att == null) throw StateError('附件元数据缺失');
-    return _repo.attachmentBytes(att);
+    // stored 模式：本机留存的明文优先（零网络、零解密），拿到即返回
+    final stored = await _storedFile(m);
+    if (stored != null) return stored.readAsBytes();
+    final bytes = await _repo.attachmentBytes(att);
+    if (_storeAttachments) {
+      // 顺手落长期目录（下次打开消息流直接命中）
+      unawaited(AttachmentStore.ensure(
+          m.env.messageId, _attachmentExtOf(m), () async => bytes));
+    }
+    return bytes;
+  }
+
+  /// 是否"留存"模式（附件明文长期留在本机）。
+  bool get _storeAttachments => _attachmentStorage == 'stored';
+
+  /// 附件在长期目录里的扩展名（语音固定 m4a，其余按正文后缀）。
+  String _attachmentExtOf(HistoryMessage m) =>
+      m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+
+  /// 本机留存的明文副本（stored 模式且文件仍在）→ 直接读；否则 null。
+  Future<File?> _storedFile(HistoryMessage m) async {
+    if (!_storeAttachments) return null;
+    final f = await AttachmentStore.pathFor(m.env.messageId, _attachmentExtOf(m));
+    if (f == null || !await f.exists()) return null;
+    return f;
+  }
+
+  /// 重新下载某条附件（清掉缓存 future → 下次渲染重新拉取）。
+  void _retryAttachment(HistoryMessage m) {
+    _imageCache.remove(m.env.messageId);
+    _videoCache.remove(m.env.messageId);
+    setState(() {});
+  }
+
+  /// stored 模式：新到附件的明文**收到即落盘**（消息流里点开就能看，不用等下载）。
+  /// 已有的跳过；失败静默——不打扰，用户点消息还能重新下载。
+  Future<void> _autoStoreAttachments(List<HistoryMessage> msgs) async {
+    if (!_storeAttachments) return;
+    for (final m in msgs) {
+      try {
+        await _attachmentBytes(m);
+      } catch (_) {
+        // 单个失败不影响其它（网络抖动/元数据未就绪）
+      }
+    }
   }
 
   /// 图片明文（发送端本地密文解密 / 接收端服务端拉取）：按 messageId 缓存 future，
@@ -2725,7 +2849,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           );
         }
         if (snap.hasError) {
-          return Text(AppLocalizations.of(context)!.chatPageImageLoadFailed(m.plaintext));
+          return GestureDetector(
+            onTap: () => _retryAttachment(m),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.download_outlined, size: 16),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    AppLocalizations.of(context)!.chatPageAttachmentTapToDownload,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
         return const SizedBox(width: 60, height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
       },
@@ -2980,13 +3119,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '$bytes B';
   }
 
-  /// 下载并保存文件附件到应用文档目录（captain=文件名）。
+  /// 文件附件：留存模式下**本机已有就直接打开**（零网络），否则下载后打开。
+  /// secured 模式下沿用原来的"下载保存到应用文档目录 + 提示路径"。
   Future<void> _downloadFile(
       HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageAttachmentMetaMissing);
+      showTopNotice(context, l10n.chatPageAttachmentMetaMissing);
+      return;
+    }
+    // 留存副本还在 → 直接交给系统应用打开
+    final stored = await _storedFile(m);
+    if (stored != null) {
+      await _openFileWith(stored.path);
       return;
     }
     try {
@@ -2996,14 +3143,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         sha256: att['sha256'] as String,
         nonce: base64Decode(att['nonce'] as String),
       );
+      if (_storeAttachments) {
+        final file = await AttachmentStore.ensure(
+            m.env.messageId, _attachmentExtOf(m), () async => bytes);
+        if (file != null) {
+          await _openFileWith(file.path);
+          return;
+        }
+      }
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/${m.plaintext}');
       await file.writeAsBytes(bytes);
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageSaved(file.path));
+      showTopNotice(context, l10n.chatPageSaved(file.path));
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageDownloadFailed('$e'));
+      showTopNotice(context, l10n.chatPageDownloadFailed('$e'));
+    }
+  }
+
+  /// 用系统应用打开本地文件（iOS 走预览/分享，Android 走 FileProvider）。
+  Future<void> _openFileWith(String path) async {
+    final res = await OpenFilex.open(path);
+    if (!mounted) return;
+    if (res.type != ResultType.done) {
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageFileOpenFailed(res.message));
     }
   }
 
@@ -3048,6 +3212,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _showLocalePicker();
                   case 'style':
                     _showStylePicker();
+                  case 'storage':
+                    _showAttachmentStoragePicker();
                   case 'burn':
                     _showBurnPicker();
                   case 'invite':
@@ -3131,6 +3297,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(l10n.chatPageMenuStyleLabel, style: labelStyle),
                       const Spacer(),
                       Text(kUiStyleLabels[_uiStyle] ?? ''),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'storage',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuAttachmentStorage, style: labelStyle),
+                      const Spacer(),
+                      Text(kAttachmentStorageLabels[_attachmentStorage] ?? ''),
                     ],
                   ),
                 ),

@@ -522,6 +522,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuLocaleLabel => '界面语言';
 
   @override
+  String get chatPageMenuAttachmentStorage => '附件存储';
+
+  @override
   String get chatPageMenuStyleLabel => '界面风格';
 
   @override
@@ -693,6 +696,14 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String chatPageDownloadFailed(String error) {
     return '下载失败: $error';
+  }
+
+  @override
+  String get chatPageAttachmentTapToDownload => '附件不在本机，点击重新下载';
+
+  @override
+  String chatPageFileOpenFailed(String error) {
+    return '打开文件失败: $error';
   }
 
   @override

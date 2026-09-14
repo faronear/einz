@@ -206,6 +206,7 @@
   },
   "chatPageEscrowRotatedNotice": "Your partner reset the passphrase — use the new one to create invites or change it",
   "chatPageMenuLocaleLabel": "Language",
+  "chatPageMenuAttachmentStorage": "Attachment storage",
   "chatPageMenuStyleLabel": "Interface style",
   "chatPageStyleSheetClose": "Close",
   "chatPageMenuBurnLabel": "Burn-after-read",
@@ -308,6 +309,13 @@
   },
   "chatPageDownloadFailed": "Download failed: {error}",
   "@chatPageDownloadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "chatPageAttachmentTapToDownload": "Not on this device — tap to download again",
+  "chatPageFileOpenFailed": "Could not open file: {error}",
+  "@chatPageFileOpenFailed": {
     "placeholders": {
       "error": {"type": "String"}
     }
