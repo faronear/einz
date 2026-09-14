@@ -5221,3 +5221,30 @@ Push/Ad Hoc。Ad Hoc 与 App Store 都是 **production** APNs，装了能力两�
 **文档：** docs/IOS.md §2 加脚本用法（手工步骤保留在 §2.2）、§3 更新两份 plist 说明、
 §4 重写为"App Store 包 + TestFlight（试用分发，不上架）"：内部/外部测试组对照（无审核 vs
 Beta App Review）、90 天过期、出口合规、APNs 两个缺口；§0 补 App Store profile 未装的备注。
+
+### 修 sendPushHint 跨空间泄露 + 推送暂缓（老板 2026-09-14）
+
+**老板决策：推送放弃不做**——使用者仅限老板朋友圈的极少数人，不值得投入；
+收消息继续靠 **WS 实时 + 打开 App 增量同步**兜底。
+
+**要修的 bug（老板"修掉"）：** `server/src/push.ts` 的 `sendPushHint` 取 token 时
+只按 `device_id != 自己` 过滤，**没有 space 过滤** → 一旦接上真实推送，一条消息会把
+"有新消息"提示推给这台服务器上**所有空间**的设备（跨空间泄露"谁在发消息"）。
+补充事实：该函数**当前无人调用**（服务端没有任何 push 发送点），所以是潜伏雷，不是在线事故。
+
+**改法：** devices 表没有 space_id，设备经 `person_id → space_members` 归属 Space：
+```sql
+SELECT p.device_id, p.platform, p.token
+  FROM push_tokens p
+  JOIN devices d  ON d.device_id = p.device_id
+  JOIN space_members sm ON sm.person_id = d.person_id AND sm.space_id = ?
+ WHERE p.device_id != ? AND d.status = 'active'
+```
+顺带跳过已撤销设备（`d.status != 'active'`）。
+
+**测试：** 新增 `server/test/push_scope.test.ts`（纯 DB 单测，openDb 到临时库）——
+两 Space 四设备（含一台 revoked）→ 断言只投给同空间在用设备、不跨空间、不投自己与已撤销；
+已并入 `npm test` 链。**验证：** `npm run build`（tsc）无错；`npm test` 5 个文件全过。
+
+**文档：** `aimemo/productLens.zhcn.md` §10 与"技术选型"表标注推送为 `[待评审]` 暂缓
+（含链路现状：iOS 客户端已注册、Android 无推送依赖、服务端占位且无人调用、已按 Space 收敛）。

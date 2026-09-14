@@ -41,9 +41,20 @@ export function unregisterPushToken(cfg: ServerConfig, token: string): { ok: tru
  * 当前实现为占位：从 push_tokens 取目标设备，记录日志（不泄露内容）。
  */
 export function sendPushHint(spaceId: string, exceptDeviceId: string): void {
+  // **只投给同一 Space 的其他设备**：devices 表没有 space_id，设备经
+  // person_id → space_members 归属 Space。此前只按 `device_id != 自己` 过滤 →
+  // 会把提示推给这台服务器上**所有空间**的设备（跨空间泄露"谁在发消息"）。
+  // 同时跳过已撤销的设备（status != 'active'）。
   const rows = getDb()
-    .prepare(`SELECT device_id, platform, token FROM push_tokens WHERE device_id != ?`)
-    .all(exceptDeviceId) as { device_id: string; platform: string; token: string }[];
+    .prepare(
+      `SELECT p.device_id, p.platform, p.token
+         FROM push_tokens p
+         JOIN devices d  ON d.device_id = p.device_id
+         JOIN space_members sm ON sm.person_id = d.person_id AND sm.space_id = ?
+        WHERE p.device_id != ?
+          AND d.status = 'active'`,
+    )
+    .all(spaceId, exceptDeviceId) as { device_id: string; platform: string; token: string }[];
 
   for (const row of rows) {
     // Phase 3: 调用 APNs / FCM 发送 { type: "new_message", space_id }，无正文。

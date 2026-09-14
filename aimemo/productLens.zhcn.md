@@ -261,7 +261,7 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 | 加密       | `sodium_libs`（dart:ffi 绑定原生 libsodium）                |
 | 安全存储   | `flutter_secure_storage`（iOS Keychain / Android Keystore）[已实现] 跳过 PIN 场景的明文 Space Key 包经 `SecureStore` 封装（`app/lib/data/secure_store.dart`）存入；设 PIN 场景密钥包仍为 PIN 派生密钥加密后落 app_state。**生存周期已定（老板 2026-09-14）：卸载即重置**（沙盒标记判定全新安装并清残留）+ iOS/macOS 用 `first_unlock_this_device`（条目不随备份/换机迁移），见 `docs/DATABASE.md` §4.1 |
 | 本地数据库 | `drift`（SQLite，类型安全，支持迁移）                       |
-| 推送       | FCM（Android）/ APNs（iOS）+ `flutter_local_notifications`  |
+| 推送       | FCM（Android）/ APNs（iOS）+ `flutter_local_notifications` ——`[待评审]` 暂缓（2026-09-14 决策：用户极少，WS 兜底；服务端 `sendPushHint` 仍为日志占位） |
 | 后台       | `workmanager`（同步重试、清理）                             |
 | 媒体       | `camera`（拍摄）、`image_picker`（相册）                    |
 
@@ -386,6 +386,15 @@ sync_state(...)                          ← 客户端增量同步锚点
 - 目的：App 在后台/被杀时通知新消息到来。架构：Server ──► APNs（iOS）/ FCM（Android）。
 - **推送永不包含消息正文**，只发"Einz 有新消息"类提示；App 收到提示后自行从 Server 拉取密文并解密。
 - 设备安装/登录时注册 Push Token（`push_tokens` 表），撤销设备时移除 Token。
+- **状态：`[待评审]` 暂缓实现（老板 2026-09-14 决策）**——使用者目前仅限老板朋友圈的极少数人，
+  投入产出不划算，收消息以 **WS 实时 + 打开 App 增量同步**兜底。链路现状：
+  - 客户端：AppDelegate（iOS）已注册通知、`chat_page._registerPushToken()` 已调 `POST /push/register`；
+    Android 侧**无**任何推送依赖（pubspec / Manifest 都干净）。
+  - Server：`sendPushHint()` **仍为日志占位**（无 APNs/FCM 实际发送），且当前**无人调用**。
+  - 已按 Space 收敛（2026-09-14 修）：`sendPushHint` 经 `person_id → space_members` 只投同 Space
+    的在用设备——此前只排自己，接上真推送就会把提示推给**所有空间**的设备。
+    真要接推送前的缺口见 `docs/IOS.md` §4.2（iOS：Push capability + entitlements + 服务端 APNs .p8；
+    Android：国行 ROM 需厂商通道/聚合 SDK）。
 
 ---
 
