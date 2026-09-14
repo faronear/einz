@@ -5007,5 +5007,45 @@ dead-strip，导出表原样保留 → 同一个 bug 在本地"看起来正常"�
 - **但发现另一个真问题：16KB 页对齐不达标。** 四个 ABI 的 LOAD 段 `p_align` 全是
   **0x1000（4KB）**，而 Android 15+ 的 16KB 页设备要求 **≥ 0x4000**——在这种设备上
   `dlopen("libsodium.so")` 会直接失败（症状同 iOS：加载不了 libsodium）。
-  这是**预编译 .so 的固有问题**，解法是重新链接/重编 libsodium
-  （NDK r28+ 默认 16KB，或传 `-Wl,-z,max-page-size=16384`）→ 待老板定方案。
+  → **已修（老板拍板"现在修"）**，见下一节。
+
+### 安卓 libsodium 重编：4KB → 16KB 页对齐（老板无安卓真机，要求确保同类问题）
+
+**触发：** 老板指出他没有安卓手机、难以真机测试，要求确保安卓上没有类似 iOS 的问题。
+
+**审计（静态，不依赖真机）：**
+- **符号导出：本来就没问题。** `jniLibs` 4 个 ABI 的 `libsodium.so` 是 ELF 共享库，
+  dynsym（ELF 的导出表）各 651 个符号，与 Dart 侧 `sodium` 包需要的 **647 个**对账
+  **缺失 0**。ELF 不存在 iOS 那种"主可执行文件导出表被 install-strip 清空"的机制。
+- **页对齐：有问题。** 四个 ABI 的 LOAD 段 `p_align` 全是 **0x1000（4KB）**。
+  Android 15+ 的 **16KB 页设备**要求 ≥ **0x4000**：4KB 对齐的 .so 在这些设备上
+  `dlopen` 直接失败 → 表现就是"加载不了 libsodium / 密钥生成失败"。
+  这正是"本机模拟器测不出"的类型（模拟器一般 4KB 页）。
+
+**修法（老板拍板现在修）：** 用本机 NDK 重编 libsodium 1.0.20（与 iOS 侧同版本）。
+- 工具链：`~/Library/Android/sdk/ndk/28.2.13676358`（r28 起默认 16KB）
+- 每 ABI 一次：`--enable-shared --disable-static --disable-soname-versions`，
+  `CC=<ndk clang wrapper>`、`AR/RANLIB/NM/STRIP=llvm-*`，
+  **`LDFLAGS="-Wl,-z,max-page-size=16384"`**（关键），`CFLAGS="-O2 -fPIC"`
+- host 三元组：`aarch64-linux-android` / `armv7a-linux-androideabi` /
+  `x86_64-linux-android` / `i686-linux-android`（API 24，与 minSdk 24 对齐）
+- 产物 `src/libsodium/.libs/libsodium.so` → 覆盖 `jniLibs/<abi>/` → `llvm-strip --strip-unneeded`
+
+**验证（逐项，且做了反向验证）：**
+| 检查点 | 结果 |
+| --- | --- |
+| 4 个 ABI 的 p_align | 全部 `0x4000` ✅ |
+| 架构匹配（aarch64/arm/x86_64/i386） | ✅ |
+| 符号覆盖（647 个需求） | 缺失 **0**，dynsym **651**（与原版一致）✅ |
+| SONAME | `libsodium.so`（无版本后缀，Android 要求）✅ |
+| `llvm-strip --strip-unneeded` 后 | 对齐与符号均不变 ✅ |
+| **APK 内**（`flutter build apk --release` → 83.5MB） | 3 个 ABI 的 .so 均 STORED、数据偏移 **mod 16384 = 0**、p_align `0x4000`、符号缺失 0 ✅ |
+| manifest `extractNativeLibs` | `false`（直接从 APK mmap → 包内对齐就必须达标）✅ |
+
+**新增守卫脚本 `app/android/checkNativeLibs.py`**（可重复执行、退出码非 0 即有问题）：
+检查每个 ABI 的 ① 架构 ② 16KB 页对齐 ③ `sodium_init` 存在 ④ 与 pub 缓存里 `sodium` 包
+的 647 个符号做差集。**并做了反向验证**：把旧的 4KB 库换回去 → 脚本正确报
+`16KB 页对齐不达标` 且退出码 1；还原后恢复全绿。脚本头部注释里写了完整的重编配方。
+
+**顺带说明：** APK 实际只含 **3 个 ABI**（arm64-v8a / armeabi-v7a / x86_64）——Flutter
+release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。

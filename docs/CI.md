@@ -108,6 +108,24 @@ systemctl status gitea-runner   # active (running) 即成功
 
 > APK 目前为 **debug 签名**，仅用于测试分发。如需上架/正式发布，需先创建 release keystore 并配置 `app/android/key.properties`（见 aimemo/worklog 待办），工作流再做对应调整。
 
+### 1.6 原生库（libsodium）校验
+
+`app/android/app/src/main/jniLibs/<abi>/libsodium.so` 是 **vendored 预编译库**，有两个
+**本机模拟器测不出**的坑（只有真机/特定设备才暴露）：
+
+1. **16KB 页对齐**：Android 15+ 的 16KB 页设备要求每个 LOAD 段 `p_align >= 0x4000`，
+   4KB 对齐（`0x1000`）的 .so 在这些设备上 `dlopen` 直接失败 → 表现为"加载不了 libsodium"；
+2. **符号完整性**：libsodium 符号只在运行时经 `DynamicLibrary.open('libsodium.so')` 解析，
+   少一个符号就要跑起来才炸。
+
+替换/升级该库后**务必**跑一次（退出码非 0 = 有问题）：
+
+```bash
+python3 app/android/checkNativeLibs.py
+```
+
+重编配方（NDK r28 起默认 16KB，关键是 `-Wl,-z,max-page-size=16384`）写在该脚本头部注释里。
+
 ---
 
 ## 二、iOS：Codemagic 云构建
