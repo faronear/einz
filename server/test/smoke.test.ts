@@ -298,6 +298,25 @@ async function main (): Promise<void> {
       'duplicate message_id is idempotent'
     )
 
+    // 5.1) 非法 message_id（含路径字符）必须 400——P1 路径遍历防御：
+    //      message_id 会被客户端当文件路径片段（App 媒体解密缓存按它拼文件名），
+    //      此前 messages 端点只查了"非空字符串"（老板 2026-09-14 排查出的缺口）
+    for (const badId of ['a/../../evil', '..\\evil', 'a.b', 'a'.repeat(65)]) {
+      const bad = await fetch(`http://127.0.0.1:${port}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${devA.sessionToken}`
+        },
+        body: JSON.stringify({ ...envA, message_id: badId })
+      })
+      assert.equal(
+        bad.status,
+        400,
+        `illegal message_id ${JSON.stringify(badId)} must be rejected`
+      )
+    }
+
     // 6) B 凭邀请码登记 + 认证 + 增量同步
     const inviteRes = await fetch(`http://127.0.0.1:${port}/invites`, {
       method: 'POST',

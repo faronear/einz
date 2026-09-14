@@ -2,6 +2,7 @@ import { getDb } from "./db.js";
 import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
 import { attachmentsForMessages, type AttachmentMeta } from "./attachments.js";
+import { assertSafeMessageId } from "./safeId.js";
 
 const ALLOWED_TYPES = new Set(["text", "image", "video", "voice", "audio", "file", "system"]);
 
@@ -34,6 +35,9 @@ function validateEnvelope(body: unknown): MessageEnvelope {
   ) {
     throw new ApiError("INVALID_REQUEST", "invalid message envelope", 400);
   }
+  // P1 路径遍历防御：message_id 会被客户端当作文件路径片段（App 媒体解密缓存
+  // 按 message_id 拼缓存文件名）——此前只查了"非空字符串"（老板 2026-09-14）
+  assertSafeMessageId(b.message_id);
   const sp = b.sender_person_id;
   if (sp !== undefined && typeof sp !== "string") {
     throw new ApiError("INVALID_REQUEST", "invalid sender_person_id", 400);
