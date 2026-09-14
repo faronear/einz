@@ -826,6 +826,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         keyVersion: widget.keyVersion,
         token: widget.token,
         db: widget.db ?? LocalDatabase(),
+        hasPin: _hasPin,
+        api: widget.api,
         onPassphraseUpdated: (updatedAt) {
           if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
         },
@@ -3693,8 +3695,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   }
 }
 
-/// 修改口令弹窗（StatefulWidget）：旧口令验证（fetch 口令密保箱解密）→
-/// 新口令重加密上传（含新 argon2id 哈希）→ 本地明文 payload 同步更新。
+/// 修改口令弹窗（StatefulWidget）：
+/// （设 PIN 时先验 PIN）→ 旧口令验证（fetch 口令密保箱解密）→
+/// 新口令重加密上传（含新 argon2id 哈希）→ 本地同步更新
+/// （设 PIN 场景：PIN 解包改 escrowPassphrase 后同 PIN 重新加密；
+///  跳过 PIN 场景：明文 payload 直写 Keychain）。
 class _ChangePassphraseDialog extends StatefulWidget {
   const _ChangePassphraseDialog({
     required this.server,
@@ -3703,10 +3708,14 @@ class _ChangePassphraseDialog extends StatefulWidget {
     required this.keyVersion,
     required this.token,
     required this.db,
+    required this.hasPin,
     required this.onPassphraseUpdated,
+    this.api, // 测试注入（fake api，不触网）；默认按 server 新建
   });
 
   final String server;
+  final bool hasPin;
+  final ApiClient? api;
   final String spaceKeyB64;
   final String spaceId;
   final int keyVersion;
@@ -3721,6 +3730,7 @@ class _ChangePassphraseDialog extends StatefulWidget {
 }
 
 class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
+  final _pinCtrl = TextEditingController();
   final _oldCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -3731,6 +3741,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
 
   @override
   void dispose() {
+    _pinCtrl.dispose();
     _oldCtrl.dispose();
     _newCtrl.dispose();
     _confirmCtrl.dispose();
@@ -3756,6 +3767,12 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.chatPageChangePassphraseMismatch);
       return;
     }
+    // 设 PIN：先验 PIN（复用 AppLockService.unlock 的防爆破锁定）
+    final pin = widget.hasPin ? _pinCtrl.text : '';
+    if (widget.hasPin && pin.isEmpty) {
+      setState(() => _error = l10n.lockPagePinPrompt);
+      return;
+    }
     // 显性确认：修改密保口令（防误触——老板要求）
     final confirmed = await showDialog<bool>(
       context: context,
@@ -3775,7 +3792,17 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       _error = null;
     });
     try {
-      final api = ApiClient(widget.server);
+      final lock = AppLockService(widget.db);
+      if (widget.hasPin) {
+        try {
+          await lock.unlock(pin);
+        } on AppLockException catch (e) {
+          if (!mounted) return;
+          setState(() => _error = e.message);
+          return;
+        }
+      }
+      final api = widget.api ?? ApiClient(widget.server);
       final escrow = KeyEscrowService(api);
       // 1) 验证旧口令：必须能解开服务器当前口令密保箱
       final snap = await api.getKeyEscrow(widget.token);
@@ -3799,16 +3826,22 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         token: widget.token,
         rotated: true,
       );
-      // 3) 本地明文 payload 同步（跳过 PIN 场景；设 PIN 场景由 _syncEscrow 保护）。
-      //    同步本端已知口令更新时间，避免下次上线补查误报"对方重设"（其实是自己刚改的）
+      // 3) 本地同步 + 记录本端已知口令更新时间（避免下次上线补查误报
+      //    "对方重设"——其实是自己刚改的）
       int? serverUpdatedAt;
       try {
         serverUpdatedAt = (await api.getKeyEscrow(widget.token)).updatedAt;
       } catch (_) {
         // 记录失败不影响结果（下次上线补查再对比）
       }
-      await AppLockService(widget.db)
-          .updateEscrowPassphrase(newPass, updatedAt: serverUpdatedAt);
+      if (widget.hasPin) {
+        // 设 PIN：PIN 解包改 escrowPassphrase → 同 PIN 重新加密落盘
+        // （PIN 已在内存——第 0 步验证通过，不再二次询问）
+        await lock.updateEscrowPassphraseWithPin(
+            pin, newPass, updatedAt: serverUpdatedAt);
+      } else {
+        await lock.updateEscrowPassphrase(newPass, updatedAt: serverUpdatedAt);
+      }
       widget.onPassphraseUpdated(serverUpdatedAt); // 聊天页记录已知时间
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -3832,6 +3865,18 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.hasPin) ...[
+            TextField(
+              controller: _pinCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: l10n.lockPagePinLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           TextField(
             controller: _oldCtrl,
             obscureText: true,

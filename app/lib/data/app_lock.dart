@@ -139,8 +139,7 @@ class AppLockService {
   }
 
   /// 修改 escrow 口令后同步本地明文配置（跳过 PIN 场景）。
-  /// 设 PIN 场景（加密包）因无 PIN 可用不动锁包——由 lock_page._syncEscrow
-  /// 的上传前口令验证保护，防止旧口令覆盖新口令密保箱。
+  /// 设 PIN 场景走 [updateEscrowPassphraseWithPin]。
   Future<void> updateEscrowPassphrase(String passphrase, {int? updatedAt}) async {
     final plain = await loadPlain();
     if (plain == null) return;
@@ -154,6 +153,33 @@ class AppLockService {
       escrowPassphrase: passphrase,
       escrowUpdatedAt: updatedAt ?? plain.escrowUpdatedAt,
     ));
+  }
+
+  /// 修改 escrow 口令后同步本地锁包（设 PIN 场景，老板 2026-09-14）：
+  /// 用 [pin] 解开锁包 → 更新 escrowPassphrase/escrowUpdatedAt →
+  /// 同一 PIN 重新加密落盘。
+  /// PIN 错/锁定抛 [AppLockException]（复用 [unlock] 的防爆破计数）。
+  Future<void> updateEscrowPassphraseWithPin(
+    String pin,
+    String passphrase, {
+    int? updatedAt,
+  }) async {
+    final payload = await unlock(pin);
+    final updated = AppLockPayload(
+      server: payload.server,
+      spaceKeyB64: payload.spaceKeyB64,
+      spaceId: payload.spaceId,
+      deviceId: payload.deviceId,
+      keyVersion: payload.keyVersion,
+      token: payload.token,
+      escrowPassphrase: passphrase,
+      escrowUpdatedAt: updatedAt ?? payload.escrowUpdatedAt,
+      publicKeyB64: payload.publicKeyB64,
+      privateKeyB64: payload.privateKeyB64,
+    );
+    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(updated.toJson())));
+    final pkg = await encryptWithPassphrase(payload: bytes, passphrase: pin);
+    await _set(_kPackage, jsonEncode(pkg.toJson()));
   }
 
   /// 设置 PIN 并加密保存 Space Key 包（老板决策：不再生成 12 词恢复码）。
