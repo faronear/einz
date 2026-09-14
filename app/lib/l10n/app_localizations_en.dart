@@ -558,6 +558,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => 'Attachment storage';
 
   @override
+  String get chatPageAttachmentStorageSubmit => 'Submit';
+
+  @override
+  String get chatPageAttachmentStorageWarnClear =>
+      'Switching to Secure immediately deletes locally stored attachments';
+
+  @override
   String get chatPageMenuStyleLabel => 'Interface style';
 
   @override

@@ -207,6 +207,8 @@
   "chatPageEscrowRotatedNotice": "伴侣已重设密保口令——生成邀请或再次修改时请使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuAttachmentStorage": "附件存储",
+  "chatPageAttachmentStorageSubmit": "提交",
+  "chatPageAttachmentStorageWarnClear": "切到「安全」会立即删除本机已留存的附件明文",
   "chatPageMenuStyleLabel": "界面风格",
   "chatPageStyleSheetClose": "关闭",
   "chatPageMenuBurnLabel": "阅后即焚",

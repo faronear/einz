@@ -525,6 +525,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => '附件存储';
 
   @override
+  String get chatPageAttachmentStorageSubmit => '提交';
+
+  @override
+  String get chatPageAttachmentStorageWarnClear => '切到「安全」会立即删除本机已留存的附件明文';
+
+  @override
   String get chatPageMenuStyleLabel => '界面风格';
 
   @override

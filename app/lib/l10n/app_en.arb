@@ -207,6 +207,8 @@
   "chatPageEscrowRotatedNotice": "Your partner reset the passphrase — use the new one to create invites or change it",
   "chatPageMenuLocaleLabel": "Language",
   "chatPageMenuAttachmentStorage": "Attachment storage",
+  "chatPageAttachmentStorageSubmit": "Submit",
+  "chatPageAttachmentStorageWarnClear": "Switching to Secure immediately deletes locally stored attachments",
   "chatPageMenuStyleLabel": "Interface style",
   "chatPageStyleSheetClose": "Close",
   "chatPageMenuBurnLabel": "Burn-after-read",

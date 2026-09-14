@@ -687,32 +687,71 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 切回 secured 时**清空已留存的明文**（否则"安全"名不副实——老板 2026-09-14 定）。
   Future<void> _showAttachmentStoragePicker() async {
     final l10n = AppLocalizations.of(context)!;
+    // **不点选即生效**（老板 2026-09-14）：切回「安全」会立刻删掉本机已留存的附件
+    // 明文，是有害操作——不像界面风格那样随手试。故改成单选列表 + 底部提交按钮，
+    // 选好再确认一次才落地。
+    var selected = _attachmentStorage;
     await showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(l10n.chatPageMenuAttachmentStorage,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-            ),
-            for (final mode in kAttachmentStorageOptions)
-              ListTile(
-                title: Text(kAttachmentStorageLabels[mode]!),
-                subtitle: Text(kAttachmentStorageDescriptions[mode]!),
-                trailing: mode == _attachmentStorage ? const Icon(Icons.check) : null,
-                onTap: () async {
-                  await AttachmentStorageSettings(widget.db ?? LocalDatabase()).save(mode);
-                  if (mode == 'secured') {
-                    // 切回安全模式：把本机留存的明文附件全部清除
-                    unawaited(AttachmentStore.clear());
-                  }
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                },
+        child: StatefulBuilder(
+          builder: (ctx, setSheetState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(l10n.chatPageMenuAttachmentStorage,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
               ),
-          ],
+              // RadioGroup（Flutter 3.32+ 的新 API）：组内单选状态统一管理
+              RadioGroup<String>(
+                groupValue: selected,
+                onChanged: (v) => setSheetState(() => selected = v ?? selected),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final mode in kAttachmentStorageOptions)
+                      RadioListTile<String>(
+                        value: mode,
+                        title: Text(kAttachmentStorageLabels[mode]!),
+                        subtitle: Text(kAttachmentStorageDescriptions[mode]!),
+                      ),
+                  ],
+                ),
+              ),
+              // 选定的模式会删除本地明文时才提示（避免误以为只是换个显示）
+              if (selected == 'secured' && _attachmentStorage != 'secured')
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text(
+                    l10n.chatPageAttachmentStorageWarnClear,
+                    style: TextStyle(
+                        fontSize: 12, color: Theme.of(ctx).colorScheme.error),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: selected == _attachmentStorage
+                        ? null // 没改动：不必提交
+                        : () async {
+                            await AttachmentStorageSettings(
+                                    widget.db ?? LocalDatabase())
+                                .save(selected);
+                            if (selected == 'secured') {
+                              // 切回安全模式：把本机留存的明文附件全部清除
+                              await AttachmentStore.clear();
+                            }
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                          },
+                    child: Text(l10n.chatPageAttachmentStorageSubmit),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

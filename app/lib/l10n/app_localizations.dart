@@ -1082,6 +1082,18 @@ abstract class AppLocalizations {
   /// **'Attachment storage'**
   String get chatPageMenuAttachmentStorage;
 
+  /// No description provided for @chatPageAttachmentStorageSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get chatPageAttachmentStorageSubmit;
+
+  /// No description provided for @chatPageAttachmentStorageWarnClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Switching to Secure immediately deletes locally stored attachments'**
+  String get chatPageAttachmentStorageWarnClear;
+
   /// No description provided for @chatPageMenuStyleLabel.
   ///
   /// In en, this message translates to:

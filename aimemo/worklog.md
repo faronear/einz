@@ -5281,3 +5281,18 @@ SELECT p.device_id, p.platform, p.token
 **已知待办：** ① android 下有两份 MainActivity（namespace `com.example.einz` 生效，
 `cc/tic/einz` 那份是死代码，待清理）；② stored 模式首屏会后台下载整页附件（流量/存储）；
 ③ 真机验证（iOS + 安卓）待老板——尤其"打开本地文件"这条链路两端都要实机试。
+
+### 附件存储弹窗改为「单选 + 提交」（老板 2026-09-14 追加）
+
+**老板更正：** 附件存储**不能点选即生效**——切回「安全」会立刻删掉已下载的附件明文，
+是有害操作，不像界面风格那样对数据无害、可以随便试。改成单选列表 + 底部提交按钮。
+
+**改法：** `_showAttachmentStoragePicker` 用 `StatefulBuilder` 持有 `selected`（初值=当前模式），
+`RadioGroup<String>`（Flutter 3.32+ 新 API；`RadioListTile` 的 groupValue/onChanged 已弃用）
+里两项二选一；底部一个整宽 `FilledButton`「提交」——与当前模式相同时禁用（没改动不必提交）。
+**只有点了提交才落地**：`save(selected)` → 若选 secured 则 `AttachmentStore.clear()`。
+另加一句红字警示：选中「安全」且当前不是 secured 时显示
+「切到「安全」会立即删除本机已留存的附件明文」（l10n `chatPageAttachmentStorageWarnClear`）。
+l10n 中英新增 `chatPageAttachmentStorageSubmit` / `chatPageAttachmentStorageWarnClear`。
+
+**验证：** `flutter analyze` 无 issue；`chat_page_menu_test` 19 项全过。
