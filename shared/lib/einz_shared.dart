@@ -5,7 +5,6 @@ export 'src/crypto/attachment_crypto.dart';
 export 'src/crypto/backup.dart';
 export 'src/crypto/key_escrow.dart';
 export 'src/crypto/keys.dart';
-export 'src/crypto/keyring.dart';
 export 'src/crypto/message_crypto.dart';
 export 'src/crypto/passphrase_crypto.dart';
 export 'src/protocol/api_client.dart';

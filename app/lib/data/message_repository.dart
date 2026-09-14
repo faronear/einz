@@ -71,7 +71,10 @@ class MessageRepository {
   final String deviceId;
   final int keyVersion;
 
-  /// 归档 Space Key（key_version → 密钥），轮换后解密旧消息（E2EE.md §9.2）。
+  /// 归档 Space Key（key_version → 密钥）：按消息携带的 key_version 解密旧数据
+  /// （E2EE.md §9.2）。**保留说明（2026-09-14）：** 轮换方案已决定不做
+  /// （docs/SECURITY.md），故当前无写入方（App 侧恒为空）；保留这一只读入口是为了
+  /// 兼容归档恢复与将来可能的轮换，且删除会牵动全部解密路径而收益为零。
   final Map<int, Uint8List> archivedKeys;
 
   /// 阅后即焚设置（可选；未注入时默认 0=无限，行为与旧版一致）。

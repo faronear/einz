@@ -250,18 +250,4 @@ export function notifyRevoked(deviceId: string): void {
   conns.delete(deviceId);
 }
 
-/** 通知剩余设备执行 Space Key 轮换（PROTOCOL.md §8.2 key.rotation）。
- *  Multiverse：仅同 Space 的在线设备（发起方无 WS 连接时不广播）。 */
-export function notifyKeyRotation(exceptDeviceId: string, keyVersion: number): void {
-  const spaceId = sameSpace(exceptDeviceId);
-  if (spaceId == null) return;
-  for (const [deviceId, conn] of conns) {
-    if (deviceId === exceptDeviceId) continue;
-    if (conn.spaceId !== spaceId) continue;
-    if (conn.ws.readyState === WebSocket.OPEN) {
-      conn.ws.send(JSON.stringify({ id: 0, type: "key.rotation", payload: { key_version: keyVersion } }));
-    }
-  }
-}
-
 export { randomUUID };

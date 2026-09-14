@@ -62,12 +62,14 @@ export function listDevices (
   }
 }
 
-/** DELETE /devices/:id：撤销设备（白名单移除 + 清 Push Token + 触发密钥轮换，PROTOCOL.md §7.2）。 */
+/** DELETE /devices/:id：撤销设备（白名单移除 + 清 Push Token + 清会话，PROTOCOL.md §7.2）。
+ *  2026-09-14 决策：不再返回 `key_rotation_required`——产品不做密钥轮换（无端侧入口、
+ *  分发链路不成立），该字段只会暗示一个不存在的能力，见 docs/SECURITY.md。 */
 export function revokeDevice (
   cfg: ServerConfig,
   token: string,
   targetDeviceId: string
-): { key_rotation_required: boolean } {
+): { ok: true } {
   const { device_id: callerId } = resolveSession(token)
   if (!isActiveDevice(cfg, callerId))
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
@@ -85,7 +87,7 @@ export function revokeDevice (
   db.prepare(`DELETE FROM push_tokens WHERE device_id = ?`).run(targetDeviceId)
   db.prepare(`DELETE FROM sessions WHERE device_id = ?`).run(targetDeviceId)
 
-  return { key_rotation_required: true }
+  return { ok: true }
 }
 
 /**

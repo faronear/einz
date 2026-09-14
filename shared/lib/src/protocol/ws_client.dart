@@ -7,7 +7,6 @@ import '../crypto/message_crypto.dart';
 /// WS 事件帧类型（PROTOCOL.md §8）。
 const String kWsTypeHello = 'hello';
 const String kWsTypeMessageNew = 'message.new';
-const String kWsTypeKeyRotation = 'key.rotation';
 const String kWsTypeDeviceRevoked = 'device.revoked';
 const String kWsTypePeerOnline = 'peer.online';
 const String kWsTypePeerOffline = 'peer.offline';
@@ -43,13 +42,6 @@ class WsMessageNewEvent extends WsEvent {
 
   final MessageEnvelope message;
   final int serverSequence;
-}
-
-/// key.rotation：Space Key 轮换通知。
-class WsKeyRotationEvent extends WsEvent {
-  const WsKeyRotationEvent({required super.type, required this.keyVersion});
-
-  final int keyVersion;
 }
 
 /// device.revoked：本设备被撤销（Server 发帧后主动断开）。
@@ -225,12 +217,6 @@ class WsClient {
             type: type,
             message: MessageEnvelope.fromJson(payload['message'] as Map<String, dynamic>),
             serverSequence: payload['server_sequence'] as int,
-          ));
-          break;
-        case kWsTypeKeyRotation:
-          onEvent?.call(WsKeyRotationEvent(
-            type: type,
-            keyVersion: payload['key_version'] as int,
           ));
           break;
         case kWsTypeDeviceRevoked:

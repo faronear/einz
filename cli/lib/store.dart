@@ -176,26 +176,17 @@ class DeviceStore {
 
   /// 按 key_version 取 Space Key（当前或归档）；未知版本返回 null。
   /// 用于解密历史消息（E2EE.md §9.2：归档密钥只读，不参与新加密）。
+  ///
+  /// **保留说明（2026-09-14）：** 这是"读懂轮换状态"的只读路径——轮换方案已决定不做
+  /// （见 docs/SECURITY.md），因此 `archivedSpaceKeys` 在实践中恒为空；保留它是因为
+  /// （a）备份/恢复载荷里的 `archived_space_keys` 字段要保持兼容，（b）将来若恢复轮换，
+  /// 解密侧无需改动。产生轮换状态的入口（`rotate` 命令 / `rotateSpaceKey()`）已撤除。
   String? spaceKeyForVersion(int version) {
     if (version == keyVersion) return spaceKey;
     for (final entry in archivedSpaceKeys) {
       if (entry['key_version'] == version) return entry['space_key'] as String?;
     }
     return null;
-  }
-
-  /// 轮换 Space Key：当前密钥归档（key_version+1），生成新密钥（E2EE.md §9.1 步骤 3–4）。
-  /// 返回新 Space Key（base64）；调用方负责 seal 给对方并保存。
-  Future<String> rotateSpaceKey() async {
-    final s = await sodium();
-    final newKey = s.randombytes.buf(32);
-    final newB64 = base64Encode(newKey);
-    if (spaceKey != null) {
-      archivedSpaceKeys.add({'key_version': keyVersion, 'space_key': spaceKey});
-    }
-    spaceKey = newB64;
-    keyVersion = keyVersion + 1;
-    return newB64;
   }
 
   void requireSession() {

@@ -10,7 +10,7 @@ import { getAvatar, storeAvatar } from "./avatars.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
-import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyKeyRotation, notifyRevoked, wsConnCount } from "./ws.js";
+import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyRevoked, wsConnCount } from "./ws.js";
 import { createJoinToken, createSpace, joinSpace, lookupSpace, preflightJoin } from "./spaces.js";
 import { logActivity, logSyncActivity, metaOf } from "./audit.js";
 
@@ -413,13 +413,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       meta: metaOf(req),
     });
     notifyRevoked(devMatch[1]);
-    // Space Key 轮换由剩余可信设备在客户端发起（E2EE.md §9.1）；
-    // key.rotation 通知发给"除被撤销设备外"的所有剩余设备（含撤销发起者），
-    // 用已入库消息的最大 key_version+1 作为建议版本（PROTOCOL.md §8.2）。
-    const maxVersion = (getDb()
-      .prepare(`SELECT COALESCE(MAX(key_version), 0) + 1 AS next FROM messages`)
-      .get() as { next: number }).next;
-    notifyKeyRotation(devMatch[1], maxVersion);
+    // 注：这里原先还会 notifyKeyRotation()（PROTOCOL.md §8.2 key.rotation），提示剩余
+    // 设备轮换 Space Key。2026-09-14 决策：产品不做密钥轮换（App/TUI 无入口、分发链路
+    // 不成立、ROI 极低），该通知与 `key_rotation_required` 一并撤除，见 docs/SECURITY.md。
     sendJson(res, 200, result);
     return;
   }

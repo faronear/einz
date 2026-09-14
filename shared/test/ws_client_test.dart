@@ -1,5 +1,5 @@
 // WsClient 单测：本地 HttpServer + WebSocketTransformer 模拟 Server /ws 端点，
-// 验证连接、事件解析（hello/message.new/key.rotation/未知帧）、断线重连状态。
+// 验证连接、事件解析（hello/message.new/未知帧——含已撤除的 key.rotation）、断线重连状态。
 
 import 'dart:convert';
 import 'dart:io';
@@ -82,25 +82,6 @@ void main() {
     await client.stop();
   });
 
-  test('key.rotation 事件：key_version 解析', () async {
-    final (server, base, conns) = await _startWsServer();
-    addTearDown(() => server.close(force: true));
-    final events = <WsEvent>[];
-    final client = WsClient(server: base, token: 'tok', onEvent: events.add);
-    client.start();
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    conns.first.add(jsonEncode({
-      'id': 0,
-      'type': 'key.rotation',
-      'payload': {'key_version': 2},
-    }));
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    expect(events.whereType<WsKeyRotationEvent>().single.keyVersion, 2);
-    await client.stop();
-  });
-
   test('未知类型帧被忽略', () async {
     final (server, base, conns) = await _startWsServer();
     addTearDown(() => server.close(force: true));
@@ -109,10 +90,14 @@ void main() {
     client.start();
     await Future.delayed(const Duration(milliseconds: 300));
 
+    // key.rotation 自 2026-09-14 起不再是协议帧（轮换方案不做，见 docs/SECURITY.md），
+    // 与任意未知帧一样必须被安全忽略——旧服务器仍可能下发。
     conns.first.add(jsonEncode({'id': 0, 'type': 'unknown.event', 'payload': {}}));
+    conns.first.add(jsonEncode({'id': 0, 'type': 'key.rotation', 'payload': {'key_version': 2}}));
     await Future.delayed(const Duration(milliseconds: 200));
 
     expect(events.where((e) => e.type == 'unknown.event'), isEmpty);
+    expect(events.where((e) => e.type == 'key.rotation'), isEmpty);
     await client.stop();
   });
 

@@ -41,7 +41,7 @@ Future<void> main(List<String> args) async {
     ..addOption('out', help: '下载输出的本地文件路径（fetch 用）/ 备份输出文件（backup 用）')
     ..addOption('in', help: '备份输入文件（restore 用）')
     ..addOption('recovery-code', help: '12 词恢复码（restore 用；backup 会自动生成并打印）')
-    ..addOption('key-version', help: '导入的 Space Key 版本号（import 用，默认 1；轮换导入时用新版本）')
+    ..addOption('key-version', help: '导入的 Space Key 版本号（import 用，默认 1）')
     ..addOption('action', help: 'escrow 子命令: upload|download')
     ..addOption('passphrase', help: '口令托管密钥的口令（escrow 用）')
     ..addOption('invite-code', help: '邀请码（enroll 用；留空=首设备自举，登记为创建者）')
@@ -77,8 +77,9 @@ Future<void> main(List<String> args) async {
       await _cmdBackup(opts);
     case 'restore':
       await _cmdRestore(opts);
-    case 'rotate':
-      await _cmdRotate(opts);
+    // 注：'rotate'（Space Key 轮换）已于 2026-09-14 撤除——产品不做密钥轮换
+    // （端侧无入口、分发链路不成立、ROI 极低）。决策与替代方案见 docs/SECURITY.md；
+    // 需要旧实现时看 git 历史（本仓库 commit: 撤除密钥轮换方案）。
     case 'seal':
       await _cmdSeal(opts);
     case 'history':
@@ -554,25 +555,6 @@ Future<void> _cmdSeal(ArgResults opts) async {
   stdout.writeln('   副本已写入: $out（对方用 import 或 App 粘贴导入）');
 }
 
-/// Space Key 轮换（E2EE.md §9.1）：当前密钥归档（key_version+1），生成新密钥，
-/// seal 给对方设备，写密保信封文件。对方用 `import --key-version N` 导入并归档旧密钥。
-Future<void> _cmdRotate(ArgResults opts) async {
-  final path = _require(opts, 'store');
-  final store = DeviceStore.load(path);
-  store.requireSpace();
-  final peerPubkey = _require(opts, 'peer-pubkey');
-  final outEnvelopePeer = _require(opts, 'out-envelope-peer');
-
-  final s = await sodium();
-  final newKeyB64 = await store.rotateSpaceKey();
-  final envelopePeer = await sealFor(s, base64Decode(peerPubkey), base64Decode(newKeyB64));
-  File(outEnvelopePeer).writeAsStringSync(base64Encode(envelopePeer));
-
-  store.save(path);
-  stdout.writeln('✅ Space Key 已轮换: key_version=${store.keyVersion}（旧版本已归档）');
-  stdout.writeln('   对方密封副本已写入: $outEnvelopePeer（对方执行 import --key-version ${store.keyVersion}）');
-}
-
 /// 解密本地消息历史（不依赖 Server）：按每条消息的 key_version 选密钥，
 /// 轮换后旧消息用归档密钥、新消息用当前密钥（E2EE.md §9.2）。
 Future<void> _cmdHistory(ArgResults opts) async {
@@ -746,10 +728,6 @@ Future<void> _cmdListen(ArgResults opts) async {
                     );
             final sender = env.senderDeviceId == store.deviceId ? '我' : '你';
             stdout.writeln('[$sender seq=$seq v${env.keyVersion}] $plain');
-          case 'key.rotation':
-            final payload = frame['payload'] as Map<String, dynamic>;
-            stdout.writeln('🔑 收到 Space Key 轮换通知: 建议 key_version=${payload['key_version']}');
-            stdout.writeln('   请执行 rotate --peer-pubkey <对方公钥> --out-envelope-peer <文件> 后 import');
           case 'device.revoked':
             final payload = frame['payload'] as Map<String, dynamic>;
             stdout.writeln('🚫 本设备已被撤销: device_id=${payload['device_id']}');
@@ -757,7 +735,7 @@ Future<void> _cmdListen(ArgResults opts) async {
           case 'ping':
             // 忽略服务端不应下发的类型；心跳由客户端发起
           default:
-          // 忽略未知帧（pong / sync.advance / key.rotation / device.revoked 等）
+          // 忽略未知帧（pong / sync.advance 等）
         }
       }
       stdout.writeln('⚠️ WS 已断开，2 秒后重连…');
