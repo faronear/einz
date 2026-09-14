@@ -752,6 +752,12 @@ abstract class AppLocalizations {
   /// **'PINs do not match'**
   String get setPinDialogPinMismatch;
 
+  /// No description provided for @setPinDialogOldWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong current PIN'**
+  String get setPinDialogOldWrong;
+
   /// No description provided for @setPinDialogSetupFailed.
   ///
   /// In en, this message translates to:
@@ -773,26 +779,44 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockClearHint.
   ///
   /// In en, this message translates to:
-  /// **'Leave blank to clear PIN'**
+  /// **'Once set, you\'ll unlock every time you enter the space — safer. Both changing and clearing require your current PIN; leave the new PIN blank to clear it.'**
   String get chatPageSetLockClearHint;
+
+  /// No description provided for @chatPageSetLockHintNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Once set, you\'ll unlock every time you enter the space — safer.'**
+  String get chatPageSetLockHintNoPin;
+
+  /// No description provided for @chatPageSetLockOldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current PIN'**
+  String get chatPageSetLockOldLabel;
+
+  /// No description provided for @chatPageSetLockOldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your current PIN first'**
+  String get chatPageSetLockOldRequired;
+
+  /// No description provided for @chatPageSetLockSameAsOld.
+  ///
+  /// In en, this message translates to:
+  /// **'New PIN is the same as the current one — nothing changed'**
+  String get chatPageSetLockSameAsOld;
+
+  /// No description provided for @chatPageSetLockNoPinNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'No PIN set — next launch goes straight into the space'**
+  String get chatPageSetLockNoPinNotice;
 
   /// No description provided for @chatPageSetLockDone.
   ///
   /// In en, this message translates to:
   /// **'App lock set — PIN required at next launch'**
   String get chatPageSetLockDone;
-
-  /// No description provided for @chatPageSetLockConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Set app lock?'**
-  String get chatPageSetLockConfirmTitle;
-
-  /// No description provided for @chatPageSetLockConfirmMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Set the app lock? You\'ll need the PIN at every launch.'**
-  String get chatPageSetLockConfirmMessage;
 
   /// No description provided for @chatPageSetLockCleared.
   ///
@@ -809,7 +833,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageClearLockMessage.
   ///
   /// In en, this message translates to:
-  /// **'Both PIN fields empty — clear the app lock? You\'ll enter directly next time.'**
+  /// **'A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.'**
   String get chatPageClearLockMessage;
 
   /// No description provided for @chatPageMenuInvite.
@@ -991,6 +1015,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New passphrases do not match'**
   String get chatPageChangePassphraseMismatch;
+
+  /// No description provided for @chatPageChangePassphraseSame.
+  ///
+  /// In en, this message translates to:
+  /// **'New passphrase is the same as the current one — nothing changed'**
+  String get chatPageChangePassphraseSame;
 
   /// No description provided for @chatPageChangePassphraseConfirmTitle.
   ///

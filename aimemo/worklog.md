@@ -5143,3 +5143,45 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 **验证：** `dart analyze bin lib` 无 issue、`dart test test/` 17 项全过；
 `flutter analyze` 无 issue、`flutter test test/lock_page_test.dart` 通过。
 两处交互手感由老板自测。
+
+### 锁屏码弹窗五项改造 + 密保口令"新旧相同"拦截 + 发送键纸飞机朝上（老板 2026-09-14）
+
+**老板需求（5 条 + 1 条追加）：**
+1. 有 PIN 时增加「当前锁屏码」验证框（老板问我有没有必要 → 我建议加，且**清空也要验**
+   ——否则"清空 → 重设"两步即可绕过；老板拍板：加验证，改/清都验）；
+2. 新设 PIN 提交后的二次确认弹窗**删掉**；
+3. 本来没 PIN + 留空提交 → 不调后台；老板定：**顶部通知提示一句**「锁屏码为空，下次启动可直接进入秘境」；
+4. 有 PIN 时新旧 PIN 相同 → 红字提示，不真设置；
+5. 密保口令：新旧相同 → 红字提示，不真修改；
+6. （追加）输入栏右侧发送键的纸飞机由朝右改为**朝上**。
+
+**改法（app/lib/chat_page.dart）：**
+- `_SetLockDialog`：新增 `hasPin` 构造参数（**开弹窗前**由 `_showSetLockDialog` 读好传进来，
+  不在弹窗里异步读——毫秒级窗口会让"当前锁屏码"验证被跳过）；有 PIN 时多一个
+  `_oldCtrl` 验证框；`_busy` 防连点（Argon2id 校验期间禁用提交键）。
+- 校验顺序：① 有 PIN → 旧码必填 → `AppLockService.unlock(旧码)` 验证（复用锁屏那套
+  防爆破：连错 5 次锁 30 秒，文案复用 `lockPageTooManyAttempts`）→ ② 两空清空分支
+  （无 PIN 则只弹顶部通知、不写盘）→ ③ 新旧相同红字 → ④ 位数/数字/两次一致 → ⑤ `setPin`。
+  新旧相同**放在旧码校验之后**：先验再比，避免把"你猜对了当前锁屏码"当提示漏出去。
+- 删除设置路径的二次确认弹窗（`chatPageSetLockConfirmTitle/Message` 两个 l10n 键一并删除）；
+  清空路径的确认弹窗保留（清空=降级操作，Space Key 转明文）。
+- `_ChangePassphraseDialog`：拿到服务端状态后、弹确认前，`!rebuilding && oldPass == newPass`
+  → 红字 `chatPageChangePassphraseSame`，不上传（重建路径本就不用旧口令，不拦）。
+- 发送键：`Transform.rotate(angle: -math.pi/2, child: Icon(Icons.send))` —— Material 的
+  `Icons.send` 本身朝右，逆时针 90° 摆正为朝上；Transform 不改占位，布局不变。
+  （消息气泡里的 `_SendingPlane` 小飞机没动，仍在飞——老板若要一起改说一声。）
+
+**TUI（cli/bin/einz_tui.dart）：** `/passphrase` 同口径——旧口令验证通过后，新口令与它
+相同则提示「⚠️ 新口令与旧口令相同，未作修改——请换一个新口令」并重新输入（无密保箱的
+重建路径不拦）。
+
+**l10n（app/lib/l10n/app_*.arb）：** 新增 `chatPageSetLockOldLabel` / `chatPageSetLockOldRequired` /
+`setPinDialogOldWrong` / `chatPageSetLockSameAsOld` / `chatPageSetLockNoPinNotice` /
+`chatPageSetLockHintNoPin` / `chatPageChangePassphraseSame`；改 `chatPageSetLockClearHint`
+（改为"修改或清空都需先输入当前锁屏码；新码留空 = 清空"）与 `chatPageClearLockMessage`
+（原文案"两个 PIN 输入框均为空"已不成立）；删 2 个死键。中英双语同步。
+
+**验证：** `flutter analyze` 无 issue；`dart analyze bin lib` 无 issue；
+`flutter test test/chat_page_menu_test.dart test/lock_page_test.dart` 19 项全过
+（含新增/改写 3 例：有 PIN 时旧码必填+填错+新旧相同+清空取消；无 PIN 两空提交不写盘只提示；
+改口令新旧相同不弹确认不上传）；`dart test test/` 17 项全过。

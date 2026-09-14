@@ -3002,6 +3002,8 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   //    旧口令无从校验，跳过校验直接用新口令重建（本设备已认证且持有
   //    Space Key，重建不新增权限）——与 App 同口径。
   PassphraseEnvelope? serverFile;
+  // 验证通过的旧口令（无密保箱的重建路径为 null）：新口令与它相同则拒绝修改
+  String? oldPass;
   try {
     serverFile = (await api.getKeyEscrow(store.sessionToken!)).file;
   } catch (e) {
@@ -3015,7 +3017,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   } else {
     while (true) {
       if (!_state!.running) return; // 已退出
-      final oldPass = await _prompt(session, '❓ 验证老密保口令：', hidden: false, required: true);
+      oldPass = await _prompt(session, '❓ 验证老密保口令：', hidden: false, required: true);
       if (oldPass.isEmpty) continue;
       try {
         await escrow.openPackage(passphrase: oldPass, envelope: serverFile);
@@ -3034,6 +3036,14 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
       session.messages.add(_systemMessage(session, policyError));
+      _scheduleRender();
+      continue;
+    }
+    // 新口令与刚验证过的旧口令相同 → 不真去改（老板 2026-09-14，与 App 同口径）。
+    // 放在旧口令校验之后：先验旧再比，避免把"你猜对了旧口令"当提示漏出去
+    if (oldPass != null && p1 == oldPass) {
+      session.messages.add(
+          _systemMessage(session, '⚠️ 新口令与旧口令相同，未作修改——请换一个新口令'));
       _scheduleRender();
       continue;
     }

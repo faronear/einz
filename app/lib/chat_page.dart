@@ -790,11 +790,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 卸载同步释放，避免"点设置后 dispose 竞态"（TextField 卸载动画中向已销毁
     // controller 加 listener → debugAssertNotDisposed / _dependents.isEmpty 红屏，
     // 2026-09-05 真机定位）。
+    // 是否已设锁屏码**在开弹窗前读好再传进去**（老板 2026-09-14）：弹窗里要据此决定
+    // 出不出现"当前锁屏码"验证框，异步读会有毫秒级窗口让验证被跳过
+    final db = widget.db ?? LocalDatabase();
+    final hasPin = await AppLockService(db).isSetup;
+    if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => _SetLockDialog(
         payload: payload,
-        db: widget.db ?? LocalDatabase(),
+        db: db,
+        hasPin: hasPin,
       ),
     );
     if (ok == true && mounted) {
@@ -3501,11 +3507,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                       const SizedBox(width: 8),
                       // 发送键：文字态发文字；预览态发录音；提示/录音态禁用（无可发内容）
+                      // 纸飞机**朝上**（老板 2026-09-14）——消息流在输入框上方，朝上才
+                      // 表达"发进上面的消息流"；Material 的 Icons.send 本身朝右，
+                      // 逆时针转 90° 摆正。Transform 不改变占位，按钮布局不变
                       IconButton.filled(
                         onPressed: _inputMode == _InputMode.preview
                             ? _sendVoice
                             : (_inputMode == _InputMode.text ? _send : null),
-                        icon: const Icon(Icons.send),
+                        icon: Transform.rotate(
+                          angle: -math.pi / 2,
+                          child: const Icon(Icons.send),
+                        ),
                       ),
                     ],
                   ),
@@ -3533,22 +3545,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 /// 避免"点设置后 dispose 竞态"（TextField 卸载动画中向已销毁 controller 加 listener
 /// → debugAssertNotDisposed / _dependents.isEmpty 红屏，2026-09-05 真机定位）。
 class _SetLockDialog extends StatefulWidget {
-  const _SetLockDialog({required this.payload, required this.db});
+  const _SetLockDialog({
+    required this.payload,
+    required this.db,
+    required this.hasPin,
+  });
 
   final AppLockPayload payload;
   final LocalDatabase db;
+
+  /// 打开弹窗**之前**读好的"本机是否已设锁屏码"（开弹窗前读、不在弹窗里异步读，
+  /// 避免毫秒级窗口里验证被跳过）。
+  final bool hasPin;
 
   @override
   State<_SetLockDialog> createState() => _SetLockDialogState();
 }
 
 class _SetLockDialogState extends State<_SetLockDialog> {
+  final _oldCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   String? _error;
+  // 已设锁屏码 → 出「当前锁屏码」验证框（老板 2026-09-14）
+  bool get _hasPin => widget.hasPin;
+  bool _busy = false; // 当前锁屏码校验中（Argon2id）：防连点重复提交
 
   @override
   void dispose() {
+    _oldCtrl.dispose();
     _pinCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
@@ -3556,12 +3581,61 @@ class _SetLockDialogState extends State<_SetLockDialog> {
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
+    if (_busy) return;
+    final oldPin = _oldCtrl.text;
     final pin = _pinCtrl.text;
-    // 两空 = 设为空：取消启动锁（Space Key 转明文保存，与向导"不设置锁屏码"一致）
-    if (pin.isEmpty && _confirmCtrl.text.isEmpty) {
+    final confirm = _confirmCtrl.text;
+
+    // 已设锁屏码：修改与清空都必须先验证当前锁屏码（老板 2026-09-14 定）——
+    // 否则"清空 → 重设"两步即可绕过验证；手机被他人短暂拿到就能装一个自己的 PIN。
+    // 验证走 AppLockService.unlock（与锁屏同一套防爆破：连错 5 次锁 30 秒）。
+    if (_hasPin) {
+      if (oldPin.isEmpty) {
+        setState(() => _error = l10n.chatPageSetLockOldRequired);
+        return;
+      }
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      try {
+        await AppLockService(widget.db).unlock(oldPin);
+      } on AppLockLockedException catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = l10n.lockPageTooManyAttempts(e.remainingSeconds);
+        });
+        return;
+      } on AppLockException {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = l10n.setPinDialogOldWrong;
+        });
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = l10n.setPinDialogSetupFailed('$e');
+        });
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _busy = false);
+    }
+
+    // 两空 = 清空锁屏码（Space Key 转明文保存，与向导"不设置锁屏码"一致）
+    if (pin.isEmpty && confirm.isEmpty) {
+      // 本来就没设锁屏码：没有可清的东西——不调后台、不改动，只提示一句（老板 2026-09-14）
+      if (!_hasPin) {
+        showTopNotice(context, l10n.chatPageSetLockNoPinNotice);
+        return;
+      }
       // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
       final overlay = Overlay.of(context, rootOverlay: true);
-      // 显性确认：清空锁屏码（防误触——两空提交前必须弹窗确认）
+      // 显性确认：清空锁屏码（防误触——清空是降级操作）
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -3587,6 +3661,12 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       }
       return;
     }
+    // 新旧码相同 → 红字提示，不真去设置（老板 2026-09-14）。放在旧码校验之后：
+    // 先验完旧码再比，避免把"你猜对了当前锁屏码"当成提示漏出去
+    if (_hasPin && pin == oldPin) {
+      setState(() => _error = l10n.chatPageSetLockSameAsOld);
+      return;
+    }
     if (!AppLockService.isPinDigitsOnly(pin)) {
       setState(() => _error = l10n.setPinDialogPinDigitsOnly);
       return;
@@ -3595,26 +3675,13 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       setState(() => _error = l10n.setPinDialogPinTooShort);
       return;
     }
-    if (pin != _confirmCtrl.text) {
+    if (pin != confirm) {
       setState(() => _error = l10n.setPinDialogPinMismatch);
       return;
     }
     // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
     final overlay = Overlay.of(context, rootOverlay: true);
-    // 显性确认：设置/重设 PIN 锁屏（防误触——与设空清除的确认弹窗对称）
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.chatPageSetLockConfirmTitle),
-        content: Text(l10n.chatPageSetLockConfirmMessage),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
-        ],
-      ),
-    );
-    if (confirmed != true) return; // 取消：留在本弹窗（不设置）
+    // 设置/重设不再弹二次确认（老板 2026-09-14：新码/确认两栏已足够，多一次确认多余）
     try {
       await AppLockService(widget.db).setPin(pin, payload: widget.payload);
       if (!mounted) return;
@@ -3635,15 +3702,28 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start, // 小字/输入框与大标题左对齐（老板要求）
         children: [
-          // 提示：设置后，每次进入秘境都要解锁，更安全。也可以留空提交，即可清空现有 PIN。（大标题下、输入框上方——老板要求）
+          // 提示：设置后，每次进入秘境都要解锁，更安全。已设锁屏码时另有说明（修改/清空需验旧码）。大标题下、输入框上方——老板要求
           Text(
-            l10n.chatPageSetLockClearHint,
+            _hasPin ? l10n.chatPageSetLockClearHint : l10n.chatPageSetLockHintNoPin,
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.outline,
             ),
           ),
           const SizedBox(height: 10),
+          // 已设锁屏码：先输当前锁屏码（修改/清空都要验证）
+          if (_hasPin) ...[
+            TextField(
+              controller: _oldCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: l10n.chatPageSetLockOldLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           TextField(
             controller: _pinCtrl,
             obscureText: true,
@@ -3671,7 +3751,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.cancel)),
-        FilledButton(onPressed: _submit, child: Text(l10n.setPinDialogSetPin)),
+        FilledButton(onPressed: _busy ? null : _submit, child: Text(l10n.setPinDialogSetPin)),
       ],
     );
   }
@@ -3764,6 +3844,12 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     if (!mounted) return;
     setState(() => _busy = false);
     final rebuilding = serverFile == null;
+    // 新口令与旧口令相同 → 红字提示，不真去改（老板 2026-09-14）。放在拿到服务端状态
+    // 之后：无密保箱（重建路径）本就不用旧口令，那种情况下不该拦（用户可能只是重填同一个口令重建）
+    if (!rebuilding && oldPass == newPass) {
+      setState(() => _error = l10n.chatPageChangePassphraseSame);
+      return;
+    }
     // 显性确认：修改密保口令（防误触——老板要求）；重建口径另有文案
     final confirmed = await showDialog<bool>(
       context: context,

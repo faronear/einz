@@ -247,15 +247,13 @@ void main() {
     expect(find.text('设置锁屏码'), findsOneWidget);
 
     // 输入有效 PIN（两次一致）——限定在弹窗内查找，避免匹配聊天页消息输入框
+    // （本机未设 PIN → 弹窗只有两框：新 PIN / 确认 PIN）
     final pinFields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(pinFields.at(0), '123456');
     await tester.enterText(pinFields.at(1), '123456');
-    // 点"提交"→ 先弹显性确认对话框（设非空 PIN 也要求确认）
+    // 点"提交"→ 直接设置（不再有二次确认弹窗——老板 2026-09-14 删除）
     await tester.tap(find.text('提交'));
-    await tester.pumpAndSettle();
-    expect(find.text('设置 PIN 锁屏？'), findsOneWidget); // 确认弹窗标题
-    await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
 
     // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
@@ -263,6 +261,83 @@ void main() {
     // 弹窗应已关闭，锁已落盘
     expect(find.text('设置锁屏码'), findsNothing);
     expect(await AppLockService(db).isSetup, true);
+  });
+
+  testWidgets('有 PIN 时改码：不填/填错旧码都报错不动锁；相同新码也不设置', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+    // 先设好一个 PIN（改码场景的前提）
+    await AppLockService(db).setPin('123456',
+        payload: AppLockPayload(
+          server: 'https://einz.tic.cc',
+          spaceKeyB64: base64Encode(spaceKey),
+          spaceId: 'space-demo',
+          deviceId: 'dev-a',
+          token: 'tok',
+        ));
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('锁屏码'));
+    await tester.pumpAndSettle();
+    // 已设 PIN → 多出「当前锁屏码」框（共 3 框：旧/新/确认）
+    final fields =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    expect(fields.evaluate().length, 3);
+
+    // 1) 旧码留空 → 红字要求先输入旧码，不动锁
+    await tester.tap(find.text('提交'));
+    await tester.pumpAndSettle();
+    expect(find.text('请先输入当前锁屏码'), findsOneWidget);
+    expect(await AppLockService(db).isSetup, true);
+
+    // 2) 旧码填错 → 红字"当前锁屏码错误"，不动锁
+    await tester.enterText(fields.at(0), '000000');
+    await tester.tap(find.text('提交'));
+    await tester.pumpAndSettle();
+    expect(find.text('当前锁屏码错误'), findsOneWidget);
+    expect(await AppLockService(db).isSetup, true);
+
+    // 3) 旧码正确、新码与旧码相同 → 红字提示，不真去设置
+    await tester.enterText(fields.at(0), '123456');
+    await tester.enterText(fields.at(1), '123456');
+    await tester.enterText(fields.at(2), '123456');
+    await tester.tap(find.text('提交'));
+    await tester.pumpAndSettle();
+    expect(find.text('新锁屏码与当前锁屏码相同，未作修改'), findsOneWidget);
+    expect(await AppLockService(db).isSetup, true);
+
+    // 4) 旧码正确 + 新码留空 → 才进清空确认；点取消不动锁
+    await tester.enterText(fields.at(1), '');
+    await tester.enterText(fields.at(2), '');
+    await tester.tap(find.text('提交'));
+    await tester.pumpAndSettle();
+    expect(find.text('清空锁屏码？'), findsOneWidget);
+    final confirmDialog = find.byType(AlertDialog).last;
+    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
+    await tester.pumpAndSettle();
+    expect(find.text('设置锁屏码'), findsOneWidget); // 设置弹窗仍在
+    expect(await AppLockService(db).isSetup, true, reason: '取消不清锁');
   });
 
   testWidgets('改名对话框保存后无红屏（controller 延迟 dispose）', (WidgetTester tester) async {
@@ -383,7 +458,7 @@ void main() {
     expect(field.focusNode!.hasFocus, isTrue);
   });
 
-  testWidgets('设置 PIN 两空提交 = 设为空（不报"至少4位"，转明文取消锁）', (WidgetTester tester) async {
+  testWidgets('无 PIN 时两空提交：不报至少6位、不写盘，只顶部提示一句', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -413,61 +488,16 @@ void main() {
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
     expect(find.text('设置锁屏码'), findsOneWidget); // 弹窗标题
-    // 两空点「提交」→ 先弹显性确认对话框（防误触——老板要求）
+    // 两空点「提交」：本来就没设 PIN → 直接返回（老板 2026-09-14）——不弹清空确认、
+    // 不调后台、不做任何写盘，只在顶部通知里说一句
     await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
-    expect(find.text('清空锁屏码？'), findsOneWidget); // 确认弹窗标题
-    expect(find.text('PIN 至少4位'), findsNothing);
-    // 点「确认」→ 才执行清除锁（转明文）
-    await tester.tap(find.text('确认'));
-    await tester.pumpAndSettle();
-    expect(find.text('已清空锁屏码（下次启动直接进入）'), findsOneWidget); // SnackBar
-    // 弹窗已关闭；无加密包（isSetup false），明文配置仍在（hasConfig true）
-    expect(find.text('设置锁屏码'), findsNothing);
+    expect(find.text('清空锁屏码？'), findsNothing);
+    expect(find.text('锁屏码为空，下次启动可直接进入秘境'), findsOneWidget); // 顶部通知
+    expect(find.text('设置锁屏码'), findsOneWidget); // 弹窗保持原样
     final lock = AppLockService(db);
-    expect(await lock.isSetup, false, reason: '两空提交不设加密锁');
-    expect(await lock.hasConfig, true, reason: 'Space Key 明文保留（下次启动直接进入）');
-  });
-
-  testWidgets('两空提交：确认弹窗点取消不执行清除（防误触）', (WidgetTester tester) async {
-    final db = LocalDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    final spaceKey = await generateSpaceKey();
-    final api = _FakeApi();
-
-    await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('zh'),
-      home: ChatPage(
-        server: 'https://einz.tic.cc',
-        spaceId: 'space-demo',
-        deviceId: 'dev-a',
-        spaceKey: spaceKey,
-        keyVersion: 1,
-        token: 'tok',
-        db: db,
-        api: api,
-        enableWs: false,
-      ),
-    ));
-    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
-
-    // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两空）→ 点「提交」→ 确认弹窗
-    await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('锁屏码'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('提交'));
-    await tester.pumpAndSettle();
-    expect(find.text('清空锁屏码？'), findsOneWidget); // 确认弹窗出现
-    // 点「取消」→ 不执行清除：设置弹窗仍在、无 SnackBar
-    // （"取消"同时存在于设置弹窗与确认弹窗——用叠在最上的确认弹窗定位）
-    final confirmDialog = find.byType(AlertDialog).last;
-    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
-    await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsOneWidget); // 设置弹窗未关闭
-    expect(find.text('已清空锁屏码（下次启动直接进入）'), findsNothing);
+    expect(await lock.isSetup, false);
+    expect(await lock.hasConfig, false, reason: '本来就没锁可清：不做任何写盘');
   });
 
   testWidgets('解锁重进：ChatPage 不带名字时从 profile 恢复顶部条名字', (WidgetTester tester) async {
@@ -900,6 +930,25 @@ void main() {
     expect(find.text('旧口令错误'), findsOneWidget, reason: '旧口令错应红字');
     expect(find.text('修改密保口令？'), findsNothing, reason: '未过口令验证不应进显性确认');
     expect(api.uploadedPackage, isNull, reason: '旧口令错不得上传');
+  });
+
+  testWidgets('改口令：新口令与旧口令相同 → 红字，不进确认、不上传', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    final api = await _openChangePassphraseDialog(
+        tester, db,
+        oldPassphrase: 'oldpass1234',
+        spaceKey: spaceKey);
+
+    await _enterDialogFields(tester, oldPass: 'oldpass1234', newPass: 'oldpass1234');
+    await tester.tap(find.widgetWithText(FilledButton, '修改'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('新口令与旧口令相同，未作修改'), findsOneWidget, reason: '新旧相同应红字');
+    expect(find.text('修改密保口令？'), findsNothing, reason: '新旧相同不该进显性确认');
+    expect(api.uploadedPackage, isNull, reason: '新旧相同不得上传');
   });
 
   testWidgets('改口令：全流程成功 → 上传 rotated 包（本地不落新口令）',

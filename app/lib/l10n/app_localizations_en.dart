@@ -368,6 +368,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogPinMismatch => 'PINs do not match';
 
   @override
+  String get setPinDialogOldWrong => 'Wrong current PIN';
+
+  @override
   String setPinDialogSetupFailed(String error) {
     return 'Setup failed: $error';
   }
@@ -381,18 +384,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageSetLockTitle => 'Set app lock';
 
   @override
-  String get chatPageSetLockClearHint => 'Leave blank to clear PIN';
+  String get chatPageSetLockClearHint =>
+      'Once set, you\'ll unlock every time you enter the space — safer. Both changing and clearing require your current PIN; leave the new PIN blank to clear it.';
+
+  @override
+  String get chatPageSetLockHintNoPin =>
+      'Once set, you\'ll unlock every time you enter the space — safer.';
+
+  @override
+  String get chatPageSetLockOldLabel => 'Current PIN';
+
+  @override
+  String get chatPageSetLockOldRequired => 'Enter your current PIN first';
+
+  @override
+  String get chatPageSetLockSameAsOld =>
+      'New PIN is the same as the current one — nothing changed';
+
+  @override
+  String get chatPageSetLockNoPinNotice =>
+      'No PIN set — next launch goes straight into the space';
 
   @override
   String get chatPageSetLockDone =>
       'App lock set — PIN required at next launch';
-
-  @override
-  String get chatPageSetLockConfirmTitle => 'Set app lock?';
-
-  @override
-  String get chatPageSetLockConfirmMessage =>
-      'Set the app lock? You\'ll need the PIN at every launch.';
 
   @override
   String get chatPageSetLockCleared =>
@@ -403,7 +418,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageClearLockMessage =>
-      'Both PIN fields empty — clear the app lock? You\'ll enter directly next time.';
+      'A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.';
 
   @override
   String get chatPageMenuInvite => 'Invite code';
@@ -500,6 +515,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseMismatch => 'New passphrases do not match';
+
+  @override
+  String get chatPageChangePassphraseSame =>
+      'New passphrase is the same as the current one — nothing changed';
 
   @override
   String get chatPageChangePassphraseConfirmTitle => 'Change passphrase?';
