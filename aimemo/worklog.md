@@ -4601,3 +4601,30 @@ projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 
 
 **另注：** 期间另一位 agent 自行提交了 `16bcdd8`（App 改口令弹窗支持 PIN 验证）——我全程
 只用自己的文件路径提交，未触碰其改动。
+
+### App 改口令弹窗：PIN 验证 + 锁包一次性同步（commit `16bcdd8`）
+
+**背景（老板 2026-09-14 询问改口令背后的流程逻辑）：** 梳理中（旧口令验证的本质是
+"新口令能否解开服务器当前密保箱"——服务器从不保存/比对旧口令）发现真实副作用：
+设了 PIN 的设备改口令时，弹窗只更新 Keychain 明文 payload，**锁包**（PIN 加密的
+`AppLockPayload`）里的 `escrowPassphrase` 永久停留旧值 → 日后 Space Key 轮换时
+`lock_page._syncEscrow` 上传前校验用旧口令解不开新包而跳过重传 → 该设备密保箱
+备份能力静默失效且不自愈。（"锁包"≠"密保箱"：前者本机 drift、PIN 加密，后者
+服务器托管、密保口令加密，二者并列不嵌套。）
+
+**老板拍板方案：** 改口令弹窗置顶「锁屏码」框（仅本机有 PIN 时显示），一次提交内
+完成验证+同步——单一弹窗，不做两步弹窗（PIN 内存中跨步骤复用，不二次询问）。
+
+**实现：**
+- `app_lock.dart` 新增 `updateEscrowPassphraseWithPin(pin, passphrase, {updatedAt})`：
+  `unlock`（复用防爆破 5 次/30 秒锁定）→ 更新 escrowPassphrase/escrowUpdatedAt →
+  同一 PIN 重新加密落盘
+- `_ChangePassphraseDialog`：PIN 字段（`hasPin` 时显示）；流程 = 空 PIN 红字拦截
+  （在校验后、显性确认前）→ 显性确认 → PIN 验证 → 旧口令验证 → 新口令重加密上传
+  （`rotated: true`）→ 本地同步（有 PIN 改锁包 / 跳过 PIN 改 Keychain 明文，互斥）；
+  `widget.api` 可注入（`widget.api ?? ApiClient(server)`），测试可离线断言上传
+- l10n 复用现有文案（`lockPagePinLabel` + `AppLockException` 消息），无新增条目
+
+**验证：** `flutter analyze` 0 issue；`chat_page_menu_test` 19/19（+4 新例：PIN 框
+存在/空 PIN 拦截不触网、PIN 错锁包保持旧口令、有 PIN 全流程上传 rotated 包+锁包
+同步断言、无 PIN 回归）；锁/口令相关 5 文件 30/30 全过。
