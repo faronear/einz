@@ -144,6 +144,10 @@ class _StartupGateState extends State<StartupGate> {
   Future<void> _check() async {
     try {
       final lock = AppLockService(LocalDatabase());
+      // 全新安装（沙盒被清过）就清掉上一次安装残留的安全存储条目——语义 = 卸载即重置
+      // （安全存储条目活过卸载，drift 不会；老板 2026-09-14 决策）。必须在读
+      // isSetup/loadPlain **之前**，否则残留的明文包会把人直接拖进聊天。
+      await lock.ensureFreshInstall();
       final hasLock = await lock.isSetup;
       // 无锁包时读明文配置（跳过 PIN 的无锁场景：下次启动直接进聊天）
       final plain = hasLock ? null : await lock.loadPlain();

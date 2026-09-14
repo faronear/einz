@@ -12,7 +12,14 @@ class SecureStore {
 
   static const _prefix = 'einz.secure.';
 
-  static final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  /// 无障碍级别选 `..._this_device`（iOS/macOS）：默认的 `unlocked` 会被
+  /// **加密备份/换机恢复**带到新设备——用户换机还原备份即可读到旧消息。
+  /// `this_device` 变体不随备份迁移（Apple 文档语义）。`synchronizable` 保持
+  /// 默认 false（不走 iCloud Keychain 同步）。
+  static final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+    mOptions: MacOsOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
 
   static String _key(String name) => '$_prefix$name';
 

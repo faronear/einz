@@ -278,6 +278,21 @@ CREATE TABLE app_state (
 - 身份私钥 + Space Key 明文只在此处；SQLite 中只存密文。
 - 归档 Space Key 仅用于解密旧消息（E2EE.md §9.2）。
 
+### 4.1 安全存储的生存周期（平台差异，老板 2026-09-14 决策）
+
+安全存储条目**不随 App 卸载消失**（iOS/macOS Keychain、Linux libsecret），而 drift 库会。
+两条防线（实现见 `app/lib/data/secure_store.dart`、`app/lib/data/app_lock.dart`）：
+
+- **无障碍级别用 `..._this_device`**：iOS/macOS 默认的 `unlocked` 条目会被**加密备份 /
+  换机恢复**带到新设备（用户换机还原备份即可读旧消息）；`first_unlock_this_device`
+  变体不迁移。`synchronizable=false`（不走 iCloud Keychain 同步）是库默认值，保持。
+- **卸载即重置**：drift `app_state` 的 `app_lock.install_id` 记录本次安装的随机标记。
+  启动时（`AppLockService.ensureFreshInstall()`，**在读取锁包之前**）若标记缺失
+  = 沙盒被清过 = 全新安装 → 清空 `einz.secure.` 下本 App 的条目，再落新标记。
+  iOS"卸载 App（保留数据）"与整机/iCloud 备份恢复都会把沙盒带回来（标记仍在）→ 不误清。
+  后果：重装 = 重新接入（与"设了 PIN"的用户行为一致——其加密锁包在 drift，本来就随卸载
+  消失）；"跳过 PIN"用户此前靠 Keychain 里的明文包被直接拖进聊天，现已消除。
+
 ---
 
 ## 5. 迁移策略

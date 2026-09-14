@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
@@ -15,6 +16,9 @@ import 'secure_store.dart';
 /// - 防爆破：连续错误 [maxAttempts] 次 → 锁定 [lockSeconds] 秒（纯本地，Server 不参与）。
 /// - 跳过 PIN：明文 Space Key 包存系统安全存储（Keychain/Keystore，SecureStore），
 ///   不再落 SQLite（老板 2026-09-14：消除 app_state 明文密钥）。
+/// - **卸载即重置**（老板 2026-09-14 决策，见 [ensureFreshInstall]）：安全存储条目会
+///   活过 App 卸载（iOS/macOS Keychain、Linux libsecret；Android/Windows 落在应用数据
+///   目录里卸载即清），故全新安装时清掉上一次安装的残留，语义与设 PIN 用户一致。
 class AppLockService {
   AppLockService(this.db);
 
@@ -22,6 +26,9 @@ class AppLockService {
 
   /// 明文 Space Key 包在 SecureStore 里的条目名（自动加 einz.secure. 前缀）。
   static const _securePlain = 'app_lock.plain';
+
+  /// SecureStore 里属于本 App 的条目清单（[ensureFreshInstall] 清理用；新增条目须登记）。
+  static const _secureKeys = [_securePlain];
 
   static const int maxAttempts = 5;
   static const int lockSeconds = 30;
@@ -41,12 +48,39 @@ class AppLockService {
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
   static const _kProfile = 'app_lock.profile'; // JSON: {personName, peerName, deviceName}
 
+  /// 本次安装的标记（随机 id）。**非密钥、非敏感**——它的全部意义就是"沙盒里有没有
+  /// 东西"：drift 库随 App 卸载消失，安全存储条目不会，故"标记不在"= 全新安装。
+  static const _kInstallId = 'app_lock.install_id';
+
   /// 是否已设置启动锁（有 PIN 加密的密钥包）。
   Future<bool> get isSetup async => await _get(_kPackage) != null;
 
   /// 本设备是否已配置（设锁或跳过均算；StartupGate 据此决定直接进聊天）。
   Future<bool> get hasConfig async =>
       await isSetup || await loadPlain() != null;
+
+  /// 全新安装检测 + 上一次安装残留清理（老板 2026-09-14 决策：卸载即重置）。
+  ///
+  /// 安全存储条目会活过 App 卸载（iOS/macOS Keychain、Linux libsecret），而 drift
+  /// 库不会。所以"沙盒里没有本次安装标记"≈"沙盒被清过 = 全新安装"，此时清掉上一次
+  /// 安装残留的密钥条目——否则"跳过 PIN"的用户卸载重装会被直接拖进聊天，与"设了
+  /// PIN"的用户（锁包在 drift，随沙盒一起消失）行为不一致。
+  ///
+  /// 幂等，启动流程里可重复调用。iOS"卸载 App（保留数据）"、iCloud/整机备份恢复都会
+  /// 把沙盒带回来（标记仍在）→ 不会误清。跨设备泄漏另由 SecureStore 的
+  /// `..._this_device` 无障碍级别兜住（条目不随备份迁移）。
+  Future<void> ensureFreshInstall() async {
+    if (await _get(_kInstallId) != null) return; // 同一安装：什么都不做
+    await SecureStore.deleteAll(_secureKeys); // 全新安装：清残留（无残留则静默）
+    await _set(_kInstallId, _newInstallId());
+  }
+
+  /// 随机安装标记（16 字节 hex）。只用于判定"沙盒是否为空"，无密码学用途。
+  static String _newInstallId() {
+    final r = Random.secure();
+    return List.generate(
+        16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+  }
 
   /// 明文保存 Space Key 包（跳过 PIN 场景）：无锁包但有此明文时，
   /// 下次启动直接进聊天（免打扰），直到用户在聊天页补设 PIN。

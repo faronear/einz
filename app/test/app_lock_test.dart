@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/secure_store.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 void main() {
@@ -123,5 +124,37 @@ void main() {
     expect(p['personName'], 'Lukas');
     expect(p['peerName'], 'Alice');
     expect(p['deviceName'], 'iPhone');
+  });
+
+  // ---- 卸载即重置（老板 2026-09-14 决策）：安全存储条目活过 App 卸载，drift 不会 ----
+
+  test('全新安装（沙盒无安装标记）→ 清掉上一次安装残留的安全存储条目', () async {
+    // 模拟：上一次安装在 Keychain 里留下的明文包（沙盒已随卸载清空 → 无安装标记）
+    FlutterSecureStorage.setMockInitialValues({
+      'einz.secure.app_lock.plain': '{"space_id":"previous-install"}',
+    });
+    await lock.ensureFreshInstall();
+    expect(await SecureStore.read('app_lock.plain'), isNull,
+        reason: '残留包必须被清掉，否则重装会被直接拖进聊天');
+  });
+
+  test('同一安装内重复调用不会误清本次写入的包（标记已落）', () async {
+    await lock.ensureFreshInstall(); // 本次安装首次启动：落标记
+    await lock.savePlain(payload); // 用户跳过 PIN → 明文包入安全存储
+    await lock.ensureFreshInstall(); // 再次启动（同一安装，沙盒标记还在）
+    final p = await lock.loadPlain();
+    expect(p, isNotNull, reason: '同一安装不得误清');
+    expect(p!.spaceId, 'space-test');
+  });
+
+  test('安装标记不影响 clear()：设备被撤销后仍清空密钥条目', () async {
+    await lock.ensureFreshInstall();
+    await lock.savePlain(payload);
+    await lock.clear();
+    expect(await SecureStore.read('app_lock.plain'), isNull);
+    expect(await lock.hasConfig, false);
+    // clear 之后同一安装内再启动：标记仍在 → 不会重复清理（也无残留可清）
+    await lock.ensureFreshInstall();
+    expect(await lock.hasConfig, false);
   });
 }
