@@ -84,9 +84,9 @@
 
 ## Phase 4 — 加固（估算 3–7 天）
 
-- [ ] 设备撤销 + Space Key 轮换
+- [x] 设备撤销（白名单 + 上线自毁）——**Space Key 轮换不做**（2026-09-14 决策，见 SECURITY.md §3）
 - [ ] 备份与恢复（模型 A：本地加密备份 + 恢复码）
-- [x] 设备撤销 + Space Key 轮换（撤销生效于认证/同步路径 + key.rotation WS 通知 + 归档密钥解旧消息）
+- [x] 设备撤销（撤销生效于认证/同步路径 403 + 被撤销设备上线自毁）＋ 轮换相关代码撤除（SpaceKeyRing / einz rotate / key.rotation 广播，2026-09-14）
 - [x] 备份与恢复（模型 A：本地加密备份 + 恢复码，shared backup.dart + CLI backup/restore）
 - [x] 安全测试 / 离线 / 网络故障 / 服务重启测试（phase4_e2e.sh 段 C/D/E/F 全过）
 - [x] Server 备份脚本（SQLite Backup API）与恢复演练（npm run backup/restore，演练通过）

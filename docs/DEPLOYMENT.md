@@ -19,7 +19,7 @@
 - **固定两人一空间**：一个 `space_id` 对应两台设备（A/B），无动态配对。
 - **E2EE 全链路**：Server 只见密文（消息、附件均为密文 + 元数据）。
 - **静态白名单**：`config.json` 声明可信设备；不在其中的设备一律拒绝（403）。
-- **撤销语义**：撤销 = 白名单移除 + 清会话/Push Token + WS 断开 + 通知剩余设备轮换 Space Key（E2EE.md §9）。
+- **撤销语义**：撤销 = 白名单移除 + 清会话/Push Token + WS 断开；**不**轮换 Space Key（见 `docs/SECURITY.md` §3）。
 
 **仓库角色速览：**
 
@@ -130,7 +130,7 @@ dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 
 | `init --store <s> --device-id <id>`                                                               | 生成本机身份密钥对                                             |
 | `pubkey --store <s>`                                                                              | 导出公钥（base64）                                             |
 | `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-envelope-peer <f>` | 生成 Space Key + 白名单 + 密保信封                             |
-| `import --store <s> --envelope-file <f> --space-id <id> [--key-version N]`                        | 导入密保信封（轮换导入用 --key-version）                       |
+| `import --store <s> --envelope-file <f> --space-id <id> [--key-version N]`                        | 导入密保信封（`--key-version N` 可指定版本）                   |
 | `auth --store <s> --server <url>`                                                                 | challenge-response 认证，拿 session_token                      |
 | `send --store <s> --server <url> --message <文本>`                                                | 加密发送（先入队，失败自动补发；`--server` 可省略=纯离线入队） |
 | `sync --store <s> --server <url> [--after N]`                                                     | 增量同步（翻页拉全量 → 落库 → 推进锚点 → 补发队列）            |
@@ -138,11 +138,10 @@ dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 
 | `attach --store <s> --server <url> --file <p> [--type image\|video\|voice] [--caption <t>]`       | 附件加密上传                                                   |
 | `fetch --store <s> --server <url> --attachment-id <id> [--out <p>]`                               | 附件下载解密                                                   |
 | `history --store <s>`                                                                             | 解密本地历史（按 key_version 选密钥）                          |
-| `rotate --store <s> --peer-pubkey <b64> --out-envelope-peer <f>`                                  | 轮换 Space Key（key_version+1，旧密钥归档）                    |
 | `backup --store <s> --out <f>`                                                                    | 本地加密备份（生成 12 词恢复码）                               |
 | `restore --in <f> --recovery-code <12词> [--store <s>]`                                           | 恢复码解密还原                                                 |
 
-> 其余部分（生产部署 / 备份恢复 / 撤销轮换 / 安全边界 / 故障排查）见下节。
+> 其余部分（生产部署 / 备份恢复 / 撤销与安全 / 故障排查）见下节。
 
 ---
 
@@ -254,29 +253,24 @@ dart run bin/einz.dart restore --in "$W/backup-a.json" --recovery-code "<12词>"
 # 之后：init 新身份 → 更新 config.json 白名单 → 重启服务器（E2EE.md §10.2）
 ```
 
-### 5.3 设备撤销 + Space Key 轮换
+### 5.3 设备撤销（**不**轮换 Space Key）
 
-**场景：** 手机丢失/失窃 → 撤销该设备，防止其继续收新消息。
+**场景：** 手机丢失/失窃 → 撤销该设备，阻止它继续收新消息。
 
 ```bash
-# 1) A 撤销 B（DELETE /devices/dev-b1；Server 返回 key_rotation_required: true，
-#    并广播 key.rotation 给剩余设备 + 关闭 B 的 WS 连接）
+# 1) A 撤销 B（DELETE /devices/dev-b1）：移出白名单 + 清 Push Token + 清会话，
+#    并关闭 B 的 WS 连接（Server 不再下发 key.rotation —— 轮换方案已决定不做）
 curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
   -H "Authorization: Bearer <A的session_token>"
 
-# 2) 剩余设备 A 收到 key.rotation 通知 → 立即轮换（key_version+1，旧密钥归档）
-dart run bin/einz.dart rotate \
-  --store "$W/a.json" --peer-pubkey "$PUB_B" --out-envelope-peer "$W/envelope-v2.txt"
-
-# 3) 若 B 是误撤（仍可信）：B 导入新版本密钥（旧密钥自动归档）
-dart run bin/einz.dart import \
-  --store "$W/b.json" --envelope-file "$W/envelope-v2.txt" --space-id "space-demo" --key-version 2
-
-# 4) 服务器 config.json 移除被撤销设备 → 重启服务器生效
+# 2) 服务器 config.json 移除被撤销设备 → 重启服务器生效
 ```
 
-- 轮换后：**新消息用新密钥**，旧消息仍用归档密钥解密（`history` 命令自动按 key_version 选密钥）。
-- 被撤销设备：无法认证（403）/同步/发送；其旧 WS 连接已被服务端关闭。
+- 被撤销设备：无法认证（403）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
+- 被撤销设备**上线即自毁本地数据**（App `_onDeviceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存）。
+- **不需要**轮换 Space Key：撤销的效力来自白名单（它取不到新密文）+ 自毁。
+  怀疑密钥材料被提取（越狱/镜像泄露）时的止损流程见 `docs/SECURITY.md` §4.2（替代方案 = 重建空间）。
+- 已同步的历史密文不可追回（设备端已解密数据的固有属性）。
 
 ### 5.4 数据目录备份策略（汇总）
 
@@ -299,9 +293,9 @@ dart run bin/einz.dart import \
 | 备份加密       | Server 备份 AES-256-GCM（`EINZ_DB_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露                                  |
 | 供应链         | Gradle 镜像`distributionSha256Sum` 锁定官方校验和                               | 构建工具链不可被镜像篡改（P3 修复）                 |
 | 认证           | challenge-response（一次性、5 分钟过期）；session_token 服务端签发              | 防重放                                              |
-| 前向保密       | Space Key 简单派生（已接受的代价，E2EE.md §11.1）                               | 轮换 + 安全存储缓解                                 |
+| 前向保密       | Space Key 简单派生（已接受的代价，E2EE.md §11.1）                               | 安全存储隔离；不轮换的取舍见 SECURITY.md §3        |
 
-**威胁模型提醒（E2EE.md §9.3）：** 被撤销设备已持有的历史密文无法收回（设备端已解密数据的固有属性）；密钥轮换阻止其读取**之后**的新消息。
+**威胁模型提醒（SECURITY.md §3/§4.1）：** 被撤销设备已持有的历史密文无法收回（设备端已解密数据的固有属性）；它读不到**之后**的新消息，靠的是白名单（`/sync` 403）而非轮换。
 
 ---
 
@@ -332,7 +326,7 @@ dart run bin/einz.dart import \
 - [ ] 附件上传→下载解密与原文件一致
 - [ ] `npm run backup -- --verify` 成功；恢复演练通过
 - [ ] `backup`/`restore`（恢复码）闭环通过
-- [ ] 撤销 B：B 认证 403、A 收到 key.rotation、A 轮换后双版本历史可解
+- [ ] 撤销 B：B 认证 403 / 同步 403；A 无需轮换（撤销即阻断 B 取新密文）
 
 ## 9. 版本升级（新代码上线）
 
