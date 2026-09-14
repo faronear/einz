@@ -19,13 +19,20 @@
 
 ## 网络环境与翻墙能力
 
-- **老板有翻墙能力，随时可开**（2026-09-14 自述）：本机装有 **Tailscale**，可开 **exit node**
-  走海外出口。需要访问海外站点/服务（含墙外自建服务）时，**直接请老板开 Tailscale exit node**，
-  不用自己绕。
+- **老板有两个翻墙通道，且会频繁来回切换**（2026-09-14 自述）：
+  1. **Tailscale exit node**（海外出口）；
+  2. **零点云**（商业翻墙工具）。
+  切换是为了"能连上网"——所以在老板手边，**网络可达性是动态变化的**，不要在某个时刻的
+  连通/不通结论上做长期推断。
 - **`git.tic.cc` 在美国机房**（自建 Gitea）→ 大陆直连**只有间歇性可用**：典型症状是
   `LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to git.tic.cc:443`（TLS 握手阶段就被打断），
   `curl` 得到 `http=000`，偶尔某一次能通。**push/pull/核实远端前先确认已翻墙**，
   否则会出现"push 好像成功了但随后核实全失败"的假象。
+- **操作约定**：遇到 `git.tic.cc` 连不上时，**先报给老板请他切一下隧道**，不要自己反复重试
+  （既慢又费 token）。排查命令：
+  `/Applications/Tailscale.app/Contents/MacOS/Tailscale status`
+  —— 注意 **App 进程在跑 ≠ 已启用**（曾出现 App 在跑但 `status` 显示 `Tailscale is stopped`、
+  `ExitNodeStatus: None`，那时流量并没走出口）。
 - 其他：海外 dev 站点常超时/被墙 → 优先走国内镜像（TUNA 等）或让老板开代理；
   本机 brew cask 已坏，装工具优先下 tar.gz。
 
