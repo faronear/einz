@@ -125,7 +125,7 @@ class AppLockService {
   /// 注意：PIN 丢失则本设备 Space Key 包无法解密（无恢复副本，纯本地）。
   Future<void> setPin(String pin, {required AppLockPayload payload}) async {
     final bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload.toJson())));
-    final pkg = await encryptBackup(payload: bytes, recoveryCode: pin);
+    final pkg = await encryptBackup(payload: bytes, backupCode: pin);
 
     await _set(_kPackage, jsonEncode(pkg.toJson()));
     await _set(_kAttempts, '0');
@@ -139,7 +139,7 @@ class AppLockService {
     final raw = await _get(_kPackage);
     if (raw == null) throw const AppLockException('尚未设置锁屏码');
     try {
-      final plain = await decryptBackup(file: BackupFile.fromJson(jsonDecode(raw)), recoveryCode: pin);
+      final plain = await decryptBackup(file: BackupFile.fromJson(jsonDecode(raw)), backupCode: pin);
       await _set(_kAttempts, '0');
       return AppLockPayload.fromJson(jsonDecode(utf8.decode(plain)));
     } on FormatException {

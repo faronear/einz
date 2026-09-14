@@ -165,21 +165,21 @@ void main() {
       expect(words.length, 12, reason: '恢复码应为 12 词');
 
       final payload = Uint8List.fromList(utf8.encode('{"space_key":"secret","history":[...]}'));
-      final file = await encryptBackup(payload: payload, recoveryCode: code);
+      final file = await encryptBackup(payload: payload, backupCode: code);
 
       final json = file.toJson();
       final restored = BackupFile.fromJson(json);
-      final plain = await decryptBackup(file: restored, recoveryCode: code);
+      final plain = await decryptBackup(file: restored, backupCode: code);
       expect(utf8.decode(plain), utf8.decode(payload));
     });
 
     test('错误恢复码无法解密', () async {
       final code = await generateRecoveryCode();
       final payload = Uint8List.fromList(utf8.encode('top-secret'));
-      final file = await encryptBackup(payload: payload, recoveryCode: code);
+      final file = await encryptBackup(payload: payload, backupCode: code);
 
       await expectLater(
-        decryptBackup(file: file, recoveryCode: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon'),
+        decryptBackup(file: file, backupCode: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon'),
         throwsA(isA<FormatException>()),
       );
     });

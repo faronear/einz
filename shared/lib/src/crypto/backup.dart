@@ -295,15 +295,19 @@ Future<String> generateRecoveryCode() async {
   return words.join(' ');
 }
 
-/// 派生 BackupKey（E2EE.md §4.3 / §10.1）：Argon2id(recoveryCode, salt) → 32B。
+/// 派生 BackupKey（E2EE.md §4.3 / §10.1）：Argon2id(backupCode, salt) → 32B。
+///
+/// [backupCode] 是通用的高熵人类可输入口令——按调用方语义不同，实际传入
+/// 12 词恢复码（CLI backup/restore）、锁屏码 PIN（App 启动锁）或密保口令
+/// （口令密保箱）。不要与「恢复码」这个具体凭证混淆。
 Future<Uint8List> deriveBackupKey({
-  required String recoveryCode,
+  required String backupCode,
   required Uint8List salt,
 }) async {
   final s = await _sumo();
   final key = s.crypto.pwhash.call(
     outLen: 32,
-    password: Int8List.fromList(utf8.encode(recoveryCode)),
+    password: Int8List.fromList(utf8.encode(backupCode)),
     salt: salt,
     opsLimit: s.crypto.pwhash.opsLimitModerate,
     memLimit: s.crypto.pwhash.memLimitModerate,
@@ -350,13 +354,14 @@ class BackupFile {
 /// 加密备份内容（payload = JSON 序列化的密钥归档 + 消息历史 + 附件元数据）。
 ///
 /// 内部生成随机 salt → 派生 BackupKey → 加密；salt 随文件头保存，解密时复用。
+/// [backupCode] 语义见 [deriveBackupKey]（通用人类口令，非特指恢复码）。
 Future<BackupFile> encryptBackup({
   required Uint8List payload,
-  required String recoveryCode,
+  required String backupCode,
 }) async {
   final s = await _sumo();
   final salt = await generateBackupSalt();
-  final backupKey = await deriveBackupKey(recoveryCode: recoveryCode, salt: salt);
+  final backupKey = await deriveBackupKey(backupCode: backupCode, salt: salt);
   final nonce = s.randombytes.buf(s.crypto.aeadXChaCha20Poly1305IETF.nonceBytes);
   final aad = Uint8List.fromList(utf8.encode(kBackupFormat));
   final key = s.secureCopy(backupKey);
@@ -374,13 +379,13 @@ Future<BackupFile> encryptBackup({
   );
 }
 
-/// 解密备份内容（恢复码错误 / 数据损坏会抛 [FormatException]）。
+/// 解密备份内容（口令错误 / 数据损坏会抛 [FormatException]）。
 Future<Uint8List> decryptBackup({
   required BackupFile file,
-  required String recoveryCode,
+  required String backupCode,
 }) async {
   final s = await sodium();
-  final backupKey = await deriveBackupKey(recoveryCode: recoveryCode, salt: file.salt);
+  final backupKey = await deriveBackupKey(backupCode: backupCode, salt: file.salt);
   final aad = Uint8List.fromList(utf8.encode(kBackupFormat));
   final key = s.secureCopy(backupKey);
   try {

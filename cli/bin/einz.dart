@@ -490,10 +490,12 @@ Future<void> _cmdBackup(ArgResults opts) async {
     'space_key': store.spaceKey, // base64（测试端明文存储；App 生产走 Keychain/Keystore）
     'history': store.history,
     'attachments': store.attachments,
+    'pending': store.pending, // 离线发送队列（restore 端会还原；此前漏带导致恢复后丢失）
+    'archived_space_keys': store.archivedSpaceKeys, // 轮换归档密钥（漏带则恢复后旧消息解不开）
   });
 
   final recoveryCode = await generateRecoveryCode();
-  final file = await encryptBackup(payload: Uint8List.fromList(utf8.encode(payload)), recoveryCode: recoveryCode);
+  final file = await encryptBackup(payload: Uint8List.fromList(utf8.encode(payload)), backupCode: recoveryCode);
   File(outPath).writeAsStringSync(JsonEncoder.withIndent('  ').convert(file.toJson()));
 
   stdout.writeln('✅ 备份已导出: $outPath');
@@ -509,7 +511,7 @@ Future<void> _cmdRestore(ArgResults opts) async {
 
   final raw = File(inPath).readAsStringSync();
   final file = BackupFile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-  final plain = await decryptBackup(file: file, recoveryCode: recoveryCode);
+  final plain = await decryptBackup(file: file, backupCode: recoveryCode);
   final data = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
 
   stdout.writeln('✅ 备份解密成功（恢复码有效）');

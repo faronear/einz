@@ -27,7 +27,7 @@ class KeyEscrowService {
       'space_id': spaceId,
       'key_version': keyVersion,
     })));
-    return encryptBackup(payload: payload, recoveryCode: passphrase);
+    return encryptBackup(payload: payload, backupCode: passphrase);
   }
 
   /// 用口令解出 Space Key 包；口令错误抛 [FormatException]。
@@ -35,7 +35,7 @@ class KeyEscrowService {
     required String passphrase,
     required BackupFile file,
   }) async {
-    final plain = await decryptBackup(file: file, recoveryCode: passphrase);
+    final plain = await decryptBackup(file: file, backupCode: passphrase);
     final json = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
     return EscrowPayload(
       spaceKeyB64: json['space_key'] as String,
