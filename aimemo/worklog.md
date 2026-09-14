@@ -4884,3 +4884,63 @@ Ad Hoc 分发做不了，且 App 每 7 天需要重装续期）。已把这点�
 - §4 玩法 C（TestFlight/上架：当前不做 + 真做要补 ITSAppUsesNonExemptEncryption 等）
 - §5 常见问题表（含 profile 7 天到期、`device was not unlocked`、libsodium、SPM 等）
 - §6 真机验证清单
+
+### iOS 切到 Faronear 付费账号：Ad Hoc 1 年签名 + 装到 iPhone 11（实测通过）
+
+**背景（老板 2026-09-14）：** 上一轮发现个人团队 `37KQR6645B` 签发的 profile 只有 7 天
+（免费团队特征）。老板把新证书与 profile 放在
+`/Volumes/repodisk/simsim_key/cert-apple-苹果应用证书/20260914/`。
+
+**核查结论（都验过，不用老板手动转交）：**
+- `3_证书.p12` 含 Apple Distribution 证书 + 私钥（`FaronearPrikey`，口令在
+  `3_certpassword.simsim.js`）——p12 是 Apple 默认的 RC2-40 旧格式，`openssl` 需 `-legacy`，
+  但 `security import` 直接可用。
+- 钥匙串里原有 **3 张同名** `Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)`：
+  `2E9074CD…`(2024→2025 过期)、`E05D377C…`(2025→2026 过期)、
+  **`5914DE2D…`(2026-09-14 → 2027-09-14 有效)**。前两张是历史遗留（会让 Xcode 身份选择变乱），
+  按老板指示**已删除**；有效那张的私钥本就在，导入 p12 是重复导入（无害）。
+- 老板最初建的 `Einz_Dist_Adhoc.mobileprovision` 用的是 App ID `cc.tic.einz.ios.adhoc`；
+  我提出 `.adhoc` 与将来上架的 `cc.tic.einz.ios` **不是同一个 App**（数据容器不互通），
+  老板随后**覆盖**成 Ad Hoc for `cc.tic.einz.ios`：profile 名 `Einz Dist Adhoc`
+  （UUID `458acdea-…`，1 年，含 iPhone 11 + iPhone XR + 一台旧设备，绑有效证书）。
+
+**工程改造（`app/ios/Runner.xcodeproj`）：**
+- 3 个 Runner 配置：`PRODUCT_BUNDLE_IDENTIFIER` `cc.tic.einz` → **`cc.tic.einz.ios`**、
+  `DEVELOPMENT_TEAM` `37KQR6645B` → **`CQ6733CTMV`**
+- **Release** 配置额外改为**手动签名**（确定性最好，不依赖 Xcode 是否登录该 Apple ID）：
+  `CODE_SIGN_STYLE = Manual`、`"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"`、
+  `PROVISIONING_PROFILE_SPECIFIER = "Einz Dist Adhoc"`
+  （必须带 `[sdk=iphoneos*]` 限定符——项目级同名设置会覆盖不合限定的 target 设置）
+- 新增 `app/ios/exportOptionsAdhoc.plist`（`method=ad-hoc` + 显式证书/profile/bundle 映射）
+
+**实测：**
+```bash
+flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist
+# → build/ios/ipa/einz.ipa（13.7MB）；archive 200MB；Bundle Identifier: cc.tic.einz.ios
+unzip -q build/ios/ipa/einz.ipa -d /tmp/einz-ipa
+xcrun devicectl device install app --device 00008030-0005306011F9402E /tmp/einz-ipa/Payload/Runner.app
+# → App installed: bundleID cc.tic.einz.ios
+```
+校验：`codesign -dv` → `Identifier=cc.tic.einz.ios`、`TeamIdentifier=CQ6733CTMV`、
+`Authority=Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)`；内嵌 profile 名
+`Einz Dist Adhoc`、到期 2027-09-14 ✓。iPhone XR 那台 `unavailable`（未连/未解锁）故未装。
+
+**命令知识（记下来避免再踩）：** ad-hoc / app-store / development 的差别**只在导出一步**，
+archive 完全相同；`--export-method` 是便利参数（内部生成 exportOptions plist），
+与 `--export-options-plist` **不能同时给**；同一个 archive 可 `xcodebuild -exportArchive`
+用不同 options 导出多次。详见 `docs/IOS.md` §3。
+
+**文档：`docs/IOS.md` → v3.0**：配置速览（team/bundle/证书/profile/密钥保管位置）、
+与旧版两处关键差异（换团队=7 天→1 年；换 bundle id=手机上变另一个 App 需重新接入）、
+玩法 A 的完整命令、ad-hoc/app-store 区别表、手动签名配置、常见问题（含 UDID 不在 profile、
+SPM 残留、`--export-options-plist` 冲突等）。
+
+**顺带处理了并发合并：** 期间另一个 agent 跑了 `git pull`，`docs/IOS.md` 冲突——远端
+`a2473b7` 改的是**旧版 v1.0** 的常见问题表（已被本地 v2.0 重写取代），只有一行
+`Missing package product 'FlutterGeneratedPluginSwiftPackage'` 是新信息。解决：保留本地表格 +
+并入该行与「APNs 未接入」一行；其 `Runner.xcodeproj` 的 SPM 引用清理与本地一致（无冲突）；
+worklog 增量原样保留。
+
+**校正一处旧记录：** 那份 worklog 写着「Xcode 16.1 太旧、最高支持 iOS 18.1 设备，带不动 iOS 26.3
+真机，需升级 Xcode 26.x」——**实测不成立**：Xcode 16.1 对 iOS 26.3.1 的 iPhone 11，开发安装与
+Ad Hoc 安装各成功一次。
