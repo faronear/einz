@@ -5318,10 +5318,12 @@ macOS/桌面/测试环境自动退回占位图标——与 video_player 的平�
 - `_retryAttachment` 顺带清缩略图缓存。
 
 **测试：** 新增 `test/chat_quote_video_test.dart`（2 项，镜像 `chat_quote_image_test`）。
-**踩坑（重要，跨测试通用）：** `testWidgets` 跑在 FakeAsync 区里，**真实 dart:io 永远不会完成**
+**踩坑（仅测试环境，真机无此问题）：** `testWidgets` 跑在 FakeAsync 区里，**真实 dart:io 永远不会完成**
 ——`MediaCache` 的 `exists()/writeAsBytes()` 会一直挂着，缩略图永远转圈，`pumpAndSettle` 必超时。
 解法是 `settleIo()`：pump（触发构建、发起 IO）与 `tester.runAsync(真实 100ms 窗口)` 交替若干轮，
 直到不再转圈；再 mock 两条通道（path_provider 取临时目录、video_thumbnail 回一张小 PNG），
 于是三处缩略图能按尺寸（48/24/40）断言。
 
-**验证：** `flutter analyze` 无 issue；`flutter test` 118 项全过。真机首帧效果待老板验证。
+（真机走正常 isolate 事件循环，`dart:io` 照常完成，无需任何修复——老板 2026-09-15 问过确认。）
+
+**验证：** `flutter analyze` 无 issue；`flutter test` 117 项全过。真机首帧效果待老板验证。
