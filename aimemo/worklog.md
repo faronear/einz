@@ -4538,3 +4538,36 @@ cli 单测 14/14 + message_status_check/receipts_check 全过、server 4 套测�
 `flutter analyze` 0 issue、app 全量 111 通过（+1 skip goldens）。
 
 **已知代价（已接受）：** 重装 = 重新接入（需伴侣设备发新邀请码 + 输密保口令）。
+
+### 决策定稿：不做 Space Key 轮换 → 撤除写侧代码 + 立安全政策文档
+
+**老板决策（2026-09-14）：** 不再考虑轮换方案，改为把现有代码方案与非代码安保政策加固
+完善，并给未来留下考据。理由（讨论过程）：轮换唯一独占的能力是"让已泄露的密钥对**未来**
+消息失效"；而架构上**取密钥比取密文容易**（密保箱取包免设备认证，密文必须持白名单
+token），所以撤销（掐密文通道）+ 被撤销设备上线自毁已覆盖绝大多数真实事故，轮换只是
+二阶防御；其成本集中在**分发**（新密钥要在不给被撤销设备的前提下送到剩余设备），任一环
+失败 = 消息永久不可解。该场景（越狱/镜像泄露）可用「**重建空间**」零成本替代。
+
+**落地原则：撤除"产生"轮换状态的入口，保留"读懂"轮换状态的只读路径。**
+
+**提交 1（`33e20f4`）代码撤除：**
+- server：`notifyKeyRotation()`、`app.ts` 调用点、撤销响应 `key_rotation_required`（→`{ok:true}`）
+- shared：删除 `keyring.dart`（`SpaceKeyRing` 仅测试引用）、export、ws_client 的
+  `kWsTypeKeyRotation`/`WsKeyRotationEvent`/分发分支
+- cli：`rotate` 命令 + `_cmdRotate` + `key.rotation` 帧处理 + `DeviceStore.rotateSpaceKey()`
+- 保留：`key_version` 字段、按版本取密钥的解密路径、备份载荷 `archived_space_keys`、
+  "更高版本即归档旧密钥"守卫（各处补了保留说明注释）
+- 测试：删 3 例；把 `key.rotation` 并入"未知帧被忽略"用例（旧服务器仍可能下发）；
+  新增 `cli/test/store_key_version_test.dart` 守读侧
+
+**提交 2（`785c0b9`）文档：** 新增 **`docs/SECURITY.md`**（安全口径唯一权威）：
+§1 威胁模型（含明确不在范围）｜§2 现有控制矩阵（对照代码位置）｜§3 不做轮换的收益矩阵
+（8 场景）+ 撤除/保留清单 + 替代方案 + 恢复前置条件(5 条)｜§4 事件处置手册（丢机/疑似
+密钥被提取/服务器被攻破/口令泄露/伴侣设备可疑/换机）｜§5 用户侧安保政策（口令规则、
+设备卫生、恢复码、设备清单、预期管理）｜§6 已接受残留风险清单｜§7 考据。
+并同步改写 E2EE §9、PROTOCOL、DEPLOYMENT §5.3、KEY_ESCROW、productLens §3/§4.4/§12、
+projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 里指向不存在的
+`docs/APP_LOCK.md` 的悬空引用（改指 SECURITY.md / DATABASE.md §4）。
+
+**验证：** server build + 4 套测试全过；shared analyze 0 issue / 26 测试；cli analyze
+0 issue / 15 测试 + 两套集成；app analyze 0 issue / 111 测试。

@@ -8,7 +8,8 @@ import 'package:einz_shared/einz_shared.dart';
 import 'local_database.dart';
 import 'secure_store.dart';
 
-/// App 启动锁（方案 B：PIN 加密密钥，docs/APP_LOCK.md）。
+/// App 启动锁（方案 B：PIN 加密密钥）。安全口径与威胁模型见 `docs/SECURITY.md`
+/// §2/§4，密钥存储位置见 `docs/DATABASE.md` §4（原先指向的 docs/APP_LOCK.md 从未落地）。
 ///
 /// - 首次设置 PIN：Argon2id 派生密钥加密"Space Key 包"（XChaCha20，复用 backup.dart），
 ///   密文存 drift app_state；同时用 12 词恢复码再加密一份（PIN 丢失兑底）。
