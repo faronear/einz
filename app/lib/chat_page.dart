@@ -3318,7 +3318,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const PopupMenuDivider(),
-                // 系统设置组：语言/阅后即焚/邀请/PIN/导出/口令
+                // 系统设置组：语言/风格；分隔线以下是安全相关：阅后即焚/附件存储/PIN/邀请/口令
                 PopupMenuItem(
                   value: 'locale',
                   child: Row(
@@ -3339,16 +3339,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'storage',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuAttachmentStorage, style: labelStyle),
-                      const Spacer(),
-                      Text(kAttachmentStorageLabels[_attachmentStorage] ?? ''),
-                    ],
-                  ),
-                ),
                 const PopupMenuDivider(), // 分隔：以下是安全相关设置（老板要求 2026-09-10）
                 PopupMenuItem(
                   value: 'burn',
@@ -3357,6 +3347,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(l10n.chatPageMenuBurnLabel, style: labelStyle),
                       const Spacer(),
                       Text(_burnOptionLabel(_burnSeconds, l10n)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'storage',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuAttachmentStorage, style: labelStyle),
+                      const Spacer(),
+                      Text(kAttachmentStorageLabels[_attachmentStorage] ?? ''),
                     ],
                   ),
                 ),
