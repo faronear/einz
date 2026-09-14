@@ -2697,7 +2697,6 @@ Future<void> _execCommand(String line) async {
         'history': store.history,
         'attachments': store.attachments,
         'pending': store.pending,
-        'archived_space_keys': store.archivedSpaceKeys,
       });
       final recoveryCode = await generateRecoveryCode();
       final file = await encryptWithPassphrase(

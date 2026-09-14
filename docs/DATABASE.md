@@ -268,15 +268,13 @@ CREATE TABLE app_state (
 ```json
 {
   "device": { "device_id": "…", "public_key": "…", "private_key": "…" },
-  "space_keys": {
-    "current":  { "key_version": 2, "key": "base64(32B)" },
-    "archived": [ { "key_version": 1, "key": "base64(32B)" } ]
-  }
+  "space_key": { "key_version": 1, "key": "base64(32B)" }
 }
 ```
 
 - 身份私钥 + Space Key 明文只在此处；SQLite 中只存密文。
-- 归档 Space Key 仅用于解密旧消息（E2EE.md §9.2）。
+- **一个 Space 一把 Space Key**（`key_version` 恒为 1）：轮换不做，故无归档密钥层
+  （2026-09-14 决策与撤除清单见 `SECURITY.md` §3；`key_version` 字段本身保留在信封/AAD 里）。
 
 ### 4.1 安全存储的生存周期（平台差异，老板 2026-09-14 决策）
 

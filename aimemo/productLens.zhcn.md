@@ -179,8 +179,9 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 - **替代方案（怀疑密钥泄露时）：重建空间**——新建空间 + 重新邀请伴侣，零新代码、保证最强
   （全新密钥、无旧 key_version 残留），代价是伴侣重新接入一次、历史留在旧空间。
 - **已撤除的代码**：`SpaceKeyRing`、`einz rotate`、`DeviceStore.rotateSpaceKey()`、服务端
-  `key.rotation` 广播与 `key_rotation_required`（原实现见 git 历史）。**保留只读面**：
-  `key_version` 字段、按版本取密钥的解密路径、备份载荷里的 `archived_space_keys`。
+  `key.rotation` 广播与 `key_rotation_required`；**归档密钥层一并删除**（`archived_space_keys`
+  / `archivedKeys` / "高版本即归档"守卫——无生产者且无存量数据，不背兼容包袱）。
+  唯一留下的是 **`key_version` 本身**（信封/AAD 一部分，见 §4.2）+ 按版本取钥的收口。
 - `[搁置]` **密保箱纳入归档密钥**（`aimemo/escrowArchivedKeys.md`）：这是轮换的前置依赖，
   随轮换一并搁置；将来恢复轮换时按 `SECURITY.md` §3.5 的清单补齐。
 

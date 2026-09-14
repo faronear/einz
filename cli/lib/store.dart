@@ -37,13 +37,11 @@ class DeviceStore {
     List<String>? pending,
     List<Map<String, dynamic>>? history,
     List<Map<String, dynamic>>? attachments,
-    List<Map<String, dynamic>>? archivedSpaceKeys,
   })  : personNames = personNames ?? {},
         personGenders = personGenders ?? {},
         pending = pending ?? [],
         history = history ?? [],
-        attachments = attachments ?? [],
-        archivedSpaceKeys = archivedSpaceKeys ?? [];
+        attachments = attachments ?? [];
 
   String? deviceId; // 规范设备 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 personId 一致）
   final String publicKey; // base64
@@ -87,9 +85,6 @@ class DeviceStore {
   /// 本地附件元数据（上传/同步后落盘，解密需要 nonce/sha256/key_version）。
   final List<Map<String, dynamic>> attachments;
 
-  /// 归档 Space Key（E2EE.md §9.2）：[{key_version, space_key(base64)}]，只读用于解密旧消息。
-  final List<Map<String, dynamic>> archivedSpaceKeys;
-
   static Future<DeviceStore> create({String? deviceId}) async {
     final kp = await DeviceKeyPair.generate(deviceId: deviceId);
     return DeviceStore(
@@ -123,7 +118,6 @@ class DeviceStore {
         'pending': pending,
         'history': history,
         'attachments': attachments,
-        'archived_space_keys': archivedSpaceKeys,
       };
 
   static DeviceStore fromJson(Map<String, dynamic> json) => DeviceStore(
@@ -150,7 +144,6 @@ class DeviceStore {
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-        archivedSpaceKeys: (json['archived_space_keys'] as List?)?.cast<Map<String, dynamic>>() ?? [],
       );
 
   void save(String path) {
@@ -174,18 +167,11 @@ class DeviceStore {
     }
   }
 
-  /// 按 key_version 取 Space Key（当前或归档）；未知版本返回 null。
-  /// 用于解密历史消息（E2EE.md §9.2：归档密钥只读，不参与新加密）。
-  ///
-  /// **保留说明（2026-09-14）：** 这是"读懂轮换状态"的只读路径——轮换方案已决定不做
-  /// （见 docs/SECURITY.md），因此 `archivedSpaceKeys` 在实践中恒为空；保留它是因为
-  /// （a）备份/恢复载荷里的 `archived_space_keys` 字段要保持兼容，（b）将来若恢复轮换，
-  /// 解密侧无需改动。产生轮换状态的入口（`rotate` 命令 / `rotateSpaceKey()`）已撤除。
+  /// 按 key_version 取 Space Key：只有**当前版本**可取（一个 Space 一把钥匙），
+  /// 未知版本返回 null → 调用方报错，而不是拿错钥匙硬解出一堆垃圾。
+  /// 这个收口必须存在，因为 `key_version` 是信封/AAD 的一部分（E2EE.md §5.2）。
   String? spaceKeyForVersion(int version) {
     if (version == keyVersion) return spaceKey;
-    for (final entry in archivedSpaceKeys) {
-      if (entry['key_version'] == version) return entry['space_key'] as String?;
-    }
     return null;
   }
 

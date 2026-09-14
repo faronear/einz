@@ -187,10 +187,6 @@ Future<void> _cmdImport(ArgResults opts) async {
   final envelope = base64Decode(File(envelopeFile).readAsStringSync().trim());
   final opened = await sealOpen(s, envelope, store.publicKeyBytes, store.privateKeyBytes);
 
-  // 轮换导入（--key-version > 当前）：旧密钥归档（E2EE.md §9.2），写入新版本密钥
-  if (keyVersion > store.keyVersion && store.spaceKey != null) {
-    store.archivedSpaceKeys.add({'key_version': store.keyVersion, 'space_key': store.spaceKey});
-  }
   store.spaceKey = base64Encode(opened);
   store.spaceId = spaceId;
   store.keyVersion = keyVersion;
@@ -339,10 +335,6 @@ Future<void> _cmdEscrowDownload(ArgResults opts) async {
     return;
   }
 
-  // 写回 store（参照 import 的归档逻辑：新版本 > 当前时归档旧密钥）
-  if (payload.keyVersion > store.keyVersion && store.spaceKey != null) {
-    store.archivedSpaceKeys.add({'key_version': store.keyVersion, 'space_key': store.spaceKey});
-  }
   store.spaceKey = payload.spaceKeyB64;
   store.spaceId = payload.spaceId;
   store.keyVersion = payload.keyVersion;
@@ -492,7 +484,6 @@ Future<void> _cmdBackup(ArgResults opts) async {
     'history': store.history,
     'attachments': store.attachments,
     'pending': store.pending, // 离线发送队列（restore 端会还原；此前漏带导致恢复后丢失）
-    'archived_space_keys': store.archivedSpaceKeys, // 轮换归档密钥（漏带则恢复后旧消息解不开）
   });
 
   final recoveryCode = await generateRecoveryCode();
@@ -532,7 +523,6 @@ Future<void> _cmdRestore(ArgResults opts) async {
       history: (data['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
       attachments: (data['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
       pending: (data['pending'] as List?)?.cast<String>() ?? [],
-      archivedSpaceKeys: (data['archived_space_keys'] as List?)?.cast<Map<String, dynamic>>() ?? [],
     );
     restored.save(outPath);
     stdout.writeln('✅ 已恢复设备存储: $outPath（历史 ${restored.historyCount} 条 + 队列 ${restored.pendingCount} 条；提示：设备凭证需重新 init 并登记白名单）');

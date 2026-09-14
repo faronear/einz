@@ -92,17 +92,23 @@
 | `cli/bin/einz.dart` | `rotate` 命令 + `_cmdRotate` + `key.rotation` 帧处理 | 删除；`--key-version` 文案去掉轮换暗示 |
 | `cli/lib/store.dart` | `DeviceStore.rotateSpaceKey()` | 删除 |
 
-### 3.3 保留的读侧（只读：读懂轮换状态）
+### 3.3 留下的只有 `key_version` 本身（无归档层）
 
-保留原则：**撤除"产生"轮换状态的入口，保留"读懂"轮换状态的只读路径**——这些路径同时
-也是数据格式兼容层，删除它们要动全部解密链路，收益为零。
+原则：**一个 Space 一把钥匙**。轮换不做之后，"归档密钥"这一层没有任何生产者，也没有
+存量数据（产品尚未上线，见 §7），因此**不背兼容包袱**——连同归档容器与"高版本即归档"
+守卫一起删除。
 
-| 位置 | 内容 | 保留理由 |
-| --- | --- | --- |
-| `cli/lib/store.dart` | `spaceKeyForVersion()` + `archivedSpaceKeys` | 备份/恢复载荷字段兼容；将来恢复轮换时解密侧无需改 |
-| `app/lib/data/message_repository.dart` | `archivedKeys` + `_keyForVersion()` | 同上（App 侧当前恒为空，属预留只读口） |
-| `cli/bin/einz.dart` / `cli/lib/chat_core.dart` | 收到**更高** `key_version` 时归档旧密钥的守卫 | 防止 `import --key-version N` 覆盖后旧消息失解 |
-| 全线 | `key_version` 字段本身 | 线格式一部分；解密按它选密钥 |
+| 位置 | 现在的形态 |
+| --- | --- |
+| 信封 / AAD / 服务端 `messages.key_version` 列 | **保留**：`key_version` 是线格式的一部分，且**参与 AAD**（`shared/lib/src/crypto/message_crypto.dart:64`）——它是"这条密文用哪把钥匙"的自描述标签 |
+| `cli/lib/store.dart` `spaceKeyForVersion()` | **保留**：退化为"只有当前版本可取，未知版本返回 null"的收口（拿不到就报错，而不是拿错钥匙硬解） |
+| `app/lib/data/message_repository.dart` `_keyForVersion()` | 同上 |
+| ~~`archivedSpaceKeys` / `archivedKeys` / 备份载荷 `archived_space_keys`~~ | **已删除**（2026-09-14）：无生产者、无存量数据，留着只是噪声 |
+| ~~import / escrow-fetch 的"更高版本即归档旧密钥"守卫~~ | **已删除**：同上 |
+
+> 为什么不像其它字段一样连 `key_version` 一起删掉？它被烤进 AEAD 的 AAD，改它等于给
+> 所有密文换一套认证参数；而它同时也是"将来真要引入第二把钥匙"时唯一现成的挂点。
+> 留着它零成本，删掉它只有一次性的整洁收益和一条不可逆的路。
 
 ### 3.4 替代方案：重建空间（怀疑密钥泄露时的官方止损）
 

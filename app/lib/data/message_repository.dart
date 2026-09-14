@@ -52,12 +52,11 @@ class MessageRepository {
     required this.spaceId,
     required this.deviceId,
     this.keyVersion = 1,
-    Map<int, Uint8List>? archivedKeys,
     this.token,
     this.settings,
     this.reauth,
     String? personId,
-  }) : archivedKeys = archivedKeys ?? {} {
+  }) {
     // 向导完成时已知本端 personId：立即种入映射，保证首帧就按 person 判定归属
     // （离线启动时 GET /space 拉不到映射；持久化映射由 refreshDeviceMap 落盘）。
     final pid = personId;
@@ -70,12 +69,6 @@ class MessageRepository {
   final String spaceId;
   final String deviceId;
   final int keyVersion;
-
-  /// 归档 Space Key（key_version → 密钥）：按消息携带的 key_version 解密旧数据
-  /// （E2EE.md §9.2）。**保留说明（2026-09-14）：** 轮换方案已决定不做
-  /// （docs/SECURITY.md），故当前无写入方（App 侧恒为空）；保留这一只读入口是为了
-  /// 兼容归档恢复与将来可能的轮换，且删除会牵动全部解密路径而收益为零。
-  final Map<int, Uint8List> archivedKeys;
 
   /// 阅后即焚设置（可选；未注入时默认 0=无限，行为与旧版一致）。
   final BurnAfterSettings? settings;
@@ -770,10 +763,12 @@ class MessageRepository {
     );
   }
 
-  /// 按 key_version 选解密密钥：当前版本用 spaceKey，旧版本用归档（E2EE.md §9.2）。
+  /// 按 key_version 选解密密钥：只有当前版本（一个 Space 一把钥匙），
+  /// 未知版本返回 null → 调用方报错，而不是拿错钥匙硬解出一堆垃圾。
+  /// （`key_version` 是信封/AAD 的一部分，所以这个收口必须存在——E2EE.md §5.2。）
   Uint8List? _keyForVersion(int version) {
     if (version == keyVersion) return spaceKey;
-    return archivedKeys[version];
+    return null;
   }
 
   /// 待发送队列长度。

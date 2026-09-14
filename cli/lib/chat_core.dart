@@ -213,10 +213,6 @@ class ChatSession {
     if (payload == null) {
       throw StateError('Server 无口令密保箱（请先在对端执行 escrow upload）');
     }
-    // 写回 store（参照 import 的归档逻辑：新版本 > 当前时归档旧密钥）
-    if (payload.keyVersion > store.keyVersion && store.spaceKey != null) {
-      store.archivedSpaceKeys.add({'key_version': store.keyVersion, 'space_key': store.spaceKey});
-    }
     store.spaceKey = payload.spaceKeyB64;
     store.spaceId = payload.spaceId;
     store.keyVersion = payload.keyVersion;

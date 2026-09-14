@@ -381,24 +381,18 @@ Client                     Server
 - 轮换的成本集中在**分发**：新密钥要在不给被撤销设备的前提下送到剩余设备，需要设备公钥
   通道 + 可靠投递 + 归档缺口补偿 + 轮换协调，任一环失败 = 消息**永久不可解**。
 
-### 9.2 密钥版本与归档（**只读保留**）
+### 9.2 密钥版本（保留）与归档层（**已删除**）
 
-设备本地保存一个**只读归档**：
-
-```json
-{
-  "current": { "key_version": 2, "space_key": "…" },
-  "archived": [{ "key_version": 1, "space_key": "…" }]
-}
-```
-
-- 解密某条消息时：按消息携带的 `key_version` 选择密钥 → 该字段与"按版本取密钥"的读路径
-  保留（`cli/lib/store.dart` `spaceKeyForVersion`、`app/lib/data/message_repository.dart`
-  `_keyForVersion`）；
-- 归档只用于解密旧数据，不参与新加密；字段也出现在备份/恢复载荷（`archived_space_keys`），
-  保持格式兼容；
-- **产生**轮换状态的入口已全部撤除（`SpaceKeyRing`、`einz rotate`、`rotateSpaceKey()`、
-  服务端 `key.rotation` 广播与 `key_rotation_required`）——原实现见 git 历史。
+- **`key_version` 保留**：每条密文携带它，且它**参与 AAD**
+  （`'einz-v1' ‖ space_id ‖ message_id ‖ sender_device_id ‖ type ‖ key_version`，
+  `shared/lib/src/crypto/message_crypto.dart:64`）——是"这条密文该用哪把钥匙"的自描述标签。
+- **一个 Space 一把钥匙**：解密侧的 `spaceKeyForVersion()` / `_keyForVersion()` 只认当前
+  版本，其它版本返回 null（报错，而不是硬解）。
+- **归档层已删除**（2026-09-14）：`archived_space_keys`（store 字段 / 备份载荷 / 解锁重传）
+  与"更高版本即归档旧密钥"守卫全部移除——轮换不做即无生产者，且产品未上线、无存量数据，
+  不背兼容包袱。原实现见 git 历史。
+- **产生**轮换状态的入口同样已撤除（`SpaceKeyRing`、`einz rotate`、`rotateSpaceKey()`、
+  服务端 `key.rotation` 广播与 `key_rotation_required`）。
 
 ### 9.3 撤销语义（现行）
 
