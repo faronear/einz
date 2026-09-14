@@ -4628,3 +4628,29 @@ projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 
 **验证：** `flutter analyze` 0 issue；`chat_page_menu_test` 19/19（+4 新例：PIN 框
 存在/空 PIN 拦截不触网、PIN 错锁包保持旧口令、有 PIN 全流程上传 rotated 包+锁包
 同步断言、无 PIN 回归）；锁/口令相关 5 文件 30/30 全过。
+
+### 纠正：「不做轮换」决策落地后，16bcdd8 的价值重定位 + 陈旧注释修正
+
+**背景（老板 2026-09-14 提醒）：** 老板最后拍板**拒绝并撤除 Space Key 轮换**
+（commit `33e20f4` 撤代码、`785c0b9` 立 SECURITY.md、`99b181e` 删归档密钥层；
+phase4_e2e.sh 有回归守卫确认 `rotate` 命令已删）。此前 16bcdd8 的论证把
+"Space Key 轮换时锁包旧口令导致 _syncEscrow 跳过重传"当主要失效场景——
+**该场景随轮换撤除而永久消失**，16bcdd8 记录里的这段表述已过时。
+
+**价值重定位：** 轮换撤掉后 `keyVersion` 永不推进，`_syncEscrow` 的
+"版本落后→重传"分支变死分支，唯一还活的自愈路径是"**服务器密保箱缺失→重传**"
+（服务端 key_escrow 数据丢失时，解锁凭锁包口令重建）。16bcdd8 的残余价值即
+保证锁包持有**当前**口令，使这条冷路径自愈可用；价值降格但仍在。
+
+**注释修正（老板 commit `ab06c5e`）：** `lock_page._syncEscrow` 与
+`app_lock.escrowPassphrase` 的"rotate 后同步"注释——老板澄清那里的 rotate 本指
+**口令重设（passphrase.rotated）与本机版本更新**，与 Space Key 轮换无关，
+但字面易误导。改为按真实行为描述：仅当服务器无包或本机版本更新时重传；
+普通解锁提前返回、不推进 updated_at。纯注释无行为变化，flutter analyze 0 issue。
+
+**TUI 侧结论（同轮讨论）：** TUI 不持久化密保口令（`DeviceStore` 无该字段；
+口令只在创建/修改当次内存中传给服务端，服务端存 argon2id 哈希用于校验
+加入方输入）。TUI 的 PIN 也只是 `pinHash` 会话门禁（`_unlockPin` 在
+`loadHistory` 前拦截），不加密任何本地包。故 TUI 无锁包概念、无需
+"PIN 更新锁包"——与 App 是同名不同物的两套机制；TUI 不上生产
+（Space Key 明文落盘是接受的测试代价）。
