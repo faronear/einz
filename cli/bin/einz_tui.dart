@@ -991,7 +991,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
         }
         // 连同解包一起验：口令对但包不匹配也按口令错误处理，避免白烧 token
         verified =
-            await KeyEscrowService(api).openPackage(passphrase: input, file: file);
+            await KeyEscrowService(api).openPackage(passphrase: input, envelope: file);
         break;
       } on ApiException catch (e) {
         if (e.code != 'ESCROW_VERIFY_FAILED') rethrow;
@@ -2949,7 +2949,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
         return;
       }
       try {
-        await escrow.openPackage(passphrase: oldPass, file: file);
+        await escrow.openPackage(passphrase: oldPass, envelope: file);
       } on FormatException {
         session.messages.add(_systemMessage(session, '⚠️ 旧口令错误，请重新输入（或 /exit 退出）'));
         continue;
