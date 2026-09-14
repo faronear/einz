@@ -682,6 +682,16 @@ String _inferAttachmentType(String? explicit, String fileName) {
 }
 
 /// 实时监听：连接 WS 接收 message.new，实时落盘历史并解密打印。
+/// 被撤销 / 会话失效（401 UNAUTHORIZED / 403 FORBIDDEN）判定：
+/// 这不是"网络错误"，而是撤销已生效——友好退出，不要抛未捕获异常或无限重连。
+/// （2026-09-14 复核 phase4 验收时发现：撤销会先清会话，监听器随后的 /sync 直接崩栈。）
+bool _isRevokedOrSessionDead(Object e) =>
+    e is ApiException &&
+    (e.code == 'UNAUTHORIZED' ||
+        e.code == 'FORBIDDEN' ||
+        e.httpStatus == 401 ||
+        e.httpStatus == 403);
+
 /// 断线自动重连，重连前先 /sync 补齐错过的消息（PROTOCOL.md §8.3）。
 Future<void> _cmdListen(ArgResults opts) async {
   final path = _require(opts, 'store');
@@ -691,7 +701,16 @@ Future<void> _cmdListen(ArgResults opts) async {
   store.requireSession();
 
   // 启动前先补一次同步（含补发离线队列），避免错过断线期间消息
-  final added = await _syncIncremental(store, server);
+  final List<MessageEnvelope> added;
+  try {
+    added = await _syncIncremental(store, server);
+  } on ApiException catch (e) {
+    if (_isRevokedOrSessionDead(e)) {
+      stdout.writeln('🚫 本设备已被撤销或会话失效（$e）——停止监听');
+      return;
+    }
+    rethrow;
+  }
   await _flushPending(store, path, server);
   store.save(path);
   if (added.isNotEmpty) {
@@ -751,6 +770,12 @@ Future<void> _cmdListen(ArgResults opts) async {
       if (backfilled.isNotEmpty) {
         stdout.writeln('📥 重连补齐 ${backfilled.length} 条');
       }
+    } on ApiException catch (e) {
+      if (_isRevokedOrSessionDead(e)) {
+        stdout.writeln('🚫 本设备已被撤销或会话失效（$e）——停止监听');
+        return;
+      }
+      // 其余（网络不可达等）：继续等待重连
     } catch (_) {
       // server 不可达，继续等待重连
     }
