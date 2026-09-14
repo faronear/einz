@@ -27,7 +27,7 @@ readonly DEFAULT_DEVICE="00008030-0005306011F9402E" # iPhone 11（luk_ip11_21070
 
 # ---------- 参数解析 ----------
 CHANNEL="${1:-}"
-if [[ "$CHANNEL" != "adhoc" && "$CHANNEL" != "appstore" ]]; then
+if [[ "${CHANNEL}" != "adhoc" && "${CHANNEL}" != "appstore" ]]; then
   cat >&2 <<'USAGE'
 用法: app/ios/buildIos.sh <adhoc|appstore> [选项]
 
@@ -46,14 +46,14 @@ shift
 
 DO_INSTALL=0
 DO_UPLOAD=0
-DEVICE="$DEFAULT_DEVICE"
+DEVICE="${DEFAULT_DEVICE}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --install) DO_INSTALL=1 ;;
     --upload) DO_UPLOAD=1 ;;
     --device)
       DEVICE="${2:-}"
-      if [[ -z "$DEVICE" ]]; then echo "❌ --device 需要一个 UDID" >&2; exit 64; fi
+      if [[ -z "${DEVICE}" ]]; then echo "❌ --device 需要一个 UDID" >&2; exit 64; fi
       shift
       ;;
     -h | --help) exec "$0" ;;
@@ -62,51 +62,51 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ "$CHANNEL" == "appstore" && "$DO_INSTALL" == 1 ]]; then
+if [[ "${CHANNEL}" == "appstore" && "${DO_INSTALL}" == 1 ]]; then
   echo "❌ App Store 包不能直装到手机（只能 TestFlight / 上架安装）——去掉 --install" >&2
   exit 64
 fi
 
 # ---------- 定位 flutter 与 app 目录 ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$APP_DIR"
+APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${APP_DIR}"
 
 FLUTTER="$(command -v flutter || true)"
-if [[ -z "$FLUTTER" && -x "$HOME/development/flutter/bin/flutter" ]]; then
-  FLUTTER="$HOME/development/flutter/bin/flutter"
-  export PATH="$HOME/development/flutter/bin:$PATH"
+if [[ -z "${FLUTTER}" && -x "${HOME}/development/flutter/bin/flutter" ]]; then
+  FLUTTER="${HOME}/development/flutter/bin/flutter"
+  export PATH="${HOME}/development/flutter/bin:${PATH}"
 fi
-if [[ -z "$FLUTTER" ]]; then
-  echo "❌ 找不到 flutter：请先 export PATH=\"\$HOME/development/flutter/bin:\$PATH\"" >&2
+if [[ -z "${FLUTTER}" ]]; then
+  echo "❌ 找不到 flutter：请先 export PATH=\"\${HOME}/development/flutter/bin:\${PATH}\"" >&2
   exit 1
 fi
-echo "▶ flutter: $FLUTTER"
+echo "▶ flutter: ${FLUTTER}"
 
 # ---------- 1) SPM 必须关闭（用 CocoaPods + 本地 libsodium pod）----------
-if "$FLUTTER" config --list 2>/dev/null | grep -q 'enable-swift-package-manager: true'; then
+if "${FLUTTER}" config --list 2>/dev/null | grep -q 'enable-swift-package-manager: true'; then
   echo "▶ 关闭 Swift Package Manager（工程依赖 CocoaPods 的 libsodium pod）…"
-  "$FLUTTER" config --no-enable-swift-package-manager >/dev/null
+  "${FLUTTER}" config --no-enable-swift-package-manager >/dev/null
 fi
 
 # ---------- 2) 签名证书 ----------
-if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$TEAM_ID"; then
+if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "${TEAM_ID}"; then
   cat >&2 <<ERR
-❌ 钥匙串里没有 $TEAM_ID 的 Apple Distribution 证书。
+❌ 钥匙串里没有 ${TEAM_ID} 的 Apple Distribution 证书。
    补一步（证书目录 /Volumes/repodisk/simsim_key/cert-apple-苹果应用证书/20260914/）：
      security import <3_证书.p12> -k ~/Library/Keychains/login.keychain-db -P <口令> -A
    （口令在同目录 3_certpassword.simsim.js）
 ERR
   exit 1
 fi
-echo "✅ 证书: Apple Distribution … ($TEAM_ID)"
+echo "✅ 证书: Apple Distribution … (${TEAM_ID})"
 
 # ---------- 3) 对应的 mobileprovision 是否已装到本机 ----------
-PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+PROFILE_DIR="${HOME}/Library/MobileDevice/Provisioning Profiles"
 profile_exists() { # $1 = profile 名
   local f xml
-  [[ -d "$PROFILE_DIR" ]] || return 1
-  for f in "$PROFILE_DIR"/*.mobileprovision; do
+  [[ -d "${PROFILE_DIR}" ]] || return 1
+  for f in "${PROFILE_DIR}"/*.mobileprovision; do
     [[ -e "$f" ]] || continue
     xml="$(security cms -D -i "$f" 2>/dev/null || true)"
     [[ -n "$xml" ]] || continue
@@ -115,57 +115,63 @@ profile_exists() { # $1 = profile 名
   return 1
 }
 
-if [[ "$CHANNEL" == "adhoc" ]]; then
-  PROFILE_NAME="$PROFILE_ADHOC"
+if [[ "${CHANNEL}" == "adhoc" ]]; then
+  PROFILE_NAME="${PROFILE_ADHOC}"
   PLIST="ios/exportOptionsAdhoc.plist"
 else
-  PROFILE_NAME="$PROFILE_STORE"
+  PROFILE_NAME="${PROFILE_STORE}"
   PLIST="ios/exportOptionsAppStore.plist"
 fi
 
-if ! profile_exists "$PROFILE_NAME"; then
+if ! profile_exists "${PROFILE_NAME}"; then
   cat >&2 <<ERR
-❌ 本机缺少 $CHANNEL 用的描述文件「$PROFILE_NAME」（bundle $BUNDLE_ID）。
+❌ 本机缺少 ${CHANNEL} 用的描述文件「${PROFILE_NAME}」（bundle ${BUNDLE_ID}）。
    补一步：developer.apple.com → Certificates, Identifiers & Profiles → Profiles
-   → 下载 $PROFILE_NAME → 复制为：
+   → 下载 ${PROFILE_NAME} → 复制为：
      ~/Library/MobileDevice/Provisioning Profiles/<UUID>.mobileprovision
    （已从别的 Mac 拷过证书时别忘了这一步；Ad Hoc 那台 UUID 458acdea-…）
 ERR
   exit 1
 fi
-echo "✅ 描述文件: $PROFILE_NAME"
+echo "✅ 描述文件: ${PROFILE_NAME}"
 
 # ---------- 4) 构建 ----------
-echo "▶ 构建 $CHANNEL IPA（约 1–3 分钟）…"
-"$FLUTTER" build ipa --release --export-options-plist="$PLIST"
-IPA="$APP_DIR/build/ios/ipa/einz.ipa"
-[[ -f "$IPA" ]] || { echo "❌ 没找到产物 $IPA" >&2; exit 1; }
-echo "✅ IPA: $IPA ($(du -h "$IPA" | cut -f1))"
+echo "▶ 构建 ${CHANNEL} IPA（约 1–3 分钟）…"
+"${FLUTTER}" build ipa --release --export-options-plist="${PLIST}"
+IPA="${APP_DIR}/build/ios/ipa/einz.ipa"
+[[ -f "${IPA}" ]] || { echo "❌ 没找到产物 ${IPA}" >&2; exit 1; }
+echo "✅ IPA: ${IPA} ($(du -h "${IPA}" | cut -f1))"
 
 # ---------- 5) 安装 / 上传 ----------
-if [[ "$CHANNEL" == "adhoc" ]]; then
-  if [[ "$DO_INSTALL" == 0 ]]; then
+if [[ "${CHANNEL}" == "adhoc" ]]; then
+  if [[ "${DO_INSTALL}" == 0 ]]; then
     echo "ℹ️  装到手机：app/ios/buildIos.sh adhoc --install [--device <UDID>]"
     exit 0
   fi
-  echo "▶ 安装到设备 $DEVICE（devicectl 只吃 .app，先解包）…"
+  echo "▶ 安装到设备 ${DEVICE}（devicectl 只吃 .app，先解包）…"
   WORK="$(mktemp -d)"
-  unzip -q "$IPA" -d "$WORK"
-  if xcrun devicectl device install app --device "$DEVICE" "$WORK/Payload/Runner.app"; then
-    echo "✅ 已安装（bundle $BUNDLE_ID）。装不上先看：手机是否锁屏 / UDID 是否在 profile 里"
+  unzip -q "${IPA}" -d "${WORK}"
+  if xcrun devicectl device install app --device "${DEVICE}" "${WORK}/Payload/Runner.app"; then
+    echo "✅ 已安装（bundle ${BUNDLE_ID}）。装不上先看：手机是否锁屏 / UDID 是否在 profile 里"
     echo "   xcrun devicectl list devices   # 查 UDID"
   else
-    echo "❌ 安装失败。常见原因：手机锁屏（提示 device was not unlocked）、UDID 不在 profile 里、未配对该设备" >&2
-    rm -rf "$WORK"
+    # 常见失败：手机锁屏（device was not unlocked）、UDID 不在 profile 里、
+    # 手机没连上/不在同一 Wi-Fi（devicectl 走网络隧道，报 tunnel interrupted / timed out）
+    echo "❌ 安装失败。常见原因：" >&2
+    echo "   · 手机没连上或不在同一 Wi-Fi（报 tunnel interrupted / timed out → 解锁手机、连上后重试）" >&2
+    echo "   · 手机锁屏（提示 device was not unlocked）" >&2
+    echo "   · 该设备 UDID 不在 $PROFILE_NAME 里 / 未配对" >&2
+    echo "   xcrun devicectl list devices   # 查设备是否 available (paired) 与 UDID" >&2
+    rm -rf "${WORK}"
     exit 1
   fi
-  rm -rf "$WORK"
+  rm -rf "${WORK}"
 else
   echo "ℹ️  TestFlight / 上架流程：上传后到 App Store Connect 选构建版本。"
   echo "   上传命令（也见 docs/IOS.md §4）："
-  echo "     xcrun altool --upload-app -f \"$IPA\" -t ios \\"
-  echo "       --apiKey \"\$ASC_API_KEY_ID\" --apiIssuer \"\$ASC_API_ISSUER\""
-  if [[ "$DO_UPLOAD" == 0 ]]; then
+  echo "     xcrun altool --upload-app -f \"${IPA}\" -t ios \\"
+  echo "       --apiKey \"\${ASC_API_KEY_ID}\" --apiIssuer \"\${ASC_API_ISSUER}\""
+  if [[ "${DO_UPLOAD}" == 0 ]]; then
     echo "   （加 --upload 让脚本直接传）"
     exit 0
   fi
@@ -174,7 +180,7 @@ else
     exit 1
   fi
   echo "▶ 上传到 App Store Connect…"
-  xcrun altool --upload-app -f "$IPA" -t ios \
-    --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER"
+  xcrun altool --upload-app -f "${IPA}" -t ios \
+    --apiKey "${ASC_API_KEY_ID}" --apiIssuer "${ASC_API_ISSUER}"
   echo "✅ 上传已提交；等 Apple 处理完（几分钟～几十分钟）即可在 TestFlight 里选版本"
 fi
