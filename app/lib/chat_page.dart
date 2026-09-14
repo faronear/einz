@@ -2124,18 +2124,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 输入栏引用条：被引用消息预览 + 取消按钮。
   ///
-  /// 背景色**与消息气泡里的引用框完全一致**（黑 6% 半透明 / gradient 白 12%）——
-  /// 只要能看出和周边输入区不是同一块就行，深底太突兀（老板 2026-09-13）；
-  /// 蓝色左边缘也已在同日去掉。
+  /// 配色**两种界面风格一致**（老板 2026-09-14）：此前 gradient 下用「白 12% 底 +
+  /// white70 字/图标」，而 gradient 的输入栏本身就是 85% 白悬浮条——白底上的淡白
+  /// 字几乎看不见。改为与素雅纯色同款：黑 6% 半透明底 + 灰字/灰图标（顺带与气泡里
+  /// 的引用框保持同一族颜色）；蓝色左边缘也已在 2026-09-13 去掉。
   Widget _buildQuoteBanner(HistoryMessage quote) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         // 与气泡引用框同色（_buildQuoteBlockContent 所在的引用块）
-        color: _uiStyle == 'gradient'
-            ? Colors.white12
-            : Colors.black.withValues(alpha: 0.06),
+        color: Colors.black.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -2143,9 +2142,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 引用图片时显示原图缩略图（否则双引号图标）——与发送后的引用块一致
           quote.env.type == 'image'
               ? _buildImageThumb(quote, size: 24)
-              : Icon(Icons.format_quote,
-                  size: 14,
-                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey),
+              : const Icon(Icons.format_quote, size: 14, color: Colors.grey),
           const SizedBox(width: 6),
           // 语音/音频：波形图 + 秒数（与气泡/发送后的引用块一致，不再显示「语音」
           // 这类文字——老板要求 2026-09-13）
@@ -2154,9 +2151,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               messageId: quote.env.messageId,
               seconds: _audioDurationSeconds(quote),
               isVoice: quote.env.type == 'voice',
-              color: _uiStyle == 'gradient'
-                  ? Colors.white70
-                  : Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const Spacer(), // 取消按钮仍靠右（与文字引用时一致）
           ] else
@@ -2166,20 +2161,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 _quotePreview(quote.plaintext),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 12,
-                    color: _uiStyle == 'gradient'
-                        ? Colors.white70
-                        : Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
               ),
             ),
           InkWell(
             onTap: () => setState(() => _quoteTarget = null),
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Icon(Icons.close,
-                  size: 16,
-                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 16, color: Colors.grey),
             ),
           ),
         ],

@@ -5081,3 +5081,20 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 但 `attachFile(arg)` 把整个 arg 当路径、`caption` 参数从没传过——即"描述"其实不支持
 （带空格路径也因此没法和描述区分开）。要不要支持描述（如首个空格切分 / `--` 分隔），
 请老板拍板。
+
+### App 渐变风格下「输入栏引用条」看不清 → 与素雅纯色统一配色（老板 2026-09-14）
+
+**反馈（老板）：** 渐变粉蓝风格下长按消息点「引用」，输入框上方那条引用条背景很淡、
+里面字更淡，看不清；要求做得和素雅纯色风格下一样。
+
+**根因：** `_buildQuoteBanner` 按风格分色——gradient 分支是「`Colors.white12` 底 +
+`white70` 图标/文字/波形秒数」。但 gradient 的输入栏本身就是 `Colors.white` 85% 的
+悬浮圆角条（`chatPageInputBar`）——白底淡白字 = 几乎不可见。素雅纯色那一支是
+「黑 6% 底 + 灰图标 + `grey.shade700` 文字」，落在浅色背景上对比度正常。
+
+**改法（app/lib/chat_page.dart，`_buildQuoteBanner`）：** 删掉该组件的三处
+`_uiStyle == 'gradient' ? … : …` 分色，固定用素雅纯色那套（黑 6% 底 / 灰图标 /
+`grey.shade700` 文字 / 波形用 `colorScheme.primary`）。只动输入栏引用条；
+气泡**内**的引用块（`_buildQuoteBlockContent`，gradient 气泡是深底）保持 white70 不变。
+
+**验证：** `flutter analyze` 无 issue。视觉/手感由老板自测（未代跑测试）。
