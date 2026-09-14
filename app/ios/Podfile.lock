@@ -64,7 +64,7 @@ SPEC CHECKSUMS:
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
-  libsodium: a8be4d4dc598ca2fcadc4ff29ec7b940e2747a5b
+  libsodium: 4f02ecd7a46e9954c79582988fd34b4d20957237
   mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
   record_ios: 390a30c7caaf8b5d0fb1cb1d2fd5064b48b4520c
   video_player_avfoundation: 3453f792138786248960ca029747fcd9f318ef52

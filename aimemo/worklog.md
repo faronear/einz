@@ -4968,3 +4968,44 @@ Ad Hoc 安装各成功一次。
 
 **另：** `feature/multiverse` 已**完全并入** main（`git merge-base --is-ancestor` 通过），
 所以新仓库只有 main 也不会丢任何东西。
+
+### iOS 真机 release 修复：`Failed to look up symbol 'sodium_init'`（导出表被 install-strip 清空）
+
+**老板 2026-09-14 真机报错：** iPhone 11 上 Ad Hoc 版首屏「密钥生成失败: Invalid argument(s):
+Failed to look up symbol 'sodium_init'」。
+
+**排查（关键是别被错误的测量方法带偏）：**
+1. 先查构建产物二进制 → `nm` 里 sodium 符号数 **0**，一度以为"根本没链进来"。
+   但 `strings` 能搜到 `expand 32-byte k`、`sodium_crit_enter` → **代码其实在**。
+2. 换用 `dyld_info -exports`（dlsym 真正查的那张表）：
+   - 普通 `xcodebuild ... build`（Release，未 install-strip）产物：**导出 652 个符号**
+   - `.xcarchive` 产物与导出后的 IPA：**只有 1 个**（`__mh_execute_header`）
+   → 差别不在链接，而在 **archive/install 阶段的 strip**。
+3. 对照实验：在"好"的二进制上手工跑各种 strip → `-S` / `-x` / `-S -x` / `-r` 都**不影响**
+   导出表，唯独 **`strip -u` 把导出表清成 0**，与 archive 产物症状完全一致。
+4. 结论：`STRIP_INSTALLED_PRODUCT = YES`（Release 默认）在 archive 时清空主可执行文件的
+   导出表；而 libsodium 的符号**只**由 Dart 在运行时经 `DynamicLibrary.process()`（dlsym）
+   查找，链接期无可见引用，于是全被清掉。
+
+**为什么模拟器/开发构建测不出：** 模拟器上跑的是 **Debug** 构建，既不做 install-strip 也不做
+dead-strip，导出表原样保留 → 同一个 bug 在本地"看起来正常"。
+
+**修法（两处，缺一不可）：**
+- `app/ios/Libraries/libsodium.podspec`：保留 `-force_load <静态库>`，并补
+  `-Wl,-export_dynamic`（ld 文档：保留主可执行文件的全局符号）。
+- `app/ios/Runner.xcodeproj`：Runner 的 **Release** 配置加 **`STRIP_INSTALLED_PRODUCT = NO`**。
+
+**验证（不靠"应该能行"，逐符号对账）：** 先从 `~/.pub-cache/.../sodium-2.3.1+1` 提取该包
+`lookupFunction` 用到的全部符号名 → 共 **647 个**（593 `crypto_*` + 42 `sodium_*` +
+12 `randombytes_*`）；再用 `dyld_info -exports` 取 IPA 的导出表做差集：
+**导出 652 个 / 缺失 0 个**，`sodium_init` 在列 ✓。已 `devicectl install` 到 iPhone 11。
+
+**顺带查了安卓侧（老板没有安卓真机，要求确保不出同类问题）：**
+- **符号导出：没问题。** `jniLibs` 4 个 ABI 的 `libsodium.so`（ELF 共享库）dynsym 各 651 个
+  符号，与上述 647 个需求对账 **缺失 0**。ELF 的 dynsym 就是导出表，不存在 iOS 那种
+  "主可执行文件导出表被清空"的问题。
+- **但发现另一个真问题：16KB 页对齐不达标。** 四个 ABI 的 LOAD 段 `p_align` 全是
+  **0x1000（4KB）**，而 Android 15+ 的 16KB 页设备要求 **≥ 0x4000**——在这种设备上
+  `dlopen("libsodium.so")` 会直接失败（症状同 iOS：加载不了 libsodium）。
+  这是**预编译 .so 的固有问题**，解法是重新链接/重编 libsodium
+  （NDK r28+ 默认 16KB，或传 `-Wl,-z,max-page-size=16384`）→ 待老板定方案。
