@@ -286,6 +286,13 @@ Future<void> _cmdEscrowUpload(ArgResults opts) async {
   }
   final server = _require(opts, 'server');
   final passphrase = _require(opts, 'passphrase');
+  // 口令强度策略（唯一来源 shared/passphrase_policy.dart）：设置时校验，输入既有口令不校验
+  final violation = checkPassphrasePolicy(passphrase);
+  if (violation != null) {
+    throw StateError(violation == PassphrasePolicyViolation.tooShort
+        ? '密保口令不得少于 $kPassphraseMinLength 位'
+        : '密保口令需同时包含字母与数字');
+  }
   final api = ApiClient(server);
   final s = await sodium();
 
@@ -316,6 +323,13 @@ Future<void> _cmdEscrowDownload(ArgResults opts) async {
   final store = DeviceStore.load(path);
   final server = _require(opts, 'server');
   final passphrase = _require(opts, 'passphrase');
+  // 口令强度策略（唯一来源 shared/passphrase_policy.dart）：设置时校验，输入既有口令不校验
+  final violation = checkPassphrasePolicy(passphrase);
+  if (violation != null) {
+    throw StateError(violation == PassphrasePolicyViolation.tooShort
+        ? '密保口令不得少于 $kPassphraseMinLength 位'
+        : '密保口令需同时包含字母与数字');
+  }
   final api = ApiClient(server);
   final s = await sodium();
 

@@ -61,8 +61,9 @@
     }
   },
   "wizardPassphraseHint": "对所有内容进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
-  "wizardPassphraseMinLengthHint": "至少8位以上密码",
-  "wizardPassphraseTooShort": "口令不得少于 8 位",
+  "wizardPassphraseMinLengthHint": "至少 10 位，且同时包含字母与数字",
+  "wizardPassphraseTooShort": "口令不得少于 10 位",
+  "wizardPassphraseWeak": "口令需同时包含字母与数字",
   "wizardPassphraseConfirmHint": "再输一次以确认",
   "wizardPassphraseMismatch": "两次输入的口令不一致",
   "wizardJoinPassphraseHint": "口令是与伴侣共享的密码，用于保护聊天内容。如果不知道口令，请询问伴侣。",
@@ -190,14 +191,14 @@
   "chatPageChangePassphraseConfirmMessage": "确定要修改密保口令吗？修改后需用新口令解密内容密文。",
   "chatPageChangePassphraseOldWrong": "旧口令错误",
   "chatPageChangePassphraseNoEscrow": "尚未设置口令（无口令密保箱可修改）",
-  "chatPageChangePassphraseDone": "✅ 口令已修改（新设备加入时请使用新口令）",
+  "chatPageChangePassphraseDone": "✅ 口令已修改（请告知伴侣；新设备接入需用新口令）",
   "chatPageChangePassphraseFailed": "修改口令失败: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
       "error": {"type": "String"}
     }
   },
-  "chatPageEscrowRotatedNotice": "其他设备已重设密保口令，本设备将解除绑定的秘境",
+  "chatPageEscrowRotatedNotice": "伴侣已重设密保口令——生成邀请或再次修改时请使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuStyleLabel": "界面风格",
   "chatPageStyleSheetClose": "关闭",

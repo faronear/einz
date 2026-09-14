@@ -61,8 +61,9 @@
     }
   },
   "wizardPassphraseHint": "Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.",
-  "wizardPassphraseMinLengthHint": "At least 8 characters",
-  "wizardPassphraseTooShort": "Passphrase must be at least 8 characters",
+  "wizardPassphraseMinLengthHint": "At least 10 characters, with letters and digits",
+  "wizardPassphraseTooShort": "Passphrase must be at least 10 characters",
+  "wizardPassphraseWeak": "Passphrase must contain both letters and digits",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
   "wizardPassphraseMismatch": "Passphrases do not match",
   "wizardJoinPassphraseHint": "A password shared with your partner to protect messages. Don't know it? Ask your partner.",
@@ -190,7 +191,7 @@
   "chatPageChangePassphraseConfirmMessage": "Change the passphrase? You'll need the new one to decrypt content.",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
   "chatPageChangePassphraseNoEscrow": "No passphrase set (nothing to change)",
-  "chatPageChangePassphraseDone": "✅ Passphrase updated (new devices must use it)",
+  "chatPageChangePassphraseDone": "✅ Passphrase updated — tell your partner; new devices must use the new one",
   "chatPageChangePassphraseFailed": "Failed to change passphrase: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {

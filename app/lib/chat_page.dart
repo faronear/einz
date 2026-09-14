@@ -3734,8 +3734,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
   final _oldCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
-  // 与创建向导保持一致的最短口令长度（老板要求 2026-09-12）
-  static const int _passphraseMinLength = 8;
+  // 与创建向导共用同一策略（shared 的 passphrase_policy.dart）
   bool _busy = false;
   String? _error;
 
@@ -3759,8 +3758,11 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.setupPageNeedPassphrase);
       return;
     }
-    if (newPass.length < _passphraseMinLength) {
-      setState(() => _error = l10n.wizardPassphraseTooShort);
+    final violation = checkPassphrasePolicy(newPass);
+    if (violation != null) {
+      setState(() => _error = violation == PassphrasePolicyViolation.tooShort
+          ? l10n.wizardPassphraseTooShort
+          : l10n.wizardPassphraseWeak);
       return;
     }
     if (newPass != confirm) {

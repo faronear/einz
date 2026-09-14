@@ -46,6 +46,8 @@
 | 密钥安全存储 | `app/lib/data/secure_store.dart` | Keychain/Keystore；iOS/macOS 用 `first_unlock_this_device`（**不随备份/换机迁移**） |
 | 卸载即重置 | `app_lock.ensureFreshInstall()` + `main.dart` `StartupGate` | 安全存储条目活过卸载 → 全新安装时清残留（`DATABASE.md` §4.1） |
 | 口令托管（接入凭证） | `shared/lib/src/crypto/key_escrow.dart` | Argon2id + XChaCha20-Poly1305；**取包免设备认证**（见 §3.2） |
+| 口令强度策略 | `shared/lib/src/crypto/passphrase_policy.dart` | ≥10 位且含字母数字；设置/修改时三端统一校验（输入既有口令不校验） |
+| 取包失败限速 | `server/src/escrow.ts`（`ESCROW_RATE_LIMITED`） | 免认证取包端点按 space 计失败次数，超限 429（默认 10 次/15 分钟） |
 | 口令重设通知 | `server/src/escrow.ts` + WS `passphrase.rotated` | 改口令后其余设备收通知 / 离线补查 `updated_at` |
 | 整机备份 | CLI `backup`/`restore`、App「导出完整备份」 | 12 词恢复码（Argon2id 派生）加密；恢复码离线保存 |
 | 附件与媒体 | `MediaCache` + `local_attachments` | 解密副本落 App 私有缓存；焚毁/删除定点清理、启动孤儿清理 |
@@ -164,6 +166,9 @@
 ### 4.4 密保口令泄露或怀疑
 
 1. 在任一设备上**修改口令**（App 聊天页 ⋯ / TUI `/passphrase`）：服务端密保箱重加密，旧口令立即失效，其余设备收 `passphrase.rotated` 通知；
+   - ⚠️ **改完必须线下把新口令告知伴侣**：对方设备记录的仍是旧口令（新口令不在网络上传递），
+     它自己不知道已失效——不告知的话，对方日后接入新设备或做恢复会失败。这也是改口令的
+     唯一真实摩擦点；
 2. 注意：改口令**不换密钥**（箱子里还是同一把 Space Key）→ 已经取过箱子的人不受影响；若同时怀疑密钥，按 §4.2。
 
 ### 4.5 伴侣设备可疑
@@ -180,7 +185,8 @@
 
 ## 5. 用户侧安保政策（非代码）
 
-1. **口令**：≥10 位混合字符或 ≥5 个词；**不复用**其它服务的口令；不存云盘/备忘录/聊天记录。
+1. **口令**：≥10 位且同时含字母与数字（更推荐"三个不相关的词 + 数字"这类词串）；**不复用**
+   其它服务的口令；不存云盘/备忘录/聊天记录。**改口令后当面/线下告知伴侣**（见 §4.4）。
 2. **设备**：不 root、不越狱；开启系统锁屏与整机加密；给 App 设 PIN（跳过 PIN 会丢失一层防线）。
 3. **恢复码**：备份导出的 12 词恢复码**离线**保存（纸/离线介质），丢失即无法恢复归档。
 4. **设备清单**：定期检查在网设备（App 设备列表），撤销不再使用的。

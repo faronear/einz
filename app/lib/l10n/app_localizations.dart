@@ -437,14 +437,20 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseMinLengthHint.
   ///
   /// In en, this message translates to:
-  /// **'At least 8 characters'**
+  /// **'At least 10 characters, with letters and digits'**
   String get wizardPassphraseMinLengthHint;
 
   /// No description provided for @wizardPassphraseTooShort.
   ///
   /// In en, this message translates to:
-  /// **'Passphrase must be at least 8 characters'**
+  /// **'Passphrase must be at least 10 characters'**
   String get wizardPassphraseTooShort;
+
+  /// No description provided for @wizardPassphraseWeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase must contain both letters and digits'**
+  String get wizardPassphraseWeak;
 
   /// No description provided for @wizardPassphraseConfirmHint.
   ///
@@ -1013,7 +1019,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseDone.
   ///
   /// In en, this message translates to:
-  /// **'✅ Passphrase updated (new devices must use it)'**
+  /// **'✅ Passphrase updated — tell your partner; new devices must use the new one'**
   String get chatPageChangePassphraseDone;
 
   /// No description provided for @chatPageChangePassphraseFailed.

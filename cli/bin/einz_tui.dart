@@ -854,6 +854,12 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
             required: true))
         .trim();
     if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
+    final policyError = _passphrasePolicyError(passphrase);
+    if (policyError != null) {
+      session.messages.add(_systemMessage(session, policyError));
+      _scheduleRender();
+      continue;
+    }
     break;
   }
   try {
@@ -2964,6 +2970,12 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
     if (!_state!.running) return;
     final p1 = await _prompt(session, '❓ 设置新密保口令（务必牢记，严禁泄漏！）：', hidden: false, required: true);
     if (p1.isEmpty) continue;
+    final policyError = _passphrasePolicyError(p1);
+    if (policyError != null) {
+      session.messages.add(_systemMessage(session, policyError));
+      _scheduleRender();
+      continue;
+    }
     // final p2 = await _prompt(session, '❓ 请再次输入新口令确认：', hidden: false, required: true);
     // if (p1 != p2) {
     //   session.messages.add(_systemMessage(session, '⚠️ 两次输入的口令不一致，请重新设置'));
@@ -3006,6 +3018,12 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
     if (!_state!.running) break; // 已退出：结束口令设置
     final p1 = await _prompt(session, '❓ 设置密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
+    final policyError = _passphrasePolicyError(p1);
+    if (policyError != null) {
+      session.messages.add(_systemMessage(session, policyError));
+      _scheduleRender();
+      continue;
+    }
     try {
       final api = ApiClient(session.server);
       // _busy：打包/上传期间插入"⏳ 口令正在加密打包我的空间......"、禁止输入、隐藏光标，
@@ -3084,6 +3102,16 @@ bool _sameStringMap(Map<String, String> a, Map<String, String> b) {
     if (b[e.key] != e.value) return false;
   }
   return true;
+}
+
+/// 密保口令策略校验（**设置/修改**时用；输入既有口令不校验，避免把旧短口令用户挡在门外）。
+/// 策略唯一来源：shared 的 passphrase_policy.dart。
+String? _passphrasePolicyError(String passphrase) {
+  final violation = checkPassphrasePolicy(passphrase);
+  if (violation == null) return null;
+  return violation == PassphrasePolicyViolation.tooShort
+      ? '⚠️ 口令不得少于 $kPassphraseMinLength 位，请重新输入'
+      : '⚠️ 口令需同时包含字母与数字，请重新输入';
 }
 
 /// 系统提示消息的 message_id 计数器（保证唯一——此前用毫秒时间戳，同刻会产生

@@ -148,6 +148,54 @@ export function deleteKeyEscrow (
   return { ok: true }
 }
 
+
+/**
+ * 取包口令尝试限速（2026-09-14）：口令是**免设备认证**端点的唯一凭证，无限次尝试
+ * 等于允许在线爆破（每次尝试都要跑一遍 argon2id，代价高但可无限重复）。
+ * 按 space_id 计失败次数：窗口内超过上限 → 429，直到窗口滑过；成功一次即重置。
+ *
+ * 阈值可用环境变量覆盖（EINZ_ESCROW_RATE_MAX / EINZ_ESCROW_RATE_WINDOW_MS），
+ * 便于测试与运维调参；这是"防在线爆破"，**防不住**拿到 hash 后的离线爆破——
+ * 那一层靠口令强度（见 shared/lib/src/crypto/passphrase_policy.dart）。
+ */
+const ESCROW_RATE_MAX = Number(process.env.EINZ_ESCROW_RATE_MAX ?? 10)
+const ESCROW_RATE_WINDOW_MS = Number(
+  process.env.EINZ_ESCROW_RATE_WINDOW_MS ?? 15 * 60 * 1000
+)
+const escrowFailures = new Map<string, number[]>()
+
+function recentFailures (spaceId: string, now: number): number[] {
+  const list = (escrowFailures.get(spaceId) ?? []).filter(
+    t => now - t < ESCROW_RATE_WINDOW_MS
+  )
+  if (list.length === 0) escrowFailures.delete(spaceId)
+  else escrowFailures.set(spaceId, list)
+  return list
+}
+
+function assertEscrowNotRateLimited (spaceId: string): void {
+  const list = recentFailures(spaceId, Date.now())
+  if (list.length >= ESCROW_RATE_MAX) {
+    const retryAfterMs = ESCROW_RATE_WINDOW_MS - (Date.now() - list[0])
+    throw new ApiError(
+      'ESCROW_RATE_LIMITED',
+      `too many passphrase attempts, retry after ${Math.ceil(retryAfterMs / 1000)}s`,
+      429
+    )
+  }
+}
+
+function recordEscrowFailure (spaceId: string): void {
+  const now = Date.now()
+  const list = recentFailures(spaceId, now)
+  list.push(now)
+  escrowFailures.set(spaceId, list)
+}
+
+function clearEscrowFailures (spaceId: string): void {
+  escrowFailures.delete(spaceId)
+}
+
 /**
  * Multiverse：按空间读写口令托管包（POST /spaces/{spaceId}/key-escrow，
  * PROTOCOL_MULTIVERSE.md §4.2）：
@@ -168,6 +216,7 @@ export async function escrowForSpace (
   const b = (body ?? {}) as Record<string, unknown>
   if (b.passphrase != null) {
     // 取包：验证口令（口令即"拿到 Space Key 的凭证"）
+    assertEscrowNotRateLimited(spaceId) // 限速：防在线爆破（见文件顶部说明）
     const row = getDb()
       .prepare(`SELECT passphrase_hash, package FROM key_escrow WHERE space_id = ?`)
       .get(spaceId) as
@@ -183,8 +232,10 @@ export async function escrowForSpace (
       !row.passphrase_hash ||
       !(await pwhashStrVerify(row.passphrase_hash, b.passphrase))
     ) {
+      recordEscrowFailure(spaceId) // 记一次失败（限速用）
       throw new ApiError('ESCROW_VERIFY_FAILED', '口令错误', 401)
     }
+    clearEscrowFailures(spaceId) // 成功即重置窗口
     return { ok: true, package: JSON.parse(row.package) as EscrowPackage }
   }
 

@@ -181,10 +181,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对所有内容进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
-  String get wizardPassphraseMinLengthHint => '至少8位以上密码';
+  String get wizardPassphraseMinLengthHint => '至少 10 位，且同时包含字母与数字';
 
   @override
-  String get wizardPassphraseTooShort => '口令不得少于 8 位';
+  String get wizardPassphraseTooShort => '口令不得少于 10 位';
+
+  @override
+  String get wizardPassphraseWeak => '口令需同时包含字母与数字';
 
   @override
   String get wizardPassphraseConfirmHint => '再输一次以确认';
@@ -486,7 +489,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseNoEscrow => '尚未设置口令（无口令密保箱可修改）';
 
   @override
-  String get chatPageChangePassphraseDone => '✅ 口令已修改（新设备加入时请使用新口令）';
+  String get chatPageChangePassphraseDone => '✅ 口令已修改（请告知伴侣；新设备接入需用新口令）';
 
   @override
   String chatPageChangePassphraseFailed(String error) {
@@ -494,7 +497,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEscrowRotatedNotice => '其他设备已重设密保口令，本设备将解除绑定的秘境';
+  String get chatPageEscrowRotatedNotice => '伴侣已重设密保口令——生成邀请或再次修改时请使用新口令';
 
   @override
   String get chatPageMenuLocaleLabel => '界面语言';

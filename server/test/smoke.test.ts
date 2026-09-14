@@ -259,7 +259,9 @@ async function main (): Promise<void> {
       ...process.env,
       PORT: String(port),
       EINZ_DB: join(tempDir, 'einz.sqlite.db'),
-      EINZ_FILES: join(tempDir, 'files')
+      EINZ_FILES: join(tempDir, 'files'),
+      // 取包限速阈值压小，便于本测试快速断言（生产默认 10 次/15 分钟）
+      EINZ_ESCROW_RATE_MAX: '2'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -1028,8 +1030,61 @@ async function main (): Promise<void> {
       '/recover（全丢恢复）应已移除——该功能在 v2 无意义（见 docs/PROTOCOL.md）'
     )
 
+    // 13) 取包端点限速（2026-09-14）：`POST /spaces/{id}/key-escrow` 是**免设备认证**的
+    //     口令校验端点，若不限速即可在线爆破口令（口令 = 拿到 Space Key 的凭证）。
+    //     阈值由 EINZ_ESCROW_RATE_MAX 压到 2：两次失败后第 3 次起 429。
+    const rateSpace = await (async () => {
+      const r = await fetch(`http://127.0.0.1:${port}/spaces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: '限速测试空间' })
+      })
+      assert.equal(r.status, 201, 'create space for rate-limit test should succeed')
+      return ((await r.json()) as { spaceId: string }).spaceId
+    })()
+    const ratePkg = {
+      format: 'backup-v1',
+      salt: sodium.to_base64(sodium.randombytes_buf(16), B64),
+      nonce: sodium.to_base64(sodium.randombytes_buf(24), B64),
+      ciphertext: sodium.to_base64(sodium.randombytes_buf(48), B64)
+    }
+    const ratePass = 'rate-limit-pass-123'
+    const rateUp = await fetch(
+      `http://127.0.0.1:${port}/spaces/${rateSpace}/key-escrow`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          package: ratePkg,
+          passphrase_hash: await pwhashStr(ratePass)
+        })
+      }
+    )
+    assert.equal(rateUp.status, 200, 'space escrow upload with hash should succeed')
+
+    const tryPassphrase = async (passphrase: string): Promise<number> => {
+      const r = await fetch(
+        `http://127.0.0.1:${port}/spaces/${rateSpace}/key-escrow`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passphrase })
+        }
+      )
+      return r.status
+    }
+    assert.equal(await tryPassphrase(ratePass), 200, 'correct passphrase should fetch the package')
+    assert.equal(await tryPassphrase('wrong-1'), 401, 'wrong passphrase must be rejected')
+    assert.equal(await tryPassphrase('wrong-2'), 401, 'wrong passphrase must be rejected')
+    assert.equal(
+      await tryPassphrase('wrong-3'),
+      429,
+      'exceeding the failure budget must be rate limited (ESCROW_RATE_LIMITED)'
+    )
+    console.log('✅ 取包限速：2 次失败后第 3 次 429（免认证端点防在线爆破）')
+
     console.log(
-      '✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 名称默认值'
+      '✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称默认值'
     )
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，

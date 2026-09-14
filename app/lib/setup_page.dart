@@ -100,9 +100,9 @@ class _SetupPageState extends State<SetupPage> {
   // create 首台设备：口令二次确认（避免设错口令后无法再入）。join 是验证已有
   // 口令，无需确认，故仅 create 用。
   final _escrowPassphraseConfirm = TextEditingController();
-  // 接入口令最短长度（仅 create 设置时校验；join 是验证已有口令不限制，
-  // 避免历史短口令被新规则挡在门外——老板要求 2026-09-12）
-  static const int _passphraseMinLength = 8;
+  // 接入口令强度（仅 create 设置时校验；join 是验证已有口令不限制，避免历史短口令
+  // 被新规则挡在门外）。策略唯一来源：shared 的 passphrase_policy.dart。
+
   final _pin = TextEditingController(); // 启动锁 PIN（内嵌表单，不再弹窗）
   final _confirm = TextEditingController();
   // 两个 PIN 输入框的合并监听：底部按钮据此把标签切成「跳过」（不必整页重建）
@@ -652,11 +652,17 @@ class _SetupPageState extends State<SetupPage> {
             ? l10n.wizardJoinPassphraseRequired
             : l10n.setupPageNeedPassphrase;
         invalid = true;
-      } else if (_role == _WizardRole.create && pass.length < _passphraseMinLength) {
-        // 首台设备：口令不得少于 8 位（老板要求 2026-09-12）
-        localError = l10n.wizardPassphraseTooShort;
-        invalid = true;
-      } else if (_role == _WizardRole.create &&
+      } else if (_role == _WizardRole.create && pass.isNotEmpty) {
+        // 首台设备：口令强度（长度 + 字母数字混合），策略见 shared passphrase_policy.dart
+        final violation = checkPassphrasePolicy(pass);
+        if (violation != null) {
+          localError = violation == PassphrasePolicyViolation.tooShort
+              ? l10n.wizardPassphraseTooShort
+              : l10n.wizardPassphraseWeak;
+          invalid = true;
+        }
+      }
+      if (!invalid && _role == _WizardRole.create &&
           _escrowPassphraseConfirm.text.trim() != pass) {
         // 首台设备：口令需二次输入一致（老板要求 2026-09-12）
         localError = l10n.wizardPassphraseMismatch;

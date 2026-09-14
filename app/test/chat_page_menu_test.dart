@@ -536,8 +536,8 @@ void main() {
     // 输入新口令 + 确认（匹配）；旧口令留空（确认弹窗在校验后、旧口令验证前）
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    await tester.enterText(fields.at(1), 'newpass1');
-    await tester.enterText(fields.at(2), 'newpass1');
+    await tester.enterText(fields.at(1), 'newpass123');
+    await tester.enterText(fields.at(2), 'newpass123');
     // 提交（按钮文本「修改」，弹窗标题「修改口令」）
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
@@ -550,7 +550,7 @@ void main() {
     expect(find.text('修改密保口令？'), findsNothing);
   });
 
-  testWidgets('修改口令：新口令不足 8 位 → 红字拦截，不弹显性确认', (WidgetTester tester) async {
+  testWidgets('修改口令：新口令不满足强度（长度/字母数字）→ 红字拦截，不弹显性确认', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -577,23 +577,30 @@ void main() {
     await tester.tap(find.text('密保口令'));
     await tester.pumpAndSettle();
 
-    // 7 位（不足 8）：点提交 → 红字拦截，不弹显性确认弹窗
+    // 7 位（不足 10）：点提交 → 红字拦截，不弹显性确认弹窗
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     await tester.enterText(fields.at(1), 'short7!');
     await tester.enterText(fields.at(2), 'short7!');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
+    expect(find.text('口令不得少于 10 位'), findsOneWidget, reason: '不足 10 位应红字提醒');
     expect(find.text('修改密保口令？'), findsNothing, reason: '校验未过不应进入显性确认');
 
-    // 补齐 8 位：放行到显性确认
-    await tester.enterText(fields.at(1), 'longpass1');
-    await tester.enterText(fields.at(2), 'longpass1');
+    // 长度够但只有数字：同样拦截（策略：字母 + 数字）
+    await tester.enterText(fields.at(1), '1234567890');
+    await tester.enterText(fields.at(2), '1234567890');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 8 位'), findsNothing, reason: '满足长度后旧红字不应残留');
-    expect(find.text('修改密保口令？'), findsOneWidget, reason: '满足长度应进入显性确认');
+    expect(find.text('口令需同时包含字母与数字'), findsOneWidget, reason: '缺字母应红字提醒');
+
+    // 满足策略：放行到显性确认
+    await tester.enterText(fields.at(1), 'new-pass-2026');
+    await tester.enterText(fields.at(2), 'new-pass-2026');
+    await tester.tap(find.widgetWithText(FilledButton, '修改'));
+    await tester.pumpAndSettle();
+    expect(find.text('口令不得少于 10 位'), findsNothing, reason: '满足策略后旧红字不应残留');
+    expect(find.text('修改密保口令？'), findsOneWidget, reason: '满足策略应进入显性确认');
   });
 
   testWidgets('菜单改名后写 profile（重启后从 profile 恢复新名字）', (WidgetTester tester) async {
@@ -953,7 +960,7 @@ void main() {
     expect(fields.evaluate().length, 4);
 
     // 只填新口令（PIN 空）→ 红字「输入锁屏码」；不应弹确认、不触网
-    await _enterDialogFields(tester, hasPin: true, newPass: 'newpass1');
+    await _enterDialogFields(tester, hasPin: true, newPass: 'newpass123');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('输入锁屏码'), findsOneWidget, reason: '空 PIN 应红字提醒');
@@ -981,7 +988,7 @@ void main() {
         spaceKey: spaceKey);
 
     await _enterDialogFields(tester,
-        hasPin: true, pin: '999999', oldPass: 'oldpass1', newPass: 'newpass1');
+        hasPin: true, pin: '999999', oldPass: 'oldpass1', newPass: 'newpass123');
     await _confirmChange(tester);
 
     expect(find.text('锁屏码 错误'), findsOneWidget, reason: 'PIN 错应红字');
@@ -1014,7 +1021,7 @@ void main() {
         spaceKey: spaceKey);
 
     await _enterDialogFields(tester,
-        hasPin: true, pin: '123456', oldPass: 'oldpass1', newPass: 'newpass1');
+        hasPin: true, pin: '123456', oldPass: 'oldpass1', newPass: 'newpass123');
     await _confirmChange(tester);
 
     // 成功：上传 rotated 包 + 附新口令哈希；弹窗关闭 + SnackBar
@@ -1026,7 +1033,7 @@ void main() {
     // 上传的包：新口令可解开、Space Key 一致、旧口令解不开
     final uploaded = api.uploadedPackage!;
     final reopened = await KeyEscrowService(ApiClient('http://fake'))
-        .openPackage(passphrase: 'newpass1', envelope: uploaded);
+        .openPackage(passphrase: 'newpass123', envelope: uploaded);
     expect(reopened.spaceKeyB64, base64Encode(spaceKey));
     expect(() async =>
         await KeyEscrowService(ApiClient('http://fake'))
@@ -1036,7 +1043,7 @@ void main() {
 
     // 锁包已同步：旧 PIN 仍可解出、口令与更新时间均已刷新
     final payload = await AppLockService(db).unlock('123456');
-    expect(payload.escrowPassphrase, 'newpass1');
+    expect(payload.escrowPassphrase, 'newpass123');
     expect(payload.escrowUpdatedAt, 2000, reason: '锁包应记录服务端推进后的 updated_at');
     expect(payload.spaceKeyB64, base64Encode(spaceKey));
   });
@@ -1062,14 +1069,14 @@ void main() {
     expect(find.text('锁屏码'), findsNothing, reason: '无 PIN 不应有锁屏码输入框');
 
     await _enterDialogFields(tester,
-        hasPin: false, oldPass: 'oldpass1', newPass: 'newpass1');
+        hasPin: false, oldPass: 'oldpass1', newPass: 'newpass123');
     await _confirmChange(tester);
 
     expect(api.uploadedRotated, isTrue, reason: '无 PIN 场景修改口令同样传 rotated: true');
     expect(find.text('修改口令'), findsNothing, reason: '成功应关闭弹窗');
     // 明文已同步（无锁包可解）
     final plain = await AppLockService(db).loadPlain();
-    expect(plain?.escrowPassphrase, 'newpass1');
+    expect(plain?.escrowPassphrase, 'newpass123');
     expect(await AppLockService(db).isSetup, isFalse, reason: '无 PIN 场景不产生锁包');
   });
 }

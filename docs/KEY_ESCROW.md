@@ -57,15 +57,25 @@
 | 口令派生   | Argon2id（sodium_sumo pwhash，opsLimitModerate / memLimitModerate） | `shared/lib/src/crypto/backup.dart` `derivePassphraseKey()` |
 | 加密       | XChaCha20-Poly1305（AEAD，随机 nonce）                              | 同上 `encryptWithPassphrase()`                                  |
 | 密文包格式 | `{format, salt, nonce, ciphertext}`（base64）                       | 同上 `PassphraseEnvelope`                                       |
-| 盐         | 每次托管随机生成（32B），防彩虹表                                   | 同上 `generatePassphraseSalt()`                             |
+| 盐         | 每次托管随机生成（16B，`crypto_pwhash_SALTBYTES`），防彩虹表       | 同上 `generatePassphraseSalt()`                             |
 
-**口令强度要求**：口令需满足最低熵（建议 ≥ 10 位混合字符，或 ≥ 5 个词）。口令不满足时客户端拒绝设置并提示。
+**口令强度要求（已强制，2026-09-14）：** ≥ **10 位**且**同时包含字母与数字**——规则唯一来源
+`shared/lib/src/crypto/passphrase_policy.dart`，App（创建/改口令）、TUI（创建/`/passphrase`）、
+CLI（`escrow upload`）在**设置/修改**时校验并提示；**输入既有口令不校验**（避免把已有短口令的
+用户挡在门外）。更推荐"三个不相关的词 + 数字"这种词串（熵更高且好记）。
 
-**防爆破**：口令验证发生在客户端（解密失败 = 口令错），Server 不参与验证 → Server 侧无法限速；因此依赖：
+**防爆破（2026-09-14 订正）：** 原文写"口令验证发生在客户端，Server 不参与"——已过时。现在
+**服务端参与验证**：`key_escrow.passphrase_hash` 存 argon2id 串，取包端点
+`POST /spaces/{id}/key-escrow` 由服务端 `pwhashStrVerify` 校验（`server/src/escrow.ts`）。
+因此防线是三层：
 
-1. Argon2id 慢哈希（单次尝试成本高）；
-2. 口令高熵要求；
-3. （可选增强）客户端侧错误尝试本地延迟锁定（对齐 App 锁的 5 次/30s 策略）。
+1. **口令强度**（上方策略）——这是主要防线：拿到 hash 后的**离线**爆破无法被限速，只能靠熵；
+2. **服务端失败限速**——按 space 计失败次数，窗口内超限返回 429 `ESCROW_RATE_LIMITED`
+   （默认 10 次 / 15 分钟，可用 `EINZ_ESCROW_RATE_MAX`、`EINZ_ESCROW_RATE_WINDOW_MS` 调参）；
+3. **Argon2id 慢哈希**（moderate：256 MiB / 3 轮）——单次验证本身就贵。
+
+> 限速是"防在线爆破"，**防不住**已获取 hash 的离线爆破；且按 space 限速意味着攻击者可
+> 用失败尝试把合法取包暂时挡在窗口外（影响面：延迟接入，不丢数据）。
 
 ---
 

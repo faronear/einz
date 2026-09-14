@@ -188,11 +188,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.';
 
   @override
-  String get wizardPassphraseMinLengthHint => 'At least 8 characters';
+  String get wizardPassphraseMinLengthHint =>
+      'At least 10 characters, with letters and digits';
 
   @override
   String get wizardPassphraseTooShort =>
-      'Passphrase must be at least 8 characters';
+      'Passphrase must be at least 10 characters';
+
+  @override
+  String get wizardPassphraseWeak =>
+      'Passphrase must contain both letters and digits';
 
   @override
   String get wizardPassphraseConfirmHint => 'Re-enter passphrase';
@@ -513,7 +518,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseDone =>
-      '✅ Passphrase updated (new devices must use it)';
+      '✅ Passphrase updated — tell your partner; new devices must use the new one';
 
   @override
   String chatPageChangePassphraseFailed(String error) {
