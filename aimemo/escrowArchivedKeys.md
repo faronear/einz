@@ -99,3 +99,34 @@ Server 无轮换端点。productLens §12 说「撤销必须触发轮换」，�
 2. AppLockPayload 归档字段 + App 各接入/重传点（~1-2h）
 3. CLI/TUI 调用点（~0.5h）
 4. 文档 KEY_ESCROW.md / E2EE.md §9.2 交叉引用（~0.5h）
+
+---
+
+## 5. 评审意见（2026-09-14，CodeBuddy 会话复核）
+
+> 方向认可：payload v2 加可选字段、Server 零改动、解锁重传自愈、格式沿用
+> `archived_space_keys` 不发明新格式——都能落地，且 §3"轮换入口全未实现"经核实
+> 属实（`SpaceKeyRing.rotate()` 确无生产调用点）。以下两点建议在开工前定一下。
+
+### 5.1 `upload()` 是覆盖式写包 → 归档集合可能被"缺件的设备"写小
+
+`KeyEscrowService.upload()` 用当前设备的密钥环整体重建 payload 覆盖服务端。
+设备 B 若在某次轮换时离线（本地缺该版本的归档密钥），它下次解锁重传就会把密保箱的
+`archived_space_keys` 写少，把设备 A 已补进去的版本挤掉——"自愈"变成"互相覆盖"。
+
+**建议：上传前先 fetch 现有包 → 与本地归档做 max-union → 再上传。** App 的
+`_syncEscrow` 本来就已经 `getKeyEscrow()` + `openPackage()` 验过一次口令（防旧口令
+覆盖），顺手把归档并进去即可，成本≈0。CLI/TUI 的上传点同理。
+
+### 5.2 影响面需在文档与 productLens 里对齐措辞
+
+归档密钥入箱后，"拿到密保口令"= 能解**该 Space 的全部历史**（不再只是当前密钥）。
+这与产品意图一致（凭口令全量恢复），但 productLens §4.4 与本文档相邻处写着
+"轮换不能追溯历史"——那句讲的是**被撤销设备已同步的密文**，与"密保箱可解历史"
+是两回事，建议两处各加一句限定，避免将来读成自相矛盾。
+
+### 5.3 顺带：`docs/KEY_ESCROW.md` 两处笔误（与本文档无关，见者顺手改）
+
+- 表格"盐 每次托管随机生成（32B）"→ 实为 16B（`crypto_pwhash_SALTBYTES`）；
+- 同表把口令派生/加密/信封的出处标为 `backup.dart` → 规范位置已是
+  `shared/lib/src/crypto/passphrase_crypto.dart`（backup 仅 re-export）。
