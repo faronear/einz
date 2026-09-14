@@ -29,6 +29,27 @@ import UIKit
           result(FlutterMethodNotImplemented)
         }
       }
+
+      // MethodChannel：Dart 侧取「附件明文长期存放目录」（stored 模式）。
+      // 目录在 Application Support 下，并标记 isExcludedFromBackup ——
+      // 明文绝不能进 iCloud/iTunes 备份（换机还原就能读到旧附件）。
+      let store = FlutterMethodChannel(name: "einz/store", binaryMessenger: registrar.messenger())
+      store.setMethodCallHandler { call, result in
+        if call.method == "getStoredDir" {
+          let base = NSSearchPathForDirectoriesInDomains(
+            .applicationSupportDirectory, .userDomainMask, true).first ?? ""
+          let dir = (base as NSString).appendingPathComponent("einz_media")
+          try? FileManager.default.createDirectory(
+            atPath: dir, withIntermediateDirectories: true)
+          var url = URL(fileURLWithPath: dir)
+          var values = URLResourceValues()
+          values.isExcludedFromBackup = true
+          try? url.setResourceValues(values)
+          result(dir)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
     }
   }
 

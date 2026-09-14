@@ -19,6 +19,9 @@ class MediaCache {
 
   static const _prefix = 'einz_media_';
 
+  /// 文件名统一前缀（长期存放目录 [AttachmentStore] 复用同一套命名）。
+  static String get fileNamePrefix => _prefix;
+
   /// 历史遗留前缀（旧版直接写 Directory.systemTemp、时间戳命名，从未清理）。
   static const _legacyPrefixes = ['einz_audio_', 'einz_preview_'];
 
