@@ -17,6 +17,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:einz_shared/einz_shared.dart';
 import 'package:einz_cli/store.dart';
@@ -2382,6 +2383,10 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
+        '/backup [路径] :: 导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
         '/pin <PIN> :: 查看状态、设置或清空锁屏码',
       ));
       s.session.messages.add(_systemMessage(
@@ -2673,6 +2678,35 @@ Future<void> _execCommand(String line) async {
     case '/open':
       // 打开附件到系统应用：/open <序号>（序号 = 消息里显示的 #N，固定不变）
       await _execOpen(parts);
+    case '/backup': {
+      // 备份导出（E2EE.md §10.1，与 CLI backup 同构）：Space Key + 密文历史 +
+      // 附件元数据 + 离线队列 + 归档密钥 → 恢复码加密 → JSON 文件（纯本地，Server 不接触）
+      if (s.session.store.spaceKey == null) {
+        s.session.messages.add(_systemMessage(s.session, '⚠️ 未持有 Space Key（先 /space 接入秘境）——没有可备份的密钥'));
+        break;
+      }
+      final outPath = arg.trim().isNotEmpty
+          ? arg.trim()
+          : '${File(s.storePath).parent.path}/einz-backup-${DateTime.now().toIso8601String().substring(0, 10)}.json';
+      final store = s.session.store;
+      final payload = jsonEncode({
+        'device_id': store.deviceId,
+        'space_id': store.spaceId,
+        'key_version': store.keyVersion,
+        'space_key': store.spaceKey,
+        'history': store.history,
+        'attachments': store.attachments,
+        'pending': store.pending,
+        'archived_space_keys': store.archivedSpaceKeys,
+      });
+      final recoveryCode = await generateRecoveryCode();
+      final file = await encryptWithPassphrase(
+          payload: Uint8List.fromList(utf8.encode(payload)), passphrase: recoveryCode);
+      File(outPath).writeAsStringSync(JsonEncoder.withIndent('  ').convert(file.toJson()));
+      s.session.messages.add(_systemMessage(s.session, '✅ 备份已导出: $outPath'));
+      s.session.messages.add(_systemMessage(
+          s.session, '⚠️ 恢复码（12 词助记词，请离线妥善保存，丢失即无法恢复）：\n$recoveryCode'));
+    }
     case '/exit':
     case '/quit':
       s.running = false;
