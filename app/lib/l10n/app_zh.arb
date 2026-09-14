@@ -61,7 +61,7 @@
     }
   },
   "wizardPassphraseHint": "对所有内容进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
-  "wizardPassphraseMinLengthHint": "至少 10 位，且同时包含字母与数字",
+  "wizardPassphraseMinLengthHint": "至少 10 位",
   "wizardPassphraseTooShort": "口令不得少于 10 位",
   "wizardPassphraseWeak": "口令需同时包含字母与数字",
   "wizardPassphraseConfirmHint": "再输一次以确认",
@@ -188,7 +188,7 @@
   "chatPageChangePassphraseConfirmLabel": "确认新口令",
   "chatPageChangePassphraseMismatch": "两次输入的新口令不一致",
   "chatPageChangePassphraseConfirmTitle": "修改密保口令？",
-  "chatPageChangePassphraseConfirmMessage": "确定要修改密保口令吗？修改后需用新口令解密内容密文。",
+  "chatPageChangePassphraseConfirmMessage": "确定要修改密保口令吗？修改后需用新口令才能绑定新设备。",
   "chatPageChangePassphraseOldWrong": "旧口令错误",
   "chatPageChangePassphraseRebuildTitle": "重建密保箱？",
   "chatPageChangePassphraseRebuildMessage": "服务器上找不到密保箱（可能数据丢失）。将直接用新口令重建，无需旧口令。重建后请线下告知伴侣新口令。",

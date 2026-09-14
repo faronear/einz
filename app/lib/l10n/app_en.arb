@@ -61,7 +61,7 @@
     }
   },
   "wizardPassphraseHint": "Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.",
-  "wizardPassphraseMinLengthHint": "At least 10 characters, with letters and digits",
+  "wizardPassphraseMinLengthHint": "At least 10 characters",
   "wizardPassphraseTooShort": "Passphrase must be at least 10 characters",
   "wizardPassphraseWeak": "Passphrase must contain both letters and digits",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
@@ -188,7 +188,7 @@
   "chatPageChangePassphraseConfirmLabel": "Confirm new passphrase",
   "chatPageChangePassphraseMismatch": "New passphrases do not match",
   "chatPageChangePassphraseConfirmTitle": "Change passphrase?",
-  "chatPageChangePassphraseConfirmMessage": "Change the passphrase? You'll need the new one to decrypt content.",
+  "chatPageChangePassphraseConfirmMessage": "Change the passphrase? The new one will be required to bind new devices.",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
   "chatPageChangePassphraseRebuildTitle": "Rebuild the passphrase box?",
   "chatPageChangePassphraseRebuildMessage": "No passphrase box was found on the server (data may have been lost). It will be rebuilt directly with the new passphrase — the current one is not required. Tell your partner the new passphrase afterwards.",

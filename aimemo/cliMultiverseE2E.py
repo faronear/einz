@@ -11,11 +11,15 @@
 流程（2026-09-10 老板定稿引导：第一步输入 C/create（创建）或 J/join（加入），
       大小写均可；create 录入两人名字/性别；join 按身份选择而非自填名字）：
   设备 A：输入 C → 名字 Lukas → 性别 男 → 伴侣名字 Alice → 伴侣性别 女
-          → 口令 abc123 → 抓邀请 token
+          → 口令 einzpass2026 → 抓邀请 token
   设备 B：输入 J → 粘贴 token → 选择身份 1（第二人 Alice）→ 口令 → 加入成功
   设备 C：第一人的其他设备——curl 生成第二个 token → 选择身份 0（第一人 Lukas）
           → 口令 → 加入成功（验证「同身份多设备」）
-  断言：B/C 的空间地址与 A 一致。
+  断言①（老板 2026-09-14）：B 向导未按回车「显性进入聊天态」前，A 发的消息**不得**
+          进 B 的消息流；B 回车后才由增量同步补齐。
+  断言②：B/C 的空间地址与 A 一致（读 store 的 space_address，不抓终端渲染）。
+
+注入：EINZ_E2E_PORT（默认 3999）、EINZ_E2E_SERVER 可覆盖。
 """
 import json
 import os
@@ -35,6 +39,10 @@ SERVER = os.environ.get(
 STORE_A = "/tmp/einz-e2e-a.json"
 STORE_B = "/tmp/einz-e2e-b.json"
 STORE_C = "/tmp/einz-e2e-c.json"
+
+# 密保口令：必须满足强度策略（≥10 位且含字母与数字，shared/passphrase_policy.dart）。
+# 2026-09-14 起三端强制校验——原脚本用的 "abc123"（6 位）已被拒，脚本因此失效。
+PASSPHRASE = "einzpass2026"
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -80,6 +88,27 @@ def read_until(master, patterns, timeout=40, prefix=""):
 
 def send(master, text):
     os.write(master, text.encode())
+
+
+def store_address(path):
+    """读 store 文件里的 space_address——比抓终端渲染可靠（pty 会按宽度折行截断；
+    join 路径也不打印地址，只有 create 打印）。"""
+    with open(path) as f:
+        return json.load(f).get("space_address") or ""
+
+
+def wait_welcome_and_enter(m, label, timeout=30):
+    """向导收尾：跳过可能出现的锁屏码询问，等到欢迎辞后再回车显性进入聊天态。
+    收尾前会每 2 秒补一个回车（跳过锁屏码）——锁屏码提示可能早于本次读取出现。"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        name, out, _ = read_until(m, [("welcome", re.compile(r"输入回车"))],
+                                  timeout=2, prefix=label)
+        if name == "welcome":
+            send(m, "\r")
+            return True
+        send(m, "\r")  # 仍在锁屏码询问：跳过（可空）
+    return False
 
 
 def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_wrong=False):
@@ -138,7 +167,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         name, out, _ = read_until(m, [
             ("ask_passphrase", re.compile(r"验证密保口令")),
         ], prefix=label)
-        send(m, "abc123\r")
+        send(m, PASSPHRASE + "\r")
         name, out, _ = read_until(m, [
             ("joined", re.compile(r"成功加入秘境")),
             ("fail", re.compile(r"加入秘境失败|口令错误|找不到受托管")),
@@ -146,10 +175,8 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
     if name != "joined":
         print(f"FAIL {label}: 加入未成功。输出:\n", out[-1000:])
         sys.exit(1)
-    m_addr = re.search(r"地址: (0x[0-9a-fA-F]+)", out)
-    addr = m_addr.group(1) if m_addr else None
-    print(f"{label}: 加入成功, 地址 =", addr)
-    return p, m, addr
+    print(f"{label}: 加入成功（随后进入向导收尾：锁屏码 → 欢迎辞回车）")
+    return p, m
 
 
 def main():
@@ -198,7 +225,7 @@ def main():
     name, out, _ = read_until(m_a, [
         ("ask_passphrase", re.compile(r"设置密保口令")),
     ], prefix="A")
-    send(m_a, "abc123\r")
+    send(m_a, PASSPHRASE + "\r")
     name, out, _ = read_until(m_a, [
         ("created", re.compile(r"成功创建秘境")),
         ("fail", re.compile(r"创建空间失败")),
@@ -231,32 +258,75 @@ def main():
     join_flow("B", STORE_B, token1, identity_name="Alice",
               wrong_token="e1_WrongToken999", quit_after_wrong=True)
     # B2：第二人正常加入（选身份 1 = Alice）——join 链路由本流程验证
-    p_b, m_b, addr_b = join_flow("B", STORE_B, token1, identity_name="Alice")
+    # 注意：join_flow 返回时 B 才刚「加入成功」，仍在向导里（锁屏码 → 欢迎辞回车）。
+    p_b, m_b = join_flow("B", STORE_B, token1, identity_name="Alice")
 
     # ---------- 设备 C：第一人的其他设备（选身份 0 = Lukas）----------
-    # 验证 /invite 命令工作（输出新设备绑定邀请——渲染帧交错导致抓 token 不可靠，
-    # 故 join 用同端点 curl 生成的 token 验证 join 链路——createJoinToken 同一端点）。
-    # A create 后可能卡在锁屏码询问（_askSetPin——onboarded=true）：先回车跳过
-    send(m_a, "\r")
+    # A 先走完自己的向导（跳过锁屏码 → 欢迎辞回车显性进入聊天态），否则后面的
+    # /invite 与聊天消息会被未完成的向导问答吞掉。
+    if not wait_welcome_and_enter(m_a, "A"):
+        print("FAIL A: 未等到欢迎辞（向导收尾失败）")
+        sys.exit(1)
+    print("A: 向导收尾完成（回车进入聊天态）")
     send(m_a, "/invite\r")
     name, out3, _ = read_until(m_a, [
-        ("invite", re.compile(r"新设备绑定邀请")),
+        ("invite", re.compile(r"邀请新设备")),
         ("fail", re.compile(r"邀请生成失败")),
     ], timeout=20, prefix="A-invite")
     if name != "invite":
         print("FAIL A: /invite 未生成绑定邀请。输出:\n", out3[-600:])
         sys.exit(1)
     print("A: /invite 命令工作（生成新设备绑定邀请）")
+
+    # ---------- 断言①：向导未显性结束前，对方消息不得进消息流（老板 2026-09-14）----------
+    # 此刻 B 仍停在向导里（锁屏码询问，尚未按回车进聊天态）。
+    # 探测文本默认 ASCII：pty 注入非 ASCII 的字节序列在按键层未必被逐字正确解析，
+    # 用 ASCII 让失败原因唯一（只可能是"消息插队"，不是"文本没打进去"）。
+    # 需要验证中文输入时用 EINZ_GATE_TEXT 覆盖。
+    GATE_TEXT = os.environ.get("EINZ_GATE_TEXT", "gate-probe-msg")
+    send(m_a, GATE_TEXT + "\r")
+    # 先确认 A 真的发出去了（状态栏「已发送」）——否则失败原因会在 A 侧而不在 B 侧，
+    # 断言会误导（曾出现一次 A 未发出导致的假失败）。
+    name, out_a_send, _ = read_until(m_a, [("sent", re.compile(r"已发送"))],
+                                     timeout=15, prefix="A-send")
+    if name != "sent":
+        print("FAIL A: 消息未发出（未见「已发送」状态）。A 屏幕:\n",
+              strip_ansi(out_a_send)[-700:])
+        sys.exit(1)
+    print("A: 消息已发出 ✓")
+    _, out_gate, _ = read_until(m_b, [("never", re.compile(r"§不存在的锚点§"))],
+                                timeout=3, prefix="B-gate")
+    if GATE_TEXT in out_gate:
+        print("FAIL B: 未按回车结束向导前就收到了对方消息（应等显性进入聊天态）。输出:\n",
+              out_gate[-800:])
+        sys.exit(1)
+    print("B: 向导期间未收到对方消息 ✓（不插队）")
+    # B 走完向导 → 回车进入聊天态 → 该消息应由「回车后的增量同步」补齐
+    if not wait_welcome_and_enter(m_b, "B"):
+        print("FAIL B: 未等到欢迎辞（向导收尾失败）")
+        sys.exit(1)
+    name, out_after, _ = read_until(m_b, [
+        ("got", re.compile(GATE_TEXT)),
+    ], timeout=25, prefix="B-after")
+    if name != "got":
+        print("FAIL B: 回车进入聊天态后仍未收到该消息。输出:\n", out_after[-1000:])
+        sys.exit(1)
+    print("B: 回车进入聊天态后收到该消息 ✓（增量同步补齐，未插进向导消息之间）")
+
     token2 = new_join_token()
     print("C: 生成新 token =", token2)
-    p_c, m_c, addr_c = join_flow("C", STORE_C, token2, identity_name="Lukas")
+    p_c, m_c = join_flow("C", STORE_C, token2, identity_name="Lukas")
 
-    # ---------- 断言 ----------
-    ok_b = (addr_b or "")[:20] == addr_a[:20]
-    ok_c = (addr_c or "")[:20] == addr_a[:20]
+    # ---------- 断言②：三台设备的空间地址一致（读 store，不抓终端）----------
+    addr_a = store_address(STORE_A)
+    addr_b = store_address(STORE_B)
+    addr_c = store_address(STORE_C)
+    ok_b = bool(addr_a) and addr_b == addr_a
+    ok_c = bool(addr_a) and addr_c == addr_a
+    print("A 地址 =", addr_a)
     print("B 空间地址一致:", ok_b, "| C 空间地址一致:", ok_c)
     if not (ok_b and ok_c):
-        print("FAIL: 空间地址不一致")
+        print(f"FAIL: 空间地址不一致（B={addr_b} C={addr_c}）")
         sys.exit(1)
 
     # 收尾：跳过可能的锁屏码询问后退出

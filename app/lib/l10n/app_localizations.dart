@@ -437,7 +437,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseMinLengthHint.
   ///
   /// In en, this message translates to:
-  /// **'At least 10 characters, with letters and digits'**
+  /// **'At least 10 characters'**
   String get wizardPassphraseMinLengthHint;
 
   /// No description provided for @wizardPassphraseTooShort.
@@ -1001,7 +1001,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'Change the passphrase? You\'ll need the new one to decrypt content.'**
+  /// **'Change the passphrase? The new one will be required to bind new devices.'**
   String get chatPageChangePassphraseConfirmMessage;
 
   /// No description provided for @chatPageChangePassphraseOldWrong.

@@ -181,7 +181,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseHint => '对所有内容进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
 
   @override
-  String get wizardPassphraseMinLengthHint => '至少 10 位，且同时包含字母与数字';
+  String get wizardPassphraseMinLengthHint => '至少 10 位';
 
   @override
   String get wizardPassphraseTooShort => '口令不得少于 10 位';
@@ -480,7 +480,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseConfirmMessage =>
-      '确定要修改密保口令吗？修改后需用新口令解密内容密文。';
+      '确定要修改密保口令吗？修改后需用新口令才能绑定新设备。';
 
   @override
   String get chatPageChangePassphraseOldWrong => '旧口令错误';

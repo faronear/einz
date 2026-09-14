@@ -651,7 +651,14 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   await _activateAfterBind(session, store, storePath, server);
 }
 
-/// 绑定空间后激活会话：同步设备名 → 增量同步 →（新入网）设锁屏码 → 启动 WS。
+/// 绑定空间后激活会话。顺序随是否入网而不同：
+/// - 正常启动：增量同步 → 启动 WS（立刻可收发）
+/// - 新入网（[_onboarded]）：设锁屏码 → 致欢迎辞并**等用户回车**显性进入聊天态
+///   → 才增量同步 + 启动 WS
+///
+/// **入网向导期间不 sync、不启 WS**（老板 2026-09-14）：否则对方消息会直接流进
+/// 消息流、插在向导的 system 消息之间。入网期间错过的消息由回车后的那次增量同步
+/// 一次性补齐。
 Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String storePath, String server) async {
   // 已登记设备启动时把本地设备名称同步到后台（TUI 里改名后服务端 dev1 的
   // deviceName 同步更新；首设备 enroll 已带上 deviceName，此处幂等覆盖）
@@ -667,10 +674,11 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
     }
   }
 
-  // 启动前先增量同步一次：补齐启动前错过的消息（本地历史只含上次落盘内容，
-  // WS 只推连接建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
+  // 启动前增量同步：补齐启动前错过的消息（本地历史只含上次落盘内容，WS 只推连接
+  // 建立之后的实时事件；不先 sync 的话，对方刚发的消息要手动 /sync 才出现）。
   // 未接入空间（无 Space Key）时跳过——历史无法解密，且 _decrypt 会兜底占位。
-  if (session.hasSession && session.hasSpace && server.isNotEmpty) {
+  Future<void> startupSync() async {
+    if (!session.hasSession || !session.hasSpace || server.isEmpty) return;
     try {
       final fresh = await session.sync();
       if (fresh.isNotEmpty) {
@@ -681,14 +689,9 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
     }
   }
 
-  // 锁屏码：本次刚入网 → 询问设置（可空跳过）；重启解锁已由 main 在
-  // loadHistory 前处理（_unlockPin）——此处不再重复
-  if (_onboarded) {
-    await _askSetPin(session, storePath);
-  }
-
   // 启动 WS 实时监听（已激活且配置了 server 时）；新消息到达或连接状态变化即重绘
-  if (session.hasSession && server.isNotEmpty) {
+  void startWs() {
+    if (!session.hasSession || server.isEmpty) return;
     session.startWs(
       onMessage: (_) => _refreshGenderForLatest(_state!),
       onStatus: (_) {
@@ -713,14 +716,35 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
       onReceiptUpdated: () => _scheduleRender(),
     );
   }
+
+  // 非入网路径（正常启动）：立刻补同步 + 收实时消息
+  if (!_onboarded) {
+    await startupSync();
+    startWs();
+  }
+
+  // 锁屏码：本次刚入网 → 询问设置（可空跳过）；重启解锁已由 main 在
+  // loadHistory 前处理（_unlockPin）——此处不再重复
+  if (_onboarded) {
+    await _askSetPin(session, storePath);
+  }
+
   // 认证后立即拉取 person 名称/性别表（向导刚结束时 token 才就绪——启动时
   // main 的刷新会因 token 未就绪失败静默；此处补齐——否则向导结束直接发消息
   // 时对方气泡按未知性别回退青绿——老板 2026-09-10 实测）
   await _refreshPersonNames(_state!);
   // 拉一次回执水位：我发出消息的 delivered 状态（单勾→双勾）首屏即正确
   await session.refreshReceipts();
-  // 入网收尾：致欢迎辞 → 等用户回车 → 清空 system 消息切到聊天态
-  if (_onboarded) await _finalizeOnboarding(session);
+
+  if (_onboarded) {
+    // 入网收尾：致欢迎辞 → 等用户回车 → 清空 system 消息切到聊天态
+    await _finalizeOnboarding(session);
+    if (!_state!.running) return; // 回车期间 /exit：不再继续
+    // 已显性进入聊天态：此时才补同步 + 启 WS（入网期间对方发的消息在此一次补齐，
+    // 不再插进向导消息之间）
+    await startupSync();
+    startWs();
+  }
   _scheduleRender();
 }
 
@@ -2915,7 +2939,10 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
 /// 修改托管口令（/passphrase）：① 服务器有密保箱 → 旧口令验证（fetch 解密）→
 /// 新口令重加密上传（含新 argon2id 哈希）；② 服务器**无**密保箱（数据丢失）→
 /// 无从校验旧口令，跳过校验直接用新口令重建（与 App 同口径）。
-/// 口令输入不回显（hidden）。
+/// 口令输入**故意明文回显**（`hidden: false`）——老板 2026-09-14 要求：隐藏回显时
+/// 看不见自己敲的内容（连 `/exit` 这类控制命令都看不见），而口令提交后只用于本地
+/// 加密上传、不会进入消息流，明文回显的风险可接受。（对比：`_spaceJoin` 的接入
+/// 口令校验用 `hidden: true`。）
 /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
 /// 服务器更新 = 口令已重设——系统消息通知（插入消息流，不弹窗）。
 Future<void> _checkEscrowRotated(ChatSession session) async {

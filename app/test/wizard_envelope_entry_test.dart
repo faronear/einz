@@ -185,7 +185,7 @@ void main() {
 
   testWidgets('create 口令页：首框有强度提示；长度不足 / 缺字母数字 → 红字拦截', (WidgetTester tester) async {
     await pumpToPassphrase(tester);
-    expect(find.text('至少 10 位，且同时包含字母与数字'), findsOneWidget,
+    expect(find.text('至少 10 位'), findsOneWidget,
         reason: '首个口令框应有强度提示语');
 
     // 7 位（不足 10）：红字拦截，停留本页
