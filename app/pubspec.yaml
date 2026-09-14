@@ -56,6 +56,7 @@ dependencies:
   mobile_scanner: ^7.4.0
   device_info_plus: ^13.2.0 # 13.x iOS 源码含 isiOSAppOnVision（iOS 26.1 API）；Xcode 16.1 编译前需删 pub cache 中该段（见工作区说明），升级 Xcode 后复原
   open_filex: ^4.7.0
+  video_thumbnail: ^0.5.6
 
 dev_dependencies:
   flutter_test:

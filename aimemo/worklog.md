@@ -5296,3 +5296,32 @@ SELECT p.device_id, p.platform, p.token
 l10n 中英新增 `chatPageAttachmentStorageSubmit` / `chatPageAttachmentStorageWarnClear`。
 
 **验证：** `flutter analyze` 无 issue；`chat_page_menu_test` 19 项全过。
+
+### 视频消息：长按菜单 / 引用条 / 引用块显示首帧缩略图（老板 2026-09-15）
+
+**背景：** 老板反馈——长按视频消息，菜单顶部的简略气泡是「📎 video.mp4」；点「引用」后
+输入栏引用条是引号图标 + 文件名；气泡里的引用块也只有文字。图片三处都是真缩略图，视频
+应该有同样的待遇。
+
+**方案确认（老板拍板）：** ① 新增 `video_thumbnail 0.5.6` 原生取帧（**仅 Android/iOS**，
+macOS/桌面/测试环境自动退回占位图标——与 video_player 的平台覆盖基本一致）；② 缩略图上
+**叠一个播放小三角**，与图片缩略图区分。
+
+**改法：**
+- `_videoBytes(m)`：抽出与 `_imageBytes` 同款的视频明文缓存（内联预览与取帧共用一次解密）。
+- `_videoThumbBytes(m)`：`MediaCache.ensure(id,'mp4',…)` 复用内联预览的解密缓存文件（同一条
+  消息只解密、只落盘一次）→ `VideoThumbnail.thumbnailData(JPEG, 128, q75)` → 按 messageId 缓存。
+- 新增 `_buildVideoThumb(m, {size})`：首帧 + `Icons.play_circle_fill`；加载中转圈，失败显示
+  `Icons.videocam_outlined` 占位。
+- 三处接线：长按菜单预览行 `size:48`（原来落到 default 分支显示 📎 文件名）、气泡内引用块
+  `size:40`、输入栏引用条 `size:24`（引用条按老板要求保留右侧文件名）。
+- `_retryAttachment` 顺带清缩略图缓存。
+
+**测试：** 新增 `test/chat_quote_video_test.dart`（2 项，镜像 `chat_quote_image_test`）。
+**踩坑（重要，跨测试通用）：** `testWidgets` 跑在 FakeAsync 区里，**真实 dart:io 永远不会完成**
+——`MediaCache` 的 `exists()/writeAsBytes()` 会一直挂着，缩略图永远转圈，`pumpAndSettle` 必超时。
+解法是 `settleIo()`：pump（触发构建、发起 IO）与 `tester.runAsync(真实 100ms 窗口)` 交替若干轮，
+直到不再转圈；再 mock 两条通道（path_provider 取临时目录、video_thumbnail 回一张小 PNG），
+于是三处缩略图能按尺寸（48/24/40）断言。
+
+**验证：** `flutter analyze` 无 issue；`flutter test` 118 项全过。真机首帧效果待老板验证。

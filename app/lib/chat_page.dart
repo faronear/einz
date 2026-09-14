@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'brand_logo.dart';
 import 'data/attachment_storage_settings.dart';
@@ -126,6 +127,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final Map<String, Future<Uint8List>> _imageCache = {};
   // 视频解密缓存（messageId → Future<bytes>），内联预览用（避免重复解密）。
   final Map<String, Future<Uint8List>> _videoCache = {};
+  // 视频首帧缩略图缓存（messageId → Future<bytes>）：长按菜单/引用块/引用条共用。
+  final Map<String, Future<Uint8List>> _videoThumbCache = {};
   List<HistoryMessage> _messages = [];
   Timer? _ticker;
   // 分页加载（UI 懒渲染）：上滑到顶部加载更早历史；ticker 只增量追加新增
@@ -2050,6 +2053,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       case 'image':
         bubbleContent = _buildImageThumb(m, size: 48);
         break;
+      case 'video':
+        bubbleContent = _buildVideoThumb(m, size: 48);
+        break;
       default:
         bubbleContent = Text(
           preview.isEmpty ? m.env.type : preview,
@@ -2201,13 +2207,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 引用块内容：原消息是图片就显示它的缩略图、是语音/音频就显示波形图 + 秒数
-  /// （老板要求 2026-09-13），其余（含图片原消息尚未加载/无附件）沿用文字预览。
+  /// 引用块内容：原消息是图片/视频就显示它的缩略图（视频取首帧 + 播放三角，
+  /// 老板要求 2026-09-15）、是语音/音频就显示波形图 + 秒数（老板要求
+  /// 2026-09-13），其余（含原消息尚未加载/无附件）沿用文字预览。
   Widget _buildQuoteBlockContent(Map<String, dynamic> quote) {
     final type = quote['type'] as String?;
     if (type == 'image') {
       final quoted = _messageById(quote['messageId'] as String? ?? '');
       if (quoted != null) return _buildImageThumb(quoted, size: 40);
+    }
+    if (type == 'video') {
+      final quoted = _messageById(quote['messageId'] as String? ?? '');
+      if (quoted != null) return _buildVideoThumb(quoted, size: 40);
     }
     if (type == 'voice' || type == 'audio') {
       final seconds =
@@ -2248,10 +2259,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
       child: Row(
         children: [
-          // 引用图片时显示原图缩略图（否则双引号图标）——与发送后的引用块一致
+          // 引用图片/视频时显示原附件缩略图（否则双引号图标）——与发送后的
+          // 引用块一致（视频显示首帧 + 播放三角，老板要求 2026-09-15）
           quote.env.type == 'image'
               ? _buildImageThumb(quote, size: 24)
-              : const Icon(Icons.format_quote, size: 14, color: Colors.grey),
+              : quote.env.type == 'video'
+                  ? _buildVideoThumb(quote, size: 24)
+                  : const Icon(Icons.format_quote, size: 14, color: Colors.grey),
           const SizedBox(width: 6),
           // 语音/音频：波形图 + 秒数（与气泡/发送后的引用块一致，不再显示「语音」
           // 这类文字——老板要求 2026-09-13）
@@ -2777,12 +2791,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       HistoryMessage m) {
     final att = m.attachment;
     if (att == null) return Text('🎬 ${m.plaintext}');
-    final future = _videoCache.putIfAbsent(
-      m.env.messageId,
-      () => _attachmentBytes(m),
-    );
     return FutureBuilder<Uint8List>(
-      future: future,
+      future: _videoBytes(m),
       builder: (context, snap) {
         if (snap.hasData) {
           return _VideoPreview(bytes: snap.data!, messageId: m.env.messageId);
@@ -2810,6 +2820,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       },
     );
   }
+
+  /// 视频明文（同 [_imageBytes]）：按 messageId 缓存 future，内联预览与首帧
+  /// 缩略图共用同一次解密。
+  Future<Uint8List> _videoBytes(HistoryMessage m) =>
+      _videoCache.putIfAbsent(m.env.messageId, () => _attachmentBytes(m));
+
+  /// 视频首帧缩略图（JPEG，长边 128）：复用内联预览的解密缓存文件（同一条消息
+  /// 只解密、只落盘一次）→ 原生取帧；按 messageId 缓存（老板要求 2026-09-15：
+  /// 长按菜单/引用条/引用块里视频也显示缩略图，而不是别针 + 文件名）。
+  Future<Uint8List> _videoThumbBytes(HistoryMessage m) =>
+      _videoThumbCache.putIfAbsent(m.env.messageId, () async {
+        final file =
+            await MediaCache.ensure(m.env.messageId, 'mp4', () => _videoBytes(m));
+        final thumb = await VideoThumbnail.thumbnailData(
+          video: file.path,
+          imageFormat: ImageFormat.JPEG,
+          maxWidth: 128,
+          quality: 75,
+        );
+        if (thumb == null) throw StateError('视频缩略图取帧失败');
+        return thumb;
+      });
 
   /// 附件明文：发送端优先本地密文解密（上传完成前/失败后也能即时显示），
   /// 无本地密文（接收端）走服务端拉取。
@@ -2847,6 +2879,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void _retryAttachment(HistoryMessage m) {
     _imageCache.remove(m.env.messageId);
     _videoCache.remove(m.env.messageId);
+    _videoThumbCache.remove(m.env.messageId);
     setState(() {});
   }
 
@@ -2965,6 +2998,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: snap.hasError
               ? Icon(Icons.broken_image_outlined,
                   size: size * 0.5, color: Colors.grey)
+              : SizedBox(
+                  width: size * 0.45,
+                  height: size * 0.45,
+                  child: const CircularProgressIndicator(strokeWidth: 2)),
+        );
+      },
+    );
+  }
+
+  /// 小尺寸视频缩略图（长按菜单预览行 / 引用块 / 输入栏引用条用）：首帧 + 播放
+  /// 三角，正方形 cover 裁剪；加载中转圈，失败（无附件/解密失败/平台无取帧能力）
+  /// 显示摄像机占位（老板要求 2026-09-15）。
+  Widget _buildVideoThumb(HistoryMessage m, {double size = 40}) {
+    return FutureBuilder<Uint8List>(
+      future: _videoThumbBytes(m),
+      builder: (context, snap) {
+        if (snap.hasData) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.memory(snap.data!,
+                    width: size, height: size, fit: BoxFit.cover),
+                Icon(Icons.play_circle_fill,
+                    size: size * 0.5, color: Colors.white70),
+              ],
+            ),
+          );
+        }
+        return Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: snap.hasError
+              ? Icon(Icons.videocam_outlined, size: size * 0.5, color: Colors.grey)
               : SizedBox(
                   width: size * 0.45,
                   height: size * 0.45,
