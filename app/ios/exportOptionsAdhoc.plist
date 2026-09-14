@@ -2,8 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Ad Hoc 导出的确定性配置：手动签名 + 显式指定证书与 profile，
      不依赖 Xcode 是否登录了该 Apple ID（auto 签名在无账号环境下会失败）。
-     用法：flutter build ipa --release --export-method ad-hoc \
-             --export-options-plist=ios/exportOptionsAdhoc.plist -->
+     用法：flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist
+     ⚠️ 不要再叠加 --export-method：二者同时给 Flutter 会直接报错
+     （"--export-options-plist is not compatible with --export-method"）。
+     只导出、不重新编译时（同一个 archive 可导出多次）：
+       xcodebuild -exportArchive -archivePath build/ios/archive/Runner.xcarchive \
+         -exportOptionsPlist ios/exportOptionsAdhoc.plist -exportPath /tmp/adhoc-out -->
 <plist version="1.0">
 <dict>
 	<key>method</key>
