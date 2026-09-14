@@ -4510,3 +4510,31 @@ cli 单测 14/14 + message_status_check/receipts_check 全过、server 4 套测�
   重置"，需要显式处理（例如登录态里记录安装标识做比对）。
 - `docs/KEY_ESCROW.md` 两处笔误：盐写 32B（实为 16B，`crypto_pwhash_SALTBYTES`）；
   口令加解密函数出处仍标 `backup.dart`（规范位置 `passphrase_crypto.dart`）。
+
+### 安全存储生命周期：卸载即重置 + 不随备份迁移（老板选 A）
+
+**问题（承接复核）：** 安全存储条目活过 App 卸载——iOS/macOS Keychain、Linux libsecret
+都不随卸载清理（只有 Android/Windows 把数据放应用数据目录里，卸载即清）。而 drift 库
+随沙盒消失。于是"跳过 PIN"的用户卸载重装会被 Keychain 里的明文包**直接拖进聊天**
+（并且因为 drift 空了，会从 seq 0 全量重同步服务器密文、用 Keychain 的 Space Key 解密），
+与"设了 PIN"的用户（加密锁包在 drift，随卸载消失 → 走 SetupPage）行为不一致。
+
+**老板决策：A. 卸载即重置**（不做"提示用户选择"）。
+
+**改动（commit `db8ceca`）：**
+- `AppLockService.ensureFreshInstall()`：drift `app_state` 的 `app_lock.install_id`
+  = 本次安装的随机标记（非密钥、非敏感）。启动时标记缺失 = 沙盒被清过 = 全新安装 →
+  清空 `einz.secure.` 下本 App 条目再落新标记。在 `StartupGate._check` 开头调用，
+  **必须早于读 `isSetup`/`loadPlain`**。
+  边界：iOS"卸载 App（保留数据）"/整机与 iCloud 备份恢复都会带回沙盒（标记仍在）→
+  不误清；设备撤销的 `clear()` 删除集不含标记 → 不受影响；幂等可重复调用。
+- `SecureStore`：iOS/macOS 无障碍级别 `first_unlock_this_device`。默认 `unlocked`
+  的条目会随**加密备份/换机恢复**到新设备（换机还原备份即可读旧消息）；`this_device`
+  变体不迁移。`synchronizable` 保持库默认 false。
+- `docs/DATABASE.md` §4.1 记录以上两条；`app/ios/Podfile.lock` 补上
+  flutter_secure_storage 的 pod 记录（前一个 agent 只加了 pubspec）。
+
+**测试：** app_lock_test +3 例（全新安装清残留 / 同一安装不误清 / clear 仍清密钥）；
+`flutter analyze` 0 issue、app 全量 111 通过（+1 skip goldens）。
+
+**已知代价（已接受）：** 重装 = 重新接入（需伴侣设备发新邀请码 + 输密保口令）。
