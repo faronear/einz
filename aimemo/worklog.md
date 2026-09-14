@@ -5123,3 +5123,23 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 
 **验证：** `dart analyze bin lib` 无 issue；`dart test test/` 17 项全过。
 交互手感由老板自测（`cd cli && dart run bin/einz_tui.dart`）。
+
+### 老板两项小需求：TUI busy 时不再吞掉输入 + App 锁屏页自动聚焦（2026-09-14）
+
+**① TUI：busy 期间回车不再丢字（`cli/bin/einz_tui.dart`）**
+- 现象：上一条命令/消息还在处理时敲字回车，刚输入的内容被静默丢弃——回车分支先
+  `input.clear()` 再 `if (busy) continue`，把文本清掉后才决定不提交。
+- 改法：把 `busy` 判断提到读取/清空输入**之前**；命中则只设状态栏提示
+  `⏳ 上一条还在处理中，稍后回车再发`（新常量 `_kBusyResendHint`）+ 重绘，输入行原样保留；
+  该操作结束时在 `whenComplete` 里把这条提示清掉（后续 handler 自己写过的状态不动）。
+- 注：Ctrl+C 仍是任何时候都有效的逃生门；`/exit` 在 busy 中仍要等当前操作结束（原行为）。
+
+**② App：锁屏页进入即聚焦 PIN 输入框（`app/lib/lock_page.dart`）**
+- 现象：冷启动（或后台切回）进锁屏页，焦点不在输入框，要手动点一下才弹键盘。
+- 改法：加 `FocusNode` + `autofocus: true`；另外锁定倒计时归零时（`enabled: !locked`
+  由 false 变 true）在 `addPostFrameCallback` 里把焦点交还输入框——本帧输入框还是
+  disabled，直接 `requestFocus` 会被忽略。覆盖锁屏（asOverlay）与冷启动锁屏同一条路径。
+
+**验证：** `dart analyze bin lib` 无 issue、`dart test test/` 17 项全过；
+`flutter analyze` 无 issue、`flutter test test/lock_page_test.dart` 通过。
+两处交互手感由老板自测。

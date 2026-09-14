@@ -1990,6 +1990,11 @@ void _renderInputLine() {
 // ---------- 输入循环（逐键，异步流）----------
 // 注意：readByteSync 在 pty/重定向环境下与 stdout.write 存在 StreamSink 冲突
 // （Dart 已知行为），故改用 stdin.listen 异步字节流 + busy 锁防并发。
+
+/// busy（上一条命令/消息还在处理）时回车被拦下的状态栏提示：只提示，输入行原样保留
+/// （老板 2026-09-14）。操作结束后由 whenComplete 自动清掉。
+const _kBusyResendHint = '⏳ 上一条还在处理中，稍后回车再发';
+
 Future<void> _runInputLoop(ChatSession session) async {
   _enterRaw();
   // 启用终端鼠标事件（滚轮翻页用）：1000 = 按钮事件（按下/释放），1006 = SGR
@@ -2142,6 +2147,14 @@ Future<void> _runInputLoop(ChatSession session) async {
           inputChanged = true;
           continue;
         }
+        // busy（上一条命令/消息还在处理）：**不清输入、不提交**——此前先 input.clear()
+        // 再判 busy，把敲好的字静默丢了（老板 2026-09-14 确认顺手修）。这里只提示一句，
+        // 输入原样留在输入行，稍后回车即可发。
+        if (busy) {
+          _state!.status = _kBusyResendHint;
+          _scheduleRender();
+          continue;
+        }
         final line = _state!.input.toString().trim();
         _state!.input.clear();
         _state!.cursor = 0;
@@ -2160,7 +2173,6 @@ Future<void> _runInputLoop(ChatSession session) async {
           inputChanged = true; // 清空输入行，等待下方统一重绘
           continue;
         }
-        if (busy) continue; // 上一条命令/消息还在处理
         busy = true;
         final future = (_state!.pendingInvite)
             ? (line.startsWith('/') ? _execCommand(line) : _handleInviteInput(line)) // / 开头按命令（/exit 退出），否则按邀请码
@@ -2180,6 +2192,8 @@ Future<void> _runInputLoop(ChatSession session) async {
             // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
             Future.delayed(const Duration(seconds: 2), () => exit(0));
           } else {
+            // busy 期间的「稍后再发」提示退场（若还挂着——后续 handler 自己写的状态不动）
+            if (_state!.status == _kBusyResendHint) _state!.status = '';
             _render();
           }
         });

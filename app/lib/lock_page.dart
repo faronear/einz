@@ -32,6 +32,7 @@ class LockPage extends StatefulWidget {
 class _LockPageState extends State<LockPage> {
   late final AppLockService _lock;
   final _pin = TextEditingController();
+  final _pinFocus = FocusNode(); // 锁屏激活即聚焦（弹键盘待输入，不用先点一下输入框）
   bool _busy = false;
   String? _error;
   int _lockSeconds = 0;
@@ -55,13 +56,24 @@ class _LockPageState extends State<LockPage> {
   void dispose() {
     _ticker?.cancel();
     _pin.dispose();
+    _pinFocus.dispose();
     super.dispose();
   }
 
   Future<void> _refreshLockSeconds() async {
     final s = await _lock.remainingLockSeconds;
     if (!mounted) return;
-    if (s != _lockSeconds) setState(() => _lockSeconds = s);
+    if (s != _lockSeconds) {
+      setState(() => _lockSeconds = s);
+      if (s == 0) {
+        // 连续错误锁定倒计时结束 → 输入框重新可用：自动把焦点交还它
+        // （否则还得手动点一下输入框才弹键盘）。焦点只能等重建后再给——
+        // 本帧里输入框仍是 enabled:false，requestFocus 会被忽略
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _pinFocus.requestFocus();
+        });
+      }
+    }
   }
 
   void _enterChat(AppLockPayload payload) {
@@ -272,6 +284,10 @@ class _LockPageState extends State<LockPage> {
             const SizedBox(height: 24),
             TextField(
               controller: _pin,
+              // 进入锁屏页即聚焦输入框 → 直接弹键盘等待输入（老板要求 2026-09-14：
+              // 此前要手动点一下输入框才出键盘）；冷启动锁屏与后台切回覆盖锁屏都生效
+              focusNode: _pinFocus,
+              autofocus: true,
               obscureText: true,
               enabled: !locked,
               keyboardType: TextInputType.number,
