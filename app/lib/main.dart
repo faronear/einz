@@ -252,7 +252,6 @@ class _StartupGateState extends State<StartupGate> {
         spaceKey: base64Decode(plain.spaceKeyB64),
         keyVersion: plain.keyVersion,
         token: plain.token ?? '',
-        escrowPassphrase: plain.escrowPassphrase,
         reauth: reauth,
         publicKeyB64: plain.publicKeyB64,
         privateKeyB64: plain.privateKeyB64,

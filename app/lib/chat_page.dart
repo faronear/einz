@@ -54,7 +54,6 @@ class ChatPage extends StatefulWidget {
     this.api,
     this.enableWs = true,
     this.reauth,
-    this.escrowPassphrase,
     this.escrowUpdatedAt,
     this.personName, // 我的名字（登记时设置；菜单显示/修改）
     this.deviceName, // 我的设备名（登记时自动获取；菜单显示/修改）
@@ -70,10 +69,6 @@ class ChatPage extends StatefulWidget {
   final Uint8List spaceKey;
   final int keyVersion;
   final String token;
-
-  /// 接入口令（escrow，向导设置后随锁包传入）：补设锁/改口令等场景使用；
-  /// 邀请码分享不编入口令（降级 B，与 TUI 一致）。
-  final String? escrowPassphrase;
 
   /// 本端已知的服务端口令更新时间（ms）：启动/上线时与服务器对比，
   /// 服务器更新 = 离线期间口令被重设（只发通知，不弹窗）。
@@ -788,7 +783,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       spaceKeyB64: base64Encode(widget.spaceKey),
       keyVersion: widget.keyVersion,
       token: widget.token,
-      escrowPassphrase: widget.escrowPassphrase,
       publicKeyB64: widget.publicKeyB64,
       privateKeyB64: widget.privateKeyB64,
     );
@@ -815,7 +809,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     setState(() => _hasPin = has);
   }
 
-  /// 修改口令（escrow 托管口令，空间级）：旧口令验证 → 新口令重加密上传 → 本地同步。
+  /// 修改口令（escrow 托管口令，空间级）：旧口令验证 → 新口令重加密上传
+  /// （本地不落密保口令，与 TUI 对齐）。
   Future<void> _showChangePassphraseDialog() async {
     final changed = await showDialog<bool>(
       context: context,
@@ -825,8 +820,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         spaceId: widget.spaceId,
         keyVersion: widget.keyVersion,
         token: widget.token,
-        db: widget.db ?? LocalDatabase(),
-        hasPin: _hasPin,
         api: widget.api,
         onPassphraseUpdated: (updatedAt) {
           if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
@@ -3695,11 +3688,9 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   }
 }
 
-/// 修改口令弹窗（StatefulWidget）：
-/// （设 PIN 时先验 PIN）→ 旧口令验证（fetch 口令密保箱解密）→
-/// 新口令重加密上传（含新 argon2id 哈希）→ 本地同步更新
-/// （设 PIN 场景：PIN 解包改 escrowPassphrase 后同 PIN 重新加密；
-///  跳过 PIN 场景：明文 payload 直写 Keychain）。
+/// 修改口令弹窗（StatefulWidget）：旧口令验证（fetch 口令密保箱解密）→
+/// 新口令重加密上传（含新 argon2id 哈希）。本地不落密保口令
+/// （与 TUI 对齐；服务器为唯一真相源，丢失时用户走"修改口令"手动重建）。
 class _ChangePassphraseDialog extends StatefulWidget {
   const _ChangePassphraseDialog({
     required this.server,
@@ -3707,20 +3698,16 @@ class _ChangePassphraseDialog extends StatefulWidget {
     required this.spaceId,
     required this.keyVersion,
     required this.token,
-    required this.db,
-    required this.hasPin,
     required this.onPassphraseUpdated,
     this.api, // 测试注入（fake api，不触网）；默认按 server 新建
   });
 
   final String server;
-  final bool hasPin;
   final ApiClient? api;
   final String spaceKeyB64;
   final String spaceId;
   final int keyVersion;
   final String token;
-  final LocalDatabase db;
 
   /// 上传成功后回传服务端 updated_at（聊天页记录已知时间，防下次补查误报自己改了口令）。
   final ValueChanged<int?> onPassphraseUpdated;
@@ -3730,7 +3717,6 @@ class _ChangePassphraseDialog extends StatefulWidget {
 }
 
 class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
-  final _pinCtrl = TextEditingController();
   final _oldCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -3740,7 +3726,6 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
 
   @override
   void dispose() {
-    _pinCtrl.dispose();
     _oldCtrl.dispose();
     _newCtrl.dispose();
     _confirmCtrl.dispose();
@@ -3769,12 +3754,6 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.chatPageChangePassphraseMismatch);
       return;
     }
-    // 设 PIN：先验 PIN（复用 AppLockService.unlock 的防爆破锁定）
-    final pin = widget.hasPin ? _pinCtrl.text : '';
-    if (widget.hasPin && pin.isEmpty) {
-      setState(() => _error = l10n.lockPagePinPrompt);
-      return;
-    }
     // 显性确认：修改密保口令（防误触——老板要求）
     final confirmed = await showDialog<bool>(
       context: context,
@@ -3794,16 +3773,6 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       _error = null;
     });
     try {
-      final lock = AppLockService(widget.db);
-      if (widget.hasPin) {
-        try {
-          await lock.unlock(pin);
-        } on AppLockException catch (e) {
-          if (!mounted) return;
-          setState(() => _error = e.message);
-          return;
-        }
-      }
       final api = widget.api ?? ApiClient(widget.server);
       final escrow = KeyEscrowService(api);
       // 1) 验证旧口令：必须能解开服务器当前口令密保箱
@@ -3828,21 +3797,13 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         token: widget.token,
         rotated: true,
       );
-      // 3) 本地同步 + 记录本端已知口令更新时间（避免下次上线补查误报
-      //    "对方重设"——其实是自己刚改的）
+      // 3) 记录本端已知口令更新时间（避免下次上线补查误报"对方重设"——
+      //    其实是自己刚改的）。本地不存口令（服务器为唯一真相源）。
       int? serverUpdatedAt;
       try {
         serverUpdatedAt = (await api.getKeyEscrow(widget.token)).updatedAt;
       } catch (_) {
         // 记录失败不影响结果（下次上线补查再对比）
-      }
-      if (widget.hasPin) {
-        // 设 PIN：PIN 解包改 escrowPassphrase → 同 PIN 重新加密落盘
-        // （PIN 已在内存——第 0 步验证通过，不再二次询问）
-        await lock.updateEscrowPassphraseWithPin(
-            pin, newPass, updatedAt: serverUpdatedAt);
-      } else {
-        await lock.updateEscrowPassphrase(newPass, updatedAt: serverUpdatedAt);
       }
       widget.onPassphraseUpdated(serverUpdatedAt); // 聊天页记录已知时间
       if (!mounted) return;
@@ -3867,18 +3828,6 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.hasPin) ...[
-            TextField(
-              controller: _pinCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: l10n.lockPagePinLabel,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
           TextField(
             controller: _oldCtrl,
             obscureText: true,

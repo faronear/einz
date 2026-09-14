@@ -4690,3 +4690,34 @@ phase4_e2e.sh 有回归守卫确认 `rotate` 命令已删）。此前 16bcdd8 �
 差别不小；但对**人选口令**差别很小（真正的风险是"可预测"，不是"短"）。而我们的
 Argon2id 用 moderate（256 MiB/3 轮），单次验证本就昂贵——**在原先"零限速"的前提下，加限速
 的收益大于加长度**。所以两件都做了：门槛提 10 位 + 服务端限速。
+
+### App 本地不再缓存密保口令（锁包/明文 payload 移除 escrowPassphrase + 解锁重传移除）
+
+**老板决策（2026-09-14）：** 与 TUI 对齐——客户端不本地缓存密保口令，服务器为唯一真相源；
+口令丢失时用户走"修改口令"手动重建，App 无本地口令缓存可自动重传。
+
+**改动：**
+- `app_lock.dart`：`AppLockPayload` 移除 `escrowPassphrase` 字段（`escrowUpdatedAt` 保留——
+  仅用于"对方重设"检测对比）；删除 `updateEscrowPassphrase` / `updateEscrowPassphraseWithPin`
+  两个方法（16bcdd8 引入、本决策使其失去存在前提）。
+- `lock_page.dart`：删除 `_syncEscrow`（解锁时 fetch→验口令→条件重传）及解锁调用点；
+  移除闲置的 shared import。
+- `chat_page.dart`：`ChatPage.escrowPassphrase` 参数移除（补设锁不再要求"口令存在"）；
+  `_showSetLockDialog` 去掉口令判空拦截；改口令弹窗（`_ChangePassphraseDialog`）移除 PIN
+  输入框与 hasPin 分支（PIN 校验与锁包同步不再需要）——流程回到"旧口令验证（fetch 解密）
+  → 新口令重加密上传 rotated:true"，本地不落新口令。
+- `setup_page.dart`：创建/加入流程的 `AppLockPayload`/`_setupLockAndEnter` 不再携带
+  escrowPassphrase（向导口令输入框保留——它仍用于创建时建密保箱/加入时验证）。
+- 测试：`chat_page_menu_test.dart` 改口令 4 测试（PIN 空/PIN 错/PIN 全流程/无 PIN）→
+  2 测试（旧口令错红字不上传 / 全流程成功上传 rotated 包且本地不落新口令）；
+  辅助函数去 hasPin 分支。
+
+**语义影响：** "服务器密保箱数据丢失→解锁自愈重传"的冷路径消失（与 TUI 一致，TUI 本就
+没有）；该场景的恢复手段 = 用 CLI/TUI 重新 `escrow upload`（用当前口令重建密保箱，无需旧口令），
+或"修改口令"流程（需记得旧口令）；全丢场景走备份恢复/恢复码。"对方重设"被动更新机制
+（passphrase.rotated 广播 + 离线补查）不受影响——它靠服务器时间戳对比，不依赖本地口令。
+
+**文档同步：** E2EE.md §7（轮换应对表：客户端不再自动重传）、PROTOCOL.md §7.4（不本地缓存
+密保口令）、KEY_ESCROW.md §12.2 注记（客户端不再缓存口令）。
+
+**验证：** flutter analyze 0 issue；chat_page_menu + app_lock + lock_page 29 项全过。

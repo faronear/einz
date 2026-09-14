@@ -138,50 +138,6 @@ class AppLockService {
         .go();
   }
 
-  /// 修改 escrow 口令后同步本地明文配置（跳过 PIN 场景）。
-  /// 设 PIN 场景走 [updateEscrowPassphraseWithPin]。
-  Future<void> updateEscrowPassphrase(String passphrase, {int? updatedAt}) async {
-    final plain = await loadPlain();
-    if (plain == null) return;
-    await savePlain(AppLockPayload(
-      server: plain.server,
-      spaceKeyB64: plain.spaceKeyB64,
-      spaceId: plain.spaceId,
-      deviceId: plain.deviceId,
-      keyVersion: plain.keyVersion,
-      token: plain.token,
-      escrowPassphrase: passphrase,
-      escrowUpdatedAt: updatedAt ?? plain.escrowUpdatedAt,
-    ));
-  }
-
-  /// 修改 escrow 口令后同步本地锁包（设 PIN 场景，老板 2026-09-14）：
-  /// 用 [pin] 解开锁包 → 更新 escrowPassphrase/escrowUpdatedAt →
-  /// 同一 PIN 重新加密落盘。
-  /// PIN 错/锁定抛 [AppLockException]（复用 [unlock] 的防爆破计数）。
-  Future<void> updateEscrowPassphraseWithPin(
-    String pin,
-    String passphrase, {
-    int? updatedAt,
-  }) async {
-    final payload = await unlock(pin);
-    final updated = AppLockPayload(
-      server: payload.server,
-      spaceKeyB64: payload.spaceKeyB64,
-      spaceId: payload.spaceId,
-      deviceId: payload.deviceId,
-      keyVersion: payload.keyVersion,
-      token: payload.token,
-      escrowPassphrase: passphrase,
-      escrowUpdatedAt: updatedAt ?? payload.escrowUpdatedAt,
-      publicKeyB64: payload.publicKeyB64,
-      privateKeyB64: payload.privateKeyB64,
-    );
-    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(updated.toJson())));
-    final pkg = await encryptWithPassphrase(payload: bytes, passphrase: pin);
-    await _set(_kPackage, jsonEncode(pkg.toJson()));
-  }
-
   /// 设置 PIN 并加密保存 Space Key 包（老板决策：不再生成 12 词恢复码）。
   /// 注意：PIN 丢失则本设备 Space Key 包无法解密（无恢复副本，纯本地）。
   Future<void> setPin(String pin, {required AppLockPayload payload}) async {
@@ -288,7 +244,6 @@ class AppLockPayload {
     required this.deviceId,
     this.keyVersion = 1,
     this.token,
-    this.escrowPassphrase,
     this.escrowUpdatedAt,
     this.publicKeyB64,
     this.privateKeyB64,
@@ -300,11 +255,6 @@ class AppLockPayload {
   final String deviceId;
   final int keyVersion;
   final String? token;
-
-  /// 口令托管（KEY_ESCROW.md）的接入口令：与 App 锁 PIN 区分，
-  /// 同样受 PIN 加密保护；解锁/认证成功时用于**按需**重传口令密保箱
-  /// （服务器无包或本机版本更新时才传；普通重传不推进 updated_at）。
-  final String? escrowPassphrase;
 
   /// 本端已知的服务端口令更新时间（ms）：上线时与服务器对比，
   /// 服务器更新 = 离线期间口令被重设（应弹窗重新验证）。
@@ -322,7 +272,6 @@ class AppLockPayload {
         'device_id': deviceId,
         'key_version': keyVersion,
         'token': token,
-        'escrow_passphrase': escrowPassphrase,
         'escrow_updated_at': escrowUpdatedAt,
         'device_public_key': publicKeyB64,
         'device_private_key': privateKeyB64,
@@ -335,7 +284,6 @@ class AppLockPayload {
         deviceId: json['device_id'] as String,
         keyVersion: (json['key_version'] as int?) ?? 1,
         token: json['token'] as String?,
-        escrowPassphrase: json['escrow_passphrase'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
         publicKeyB64: json['device_public_key'] as String?,
         privateKeyB64: json['device_private_key'] as String?,

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io' show exit;
 
 import 'package:flutter/material.dart';
-import 'package:einz_shared/einz_shared.dart';
 
 import 'brand_logo.dart';
 import 'chat_page.dart';
@@ -84,52 +83,12 @@ class _LockPageState extends State<LockPage> {
         spaceKey: base64Decode(payload.spaceKeyB64),
         keyVersion: payload.keyVersion,
         token: payload.token ?? '',
-        escrowPassphrase: payload.escrowPassphrase,
         escrowUpdatedAt: payload.escrowUpdatedAt,
         reauth: reauth,
         publicKeyB64: payload.publicKeyB64,
         privateKeyB64: payload.privateKeyB64,
       ),
     ));
-  }
-
-  /// 解锁时同步口令密保箱（KEY_ESCROW.md §7）：仅当服务器没有包、或本机版本更新时
-  /// 才重传；普通解锁会提前返回，不刷 updated_at（避免对方误报"口令被重设"）。
-  /// 失败静默，下次解锁自动重试。
-  void _syncEscrow(AppLockPayload payload) {
-    final pass = payload.escrowPassphrase;
-    final token = payload.token;
-    if (pass == null || pass.isEmpty || token == null || token.isEmpty) return;
-    unawaited(() async {
-      try {
-        final api = ApiClient(payload.server);
-        final escrow = KeyEscrowService(api);
-        // 上传前校验：本地口令必须能解开服务器当前口令密保箱，否则跳过重传——
-        // 口令已修改但本机锁包未同步时，防止旧口令覆盖新口令密保箱
-        final snap = await api.getKeyEscrow(token);
-        final current = snap.file;
-        if (current != null) {
-          try {
-            final serverPayload =
-                await escrow.openPackage(passphrase: pass, envelope: current);
-            // 服务器包已不旧于本端（同口令 + 同/更高 keyVersion）→ 无需重传，
-            // 避免每次重启解锁都刷 updated_at / 哈希，触发对方"口令被重设"误报
-            if (serverPayload.keyVersion >= payload.keyVersion) return;
-          } on FormatException {
-            return; // 本地口令与服务器包不匹配：不覆盖
-          }
-        }
-        await escrow.upload(
-          passphrase: pass,
-          spaceKeyB64: payload.spaceKeyB64,
-          spaceId: payload.spaceId,
-          keyVersion: payload.keyVersion,
-          token: token,
-        );
-      } catch (_) {
-        // 忽略：托管不可用不影响聊天（离线/Server 暂不可达）
-      }
-    }());
   }
 
   Future<void> _unlock() async {
@@ -141,7 +100,6 @@ class _LockPageState extends State<LockPage> {
     try {
       final payload = await _lock.unlock(_pin.text);
       if (!mounted) return;
-      _syncEscrow(payload); // 解锁后按需同步口令密保箱（见 _syncEscrow 注释）
       _enterChat(payload);
     } on AppLockLockedException catch (e) {
       if (!mounted) return;

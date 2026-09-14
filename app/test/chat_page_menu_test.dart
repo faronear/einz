@@ -83,12 +83,7 @@ class _FakeApi extends ApiClient {
   }
 }
 
-// ── 修改口令：设 PIN 场景辅助（老板 2026-09-14：先验 PIN，成功后一次性同步锁包）──
-
-/// 预置锁包（PIN 加密）：解锁后得到给定 payload。
-Future<void> _installPinPackage(LocalDatabase db, String pin, AppLockPayload payload) async {
-  await AppLockService(db).setPin(pin, payload: payload);
-}
+// ── 修改口令：辅助（弹窗打开/输入/确认）──
 
 /// 聊天页 + 密保口令弹窗打开（返回 fake api 供断言）。
 /// [spaceKey] 传入以便调用方断言「上传包解出的 Space Key 一致」。
@@ -127,22 +122,14 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
   return api;
 }
 
-/// 弹窗内输入（有 PIN 场景 4 框：锁屏码/旧/新/确认；无 PIN 场景 3 框：旧/新/确认）。
-/// [hasPin] 决定框布局——空 PIN 测试也要按 4 框填写。
+/// 弹窗内输入（3 框：旧/新/确认）。
 Future<void> _enterDialogFields(WidgetTester tester,
-    {required bool hasPin, String pin = '', String oldPass = '', String newPass = ''}) async {
+    {String oldPass = '', String newPass = ''}) async {
   final fields =
       find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-  if (hasPin) {
-    await tester.enterText(fields.at(0), pin);
-    await tester.enterText(fields.at(1), oldPass);
-    await tester.enterText(fields.at(2), newPass);
-    await tester.enterText(fields.at(3), newPass);
-  } else {
-    await tester.enterText(fields.at(0), oldPass);
-    await tester.enterText(fields.at(1), newPass);
-    await tester.enterText(fields.at(2), newPass);
-  }
+  await tester.enterText(fields.at(0), oldPass);
+  await tester.enterText(fields.at(1), newPass);
+  await tester.enterText(fields.at(2), newPass);
 }
 
 Future<void> _confirmChange(WidgetTester tester) async {
@@ -936,92 +923,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('改口令（有 PIN）：PIN 框存在；空 PIN 红字且不误报口令重设', (WidgetTester tester) async {
+  testWidgets('改口令：旧口令错 → 红字，不上传', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
-    await _installPinPackage(
-        db, '123456',
-        AppLockPayload(
-            server: 'https://einz.tic.cc',
-            spaceKeyB64: base64Encode(spaceKey),
-            spaceId: 'space-demo',
-            deviceId: 'dev-a',
-            token: 'tok'));
-
-    final api = await _openChangePassphraseDialog(
-        tester, db,
-        spaceKey: spaceKey);
-
-    // 锁屏码框存在且有 PIN 场景 4 个输入框
-    expect(find.text('锁屏码'), findsOneWidget, reason: '有 PIN 应显示锁屏码输入框');
-    final fields =
-        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
-    expect(fields.evaluate().length, 4);
-
-    // 只填新口令（PIN 空）→ 红字「输入锁屏码」；不应弹确认、不触网
-    await _enterDialogFields(tester, hasPin: true, newPass: 'newpass123');
-    await tester.tap(find.widgetWithText(FilledButton, '修改'));
-    await tester.pumpAndSettle();
-    expect(find.text('输入锁屏码'), findsOneWidget, reason: '空 PIN 应红字提醒');
-    expect(find.text('修改密保口令？'), findsNothing, reason: 'PIN 未过不应进显性确认');
-    expect(api.uploadedPackage, isNull, reason: 'PIN 未过不得上传');
-  });
-
-  testWidgets('改口令（有 PIN）：PIN 错 → 红字，锁包保持旧口令', (WidgetTester tester) async {
-    final db = LocalDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    final spaceKey = await generateSpaceKey();
-    await _installPinPackage(
-        db, '123456',
-        AppLockPayload(
-            server: 'https://einz.tic.cc',
-            spaceKeyB64: base64Encode(spaceKey),
-            spaceId: 'space-demo',
-            deviceId: 'dev-a',
-            token: 'tok',
-            escrowPassphrase: 'oldpass1'));
 
     final api = await _openChangePassphraseDialog(
         tester, db,
         oldPassphrase: 'oldpass1',
         spaceKey: spaceKey);
 
-    await _enterDialogFields(tester,
-        hasPin: true, pin: '999999', oldPass: 'oldpass1', newPass: 'newpass123');
+    await _enterDialogFields(tester, oldPass: 'wrongpass', newPass: 'newpass123');
     await _confirmChange(tester);
 
-    expect(find.text('锁屏码 错误'), findsOneWidget, reason: 'PIN 错应红字');
-    expect(find.text('修改密保口令？'), findsNothing, reason: 'PIN 错不应进显性确认');
-    expect(api.uploadedPackage, isNull, reason: 'PIN 错不得上传');
-    // 锁包未动：旧 PIN 仍可解出，口令字段仍是旧值
-    final payload = await AppLockService(db).unlock('123456');
-    expect(payload.escrowPassphrase, 'oldpass1');
+    expect(find.text('旧口令错误'), findsOneWidget, reason: '旧口令错应红字');
+    expect(find.text('修改密保口令？'), findsNothing, reason: '未过口令验证不应进显性确认');
+    expect(api.uploadedPackage, isNull, reason: '旧口令错不得上传');
   });
 
-  testWidgets('改口令（有 PIN）：全流程成功 → 上传 rotated 包 + 锁包同步新口令',
+  testWidgets('改口令：全流程成功 → 上传 rotated 包（本地不落新口令）',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
-    await _installPinPackage(
-        db, '123456',
-        AppLockPayload(
-            server: 'https://einz.tic.cc',
-            spaceKeyB64: base64Encode(spaceKey),
-            spaceId: 'space-demo',
-            deviceId: 'dev-a',
-            token: 'tok',
-            escrowPassphrase: 'oldpass1',
-            escrowUpdatedAt: 1000));
 
     final api = await _openChangePassphraseDialog(
         tester, db,
         oldPassphrase: 'oldpass1',
         spaceKey: spaceKey);
 
-    await _enterDialogFields(tester,
-        hasPin: true, pin: '123456', oldPass: 'oldpass1', newPass: 'newpass123');
+    await _enterDialogFields(tester, oldPass: 'oldpass1', newPass: 'newpass123');
     await _confirmChange(tester);
 
     // 成功：上传 rotated 包 + 附新口令哈希；弹窗关闭 + SnackBar
@@ -1040,43 +971,5 @@ void main() {
             .openPackage(passphrase: 'oldpass1', envelope: uploaded),
         throwsFormatException,
         reason: '旧口令不应再解开新密保箱');
-
-    // 锁包已同步：旧 PIN 仍可解出、口令与更新时间均已刷新
-    final payload = await AppLockService(db).unlock('123456');
-    expect(payload.escrowPassphrase, 'newpass123');
-    expect(payload.escrowUpdatedAt, 2000, reason: '锁包应记录服务端推进后的 updated_at');
-    expect(payload.spaceKeyB64, base64Encode(spaceKey));
-  });
-
-  testWidgets('改口令（无 PIN）：PIN 框不出现，成功路径回归', (WidgetTester tester) async {
-    final db = LocalDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    final spaceKey = await generateSpaceKey();
-    // 明文配置（跳过 PIN 场景）：改口令后应直写 Keychain
-    await AppLockService(db).savePlain(AppLockPayload(
-        server: 'https://einz.tic.cc',
-        spaceKeyB64: base64Encode(spaceKey),
-        spaceId: 'space-demo',
-        deviceId: 'dev-a',
-        token: 'tok',
-        escrowPassphrase: 'oldpass1'));
-
-    final api = await _openChangePassphraseDialog(
-        tester, db,
-        oldPassphrase: 'oldpass1',
-        spaceKey: spaceKey);
-
-    expect(find.text('锁屏码'), findsNothing, reason: '无 PIN 不应有锁屏码输入框');
-
-    await _enterDialogFields(tester,
-        hasPin: false, oldPass: 'oldpass1', newPass: 'newpass123');
-    await _confirmChange(tester);
-
-    expect(api.uploadedRotated, isTrue, reason: '无 PIN 场景修改口令同样传 rotated: true');
-    expect(find.text('修改口令'), findsNothing, reason: '成功应关闭弹窗');
-    // 明文已同步（无锁包可解）
-    final plain = await AppLockService(db).loadPlain();
-    expect(plain?.escrowPassphrase, 'newpass123');
-    expect(await AppLockService(db).isSetup, isFalse, reason: '无 PIN 场景不产生锁包');
   });
 }

@@ -307,7 +307,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 - 鉴权：Bearer session_token（challenge-response 后）；设备须在白名单（403）。
 - 包结构校验仅限字段类型（`format`/`salt`/`nonce`/`ciphertext` 均为非空 base64 字符串，400 拒绝坏字段）；**Server 永不解析包内容**。
 - 口令验证发生在客户端（解密失败 = 口令错，AEAD tag 校验），Server 无法限速 → 依赖 Argon2id 慢哈希 + 口令熵要求 + 客户端本地错误处理。
-- 客户端接入流程：生成身份 → 白名单登记 → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。**口令重设**后客户端解锁时自动重传新密文包（KEY_ESCROW.md §7）。
+- 客户端接入流程：生成身份 → 白名单登记 → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。客户端**不本地缓存密保口令**（服务器为唯一真相源，KEY_ESCROW.md §12）；口令重设/密保箱重建走"修改口令"或 `cli escrow upload` 手动上传，无解锁自动重传。
 - **`/recover`（全丢恢复）已整体移除**（2026-09-13，Server 端点 + TUI 入口 + 客户端方法
   全部删除）。理由：① 它按 `space_id=''` 那一行读包，Multiverse 下本就永远读不到；
   ② 它的撤销逻辑是**全库范围**的（`UPDATE devices … WHERE status='active'`、

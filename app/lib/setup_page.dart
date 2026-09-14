@@ -1104,7 +1104,6 @@ class _SetupPageState extends State<SetupPage> {
     required String spaceKeyB64,
     required int keyVersion,
     required String token,
-    String? escrowPassphrase,
     String? publicKeyB64, // 设备公钥（b64）：随锁包持久化，重启后 reauth + 弹窗展示
     String? privateKeyB64, // 设备私钥（b64）：随锁包持久化（与 Space Key 同库同策略）
   }) async {
@@ -1130,7 +1129,6 @@ class _SetupPageState extends State<SetupPage> {
         spaceKeyB64: spaceKeyB64,
         keyVersion: keyVersion,
         token: token,
-        escrowPassphrase: escrowPassphrase,
         publicKeyB64: publicKeyB64,
         privateKeyB64: privateKeyB64,
       );
@@ -1870,10 +1868,8 @@ class _SetupPageState extends State<SetupPage> {
         token = session.sessionToken;
         _sessionToken = token;
       }
-      // 3) 口令（Multiverse：sealed 包已随 POST /spaces 提交，无需再上传托管；
-      // 口令仅用于 AppLockPayload 持久化）
-      final pass = _escrowPassphrase.text.trim();
-      // 4) 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
+      // 3) 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
+      // （密保口令不随 AppLockPayload 持久化——服务器为唯一真相源）
       if (_pinSkipped) {
         if (!mounted) return;
         await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
@@ -1883,7 +1879,6 @@ class _SetupPageState extends State<SetupPage> {
           spaceKeyB64: base64Encode(_spaceKey!),
           keyVersion: 1,
           token: token,
-          escrowPassphrase: pass,
           publicKeyB64: kp.publicKeyB64,
           privateKeyB64: kp.privateKeyB64,
         ));
@@ -1897,7 +1892,6 @@ class _SetupPageState extends State<SetupPage> {
         spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: 1,
         token: token,
-        escrowPassphrase: pass,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
       );
@@ -2104,7 +2098,6 @@ class _SetupPageState extends State<SetupPage> {
     final kp = _keyPair;
     if (kp == null) return;
     // 口令已在口令页（步骤 3）验证通过（_verifyJoinPassphrase），这里仅设锁/完成
-    final passphrase = _escrowPassphrase.text.trim();
     if (_pinSkipped) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
@@ -2114,7 +2107,6 @@ class _SetupPageState extends State<SetupPage> {
         spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: _joinKeyVersion,
         token: _sessionToken!,
-        escrowPassphrase: passphrase,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
       ));
@@ -2128,7 +2120,6 @@ class _SetupPageState extends State<SetupPage> {
       spaceKeyB64: base64Encode(_spaceKey!),
       keyVersion: _joinKeyVersion,
       token: _sessionToken!,
-      escrowPassphrase: passphrase,
       publicKeyB64: kp.publicKeyB64,
       privateKeyB64: kp.privateKeyB64,
     );

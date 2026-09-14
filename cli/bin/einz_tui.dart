@@ -1033,7 +1033,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     store.personId = join.personId;
     store.personName = myName ?? '成员';
     store.save(storePath);
-    session.messages.add(_systemMessage(session, '🎉 口令验证通过，成功加入秘境。'));
+    session.messages.add(_systemMessage(session, '✅ 口令验证通过，成功加入秘境。'));
     session.messages.add(_systemMessage(session, '----------------'));
     _onboarded = true;
     _scheduleRender();
