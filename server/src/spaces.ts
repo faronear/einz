@@ -5,6 +5,7 @@ import { pwhashStr, toB64 } from "./crypto.js";
 import { parsePackage, type EscrowPackage } from "./escrow.js";
 import { deriveSpaceAddress } from "./address.js";
 import { loadConfig } from "./config.js";
+import { normalizeDeviceName } from "./deviceName.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
 // - space_address 由 space_public_key（创建者公钥）经 Keccak-256 + EIP-55 派生
@@ -160,7 +161,7 @@ export async function createSpace(
         `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at)
          VALUES (?, ?, ?, 'active', ?, ?)`,
       )
-      .run(deviceId, creatorPersonId, publicKey, deviceName ?? null, now);
+      .run(deviceId, creatorPersonId, publicKey, normalizeDeviceName(deviceName), now);
     sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(
@@ -320,7 +321,7 @@ export function joinSpace(
         `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at)
          VALUES (?, ?, ?, 'active', ?, ?)`,
       )
-      .run(deviceId, personId, publicKey, deviceName ?? null, Date.now());
+      .run(deviceId, personId, publicKey, normalizeDeviceName(deviceName), Date.now());
     const sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(

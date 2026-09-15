@@ -920,6 +920,18 @@ abstract class AppLocalizations {
   /// **'Name cannot be empty'**
   String get chatPageRenameDeviceEmptyError;
 
+  /// No description provided for @chatPageRenameDeviceInvalidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Only Chinese/English letters, digits, _ and - are allowed'**
+  String get chatPageRenameDeviceInvalidError;
+
+  /// No description provided for @chatPageRenameDeviceTooLongError.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters'**
+  String chatPageRenameDeviceTooLongError(int max);
+
   /// No description provided for @chatPageRenameMyselfEmptyError.
   ///
   /// In en, this message translates to:

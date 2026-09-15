@@ -170,6 +170,13 @@
   "chatPageRenameDeviceTitle": "Device info",
   "chatPageRenameDeviceLabel": "Device name",
   "chatPageRenameDeviceEmptyError": "Name cannot be empty",
+  "chatPageRenameDeviceInvalidError": "Only Chinese/English letters, digits, _ and - are allowed",
+  "chatPageRenameDeviceTooLongError": "At most {max} characters",
+  "@chatPageRenameDeviceTooLongError": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
   "chatPageRenameMyselfEmptyError": "Name cannot be empty",
   "chatPageRenameSameAsPeerError": "Can't match your partner's name — pick another",
   "chatPageCopy": "Copy",

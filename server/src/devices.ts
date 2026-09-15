@@ -1,6 +1,7 @@
 import { getDb } from './db.js'
 import { ApiError } from './auth.js'
 import { getDevice } from './config.js'
+import { assertDeviceName } from './deviceName.js'
 import { deviceScopeClause, requireSession } from './guard.js'
 import { broadcastProfileUpdated, getConnectedAt } from './ws.js'
 
@@ -77,8 +78,10 @@ export function updateDeviceName (
 
   const b = (body ?? {}) as { device_name?: string }
   const deviceName = (b.device_name ?? '').trim()
-  if (!deviceName)
-    throw new ApiError('INVALID_REQUEST', 'device_name 不能为空', 400)
+  // 设备名字符白名单 + 长度上限（老板 2026-09-16）：用户主动改名 → 不合规直接
+  // 400 让客户端提示重输，不悄悄改写他的输入（create/join 的自动名走
+  // normalizeDeviceName 消毒，见 deviceName.ts）
+  assertDeviceName(deviceName)
 
   getDb()
     .prepare(`UPDATE devices SET device_name = ? WHERE device_id = ?`)

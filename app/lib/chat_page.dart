@@ -1138,6 +1138,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     : l10n.chatPageRenameMyselfEmptyError;
                 return;
               }
+              // 设备名字符白名单 + 长度上限（老板 2026-09-16）：只允许中英文、
+              // 数字、`_`、`-`，≤32；不合规提示重输（服务端另有 400 兜底）
+              if (renameDevice) {
+                final violation = checkDeviceNamePolicy(name);
+                if (violation != null) {
+                  nameError.value = violation == DeviceNameViolation.tooLong
+                      ? l10n.chatPageRenameDeviceTooLongError(kDeviceNameMaxLength)
+                      : l10n.chatPageRenameDeviceInvalidError;
+                  return;
+                }
+              }
               // 不允许改成与对方相同的名字（老板 2026-09-10）
               if (!renameDevice && widget.peerName != null && name == widget.peerName) {
                 nameError.value = l10n.chatPageRenameSameAsPeerError;

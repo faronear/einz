@@ -756,6 +756,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('名称不能为空'), findsOneWidget, reason: '全空格设备名保存应红字警示');
 
+    // 不合规字符（空格、标点）→ 红字警示并停留（老板 2026-09-16：设备名只允许
+    // 中文字/英文字母/数字/`_`/`-`）
+    await tester.enterText(dialogField, 'My Phone!');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('只能用中文字、英文字母、数字、下划线(_)、中划线(-)'), findsOneWidget,
+        reason: '含空格/感叹号的设备名保存应红字警示');
+
+    // 超长（>32）→ 红字警示
+    await tester.enterText(dialogField, 'a' * 33);
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('最多 32 个字符'), findsOneWidget, reason: '超长设备名应红字警示');
+
     // 开始填写即消红字
     await tester.enterText(dialogField, '我的手机');
     await tester.pumpAndSettle();

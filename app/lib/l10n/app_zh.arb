@@ -170,6 +170,13 @@
   "chatPageRenameDeviceTitle": "我的设备信息",
   "chatPageRenameDeviceLabel": "设备名称",
   "chatPageRenameDeviceEmptyError": "名称不能为空",
+  "chatPageRenameDeviceInvalidError": "只能用中文字、英文字母、数字、下划线(_)、中划线(-)",
+  "chatPageRenameDeviceTooLongError": "最多 {max} 个字符",
+  "@chatPageRenameDeviceTooLongError": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
   "chatPageRenameMyselfEmptyError": "名字不能为空",
   "chatPageRenameSameAsPeerError": "不能与对方同名，请换个名字",
   "chatPageCopy": "复制",

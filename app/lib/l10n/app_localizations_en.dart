@@ -464,6 +464,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRenameDeviceEmptyError => 'Name cannot be empty';
 
   @override
+  String get chatPageRenameDeviceInvalidError =>
+      'Only Chinese/English letters, digits, _ and - are allowed';
+
+  @override
+  String chatPageRenameDeviceTooLongError(int max) {
+    return 'At most $max characters';
+  }
+
+  @override
   String get chatPageRenameMyselfEmptyError => 'Name cannot be empty';
 
   @override

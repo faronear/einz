@@ -439,6 +439,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameDeviceEmptyError => '名称不能为空';
 
   @override
+  String get chatPageRenameDeviceInvalidError => '只能用中文字、英文字母、数字、下划线(_)、中划线(-)';
+
+  @override
+  String chatPageRenameDeviceTooLongError(int max) {
+    return '最多 $max 个字符';
+  }
+
+  @override
   String get chatPageRenameMyselfEmptyError => '名字不能为空';
 
   @override

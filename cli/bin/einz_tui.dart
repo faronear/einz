@@ -574,6 +574,16 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String storePath, String server) async {
   // 已登记设备启动时把本地设备名称同步到后台（TUI 里改名后服务端 dev1 的
   // deviceName 同步更新；首设备 enroll 已带上 deviceName，此处幂等覆盖）
+  final storedDeviceName = store.deviceName;
+  if (storedDeviceName != null && storedDeviceName.isNotEmpty) {
+    // 存量名（本机自动取的宿主机名可能含空格等）按新规则消毒后再上传——否则
+    // 服务端会拒收不合规字符，名字永远同步不上去
+    final fixed = sanitizeDeviceName(storedDeviceName);
+    if (fixed != storedDeviceName) {
+      store.deviceName = fixed;
+      store.save(storePath);
+    }
+  }
   if (store.deviceId != null &&
       store.spaceId != null &&
       (store.deviceName?.isNotEmpty ?? false) &&
@@ -2733,12 +2743,20 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
       } else {
+        // 字符白名单 + 长度上限（老板 2026-09-16）：不合规就提示重输，不静默改写
+        // 用户的输入（服务端 POST /devices/name 同样会 400 兜底）
+        final violation = checkDeviceNamePolicy(arg);
+        if (violation != null) {
+          s.session.messages.add(_systemMessage(s.session, _deviceNameRuleHint()));
+          break;
+        }
+        final name = arg.trim();
         try {
           final old = s.session.store.deviceName ?? '(未设置)';
-          s.session.store.deviceName = arg;
+          s.session.store.deviceName = name;
           s.session.store.save(s.session.storePath);
-          await ApiClient(s.session.server).updateDeviceName(arg, s.session.store.sessionToken!);
-          s.session.messages.add(_systemMessage(s.session, '✅ 设备名已更新: $old → $arg'));
+          await ApiClient(s.session.server).updateDeviceName(name, s.session.store.sessionToken!);
+          s.session.messages.add(_systemMessage(s.session, '✅ 设备名已更新: $old → $name'));
         } catch (e) {
           s.session.messages.add(_systemMessage(s.session, '❌ 设备名修改失败: $e'));
         }
@@ -3236,8 +3254,8 @@ void _abortPendingGuide() {
 }
 
 /// 新设备的默认名称：宿主机名去 .local 后缀（Platform.localHostname 形如
-/// 'lukde-MacBook-Pro.local'）并截断到 32 字符；异常/空值/localhost 回退
-/// 空串（不设置 deviceName，由服务端用规范 id devN 兜底）。
+/// 'lukde-MacBook-Pro.local'），再按设备名规则消毒（不合规字符 → `_`、截断 32）；
+/// 异常/空值/localhost 回退空串（不设置 deviceName，展示层用 device_id 兜底）。
 String _defaultDeviceName() {
   try {
     var name = Platform.localHostname.trim();
@@ -3246,8 +3264,14 @@ String _defaultDeviceName() {
       name = name.substring(0, name.length - '.local'.length);
     }
     name = name.trim();
-    return name.length > 32 ? name.substring(0, 32) : name;
+    if (name.isEmpty) return '';
+    return sanitizeDeviceName(name);
   } catch (_) {
     return '';
   }
+}
+
+/// 设备名不合规时的提示（规则见 device_name_policy：中英文/数字/`_`/`-`，≤32）。
+String _deviceNameRuleHint() {
+  return '⚠️ 设备名只能用中文字、英文字母、数字、下划线(_)、中划线(-)，最长 $kDeviceNameMaxLength 个字符';
 }

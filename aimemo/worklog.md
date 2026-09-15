@@ -6139,3 +6139,34 @@ device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对
   `flutter analyze app/lib/chat_page.dart` 全干净。
 
 **待定**：App 端顶部条暂未加 "n/m台在线"（本次只修它的在线判定），需要时再上。
+
+## 2026-09-16 设备名字符白名单：中英文/数字/`_`/`-`，最长 32（老板定）
+
+**规则**：设备名只允许 **中文字、英文字母、数字 0-9、下划线 `_`、中划线 `-`**，最长 32 字符。
+两条不同的处理（老板 2026-09-16 定）：
+- **自动取的名**（TUI 宿主机名、App 手机型号）→ 不合规字符换成 `_`（"iPhone 15 Pro" →
+  `iPhone_15_Pro`）；用户没表达过意愿，换掉不违背他意图。
+- **用户输入的名**（TUI `/device <名>`、App 改名弹窗）→ 不合规**拒绝并提示重输**，
+  不静默改写人的输入（改了不告诉用户 = 名字莫名变了）。
+
+**落地（三端同一约定，两份实现——Dart/TS 无法共用一份代码，改动要同步）**
+- `shared/lib/src/policy/device_name_policy.dart`（新，唯一来源）：`kDeviceNameMaxLength=32`、
+  `checkDeviceNamePolicy()`（返回 `DeviceNameViolation`）、`sanitizeDeviceName()`；
+  中文取 CJK 基本区 `\u4e00-\u9fff` + 扩展 A `\u3400-\u4dbf`。
+- `server/src/deviceName.ts`（新）：`assertDeviceName()`（显式改名 → 400）、
+  `normalizeDeviceName()`（create/join → 消毒，空则 null）。接入点：
+  `devices.ts` 的 `POST /devices/name`、`spaces.ts` 的 create 与 join 三处写库点。
+- TUI：`_defaultDeviceName()` 消毒；`/device` 命令校验后拒（含服务端 400 兜底）；
+  `_activateAfterBind` 里把**存量**不合规名先消毒再上传（否则老设备永远同步不上去）。
+- App：`setup_page._autoDeviceName()` 消毒；改名弹窗校验 + 两条新 l10n
+  （`chatPageRenameDeviceInvalidError` / `chatPageRenameDeviceTooLongError`，zh/en 已生成）。
+
+**测试**
+- `shared/test/device_name_policy_test.dart`（新）：合规/不合规/超长/边界 32、消毒不变量
+  （"消毒结果一律能通过校验"）——`dart test` 9 项全过。
+- `server/test/device_name.test.ts`（新，已挂 `npm test`）：纯函数 + 端到端（create 携带
+  `老板的 iPhone` → 落库 `老板的_iPhone`；改名 `MacBook Pro`/`!`/emoji/33 字 → 400；
+  合规名 200 生效）。注意所有请求要带 `X-Protocol-Version: 1`，否则一律 400。
+- `app/test/chat_page_menu_test.dart`：我的设备弹窗新增"空格/标点 → 红字"、"33 字 → 红字"。
+- 全量：`server npm test` 全绿、`tsc --noEmit`、`dart analyze`(cli/shared)、
+  `flutter analyze`、`flutter test`(app) 全过。

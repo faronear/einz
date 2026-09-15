@@ -1073,6 +1073,8 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 登记用默认设备名：设备型号（device_info_plus，如 "iPhone 15 Pro" /
   /// "SM-S918B"）；平台通道不可用（widget 测试等）时回退 'dev-mobile'。
+  /// 型号里的空格/符号按设备名规则换成 `_`（老板 2026-09-16：只允许中英文、
+  /// 数字、`_`、`-`，≤32）——"iPhone 15 Pro" → "iPhone_15_Pro"。
   Future<String> _autoDeviceName() async {
     if (_autoDeviceNameCache != null) return _autoDeviceNameCache!;
     var name = 'dev-mobile';
@@ -1081,6 +1083,7 @@ class _SetupPageState extends State<SetupPage> {
       final model = (info as dynamic).model?.toString().trim();
       if (model != null && model.isNotEmpty) name = model;
     } catch (_) {}
+    name = sanitizeDeviceName(name);
     _autoDeviceNameCache = name;
     return name;
   }
