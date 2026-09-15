@@ -20,6 +20,8 @@ import { logActivity, logSyncActivity, metaOf } from "./audit.js";
 const PORT = Number(process.env.PORT ?? 3000);
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
 const SERVER_VERSION = "1.0.0";
+/** 协议版本（PROTOCOL.md §1）：REST 用请求头 X-Protocol-Version，WS 用握手 ?pv= */
+const PROTOCOL_VERSION = 1;
 openDb(); // 先开库（所有路由依赖 db 就绪）
 const cfg: ServerConfig = loadConfig();
 // 免认证的 POST /spaces 会一直开着（新空间创建者没有任何凭证可用），所以
@@ -95,6 +97,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
   const method = req.method ?? "GET";
+
+  assertProtocolVersion(req, path);
 
   // 全站兜底限速（按 IP；真正的刷量防护在反代/云侧，这里只防误用与粗暴刷）
   limitByIp(req, "global");
@@ -478,6 +482,28 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
 
   sendJson(res, 404, { error: { code: "NOT_FOUND", message: "not found" } });
+}
+
+/**
+ * 协议版本硬校验（PROTOCOL.md §1：所有请求携带 `X-Protocol-Version: 1`，不匹配 →
+ * 400 PROTOCOL_VERSION_MISMATCH）。2026-09-15 评审 S7：文档承诺了但服务端从没实现，
+ * 客户端也从不设这个头——现在双侧都补上。
+ *
+ * 豁免（有意为之）：
+ * - `GET /health`：外部监控/```curl``` 健康检查，不该被协议版本卡住；
+ * - `GET /join/:token`：在浏览器里打开的邀请落地页，浏览器无法自定义请求头。
+ */
+function assertProtocolVersion(req: IncomingMessage, path: string): void {
+  if (path === "/health" || path.startsWith("/join/")) return;
+  const raw = req.headers["x-protocol-version"];
+  const version = Array.isArray(raw) ? raw[0] : raw;
+  if (version !== String(PROTOCOL_VERSION)) {
+    throw new ApiError(
+      "PROTOCOL_VERSION_MISMATCH",
+      `unsupported protocol version: ${version ?? "(missing)"}（需 X-Protocol-Version: ${PROTOCOL_VERSION}）`,
+      400
+    );
+  }
 }
 
 function sendJson(res: ServerResponse, status: number, data: unknown): void {

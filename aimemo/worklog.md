@@ -5953,3 +5953,27 @@ S3（附件重试不幂等 → C2）、S5（restore 路径校验 → B2）、S6�
 - **S12 后半段**：`PROTOCOL_MULTIVERSE.md` 的草案字段名（`spaceAddress`/`spacePublicKey`）
   与实现（`space_id`/`public_key`/`space_address`）不一致——文档是草案，P3 已把头部改成
   "已实现"，但正文 §4 的请求示例需要按实现重写一遍。**列入 P4 或下次文档批**。
+
+### S7/S9/S11/S15 四条按老板拍板落地
+
+- **S7 补实现**（选了"补实现"）：`app.ts` 新增 `assertProtocolVersion`，对 REST 硬校验
+  `X-Protocol-Version: 1`，不符 → `400 PROTOCOL_VERSION_MISMATCH`；**豁免 `/health`**
+  （监控/curl）**与 `/join/:token`**（浏览器落地页无法自定义头）。客户端侧
+  `ApiClient` 在 `_post/_get/_getBytes/_delete` 四处统一带该头（`protocolVersionHeader`）。
+  配套：4 个服务端测试文件在顶部包一层 fetch 注入默认头（保留 `RAW_FETCH` 供反例），
+  smoke 新增三条断言（缺头 400 / 版本不符 400 / `/health` 免校验 200）；
+  三个用裸 `HttpClient` 的 CLI 检查脚本（`receipts_check`、`timestamp_check`）补头。
+- **S9 部署前提已满足**：核实两个 compose 模板——`withcaddy` 不发布 server 端口（由同
+  网络 Caddy 反代）、`nocaddy` 把端口绑到 `127.0.0.1`，所以"只经反代暴露"这个前提是成立的，
+  **不需要代码开关**；改为在 `SECURITY.md` §6 记一条残留风险（含"若直跑公网端口会怎样"的
+  明确说明 + 应对）。
+- **S15**：App 生成 Space Key 的两处从 `Random.secure()` 改为 `(await sodium()).randombytes.buf(32)`
+  （两套 CSPRNG 并存没必要，口径统一走 libsodium；space_id 的 UUID 仍用 Random.secure）。
+- **S11 不回退**：`SECURITY.md` §6 补一行——"口令策略只卡 ≥8 位、不卡字符种类"是老板
+  2026-09-15 的明确取舍（易记优先），在线爆破由服务端限速兜，**离线爆破只能靠口令熵**
+  （建议引导用 `/passphrase random` 的 12 词）。
+- 顺便：`PROTOCOL.md` §1 写明该硬校验的实现状态与两处豁免；`DEPLOYMENT.md` §3.3 的验证
+  curl 示例补上 `X-Protocol-Version` 头（并演示缺头 → 400）。
+
+**验证**：server tsc 干净 + npm test 5 套件全绿（含新增的协议版本断言）；shared 28 项、
+cli 18 项测试全过；shared/cli/app analyze 全干净。

@@ -87,6 +87,7 @@ Future<Map<String, dynamic>> _getReceipts(String server, String token) async {
   try {
     final req = await client.getUrl(Uri.parse('$server/receipts'));
     req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+    req.headers.set('X-Protocol-Version', '1'); // 协议硬校验（PROTOCOL.md §1）
     final res = await req.close();
     final text = await res.transform(utf8.decoder).join();
     if (res.statusCode != 200) {

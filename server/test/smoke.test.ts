@@ -26,6 +26,15 @@ import assert from 'node:assert/strict'
 import Database from 'better-sqlite3'
 import { pwhashStr } from '../src/crypto.js'
 
+// 所有请求默认带协议版本头（与客户端一致）：服务端对 API 路径做硬校验，
+// 缺头/版本不符 → 400 PROTOCOL_VERSION_MISMATCH（PROTOCOL.md §1，2026-09-15 补实现）。
+const RAW_FETCH = globalThis.fetch
+globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
+  RAW_FETCH(input, {
+    ...init,
+    headers: { 'X-Protocol-Version': '1', ...(init?.headers as Record<string, string> | undefined) }
+  })) as typeof fetch
+
 const ROOT = resolve(import.meta.dirname, '..')
 const HELLO = 'hello b, this is a secret message ❤️'
 
@@ -305,6 +314,16 @@ async function main (): Promise<void> {
 
   try {
     await waitReady(port)
+
+    // 0) 协议版本硬校验（PROTOCOL.md §1）：缺头 → 400（/health 免校验，见下一段）
+    const noVersion = await RAW_FETCH(`http://127.0.0.1:${port}/space`)
+    assert.equal(noVersion.status, 400, '缺少 X-Protocol-Version 的请求必须 400')
+    const wrongVersion = await RAW_FETCH(`http://127.0.0.1:${port}/space`, {
+      headers: { 'X-Protocol-Version': '99' }
+    })
+    assert.equal(wrongVersion.status, 400, '协议版本不符必须 400')
+    const healthNoVersion = await RAW_FETCH(`http://127.0.0.1:${port}/health`)
+    assert.equal(healthNoVersion.status, 200, '/health 免协议版本校验（监控/curl 用）')
 
     // 1) 未登记设备挑战 → 403（带了 space_id 仍应拒绝：设备不在 devices 表）
     const evil = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {

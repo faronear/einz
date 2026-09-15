@@ -15,6 +15,11 @@ class ApiClient {
 
   final String baseUrl;
 
+  /// 协议版本头（PROTOCOL.md §1）：服务端做硬校验，缺失/不匹配 → 400。
+  /// 所有 REST 请求都带上（WS 用握手的 `?pv=`）。
+  static const protocolVersionHeader = 'X-Protocol-Version';
+  static const protocolVersion = '1';
+
   /// 瞬时网络错误自动重试次数（翻墙/网络抖动下的间歇性握手失败不致命）。
   static const retryCount = 3;
 
@@ -377,6 +382,7 @@ class ApiClient {
       try {
         final req = await client.postUrl(Uri.parse('$baseUrl$path'));
         req.headers.contentType = ContentType.json;
+        req.headers.set(protocolVersionHeader, protocolVersion);
         if (withToken && token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
@@ -398,6 +404,7 @@ class ApiClient {
       final client = _client;
       try {
         final req = await client.getUrl(Uri.parse('$baseUrl$path'));
+        req.headers.set(protocolVersionHeader, protocolVersion);
         if (token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
@@ -441,6 +448,7 @@ class ApiClient {
       final client = _client;
       try {
         final req = await client.getUrl(Uri.parse('$baseUrl$path'));
+        req.headers.set(protocolVersionHeader, protocolVersion);
         final res = await req.close().timeout(responseTimeout);
         if (res.statusCode == 404) return null; // 未设置
         if (res.statusCode >= 400) {
@@ -463,6 +471,7 @@ class ApiClient {
       final client = _client;
       try {
         final req = await client.deleteUrl(Uri.parse('$baseUrl$path'));
+        req.headers.set(protocolVersionHeader, protocolVersion);
         if (token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }

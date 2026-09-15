@@ -1542,7 +1542,9 @@ class _SetupPageState extends State<SetupPage> {
       if (kp == null) return;
       // 客户端生成 space_id + Space Key（协议 §3.4）
       final spaceId = _newSpaceId();
-      _spaceKey ??= Uint8List.fromList(List.generate(32, (_) => Random.secure().nextInt(256)));
+      // Space Key 用 libsodium 的 CSPRNG（与文档口径统一：随机数只走 libsodium；
+      // Dart 的 Random.secure() 也是 CSPRNG，但两套来源没必要并存，2026-09-15 评审 S15）
+      _spaceKey ??= (await sodium()).randombytes.buf(32);
       final api = ApiClient(_server);
       final passphrase = _escrowPassphrase.text.trim();
       final sealed = passphrase.isEmpty
@@ -1850,7 +1852,9 @@ class _SetupPageState extends State<SetupPage> {
     });
     try {
       // 1) 随机生成 Space Key（CSPRNG 32B，仅首次）
-      _spaceKey ??= Uint8List.fromList(List.generate(32, (_) => Random.secure().nextInt(256)));
+      // Space Key 用 libsodium 的 CSPRNG（与文档口径统一：随机数只走 libsodium；
+      // Dart 的 Random.secure() 也是 CSPRNG，但两套来源没必要并存，2026-09-15 评审 S15）
+      _spaceKey ??= (await sodium()).randombytes.buf(32);
       // 2) 认证（缓存 session；用登记后服务端分配的真实 deviceId）
       var token = _sessionToken;
       if (token == null) {

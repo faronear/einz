@@ -145,12 +145,16 @@ docker compose ps                       # 两个服务均 healthy/running
 ### 3.3 验证部署
 
 ```bash
-# 域名解析 + TLS 正常（应返回鉴权错误而非连接失败）
-curl -s https://<你的域名>/space | head -c 200        # 期望 401/403 JSON
+# 健康检查（免协议版本头）
+curl -s https://<你的域名>/health | head -c 200       # 期望 {"status":"ok",...}
+# 域名解析 + TLS 正常（应返回鉴权错误而非连接失败；注意要带协议版本头）
+curl -s -H 'X-Protocol-Version: 1' https://<你的域名>/space | head -c 200   # 期望 401/403 JSON
+# 缺协议版本头 → 400（硬校验）
+curl -s -o /dev/null -w '%{http_code}\n' https://<你的域名>/space            # 期望 400
 # 未登记设备拒绝（dev-evil 不在 devices 表）
 curl -s -o /dev/null -w '%{http_code}\n' \
   -X POST https://<你的域名>/auth/challenge \
-  -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' -H 'X-Protocol-Version: 1' \
   -d '{"device_id":"dev-evil","space_id":"whatever"}'   # 期望 403
 ```
 

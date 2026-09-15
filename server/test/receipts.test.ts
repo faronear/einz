@@ -16,6 +16,15 @@ import { join, resolve } from 'node:path'
 import { WebSocket } from 'ws'
 import assert from 'node:assert/strict'
 
+// 所有请求默认带协议版本头（与客户端一致）：服务端对 API 路径做硬校验，
+// 缺头/版本不符 → 400 PROTOCOL_VERSION_MISMATCH（PROTOCOL.md §1，2026-09-15 补实现）。
+const RAW_FETCH = globalThis.fetch
+globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
+  RAW_FETCH(input, {
+    ...init,
+    headers: { 'X-Protocol-Version': '1', ...(init?.headers as Record<string, string> | undefined) }
+  })) as typeof fetch
+
 const ROOT = resolve(import.meta.dirname, '..')
 
 let serverProc: ChildProcess | null = null

@@ -29,6 +29,7 @@ Future<void> main() async {
   for (var i = 0; i < 60; i++) {
     try {
       final req = await client.getUrl(Uri.parse('$base/devices'));
+    req.headers.set('X-Protocol-Version', '1'); // 协议硬校验（PROTOCOL.md §1）
       final res = await req.close();
       res.drain<void>();
       if (res.statusCode != 0) {

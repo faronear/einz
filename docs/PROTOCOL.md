@@ -11,6 +11,11 @@
 - 生产环境强制 HTTPS / WSS（Caddy 终结 TLS），禁止 HTTP / WS。
 - 所有请求/帧携带 `X-Protocol-Version: 1`（或 WS 握手 query `?pv=1`）；版本不匹配 → `400 PROTOCOL_VERSION_MISMATCH`。
 - 服务端与客户端必须校验对方版本；V1 阶段两端同时升级，不做多版本兼容矩阵。
+  - **实现状态（2026-09-15 补）**：REST 由 `app.ts` 的 `assertProtocolVersion` 硬校验；
+    `shared/lib/src/protocol/api_client.dart` 在所有请求上带该头（`ApiClient.protocolVersionHeader`）；
+    WS 握手校验 `?pv=1`（不匹配关闭 4400）。
+  - **豁免**：`GET /health`（外部监控 / curl 健康检查）与 `GET /join/:token`
+    （浏览器打开的邀请落地页，无法自定义请求头）。
 
 ## 2. 通用约定
 
