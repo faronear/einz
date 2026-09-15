@@ -17,6 +17,7 @@ import 'data/locale_settings.dart';
 import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/top_notice.dart';
+import 'widgets/passphrase_field.dart';
 
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
 enum _WizardRole { create, join, offline }
@@ -1762,21 +1763,20 @@ class _SetupPageState extends State<SetupPage> {
               ),
           ],
         ),
-        TextField(
+        // 口令框带"查看明文"眼睛（点一下看 3 秒自动回暗码，老板 2026-09-15）；
+        // 下面的**确认框刻意不给眼睛**——确认是用来复核的，能顺手点开就失去意义。
+        PassphraseField(
           controller: _escrowPassphrase,
           style: const TextStyle(fontSize: 20),
-          obscureText: true,
+          revealTip: l10n.chatPagePassphraseRevealTip,
           // 开始填写即清除「口令为空」红字（不依赖再点下一步）
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
           },
-          decoration: InputDecoration(
-            // 仅首台设备设置时提示最短长度（join 是验证已有口令）
-            hintText: _role == _WizardRole.create
-                ? l10n.wizardPassphraseMinLengthHint
-                : null,
-            border: const OutlineInputBorder(),
-          ),
+          // 仅首台设备设置时提示最短长度（join 是验证已有口令）
+          hintText: _role == _WizardRole.create
+              ? l10n.wizardPassphraseMinLengthHint
+              : null,
         ),
         // 首台设备：口令需二次输入确认（避免设错口令后无法再入；老板要求 2026-09-12）。
         // 后续设备是「验证」已有口令，无需确认。

@@ -731,7 +731,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageDevicePublicKeyFailed => '未记录';
 
   @override
-  String get burnOptionKeepIndefinitely => '长期保留';
+  String get burnOptionKeepIndefinitely => '不设期限';
 
   @override
   String get burnOption1Minute => '1 分钟';
