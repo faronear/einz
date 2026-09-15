@@ -156,14 +156,16 @@ void main() {
         reason: '切回纯色后状态条仍为悬浮圆角（两风格统一）');
     expect(await settings.load(), 'plain');
 
-    // 右上角 ✕ 仍可关闭弹窗（未点选任何风格时）
+    // 无右上角 ✕（老板 2026-09-15 统一：几个设置弹层都不要关闭按钮）——
+    // 改成验证"未点选任何风格时下滑 / 系统返回也能关掉弹窗"
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.close));
+    expect(find.byIcon(Icons.close), findsNothing, reason: '设置弹层统一不设关闭按钮');
+    await tester.binding.handlePopRoute(); // 模拟系统返回/下滑关闭
     await tester.pumpAndSettle();
-    expect(find.text('界面风格'), findsNothing, reason: '点 ✕ 后弹窗应关闭');
+    expect(find.text('界面风格'), findsNothing, reason: '返回后弹窗应关闭');
     expect(tester.takeException(), isNull);
   });
 

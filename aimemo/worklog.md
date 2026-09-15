@@ -5327,3 +5327,23 @@ macOS/桌面/测试环境自动退回占位图标——与 video_player 的平�
 （真机走正常 isolate 事件循环，`dart:io` 照常完成，无需任何修复——老板 2026-09-15 问过确认。）
 
 **验证：** `flutter analyze` 无 issue；`flutter test` 117 项全过。真机首帧效果待老板验证。
+
+### 设置弹层统一 + 附件存储选项双语化（老板 2026-09-15）
+
+**老板要求：** ① 附件存储弹层里"安全（不留存）"只有中文 → 补英文，并改文案为
+「不存本地 / 本地保存」；② 选中项要有背景高亮；③ 「界面语言 / 阅后即焚 / 附件存储」
+三个弹层与「界面风格」统一：**都不要右上角关闭按钮**，**选中行都要高亮**。
+
+**改法：**
+- 新增通用弹层 `app/lib/widgets/option_picker_sheet.dart`：标题（无关闭按钮）+ 选项行
+  （选中项浅 tint 圆角底 + 对勾）+ 可选"提交"按钮（`submitLabel` 非空时改为单选提交模式，
+  与附件存储的"有害操作要确认"匹配）+ 可选红字警示（`warningFor`）。
+- 三个弹层改用之：界面语言、阅后即焚（原 `ListTile` + trailing 对勾）、附件存储；
+  `ui_style_picker.dart` 去掉右上角 ✕（保留预览图与高亮）。
+- 文案双语化：`kAttachmentStorageLabels/Descriptions` 两个写死中文的常量表**删除**，
+  改 l10n：`chatPageAttachmentStorageSecured`(不存本地 / Not stored locally)、
+  `...Stored`(本地保存 / Save locally) 及两个 `...Desc`。
+- l10n 同时删掉不再使用的 `chatPageStyleSheetClose`。
+- 测试：`ui_style_switch_test` 里"点 ✕ 关闭"的用例改为"弹层无 ✕ + 系统返回可关闭"。
+
+**验证：** `flutter analyze` 无 issue；ui_style_switch + chat_page_menu + lock_page 23 项全过。

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/ui_style_settings.dart';
-import '../l10n/app_localizations.dart';
 
 /// 界面风格选择弹层：列出全部风格（目前：素雅纯色 / 渐变粉蓝），每项 = 一张
 /// 预览图 + 名称 + 一句描述；点选即保存并立即生效（uiStyleNotifier 通知聊天页
@@ -48,25 +47,18 @@ class _UiStylePickerSheetState extends State<UiStylePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text('界面风格',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: l10n.chatPageStyleSheetClose,
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
+          // 无右上角关闭按钮（老板 2026-09-15 统一）：下滑/点外部/返回键即关闭，
+          // 与「界面语言 / 阅后即焚 / 附件存储」弹层观感一致
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('界面风格',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
             ),
           ),
           for (final option in kUiStyleOptions)

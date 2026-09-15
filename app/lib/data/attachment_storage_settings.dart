@@ -13,19 +13,6 @@ import 'local_database.dart';
 /// 注意：切换模式只影响**之后**的行为与清理策略，见 [AttachmentStore]。
 const List<String> kAttachmentStorageOptions = ['secured', 'stored'];
 
-/// 选项标签（菜单当前值 / 弹窗直接用）。
-const Map<String, String> kAttachmentStorageLabels = {
-  'secured': '安全（不留存）', // Secure (no local copy)
-  'stored': '留存（直接打开）', // Keep (open instantly)
-};
-
-/// 选项描述（一句话，弹窗中展示）。
-const Map<String, String> kAttachmentStorageDescriptions = {
-  'secured': '每次打开都重新下载，本机不留明文副本', // Re-download each time; no plaintext kept
-  'stored': '下载过的附件明文留在本机，消息流里直接打开（不进系统备份）',
-  // Keep decrypted files on device; open instantly (excluded from backups)
-};
-
 /// 切换通知：聊天页监听后即时生效（点选即切换）。
 final ValueNotifier<String> attachmentStorageNotifier =
     ValueNotifier<String>('secured');

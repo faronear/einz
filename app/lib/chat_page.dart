@@ -32,6 +32,7 @@ import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 import 'widgets/emoji_panel.dart';
+import 'widgets/option_picker_sheet.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
 
@@ -637,28 +638,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final settings = LocaleSettings(widget.db ?? LocalDatabase());
     final current = await settings.load();
     if (!mounted) return;
-    final picked = await showModalBottomSheet<String>(
+    final l10n = AppLocalizations.of(context)!;
+    var picked = current;
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text('界面语言 / Language', style: TextStyle(fontWeight: FontWeight.w600)),
-            ),
-            for (final option in kLocaleOptions)
-              ListTile(
-                title: Text(kLocaleLabels[option]!),
-                trailing: option == current ? const Icon(Icons.check) : null,
-                onTap: () => Navigator.of(ctx).pop(option),
-              ),
-          ],
-        ),
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageMenuLocaleLabel,
+        selected: current,
+        options: [
+          for (final option in kLocaleOptions)
+            OptionPickerItem(value: option, label: kLocaleLabels[option]!),
+        ],
+        onApply: (value) async {
+          picked = value;
+          await settings.save(value);
+        },
       ),
     );
-    if (picked == null) return;
-    await settings.save(picked);
+    if (picked == current) return;
     if (!mounted) return;
     showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
@@ -688,74 +685,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 顶栏菜单 → 附件存储（安全 / 留存）：本设备设置，两台设备可各选各的。
   /// 切回 secured 时**清空已留存的明文**（否则"安全"名不副实——老板 2026-09-14 定）。
+  /// 附件存储模式标签（按当前语言）。
+  String _attachmentStorageLabel(String mode, AppLocalizations l10n) =>
+      mode == 'stored'
+          ? l10n.chatPageAttachmentStorageStored
+          : l10n.chatPageAttachmentStorageSecured;
+
+  /// 附件存储模式说明（按当前语言）。
+  String _attachmentStorageDesc(String mode, AppLocalizations l10n) =>
+      mode == 'stored'
+          ? l10n.chatPageAttachmentStorageStoredDesc
+          : l10n.chatPageAttachmentStorageSecuredDesc;
+
+  /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「不存本地」
+  /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
   Future<void> _showAttachmentStoragePicker() async {
     final l10n = AppLocalizations.of(context)!;
-    // **不点选即生效**（老板 2026-09-14）：切回「安全」会立刻删掉本机已留存的附件
-    // 明文，是有害操作——不像界面风格那样随手试。故改成单选列表 + 底部提交按钮，
-    // 选好再确认一次才落地。
-    var selected = _attachmentStorage;
     await showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: StatefulBuilder(
-          builder: (ctx, setSheetState) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(l10n.chatPageMenuAttachmentStorage,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-              ),
-              // RadioGroup（Flutter 3.32+ 的新 API）：组内单选状态统一管理
-              RadioGroup<String>(
-                groupValue: selected,
-                onChanged: (v) => setSheetState(() => selected = v ?? selected),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final mode in kAttachmentStorageOptions)
-                      RadioListTile<String>(
-                        value: mode,
-                        title: Text(kAttachmentStorageLabels[mode]!),
-                        subtitle: Text(kAttachmentStorageDescriptions[mode]!),
-                      ),
-                  ],
-                ),
-              ),
-              // 选定的模式会删除本地明文时才提示（避免误以为只是换个显示）
-              if (selected == 'secured' && _attachmentStorage != 'secured')
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: Text(
-                    l10n.chatPageAttachmentStorageWarnClear,
-                    style: TextStyle(
-                        fontSize: 12, color: Theme.of(ctx).colorScheme.error),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: selected == _attachmentStorage
-                        ? null // 没改动：不必提交
-                        : () async {
-                            await AttachmentStorageSettings(
-                                    widget.db ?? LocalDatabase())
-                                .save(selected);
-                            if (selected == 'secured') {
-                              // 切回安全模式：把本机留存的明文附件全部清除
-                              await AttachmentStore.clear();
-                            }
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                          },
-                    child: Text(l10n.chatPageAttachmentStorageSubmit),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageMenuAttachmentStorage,
+        selected: _attachmentStorage,
+        submitLabel: l10n.chatPageAttachmentStorageSubmit,
+        // 只在"准备切回不存本地、且当前不是它"时提示（真要删数据）
+        warningFor: (v) => (v == 'secured' && _attachmentStorage != 'secured')
+            ? l10n.chatPageAttachmentStorageWarnClear
+            : null,
+        options: [
+          for (final mode in kAttachmentStorageOptions)
+            OptionPickerItem(
+              value: mode,
+              label: _attachmentStorageLabel(mode, l10n),
+              description: _attachmentStorageDesc(mode, l10n),
+            ),
+        ],
+        onApply: (mode) async {
+          await AttachmentStorageSettings(widget.db ?? LocalDatabase()).save(mode);
+          if (mode == 'secured') {
+            // 切回不存本地：把本机留存的明文附件全部清除
+            await AttachmentStore.clear();
+          }
+        },
       ),
     );
   }
@@ -1209,30 +1179,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 返回选中秒数（null=取消）；[current] 为当前值（右侧勾选标记）。
   Future<int?> _pickBurnSeconds({required int current}) async {
     final l10n = AppLocalizations.of(context)!;
-    final picked = await showModalBottomSheet<String>(
+    String? picked;
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        // Column(min)：档位经精简后内容高度不超屏幕，整体显示无需滚动
-        // （此前 8 档溢出 47px，删除「30 分钟」后 7 档正好容纳）
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(l10n.chatPageBurnHeading,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+      builder: (ctx) => OptionPickerSheet(
+        title: l10n.chatPageBurnHeading,
+        selected: '$current',
+        options: [
+          for (final entry in kBurnAfterOptions.entries)
+            OptionPickerItem(
+              value: '${entry.value}',
+              label: _burnOptionLabel(entry.value, l10n),
             ),
-            for (final entry in kBurnAfterOptions.entries)
-              ListTile(
-                title: Text(_burnOptionLabel(entry.value, l10n)),
-                trailing: entry.value == current ? const Icon(Icons.check) : null,
-                onTap: () => Navigator.of(ctx).pop(entry.value.toString()),
-              ),
-          ],
-        ),
+        ],
+        onApply: (value) async => picked = value,
       ),
     );
-    return picked == null ? null : int.parse(picked);
+    return picked == null ? null : int.parse(picked!);
   }
 
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置，发送新消息时生效）。
@@ -3429,7 +3392,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuAttachmentStorage, style: labelStyle),
                       const Spacer(),
-                      Text(kAttachmentStorageLabels[_attachmentStorage] ?? ''),
+                      Text(_attachmentStorageLabel(_attachmentStorage, l10n)),
                     ],
                   ),
                 ),

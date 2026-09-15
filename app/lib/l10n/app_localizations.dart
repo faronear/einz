@@ -1082,6 +1082,30 @@ abstract class AppLocalizations {
   /// **'Attachment storage'**
   String get chatPageMenuAttachmentStorage;
 
+  /// No description provided for @chatPageAttachmentStorageSecured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not stored locally'**
+  String get chatPageAttachmentStorageSecured;
+
+  /// No description provided for @chatPageAttachmentStorageSecuredDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads every time it is opened; no plaintext copy is kept'**
+  String get chatPageAttachmentStorageSecuredDesc;
+
+  /// No description provided for @chatPageAttachmentStorageStored.
+  ///
+  /// In en, this message translates to:
+  /// **'Save locally'**
+  String get chatPageAttachmentStorageStored;
+
+  /// No description provided for @chatPageAttachmentStorageStoredDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps decrypted attachments on this device for instant opening (excluded from backups)'**
+  String get chatPageAttachmentStorageStoredDesc;
+
   /// No description provided for @chatPageAttachmentStorageSubmit.
   ///
   /// In en, this message translates to:
@@ -1099,12 +1123,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Interface style'**
   String get chatPageMenuStyleLabel;
-
-  /// No description provided for @chatPageStyleSheetClose.
-  ///
-  /// In en, this message translates to:
-  /// **'Close'**
-  String get chatPageStyleSheetClose;
 
   /// No description provided for @chatPageMenuBurnLabel.
   ///

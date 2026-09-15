@@ -525,6 +525,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => '附件存储';
 
   @override
+  String get chatPageAttachmentStorageSecured => '不存本地';
+
+  @override
+  String get chatPageAttachmentStorageSecuredDesc => '附件每次打开都重新下载，本机不留明文副本';
+
+  @override
+  String get chatPageAttachmentStorageStored => '本地保存';
+
+  @override
+  String get chatPageAttachmentStorageStoredDesc =>
+      '下载过的附件明文留在本机，消息流里直接打开（不进系统备份）';
+
+  @override
   String get chatPageAttachmentStorageSubmit => '提交';
 
   @override
@@ -532,9 +545,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageMenuStyleLabel => '界面风格';
-
-  @override
-  String get chatPageStyleSheetClose => '关闭';
 
   @override
   String get chatPageMenuBurnLabel => '阅后即焚';
