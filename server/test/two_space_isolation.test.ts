@@ -364,11 +364,16 @@ async function main (): Promise<void> {
         body: blob
       })
     const attId = 'aa11bb22cc33dd44'
-    assert.equal(
-      (await uploadAs(spaceC.sessionToken, attId, 'c0001aaaa')).status,
-      200,
-      'C 上传自己空间的附件应成功'
-    )
+    const firstUpload = await uploadAs(spaceC.sessionToken, attId, 'c0001aaaa')
+    assert.equal(firstUpload.status, 200, 'C 上传自己空间的附件应成功')
+    const firstBody = (await firstUpload.json()) as { storage_path: string; created_at: number }
+    // C2 幂等回归：网络抖动后客户端会用**同一个 attachment_id** 重传，必须仍返回 200
+    // （此前写盘 flag:"wx" 撞 EEXIST → 500），且返回同一条记录
+    const retryUpload = await uploadAs(spaceC.sessionToken, attId, 'c0001aaaa')
+    assert.equal(retryUpload.status, 200, '同一 attachment_id 重传必须幂等返回 200')
+    const retryBody = (await retryUpload.json()) as { storage_path: string; created_at: number }
+    assert.equal(retryBody.storage_path, firstBody.storage_path, '幂等重传应返回同一条记录')
+    assert.equal(retryBody.created_at, firstBody.created_at, '幂等重传不应刷新 created_at')
     assert.equal(
       (
         await fetch(`http://127.0.0.1:${port}/attachments/${attId}`, {

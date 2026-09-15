@@ -36,7 +36,10 @@ function assignDeviceId (clientId: string): string {
  *  注意：不在本接口刷新调用方 last_seen——last_seen 只由 WS 连接/心跳/断开维护，
  *  否则任何轮询客户端都会让自己"永远新鲜"（对方误判在线，见 chat_page 在线判定）。
  *  范围：**仅本会话可见的设备**（该空间成员；见 guard.deviceScopeClause）——
- *  此前直出全局 devices 表，跨空间泄漏 person/公钥/在线状态（2026-09-15 评审 C2）。 */
+ *  此前直出全局 devices 表，跨空间泄漏 person/公钥/在线状态（2026-09-15 评审 C2）。
+ *  刻意**不返回 public_key**（2026-09-15 评审 C5）：设备公钥是密码学标识，
+ *  列表接口没有使用它的场景（challenge 由服务端用公钥密封，客户端用不到对端公钥），
+ *  少一个可被批量采集的字段就少一分元数据面。 */
 export function listDevices (
   cfg: ServerConfig,
   token: string
@@ -48,7 +51,7 @@ export function listDevices (
   const scope = deviceScopeClause(space_id)
   const rows = getDb()
     .prepare(
-      `SELECT d.device_id, d.person_id, d.status, d.last_seen, d.public_key, d.device_name
+      `SELECT d.device_id, d.person_id, d.status, d.last_seen, d.device_name
          FROM devices d
         WHERE ${scope.sql}
         ORDER BY d.created_at`
@@ -58,7 +61,6 @@ export function listDevices (
     person_id: string
     status: string
     last_seen: number | null
-    public_key: string
     device_name: string
   }[]
   return {

@@ -39,7 +39,8 @@ export interface AttachmentMeta {
   created_at: number;
 }
 
-/** 校验附件元数据与 blob（sha256 = 密文哈希），落盘并入库（PROTOCOL.md §6.1）。 */
+/** 校验附件元数据与 blob（sha256 = 密文哈希），落盘并入库（PROTOCOL.md §6.1）。
+ *  同一 attachment_id 重复上传**幂等返回原记录**（网络重试安全，见下方注释）。 */
 export function storeAttachment(
   cfg: ServerConfig,
   token: string,
@@ -60,10 +61,12 @@ export function storeAttachment(
   // 就能把 blob 挂到别的空间的消息上（对方的 /sync 会收到我方附件元数据），
   // 或顶掉别的空间的同名 attachment_id。两处都必须与本会话空间一致。
   const spaceId = sessionSpace ?? "";
-  const clash = db
-    .prepare(`SELECT space_id FROM attachments WHERE attachment_id = ?`)
-    .get(meta.attachment_id) as { space_id: string } | undefined;
-  if (clash && clash.space_id !== spaceId) {
+  const stored = db
+    .prepare(`SELECT space_id, storage_path, created_at FROM attachments WHERE attachment_id = ?`)
+    .get(meta.attachment_id) as
+    | { space_id: string; storage_path: string; created_at: number }
+    | undefined;
+  if (stored && stored.space_id !== spaceId) {
     throw new ApiError("FORBIDDEN", "attachment_id belongs to another space", 403);
   }
   const host = db
@@ -77,6 +80,14 @@ export function storeAttachment(
   const sha = createHash("sha256").update(blob).digest("base64");
   if (sha !== meta.sha256) throw new ApiError("INVALID_REQUEST", "sha256 mismatch", 400);
 
+  // 幂等（2026-09-15 评审 C2）：同一 attachment_id 重复上传 → 返回原记录，而不是
+  // 500。两阶段上传（PROTOCOL.md §6.1）遇到网络抖动时客户端会用**同一个
+  // attachment_id** 重传，此前写盘的 `flag: "wx"` 会撞 EEXIST 直接抛成 500
+  // （实测：隔离测试第二次跑就复现）。语义与 /messages 的 message_id 幂等一致。
+  if (stored) {
+    return { attachment_id: meta.attachment_id, storage_path: stored.storage_path, created_at: stored.created_at };
+  }
+
   // 按 attachment_id 前两位分片目录
   const shard = meta.attachment_id.slice(0, 2);
   const dir = join(FILES_ROOT, shard);
@@ -84,7 +95,16 @@ export function storeAttachment(
   const storagePath = `${shard}/${meta.attachment_id}`;
   const full = join(FILES_ROOT, storagePath);
   assertInsideFilesRoot(full);
-  writeFileSync(full, blob, { flag: "wx" });
+  // 记录不存在但文件在（上次写盘后、入库前崩了）：内容一致就复用，不一致说明
+  // 这个 id 被复用于不同内容 → 409（不能静默覆盖别人的 blob）
+  if (existsSync(full)) {
+    const existing = readFileSync(full);
+    if (createHash("sha256").update(existing).digest("base64") !== meta.sha256) {
+      throw new ApiError("CONFLICT", "attachment_id already stored with different content", 409);
+    }
+  } else {
+    writeFileSync(full, blob, { flag: "wx" });
+  }
 
   const now = Date.now();
   // v2 多空间：附件归属取会话绑定的 Space（spaceId 已在上面解析，同 postMessage）。

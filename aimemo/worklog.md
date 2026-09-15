@@ -5706,3 +5706,32 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
 
 **验证：** `tsc` 干净 + `npm test` 5 套件全绿（收口把冒烟测试里一处真实的回归先跑红、
 再确认是导入漏了而非语义变化）。
+
+## 2026-09-15 C/D 逐条拍板后的执行
+
+老板决策：**C1 不改**（同意"加鉴权不抵成本"的判断）、**C2 做幂等**、**C3 问怎么操作**、
+**C4 不改**（测试口令）、**C5 顺手去掉**、**D3 接受重构**（新依据：**v1 从未真实上线**，
+不存在需要兼容的历史客户端与历史数据 → 我原先"只冻结不重构"的意见作废）、
+**E1 信息补充**：整个 `productX/` 用 **Seafile** 在多机间自动同步（解释 77 个冲突副本的来源）。
+
+本轮已做：
+
+- **C2 附件重复上传幂等**（`attachments.ts`）：同一 `attachment_id` 已有记录 → **直接返回原
+  记录**（不刷新 `created_at`、不重复写盘）；记录缺失但文件在（写盘后入库前崩溃）→ 校验内容
+  哈希一致就复用、不一致 409（不静默覆盖别人的 blob）。语义与 `/messages` 的 `message_id`
+  幂等一致。隔离测试补三条断言（重传 200、同 `storage_path`、`created_at` 不变）。
+- **C5 `/devices` 不再返回 `public_key`**（`devices.ts`）：两个客户端都只读
+  `device_id/device_name/last_seen/connected_at/person_id`；challenge 由服务端用公钥密封、
+  客户端用不到对端公钥 —— 少一个可被批量采集的字段。
+- **C1 记入残留风险**（`docs/SECURITY.md` §6）：`GET /avatar/:personId` 免认证可读 = 接受，
+  附理由（personId 是随机 UUID 不可枚举；本人自愿上传的展示图；加鉴权要重做客户端缓存）。
+- **C3 落地"口令可不进工作区"的机制**（`app/android/app/build.gradle.kts`）：properties 路径
+  可用 `EINZ_ANDROID_KEY_PROPERTIES` 换到同步盘之外；口令优先读 `EINZ_STORE_PASSWORD` /
+  `EINZ_KEY_PASSWORD`（可从 macOS 钥匙串现取现用），未设置才回落文件明文；`storeFile` 改为
+  相对 properties 所在目录解析（默认路径下行为不变）。**口令与 keystore 的实际搬迁由老板操作**，
+  Android 出包需真机/本机构建验证（非我可代测项）。
+- **E1 待办**：Seafile 的忽略文件是 `.seafile-ignore.txt`（**不是** Syncthing 的 `.stignore`），
+  方案已给老板，涉及是否停止同步 `.git/`（会改变他"用文件同步代替 git 跨机"的习惯），
+  等他一句话再落盘。
+- **D3 待办**：已出分期方案（服务端删 v1 轨道 → 数据层收敛 → 客户端改造 → 文档/测试清理），
+  等边界确认后开工。

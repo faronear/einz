@@ -33,7 +33,18 @@ android {
     buildTypes {
         release {
             // 签名配置：读取 android/key.properties（不存在则退回 debug 签名，保证 flutter run --release 可用）
-            val keystorePropertiesFile = rootProject.file("key.properties")
+            //
+            // 口令可不进工作区（2026-09-15 评审 C3：本目录会被 Seafile 同步到多台机器）：
+            // ① properties 路径可换：设 EINZ_ANDROID_KEY_PROPERTIES 指到同步盘之外，
+            //    例如 ~/.einz/android/key.properties（keystore 也放同目录）。
+            // ② 口令优先从环境变量取（可现取现用，不落盘）：
+            //      security add-generic-password -a "$USER" -s einz-android-store -w '…'   # 一次性
+            //      export EINZ_STORE_PASSWORD=$(security find-generic-password -a "$USER" -s einz-android-store -w)
+            //      export EINZ_KEY_PASSWORD=$(security find-generic-password -a "$USER" -s einz-android-key -w)
+            //    未设置环境变量时，才回落到 properties 文件里的明文值（现状，向后兼容）。
+            val keystorePropertiesFile = rootProject.file(
+                System.getenv("EINZ_ANDROID_KEY_PROPERTIES") ?: "key.properties"
+            )
             val keystoreProperties = Properties().apply {
                 if (keystorePropertiesFile.exists()) {
                     keystorePropertiesFile.inputStream().use { load(it) }
@@ -44,10 +55,13 @@ android {
             if (hasSigning) {
                 signingConfig = signingConfigs.create("release") {
                     keyAlias = keystoreProperties.getProperty("keyAlias")
-                    keyPassword = keystoreProperties.getProperty("keyPassword")
-                    // storeFile 与 key.properties 同目录（rootProject = android/），相对模块目录解析会多一层 app/
-                    storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
-                    storePassword = keystoreProperties.getProperty("storePassword")
+                    keyPassword = System.getenv("EINZ_KEY_PASSWORD")
+                        ?: keystoreProperties.getProperty("keyPassword")
+                    // storeFile 相对 properties 文件所在目录解析（默认与 key.properties 同目录）
+                    storeFile = keystorePropertiesFile.parentFile
+                        .resolve(keystoreProperties.getProperty("storeFile"))
+                    storePassword = System.getenv("EINZ_STORE_PASSWORD")
+                        ?: keystoreProperties.getProperty("storePassword")
                 }
             } else {
                 // TODO: 配置 app/android/key.properties + release keystore 后替换
