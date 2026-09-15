@@ -473,6 +473,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseSubmit => '修改';
 
   @override
+  String get chatPageChangePassphraseHint =>
+      '口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
+
+  @override
   String get chatPageChangePassphraseOldLabel => '旧口令';
 
   @override

@@ -501,6 +501,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageChangePassphraseSubmit => 'Change';
 
   @override
+  String get chatPageChangePassphraseHint =>
+      'The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.';
+
+  @override
   String get chatPageChangePassphraseOldLabel => 'Current passphrase';
 
   @override

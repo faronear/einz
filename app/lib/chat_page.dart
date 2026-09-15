@@ -4174,6 +4174,15 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // 说明文字（与邀请码 / PIN 弹窗同款：大标题下小字说明，老板要求 2026-09-15）
+          Text(
+            l10n.chatPageChangePassphraseHint,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 12),
           // 三个口令框都可临时查看明文（点眼睛，3 秒后自动回暗码）
           _PassphraseField(
             controller: _oldCtrl,

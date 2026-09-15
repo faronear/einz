@@ -5483,3 +5483,14 @@ TUI `/passphrase random` 生成 12 词恢复码当口令）。
 App 改口令与向导用例改为 8 位口径、删除"缺字母数字"用例。
 **验证：** shared 29 项、cli 17 项、app（menu + wizard）26 项全过；
 `dart analyze` / `flutter analyze` 无 issue。
+
+### 改口令弹窗：大标题下加说明文字（老板 2026-09-15）
+
+与邀请码 / PIN 弹窗同款：`chatPageChangePassphraseHint` ——
+「口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。」
+（en: "The passphrase encrypts every message. Memorize it and never leak it — share it
+only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置于标题与三个口令框之间。
+注：向导里已有一条相近的 `wizardPassphraseHint`（"对所有**内容**进行加密…"），本次按老板给的
+原话新增了一条，未改向导文案——要统一的话说一声。
+
+**验证：** `flutter analyze` 无 issue；`chat_page_menu_test` 19 项全过。

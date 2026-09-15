@@ -986,6 +986,12 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get chatPageChangePassphraseSubmit;
 
+  /// No description provided for @chatPageChangePassphraseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.'**
+  String get chatPageChangePassphraseHint;
+
   /// No description provided for @chatPageChangePassphraseOldLabel.
   ///
   /// In en, this message translates to:

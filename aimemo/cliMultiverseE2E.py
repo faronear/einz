@@ -40,7 +40,7 @@ STORE_A = "/tmp/einz-e2e-a.json"
 STORE_B = "/tmp/einz-e2e-b.json"
 STORE_C = "/tmp/einz-e2e-c.json"
 
-# 密保口令：必须满足强度策略（≥10 位且含字母与数字，shared/passphrase_policy.dart）。
+# 密保口令：必须满足强度策略（shared/passphrase_policy.dart）。
 # 2026-09-14 起三端强制校验——原脚本用的 "abc123"（6 位）已被拒，脚本因此失效。
 PASSPHRASE = "einzpass2026"
 

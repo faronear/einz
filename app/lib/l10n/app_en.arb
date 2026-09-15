@@ -186,6 +186,7 @@
   "save": "Save",
   "chatPageChangePassphraseTitle": "Change passphrase",
   "chatPageChangePassphraseSubmit": "Change",
+  "chatPageChangePassphraseHint": "The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.",
   "chatPageChangePassphraseOldLabel": "Current passphrase",
   "chatPageChangePassphraseNewLabel": "New passphrase",
   "chatPageChangePassphraseConfirmLabel": "Confirm new passphrase",
