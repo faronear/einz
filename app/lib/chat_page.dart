@@ -3430,7 +3430,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPagePinLabel, style: labelStyle),
                       const Spacer(),
-                      Text(_hasPin ? l10n.chatPagePinSetValue : l10n.chatPagePinUnsetValue),
+                      // 未设置时只显示「锁屏码」，不显示「未设置」尾缀（老板 2026-09-15）
+                      if (_hasPin) Text(l10n.chatPagePinSetValue),
                     ],
                   ),
                 ),
