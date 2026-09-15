@@ -5367,3 +5367,18 @@ PIN 是短数字串，靠左小字既不明显也不好确认位数 → 参照�
 不显示明文数字）。
 
 **验证：** `flutter analyze` 无 issue；`lock_page_test` 通过。视觉待老板实机确认。
+
+### 全屏查看沉浸式（遮罩盖到屏幕最顶端）+ 附件存储默认改长期保存（2026-09-15）
+
+**① 头像 / 视频 / 图片全屏：遮罩覆盖全屏（含状态栏）**
+- 关键认知：**状态栏（时间/电量/信号）是系统层绘制的，App 盖不住，只能隐藏** →
+  新增 `widgets/immersive_fullscreen.dart`：`withImmersiveFullscreen(open)` 在打开期间
+  `SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky, [])`，
+  关闭后恢复 `SystemUiMode.manual + SystemUiOverlay.values`；平台/通道不可用静默降级。
+- 三个查看器（图片 `_showFullImage`、头像 `_MyAvatarState._showFullscreen`、
+  视频 `_playFullscreen`）统一：内容包一层 `SizedBox.expand`（黑底严格铺满整屏，
+  含刘海/状态栏区域）；关闭键套 `SafeArea`（万一系统栏没隐藏也不会被压住）。
+
+**② 附件存储默认值改为 `stored`（长期保存）**——老板：更符合习惯体验。
+`AttachmentStorageSettings.load()` 缺省值 与 `attachmentStorageNotifier` 初值都由
+'secured' 改为 'stored'；老版本升上来也是长期保存（要"不存本地"手动切一次即可）。

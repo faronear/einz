@@ -32,6 +32,7 @@ import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 import 'widgets/emoji_panel.dart';
+import 'widgets/immersive_fullscreen.dart';
 import 'widgets/option_picker_sheet.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
@@ -2911,32 +2912,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 全屏查看图片（黑底大图 + 双指缩放 + 右上角关闭，与头像全屏一致）。
-  void _showFullImage(Uint8List bytes) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: InteractiveViewer(
-                child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
+  Future<void> _showFullImage(Uint8List bytes) async {
+    await withImmersiveFullscreen(() => showDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          builder: (ctx) => Dialog(
+            backgroundColor: Colors.black,
+            insetPadding: EdgeInsets.zero,
+            // SizedBox.expand：黑底严格铺满整屏（含状态栏与刘海区域）
+            child: SizedBox.expand(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: InteractiveViewer(
+                      child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    // SafeArea：万一系统栏没隐藏（某平台不支持），关闭键也不会被压在下面
+                    child: SafeArea(
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(ctx).pop(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 
   /// 小尺寸图片缩略图（长按菜单预览行 / 引用块 / 输入栏引用条用）：正方形 cover
@@ -4508,31 +4515,35 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     }
   }
 
-  /// 全屏查看头像（黑底大图 + 右上角关闭）。
-  void _showFullscreen() {
+  /// 全屏查看头像（黑底大图 + 右上角关闭；隐藏系统状态栏 = 沉浸感）。
+  Future<void> _showFullscreen() async {
     final bytes = _bytes;
     if (bytes == null) return;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            Positioned.fill(child: Image.memory(bytes, fit: BoxFit.contain)),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+    await withImmersiveFullscreen(() => showDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => Dialog(
+            backgroundColor: Colors.black,
+            insetPadding: EdgeInsets.zero,
+            child: SizedBox.expand(
+              child: Stack(
+                children: [
+                  Positioned.fill(child: Image.memory(bytes, fit: BoxFit.contain)),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: SafeArea(
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 
   @override
@@ -4662,36 +4673,41 @@ class _VideoPreviewState extends State<_VideoPreview> {
     await c.seekTo(Duration.zero);
     await c.play();
     if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        // 与图片全屏一致：纯黑底 + 铺满全屏（老板要求 2026-09-12——
-        // 视频全屏也应是黑底大画面，而不是默认半透明遮罩下的圆角小卡）
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Center(
-                child: AspectRatio(
-                  aspectRatio: c.value.aspectRatio,
-                  child: VideoPlayer(c),
-                ),
+    await withImmersiveFullscreen(() => showDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          builder: (ctx) => Dialog(
+            // 与图片全屏一致：纯黑底 + 铺满全屏 + 隐藏系统状态栏（老板要求
+            // 2026-09-12 / 2026-09-15——视频全屏也应是黑底大画面，且遮罩要盖到
+            // 屏幕最顶端，而不是默认半透明遮罩下的圆角小卡）
+            backgroundColor: Colors.black,
+            insetPadding: EdgeInsets.zero,
+            child: SizedBox.expand(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Center(
+                      child: AspectRatio(
+                        aspectRatio: c.value.aspectRatio,
+                        child: VideoPlayer(c),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: SafeArea(
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(ctx).pop(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
     await c.pause();
   }
 }
