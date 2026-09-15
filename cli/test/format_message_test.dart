@@ -80,7 +80,7 @@ void main() {
   });
 
   // 语音消息（App 录音 type=voice）：明文 caption 只是「语音」，时长在载荷 meta。
-  ChatMessage voice({int? seconds}) => ChatMessage(
+  ChatMessage voice({int? seconds, bool isMine = false}) => ChatMessage(
         env: MessageEnvelope(
           v: 1,
           type: 'voice',
@@ -91,7 +91,7 @@ void main() {
           ciphertext: '',
         ),
         plain: '语音',
-        isMine: false,
+        isMine: isMine,
         createdAt: 0,
         meta: seconds == null ? null : {kMetaAudioDurationSeconds: seconds},
       );
@@ -117,6 +117,17 @@ void main() {
     );
     expect(lines, hasLength(1));
     expect(lines[0], contains('#3 🔊 语音 18s'));
+  });
+
+  test('我方附件同样显示 #N（对方与我方都要能 /open <序号> 指定）', () {
+    // 回归：我方分支曾误用未加序号的 body → 自己发的附件不显示 #N（老板 2026-09-15）
+    final lines = formatMessage(
+      voice(seconds: 18, isMine: true),
+      80,
+      attachmentNos: {'voice-1': 2},
+    );
+    expect(lines, hasLength(1));
+    expect(lines[0], contains('#2 🔊 语音 18s'));
   });
 
   test('消息标签去掉名字：对方 [时间]、我的 [时间]（无状态时）', () {

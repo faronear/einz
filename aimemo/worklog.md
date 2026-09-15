@@ -6023,3 +6023,17 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
    deleteKeyEscrow，**断言每一个请求都带上了协议版本头**——新增请求点再漏会直接挂测试。
 
 **验证**：shared 33 项（含新增 5 项）、cli 18 项、server 5 套件全过；shared/cli/app analyze 全干净。
+
+## 2026-09-15 我发的附件不显示 #N（真 bug，一行修复）
+
+**现象**：对方发来的附件带 `#1`/`#2`，自己发的附件没有序号 → `/open <序号>` 用不了。
+**根因**：`formatMessage` 里渲染正文时用的是 `displayBody`（带序号前缀），但**"我的消息"分支
+误用了未加前缀的 `body`** —— 对方分支一直是 `displayBody`。`_attachmentNos` 本身没问题
+（我发的附件也算进序号表），所以 `/open N` 其实能开，只是屏幕上没号，没法知道该输几。
+**修复**：该分支改为 `displayBody`。
+**回归测试**：`cli/test/format_message_test.dart` 补一条"我方附件同样显示 #N"
+（原有用例用的是 `isMine: false` 的语音消息，只覆盖了对方分支，所以漏了）；给 `voice()`
+辅助加了 `isMine` 参数。
+
+注：该文件同时有另一位 agent 未提交的"欢迎辞自动倒计时"改动，我按 hunk 隔离只提交了自己的那一行。
+验证：cli 19 项测试全过（新增 1 项）、dart analyze 干净。

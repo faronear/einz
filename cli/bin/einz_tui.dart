@@ -1878,7 +1878,9 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
   final lane = suffixW + 1; // 右侧标签栏宽（含标签前一个空格）
   final leftPad = sideMargin; // 左侧留白 = 对方正文右侧留白（8 列）
   final textWidth = cols - lane - leftPad;
-  final wrapped = _wrapByWidth(body, textWidth > 0 ? textWidth : cols - lane - 1);
+  // ⚠️ 用 displayBody（带附件固定序号 #N），不能用 body——否则我发的附件不显示 #N，
+  // /open <序号> 就没法指定自己发的附件（老板 2026-09-15 反馈；对方分支一直是对的）。
+  final wrapped = _wrapByWidth(displayBody, textWidth > 0 ? textWidth : cols - lane - 1);
   final lines = <String>[];
   for (var i = 0; i < wrapped.length; i++) {
     if (i == wrapped.length - 1 && wrapped.length > 1) {
