@@ -27,7 +27,7 @@
 | ------------- | ----------------------------------------------------- | ---------------------------------------------- |
 | `server/`     | Node.js + TypeScript 哑转发器                         | `npm run build && node dist/app.js`，或 Docker |
 | `shared/`     | 纯 Dart 核心（crypto/protocol/sync），CLI 与 App 共用 | 库，不独立运行                                 |
-| `cli/`        | Dart CLI 测试端（当前最完整的客户端实作）             | `dart run bin/einz.dart <命令>`                |
+| `cli/`        | Dart **TUI** 客户端（最完整的客户端实作）             | `dart run bin/einz_tui.dart --store <store> --server <url>` |
 | `app/`        | Flutter 手机客户端（V1 骨架 + 本地库）                | `flutter run`（真机验证待环境）                |
 | `deployment/` | Docker Compose + Caddy（生产单机部署）                | `docker compose up -d`                         |
 
@@ -59,6 +59,12 @@ dart pub get
 > `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"`（Homebrew 安装一般自动探测，无需设置）。
 
 ### 2.2 生成两台设备凭证 + 一次性配置（白名单 + Space Key 分发）
+
+> ⚠️ **本节已作废（2026-09-15）**：v1 脚本 CLI `cli/bin/einz.dart` 已随 Multiverse 收敛删除
+> （v1 的设备登记 enroll、20 位邀请码、信封导入 config/import 全部不存在）。
+> 现在两台设备接入的路径是：**TUI 引导**（`tui1-dev` / `tui2-dev`，见 `package.json` 脚本）
+> 或 **App 向导**（创建秘境 / 加入秘境）；命令级流程见 `docs/ONBOARDING.md`。
+> 下面这段命令**仅作历史参考，不要照抄**。
 
 CLI 命令（在 `cli/` 目录，下面 `$W` 是临时工作目录，如 `/tmp/einz-trial`）：
 

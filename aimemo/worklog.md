@@ -5789,3 +5789,36 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
   8 处"无 space 回落"、`isActiveDevice(_cfg,…)` 的空 cfg 参数；三个服务端测试套件从
   enroll+invite 流程改写为 spaces 流程。
 - P3：PROTOCOL.md 删 v1 段、KEY_ESCROW/SETUP 归档、SECURITY/productLens 同步。
+
+### 路线 1 落地：删除 v1 脚本 CLI 与其 e2e 脚本（老板拍板）
+
+老板选**路线 1（删）**，并纠正我一处表述错误（见下）。
+
+**删除**：
+- `cli/bin/einz.dart`（旧脚本 CLI，20+ 条 v1 命令：enroll/invite/config/import/escrow(v1)/rotate…）
+- `cli/test/` 的 6 个 v1 e2e 脚本：`e2e.sh`、`phase1/2/4_e2e.sh`、`auto_sync_check.sh`、`_e2e_lib.sh`
+  （全部 source `_e2e_lib.sh` 并驱动 `einz.dart`；无文档/CI 引用，仅 dev 手册）
+- `cli/demo/setup.sh`（v1 方式生成 demo store；已被 TUI 自带引导 + `tui*-dev-new` 取代）
+
+**连带修**（否则仓库半坏）：
+- `cli/test/tui_smoke.py` 改写为**双 TUI** 互测（原来用 `einz.dart sync/send` 驱动对端）：
+  两个 TUI 实例互为对端，断言改为"对端 store 历史增长"（store 只存密文，解密正确性由
+  shared 加密测试与 App 覆盖）；同时修掉脚本里硬编码的旧路径 `/Users/luk/einz/cli`
+  （改为按脚本位置推导）与 `SERVER` 可覆盖。**未自测**（需 server + pty 双 TUI）。
+- 6 处过时注释（`chat_core`×3、`einz_tui`、`einz_chat` 的引导提示、`dart-docker.sh` 示例、
+  `sync_state.dart`）改写为 v2 说法。
+- 文档加**作废提示**并给出等价路径：`ONBOARDING.md` 方式二（CLI 分步）、`DEPLOYMENT.md`
+  目录表 + §2.2、`updateServer.md` §3、`SECURITY.md` §4.7 第 2 条（改为 TUI `/passphrase`）。
+  **P3 要把这些段落真正重写掉**，现在只是防止有人照抄已删除的命令。
+
+**验证**：`dart analyze`(cli/shared) 干净、`cli dart test` 18 项全过、`tui_smoke.py` 语法自检通过。
+
+### 我的一处表述错误（老板指出）
+
+我说"给第二台设备加设备时，粘贴的是邀请链接而不是 20 位邀请码"，暗示 `/invite` 会变 ——
+老板指出他**一直**用 `/invite` 生成的就是邀请链接，20 位邀请码只存在于最早期 v1。
+核实：他对。`/invite` 自 Multiverse 起就调 `createJoinToken` 打印 `r.link`；20 位邀请码只属于
+**被我删掉的那条 `enrollDevice` 路径**（`genInviteCode` 生成 5×4 位），以及 TUI 引导里那个
+"输错邀请码重试"的循环。他日常用的 TUI 加入流程（`_prompt('❓ 输入邀请码:')` → `_spaceJoin`）
+**本来就是收链接/token 的**（只是标签写着"邀请码"）。所以对他来说这条操作**没有任何变化** ——
+我把"删掉死路径"说成了"操作会变"。教训：讲变化前先确认这条路径**是否真被使用**。

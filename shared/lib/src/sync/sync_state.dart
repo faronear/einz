@@ -3,7 +3,7 @@
 /// 注（2026-09-15 评审）：本文件原有的 `SyncState` / `PendingMessage` 两个类
 /// 与 App 端的 drift 实现（`sync_state` 表 + pending 队列 + `_advanceAnchor`）
 /// 重复且**无人引用**，已删除；`generateSpaceKey` / `buildConfigPayload` 仍在用
-/// （CLI：`einz.dart`、`einz_tui.dart`；测试：`shared/test/einz_shared_test.dart`），保留。
+/// （CLI：`einz_tui.dart`；测试：`shared/test/einz_shared_test.dart`），保留。
 library;
 
 import 'dart:convert';

@@ -226,7 +226,7 @@ Future<(bool, String, List<String>)> _probeServer(String server) async {
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
 /// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
-/// key envelope 导入时置 exitCode=1（main 据此退出，提示用户改用 einz.dart import）。
+/// key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧用密保信封导入）。
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 

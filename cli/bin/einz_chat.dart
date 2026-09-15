@@ -49,7 +49,7 @@ Future<void> main(List<String> args) async {
     store = DeviceStore.load(storePath);
   } on StateError catch (e) {
     _err('$e');
-    _info('先运行: dart run bin/einz.dart init --store $storePath --device-id <id>');
+    _info('先用 TUI 引导创建/加入秘境: dart run bin/einz_tui.dart --store $storePath --server <url>');
     exitCode = 1;
     return;
   }

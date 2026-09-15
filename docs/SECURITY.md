@@ -200,8 +200,9 @@
 
 1. **在任一已解锁设备上走"修改口令"**（App 聊天页 ⋯ / TUI `/passphrase`）——客户端检出
    服务器无箱时会**跳过旧口令校验**，直接用新口令重建（确认文案为"重建"口径）；
-2. 或 `cli escrow upload --store <store> --server <url> --passphrase <新口令>`（`cli/bin/einz.dart`）——
-   用本地 store 的 Space Key + 现输口令直接覆盖上传，同样不需要旧口令。
+2. 或 **TUI 里 `/passphrase`**（等价于旧版的 `cli escrow upload`）——用本地 store 的 Space Key +
+   现输口令直接覆盖上传，同样不需要旧口令。
+   （旧版脚本 CLI `cli/bin/einz.dart` 已随 v1 收敛删除，命令不再存在。）
 
 重建后**线下告知伴侣新口令**（同 §4.4）。
 

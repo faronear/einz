@@ -101,7 +101,10 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现/创建设备
 # 直接进入 TUI，状态栏 ● 在线
 ```
 
-**方式二：CLI 分步命令**（等价流程）：
+**方式二：CLI 分步命令** —— ⚠️ **已作废**（2026-09-15：v1 脚本 CLI `cli/bin/einz.dart`
+已随 Multiverse 收敛删除，v1 的设备登记（enroll）与 20 位邀请码都不再存在）。
+请只用上面的 TUI 流程；等价的分步命令若仍需，见 `docs/DEPLOYMENT.md` §2 的说明。
+下面这段历史命令**不要照抄**（`init`/`enroll`/`escrow`/`invite` 均已删除）：
 
 ```bash
 cd /Users/Shared/productX/only/cli

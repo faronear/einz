@@ -55,7 +55,7 @@ setup() {
   echo ""
   echo "✅ 全部就绪。日常只需："
   echo "   进聊天：    $0 tui"
-  echo "   容器 dart： $0 dartc <参数>   （例：$0 dartc run bin/einz.dart sync …）"
+  echo "   容器 dart： $0 dartc <参数>   （例：$0 dartc run bin/einz_tui.dart --store demo/s1.json …）"
   echo "   编 Linux 产物：$0 build   （产物在 cli/build/einz-tui-linux-<架构>-<yymmddhhmm>）"
   echo "   升级 SDK：  $0    （重新执行一键 setup）"
 }

@@ -82,6 +82,9 @@ curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 
 ## 3. 客户端实测（以口令托管为例，本机 macOS/Linux）
 
+> ⚠️ **命令已作废（2026-09-15）**：`cli/bin/einz.dart` 已随 v1 收敛删除。
+> 现在的等价操作：TUI 里 `/passphrase`（设置/修改口令，含密保箱重建），或 App 聊天页 ⋯ → 修改口令。
+
 ```bash
 cd /Users/Shared/productX/only/cli
 dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
