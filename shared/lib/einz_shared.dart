@@ -9,6 +9,7 @@ export 'src/crypto/message_crypto.dart';
 export 'src/crypto/passphrase_crypto.dart';
 export 'src/crypto/passphrase_policy.dart';
 export 'src/policy/device_name_policy.dart';
+export 'src/policy/person_name_policy.dart';
 export 'src/protocol/api_client.dart';
 export 'src/protocol/message_payload.dart';
 export 'src/protocol/types.dart';

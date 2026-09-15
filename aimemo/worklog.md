@@ -6170,3 +6170,43 @@ device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对
 - `app/test/chat_page_menu_test.dart`：我的设备弹窗新增"空格/标点 → 红字"、"33 字 → 红字"。
 - 全量：`server npm test` 全绿、`tsc --noEmit`、`dart analyze`(cli/shared)、
   `flutter analyze`、`flutter test`(app) 全过。
+
+## 2026-09-16 用户名称（person 显示名）规则：≤32，中英文/数字/`_`/`-`/emoji
+
+**规则**（老板 2026-09-16）：最多 32 字符，只允许 **中文字、英文字母、数字、`_`、
+`-`、表情符 emoji**。与设备名规则的差别就是**允许 emoji**——名字是给人看的亲昵
+称呼（"小猪🐷"），设备名是给机器看的短标识，所以两条规则**不合并**。
+
+**处理**：名字一律由用户输入（向导的"我的名字/伴侣的名字"、改名弹窗、`/myname`），
+没有"自动取名"这条路 → 只校验、**不消毒**：不合规就拒绝并提示重输（静默改写人的
+名字 = 名字莫名变了）。服务端同样只拒（400），不做替换。
+
+**落地**
+- `shared/lib/src/policy/person_name_policy.dart`（新，唯一来源）：`kPersonNameMaxLength=32`、
+  `checkPersonNamePolicy()`、`PersonNameViolation`。emoji 用 Unicode 属性
+  `\p{Extended_Pictographic}`（Dart 正则支持 `unicode: true`），再补四类拼装件：
+  区域指示符（国旗 🇨🇳）、变体选择符（❤️）、ZWJ（👨‍👩‍👧）、键帽（1️⃣）。
+- `server/src/personName.ts`（新，TS 孪生）：`assertPersonName()`；接入
+  `POST /devices/person-name` 与 `POST /spaces`（display_name + partner_name，
+  未传不校验——服务端不强制必填，必填由客户端引导负责）。
+- TUI：create 向导两个名字 + `/myname` 命令校验后拒（提示"最长 32/只能用…"）。
+  **join 的"完整输入我的名字"不校验**——那是拿输入去匹配既有身份名（查表），
+  校验反而会让老名字的用户加不进来。
+- App：向导 create 步骤 1/2 两个名字 + 改名弹窗校验；新增 4 条 l10n
+  （`wizardNameInvalidError`/`wizardNameTooLongError`、
+  `chatPageRenameNameInvalidError`/`chatPageRenameNameTooLongError`，zh/en 已 gen-l10n）。
+
+**计数口径**：按 Unicode 码点（`runes.length` / `[...value].length`），一个 emoji 算 1；
+ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），属可接受偏差——真正的"肉眼一个字"
+需要 grapheme 切分库，不值得为此引入依赖。
+
+**测试**
+- `shared/test/person_name_policy_test.dart`（新，4 项）：emoji 各类形态放行、
+  空格/中文标点/@/全角拒、32/33 边界。
+- `server/test/person_name.test.ts`（新，已挂 `npm test`，2 项）：纯函数 + 端到端
+  （create 两个名字任一含空格 → 400；`小猪🐷` 原样入库；改名含空格 400、带 emoji 200）。
+- `app/test/chat_page_menu_test.dart`：个人资料弹窗新增"空格 → 红字""33 字 → 红字"，
+  最终用 `阿猪🐷_01` 成功关窗（顺带证明 emoji 放行）。
+- TUI 手工实测（pty）：create 向导"我的名字/伴侣名字"含空格与 33 字都被拦、
+  合规名放行；`/myname Mr Lukas` 被拦、`/myname 阿猪🐷_01` 更新并落盘。
+- 全量：`server npm test` 全绿、`dart analyze`(cli/shared)、`flutter analyze` 干净。

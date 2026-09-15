@@ -6,6 +6,7 @@ import { parsePackage, type EscrowPackage } from "./escrow.js";
 import { deriveSpaceAddress } from "./address.js";
 import { loadConfig } from "./config.js";
 import { normalizeDeviceName } from "./deviceName.js";
+import { assertPersonName } from "./personName.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
 // - space_address 由 space_public_key（创建者公钥）经 Keccak-256 + EIP-55 派生
@@ -99,6 +100,11 @@ export async function createSpace(
       throw new ApiError("SPACE_LIMIT_REACHED", "空间数量已达上限（maxSpaces）", 409);
     }
   }
+  // 用户名称白名单（老板 2026-09-16）：create 录入的是**两人**的名字（我的 +
+  // 伴侣），都是用户自己输入的 → 不合规直接 400，让客户端提示重输。
+  // 只有传了才校验（未传维持现状——服务端不强制必填，必填由客户端引导负责）
+  if (displayName != null) assertPersonName(displayName);
+  if (partnerName != null) assertPersonName(partnerName);
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
   const spacePublicKey = publicKey ?? "pending:" + randomUUID();
   // 地址 = Keccak-256(space_public_key) 后 20 字节 + EIP-55（确定性；公钥缺失回退随机）

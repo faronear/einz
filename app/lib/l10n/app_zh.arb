@@ -20,6 +20,13 @@
   "wizardPeerNameHintInput": "伴侣常用的名字",
   "wizardNameRequired": "填写我的名字",
   "wizardPeerNameRequired": "填写我的秘境伴侣的名字",
+  "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符",
+  "wizardNameTooLongError": "名字最多 {max} 个字符",
+  "@wizardNameTooLongError": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
   "wizardNameHintInput": "输入我常用的名字",
   "wizardMyGenderLabel": "我的性别",
   "wizardPeerGenderLabel": "伴侣的性别",
@@ -178,6 +185,13 @@
     }
   },
   "chatPageRenameMyselfEmptyError": "名字不能为空",
+  "chatPageRenameNameInvalidError": "只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符",
+  "chatPageRenameNameTooLongError": "最多 {max} 个字符",
+  "@chatPageRenameNameTooLongError": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
   "chatPageRenameSameAsPeerError": "不能与对方同名，请换个名字",
   "chatPageCopy": "复制",
   "chatPageCopied": "已复制",

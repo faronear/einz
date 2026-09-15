@@ -73,6 +73,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardPeerNameRequired => 'Enter your partner\'s name';
 
   @override
+  String get wizardNameInvalidError =>
+      'Only Chinese/English letters, digits, _ , - and emoji are allowed';
+
+  @override
+  String wizardNameTooLongError(int max) {
+    return 'At most $max characters';
+  }
+
+  @override
   String get wizardNameHintInput => 'Your name';
 
   @override
@@ -474,6 +483,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageRenameMyselfEmptyError => 'Name cannot be empty';
+
+  @override
+  String get chatPageRenameNameInvalidError =>
+      'Only Chinese/English letters, digits, _ , - and emoji are allowed';
+
+  @override
+  String chatPageRenameNameTooLongError(int max) {
+    return 'At most $max characters';
+  }
 
   @override
   String get chatPageRenameSameAsPeerError =>

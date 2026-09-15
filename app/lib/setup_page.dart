@@ -585,6 +585,15 @@ class _SetupPageState extends State<SetupPage> {
     if (key != null) _revealGender(key);
   }
 
+  /// 用户名称不合规 → 红字文案（规则见 shared person_name_policy：中英文/数字/
+  /// `_`/`-`/emoji，≤32；名字一律是用户输入的，不静默改写）。
+  String _nameRuleError(PersonNameViolation violation) {
+    final l10n = AppLocalizations.of(context)!;
+    return violation == PersonNameViolation.tooLong
+        ? l10n.wizardNameTooLongError(kPersonNameMaxLength)
+        : l10n.wizardNameInvalidError;
+  }
+
   Future<void> _nextStep() async {
     final l10n = AppLocalizations.of(context)!;
     // 先收起键盘：整页（含性别卡与红字警告）完整露出，避免警告被键盘遮挡，
@@ -606,8 +615,13 @@ class _SetupPageState extends State<SetupPage> {
     var invalid = false;
     // 名字+性别页（create 步骤 1——Multiverse join 改为身份选择页，不再自填名字）
     if (_role == _WizardRole.create && _step == 1) {
-      if (_personName.text.trim().isEmpty) {
+      final mine = _personName.text.trim();
+      if (mine.isEmpty) {
         localError = l10n.wizardNameRequired;
+        invalid = true;
+      } else if (checkPersonNamePolicy(mine) case final v?) {
+        // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
+        localError = _nameRuleError(v);
         invalid = true;
       }
       if (_myGender == null) {
@@ -627,8 +641,12 @@ class _SetupPageState extends State<SetupPage> {
     // create 录入两人身份，join 时按身份选择而非自填名字）
     String? partnerGenderError;
     if (_role == _WizardRole.create && _step == 2) {
-      if (_partnerNameCtrl.text.trim().isEmpty) {
+      final partner = _partnerNameCtrl.text.trim();
+      if (partner.isEmpty) {
         localError = l10n.wizardPeerNameRequired;
+        invalid = true;
+      } else if (checkPersonNamePolicy(partner) case final v?) {
+        localError = _nameRuleError(v);
         invalid = true;
       }
       if (_partnerGender == null) {

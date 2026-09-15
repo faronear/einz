@@ -218,6 +218,18 @@ abstract class AppLocalizations {
   /// **'Enter your partner\'s name'**
   String get wizardPeerNameRequired;
 
+  /// No description provided for @wizardNameInvalidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Only Chinese/English letters, digits, _ , - and emoji are allowed'**
+  String get wizardNameInvalidError;
+
+  /// No description provided for @wizardNameTooLongError.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters'**
+  String wizardNameTooLongError(int max);
+
   /// No description provided for @wizardNameHintInput.
   ///
   /// In en, this message translates to:
@@ -937,6 +949,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Name cannot be empty'**
   String get chatPageRenameMyselfEmptyError;
+
+  /// No description provided for @chatPageRenameNameInvalidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Only Chinese/English letters, digits, _ , - and emoji are allowed'**
+  String get chatPageRenameNameInvalidError;
+
+  /// No description provided for @chatPageRenameNameTooLongError.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters'**
+  String chatPageRenameNameTooLongError(int max);
 
   /// No description provided for @chatPageRenameSameAsPeerError.
   ///

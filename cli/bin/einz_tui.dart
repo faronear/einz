@@ -743,13 +743,21 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       displayName =
           (await _prompt(session, '❓ 我的名字（后期可改）:', required: true)).trim();
       if (!_state!.running) return;
-      if (displayName.isNotEmpty) {
-        session.messages.add(_systemMessage(session, '✅ ${displayName}'));
-        session.messages.add(_systemMessage(session, '----------------'));
-        break;
+      // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，最长 32
+      final violation = checkPersonNamePolicy(displayName);
+      if (violation == PersonNameViolation.empty) {
+        session.messages.add(_systemMessage(session, '❌ 名字必填，请输入'));
+        _scheduleRender();
+        continue;
       }
-      session.messages.add(_systemMessage(session, '❌ 名字必填，请输入'));
-      _scheduleRender();
+      if (violation != null) {
+        session.messages.add(_systemMessage(session, _personNameRuleHint(violation)));
+        _scheduleRender();
+        continue;
+      }
+      session.messages.add(_systemMessage(session, '✅ ${displayName}'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      break;
     }
   }
   // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）。
@@ -784,6 +792,13 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     if (!_state!.running) return;
     if (partnerName.isEmpty) {
       session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
+      _scheduleRender();
+      continue;
+    }
+    // 用户名称白名单（同"我的名字"）：不合规提示重输
+    final partnerViolation = checkPersonNamePolicy(partnerName);
+    if (partnerViolation != null) {
+      session.messages.add(_systemMessage(session, _personNameRuleHint(partnerViolation)));
       _scheduleRender();
       continue;
     }
@@ -2708,22 +2723,30 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
       } else {
+        // 字符白名单 + 长度上限（老板 2026-09-16）：不合规提示重输（服务端
+        // POST /devices/person-name 同样 400 兜底）
+        final violation = checkPersonNamePolicy(arg);
+        if (violation != null) {
+          s.session.messages.add(_systemMessage(s.session, _personNameRuleHint(violation)));
+          break;
+        }
+        final name = arg.trim();
         // 不允许改成与对方相同的名字（老板 2026-09-10）
         final peerNames = s.personNames.entries
             .where((e) => e.key != s.session.store.personId)
             .map((e) => e.value)
             .toList();
-        if (peerNames.contains(arg)) {
-          s.session.messages.add(_systemMessage(s.session, '⚠️ 名字不能与对方相同（$arg），请换个名字'));
+        if (peerNames.contains(name)) {
+          s.session.messages.add(_systemMessage(s.session, '⚠️ 名字不能与对方相同（$name），请换个名字'));
           s.status = '';
         } else {
           try {
             final old = s.session.store.personName ?? '(未设置)';
-            s.session.store.personName = arg;
+            s.session.store.personName = name;
             s.session.store.save(s.session.storePath);
-            await ApiClient(s.session.server).updatePersonName(arg, s.session.store.sessionToken!);
+            await ApiClient(s.session.server).updatePersonName(name, s.session.store.sessionToken!);
             await _refreshPersonNames(s);
-            s.session.messages.add(_systemMessage(s.session, '✅ 我的名字已更新: $old → $arg'));
+            s.session.messages.add(_systemMessage(s.session, '✅ 我的名字已更新: $old → $name'));
           } catch (e) {
             s.session.messages.add(_systemMessage(s.session, '❌ 我的名字修改失败: $e'));
           }
@@ -3274,4 +3297,12 @@ String _defaultDeviceName() {
 /// 设备名不合规时的提示（规则见 device_name_policy：中英文/数字/`_`/`-`，≤32）。
 String _deviceNameRuleHint() {
   return '⚠️ 设备名只能用中文字、英文字母、数字、下划线(_)、中划线(-)，最长 $kDeviceNameMaxLength 个字符';
+}
+
+/// 用户名称不合规时的提示（规则见 person_name_policy：中英文/数字/`_`/`-`/emoji，≤32）。
+String _personNameRuleHint(PersonNameViolation violation) {
+  if (violation == PersonNameViolation.tooLong) {
+    return '⚠️ 名字最长 $kPersonNameMaxLength 个字符（一个表情符算 1 个）';
+  }
+  return '⚠️ 名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符';
 }

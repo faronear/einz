@@ -837,15 +837,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('名字不能为空'), findsOneWidget, reason: '空名字保存应红字警示（人名专用提示）');
 
-    // 填写即消红字 → 保存成功关窗
-    await tester.enterText(dialogField, 'Lukas');
+    // 不合规字符（空格、@）→ 红字警示并停留（老板 2026-09-16：名字只允许
+    // 中文字/英文字母/数字/`_`/`-`/emoji）
+    await tester.enterText(dialogField, 'Mr Lukas');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符'), findsOneWidget,
+        reason: '含空格的名字保存应红字警示');
+
+    // 超长（>32）→ 红字警示
+    await tester.enterText(dialogField, 'a' * 33);
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('最多 32 个字符'), findsOneWidget, reason: '超长名字应红字警示');
+
+    // 填写即消红字 → 保存成功关窗（名字用带 emoji 的——与设备名规则的差别：
+    // 表情符在人名里是允许的）
+    await tester.enterText(dialogField, '阿猪\u{1F437}_01');
     await tester.pumpAndSettle();
     expect(find.text('名字不能为空'), findsNothing, reason: '开始填写后红字应消失');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('我的个人资料'), findsNothing, reason: '保存成功应关闭弹窗');
+    expect(find.text('我的个人资料'), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
   });
 
   testWidgets('长按菜单预览行对齐：我的消息靠右、对方消息靠左', (WidgetTester tester) async {

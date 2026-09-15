@@ -2,6 +2,7 @@ import { getDb } from './db.js'
 import { ApiError } from './auth.js'
 import { getDevice } from './config.js'
 import { assertDeviceName } from './deviceName.js'
+import { assertPersonName } from './personName.js'
 import { deviceScopeClause, requireSession } from './guard.js'
 import { broadcastProfileUpdated, getConnectedAt } from './ws.js'
 
@@ -103,8 +104,9 @@ export function updatePersonName (
 
   const b = (body ?? {}) as { person_name?: string }
   const personName = (b.person_name ?? '').trim()
-  if (!personName)
-    throw new ApiError('INVALID_REQUEST', 'person_name 不能为空', 400)
+  // 用户名称白名单 + 长度上限（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，
+  // 最长 32；不合规直接 400 让客户端提示重输（名字是用户自己输的，不静默改写）
+  assertPersonName(personName)
 
   const row = getDb()
     .prepare(`SELECT person_id FROM devices WHERE device_id = ?`)

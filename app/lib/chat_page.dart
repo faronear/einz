@@ -1149,6 +1149,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   return;
                 }
               }
+              // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
+              if (!renameDevice) {
+                final violation = checkPersonNamePolicy(name);
+                if (violation != null) {
+                  nameError.value = violation == PersonNameViolation.tooLong
+                      ? l10n.chatPageRenameNameTooLongError(kPersonNameMaxLength)
+                      : l10n.chatPageRenameNameInvalidError;
+                  return;
+                }
+              }
               // 不允许改成与对方相同的名字（老板 2026-09-10）
               if (!renameDevice && widget.peerName != null && name == widget.peerName) {
                 nameError.value = l10n.chatPageRenameSameAsPeerError;

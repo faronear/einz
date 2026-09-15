@@ -70,6 +70,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameRequired => '填写我的秘境伴侣的名字';
 
   @override
+  String get wizardNameInvalidError => '名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符';
+
+  @override
+  String wizardNameTooLongError(int max) {
+    return '名字最多 $max 个字符';
+  }
+
+  @override
   String get wizardNameHintInput => '输入我常用的名字';
 
   @override
@@ -448,6 +456,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageRenameMyselfEmptyError => '名字不能为空';
+
+  @override
+  String get chatPageRenameNameInvalidError =>
+      '只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符';
+
+  @override
+  String chatPageRenameNameTooLongError(int max) {
+    return '最多 $max 个字符';
+  }
 
   @override
   String get chatPageRenameSameAsPeerError => '不能与对方同名，请换个名字';

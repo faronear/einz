@@ -20,6 +20,13 @@
   "wizardPeerNameHintInput": "Partner's name",
   "wizardNameRequired": "Enter your name",
   "wizardPeerNameRequired": "Enter your partner's name",
+  "wizardNameInvalidError": "Only Chinese/English letters, digits, _ , - and emoji are allowed",
+  "wizardNameTooLongError": "At most {max} characters",
+  "@wizardNameTooLongError": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
   "wizardNameHintInput": "Your name",
   "wizardMyGenderLabel": "Your gender",
   "wizardPeerGenderLabel": "Partner's gender",
@@ -178,6 +185,13 @@
     }
   },
   "chatPageRenameMyselfEmptyError": "Name cannot be empty",
+  "chatPageRenameNameInvalidError": "Only Chinese/English letters, digits, _ , - and emoji are allowed",
+  "chatPageRenameNameTooLongError": "At most {max} characters",
+  "@chatPageRenameNameTooLongError": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
   "chatPageRenameSameAsPeerError": "Can't match your partner's name — pick another",
   "chatPageCopy": "Copy",
   "chatPageCopied": "Copied",
