@@ -338,6 +338,63 @@ void main() {
     expect(await AppLockService(db).isSetup, true, reason: '取消不清锁');
   });
 
+  testWidgets('有 PIN 时清空锁屏码：菜单项立即刷新（不再显示「已设置」）', (WidgetTester tester) async {
+    // 回归：清空成功后弹窗也 pop(true)，调用方此前写死 _hasPin=true——
+    // 锁已清但菜单仍显示「锁屏码 已设置」（老板 2026-09-15 实测）。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+    await AppLockService(db).setPin('123456',
+        payload: AppLockPayload(
+          server: 'https://einz.tic.cc',
+          spaceKeyB64: base64Encode(spaceKey),
+          spaceId: 'space-demo',
+          deviceId: 'dev-a',
+          token: 'tok',
+        ));
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('锁屏码'));
+    await tester.pumpAndSettle();
+    final fields =
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    // 旧码正确 + 新码两栏留空 → 清空确认 → 确认
+    await tester.enterText(fields.at(0), '123456');
+    await tester.tap(find.text('提交'));
+    await tester.pumpAndSettle();
+    final confirmDialog = find.byType(AlertDialog).last;
+    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('设置锁屏码'), findsNothing, reason: '清空成功后设置弹窗应关闭');
+    expect(await AppLockService(db).isSetup, false, reason: '锁包应已删除');
+    // 打开菜单：锁屏码项不应再有「已设置」尾缀（回归点——此前仍显示已设置）
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('已设置'), findsNothing,
+        reason: '清空后菜单项应只显示「锁屏码」，不带「已设置」尾缀');
+  });
+
   testWidgets('改名对话框保存后无红屏（controller 延迟 dispose）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);

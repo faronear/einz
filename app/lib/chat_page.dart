@@ -888,7 +888,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
     );
     if (ok == true && mounted) {
-      setState(() => _hasPin = true); // 设置成功：菜单项刷新为「PIN: 已设置」
+      // 设置或清空成功：不再猜结果（此前写死 _hasPin=true，清空后菜单仍显示
+      // 「已设置」——老板 2026-09-15 实测），按落盘后的真实状态刷新菜单
+      await _refreshPinStatus();
     }
   }
 
