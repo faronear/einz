@@ -515,7 +515,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachmentStorageSecured => '远程托管';
 
   @override
-  String get chatPageAttachmentStorageSecuredDesc => '每次打开附件都重新下载并解密，本机不留明文副本，更私密';
+  String get chatPageAttachmentStorageSecuredDesc =>
+      '每次打开附件都重新下载并解密，本机不留明文副本，更私密';
 
   @override
   String get chatPageAttachmentStorageStored => '本地留存';
@@ -670,7 +671,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachGalleryImage => '相册图片';
 
   @override
-  String get chatPageAttachVideoCamera => '拍摄视频';
+  String get chatPageAttachVideoCamera => '拍视频';
 
   @override
   String get chatPageAttachVideoGallery => '相册视频';

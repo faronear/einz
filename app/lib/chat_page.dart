@@ -2701,11 +2701,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           padding: const EdgeInsets.all(16),
           child: _buildActionCardGrid([
             _buildActionCard(
-              icon: Icons.emoji_emotions_outlined,
-              label: l10n.chatPageAttachEmoji,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
-            ),
-            _buildActionCard(
               icon: Icons.photo_camera,
               label: l10n.chatPageAttachPhoto,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
@@ -2734,6 +2729,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               icon: Icons.insert_drive_file,
               label: l10n.chatPageAttachAnyFile,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.anyFile),
+            ),
+            // 表情符放最后（老板 2026-09-15）：附件优先，表情不是附件
+            _buildActionCard(
+              icon: Icons.emoji_emotions_outlined,
+              label: l10n.chatPageAttachEmoji,
+              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.emoji),
             ),
           ]),
         ),
