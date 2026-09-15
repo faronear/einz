@@ -6,18 +6,6 @@ import 'local_database.dart';
 /// gradient（渐变粉蓝，与首屏/向导同款品牌渐变）。
 const List<String> kUiStyleOptions = ['plain', 'gradient'];
 
-/// 选项标签（自带双语，菜单当前值/弹窗直接用）。
-const Map<String, String> kUiStyleLabels = {
-  'plain': '素雅纯色', // Plain
-  'gradient': '渐变粉蓝', //  Gradient
-};
-
-/// 选项描述（一句话，弹窗中每张预览图下方展示）。
-const Map<String, String> kUiStyleDescriptions = {
-  'plain': '浅粉纯色背景，清淡优雅', // Plain light-pink background, clean & calm
-  'gradient': '粉蓝渐变背景，深情典雅', // Pink-blue gradient matching the main colors
-};
-
 /// 品牌粉蓝渐变（首屏/向导同款，聊天页 gradient 风格与预览图共用）。
 const LinearGradient kBrandGradient = LinearGradient(
   begin: Alignment.topLeft,

@@ -582,6 +582,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuStyleLabel => 'Interface style';
 
   @override
+  String get chatPageUiStylePlain => 'Plain';
+
+  @override
+  String get chatPageUiStylePlainDesc =>
+      'Light pink solid background, clean and calm';
+
+  @override
+  String get chatPageUiStyleGradient => 'Gradient';
+
+  @override
+  String get chatPageUiStyleGradientDesc =>
+      'Pink-blue gradient in the brand colors';
+
+  @override
   String get chatPageMenuBurnLabel => 'Burn-after-read';
 
   @override

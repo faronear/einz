@@ -79,10 +79,10 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
         builder: (ctx, setSheetState) => Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 标题**居中**（老板 2026-09-15）：靠左会与下面的选项行分不清层次
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Center(
                 child: Text(widget.title,
                     style: const TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 16)),

@@ -5347,3 +5347,14 @@ macOS/桌面/测试环境自动退回占位图标——与 video_player 的平�
 - 测试：`ui_style_switch_test` 里"点 ✕ 关闭"的用例改为"弹层无 ✕ + 系统返回可关闭"。
 
 **验证：** `flutter analyze` 无 issue；ui_style_switch + chat_page_menu + lock_page 23 项全过。
+
+### 选择类弹层标题居中 + 界面风格文案双语化（老板 2026-09-15 续）
+
+- **标题居中**：通用弹层 `option_picker_sheet.dart` 顶部标题由左对齐改居中（靠左与下面的
+  选项行层次不清）；界面风格弹层同样居中，四个弹层一致。
+- **界面风格补英文**：删掉写死中文的 `kUiStyleLabels` / `kUiStyleDescriptions`，
+  改 l10n：`chatPageUiStylePlain`(素雅纯色 / Plain)、`chatPageUiStyleGradient`(渐变粉蓝 /
+  Gradient) 及两条 `...Desc`；弹层标题改用已有的 `chatPageMenuStyleLabel`（界面风格 /
+  Interface style）；菜单里显示的当前风格值同步走 l10n。
+
+**验证：** `flutter analyze` 无 issue；ui_style_switch + chat_page_menu 23 项全过。

@@ -547,6 +547,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuStyleLabel => '界面风格';
 
   @override
+  String get chatPageUiStylePlain => '素雅纯色';
+
+  @override
+  String get chatPageUiStylePlainDesc => '浅粉纯色背景，清淡优雅';
+
+  @override
+  String get chatPageUiStyleGradient => '渐变粉蓝';
+
+  @override
+  String get chatPageUiStyleGradientDesc => '粉蓝渐变背景，深情典雅';
+
+  @override
   String get chatPageMenuBurnLabel => '阅后即焚';
 
   @override

@@ -1124,6 +1124,30 @@ abstract class AppLocalizations {
   /// **'Interface style'**
   String get chatPageMenuStyleLabel;
 
+  /// No description provided for @chatPageUiStylePlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain'**
+  String get chatPageUiStylePlain;
+
+  /// No description provided for @chatPageUiStylePlainDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Light pink solid background, clean and calm'**
+  String get chatPageUiStylePlainDesc;
+
+  /// No description provided for @chatPageUiStyleGradient.
+  ///
+  /// In en, this message translates to:
+  /// **'Gradient'**
+  String get chatPageUiStyleGradient;
+
+  /// No description provided for @chatPageUiStyleGradientDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Pink-blue gradient in the brand colors'**
+  String get chatPageUiStyleGradientDesc;
+
   /// No description provided for @chatPageMenuBurnLabel.
   ///
   /// In en, this message translates to:

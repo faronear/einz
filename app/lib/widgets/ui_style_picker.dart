@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/ui_style_settings.dart';
+import '../l10n/app_localizations.dart';
 
 /// 界面风格选择弹层：列出全部风格（目前：素雅纯色 / 渐变粉蓝），每项 = 一张
 /// 预览图 + 名称 + 一句描述；点选即保存并立即生效（uiStyleNotifier 通知聊天页
@@ -47,23 +48,29 @@ class _UiStylePickerSheetState extends State<UiStylePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 无右上角关闭按钮（老板 2026-09-15 统一）：下滑/点外部/返回键即关闭，
-          // 与「界面语言 / 阅后即焚 / 附件存储」弹层观感一致
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text('界面风格',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+          // 无右上角关闭按钮（老板 2026-09-15 统一）：下滑/点外部/返回键即关闭；
+          // 标题居中——与其它选择类弹层一致（靠左会和选项行分不清层次）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Center(
+              child: Text(l10n.chatPageMenuStyleLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
             ),
           ),
           for (final option in kUiStyleOptions)
             _StyleOptionCard(
               option: option,
+              label: option == 'gradient'
+                  ? l10n.chatPageUiStyleGradient
+                  : l10n.chatPageUiStylePlain,
+              description: option == 'gradient'
+                  ? l10n.chatPageUiStyleGradientDesc
+                  : l10n.chatPageUiStylePlainDesc,
               active: option == _active,
               onTap: () => _apply(option),
             ),
@@ -78,11 +85,19 @@ class _UiStylePickerSheetState extends State<UiStylePickerSheet> {
 class _StyleOptionCard extends StatelessWidget {
   const _StyleOptionCard({
     required this.option,
+    required this.label,
+    required this.description,
     required this.active,
     required this.onTap,
   });
 
   final String option;
+
+  /// 风格名（按当前语言）。
+  final String label;
+
+  /// 风格描述（按当前语言）。
+  final String description;
   final bool active;
   final VoidCallback onTap;
 
@@ -107,11 +122,11 @@ class _StyleOptionCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(kUiStyleLabels[option]!,
+                      Text(label,
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 3),
                       Text(
-                        kUiStyleDescriptions[option]!,
+                        description,
                         style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                       ),
                     ],

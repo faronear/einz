@@ -685,6 +685,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 顶栏菜单 → 附件存储（安全 / 留存）：本设备设置，两台设备可各选各的。
   /// 切回 secured 时**清空已留存的明文**（否则"安全"名不副实——老板 2026-09-14 定）。
+  /// 界面风格名（按当前语言）。
+  String _uiStyleLabel(String style, AppLocalizations l10n) =>
+      style == 'gradient' ? l10n.chatPageUiStyleGradient : l10n.chatPageUiStylePlain;
+
   /// 附件存储模式标签（按当前语言）。
   String _attachmentStorageLabel(String mode, AppLocalizations l10n) =>
       mode == 'stored'
@@ -3371,7 +3375,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuStyleLabel, style: labelStyle),
                       const Spacer(),
-                      Text(kUiStyleLabels[_uiStyle] ?? ''),
+                      Text(_uiStyleLabel(_uiStyle, l10n)),
                     ],
                   ),
                 ),
