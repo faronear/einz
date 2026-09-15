@@ -33,6 +33,7 @@ import 'lock_page.dart';
 import 'setup_page.dart';
 import 'widgets/emoji_panel.dart';
 import 'widgets/immersive_fullscreen.dart';
+import 'widgets/passphrase_field.dart';
 import 'widgets/option_picker_sheet.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
@@ -668,10 +669,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 加载持久化的界面风格（默认素雅纯色，保留原有视觉效果）。
+  /// 同步回 uiStyleNotifier：弹层选中态读的是 notifier，不回写会导致
+  /// 冷启动后"页面是渐变、弹层却选中素雅纯色"的不一致。
   Future<void> _loadUiStyle() async {
     final s = UiStyleSettings(widget.db ?? LocalDatabase());
     final style = await s.load();
-    if (mounted) setState(() => _uiStyle = style);
+    if (!mounted) return;
+    setState(() => _uiStyle = style);
+    if (uiStyleNotifier.value != style) uiStyleNotifier.value = style;
   }
 
   /// 风格切换通知（弹窗内点选即触发）：立即重建背景与菜单当前值。
@@ -2915,35 +2920,42 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 全屏查看图片（黑底大图 + 双指缩放 + 右上角关闭，与头像全屏一致）。
+  /// 全屏查看图片（品牌粉蓝渐变大图 + 双指缩放 + 右上角关闭，与头像全屏一致）。
+  /// useSafeArea:false + 直角 shape：背景铺满整屏，不留圆角和上下安全区空隙。
+  /// 背景 = kBrandGradient（老板 2026-09-15：全屏查看用首屏同款渐变，更有品牌感）。
   Future<void> _showFullImage(Uint8List bytes) async {
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
+          useSafeArea: false,
           builder: (ctx) => Dialog(
-            backgroundColor: Colors.black,
+            backgroundColor: Colors.transparent,
             insetPadding: EdgeInsets.zero,
-            // SizedBox.expand：黑底严格铺满整屏（含状态栏与刘海区域）
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            // SizedBox.expand：渐变底严格铺满整屏（含状态栏与刘海区域）
             child: SizedBox.expand(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: InteractiveViewer(
-                      child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
-                    ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    // SafeArea：万一系统栏没隐藏（某平台不支持），关闭键也不会被压在下面
-                    child: SafeArea(
-                      child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.of(ctx).pop(),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(gradient: kBrandGradient),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: InteractiveViewer(
+                        child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
                       ),
                     ),
-                  ),
-                ],
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      // SafeArea：万一系统栏没隐藏（某平台不支持），关闭键也不会被压在下面
+                      child: SafeArea(
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -3396,7 +3408,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuBurnLabel, style: labelStyle),
                       const Spacer(),
-                      Text(_burnOptionLabel(_burnSeconds, l10n)),
+                      // 不设期限（0）不显示档位值，菜单项只显示「阅后即焚」；
+                      // 选了具体时长才在右侧显示（老板 2026-09-15）
+                      if (_burnSeconds > 0) Text(_burnOptionLabel(_burnSeconds, l10n)),
                     ],
                   ),
                 ),
@@ -4183,24 +4197,26 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
             ),
           ),
           const SizedBox(height: 12),
-          // 三个口令框都可临时查看明文（点眼睛，3 秒后自动回暗码）
-          _PassphraseField(
+          // 旧口令/新口令可临时查看明文（点眼睛，3 秒后自动回暗码）；
+          // **确认新口令不给眼睛**——确认框是用来复核的，给"看一眼"反而容易顺手点开
+          // （老板 2026-09-15）。
+          PassphraseField(
             controller: _oldCtrl,
             labelText: l10n.chatPageChangePassphraseOldLabel,
             revealTip: l10n.chatPagePassphraseRevealTip,
           ),
           const SizedBox(height: 8),
-          _PassphraseField(
+          PassphraseField(
             controller: _newCtrl,
             labelText: l10n.chatPageChangePassphraseNewLabel,
             hintText: l10n.wizardPassphraseMinLengthHint,
             revealTip: l10n.chatPagePassphraseRevealTip,
           ),
           const SizedBox(height: 8),
-          _PassphraseField(
+          PassphraseField(
             controller: _confirmCtrl,
             labelText: l10n.chatPageChangePassphraseConfirmLabel,
-            revealTip: l10n.chatPagePassphraseRevealTip,
+            showReveal: false,
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -4508,31 +4524,37 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     }
   }
 
-  /// 全屏查看头像（黑底大图 + 右上角关闭；隐藏系统状态栏 = 沉浸感）。
+  /// 全屏查看头像（品牌粉蓝渐变大图 + 右上角关闭；隐藏系统状态栏 = 沉浸感）。
+  /// 背景 = kBrandGradient，与图片全屏一致（老板 2026-09-15）。
   Future<void> _showFullscreen() async {
     final bytes = _bytes;
     if (bytes == null) return;
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
+          useSafeArea: false,
           builder: (_) => Dialog(
-            backgroundColor: Colors.black,
+            backgroundColor: Colors.transparent,
             insetPadding: EdgeInsets.zero,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             child: SizedBox.expand(
-              child: Stack(
-                children: [
-                  Positioned.fill(child: Image.memory(bytes, fit: BoxFit.contain)),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: SafeArea(
-                      child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.of(context).pop(),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(gradient: kBrandGradient),
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: Image.memory(bytes, fit: BoxFit.contain)),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: SafeArea(
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -4669,34 +4691,39 @@ class _VideoPreviewState extends State<_VideoPreview> {
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
+          useSafeArea: false,
           builder: (ctx) => Dialog(
-            // 与图片全屏一致：纯黑底 + 铺满全屏 + 隐藏系统状态栏（老板要求
-            // 2026-09-12 / 2026-09-15——视频全屏也应是黑底大画面，且遮罩要盖到
+            // 与图片全屏一致：品牌渐变底 + 铺满全屏 + 隐藏系统状态栏（老板要求
+            // 2026-09-12 / 2026-09-15——视频全屏也应是渐变大画面，且背景要盖到
             // 屏幕最顶端，而不是默认半透明遮罩下的圆角小卡）
-            backgroundColor: Colors.black,
+            backgroundColor: Colors.transparent,
             insetPadding: EdgeInsets.zero,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             child: SizedBox.expand(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Center(
-                      child: AspectRatio(
-                        aspectRatio: c.value.aspectRatio,
-                        child: VideoPlayer(c),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(gradient: kBrandGradient),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Center(
+                        child: AspectRatio(
+                          aspectRatio: c.value.aspectRatio,
+                          child: VideoPlayer(c),
+                        ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: SafeArea(
-                      child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.of(ctx).pop(),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: SafeArea(
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -4800,62 +4827,3 @@ class _HourglassFlipState extends State<_HourglassFlip>
     );
   }
 }
-
-/// 口令输入框：默认暗码，右侧眼睛可临时查看明文，**3 秒后自动回到暗码**
-/// （老板 2026-09-15）——方便确认自己输对了，又不至于把口令长期暴露在屏幕上。
-class _PassphraseField extends StatefulWidget {
-  const _PassphraseField({
-    required this.controller,
-    required this.revealTip,
-    this.labelText,
-    this.hintText,
-  });
-
-  final TextEditingController controller;
-  final String? labelText;
-  final String? hintText;
-  final String revealTip;
-
-  @override
-  State<_PassphraseField> createState() => _PassphraseFieldState();
-}
-
-class _PassphraseFieldState extends State<_PassphraseField> {
-  bool _revealed = false;
-  Timer? _timer;
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _toggle() {
-    setState(() => _revealed = !_revealed);
-    _timer?.cancel();
-    if (_revealed) {
-      _timer = Timer(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _revealed = false);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: widget.controller,
-      obscureText: !_revealed,
-      decoration: InputDecoration(
-        labelText: widget.labelText,
-        hintText: widget.hintText,
-        border: const OutlineInputBorder(),
-        suffixIcon: IconButton(
-          icon: Icon(_revealed ? Icons.visibility : Icons.visibility_off),
-          tooltip: widget.revealTip,
-          onPressed: _toggle,
-        ),
-      ),
-    );
-  }
-}
-

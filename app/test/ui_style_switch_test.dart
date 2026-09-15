@@ -196,6 +196,49 @@ void main() {
     expect(gradientBackground, findsOneWidget, reason: '重启后应从持久化恢复渐变风格');
   });
 
+  testWidgets('冷启动：持久化为渐变时，弹层选中态应为渐变粉蓝（notifier 同步）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 预置：上次运行选择了渐变粉蓝。用 save() 写库后立即把 notifier 重置回
+    // 默认 plain——模拟真实冷启动（进程重启后 notifier 是默认值，只有数据库
+    // 里留着 gradient）。若 _loadUiStyle 不回写 notifier，此测试会红。
+    await UiStyleSettings(db).save('gradient');
+    uiStyleNotifier.value = 'plain';
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        server: 'https://einz.tic.cc',
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(uiStyleNotifier.value, 'gradient', reason: '加载持久化风格后应同步回 notifier');
+    expect(gradientBackground, findsOneWidget, reason: '冷启动应恢复渐变背景');
+
+    // 打开风格弹层：渐变粉蓝应有对勾，素雅纯色没有（此前 bug：冷启动后弹层误选纯色）
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('界面风格'));
+    await tester.pumpAndSettle();
+    final gradientRow = find.ancestor(of: find.text('渐变粉蓝'), matching: find.byType(Row)).first;
+    expect(find.descendant(of: gradientRow, matching: find.byIcon(Icons.check)), findsOneWidget,
+        reason: '冷启动后弹层应选中渐变粉蓝');
+    final plainRow = find.ancestor(of: find.text('素雅纯色'), matching: find.byType(Row)).first;
+    expect(find.descendant(of: plainRow, matching: find.byIcon(Icons.check)), findsNothing,
+        reason: '素雅纯色不应处于选中态');
+  });
+
   testWidgets('渐变风格下输入栏上方无截断空隙（消息列表直达输入栏）', (WidgetTester tester) async {
     // 模拟真机 insets（状态栏 59 / 底部 Home 条 34）：SafeArea 会应用 MediaQuery 顶部
     // inset——输入栏如果保留 top inset，消息列表底部会停在输入栏上方约一屏高的空隙处，
