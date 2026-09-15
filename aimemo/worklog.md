@@ -5608,3 +5608,24 @@ only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置
 文档表缺 4 个文件、PROTOCOL_MULTIVERSE 示例硬编码链接）；仓库卫生（SFConflict 已 77 个且
 **3 个落在 `.git/` 内部**，比 cli/demo 的更该先处理）；架构项（app.ts 手写路由剩余 ~20 处
 鉴权三连尚未统一走 guard——本次只在 C1/C2 触点收口，全量改造是评审架构项 #1）。
+
+### 清理 Syncthing 冲突副本（77 个 → 0）
+
+全仓 `*SFConflict*` 共 **77 个**（报告写 64，两周后又长出来了），全部落在 .gitignore
+覆盖范围内、无一个被 git 跟踪（`git status` 零删除条目可证）：
+
+| 位置 | 数量 | 处理 |
+| --- | --- | --- |
+| `cli/demo/`（`s1.json` / `s2.json` 的旧副本） | 47 | 直接删（正本 s1/s2.json 在，demo 环境可重建） |
+| `app/build/`、`app/.dart_tool/`、`shared/.dart_tool/`、`cli/.dart_tool/` | 17 | 直接删（构建产物，可重建） |
+| `.git/index`、`.git/logs/refs/remotes/origin/main` | 4 | 直接删（见下，注意这是**同步工具在写 .git 内部**） |
+| `server/data/`（`einz.sqlite.db{,-wal,-shm}` 旧副本） | 9 | **隔离到仓库外** `~/einz-sfconflict-20260915/server-data/`（含一份 2026-09-10 的完整旧 DB 快照，删掉不可逆，故不动手；确认无用后自行删除） |
+
+- 隔离前已比对：正本 `server/data/einz.sqlite.db` 是当前 dev server（pid 99642）在用的，
+  mtime 09-15 12:33；9 个副本都是 09-07 ~ 09-10 的旧物，无更新内容。
+- 顺手排查了其他同步残留（`*sync-conflict*` / `.stversions` / `*conflicted copy*`）：无。
+- 健康检查：`git fsck --connectivity-only` 只有 dangling 对象（正常），`/health` 正常。
+- **根因没除**：冲突副本出现在 `.git/index`、`.git/logs/...` 上，说明同步工具正在同步
+  `.git/` 目录——并发写 .git 有把仓库写坏的风险（比 cli/demo 的文件更严重）。本机当前
+  **没有 Syncthing 进程**（`pgrep -i synth` 无），所以副本是别处同步过来的遗留；要根治
+  得在配置同步的那一端把 `.git/` 排除。已列入待讨论。
