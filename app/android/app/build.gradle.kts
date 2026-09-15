@@ -42,6 +42,8 @@ android {
             //      export EINZ_STORE_PASSWORD=$(security find-generic-password -a "$USER" -s einz-android-store -w)
             //      export EINZ_KEY_PASSWORD=$(security find-generic-password -a "$USER" -s einz-android-key -w)
             //    未设置环境变量时，才回落到 properties 文件里的明文值（现状，向后兼容）。
+            //    注意 Gradle daemon 可能复用旧环境：若明明 export 了却取不到，
+            //    先 `cd app/android && ./gradlew --stop`（或加 --no-daemon）再构建。
             val keystorePropertiesFile = rootProject.file(
                 System.getenv("EINZ_ANDROID_KEY_PROPERTIES") ?: "key.properties"
             )
