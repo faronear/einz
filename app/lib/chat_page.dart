@@ -2022,7 +2022,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         m.env.senderPersonId ?? _repo.personIdOfDevice(m.env.senderDeviceId);
     final preview = m.plaintext.trim();
     // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长，可点按播放
-    // （老板要求 2026-09-13）；其余类型沿用单行文本（空正文显示类型占位）。
+    // （老板要求 2026-09-13）；文件消息显示文件图标 + 文件名（老板要求 2026-09-15）；
+    // 其余类型沿用单行文本（空正文显示类型占位）。
     final Widget bubbleContent;
     switch (m.env.type) {
       case 'voice':
@@ -2034,6 +2035,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         break;
       case 'video':
         bubbleContent = _buildVideoThumb(m, size: 48);
+        break;
+      case 'file':
+        // 附件消息明文自带 📎 前缀（发送端兜底文案）；预览行已有文件图标，去掉
+        var fileName = preview;
+        if (fileName.startsWith('📎')) fileName = fileName.replaceFirst('📎', '').trim();
+        bubbleContent = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.insert_drive_file, size: 20,
+                color: _uiStyle == 'gradient' ? Colors.white : null),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                fileName.isEmpty ? m.env.type : fileName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
         break;
       default:
         bubbleContent = Text(
@@ -2188,7 +2209,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 引用块内容：原消息是图片/视频就显示它的缩略图（视频取首帧 + 播放三角，
   /// 老板要求 2026-09-15）、是语音/音频就显示波形图 + 秒数（老板要求
-  /// 2026-09-13），其余（含原消息尚未加载/无附件）沿用文字预览。
+  /// 2026-09-13）、是文件就显示文件图标 + 文件名（老板要求 2026-09-15），
+  /// 其余（含原消息尚未加载/无附件）沿用文字预览。
   Widget _buildQuoteBlockContent(Map<String, dynamic> quote) {
     final type = quote['type'] as String?;
     if (type == 'image') {
@@ -2198,6 +2220,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (type == 'video') {
       final quoted = _messageById(quote['messageId'] as String? ?? '');
       if (quoted != null) return _buildVideoThumb(quoted, size: 40);
+    }
+    if (type == 'file') {
+      // 原消息已加载 → 用消息流同款文件名片（图标 + 名字/尺寸）；未加载时退回
+      // preview 文本（剥 📎 前缀）+ 文件图标——引用快照的 preview 就是文件名
+      var fileName = _quotePreview(quote['preview'] as String? ?? '');
+      if (fileName.startsWith('📎')) fileName = fileName.replaceFirst('📎', '').trim();
+      final quoted = _messageById(quote['messageId'] as String? ?? '');
+      if (quoted != null) return _buildFileCard(quoted);
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.insert_drive_file, size: 16,
+              color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              fileName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700),
+            ),
+          ),
+        ],
+      );
     }
     if (type == 'voice' || type == 'audio') {
       final seconds =
@@ -3186,9 +3234,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
 
-  /// 文件消息：文件图标 + 文件名 + 右侧「下载组合按钮」（上=下载图标，下=尺寸）。
-  /// 点文件名或图标即可下载/打开（老板 2026-09-15：下载按钮和尺寸合并为一枚
-  /// 组合按钮，尺寸不再单独占一行）。
+  /// 文件消息：文件图标 + 文件信息（上=文件名、下=尺寸）。整块正文可点按
+  /// （含文件图标），触摸即下载/打开（本机有留存副本则直接用系统应用打开；
+  /// 老板 2026-09-15：实测点文件名就能打开，下载图标不必要，删掉）。
   Widget _buildFileCard(
       HistoryMessage m) {
     final size = (m.attachment?['size'] as int?) ?? 0;
@@ -3196,35 +3244,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 附件消息明文是「📎 文件名」（发送端兜底文案）；名片里已有文件图标，前缀去掉
     var name = m.plaintext.trim();
     if (name.startsWith('📎')) name = name.replaceFirst('📎', '').trim();
-    final downloadButton = InkWell(
-      borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
       onTap: () => _downloadFile(m),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.download, size: 20),
-            Text(_formatSize(size),
-                style: TextStyle(fontSize: 10, color: subtitleColor)),
-          ],
-        ),
-      ),
-    );
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.insert_drive_file, size: 28),
-        const SizedBox(width: 8),
-        Flexible(
-          child: GestureDetector(
-            onTap: () => _downloadFile(m),
-            child: Text(name, overflow: TextOverflow.ellipsis),
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.insert_drive_file, size: 30),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(name, overflow: TextOverflow.ellipsis),
+                Text(_formatSize(size),
+                    style: TextStyle(fontSize: 11, color: subtitleColor)),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        downloadButton,
-      ],
+        ],
+      ),
     );
   }
 
