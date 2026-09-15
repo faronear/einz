@@ -431,7 +431,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.'**
+  /// **'The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.'**
   String get wizardPassphraseHint;
 
   /// No description provided for @wizardPassphraseMinLengthHint.
@@ -985,12 +985,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change'**
   String get chatPageChangePassphraseSubmit;
-
-  /// No description provided for @chatPageChangePassphraseHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.'**
-  String get chatPageChangePassphraseHint;
 
   /// No description provided for @chatPageChangePassphraseOldLabel.
   ///

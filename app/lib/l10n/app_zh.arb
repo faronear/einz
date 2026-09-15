@@ -60,7 +60,7 @@
       "error": {"type": "String"}
     }
   },
-  "wizardPassphraseHint": "对所有内容进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
+  "wizardPassphraseHint": "口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
   "wizardPassphraseMinLengthHint": "至少 8 位",
   "wizardPassphraseTooShort": "口令不得少于 8 位",
   "wizardPassphraseConfirmHint": "再输一次以确认",
@@ -186,7 +186,6 @@
   "save": "保存",
   "chatPageChangePassphraseTitle": "修改口令",
   "chatPageChangePassphraseSubmit": "修改",
-  "chatPageChangePassphraseHint": "口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
   "chatPageChangePassphraseOldLabel": "旧口令",
   "chatPageChangePassphraseNewLabel": "新口令",
   "chatPageChangePassphraseConfirmLabel": "确认新口令",

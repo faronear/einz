@@ -4174,9 +4174,10 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 说明文字（与邀请码 / PIN 弹窗同款：大标题下小字说明，老板要求 2026-09-15）
+          // 说明文字（与创建向导**共用同一句** wizardPassphraseHint，老板 2026-09-15
+          // 要求统一口径；样式与邀请码 / PIN 弹窗一致：大标题下小字说明）
           Text(
-            l10n.chatPageChangePassphraseHint,
+            l10n.wizardPassphraseHint,
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.outline,

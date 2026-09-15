@@ -5494,3 +5494,15 @@ only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置
 原话新增了一条，未改向导文案——要统一的话说一声。
 
 **验证：** `flutter analyze` 无 issue；`chat_page_menu_test` 19 项全过。
+
+### 统一 `wizardPassphraseHint`（老板 2026-09-15 追加）
+
+上一轮为改口令弹窗新加了 `chatPageChangePassphraseHint`，与创建向导的 `wizardPassphraseHint`
+只差"消息 vs 内容"两字——老板要求统一：**以老板给的原话为准，只保留一个键**：
+- `wizardPassphraseHint` = 「口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！
+  仅可将口令分享给秘境伴侣。」（en: "The passphrase encrypts every message. Memorize it and
+  never leak it — share it only with your partner."）
+- 删除 `chatPageChangePassphraseHint`；改口令弹窗改用 `wizardPassphraseHint`（同一个键，
+  创建向导 create 步骤与改口令弹窗共用一句；join 步骤另有 `wizardJoinPassphraseHint`，未动）。
+
+**验证：** `flutter analyze` 无 issue；menu + wizard + join 共 34 项全过。
