@@ -1041,6 +1041,18 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
   } on FormatException {
     session.messages.add(_systemMessage(session, '⚠️ 口令错误：请确认与创建者设置的口令一致'));
     _scheduleRender();
+  } on ApiException catch (e) {
+    // 2026-09-15：服务端限速（同一 IP 5 分钟内的加入/认证次数上限）会返回 429。
+    // 原始 ApiException 很长又不好懂，单独翻译成人话 + 给出可操作的等待时间。
+    if (e.code == 'RATE_LIMITED') {
+      session.messages.add(_systemMessage(
+          session, '⚠️ 操作太频繁，被服务端限流了（保护机制，不是你的邀请码有问题）'));
+      session.messages.add(_systemMessage(
+          session, '   $e —— 等提示的秒数过后再试；自用服务器也可以直接重启服务端清空计数。'));
+    } else {
+      session.messages.add(_systemMessage(session, '⚠️ 加入秘境失败: $e'));
+    }
+    _scheduleRender();
   } catch (e) {
     session.messages.add(_systemMessage(session, '⚠️ 加入秘境失败: $e'));
     _scheduleRender();

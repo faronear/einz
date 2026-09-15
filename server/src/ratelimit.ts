@@ -28,7 +28,11 @@ const SPACE_CREATE_MAX = Number(process.env.EINZ_RATELIMIT_SPACE_CREATE ?? 20);
 const SPACE_CREATE_WINDOW_MS = 60 * 60 * 1000;
 
 /** 认证与加入类端点（challenge / join / lookup / enroll）：5 分钟。 */
-const AUTH_MAX = Number(process.env.EINZ_RATELIMIT_AUTH ?? 30);
+// 30 → 60（2026-09-15）：一次"加入秘境"要消耗 preflight + join 两个请求，
+// 口令试错又会回到流程重来，两个人自用很容易打满 → 表现为"输入邀请码总是失败"。
+// 安全性没实质下降：join token 是 32B 随机不可猜，口令爆破由 escrow 自己的
+// 失败计数兜（10 次/15 分钟）；这里只防"无限造 DB 行 / 无脑刷"。
+const AUTH_MAX = Number(process.env.EINZ_RATELIMIT_AUTH ?? 60);
 const AUTH_WINDOW_MS = 5 * 60 * 1000;
 
 /** 全站兜底：每分钟。App 3s 轮询 /sync + TUI 30s + 附件 = 远低于此；

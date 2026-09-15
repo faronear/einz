@@ -6058,3 +6058,21 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
    **不校验旧口令**，若把"查不到"当成"没有箱"去提示，用户输新口令会**顶掉**原有密保箱（等于把伴侣
    锁在门外）——保守优先。
 验证：cli analyze 干净、19 项测试全过；创建者侧老板复测已正常。
+
+## 2026-09-15 "输入邀请码总是失败" = 被我今天加的全局限速拦了
+
+**现象**：老板试加入，一直失败，报 `ApiException(RATE_LIMITED): too many requests, retry after 217s`；
+等几分钟后就能进了。
+**根因**：H2 加的按 IP 限速里，`auth` 桶是 **30 次 / 5 分钟**，它覆盖
+`GET /spaces/lookup`、`POST /spaces/join/preflight`、`POST /spaces/join`、`POST /auth/challenge`。
+而**一次"加入秘境"要消耗 preflight + join 两个请求**，口令/名字试错再走一遍流程就继续叠加 ——
+两个人自用很容易打满；打满后**每一次**都 429，于是表现为"邀请码总是失败"（其实邀请码没问题）。
+
+**处理**
+1. `AUTH_MAX` 默认 30 → **60**（env `EINZ_RATELIMIT_AUTH` 可再调）。安全性没实质下降：join token 是
+   32B 随机不可猜，口令爆破由 escrow 自己的失败计数兜（10 次/15 分钟）；这个桶只防"无限造 DB 行/无脑刷"。
+2. TUI 认得 `RATE_LIMITED`：翻译成"操作太频繁，被服务端限流了（不是你的邀请码有问题）"并带出等待秒数；
+   提示自用服务器可直接**重启服务端清空计数**（计数在内存里）。
+3. 文档：把"限流"写进 ONBOARDING 的常见坑表，说明触发条件与自救方式。
+
+验证：cli analyze + 19 项测试、server tsc 全绿。
