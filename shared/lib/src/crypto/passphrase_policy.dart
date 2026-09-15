@@ -9,28 +9,27 @@
 /// 已有短口令的用户挡在门外——与 App 锁屏码的处理一致。
 library;
 
-/// 最短长度。10 位含字母与数字 ≈ 47 bit（随机串），比 8 位多约 9 bit；
-/// 真实收益主要是挡住"12345678""abcdefgh"这类最弱输入。
-const int kPassphraseMinLength = 10;
+/// 最短长度（**唯一硬要求**，老板 2026-09-15 定）：只卡长度，不卡字符种类。
+///
+/// 思路：复杂度规则可以无限加（大小写、符号、字典……），但每加一条都是对用户的
+/// 打扰，也挡不住"P@ssw0rd"这类应付。系统只守住最短长度这一条底线，**复杂度交给
+/// 用户自己决定**——愿意的话可以用 CLI `einz passphrase random` / TUI
+/// `/passphrase random` 生成 12 词恢复码当口令。
+const int kPassphraseMinLength = 8;
 
 /// 违规原因（稳定码；各端自行映射文案 / l10n key，不把文案写进策略层）。
 enum PassphrasePolicyViolation {
-  /// 长度不足 [kPassphraseMinLength]。
+  /// 长度不足 [kPassphraseMinLength]（当前唯一一条规则）。
   tooShort,
-
-  /// 未同时包含字母与数字。
-  needLetterAndDigit,
 }
 
 /// 校验密保口令：返回 null = 通过。
+///
+/// 只校验长度（[kPassphraseMinLength]）；不再要求字母+数字混合——见
+/// [kPassphraseMinLength] 的说明。
 PassphrasePolicyViolation? checkPassphrasePolicy(String passphrase) {
   if (passphrase.length < kPassphraseMinLength) {
     return PassphrasePolicyViolation.tooShort;
-  }
-  final hasLetter = RegExp('[A-Za-z]').hasMatch(passphrase);
-  final hasDigit = RegExp('[0-9]').hasMatch(passphrase);
-  if (!hasLetter || !hasDigit) {
-    return PassphrasePolicyViolation.needLetterAndDigit;
   }
   return null;
 }

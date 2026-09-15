@@ -437,20 +437,14 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseMinLengthHint.
   ///
   /// In en, this message translates to:
-  /// **'At least 10 characters'**
+  /// **'At least 8 characters'**
   String get wizardPassphraseMinLengthHint;
 
   /// No description provided for @wizardPassphraseTooShort.
   ///
   /// In en, this message translates to:
-  /// **'Passphrase must be at least 10 characters'**
+  /// **'Passphrase must be at least 8 characters'**
   String get wizardPassphraseTooShort;
-
-  /// No description provided for @wizardPassphraseWeak.
-  ///
-  /// In en, this message translates to:
-  /// **'Passphrase must contain both letters and digits'**
-  String get wizardPassphraseWeak;
 
   /// No description provided for @wizardPassphraseConfirmHint.
   ///
@@ -1010,6 +1004,12 @@ abstract class AppLocalizations {
   /// **'Confirm new passphrase'**
   String get chatPageChangePassphraseConfirmLabel;
 
+  /// No description provided for @chatPagePassphraseRevealTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show plain text (auto-hides after 3s)'**
+  String get chatPagePassphraseRevealTip;
+
   /// No description provided for @chatPageChangePassphraseMismatch.
   ///
   /// In en, this message translates to:
@@ -1022,35 +1022,11 @@ abstract class AppLocalizations {
   /// **'New passphrase is the same as the current one — nothing changed'**
   String get chatPageChangePassphraseSame;
 
-  /// No description provided for @chatPageChangePassphraseConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Change passphrase?'**
-  String get chatPageChangePassphraseConfirmTitle;
-
-  /// No description provided for @chatPageChangePassphraseConfirmMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Change the passphrase? The new one will be required to bind new devices.'**
-  String get chatPageChangePassphraseConfirmMessage;
-
   /// No description provided for @chatPageChangePassphraseOldWrong.
   ///
   /// In en, this message translates to:
   /// **'Wrong current passphrase'**
   String get chatPageChangePassphraseOldWrong;
-
-  /// No description provided for @chatPageChangePassphraseRebuildTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Rebuild the passphrase box?'**
-  String get chatPageChangePassphraseRebuildTitle;
-
-  /// No description provided for @chatPageChangePassphraseRebuildMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'No passphrase box was found on the server (data may have been lost). It will be rebuilt directly with the new passphrase — the current one is not required. Tell your partner the new passphrase afterwards.'**
-  String get chatPageChangePassphraseRebuildMessage;
 
   /// No description provided for @chatPageChangePassphraseDone.
   ///

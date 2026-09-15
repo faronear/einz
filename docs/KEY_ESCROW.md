@@ -59,7 +59,7 @@
 | 密文包格式 | `{format, salt, nonce, ciphertext}`（base64）                       | 同上 `PassphraseEnvelope`                                       |
 | 盐         | 每次托管随机生成（16B，`crypto_pwhash_SALTBYTES`），防彩虹表       | 同上 `generatePassphraseSalt()`                             |
 
-**口令强度要求（已强制，2026-09-14）：** ≥ **10 位**且**同时包含字母与数字**——规则唯一来源
+**口令要求（2026-09-15 起）：** ≥ **8 位**（**只卡长度，不卡字符种类**）——规则唯一来源
 `shared/lib/src/crypto/passphrase_policy.dart`，App（创建/改口令）、TUI（创建/`/passphrase`）、
 CLI（`escrow upload`）在**设置/修改**时校验并提示；**输入既有口令不校验**（避免把已有短口令的
 用户挡在门外）。更推荐"三个不相关的词 + 数字"这种词串（熵更高且好记）。

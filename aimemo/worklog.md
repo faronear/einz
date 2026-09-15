@@ -5451,3 +5451,35 @@ PIN 是短数字串，靠左小字既不明显也不好确认位数 → 参照�
    不弹二次确认"，重建路径用例去掉"重建密保箱？"断言。
 
 **验证：** `flutter analyze` 无 issue；menu + lock_page + ui_style 24 项全过。
+
+### 口令策略放宽为"只卡 ≥8 位" + 改口令框加眼睛 + 清理死文案键（老板 2026-09-15）
+
+**老板思路：** 复杂度要求可以无限加（大小写/符号/字典…），但每加一条都是打扰。系统只守
+**最短长度这一条底线**，复杂度交给用户（愿意的话可用 `einz passphrase random` /
+TUI `/passphrase random` 生成 12 词恢复码当口令）。
+
+**改动（策略唯一来源 `shared/lib/src/crypto/passphrase_policy.dart`）：**
+- `kPassphraseMinLength` 10 → **8**；删掉"必须同时含字母与数字"（枚举值
+  `PassphrasePolicyViolation.needLetterAndDigit` 一并删除），`checkPassphrasePolicy`
+  现在只判长度。
+- 三端消费点对齐：App 聊天页改口令、App 创建向导（仅 create，join 是验证不套策略）、
+  TUI `_passphrasePolicyError`、CLI `escrow upload`（设置）→ 都只剩"长度不足"一种提示。
+- **CLI `escrow download`（凭既有口令取包）原本也在跑策略校验**——与设计（输入既有口令
+  不校验）不符，会把老短口令用户挡在门外 → 去掉校验（老板要求"设置时和验证时对齐"）。
+- 文案：l10n `wizardPassphraseTooShort` 10 位 → 8 位、`wizardPassphraseMinLengthHint`
+  "至少 10 位" → "至少 8 位"；**删除不再使用的 `wizardPassphraseWeak`**。
+- 文档：`docs/KEY_ESCROW.md`、`docs/SECURITY.md`（表格 + 口令一节）改为"≥8 位、只卡长度、
+  不卡字符种类；设置/修改时校验，输入既有口令不校验"，并写上 random 12 词的用法。
+
+**改口令弹窗加眼睛**：新增 `_PassphraseField`（旧口令 / 新口令 / 确认新口令三个都用）：
+默认暗码，右侧眼睛点一下显示明文，**3 秒后自动回到暗码**（Timer，dispose 取消）。
+新增 l10n `chatPagePassphraseRevealTip`（查看明文（3 秒后自动变回暗码）/ Show plain text
+(auto-hides after 3s)）。
+
+**清掉的死文案键**：`chatPageChangePassphraseConfirmTitle/Message`、
+`chatPageChangePassphraseRebuildTitle/Message`（上一轮删掉二次确认弹窗后已无引用）。
+
+**测试同步：** shared 策略单测（新增"纯数字/纯字母/纯符号/中文 8 位都放行"）；
+App 改口令与向导用例改为 8 位口径、删除"缺字母数字"用例。
+**验证：** shared 29 项、cli 17 项、app（menu + wizard）26 项全过；
+`dart analyze` / `flutter analyze` 无 issue。

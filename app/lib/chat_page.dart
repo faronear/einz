@@ -4085,11 +4085,10 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.setupPageNeedPassphrase);
       return;
     }
-    final violation = checkPassphrasePolicy(newPass);
-    if (violation != null) {
-      setState(() => _error = violation == PassphrasePolicyViolation.tooShort
-          ? l10n.wizardPassphraseTooShort
-          : l10n.wizardPassphraseWeak);
+    // 口令策略（唯一来源 shared/passphrase_policy.dart）：只要求最短 8 位，
+    // 字符种类不限（老板 2026-09-15：复杂度交给用户自己决定）
+    if (checkPassphrasePolicy(newPass) != null) {
+      setState(() => _error = l10n.wizardPassphraseTooShort);
       return;
     }
     if (newPass != confirm) {
@@ -4175,32 +4174,24 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
+          // 三个口令框都可临时查看明文（点眼睛，3 秒后自动回暗码）
+          _PassphraseField(
             controller: _oldCtrl,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: l10n.chatPageChangePassphraseOldLabel,
-              border: const OutlineInputBorder(),
-            ),
+            labelText: l10n.chatPageChangePassphraseOldLabel,
+            revealTip: l10n.chatPagePassphraseRevealTip,
           ),
           const SizedBox(height: 8),
-          TextField(
+          _PassphraseField(
             controller: _newCtrl,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: l10n.chatPageChangePassphraseNewLabel,
-              hintText: l10n.wizardPassphraseMinLengthHint,
-              border: const OutlineInputBorder(),
-            ),
+            labelText: l10n.chatPageChangePassphraseNewLabel,
+            hintText: l10n.wizardPassphraseMinLengthHint,
+            revealTip: l10n.chatPagePassphraseRevealTip,
           ),
           const SizedBox(height: 8),
-          TextField(
+          _PassphraseField(
             controller: _confirmCtrl,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: l10n.chatPageChangePassphraseConfirmLabel,
-              border: const OutlineInputBorder(),
-            ),
+            labelText: l10n.chatPageChangePassphraseConfirmLabel,
+            revealTip: l10n.chatPagePassphraseRevealTip,
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -4800,3 +4791,62 @@ class _HourglassFlipState extends State<_HourglassFlip>
     );
   }
 }
+
+/// 口令输入框：默认暗码，右侧眼睛可临时查看明文，**3 秒后自动回到暗码**
+/// （老板 2026-09-15）——方便确认自己输对了，又不至于把口令长期暴露在屏幕上。
+class _PassphraseField extends StatefulWidget {
+  const _PassphraseField({
+    required this.controller,
+    required this.revealTip,
+    this.labelText,
+    this.hintText,
+  });
+
+  final TextEditingController controller;
+  final String? labelText;
+  final String? hintText;
+  final String revealTip;
+
+  @override
+  State<_PassphraseField> createState() => _PassphraseFieldState();
+}
+
+class _PassphraseFieldState extends State<_PassphraseField> {
+  bool _revealed = false;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _revealed = !_revealed);
+    _timer?.cancel();
+    if (_revealed) {
+      _timer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _revealed = false);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: widget.controller,
+      obscureText: !_revealed,
+      decoration: InputDecoration(
+        labelText: widget.labelText,
+        hintText: widget.hintText,
+        border: const OutlineInputBorder(),
+        suffixIcon: IconButton(
+          icon: Icon(_revealed ? Icons.visibility : Icons.visibility_off),
+          tooltip: widget.revealTip,
+          onPressed: _toggle,
+        ),
+      ),
+    );
+  }
+}
+

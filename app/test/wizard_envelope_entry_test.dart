@@ -183,34 +183,25 @@ void main() {
     expect(find.text('设置锁屏码'), findsOneWidget, reason: '一致应放行进 PIN 步骤');
   });
 
-  testWidgets('create 口令页：首框有强度提示；长度不足 / 缺字母数字 → 红字拦截', (WidgetTester tester) async {
+  testWidgets('create 口令页：首框有长度提示；不足 8 位 → 红字拦截（不卡字符种类）', (WidgetTester tester) async {
     await pumpToPassphrase(tester);
-    expect(find.text('至少 10 位'), findsOneWidget,
-        reason: '首个口令框应有强度提示语');
+    expect(find.text('至少 8 位'), findsOneWidget,
+        reason: '首个口令框应有长度提示语');
 
-    // 7 位（不足 10）：红字拦截，停留本页
+    // 7 位（不足 8）：红字拦截，停留本页
     await tester.enterText(find.byType(TextField).at(0), '1234567');
     await tester.enterText(find.byType(TextField).at(1), '1234567');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 10 位'), findsOneWidget, reason: '不足 10 位应红字提醒');
-    expect(find.text('设置密保口令'), findsOneWidget, reason: '不足 10 位应停留口令页');
+    expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
+    expect(find.text('设置密保口令'), findsOneWidget, reason: '不足 8 位应停留口令页');
 
-    // 长度够但只有数字（缺字母）：同样拦截（策略：字母 + 数字）
-    await tester.enterText(find.byType(TextField).at(0), '1234567890');
-    await tester.enterText(find.byType(TextField).at(1), '1234567890');
+    // 8 位纯数字：放行（老板 2026-09-15：只卡最短长度，字符种类由用户自定）
+    await tester.enterText(find.byType(TextField).at(0), '12345678');
+    await tester.enterText(find.byType(TextField).at(1), '12345678');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令需同时包含字母与数字'), findsOneWidget,
-        reason: '缺字母应红字提醒（防纯数字弱口令）');
-
-    // 满足策略（≥10 位且含字母数字）：放行
-    await tester.enterText(find.byType(TextField).at(0), 'einz-pass-2026');
-    await tester.enterText(find.byType(TextField).at(1), 'einz-pass-2026');
-    await tester.tap(find.text('下一步'));
-    await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 10 位'), findsNothing, reason: '满足策略后旧红字不应残留');
-    expect(find.text('口令需同时包含字母与数字'), findsNothing, reason: '满足策略后旧红字不应残留');
+    expect(find.text('口令不得少于 8 位'), findsNothing, reason: '够 8 位不该再报长度');
     expect(find.text('设置锁屏码'), findsOneWidget, reason: '满足策略应放行进 PIN 步骤');
   });
 }

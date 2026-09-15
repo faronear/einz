@@ -188,15 +188,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Encrypts & decrypts all messages. Remember it — never leak! Share only with your partner.';
 
   @override
-  String get wizardPassphraseMinLengthHint => 'At least 10 characters';
+  String get wizardPassphraseMinLengthHint => 'At least 8 characters';
 
   @override
   String get wizardPassphraseTooShort =>
-      'Passphrase must be at least 10 characters';
-
-  @override
-  String get wizardPassphraseWeak =>
-      'Passphrase must contain both letters and digits';
+      'Passphrase must be at least 8 characters';
 
   @override
   String get wizardPassphraseConfirmHint => 'Re-enter passphrase';
@@ -514,6 +510,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageChangePassphraseConfirmLabel => 'Confirm new passphrase';
 
   @override
+  String get chatPagePassphraseRevealTip =>
+      'Show plain text (auto-hides after 3s)';
+
+  @override
   String get chatPageChangePassphraseMismatch => 'New passphrases do not match';
 
   @override
@@ -521,22 +521,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'New passphrase is the same as the current one — nothing changed';
 
   @override
-  String get chatPageChangePassphraseConfirmTitle => 'Change passphrase?';
-
-  @override
-  String get chatPageChangePassphraseConfirmMessage =>
-      'Change the passphrase? The new one will be required to bind new devices.';
-
-  @override
   String get chatPageChangePassphraseOldWrong => 'Wrong current passphrase';
-
-  @override
-  String get chatPageChangePassphraseRebuildTitle =>
-      'Rebuild the passphrase box?';
-
-  @override
-  String get chatPageChangePassphraseRebuildMessage =>
-      'No passphrase box was found on the server (data may have been lost). It will be rebuilt directly with the new passphrase — the current one is not required. Tell your partner the new passphrase afterwards.';
 
   @override
   String get chatPageChangePassphraseDone =>

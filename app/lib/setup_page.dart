@@ -653,12 +653,10 @@ class _SetupPageState extends State<SetupPage> {
             : l10n.setupPageNeedPassphrase;
         invalid = true;
       } else if (_role == _WizardRole.create && pass.isNotEmpty) {
-        // 首台设备：口令强度（长度 + 字母数字混合），策略见 shared passphrase_policy.dart
-        final violation = checkPassphrasePolicy(pass);
-        if (violation != null) {
-          localError = violation == PassphrasePolicyViolation.tooShort
-              ? l10n.wizardPassphraseTooShort
-              : l10n.wizardPassphraseWeak;
+        // 首台设备：口令策略（只要求最短 8 位，见 shared passphrase_policy.dart）；
+        // 后续设备（join）是「验证既有口令」，不套策略（老短口令也要能进来）
+        if (checkPassphrasePolicy(pass) != null) {
+          localError = l10n.wizardPassphraseTooShort;
           invalid = true;
         }
       }

@@ -3180,13 +3180,11 @@ bool _sameStringMap(Map<String, String> a, Map<String, String> b) {
 }
 
 /// 密保口令策略校验（**设置/修改**时用；输入既有口令不校验，避免把旧短口令用户挡在门外）。
-/// 策略唯一来源：shared 的 passphrase_policy.dart。
+/// 策略唯一来源：shared 的 passphrase_policy.dart——现在只要求最短
+/// [kPassphraseMinLength] 位，字符种类不限（老板 2026-09-15）。
 String? _passphrasePolicyError(String passphrase) {
-  final violation = checkPassphrasePolicy(passphrase);
-  if (violation == null) return null;
-  return violation == PassphrasePolicyViolation.tooShort
-      ? '⚠️ 口令不得少于 $kPassphraseMinLength 位，请重新输入'
-      : '⚠️ 口令需同时包含字母与数字，请重新输入';
+  if (checkPassphrasePolicy(passphrase) == null) return null;
+  return '⚠️ 口令不得少于 $kPassphraseMinLength 位，请重新输入';
 }
 
 /// 系统提示消息的 message_id 计数器（保证唯一——此前用毫秒时间戳，同刻会产生

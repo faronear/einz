@@ -286,12 +286,9 @@ Future<void> _cmdEscrowUpload(ArgResults opts) async {
   }
   final server = _require(opts, 'server');
   final passphrase = _require(opts, 'passphrase');
-  // 口令强度策略（唯一来源 shared/passphrase_policy.dart）：设置时校验，输入既有口令不校验
-  final violation = checkPassphrasePolicy(passphrase);
-  if (violation != null) {
-    throw StateError(violation == PassphrasePolicyViolation.tooShort
-        ? '密保口令不得少于 $kPassphraseMinLength 位'
-        : '密保口令需同时包含字母与数字');
+  // 口令策略（唯一来源 shared/passphrase_policy.dart）：设置时校验，输入既有口令不校验
+  if (checkPassphrasePolicy(passphrase) != null) {
+    throw StateError('密保口令不得少于 $kPassphraseMinLength 位');
   }
   final api = ApiClient(server);
   final s = await sodium();
@@ -323,13 +320,8 @@ Future<void> _cmdEscrowDownload(ArgResults opts) async {
   final store = DeviceStore.load(path);
   final server = _require(opts, 'server');
   final passphrase = _require(opts, 'passphrase');
-  // 口令强度策略（唯一来源 shared/passphrase_policy.dart）：设置时校验，输入既有口令不校验
-  final violation = checkPassphrasePolicy(passphrase);
-  if (violation != null) {
-    throw StateError(violation == PassphrasePolicyViolation.tooShort
-        ? '密保口令不得少于 $kPassphraseMinLength 位'
-        : '密保口令需同时包含字母与数字');
-  }
+  // **不校验策略**：这里是「凭既有口令取包」，历史短口令也要能取出来（否则老用户被
+  // 挡在门外）——策略只在设置/修改时生效（老板 2026-09-15 对齐要求）
   final api = ApiClient(server);
   final s = await sodium();
 

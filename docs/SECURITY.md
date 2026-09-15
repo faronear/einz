@@ -46,7 +46,7 @@
 | 密钥安全存储 | `app/lib/data/secure_store.dart` | Keychain/Keystore；iOS/macOS 用 `first_unlock_this_device`（**不随备份/换机迁移**） |
 | 卸载即重置 | `app_lock.ensureFreshInstall()` + `main.dart` `StartupGate` | 安全存储条目活过卸载 → 全新安装时清残留（`DATABASE.md` §4.1） |
 | 口令托管（接入凭证） | `shared/lib/src/crypto/key_escrow.dart` | Argon2id + XChaCha20-Poly1305；**取包免设备认证**（见 §3.2） |
-| 口令强度策略 | `shared/lib/src/crypto/passphrase_policy.dart` | ≥10 位且含字母数字；设置/修改时三端统一校验（输入既有口令不校验） |
+| 口令策略 | `shared/lib/src/crypto/passphrase_policy.dart` | ≥8 位（只卡长度、不卡字符种类）；设置/修改时三端统一校验，输入既有口令（接入/取包）不校验 |
 | 取包失败限速 | `server/src/escrow.ts`（`ESCROW_RATE_LIMITED`） | 免认证取包端点按 space 计失败次数，超限 429（默认 10 次/15 分钟） |
 | 口令重设通知 | `server/src/escrow.ts` + WS `passphrase.rotated` | 改口令后其余设备收通知 / 离线补查 `updated_at` |
 | 客户端不缓存密保口令 | `app/lib/data/app_lock.dart`（`AppLockPayload` 无口令字段） | 2026-09-14 起锁包与明文 payload 均不含口令——本地秘密面只剩 Space Key + 设备私钥；代价见 §4.7、§6 |
@@ -209,7 +209,8 @@
 
 ## 5. 用户侧安保政策（非代码）
 
-1. **口令**：≥10 位且同时含字母与数字（更推荐"三个不相关的词 + 数字"这类词串）；**不复用**
+1. **口令**：≥8 位（系统只守最短长度这一条底线，复杂度由用户自定——可用
+   `einz passphrase random` / TUI `/passphrase random` 生成 12 词恢复码当口令）；**不复用**
    其它服务的口令；不存云盘/备忘录/聊天记录。**改口令后当面/线下告知伴侣**（见 §4.4）。
 2. **设备**：不 root、不越狱；开启系统锁屏与整机加密；给 App 设 PIN（跳过 PIN 会丢失一层防线）。
 3. **恢复码**：备份导出的 12 词恢复码**离线**保存（纸/离线介质），丢失即无法恢复归档。

@@ -552,24 +552,24 @@ void main() {
     await _openChangePassphraseDialog(tester, db,
         oldPassphrase: 'oldpass1', spaceKey: spaceKey);
 
-    // 7 位（不足 10）：点提交 → 红字拦截，不弹显性确认弹窗
+    // 7 位（不足 8）：点提交 → 红字拦截，不弹第二个确认弹窗
     await _enterDialogFields(tester, newPass: 'short7!');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 10 位'), findsOneWidget, reason: '不足 10 位应红字提醒');
-    expect(find.text('修改密保口令？'), findsNothing, reason: '校验未过不应进入显性确认');
+    expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
+    expect(find.text('修改密保口令？'), findsNothing, reason: '校验未过不应进确认');
 
-    // 长度够但只有数字：同样拦截（策略：字母 + 数字）
-    await _enterDialogFields(tester, newPass: '1234567890');
+    // 8 位纯数字：放行（老板 2026-09-15：只卡长度，不卡字符种类）
+    await _enterDialogFields(tester, newPass: '12345678');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
-    expect(find.text('口令需同时包含字母与数字'), findsOneWidget, reason: '缺字母应红字提醒');
+    expect(find.text('口令不得少于 8 位'), findsNothing, reason: '够 8 位就不该再报长度');
 
     // 满足策略：不再有第二个确认弹窗——点「修改」即执行（旧口令没填会在执行时报红字）
     await _enterDialogFields(tester, newPass: 'new-pass-2026');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 10 位'), findsNothing, reason: '满足策略后旧红字不应残留');
+    expect(find.text('口令不得少于 8 位'), findsNothing, reason: '满足策略后旧红字不应残留');
     expect(find.text('修改密保口令？'), findsNothing, reason: '不再弹第二个确认弹窗');
   });
 

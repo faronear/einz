@@ -12,20 +12,17 @@ void main() {
     expect(checkPassphrasePolicy('',), PassphrasePolicyViolation.tooShort);
   });
 
-  test('长度够但缺字母或数字 → needLetterAndDigit', () {
-    expect(
-      checkPassphrasePolicy('1234567890'),
-      PassphrasePolicyViolation.needLetterAndDigit,
-    );
-    expect(
-      checkPassphrasePolicy('abcdefghij'),
-      PassphrasePolicyViolation.needLetterAndDigit,
-    );
+  test('只要求长度：不卡字符种类（老板 2026-09-15）', () {
+    // 纯数字 / 纯字母 / 纯符号，只要够长就放行——复杂度交给用户自己决定
+    expect(checkPassphrasePolicy('12345678'), isNull);
+    expect(checkPassphrasePolicy('abcdefgh'), isNull);
+    expect(checkPassphrasePolicy('!!!!!!!!'), isNull);
+    expect(checkPassphrasePolicy('口令口令口令口令'), isNull); // 中文也按字数算
   });
 
-  test('满足策略（≥10 位且含字母数字）→ 通过', () {
+  test('满足策略（≥8 位）→ 通过', () {
     expect(checkPassphrasePolicy('einz-pass-2026'), isNull);
-    expect(checkPassphrasePolicy('correct horse 9'), isNull); // 词串 + 数字
-    expect(kPassphraseMinLength, 10);
+    expect(checkPassphrasePolicy('correct horse'), isNull); // 词串
+    expect(kPassphraseMinLength, 8);
   });
 }
