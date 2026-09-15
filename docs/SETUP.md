@@ -1,11 +1,17 @@
-# Einz — 一次性配置手册（docs/SETUP.md）
+# Einz — 一次性配置手册（docs/SETUP.md）· **已归档**
 
-> **状态：** Draft v0.1（Phase 0 产出）
-> **版本适用：** 本文描述 **v1 单空间（`v1-single-space`）** 的白名单/信封分发模型。
-> Multiverse（`v2-multiverse`）下改由 `POST /spaces` 创建空间 + 邀请码/口令加入，
-> 见 `PROTOCOL_MULTIVERSE.md` 与 `ONBOARDING.md`。
-> **适用场景：** 首次部署 Einz——两台设备 + 一台服务器，一次性建立信任关系。
-> **关联文档：** `docs/E2EE.md` §7（密钥分发）、§8（认证）；`docs/PROTOCOL.md`；`aimemo/productLens.zhcn.md` §5。
+> **状态：`[已归档]`（v1 单空间时代的设计稿，2026-09-15 停止维护）**
+>
+> 本文描述 v1 的"静态白名单 `config.json` + 密保信封离线分发 Space Key"模型。
+> 该模型已随 Multiverse 收敛**整体删除**：设备登记改为 `POST /spaces` / `POST /spaces/join`
+> 自助完成，Space Key 走口令密保箱（`/spaces/{id}/key-escrow`）分发，脚本 CLI
+> `cli/bin/einz.dart`（本文所有命令的载体）也已删除。
+>
+> **当前流程请看：** `docs/ONBOARDING.md`（AB 互通操作手册）、`docs/DEPLOYMENT.md` §2（快速试用）、
+> `docs/PROTOCOL_MULTIVERSE.md`（协议）、`docs/KEY_ESCROW.md`（口令托管）。
+>
+> 下面内容**仅作历史参考，不要照抄**（涉及的 config.json 白名单、`init`/`config`/`import`/
+> `enroll` 命令都不存在了）。
 
 ---
 

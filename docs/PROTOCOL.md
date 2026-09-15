@@ -29,18 +29,21 @@
 
 ```json
 // 请求
-{ "device_id": "dev-a1" }
+{ "device_id": "dev-a1", "space_id": "…" }
 
 // 响应 200
 {
   "challenge_id": "uuidv7",
-  "sealed_challenge": "base64(seal(challenge, 白名单公钥))",
+  "sealed_challenge": "base64(seal(challenge, 设备公钥))",
   "expires_in": 300
 }
 ```
 
-- challenge = 32 随机字节；Server 记录 `{challenge_id → challenge, device_id, 过期 5min, 一次性}`。
-- **仅白名单内设备可发起**（E2EE.md §7.3、§8）。
+- challenge = 32 随机字节；Server 记录 `{challenge_id → challenge, device_id, space_id, 过期 5min, 一次性}`。
+- **`space_id` 必填**（2026-09-15 v1 收敛后）：Multiverse 下所有数据按 space 隔离，会话必须绑定
+  一个 space；缺省 → `400 INVALID_REQUEST`。v1 时代允许不带（签出"无 space 会话"），
+  那类会话什么也访问不了，所以直接拒绝而不是让下游各自兜底。
+- **仅 devices 表内在册（且未撤销）的设备可发起**（E2EE.md §7.3、§8），否则 403。
 
 ### POST /auth/verify
 
@@ -59,14 +62,14 @@
 
 | 方法 | 路径 | 用途 | 鉴权 |
 | --- | --- | --- | --- |
-| POST | /auth/challenge | 获取密封 challenge | 白名单公钥 |
+| POST | /auth/challenge | 获取密封 challenge（`device_id` + `space_id`） | 设备公钥 |
 | POST | /auth/verify | 提交明文换取 session | challenge |
 | POST | /messages | 上传新消息密文 | Bearer |
 | GET | /sync?after=<seq>&limit=<n> | 增量拉取（§5） | Bearer |
 | POST | /attachments | 上传附件 blob（分片可选） | Bearer |
 | GET | /attachments/:id | 下载附件 blob | Bearer |
 | GET | /devices | 设备列表 | Bearer |
-| DELETE | /devices/:id | 撤销设备（移出白名单 + 清 Push Token/会话） | Bearer |
+| DELETE | /devices/:id | 撤销设备（标记 revoked + 清 Push Token/会话） | Bearer |
 | POST | /push/register | 注册 Push Token | Bearer |
 | DELETE | /push/register | 注销 Push Token | Bearer |
 | GET | /space | 空间信息（space_id、成员设备） | Bearer |
@@ -261,17 +264,25 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 ### 7.1 设备列表 GET /devices
 
+**范围：只返回本会话所属空间成员名下的设备**（2026-09-15 评审 C2）——devices 表本身是
+全局表，此前直出会跨空间泄漏 person、在线状态与公钥。**不返回 `public_key`**
+（2026-09-15 评审 C5：列表接口没有消费它的场景，challenge 由服务端用公钥密封）。
+
 ```json
 // 响应 200
 { "devices": [
-    { "device_id": "dev-a1", "person_id": "person-a", "status": "active", "last_seen": 1787900000000 }
+    { "device_id": "…", "person_id": "…", "status": "active", "last_seen": 1787900000000,
+      "device_name": "MacBook", "connected_at": 1787900000000 }
 ] }
 ```
 
+- `last_seen` 只由 WS 连接/心跳/断开维护（轮询端点不刷新它，否则调用方会让自己"永远新鲜"）；
+  `connected_at` = 当前 WS 连接的建立时刻（离线为 null）。
+
 ### 7.2 撤销设备 DELETE /devices/:id
 
-- 仅允许撤销"同 person 的另一台设备"（V1 一人一机时主要用于异常场景）。
-- Server 将设备移出白名单、清除其 Push Token 与活动会话，并关闭其 WS 连接；**不**通知 Space Key 轮换
+- 仅允许撤销"同 person 的另一台设备"（一人一机时主要用于异常场景）。
+- Server 把设备标记为 `revoked`、清除其 Push Token 与活动会话，并关闭其 WS 连接；**不**通知 Space Key 轮换
   （轮换方案 2026-09-14 决定不做，见 `SECURITY.md` §3）。
 
 ### 7.3 Push Token POST /push/register
@@ -302,7 +313,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 // 响应 200
 { "ok": true }
 
-// GET /key-escrow（拉取；白名单内任一设备可读）
+// GET /key-escrow（拉取；在册设备可读，按会话绑定的 space 取那一份）
 // 响应 200（未托管时为空对象）
 { "package": { "format": "backup-v1", "salt": "b64", "nonce": "b64", "ciphertext": "b64" } }
 
@@ -310,10 +321,15 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 { "ok": true }
 ```
 
-- 鉴权：Bearer session_token（challenge-response 后）；设备须在白名单（403）。
+- 鉴权：Bearer session_token（challenge-response 后）；设备须在 devices 表内且未撤销（403）。
+  包按**会话绑定的 space** 存取（`escrowSpaceId`）——Multiverse 下同一台服务器有多个空间，
+  各存各的一份（2026-09-12 修的 space_id 错位 bug，见 escrow.ts 注释）。
 - 包结构校验仅限字段类型（`format`/`salt`/`nonce`/`ciphertext` 均为非空 base64 字符串，400 拒绝坏字段）；**Server 永不解析包内容**。
 - 口令验证发生在客户端（解密失败 = 口令错，AEAD tag 校验），Server 无法限速 → 依赖 Argon2id 慢哈希 + 口令熵要求 + 客户端本地错误处理。
-- 客户端接入流程：生成身份 → 白名单登记 → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。客户端**不本地缓存密保口令**（服务器为唯一真相源，KEY_ESCROW.md §12）；无解锁自动重传。口令重设/密保箱重建走"修改口令"或 `cli escrow upload` 手动上传：**服务器已有箱**时须先验旧口令（解箱成功）才覆盖；**服务器无箱**时跳过旧口令校验、用新口令直接重建（设备已认证且持有 Space Key，不新增权限）。
+- 客户端接入流程（v2）：口令取钥（`POST /spaces/{id}/key-escrow`，免认证）→ 加入空间
+  → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。客户端**不本地缓存密保口令**
+  （服务器为唯一真相源，KEY_ESCROW.md §12）；无解锁自动重传。口令重设/密保箱重建走
+  App「修改口令」或 TUI `/passphrase`：**服务器已有箱**时须先验旧口令（解箱成功）才覆盖；**服务器无箱**时跳过旧口令校验、用新口令直接重建（设备已认证且持有 Space Key，不新增权限）。
 - **`/recover`（全丢恢复）已整体移除**（2026-09-13，Server 端点 + TUI 入口 + 客户端方法
   全部删除）。理由：① 它按 `space_id=''` 那一行读包，Multiverse 下本就永远读不到；
   ② 它的撤销逻辑是**全库范围**的（`UPDATE devices … WHERE status='active'`、
@@ -321,7 +337,8 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   服务器上**所有空间**的设备全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
   只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方设备全丢 =
   双方放弃该空间，重新建一个即可（v1 只有一个空间才不得不支持恢复）。
-  新设备接入仍走：邀请码 / 密保口令 / 密保信封（KEY_ESCROW.md §13）。
+  新设备接入仍走：**一次性 join token（邀请链接）/ 密保口令 / 密保信封**
+  （KEY_ESCROW.md §13；v1 的 20 位邀请码与 `/invites` 已随 2026-09-15 收敛删除）。
 
 ## 8. WebSocket（实时通道）
 

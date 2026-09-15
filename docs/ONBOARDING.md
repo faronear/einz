@@ -1,9 +1,12 @@
 # Einz 部署与 AB 互通操作手册（Onboarding）
 
-从零开始：VPS 部署（**无需任何配置文件**）→ 首个设备自举成为创建者 → 口令托管 → 邀请码 → 对方加入 → 双端互通对话。
+从零开始：VPS 部署（**无需任何配置文件**）→ A 创建空间 → 上传口令密保箱 → 生成邀请链接 →
+B 加入（口令取钥）→ 双端互通对话。
 
-> 适用：两人私密空间（person-a / person-b），服务器自建，客户端 TUI（Mac / Windows）。
-> 自主模式：**不需要 config.json**——server 首启自动生成 space_id，白名单完全靠动态登记（首个设备免邀请码自举为创建者，之后设备凭邀请码加入）。
+> 适用：两人私密空间，服务器自建，客户端 TUI（Mac / Windows）或 App。
+> **Multiverse（v2）**：一个 Server 可承载多个互不可见的空间；设备登记与白名单都在数据库里，
+> 没有静态配置文件。v1 时代的脚本 CLI（`cli/bin/einz.dart`）、20 位邀请码、密保信封分发
+> 已随 2026-09-15 收敛删除，本文流程全部按 v2。
 
 ---
 
@@ -17,8 +20,8 @@
 | Flutter SDK | 3.x stable          | 见下"Flutter 安装"       | app 端                                                       |
 
 - Homebrew 路径：**Intel Mac** 为 `/usr/local`，**Apple Silicon** 为 `/opt/homebrew`；`pkg-config --modversion libsodium` 可验证。
-- **Flutter 安装（中国网络镜像）**：Google storage 与 GitHub 不可达时使用镜像 `storage.flutter-io.cn`（如 `flutter_macos_arm64_3.47.2-stable.zip`，注意选对 arm64 / x64 包），解压到 `~/development/flutter` 并加 PATH；需 ≥9GB 磁盘空闲。
-- **Docker 容器化开发（`cli/dart-docker.sh`）注意**：仓库所在卷必须能被 Docker 枚举目录。macOS 上外部 APFS 卷（挂载标志 `noowners`，如 `/Volumes/xxx`）Docker 无法枚举目录（`dart run` 报 `PathAccessException: Operation not permitted`）——**把仓库放到 `~/` 下（如 `git clone ... ~/einz`）**，符号链接不能解决。
+- **Flutter 安装（中国网络镜像）**：Google storage 与 GitHub 不可达时使用镜像 `storage.flutter-io.cn`（注意选对 arm64 / x64 包），解压到 `~/development/flutter` 并加 PATH；需 ≥9GB 磁盘空闲。
+- **Docker 容器化开发（`cli/dart-docker.sh`）注意**：仓库所在卷必须能被 Docker 枚举目录。macOS 上外部 APFS 卷（挂载标志 `noowners`，如 `/Volumes/xxx`）Docker 无法枚举目录（`dart run` 报 `PathAccessException: Operation not permitted`）——**把仓库放到 `~/` 下**（如 `git clone ... ~/einz`），符号链接不能解决。
 
 **开发侧踩坑补充（改 server/shared 代码时勿回退）：**
 
@@ -26,20 +29,21 @@
 2. **sync 响应必须补 `v:1`**（PROTOCOL.md §5.2）：`v` 是协议常量未入库，漏了客户端解析崩溃。
 3. **npm 依赖**：`libsodium-wrappers` 的 ESM 入口在 Node ESM 下损坏（缺 libsodium.mjs），server 统一用 `createRequire` 强制加载 CJS 构建。
 4. **LIBSODIUM_PATH**：shared 加载 libsodium 优先环境变量 `LIBSODIUM_PATH`，其次 macOS Homebrew 路径；非标准路径安装（含 Windows DLL）必须显式设置（见 DEPLOYMENT.md）。
+5. **WS 凭证走握手头**（2026-09-15 评审 H4）：`Authorization: Bearer <session_token>`，**不再**是 `?token=`（URL 会进反代日志）。
 
 ---
 
 ## 术语速览
 
-| 概念                      | 说明                                                                                                                                                                        |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **space_id**              | 空间唯一标识（UUID）。**server 首启自动生成并持久化**（db meta 表），`/health` 可查看；登记响应会带回给客户端                                                               |
-| **Space Key**             | 32B 随机空间密钥（端到端加密用），创建者生成，对方凭口令从口令密保箱获取                                                                                                    |
-| **口令（passphrase）**    | 创建者 escrow upload 时设定，对方凭它解出 Space Key。**别和邀请码混淆**                                                                                                     |
-| **邀请码（invite_code）** | 一次性（默认 24h 有效），创建者生成、白名单外新设备登记用                                                                                                                   |
-| **person id**             | 后台规范 id（personA / personB，服务端分配）；自定义名称（如`lukas` / `Alice`）存名称表用于显示；"自己/对方"按规范 id 判断；一个空间最多两个 person（同 person 多设备允许） |
-| **自举（bootstrap）**     | 空间 0 台设备时，第一个登记的设备免邀请码自动成为**创建者**（拥有生成邀请码权限）                                                                                           |
-| **白名单**                | 数据库 devices 表（动态登记，运行时可写，**无需 config.json 种子**）；撤销（revoked）实时生效                                                                               |
+| 概念 | 说明 |
+| --- | --- |
+| **space_id / space_address** | 空间唯一标识（UUID）与对外地址（由空间公钥经 Keccak-256 + EIP-55 派生）。创建空间时由客户端生成 space_id 一并提交 |
+| **Space Key** | 32B 随机空间密钥（端到端加密用），创建者本地生成；加入方凭**口令**从口令密保箱取回 |
+| **口令（passphrase）** | 创建空间时设定，两人共用；对方凭它解出 Space Key。**别和邀请链接混淆** |
+| **邀请链接 / join token** | 一次性（默认 24h、用后作废），创建者 `/invite` 生成；B 拿它加入空间 |
+| **person / partner_slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。person_id 是空间内随机 UUID；同一身份可多台设备（"自己/对方"按 person_id 判断） |
+| **设备登记** | 由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭 join token）完成，**同时签发绑定该空间的会话**——没有独立的登记步骤 |
+| **设备在册状态** | `devices` 表（`active` / `revoked`）；未登记或已撤销设备一律拒绝（401/403），无需任何配置文件 |
 
 ---
 
@@ -57,8 +61,8 @@ python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"  
 # ↑ 把输出粘贴到 .env 的 EINZ_DB_BACKUP_KEY= 后面（只用于 npm run backup 归档加密）
 docker compose up -d --build server
 curl -s https://einz.tic.cc/health
-# {"status":"ok","space_id":"<自动生成的UUID>",...}   ← 首次启动自动生成 space_id，无需任何配置
-docker compose logs -f server   # 查看日志（启动/登记/邀请码等事件；Ctrl+C 停止跟踪）
+# {"status":"ok","protocol_version":"v2-multiverse","version":"1.0.0","capabilities":["spaces","join-tokens"],...}
+docker compose logs -f server   # 查看日志（启动/建空间/设备登记等事件；Ctrl+C 停止跟踪）
 
 # ② 本机（Mac）：拉最新代码
 cd /Users/Shared/productX/only && git pull
@@ -68,106 +72,69 @@ rm -f ~/.einz/*.json
 mkdir -p ~/.einz
 ```
 
-> 💡 server 处于"未初始化"状态（0 台设备）时，业务接口（auth/发消息）会拒绝——**首个设备自举后即自动激活**，全程无需重启、无需配置文件。
+> `/health` 只返回服务健康、协议版本与能力（不再有 space_id / 消息数 / 在线数——免鉴权端点
+> 不吐业务量，2026-09-15 评审 B1）。空间信息在认证后由 `/space` 返回。
+>
+> 可选：`server/einz_server_config.json` 的 `maxSpaces` 控制新空间数量上限（0=不限）。
+> 自用建议设 1~2，否则等于对公网开放建空间（服务端启动会打告警）。
 
 ---
 
-## 阶段 1：B 端（Windows）生成设备凭证
+## 阶段 1：A 创建空间（Mac）
 
-> 身份必须在 B 自己的机器上生成（私钥留本机）。**也可以跳过本阶段**——B 直接用 TUI 引导，登记时自动生成身份。
-
-```powershell
-cd 你的only目录\cli
-dart run bin/einz.dart init --store "$env:USERPROFILE\.einz\b.json" --device-id dev-b1
-# 用 TUI 引导时无需手动 init（见阶段 5）
-```
-
----
-
-## 阶段 2：A 端（Mac）创建空间（首设备自举）
-
-**方式一：TUI 全自动（推荐）**——直接启动，引导会完成：生成身份 → 自举登记（成为创建者）→ 生成 Space Key → 上传口令密保箱 → 生成邀请码：
+TUI 引导会一次完成：生成设备身份 → `POST /spaces` 建空间（登记设备 + 签发会话）→
+本地生成 Space Key → 用口令加密上传密保箱 → 打印邀请链接。
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/einz_tui.dart   # 不传 --store：自动发现/创建设备
+dart run bin/einz_tui.dart --server https://einz.tic.cc \
+  --store ~/.einz/a.json
 # 引导流程：
-# 引导流程（设备凭证自动生成，登记后由服务端分配 dev1 等规范 id）：
-#   我的名称（如 lukas）→ 设备名称（显示用，如 MacBook）
-#   ✅ 首设备自举成功（你是空间创建者，分配为 dev1 / personA）
-#   设置托管口令:（如 faronear，对方凭它接入）
-#   ✅ 口令密保箱已上传
-#   对方名称（如 Alice）→ ✅ 邀请码已生成（发给对方，绑定 personB）
-# 直接进入 TUI，状态栏 ● 在线
+#   选 c 创建秘境
+#   我的名字（如 lukas）+ 性别；伴侣名字（如 Alice，预置在 slot=1，等她加入时确认）
+#   设置密保口令（如 faronear，两分钟后对方凭它接入；≥8 位）
+#   ✅ 成功创建秘境！地址: 0x…（自动上传密保箱、签发会话、进入会话）
 ```
 
-**方式二：CLI 分步命令** —— ⚠️ **已作废**（2026-09-15：v1 脚本 CLI `cli/bin/einz.dart`
-已随 Multiverse 收敛删除，v1 的设备登记（enroll）与 20 位邀请码都不再存在）。
-请只用上面的 TUI 流程；等价的分步命令若仍需，见 `docs/DEPLOYMENT.md` §2 的说明。
-下面这段历史命令**不要照抄**（`init`/`enroll`/`escrow`/`invite` 均已删除）：
+进会话后执行 `/invite` 打印**邀请链接**（`https://einz.tic.cc/join/e1_…`，24 小时一次性），
+把链接离线发给 B（或让对方扫码）。
 
-```bash
-cd /Users/Shared/productX/only/cli
-dart run bin/einz.dart init --store ~/.einz/a.json --device-id dev-a1
-# ① 首设备自举登记（免邀请码，成为创建者；--person 是你的名称，如 lukas）
-dart run bin/einz.dart enroll --store ~/.einz/a.json \
-  --server https://einz.tic.cc --person lukas [--device-name MacBook]
-# ✅ 登记成功: device_id=dev1 person_id=personA space_id=<服务端的UUID>
-# ② 上传口令密保箱（store 无 Space Key 时自动生成）
-dart run bin/einz.dart auth --store ~/.einz/a.json --server https://einz.tic.cc
-dart run bin/einz.dart escrow --action upload \
-  --store ~/.einz/a.json --server https://einz.tic.cc --passphrase 'faronear'
-# ✅ 口令密保箱已上传
-```
+> 命令一览：`/help`；空间状态 `/space`；改口令 `/passphrase`；设备名 `/device <名>`；
+> 我的显示名 `/myname <名>`。
 
 ---
 
-## 阶段 3：A 生成邀请码（创建者客户端）
-
-```bash
-cd /Users/Shared/productX/only/cli
-dart run bin/einz.dart invite --store ~/.einz/a.json \
-  --server https://einz.tic.cc --person personB --name Alice [--hours 24]
-# ✅ 邀请码已生成（24h 有效，一次性）: XXXX-XXXXX-XXXXX-XXXXX
-# 把邀请码离线发给对方（绑定 personB=Alice；给自己加设备用 --person personA）
-```
-
-> TUI 方式创建空间时**已自动生成**邀请码（阶段 2 引导里打印），此命令用于之后随时补发。权限：任一 active 设备均可生成（第一/第二使用者都能邀请自己的其他设备）。
-
----
-
-## 阶段 4：A 进入 TUI（Mac，日常使用）
-
-```bash
-cd /Users/Shared/productX/only/cli
-dart run bin/einz_tui.dart   # 不传 --store：自动发现 ~/.einz/ 下的设备
-# 自动使用已有设备（a.json 或 [设备名].json），多台会列出选择
-# 启动探测 https://einz.tic.cc/health → 能连 → 直接进 TUI（不询问服务器）
-# 状态栏 ● 在线；输入消息回车发送
-```
-
----
-
-## 阶段 5：B 进入 TUI（Windows，加入空间）
+## 阶段 2：B 加入空间（Windows）
 
 ```powershell
 cd 你的only目录\cli
-dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz\ 下的设备
-# 引导流程（空间已有设备 → 走邀请码登记）：
-# 引导流程（空间已有设备 → 走邀请码登记；设备凭证自动生成）：
-#   身份名字（如 Alice）→ 设备名称（显示用，如 Windows）
-#   ⚠️ 自举失败（空间已有创建者）→ 输入邀请码: XXXX-XXXXX-XXXXX-XXXXX
-#   ✅ 邀请码登记成功（分配为 dev2 / personB）
-#   无 Space Key → 问"接入方式" → 回车=1 口令接入
-#   口令: faronear（⚠️ 输口令，不是邀请码；Windows 隐藏回显无星号，回车提交）
-#   ✅ 口令认证成功 → 认证成功 → 进入 TUI
+dart run bin/einz_tui.dart --server https://einz.tic.cc `
+  --store "$env:USERPROFILE\.einz\b.json"
+# 引导流程：
+#   选 j 加入秘境
+#   粘贴 A 给的邀请链接（或纯 token）
+#   ✅ 邀请码验证通过 → 选择身份（1=第一人 / 2=伴侣，一般选 2）
+#   输入 A 设置的密保口令（⚠️ 输口令，不是邀请链接；Windows 隐藏回显无星号）
+#   ✅ 口令验证通过，成功加入秘境（取回 Space Key + 登记设备 + 签发会话）
 ```
 
-> 同一人加第二台设备：TUI 引导时名称填**相同值**（如 Alice）、邀请码再生成一个即可（同 person 多设备不受两 person 上限影响）。
+> 同一人加第二台设备：同样选 `j` 加入，身份选**同一个人**（1 或 2 与已有设备一致）——
+> 同一 person 多设备不受"两人上限"限制（那限制只针对新增 person）。
 
 ---
 
-## 阶段 6：AB 互通验证
+## 阶段 3：日常使用（两端）
+
+```bash
+cd /Users/Shared/productX/only/cli
+dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ 下的设备后列出选择
+# 启动探测 /health → 能连 → 直接进 TUI（不询问服务器）；状态栏 ● 在线
+# 输入消息回车即发送（无需子命令）
+```
+
+---
+
+## 阶段 4：AB 互通验证
 
 | 验证项       | 操作                          | 期望                                                       |
 | ------------ | ----------------------------- | ---------------------------------------------------------- |
@@ -177,7 +144,7 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz
 | 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀（**同 person 多设备互显"我"**） |
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                |
 | 服务器重设   | `/server https://einz.tic.cc` | 重连并认证                                                 |
-| 邀请码       | 创建者`/invite` 之外          | 需补发时用 CLI`dart run bin/einz.dart invite ...`          |
+| 补发邀请     | 任一方 `/invite`              | 打印新的 24h 一次性邀请链接（给自己加设备也用它）          |
 
 ---
 
@@ -185,20 +152,26 @@ dart run bin/einz_tui.dart   # 不传 --store：自动发现 %USERPROFILE%\.einz
 
 | 症状                                    | 原因                         | 处理                                                                           |
 | --------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
-| server 日志报"缺少配置文件"             | 旧版本行为（已移除）         | `git pull` 后 server 不再读 config.json（自主模式），无需配置文件              |
-| 首设备自举失败/被要求邀请码             | 空间已有设备（你不是第一个） | 这是正常加入者路径：输入创建者给的邀请码即可                                   |
-| 口令接入`FormatException: 备份解密失败` | **口令输成了邀请码**         | 口令是创建者 escrow upload 时设的（如 faronear），不是邀请码                   |
-| 只有`/health` 可用、业务全拒            | 空间 0 台设备（未自举）      | 让第一个设备走一次引导（自举）即激活，无需重启                                 |
-| 生成邀请码报 403                        | 非创建者调用`invite`         | 邀请码只能由**首设备自举的 person** 生成（TUI 引导自动完成或 CLI invite 命令） |
-| 启动 255 崩溃                           | 旧代码渲染/终端问题          | 已全部修复（git pull 后重试）                                                  |
-| `/health` 正常但 auth 握手失败          | 本机翻墙/网络抖动            | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试                              |
+| 口令接入报解密失败 / `FormatException`  | **把邀请链接当成口令输了**   | 口令是创建空间时设的那串（如 faronear）；邀请链接是 `/invite` 打印的 24h 一次性凭证 |
+| 加入时报 `TOKEN_EXPIRED` / `TOKEN_USED` | 邀请链接过期或已被用过       | 让创建者重新 `/invite` 生成一个                                               |
+| `/auth` 报"设备尚未绑定秘境"            | 新 store 还没加入/创建空间   | 先 `/space create` 或 `/space join <链接>`                                     |
+| 加入时报 `FORBIDDEN not a member`       | 会话的空间与目标空间不一致   | 该设备已属于另一个空间（一设备一空间）：换 store 或用新设备                    |
+| 启动 255 崩溃                           | 旧代码渲染/终端问题          | 已修复（`git pull` 后重试）                                                    |
+| `/health` 正常但认证握手失败            | 本机翻墙/网络抖动            | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试                              |
+| 发消息一直"发送中"                      | WS 未连上 / 会话失效         | `/auth` 重新激活；看服务端日志 `[req] WS /ws connect`                          |
 
 ---
 
 ## 说明
 
-- **无 config.json**：space_id 由 server 首启自动生成（db meta 表持久化）；白名单 = devices 表（动态登记）
-- **信任模型**：空间 0 台设备时，**第一个登记的设备成为创建者**（先到先得）——私有部署场景适用；创建者拥有生成邀请码的唯一权限
-- **两 person 上限**：空间内 distinct person ≤2（同 person 多设备允许）；新 person 登记/发邀请码时由 server 强制检查
-- 撤销设备：`DELETE /devices/:id`（需认证）；被撤销设备重启不复活，且触发密钥轮换
-- 服务端监控：`GET /health`（免鉴权）、`docker compose logs -f server`（启动/登记/邀请码事件）
+- **无配置文件**：设备与空间全在库里（`spaces` / `space_members` / `devices`）；`config.json`
+  这类静态白名单与 v1 脚本 CLI 已随 2026-09-15 收敛删除。
+- **信任模型**：`POST /spaces` 免认证（创建者此刻还没有凭证）——所以 `maxSpaces` 是开放注册的
+  总闸；私有部署建议设成 1~2。空间一旦建立，只有持口令 + 有效 join token 的人能进来。
+- **会话必带空间**：认证时 `space_id` 必填；无 space 的会话不存在（也访问不到任何数据）。
+- **两人上限**：一个空间内 distinct person ≤2（同 person 多设备不限）；由 `space_members`
+  的两个槽位在数据库层强制。
+- **撤销设备**：`DELETE /devices/:id`（需认证）→ 标记 `revoked` + 清会话/Push Token + 关 WS；
+  被撤销设备重启不复活（**不**做密钥轮换，见 `SECURITY.md` §3；止损走重建空间）。
+- **服务端监控**：`GET /health`（免鉴权）、`docker compose logs -f server`（含
+  `[req]` 请求日志与 WS 连接数）、`server/data/einz.sqlite.db` 的审计表（上下线/发送/接收）。

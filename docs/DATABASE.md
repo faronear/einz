@@ -10,7 +10,10 @@
 
 - 双端都用 SQLite：Server 用 `better-sqlite3`，客户端用 `drift`（Flutter/CLI 共用 `shared/` 中的 schema 定义）。
 - **所有用户内容一律密文存储**：`ciphertext` / blob 字段，绝不出现明文。
-- Server 端**无 `spaces` / `space_members` 表**：固定两人一空间由 `config.json` 表达（productLens §8.3）。
+- **多空间（Multiverse）**：Server 端有 `spaces` / `space_members` / `join_tokens` 表——一个
+  Server 可承载多个互不可见的双人空间，成员与身份锚点都在库里（`config.json` 只留
+  `maxSpaces` 这类运维开关）。所有按 space 隔离的读写都必须带 space 过滤（见 `guard.ts`）。
+- **会话必须绑定 space**（2026-09-15 v1 收敛后）：不再存在"无 space 会话"这种形态。
 - 时间一律 Unix 毫秒（UTC）整数。
 - ID 一律 UUIDv7（TEXT），不使用自增主键作为业务 ID。
 - 迁移：版本化 migration 列表，只增不改（见 §5）。
@@ -20,41 +23,91 @@
 ## 2. Server SQLite（einz.sqlite.db）
 
 ```sql
--- 白名单设备（由 config.json 初始化，运行期可撤销）
+-- 设备（v2：由 POST /spaces / POST /spaces/join 登记；表本身是全局表，
+-- 归属空间靠 devices.person_id → space_members 推导）
 CREATE TABLE devices (
-    device_id   TEXT PRIMARY KEY,          -- UUIDv7
-    person_id   TEXT NOT NULL,             -- "person-a" | "person-b"
+    device_id   TEXT PRIMARY KEY,          -- UUIDv7（服务端生成）
+    person_id   TEXT NOT NULL,             -- 空间内身份 UUID（v2；见 space_members.person_id）
     public_key  TEXT NOT NULL,             -- base64(X25519 公钥)
     status      TEXT NOT NULL DEFAULT 'active',  -- active | revoked
-    last_seen   INTEGER,
+    device_name TEXT,                      -- 设备显示名（TUI/App 可改）
+    last_seen   INTEGER,                   -- 只由 WS 连接/心跳/断开维护
     created_at  INTEGER NOT NULL
+);
+
+-- 空间（Multiverse；space_address 由 space_public_key 经 Keccak-256 + EIP-55 派生）
+CREATE TABLE spaces (
+    space_id         TEXT PRIMARY KEY,
+    space_address    TEXT NOT NULL UNIQUE,
+    space_public_key TEXT NOT NULL UNIQUE,
+    display_name     TEXT,
+    status           TEXT NOT NULL DEFAULT 'waiting',  -- waiting | active | archived
+    created_at       INTEGER NOT NULL,
+    updated_at       INTEGER NOT NULL
+);
+
+-- 空间成员（两个身份槽位：0=创建者/第一人，1=伴侣/第二人。
+-- person_id 是身份锚点，同一身份多设备共享；伴侣预置行 person_id 为 NULL 直到加入）
+-- 名称的唯一数据源就是这里的 display_name（v1 的 meta person_name:* 已删除）
+CREATE TABLE space_members (
+    space_id     TEXT NOT NULL REFERENCES spaces(space_id),
+    person_id    TEXT,
+    partner_slot INTEGER NOT NULL,
+    display_name TEXT,
+    gender       TEXT,                     -- male | female
+    status       TEXT NOT NULL DEFAULT 'active',  -- active | pending
+    joined_at    INTEGER,
+    PRIMARY KEY (space_id, person_id),
+    UNIQUE (space_id, partner_slot)
+);
+
+-- 一次性加入凭证（邀请链接里的 token；**只存 SHA-256 hash**，24h 过期、用后作废）
+CREATE TABLE join_tokens (
+    space_id          TEXT NOT NULL REFERENCES spaces(space_id),
+    token_hash        TEXT PRIMARY KEY,
+    created_by_device TEXT NOT NULL,
+    expires_at        INTEGER NOT NULL,
+    used_at           INTEGER,
+    created_at        INTEGER NOT NULL
+);
+CREATE INDEX idx_join_tokens_space ON join_tokens (space_id, used_at);
+
+-- 口令托管包（Server 只存密文，不解析；按 space 一份，UPSERT 最新者胜）
+CREATE TABLE key_escrow (
+    space_id        TEXT PRIMARY KEY,
+    package         TEXT NOT NULL,         -- JSON：{format,salt,nonce,ciphertext}
+    passphrase_hash TEXT,                  -- argon2id（crypt_pwhash_str，自含盐）
+    updated_at      INTEGER NOT NULL
 );
 
 -- 消息（只存密文信封，见 E2EE.md §5）
 CREATE TABLE messages (
     message_id       TEXT PRIMARY KEY,     -- UUIDv7（客户端生成，幂等键）
-    space_id         TEXT NOT NULL,        -- 全系统唯一常量（config.json）
+    space_id         TEXT NOT NULL,
     sender_device_id TEXT NOT NULL,
-    type             TEXT NOT NULL,        -- text|image|video|voice|system
+    sender_person_id TEXT,
+    type             TEXT NOT NULL,        -- text|image|video|voice|audio|file|system
     key_version      INTEGER NOT NULL,
     nonce            TEXT NOT NULL,        -- base64(24B)
     ciphertext       TEXT NOT NULL,        -- base64
-    server_sequence  INTEGER NOT NULL UNIQUE,  -- per-space 单调递增，分配后不可变
-    created_at       INTEGER NOT NULL
+    server_sequence  INTEGER NOT NULL,     -- 按 Space 独立递增；UNIQUE(space_id, server_sequence)
+    created_at       INTEGER NOT NULL,
+    UNIQUE (space_id, server_sequence)     -- Multiverse：序号按 Space 独立（不是全局）
 );
 
 CREATE INDEX idx_messages_seq ON messages (space_id, server_sequence);
 
--- 附件元数据（blob 落盘于 /data/files/）
+-- 附件元数据（blob 落盘于 /data/files/<前两位>/<attachment_id>）
+-- 注：message_id **没有**外键约束——两阶段上传（先传 blob 后发消息，PROTOCOL.md §6.1）
 CREATE TABLE attachments (
     attachment_id TEXT PRIMARY KEY,        -- UUIDv7
-    message_id    TEXT NOT NULL REFERENCES messages(message_id),
+    message_id    TEXT NOT NULL,
     space_id      TEXT NOT NULL,
     key_version   INTEGER NOT NULL,
     size          INTEGER NOT NULL,        -- 密文大小
     sha256        TEXT NOT NULL,           -- 密文哈希（base64）
     nonce         TEXT NOT NULL,           -- base64(24B)
-    storage_path  TEXT NOT NULL,           -- files/xx/yy
+    storage_path  TEXT NOT NULL,           -- <前两位>/<attachment_id>
     created_at    INTEGER NOT NULL
 );
 
@@ -69,19 +122,22 @@ CREATE TABLE push_tokens (
 );
 
 -- 一次性挑战（防重放，5 分钟过期，清理任务定期删除）
+-- space_id 必填（v1 收敛后）：签出的会话绑定该空间
 CREATE TABLE challenges (
     challenge_id TEXT PRIMARY KEY,
     device_id    TEXT NOT NULL,
+    space_id     TEXT,
     challenge    TEXT NOT NULL,            -- 32B 随机（base64）
     expires_at   INTEGER NOT NULL,
     used         INTEGER NOT NULL DEFAULT 0
 );
 
--- 会话令牌
+-- 会话令牌（**只存 sha256(token)**，明文只回给客户端；2026-09-15 评审 H4）
+-- 同一设备同一 space 同时只有一个会话（重新认证即清旧行）
 CREATE TABLE sessions (
-    session_token TEXT PRIMARY KEY,
+    session_token TEXT PRIMARY KEY,        -- sha256 十六进制
     device_id     TEXT NOT NULL,
-    space_id      TEXT,                    -- Multiverse：会话绑定空间（v1 legacy 为 NULL）
+    space_id      TEXT,                    -- 会话绑定的空间（新会话必填）
     expires_at    INTEGER NOT NULL,
     created_at    INTEGER NOT NULL
 );
@@ -94,6 +150,13 @@ CREATE TABLE receipts (
     read_upto_seq      INTEGER NOT NULL DEFAULT 0,
     updated_at         INTEGER NOT NULL,
     PRIMARY KEY (space_id, person_id)
+);
+
+-- 键值（目前只用于 schema_version 标记；v1 的 person_name:* / person_gender:*/
+-- creator_person_id 已随 v1 收敛删除，启动迁移会清掉存量行）
+CREATE TABLE meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 ```
 
@@ -141,7 +204,6 @@ CREATE TABLE device_activity (
 | `receipt`         | `POST /receipts`          | `reported_delivered`、`reported_read`、`delivered_upto_seq`、`read_upto_seq` |
 | `push.register`   | `POST /push/register`     | `platform`、`token_prefix`（**只落前 8 位**，不落完整推送凭证）              |
 | `push.unregister` | `DELETE /push/register`   | —                                                                            |
-| `device.enroll`   | `POST /devices/enroll`    | `person_id`                                                                  |
 | `device.rename`   | `POST /devices/name`      | `device_name`                                                                |
 | `person.rename`   | `POST /devices/person-name` | `person_name`                                                              |
 | `device.revoke`   | `DELETE /devices/:id`     | `target_device_id`                                                           |

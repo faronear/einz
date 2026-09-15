@@ -82,21 +82,16 @@ curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 
 ## 3. 客户端实测（以口令托管为例，本机 macOS/Linux）
 
-> ⚠️ **命令已作废（2026-09-15）**：`cli/bin/einz.dart` 已随 v1 收敛删除。
-> 现在的等价操作：TUI 里 `/passphrase`（设置/修改口令，含密保箱重建），或 App 聊天页 ⋯ → 修改口令。
+> 注（2026-09-15）：旧命令 `cli/bin/einz.dart escrow --action upload/download` 已随 v1 收敛删除，
+> 现在用 TUI 的 `/passphrase`（或 App 聊天页 ⋯ → 修改口令）做等价操作。
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
-  --server https://einz.tic.cc --passphrase "你的接入口令"
-# 期望：✅ 口令密保箱已上传
-
-dart run bin/einz.dart escrow --action download --store /tmp/b.json \
-  --server https://einz.tic.cc --passphrase "你的接入口令"
-# 期望：✅ 口令密保箱已解出 Space Key
+dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
+# 会话里执行 /passphrase → 设置或修改密保口令（含密保箱重建）
+# 期望：✅ 口令密保箱已上传 / 已更新
 ```
-
-> `/tmp/a.json`/`/tmp/b.json` 为设备 store 文件路径（本机 /tmp/ 或按需生成：`init` 后 `config`/`import`）。
+> `/tmp/a.json` 为设备 store 文件路径（本机 /tmp/ 或按需指定；由 TUI 引导生成）。
 
 ---
 
@@ -116,7 +111,7 @@ cd deployment && docker compose up -d --build server
 | 项                | 说明                                                                                                                                                                                           |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 存量数据          | 不受影响（messages/devices/会话等不动，新表初始为空）                                                                                                                                          |
-| 白名单            | 无需改动（既有设备认证不受影响）                                                                                                                                                               |
+| 设备在册状态      | 无需改动（既有设备与会话不受影响）                                                                                                                                                               |
 | Caddy / HTTPS     | 无需改动（Caddyfile 已 assume-unchanged）                                                                                                                                                      |
 | 备份密钥          | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose             |
 | 旧部署升级        | 若 .env 里还是旧变量名 `EINZ_BACKUP_KEY`（2026-08 前部署）：手动改名为 `EINZ_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |

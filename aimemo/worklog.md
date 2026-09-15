@@ -5880,3 +5880,23 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
 `SETUP.md`、`DEPLOYMENT.md` §2.2/§5.2、`ONBOARDING.md` 方式二、`updateServer.md` §3
 ——现在这些段落都带着"已作废"提示，需要真正重写成 v2 流程或归档。
 `SECURITY.md` §2 控制表可再补"会话必带 space"一条。
+
+## 2026-09-15 P3：文档收敛到 v2（已完成）
+
+D3 收敛第三期。判据：**文档里不能再出现"照抄就报错"的指令**（已删端点/已删命令/已不存在的
+配置文件），历史决策保留但必须标明是历史。逐份处理：
+
+| 文档 | 处理 |
+| --- | --- |
+| `PROTOCOL.md` | `/auth/challenge` 补 `space_id` 必填（**API 契约变更**）；`sealed_challenge` 的"白名单公钥"→ 设备公钥；`/devices` 补"只返回本空间设备 + 不返回 public_key"；`/key-escrow` 补"按会话 space 存取"；恢复流程改指 join token（20 位邀请码已删） |
+| `DATABASE.md` | §2 schema **整段重写**：补 `spaces` / `space_members` / `join_tokens` / `key_escrow` / `meta`，删 `invites`；`messages` 改 `UNIQUE(space_id, server_sequence)`；`sessions` 注明只存 sha256、同设备同 space 只一个会话；`attachments` 注明无外键（两阶段上传）；审计表删 `device.enroll` 行；总则改掉"无 spaces 表、config.json 表达" |
+| `E2EE.md` | 19 处"静态白名单 config.json"→ 设备在册状态（devices 表）/ join token 登记；顶部补 v2 说明 |
+| `DEPLOYMENT.md` | **§2 快速试用整章重写**（TUI 两条命令 + 命令总览表，替换 v1 CLI 全流程）；§1 形态说明、§3.1/3.2/3.3/3.4、§4 接入闭环、§5.2 备份恢复、§5.3 撤销、§6 控制表、§7 排错、§9.4 全部去 v1；顺带修掉一行被打断的 ANSI 转义残留 |
+| `ONBOARDING.md` | **整篇重写**为 v2 操作手册（术语表、阶段 0 VPS、阶段 1 A 创建、阶段 2 B 加入、阶段 3 日常、阶段 4 互通验证、坑表、说明）；保留环境准备与开发踩坑、补"WS 凭证走握手头" |
+| `SETUP.md` | **归档**：顶部加"已归档（v1 设计稿）"横幅 + 指向当前文档，正文保留作历史 |
+| `KEY_ESCROW.md` | 6 处权限/流程措辞改 v2；顶部版本说明改为"机制与空间模型无关，文中白名单 = devices 在册状态" |
+| `SECURITY.md` | 控制表补**"会话必带 space"**一行；`isActiveDevice`/`revokeDevice`/取密文等 9 处措辞改 v2 |
+| `IOS.md` / `updateServer.md` / `README.md` | 邀请码 → 邀请链接；updateServer §3 的命令块换成 TUI `/passphrase`（原块是已删命令）；README 架构行去掉"静态白名单" |
+
+**验证**：全仓 `grep "dart run bin/einz.dart|/devices/enroll"` 在 docs + README **零命中**；
+`server tsc` 干净（文档改动未触碰代码）。

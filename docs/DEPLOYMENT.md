@@ -11,15 +11,18 @@
 ```text
 ┌─────────────┐   REST / WS   ┌──────────────┐   REST / WS   ┌─────────────┐
 │  设备 A      │◄────────────►│  Server       │◄────────────►│  设备 B      │
-│  (CLI/App)  │  只见密文     │  静态白名单   │  只见密文     │  (CLI/App)  │
+│  (TUI/App)  │  只见密文     │  在册设备表   │  只见密文     │  (TUI/App)  │
 └─────────────┘   E2EE        │  哑转发器     │   E2EE        └─────────────┘
                               └──────────────┘
 ```
 
-- **固定两人一空间**：一个 `space_id` 对应两台设备（A/B），无动态配对。
+- **一个空间 = 两个人**（`space_members` 两个身份槽位），同一身份可多台设备；一个 Server
+  可承载**多个互不可见的空间**（Multiverse，2026-09-12 起）。
 - **E2EE 全链路**：Server 只见密文（消息、附件均为密文 + 元数据）。
-- **静态白名单**：`config.json` 声明可信设备；不在其中的设备一律拒绝（403）。
-- **撤销语义**：撤销 = 白名单移除 + 清会话/Push Token + WS 断开；**不**轮换 Space Key（见 `docs/SECURITY.md` §3）。
+- **设备白名单在数据库里**（`devices` 表）：设备由 `POST /spaces` / `POST /spaces/join`
+  自助登记，无需服务器配置文件；未登记/已撤销设备一律拒绝（401/403）。
+- **撤销语义**：撤销 = 标记 `revoked` + 清会话/Push Token + WS 断开；**不**轮换 Space Key
+  （见 `docs/SECURITY.md` §3）。
 
 **仓库角色速览：**
 
@@ -35,121 +38,76 @@
 
 ## 2. 快速试用（本机 5 分钟，无 Docker）
 
-> 前置：Node ≥ 20、Dart ≥ 3.12；libsodium（Windows 需设 `LIBSODIUM_PATH` 指向 `libsodium.dll`，见下文）。
+> 前置：Node ≥ 20、Dart ≥ 3.12；libsodium（Windows 需设 `LIBSODIUM_PATH`，见 §7）。
+> **不需要任何服务器配置文件**：设备登记与白名单都在数据库里，由客户端自助完成
+> （Multiverse）。v1 时代的静态白名单 `server/config/config.json` 与脚本 CLI
+> `cli/bin/einz.dart` 已随 2026-09-15 收敛删除。
 
-### 2.1 准备两个终端
-
-**终端 A（服务器）：**
+### 2.1 启动服务器
 
 ```bash
 cd server
 npm install
 npm run build            # tsc 编译到 dist/
-cp config/config.json.example config/config.json   # 占位配置，稍后用 CLI 生成真实白名单
+node dist/app.js         # 默认 :3000；PORT=3000 可指定；数据落在 server/data/
 ```
 
-**终端 B（配置 + 设备，用 CLI）：**
+看到 `[einz] server listening on :3000` 即就绪。`GET /health` 返回
+`{ "status": "ok", "protocol_version": "v2-multiverse", "capabilities": [...] }`。
+
+### 2.2 两台设备接入（TUI）
+
+**终端 A —— 第一台设备（创建秘境）：**
 
 ```bash
-cd cli
-dart pub get
+cd cli && dart pub get
+dart run bin/einz_tui.dart --store /tmp/a.json --server http://localhost:3000
 ```
 
-> macOS/Linux 提示：若 CLI 报 libsodium 加载失败，先设置
-> `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"`（Homebrew 安装一般自动探测，无需设置）。
+按引导走：选 `c` 创建秘境 → 输入我的名字/性别、伴侣名字/性别 → 设置密保口令 →
+客户端生成 Space Key、上传口令密保箱、签发会话，直接进入会话（状态栏 ● 在线）。
+在会话里执行 `/invite` 会打印**邀请链接**（`https://<host>/join/<token>`，24 小时一次性）。
 
-### 2.2 生成两台设备凭证 + 一次性配置（白名单 + Space Key 分发）
-
-> ⚠️ **本节已作废（2026-09-15）**：v1 脚本 CLI `cli/bin/einz.dart` 已随 Multiverse 收敛删除
-> （v1 的设备登记 enroll、20 位邀请码、信封导入 config/import 全部不存在）。
-> 现在两台设备接入的路径是：**TUI 引导**（`tui1-dev` / `tui2-dev`，见 `package.json` 脚本）
-> 或 **App 向导**（创建秘境 / 加入秘境）；命令级流程见 `docs/ONBOARDING.md`。
-> 下面这段命令**仅作历史参考，不要照抄**。
-
-CLI 命令（在 `cli/` 目录，下面 `$W` 是临时工作目录，如 `/tmp/einz-trial`）：
+**终端 B —— 第二台设备（加入秘境）：**
 
 ```bash
-W=/tmp/einz-trial && mkdir -p $W
-
-# 1) 设备 A/B 各自生成 X25519 身份密钥（私钥只留在本机 store）
-dart run bin/einz.dart init --store "$W/a.json" --device-id dev-a1
-dart run bin/einz.dart init --store "$W/b.json" --device-id dev-b1
-
-# 2) 取 B 的公钥，A 侧生成 Space Key 并输出：
-#    - config.json（服务器白名单 + space_id）
-#    - envelope-b.txt（密保信封：密封给 B 的 Space Key 副本）
-PUB_B="$(dart run bin/einz.dart pubkey --store "$W/b.json")"
-dart run bin/einz.dart config \
-  --store "$W/a.json" --peer-pubkey "$PUB_B" \
-  --space-id "space-demo" \
-  --out-config "$W/config.json" --out-envelope-peer "$W/envelope-b.txt"
-
-# 3) B 导入密保信封，解出 Space Key
-dart run bin/einz.dart import \
-  --store "$W/b.json" --envelope-file "$W/envelope-b.txt" --space-id "space-demo"
+dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 ```
 
-产物（**config.json 禁止提交 Git**，私钥/恢复码离线保管）：
+选 `j` 加入 → 粘贴 A 给的邀请链接（或纯 token）→ 选择自己是哪一个身份（1/2）→
+输入 A 设置的密保口令（用它从口令密保箱取回 Space Key，同时完成设备登记 + 签发会话）→
+进入会话。
 
-| 产物                      | 内容                                  | 去向                              |
-| ------------------------- | ------------------------------------- | --------------------------------- |
-| `$W/config.json`          | space_id + A/B 白名单                 | 服务器`server/config/config.json` |
-| `$W/envelope-b.txt`       | 密保信封（密封 Space Key，仅 B 可解） | 导入 B 后删除                     |
-| `$W/a.json` / `$W/b.json` | 设备 store（身份密钥 + Space Key）    | 本机保存                          |
+> `server/einz_server_config.json`（不入 git，可选）里 `maxSpaces` 控制**新空间数量上限**：
+> `0`=不限、`1`=退回单空间、`n`=最多 n 个；改后重启生效。当前为 `0` 时服务端启动会打一条
+> "等于对公网开放建空间"的告警——自用建议设成 1~2。
 
-### 2.3 启动服务器并双端收发
+### 2.3 双端收发
 
-```bash
-# 终端 A：把生成的 config.json 拷到 server/config/ 后启动
-cp "$W/config.json" server/config/config.json
-cd server && node dist/app.js          # 默认 :3000；可用 PORT=3000 指定
-```
+TUI 里**直接输入文字回车即发送**（无需子命令）；对方在线时经 WS 实时到达，离线时下次
+`/sync` 或下次启动自动补齐。图片/视频/语音/文件用输入栏的「+」面板或 `/attach <file>`；
+点消息里的附件编号用 `/open <序号>` 打开。
 
-```bash
-# 终端 B：双端认证 + 发消息 + 同步
-dart run bin/einz.dart auth  --store "$W/a.json" --server http://127.0.0.1:3000
-dart run bin/einz.dart send  --store "$W/a.json" --server http://127.0.0.1:3000 --message "你好，B！"
-dart run bin/einz.dart sync  --store "$W/b.json" --server http://127.0.0.1:3000   # B 应解出明文
-```
+App 端同理：设置页选「创建秘境」或「加入秘境」，扫邀请二维码/粘贴链接，再输密保口令。
 
-**实时聊天（WS）：** 终端 1 跑 `listen`，终端 2 发消息，实时收到：
+**TUI 命令总览**（`/help` 也能看）：
 
-```bash
-dart run bin/einz.dart listen --store "$W/b.json" --server http://127.0.0.1:3000
-# 另开终端：
-dart run bin/einz.dart send --store "$W/a.json" --server http://127.0.0.1:3000 --message "实时消息"
-```
+| 命令 | 用途 |
+| --- | --- |
+| `/space` | 空间状态 / `/space create` 新建 / `/space join <链接>` 加入 |
+| `/invite` | 生成一次性邀请链接（24h，把新设备绑进秘境） |
+| `/auth [server]` | 激活/续期会话（challenge-response） |
+| `/passphrase [random]` | 设置/修改密保口令（`random` 生成随机 12 词） |
+| `/pin` | 设置/修改启动锁 PIN |
+| `/devices` | 列出秘境内的设备与在线状态 |
+| `/device <名称>` / `/myname <名称>` | 改本设备名 / 改自己的显示名 |
+| `/sync` / `/history` | 手动增量同步 / 看本地解密历史 |
+| `/attach <file>` / `/open <序号>` | 上传附件 / 打开消息里的附件 |
+| `/backup` | 导出加密备份（12 词恢复码） |
+| `/server <url>` | 切换/确认服务器地址 |
+| `/exit` | 退出 |
 
-**发图片/语音（附件）：**
-
-```bash
-dart run bin/einz.dart attach --store "$W/a.json" --server http://127.0.0.1:3000 \
-  --file ./photo.jpg --type image --caption "看看这个"
-dart run bin/einz.dart fetch --store "$W/b.json" --server http://127.0.0.1:3000 \
-  --attachment-id <附件ID> --out ./photo-b.jpg     # 下载→sha256 校验→解密→写文件
-```
-
-**CLI 命令总览：**
-
-| 命令                                                                                              | 用途                                                           |
-| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `init --store <s> --device-id <id>`                                                               | 生成本机身份密钥对                                             |
-| `pubkey --store <s>`                                                                              | 导出公钥（base64）                                             |
-| `config --store <s> --peer-pubkey <b64> --space-id <id> --out-config <c> --out-envelope-peer <f>` | 生成 Space Key + 白名单 + 密保信封                             |
-| `import --store <s> --envelope-file <f> --space-id <id> [--key-version N]`                        | 导入密保信封（`--key-version N` 可指定版本）                   |
-| `auth --store <s> --server <url>`                                                                 | challenge-response 认证，拿 session_token                      |
-| `send --store <s> --server <url> --message <文本>`                                                | 加密发送（先入队，失败自动补发；`--server` 可省略=纯离线入队） |
-| `sync --store <s> --server <url> [--after N]`                                                     | 增量同步（翻页拉全量 → 落库 → 推进锚点 → 补发队列）            |
-| `listen --store <s> --server <url>`                                                               | WS 实时接收 message.new（断线 2s 重连，重连前先 /sync 补齐）   |
-| `attach --store <s> --server <url> --file <p> [--type image\|video\|voice] [--caption <t>]`       | 附件加密上传                                                   |
-| `fetch --store <s> --server <url> --attachment-id <id> [--out <p>]`                               | 附件下载解密                                                   |
-| `history --store <s>`                                                                             | 解密本地历史（按 key_version 选密钥）                          |
-| `backup --store <s> --out <f>`                                                                    | 本地加密备份（生成 12 词恢复码）                               |
-| `restore --in <f> --recovery-code <12词> [--store <s>]`                                           | 恢复码解密还原                                                 |
-
-> 其余部分（生产部署 / 备份恢复 / 撤销与安全 / 故障排查）见下节。
-
----
+> 更完整的操作手册见 `docs/ONBOARDING.md`；协议细节见 `docs/PROTOCOL.md`。
 
 ## 3. 生产部署（Docker Compose + Caddy，单机）
 
@@ -160,7 +118,6 @@ deployment/
 ├── Caddyfile             # 域名 + TLS 自动签发 + 反代 + WSS 升级
 ├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server 两个服务（部署时拷贝为 docker-compose.yml）
 ├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000（可选）
-├── config/config.json    # 白名单（禁止提交 Git；由 2.2 生成后拷入）
 └── data/                 # 数据卷映射：einz.sqlite.db + files/ + backups/
 ```
 
@@ -169,10 +126,7 @@ deployment/
 ### 3.2 部署步骤
 
 ```bash
-# 1) 按 2.2 生成 config.json（或用后续 3.3 的命令级流程）
-cp "$W/config.json" deployment/config/config.json
-
-# 2) 改域名：deployment/Caddyfile 中 private.example.com → 你的域名
+# 1) 改域名：deployment/Caddyfile 中 private.example.com → 你的域名
 
 # 3) 备份密钥：生成 32 字节 base64 密钥（npm run backup 需要，见 §5）
 python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
@@ -193,13 +147,14 @@ docker compose ps                       # 两个服务均 healthy/running
 ```bash
 # 域名解析 + TLS 正常（应返回鉴权错误而非连接失败）
 curl -s https://<你的域名>/space | head -c 200        # 期望 401/403 JSON
-# 白名单外设备拒绝（dev-evil 未登记）
+# 未登记设备拒绝（dev-evil 不在 devices 表）
 curl -s -o /dev/null -w '%{http_code}\n' \
   -X POST https://<你的域名>/auth/challenge \
-  -H 'Content-Type: application/json' -d '{"device_id":"dev-evil"}'   # 期望 403
+  -H 'Content-Type: application/json' \
+  -d '{"device_id":"dev-evil","space_id":"whatever"}'   # 期望 403
 ```
 
-CLI 设备改用 `--server https://<你的域名>` 即可远程使用（WS 地址自动为 `wss://`）。
+客户端改用 `--server https://<你的域名>`（TUI）/ 设置页填域名（App）即可远程使用（WS 自动为 `wss://`）。
 
 ### 3.4 端口与数据目录
 
@@ -208,22 +163,27 @@ CLI 设备改用 `--server https://<你的域名>` 即可远程使用（WS 地�
 | `einz.sqlite.db` | `/data/einz.sqlite.db`   | SQLite（消息密文、设备表、会话、push token） |
 | 附件 blob        | `/data/files/`           | 密文文件，按 attachment_id 前 2 位分片       |
 | 备份产物         | `/data/backups/`         | `npm run backup` 的加密归档                  |
-| 白名单           | `/config/config.json`    | 只读挂载，启动时加载                         |
+| 空间与成员       | `/data/einz.sqlite.db`   | `spaces` / `space_members` / `join_tokens` 同库 |
 | 服务端口         | `3000`（expose，仅内网） | 由 Caddy 反代对外                            |
 
 ---
 
-## 4. 一次性配置（命令级实作，替代 SETUP.md 的"[待开发]"标注）
+## 4. 接入闭环（v2 要点）
 
-SETUP.md §3 的设计流程已由 CLI 实现（2.2 已演示）。要点重申：
+`SETUP.md`（v1 设计稿）已归档，当前流程见 §2.2。要点重申：
 
-1. **身份密钥**：`init` 生成 X25519 密钥对，私钥只留在设备 store。
-2. **Space Key 分发**：`config` 生成 32B 随机 Space Key，分别 `crypto_box_seal` 给 A/B——只有对应设备能解开（E2EE.md §7.1）。
-3. **白名单登记**：`config.json`（space_id + devices）放进服务器后启动；`syncWhitelistToDb` 会在启动时登记进 devices 表，撤销状态不被覆盖（Phase 4 加固）。
-4. **导入与销毁**：`import` 解封后删除密保信封临时文件。
-5. **恢复码**：`backup` 命令会生成 12 词恢复码（E2EE.md §10），**离线保存多份，Server 不接触**。
+1. **身份密钥**：客户端首启生成 X25519 密钥对，私钥只留在设备（App 用 Keychain/Keystore，
+   TUI store 是明文 JSON 的测试驱动）。
+2. **Space Key 分发**：创建者本地生成 32B Space Key，用**口令（Argon2id）加密**成密保箱托管
+   到 Server（`POST /spaces` 创建时一并上传）；加入方用同一口令取回
+   （`POST /spaces/{id}/key-escrow`，免认证、防爆破靠限速）。另有密保信封（用对方公钥
+   `crypto_box_seal` 密封）作为离线备用路径（E2EE.md §7.1）。
+3. **设备登记**：由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭一次性 join token）完成，
+   同时签发绑定该空间的会话——不再有独立的登记步骤，也没有静态白名单文件。
+4. **恢复码**：`/backup`（TUI）/ App「导出完整备份」生成 12 词恢复码（E2EE.md §10），
+   **离线保存多份，Server 不接触**。
 
-> 安全操作建议：密钥生成/密封/导入在受控环境进行；`config.json`、设备私钥、恢复码三者分开存放——任一单独泄露都不足以解密历史消息。
+> 安全操作建议：口令、设备私钥、恢复码三者分开存放——任一单独泄露都不足以解密历史消息。
 
 ---
 
@@ -249,32 +209,29 @@ npm run restore -- data/backups/backup-<ts>.json
 
 ### 5.2 客户端备份 / 恢复（恢复码，模型 A）
 
-```bash
-# 设备导出（生成 12 词恢复码，离线保存）
-dart run bin/einz.dart backup --store "$W/a.json" --out "$W/backup-a.json"
-# ⚠️ 恢复码打印后请立即离线妥善保存（丢失即无法恢复）
+**导出**：TUI 里 `/backup`，或 App 聊天页 ⋯ → 导出完整备份（生成 12 词恢复码）。
+⚠️ 恢复码打印后请立即离线妥善保存（丢失即无法恢复）。
 
-# 换机恢复（新设备：恢复密钥 → 重新生成身份 → 登记白名单）
-dart run bin/einz.dart restore --in "$W/backup-a.json" --recovery-code "<12词>" --store "$W/a-new.json"
-# 之后：init 新身份 → 更新 config.json 白名单 → 重启服务器（E2EE.md §10.2）
-```
+**换机恢复**：新设备先正常接入（`/space join` 拿回 Space Key）后，用恢复码在 App 里
+导入历史备份（E2EE.md §10.2）。v1 时代的 `einz.dart backup/restore` 命令行已随脚本 CLI
+删除。
 
 ### 5.3 设备撤销（**不**轮换 Space Key）
 
 **场景：** 手机丢失/失窃 → 撤销该设备，阻止它继续收新消息。
 
 ```bash
-# 1) A 撤销 B（DELETE /devices/dev-b1）：移出白名单 + 清 Push Token + 清会话，
+# 1) A 撤销 B（DELETE /devices/dev-b1）：标记 revoked + 清 Push Token + 清会话，
 #    并关闭 B 的 WS 连接（Server 不再下发 key.rotation —— 轮换方案已决定不做）
 curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
   -H "Authorization: Bearer <A的session_token>"
 
-# 2) 服务器 config.json 移除被撤销设备 → 重启服务器生效
+# 2) 完成——撤销实时生效，不需要重启服务器、也不需要改任何配置文件
 ```
 
 - 被撤销设备：无法认证（403）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
 - 被撤销设备**上线即自毁本地数据**（App `_onDeviceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存）。
-- **不需要**轮换 Space Key：撤销的效力来自白名单（它取不到新密文）+ 自毁。
+- **不需要**轮换 Space Key：撤销的效力来自设备被标记 `revoked`（它取不到新密文）+ 自毁。
   怀疑密钥材料被提取（越狱/镜像泄露）时的止损流程见 `docs/SECURITY.md` §4.2（替代方案 = 重建空间）。
 - 已同步的历史密文不可追回（设备端已解密数据的固有属性）。
 
@@ -292,7 +249,7 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
 
 | 边界           | 机制                                                                            | 说明                                                |
 | -------------- | ------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 白名单         | `config.json` + `isActiveDevice`（叠加数据库 revoked 状态）                     | 未登记设备 403；撤销后立即拒绝认证/同步/发送        |
+| 设备在册状态   | `devices` 表 + `isActiveDevice`（v2：由 spaces create/join 自助登记）           | 未登记设备 403；撤销后立即拒绝认证/同步/发送        |
 | 服务端只见密文 | E2EE 全链路（消息/附件均为密文 + 元数据）                                       | `messages` 表只有 ciphertext（冒烟测试验证）        |
 | 路径遍历       | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧）               | 失陷白名单设备也无法越出`files/`（V1 审查 P1 修复） |
 | WS 撤销实时性  | 撤销即关闭被撤销设备连接（close 4403）                                          | 无法继续收新消息广播（P2 修复）                     |
@@ -301,7 +258,7 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
 | 认证           | challenge-response（一次性、5 分钟过期）；session_token 服务端签发              | 防重放                                              |
 | 前向保密       | Space Key 简单派生（已接受的代价，E2EE.md §11.1）                               | 安全存储隔离；不轮换的取舍见 SECURITY.md §3        |
 
-**威胁模型提醒（SECURITY.md §3/§4.1）：** 被撤销设备已持有的历史密文无法收回（设备端已解密数据的固有属性）；它读不到**之后**的新消息，靠的是白名单（`/sync` 403）而非轮换。
+**威胁模型提醒（SECURITY.md §3/§4.1）：** 被撤销设备已持有的历史密文无法收回（设备端已解密数据的固有属性）；它读不到**之后**的新消息，靠的是设备在册状态（`/sync` 403）而非轮换。
 
 ---
 
@@ -309,12 +266,12 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
 
 | 症状                                   | 原因                                                      | 处理                                                        |
 | -------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
-| Server 拒绝启动                        | `config.json` 缺失/格式错（需 space_id + ≥1 active 设备） | 检查`server/config/config.json`；用 CLI `config` 重新生成   |
+| Server 起不来 / 端口占用               | 端口被占或 Node 版本过低（需 ≥20）                        | 换 `PORT=`；`node -v` 确认版本                              |
 | `curl /space` 401/403                  | 正常（未认证）                                            | 按 §3.3 验证                                                |
 | CLI 报 libsodium 加载失败              | 未设`LIBSODIUM_PATH`（或 libsodium 装在非标准路径）       | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"` |
-| `auth` 失败（403）                     | 设备不在白名单 / 已被撤销                                 | 检查 config.json 与 devices 表状态；重新登记                |
-| `send` 提示"已入队（离线）"            | `--server` 省略或未认证                                   | 补`--server`；先 `auth`                                     |
-| `sync` 拉不到对方消息                  | 锚点已推进 / 网络 / 白名单                                | 用`--after 0` 强制全量重拉排查                              |
+| `/auth` 失败（403）                    | 设备未登记 / 已被撤销                                     | 查 devices 表状态；设备被撤销只能重新 `/space join` 入网    |
+| 发消息一直"发送中"                    | WS 未连上 / 会话失效                                      | `/auth` 重新激活；或看服务端日志 `[req] WS /ws connect`     |
+| `/sync` 拉不到对方消息                 | 锚点已推进 / 网络 / 设备被撤销                            | 用 `/sync` 前先在本地库清锚点排查（或看服务端审计表）        |
 | `fetch` 报 sha256 不匹配               | 附件密文损坏或元数据过期                                  | 重新`sync` 拉元数据后重试                                   |
 | WS 连不上                              | 反代未开 WSS / token 未 URL 编码                          | 检查 Caddy；token 含`+`/`=` 需编码（客户端自动处理）        |
 | `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷）                            | 拷贝到纯 ASCII 路径构建（如`/tmp/einz-build`），产物拷回    |
@@ -326,7 +283,7 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
 ## 8. 验收清单（部署完成后逐项打勾）
 
 - [ ] `https://<域名>/space` 返回鉴权错误（TLS 正常）
-- [ ] 白名单外设备 403
+- [ ] 未登记设备认证 403
 - [ ] A→B 发消息，B 同步解出明文；Server 数据库无明文
 - [ ] `listen` 实时收到 `message.new`
 - [ ] 附件上传→下载解密与原文件一致
@@ -390,12 +347,12 @@ curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 
 ### 9.4 客户端实测（以口令托管为例，本机 macOS/Linux）
 
+命令行的等价路径已随脚本 CLI 删除，改用 TUI：
+
 ```bash
-cd /Users/Shared/productX/only/cli
-dart run bin/einz.dart escrow --action upload --store /tmp/a.json \
-  --server https://einz.tic.cc --passphrase "你的接入口令"
-dart run bin/einz.dart escrow --action download --store /tmp/b.json \
-  --server https://einz.tic.cc --passphrase "你的接入口令"
+cd cli
+dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
+# 会话里执行 /passphrase 设置或修改密保口令（含密保箱重建）
 ```
 
 ### 9.5 升级注意事项
@@ -403,7 +360,7 @@ dart run bin/einz.dart escrow --action download --store /tmp/b.json \
 | 项                       | 说明                                                                                                                                                     |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 存量数据                 | 不受影响（messages/devices/会话等全部不动，新表初始为空）                                                                                                |
-| 白名单                   | 无需改动（既有设备认证不受影响）                                                                                                                         |
+| 设备在册状态             | 无需改动（既有设备与会话不受影响）                                                                                                                         |
 | Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖）                                                                                                 |
 | App 侧                   | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                             |
 | 回滚                     | `cd $EINZ_ROOT && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ deployment/ shared/` → 重新 `docker compose up -d --build server` |
