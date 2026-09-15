@@ -515,14 +515,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachmentStorageSecured => '远程托管';
 
   @override
-  String get chatPageAttachmentStorageSecuredDesc => '每次打开附件都重新下载并解密，本机不留明文副本';
+  String get chatPageAttachmentStorageSecuredDesc => '每次打开附件都重新下载并解密，本机不留明文副本，更私密';
 
   @override
   String get chatPageAttachmentStorageStored => '本地留存';
 
   @override
   String get chatPageAttachmentStorageStoredDesc =>
-      '第一次下载附件留存明文副本在本机，以后打开可直接使用';
+      '第一次下载附件时保存明文副本，以后本机可直接打开，更方便';
 
   @override
   String get chatPageAttachmentStorageSubmit => '提交';

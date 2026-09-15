@@ -728,7 +728,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
 /// 欢迎辞倒计时文本（两行，老板 2026-09-15）：首行欢迎辞；读秒单独一行
 /// "即将进入秘境聊天：<秒数>"，逐秒跳动。
 String _welcomeCountdownText(int remain) {
-  return '一切就绪！即将开始和伴侣聊天吧 💞\n即将进入秘境聊天：$remain';
+  return '一切就绪！即将进入秘境 💞 与伴侣聊天： $remain';
 }
 
 /// 客户端生成 space_id（UUIDv4，协议 §3.4：space_id/space_key 由客户端生成——
