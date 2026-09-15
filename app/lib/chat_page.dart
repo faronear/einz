@@ -2065,47 +2065,53 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           overflow: TextOverflow.ellipsis,
         );
     }
-    return Container(
-      // 与被引消息的引用块（气泡内 / 输入栏引用条）同款浅灰底：用底色而非横线
-      // 与下方菜单项区分（老板要求 2026-09-13）。弹窗始终跟随浅色主题，不随
-      // gradient 气泡风格变白。
-      color: Colors.black.withValues(alpha: 0.06),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        key: const ValueKey('messagePreviewRow'), // 测试断言对齐用（项目惯例）
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment:
-            mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!mine) ...[
-            _MessageAvatar(
-                personId: avatarPersonId, server: widget.server, api: widget.api),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                // 与消息流一致：按发言人性别配色（男天蓝 / 女品牌粉）
-                color: _bubbleColor(mine: mine),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: DefaultTextStyle.merge(
-                style: TextStyle(
-                  color: _uiStyle == 'gradient' ? Colors.white : null,
-                  fontSize: 14,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          // 预览条背景色已清空（老板 2026-09-15 试用效果：去掉浅灰底，只留气泡本身）。
+          // 弹窗始终跟随浅色主题，不随 gradient 气泡风格变白。
+          color: Colors.transparent,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            key: const ValueKey('messagePreviewRow'), // 测试断言对齐用（项目惯例）
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment:
+                mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+            children: [
+              if (!mine) ...[
+                _MessageAvatar(
+                    personId: avatarPersonId, server: widget.server, api: widget.api),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    // 与消息流一致：按发言人性别配色（男天蓝 / 女品牌粉）
+                    color: _bubbleColor(mine: mine),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: DefaultTextStyle.merge(
+                    style: TextStyle(
+                      color: _uiStyle == 'gradient' ? Colors.white : null,
+                      fontSize: 14,
+                    ),
+                    child: bubbleContent,
+                  ),
                 ),
-                child: bubbleContent,
               ),
-            ),
+              if (mine) ...[
+                const SizedBox(width: 8),
+                _MessageAvatar(
+                    personId: avatarPersonId, server: widget.server, api: widget.api),
+              ],
+            ],
           ),
-          if (mine) ...[
-            const SizedBox(width: 8),
-            _MessageAvatar(
-                personId: avatarPersonId, server: widget.server, api: widget.api),
-          ],
-        ],
-      ),
+        ),
+        // 预览条底部的淡灰分隔线（老板 2026-09-15：底色清空后用线与菜单项分层）
+        const Divider(height: 1, thickness: 0.5, color: Color(0x14000000)),
+      ],
     );
   }
 
