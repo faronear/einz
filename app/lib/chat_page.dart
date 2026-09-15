@@ -3186,31 +3186,44 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
 
-  /// 文件消息：文件卡片（文件名 + 大小 + 下载保存）。
+  /// 文件消息：文件图标 + 文件名 + 右侧「下载组合按钮」（上=下载图标，下=尺寸）。
+  /// 点文件名或图标即可下载/打开（老板 2026-09-15：下载按钮和尺寸合并为一枚
+  /// 组合按钮，尺寸不再单独占一行）。
   Widget _buildFileCard(
       HistoryMessage m) {
     final size = (m.attachment?['size'] as int?) ?? 0;
+    final subtitleColor = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
+    // 附件消息明文是「📎 文件名」（发送端兜底文案）；名片里已有文件图标，前缀去掉
+    var name = m.plaintext.trim();
+    if (name.startsWith('📎')) name = name.replaceFirst('📎', '').trim();
+    final downloadButton = InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _downloadFile(m),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.download, size: 20),
+            Text(_formatSize(size),
+                style: TextStyle(fontSize: 10, color: subtitleColor)),
+          ],
+        ),
+      ),
+    );
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          icon: const Icon(Icons.download),
-          onPressed: () => _downloadFile(m),
-          visualDensity: VisualDensity.compact,
-        ),
+        const Icon(Icons.insert_drive_file, size: 28),
+        const SizedBox(width: 8),
         Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('📄 ${m.plaintext}', overflow: TextOverflow.ellipsis),
-              Text(_formatSize(size),
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey)),
-            ],
+          child: GestureDetector(
+            onTap: () => _downloadFile(m),
+            child: Text(name, overflow: TextOverflow.ellipsis),
           ),
         ),
+        const SizedBox(width: 8),
+        downloadButton,
       ],
     );
   }
