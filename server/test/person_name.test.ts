@@ -46,11 +46,13 @@ function req (port: number, path: string, init?: RequestInit): Promise<Response>
 }
 
 test('assertPersonName：合规放行（含 emoji），不合规 400', () => {
-  for (const ok of ['Lukas', '小猪🐷', 'a_张-1', '😀', '🇨🇳', '👨‍👩‍👧', '❤️', '✨', 'a'.repeat(32)]) {
+  // 𠮷 = 扩展 B 汉字（罕见姓名用字，老板 2026-09-16 要求放行）
+  for (const ok of ['Lukas', '小猪🐷', 'a_张-1', '😀', '🇨🇳', '👨‍👩‍👧', '❤️', '✨', '𠮷', '㐀', 'a'.repeat(32)]) {
     assert.doesNotThrow(() => assertPersonName(ok), `应放行: ${ok}`)
   }
   // 空格、中文标点、@、全角字母、超长 —— 都不合规
-  for (const bad of ['', '   ', 'Mr Lukas', '名字。', 'a@b', 'Ｌｕｋａｓ', 'a'.repeat(33), '😀'.repeat(33)]) {
+  // 假名 / 谚文 / 全角字母不是汉字，仍拒
+  for (const bad of ['', '   ', 'Mr Lukas', '名字。', 'a@b', 'Ｌｕｋａｓ', 'あ', '한', 'Ａ', 'a'.repeat(33), '😀'.repeat(33)]) {
     assert.throws(
       () => assertPersonName(bad),
       (e: unknown) => e instanceof ApiError && e.code === 'INVALID_REQUEST',

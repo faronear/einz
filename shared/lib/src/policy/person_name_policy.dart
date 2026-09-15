@@ -18,12 +18,13 @@ const int kPersonNameMaxLength = 32;
 
 /// 单个合规字符：中文字 / 英文字母 / 数字 / `_` / `-` / emoji。
 ///
-/// emoji 走 Unicode 属性 `\p{Extended_Pictographic}`（比手写区间全：含杂项符号、
-/// dingbats、 supplemental symbols 等），再补四类"拼装件"：
+/// 中文用 `\p{Script=Han}`（全部汉字区，含 `𠮷` 这类罕见姓名用字；不含假名/谚文/
+/// 全角）。emoji 走 `\p{Extended_Pictographic}`（比手写区间全：含杂项符号、
+/// dingbats、supplemental symbols 等），再补四类"拼装件"：
 /// `\u{1F1E6}-\u{1F1FF}` 区域指示符（国旗 🇨🇳）、`\uFE0F/\uFE0E` 变体选择符
 /// （❤️）、`\u200D` ZWJ（👨‍👩‍👧 家庭组合）、`\u20E3` 键帽（1️⃣）。
 final RegExp kPersonNameAllowedChar = RegExp(
-  r'[0-9A-Za-z_\-\u3400-\u4DBF\u4E00-\u9FFF'
+  r'[0-9A-Za-z_\-\p{Script=Han}'
   r'\p{Extended_Pictographic}'
   r'\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{FE0E}\u{200D}\u{20E3}]',
   unicode: true,
@@ -31,7 +32,7 @@ final RegExp kPersonNameAllowedChar = RegExp(
 
 /// 整个名字是否合规（含首尾空白与空格——空格不在白名单里）。
 final RegExp kPersonNamePattern = RegExp(
-  r'^[0-9A-Za-z_\-\u3400-\u4DBF\u4E00-\u9FFF'
+  r'^[0-9A-Za-z_\-\p{Script=Han}'
   r'\p{Extended_Pictographic}'
   r'\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{FE0E}\u{200D}\u{20E3}]+$',
   unicode: true,

@@ -29,15 +29,25 @@ void main() {
       expect(checkPersonNamePolicy(sparkles), isNull);
     });
 
-    test('不合规：空格 / 中文标点 / @ / 全角符号 / 空', () {
-      expect(checkPersonNamePolicy(''), PersonNameViolation.empty);
-      expect(checkPersonNamePolicy('   '), PersonNameViolation.empty);
-      // 空格不在白名单里（老板清单只有中英文、数字、`_`、`-`、emoji）
-      expect(checkPersonNamePolicy('Mr Lukas'), PersonNameViolation.illegalCharacter);
-      expect(checkPersonNamePolicy('名字。'), PersonNameViolation.illegalCharacter);
-      expect(checkPersonNamePolicy('a@b'), PersonNameViolation.illegalCharacter);
-      expect(checkPersonNamePolicy('Ｌｕｋａｓ'), PersonNameViolation.illegalCharacter); // 全角
-    });
+  test('不合规：空格 / 中文标点 / @ / 全角符号 / 空', () {
+    expect(checkPersonNamePolicy(''), PersonNameViolation.empty);
+    expect(checkPersonNamePolicy('   '), PersonNameViolation.empty);
+    // 空格不在白名单里（老板清单只有中英文、数字、`_`、`-`、emoji）
+    expect(checkPersonNamePolicy('Mr Lukas'), PersonNameViolation.illegalCharacter);
+    expect(checkPersonNamePolicy('名字。'), PersonNameViolation.illegalCharacter);
+    expect(checkPersonNamePolicy('a@b'), PersonNameViolation.illegalCharacter);
+    expect(checkPersonNamePolicy('Ｌｕｋａｓ'), PersonNameViolation.illegalCharacter); // 全角
+  });
+
+  test('中文字 = \p{Script=Han}：罕见姓名用字放行，假名/谚文仍拒', () {
+    expect(checkPersonNamePolicy('张'), isNull); // 基本区
+    expect(checkPersonNamePolicy('𠮷'), isNull); // 扩展 B（U+20BB7，老板 2026-09-16 要求放行）
+    expect(checkPersonNamePolicy('㐀'), isNull); // 扩展 A
+    // 不是汉字：日文假名、韩文、全角字母
+    expect(checkPersonNamePolicy('あ'), PersonNameViolation.illegalCharacter);
+    expect(checkPersonNamePolicy('한'), PersonNameViolation.illegalCharacter);
+    expect(checkPersonNamePolicy('Ａ'), PersonNameViolation.illegalCharacter);
+  });
 
     test('不合规：超长（按码点计 >32）', () {
       expect(checkPersonNamePolicy('a' * 32), isNull); // 边界：32 正好

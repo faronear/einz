@@ -15,6 +15,14 @@ void main() {
       expect(checkDeviceNamePolicy('_'), isNull); // 消毒产物也可能是纯下划线
     });
 
+    test('中文字 = \\p{Script=Han}：罕见用字放行，假名/谚文/全角仍拒', () {
+      expect(checkDeviceNamePolicy('𠮷'), isNull); // 扩展 B 汉字
+      expect(checkDeviceNamePolicy('㐀'), isNull); // 扩展 A 汉字
+      expect(checkDeviceNamePolicy('あ'), DeviceNameViolation.illegalCharacter); // 假名
+      expect(checkDeviceNamePolicy('한'), DeviceNameViolation.illegalCharacter); // 谚文
+      expect(checkDeviceNamePolicy('Ａ'), DeviceNameViolation.illegalCharacter); // 全角
+    });
+
     test('不合规：空 / 空格 / 中文标点 / emoji / 空格分隔的词', () {
       expect(checkDeviceNamePolicy(''), DeviceNameViolation.empty);
       expect(checkDeviceNamePolicy('   '), DeviceNameViolation.empty);

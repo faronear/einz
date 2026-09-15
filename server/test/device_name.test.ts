@@ -63,6 +63,10 @@ test('assertDeviceName：用户改名不合规 → 400', () => {
   assert.doesNotThrow(() => assertDeviceName('My-Mac_01'))
   assert.doesNotThrow(() => assertDeviceName('老板的电脑'))
   assert.doesNotThrow(() => assertDeviceName('a'.repeat(32))) // 边界：32 正好
+  assert.doesNotThrow(() => assertDeviceName('𠮷')) // 扩展 B 汉字（Script=Han）
+  assert.doesNotThrow(() => assertDeviceName('㐀')) // 扩展 A 汉字
+  assert.throws(() => assertDeviceName('あ')) // 假名不是汉字
+  assert.throws(() => assertDeviceName('Ａ')) // 全角字母不是汉字
   for (const bad of ['', '   ', 'MacBook Pro', 'iPhone15!', '设备。一号', '📱phone', 'a'.repeat(33)]) {
     assert.throws(
       () => assertDeviceName(bad),

@@ -15,15 +15,18 @@ const int kDeviceNameMaxLength = 32;
 
 /// 单个合规字符：中文字 / 英文字母 / 数字 / `_` / `-`。
 ///
-/// 中文取 CJK 统一汉字基本区（\u4e00-\u9fff）与扩展 A（\u3400-\u4dbf）——覆盖日常
-/// 用字；不含标点、全角符号、emoji（它们在展示层的宽度与截断行为都不可控）。
+/// 中文用 Unicode 属性 `\p{Script=Han}`（覆盖全部汉字区：基本区 + 扩展 A~G +
+/// 兼容汉字，包括 `𠮷` 这类罕见姓名用字），且**不含**日文假名、韩文、全角字母
+/// 与中文标点——它们不是汉字。
 final RegExp kDeviceNameAllowedChar = RegExp(
-  r'[0-9A-Za-z_\-\u3400-\u4dbf\u4e00-\u9fff]',
+  r'[0-9A-Za-z_\-\p{Script=Han}]',
+  unicode: true,
 );
 
 /// 整个名字是否合规（配合 [checkDeviceNamePolicy] 用；单独用于逐字符替换）。
 final RegExp kDeviceNamePattern = RegExp(
-  r'^[0-9A-Za-z_\-\u3400-\u4dbf\u4e00-\u9fff]+$',
+  r'^[0-9A-Za-z_\-\p{Script=Han}]+$',
+  unicode: true,
 );
 
 /// 违规原因（稳定码；各端自行映射文案 / l10n key，不把文案写进策略层）。

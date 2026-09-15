@@ -17,9 +17,10 @@ import { ApiError } from "./auth.js";
  *    提示重输，而不是悄悄把人的输入改掉。 */
 export const DEVICE_NAME_MAX_LENGTH = 32;
 
-/** 中文取 CJK 统一汉字基本区 + 扩展 A（与 Dart 版同一区间）。 */
-const DEVICE_NAME_ALLOWED_CHAR = /[0-9A-Za-z_\-㐀-䶿一-鿿]/u;
-export const DEVICE_NAME_RE = /^[0-9A-Za-z_\-㐀-䶿一-鿿]+$/u;
+/** 中文用 Unicode 属性 \p{Script=Han}（与 Dart 版一致）：覆盖全部汉字区（含
+ *  `𠮷` 这类罕见姓名用字），且不含日文假名 / 韩文 / 全角字母。 */
+const DEVICE_NAME_ALLOWED_CHAR = /[0-9A-Za-z_\-\p{Script=Han}]/u;
+export const DEVICE_NAME_RE = /^[0-9A-Za-z_\-\p{Script=Han}]+$/u;
 
 /** 显式改名：不合规 → 400（文案给调用方/用户看，客户端另有本地提示）。 */
 export function assertDeviceName(name: string): void {

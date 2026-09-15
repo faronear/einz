@@ -13,11 +13,12 @@ import { ApiError } from "./auth.js";
  *  直接 400，让客户端提示重输，而不是悄悄把人的名字改掉。 */
 export const PERSON_NAME_MAX_LENGTH = 32;
 
-/** emoji 走 Unicode 属性（比手写区间全），再补国旗/变体选择符/ZWJ/键帽四类拼装件。 */
+/** 中文用 \p{Script=Han}（全部汉字区，含 `𠮷`；不含假名/谚文/全角）；emoji 走
+ *  Unicode 属性（比手写区间全），再补国旗/变体选择符/ZWJ/键帽四类拼装件。 */
 const PERSON_NAME_ALLOWED_CHAR =
-  /[0-9A-Za-z_\-㐀-䶿一-鿿\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️︎‍⃣]/u;
+  /[0-9A-Za-z_\-\p{Script=Han}\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️︎‍⃣]/u;
 export const PERSON_NAME_RE =
-  /^[0-9A-Za-z_\-㐀-䶿一-鿿\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️︎‍⃣]+$/u;
+  /^[0-9A-Za-z_\-\p{Script=Han}\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️︎‍⃣]+$/u;
 
 /** 不合规 → 400（文案给调用方/用户看，客户端另有本地提示）。 */
 export function assertPersonName(name: string): void {
