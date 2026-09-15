@@ -578,7 +578,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageActionDelete => '删除';
+  String get chatPageActionDelete => '立刻删除';
 
   @override
   String get chatPageActionQuote => '引用';

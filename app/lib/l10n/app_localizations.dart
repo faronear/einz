@@ -965,7 +965,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageExitMessage.
   ///
   /// In en, this message translates to:
-  /// **'Exits Einz on this device. You\'ll need your PIN to re-enter.'**
+  /// **'Exits Einz on this device.'**
   String get chatPageExitMessage;
 
   /// No description provided for @save.
@@ -1187,7 +1187,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageActionDelete.
   ///
   /// In en, this message translates to:
-  /// **'Delete'**
+  /// **'Delete now'**
   String get chatPageActionDelete;
 
   /// No description provided for @chatPageActionQuote.

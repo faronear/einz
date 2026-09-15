@@ -488,8 +488,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageExitTitle => 'Exit?';
 
   @override
-  String get chatPageExitMessage =>
-      'Exits Einz on this device. You\'ll need your PIN to re-enter.';
+  String get chatPageExitMessage => 'Exits Einz on this device.';
 
   @override
   String get save => 'Save';
@@ -613,7 +612,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageActionDelete => 'Delete';
+  String get chatPageActionDelete => 'Delete now';
 
   @override
   String get chatPageActionQuote => 'Quote';

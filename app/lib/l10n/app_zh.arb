@@ -234,7 +234,7 @@
       "duration": {"type": "String"}
     }
   },
-  "chatPageActionDelete": "删除",
+  "chatPageActionDelete": "立刻删除",
   "chatPageActionQuote": "引用",
   "chatPageActionBurn": "阅后即焚",
   "chatPageDeleteConfirmTitle": "删除消息",

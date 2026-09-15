@@ -182,7 +182,7 @@
     }
   },
   "chatPageExitTitle": "Exit?",
-  "chatPageExitMessage": "Exits Einz on this device. You'll need your PIN to re-enter.",
+  "chatPageExitMessage": "Exits Einz on this device.",
   "save": "Save",
   "chatPageChangePassphraseTitle": "Change passphrase",
   "chatPageChangePassphraseSubmit": "Change",
@@ -234,7 +234,7 @@
       "duration": {"type": "String"}
     }
   },
-  "chatPageActionDelete": "Delete",
+  "chatPageActionDelete": "Delete now",
   "chatPageActionQuote": "Quote",
   "chatPageActionBurn": "Burn after reading",
   "chatPageDeleteConfirmTitle": "Delete message",
