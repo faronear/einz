@@ -153,7 +153,7 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 设备登记结果（服务端分配的真实 deviceId/personId/spaceId）。
   /// 认证（challenge）与进聊天页一律用它，不用本地临时 deviceId。
-  EnrollResult? _enroll;
+  DeviceBinding? _enroll;
 
   /// create 自举失败（服务器已有空间设备）时为 true → 展示改用"加入"的引导。
   bool _bootstrapFailed = false;
@@ -1567,7 +1567,7 @@ class _SetupPageState extends State<SetupPage> {
           ));
       if (!mounted) return;
       _sessionToken = created.sessionToken;
-      _enroll = EnrollResult(
+      _enroll = DeviceBinding(
         deviceId: created.deviceId,
         personId: created.creatorPersonId,
         spaceId: created.spaceId,
@@ -2045,7 +2045,7 @@ class _SetupPageState extends State<SetupPage> {
             ));
         if (!mounted) return false;
         _sessionToken = join.sessionToken;
-        _enroll = EnrollResult(
+        _enroll = DeviceBinding(
           deviceId: join.deviceId,
           personId: join.personId,
           spaceId: join.spaceId,
