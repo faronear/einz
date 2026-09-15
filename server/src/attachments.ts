@@ -56,6 +56,23 @@ export function storeAttachment(
 
   const db = getDb();
 
+  // C2 空间归属校验：attachment_id 与 message_id 都是**客户端生成**的，不校验
+  // 就能把 blob 挂到别的空间的消息上（对方的 /sync 会收到我方附件元数据），
+  // 或顶掉别的空间的同名 attachment_id。两处都必须与本会话空间一致。
+  const spaceId = sessionSpace ?? "";
+  const clash = db
+    .prepare(`SELECT space_id FROM attachments WHERE attachment_id = ?`)
+    .get(meta.attachment_id) as { space_id: string } | undefined;
+  if (clash && clash.space_id !== spaceId) {
+    throw new ApiError("FORBIDDEN", "attachment_id belongs to another space", 403);
+  }
+  const host = db
+    .prepare(`SELECT space_id FROM messages WHERE message_id = ?`)
+    .get(meta.message_id) as { space_id: string } | undefined;
+  if (host && host.space_id !== spaceId) {
+    throw new ApiError("FORBIDDEN", "message_id belongs to another space", 403);
+  }
+
   if (blob.length !== meta.size) throw new ApiError("INVALID_REQUEST", "size mismatch", 400);
   const sha = createHash("sha256").update(blob).digest("base64");
   if (sha !== meta.sha256) throw new ApiError("INVALID_REQUEST", "sha256 mismatch", 400);
@@ -70,11 +87,10 @@ export function storeAttachment(
   writeFileSync(full, blob, { flag: "wx" });
 
   const now = Date.now();
-  // v2 多空间：附件归属取会话绑定的 Space（同 postMessage）。
+  // v2 多空间：附件归属取会话绑定的 Space（spaceId 已在上面解析，同 postMessage）。
   // 注意：两阶段上传（PROTOCOL.md §6.1）先传 blob 后发消息——此刻 messages
   // 行尚不存在，不能从消息反查 space_id（否则 NULL 落入 NOT NULL 列 → 500，
   // 上传失败 → 发送端气泡回退「📎 文件名」、接收端 /sync 无附件元数据）。
-  const spaceId = sessionSpace ?? "";
   db.prepare(
     `INSERT INTO attachments (attachment_id, message_id, space_id, key_version, size, sha256, nonce, storage_path, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -83,18 +99,22 @@ export function storeAttachment(
   return { attachment_id: meta.attachment_id, storage_path: storagePath, created_at: now };
 }
 
-/** 下载附件 blob（PROTOCOL.md §6.2）：鉴权 + 白名单校验。 */
+/** 下载附件 blob（PROTOCOL.md §6.2）：鉴权 + 白名单校验 + **空间归属**校验。 */
 export function getAttachmentBlob(cfg: ServerConfig, token: string, attachmentId: string): Buffer {
-  const { device_id } = resolveSession(token);
+  const { device_id, space_id: sessionSpace } = resolveSession(token);
   if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   touchLastSeen(device_id);
 
   assertSafeId(attachmentId, "attachment_id");
 
   const row = getDb()
-    .prepare(`SELECT storage_path FROM attachments WHERE attachment_id = ?`)
-    .get(attachmentId) as { storage_path: string } | undefined;
+    .prepare(`SELECT storage_path, space_id FROM attachments WHERE attachment_id = ?`)
+    .get(attachmentId) as { storage_path: string; space_id: string } | undefined;
+  // 404 而非 403：不向非成员确认"这个 attachment_id 存在"（元数据最小化，C2）
   if (!row) throw new ApiError("NOT_FOUND", "attachment not found", 404);
+  if (row.space_id !== (sessionSpace ?? "")) {
+    throw new ApiError("NOT_FOUND", "attachment not found", 404);
+  }
 
   const full = join(FILES_ROOT, row.storage_path);
   assertInsideFilesRoot(full);

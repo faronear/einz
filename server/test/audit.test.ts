@@ -90,7 +90,8 @@ async function main (): Promise<void> {
     // 2) WS 上线 → 下线（等服务端写完 close 事件）
     await new Promise<void>((done, fail) => {
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=1&token=${encodeURIComponent(created.sessionToken)}`
+        `ws://127.0.0.1:${port}/ws?pv=1`,
+        { headers: { Authorization: `Bearer ${created.sessionToken}` } }
       )
       ws.on('open', () => {
         sleep(50).then(() => {

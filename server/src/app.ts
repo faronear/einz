@@ -6,11 +6,14 @@ import { cleanupExpired, ApiError, createChallenge, resolveSession, verifyChalle
 import { postMessage, syncMessages } from "./messages.js";
 import { getReceipts, postReceipts } from "./receipts.js";
 import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./attachments.js";
-import { getAvatar, storeAvatar } from "./avatars.js";
+import { getAvatar, storeAvatar, MAX_AVATAR_BYTES } from "./avatars.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyRevoked, wsConnCount } from "./ws.js";
+import { bearerToken, optionalBearerToken, requireSpaceMember } from "./guard.js";
+import { MAX_ATTACHMENT_BYTES, readBody, readJsonBody } from "./body.js";
+import { limitByIp } from "./ratelimit.js";
 import { createJoinToken, createSpace, joinSpace, lookupSpace, preflightJoin } from "./spaces.js";
 import { logActivity, logSyncActivity, metaOf } from "./audit.js";
 
@@ -19,6 +22,15 @@ const LOG_REQUESTS = (process.env.LOG_LEVEL ?? "info") !== "quiet";
 const SERVER_VERSION = "1.0.0";
 openDb(); // 先开库（所有路由依赖 db 就绪）
 const cfg: ServerConfig = loadConfig();
+// 免认证的 POST /spaces 会一直开着（新空间创建者没有任何凭证可用），所以
+// maxSpaces 是"公网开放注册"的唯一总闸：0 = 不限 → 任何人都能无限建空间
+// （2026-09-15 评审 H2）。这里只提醒，改配置由老板决定。
+if (cfg.max_spaces === 0) {
+  console.warn(
+    "[einz] ⚠️ maxSpaces=0（不限）：POST /spaces 免认证，等于对公网开放建空间。" +
+      "若不需要对外开放注册，请在 server/einz_server_config.json 设为实际预期值（如 1~2）后重启。"
+  );
+}
 
 /** 邀请链接 base：按请求真实地址（Host + x-forwarded-proto）生成——TUI
  *  --server http://localhost:3000 / app local_config.json 覆盖服务器地址时，
@@ -65,6 +77,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
   const method = req.method ?? "GET";
+
+  // 全站兜底限速（按 IP；真正的刷量防护在反代/云侧，这里只防误用与粗暴刷）
+  limitByIp(req, "global");
 
   // 健康检查（免鉴权，供外部随时探测服务状态）
   if (method === "GET" && path === "/health") {
@@ -123,10 +138,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
-  // Multiverse：多租户空间（骨架，成员认证由 U1 Space-scoped session 补齐；
-  // 见 docs/PROTOCOL_MULTIVERSE.md §4）
+  // Multiverse：多租户空间（空间本身自举：POST /spaces 免认证——新空间创建者
+  // 还没有任何凭证；其余 /spaces/* 端点一律要求该空间成员会话，见 guard.ts）
   if (method === "POST" && path === "/spaces") {
-    const body = await readJson(req);
+    limitByIp(req, "spaceCreate");
+    const body = await readJsonBody(req);
     const r = await createSpace(
       body?.space_id == null ? undefined : String(body.space_id),
       body?.display_name == null ? undefined : String(body.display_name),
@@ -143,18 +159,21 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
   if (method === "GET" && path === "/spaces/lookup") {
+    limitByIp(req, "auth");
     const r = lookupSpace(url.searchParams.get("address") ?? undefined);
     sendJson(res, 200, r);
     return;
   }
   if (method === "POST" && path === "/spaces/join/preflight") {
-    const body = await readJson(req);
+    limitByIp(req, "auth");
+    const body = await readJsonBody(req);
     const r = preflightJoin(String(body?.token ?? ""));
     sendJson(res, 200, r);
     return;
   }
   if (method === "POST" && path === "/spaces/join") {
-    const body = await readJson(req);
+    limitByIp(req, "auth");
+    const body = await readJsonBody(req);
     const r = joinSpace(
       String(body?.token ?? ""),
       String(body?.public_key ?? ""),
@@ -168,14 +187,18 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "POST" && path.startsWith("/spaces/") && path.endsWith("/join-tokens")) {
     const spaceId = path.slice("/spaces/".length, -"/join-tokens".length);
+    // C1 修复：签发邀请凭证 = 空间级操作，必须持该空间成员会话（此前任何人
+    // 拿到 spaceId 就能自签邀请码、以 partner_slot=0 冒充创建者加设备）
+    requireSpaceMember(cfg, optionalBearerToken(req), spaceId);
     const r = createJoinToken(spaceId, requestBaseUrl(req));
     sendJson(res, 201, r);
     return;
   }
   if (method === "POST" && path.startsWith("/spaces/") && path.endsWith("/key-escrow")) {
     const spaceId = path.slice("/spaces/".length, -"/key-escrow".length);
-    const body = await readJson(req);
-    const r = await escrowForSpace(spaceId, body);
+    const body = await readJsonBody(req);
+    // 口令取包分支免认证（加入方尚无 session），上传分支在 escrowForSpace 内校验成员
+    const r = await escrowForSpace(cfg, optionalBearerToken(req), spaceId, body);
     sendJson(res, 200, r);
     return;
   }
@@ -183,7 +206,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // 认证（challenge-response）
   // 签发 session = 设备重新取得访问权（App 冷启动/会话过期重登），审计记一笔
   if (method === "POST" && path === "/auth/verify") {
-    const body = await readJson(req);
+    const body = await readJsonBody(req);
     const result = verifyChallenge(cfg, String(body?.challenge_id ?? ""), String(body?.challenge_plaintext ?? ""));
     const challengeDevice = getDb()
       .prepare(`SELECT device_id, space_id FROM challenges WHERE challenge_id = ?`)
@@ -201,7 +224,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
   if (method === "POST" && path === "/auth/challenge") {
-    const body = await readJson(req);
+    limitByIp(req, "auth");
+    const body = await readJsonBody(req);
     const deviceId = String(body?.device_id ?? "");
     // Multiverse：可选 target space（记录到 challenge→session；不带则 legacy 回落）
     const spaceId = body?.space_id == null ? undefined : String(body.space_id);
@@ -210,7 +234,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
   if (method === "POST" && path === "/auth/verify") {
-    const body = await readJson(req);
+    const body = await readJsonBody(req);
     const result = verifyChallenge(cfg, String(body?.challenge_id ?? ""), String(body?.challenge_plaintext ?? ""));
     sendJson(res, 200, result);
     return;
@@ -218,8 +242,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   // 消息与同步
   if (method === "POST" && path === "/messages") {
-    const body = await readJson(req);
-    const token = bearer(req);
+    const body = await readJsonBody(req);
+    const token = bearerToken(req);
     const sess = resolveSession(token);
     const result = postMessage(cfg, token, body);
     const envelope = body as { sender_device_id?: string; type?: string };
@@ -241,7 +265,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
   if (method === "GET" && path === "/sync") {
-    const token = bearer(req);
+    const token = bearerToken(req);
     const sess = resolveSession(token);
     const after = Number(url.searchParams.get("after") ?? 0);
     const limit = Number(url.searchParams.get("limit") ?? 100);
@@ -261,8 +285,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   // 消息回执（已送达/已读）：单调高水位，按 (space, person) 一行
   if (method === "POST" && path === "/receipts") {
-    const body = await readJson(req);
-    const token = bearer(req);
+    const body = await readJsonBody(req);
+    const token = bearerToken(req);
     const sess = resolveSession(token);
     const b = (body ?? {}) as Record<string, unknown>;
     const result = postReceipts(cfg, token, body);
@@ -283,13 +307,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
   if (method === "GET" && path === "/receipts") {
-    sendJson(res, 200, getReceipts(cfg, bearer(req)));
+    sendJson(res, 200, getReceipts(cfg, bearerToken(req)));
     return;
   }
 
   // 附件
   if (method === "POST" && path === "/attachments") {
-    const token = bearer(req);
+    const token = bearerToken(req);
     // P2 修复：x-attachment-meta 缺失/坏 JSON 应返回 400，而非崩溃成 500（PROTOCOL.md §9）
     const rawMeta = req.headers["x-attachment-meta"];
     let meta: unknown;
@@ -301,15 +325,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     } catch {
       throw new ApiError("INVALID_REQUEST", "malformed x-attachment-meta header", 400);
     }
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) chunks.push(chunk as Buffer);
-    const blob = Buffer.concat(chunks);
+    // H1：附件 blob 上限（默认 64 MiB，EINZ_MAX_ATTACHMENT_BYTES 可覆盖）
+    const blob = await readBody(req, MAX_ATTACHMENT_BYTES);
     sendJson(res, 200, storeAttachment(cfg, token, meta as never, blob));
     return;
   }
   const attMatch = path.match(/^\/attachments\/([^/]+)$/);
   if (method === "GET" && attMatch) {
-    const token = bearer(req);
+    const token = bearerToken(req);
     const blob = getAttachmentBlob(cfg, token, attMatch[1]);
     res.writeHead(200, { "Content-Type": "application/octet-stream" });
     res.end(blob);
@@ -318,11 +341,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   // 头像（per-person）：上传（token 认证，写本人头像文件）/ 获取（公开，404=未设置）
   if (method === "POST" && path === "/avatar") {
-    const token = bearer(req);
+    const token = bearerToken(req);
     const { device_id } = resolveSession(token);
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) chunks.push(chunk as Buffer);
-    const blob = Buffer.concat(chunks);
+    // H1：头像上限 2MB（与 storeAvatar 内的校验同一个常量，提前在这里拒绝）
+    const blob = await readBody(req, MAX_AVATAR_BYTES);
     const stored = storeAvatar(cfg, token, blob);
     // 广播：伴侣（及本人其他设备）在线时立即重拉头像——否则要等重启 App
     // （客户端静态缓存只在进程内失效——老板 2026-09-11）
@@ -345,7 +367,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // 设备
   if (method === "POST" && path === "/devices/enroll") {
     // 动态登记（免认证，邀请码即准入令牌）：新设备凭邀请码登记，立即生效无需重启
-    const body = await readJson(req);
+    limitByIp(req, "auth");
+    const body = await readJsonBody(req);
     const result = enrollDevice(cfg, body);
     logActivity({
       deviceId: result.device_id,
@@ -359,8 +382,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "POST" && path === "/devices/name") {
     // 更新本设备名称（已登记设备 TUI 改名后同步后台，显示层用）
-    const body = await readJson(req);
-    const token = bearer(req);
+    const body = await readJsonBody(req);
+    const token = bearerToken(req);
     const sess = resolveSession(token);
     const b = (body ?? {}) as Record<string, unknown>;
     sendJson(res, 200, updateDeviceName(cfg, token, body));
@@ -375,8 +398,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "POST" && path === "/devices/person-name") {
     // 更新本设备 person 显示名（/rename 命令，显示层用）
-    const body = await readJson(req);
-    const token = bearer(req);
+    const body = await readJsonBody(req);
+    const token = bearerToken(req);
     const sess = resolveSession(token);
     const b = (body ?? {}) as Record<string, unknown>;
     sendJson(res, 200, updatePersonName(cfg, token, body));
@@ -391,17 +414,17 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "POST" && path === "/invites") {
     // 创建者生成邀请码（白名单外新设备加入用）
-    const body = await readJson(req);
-    sendJson(res, 200, createInvite(cfg, bearer(req), body));
+    const body = await readJsonBody(req);
+    sendJson(res, 200, createInvite(cfg, bearerToken(req), body));
     return;
   }
   if (method === "GET" && path === "/devices") {
-    sendJson(res, 200, listDevices(cfg, bearer(req)));
+    sendJson(res, 200, listDevices(cfg, bearerToken(req)));
     return;
   }
   const devMatch = path.match(/^\/devices\/([^/]+)$/);
   if (method === "DELETE" && devMatch) {
-    const token = bearer(req);
+    const token = bearerToken(req);
     const caller = resolveSession(token);
     const result = revokeDevice(cfg, token, devMatch[1]);
     // 审计：设备撤销（谁撤的、撤了谁）
@@ -422,8 +445,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   // 推送
   if (method === "POST" && path === "/push/register") {
-    const body = await readJson(req);
-    const token = bearer(req);
+    const body = await readJsonBody(req);
+    const token = bearerToken(req);
     const sess = resolveSession(token);
     const b = (body ?? {}) as Record<string, unknown>;
     sendJson(res, 200, registerPushToken(cfg, token, body));
@@ -440,7 +463,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
   if (method === "DELETE" && path === "/push/register") {
-    const token = bearer(req);
+    const token = bearerToken(req);
     const sess = resolveSession(token);
     sendJson(res, 200, unregisterPushToken(cfg, token));
     logActivity({ deviceId: sess.device_id, spaceId: sess.space_id, kind: "push.unregister", meta: metaOf(req) });
@@ -449,45 +472,26 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   // 密钥托管（口令托管，KEY_ESCROW.md §4）：Server 只存密文包，不解析内容
   if (method === "POST" && path === "/key-escrow") {
-    const body = await readJson(req);
-    sendJson(res, 200, uploadKeyEscrow(cfg, bearer(req), body));
+    const body = await readJsonBody(req);
+    sendJson(res, 200, uploadKeyEscrow(cfg, bearerToken(req), body));
     return;
   }
   if (method === "GET" && path === "/key-escrow") {
-    sendJson(res, 200, getKeyEscrow(cfg, bearer(req)));
+    sendJson(res, 200, getKeyEscrow(cfg, bearerToken(req)));
     return;
   }
   if (method === "DELETE" && path === "/key-escrow") {
-    sendJson(res, 200, deleteKeyEscrow(cfg, bearer(req)));
+    sendJson(res, 200, deleteKeyEscrow(cfg, bearerToken(req)));
     return;
   }
 
   // 空间
   if (method === "GET" && path === "/space") {
-    sendJson(res, 200, getSpace(cfg, bearer(req)));
+    sendJson(res, 200, getSpace(cfg, bearerToken(req)));
     return;
   }
 
   sendJson(res, 404, { error: { code: "NOT_FOUND", message: "not found" } });
-}
-
-function bearer(req: IncomingMessage): string {
-  const h = req.headers.authorization ?? "";
-  const m = h.match(/^Bearer (.+)$/);
-  if (!m) throw new ApiError("UNAUTHORIZED", "missing bearer token", 401);
-  return m[1];
-}
-
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
-  const text = Buffer.concat(chunks).toString("utf8");
-  if (!text) return {};
-  try {
-    return JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    throw new ApiError("INVALID_REQUEST", "invalid json body", 400);
-  }
 }
 
 function sendJson(res: ServerResponse, status: number, data: unknown): void {

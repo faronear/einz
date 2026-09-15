@@ -362,11 +362,10 @@ async function main (): Promise<void> {
 
     // 10) WS：A 连接后，B 发消息 → A 实时收到 message.new
     await new Promise<void>((done, fail) => {
-      // token 含 base64 的 +/= 字符，作为查询参数必须 URL 编码（PROTOCOL.md §8.1）
+      // 凭证走握手头（PROTOCOL.md §8.1：token 不放 URL query）
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=1&token=${encodeURIComponent(
-          devA.sessionToken
-        )}`
+        `ws://127.0.0.1:${port}/ws?pv=1`,
+        { headers: { Authorization: `Bearer ${devA.sessionToken}` } }
       )
       const timer = setTimeout(
         () => fail(new Error('WS message.new timeout')),
@@ -909,8 +908,13 @@ async function main (): Promise<void> {
       }
       const tk6 = await fetch(
         `http://127.0.0.1:${port6}/spaces/${a6.spaceId}/join-tokens`,
-        { method: 'POST' }
+        {
+          method: 'POST',
+          // C1 修复后：签发邀请需要该空间成员会话（创建者自己即可）
+          headers: { Authorization: `Bearer ${a6.sessionToken}` }
+        }
       )
+      assert.equal(tk6.status, 201, 'create join token should succeed')
       const { joinToken } = (await tk6.json()) as { joinToken: string }
       const join6 = await fetch(`http://127.0.0.1:${port6}/spaces/join`, {
         method: 'POST',
@@ -926,9 +930,8 @@ async function main (): Promise<void> {
 
       // B 在线（WS）；A 始终不连 WS
       const ws6 = new WebSocket(
-        `ws://127.0.0.1:${port6}/ws?pv=1&token=${encodeURIComponent(
-          b6.sessionToken
-        )}`
+        `ws://127.0.0.1:${port6}/ws?pv=1`,
+        { headers: { Authorization: `Bearer ${b6.sessionToken}` } }
       )
       const got = new Promise<Record<string, string>>((done, fail) => {
         const timer = setTimeout(
@@ -1033,14 +1036,20 @@ async function main (): Promise<void> {
     // 13) 取包端点限速（2026-09-14）：`POST /spaces/{id}/key-escrow` 是**免设备认证**的
     //     口令校验端点，若不限速即可在线爆破口令（口令 = 拿到 Space Key 的凭证）。
     //     阈值由 EINZ_ESCROW_RATE_MAX 压到 2：两次失败后第 3 次起 429。
+    //     注（2026-09-15 C1）：取包分支仍免认证，但**上传分支要成员会话**——所以
+    //     这里建空间时带上 public_key，拿创建者自己的 session 用于上传。
     const rateSpace = await (async () => {
       const r = await fetch(`http://127.0.0.1:${port}/spaces`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: '限速测试空间' })
+        body: JSON.stringify({
+          displayName: '限速测试空间',
+          public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
+          device_name: 'dev-rate'
+        })
       })
       assert.equal(r.status, 201, 'create space for rate-limit test should succeed')
-      return ((await r.json()) as { spaceId: string }).spaceId
+      return (await r.json()) as { spaceId: string; sessionToken: string }
     })()
     const ratePkg = {
       format: 'backup-v1',
@@ -1050,10 +1059,13 @@ async function main (): Promise<void> {
     }
     const ratePass = 'rate-limit-pass-123'
     const rateUp = await fetch(
-      `http://127.0.0.1:${port}/spaces/${rateSpace}/key-escrow`,
+      `http://127.0.0.1:${port}/spaces/${rateSpace.spaceId}/key-escrow`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${rateSpace.sessionToken}`
+        },
         body: JSON.stringify({
           package: ratePkg,
           passphrase_hash: await pwhashStr(ratePass)
@@ -1062,9 +1074,20 @@ async function main (): Promise<void> {
     )
     assert.equal(rateUp.status, 200, 'space escrow upload with hash should succeed')
 
+    // 上传分支必须持成员会话：不带凭证 → 401，非成员 → 403（C1 回归）
+    const noAuthUp = await fetch(
+      `http://127.0.0.1:${port}/spaces/${rateSpace.spaceId}/key-escrow`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ package: ratePkg, passphrase_hash: await pwhashStr(ratePass) })
+      }
+    )
+    assert.equal(noAuthUp.status, 401, 'escrow upload without session must be rejected')
+
     const tryPassphrase = async (passphrase: string): Promise<number> => {
       const r = await fetch(
-        `http://127.0.0.1:${port}/spaces/${rateSpace}/key-escrow`,
+        `http://127.0.0.1:${port}/spaces/${rateSpace.spaceId}/key-escrow`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

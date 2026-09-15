@@ -229,7 +229,8 @@ async function main (): Promise<void> {
     // 7) Alice 在线时，Bob 上报 read=2 → Alice 应通过 WS 收到 receipt.updated
     await new Promise<void>((done, fail) => {
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=1&token=${encodeURIComponent(alice.sessionToken)}`
+        `ws://127.0.0.1:${port}/ws?pv=1`,
+        { headers: { Authorization: `Bearer ${alice.sessionToken}` } }
       )
       const timer = setTimeout(() => fail(new Error('WS receipt.updated timeout')), 5000)
       ws.on('message', data => {

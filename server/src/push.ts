@@ -1,6 +1,7 @@
 import { getDb } from "./db.js";
 import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
+import { deviceScopeClause } from "./guard.js";
 
 export interface PushTokenBody {
   platform: "ios" | "android";
@@ -65,16 +66,19 @@ export function sendPushHint(spaceId: string, exceptDeviceId: string): void {
 /** GET /space：空间信息（space_id + 成员设备 + person 名称/性别表）。
  *  v2：名称/性别从 space_members 表读（display_name/gender——create/join 写入），
  *  不再读 v1 的 meta person_name:* 与 person_gender:* 键（v2 不写 meta——老板 2026-09-10
- *  反馈：标题栏对方名字一直 '-'、气泡全青色）。 */
+ *  反馈：标题栏对方名字一直 '-'、气泡全青色）。
+ *  设备范围：**仅本空间成员设备**（guard.deviceScopeClause）——此前直出全局
+ *  devices 表，跨空间泄漏 person/在线状态（2026-09-15 评审 C2）。 */
 export function getSpace(
   cfg: ServerConfig,
   token: string
 ): { space_id: string; devices: unknown[]; person_names: Record<string, string>; person_genders: Record<string, string> } {
   const sess = resolveSession(token);
   if (!isActiveDevice(cfg, sess.device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+  const scope = deviceScopeClause(sess.space_id);
   const devices = getDb()
-    .prepare(`SELECT device_id, person_id, status, last_seen FROM devices WHERE status = 'active'`)
-    .all();
+    .prepare(`SELECT d.device_id, d.person_id, d.status, d.last_seen FROM devices d WHERE d.status = 'active' AND (${scope.sql})`)
+    .all(...scope.params);
   // v2：成员名称/性别表（space_members——按 person_id；同一身份多设备共享）
   const personNames: Record<string, string> = {};
   const personGenders: Record<string, string> = {};

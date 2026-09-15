@@ -5506,3 +5506,105 @@ only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置
   创建向导 create 步骤与改口令弹窗共用一句；join 步骤另有 `wizardJoinPassphraseHint`，未动）。
 
 **验证：** `flutter analyze` 无 issue；menu + wizard + join 共 34 项全过。
+
+---
+
+## 2026-09-15 服务端安全修复（评审 C1/C2/H1/H2/H4 落地）
+
+**背景：** `aimemo/architectureReview20260915.md`（只读评审，基线 commit `70f32cf`）报了
+2 个严重 + 4 个高危问题。我先逐条回代码核实，把「成立 / 夸大 / 误报」分开，老板拍板先修
+**我认可的那一批**（C1、C2、H1、H2、H4），其余（死代码、文档、仓库卫生、架构项）留待讨论。
+
+### 核实结论（先说结论再动手）
+
+- **成立**：C1（两个 space 级端点完全无鉴权）、C2（跨空间隔离失效）、H1（无 body 上限）、
+  H2（无全局限速 + maxSpaces=0 公网开放注册）、H4（WS token 走 URL + session 明文入库）。
+  另有中危若干（/avatar 公开、/health 泄露计数、restoreBackup 的 `files/` 分支可 `../` 逃逸、
+  恢复码取词模偏差——实测词表 2050 条、`65536 % 2050 = 1986`，偏差真实但量级极小）。
+- **报告里两条是误报，已回给老板**：
+  ① `cli/demo/.gitignore` 并非"漏保护 store-*.json"——`s*.json` 的 `*` 恰好覆盖
+     `store-a.json`（`git check-ignore -v` 实测命中该规则），不会 `git add .` 就泄露；
+  ② `app.db*` 改 `*.db*` 是冗余——`einz.sqlite.db{,-wal,-shm}` 已被根 `.gitignore` 的
+     `*.db` 系列覆盖。
+  另：`sendPushHint` 无人调用属实，但那是**已记录的刻意决策**（`docs/IOS.md` §4.1 +
+  productLens，2026-09-14 老板拍板暂缓推送，WS 兜底），不是待修缺陷。
+- **报告本身的方法学问题**：基线落后当时 HEAD 13 个提交（行号/计数已漂移：chat_page 实为
+  4863 行、SFConflict 实为 77 个、`tmp_probe4_test.dart` 已被 d425159 删除）；`api_client.dart`
+  与 `ws_client.dart` 实际在 `shared/lib/src/protocol/` 而非 `app/lib/data/`。动手前必须重新定位。
+
+### 改了什么
+
+**C1 — space 级端点补鉴权（结构性解法：抽守卫）**
+
+新增 `server/src/guard.ts`：`bearerToken` / `optionalBearerToken` / `requireSession` /
+`isSpaceMember` / `requireSpaceMember`。判定依据是 **devices.person_id → space_members**，
+而不是会话里的 space_id（同一身份多设备、将来一设备多空间会话都不受影响）。
+
+- `POST /spaces/{id}/join-tokens`：挂 `requireSpaceMember`（未带凭证 401 / 非成员 403）。
+- `POST /spaces/{id}/key-escrow`：**上传分支**挂 `requireSpaceMember`；**取包（passphrase）
+  分支刻意保持免认证**——调用方是还没入空间的加入方，它只有口令、没有 session，免认证是
+  "口令即凭证"这套设计的前提（防爆破靠既有 escrow 限速）。
+- 客户端协同改：`api_client.createJoinToken(spaceId, token)` 由 `withToken: false` 改为带
+  token；`chat_page.dart` `_showInviteDialog` 传 `widget.token`；TUI `/invite` 传
+  `store.sessionToken` 并加"未认证"人话提示；测试里的 fake override 签名同步。
+- 附带：`app.ts` 本地 `bearer()` 与 guard 重复 → 统一用 `bearerToken`（同语义，去重）。
+
+**C2 — 空间过滤收口到单一实现处**
+
+新增 `guard.deviceScopeClause(spaceId)`，`/space`（`push.ts`）与 `/devices`（`devices.ts`）
+共用：有 space 的会话 → 该空间在册成员名下的设备；**legacy 无 space 会话 → 只返回"不属于
+任何空间"的设备**。这一步是关键设计：如果 legacy 回落成"全部设备"，那拿一个不带 space_id 的
+会话（任何已登记设备都能这么认证）就能绕开隔离重新拿到全局设备表。
+`/space` 另保留原有 `status='active'` 过滤，不改变既有语义。
+
+附件（`attachments.ts`）：读侧校验 `attachments.space_id` 与会话一致，跨空间返回 **404 而非
+403**（不向非成员确认"这个 id 存在"）；写侧拒绝跨空间的 `attachment_id` 与 `message_id`
+（两个 ID 都是客户端生成的，不校验就能把 blob 挂到别人空间的消息上）。
+
+**H1 — 请求体上限**
+
+新增 `server/src/body.ts`：`readBody(req, limit)`（Content-Length 预检 + 流式累计兜底）、
+`readJsonBody`。JSON 1 MiB、附件 64 MiB、头像 2 MiB（复用 `avatars.MAX_AVATAR_BYTES`，
+已导出），超限 413 `PAYLOAD_TOO_LARGE`；`EINZ_MAX_JSON_BYTES` / `EINZ_MAX_ATTACHMENT_BYTES`
+可覆盖。`app.ts` 的本地 `readJson` 删除，三个读体点全部改走 body.ts。
+
+**H2 — 全局限速 + 配置告警**
+
+新增 `server/src/ratelimit.ts`（按 IP 固定窗口，懒清理）：建空间 20/小时、认证与加入类
+（`/auth/challenge`、`/spaces/join{,/preflight}`、`/spaces/lookup`、`/devices/enroll`）
+30/5 分钟、全站兜底 600/分钟；阈值均可用 env 覆盖。`maxSpaces === 0` 时启动打醒目告警——
+**配置本身留给老板改**（`server/einz_server_config.json` 不入库，生产值由老板定）。
+
+**H4 — WS token 移出 URL + 会话存哈希**
+
+- `ws.ts` 从 Upgrade 请求的 `Authorization: Bearer` 取 token，不再读 `?token=`；
+- `shared/.../ws_client.dart` 与 `cli/bin/einz.dart`（两处 WS 实现）改走握手头；
+- `sessions` 表改存 `sha256(token)` 十六进制（`auth.hashSessionToken`），`resolveSession`
+  对传入明文现算哈希再查库；`db.ts` 加迁移：**删除存量非哈希行**（会话本就 24h TTL，
+  客户端冷启动用设备私钥自动重新 challenge-response，用户无感）；
+- 4 处测试的 WS 连接与 1 处 join-tokens 调用、1 处 escrow 上传随之更新；
+- 文档：`docs/PROTOCOL.md` §8.1 改为头部鉴权并注明不再接受 query；`docs/SECURITY.md` §2
+  补 7 行"现有控制"（space 级鉴权 / 空间隔离 / 体积上限 / 全局限速 / 会话哈希 / WS 凭证）。
+
+### 验证
+
+- `server`: `npx tsc --noEmit` 干净；`npm run build` + `npm test` **5 个套件全绿**
+  （smoke / 两空间隔离 / 回执 / 审计 / push 作用域）。
+- 给 `two_space_isolation.test.ts` 补了 C1/C2/H4 回归断言（用 `POST /spaces` 带 public_key
+  造"真正的 v2 设备"——原先测试里的 devA/devB 走 v1 登记、不属于任何 space，正好用来验证
+  legacy 轨道行为）：跨空间签发邀请 403 / 未带凭证 401 / 自己的 201；跨空间托管包上传 403、
+  自己的 200；`/devices`、`/space` 不含他空间设备、legacy 会话看不到 v2 设备；跨空间读附件
+  404、跨空间挂附件 403；`sessions` 表每行都是 `^[0-9a-f]{64}$` 且不含明文 token。
+  修的过程中两处测试因"此前依赖免认证"而暴露失败（smoke 的 join-tokens、escrow 上传），
+  已按新契约修正——这本身就是修复生效的证据。
+- `shared` / `cli` / `app`: `dart analyze` / `flutter analyze` 全部 `No issues found`。
+  App 侧 UI 由老板真机自测（本次动了 `chat_page._showInviteDialog` 的调用与 WS 连接方式）。
+
+### 待讨论（未做，留给老板拍板）
+
+死代码清单（第二个 `/auth/verify`、`generateAttachmentNonce`、`Api.devices`、
+`fetchAttachment` 的 sha256 参数、`statusText`、`SyncState`/`PendingMessage`——注意
+`buildConfigPayload` 仍被 shared 测试使用，删前要动测试）；文档 4 条过期（README scripts 名、
+文档表缺 4 个文件、PROTOCOL_MULTIVERSE 示例硬编码链接）；仓库卫生（SFConflict 已 77 个且
+**3 个落在 `.git/` 内部**，比 cli/demo 的更该先处理）；架构项（app.ts 手写路由剩余 ~20 处
+鉴权三连尚未统一走 guard——本次只在 C1/C2 触点收口，全量改造是评审架构项 #1）。

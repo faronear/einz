@@ -18,8 +18,9 @@ function assertSafePersonId(personId: string): void {
   }
 }
 
-/** 头像大小上限（2MB，png/jpg 均足够）。 */
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+/** 头像大小上限（2MB，png/jpg 均足够）。上传路由用它做请求体上限，避免先
+ *  把超大 body 读进内存再判超限（2026-09-15 评审 H1）。 */
+export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 /** 上传本人头像：token 认证 → 解析设备 → 查 person_id → 写文件（覆盖旧头像）。 */
 export function storeAvatar(

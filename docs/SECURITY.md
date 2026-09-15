@@ -48,6 +48,12 @@
 | 口令托管（接入凭证） | `shared/lib/src/crypto/key_escrow.dart` | Argon2id + XChaCha20-Poly1305；**取包免设备认证**（见 §3.2） |
 | 口令策略 | `shared/lib/src/crypto/passphrase_policy.dart` | ≥8 位（只卡长度、不卡字符种类）；设置/修改时三端统一校验，输入既有口令（接入/取包）不校验 |
 | 取包失败限速 | `server/src/escrow.ts`（`ESCROW_RATE_LIMITED`） | 免认证取包端点按 space 计失败次数，超限 429（默认 10 次/15 分钟） |
+| space 级端点鉴权 | `server/src/guard.ts` `requireSpaceMember` | `/spaces/{id}/join-tokens` 与 `/spaces/{id}/key-escrow` **上传分支**必须持该空间成员会话（2026-09-15 评审 C1 修复：此前完全无鉴权，拿到 spaceId 即可自签邀请 / 覆盖别人的口令托管包）。**口令取包分支仍刻意免认证**（加入方尚无 session，口令即凭证） |
+| 空间隔离 | `guard.ts` `deviceScopeClause` + `attachments.ts` | `GET /space`、`GET /devices` 只返回本空间成员设备；附件读写校验 `attachments.space_id` 与会话一致（2026-09-15 评审 C2 修复）。legacy 无 space 会话只看到"不属于任何空间"的设备——**不回落成全局**，否则等于留后门 |
+| 请求体上限 | `server/src/body.ts` | JSON 1 MiB / 附件 64 MiB / 头像 2 MiB，超限 413（2026-09-15 评审 H1 修复）。可用 `EINZ_MAX_JSON_BYTES`、`EINZ_MAX_ATTACHMENT_BYTES` 覆盖 |
+| 全局限速 | `server/src/ratelimit.ts` | 按来源 IP 固定窗口：建空间 20/小时、认证与加入类 30/5 分钟、全站兜底 600/分钟（2026-09-15 评审 H2 修复，防公网开放注册被刷） |
+| 会话凭证存储 | `server/src/auth.ts` `hashSessionToken` | `sessions` 表只存 session token 的 sha256（与 `join_tokens` 同标准）；库/备份泄露不能直接冒用会话（2026-09-15 评审 H4 修复） |
+| WS 凭证传输 | `server/src/ws.ts` | 握手用 `Authorization: Bearer`，**不再接受 `?token=`**——URL 会进反代 access log / 代理缓存（2026-09-15 评审 H4 修复） |
 | 口令重设通知 | `server/src/escrow.ts` + WS `passphrase.rotated` | 改口令后其余设备收通知 / 离线补查 `updated_at` |
 | 客户端不缓存密保口令 | `app/lib/data/app_lock.dart`（`AppLockPayload` 无口令字段） | 2026-09-14 起锁包与明文 payload 均不含口令——本地秘密面只剩 Space Key + 设备私钥；代价见 §4.7、§6 |
 | 整机备份 | CLI `backup`/`restore`、App「导出完整备份」 | 12 词恢复码（Argon2id 派生）加密；恢复码离线保存 |

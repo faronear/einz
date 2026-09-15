@@ -717,9 +717,12 @@ Future<void> _cmdListen(ArgResults opts) async {
   stdout.writeln('🔌 实时监听: $wsUrl/ws（Ctrl+C 退出）');
   while (true) {
     try {
-      // token 含 base64 的 +/= 字符，必须 URL 编码（PROTOCOL.md §8.1）
-      final uri = Uri.parse('$wsUrl/ws?pv=1&token=${Uri.encodeQueryComponent(store.sessionToken!)}');
-      final ws = await WebSocket.connect(uri.toString());
+      // 凭证走握手头（PROTOCOL.md §8.1）：URL 会进反代日志，token 不放 query
+      final uri = Uri.parse('$wsUrl/ws?pv=1');
+      final ws = await WebSocket.connect(
+        uri.toString(),
+        headers: {'Authorization': 'Bearer ${store.sessionToken!}'},
+      );
       stdout.writeln('✅ WS 已连接');
       await for (final data in ws) {
         final frame = jsonDecode(data as String) as Map<String, dynamic>;

@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto'
 import { getDb, getMeta, setMeta } from './db.js'
 import { ApiError, resolveSession } from './auth.js'
 import { isActiveDevice, getDevice, type ServerConfig } from './config.js'
+import { deviceScopeClause } from './guard.js'
 import { broadcastProfileUpdated, getConnectedAt } from './ws.js'
 
 /** 邀请码字符集（去易混字符 0/O/1/I）与格式：5 字符一组，共 4 组。 */
@@ -33,20 +34,26 @@ function assignDeviceId (clientId: string): string {
 
 /** GET /devices：设备列表（含 person 映射）。
  *  注意：不在本接口刷新调用方 last_seen——last_seen 只由 WS 连接/心跳/断开维护，
- *  否则任何轮询客户端都会让自己"永远新鲜"（对方误判在线，见 chat_page 在线判定）。 */
+ *  否则任何轮询客户端都会让自己"永远新鲜"（对方误判在线，见 chat_page 在线判定）。
+ *  范围：**仅本会话可见的设备**（该空间成员；见 guard.deviceScopeClause）——
+ *  此前直出全局 devices 表，跨空间泄漏 person/公钥/在线状态（2026-09-15 评审 C2）。 */
 export function listDevices (
   cfg: ServerConfig,
   token: string
 ): { devices: unknown[] } {
-  const { device_id } = resolveSession(token)
+  const { device_id, space_id } = resolveSession(token)
   if (!isActiveDevice(cfg, device_id))
     throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
 
+  const scope = deviceScopeClause(space_id)
   const rows = getDb()
     .prepare(
-      `SELECT device_id, person_id, status, last_seen, public_key, device_name FROM devices ORDER BY created_at`
+      `SELECT d.device_id, d.person_id, d.status, d.last_seen, d.public_key, d.device_name
+         FROM devices d
+        WHERE ${scope.sql}
+        ORDER BY d.created_at`
     )
-    .all() as {
+    .all(...scope.params) as {
     device_id: string
     person_id: string
     status: string

@@ -753,14 +753,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 邀请设备：生成一次性 join token（POST /spaces/{id}/join-tokens，Multiverse
-  /// v2，24h 一次性、免认证；旧 v1 createInvite 已废弃，不再生成 v1 邀请码）。
+  /// v2，24h 一次性、需本人会话认证；旧 v1 createInvite 已废弃，不再生成 v1 邀请码）。
   /// 二维码与展示内容 = 邀请链接（`https://einz.tic.cc/join/<token>`），对方 App/
   /// CLI 可扫码或粘贴链接加入；口令由对方加入时另行输入（降级 B，与 TUI 一致）。
   Future<void> _showInviteDialog() async {
     // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"邀请设备"确认窗）
     try {
       final api = widget.api ?? ApiClient(widget.server);
-      final r = await api.createJoinToken(widget.spaceId);
+      final r = await api.createJoinToken(widget.spaceId, widget.token);
       if (!mounted) return;
       await showDialog<void>(
         context: context,

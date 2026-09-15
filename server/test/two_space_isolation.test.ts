@@ -4,7 +4,11 @@
  * 验证（PROTOCOL_MULTIVERSE.md §7.1 落地）：
  *   - 设备 A 认证绑定 spaceA、设备 B 认证绑定 spaceB；
  *   - A 发消息后：A 的 /sync 能看到 1 条，B 的 /sync 为 0（跨空间不可见）；
- *   - 反向：B 发消息后 A 仍看不到（server_sequence 按 Space 独立递增）。
+ *   - 反向：B 发消息后 A 仍看不到（server_sequence 按 Space 独立递增）；
+ *   - 2026-09-15 评审 C1/C2/H4 回归：
+ *       空间级端点必须持本空间成员会话（join-tokens / key-escrow 上传）；
+ *       /devices 与 /space 只返回本空间设备；跨空间读附件 404；
+ *       sessions 表只存 sha256（明文 token 不入库）。
  *
  * 运行：npm test（需先 npm run build 生成 dist/）
  */
@@ -12,7 +16,9 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 // libsodium-wrappers 的 ESM 入口在 Node ESM 下损坏，统一用 CJS 构建（同 smoke.test.ts）。
 const sodium = require('libsodium-wrappers') as typeof import('libsodium-wrappers')
+const Database = require('better-sqlite3') as typeof import('better-sqlite3')
 const B64 = sodium.base64_variants.ORIGINAL
+import { createHash } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer, type AddressInfo } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -210,7 +216,193 @@ async function main (): Promise<void> {
     assert.equal(syncB2.messages.length, 1, 'Space B sees its own message')
     assert.equal(syncB2.messages[0].message_id, 'b-0001')
 
-    console.log('✅ 双 Space 隔离测试通过：A 与 B 消息互不可见，sequence 各自独立')
+    // ── C1/C2/H4 回归（2026-09-15 评审）──
+    // 需要一个"真正的 v2 设备"：POST /spaces 带 public_key 时，创建者设备就是该
+    // 空间的在册成员（person_id 落在 space_members）。上面 devA/devB 走的是 v1
+    // 登记（personA/personB，不属于任何 space），正好用来验证 legacy 轨道行为。
+    const createV2Space = async (
+      label: string
+    ): Promise<{ spaceId: string; deviceId: string; sessionToken: string }> => {
+      const kp = sodium.crypto_box_keypair()
+      const res = await fetch(`http://127.0.0.1:${port}/spaces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: label,
+          public_key: sodium.to_base64(kp.publicKey, B64),
+          device_name: label
+        })
+      })
+      assert.equal(res.status, 201, `create ${label} should succeed`)
+      const b = (await res.json()) as {
+        spaceId: string
+        deviceId: string
+        sessionToken: string
+      }
+      assert.ok(b.deviceId.length > 0 && b.sessionToken.length > 0, '创建者应直接拿到设备与会话')
+      return b
+    }
+    const spaceC = await createV2Space('空间C')
+    const spaceD = await createV2Space('空间D')
+
+    // C1：签发邀请 = 空间级操作，必须持该空间成员会话
+    const mintAs = (spaceId: string, token?: string): Promise<Response> =>
+      fetch(`http://127.0.0.1:${port}/spaces/${spaceId}/join-tokens`, {
+        method: 'POST',
+        ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {})
+      })
+    assert.equal((await mintAs(spaceC.spaceId)).status, 401, '签发邀请未带凭证必须 401')
+    assert.equal(
+      (await mintAs(spaceD.spaceId, spaceC.sessionToken)).status,
+      403,
+      'C 不得为 D 的空间签发邀请（跨空间）'
+    )
+    assert.equal(
+      (await mintAs(spaceC.spaceId, spaceC.sessionToken)).status,
+      201,
+      'C 可为自己的空间签发邀请'
+    )
+
+    const escrowUpload = (spaceId: string, token?: string): Promise<Response> =>
+      fetch(`http://127.0.0.1:${port}/spaces/${spaceId}/key-escrow`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          package: { format: 'backup-v1', salt: 's', nonce: 'n', ciphertext: 'c' },
+          passphrase_hash: 'x'
+        })
+      })
+    assert.equal((await escrowUpload(spaceC.spaceId)).status, 401, '上传托管包未带凭证必须 401')
+    assert.equal(
+      (await escrowUpload(spaceD.spaceId, spaceC.sessionToken)).status,
+      403,
+      'C 不得覆盖 D 空间的口令托管包（跨空间）'
+    )
+    assert.equal(
+      (await escrowUpload(spaceC.spaceId, spaceC.sessionToken)).status,
+      200,
+      'C 可上传自己空间的托管包'
+    )
+
+    // C2：设备列表 / 空间信息只含本空间设备
+    const devicesOf = async (token: string): Promise<string[]> => {
+      const res = await fetch(`http://127.0.0.1:${port}/devices`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      assert.equal(res.status, 200, '/devices should succeed')
+      const body = (await res.json()) as { devices: Array<{ device_id: string }> }
+      return body.devices.map(x => x.device_id)
+    }
+    const devIdsC = await devicesOf(spaceC.sessionToken)
+    assert.ok(devIdsC.includes(spaceC.deviceId), 'C 的 /devices 应包含自己')
+    assert.ok(!devIdsC.includes(spaceD.deviceId), 'C 的 /devices 不得含 D 空间设备')
+
+    // legacy 会话（v1 轨道）只应看到"不属于任何空间"的设备——否则拿一个不带
+    // space_id 的会话就能绕开隔离，重新拿到全局设备表
+    const legacyIds = await devicesOf(devA.sessionToken)
+    assert.ok(!legacyIds.includes(spaceC.deviceId), 'legacy 会话不得看到 v2 空间设备')
+    assert.ok(!legacyIds.includes(spaceD.deviceId), 'legacy 会话不得看到 v2 空间设备')
+
+    const spaceOf = async (token: string): Promise<string[]> => {
+      const res = await fetch(`http://127.0.0.1:${port}/space`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      assert.equal(res.status, 200, '/space should succeed')
+      const body = (await res.json()) as { devices: Array<{ device_id: string }> }
+      return body.devices.map(x => x.device_id)
+    }
+    const spaceDevC = await spaceOf(spaceC.sessionToken)
+    assert.ok(!spaceDevC.includes(spaceD.deviceId), '/space 不得含 D 空间设备')
+
+    // C2：跨空间附件——C 发消息并挂附件，D 读 404、挂 403
+    const postAsC = await fetch(`http://127.0.0.1:${port}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${spaceC.sessionToken}`
+      },
+      body: JSON.stringify({
+        v: 1,
+        type: 'text',
+        key_version: 1,
+        message_id: 'c0001aaaa',
+        sender_device_id: spaceC.deviceId,
+        nonce: 'x',
+        ciphertext: 'y'
+      })
+    })
+    assert.equal(postAsC.status, 200, 'C 发消息应成功')
+
+    const blob = Buffer.from('cipher-attachment-blob')
+    const sha = createHash('sha256').update(blob).digest('base64')
+    const uploadAs = (token: string, attachmentId: string, messageId: string): Promise<Response> =>
+      fetch(`http://127.0.0.1:${port}/attachments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          Authorization: `Bearer ${token}`,
+          'x-attachment-meta': JSON.stringify({
+            attachment_id: attachmentId,
+            message_id: messageId,
+            key_version: 1,
+            size: blob.length,
+            sha256: sha,
+            nonce: 'n'
+          })
+        },
+        body: blob
+      })
+    const attId = 'aa11bb22cc33dd44'
+    assert.equal(
+      (await uploadAs(spaceC.sessionToken, attId, 'c0001aaaa')).status,
+      200,
+      'C 上传自己空间的附件应成功'
+    )
+    assert.equal(
+      (
+        await fetch(`http://127.0.0.1:${port}/attachments/${attId}`, {
+          headers: { Authorization: `Bearer ${spaceC.sessionToken}` }
+        })
+      ).status,
+      200,
+      'C 读自己的附件应成功'
+    )
+    assert.equal(
+      (
+        await fetch(`http://127.0.0.1:${port}/attachments/${attId}`, {
+          headers: { Authorization: `Bearer ${spaceD.sessionToken}` }
+        })
+      ).status,
+      404,
+      'D 读 C 的附件必须 404（不确认存在性）'
+    )
+    assert.equal(
+      (await uploadAs(spaceD.sessionToken, 'ee55ff66aa77bb88', 'c0001aaaa')).status,
+      403,
+      'D 不得把附件挂到 C 空间的消息上'
+    )
+
+    // ── H4 回归：会话只以 sha256 入库，明文不进库 ──
+    const sqlite = new Database(join(tempDir, 'einz.sqlite.db'), { readonly: true })
+    const sessions = sqlite.prepare(`SELECT session_token FROM sessions`).all() as Array<{
+      session_token: string
+    }>
+    sqlite.close()
+    assert.ok(sessions.length > 0, '应有会话行')
+    for (const s of sessions) {
+      assert.match(s.session_token, /^[0-9a-f]{64}$/, '会话必须以 sha256 十六进制存储')
+    }
+    assert.ok(
+      !sessions.some(s => s.session_token === devA.sessionToken),
+      '明文 session token 不得入库'
+    )
+
+    console.log(
+      '✅ 双 Space 隔离测试通过：消息互不可见、sequence 独立、空间级端点鉴权与设备/附件隔离生效、会话只存哈希'
+    )
   } finally {
     if (serverProc && serverProc.exitCode === null) serverProc.kill()
     if (tempDir) rmSync(tempDir, { recursive: true, force: true })

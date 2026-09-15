@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { randomUUID } from "node:crypto";
 import { resolveSession } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
+import { optionalBearerToken } from "./guard.js";
 import type { MessageEnvelope } from "./messages.js";
 import { getDb } from "./db.js";
 import { logConnection, metaOf, type RequestMeta } from "./audit.js";
@@ -116,7 +117,10 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
   wss.on("connection", (ws, req) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const pv = url.searchParams.get("pv");
-    const token = url.searchParams.get("token");
+    // H4 修复（2026-09-15 评审）：token 从 Authorization 头取，**不再**从 URL
+    // query 读——URL 会进反代 access log / 代理缓存 / 浏览器历史，会话凭证不该
+    // 落在这些地方（此前是 `?pv=1&token=<session_token>`）。
+    const token = optionalBearerToken(req);
 
     if (pv !== "1") {
       ws.close(4400, "PROTOCOL_VERSION_MISMATCH");

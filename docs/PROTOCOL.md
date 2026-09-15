@@ -322,11 +322,14 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 ### 8.1 连接
 
 ```text
-wss://host/ws?pv=1&token=<session_token>
+wss://host/ws?pv=1
+Authorization: Bearer <session_token>
 ```
 
-- **`token` 必须 URL 编码**（session_token 为标准 base64，含 `+`/`=` 等字符，直接拼接会被查询串解析破坏）。
-- 握手失败（token 无效/过期/非白名单）→ 关闭并返回 4401。
+- **`session_token` 走握手请求头**（`Authorization: Bearer …`），**不放 URL query**
+  （2026-09-15 评审 H4：URL 会进反代 access log / 代理缓存 / 浏览器历史）。
+  服务端不再接受 `?token=`。
+- 握手失败（token 无效/过期/非白名单）→ 连接建立后关闭并返回 4401。
 - 连接期间 Server 持续校验 token 有效期。
 
 ### 8.2 帧格式（JSON 文本帧）

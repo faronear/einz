@@ -2785,9 +2785,15 @@ Future<void> _execInvite() async {
     s.status = '';
     return;
   }
+  // 签发邀请凭证要求本设备持该空间成员会话（服务端 403/401 亦可，这里先给人话）
+  if (store.sessionToken == null) {
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 尚未认证（先 /auth 激活本设备）'));
+    s.status = '';
+    return;
+  }
   try {
     final api = ApiClient(store.server ?? '');
-    final r = await _busy(s.session, '⏳ 邀请生成中......', () => api.createJoinToken(store.spaceId!));
+    final r = await _busy(s.session, '⏳ 邀请生成中......', () => api.createJoinToken(store.spaceId!, store.sessionToken!));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
     s.session.messages.add(_systemMessage(s.session, '✅ 邀请新设备，24 小时内一次性有效：\n📎 ${r.link}\n🛡️  ${r.joinToken}'));
     s.status = ''; // 反馈在消息区，状态栏保持干净

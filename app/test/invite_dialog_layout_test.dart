@@ -45,7 +45,7 @@ class _InviteFakeApi extends ApiClient {
   }
 
   @override
-  Future<JoinTokenResult> createJoinToken(String spaceId) async =>
+  Future<JoinTokenResult> createJoinToken(String spaceId, String token) async =>
       const JoinTokenResult(
         joinToken: 'e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
         link: 'https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789',

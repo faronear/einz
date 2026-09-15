@@ -284,6 +284,18 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   }
   // Multiverse：schema version 标记（首次启动写入 2，后续保持；供能力探测与迁移）
   db.prepare(`INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '2')`).run();
+
+  // 迁移：sessions.session_token 由明文改为 sha256 十六进制（2026-09-15 评审 H4）。
+  // 存量明文行既无法反推出哈希（伪造一个哈希也没有意义——查库时是拿客户端明文
+  // 现算哈希），也**不能**保留：注释见 auth.resolveSession。会话本就 24h TTL、
+  // 客户端冷启动会用设备私钥自动重新 challenge-response，故直接清掉。
+  // 判定：sha256 十六进制 = 64 位 [0-9a-f]。此语句对已迁移库是空操作。
+  const droppedSessions = db
+    .prepare(`DELETE FROM sessions WHERE length(session_token) != 64 OR session_token GLOB '*[^0-9a-f]*'`)
+    .run().changes;
+  if (droppedSessions > 0) {
+    console.log(`[einz] 会话存储迁移：清掉 ${droppedSessions} 条明文 session（客户端会自动重新认证）`);
+  }
   return db;
 }
 

@@ -171,12 +171,15 @@ class ApiClient {
   }
 
   /// Multiverse：生成绑定新设备的邀请（POST /spaces/{id}/join-tokens——
-  /// 24h 一次性 token，新设备 /space join 绑定；服务端不要求认证）。
-  Future<JoinTokenResult> createJoinToken(String spaceId) async {
+  /// 24h 一次性 token，新设备 /space join 绑定）。
+  ///
+  /// 需认证：签发邀请凭证 = 空间级操作，服务端要求调用方持该空间成员会话
+  /// （2026-09-15 评审 C1 修复；此前免认证，任何人拿到 spaceId 即可自签）。
+  Future<JoinTokenResult> createJoinToken(String spaceId, String token) async {
     final res = await _post(
       '/spaces/$spaceId/join-tokens',
       const {},
-      withToken: false,
+      token: token,
     );
     return JoinTokenResult.fromJson(res);
   }

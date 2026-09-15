@@ -162,8 +162,13 @@ class WsClient {
     if (_stopped) return;
     _setStatus(_attempt == 0 ? WsStatus.connecting : WsStatus.reconnecting);
     final wsUrl = server.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
-    final uri = Uri.parse('$wsUrl/ws?pv=1&token=${Uri.encodeQueryComponent(_token)}');
-    WebSocket.connect(uri.toString()).then((ws) {
+    // 凭证走握手头，**不放 URL query**（2026-09-15 评审 H4）：URL 会进反代
+    // access log / 代理缓存 / 浏览器历史，session token 不该落在这些地方。
+    final uri = Uri.parse('$wsUrl/ws?pv=1');
+    WebSocket.connect(
+      uri.toString(),
+      headers: {'Authorization': 'Bearer $_token'},
+    ).then((ws) {
       if (_stopped) {
         ws.close();
         return;

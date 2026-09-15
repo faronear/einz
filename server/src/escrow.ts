@@ -2,6 +2,7 @@ import { getDb } from './db.js'
 import { ApiError, resolveSession } from './auth.js'
 import { isActiveDevice, type ServerConfig } from './config.js'
 import { pwhashStrVerify } from './crypto.js'
+import { requireSpaceMember } from './guard.js'
 import { broadcastPassphraseRotated } from './ws.js'
 
 /**
@@ -199,12 +200,18 @@ function clearEscrowFailures (spaceId: string): void {
 /**
  * Multiverse：按空间读写口令托管包（POST /spaces/{spaceId}/key-escrow，
  * PROTOCOL_MULTIVERSE.md §4.2）：
- * - 上传/更新：{ package, passphrase_hash? }（沿用 v1 upload 语义，按 spaceId 隔离）；
+ * - 上传/更新：{ package, passphrase_hash? }（沿用 v1 upload 语义，按 spaceId 隔离）
+ *   ——**必须持该空间成员会话**（2026-09-15 评审 C1：此前任何人拿到 spaceId 就能
+ *   覆盖别人的口令托管包与 passphrase_hash，把真实用户顶掉）；
  * - 取包：{ passphrase } → argon2id 校验口令，正确才返回密封包（加入方取钥，
  *   不撤销任何设备、不消耗任何凭证）。
- * 骨架阶段无 session 认证，成员权限由 U1 Space-scoped session 补齐。
+ *
+ * 取包分支**刻意保持免认证**：调用方是还没入空间的加入方（它只持口令，尚无
+ * session），免认证是这套"口令即凭证"设计的前提；防爆破靠下面的限速。
  */
 export async function escrowForSpace (
+  cfg: ServerConfig,
+  token: string | null,
   spaceId: string,
   body: unknown
 ): Promise<{ ok: true } | { ok: true; package: EscrowPackage }> {
@@ -240,6 +247,8 @@ export async function escrowForSpace (
   }
 
   // 上传/更新（UPSERT，最新者胜——与 v1 upload 一致）
+  // 鉴权：必须是该空间成员（见函数头注释；漏挂此校验等于允许任意人顶掉真实用户）
+  requireSpaceMember(cfg, token, spaceId)
   const pkg = parsePackage(b.package)
   const passphraseHash = b.passphrase_hash
   if (

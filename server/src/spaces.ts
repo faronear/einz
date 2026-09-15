@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getDb } from "./db.js";
-import { ApiError } from "./auth.js";
+import { ApiError, hashSessionToken } from "./auth.js";
 import { pwhashStr, toB64 } from "./crypto.js";
 import { parsePackage, type EscrowPackage } from "./escrow.js";
 import { deriveSpaceAddress } from "./address.js";
@@ -167,7 +167,8 @@ export async function createSpace(
         `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(sessionToken, deviceId, spaceId, now + SESSION_TTL_MS, now);
+      // 库中存 sha256（明文只回给客户端；见 auth.hashSessionToken）
+      .run(hashSessionToken(sessionToken), deviceId, spaceId, now + SESSION_TTL_MS, now);
   }
   const t = newJoinToken(spaceId, "creator");
   return {
@@ -326,7 +327,8 @@ export function joinSpace(
         `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(sessionToken, deviceId, tk.space_id, Date.now() + SESSION_TTL_MS, Date.now());
+      // 库中存 sha256（明文只回给客户端；见 auth.hashSessionToken）
+      .run(hashSessionToken(sessionToken), deviceId, tk.space_id, Date.now() + SESSION_TTL_MS, Date.now());
     getDb()
       .prepare(`UPDATE spaces SET status = 'active', updated_at = ? WHERE space_id = ?`)
       .run(Date.now(), tk.space_id);
