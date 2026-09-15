@@ -10,6 +10,7 @@
     "server-prod": "cd deployment; git pull; docker compose up -d --build server; docker compose down; docker compose up -d; docker compose logs -f server",
     "server-prod-new": "npm run server-clean && npm run server-prod",
     "build-prod-ios": "cd app; flutter build ios --release",
+    "ios-deps": "cd app && flutter pub get && cd ios && pod install",
     "build-ios-adhoc": "bash app/ios/buildIos.sh adhoc",
     "build-and-install-ios-adhoc": "bash app/ios/buildIos.sh adhoc --install",
     "build-and-install-ios-adhoc-stepbystep": "ls ~/Library/MobileDevice/Provisioning\\ Profiles/; cd app; flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist; ls -la build/ios/ipa/einz.ipa; xcrun devicectl list devices; rm -rf /tmp/einz-ipa && mkdir -p /tmp/einz-ipa; unzip -q build/ios/ipa/einz.ipa -d /tmp/einz-ipa; xcrun devicectl device install app --device 00008030-0005306011F9402E /tmp/einz-ipa/Payload/Runner.app",
