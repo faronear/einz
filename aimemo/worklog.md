@@ -5822,3 +5822,61 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
 "输错邀请码重试"的循环。他日常用的 TUI 加入流程（`_prompt('❓ 输入邀请码:')` → `_spaceJoin`）
 **本来就是收链接/token 的**（只是标签写着"邀请码"）。所以对他来说这条操作**没有任何变化** ——
 我把"删掉死路径"说成了"操作会变"。教训：讲变化前先确认这条路径**是否真被使用**。
+
+## 2026-09-15 P2：服务端删 v1 轨道（已完成）
+
+路线 1 定了之后 P2 没有悬念。核心思路：**把"会话必带 space"收口到 guard 一处，让 8 处
+`?? ""` 回落自然消失**，而不是各处继续各自兜底。
+
+### 服务端改动
+
+- **`guard.requireSession(token)` 强化**：新增"会话必须绑定 space"判定（无 space → 401
+  重新认证）。所有模块（messages / attachments / receipts / push / devices / avatars /
+  escrow / ws）改为调它，**并且各自的 `cfg` 参数一并去掉**（`isActiveDevice(_cfg,…)` 的
+  空参数是评审架构项 #2 点名的）。
+- **8 处"无 space 回落"全部删除**：`messages`/`attachments` 的 `sessionSpace ?? ""`、
+  `escrowSpaceId` 的 `?? ''`、`getSpace` 返回值的 `?? ""`、`receipts` 两处"空 space 早退"、
+  `deviceScopeClause` 的 legacy 分支（现在只按空间成员过滤）。
+- **`createChallenge(deviceId, spaceId)`**：space 必填（否则 400）；`verifyChallenge` 拒绝
+  无 space 的 challenge。→ "无 space 会话"这种形态从入口就没了。
+- **删除 v1 端点与代码**：`POST /devices/enroll`（含首设备自举）、`POST /invites`、
+  `enrollDevice` / `createInvite` / `genInviteCode` / `assignDeviceId`。
+- **`updatePersonName` 只写 `space_members.display_name`**（v1 还写一份 meta
+  `person_name:*`，两处写必然漂移）。
+- **`db.ts` 迁移**：`DROP TABLE IF EXISTS invites` + 清 meta 里的
+  `person_name:*` / `person_gender:*` / `creator_person_id`（启动自动执行，幂等）。
+- `attachWs(wss)` / `createChallenge` / `verifyChallenge` 等签名去 cfg。
+
+### 客户端收尾（P1 遗留）
+
+- 删 `ApiClient.enrollDevice` / `createInvite`（指向已删端点）与 `Api.devicesEnroll` /
+  `Api.invites` 常量、`InviteResult` 类型。
+- `EnrollResult` → **`DeviceBinding`**：App 向导本来只把它当"本次绑定拿到的身份"聚合器
+  （create/join 都直接返回三个 id），v1 端点没了之后这个名字会误导人。
+
+### 测试改写
+
+- **`smoke.test.ts`**：`TestDevice` 的 `enroll` → `createSpace`（`POST /spaces`）+
+  `mintJoinToken` / `joinSpace`；`auth` 补 `space_id`；新增两条断言（未登记设备挑战 403、
+  **已登记设备不带 space_id → 400**）。删掉两个查 meta 名称表的用例（12/12a），改为
+  v2 断言：创建时带 `partner_name` → 落 `space_members` slot=1（该行 person_id 仍为 NULL，
+  等伴侣加入才进 `/space` 的 person_names——这是"预置"语义，不是丢数据）。
+- **`two_space_isolation.test.ts` 整体重写为 v2-native**：原来一半篇幅是 v1 设备搭建
+  （enroll + 邀请码 + "legacy 会话"断言）。现在两个空间各自由 `POST /spaces` 创建，
+  保留并覆盖：消息双向隔离 + sequence 独立、C1（join-tokens / escrow 上传的 401/403/201）、
+  C2（/devices、/space 空间收敛、附件跨空间读 404 / 挂 403、幂等重传）、H4（sessions 只存 sha256）。
+- `audit.test.ts` / `receipts.test.ts` 无需改（它们本来就用 spaces 流程造设备）。
+
+**验证**：`tsc` 干净 + `npm test` 5 套件全绿；shared/cli `dart analyze` + app
+`flutter analyze` 全 `No issues found`。
+
+**开发库**：按老板"数据可丢弃"的口径，迁移前已把 `server/data/einz.sqlite.db*`
+（含 3.6MB WAL）复制到 `~/einz-sfconflict-20260915/dev-db-backup-20260915/`；
+服务端下次启动会自动跑迁移（drop invites + 清 meta 名称键）。
+
+### P3 待办（文档收敛）
+
+`PROTOCOL.md` 的 v1 段（白名单登记 / 邀请码 / 信封分发）、`KEY_ESCROW.md` 的 v1 主体、
+`SETUP.md`、`DEPLOYMENT.md` §2.2/§5.2、`ONBOARDING.md` 方式二、`updateServer.md` §3
+——现在这些段落都带着"已作废"提示，需要真正重写成 v2 流程或归档。
+`SECURITY.md` §2 控制表可再补"会话必带 space"一条。

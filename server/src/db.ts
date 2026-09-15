@@ -71,26 +71,16 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     CREATE TABLE IF NOT EXISTS challenges (
       challenge_id TEXT PRIMARY KEY,
       device_id    TEXT NOT NULL,
-      space_id     TEXT,  -- Multiverse：目标 Space（NULL=legacy v1 认证）
+      space_id     TEXT,  -- 目标 Space（v1 收敛后必填；NULL 只可能是存量旧行）
       challenge    TEXT NOT NULL,
       expires_at   INTEGER NOT NULL,
       used         INTEGER NOT NULL DEFAULT 0
     );
 
-    CREATE TABLE IF NOT EXISTS invites (
-      invite_code TEXT PRIMARY KEY,
-      person_id   TEXT NOT NULL,
-      status      TEXT NOT NULL DEFAULT 'pending',  -- pending | used | expired
-      created_at  INTEGER NOT NULL,
-      expires_at  INTEGER NOT NULL,
-      used_by     TEXT,
-      used_at     INTEGER
-    );
-
     CREATE TABLE IF NOT EXISTS sessions (
       session_token TEXT PRIMARY KEY,
       device_id     TEXT NOT NULL,
-      space_id      TEXT,  -- Multiverse：绑定 Space（NULL=legacy v1 会话）
+      space_id      TEXT,  -- 绑定 Space（v1 收敛后必填；NULL 只可能是存量旧行）
       expires_at    INTEGER NOT NULL,
       created_at    INTEGER NOT NULL
     );
@@ -284,6 +274,18 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   }
   // Multiverse：schema version 标记（首次启动写入 2，后续保持；供能力探测与迁移）
   db.prepare(`INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '2')`).run();
+
+  // 迁移（2026-09-15 v1 收敛）：drop invites 表 + 清 meta 里的 v1 名称/创建者键。
+  // v1 的邀请码登记（/invites、/devices/enroll）与 meta 名称表（person_name:* /
+  // person_gender:* / creator_person_id）已删除；名称的唯一数据源是
+  // space_members.display_name。此语句对已迁移库是空操作。
+  db.exec(`DROP TABLE IF EXISTS invites`);
+  const droppedMeta = db
+    .prepare(`DELETE FROM meta WHERE key = 'creator_person_id' OR key LIKE 'person_name:%' OR key LIKE 'person_gender:%'`)
+    .run().changes;
+  if (droppedMeta > 0) {
+    console.log(`[einz] v1 收敛迁移：清掉 ${droppedMeta} 条 meta 名称/创建者键（名称改用 space_members.display_name）`);
+  }
 
   // 迁移：sessions.session_token 由明文改为 sha256 十六进制（2026-09-15 评审 H4）。
   // 存量明文行既无法反推出哈希（伪造一个哈希也没有意义——查库时是拿客户端明文

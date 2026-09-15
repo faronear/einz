@@ -6,7 +6,7 @@ import { ApiError } from "./auth.js";
  *
  * 为什么必须有上限（2026-09-15 评审 H1）：此前 readJson / 附件上传 / 头像上传
  * 都是 `for await` 全量 Buffer.concat 进内存——一个 Content-Length 巨大的请求
- * 就能把服务端内存打爆；`POST /spaces`、`/devices/enroll` 这类免认证端点更是
+ * 就能把服务端内存打爆；`POST /spaces` 这类免认证端点更是
  * 公网直接可打。
  */
 

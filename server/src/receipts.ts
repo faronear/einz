@@ -1,6 +1,6 @@
 import { getDb } from './db.js'
-import { ApiError, resolveSession } from './auth.js'
-import { isActiveDevice, type ServerConfig } from './config.js'
+import { ApiError } from './auth.js'
+import { requireSession } from './guard.js'
 import { broadcastReceiptUpdated } from './ws.js'
 
 /**
@@ -58,15 +58,10 @@ function asSeq (raw: unknown, field: string): number {
  * 返回调用方夹紧后的 { delivered_upto_seq, read_upto_seq }。
  */
 export function postReceipts (
-  cfg: ServerConfig,
   token: string,
   body: unknown
 ): { delivered_upto_seq: number; read_upto_seq: number } {
-  const { device_id, space_id } = resolveSession(token)
-  if (!isActiveDevice(cfg, device_id))
-    throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
-  if (space_id == null || space_id === '')
-    throw new ApiError('INVALID_REQUEST', 'session 未绑定 space', 400)
+  const { device_id, space_id } = requireSession(token)
 
   const b = (body ?? {}) as Record<string, unknown>
   const cap = maxSequence(space_id)
@@ -111,13 +106,9 @@ export function postReceipts (
 
 /** GET /receipts：本 space 全部回执行（重连/补拉用）。 */
 export function getReceipts (
-  cfg: ServerConfig,
   token: string
 ): { receipts: ReceiptRow[] } {
-  const { device_id, space_id } = resolveSession(token)
-  if (!isActiveDevice(cfg, device_id))
-    throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
-  if (space_id == null || space_id === '') return { receipts: [] }
+  const { device_id, space_id } = requireSession(token)
 
   const rows = getDb()
     .prepare(

@@ -1,7 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
-import { resolveSession } from "./auth.js";
-import { isActiveDevice, type ServerConfig } from "./config.js";
-import { optionalBearerToken } from "./guard.js";
+import { optionalBearerToken, requireSession } from "./guard.js";
 import type { MessageEnvelope } from "./messages.js";
 import { getDb } from "./db.js";
 import { logConnection, metaOf, type RequestMeta } from "./audit.js";
@@ -9,7 +7,7 @@ import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 interface Conn {
   ws: WebSocket;
   deviceId: string;
-  spaceId: string; // Multiverse：连接绑定的 Space（legacy 回落 cfg.space_id）
+  spaceId: string; // 连接绑定的 Space（会话必带 space）
   alive: boolean;
   connectedAt: number; // 本次 WS 连接建立时刻（ms）——/devices 显示"上线时间"
   meta: RequestMeta; // 来源 IP / UA（建连时的 req），审计落库用
@@ -107,7 +105,7 @@ export function broadcastProfileUpdated(
 }
 
 /** 注册 WS 服务（PROTOCOL.md §8）。 */
-export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
+export function attachWs(wss: WebSocketServer): void {
   wss.on("connection", (ws, req) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const pv = url.searchParams.get("pv");
@@ -124,19 +122,14 @@ export function attachWs(wss: WebSocketServer, cfg: ServerConfig): void {
     let deviceId: string;
     let spaceId: string;
     try {
-      const sess = resolveSession(token ?? "");
+      // requireSession 同时完成：会话有效 + 设备在册 + 会话带 space（v1 收敛后必备）
+      const sess = requireSession(token);
       deviceId = sess.device_id;
-      // Multiverse：WS 绑定 session 的 Space（legacy 无空间 → 空串）
-      spaceId = sess.space_id ?? "";
+      spaceId = sess.space_id;
     } catch {
       ws.close(4401, "UNAUTHORIZED");
       return;
     }
-    if (!isActiveDevice(cfg, deviceId)) {
-      ws.close(4403, "FORBIDDEN");
-      return;
-    }
-
     // V1 一人一机：重复连接踢掉旧连接
     const old = conns.get(deviceId);
     if (old) old.ws.close(4408, "duplicate connection");

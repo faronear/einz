@@ -56,10 +56,12 @@ export function loadConfig(): ServerConfig {
 
 /**
  * 设备是否在白名单且未被撤销。
- * 判定源 = 数据库 devices 表（运行时可写：POST /devices/enroll 动态登记）。
- * 撤销（status='revoked'）实时生效（E2EE.md §9.3）。
+ * 判定源 = 数据库 devices 表。撤销（status='revoked'）实时生效（E2EE.md §9.3）。
+ *
+ * 注：v1 时代曾接收 ServerConfig（白名单来自 config.json 的静态数组），Multiverse
+ * 改成动态登记后该参数已无用——2026-09-15 收敛时去掉（评审架构项 #2）。
  */
-export function isActiveDevice(_cfg: ServerConfig, deviceId: string): boolean {
+export function isActiveDevice(deviceId: string): boolean {
   const row = getDb()
     .prepare(`SELECT status FROM devices WHERE device_id = ?`)
     .get(deviceId) as { status: string } | undefined;
@@ -68,7 +70,7 @@ export function isActiveDevice(_cfg: ServerConfig, deviceId: string): boolean {
 }
 
 /** 取设备信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 devices 表。 */
-export function getDevice(_cfg: ServerConfig, deviceId: string): DeviceConfig | undefined {
+export function getDevice(deviceId: string): DeviceConfig | undefined {
   const row = getDb()
     .prepare(`SELECT device_id, person_id, public_key, status FROM devices WHERE device_id = ?`)
     .get(deviceId) as { device_id: string; person_id: string; public_key: string; status: string } | undefined;

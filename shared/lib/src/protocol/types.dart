@@ -58,19 +58,17 @@ class SessionResult {
       );
 }
 
-/// 动态登记结果（POST /devices/enroll 返回）：登记后设备已在白名单生效。
-class EnrollResult {
-  const EnrollResult({required this.deviceId, required this.personId, required this.spaceId});
+/// 设备绑定结果（v2）：`POST /spaces` 与 `POST /spaces/join` 都直接返回这三个 id，
+/// App 向导用它聚合"本次绑定拿到的身份"。
+///
+/// 历史：v1 时代这是 `POST /devices/enroll` 的响应类型（`EnrollResult`）。该端点与
+/// v1 邀请码已随 Multiverse 收敛删除（2026-09-15），所以它不再是"某个端点的响应"。
+class DeviceBinding {
+  const DeviceBinding({required this.deviceId, required this.personId, required this.spaceId});
 
   final String deviceId;
   final String personId;
   final String spaceId;
-
-  factory EnrollResult.fromJson(Map<String, dynamic> json) => EnrollResult(
-        deviceId: json['device_id'] as String,
-        personId: json['person_id'] as String,
-        spaceId: json['space_id'] as String,
-      );
 }
 
 /// Multiverse：join token preflight 结果（POST /spaces/join/preflight 返回，
@@ -208,20 +206,6 @@ class JoinTokenResult {
         joinToken: json['joinToken'] as String,
         link: json['link'] as String,
         expiresAt: json['expiresAt'] as int,
-      );
-}
-
-class InviteResult {
-  const InviteResult({required this.inviteCode, required this.personId, required this.expiresAt});
-
-  final String inviteCode;
-  final String personId;
-  final int expiresAt;
-
-  factory InviteResult.fromJson(Map<String, dynamic> json) => InviteResult(
-        inviteCode: json['invite_code'] as String,
-        personId: json['person_id'] as String,
-        expiresAt: json['expires_at'] as int,
       );
 }
 

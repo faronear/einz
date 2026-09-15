@@ -11,7 +11,7 @@ import { loadConfig } from "./config.js";
 //   （见 PROTOCOL_MULTIVERSE.md §1.3；地址只定位不授权）；
 // - join token 授权语义完整（一次性、24h、只存 SHA-256 hash）；
 // - 成员数事务约束完整（并发加入只有一个成功）；
-// - 端点的成员认证（Space-scoped session）由 U1 补齐，骨架暂免鉴权。
+// - 端点的成员认证：space 级端点走 guard.requireSpaceMember（2026-09-15 评审 C1 补齐）。
 
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const TOKEN_TTL_MS = 24 * 3600 * 1000; // token 默认 24h（老板 2026-09-10 拍板）

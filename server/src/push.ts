@@ -1,6 +1,7 @@
 import { getDb } from "./db.js";
-import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
-import { isActiveDevice, type ServerConfig } from "./config.js";
+import { ApiError } from "./auth.js";
+import { requireSession } from "./guard.js";
+import { type ServerConfig } from "./config.js";
 import { deviceScopeClause } from "./guard.js";
 
 export interface PushTokenBody {
@@ -9,9 +10,8 @@ export interface PushTokenBody {
 }
 
 /** POST /push/register：注册/更新 Push Token（PROTOCOL.md §7.3）。 */
-export function registerPushToken(cfg: ServerConfig, token: string, body: unknown): { ok: true } {
-  const { device_id } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+export function registerPushToken(token: string, body: unknown): { ok: true } {
+  const { device_id } = requireSession(token);
 
   const b = body as Partial<PushTokenBody>;
   if ((b.platform !== "ios" && b.platform !== "android") || typeof b.token !== "string" || b.token.length === 0) {
@@ -29,9 +29,8 @@ export function registerPushToken(cfg: ServerConfig, token: string, body: unknow
 }
 
 /** DELETE /push/register：注销 Push Token。 */
-export function unregisterPushToken(cfg: ServerConfig, token: string): { ok: true } {
-  const { device_id } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+export function unregisterPushToken(token: string): { ok: true } {
+  const { device_id } = requireSession(token);
   getDb().prepare(`DELETE FROM push_tokens WHERE device_id = ?`).run(device_id);
   return { ok: true };
 }
@@ -70,11 +69,9 @@ export function sendPushHint(spaceId: string, exceptDeviceId: string): void {
  *  设备范围：**仅本空间成员设备**（guard.deviceScopeClause）——此前直出全局
  *  devices 表，跨空间泄漏 person/在线状态（2026-09-15 评审 C2）。 */
 export function getSpace(
-  cfg: ServerConfig,
   token: string
 ): { space_id: string; devices: unknown[]; person_names: Record<string, string>; person_genders: Record<string, string> } {
-  const sess = resolveSession(token);
-  if (!isActiveDevice(cfg, sess.device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+  const sess = requireSession(token);
   const scope = deviceScopeClause(sess.space_id);
   const devices = getDb()
     .prepare(`SELECT d.device_id, d.person_id, d.status, d.last_seen FROM devices d WHERE d.status = 'active' AND (${scope.sql})`)
@@ -89,5 +86,5 @@ export function getSpace(
     if (m.display_name != null) personNames[m.person_id] = m.display_name;
     if (m.gender != null) personGenders[m.person_id] = m.gender;
   }
-  return { space_id: sess.space_id ?? "", devices, person_names: personNames, person_genders: personGenders };
+  return { space_id: sess.space_id, devices, person_names: personNames, person_genders: personGenders };
 }

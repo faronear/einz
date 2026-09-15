@@ -77,57 +77,93 @@ interface MessageEnvelope {
 // ---------- 模拟设备（扮演未来 Dart 客户端） ----------
 
 class TestDevice {
-  deviceId: string
-  personId: string
+  deviceId = ''
+  personId = ''
   keypair: KeyPair
   sessionToken = ''
   spaceKey: Uint8Array
+  spaceId = ''
+  partnerSlot = -1
 
-  constructor (deviceId: string, personId: string, spaceKey: Uint8Array) {
-    this.deviceId = deviceId
-    this.personId = personId
+  constructor (spaceKey: Uint8Array) {
     this.keypair = sodium.crypto_box_keypair()
     this.spaceKey = spaceKey
   }
 
-  /** 设备动态登记（自主模式：白名单在 devices 表，POST /devices/enroll）。
-   *  首设备免邀请码自举；后续设备凭创建者邀请码。服务端可能分配规范 id
-   *  （dev1/dev2…），登记后回写 deviceId，保证后续 challenge/消息 AAD 用同一 id。
-   *  [personName] 可选自定义用户名（如 luk）；不传则验证服务端默认落规范 id。 */
-  async enroll (
-    port: number,
-    inviteCode = '',
-    personName = ''
-  ): Promise<string> {
-    const res = await fetch(`http://127.0.0.1:${port}/devices/enroll`, {
+  /** 创建空间（v2 入口）：**一步完成设备登记 + 签发绑定该空间的会话**。
+   *  替代已删除的 v1 `POST /devices/enroll`（v1 收敛，2026-09-15）。 */
+  async createSpace (port: number, displayName = '测试空间', partnerName?: string): Promise<string> {
+    const res = await fetch(`http://127.0.0.1:${port}/spaces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        device_id: this.deviceId,
+        display_name: displayName,
+        ...(partnerName ? { partner_name: partnerName } : {}),
         public_key: sodium.to_base64(this.keypair.publicKey, B64),
-        ...(inviteCode ? { invite_code: inviteCode } : {}),
-        ...(personName ? { person_name: personName } : {}),
-        device_name: this.deviceId
+        device_name: 'dev-a'
       })
     })
-    assert.equal(res.status, 200, 'enroll should succeed')
+    assert.equal(res.status, 201, 'create space should succeed')
     const body = (await res.json()) as {
-      ok: boolean
-      device_id: string
-      space_id: string
+      spaceId: string
+      deviceId: string
+      creatorPersonId: string
+      sessionToken: string
     }
-    assert.equal(body.ok, true, 'enroll ok')
-    this.deviceId = body.device_id
-    return body.space_id
+    this.spaceId = body.spaceId
+    this.deviceId = body.deviceId
+    this.personId = body.creatorPersonId
+    this.sessionToken = body.sessionToken
+    this.partnerSlot = 0
+    return body.spaceId
   }
 
+  /** 生成一次性 join token（需创建者会话）。 */
+  async mintJoinToken (port: number): Promise<string> {
+    const res = await fetch(
+      `http://127.0.0.1:${port}/spaces/${this.spaceId}/join-tokens`,
+      { method: 'POST', headers: { Authorization: `Bearer ${this.sessionToken}` } }
+    )
+    assert.equal(res.status, 201, 'mint join token should succeed')
+    return ((await res.json()) as { joinToken: string }).joinToken
+  }
+
+  /** 加入空间（v2 入口）：登记设备 + 签发会话 + 返回自己的身份槽位。 */
+  async joinSpace (port: number, token: string, partnerSlot = 1): Promise<void> {
+    const res = await fetch(`http://127.0.0.1:${port}/spaces/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        public_key: sodium.to_base64(this.keypair.publicKey, B64),
+        device_name: 'dev-b',
+        partner_slot: partnerSlot
+      })
+    })
+    assert.equal(res.status, 200, 'join space should succeed')
+    const body = (await res.json()) as {
+      spaceId: string
+      personId: string
+      partnerSlot: number
+      sessionToken: string
+      deviceId: string
+    }
+    this.spaceId = body.spaceId
+    this.personId = body.personId
+    this.partnerSlot = body.partnerSlot
+    this.sessionToken = body.sessionToken
+    this.deviceId = body.deviceId
+  }
+
+  /** challenge-response 重新认证（已登记设备冷启动路径）。
+   *  **challenge 必须带 space_id**（v2：会话绑定空间；不带会拿到无 space 的会话）。 */
   async auth (port: number): Promise<void> {
     const challengeRes = await fetch(
       `http://127.0.0.1:${port}/auth/challenge`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: this.deviceId })
+        body: JSON.stringify({ device_id: this.deviceId, space_id: this.spaceId })
       }
     )
     assert.equal(challengeRes.status, 200, 'challenge should succeed')
@@ -250,8 +286,8 @@ async function main (): Promise<void> {
 
   tempDir = mkdtempSync(join(tmpdir(), 'einz-smoke-'))
   const spaceKey = sodium.randombytes_buf(32)
-  const devA = new TestDevice('dev-a1', 'person-a', spaceKey)
-  const devB = new TestDevice('dev-b1', 'person-b', spaceKey)
+  const devA = new TestDevice(spaceKey)
+  const devB = new TestDevice(spaceKey)
 
   const port = await freePort()
   serverProc = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
@@ -270,21 +306,27 @@ async function main (): Promise<void> {
   try {
     await waitReady(port)
 
-    // 1) 未登记设备挑战 → 403
+    // 1) 未登记设备挑战 → 403（带了 space_id 仍应拒绝：设备不在 devices 表）
     const evil = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: 'dev-evil' })
+      body: JSON.stringify({ device_id: 'dev-evil', space_id: 'space-evil' })
     })
     assert.equal(evil.status, 403, 'non-enrolled device must be rejected')
 
-    // 2) 设备登记（自主模式：白名单在 devices 表，动态登记）
-    const spaceId = await devA.enroll(port) // 首设备自举（免邀请码，成为创建者）
-    // Multiverse：enroll 不再返回全局 space_id（0ac9372——空间由 /spaces
-    // create/join 建立并经 session 绑定）；E2EE 派生与消息落库均用空串一致回落
-    assert.equal(spaceId, '', 'multiverse enroll 返回空 space_id（无全局空间）')
+    // 2) A 创建空间（v2 入口：登记设备 + 签发会话）
+    const spaceId = await devA.createSpace(port)
 
-    // 3) A 认证
+    // 2b) 已登记设备但不带 space_id → 400（v1 收敛：会话必须绑定空间；
+    //     顺序上设备校验在前，所以这条要用**已登记**的设备验）
+    const noSpace = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: devA.deviceId })
+    })
+    assert.equal(noSpace.status, 400, 'challenge without space_id must be rejected')
+
+    // 3) A 重新认证（冷启动路径：challenge 带 space_id）
     await devA.auth(port)
 
     // 4) A 加密发送
@@ -319,18 +361,9 @@ async function main (): Promise<void> {
       )
     }
 
-    // 6) B 凭邀请码登记 + 认证 + 增量同步
-    const inviteRes = await fetch(`http://127.0.0.1:${port}/invites`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${devA.sessionToken}`
-      },
-      body: JSON.stringify({ person_id: 'personB', person_name: 'bob' })
-    })
-    assert.equal(inviteRes.status, 200, 'invite should succeed')
-    const { invite_code } = (await inviteRes.json()) as { invite_code: string }
-    await devB.enroll(port, invite_code)
+    // 6) B 用 join token 加入空间 + 认证 + 增量同步（v2 入口，替代 v1 邀请码登记）
+    const joinToken = await devA.mintJoinToken(port)
+    await devB.joinSpace(port, joinToken)
     await devB.auth(port)
     const sync1 = await devB.sync(port, 0)
     assert.equal(sync1.messages.length, 1, 'B should receive exactly 1 message')
@@ -464,175 +497,36 @@ async function main (): Promise<void> {
       'escrow cleared after delete'
     )
 
-    // 12) 名称默认值：person 未设用户名登记时，服务端默认落规范 id（/health 可查）
-    //     （独立服务器验证：A 设名 luk；B 全程无名 → 期望 person_names={A:luk,B:personB}）
-    const tempDir2 = mkdtempSync(join(tmpdir(), 'einz-name-default-'))
-    const port2 = await freePort()
-    let serverProc2: ChildProcess | null = null
-    try {
-      serverProc2 = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
-        env: {
-          ...process.env,
-          PORT: String(port2),
-          EINZ_DB: join(tempDir2, 'einz.sqlite.db'),
-          EINZ_FILES: join(tempDir2, 'files')
-        },
-        stdio: ['ignore', 'pipe', 'pipe']
-      })
-      serverProc2.stderr?.on('data', d =>
-        process.stderr.write(`[server2] ${d}`)
-      )
-      await waitReady(port2)
-
-      const devA2 = new TestDevice(
-        'dev-a2',
-        'person-a',
-        sodium.randombytes_buf(32)
-      )
-      const devB2 = new TestDevice(
-        'dev-b2',
-        'person-b',
-        sodium.randombytes_buf(32)
-      )
-      await devA2.enroll(port2, '', 'luk') // 首设备自举并设用户名 luk
-      await devA2.auth(port2)
-
-      // 邀请 personB（不预设名称）
-      const inviteRes2 = await fetch(`http://127.0.0.1:${port2}/invites`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${devA2.sessionToken}`
-        },
-        body: JSON.stringify({ person_id: 'personB' })
-      })
-      assert.equal(inviteRes2.status, 200, 'invite personB should succeed')
-      const { invite_code: inviteCode2 } = (await inviteRes2.json()) as {
-        invite_code: string
-      }
-
-      // B 登记且不传用户名 → 服务端应默认 person_name = 规范 id
-      await devB2.enroll(port2, inviteCode2)
-      const healthRes2 = await fetch(`http://127.0.0.1:${port2}/health`)
-      assert.equal(healthRes2.status, 200, 'health should be reachable')
-      const health2 = (await healthRes2.json()) as Record<string, unknown>
-      // Multiverse：/health 不再返回全局 person 表（避免跨空间泄漏成员元数据，
-      // PROTOCOL_MULTIVERSE.md §4.1）——登记默认名的验证改查 db meta
-      assert.equal('person_names' in health2, false, 'Multiverse /health 不应返回 person_names')
-      const db2 = new Database(join(tempDir2, 'einz.sqlite.db'))
-      const nameRow2 = db2
-        .prepare(`SELECT value FROM meta WHERE key = 'person_name:personB'`)
-        .get() as { value: string } | undefined
-      db2.close()
-      assert.equal(
-        nameRow2?.value,
-        'personB',
-        '未设用户名登记后 meta 应含默认规范 id（personB）'
-      )
-    } finally {
-      await new Promise<void>(done => {
-        if (!serverProc2 || serverProc2.exitCode !== null) {
-          done()
-          return
-        }
-        const timer = setTimeout(() => {
-          serverProc2?.kill('SIGKILL')
-          done()
-        }, 3000)
-        serverProc2.once('exit', () => {
-          clearTimeout(timer)
-          done()
-        })
-      })
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          rmSync(tempDir2, { recursive: true, force: true })
-          break
-        } catch {
-          await new Promise(r => setTimeout(r, 200))
-        }
-      }
+    // 12) 名称表（v2）：创建空间时带 partner_name → 落 space_members.display_name，
+    //     GET /space 的 person_names 应含双方名字。**名称的唯一数据源是
+    //     space_members**——v1 的 meta `person_name:*` 表已随收敛删除，所以这里
+    //     按 v2 的读法断言（此前两个用例查 meta，已作废）。
+    const preset = new TestDevice(sodium.randombytes_buf(32))
+    await preset.createSpace(port, '我', 'Alice')
+    const infoRes = await fetch(`http://127.0.0.1:${port}/space`, {
+      headers: { Authorization: `Bearer ${preset.sessionToken}` }
+    })
+    assert.equal(infoRes.status, 200, 'GET /space should succeed')
+    const info = (await infoRes.json()) as {
+      person_names: Record<string, string>
     }
-
-    // 12a) 第二用户预置名（首设备自举附 partner_name）：A 自举带 partner_name='Alice'
-    //      → 名称表 personB=Alice（后续设备引导可直接按名称选身份）；
-    //      跳过（不传 partner_name）→ 服务端落默认 personB（上一用例 12 已覆盖：
-    //      最终名称表 {A:luk, B:personB}）
-    const tempDir3 = mkdtempSync(join(tmpdir(), 'einz-partner-'))
-    const port3 = await freePort()
-    let serverProc3: ChildProcess | null = null
-    try {
-      serverProc3 = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
-        env: {
-          ...process.env,
-          PORT: String(port3),
-          EINZ_DB: join(tempDir3, 'einz.sqlite.db'),
-          EINZ_FILES: join(tempDir3, 'files')
-        },
-        stdio: ['ignore', 'pipe', 'pipe']
-      })
-      serverProc3.stderr?.on('data', d =>
-        process.stderr.write(`[server3] ${d}`)
-      )
-      await waitReady(port3)
-
-      const partnerPk = sodium.to_base64(sodium.randombytes_buf(32), B64)
-      const enrollPartner = await fetch(
-        `http://127.0.0.1:${port3}/devices/enroll`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            public_key: partnerPk,
-            person_name: 'luk',
-            partner_name: 'Alice'
-          })
-        }
-      )
-      assert.equal(
-        enrollPartner.status,
-        200,
-        'self-bootstrap with partner_name should succeed'
-      )
-      const health3 = (await (
-        await fetch(`http://127.0.0.1:${port3}/health`)
-      ).json()) as Record<string, unknown>
-      // Multiverse：/health 不再返回全局 person 表，partner_name 落位的验证改查 db meta
-      assert.equal('person_names' in health3, false, 'Multiverse /health 不应返回 person_names')
-      const db3 = new Database(join(tempDir3, 'einz.sqlite.db'))
-      const nameRow3 = db3
-        .prepare(`SELECT value FROM meta WHERE key = 'person_name:personB'`)
-        .get() as { value: string } | undefined
-      db3.close()
-      assert.equal(
-        nameRow3?.value,
-        'Alice',
-        'partner_name preset should land on personB name table'
-      )
-    } finally {
-      await new Promise<void>(done => {
-        if (!serverProc3 || serverProc3.exitCode !== null) {
-          done()
-          return
-        }
-        const timer = setTimeout(() => {
-          serverProc3?.kill('SIGKILL')
-          done()
-        }, 3000)
-        serverProc3.once('exit', () => {
-          clearTimeout(timer)
-          done()
-        })
-      })
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          rmSync(tempDir3, { recursive: true, force: true })
-          break
-        } catch {
-          await new Promise(r => setTimeout(r, 200))
-        }
-      }
-    }
+    assert.equal(
+      info.person_names[preset.personId],
+      '我',
+      '创建者名字应落 space_members.display_name'
+    )
+    // partner 预置名落在 space_members 的 slot=1 行（该行 person_id 仍为 NULL，
+    // 等伴侣加入后才出现在 /space 的 person_names —— 这是"预置"语义，不是丢数据）
+    const dbPreset = new Database(join(tempDir, 'einz.sqlite.db'), { readonly: true })
+    const partnerRow = dbPreset
+      .prepare(`SELECT display_name FROM space_members WHERE space_id = ? AND partner_slot = 1`)
+      .get(preset.spaceId) as { display_name: string | null } | undefined
+    dbPreset.close()
+    assert.equal(
+      partnerRow?.display_name,
+      'Alice',
+      'partner_name 预置应落 space_members slot=1（后续设备引导可按名字选身份）'
+    )
 
     // 12b) 改名后名称表即时更新（回归：90ec740 把 getSpace 改读 space_members，
     //      但 updatePersonName 仍只写 meta → GET /space 返回旧名——TUI 右上角自己
@@ -1107,7 +1001,7 @@ async function main (): Promise<void> {
     console.log('✅ 取包限速：2 次失败后第 3 次 429（免认证端点防在线爆破）')
 
     console.log(
-      '✅ 冒烟测试全部通过：登记 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称默认值'
+      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members)'
     )
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，

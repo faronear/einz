@@ -3,8 +3,9 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node
 import { join, resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db.js";
-import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
-import { isActiveDevice, type ServerConfig } from "./config.js";
+import { ApiError, touchLastSeen } from "./auth.js";
+import { requireSession } from "./guard.js";
+import { type ServerConfig } from "./config.js";
 
 // 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -42,13 +43,11 @@ export interface AttachmentMeta {
 /** 校验附件元数据与 blob（sha256 = 密文哈希），落盘并入库（PROTOCOL.md §6.1）。
  *  同一 attachment_id 重复上传**幂等返回原记录**（网络重试安全，见下方注释）。 */
 export function storeAttachment(
-  cfg: ServerConfig,
   token: string,
   meta: { message_id: string; attachment_id: string; key_version: number; size: number; sha256: string; nonce: string },
   blob: Buffer
 ): { attachment_id: string; storage_path: string; created_at: number } {
-  const { device_id, space_id: sessionSpace } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+  const { device_id, space_id: spaceId } = requireSession(token);
   touchLastSeen(device_id);
 
   // P1 路径遍历防御：attachment_id/message_id 必须在安全字符集内（拒绝 / . \ 等）
@@ -60,7 +59,6 @@ export function storeAttachment(
   // C2 空间归属校验：attachment_id 与 message_id 都是**客户端生成**的，不校验
   // 就能把 blob 挂到别的空间的消息上（对方的 /sync 会收到我方附件元数据），
   // 或顶掉别的空间的同名 attachment_id。两处都必须与本会话空间一致。
-  const spaceId = sessionSpace ?? "";
   const stored = db
     .prepare(`SELECT space_id, storage_path, created_at FROM attachments WHERE attachment_id = ?`)
     .get(meta.attachment_id) as
@@ -120,9 +118,8 @@ export function storeAttachment(
 }
 
 /** 下载附件 blob（PROTOCOL.md §6.2）：鉴权 + 白名单校验 + **空间归属**校验。 */
-export function getAttachmentBlob(cfg: ServerConfig, token: string, attachmentId: string): Buffer {
-  const { device_id, space_id: sessionSpace } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+export function getAttachmentBlob(token: string, attachmentId: string): Buffer {
+  const { device_id, space_id: spaceId } = requireSession(token);
   touchLastSeen(device_id);
 
   assertSafeId(attachmentId, "attachment_id");
@@ -132,7 +129,7 @@ export function getAttachmentBlob(cfg: ServerConfig, token: string, attachmentId
     .get(attachmentId) as { storage_path: string; space_id: string } | undefined;
   // 404 而非 403：不向非成员确认"这个 attachment_id 存在"（元数据最小化，C2）
   if (!row) throw new ApiError("NOT_FOUND", "attachment not found", 404);
-  if (row.space_id !== (sessionSpace ?? "")) {
+  if (row.space_id !== spaceId) {
     throw new ApiError("NOT_FOUND", "attachment not found", 404);
   }
 

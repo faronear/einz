@@ -1,5 +1,5 @@
 import { getDb } from "./db.js";
-import { getDevice, isActiveDevice, type ServerConfig } from "./config.js";
+import { getDevice, isActiveDevice } from "./config.js";
 import { constantTimeEqualB64, randomBytes, sealFor, toB64 } from "./crypto.js";
 import { createHash, randomBytes as nodeRandomBytes } from "node:crypto";
 
@@ -19,13 +19,18 @@ export interface SessionResult {
 }
 
 /** 阶段 1：生成密封 challenge（PROTOCOL.md §3）。仅白名单内 active 设备可发起。
- *  Multiverse：可选目标 spaceId（记录到 challenge，随后随 session 绑定；不带则
- *  legacy 回落——存量 v1 客户端行为不变）。 */
-export async function createChallenge(cfg: ServerConfig, deviceId: string, spaceId?: string): Promise<ChallengeResult> {
-  if (!isActiveDevice(cfg, deviceId)) {
+ *
+ * **spaceId 必填**（2026-09-15 v1 收敛后）：数据全按 space 隔离，会话必须绑定一个
+ * space。v1 时代允许不带（落 NULL 的 legacy 会话），那类会话什么都访问不了，
+ * 却让下游 8 处代码各自 `?? ""` 回落——现在在入口就拒绝。 */
+export async function createChallenge(deviceId: string, spaceId: string): Promise<ChallengeResult> {
+  if (!isActiveDevice(deviceId)) {
     throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   }
-  const device = getDevice(cfg, deviceId)!;
+  if (spaceId == null || spaceId.length === 0) {
+    throw new ApiError("INVALID_REQUEST", "space_id 必填（Multiverse：会话必须绑定空间）", 400);
+  }
+  const device = getDevice(deviceId)!;
   const challenge = await randomBytes(32);
   const challengeId = toB64(await randomBytes(16));
   const sealed = await sealFor(device.public_key, challenge);
@@ -35,15 +40,14 @@ export async function createChallenge(cfg: ServerConfig, deviceId: string, space
       `INSERT INTO challenges (challenge_id, device_id, space_id, challenge, expires_at, used)
        VALUES (?, ?, ?, ?, ?, 0)`
     )
-    .run(challengeId, deviceId, spaceId ?? null, toB64(challenge), Date.now() + CHALLENGE_TTL_MS);
+    .run(challengeId, deviceId, spaceId, toB64(challenge), Date.now() + CHALLENGE_TTL_MS);
 
   return { challenge_id: challengeId, sealed_challenge: sealed, expires_in: CHALLENGE_TTL_MS / 1000 };
 }
 
 /** 阶段 2：校验明文并签发 session（PROTOCOL.md §3）。challenge 一次性。
- *  Multiverse：session 绑定 challenge 记录的目标 Space（NULL → session 无空间，
- *  legacy 客户端不带 space_id——v2 下客户端必带）。 */
-export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintextB64: string): SessionResult {
+ *  session 继承 challenge 的 space（challenge 必带 space，见 createChallenge）。 */
+export function verifyChallenge(challengeId: string, plaintextB64: string): SessionResult {
   const row = getDb()
     .prepare(`SELECT * FROM challenges WHERE challenge_id = ?`)
     .get(challengeId) as
@@ -53,6 +57,10 @@ export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintex
   if (!row) throw new ApiError("INVALID_REQUEST", "unknown challenge", 400);
   if (row.used !== 0) throw new ApiError("CONFLICT", "challenge already used", 409);
   if (row.expires_at < Date.now()) throw new ApiError("INVALID_REQUEST", "challenge expired", 400);
+  // v1 时代签发的 challenge（无 space）已不可用：拒绝而不是发一个空空间会话
+  if (row.space_id == null || row.space_id.length === 0) {
+    throw new ApiError("INVALID_REQUEST", "challenge has no space, re-issue it", 400);
+  }
 
   // 校验客户端解封出的明文是否等于当初的 challenge（常量时间比较）
   let ok = false;
@@ -69,7 +77,7 @@ export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintex
   // session_token 用 Node crypto 同步生成（无需 await）
   const sessionToken = toB64(new Uint8Array(nodeRandomBytes(32)));
   const now = Date.now();
-  const sessionSpaceId = row.space_id ?? ""; // v2：challenge 必带目标 Space（legacy 无空间 → 空串）
+  const sessionSpaceId = row.space_id; // 上面已保证非空
   // 同一设备在同一 Space 只保留一个会话：重装/换机/续期后旧 token 立即失效。
   // 此前旧会话会一直累积到过期（24h），而产品上唯一的吊销手段是"整体撤销设备"
   // （2026-09-15 评审）。COALESCE 兼容 ALTER 前写入的 NULL 行。
@@ -96,7 +104,8 @@ export function hashSessionToken(token: string): string {
 }
 
 /** 通过 session_token 解析设备（Multiverse：附带 session 绑定的 space_id，
- *  NULL=ALTER 前的 legacy 存量会话，调用方按需回落）。
+ *  NULL 只可能来自 v1 收敛前的存量行；新写入一律带 space（createChallenge 强制），
+ *  调用方不必再回落——guard.requireSession 直接拒绝无 space 的会话。
  *  库中存的是 token 的 sha256（见 hashSessionToken）——传入的是客户端持有的明文。 */
 export function resolveSession(token: string): { device_id: string; space_id: string | null } {
   const stored = hashSessionToken(token);

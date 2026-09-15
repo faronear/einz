@@ -1,6 +1,7 @@
 import { getDb } from "./db.js";
-import { ApiError, resolveSession, touchLastSeen } from "./auth.js";
-import { isActiveDevice, type ServerConfig } from "./config.js";
+import { ApiError, touchLastSeen } from "./auth.js";
+import { requireSession } from "./guard.js";
+import { type ServerConfig } from "./config.js";
 import { attachmentsForMessages, type AttachmentMeta } from "./attachments.js";
 import { assertSafeMessageId } from "./safeId.js";
 
@@ -57,9 +58,8 @@ function validateEnvelope(body: unknown): MessageEnvelope {
 /** POST /messages：持久化密文并分配 server_sequence；同一 message_id 幂等（PROTOCOL.md §5.1）。
  *  Multiverse：写入 session 绑定的 Space（legacy 回落 cfg.space_id），幂等与
  *  server_sequence 均按 Space 隔离（PROTOCOL_MULTIVERSE.md §3.6）。 */
-export function postMessage(cfg: ServerConfig, token: string, body: unknown): { message_id: string; server_sequence: number; created_at: number } {
-  const { device_id, space_id: sessionSpace } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+export function postMessage(token: string, body: unknown): { message_id: string; server_sequence: number; created_at: number } {
+  const { device_id, space_id: sessionSpace } = requireSession(token);
   touchLastSeen(device_id);
   const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
 
@@ -92,13 +92,11 @@ export function postMessage(cfg: ServerConfig, token: string, body: unknown): { 
 
 /** GET /sync?after=&limit=：按 server_sequence 增量拉取（PROTOCOL.md §5.2）。 */
 export function syncMessages(
-  cfg: ServerConfig,
   token: string,
   after: number,
   limit: number
 ): { messages: StoredMessage[]; attachments_meta: AttachmentMeta[]; last_sequence: number; has_more: boolean } {
-  const { device_id, space_id: sessionSpace } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+  const { device_id, space_id: sessionSpace } = requireSession(token);
   touchLastSeen(device_id);
   const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
 

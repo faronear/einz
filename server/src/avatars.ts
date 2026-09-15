@@ -2,14 +2,15 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db.js";
-import { ApiError, resolveSession } from "./auth.js";
-import { isActiveDevice, type ServerConfig } from "./config.js";
+import { requireSession } from "./guard.js";
+import { ApiError } from "./auth.js";
+import { type ServerConfig } from "./config.js";
 
 // 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AVATARS_ROOT = process.env.EINZ_AVATARS ?? resolve(HERE, "../data/avatars");
 
-/** 宽松 personId 校验（P1 路径遍历防御）：personA/personB 等字母数字 + 下划线/连字符，
+/** 宽松 personId 校验（P1 路径遍历防御）：UUID / 规范 id 等字母数字 + 下划线/连字符，
  *  杜绝 /、.、\ 等路径字符。 */
 const SAFE_PERSON_RE = /^[A-Za-z0-9_-]{1,64}$/;
 function assertSafePersonId(personId: string): void {
@@ -24,12 +25,10 @@ export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 /** 上传本人头像：token 认证 → 解析设备 → 查 person_id → 写文件（覆盖旧头像）。 */
 export function storeAvatar(
-  cfg: ServerConfig,
   token: string,
   blob: Buffer
 ): { person_id: string; size: number } {
-  const { device_id } = resolveSession(token);
-  if (!isActiveDevice(cfg, device_id)) throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
+  const { device_id } = requireSession(token);
   const row = getDb()
     .prepare(`SELECT person_id FROM devices WHERE device_id = ?`)
     .get(device_id) as { person_id: string } | undefined;

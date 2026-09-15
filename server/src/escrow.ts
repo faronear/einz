@@ -2,7 +2,7 @@ import { getDb } from './db.js'
 import { ApiError, resolveSession } from './auth.js'
 import { isActiveDevice, type ServerConfig } from './config.js'
 import { pwhashStrVerify } from './crypto.js'
-import { requireSpaceMember } from './guard.js'
+import { requireSession, requireSpaceMember } from './guard.js'
 import { broadcastPassphraseRotated } from './ws.js'
 
 /**
@@ -47,20 +47,17 @@ export function parsePackage (raw: unknown): EscrowPackage {
  * 会话回落 ""，保持旧行为不变）。
  */
 function escrowSpaceId (token: string): string {
-  return resolveSession(token).space_id ?? ''
+  return requireSession(token).space_id ?? ''
 }
 
 /** POST /key-escrow：上传/更新密文包（UPSERT，按 space 一份）。
  *  可选附 `passphrase_hash`（argon2id）：加入方取包时用它校验口令是否正确
  *  （见 escrowForSpace 的 { passphrase } 分支）。 */
 export function uploadKeyEscrow (
-  cfg: ServerConfig,
   token: string,
   body: unknown
 ): { ok: true } {
-  const { device_id } = resolveSession(token)
-  if (!isActiveDevice(cfg, device_id))
-    throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
+  const { device_id } = requireSession(token)
   const spaceId = escrowSpaceId(token)
 
   const pkg = parsePackage((body as { package?: unknown })?.package)
@@ -116,12 +113,9 @@ export function uploadKeyEscrow (
 
 /** GET /key-escrow：拉取密文包（无包时返回空对象）。 */
 export function getKeyEscrow (
-  cfg: ServerConfig,
   token: string
 ): { package?: EscrowPackage; updated_at?: number } {
-  const { device_id } = resolveSession(token)
-  if (!isActiveDevice(cfg, device_id))
-    throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
+  const { device_id } = requireSession(token)
 
   const spaceId = escrowSpaceId(token)
   const row = getDb()
@@ -137,12 +131,9 @@ export function getKeyEscrow (
 
 /** DELETE /key-escrow：清除密文包。 */
 export function deleteKeyEscrow (
-  cfg: ServerConfig,
   token: string
 ): { ok: true } {
-  const { device_id } = resolveSession(token)
-  if (!isActiveDevice(cfg, device_id))
-    throw new ApiError('FORBIDDEN', 'device not in whitelist', 403)
+  const { device_id } = requireSession(token)
 
   const spaceId = escrowSpaceId(token)
   getDb().prepare(`DELETE FROM key_escrow WHERE space_id = ?`).run(spaceId)
@@ -210,7 +201,6 @@ function clearEscrowFailures (spaceId: string): void {
  * session），免认证是这套"口令即凭证"设计的前提；防爆破靠下面的限速。
  */
 export async function escrowForSpace (
-  cfg: ServerConfig,
   token: string | null,
   spaceId: string,
   body: unknown
@@ -246,9 +236,9 @@ export async function escrowForSpace (
     return { ok: true, package: JSON.parse(row.package) as EscrowPackage }
   }
 
-  // 上传/更新（UPSERT，最新者胜——与 v1 upload 一致）
+  // 上传/更新（UPSERT，最新者胜）
   // 鉴权：必须是该空间成员（见函数头注释；漏挂此校验等于允许任意人顶掉真实用户）
-  requireSpaceMember(cfg, token, spaceId)
+  requireSpaceMember(token, spaceId)
   const pkg = parsePackage(b.package)
   const passphraseHash = b.passphrase_hash
   if (

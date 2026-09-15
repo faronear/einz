@@ -83,35 +83,7 @@ class ApiClient {
 
   /// 新设备凭一次性邀请码动态登记（POST /devices/enroll，免认证——邀请码即准入令牌）。
   /// 登记成功后设备立即在服务端白名单生效（无需人工改 config.json / 重启）。
-  Future<EnrollResult> enrollDevice({
-    String? deviceId,
-    required String publicKey,
-    String? inviteCode,
-    String? personName,
-    String? partnerName,
-    String? personGender,
-    String? partnerGender,
-    String? deviceName,
-    String? personId,
-  }) async {
-    final res = await _post(
-      Api.devicesEnroll,
-      {
-        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
-        'public_key': publicKey,
-        if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
-        if (personName != null && personName.isNotEmpty) 'person_name': personName,
-        if (partnerName != null && partnerName.isNotEmpty) 'partner_name': partnerName,
-        if (personGender != null && personGender.isNotEmpty) 'person_gender': personGender,
-        if (partnerGender != null && partnerGender.isNotEmpty) 'partner_gender': partnerGender,
-        if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
-        if (personId != null && personId.isNotEmpty) 'person_id': personId,
-      },
-      withToken: false,
-    );
-    return EnrollResult.fromJson(res);
-  }
-
+  
   /// Multiverse：join token 轻量校验（不消费），返回空间公开信息供确认
   /// （POST /spaces/join/preflight，PROTOCOL_MULTIVERSE.md §5——App 向导
   /// 第一步 fail-fast：无效/过期/已用/已满在此拦截）。
@@ -211,24 +183,7 @@ class ApiClient {
   }
 
   /// 生成邀请码（POST /invites，需认证 token）：person_id 为规范 id（personA/personB）。
-  Future<InviteResult> createInvite({
-    required String token,
-    required String personId,
-    String? personName,
-    int hours = 24,
-  }) async {
-    final res = await _post(
-      Api.invites,
-      {
-        'person_id': personId,
-        if (personName != null && personName.isNotEmpty) 'person_name': personName,
-        'hours': hours,
-      },
-      token: token,
-    );
-    return InviteResult.fromJson(res);
-  }
-
+  
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
     final res = await _post(Api.messages, env.toJson(), token: token);
     return PostMessageResult.fromJson(res);
