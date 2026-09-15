@@ -149,9 +149,11 @@ bool _onboarded = false;
 /// 入网收尾（向导态→聊天态的切换）是否已执行（只跑一次）。
 bool _onboardingFinalized = false;
 
-/// 入网向导收尾的欢迎辞：向导完成后作为最后一条 system 消息出现，提示用户按回车
-/// 进入聊天态（回车后清空全部 system 消息、只留真实对话——老板 2026-09-13 定稿）。
-const String _kWelcomeText = '一切就绪！输入回车，立刻开始和伴侣聊天吧！';
+/// 入网向导收尾：向导完成后作为最后一条 system 消息出现，随后自动
+/// 倒计时（屏幕上跳动显示剩余秒数）进入聊天态——倒计时结束清空全部 system
+/// 消息、只留真实对话（老板 2026-09-15 定稿：不再要求按回车，自动倒计时更直观）。
+/// 欢迎辞倒计时秒数（到点自动进入聊天态并开始同步）。
+const int _kWelcomeCountdownSeconds = 5;
 
 /// SIGWINCH 防抖计时器（窗口尺寸变化 120ms 内合并为一次全量重绘）。
 Timer? _resizeTimer;
@@ -680,21 +682,44 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
   _scheduleRender();
 }
 
-/// 入网向导收尾（老板 2026-09-13 定稿）：向导完成后在消息流里致欢迎辞，等待用户
-/// 按回车（输入内容不限、不提交为消息）作为「向导态 → 聊天态」的切换点；回车后
-/// 清空全部 system 消息（向导日志 + 欢迎辞），只留真实对话并滚到最新。这样向导
-/// 输出与聊天记录明确分离，也不必把欢迎语塞进底部状态条。
+/// 入网向导收尾（老板 2026-09-15 定稿）：向导完成后在消息流里致欢迎辞，随后
+/// 自动倒计时（欢迎辞 system 消息上跳动显示剩余秒数，5→1）；倒计时结束作为
+/// 「向导态 → 聊天态」的切换点：清空全部 system 消息（向导日志 + 欢迎辞），
+/// 只留真实对话并滚到最新。此前的"等用户按回车"实测不好理解（用户不知道
+/// 要按回车、也不知道按了会发生什么），自动倒计时无需学习成本。倒计时期间
+/// 忽略普通按键（Ctrl+C / /exit 仍可退出），回车等输入不会变成消息。
 Future<void> _finalizeOnboarding(ChatSession session) async {
   if (_onboardingFinalized) return;
   _onboardingFinalized = true;
   if (!_state!.running) return;
-  // 欢迎辞即最后一条向导 system 消息；_prompt 负责渲染并等输入循环提交回车
+  // 欢迎辞即最后一条向导向导 system 消息；倒计时期间逐秒替换该消息（重渲染可见秒数跳动）
+  // processing=true：倒计时期间忽略输入、隐藏光标（复用 busy 机制——此时尚未进入
+  // 聊天态，敲字不应被当作消息提交；Ctrl+C 仍可退出）
+  _state!.processing = true;
   session.messages.add(_systemMessage(session, '----------------'));
-  await _prompt(session, _kWelcomeText);
-  if (!_state!.running) return; // 回车期间 /exit：不再继续
+  ChatMessage countdownMsg = _systemMessage(session, _welcomeCountdownText(_kWelcomeCountdownSeconds));
+  session.messages.add(countdownMsg);
+  _scheduleRender();
+  for (var remain = _kWelcomeCountdownSeconds - 1; remain >= 1; remain--) {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    if (!_state!.running) return; // 倒计时期间 /exit / Ctrl+C：立即结束
+    // ChatMessage.plain 是 final：整条替换（位置不变——还是最后一条向导消息）
+    countdownMsg = _systemMessage(session, _welcomeCountdownText(remain));
+    session.messages[session.messages.length - 1] = countdownMsg;
+    _scheduleRender();
+  }
+  await Future<void>.delayed(const Duration(seconds: 1));
+  if (!_state!.running) return; // 倒计时期间 /exit：不再继续
+  _state!.processing = false;
   // 切换到聊天态：清空全部 system 消息，只留真实对话（对方预发 / 自己发出的）
   session.messages.removeWhere((m) => m.isSystem);
   _scheduleRender();
+}
+
+/// 欢迎辞倒计时文本（两行，老板 2026-09-15）：首行欢迎辞；读秒单独一行
+/// "即将进入秘境聊天：<秒数>"，逐秒跳动。
+String _welcomeCountdownText(int remain) {
+  return '一切就绪！即将开始和伴侣聊天吧 💞\n即将进入秘境聊天：$remain';
 }
 
 /// 客户端生成 space_id（UUIDv4，协议 §3.4：space_id/space_key 由客户端生成——
