@@ -5358,3 +5358,12 @@ macOS/桌面/测试环境自动退回占位图标——与 video_player 的平�
   Interface style）；菜单里显示的当前风格值同步走 l10n。
 
 **验证：** `flutter analyze` 无 issue；ui_style_switch + chat_page_menu 23 项全过。
+
+### 锁屏 PIN 输入框：居中 + 放大（老板 2026-09-15）
+
+PIN 是短数字串，靠左小字既不明显也不好确认位数 → 参照手机验证码输入：
+`textAlign: TextAlign.center` + `fontSize: 24` + `letterSpacing: 8`，
+`contentPadding` 上下加高（左右留白对称）。`obscureText` 保持（锁屏码仍以圆点显示，
+不显示明文数字）。
+
+**验证：** `flutter analyze` 无 issue；`lock_page_test` 通过。视觉待老板实机确认。

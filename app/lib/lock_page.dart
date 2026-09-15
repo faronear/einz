@@ -291,9 +291,15 @@ class _LockPageState extends State<LockPage> {
               obscureText: true,
               enabled: !locked,
               keyboardType: TextInputType.number,
+              // 居中 + 大字号 + 字距（老板 2026-09-15）：像输手机验证码那样——
+              // PIN 是短数字串，靠左小字既不明显也不好确认位数
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8),
               decoration: InputDecoration(
                 labelText: locked ? l10n.lockPageLockedSeconds(_lockSeconds) : l10n.lockPagePinLabel,
                 border: const OutlineInputBorder(),
+                // 居中后左右留白对称（label 仍顶在左上，不影响）
+                contentPadding: const EdgeInsets.symmetric(vertical: 18),
               ),
               onSubmitted: (_) => _unlock(),
             ),
