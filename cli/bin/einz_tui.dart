@@ -101,7 +101,7 @@ class _TuiState {
   bool running = true;
 
   /// 等待邀请码输入（/auth 未登记引导）：输入循环的下一次输入按邀请码处理。
-  bool pendingInvite = false;
+  bool pendingJoinToken = false;
 
   /// 等待密保口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
   bool pendingSpaceKey = false;
@@ -489,86 +489,16 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     return;
   }
 
-  // 设备登记：未登记才 enroll（首设备自举 / 凭邀请码绑定）——已登记设备（重启
-  // 进入）跳过 enroll，直接走认证/TUI（否则服务端 activeCount>0 会误判"空间
-  // 已有设备"要求邀请码，发起者自己被挡在门外）
+  // 旧版 store（v1 时代留下：有 Space Key 但没有设备登记/空间绑定信息）不再走
+  // enroll——v1 的 /devices/enroll 已随 Multiverse 收敛下线，设备登记 + 空间会话
+  // 一律由 /space create、/space join 一步完成（2026-09-15 P1）。
   if (server.isNotEmpty && (store.deviceId == null || store.spaceId == null)) {
-    try {
-      final r = await _busy(session, '⏳ 设备绑定中......', () => ApiClient(server).enrollDevice(
-        deviceId: store.deviceId,
-        publicKey: store.publicKey,
-        personName: store.personName,
-        partnerName: partnerPresetName,
-        personGender: _genderCode(myGender),
-        partnerGender: _genderCode(partnerGender),
-        deviceName: store.deviceName,
-      ));
-      store.deviceId = r.deviceId;
-      store.personId = r.personId;
-      store.spaceId = r.spaceId;
-      store.save(storePath);
-      // 登记成功系统通知（老板要求：设备信息上传后台登记后显示）
-      session.messages.add(_systemMessage(session, '🎉 新设备已成功绑定'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      _scheduleRender();
-      if (!_state!.running) return; // 绑定期间被 /exit 或 Ctrl+C 中断：不再生成口令托管等
-      // 发起者首次创建：生成 Space Key + 上传口令密保箱（两次确认，机密 *）。
-      // 全丢恢复后跳过此段：spaceKey 已由备份解出、口令密保箱与口令未变（不重传）
-      if (store.spaceKey == null) {
-        final sk = await generateSpaceKey();
-        store.spaceKey = base64Encode(sk);
-        store.save(storePath);
-        await _setupEscrowPassphrase(store, storePath, session);
-        _onboarded = true; // 首设备入网完成
-      }
-      _scheduleRender();
-    } catch (e) {
-      if (e is ApiException && e.code == 'INVALID_REQUEST') {
-        _scheduleRender();
-        // 身份已在引导开头选定（chosenPerson）；此处只做邀请码重试循环：
-        // 输错/留空反复要求重输，直到登记成功（成功才结束引导）
-        while (true) {
-          if (!_state!.running) break; // 已退出（/exit 或 Ctrl+C）：结束引导
-          final inviteCode = await _prompt(session, '❓ 输入邀请码（由任意一个已绑定设备生成）:');
-          if (!_state!.running) break; // 退出中（/exit 逃生门已触发）——立即结束引导，不进登记
-          if (inviteCode.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 您尚未提供邀请码，请重新输入:'));
-            _scheduleRender();
-            continue;
-          }
-          try {
-            final r = await _busy(session, '⏳ 邀请码验证中......', () => ApiClient(server).enrollDevice(
-              deviceId: store.deviceId,
-              publicKey: store.publicKey,
-              inviteCode: inviteCode,
-              personName: store.personName,
-              deviceName: store.deviceName,
-              personId: chosenPerson, // 用户引导选择的身份（null 时服务端用邀请码绑定）
-            ));
-            store.deviceId = r.deviceId;
-            store.personId = r.personId;
-            store.spaceId = r.spaceId;
-            store.save(storePath);
-            _onboarded = true; // 新设备入网完成
-            session.messages.add(_systemMessage(session, '✅ 邀请码验证成功'));
-            session.messages.add(_systemMessage(session, '----------------'));
-            session.messages.add(_systemMessage(session, '🎉 新设备已成功绑定'));
-            session.messages.add(_systemMessage(session, '----------------'));
-            _scheduleRender();
-            break;
-          } catch (e2) {
-            session.messages.add(_systemMessage(session, '⚠️ 邀请码验证失败（无效/已用/过期或网络问题）。'));
-            session.messages.add(_systemMessage(session, '----------------'));
-            _scheduleRender();
-          }
-        }
-      } else {
-        if (!_state!.running) return; // 退出中：不输出"绑定失败"噪音，直接结束引导
-        session.messages.add(_systemMessage(session, '⚠️ 第一个设备绑定失败。'));
-        session.messages.add(_systemMessage(session, '----------------'));
-        _scheduleRender();
-      }
-    }
+    session.messages.add(_systemMessage(
+        session,
+        '⚠️ 本机 store 缺少设备登记信息（旧版遗留）\n'
+        '  请用 /space create 新建秘境，或用 /space join <邀请链接> 加入已有秘境'));
+    session.messages.add(_systemMessage(session, '----------------'));
+    _scheduleRender();
   }
 
   // 已绑定但未进入空间（无 Space Key，如重启的第二设备）：自动进入口令
@@ -618,9 +548,11 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     store.save(storePath);
   }
 
-  // 已登记但口令密保箱未上传（发起者引导中断）：重启再进引导设置口令。
+  // 已登记但口令密保箱未上传（创建者引导中断）：重启再进引导设置口令。
+  // （判据用 partnerSlot == 0 = 创建者/第一人；v1 时代的 personId == 'personA'
+  //   在 v2 下恒不成立，会让这条恢复路径永不触发）
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
-  if (_state!.running && store.spaceId != null && store.personId == 'personA' && !store.escrowUploaded) {
+  if (_state!.running && store.spaceId != null && store.partnerSlot == 0 && !store.escrowUploaded) {
     session.messages.add(_systemMessage(session, '检测到尚未设置密保口令，现在设置: '));
     _scheduleRender();
     await _setupEscrowPassphrase(store, storePath, session);
@@ -916,6 +848,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     store.sessionToken = created.sessionToken;
     store.deviceId = created.deviceId;
     store.personId = created.creatorPersonId;
+    store.partnerSlot = 0; // 创建者 = 第一人（v2 身份槽位；替代 v1 的 personA 判据）
     store.personName = displayName;
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
@@ -1055,6 +988,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     store.sessionToken = join.sessionToken;
     store.deviceId = join.deviceId;
     store.personId = join.personId;
+    store.partnerSlot = join.partnerSlot; // v2 身份槽位（0=第一人，1=第二人）
     store.personName = myName ?? '成员';
     store.save(storePath);
     session.messages.add(_systemMessage(session, '✅ 口令验证通过，成功加入秘境。'));
@@ -2160,7 +2094,7 @@ Future<void> _runInputLoop(ChatSession session) async {
         _state!.cursor = 0;
         // 输入历史（↑↓ 浏览复用）：口令/邀请码等机密输入不进历史
         if (!_state!.hiddenInput &&
-            !_state!.pendingInvite &&
+            !_state!.pendingJoinToken &&
             !_state!.pendingSpaceKey &&
             line.isNotEmpty &&
             (_state!.inputHistory.isEmpty || _state!.inputHistory.last != line)) {
@@ -2174,8 +2108,8 @@ Future<void> _runInputLoop(ChatSession session) async {
           continue;
         }
         busy = true;
-        final future = (_state!.pendingInvite)
-            ? (line.startsWith('/') ? _execCommand(line) : _handleInviteInput(line)) // / 开头按命令（/exit 退出），否则按邀请码
+        final future = (_state!.pendingJoinToken)
+            ? (line.startsWith('/') ? _execCommand(line) : _handleJoinTokenInput(line)) // / 开头按命令（/exit 退出），否则按邀请链接
             : (_state!.pendingSpaceKey)
                 ? (line.startsWith('/') ? _execCommand(line) : _handleSpaceKeyInput(line)) // / 开头按命令（/exit 退出），否则按口令
                 : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
@@ -2494,13 +2428,17 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/auth':
-      // 未登记（deviceId null，如引导时跳过/登记失败）→ 引导邀请码登记后再认证
+      // 未绑定（deviceId null，如引导时跳过/加入失败）→ 引导加入秘境后再认证
       if (s.session.store.deviceId == null) {
-        // 提示作为 system 消息进消息流；邀请码由输入循环接管输入——
+        // 提示作为 system 消息进消息流；邀请链接由输入循环接管输入——
         // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
-        s.pendingInvite = true;
-        s.session.messages.add(_systemMessage(s.session, '❓ 输入秘境邀请码（由其他已认证设备生成'));
-        s.status = '⌛️ 等待邀请码输入…';
+        s.pendingJoinToken = true;
+        s.session.messages.add(_systemMessage(
+            s.session,
+            '❓ 本设备尚未绑定秘境\n'
+            '   输入邀请链接（或纯 token）加入伴侣的秘境；\n'
+            '   新建秘境请先 /space create'));
+        s.status = '⌛️ 等待邀请链接输入…';
         break;
       }
       // 无参数：先输出当前登录状态，再给出详细用法（激活需带服务器地址）
@@ -2859,47 +2797,20 @@ Future<void> _execOpen(List<String> parts) async {
   }
 }
 
-/// 输入循环接管的邀请码登记（/auth 未登记引导）：认证登记 → system 消息结果 → 激活 → WS。
-Future<void> _handleInviteInput(String inviteCode) async {
+/// 输入循环接管的"邀请链接加入"（/auth 未绑定时的引导）。
+///
+/// 走 `/space join` 的同一条路径（`_spaceJoin`）：preflight 校验 → 口令取钥 →
+/// joinSpace 登记设备 + 签发空间会话 + 取 Space Key。**v1 的邀请码登记已随
+/// Multiverse 收敛删除**（2026-09-15 P1）：设备登记不再有单独的入口。
+Future<void> _handleJoinTokenInput(String token) async {
   final s = _state!;
-  s.pendingInvite = false;
-  if (inviteCode.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供邀请码，无法绑定到秘境'));
+  s.pendingJoinToken = false;
+  if (token.isEmpty) {
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供邀请链接，无法绑定到秘境'));
     return;
   }
-  try {
-    final r = await ApiClient(s.session.server).enrollDevice(
-      publicKey: s.session.store.publicKey,
-      inviteCode: inviteCode,
-      personName: s.session.store.personName,
-      deviceName: s.session.store.deviceName,
-    );
-    s.session.store.deviceId = r.deviceId;
-    s.session.store.personId = r.personId;
-    s.session.store.spaceId = r.spaceId;
-    s.session.store.save(s.session.storePath);
-    s.session.messages.add(_systemMessage(s.session, '✅ 邀请码验证成功，新设备 ${s.session.store.deviceName} 已成功绑定到秘境。'));
-    // 登记成功后继续认证
-    try {
-      await s.session.auth();
-      s.session.messages.add(_systemMessage(s.session, '✅ 成功刷新会话'));
-      s.status = '';
-      _refreshPersonNames(s); // 刷新 person 名称表
-      if (s.session.wsClient == null && s.session.hasSession) {
-        s.session.startWs(
-          onMessage: (_) => _refreshGenderForLatest(_state!),
-          onStatus: (_) => _render(),
-          onAutoSync: (_) => _refreshGenderForLatest(_state!),
-          onRevoked: _onWsRevoked,
-        );
-      }
-    } catch (e) {
-      s.session.messages.add(_systemMessage(s.session, '⚠️ 机密线路激活失败: $e'));
-      s.status = '';
-    }
-  } catch (e) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 邀请码验证失败（无效/已用/过期或网络问题）'));
-  }
+  s.status = '';
+  await _spaceJoin(s.session, s.session.store, s.session.storePath, token);
 }
 
 /// 输入循环接管的密保口令接入（/space 未接入引导）：口令 → accessByEscrow。

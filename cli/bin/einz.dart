@@ -200,7 +200,7 @@ Future<void> _cmdAuth(ArgResults opts) async {
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId!);
+  final challenge = await api.challenge(store.deviceId!, spaceId: store.spaceId);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
@@ -293,7 +293,7 @@ Future<void> _cmdEscrowUpload(ArgResults opts) async {
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId!);
+  final challenge = await api.challenge(store.deviceId!, spaceId: store.spaceId);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
@@ -325,7 +325,7 @@ Future<void> _cmdEscrowDownload(ArgResults opts) async {
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId!);
+  final challenge = await api.challenge(store.deviceId!, spaceId: store.spaceId);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),

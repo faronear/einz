@@ -52,9 +52,6 @@ Future<void> pumpToPassphrase(
         creatorPersonId: 'personA',
         sessionToken: 'tok',
       ),
-      // join 走到口令页前不登记，此 fake 不会被调用也无妨
-      enrollOverride: (_) async =>
-          const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
     ),
   ));
   await tester.pumpAndSettle();

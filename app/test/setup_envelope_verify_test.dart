@@ -30,8 +30,6 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
             SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
             SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
           ]),
-      enrollOverride: (_) async =>
-          const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test'),
       authOverride: (kp, id) async =>
           SessionResult(sessionToken: 'tok', spaceId: 'space-test', expiresIn: 3600),
       keyPairOverride: kp,

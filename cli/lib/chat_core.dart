@@ -175,9 +175,11 @@ class ChatSession {
     // 未登记（登记失败/邀请码输错）时 deviceId 为 null——先检查，避免空断言崩溃
     final deviceId = store.deviceId;
     if (deviceId == null) {
-      throw StateError('设备尚未登记（无 device_id），请先完成引导登记（自举或邀请码）');
+      throw StateError('设备尚未绑定秘境，请先 /space create（新建）或 /space join <邀请链接>（加入）');
     }
-    final challenge = await api.challenge(deviceId);
+    // spaceId 必须一并提交：否则拿到的是"无 space 的 legacy 会话"，/sync 与
+    // /messages 会落到空 space 桶 → 会话过期自动续期后消息全空（P1 收敛）。
+    final challenge = await api.challenge(deviceId, spaceId: store.spaceId);
     final opened = await sealOpen(
       s,
       base64Decode(challenge.sealedChallenge),

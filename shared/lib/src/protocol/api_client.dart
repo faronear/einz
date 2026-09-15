@@ -54,8 +54,21 @@ class ApiClient {
     throw last!;
   }
 
-  Future<ChallengeResult> challenge(String deviceId) async {
-    final res = await _post(Api.challenge, {'device_id': deviceId}, withToken: false);
+  /// 阶段 1：取密封 challenge。
+  ///
+  /// [spaceId] 必须传（Multiverse）：签发出来的 session 会绑定该 Space，后续
+  /// `/sync`、`/messages`、escrow 都按会话里的 space 定位数据。不传 → 服务端
+  /// 落"无 space 的 legacy 会话"，该会话看不到任何空间的数据（P1 收敛前 CLI 的
+  /// `/auth` 就是漏传，导致会话过期续期后消息全空）。
+  Future<ChallengeResult> challenge(String deviceId, {String? spaceId}) async {
+    final res = await _post(
+      Api.challenge,
+      {
+        'device_id': deviceId,
+        if (spaceId != null && spaceId.isNotEmpty) 'space_id': spaceId,
+      },
+      withToken: false,
+    );
     return ChallengeResult.fromJson(res);
   }
 

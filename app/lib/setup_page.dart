@@ -21,15 +21,15 @@ import 'widgets/top_notice.dart';
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
 enum _WizardRole { create, join, offline }
 
-/// 设置页：一次性配置（生成设备凭证 → 自动登记入网 → 获得 Space Key → 设置启动锁）。
+/// 设置页：一次性配置（生成设备凭证 → 建立/加入空间 → 获得 Space Key → 设置启动锁）。
 ///
-/// 服务器登记已全自动化（对齐 TUI/CLI 的 enroll 流程，不再需要 config.json 白名单）：
-/// - create（第一个使用者）：首设备免邀请码自举登记 → 设接入口令托管 Space Key →
-///   登记完成进聊天页（邀请码由聊天页顶栏生成，二维码只含邀请码、不编口令——
-///   降级 B，与 TUI 一致；口令由加入方另行输入）；
-/// - join：输入邀请码 → 凭邀请码登记 → 口令托管拉取 Space Key；
-/// - offline：密保信封导入（用对方公钥密封的 Space Key，同样先凭邀请码登记）。
-/// 认证统一在登记之后进行（challenge 要求设备已入网），deviceId/spaceId 用登记返回值。
+/// 全部走 Multiverse（v2）闭环，**不再有 v1 的设备登记与邀请码**（2026-09-15 P1 收敛）：
+/// - create（第一个使用者）：`POST /spaces` 一步完成设备登记 + 签发空间会话 →
+///   设接入口令托管 Space Key → 进聊天页（邀请由聊天页顶栏调 `/spaces/{id}/join-tokens`
+///   生成链接/二维码；口令由加入方另行输入）；
+/// - join：邀请链接/token → preflight → 口令取钥 → `POST /spaces/join` 登记设备 + 发会话；
+/// - offline：密保信封导入（用对方公钥密封的 Space Key，口令页的平行替代）。
+/// 会话由 create/join 直接签发（绑定该 Space），无需再单独登记。
 class SetupPage extends StatefulWidget {
   const SetupPage({
     super.key,
@@ -38,8 +38,6 @@ class SetupPage extends StatefulWidget {
     this.preflightOverride,
     this.joinOverride,
     this.createOverride,
-    this.enrollOverride,
-    this.createInviteOverride,
     this.authOverride,
     this.keyPairOverride,
     this.escrowOverride,
@@ -61,12 +59,6 @@ class SetupPage extends StatefulWidget {
 
   /// Multiverse create 提交注入（测试用；默认真实 ApiClient.createSpace）。
   final Future<SpaceCreateResult> Function()? createOverride;
-
-  /// 测试注入：登记设备（生产走真实 ApiClient.enrollDevice；注入后不发起网络请求）。
-  final Future<EnrollResult> Function(String? inviteCode)? enrollOverride;
-
-  /// 测试注入：生成邀请码（生产走真实 ApiClient.createInvite）。
-  final Future<InviteResult> Function(String personId)? createInviteOverride;
 
   /// 测试注入：challenge-response 认证（生产走真实 ApiClient.challenge/verify；
   /// 注入后不发起网络请求，供 golden 走 PIN/跳过路径）。

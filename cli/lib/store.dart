@@ -23,6 +23,7 @@ class DeviceStore {
     this.spaceKey,
     this.spaceId,
     this.spaceAddress,
+    this.partnerSlot,
     this.keyVersion = 1,
     this.sessionToken,
     this.server,
@@ -46,7 +47,8 @@ class DeviceStore {
   String? deviceId; // 规范设备 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 personId 一致）
   final String publicKey; // base64
   final String privateKey; // base64（测试用明文存储）
-  String? personId; // 规范 person id（personA/personB），enroll 后由服务端返回写入
+  String? personId; // 空间内身份 id（v2：createSpace 返回 creatorPersonId / joinSpace 返回 personId，均为 UUID）
+  int? partnerSlot; // 本设备在空间里的身份槽位（0=创建者/第一人，1=伴侣/第二人；v2 create/join 返回）
   String? personName; // 使用者自定义名称（如 lukas），显示层用
   String? deviceName; // 设备自定义名称（如 MacBook），显示层用
   String? spaceKey; // base64，config/import 后填充
@@ -99,6 +101,7 @@ class DeviceStore {
         'public_key': publicKey,
         'private_key': privateKey,
         'person_id': personId,
+        'partner_slot': partnerSlot,
         'person_name': personName,
         'device_name': deviceName,
         'space_key': spaceKey,
@@ -125,6 +128,7 @@ class DeviceStore {
         publicKey: json['public_key'] as String,
         privateKey: json['private_key'] as String,
         personId: json['person_id'] as String?,
+        partnerSlot: json['partner_slot'] as int?,
         personName: json['person_name'] as String?,
         deviceName: json['device_name'] as String?,
         spaceKey: json['space_key'] as String?,

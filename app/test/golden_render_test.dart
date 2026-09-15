@@ -130,10 +130,6 @@ void main() {
     );
   });
 
-  // 测试注入：登记（真实路径走 ApiClient.enrollDevice；此处绕开网络，返回固定结果）。
-  Future<EnrollResult> fakeEnroll(String? inviteCode) async =>
-      const EnrollResult(deviceId: 'dev1', personId: 'personA', spaceId: 'space-test');
-
   // 测试注入：认证（真实路径走 ApiClient.challenge/verify；此处绕开网络）。
   Future<SessionResult> fakeAuth(DeviceKeyPair kp, String enrolledDeviceId) async =>
       SessionResult(sessionToken: 'tok-fake', spaceId: 'space-test', expiresIn: 86400);
@@ -225,8 +221,6 @@ void main() {
     WidgetTester tester, {
     Map<String, String> probeNames = const {},
     bool probeOk = true,
-    Future<EnrollResult> Function(String? inviteCode)? enroll,
-    Future<InviteResult> Function(String personId)? invite,
     Future<SessionResult> Function(DeviceKeyPair kp, String enrolledDeviceId)? auth,
     DeviceKeyPair? keyPair,
   }) async {
@@ -239,8 +233,6 @@ void main() {
       home: SetupPage(
         db: db,
         probeServer: (_) async => (probeOk, '', const <String>[]),
-        enrollOverride: enroll,
-        createInviteOverride: invite,
         authOverride: auth,
         keyPairOverride: keyPair,
       ),
@@ -269,7 +261,7 @@ void main() {
 
   testWidgets('golden: 向导1.1.3-接入口令步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: fakeEnroll);
+    await pumpSetup(tester);
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
@@ -285,7 +277,7 @@ void main() {
 
   testWidgets('golden: 向导1.1.4-PIN 步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: fakeEnroll);
+    await pumpSetup(tester);
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
@@ -304,7 +296,7 @@ void main() {
 
   testWidgets('golden: 向导1.1.6-完成步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: fakeEnroll, auth: fakeAuth);
+    await pumpSetup(tester, auth: fakeAuth);
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
@@ -326,7 +318,7 @@ void main() {
 
   testWidgets('向导完成：弹出欢迎对话框（欢迎词 + 唯一「开始聊天」按钮）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, enroll: fakeEnroll, auth: fakeAuth);
+    await pumpSetup(tester, auth: fakeAuth);
     await tester.enterText(find.byType(TextField), 'Lukas'); // 本人名字（必填）
     await tester.tap(find.text('下一步')); // 名字 → 对方名字页
     await tester.pumpAndSettle();
@@ -369,7 +361,7 @@ void main() {
   testWidgets('golden: 向导1.3.1-密保信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     // 信封入口仅 join（第二/三台设备）口令页显示：探测到 personA → 身份（自动进邀请码）→ 口令页
-    await pumpSetup(tester, probeNames: {'personA': 'Lukas'}, enroll: fakeEnroll);
+    await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
     await tester.tap(find.text('Lukas')); // 选身份（自动进邀请码页）
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 邀请码（校验非空）

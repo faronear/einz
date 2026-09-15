@@ -5735,3 +5735,57 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
   等他一句话再落盘。
 - **D3 待办**：已出分期方案（服务端删 v1 轨道 → 数据层收敛 → 客户端改造 → 文档/测试清理），
   等边界确认后开工。
+
+## 2026-09-15 D3 拍板"做 A" → P1 客户端切 v2（已完成）
+
+老板拍板：**C1 不改 / C2 幂等 / C4 不改 / C5 去掉 / D3 接受重构**（新依据：v1 从未上线，
+无历史客户端与数据）；并答：**开发库可丢弃**、**TUI 录入伴侣名字保留**、**E1 seafile 忽略文件
+位置本就正确**（productX 就是资料库根，`*/.git/` 覆盖嵌套仓库 —— 我上一轮"位置不对"的判断作废）。
+
+### 读代码后的重要修正：P1 比预想小得多
+
+核实发现**客户端其实已经是 v2**：
+- **App**：`createSpace` / `joinSpace` / `preflightJoin` 全 v2；v1 只剩两个**死注入点**
+  （`enrollOverride` / `createInviteOverride` 声明了但页面内无人调用）。
+- **TUI 新设备**：`_runGuide` 里 `if (store.spaceKey == null)` 已经走"c: 创建秘境 / j: 加入秘境"
+  → `_spaceCreate` / `_spaceJoin`（v2 一步完成设备登记 + 签发空间会话），**并在该分支后 return**，
+  所以下面的 v1 enroll 块对新设备根本不可达 —— 它只对"旧版 store（有 spaceKey 但缺登记信息）"生效。
+- 真正的 v1 活路径只有：TUI 的旧 store 分支、`/auth` 未绑定时的"邀请码登记"、
+  `einz.dart`（旧版脚本 CLI，20+ 条 v1 命令，e2e 脚本在用）。
+
+### 本轮改动（P1-a / P1-b）
+
+- **修掉一个真实潜在 bug**：`ApiClient.challenge(deviceId)` 一直**不传 `space_id`**
+  → 拿到的是"无 space 的 legacy 会话"。CLI/TUI 一旦 `/auth` 或 401 自动续期，会话就退化成
+  空空间会话，`/sync` 与 `/messages` 会落到 `space_id=''` 空桶 → 消息全空。
+  现在 `challenge(deviceId, {spaceId})`（shared）+ `chat_core.auth()`、`einz.dart` 三处调用
+  全部带上 `store.spaceId`，与 App 一致。
+- **TUI 旧 store 分支**：删掉 v1 enroll + 邀请码重试循环，改为一句明确指引
+  （"本机 store 缺少设备登记信息（旧版遗留）→ 用 /space create 或 /space join"）。
+- **TUI `/auth` 未绑定引导**：`pendingInvite` / `_handleInviteInput` 改为
+  `pendingJoinToken` / `_handleJoinTokenInput` —— 输入邀请链接（或纯 token）后直接复用
+  `_spaceJoin`（preflight → 口令取钥 → joinSpace）。**命令名不变**：`/auth`、`/space`、
+  `/invite`、`/sync`… 全保留。
+- **TUI 身份判据去 v1 化**：新增 `store.partnerSlot`（create=0 / join=join.partnerSlot，
+  已落盘 + 兼容缺字段的旧 store），把 `store.personId == 'personA'` 的"创建者引导中断后补设
+  口令密保箱"判据改为 `partnerSlot == 0` —— 原来那条在 v2 下（personId 是 UUID）**恒不成立**，
+  等于恢复路径永不触发。
+- **App**：删掉 `SetupPage` 的两个死注入点，并把类注释里"凭邀请码登记"的过时描述改写为
+  v2 闭环（create/join 直接签发会话，不再单独登记）；三个测试文件的对应传参机械清理。
+
+**验证**：`dart analyze`(shared/cli) 与 `flutter analyze`(app) 全 `No issues found`；
+`shared dart test` 28 项、`cli dart test` 18 项、`server npm test` 5 套件全绿。
+
+### P1 剩余 / P2 清单
+
+- `cli/bin/einz.dart`（旧脚本 CLI）**仍是 v1-native**：`enroll` / `invite` / `escrow`(v1) /
+  `config` / `import` / `rotate` 等命令，`cli/test/*.sh` 的 e2e 脚本依赖它（8 个脚本、
+  用到 sync/send/auth/enroll/invite/escrow 等）。**这是 P2 最大的待决项**：删掉它 + 重写 e2e，
+  还是给它补 v2 命令？需要老板拍板。
+- TUI 里还有 v1 死残留：`_probePersonNames` / `_probePersonGenders`（**从未被赋值**，
+  恒空 → 依赖它们的身份选择块 `_runGuide` 开头那段是死代码）、`_refreshPersonNames` /
+  `_refreshGenderForLatest` 的 v1 名称表读法。
+- P2（服务端）：`/devices/enroll`、`/invites`、`invites` 表、meta 名称表、`personA/personB`、
+  8 处"无 space 回落"、`isActiveDevice(_cfg,…)` 的空 cfg 参数；三个服务端测试套件从
+  enroll+invite 流程改写为 spaces 流程。
+- P3：PROTOCOL.md 删 v1 段、KEY_ESCROW/SETUP 归档、SECURITY/productLens 同步。
