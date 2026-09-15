@@ -398,52 +398,9 @@ Future<void> _unlockPin(ChatSession session) async {
 Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
 
-  // 身份选择（仅后续设备、未登记的新设备）：先问是第一还是第二个人（personA/personB），
-  // 按需设置名字——与首设备"先名字后设备名"的顺序对齐（此前是先问设备名再问身份）。
-  // 首设备（探测无 person 名称表）跳过此步，直接走下方"身份名字"询问。
-  String? chosenPerson;
-  if (store.deviceId == null && _probePersonNames.isNotEmpty) {
-    final aName = _probePersonNames['personA'] ?? '';
-    final bName = _probePersonNames['personB'] ?? '';
-    while (true) {
-      if (!_state!.running) return; // /exit 或 Ctrl+C：立即结束引导
-      final choice = await _prompt(session, '❓ 如果你是 $aName，输入 1；如果你是 $bName，输入 2');
-      if (choice == '1' || choice.toLowerCase() == 'persona') { chosenPerson = 'personA'; break; }
-      if (choice == '2' || choice.toLowerCase() == 'personb') { chosenPerson = 'personB'; break; }
-      session.messages.add(_systemMessage(session, '❓ 输入 1 ($aName) 或 2 ($bName)'));
-      _scheduleRender();
-    }
-    // 身份一旦选定（输入 1/2 确认），立即本地记录 personId——标题栏随即显示
-    // 正确的对方（左）/自己（右）。此前等 enroll 返回后才设置，绑定期间
-    // personId 仍为空：左侧继续显示名称表第一项（猜测），与右侧刚设的
-    // 自己名字相同——"左右两侧都是同一个人"（老板实测反馈）。
-    store.personId = chosenPerson;
-    store.save(storePath);
-    if (chosenPerson == 'personB') {
-      if ((_probePersonNames['personB'] ?? '').isEmpty) {
-        // personB 还没有名称——要求输入显示名
-        final name = await _prompt(session, '❓ 输入我的名字（也可直接回车先跳过，以后可随时修改）:');
-        if (!_state!.running) return; // 退出中：不再继续设置，直接结束引导
-        if (name.isNotEmpty) { 
-          store.personName = name;
-          session.messages.add(_systemMessage(session, '✅ 欢迎 $name 来到秘境！'));
-        }else {
-          session.messages.add(_systemMessage(session, '✅ 欢迎来到秘境！'));
-        }
-      } else {
-        store.personName = _probePersonNames['personB'];
-        session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到秘境！'));
-      }
-    } else if (chosenPerson == 'personA') {
-      store.personName = _probePersonNames['personA'] ?? store.personName; // 显示用
-      session.messages.add(_systemMessage(session, '✅ 欢迎 ${store.personName} 来到秘境！'));
-    }
-    session.messages.add(_systemMessage(session, '----------------'));
-    _scheduleRender();
-  }
-
-  // 第二用户预置名（仅首设备新空间时询问；回车跳过 → 服务端落默认 personB）：
-  // 登记（enroll 自举）时随请求提交，后续设备启动引导即可按名称表选身份。
+  // v2 已无「v1 全局 person 名称表」（/health 的 person_names 随 2efad8c 下线）——
+  // 原先据此做的 personA/personB 身份选择块是死代码（_probePersonNames 恒为空），
+  // 已移除（老板 2026-09-15）。身份现在由 /space join 的 preflight slots 选择。
   store.save(storePath);
 
   // Multiverse：未绑定空间的新设备第一步选择「加入伴侣的秘境」/「创建新秘境」
@@ -455,7 +412,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       // 一条系统消息内多行（\n 分隔）：整体被消息间空行隔开、又不会
       // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）
       final choice = (await _prompt(
-              session, '❓ 选择秘境入口\n   c: 创建秘境\n   j: 加入秘境'))
+              session, '❓ 选择秘境入口\n   c: 创建秘境\n   j: 加入秘境',
+              required: true)) // 必填：留空回车不接受
           .trim()
           .toLowerCase();
       if (!_state!.running) return;
@@ -472,7 +430,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         // 加入流程：token 错误被拒后直接重输 token（不回到 create/join 首问——
         // 老板 2026-09-10）
         while (true) {
-          final token = (await _prompt(session, '❓ 输入邀请码:')).trim();
+          // 必填（老板 2026-09-15）：留空回车不接受，继续等待输入
+          final token =
+              (await _prompt(session, '❓ 输入邀请码:', required: true)).trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
             session.messages.add(_systemMessage(session, '⚠️ 必须输入邀请码！可从任意一台已绑定的设备生成邀请码.'));
@@ -761,7 +721,8 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   if (displayName.isEmpty) {
     // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）
     while (true) {
-      displayName = (await _prompt(session, '❓ 我的名字（后期可改）:')).trim();
+      displayName =
+          (await _prompt(session, '❓ 我的名字（后期可改）:', required: true)).trim();
       if (!_state!.running) return;
       if (displayName.isNotEmpty) {
         session.messages.add(_systemMessage(session, '✅ ${displayName}'));
@@ -775,7 +736,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   // 我的性别（本地记录；Multiverse create 暂不提交——服务端无 gender 通道）。
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (myGender == null) {
-    final g = (await _prompt(session, '❓ 我的性别是\n  1: 男\n  2: 女')).trim();
+    final g = (await _prompt(session, '❓ 我的性别是\n  1: 男\n  2: 女',
+            required: true))
+        .trim();
     if (!_state!.running) return;
     if (g == '1') {
       myGender = '男';
@@ -796,7 +759,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   // join 时按身份选择而非自填名字）
   String partnerName;
   while (true) {
-    partnerName = (await _prompt(session, '❓ 伴侣的名字（后期可改）:')).trim();
+    partnerName = (await _prompt(session, '❓ 伴侣的名字（后期可改）:',
+            required: true))
+        .trim();
     if (!_state!.running) return;
     if (partnerName.isEmpty) {
       session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
@@ -817,7 +782,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   String partnerGender;
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (true) {
-    partnerGender = (await _prompt(session, '❓ 伴侣的性别是\n  1: 男\n  2: 女')).trim();
+    partnerGender = (await _prompt(session, '❓ 伴侣的性别是\n  1: 男\n  2: 女',
+            required: true))
+        .trim();
     if (!_state!.running) return;
     if (partnerGender == '1') {
       partnerGender = '男';
@@ -951,7 +918,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     var chosenSlot = -1;
     while (chosenSlot < 0) {
       final choice = (await _prompt(
-              session, '❓ 完整输入我的名字（注意大小写）:'))
+              session, '❓ 完整输入我的名字（注意大小写）:', required: true))
           .trim();
       if (!_state!.running) return;
       final matches = <int>[];
@@ -1146,9 +1113,8 @@ Future<void> main(List<String> args) async {
   _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
   // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
   // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
-  // 启动探测值（_probePerson*）覆盖在缓存之上（在线时更新）。
-  _state!.personNames = {...store.personNames, ..._probePersonNames};
-  _state!.personGenders = {...store.personGenders, ..._probePersonGenders};
+  _state!.personNames = Map.of(store.personNames);
+  _state!.personGenders = Map.of(store.personGenders);
   _refreshPersonNames(_state!); // 认证后刷新（保持最新，并回写缓存）
 
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
@@ -2910,12 +2876,6 @@ void _printFarewell(ChatSession session) {
 
 /// 引导阶段产生的系统提示（进 TUI 后作为 system 消息显示在对话流）。
 final List<String> _guidanceNotes = [];
-
-/// 启动探测获取的 person 名称表（/health 系统信息，person_id → personName）。
-Map<String, String> _probePersonNames = {};
-
-/// 启动探测获取的 person 性别表（/health 系统信息，person_id → male/female）。
-Map<String, String> _probePersonGenders = {};
 
 /// 启动自检结果：0=正常/离线（可看本地历史）；1=设备已被撤销；2=会话已失效
 /// （/revoke 会 DELETE 该设备的 sessions，缓存 token 死 → 401）需清除 token 走引导

@@ -6076,3 +6076,25 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
 3. 文档：把"限流"写进 ONBOARDING 的常见坑表，说明触发条件与自救方式。
 
 验证：cli analyze + 19 项测试、server tsc 全绿。
+
+## 2026-09-15 入网向导：必填项不允许直接回车跳过
+
+**需求（老板）**：新设备向导里要求必须输入的地方（选男女、输名字、输邀请码、输口令），
+直接回车不接受——继续停在原问答等输入。
+
+**做法**：`_prompt` 已有 `required` 通道（输入循环 `einz_tui.dart` 回车处理里拦截留空、提示
+"⚠️ 此项不能为空，请继续输入"、不清空等待），此前只用在口令类问答上。本次把向导里其余必填
+问答也接上：`选择秘境入口(c/j)`、`输入邀请码`、`我的名字`、`我的性别`、`伴侣的名字`、
+`伴侣的性别`、join 的 `完整输入我的名字`。`/exit` 逃生门与 Ctrl+C 不受影响。
+
+**顺带清掉的 v1 死代码**：`_probePersonNames/_probePersonGenders` 自 `2efad8c`（v2 升级、
+"/health 不再返回全局 person 表"）起**从未被赋值**，恒为空 → `_runGuide` 开头那段
+personA/personB 身份选择块（含"输入我的名字（也可直接回车先跳过）"）根本走不到。已删除该块、
+两个变量、main 里的空展开，并删掉失效用例 `cli/test/guide_identity_order_check.py`
+（它靠 /health 的 person_names 触发，断言的"请输入设备名称"等文案 v2 已不存在）。
+v2 的身份选择走 `/space join` 的 preflight slots。
+
+**测试**：`cli/test/guide_input_rules_check.py` 新增"每个必填问答先空回车必须被拦下"的断言
+（设备 A 五个问答 + 设备 B 三个问答）；顺带修了它两处陈旧：口令仍用 6 位（现策略 ≥8）、
+裸 POST 签发邀请码（现需 `Bearer` + `X-Protocol-Version: 1`，并把 400 的响应体打出来便于诊断）。
+验证：cli `dart analyze` 干净，该用例三项全绿。

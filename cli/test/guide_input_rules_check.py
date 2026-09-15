@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # 引导输入规则回归（老板 2026-09-11）
+#   0) create 各必填问答（秘境入口/我的名字/我的性别/伴侣的名字/伴侣的性别）
+#      留空回车 → 必须被拦住（提示「此项不能为空」，继续等同一问答）
+#      （老板 2026-09-15：入网向导要求必须输入时不允许直接回车跳过）
 #   1) create 口令必填：走到「设置密保口令」留空回车 → 必须被拦住（提示
 #      「此项不能为空」，且不进入创建）；补输口令后创建成功
 #   2) 锁屏码规则（与 App 一致：纯数字 + 至少 6 位）：字母 → 提示「锁屏码只能是
@@ -103,6 +106,13 @@ def main():
                 print(f'❌ 未到「{expect}」问答')
                 print(out[-600:])
                 return 1
+            # 必填：留空回车不接受（老板 2026-09-15）—— 提示后仍停在原问答
+            send(m, '\r')
+            out = wait_text(m, '此项不能为空', timeout=10)
+            if '此项不能为空' not in out:
+                print(f'❌ 「{expect}」留空回车未被拦住（未提示此项不能为空）')
+                print(out[-600:])
+                return 1
             send(m, payload)
 
         # 关键：口令留空回车 → 必须拦住
@@ -122,8 +132,8 @@ def main():
             print(out[-600:])
             return 1
 
-        # 补输口令 → 创建成功
-        send(m, 'abc123\r')
+        # 补输口令 → 创建成功（≥ kPassphraseMinLength=8 位——老板 2026-09-15 起）
+        send(m, 'abc12345\r')
         out = wait_text(m, '成功创建秘境', timeout=40)
         if '成功创建秘境' not in out:
             print('❌ 输入口令后未创建成功')
@@ -171,11 +181,19 @@ def main():
         # ---------- 设备 B：join 的口令也必须必填 ----------
         with open(store) as f:
             store_a = json.load(f)
+        # 签发邀请码是空间级操作，必须带本空间成员会话（server C1 修复后要求
+        # 认证——此前裸 POST 也能签，现已 400）
         req = urllib.request.Request(
             f'http://127.0.0.1:{port}/spaces/{store_a["space_id"]}/join-tokens',
-            method='POST')
-        with urllib.request.urlopen(req, timeout=5) as r:
-            join_token = json.load(r)['joinToken']
+            method='POST',
+            headers={'Authorization': f'Bearer {store_a["session_token"]}',
+                     'X-Protocol-Version': '1'})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                join_token = json.load(r)['joinToken']
+        except urllib.error.HTTPError as e:
+            print(f'❌ 签发邀请码失败（HTTP {e.code}）: {e.read().decode("utf-8", "replace")[:300]}')
+            return 1
 
         store_b = os.path.join(WORK, 'b.json')
         m2, p2 = start_tui(store_b, port)
@@ -188,6 +206,13 @@ def main():
             out = wait_text(m2, expect)
             if expect not in out:
                 print(f'❌ B 未到「{expect}」问答')
+                print(out[-600:])
+                return 1
+            # 必填：留空回车不接受（老板 2026-09-15）—— 邀请码尤其不能放空
+            send(m2, '\r')
+            out = wait_text(m2, '此项不能为空', timeout=10)
+            if '此项不能为空' not in out:
+                print(f'❌ B「{expect}」留空回车未被拦住（未提示此项不能为空）')
                 print(out[-600:])
                 return 1
             send(m2, payload)
@@ -223,7 +248,7 @@ def main():
             return 1
 
         # 同一个 token：重输正确口令 → 应加入成功（token 未被消耗）
-        send(m2, 'abc123\r')
+        send(m2, 'abc12345\r')
         out = wait_text(m2, '成功加入秘境', timeout=40)
         if '成功加入秘境' not in out:
             print('❌ B 输错后重输正确口令未加入成功（token 应仍有效）')
