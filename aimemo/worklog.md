@@ -5686,3 +5686,23 @@ cli analyze 干净 + 新增锚点用例通过；app `flutter analyze` 无 issue�
 `server/data/files/aa/`，第二次跑就因 `flag:"wx"` 撞 EEXIST 变 500 —— 已把 `EINZ_FILES`
 指到临时目录，并清掉那个 22 字节残留（同目录 `01/` 下 71 个真实附件 blob 未动）。
 这条恰好复现了待讨论清单里 C2 那个"同 ID 重传返回 500"的问题。
+
+### B8：app.ts 鉴权三连收口到 guard（同一批，单独提交）
+
+评审架构项 #1。做法：路由里原先的
+`const token = bearerToken(req); const sess = resolveSession(token);`
+统一改为 `const sess = requireSession(cfg, token);` —— 一句同时完成"会话有效 + 设备在册"，
+路由层不再依赖被调模块顺手校验。**改了 13 处**（messages / sync / receipts / attachments
+读写 / avatar / devices name+person-name / DELETE devices / push register+unregister /
+key-escrow 三处 / space），并删掉 app.ts 里已无用的 `resolveSession` 导入。
+
+**刻意保留一处重复**：`GET /receipts`、`GET /devices`、`/key-escrow` 三件套、`GET /space`
+这 5 条是"一行转发"给已内置鉴权的模块函数（每个模块第一件事就是 resolveSession +
+isActiveDevice），再包一层只是多一次库查询、不增加安全性 —— 所以没动，而是在 `route()`
+顶部写清**鉴权约定**：受保护端点必须二选一（路由层显式调 guard，或交给已内置鉴权的模块），
+并把**免鉴权端点白名单**（/health、/join/:token、POST /spaces、join 两个、lookup、enroll、
+avatar 读取、key-escrow 取包分支）连理由一起登记在案——以后新增免鉴权端点必须在此登记，
+这正是当初 C1 两个端点"没人注意到它没鉴权"的根源。
+
+**验证：** `tsc` 干净 + `npm test` 5 套件全绿（收口把冒烟测试里一处真实的回归先跑红、
+再确认是导入漏了而非语义变化）。

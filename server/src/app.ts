@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { WebSocketServer } from "ws";
 import { loadConfig, type ServerConfig } from "./config.js";
 import { getDb, openDb } from "./db.js";
-import { cleanupExpired, ApiError, createChallenge, resolveSession, verifyChallenge } from "./auth.js";
+import { cleanupExpired, ApiError, createChallenge, verifyChallenge } from "./auth.js";
 import { postMessage, syncMessages } from "./messages.js";
 import { getReceipts, postReceipts } from "./receipts.js";
 import { getAttachmentBlob, storeAttachment, cleanupOrphanAttachments } from "./attachments.js";
@@ -11,7 +11,7 @@ import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
 import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyRevoked } from "./ws.js";
-import { bearerToken, optionalBearerToken, requireSpaceMember } from "./guard.js";
+import { bearerToken, optionalBearerToken, requireSession, requireSpaceMember } from "./guard.js";
 import { MAX_ATTACHMENT_BYTES, readBody, readJsonBody } from "./body.js";
 import { limitByIp } from "./ratelimit.js";
 import { createJoinToken, createSpace, joinSpace, lookupSpace, preflightJoin } from "./spaces.js";
@@ -73,6 +73,22 @@ server.on("upgrade", (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
 });
 
+/**
+ * 路由表（手写）。
+ *
+ * **鉴权约定（2026-09-15 评审后收口，新增端点务必遵守）**：
+ * - 每条处理受保护资源的路径，都必须显式回答"凭什么能访问"——二选一：
+ *   ① 在路由里调 `requireSession(cfg, token)`（设备级）或
+ *      `requireSpaceMember(cfg, token, spaceId)`（空间级，见 guard.ts）；
+ *   ② 把 token 交给**已内置鉴权**的模块函数（各模块第一件事就是
+ *      resolveSession + isActiveDevice，例如 messages/receipts/devices/escrow/push）。
+ * - 免鉴权端点只有这几个，且都是有意为之：`GET /health`、`GET /join/:token`（落地页）、
+ *   `POST /spaces`（空间自举，创建者还没有凭证）、`POST /spaces/join{,/preflight}`、
+ *   `GET /spaces/lookup`（按地址定位，给未入网者用）、`POST /devices/enroll`
+ *   （邀请码即准入令牌）、`GET /avatar/:personId`（本人自愿上传的展示图）、
+ *   `POST /spaces/{id}/key-escrow` 的**口令取包分支**（加入方只有口令）。
+ *   新增免鉴权端点必须在此处登记并说明理由。
+ */
 async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
@@ -232,7 +248,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/messages") {
     const body = await readJsonBody(req);
     const token = bearerToken(req);
-    const sess = resolveSession(token);
+    const sess = requireSession(cfg, token);
     const result = postMessage(cfg, token, body);
     const envelope = body as { sender_device_id?: string; type?: string };
     const stored = { ...(body as object), server_sequence: result.server_sequence, created_at: result.created_at };
@@ -254,7 +270,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "GET" && path === "/sync") {
     const token = bearerToken(req);
-    const sess = resolveSession(token);
+    const sess = requireSession(cfg, token);
     const after = Number(url.searchParams.get("after") ?? 0);
     const limit = Number(url.searchParams.get("limit") ?? 100);
     const result = syncMessages(cfg, token, after, limit);
@@ -275,7 +291,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/receipts") {
     const body = await readJsonBody(req);
     const token = bearerToken(req);
-    const sess = resolveSession(token);
+    const sess = requireSession(cfg, token);
     const b = (body ?? {}) as Record<string, unknown>;
     const result = postReceipts(cfg, token, body);
     // 审计：回执上报明细（设备级；receipts 表本身仍是 person 级 HWM，语义不变）
@@ -299,9 +315,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
-  // 附件
+  // 附件（两条都要求有效会话 + 在册设备：收口在 requireSession，模块内仍各自校验空间归属）
   if (method === "POST" && path === "/attachments") {
     const token = bearerToken(req);
+    requireSession(cfg, token);
     // P2 修复：x-attachment-meta 缺失/坏 JSON 应返回 400，而非崩溃成 500（PROTOCOL.md §9）
     const rawMeta = req.headers["x-attachment-meta"];
     let meta: unknown;
@@ -321,6 +338,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const attMatch = path.match(/^\/attachments\/([^/]+)$/);
   if (method === "GET" && attMatch) {
     const token = bearerToken(req);
+    requireSession(cfg, token);
     const blob = getAttachmentBlob(cfg, token, attMatch[1]);
     res.writeHead(200, { "Content-Type": "application/octet-stream" });
     res.end(blob);
@@ -330,7 +348,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // 头像（per-person）：上传（token 认证，写本人头像文件）/ 获取（公开，404=未设置）
   if (method === "POST" && path === "/avatar") {
     const token = bearerToken(req);
-    const { device_id } = resolveSession(token);
+    const { device_id } = requireSession(cfg, token);
     // H1：头像上限 2MB（与 storeAvatar 内的校验同一个常量，提前在这里拒绝）
     const blob = await readBody(req, MAX_AVATAR_BYTES);
     const stored = storeAvatar(cfg, token, blob);
@@ -372,7 +390,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // 更新本设备名称（已登记设备 TUI 改名后同步后台，显示层用）
     const body = await readJsonBody(req);
     const token = bearerToken(req);
-    const sess = resolveSession(token);
+    const sess = requireSession(cfg, token);
     const b = (body ?? {}) as Record<string, unknown>;
     sendJson(res, 200, updateDeviceName(cfg, token, body));
     logActivity({
@@ -388,7 +406,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // 更新本设备 person 显示名（/rename 命令，显示层用）
     const body = await readJsonBody(req);
     const token = bearerToken(req);
-    const sess = resolveSession(token);
+    const sess = requireSession(cfg, token);
     const b = (body ?? {}) as Record<string, unknown>;
     sendJson(res, 200, updatePersonName(cfg, token, body));
     logActivity({
@@ -413,7 +431,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const devMatch = path.match(/^\/devices\/([^/]+)$/);
   if (method === "DELETE" && devMatch) {
     const token = bearerToken(req);
-    const caller = resolveSession(token);
+    const caller = requireSession(cfg, token);
     const result = revokeDevice(cfg, token, devMatch[1]);
     // 审计：设备撤销（谁撤的、撤了谁）
     logActivity({
@@ -435,7 +453,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "POST" && path === "/push/register") {
     const body = await readJsonBody(req);
     const token = bearerToken(req);
-    const sess = resolveSession(token);
+    const sess = requireSession(cfg, token);
     const b = (body ?? {}) as Record<string, unknown>;
     sendJson(res, 200, registerPushToken(cfg, token, body));
     // 审计：Push Token 变更（换机/重装 App 会体现为 token 变化）
@@ -452,7 +470,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (method === "DELETE" && path === "/push/register") {
     const token = bearerToken(req);
-    const sess = resolveSession(token);
+    const sess = requireSession(cfg, token);
     sendJson(res, 200, unregisterPushToken(cfg, token));
     logActivity({ deviceId: sess.device_id, spaceId: sess.space_id, kind: "push.unregister", meta: metaOf(req) });
     return;
