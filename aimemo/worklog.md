@@ -5977,3 +5977,29 @@ S3（附件重试不幂等 → C2）、S5（restore 路径校验 → B2）、S6�
 
 **验证**：server tsc 干净 + npm test 5 套件全绿（含新增的协议版本断言）；shared 28 项、
 cli 18 项测试全过；shared/cli/app analyze 全干净。
+
+## 2026-09-15 App 口令输入框的"眼睛"分配（老板要求）
+
+- **改口令弹窗**：旧口令 / 新口令保留眼睛；**确认新口令不给眼睛**（确认是用来复核的）。
+- **新设备向导「设置密保口令」步骤**：**第一个**输入框加眼睛；下面的确认框不给（同上理由）。
+- 实现：抽了 `app/lib/widgets/passphrase_field.dart`（共用组件：默认暗码 + 眼睛 + 3 秒自动回暗码，
+  `showReveal` 控制是否给眼睛）。此前这套逻辑只有 chat_page 里一份私有 `_PassphraseField`，
+  向导要用同样行为时再写一份必然漂移——现在两处共用，chat_page 的私有类已删。
+  文件名用 snake_case（`passphrase_field.dart`）与同目录其它 widget 一致（Dart lint 的 file_names）。
+  l10n 复用了既有的 `chatPagePassphraseRevealTip`（字符串是通用的；键名带 chatPage 是历史，
+  重命名要动 arb + 重新 gen-l10n，列入待办，不阻塞）。
+
+### ⚠️ 过程中的一次自伤（已修复，记录以免重犯）
+
+我用 python 脚本"按标记切片"删除 chat_page 里的私有类时，切片终点算错（脚本用
+`s.index("\nclass ", end)` 找下一个类，而 `end` 落在了更早的位置），结果把约 1000 行
+（`_SetLockDialog` … `_HourglassFlipState`）复制了一遍 —— `flutter analyze` 报出 48 个问题
+（18 个 duplicate_definition）。修复：按重复定义的行号定位出重复块（4831–5830），逐字核对
+边界后整块删除；再删掉多出的一个 `}` 与已无人使用的私有类；最后 `flutter analyze` 干净
+（0 issue）。**核实了另一位 agent 在 chat_page 的未提交改动（全屏渐变 UI）完好保留**。
+
+教训：**surgical 删除不要用"猜边界"的脚本切片**——要么用 Edit 工具给出精确的 old_string，
+要么先算准首尾标记并核对（如本次先打印 `repr(边界上下文)` 再切）。另一位 agent 正在同一工作区
+改 chat_page（全屏渐变）、TUI（欢迎辞自动倒计时）、l10n（重新 gen-l10n）、server/app.ts
+（import 重排），所以我的 chat_page 改动**留在工作区未提交**（与他们的改动同处一个 diff hunk，
+不便按 hunk 隔离），setup_page 与共用组件已单独提交。
