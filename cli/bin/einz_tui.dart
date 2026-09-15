@@ -555,9 +555,18 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   //   在 v2 下恒不成立，会让这条恢复路径永不触发）
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
   if (_state!.running && store.spaceId != null && store.partnerSlot == 0 && !store.escrowUploaded) {
-    session.messages.add(_systemMessage(session, '检测到尚未设置密保口令，现在设置: '));
-    _scheduleRender();
-    await _setupEscrowPassphrase(store, storePath, session);
+    // 先问服务端：本地没标记 ≠ 服务端没有箱。创建空间时密保箱是随 `POST /spaces`
+    // 一并上传的（此前没记 escrowUploaded），老 store 重启后会走到这里 —— 直接再问
+    // 一遍会让用户以为上次白设了（老板 2026-09-15 反馈）。查到箱就补标记并跳过。
+    final hasBox = await _serverHasEscrow(store);
+    if (hasBox == true) {
+      store.escrowUploaded = true;
+      store.save(storePath);
+    } else if (hasBox == false && _state!.running) {
+      session.messages.add(_systemMessage(session, '检测到尚未设置密保口令，现在设置: '));
+      _scheduleRender();
+      await _setupEscrowPassphrase(store, storePath, session);
+    }
   }
 
   // /exit 退出后（口令/其他引导步骤触发 running=false）：立即结束引导，
@@ -874,6 +883,10 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     store.deviceId = created.deviceId;
     store.personId = created.creatorPersonId;
     store.partnerSlot = 0; // 创建者 = 第一人（v2 身份槽位；替代 v1 的 personA 判据）
+    // 密保箱已随本次 POST /spaces 上传（sealed/escrowPassphrase 成对提交，口令非空才走到这）
+    // → 标记托管就绪。漏了这行的话，下次启动会被判成"尚未设置密保口令"再问一遍
+    // （老板 2026-09-15 反馈）。
+    store.escrowUploaded = true;
     store.personName = displayName;
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
@@ -1014,6 +1027,10 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     store.deviceId = join.deviceId;
     store.personId = join.personId;
     store.partnerSlot = join.partnerSlot; // v2 身份槽位（0=第一人，1=第二人）
+    // 密保箱本来就存在（刚才正是靠口令从它取回 Space Key）→ 标记托管就绪。
+    // 漏了这行：若加入者选的是 slot=0（同一人的另一台设备），重启后会被判成
+    // "尚未设置密保口令"再问一遍（老板 2026-09-15 反馈）。
+    store.escrowUploaded = true;
     store.personName = myName ?? '成员';
     store.save(storePath);
     session.messages.add(_systemMessage(session, '✅ 口令验证通过，成功加入秘境。'));
@@ -3031,6 +3048,25 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
 }
 
 /// 设置托管口令（单次输入：口令不在消息流回显，留空回车由输入循环拦截不提交、
+/// 服务端是否已有本空间的口令密保箱（只问有没有，不解包）。
+/// 返回 `true`=确认有箱、`false`=确认无箱、**`null`=查不到**（网络/会话失效）。
+///
+/// 为什么要三态（2026-09-15）：`_setupEscrowPassphrase` 上传时**不校验旧口令**
+/// （它只在"确认服务端无箱"的引导分支里用）。若把"查不到"当成"没有箱"去提示用户
+/// 重设，用户输入新口令就会**顶掉**原有密保箱（等于把伴侣锁在门外）。所以查不到时
+/// 一律不提示，留到下次会话正常时再判定。
+Future<bool?> _serverHasEscrow(DeviceStore store) async {
+  final server = store.server;
+  final token = store.sessionToken;
+  if (server == null || server.isEmpty || token == null || token.isEmpty) return null;
+  try {
+    final res = await ApiClient(server).getKeyEscrow(token);
+    return res.file != null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /// 继续输入；成功标记 store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {

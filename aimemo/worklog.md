@@ -6037,3 +6037,24 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
 
 注：该文件同时有另一位 agent 未提交的"欢迎辞自动倒计时"改动，我按 hunk 隔离只提交了自己的那一行。
 验证：cli 19 项测试全过（新增 1 项）、dart analyze 干净。
+
+## 2026-09-15 重启又问"尚未设置密保口令"（创建者与加入者两条路径）
+
+**现象**：向导里设过密保口令、发了消息，`/exit` 再开又被要求"检测到尚未设置密保口令，现在设置:"。
+**根因**：`store.escrowUploaded` 这个"密保箱已就绪"标记，在**两条主路径上都没写**：
+1. **创建者**：密保箱其实随 `POST /spaces` 的 `sealedSpaceKey + escrowPassphrase` 一并上传了，
+   但客户端只在 `_setupEscrowPassphrase`（手动补设那条路）里置过 true → 创建者永远 false。
+2. **加入者**：密保箱本来就存在（刚靠口令从它取回 Space Key），但 `joinSpace` 成功后同样没置
+   true → 若加入时选的是 slot=0（同一人的另一台设备），重启就中招。
+
+之前这条"补设"分支的判据是 `store.personId == 'personA'` —— v2 下 personId 是 UUID → 分支是死的，
+所以现象没暴露；我 P1 把它改成 `partnerSlot == 0` 之后才复活，才暴露出标记没写。
+
+**修复（三处）**：
+1. `POST /spaces` 创建成功 → `store.escrowUploaded = true`（口令非空才会走到这，sealed 必然已上传）。
+2. `POST /spaces/join` 成功 → 同样置 true（密保箱本来就存在）。
+3. **自愈**：引导里看到 `!escrowUploaded` 时先查服务端 `GET /key-escrow`：有箱 → 补标记跳过；
+   **查不到（网络/会话失效）→ 不提示**（三态 `bool?`）。原因：`_setupEscrowPassphrase` 上传时
+   **不校验旧口令**，若把"查不到"当成"没有箱"去提示，用户输新口令会**顶掉**原有密保箱（等于把伴侣
+   锁在门外）——保守优先。
+验证：cli analyze 干净、19 项测试全过；创建者侧老板复测已正常。
