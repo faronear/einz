@@ -62,9 +62,3 @@ Future<Uint8List> decryptAttachment({
     key.dispose();
   }
 }
-
-/// 生成附件 nonce（与密文一同存元数据）。
-Future<Uint8List> generateAttachmentNonce() async {
-  final s = await sodium();
-  return s.randombytes.buf(s.crypto.aeadXChaCha20Poly1305IETF.nonceBytes);
-}

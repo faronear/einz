@@ -3230,7 +3230,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final bytes = await _repo.fetchAttachment(
         attachmentId: att['attachment_id'] as String,
         keyVersion: att['key_version'] as int,
-        sha256: att['sha256'] as String,
         nonce: base64Decode(att['nonce'] as String),
       );
       if (_storeAttachments) {

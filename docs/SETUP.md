@@ -1,6 +1,9 @@
 # Einz — 一次性配置手册（docs/SETUP.md）
 
 > **状态：** Draft v0.1（Phase 0 产出）
+> **版本适用：** 本文描述 **v1 单空间（`v1-single-space`）** 的白名单/信封分发模型。
+> Multiverse（`v2-multiverse`）下改由 `POST /spaces` 创建空间 + 邀请码/口令加入，
+> 见 `PROTOCOL_MULTIVERSE.md` 与 `ONBOARDING.md`。
 > **适用场景：** 首次部署 Einz——两台设备 + 一台服务器，一次性建立信任关系。
 > **关联文档：** `docs/E2EE.md` §7（密钥分发）、§8（认证）；`docs/PROTOCOL.md`；`aimemo/productLens.zhcn.md` §5。
 

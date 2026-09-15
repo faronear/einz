@@ -98,7 +98,7 @@ class WsReceiptUpdatedEvent extends WsEvent {
 /// WS 实时客户端：连接 / 事件回调 / 自动重连（指数退避，上限 30s）。
 ///
 /// - [server] 传 http(s) 基址（https://einz.tic.cc），内部转换为 ws(s)://
-/// - token 含 base64 的 +/= 字符，必须 URL 编码（PROTOCOL.md §8.1）
+/// - 凭证走握手头 `Authorization: Bearer <session_token>`，**不放 URL**（PROTOCOL.md §8.1）
 /// - [stop] 之前持续重连；状态经 [onStatus] 回调（App 据此切换轮询策略）
 /// - [onUnauthorized]：服务器以 4401 关闭（session 过期）时调用——CLI/App 在此
 ///   重新认证并 [updateToken]，随后立即重连；未提供则按普通断线退避重连
@@ -189,6 +189,10 @@ class WsClient {
   /// 连接关闭：4401（session 过期）→ 续期后立即重连；其他 → 退避重连。
   Future<void> _onClosed(WebSocket ws) async {
     if (_stopped) return;
+    // 旧连接的 onDone 迟到（已重连、甚至已换新连接后旧 socket 才收尾）→ 忽略：
+    // 否则会白触发一次退避重连，多开一条连接（2026-09-15 评审）。
+    if (ws != _ws) return;
+    _ws = null;
     if (ws.closeCode == 4401 && onUnauthorized != null) {
       try {
         await onUnauthorized!(); // 重新认证并 updateToken

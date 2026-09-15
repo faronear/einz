@@ -150,7 +150,15 @@ async function main (): Promise<void> {
   tempDir = mkdtempSync(join(tmpdir(), 'einz-isolation-'))
   const port = await freePort()
   serverProc = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
-    env: { ...process.env, PORT: String(port), EINZ_DB: join(tempDir, 'einz.sqlite.db') },
+    // EINZ_FILES 必须一并指到临时目录：否则附件会写进 server/data/files/，
+    // 上一次运行的 blob 会让下一次上传因 `flag: "wx"` 撞 EEXIST 变成 500
+    // （测试必须与仓库状态无关）。
+    env: {
+      ...process.env,
+      PORT: String(port),
+      EINZ_DB: join(tempDir, 'einz.sqlite.db'),
+      EINZ_FILES: join(tempDir, 'files')
+    },
     stdio: 'ignore'
   })
   await waitReady(port)

@@ -1,6 +1,9 @@
-# Einz 协议 Multiverse 草案（多租户 Space 加入授权）
+# Einz 协议 Multiverse（多租户 Space 加入授权）
 
-> 状态：`[待评审] 草案，尚未实现`
+> 状态：`[已实现]`（空间创建/加入/成员鉴权/空间隔离已在服务端与双端落地；
+> 2026-09-15 起 `/spaces/{id}/join-tokens` 与 `/spaces/{id}/key-escrow` 上传分支
+> **要求该空间成员会话**——本节 §4.2 的"成员端点 / NOT_A_MEMBER"即此约定；
+> 实现里错误码统一用服务端全局惯例的 `FORBIDDEN`/`UNAUTHORIZED`）
 >
 > 配套：`aimemo/upgradeToMultiverse.md`（总体架构升级计划）、本文聚焦**加入授权闭环**
 > （含 join token、Space 定位、密钥分发、错误码），是 Multiverse 多租户的第一阶段协议。
@@ -51,7 +54,7 @@ Multiverse 的目标是让一个 Server 承载多个 Space（每个 Space 始终
 
 ### 2.2 深链与 App 内输入
 
-- 分享链接（二维码内码即此链接或纯 token）：`https://einz.tic.cc/join/<token>`——
+- 分享链接（二维码内码即此链接或纯 token）：`https://<host>/join/<token>`——
   host 由服务端按请求真实地址生成（Host + x-forwarded-proto），本地/自建服务器时
   与实际访问地址一致（如 `http://localhost:3000/join/<token>`），不硬编码（2026-09-11）；
 - App 加入页输入框**同时接受**完整链接与纯 token（App 解析出 token 部分）；
@@ -144,7 +147,7 @@ POST /spaces/join
 ```text
 POST /spaces/{spaceId}/join-tokens
   现有成员生成一次性邀请 token（可刷新/撤销）。
-  请求：{ }  →  201 { joinToken, link: "https://einz.tic.cc/join/<token>", expiresAt }
+  请求：{ }  →  201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
   错误：NOT_A_MEMBER / SPACE_FULL（满员后不再生成）
 
 DELETE /spaces/{spaceId}/join-tokens/{tokenHash}

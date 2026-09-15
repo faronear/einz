@@ -532,8 +532,6 @@ class MessageRepository {
 
   /// 读取本地历史（解密为明文，按 server_sequence 升序；未同步的排最后）。
   /// 附件消息附带本地附件元数据（attachment != null）；阅后即焚消息附带到期时间（expiresAt）。
-  /// 读取本地历史（解密为明文，按 server_sequence 升序；未同步的排最后）。
-  /// 附件消息附带本地附件元数据（attachment != null）；阅后即焚消息附带到期时间（expiresAt）。
   Future<List<HistoryMessage>> history() async {
     final rows = await (db.select(db.localMessages)
           ..where((m) => m.spaceId.equals(spaceId)))
@@ -736,16 +734,19 @@ class MessageRepository {
     return fetchAttachment(
       attachmentId: att['attachment_id'] as String,
       keyVersion: att['key_version'] as int,
-      sha256: att['sha256'] as String,
       nonce: base64Decode(att['nonce'] as String),
     );
   }
 
-  /// 下载并解密附件密文（校验 sha256 + AEAD 解密，PROTOCOL.md §6.2）。
+  /// 下载并解密附件密文（PROTOCOL.md §6.2）。
+  ///
+  /// 完整性由 AEAD 保证：`attachmentId` 与 `spaceId` 都在 AAD 里，解密成功即说明
+  /// 密文与元数据匹配。**不做 sha256 比对**——元数据里的 `sha256` 是密文哈希，
+  /// 只用于上传时服务端校验存储完整性；客户端再比一遍是重复劳动
+  /// （2026-09-15 评审：此前的注释声称校验 sha256，实际从未比较，已改注释）。
   Future<Uint8List> fetchAttachment({
     required String attachmentId,
     required int keyVersion,
-    required String sha256,
     required Uint8List nonce,
   }) async {
     final t = token;

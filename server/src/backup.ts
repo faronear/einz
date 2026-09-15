@@ -8,8 +8,8 @@
  * 密钥：环境变量 EINZ_DB_BACKUP_KEY（base64 32B）。未设置时拒绝执行（防误备份明文）。
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync, copyFileSync } from "node:fs";
-import { join, resolve, dirname, relative } from "node:path";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { join, resolve, dirname, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 
@@ -104,6 +104,23 @@ export async function createBackup(paths = resolveBackupPaths()): Promise<string
   return outPath;
 }
 
+/**
+ * 确保落盘路径仍在 root 之内（纵深防御，同 attachments.assertInsideFilesRoot）。
+ *
+ * 为什么需要（2026-09-15 评审）：备份条目里的 `path` 是**备份文件里自带的字符串**，
+ * 恢复时 `join(paths.files, entry.path.slice("files/".length))` 直接落盘——一份
+ * `files/../../etc/xxx` 就能写到附件根目录之外。缓解是备份包本身有 AES-256-GCM
+ * 认证（伪造需要备份密钥），但这类越界读写的防线不该只靠"上游可信"。
+ * 正常备份路径由 `relative()` 产出，本就干净，所以这里的约束不会误伤。
+ */
+function assertInsideRoot(root: string, candidate: string): void {
+  // 用 resolve + 分隔符拼接，避免 Windows（resolve 返回 \）与 "/" 混用误判
+  const prefix = resolve(root) + sep;
+  if (!resolve(candidate).startsWith(prefix)) {
+    throw new Error(`备份条目路径逃出根目录（拒绝恢复）: ${candidate}`);
+  }
+}
+
 /** 从加密备份恢复：解密 → 写回 einz.sqlite.db / files/ / config.json。 */
 export function restoreBackup(backupPath: string, paths = resolveBackupPaths()): void {
   const key = backupKey();
@@ -124,14 +141,17 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
   if (existsSync(paths.files)) rmSync(paths.files, { recursive: true, force: true });
 
   for (const entry of parsed.entries) {
-    const target = join(paths.dataDir, entry.path);
+    // 注：`app.db` / `config.json` 两个分支是**精确等值匹配**，路径不受条目内容影响，
+    // 无需约束；真正的缺口只在 files/ 分支（前缀匹配 + 截断拼接）。
     if (entry.path.startsWith("files/")) {
       const fileTarget = join(paths.files, entry.path.slice("files/".length));
+      assertInsideRoot(paths.files, fileTarget);
       mkdirSync(dirname(fileTarget), { recursive: true });
       writeFileSync(fileTarget, Buffer.from(entry.b64, "base64"));
       continue;
     }
     if (entry.path === "app.db") {
+      const target = join(paths.dataDir, entry.path);
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, Buffer.from(entry.b64, "base64"));
       continue;
@@ -168,5 +188,3 @@ export function verifyBackup(backupPath: string, paths = resolveBackupPaths()): 
   const parsed = JSON.parse(payload) as { entries: { path: string; b64: string }[] };
   return { created_at: file.created_at, entries: parsed.entries.map((e) => e.path) };
 }
-
-export { copyFileSync };

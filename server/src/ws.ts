@@ -1,5 +1,4 @@
 import { WebSocketServer, WebSocket } from "ws";
-import { randomUUID } from "node:crypto";
 import { resolveSession } from "./auth.js";
 import { isActiveDevice, type ServerConfig } from "./config.js";
 import { optionalBearerToken } from "./guard.js";
@@ -18,11 +17,6 @@ interface Conn {
 }
 
 const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1：每设备至多 1 条连接）
-
-/** 当前在线 WS 连接数（/health 健康检查用）。 */
-export function wsConnCount(): number {
-  return conns.size;
-}
 
 /** 设备当前 WS 连接的建立时刻（ms；离线设备返回 null）。 */
 export function getConnectedAt(deviceId: string): number | null {
@@ -253,5 +247,3 @@ export function notifyRevoked(deviceId: string): void {
   }
   conns.delete(deviceId);
 }
-
-export { randomUUID };

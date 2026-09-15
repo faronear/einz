@@ -1,6 +1,10 @@
 # 口令托管密钥（Passphrase-Protected Key Escrow）方案
 
 > **状态：`[已实现]`**（2026-08-29 落地：Server 三端点 + shared KeyEscrowService + CLI escrow 命令 + App 接入口令/凭口令接入/rotate 自动重传；Server 冒烟、shared 16 项、App 18 项、CLI 全链路与双端 e2e 全过）。
+> **版本适用：** 本文主体描述 **v1 单空间（`v1-single-space`）** 的托管与"白名单"语境；
+> Multiverse（`v2-multiverse`）下空间与成员改由 `POST /spaces` / `join` 建立、按
+> `space_id` 隔离，托管包读写见 `PROTOCOL_MULTIVERSE.md` §4.2（2026-09-15 起上传分支需
+> 该空间成员会话，口令取包分支仍免认证）。
 > **定位：** 在**不推倒现有 E2EE**（Server 只见密文）的前提下，解决"换设备 / 朋友新接入门槛高"的痛点。
 > **相关文档：** docs/E2EE.md（协议）、docs/DEPLOYMENT.md §2.2（当前 seal/import 分发）、docs/PROTOCOL.md §7.4（协议增补）
 

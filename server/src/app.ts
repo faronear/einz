@@ -10,7 +10,7 @@ import { getAvatar, storeAvatar, MAX_AVATAR_BYTES } from "./avatars.js";
 import { createInvite, enrollDevice, listDevices, revokeDevice, updateDeviceName, updatePersonName } from "./devices.js";
 import { getSpace, registerPushToken, unregisterPushToken } from "./push.js";
 import { deleteKeyEscrow, escrowForSpace, getKeyEscrow, uploadKeyEscrow } from "./escrow.js";
-import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyRevoked, wsConnCount } from "./ws.js";
+import { attachWs, broadcastNewMessage, broadcastProfileUpdated, notifyRevoked } from "./ws.js";
 import { bearerToken, optionalBearerToken, requireSpaceMember } from "./guard.js";
 import { MAX_ATTACHMENT_BYTES, readBody, readJsonBody } from "./body.js";
 import { limitByIp } from "./ratelimit.js";
@@ -83,20 +83,15 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   // 健康检查（免鉴权，供外部随时探测服务状态）
   if (method === "GET" && path === "/health") {
-    const msgCount = (getDb()
-      .prepare(`SELECT COUNT(*) AS n FROM messages`)
-      .get() as { n: number }).n;
-    // Multiverse：/health 只报告服务健康、协议版本与能力，不再返回全局
-    // person 名称/性别表（多空间下避免跨空间泄漏成员元数据；空间状态由
-    // 受保护 API 获取，见 PROTOCOL_MULTIVERSE.md §4.1）
+    // 只报告服务健康、协议版本与能力：**不返回消息总量 / 在线连接数 / 成员元数据**
+    // （2026-09-15 评审：免鉴权公网端点吐业务量属元数据泄露；Multiverse 下更要避免
+    // 跨空间泄漏，空间状态由受保护 API 获取，见 PROTOCOL_MULTIVERSE.md §4.1）
     sendJson(res, 200, {
       status: "ok",
       protocol_version: cfg.protocol_version,
       version: SERVER_VERSION,
       uptime_sec: Math.floor(process.uptime()),
       capabilities: cfg.capabilities,
-      messages_count: msgCount,
-      ws_clients: wsConnCount(),
     });
     return;
   }
@@ -233,13 +228,6 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     sendJson(res, 200, result);
     return;
   }
-  if (method === "POST" && path === "/auth/verify") {
-    const body = await readJsonBody(req);
-    const result = verifyChallenge(cfg, String(body?.challenge_id ?? ""), String(body?.challenge_plaintext ?? ""));
-    sendJson(res, 200, result);
-    return;
-  }
-
   // 消息与同步
   if (method === "POST" && path === "/messages") {
     const body = await readJsonBody(req);

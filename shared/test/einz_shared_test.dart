@@ -148,16 +148,6 @@ void main() {
     });
   });
 
-  group('同步状态', () {
-    test('锚点只前进不倒退', () {
-      final st = SyncState(spaceId: 'space-1');
-      st.advance(5);
-      st.advance(3);
-      st.advance(10);
-      expect(st.lastServerSequence, 10);
-    });
-  });
-
   group('备份恢复（恢复码 + Argon2id）', () {
     test('备份加密→解密闭环，内容一致', () async {
       final code = await generateRecoveryCode();

@@ -58,7 +58,4 @@ class ServerSettings {
       client.close(force: true);
     }
   }
-
-  /// 探测并用 JSON 展示状态（调试/测试辅助）。
-  static String statusText(bool ok) => ok ? 'ok' : 'unreachable';
 }

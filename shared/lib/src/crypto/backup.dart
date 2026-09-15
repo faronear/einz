@@ -279,11 +279,18 @@ const List<String> _mnemonicWords = [
 /// 生成 12 词恢复码（离线保存，Server 不接触）。
 Future<String> generateRecoveryCode() async {
   final s = await sodium();
-  final idx = await s.randombytes.buf(12 * 2); // 每词 16bit，从 2048 词表中取
+  final total = _mnemonicWords.length;
+  // 拒绝采样：只接受 [0, floor(65536/total)*total) 区间内的 16bit 值，保证每词等概率。
+  // 直接 `% total` 有模偏差——词表是 2050 条（非 2 的幂，也不是 65536 的因子），
+  // 前 1986 个词会比其他词多一份概率（2026-09-15 评审；熵损失极小，但修起来很便宜）。
+  final limit = (65536 ~/ total) * total; // 2050 → 63550
   final words = <String>[];
-  for (var i = 0; i < 12; i++) {
-    final n = (idx[i * 2] << 8) | idx[i * 2 + 1];
-    words.add(_mnemonicWords[n % _mnemonicWords.length]);
+  while (words.length < 12) {
+    final buf = await s.randombytes.buf(12 * 2); // 每词 16bit
+    for (var i = 0; i + 1 < buf.length && words.length < 12; i += 2) {
+      final n = (buf[i] << 8) | buf[i + 1];
+      if (n < limit) words.add(_mnemonicWords[n % total]);
+    }
   }
   return words.join(' ');
 }

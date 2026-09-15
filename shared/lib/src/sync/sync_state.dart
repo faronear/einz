@@ -1,4 +1,9 @@
-/// 同步状态跟踪（PROTOCOL.md §5.3）：本地 last_server_sequence + 离线发送队列。
+/// 同步与配置产物：Space Key 生成 + 一次性配置载荷（PROTOCOL.md §5.3 / E2EE.md §7.1）。
+///
+/// 注（2026-09-15 评审）：本文件原有的 `SyncState` / `PendingMessage` 两个类
+/// 与 App 端的 drift 实现（`sync_state` 表 + pending 队列 + `_advanceAnchor`）
+/// 重复且**无人引用**，已删除；`generateSpaceKey` / `buildConfigPayload` 仍在用
+/// （CLI：`einz.dart`、`einz_tui.dart`；测试：`shared/test/einz_shared_test.dart`），保留。
 library;
 
 import 'dart:convert';
@@ -6,44 +11,6 @@ import 'dart:typed_data';
 
 import '../crypto/keys.dart';
 import '../sodium.dart';
-
-/// 本地同步锚点（每 Space 一个）。
-class SyncState {
-  SyncState({required this.spaceId, this.lastServerSequence = 0});
-
-  final String spaceId;
-  int lastServerSequence;
-
-  /// 收到新消息后推进锚点（只前进，不倒退）。
-  void advance(int serverSequence) {
-    if (serverSequence > lastServerSequence) {
-      lastServerSequence = serverSequence;
-    }
-  }
-
-  Map<String, dynamic> toJson() => {
-        'space_id': spaceId,
-        'last_server_sequence': lastServerSequence,
-      };
-
-  factory SyncState.fromJson(Map<String, dynamic> json) => SyncState(
-        spaceId: json['space_id'] as String,
-        lastServerSequence: json['last_server_sequence'] as int,
-      );
-}
-
-/// 离线发送队列项。
-class PendingMessage {
-  PendingMessage({required this.envelopeJson, required this.createdAt});
-
-  final String envelopeJson;
-  final int createdAt;
-
-  Map<String, dynamic> toJson() => {
-        'envelope': jsonDecode(envelopeJson),
-        'created_at': createdAt,
-      };
-}
 
 /// 生成新的 Space Key（32B）。
 Future<Uint8List> generateSpaceKey() async {

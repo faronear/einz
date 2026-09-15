@@ -70,6 +70,13 @@ export function verifyChallenge(cfg: ServerConfig, challengeId: string, plaintex
   const sessionToken = toB64(new Uint8Array(nodeRandomBytes(32)));
   const now = Date.now();
   const sessionSpaceId = row.space_id ?? ""; // v2：challenge 必带目标 Space（legacy 无空间 → 空串）
+  // 同一设备在同一 Space 只保留一个会话：重装/换机/续期后旧 token 立即失效。
+  // 此前旧会话会一直累积到过期（24h），而产品上唯一的吊销手段是"整体撤销设备"
+  // （2026-09-15 评审）。COALESCE 兼容 ALTER 前写入的 NULL 行。
+  db.prepare(`DELETE FROM sessions WHERE device_id = ? AND COALESCE(space_id, '') = ?`).run(
+    row.device_id,
+    sessionSpaceId
+  );
   db.prepare(
     `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`
   ).run(hashSessionToken(sessionToken), row.device_id, sessionSpaceId, now + SESSION_TTL_MS, now);

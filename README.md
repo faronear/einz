@@ -20,11 +20,15 @@ aimemo/      记忆与工作空间（productLens / projectPlan / worklog / userP
 | ---------------------- | ---------------------------------------------------------------------------- |
 | `docs/E2EE.md`         | 密钥层级、派生、配置分发、认证、轮换、恢复                                   |
 | `docs/PROTOCOL.md`     | REST + WebSocket 协议唯一权威                                                |
+| `docs/PROTOCOL_MULTIVERSE.md` | 多空间（Multiverse）协议：space 地址、加入闭环、空间隔离与成员鉴权    |
 | `docs/DATABASE.md`     | 双端 SQLite schema 与迁移                                                    |
+| `docs/SECURITY.md`     | **安全模型与安保政策（威胁模型、现有控制、明确不做、事件处置手册）**         |
 | `docs/DEPLOYMENT.md`   | **部署手册（从零部署 + 快速试用 + 备份恢复/撤销轮换运维 + 故障排查）**       |
+| `docs/ONBOARDING.md`   | **部署与 AB 互通操作手册（从零到双端对话）**                                 |
+| `docs/CI.md`           | **CI 打包指南（Codemagic，无需本机 Xcode / Android SDK）**                   |
 | `docs/IOS.md`          | **iOS 构建与真机验证指引（Mac 环境）**                                       |
 | `docs/updateServer.md` | **服务器更新流程（git push/pull 版，另一台电脑照做即可）**                   |
-| `docs/KEY_ESCROW.md`   | **口令托管密钥方案（`[待评审]`：换设备/朋友接入凭口令，Server 仍只见密文）** |
+| `docs/KEY_ESCROW.md`   | **口令托管密钥方案（换设备/朋友接入凭口令，Server 仍只见密文）**              |
 | `docs/SETUP.md`        | 一次性配置设计稿（命令级实作见 DEPLOYMENT.md §2/§4）                         |
 | `docs/REMOTE.md`       | **远程访问 iMac 手册（Apple ID 屏幕共享 + Tailscale 两条路线）**             |
 
@@ -50,7 +54,14 @@ cp local_config.example.json local_config.json   # 按需修改里面的 kEinzSe
 flutter run --dart-define-from-file=local_config.json   # flutter run/build 都支持此参数
 ```
 
-- `app/local_config.json` **不入 git**（已 .gitignore）——覆盖 `kEinzServer` 等启动参数（`String.fromEnvironment`），不污染 commit
-- 打包入口：`npm run build-ios`（iOS release，连生产服务器 einz.tic.cc）；Android 出包用 `npm run build-apk`。本机调试带本地配置用 `npm run ios-run` / `npm run ios-run-new`（已含 `--dart-define-from-file=local_config.json`，指向 localhost:3000）。`scripts/build_ios.sh` 已移除，相关能力并入 npm 脚本。
-- 调试入口：`flutter run --dart-define-from-file=local_config.json -d <UDID>`（run 同样支持，手动加参数即可）
+- 本仓有**三个**本机配置文件，都不入 git（已 .gitignore），只有模板 `local_config.example.json` 入库：
+  - `app/local_config.ios.json` / `app/local_config.android.json` —— **分平台**，被下方 npm 脚本直接引用；
+  - `app/local_config.json` —— 通用，手动加 `--dart-define-from-file=local_config.json` 时用。
+- 打包入口：iOS release 用 `npm run build-prod-ios`（连生产服务器 einz.tic.cc）；Ad Hoc 安装包用
+  `npm run build-ios-adhoc`（含 `--install` 变体），App Store 用 `npm run build-ios-appstore` /
+  `npm run upload-ios-appstore`；Android 用 `npm run build-prod-apk`。
+- 本机调试（已含 `--dart-define-from-file`，指向 localhost:3000）：iOS 模拟器 `npm run ios-run-dev` /
+  `ios-run-dev-new`（+ `ios-refresh` 热重载、`ios-reload` 热重启），Android 模拟器 `npm run apk-run-dev` /
+  `apk-run-dev-new`。`scripts/build_ios.sh` 已移除，相关能力并入 npm 脚本。
+- 调试入口（手动）：`flutter run --dart-define-from-file=local_config.json -d <UDID>`（run 同样支持）
 - 服务端对应：`server/einz_server_config.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）

@@ -5629,3 +5629,60 @@ only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置
   `.git/` 目录——并发写 .git 有把仓库写坏的风险（比 cli/demo 的文件更严重）。本机当前
   **没有 Syncthing 进程**（`pgrep -i synth` 无），所以副本是别处同步过来的遗留；要根治
   得在配置同步的那一端把 `.git/` 排除。已列入待讨论。
+
+### A 批：死代码清理 + 文档修正（老板 2026-09-15 拍板"AB 全做"）
+
+逐条核实后执行（两条与报告原文不同，见下）：
+
+- **A1** 删掉第二个 `POST /auth/verify`（`app.ts`，L185 已匹配、永不可达；保留的是**带审计**
+  的那一个）。顺手发现 `/health` 与 `wsConnCount` 的关系见 B1。
+- **A2** `generateAttachmentNonce` 删除；**A3** `Api.devices` 删除；**A4** `statusText` 删除。
+- **A5** `history()` 重复的两行 doc 注释删一组。
+- **A6** 删 `export { randomUUID }`（`ws.ts`）与 `export { copyFileSync }`（`backup.ts`），
+  连带清理不再需要的 `node:crypto` / `node:fs` 导入。
+- **A7** `fetchAttachment` 去掉 `sha256` 参数（定义 + 两个调用点：`message_repository` 内部
+  与 `chat_page`），注释改为说明"完整性由 AEAD 保证（attachmentId/spaceId 在 AAD 里）"——
+  不实现 sha256 比对，因为它是密文哈希、上传时服务端已校验过，客户端再算是重复劳动。
+- **A8** `sync_state.dart` **只删 `SyncState` / `PendingMessage` 两个类**。核实推翻了报告的
+  措辞：同文件的 `generateSpaceKey()` 被 `cli/bin/einz.dart`、`einz_tui.dart` 与 40+ 处测试
+  使用，`buildConfigPayload` 被 `shared/test/einz_shared_test.dart` 使用 —— **文件不能删**。
+  随之把"锚点只前进不倒退"这条不变量的用例从 shared 移到 CLI
+  （新增 `cli/test/store_anchor_test.dart`，测 `store.advanceAnchor`），
+  避免删类顺带丢掉承重的不变量覆盖。
+- **A9** README 修正：npm 脚本名全部改为实际存在的（`build-prod-ios` / `build-ios-adhoc` /
+  `upload-ios-appstore` / `build-prod-apk` / `ios-run-dev` / `apk-run-dev` 等）；文档表补
+  `PROTOCOL_MULTIVERSE.md`、`SECURITY.md`、`ONBOARDING.md`、`CI.md`；本地配置改为说明
+  **三个**文件（`local_config.ios.json` / `.android.json` 分平台被脚本引用、`local_config.json`
+  通用、只有 `.example.json` 入库）；顺带修掉 `KEY_ESCROW.md` 的 `[待评审]` 标记（其实已实现）。
+- **A9′（超出报告）** `PROTOCOL_MULTIVERSE.md` 头部状态写的是"`[待评审]` 草案，尚未实现"，
+  而空间创建/加入/鉴权/隔离早已落地 —— 改为 `[已实现]` 并注明 C1 后的成员鉴权约定；
+  两处硬编码 `https://einz.tic.cc/join/<token>` 改占位符 `https://<host>/join/<token>`。
+- **A10** `KEY_ESCROW.md` / `SETUP.md` 各加一行"本文对应 v1 单空间模型，Multiverse 见
+  PROTOCOL_MULTIVERSE.md"，不重写正文。
+
+### B 批：安全加固 7 项
+
+- **B1** `/health` 去掉 `messages_count` 与 `ws_clients`（免鉴权公网端点不吐业务量）。
+  连带 `wsConnCount()` 失去唯一消费者 → 一并删除（在线数仍可从 `[req] WS /ws … total=N`
+  日志看到）。客户端 `server_settings.probe` 只读 pv/caps，不受影响。
+- **B2** `restoreBackup` 的 `files/` 分支加 `assertInsideRoot`（`files/../../x` 可逃出附件根）。
+  核实后只加在这一处：另两个分支是**精确等值匹配**（`app.db` / `config.json`），路径不受
+  条目内容影响，在那里加校验是安全表演。
+- **B3** 恢复码取词改**拒绝采样**（`limit = 65536/total*total = 63550`，超出则丢弃重抽）：
+  词表实测 2050 条，原 `% 2050` 有模偏差。注意恢复码只当口令字符串用、不参与熵校验，
+  **改算法不会让已发出的恢复码失效**。
+- **B4** `_sumo()` 加单例缓存（此前每次 `SodiumSumoInit.init2` 都重新 dlopen），
+  `decryptWithPassphrase` 从 `sodium()` 改为 `_sumo()`（与加密路径同源）；补 `resetSodiumSumo()`。
+- **B5** `PROTOCOL.md` §5.1 把 `message_id` 幂等从"描述"升格为**硬契约**：写明客户端传输层
+  自动重试依赖它、服务端不得改成"重复即报错"，并补幂等范围是 `(message_id, space_id)`。
+- **B6** `ws_client._onClosed` 加 `ws != _ws` 早退（旧连接 onDone 迟到会白触发一次重连）；
+  顺带修掉类注释里"H4 之前的 token 必须 URL 编码"这句已过时的说明。
+- **B7** `verifyChallenge` 成功后按 `(device_id, COALESCE(space_id,''))` 删除旧会话 ——
+  同一设备同一空间只留一个 session，重装/换机/续期后旧 token 立即失效（此前只能整体撤销设备）。
+
+**验证：** server `tsc` 干净 + `npm test` 5 套件全绿；shared `dart test` 28 项全过；
+cli analyze 干净 + 新增锚点用例通过；app `flutter analyze` 无 issue。
+过程中发现**测试自身在污染仓库**：两空间隔离测试没设 `EINZ_FILES`，附件写进了
+`server/data/files/aa/`，第二次跑就因 `flag:"wx"` 撞 EEXIST 变 500 —— 已把 `EINZ_FILES`
+指到临时目录，并清掉那个 22 字节残留（同目录 `01/` 下 71 个真实附件 blob 未动）。
+这条恰好复现了待讨论清单里 C2 那个"同 ID 重传返回 500"的问题。

@@ -27,8 +27,19 @@ const String kPassphraseFormat = 'einz-backup-v1';
 /// 归档文本（Space Key + 全量聊天历史）。
 const String kPassphraseExportPrefix = 'EINZ-BACKUP:';
 
-/// 获取 SodiumSumo 实例（pwhash/Argon2id 只在 sumo 构建中提供）。
-Future<SodiumSumo> _sumo() => SodiumSumoInit.init2(loadDynamicLibrary);
+/// SodiumSumo 单例（pwhash/Argon2id 只在 sumo 构建中提供）。
+///
+/// 必须缓存：`SodiumSumoInit.init2` 每次都会重新 dlopen + 初始化库（`hashPassphrase`
+/// 每次调用都会走到这里，代价是几十 ms 级的白工）。`sodium.dart` 的 `sodium()`
+/// 本来就是缓存的，这里与之对齐（2026-09-15 评审）。
+SodiumSumo? _sumoInstance;
+Future<SodiumSumo> _sumo() async =>
+    _sumoInstance ??= await SodiumSumoInit.init2(loadDynamicLibrary);
+
+/// 重置缓存的 SodiumSumo 实例（仅测试用，与 `sodium.dart` 的 `resetSodium()` 对应）。
+void resetSodiumSumo() {
+  _sumoInstance = null;
+}
 
 /// 派生口令密钥（E2EE.md §4.3 / §10.1）：Argon2id(passphrase, salt) → 32B。
 ///
@@ -121,7 +132,9 @@ Future<Uint8List> decryptWithPassphrase({
   required PassphraseEnvelope envelope,
   required String passphrase,
 }) async {
-  final s = await sodium();
+  // 与加密路径同一个实例（SodiumSumo 是 Sodium 的超集）：此前这里用 sodium()、
+  // 加密路径用 _sumo()，两条路径不一致（2026-09-15 评审，纯一致性瑕疵）。
+  final s = await _sumo();
   final key = await derivePassphraseKey(passphrase: passphrase, salt: envelope.salt);
   final aad = Uint8List.fromList(utf8.encode(kPassphraseFormat));
   final secureKey = s.secureCopy(key);

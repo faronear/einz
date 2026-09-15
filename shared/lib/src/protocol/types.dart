@@ -14,7 +14,6 @@ class Api {
   static const messages = '/messages';
   static const sync = '/sync';
   static const attachments = '/attachments';
-  static const devices = '/devices';
   static const devicesEnroll = '/devices/enroll';
   static const invites = '/invites';
   static const pushRegister = '/push/register';
