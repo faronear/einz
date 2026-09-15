@@ -283,7 +283,7 @@ class ApiClient {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await client.postUrl(Uri.parse('$baseUrl${Api.attachments}'));
+        final req = await _openRequest('POST', '$baseUrl${Api.attachments}');
         req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         req.headers.set('x-attachment-meta', jsonEncode({
           'message_id': messageId,
@@ -312,7 +312,7 @@ class ApiClient {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await client.getUrl(Uri.parse('$baseUrl${Api.attachments}/$attachmentId'));
+        final req = await _openRequest('GET', '$baseUrl${Api.attachments}/$attachmentId');
         req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         final res = await req.close();
         if (res.statusCode >= 400) {
@@ -380,9 +380,8 @@ class ApiClient {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await client.postUrl(Uri.parse('$baseUrl$path'));
+        final req = await _openRequest('POST', '$baseUrl$path');
         req.headers.contentType = ContentType.json;
-        req.headers.set(protocolVersionHeader, protocolVersion);
         if (withToken && token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
@@ -403,8 +402,7 @@ class ApiClient {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await client.getUrl(Uri.parse('$baseUrl$path'));
-        req.headers.set(protocolVersionHeader, protocolVersion);
+        final req = await _openRequest('GET', '$baseUrl$path');
         if (token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
@@ -420,12 +418,32 @@ class ApiClient {
     });
   }
 
+  /// 打开一个请求：所有 REST 请求都从这里出去，**统一带上协议版本头**。
+  /// 2026-09-15 教训：此前该头被（手动）写在各个请求点，附件上传/下载/头像上传
+  /// 三处漏了 → 服务端硬校验直接 400，表现是"上传文件总失败"。收敛到一处，
+  /// 以后新增请求不可能再漏。
+  Future<HttpClientRequest> _openRequest(String method, String url) async {
+    final HttpClientRequest req;
+    switch (method) {
+      case 'POST':
+        req = await _client.postUrl(Uri.parse(url));
+      case 'GET':
+        req = await _client.getUrl(Uri.parse(url));
+      case 'DELETE':
+        req = await _client.deleteUrl(Uri.parse(url));
+      default:
+        throw ArgumentError.value(method, 'method', 'unsupported http method');
+    }
+    req.headers.set(protocolVersionHeader, protocolVersion);
+    return req;
+  }
+
   /// raw bytes 上传（头像等二进制）：image/png + Bearer token。
   Future<void> _postBytes(String path, Uint8List bytes, {String? token}) {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await client.postUrl(Uri.parse('$baseUrl$path'));
+        final req = await _openRequest('POST', '$baseUrl$path');
         req.headers.contentType = ContentType('image', 'png');
         if (token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
@@ -447,8 +465,7 @@ class ApiClient {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await client.getUrl(Uri.parse('$baseUrl$path'));
-        req.headers.set(protocolVersionHeader, protocolVersion);
+        final req = await _openRequest('GET', '$baseUrl$path');
         final res = await req.close().timeout(responseTimeout);
         if (res.statusCode == 404) return null; // 未设置
         if (res.statusCode >= 400) {
@@ -470,8 +487,7 @@ class ApiClient {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await client.deleteUrl(Uri.parse('$baseUrl$path'));
-        req.headers.set(protocolVersionHeader, protocolVersion);
+        final req = await _openRequest('DELETE', '$baseUrl$path');
         if (token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
         }

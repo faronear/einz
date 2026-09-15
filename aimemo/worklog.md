@@ -6003,3 +6003,23 @@ cli 18 项测试全过；shared/cli/app analyze 全干净。
 改 chat_page（全屏渐变）、TUI（欢迎辞自动倒计时）、l10n（重新 gen-l10n）、server/app.ts
 （import 重排），所以我的 chat_page 改动**留在工作区未提交**（与他们的改动同处一个 diff hunk，
 不便按 hunk 隔离），setup_page 与共用组件已单独提交。
+
+## 2026-09-15 上传文件失败：我加协议头时漏了附件那两处（已修 + 已有回归测试）
+
+**现象**：老板测 TUI 上传文件总是报错。
+**根因**：我今天补的协议版本硬校验（S7）——服务端对 API 路径要求 `X-Protocol-Version: 1`
+（缺头 → 400）。而客户端当初把该头**手动写在各个请求构造点**，`ApiClient` 里 7 个请求点中
+**附件上传 `postAttachment`、附件下载 `getAttachment`、头像上传 `_postBytes` 三处漏了** →
+这三个请求一律 400，表现就是"上传/下载附件、传头像失败"。其余（challenge/verify/space/
+devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
+**App 同样受影响**（App 与 TUI 共用 `shared` 的 ApiClient）：只要是在我 S7 提交之后构建的包，
+上传附件/头像、下载附件都会 400；收发文字、加解密、登录不受影响。
+
+**修复（两道）**
+1. 请求构造收敛到 `_openRequest(method, url)` **单一入口**，内部统一设置协议版本头——
+   结构上不可能再漏（根因是"同一件事手写了 7 遍"）。
+2. 新增 `shared/test/protocol_version_test.dart`：起一个本地 `HttpServer`，真实调用
+   challenge/verify/postAttachment/getAttachment/uploadAvatar/getAvatar/getSpace/listDevices/
+   deleteKeyEscrow，**断言每一个请求都带上了协议版本头**——新增请求点再漏会直接挂测试。
+
+**验证**：shared 33 项（含新增 5 项）、cli 18 项、server 5 套件全过；shared/cli/app analyze 全干净。
