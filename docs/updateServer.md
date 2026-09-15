@@ -18,8 +18,8 @@
 git config --global credential.helper manager
 
 # 3) 克隆仓库（文档随仓库一起下来，之后都在仓库内操作）
-git clone https://git.tic.cc/fon/only
-cd only
+git clone https://git.tic.cc/fon/einz
+cd einz
 
 # 4) （CLI 实测才需要）安装 Node ≥ 20 / Dart ≥ 3.12 / libsodium：
 #    - macOS（Homebrew）：brew install node dart-sdk libsodium
@@ -36,7 +36,7 @@ cd only
 export EINZ_ROOT=/opt/einz
 cd $EINZ_ROOT
 git init
-git remote add origin https://git.tic.cc/fon/only
+git remote add origin https://git.tic.cc/fon/einz
 git fetch origin
 git checkout -b main origin/main
 git update-index --assume-unchanged deployment/Caddyfile   # 关键：Caddyfile 保留 VPS 域名，pull 不再覆盖
@@ -57,7 +57,7 @@ git status --short                                          # 应只显示本地
 ### 2.1 本机：提交并推送
 
 ```bash
-cd <仓库路径>        # 例：cd only 或 cd /Users/Shared/productX/only
+cd <仓库路径>        # 例：cd einz 或 cd /Volumes/repodisk/productX/einz
 git add -A
 git commit -m "feat: 你的改动说明"
 git push origin main
@@ -86,7 +86,7 @@ curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 > 现在用 TUI 的 `/passphrase`（或 App 聊天页 ⋯ → 修改口令）做等价操作。
 
 ```bash
-cd /Users/Shared/productX/only/cli
+cd /Volumes/repodisk/productX/einz/cli
 dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
 # 会话里执行 /passphrase → 设置或修改密保口令（含密保箱重建）
 # 期望：✅ 口令密保箱已上传 / 已更新

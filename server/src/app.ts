@@ -61,7 +61,9 @@ const server = createServer(async (req, res) => {
   }
 });
 
-const wss = new WebSocketServer({ noServer: true });
+// maxPayload：WS 帧上限（默认 100 MiB 对哑转发器太大——一条超长帧就能吃掉内存，
+// 2026-09-15 评审 S8）。消息本身走 REST，WS 只推 message.new 等小帧；1 MiB 足够。
+const wss = new WebSocketServer({ noServer: true, maxPayload: 1 * 1024 * 1024 });
 attachWs(wss);
 
 server.on("upgrade", (req, socket, head) => {

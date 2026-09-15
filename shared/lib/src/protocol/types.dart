@@ -1,12 +1,6 @@
 /// 协议常量与类型（PROTOCOL.md）。
 library;
 
-/// 协议版本。
-const int kProtocolVersion = 1;
-
-/// 消息类型。
-const Set<String> kMessageTypes = {'text', 'image', 'video', 'voice', 'audio', 'file', 'system'};
-
 /// 认证 / 同步相关 REST 端点（PROTOCOL.md §4）。
 class Api {
   static const challenge = '/auth/challenge';
@@ -23,7 +17,6 @@ class Api {
   static const spaces = '/spaces';
   static const spaceJoinPreflight = '/spaces/join/preflight';
   static const spaceJoin = '/spaces/join';
-  static const spaceLookup = '/spaces/lookup';
   // 消息回执（已送达/已读）单调高水位（POST 上报 / GET 回读）
   static const receipts = '/receipts';
 }

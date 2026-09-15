@@ -75,8 +75,25 @@
 | GET | /space | 空间信息（space_id、成员设备） | Bearer |
 | POST | /receipts | 上报自己的送达/已读高水位（§5.4） | Bearer |
 | GET | /receipts | 拉取本 space 全部回执行（§5.4） | Bearer |
+| POST | /devices/name | 改本设备显示名 | Bearer |
+| POST | /devices/person-name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
+| POST | /avatar | 上传本人头像 | Bearer |
+| GET | /avatar/:personId | 取头像（免认证，公开可读） | — |
+| GET | /join/:token | 邀请落地页（提示用 App 打开） | — |
 
-> V1 无用户账号、无动态配对、无空间管理 REST（配置在安装阶段完成，productLens §9.3）。
+**Multiverse（v2）空间端点**（详见 `PROTOCOL_MULTIVERSE.md` §4）：
+
+| 方法 | 路径 | 用途 | 鉴权 |
+| --- | --- | --- | --- |
+| POST | /spaces | 创建空间（登记创建者设备 + 签发会话） | — （自举） |
+| GET | /spaces/lookup?address= | 按地址定位空间（最小公开信息） | — |
+| POST | /spaces/join/preflight | 校验 join token（**不消费**） | — |
+| POST | /spaces/join | 用 join token 加入（登记设备 + 签发会话） | — |
+| POST | /spaces/{id}/join-tokens | 生成一次性邀请链接 | **空间成员** |
+| POST | /spaces/{id}/key-escrow | `{passphrase}` 取密文包（免认证）；`{package,…}` 上传/更新（**空间成员**） | 分支不同 |
+
+> 无用户账号体系；空间与成员关系由上述端点自助建立（不再有静态配置文件）。
+> **免鉴权端点白名单**及其理由写在 `server/src/app.ts` 的 `route()` 顶部注释里，新增免鉴权端点必须在那里登记。
 
 ## 5. 消息与同步
 
@@ -325,7 +342,10 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   包按**会话绑定的 space** 存取（`escrowSpaceId`）——Multiverse 下同一台服务器有多个空间，
   各存各的一份（2026-09-12 修的 space_id 错位 bug，见 escrow.ts 注释）。
 - 包结构校验仅限字段类型（`format`/`salt`/`nonce`/`ciphertext` 均为非空 base64 字符串，400 拒绝坏字段）；**Server 永不解析包内容**。
-- 口令验证发生在客户端（解密失败 = 口令错，AEAD tag 校验），Server 无法限速 → 依赖 Argon2id 慢哈希 + 口令熵要求 + 客户端本地错误处理。
+- 口令校验**在服务端**（`/spaces/{id}/key-escrow` 带 `passphrase` 分支：argon2id 哈希比对，
+  失败按 space 计次限速 → `429 ESCROW_RATE_LIMITED`，默认 10 次/15 分钟）；客户端解包失败
+  仍等价于口令错（AEAD tag 校验）。密文包内容 Server 永不解析。
+  （早先版本文档写的"验证在客户端、Server 无法限速"已作废——2026-09-14 改为服务端校验 + 限速。）
 - 客户端接入流程（v2）：口令取钥（`POST /spaces/{id}/key-escrow`，免认证）→ 加入空间
   → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。客户端**不本地缓存密保口令**
   （服务器为唯一真相源，KEY_ESCROW.md §12）；无解锁自动重传。口令重设/密保箱重建走

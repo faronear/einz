@@ -5900,3 +5900,56 @@ D3 收敛第三期。判据：**文档里不能再出现"照抄就报错"的指�
 
 **验证**：全仓 `grep "dart run bin/einz.dart|/devices/enroll"` 在 docs + README **零命中**；
 `server tsc` 干净（文档改动未触碰代码）。
+
+## 2026-09-15 第二份评审（qwen3.8-27b）逐条核实
+
+`aimemo/architectureReview20260915_qwen38.md` 基于**同一旧 commit**（在 C1/C2/H1/H2/H4 与
+A/B/P1/P2/P3 之前），所以大部分是我今天已处理过的。逐条核实结果：
+
+**已验证为真、且我今天没覆盖的（已修，见下一次提交）**
+
+- **S4 备份实际是坏的**（报告抓到、我漏了）：`backup.ts` 无条件
+  `readFileSync(paths.config)`，而 v2 已没有 `server/config/config.json` → `npm run backup`
+  直接 ENOENT 崩。备份是每日运维动作，崩了等于没备份。已改为**可选 entry**（文件不在就跳过）。
+- **S8 WS 无帧上限**（真的）：`new WebSocketServer({ noServer: true })` 未设 `maxPayload`
+  → 默认 100 MiB/帧。已设 1 MiB（消息走 REST，WS 只推小帧）。
+- **S12 判为误报**：报告说"client 发的 `gender` server 不读（创建者性别丢失）"——核实
+  `app.ts:160` 读了 `body.gender`，客户端 `createSpace` 也发 `'gender'`，`createSpace` 里
+  `normGender(gender)` 落 `space_members.gender`。**不成立**。
+- **报告 §3 的"App「导出完整备份」入口已删"为真**：App 里恢复码导出确实按老板决策删除
+  （`app_lock.dart` 注释：PIN 丢失即无法解锁）。而 `SECURITY.md`/`DEPLOYMENT.md`/`E2EE.md`
+  仍写着 App 能导出备份 → 已改（我 P3 写的 DEPLOYMENT §4 也中招，一起改）。
+- **`updateServer.md` 仓库名写错**（真的）：文档写 `git.tic.cc/fon/only`，实际 remote 是
+  `git.tic.cc/fon/einz`；路径 `/Users/Shared/productX/only` 也过期 → 已改。
+- **死常量**（真的）：`kProtocolVersion` / `kMessageTypes` / `Api.spaceLookup` 各只有定义处
+  一次引用 → 已删。
+- **`app/README.md` 是 flutter 模板文案**（真的）→ 已换成真项目说明。
+- **根 `package.json` `"name": "only"`**（真的）→ 改 `einz`（用 `git apply --cached` 只暂存
+  这一行，同文件里他人未提交的 `l10n` 脚本改动原样留在工作区）。
+- **PROTOCOL.md §7.4 的"口令验证在客户端、Server 无法限速"**（真的，2026-09-14 已改成服务端
+  校验 + 限速）→ 已改；§4 端点表补上 v2 空间端点（报告 §2.1 说的"表缺 9+ 端点"）。
+- **PROTOCOL.md §1/§11 承诺的 `X-Protocol-Version` 硬校验其实没实现**（真的，S7）：
+  REST 无任何检查、客户端从不设该头（`kProtocolVersion` 因此是死常量，已删）。WS 只校验
+  `?pv=1`。**待你定**：补实现（客户端已统一走 `pv=1`，加头成本低）还是把文档改成"仅 WS 握手校验"。
+
+**报告已过期（我今天修过）**：S1（join-tokens/key-escrow 免鉴权 → C1 已挂成员校验；
+`POST /spaces` 匿名建空间是**自举必需**，闸门是 `maxSpaces`）、S2（体积上限 → H1）、
+S3（附件重试不幂等 → C2）、S5（restore 路径校验 → B2）、S6（限流 → H2）、S10（/space
+/devices 全局表 → C2）、S14（v1 自举抢注 → P2 已删 enroll）、§4 死代码清单（A 批 + P2 全清）、
+§3 文档清单（P3 全部处理）、`/auth/verify` 重复路由（A1）、`/health` 泄漏（B1）。
+
+**仍成立但不建议现在做（需你拍板）**
+
+- **S9 无条件信任 `x-forwarded-for`/Host**：直连公网时攻击者可让邀请链接指向自己的域名
+  （钓鱼）+ 伪造审计 IP。单机 + Caddy 反代下风险可控，但服务端 `node dist/app.js` 若直曝
+  端口就是真的。建议：加 `EINZ_TRUST_PROXY=1` 开关（默认不信任），或干脆只监听 127.0.0.1
+  由 Caddy 转发。
+- **S11 口令熵**：报告按"≥10 位"算 ≈13 bit；而你今天已主动放宽到 **≥8 位且不卡字符种类**
+  ——这是刻意的产品取舍（易记优先，且在线爆破有服务端限速），我不建议回退，但要明确它是
+  已知取舍（已写在 SECURITY.md 的残留风险里？——没有，可以补一条）。
+- **S13 限速状态在进程内存**：单实例部署下等价，多实例才需要外部存储；接受。
+- **S15 App 用 Dart `Random.secure()` 生成 Space Key**：仍是 CSPRNG，安全上没问题；只是
+  与"随机数统一走 libsodium"的口径不一致 → 建议顺手改成 `sodium.randombytes`（1 行）。
+- **S12 后半段**：`PROTOCOL_MULTIVERSE.md` 的草案字段名（`spaceAddress`/`spacePublicKey`）
+  与实现（`space_id`/`public_key`/`space_address`）不一致——文档是草案，P3 已把头部改成
+  "已实现"，但正文 §4 的请求示例需要按实现重写一遍。**列入 P4 或下次文档批**。

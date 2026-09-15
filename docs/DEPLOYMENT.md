@@ -180,7 +180,7 @@ curl -s -o /dev/null -w '%{http_code}\n' \
    `crypto_box_seal` 密封）作为离线备用路径（E2EE.md §7.1）。
 3. **设备登记**：由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭一次性 join token）完成，
    同时签发绑定该空间的会话——不再有独立的登记步骤，也没有静态白名单文件。
-4. **恢复码**：`/backup`（TUI）/ App「导出完整备份」生成 12 词恢复码（E2EE.md §10），
+4. **恢复码**：TUI `/backup` 生成 12 词恢复码（E2EE.md §10；App 侧导出入口已删），
    **离线保存多份，Server 不接触**。
 
 > 安全操作建议：口令、设备私钥、恢复码三者分开存放——任一单独泄露都不足以解密历史消息。
@@ -209,7 +209,8 @@ npm run restore -- data/backups/backup-<ts>.json
 
 ### 5.2 客户端备份 / 恢复（恢复码，模型 A）
 
-**导出**：TUI 里 `/backup`，或 App 聊天页 ⋯ → 导出完整备份（生成 12 词恢复码）。
+**导出**：TUI 里 `/backup`（生成 12 词恢复码）。⚠️ App 侧的恢复码导出入口已按老板决策删除
+（`app_lock.dart`：PIN 丢失即无法解锁本设备密钥包），所以**恢复码目前只能从 TUI/CLI 侧产生**。
 ⚠️ 恢复码打印后请立即离线妥善保存（丢失即无法恢复）。
 
 **换机恢复**：新设备先正常接入（`/space join` 拿回 Space Key）后，用恢复码在 App 里

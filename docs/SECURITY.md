@@ -57,7 +57,7 @@
 | WS 凭证传输 | `server/src/ws.ts` | 握手用 `Authorization: Bearer`，**不再接受 `?token=`**——URL 会进反代 access log / 代理缓存（2026-09-15 评审 H4 修复） |
 | 口令重设通知 | `server/src/escrow.ts` + WS `passphrase.rotated` | 改口令后其余设备收通知 / 离线补查 `updated_at` |
 | 客户端不缓存密保口令 | `app/lib/data/app_lock.dart`（`AppLockPayload` 无口令字段） | 2026-09-14 起锁包与明文 payload 均不含口令——本地秘密面只剩 Space Key + 设备私钥；代价见 §4.7、§6 |
-| 整机备份 | CLI `backup`/`restore`、App「导出完整备份」 | 12 词恢复码（Argon2id 派生）加密；恢复码离线保存 |
+| 整机备份 | TUI `/backup`（App 侧恢复码导出已按老板决策删除） | 12 词恢复码（Argon2id 派生）加密；恢复码离线保存 |
 | 附件与媒体 | `MediaCache` + `local_attachments` | 解密副本落 App 私有缓存；焚毁/删除定点清理、启动孤儿清理 |
 | 落库内容 | `DATABASE.md` §3 | 只落密文 + 元数据；明文（草稿/解密缓存）仅本机 |
 

@@ -74,11 +74,16 @@ export async function createBackup(paths = resolveBackupPaths()): Promise<string
   const dbBytes = readFileSync(tmpDb);
   rmSync(tmpDb, { force: true });
 
-  // 2) 组装 payload：db + files/ + config.json
+  // 2) 组装 payload：db + files/ + config.json（**可选**）
+  //    v2（Multiverse）没有静态白名单 config.json 了——设备与空间都在库里。
+  //    此前无条件 readFileSync(config) 会让 `npm run backup` 直接 ENOENT 崩掉
+  //    （2026-09-15 评审 S4：备份是每日运维动作，崩了等于没有备份）。
   const entries = [
     { path: "app.db", data: dbBytes },
     ...collectFilesRecursive(paths.files, paths.files),
-    { path: "config.json", data: readFileSync(paths.config) },
+    ...(existsSync(paths.config)
+      ? [{ path: "config.json", data: readFileSync(paths.config) }]
+      : []),
   ];
   const payload = JSON.stringify({
     format: FORMAT,

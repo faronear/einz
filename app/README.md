@@ -1,17 +1,9 @@
-# einz
+# einz（Flutter App）
 
-A new Flutter project.
+Einz 的手机端：双人私密空间客户端（E2EE 聊天 + 附件 + 语音）。
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- 加解密与协议实现全部在 `../shared/`（与 TUI 共用，无分叉）；本目录只做 UI 与本地库。
+- 本地库 `drift`（SQLite），密钥进 Keychain/Keystore（见 `../docs/DATABASE.md` §4）。
+- 运行：`flutter run --dart-define-from-file=local_config.ios.json`（或 `npm run ios-run-dev`）；
+  打包与签名见 `../README.md` 与 `../docs/DEPLOYMENT.md`。
+- 上手流程（创建/加入秘境）见 `../docs/ONBOARDING.md`。
