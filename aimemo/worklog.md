@@ -2294,6 +2294,7 @@ TextButton.icon 文字链接。互切逻辑（\_preEnvelopeRole 记来源）不�
 **背景：** 老板在 iMac（macOS 15.7.7，Xcode 16.1，Flutter 3.47.2）上尝试把 Einz 装到 iPhone 11（iOS 26.3）。付费开发者账号已过期未续费，但**免费 Personal Team 即可真机调试**（7 天重签限制；APNs/分发仍需付费）。
 
 **排障过程：**
+
 1. **Xcode 16.1 太旧**：最高只支持 iOS 18.1 设备，带不动 iOS 26.3 真机 → 需 App Store 升级 Xcode 26.x（macOS 15.7.7 满足要求）。
 2. **误跑模拟器**：状态栏 "Paused Runner on iPhone 16 Pro" = 旧模拟器调试会话残留（之前启动过 iPhone 16 Simulator）。Cmd+7 停掉旧会话、下拉框选回真机即可。
 3. **构建失败 "Missing package product 'FlutterGeneratedPluginSwiftPackage'"**：根因是仓库提交的 `Runner.xcodeproj` 残留 Flutter 3.35+ 默认 SPM 生成工程时的 **8 处 Swift Package 引用**，而工程实际走 CocoaPods（docs/IOS.md 要求 `--no-enable-swift-package-manager`，libsodium 本地 pod）。禁用 SPM **不会**自动清除已提交的 pbxproj 引用。
@@ -4411,6 +4412,7 @@ UI 老板自测。
 `senderPersonId == personId` 判定，所以离线也准。
 
 **改动（commit `92d33bf`，`app/lib/data/message_repository.dart` + `chat_page.dart`）：**
+
 - `MessageRepository` 构造函数接收 `personId`（向导登记时已知）并种入映射；
 - `refreshDeviceMap` 成功后把映射持久化到 `app_state`，启动时惰性载入；
 - 归属判定 `_isMineMessage`：优先信封自带 `senderPersonId`（离线可得）→ 映射查表
@@ -4429,8 +4431,8 @@ UI 老板自测。
 背后页面底部的「上一步」「完成」按钮属于视觉干扰，去掉。
 
 **改动（commit `8d5084e`，`app/lib/setup_page.dart`）：** 底部导航 Row 的条件由
-`_role != null` 改为 `_role != null && _step < _stepCount`——完成页（_step ==
-_stepCount）不渲染底部导航；其余步骤行为不变（含 _step==0 异常兜底的「下一步」）。
+`_role != null` 改为 `_role != null && _step < _stepCount`——完成页（\_step ==
+\_stepCount）不渲染底部导航；其余步骤行为不变（含 \_step==0 异常兜底的「下一步」）。
 `flutter analyze lib test` 0 issue。UI 老板自测。
 
 ### App：完成页去掉进度圆点 + 欢迎弹窗标题换品牌 Logo
@@ -4439,6 +4441,7 @@ _stepCount）不渲染底部导航；其余步骤行为不变（含 _step==0 异
 进度之一）；② 欢迎弹窗标题「一切就绪！」前不要通用庆祝图标 🎉，换成我们的 Logo。
 
 **改动（commit `8d8c832`，`setup_page.dart` + l10n zh/en）：**
+
 - 进度圆点与其下 72px 留白仅在 `_step < _stepCount`（向导步骤内）渲染；
 - l10n `welcomeDialogTitleCreate/Join` 去掉 🎉 前缀（重跑 gen-l10n）；
 - 弹窗标题改为 Row：BrandLogo(26px) + 标题文本。
@@ -4455,11 +4458,12 @@ _stepCount）不渲染底部导航；其余步骤行为不变（含 _step==0 异
 flutter_secure_storage（Keychain/Keystore），跳过 PIN 场景密钥入 keystore。
 
 **改动：**
+
 - pubspec：加 `flutter_secure_storage ^11.1.1`（9.x 与 device_info_plus 13 的 win32 ^6 冲突，pub 建议升 11.x）；
 - 新建 `app/lib/data/secure_store.dart`：SecureStore 封装（统一 `einz.secure.` 前缀、
   UnsupportedError 视为未配置、deleteAll 逐 key 删除避免误清 Keychain 全局）；
 - `app_lock.dart`：savePlain/loadPlain/clearPlain/clear 迁到 SecureStore；loadPlain
-  自动迁移旧 app_state 明文副本（读到即搬走并删库内残留）；app_state 只剩 _kSkipped 等非敏感键；
+  自动迁移旧 app_state 明文副本（读到即搬走并删库内残留）；app_state 只剩 \_kSkipped 等非敏感键；
 - `app_lock_test.dart`：setUp 加 `FlutterSecureStorage.setMockInitialValues({})` 测试替身。
 
 **验证：** flutter analyze 0 issue；flutter test app_lock_test 8/8 全过。
@@ -4474,6 +4478,7 @@ flutter_secure_storage（Keychain/Keystore），跳过 PIN 场景密钥入 keyst
 生命周期管理（不做"密文缓存"方案 3——解密瞬间仍在磁盘，增益有限）。
 
 **改动：**
+
 - 新建 `app/lib/data/media_cache.dart`：MediaCache（确定性路径 `einz_media_<messageId>.<ext>`
   存 App 私有缓存目录；`ensure` 已存在即复用——重复播放零解密；`deleteFor` 定点删；
   `deleteAll` 设备撤销用；`prune` 孤儿清理含历史遗留 systemTemp 文件；全部尽力而为，
@@ -4513,6 +4518,7 @@ cli 单测 14/14 + message_status_check/receipts_check 全过、server 4 套测�
 `deleteFor/prune` 用同一套规则。测试：server +4 非法 id 用例、app +3 例。
 
 **评审意见（不阻塞）：**
+
 - 密保箱归档密钥方案（`escrowArchivedKeys.md`，[待评审]）方向认可；两点补充已追评到
   文档：① `upload()` 覆盖式写包 → 归档集合可能被"缺件的设备"写小，建议先 fetch
   再 max-union 上传（App `_syncEscrow` 本就会先 fetch 验口令，顺手即可）；② 归档密钥
@@ -4534,6 +4540,7 @@ cli 单测 14/14 + message_status_check/receipts_check 全过、server 4 套测�
 **老板决策：A. 卸载即重置**（不做"提示用户选择"）。
 
 **改动（commit `db8ceca`）：**
+
 - `AppLockService.ensureFreshInstall()`：drift `app_state` 的 `app_lock.install_id`
   = 本次安装的随机标记（非密钥、非敏感）。启动时标记缺失 = 沙盒被清过 = 全新安装 →
   清空 `einz.secure.` 下本 App 条目再落新标记。在 `StartupGate._check` 开头调用，
@@ -4563,6 +4570,7 @@ token），所以撤销（掐密文通道）+ 被撤销设备上线自毁已覆�
 **落地原则：撤除"产生"轮换状态的入口，保留"读懂"轮换状态的只读路径。**
 
 **提交 1（`33e20f4`）代码撤除：**
+
 - server：`notifyKeyRotation()`、`app.ts` 调用点、撤销响应 `key_rotation_required`（→`{ok:true}`）
 - shared：删除 `keyring.dart`（`SpaceKeyRing` 仅测试引用）、export、ws_client 的
   `kWsTypeKeyRotation`/`WsKeyRotationEvent`/分发分支
@@ -4590,6 +4598,7 @@ projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 
 数据，不需要考虑和历史数据的兼容性**。
 
 **提交 1（`cf50bec`）验收脚本收敛：**
+
 - 新增 `cli/test/_e2e_lib.sh` 共用件：`wpath`（cygpath 只有 Windows 有）、`py`
   （macOS 只有 python3）、`field_of/token_of/id_of`（Multiverse 的 device_id/person_id
   由服务端分配，不能用 init 传的 dev-a1/dev-b1）、`start_server/stop_server`、
@@ -4602,6 +4611,7 @@ projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 
 - **结果：5 个脚本首次全部在 macOS 上跑通。**
 
 **提交 2（`99b181e`）归档密钥层删除（依据"无存量数据，不背兼容包袱"）：**
+
 - 删除 `DeviceStore.archivedSpaceKeys`、`MessageRepository.archivedKeys`、
   import/escrow-download/TUI 的"更高版本即归档旧密钥"守卫、备份载荷 `archived_space_keys`。
 - 只留 `key_version` 本身（信封/AAD 一部分；`message_crypto.dart:64`）+ 按版本取钥的收口
@@ -4628,6 +4638,7 @@ projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 
 完成验证+同步——单一弹窗，不做两步弹窗（PIN 内存中跨步骤复用，不二次询问）。
 
 **实现：**
+
 - `app_lock.dart` 新增 `updateEscrowPassphraseWithPin(pin, passphrase, {updatedAt})`：
   `unlock`（复用防爆破 5 次/30 秒锁定）→ 更新 escrowPassphrase/escrowUpdatedAt →
   同一 PIN 重新加密落盘
@@ -4646,7 +4657,7 @@ projectPlan、escrowArchivedKeys（→`[搁置]`）。另修正 `app_lock.dart` 
 **背景（老板 2026-09-14 提醒）：** 老板最后拍板**拒绝并撤除 Space Key 轮换**
 （commit `33e20f4` 撤代码、`785c0b9` 立 SECURITY.md、`99b181e` 删归档密钥层；
 phase4_e2e.sh 有回归守卫确认 `rotate` 命令已删）。此前 16bcdd8 的论证把
-"Space Key 轮换时锁包旧口令导致 _syncEscrow 跳过重传"当主要失效场景——
+"Space Key 轮换时锁包旧口令导致 \_syncEscrow 跳过重传"当主要失效场景——
 **该场景随轮换撤除而永久消失**，16bcdd8 记录里的这段表述已过时。
 
 **价值重定位：** 轮换撤掉后 `keyVersion` 永不推进，`_syncEscrow` 的
@@ -4680,6 +4691,7 @@ phase4_e2e.sh 有回归守卫确认 `rotate` 命令已删）。此前 16bcdd8 �
 提取 → 无用（要重建空间）；已同步密文泄露 → 无用（不可追溯）。
 
 **核出的四个口子（已全部修复，提交 `d3c729a`）：**
+
 1. **强度策略缺失/不一致**：代码只查 8 位（TUI 完全不查），而 KEY_ESCROW.md 写"≥10 位混合
    或 ≥5 词"。→ 立唯一来源 `shared/lib/src/crypto/passphrase_policy.dart`（≥10 位且含字母
    数字；只在设置/修改时校验），App/TUI/CLI 三端接入。
@@ -4692,8 +4704,9 @@ phase4_e2e.sh 有回归守卫确认 `rotate` 命令已删）。此前 16bcdd8 �
    传递，不告知则对方日后接入/恢复会失败。
 
 **文档：** KEY_ESCROW.md 订正"防爆破"段（原文"Server 不参与验证"已过时 → 三层防线：口令强度
-+ 服务端限速 + Argon2id）、强度要求改为已强制口径、盐 32B→16B 笔误；SECURITY.md §2 控制矩阵
-加两行、§4.4 补"必须线下告知伴侣"、§5 政策更新。
+
+- 服务端限速 + Argon2id）、强度要求改为已强制口径、盐 32B→16B 笔误；SECURITY.md §2 控制矩阵
+  加两行、§4.4 补"必须线下告知伴侣"、§5 政策更新。
 
 **验证：** shared analyze 0 / 29 测试；cli 0 / 15 测试；app 0 / 115 测试；server build + 4 套
 测试；5 个验收脚本全绿。
@@ -4709,6 +4722,7 @@ Argon2id 用 moderate（256 MiB/3 轮），单次验证本就昂贵——**在�
 口令丢失时用户走"修改口令"手动重建，App 无本地口令缓存可自动重传。
 
 **改动：**
+
 - `app_lock.dart`：`AppLockPayload` 移除 `escrowPassphrase` 字段（`escrowUpdatedAt` 保留——
   仅用于"对方重设"检测对比）；删除 `updateEscrowPassphrase` / `updateEscrowPassphraseWithPin`
   两个方法（16bcdd8 引入、本决策使其失去存在前提）。
@@ -4757,6 +4771,7 @@ Argon2id 用 moderate（256 MiB/3 轮），单次验证本就昂贵——**在�
 
 **发现的事实错误（同一说法重复 4 处）：** commit 正文、KEY_ESCROW.md §12.2、PROTOCOL.md §7.4、
 `_ChangePassphraseDialog` 类注释都写"密保箱重建走**修改口令**"——**当时走不通**：
+
 - App：`chat_page.dart` 检出服务器无包 → 直接 `throw _NoEscrowException` → 提示"尚未设置口令
   （无口令密保箱可修改）"，**到不了设新口令那步**；
 - TUI：`einz_tui.dart` 检出 `file == null` → "⚠️ 尚未设置密保口令，无需修改" 后 `return`。
@@ -4771,6 +4786,7 @@ Space Key，不新增权限；比 16bcdd8 的"存口令 + 解锁自动重传"更
 互斥）。
 
 **实现：**
+
 - **App** `_ChangePassphraseDialog._submit`：把"取密保箱"从上传前挪到**显性确认之前**——先
   fetch 一次拿到 `file`，`rebuilding = file == null`；确认弹窗按是否重建切换标题/正文
   （新增 l10n `chatPageChangePassphraseRebuildTitle` / `…RebuildMessage`，删除已失去意义的
@@ -4785,6 +4801,7 @@ Space Key，不新增权限；比 16bcdd8 的"存口令 + 解锁自动重传"更
   `_fakeWithEscrow`，顺带消除重复的造箱代码。
 
 **文档：**
+
 - 新增 `docs/SECURITY.md` **§4.7「服务端密保箱丢失 / 被破坏」**（表现 / 影响 / 两条重建路径 /
   为何跳过旧口令是安全的 / 兜底）；
 - §2 控制矩阵加「客户端不缓存密保口令」行；§4.4 订正——原文"对方设备记录的仍是旧口令"**已不
@@ -4831,6 +4848,7 @@ Space Key，不新增权限；比 16bcdd8 的"存口令 + 解锁自动重传"更
 > （`autoSyncInterval`），所以"回车后才 sync + 启 WS"不会留下消息丢失窗口。
 
 **验收脚本 `aimemo/cliMultiverseE2E.py` 现代化（原脚本已失效，跑不通）：**
+
 - `abc123`（6 位）→ `einzpass2026`：口令强度策略强制 ≥10 位后原脚本必失败
 - `/invite` 断言正则 `新设备绑定邀请` 已过时 → `邀请新设备`（实际文案"✅ 邀请新设备，24 小时内一次性有效"）
 - 空间地址改为**读 store 的 `space_address`**：原抓终端渲染不可靠（join 路径本就不打印
@@ -4852,6 +4870,7 @@ Space Key，不新增权限；比 16bcdd8 的"存口令 + 解锁自动重传"更
 写成可自助执行的文档。
 
 **实测路径（玩法 A：开发安装，不需要 Archive）：**
+
 ```bash
 export PATH="$HOME/development/flutter/bin:$PATH"
 cd app
@@ -4860,6 +4879,7 @@ xcrun devicectl device install app \
   --device 00008030-0005306011F9402E build/ios/iphoneos/Runner.app
 # → App installed: bundleID cc.tic.einz
 ```
+
 - 构建自动签名成功：`Automatically signing iOS … using specified development team 37KQR6645B`
 - `devicectl … process launch` 报 `device was not, or could not be, unlocked` ——**只是手机锁屏**，
   不是签名问题（安装本身已成功，App 图标可见）。
@@ -4869,13 +4889,15 @@ xcrun devicectl device install app \
 **⚠️ 重要发现：账号仍是免费个人团队级别。** 先删掉旧的 `cc.tic.einz` profile 促使重签，
 重新构建后新 profile 有效期 **2026-09-14 → 2026-09-21 仅 7 天**（免费团队特征；付费为 1 年）。
 本机 keychain 另有一张 `Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)`（2025-07-15 过期）
-+ 配套 Ad Hoc/profile（2024 年即过期）——**Faronear 公司账号看起来才是那个付费/机构账号**。
-结论：老板续费的可能是另一个账号；需要确认后决定是否把工程换到 `CQ6733CTMV`（否则
-Ad Hoc 分发做不了，且 App 每 7 天需要重装续期）。已把这点写进 `docs/IOS.md` §0。
-（旧的 7 天期 profile 已备份在 `/tmp/einz-profiles-backup/`，随时可还原。）
+
+- 配套 Ad Hoc/profile（2024 年即过期）——**Faronear 公司账号看起来才是那个付费/机构账号**。
+  结论：老板续费的可能是另一个账号；需要确认后决定是否把工程换到 `CQ6733CTMV`（否则
+  Ad Hoc 分发做不了，且 App 每 7 天需要重装续期）。已把这点写进 `docs/IOS.md` §0。
+  （旧的 7 天期 profile 已备份在 `/tmp/einz-profiles-backup/`，随时可还原。）
 
 **文档：`docs/IOS.md` 重写为 v2.0**（v1.0 的 bundle id `com.example.onlyspace`、仓库
 `git.tic.cc/fon/only`、「当前无付费账号」等说法全部过时）：
+
 - §0 配置速览（bundle id / team / 签名身份 / 生产服务器 / SPM 必须关 / APNs 未接入）+ 账号级别提醒
 - §1 前置检查命令（flutter doctor / config / devicectl / find-identity）+ 手机侧一次性准备
 - §2 **玩法 A**（开发安装：build + install + launch，含"别用 local_config.ios.json"的坑）
@@ -4892,6 +4914,7 @@ Ad Hoc 分发做不了，且 App 每 7 天需要重装续期）。已把这点�
 `/Volumes/repodisk/simsim_key/cert-apple-苹果应用证书/20260914/`。
 
 **核查结论（都验过，不用老板手动转交）：**
+
 - `3_证书.p12` 含 Apple Distribution 证书 + 私钥（`FaronearPrikey`，口令在
   `3_certpassword.simsim.js`）——p12 是 Apple 默认的 RC2-40 旧格式，`openssl` 需 `-legacy`，
   但 `security import` 直接可用。
@@ -4905,6 +4928,7 @@ Ad Hoc 分发做不了，且 App 每 7 天需要重装续期）。已把这点�
   （UUID `458acdea-…`，1 年，含 iPhone 11 + iPhone XR + 一台旧设备，绑有效证书）。
 
 **工程改造（`app/ios/Runner.xcodeproj`）：**
+
 - 3 个 Runner 配置：`PRODUCT_BUNDLE_IDENTIFIER` `cc.tic.einz` → **`cc.tic.einz.ios`**、
   `DEVELOPMENT_TEAM` `37KQR6645B` → **`CQ6733CTMV`**
 - **Release** 配置额外改为**手动签名**（确定性最好，不依赖 Xcode 是否登录该 Apple ID）：
@@ -4914,6 +4938,7 @@ Ad Hoc 分发做不了，且 App 每 7 天需要重装续期）。已把这点�
 - 新增 `app/ios/exportOptionsAdhoc.plist`（`method=ad-hoc` + 显式证书/profile/bundle 映射）
 
 **实测：**
+
 ```bash
 flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist
 # → build/ios/ipa/einz.ipa（13.7MB）；archive 200MB；Bundle Identifier: cc.tic.einz.ios
@@ -4921,6 +4946,7 @@ unzip -q build/ios/ipa/einz.ipa -d /tmp/einz-ipa
 xcrun devicectl device install app --device 00008030-0005306011F9402E /tmp/einz-ipa/Payload/Runner.app
 # → App installed: bundleID cc.tic.einz.ios
 ```
+
 校验：`codesign -dv` → `Identifier=cc.tic.einz.ios`、`TeamIdentifier=CQ6733CTMV`、
 `Authority=Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)`；内嵌 profile 名
 `Einz Dist Adhoc`、到期 2027-09-14 ✓。iPhone XR 那台 `unavailable`（未连/未解锁）故未装。
@@ -4951,6 +4977,7 @@ Ad Hoc 安装各成功一次。
 「目前的 git.tic.cc 上还没有 einz，但可以直接 push」。
 
 **push 前的核实（按老板要求"再核实"）：**
+
 - `git status` 干净；无 `MERGE_HEAD`/rebase 残留；单工作树
 - 进程表里只有 **1 个** codebuddy 进程（无其它 agent 在跑）→ 与"另一个 agent 已关闭"一致
 - 最近 10 分钟被触碰的文件仅 `server/data/einz.sqlite.db-wal` 与 `cli/demo/s2.json`，
@@ -4975,12 +5002,13 @@ Ad Hoc 安装各成功一次。
 Failed to look up symbol 'sodium_init'」。
 
 **排查（关键是别被错误的测量方法带偏）：**
+
 1. 先查构建产物二进制 → `nm` 里 sodium 符号数 **0**，一度以为"根本没链进来"。
    但 `strings` 能搜到 `expand 32-byte k`、`sodium_crit_enter` → **代码其实在**。
 2. 换用 `dyld_info -exports`（dlsym 真正查的那张表）：
    - 普通 `xcodebuild ... build`（Release，未 install-strip）产物：**导出 652 个符号**
    - `.xcarchive` 产物与导出后的 IPA：**只有 1 个**（`__mh_execute_header`）
-   → 差别不在链接，而在 **archive/install 阶段的 strip**。
+     → 差别不在链接，而在 **archive/install 阶段的 strip**。
 3. 对照实验：在"好"的二进制上手工跑各种 strip → `-S` / `-x` / `-S -x` / `-r` 都**不影响**
    导出表，唯独 **`strip -u` 把导出表清成 0**，与 archive 产物症状完全一致。
 4. 结论：`STRIP_INSTALLED_PRODUCT = YES`（Release 默认）在 archive 时清空主可执行文件的
@@ -4991,6 +5019,7 @@ Failed to look up symbol 'sodium_init'」。
 dead-strip，导出表原样保留 → 同一个 bug 在本地"看起来正常"。
 
 **修法（两处，缺一不可）：**
+
 - `app/ios/Libraries/libsodium.podspec`：保留 `-force_load <静态库>`，并补
   `-Wl,-export_dynamic`（ld 文档：保留主可执行文件的全局符号）。
 - `app/ios/Runner.xcodeproj`：Runner 的 **Release** 配置加 **`STRIP_INSTALLED_PRODUCT = NO`**。
@@ -5001,6 +5030,7 @@ dead-strip，导出表原样保留 → 同一个 bug 在本地"看起来正常"�
 **导出 652 个 / 缺失 0 个**，`sodium_init` 在列 ✓。已 `devicectl install` 到 iPhone 11。
 
 **顺带查了安卓侧（老板没有安卓真机，要求确保不出同类问题）：**
+
 - **符号导出：没问题。** `jniLibs` 4 个 ABI 的 `libsodium.so`（ELF 共享库）dynsym 各 651 个
   符号，与上述 647 个需求对账 **缺失 0**。ELF 的 dynsym 就是导出表，不存在 iOS 那种
   "主可执行文件导出表被清空"的问题。
@@ -5014,6 +5044,7 @@ dead-strip，导出表原样保留 → 同一个 bug 在本地"看起来正常"�
 **触发：** 老板指出他没有安卓手机、难以真机测试，要求确保安卓上没有类似 iOS 的问题。
 
 **审计（静态，不依赖真机）：**
+
 - **符号导出：本来就没问题。** `jniLibs` 4 个 ABI 的 `libsodium.so` 是 ELF 共享库，
   dynsym（ELF 的导出表）各 651 个符号，与 Dart 侧 `sodium` 包需要的 **647 个**对账
   **缺失 0**。ELF 不存在 iOS 那种"主可执行文件导出表被 install-strip 清空"的机制。
@@ -5023,6 +5054,7 @@ dead-strip，导出表原样保留 → 同一个 bug 在本地"看起来正常"�
   这正是"本机模拟器测不出"的类型（模拟器一般 4KB 页）。
 
 **修法（老板拍板现在修）：** 用本机 NDK 重编 libsodium 1.0.20（与 iOS 侧同版本）。
+
 - 工具链：`~/Library/Android/sdk/ndk/28.2.13676358`（r28 起默认 16KB）
 - 每 ABI 一次：`--enable-shared --disable-static --disable-soname-versions`，
   `CC=<ndk clang wrapper>`、`AR/RANLIB/NM/STRIP=llvm-*`，
@@ -5060,6 +5092,7 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 确认后按 messageId 覆盖为 sent），附件漏了这一步。
 
 **改法（cli/lib/chat_core.dart `attachFile`）：**
+
 1. 调整顺序：先装好消息信封（`encryptMessage`，与文件字节无关）→ **立即 `_appendDedup`
    一条 pending 气泡 + `_sortMessages()` 通知 UI** → 再 `file.readAsBytes()` / 加密 /
    上传 blob / 发消息 / 落盘。
@@ -5105,12 +5138,14 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 提示），回车后到上传完毕前**打不了字**；要求上传做成异步——发送后立刻上屏、立刻回到可输入状态。
 
 **根因（两层）：**
+
 1. `/attach` 在 `_execCommand` 里 `await` 了整条上传链，输入循环的 `busy` 一直挂到上传结束；
    期间回车会被 `if (busy) continue` 丢掉（而且那行输入在检查前已被 `input.clear()` 清掉）。
 2. 我上一版加的 `s.status = '⏳ 上传附件中（…）……'` 就挂在输入行正下方的状态行上，
    输入行为空 + 下面一行在转圈 → 看起来"光标去了状态条"。
 
 **改法（cli/bin/einz_tui.dart）：**
+
 - 新增 `_uploadAttachmentInBackground(session, path)`：内部 `await attachFile` + try/catch
   出 ❌ 提示；`/attach` 分支改成 `unawaited(_uploadAttachmentInBackground(...))` 立即返回
   → 输入循环 `busy` 立刻复位、`_render()` 把光标放回输入行，马上可以继续打字。
@@ -5127,6 +5162,7 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 ### 老板两项小需求：TUI busy 时不再吞掉输入 + App 锁屏页自动聚焦（2026-09-14）
 
 **① TUI：busy 期间回车不再丢字（`cli/bin/einz_tui.dart`）**
+
 - 现象：上一条命令/消息还在处理时敲字回车，刚输入的内容被静默丢弃——回车分支先
   `input.clear()` 再 `if (busy) continue`，把文本清掉后才决定不提交。
 - 改法：把 `busy` 判断提到读取/清空输入**之前**；命中则只设状态栏提示
@@ -5135,6 +5171,7 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 - 注：Ctrl+C 仍是任何时候都有效的逃生门；`/exit` 在 busy 中仍要等当前操作结束（原行为）。
 
 **② App：锁屏页进入即聚焦 PIN 输入框（`app/lib/lock_page.dart`）**
+
 - 现象：冷启动（或后台切回）进锁屏页，焦点不在输入框，要手动点一下才弹键盘。
 - 改法：加 `FocusNode` + `autofocus: true`；另外锁定倒计时归零时（`enabled: !locked`
   由 false 变 true）在 `addPostFrameCallback` 里把焦点交还输入框——本帧输入框还是
@@ -5147,6 +5184,7 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 ### 锁屏码弹窗五项改造 + 密保口令"新旧相同"拦截 + 发送键纸飞机朝上（老板 2026-09-14）
 
 **老板需求（5 条 + 1 条追加）：**
+
 1. 有 PIN 时增加「当前锁屏码」验证框（老板问我有没有必要 → 我建议加，且**清空也要验**
    ——否则"清空 → 重设"两步即可绕过；老板拍板：加验证，改/清都验）；
 2. 新设 PIN 提交后的二次确认弹窗**删掉**；
@@ -5156,6 +5194,7 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 6. （追加）输入栏右侧发送键的纸飞机由朝右改为**朝上**。
 
 **改法（app/lib/chat_page.dart）：**
+
 - `_SetLockDialog`：新增 `hasPin` 构造参数（**开弹窗前**由 `_showSetLockDialog` 读好传进来，
   不在弹窗里异步读——毫秒级窗口会让"当前锁屏码"验证被跳过）；有 PIN 时多一个
   `_oldCtrl` 验证框；`_busy` 防连点（Argon2id 校验期间禁用提交键）。
@@ -5175,7 +5214,7 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 相同则提示「⚠️ 新口令与旧口令相同，未作修改——请换一个新口令」并重新输入（无密保箱的
 重建路径不拦）。
 
-**l10n（app/lib/l10n/app_*.arb）：** 新增 `chatPageSetLockOldLabel` / `chatPageSetLockOldRequired` /
+**l10n（app/lib/l10n/app\_\*.arb）：** 新增 `chatPageSetLockOldLabel` / `chatPageSetLockOldRequired` /
 `setPinDialogOldWrong` / `chatPageSetLockSameAsOld` / `chatPageSetLockNoPinNotice` /
 `chatPageSetLockHintNoPin` / `chatPageChangePassphraseSame`；改 `chatPageSetLockClearHint`
 （改为"修改或清空都需先输入当前锁屏码；新码留空 = 清空"）与 `chatPageClearLockMessage`
@@ -5192,6 +5231,7 @@ release 默认剔除 x86；`x86/` 目录留在仓库里但不会进包。
 并问"如果用 App Store 包走 TestFlight 试用、不走审核，是不是就能用 APNs 了"。
 
 **新增 `app/ios/buildIos.sh`（可执行）：**
+
 - `buildIos.sh adhoc [--install] [--device <UDID>]`：校验 flutter → SPM 已关（未关则自动关）→
   钥匙串有 `CQ6733CTMV` 的 Apple Distribution 证书 → 本机装有「Einz Dist Adhoc」→
   `flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist` →
@@ -5233,6 +5273,7 @@ Beta App Review）、90 天过期、出口合规、APNs 两个缺口；§0 补 A
 补充事实：该函数**当前无人调用**（服务端没有任何 push 发送点），所以是潜伏雷，不是在线事故。
 
 **改法：** devices 表没有 space_id，设备经 `person_id → space_members` 归属 Space：
+
 ```sql
 SELECT p.device_id, p.platform, p.token
   FROM push_tokens p
@@ -5240,6 +5281,7 @@ SELECT p.device_id, p.platform, p.token
   JOIN space_members sm ON sm.person_id = d.person_id AND sm.space_id = ?
  WHERE p.device_id != ? AND d.status = 'active'
 ```
+
 顺带跳过已撤销设备（`d.status != 'active'`）。
 
 **测试：** 新增 `server/test/push_scope.test.ts`（纯 DB 单测，openDb 到临时库）——
@@ -5256,6 +5298,7 @@ SELECT p.device_id, p.platform, p.token
 目录（系统可清）；通用文件卡片每次点下载都重新拉。
 
 **老板拍板的取舍（放弃一部分安全换体验）：**
+
 - `secured`（默认，即原行为）：不留存明文，按需下载；
 - `stored`：明文长期留在本机 App 私有目录 + **不进系统备份**，消息流直接打开；
   文件被清掉时消息上给"点击重新下载"。
@@ -5264,11 +5307,12 @@ SELECT p.device_id, p.platform, p.token
 - 切回 `secured` 时**清空**已存明文（否则"安全"名不副实）。
 
 **实现（分两个提交）：**
-1. 数据层/平台层：新增 `data/attachment_storage_settings.dart`（app_state
+
+1. 数据层/平台层：新增 `data/attachment_storage_settings.dart`（app*state
    `attachment_storage`，带 `attachmentStorageNotifier` 即时生效）；
-   `data/attachment_store.dart`（长期目录，复用 MediaCache 的 `einz_media_<safe(id)>.<safe(ext)>`
-   命名——safeName 白名单化防路径越出目录；`ensure/deleteFor/clear`，平台不可用静默回落）；
-   iOS `AppDelegate.swift` 与 Android `MainActivity.kt` 各加 `einz/store` MethodChannel
+   `data/attachment_store.dart`（长期目录，复用 MediaCache 的 `einz_media*<safe(id)>.<safe(ext)>`
+命名——safeName 白名单化防路径越出目录；`ensure/deleteFor/clear`，平台不可用静默回落）；
+iOS `AppDelegate.swift`与 Android`MainActivity.kt`各加`einz/store` MethodChannel
    返回"不备份私有目录"（两端各约 20 行）。
 2. UI 接线：菜单「界面风格」下加「附件存储」（两个选项带说明，点选即生效）；
    `_attachmentBytes` 改为"留存副本优先 → 否则下载 → stored 模式下顺手落盘"（图片/视频/
@@ -5308,6 +5352,7 @@ macOS/桌面/测试环境自动退回占位图标——与 video_player 的平�
 **叠一个播放小三角**，与图片缩略图区分。
 
 **改法：**
+
 - `_videoBytes(m)`：抽出与 `_imageBytes` 同款的视频明文缓存（内联预览与取帧共用一次解密）。
 - `_videoThumbBytes(m)`：`MediaCache.ensure(id,'mp4',…)` 复用内联预览的解密缓存文件（同一条
   消息只解密、只落盘一次）→ `VideoThumbnail.thumbnailData(JPEG, 128, q75)` → 按 messageId 缓存。
@@ -5331,18 +5376,19 @@ macOS/桌面/测试环境自动退回占位图标——与 video_player 的平�
 ### 设置弹层统一 + 附件存储选项双语化（老板 2026-09-15）
 
 **老板要求：** ① 附件存储弹层里"安全（不留存）"只有中文 → 补英文，并改文案为
-「不存本地 / 本地保存」；② 选中项要有背景高亮；③ 「界面语言 / 阅后即焚 / 附件存储」
+「远程托管 / 本地留存」；② 选中项要有背景高亮；③ 「界面语言 / 阅后即焚 / 附件存储」
 三个弹层与「界面风格」统一：**都不要右上角关闭按钮**，**选中行都要高亮**。
 
 **改法：**
+
 - 新增通用弹层 `app/lib/widgets/option_picker_sheet.dart`：标题（无关闭按钮）+ 选项行
   （选中项浅 tint 圆角底 + 对勾）+ 可选"提交"按钮（`submitLabel` 非空时改为单选提交模式，
   与附件存储的"有害操作要确认"匹配）+ 可选红字警示（`warningFor`）。
 - 三个弹层改用之：界面语言、阅后即焚（原 `ListTile` + trailing 对勾）、附件存储；
   `ui_style_picker.dart` 去掉右上角 ✕（保留预览图与高亮）。
 - 文案双语化：`kAttachmentStorageLabels/Descriptions` 两个写死中文的常量表**删除**，
-  改 l10n：`chatPageAttachmentStorageSecured`(不存本地 / Not stored locally)、
-  `...Stored`(本地保存 / Save locally) 及两个 `...Desc`。
+  改 l10n：`chatPageAttachmentStorageSecured`(远程托管 / Not stored locally)、
+  `...Stored`(本地留存 / Save locally) 及两个 `...Desc`。
 - l10n 同时删掉不再使用的 `chatPageStyleSheetClose`。
 - 测试：`ui_style_switch_test` 里"点 ✕ 关闭"的用例改为"弹层无 ✕ + 系统返回可关闭"。
 
@@ -5371,6 +5417,7 @@ PIN 是短数字串，靠左小字既不明显也不好确认位数 → 参照�
 ### 全屏查看沉浸式（遮罩盖到屏幕最顶端）+ 附件存储默认改长期保存（2026-09-15）
 
 **① 头像 / 视频 / 图片全屏：遮罩覆盖全屏（含状态栏）**
+
 - 关键认知：**状态栏（时间/电量/信号）是系统层绘制的，App 盖不住，只能隐藏** →
   新增 `widgets/immersive_fullscreen.dart`：`withImmersiveFullscreen(open)` 在打开期间
   `SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky, [])`，
@@ -5381,4 +5428,26 @@ PIN 是短数字串，靠左小字既不明显也不好确认位数 → 参照�
 
 **② 附件存储默认值改为 `stored`（长期保存）**——老板：更符合习惯体验。
 `AttachmentStorageSettings.load()` 缺省值 与 `attachmentStorageNotifier` 初值都由
-'secured' 改为 'stored'；老版本升上来也是长期保存（要"不存本地"手动切一次即可）。
+'secured' 改为 'stored'；老版本升上来也是长期保存（要"远程托管"手动切一次即可）。
+
+### 老板五项微调（2026-09-15 续）：字号 15 / 锁屏去掉标签 / 措辞 / 上传中可播音频 / 口令不二次确认
+
+1. **消息流字号定 15**：原来吃 Flutter 默认 14（比微信小），试过 16，老板取中间 → 新增
+   `kMessageFontSize = 15`，合并进气泡的 `DefaultTextStyle.merge`。时间戳/焚毁标签/
+   引用块/长按预览行都显式设了字号，不受影响（老板明确：预览行与引用行不改）。
+2. **锁屏页输入框去掉 labelText**（上边框里不再挂"锁屏码"）——提示在上方 `lockPagePinPrompt`
+   已说一遍；连续错误锁定的倒计时改到输入框**上方**红字显示（原来借 labelText）。
+3. **附件存储措辞（老板改中文，我同步英文与注释）**：`secured` = 远程托管 / Remote only，
+   `stored` = 本地留存 / Keep locally；两条描述按老板新措辞重写；红字警示里的模式名
+   同步为「远程托管」（原文是「安全」，已与标签不符）；`option_picker_sheet.dart` 与
+   `attachment_storage_settings.dart` 注释里的旧措辞一并更新。
+4. **音频上传中也能播**：`_playAudioMessage` 的加载函数由 `_repo.fetchAttachment`（直连
+   网络）改为 `_attachmentBytes(m)`（发送端优先用**本地密文**解密）——与图片/视频一致。
+   此前上传还在传（没拿到 server_sequence）时点播放会走网络失败 → 通知栏"音频播放失败"。
+5. **修改口令不再弹第二个确认弹窗**（老板：两个叠着累赘）：校验全过就直接改，有错一律
+   弹窗内红字报（旧口令错 / 新旧相同 / 强度不足 / 上传失败等路径各自已有红字）。
+   `chatPageChangePassphraseConfirm*`、`chatPageChangePassphraseRebuild*` 四个文案键已无引用
+   （保留未删，等老板确认后再清）。测试同步：原"提交前弹显性确认"用例改为"提交即执行、
+   不弹二次确认"，重建路径用例去掉"重建密保箱？"断言。
+
+**验证：** `flutter analyze` 无 issue；menu + lock_page + ui_style 24 项全过。

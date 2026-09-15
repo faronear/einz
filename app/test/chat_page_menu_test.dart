@@ -139,11 +139,9 @@ Future<void> _enterDialogFields(WidgetTester tester,
   await tester.enterText(fields.at(2), newPass);
 }
 
+/// 点「修改」即生效——**不再有第二个确认弹窗**（老板 2026-09-15：两个叠着累赘）。
 Future<void> _confirmChange(WidgetTester tester) async {
   await tester.tap(find.widgetWithText(FilledButton, '修改'));
-  await tester.pumpAndSettle();
-  final confirmDialog = find.byType(AlertDialog).last;
-  await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
   await tester.pumpAndSettle();
 }
 
@@ -530,7 +528,7 @@ void main() {
     expect(find.text('Alice'), findsOneWidget, reason: '对方名字应从 profile 恢复（顶部条左侧）');
   });
 
-  testWidgets('修改口令：提交前弹显性确认（取消不执行）', (WidgetTester tester) async {
+  testWidgets('修改口令：提交即执行，不再弹第二个确认弹窗', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -538,18 +536,12 @@ void main() {
     await _openChangePassphraseDialog(tester, db,
         oldPassphrase: 'oldpass1', spaceKey: spaceKey);
 
-    // 输入新口令 + 确认（匹配）；旧口令留空（确认弹窗在旧口令验证之前）
+    // 输入新口令 + 确认（匹配）；旧口令留空 → 应红字"旧口令错误"，不改、不弹二次确认
     await _enterDialogFields(tester, newPass: 'newpass123');
-    // 提交（按钮文本「修改」，弹窗标题「修改口令」）
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
-    expect(find.text('修改密保口令？'), findsOneWidget); // 显性确认弹窗
-    // 点取消 → 不执行修改（改口令弹窗仍在）
-    final confirmDialog = find.byType(AlertDialog).last;
-    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
-    await tester.pumpAndSettle();
-    expect(find.text('修改口令'), findsWidgets); // 改口令弹窗未关闭
-    expect(find.text('修改密保口令？'), findsNothing);
+    expect(find.text('修改密保口令？'), findsNothing, reason: '不应再弹第二个确认弹窗');
+    expect(find.text('旧口令错误'), findsOneWidget, reason: '旧口令没填应红字报出');
   });
 
   testWidgets('修改口令：新口令不满足强度（长度/字母数字）→ 红字拦截，不弹显性确认', (WidgetTester tester) async {
@@ -573,12 +565,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('口令需同时包含字母与数字'), findsOneWidget, reason: '缺字母应红字提醒');
 
-    // 满足策略：放行到显性确认
+    // 满足策略：不再有第二个确认弹窗——点「修改」即执行（旧口令没填会在执行时报红字）
     await _enterDialogFields(tester, newPass: 'new-pass-2026');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 10 位'), findsNothing, reason: '满足策略后旧红字不应残留');
-    expect(find.text('修改密保口令？'), findsOneWidget, reason: '满足策略应进入显性确认');
+    expect(find.text('修改密保口令？'), findsNothing, reason: '不再弹第二个确认弹窗');
   });
 
   testWidgets('菜单改名后写 profile（重启后从 profile 恢复新名字）', (WidgetTester tester) async {
@@ -997,13 +989,9 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
 
-    // 确认文案走"重建"口径，不是普通"修改密保口令？"
-    expect(find.text('重建密保箱？'), findsOneWidget, reason: '无密保箱应提示重建');
+    // 无密保箱 = 重建路径：同样不再弹第二个确认（原来是"重建密保箱？"确认框）
+    expect(find.text('重建密保箱？'), findsNothing, reason: '不再弹第二个确认弹窗');
     expect(find.text('修改密保口令？'), findsNothing);
-
-    final confirmDialog = find.byType(AlertDialog).last;
-    await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
-    await tester.pumpAndSettle();
 
     // 旧口令为空也放行：直接上传 rotated 包重建
     expect(api.uploadedRotated, isTrue, reason: '重建同样传 rotated: true（广播口令变更）');

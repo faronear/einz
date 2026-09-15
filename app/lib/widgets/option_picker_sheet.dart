@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 ///   省一个按钮、也让几个弹层的观感统一；
 /// - **当前选中项必须有背景高亮**（浅色 tint + 对勾），给用户明确的"现在是这个"；
 /// - 点选即生效（[submitLabel] 为空）；给 [submitLabel] 时改为"单选 + 提交"
-///   （用于**有副作用**的开关，如附件存储切回「不存本地」会删掉已存明文）。
+///   （用于**有副作用**的开关，如附件存储切回「远程托管」会删掉已存明文）。
 class OptionPickerSheet extends StatefulWidget {
   const OptionPickerSheet({
     super.key,

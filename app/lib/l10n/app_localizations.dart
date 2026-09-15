@@ -1085,25 +1085,25 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageSecured.
   ///
   /// In en, this message translates to:
-  /// **'Not stored locally'**
+  /// **'Remote only'**
   String get chatPageAttachmentStorageSecured;
 
   /// No description provided for @chatPageAttachmentStorageSecuredDesc.
   ///
   /// In en, this message translates to:
-  /// **'Downloads every time it is opened; no plaintext copy is kept'**
+  /// **'Downloads and decrypts the attachment every time it is opened; no plaintext copy is kept'**
   String get chatPageAttachmentStorageSecuredDesc;
 
   /// No description provided for @chatPageAttachmentStorageStored.
   ///
   /// In en, this message translates to:
-  /// **'Save locally'**
+  /// **'Keep locally'**
   String get chatPageAttachmentStorageStored;
 
   /// No description provided for @chatPageAttachmentStorageStoredDesc.
   ///
   /// In en, this message translates to:
-  /// **'Keeps decrypted attachments on this device for instant opening (excluded from backups)'**
+  /// **'Keeps a decrypted copy after the first download, so opening it again is instant'**
   String get chatPageAttachmentStorageStoredDesc;
 
   /// No description provided for @chatPageAttachmentStorageSubmit.
@@ -1115,7 +1115,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageWarnClear.
   ///
   /// In en, this message translates to:
-  /// **'Switching to Secure immediately deletes locally stored attachments'**
+  /// **'Switching to \"Remote only\" immediately deletes locally stored attachments'**
   String get chatPageAttachmentStorageWarnClear;
 
   /// No description provided for @chatPageMenuStyleLabel.

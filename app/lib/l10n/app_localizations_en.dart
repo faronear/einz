@@ -558,25 +558,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => 'Attachment storage';
 
   @override
-  String get chatPageAttachmentStorageSecured => 'Not stored locally';
+  String get chatPageAttachmentStorageSecured => 'Remote only';
 
   @override
   String get chatPageAttachmentStorageSecuredDesc =>
-      'Downloads every time it is opened; no plaintext copy is kept';
+      'Downloads and decrypts the attachment every time it is opened; no plaintext copy is kept';
 
   @override
-  String get chatPageAttachmentStorageStored => 'Save locally';
+  String get chatPageAttachmentStorageStored => 'Keep locally';
 
   @override
   String get chatPageAttachmentStorageStoredDesc =>
-      'Keeps decrypted attachments on this device for instant opening (excluded from backups)';
+      'Keeps a decrypted copy after the first download, so opening it again is instant';
 
   @override
   String get chatPageAttachmentStorageSubmit => 'Submit';
 
   @override
   String get chatPageAttachmentStorageWarnClear =>
-      'Switching to Secure immediately deletes locally stored attachments';
+      'Switching to \"Remote only\" immediately deletes locally stored attachments';
 
   @override
   String get chatPageMenuStyleLabel => 'Interface style';

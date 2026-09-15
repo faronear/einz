@@ -115,6 +115,12 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
+/// 消息流正文（气泡内跟随默认样式的文字）字号（老板 2026-09-15 定：15）。
+/// 原样：跟着 Flutter 默认 14，比微信小一圈；试过 16，老板取中间值 15。
+/// 只作用于气泡内跟随默认样式的文字——时间戳/焚毁标签/引用块/长按预览行都显式
+/// 设了字号，不受影响。
+const double kMessageFontSize = 15;
+
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late final MessageRepository _repo;
   final _input = TextEditingController();
@@ -702,7 +708,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ? l10n.chatPageAttachmentStorageStoredDesc
           : l10n.chatPageAttachmentStorageSecuredDesc;
 
-  /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「不存本地」
+  /// 附件存储：**单选 + 提交**（不点选即生效——老板 2026-09-14）——切回「远程托管」
   /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
   Future<void> _showAttachmentStoragePicker() async {
     final l10n = AppLocalizations.of(context)!;
@@ -712,7 +718,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         title: l10n.chatPageMenuAttachmentStorage,
         selected: _attachmentStorage,
         submitLabel: l10n.chatPageAttachmentStorageSubmit,
-        // 只在"准备切回不存本地、且当前不是它"时提示（真要删数据）
+        // 只在"准备切回远程托管、且当前不是它"时提示（真要删数据）
         warningFor: (v) => (v == 'secured' && _attachmentStorage != 'secured')
             ? l10n.chatPageAttachmentStorageWarnClear
             : null,
@@ -727,7 +733,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         onApply: (mode) async {
           await AttachmentStorageSettings(widget.db ?? LocalDatabase()).save(mode);
           if (mode == 'secured') {
-            // 切回不存本地：把本机留存的明文附件全部清除
+            // 切回远程托管：把本机留存的明文附件全部清除
             await AttachmentStore.clear();
           }
         },
@@ -2576,12 +2582,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _audioStartedMessageId = null; // 旧波形进度先复位
       });
       final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
-      Future<Uint8List> load() => _repo.fetchAttachment(
-            attachmentId: att['attachment_id'] as String,
-            keyVersion: att['key_version'] as int,
-            sha256: att['sha256'] as String,
-            nonce: base64Decode(att['nonce'] as String),
-          );
+      // 与图片/视频一致走 [_attachmentBytes]：发送端优先用**本地密文**解密——
+      // 上传还在传（没拿到 server_sequence）时文件本来就在本机，点了就该能播
+      // （老板 2026-09-15）；此前这里直连 fetchAttachment 走网络 → 落"音频播放失败"
+      Future<Uint8List> load() => _attachmentBytes(m);
       // 解密落盘：确定性路径按 messageId 复用——重复播放不再重复下载解密
       // stored 模式放长期目录（跨会话保留），否则临时缓存（系统可清）
       final tmp = (_storeAttachments
@@ -3562,9 +3566,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           ),
                           child: DefaultTextStyle.merge(
                             // gradient 深色气泡下文字/图标改白色（醒目，老板要求）；
-                            // plain 浅色气泡不合并颜色（保持默认深色文字/图标）
+                            // plain 浅色气泡不合并颜色（保持默认深色文字/图标）。
+                            // 正文字号 [kMessageFontSize]（老板 2026-09-15：原来跟着
+                            // Flutter 默认 14 走，比微信小一圈）——气泡内所有跟随默认
+                            // 样式的文字（正文、文件名）一起变大；时间戳/焚毁标签/
+                            // 引用块各自显式设了小字号，不受影响
                             style: TextStyle(
-                                color: _uiStyle == 'gradient' ? Colors.white : null),
+                                color: _uiStyle == 'gradient' ? Colors.white : null,
+                                fontSize: kMessageFontSize),
                             child: IconTheme.merge(
                               data: IconThemeData(
                                   color: _uiStyle == 'gradient' ? Colors.white : null),
@@ -4112,24 +4121,8 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       setState(() => _error = l10n.chatPageChangePassphraseSame);
       return;
     }
-    // 显性确认：修改密保口令（防误触——老板要求）；重建口径另有文案
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(rebuilding
-            ? l10n.chatPageChangePassphraseRebuildTitle
-            : l10n.chatPageChangePassphraseConfirmTitle),
-        content: Text(rebuilding
-            ? l10n.chatPageChangePassphraseRebuildMessage
-            : l10n.chatPageChangePassphraseConfirmMessage),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.confirm)),
-        ],
-      ),
-    );
-    if (confirmed != true) return; // 取消：留在本弹窗（不修改）
+    // 不再弹第二个确认弹窗（老板 2026-09-15：两个叠着累赘）——校验都过了就直接改：
+    // 口令已在三个输入框里输过一遍，本身就是确认；有错一律在弹窗内红字报出。
     setState(() {
       _busy = true;
       _error = null;

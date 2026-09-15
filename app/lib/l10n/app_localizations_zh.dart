@@ -525,23 +525,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuAttachmentStorage => '附件存储';
 
   @override
-  String get chatPageAttachmentStorageSecured => '不存本地';
+  String get chatPageAttachmentStorageSecured => '远程托管';
 
   @override
-  String get chatPageAttachmentStorageSecuredDesc => '附件每次打开都重新下载，本机不留明文副本';
+  String get chatPageAttachmentStorageSecuredDesc => '每次打开附件都重新下载并解密，本机不留明文副本';
 
   @override
-  String get chatPageAttachmentStorageStored => '本地保存';
+  String get chatPageAttachmentStorageStored => '本地留存';
 
   @override
   String get chatPageAttachmentStorageStoredDesc =>
-      '下载过的附件明文留在本机，消息流里直接打开（不进系统备份）';
+      '第一次下载附件留存明文副本在本机，以后打开可直接使用';
 
   @override
   String get chatPageAttachmentStorageSubmit => '提交';
 
   @override
-  String get chatPageAttachmentStorageWarnClear => '切到「安全」会立即删除本机已留存的附件明文';
+  String get chatPageAttachmentStorageWarnClear => '切到「远程托管」会立即删除本机已留存的附件明文';
 
   @override
   String get chatPageMenuStyleLabel => '界面风格';

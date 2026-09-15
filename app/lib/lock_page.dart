@@ -282,6 +282,14 @@ class _LockPageState extends State<LockPage> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 24),
+            // 连续错误锁定：倒计时提示（原来挂在输入框的 labelText 上，现已移除 label）
+            if (locked)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(l10n.lockPageLockedSeconds(_lockSeconds),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ),
             TextField(
               controller: _pin,
               // 进入锁屏页即聚焦输入框 → 直接弹键盘等待输入（老板要求 2026-09-14：
@@ -295,11 +303,12 @@ class _LockPageState extends State<LockPage> {
               // PIN 是短数字串，靠左小字既不明显也不好确认位数
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 24, letterSpacing: 8),
-              decoration: InputDecoration(
-                labelText: locked ? l10n.lockPageLockedSeconds(_lockSeconds) : l10n.lockPagePinLabel,
-                border: const OutlineInputBorder(),
-                // 居中后左右留白对称（label 仍顶在左上，不影响）
-                contentPadding: const EdgeInsets.symmetric(vertical: 18),
+              decoration: const InputDecoration(
+                // 无 labelText（老板 2026-09-15）：上边框里不再挂"锁屏码"提示——
+                // 提示已在上方 lockPagePinPrompt 说过一遍，输入框只管输数字
+                border: OutlineInputBorder(),
+                // 上下加高，字大之后不至于挤边
+                contentPadding: EdgeInsets.symmetric(vertical: 18),
               ),
               onSubmitted: (_) => _unlock(),
             ),
