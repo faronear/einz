@@ -56,7 +56,16 @@ class _TuiState {
   final String storePath;
 
   /// 对方是否在线（listDevices last_seen<60s 轮询 + peer.online/offline 广播更新）。
+  /// 判定维度是"人"：同一 person 的多台设备是我自己的设备，不算对方。
   bool peerOnline = false;
+
+  /// 我的设备：在线数 / 总数（同一 person 的多设备；listDevices 轮询统计）。
+  int myDeviceOnline = 0;
+  int myDeviceTotal = 0;
+
+  /// 对方设备：在线数 / 总数（同一 person 的多设备；listDevices 轮询统计）。
+  int peerDeviceOnline = 0;
+  int peerDeviceTotal = 0;
 
   /// 设备名映射（device_id → device_name——listDevices 轮询更新；顶部条对方 #设备名）。
   final Map<String, String> deviceNames = {};
@@ -688,7 +697,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
 /// 欢迎辞倒计时文本（两行，老板 2026-09-15）：首行欢迎辞；读秒单独一行
 /// "即将进入秘境聊天：<秒数>"，逐秒跳动。
 String _welcomeCountdownText(int remain) {
-  return '一切就绪！即将进入秘境 💞 与伴侣聊天： $remain';
+  return '一切就绪！即将进入秘境与伴侣聊天 💞 $remain';
 }
 
 /// 客户端生成 space_id（UUIDv4，协议 §3.4：space_id/space_key 由客户端生成——
@@ -1432,12 +1441,13 @@ void _render() {
   // 对方消息在左、我的消息在右）、品牌名 "Einz TUI" 居中
   // （窄终端放不下三段时先弃中段，再不行截断右段，保左段完整）。
   final titleText = _titleBarThree(
-    '$peerDot $peerName #$peerDevice',
+    '$peerDot $peerName #$peerDevice${_deviceCountLabel(s.peerDeviceOnline, s.peerDeviceTotal)}',
     // 品牌名 bold 展示后必须关闭粗体（ESC[22m）再继续——否则 bold 状态泄漏到
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
     '${_bold}Einz TUI\x1B[22m$_white',
-    '$myDot ${_personLabel(s.session.store, s.personNames)}',
+    '$myDot ${_personLabel(s.session.store, s.personNames)}'
+        '${_deviceCountLabel(s.myDeviceOnline, s.myDeviceTotal)}',
     cols,
   );
   buf.write(titleText);
@@ -1565,6 +1575,13 @@ String _peerNameOf(_TuiState s) {
   return partnerPresetName ?? '-';
 }
 
+/// 同一身份的多设备计数（顶部条 "n/m台在线"）：单设备时不显示——"1/1台在线"
+/// 只是噪音；多设备时才需要知道"我的/对方的哪几台在线"（老板 2026-09-16）。
+String _deviceCountLabel(int onlineCount, int totalCount) {
+  if (totalCount < 2) return '';
+  return ' $onlineCount/${totalCount}台在线';
+}
+
 /// 对方设备名：对方最新一条消息的 senderDeviceId → 设备名映射 → device_id → '-'
 /// （无消息时用对方当前在线设备兜底——老板需求：多设备取最新一条消息的设备）。
 String _peerDeviceLabel(_TuiState s) {
@@ -1617,6 +1634,9 @@ void _onWsRevoked(WsDeviceRevokedEvent event) {
 void _onPeerStatus(WsPeerStatusEvent event) {
   final s = _state;
   if (s == null) return;
+  // 与我同身份的设备（我自己的另一台）上下线不算"对方"——新服务端已不推这类
+  // 广播，这里兜住旧服务端（旧 payload 无 person_id 时按原行为处理）
+  if (event.personId != null && event.personId == s.session.store.personId) return;
   final online = event.type == kWsTypePeerOnline;
   if (online != s.peerOnline) {
     s.peerOnline = online;
@@ -1642,38 +1662,68 @@ Future<void> _refreshPeerOnline() async {
     final devices = await ApiClient(server).listDevices(token);
     final now = DateTime.now().millisecondsSinceEpoch;
     final myId = s.session.store.deviceId;
-    // 对方在线 = 有实时 WS 连接（connected_at 非 null）；旧服务器无该字段时退回
+    final myPid = s.session.store.personId;
+    // 本机是否在线取本地 WS 状态（首屏轮询常早于 WS 建连，此时服务端 connected_at
+    // 还是 null —— 否则刚启动会先显示"0/2台在线"再跳成 1/2）
+    final myWsOnline = s.session.wsStatus == WsStatus.connected;
+    // 设备在线 = 有实时 WS 连接（connected_at 非 null）；旧服务器无该字段时退回
     // last_seen<60s（last_seen 会被轮询 touchLastSeen 持续刷新，不代表实时连接）
-    final online = devices.any((d) {
-      if (d['device_id'] == myId) return false; // 自己不算
+    bool deviceOnline(Map d) {
+      if (d['device_id'] == myId && myWsOnline) return true;
       if (d.containsKey('connected_at')) return d['connected_at'] != null;
       final last = d['last_seen'];
       if (last is! num) return false;
       return now - last < 60 * 1000;
-    });
-    // 顺带维护设备名映射与对方在线设备（顶部条对方 #设备名）
-    final myPid = s.session.store.personId;
+    }
+    // 顺带维护设备名映射、对方在线设备（顶部条对方 #设备名）与双方设备计数。
+    // 关键：在线是"人"维度的——同一 person 的其它设备是我自己的设备，不能点亮
+    // 对方（此前只按 device_id != 自己 判定 → 我的第二台设备一上线，尚未加入的
+    // 对方 B 就显示绿灯——老板 2026-09-16 实测）。
     s.deviceNames.clear();
+    int myTotal = 0;
+    int myOnline = 0;
+    int peerTotal = 0;
+    int peerOnline = 0;
     String? onlinePeerDevice;
     for (final d in devices) {
+      if (d['status'] != null && d['status'] != 'active') continue; // 已撤销不计
       final devId = (d['device_id'] as String?) ?? '';
       final devName = (d['device_name'] as String?) ?? '';
       if (devId.isNotEmpty && devName.isNotEmpty) s.deviceNames[devId] = devName;
-      if (devId != myId) {
-        final isOnline = d.containsKey('connected_at')
-            ? d['connected_at'] != null
-            : (d['last_seen'] is num) &&
-                (now - (d['last_seen'] as num) < 60 * 1000);
-        if (isOnline && d['person_id'] != myPid && onlinePeerDevice == null) {
-          onlinePeerDevice = devId;
+      final pid = d['person_id'] as String?;
+      final isOnline = deviceOnline(d);
+      if (pid == null || myPid == null) {
+        // 身份尚未落位（新设备引导中）：退回按设备判定，不统计多设备数
+        if (devId != myId && isOnline) {
+          peerOnline++;
+          onlinePeerDevice ??= devId;
         }
+        continue;
+      }
+      if (pid == myPid) {
+        myTotal++;
+        if (isOnline) myOnline++;
+        continue;
+      }
+      peerTotal++;
+      if (isOnline) {
+        peerOnline++;
+        onlinePeerDevice ??= devId;
       }
     }
+    final online = peerOnline > 0;
+    final changed = online != s.peerOnline ||
+        myOnline != s.myDeviceOnline ||
+        myTotal != s.myDeviceTotal ||
+        peerOnline != s.peerDeviceOnline ||
+        peerTotal != s.peerDeviceTotal;
+    s.peerOnline = online;
+    s.myDeviceOnline = myOnline;
+    s.myDeviceTotal = myTotal;
+    s.peerDeviceOnline = peerOnline;
+    s.peerDeviceTotal = peerTotal;
     s.peerDeviceId = onlinePeerDevice;
-    if (online != s.peerOnline) {
-      s.peerOnline = online;
-      _render();
-    }
+    if (changed) _render();
   } catch (_) {
     // 查询失败保持上次状态（断网/未认证）
   }

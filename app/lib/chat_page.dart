@@ -473,6 +473,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对端上下线（Server 广播——立即更新对方在线状态，不等 30s 轮询）。
   void _onPeerStatus(WsPeerStatusEvent event) {
     if (event.deviceId == widget.deviceId) return; // 本设备自身的事件忽略
+    // 与我同身份的设备（我自己的另一台）不算"对方"（新服务端已不推这类广播，
+    // 这里兜住旧服务端——旧 payload 无 person_id 时按原行为处理）
+    if (event.personId != null && event.personId == widget.personId) return;
     final online = event.type == kWsTypePeerOnline;
     if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
   }
@@ -931,7 +934,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final api = widget.api ?? ApiClient(widget.server);
       final devices = await api.listDevices(widget.token);
       final now = DateTime.now().millisecondsSinceEpoch;
-      final peer = devices.where((d) => d['device_id'] != widget.deviceId).toList();
+      // 在线是"人"维度的：同一 person 的其它设备是我自己的设备，不算对方
+      // （重启路径不传 personId → 从设备表里按本设备反查；查不到才退回按设备判定）
+      var mine = widget.personId;
+      if (mine == null || mine.isEmpty) {
+        for (final d in devices) {
+          if (d['device_id'] == widget.deviceId) {
+            mine = d['person_id'] as String?;
+            break;
+          }
+        }
+      }
+      final peer = devices.where((d) {
+        if (d['device_id'] == widget.deviceId) return false;
+        final pid = d['person_id'] as String?;
+        if (pid == null || mine == null || mine.isEmpty) return true;
+        return pid != mine;
+      }).toList();
       final online = peer.isNotEmpty && peer.any((d) {
         // 实时 WS 连接 = 真在线（server 重启/未入网时立即准确）；last_seen 会被
         // 轮询 touchLastSeen 持续刷新，不能代表实时连接（修复"未入网却显示绿灯"）。

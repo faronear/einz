@@ -7,6 +7,7 @@ import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 interface Conn {
   ws: WebSocket;
   deviceId: string;
+  personId: string | null; // 设备归属身份（同一人的多设备共享 person_id）
   spaceId: string; // 连接绑定的 Space（会话必带 space）
   alive: boolean;
   connectedAt: number; // 本次 WS 连接建立时刻（ms）——/devices 显示"上线时间"
@@ -19,12 +20,6 @@ const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1
 /** 设备当前 WS 连接的建立时刻（ms；离线设备返回 null）。 */
 export function getConnectedAt(deviceId: string): number | null {
   return conns.get(deviceId)?.connectedAt ?? null;
-}
-
-/** 广播只发给与发起方同一 Space 的在线设备（Multiverse：跨空间不推送；
- *  发起方不在线（无连接）时不广播）。 */
-function sameSpace(exceptDeviceId: string): string | null {
-  return conns.get(exceptDeviceId)?.spaceId ?? null;
 }
 
 /** 发起方设备所属 Space：优先其在线连接；**不在线时回退查 sessions**
@@ -43,14 +38,27 @@ function spaceOfDevice(deviceId: string): string | null {
   return row?.space_id ?? null;
 }
 
+/** 广播只发给**另一个人**的在线设备：同一 person 的多台设备（同一人的手机+电脑）
+ *  不算"对方"——此前只排除发起设备本身，自己的第二台设备一上线，第一台就把
+ *  对方灯点亮（老板 2026-09-16 实测：B 从未加入却显示在线）。
+ *  payload 带 person_id：客户端（可能连着旧版服务端）据此二次过滤。 */
 function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer.offline"): void {
-  const spaceId = sameSpace(exceptDeviceId);
+  const origin = conns.get(exceptDeviceId);
+  const spaceId = origin?.spaceId ?? null;
   if (spaceId == null) return;
+  const originPersonId = origin?.personId ?? null;
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
     if (conn.spaceId !== spaceId) continue;
+    if (originPersonId != null && conn.personId === originPersonId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
-      conn.ws.send(JSON.stringify({ id: 0, type, payload: { device_id: exceptDeviceId } }));
+      conn.ws.send(
+        JSON.stringify({
+          id: 0,
+          type,
+          payload: { device_id: exceptDeviceId, person_id: originPersonId },
+        })
+      );
     }
   }
 }
@@ -121,11 +129,14 @@ export function attachWs(wss: WebSocketServer): void {
 
     let deviceId: string;
     let spaceId: string;
+    let personId: string | null;
     try {
       // requireSession 同时完成：会话有效 + 设备在册 + 会话带 space（v1 收敛后必备）
       const sess = requireSession(token);
       deviceId = sess.device_id;
       spaceId = sess.space_id;
+      // 设备归属身份：peer 广播据此跳过同一人的其它设备（同人≠对方）
+      personId = sess.person_id === "" ? null : sess.person_id;
     } catch {
       ws.close(4401, "UNAUTHORIZED");
       return;
@@ -136,7 +147,16 @@ export function attachWs(wss: WebSocketServer): void {
 
     const now = Date.now();
     const meta = metaOf(req);
-    const conn: Conn = { ws, deviceId, spaceId, alive: true, connectedAt: now, meta, timedOut: false };
+    const conn: Conn = {
+      ws,
+      deviceId,
+      personId,
+      spaceId,
+      alive: true,
+      connectedAt: now,
+      meta,
+      timedOut: false,
+    };
     conns.set(deviceId, conn);
     // WS 连接 = 在线：刷新 last_seen（App 判定对方在线）
     getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(now, deviceId);
@@ -190,7 +210,7 @@ export function attachWs(wss: WebSocketServer): void {
         // 来源 IP/UA），再 terminate——审计需要区分"客户端主动断"与"超时失联"。
         //
         // 注意：这里**先**从 conns 移除，所以 close 里的 broadcastPeerStatus 会
-        // 因 sameSpace() 取不到空间而静默不发——即 peer.offline 不广播。这是
+        // 因广播取不到发起方空间而静默不发——即 peer.offline 不广播。这是
         // 现状行为（对端靠 30s 轮询 + connected_at/last_seen 兜底，最多晚 30s
         // 看到离线），不是 bug，别"顺手"改成先广播再删（会让在线状态抖动）。
         conn.timedOut = true;

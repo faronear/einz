@@ -6098,3 +6098,44 @@ v2 的身份选择走 `/space join` 的 preflight slots。
 （设备 A 五个问答 + 设备 B 三个问答）；顺带修了它两处陈旧：口令仍用 6 位（现策略 ≥8）、
 裸 POST 签发邀请码（现需 `Bearer` + `X-Protocol-Version: 1`，并把 400 的响应体打出来便于诊断）。
 验证：cli `dart analyze` 干净，该用例三项全绿。
+
+## 2026-09-16 在线状态：同一身份的第二台设备被当成"对方"（老板实测）
+
+**现象**：A 创建空间（B 尚未加入）→ A 用第二台 TUI（不同 store）以**同一身份 A** 加入 →
+两台 TUI 顶部条都把 B 显示成绿灯在线，而 B 从未加入。
+
+**根因**：在线状态按 **device** 判定、却按 **person** 展示——join 会复用 person_id、只新开
+device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对方"：
+1. TUI `_refreshPeerOnline`：`online` 只排除 `device_id == 自己`，没排除 `person_id == 自己`
+   （同一函数里选 `onlinePeerDevice` 时反而过滤了 person——两处判定不一致）；
+2. 服务端 `ws.ts broadcastPeerStatus`：只跳过发起设备，同 person 的其它设备照样收到
+   `peer.online`，而 payload 只有 `device_id`，客户端无从分辨；
+3. App `chat_page._refreshPeerOnline` / `_onPeerStatus`：同一缺陷（只比 `device_id`）。
+
+**修复（老板定：TUI + App + 服务端一起修）**
+- 服务端：`Conn` 增加 `personId`（取 `requireSession` 已有的 `person_id`），广播**跳过与发起
+  设备同 person 的连接**，且 payload 带 `person_id`；`PROTOCOL.md §8` 同步。删掉被取代的
+  `sameSpace()`。`sendPushHint` 早就是同样的按 person 收敛写法，本次对齐它。
+- 共享协议：`WsPeerStatusEvent` 增加可选 `personId`（旧服务端不带 → 客户端按原行为处理）。
+- TUI/App：收到 peer 广播时忽略"与我同身份"的事件；`_refreshPeerOnline` 改为按
+  person 维度统计；TUI 顺带跳过已撤销设备（不计入总数）。
+- TUI 顶部条（老板要求）：左右两段各加 **"n/m台在线"**（n=该身份在线设备数，m=总设备数），
+  **仅当 m≥2 才显示**（单设备时"1/1台在线"是噪音）。本机是否在线取本地 WS 状态——
+  首屏轮询常早于 WS 建连，否则启动瞬间会先闪一个"0/2台在线"。
+- 代价：自己的第二台设备上线，第一台最多 30s（轮询周期）后才更新计数——修复后不再互推
+  peer 广播，这是刻意的取舍（不是"对方"就不该走对方通道）。
+
+**测试**
+- `server/test/peer_status.test.ts`（新，已挂进 `npm test`）：a1/a2 同 person、b1 另一人 →
+  a2 上线不得给 a1 发任何 peer 广播；b1 上/下线 a1、a2 都收到且 payload 带 person_id；
+  a1 下线不得惊动 a2。已验证"去掉修复即红"。
+- `cli/test/presence_check.py`（新，pty 真实 TUI，自起 server + 临时库）：
+  基线（单设备无计数、对方 ○）→ C 同身份加入后两台都 2/2台在线且对方仍 ○ →
+  正控制：B（真正的第二人）加入后两台都 ● Alice。3 项全过。
+- pty 抓取的两个坑（写进用例注释）：TUI 只在**状态变化**时全量重绘，敲空回车只重绘输入行 →
+  必须按清屏序列切"最后一帧"；入网收尾是"锁屏码（空回车跳过）→ 欢迎辞倒计时 6s"，
+  倒计时期间按键被忽略。
+- 回归：`server npm test` 全绿、`tsc --noEmit`、`cli dart analyze`、
+  `flutter analyze app/lib/chat_page.dart` 全干净。
+
+**待定**：App 端顶部条暂未加 "n/m台在线"（本次只修它的在线判定），需要时再上。
