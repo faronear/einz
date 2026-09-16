@@ -403,7 +403,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _refreshPeerOnline();
     _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
     WidgetsBinding.instance.addObserver(this);
-    final db = widget.db ?? LocalDatabase();
+    final db = widget.db ?? LocalDatabase.shared;
     // 名字未由向导传入（如 PIN 解锁后重启进聊天）→ 从本地 profile 恢复
     AppLockService(db).loadProfile().then((p) {
       if (!mounted) return;
@@ -551,7 +551,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
       // 校正结果回写本地快照：否则下次启动（尤其离线）又用回入网时的旧值
       // （setState 只覆盖非空值，故不会把已有名字写成空）
-      await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
+      await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
         personName: _myPersonName,
         peerName: _peerName,
         deviceName: _myDeviceName,
@@ -603,7 +603,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await _ws?.stop();
     if (!mounted) return;
     try {
-      final db = widget.db ?? LocalDatabase();
+      final db = widget.db ?? LocalDatabase.shared;
       await AppLockService(db).clear();
       await (db.delete(db.localAttachments)).go();
       await (db.delete(db.localMessages)).go();
@@ -639,14 +639,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
   Future<void> _loadBurnLabel() async {
-    final s = BurnAfterSettings(widget.db ?? LocalDatabase());
+    final s = BurnAfterSettings(widget.db ?? LocalDatabase.shared);
     final seconds = await s.load();
     if (mounted) setState(() => _burnSeconds = seconds);
   }
 
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效）。
   Future<void> _showLocalePicker() async {
-    final settings = LocaleSettings(widget.db ?? LocalDatabase());
+    final settings = LocaleSettings(widget.db ?? LocalDatabase.shared);
     final current = await settings.load();
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
@@ -675,7 +675,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 同步回 uiStyleNotifier：弹层选中态读的是 notifier，不回写会导致
   /// 冷启动后"页面是渐变、弹层却选中素雅纯色"的不一致。
   Future<void> _loadUiStyle() async {
-    final s = UiStyleSettings(widget.db ?? LocalDatabase());
+    final s = UiStyleSettings(widget.db ?? LocalDatabase.shared);
     final style = await s.load();
     if (!mounted) return;
     setState(() => _uiStyle = style);
@@ -688,7 +688,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadAttachmentStorage() async {
-    final s = AttachmentStorageSettings(widget.db ?? LocalDatabase());
+    final s = AttachmentStorageSettings(widget.db ?? LocalDatabase.shared);
     final mode = await s.load();
     if (mounted) setState(() => _attachmentStorage = mode);
   }
@@ -739,7 +739,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
         ],
         onApply: (mode) async {
-          await AttachmentStorageSettings(widget.db ?? LocalDatabase()).save(mode);
+          await AttachmentStorageSettings(widget.db ?? LocalDatabase.shared).save(mode);
           if (mode == 'secured') {
             // 切回远程托管：把本机留存的明文附件全部清除
             await AttachmentStore.clear();
@@ -755,7 +755,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await showModalBottomSheet<void>(
       context: context,
       builder: (_) => UiStylePickerSheet(
-        settings: UiStyleSettings(widget.db ?? LocalDatabase()),
+        settings: UiStyleSettings(widget.db ?? LocalDatabase.shared),
       ),
     );
   }
@@ -879,7 +879,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 2026-09-05 真机定位）。
     // 是否已设锁屏码**在开弹窗前读好再传进去**（老板 2026-09-14）：弹窗里要据此决定
     // 出不出现"当前锁屏码"验证框，异步读会有毫秒级窗口让验证被跳过
-    final db = widget.db ?? LocalDatabase();
+    final db = widget.db ?? LocalDatabase.shared;
     final hasPin = await AppLockService(db).isSetup;
     if (!mounted) return;
     final ok = await showDialog<bool>(
@@ -899,7 +899,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 刷新本机 PIN 状态（菜单项「PIN: 已设置/未设置」；initState 时读取）。
   Future<void> _refreshPinStatus() async {
-    final has = await AppLockService(widget.db ?? LocalDatabase()).isSetup;
+    final has = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
     if (!mounted || has == _hasPin) return;
     setState(() => _hasPin = has);
   }
@@ -1203,7 +1203,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 同步当前名字到本地 profile（改名/改设备名后调用——重启从 profile 恢复）。
   Future<void> _saveProfile() async {
-    await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
+    await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
       personName: _myPersonName,
       peerName: _peerName,
       deviceName: _myDeviceName,
@@ -1258,7 +1258,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置，发送新消息时生效）。
   Future<void> _showBurnPicker() async {
-    final settings = BurnAfterSettings(widget.db ?? LocalDatabase());
+    final settings = BurnAfterSettings(widget.db ?? LocalDatabase.shared);
     final current = await settings.load();
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;

@@ -105,6 +105,11 @@ class AppState extends Table {
 class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(_openConnection());
 
+  /// 全 App 共享的单例连接：LocalDatabase() 是惰性打开，多处 new 会导致
+  /// 同一 SQLite 文件被开多个连接（drift 警告 race condition，且从不关闭）。
+  /// 调用点一律用 [shared]；测试用 [forTesting] 自带 executor，不受影响。
+  static final LocalDatabase shared = LocalDatabase();
+
   LocalDatabase.forTesting(super.executor) : super();
 
   @override

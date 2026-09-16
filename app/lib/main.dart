@@ -48,7 +48,7 @@ class _EinzAppState extends State<EinzApp> {
   }
 
   Future<void> _initLocale() async {
-    final settings = LocaleSettings(LocalDatabase());
+    final settings = LocaleSettings(LocalDatabase.shared);
     final pref = await settings.load();
     if (!mounted) return;
     setState(() {
@@ -143,7 +143,7 @@ class _StartupGateState extends State<StartupGate> {
 
   Future<void> _check() async {
     try {
-      final lock = AppLockService(LocalDatabase());
+      final lock = AppLockService(LocalDatabase.shared);
       // 全新安装（沙盒被清过）就清掉上一次安装残留的安全存储条目——语义 = 卸载即重置
       // （安全存储条目活过卸载，drift 不会；老板 2026-09-14 决策）。必须在读
       // isSetup/loadPlain **之前**，否则残留的明文包会把人直接拖进聊天。

@@ -214,7 +214,7 @@ class _SetupPageState extends State<SetupPage> {
   /// 无法连接 → 显示输入框引导覆盖（降低小白负担）。
   Future<void> _initServer() async {
     try {
-      final db = widget.db ?? LocalDatabase();
+      final db = widget.db ?? LocalDatabase.shared;
       final settings = ServerSettings(db);
       final saved = await settings.load();
       final probe = widget.probeServer ?? ServerSettings.probe;
@@ -1059,7 +1059,7 @@ class _SetupPageState extends State<SetupPage> {
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效——
   /// localeNotifier 通知 EinzApp 重建 MaterialApp，整个向导刷新）。
   Future<void> _showLocalePicker() async {
-    final settings = LocaleSettings(widget.db ?? LocalDatabase());
+    final settings = LocaleSettings(widget.db ?? LocalDatabase.shared);
     final current = await settings.load();
     if (!mounted) return;
     final picked = await showModalBottomSheet<String>(
@@ -1143,7 +1143,7 @@ class _SetupPageState extends State<SetupPage> {
         publicKeyB64: publicKeyB64,
         privateKeyB64: privateKeyB64,
       );
-      await AppLockService(widget.db ?? LocalDatabase()).setPin(pin, payload: payload);
+      await AppLockService(widget.db ?? LocalDatabase.shared).setPin(pin, payload: payload);
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -1164,7 +1164,7 @@ class _SetupPageState extends State<SetupPage> {
     // 名字持久化：PIN 解锁/重启后 ChatPage 恢复显示（AppLockPayload 不含名字）。
     // await 确保 profile 写入完成后再进聊天（消除 unawaited 竞态——2026-09-07
     // 老板实测：设 PIN 重启解锁后顶部条丢名字）
-    await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
+    await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
       // 本人名字：join=所选身份（create 预置）；create=自填
       personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
       // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
@@ -1901,7 +1901,7 @@ class _SetupPageState extends State<SetupPage> {
       // （密保口令不随 AppLockPayload 持久化——服务器为唯一真相源）
       if (_pinSkipped) {
         if (!mounted) return;
-        await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
+        await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
           server: _server,
           spaceId: _spaceId.text.trim(),
           deviceId: _enroll!.deviceId,
@@ -2129,7 +2129,7 @@ class _SetupPageState extends State<SetupPage> {
     // 口令已在口令页（步骤 3）验证通过（_verifyJoinPassphrase），这里仅设锁/完成
     if (_pinSkipped) {
       if (!mounted) return;
-      await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
+      await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
         server: _server,
         spaceId: _spaceId.text,
         deviceId: _enroll!.deviceId,
@@ -2238,7 +2238,7 @@ class _SetupPageState extends State<SetupPage> {
     // 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
     if (_pinSkipped) {
       if (!mounted) return;
-      await AppLockService(widget.db ?? LocalDatabase()).savePlain(AppLockPayload(
+      await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
         server: _server,
         spaceId: enroll.spaceId,
         deviceId: enroll.deviceId,

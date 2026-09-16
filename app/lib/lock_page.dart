@@ -42,7 +42,7 @@ class _LockPageState extends State<LockPage> {
   @override
   void initState() {
     super.initState();
-    _lock = AppLockService(widget.db ?? LocalDatabase());
+    _lock = AppLockService(widget.db ?? LocalDatabase.shared);
     // 锁屏仅在设置过 PIN（有锁包）时激活：无锁包（向导跳过 PIN 的明文配置）
     // 不显示解锁表单，避免"无法解锁、跳不出去"的死锁
     _lock.isSetup.then((ok) {
@@ -171,7 +171,7 @@ class _LockPageState extends State<LockPage> {
   /// 顶栏 🌐：切换界面语言（跟随系统/中文/English，即时生效——
   /// localeNotifier 通知 EinzApp 重建 MaterialApp，锁屏页语言随之刷新）。
   Future<void> _showLocalePicker() async {
-    final settings = LocaleSettings(widget.db ?? LocalDatabase());
+    final settings = LocaleSettings(widget.db ?? LocalDatabase.shared);
     final current = await settings.load();
     if (!mounted) return;
     final picked = await showModalBottomSheet<String>(
