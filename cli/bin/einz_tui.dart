@@ -1708,6 +1708,12 @@ void _onProfileUpdated(WsProfileUpdatedEvent e) {
     s.personNames[e.personId!] = e.personName!;
     // 回写本地缓存：离线启动时仍显示改名后的名字
     s.session.store.personNames = Map.of(s.personNames);
+    // 对方改名 → 同步预置名快照：/myname 的同名判据与顶部条兜底都用它，不跟上的话
+    // 旧名字会一直卡在判据里（明明已没人叫那个名字，却仍不许我用）。与 App 的
+    // _onProfileUpdated 同向（它用广播里的新名字覆盖 _peerName）。
+    if (e.personId != s.session.store.personId) {
+      s.session.store.peerName = e.personName;
+    }
     s.session.store.save(s.session.storePath);
   }
   if (e.deviceName != null && e.deviceName!.isNotEmpty) {
@@ -2835,11 +2841,13 @@ Future<void> _execCommand(String line) async {
           break;
         }
         final name = arg.trim();
-        // 不允许改成与对方相同的名字（老板 2026-09-10）
-        final peerNames = s.personNames.entries
-            .where((e) => e.key != s.session.store.personId)
-            .map((e) => e.value)
-            .toList();
+        // 不允许改成与对方相同的名字（老板 2026-09-10）：服务端 person 表里的对方
+        // 名字 + 预置名快照（对方还没加入时 person 表里没有他——老板 2026-09-16）
+        final peerNames = <String>[
+          for (final e in s.personNames.entries)
+            if (e.key != s.session.store.personId) e.value,
+          if ((s.session.store.peerName ?? '').isNotEmpty) s.session.store.peerName!,
+        ];
         if (peerNames.contains(name)) {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 名字不能与对方相同（$name），请换个名字'));
           s.status = '';
@@ -3303,12 +3311,28 @@ Future<void> _refreshPersonNames(_TuiState s) async {
     final r = await ApiClient(s.session.server).getSpace(token);
     s.personNames = r.personNames;
     s.personGenders = r.personGenders;
-    // 回写本地缓存（离线启动兜底）；只有内容变化才落盘，避免频繁刷新时反复写盘
     final store = s.session.store;
+    // 对方**真实**名字（对方已加入才有——同一身份多设备共享同一 personId）→ 校正
+    // 预置名快照：否则对方改名后旧预置名会一直留着，把 /myname 的同名判据误伤
+    // （明明已没人叫那个名字，却仍不许我用）。对齐 App 的 _refreshProfileFromServer。
+    final myPid = store.personId;
+    String? peer;
+    if (myPid != null) {
+      for (final e in r.personNames.entries) {
+        if (e.key != myPid) {
+          peer = e.value;
+          break;
+        }
+      }
+    }
+    final peerChanged = peer != null && peer.isNotEmpty && peer != store.peerName;
+    // 回写本地缓存（离线启动兜底）；只有内容变化才落盘，避免频繁刷新时反复写盘
     if (!_sameStringMap(store.personNames, r.personNames) ||
-        !_sameStringMap(store.personGenders, r.personGenders)) {
+        !_sameStringMap(store.personGenders, r.personGenders) ||
+        peerChanged) {
       store.personNames = Map.of(r.personNames);
       store.personGenders = Map.of(r.personGenders);
+      if (peerChanged) store.peerName = peer;
       store.save(s.session.storePath);
     }
     _scheduleRender();

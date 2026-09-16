@@ -6619,16 +6619,30 @@ person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落
     覆盖"我选了 slot=0（同第一人的另一台设备）而第二人还没加入"这条同样会显示 '-' 的路径）。
 - 名字来源以服务端为准：对方加入后 `personNames` 优先，本字段只是未加入/离线时兜底。
 
-**没动的**：`/myname` 的"不许与对方同名"判据仍只看 `personNames`——对方未加入时
-可把自己的名字改成与伴侣预置名相同（加入方按名字选身份，届时会撞"存在同名成员"）。
-要不要把 `store.peerName` 也纳入该判据，留给老板定。
+**顺带收口**（老板 2026-09-16 拍板"把 peerName 纳入判据"）：
+- `/myname` 的"不许与对方同名"判据除 `personNames` 里的对方，再算上 `store.peerName`
+  （对方未加入时 person 表里没有他，此前可把自己改成与伴侣预置名相同——加入方按名字
+  选身份时会撞"存在同名成员"）。
+- 但判据引入快照就**必须让快照跟上改名**，否则旧预置名会一直卡在判据里（明明已没人叫
+  Alice，却仍不许我用）：`_refreshPersonNames` 在拉到对方真实名字时回写 `store.peerName`；
+  `_onProfileUpdated`（对方改名广播，payload 带 person_id）也同步覆盖——与 App 的
+  `_refreshProfileFromServer`/`_onProfileUpdated` 同向。
 
-**发现（未改，待老板定）**：`cli/test/presence_check.py` 已失效且与新行为冲突——
-① 断言 `2/2台在线` 是旧格式（现为 `#2/2`，`b6e6af0` 同一提交内末尾又改过格式，
-探针没跟上）；② 拿 `'● - #'` 当"对方在线"哨兵，本次修好后对方名字不再是 `-`。该探针
-需整篇对齐（哨兵改 `○ Alice`/`● Alice`、计数改 `#2/2`）才能作为本修复的回归用例。
+**探针对齐**（`cli/test/presence_check.py` 已失效：① `2/2台在线` 是旧格式，现为 `#1/1`
+——本机由 `@设备名` 独立、计数扣除本机（`b6e6af0` 同一提交内末尾改的格式，探针没跟上）；
+② 拿 `'● - #'` 当"对方在线"哨兵，对方名字不再是 `-` 后失效）。改动：
+- 新增 `title_bar()`/`split_bar()`：按行取标题栏、以 `Einz TUI` 切三段分别断言（此前整帧
+  子串匹配会把左段"对方"与右段"我"混在一起）。
+- 基线断言改为左段 == `○ Alice`（本修复的回归点）、右段无计数；
+- C 上线后断言右段 `#1/1`（我的另一台设备在线）+ 左段仍 `○ Alice` 且非 `● Alice`；
+- 新增：`/myname Alice` 被拒（判据含预置名）+ 正控制 `LukasX→Lukas` 未被误伤；
+- 新增第 ④ 项：B 改名 Alicia → A/C 左段跟随 `● Alicia`，且 A 此后能改用已空出的
+  `Alice`（钉住"快照跟随改名"这条，缺回写就会失败）。
 
 **验证**：`dart analyze`(cli) 全绿；`dart test test/store_person_cache_test.dart` 3 项全过
-（新增 peerName 落盘往返用例）。**端到端实测**（本地 server dist + pty 真实渲染）：
-create（我 Lukas / 伴侣 Alice）→ 进入聊天态，顶部条为
-`○ Alice …… Einz TUI …… ● Lukas @DoomBase`；杀进程重启（读回 store）仍是 `○ Alice`。
+（新增 peerName 落盘往返用例）。**端到端实测**：
+1. 临时 pty 脚本（/tmp）——create（我 Lukas / 伴侣 Alice）→ 聊天态顶部条
+   `○ Alice …… Einz TUI …… ● Lukas @DoomBase`；杀进程重启（读回 store）仍是 `○ Alice`。
+2. `python3 cli/test/presence_check.py` 全过：基线 `○ Alice` + 右段无计数 →
+   `/myname Alice` 被拒、`LukasX→Lukas` 正常 → C 同身份上线两边 `#1/1` 且对方仍 `○ Alice`
+   → B 加入两边 `● Alice` → B 改名 Alicia 两边 `● Alicia`、A 可改用 `Alice`。
