@@ -91,7 +91,8 @@
 - [x] 撤销语义收窄（2026-09-16）：服务端区分 `DEVICE_REVOKED`（明确撤销）与 `FORBIDDEN`（未登记，含库被清空/重置）；客户端**只对明确撤销**自毁（App 清锁包+消息+附件，TUI 清 store+附件缓存后退出），库被重置/连不上只发常驻警告并允许继续读本地消息；撤销自毁覆盖 TUI 所有认证入口（`revoked_check.py` 四场景）
 - [ ] 后台被重置后的"重新入网"入口（TUI `/space reset` 解绑 + App 菜单项）——当前 `spaceKey != null` 时 create/join 会被拒，库被清空后只能离线看历史（2026-09-16 定：本轮不做）
 - [x] 撤销授权收口（2026-09-16）：`POST /devices/:id/revoke` —— **同 space 内可互撤 + 每次校验密保口令**（argon2id，复用取包的校验与失败限速；缺口令哈希 409 `PASSPHRASE_NOT_SET` 拒绝放行）；旧的免口令 `DELETE /devices/:id` 移除；`ApiClient.revokeDevice` 已就绪
-- [ ] 撤销的**客户端入口**（TUI 命令 + App 设备列表里的"撤销这台设备"）：隐藏输入口令 + 二次确认 + 按 `ESCROW_*` 失败码分别提示（服务端规则已就绪）
+- [x] 撤销的客户端入口（TUI，2026-09-16）：`/devices` 列同空间全部设备（带序号、标注在线/已撤销）＋ `/revoke <序号|设备名>`（三重确认：选设备 → 输入 yes → 隐藏输入密保口令；按 `ESCROW_*` 失败码分别提示且均注明"未做任何改动"）；探针 `cli/test/revoke_command_check.py` 五条全过
+- [ ] 撤销的 **App** 入口（设备列表里的"撤销这台设备"）：同样要口令 + 二次确认（`ApiClient.revokeDevice` 已就绪）
 - [x] 备份与恢复（模型 A：本地加密备份 + 恢复码，shared backup.dart + CLI backup/restore）
 - [x] 安全测试 / 离线 / 网络故障 / 服务重启测试（phase4_e2e.sh 段 C/D/E/F 全过）
 - [x] Server 备份脚本（SQLite Backup API）与恢复演练（npm run backup/restore，演练通过）

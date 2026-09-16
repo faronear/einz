@@ -1731,6 +1731,124 @@ String _fmtTime(int ms) {
   return '${t.month}/${t.day} $hhmm';
 }
 
+/// 同空间设备列表的一行（`/devices` 与 `/revoke` **共用同一份编号**——两个命令看到的
+/// 序号必须一致，所以不可撤销的本机、已被撤销的设备也照常占号，由 `/revoke` 拒绝）。
+class _DeviceRow {
+  _DeviceRow({
+    required this.no,
+    required this.deviceId,
+    required this.label,
+    required this.personName,
+    required this.online,
+    required this.tag,
+    required this.when,
+    required this.isMe,
+    required this.revoked,
+  });
+
+  final int no; // 1 基序号（与 /devices 输出一致；/revoke 按它选设备）
+  final String deviceId;
+  final String label; // 设备名（缺失回退 device_id）
+  final String personName; // 使用者名字（缺失回退 person_id）
+  final bool online;
+  final String tag; // 本机 / 已撤销 / 在线 / 离线
+  final String when; // since 上线时刻 / (上次活跃 时刻)
+  final bool isMe;
+  final bool revoked;
+
+  /// 列表行文本（/devices 与 /revoke 的列表、确认提示共用，保证逐字一致）。
+  String get line => '\n  $no) ${online ? '🟢' : '⚪'} $label [$personName] $tag$when';
+}
+
+/// 拉取**同空间全部设备**（我 + 对方，不只是自己的设备）并格式化为带序号的行。
+///
+/// 在线判定与顶部条同源：本机以本地 WS 状态为准；其余看 `connected_at`（旧服务端无该
+/// 字段时退回 last_seen<60s）。已被撤销的设备（`status != 'active'`）也列出来并标注
+/// ——服务端 /devices 不过滤状态，藏着不显示反而会让人以为"设备凭空消失了"。
+/// 网络/会话异常原样抛出，由调用方提示。
+Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
+  final server = s.session.store.server ?? '';
+  final token = s.session.store.sessionToken;
+  if (server.isEmpty || token == null) {
+    throw StateError('未连接（缺少 server/token）');
+  }
+  final devices = await ApiClient(server).listDevices(token);
+  final myId = s.session.store.deviceId;
+  final now = DateTime.now().millisecondsSinceEpoch;
+  final myWsOnline = s.session.wsStatus == WsStatus.connected;
+  final rows = <_DeviceRow>[];
+  var no = 0;
+  for (final d in devices) {
+    final devId = (d['device_id'] ?? '-') as String;
+    final devName = (d['device_name'] as String? ?? '');
+    final person = (d['person_id'] ?? '-') as String;
+    final last = d['last_seen'];
+    final connectedAt = d['connected_at'];
+    final revoked = d['status'] != null && d['status'] != 'active';
+    // 上线时刻：online_since（进入在线态，重连不刷新，与顶部条同源）→ connected_at
+    final sinceMs = (d['online_since'] as num?)?.toInt() ??
+        (connectedAt is num ? connectedAt.toInt() : null);
+    // 在线判定：本机以本地 WS 状态为准（与顶部条一致）；其余有实时连接
+    // （connected_at 非 null）即在线；旧服务端无该字段时退回 last_seen<60s
+    final online = !revoked &&
+        (devId == myId
+            ? myWsOnline
+            : (d.containsKey('connected_at')
+                ? connectedAt != null
+                : (last is num && now - last < 60 * 1000)));
+    final isMe = devId == myId;
+    // 在线 → "since 上线时刻"；离线 → "上次活跃 时刻"（**不显示上线时刻**：服务端
+    // 离线时 last_seen 置 0，直接格式化会变成 1970-01-01——老板 2026-09-16 实测）。
+    final String when;
+    if (online) {
+      when = (sinceMs != null && sinceMs > 0) ? ' since ${_fmtTime(sinceMs)}' : '';
+    } else if (!revoked) {
+      when = (last is num && last > 0) ? ' (上次活跃 ${_fmtTime(last.toInt())})' : '';
+    } else {
+      when = '';
+    }
+    rows.add(_DeviceRow(
+      no: ++no,
+      deviceId: devId,
+      label: devName.isNotEmpty ? devName : devId,
+      personName: s.personNames[person] ?? person,
+      online: online,
+      tag: isMe ? '本机' : (revoked ? '已撤销' : (online ? '在线' : '离线')),
+      when: when,
+      isMe: isMe,
+      revoked: revoked,
+    ));
+  }
+  return rows;
+}
+
+/// 按序号（1 基，与 /devices 一致）/ 设备名 / device_id 匹配设备行。
+/// 返回全部匹配项（调用方区分"没匹配"与"同名多台"——后者不能猜，必须让用户用序号）。
+List<_DeviceRow> _matchDeviceRows(List<_DeviceRow> rows, String input) {
+  final key = input.trim();
+  if (key.isEmpty) return const [];
+  final no = int.tryParse(key);
+  if (no != null) {
+    return [for (final r in rows) if (r.no == no) r];
+  }
+  return [for (final r in rows) if (r.deviceId == key || r.label == key) r];
+}
+
+/// 撤销失败的按码提示（PROTOCOL.md §7.2 的失败码）。**每次都要说清"目标设备未受影响"**
+/// ——撤销是破坏性操作，用户必须能立刻判断"刚才那下到底生效没有"。
+String _revokeErrorHint(ApiException e) => switch (e.code) {
+      'ESCROW_VERIFY_FAILED' =>
+        '⚠️ 密保口令错误——撤销未执行，目标设备毫发无损（重试：/revoke <序号>）',
+      'ESCROW_RATE_LIMITED' => '⚠️ 口令尝试过多被限流——稍等再试（目标设备未受影响）',
+      'PASSPHRASE_NOT_SET' =>
+        '⚠️ 本空间还没有可校验的密保口令（未设置或被清除）——先用 /passphrase 设置口令再撤销',
+      'FORBIDDEN' => '⚠️ 目标设备不在本空间（可能已被移除或撤销）——未做任何改动',
+      'NOT_FOUND' => '⚠️ 该设备不存在——未做任何改动',
+      'INVALID_REQUEST' => '⚠️ 请求被拒（不能撤销本机）——未做任何改动',
+      'UNAUTHORIZED' => '⚠️ 会话已失效——先 /auth 重新激活再试（未做任何改动）',
+      _ => '⚠️ 撤销失败: ${e.message}——未做任何改动',
+    };
+
 /// 对方改名/改设备名（Server 广播 profile.updated）：立即更新名称映射。
 void _onProfileUpdated(WsProfileUpdatedEvent e) {
   final s = _state;
@@ -2592,7 +2710,11 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/devices :: 查看秘境里的设备列表',
+        '/devices :: 查看秘境里的设备列表（同空间全部设备）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/revoke <序号|设备名> :: 撤销同空间的某台设备（需密保口令；被撤设备将清空本地数据）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2793,6 +2915,23 @@ Future<void> _execCommand(String line) async {
       }
       break;
     case '/devices':
+      // 同空间**全部**设备（我 + 对方，不只自己的）——序号与 /revoke 的选择一致
+      try {
+        final rows = await _fetchDeviceRows(s);
+        final sb = StringBuffer('📱 设备列表（同空间 ${rows.length} 台，/revoke <序号> 可撤销）：');
+        for (final r in rows) {
+          sb.write(r.line);
+        }
+        s.session.messages.add(_systemMessage(s.session, sb.toString()));
+      } catch (e) {
+        s.session.messages.add(_systemMessage(s.session, '❌ 获取设备列表失败: $e'));
+      }
+      break;
+    case '/revoke':
+      // 撤销同空间某台设备（PROTOCOL.md §7.2，老板 2026-09-16）：
+      // **同 space 内可互撤**（自己的另一台 / 伴侣的设备），但每次都要校验密保口令——
+      // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
+      // 选设备（序号/设备名）→ 输入 yes 确认目标 → 输入口令。任一步取消都不做任何改动。
       try {
         final server = s.session.store.server ?? '';
         final token = s.session.store.sessionToken;
@@ -2800,44 +2939,85 @@ Future<void> _execCommand(String line) async {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 未连接（缺少 server/token）'));
           break;
         }
-        final devices = await ApiClient(server).listDevices(token);
-        final myId = s.session.store.deviceId;
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final myWsOnline = s.session.wsStatus == WsStatus.connected;
-        final sb = StringBuffer('📱 设备列表：');
-        for (final d in devices) {
-          final devId = (d['device_id'] ?? '-') as String;
-          final devName = (d['device_name'] as String? ?? '');
-          final person = (d['person_id'] ?? '-') as String;
-          final last = d['last_seen'];
-          final connectedAt = d['connected_at'];
-          // 上线时刻：online_since（进入在线态，重连不刷新，与顶部条同源）→ connected_at
-          final sinceMs = (d['online_since'] as num?)?.toInt() ??
-              (connectedAt is num ? connectedAt.toInt() : null);
-          // 在线判定：本机以本地 WS 状态为准（与顶部条一致）；其余有实时连接
-          // （connected_at 非 null）即在线；旧服务端无该字段时退回 last_seen<60s
-          final online = devId == myId
-              ? myWsOnline
-              : (d.containsKey('connected_at')
-                  ? connectedAt != null
-                  : (last is num && now - last < 60 * 1000));
-          final displayName = devName.isNotEmpty ? devName : devId; // dev name，backup id
-          final personName = s.personNames[person] ?? person; // person name，backup id
-          final tag = devId == myId ? '本机' : (online ? '在线' : '离线');
-          // 在线 → "since 上线时刻"；离线 → "上次活跃 时刻"（**不显示上线时刻**：
-          // 服务端离线时 last_seen 置 0，直接格式化会变成 1970-01-01 的
-          // "1/1 08:00"——老板 2026-09-16 实测）。时间戳缺失/为 0 就不显示时间。
-          final String when;
-          if (online) {
-            when = (sinceMs != null && sinceMs > 0) ? ' since ${_fmtTime(sinceMs)}' : '';
-          } else {
-            when = (last is num && last > 0) ? ' (上次活跃 ${_fmtTime(last.toInt())})' : '';
+        final rows = await _fetchDeviceRows(s);
+        if (!s.running) break;
+        _DeviceRow? picked;
+        if (arg.isNotEmpty) {
+          final matches = _matchDeviceRows(rows, arg);
+          if (matches.isEmpty) {
+            s.session.messages.add(_systemMessage(
+                s.session, '⚠️ 没有匹配的设备「$arg」——用 /devices 查看序号或设备名'));
+            break;
           }
-          sb.write('\n  ${online ? '🟢' : '⚪'} $displayName [$personName] $tag$when');
+          if (matches.length > 1) {
+            s.session.messages.add(_systemMessage(
+                s.session, '⚠️ 有 ${matches.length} 台设备同名「$arg」——请用 /revoke <序号> 指定'));
+            break;
+          }
+          picked = matches.first;
+        } else {
+          final sb = StringBuffer('📱 选择要撤销的设备（同空间 ${rows.length} 台）：');
+          for (final r in rows) {
+            sb.write(r.line);
+          }
+          s.session.messages.add(_systemMessage(s.session, sb.toString()));
+          final answer = (await _prompt(s.session, '❓ 输入要撤销的设备序号:', required: true)).trim();
+          if (!s.running) break;
+          final matches = _matchDeviceRows(rows, answer);
+          if (matches.length != 1) {
+            s.session.messages.add(_systemMessage(
+                s.session,
+                matches.isEmpty
+                    ? '⚠️ 序号/设备名无效——已取消（未做任何改动）'
+                    : '⚠️ 同名多台无法确定——已取消，请用序号重新指定'));
+            break;
+          }
+          picked = matches.first;
         }
-        s.session.messages.add(_systemMessage(s.session, sb.toString()));
+        final target = picked;
+        if (target.isMe) {
+          s.session.messages.add(_systemMessage(
+              s.session, '⚠️ 不能撤销本机——请在同空间的另一台设备上撤销它（未做任何改动）'));
+          break;
+        }
+        if (target.revoked) {
+          s.session.messages.add(
+              _systemMessage(s.session, '⚠️ #${target.no} ${target.label} 已经是「已撤销」状态（未做任何改动）'));
+          break;
+        }
+        // 二次确认：必须让用户看清"撤的是哪一台"——选错序号就是不可逆的数据销毁
+        s.session.messages.add(_systemMessage(
+            s.session,
+            '⚠️ 即将撤销 #${target.no} ${target.label}（使用者：${target.personName}）——\n'
+            '   该设备下次联网认证时会**清空本地数据**（含历史消息与附件），不可逆。'));
+        final confirm =
+            (await _prompt(s.session, '❓ 确认请输入 yes（其他任意输入取消）:', required: true)).trim();
+        if (!s.running) break;
+        if (confirm.toLowerCase() != 'yes') {
+          s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
+          break;
+        }
+        // 口令（隐藏输入）：撤销的授权因子——即使本机已持会话，也必须由口令持有者授权
+        final passphrase =
+            (await _prompt(s.session, '❓ 输入密保口令（撤销需校验）:', hidden: true, required: true))
+                .trim();
+        if (!s.running) break;
+        // 防御：required 已拦空回车，这里兜住 /exit 之类的中断（空口令会被服务端 400）
+        if (passphrase.isEmpty) {
+          s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
+          break;
+        }
+        await _busy(s.session, '⏳ 正在撤销 ${target.label}......',
+            () => ApiClient(server).revokeDevice(target.deviceId, passphrase, token));
+        s.session.messages.add(_systemMessage(
+            s.session,
+            '✅ 已撤销 #${target.no} ${target.label}——该设备下次联网认证时会清空本地数据；'
+            '已在线则立即被服务端断开（/devices 可复查）'));
+        _refreshPeerOnline(); // 顶部条的在线数/设备列表立即去掉它
+      } on ApiException catch (e) {
+        s.session.messages.add(_systemMessage(s.session, _revokeErrorHint(e)));
       } catch (e) {
-        s.session.messages.add(_systemMessage(s.session, '❌ 获取设备列表失败: $e'));
+        s.session.messages.add(_systemMessage(s.session, '❌ 撤销失败: $e（未做任何改动）'));
       }
       break;
     case '/sync':
