@@ -168,6 +168,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 若仍每 3s 发一轮会并发堆积 → 必须重入保护 + 退避。
   int _consecutiveSyncFailures = 0;
 
+  /// 服务器不认这台设备（认证 403 `FORBIDDEN`：后台库被重置 / 本设备未登记）。
+  /// **只警告，绝不销毁本地数据**（老板 2026-09-16：运维失误不该导致客户端抹数据）——
+  /// 与"设备被明确撤销"（403 `DEVICE_REVOKED` / `device.revoked` 帧）严格区分：
+  /// 只有后者才自毁。库复原后同步成功即自动复位。
+  bool _deviceUnrecognized = false;
+
+  /// 已执行过撤销自毁：短路后续网络与重入（`device.revoked` 帧与重认证可能同时触发）。
+  bool _wiped = false;
+
   /// ticker 轮询的"上一轮是否还在跑"（重入保护：避免离线时并发堆积）。
   bool _tickerRefreshInFlight = false;
 
@@ -259,22 +268,45 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
   }
 
-  /// 离线/未送达提示条：**有 pending 消息 + 连接异常** 才显示，让"小飞机停了很久"
-  /// 这件事有明确解释（老板 2026-09-13：之前看起来像卡死）。
-  /// 连接异常的判定：WS 断开，或有连续同步失败。
+  /// 常驻提示条（老板 2026-09-16：连不上/未被识别要持续可见，不能只弹一次通知）。
+  /// 三档优先级：
+  /// - 服务器不认本设备（库被重置）→ 淡红：明确"数据没被清除"，用户可继续读本地消息；
+  /// - 有 pending 消息 + 连接异常 → 淡琥珀（原有：解释"小飞机停了很久"）；
+  /// - 仅连续同步失败（无 pending）→ 淡琥珀「离线 · 仅可查看本地消息」。
+  /// 判定用 `_consecutiveSyncFailures > 0` 而不是 `!_ws.connected`，避免普通重连闪条。
   Widget _buildOfflineHint() {
+    final l10n = AppLocalizations.of(context)!;
+    if (_deviceUnrecognized) {
+      return _hintBanner(
+        l10n.chatPageDeviceUnrecognized,
+        bg: const Color(0xFFFFEBEE), // 淡红：需要用户知晓的状态（非报错弹窗）
+        fg: const Color(0xFFB71C1C),
+      );
+    }
     final troubled =
         _consecutiveSyncFailures > 0 || (_ws != null && !_ws!.connected.value);
-    if (_unsentCount == 0 || !troubled) return const SizedBox.shrink();
-    final l10n = AppLocalizations.of(context)!;
+    if (_unsentCount > 0 && troubled) {
+      return _hintBanner(
+        l10n.chatPageOfflineUnsent(_unsentCount),
+        bg: const Color(0xFFFFF3E0), // 淡琥珀：提示而非报错
+        fg: const Color(0xFF8A5300),
+      );
+    }
+    if (_consecutiveSyncFailures == 0) return const SizedBox.shrink();
+    return _hintBanner(
+      l10n.chatPageOfflineLocalOnly,
+      bg: const Color(0xFFFFF3E0),
+      fg: const Color(0xFF8A5300),
+    );
+  }
+
+  /// 提示条外观：整宽、单行小字（常驻在状态条下方，不遮挡输入区）。
+  Widget _hintBanner(String text, {required Color bg, required Color fg}) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFFFFF3E0), // 淡琥珀：提示而非报错
+      color: bg,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Text(
-        l10n.chatPageOfflineUnsent(_unsentCount),
-        style: const TextStyle(fontSize: 12, color: Color(0xFF8A5300)),
-      ),
+      child: Text(text, style: TextStyle(fontSize: 12, color: fg)),
     );
   }
 
@@ -595,36 +627,54 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// session 过期自动续期（WS 4401 / 请求 401）：challenge-response 重新签发 token。
-  /// 认证 403（设备已被撤销，服务端拒绝挑战）→ 走 [_onDeviceRevoked] 撤销处理
-  /// （清理本地数据 → 提示 → 回设置页）；其他异常原样抛出（调用方退避/提示）。
+  ///
+  /// 撤销毁数据**只认两个明确信号**（老板 2026-09-16）：
+  /// - `DEVICE_REVOKED`：服务端明确说"这台设备被撤销了"（涉嫌被盗用）→ [_onDeviceRevoked]
+  ///   清空本地数据 → 提示 → 回设置页；
+  /// - `device.revoked` 帧（见 [_onDeviceRevoked] 的另一挂点）。
+  ///
+  /// `FORBIDDEN` 只表示"服务器不认这台设备"——**最可能是后台数据库被清空/重置**，
+  /// 这是运维失误而非撤销，只置 [_deviceUnrecognized] 让常驻提示条说明情况，
+  /// 本地消息仍然可读（此前一律当撤销处理，把本地数据全删了，不可挽回）。
+  /// 其他异常原样抛出（调用方退避/提示）。
   Future<String> _reauthWithRevokedFallback() async {
     try {
       return await widget.reauth!();
     } on ApiException catch (e) {
-      if (e.code == 'FORBIDDEN') {
+      if (e.code == 'DEVICE_REVOKED') {
         await _onDeviceRevoked();
+      } else if (e.code == 'FORBIDDEN' && mounted && !_deviceUnrecognized) {
+        setState(() => _deviceUnrecognized = true);
       }
       rethrow;
     }
   }
 
-  /// 本设备被撤销（Server 广播 device.revoked）：清理本地数据（锁包+消息库）
-  /// → 提示 → 强制回设置页重新配置。
+  /// 本设备被撤销（Server 广播 device.revoked / 认证 403 DEVICE_REVOKED）：
+  /// 清理本地数据（锁包+消息库）→ 提示 → 强制回设置页重新配置。
+  /// **只有明确撤销走这里**（未登记/连不上只提示，见 [_reauthWithRevokedFallback]）。
   Future<void> _onDeviceRevoked() async {
+    if (_wiped) return; // 去重：WS 帧与重认证可能同时触发（两次清理/两次跳转）
+    _wiped = true;
     _ticker?.cancel();
     await _ws?.stop();
     if (!mounted) return;
-    try {
-      final db = widget.db ?? LocalDatabase.shared;
-      await AppLockService(db).clear();
-      await (db.delete(db.localAttachments)).go();
-      await (db.delete(db.localMessages)).go();
-      await (db.delete(db.syncState)).go();
-      await MediaCache.deleteAll(); // 媒体解密缓存一并清空
-      await AttachmentStore.clear(); // stored 模式留存的明文一并清空
-    } catch (_) {
-      // 清理失败不阻塞登出（尽力清除）
+    final db = widget.db ?? LocalDatabase.shared;
+    // 逐步 best-effort：此前 6 步共用一个 try，第一步（清锁包）一抛异常，后面三个
+    // delete 全被跳过 → 消息明文留在盘上，与"撤销=销毁"的语义相反。
+    Future<void> step(Future<void> Function() f) async {
+      try {
+        await f();
+      } catch (_) {
+        // 单步失败不阻断其余清理
+      }
     }
+    await step(() => AppLockService(db).clear());
+    await step(() => (db.delete(db.localAttachments)).go());
+    await step(() => (db.delete(db.localMessages)).go());
+    await step(() => (db.delete(db.syncState)).go());
+    await step(MediaCache.deleteAll); // 媒体解密缓存一并清空
+    await step(AttachmentStore.clear); // stored 模式留存的明文一并清空
     if (!mounted) return;
     showTopNotice(context, AppLocalizations.of(context)!.chatPageDeviceRevoked);
     Navigator.of(context).pushAndRemoveUntil(
@@ -1719,6 +1769,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 增量刷新：**先本地秒上屏**（_refreshLocal）→ 再网络 sync → 再本地刷新一次。
   /// 这样收到的消息/自己的回执能立即出现，网络慢也不阻塞已到内容（老板 2026-09-12）。
   Future<void> _refresh({bool realtime = false}) async {
+    if (_wiped) return; // 已撤销自毁：不再发起任何网络请求（页面正在被替换）
     await _refreshLocal(realtime: realtime);
     try {
       await _repo.sync();
@@ -1733,8 +1784,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 同步成功：复位退避（周期回到基准）。
+  /// 同步成功：复位退避（周期回到基准），并清掉"服务器不认本设备"的常驻提示
+  /// （后台库被复原后应自动恢复正常，无需用户干预）。
   void _onSyncSucceeded() {
+    if (_deviceUnrecognized && mounted) {
+      setState(() => _deviceUnrecognized = false);
+    }
     if (_consecutiveSyncFailures == 0) return;
     _consecutiveSyncFailures = 0;
     _ensureTickerInterval();

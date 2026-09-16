@@ -1316,6 +1316,18 @@ abstract class AppLocalizations {
   /// **'Offline · {count} unsent'**
   String chatPageOfflineUnsent(int count);
 
+  /// No description provided for @chatPageDeviceUnrecognized.
+  ///
+  /// In en, this message translates to:
+  /// **'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared'**
+  String get chatPageDeviceUnrecognized;
+
+  /// No description provided for @chatPageOfflineLocalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline · local messages only, cannot send or receive'**
+  String get chatPageOfflineLocalOnly;
+
   /// No description provided for @chatPageMsgResending.
   ///
   /// In en, this message translates to:

@@ -281,6 +281,8 @@
       "count": {"type": "int"}
     }
   },
+  "chatPageDeviceUnrecognized": "本设备未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除",
+  "chatPageOfflineLocalOnly": "离线 · 仅可查看本地消息，无法收发",
   "chatPageMsgResending": "重发中…",
   "chatPageMsgSpeedingUp": "加速中…",
   "chatPageVoiceStartFailed": "录音启动失败: {error}",

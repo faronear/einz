@@ -657,6 +657,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageDeviceUnrecognized =>
+      '本设备未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
+
+  @override
+  String get chatPageOfflineLocalOnly => '离线 · 仅可查看本地消息，无法收发';
+
+  @override
   String get chatPageMsgResending => '重发中…';
 
   @override

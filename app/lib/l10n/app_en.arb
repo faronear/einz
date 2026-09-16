@@ -281,6 +281,8 @@
       "count": {"type": "int"}
     }
   },
+  "chatPageDeviceUnrecognized": "This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared",
+  "chatPageOfflineLocalOnly": "Offline · local messages only, cannot send or receive",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
   "chatPageVoiceStartFailed": "Recording start failed: {error}",

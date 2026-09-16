@@ -692,6 +692,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageDeviceUnrecognized =>
+      'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
+
+  @override
+  String get chatPageOfflineLocalOnly =>
+      'Offline · local messages only, cannot send or receive';
+
+  @override
   String get chatPageMsgResending => 'Resending…';
 
   @override
