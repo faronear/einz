@@ -127,7 +127,7 @@ class _SetupPageState extends State<SetupPage> {
   // 且再点「下一步」不再重复校验——token 已被 joinSpace 消费，重校验必然失败
   // （老板 2026-09-12）
   bool _joinTokenVerified = false;
-  String? _joinSpaceName;
+
   String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
 
   // 服务器地址：默认 einz.tic.cc；探测失败由自动重试兜底（启动屏不展示输入框）
@@ -790,7 +790,6 @@ class _SetupPageState extends State<SetupPage> {
         _joinedToken = null;
         _joinedSlot = null;
         _joinTokenVerified = false; // 回入口页重选角色：token 状态全部作废
-        _joinSpaceName = null;
         _joinSlots = const [];
         _chosenSlot = null;
         _slotError = null;
@@ -1168,8 +1167,9 @@ class _SetupPageState extends State<SetupPage> {
     await AppLockService(widget.db ?? LocalDatabase()).saveProfile(
       // 本人名字：join=所选身份（create 预置）；create=自填
       personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
-      // 对方名字：join=创建者名字（preflight 空间显示名）；create=伴侣名字（预置）
-      peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : _partnerNameCtrl.text.trim(),
+      // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
+      // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
+      peerName: _role == _WizardRole.join ? _joinPeerName : _partnerNameCtrl.text.trim(),
       deviceName: deviceName,
       // 本人性别：join=所选身份性别；create=自填
       myGender: _role == _WizardRole.join ? _joinSelectedGender : (_myGender ?? ''),
@@ -1189,8 +1189,9 @@ class _SetupPageState extends State<SetupPage> {
         token: token,
         personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
         personId: enroll.personId,
-        // 对方名字：join=创建者名字（preflight 空间显示名）；create=伴侣名字（预置）
-        peerName: _role == _WizardRole.join ? (_joinSpaceName ?? '') : _partnerNameCtrl.text.trim(),
+        // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
+        // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
+        peerName: _role == _WizardRole.join ? _joinPeerName : _partnerNameCtrl.text.trim(),
         deviceName: deviceName,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
@@ -1409,6 +1410,20 @@ class _SetupPageState extends State<SetupPage> {
     return '';
   }
 
+  /// join 时对方（另一个身份 slot）的名字——对话顶部条左侧显示用。
+  /// **不能**用预检返回的 `displayName`（那是**空间名**，create 时写入的是创建者
+  /// 自己的名字）：A 创建空间、A 的第二台设备（App）加入、B 尚未加入时，
+  /// 空间名就是 A → 顶部条两边都显示 A（老板 2026-09-16 实测）。
+  /// 与 [_joinPeerGender] 对称：对方 = 另一个身份 slot 的预置名字
+  /// （create 时录入的伴侣名字，B 未加入也有值）。
+  String get _joinPeerName {
+    if (_chosenSlot == null) return '';
+    for (final s in _joinSlots) {
+      if (s.slot != _chosenSlot) return s.displayName ?? '';
+    }
+    return '';
+  }
+
   /// join 时对方（另一个身份 slot）的性别——消息气泡配色用（v1 语义：
   /// join=另一人的性别；此前 v2 写死空串 → 对方气泡一律灰色回退）。
   String get _joinPeerGender {
@@ -1486,7 +1501,6 @@ class _SetupPageState extends State<SetupPage> {
         // 换 token（或换身份）后，之前的"已 join"标记作废：需重新 joinSpace
         _joinedToken = null;
         _joinedSlot = null;
-        _joinSpaceName = pre.displayName;
         _joinSlots = pre.slots; // 身份选择页（步骤 2）展示两身份
         _chosenSlot = null; // 换 token 后重置身份选择
         _joinTokenVerified = true; // 已验证：输入框锁只读，且不再重复校验

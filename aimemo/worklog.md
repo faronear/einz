@@ -6428,3 +6428,26 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 仅本机 `● 阿猪 @MacBook`。
 
 **验证**：`dart analyze`(cli) 干净。
+
+## 2026-09-16 修 App 加入空间后「对方姓名」显示成自己
+
+**现象**（老板 2026-09-16）：全新库里 TUI 用户 A 创建空间 → App 用户 A（同一人的第二台
+设备）加入空间，B 尚未加入 → App 顶部条**两侧都显示 A**（左侧"对方"应为 B）。
+
+**根因**：`setup_page` join 提交时把预检返回的 `pre.displayName` 当作 peerName 传给
+ChatPage（`app/lib/setup_page.dart:1172`、`1193`）。而 `pre.displayName` 是
+**空间名**（`spaces.display_name`），服务端 create 时写入的是**创建者自己的名字**
+（`server/src/spaces.ts:118`，CLI create 传的就是"我的名字"）→ 于是"对方"= A。
+chat_page 的 `_refreshProfileFromServer()` 只在找到"非我 person"时覆盖 peerName
+（B 未加入时 personNames 里只有 A），无法自救。
+
+**修法**：新增 `_joinPeerName` getter——取**另一个身份 slot 的预置名字**，与既有的
+`_joinPeerGender`（同样取另一个 slot）对齐；`peerName` 改用它；删除已无消费者的
+`_joinSpaceName` 字段。
+
+**遗留**：`spaces.display_name` 语义上其实是"创建者名字"（不是独立的空间名）——
+将来若要展示空间名需注意这一点。
+
+**验证**：`flutter analyze`（app）干净。**该链路（setup → ChatPage 的 peerName）没有
+测试覆盖**：现有 join 测试的 fake 里空间名与 slot 名同为 'Lukas'，掩盖了这个差异，
+建议后续补一条回归（fake 里让空间名 ≠ 对方 slot 名）。
