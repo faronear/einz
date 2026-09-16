@@ -554,11 +554,20 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       session.messages.add(_systemMessage(session, '✅ 机密线路激活成功。'));
       _scheduleRender();
     } catch (e) {
-      if (e is ApiException && e.code == 'FORBIDDEN') {
-        // 挑战被服务端拒绝（设备已被撤销）→ 不进 TUI：恢复终端、提示后直接退出
-        _exitRevoked();
+      final code = e is ApiException ? e.code : '';
+      // 只有"设备被明确撤销"才清盘退出（老板 2026-09-16；此前任何 403 都当撤销，
+      // 后台库被重置时用户既丢了数据、也没法看本地历史）
+      if (code == 'DEVICE_REVOKED') {
+        _exitRevoked(storePath); // 不返回
       }
-      session.messages.add(_systemMessage(session, '⚠️ 机密线路激活失败。可进入 TUI 后用 /auth 重试'));
+      if (code == 'FORBIDDEN') {
+        // 服务器不认本设备（库被清空/重置最常见，也可能是本设备未登记）：
+        // 警告后继续进 TUI——本地历史照常可读，联网功能不可用
+        session.messages.add(_systemMessage(session, _unrecognizedNotice));
+      } else {
+        session.messages.add(
+            _systemMessage(session, '⚠️ 机密线路激活失败。可进入 TUI 后用 /auth 重试'));
+      }
       _scheduleRender();
     }
   }
@@ -639,6 +648,7 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
       },
       onProfileUpdated: _onProfileUpdated,
       onRevoked: _onWsRevoked,
+      onUnrecognized: _onWsUnrecognized,
       // 对方送达/已读水位更新（receipt.updated）：重绘以刷新我发出消息的状态
       onReceiptUpdated: () => _scheduleRender(),
     );
@@ -1123,25 +1133,27 @@ Future<void> main(List<String> args) async {
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
 
-  // 启动自检：设备是否已被撤销（/revoke）——已撤销不进 TUI：
-  // 终端直接提示"本设备已被撤销。"后退出（不渲染界面、不加载历史）。
-  // 会话被清（/revoke 会 DELETE 该设备的 sessions）→ 清 token 走挑战重认证；挑战 403
-  // （设备已撤销）由引导识别后同样提示退出（见 _runGuide）。
+  // 启动自检：**只有服务端明确撤销本设备**才不进 TUI（清盘 + 提示 + 退出）。
+  // 会话被清（/revoke 会 DELETE 该设备的 sessions）→ 清 token 走挑战重认证；挑战返回
+  // 403 DEVICE_REVOKED 同样清盘退出、FORBIDDEN（库被重置/未登记）只警告继续（见 _runGuide）。
   final probe = await _probeRevoked(store, server);
   if (probe == 1) {
-    // 尚未进 raw/输入循环；用 stderr 与 403 路径保持一致（终端同样可见）
-    try {
-      stderr.writeln('本设备已被撤销。');
-      stderr.flush();
-    } catch (_) {}
-    exit(0);
+    _exitRevoked(storePath); // 不返回
   }
   if (probe == 2) {
     store.sessionToken = null;
     store.save(storePath);
   }
+  if (probe == 3) {
+    // 服务器不认本设备：只警告，照常进 TUI 看本地历史（数据一条不删）
+    _guidanceNotes.add(_unrecognizedNotice);
+  }
 
   final session = ChatSession(store, storePath, server);
+  // 运行期任何一次认证拿到 403 DEVICE_REVOKED（会话过期自动续期 / /auth / 切换服务器）
+  // → 立即清盘退出：撤销语义在"所有认证入口"上一致（老板 2026-09-16）。
+  // FORBIDDEN（库被重置/未登记）不会走这里，只在消息流里警告。
+  session.onDeviceRevoked = () => _exitRevoked(storePath);
   // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
   // _state 赋值之后（否则 Null check 崩溃——2026-09-08 老板实测）
   _state = _TuiState(session, storePath);
@@ -1235,13 +1247,32 @@ void _exitRaw() {
   _restoreTerminal();
 }
 
-/// 设备已被撤销（引导挑战 403 / 在线 WS 广播 device.revoked）→ 恢复终端、
-/// 提示后立即退出。提示写 stderr：pty 下退出瞬间 stdout flush 未决时
-/// stdout.write 会抛 "StreamSink is bound to a stream"——stderr 独立 sink 必达。
-void _exitRevoked() {
+/// 设备被**明确撤销**（认证 403 `DEVICE_REVOKED` / 在线 WS 广播 device.revoked）→
+/// 同步销毁本地数据、恢复终端、提示后立即退出。**只有这一条路径会删本地数据**：
+/// 未登记（库被重置）/连不上只警告，绝不动本地文件（老板 2026-09-16）。
+///
+/// 清盘范围（与 App 的自毁对齐）：store 文件（含历史信封/附件元数据/离线队列/
+/// space_key/会话 token/设备私钥，以及同名的 .bak 备份）与附件明文缓存目录。
+/// 刻意**不**删 `~/.einz` 整个目录（同机多设备共用）与用户导出的 `einz-backup-*.json`。
+///
+/// 顺序很重要：`exit(0)` 会立即终止进程，之后不会再有 `store.save()` 落盘；若改成
+/// 先退出后异步删、或删完还继续跑，都可能被在途写把文件重建回来——所以"同步删完→再退出"。
+/// 提示写 stderr：pty 下退出瞬间 stdout flush 未决时 stdout.write 会抛
+/// "StreamSink is bound to a stream"——stderr 独立 sink 必达。
+void _exitRevoked(String storePath) {
+  for (final path in [storePath, '$storePath.bak']) {
+    try {
+      final f = File(path);
+      if (f.existsSync()) f.deleteSync();
+    } catch (_) {}
+  }
+  try {
+    final cache = Directory(attachmentCacheDir());
+    if (cache.existsSync()) cache.deleteSync(recursive: true);
+  } catch (_) {}
   _restoreTerminal();
   try {
-    stderr.write('$_clearHome本设备已被撤销。\n');
+    stderr.write('$_clearHome本设备已被撤销，本地数据已清除，请重新入网。\n');
     stderr.flush();
   } catch (_) {}
   exit(0);
@@ -1725,7 +1756,19 @@ void _onProfileUpdated(WsProfileUpdatedEvent e) {
 /// 在线期间收到 device.revoked（被 /revoke 撤销）→ 立刻回命令行：
 /// 恢复终端、提示"本设备已被撤销。"后退出。
 void _onWsRevoked(WsDeviceRevokedEvent event) {
-  _exitRevoked();
+  final s = _state;
+  if (s == null) return;
+  _exitRevoked(s.session.storePath);
+}
+
+/// WS 重连时重新认证失败（403 `FORBIDDEN`：后台库被重置/本设备未登记）→
+/// 只提示一次，继续跑（退避重连；库复原后自动恢复）。**绝不删本地数据**。
+void _onWsUnrecognized() {
+  final s = _state;
+  if (s == null || !s.running || _unrecognizedShown) return;
+  _unrecognizedShown = true;
+  s.session.messages.add(_systemMessage(s.session, _unrecognizedNotice));
+  _scheduleRender();
 }
 
 /// 对端上下线广播（Server 推送——立即更新对方在线状态，不等轮询）。
@@ -2610,7 +2653,7 @@ Future<void> _execCommand(String line) async {
           s.session.store.save(s.session.storePath);
           if (s.session.wsClient == null && s.session.hasSession) {
             s.session.startWs(onMessage: (_) => _refreshGenderForLatest(_state!), onStatus: (_) => _render(), onAutoSync: (_) => _refreshGenderForLatest(_state!),
-              onRevoked: _onWsRevoked);
+              onRevoked: _onWsRevoked, onUnrecognized: _onWsUnrecognized);
           }
           s.session.messages.add(_systemMessage(s.session, '✅ 已切换服务器并激活: $arg'));
           s.status = ''; // 一次性结果进消息流，清掉旧瞬时通知
@@ -2655,6 +2698,7 @@ Future<void> _execCommand(String line) async {
             onStatus: (_) => _render(),
             onAutoSync: (_) => _refreshGenderForLatest(_state!),
             onRevoked: _onWsRevoked,
+            onUnrecognized: _onWsUnrecognized,
           );
         }
       } catch (e) {
@@ -3080,9 +3124,19 @@ void _printFarewell(ChatSession session) {
 /// 引导阶段产生的系统提示（进 TUI 后作为 system 消息显示在对话流）。
 final List<String> _guidanceNotes = [];
 
-/// 启动自检结果：0=正常/离线（可看本地历史）；1=设备已被撤销；2=会话已失效
-/// （/revoke 会 DELETE 该设备的 sessions，缓存 token 死 → 401）需清除 token 走引导
-/// 挑战重认证——挑战阶段若设备已撤销会 403（由引导兜底识别为 revoked）。
+/// "服务器不认本设备"提示（403 `FORBIDDEN`：库被清空/重置、本设备未登记）。
+/// 刻意写明"本地数据未清除"——老板 2026-09-16：此前客户端把这种情况当"本设备已被撤销"
+/// 直接退出/抹数据，运维失误造成不可挽回的损失；现在只警告，历史照常可看。
+const String _unrecognizedNotice =
+    '⚠️ 本设备未被服务器识别（服务器数据可能已重置）——仍可查看本地历史，联网功能暂停；本地数据未清除';
+
+/// 是否已提示过"服务器不认本设备"（每进程只提示一次，避免退避重连每分钟刷屏）。
+bool _unrecognizedShown = false;
+
+/// 启动自检结果：0=正常/离线（可看本地历史）；1=设备被**明确撤销**（自毁+退出）；
+/// 2=会话已失效（/revoke 会 DELETE 该设备的 sessions，缓存 token 死 → 401）需清除
+/// token 走引导挑战重认证——挑战阶段若设备被撤销会 403 `DEVICE_REVOKED`（由引导兜底
+/// 识别）；3=服务器不认本设备（库被重置/未登记，403 `FORBIDDEN`）→ 只警告，继续离线可用。
 Future<int> _probeRevoked(DeviceStore store, String server) async {
   if (store.deviceId == null || store.spaceId == null || store.sessionToken == null) {
     return 0;
@@ -3091,8 +3145,12 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
     await ApiClient(server).getSpace(store.sessionToken!);
     return 0; // 200：设备 active（会话有效）
   } on ApiException catch (e) {
-    if (e.code == 'FORBIDDEN') return 1; // 设备 revoked（/revoke 单撤时会话仍在）
-    if (e.code == 'UNAUTHORIZED') return 2; // 会话被清/过期：清除 token 重认证
+    // 只有服务端**明确说"这台设备被撤销了"**才自毁（老板 2026-09-16）。
+    // FORBIDDEN 表示"服务器不认本设备"——库被清空/重置是最常见原因，属运维失误，
+    // 只警告，本地数据一条都不能删（此前 403 一律当撤销，把本地数据全删了）。
+    if (e.code == 'DEVICE_REVOKED') return 1; // 被明确撤销 → 自毁 + 退出
+    if (e.code == 'FORBIDDEN') return 3; // 未登记（库被重置）→ 警告，继续离线可用
+    if (e.code == 'UNAUTHORIZED') return 2; // 会话被清/过期：清 token 走重认证
     return 0;
   } catch (_) {
     return 0; // 网络异常：保持离线查看历史的现状能力

@@ -12,6 +12,15 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:einz_shared/einz_shared.dart';
 import 'package:einz_cli/store.dart';
 
+/// 附件解密缓存目录（`~/.einz/cache`）：下载的附件明文落在这里，用系统默认应用打开。
+/// 抽成函数是为了让"撤销自毁"和下载两处共用同一个路径（TUI 撤销时要连同它一起清掉）。
+String attachmentCacheDir() {
+  final home = Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'] ??
+      Directory.current.path;
+  return '$home/.einz/cache';
+}
+
 /// 展示消息的全局插入序号（仅用于排序平局决胜）。Dart 的 `List.sort` **不稳定**，
 /// 同毫秒创建的系统消息（如 join 向导里「✅ 我是 X」「----------------」「❓ 验证密保口令:」
 /// 基本同刻产生）排序后会被打乱（老板 2026-09-13 实测：口令提示跑到"我是 X"之前）。
@@ -90,6 +99,11 @@ class ChatSession {
   /// `flushPending()` 的网络等待**之前**就刷新到屏幕（老板 2026-09-13：App 能
   /// 立刻显示离线消息，TUI 之前要等补发网络超时回来才显示）。
   void Function()? onChanged;
+
+  /// 认证时被服务端**明确撤销**（403 `DEVICE_REVOKED`）的回调——UI 据此清盘并退出。
+  /// 与其它撤销路径（WS `device.revoked` 帧、启动自检、引导认证）语义一致：
+  /// **只有明确撤销才清空本地数据**；`FORBIDDEN`（库被重置/未登记）不走这里。
+  void Function()? onDeviceRevoked;
 
   /// WS 实时监听（null = 未启动）。
   WsClient? wsClient;
@@ -179,7 +193,15 @@ class ChatSession {
     }
     // spaceId 必须一并提交：否则拿到的是"无 space 的 legacy 会话"，/sync 与
     // /messages 会落到空 space 桶 → 会话过期自动续期后消息全空（P1 收敛）。
-    final challenge = await api.challenge(deviceId, spaceId: store.spaceId);
+    final ChallengeResult challenge;
+    try {
+      challenge = await api.challenge(deviceId, spaceId: store.spaceId);
+    } on ApiException catch (e) {
+      // 挑战被明确拒绝为"设备已撤销" → 通知 UI 清盘退出（其他失败原样抛出：
+      // FORBIDDEN 只是"服务器不认本设备"，最常见的原因是后台库被重置，绝不能删数据）
+      if (e.code == 'DEVICE_REVOKED') onDeviceRevoked?.call();
+      rethrow;
+    }
     final opened = await sealOpen(
       s,
       base64Decode(challenge.sealedChallenge),
@@ -504,6 +526,7 @@ class ChatSession {
     void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
     void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
     void Function(WsDeviceRevokedEvent event)? onRevoked,
+    void Function()? onUnrecognized,
     void Function()? onReceiptUpdated,
   }) {
     if (server.isEmpty || store.sessionToken == null) return;
@@ -512,8 +535,29 @@ class ChatSession {
       token: store.sessionToken!,
       onUnauthorized: () async {
         // session 过期（WS 4401）：自动重新认证并更新 token，随后 WsClient 立即重连
-        await auth();
-        wsClient?.updateToken(store.sessionToken!);
+        try {
+          await auth();
+          wsClient?.updateToken(store.sessionToken!);
+        } on ApiException catch (e) {
+          // 重新认证失败要区分语义（老板 2026-09-16）——异常被 ws_client 吞掉的话，
+          // 后台库被重置时客户端会无限静默退避重连，用户看不到任何解释。
+          if (e.code == 'DEVICE_REVOKED') {
+            // 设备被明确撤销：交给 UI 走"自毁 + 退出"（WS 就此结束，不必再重连）
+            onRevoked?.call(WsDeviceRevokedEvent(
+              type: kWsTypeDeviceRevoked,
+              deviceId: store.deviceId ?? '',
+            ));
+            wsClient?.stop();
+            return;
+          }
+          if (e.code == 'FORBIDDEN') {
+            // 服务器不认本设备（最可能是后台库被重置）→ 只警告。异常**照旧抛出**：
+            // ws_client 只在 onUnauthorized 抛异常时走退避重连（正常返回会立刻重连
+            // → 每次 4401 就重连一次，等于打服务端）；退避重连也保证库被复原后自动恢复
+            onUnrecognized?.call();
+          }
+          rethrow;
+        }
       },
       onEvent: (event) async {
         if (event is WsMessageNewEvent) {
@@ -750,10 +794,7 @@ class ChatSession {
       keyVersion: meta['key_version'] as int,
     );
     // 缓存目录 ~/.einz/cache；扩展名优先取 caption 里的文件名，其次按消息类型兜底
-    final home = Platform.environment['HOME'] ??
-        Platform.environment['USERPROFILE'] ??
-        Directory.current.path;
-    final cacheDir = Directory('$home/.einz/cache')..createSync(recursive: true);
+    final cacheDir = Directory(attachmentCacheDir())..createSync(recursive: true);
     final extMatch = RegExp(r'\.([A-Za-z0-9]{1,8})$').firstMatch(msg.plain);
     final ext = extMatch?.group(1)?.toLowerCase() ??
         switch (msg.env.type) {
