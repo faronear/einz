@@ -66,7 +66,7 @@ function normGender(g?: string): string | undefined {
 
 export async function createSpace(
   clientSpaceId?: string,
-  displayName?: string,
+  personName?: string, // 创建者（第一人）的显示名——落 space_members，不落 spaces
   gender?: string,
   partnerName?: string,
   partnerGender?: string,
@@ -103,7 +103,7 @@ export async function createSpace(
   // 用户名称白名单（老板 2026-09-16）：create 录入的是**两人**的名字（我的 +
   // 伴侣），都是用户自己输入的 → 不合规直接 400，让客户端提示重输。
   // 只有传了才校验（未传维持现状——服务端不强制必填，必填由客户端引导负责）
-  if (displayName != null) assertPersonName(displayName);
+  if (personName != null) assertPersonName(personName);
   if (partnerName != null) assertPersonName(partnerName);
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
   const spacePublicKey = publicKey ?? "pending:" + randomUUID();
@@ -115,17 +115,17 @@ export async function createSpace(
   const now = Date.now();
   getDb()
     .prepare(
-      `INSERT INTO spaces (space_id, space_address, space_public_key, display_name, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'waiting', ?, ?)`,
+      `INSERT INTO spaces (space_id, space_address, space_public_key, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'waiting', ?, ?)`,
     )
-    .run(spaceId, spaceAddress, spacePublicKey, displayName ?? null, now, now);
+    .run(spaceId, spaceAddress, spacePublicKey, now, now);
   const creatorPersonId = randomUUID();
   getDb()
     .prepare(
       `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
        VALUES (?, ?, 0, ?, ?, 'active', ?)`,
     )
-    .run(spaceId, creatorPersonId, displayName ?? null, normGender(gender) ?? null, now);
+    .run(spaceId, creatorPersonId, personName ?? null, normGender(gender) ?? null, now);
   // 伴侣（第二人）预置：名字/性别必填（老板 2026-09-10 定稿——create 时录入两人
   // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，person_id 由
   // 首个加入该 slot 的设备生成。
@@ -190,29 +190,30 @@ export async function createSpace(
   };
 }
 
-/** 精确查找 Space（仅最小公开信息：名称、状态、成员数；custom_id 后置）。 */
+/** 精确查找 Space（仅最小公开信息：状态、成员数；custom_id 后置）。 */
 export function lookupSpace(
   address?: string,
-): { spaceId: string; displayName: string | null; status: string; memberCount: number } {
+): { spaceId: string; status: string; memberCount: number } {
   const row = getDb()
-    .prepare(`SELECT space_id, display_name, status FROM spaces WHERE space_address = ?`)
-    .get(address ?? "") as { space_id: string; display_name: string | null; status: string } | undefined;
+    .prepare(`SELECT space_id, status FROM spaces WHERE space_address = ?`)
+    .get(address ?? "") as { space_id: string; status: string } | undefined;
   if (!row) throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
   const memberCount = (
     getDb()
       .prepare(`SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND status = 'active'`)
       .get(row.space_id) as { n: number }
   ).n;
-  return { spaceId: row.space_id, displayName: row.display_name, status: row.status, memberCount };
+  return { spaceId: row.space_id, status: row.status, memberCount };
 }
 
 /** join preflight：轻量校验 token（格式/未用/未过期/空间可加入）但**不消费**，
- *  返回空间公开信息供客户端确认（PROTOCOL_MULTIVERSE.md §5 ①/② fail-fast）。 */
+ *  返回空间公开信息供客户端确认（PROTOCOL_MULTIVERSE.md §5 ①/② fail-fast）。
+ *  响应**不含空间名**（spaces.display_name 已删，2026-09-16）：join 方需要的"对方
+ *  是谁"由 slots 里的身份名提供。 */
 export function preflightJoin(
   token: string,
 ): {
   spaceId: string;
-  displayName: string | null;
   status: string;
   memberCount: number;
   slots: { slot: number; displayName: string | null; gender: string | null; status: string }[];
@@ -225,8 +226,8 @@ export function preflightJoin(
   if (tk.used_at != null) throw new ApiError("TOKEN_USED", "join token already used", 410);
   if (tk.expires_at < Date.now()) throw new ApiError("TOKEN_EXPIRED", "join token expired", 410);
   const sp = getDb()
-    .prepare(`SELECT display_name, status FROM spaces WHERE space_id = ?`)
-    .get(tk.space_id) as { display_name: string | null; status: string } | undefined;
+    .prepare(`SELECT status FROM spaces WHERE space_id = ?`)
+    .get(tk.space_id) as { status: string } | undefined;
   if (!sp || (sp.status !== "waiting" && sp.status !== "active")) {
     throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
   }
@@ -251,7 +252,7 @@ export function preflightJoin(
   }));
   const memberCount = slots.filter((s) => s.status === "active").length;
   // 多设备语义（同一身份可多台设备）：不再有「满」——身份由加入者选择
-  return { spaceId: tk.space_id, displayName: sp.display_name, status: sp.status, memberCount, slots };
+  return { spaceId: tk.space_id, status: sp.status, memberCount, slots };
 }
 
 /** 加入 Space：事务内消费 token（未用/未过期/未满员）并插入第二位成员；
@@ -261,7 +262,6 @@ export function joinSpace(
   token: string,
   publicKey: string,
   deviceName?: string,
-  displayName?: string,
   gender?: string,
   partnerSlot?: number,
 ): { spaceId: string; personId: string; partnerSlot: number; sessionToken: string; spaceAddress: string } {

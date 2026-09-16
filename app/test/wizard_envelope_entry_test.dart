@@ -31,7 +31,6 @@ Future<void> pumpToPassphrase(
       preflightOverride: join
           ? (token) async => const SpaceJoinPreflight(
               spaceId: 'space-test',
-              displayName: 'Lukas',
               status: 'waiting',
               memberCount: 1,
               slots: [

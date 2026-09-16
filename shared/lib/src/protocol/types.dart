@@ -90,17 +90,17 @@ class SpaceMemberSlot {
       );
 }
 
+/// 空间公开信息 + 两身份 slot（**不含空间名**：spaces.display_name 已删，
+/// 2026-09-16——join 方需要的"对方是谁"由 slots 里的身份名提供）。
 class SpaceJoinPreflight {
   const SpaceJoinPreflight({
     required this.spaceId,
-    required this.displayName,
     required this.status,
     required this.memberCount,
     required this.slots,
   });
 
   final String spaceId;
-  final String? displayName;
   final String status;
   final int memberCount;
   final List<SpaceMemberSlot> slots;
@@ -108,7 +108,6 @@ class SpaceJoinPreflight {
   factory SpaceJoinPreflight.fromJson(Map<String, dynamic> json) =>
       SpaceJoinPreflight(
         spaceId: json['spaceId'] as String,
-        displayName: json['displayName'] as String?,
         status: json['status'] as String,
         memberCount: json['memberCount'] as int,
         slots: (json['slots'] as List<dynamic>? ?? const [])

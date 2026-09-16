@@ -36,11 +36,11 @@ CREATE TABLE devices (
 );
 
 -- 空间（Multiverse；space_address 由 space_public_key 经 Keccak-256 + EIP-55 派生）
+-- 注（2026-09-16）：原 display_name 列已删除（创建者名字的冗余快照，只写不读且改名不同步）
 CREATE TABLE spaces (
     space_id         TEXT PRIMARY KEY,
     space_address    TEXT NOT NULL UNIQUE,
     space_public_key TEXT NOT NULL UNIQUE,
-    display_name     TEXT,
     status           TEXT NOT NULL DEFAULT 'waiting',  -- waiting | active | archived
     created_at       INTEGER NOT NULL,
     updated_at       INTEGER NOT NULL

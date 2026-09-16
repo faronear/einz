@@ -1477,8 +1477,8 @@ class _SetupPageState extends State<SetupPage> {
   /// join 第一步 token 校验：POST /spaces/join/preflight（不消费 token）。
   /// 成功 → 记录 token/身份 slots（供后续步骤与最终 join 提交）并放行；失败 →
   /// 错误码映射红字（TOKEN_INVALID/EXPIRED/USED/SPACE_FULL，
-  /// PROTOCOL_MULTIVERSE.md §6），停留本页。displayName 保留为进入聊天页的
-  /// 对方名字（peerName，不再是确认卡片文案）。
+  /// PROTOCOL_MULTIVERSE.md §6），停留本页。预检返回的 slots 用于身份选择页，
+  /// 「对方名字」取另一个 slot 的名字（见 _joinPeerName——**不是**空间名）。
   Future<bool> _verifyJoinToken() async {
     final raw = _inviteCode.text.trim();
     if (raw.isEmpty) {
@@ -1594,7 +1594,7 @@ class _SetupPageState extends State<SetupPage> {
       final created = await (widget.createOverride?.call() ??
           api.createSpace(
             spaceId: spaceId,
-            displayName: _personName.text.trim(),
+            personName: _personName.text.trim(),
             gender: _myGender,
             partnerName: _partnerNameCtrl.text.trim(),
             partnerGender: _partnerGender,

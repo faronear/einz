@@ -101,12 +101,12 @@ class TestDevice {
 
   /** 创建空间（v2 入口）：**一步完成设备登记 + 签发绑定该空间的会话**。
    *  替代已删除的 v1 `POST /devices/enroll`（v1 收敛，2026-09-15）。 */
-  async createSpace (port: number, displayName = '测试空间', partnerName?: string): Promise<string> {
+  async createSpace (port: number, personName = '测试空间', partnerName?: string): Promise<string> {
     const res = await fetch(`http://127.0.0.1:${port}/spaces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        display_name: displayName,
+        person_name: personName,
         ...(partnerName ? { partner_name: partnerName } : {}),
         public_key: sodium.to_base64(this.keypair.publicKey, B64),
         device_name: 'dev-a'
@@ -574,7 +574,7 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          display_name: 'luk',
+          person_name: 'luk',
           public_key: creatorPk,
           device_name: 'dev-a'
         })
@@ -677,7 +677,7 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          display_name: 'luk',
+          person_name: 'luk',
           public_key: creatorPk5,
           device_name: 'dev-a'
         })
@@ -808,7 +808,7 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          display_name: 'alice',
+          person_name: 'alice',
           public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
           device_name: 'dev-a'
         })
@@ -956,7 +956,7 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          displayName: '限速测试空间',
+          person_name: '限速测试空间',
           public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
           device_name: 'dev-rate'
         })

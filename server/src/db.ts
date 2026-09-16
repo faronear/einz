@@ -91,11 +91,13 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     );
 
     -- Multiverse（v2）：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3）
+    -- 刻意**没有** display_name：v1 曾把创建者名字快照在这里，但它是只写不读的死字段，
+    -- 且创建者改名（POST /devices/person-name）不会同步 → 会与真实名字冲突。
+    -- 人的名字唯一数据源是 space_members.display_name（老板 2026-09-16）。
     CREATE TABLE IF NOT EXISTS spaces (
       space_id         TEXT PRIMARY KEY,
       space_address    TEXT NOT NULL UNIQUE,
       space_public_key TEXT NOT NULL UNIQUE,
-      display_name     TEXT,
       status           TEXT NOT NULL DEFAULT 'waiting',  -- waiting | active | archived
       created_at       INTEGER NOT NULL,
       updated_at       INTEGER NOT NULL
@@ -285,6 +287,15 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     .run().changes;
   if (droppedMeta > 0) {
     console.log(`[einz] v1 收敛迁移：清掉 ${droppedMeta} 条 meta 名称/创建者键（名称改用 space_members.display_name）`);
+  }
+
+  // 迁移（2026-09-16）：删掉 spaces.display_name（创建者名字的冗余快照）。
+  // 它是只写不读的死字段，且创建者改名不同步 → 会与 space_members.display_name
+  // 冲突。sqlite 3.35+ 支持 DROP COLUMN；先查 pragma 保证幂等（已删过则跳过）。
+  const spaceCols = db.prepare(`PRAGMA table_info(spaces)`).all() as { name: string }[];
+  if (spaceCols.some((c) => c.name === "display_name")) {
+    db.exec(`ALTER TABLE spaces DROP COLUMN display_name`);
+    console.log(`[einz] 迁移：删除 spaces.display_name（人的名字唯一数据源是 space_members.display_name）`);
   }
 
   // 迁移：sessions.session_token 由明文改为 sha256 十六进制（2026-09-15 评审 H4）。

@@ -75,7 +75,7 @@ class Device {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         public_key: `pk-${this.label}`,
-        display_name: 'Lukas',
+        person_name: 'Lukas',
         partner_name: 'Alice',
         escrow_passphrase: 'pass123',
         sealed_space_key: {

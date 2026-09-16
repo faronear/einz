@@ -79,7 +79,7 @@ async function createSpace (port: number, label: string): Promise<SpacePeer> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      display_name: label,
+      person_name: label,
       public_key: sodium.to_base64(kp.publicKey, B64),
       device_name: label
     })

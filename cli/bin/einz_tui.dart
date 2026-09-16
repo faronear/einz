@@ -876,7 +876,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     session.messages.add(_systemMessage(session, '----------------'));
     final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
       spaceId: spaceId,
-      displayName: displayName,
+      personName: displayName,
       gender: _genderCode(myGender), // 中文 → male/female（与 enroll 一致——老板 2026-09-10）
       partnerName: partnerName,
       partnerGender: _genderCode(partnerGender),

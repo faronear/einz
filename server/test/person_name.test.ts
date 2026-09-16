@@ -72,12 +72,12 @@ test('端到端：create 的两个名字与改名都按白名单收口', async (
     await waitReady(port)
 
     // 1) create：两个名字（我的 / 伴侣的）任一含空格 → 400（都是用户输入的，不消毒）
-    const createWith = async (displayName: string, partnerName: string): Promise<number> => {
+    const createWith = async (personName: string, partnerName: string): Promise<number> => {
       const res = await req(port, '/spaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          display_name: displayName,
+          person_name: personName,
           partner_name: partnerName,
           public_key: Buffer.alloc(32, 7).toString('base64')
         })
@@ -92,7 +92,7 @@ test('端到端：create 的两个名字与改名都按白名单收口', async (
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        display_name: '小猪🐷',
+        person_name: '小猪🐷',
         partner_name: 'Alice-01',
         public_key: Buffer.alloc(32, 7).toString('base64')
       })

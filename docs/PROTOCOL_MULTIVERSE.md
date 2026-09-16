@@ -68,11 +68,12 @@ spaces (
   space_id          TEXT PRIMARY KEY,        -- UUIDv4
   space_address     TEXT NOT NULL UNIQUE,    -- EIP-55 地址，仅定位
   space_public_key  TEXT NOT NULL UNIQUE,    -- Space Identity 公钥（地址派生根）
-  display_name      TEXT,
   status            TEXT NOT NULL DEFAULT 'waiting',  -- waiting|active|archived
   created_at        INTEGER NOT NULL,
   updated_at        INTEGER NOT NULL
 )
+-- 注（2026-09-16）：原 display_name 列已删除——它只是创建者名字的冗余快照
+-- （只写不读，且创建者改名后不同步）。人的名字唯一数据源是 space_members.display_name。
 
 space_members (
   space_id          TEXT NOT NULL REFERENCES spaces(space_id),
@@ -126,18 +127,19 @@ GET /health
 POST /spaces
   创建 Space（首设备自举，无 token）。
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,
-          displayName?, customId? }
+          personName?, partnerName?, customId? }   // personName=第一人名字（2026-09-16 由 displayName 改名）
   响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token（含链接）
   错误：DEVICE_ALREADY_BOUND / ADDRESS_TAKEN / INVALID_ADDRESS
 
 GET /spaces/lookup?address=... | ?custom_id=...
   精确查找，只返回最小公开信息：
-  { spaceId, displayName, status, memberCount }   （1/2 状态）
+  { spaceId, status, memberCount }   （1/2 状态；无空间名——2026-09-16 起）
   不返回成员姓名、性别、消息数量、设备信息。
 
 POST /spaces/join
   用 join token 完成加入（第 3 步身份登记 + 取钥可在此前后拆分，见 §5）。
-  请求：{ token, publicKey, deviceName?, displayName, gender? }
+  请求：{ token, publicKey, deviceName?, partnerSlot?, gender? }
+  （无名字字段：身份名取自 create 时为该 slot 预置的名字——2026-09-16）
   响应：200 { spaceId, personId, partnerSlot, sessionToken }
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / SPACE_FULL / DEVICE_ALREADY_BOUND
 ```

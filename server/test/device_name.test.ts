@@ -91,7 +91,7 @@ test('端到端：create 消毒入库，改名不合规被拒', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        display_name: 'luk',
+        person_name: 'luk',
         public_key: Buffer.alloc(32, 7).toString('base64'),
         device_name: '老板的 iPhone'
       })

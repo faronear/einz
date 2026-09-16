@@ -92,7 +92,7 @@ Future<int> _run() async {
     final api = ApiClient(server);
     final created = await api.createSpace(
       publicKey: 'pk-a',
-      displayName: 'Lukas',
+      personName: 'Lukas',
       partnerName: 'Alice',
       escrowPassphrase: kPassphrase,
       sealedSpaceKey: PassphraseEnvelope(

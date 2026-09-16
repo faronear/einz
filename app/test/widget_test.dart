@@ -91,7 +91,6 @@ void main() {
     await tester.pumpWidget(wrapApp(
       preflightOverride: (token) async => const SpaceJoinPreflight(
         spaceId: 'space-test',
-        displayName: 'Lukas',
         status: 'waiting',
         memberCount: 1,
         slots: [

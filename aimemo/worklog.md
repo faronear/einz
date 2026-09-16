@@ -6451,3 +6451,41 @@ chat_page 的 `_refreshProfileFromServer()` 只在找到"非我 person"时覆盖
 **验证**：`flutter analyze`（app）干净。**该链路（setup → ChatPage 的 peerName）没有
 测试覆盖**：现有 join 测试的 fake 里空间名与 slot 名同为 'Lukas'，掩盖了这个差异，
 建议后续补一条回归（fake 里让空间名 ≠ 对方 slot 名）。
+
+## 2026-09-16 删除 spaces.display_name + 请求体 display_name 改名 person_name
+
+**决策**（老板 2026-09-16）：确认删掉 `spaces.display_name`（**不是**改名），并把
+create/join 请求体里的 `display_name`（其实是"我的名字"）改名 `person_name`。
+
+**为什么删而不是改名**：它是**只写不读的死字段**——create 时写入创建者名字
+（`spaces.ts` 的 INSERT），只有 `lookupSpace` / `preflightJoin` 回传给客户端，而
+`SpaceResult`/`SpaceJoinPreflight` 的 displayName 已无任何消费者（App 上一 commit
+刚删掉唯一一处）。即便改名 `creator_name` 也救不了：创建者改名走
+`POST /devices/person-name`，只 UPDATE `space_members.display_name`（devices.ts 注释
+明确"名称的唯一数据源是 space_members.display_name"）→ 这个列是**会过时的冗余快照**。
+真要"空间名"是新产品概念（名字属于空间而非人），应另立字段。
+
+**落地**：
+- `server/src/db.ts`：spaces 建表去掉该列；新增迁移 `ALTER TABLE spaces DROP COLUMN
+  display_name`（先查 `PRAGMA table_info` 保证幂等，sqlite 3.35+）。
+- `server/src/spaces.ts`：createSpace 参数 `displayName` → `personName`（仍写
+  space_members）；`lookupSpace`/`preflightJoin` 的 SELECT 与返回值去掉 displayName；
+  **删掉 joinSpace 的 displayName 死参数**（函数体从未使用——join 按身份选择，不自填名字）。
+- `server/src/app.ts`：create 读 `body.person_name`；join 不再读名字字段。
+- `shared`：`SpaceJoinPreflight.displayName` 删除（`SpaceMemberSlot.displayName` 保留
+  ——那是成员名，与空间名无关）；`api_client` 的 createSpace 参数/字段改名 person_name，
+  joinSpace 删 displayName 参数。
+- 客户端调用点（app setup_page、cli ein z_tui、cli/test 两个探针）随参数改名。
+- 文档：PROTOCOL_MULTIVERSE.md（spaces 表结构、/spaces 请求、/spaces/lookup 响应、
+  join 请求）、DATABASE.md（spaces 表结构）同步。
+- 测试：server 测试请求体 display_name → person_name（**注意**：smoke 测试跑的是
+  `dist/app.js`，改服务端后必须先 `npm run build` 再 `npm test`，否则测的是旧产物）。
+
+**验证**：`npm run build` + `npm test`（冒烟/隔离/回执/审计/推送/peer/设备名/人名全绿）、
+`shared dart test` 49 项、`dart analyze`(shared/cli)、`flutter analyze`(app) 全绿；
+**迁移手工实测**：带旧列的库启动后列被删且数据保留，二次启动不再重复执行（幂等）。
+
+**并发隔离**：`app/lib/l10n/app_zh.arb`、`app_localizations_zh.dart` 及
+`app/test/setup_join_passphrase_test.dart` 里的文案改动（"聊天内容"→"秘境内容"）
+是**他人的在途改动**，未纳入本次提交——该测试文件用 `git checkout` 复原后只重放我的
+hunk 再 `git add`，工作区仍保留他人改动。

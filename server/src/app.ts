@@ -211,7 +211,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     const body = await readJsonBody(req)
     const r = await createSpace(
       body?.space_id == null ? undefined : String(body.space_id),
-      body?.display_name == null ? undefined : String(body.display_name),
+      // person_name = 创建者（第一人）的显示名；v1 的 display_name 字段已废弃改名
+      body?.person_name == null ? undefined : String(body.person_name),
       body?.gender == null ? undefined : String(body.gender),
       body?.partner_name == null ? undefined : String(body.partner_name),
       body?.partner_gender == null ? undefined : String(body.partner_gender),
@@ -246,7 +247,6 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       String(body?.token ?? ''),
       String(body?.public_key ?? ''),
       body?.device_name == null ? undefined : String(body.device_name),
-      body?.display_name == null ? undefined : String(body.display_name),
       body?.gender == null ? undefined : String(body.gender),
       body?.partner_slot == null ? undefined : Number(body.partner_slot)
     )

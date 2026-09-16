@@ -110,7 +110,7 @@ Future<int> _run() async {
     // A 创建空间（sealedSpaceKey 仅需结构合法；本测试不跑 escrow 解密流程）
     final created = await api.createSpace(
       publicKey: 'pk-a',
-      displayName: 'Lukas',
+      personName: 'Lukas',
       partnerName: 'Alice',
       escrowPassphrase: kPassphrase,
       sealedSpaceKey: PassphraseEnvelope(

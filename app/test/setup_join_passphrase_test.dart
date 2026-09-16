@@ -61,7 +61,6 @@ Future<void> pumpToJoinToken(
       preflightOverride: preflight ??
           (token) async => const SpaceJoinPreflight(
               spaceId: 'space-test',
-              displayName: 'Lukas',
               status: 'waiting',
               memberCount: 1,
               slots: [
@@ -214,7 +213,6 @@ void main() {
       if (preflightCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
       return const SpaceJoinPreflight(
           spaceId: 'space-test',
-          displayName: 'Lukas',
           status: 'waiting',
           memberCount: 1,
           slots: [
