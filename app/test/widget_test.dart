@@ -61,6 +61,16 @@ void main() {
     expect(find.text('创建秘境'), findsWidgets);
     expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);
+
+    // 名字含空格 → 下一步被拦下并出红字（老板 2026-09-16：名字字符白名单，
+    // 只允许中文字/英文字母/数字/`_`/`-`/emoji）
+    await tester.enterText(find.byType(TextField).first, 'Mr Lukas');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+    expect(find.text('名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符'),
+        findsOneWidget, reason: '含空格的名字必须被拦下并提示');
+    // 仍停在名字步骤（没被放行到下一页）
+    expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
   });
 
   testWidgets('入口页选「加入秘境」→ token 页（粘贴/扫码）',
