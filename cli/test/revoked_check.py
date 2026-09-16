@@ -127,7 +127,8 @@ def onboard(label, store, port, home):
     print(f'✅ {label}: 入网并保持在线（WS 已连接）')
     return m, p
 
-def http(port, method, path, body=None, token=None):
+def http_status(port, method, path, body=None, token=None):
+    """发请求并返回 (status, body)；4xx/5xx **不抛异常**（本探针要断言错误码）。"""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method)
     req.add_header('Content-Type', 'application/json')
@@ -135,15 +136,29 @@ def http(port, method, path, body=None, token=None):
     req.add_header('X-Protocol-Version', '1')
     if token:
         req.add_header('Authorization', f'Bearer {token}')
+
+    def _parse(raw):
+        try:
+            return json.loads(raw.decode() or '{}')
+        except Exception:
+            return {}
+
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
-            return json.load(r)
+            return r.status, _parse(r.read())
     except urllib.error.HTTPError as e:
-        print(f'❌ HTTP {e.code} {method} {path}: {e.read().decode("utf-8", "replace")}')
-        raise
+        return e.code, _parse(e.read())
 
-def revoke(port, store_path, victim_device):
-    """用"另一台设备"（HTTP 侧加入）吊销 victim——DELETE /devices/:id 不允许撤自己。"""
+def http(port, method, path, body=None, token=None):
+    """成功才返回 body；4xx 打印响应体后抛出（调试用——只有状态码看不出去哪一步）。"""
+    status, body = http_status(port, method, path, body, token)
+    if status >= 400:
+        print(f'❌ HTTP {status} {method} {path}: {body}')
+        raise SystemExit(1)
+    return body
+
+def join_revoker(port, store_path):
+    """让"另一台设备"从 HTTP 侧加入本空间，返回它的会话（撤销不允许撤自己，需要第三方）。"""
     st = json.load(open(store_path))
     # 签发加入码要**空间成员会话**（C1 回归后该端点必须带 Bearer；旧版探针漏了 → 401）
     jt = http(port, 'POST', f'/spaces/{st["space_id"]}/join-tokens',
@@ -151,7 +166,15 @@ def revoke(port, store_path, victim_device):
     revoker = http(port, 'POST', '/spaces/join', {
         'token': jt, 'public_key': 'pk-revoker',
         'partner_slot': 1, 'device_name': 'revoker'})
-    http(port, 'DELETE', f'/devices/{victim_device}', token=revoker['sessionToken'])
+    return revoker['sessionToken']
+
+def revoke(port, device_id, passphrase, token):
+    """POST /devices/:id/revoke：撤销本空间另一台设备——**每次都要校验密保口令**（2026-09-16）。"""
+    status, body = http_status(port, 'POST', f'/devices/{device_id}/revoke',
+                               {'passphrase': passphrase}, token)
+    if status != 200:
+        print(f'❌ 撤销失败 HTTP {status}: {body}')
+        raise SystemExit(1)
 
 def wait_exit(m, p, seconds=8):
     deadline = time.time() + seconds
@@ -181,7 +204,29 @@ def main():
         os.makedirs(cache_dir, exist_ok=True)
         open(f'{cache_dir}/dummy.bin', 'wb').write(b'should-be-wiped')
 
-        revoke(port_a, store_a, my_device)
+        revoker_token = join_revoker(port_a, store_a)
+
+        # 口令校验（老板 2026-09-16 定稿：同 space 内可互撤，但每次撤销都要验密保口令）：
+        # ① 口令错 → 401，且设备**毫发无损**（在线 TUI 不得退出、不得清盘）；
+        # ② 不带口令 → 400。两条都在"正确口令"之前跑，确保撤销确实被拦住。
+        bad_status, bad_body = http_status(
+            port_a, 'POST', f'/devices/{my_device}/revoke',
+            {'passphrase': 'wrong-passphrase'}, revoker_token)
+        if bad_status != 401 or bad_body.get('error', {}).get('code') != 'ESCROW_VERIFY_FAILED':
+            print(f'❌ 口令错误应 401 ESCROW_VERIFY_FAILED，实际 {bad_status} {bad_body}')
+            return 1
+        no_pass_status, _ = http_status(
+            port_a, 'POST', f'/devices/{my_device}/revoke', {}, revoker_token)
+        if no_pass_status != 400:
+            print(f'❌ 不带口令应 400，实际 {no_pass_status}')
+            return 1
+        time.sleep(1.5)
+        if p1.poll() is not None:
+            print('❌ 撤销被口令拦下，但在线 TUI 却退出了（口令校验没生效？）')
+            return 1
+        print('✅ 口令错 → 401、缺口令 → 400，且设备未受影响（在线 TUI 仍运行）')
+
+        revoke(port_a, my_device, PASSPHRASE, revoker_token)
 
         # ① 在线被撤销：收到 device.revoked 帧 → 清盘 + 提示 + 自退
         out = wait_text(m1, '本设备已被撤销', timeout=15)

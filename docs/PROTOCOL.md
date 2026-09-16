@@ -308,11 +308,28 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   **重连不刷新**（被新连接踢掉后又连上不算重新上线），客户端据此按上线顺序排列
   对端的多台在线设备（最新上线在最前）。
 
-### 7.2 撤销设备 DELETE /devices/:id
+### 7.2 撤销设备 POST /devices/:id/revoke
 
-- 仅允许撤销"同 person 的另一台设备"（一人一机时主要用于异常场景）。
+```json
+{ "passphrase": "<空间密保口令>" }
+```
+
+- **授权（2026-09-16 定稿）**：
+  1. **同 space 内可互撤**——不限于"同一 person 的另一台设备"：A 的手机丢了又没有第二台
+     设备时，伴侣 B 也能替他撤掉那台（早期实现是"任何在册设备能撤任何设备"，连空间都不
+     校验；文档当时写的是"仅限同 person"，代码比文档更宽，现已按本规则收口）；
+  2. **每次撤销都必须校验密保口令**（argon2id，与取包同一套校验与失败限速）。撤销会让
+     对方客户端**自毁本地数据**，属不可逆的破坏性操作，必须由口令持有者授权——这样伴侣
+     的一台设备即便被入侵，仅凭 session 也清不掉另一方的设备。
+  3. 不能撤自己 → `400 INVALID_REQUEST`。
+- 失败码：缺口令 → `400 INVALID_REQUEST`；目标不在本空间 → `403 FORBIDDEN`；
+  口令错 → `401 ESCROW_VERIFY_FAILED`；尝试过多 → `429 ESCROW_RATE_LIMITED`；
+  该空间未托管口令（从未设置或被 `DELETE /key-escrow` 清除）→ `409 PASSPHRASE_NOT_SET`
+  （**拒绝放行**，不放宽成"无需口令"）。
 - Server 把设备标记为 `revoked`、清除其 Push Token 与活动会话，并关闭其 WS 连接；**不**通知 Space Key 轮换
   （轮换方案 2026-09-14 决定不做，见 `SECURITY.md` §3）。
+- 注：早期版本是 `DELETE /devices/:id` 且**无需口令**——该形态已移除（口令要求无法可靠地
+  放在 DELETE 请求体里，且旧形态允许空间内任意设备远程抹掉别人的数据）。
 - 被撤销的设备随后：在线 → 收到 `device.revoked` 帧 + close `4403`；离线/重连 → 会话已被删
   返回 `401 UNAUTHORIZED`，重认证时挑战返回 `403 DEVICE_REVOKED`。**这两个信号（帧 / 该 code）
   是客户端唯一被授权清空本地数据的依据**；`403 FORBIDDEN`（未登记）与网络故障都只应警告。
@@ -428,6 +445,9 @@ Authorization: Bearer <session_token>
 | UNAUTHORIZED | 401 | 未认证 / token 失效 |
 | FORBIDDEN | 403 | 设备不在白名单（**未登记**，含服务端库被清空/重置；客户端只警告，**不得**清空本地数据） |
 | DEVICE_REVOKED | 403 | 本设备已被**明确撤销**（`status='revoked'`，涉嫌被盗用；客户端应清空本地数据后重新入网） |
+| ESCROW_VERIFY_FAILED | 401 | 密保口令错误（取包 / 撤销设备的二次校验） |
+| ESCROW_RATE_LIMITED | 429 | 口令尝试过多（按 space 计失败次数，滑窗内超限） |
+| PASSPHRASE_NOT_SET | 409 | 该空间未托管密保口令，无法校验（撤销设备要求先设置口令） |
 | NOT_FOUND | 404 | 资源不存在 |
 | CONFLICT | 409 | 重复 / 状态冲突 |
 | RATE_LIMITED | 429 | 触发限流 |

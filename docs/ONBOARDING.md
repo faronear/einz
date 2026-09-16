@@ -172,7 +172,8 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 - **会话必带空间**：认证时 `space_id` 必填；无 space 的会话不存在（也访问不到任何数据）。
 - **两人上限**：一个空间内 distinct person ≤2（同 person 多设备不限）；由 `space_members`
   的两个槽位在数据库层强制。
-- **撤销设备**：`DELETE /devices/:id`（需认证）→ 标记 `revoked` + 清会话/Push Token + 关 WS；
+- **撤销设备**：`POST /devices/:id/revoke`（需同空间成员认证 + **校验密保口令**）→ 标记
+  `revoked` + 清会话/Push Token + 关 WS；
   被撤销设备重启不复活（**不**做密钥轮换，见 `SECURITY.md` §3；止损走重建空间）。
 - **服务端监控**：`GET /health`（免鉴权）、`docker compose logs -f server`（含
   `[req]` 请求日志与 WS 连接数）、`server/data/einz.sqlite.db` 的审计表（上下线/发送/接收）。

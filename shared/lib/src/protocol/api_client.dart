@@ -225,6 +225,17 @@ class ApiClient {
     await _post('/devices/person-name', {'person_name': personName}, token: token);
   }
 
+  /// 撤销**本空间内**的另一台设备（POST /devices/:id/revoke，PROTOCOL.md §7.2）。
+  ///
+  /// 授权（2026-09-16）：同 space 内可互撤，但**每次都要校验密保口令**——撤销会让
+  /// 对方客户端自毁本地数据，属不可逆操作。失败码：口令错 401 `ESCROW_VERIFY_FAILED`、
+  /// 尝试过多 429 `ESCROW_RATE_LIMITED`、该空间未托管口令 409 `PASSPHRASE_NOT_SET`、
+  /// 目标不在本空间 403 `FORBIDDEN`。**调用方必须在成功后才提示/清理**（失败时目标
+  /// 设备不受任何影响）。
+  Future<void> revokeDevice(String deviceId, String passphrase, String token) async {
+    await _post('/devices/$deviceId/revoke', {'passphrase': passphrase}, token: token);
+  }
+
   /// 上传本人头像（raw 图片 bytes，服务端按 person 存储覆盖）。
   ///
   /// 返回服务端确认的 person_id：上传方**收不到**自己的 profile.updated 广播

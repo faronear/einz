@@ -6714,3 +6714,53 @@ App 侧 UI 行为（常驻提示条文案/样式）由老板真机自测。
 **并发隔离**：`cli/bin/einz_tui.dart` 里另有一处他人未完成改动（欢迎辞尾部多加一个 💞），
 用 `git diff -U0` 拆 hunk 后 `git apply --cached --unidiff-zero` 只暂存我的 14 个 hunk，
 对方那条留在工作区；`package.json`（iOS 构建脚本）同样未纳入。
+
+## 2026-09-16 撤销授权收口：同 space 内可互撤 + 每次必须验密保口令
+
+**背景**：上一个改动（撤销语义收窄）之后，我核对"撤销事件"的出口时发现 `revokeDevice`
+的授权检查**只有"不能撤自己"**——既不校验目标是同一 person（文档写的是"仅限同 person"），
+也不校验同一 space。而撤销现在会触发对方客户端**自毁本地数据**，所以伴侣的一台被入侵
+设备可以远程清掉另一方的设备数据。
+
+**老板定稿**（回答"要不要允许伴侣互撤"）：**同 space 内可互撤，但每次撤销都要验证口令**。
+（选它而不是"严格同 person"：A 的手机丢了又没有第二台设备时，伴侣 B 得能替他撤。）
+
+**落地**：
+
+- **`server/src/escrow.ts`**：新增 `assertSpacePassphrase(spaceId, passphrase)`——复用现成的
+  argon2id 校验（`key_escrow.passphrase_hash`）与**同一套失败限速**（`escrowFailures` 按
+  space 计数，`EINZ_ESCROW_RATE_MAX`/`WINDOW_MS`）。刻意复用而不是各写一份：口令是"销毁
+  某台设备本地数据"的授权凭证，强度必须与取钥同级；共用预算还能防止空间内被入侵设备
+  换端点绕过限速。失败码与取包分支保持一致：`INVALID_REQUEST`(400，缺口令) /
+  `ESCROW_VERIFY_FAILED`(401，口令错) / `ESCROW_RATE_LIMITED`(429)；**新增
+  `PASSPHRASE_NOT_SET`(409)**——该空间没有可校验的口令（从未设置，或被 `DELETE /key-escrow`
+  清掉）时**拒绝放行**（放行等于撤销不需要口令，正是要堵的洞）。
+- **`server/src/devices.ts`**：`revokeDevice(token, targetId, passphrase)` 改 async，授权三步：
+  目标存在(404) → 不能撤自己(400) → **目标 person 是本空间在册成员**(否则 403
+  `FORBIDDEN`) → 口令校验。顺序上"目标合法性"在口令之前（错误目标不该消耗口令预算）。
+- **`server/src/app.ts`**：路由从 `DELETE /devices/:id` 改为 **`POST /devices/:id/revoke`**
+  （口令放请求体；DELETE 带 body 在部分代理/客户端不可靠），旧的**无口令形态移除**——留着
+  就等于留一条绕过口令的路径。审计仍记 `device.revoke`（**不记口令**）。
+- **`shared/api_client.dart`**：新增 `revokeDevice(deviceId, passphrase, token)`，供后续
+  TUI/App 的"撤销我的其他设备"入口调用（老板说入口将来在 TUI 做，本次只把服务端规则与
+  客户端方法准备好）。
+- **冒烟测试**新增一整段授权断言：缺口令哈希→409、缺口令→400、跨空间→403（用第二个空间
+  的设备撤本空间设备）、口令错→401 且**目标设备仍能正常认证**（auth 走通=毫发无损）、
+  撤自己→400、正确口令→200 后目标挑战返回 `DEVICE_REVOKED`。注意主空间在测试里默认有
+  `recover-pass-123` 的哈希 → 用例先 `DELETE /key-escrow` 清掉，才能覆盖 409 分支。
+- **探针** `cli/test/revoked_check.py`：`revoke()` 改走新端点 + 口令；新增负例——先发一次
+  错口令(401)与一次不带口令(400)，断言**在线 TUI 仍运行**（口令拦下时必须毫发无损），
+  再用正确口令撤销。顺带把 http 助手拆成 `http_status`(不抛异常，便于断言错误码)。
+- **文档**：PROTOCOL.md §7.2 重写（授权三条 + 失败码 + 说明旧 DELETE 形态已移除）、错误表
+  增 3 行；DEPLOYMENT.md §5.3 curl 换成 POST + 口令并写明三种失败码；SECURITY.md §2 表与
+  §4.1 事件手册（并注明"客户端入口尚未做，当前只能运维 curl"）、ONBOARDING.md、E2EE.md
+  §9.3、DATABASE.md 审计表；SETUP.md 里 v1 时代的"撤销 + 密钥轮换"整段标注作废。
+
+**验证**：`npm run build` 干净；`npm test`(server) 全绿（含新断言输出
+「授权：缺口令哈希 409 / 缺口令 400 / 跨空间 403 / 口令错 401（目标无损）/ 撤自己 400」）；
+`dart analyze`+`dart test`(shared) 全绿（49 项）；`python3 cli/test/revoked_check.py`
+四场景 + 口令负例全绿。
+
+**待办**：TUI（以及 App 的设备列表）里的撤销入口本身还没做——本轮只定义了规则、准备好
+`ApiClient.revokeDevice`；实现时记得：口令输入走隐藏输入（`_prompt(..., hidden: true)`）、
+二次确认（撤销不可逆）、失败按 `ESCROW_*` 码分别提示。

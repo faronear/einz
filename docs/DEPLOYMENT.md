@@ -226,20 +226,28 @@ npm run restore -- data/backups/backup-<ts>.json
 **场景：** 手机丢失/失窃 → 撤销该设备，阻止它继续收新消息。
 
 ```bash
-# 1) A 撤销 B（DELETE /devices/dev-b1）：标记 revoked + 清 Push Token + 清会话，
-#    并关闭 B 的 WS 连接（Server 不再下发 key.rotation —— 轮换方案已决定不做）
-curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
-  -H "Authorization: Bearer <A的session_token>"
+# 1) 撤销某台设备（POST /devices/<device_id>/revoke）：标记 revoked + 清 Push Token +
+#    清会话，并关闭它的 WS 连接（Server 不再下发 key.rotation —— 轮换方案已决定不做）
+#    **必须带空间密保口令**（2026-09-16）：撤销会让该设备自毁本地数据，属不可逆操作。
+#    授权范围 = 同 space 内可互撤（自己的另一台设备，或伴侣的设备）。
+curl -X POST http://127.0.0.1:3000/devices/dev-b1/revoke \
+  -H "Authorization: Bearer <A的session_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"passphrase":"<空间密保口令>"}'
 
 # 2) 完成——撤销实时生效，不需要重启服务器、也不需要改任何配置文件
 ```
+- device_id 是 UUID（`GET /devices` 可见），不是 `dev1/dev2` 那种序号（v1 遗留叫法）。
+- 口令错 → `401 ESCROW_VERIFY_FAILED`（设备毫发无损）；同空间口令尝试过多 → `429`；
+  空间还没设置密保口令 → `409 PASSPHRASE_NOT_SET`（先在任一在册设备上 `/passphrase` 设置）。
 
 - 被撤销设备：无法认证（403 `DEVICE_REVOKED`）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
 - 被撤销设备**上线即自毁本地数据**（App `_onDeviceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存；
   TUI `_exitRevoked`：清 store 文件 + 附件缓存后退出）。
 - **别把"清空/重置服务端库"当撤销手段**：库一清，设备行就不存在了，客户端只会收到
   403 `FORBIDDEN`（未登记）→ 按 2026-09-16 的语义**只警告、不清本地数据**，用户仍能看本地历史。
-  要真正撤销请用 §5.3 的 `DELETE /devices/:id`（那才会发 `device.revoked` / 返回 `DEVICE_REVOKED`）。
+  要真正撤销请用 §5.3 的 `POST /devices/:id/revoke`（带密保口令；那才会发 `device.revoked` /
+  返回 `DEVICE_REVOKED`）。
 - **不需要**轮换 Space Key：撤销的效力来自设备被标记 `revoked`（它取不到新密文）+ 自毁。
   怀疑密钥材料被提取（越狱/镜像泄露）时的止损流程见 `docs/SECURITY.md` §4.2（替代方案 = 重建空间）。
 - 已同步的历史密文不可追回（设备端已解密数据的固有属性）。

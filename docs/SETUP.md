@@ -157,9 +157,9 @@ docker compose up -d --build
 
 ### 撤销设备与密钥轮换
 
-1. `DELETE /devices/:id`（服务器返回 `key_rotation_required: true`）。
-2. 剩余可信设备生成新 Space Key（key_version +1），重新密封分发（E2EE.md §9）。
-3. 服务器 `config.json` 中移除被撤销设备。
+> 本节是 **v1 时代**的流程（`config.json` 白名单 + 恢复码 + 密钥轮换），Multiverse 下已
+> 全部作废，保留仅为追溯。现行做法见 `DEPLOYMENT.md` §5.3 / `SECURITY.md` §4：
+> `POST /devices/:id/revoke`（带空间密保口令），**不做**密钥轮换。
 
 ### 备份（运维）
 

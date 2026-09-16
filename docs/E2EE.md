@@ -402,6 +402,8 @@ Client                     Server
 
 - 被撤销设备：无法再认证（标记 revoked，挑战返回 403 `DEVICE_REVOKED`）、无法同步、无法发送；
   其旧 Push Token 一并清除；
+- **撤销的授权**（2026-09-16）：同 space 内可互撤，但每次撤销都必须校验空间密保口令
+  （`POST /devices/:id/revoke`）——撤销会触发对方客户端自毁本地数据，属不可逆操作；
 - 被撤销设备**上线即自毁本地数据**（App `chat_page._onDeviceRevoked`；TUI `_exitRevoked`；`SECURITY.md` §2）；
 - **只有这个明确信号才触发自毁**（2026-09-16）：`device.revoked` 帧 / 403 `DEVICE_REVOKED`。
   403 `FORBIDDEN`（设备未登记，常见于服务端库被清空或换了新库）与网络故障一律只警告，

@@ -206,7 +206,7 @@ CREATE TABLE device_activity (
 | `push.unregister` | `DELETE /push/register`   | —                                                                            |
 | `device.rename`   | `POST /devices/name`      | `device_name`                                                                |
 | `person.rename`   | `POST /devices/person-name` | `person_name`                                                              |
-| `device.revoke`   | `DELETE /devices/:id`     | `target_device_id`                                                           |
+| `device.revoke`   | `POST /devices/:id/revoke` | `target_device_id`（**不记口令**）                                          |
 
 **说明：**
 
