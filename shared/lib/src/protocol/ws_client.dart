@@ -54,11 +54,19 @@ class WsDeviceRevokedEvent extends WsEvent {
 /// peer.online/peer.offline：对端设备上下线通知（App 实时更新对方在线状态）。
 /// [personId] 为上下线设备所属身份：与其相同身份的设备（我自己的另一台）不算
 /// "对方"，接收方须忽略（旧服务端不带该字段时为 null——按原行为处理）。
+/// [onlineSince] 仅 peer.online 携带：该设备进入在线态的时刻（ms，重连不刷新），
+/// 接收方据此按上线顺序排列对端的在线设备（最新上线在最前；旧服务端为 null）。
 class WsPeerStatusEvent extends WsEvent {
-  const WsPeerStatusEvent({required super.type, required this.deviceId, this.personId});
+  const WsPeerStatusEvent({
+    required super.type,
+    required this.deviceId,
+    this.personId,
+    this.onlineSince,
+  });
 
   final String deviceId;
   final String? personId;
+  final int? onlineSince;
 }
 
 /// passphrase.rotated：空间口令已被重设（客户端收到后只发通知，不弹窗）。
@@ -243,6 +251,7 @@ class WsClient {
             type: type,
             deviceId: payload['device_id'] as String? ?? '',
             personId: payload['person_id'] as String?,
+            onlineSince: payload['online_since'] as int?,
           ));
           break;
         case kWsTypePassphraseRotated:

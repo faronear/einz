@@ -6279,3 +6279,38 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
    取第一个在线的对方设备，即**最早注册的那台在线设备**，不是最近活跃那台；
    对方全离线则为 null → 显示 `-`。
 另外 `peerDot`（灯）只看 `peerOnline>0`（任一对方设备在线），与显示的这台是否在线无关。
+
+## 2026-09-16 协议新增 online_since + TUI 列出对方所有在线设备
+
+**需求**（老板 2026-09-16）：顶部条左段改成 `灯 名字 n/m台在线 #设备1#设备2…`，
+**逐个列出对方所有在线设备**，顺序按**上线顺序**（最新上线在最前），
+不再按"最近一条消息来自哪台"。
+
+**协议增强**（老板授权改协议：目前全是测试数据，趁机做强壮）：
+- `server/src/ws.ts`：`Conn` 增 `onlineSince`——进入在线态的时刻；**重连（被新连接
+  踢掉后又连上）沿用旧值不刷新**，只有"从无连接变成有连接"才置 now。
+  新增导出 `getOnlineSince()`；`peer.online` 广播带 `online_since`
+  （`peer.offline` 不带——已下线，上线时刻无意义）。
+- `server/src/devices.ts`：`/devices` 增 `online_since` 字段（离线为 null）。
+- `shared/lib/src/protocol/ws_client.dart`：`WsPeerStatusEvent` 增 `onlineSince`。
+- `docs/PROTOCOL.md`：§7.1 补字段与"重连不刷新"语义；§8 peer.online 行同步。
+
+**CLI**（`cli/bin/einz_tui.dart`）：
+- `_TuiState.peerDeviceId`（单台）→ `peerOnlineSince`（device_id → 上线时刻，仅在线设备）。
+- `_peerDeviceLabel()` 改为拼 `#A#B#C`（按 online_since 降序），**去掉"最新消息
+  senderDeviceId"那一级**；无在线设备时返回空串（只显示 n/m）。
+- `_onPeerStatus()` 收到广播即触发 `_refreshPeerOnline()`——广播只带 device_id，
+  设备名/总数仍要 /devices，否则新设备名最多晚 30s（轮询周期）。
+- `changed` 判定加入设备集合比较（A 下 B 上、数量不变也要重绘）。
+
+**标题栏截断语义澄清**（老板纠正）：三段**各占全宽 1/3 上限、互不挤压**，超宽的一段
+**自己**截断——**品牌名也一样自我压缩**（`Einz …`），不存在"左右太长就整段丢掉品牌"。
+旧实现（`_titleBarThree`）是"放不下就弃品牌"，已改为三段都 `_truncateByWidth`；
+中段被截时补回 `\x1B[22m$_white`（否则 bold 泄漏到右段的绿点）。
+推论：左段新格式被截时丢的是最右的"最早上线"设备名，最新上线的紧挨名字保留。
+
+**心跳超时不广播 peer.offline**：保持现状（`ws.ts` 注释已说明会让在线状态抖动），
+客户端最坏 60s 才移除离线设备——老板确认不动。
+
+**验证**：`server npm test`（含新增 online_since 回归：重连不刷新 + offline 不带字段）、
+`shared dart test` 49 项、`cli dart analyze`、`flutter analyze`(app) 全绿。

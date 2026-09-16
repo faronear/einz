@@ -70,8 +70,10 @@ class _TuiState {
   /// 设备名映射（device_id → device_name——listDevices 轮询更新；顶部条对方 #设备名）。
   final Map<String, String> deviceNames = {};
 
-  /// 对方当前在线设备的 device_id（listDevices 轮询记录；无消息时顶部条兜底显示）。
-  String? peerDeviceId;
+  /// 对方**在线设备**表：device_id → 上线时刻（ms，`online_since`；重连不刷新）。
+  /// 顶部条逐个列出这些设备（按上线时刻降序 = 最新上线紧挨名字）；离线设备不在表内，
+  /// 只计入 peerDeviceOnline/Total 的分母（老板 2026-09-16）。
+  final Map<String, int> peerOnlineSince = {};
 
   /// 输入缓冲区（逐键追加）。
   final StringBuffer input = StringBuffer();
@@ -1326,29 +1328,31 @@ String _barLine(String colorSeq, String text, int cols) {
   return '$content${pad > 0 ? ' ' * pad : ''}$_reset';
 }
 
-/// 三段式标题栏拼装：左右在线状态段各自贴缘，长度上限为全宽 1/3 - 1 字符
-/// （超出截断成 … 符号）；品牌名居中于屏幕正中（即中间 1/3 的正中），
-/// 窗口拉伸时左右段随上限同步扩展、品牌始终保持在中央。
+/// 三段式标题栏拼装：左/中/右**各占全宽 1/3 - 1 字符的上限，互不挤压**
+/// （老板 2026-09-16）——超出的一段**自己**截断成 … 符号，既不挤掉别人、也不会
+/// 被别人挤掉：品牌名同样受 1/3 上限约束（放不下时自我压缩成 "Einz …"），
+/// 不存在"左右太长就把品牌整段丢掉"的行为。
+/// 左段贴左缘、中段居中、右段贴右缘，窗口拉伸时三段随上限同步扩展。
 /// 各段可含 ANSI 颜色（_displayWidth 会跳过转义序列）；返回已铺满整行的成品。
-/// 超窄终端（左右段与品牌重叠）时弃品牌，保左右段。
 String _titleBarThree(String left, String center, String right, int cols) {
-  final sideMax = cols ~/ 3 - 1; // 每侧状态区上限：全宽 1/3 - 1 字符
+  final sideMax = cols ~/ 3 - 1; // 每段上限：全宽 1/3 - 1 字符
   final leftT = _truncateByWidth(left, sideMax);
   final rightT = _truncateByWidth(right, sideMax);
+  final centerT = _truncateByWidth(center, sideMax);
+  // 中段被截时尾部会丢掉「关粗体 + 白字」序列 → 补回，否则 bold 泄漏到其后的
+  // 右段（终端把右段的绿点按亮绿渲染——老板 2026-09-10 反馈过同类问题）
+  final centerSafe =
+      centerT.length == center.length ? centerT : '$centerT\x1B[22m$_white';
   final lw = _displayWidth(leftT);
   final rw = _displayWidth(rightT);
-  final cw = _displayWidth(center);
+  final cw = _displayWidth(centerSafe);
   final centerPos = (cols - cw) ~/ 2; // 品牌名起点：屏幕正中（中间 1/3 的正中）
-  final String content;
-  if (centerPos >= lw && centerPos + cw <= cols - rw) {
-    // 常规：左段贴左缘、品牌居中、右段贴右缘，中间以空格补齐
-    content =
-        '$leftT${' ' * (centerPos - lw)}$center${' ' * ((cols - rw) - (centerPos + cw))}$rightT';
-  } else {
-    // 超窄终端：左右段之间放不下品牌——弃品牌，左右仍贴缘
-    final gap = cols - lw - rw;
-    content = '$leftT${gap > 0 ? ' ' * gap : ''}$rightT';
-  }
+  // 每段都 ≤ 全宽 1/3 - 1 ⇒ 三段总宽 < cols，不会重叠；仍取 max(0,…) 兜住
+  // 极窄终端（cols < 6 时 sideMax ≤ 0 不截断）以免负数空格抛异常。
+  final leftPad = centerPos - lw;
+  final rightPad = (cols - rw) - (centerPos + cw);
+  final content =
+      '$leftT${' ' * (leftPad > 0 ? leftPad : 0)}$centerSafe${' ' * (rightPad > 0 ? rightPad : 0)}$rightT';
   return _barLine(_bgBlack, content, cols);
 }
 
@@ -1460,13 +1464,15 @@ void _render() {
     WsStatus.stopped => '${_white}○',
   };
   final peerName = _peerNameOf(s);
-  final peerDevice = _peerDeviceLabel(s);
   final peerDot = s.peerOnline ? '$_green●$_white' : '${_white}○';
   // 三段式标题栏：对方状态贴左缘、我的状态贴右缘（与消息左右分栏一致——
-  // 对方消息在左、我的消息在右）、品牌名 "Einz TUI" 居中
-  // （窄终端放不下三段时先弃中段，再不行截断右段，保左段完整）。
+  // 对方消息在左、我的消息在右）、品牌名 "Einz TUI" 居中。
+  // 三段各占全宽 1/3 上限、互不挤压，超宽的一段自己截断（含品牌名）；
+  // 因此每段都是"尾部先丢"——两侧的灯与名字在前，设备名在后最先被截。
+  final peerDevices = _peerDeviceLabel(s);
   final titleText = _titleBarThree(
-    '$peerDot $peerName #$peerDevice${_deviceCountLabel(s.peerDeviceOnline, s.peerDeviceTotal)}',
+    '$peerDot $peerName'
+        '${_deviceCountLabel(s.peerDeviceOnline, s.peerDeviceTotal)}$peerDevices',
     // 品牌名 bold 展示后必须关闭粗体（ESC[22m）再继续——否则 bold 状态泄漏到
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
@@ -1607,18 +1613,19 @@ String _deviceCountLabel(int onlineCount, int totalCount) {
   return ' $onlineCount/${totalCount}台在线';
 }
 
-/// 对方设备名：对方最新一条消息的 senderDeviceId → 设备名映射 → device_id → '-'
-/// （无消息时用对方当前在线设备兜底——老板需求：多设备取最新一条消息的设备）。
+/// 对方在线设备片段：`#A#B#C`——**逐个列出对方所有在线设备**，按上线时刻降序
+/// （最新上线的紧挨名字，最早上线的在最右 = 最先被截断丢弃）。
+/// 刻意不按"最近一条消息发自哪台"（老板 2026-09-16）：多设备时应展示谁在线、
+/// 谁刚上线，而不是最后发言的那台（它可能早已离线）。
+/// 名字取 listDevices 的 device_name，未知名回退 device_id；无在线设备时空串。
 String _peerDeviceLabel(_TuiState s) {
-  String? senderId;
-  for (final msg in s.session.messages.reversed) {
-    if (msg.isMine || msg.isSystem) continue;
-    senderId = msg.env.senderDeviceId;
-    break;
+  final entries = s.peerOnlineSince.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  final buf = StringBuffer();
+  for (final e in entries) {
+    buf.write('#${s.deviceNames[e.key] ?? e.key}');
   }
-  final devId = senderId ?? s.peerDeviceId;
-  if (devId == null) return '-';
-  return s.deviceNames[devId] ?? devId;
+  return buf.toString();
 }
 
 /// last_seen 毫秒 → 时间文本：今天 HH:mm / 昨天 HH:mm / M/d HH:mm。
@@ -1674,6 +1681,9 @@ void _onPeerStatus(WsPeerStatusEvent event) {
       _refreshPersonNames(s);
     }
   }
+  // 广播只带 device_id（+上线时刻），设备名/总数仍来自 /devices——立刻重拉一次，
+  // 否则新上线的设备名要等 30s 轮询才出现在顶部条（老板 2026-09-16）
+  _refreshPeerOnline();
 }
 
 /// 查询对方在线状态（listDevices last_seen<60s——同 App 判定），更新顶部条。
@@ -1709,7 +1719,7 @@ Future<void> _refreshPeerOnline() async {
     int myOnline = 0;
     int peerTotal = 0;
     int peerOnline = 0;
-    String? onlinePeerDevice;
+    final peerSince = <String, int>{}; // 在线对方设备 → 上线时刻（降序展示）
     for (final d in devices) {
       if (d['status'] != null && d['status'] != 'active') continue; // 已撤销不计
       final devId = (d['device_id'] as String?) ?? '';
@@ -1717,11 +1727,15 @@ Future<void> _refreshPeerOnline() async {
       if (devId.isNotEmpty && devName.isNotEmpty) s.deviceNames[devId] = devName;
       final pid = d['person_id'] as String?;
       final isOnline = deviceOnline(d);
+      // 上线时刻：online_since（进入在线态，重连不刷新）→ 退回 connected_at → 0
+      final since = (d['online_since'] as num?)?.toInt() ??
+          (d['connected_at'] as num?)?.toInt() ??
+          0;
       if (pid == null || myPid == null) {
         // 身份尚未落位（新设备引导中）：退回按设备判定，不统计多设备数
         if (devId != myId && isOnline) {
           peerOnline++;
-          onlinePeerDevice ??= devId;
+          peerSince[devId] = since;
         }
         continue;
       }
@@ -1733,21 +1747,27 @@ Future<void> _refreshPeerOnline() async {
       peerTotal++;
       if (isOnline) {
         peerOnline++;
-        onlinePeerDevice ??= devId;
+        peerSince[devId] = since;
       }
     }
     final online = peerOnline > 0;
+    // 设备集合变化也要重绘：A 下 B 上（在线数不变）时顶部条应换成 B 的名字
+    final devicesChanged = peerSince.length != s.peerOnlineSince.length ||
+        peerSince.entries.any((e) => s.peerOnlineSince[e.key] != e.value);
     final changed = online != s.peerOnline ||
         myOnline != s.myDeviceOnline ||
         myTotal != s.myDeviceTotal ||
         peerOnline != s.peerDeviceOnline ||
-        peerTotal != s.peerDeviceTotal;
+        peerTotal != s.peerDeviceTotal ||
+        devicesChanged;
     s.peerOnline = online;
     s.myDeviceOnline = myOnline;
     s.myDeviceTotal = myTotal;
     s.peerDeviceOnline = peerOnline;
     s.peerDeviceTotal = peerTotal;
-    s.peerDeviceId = onlinePeerDevice;
+    s.peerOnlineSince
+      ..clear()
+      ..addAll(peerSince);
     if (changed) _render();
   } catch (_) {
     // 查询失败保持上次状态（断网/未认证）

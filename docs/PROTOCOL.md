@@ -294,12 +294,15 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 // 响应 200
 { "devices": [
     { "device_id": "…", "person_id": "…", "status": "active", "last_seen": 1787900000000,
-      "device_name": "MacBook", "connected_at": 1787900000000 }
+      "device_name": "MacBook", "connected_at": 1787900000000, "online_since": 1787900000000 }
 ] }
 ```
 
 - `last_seen` 只由 WS 连接/心跳/断开维护（轮询端点不刷新它，否则调用方会让自己"永远新鲜"）；
-  `connected_at` = 当前 WS 连接的建立时刻（离线为 null）。
+  `connected_at` = 当前 WS 连接的建立时刻（离线为 null）；
+  `online_since` = 进入**在线态**的时刻（离线为 null）——与 `connected_at` 的区别是
+  **重连不刷新**（被新连接踢掉后又连上不算重新上线），客户端据此按上线顺序排列
+  对端的多台在线设备（最新上线在最前）。
 
 ### 7.2 撤销设备 DELETE /devices/:id
 
@@ -394,7 +397,7 @@ Authorization: Bearer <session_token>
 | S→C | `sync.advance` | `{ "last_sequence": 105 }` | 提示有新数据，可拉 /sync |
 | S→C | `receipt.updated` | `{ "person_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
 | S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话 |
-| S→C | `peer.online` | `{ "device_id": "dev1", "person_id": "per1" }` | 对端设备上线（WS 连接建立时广播；**不发给同 person 的设备**——自己的另一台不是"对方"） |
+| S→C | `peer.online` | `{ "device_id": "dev1", "person_id": "per1", "online_since": 1787900000000 }` | 对端设备上线（WS 连接建立时广播；**不发给同 person 的设备**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
 | S→C | `peer.offline` | `{ "device_id": "dev1", "person_id": "per1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 person 设备） |
 | S→C | `passphrase.rotated` | `{ "device_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成邀请码/改口令时按需检测 updated_at 再要求输入新口令） |
 

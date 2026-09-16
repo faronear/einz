@@ -11,6 +11,10 @@ interface Conn {
   spaceId: string; // 连接绑定的 Space（会话必带 space）
   alive: boolean;
   connectedAt: number; // 本次 WS 连接建立时刻（ms）——/devices 显示"上线时间"
+  onlineSince: number; // 进入在线态的时刻（ms）——与 connectedAt 的区别：重连
+  // （被新连接踢掉后又连上）不刷新它，只有"从无连接变成有连接"才置 now。
+  // 用途：客户端按"上线顺序"排列对端的多台在线设备（最新上线在最前），
+  // 重连不应让设备跳到队首（老板 2026-09-16）。
   meta: RequestMeta; // 来源 IP / UA（建连时的 req），审计落库用
   timedOut: boolean; // 已被心跳判定为超时（close 时据此记 heartbeat_timeout）
 }
@@ -20,6 +24,11 @@ const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1
 /** 设备当前 WS 连接的建立时刻（ms；离线设备返回 null）。 */
 export function getConnectedAt(deviceId: string): number | null {
   return conns.get(deviceId)?.connectedAt ?? null;
+}
+
+/** 设备进入在线态的时刻（ms；离线返回 null）——重连不刷新，见 Conn.onlineSince。 */
+export function getOnlineSince(deviceId: string): number | null {
+  return conns.get(deviceId)?.onlineSince ?? null;
 }
 
 /** 发起方设备所属 Space：优先其在线连接；**不在线时回退查 sessions**
@@ -41,25 +50,25 @@ function spaceOfDevice(deviceId: string): string | null {
 /** 广播只发给**另一个人**的在线设备：同一 person 的多台设备（同一人的手机+电脑）
  *  不算"对方"——此前只排除发起设备本身，自己的第二台设备一上线，第一台就把
  *  对方灯点亮（老板 2026-09-16 实测：B 从未加入却显示在线）。
- *  payload 带 person_id：客户端（可能连着旧版服务端）据此二次过滤。 */
+ *  payload 带 person_id：客户端（可能连着旧版服务端）据此二次过滤。
+ *  peer.online 另带 online_since：接收方据此把该设备插到"在线设备列表"的正确
+ *  位置（按上线顺序，最新上线在最前），省掉一次 /devices 往返（老板 2026-09-16）。 */
 function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer.offline"): void {
   const origin = conns.get(exceptDeviceId);
   const spaceId = origin?.spaceId ?? null;
   if (spaceId == null) return;
   const originPersonId = origin?.personId ?? null;
+  const payload: Record<string, unknown> = {
+    device_id: exceptDeviceId,
+    person_id: originPersonId,
+  };
+  if (type === "peer.online") payload.online_since = origin?.onlineSince ?? null;
+  const frame = JSON.stringify({ id: 0, type, payload });
   for (const [deviceId, conn] of conns) {
     if (deviceId === exceptDeviceId) continue;
     if (conn.spaceId !== spaceId) continue;
     if (originPersonId != null && conn.personId === originPersonId) continue;
-    if (conn.ws.readyState === WebSocket.OPEN) {
-      conn.ws.send(
-        JSON.stringify({
-          id: 0,
-          type,
-          payload: { device_id: exceptDeviceId, person_id: originPersonId },
-        })
-      );
-    }
+    if (conn.ws.readyState === WebSocket.OPEN) conn.ws.send(frame);
   }
 }
 
@@ -154,6 +163,8 @@ export function attachWs(wss: WebSocketServer): void {
       spaceId,
       alive: true,
       connectedAt: now,
+      // 重连（旧连接尚在，被本次踢掉）沿用旧上线时刻：设备没有真正"下线又上线"
+      onlineSince: old?.onlineSince ?? now,
       meta,
       timedOut: false,
     };

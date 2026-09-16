@@ -4,7 +4,7 @@ import { getDevice } from './config.js'
 import { assertDeviceName } from './deviceName.js'
 import { assertPersonName } from './personName.js'
 import { deviceScopeClause, requireSession } from './guard.js'
-import { broadcastProfileUpdated, getConnectedAt } from './ws.js'
+import { broadcastProfileUpdated, getConnectedAt, getOnlineSince } from './ws.js'
 
 /** GET /devices：设备列表（含 person 映射）。
  *  注意：不在本接口刷新调用方 last_seen——last_seen 只由 WS 连接/心跳/断开维护，
@@ -37,7 +37,9 @@ export function listDevices (
   return {
     devices: rows.map(r => ({
       ...r,
-      connected_at: getConnectedAt(r.device_id)
+      connected_at: getConnectedAt(r.device_id),
+      // 进入在线态的时刻（重连不刷新）：客户端据此按上线顺序排列对端在线设备
+      online_since: getOnlineSince(r.device_id)
     }))
   }
 }

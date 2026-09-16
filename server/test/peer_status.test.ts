@@ -15,6 +15,7 @@ import { test } from 'node:test'
 import { WebSocket, WebSocketServer } from 'ws'
 
 import { hashSessionToken } from '../src/auth.js'
+import { listDevices } from '../src/devices.js'
 import { getDb, openDb } from '../src/db.js'
 import { attachWs } from '../src/ws.js'
 
@@ -127,6 +128,75 @@ test('peer 上下线广播：跳过同一 person 的设备，只给对方', asyn
     )
 
     a2.ws.close()
+    await sleep(50)
+  } finally {
+    wss.close()
+    for (const c of wss.clients) c.terminate()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+/** 取 a1 收到的、关于 b1 的最后一帧指定类型的广播。 */
+function lastAbout (
+  frames: Client['frames'],
+  type: string,
+  deviceId: string,
+): Record<string, unknown> | undefined {
+  const hits = frames.filter(f => f.type === type && f.payload.device_id === deviceId)
+  return hits.length === 0 ? undefined : hits[hits.length - 1]!.payload
+}
+
+test('online_since：进入在线态的时刻——重连不刷新；peer.offline 不带该字段', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'einz-since-'))
+  const wss = new WebSocketServer({ port: 0 })
+  attachWs(wss)
+  const port = (wss.address() as { port: number }).port
+  try {
+    openDb(join(dir, 'since.db'))
+    seed()
+
+    const a1 = await connect(port, 'tok-a1')
+    const b1 = await connect(port, 'tok-b1')
+    await waitFor('a1 收到 b1 的 peer.online', () =>
+      a1.frames.some(f => f.type === 'peer.online' && f.payload.device_id === 'b1'))
+    const first = lastAbout(a1.frames, 'peer.online', 'b1')!
+    assert.equal(typeof first.online_since, 'number', 'peer.online 应带 online_since')
+
+    // /devices 与广播同源：客户端既能轮询也能靠广播增量维护
+    const row = listDevices('tok-a1').devices.find(d => d.device_id === 'b1') as
+      | Record<string, unknown>
+      | undefined
+    assert.equal(row?.online_since, first.online_since, '/devices 的 online_since 应与广播一致')
+    assert.ok(row?.connected_at != null, '在线设备应有 connected_at')
+
+    // 重连（旧连接被踢、再连上）：不算"重新上线"→ online_since 不变，
+    // 客户端列表里该设备不该跳到队首（老板 2026-09-16）
+    await sleep(20)
+    const b1Again = await connect(port, 'tok-b1')
+    await waitFor('a1 收到 b1 重连后的 peer.online', () =>
+      a1.frames.filter(f => f.type === 'peer.online' && f.payload.device_id === 'b1').length >= 2)
+    const second = lastAbout(a1.frames, 'peer.online', 'b1')!
+    assert.equal(
+      second.online_since,
+      first.online_since,
+      '重连不得刷新 online_since（否则设备会跳到"最新上线"的位置）',
+    )
+    const rowAgain = listDevices('tok-a1').devices.find(d => d.device_id === 'b1') as
+      | Record<string, unknown>
+      | undefined
+    assert.equal(rowAgain?.online_since, first.online_since, '/devices 同样不因重连刷新')
+    assert.notEqual(rowAgain?.connected_at, row?.connected_at, 'connected_at 应随本次连接刷新')
+
+    b1Again.ws.close()
+    await waitFor('a1 收到 b1 的 peer.offline', () =>
+      a1.frames.some(f => f.type === 'peer.offline' && f.payload.device_id === 'b1'))
+    assert.ok(
+      !('online_since' in (lastAbout(a1.frames, 'peer.offline', 'b1') ?? {})),
+      'peer.offline 不带 online_since（已下线，上线时刻无意义）',
+    )
+
+    b1.ws.close()
+    a1.ws.close()
     await sleep(50)
   } finally {
     wss.close()

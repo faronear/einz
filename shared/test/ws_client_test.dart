@@ -82,6 +82,39 @@ void main() {
     await client.stop();
   });
 
+  test('peer.online/peer.offline：解析 device_id/person_id/online_since', () async {
+    final (server, base, conns) = await _startWsServer();
+    addTearDown(() => server.close(force: true));
+    final events = <WsEvent>[];
+    final client = WsClient(server: base, token: 'tok', onEvent: events.add);
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    conns.first.add(jsonEncode({
+      'id': 0,
+      'type': 'peer.online',
+      'payload': {
+        'device_id': 'dev-b',
+        'person_id': 'per-b',
+        'online_since': 1787900000000,
+      },
+    }));
+    conns.first.add(jsonEncode({
+      'id': 0,
+      'type': 'peer.offline',
+      'payload': {'device_id': 'dev-b', 'person_id': 'per-b'},
+    }));
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    final online = events.whereType<WsPeerStatusEvent>().first;
+    expect(online.deviceId, 'dev-b');
+    expect(online.personId, 'per-b');
+    expect(online.onlineSince, 1787900000000);
+    // 离线帧不带该字段（已下线，上线时刻无意义）
+    expect(events.whereType<WsPeerStatusEvent>().last.onlineSince, isNull);
+    await client.stop();
+  });
+
   test('未知类型帧被忽略', () async {
     final (server, base, conns) = await _startWsServer();
     addTearDown(() => server.close(force: true));
