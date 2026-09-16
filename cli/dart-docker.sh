@@ -64,6 +64,9 @@ case "${1:-setup}" in
   tui)
     shift
     ensure_image
+    # 按入库 lockfile 强制解析：lockfile 与 pubspec 不符或缓存残留旧包时直接报错，
+    # 避免静默解析出不兼容版本（曾致首次安装时报 SodiumSumoInit 旧 API 编译错）
+    run_container -i dart pub get --enforce-lockfile
     run_container -it dart run bin/einz_tui.dart "$@"
     ;;
   dartc)
