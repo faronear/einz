@@ -1606,11 +1606,12 @@ String _peerNameOf(_TuiState s) {
   return partnerPresetName ?? '-';
 }
 
-/// 同一身份的多设备计数（顶部条 "n/m台在线"）：单设备时不显示——"1/1台在线"
-/// 只是噪音；多设备时才需要知道"我的/对方的哪几台在线"（老板 2026-09-16）。
+/// 同一身份的多设备计数（顶部条 "#n/m"）：**始终显示**，不省略 1/1——0 台在线时
+/// 人名后面若什么都没有，"没有人名对应的设备"和"只是没显示"就分不清了
+/// （老板 2026-09-16）。"台在线"字样去掉：以 # 引导，与紧随其后的 #设备名 同形，
+/// 一眼看出这一段是设备信息而非人名。
 String _deviceCountLabel(int onlineCount, int totalCount) {
-  if (totalCount < 2) return '';
-  return ' $onlineCount/${totalCount}台在线';
+  return ' #$onlineCount/$totalCount';
 }
 
 /// 对方在线设备片段：`#A#B#C`——**逐个列出对方所有在线设备**，按上线时刻降序
