@@ -18,6 +18,7 @@ import 'data/server_settings.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/passphrase_field.dart';
+import 'widgets/cute_house_icon.dart';
 
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
 enum _WizardRole { create, join, offline }
@@ -916,8 +917,9 @@ class _SetupPageState extends State<SetupPage> {
           ),
         _stepHeader(l10n.setupEntryTitle, l10n.setupEntryHint),
         const SizedBox(height: 12),
-        // 左右两张卡片：创建（品牌蓝 + 锤子图标）/ 加入（品牌粉 + 门图标）；
-        // 创建不用加号（易与"加入"混淆，老板 2026-09-11 改为工具/建造语义图标）
+        // 左右两张卡片：创建（品牌蓝 + 锤子图标）/ 加入（品牌粉 + 可爱小房子——加入后
+        // 两人就组成了一个窝/家，老板 2026-09-16）；创建不用加号（易与"加入"混淆，
+        // 老板 2026-09-11 改为工具/建造语义图标）
         // 注意：不能用 crossAxisAlignment.stretch——入口页包在 SingleChildScrollView
         // 里（高度无界），stretch 会抛 "BoxConstraints forces an infinite height"
         // 导致卡片不渲染（2026-09-11 真机报告）；等高由 _EntryCard 固定高度保证
@@ -925,7 +927,8 @@ class _SetupPageState extends State<SetupPage> {
           children: [
             Expanded(
               child: _EntryCard(
-                icon: Icons.build_outlined,
+                icon: const Icon(Icons.build_outlined,
+                    size: 44, color: Color(0xFF2271F7)),
                 label: l10n.setupEntryCreate,
                 backgroundColor: const Color(0xFFE3F2FD),
                 accentColor: const Color(0xFF2271F7),
@@ -938,7 +941,11 @@ class _SetupPageState extends State<SetupPage> {
             const SizedBox(width: 12),
             Expanded(
               child: _EntryCard(
-                icon: Icons.door_front_door_outlined,
+                // 自绘小房子：门窗用卡片底色挖空，所以要把底色传进去
+                icon: const CuteHouseIcon(
+                  color: Color(0xFFD6529C),
+                  background: Color(0xFFFDD6ED),
+                ),
                 label: l10n.setupEntryJoin,
                 backgroundColor: const Color(0xFFFDD6ED),
                 accentColor: const Color(0xFFD6529C),
@@ -2400,6 +2407,8 @@ class _DogEarClipper extends CustomClipper<Path> {
 
 /// 空间入口页的选择卡片：大图标 + 名称，点按选择「创建秘境 / 加入秘境」。
 /// 浅色品牌底 + 品牌色图标/文字，两张卡片左右并排（老板 2026-09-11）。
+/// 图标收成 [Widget] 而不是 `IconData`：加入卡片用的是自绘的 [CuteHouseIcon]
+/// （老板 2026-09-16），Material 字形表达不了。
 class _EntryCard extends StatelessWidget {
   const _EntryCard({
     required this.icon,
@@ -2409,7 +2418,7 @@ class _EntryCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String label;
   final Color backgroundColor;
   final Color accentColor;
@@ -2430,7 +2439,7 @@ class _EntryCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 44, color: accentColor),
+                icon,
                 const SizedBox(height: 12),
                 Text(
                   label,
