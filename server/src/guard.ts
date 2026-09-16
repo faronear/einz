@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { getDb } from "./db.js";
 import { ApiError, resolveSession } from "./auth.js";
-import { getDevice, isActiveDevice } from "./config.js";
+import { getDevice, getDeviceStatus } from "./config.js";
 
 /**
  * 鉴权守卫：路由里"取 token → resolveSession → 白名单校验（→ 空间成员校验）"
@@ -44,8 +44,10 @@ export function optionalBearerToken(req: IncomingMessage): string | null {
 }
 
 /**
- * 认证 + 白名单校验 + **会话必须绑定 space**。
- * token 为 null（未带凭证）→ 401；设备未登记/已撤销 → 403；
+ * 认证 + 设备状态校验 + **会话必须绑定 space**。
+ * token 为 null（未带凭证）→ 401；设备**被明确撤销** → 403 `DEVICE_REVOKED`
+ * （客户端据此自毁本地数据）；设备不在册（库被清/未登记）→ 403 `FORBIDDEN`
+ * （客户端只应警告，绝不销毁数据）；
  * 会话没有 space（v1 遗留会话）→ 401（重新认证即可拿到绑定 space 的会话）。
  */
 export function requireSession(token: string | null): DeviceSession {
@@ -53,7 +55,11 @@ export function requireSession(token: string | null): DeviceSession {
     throw new ApiError("UNAUTHORIZED", "missing bearer token", 401);
   }
   const { device_id, space_id } = resolveSession(token);
-  if (!isActiveDevice(device_id)) {
+  const deviceStatus = getDeviceStatus(device_id);
+  if (deviceStatus === "revoked") {
+    throw new ApiError("DEVICE_REVOKED", "device revoked", 403);
+  }
+  if (deviceStatus === "missing") {
     throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   }
   if (space_id == null || space_id.length === 0) {

@@ -1,6 +1,5 @@
 import { getDb } from './db.js'
 import { ApiError, resolveSession } from './auth.js'
-import { isActiveDevice, type ServerConfig } from './config.js'
 import { pwhashStrVerify } from './crypto.js'
 import { requireSession, requireSpaceMember } from './guard.js'
 import { broadcastPassphraseRotated } from './ws.js'

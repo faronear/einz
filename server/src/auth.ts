@@ -1,5 +1,5 @@
 import { getDb } from "./db.js";
-import { getDevice, isActiveDevice } from "./config.js";
+import { getDevice, getDeviceStatus } from "./config.js";
 import { constantTimeEqualB64, randomBytes, sealFor, toB64 } from "./crypto.js";
 import { createHash, randomBytes as nodeRandomBytes } from "node:crypto";
 
@@ -18,13 +18,23 @@ export interface SessionResult {
   expires_in: number;
 }
 
-/** 阶段 1：生成密封 challenge（PROTOCOL.md §3）。仅白名单内 active 设备可发起。
+/** 阶段 1：生成密封 challenge（PROTOCOL.md §3）。仅在册且未撤销的设备可发起。
+ *
+ * 两种拒绝**必须给不同 code**（老板 2026-09-16）：
+ * - 设备被明确撤销 → `DEVICE_REVOKED`（客户端据此自毁本地数据）；
+ * - 设备不在册（库被清/从未登记）→ `FORBIDDEN`（客户端**只应警告**，绝不销毁数据）。
+ * 此前两者都返回 FORBIDDEN，导致"后台数据库被重置"被客户端误判为"本设备被撤销"
+ * 而清空本地数据——运维失误造成不可挽回的数据损失。
  *
  * **spaceId 必填**（2026-09-15 v1 收敛后）：数据全按 space 隔离，会话必须绑定一个
  * space。v1 时代允许不带（落 NULL 的 legacy 会话），那类会话什么都访问不了，
  * 却让下游 8 处代码各自 `?? ""` 回落——现在在入口就拒绝。 */
 export async function createChallenge(deviceId: string, spaceId: string): Promise<ChallengeResult> {
-  if (!isActiveDevice(deviceId)) {
+  const deviceStatus = getDeviceStatus(deviceId);
+  if (deviceStatus === "revoked") {
+    throw new ApiError("DEVICE_REVOKED", "device revoked", 403);
+  }
+  if (deviceStatus === "missing") {
     throw new ApiError("FORBIDDEN", "device not in whitelist", 403);
   }
   if (spaceId == null || spaceId.length === 0) {

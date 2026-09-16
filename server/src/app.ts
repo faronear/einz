@@ -131,7 +131,7 @@ server.on('upgrade', (req, socket, head) => {
  *   ① 在路由里调 `requireSession(token)`（设备级）或
  *      `requireSpaceMember(token, spaceId)`（空间级，见 guard.ts）；
  *   ② 把 token 交给**已内置鉴权**的模块函数（各模块第一件事就是
- *      resolveSession + isActiveDevice，例如 messages/receipts/devices/escrow/push）。
+ *      resolveSession + 设备状态校验，例如 messages/receipts/devices/escrow/push）。
  * - 免鉴权端点只有这几个，且都是有意为之：`GET /health`、`GET /join/:token`（落地页）、
  *   `POST /spaces`（空间自举，创建者还没有凭证）、`POST /spaces/join{,/preflight}`、
  *   `GET /spaces/lookup`（按地址定位，给未入网者用）、

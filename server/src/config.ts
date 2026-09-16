@@ -54,19 +54,23 @@ export function loadConfig(): ServerConfig {
   };
 }
 
+/** 设备在库里的三种状态。**revoked 与 missing 是不同产品语义，禁止再合并成一个布尔**：
+ * 前者是"这台设备被明确撤销"（可能涉嫌被盗用 → 客户端自毁本地数据），后者是
+ * "此设备不在册"（库被清/从未登记 → 客户端只应离线警告，绝不销毁数据）。 */
+export type DeviceStatus = "active" | "revoked" | "missing";
+
 /**
- * 设备是否在白名单且未被撤销。
- * 判定源 = 数据库 devices 表。撤销（status='revoked'）实时生效（E2EE.md §9.3）。
+ * 设备状态（判定源 = 数据库 devices 表）。撤销（status='revoked'）实时生效（E2EE.md §9.3）。
  *
- * 注：v1 时代曾接收 ServerConfig（白名单来自 config.json 的静态数组），Multiverse
- * 改成动态登记后该参数已无用——2026-09-15 收敛时去掉（评审架构项 #2）。
+ * 注：v1 时代白名单来自 config.json 的静态数组，Multiverse 改成动态登记后
+ * 配置参数已无用——2026-09-15 收敛时去掉（评审架构项 #2）。
  */
-export function isActiveDevice(deviceId: string): boolean {
+export function getDeviceStatus(deviceId: string): DeviceStatus {
   const row = getDb()
     .prepare(`SELECT status FROM devices WHERE device_id = ?`)
     .get(deviceId) as { status: string } | undefined;
-  if (row == null) return false; // db 无记录 = 未登记 → 拒绝
-  return row.status === "active";
+  if (row == null) return "missing"; // db 无记录 = 未登记（含库被重置）
+  return row.status === "revoked" ? "revoked" : "active";
 }
 
 /** 取设备信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 devices 表。 */

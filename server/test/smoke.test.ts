@@ -325,13 +325,20 @@ async function main (): Promise<void> {
     const healthNoVersion = await RAW_FETCH(`http://127.0.0.1:${port}/health`)
     assert.equal(healthNoVersion.status, 200, '/health 免协议版本校验（监控/curl 用）')
 
-    // 1) 未登记设备挑战 → 403（带了 space_id 仍应拒绝：设备不在 devices 表）
+    // 1) 未登记设备挑战 → 403 FORBIDDEN（带了 space_id 仍应拒绝：设备不在 devices 表）
+    //    **code 必须是 FORBIDDEN，不能是 DEVICE_REVOKED**：库被清/从未登记≠被撤销，
+    //    客户端据此只警告、不清空本地数据（老板 2026-09-16）。
     const evil = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ device_id: 'dev-evil', space_id: 'space-evil' })
     })
     assert.equal(evil.status, 403, 'non-enrolled device must be rejected')
+    assert.equal(
+      ((await evil.json()) as { error: { code: string } }).error.code,
+      'FORBIDDEN',
+      '未登记设备必须是 FORBIDDEN（与 DEVICE_REVOKED 区分：未登记不得触发客户端自毁）'
+    )
 
     // 2) A 创建空间（v2 入口：登记设备 + 签发会话）
     const spaceId = await devA.createSpace(port)
@@ -1019,8 +1026,64 @@ async function main (): Promise<void> {
     )
     console.log('✅ 取包限速：2 次失败后第 3 次 429（免认证端点防在线爆破）')
 
+    // 12) 撤销语义（老板 2026-09-16）：**只有明确撤销**才给 DEVICE_REVOKED。
+    //     此前 revoked 与"库被重置/未登记"都返回 FORBIDDEN，客户端只能把 403 一律
+    //     当撤销处理 → 后台 DB 被清空时客户端自毁本地数据，不可挽回。
+    const revokeB = await fetch(
+      `http://127.0.0.1:${port}/devices/${devB.deviceId}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${devA.sessionToken}` } }
+    )
+    assert.equal(revokeB.status, 200, 'revoke should succeed')
+
+    // 12a) 已撤销设备挑战 → 403 DEVICE_REVOKED
+    const revokedCh = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: devB.deviceId, space_id: spaceId })
+    })
+    assert.equal(revokedCh.status, 403, 'revoked device must be rejected')
+    assert.equal(
+      ((await revokedCh.json()) as { error: { code: string } }).error.code,
+      'DEVICE_REVOKED',
+      '已撤销设备必须返回 DEVICE_REVOKED（客户端据此清空本地数据）'
+    )
+    // 撤销同时清掉该设备的会话（PROTOCOL.md §7.2）→ 旧 token 落到 401
+    const revokedSync = await fetch(`http://127.0.0.1:${port}/sync?after=0`, {
+      headers: { Authorization: `Bearer ${devB.sessionToken}` }
+    })
+    assert.equal(revokedSync.status, 401, 'revoked device session must be gone')
+
+    // 12b) guard.requireSession 的 revoked 分支（防御性）：revoke 已删会话，正常路径
+    //      走不到，这里直接种一条属于该 revoked 设备的会话——若该分支被误删，
+    //      被撤销设备就能拿着旧会话继续同步消息（安全缺口）
+    const staleToken = 'revoked-device-stale-session'
+    const seedDb = new Database(join(tempDir, 'einz.sqlite.db'))
+    seedDb
+      .prepare(
+        `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(
+        createHash('sha256').update(staleToken).digest('hex'),
+        devB.deviceId,
+        spaceId,
+        Date.now() + 3_600_000,
+        Date.now()
+      )
+    seedDb.close()
+    const staleSync = await fetch(`http://127.0.0.1:${port}/sync?after=0`, {
+      headers: { Authorization: `Bearer ${staleToken}` }
+    })
+    assert.equal(staleSync.status, 403, 'revoked device with a live session must be rejected')
+    assert.equal(
+      ((await staleSync.json()) as { error: { code: string } }).error.code,
+      'DEVICE_REVOKED',
+      'requireSession 对 revoked 设备也必须 DEVICE_REVOKED'
+    )
+    console.log('✅ 撤销语义：已撤销 → DEVICE_REVOKED（挑战与会话校验两处），未登记 → FORBIDDEN')
+
     console.log(
-      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members)'
+      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members) / 撤销语义'
     )
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，
