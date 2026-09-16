@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "l10n": "echo Generating app_localizations_xx.dart from app_xx.arb; cd app && flutter gen-l10n",
+    "pub-patches": "bash scripts/patchPubCache.sh",
     "server-dev": "cd server && npm run dev",
     "server-dev-new": "rm -fr server/data/einz.sqlite.db* && rm -fr server/data/files && npm run server-dev",
     "server-prod": "cd deployment; git pull; docker compose up -d --build server; docker compose down; docker compose up -d; docker compose logs -f server",
