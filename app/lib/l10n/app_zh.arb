@@ -72,7 +72,7 @@
   "wizardPassphraseTooShort": "口令不得少于 8 位",
   "wizardPassphraseConfirmHint": "再输一次以确认",
   "wizardPassphraseMismatch": "两次输入的口令不一致",
-  "wizardJoinPassphraseHint": "口令是与伴侣共享的密码，用于保护秘境内容。如果不知道口令，请询问伴侣。",
+  "wizardJoinPassphraseHint": "口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。",
   "wizardJoinPassphraseWrong": "口令错误：请确认首台设备创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
   "wizardSwitchToPassphrase": "改用线上密保口令",

@@ -202,7 +202,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseMismatch => '两次输入的口令不一致';
 
   @override
-  String get wizardJoinPassphraseHint => '口令是与伴侣共享的密码，用于保护秘境内容。如果不知道口令，请询问伴侣。';
+  String get wizardJoinPassphraseHint => '口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
