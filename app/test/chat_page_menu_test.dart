@@ -472,7 +472,7 @@ void main() {
     await tester.pumpAndSettle();
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
     expect(find.text('退出秘境？'), findsOneWidget);
-    expect(find.text('将在本设备上退出 Einz 秘境。'), findsOneWidget);
+    expect(find.text('将在本设备上退出我的秘境。下次启动可重新进入。'), findsOneWidget);
     // 点取消关闭弹窗（不触发 exit）
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();

@@ -1018,7 +1018,7 @@
 **并发协调记录：**
 
 - 老板同一工作区同步改文案（「PIN 锁屏码」→「锁屏码」，含 ARB/生成文件/app_lock 异常串/lock+setup+menu 测试断言），其 WIP 中间态曾致 4 个 PIN 测试瞬红——A/B（stash 我的改动）证实与我的菜单样式无关，根因是 ARB 改名后测试断言未同步 + 未提交的生成文件中间态
-- chat_page_menu_test 退出弹窗断言同步 523d25a 新文案（「将彻底关闭应用。」→「将在本设备上退出 Einz 秘境。」）
+- chat_page_menu_test 退出弹窗断言同步 523d25a 新文案（「将彻底关闭应用。」→「将在本设备上退出我的秘境。下次启动可重新进入。」）
 - 老板选择「我代为分两个 commit 收尾」：① b579172 文案批次（含 test 文件锁屏码断言与退出断言）② 本次样式（chat_page.dart + 本条注记）
 - `server_settings.dart` 的 `kEinzServer = http://localhost:3000` 为老板本地测试配置（源码注释「不要 commit」），始终不入库
 
@@ -1059,7 +1059,7 @@
 
 - `lock_page.dart`：新增 `_buildMenu`（PopupMenuButton：语言行「界面语言 中文」= Row 标签淡灰 + Spacer + 当前值；退出行；中间 PopupMenuDivider）、`_showLocalePicker`（复用 LocaleSettings 底部弹层，即时生效）、`_showExitAppDialog`（确认后 exit(0)）；两个 Scaffold（正常解锁表单 + \_noLock 兜底页）AppBar 均挂 ⋯ 菜单；onSelected 沿用 300ms 延迟防 MenuRoute/DialogRoute 交叉卸载断言
 - `setup_page.dart` 身份卡片：`title: Text(aName.isEmpty ? wizardIdentityCreator : aName)`（bName 同）；不再拼接「名字 (身份)」
-- 测试同步：widget_test/setup_probe_retry_test 的「Einz 秘境：创建中：名字」→「创建中：我」（老板文案 名字→我）；4 个测试文件 5 处 `find.textContaining('秘境创建者')` → `find.text('Lukas')`（身份卡有名字只显名字）；golden_render_test 退出弹窗断言「将彻底关闭应用。」→「将在本设备上退出 Einz 秘境。」（HEAD 已过期，顺手修）
+- 测试同步：widget_test/setup_probe_retry_test 的「Einz 秘境：创建中：名字」→「创建中：我」（老板文案 名字→我）；4 个测试文件 5 处 `find.textContaining('秘境创建者')` → `find.text('Lukas')`（身份卡有名字只显名字）；golden_render_test 退出弹窗断言「将彻底关闭应用。」→「将在本设备上退出我的秘境。下次启动可重新进入。」（HEAD 已过期，顺手修）
 
 **验证：** flutter analyze 0 issue（仅 1 既有 info lint）；全部功能测试通过（含 lock_page/menu/join/envelope/probe_retry/widget/invite_dialog）；11 个 golden 像素失配保持红不重刷（政策：禁止 --update-goldens；本轮文案 + 身份卡 + 锁屏 ⋯ 图标均影响渲染，需老板定夺是否后续统一重刷）。
 
@@ -5459,6 +5459,7 @@ PIN 是短数字串，靠左小字既不明显也不好确认位数 → 参照�
 TUI `/passphrase random` 生成 12 词恢复码当口令）。
 
 **改动（策略唯一来源 `shared/lib/src/crypto/passphrase_policy.dart`）：**
+
 - `kPassphraseMinLength` 10 → **8**；删掉"必须同时含字母与数字"（枚举值
   `PassphrasePolicyViolation.needLetterAndDigit` 一并删除），`checkPassphrasePolicy`
   现在只判长度。
@@ -5499,6 +5500,7 @@ only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置
 
 上一轮为改口令弹窗新加了 `chatPageChangePassphraseHint`，与创建向导的 `wizardPassphraseHint`
 只差"消息 vs 内容"两字——老板要求统一：**以老板给的原话为准，只保留一个键**：
+
 - `wizardPassphraseHint` = 「口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！
   仅可将口令分享给秘境伴侣。」（en: "The passphrase encrypts every message. Memorize it and
   never leak it — share it only with your partner."）
@@ -5522,11 +5524,11 @@ only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置
   另有中危若干（/avatar 公开、/health 泄露计数、restoreBackup 的 `files/` 分支可 `../` 逃逸、
   恢复码取词模偏差——实测词表 2050 条、`65536 % 2050 = 1986`，偏差真实但量级极小）。
 - **报告里两条是误报，已回给老板**：
-  ① `cli/demo/.gitignore` 并非"漏保护 store-*.json"——`s*.json` 的 `*` 恰好覆盖
-     `store-a.json`（`git check-ignore -v` 实测命中该规则），不会 `git add .` 就泄露；
-  ② `app.db*` 改 `*.db*` 是冗余——`einz.sqlite.db{,-wal,-shm}` 已被根 `.gitignore` 的
-     `*.db` 系列覆盖。
-  另：`sendPushHint` 无人调用属实，但那是**已记录的刻意决策**（`docs/IOS.md` §4.1 +
+  ① `cli/demo/.gitignore` 并非"漏保护 store-_.json"——`s_.json`的`_`恰好覆盖
+  `store-a.json`（`git check-ignore -v`实测命中该规则），不会`git add .`就泄露；
+②`app.db_`改`_.db_` 是冗余——`einz.sqlite.db{,-wal,-shm}`已被根`.gitignore`的
+  `\*.db` 系列覆盖。
+另：`sendPushHint` 无人调用属实，但那是**已记录的刻意决策**（`docs/IOS.md` §4.1 +
   productLens，2026-09-14 老板拍板暂缓推送，WS 兜底），不是待修缺陷。
 - **报告本身的方法学问题**：基线落后当时 HEAD 13 个提交（行号/计数已漂移：chat_page 实为
   4863 行、SFConflict 实为 77 个、`tmp_probe4_test.dart` 已被 d425159 删除）；`api_client.dart`
@@ -5614,12 +5616,12 @@ only with your partner."），小字（12）+ `colorScheme.outline` 淡色，置
 全仓 `*SFConflict*` 共 **77 个**（报告写 64，两周后又长出来了），全部落在 .gitignore
 覆盖范围内、无一个被 git 跟踪（`git status` 零删除条目可证）：
 
-| 位置 | 数量 | 处理 |
-| --- | --- | --- |
-| `cli/demo/`（`s1.json` / `s2.json` 的旧副本） | 47 | 直接删（正本 s1/s2.json 在，demo 环境可重建） |
-| `app/build/`、`app/.dart_tool/`、`shared/.dart_tool/`、`cli/.dart_tool/` | 17 | 直接删（构建产物，可重建） |
-| `.git/index`、`.git/logs/refs/remotes/origin/main` | 4 | 直接删（见下，注意这是**同步工具在写 .git 内部**） |
-| `server/data/`（`einz.sqlite.db{,-wal,-shm}` 旧副本） | 9 | **隔离到仓库外** `~/einz-sfconflict-20260915/server-data/`（含一份 2026-09-10 的完整旧 DB 快照，删掉不可逆，故不动手；确认无用后自行删除） |
+| 位置                                                                     | 数量 | 处理                                                                                                                                       |
+| ------------------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cli/demo/`（`s1.json` / `s2.json` 的旧副本）                            | 47   | 直接删（正本 s1/s2.json 在，demo 环境可重建）                                                                                              |
+| `app/build/`、`app/.dart_tool/`、`shared/.dart_tool/`、`cli/.dart_tool/` | 17   | 直接删（构建产物，可重建）                                                                                                                 |
+| `.git/index`、`.git/logs/refs/remotes/origin/main`                       | 4    | 直接删（见下，注意这是**同步工具在写 .git 内部**）                                                                                         |
+| `server/data/`（`einz.sqlite.db{,-wal,-shm}` 旧副本）                    | 9    | **隔离到仓库外** `~/einz-sfconflict-20260915/server-data/`（含一份 2026-09-10 的完整旧 DB 快照，删掉不可逆，故不动手；确认无用后自行删除） |
 
 - 隔离前已比对：正本 `server/data/einz.sqlite.db` 是当前 dev server（pid 99642）在用的，
   mtime 09-15 12:33；9 个副本都是 09-07 ~ 09-10 的旧物，无更新内容。
@@ -5745,6 +5747,7 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
 ### 读代码后的重要修正：P1 比预想小得多
 
 核实发现**客户端其实已经是 v2**：
+
 - **App**：`createSpace` / `joinSpace` / `preflightJoin` 全 v2；v1 只剩两个**死注入点**
   （`enrollOverride` / `createInviteOverride` 声明了但页面内无人调用）。
 - **TUI 新设备**：`_runGuide` 里 `if (store.spaceKey == null)` 已经走"c: 创建秘境 / j: 加入秘境"
@@ -5795,12 +5798,14 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
 老板选**路线 1（删）**，并纠正我一处表述错误（见下）。
 
 **删除**：
+
 - `cli/bin/einz.dart`（旧脚本 CLI，20+ 条 v1 命令：enroll/invite/config/import/escrow(v1)/rotate…）
 - `cli/test/` 的 6 个 v1 e2e 脚本：`e2e.sh`、`phase1/2/4_e2e.sh`、`auto_sync_check.sh`、`_e2e_lib.sh`
   （全部 source `_e2e_lib.sh` 并驱动 `einz.dart`；无文档/CI 引用，仅 dev 手册）
 - `cli/demo/setup.sh`（v1 方式生成 demo store；已被 TUI 自带引导 + `tui*-dev-new` 取代）
 
 **连带修**（否则仓库半坏）：
+
 - `cli/test/tui_smoke.py` 改写为**双 TUI** 互测（原来用 `einz.dart sync/send` 驱动对端）：
   两个 TUI 实例互为对端，断言改为"对端 store 历史增长"（store 只存密文，解密正确性由
   shared 加密测试与 App 覆盖）；同时修掉脚本里硬编码的旧路径 `/Users/luk/einz/cli`
@@ -5886,17 +5891,17 @@ avatar 读取、key-escrow 取包分支）连理由一起登记在案——以�
 D3 收敛第三期。判据：**文档里不能再出现"照抄就报错"的指令**（已删端点/已删命令/已不存在的
 配置文件），历史决策保留但必须标明是历史。逐份处理：
 
-| 文档 | 处理 |
-| --- | --- |
-| `PROTOCOL.md` | `/auth/challenge` 补 `space_id` 必填（**API 契约变更**）；`sealed_challenge` 的"白名单公钥"→ 设备公钥；`/devices` 补"只返回本空间设备 + 不返回 public_key"；`/key-escrow` 补"按会话 space 存取"；恢复流程改指 join token（20 位邀请码已删） |
-| `DATABASE.md` | §2 schema **整段重写**：补 `spaces` / `space_members` / `join_tokens` / `key_escrow` / `meta`，删 `invites`；`messages` 改 `UNIQUE(space_id, server_sequence)`；`sessions` 注明只存 sha256、同设备同 space 只一个会话；`attachments` 注明无外键（两阶段上传）；审计表删 `device.enroll` 行；总则改掉"无 spaces 表、config.json 表达" |
-| `E2EE.md` | 19 处"静态白名单 config.json"→ 设备在册状态（devices 表）/ join token 登记；顶部补 v2 说明 |
-| `DEPLOYMENT.md` | **§2 快速试用整章重写**（TUI 两条命令 + 命令总览表，替换 v1 CLI 全流程）；§1 形态说明、§3.1/3.2/3.3/3.4、§4 接入闭环、§5.2 备份恢复、§5.3 撤销、§6 控制表、§7 排错、§9.4 全部去 v1；顺带修掉一行被打断的 ANSI 转义残留 |
-| `ONBOARDING.md` | **整篇重写**为 v2 操作手册（术语表、阶段 0 VPS、阶段 1 A 创建、阶段 2 B 加入、阶段 3 日常、阶段 4 互通验证、坑表、说明）；保留环境准备与开发踩坑、补"WS 凭证走握手头" |
-| `SETUP.md` | **归档**：顶部加"已归档（v1 设计稿）"横幅 + 指向当前文档，正文保留作历史 |
-| `KEY_ESCROW.md` | 6 处权限/流程措辞改 v2；顶部版本说明改为"机制与空间模型无关，文中白名单 = devices 在册状态" |
-| `SECURITY.md` | 控制表补**"会话必带 space"**一行；`isActiveDevice`/`revokeDevice`/取密文等 9 处措辞改 v2 |
-| `IOS.md` / `updateServer.md` / `README.md` | 邀请码 → 邀请链接；updateServer §3 的命令块换成 TUI `/passphrase`（原块是已删命令）；README 架构行去掉"静态白名单" |
+| 文档                                       | 处理                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PROTOCOL.md`                              | `/auth/challenge` 补 `space_id` 必填（**API 契约变更**）；`sealed_challenge` 的"白名单公钥"→ 设备公钥；`/devices` 补"只返回本空间设备 + 不返回 public_key"；`/key-escrow` 补"按会话 space 存取"；恢复流程改指 join token（20 位邀请码已删）                                                                                          |
+| `DATABASE.md`                              | §2 schema **整段重写**：补 `spaces` / `space_members` / `join_tokens` / `key_escrow` / `meta`，删 `invites`；`messages` 改 `UNIQUE(space_id, server_sequence)`；`sessions` 注明只存 sha256、同设备同 space 只一个会话；`attachments` 注明无外键（两阶段上传）；审计表删 `device.enroll` 行；总则改掉"无 spaces 表、config.json 表达" |
+| `E2EE.md`                                  | 19 处"静态白名单 config.json"→ 设备在册状态（devices 表）/ join token 登记；顶部补 v2 说明                                                                                                                                                                                                                                           |
+| `DEPLOYMENT.md`                            | **§2 快速试用整章重写**（TUI 两条命令 + 命令总览表，替换 v1 CLI 全流程）；§1 形态说明、§3.1/3.2/3.3/3.4、§4 接入闭环、§5.2 备份恢复、§5.3 撤销、§6 控制表、§7 排错、§9.4 全部去 v1；顺带修掉一行被打断的 ANSI 转义残留                                                                                                               |
+| `ONBOARDING.md`                            | **整篇重写**为 v2 操作手册（术语表、阶段 0 VPS、阶段 1 A 创建、阶段 2 B 加入、阶段 3 日常、阶段 4 互通验证、坑表、说明）；保留环境准备与开发踩坑、补"WS 凭证走握手头"                                                                                                                                                                |
+| `SETUP.md`                                 | **归档**：顶部加"已归档（v1 设计稿）"横幅 + 指向当前文档，正文保留作历史                                                                                                                                                                                                                                                             |
+| `KEY_ESCROW.md`                            | 6 处权限/流程措辞改 v2；顶部版本说明改为"机制与空间模型无关，文中白名单 = devices 在册状态"                                                                                                                                                                                                                                          |
+| `SECURITY.md`                              | 控制表补**"会话必带 space"**一行；`isActiveDevice`/`revokeDevice`/取密文等 9 处措辞改 v2                                                                                                                                                                                                                                             |
+| `IOS.md` / `updateServer.md` / `README.md` | 邀请码 → 邀请链接；updateServer §3 的命令块换成 TUI `/passphrase`（原块是已删命令）；README 架构行去掉"静态白名单"                                                                                                                                                                                                                   |
 
 **验证**：全仓 `grep "dart run bin/einz.dart|/devices/enroll"` 在 docs + README **零命中**；
 `server tsc` 干净（文档改动未触碰代码）。
@@ -6016,6 +6021,7 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
 上传附件/头像、下载附件都会 400；收发文字、加解密、登录不受影响。
 
 **修复（两道）**
+
 1. 请求构造收敛到 `_openRequest(method, url)` **单一入口**，内部统一设置协议版本头——
    结构上不可能再漏（根因是"同一件事手写了 7 遍"）。
 2. 新增 `shared/test/protocol_version_test.dart`：起一个本地 `HttpServer`，真实调用
@@ -6042,6 +6048,7 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
 
 **现象**：向导里设过密保口令、发了消息，`/exit` 再开又被要求"检测到尚未设置密保口令，现在设置:"。
 **根因**：`store.escrowUploaded` 这个"密保箱已就绪"标记，在**两条主路径上都没写**：
+
 1. **创建者**：密保箱其实随 `POST /spaces` 的 `sealedSpaceKey + escrowPassphrase` 一并上传了，
    但客户端只在 `_setupEscrowPassphrase`（手动补设那条路）里置过 true → 创建者永远 false。
 2. **加入者**：密保箱本来就存在（刚靠口令从它取回 Space Key），但 `joinSpace` 成功后同样没置
@@ -6051,13 +6058,14 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
 所以现象没暴露；我 P1 把它改成 `partnerSlot == 0` 之后才复活，才暴露出标记没写。
 
 **修复（三处）**：
+
 1. `POST /spaces` 创建成功 → `store.escrowUploaded = true`（口令非空才会走到这，sealed 必然已上传）。
 2. `POST /spaces/join` 成功 → 同样置 true（密保箱本来就存在）。
 3. **自愈**：引导里看到 `!escrowUploaded` 时先查服务端 `GET /key-escrow`：有箱 → 补标记跳过；
    **查不到（网络/会话失效）→ 不提示**（三态 `bool?`）。原因：`_setupEscrowPassphrase` 上传时
    **不校验旧口令**，若把"查不到"当成"没有箱"去提示，用户输新口令会**顶掉**原有密保箱（等于把伴侣
    锁在门外）——保守优先。
-验证：cli analyze 干净、19 项测试全过；创建者侧老板复测已正常。
+   验证：cli analyze 干净、19 项测试全过；创建者侧老板复测已正常。
 
 ## 2026-09-15 "输入邀请码总是失败" = 被我今天加的全局限速拦了
 
@@ -6069,6 +6077,7 @@ devices/key-escrow/join-tokens）都正常，所以只有上传受影响。
 两个人自用很容易打满；打满后**每一次**都 429，于是表现为"邀请码总是失败"（其实邀请码没问题）。
 
 **处理**
+
 1. `AUTH_MAX` 默认 30 → **60**（env `EINZ_RATELIMIT_AUTH` 可再调）。安全性没实质下降：join token 是
    32B 随机不可猜，口令爆破由 escrow 自己的失败计数兜（10 次/15 分钟）；这个桶只防"无限造 DB 行/无脑刷"。
 2. TUI 认得 `RATE_LIMITED`：翻译成"操作太频繁，被服务端限流了（不是你的邀请码有问题）"并带出等待秒数；
@@ -6106,6 +6115,7 @@ v2 的身份选择走 `/space join` 的 preflight slots。
 
 **根因**：在线状态按 **device** 判定、却按 **person** 展示——join 会复用 person_id、只新开
 device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对方"：
+
 1. TUI `_refreshPeerOnline`：`online` 只排除 `device_id == 自己`，没排除 `person_id == 自己`
    （同一函数里选 `onlinePeerDevice` 时反而过滤了 person——两处判定不一致）；
 2. 服务端 `ws.ts broadcastPeerStatus`：只跳过发起设备，同 person 的其它设备照样收到
@@ -6113,6 +6123,7 @@ device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对
 3. App `chat_page._refreshPeerOnline` / `_onPeerStatus`：同一缺陷（只比 `device_id`）。
 
 **修复（老板定：TUI + App + 服务端一起修）**
+
 - 服务端：`Conn` 增加 `personId`（取 `requireSession` 已有的 `person_id`），广播**跳过与发起
   设备同 person 的连接**，且 payload 带 `person_id`；`PROTOCOL.md §8` 同步。删掉被取代的
   `sameSpace()`。`sendPushHint` 早就是同样的按 person 收敛写法，本次对齐它。
@@ -6126,6 +6137,7 @@ device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对
   peer 广播，这是刻意的取舍（不是"对方"就不该走对方通道）。
 
 **测试**
+
 - `server/test/peer_status.test.ts`（新，已挂进 `npm test`）：a1/a2 同 person、b1 另一人 →
   a2 上线不得给 a1 发任何 peer 广播；b1 上/下线 a1、a2 都收到且 payload 带 person_id；
   a1 下线不得惊动 a2。已验证"去掉修复即红"。
@@ -6144,12 +6156,14 @@ device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对
 
 **规则**：设备名只允许 **中文字、英文字母、数字 0-9、下划线 `_`、中划线 `-`**，最长 32 字符。
 两条不同的处理（老板 2026-09-16 定）：
+
 - **自动取的名**（TUI 宿主机名、App 手机型号）→ 不合规字符换成 `_`（"iPhone 15 Pro" →
   `iPhone_15_Pro`）；用户没表达过意愿，换掉不违背他意图。
 - **用户输入的名**（TUI `/device <名>`、App 改名弹窗）→ 不合规**拒绝并提示重输**，
   不静默改写人的输入（改了不告诉用户 = 名字莫名变了）。
 
 **落地（三端同一约定，两份实现——Dart/TS 无法共用一份代码，改动要同步）**
+
 - `shared/lib/src/policy/device_name_policy.dart`（新，唯一来源）：`kDeviceNameMaxLength=32`、
   `checkDeviceNamePolicy()`（返回 `DeviceNameViolation`）、`sanitizeDeviceName()`；
   中文取 CJK 基本区 `\u4e00-\u9fff` + 扩展 A `\u3400-\u4dbf`。
@@ -6162,6 +6176,7 @@ device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对
   （`chatPageRenameDeviceInvalidError` / `chatPageRenameDeviceTooLongError`，zh/en 已生成）。
 
 **测试**
+
 - `shared/test/device_name_policy_test.dart`（新）：合规/不合规/超长/边界 32、消毒不变量
   （"消毒结果一律能通过校验"）——`dart test` 9 项全过。
 - `server/test/device_name.test.ts`（新，已挂 `npm test`）：纯函数 + 端到端（create 携带
@@ -6182,6 +6197,7 @@ device_id（`spaces.ts`），于是"我自己的新设备"被两端都算成"对
 名字 = 名字莫名变了）。服务端同样只拒（400），不做替换。
 
 **落地**
+
 - `shared/lib/src/policy/person_name_policy.dart`（新，唯一来源）：`kPersonNameMaxLength=32`、
   `checkPersonNamePolicy()`、`PersonNameViolation`。emoji 用 Unicode 属性
   `\p{Extended_Pictographic}`（Dart 正则支持 `unicode: true`），再补四类拼装件：
@@ -6201,6 +6217,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 需要 grapheme 切分库，不值得为此引入依赖。
 
 **测试**
+
 - `shared/test/person_name_policy_test.dart`（新，4 项）：emoji 各类形态放行、
   空格/中文标点/@/全角拒、32/33 边界。
 - `server/test/person_name.test.ts`（新，已挂 `npm test`，2 项）：纯函数 + 端到端
@@ -6235,6 +6252,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 颠倒成 `#设备名称 在线数量/总共数量 名字 灯`，让**设备名贴中间、绿点贴屏幕右缘**。
 
 **落地**（`cli/bin/einz_tui.dart`）：
+
 - 右段（我）改为 `#设备名` + `n/m台在线`（仅 total≥2 才显示）+ ` 名字` + ` 灯`，
   与左段（对方）`灯 名字 #设备名 n/m台在线` 成镜像。
 - 抽出 `_myDeviceLabel()`（返回 `#设备名`，永远指**本机这台**）；`_personLabel()`
@@ -6262,6 +6280,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 先砍掉右缘的灯和名字——而这两项才是关键信息（设备名是次要的）。截断优先级不能反。
 
 **落地**：`cli/bin/einz_tui.dart` 还原到 b0cc051 之前：
+
 - 右段（我）回到 `灯 名字 #设备名 n/m台在线`（灯贴左、设备名在最右 → 先被截掉的是设备名）。
 - `_personLabel()` 重新拼 `personName #deviceName`；删除 `_myDeviceLabel()`。
 - `_deviceCountLabel()`（total<2 不显示）与 `_peerDeviceLabel()` 保持不动。
@@ -6272,13 +6291,14 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 **验证**：`dart analyze`（cli）干净。
 
 **附带分析（老板追问：对方多设备时 TUI 显示哪台？）**：`_peerDeviceLabel()` 两级取值——
-1) 本地消息列表**倒序**第一条非我、非系统的消息 → 其 `senderDeviceId`，即"最近一条
+
+1. 本地消息列表**倒序**第一条非我、非系统的消息 → 其 `senderDeviceId`，即"最近一条
    对方消息来自哪台"（注意：只看本地消息序，不看那台现在是否在线）；
-2) 无消息时回退 `s.peerDeviceId`，来自 `_refreshPeerOnline()` 的
+2. 无消息时回退 `s.peerDeviceId`，来自 `_refreshPeerOnline()` 的
    `onlinePeerDevice ??= devId`——遍历 `/devices` 结果（服务端按 `created_at` 升序）
    取第一个在线的对方设备，即**最早注册的那台在线设备**，不是最近活跃那台；
    对方全离线则为 null → 显示 `-`。
-另外 `peerDot`（灯）只看 `peerOnline>0`（任一对方设备在线），与显示的这台是否在线无关。
+   另外 `peerDot`（灯）只看 `peerOnline>0`（任一对方设备在线），与显示的这台是否在线无关。
 
 ## 2026-09-16 协议新增 online_since + TUI 列出对方所有在线设备
 
@@ -6287,6 +6307,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 不再按"最近一条消息来自哪台"。
 
 **协议增强**（老板授权改协议：目前全是测试数据，趁机做强壮）：
+
 - `server/src/ws.ts`：`Conn` 增 `onlineSince`——进入在线态的时刻；**重连（被新连接
   踢掉后又连上）沿用旧值不刷新**，只有"从无连接变成有连接"才置 now。
   新增导出 `getOnlineSince()`；`peer.online` 广播带 `online_since`
@@ -6296,6 +6317,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 - `docs/PROTOCOL.md`：§7.1 补字段与"重连不刷新"语义；§8 peer.online 行同步。
 
 **CLI**（`cli/bin/einz_tui.dart`）：
+
 - `_TuiState.peerDeviceId`（单台）→ `peerOnlineSince`（device_id → 上线时刻，仅在线设备）。
 - `_peerDeviceLabel()` 改为拼 `#A#B#C`（按 online_since 降序），**去掉"最新消息
   senderDeviceId"那一级**；无在线设备时返回空串（只显示 n/m）。
@@ -6347,6 +6369,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 我的所有设备），差异纯粹是我在**显示层**只拼了本机那一台。结论：改为对称展示。
 
 **落地**（`cli/bin/einz_tui.dart`）：
+
 - `_TuiState` 增 `myOnlineSince`（device_id → 上线时刻），与 `peerOnlineSince` 对称；
   `_refreshPeerOnline()` 在 `pid == myPid` 分支一并收集。
 - 抽出 `_byOnlineOrder()`：两侧共用的"按上线时刻降序"顺序。
@@ -6371,12 +6394,14 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 "我的在线列表"里不再重复显示本机名。
 
 **落地**（`cli/bin/einz_tui.dart`）：
+
 - `_TuiState.myOnlineSince` → 重命名为 `myOtherOnlineSince`（**不含本机**）；
   `_refreshPeerOnline()` 里 `devId != myId` 才入表（本机在线与否只进 `#n/m` 计数）。
 - `_myDevicesLabel()`：先拼 `#本机名`（/devices 的 device_name 优先，缺失回退本地
   store，未登记显示 `-`），再按上线时刻降序列出其余在线设备。
 
 **效果**：
+
 - 本机+手机都在线 → `● 阿猪 #2/2#MacBook#Phone`（本机在首位）
 - 本机离线、手机在线 → `✗ 阿猪 #1/2#MacBook#Phone`（**本机名仍在首位**）
 
@@ -6392,6 +6417,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 即 "1/1 08:00"。
 
 **落地**（`cli/bin/einz_tui.dart` 的 `/devices` 分支）：
+
 - 在线 → `since <上线时刻>`，取 `online_since`（重连不刷新，与顶部条同源）→ `connected_at`；
 - 离线 → **不再显示上线时刻**，改为 `(上次活跃 <last_seen>)`，且 `last_seen <= 0`
   （从未活跃/已被置 0）时**整段时间不显示**；
@@ -6418,6 +6444,7 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 "我的其它设备"：`myOtherDeviceTotal`（分母）+ `myOtherOnlineSince.length`（分子）。
 
 **落地**（`cli/bin/einz_tui.dart`）：
+
 - 删 `myDeviceOnline`/`myDeviceTotal`（无消费者），增 `myOtherDeviceTotal`。
 - `_myDeviceTag()`：` @设备名`（人名与 @ 之间空一格；未登记显示 `@-`）。
 - `_myOtherDevicesLabel()`（替代 `_myDevicesLabel()`）：只列其它在线设备。
@@ -6466,8 +6493,9 @@ create/join 请求体里的 `display_name`（其实是"我的名字"）改名 `p
 真要"空间名"是新产品概念（名字属于空间而非人），应另立字段。
 
 **落地**：
+
 - `server/src/db.ts`：spaces 建表去掉该列；新增迁移 `ALTER TABLE spaces DROP COLUMN
-  display_name`（先查 `PRAGMA table_info` 保证幂等，sqlite 3.35+）。
+display_name`（先查 `PRAGMA table_info` 保证幂等，sqlite 3.35+）。
 - `server/src/spaces.ts`：createSpace 参数 `displayName` → `personName`（仍写
   space_members）；`lookupSpace`/`preflightJoin` 的 SELECT 与返回值去掉 displayName；
   **删掉 joinSpace 的 displayName 死参数**（函数体从未使用——join 按身份选择，不自填名字）。
@@ -6511,6 +6539,7 @@ hunk 再 `git add`，工作区仍保留他人改动。
 的头像预览也是空白默认图标**（与账号是否已设头像无关）。
 
 **方案**：运行时代码解析出本机 personId，并以上传响应为权威来源。
+
 - `shared/.../api_client.dart`：`uploadAvatar` 返回服务端确认的 `person_id`（`_postBytes`
   改为返回响应体文本；解析失败返回 null，**不能让解析失败把成功的上传报成失败**）。
 - `app/lib/data/message_repository.dart`：新增 `resolveMyPersonId()`——从持久化的
@@ -6537,12 +6566,14 @@ TUI/CLI（持久化了 personId，无此问题）。
 一按即进锁屏页，强化安全性。
 
 **决策**（AskUserQuestion 核对）：
+
 1. **未设置锁屏码（PIN）时隐藏该按钮**——没 PIN 时 `LockPage` 只会显示"尚未设置锁屏码"
    提示页（锁屏不激活），摆一个按了没用的按钮只会误导。
 2. **手动锁屏必须输对 PIN 才能退出**：返回手势 / 返回键（Android）都被挡掉。
    （切后台超时那条覆盖锁屏路径**保持旧语义**——仍可手势退回，未改动。）
 
 **落地**：
+
 - `app/lib/lock_page.dart`：新增 `canDismiss`（默认 true）——false 时用
   `PopScope(canPop: false)` 挡返回，并 `automaticallyImplyLeading: false` 隐藏
   返回箭头（点了也会被挡，留着误导）。**无 PIN（`_noLock`）时恒定可退**，否则会
