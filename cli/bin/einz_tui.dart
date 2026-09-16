@@ -2731,6 +2731,7 @@ Future<void> _execCommand(String line) async {
         final devices = await ApiClient(server).listDevices(token);
         final myId = s.session.store.deviceId;
         final now = DateTime.now().millisecondsSinceEpoch;
+        final myWsOnline = s.session.wsStatus == WsStatus.connected;
         final sb = StringBuffer('📱 设备列表：');
         for (final d in devices) {
           final devId = (d['device_id'] ?? '-') as String;
@@ -2738,15 +2739,29 @@ Future<void> _execCommand(String line) async {
           final person = (d['person_id'] ?? '-') as String;
           final last = d['last_seen'];
           final connectedAt = d['connected_at'];
-          final online = (last is num) && (now - last < 60 * 1000);
-          // 在线设备显示本次上线时刻（connected_at）；离线设备用 last_seen 兜底
-          final since = (connectedAt is num)
-              ? _fmtTime(connectedAt.toInt())
-              : ((last is num) ? _fmtTime(last.toInt()) : '-');
+          // 上线时刻：online_since（进入在线态，重连不刷新，与顶部条同源）→ connected_at
+          final sinceMs = (d['online_since'] as num?)?.toInt() ??
+              (connectedAt is num ? connectedAt.toInt() : null);
+          // 在线判定：本机以本地 WS 状态为准（与顶部条一致）；其余有实时连接
+          // （connected_at 非 null）即在线；旧服务端无该字段时退回 last_seen<60s
+          final online = devId == myId
+              ? myWsOnline
+              : (d.containsKey('connected_at')
+                  ? connectedAt != null
+                  : (last is num && now - last < 60 * 1000));
           final displayName = devName.isNotEmpty ? devName : devId; // dev name，backup id
           final personName = s.personNames[person] ?? person; // person name，backup id
           final tag = devId == myId ? '本机' : (online ? '在线' : '离线');
-          sb.write('\n  ${online ? '🟢' : '⚪'} $displayName [$personName] $tag (since $since)');
+          // 在线 → "since 上线时刻"；离线 → "上次活跃 时刻"（**不显示上线时刻**：
+          // 服务端离线时 last_seen 置 0，直接格式化会变成 1970-01-01 的
+          // "1/1 08:00"——老板 2026-09-16 实测）。时间戳缺失/为 0 就不显示时间。
+          final String when;
+          if (online) {
+            when = (sinceMs != null && sinceMs > 0) ? ' since ${_fmtTime(sinceMs)}' : '';
+          } else {
+            when = (last is num && last > 0) ? ' (上次活跃 ${_fmtTime(last.toInt())})' : '';
+          }
+          sb.write('\n  ${online ? '🟢' : '⚪'} $displayName [$personName] $tag$when');
         }
         s.session.messages.add(_systemMessage(s.session, sb.toString()));
       } catch (e) {

@@ -6381,3 +6381,24 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 - 本机离线、手机在线 → `✗ 阿猪 #1/2#MacBook#Phone`（**本机名仍在首位**）
 
 **验证**：`dart analyze`(cli) 干净。
+
+## 2026-09-16 修 /devices 离线设备显示 "since 1/1 08:00"
+
+**现象**（老板 2026-09-16）：`/devices` 里离线设备总显示 `⚪ tui1 [Nan] 离线 (since 1/1 08:00)`。
+
+**根因**：服务端离线时把 `last_seen` 置 **0**（`ws.ts` close / heartbeat 分支），而旧代码
+`since = connectedAt != null ? _fmtTime(connectedAt) : _fmtTime(last_seen)` 在离线时
+（`connected_at` 为 null）落回 `last_seen = 0` → 格式化出 **1970-01-01 08:00（UTC+8）**
+即 "1/1 08:00"。
+
+**落地**（`cli/bin/einz_tui.dart` 的 `/devices` 分支）：
+- 在线 → `since <上线时刻>`，取 `online_since`（重连不刷新，与顶部条同源）→ `connected_at`；
+- 离线 → **不再显示上线时刻**，改为 `(上次活跃 <last_seen>)`，且 `last_seen <= 0`
+  （从未活跃/已被置 0）时**整段时间不显示**；
+- 在线判定与顶部条对齐：本机以本地 `wsStatus` 为准，其余看 `connected_at` 非 null
+  （旧服务端退回 `last_seen < 60s`）。
+
+**效果**：`🟢 tui1 [Nan] 本机 since 9/16 10:20` / `⚪ tui2 [Nan] 离线 (上次活跃 8/14 15:30)`
+/ 从未活跃过则 `⚪ tui3 [Nan] 离线`。
+
+**验证**：`dart analyze`(cli) 干净（界面观感由老板自测）。
