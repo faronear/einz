@@ -7,23 +7,19 @@ import 'package:flutter/material.dart';
 ///
 /// 为什么自绘而不是用 Material 的 `Icons.cottage` / `home_rounded`：
 /// 字形在浅色品牌卡片上偏"系统图标感"，且大小/重心固定；自绘能跟随卡片底色挖空门窗
-/// （[background] 传卡片底色，让门窗"透出底色"而不是糊上一块白）、并且整体高度可以
-/// 精确对齐旁边"创建秘境"的图标。
+/// （[background] 传卡片底色，让门窗"透出底色"而不是糊上一块白），形状也完全可控。
 ///
-/// 尺寸标定（老板 2026-09-16 反馈"房子比锤子矮"后改为量着做）：把两个图标各栅格化一次、
-/// 量"墨迹"包围盒——`Icon(Icons.build_outlined, size: 44)` 的墨迹是 **42×42px**，而原来
-/// 那版房子本体只有约 31px（确实矮了 11px）。现在房子本体占本稿 75/100 单位，
-/// 默认 [size] = 56 → 本体墨迹 **42px**，与锤子持平；连爱心整体 51×56px。
+/// 尺寸（2026-09-16 试过一轮，结论是别动）：默认 46。曾把房子本体撑到 42px
+/// （= 旁边 `Icon(Icons.build_outlined, size: 44)` 的墨迹高度，实测 42×42，需 `size: 56`），
+/// 但图标块一高，卡片里**居中**的图标+文字整体下移，「加入秘境」就比隔壁「创建秘境」
+/// 低一截（老板实测）。若日后确实要加大，请先把两张卡片的图标槽位固定成同一高度
+/// （例如统一的 SizedBox 包住图标），否则标签会再次错位。
 class CuteHouseIcon extends StatelessWidget {
   const CuteHouseIcon({
     super.key,
     required this.color,
     required this.background,
-    // 默认 56：让**房子本体**（屋顶→底座）的墨迹高度对齐旁边 `Icon(size: 44)` 的锤子。
-    // 实测（栅格化量墨迹包围盒）：Material 字形几乎占满 em，锤子在 size 44 时墨迹 42×42px；
-    // 本稿房子本体占 75/100 单位 → 0.75×56 ≈ 42px ✓（老板 2026-09-16：原先房子比锤子矮，
-    // 要求等高）。爱心另在房子上方约 10px，是刻意的"烟囱冒心"，所以整体会比锤子略高。
-    this.size = 56,
+    this.size = 46,
   });
 
   /// 房子主色（跟随入口卡片的品牌色）。
@@ -64,22 +60,21 @@ class _CuteHousePainter extends CustomPainter {
       ..color = background
       ..isAntiAlias = true;
 
-    // 烟囱冒出的爱心：先画（下半截随后被烟囱接住，接缝自然）
-    canvas.drawPath(_heart(p(72, 13), 12 * u), body);
-    // 烟囱：加宽（68..82）并探出屋面（屋顶右坡在 x=68 处约 y=43），让"冒烟"这件事
-    // 一眼看得出来（老板 2026-09-16：烟囱更明显一点点）
+    // 烟囱冒出的爱心：先画（下半截随后被屋顶/烟囱压住，接缝自然）
+    canvas.drawPath(_heart(p(74, 15), 9 * u), body);
+    // 烟囱
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromPoints(p(68, 24), p(82, 54)),
+        Rect.fromPoints(p(62, 26), p(74, 48)),
         Radius.circular(3 * u),
       ),
       body,
     );
     // 屋顶：填充 + 同色粗描边（描边把三个角磨圆 = 可爱化；单靠 fill 是尖角）
     final roof = Path()
-      ..moveTo(50 * u, 28 * u)
-      ..lineTo(94 * u, 64 * u)
-      ..lineTo(6 * u, 64 * u)
+      ..moveTo(50 * u, 20 * u)
+      ..lineTo(92 * u, 56 * u)
+      ..lineTo(8 * u, 56 * u)
       ..close();
     canvas.drawPath(roof, body);
     canvas.drawPath(
@@ -95,21 +90,21 @@ class _CuteHousePainter extends CustomPainter {
     // 房身（比屋顶窄，形成屋檐外挑）
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromPoints(p(14, 58), p(86, 98)),
-        Radius.circular(9 * u),
+        Rect.fromPoints(p(18, 52), p(82, 88)),
+        Radius.circular(8 * u),
       ),
       body,
     );
     // 门（拱形，落到房身底边）+ 圆窗：用卡片底色挖空
     canvas.drawRRect(
       RRect.fromRectAndCorners(
-        Rect.fromPoints(p(42, 74), p(58, 98)),
-        topLeft: Radius.circular(9 * u),
-        topRight: Radius.circular(9 * u),
+        Rect.fromPoints(p(42, 66), p(58, 88)),
+        topLeft: Radius.circular(8 * u),
+        topRight: Radius.circular(8 * u),
       ),
       hole,
     );
-    canvas.drawCircle(p(33, 76), 5 * u, hole);
+    canvas.drawCircle(p(32, 68), 4.5 * u, hole);
   }
 
   /// 心形：两段三次贝塞尔 + 底部尖角（[c] 为心形中心，[s] 为半宽量级）。
