@@ -103,7 +103,7 @@ Future<void> pumpToJoinPassphrase(
   await tester.pumpAndSettle(); // → 口令页
   // 口令页应为「验证」语义：标题与提示都是验证措辞
   expect(find.text('验证密保口令'), findsOneWidget); // 标题（join=验证套，create=设置套）
-  expect(find.text('口令是与伴侣共享的密码，用于保护聊天内容。如果不知道口令，请询问伴侣。'),
+  expect(find.text('口令是与伴侣共享的密码，用于保护秘境内容。如果不知道口令，请询问伴侣。'),
       findsOneWidget); // hint
   // join 提交（POST /spaces/join）成功后若出 SnackBar 停留 4 秒：等其消失避免遮挡
   await tester.pump(const Duration(seconds: 5));
@@ -125,7 +125,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('口令错误：请确认首台设备创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
-    expect(find.text('口令是与伴侣共享的密码，用于保护聊天内容。如果不知道口令，请询问伴侣。'),
+    expect(find.text('口令是与伴侣共享的密码，用于保护秘境内容。如果不知道口令，请询问伴侣。'),
         findsOneWidget, reason: '应停留在口令页');
     expect(find.text('设置锁屏码'), findsNothing, reason: '不应进入 PIN 页');
   });
@@ -247,7 +247,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令是与伴侣共享的密码，用于保护聊天内容。如果不知道口令，请询问伴侣。'),
+    expect(find.text('口令是与伴侣共享的密码，用于保护秘境内容。如果不知道口令，请询问伴侣。'),
         findsOneWidget, reason: '未托管时停留口令页');
   });
 
