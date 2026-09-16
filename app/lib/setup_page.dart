@@ -2439,7 +2439,14 @@ class _EntryCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                icon,
+                // 图标槽位**固定 48 高**：两张卡片的图标尺寸本可以不同（创建是
+                // Icon(44)，加入是自绘房子 46），而 Column 是居中的——列高差 2px 就会
+                // 让两个标签差 1px（老板 2026-09-16 实测"加入"比"创建"低一点）。
+                // 统一槽位后标签位置与图标尺寸解耦，以后改图标大小也不会再错位。
+                SizedBox(
+                  height: 48,
+                  child: Center(child: icon),
+                ),
                 const SizedBox(height: 12),
                 Text(
                   label,
