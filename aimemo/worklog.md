@@ -6592,3 +6592,43 @@ TUI/CLI（持久化了 personId，无此问题）。
 **验证**：`flutter analyze` 全绿。golden 不受影响：`LockPage` 在测试里是 home 路由
 （`canPop=false`，本来就没有返回箭头）；ChatPage golden 的假 DB 无 PIN → 图标不渲染。
 UI 由老板真机自测。
+
+## 2026-09-16 修复：TUI 刚创建秘境进入聊天后顶部条不显示对方名字
+
+**现象**（老板 2026-09-16）：TUI 创建秘境时已录入伴侣名字（Alice），对方尚未加入，
+但创建后进入聊天窗口，顶部条左段仍是 `○ -`（应为 `○ Alice`）。
+
+**根因**：`_peerNameOf` 的兜底变量 `partnerPresetName` **只读不写**——v1 时代它是
+`_runGuide` 里的局部变量（名字问答时赋值、随 enroll 提交），v2 改造把"第二用户名字"
+问答并进 create 之后，赋值点被删、变量被提到顶层（`einz_tui.dart:146`），从此恒为
+null → 兜底失效，退化成 `'-'`。
+
+而"对方未加入"时 `personNames` 里**必然查不到对方**：`GET /space` 只返回
+`person_id IS NOT NULL` 的成员（`server/src/push.ts:83`），create 预置的伴侣槽位
+person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落位。
+→ 两条路都断了，只能显示占位符。（App 侧无此问题：向导把 peerName 写进
+`app_lock.profile` 快照，`chat_page` 拿它兜底。）
+
+**方案**（对齐 App 的"预置名快照"）：
+- `cli/lib/store.dart`：`DeviceStore` 新增 `peerName`（落盘键 `peer_name`）。
+- `cli/bin/einz_tui.dart`：
+  - 删掉死变量 `partnerPresetName`；
+  - `_peerNameOf` 兜底链改为 `personNames(非我) → store.peerName → '-'`；
+  - `_spaceCreate` 落盘 `store.peerName = partnerName`；
+  - `_spaceJoin` 落盘**另一身份槽位**的预置名（与 App 的 `_joinPeerName` 同源同法，
+    覆盖"我选了 slot=0（同第一人的另一台设备）而第二人还没加入"这条同样会显示 '-' 的路径）。
+- 名字来源以服务端为准：对方加入后 `personNames` 优先，本字段只是未加入/离线时兜底。
+
+**没动的**：`/myname` 的"不许与对方同名"判据仍只看 `personNames`——对方未加入时
+可把自己的名字改成与伴侣预置名相同（加入方按名字选身份，届时会撞"存在同名成员"）。
+要不要把 `store.peerName` 也纳入该判据，留给老板定。
+
+**发现（未改，待老板定）**：`cli/test/presence_check.py` 已失效且与新行为冲突——
+① 断言 `2/2台在线` 是旧格式（现为 `#2/2`，`b6e6af0` 同一提交内末尾又改过格式，
+探针没跟上）；② 拿 `'● - #'` 当"对方在线"哨兵，本次修好后对方名字不再是 `-`。该探针
+需整篇对齐（哨兵改 `○ Alice`/`● Alice`、计数改 `#2/2`）才能作为本修复的回归用例。
+
+**验证**：`dart analyze`(cli) 全绿；`dart test test/store_person_cache_test.dart` 3 项全过
+（新增 peerName 落盘往返用例）。**端到端实测**（本地 server dist + pty 真实渲染）：
+create（我 Lukas / 伴侣 Alice）→ 进入聊天态，顶部条为
+`○ Alice …… Einz TUI …… ● Lukas @DoomBase`；杀进程重启（读回 store）仍是 `○ Alice`。

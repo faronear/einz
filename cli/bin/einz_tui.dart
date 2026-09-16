@@ -143,9 +143,6 @@ class _TuiState {
 
 _TuiState? _state;
 
-/// 第二用户预置名（首设备 create 时询问；顶部条对方名字兜底显示）。
-String? partnerPresetName;
-
 /// 首设备 create 时询问的性别（我的/伴侣）：仅接受 男/女（否则重新询问），
 /// 登记时随名字一并提交服务端（person_gender/partner_gender）。
 String? myGender;
@@ -897,6 +894,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     // （老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.personName = displayName;
+    // 伴侣名字落盘：对方尚未加入时 GET /space 的 person 表里没有他（person_id 未
+    // 由加入者生成），顶部条左段靠这条兜底显示名字（否则刚创建后一直是 '-'）
+    store.peerName = partnerName;
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
     // session.messages.add(_systemMessage(session, '📎 邀请新设备（24 小时有效、仅可用一次）：\n ${created.link}\n🛡️  ${created.joinToken}''));
@@ -1041,6 +1041,15 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     // "尚未设置密保口令"再问一遍（老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.personName = myName ?? '成员';
+    // 对方名字落盘：取另一身份槽位的预置名（create 录入的两人身份）。我选了
+    // slot=0（同第一人的另一台设备）而第二人还没加入时，GET /space 的 person 表里
+    // 没有他 → 顶部条左段靠这条兜底显示名字，而不是 '-'
+    for (final slot in slots) {
+      if (slot.slot != chosenSlot && slot.displayName != null) {
+        store.peerName = slot.displayName;
+        break;
+      }
+    }
     store.save(storePath);
     session.messages.add(_systemMessage(session, '✅ 口令验证通过，成功加入秘境。'));
     session.messages.add(_systemMessage(session, '----------------'));
@@ -1605,7 +1614,8 @@ List<String> _byOnlineOrder(Map<String, int> sinceById) {
   return [for (final e in entries) e.key];
 }
 
-/// 对方显示名：探测名表（personA/personB）→ 首设备预置名 → '-'。
+/// 对方显示名：personNames 里非我的一项 → store.peerName（create 预置的伴侣名 /
+/// join 时另一身份槽位的名字）→ '-'。
 /// 本设备身份未确认（新设备引导中/未登记，personId 为空）时对方是谁不确定——
 /// 不猜测名称表第一项（此前会把 personA 的名字当成对方展示，引导中左右两侧
 /// 甚至显示同一个人——老板实测反馈），显示中性占位「?」（老板要求，不写"对方"）。
@@ -1620,7 +1630,12 @@ String _peerNameOf(_TuiState s) {
   for (final entry in s.personNames.entries) {
     if (entry.key != myPid) return entry.value;
   }
-  return partnerPresetName ?? '-';
+  // 对方还没加入：空间里没有他的 person_id → GET /space 的 person 表里没有他，
+  // 回落到创建/加入时已知的名字（老板 2026-09-16：刚创建就进聊天窗口时要显示
+  // 对方名字，而不是 '-'）
+  final preset = s.session.store.peerName;
+  if (preset != null && preset.isNotEmpty) return preset;
+  return '-';
 }
 
 /// 同一身份的多设备计数（顶部条 "#n/m"）：**有设备就显示**，不省略 0/n——全离线

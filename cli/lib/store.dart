@@ -19,6 +19,7 @@ class DeviceStore {
     required this.privateKey,
     this.personId,
     this.personName,
+    this.peerName,
     this.deviceName,
     this.spaceKey,
     this.spaceId,
@@ -50,6 +51,13 @@ class DeviceStore {
   String? personId; // 空间内身份 id（v2：createSpace 返回 creatorPersonId / joinSpace 返回 personId，均为 UUID）
   int? partnerSlot; // 本设备在空间里的身份槽位（0=创建者/第一人，1=伴侣/第二人；v2 create/join 返回）
   String? personName; // 使用者自定义名称（如 lukas），显示层用
+
+  /// 对方（另一身份）名字：create 录入的伴侣名 / join 时另一身份槽位的名字。
+  /// 对方**尚未加入**时空间里还没有他的 person_id，GET /space 的 person 表拿不到
+  /// 这个名字 → 顶部条用本字段兜底（否则刚创建/刚加入后一直显示 '-'；老板 2026-09-16）。
+  /// 对方加入后以其真实名字为准（personNames 优先），本字段只是离线/未加入时的兜底。
+  String? peerName;
+
   String? deviceName; // 设备自定义名称（如 MacBook），显示层用
   String? spaceKey; // base64，config/import 后填充
   String? spaceId;
@@ -103,6 +111,7 @@ class DeviceStore {
         'person_id': personId,
         'partner_slot': partnerSlot,
         'person_name': personName,
+        'peer_name': peerName,
         'device_name': deviceName,
         'space_key': spaceKey,
         'space_id': spaceId,
@@ -130,6 +139,7 @@ class DeviceStore {
         personId: json['person_id'] as String?,
         partnerSlot: json['partner_slot'] as int?,
         personName: json['person_name'] as String?,
+        peerName: json['peer_name'] as String?,
         deviceName: json['device_name'] as String?,
         spaceKey: json['space_key'] as String?,
         spaceId: json['space_id'] as String?,

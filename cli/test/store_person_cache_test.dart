@@ -33,5 +33,24 @@ void main() {
     final loaded = DeviceStore.load(path);
     expect(loaded.personNames, isEmpty);
     expect(loaded.personGenders, isEmpty);
+    expect(loaded.peerName, isNull); // 旧 store 无预置名 → 顶部条回退 '-'
+  });
+
+  // 对方尚未加入时空间里还没有他的 person_id，GET /space 的 person 表拿不到对方
+  // 名字 → 顶部条要用 create/join 时已知的名字兜底（老板 2026-09-16：刚创建后
+  // 进入聊天窗口应显示对方名字），故该名字必须落盘、重启后仍在。
+  test('peerName（对方预置名）落盘后可读回', () {
+    final dir = Directory.systemTemp.createTempSync('einz-store-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/s.json';
+
+    final st = DeviceStore(publicKey: 'pk', privateKey: 'sk')
+      ..personName = 'Lukas'
+      ..peerName = 'Alice';
+    st.save(path);
+
+    final loaded = DeviceStore.load(path);
+    expect(loaded.peerName, 'Alice');
+    expect(loaded.personName, 'Lukas');
   });
 }
