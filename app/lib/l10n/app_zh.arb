@@ -17,7 +17,7 @@
   "wizardDetectFailed": "暂时无法连接服务器，正在自动重试…",
   "wizardNameHint": "我的名字（以后可以随时修改）",
   "wizardPeerNameHint": "伴侣的名字（以后可以随时修改）",
-  "wizardPeerNameHintInput": "伴侣常用的名字",
+  "wizardPeerNameHintInput": "伴侣的昵称",
   "wizardNameRequired": "填写我的名字",
   "wizardPeerNameRequired": "填写我的秘境伴侣的名字",
   "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符",
@@ -27,7 +27,7 @@
       "max": {"type": "int"}
     }
   },
-  "wizardNameHintInput": "输入我常用的名字",
+  "wizardNameHintInput": "输入我的昵称",
   "wizardMyGenderLabel": "我的性别",
   "wizardPeerGenderLabel": "伴侣的性别",
   "wizardGenderMale": "男",

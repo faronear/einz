@@ -61,7 +61,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameHint => '伴侣的名字（以后可以随时修改）';
 
   @override
-  String get wizardPeerNameHintInput => '伴侣常用的名字';
+  String get wizardPeerNameHintInput => '伴侣的昵称';
 
   @override
   String get wizardNameRequired => '填写我的名字';
@@ -78,7 +78,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardNameHintInput => '输入我常用的名字';
+  String get wizardNameHintInput => '输入我的昵称';
 
   @override
   String get wizardMyGenderLabel => '我的性别';
