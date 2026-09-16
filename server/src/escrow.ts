@@ -188,6 +188,45 @@ function clearEscrowFailures (spaceId: string): void {
 }
 
 /**
+ * 校验某空间的**密保口令**（argon2id + 同一套失败限速），供"撤销设备"这类敏感操作复用。
+ *
+ * 为什么复用同一套（而不是各写一份）：
+ * - 口令是"销毁本空间某台设备本地数据"的授权凭证，校验强度必须与取钥同级；
+ * - 限速窗口按 space 共享（`escrowFailures`）：错误口令的尝试不分来源地计入同一预算，
+ *   在空间内被入侵的设备无法靠换端点绕过限速去爆破口令。
+ *
+ * 失败码与取包分支保持一致，便于客户端统一提示：
+ * - 无口令可校验（从未设置 / 被 `DELETE /key-escrow` 清除）→ 409 `PASSPHRASE_NOT_SET`
+ *   ——**拒绝而不是放行**：放行等于撤销无需口令，那个洞正是本次要堵的；
+ * - 口令错 → 401 `ESCROW_VERIFY_FAILED`（并记一次失败）；
+ * - 失败过多 → 429 `ESCROW_RATE_LIMITED`。
+ */
+export async function assertSpacePassphrase (
+  spaceId: string,
+  passphrase: unknown
+): Promise<void> {
+  if (typeof passphrase !== 'string' || passphrase.length === 0) {
+    throw new ApiError('INVALID_REQUEST', 'passphrase 必填（撤销设备需校验密保口令）', 400)
+  }
+  assertEscrowNotRateLimited(spaceId) // 限速：防空间内被入侵设备在线爆破口令
+  const row = getDb()
+    .prepare(`SELECT passphrase_hash FROM key_escrow WHERE space_id = ?`)
+    .get(spaceId) as { passphrase_hash: string | null } | undefined
+  if (!row || !row.passphrase_hash) {
+    throw new ApiError(
+      'PASSPHRASE_NOT_SET',
+      '该空间未托管密保口令，无法校验；请先在任一在册设备上设置密保口令',
+      409
+    )
+  }
+  if (!(await pwhashStrVerify(row.passphrase_hash, passphrase))) {
+    recordEscrowFailure(spaceId)
+    throw new ApiError('ESCROW_VERIFY_FAILED', '口令错误', 401)
+  }
+  clearEscrowFailures(spaceId) // 成功即重置窗口
+}
+
+/**
  * Multiverse：按空间读写口令托管包（POST /spaces/{spaceId}/key-escrow，
  * PROTOCOL_MULTIVERSE.md §4.2）：
  * - 上传/更新：{ package, passphrase_hash? }（沿用 v1 upload 语义，按 spaceId 隔离）

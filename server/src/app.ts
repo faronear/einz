@@ -495,20 +495,27 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     sendJson(res, 200, listDevices(bearerToken(req)))
     return
   }
-  const devMatch = path.match(/^\/devices\/([^/]+)$/)
-  if (method === 'DELETE' && devMatch) {
+  // 撤销走 POST + 请求体（口令放 body）：DELETE 带 body 在部分代理/客户端上不可靠，
+  // 而"每次撤销都要校验密保口令"是硬要求（2026-09-16）——旧的无口令 DELETE 已移除。
+  const devRevokeMatch = path.match(/^\/devices\/([^/]+)\/revoke$/)
+  if (method === 'POST' && devRevokeMatch) {
+    const body = await readJsonBody(req)
     const token = bearerToken(req)
     const caller = requireSession(token)
-    const result = revokeDevice(token, devMatch[1])
-    // 审计：设备撤销（谁撤的、撤了谁）
+    const result = await revokeDevice(
+      token,
+      devRevokeMatch[1],
+      (body as { passphrase?: unknown } | null)?.passphrase
+    )
+    // 审计：设备撤销（谁撤的、撤了谁）——**不记口令**
     logActivity({
       deviceId: caller.device_id,
       spaceId: caller.space_id,
       kind: 'device.revoke',
-      detail: { target_device_id: devMatch[1] },
+      detail: { target_device_id: devRevokeMatch[1] },
       meta: metaOf(req)
     })
-    notifyRevoked(devMatch[1])
+    notifyRevoked(devRevokeMatch[1])
     // 注：这里原先还会 notifyKeyRotation()（PROTOCOL.md §8.2 key.rotation），提示剩余
     // 设备轮换 Space Key。2026-09-14 决策：产品不做密钥轮换（App/TUI 无入口、分发链路
     // 不成立、ROI 极低），该通知与 `key_rotation_required` 一并撤除，见 docs/SECURITY.md。

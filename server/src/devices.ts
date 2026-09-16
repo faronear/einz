@@ -3,7 +3,8 @@ import { ApiError } from './auth.js'
 import { getDevice } from './config.js'
 import { assertDeviceName } from './deviceName.js'
 import { assertPersonName } from './personName.js'
-import { deviceScopeClause, requireSession } from './guard.js'
+import { deviceScopeClause, isSpaceMember, requireSession } from './guard.js'
+import { assertSpacePassphrase } from './escrow.js'
 import { broadcastProfileUpdated, getConnectedAt, getOnlineSince } from './ws.js'
 
 /** GET /devices：设备列表（含 person 映射）。
@@ -44,19 +45,38 @@ export function listDevices (
   }
 }
 
-/** DELETE /devices/:id：撤销设备（白名单移除 + 清 Push Token + 清会话，PROTOCOL.md §7.2）。
- *  2026-09-14 决策：不再返回 `key_rotation_required`——产品不做密钥轮换（无端侧入口、
- *  分发链路不成立），该字段只会暗示一个不存在的能力，见 docs/SECURITY.md。 */
-export function revokeDevice (
+/** POST /devices/:id/revoke：撤销**本空间内**的另一台设备
+ *  （白名单移除 + 清 Push Token + 清会话，PROTOCOL.md §7.2）。
+ *
+ * 授权规则（老板 2026-09-16 定稿）：
+ * 1. **同 space 内可互撤**——不限于"同一 person 的另一台设备"：A 的手机丢了、A 又没有
+ *    第二台设备时，伴侣 B 也能替他撤掉那台（此前的实现是"任何在册设备能撤任何设备"，
+ *    连空间都不校验；而文档写的是"仅限同 person"，代码比文档更宽）；
+ * 2. **每次撤销都要校验密保口令**（`assertSpacePassphrase`：argon2id + 失败限速）——
+ *    撤销会让对方客户端**自毁本地数据**，属于不可逆的破坏性操作，必须由"口令持有者"
+ *    授权；这样即使伴侣的一台设备被入侵，仅凭 session 也清不掉另一方的设备。
+ * 3. 不能撤自己（400）：撤销自己等于就地自毁，产品上没有这个场景，留个明确的报错。
+ *
+ * 2026-09-14 决策：不返回 `key_rotation_required`——产品不做密钥轮换（无端侧入口、
+ * 分发链路不成立），该字段只会暗示一个不存在的能力，见 docs/SECURITY.md。 */
+export async function revokeDevice (
   token: string,
-  targetDeviceId: string
-): { ok: true } {
-  const { device_id: callerId } = requireSession(token)
+  targetDeviceId: string,
+  passphrase: unknown
+): Promise<{ ok: true }> {
+  const caller = requireSession(token)
 
   const target = getDevice(targetDeviceId)
   if (!target) throw new ApiError('NOT_FOUND', 'device not found', 404)
-  if (target.device_id === callerId)
+  if (target.device_id === caller.device_id)
     throw new ApiError('INVALID_REQUEST', 'cannot revoke self', 400)
+  // 目标设备必须属于**本会话所在空间**（devices 表没有 space 列，空间归属走
+  // devices.person_id → space_members）
+  if (target.person_id.length === 0 || !isSpaceMember(caller.space_id, target.person_id)) {
+    throw new ApiError('FORBIDDEN', 'target device is not in this space', 403)
+  }
+  // 口令校验放在"目标合法性"之后：错误的目标不该消耗口令尝试预算
+  await assertSpacePassphrase(caller.space_id, passphrase)
 
   const db = getDb()
   const now = Date.now()

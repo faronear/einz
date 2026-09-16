@@ -1026,16 +1026,90 @@ async function main (): Promise<void> {
     )
     console.log('✅ 取包限速：2 次失败后第 3 次 429（免认证端点防在线爆破）')
 
-    // 12) 撤销语义（老板 2026-09-16）：**只有明确撤销**才给 DEVICE_REVOKED。
-    //     此前 revoked 与"库被重置/未登记"都返回 FORBIDDEN，客户端只能把 403 一律
-    //     当撤销处理 → 后台 DB 被清空时客户端自毁本地数据，不可挽回。
-    const revokeB = await fetch(
-      `http://127.0.0.1:${port}/devices/${devB.deviceId}`,
-      { method: 'DELETE', headers: { Authorization: `Bearer ${devA.sessionToken}` } }
-    )
-    assert.equal(revokeB.status, 200, 'revoke should succeed')
+    // 12) 撤销语义（老板 2026-09-16）分两件事：
+    //     ① **只有明确撤销**才给 DEVICE_REVOKED（此前 revoked 与"库被重置/未登记"
+    //        都返回 FORBIDDEN，客户端只能把 403 一律当撤销 → 后台 DB 被清空时客户端
+    //        自毁本地数据，不可挽回）；
+    //     ② **授权边界**（2026-09-16 定稿）：同 space 内可互撤，但每次都要验密保口令。
+    const pass = 'smoke-revoke-pass'
+    const revokeUrl = `http://127.0.0.1:${port}/devices/${devB.deviceId}/revoke`
+    const revokeReq = async (
+      passphrase: unknown,
+      token: string
+    ): Promise<Response> =>
+      await fetch(revokeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(passphrase === undefined ? {} : { passphrase })
+      })
 
-    // 12a) 已撤销设备挑战 → 403 DEVICE_REVOKED
+    // 12a) 该空间没有可校验的密保口令（先清掉 escrow）→ 409 PASSPHRASE_NOT_SET
+    //      ——**拒绝放行**：没有可校验的口令就等于撤销无需口令，正是要堵的洞
+    const escrowClear = await fetch(`http://127.0.0.1:${port}/key-escrow`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${devA.sessionToken}` }
+    })
+    assert.equal(escrowClear.status, 200, 'clear escrow for the no-hash case')
+    const noHash = await revokeReq(pass, devA.sessionToken)
+    assert.equal(noHash.status, 409, 'no passphrase_hash → must refuse (fail closed)')
+    assert.equal(
+      ((await noHash.json()) as { error: { code: string } }).error.code,
+      'PASSPHRASE_NOT_SET',
+      '缺口令哈希必须返回 PASSPHRASE_NOT_SET'
+    )
+
+    // 12b) 请求体缺 passphrase → 400（不消耗限速预算）
+    const noPass = await revokeReq(undefined, devA.sessionToken)
+    assert.equal(noPass.status, 400, 'missing passphrase → 400')
+
+    // 12c) 跨空间撤销 → 403：另一空间的设备不能撤本空间的设备
+    const cross = await revokeReq(pass, preset.sessionToken)
+    assert.equal(cross.status, 403, 'cross-space revoke must be rejected')
+    assert.equal(
+      ((await cross.json()) as { error: { code: string } }).error.code,
+      'FORBIDDEN',
+      '跨空间撤销 → FORBIDDEN'
+    )
+
+    // 12d) 上传带口令哈希的密保箱 → 口令错 → 401 且**目标设备毫发无损**
+    const upHash = await fetch(`http://127.0.0.1:${port}/spaces/${spaceId}/key-escrow`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${devA.sessionToken}` },
+      body: JSON.stringify({
+        package: {
+          format: 'backup-v1',
+          salt: sodium.to_base64(sodium.randombytes_buf(16), B64),
+          nonce: sodium.to_base64(sodium.randombytes_buf(24), B64),
+          ciphertext: sodium.to_base64(sodium.randombytes_buf(48), B64)
+        },
+        passphrase_hash: await pwhashStr(pass)
+      })
+    })
+    assert.equal(upHash.status, 200, 'escrow upload with hash should succeed')
+
+    const wrongPass = await revokeReq('not-the-passphrase', devA.sessionToken)
+    assert.equal(wrongPass.status, 401, 'wrong passphrase must be rejected')
+    assert.equal(
+      ((await wrongPass.json()) as { error: { code: string } }).error.code,
+      'ESCROW_VERIFY_FAILED',
+      '口令错 → ESCROW_VERIFY_FAILED'
+    )
+    await devB.auth(port) // 口令错**不得**产生任何效果：目标设备仍能正常认证
+    assert.equal(devB.sessionToken.length > 0, true, 'target device unaffected by failed revoke')
+
+    // 12e) 不能撤自己 → 400
+    const self = await fetch(`http://127.0.0.1:${port}/devices/${devA.deviceId}/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${devA.sessionToken}` },
+      body: JSON.stringify({ passphrase: pass })
+    })
+    assert.equal(self.status, 400, 'cannot revoke self')
+
+    // 12f) 口令正确 → 200，目标设备被撤销
+    const revokeB = await revokeReq(pass, devA.sessionToken)
+    assert.equal(revokeB.status, 200, 'revoke with correct passphrase should succeed')
+
+    // 12g) 已撤销设备挑战 → 403 DEVICE_REVOKED
     const revokedCh = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1053,7 +1127,7 @@ async function main (): Promise<void> {
     })
     assert.equal(revokedSync.status, 401, 'revoked device session must be gone')
 
-    // 12b) guard.requireSession 的 revoked 分支（防御性）：revoke 已删会话，正常路径
+    // 12h) guard.requireSession 的 revoked 分支（防御性）：revoke 已删会话，正常路径
     //      走不到，这里直接种一条属于该 revoked 设备的会话——若该分支被误删，
     //      被撤销设备就能拿着旧会话继续同步消息（安全缺口）
     const staleToken = 'revoked-device-stale-session'
@@ -1080,10 +1154,13 @@ async function main (): Promise<void> {
       'DEVICE_REVOKED',
       'requireSession 对 revoked 设备也必须 DEVICE_REVOKED'
     )
-    console.log('✅ 撤销语义：已撤销 → DEVICE_REVOKED（挑战与会话校验两处），未登记 → FORBIDDEN')
+    console.log(
+      '✅ 撤销语义：已撤销 → DEVICE_REVOKED（挑战与会话校验两处），未登记 → FORBIDDEN；' +
+        '授权：缺口令哈希 409 / 缺口令 400 / 跨空间 403 / 口令错 401（目标无损）/ 撤自己 400'
+    )
 
     console.log(
-      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members) / 撤销语义'
+      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members) / 撤销语义与授权'
     )
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，
