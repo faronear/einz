@@ -6402,3 +6402,29 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 / 从未活跃过则 `⚪ tui3 [Nan] 离线`。
 
 **验证**：`dart analyze`(cli) 干净（界面观感由老板自测）。
+
+## 2026-09-16 右段改为「灯 名字 @本机名 #n/m#其它在线设备」——本机从列表独立
+
+**方案**（老板 2026-09-16，我确认合理性并补了一个数学坑）：
+把本机用 `@设备名` 从设备列表里独立出来（本机可能在线也可能离线，但总要说清"我此刻
+在哪台"），后面的 `#n/m` 与在线列表**扣除本机**。
+
+**为什么这是对的**：此前本机名恒在列表首位但**不计在线**，导致本机离线时
+`✗ 阿猪 #1/2#MacBook#Phone` 里 n=1 却列了两个名字，且列出的 MacBook 明明离线——
+计数与列表对不上。独立后 n 与列表严格一一对应。
+
+**补的坑**：不能直接用 `myDeviceOnline - 1 / myDeviceTotal - 1`——`myDeviceOnline`
+本身已不含离线时的本机，减 1 会出现 `#-1/1`。改为在 `_refreshPeerOnline()` 里单独统计
+"我的其它设备"：`myOtherDeviceTotal`（分母）+ `myOtherOnlineSince.length`（分子）。
+
+**落地**（`cli/bin/einz_tui.dart`）：
+- 删 `myDeviceOnline`/`myDeviceTotal`（无消费者），增 `myOtherDeviceTotal`。
+- `_myDeviceTag()`：` @设备名`（人名与 @ 之间空一格；未登记显示 `@-`）。
+- `_myOtherDevicesLabel()`（替代 `_myDevicesLabel()`）：只列其它在线设备。
+- `_deviceCountLabel()`：`totalCount <= 0` 整段省略（我的其它设备 0 台时右侧就是
+  `● 阿猪 @MacBook`）；有设备则 `#n/m`（0 也显示）。
+
+**效果**：本机+手机在线 `● 阿猪 @MacBook #1/1#Phone`；本机离线 `✗ 阿猪 @MacBook #1/1#Phone`；
+仅本机 `● 阿猪 @MacBook`。
+
+**验证**：`dart analyze`(cli) 干净。

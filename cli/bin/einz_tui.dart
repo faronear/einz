@@ -59,9 +59,9 @@ class _TuiState {
   /// 判定维度是"人"：同一 person 的多台设备是我自己的设备，不算对方。
   bool peerOnline = false;
 
-  /// 我的设备：在线数 / 总数（同一 person 的多设备；listDevices 轮询统计）。
-  int myDeviceOnline = 0;
-  int myDeviceTotal = 0;
+  /// 我的**其它设备**总数（不含本机；listDevices 轮询统计）——右段 `#n/m` 的分母。
+  /// 本机由 `@设备名` 独立表示，不计入这一对数字（老板 2026-09-16）。
+  int myOtherDeviceTotal = 0;
 
   /// 对方设备：在线数 / 总数（同一 person 的多设备；listDevices 轮询统计）。
   int peerDeviceOnline = 0;
@@ -77,8 +77,8 @@ class _TuiState {
 
   /// 我的**其它在线设备**表：device_id → 上线时刻（ms）——右段逐个列出
   /// （数据同样来自 /devices，客户端对本方/对方的掌握是对称的）。
-  /// **不含本机**：本机名恒在右段设备列表首位、不论是否在线（老板 2026-09-16），
-  /// 不必也不能在"其余在线设备"里重复出现。本机在线与否只影响 #n/m 计数。
+  /// **不含本机**：本机由 `@设备名` 单独表示（不论在线与否都显示），
+  /// 故本表长度即 `#n/m` 里的 n，与后面列出的设备名严格一一对应。
   final Map<String, int> myOtherOnlineSince = {};
 
   /// 输入缓冲区（逐键追加）。
@@ -1483,10 +1483,13 @@ void _render() {
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
     '${_bold}Einz TUI\x1B[22m$_white',
-    // 右段（我）：与左段**完全同构**——`灯 名字 #n/m#设备名…`（老板 2026-09-16）
+    // 右段（我）：`灯 名字 @本机名 #n/m#其它在线设备…`（老板 2026-09-16）——
+    // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
+    // 后面的 #n/m 与设备列表**扣除本机**，两者严格一一对应。
     '$myDot ${_personLabel(s.session.store, s.personNames)}'
-        '${_deviceCountLabel(s.myDeviceOnline, s.myDeviceTotal)}'
-        '${_myDevicesLabel(s)}',
+        '${_myDeviceTag(s)}'
+        '${_deviceCountLabel(s.myOtherOnlineSince.length, s.myOtherDeviceTotal)}'
+        '${_myOtherDevicesLabel(s)}',
     cols,
   );
   buf.write(titleText);
@@ -1620,11 +1623,14 @@ String _peerNameOf(_TuiState s) {
   return partnerPresetName ?? '-';
 }
 
-/// 同一身份的多设备计数（顶部条 "#n/m"）：**始终显示**，不省略 1/1——0 台在线时
-/// 人名后面若什么都没有，"没有人名对应的设备"和"只是没显示"就分不清了
+/// 同一身份的多设备计数（顶部条 "#n/m"）：**有设备就显示**，不省略 0/n——全离线
+/// 时人名后面若什么都没有，"没有人名对应的设备"和"只是没显示"就分不清了
 /// （老板 2026-09-16）。"台在线"字样去掉：以 # 引导，与紧随其后的 #设备名 同形，
 /// 一眼看出这一段是设备信息而非人名。
+/// totalCount ≤ 0（没有这类设备，如我的其它设备为 0 台）时整段省略——本机那台由
+/// `@设备名` 表示，不参与这对数字（老板 2026-09-16）。
 String _deviceCountLabel(int onlineCount, int totalCount) {
+  if (totalCount <= 0) return '';
   return ' #$onlineCount/$totalCount';
 }
 
@@ -1641,24 +1647,30 @@ String _peerDeviceLabel(_TuiState s) {
   return buf.toString();
 }
 
-/// 我的设备片段：`#本机名#其它在线设备…`
-/// - **本机名恒列首位、不论是否在线**（老板 2026-09-16）：本机是这一屏的"我"，
-///   TUI 一上线就该看到自己；若按上线时间排，后上线的其它设备会把本机挤到后面。
-///   本机在线与否只体现在 `#n/m` 计数里（灯则表示本机 WS 连接状态）。
-/// - 其余我的在线设备按上线时刻降序，与左段同构；本机不在其中（不重复显示）。
-/// - 本机名优先取 /devices 的 device_name，缺失回退本地 store（未登记时显示 '-'）。
-String _myDevicesLabel(_TuiState s) {
+/// 我的在线设备片段：`#A#B#C`——**其它**在线设备，按上线时刻降序（与左段同构）。
+/// **不含本机**：本机由 `_myDeviceTag` 的 `@设备名` 单独表示，故本表数量与
+/// `#n/m` 的 n 一致。
+/// 名字取 listDevices 的 device_name，未知名回退 device_id；无其它在线设备时空串。
+String _myOtherDevicesLabel(_TuiState s) {
+  final buf = StringBuffer();
+  for (final id in _byOnlineOrder(s.myOtherOnlineSince)) {
+    buf.write('#${s.deviceNames[id] ?? id}');
+  }
+  return buf.toString();
+}
+
+/// 右段本机标识：` @设备名`——把"我此刻在哪台"从设备列表里**独立**出来
+/// （老板 2026-09-16）：本机可能在线也可能离线，但总要说清我坐在哪台机器前，
+/// 且它不该混进后面的 `#n/m` 与在线设备列表里（否则本机离线时计数与列表对不上）。
+/// 名字优先取 /devices 的 device_name，缺失回退本地 store；未登记显示 `@-`。
+String _myDeviceTag(_TuiState s) {
   final store = s.session.store;
   final myId = store.deviceId;
   final myName = (myId != null ? s.deviceNames[myId] : null) ??
       store.deviceName ??
       myId ??
       '-';
-  final buf = StringBuffer('#$myName');
-  for (final id in _byOnlineOrder(s.myOtherOnlineSince)) {
-    buf.write('#${s.deviceNames[id] ?? id}');
-  }
-  return buf.toString();
+  return ' @$myName';
 }
 
 /// last_seen 毫秒 → 时间文本：今天 HH:mm / 昨天 HH:mm / M/d HH:mm。
@@ -1751,12 +1763,11 @@ Future<void> _refreshPeerOnline() async {
     // 对方（此前只按 device_id != 自己 判定 → 我的第二台设备一上线，尚未加入的
     // 对方 B 就显示绿灯——老板 2026-09-16 实测）。
     s.deviceNames.clear();
-    int myTotal = 0;
-    int myOnline = 0;
+    int myOtherTotal = 0; // 我的其它设备总数（不含本机——它由 @设备名 表示）
     int peerTotal = 0;
     int peerOnline = 0;
     final peerSince = <String, int>{}; // 在线对方设备 → 上线时刻（降序展示）
-    // 在线我方设备 → 上线时刻（降序展示；**不含本机**——本机恒在右段首位）
+    // 在线我方**其它**设备 → 上线时刻（降序展示；不含本机）
     final myOtherSince = <String, int>{};
     for (final d in devices) {
       if (d['status'] != null && d['status'] != 'active') continue; // 已撤销不计
@@ -1778,12 +1789,10 @@ Future<void> _refreshPeerOnline() async {
         continue;
       }
       if (pid == myPid) {
-        myTotal++;
-        if (isOnline) {
-          myOnline++;
-          // 本机不进列表（它恒在右段首位，见 myOtherOnlineSince 注释）
-          if (devId != myId) myOtherSince[devId] = since;
-        }
+        // 本机不参与 #n/m 与设备列表（它由 @设备名 单独表示，不论在线与否）
+        if (devId == myId) continue;
+        myOtherTotal++;
+        if (isOnline) myOtherSince[devId] = since;
         continue;
       }
       peerTotal++;
@@ -1799,14 +1808,12 @@ Future<void> _refreshPeerOnline() async {
         myOtherSince.length != s.myOtherOnlineSince.length ||
         myOtherSince.entries.any((e) => s.myOtherOnlineSince[e.key] != e.value);
     final changed = online != s.peerOnline ||
-        myOnline != s.myDeviceOnline ||
-        myTotal != s.myDeviceTotal ||
+        myOtherTotal != s.myOtherDeviceTotal ||
         peerOnline != s.peerDeviceOnline ||
         peerTotal != s.peerDeviceTotal ||
         devicesChanged;
     s.peerOnline = online;
-    s.myDeviceOnline = myOnline;
-    s.myDeviceTotal = myTotal;
+    s.myOtherDeviceTotal = myOtherTotal;
     s.peerDeviceOnline = peerOnline;
     s.peerDeviceTotal = peerTotal;
     s.peerOnlineSince
