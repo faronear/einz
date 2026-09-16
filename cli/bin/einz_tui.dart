@@ -1471,8 +1471,11 @@ void _render() {
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
     '${_bold}Einz TUI\x1B[22m$_white',
-    '$myDot ${_personLabel(s.session.store, s.personNames)}'
-        '${_deviceCountLabel(s.myDeviceOnline, s.myDeviceTotal)}',
+    // 右段（我）：`#设备名 n/m台在线 名字 灯`——设备名贴中间、灯贴屏幕右缘
+    // （老板 2026-09-16；与左段的 `灯 名字 #设备名 n/m台在线` 成镜像）
+    '${_myDeviceLabel(s.session.store)}'
+        '${_deviceCountLabel(s.myDeviceOnline, s.myDeviceTotal)}'
+        ' ${_personLabel(s.session.store, s.personNames)} $myDot',
     cols,
   );
   buf.write(titleText);
@@ -1569,17 +1572,21 @@ void _render() {
   }
 }
 
-/// 状态条身份标签：personName #deviceName（远程名称表优先——同 person 多设备同步
-/// 显示最新名字；未拉取/未知回退本地 store，再回退规范 id）。
+/// 状态条我的显示名（远程名称表优先——同 person 多设备同步显示最新名字；
+/// 未拉取/未知回退本地 store，再回退规范 id）。
 /// 返回纯文本（不含颜色），由调用方（标题栏）统一着色。
 String _personLabel(DeviceStore store, Map<String, String> personNames) {
   final pid = store.personId;
-  final person = (pid != null ? personNames[pid] : null) ??
+  return (pid != null ? personNames[pid] : null) ??
       store.personName ??
       store.personId ??
       '-';
-  final device = store.deviceName ?? store.deviceId ?? '-';
-  return '$person #$device';
+}
+
+/// 状态条我的设备片段：`#设备名`——**永远指本机这台**（我的灯是本机的 WS 连接
+/// 状态，不是"我的某一台"；同一身份的其它设备只体现在 `n/m台在线` 的计数里）。
+String _myDeviceLabel(DeviceStore store) {
+  return '#${store.deviceName ?? store.deviceId ?? '-'}';
 }
 
 /// 对方显示名：探测名表（personA/personB）→ 首设备预置名 → '-'。

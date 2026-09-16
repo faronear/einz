@@ -6228,3 +6228,30 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 测试：shared 两条策略各加"汉字范围"用例（10 项）、server 两个测试补 𠮷/㐀 放行与
 あ/Ａ 拒收；`dart test`(shared 48 项)、`server npm test`、`dart analyze`、
 `flutter analyze`、`flutter test`(app) 全绿。
+
+## 2026-09-16 TUI 状态条"我的状态"顺序颠倒
+
+**需求**（老板 2026-09-16）：把标题栏右段（我）的顺序从 `灯 名字 #设备名 n/m台在线`
+颠倒成 `#设备名称 在线数量/总共数量 名字 灯`，让**设备名贴中间、绿点贴屏幕右缘**。
+
+**落地**（`cli/bin/einz_tui.dart`）：
+- 右段（我）改为 `#设备名` + `n/m台在线`（仅 total≥2 才显示）+ ` 名字` + ` 灯`，
+  与左段（对方）`灯 名字 #设备名 n/m台在线` 成镜像。
+- 抽出 `_myDeviceLabel()`（返回 `#设备名`，永远指**本机这台**）；`_personLabel()`
+  现在只回显人/person 显示名；`#设备名` 不再由 `_personLabel` 拼。
+- 新增 `_myDeviceLabel` 注释明确语义：我的灯 = 本机 WS 连接状态，不是"我的某一台"；
+  同一身份的其它设备只体现在 `n/m台在线` 计数里。
+
+**老板追问：对方状态里的设备显示哪一个？** 答：左段的 `#设备名` 取
+`_peerDeviceLabel()`——优先取"最近一次收到消息的发送设备"，回退到当前在线的对方
+设备（`s.peerDeviceId`）。即"对方状态"展示的是**最近活跃的对方设备**，而非固定某台。
+
+**验证**：`dart analyze` 干净；pty 手工实测右段渲染为 `#Smoke_Dev-1 阿猪🐷_01 ●`
+（连上 WS 转绿 ●，未连白 ○，重连中 ↻），`/devices` 确认 `Smoke_Dev-1 [阿猪🐷_01] 本机`。
+
+## 2026-09-16 package.json 部署脚本修正
+
+- `server-dev-new` 原先依赖被删的 `server-clean` → 改为内联 `rm -fr server/data/...`，
+  使其自包含。
+- `server-prod-new` 原先清理 `server/data`（部署产物实际在 `deployment/data`）→
+  改为清理 `deployment/data`，否则生产清净不彻底。
