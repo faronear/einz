@@ -75,6 +75,11 @@ class _TuiState {
   /// 只计入 peerDeviceOnline/Total 的分母（老板 2026-09-16）。
   final Map<String, int> peerOnlineSince = {};
 
+  /// 我的**在线设备**表：device_id → 上线时刻（ms）——右段与左段同构地逐个列出
+  /// （数据同样来自 /devices，客户端对本方/对方的掌握是对称的）。
+  /// 本机那台是否在线以本地 WS 状态为准；离线设备不在表内，只进分母（老板 2026-09-16）。
+  final Map<String, int> myOnlineSince = {};
+
   /// 输入缓冲区（逐键追加）。
   final StringBuffer input = StringBuffer();
 
@@ -1480,7 +1485,7 @@ void _render() {
     // 右段（我）：与左段**完全同构**——`灯 名字 #n/m#设备名…`（老板 2026-09-16）
     '$myDot ${_personLabel(s.session.store, s.personNames)}'
         '${_deviceCountLabel(s.myDeviceOnline, s.myDeviceTotal)}'
-        '${_myDeviceLabel(s.session.store)}',
+        '${_myDevicesLabel(s)}',
     cols,
   );
   buf.write(titleText);
@@ -1588,12 +1593,12 @@ String _personLabel(DeviceStore store, Map<String, String> personNames) {
       '-';
 }
 
-/// 状态条我的设备片段：`#设备名`——**永远指本机这台**，排在 `#n/m` 计数之后
-/// （与左段同构：`灯 名字 #n/m#设备名…`；老板 2026-09-16）。
-/// 为什么只列本机：客户端只掌握本机的 WS 连接状态，同一身份的其它设备是否在线
-/// 只有 /devices 知道（它们只体现在 `#n/m` 的计数里）。
-String _myDeviceLabel(DeviceStore store) {
-  return '#${store.deviceName ?? store.deviceId ?? '-'}';
+/// 在线设备按上线时刻降序（最新上线在最前）——两侧共用的展示顺序
+/// （老板 2026-09-16：按上线顺序排，不按"最近发过消息"）。
+List<String> _byOnlineOrder(Map<String, int> sinceById) {
+  final entries = sinceById.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  return [for (final e in entries) e.key];
 }
 
 /// 对方显示名：探测名表（personA/personB）→ 首设备预置名 → '-'。
@@ -1628,11 +1633,26 @@ String _deviceCountLabel(int onlineCount, int totalCount) {
 /// 谁刚上线，而不是最后发言的那台（它可能早已离线）。
 /// 名字取 listDevices 的 device_name，未知名回退 device_id；无在线设备时空串。
 String _peerDeviceLabel(_TuiState s) {
-  final entries = s.peerOnlineSince.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
   final buf = StringBuffer();
-  for (final e in entries) {
-    buf.write('#${s.deviceNames[e.key] ?? e.key}');
+  for (final id in _byOnlineOrder(s.peerOnlineSince)) {
+    buf.write('#${s.deviceNames[id] ?? id}');
+  }
+  return buf.toString();
+}
+
+/// 我的在线设备片段：`#A#B#C`——列出**我的全部在线设备**，按上线时刻降序，
+/// 与左段完全同构（数据同样来自 /devices；我方与对方的信息掌握是对称的）。
+/// 注意与灯的分工：**灯只表示本机这台的 WS 连接状态**（终端连接健康指示灯），
+/// 本列表表示"我的设备谁在线"（老板 2026-09-16）。
+/// 本机名优先取 /devices 的 device_name，缺失回退本地 store（离线自检场景）。
+String _myDevicesLabel(_TuiState s) {
+  final store = s.session.store;
+  final buf = StringBuffer();
+  for (final id in _byOnlineOrder(s.myOnlineSince)) {
+    final name = s.deviceNames[id] ??
+        (id == store.deviceId ? store.deviceName : null) ??
+        id;
+    buf.write('#$name');
   }
   return buf.toString();
 }
@@ -1713,7 +1733,10 @@ Future<void> _refreshPeerOnline() async {
     // 设备在线 = 有实时 WS 连接（connected_at 非 null）；旧服务器无该字段时退回
     // last_seen<60s（last_seen 会被轮询 touchLastSeen 持续刷新，不代表实时连接）
     bool deviceOnline(Map d) {
-      if (d['device_id'] == myId && myWsOnline) return true;
+      // 本机一律以本地 WS 状态为准，**不回退服务端**：服务端要等心跳超时（最多 30s）
+      // 才把本机判离线，那段时间会出现"本机灯已红/↻、而 #n/m 仍把自己算作在线"的
+      // 自相矛盾（老板 2026-09-16）。
+      if (d['device_id'] == myId) return myWsOnline;
       if (d.containsKey('connected_at')) return d['connected_at'] != null;
       final last = d['last_seen'];
       if (last is! num) return false;
@@ -1729,6 +1752,7 @@ Future<void> _refreshPeerOnline() async {
     int peerTotal = 0;
     int peerOnline = 0;
     final peerSince = <String, int>{}; // 在线对方设备 → 上线时刻（降序展示）
+    final mySince = <String, int>{}; // 在线我方设备 → 上线时刻（降序展示）
     for (final d in devices) {
       if (d['status'] != null && d['status'] != 'active') continue; // 已撤销不计
       final devId = (d['device_id'] as String?) ?? '';
@@ -1750,7 +1774,10 @@ Future<void> _refreshPeerOnline() async {
       }
       if (pid == myPid) {
         myTotal++;
-        if (isOnline) myOnline++;
+        if (isOnline) {
+          myOnline++;
+          mySince[devId] = since;
+        }
         continue;
       }
       peerTotal++;
@@ -1762,7 +1789,9 @@ Future<void> _refreshPeerOnline() async {
     final online = peerOnline > 0;
     // 设备集合变化也要重绘：A 下 B 上（在线数不变）时顶部条应换成 B 的名字
     final devicesChanged = peerSince.length != s.peerOnlineSince.length ||
-        peerSince.entries.any((e) => s.peerOnlineSince[e.key] != e.value);
+        peerSince.entries.any((e) => s.peerOnlineSince[e.key] != e.value) ||
+        mySince.length != s.myOnlineSince.length ||
+        mySince.entries.any((e) => s.myOnlineSince[e.key] != e.value);
     final changed = online != s.peerOnline ||
         myOnline != s.myDeviceOnline ||
         myTotal != s.myDeviceTotal ||
@@ -1777,6 +1806,9 @@ Future<void> _refreshPeerOnline() async {
     s.peerOnlineSince
       ..clear()
       ..addAll(peerSince);
+    s.myOnlineSince
+      ..clear()
+      ..addAll(mySince);
     if (changed) _render();
   } catch (_) {
     // 查询失败保持上次状态（断网/未认证）

@@ -6339,3 +6339,27 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
 **效果**：左 `● 阿猪 #2/3#MacBook#Phone` / 右 `● 阿猪 #1/2#MacBook`（同构）。
 
 **验证**：`dart analyze`(cli) 干净。
+
+## 2026-09-16 右段列出我的全部在线设备 + 本机在线以本地为准
+
+**老板质疑**：TUI 只掌握我的当前设备，却能掌握对方所有在线设备——为何我方信息反而少？
+**答**：信息其实同源对称（同一次 `/devices` 响应，`myDeviceOnline/myDeviceTotal` 早已在统计
+我的所有设备），差异纯粹是我在**显示层**只拼了本机那一台。结论：改为对称展示。
+
+**落地**（`cli/bin/einz_tui.dart`）：
+- `_TuiState` 增 `myOnlineSince`（device_id → 上线时刻），与 `peerOnlineSince` 对称；
+  `_refreshPeerOnline()` 在 `pid == myPid` 分支一并收集。
+- 抽出 `_byOnlineOrder()`：两侧共用的"按上线时刻降序"顺序。
+- 新 `_myDevicesLabel()`（替代 `_myDeviceLabel()`）：列出**我的全部在线设备**
+  `#A#B#C`，本机名优先 /devices 的 device_name、缺失回退本地 store。
+- **灯与列表的分工**：灯仍只表示**本机这台的 WS 连接状态**（终端连接健康指示灯），
+  列表表示"我的设备谁在线"——老板确认这个组合（列全部 + 灯保本机）。
+
+**同时修的矛盾**（老板确认）：`deviceOnline()` 对本机不再回退服务端 `connected_at`，
+一律以本地 `wsStatus` 为准——否则本机刚断线时灯已变红/↻，`#n/m` 却仍把自己算作在线
+（服务端要等 30s 心跳超时才察觉）。
+
+**效果**：左 `● 阿猪 #2/3#MacBook#Phone` / 右 `● 阿猪 #1/2#MacBook`（完全同构）；
+本机断线时右段立即变 `✗ 阿猪 #0/2#MacBook`（本机不在在线列表内）。
+
+**验证**：`dart analyze`(cli) 干净。
