@@ -6255,3 +6255,27 @@ ZWJ 组合/国旗这类多码点序列会多算（👨‍👩‍👧 算 5），
   使其自包含。
 - `server-prod-new` 原先清理 `server/data`（部署产物实际在 `deployment/data`）→
   改为清理 `deployment/data`，否则生产清净不彻底。
+
+## 2026-09-16 回退 b0cc051（TUI 右段顺序还原）
+
+**原因**（老板 2026-09-16）：镜像顺序 `#设备名 n/m台在线 名字 灯` 在**窄终端被截断时**
+先砍掉右缘的灯和名字——而这两项才是关键信息（设备名是次要的）。截断优先级不能反。
+
+**落地**：`cli/bin/einz_tui.dart` 还原到 b0cc051 之前：
+- 右段（我）回到 `灯 名字 #设备名 n/m台在线`（灯贴左、设备名在最右 → 先被截掉的是设备名）。
+- `_personLabel()` 重新拼 `personName #deviceName`；删除 `_myDeviceLabel()`。
+- `_deviceCountLabel()`（total<2 不显示）与 `_peerDeviceLabel()` 保持不动。
+
+**结论/教训**：镜像排版不能以"截断时会先丢关键信息"为代价；真要镜像，得先改
+`_titleBarThree` 的截断策略（从右段尾部截 → 改成中段/设备名优先丢弃），而不是调顺序。
+
+**验证**：`dart analyze`（cli）干净。
+
+**附带分析（老板追问：对方多设备时 TUI 显示哪台？）**：`_peerDeviceLabel()` 两级取值——
+1) 本地消息列表**倒序**第一条非我、非系统的消息 → 其 `senderDeviceId`，即"最近一条
+   对方消息来自哪台"（注意：只看本地消息序，不看那台现在是否在线）；
+2) 无消息时回退 `s.peerDeviceId`，来自 `_refreshPeerOnline()` 的
+   `onlinePeerDevice ??= devId`——遍历 `/devices` 结果（服务端按 `created_at` 升序）
+   取第一个在线的对方设备，即**最早注册的那台在线设备**，不是最近活跃那台；
+   对方全离线则为 null → 显示 `-`。
+另外 `peerDot`（灯）只看 `peerOnline>0`（任一对方设备在线），与显示的这台是否在线无关。
