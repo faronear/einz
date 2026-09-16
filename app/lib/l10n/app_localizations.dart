@@ -1184,6 +1184,12 @@ abstract class AppLocalizations {
   /// **'PIN'**
   String get chatPagePinLabel;
 
+  /// No description provided for @chatPageLockNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock now'**
+  String get chatPageLockNow;
+
   /// No description provided for @chatPagePinSetValue.
   ///
   /// In en, this message translates to:

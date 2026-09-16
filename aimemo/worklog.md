@@ -6530,3 +6530,34 @@ hunk 再 `git add`，工作区仍保留他人改动。
 TUI/CLI（持久化了 personId，无此问题）。
 **验证**：`flutter analyze`（app/shared）全绿；UI 由老板真机自测
 （PIN 解锁路径上传 → 消息流立即更新；重启后菜单预览显示已有头像；对方改头像仍实时刷新）。
+
+## 2026-09-16 聊天页顶栏新增「一键锁屏」按钮
+
+**需求**（老板 2026-09-16）：聊天页顶栏加一个锁屏图标，放在下拉菜单（⋯）图标左侧，
+一按即进锁屏页，强化安全性。
+
+**决策**（AskUserQuestion 核对）：
+1. **未设置锁屏码（PIN）时隐藏该按钮**——没 PIN 时 `LockPage` 只会显示"尚未设置锁屏码"
+   提示页（锁屏不激活），摆一个按了没用的按钮只会误导。
+2. **手动锁屏必须输对 PIN 才能退出**：返回手势 / 返回键（Android）都被挡掉。
+   （切后台超时那条覆盖锁屏路径**保持旧语义**——仍可手势退回，未改动。）
+
+**落地**：
+- `app/lib/lock_page.dart`：新增 `canDismiss`（默认 true）——false 时用
+  `PopScope(canPop: false)` 挡返回，并 `automaticallyImplyLeading: false` 隐藏
+  返回箭头（点了也会被挡，留着误导）。**无 PIN（`_noLock`）时恒定可退**，否则会
+  死锁在"尚未设置锁屏码"提示页。解锁走 `_enterChat` 的 `Navigator.pop()`——直接 pop
+  不受 PopScope 限制（PopScope 只影响 `maybePop`/手势/返回键），已确认。
+- `app/lib/chat_page.dart`：顶栏 actions 在 `PopupMenuButton` **之前**插入
+  `IconButton(Icons.lock_outline)`（`if (_hasPin)` 才显示），点击 `_lockNow()` 推
+  `LockPage(asOverlay: true, canDismiss: false)`——解锁后 pop 回聊天页、保留消息状态。
+- l10n：新增 `chatPageLockNow`（zh「锁屏」/ en「Lock now」）作 tooltip，
+  `flutter gen-l10n` 重生成三个 `app_localizations*.dart`。
+
+**顺带确认（无需改动）**：锁屏覆盖期间不会误标对方消息为已读——
+`_scheduleReadReport` 有 `ModalRoute.of(context)?.isCurrent != true → return` 守卫
+（`chat_page.dart:1536`），覆盖锁屏压在上面时聊天页不是当前路由。
+
+**验证**：`flutter analyze` 全绿。golden 不受影响：`LockPage` 在测试里是 home 路由
+（`canPop=false`，本来就没有返回箭头）；ChatPage golden 的假 DB 无 PIN → 图标不渲染。
+UI 由老板真机自测。

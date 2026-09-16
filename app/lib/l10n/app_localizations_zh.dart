@@ -584,6 +584,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinLabel => '锁屏码';
 
   @override
+  String get chatPageLockNow => '锁屏';
+
+  @override
   String get chatPagePinSetValue => '已设置';
 
   @override

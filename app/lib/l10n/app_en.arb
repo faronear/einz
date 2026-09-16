@@ -239,6 +239,7 @@
   "chatPageMenuMyNameLabel": "My name",
   "chatPageMenuDeviceNameLabel": "Device",
   "chatPagePinLabel": "PIN",
+  "chatPageLockNow": "Lock now",
   "chatPagePinSetValue": "Set",
   "chatPagePinUnsetValue": "Not set",
   "@chatPageLocaleSwitched": {

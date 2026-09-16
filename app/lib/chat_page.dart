@@ -1376,6 +1376,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  /// 手动锁屏（顶栏锁图标）：立即推覆盖锁屏 → 解锁成功 pop 回本页（保留消息状态）。
+  /// canDismiss=false：返回手势/返回键都被挡，必须输对锁屏码才能回聊天
+  /// （老板 2026-09-16 要求"强化安全性"；切后台超时那条路径仍是可手势退回的旧语义）。
+  void _lockNow() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const LockPage(asOverlay: true, canDismiss: false)));
+  }
+
   /// App 生命周期：切后台记时，回前台超过阈值 → 覆盖锁屏（保留聊天页状态）。
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -3425,6 +3433,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ],
         ),
         actions: [
+          // 锁屏（老板要求 2026-09-16）：一键立即锁屏，放在下拉菜单图标左侧。
+          // 仅在已设置锁屏码时出现——没设 PIN 时锁屏不激活（LockPage 只会显示
+          // "尚未设置锁屏码"提示页），摆一个按了没用的按钮反而误导。
+          if (_hasPin)
+            IconButton(
+              icon: const Icon(Icons.lock_outline),
+              tooltip: l10n.chatPageLockNow,
+              onPressed: _lockNow,
+            ),
           // 顶栏统一入口：语言/阅后即焚/邀请码/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),

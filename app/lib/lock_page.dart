@@ -17,10 +17,18 @@ import 'widgets/top_notice.dart';
 ///
 /// [asOverlay]：true = 聊天中切后台超时返回的覆盖锁屏（解锁成功 pop 回聊天页，
 /// 保留消息状态）；false = 冷启动锁屏（解锁成功 pushReplacement 进聊天页）。
+///
+/// [canDismiss]：false = 手动点聊天页顶栏「锁屏」进入的严格锁屏——返回手势/返回键
+/// 都被 PopScope 挡掉，必须输对 PIN 才回聊天（老板 2026-09-16 要求"强化安全性"）；
+/// true（默认）= 现有覆盖锁屏语义，允许手势退回。未设置 PIN（无锁包）时恒定可退，
+/// 否则会死锁在提示页。
 class LockPage extends StatefulWidget {
-  const LockPage({super.key, this.asOverlay = false, this.db});
+  const LockPage({super.key, this.asOverlay = false, this.canDismiss = true, this.db});
 
   final bool asOverlay;
+
+  /// 是否允许不输 PIN 就退出锁屏（返回手势/返回键）。
+  final bool canDismiss;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -223,6 +231,9 @@ class _LockPageState extends State<LockPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    // 严格锁屏（canDismiss=false）也不能挡无 PIN 的情况：否则「尚未设置锁屏码」
+    // 提示页会死锁——退不出去也解锁不了。无锁包时恒定可退。
+    final canDismiss = widget.canDismiss || _noLock;
     // 未设置 PIN（无锁包）：锁屏不激活——提示原因，不显示解锁表单
     if (_noLock) {
       return Scaffold(
@@ -257,71 +268,78 @@ class _LockPageState extends State<LockPage> {
       );
     }
     final locked = _lockSeconds > 0;
-    return Scaffold(
-      appBar: AppBar(
-        // 与其他页面一致：Logo 在标题栏左侧 + 标题（页面中间不再放大 Logo）
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const BrandLogo(),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(l10n.lockPageTitle,
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-          ],
-        ),
-        actions: [_buildMenu(l10n)],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(l10n.lockPagePinPrompt,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 24),
-            // 连续错误锁定：倒计时提示（原来挂在输入框的 labelText 上，现已移除 label）
-            if (locked)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(l10n.lockPageLockedSeconds(_lockSeconds),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+    return PopScope(
+      // 手动锁屏（canDismiss=false）：返回手势/返回键不生效，只能输对 PIN 回去
+      // （解锁走 _enterChat 的 Navigator.pop——直接 pop 不受 PopScope 限制）
+      canPop: canDismiss,
+      child: Scaffold(
+        appBar: AppBar(
+          // 严格锁屏不显示返回箭头（点了也会被挡，留着只会误导）
+          automaticallyImplyLeading: canDismiss,
+          // 与其他页面一致：Logo 在标题栏左侧 + 标题（页面中间不再放大 Logo）
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const BrandLogo(),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(l10n.lockPageTitle,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
-            TextField(
-              controller: _pin,
-              // 进入锁屏页即聚焦输入框 → 直接弹键盘等待输入（老板要求 2026-09-14：
-              // 此前要手动点一下输入框才出键盘）；冷启动锁屏与后台切回覆盖锁屏都生效
-              focusNode: _pinFocus,
-              autofocus: true,
-              obscureText: true,
-              enabled: !locked,
-              keyboardType: TextInputType.number,
-              // 居中 + 大字号 + 字距（老板 2026-09-15）：像输手机验证码那样——
-              // PIN 是短数字串，靠左小字既不明显也不好确认位数
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 24, letterSpacing: 8),
-              decoration: const InputDecoration(
-                // 无 labelText（老板 2026-09-15）：上边框里不再挂"锁屏码"提示——
-                // 提示已在上方 lockPagePinPrompt 说过一遍，输入框只管输数字
-                border: OutlineInputBorder(),
-                // 上下加高，字大之后不至于挤边
-                contentPadding: EdgeInsets.symmetric(vertical: 18),
-              ),
-              onSubmitted: (_) => _unlock(),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: locked || _busy ? null : _unlock,
-              child: Text(l10n.lockPageUnlock),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
             ],
-          ],
+          ),
+          actions: [_buildMenu(l10n)],
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(l10n.lockPagePinPrompt,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 24),
+              // 连续错误锁定：倒计时提示（原来挂在输入框的 labelText 上，现已移除 label）
+              if (locked)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(l10n.lockPageLockedSeconds(_lockSeconds),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ),
+              TextField(
+                controller: _pin,
+                // 进入锁屏页即聚焦输入框 → 直接弹键盘等待输入（老板要求 2026-09-14：
+                // 此前要手动点一下输入框才出键盘）；冷启动锁屏与后台切回覆盖锁屏都生效
+                focusNode: _pinFocus,
+                autofocus: true,
+                obscureText: true,
+                enabled: !locked,
+                keyboardType: TextInputType.number,
+                // 居中 + 大字号 + 字距（老板 2026-09-15）：像输手机验证码那样——
+                // PIN 是短数字串，靠左小字既不明显也不好确认位数
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                decoration: const InputDecoration(
+                  // 无 labelText（老板 2026-09-15）：上边框里不再挂"锁屏码"提示——
+                  // 提示已在上方 lockPagePinPrompt 说过一遍，输入框只管输数字
+                  border: OutlineInputBorder(),
+                  // 上下加高，字大之后不至于挤边
+                  contentPadding: EdgeInsets.symmetric(vertical: 18),
+                ),
+                onSubmitted: (_) => _unlock(),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: locked || _busy ? null : _unlock,
+                child: Text(l10n.lockPageUnlock),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
         ),
       ),
     );

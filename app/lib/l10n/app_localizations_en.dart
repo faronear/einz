@@ -619,6 +619,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePinLabel => 'PIN';
 
   @override
+  String get chatPageLockNow => 'Lock now';
+
+  @override
   String get chatPagePinSetValue => 'Set';
 
   @override

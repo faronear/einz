@@ -239,6 +239,7 @@
   "chatPageMenuMyNameLabel": "我的身份",
   "chatPageMenuDeviceNameLabel": "我的设备",
   "chatPagePinLabel": "锁屏码",
+  "chatPageLockNow": "锁屏",
   "chatPagePinSetValue": "已设置",
   "chatPagePinUnsetValue": "未设置",
   "@chatPageLocaleSwitched": {
