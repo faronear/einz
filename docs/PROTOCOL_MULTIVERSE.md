@@ -199,6 +199,8 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `ADDRESS_TAKEN` | space_address 冲突（碰撞），需重新生成 Identity Key | 409 |
 | `INVALID_ADDRESS` | EIP-55 校验失败或格式错误 | 400 |
 | `ESCROW_VERIFY_FAILED` | 口令 escrow 验证失败（口令错误） | 401 |
+| `DEVICE_REVOKED` | 本设备已被明确撤销（`/auth/challenge`、会话校验）：客户端应清空本地数据后重新入网 | 403 |
+| `FORBIDDEN` | 设备未登记（含服务端库被清空/重置）：客户端**只应警告**，不得清空本地数据 | 403 |
 
 ## 7. 安全要求与待定项
 

@@ -88,6 +88,8 @@
 - [x] 设备撤销（白名单 + 上线自毁）——**Space Key 轮换不做**（2026-09-14 决策，见 SECURITY.md §3）
 - [ ] 备份与恢复（模型 A：本地加密备份 + 恢复码）
 - [x] 设备撤销（撤销生效于认证/同步路径 403 + 被撤销设备上线自毁）＋ 轮换相关代码撤除（SpaceKeyRing / einz rotate / key.rotation 广播，2026-09-14）
+- [x] 撤销语义收窄（2026-09-16）：服务端区分 `DEVICE_REVOKED`（明确撤销）与 `FORBIDDEN`（未登记，含库被清空/重置）；客户端**只对明确撤销**自毁（App 清锁包+消息+附件，TUI 清 store+附件缓存后退出），库被重置/连不上只发常驻警告并允许继续读本地消息；撤销自毁覆盖 TUI 所有认证入口（`revoked_check.py` 四场景）
+- [ ] 后台被重置后的"重新入网"入口（TUI `/space reset` 解绑 + App 菜单项）——当前 `spaceKey != null` 时 create/join 会被拒，库被清空后只能离线看历史（2026-09-16 定：本轮不做）
 - [x] 备份与恢复（模型 A：本地加密备份 + 恢复码，shared backup.dart + CLI backup/restore）
 - [x] 安全测试 / 离线 / 网络故障 / 服务重启测试（phase4_e2e.sh 段 C/D/E/F 全过）
 - [x] Server 备份脚本（SQLite Backup API）与恢复演练（npm run backup/restore，演练通过）

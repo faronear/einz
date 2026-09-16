@@ -400,8 +400,12 @@ Client                     Server
 
 ### 9.3 撤销语义（现行）
 
-- 被撤销设备：无法再认证（标记 revoked）、无法同步、无法发送；其旧 Push Token 一并清除；
-- 被撤销设备**上线即自毁本地数据**（App `chat_page._onDeviceRevoked`；`SECURITY.md` §2）；
+- 被撤销设备：无法再认证（标记 revoked，挑战返回 403 `DEVICE_REVOKED`）、无法同步、无法发送；
+  其旧 Push Token 一并清除；
+- 被撤销设备**上线即自毁本地数据**（App `chat_page._onDeviceRevoked`；TUI `_exitRevoked`；`SECURITY.md` §2）；
+- **只有这个明确信号才触发自毁**（2026-09-16）：`device.revoked` 帧 / 403 `DEVICE_REVOKED`。
+  403 `FORBIDDEN`（设备未登记，常见于服务端库被清空或换了新库）与网络故障一律只警告，
+  客户端保留本地数据并允许继续查看本地消息——服务端库的运维失误不该销毁客户端数据；
 - 被撤销设备已持有的历史密文无法收回——这是设备端已解密数据的固有属性，非协议漏洞；
 - 事件处置手册见 `SECURITY.md` §4。
 

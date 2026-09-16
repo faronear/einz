@@ -6646,3 +6646,71 @@ person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落
 2. `python3 cli/test/presence_check.py` 全过：基线 `○ Alice` + 右段无计数 →
    `/myname Alice` 被拒、`LukasX→Lukas` 正常 → C 同身份上线两边 `#1/1` 且对方仍 `○ Alice`
    → B 加入两边 `● Alice` → B 改名 Alicia 两边 `● Alicia`、A 可改用 `Alice`。
+
+## 2026-09-16 撤销语义收窄：只有"明确单设备撤销"才自毁，后台库被重置只警告
+
+**现象**（老板 2026-09-16）：清空后台数据库、App/TUI 重新连时，客户端立刻提示"本设备已被
+撤销"并清空本地数据；**即使把库复原也救不回来**。老板原话："后台偶尔的运维失误会导致
+客户端清空，这有时候太过头了。"要求改成：**只有后台明确针对一台设备下撤销指令**（代表
+涉嫌被盗用）才立刻清空 App/TUI；其他情况（连不上/服务器不认）只发一条警告，允许继续
+打开本地消息流。
+
+**核实**（老板中途澄清"App 会清空，TUI 不一定"——**澄清正确**）：
+
+| | 库被清空后重连 |
+| --- | --- |
+| App | `_reauthWithRevokedFallback` 把任何 `code=='FORBIDDEN'` 当撤销 → `_onDeviceRevoked`：清锁包+localMessages+localAttachments+syncState+媒体缓存+附件明文 → SetupPage（**真删，不可恢复**） |
+| TUI | 只清 session token + 打印"本设备已被撤销。"后 exit；**store/历史一条没删**（全仓确认 cli 无任何删除 store 的代码） |
+
+**根因**（服务端语义塌缩）：`createChallenge`（`auth.ts`）与 `requireSession`（`guard.ts`）
+对"devices 表没这行"和"行存在但 status=revoked"都抛 `403 FORBIDDEN`（`isActiveDevice`
+把二者判成同一个布尔）；WS 握手又把所有失败塌成 close `4401`（只有在线被撤销才收到
+`device.revoked` 帧 + `4403`）。客户端无从分辨，只能按"403 = 撤销"处理。
+
+**方案**（老板拍板 4 条）：① 服务端加专用错误码；② TUI 真撤销时也清空（与 App 对齐）；
+③ 后台被重置后的"重新入网"入口本轮不做；④ App 用常驻提示条（不是弹一次通知）。
+
+**落地**：
+
+- **server**：`isActiveDevice`（布尔）→ `getDeviceStatus`（三态 `active|revoked|missing`）；
+  `revoked` → `403 DEVICE_REVOKED`，`missing` → `403 FORBIDDEN`（保持原样）。`ws.ts` **刻意
+  不改**（握手仍 4401——旧客户端只认 4401 走续期，改 4403 会让旧客户端静默退避）。清理
+  `auth.ts`/`guard.ts` 的 import 与 `escrow.ts` 的死 import。冒烟新增：未登记→FORBIDDEN、
+  已撤销→DEVICE_REVOKED（挑战 + requireSession 两处；后者直接种一条属于 revoked 设备的
+  会话，否则该防御分支走不到——被撤销设备能拿旧会话继续同步消息）。
+- **app**：`_reauthWithRevokedFallback` 只在 `DEVICE_REVOKED` 自毁；`FORBIDDEN` 只置
+  `_deviceUnrecognized` → 常驻提示条（淡红，文案明确"本地数据未清除"）；无 pending 的
+  纯离线新增"离线 · 仅可查看本地消息"；`_onSyncSucceeded` 复位（库复原即自动恢复）。
+  自毁健壮性：`_wiped` 重入守卫 + 6 步清理改逐步 best-effort（此前共用一个 try，清锁包
+  一抛异常，后面 3 个 delete 全跳过 → 明文留在盘上）。
+- **cli**：`_probeRevoked` 四态；引导认证 catch 区分（DEVICE_REVOKED→清盘退出；
+  FORBIDDEN→警告继续进 TUI）；`_exitRevoked` 改为**先同步删盘再 exit**（删 store(+.bak) +
+  附件缓存 `attachmentCacheDir()`，不碰 `~/.einz` 整目录与用户导出的 backup）；
+  `chat_core.auth()` 拿到 DEVICE_REVOKED 时回调 `onDeviceRevoked`（覆盖运行期续期/`/auth`/
+  切服务器这些入口）；WS 重连的 onUnauthorized 同样区分（FORBIDDEN 只警告一次并**抛异常**
+  走退避重连——正常返回会让 ws_client 每次 4401 立刻重连，等于打服务端）。
+- **探针** `cli/test/revoked_check.py` 重写为四条并跑通：① 在线撤销→清盘退出（store+缓存
+  都没了）；② 离线被撤销（重启认证 DEVICE_REVOKED）→ 同样清盘退出；③ **后台库被清空**
+  （停服→删库→同端口重启空库）→ 只警告「本设备未被服务器识别」、进程仍在、**本地历史
+  完好、space_key 未动**；④ 警告状态下 `/exit` 正常退出且 store 保留。顺带修探针两处早已
+  失效处：缺 `X-Protocol-Version`（硬校验 → 400）、签发加入码没带 Bearer（C1 后 → 401）；
+  TUI 起在隔离 `HOME` 下，否则自毁会删掉开发机真实的 `~/.einz/cache`。
+- **文档**：PROTOCOL.md（挑战说明、错误表、§7.2）、SECURITY.md §2 表、DEPLOYMENT.md §5.3 +
+  排障表、E2EE.md §9.3、ONBOARDING.md、PROTOCOL_MULTIVERSE.md 错误码表全部改为区分两码；
+  shared `ApiException` 注释补一句"只有 DEVICE_REVOKED 授权清空本地数据"。
+
+**上线顺序**（写进提交与文档）：**先服务端**（新增 `DEVICE_REVOKED`）再发客户端。窗口期：
+服务端新+客户端旧 → 冷启动路径的真撤销不再自毁（在线帧仍自毁）；客户端新+服务端旧 →
+真撤销被当"未登记"只警告。反向都只是"少自毁一次"，远好于"误自毁"。
+
+**验证**：`npm run build && npm test`(server) 全绿（含新断言）；`dart analyze`+`dart test`
+(shared/cli) 全绿；`flutter analyze`(app) 干净；`python3 cli/test/revoked_check.py` 四场景全绿。
+App 侧 UI 行为（常驻提示条文案/样式）由老板真机自测。
+
+**本次不做**：后台被重置后的重新入网入口（TUI `/space reset`、App 菜单项）——现在
+`store.spaceKey != null` 时 TUI 的 `/space create|join` 会拒绝、且没有 unbind 命令，
+库被清空后用户上不了线只能看本地历史；**这是后续单独要补的**。WS 握手 close code 拆分也不做。
+
+**并发隔离**：`cli/bin/einz_tui.dart` 里另有一处他人未完成改动（欢迎辞尾部多加一个 💞），
+用 `git diff -U0` 拆 hunk 后 `git apply --cached --unidiff-zero` 只暂存我的 14 个 hunk，
+对方那条留在工作区；`package.json`（iOS 构建脚本）同样未纳入。

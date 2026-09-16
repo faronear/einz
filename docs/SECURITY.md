@@ -39,9 +39,9 @@
 | 控制 | 实现位置 | 说明 |
 | --- | --- | --- |
 | 消息端到端加密 | `shared/lib/src/crypto/message_crypto.dart` | Space Key → 每消息派生密钥；AEAD AAD 绑定 space/message/device/type/key_version |
-| 设备在册状态 | `server/src/config.ts` `isActiveDevice` + `guard.requireSession`（`/sync` 403） | 未登记/已撤销设备**取不到密文**；会话还必须绑定 space（无 space 会话直接 401） |
+| 设备在册状态 | `server/src/config.ts` `getDeviceStatus`（三态）+ `guard.requireSession` | 未登记（403 `FORBIDDEN`）或已撤销（403 `DEVICE_REVOKED`）设备**取不到密文**；会话还必须绑定 space（无 space 会话直接 401）。**两种 code 必须分开**：混淆会让"服务端库被清空"被客户端误判为撤销 |
 | 设备撤销 | `server/src/devices.ts` `revokeDevice`（标记 revoked + 清 Push + 清会话 + 踢 WS） | 被撤销设备无法认证/同步/发送；同一设备重新认证会清掉其旧会话 |
-| 被撤销设备自毁 | `app/lib/chat_page.dart` `_onDeviceRevoked` | 收到 `device.revoked` 或认证 403 → 清锁包 + 消息 + 附件 + 媒体缓存 → 回设置页 |
+| 被撤销设备自毁 | `app/lib/chat_page.dart` `_onDeviceRevoked`；`cli/bin/einz_tui.dart` `_exitRevoked` | **只认明确撤销信号**：`device.revoked` 帧或认证 403 `DEVICE_REVOKED` → 清锁包 + 消息 + 附件 + 媒体缓存（TUI 清 store 文件 + 附件缓存）→ 回设置页 / 退出。未登记（403 `FORBIDDEN`）与连不上**只警告**，本地数据一律保留（2026-09-16） |
 | App 启动锁（PIN） | `app/lib/data/app_lock.dart` | PIN 派生密钥加密 Space Key 包；防偷看与离线取证 |
 | 密钥安全存储 | `app/lib/data/secure_store.dart` | Keychain/Keystore；iOS/macOS 用 `first_unlock_this_device`（**不随备份/换机迁移**） |
 | 卸载即重置 | `app_lock.ensureFreshInstall()` + `main.dart` `StartupGate` | 安全存储条目活过卸载 → 全新安装时清残留（`DATABASE.md` §4.1） |

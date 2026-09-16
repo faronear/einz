@@ -48,7 +48,11 @@
 - **`space_id` 必填**（2026-09-15 v1 收敛后）：Multiverse 下所有数据按 space 隔离，会话必须绑定
   一个 space；缺省 → `400 INVALID_REQUEST`。v1 时代允许不带（签出"无 space 会话"），
   那类会话什么也访问不了，所以直接拒绝而不是让下游各自兜底。
-- **仅 devices 表内在册（且未撤销）的设备可发起**（E2EE.md §7.3、§8），否则 403。
+- **仅 devices 表内在册（且未撤销）的设备可发起**（E2EE.md §7.3、§8）。拒绝时**两种 code
+  必须区分**（2026-09-16）：
+  - 设备行存在但 `status='revoked'` → `403 DEVICE_REVOKED`（客户端据此清空本地数据）；
+  - devices 表**没有这一行**（库被清空/重置、从未登记）→ `403 FORBIDDEN`
+    （客户端**只应警告**，绝不清空本地数据——运维失误不该导致客户端抹数据）。
 
 ### POST /auth/verify
 
@@ -309,6 +313,9 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 - 仅允许撤销"同 person 的另一台设备"（一人一机时主要用于异常场景）。
 - Server 把设备标记为 `revoked`、清除其 Push Token 与活动会话，并关闭其 WS 连接；**不**通知 Space Key 轮换
   （轮换方案 2026-09-14 决定不做，见 `SECURITY.md` §3）。
+- 被撤销的设备随后：在线 → 收到 `device.revoked` 帧 + close `4403`；离线/重连 → 会话已被删
+  返回 `401 UNAUTHORIZED`，重认证时挑战返回 `403 DEVICE_REVOKED`。**这两个信号（帧 / 该 code）
+  是客户端唯一被授权清空本地数据的依据**；`403 FORBIDDEN`（未登记）与网络故障都只应警告。
 
 ### 7.3 Push Token POST /push/register
 
@@ -419,7 +426,8 @@ Authorization: Bearer <session_token>
 | PROTOCOL_VERSION_MISMATCH | 400 | 协议版本不匹配 |
 | INVALID_REQUEST | 400 | 请求格式错误 |
 | UNAUTHORIZED | 401 | 未认证 / token 失效 |
-| FORBIDDEN | 403 | 设备不在白名单 |
+| FORBIDDEN | 403 | 设备不在白名单（**未登记**，含服务端库被清空/重置；客户端只警告，**不得**清空本地数据） |
+| DEVICE_REVOKED | 403 | 本设备已被**明确撤销**（`status='revoked'`，涉嫌被盗用；客户端应清空本地数据后重新入网） |
 | NOT_FOUND | 404 | 资源不存在 |
 | CONFLICT | 409 | 重复 / 状态冲突 |
 | RATE_LIMITED | 429 | 触发限流 |

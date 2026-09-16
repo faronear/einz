@@ -296,6 +296,12 @@ class ReceiptRow {
 }
 
 /// 服务端错误（PROTOCOL.md §9）。
+///
+/// 错误码语义（客户端**只应**按下述处理，2026-09-16）：
+/// - `DEVICE_REVOKED`（403）：本设备被**明确撤销**（涉嫌被盗用）——唯一授权客户端
+///   清空本地数据的错误码；
+/// - `FORBIDDEN`（403）：设备**未登记**（最常见原因是服务端库被清空/重置，属运维失误）
+///   ——只警告，绝不清空本地数据，允许继续查看本地消息（`device.revoked` 帧同理是明确撤销）。
 class ApiException implements Exception {
   ApiException(this.code, this.message, [this.httpStatus = 0]);
 

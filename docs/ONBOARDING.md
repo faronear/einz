@@ -43,7 +43,7 @@ B 加入（口令取钥）→ 双端互通对话。
 | **邀请链接 / join token** | 一次性（默认 24h、用后作废），创建者 `/invite` 生成；B 拿它加入空间 |
 | **person / partner_slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。person_id 是空间内随机 UUID；同一身份可多台设备（"自己/对方"按 person_id 判断） |
 | **设备登记** | 由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭 join token）完成，**同时签发绑定该空间的会话**——没有独立的登记步骤 |
-| **设备在册状态** | `devices` 表（`active` / `revoked`）；未登记或已撤销设备一律拒绝（401/403），无需任何配置文件 |
+| **设备在册状态** | `devices` 表（`active` / `revoked`）；未登记 → 401/403 `FORBIDDEN`（只警告），已撤销 → 403 `DEVICE_REVOKED`（客户端自毁本地数据），无需任何配置文件 |
 
 ---
 

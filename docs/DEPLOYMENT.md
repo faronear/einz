@@ -234,8 +234,12 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
 # 2) 完成——撤销实时生效，不需要重启服务器、也不需要改任何配置文件
 ```
 
-- 被撤销设备：无法认证（403）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
-- 被撤销设备**上线即自毁本地数据**（App `_onDeviceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存）。
+- 被撤销设备：无法认证（403 `DEVICE_REVOKED`）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
+- 被撤销设备**上线即自毁本地数据**（App `_onDeviceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存；
+  TUI `_exitRevoked`：清 store 文件 + 附件缓存后退出）。
+- **别把"清空/重置服务端库"当撤销手段**：库一清，设备行就不存在了，客户端只会收到
+  403 `FORBIDDEN`（未登记）→ 按 2026-09-16 的语义**只警告、不清本地数据**，用户仍能看本地历史。
+  要真正撤销请用 §5.3 的 `DELETE /devices/:id`（那才会发 `device.revoked` / 返回 `DEVICE_REVOKED`）。
 - **不需要**轮换 Space Key：撤销的效力来自设备被标记 `revoked`（它取不到新密文）+ 自毁。
   怀疑密钥材料被提取（越狱/镜像泄露）时的止损流程见 `docs/SECURITY.md` §4.2（替代方案 = 重建空间）。
 - 已同步的历史密文不可追回（设备端已解密数据的固有属性）。
@@ -274,7 +278,8 @@ curl -X DELETE http://127.0.0.1:3000/devices/dev-b1 \
 | Server 起不来 / 端口占用               | 端口被占或 Node 版本过低（需 ≥20）                        | 换 `PORT=`；`node -v` 确认版本                              |
 | `curl /space` 401/403                  | 正常（未认证）                                            | 按 §3.3 验证                                                |
 | CLI 报 libsodium 加载失败              | 未设`LIBSODIUM_PATH`（或 libsodium 装在非标准路径）       | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"` |
-| `/auth` 失败（403）                    | 设备未登记 / 已被撤销                                     | 查 devices 表状态；设备被撤销只能重新 `/space join` 入网    |
+| `/auth` 失败 403 `FORBIDDEN`           | 设备未登记（常见：**服务端库被清空/重置**，或换了新库）    | 客户端只警告、数据不丢；查 devices 表是否有该 device_id。库被重置时用备份恢复库，或让设备重新 `/space join` |
+| `/auth` 失败 403 `DEVICE_REVOKED`      | 该设备已被明确撤销（§5.3）                                | 设备端已自毁本地数据，只能重新 `/space join` 入网           |
 | 发消息一直"发送中"                    | WS 未连上 / 会话失效                                      | `/auth` 重新激活；或看服务端日志 `[req] WS /ws connect`     |
 | `/sync` 拉不到对方消息                 | 锚点已推进 / 网络 / 设备被撤销                            | 用 `/sync` 前先在本地库清锚点排查（或看服务端审计表）        |
 | `fetch` 报 sha256 不匹配               | 附件密文损坏或元数据过期                                  | 重新`sync` 拉元数据后重试                                   |
