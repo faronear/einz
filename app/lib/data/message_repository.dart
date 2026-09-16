@@ -202,6 +202,18 @@ class MessageRepository {
   /// 设备 → 用户（person_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPersonId）。
   String? personIdOfDevice(String deviceId) => _personByDevice[deviceId];
 
+  /// 反查本机 personId（头像上传/缓存失效用）。
+  /// 优先构造时种入的值；缺失（PIN 解锁/明文直进等重启路径不传 personId）时
+  /// 从持久化的 device→person 映射里取——离线启动也拿得到（与归属判定同源，
+  /// 映射由 [refreshDeviceMap] 落盘）。都拿不到才返回 null。
+  Future<String?> resolveMyPersonId() async {
+    final seeded = _personByDevice[deviceId];
+    if (seeded != null && seeded.isNotEmpty) return seeded;
+    await _ensureIdentityLoaded();
+    final pid = _personByDevice[deviceId];
+    return (pid == null || pid.isEmpty) ? null : pid;
+  }
+
   /// 当前同步锚点（本地库 sync_state）。
   Future<int> get lastSequence async {
     final row = await (db.select(db.syncState)

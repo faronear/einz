@@ -214,6 +214,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
+  /// 我的 personId（头像上传/缓存失效/归属判定用）：向导路径由 widget 传入；
+  /// 重启（PIN 解锁/明文直进）路径 widget.personId 为空 → 运行时反查补齐
+  /// （见 [_loadMyAvatar] / [_refreshProfileFromServer]）。
+  String? _myPersonId;
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
@@ -399,7 +403,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _myGender = ''; // 个人资料弹窗性别图标：由 profile 恢复（向导完成时写入）
     _peerGender = ''; // 消息气泡配色：由 profile 恢复（向导完成时写入）
     _peerName = widget.peerName ?? '';
-    _loadMyAvatar();
+    _myPersonId = widget.personId; // 向导路径已知；重启路径为 null → 稍后反查补齐
     _refreshPeerOnline();
     _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
     WidgetsBinding.instance.addObserver(this);
@@ -432,6 +436,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 按 person 维度分左右分栏（服务器离线拉不到 device→person 映射）
       personId: widget.personId,
     );
+    // 头像加载要在 _repo 就绪后（重启路径要靠它反查本机 personId）
+    _loadMyAvatar();
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
     _inputFocusNode.addListener(_onInputFocusChanged);
@@ -532,6 +538,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         }
       }
       if (mine == null || mine.isEmpty) return;
+      // 反查到的本机 personId 落地：头像加载/上传后的缓存失效都要用它
+      // （重启路径 widget.personId 为空，否则上传头像后消息流不刷新）
+      final mineChanged = _myPersonId != mine;
+      _myPersonId = mine;
+      // 启动时没有 personId（重启路径）或反查值与服务器不一致 → 重拉头像
+      if ((mineChanged || _myAvatarBytes == null) && mounted) unawaited(_loadMyAvatar());
       final myG = space.personGenders[mine] ?? '';
       var peerG = '';
       var peerName = '';
@@ -966,9 +978,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 加载我的头像（异步；未设置/失败 → 保持默认图标）。
+  /// personId 缺失时（重启路径）从本地持久化的 device→person 映射反查。
   Future<void> _loadMyAvatar() async {
-    final pid = widget.personId;
-    if (pid == null || pid.isEmpty) return;
+    var pid = _myPersonId;
+    if (pid == null || pid.isEmpty) {
+      pid = await _repo.resolveMyPersonId();
+      if (pid == null || pid.isEmpty) return;
+      _myPersonId = pid;
+    }
+    if (!mounted) return;
     try {
       final api = widget.api ?? ApiClient(widget.server);
       final bytes = await api.getAvatar(pid);
@@ -993,10 +1011,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     try {
       final api = widget.api ?? ApiClient(widget.server);
-      await api.uploadAvatar(bytes, widget.token);
+      // 服务端在上传响应里回 person_id：上传方收不到自己的 profile.updated 广播，
+      // 这个返回值是失效本端头像缓存最可靠的依据（重启路径 widget.personId 为空，
+      // 旧实现 invalidate(null) 静默失效失败 — 老板 2026-09-16 报告）
+      final personId = await api.uploadAvatar(bytes, widget.token);
+      // 服务端回的是权威值；响应异常/旧服务端缺字段 → 退到本地反查
+      final pid = (personId != null && personId.isNotEmpty)
+          ? personId
+          : (_myPersonId ?? await _repo.resolveMyPersonId());
       if (!mounted) return;
+      if (pid != null && pid.isNotEmpty) _myPersonId = pid;
       // 消息流里的头像走静态缓存：主动失效才会重拉（否则要重启才更新）
-      _MessageAvatarState.invalidate(widget.personId);
+      _MessageAvatarState.invalidate(pid);
       setState(() => _myAvatarBytes = bytes);
       showTopNotice(context, l10n.chatPageAvatarUploaded);
     } catch (e) {
@@ -4618,10 +4644,11 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     try {
       final api = widget.api ?? ApiClient(widget.server);
       final bytes = await api.getAvatar(personId);
-      if (bytes != null && mounted) {
-        _cache[personId] = bytes;
-        setState(() {});
-      }
+      if (bytes == null) return;
+      // 缓存写入不看 mounted：失效广播时未挂载的实例（滚出屏幕被回收）若丢弃结果，
+      // 静态缓存会一直留着旧图，滚动回来 initState 见缓存命中也不再重拉
+      _cache[personId] = bytes;
+      if (mounted) setState(() {});
     } catch (_) {
       // 网络失败：保持默认图标
     }

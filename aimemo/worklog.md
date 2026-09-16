@@ -6489,3 +6489,44 @@ create/join 请求体里的 `display_name`（其实是"我的名字"）改名 `p
 `app/test/setup_join_passphrase_test.dart` 里的文案改动（"聊天内容"→"秘境内容"）
 是**他人的在途改动**，未纳入本次提交——该测试文件用 `git checkout` 复原后只重放我的
 hunk 再 `git add`，工作区仍保留他人改动。
+
+## 2026-09-16 修复：上传头像后消息流仍显示旧头像（重启才更新）
+
+**现象**（老板 2026-09-16 报告）：在 iOS App 菜单里上传头像，消息流中自己消息的头像
+仍是旧图，直到重启 App 才更新。
+
+**根因**：上传后的刷新路径**唯一**依赖 `ChatPage.widget.personId`，而它是 null。
+
+1. `app/lib/chat_page.dart` 上传成功后调 `_MessageAvatarState.invalidate(widget.personId)`，
+   而 `invalidate(null/空串)` 直接 return（静默失效失败）。
+2. `server/src/ws.ts` 的 `broadcastProfileUpdated(exceptDeviceId, ...)` **明确跳过发送设备**
+   → 上传方自己收不到 `profile.updated`，没有第二条刷新路径兜底。
+3. `widget.personId` 只在向导路径传（`setup_page.dart`）；**PIN 解锁**（`lock_page.dart`）
+   与**明文配置直进**（`main.dart`）都不传（`chat_page.dart` 里 2026-09-11 的注释已自认
+   "重启路径不传 personId，从 /space 设备表反查"）。→ 只要 App 重启过一次，之后每次上传
+   头像的失效都是空操作；消息流里自己消息的头像 personId 来自信封 `senderPersonId`（非空），
+   命中 `_MessageAvatarState._cache` 的旧 bytes；重启后进程内缓存为空 → initState 重拉才更新。
+
+**同源第二缺陷**：`_loadMyAvatar()` 同样以 `widget.personId` 为前置，重启路径下**菜单里
+的头像预览也是空白默认图标**（与账号是否已设头像无关）。
+
+**方案**：运行时代码解析出本机 personId，并以上传响应为权威来源。
+- `shared/.../api_client.dart`：`uploadAvatar` 返回服务端确认的 `person_id`（`_postBytes`
+  改为返回响应体文本；解析失败返回 null，**不能让解析失败把成功的上传报成失败**）。
+- `app/lib/data/message_repository.dart`：新增 `resolveMyPersonId()`——从持久化的
+  device→person 映射反查本机 personId（离线可用，与归属判定同源）。
+- `app/lib/chat_page.dart`：新增 `_myPersonId` 字段（initState 取 `widget.personId`）；
+  `_loadMyAvatar` 缺失时走 `resolveMyPersonId()`（调用点挪到 `_repo` 就绪之后）；
+  `_showAvatarUpload` 用上传返回的 person_id 失效缓存（缺失退本地反查）；
+  `_refreshProfileFromServer` 落 `_myPersonId` 并在变化/无头像时补拉；
+  `_MessageAvatarState._load` **未挂载也写缓存**（滚出屏幕被回收的实例原先会丢弃结果，
+  回来时 initState 见缓存命中不再重拉 → 仍显示旧图）。
+
+**为什么不在锁包/明文配置里加 personId 字段**：要动 `AppLockPayload` 序列化格式，
+且**对存量安装无效**（老锁包里没有该字段）→ 运行时解析是必须的。彻底根治可作为后续项
+（把 personId 写进 `app_lock.profile` + 锁包 v2）。
+
+**未改动**：服务端（`storeAvatar`/`GET /avatar` 无缓存，响应已含 `person_id`）、
+TUI/CLI（持久化了 personId，无此问题）。
+**验证**：`flutter analyze`（app/shared）全绿；UI 由老板真机自测
+（PIN 解锁路径上传 → 消息流立即更新；重启后菜单预览显示已有头像；对方改头像仍实时刷新）。
