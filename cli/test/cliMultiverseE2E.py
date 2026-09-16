@@ -6,7 +6,7 @@
   2. dart 在 PATH（flutter/bin）
 
 用法：
-  python3 aimemo/cliMultiverseE2E.py
+  python3 cli/test/cliMultiverseE2E.py
 
 流程（2026-09-10 老板定稿引导：第一步输入 C/create（创建）或 J/join（加入），
       大小写均可；create 录入两人名字/性别；join 按身份选择而非自填名字）：
@@ -30,7 +30,8 @@ import subprocess
 import sys
 import time
 
-CLI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cli")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CLI_DIR = os.path.join(ROOT, "cli")
 # 端口可用 EINZ_E2E_PORT 覆盖（默认 3999 被占用时换一个，避免误杀别人的实例）
 SERVER = os.environ.get(
     "EINZ_E2E_SERVER",

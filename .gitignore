@@ -36,6 +36,10 @@ server/einz_server_config.json
 .DS_Store
 .atomcode/
 
+# --- Python（e2e 探针脚本产生的缓存） ---
+__pycache__/
+*.pyc
+
 Caddyfile
 
 # ein-tui 编译产物目录（cli/build.sh 输出），不入库

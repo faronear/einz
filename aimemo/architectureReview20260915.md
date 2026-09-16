@@ -89,7 +89,7 @@
 - **`cli/demo/.gitignore` 漏保护 `store-*.json`（设备私钥 store 文件）**——当前未入 git 仅因尚未被 add，`git add .` 即泄露。卫生项里最优先补这条。
 - Android 签名口令 `app/android/key.properties` 明文在工作区且随 Syncthing 多机流转（未入 git）：建议轮换口令 + 构建脚本改环境变量注入。keystore.jks 同理（未入 git）。
 - `cli/demo/.gitignore` 的 `app.db*` 宜改为 `*.db*`，与根规则对齐。
-- `aimemo/cliMultiverseE2E.py` 中 `einzpass2026` 若与真实口令同值，建议更换。
+- `cli/test/cliMultiverseE2E.py` 中 `einzpass2026` 若与真实口令同值，建议更换。
 
 ---
 
