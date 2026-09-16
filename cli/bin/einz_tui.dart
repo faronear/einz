@@ -75,10 +75,11 @@ class _TuiState {
   /// 只计入 peerDeviceOnline/Total 的分母（老板 2026-09-16）。
   final Map<String, int> peerOnlineSince = {};
 
-  /// 我的**在线设备**表：device_id → 上线时刻（ms）——右段与左段同构地逐个列出
+  /// 我的**其它在线设备**表：device_id → 上线时刻（ms）——右段逐个列出
   /// （数据同样来自 /devices，客户端对本方/对方的掌握是对称的）。
-  /// 本机那台是否在线以本地 WS 状态为准；离线设备不在表内，只进分母（老板 2026-09-16）。
-  final Map<String, int> myOnlineSince = {};
+  /// **不含本机**：本机名恒在右段设备列表首位、不论是否在线（老板 2026-09-16），
+  /// 不必也不能在"其余在线设备"里重复出现。本机在线与否只影响 #n/m 计数。
+  final Map<String, int> myOtherOnlineSince = {};
 
   /// 输入缓冲区（逐键追加）。
   final StringBuffer input = StringBuffer();
@@ -1640,19 +1641,22 @@ String _peerDeviceLabel(_TuiState s) {
   return buf.toString();
 }
 
-/// 我的在线设备片段：`#A#B#C`——列出**我的全部在线设备**，按上线时刻降序，
-/// 与左段完全同构（数据同样来自 /devices；我方与对方的信息掌握是对称的）。
-/// 注意与灯的分工：**灯只表示本机这台的 WS 连接状态**（终端连接健康指示灯），
-/// 本列表表示"我的设备谁在线"（老板 2026-09-16）。
-/// 本机名优先取 /devices 的 device_name，缺失回退本地 store（离线自检场景）。
+/// 我的设备片段：`#本机名#其它在线设备…`
+/// - **本机名恒列首位、不论是否在线**（老板 2026-09-16）：本机是这一屏的"我"，
+///   TUI 一上线就该看到自己；若按上线时间排，后上线的其它设备会把本机挤到后面。
+///   本机在线与否只体现在 `#n/m` 计数里（灯则表示本机 WS 连接状态）。
+/// - 其余我的在线设备按上线时刻降序，与左段同构；本机不在其中（不重复显示）。
+/// - 本机名优先取 /devices 的 device_name，缺失回退本地 store（未登记时显示 '-'）。
 String _myDevicesLabel(_TuiState s) {
   final store = s.session.store;
-  final buf = StringBuffer();
-  for (final id in _byOnlineOrder(s.myOnlineSince)) {
-    final name = s.deviceNames[id] ??
-        (id == store.deviceId ? store.deviceName : null) ??
-        id;
-    buf.write('#$name');
+  final myId = store.deviceId;
+  final myName = (myId != null ? s.deviceNames[myId] : null) ??
+      store.deviceName ??
+      myId ??
+      '-';
+  final buf = StringBuffer('#$myName');
+  for (final id in _byOnlineOrder(s.myOtherOnlineSince)) {
+    buf.write('#${s.deviceNames[id] ?? id}');
   }
   return buf.toString();
 }
@@ -1752,7 +1756,8 @@ Future<void> _refreshPeerOnline() async {
     int peerTotal = 0;
     int peerOnline = 0;
     final peerSince = <String, int>{}; // 在线对方设备 → 上线时刻（降序展示）
-    final mySince = <String, int>{}; // 在线我方设备 → 上线时刻（降序展示）
+    // 在线我方设备 → 上线时刻（降序展示；**不含本机**——本机恒在右段首位）
+    final myOtherSince = <String, int>{};
     for (final d in devices) {
       if (d['status'] != null && d['status'] != 'active') continue; // 已撤销不计
       final devId = (d['device_id'] as String?) ?? '';
@@ -1776,7 +1781,8 @@ Future<void> _refreshPeerOnline() async {
         myTotal++;
         if (isOnline) {
           myOnline++;
-          mySince[devId] = since;
+          // 本机不进列表（它恒在右段首位，见 myOtherOnlineSince 注释）
+          if (devId != myId) myOtherSince[devId] = since;
         }
         continue;
       }
@@ -1790,8 +1796,8 @@ Future<void> _refreshPeerOnline() async {
     // 设备集合变化也要重绘：A 下 B 上（在线数不变）时顶部条应换成 B 的名字
     final devicesChanged = peerSince.length != s.peerOnlineSince.length ||
         peerSince.entries.any((e) => s.peerOnlineSince[e.key] != e.value) ||
-        mySince.length != s.myOnlineSince.length ||
-        mySince.entries.any((e) => s.myOnlineSince[e.key] != e.value);
+        myOtherSince.length != s.myOtherOnlineSince.length ||
+        myOtherSince.entries.any((e) => s.myOtherOnlineSince[e.key] != e.value);
     final changed = online != s.peerOnline ||
         myOnline != s.myDeviceOnline ||
         myTotal != s.myDeviceTotal ||
@@ -1806,9 +1812,9 @@ Future<void> _refreshPeerOnline() async {
     s.peerOnlineSince
       ..clear()
       ..addAll(peerSince);
-    s.myOnlineSince
+    s.myOtherOnlineSince
       ..clear()
-      ..addAll(mySince);
+      ..addAll(myOtherSince);
     if (changed) _render();
   } catch (_) {
     // 查询失败保持上次状态（断网/未认证）
