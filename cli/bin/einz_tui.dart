@@ -173,11 +173,15 @@ const int _kWelcomeCountdownSeconds = 5;
 Timer? _resizeTimer;
 StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
 
-/// 默认服务器地址：优先读 cli/config.json 的 server 字段（本地可改），
-/// 文件缺失/格式异常时回退硬编码 https://einz.tic.cc。
+/// 默认服务器地址：优先读 cli/localConfig.json 的 server 字段（本机配置，不入库；
+/// 模板见 cli/localConfig.example.json），文件缺失/格式异常时回退硬编码
+/// https://einz.tic.cc。
+///
+/// 注：路径**按当前工作目录**解析（`File('localConfig.json')`），所以只有 `cd cli`
+/// 之后跑（`npm run tui*-dev` 就是这么干的）才读得到——在别的目录跑会静默走硬编码。
 String _defaultServer() {
   try {
-    final f = File('config.json');
+    final f = File('localConfig.json');
     if (f.existsSync()) {
       final v = (jsonDecode(f.readAsStringSync()) as Map<String, dynamic>)['server'];
       if (v is String && v.isNotEmpty) return v;
@@ -246,7 +250,7 @@ Future<(bool, String, List<String>)> _probeServer(String server) async {
 Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
-  // ① 服务器地址：--server 参数 > store 持久化值 > config 默认（cli/config.json）> 硬编码
+  // ① 服务器地址：--server 参数 > store 持久化值 > 本机默认（cli/localConfig.json）> 硬编码
   if (server.isEmpty) {
     final saved = store?.server;
     server = (saved != null && saved.isNotEmpty) ? saved : _defaultServer();
@@ -915,7 +919,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     _scheduleRender();
     await _activateAfterBind(session, store, storePath, server);
   } catch (e) {
-    // 空间数量上限：明确禁止提示（config.json maxSpaces——老板 2026-09-10）
+    // 空间数量上限：明确禁止提示（serverConfig.json maxSpaces——老板 2026-09-10）
     if (e is ApiException && e.code == 'SPACE_LIMIT_REACHED') {
       session.messages.add(_systemMessage(session, '⚠️ 空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间'));
     } else {

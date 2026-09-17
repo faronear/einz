@@ -104,4 +104,4 @@ esac
 echo ""
 echo "运行示例:"
 echo "   ${OUT} --store ~/.einz/myeinz.json --server https://einz.tic.cc"
-echo "   （不带参数则使用默认 store 与 config.json/内置服务器地址；TUI 需在真实终端中运行）"
+echo "   （不带参数则使用默认 store 与 localConfig.json/内置服务器地址；TUI 需在真实终端中运行）"

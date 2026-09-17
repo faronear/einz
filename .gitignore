@@ -22,6 +22,7 @@ deployment/config/serverConfig.json
 
 # --- 密钥与配置（禁止提交） ---
 .env
+cli/localConfig.json
 server/config/serverConfig.json
 *.pem
 *.key
