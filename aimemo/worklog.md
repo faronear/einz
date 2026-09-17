@@ -6896,3 +6896,24 @@ ONBOARDING×1 同步。现在本机与部署都是"config/ 目录 + 同名文件
 
 命名理由（供以后参考）：目录已经叫 `config/`，文件名再带 `einz_server_` 前缀是重复；
 且容器里挂的就是 `/config/serverConfig.json`，本机/部署两处同名同形。
+
+## 2026-09-17 app 本地配置改名 localConfig.*.json
+
+老板 FYI：他已加 `server/config/serverConfig.example.json`，并把根 .gitignore 收窄成只忽略
+`config/serverConfig.json`（模板入库）。
+
+本任务：app 侧同构改名（提交 fcedcb2）：
+- 文件：`app/localConfig.example.json`（git mv，入库模板）、`localConfig.ios.json` /
+  `localConfig.android.json`（gitignore，本机文件）；
+- `app/.gitignore`：`/localConfig.*.json` + `!/localConfig.example.json` + `/localConfig.json`
+  （否定式保证模板入库，与老板在 server 侧的"只忽略真配置"口径一致）；
+- package.json 4 条 npm 脚本、README×6、app/README×1、`server_settings.dart` 注释×2、
+  `server/src/{app,spaces}.ts` 注释各 1。
+
+**并发隔离**：package.json 正被另一个 agent 重写（npm 脚本批量改名 apk-run-dev →
+app-apk-emu-run-local 之类）。做法：先 sed 改工作区文件（保留双方改动），再用
+`git hash-object -w` + `git update-index --cacheinfo` 把"HEAD + 仅我的改名"单独塞进索引，
+提交后他们的 37/35 重排仍原样留在工作区未暂存。
+
+验证：`flutter analyze`(app) 无问题；`tsc`(server) 干净；`git check-ignore` 确认 ios 被忽略、
+example 不被忽略；全仓（除 server/dist 构建产物与 aimemo 历史）已无 `local_config` 残留。
