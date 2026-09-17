@@ -6943,3 +6943,21 @@ example 不被忽略；全仓（除 server/dist 构建产物与 aimemo 历史）
 （不再用 ` / ` 特例），两个分支合并成一个 `stamp`：
 `  2) ⚪ MacBook [bob] 离线 since 昨天 08:38 (20260916T003800Z)`；
 stamp=0（干净下线/已撤销）时干脆不显示时间。
+
+## 2026-09-17 cli 配置本机化：config.json → localConfig.json
+
+老板问 cli/config.json 是"覆盖"还是"定义默认" → 答：**它本身就是优先级链里的一级**
+（`--server` > store 持久化值 > config.json > 硬编码 einz.tic.cc），只是入库且值与硬编码相同，
+所以是个空操作。按 app 侧同构改成真·本机配置（提交 458b1a5）：
+- `cli/config.json`（入库）→ `cli/localConfig.example.json`（模板，`git mv`）；
+- 真配置 `cli/localConfig.json` 加入根 .gitignore（已在本机用原值 `{"server":"https://einz.tic.cc"}`
+  生成一份，不入库）；`_defaultServer()` 改读 `localConfig.json`；`cli/build.sh` 提示文案同步。
+- 保留 CWD 相对解析（`File('localConfig.json')`）不动——改成脚本相对会影响编译产物与
+  `npm run tui*-dev`（它们本来就 `cd cli`），已在函数注释里写明这个坑。
+
+**验证（真跑）**：临时把 localConfig.json 写成 `http://127.0.0.1:5999` → 起 TUI 打印
+"❌ 无法连接服务器 http://127.0.0.1:5999（/health 探测失败）"，证明读到了；删掉该文件 →
+直接走硬编码 einz.tic.cc 且探测通过进引导，证明回退正常。`flutter analyze`(cli) 干净。
+
+顺带发现：`cli/demo/config.json` 是 v1 遗留的静态白名单样本（space_id + devices 数组），
+demo/ 整个目录已被忽略，全仓无引用。要不要删等老板发话。
