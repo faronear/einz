@@ -14,7 +14,7 @@ const LinearGradient kBrandGradient = LinearGradient(
 );
 
 /// 界面风格切换通知：聊天页监听后即时重建（点选即切换，弹窗随即关闭）。
-final ValueNotifier<String> uiStyleNotifier = ValueNotifier<String>('plain');
+final ValueNotifier<String> uiStyleNotifier = ValueNotifier<String>('gradient');
 
 /// 界面风格偏好设置（存本设备 app_state，key='ui_style'）。
 class UiStyleSettings {
@@ -24,11 +24,12 @@ class UiStyleSettings {
 
   static const _kKey = 'ui_style';
 
-  /// 当前界面风格（'plain'/'gradient'，默认 plain——保留原有视觉效果）。
+  /// 当前界面风格（'plain'/'gradient'，默认 gradient——首次进入聊天即粉蓝渐变，
+  /// 老板要求 2026-09-17；已保存过偏好的设备沿用其选择）。
   Future<String> load() async {
     final row = await (db.select(db.appState)..where((s) => s.key.equals(_kKey))).getSingleOrNull();
     final v = row?.value;
-    return (v == null || !kUiStyleOptions.contains(v)) ? 'plain' : v;
+    return (v == null || !kUiStyleOptions.contains(v)) ? 'gradient' : v;
   }
 
   /// 保存界面风格并通知即时生效。

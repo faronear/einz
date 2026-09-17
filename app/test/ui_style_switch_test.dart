@@ -57,7 +57,8 @@ void main() {
     await sodium();
   });
 
-  // uiStyleNotifier 是全局通知器：每个用例前重置为默认纯色，避免跨用例残留
+  // uiStyleNotifier 是全局通知器：每个用例前重置为已知状态（plain），
+  // 避免跨用例残留（应用默认已是 gradient——老板要求 2026-09-17）
   setUp(() {
     uiStyleNotifier.value = 'plain';
   });
@@ -100,8 +101,9 @@ void main() {
   testWidgets('界面风格弹窗：两风格+描述展示；点选即生效并关窗；持久化', (WidgetTester tester) async {
     final db = await pumpChatPage(tester);
 
-    // 默认素雅纯色：无渐变背景层；状态条已是悬浮圆角（两风格统一，老板要求）
-    expect(gradientBackground, findsNothing, reason: '默认纯色风格不应有渐变背景');
+    // 首次进入聊天默认渐变粉蓝（老板要求 2026-09-17）：渐变背景层存在；
+    // 状态条为悬浮圆角（两风格统一）
+    expect(gradientBackground, findsOneWidget, reason: '默认渐变风格应有渐变背景层');
     expect(barDecoration(tester, statusBar)?.borderRadius, BorderRadius.circular(24),
         reason: '默认素雅纯色风格的状态条也应为悬浮圆角（不顶左右两头）');
 
