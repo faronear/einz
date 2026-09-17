@@ -6865,3 +6865,22 @@ v1 静态白名单早废。
    没有 `files/` 前缀），而 `restoreBackup` 只认 `startsWith("files/")` → **附件永远恢复不回来**。
 2. 恢复把库写成 `data/app.db`，而服务读的是 `data/einz.sqlite.db` → **恢复后库不生效**
    （除非手工改名）。DEPLOYMENT.md §5.1 的演练"删除 data → 恢复 → 重启验证消息仍在"目前跑不通。
+
+## 2026-09-17（再续）恢复 bug 修复 + 本机配置迁到 server/config/
+
+**恢复侧两个既有 bug 已修**（提交 a624555，老板 2026-09-17 拍板）：
+1. `restoreBackup` 把库写成 `data/app.db`，而服务读 `EINZ_DB`（默认 einz.sqlite.db）
+   → 恢复等于没恢复。改成写 `paths.db`，并连 `-wal` / `-shm` 一起先删（残留 WAL 会被
+   SQLite 重放进刚恢复的库，恢复出"半新半旧"的数据）。
+2. 备份里附件条目的 path 是 `aa/bb.bin`（`collectFilesRecursive` 用 `relative(filesDir, …)`，
+   没有 `files/` 前缀），恢复只认 `files/` 开头 → 附件**从不恢复**。改成：非 `app.db`
+   的条目一律当附件，`files/` 前缀有就剥、没有就直接用，仍走 `assertInsideRoot`。
+   验证：临时脚本"删库删附件 → 恢复"→ 库行数 1、附件内容 hello、无残留 -wal、无 app.db。
+
+**本机配置路径统一**（提交 9f266c9）：`server/einz_server_config.json` →
+`server/config/einz_server_config.json`（已帮老板 `mv`，内容 `{"maxSpaces": 0}` 未改），
+`config.ts` 默认路径同步、`.gitignore` 换成 `server/config/`、README×2 / DEPLOYMENT×2 /
+ONBOARDING×1 同步。现在本机与部署都是"config/ 目录 + 同名文件"，部署时由
+`EINZ_CONFIG` 指到容器 `/config/`。
+⚠️ **另一台机器（美国）pull 后也要 `mv server/einz_server_config.json server/config/`**，
+否则静默走默认值 maxSpaces=0（=不限），与文件里写的值不一致时最难查。
