@@ -9,7 +9,9 @@
 //   eval "$(node scripts/appVersion.js)"
 //   flutter build apk --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
 //
-// 版本号 APP_BUILD_NAME = yymm.ddhh.mm      例 2609.1810.35 = 2026-09-18 10:35（本地时间）
+// 版本号 APP_BUILD_NAME = yymm.ddhh.mm      例 2609.1810.35 = 2026-09-18 10:35 UTC
+//   用 UTC 而不是本地时间：老板中美两地跑，按本地时间打会出现"后打的包时间更小"
+//   （例如中国 09-18 22:00 打完飞美国，当地 09-18 07:00 再打一包），UTC 下始终单调。
 //   iOS/macOS CFBundleShortVersionString、Android versionName、Windows/Linux 的 major.minor.patch。
 //   为什么是三段而不是两段的 yymm.ddhh：iOS 侧 flutter_tools 会把不满三段的 build-name 补 0
 //   （packages/flutter_tools/lib/src/build_info.dart 的 validatedBuildNameForPlatform），
@@ -25,11 +27,11 @@ const pad2 = (value) => String(value).padStart(2, '0');
 
 function computeVersion(now) {
   const stamp =
-    pad2(now.getFullYear() % 100) + // yy
-    pad2(now.getMonth() + 1) + //     mm
-    pad2(now.getDate()) + //         dd
-    pad2(now.getHours()) + //        hh
-    pad2(now.getMinutes()); //       mm
+    pad2(now.getUTCFullYear() % 100) + // yy
+    pad2(now.getUTCMonth() + 1) + //     mm
+    pad2(now.getUTCDate()) + //         dd
+    pad2(now.getUTCHours()) + //        hh
+    pad2(now.getUTCMinutes()); //       mm
   return {
     // 2609.1810.35
     buildName: `${stamp.slice(0, 4)}.${stamp.slice(4, 8)}.${stamp.slice(8, 10)}`,

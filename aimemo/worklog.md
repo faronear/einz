@@ -6986,3 +6986,33 @@ demo/ 整个目录已被忽略，全仓无引用。要不要删等老板发话�
 （order_check / timestamp_check / auto_sync_probe）与 demo/run_a.sh、run_b.sh 引用；
 `demo/s1..s4`、`st1/st2` 被 npm 的 `tui*-dev` / `tui*-prod` 脚本引用；
 `demo/envelope-b.txt` 判定不清（v2 仍保留"信封密封"离线备用路径），留着。
+
+## 2026-09-18 打包版本号改成 yymm.ddhh.mm（老板拍板）
+
+之前每次打包 iOS / Android 都是 pubspec 里写死的 `1.0.0+1`，产物分不出先后。老板要求每次
+打包自动带时间。定下来的口径（提交 02f93e4）：
+
+- **版本号 `yymm.ddhh.mm`**（例 `2609.1810.35` = UTC 2026-09-18 10:35），
+  iOS/macOS 的 CFBundleShortVersionString、Android versionName、Windows/Linux 的
+  major.minor.patch 共用同一个串。
+- **构建号 `yymmddhh`**（例 `26091810`），iOS/macOS CFBundleVersion、Android versionCode。
+- 唯一出处 `scripts/appVersion.js`（node 写的，全平台/CI 都能调；shell 里
+  `eval "$(node scripts/appVersion.js)"` 一次拿两个值）。
+
+**为什么不是两段 `yymm.ddhh`**：flutter_tools 的 `validatedBuildNameForPlatform` 会把
+不满三段的 build-name 补 0，iOS 上会拿到 `2609.1810.0`，与安卓不一致——这是老板明确要避开的。
+**构建号为什么只到小时**：Android versionCode 上限 2100000000，带分钟（2609181035）溢出；
+Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不进去，所以 Windows
+只传版本号、构建号让 flutter 取 0。
+
+**已验证**：`flutter build ios --config-only` → `ios/Flutter/Generated.xcconfig`
+`FLUTTER_BUILD_NAME=2609.1807.22`；`flutter build apk --config-only` →
+`android/local.properties` `flutter.versionName=2609.1807.22` / `versionCode=26091807`。
+（两个文件都在 .gitignore 里，不入库。）
+
+**老板追加两点**（同日第二个提交）：
+
+- 版本号改 **UTC**：本地时间下中美两地打包会出现"后打的包时间反而更小"，UTC 才单调。
+- `desk-mac-build-prod` 就是老板自己当时在写的脚本（macOS 桌面打包），我的版本号改动并进去，
+  一起提交。（工作区里另外还有 entitlements / `cli/bin/einz_tui.dart` 的未提交改动，是别的
+  活儿，没动。）
