@@ -197,6 +197,11 @@ IPA="${APP_DIR}/build/ios/ipa/einz.ipa"
 [[ -f "${IPA}" ]] || { echo "❌ 没找到产物 ${IPA}" >&2; exit 1; }
 echo "✅ IPA: ${IPA} ($(du -h "${IPA}" | cut -f1))"
 
+# 把本次版本号落盘，给外面（npm run app-ios-build-* 改产物名）取用：
+# 产物文件名要用包内那个版本号，而不是重新读一次时钟——构建跨过整点/整分就会对不上。
+# build/ 不入库，不用清理。
+printf '%s\n' "${APP_BUILD_NAME}" > "${APP_DIR}/build/ios/ipa/version.txt"
+
 # ---------- 7) 安装 / 上传 ----------
 if [[ "${CHANNEL}" == "adhoc" ]]; then
   if [[ "${DO_INSTALL}" == 0 ]]; then
