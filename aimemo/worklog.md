@@ -6823,3 +6823,22 @@ B 以伴侣身份加入后 A 的 `/devices` 显示「同空间 2 台」，含本
 
 验证：`flutter analyze`(cli) 干净；另用临时脚本在默认时区与 `TZ=America/New_York` 下
 各跑一次，同一 epoch 输出逐字一致。
+
+## 2026-09-17 核查 deployment/config/config.json（v1 残留）
+
+结论：**该文件从来不在仓库里**——`git ls-files deployment` 只有 .env.sh / Caddyfile.example /
+两个 compose；`deployment/config/` 目录在工作区也不存在（.gitignore 21 行的
+`deployment/config/` 是更早清理时留下的占位）。v2/Multiverse 的设备与空间都在库里，
+v1 静态白名单早废。
+
+真正残留的是**引用**，已清掉：两个 compose 的 `EINZ_CONFIG=/config/config.json` +
+`./config:/config:ro` 挂载 + 头部"按 docs/SETUP.md 生成 config.json"步骤（SETUP.md 本身
+已过期），并补注"无需任何配置文件"；`docs/DEPLOYMENT.md` §9.1、`docs/updateServer.md`
+的"本地化文件"清单去掉 `deployment/config/`。
+
+保留未动的两处（等老板定夺）：
+- `server/src/backup.ts` 仍认 `EINZ_CONFIG`（`existsSync` 已守卫，缺失就跳过该 entry）；
+  恢复侧 `entry.path === "config.json"` 分支同理——只影响"恢复 v1 老备份"这一条路径。
+- `.gitignore:21 deployment/config/` 故意留着：VPS 旧目录若还在，至少不会污染 git status。
+
+验证：`docker compose -f ... config` 两个 compose 均解析通过。
