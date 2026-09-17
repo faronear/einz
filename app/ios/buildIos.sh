@@ -138,7 +138,31 @@ ERR
 fi
 echo "✅ 描述文件: ${PROFILE_NAME}"
 
-# ---------- 4) 构建 ----------
+# ---------- 4) SDK 版本预检（App Store 上传要求 iOS 26 SDK 起）----------
+# Apple 自 2026-04-28 起拒收低于 iOS 26 SDK 的上传包（Transporter 报
+# "SDK version issue ... must be built with the iOS 26 SDK or later"）。
+# 与其打完包才在上传时被拒，不如开局就拦住。Ad Hoc 走 devicectl 直装，不受此限，
+# 所以只在 appstore 渠道硬拦；adhoc 渠道仅打印供参考。
+readonly MIN_SDK_MAJOR_STORE=26
+XCODE_DEV="$(xcode-select -p 2>/dev/null || true)"
+SDK_VERSION="$(xcrun --show-sdk-version --sdk iphoneos 2>/dev/null || true)"
+SDK_MAJOR="${SDK_VERSION%%.*}"
+echo "▶ Xcode: ${XCODE_DEV}（iOS SDK ${SDK_VERSION:-未知}）"
+if [[ "${CHANNEL}" == "appstore" ]]; then
+  if [[ -z "${SDK_MAJOR}" ]] || (( SDK_MAJOR < MIN_SDK_MAJOR_STORE )); then
+    cat >&2 <<ERR
+❌ 当前 iOS SDK 是 ${SDK_VERSION:-未知}，App Store Connect 只收 iOS ${MIN_SDK_MAJOR_STORE} SDK 起的包。
+   换用带 iOS 26 SDK 的 Xcode 再跑（只影响这一条命令，不动全局默认）：
+     DEVELOPER_DIR=/Applications/Xcode26.3.app/Contents/Developer npm run app-ios-build-appstore
+   或全局切换：sudo xcode-select -s /Applications/Xcode26.3.app/Contents/Developer
+   （本机 iMac19,1 上不了 macOS 26 Tahoe，Xcode 天花板是 26.3，别去下载 26.4.1+）
+ERR
+    exit 1
+  fi
+  echo "✅ SDK: iOS ${SDK_VERSION}（满足上传要求）"
+fi
+
+# ---------- 5) 构建 ----------
 echo "▶ 构建 ${CHANNEL} IPA（约 1–3 分钟）…"
 "${FLUTTER}" build ipa --release --export-options-plist="${PLIST}"
 IPA="${APP_DIR}/build/ios/ipa/einz.ipa"

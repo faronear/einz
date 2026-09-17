@@ -139,8 +139,13 @@ python3 app/android/checkNativeLibs.py
 ### 2.2 配置 Apple 签名
 
 1. Codemagic 页面左侧 **Signing → iOS**，按向导登录 Apple Developer 账号（或配置 App Store Connect API Key）。
-2. 确认 App 的 bundle id 为 **`cc.tic.einz`**，Codemagic 会自动创建/匹配证书与 Provisioning Profile。
-3. 若签名向导生成新的证书，需要把对应私钥保存在 Codemagic 中，并（如需发布 App Store）在 Apple 开发者后台的 Certificates/Profiles 中确认对应条目存在。
+2. 确认 App 的 bundle id 为 **`cc.tic.einz.ios`**。
+3. **描述文件要传两个，只传证书不够**：`Einz_Dist_Adhoc.mobileprovision` 与 `Einz_Dist_AppStoreConnect.mobileprovision`。
+   工程 Release 配置写死了 `PROVISIONING_PROFILE_SPECIFIER = "Einz Dist Adhoc"`
+   （见 `app/ios/Runner.xcodeproj/project.pbxproj`），archive 阶段必须有它，导出阶段再由
+   `exportOptionsAppStore.plist` 重签成 App Store 的。少传 Adhoc 会报
+   `No profile for team 'CQ6733CTMV' matching 'Einz Dist Adhoc' found`。
+4. 若签名向导生成新的证书，需要把对应私钥保存在 Codemagic 中，并（如需发布 App Store）在 Apple 开发者后台的 Certificates/Profiles 中确认对应条目存在。
 
 ### 2.3 构建
 
@@ -148,6 +153,8 @@ python3 app/android/checkNativeLibs.py
 
 - 每次构建约 20–40 分钟（首次因依赖下载更久），免费额度 500 分钟/月。
 - 产物 IPA 出现在构建页面的 **Artifacts**：`app/build/ios/ipa/*.ipa`（已签名）。
+- 工作流里显式带了 `--export-options-plist=ios/exportOptionsAppStore.plist`，产物是 App Store / TestFlight 包；
+  去掉它默认导出方式不是 app-store，传 TestFlight 会被拒。
 - 可配置自动上传 TestFlight：在 Codemagic 页面 **Publishing → App Store Connect** 开启，或用 `codemagic.yaml` 的 `publishing` 段。
 
 ### 2.4 说明

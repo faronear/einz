@@ -25,7 +25,11 @@ workflows:
       - name: Build iOS IPA
         working_directory: app
         script: |
-          flutter build ipa --release
+          # 必须显式给导出配置，否则默认导出方式不是 app-store，产物传不了 TestFlight。
+          # 两个描述文件都要在 Codemagic 的 Code signing 里装齐：
+          #   Einz Dist Adhoc            → archive 阶段用（工程 Release 写死了它）
+          #   Einz Dist AppStoreConnect  → 导出阶段重签用
+          flutter build ipa --release --export-options-plist=ios/exportOptionsAppStore.plist
     artifacts:
       - app/build/ios/ipa/*.ipa
     publishing:
