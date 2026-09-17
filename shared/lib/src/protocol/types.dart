@@ -231,6 +231,7 @@ class SpaceResult {
     required this.devices,
     this.personNames = const {},
     this.personGenders = const {},
+    this.personSlots = const {},
   });
 
   final String spaceId;
@@ -242,6 +243,10 @@ class SpaceResult {
   /// person_id → gender（male/female，显示层用）。
   final Map<String, String> personGenders;
 
+  /// person_id → partner_slot（0=第一人/创建者，1=第二人/伴侣；
+  /// 同性别气泡配色区分「第二个人」用，老服务端无此键时为空表）。
+  final Map<String, int> personSlots;
+
   factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(
         spaceId: json['space_id'] as String,
         devices: (json['devices'] as List)
@@ -251,6 +256,8 @@ class SpaceResult {
             .map((k, v) => MapEntry(k, v as String)),
         personGenders: (json['person_genders'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as String)),
+        personSlots: (json['person_slots'] as Map<String, dynamic>? ?? {})
+            .map((k, v) => MapEntry(k, v as int)),
       );
 }
 

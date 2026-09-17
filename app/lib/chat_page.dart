@@ -222,6 +222,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _myDeviceName; // 我的设备名（菜单显示；改名后 setState 刷新）
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
+  int? _mySlot; // 我的身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色判定用）
+  int? _peerSlot; // 对方身份槽位（同上）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
   /// 我的 personId（头像上传/缓存失效/归属判定用）：向导路径由 widget 传入；
   /// 重启（PIN 解锁/明文直进）路径 widget.personId 为空 → 运行时反查补齐
@@ -434,6 +436,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _myDeviceName = widget.deviceName ?? '';
     _myGender = ''; // 个人资料弹窗性别图标：由 profile 恢复（向导完成时写入）
     _peerGender = ''; // 消息气泡配色：由 profile 恢复（向导完成时写入）
+    _mySlot = null; // 身份槽位（0=第一人/1=第二人）：由 profile 恢复 + /space 校正
+    _peerSlot = null;
     _peerName = widget.peerName ?? '';
     _myPersonId = widget.personId; // 向导路径已知；重启路径为 null → 稍后反查补齐
     _refreshPeerOnline();
@@ -444,11 +448,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     AppLockService(db).loadProfile().then((p) {
       if (!mounted) return;
       setState(() {
-        if (_myPersonName.isEmpty) _myPersonName = p['personName'] ?? '';
-        if (_myDeviceName.isEmpty) _myDeviceName = p['deviceName'] ?? '';
-        if (_peerName.isEmpty) _peerName = p['peerName'] ?? '';
-        if (_myGender.isEmpty) _myGender = p['myGender'] ?? '';
-        if (_peerGender.isEmpty) _peerGender = p['peerGender'] ?? '';
+        if (_myPersonName.isEmpty) _myPersonName = p['personName'] as String? ?? '';
+        if (_myDeviceName.isEmpty) _myDeviceName = p['deviceName'] as String? ?? '';
+        if (_peerName.isEmpty) _peerName = p['peerName'] as String? ?? '';
+        if (_myGender.isEmpty) _myGender = p['myGender'] as String? ?? '';
+        if (_peerGender.isEmpty) _peerGender = p['peerGender'] as String? ?? '';
+        _mySlot = p['mySlot'] as int?; // 槽位无"空值语义"问题，直接恢复
+        _peerSlot = p['peerSlot'] as int?;
       });
       // 快照可能过期（对方改名 / v2 早期把对方性别写死空串）→ 以服务端为准校正
       // 名字与性别（老板 2026-09-11：App 重启后一直显示旧的对方名字）
@@ -579,19 +585,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final myG = space.personGenders[mine] ?? '';
       var peerG = '';
       var peerName = '';
+      var peerId = '';
       for (final entry in space.personNames.entries) {
         if (entry.key == mine) continue;
         peerName = entry.value;
         peerG = space.personGenders[entry.key] ?? '';
+        peerId = entry.key;
         break;
       }
       final myName = space.personNames[mine] ?? '';
+      // 身份槽位（0=第一人/创建者，1=第二人）：同性别第二人气泡取青色的判据
+      // （老服务端 person_slots 为空表 → 保持 null，不启用青色）
+      final mySlot = space.personSlots[mine];
+      final peerSlot = peerId.isEmpty ? null : space.personSlots[peerId];
       if (!mounted) return;
       setState(() {
         if (myName.isNotEmpty) _myPersonName = myName;
         if (peerName.isNotEmpty) _peerName = peerName;
         if (myG.isNotEmpty) _myGender = myG;
         if (peerG.isNotEmpty) _peerGender = peerG;
+        _mySlot = mySlot;
+        _peerSlot = peerSlot;
       });
       // 校正结果回写本地快照：否则下次启动（尤其离线）又用回入网时的旧值
       // （setState 只覆盖非空值，故不会把已有名字写成空）
@@ -601,6 +615,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         deviceName: _myDeviceName,
         myGender: _myGender,
         peerGender: _peerGender,
+        mySlot: _mySlot,
+        peerSlot: _peerSlot,
       );
     } catch (_) {
       // 网络失败：保持快照值（下次刷新再试）
@@ -1285,6 +1301,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       deviceName: _myDeviceName,
       myGender: _myGender,
       peerGender: _peerGender,
+      mySlot: _mySlot,
+      peerSlot: _peerSlot,
     );
   }
 
@@ -3239,13 +3257,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 性别未登记（旧配置）回退原默认色（本人 indigo.shade100 / 对方 grey.shade200）。
   /// gradient 风格改用深色气泡（男深蓝 #2271F7 / 女深粉 #B83D80，白字醒目——
   /// 浅 tint 在渐变背景上区分度不足，老板要求 2026-09-09）。
+  /// 两人同性别时第二个人（slot=1）取青色（2026-09-17 老板要求）——
+  /// 槽位未知（老服务端/未拉取）或性别不同/未登记时不启用。
   Color _bubbleColor({required bool mine}) {
     final gender = mine ? _myGender : _peerGender;
+    final slot = mine ? _mySlot : _peerSlot;
+    final otherSlot = mine ? _peerSlot : _mySlot;
+    final bothGendersKnown =
+        (_myGender == 'male' || _myGender == 'female') &&
+        (_peerGender == 'male' || _peerGender == 'female');
+    final sameGenderSecond = bothGendersKnown &&
+        _myGender == _peerGender &&
+        slot != null &&
+        otherSlot != null &&
+        slot != otherSlot &&
+        slot == 1;
     if (_uiStyle == 'gradient') {
+      if (sameGenderSecond) return const Color(0xFF00838F); // 深青（同性别第二人）
       if (gender == 'female') return const Color(0xFFB83D80); // 深粉（品牌粉加深）
       if (gender == 'male') return const Color(0xFF2271F7); // 品牌深蓝
       return mine ? const Color(0xFF2271F7) : const Color(0xFF64748B); // 性别未登记
     }
+    if (sameGenderSecond) return const Color(0xFF26C6DA).withValues(alpha: 0.22); // 青色 tint
     if (gender == 'female') return const Color(0xFFD6529C).withValues(alpha: 0.18);
     if (gender == 'male') return const Color(0xFF3BAFFD).withValues(alpha: 0.18);
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;

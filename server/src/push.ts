@@ -70,7 +70,7 @@ export function sendPushHint(spaceId: string, exceptDeviceId: string): void {
  *  devices 表，跨空间泄漏 person/在线状态（2026-09-15 评审 C2）。 */
 export function getSpace(
   token: string
-): { space_id: string; devices: unknown[]; person_names: Record<string, string>; person_genders: Record<string, string> } {
+): { space_id: string; devices: unknown[]; person_names: Record<string, string>; person_genders: Record<string, string>; person_slots: Record<string, number> } {
   const sess = requireSession(token);
   const scope = deviceScopeClause(sess.space_id);
   const devices = getDb()
@@ -79,12 +79,14 @@ export function getSpace(
   // v2：成员名称/性别表（space_members——按 person_id；同一身份多设备共享）
   const personNames: Record<string, string> = {};
   const personGenders: Record<string, string> = {};
+  const personSlots: Record<string, number> = {};
   const members = getDb()
-    .prepare(`SELECT person_id, display_name, gender FROM space_members WHERE space_id = ? AND person_id IS NOT NULL`)
-    .all(sess.space_id) as { person_id: string; display_name: string | null; gender: string | null }[];
+    .prepare(`SELECT person_id, display_name, gender, partner_slot FROM space_members WHERE space_id = ? AND person_id IS NOT NULL`)
+    .all(sess.space_id) as { person_id: string; display_name: string | null; gender: string | null; partner_slot: number }[];
   for (const m of members) {
     if (m.display_name != null) personNames[m.person_id] = m.display_name;
     if (m.gender != null) personGenders[m.person_id] = m.gender;
+    personSlots[m.person_id] = m.partner_slot;
   }
-  return { space_id: sess.space_id, devices, person_names: personNames, person_genders: personGenders };
+  return { space_id: sess.space_id, devices, person_names: personNames, person_genders: personGenders, person_slots: personSlots };
 }

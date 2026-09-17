@@ -36,11 +36,13 @@ class DeviceStore {
     this.escrowUploaded = false,
     Map<String, String>? personNames,
     Map<String, String>? personGenders,
+    Map<String, int>? personSlots,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
     List<Map<String, dynamic>>? attachments,
   })  : personNames = personNames ?? {},
         personGenders = personGenders ?? {},
+        personSlots = personSlots ?? {},
         pending = pending ?? [],
         history = history ?? [],
         attachments = attachments ?? [];
@@ -86,6 +88,10 @@ class DeviceStore {
   /// （否则所有气泡回退青绿——老板 2026-09-13）。
   Map<String, String> personGenders;
 
+  /// 空间成员槽位缓存（person_id → 0=第一人/创建者，1=第二人/伴侣）：
+  /// 同性别时第二人气泡取青色（GET /space 的 person_slots，离线兜底用）。
+  Map<String, int> personSlots;
+
   /// 离线发送队列：MessageEnvelope 的 JSON 字符串（已加密，落盘安全）。
   final List<String> pending;
 
@@ -127,6 +133,7 @@ class DeviceStore {
         'escrow_updated_at': escrowUpdatedAt,
         'person_names': personNames,
         'person_genders': personGenders,
+        'person_slots': personSlots,
         'pending': pending,
         'history': history,
         'attachments': attachments,
@@ -155,6 +162,7 @@ class DeviceStore {
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
         personNames: (json['person_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
         personGenders: (json['person_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
+        personSlots: (json['person_slots'] as Map?)?.map((k, v) => MapEntry('$k', v as int)) ?? {},
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],

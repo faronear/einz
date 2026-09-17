@@ -206,6 +206,8 @@ class AppLockService {
     required String deviceName,
     String myGender = '', // 本人性别（male/female；个人资料弹窗图标展示用）
     String peerGender = '', // 对方性别（male/female；消息气泡配色用）
+    int? mySlot, // 本人身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色用）
+    int? peerSlot, // 对方身份槽位（同上；对方气泡配色判定用）
   }) async {
     await _set(_kProfile, jsonEncode({
       'personName': personName,
@@ -213,11 +215,13 @@ class AppLockService {
       'deviceName': deviceName,
       'myGender': myGender,
       'peerGender': peerGender,
+      'mySlot': mySlot,
+      'peerSlot': peerSlot,
     }));
   }
 
   /// 读回保存的资料（键缺失返回空串——解锁场景 ChatPage 空名时恢复）。
-  Future<Map<String, String>> loadProfile() async {
+  Future<Map<String, Object?>> loadProfile() async {
     final raw = await _get(_kProfile);
     if (raw == null) return const {};
     try {
@@ -228,6 +232,8 @@ class AppLockService {
         'deviceName': (m['deviceName'] as String?) ?? '',
         'myGender': (m['myGender'] as String?) ?? '',
         'peerGender': (m['peerGender'] as String?) ?? '',
+        'mySlot': (m['mySlot'] as num?)?.toInt(),
+        'peerSlot': (m['peerSlot'] as num?)?.toInt(),
       };
     } catch (_) {
       return const {};

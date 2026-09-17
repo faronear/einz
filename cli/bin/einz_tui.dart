@@ -38,6 +38,7 @@ const _bold = '$_esc[1m';
 const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息整条底色（最初方案；macOS Terminal 效果好）
 const _bgBlue = '$_esc[104m'; // 亮蓝背景：男性对方消息整条底色
 const _bgTeal = '$_esc[48;5;37m'; // 青绿背景（256 色 #00AFAF）：性别未知的对方消息整条底色
+const _bgCyan = '$_esc[106m'; // 亮青背景：两人同性别时第二个人的消息整条底色（2026-09-17 老板要求）
 const _bgBlack = '$_esc[40m'; // 黑色背景：标题栏/底部状态行整行底色
 
 // \x1B[2J 清屏 + \x1B[3J 清除回滚缓冲 + \x1B[H 光标回家：全屏重绘应用（类似 vim/htop）
@@ -128,6 +129,10 @@ class _TuiState {
 
   /// person_id → gender（GET /health、/space 拉取，对方消息背景色用）。
   Map<String, String> personGenders = {};
+
+  /// person_id → partner_slot（GET /space 拉取，0=第一人/创建者，1=第二人/伴侣；
+  /// 同性别时第二人气泡取青色用）。
+  Map<String, int> personSlots = {};
 
   /// 引导问答等待类型（非 null 时输入循环的下一次输入按此问答处理）。
   String? pendingGuidance;
@@ -1182,6 +1187,7 @@ Future<void> main(List<String> args) async {
   // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
   _state!.personNames = Map.of(store.personNames);
   _state!.personGenders = Map.of(store.personGenders);
+  _state!.personSlots = Map.of(store.personSlots);
   _refreshPersonNames(_state!); // 认证后刷新（保持最新，并回写缓存）
 
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
@@ -2172,10 +2178,11 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
     return out;
   }
   if (!m.isMine) {
-    // 对方消息：左侧性别气泡——背景按对方性别配色（男蓝/女品红/未知青绿），
+    // 对方消息：左侧性别气泡——背景按对方性别配色（男蓝/女品红/未知青绿；
+    // 两人同性别时第二个人取亮青——2026-09-17 老板要求），
     // [时间] 黑字标签嵌在气泡左缘（首行，长消息标签跟首行文字走）、正文白字；
     // 气泡矩形 col 1 → cols - rightPad，与右侧我方气泡（col 9 → cols）左右对称
-    final bubbleBackground =
+    final bubbleBackground = _sameGenderSecondCyan(m.env.senderPersonId) ??
         _genderBubble(_state?.personGenders[m.env.senderPersonId]);
     final label = '[$time]';
     final labelW = _displayWidth(label);
@@ -2204,17 +2211,15 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
   // 我的消息：气泡整块从左侧 sideMargin 列留白起铺满到屏缘（右侧区域气泡风格——
   // 长短消息左缘统一对齐；长消息正文在左，单行短消息正文右对齐贴着 [我 时间] 标签、
   // 标签贴最右），背景按我的性别配色——男蓝、女品红、性别未知（旧空间未登记/尚未拉取）
-  // 青绿底；前导留白不上色。
+  // 青绿底；两人同性别时第二个人（我）取亮青（2026-09-17 老板要求）；前导留白不上色。
   // 兼容服务端两种取值：App 提交规范 male/female，旧 TUI 提交过中文 男/女。
   final rawGender = _state?.personGenders[m.env.senderPersonId];
-  final String partnerBackground;
-  if (rawGender == 'male' || rawGender == '男') {
-    partnerBackground = _bgBlue;
-  } else if (rawGender == 'female' || rawGender == '女') {
-    partnerBackground = _bgPink;
-  } else {
-    partnerBackground = _bgTeal; // 性别未知：青绿底（2026-09-10 老板要求）
-  }
+  final String partnerBackground = _sameGenderSecondCyan(m.env.senderPersonId) ??
+      (rawGender == 'male' || rawGender == '男'
+          ? _bgBlue
+          : rawGender == 'female' || rawGender == '女'
+              ? _bgPink
+              : _bgTeal); // 性别未知：青绿底（2026-09-10 老板要求）
   // 我的消息标签：[状态 时间]（老板 2026-09-13：去掉名字、状态提到时间前面），
   // 已读（read）时状态字符标蓝——TUI 独有（App 已读只留数据档位不展示）。
   final status = _state?.session.sentStatusOf(m) ?? '';
@@ -3575,6 +3580,7 @@ Future<void> _refreshPersonNames(_TuiState s) async {
     final r = await ApiClient(s.session.server).getSpace(token);
     s.personNames = r.personNames;
     s.personGenders = r.personGenders;
+    s.personSlots = r.personSlots;
     final store = s.session.store;
     // 对方**真实**名字（对方已加入才有——同一身份多设备共享同一 personId）→ 校正
     // 预置名快照：否则对方改名后旧预置名会一直留着，把 /myname 的同名判据误伤
@@ -3593,9 +3599,11 @@ Future<void> _refreshPersonNames(_TuiState s) async {
     // 回写本地缓存（离线启动兜底）；只有内容变化才落盘，避免频繁刷新时反复写盘
     if (!_sameStringMap(store.personNames, r.personNames) ||
         !_sameStringMap(store.personGenders, r.personGenders) ||
+        !_sameIntMap(store.personSlots, r.personSlots) ||
         peerChanged) {
       store.personNames = Map.of(r.personNames);
       store.personGenders = Map.of(r.personGenders);
+      store.personSlots = Map.of(r.personSlots);
       if (peerChanged) store.peerName = peer;
       store.save(s.session.storePath);
     }
@@ -3612,6 +3620,30 @@ bool _sameStringMap(Map<String, String> a, Map<String, String> b) {
     if (b[e.key] != e.value) return false;
   }
   return true;
+}
+
+/// 两个 String→int 映射内容是否完全一致（同上，personSlots 落盘防抖用）。
+bool _sameIntMap(Map<String, int> a, Map<String, int> b) {
+  if (a.length != b.length) return false;
+  for (final e in a.entries) {
+    if (b[e.key] != e.value) return false;
+  }
+  return true;
+}
+
+/// 同性别第二人的气泡背景色（2026-09-17 老板要求）：空间两人性别都已登记且相同
+/// 时，第二个人（partner_slot=1）的消息气泡取亮青——否则两蓝/两粉无法区分谁发的。
+/// [senderPid] 发言人 person_id；槽位表 person_slots 来自 GET /space
+/// （老服务端无此键 → 空表 → 不适用）。返回 null = 不适用（性别不同/未登记/
+/// 槽位未知），调用方沿用原性别配色。
+String? _sameGenderSecondCyan(String? senderPid) {
+  final slots = _state?.personSlots;
+  if (senderPid == null || slots == null || slots.length < 2) return null;
+  // 两人性别都必须已登记（规范值 male/female）且完全相同才启用青色
+  final genders = slots.keys.map((pid) => _state?.personGenders[pid]).toSet();
+  if (genders.length != 1) return null;
+  if (genders.first != 'male' && genders.first != 'female') return null;
+  return slots[senderPid] == 1 ? _bgCyan : null;
 }
 
 /// 密保口令策略校验（**设置/修改**时用；输入既有口令不校验，避免把旧短口令用户挡在门外）。
