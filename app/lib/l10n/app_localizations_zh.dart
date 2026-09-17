@@ -824,4 +824,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String lockPageUnlockFailed(String error) {
     return '解锁失败: $error';
   }
+
+  @override
+  String get chatPageMenuAbout => '关于秘境';
+
+  @override
+  String get aboutPageTitle => '关于秘境';
+
+  @override
+  String get aboutIntro =>
+      '秘境是给两个人用的私密共享空间：消息端到端加密，服务器只转发密文、读不到内容；数据优先存在各自手机里；一个空间固定两个人。';
+
+  @override
+  String get aboutVersionLabel => '版本号';
+
+  @override
+  String get aboutServerLabel => '服务器地址';
 }

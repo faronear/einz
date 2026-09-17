@@ -9,6 +9,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'about_page.dart';
 import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
@@ -327,6 +328,7 @@ class _SetupPageState extends State<SetupPage> {
               Future<void>.delayed(const Duration(milliseconds: 300), () {
                 if (!mounted) return;
                 if (value == 'locale') _showLocalePicker();
+                if (value == 'about') _openAboutPage();
                 if (value == 'exit') _showExitAppDialog();
               });
             },
@@ -346,6 +348,11 @@ class _SetupPageState extends State<SetupPage> {
                       Text(kLocaleLabels[langCode] ?? langCode),
                     ],
                   ),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'about',
+                  child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
                 const PopupMenuDivider(),
                 PopupMenuItem(
@@ -1073,6 +1080,13 @@ class _SetupPageState extends State<SetupPage> {
       kp.privateKey,
     );
     return api.verify(challenge.challengeId, base64Encode(opened));
+  }
+
+  /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
+  void _openAboutPage() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db)),
+    );
   }
 
   /// 退出应用（等价 TUI /exit；向导任意页面可经 ⋯ 菜单退出）：

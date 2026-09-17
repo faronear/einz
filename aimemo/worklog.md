@@ -7039,3 +7039,21 @@ Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不�
 文件命名统一用它；iOS 侧 `build/ios/ipa/version.txt` 也从"只写版本号"改成写
 `APP_BUILD_NAME=` + `APP_BUILD_STAMP=` 两行，外面 `eval "$(cat ...)"` 取。
 包内版本号本身仍是三段 `yymm.ddhh.mm`（iOS 要求三段，安卓跟着统一用同一个串）。
+
+## 2026-09-18 新增「关于秘境」页（对话页 + 向导页右上角菜单）
+
+老板要求：右上角菜单加一项「关于秘境」，里面放版本号 + 服务器地址 + 秘境一句话说明。
+
+- 新页 `app/lib/about_page.dart`：Logo + 说明 + 版本号（`2609.1723.30 (26091723)`，
+  带构建号方便对到具体那次打包）+ 服务器地址（长按可复制）。
+- 版本号首次进 App，为此加了依赖 `package_info_plus ^10.2.1`（只多两个包，纯平台通道，
+  无需 pod/gradle 改动）。读的是打包写进产物的 CFBundleShortVersionString / versionName，
+  不是 pubspec 里那个写死的 1.0.0。
+- 服务器地址走 `ServerSettings(db).load()`（持久化值优先，没改过就是默认 einz.tic.cc），
+  db 沿用页面 `widget.db ?? LocalDatabase.shared` 的注入习惯。
+- 入口：chat_page 的 ⋯ 菜单「修改密保口令」之后、分割线之前；setup_page 的菜单在
+  「退出」之前加了分割线分隔（原来只有语言 + 退出两项）。
+- l10n 新增 5 个 key（chatPageMenuAbout / aboutPageTitle / aboutIntro /
+  aboutVersionLabel / aboutServerLabel），zh + en 都填了，`flutter gen-l10n` 重新生成。
+
+`flutter analyze` 干净（app/）。UI 效果老板自测。

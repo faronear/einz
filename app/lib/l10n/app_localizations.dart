@@ -1603,6 +1603,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock failed: {error}'**
   String lockPageUnlockFailed(String error);
+
+  /// No description provided for @chatPageMenuAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get chatPageMenuAbout;
+
+  /// No description provided for @aboutPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get aboutPageTitle;
+
+  /// No description provided for @aboutIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Einz is a private shared space for two: messages are end-to-end encrypted — the server only relays ciphertext and cannot read them; data lives on your own device first; one space holds exactly two people.'**
+  String get aboutIntro;
+
+  /// No description provided for @aboutVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get aboutVersionLabel;
+
+  /// No description provided for @aboutServerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get aboutServerLabel;
 }
 
 class _AppLocalizationsDelegate

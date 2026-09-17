@@ -864,4 +864,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String lockPageUnlockFailed(String error) {
     return 'Unlock failed: $error';
   }
+
+  @override
+  String get chatPageMenuAbout => 'About';
+
+  @override
+  String get aboutPageTitle => 'About';
+
+  @override
+  String get aboutIntro =>
+      'Einz is a private shared space for two: messages are end-to-end encrypted — the server only relays ciphertext and cannot read them; data lives on your own device first; one space holds exactly two people.';
+
+  @override
+  String get aboutVersionLabel => 'Version';
+
+  @override
+  String get aboutServerLabel => 'Server';
 }

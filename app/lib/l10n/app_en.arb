@@ -390,5 +390,10 @@
     "placeholders": {
       "error": {"type": "String"}
     }
-  }
+  },
+  "chatPageMenuAbout": "About",
+  "aboutPageTitle": "About",
+  "aboutIntro": "Einz is a private shared space for two: messages are end-to-end encrypted — the server only relays ciphertext and cannot read them; data lives on your own device first; one space holds exactly two people.",
+  "aboutVersionLabel": "Version",
+  "aboutServerLabel": "Server"
 }

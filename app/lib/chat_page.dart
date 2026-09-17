@@ -16,6 +16,7 @@ import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
+import 'about_page.dart';
 import 'brand_logo.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/attachment_store.dart';
@@ -1002,6 +1003,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (changed == true && mounted) {
       showTopNotice(context, AppLocalizations.of(context)!.chatPageChangePassphraseDone);
     }
+  }
+
+  /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
+  void _openAboutPage() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db)),
+    );
   }
 
   /// 对方在线判定：对方有实时 WS 连接（connected_at 非 null）= 在线；
@@ -3568,6 +3576,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _showSetLockDialog();
                   case 'passphrase':
                     _showChangePassphraseDialog();
+                  case 'about':
+                    _openAboutPage();
                   case 'name':
                     _showRenameDialog(renameDevice: false);
                   case 'avatar':
@@ -3687,6 +3697,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 PopupMenuItem(
                   value: 'passphrase',
                   child: Text(l10n.chatPageMenuChangePassphrase, style: labelStyle),
+                ),
+                PopupMenuItem(
+                  value: 'about',
+                  child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
                 const PopupMenuDivider(),
                 PopupMenuItem(
