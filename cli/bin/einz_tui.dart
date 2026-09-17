@@ -1719,16 +1719,30 @@ String _myDeviceTag(_TuiState s) {
   return ' @$myName';
 }
 
-/// 设备上下线时刻（毫秒 epoch）→ UTC 记法 `2026-02-26T12:35:56Z`。
+/// 设备上下线时刻（毫秒 epoch）→ 本地时间文本：今天 HH:mm / 昨天 HH:mm / M/d HH:mm。
 ///
-/// **不用本地时区**：同一份 /devices 在美国主机和中国主机上跑，输出必须逐字一致
-/// （老板 2026-09-17）——之前按本地时区显示，跨时区的两台机器看到的时间对不上。
-/// 秒级精度足够（设备上下线不需要亚秒），末尾 `Z` 明说是 UTC。
-String _fmtDeviceTime(int ms) {
+/// **只给人一眼看**：跨时区核对另有 UTC（见 `_fmtDeviceTimeUtc`）——老板 2026-09-17
+/// 要求两个都在：本地时间直观，UTC 用来保证中美两台机器看到的能互相对上。
+String _fmtDeviceTimeLocal(int ms) {
+  final t = DateTime.fromMillisecondsSinceEpoch(ms);
+  final now = DateTime.now();
+  final hhmm =
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  if (t.year == now.year && t.month == now.month && t.day == now.day) return hhmm;
+  final y = now.subtract(const Duration(days: 1));
+  if (t.year == y.year && t.month == y.month && t.day == y.day) return '昨天 $hhmm';
+  return '${t.month}/${t.day} $hhmm';
+}
+
+/// 设备上下线时刻（毫秒 epoch）→ 紧凑 UTC `20260226T123556Z`（去掉 `-` 与 `:`）。
+///
+/// 不带分隔符是老板 2026-09-17 定的：秒级精度足够，去掉分隔符后宽度小，设备列表
+/// 一行里塞得下；末尾 `Z` 明说是 UTC。
+String _fmtDeviceTimeUtc(int ms) {
   final t = DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
   String two(int v) => v.toString().padLeft(2, '0');
-  return '${t.year.toString().padLeft(4, '0')}-${two(t.month)}-${two(t.day)}'
-      'T${two(t.hour)}:${two(t.minute)}:${two(t.second)}Z';
+  return '${t.year.toString().padLeft(4, '0')}${two(t.month)}${two(t.day)}'
+      'T${two(t.hour)}${two(t.minute)}${two(t.second)}Z';
 }
 
 /// 同空间设备列表的一行（`/devices` 与 `/revoke` **共用同一份编号**——两个命令看到的
@@ -1802,10 +1816,14 @@ Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
     final String when;
     if (online) {
       final since = sinceMs ?? 0;
-      when = since > 0 ? ' since ${_fmtDeviceTime(since)}' : '';
+      when = since > 0
+          ? ' since ${_fmtDeviceTimeLocal(since)} (${_fmtDeviceTimeUtc(since)})'
+          : '';
     } else if (!revoked) {
+      // 离线那一组外层已有括号，UTC 用 ` / ` 接在同一组里——再套一层括号太挤。
       when = (last is num && last > 0)
-          ? ' (上次活跃 ${_fmtDeviceTime(last.toInt())})'
+          ? ' (上次活跃 ${_fmtDeviceTimeLocal(last.toInt())}'
+              ' / ${_fmtDeviceTimeUtc(last.toInt())})'
           : '';
     } else {
       when = '';
