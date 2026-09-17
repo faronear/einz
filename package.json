@@ -16,7 +16,7 @@
     "app-apk-emu-run-remote": "bash scripts/patchPubCache.sh && cd app; flutter run -d emulator-5554",
     "app-apk-emu-run-remote-new": "bash scripts/patchPubCache.sh && cd app; flutter install -d emulator-5554; flutter run -d emulator-5554",
     "app-apk-build-prod": "bash scripts/patchPubCache.sh && cd app; flutter build apk --release && mkdir -p _release.gitomit && mv build/app/outputs/flutter-apk/app-release.apk \"_release.gitomit/einz.$(date +%y%m%d%H).apk\" && ls -lh \"_release.gitomit/einz.$(date +%y%m%d%H).apk\"",
-    "app-ios-emu-boot": "xcrun simctl boot 720C22F9-D844-44EE-BDA6-87900913A39B; open -a Simulator; xcrun simctl list devices | grep -i booted",
+    "app-ios-emu-boot": "xcrun simctl boot 720C22F9-D844-44EE-BDA6-87900913A39B; open \"$(xcode-select -p)/Applications/Simulator.app\"; xcrun simctl list devices | grep -i booted",
     "app-ios-emu-run-local": "cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --dart-define-from-file=localConfig.ios.json --pid-file /tmp/einz_flutter.pid",
     "app-ios-emu-run-local-new": "xcrun simctl uninstall booted cc.tic.einz.ios; cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --dart-define-from-file=localConfig.ios.json --pid-file /tmp/einz_flutter.pid",
     "app-ios-emu-run-remote": "cd app; flutter run -d 720C22F9-D844-44EE-BDA6-87900913A39B --pid-file /tmp/einz_flutter.pid",
