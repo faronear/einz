@@ -31,4 +31,4 @@ workflows:
     publishing:
       email:
         recipients:
-          - you@example.com   # TODO: 改为你的邮箱，构建失败/成功时通知
+          - codemagic@tic.cc   # TODO: 改为你的邮箱，构建失败/成功时通知
