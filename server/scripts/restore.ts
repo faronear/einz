@@ -1,6 +1,6 @@
 /**
  * 恢复 CLI：npm run restore -- <备份文件路径>
- * 解密备份并写回 einz.sqlite.db / files/ / config.json。
+ * 解密备份并写回 einz.sqlite.db / files/。
  * ⚠️ 会覆盖现有数据，执行前请确认。
  */
 import { restoreBackup, resolveBackupPaths } from "../src/backup.js";

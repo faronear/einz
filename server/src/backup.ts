@@ -2,8 +2,11 @@
  * Server 备份与恢复（DATABASE.md §6）
  *
  * 备份 = einz.sqlite.db（SQLite 官方 Backup API 在线备份，禁止直接复制正在写入的 db）
- *       + /data/files/（附件密文 blob）+ config.json（白名单）
+ *       + /data/files/（附件密文 blob）
  * 产物 = 单文件，AES-256-GCM 加密归档到 <data>/backups/。
+ *
+ * 注：v1 的静态白名单 config.json 已随 Multiverse 删除（设备与空间都在库里），
+ *     备份里不再有该条目——`EINZ_CONFIG` 一并移除（老板 2026-09-17 确认无老备份）。
  *
  * 密钥：环境变量 EINZ_DB_BACKUP_KEY（base64 32B）。未设置时拒绝执行（防误备份明文）。
  */
@@ -21,7 +24,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export interface BackupPaths {
   db: string; // einz.sqlite.db 路径
   files: string; // 附件根目录
-  config: string; // config.json 路径
   dataDir: string; // <data>/ 根目录（backups/ 也在这里）
 }
 
@@ -29,9 +31,8 @@ export interface BackupPaths {
 export function resolveBackupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
   const db = env.EINZ_DB ?? resolve(HERE, "../data/einz.sqlite.db");
   const files = env.EINZ_FILES ?? resolve(HERE, "../data/files");
-  const config = env.EINZ_CONFIG ?? resolve(HERE, "../config/config.json");
   const dataDir = resolve(dirname(db));
-  return { db, files, config, dataDir };
+  return { db, files, dataDir };
 }
 
 function backupKey(): Buffer {
@@ -74,16 +75,10 @@ export async function createBackup(paths = resolveBackupPaths()): Promise<string
   const dbBytes = readFileSync(tmpDb);
   rmSync(tmpDb, { force: true });
 
-  // 2) 组装 payload：db + files/ + config.json（**可选**）
-  //    v2（Multiverse）没有静态白名单 config.json 了——设备与空间都在库里。
-  //    此前无条件 readFileSync(config) 会让 `npm run backup` 直接 ENOENT 崩掉
-  //    （2026-09-15 评审 S4：备份是每日运维动作，崩了等于没有备份）。
+  // 2) 组装 payload：db + files/（v1 的 config.json 白名单条目已删，见文件头）
   const entries = [
     { path: "app.db", data: dbBytes },
     ...collectFilesRecursive(paths.files, paths.files),
-    ...(existsSync(paths.config)
-      ? [{ path: "config.json", data: readFileSync(paths.config) }]
-      : []),
   ];
   const payload = JSON.stringify({
     format: FORMAT,
@@ -126,7 +121,7 @@ function assertInsideRoot(root: string, candidate: string): void {
   }
 }
 
-/** 从加密备份恢复：解密 → 写回 einz.sqlite.db / files/ / config.json。 */
+/** 从加密备份恢复：解密 → 写回 einz.sqlite.db / files/。 */
 export function restoreBackup(backupPath: string, paths = resolveBackupPaths()): void {
   const key = backupKey();
   const file = JSON.parse(readFileSync(backupPath, "utf8")) as {
@@ -146,8 +141,8 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
   if (existsSync(paths.files)) rmSync(paths.files, { recursive: true, force: true });
 
   for (const entry of parsed.entries) {
-    // 注：`app.db` / `config.json` 两个分支是**精确等值匹配**，路径不受条目内容影响，
-    // 无需约束；真正的缺口只在 files/ 分支（前缀匹配 + 截断拼接）。
+    // 注：`app.db` 是**精确等值匹配**，路径不受条目内容影响，无需约束；
+    // 真正的缺口只在 files/ 分支（前缀匹配 + 截断拼接）。
     if (entry.path.startsWith("files/")) {
       const fileTarget = join(paths.files, entry.path.slice("files/".length));
       assertInsideRoot(paths.files, fileTarget);
@@ -159,10 +154,6 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
       const target = join(paths.dataDir, entry.path);
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, Buffer.from(entry.b64, "base64"));
-      continue;
-    }
-    if (entry.path === "config.json") {
-      writeFileSync(paths.config, Buffer.from(entry.b64, "base64"));
     }
   }
 }

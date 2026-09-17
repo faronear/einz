@@ -1,7 +1,7 @@
 /**
  * 备份 CLI：npm run backup [-- --verify]
  * 产出加密备份到 <data>/backups/backup-<ts>.json，并打印文件列表。
- * 依赖环境变量：EINZ_DB / EINZ_FILES / EINZ_CONFIG（可选，有默认值）、
+ * 依赖环境变量：EINZ_DB / EINZ_FILES（可选，有默认值）、
  *               EINZ_DB_BACKUP_KEY（必需，base64 32B）。
  */
 import { createBackup, listBackups, resolveBackupPaths, verifyBackup } from "../src/backup.js";

@@ -201,7 +201,7 @@ cd server   # 或 docker compose exec server npm run backup
 # 备份（需 EINZ_DB_BACKUP_KEY，base64 32B）
 export EINZ_DB_BACKUP_KEY="<部署时生成的密钥>"
 npm run backup -- --verify
-# 产物：data/backups/backup-<ts>.json（AES-256-GCM 加密的 einz.sqlite.db + files/ + config.json）
+# 产物：data/backups/backup-<ts>.json（AES-256-GCM 加密的 einz.sqlite.db + files/）
 
 # 恢复（覆盖当前数据，先停服务再执行）
 npm run restore -- data/backups/backup-<ts>.json
@@ -256,7 +256,7 @@ curl -X POST http://127.0.0.1:3000/devices/dev-b1/revoke \
 
 | 数据                                   | 手段                                    | 频率建议        |
 | -------------------------------------- | --------------------------------------- | --------------- |
-| Server einz.sqlite.db + files + config | `npm run backup`（加密归档到 backups/） | 每日（可 cron） |
+| Server einz.sqlite.db + files          | `npm run backup`（加密归档到 backups/） | 每日（可 cron） |
 | 客户端密钥 + 历史                      | `backup` 命令（恢复码加密）             | 每次重大变更后  |
 | 恢复码 / 备份密钥                      | 离线多份                                | 永久            |
 

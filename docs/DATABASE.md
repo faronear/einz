@@ -364,5 +364,5 @@ CREATE TABLE app_state (
 
 ## 6. 备份（Server 侧）
 
-- 备份 = `einz.sqlite.db`（用 SQLite 官方 Backup API，禁止直接复制正在写入的 db）+ `/data/files/` + config.json，产物加密归档到 `/data/backups/`（productLens §11.2）。
+- 备份 = `einz.sqlite.db`（用 SQLite 官方 Backup API，禁止直接复制正在写入的 db）+ `/data/files/`，产物加密归档到 `/data/backups/`（productLens §11.2）。v1 的静态白名单 `config.json` 已删（设备与空间都在库里），备份里不再有该条目。
 - 客户端备份见 E2EE.md §10（恢复码 + 加密导出，含本库与密钥归档）。
