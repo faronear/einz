@@ -129,7 +129,10 @@ if ! profile_exists "${PROFILE_NAME}"; then
    补一步：developer.apple.com → Certificates, Identifiers & Profiles → Profiles
    → 下载 ${PROFILE_NAME} → 复制为：
      ~/Library/MobileDevice/Provisioning Profiles/<UUID>.mobileprovision
-   （已从别的 Mac 拷过证书时别忘了这一步；Ad Hoc 那台 UUID 458acdea-…）
+   本机已知 UUID（换机器时直接对号入座）：
+     App Store → eb4be29b-a197-4813-b11e-a400232b0472
+     Ad Hoc    → 458acdea-8f20-4a6d-99fa-6c824506749a
+   （已从别的 Mac 拷过证书时别忘了这一步：复制文件名必须是 UUID，Xcode 按 UUID 索引）
 ERR
   exit 1
 fi
