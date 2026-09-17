@@ -40,7 +40,7 @@ npm install
 npm run dev
 ```
 
-可选：`server/config/einz_server_config.json`（本机配置，不入 git）里的 `maxSpaces`
+可选：`server/config/serverConfig.json`（本机配置，不入 git）里的 `maxSpaces`
 （0=不限 / 1=单空间 / n=上限，改后重启生效）。
 
 ## 本地开发配置（App）
@@ -64,4 +64,4 @@ flutter run --dart-define-from-file=local_config.json   # flutter run/build 都�
   `ios-run-dev-new`（+ `ios-refresh` 热重载、`ios-reload` 热重启），Android 模拟器 `npm run apk-run-dev` /
   `apk-run-dev-new`。`scripts/build_ios.sh` 已移除，相关能力并入 npm 脚本。
 - 调试入口（手动）：`flutter run --dart-define-from-file=local_config.json -d <UDID>`（run 同样支持）
-- 服务端对应：`server/config/einz_server_config.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）
+- 服务端对应：`server/config/serverConfig.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）

@@ -75,7 +75,7 @@ mkdir -p ~/.einz
 > `/health` 只返回服务健康、协议版本与能力（不再有 space_id / 消息数 / 在线数——免鉴权端点
 > 不吐业务量，2026-09-15 评审 B1）。空间信息在认证后由 `/space` 返回。
 >
-> 可选：`server/config/einz_server_config.json` 的 `maxSpaces` 控制新空间数量上限（0=不限）。
+> 可选：`server/config/serverConfig.json` 的 `maxSpaces` 控制新空间数量上限（0=不限）。
 > 自用建议设 1~2，否则等于对公网开放建空间（服务端启动会打告警）。
 
 ---

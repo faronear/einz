@@ -18,7 +18,7 @@
 #   2. 启动：docker compose -f deployment/docker-compose.nocaddy.yml up -d
 #
 # 注：**配置文件是可选的**——设备与空间都在库里（v1 的静态白名单 config.json 已废），
-#     `./config` 里现在只放 `einz_server_config.json`（当前字段：maxSpaces，改后重启
+#     `./config` 里现在只放 `serverConfig.json`（当前字段：maxSpaces，改后重启
 #     生效）；目录为空或文件缺失都照常启动（走默认值）。
 services:
   server:
@@ -28,9 +28,9 @@ services:
     restart: unless-stopped
     environment:
       - PORT=3000
-      # 服务端配置文件（可选）：宿主机 ./config/einz_server_config.json → 容器 /config/。
+      # 服务端配置文件（可选）：宿主机 ./config/serverConfig.json → 容器 /config/。
       # 文件缺失时服务端按默认值启动（当前唯一字段 maxSpaces：0=不限 / n=上限）。
-      - EINZ_CONFIG=/config/einz_server_config.json
+      - EINZ_CONFIG=/config/serverConfig.json
       - EINZ_DB=/data/einz.sqlite.db
       - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：

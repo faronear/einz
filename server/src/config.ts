@@ -16,24 +16,24 @@ export interface ServerConfig {
   protocol_version: string;
   /** Multiverse：能力清单（随端点实现逐步扩展） */
   capabilities: string[];
-  /** 空间数量上限（einz_server_config.json 的 maxSpaces：0=不限；1=单空间即退回 v1 模式；n=最多 n 个）。 */
+  /** 空间数量上限（serverConfig.json 的 maxSpaces：0=不限；1=单空间即退回 v1 模式；n=最多 n 个）。 */
   max_spaces: number;
 }
 
-/** 读取 einz_server_config.json（默认 server/config/einz_server_config.json——本机配置
+/** 读取 serverConfig.json（默认 server/config/serverConfig.json——本机配置
  *  不入 git；可用环境变量 `EINZ_CONFIG` 指向别处，Docker 部署靠它读挂载进来的
- *  /config/einz_server_config.json，两种形态都是"config/ 目录 + 同名文件"）。
+ *  /config/serverConfig.json，两种形态都是"config/ 目录 + 同名文件"）。
  *  服务端每次启动读取一次（改配置需重启生效；文件缺失或解析失败按默认值处理）。
  *  当前支持字段：maxSpaces。 */
 let fileConfigCache: { maxSpaces?: number } | null = null;
 function readFileConfig(): { maxSpaces?: number } {
   if (fileConfigCache != null) return fileConfigCache;
-  const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../config/einz_server_config.json");
+  const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../config/serverConfig.json");
   if (existsSync(path)) {
     try {
       fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as { maxSpaces?: number };
     } catch (e) {
-      console.warn(`[einz] einz_server_config.json 解析失败（按默认配置继续）: ${e}`);
+      console.warn(`[einz] serverConfig.json 解析失败（按默认配置继续）: ${e}`);
       fileConfigCache = {};
     }
   } else {
