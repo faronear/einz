@@ -6842,3 +6842,26 @@ v1 静态白名单早废。
 - `.gitignore:21 deployment/config/` 故意留着：VPS 旧目录若还在，至少不会污染 git status。
 
 验证：`docker compose -f ... config` 两个 compose 均解析通过。
+
+## 2026-09-17（续）config/ 目录回归：改成服务端配置挂载
+
+老板改主意（对）：`config/` 还要用，但内容从 v1 白名单换成 `einz_server_config.json`。
+先发现一个前提事实：**Docker 部署此前根本配不了 maxSpaces**——`config.ts` 把路径写死成
+`server/einz_server_config.json`（容器里 = `/app/einz_server_config.json`，镜像里没有）。
+
+已改（提交 2d37195）：
+- `server/src/config.ts`：`readFileConfig()` 路径改为 `process.env.EINZ_CONFIG ?? 默认路径`
+  ——`EINZ_CONFIG` 这个名字是复用的（备份侧刚把它删掉，名字空出来了）；顺手把告警文案里的
+  "config.json" 改成 "einz_server_config.json"。
+- 两个 compose：恢复 `./config:/config:ro`，`EINZ_CONFIG=/config/einz_server_config.json`
+  （**默认启用**，老板选的 → docker up 仍会自动建出空 config/ 目录，但这次它是有意义的位置）。
+- `docs/DEPLOYMENT.md` §3.1：目录树加 config/，写明字段 maxSpaces + 示例 + "文件缺失照常启动"。
+
+验证：tsc 干净；`npm test`(server) 全绿；临时脚本验证 `EINZ_CONFIG` 生效（不设 → 0，
+设了 → 2）；两个 compose `docker compose config` 解析通过。
+
+**顺带查出两个恢复侧的既有 bug（不是本次改动引入，等老板定夺）**：
+1. 备份里 files 条目的 path 是 `aa/bb.bin`（`collectFilesRecursive` 用 `relative(filesDir, …)`，
+   没有 `files/` 前缀），而 `restoreBackup` 只认 `startsWith("files/")` → **附件永远恢复不回来**。
+2. 恢复把库写成 `data/app.db`，而服务读的是 `data/einz.sqlite.db` → **恢复后库不生效**
+   （除非手工改名）。DEPLOYMENT.md §5.1 的演练"删除 data → 恢复 → 重启验证消息仍在"目前跑不通。
