@@ -140,21 +140,28 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
   // 先清空旧 files/（恢复为备份时的精确状态）
   if (existsSync(paths.files)) rmSync(paths.files, { recursive: true, force: true });
 
+  // 库：连 -wal / -shm 一起删——只覆盖主库的话，残留的 WAL 会被 SQLite 重放进
+  // 刚恢复的库里，恢复出"半新半旧"的数据（老板 2026-09-17）。
+  for (const suffix of ["", "-wal", "-shm"]) rmSync(paths.db + suffix, { force: true });
+
   for (const entry of parsed.entries) {
-    // 注：`app.db` 是**精确等值匹配**，路径不受条目内容影响，无需约束；
-    // 真正的缺口只在 files/ 分支（前缀匹配 + 截断拼接）。
-    if (entry.path.startsWith("files/")) {
-      const fileTarget = join(paths.files, entry.path.slice("files/".length));
-      assertInsideRoot(paths.files, fileTarget);
-      mkdirSync(dirname(fileTarget), { recursive: true });
-      writeFileSync(fileTarget, Buffer.from(entry.b64, "base64"));
+    // `app.db` 是**精确等值匹配**（条目名只是内部标签，落盘位置取 paths.db，
+    // 即 EINZ_DB / 默认 einz.sqlite.db——此前写成同名 app.db，服务读不到，恢复等于没恢复）。
+    if (entry.path === "app.db") {
+      mkdirSync(dirname(paths.db), { recursive: true });
+      writeFileSync(paths.db, Buffer.from(entry.b64, "base64"));
       continue;
     }
-    if (entry.path === "app.db") {
-      const target = join(paths.dataDir, entry.path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, Buffer.from(entry.b64, "base64"));
-    }
+    // 其余一律当附件：备份里的路径是 files/ 内的相对路径，早期备份可能带
+    // `files/` 前缀也可能不带（两种都认）。路径来自备份文件 → 必须校验落盘位置，
+    // 否则一份 `../../etc/xxx` 就能写到附件根目录之外。
+    const relative = entry.path.startsWith("files/")
+      ? entry.path.slice("files/".length)
+      : entry.path;
+    const fileTarget = join(paths.files, relative);
+    assertInsideRoot(paths.files, fileTarget);
+    mkdirSync(dirname(fileTarget), { recursive: true });
+    writeFileSync(fileTarget, Buffer.from(entry.b64, "base64"));
   }
 }
 

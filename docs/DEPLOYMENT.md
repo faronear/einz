@@ -221,6 +221,10 @@ npm run backup -- --verify
 npm run restore -- data/backups/backup-<ts>.json
 ```
 
+- 恢复会**先删后写**：`files/` 整个清空重建，库写到 `EINZ_DB` 指向的文件
+  （默认 `data/einz.sqlite.db`，连 `-wal`/`-shm` 一起删，避免旧 WAL 被重放进恢复的库）。
+  备份里的 `app.db` 只是内部条目名，不是落盘文件名。
+
 - **为什么用 SQLite Backup API**：`einz.sqlite.db` 运行中直接复制可能损坏；Backup API 在线备份安全（DATABASE.md §6）。
 - **演练建议**：定期执行"备份 → 删除 data → 恢复 → 重启验证消息仍在"（Phase 4 已提供完整演练流程，见 `cli/test/phase4_e2e.sh` 步骤 9–10 及 worklog）。
 - **备份密钥保管**：与服务器数据分开存放（如密码管理器）；丢失密钥 = 备份不可恢复。
