@@ -1,0 +1,10 @@
+# Flutter-related
+**/Flutter/ephemeral/
+**/Pods/
+
+# Xcode-related
+**/dgph
+**/xcuserdata/
+
+# 1024 母版图标不入 git（老板决策；源文件在 app/assets/logo.png）
+Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png
