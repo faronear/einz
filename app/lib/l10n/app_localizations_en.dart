@@ -716,6 +716,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageVoicePermissionDenied =>
+      'Microphone permission denied. Please enable it in system settings.';
+
+  @override
+  String get chatPageVoiceEmpty => 'Recording was empty and was discarded.';
+
+  @override
   String get chatPageLongPressToRecord => 'Long press to record';
 
   @override

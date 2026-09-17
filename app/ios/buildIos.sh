@@ -25,6 +25,18 @@ readonly PROFILE_ADHOC="Einz Dist Adhoc"
 readonly PROFILE_STORE="Einz Dist AppStoreConnect"
 readonly DEFAULT_DEVICE="00008030-0005306011F9402E" # iPhone 11（luk_ip11_210700）
 
+# 统一用 Xcode 26.3（iOS 26.2 SDK）：
+#   · appstore 渠道是硬要求——Apple 自 2026-04-28 起只收 iOS 26 SDK 起的包；
+#   · adhoc 渠道跟着一起切，免得本地装机版本与上架版本在 iOS 26 设备上
+#     原生 UI/行为不一致，测出来的结论不可信。
+# 本机 iMac19,1 上不了 macOS 26 Tahoe，Xcode 天花板就是 26.3（26.4.1+ 要 Tahoe 26.2+）。
+# 想临时换回系统默认的 Xcode 16.1：DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer …
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode26.3.app/Contents/Developer}"
+if [[ ! -d "${DEVELOPER_DIR}" ]]; then
+  echo "❌ 找不到 ${DEVELOPER_DIR}（Xcode 26.3）。装好后重跑，或用 DEVELOPER_DIR 指定别的位置" >&2
+  exit 1
+fi
+
 # ---------- 参数解析 ----------
 CHANNEL="${1:-}"
 if [[ "${CHANNEL}" != "adhoc" && "${CHANNEL}" != "appstore" ]]; then
@@ -144,17 +156,18 @@ echo "✅ 描述文件: ${PROFILE_NAME}"
 # 与其打完包才在上传时被拒，不如开局就拦住。Ad Hoc 走 devicectl 直装，不受此限，
 # 所以只在 appstore 渠道硬拦；adhoc 渠道仅打印供参考。
 readonly MIN_SDK_MAJOR_STORE=26
-XCODE_DEV="$(xcode-select -p 2>/dev/null || true)"
 SDK_VERSION="$(xcrun --show-sdk-version --sdk iphoneos 2>/dev/null || true)"
 SDK_MAJOR="${SDK_VERSION%%.*}"
-echo "▶ Xcode: ${XCODE_DEV}（iOS SDK ${SDK_VERSION:-未知}）"
+echo "▶ Xcode: ${DEVELOPER_DIR}（iOS SDK ${SDK_VERSION:-未知}）"
 if [[ "${CHANNEL}" == "appstore" ]]; then
   if [[ -z "${SDK_MAJOR}" ]] || (( SDK_MAJOR < MIN_SDK_MAJOR_STORE )); then
     cat >&2 <<ERR
 ❌ 当前 iOS SDK 是 ${SDK_VERSION:-未知}，App Store Connect 只收 iOS ${MIN_SDK_MAJOR_STORE} SDK 起的包。
-   换用带 iOS 26 SDK 的 Xcode 再跑（只影响这一条命令，不动全局默认）：
+   换个带 iOS 26 SDK 的 Xcode（只影响这一条命令）：
      DEVELOPER_DIR=/Applications/Xcode26.3.app/Contents/Developer npm run app-ios-build-appstore
-   或全局切换：sudo xcode-select -s /Applications/Xcode26.3.app/Contents/Developer
+   若报 "iOS xx is not installed"：该 Xcode 的 iOS 平台组件没装，
+   Xcode 26.3 → Settings → Components → 装 iOS；或
+   DEVELOPER_DIR=/Applications/Xcode26.3.app/Contents/Developer xcodebuild -downloadPlatform iOS
    （本机 iMac19,1 上不了 macOS 26 Tahoe，Xcode 天花板是 26.3，别去下载 26.4.1+）
 ERR
     exit 1

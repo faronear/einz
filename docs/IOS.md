@@ -15,13 +15,32 @@
 | Team ID | **`CQ6733CTMV`** | Faronear Co. Ltd.（**付费**账号） |
 | 签名证书 | `Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)` | SHA-1 `5914DE2D…`，2026-09-14 → **2027-09-14**；私钥 `FaronearPrikey` 在本机登录钥匙串 |
 | Ad Hoc profile | **`Einz Dist Adhoc`**（UUID `458acdea-…`） | 1 年，含 iPhone 11 + iPhone XR + 一台旧设备；**已装在本机** |
-| App Store profile | `Einz Dist AppStoreConnect` | 1 年，**同 bundle id**（当前不上架，备用）；**本机尚未安装**（2026-09-14 核）——走 `appstore` 渠道前要先从开发者后台下载并放进 `~/Library/MobileDevice/Provisioning Profiles/` |
+| App Store profile | **`Einz Dist AppStoreConnect`**（UUID `eb4be29b-…`） | 1 年，**同 bundle id**；**已装在本机**（2026-09-17 装） |
+| 本机 Xcode | **26.3**（iOS 26.2 SDK），`/Applications/Xcode26.3.app` | App Store 上传的硬要求（iOS 26 SDK 起）；Ad Hoc 也已统一用它，见 §0.1 |
 | 证书/密钥保管位置 | `/Volumes/repodisk/simsim_key/cert-apple-苹果应用证书/20260914/` | `.p12` + `.cer` + CSR + 口令文件（`3_certpassword.simsim.js`）——**勿入 git** |
 | 生产服务器 | `https://einz.tic.cc` | 代码默认值，真机开箱可用 |
 | 部署目标 | iOS 15.0 | |
 | 本机 Flutter | 3.47.2（`~/development/flutter`） | 需 `export PATH="$HOME/development/flutter/bin:$PATH"` |
 | SPM | **必须关闭** | `flutter config --no-enable-swift-package-manager`（用 CocoaPods + 本地 libsodium pod） |
 | APNs 推送 | **未接入** | 工程缺 Push Notifications capability（无 entitlements 文件，无 `aps-environment`）；服务端 `sendPushHint` 仍为日志占位。不影响聊天（WS 兜底）。**与分发方式无关**：Ad Hoc 与 App Store 都是 production 环境，装了能力两边都能推（见 §4.2） |
+
+### 0.1 Xcode 版本：26.3 是本机天花板
+
+- Apple 自 **2026-04-28** 起，上传 App Store Connect 的包必须用 **iOS 26 SDK 起**（Xcode 26+）；
+  用 iOS 18 SDK 编的包会被 Transporter 拒：`SDK version issue ... must be built with the iOS 26 SDK or later`。
+- 打包机是 **iMac19,1（Intel i5-8500）**，停在 macOS 15.7.7 Sequoia，**上不了 macOS 26 Tahoe**
+  （Tahoe 的 Intel iMac 只认 2020 款），而 Xcode 26.4.1+ 要求 macOS 26.2+ →
+  **本机最高只能用 Xcode 26.3**（要求 macOS 15.6–26.x，带 iOS 26.2 SDK）。别去下 26.4.1+。
+  > 下载页上的 "universal" 包只说明二进制含 x86_64，**不降低 macOS 要求**。
+- 新装的 Xcode 还要单独装 **iOS 平台组件**，否则 `xcodebuild` 报
+  `iOS 26.2 is not installed ... download and install the platform`：
+  Xcode 26.3 → Settings → Components → 装 iOS；或
+  `DEVELOPER_DIR=/Applications/Xcode26.3.app/Contents/Developer xcodebuild -downloadPlatform iOS`。
+- `buildIos.sh` 里已固定 `DEVELOPER_DIR=/Applications/Xcode26.3.app/...`（可用环境变量覆盖），
+  两个渠道都走 26.3，且 appstore 渠道开局校验 SDK ≥ 26。
+- **注意**：Xcode 16.1（iOS 18 SDK）已不能用于打包——`device_info_plus` 13.x 用了
+  `@available(iOS 26.1, *)` 的 API，旧 SDK 编译不过（早期靠删 pub cache 绕过，现已复原，
+  26.3 可直接编过）。
 
 ### ⚠️ 与旧版的两处关键差异
 
@@ -201,7 +220,7 @@ xcrun altool --upload-app -f build/ios/ipa/einz.ipa -t ios \
 | `pod install` 未执行 / `Podfile.lock` 无 libsodium | 同上，先关 SPM 再构建 |
 | `Missing package product 'FlutterGeneratedPluginSwiftPackage'` | pbxproj 曾残留 Flutter SPM（3.35+ 默认开启）生成的 Swift Package 引用，禁用 SPM 后残留导致构建失败；**已随仓库修复**（8 处引用全删）。旧副本请拉最新代码，或手工删 `XCLocalSwiftPackageReference` / `XCSwiftPackageProductDependency` / `packageReferences` / `packageProductDependencies` 相关段落 |
 | 杀进程后收不到消息提示 | APNs 未接入 → 打开 App 时靠 WS／增量同步补齐（见 §0） |
-| 「必须升级 Xcode 才能装 iOS 26 真机」 | **不成立**（2026-09-14 实测）：Xcode 16.1 + iOS 26.3.1 的 iPhone 11，开发安装与 Ad Hoc 安装均成功 |
+| 「必须升级 Xcode 才能装 iOS 26 真机」 | **装真机本身不需要**（2026-09-14 实测：Xcode 16.1 + iOS 26.3.1 的 iPhone 11，开发安装与 Ad Hoc 安装均成功）。但**打包现在必须用 Xcode 26.3**——否则上传 App Store 被拒，见 §0.1 |
 | 磁盘紧张 | `rm -rf ~/Library/Developer/Xcode/DerivedData`（可占数 GB） |
 
 ---

@@ -680,6 +680,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageVoicePermissionDenied => '麦克风权限被拒绝，请到系统设置里开启。';
+
+  @override
+  String get chatPageVoiceEmpty => '录音内容为空，已丢弃。';
+
+  @override
   String get chatPageLongPressToRecord => '长按开始录音';
 
   @override

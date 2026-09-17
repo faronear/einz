@@ -2515,8 +2515,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (_playingMessageId != null) _playingMessageId = null;
       if (_audioStartedMessageId != null) _audioStartedMessageId = null;
       await _player?.stop();
+      final recorder = (_recorder ??= AudioRecorder());
+      // 安卓端 start() 不会自动申请 RECORD_AUDIO 运行时权限（manifest 静态声明
+      // 不够，Android 6.0+ 需动态授权），必须先 hasPermission() 显式申请，
+      // 否则无权限设备上 AudioRecord 初始化失败：要么 start 抛错（无波形），
+      // 要么读到全零数据（波形极小、文件 0 字节发不出）。
+      if (!await recorder.hasPermission()) {
+        if (!mounted) return;
+        showTopNotice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
+        return;
+      }
       final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await (_recorder ??= AudioRecorder()).start(const RecordConfig(), path: path);
+      await recorder.start(const RecordConfig(), path: path);
       // 振幅流：实时驱动录音条波形（record 插件内部无订阅者时不做事）
       _voiceSamples.clear();
       _recordSeconds = 0;
@@ -2563,6 +2573,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ok = await f.exists() && await f.length() > 0;
       }
       if (!mounted) return;
+      // 空录音（权限被系统拒后仍可能走到这里）不再静默回文字态，给明确反馈
+      if (!ok) showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceEmpty);
       setState(() {
         _inputMode = ok ? _InputMode.preview : _InputMode.text;
         if (!ok) _recordingPath = null;

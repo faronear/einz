@@ -1352,6 +1352,18 @@ abstract class AppLocalizations {
   /// **'Recording failed: {error}'**
   String chatPageVoiceFailed(String error);
 
+  /// No description provided for @chatPageVoicePermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission denied. Please enable it in system settings.'**
+  String get chatPageVoicePermissionDenied;
+
+  /// No description provided for @chatPageVoiceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording was empty and was discarded.'**
+  String get chatPageVoiceEmpty;
+
   /// No description provided for @chatPageLongPressToRecord.
   ///
   /// In en, this message translates to:
