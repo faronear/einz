@@ -6961,3 +6961,17 @@ stamp=0（干净下线/已撤销）时干脆不显示时间。
 
 顺带发现：`cli/demo/config.json` 是 v1 遗留的静态白名单样本（space_id + devices 数组），
 demo/ 整个目录已被忽略，全仓无引用。要不要删等老板发话。
+
+## 2026-09-17 删 v1 遗留（老板拍板）
+
+删两处，保留其余（提交 9a6d627）：
+- `cli/demo/config.json`：v1 静态白名单样本（space_id + devices 数组），无引用；
+  顺手把 `cli/demo/.gitignore` 里那条 `config.json` 也清了。
+- `docs/SETUP.md`：v1《一次性配置手册》设计稿（174 行；config.json 白名单 + 密保信封离线
+  分发 + `init/config/import/enroll` 命令，载体 `cli/bin/einz.dart` 早已删）。引用同步：
+  README 文档表删该行、DEPLOYMENT §头部改指向 ONBOARDING.md、§4 开头改成自述 v2 要点。
+
+**没删的（别再误伤）**：`cli/demo/store-a.json` / `store-b.json` 被 `cli/test/` 里的探针
+（order_check / timestamp_check / auto_sync_probe）与 demo/run_a.sh、run_b.sh 引用；
+`demo/s1..s4`、`st1/st2` 被 npm 的 `tui*-dev` / `tui*-prod` 脚本引用；
+`demo/envelope-b.txt` 判定不清（v2 仍保留"信封密封"离线备用路径），留着。
