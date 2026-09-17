@@ -1018,7 +1018,7 @@
 **并发协调记录：**
 
 - 老板同一工作区同步改文案（「PIN 锁屏码」→「锁屏码」，含 ARB/生成文件/app_lock 异常串/lock+setup+menu 测试断言），其 WIP 中间态曾致 4 个 PIN 测试瞬红——A/B（stash 我的改动）证实与我的菜单样式无关，根因是 ARB 改名后测试断言未同步 + 未提交的生成文件中间态
-- chat_page_menu_test 退出弹窗断言同步 523d25a 新文案（「将彻底关闭应用。」→「将在本设备上退出我的秘境。下次启动可重新进入。」）
+- chat_page_menu_test 退出弹窗断言同步 523d25a 新文案（「将彻底关闭应用。」→「即将退出我的秘境。下次启动可重新进入。」）
 - 老板选择「我代为分两个 commit 收尾」：① b579172 文案批次（含 test 文件锁屏码断言与退出断言）② 本次样式（chat_page.dart + 本条注记）
 - `server_settings.dart` 的 `kEinzServer = http://localhost:3000` 为老板本地测试配置（源码注释「不要 commit」），始终不入库
 
@@ -1059,7 +1059,7 @@
 
 - `lock_page.dart`：新增 `_buildMenu`（PopupMenuButton：语言行「界面语言 中文」= Row 标签淡灰 + Spacer + 当前值；退出行；中间 PopupMenuDivider）、`_showLocalePicker`（复用 LocaleSettings 底部弹层，即时生效）、`_showExitAppDialog`（确认后 exit(0)）；两个 Scaffold（正常解锁表单 + \_noLock 兜底页）AppBar 均挂 ⋯ 菜单；onSelected 沿用 300ms 延迟防 MenuRoute/DialogRoute 交叉卸载断言
 - `setup_page.dart` 身份卡片：`title: Text(aName.isEmpty ? wizardIdentityCreator : aName)`（bName 同）；不再拼接「名字 (身份)」
-- 测试同步：widget_test/setup_probe_retry_test 的「Einz 秘境：创建中：名字」→「创建中：我」（老板文案 名字→我）；4 个测试文件 5 处 `find.textContaining('秘境创建者')` → `find.text('Lukas')`（身份卡有名字只显名字）；golden_render_test 退出弹窗断言「将彻底关闭应用。」→「将在本设备上退出我的秘境。下次启动可重新进入。」（HEAD 已过期，顺手修）
+- 测试同步：widget_test/setup_probe_retry_test 的「Einz 秘境：创建中：名字」→「创建中：我」（老板文案 名字→我）；4 个测试文件 5 处 `find.textContaining('秘境创建者')` → `find.text('Lukas')`（身份卡有名字只显名字）；golden_render_test 退出弹窗断言「将彻底关闭应用。」→「即将退出我的秘境。下次启动可重新进入。」（HEAD 已过期，顺手修）
 
 **验证：** flutter analyze 0 issue（仅 1 既有 info lint）；全部功能测试通过（含 lock_page/menu/join/envelope/probe_retry/widget/invite_dialog）；11 个 golden 像素失配保持红不重刷（政策：禁止 --update-goldens；本轮文案 + 身份卡 + 锁屏 ⋯ 图标均影响渲染，需老板定夺是否后续统一重刷）。
 
@@ -6610,6 +6610,7 @@ person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落
 `app_lock.profile` 快照，`chat_page` 拿它兜底。）
 
 **方案**（对齐 App 的"预置名快照"）：
+
 - `cli/lib/store.dart`：`DeviceStore` 新增 `peerName`（落盘键 `peer_name`）。
 - `cli/bin/einz_tui.dart`：
   - 删掉死变量 `partnerPresetName`；
@@ -6620,6 +6621,7 @@ person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落
 - 名字来源以服务端为准：对方加入后 `personNames` 优先，本字段只是未加入/离线时兜底。
 
 **顺带收口**（老板 2026-09-16 拍板"把 peerName 纳入判据"）：
+
 - `/myname` 的"不许与对方同名"判据除 `personNames` 里的对方，再算上 `store.peerName`
   （对方未加入时 person 表里没有他，此前可把自己改成与伴侣预置名相同——加入方按名字
   选身份时会撞"存在同名成员"）。
@@ -6631,6 +6633,7 @@ person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落
 **探针对齐**（`cli/test/presence_check.py` 已失效：① `2/2台在线` 是旧格式，现为 `#1/1`
 ——本机由 `@设备名` 独立、计数扣除本机（`b6e6af0` 同一提交内末尾改的格式，探针没跟上）；
 ② 拿 `'● - #'` 当"对方在线"哨兵，对方名字不再是 `-` 后失效）。改动：
+
 - 新增 `title_bar()`/`split_bar()`：按行取标题栏、以 `Einz TUI` 切三段分别断言（此前整帧
   子串匹配会把左段"对方"与右段"我"混在一起）。
 - 基线断言改为左段 == `○ Alice`（本修复的回归点）、右段无计数；
@@ -6641,6 +6644,7 @@ person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落
 
 **验证**：`dart analyze`(cli) 全绿；`dart test test/store_person_cache_test.dart` 3 项全过
 （新增 peerName 落盘往返用例）。**端到端实测**：
+
 1. 临时 pty 脚本（/tmp）——create（我 Lukas / 伴侣 Alice）→ 聊天态顶部条
    `○ Alice …… Einz TUI …… ● Lukas @DoomBase`；杀进程重启（读回 store）仍是 `○ Alice`。
 2. `python3 cli/test/presence_check.py` 全过：基线 `○ Alice` + 右段无计数 →
@@ -6657,10 +6661,10 @@ person_id 为 NULL（`server/src/spaces.ts:135`），要等加入者登记才落
 
 **核实**（老板中途澄清"App 会清空，TUI 不一定"——**澄清正确**）：
 
-| | 库被清空后重连 |
-| --- | --- |
+|     | 库被清空后重连                                                                                                                                                                           |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | App | `_reauthWithRevokedFallback` 把任何 `code=='FORBIDDEN'` 当撤销 → `_onDeviceRevoked`：清锁包+localMessages+localAttachments+syncState+媒体缓存+附件明文 → SetupPage（**真删，不可恢复**） |
-| TUI | 只清 session token + 打印"本设备已被撤销。"后 exit；**store/历史一条没删**（全仓确认 cli 无任何删除 store 的代码） |
+| TUI | 只清 session token + 打印"本设备已被撤销。"后 exit；**store/历史一条没删**（全仓确认 cli 无任何删除 store 的代码）                                                                       |
 
 **根因**（服务端语义塌缩）：`createChallenge`（`auth.ts`）与 `requireSession`（`guard.ts`）
 对"devices 表没这行"和"行存在但 status=revoked"都抛 `403 FORBIDDEN`（`isActiveDevice`
@@ -6837,6 +6841,7 @@ v1 静态白名单早废。
 的"本地化文件"清单去掉 `deployment/config/`。
 
 保留未动的两处（等老板定夺）：
+
 - `server/src/backup.ts` 仍认 `EINZ_CONFIG`（`existsSync` 已守卫，缺失就跳过该 entry）；
   恢复侧 `entry.path === "config.json"` 分支同理——只影响"恢复 v1 老备份"这一条路径。
 - `.gitignore:21 deployment/config/` 故意留着：VPS 旧目录若还在，至少不会污染 git status。
@@ -6850,6 +6855,7 @@ v1 静态白名单早废。
 `server/einz_server_config.json`（容器里 = `/app/einz_server_config.json`，镜像里没有）。
 
 已改（提交 2d37195）：
+
 - `server/src/config.ts`：`readFileConfig()` 路径改为 `process.env.EINZ_CONFIG ?? 默认路径`
   ——`EINZ_CONFIG` 这个名字是复用的（备份侧刚把它删掉，名字空出来了）；顺手把告警文案里的
   "config.json" 改成 "einz_server_config.json"。
@@ -6861,6 +6867,7 @@ v1 静态白名单早废。
 设了 → 2）；两个 compose `docker compose config` 解析通过。
 
 **顺带查出两个恢复侧的既有 bug（不是本次改动引入，等老板定夺）**：
+
 1. 备份里 files 条目的 path 是 `aa/bb.bin`（`collectFilesRecursive` 用 `relative(filesDir, …)`，
    没有 `files/` 前缀），而 `restoreBackup` 只认 `startsWith("files/")` → **附件永远恢复不回来**。
 2. 恢复把库写成 `data/app.db`，而服务读的是 `data/einz.sqlite.db` → **恢复后库不生效**
@@ -6869,6 +6876,7 @@ v1 静态白名单早废。
 ## 2026-09-17（再续）恢复 bug 修复 + 本机配置迁到 server/config/
 
 **恢复侧两个既有 bug 已修**（提交 a624555，老板 2026-09-17 拍板）：
+
 1. `restoreBackup` 把库写成 `data/app.db`，而服务读 `EINZ_DB`（默认 einz.sqlite.db）
    → 恢复等于没恢复。改成写 `paths.db`，并连 `-wal` / `-shm` 一起先删（残留 WAL 会被
    SQLite 重放进刚恢复的库，恢复出"半新半旧"的数据）。
@@ -6897,12 +6905,13 @@ ONBOARDING×1 同步。现在本机与部署都是"config/ 目录 + 同名文件
 命名理由（供以后参考）：目录已经叫 `config/`，文件名再带 `einz_server_` 前缀是重复；
 且容器里挂的就是 `/config/serverConfig.json`，本机/部署两处同名同形。
 
-## 2026-09-17 app 本地配置改名 localConfig.*.json
+## 2026-09-17 app 本地配置改名 localConfig.\*.json
 
 老板 FYI：他已加 `server/config/serverConfig.example.json`，并把根 .gitignore 收窄成只忽略
 `config/serverConfig.json`（模板入库）。
 
 本任务：app 侧同构改名（提交 fcedcb2）：
+
 - 文件：`app/localConfig.example.json`（git mv，入库模板）、`localConfig.ios.json` /
   `localConfig.android.json`（gitignore，本机文件）；
 - `app/.gitignore`：`/localConfig.*.json` + `!/localConfig.example.json` + `/localConfig.json`
@@ -6928,7 +6937,7 @@ example 不被忽略；全仓（除 server/dist 构建产物与 aimemo 历史）
 - 行样式（同一时刻在 Asia/Shanghai 与 America/New_York 各跑一遍验证）：
   - `  1) 🟢 DoomBase [ali] 在线 since 20:40 (20260917T124005Z)`
   - `  2) ⚪ MacBook [bob] 离线 (上次活跃 昨天 08:12 / 20260916T001230Z)`
-    离线那一组外层已有括号 → UTC 用 ` / ` 接在同一组里，不套第二层括号。
+    离线那一组外层已有括号 → UTC 用 `/` 接在同一组里，不套第二层括号。
 - 验证：`flutter analyze`(cli) 干净。
 
 ## 2026-09-17 TUI 设备时间：离线也用 since
@@ -6940,7 +6949,7 @@ example 不被忽略；全仓（除 server/dist 构建产物与 aimemo 历史）
 但 `GET /devices` 没带出来（要的话是服务端加字段，另议）。
 
 按老板指示改：离线的 `(上次活跃 …)` → `离线 since …`，与在线同一措辞，UTC 也回到括号里
-（不再用 ` / ` 特例），两个分支合并成一个 `stamp`：
+（不再用 `/` 特例），两个分支合并成一个 `stamp`：
 `  2) ⚪ MacBook [bob] 离线 since 昨天 08:38 (20260916T003800Z)`；
 stamp=0（干净下线/已撤销）时干脆不显示时间。
 
@@ -6949,6 +6958,7 @@ stamp=0（干净下线/已撤销）时干脆不显示时间。
 老板问 cli/config.json 是"覆盖"还是"定义默认" → 答：**它本身就是优先级链里的一级**
 （`--server` > store 持久化值 > config.json > 硬编码 einz.tic.cc），只是入库且值与硬编码相同，
 所以是个空操作。按 app 侧同构改成真·本机配置（提交 458b1a5）：
+
 - `cli/config.json`（入库）→ `cli/localConfig.example.json`（模板，`git mv`）；
 - 真配置 `cli/localConfig.json` 加入根 .gitignore（已在本机用原值 `{"server":"https://einz.tic.cc"}`
   生成一份，不入库）；`_defaultServer()` 改读 `localConfig.json`；`cli/build.sh` 提示文案同步。
@@ -6965,6 +6975,7 @@ demo/ 整个目录已被忽略，全仓无引用。要不要删等老板发话�
 ## 2026-09-17 删 v1 遗留（老板拍板）
 
 删两处，保留其余（提交 9a6d627）：
+
 - `cli/demo/config.json`：v1 静态白名单样本（space_id + devices 数组），无引用；
   顺手把 `cli/demo/.gitignore` 里那条 `config.json` 也清了。
 - `docs/SETUP.md`：v1《一次性配置手册》设计稿（174 行；config.json 白名单 + 密保信封离线

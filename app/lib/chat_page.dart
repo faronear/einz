@@ -859,7 +859,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 靠左对齐——本弹窗除二维码外其余内容均靠左
               const Align(
                 alignment: Alignment.centerLeft,
-                child: Text('新设备必须验证邀请码，才能绑定到当前秘境。24 小时内一次性有效。',
+                child: Text('邀请新设备加入当前秘境。24 小时内一次性有效。',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
               const SizedBox(height: 12),

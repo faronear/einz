@@ -203,7 +203,7 @@
     }
   },
   "chatPageExitTitle": "退出秘境？",
-  "chatPageExitMessage": "将在本设备上退出我的秘境。下次启动可重新进入。",
+  "chatPageExitMessage": "即将退出我的秘境。下次启动可重新进入。",
   "save": "保存",
   "chatPageChangePassphraseTitle": "修改口令",
   "chatPageChangePassphraseSubmit": "修改",
