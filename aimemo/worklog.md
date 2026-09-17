@@ -6812,3 +6812,14 @@ B 以伴侣身份加入后 A 的 `/devices` 显示「同空间 2 台」，含本
 回归重跑 `presence_check.py`（4 项）、`revoked_check.py`（4 场景）仍全绿。
 
 **仍待办**：App 里的设备列表 + 撤销入口（服务端规则与 `ApiClient.revokeDevice` 已就绪）。
+
+## 2026-09-17 TUI 设备时间改 UTC
+
+老板在中、美两台主机上用，同一个 `/devices` 输出的时间按各自本地时区显示 → 对不上。
+`_fmtTime`（今天 HH:mm / 昨天 HH:mm / M/d HH:mm）改为 `_fmtDeviceTime`，输出
+`2026-02-26T12:35:56Z`（`isUtc: true`，秒级，末尾 Z）；`last_seen <= 0` 的守卫保留
+（否则会打印 1970-01-01）。影响面只有 `/devices` 与 `/revoke` 的列表行（`since …` 与
+`（上次活跃 …）`），消息时间戳仍是本地时区，未动。
+
+验证：`flutter analyze`(cli) 干净；另用临时脚本在默认时区与 `TZ=America/New_York` 下
+各跑一次，同一 epoch 输出逐字一致。
