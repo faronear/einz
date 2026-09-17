@@ -50,18 +50,18 @@ npm run dev
 
 ```bash
 cd app
-cp local_config.example.json local_config.json   # 按需修改里面的 kEinzServer
-flutter run --dart-define-from-file=local_config.json   # flutter run/build 都支持此参数
+cp localConfig.example.json localConfig.json   # 按需修改里面的 kEinzServer
+flutter run --dart-define-from-file=localConfig.json   # flutter run/build 都支持此参数
 ```
 
-- 本仓有**三个**本机配置文件，都不入 git（已 .gitignore），只有模板 `local_config.example.json` 入库：
-  - `app/local_config.ios.json` / `app/local_config.android.json` —— **分平台**，被下方 npm 脚本直接引用；
-  - `app/local_config.json` —— 通用，手动加 `--dart-define-from-file=local_config.json` 时用。
+- 本仓有**三个**本机配置文件，都不入 git（已 .gitignore），只有模板 `localConfig.example.json` 入库：
+  - `app/localConfig.ios.json` / `app/localConfig.android.json` —— **分平台**，被下方 npm 脚本直接引用；
+  - `app/localConfig.json` —— 通用，手动加 `--dart-define-from-file=localConfig.json` 时用。
 - 打包入口：iOS release 用 `npm run build-prod-ios`（连生产服务器 einz.tic.cc）；Ad Hoc 安装包用
   `npm run build-ios-adhoc`（含 `--install` 变体），App Store 用 `npm run build-ios-appstore` /
   `npm run upload-ios-appstore`；Android 用 `npm run build-prod-apk`。
 - 本机调试（已含 `--dart-define-from-file`，指向 localhost:3000）：iOS 模拟器 `npm run ios-run-dev` /
   `ios-run-dev-new`（+ `ios-refresh` 热重载、`ios-reload` 热重启），Android 模拟器 `npm run apk-run-dev` /
   `apk-run-dev-new`。`scripts/build_ios.sh` 已移除，相关能力并入 npm 脚本。
-- 调试入口（手动）：`flutter run --dart-define-from-file=local_config.json -d <UDID>`（run 同样支持）
+- 调试入口（手动）：`flutter run --dart-define-from-file=localConfig.json -d <UDID>`（run 同样支持）
 - 服务端对应：`server/config/serverConfig.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）

@@ -71,7 +71,7 @@ if (cfg.max_spaces === 0) {
 }
 
 /** 邀请链接 base：按请求真实地址（Host + x-forwarded-proto）生成——TUI
- *  --server http://localhost:3000 / app local_config.json 覆盖服务器地址时，
+ *  --server http://localhost:3000 / app localConfig.json 覆盖服务器地址时，
  *  邀请链接与客户端实际使用的服务器一致（不再硬编码 einz.tic.cc，2026-09-11）。 */
 function requestBaseUrl (req: IncomingMessage): string {
   const proto = String(req.headers['x-forwarded-proto'] ?? 'http')

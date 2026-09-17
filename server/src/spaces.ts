@@ -19,7 +19,7 @@ const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvw
 const TOKEN_TTL_MS = 24 * 3600 * 1000; // token 默认 24h（老板 2026-09-10 拍板）
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // join 签发 session 有效期（同 v1）
 // 邀请链接 base（兜底值）：正常由服务端按请求真实 Host 生成（TUI --server /
-// app local_config.json 覆盖服务器地址时链接同步正确，老板 2026-09-11）
+// app localConfig.json 覆盖服务器地址时链接同步正确，老板 2026-09-11）
 const DEFAULT_LINK_BASE = "https://einz.tic.cc";
 
 /** base58url 编码（无歧义字符集；32B 随机数 → 43~44 字符）。 */
