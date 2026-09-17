@@ -1,29 +1,46 @@
 #!/usr/bin/env node
-// 把「设备名@系统版本」或 UDID 解析成本机真实存在的模拟器 UDID（供 emuBootIos.sh 调用）。
+// 把「短名@系统版本」解析成本机真实存在的模拟器 UDID（供 emuBootIos.sh 调用）。
 //
-// 跨机器可移植：不依赖写死的 UDID——UDID 是每台 Mac 各自生成的，换机器就失效。
-// 设备名（"iPhone 16"）和系统版本（26.3）是 Xcode 自带的，任何机器上都能查到。
+//   node scripts/emuResolveIos.js ip16@26.3        # 短名（见下面别名表）
+//   node scripts/emuResolveIos.js "iPhone 16@26.3" # 写机型全名也行
+//   node scripts/emuResolveIos.js "iPhone 16"      # 不给版本 → 取系统版本最高的那台
+//   node scripts/emuResolveIos.js FF429526-…       # 本来就是 UDID → 原样返回
 //
-//   node scripts/emuResolveIos.js "iPhone 16@26.3"   # 机型 + 系统版本
-//   node scripts/emuResolveIos.js "iPhone 16"        # 同名多台 → 取系统版本最高的
-//   node scripts/emuResolveIos.js FF429526-A7EE-…    # 本来就是 UDID → 原样返回
+// 为什么不用 UDID：UDID 是每台 Mac 各自生成的，换台机器就失效。
+// 机型名 + 系统版本是 Xcode 自带的，任何机器上都能查到，所以跨机器可移植。
+//
+// 加短名：改下面的 builtinAlias，或在 package.json 的 config 里加一条
+// （"ipad": "iPad Pro 13-inch (M4)"），config 里的优先。
 
 const { execSync } = require('child_process');
+const path = require('path');
 
-const spec = (process.argv[2] || '').trim();
-if (!spec) {
-  console.error('❌ 需要一个参数：设备名[@系统版本] 或 UDID');
-  process.exit(1);
+const builtinAlias = {
+  ip16: 'iPhone 16',
+  ip16plus: 'iPhone 16 Plus',
+  ip16pro: 'iPhone 16 Pro',
+  ip16pm: 'iPhone 16 Pro Max',
+};
+
+const rootDir = path.resolve(__dirname, '..');
+let pkgConfig = {};
+try {
+  pkgConfig = require(path.join(rootDir, 'package.json')).config || {};
+} catch (error) {
+  pkgConfig = {};
 }
 
-if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spec)) {
-  console.log(spec);
+const input = (process.argv[2] || '').trim() || String(pkgConfig.default || 'ip16@26.3').trim();
+
+if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)) {
+  console.log(input);
   process.exit(0);
 }
 
-const at = spec.lastIndexOf('@');
-const name = (at === -1 ? spec : spec.slice(0, at)).trim();
-const wantVersion = at === -1 ? '' : spec.slice(at + 1).trim().replace(/^iOS\s*/i, '');
+const at = input.lastIndexOf('@');
+const left = (at === -1 ? input : input.slice(0, at)).trim();
+const version = at === -1 ? '' : input.slice(at + 1).trim().replace(/^iOS\s*/i, '');
+const deviceName = pkgConfig[left] || builtinAlias[left.toLowerCase()] || left;
 
 const json = JSON.parse(execSync('xcrun simctl list devices available -j').toString());
 const runtimeKeyFor = (want) => `iOS-${want.replace(/\./g, '-')}`;
@@ -37,18 +54,18 @@ for (const [runtimeKey, devices] of Object.entries(json.devices)) {
   if (!/iOS-/.test(runtimeKey)) {
     continue;
   }
-  if (wantVersion && !runtimeKey.includes(runtimeKeyFor(wantVersion))) {
+  if (version && !runtimeKey.includes(runtimeKeyFor(version))) {
     continue;
   }
   for (const device of devices) {
-    if (device.name.toLowerCase() === name.toLowerCase()) {
+    if (device.name.toLowerCase() === deviceName.toLowerCase()) {
       matched.push({ ...device, runtimeKey });
     }
   }
 }
 
 if (matched.length === 0) {
-  console.error(`❌ 本机没有匹配的模拟器：${spec}`);
+  console.error(`❌ 本机没有匹配的模拟器：${input}（机型「${deviceName}」${version ? ` + iOS ${version}` : ''}）`);
   console.error('   看有哪些：xcrun simctl list devices available');
   process.exit(1);
 }
