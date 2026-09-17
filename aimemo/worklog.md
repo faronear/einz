@@ -6884,3 +6884,15 @@ ONBOARDING×1 同步。现在本机与部署都是"config/ 目录 + 同名文件
 `EINZ_CONFIG` 指到容器 `/config/`。
 ⚠️ **另一台机器（美国）pull 后也要 `mv server/einz_server_config.json server/config/`**，
 否则静默走默认值 maxSpaces=0（=不限），与文件里写的值不一致时最难查。
+
+## 2026-09-17（末）配置文件定名 serverConfig.json
+
+- `.gitignore` 保持集中在根目录（老板确认：不建 `server/.gitignore`）。
+- 服务端配置文件改名：`einz_server_config.json` → **`serverConfig.json`**（提交 8fb915e）。
+  本机 `server/config/serverConfig.json`（已 `mv`），部署 `deployment/config/serverConfig.json`
+  → 容器 `/config/serverConfig.json`（`EINZ_CONFIG`）。`config.ts` 默认路径、两个 compose、
+  README×2 / DEPLOYMENT×5 / ONBOARDING×1 全部同步；全仓已无 `einz_server_config` 残留。
+- 验证：tsc 干净；`npm test`(server) 全绿；默认路径文件存在；两个 compose 解析通过。
+
+命名理由（供以后参考）：目录已经叫 `config/`，文件名再带 `einz_server_` 前缀是重复；
+且容器里挂的就是 `/config/serverConfig.json`，本机/部署两处同名同形。
