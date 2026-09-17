@@ -1,7 +1,6 @@
 # demo 为本地体验环境：只忽略数据文件（密钥/临时 DB/日志），
 # 脚本（setup/run_a/run_b/stop）与 .gitignore 本身入库。
 s*.json
-config.json
 envelope-*.txt
 app.db*
 *.pid

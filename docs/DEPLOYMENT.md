@@ -2,7 +2,7 @@
 
 > **状态：** v1.0（Phase 0–4 完成后整理，命令均经本机实测）
 > **适用场景：** 从零部署 Einz 并开始试用——服务器（Docker Compose + Caddy 或裸 Node）+ 两台设备（当前 CLI 测试端 / Flutter App）。
-> **关联文档：** `docs/E2EE.md`（密码学）、`docs/PROTOCOL.md`（协议）、`docs/DATABASE.md`（存储）、`docs/SETUP.md`（一次性配置的设计稿；本文档给出命令级实作）。
+> **关联文档：** `docs/E2EE.md`（密码学）、`docs/PROTOCOL.md`（协议）、`docs/DATABASE.md`（存储）、`docs/ONBOARDING.md`（AB 互通操作手册）。
 
 ---
 
@@ -189,7 +189,8 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 
 ## 4. 接入闭环（v2 要点）
 
-`SETUP.md`（v1 设计稿）已归档，当前流程见 §2.2。要点重申：
+v1 时代那份《一次性配置手册》（静态白名单 config.json + 密保信封离线分发 Space Key 的
+设计稿）已随 Multiverse 删除——当前流程看 `docs/ONBOARDING.md` 与本文 §2.2。要点重申：
 
 1. **身份密钥**：客户端首启生成 X25519 密钥对，私钥只留在设备（App 用 Keychain/Keystore，
    TUI store 是明文 JSON 的测试驱动）。

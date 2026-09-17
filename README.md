@@ -29,7 +29,6 @@ aimemo/      记忆与工作空间（productLens / projectPlan / worklog / userP
 | `docs/IOS.md`          | **iOS 构建与真机验证指引（Mac 环境）**                                       |
 | `docs/updateServer.md` | **服务器更新流程（git push/pull 版，另一台电脑照做即可）**                   |
 | `docs/KEY_ESCROW.md`   | **口令托管密钥方案（换设备/朋友接入凭口令，Server 仍只见密文）**              |
-| `docs/SETUP.md`        | 一次性配置设计稿（命令级实作见 DEPLOYMENT.md §2/§4）                         |
 | `docs/REMOTE.md`       | **远程访问 iMac 手册（Apple ID 屏幕共享 + Tailscale 两条路线）**             |
 
 ## 快速开始（Server）
