@@ -22,7 +22,7 @@ deployment/config/
 
 # --- 密钥与配置（禁止提交） ---
 .env
-server/einz_server_config.json
+server/config/
 *.pem
 *.key
 !docs/**/*.key

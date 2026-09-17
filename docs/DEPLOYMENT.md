@@ -78,7 +78,7 @@ dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 输入 A 设置的密保口令（用它从口令密保箱取回 Space Key，同时完成设备登记 + 签发会话）→
 进入会话。
 
-> `server/einz_server_config.json`（不入 git，可选）里 `maxSpaces` 控制**新空间数量上限**：
+> `server/config/einz_server_config.json`（不入 git，可选）里 `maxSpaces` 控制**新空间数量上限**：
 > `0`=不限、`1`=退回单空间、`n`=最多 n 个；改后重启生效。当前为 `0` 时服务端启动会打一条
 > "等于对公网开放建空间"的告警——自用建议设成 1~2。
 
@@ -134,8 +134,9 @@ mkdir -p deployment/config
 echo '{"maxSpaces": 1}' > deployment/config/einz_server_config.json
 ```
 
-> 本机开发（非 Docker）不用管这个目录：直接放 `server/einz_server_config.json`
-> （同名字段，同样不入 git，见 §2.2）。
+> 本机开发（非 Docker）同理：放 `server/config/einz_server_config.json`（同名字段、
+> 同样不入 git，见 §2.2）——两种形态都是"config/ 目录 + einz_server_config.json"，
+> 只是部署时由 `EINZ_CONFIG` 指到容器里的 `/config/`。
 
 ### 3.2 部署步骤
 

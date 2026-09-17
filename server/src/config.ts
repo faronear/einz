@@ -20,14 +20,15 @@ export interface ServerConfig {
   max_spaces: number;
 }
 
-/** 读取 einz_server_config.json（默认 server/einz_server_config.json——本机配置不入
- *  git；可用环境变量 `EINZ_CONFIG` 指向别处，Docker 部署靠它读挂载进来的
- *  /config/einz_server_config.json）。服务端每次启动读取一次（改配置需重启生效；
- *  文件缺失或解析失败按默认值处理）。当前支持字段：maxSpaces。 */
+/** 读取 einz_server_config.json（默认 server/config/einz_server_config.json——本机配置
+ *  不入 git；可用环境变量 `EINZ_CONFIG` 指向别处，Docker 部署靠它读挂载进来的
+ *  /config/einz_server_config.json，两种形态都是"config/ 目录 + 同名文件"）。
+ *  服务端每次启动读取一次（改配置需重启生效；文件缺失或解析失败按默认值处理）。
+ *  当前支持字段：maxSpaces。 */
 let fileConfigCache: { maxSpaces?: number } | null = null;
 function readFileConfig(): { maxSpaces?: number } {
   if (fileConfigCache != null) return fileConfigCache;
-  const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../einz_server_config.json");
+  const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../config/einz_server_config.json");
   if (existsSync(path)) {
     try {
       fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as { maxSpaces?: number };
