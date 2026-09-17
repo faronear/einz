@@ -316,7 +316,7 @@ curl -X POST http://127.0.0.1:3000/devices/dev-b1/revoke \
 
 ### 9.1 代码传输：git pull（主推）——VPS 一次性初始化
 
-> 前置：VPS 已装 git；本地化文件（`deployment/.env`、`server/data/`、`deployment/config/`、`*.db`）
+> 前置：VPS 已装 git；本地化文件（`deployment/.env`、`server/data/`、`*.db`）
 > 均已被仓库 .gitignore 忽略，git 操作不会触碰——**唯一例外是 `deployment/Caddyfile`**
 > （仓库内为占位域名 `private.example.com`，VPS 部署时已 sed 为真实域名），需标记
 > `assume-unchanged` 防 pull 覆盖。

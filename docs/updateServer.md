@@ -45,7 +45,7 @@ git status --short                                          # 应只显示本地
 
 **为什么安全：**
 
-- 本地化文件 `deployment/.env`（备份密钥）、`server/data/`、`deployment/config/`、`*.db`
+- 本地化文件 `deployment/.env`（备份密钥）、`server/data/`、`*.db`
   全部在仓库 .gitignore 中 → git 操作不触碰，**本地数据零风险**；
 - 唯一例外 `deployment/Caddyfile`：仓库内是占位域名 `private.example.com`，
   VPS 部署时已 sed 成真实域名（einz.tic.cc）→ 用 `assume-unchanged` 标记，pull 不覆盖。

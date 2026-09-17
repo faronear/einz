@@ -3,9 +3,11 @@
 #   （cp docker-compose.withcaddy.yml docker-compose.yml）；
 #   另有无内置 Caddy 的 docker-compose.nocaddy.yml（由系统级 Caddy 反代）可选。
 # 使用前：
-#   1. 按 docs/SETUP.md 生成 config.json（白名单），放到 ./config/config.json
-#   2. 修改 Caddyfile 中的域名
-#   3. docker compose up -d
+#   1. 修改 Caddyfile 中的域名
+#   2. docker compose up -d
+#
+# 注：**无需任何配置文件**——Multiverse 的设备与空间都在库里（v1 的静态白名单
+#     config.json 已废，`EINZ_CONFIG` 与 `./config` 挂载随之移除）。
 services:
   server:
     build:
@@ -14,7 +16,6 @@ services:
     restart: unless-stopped
     environment:
       - PORT=3000
-      - EINZ_CONFIG=/config/config.json
       - EINZ_DB=/data/einz.sqlite.db
       - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
@@ -22,7 +23,6 @@ services:
       # 不入库、git pull 不覆盖）。未配置时 npm run backup 会拒绝执行（防明文备份）。
       - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
     volumes:
-      - ./config:/config:ro
       - ./data:/data
     expose:
       - "3000"
