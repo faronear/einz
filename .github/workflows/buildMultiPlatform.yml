@@ -1,0 +1,160 @@
+# Einz 多平台构建（GitHub Actions）
+#
+# 覆盖 Android / iOS / macOS / Windows 四个目标，触发方式：
+#   - push tag（v*）：全平台构建
+#   - workflow_dispatch：手动选择单个平台
+#
+# 说明：
+#   - Android / Windows / macOS 无签名要求，直接出包
+#   - iOS 需要 secrets：IOS_P12_CERTIFICATE(Base64) + IOS_P12_PASSWORD + IOS_PROVISIONING_PROFILE(Base64)
+#     未配置 secrets 时 iOS job 自动跳过
+#   - macOS 计费 10x、Windows 2x，注意私有仓库额度
+name: Multi Platform Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (all = android+windows+macos)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+          - macos
+          - windows
+
+jobs:
+  android:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'android' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+      - name: Build APK
+        working-directory: app
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-android
+          path: app/build/app/outputs/flutter-apk/*.apk
+
+  windows:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+      - name: Build Windows
+        working-directory: app
+        run: flutter build windows --release
+      - name: Zip release folder
+        run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-windows.zip
+      - name: Build CLI
+        working-directory: cli
+        run: dart compile exe bin/einz_tui.dart -o build/einz.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-windows
+          path: |
+            einz-windows.zip
+            cli/build/einz.exe
+
+  macos:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Disable Swift Package Manager
+        # 与 codemagic ios-release 相同：Podfile 存在时走 CocoaPods，避免 Flutter 3.47 默认 SPM 冲突
+        run: flutter config --no-enable-swift-package-manager
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+      - name: Build macOS App
+        working-directory: app
+        run: flutter build macos --release
+      - name: Build CLI
+        run: dart compile exe cli/bin/einz_tui.dart -o cli/build/einz-macos
+      - name: Zip app bundle
+        run: cd app/build/macos/Build/Products/Release && zip -r -y ../../../einz-macos.zip einz.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-macos
+          path: |
+            einz-macos.zip
+            cli/build/einz-macos
+
+  ios:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'ios' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check signing secrets
+        id: secrets
+        env:
+          HAS_P12: ${{ secrets.IOS_P12_CERTIFICATE != '' }}
+        run: echo "configured=${{ env.HAS_P12 }}" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        if: steps.secrets.outputs.configured == 'true'
+        with:
+          channel: stable
+          cache: true
+      - name: Install signing certificate
+        if: steps.secrets.outputs.configured == 'true'
+        env:
+          IOS_P12_CERTIFICATE: ${{ secrets.IOS_P12_CERTIFICATE }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+        run: |
+          echo "$IOS_P12_CERTIFICATE" | base64 --decode > cert.p12
+          security create-keychain -p build build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p build build.keychain
+          security import cert.p12 -k build.keychain -P "$IOS_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k build build.keychain
+      - name: Install provisioning profile
+        if: steps.secrets.outputs.configured == 'true'
+        env:
+          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+      - name: Build iOS IPA (unsigned, for device testing)
+        if: steps.secrets.outputs.configured != 'true'
+        working-directory: app
+        run: flutter build ios --release --no-codesign
+      - name: Build iOS IPA (signed)
+        if: steps.secrets.outputs.configured == 'true'
+        working-directory: app
+        run: flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-ios
+          path: |
+            app/build/ios/ipa/*.ipa
+            app/build/ios/iphoneos/Runner.app
