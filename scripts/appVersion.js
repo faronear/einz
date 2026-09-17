@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 每次打包现场生成的版本号 / 构建号——iOS / Android / macOS / Windows 全平台共用同一套。
 //
-//   node scripts/appVersion.js                  # 打两行 KEY=VALUE，给 shell eval
+//   node scripts/appVersion.js                  # 打三行 KEY=VALUE，给 shell eval
 //   node scripts/appVersion.js --build-name     # 只打版本号 2609.1810.35（PowerShell 里用）
 //   node scripts/appVersion.js --build-number   # 只打构建号 26091810
 //
@@ -16,6 +16,10 @@
 //   为什么是三段而不是两段的 yymm.ddhh：iOS 侧 flutter_tools 会把不满三段的 build-name 补 0
 //   （packages/flutter_tools/lib/src/build_info.dart 的 validatedBuildNameForPlatform），
 //   两段的 2609.1810 到 iOS 上会变成 2609.1810.0，与安卓不一致；给满三段，各平台拿到的就是同一个串。
+//
+// APP_BUILD_STAMP = yymmddhhmm               例 2609181035
+//   版本号去掉点的紧凑写法，只用来给产物文件命名（einz.adhoc.2609181035.ipa）。
+//   文件名再带点会跟扩展名混在一起，也更长。
 //
 // 构建号 APP_BUILD_NUMBER = yymmddhh          例 26091810
 //   iOS/macOS CFBundleVersion、Android versionCode。
@@ -37,10 +41,12 @@ function computeVersion(now) {
     buildName: `${stamp.slice(0, 4)}.${stamp.slice(4, 8)}.${stamp.slice(8, 10)}`,
     // 26091810
     buildNumber: stamp.slice(0, 8),
+    // 2609181035
+    buildStamp: stamp,
   };
 }
 
-const { buildName, buildNumber } = computeVersion(new Date());
+const { buildName, buildNumber, buildStamp } = computeVersion(new Date());
 
 const arg = process.argv[2];
 if (arg === '--build-name') {
@@ -50,4 +56,5 @@ if (arg === '--build-name') {
 } else {
   console.log(`APP_BUILD_NAME=${buildName}`);
   console.log(`APP_BUILD_NUMBER=${buildNumber}`);
+  console.log(`APP_BUILD_STAMP=${buildStamp}`);
 }

@@ -7029,3 +7029,13 @@ Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不�
   （`build/` 不入库；不用环境变量传递是怕 shell 里残留旧值导致版本号卡住不动。）
 - 顺带修掉一个旧毛病：原来每条脚本里 `$(date ...)` 调了两次（mv 一次、ls 一次），
   跨整点时 mv 出一个名字、ls 找另一个名字，最后一步会报"找不到文件"。
+
+## 2026-09-18 产物文件名去掉点（紧凑 yymmddhhmm）
+
+文件名带点会和扩展名混在一起、也更长，改回紧凑写法：`einz.adhoc.2609172351.ipa`、
+`einz.2609172351.apk`、`einz.macos.2609172351.app`。
+
+`scripts/appVersion.js` 多吐一个 `APP_BUILD_STAMP`（yymmddhhmm，即版本号去掉点），
+文件命名统一用它；iOS 侧 `build/ios/ipa/version.txt` 也从"只写版本号"改成写
+`APP_BUILD_NAME=` + `APP_BUILD_STAMP=` 两行，外面 `eval "$(cat ...)"` 取。
+包内版本号本身仍是三段 `yymm.ddhh.mm`（iOS 要求三段，安卓跟着统一用同一个串）。
