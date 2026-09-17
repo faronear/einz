@@ -33,7 +33,12 @@ workflows:
           # 两个描述文件都要在 Codemagic 的 Code signing 里装齐：
           #   Einz Dist Adhoc            → archive 阶段用（工程 Release 写死了它）
           #   Einz Dist AppStoreConnect  → 导出阶段重签用
-          flutter build ipa --release --export-options-plist=ios/exportOptionsAppStore.plist
+          # 版本号 yymm.ddhh.mm / 构建号 yymmddhh，各平台统一（唯一出处 scripts/appVersion.js）
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build ipa --release \
+            --build-name "$APP_BUILD_NAME" \
+            --build-number "$APP_BUILD_NUMBER" \
+            --export-options-plist=ios/exportOptionsAppStore.plist
     artifacts:
       - app/build/ios/ipa/*.ipa
     publishing:
@@ -61,7 +66,10 @@ workflows:
       - name: Build macOS App
         working_directory: app
         script: |
-          flutter build macos --release
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build macos --release \
+            --build-name "$APP_BUILD_NAME" \
+            --build-number "$APP_BUILD_NUMBER"
           # 顺手把 CLI 也编一份（macOS 版只能在 mac 上编译）
           dart compile exe ../cli/bin/einz_tui.dart -o build/einz-macos
     artifacts:
@@ -86,7 +94,11 @@ workflows:
       - name: Build Windows App
         working_directory: app
         script: |
-          flutter build windows --release
+          # Windows 机器默认 shell 是 PowerShell。
+          # 只传版本号不传构建号：FILEVERSION 四个字段各 16 位（≤65535），
+          # 构建号 26091810 塞不进去，不传则 flutter 取 0。
+          $buildName = (node ..\scripts\appVersion.js --build-name).Trim()
+          flutter build windows --release --build-name $buildName
           # 产物是散装目录（exe + dll + data），压成 zip 方便分发
           cd build/windows/x64/runner/Release
           7z a -r ../einz-windows.zip ./*

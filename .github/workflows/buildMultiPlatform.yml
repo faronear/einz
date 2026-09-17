@@ -48,7 +48,10 @@ jobs:
         run: flutter pub get
       - name: Build APK
         working-directory: app
-        run: flutter build apk --release
+        run: |
+          # 版本号 yymm.ddhh.mm / 构建号 yymmddhh，各平台统一（唯一出处 scripts/appVersion.js）
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build apk --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
       - uses: actions/upload-artifact@v4
         with:
           name: einz-android
@@ -68,7 +71,13 @@ jobs:
         run: flutter pub get
       - name: Build Windows
         working-directory: app
-        run: flutter build windows --release
+        # 用 bash 而不是默认的 PowerShell，好跟其余 job 共用 scripts/appVersion.js。
+        # 只传版本号不传构建号：FILEVERSION 四个字段各 16 位（≤65535），
+        # 构建号 26091810 塞不进去，不传则 flutter 取 0。
+        shell: bash
+        run: |
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build windows --release --build-name "$APP_BUILD_NAME"
       - name: Zip release folder
         run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-windows.zip
       - name: Build CLI
@@ -98,7 +107,9 @@ jobs:
         run: flutter pub get
       - name: Build macOS App
         working-directory: app
-        run: flutter build macos --release
+        run: |
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
       - name: Build CLI
         run: dart compile exe cli/bin/einz_tui.dart -o cli/build/einz-macos
       - name: Zip app bundle
@@ -147,11 +158,18 @@ jobs:
       - name: Build iOS IPA (unsigned, for device testing)
         if: steps.secrets.outputs.configured != 'true'
         working-directory: app
-        run: flutter build ios --release --no-codesign
+        run: |
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build ios --release --no-codesign --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
       - name: Build iOS IPA (signed)
         if: steps.secrets.outputs.configured == 'true'
         working-directory: app
-        run: flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist
+        run: |
+          eval "$(node ../scripts/appVersion.js)"
+          flutter build ipa --release \
+            --build-name "$APP_BUILD_NAME" \
+            --build-number "$APP_BUILD_NUMBER" \
+            --export-options-plist=ios/exportOptionsAdhoc.plist
       - uses: actions/upload-artifact@v4
         with:
           name: einz-ios

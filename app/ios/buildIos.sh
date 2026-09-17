@@ -82,6 +82,7 @@ fi
 # ---------- 定位 flutter 与 app 目录 ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${APP_DIR}/.." && pwd)"
 cd "${APP_DIR}"
 
 FLUTTER="$(command -v flutter || true)"
@@ -175,14 +176,28 @@ ERR
   echo "✅ SDK: iOS ${SDK_VERSION}（满足上传要求）"
 fi
 
-# ---------- 5) 构建 ----------
-echo "▶ 构建 ${CHANNEL} IPA（约 1–3 分钟）…"
-"${FLUTTER}" build ipa --release --export-options-plist="${PLIST}"
+# ---------- 5) 版本号：yymm.ddhh.mm / 构建号 yymmddhh，每次打包现场生成 ----------
+# 与 Android / macOS / Windows 共用同一套（唯一出处 scripts/appVersion.js）。
+# iOS 侧 flutter_tools 会把不满三段的 build-name 补 0，所以这里给满三段，
+# CFBundleShortVersionString 拿到的就是 2609.1810.35 这样的原值。
+NODE="$(command -v node || true)"
+if [[ -z "${NODE}" ]]; then
+  echo "❌ 找不到 node：版本号由 scripts/appVersion.js 生成" >&2
+  exit 1
+fi
+eval "$("${NODE}" "${REPO_ROOT}/scripts/appVersion.js")"
+
+# ---------- 6) 构建 ----------
+echo "▶ 构建 ${CHANNEL} IPA（版本 ${APP_BUILD_NAME} / 构建号 ${APP_BUILD_NUMBER}，约 1–3 分钟）…"
+"${FLUTTER}" build ipa --release \
+  --build-name="${APP_BUILD_NAME}" \
+  --build-number="${APP_BUILD_NUMBER}" \
+  --export-options-plist="${PLIST}"
 IPA="${APP_DIR}/build/ios/ipa/einz.ipa"
 [[ -f "${IPA}" ]] || { echo "❌ 没找到产物 ${IPA}" >&2; exit 1; }
 echo "✅ IPA: ${IPA} ($(du -h "${IPA}" | cut -f1))"
 
-# ---------- 5) 安装 / 上传 ----------
+# ---------- 7) 安装 / 上传 ----------
 if [[ "${CHANNEL}" == "adhoc" ]]; then
   if [[ "${DO_INSTALL}" == 0 ]]; then
     echo "ℹ️  装到手机：app/ios/buildIos.sh adhoc --install [--device <UDID>]"
