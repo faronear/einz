@@ -1719,16 +1719,16 @@ String _myDeviceTag(_TuiState s) {
   return ' @$myName';
 }
 
-/// last_seen 毫秒 → 时间文本：今天 HH:mm / 昨天 HH:mm / M/d HH:mm。
-String _fmtTime(int ms) {
-  final t = DateTime.fromMillisecondsSinceEpoch(ms);
-  final now = DateTime.now();
-  final hhmm =
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-  if (t.year == now.year && t.month == now.month && t.day == now.day) return hhmm;
-  final y = now.subtract(const Duration(days: 1));
-  if (t.year == y.year && t.month == y.month && t.day == y.day) return '昨天 $hhmm';
-  return '${t.month}/${t.day} $hhmm';
+/// 设备上下线时刻（毫秒 epoch）→ UTC 记法 `2026-02-26T12:35:56Z`。
+///
+/// **不用本地时区**：同一份 /devices 在美国主机和中国主机上跑，输出必须逐字一致
+/// （老板 2026-09-17）——之前按本地时区显示，跨时区的两台机器看到的时间对不上。
+/// 秒级精度足够（设备上下线不需要亚秒），末尾 `Z` 明说是 UTC。
+String _fmtDeviceTime(int ms) {
+  final t = DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${t.year.toString().padLeft(4, '0')}-${two(t.month)}-${two(t.day)}'
+      'T${two(t.hour)}:${two(t.minute)}:${two(t.second)}Z';
 }
 
 /// 同空间设备列表的一行（`/devices` 与 `/revoke` **共用同一份编号**——两个命令看到的
@@ -1801,9 +1801,12 @@ Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
     // 离线时 last_seen 置 0，直接格式化会变成 1970-01-01——老板 2026-09-16 实测）。
     final String when;
     if (online) {
-      when = (sinceMs != null && sinceMs > 0) ? ' since ${_fmtTime(sinceMs)}' : '';
+      final since = sinceMs ?? 0;
+      when = since > 0 ? ' since ${_fmtDeviceTime(since)}' : '';
     } else if (!revoked) {
-      when = (last is num && last > 0) ? ' (上次活跃 ${_fmtTime(last.toInt())})' : '';
+      when = (last is num && last > 0)
+          ? ' (上次活跃 ${_fmtDeviceTime(last.toInt())})'
+          : '';
     } else {
       when = '';
     }
