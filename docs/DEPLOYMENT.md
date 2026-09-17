@@ -118,10 +118,24 @@ deployment/
 ├── Caddyfile             # 域名 + TLS 自动签发 + 反代 + WSS 升级
 ├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server 两个服务（部署时拷贝为 docker-compose.yml）
 ├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000（可选）
+├── config/               # 可选：einz_server_config.json（服务端参数，见下；整个目录已 gitignore）
 └── data/                 # 数据卷映射：einz.sqlite.db + files/ + backups/
 ```
 
 前置：一台 VPS（域名 DNS 指向它，开放 80/443）、Docker + Compose。
+
+**服务端配置（可选）**：`deployment/config/einz_server_config.json` 会被挂到容器
+`/config/`，由 `EINZ_CONFIG` 指向——当前唯一字段 `maxSpaces`（新空间数量上限：
+`0`=不限、`1`=退回单空间、`n`=最多 n 个；改后**重启容器**生效）。文件不存在时服务端
+照常启动（走默认值 `0`）。示例：
+
+```bash
+mkdir -p deployment/config
+echo '{"maxSpaces": 1}' > deployment/config/einz_server_config.json
+```
+
+> 本机开发（非 Docker）不用管这个目录：直接放 `server/einz_server_config.json`
+> （同名字段，同样不入 git，见 §2.2）。
 
 ### 3.2 部署步骤
 

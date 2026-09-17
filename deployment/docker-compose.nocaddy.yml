@@ -17,8 +17,9 @@
 #      （Caddy 自动申请/续期 TLS；WS 升级由 reverse_proxy 自动处理）
 #   2. 启动：docker compose -f deployment/docker-compose.nocaddy.yml up -d
 #
-# 注：**无需任何配置文件**——Multiverse 的设备与空间都在库里（v1 的静态白名单
-#     config.json 已废，`EINZ_CONFIG` 与 `./config` 挂载随之移除）。
+# 注：**配置文件是可选的**——设备与空间都在库里（v1 的静态白名单 config.json 已废），
+#     `./config` 里现在只放 `einz_server_config.json`（当前字段：maxSpaces，改后重启
+#     生效）；目录为空或文件缺失都照常启动（走默认值）。
 services:
   server:
     build:
@@ -27,6 +28,9 @@ services:
     restart: unless-stopped
     environment:
       - PORT=3000
+      # 服务端配置文件（可选）：宿主机 ./config/einz_server_config.json → 容器 /config/。
+      # 文件缺失时服务端按默认值启动（当前唯一字段 maxSpaces：0=不限 / n=上限）。
+      - EINZ_CONFIG=/config/einz_server_config.json
       - EINZ_DB=/data/einz.sqlite.db
       - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
@@ -35,4 +39,5 @@ services:
     ports:
       - "127.0.0.1:3000:3000" # 仅宿主回环可见：系统级 Caddy 反代到这里，不对外直开
     volumes:
+      - ./config:/config:ro
       - ./data:/data
