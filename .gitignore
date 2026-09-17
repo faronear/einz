@@ -1,3 +1,89 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# how to include another gitignore? 
+#   https://stackoverflow.com/questions/7005142/can-i-include-other-gitignore-file-in-a-gitignore-file-like-include-in-c-li
+#   https://github.com/github/gitignore
+#   https://github.com/SlideWave/gitignore-include?tab=readme-ov-file#examples
+#   https://gitignore.io
+
+### .gitignore_global ###
+
+# Self defined pattern to ignore
+?*.gitignore
+?*.gitignore/
+?*.gitignore.*
+?*.gitignore.*/
+*.gitomit
+*.gitomit/
+*.gitomit.*
+*.gitomit.*/
+*.nogit
+*.nogit/
+*.nogit.*
+*.nogit.*/
+# 保留
+!.gitignore
+!.gitignore.*
+!.gitkeep
+
+# 通用
+.svn/
+.deploy_git/
+.idea/
+.sass-cache/
+.wrangler/
+/test/unit/coverage/
+/test/e2e/reports/
+node_modules/
+*.aab
+*.apk
+*.ipa
+*.rar
+*.tgz
+*.zip
+*.min.js
+*.min.css
+*.min.html
+*.iml
+*.njsproj
+*.ntvs*
+*.sw*
+*.sln
+*.suo
+.gitattributes
+.umi
+.umi-production
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+yarn.lock
+selenium-debug.log
+Thumbs.db
+thumbs.db
+_desktop.ini
+
+# seafile 临时文件
+._*
+.$*
+
+# office 暂存文件
+~$*
+
+# 用户shell配置脚本
+.bashrc_custom
+
+# 苹果系统临时文件
+.DS_Store
+
+# 安卓缓存文件夹
+.thumbnails
+
+# local env files
+.env
+.env.local
+.env.*.local
+
+### .gitignore.local.txt ###
+
 # --- Node ---
 node_modules/
 dist/
