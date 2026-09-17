@@ -135,6 +135,11 @@ class _SetupPageState extends State<SetupPage> {
   String _server = kEinzServer;
   bool _probeFailed = false;
   bool _probeDone = false; // 探测已成功（区分"探测中"与"已就绪"——入口页显示条件）
+  bool _probeSlow = false; // 持续失败（超过静默期）→ splash 显示"正在连接 <地址>"小字（排障用，非报错）
+  int _probeFailCount = 0;
+  // 静默期：前 N 次探测失败不显示任何文字（与"在连"无区别，老板 2026-09-18）；
+  // 超过后 splash 底部浮现"正在连接 <地址>"小字。探测 4s/次 × 5 ≈ 20s。
+  static const int _probeSlowAfter = 5;
   bool _legacyServer = false; // Multiverse：服务器协议版本不支持 spaces（旧 v1 服务器）
   Timer? _probeRetryTimer; // 探测失败后的自动重试定时器（连上即停止并自动进入）
 
@@ -225,6 +230,8 @@ class _SetupPageState extends State<SetupPage> {
         _server = saved;
         _probeFailed = !ok;
         _probeDone = ok;
+        if (!ok) _probeFailCount++;
+        if (_probeFailCount >= _probeSlowAfter) _probeSlow = true;
         _legacyServer = ok && !pv.contains('multiverse');
         if (ok && _role == null) {
           _step = 0; // 入口页（角色由用户选择）
@@ -266,9 +273,17 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _probeFailed = false;
         _probeDone = true;
+        _probeSlow = false;
         _legacyServer = !pv.contains('multiverse');
         if (_role == null) _step = 0; // 入口页（角色由用户选择）
       });
+    } else {
+      _probeFailCount++;
+      // 超过静默期才提示（老板 2026-09-18：前几次失败与"在连"无区别，不打扰；
+      // 持续失败则给出中性小字"正在连接 <地址>"，便于远程排障区分 app 卡死与网络问题）
+      if (!_probeSlow && _probeFailCount >= _probeSlowAfter) {
+        setState(() => _probeSlow = true);
+      }
     }
     // 失败：保持失败提示，等待下一轮重试（不 setState，避免每 4 秒重建一次）
   }
@@ -965,7 +980,10 @@ class _SetupPageState extends State<SetupPage> {
   /// 无 AppBar/菜单/服务器输入框，也不显示检测/失败文字（老板要求 2026-09-09：
   /// 保持简洁优美，位置固定在屏幕上半部分）——探测失败由自动重试兜底
   /// （每 4 秒重探，就绪即自动进入向导），全程零打扰。
+  /// 例外：持续失败超过静默期（[_probeSlowAfter]）后底部浮现中性小字
+  /// "正在连接 <地址>"（排障用，老板折中方案 2026-09-18）。
   Widget _buildSplashScreen() {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Container(
         // alignment 使内部 Align 撑满全屏 → 渐变 DecoratedBox 铺满整页。
@@ -988,6 +1006,21 @@ class _SetupPageState extends State<SetupPage> {
               const Spacer(flex: 2),
               const SpinningBrandLogo(size: 96),
               const Spacer(flex: 3),
+              // 持续探测失败时的中性提示（非报错）：默认不显示（前 N 次与
+              // "在连"无区别，不打扰）；排障时用户能念出目标地址，区分
+              // app 卡死与网络问题（老板折中方案 2026-09-18）
+              if (_probeSlow)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 32),
+                  child: Text(
+                    l10n.wizardProbeConnecting(_server),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.75)),
+                  ),
+                )
+              else
+                const SizedBox(height: 32), // 占位保持 Logo 位置不跳变
             ],
           ),
         ),

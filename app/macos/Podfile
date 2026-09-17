@@ -29,6 +29,10 @@ flutter_macos_podfile_setup
 target 'Runner' do
   use_frameworks!
 
+  # 本地 vendored libsodium（静态链接，运行时 DynamicLibrary.process() 解析；
+  # 沙盒读不到 /usr/local/lib，不能依赖 Homebrew）
+  pod 'libsodium-macos', :path => 'Libraries/libsodium-macos.podspec'
+
   flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths

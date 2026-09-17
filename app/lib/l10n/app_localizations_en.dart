@@ -57,6 +57,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardDetectFailed => 'Cannot reach server — retrying…';
 
   @override
+  String wizardProbeConnecting(String server) {
+    return 'Connecting to $server…';
+  }
+
+  @override
   String get wizardNameHint => 'Your name (you can change it later)';
 
   @override

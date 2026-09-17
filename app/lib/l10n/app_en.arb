@@ -15,6 +15,14 @@
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "Auto-detects if you're the first device",
   "wizardDetectFailed": "Cannot reach server — retrying…",
+  "wizardProbeConnecting": "Connecting to {server}…",
+  "@wizardProbeConnecting": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
   "wizardNameHint": "Your name (you can change it later)",
   "wizardPeerNameHint": "Your partner's name (you can change it later)",
   "wizardPeerNameHintInput": "Partner's name",

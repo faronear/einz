@@ -26,11 +26,13 @@ void resetSodium() {
 }
 
 Future<DynamicLibrary> loadDynamicLibrary() async {
-  // iOS：libsodium 以静态库形式链接进 app 二进制（本地 pod libsodium，
-  // vendored xcframework + -force_load，见 app/ios/Libraries/libsodium.podspec），
-  // 符号在进程内 → DynamicLibrary.process()。若未来改用动态 framework，改回 open('libsodium.dylib')。
-  if (Platform.isIOS) {
-    return DynamicLibrary.process();
+  // iOS/macOS：libsodium 以静态库形式链接进 app 二进制（iOS: 本地 pod libsodium，
+  // vendored xcframework + -force_load；macOS: 本地 pod libsodium-macos，
+  // fat 静态库 + -force_load，见 app/macos/Libraries/libsodium-macos.podspec），
+  // 符号在进程内 → 先试 DynamicLibrary.process()。
+  // CLI（无静态链接）不受影响：process() 里查不到 sodium_init，回落文件路径。
+  for (final lib in [DynamicLibrary.process()]) {
+    if (lib.providesSymbol('sodium_init')) return lib;
   }
   final candidates = <String>[
     if (Platform.environment.containsKey('LIBSODIUM_PATH'))

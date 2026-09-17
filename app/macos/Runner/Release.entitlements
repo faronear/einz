@@ -4,6 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- 出站网络（探测/WS/附件传输）。沙盒默认理论允许出站，但实测
+	     networkd settings 读取被拒时 HttpClient 会间歇失败，显式声明 -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)cc.tic.einz</string>

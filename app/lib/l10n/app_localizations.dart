@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'Cannot reach server — retrying…'**
   String get wizardDetectFailed;
 
+  /// No description provided for @wizardProbeConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {server}…'**
+  String wizardProbeConnecting(String server);
+
   /// No description provided for @wizardNameHint.
   ///
   /// In en, this message translates to:

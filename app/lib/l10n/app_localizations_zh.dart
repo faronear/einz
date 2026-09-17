@@ -55,6 +55,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectFailed => '暂时无法连接服务器，正在自动重试…';
 
   @override
+  String wizardProbeConnecting(String server) {
+    return '正在连接 $server…';
+  }
+
+  @override
   String get wizardNameHint => '我的名字（以后可以随时修改）';
 
   @override
