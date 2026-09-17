@@ -18,11 +18,11 @@ build/
 *.db-shm
 server/data/
 deployment/data/
-deployment/config/
+deployment/config/serverConfig.json
 
 # --- 密钥与配置（禁止提交） ---
 .env
-server/config/
+server/config/serverConfig.json
 *.pem
 *.key
 !docs/**/*.key
