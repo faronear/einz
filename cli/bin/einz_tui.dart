@@ -1766,7 +1766,7 @@ class _DeviceRow {
   final String personName; // 使用者名字（缺失回退 person_id）
   final bool online;
   final String tag; // 本机 / 已撤销 / 在线 / 离线
-  final String when; // since 上线时刻 / (上次活跃 时刻)
+  final String when; // since 上线时刻（在线）/ since 最后活跃时刻（离线，≈下线时刻）
   final bool isMe;
   final bool revoked;
 
@@ -1813,21 +1813,22 @@ Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
     final isMe = devId == myId;
     // 在线 → "since 上线时刻"；离线 → "上次活跃 时刻"（**不显示上线时刻**：服务端
     // 离线时 last_seen 置 0，直接格式化会变成 1970-01-01——老板 2026-09-16 实测）。
-    final String when;
+    // 在线 → 上线时刻；离线 → **最后一次活跃**时刻（≈ 下线时刻，老板 2026-09-17：
+    // 两种都用 `since` 一个词就行）。两点说明：
+    // - 服务端 WS 断开时把 last_seen 置 0（ws.ts），所以干净下线的设备这里 stamp=0
+    //   → 不显示时间（直接格式化会变成 1970-01-01，老板 2026-09-16 实测）；
+    // - 非 0 时它是最后一次心跳/认证的时刻，比真正断线早 ≤1 个心跳周期（30s）。
+    final int stamp;
     if (online) {
-      final since = sinceMs ?? 0;
-      when = since > 0
-          ? ' since ${_fmtDeviceTimeLocal(since)} (${_fmtDeviceTimeUtc(since)})'
-          : '';
-    } else if (!revoked) {
-      // 离线那一组外层已有括号，UTC 用 ` / ` 接在同一组里——再套一层括号太挤。
-      when = (last is num && last > 0)
-          ? ' (上次活跃 ${_fmtDeviceTimeLocal(last.toInt())}'
-              ' / ${_fmtDeviceTimeUtc(last.toInt())})'
-          : '';
+      stamp = sinceMs ?? 0;
+    } else if (!revoked && last is num) {
+      stamp = last.toInt();
     } else {
-      when = '';
+      stamp = 0;
     }
+    final when = stamp > 0
+        ? ' since ${_fmtDeviceTimeLocal(stamp)} (${_fmtDeviceTimeUtc(stamp)})'
+        : '';
     rows.add(_DeviceRow(
       no: ++no,
       deviceId: devId,
