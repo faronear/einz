@@ -6917,3 +6917,16 @@ app-apk-emu-run-local 之类）。做法：先 sed 改工作区文件（保留�
 
 验证：`flutter analyze`(app) 无问题；`tsc`(server) 干净；`git check-ignore` 确认 ios 被忽略、
 example 不被忽略；全仓（除 server/dist 构建产物与 aimemo 历史）已无 `local_config` 残留。
+
+## 2026-09-17 TUI 设备时间：本地时间回来了，UTC 跟在后面（紧凑）
+
+老板改回"两个都要"：本地时间主看、UTC 用于中美两台机器互相对账。UTC 去掉 `-` 与 `:`
+（`20260226T123556Z`），省宽度。
+
+- `cli/bin/einz_tui.dart`：拆成 `_fmtDeviceTimeLocal`（原 `_fmtTime` 逻辑：今天 HH:mm /
+  昨天 HH:mm / M/d HH:mm）+ `_fmtDeviceTimeUtc`（紧凑 UTC）。
+- 行样式（同一时刻在 Asia/Shanghai 与 America/New_York 各跑一遍验证）：
+  - `  1) 🟢 DoomBase [ali] 在线 since 20:40 (20260917T124005Z)`
+  - `  2) ⚪ MacBook [bob] 离线 (上次活跃 昨天 08:12 / 20260916T001230Z)`
+    离线那一组外层已有括号 → UTC 用 ` / ` 接在同一组里，不套第二层括号。
+- 验证：`flutter analyze`(cli) 干净。
