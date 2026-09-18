@@ -7,6 +7,7 @@
   "delete": "删除",
   "settings": "设置",
   "skip": "跳过",
+  "close": "关闭",
   "setupPageEnvelopeKeyHint": "密保信封是通过不对称加密，进行线下交接的一段文本。请联系秘境伴侣获取。",
   "setupPageNeedPassphrase": "❗️ 必须设置密保口令",
   "wizardJoinPassphraseRequired": "❗️ 请输入密保口令进行验证",
@@ -166,6 +167,18 @@
   "chatPageClearLockTitle": "清空锁屏码？",
   "chatPageClearLockMessage": "新锁屏码留空 = 清空锁屏码——确定要清除吗？清除后下次启动直接进入聊天。",
   "chatPageMenuInvite": "邀请码",
+  "chatPageInviteDialogTitle": "邀请码已生成",
+  "chatPageInviteDialogHint": "邀请新设备加入当前秘境。24 小时内一次性有效。",
+  "chatPageInviteCopyLinkTooltip": "复制邀请链接",
+  "chatPageInviteCopyCodeTooltip": "复制邀请码",
+  "chatPageInviteLinkCopied": "邀请链接已复制",
+  "chatPageInviteCodeCopied": "邀请码已复制",
+  "chatPageInviteFailed": "邀请码生成失败: {error}",
+  "@chatPageInviteFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "chatPageTitleBrand": "Einz 秘境",
   "chatPageMenuChangePassphrase": "密保口令",
   "chatPageMenuAvatar": "我的头像",

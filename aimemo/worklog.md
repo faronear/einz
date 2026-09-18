@@ -7057,3 +7057,21 @@ Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不�
   aboutVersionLabel / aboutServerLabel），zh + en 都填了，`flutter gen-l10n` 重新生成。
 
 `flutter analyze` 干净（app/）。UI 效果老板自测。
+
+## 2026-09-18 邀请码弹窗全量接 l10n（老板报 bug）
+
+老板真机反馈：app 切英文后，打开邀请码弹窗点拷贝，弹出的通知仍是中文
+「邀请码已复制」/「邀请链接已复制」。
+
+排查：`chat_page.dart` 的 `_showInviteDialog()` 里所有文案都是硬编码中文
+（标题、说明、两个 tooltip、两个拷贝通知、复制/关闭按钮、失败通知），
+是 app 里唯一一处漏接 l10n 的面向用户文案。两个通知只是最显眼的那部分。
+
+- l10n 新增 7 个 key：chatPageInviteDialogTitle / chatPageInviteDialogHint /
+  chatPageInviteCopyLinkTooltip / chatPageInviteCopyCodeTooltip /
+  chatPageInviteLinkCopied / chatPageInviteCodeCopied /
+  chatPageInviteFailed({error})；另加通用 key `close`（关闭）。
+  按钮「复制」复用 chatPageCopy。`flutter gen-l10n` 重新生成（纯增量）。
+- 中文文案一字未改，中文态表现不变（invite_dialog_layout_test 的 zh 断言仍成立）。
+
+`flutter analyze` 干净（app/）。英文态请老板再点一次拷贝确认。

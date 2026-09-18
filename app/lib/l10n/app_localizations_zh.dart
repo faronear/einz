@@ -31,6 +31,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skip => '跳过';
 
   @override
+  String get close => '关闭';
+
+  @override
   String get setupPageEnvelopeKeyHint => '密保信封是通过不对称加密，进行线下交接的一段文本。请联系秘境伴侣获取。';
 
   @override
@@ -406,6 +409,29 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageMenuInvite => '邀请码';
+
+  @override
+  String get chatPageInviteDialogTitle => '邀请码已生成';
+
+  @override
+  String get chatPageInviteDialogHint => '邀请新设备加入当前秘境。24 小时内一次性有效。';
+
+  @override
+  String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
+
+  @override
+  String get chatPageInviteCopyCodeTooltip => '复制邀请码';
+
+  @override
+  String get chatPageInviteLinkCopied => '邀请链接已复制';
+
+  @override
+  String get chatPageInviteCodeCopied => '邀请码已复制';
+
+  @override
+  String chatPageInviteFailed(String error) {
+    return '邀请码生成失败: $error';
+  }
 
   @override
   String get chatPageTitleBrand => 'Einz 秘境';

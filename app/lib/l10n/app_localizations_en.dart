@@ -31,6 +31,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skip => 'Skip';
 
   @override
+  String get close => 'Close';
+
+  @override
   String get setupPageEnvelopeKeyHint =>
       'Offline handover text (asymmetric encryption). Get it from your partner.';
 
@@ -432,6 +435,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMenuInvite => 'Invite code';
+
+  @override
+  String get chatPageInviteDialogTitle => 'Invite code generated';
+
+  @override
+  String get chatPageInviteDialogHint =>
+      'Invite a new device to this space. One-time use, valid for 24 hours.';
+
+  @override
+  String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
+
+  @override
+  String get chatPageInviteCopyCodeTooltip => 'Copy invite code';
+
+  @override
+  String get chatPageInviteLinkCopied => 'Invite link copied';
+
+  @override
+  String get chatPageInviteCodeCopied => 'Invite code copied';
+
+  @override
+  String chatPageInviteFailed(String error) {
+    return 'Failed to generate invite code: $error';
+  }
 
   @override
   String get chatPageTitleBrand => 'EINZ Private Space';

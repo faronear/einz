@@ -140,6 +140,12 @@ abstract class AppLocalizations {
   /// **'Skip'**
   String get skip;
 
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
   /// No description provided for @setupPageEnvelopeKeyHint.
   ///
   /// In en, this message translates to:
@@ -853,6 +859,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invite code'**
   String get chatPageMenuInvite;
+
+  /// No description provided for @chatPageInviteDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code generated'**
+  String get chatPageInviteDialogTitle;
+
+  /// No description provided for @chatPageInviteDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a new device to this space. One-time use, valid for 24 hours.'**
+  String get chatPageInviteDialogHint;
+
+  /// No description provided for @chatPageInviteCopyLinkTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy invite link'**
+  String get chatPageInviteCopyLinkTooltip;
+
+  /// No description provided for @chatPageInviteCopyCodeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy invite code'**
+  String get chatPageInviteCopyCodeTooltip;
+
+  /// No description provided for @chatPageInviteLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite link copied'**
+  String get chatPageInviteLinkCopied;
+
+  /// No description provided for @chatPageInviteCodeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code copied'**
+  String get chatPageInviteCodeCopied;
+
+  /// No description provided for @chatPageInviteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to generate invite code: {error}'**
+  String chatPageInviteFailed(String error);
 
   /// No description provided for @chatPageTitleBrand.
   ///

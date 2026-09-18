@@ -853,19 +853,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final api = widget.api ?? ApiClient(widget.server);
       final r = await api.createJoinToken(widget.spaceId, widget.token);
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('邀请码已生成'),
+          title: Text(l10n.chatPageInviteDialogTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // 说明文案作为大标题的补充说明，置于标题与二维码之间（老板 2026-09-13）；
               // 靠左对齐——本弹窗除二维码外其余内容均靠左
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
-                child: Text('邀请新设备加入当前秘境。24 小时内一次性有效。',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                child: Text(l10n.chatPageInviteDialogHint,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ),
               const SizedBox(height: 12),
               // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
@@ -884,14 +885,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   IconButton(
                     icon: const Icon(Icons.copy, size: 16),
                     color: const Color(0xFF2271F7),
-                    tooltip: '复制邀请链接',
+                    tooltip: l10n.chatPageInviteCopyLinkTooltip,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                     visualDensity: VisualDensity.compact,
                     onPressed: () async {
                       await Clipboard.setData(ClipboardData(text: r.link));
                       if (!ctx.mounted) return;
-                      showTopNotice(ctx, '邀请链接已复制');
+                      showTopNotice(ctx, l10n.chatPageInviteLinkCopied);
                     },
                   ),
                 ],
@@ -908,14 +909,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   IconButton(
                     icon: const Icon(Icons.copy, size: 16),
                     color: Colors.grey,
-                    tooltip: '复制邀请码',
+                    tooltip: l10n.chatPageInviteCopyCodeTooltip,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                     visualDensity: VisualDensity.compact,
                     onPressed: () async {
                       await Clipboard.setData(ClipboardData(text: r.joinToken));
                       if (!ctx.mounted) return;
-                      showTopNotice(ctx, '邀请码已复制');
+                      showTopNotice(ctx, l10n.chatPageInviteCodeCopied);
                     },
                   ),
                 ],
@@ -927,19 +928,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: r.link));
                 if (!ctx.mounted) return;
-                showTopNotice(ctx, '邀请链接已复制');
+                showTopNotice(ctx, l10n.chatPageInviteLinkCopied);
                 Navigator.of(ctx).pop();
               },
-              child: const Text('复制'),
+              child: Text(l10n.chatPageCopy),
             ),
             TextButton(
-                onPressed: () => Navigator.of(ctx).pop(), child: const Text('关闭')),
+                onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.close)),
           ],
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, '邀请码生成失败: $e');
+      showTopNotice(
+          context, AppLocalizations.of(context)!.chatPageInviteFailed('$e'));
     }
   }
 

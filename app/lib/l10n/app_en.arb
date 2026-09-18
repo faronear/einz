@@ -7,6 +7,7 @@
   "delete": "Delete",
   "settings": "Settings",
   "skip": "Skip",
+  "close": "Close",
   "setupPageEnvelopeKeyHint": "Offline handover text (asymmetric encryption). Get it from your partner.",
   "setupPageNeedPassphrase": "❗️ Set a passphrase first",
   "wizardJoinPassphraseRequired": "❗️ Enter the passphrase to verify",
@@ -166,6 +167,18 @@
   "chatPageClearLockTitle": "Clear app lock?",
   "chatPageClearLockMessage": "A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.",
   "chatPageMenuInvite": "Invite code",
+  "chatPageInviteDialogTitle": "Invite code generated",
+  "chatPageInviteDialogHint": "Invite a new device to this space. One-time use, valid for 24 hours.",
+  "chatPageInviteCopyLinkTooltip": "Copy invite link",
+  "chatPageInviteCopyCodeTooltip": "Copy invite code",
+  "chatPageInviteLinkCopied": "Invite link copied",
+  "chatPageInviteCodeCopied": "Invite code copied",
+  "chatPageInviteFailed": "Failed to generate invite code: {error}",
+  "@chatPageInviteFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
   "chatPageTitleBrand": "EINZ Private Space",
   "chatPageMenuChangePassphrase": "Passphrase",
   "chatPageMenuAvatar": "Avatar",
