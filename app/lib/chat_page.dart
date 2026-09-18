@@ -370,7 +370,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // pending（还没确认）：动态小飞机 + 可点按（幂等重发＝去问服务端收到没）
+    // pending（还没确认）：动态小飞机 + 可点按（幂等重发＝去问服务端收到没）。
+    // 小飞机用超链接蓝提示可点（老板 2026-09-18）；加速中改用中性色，避免"点了
+    // 还提示可点"的矛盾。
     return Tooltip(
       message: l10n.chatPageMsgSendingTap,
       child: GestureDetector(
@@ -382,7 +384,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               Text(busyLabel, style: TextStyle(fontSize: 10, color: subtle)),
               const SizedBox(width: 2),
             ],
-            _SendingPlane(color: subtle),
+            _SendingPlane(
+              color: busyLabel != null ? subtle : const Color(0xFF2E7CF6),
+            ),
           ],
         ),
       ),
