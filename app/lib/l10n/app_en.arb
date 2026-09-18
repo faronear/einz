@@ -179,7 +179,7 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageTitleBrand": "EINZ Private Space",
+  "chatPageTitleBrand": "My Einz",
   "chatPageMenuChangePassphrase": "Passphrase",
   "chatPageMenuAvatar": "Avatar",
   "chatPageAvatarUploaded": "✅ Avatar updated",

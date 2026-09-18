@@ -461,7 +461,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageTitleBrand => 'EINZ Private Space';
+  String get chatPageTitleBrand => 'My Einz';
 
   @override
   String get chatPageMenuChangePassphrase => 'Passphrase';

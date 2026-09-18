@@ -434,7 +434,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageTitleBrand => 'Einz 秘境';
+  String get chatPageTitleBrand => '我的秘境';
 
   @override
   String get chatPageMenuChangePassphrase => '密保口令';

@@ -905,7 +905,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageTitleBrand.
   ///
   /// In en, this message translates to:
-  /// **'EINZ Private Space'**
+  /// **'My Einz'**
   String get chatPageTitleBrand;
 
   /// No description provided for @chatPageMenuChangePassphrase.

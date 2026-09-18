@@ -179,7 +179,7 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageTitleBrand": "Einz 秘境",
+  "chatPageTitleBrand": "我的秘境",
   "chatPageMenuChangePassphrase": "密保口令",
   "chatPageMenuAvatar": "我的头像",
   "chatPageAvatarUploaded": "✅ 头像已更新",
