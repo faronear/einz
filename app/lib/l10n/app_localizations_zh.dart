@@ -862,7 +862,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      '秘境是仅限两人的私密聊天和共享空间：端到端加密所有消息和附件，没有任何第三方（包括秘境自身）能够读到内容，严格保障隐私安全。';
+      '秘境是仅限两人的私密聊天和共享空间，端到端加密所有消息和附件，没有任何第三方（包括秘境自身）能够读到内容，严格保障隐私安全。';
 
   @override
   String get aboutVersionLabel => '版本号';
