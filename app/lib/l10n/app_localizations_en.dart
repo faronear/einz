@@ -398,7 +398,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockClearHint =>
-      'Once set, you\'ll unlock every time you enter the space — safer. Both changing and clearing require your current PIN; leave the new PIN blank to clear it.';
+      'Once set, you\'ll unlock every time you enter the space — safer. You can also leave the new PIN blank to clear it.';
 
   @override
   String get chatPageSetLockHintNoPin =>

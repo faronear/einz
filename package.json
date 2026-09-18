@@ -37,7 +37,7 @@
     "app-ios-install-adhoc-ip11-steps": "ls ~/Library/MobileDevice/Provisioning\\ Profiles/; cd app; flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist; ls -la build/ios/ipa/einz.ipa; xcrun devicectl list devices; rm -rf /tmp/einz-ipa && mkdir -p /tmp/einz-ipa; unzip -q build/ios/ipa/einz.ipa -d /tmp/einz-ipa; xcrun devicectl device install app --device 00008030-0005306011F9402E /tmp/einz-ipa/Payload/Runner.app",
     "app-ios-install-adhoc-ip6s": "bash app/ios/buildIos.sh adhoc && ideviceinstaller -u 01418b9159ab75651272f3e5616c3e3fc5dd7d1e install app/build/ios/ipa/einz.ipa",
     "app-ios-upload-appstore": "bash app/ios/buildIos.sh appstore --upload",
-    "desk-mac-build-prod": "cd app && eval \"$(node ../scripts/appVersion.js)\" && flutter build macos --release --build-name \"$APP_BUILD_NAME\" --build-number \"$APP_BUILD_NUMBER\" && mkdir -p _release.gitomit && mv build/macos/Build/Products/Release/einz.app \"_release.gitomit/einz.macos.${APP_BUILD_STAMP}.app\" && ls -lh \"_release.gitomit/einz.macos.${APP_BUILD_STAMP}.app\"",
+    "desk-mac-build-prod": "cd app && eval \"$(node ../scripts/appVersion.js)\" && flutter build macos --release --build-name \"$APP_BUILD_NAME\" --build-number \"$APP_BUILD_NUMBER\" && mkdir -p _release.gitomit && RELEASE=_release.gitomit/einz.macos.${APP_BUILD_STAMP}.app && mv build/macos/Build/Products/Release/einz.app $RELEASE && ls -lh $RELEASE && open $RELEASE",
     "tui-local-1": "cd cli && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
     "tui-local-2": "cd cli && dart run bin/einz_tui.dart --store demo/s2.json --server http://localhost:3000",
     "tui-local-3": "cd cli && dart run bin/einz_tui.dart --store demo/s3.json --server http://localhost:3000",
@@ -52,8 +52,7 @@
     "tui-remote-2": "cd cli && dart run bin/einz_tui.dart --store demo/st2.json",
     "tui-remote-1-new": "cd cli && rm -f demo/st1.json && dart run bin/einz_tui.dart --store demo/st1.json",
     "tui-remote-2-new": "cd cli && rm -f demo/st2.json && dart run bin/einz_tui.dart --store demo/st2.json",
-    "syncAgentRule": "node -e \"fetch('https://git.tic.cc/opx/sysconfig/raw/branch/main/agents/syncAgentRule.mjs').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text()}).then(async t=>{await import('data:text/javascript;base64,'+Buffer.from(t).toString('base64'))})\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "syncAgentRule": "node -e \"fetch('https://git.tic.cc/opx/sysconfig/raw/branch/main/agents/syncAgentRule.mjs').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text()}).then(async t=>{await import('data:text/javascript;base64,'+Buffer.from(t).toString('base64'))})\""
   },
   "keywords": [],
   "author": "",

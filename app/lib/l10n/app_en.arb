@@ -156,7 +156,7 @@
   },
   "chatPageLocaleSwitched": "Switched to {label}",
   "chatPageSetLockTitle": "Set app lock",
-  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space — safer. Both changing and clearing require your current PIN; leave the new PIN blank to clear it.",
+  "chatPageSetLockClearHint": "Once set, you'll unlock every time you enter the space — safer. You can also leave the new PIN blank to clear it.",
   "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you enter the space — safer.",
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter your current PIN first",

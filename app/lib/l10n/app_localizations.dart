@@ -797,7 +797,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockClearHint.
   ///
   /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you enter the space — safer. Both changing and clearing require your current PIN; leave the new PIN blank to clear it.'**
+  /// **'Once set, you\'ll unlock every time you enter the space — safer. You can also leave the new PIN blank to clear it.'**
   String get chatPageSetLockClearHint;
 
   /// No description provided for @chatPageSetLockHintNoPin.
