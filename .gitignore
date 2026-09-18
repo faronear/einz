@@ -47,6 +47,12 @@ node_modules/
 *.njsproj
 *.ntvs*
 *.sw*
+# 上一条 *.sw* 本意是 vim 交换文件(.swp/.swo)，但它同样匹配 .swift，
+# 导致 macos/Runner 的 Swift 源码一直被静默忽略、从未入库（新克隆无法编译
+# macOS）。这里显式放行 macOS Runner 源码；ios/Flutter/ephemeral 下的
+# 生成物仍保持忽略。
+!app/macos/Runner/*.swift
+!app/macos/RunnerTests/*.swift
 *.sln
 *.suo
 .gitattributes
