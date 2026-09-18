@@ -2794,7 +2794,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/server <地址> :: 查看或重设后台服务器地址',
+        '/server <地址> :: 查看或持久化重设后台服务器地址（与启动时 --server 不同：--server 仅本次生效）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2814,7 +2814,9 @@ Future<void> _execCommand(String line) async {
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '当前服务器: ${s.session.server}'));
         s.session.messages.add(_systemMessage(
-            s.session, '用法: /server <地址> —— 切换并激活服务器（如 /server https://einz.tic.cc）'));
+            s.session,
+            '用法: /server <地址> —— 持久化重设并激活服务器（写入 store，下次启动仍生效；'
+                '与启动时 --server 不同，后者仅本次生效。如 /server https://einz.tic.cc）'));
         s.status = '';
       } else {
         try {
@@ -2825,7 +2827,8 @@ Future<void> _execCommand(String line) async {
             s.session.startWs(onMessage: (_) => _refreshGenderForLatest(_state!), onStatus: (_) => _render(), onAutoSync: (_) => _refreshGenderForLatest(_state!),
               onRevoked: _onWsRevoked, onUnrecognized: _onWsUnrecognized);
           }
-          s.session.messages.add(_systemMessage(s.session, '✅ 已切换服务器并激活: $arg'));
+          s.session.messages.add(_systemMessage(
+              s.session, '✅ 已切换服务器并激活（已写入 store，下次启动仍生效）: $arg'));
           s.status = ''; // 一次性结果进消息流，清掉旧瞬时通知
         } catch (e) {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 切换服务器失败: $e'));
