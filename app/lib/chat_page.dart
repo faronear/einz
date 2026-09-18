@@ -23,6 +23,7 @@ import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'data/server_settings.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
@@ -947,9 +948,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 补设/重设启动锁（跳过 PIN 后某天想设置时用；复用 PIN 表单）。
   /// 用当前会话的 Space Key 包 setPin 加密落盘（内部会清掉明文副本）。
+  /// 落盘 server 用持久层值（ServerSettings）而非会话覆盖值：命令行 --server
+  /// 仅本次生效，不能被锁包固化（否则重启不带参数仍连覆盖地址）。
   Future<void> _showSetLockDialog() async {
+    final persistentServer =
+        await ServerSettings(widget.db ?? LocalDatabase.shared).load();
     final payload = AppLockPayload(
-      server: widget.server,
+      server: persistentServer.isNotEmpty ? persistentServer : widget.server,
       spaceId: widget.spaceId,
       deviceId: widget.deviceId,
       spaceKeyB64: base64Encode(widget.spaceKey),

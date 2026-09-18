@@ -139,6 +139,12 @@ class _SetupPageState extends State<SetupPage> {
 
   // 服务器地址：默认 einz.tic.cc；探测失败由自动重试兜底（启动屏不展示输入框）
   String _server = kEinzServer;
+
+  /// 落盘专用 server（持久层语义）：_initServer 里从 ServerSettings/默认值读出，
+  /// 不随命令行 --server 覆盖。写进锁包/明文配置的 server 必须用它——
+  /// 否则 --server 的本次覆盖值会被固化，下次不带参数仍连覆盖地址。
+  String _persistentServer = kEinzServer;
+
   bool _probeFailed = false;
   bool _probeDone = false; // 探测已成功（区分"探测中"与"已就绪"——入口页显示条件）
   bool _probeSlow = false; // 持续失败（超过静默期）→ splash 显示"正在连接 <地址>"小字（排障用，非报错）
@@ -230,8 +236,11 @@ class _SetupPageState extends State<SetupPage> {
     try {
       final db = widget.db ?? LocalDatabase.shared;
       final settings = ServerSettings(db);
-      // 命令行 --server 优先（仅本次生效）；否则读本设备持久化值，无则默认。
+      // 命令行 --server 覆盖本次启动地址（仅本次生效，不写入 ServerSettings 持久层）；
+      // 否则读本设备持久化值，无则默认。
       final effective = widget.initialServer ?? await settings.load();
+      // 落盘语义的持久层 server（--server 覆盖时不更新——见 savePlain/setPin 调用点）
+      _persistentServer = await settings.load();
       final probe = widget.probeServer ?? ServerSettings.probe;
       final (ok, pv, caps) = await probe(effective);
       if (!mounted) return;
@@ -246,6 +255,13 @@ class _SetupPageState extends State<SetupPage> {
           _step = 0; // 入口页（角色由用户选择）
         }
       });
+      // 探测成功的地址持久化（ServerSettings）：命令行 --server 覆盖值**除外**——
+      // 桌面版 --server 仅本次生效，不写入持久层（否则下次不带参数仍连覆盖地址）。
+      // 覆盖场景下 _persistentServer 保持持久层原值，落盘不会把覆盖地址固化。
+      if (ok && widget.initialServer == null) {
+        await settings.save(effective);
+        _persistentServer = effective;
+      }
       // 服务端未就绪（probe 正常返回 ok=false，不抛异常）：启动自动重试，
       // 一旦就绪自动进入向导（不必等用户手动输地址）
       if (!ok) _startProbeRetry();
@@ -1972,7 +1988,7 @@ class _SetupPageState extends State<SetupPage> {
       if (_pinSkipped) {
         if (!mounted) return;
         await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-          server: _server,
+          server: _persistentServer,
           spaceId: _spaceId.text.trim(),
           deviceId: _enroll!.deviceId,
           spaceKeyB64: base64Encode(_spaceKey!),
@@ -1985,7 +2001,7 @@ class _SetupPageState extends State<SetupPage> {
         return;
       }
       final ok = await _setupLockAndEnter(
-        server: _server,
+        server: _persistentServer,
         spaceId: _spaceId.text.trim(),
         deviceId: _enroll!.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
@@ -2200,7 +2216,7 @@ class _SetupPageState extends State<SetupPage> {
     if (_pinSkipped) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-        server: _server,
+        server: _persistentServer,
         spaceId: _spaceId.text,
         deviceId: _enroll!.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
@@ -2213,7 +2229,7 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     final ok = await _setupLockAndEnter(
-      server: _server,
+      server: _persistentServer,
       spaceId: _spaceId.text,
       deviceId: _enroll!.deviceId,
       spaceKeyB64: base64Encode(_spaceKey!),
@@ -2322,7 +2338,7 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     final ok = await _setupLockAndEnter(
-      server: _server,
+      server: _persistentServer,
       spaceId: enroll.spaceId,
       deviceId: enroll.deviceId,
       spaceKeyB64: base64Encode(_spaceKey!),
