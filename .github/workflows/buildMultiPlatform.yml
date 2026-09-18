@@ -46,6 +46,9 @@ jobs:
       - name: Flutter pub get
         working-directory: app
         run: flutter pub get
+      - name: Patch pub cache (AGP 9 compat)
+        working-directory: app
+        run: bash ../scripts/patchPubCache.sh
       - name: Build APK
         working-directory: app
         run: |
