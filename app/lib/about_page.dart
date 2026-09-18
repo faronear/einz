@@ -58,7 +58,7 @@ class _AboutPageState extends State<AboutPage> {
                   const SizedBox(height: 18),
                   Text(
                     l10n.aboutIntro,
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.left,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                           height: 1.5,
