@@ -63,6 +63,13 @@ jobs:
         with:
           name: einz-android
           path: app/build/app/outputs/flutter-apk/*.apk
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: app/build/app/outputs/flutter-apk/*.apk
 
   windows:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows' }}
@@ -97,6 +104,16 @@ jobs:
         with:
           name: einz-windows
           path: |
+            einz-windows.zip
+            cli/build/einz.exe
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          # 每次构建覆盖 latest release，访客始终在同一地址取最新包
+          make_latest: true
+          files: |
             einz-windows.zip
             cli/build/einz.exe
 
@@ -135,6 +152,15 @@ jobs:
         with:
           name: einz-macos
           path: |
+            einz-macos.zip
+            cli/build/einz-macos
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: |
             einz-macos.zip
             cli/build/einz-macos
 
