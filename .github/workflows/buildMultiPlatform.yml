@@ -82,7 +82,10 @@ jobs:
         run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-windows.zip
       - name: Build CLI
         working-directory: cli
-        run: dart compile exe bin/einz_tui.dart -o build/einz.exe
+        run: |
+          dart pub get
+          mkdir -p build
+          dart compile exe bin/einz_tui.dart -o build/einz.exe
       - uses: actions/upload-artifact@v4
         with:
           name: einz-windows
@@ -111,7 +114,8 @@ jobs:
           eval "$(node ../scripts/appVersion.js)"
           flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
       - name: Build CLI
-        run: dart compile exe cli/bin/einz_tui.dart -o cli/build/einz-macos
+        run: |
+          (cd cli && dart pub get && mkdir -p build && dart compile exe bin/einz_tui.dart -o build/einz-macos)
       - name: Zip app bundle
         run: cd app/build/macos/Build/Products/Release && zip -r -y ../../../einz-macos.zip einz.app
       - uses: actions/upload-artifact@v4
