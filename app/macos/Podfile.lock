@@ -17,6 +17,8 @@ PODS:
   - mobile_scanner (7.0.0):
     - Flutter
     - FlutterMacOS
+  - package_info_plus (0.0.1):
+    - FlutterMacOS
   - record_macos (2.0.0):
     - FlutterMacOS
   - video_player_avfoundation (0.0.1):
@@ -32,6 +34,7 @@ DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
   - libsodium-macos (from `Libraries/libsodium-macos.podspec`)
   - mobile_scanner (from `Flutter/ephemeral/.symlinks/plugins/mobile_scanner/darwin`)
+  - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
   - record_macos (from `Flutter/ephemeral/.symlinks/plugins/record_macos/macos`)
   - video_player_avfoundation (from `Flutter/ephemeral/.symlinks/plugins/video_player_avfoundation/darwin`)
 
@@ -52,6 +55,8 @@ EXTERNAL SOURCES:
     :path: Libraries/libsodium-macos.podspec
   mobile_scanner:
     :path: Flutter/ephemeral/.symlinks/plugins/mobile_scanner/darwin
+  package_info_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos
   record_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/record_macos/macos
   video_player_avfoundation:
@@ -64,11 +69,12 @@ SPEC CHECKSUMS:
   file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
   flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
-  libsodium-macos: 1d72e6ac393fe2631d6303c0cdfe32081dfae38b
+  libsodium-macos: fdca0e8132183aebbf1cbeb71e3adc8e40873ceb
   mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
+  package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   record_macos: 2e43c16b84ce188b8137754ee648322a2dcdf7fa
   video_player_avfoundation: 3453f792138786248960ca029747fcd9f318ef52
 
-PODFILE CHECKSUM: 93c6db57cfa5a4b1bf9dff8befaa47c1866f1536
+PODFILE CHECKSUM: aeef18e7d938130120c0966eef573234dd4ebb66
 
 COCOAPODS: 1.16.2

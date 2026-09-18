@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
   s.author           = { 'libsodium' => 'https://github.com/jedisct1/libsodium' }
   s.source           = { :path => '.' }
 
-  s.platform         = :osx, '12.0'
+  s.platform         = :osx, '13.0'
   s.vendored_libraries = 'libsodium-macos.a'
 
   # 必须用 user_target_xcconfig（作用于 Runner 链接步骤），原因同 iOS podspec 注释：
