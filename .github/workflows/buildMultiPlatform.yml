@@ -59,17 +59,20 @@ jobs:
           # 版本号 yymm.ddhh.mm / 构建号 yymmddhh，各平台统一（唯一出处 scripts/appVersion.js）
           eval "$(node ../scripts/appVersion.js)"
           flutter build apk --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+      - name: Rename APK
+        working-directory: app
+        run: mv build/app/outputs/flutter-apk/app-release.apk einz-app-android.apk
       - uses: actions/upload-artifact@v4
         with:
           name: einz-android
-          path: app/build/app/outputs/flutter-apk/*.apk
+          path: app/einz-app-android.apk
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest Build
           make_latest: true
-          files: app/build/app/outputs/flutter-apk/*.apk
+          files: app/einz-app-android.apk
 
   windows:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows' }}
