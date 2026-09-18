@@ -2719,19 +2719,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: recording ? Colors.red.shade50 : Colors.grey.shade100,
+        color: recording ? Colors.green.shade50 : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: recording ? Colors.red.shade200 : Colors.grey.shade300),
+        border: Border.all(color: recording ? Colors.green.shade200 : Colors.grey.shade300),
       ),
       child: recording
           ? Row(
               children: [
                 Text(elapsed,
                     style: const TextStyle(
-                        color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600)),
+                        color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(width: 10),
                 Expanded(
-                    child: _WaveformBars(samples: _voiceLastSamples(40), color: Colors.red)),
+                    child: _WaveformBars(
+                        samples: _voiceLastSamples(40), color: Colors.green)),
               ],
             )
           : preview
@@ -4002,7 +4003,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         onLongPressEnd: (_) => _stopVoice(),
                         child: IconButton(
                           icon: Icon(_voiceEntryIcon(),
-                              color: _inputMode == _InputMode.recording ? Colors.red : null),
+                              color:
+                                  _inputMode == _InputMode.recording ? Colors.green : null),
                           onPressed: _onVoiceEntryTap,
                         ),
                       ),
