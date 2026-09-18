@@ -350,11 +350,11 @@ class _SetupPageState extends State<SetupPage> {
                   ),
                 ),
                 const PopupMenuDivider(),
+                // 关于与退出一组（都在分割线下方，退出垫底）
                 PopupMenuItem(
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
-                const PopupMenuDivider(),
                 PopupMenuItem(
                   value: 'exit',
                   child: Text(l10n.chatPageMenuExit, style: labelStyle),
