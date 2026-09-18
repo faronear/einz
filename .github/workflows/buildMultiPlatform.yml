@@ -113,6 +113,11 @@ jobs:
         run: flutter pub get
       - name: Build macOS App
         working-directory: app
+        env:
+          # CI 无开发证书/profile：跳过签名（ad-hoc），产物装到别的机器需 xattr -cr 或右键打开
+          CODE_SIGNING_ALLOWED: 'NO'
+          CODE_SIGNING_REQUIRED: 'NO'
+          CODE_SIGN_IDENTITY: '-'
         run: |
           eval "$(node ../scripts/appVersion.js)"
           flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
