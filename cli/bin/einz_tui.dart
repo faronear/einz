@@ -252,10 +252,11 @@ Future<(bool, String, List<String>)> _probeServer(String server) async {
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
 /// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
 /// key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧用密保信封导入）。
-Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
+Future<(DeviceStore, String, String)> _onboard(String storePath, String server,
+    {bool serverFromArgs = false}) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
-  // ① 服务器地址：--server 参数 > store 持久化值 > 本机默认（cli/localConfig.json）> 硬编码
+  // ① 服务器地址：--server 参数（仅本次生效）> store 持久化值 > 本机默认（cli/localConfig.json）> 硬编码
   if (server.isEmpty) {
     final saved = store?.server;
     server = (saved != null && saved.isNotEmpty) ? saved : _defaultServer();
@@ -292,7 +293,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
       Directory(dir).createSync(recursive: true);
       storePath = '$dir/myeinz.json';
     }
-    store.server = server; // server 已在开头解析（探测/询问），随身份一起持久化
+    // store 刚创建（首次引导）：server 必须落盘（新 store 没有持久层值可用）。
+    // 命令行 --server 也在此写入——新 store 无既有默认可保护，首次引导确认的
+    // 地址就是它的起点（与 GUI 首次入网写 ServerSettings 持久层一致）。
+    store.server = server;
     store.save(storePath);
     stdout.writeln('✅ 新设备公钥已生成: ${store.publicKey}');
     _guidanceNotes.add('✅ 新设备公钥已生成: ${store.publicKey}');
@@ -418,7 +422,8 @@ Future<void> _unlockPin(ChatSession session) async {
   }
 }
 
-Future<void> _runGuide(ChatSession session, String storePath, String server) async {
+Future<void> _runGuide(ChatSession session, String storePath, String server,
+    {bool serverFromArgs = false}) async {
   final store = session.store;
 
   // v2 已无「v1 全局 person 名称表」（/health 的 person_names 随 2efad8c 下线）——
@@ -527,8 +532,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     }
   }
 
-  // 持久化最终确认的 server（探测后沿用/用户覆盖），多终端共享同一 store 只设一次
-  if (store.server != server) {
+  // 持久化最终确认的 server——**命令行 --server 覆盖除外**（方案 X：--server 仅本次
+  // 生效，不粘进 store；要改 store 默认地址用 /server 命令显式持久化）。
+  // 已有 store（非首次引导）+ 无 --server 参数：server 即 store 原值，此处不变。
+  if (!serverFromArgs && store.server != server) {
     store.server = server;
     store.save(storePath);
   }
@@ -1142,7 +1149,7 @@ Future<void> main(List<String> args) async {
 
   // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成设备凭证；
   // 无 Space Key → 口令接入（escrow）；未激活 → auth。全部就绪后才进入 TUI。
-  final onboard = await _onboard(storePath, server);
+  final onboard = await _onboard(storePath, server, serverFromArgs: server.isNotEmpty);
   if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
   final store = onboard.$1;
   server = onboard.$2;
@@ -1198,7 +1205,7 @@ Future<void> main(List<String> args) async {
 
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
   // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
-  final guide = _runGuide(session, storePath, server);
+  final guide = _runGuide(session, storePath, server, serverFromArgs: server.isNotEmpty);
 
   _render();
 
