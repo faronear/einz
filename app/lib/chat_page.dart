@@ -1205,7 +1205,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ? null
                         : () {
                             Clipboard.setData(ClipboardData(text: widget.publicKeyB64!));
-                            showTopNotice(ctx, l10n.chatPageCopied);
+                            showTopNotice(ctx, l10n.chatPagePublicKeyCopied);
                           },
                   ),
                 ),

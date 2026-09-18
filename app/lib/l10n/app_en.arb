@@ -216,7 +216,7 @@
   },
   "chatPageRenameSameAsPeerError": "Can't match your partner's name — pick another",
   "chatPageCopy": "Copy",
-  "chatPageCopied": "Copied",
+  "chatPagePublicKeyCopied": "Copied device public key",
   "chatPageEdit": "Edit",
   "chatPageRenameFailed": "Rename failed: {error}",
   "@chatPageRenameFailed": {

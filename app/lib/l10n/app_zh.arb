@@ -216,7 +216,7 @@
   },
   "chatPageRenameSameAsPeerError": "不能与对方同名，请换个名字",
   "chatPageCopy": "复制",
-  "chatPageCopied": "已复制",
+  "chatPagePublicKeyCopied": "已复制设备公钥",
   "chatPageEdit": "编辑",
   "chatPageRenameFailed": "修改失败: {error}",
   "@chatPageRenameFailed": {

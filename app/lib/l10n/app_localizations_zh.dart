@@ -507,7 +507,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageCopy => '复制';
 
   @override
-  String get chatPageCopied => '已复制';
+  String get chatPagePublicKeyCopied => '已复制设备公钥';
 
   @override
   String get chatPageEdit => '编辑';

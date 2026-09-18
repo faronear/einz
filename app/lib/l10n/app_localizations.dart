@@ -1034,11 +1034,11 @@ abstract class AppLocalizations {
   /// **'Copy'**
   String get chatPageCopy;
 
-  /// No description provided for @chatPageCopied.
+  /// No description provided for @chatPagePublicKeyCopied.
   ///
   /// In en, this message translates to:
-  /// **'Copied'**
-  String get chatPageCopied;
+  /// **'Copied device public key'**
+  String get chatPagePublicKeyCopied;
 
   /// No description provided for @chatPageEdit.
   ///

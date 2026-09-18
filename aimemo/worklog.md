@@ -7075,3 +7075,14 @@ Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不�
 - 中文文案一字未改，中文态表现不变（invite_dialog_layout_test 的 zh 断言仍成立）。
 
 `flutter analyze` 干净（app/）。英文态请老板再点一次拷贝确认。
+
+## 2026-09-18 设备公钥拷贝通知改成具体文案（老板要求）
+
+「我的设备」弹窗里拷贝设备公钥后，通知只有「已复制 / Copied」，老板嫌太简略。
+
+- 换成 `chatPagePublicKeyCopied`：已复制设备公钥 / Copied device public key。
+- 旧的通用 key `chatPageCopied` 已无引用（只有这一处用过），一并从 arb 删掉，
+  `flutter gen-l10n` 重新生成。「复制 / Copy」（chatPageCopy）仍在用（邀请弹窗按钮、
+  公钥 tooltip），保留。
+
+`flutter analyze` 干净（app/）。

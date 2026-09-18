@@ -536,7 +536,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageCopy => 'Copy';
 
   @override
-  String get chatPageCopied => 'Copied';
+  String get chatPagePublicKeyCopied => 'Copied device public key';
 
   @override
   String get chatPageEdit => 'Edit';
