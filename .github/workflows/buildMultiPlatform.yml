@@ -1,8 +1,8 @@
 # Einz 多平台构建（GitHub Actions）
 #
 # 覆盖 Android / iOS / macOS / Windows 四个目标，触发方式：
-#   - push tag（v*）：全平台构建
-#   - workflow_dispatch：手动选择单个平台
+#   - workflow_dispatch：手动选择单个平台（push tag 自动构建暂未启用，避免每次 push 都跑 CI）
+#   - push tag（v*）：全平台构建（需要时取消下面注释）
 #
 # 说明：
 #   - Android / Windows / macOS 无签名要求，直接出包
@@ -12,9 +12,6 @@
 name: Multi Platform Build
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       platform:
@@ -28,6 +25,9 @@ on:
           - ios
           - macos
           - windows
+  # push:
+  #   tags:
+  #     - 'v*'
 
 jobs:
   android:
