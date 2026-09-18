@@ -31,6 +31,8 @@ PODS:
     - FlutterMacOS
   - open_filex (0.0.2):
     - Flutter
+  - package_info_plus (0.4.5):
+    - Flutter
   - record_ios (2.0.0):
     - Flutter
   - video_player_avfoundation (0.0.1):
@@ -50,6 +52,7 @@ DEPENDENCIES:
   - libsodium (from `./Libraries`)
   - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
   - open_filex (from `.symlinks/plugins/open_filex/ios`)
+  - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - record_ios (from `.symlinks/plugins/record_ios/ios`)
   - video_player_avfoundation (from `.symlinks/plugins/video_player_avfoundation/darwin`)
   - video_thumbnail (from `.symlinks/plugins/video_thumbnail/ios`)
@@ -77,6 +80,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/mobile_scanner/darwin"
   open_filex:
     :path: ".symlinks/plugins/open_filex/ios"
+  package_info_plus:
+    :path: ".symlinks/plugins/package_info_plus/ios"
   record_ios:
     :path: ".symlinks/plugins/record_ios/ios"
   video_player_avfoundation:
@@ -95,6 +100,7 @@ SPEC CHECKSUMS:
   libwebp: af5937a13536ef73f3784d69cc342b98961acf33
   mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
   open_filex: 432f3cd11432da3e39f47fcc0df2b1603854eff1
+  package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   record_ios: 390a30c7caaf8b5d0fb1cb1d2fd5064b48b4520c
   video_player_avfoundation: 3453f792138786248960ca029747fcd9f318ef52
   video_thumbnail: b637e0ad5f588ca9945f6e2c927f73a69a661140
