@@ -7103,3 +7103,27 @@ Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不�
 
 对话页、向导页的「退出秘境」菜单项右侧都带 `Icons.logout`（size 18，取
 labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row + Spacer + Icon。
+
+## 2026-09-18 `--server` 三连 commit 评审 + 修 5 项（老板要求评审）
+
+评审对象：`08afc29`（App）、`9ed53eb`+`5d13f7d`（TUI 方案 X）。方向（命令行覆盖不
+持久化）认可，实现有洞。老板拍板按 1+2+3(删 save)+4+5 修，已提交 `5f3b0ae`。
+
+- **主路径失效**：`main.dart` 的 `StartupGate` 给 `LockPage` 时没传 `initialServer`，
+  设过 PIN 的设备（桌面端最常见）上 `--server` 完全无效。现已透传
+  main → LockPage → ChatPage，锁屏页「关于秘境」也显示覆盖地址。
+- **漏改**：`setup_page` 信封导入 + 跳过 PIN 的 `savePlain` 仍写 `_server`（覆盖值
+  被固化），改 `_persistentServer`。
+- **删 `settings.save(effective)`**：探测成功写持久层只会把默认域名固化成 SQLite
+  记录，将来换部署域名老设备不跟随；App 又没有任何改地址入口（无输入框、无
+  `/server` 等价物），收益为零。持久层保持为空 → 始终取常量 `kEinzServer`。
+- **TUI 落盘改按"值从哪来"分类**：`serverFromArgs` 布尔换成 `--server` 原值
+  `serverArg` 比对。纯命令行覆盖 → 回落到 `_defaultServer()`；用户在探测失败后
+  手输的地址 → 照常落盘（修掉 `5d13f7d` 丢用户输入的回归）。
+- 清理：`_initServer` 两次 `settings.load()` 合并；`chat_page` 补设锁去掉恒非空死分支。
+
+**遗留待老板拍板**：用 `--server staging` 走完向导新建空间时，锁包/明文包记的仍是
+持久值（默认 prod），下次不带参数连 prod，而 `spaceId` 只存在于 staging——"入网是否
+固化本次地址"未定。另：`docs/DEPLOYMENT.md` 仍写「设置页填域名（App）」，与现实不符。
+
+`flutter analyze`（app/）与 `dart analyze`（cli/）均干净；UI 老板自测。
