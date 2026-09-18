@@ -3710,7 +3710,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 PopupMenuItem(
                   value: 'exit',
-                  child: Text(l10n.chatPageMenuExit, style: labelStyle),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuExit, style: labelStyle),
+                      const Spacer(),
+                      // 右侧退出图标：比纯文字更明确的「离开」信号（老板 2026-09-18）
+                      Icon(Icons.logout, size: 18, color: labelStyle.color),
+                    ],
+                  ),
                 ),
               ];
             },
