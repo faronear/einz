@@ -93,19 +93,19 @@ jobs:
           eval "$(node ../scripts/appVersion.js)"
           flutter build windows --release --build-name "$APP_BUILD_NAME"
       - name: Zip release folder
-        run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-windows.zip
+        run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-gui-windows.zip
       - name: Build CLI
         working-directory: cli
         run: |
           dart pub get
           mkdir -p build
-          dart compile exe bin/einz_tui.dart -o build/einz.exe
+          dart compile exe bin/einz_tui.dart -o build/einz-tui-windows.exe
       - uses: actions/upload-artifact@v4
         with:
           name: einz-windows
           path: |
-            einz-windows.zip
-            cli/build/einz.exe
+            einz-gui-windows.zip
+            cli/build/einz-tui-windows.exe
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -114,8 +114,8 @@ jobs:
           # 每次构建覆盖 latest release，访客始终在同一地址取最新包
           make_latest: true
           files: |
-            einz-windows.zip
-            cli/build/einz.exe
+            einz-gui-windows.zip
+            cli/build/einz-tui-windows.exe
 
   macos:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
@@ -145,17 +145,17 @@ jobs:
           flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
       - name: Build CLI
         run: |
-          (cd cli && dart pub get && mkdir -p build && dart compile exe bin/einz_tui.dart -o build/einz-macos)
+          (cd cli && dart pub get && mkdir -p build && dart compile exe bin/einz_tui.dart -o build/einz-tui-macos)
       - name: Zip app bundle
         # 往上五级到仓库根（Release→Products→Build→macos→app→根），
         # 之前 ../../../ 只到 app/build/macos/，导致上传的 zip 里没有 einz.app（只有 TUI）
-        run: cd app/build/macos/Build/Products/Release && zip -r -y ../../../../../einz-macos.zip einz.app
+        run: cd app/build/macos/Build/Products/Release && zip -r -y ../../../../../einz-gui-macos.zip einz.app
       - uses: actions/upload-artifact@v4
         with:
           name: einz-macos
           path: |
-            einz-macos.zip
-            cli/build/einz-macos
+            einz-gui-macos.zip
+            cli/build/einz-tui-macos
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -163,8 +163,8 @@ jobs:
           name: Latest Build
           make_latest: true
           files: |
-            einz-macos.zip
-            cli/build/einz-macos
+            einz-gui-macos.zip
+            cli/build/einz-tui-macos
 
   ios:
     if: ${{ github.event_name == 'push' || inputs.platform == 'ios' }}
