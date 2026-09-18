@@ -1006,7 +1006,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     while (true) {
       if (!_state!.running) return;
       final input =
-          (await _prompt(session, '❓ 验证密保口令:', hidden: true, required: true))
+          (await _prompt(session, '❓ 验证密保口令:', hidden: false, required: true))
               .trim();
       // 留空（含 /exit 中止）→ 重问；输入循环 required 已拦截留空回车
       if (input.isEmpty) continue;
