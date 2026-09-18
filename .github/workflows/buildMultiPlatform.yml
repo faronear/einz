@@ -51,6 +51,10 @@ jobs:
         run: bash ../scripts/patchPubCache.sh
       - name: Build APK
         working-directory: app
+        env:
+          # 公共 runner 仅 7GB 内存：覆盖 gradle.properties 里的 -Xmx8G（按本机大内存设置），
+          # 避免 OOM killer 杀 Gradle（曾表现为跑约 16 分钟后 exit 143）
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3G -XX:MaxMetaspaceSize=1G"
         run: |
           # 版本号 yymm.ddhh.mm / 构建号 yymmddhh，各平台统一（唯一出处 scripts/appVersion.js）
           eval "$(node ../scripts/appVersion.js)"
