@@ -293,10 +293,10 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server,
       Directory(dir).createSync(recursive: true);
       storePath = '$dir/myeinz.json';
     }
-    // store 刚创建（首次引导）：server 必须落盘（新 store 没有持久层值可用）。
-    // 命令行 --server 也在此写入——新 store 无既有默认可保护，首次引导确认的
-    // 地址就是它的起点（与 GUI 首次入网写 ServerSettings 持久层一致）。
-    store.server = server;
+    // store 刚创建（首次引导）：与已有 store 同一规则——写入的是持久层解析值
+    // （localConfig/硬编码默认），命令行 --server 覆盖同样不落盘（见下方统一判断）。
+    // 新 store 的 server 起点来自 TUI 预设（_defaultServer），不缺地址可用。
+    store.server = serverFromArgs ? _defaultServer() : server;
     store.save(storePath);
     stdout.writeln('✅ 新设备公钥已生成: ${store.publicKey}');
     _guidanceNotes.add('✅ 新设备公钥已生成: ${store.publicKey}');
