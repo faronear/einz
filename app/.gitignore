@@ -53,12 +53,10 @@ app.*.map.json
 # 签名密钥（禁止提交）
 /android/key.properties
 
-# flutter create 生成的平台噪音（项目只需 ios/android；勿提交 linux/web/windows）
-# macos 工程文件（entitlements/pbxproj）必须跟踪——macOS 桌面端构建依赖；
-# 仅忽略本地产物（图标等不入 git，老板决策）
+# 平台工程文件跟踪策略：macos/windows 桌面端构建依赖其工程文件，必须跟踪；
+# 各自目录内有 .gitignore 精确排除本地产物。linux/web 暂不需要，继续忽略。
 /linux/
 /web/
-/windows/
 
 # Widget Preview related
 .widget_preview/
