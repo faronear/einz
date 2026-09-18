@@ -4,6 +4,7 @@ import 'dart:io' show exit;
 
 import 'package:flutter/material.dart';
 
+import 'about_page.dart';
 import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
@@ -146,6 +147,7 @@ class _LockPageState extends State<LockPage> {
         Future<void>.delayed(const Duration(milliseconds: 300), () {
           if (!mounted) return;
           if (value == 'locale') _showLocalePicker();
+          if (value == 'about') _openAboutPage();
           if (value == 'exit') _showExitAppDialog();
         });
       },
@@ -167,6 +169,11 @@ class _LockPageState extends State<LockPage> {
             ),
           ),
           const PopupMenuDivider(),
+          // 关于与退出一组（都在分割线下方，退出垫底）——与对话页/向导页菜单一致
+          PopupMenuItem(
+            value: 'about',
+            child: Text(l10n.chatPageMenuAbout, style: labelStyle),
+          ),
           PopupMenuItem(
             value: 'exit',
             child: Text(l10n.chatPageMenuExit, style: labelStyle),
@@ -206,6 +213,14 @@ class _LockPageState extends State<LockPage> {
     await settings.save(picked);
     if (!mounted) return;
     showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
+  }
+
+  /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
+  /// 服务器地址不给：锁屏页拿不到会话信息，交给 AboutPage 回退读本设备持久化值。
+  void _openAboutPage() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db)),
+    );
   }
 
   /// 退出应用（等价 TUI /exit）：确认后彻底关闭（锁屏页无聊天可回，不回任何页）。

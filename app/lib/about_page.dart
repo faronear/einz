@@ -11,7 +11,7 @@ typedef AboutInfo = ({String version, String buildNumber, String server});
 
 /// 「关于秘境」页：版本号 + 当前服务器地址 + 一句话说明。
 ///
-/// 入口在对话页和向导页的右上角菜单（两项都叫「关于秘境」）。
+/// 入口在对话页、向导页、锁屏页的右上角菜单（三项都叫「关于秘境」）。
 /// 版本号读的是打包时写进产物的 CFBundleShortVersionString / versionName
 /// （yymm.ddhh.mm，见 scripts/appVersion.js），不是 pubspec 里那个写死的 1.0.0。
 /// 服务器地址读本设备持久化值，没改过就是默认 einz.tic.cc。

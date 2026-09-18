@@ -7086,3 +7086,15 @@ Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不�
   公钥 tooltip），保留。
 
 `flutter analyze` 干净（app/）。
+
+## 2026-09-18 锁屏页菜单加「关于秘境」（老板要求）
+
+三个有 ⋯ 菜单的页面里，锁屏页是唯一没有「关于秘境」的（对话页、向导页都有）。
+
+- `lock_page.dart` 菜单加 `about` 项，位置沿用另两页的排法：分割线下方，
+  关于在前、退出垫底；onSelected 分支 + `_openAboutPage()`（push MaterialPageRoute）。
+- `AboutPage(db: widget.db)`：锁屏页拿不到会话里的 server，不传，交给 AboutPage
+  回退读本设备持久化值（ServerSettings），和有会话时表现一致。
+- 未设 PIN 的「锁屏未激活」提示页也带同一个菜单，About 同样可达。
+
+`flutter analyze` 干净（app/）。UI 老板自测。
