@@ -105,4 +105,5 @@
 - [ ] 消息删除语义
 - [ ] 已读回执粒度
 - [ ] **macOS 分发签名 + 公证**（2026-09-18 记）：目前仅老板自用，development 签名够用；正式分发前需——Xcode 建 Developer ID Application 证书（Account Holder）→ codesign --options runtime --timestamp（Hardened Runtime 为公证硬性要求，现有 entitlements 兼容）→ zip → notarytool submit（App 专用密码 + keychain-profile）→ stapler staple；流程确认后搬进 GitHub Actions（secrets：证书 p12/密码/App 专用密码/AppleID）
+- [ ] **语音实时通话（[待评审]，2026-09-18）**：专题方案见 `aimemo/voiceCall.zhcn.md`（WebRTC + 自建 coturn，只做前台语音通话、不做后台呼入/不接推送、不做视频与桌面端）。**评审通过后才拆成本文件的任务项**；第一步是 Phase A 可行性验证（`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通）。
 - [ ] **TUI/CLI 接入已有 escrow 实现**（生产化安全加固候选）：新设备接入改走 `escrow download`（凭口令取 Space Key），替代直接传输 sealed 文件，降低 store 泄露风险；配套考察加密 store（Keychain/secret-service）——待有空时考察决定是否实施

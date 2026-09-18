@@ -54,7 +54,7 @@ dependencies:
   path_provider: ^2.1.6
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.4.0
-  device_info_plus: ^13.2.0 # 13.x iOS 源码含 isiOSAppOnVision（iOS 26.1 API）；Xcode 16.1 编译前需删 pub cache 中该段（见工作区说明），升级 Xcode 后复原
+  device_info_plus: ^13.2.0 # 13.x iOS 源码用了 @available(iOS 26.1, *) 的 isiOSAppOnVision → 需 iOS 26.1+ SDK（Xcode 26+，本机 26.3 直接编过）。早期在 Xcode 16.1 下靠删 pub cache 该段绕过，已复原（见 docs/IOS.md §0.1）
   open_filex: ^4.7.0
   video_thumbnail: ^0.5.6
   package_info_plus: ^10.2.1
