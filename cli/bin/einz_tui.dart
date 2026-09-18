@@ -3275,7 +3275,7 @@ Future<void> _execOpen(List<String> parts) async {
     s.status = '⏳ 下载附件中（${target.plain}）……';
     final path = await s.session.openAttachment(target);
     s.session.messages
-        .add(_systemMessage(s.session, '✅ 已用系统应用打开附件（${target.plain}）\n📁 附件缓存: $path'));
+        .add(_systemMessage(s.session, '✅ 已打开附件(${target.plain}): $path'));
     s.status = ''; // 下载进度通知退场，结果已在消息区
   } catch (e) {
     s.session.messages.add(_systemMessage(s.session, '❌ 打开附件失败: $e'));

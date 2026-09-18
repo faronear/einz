@@ -1613,7 +1613,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Einz Locked'**
+  /// **'My Einz'**
   String get lockPageTitle;
 
   /// No description provided for @lockPagePinPrompt.

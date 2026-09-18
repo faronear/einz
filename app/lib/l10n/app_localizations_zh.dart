@@ -825,7 +825,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get burnOption7Days => '7 天';
 
   @override
-  String get lockPageTitle => '秘境已锁定';
+  String get lockPageTitle => '我的秘境';
 
   @override
   String get lockPagePinPrompt => '输入锁屏码';

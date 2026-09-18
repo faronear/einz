@@ -865,7 +865,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get burnOption7Days => '7 days';
 
   @override
-  String get lockPageTitle => 'Einz Locked';
+  String get lockPageTitle => 'My Einz';
 
   @override
   String get lockPagePinPrompt => 'Enter PIN to unlock';
