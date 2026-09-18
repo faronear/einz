@@ -37,6 +37,7 @@ class SetupPage extends StatefulWidget {
   const SetupPage({
     super.key,
     this.db,
+    this.initialServer,
     this.probeServer,
     this.preflightOverride,
     this.joinOverride,
@@ -48,6 +49,10 @@ class SetupPage extends StatefulWidget {
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
+
+  /// 命令行 `--server` 传入的本次启动服务器（null = 不覆盖，走本设备持久化/默认）。
+  /// 仅本次启动生效，不写入持久化。
+  final String? initialServer;
 
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 ServerSettings.probe。
   /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 person 表，
@@ -188,6 +193,8 @@ class _SetupPageState extends State<SetupPage> {
     // 方案 1：名字/伴侣名输入框聚焦时，键盘升起后把性别卡滚入可见区（见 _revealGender）
     _nameFocus.addListener(_onNameFocusChange);
     _partnerNameFocus.addListener(_onPartnerNameFocusChange);
+    // 命令行 --server 覆盖本次启动地址（不持久化）；否则走默认 einz.tic.cc。
+    _server = widget.initialServer ?? kEinzServer;
     _initServer();
     _autoGenerateKey(); // 对齐 TUI：本地无设备记录即自动生成公私钥，无需用户点按钮
   }
@@ -223,12 +230,13 @@ class _SetupPageState extends State<SetupPage> {
     try {
       final db = widget.db ?? LocalDatabase.shared;
       final settings = ServerSettings(db);
-      final saved = await settings.load();
+      // 命令行 --server 优先（仅本次生效）；否则读本设备持久化值，无则默认。
+      final effective = widget.initialServer ?? await settings.load();
       final probe = widget.probeServer ?? ServerSettings.probe;
-      final (ok, pv, caps) = await probe(saved);
+      final (ok, pv, caps) = await probe(effective);
       if (!mounted) return;
       setState(() {
-        _server = saved;
+        _server = effective;
         _probeFailed = !ok;
         _probeDone = ok;
         if (!ok) _probeFailCount++;
@@ -1093,7 +1101,7 @@ class _SetupPageState extends State<SetupPage> {
   /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
   void _openAboutPage() {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db)),
+      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db, server: _server)),
     );
   }
 

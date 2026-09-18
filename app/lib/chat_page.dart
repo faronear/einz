@@ -1012,7 +1012,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
   void _openAboutPage() {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db)),
+      MaterialPageRoute(
+        builder: (_) => AboutPage(db: widget.db, server: widget.server),
+      ),
     );
   }
 

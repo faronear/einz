@@ -16,10 +16,14 @@ typedef AboutInfo = ({String version, String buildNumber, String server});
 /// （yymm.ddhh.mm，见 scripts/appVersion.js），不是 pubspec 里那个写死的 1.0.0。
 /// 服务器地址读本设备持久化值，没改过就是默认 einz.tic.cc。
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key, this.db});
+  const AboutPage({super.key, this.db, this.server});
 
   /// 测试注入用；不给就用全局库。
   final LocalDatabase? db;
+
+  /// 当前生效的服务器地址（命令行 --server 覆盖或本设备持久化值）；给则直接用，
+  /// 不给则回退读本设备持久化值。
+  final String? server;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -30,7 +34,8 @@ class _AboutPageState extends State<AboutPage> {
 
   Future<AboutInfo> _load() async {
     final pkg = await PackageInfo.fromPlatform();
-    final server = await ServerSettings(widget.db ?? LocalDatabase.shared).load();
+    final server = widget.server ??
+        await ServerSettings(widget.db ?? LocalDatabase.shared).load();
     return (version: pkg.version, buildNumber: pkg.buildNumber, server: server);
   }
 

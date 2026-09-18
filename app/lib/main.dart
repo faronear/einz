@@ -5,22 +5,34 @@ import 'package:flutter/material.dart';
 import 'brand_logo.dart';
 import 'chat_page.dart';
 import 'data/app_lock.dart';
+import 'data/launch_args.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 
-/// Einz 移动端入口。
+/// Einz 移动端（及桌面端）入口。
 ///
 /// 启动流程：检查是否已设置启动锁 → 已设置进锁屏页（PIN 解密 Space Key 包），
 /// 未设置进一次性配置页（认证后设置 PIN）。
-void main() {
-  runApp(const EinzApp());
+///
+/// 桌面端支持一个启动参数：`--server <地址>`（`open -a Einz --args
+/// --server https://host`）。它覆盖本次启动使用的服务器地址，**仅本次生效、
+/// 不写入持久化**，下次不带参数启动即恢复本设备已保存/默认地址。
+Future<void> main() async {
+  // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
+  // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
+  WidgetsFlutterBinding.ensureInitialized();
+  final initialServer = parseServerArg(await readLaunchArgs());
+  runApp(EinzApp(initialServer: initialServer));
 }
 
 class EinzApp extends StatefulWidget {
-  const EinzApp({super.key});
+  const EinzApp({super.key, this.initialServer});
+
+  /// 命令行 `--server` 传入的本次启动服务器（null = 不覆盖，走本设备持久化/默认）。
+  final String? initialServer;
 
   @override
   State<EinzApp> createState() => _EinzAppState();
@@ -115,7 +127,7 @@ class _EinzAppState extends State<EinzApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: _locale,
-      home: const StartupGate(),
+      home: StartupGate(initialServer: widget.initialServer),
     );
   }
 }
@@ -123,7 +135,10 @@ class _EinzAppState extends State<EinzApp> {
 /// 启动门：三分支——有锁包 → 锁屏页；无锁但有明文配置（跳过 PIN）→ 直接进聊天；
 /// 都无 → 设置页。
 class StartupGate extends StatefulWidget {
-  const StartupGate({super.key});
+  const StartupGate({super.key, this.initialServer});
+
+  /// 命令行 `--server` 传入的本次启动服务器（null = 不覆盖）。
+  final String? initialServer;
 
   @override
   State<StartupGate> createState() => _StartupGateState();
@@ -246,7 +261,7 @@ class _StartupGateState extends State<StartupGate> {
           ? () => reauthFromPayload(plain)
           : null;
       return ChatPage(
-        server: plain.server,
+        server: widget.initialServer ?? plain.server,
         spaceId: plain.spaceId,
         deviceId: plain.deviceId,
         spaceKey: base64Decode(plain.spaceKeyB64),
@@ -257,7 +272,7 @@ class _StartupGateState extends State<StartupGate> {
         privateKeyB64: plain.privateKeyB64,
       );
     }
-    return const SetupPage();
+    return SetupPage(initialServer: widget.initialServer);
   }
 }
 
