@@ -709,14 +709,19 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   // 聊天态，敲字不应被当作消息提交；Ctrl+C 仍可退出）
   _state!.processing = true;
   session.messages.add(_systemMessage(session, '----------------'));
-  ChatMessage countdownMsg = _systemMessage(session, _welcomeCountdownText(_kWelcomeCountdownSeconds));
+  // 欢迎辞与读秒拆成两条 system 消息（老板 2026-09-18）：读秒独立成条且逐秒
+  // 追加数字不覆盖——"5 4 3 …"式历史可回看，最后 5 4 3 2 1 完整呈现
+  session.messages.add(_systemMessage(session, '一切就绪！即将进入秘境与伴侣聊天 💞'));
+  ChatMessage countdownMsg =
+      _systemMessage(session, _welcomeCountdownText(null, _kWelcomeCountdownSeconds));
   session.messages.add(countdownMsg);
   _scheduleRender();
   for (var remain = _kWelcomeCountdownSeconds - 1; remain >= 1; remain--) {
     await Future<void>.delayed(const Duration(seconds: 1));
     if (!_state!.running) return; // 倒计时期间 /exit / Ctrl+C：立即结束
-    // ChatMessage.plain 是 final：整条替换（位置不变——还是最后一条向导消息）
-    countdownMsg = _systemMessage(session, _welcomeCountdownText(remain));
+    // 读秒消息：不替换原消息，在文本尾部追加数字（同一条内 "5 4 3 …" 逐秒延长）
+    countdownMsg = _systemMessage(
+        session, _welcomeCountdownText(countdownMsg, remain));
     session.messages[session.messages.length - 1] = countdownMsg;
     _scheduleRender();
   }
@@ -728,10 +733,11 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   _scheduleRender();
 }
 
-/// 欢迎辞倒计时文本（两行，老板 2026-09-15）：首行欢迎辞；读秒单独一行
-/// "即将进入秘境聊天：<秒数>"，逐秒跳动。
-String _welcomeCountdownText(int remain) {
-  return '一切就绪！即将进入秘境与伴侣聊天 💞 $remain 💞';
+/// 欢迎辞读秒文本（单独一条 system 消息，老板 2026-09-18）：首秒 "5"，此后
+/// 每秒在尾部追加 " 4"、" 3"……逐秒延长成 "5 4 3 2 1"，不覆盖历史数字。
+String _welcomeCountdownText(ChatMessage? current, int remain) {
+  final head = current?.plain ?? '';
+  return head.isEmpty ? '$remain' : '$head $remain';
 }
 
 /// 客户端生成 space_id（UUIDv4，协议 §3.4：space_id/space_key 由客户端生成——
