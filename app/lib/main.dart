@@ -252,7 +252,9 @@ class _StartupGateState extends State<StartupGate> {
         ),
       );
     }
-    if (_hasLock!) return const LockPage();
+    // 命令行 --server 必须透传到锁屏页：解锁后进聊天页时它覆盖锁包里的地址
+    // （否则设过 PIN 的设备上 --server 完全无效）。
+    if (_hasLock!) return LockPage(initialServer: widget.initialServer);
     final plain = _plain;
     if (plain != null) {
       // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰；

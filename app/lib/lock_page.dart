@@ -24,7 +24,8 @@ import 'widgets/top_notice.dart';
 /// true（默认）= 现有覆盖锁屏语义，允许手势退回。未设置 PIN（无锁包）时恒定可退，
 /// 否则会死锁在提示页。
 class LockPage extends StatefulWidget {
-  const LockPage({super.key, this.asOverlay = false, this.canDismiss = true, this.db});
+  const LockPage(
+      {super.key, this.asOverlay = false, this.canDismiss = true, this.db, this.initialServer});
 
   final bool asOverlay;
 
@@ -33,6 +34,12 @@ class LockPage extends StatefulWidget {
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
+
+  /// 命令行 `--server` 传入的本次启动服务器（null = 不覆盖，用锁包里的地址）。
+  ///
+  /// 解锁后进聊天页时它优先于锁包里的 server——`--server` 是本次覆盖，不写进锁包
+  /// （不传就完全无效：设过 PIN 的设备是最常见的桌面端路径）。
+  final String? initialServer;
 
   @override
   State<LockPage> createState() => _LockPageState();
@@ -98,7 +105,8 @@ class _LockPageState extends State<LockPage> {
         : null;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
-        server: payload.server,
+        // 命令行 --server 覆盖本次会话地址（仅本次生效）；否则用锁包里的持久值
+        server: widget.initialServer ?? payload.server,
         spaceId: payload.spaceId,
         deviceId: payload.deviceId,
         spaceKey: base64Decode(payload.spaceKeyB64),
@@ -223,10 +231,11 @@ class _LockPageState extends State<LockPage> {
   }
 
   /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
-  /// 服务器地址不给：锁屏页拿不到会话信息，交给 AboutPage 回退读本设备持久化值。
+  /// 服务器地址只给命令行覆盖值（有则展示本次生效地址）；否则 AboutPage 回退读
+  /// 本设备持久化值——锁屏页拿不到锁包里的地址（尚未解锁）。
   void _openAboutPage() {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db)),
+      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db, server: widget.initialServer)),
     );
   }
 

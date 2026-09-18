@@ -954,7 +954,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final persistentServer =
         await ServerSettings(widget.db ?? LocalDatabase.shared).load();
     final payload = AppLockPayload(
-      server: persistentServer.isNotEmpty ? persistentServer : widget.server,
+      server: persistentServer,
       spaceId: widget.spaceId,
       deviceId: widget.deviceId,
       spaceKeyB64: base64Encode(widget.spaceKey),

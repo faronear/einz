@@ -236,11 +236,11 @@ class _SetupPageState extends State<SetupPage> {
     try {
       final db = widget.db ?? LocalDatabase.shared;
       final settings = ServerSettings(db);
-      // 命令行 --server 覆盖本次启动地址（仅本次生效，不写入 ServerSettings 持久层）；
-      // 否则读本设备持久化值，无则默认。
-      final effective = widget.initialServer ?? await settings.load();
-      // 落盘语义的持久层 server（--server 覆盖时不更新——见 savePlain/setPin 调用点）
+      // 落盘语义的持久层 server（--server 覆盖时不更新——见 savePlain/setPin 调用点）；
+      // 持久层无记录时 load() 回退默认域名。
       _persistentServer = await settings.load();
+      // 本次生效地址：命令行 --server 覆盖 > 持久层值。
+      final effective = widget.initialServer ?? _persistentServer;
       final probe = widget.probeServer ?? ServerSettings.probe;
       final (ok, pv, caps) = await probe(effective);
       if (!mounted) return;
@@ -255,13 +255,10 @@ class _SetupPageState extends State<SetupPage> {
           _step = 0; // 入口页（角色由用户选择）
         }
       });
-      // 探测成功的地址持久化（ServerSettings）：命令行 --server 覆盖值**除外**——
-      // 桌面版 --server 仅本次生效，不写入持久层（否则下次不带参数仍连覆盖地址）。
-      // 覆盖场景下 _persistentServer 保持持久层原值，落盘不会把覆盖地址固化。
-      if (ok && widget.initialServer == null) {
-        await settings.save(effective);
-        _persistentServer = effective;
-      }
+      // 注：探测成功**不写** ServerSettings——持久层只应存"用户显式确认过的地址"，
+      // 而 App 目前没有改地址的入口，写进去只会把当前默认域名固化成本地记录，
+      // 将来换部署域名时老设备反而不跟随（不写则持久层为空、始终取常量默认）。
+
       // 服务端未就绪（probe 正常返回 ok=false，不抛异常）：启动自动重试，
       // 一旦就绪自动进入向导（不必等用户手动输地址）
       if (!ok) _startProbeRetry();
@@ -2325,7 +2322,7 @@ class _SetupPageState extends State<SetupPage> {
     if (_pinSkipped) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-        server: _server,
+        server: _persistentServer,
         spaceId: enroll.spaceId,
         deviceId: enroll.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
