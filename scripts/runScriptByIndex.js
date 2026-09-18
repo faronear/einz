@@ -7,8 +7,8 @@ const readline = require('readline');
 const packageJsonPath = path.join(__dirname, '..', 'package.json');
 const scripts = Object.entries(JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')).scripts);
 
-scripts.forEach(([name, command], index) => {
-  console.log(`${index + 1}. ${name}  =>  ${command}`);
+scripts.forEach(([name], index) => {
+  console.log(`${index + 1} : ${name}`);
 });
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
