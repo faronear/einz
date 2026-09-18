@@ -836,7 +836,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      '秘境是给两个人用的私密共享空间：消息端到端加密，服务器只转发密文、读不到内容；数据优先存在各自手机里；一个空间固定两个人。';
+      '秘境是仅限两人的私密聊天和共享空间：端到端加密所有消息和附件，没有任何第三方（包括秘境自身）能够读到内容，严格保障隐私安全。';
 
   @override
   String get aboutVersionLabel => '版本号';

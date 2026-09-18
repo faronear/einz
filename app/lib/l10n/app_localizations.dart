@@ -1625,7 +1625,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutIntro.
   ///
   /// In en, this message translates to:
-  /// **'Einz is a private shared space for two: messages are end-to-end encrypted — the server only relays ciphertext and cannot read them; data lives on your own device first; one space holds exactly two people.'**
+  /// **'Einz is a private chat and shared space for two: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.'**
   String get aboutIntro;
 
   /// No description provided for @aboutVersionLabel.
