@@ -902,6 +902,12 @@ abstract class AppLocalizations {
   /// **'Exit'**
   String get chatPageMenuExit;
 
+  /// No description provided for @chatPageMenuMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu'**
+  String get chatPageMenuMore;
+
   /// No description provided for @chatPageRenameNameTitle.
   ///
   /// In en, this message translates to:

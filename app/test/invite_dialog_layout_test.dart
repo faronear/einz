@@ -76,7 +76,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100)); // 初始加载（空历史）
 
     // 菜单 → 邀请码
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('邀请码'));
     // 菜单 pop 后延迟 300ms 才打开弹窗（chat_page onSelected 设计），

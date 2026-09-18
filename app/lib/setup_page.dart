@@ -322,7 +322,8 @@ class _SetupPageState extends State<SetupPage> {
           // 右上角菜单：语言切换 + 退出（全丢恢复按老板决策已移除，仅 TUI 保留；
           // 密保信封导入在 join 口令页次级入口）
           PopupMenuButton<String>(
-            tooltip: l10n.wizardRoleOffline,
+            icon: const Icon(Icons.menu),
+            tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
               Future<void>.delayed(const Duration(milliseconds: 300), () {

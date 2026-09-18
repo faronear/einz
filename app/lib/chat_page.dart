@@ -3552,8 +3552,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           // 顶栏统一入口：语言/阅后即焚/邀请码/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: '菜单 / More',
+            icon: const Icon(Icons.menu),
+            tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               // 修复（2026-09-05）：不能在菜单 pop 动画未完成时立即打开新 route——
               // MenuRoute 与 DialogRoute 会在 Overlay 中交叉卸载，触发

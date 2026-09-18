@@ -460,6 +460,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuExit => 'Exit';
 
   @override
+  String get chatPageMenuMore => 'Menu';
+
+  @override
   String get chatPageRenameNameTitle => 'My profile';
 
   @override

@@ -179,6 +179,7 @@
   },
   "chatPageNameUnset": "Unset",
   "chatPageMenuExit": "Exit",
+  "chatPageMenuMore": "Menu",
   "chatPageRenameNameTitle": "My profile",
   "chatPageRenameNameLabel": "My name",
   "chatPageGenderLabel": "Gender",

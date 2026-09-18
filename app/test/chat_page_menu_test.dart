@@ -122,7 +122,7 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
     ),
   ));
   await tester.pump(const Duration(milliseconds: 300));
-  await tester.tap(find.byIcon(Icons.more_vert));
+  await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
   await tester.tap(find.text('密保口令'));
   await tester.pumpAndSettle();
@@ -190,7 +190,7 @@ void main() {
     expect(find.text('未设置'), findsNothing);
 
     // 打开顶栏菜单
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     expect(find.text('密保口令'), findsOneWidget);
@@ -238,7 +238,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
     // 打开菜单 → PIN 菜单项
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
@@ -294,7 +294,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
@@ -372,7 +372,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
@@ -389,7 +389,7 @@ void main() {
     expect(find.text('设置锁屏码'), findsNothing, reason: '清空成功后设置弹窗应关闭');
     expect(await AppLockService(db).isSetup, false, reason: '锁包应已删除');
     // 打开菜单：锁屏码项不应再有「已设置」尾缀（回归点——此前仍显示已设置）
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     expect(find.text('已设置'), findsNothing,
         reason: '清空后菜单项应只显示「锁屏码」，不带「已设置」尾缀');
@@ -420,7 +420,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
     // 打开菜单 → 点「我的身份」（未传 personName → 显示"我的身份: 未设置"）
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('我的身份'));
     await tester.pumpAndSettle();
@@ -466,7 +466,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
     // 打开菜单 → 点「退出秘境」
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('退出秘境'));
     await tester.pumpAndSettle();
@@ -538,7 +538,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两个输入框都不输入 = 设为空）
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('锁屏码'));
     await tester.pumpAndSettle();
@@ -659,7 +659,7 @@ void main() {
     expect(find.text('personB'), findsWidgets);
 
     // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('我的身份'));
     await tester.pumpAndSettle();
@@ -725,7 +725,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
     // 菜单 → 我的设备
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('我的设备'));
     await tester.pumpAndSettle();
@@ -811,7 +811,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync + profile load 完成
 
     // 菜单 → 我的身份（打开个人资料弹窗）
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('我的身份'));
     await tester.pumpAndSettle();

@@ -135,12 +135,12 @@ class _LockPageState extends State<LockPage> {
     }
   }
 
-  /// 顶栏 ⋯：语言切换 + 退出应用（与对话页菜单同款布局：标签靠左、
+  /// 顶栏 ☰：语言切换 + 退出应用（与对话页菜单同款布局：标签靠左、
   /// 当前值靠右，标签用 onSurfaceVariant 淡色）。
   Widget _buildMenu(AppLocalizations l10n) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
-      tooltip: '菜单 / More',
+      icon: const Icon(Icons.menu),
+      tooltip: l10n.chatPageMenuMore,
       onSelected: (value) {
         // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言崩溃）
         Future<void>.delayed(const Duration(milliseconds: 300), () {

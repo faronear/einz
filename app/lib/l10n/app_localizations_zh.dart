@@ -434,6 +434,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuExit => '退出秘境';
 
   @override
+  String get chatPageMenuMore => '菜单';
+
+  @override
   String get chatPageRenameNameTitle => '我的个人资料';
 
   @override

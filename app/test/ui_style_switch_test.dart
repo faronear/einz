@@ -108,7 +108,7 @@ void main() {
         reason: '默认素雅纯色风格的状态条也应为悬浮圆角（不顶左右两头）');
 
     // 打开菜单 → 界面风格
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     expect(find.text('界面风格'), findsOneWidget, reason: '菜单项应为「界面风格」');
     await tester.tap(find.text('界面风格'));
@@ -143,7 +143,7 @@ void main() {
     expect(await settings.load(), 'gradient', reason: '风格选择应持久化到本地');
 
     // 重新打开弹窗 → 点回素雅纯色 → 关窗、渐变背景消失
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
@@ -160,7 +160,7 @@ void main() {
 
     // 无右上角 ✕（老板 2026-09-15 统一：几个设置弹层都不要关闭按钮）——
     // 改成验证"未点选任何风格时下滑 / 系统返回也能关掉弹窗"
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
@@ -229,7 +229,7 @@ void main() {
     expect(gradientBackground, findsOneWidget, reason: '冷启动应恢复渐变背景');
 
     // 打开风格弹层：渐变粉蓝应有对勾，素雅纯色没有（此前 bug：冷启动后弹层误选纯色）
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
@@ -277,7 +277,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     // 切到渐变风格
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
@@ -342,7 +342,7 @@ void main() {
     expect(find.text('对方的消息'), findsOneWidget);
 
     // 切到渐变风格
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('界面风格'));
     await tester.pumpAndSettle();
