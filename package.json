@@ -7,6 +7,7 @@
     "default": "ip16@26.3"
   },
   "scripts": {
+    "todo": "node scripts/runScriptByIndex.js",
     "l10n": "echo Generating app_localizations_xx.dart from app_xx.arb; cd app && flutter gen-l10n",
     "pub-patches": "bash scripts/patchPubCache.sh",
     "server-local-dev": "cd server && npm run dev",
