@@ -869,4 +869,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutServerLabel => '服务器地址';
+
+  @override
+  String get aboutServerLockedNote => '可能与解锁后不同，以解锁后为准';
 }

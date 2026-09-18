@@ -910,4 +910,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutServerLabel => 'Server';
+
+  @override
+  String get aboutServerLockedNote =>
+      'may differ after unlock; the unlocked value prevails';
 }

@@ -7127,3 +7127,16 @@ labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row +
 固化本次地址"未定。另：`docs/DEPLOYMENT.md` 仍写「设置页填域名（App）」，与现实不符。
 
 `flutter analyze`（app/）与 `dart analyze`（cli/）均干净；UI 老板自测。
+
+---
+
+## 2026-09-18 21:27 +0800 锁屏页「关于秘境」服务器地址加附注
+
+老板反馈：锁屏态读不到锁包，服务器地址只能取持久层/命令行覆盖值，可能与解锁后不同。
+
+- `AboutPage` 新增可选参数 `isLocked`（默认 false）；为真时在服务器地址下方多一行小字
+  说明。`_InfoRow` 新增可选 `note`。
+- `lock_page._openAboutPage()` 唯一传 `isLocked: true`；chat_page / setup_page 不传。
+- l10n：新增 `aboutServerLockedNote`（zh「可能与解锁后不同，以解锁后为准」/ en
+  「may differ after unlock; the unlocked value prevails」），跑 `flutter gen-l10n` 重新生成。
+- `flutter analyze` 干净；UI 老板自测。

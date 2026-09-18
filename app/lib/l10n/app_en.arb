@@ -409,5 +409,6 @@
   "aboutPageTitle": "About",
   "aboutIntro": "Einz is a private chat and shared space for two: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.",
   "aboutVersionLabel": "Version",
-  "aboutServerLabel": "Server"
+  "aboutServerLabel": "Server",
+  "aboutServerLockedNote": "may differ after unlock; the unlocked value prevails"
 }

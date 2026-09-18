@@ -1687,6 +1687,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Server'**
   String get aboutServerLabel;
+
+  /// No description provided for @aboutServerLockedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'may differ after unlock; the unlocked value prevails'**
+  String get aboutServerLockedNote;
 }
 
 class _AppLocalizationsDelegate

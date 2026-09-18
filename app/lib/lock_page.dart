@@ -235,7 +235,13 @@ class _LockPageState extends State<LockPage> {
   /// 本设备持久化值——锁屏页拿不到锁包里的地址（尚未解锁）。
   void _openAboutPage() {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db, server: widget.initialServer)),
+      MaterialPageRoute(
+        builder: (_) => AboutPage(
+          db: widget.db,
+          server: widget.initialServer,
+          isLocked: true,
+        ),
+      ),
     );
   }
 

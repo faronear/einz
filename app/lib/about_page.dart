@@ -14,9 +14,10 @@ typedef AboutInfo = ({String version, String buildNumber, String server});
 /// 入口在对话页、向导页、锁屏页的右上角菜单（三项都叫「关于秘境」）。
 /// 版本号读的是打包时写进产物的 CFBundleShortVersionString / versionName
 /// （yymm.ddhh.mm，见 scripts/appVersion.js），不是 pubspec 里那个写死的 1.0.0。
-/// 服务器地址读本设备持久化值，没改过就是默认 einz.tic.cc。
+/// 服务器地址读本设备持久化值，没改过就是默认 einz.tic.cc。锁屏页进来时
+/// （[isLocked]）服务器可能读不到锁包里的真实地址，需附「以解锁后为准」的说明。
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key, this.db, this.server});
+  const AboutPage({super.key, this.db, this.server, this.isLocked = false});
 
   /// 测试注入用；不给就用全局库。
   final LocalDatabase? db;
@@ -24,6 +25,10 @@ class AboutPage extends StatefulWidget {
   /// 当前生效的服务器地址（命令行 --server 覆盖或本设备持久化值）；给则直接用，
   /// 不给则回退读本设备持久化值。
   final String? server;
+
+  /// 是否由锁屏页打开：此时拿不到锁包里的地址（尚未解锁），服务器地址可能与实际
+  /// 生效地址不同，需要加一句说明。
+  final bool isLocked;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -75,8 +80,13 @@ class _AboutPageState extends State<AboutPage> {
                         : '${info.version} (${info.buildNumber})',
                   ),
                   const SizedBox(height: 14),
-                  // 服务器地址可长按选中复制（排查连不上时最常问的就是这个）
-                  _InfoRow(label: l10n.aboutServerLabel, value: info?.server ?? '…'),
+                  // 服务器地址可长按选中复制（排查连不上时最常问的就是这个）。
+                  // 锁屏态读不到锁包地址，可能与解锁后的实际地址不同，故附注说明。
+                  _InfoRow(
+                    label: l10n.aboutServerLabel,
+                    value: info?.server ?? '…',
+                    note: widget.isLocked ? l10n.aboutServerLockedNote : null,
+                  ),
                 ],
               ),
             );
@@ -89,10 +99,13 @@ class _AboutPageState extends State<AboutPage> {
 
 /// 一行「标签 + 值」，值可长按选中复制。
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+  const _InfoRow({required this.label, required this.value, this.note});
 
   final String label;
   final String value;
+
+  /// 值下方的补充说明（小字、弱化色），null = 不展示。
+  final String? note;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +120,14 @@ class _InfoRow extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         SelectableText(value, style: theme.textTheme.bodyLarge),
+        if (note != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            note!,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
       ],
     );
   }

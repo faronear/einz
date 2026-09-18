@@ -409,5 +409,6 @@
   "aboutPageTitle": "关于秘境",
   "aboutIntro": "秘境是仅限两人的私密聊天和共享空间，端到端加密所有消息和附件，没有任何第三方（包括秘境自身）能够读到内容，严格保障隐私安全。",
   "aboutVersionLabel": "版本号",
-  "aboutServerLabel": "服务器地址"
+  "aboutServerLabel": "服务器地址",
+  "aboutServerLockedNote": "可能与解锁后不同，以解锁后为准"
 }
