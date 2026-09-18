@@ -2164,7 +2164,7 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
     // 续行缩进 prefix 宽度，与第一行正文左缘对齐。正文保留显式 \n：每条物理行
     // 单独换行渲染（前缀只出现在第一条物理行，其余缩进对齐），空物理行保留为
     // 空白行——这样一条消息可显示成多行，又被消息间空行整体隔开
-    final prefix = '$_gray[system $time]$_reset ';
+    final prefix = '$_gray[秘境 $time]$_reset ';
     final prefixW = _displayWidth(prefix);
     final indent = ' ' * prefixW;
     final out = <String>[];

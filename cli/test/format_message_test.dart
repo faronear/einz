@@ -34,13 +34,13 @@ void main() {
     );
     // 3 条物理行 → 3 个渲染行（窄屏不触发额外折行）
     expect(lines, hasLength(3));
-    // 首行带 [system ...] 前缀
-    expect(lines[0], contains('[system'));
+    // 首行带 [秘境 ...] 前缀
+    expect(lines[0], contains('[秘境'));
     expect(lines[0], contains('❓ 秘境入口'));
     // 后续行不带前缀、缩进对齐首行正文左缘（含显式前导空格）
-    expect(lines[1], isNot(contains('[system')));
+    expect(lines[1], isNot(contains('[秘境')));
     expect(lines[1], contains('c: 创建秘境'));
-    expect(lines[2], isNot(contains('[system')));
+    expect(lines[2], isNot(contains('[秘境')));
     expect(lines[2], contains('j: 加入秘境'));
   });
 
@@ -59,13 +59,13 @@ void main() {
 
   test('长物理行在窄列宽下折行、续行缩进不带前缀', () {
     // 一条物理行 30 字；列宽 60 → 可用正文宽 = 60 - prefixW(~28) - sideMargin(8)
-    // ≈ 24，30 字拆成 2 行；续行不带 [system 前缀、缩进对齐
+    // ≈ 24，30 字拆成 2 行；续行不带 [秘境 前缀、缩进对齐
     final text = '一二三四五六七八九十十一十二十三十四十五十六十七十八十九二十';
     final lines = formatMessage(_sys(text), 60);
     expect(lines.length, greaterThanOrEqualTo(2));
-    expect(lines.where((l) => l.contains('[system')), hasLength(1));
+    expect(lines.where((l) => l.contains('[秘境')), hasLength(1));
     // 末行（续行）不应再含前缀
-    expect(lines.last, isNot(contains('[system')));
+    expect(lines.last, isNot(contains('[秘境')));
   });
 
   test('多条物理行 + 折行：每条物理行各自独立折行', () {
@@ -76,7 +76,7 @@ void main() {
     // 两条物理行各自折行 → 总行数 > 单物理行数（2）；此处 30 字/行在可用宽下
     // 拆成多行，断言整体 ≥4 且首物理行首行之外都不带前缀
     expect(lines.length, greaterThanOrEqualTo(4));
-    expect(lines.where((l) => l.contains('[system')), hasLength(1));
+    expect(lines.where((l) => l.contains('[秘境')), hasLength(1));
   });
 
   // 语音消息（App 录音 type=voice）：明文 caption 只是「语音」，时长在载荷 meta。
