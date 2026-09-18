@@ -143,6 +143,21 @@ jobs:
                     macos/Runner.xcodeproj/project.pbxproj
           eval "$(node ../scripts/appVersion.js)"
           flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+      - name: Re-sign ad-hoc without restricted entitlements
+        working-directory: app
+        run: |
+          # ad-hoc 签名不能带 keychain-access-groups / get-task-allow 这类需真实身份背书的
+          # 受限 entitlement，否则内核 AMFI 判 Invalid Signature，launchd 启动即 SIGKILL
+          # （表现为"应用程序无法打开"，崩溃日志 indicator=Taskgated Invalid Signature）。
+          # 删除受限项后对 frameworks + app 重打 ad-hoc 签名。
+          ENT=macos/Runner/Release.entitlements
+          plutil -remove keychain-access-groups "$ENT" || true
+          plutil -remove com.apple.security.get-task-allow "$ENT" || true
+          find build/macos/Build/Products/Release/einz.app/Contents/Frameworks -name "*.framework" \
+            -exec codesign -f -s - --timestamp=none {} \;
+          codesign -f -s - --timestamp=none --entitlements "$ENT" \
+            build/macos/Build/Products/Release/einz.app
+          codesign --verify -v build/macos/Build/Products/Release/einz.app
       - name: Build CLI
         run: |
           (cd cli && dart pub get && mkdir -p build && dart compile exe bin/einz_tui.dart -o build/einz-tui-macos)
