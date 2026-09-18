@@ -176,7 +176,14 @@ class _LockPageState extends State<LockPage> {
           ),
           PopupMenuItem(
             value: 'exit',
-            child: Text(l10n.chatPageMenuExit, style: labelStyle),
+            child: Row(
+              children: [
+                Text(l10n.chatPageMenuExit, style: labelStyle),
+                const Spacer(),
+                // 右侧退出图标：与对话页/向导页一致（老板 2026-09-18）
+                Icon(Icons.logout, size: 18, color: labelStyle.color),
+              ],
+            ),
           ),
         ];
       },

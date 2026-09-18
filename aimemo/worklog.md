@@ -7098,3 +7098,8 @@ Windows 的 FILEVERSION 四个字段各 16 位（≤65535），26091810 塞不�
 - 未设 PIN 的「锁屏未激活」提示页也带同一个菜单，About 同样可达。
 
 `flutter analyze` 干净（app/）。UI 老板自测。
+
+## 2026-09-18 锁屏页「退出秘境」右侧加退出图标（老板要求）
+
+对话页、向导页的「退出秘境」菜单项右侧都带 `Icons.logout`（size 18，取
+labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row + Spacer + Icon。
