@@ -177,32 +177,66 @@ const int _kWelcomeCountdownSeconds = 5;
 Timer? _resizeTimer;
 StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
 
-/// 出厂域名（localConfig.json 缺失/损坏时的硬编码托底）。
+/// 出厂主域名（候选列表的第一个，也是全不通时的兜底）。
 const String _kFactoryServer = 'https://einz.tic.cc';
 
-/// 默认服务器地址：优先读 cli/localConfig.json 的 server 字段（本机配置，不入库；
-/// 模板见 cli/localConfig.example.json），文件缺失/格式异常时回退硬编码
-/// https://einz.tic.cc。
+/// 出厂域名候选（按优先级，第一个是主域名）——与 App 端 `kFactoryServerCandidates`
+/// 同构：同一服务的**多个入口**，不是多台服务器；主域名失效时客户端自己连上备用入口
+/// （如切到备案域名），用户不需要做任何操作。加备用域名 = 这里加一行（+ 重新发布）。
+///
+/// 两端保持同构是为了让 TUI 测试能提前暴露容灾问题（老板 2026-09-19）。
+const List<String> _kFactoryServerCandidates = [_kFactoryServer];
+
+/// 本机配置（cli/localConfig.json 的 server 字段，不入库；模板见
+/// cli/localConfig.example.json）；没有或损坏 → null。
+///
+/// 它是候选探测链的**前一档**：显式配置优先、直接用，不再探测候选域名
+/// （等价于 App 端编译期 `kEinzServer` 与出厂默认的关系）。
 ///
 /// 注：路径**按当前工作目录**解析（`File('localConfig.json')`），所以只有 `cd cli`
 /// 之后跑（`npm run tui*-dev` 就是这么干的）才读得到——在别的目录跑会打印一行提示
-/// 后走硬编码（不静默：否则会误以为在测开发服务器，实际连的是生产）。
-String _defaultServer() {
-  final cached = _defaultServerCache;
-  if (cached != null) return cached; // 一次启动只解析一次（提示也只打一次）
+/// 后走候选域名（不静默：否则会误以为在测开发服务器，实际连的是生产）。
+String? _configuredServer() {
   try {
     final f = File('localConfig.json');
     if (f.existsSync()) {
       final v = (jsonDecode(f.readAsStringSync()) as Map<String, dynamic>)['server'];
-      if (v is String && v.isNotEmpty) return _defaultServerCache = v;
+      if (v is String && v.isNotEmpty) return v;
     } else {
-      stdout.writeln(
-          '⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），使用默认 $_kFactoryServer');
+      stdout.writeln('⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），'
+          '改用出厂候选域名（${_kFactoryServerCandidates.join(' / ')}）');
     }
   } catch (_) {
-    // 配置损坏：回退默认值
+    // 配置损坏：回退出厂域名
   }
-  return _defaultServerCache = _kFactoryServer;
+  return null;
+}
+
+/// 默认服务器地址（与 App 端 `resolveServer` 同构的优先级链）：
+/// 本机配置（localConfig.json）> 出厂候选域名（并发探测取第一个 /health 成功的）
+/// > 主域名。
+Future<String> _defaultServer() async {
+  final cached = _defaultServerCache;
+  if (cached != null) return cached; // 一次启动只解析一次（提示也只打一次）
+
+  final configured = _configuredServer();
+  if (configured != null) return _defaultServerCache = configured;
+  // 只有一个候选时无需探测（与 App 的 resolveServer 同短路）
+  if (_kFactoryServerCandidates.length == 1) {
+    return _defaultServerCache = _kFactoryServer;
+  }
+
+  // 并发探测：谁先 200 就用谁（主域名挂掉时不必干等 3s 超时才试备用）
+  final picked = Completer<String>();
+  var pending = _kFactoryServerCandidates.length;
+  for (final candidate in _kFactoryServerCandidates) {
+    _probeServer(candidate).then((r) {
+      if (r.$1 && !picked.isCompleted) picked.complete(candidate);
+      pending--;
+      if (pending == 0 && !picked.isCompleted) picked.complete(_kFactoryServer);
+    });
+  }
+  return _defaultServerCache = await picked.future;
 }
 
 /// [_defaultServer] 的缓存（见上：提示只打一次）。
@@ -272,7 +306,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 
   // ① 服务器地址：--server 参数（仅本次生效）> 本机默认（cli/localConfig.json）> 硬编码
   if (server.isEmpty) {
-    server = _defaultServer();
+    server = await _defaultServer();
   }
   // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（仅本次生效）
   // Multiverse：/health 不再返回全局 person 表（名称表保留为空，消息前缀用本地名字）
@@ -2902,7 +2936,7 @@ Future<void> _execCommand(String line) async {
       final st = s.session.store;
       // 地址来源：等于本机默认（localConfig.json/硬编码）= 出厂配置；否则是本次覆盖
       // （--server 启动参数或 /server 命令），只本次生效。
-      final origin = s.session.server == _defaultServer()
+      final origin = s.session.server == await _defaultServer()
           ? '本机默认'
           : '本次覆盖（--server 或 /server）';
       final ws = switch (s.session.wsStatus) {

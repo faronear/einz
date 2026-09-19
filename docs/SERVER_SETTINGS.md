@@ -41,15 +41,19 @@
 
 三层都不需要解锁就能读到（地址不在锁包里），所以**锁屏页显示的与解锁后实际连的必然是同一个值**。
 
+TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localConfig.json` 的 `server`
+（运行时读，改完重启即生效），第 3 档 = `_kFactoryServerCandidates`。两端保持同构，
+是为了让 TUI 测试能提前暴露域名容灾问题（老板 2026-09-19）。
+
 ## 3. 各端对照
 
 |              | TUI                                                                           | App（桌面端）                                                                           | App（手机端）            |
 | ------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
 | 硬编码托底   | `_kFactoryServercli/bin/einz_tui.dart:181`                                    | `kFactoryServerapp/lib/data/server_config.dart:32`                                      | 同桌面端                 |
-| 配置文件     | `cli/localConfig.json`**运行时**读（`_defaultServer()`，`einz_tui.dart:190`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`） | 同桌面端                 |
+| 配置文件     | `cli/localConfig.json`**运行时**读（`_configuredServer()`）；没有则在出厂候选域名里并发探测（`_defaultServer()`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`）；没有则并发探测出厂候选域名（`resolveServer()`） | 同桌面端                 |
 | 启动参数     | `--server <地址>`                                                             | `--server <地址>`                                                                       | 无（移动端没有启动参数） |
 | 运行期命令   | `/server [地址]`、`/status`                                                   | 「关于秘境」页显示地址                                                                  | 同桌面端                 |
-| 配置读不到时 | 打一行提示再走托底（不静默）                                                  | —                                                                                       | —                        |
+| 配置读不到时 | 打一行提示再走候选域名（不静默）                                                  | —                                                                                       | —                        |
 | 持久化       | **无**                                                                        | **无**                                                                                  | **无**                   |
 
 `cli/localConfig.json` 按**当前工作目录**解析，只有 `cd cli` 之后跑才读得到（npm scripts 都这么干）。
@@ -57,10 +61,12 @@
 ## 4. 域名容灾：候选列表
 
 ```
-kFactoryServerCandidates = [kFactoryServer]   // 加备用域名 = 加一行常量
+kFactoryServerCandidates  = [kFactoryServer]   // App：app/lib/data/server_config.dart
+_kFactoryServerCandidates = [_kFactoryServer]  // TUI：cli/bin/einz_tui.dart
+// 加备用域名 = 两边各加一行常量（+ 重新构建/发布）
 ```
 
-- `resolveServer()`（`server_config.dart:60`）：命令行 / 编译期覆盖**不探测**，直接用；否则对候选**并发**探测，取第一个 `/health` 成功的（主域名挂掉时不必干等 3s 超时才试备用）。
+- `resolveServer()`（App）/ `_defaultServer()`（TUI）：命令行 / 本机配置**不探测**，直接用；否则对候选**并发**探测，取第一个 `/health` 成功的（主域名挂掉时不必干等 3s 超时才试备用）。
 - 全部不通 → 回主域名，由向导页的 4s 自动重试兜底。
 - 老 App 加一个备用域名后**自愈**，不需要用户更新，也不需要在 App 里做任何操作。
 
