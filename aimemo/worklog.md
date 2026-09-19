@@ -7254,3 +7254,41 @@ mac 那次用隔离是对的（当时那批 hunk 还没进 HEAD）。
 「`git show HEAD:package.json` → 只重放本次改动 → `hash-object` + `update-index --cacheinfo`
 → commit」隔离，**没有 checkout/stash 工作区**，未把那些 hunk 卷进本次提交，也不会踩到并发
 agent 的写入。
+
+## 2026-09-19 GitHub 打包的 macOS CLI `einz-tui-macos` 在 Intel Mac 报 `Bad CPU type in executable`
+
+老板在 Intel Mac 上跑 GitHub Actions 出品的 `einz-tui-macos`：
+
+    [ vdisk/ ]§ ./einz-tui-macos
+    -bash: ./einz-tui-macos: Bad CPU type in executable
+
+**根因**：`einz-tui-macos` 是 Dart CLI（`dart compile exe` 出品），不是 Flutter GUI。
+- `dart compile exe` **只产出宿主架构**：在 arm64 runner（GitHub 现 `macos-latest` 是
+  Apple Silicon）上编出来就是纯 arm64。
+- **Dart 不支持 macOS 跨架构编译**：实测 `--target-os macos --target-arch arm64` 在 x64
+  宿主上报 `Unsupported target platform macos_arm64. Supported: linux_*`。所以单个 runner
+  上靠 `--target-arch` 指定不了另一种架构。
+- Intel(×64) Mac 跑 arm64 二进制 → 内核直接拒绝 → `Bad CPU type in executable`。
+
+**澄清一个常见混淆**：**桌面 GUI（`einz-gui-macos.zip`）本来就是通用二进制**，因为
+`FlutterMacOS.xcframework` 是 `macos-arm64_x86_64`，`flutter build macos` 默认产出
+arm64+x64。出问题的是 `einz-tui-macos` 这个命令行工具，它和 GUI App 是两样独立产物。
+
+**修复方案（老板拍板：通用二进制）**：`.github/workflows/buildMultiPlatform.yml`，
+提交 `c5d2cb4`：
+
+- 删除 macos job 里原有的单架构 CLI 编译步骤，以及它 release 上传里的
+  `cli/build/einz-tui-macos`（已不存在）。macos job 现在只管 GUI。
+- 新增 `macos-cli` job：`strategy.matrix` 在 `macos-13(x64)` 与 `macos-latest(arm64)`
+  **两个 runner 上各编一份** `einz-tui-{x64,arm64}`（用轻量的 `dart-lang/setup-dart@v1`，
+  不再拉整个 Flutter），各自 upload-artifact。
+- 新增 `macos-cli-combine` job（`needs: macos-cli`）：`actions/download-artifact@v4`
+  （按 artifact 名建子目录）把两份下载下来，`lipo -create -output einz-tui-macos
+  artifacts/einz-tui-macos-x64/einz-tui-x64 artifacts/einz-tui-macos-arm64/einz-tui-arm64`
+  合成通用二进制，`lipo -info` 验证后上传 artifact 与 release。
+
+下一次 CI 跑完，`einz-tui-macos` 即 arm64+x64 通用，Intel 与 Apple Silicon 的 Mac 都能直接跑。
+
+**未本地验证**：workflow 改动无法本地跑（需 CI runner），仅做了 YAML 语法校验
+（`ruby -rpsych` 通过，6 个 job）。`windows` job 的 `einz-tui-windows.exe` 不受影响，
+仍单文件上传。
