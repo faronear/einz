@@ -178,14 +178,14 @@ Timer? _resizeTimer;
 StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
 
 /// 出厂主域名（候选列表的第一个，也是全不通时的兜底）。
-const String _kFactoryServer = 'https://einz.tic.cc';
+const String _kPrimaryServer = 'https://einz.tic.cc';
 
-/// 出厂域名候选（按优先级，第一个是主域名）——与 App 端 `kFactoryServerCandidates`
+/// 出厂域名候选（按优先级，第一个是主域名）——与 App 端 `kServerCandidates`
 /// 同构：同一服务的**多个入口**，不是多台服务器；主域名失效时客户端自己连上备用入口
 /// （如切到备案域名），用户不需要做任何操作。加备用域名 = 这里加一行（+ 重新发布）。
 ///
 /// 两端保持同构是为了让 TUI 测试能提前暴露容灾问题（老板 2026-09-19）。
-const List<String> _kFactoryServerCandidates = [_kFactoryServer];
+const List<String> _kServerCandidates = [_kPrimaryServer];
 
 /// 本机配置（cli/localConfig.json 的 server 字段，不入库；模板见
 /// cli/localConfig.example.json）；没有或损坏 → null。
@@ -204,7 +204,7 @@ String? _configuredServer() {
       if (v is String && v.isNotEmpty) return v;
     } else {
       stdout.writeln('⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），'
-          '改用出厂候选域名（${_kFactoryServerCandidates.join(' / ')}）');
+          '改用出厂候选域名（${_kServerCandidates.join(' / ')}）');
     }
   } catch (_) {
     // 配置损坏：回退出厂域名
@@ -222,18 +222,18 @@ Future<String> _defaultServer() async {
   final configured = _configuredServer();
   if (configured != null) return _defaultServerCache = configured;
   // 只有一个候选时无需探测（与 App 的 resolveServer 同短路）
-  if (_kFactoryServerCandidates.length == 1) {
-    return _defaultServerCache = _kFactoryServer;
+  if (_kServerCandidates.length == 1) {
+    return _defaultServerCache = _kPrimaryServer;
   }
 
   // 并发探测：谁先 200 就用谁（主域名挂掉时不必干等 3s 超时才试备用）
   final picked = Completer<String>();
-  var pending = _kFactoryServerCandidates.length;
-  for (final candidate in _kFactoryServerCandidates) {
+  var pending = _kServerCandidates.length;
+  for (final candidate in _kServerCandidates) {
     _probeServer(candidate).then((r) {
       if (r.$1 && !picked.isCompleted) picked.complete(candidate);
       pending--;
-      if (pending == 0 && !picked.isCompleted) picked.complete(_kFactoryServer);
+      if (pending == 0 && !picked.isCompleted) picked.complete(_kPrimaryServer);
     });
   }
   return _defaultServerCache = await picked.future;

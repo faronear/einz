@@ -37,19 +37,19 @@
 | --- | ------------------------------------------------------------------- | -------------------------- | ---------------------------------------- |
 | 1   | 命令行`--server <地址>`                                             | **本次进程**（仅本次生效） | 启动时传参                               |
 | 2   | 编译期`kEinzServer`（`--dart-define-from-file=localConfig.*.json`） | **这个包**（烘进二进制）   | 改配置文件 + 重新`flutter run` / `build` |
-| 3   | 出厂候选域名`kFactoryServerCandidates`                              | 这个包                     | 改常量 + 重新发布                        |
+| 3   | 出厂候选域名`kServerCandidates`                              | 这个包                     | 改常量 + 重新发布                        |
 
 三层都不需要解锁就能读到（地址不在锁包里），所以**锁屏页显示的与解锁后实际连的必然是同一个值**。
 
 TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localConfig.json` 的 `server`
-（运行时读，改完重启即生效），第 3 档 = `_kFactoryServerCandidates`。两端保持同构，
+（运行时读，改完重启即生效），第 3 档 = `_kServerCandidates`。两端保持同构，
 是为了让 TUI 测试能提前暴露域名容灾问题（老板 2026-09-19）。
 
 ## 3. 各端对照
 
 |              | TUI                                                                           | App（桌面端）                                                                           | App（手机端）            |
 | ------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| 硬编码托底   | `_kFactoryServercli/bin/einz_tui.dart:181`                                    | `kFactoryServerapp/lib/data/server_config.dart:32`                                      | 同桌面端                 |
+| 硬编码托底   | `_kPrimaryServercli/bin/einz_tui.dart:181`                                    | `kPrimaryServerapp/lib/data/server_config.dart:32`                                      | 同桌面端                 |
 | 配置文件     | `cli/localConfig.json`**运行时**读（`_configuredServer()`）；没有则在出厂候选域名里并发探测（`_defaultServer()`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`）；没有则并发探测出厂候选域名（`resolveServer()`） | 同桌面端                 |
 | 启动参数     | `--server <地址>`                                                             | `--server <地址>`                                                                       | 无（移动端没有启动参数） |
 | 运行期命令   | `/server [地址]`、`/status`                                                   | 「关于秘境」页显示地址                                                                  | 同桌面端                 |
@@ -61,8 +61,8 @@ TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localCo
 ## 4. 域名容灾：候选列表
 
 ```
-kFactoryServerCandidates  = [kFactoryServer]   // App：app/lib/data/server_config.dart
-_kFactoryServerCandidates = [_kFactoryServer]  // TUI：cli/bin/einz_tui.dart
+kServerCandidates  = [kPrimaryServer]   // App：app/lib/data/server_config.dart
+_kServerCandidates = [_kPrimaryServer]  // TUI：cli/bin/einz_tui.dart
 // 加备用域名 = 两边各加一行常量（+ 重新构建/发布）
 ```
 

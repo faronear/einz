@@ -17,7 +17,7 @@ import 'dart:io';
 /// 1. 运行时 `--server <地址>`（桌面端启动参数）——本次启动覆盖，仅本次生效；
 /// 2. 编译期 [kEinzServer]——`flutter run/build --dart-define-from-file` 覆盖
 ///    （本机 `localConfig.*.json`，gitignore），开发指向 localhost 用；
-/// 3. 出厂域名 [kFactoryServer]——以上都没有时的硬编码托底。
+/// 3. 出厂域名 [kPrimaryServer]——以上都没有时的硬编码托底。
 ///
 /// ⚠ 发布包绝不带 `--dart-define-from-file`（会把 localhost 烘进产物，且无救回
 /// 手段）：正式打包一律走 package.json 里的 release 脚本，它们都不传该参数。
@@ -26,10 +26,18 @@ import 'dart:io';
 /// 不要放锁包），且"换服务器"不只是改地址——`spaceId`/`token`/设备密钥对全是那台
 /// 服务器上的身份，换服务器 = 清库 + 重新入网。详见 docs/SERVER_SETTINGS.md。
 const String kEinzServer =
-    String.fromEnvironment('kEinzServer', defaultValue: kFactoryServer);
+    String.fromEnvironment('kEinzServer', defaultValue: kPrimaryServer);
 
-/// 出厂主域名（未被任何覆盖时使用）：产品部署域名固定。
-const String kFactoryServer = 'https://einz.tic.cc';
+/// 出厂**主域名**：产品部署的首要入口。
+///
+/// 它的三个角色（都要求它等于 [kServerCandidates] 的第一项）：
+/// 1. 候选列表之首——优先探测；
+/// 2. 全不通时的兜底；
+/// 3. 编译期覆盖（[kEinzServer]）的默认值、以及"有没有被覆盖"的判定参照。
+///
+/// 正因为身兼数职，换主域名（如备案域名上位）时**必须同时**改这里和候选列表，
+/// 别改一处忘另一处——`test/server_config_test.dart` 有一条断言守着这个一致性。
+const String kPrimaryServer = 'https://einz.tic.cc';
 
 /// 出厂域名候选（按优先级，第一个是主域名）。
 ///
@@ -39,37 +47,37 @@ const String kFactoryServer = 'https://einz.tic.cc';
 /// 也无需在 App 里做任何操作。
 ///
 /// 新增备用域名 = 在这里加一行常量（+ 重新发包）。
-const List<String> kFactoryServerCandidates = [kFactoryServer];
+const List<String> kServerCandidates = [kPrimaryServer];
 
 /// 本次进程生效的服务器地址：`main()` 里定一次，之后全程只读。
 ///
 /// **给默认值而非 late**：单元测试不走 `main()`，late 未初始化会直接崩。
-String effectiveServer = kFactoryServer;
+String effectiveServer = kPrimaryServer;
 
 /// 当前地址是否**不在**出厂候选里（= 开发覆盖：`--server` 或编译期 dart-define）。
 ///
 /// 关于页据此标注——开发包一眼可辨，避免误把连着 localhost 的包当正式包。
 /// 连的是备用域名时不算（那仍是生产环境）。
-bool get isDevServer => !kFactoryServerCandidates.contains(effectiveServer);
+bool get isDevServer => !kServerCandidates.contains(effectiveServer);
 
 /// 定本次生效地址（启动调一次）：
 /// 1. 命令行 `--server` 覆盖 → 直接用，不探测；
-/// 2. 编译期覆盖（`kEinzServer != kFactoryServer`）→ 直接用，不探测；
-/// 3. 否则在 [kFactoryServerCandidates] 里并发探测，取第一个 `/health` 成功的；
+/// 2. 编译期覆盖（`kEinzServer != kPrimaryServer`）→ 直接用，不探测；
+/// 3. 否则在 [kServerCandidates] 里并发探测，取第一个 `/health` 成功的；
 ///    全不通 → 回主域名（由 setup_page 的 4s 自动重试兜底）。
 Future<String> resolveServer(String? argServer) async {
   if (argServer != null && argServer.isNotEmpty) return argServer;
-  if (kEinzServer != kFactoryServer) return kEinzServer;
-  if (kFactoryServerCandidates.length == 1) return kFactoryServer;
+  if (kEinzServer != kPrimaryServer) return kEinzServer;
+  if (kServerCandidates.length == 1) return kPrimaryServer;
 
   // 并发探测：谁先 200 就用谁（主域名挂掉时不必干等 3s 超时才试备用）
   final picked = Completer<String>();
-  var pending = kFactoryServerCandidates.length;
-  for (final candidate in kFactoryServerCandidates) {
+  var pending = kServerCandidates.length;
+  for (final candidate in kServerCandidates) {
     probeServer(candidate).then((r) {
       if (r.$1 && !picked.isCompleted) picked.complete(candidate);
       pending--;
-      if (pending == 0 && !picked.isCompleted) picked.complete(kFactoryServer);
+      if (pending == 0 && !picked.isCompleted) picked.complete(kPrimaryServer);
     });
   }
   return picked.future;
