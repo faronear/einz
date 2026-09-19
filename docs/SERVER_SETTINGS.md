@@ -50,7 +50,7 @@ TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localCo
 |              | TUI                                                                           | App（桌面端）                                                                           | App（手机端）            |
 | ------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
 | 硬编码托底   | `_kPrimaryServercli/bin/einz_tui.dart:181`                                    | `kPrimaryServerapp/lib/data/server_config.dart:32`                                      | 同桌面端                 |
-| 配置文件     | `cli/localConfig.json`**运行时**读（`_configuredServer()`）；没有则在出厂候选域名里并发探测（`_defaultServer()`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`）；没有则并发探测出厂候选域名（`resolveServer()`） | 同桌面端                 |
+| 配置文件     | `cli/localConfig.json`**运行时**读（`_configuredServers()`）；**支持单个地址或多个地址的数组**——多地址时只在数组内并发探测；没有配置则在出厂候选域名里探测（`_defaultServer()`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`）；没有则并发探测出厂候选域名（`resolveServer()`） | 同桌面端                 |
 | 启动参数     | `--server <地址>`                                                             | `--server <地址>`                                                                       | 无（移动端没有启动参数） |
 | 运行期命令   | `/server [地址]`、`/status`                                                   | 「关于秘境」页显示地址                                                                  | 同桌面端                 |
 | 配置读不到时 | 打一行提示再走候选域名（不静默）                                                  | —                                                                                       | —                        |
@@ -95,6 +95,12 @@ open -a Einz --args --server http://localhost:3000      # macOS（走原生桥�
 
 ```bash
 npm run tui2local-1     # 脚本里已绑定 --store + --server（tui2local = tui to localhost）
+
+# 想验"多入口容灾"（主入口挂了自动切备用）时，把 cli/localConfig.json 的 server
+# 写成数组即可——只在数组内并发探测，全不通就回第一个并追问地址，不会回落生产：
+#   { "server": ["http://localhost:3000", "http://127.0.0.1:3901"] }
+# 注：App 侧只支持单值——dart-define 传数组会被 Flutter 字符串化成 `[a, b]`（不是
+# 合法 JSON，见 flutter_command.dart 的 extractDartDefines），所以容灾验证放在 TUI 做。
 dart run bin/einz_tui.dart --server http://localhost:3000     # 临时覆盖
 ```
 

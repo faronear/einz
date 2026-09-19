@@ -1,3 +1,5 @@
 {
-  "server": "https://einz.tic.cc"
+  "_about": "本机开发配置（不入库）。server 支持单个地址，或数组（多个入口——本地可验多入口容灾：并发探测取第一个 /health 成功的，全不通就回第一个，绝不回落生产域名）",
+  "server": "https://einz.tic.cc",
+  "_serverArrayExample": ["http://localhost:3000", "http://127.0.0.1:3901"]
 }

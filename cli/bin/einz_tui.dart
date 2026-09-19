@@ -188,55 +188,73 @@ const String _kPrimaryServer = 'https://einz.tic.cc';
 const List<String> _kServerCandidates = [_kPrimaryServer];
 
 /// 本机配置（cli/localConfig.json 的 server 字段，不入库；模板见
-/// cli/localConfig.example.json）；没有或损坏 → null。
+/// cli/localConfig.example.json）里的服务器地址；没有或损坏 → 空列表。
 ///
-/// 它是候选探测链的**前一档**：显式配置优先、直接用，不再探测候选域名
-/// （等价于 App 端编译期 `kEinzServer` 与出厂默认的关系）。
+/// **支持单个或多个地址**（App 侧只支持单值：dart-define 无法可靠地传数组）——
+/// 本地要验"多入口容灾"时，把开发服务器写成数组即可：
+///   { "server": "http://localhost:3000" }
+///   { "server": ["http://localhost:3000", "http://127.0.0.1:3901"] }
+/// 多个地址时只在**你列出的这些**地址之间并发探测，绝不回落到生产域名。
 ///
 /// 注：路径**按当前工作目录**解析（`File('localConfig.json')`），所以只有 `cd cli`
 /// 之后跑（`npm run tui*-dev` 就是这么干的）才读得到——在别的目录跑会打印一行提示
 /// 后走候选域名（不静默：否则会误以为在测开发服务器，实际连的是生产）。
-String? _configuredServer() {
+List<String> _configuredServers() {
   try {
     final f = File('localConfig.json');
     if (f.existsSync()) {
       final v = (jsonDecode(f.readAsStringSync()) as Map<String, dynamic>)['server'];
-      if (v is String && v.isNotEmpty) return v;
+      if (v is String && v.isNotEmpty) return [v];
+      if (v is List) {
+        final list = v.whereType<String>().where((e) => e.isNotEmpty).toList();
+        if (list.isNotEmpty) return list;
+      }
     } else {
-      stdout.writeln('⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），'
+      stdout.writeln(
+          '⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），'
           '改用出厂候选域名（${_kServerCandidates.join(' / ')}）');
     }
   } catch (_) {
     // 配置损坏：回退出厂域名
   }
-  return null;
+  return const [];
 }
 
 /// 默认服务器地址（与 App 端 `resolveServer` 同构的优先级链）：
-/// 本机配置（localConfig.json）> 出厂候选域名（并发探测取第一个 /health 成功的）
-/// > 主域名。
+/// 本机配置（单个或多个地址）> 出厂候选域名 > 主域名。
+///
+/// 多地址时并发探测取第一个 `/health` 成功的；**一个都不通就回第一个**（紧接着引导
+/// 会探测失败并追问地址），绝不回落到生产域名——避免"以为在测本地、实际连了生产"。
 Future<String> _defaultServer() async {
   final cached = _defaultServerCache;
   if (cached != null) return cached; // 一次启动只解析一次（提示也只打一次）
 
-  final configured = _configuredServer();
-  if (configured != null) return _defaultServerCache = configured;
-  // 只有一个候选时无需探测（与 App 的 resolveServer 同短路）
-  if (_kServerCandidates.length == 1) {
-    return _defaultServerCache = _kPrimaryServer;
+  final configured = _configuredServers();
+  if (configured.isNotEmpty) {
+    return _defaultServerCache =
+        await _pickReachable(configured, fallback: configured.first);
   }
+  return _defaultServerCache =
+      await _pickReachable(_kServerCandidates, fallback: _kPrimaryServer);
+}
 
-  // 并发探测：谁先 200 就用谁（主域名挂掉时不必干等 3s 超时才试备用）
+/// 并发探测候选地址，取第一个 `/health` 成功的；全不通 → [fallback]。
+///
+/// 只有一个候选时**短路、不探测**（保持"显式配置直接用""出厂单域名直接用"的语义，
+/// 与 App 的 `resolveServer` 一致）。
+Future<String> _pickReachable(List<String> candidates,
+    {required String fallback}) async {
+  if (candidates.length == 1) return candidates.first;
   final picked = Completer<String>();
-  var pending = _kServerCandidates.length;
-  for (final candidate in _kServerCandidates) {
+  var pending = candidates.length;
+  for (final candidate in candidates) {
     _probeServer(candidate).then((r) {
       if (r.$1 && !picked.isCompleted) picked.complete(candidate);
       pending--;
-      if (pending == 0 && !picked.isCompleted) picked.complete(_kPrimaryServer);
+      if (pending == 0 && !picked.isCompleted) picked.complete(fallback);
     });
   }
-  return _defaultServerCache = await picked.future;
+  return picked.future;
 }
 
 /// [_defaultServer] 的缓存（见上：提示只打一次）。
