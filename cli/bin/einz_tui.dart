@@ -312,15 +312,18 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   // （公钥是本机已有的，读出来显示，别写成"已生成"）。
   // 终端逐行打印；进 TUI 后并成**一条** system 消息（\n 连接，块内紧贴、不与其他消息
   // 混在一起——与"选择秘境入口"那段 _prompt 同一写法）。
-  final welcome = <String>['=== Einz 秘境 ===', '当前服务器: $server'];
+  final welcome = <String>['=== Einz 秘境 ===', '✅ 当前服务器: $server'];
   final deviceName = store.deviceName;
   if (store.spaceId == null) {
-    welcome.add('✅ 新设备公钥已生成: ${store.publicKey}');
     if (deviceName != null && deviceName.isNotEmpty) {
       welcome.add('✅ 新设备默认名称: $deviceName');
     }
+    welcome.add('✅ 新设备公钥: ${store.publicKey}');
   } else {
-    welcome.add('✅ 设备公钥已读取: ${store.publicKey}');
+    if (deviceName != null && deviceName.isNotEmpty) {
+      welcome.add('✅ 设备名称: $deviceName');
+    }
+    welcome.add('✅ 设备公钥: ${store.publicKey}');
   }
   welcome.add('----------------');
   for (final line in welcome) {
@@ -2922,6 +2925,7 @@ Future<void> _execCommand(String line) async {
               '（Space Key ${st.spaceKey != null ? '已就绪' : '无'}）\n'
               '   本机设备: ${st.deviceName ?? '未命名'}'
               '（${st.deviceId ?? '未登记'}）身份 $slot\n'
+              '   设备公钥: ${st.publicKey}\n'
               '   同步: seq ${st.lastServerSequence}｜本地历史 ${st.history.length} 条\n'
               '   数据文件: ${s.storePath}'));
       s.status = '';
