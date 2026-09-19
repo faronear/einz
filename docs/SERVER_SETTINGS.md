@@ -61,10 +61,15 @@ TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localCo
 ## 4. 域名容灾：候选列表
 
 ```
-kServerCandidates  = [kPrimaryServer]   // App：app/lib/data/server_config.dart
-_kServerCandidates = [_kPrimaryServer]  // TUI：cli/bin/einz_tui.dart
+// App：app/lib/data/server_config.dart   ／   TUI：cli/bin/einz_tui.dart
+kServerCandidates  = [kPrimaryServer, 'https://einz.yuanjinx.com']
+_kServerCandidates = [_kPrimaryServer, 'https://einz.yuanjinx.com']
 // 加备用域名 = 两边各加一行常量（+ 重新构建/发布）
+// 两个入口指向**同一台服务器**（一个全球、一个国内备案），身份相同、不需要清库。
 ```
+
+探测语义：候选**并发**探测，**谁先返回 200 就用谁**（不是"列表第一个优先"——顺序只
+影响全不通时的兜底与语义）。
 
 - `resolveServer()`（App）/ `_defaultServer()`（TUI）：命令行 / 本机配置**不探测**，直接用；否则对候选**并发**探测，取第一个 `/health` 成功的（主域名挂掉时不必干等 3s 超时才试备用）。
 - 全部不通 → 回主域名，由向导页的 4s 自动重试兜底。

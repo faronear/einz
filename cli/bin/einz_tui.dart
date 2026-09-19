@@ -185,7 +185,10 @@ const String _kPrimaryServer = 'https://einz.tic.cc';
 /// （如切到备案域名），用户不需要做任何操作。加备用域名 = 这里加一行（+ 重新发布）。
 ///
 /// 两端保持同构是为了让 TUI 测试能提前暴露容灾问题（老板 2026-09-19）。
-const List<String> _kServerCandidates = [_kPrimaryServer];
+const List<String> _kServerCandidates = [
+  _kPrimaryServer, // 全球入口（无备案）
+  'https://einz.yuanjinx.com', // 中国入口（有备案）——同一台服务器，仅入口不同
+];
 
 /// 本机配置（cli/localConfig.json 的 server 字段，不入库；模板见
 /// cli/localConfig.example.json）里的服务器地址；没有或损坏 → 空列表。

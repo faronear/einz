@@ -31,7 +31,8 @@ const String kEinzServer =
 /// 出厂**主域名**：产品部署的首要入口。
 ///
 /// 它的三个角色（都要求它等于 [kServerCandidates] 的第一项）：
-/// 1. 候选列表之首——优先探测；
+/// 1. 候选列表第一项（注意：并发探测时**谁先响应谁赢**，它并不独占优先，顺序只影响
+///    兜底与语义）；
 /// 2. 全不通时的兜底；
 /// 3. 编译期覆盖（[kEinzServer]）的默认值、以及"有没有被覆盖"的判定参照。
 ///
@@ -47,7 +48,10 @@ const String kPrimaryServer = 'https://einz.tic.cc';
 /// 也无需在 App 里做任何操作。
 ///
 /// 新增备用域名 = 在这里加一行常量（+ 重新发包）。
-const List<String> kServerCandidates = [kPrimaryServer];
+const List<String> kServerCandidates = [
+  kPrimaryServer, // 全球入口（无备案）
+  'https://einz.yuanjinx.com', // 中国入口（有备案）——同一台服务器，仅入口不同
+];
 
 /// 本次进程生效的服务器地址：`main()` 里定一次，之后全程只读。
 ///
