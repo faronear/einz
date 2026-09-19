@@ -7140,3 +7140,45 @@ labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row +
 - l10n：新增 `aboutServerLockedNote`（zh「可能与解锁后不同，以解锁后为准」/ en
   「may differ after unlock; the unlocked value prevails」），跑 `flutter gen-l10n` 重新生成。
 - `flutter analyze` 干净；UI 老板自测。
+
+## 2026-09-19 服务器地址策略定稿 + 落地（A/B/C/D 四步）
+
+**策略（老板拍板）**：服务器地址**不是最终用户可配置项**，只服务两件事——
+① 开发时临时切换开发环境；② 出厂域名容灾（主域名失效时老 App 自愈）。
+不做开源/自建：未来若有别人用 einz，直接用提供的服务器；真要换域名就重新打包，
+好过让小白用户在老 App 里做复杂操作。
+
+**关键区分（写进 server_config.dart 注释）**：换**域名**（同服务器多入口）= 身份不变、
+不需清库、可自愈；换**服务器** = spaceId/token/密钥对全失效，必须清库 + 重新入网。
+
+**A 地址层重构（2707031）**
+- 新增 `app/lib/data/server_config.dart`：`kEinzServer`（编译期 dart-define）+
+  `effectiveServer`（进程全局，main() 定一次）+ `probeServer()`
+- 删 `data/server_settings.dart` 与 `app_state['server']` 持久层（save() 本就零调用）
+- 删 `AppLockPayload.server` + setup_page `_persistentServer`（6 个写入点）→ 地址不进
+  锁包 → 锁屏页与解锁后读同一个变量，**不可能再不一致**
+- 删 `AboutPage` 的 server/db/isLocked + l10n `aboutServerLockedNote`，新增
+  `aboutServerDevNote`（非出厂候选 = 开发地址，关于页标注，防开发包误当正式包）
+- 删 18 处 initialServer/server 透传 + 43 处测试注入；净减 181 行
+
+**B 出厂域名候选列表（225200a）**
+- `kFactoryServerCandidates`（目前只有 einz.tic.cc，加备用/备案域名 = 加一行常量）+ 
+  `resolveServer()`：命令行/编译期覆盖不探测直接用；否则并发探测取第一个 /health 成功
+- `isNonFactoryServer` → `isDevServer`（连备用域名不算开发包）
+
+**C 桌面端 `--reset`（fefd557）**
+- 动因：老板桌面端测试流程（打包 → `--server` 指向 dev → 测 → 原包发布）完后，本机
+  store 属于开发服务器，连生产既用不了也卸不掉
+- `data/local_reset.dart`：`resetLocalData()` 清 drift 全表 + 安全存储明文包 +
+  附件明文留存目录与临时缓存；**按行删而非删库文件**（shared 是静态单例，删文件要先
+  close、close 后不可复用）
+- StartupGate：带 `--reset` → 首帧弹确认（写明"需重新邀请才能回来"）→ 清盘 → 落设置页
+
+**D TUI 同构（2a8db9e）**
+- `store.server` 收窄为"用户显式选择"（引导手输 / `/server`），出厂默认值每次重读、
+  不再落盘 → 改 localConfig.json 立即生效，不再被老 store 钉住
+- 删 `serverArg` 原值比对（_onboard/_runGuide 参数一并移除），改 `serverPicked` 布尔
+- `_defaultServer()`：localConfig.json 找不到时打一行提示（原为静默走硬编码）
+
+**验证**：`dart analyze` app/cli 均干净（flutter analyze 因 pub 网络失败，用 dart analyze 代替）；
+UI 老板自测。SERVER_SETTINGS.md 由老板自己接着写。
