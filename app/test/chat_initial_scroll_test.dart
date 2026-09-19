@@ -300,6 +300,16 @@ void main() {
     await tester.pumpAndSettle();
 
     // 点击引用卡（msg-5 气泡内的引用块预览）
+    // 先记下原消息气泡此刻的颜色：具体色值随界面风格（plain/gradient）不同，
+    // 本测试要验的是"高亮结束后恢复成原来那个色"，不写死任何风格的具体色值
+    final bubble = find
+        .ancestor(
+            of: find.text('原始消息 2'), matching: find.byType(AnimatedContainer))
+        .first;
+    expect(bubble, findsOneWidget, reason: '应能定位到原消息气泡');
+    final colorBefore =
+        (tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration).color;
+
     await tester.tap(find.text('预览：原始消息 2'));
     // 逐帧推进：帧1=_jumpToMessage setState(jumpTargetId)；帧2=post-frame 回调1
     // （jumpTo + 置高亮 setState）帧末；帧3=渲染高亮起始帧 + 过渡动画帧
@@ -309,23 +319,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400)); // 高亮过渡动画帧
 
     // 原消息 msg-2 的气泡应高亮（显眼橘黄背景 #FF9800；只换背景色不改尺寸）
-    final bubble = find
-        .ancestor(
-            of: find.text('原始消息 2'), matching: find.byType(AnimatedContainer))
-        .first;
-    expect(bubble, findsOneWidget, reason: '应能定位到原消息气泡');
     final highlighted =
         tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration;
     expect(highlighted.color, const Color(0xFFFF9800),
         reason: '跳转目标气泡应短暂高亮（显眼橘黄背景）');
 
     // 渐变 1.5s 完成（Timer 1500ms，停留 0s）后清除，恢复原气泡色
-    // （plain 未登记性别 = indigo.shade100）
     await tester.pump(const Duration(milliseconds: 1600));
     await tester.pump(); // Timer 回调 setState 渲染
     final restored =
         tester.widget<AnimatedContainer>(bubble).decoration as BoxDecoration;
-    expect(restored.color, Colors.indigo.shade100,
+    expect(restored.color, colorBefore,
         reason: '高亮应 2s 后恢复原气泡色');
   });
 }

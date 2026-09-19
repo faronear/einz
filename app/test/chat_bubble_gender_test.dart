@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/ui_style_settings.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 
@@ -69,6 +70,9 @@ void main() {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
+    // 气泡配色随界面风格（plain 半透明 tint / gradient 不透明）而不同，本测试断言的是
+    // 「性别 → 颜色」映射，所以钉住素雅纯色风格（默认风格已于 2026-09-17 改为渐变）
+    await UiStyleSettings(db).save('plain');
     // 预置 profile 双性别（模拟向导完成时写入）
     await AppLockService(db).saveProfile(
         personName: 'Lukas',

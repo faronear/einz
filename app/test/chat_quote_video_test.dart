@@ -13,6 +13,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'real_async_settle.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/message_repository.dart';
@@ -105,22 +107,6 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  /// 让 dart:io 真正跑完：testWidgets 跑在 FakeAsync 区里，真实的异步文件操作
-  /// （MediaCache 落盘解密后的视频）不会自己完成——必须 pump（触发构建、发起 IO）
-  /// 与 runAsync（开真实时间窗口、让 IO 回调进来）交替几轮，缩略图 future 才
-  /// resolve；否则缩略图一直是转圈，pumpAndSettle 会超时。
-  Future<void> settleIo(WidgetTester tester) async {
-    // 每一轮只能推进一步（exists → 解密 → 落盘 → 取帧 → 解码），所以循环到
-    // 缩略图不再转圈为止
-    for (var round = 0; round < 10; round++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 100)));
-      if (tester.widgetList(find.byType(CircularProgressIndicator)).isEmpty) break;
-    }
-    await tester.pumpAndSettle();
-  }
-
   /// 种一条本机发出的视频消息（带本地密文副本，离线也能解密）+ 打开聊天页。
   Future<WidgetTester> pumpWithVideo(WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
@@ -156,7 +142,7 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等本地历史载入
-    await tester.pumpAndSettle(); // 等附件解密
+    await settleRealAsync(tester); // 等附件解密（真实异步，见 helper 注释）
     return tester;
   }
 
@@ -175,7 +161,7 @@ void main() {
     expect(videoBubble(), findsOneWidget, reason: '消息流应显示视频预览');
 
     await tester.longPress(videoBubble());
-    await settleIo(tester);
+    await settleRealAsync(tester);
     await tester.pumpAndSettle();
     final previewRow = find.byKey(const ValueKey('messagePreviewRow'));
     expect(
@@ -200,9 +186,9 @@ void main() {
 
     // 长按 → 引用
     await tester.longPress(videoBubble());
-    await settleIo(tester);
+    await settleRealAsync(tester);
     await tester.tap(find.text('引用'));
-    await settleIo(tester);
+    await settleRealAsync(tester);
     await tester.pumpAndSettle();
     expect(_thumbOf(24), findsOneWidget, reason: '输入栏引用条应显示视频缩略图');
     expect(find.text('video.mp4'), findsOneWidget,
@@ -210,7 +196,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), '看这个');
     await tester.testTextInput.receiveAction(TextInputAction.done);
-    await settleIo(tester);
+    await settleRealAsync(tester);
     await tester.pumpAndSettle();
 
     expect(find.text('看这个'), findsOneWidget, reason: '新消息应已发出');

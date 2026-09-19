@@ -8,6 +8,8 @@ import 'dart:typed_data';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'real_async_settle.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/message_repository.dart';
@@ -104,7 +106,8 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等本地历史载入
-    await tester.pumpAndSettle(); // 等图片解码
+    // 附件解密（FFI）与图片解码是真实异步，fake 时钟推不动——见 settleRealAsync 注释
+    await settleRealAsync(tester);
     return tester;
   }
 
