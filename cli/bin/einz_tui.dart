@@ -972,7 +972,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
   // 兼容完整邀请链接：https://host/join/<token> → 提取 token
   final token = input.contains('/join/') ? input.split('/join/').last.trim() : input.trim();
   if (token.isEmpty) {
-    session.messages.add(_systemMessage(session, '用法: /space join <邀请链接或 token>'));
+    session.messages.add(_systemMessage(session, '🔧 用法: /space join <邀请链接或 token>'));
     return;
   }
   try {
@@ -2822,11 +2822,9 @@ Future<void> _execCommand(String line) async {
     case '/server':
       // 无参数：先输出当前服务器（状态），再给出详细用法
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session, '当前服务器: ${s.session.server}'));
-        s.session.messages.add(_systemMessage(
-            s.session,
-            '用法: /server <地址> —— 切换本次会话的服务器并激活（仅本次生效，不写入 store；'
-                '要长期换地址请改 cli/localConfig.json。如 /server https://einz.tic.cc）'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 当前服务器: ${s.session.server}\n\n'
+            '🔧 用法: /server <地址> —— 切换本次会话的服务器并激活，仅本次生效，不长期保留。'
+            '要长期换地址请改 cli/localConfig.json。'));
         s.status = '';
       } else {
         try {
@@ -2872,6 +2870,12 @@ Future<void> _execCommand(String line) async {
       // 无参数：对当前服务器执行 challenge-response 激活/续期。
       // （此前这里只打印状态与用法就 break，而 4 处提示都让用户"先 /auth 重新激活"——
       //  照着敲什么也没发生，是个既有缺口。）
+      // 激活前先输出当前状态，让用户知道这次是"首次激活"还是"续期"。
+      final hadSession = s.session.store.sessionToken != null;
+      s.session.messages.add(_systemMessage(
+          s.session,
+          '📡 /auth 当前状态：\n   服务器 ${s.session.server}\n   '
+          '${hadSession ? "已有会话：本次为续期" : "未激活：本次为首次激活"}'));
       try {
         await s.session.auth();
         // 激活结果作为 system 消息进消息流（不占顶部状态栏）
@@ -2912,15 +2916,16 @@ Future<void> _execCommand(String line) async {
           s.session,
           '📊 状态\n'
               '   服务器: ${s.session.server}（$origin）\n'
-              '   线路: ${st.sessionToken != null ? '已激活' : '未激活'}\n'
-              '   实时连接: $ws\n'
+              '   机密线路: ${st.sessionToken != null ? '已激活' : '未激活'}\n'
+              '   实时连接 ws: $ws\n'
               '   对方: ${s.peerOnline ? '在线' : '离线'}\n'
-              '   秘境: ${st.spaceId ?? '未绑定'}'
-              '（Space Key ${st.spaceKey != null ? '已就绪' : '无'}）\n'
-              '   本机设备: ${st.deviceName ?? '未命名'}'
-              '（${st.deviceId ?? '未登记'}）身份 $slot\n'
-              '   设备公钥: ${st.publicKey}\n'
-              '   同步: seq ${st.lastServerSequence}｜本地历史 ${st.history.length} 条\n'
+              '   秘境 id: ${st.spaceId ?? '未绑定'}\n'
+              '   秘境密钥: ${st.spaceKey != null ? '已就绪' : '无'}）\n'
+              '   本机名称: ${st.deviceName ?? '未命名'}\n'
+              '   本机 id: ${st.deviceId ?? '未登记'}\n'
+              '   本机编号: $slot\n'
+              '   本机公钥: ${st.publicKey}\n'
+              '   消息同步: seq ${st.lastServerSequence}｜本地历史 ${st.history.length} 条\n'
               '   数据文件: ${s.storePath}'));
       s.status = '';
       break;
@@ -2935,11 +2940,11 @@ Future<void> _execCommand(String line) async {
           s.session.messages.add(_systemMessage(s.session,
               '✅ 当前设备已绑定到秘境${addr != null ? '（地址: $addr）' : ''}'));
           s.session.messages.add(_systemMessage(
-              s.session, '用法: /space address | /space create | /space join <邀请链接或 token>'));
+              s.session, '🔧 用法: /space address | /space create | /space join <邀请链接或 token>'));
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未绑定空间'));
           s.session.messages.add(_systemMessage(
-              s.session, '用法: /space create 新建私密空间；/space join <邀请链接或 token> 加入已有空间'));
+              s.session, '🔧 用法: /space create 新建私密空间；/space join <邀请链接或 token> 加入已有空间'));
         }
         break;
       }
@@ -2963,14 +2968,14 @@ Future<void> _execCommand(String line) async {
         if (sub == 'join') {
           final rest = arg.trim().substring('join'.length).trim();
           if (rest.isEmpty) {
-            s.session.messages.add(_systemMessage(s.session, '用法: /space join <邀请链接或 token>'));
+            s.session.messages.add(_systemMessage(s.session, '🔧 用法: /space join <邀请链接或 token>'));
             break;
           }
           await _spaceJoin(s.session, s.session.store, s.storePath, rest);
           break;
         }
         s.session.messages.add(
-            _systemMessage(s.session, '未知子命令: $sub —— 用法: /space [address|create|join <链接>]'));
+            _systemMessage(s.session, '未知子命令: $sub —— 🔧 用法: /space [address|create|join <链接>]'));
       }
       break;
     case '/passphrase':
@@ -2995,7 +3000,7 @@ Future<void> _execCommand(String line) async {
             s.session.store.pinHash == null ? '⚠️ 锁屏码：未设置' : '✅ 锁屏码：已设置'));
         // 先输出状态，再给出详细用法
         s.session.messages.add(_systemMessage(s.session,
-            '用法: /pin <PIN> —— 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）；/pin \'\' 重置为空（取消锁屏码）'));
+            '🔧 用法: /pin <PIN> —— 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）；/pin \'\' 重置为空（取消锁屏码）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
@@ -3128,7 +3133,7 @@ Future<void> _execCommand(String line) async {
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));
     case '/attach':
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session, '用法: /attach <文件路径> [描述]'));
+        s.session.messages.add(_systemMessage(s.session, '🔧 用法: /attach <文件路径> [描述]'));
       } else {
         // 附件消息在 attachFile 里乐观上屏（pending ⋯ → sent ✓，与普通消息同款，老板
         // 2026-09-14）；这里**不 await**——回车即交还输入（否则输入循环 busy 到上传结束，
@@ -3149,7 +3154,7 @@ Future<void> _execCommand(String line) async {
             '(未设置)';
         s.session.messages.add(_systemMessage(s.session, '当前名字: $current'));
         s.session.messages.add(
-            _systemMessage(s.session, '用法: /myname <名字> —— 修改我的显示名字（如 /myname Lukas）'));
+            _systemMessage(s.session, '🔧 用法: /myname <名字> —— 修改我的显示名字（如 /myname Lukas）'));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
@@ -3194,7 +3199,7 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '当前设备名: $current'));
         s.session.messages.add(_systemMessage(s.session, '设备公钥: ${s.session.store.publicKey}'));
         s.session.messages.add(
-            _systemMessage(s.session, '用法: /device <设备名> —— 修改本设备名称（如 /device MyMac）'));
+            _systemMessage(s.session, '🔧 用法: /device <设备名> —— 修改本设备名称（如 /device MyMac）'));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
