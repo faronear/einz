@@ -306,30 +306,24 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     store.save(storePath); // 地址不落盘：只存设备身份
   }
 
-  // 开场欢迎块：**所有启动**都显示（横幅 + 生效地址 + 身份）——地址不落盘、每次启动
-  // 算一次，显式摆出来才不会"以为在测本地、实际连的是生产"。
-  // 身份按**是否已绑定空间**分：未绑定 = 新设备（公钥/默认名本次生成）；已绑定 = 老设备
-  // （公钥是本机已有的，读出来显示，别写成"已生成"）。
+  // 开场欢迎块：**只对新设备**（尚未绑定空间）显示——那是它第一次露面，得知道自己
+  // 连的是哪台服务器、生成了什么身份。老设备（已绑定空间）**不打印**，直接进聊天；
+  // 要看服务器/连接/公钥等，用户自己敲 /status（只读，不发请求）。
   // 终端逐行打印；进 TUI 后并成**一条** system 消息（\n 连接，块内紧贴、不与其他消息
   // 混在一起——与"选择秘境入口"那段 _prompt 同一写法）。
-  final welcome = <String>['=== Einz 秘境 ===', '✅ 当前服务器: $server'];
-  final deviceName = store.deviceName;
   if (store.spaceId == null) {
+    final welcome = <String>['=== Einz 秘境 ===', '✅ 当前服务器: $server'];
+    final deviceName = store.deviceName;
     if (deviceName != null && deviceName.isNotEmpty) {
       welcome.add('✅ 新设备默认名称: $deviceName');
     }
     welcome.add('✅ 新设备公钥: ${store.publicKey}');
-  } else {
-    if (deviceName != null && deviceName.isNotEmpty) {
-      welcome.add('✅ 设备名称: $deviceName');
+    welcome.add('----------------');
+    for (final line in welcome) {
+      stdout.writeln(line);
     }
-    welcome.add('✅ 设备公钥: ${store.publicKey}');
+    _guidanceNotes.add(welcome.join('\n'));
   }
-  welcome.add('----------------');
-  for (final line in welcome) {
-    stdout.writeln(line);
-  }
-  _guidanceNotes.add(welcome.join('\n'));
   // 引导问答（名称/登记/接入/口令）由 _runGuide 在 TUI 消息流中处理
   // （system 提示 + you> 输入 + 机密 *）——此处仅返回，main 负责启动引导任务与输入循环
   return (store, server, storePath);
