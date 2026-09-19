@@ -287,9 +287,14 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     await Future<void>.delayed(Duration.zero);
   }
 
+  // 生效地址进对话流（进 TUI 后作为 system 消息显示）：地址不落盘、每次启动算一次，
+  // 显式摆出来才不会"以为在测本地、实际连的是生产"。
+  _guidanceNotes.add('当前服务器: $server');
+
   if (store == null) {
     stdout.writeln('=== Einz 秘境 ===');
     _guidanceNotes.add('=== Einz 秘境 ===');
+    stdout.writeln('当前服务器: $server');
 
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
