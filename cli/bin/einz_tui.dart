@@ -287,13 +287,6 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     await Future<void>.delayed(Duration.zero);
   }
 
-  // 开场欢迎块：**所有启动**都显示（横幅 + 生效地址）——地址不落盘、每次启动算一次，
-  // 显式摆出来才不会"以为在测本地、实际连的是生产"。
-  stdout.writeln('=== Einz 秘境 ===');
-  _guidanceNotes.add('=== Einz 秘境 ===');
-  stdout.writeln('当前服务器: $server');
-  _guidanceNotes.add('当前服务器: $server');
-
   if (store == null) {
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
     // 与 personId 一致），无需用户输入
@@ -313,22 +306,27 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
     store.save(storePath); // 地址不落盘：只存设备身份
   }
 
-  // 身份提示按**是否已绑定空间**分：未绑定 = 新设备（公钥/默认名本次生成）；
-  // 已绑定 = 老设备（公钥是本机已有的，读出来显示，别写成"已生成"）。
+  // 开场欢迎块：**所有启动**都显示（横幅 + 生效地址 + 身份）——地址不落盘、每次启动
+  // 算一次，显式摆出来才不会"以为在测本地、实际连的是生产"。
+  // 身份按**是否已绑定空间**分：未绑定 = 新设备（公钥/默认名本次生成）；已绑定 = 老设备
+  // （公钥是本机已有的，读出来显示，别写成"已生成"）。
+  // 终端逐行打印；进 TUI 后并成**一条** system 消息（\n 连接，块内紧贴、不与其他消息
+  // 混在一起——与"选择秘境入口"那段 _prompt 同一写法）。
+  final welcome = <String>['=== Einz 秘境 ===', '当前服务器: $server'];
+  final deviceName = store.deviceName;
   if (store.spaceId == null) {
-    stdout.writeln('✅ 新设备公钥已生成: ${store.publicKey}');
-    _guidanceNotes.add('✅ 新设备公钥已生成: ${store.publicKey}');
-    final name = store.deviceName;
-    if (name != null && name.isNotEmpty) {
-      stdout.writeln('✅ 新设备默认名称: $name');
-      _guidanceNotes.add('✅ 新设备默认名称: $name');
+    welcome.add('✅ 新设备公钥已生成: ${store.publicKey}');
+    if (deviceName != null && deviceName.isNotEmpty) {
+      welcome.add('✅ 新设备默认名称: $deviceName');
     }
   } else {
-    stdout.writeln('✅ 设备公钥已读取: ${store.publicKey}');
-    _guidanceNotes.add('✅ 设备公钥已读取: ${store.publicKey}');
+    welcome.add('✅ 设备公钥已读取: ${store.publicKey}');
   }
-  stdout.writeln('----------------');
-  _guidanceNotes.add('----------------');
+  welcome.add('----------------');
+  for (final line in welcome) {
+    stdout.writeln(line);
+  }
+  _guidanceNotes.add(welcome.join('\n'));
   // 引导问答（名称/登记/接入/口令）由 _runGuide 在 TUI 消息流中处理
   // （system 提示 + you> 输入 + 机密 *）——此处仅返回，main 负责启动引导任务与输入循环
   return (store, server, storePath);
