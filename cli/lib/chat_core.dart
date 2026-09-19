@@ -182,7 +182,7 @@ class ChatSession {
   /// 认证（challenge → sealOpen → verify），成功写入 store。
   Future<void> auth({String? serverOverride}) async {
     final target = serverOverride ?? server;
-    if (target.isEmpty) throw StateError('缺少服务器地址（/auth <server> 或启动时 --server）');
+    if (target.isEmpty) throw StateError('缺少服务器地址（启动时 --server 或 /server <地址>）');
     final api = ApiClient(target);
     final s = await sodium();
 

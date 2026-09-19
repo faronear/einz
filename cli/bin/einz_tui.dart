@@ -2749,7 +2749,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/auth [server] :: 激活机密线路',
+        '/auth :: 激活/续期当前服务器的机密线路（换服务器用 /server）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2849,21 +2849,20 @@ Future<void> _execCommand(String line) async {
         s.status = '⌛️ 等待邀请链接输入…';
         break;
       }
-      // 无参数：先输出当前登录状态，再给出详细用法（激活需带服务器地址）
-      if (arg.isEmpty) {
-        final authed = s.session.store.sessionToken != null;
+      // 已经带了地址 = 想换服务器——那不是 /auth 的活（换服务器用 /server）
+      if (arg.isNotEmpty) {
         s.session.messages.add(_systemMessage(
-            s.session, authed ? '✅ 在线状态：已激活机密线路' : '⚠️ 在线状态: 未激活机密线路'));
-        s.session.messages.add(_systemMessage(
-            s.session, '用法: /auth <服务器地址> —— 激活机密线路（如 /auth https://einz.tic.cc）'));
+            s.session,
+            'ℹ️ /auth 是对**当前**服务器激活/续期（不带参数）。\n'
+            '   换服务器请用: /server $arg'));
+        s.status = '';
         break;
       }
+      // 无参数：对当前服务器执行 challenge-response 激活/续期。
+      // （此前这里只打印状态与用法就 break，而 4 处提示都让用户"先 /auth 重新激活"——
+      //  照着敲什么也没发生，是个既有缺口。）
       try {
-        await s.session.auth(serverOverride: arg);
-        // 地址同步到本次会话：后续同步/WS/名称刷新都读 session.server，
-        // 否则这条命令只是"对别的服务器做了一次认证"，会话仍走旧地址。
-        // 仅本次生效（不落盘，与 /server、--server 同语义）。
-        s.session.server = arg;
+        await s.session.auth();
         // 激活结果作为 system 消息进消息流（不占顶部状态栏）
         s.session.messages.add(_systemMessage(s.session, '✅ 成功激活机密线路。'));
         s.status = '';

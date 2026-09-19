@@ -96,7 +96,7 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫邀请�
 | --- | --- |
 | `/space` | 空间状态 / `/space create` 新建 / `/space join <链接>` 加入 |
 | `/invite` | 生成一次性邀请链接（24h，把新设备绑进秘境） |
-| `/auth [server]` | 激活/续期会话（challenge-response） |
+| `/auth` | 激活/续期会话（challenge-response，对**当前**服务器） |
 | `/passphrase [random]` | 设置/修改密保口令（`random` 生成随机 12 词） |
 | `/pin` | 设置/修改启动锁 PIN |
 | `/devices` | 列出秘境内的设备与在线状态 |
@@ -104,7 +104,7 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫邀请�
 | `/sync` / `/history` | 手动增量同步 / 看本地解密历史 |
 | `/attach <file>` / `/open <序号>` | 上传附件 / 打开消息里的附件 |
 | `/backup` | 导出加密备份（12 词恢复码） |
-| `/server <url>` | 切换/确认服务器地址 |
+| `/server [url]` | 不带参数 = 显示当前服务器地址；带地址 = 切换本次会话的服务器（仅本次生效，不落盘） |
 | `/exit` | 退出 |
 
 > 更完整的操作手册见 `docs/ONBOARDING.md`；协议细节见 `docs/PROTOCOL.md`。
