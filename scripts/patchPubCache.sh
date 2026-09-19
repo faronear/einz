@@ -14,33 +14,41 @@
 set -euo pipefail
 
 PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
-HOSTED="$PUB_CACHE/hosted/pub.dev"
-OPEN_FILEX="$HOSTED/open_filex-4.7.0/android/build.gradle"
-VIDEO_THUMB="$HOSTED/video_thumbnail-0.5.6/android/build.gradle"
 
-[[ -f "$OPEN_FILEX" ]] || { echo "✗ 找不到 $OPEN_FILEX（先 flutter pub get）"; exit 1; }
-[[ -f "$VIDEO_THUMB" ]] || { echo "✗ 找不到 $VIDEO_THUMB（先 flutter pub get）"; exit 1; }
+patchOne() {
+  local HOSTED="$1"
+  local OPEN_FILEX="$HOSTED/open_filex-4.7.0/android/build.gradle"
+  local VIDEO_THUMB="$HOSTED/video_thumbnail-0.5.6/android/build.gradle"
 
-# open_filex：删除整个 buildscript 块（宿主工程已提供 AGP，无需插件自带）
-if grep -q "buildscript" "$OPEN_FILEX"; then
-  perl -0pi -e 's/buildscript \{.*?\n\}\n\n//s' "$OPEN_FILEX"
-  echo "✓ open_filex: 移除 buildscript（AGP 8.1.0 / kotlin-stdlib RC2）"
-else
-  echo "• open_filex: 已打过补丁，跳过"
-fi
+  [[ -f "$OPEN_FILEX" ]] || return 0
+  [[ -f "$VIDEO_THUMB" ]] || return 0
 
-# video_thumbnail：jcenter() → mavenCentral()；compileSdkVersion 33 → 34
-if grep -q "jcenter()" "$VIDEO_THUMB"; then
-  perl -pi -e 's/jcenter\(\)/mavenCentral()/g' "$VIDEO_THUMB"
-  echo "✓ video_thumbnail: jcenter() → mavenCentral()"
-else
-  echo "• video_thumbnail: jcenter 已替换，跳过"
-fi
-if grep -q "compileSdkVersion 33" "$VIDEO_THUMB"; then
-  perl -pi -e 's/compileSdkVersion 33/compileSdkVersion 34/' "$VIDEO_THUMB"
-  echo "✓ video_thumbnail: compileSdkVersion 33 → 34"
-else
-  echo "• video_thumbnail: compileSdk 已升级，跳过"
-fi
+  # open_filex：删除整个 buildscript 块（宿主工程已提供 AGP，无需插件自带）
+  if grep -q "buildscript" "$OPEN_FILEX"; then
+    perl -0pi -e 's/buildscript \{.*?\n\}\n\n//s' "$OPEN_FILEX"
+    echo "✓ open_filex [$HOSTED]: 移除 buildscript（AGP 8.1.0 / kotlin-stdlib RC2）"
+  else
+    echo "• open_filex [$HOSTED]: 已打过补丁，跳过"
+  fi
+
+  # video_thumbnail：jcenter() → mavenCentral()；compileSdkVersion 33 → 34
+  if grep -q "jcenter()" "$VIDEO_THUMB"; then
+    perl -pi -e 's/jcenter\(\)/mavenCentral()/g' "$VIDEO_THUMB"
+    echo "✓ video_thumbnail [$HOSTED]: jcenter() → mavenCentral()"
+  else
+    echo "• video_thumbnail [$HOSTED]: jcenter 已替换，跳过"
+  fi
+  if grep -q "compileSdkVersion 33" "$VIDEO_THUMB"; then
+    perl -pi -e 's/compileSdkVersion 33/compileSdkVersion 34/' "$VIDEO_THUMB"
+    echo "✓ video_thumbnail [$HOSTED]: compileSdkVersion 33 → 34"
+  else
+    echo "• video_thumbnail [$HOSTED]: compileSdk 已升级，跳过"
+  fi
+}
+# 遍历所有镜像目录（pub.dev / pub.flutter-io.cn / ...），镜像切换后缓存里会有多份副本
+for HOSTED in "$PUB_CACHE"/hosted/*/; do
+  [[ -d "$HOSTED" ]] || continue
+  patchOne "$HOSTED"
+done
 
 echo "✓ pub cache 补丁完成"
