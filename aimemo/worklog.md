@@ -7182,3 +7182,18 @@ labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row +
 
 **验证**：`dart analyze` app/cli 均干净（flutter analyze 因 pub 网络失败，用 dart analyze 代替）；
 UI 老板自测。SERVER_SETTINGS.md 由老板自己接着写。
+
+## 2026-09-19 追补：TUI 服务器地址彻底不落盘（2832953）
+
+老板追问"我 package.json 里已经把 store 和 server 绑定好了，为何还要在 TUI 里切
+服务器"——成立。进而定的原则：**反复要输 URL 说明服务器换了，那就该去改
+localConfig.json 或硬编码托底，而不是持久化进 store**；持久化会让人每次启动静默
+换个服务器还不自知，反而不如每次手输（那个"烦"就是配置不对的警报）。
+
+- 删 `DeviceStore.server` 字段（构造参数/toJson/fromJson 一并删）
+- 引导手输与 `/server <地址>` 都改**仅本次生效**（`session.server = arg`）
+- 8 处地址读取 `store.server` → `session.server`
+- 顺带修 `/auth <地址>`：原先只对别的服务器认证一次、会话仍走旧地址
+
+至此 TUI 与 App 同一条规则：**地址每次算，永不落盘**（`--server`/`/server`/引导
+手输都只作用于本次）。
