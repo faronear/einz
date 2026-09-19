@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -27,18 +28,52 @@ import 'dart:io';
 const String kEinzServer =
     String.fromEnvironment('kEinzServer', defaultValue: kFactoryServer);
 
-/// 出厂域名（未被任何覆盖时使用）：产品部署域名固定。
+/// 出厂主域名（未被任何覆盖时使用）：产品部署域名固定。
 const String kFactoryServer = 'https://einz.tic.cc';
 
-/// 本次进程生效的服务器地址：`main()` 里按 `--server` 覆盖定一次，之后只读。
+/// 出厂域名候选（按优先级，第一个是主域名）。
+///
+/// 这是**同一服务的多个入口**，不是多台服务器：身份（spaceId / token / 设备密钥对）
+/// 在任何入口上都一样，切换入口不需要清库、不需要重新入网。用途是域名容灾——
+/// 主域名失效（如需要切到备案域名）时，老 App 自己连上备用入口，无需用户更新，
+/// 也无需在 App 里做任何操作。
+///
+/// 新增备用域名 = 在这里加一行常量（+ 重新发包）。
+const List<String> kFactoryServerCandidates = [kFactoryServer];
+
+/// 本次进程生效的服务器地址：`main()` 里定一次，之后全程只读。
 ///
 /// **给默认值而非 late**：单元测试不走 `main()`，late 未初始化会直接崩。
-String effectiveServer = kEinzServer;
+String effectiveServer = kFactoryServer;
 
-/// 当前地址是否**不是**出厂域名（开发覆盖，或将来连上备用域名）。
+/// 当前地址是否**不在**出厂候选里（= 开发覆盖：`--server` 或编译期 dart-define）。
 ///
 /// 关于页据此标注——开发包一眼可辨，避免误把连着 localhost 的包当正式包。
-bool get isNonFactoryServer => effectiveServer != kFactoryServer;
+/// 连的是备用域名时不算（那仍是生产环境）。
+bool get isDevServer => !kFactoryServerCandidates.contains(effectiveServer);
+
+/// 定本次生效地址（启动调一次）：
+/// 1. 命令行 `--server` 覆盖 → 直接用，不探测；
+/// 2. 编译期覆盖（`kEinzServer != kFactoryServer`）→ 直接用，不探测；
+/// 3. 否则在 [kFactoryServerCandidates] 里并发探测，取第一个 `/health` 成功的；
+///    全不通 → 回主域名（由 setup_page 的 4s 自动重试兜底）。
+Future<String> resolveServer(String? argServer) async {
+  if (argServer != null && argServer.isNotEmpty) return argServer;
+  if (kEinzServer != kFactoryServer) return kEinzServer;
+  if (kFactoryServerCandidates.length == 1) return kFactoryServer;
+
+  // 并发探测：谁先 200 就用谁（主域名挂掉时不必干等 3s 超时才试备用）
+  final picked = Completer<String>();
+  var pending = kFactoryServerCandidates.length;
+  for (final candidate in kFactoryServerCandidates) {
+    probeServer(candidate).then((r) {
+      if (r.$1 && !picked.isCompleted) picked.complete(candidate);
+      pending--;
+      if (pending == 0 && !picked.isCompleted) picked.complete(kFactoryServer);
+    });
+  }
+  return picked.future;
+}
 
 /// 快速健康探测（GET {server}/health，3s 超时）。
 ///

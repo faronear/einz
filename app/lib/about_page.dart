@@ -71,7 +71,7 @@ class _AboutPageState extends State<AboutPage> {
                   _InfoRow(
                     label: l10n.aboutServerLabel,
                     value: effectiveServer,
-                    note: isNonFactoryServer ? l10n.aboutServerDevNote : null,
+                    note: isDevServer ? l10n.aboutServerDevNote : null,
                   ),
                 ],
               ),

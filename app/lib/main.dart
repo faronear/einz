@@ -27,7 +27,8 @@ Future<void> main() async {
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
   WidgetsFlutterBinding.ensureInitialized();
   // 本次生效地址定一次，之后全程只读（页面不再层层透传，锁屏/解锁同源）。
-  effectiveServer = parseServerArg(await readLaunchArgs()) ?? kEinzServer;
+  final args = await readLaunchArgs();
+  effectiveServer = await resolveServer(parseServerArg(args));
   runApp(const EinzApp());
 }
 
