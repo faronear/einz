@@ -7197,3 +7197,45 @@ localConfig.json 或硬编码托底，而不是持久化进 store**；持久化�
 
 至此 TUI 与 App 同一条规则：**地址每次算，永不落盘**（`--server`/`/server`/引导
 手输都只作用于本次）。
+
+## 2026-09-19 macOS 打包 codesign 失败：产物里的 `*.sbak` 备份文件（已加保险）
+
+老板报「昨天打 mac 包还好，今天 `npm run desk-mac-build-release` 报
+`record_macos.framework: code object is not signed at all` / `Command CodeSign failed`」。
+
+**根因不是签名配置**：`app/build/macos/Build/Products/Release/**` 里混进了 25 个
+`*.sbak`（框架二进制旁 + `*.framework.dSYM/.../DWARF/` 里），mtime 全是 9/18 08:21
+（`bba0062` 部署目标 12.0→13.0 / libsodium 重编那批之后）。codesign 递归校验 bundle 时把
+bundle 内任何 Mach-O 当 nested code，报的就是**旁边那个 .sbak**：
+
+    einz.app/Contents/Frameworks/audioplayers_darwin.framework: code object is not signed at all
+      In subcomponent: .../audioplayers_darwin.framework/Versions/A/audioplayers_darwin.sbak
+
+链条：CocoaPods `[CP] Embed Pods Frameworks` 用 `codesign --force --sign <id>
+--preserve-metadata=…` 给 9 个插件框架签名 → 每个都因同目录的 .sbak 失败 → 框架保持未签名
+→ Runner 最后签 `einz.app` 时报 `In subcomponent: …record_macos.framework`。
+**报错信息极具误导性**（指向"插件框架没签名"，真凶是多了个文件），且这些 codesign 报错只
+在 `flutter build -v` 日志里可见，非 verbose 的 npm 输出把它们吞掉了。
+
+**为什么昨天没事**：.sbak 产生于 9/18 08:21，上次成功打 mac 包在此之前；今天这次是产生后
+第一次跑 mac Release。只影响 `Release` 产物，Debug 目录干净。
+
+**没查出来是谁生成的**：实测 `strip`(-S/-x/-u) / `lipo` / `install_name_tool` / `vtool` /
+`bitcode_strip` / `llvm-strip` 都不产生 .sbak；Xcode 与 `/usr/bin` 工具链里也搜不到该字符串。
+别处（几个老仓库的 `.git/FETCH_HEAD.sbak`，2024/2025 年）也有同后缀，像是某个"改文件前先
+备份成 .sbak"的工具留下的。**origin 未知 = 可能重演**，所以加保险而不是只删一次。
+
+**处理**：
+
+- 删掉那 25 个 .sbak（纯构建产物），`desk-mac-build-release` 全流程通过，13 个内嵌
+  framework 全部签名，`codesign --verify --deep --strict` 通过；端到端复跑一次确认。
+- `package.json` 的 `desk-mac-build-release` 在 `cd app` 之后加一道保险（幂等，干净时零输出）：
+  `find build/macos -name '*.sbak' -print -delete 2>/dev/null;`
+  用 `;` 而非 `&&`：新克隆没有 `build/`，find 会返回 1，不能让它打断后续链。
+- iOS 侧同类风险**未加**（`app-ios-build-*` 走 `buildIos.sh`，同样要过 codesign）——等老板拍板。
+
+**提交注意**：`package.json` 里还留着老板/别的 agent 的一批未提交改动（4 条脚本加
+`echo ======= Moved to =======` 等），与本次改动同文件、甚至同一行。提交时用
+「`git show HEAD:package.json` → 只重放本次改动 → `hash-object` + `update-index --cacheinfo`
+→ commit」隔离，**没有 checkout/stash 工作区**，未把那些 hunk 卷进本次提交，也不会踩到并发
+agent 的写入。
