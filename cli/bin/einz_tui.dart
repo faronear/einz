@@ -4,7 +4,6 @@
 //   - 分栏布局：消息区（滚动）+ 输入区（底部）+ 状态栏（顶部，含 WS 状态）
 //   - 手写 ANSI 渲染（零新依赖；pub 缓存无 TUI 库且国内网络下载不稳）
 //   - 后台 WS 实时监听（复用 shared WsClient，断线自动重连）
-//   - 命令：/auth /sync /history /attach <file> /help /exit
 //   - 逐键输入（raw 模式），Ctrl+C 或 /exit 退出
 //
 // 用法：
