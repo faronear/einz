@@ -311,15 +311,24 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
       storePath = '$dir/myeinz.json';
     }
     store.save(storePath); // 地址不落盘：只存设备身份
+  }
+
+  // 身份提示按**是否已绑定空间**分：未绑定 = 新设备（公钥/默认名本次生成）；
+  // 已绑定 = 老设备（公钥是本机已有的，读出来显示，别写成"已生成"）。
+  if (store.spaceId == null) {
     stdout.writeln('✅ 新设备公钥已生成: ${store.publicKey}');
     _guidanceNotes.add('✅ 新设备公钥已生成: ${store.publicKey}');
-    if (autoName.isNotEmpty) {
-      stdout.writeln('✅ 新设备默认名称: $autoName');
-      _guidanceNotes.add('✅ 新设备默认名称: $autoName');
+    final name = store.deviceName;
+    if (name != null && name.isNotEmpty) {
+      stdout.writeln('✅ 新设备默认名称: $name');
+      _guidanceNotes.add('✅ 新设备默认名称: $name');
     }
-    stdout.writeln('----------------');
-    _guidanceNotes.add('----------------');
+  } else {
+    stdout.writeln('✅ 设备公钥已读取: ${store.publicKey}');
+    _guidanceNotes.add('✅ 设备公钥已读取: ${store.publicKey}');
   }
+  stdout.writeln('----------------');
+  _guidanceNotes.add('----------------');
   // 引导问答（名称/登记/接入/口令）由 _runGuide 在 TUI 消息流中处理
   // （system 提示 + you> 输入 + 机密 *）——此处仅返回，main 负责启动引导任务与输入循环
   return (store, server, storePath);
