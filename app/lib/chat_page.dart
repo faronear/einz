@@ -33,6 +33,7 @@ import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
+import 'widgets/reset_device.dart';
 import 'widgets/emoji_panel.dart';
 import 'widgets/immersive_fullscreen.dart';
 import 'widgets/passphrase_field.dart';
@@ -123,6 +124,7 @@ class ChatPage extends StatefulWidget {
 const double kMessageFontSize = 15;
 
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
+
   late final MessageRepository _repo;
   final _input = TextEditingController();
   final _inputFocusNode = FocusNode(); // 回车发送后重新聚焦（与图标发送一致保持焦点）
@@ -1010,6 +1012,65 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
+  /// 菜单项动作：等菜单关闭动画跑完再开新 route——MenuRoute/DialogRoute 在 Overlay 里
+  /// 交叉卸载会触发断言崩溃（2026-09-05 修复），所以统一在这里错峰 300ms。
+  void _menuAction(VoidCallback action) {
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      action();
+    });
+  }
+
+  /// 「高级」底部弹层（二级菜单：修改口令 / 重置设备）。两项都只给标题——
+  /// 具体后果留给点进去的弹窗说明（弹层本身不解释）。
+  ///
+  /// 为什么用弹层而不是 MenuAnchor + SubmenuButton 的级联子菜单：手机宽度下
+  /// 主菜单 280 + 子菜单约 190 塞不进一屏，级联面板会与主菜单重叠、还会被面板里的
+  /// 分隔线横穿（2026-09-19 实测），换弹层最省事。
+  Future<void> _showAdvancedSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) {
+        final red = Theme.of(ctx).colorScheme.error;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  l10n.advancedMenuTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: Text(l10n.chatPageMenuChangePassphrase),
+                onTap: () => Navigator.of(ctx).pop('passphrase'),
+              ),
+              ListTile(
+                leading: Icon(Icons.warning_amber_rounded, color: red),
+                title: Text(l10n.advancedResetDevice),
+                onTap: () => Navigator.of(ctx).pop('reset'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    // 与弹层关闭动画错开再开 dialog：Overlay 里两个 route 交叉卸载会触发断言
+    // （同 _menuAction 的 2026-09-05 修复）
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    if (picked == 'passphrase') {
+      await _showChangePassphraseDialog();
+    } else if (picked == 'reset') {
+      await confirmResetDevice(context, db: widget.db);
+    }
+  }
+
   void _openAboutPage() {
     Navigator.of(context).push<void>(
       MaterialPageRoute(builder: (_) => const AboutPage()),
@@ -3560,39 +3621,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             icon: const Icon(Icons.menu),
             tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
-              // 修复（2026-09-05）：不能在菜单 pop 动画未完成时立即打开新 route——
-              // MenuRoute 与 DialogRoute 会在 Overlay 中交叉卸载，触发
-              // InheritedElement.debugDeactivated 的 _dependents.isEmpty 断言崩溃
-              // （真机 vsync 下必现，widget 测试帧驱动掩盖）。等菜单完全关闭再打开。
-              Future<void>.delayed(const Duration(milliseconds: 300), () {
-                if (!mounted) return;
-                switch (value) {
-                  case 'locale':
-                    _showLocalePicker();
-                  case 'style':
-                    _showStylePicker();
-                  case 'storage':
-                    _showAttachmentStoragePicker();
-                  case 'burn':
-                    _showBurnPicker();
-                  case 'invite':
-                    _showInviteDialog();
-                  case 'pin':
-                    _showSetLockDialog();
-                  case 'passphrase':
-                    _showChangePassphraseDialog();
-                  case 'about':
-                    _openAboutPage();
-                  case 'name':
-                    _showRenameDialog(renameDevice: false);
-                  case 'avatar':
-                    _showAvatarUpload();
-                  case 'devname':
-                    _showRenameDialog(renameDevice: true);
-                  case 'exit':
-                    _showExitAppDialog();
-                }
-              });
+              switch (value) {
+                case 'locale':
+                  _menuAction(_showLocalePicker);
+                case 'style':
+                  _menuAction(_showStylePicker);
+                case 'storage':
+                  _menuAction(_showAttachmentStoragePicker);
+                case 'burn':
+                  _menuAction(_showBurnPicker);
+                case 'invite':
+                  _menuAction(_showInviteDialog);
+                case 'advanced':
+                  _menuAction(_showAdvancedSheet);
+                case 'pin':
+                  _menuAction(_showSetLockDialog);
+                case 'about':
+                  _menuAction(_openAboutPage);
+                case 'name':
+                  _menuAction(() => _showRenameDialog(renameDevice: false));
+                case 'avatar':
+                  _menuAction(_showAvatarUpload);
+                case 'devname':
+                  _menuAction(() => _showRenameDialog(renameDevice: true));
+                case 'exit':
+                  _menuAction(_showExitAppDialog);
+              }
             },
             itemBuilder: (context) {
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
@@ -3640,7 +3694,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const PopupMenuDivider(),
-                // 系统设置组：语言/风格；分隔线以下是安全相关：阅后即焚/附件存储/PIN/邀请/口令
+                // 系统设置组：语言/风格；分隔线以下是安全相关：阅后即焚/附件存储/PIN/邀请
                 PopupMenuItem(
                   value: 'locale',
                   child: Row(
@@ -3699,9 +3753,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'invite',
                   child: Text(l10n.chatPageMenuInvite, style: labelStyle),
                 ),
+                // 高级（二级菜单走底部弹层）——归在安全组，紧跟邀请码
                 PopupMenuItem(
-                  value: 'passphrase',
-                  child: Text(l10n.chatPageMenuChangePassphrase, style: labelStyle),
+                  value: 'advanced',
+                  child: Row(
+                    children: [
+                      Text(l10n.advancedMenuTitle, style: labelStyle),
+                      const Spacer(),
+                      Icon(Icons.chevron_right, size: 18, color: labelStyle.color),
+                    ],
+                  ),
                 ),
                 const PopupMenuDivider(),
                 // 关于与退出一组（都在分割线下方，退出垫底）

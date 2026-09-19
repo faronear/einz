@@ -911,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuChangePassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Passphrase'**
+  /// **'Change passphrase'**
   String get chatPageMenuChangePassphrase;
 
   /// No description provided for @chatPageMenuAvatar.
@@ -1073,7 +1073,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseTitle.
   ///
   /// In en, this message translates to:
-  /// **'Change passphrase'**
+  /// **'Change secret passphrase'**
   String get chatPageChangePassphraseTitle;
 
   /// No description provided for @chatPageChangePassphraseSubmit.
@@ -1694,23 +1694,35 @@ abstract class AppLocalizations {
   /// **'Development address (not production), for debugging only'**
   String get aboutServerDevNote;
 
-  /// No description provided for @resetDataTitle.
+  /// No description provided for @advancedMenuTitle.
   ///
   /// In en, this message translates to:
-  /// **'Erase all data on this device'**
-  String get resetDataTitle;
+  /// **'Advanced'**
+  String get advancedMenuTitle;
 
-  /// No description provided for @resetDataMessage.
+  /// No description provided for @advancedResetDevice.
   ///
   /// In en, this message translates to:
-  /// **'This deletes every message, attachment and key on this device and cannot be undone. To re-enter the space afterwards you will need a new invite from your partner (or the passphrase).'**
-  String get resetDataMessage;
+  /// **'Reset device'**
+  String get advancedResetDevice;
 
-  /// No description provided for @resetDataConfirm.
+  /// No description provided for @resetDeviceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Erase'**
-  String get resetDataConfirm;
+  /// **'Reset device?'**
+  String get resetDeviceTitle;
+
+  /// No description provided for @resetDeviceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This erases every message, attachment and key on this device, and returns to the new-device setup.\n\nThe space itself stays on the server, and neither your other devices nor your partner\'s are affected.\n\nThis cannot be undone!'**
+  String get resetDeviceMessage;
+
+  /// No description provided for @resetDeviceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get resetDeviceConfirm;
 }
 
 class _AppLocalizationsDelegate

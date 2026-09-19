@@ -180,7 +180,7 @@
     }
   },
   "chatPageTitleBrand": "我的秘境",
-  "chatPageMenuChangePassphrase": "密保口令",
+  "chatPageMenuChangePassphrase": "修改口令",
   "chatPageMenuAvatar": "我的头像",
   "chatPageAvatarUploaded": "✅ 头像已更新",
   "chatPageAvatarTooLarge": "图片过大（最大 2MB）",
@@ -227,7 +227,7 @@
   "chatPageExitTitle": "退出秘境？",
   "chatPageExitMessage": "即将退出我的秘境。下次启动可重新进入。",
   "save": "保存",
-  "chatPageChangePassphraseTitle": "修改口令",
+  "chatPageChangePassphraseTitle": "修改密保口令",
   "chatPageChangePassphraseSubmit": "修改",
   "chatPageChangePassphraseOldLabel": "旧口令",
   "chatPageChangePassphraseNewLabel": "新口令",
@@ -411,7 +411,9 @@
   "aboutVersionLabel": "版本号",
   "aboutServerLabel": "服务器地址",
   "aboutServerDevNote": "开发地址（非生产），仅用于开发调试",
-  "resetDataTitle": "清空本设备数据",
-  "resetDataMessage": "将清除本设备上的全部消息、附件与密钥，且无法撤销。清空后需要用对方的新邀请（或密保口令）才能重新进入秘境。",
-  "resetDataConfirm": "确认清空"
+  "advancedMenuTitle": "高级",
+  "advancedResetDevice": "重置设备",
+  "resetDeviceTitle": "重置设备？",
+  "resetDeviceMessage": "将清除本设备上的全部消息、附件与密钥，并回到新设备入网步骤。\n\n秘境本身仍保留在服务器上，你和对方的其他设备不受影响。\n\n此操作无法撤销！",
+  "resetDeviceConfirm": "确认重置"
 }

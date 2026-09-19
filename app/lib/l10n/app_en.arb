@@ -180,7 +180,7 @@
     }
   },
   "chatPageTitleBrand": "My Einz",
-  "chatPageMenuChangePassphrase": "Passphrase",
+  "chatPageMenuChangePassphrase": "Change passphrase",
   "chatPageMenuAvatar": "Avatar",
   "chatPageAvatarUploaded": "✅ Avatar updated",
   "chatPageAvatarTooLarge": "Image too large (max 2MB)",
@@ -227,7 +227,7 @@
   "chatPageExitTitle": "Exit?",
   "chatPageExitMessage": "Exits Einz on this device.",
   "save": "Save",
-  "chatPageChangePassphraseTitle": "Change passphrase",
+  "chatPageChangePassphraseTitle": "Change secret passphrase",
   "chatPageChangePassphraseSubmit": "Change",
   "chatPageChangePassphraseOldLabel": "Current passphrase",
   "chatPageChangePassphraseNewLabel": "New passphrase",
@@ -411,7 +411,9 @@
   "aboutVersionLabel": "Version",
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address (not production), for debugging only",
-  "resetDataTitle": "Erase all data on this device",
-  "resetDataMessage": "This deletes every message, attachment and key on this device and cannot be undone. To re-enter the space afterwards you will need a new invite from your partner (or the passphrase).",
-  "resetDataConfirm": "Erase"
+  "advancedMenuTitle": "Advanced",
+  "advancedResetDevice": "Reset device",
+  "resetDeviceTitle": "Reset device?",
+  "resetDeviceMessage": "This erases every message, attachment and key on this device, and returns to the new-device setup.\n\nThe space itself stays on the server, and neither your other devices nor your partner's are affected.\n\nThis cannot be undone!",
+  "resetDeviceConfirm": "Reset"
 }

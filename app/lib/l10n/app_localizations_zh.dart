@@ -437,7 +437,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTitleBrand => '我的秘境';
 
   @override
-  String get chatPageMenuChangePassphrase => '密保口令';
+  String get chatPageMenuChangePassphrase => '修改口令';
 
   @override
   String get chatPageMenuAvatar => '我的头像';
@@ -527,7 +527,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get save => '保存';
 
   @override
-  String get chatPageChangePassphraseTitle => '修改口令';
+  String get chatPageChangePassphraseTitle => '修改密保口令';
 
   @override
   String get chatPageChangePassphraseSubmit => '修改';
@@ -874,12 +874,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
 
   @override
-  String get resetDataTitle => '清空本设备数据';
+  String get advancedMenuTitle => '高级';
 
   @override
-  String get resetDataMessage =>
-      '将清除本设备上的全部消息、附件与密钥，且无法撤销。清空后需要用对方的新邀请（或密保口令）才能重新进入秘境。';
+  String get advancedResetDevice => '重置设备';
 
   @override
-  String get resetDataConfirm => '确认清空';
+  String get resetDeviceTitle => '重置设备？';
+
+  @override
+  String get resetDeviceMessage =>
+      '将清除本设备上的全部消息、附件与密钥，并回到新设备入网步骤。\n\n秘境本身仍保留在服务器上，你和对方的其他设备不受影响。\n\n此操作无法撤销！';
+
+  @override
+  String get resetDeviceConfirm => '确认重置';
 }

@@ -464,7 +464,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageTitleBrand => 'My Einz';
 
   @override
-  String get chatPageMenuChangePassphrase => 'Passphrase';
+  String get chatPageMenuChangePassphrase => 'Change passphrase';
 
   @override
   String get chatPageMenuAvatar => 'Avatar';
@@ -556,7 +556,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get save => 'Save';
 
   @override
-  String get chatPageChangePassphraseTitle => 'Change passphrase';
+  String get chatPageChangePassphraseTitle => 'Change secret passphrase';
 
   @override
   String get chatPageChangePassphraseSubmit => 'Change';
@@ -916,12 +916,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Development address (not production), for debugging only';
 
   @override
-  String get resetDataTitle => 'Erase all data on this device';
+  String get advancedMenuTitle => 'Advanced';
 
   @override
-  String get resetDataMessage =>
-      'This deletes every message, attachment and key on this device and cannot be undone. To re-enter the space afterwards you will need a new invite from your partner (or the passphrase).';
+  String get advancedResetDevice => 'Reset device';
 
   @override
-  String get resetDataConfirm => 'Erase';
+  String get resetDeviceTitle => 'Reset device?';
+
+  @override
+  String get resetDeviceMessage =>
+      'This erases every message, attachment and key on this device, and returns to the new-device setup.\n\nThe space itself stays on the server, and neither your other devices nor your partner\'s are affected.\n\nThis cannot be undone!';
+
+  @override
+  String get resetDeviceConfirm => 'Reset';
 }

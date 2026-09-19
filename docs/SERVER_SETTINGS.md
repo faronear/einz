@@ -47,7 +47,7 @@
 | ------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
 | 硬编码托底   | `_kFactoryServercli/bin/einz_tui.dart:181`                                    | `kFactoryServerapp/lib/data/server_config.dart:32`                                      | 同桌面端                 |
 | 配置文件     | `cli/localConfig.json`**运行时**读（`_defaultServer()`，`einz_tui.dart:190`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`） | 同桌面端                 |
-| 启动参数     | `--server <地址>`                                                             | `--server <地址>`、`--reset`                                                            | 无（移动端没有启动参数） |
+| 启动参数     | `--server <地址>`                                                             | `--server <地址>`                                                                       | 无（移动端没有启动参数） |
 | 运行期命令   | `/server [地址]`、`/status`                                                   | 「关于秘境」页显示地址                                                                  | 同桌面端                 |
 | 配置读不到时 | 打一行提示再走托底（不静默）                                                  | —                                                                                       | —                        |
 | 持久化       | **无**                                                                        | **无**                                                                                  | **无**                   |
@@ -82,11 +82,8 @@ flutter run --dart-define-from-file=localConfig.ios.json     # 或 npm run ios-r
 open -a Einz --args --server http://localhost:3000      # macOS（走原生桥读启动参数）
 ```
 
-测完本机 store 属于开发服务器（连生产既用不了、也没有入口能卸掉），清场用：
-
-```bash
-open -a Einz --args --reset      # 弹确认 → 清本设备数据 → 回新设备入网起点
-```
+测完本机数据属于开发服务器（连生产既用不了、也没有别的入口能卸掉），清场用
+**对话页菜单 → 高级 → 解绑设备**（桌面/手机同一入口：清本设备数据 → 回入网起点）。
 
 **TUI**
 
@@ -120,5 +117,5 @@ dart run bin/einz_tui.dart --server http://localhost:3000     # 临时覆盖
 
 ## 9. 迁移注意（本次改造的副作用）
 
-- **App 老锁包里的 `server` 字段被忽略**：升级后一律用当前构建算出的地址。生产设备无感（锁包里的值本来就＝出厂域名）；开发机上若某台是用 dev 包入的网，升级后不带 `--server` 会指向生产，需要带 `--server` 或 `--reset`。
+- **App 老锁包里的 `server` 字段被忽略**：升级后一律用当前构建算出的地址。生产设备无感（锁包里的值本来就＝出厂域名）；开发机上若某台是用 dev 包入的网，升级后不带 `--server` 会指向生产，需要带 `--server`，或用「高级 → 解绑设备」清库重来。
 - **TUI 老 store 里的 `server` 字段被忽略**：读时忽略，下次保存自然清掉。想让某个 store 固定连某台服务器，请用脚本绑定 `--store` + `--server`。
