@@ -161,9 +161,6 @@ jobs:
           codesign -f -s - --timestamp=none --entitlements "$ENT" \
             build/macos/Build/Products/Release/einz.app
           codesign --verify -v build/macos/Build/Products/Release/einz.app
-      - name: Build CLI
-        run: |
-          (cd cli && dart pub get && mkdir -p build && dart compile exe bin/einz_tui.dart -o build/einz-tui-macos)
       - name: Zip app bundle
         # 用 GITHUB_WORKSPACE 绝对路径落盘（曾数错相对层级两次，导致上传的 zip 里只有 TUI）
         run: cd app/build/macos/Build/Products/Release && zip -r -y "$GITHUB_WORKSPACE/einz-gui-macos.zip" einz.app
@@ -172,7 +169,6 @@ jobs:
           name: einz-macos
           path: |
             einz-gui-macos.zip
-            cli/build/einz-tui-macos
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -181,7 +177,63 @@ jobs:
           make_latest: true
           files: |
             einz-gui-macos.zip
-            cli/build/einz-tui-macos
+
+  # macOS 桌面 CLI（einz-tui-macos）通用二进制：
+  # dart compile exe 只产出宿主架构，且 Dart 不支持 macOS 跨架构编译，
+  # 所以分别在 Intel(macos-13) 与 Apple Silicon(macos-latest) 上各编一份，
+  # 再用 lipo 合成 arm64+x64 通用二进制，Intel Mac 才能跑（否则 Bad CPU type）。
+  macos-cli:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
+    strategy:
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x64
+          - runner: macos-latest
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Build CLI
+        working-directory: cli
+        run: |
+          dart pub get
+          mkdir -p build
+          dart compile exe bin/einz_tui.dart -o build/einz-tui-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-tui-macos-${{ matrix.arch }}
+          path: cli/build/einz-tui-${{ matrix.arch }}
+
+  macos-cli-combine:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
+    needs: macos-cli
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Combine universal binary
+        run: |
+          # download-artifact@v4 会按 artifact 名建子目录
+          lipo -create -output einz-tui-macos \
+            artifacts/einz-tui-macos-x64/einz-tui-x64 \
+            artifacts/einz-tui-macos-arm64/einz-tui-arm64
+          lipo -info einz-tui-macos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-tui-macos
+          path: einz-tui-macos
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: einz-tui-macos
 
   ios:
     if: ${{ github.event_name == 'push' || inputs.platform == 'ios' }}
