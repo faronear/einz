@@ -66,7 +66,10 @@ class DeviceStore {
   String? spaceAddress; // 空间地址（Multiverse create/join 后填充；旧 store 迁移后为 null）
   int keyVersion;
   String? sessionToken;
-  String? server; // 服务器地址（TUI 引导确认后持久化，多终端无需重复输入）
+  /// 服务器地址：**只有用户显式选择的才存**（引导里手输 / `/server` 命令）。
+  /// 出厂默认值（cli/localConfig.json）每次启动重读，不落盘——改配置立即生效，
+  /// 不会像旧行为那样被老 store 里的旧地址钉住。
+  String? server;
   String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
   int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
   int lastServerSequence;

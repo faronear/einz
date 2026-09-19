@@ -178,24 +178,36 @@ const int _kWelcomeCountdownSeconds = 5;
 Timer? _resizeTimer;
 StreamSubscription<ProcessSignal>? _sigwinchSub; // 终端尺寸监听订阅（退出前必须取消，否则进程挂起）
 
+/// 出厂域名（localConfig.json 缺失/损坏时的硬编码托底）。
+const String _kFactoryServer = 'https://einz.tic.cc';
+
 /// 默认服务器地址：优先读 cli/localConfig.json 的 server 字段（本机配置，不入库；
 /// 模板见 cli/localConfig.example.json），文件缺失/格式异常时回退硬编码
 /// https://einz.tic.cc。
 ///
 /// 注：路径**按当前工作目录**解析（`File('localConfig.json')`），所以只有 `cd cli`
-/// 之后跑（`npm run tui*-dev` 就是这么干的）才读得到——在别的目录跑会静默走硬编码。
+/// 之后跑（`npm run tui*-dev` 就是这么干的）才读得到——在别的目录跑会打印一行提示
+/// 后走硬编码（不静默：否则会误以为在测开发服务器，实际连的是生产）。
 String _defaultServer() {
+  final cached = _defaultServerCache;
+  if (cached != null) return cached; // 一次启动只解析一次（提示也只打一次）
   try {
     final f = File('localConfig.json');
     if (f.existsSync()) {
       final v = (jsonDecode(f.readAsStringSync()) as Map<String, dynamic>)['server'];
-      if (v is String && v.isNotEmpty) return v;
+      if (v is String && v.isNotEmpty) return _defaultServerCache = v;
+    } else {
+      stdout.writeln(
+          '⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），使用默认 $_kFactoryServer');
     }
   } catch (_) {
-    // 配置缺失/损坏：回退默认值
+    // 配置损坏：回退默认值
   }
-  return 'https://einz.tic.cc';
+  return _defaultServerCache = _kFactoryServer;
 }
+
+/// [_defaultServer] 的缓存（见上：提示只打一次）。
+String? _defaultServerCache;
 
 /// 默认 store 目录：$HOME/.einz（Windows 用 USERPROFILE）。
 String _defaultStoreDir() {
@@ -250,25 +262,34 @@ Future<(bool, String, List<String>)> _probeServer(String server) async {
 }
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
-/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
-/// key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧用密保信封导入）。
-Future<(DeviceStore, String, String)> _onboard(String storePath, String server,
-    {String serverArg = ''}) async {
+/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径, 地址是否用户手输)；
+/// 引导中选择 key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧
+/// 用密保信封导入）。
+///
+/// 地址**只持久化用户显式选择的**（引导里手输 / `/server` 命令）：命令行 --server
+/// 仅本次生效，出厂默认值（localConfig.json）每次重读——与 App 端同构（地址不是
+/// 设备数据）。否则改了 localConfig.json，老 store 会继续连旧地址。
+Future<(DeviceStore, String, String, bool)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
-  // ① 服务器地址：--server 参数（仅本次生效）> store 持久化值 > 本机默认（cli/localConfig.json）> 硬编码
+  // ① 服务器地址：--server 参数（仅本次生效）> store 持久化值（用户显式设过的）
+  //    > 本机默认（cli/localConfig.json）> 硬编码
   if (server.isEmpty) {
     final saved = store?.server;
     server = (saved != null && saved.isNotEmpty) ? saved : _defaultServer();
   }
   // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（回车沿用当前值）
   // Multiverse：/health 不再返回全局 person 表（名称表保留为空，消息前缀用本地名字）
+  var serverPicked = false; // 地址是否用户在引导里手输（显式选择 → 落盘）
   final (probeOk, _, _) = await _probeServer(server);
   if (!probeOk) {
     stdout.writeln('❌ 无法连接服务器 $server（/health 探测失败）');
     stdout.write('❓ 输入新服务器地址（回车沿用 $server）: ');
     final input = (_readLineCompat() ?? '').trim();
-    if (input.isNotEmpty) server = input;
+    if (input.isNotEmpty) {
+      server = input;
+      serverPicked = true;
+    }
     // 同上：readByteSync 后 stdout 共享 sink 被绑定，紧随的 writeln 会丢失
     // （如上方"已生成凭证/公钥"首启输出）——让步一个事件循环轮次恢复可写。
     await Future<void>.delayed(Duration.zero);
@@ -293,10 +314,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server,
       Directory(dir).createSync(recursive: true);
       storePath = '$dir/myeinz.json';
     }
-    // 落盘看**地址从哪来**：命令行 --server 且用户没在引导里改过（server 仍等于
-    // 原值）→ 只记本机预设值（_defaultServer），--server 仅本次生效；用户手输或
-    // 从 store/预设解析出的地址属显式选择，照常落盘。
-    store.server = (serverArg.isNotEmpty && server == serverArg) ? _defaultServer() : server;
+    // 新 store 不固化地址：出厂默认值每次启动重读（改 localConfig.json 立即生效）；
+    // 用户在引导里手输过的才算显式选择，照常落盘。
+    store.server = serverPicked ? server : null;
     store.save(storePath);
     stdout.writeln('✅ 新设备公钥已生成: ${store.publicKey}');
     _guidanceNotes.add('✅ 新设备公钥已生成: ${store.publicKey}');
@@ -309,7 +329,7 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server,
   }
   // 引导问答（名称/登记/接入/口令）由 _runGuide 在 TUI 消息流中处理
   // （system 提示 + you> 输入 + 机密 *）——此处仅返回，main 负责启动引导任务与输入循环
-  return (store, server, storePath);
+  return (store, server, storePath, serverPicked);
 }
 
 /// 引导任务（与输入循环并发）：登记/接入/口令问答在 TUI 消息流中进行——
@@ -423,7 +443,7 @@ Future<void> _unlockPin(ChatSession session) async {
 }
 
 Future<void> _runGuide(ChatSession session, String storePath, String server,
-    {String serverArg = ''}) async {
+    {bool serverPicked = false}) async {
   final store = session.store;
 
   // v2 已无「v1 全局 person 名称表」（/health 的 person_names 随 2efad8c 下线）——
@@ -532,11 +552,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server,
     }
   }
 
-  // 持久化最终确认的 server——**命令行 --server 原值除外**（--server 仅本次生效，
-  // 不粘进 store；要改 store 默认地址用 /server 命令显式持久化）。
-  // server != serverArg 有两种情况：地址被用户改写过（显式选择 → 落盘），或压根没传
-  // --server（serverArg 为空 → 沿用原语义：已有 store 时 server 即原值，此处不变）。
-  if (server != serverArg && store.server != server) {
+  // 持久化**用户显式选择的** server（引导里手输 / /server 命令）；命令行 --server
+  // 仅本次生效，出厂默认值每次重读——都不写进 store（地址不是设备数据）。
+  if (serverPicked && store.server != server) {
     store.server = server;
     store.save(storePath);
   }
@@ -1128,9 +1146,6 @@ Future<void> main(List<String> args) async {
         server = args[++i];
     }
   }
-  // 命令行 --server 原值：server 随后会被解析/引导改写，落盘判断要用原值比对
-  // （server == serverArg 说明地址仍是纯命令行覆盖，未被用户改写）。
-  final serverArg = server;
 
   // 终端能力检测：TUI 需要可交互 stdin（raw 逐键）；stdout 非终端时渲染降级但不致命
   final term = Platform.environment['TERM'] ?? '';
@@ -1153,11 +1168,12 @@ Future<void> main(List<String> args) async {
 
   // 首次使用引导（cooked 逐行问答，进入 raw 模式前）：store 不存在 → 生成设备凭证；
   // 无 Space Key → 口令接入（escrow）；未激活 → auth。全部就绪后才进入 TUI。
-  final onboard = await _onboard(storePath, server, serverArg: serverArg);
+  final onboard = await _onboard(storePath, server);
   if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
   final store = onboard.$1;
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
+  final serverPicked = onboard.$4; // 地址是否用户手输（显式选择 → 落盘）
 
   // 启动自检：**只有服务端明确撤销本设备**才不进 TUI（清盘 + 提示 + 退出）。
   // 会话被清（/revoke 会 DELETE 该设备的 sessions）→ 清 token 走挑战重认证；挑战返回
@@ -1209,7 +1225,8 @@ Future<void> main(List<String> args) async {
 
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
   // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
-  final guide = _runGuide(session, storePath, server, serverArg: serverArg);
+  final guide =
+      _runGuide(session, storePath, server, serverPicked: serverPicked);
 
   _render();
 
