@@ -7232,7 +7232,22 @@ bundle 内任何 Mach-O 当 nested code，报的就是**旁边那个 .sbak**：
 - `package.json` 的 `desk-mac-build-release` 在 `cd app` 之后加一道保险（幂等，干净时零输出）：
   `find build/macos -name '*.sbak' -print -delete 2>/dev/null;`
   用 `;` 而非 `&&`：新克隆没有 `build/`，find 会返回 1，不能让它打断后续链。
-- iOS 侧同类风险**未加**（`app-ios-build-*` 走 `buildIos.sh`，同样要过 codesign）——等老板拍板。
+- iOS 侧同类风险**已一并加保险**（老板拍板）：
+  - `app/ios/buildIos.sh` 第 6 节（构建）开头一行 —— 一处覆盖 `app-ios-build-adhoc` /
+    `app-ios-build-appstore` / `app-ios-install-adhoc-ip11` / `app-ios-install-adhoc-ip6s` /
+    `app-ios-upload-appstore` 五条 npm 脚本（它们都走 buildIos.sh）。
+    这里用 `|| true` 而不是 `;`：脚本开着 `set -euo pipefail`，`find` 在 `build/` 不存在时
+    返回 1，会把整个打包打断。已在 `bash -euo pipefail` 下实测（目录不存在不打断、植入假
+    .sbak 能删掉）。
+  - 两条内联构建、不走 buildIos.sh 的顺手补上：`app-ios-build-release`、
+    `app-ios-install-adhoc-ip11-steps`（`cd app;` 之后）—— 这两条用 `;`，因为它们是
+    `&&` 长链里的独立片段。
+  - **没跑完整 iOS 打包**验证（会往 `_release.gitomit/` 落一个新 IPA、耗时几分钟，且当前
+    `build/ios` 里没有 .sbak，跑通也证明不了保险触发）——只做了语法检查 + 片段语义实测。
+
+**补记**：写这段时老板把上面那批未提交的 `echo ======= Moved to =======` 自己提交并推了
+（`0db0788 luk: 优化脚本输出`，在我 `07969da` 之后 1 分钟）。所以 iOS 这次提交不用再做隔离；
+mac 那次用隔离是对的（当时那批 hunk 还没进 HEAD）。
 
 **提交注意**：`package.json` 里还留着老板/别的 agent 的一批未提交改动（4 条脚本加
 `echo ======= Moved to =======` 等），与本次改动同文件、甚至同一行。提交时用

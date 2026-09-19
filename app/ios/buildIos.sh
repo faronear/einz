@@ -188,6 +188,14 @@ fi
 eval "$("${NODE}" "${REPO_ROOT}/scripts/appVersion.js")"
 
 # ---------- 6) 构建 ----------
+# 先清掉构建产物里来历不明的 *.sbak 备份（Mach-O）。bundle 里任何未签名的 Mach-O 都会让
+# CocoaPods「Embed Pods Frameworks」那句 codesign --preserve-metadata 失败（报
+# In subcomponent: xxx.sbak），插件框架保持未签名 → 最后签 Runner.app 报
+# "code object is not signed at all"，而真因只在 flutter build -v 日志里看得到
+# （mac 侧已踩过一次）。幂等：干净时零输出；build/ 不存在时 find 返回 1，
+# 所以用 || true，别让 set -e 把整个打包打断。
+find "${APP_DIR}/build/ios" -name '*.sbak' -print -delete 2>/dev/null || true
+
 echo "▶ 构建 ${CHANNEL} IPA（版本 ${APP_BUILD_NAME} / 构建号 ${APP_BUILD_NUMBER}，约 1–3 分钟）…"
 "${FLUTTER}" build ipa --release \
   --build-name="${APP_BUILD_NAME}" \
