@@ -134,6 +134,3 @@ __pycache__/
 *.pyc
 
 Caddyfile
-
-# ein-tui 编译产物目录（cli/build.sh 输出），不入库
-cli/build/

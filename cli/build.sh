@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ein-tui 一键编译脚本：把 einz_tui.dart AOT 编译成免 Dart 运行时的原生可执行文件。
 #
-# 用法:   ./build.sh [输出文件名]      （产物统一放 cli/build/；默认文件名含系统-架构-时间戳：
-#                                        cli/build/einz-tui-<系统>-<架构>-<yymmddhhmm>，如 einz-tui-linux-x64-2609032201）
+# 用法:   ./build.sh [输出文件名]      （产物统一放仓库根 _release.gitomit/；默认文件名含系统-架构-时间戳：
+#                                        _release.gitomit/einz-tui-<系统>-<架构>-<yymmddhhmm>，如 einz-tui-linux-x64-2609032201）
 # 平台/架构: 操作系统优先于架构排序（不同系统产物互不兼容：Mach-O/ELF/PE）：
 #            产物只能在对应系统+架构上运行，系统与架构已写入文件名便于区分；
 #            Windows（git-bash/MSYS）产物带 .exe。Dart 官方不支持交叉编译。
@@ -16,7 +16,7 @@ export LC_ALL=C
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
-OUT_DIR="$DIR/build" # 产物统一目录（勿提交，见 .gitignore）
+OUT_DIR="$DIR/../_release.gitomit" # 产物统一目录（与 app 各平台构建产物同放，勿提交，见 .gitignore）
 mkdir -p "$OUT_DIR"
 
 # 时间戳版本 yymmddhhmm：每次打包自动生成、天然唯一（pubspec 的 version 只在

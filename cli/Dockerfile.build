@@ -3,9 +3,9 @@
 # 构建（在仓库根目录执行）：
 #   docker build -f cli/Dockerfile.build -t einz-builder .
 #
-# 取产物（落盘到宿主 cli/build/）：
-#   mkdir -p cli/build
-#   docker run --rm -v "$PWD/cli/build":/out einz-builder \
+# 取产物（落盘到宿主 _release.gitomit/）：
+#   mkdir -p _release.gitomit
+#   docker run --rm -v "$PWD/_release.gitomit":/out einz-builder \
 #       cp /app/cli/build/einz-tui-linux /out/
 #
 # 目标 Debian 主机上运行（需 libsodium 系统库）：

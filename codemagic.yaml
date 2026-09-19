@@ -108,7 +108,7 @@ workflows:
           dart compile exe bin/einz_tui.dart -o build/einz.exe
     artifacts:
       - app/build/windows/x64/runner/*.zip
-      - cli/build/einz.exe
+      - _release.gitomit/einz.exe
     publishing:
       email:
         recipients:

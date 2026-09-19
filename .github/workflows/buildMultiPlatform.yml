@@ -101,14 +101,14 @@ jobs:
         working-directory: cli
         run: |
           dart pub get
-          mkdir -p build
-          dart compile exe bin/einz_tui.dart -o build/einz-tui-windows.exe
+          mkdir -p ../_release.gitomit
+          dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-windows.exe
       - uses: actions/upload-artifact@v4
         with:
           name: einz-windows
           path: |
             einz-gui-windows.zip
-            cli/build/einz-tui-windows.exe
+            _release.gitomit/einz-tui-windows.exe
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -118,7 +118,7 @@ jobs:
           make_latest: true
           files: |
             einz-gui-windows.zip
-            cli/build/einz-tui-windows.exe
+            _release.gitomit/einz-tui-windows.exe
 
   macos:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
@@ -201,12 +201,12 @@ jobs:
         working-directory: cli
         run: |
           dart pub get
-          mkdir -p build
-          dart compile exe bin/einz_tui.dart -o build/einz-tui-${{ matrix.arch }}
+          mkdir -p ../_release.gitomit
+          dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
           name: einz-tui-macos-${{ matrix.arch }}
-          path: cli/build/einz-tui-${{ matrix.arch }}
+          path: _release.gitomit/einz-tui-${{ matrix.arch }}
 
   macos-cli-combine:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
