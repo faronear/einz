@@ -30,7 +30,7 @@ class AppLockService {
   static const _securePlain = 'app_lock.plain';
 
   /// SecureStore 里属于本 App 的条目清单（[ensureFreshInstall] 清理用；新增条目须登记）。
-  static const _secureKeys = [_securePlain];
+  static const secureKeys = [_securePlain];
 
   static const int maxAttempts = 5;
   static const int lockSeconds = 30;
@@ -73,7 +73,7 @@ class AppLockService {
   /// `..._this_device` 无障碍级别兜住（条目不随备份迁移）。
   Future<void> ensureFreshInstall() async {
     if (await _get(_kInstallId) != null) return; // 同一安装：什么都不做
-    await SecureStore.deleteAll(_secureKeys); // 全新安装：清残留（无残留则静默）
+    await SecureStore.deleteAll(secureKeys); // 全新安装：清残留（无残留则静默）
     await _set(_kInstallId, _newInstallId());
   }
 

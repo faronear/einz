@@ -410,5 +410,8 @@
   "aboutIntro": "Einz is a private chat and shared space for two: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.",
   "aboutVersionLabel": "Version",
   "aboutServerLabel": "Server",
-  "aboutServerDevNote": "Development address (not production), for debugging only"
+  "aboutServerDevNote": "Development address (not production), for debugging only",
+  "resetDataTitle": "Erase all data on this device",
+  "resetDataMessage": "This deletes every message, attachment and key on this device and cannot be undone. To re-enter the space afterwards you will need a new invite from your partner (or the passphrase).",
+  "resetDataConfirm": "Erase"
 }

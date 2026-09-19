@@ -30,6 +30,12 @@ Future<List<String>> readLaunchArgs() async {
   return Platform.executableArguments;
 }
 
+/// 启动参数里是否带了某个开关（如 `--reset`）。
+///
+/// 只判存在性，不取值——开关类参数没有值。
+bool hasLaunchArg(List<String> args, String name) =>
+    args.contains(name) || args.any((a) => a.startsWith('$name='));
+
 /// 从启动参数里解析 `--server` 的地址；未提供、缺值或空值一律返回 null。
 ///
 /// 支持 `--server <地址>` 与 `--server=<地址>` 两种写法；重复出现时最后一个生效

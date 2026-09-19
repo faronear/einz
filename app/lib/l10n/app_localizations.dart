@@ -1693,6 +1693,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Development address (not production), for debugging only'**
   String get aboutServerDevNote;
+
+  /// No description provided for @resetDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Erase all data on this device'**
+  String get resetDataTitle;
+
+  /// No description provided for @resetDataMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes every message, attachment and key on this device and cannot be undone. To re-enter the space afterwards you will need a new invite from your partner (or the passphrase).'**
+  String get resetDataMessage;
+
+  /// No description provided for @resetDataConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Erase'**
+  String get resetDataConfirm;
 }
 
 class _AppLocalizationsDelegate

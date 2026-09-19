@@ -8,6 +8,7 @@ import 'data/app_lock.dart';
 import 'data/launch_args.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
+import 'data/local_reset.dart';
 import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
@@ -18,10 +19,10 @@ import 'setup_page.dart';
 /// 启动流程：定好本次生效的服务器地址 → 检查是否已设置启动锁 → 已设置进锁屏页
 /// （PIN 解密 Space Key 包），未设置进一次性配置页（认证后设置 PIN）。
 ///
-/// 桌面端支持一个启动参数：`--server <地址>`（`open -a Einz --args
-/// --server https://host`）。它覆盖本次启动使用的服务器地址，**仅本次生效**，
-/// 下次不带参数启动即回到编译期值/出厂域名（地址从不落盘，见
-/// `data/server_config.dart`）。
+/// 桌面端支持两个启动参数：
+/// - `--server <地址>`：`open -a Einz --args --server https://host`，覆盖本次启动
+///   使用的服务器地址，**仅本次生效**（地址从不落盘，见 `data/server_config.dart`）；
+/// - `--reset`：清空本设备全部本地数据后回到新设备入网页（开发测试后清场用）。
 Future<void> main() async {
   // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
@@ -29,11 +30,14 @@ Future<void> main() async {
   // 本次生效地址定一次，之后全程只读（页面不再层层透传，锁屏/解锁同源）。
   final args = await readLaunchArgs();
   effectiveServer = await resolveServer(parseServerArg(args));
-  runApp(const EinzApp());
+  runApp(EinzApp(resetRequested: hasLaunchArg(args, '--reset')));
 }
 
 class EinzApp extends StatefulWidget {
-  const EinzApp({super.key});
+  const EinzApp({super.key, this.resetRequested = false});
+
+  /// 是否带了 `--reset`（桌面端）：启动即确认清空本设备数据。
+  final bool resetRequested;
 
   @override
   State<EinzApp> createState() => _EinzAppState();
@@ -128,15 +132,20 @@ class _EinzAppState extends State<EinzApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: _locale,
-      home: const StartupGate(),
+      home: StartupGate(resetRequested: widget.resetRequested),
     );
   }
 }
 
 /// 启动门：三分支——有锁包 → 锁屏页；无锁但有明文配置（跳过 PIN）→ 直接进聊天；
 /// 都无 → 设置页。
+///
+/// [resetRequested]（桌面端 `--reset`）：先弹确认，确认后清空本设备数据再落到
+/// 设置页（新设备入网起点）。
 class StartupGate extends StatefulWidget {
-  const StartupGate({super.key});
+  const StartupGate({super.key, this.resetRequested = false});
+
+  final bool resetRequested;
 
   @override
   State<StartupGate> createState() => _StartupGateState();
@@ -151,7 +160,42 @@ class _StartupGateState extends State<StartupGate> {
   @override
   void initState() {
     super.initState();
-    _check();
+    if (widget.resetRequested) {
+      // 等首帧：弹窗需要可用的 Navigator/Overlay
+      WidgetsBinding.instance.addPostFrameCallback((_) => _runReset());
+    } else {
+      _check();
+    }
+  }
+
+  /// `--reset`：确认 → 清盘 → 落到设置页（新设备入网起点）。取消则走正常启动。
+  Future<void> _runReset() async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.resetDataTitle),
+            content: Text(l10n.resetDataMessage),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.resetDataConfirm)),
+            ],
+          ),
+        ) ??
+        false;
+    if (!mounted) return;
+    if (!ok) {
+      _check(); // 取消：按正常分支启动
+      return;
+    }
+    await resetLocalData(LocalDatabase.shared);
+    if (!mounted) return;
+    setState(() {
+      _hasLock = false;
+      _plain = null;
+      _initError = null;
+    });
   }
 
   Future<void> _check() async {

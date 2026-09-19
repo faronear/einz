@@ -872,4 +872,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
+
+  @override
+  String get resetDataTitle => '清空本设备数据';
+
+  @override
+  String get resetDataMessage =>
+      '将清除本设备上的全部消息、附件与密钥，且无法撤销。清空后需要用对方的新邀请（或密保口令）才能重新进入秘境。';
+
+  @override
+  String get resetDataConfirm => '确认清空';
 }

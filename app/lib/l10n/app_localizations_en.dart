@@ -914,4 +914,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aboutServerDevNote =>
       'Development address (not production), for debugging only';
+
+  @override
+  String get resetDataTitle => 'Erase all data on this device';
+
+  @override
+  String get resetDataMessage =>
+      'This deletes every message, attachment and key on this device and cannot be undone. To re-enter the space afterwards you will need a new invite from your partner (or the passphrase).';
+
+  @override
+  String get resetDataConfirm => 'Erase';
 }
