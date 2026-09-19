@@ -262,34 +262,27 @@ Future<(bool, String, List<String>)> _probeServer(String server) async {
 }
 
 /// 首次使用引导（cooked 模式逐行问答，进入 raw 模式前）。
-/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径, 地址是否用户手输)；
-/// 引导中选择 key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧
-/// 用密保信封导入）。
+/// 返回 (就绪的 store, 生效的 server 地址, 生效的 store 路径)；引导中选择
+/// key envelope 导入时置 exitCode=1（main 据此退出，提示用户在 App 侧用密保信封导入）。
 ///
-/// 地址**只持久化用户显式选择的**（引导里手输 / `/server` 命令）：命令行 --server
-/// 仅本次生效，出厂默认值（localConfig.json）每次重读——与 App 端同构（地址不是
-/// 设备数据）。否则改了 localConfig.json，老 store 会继续连旧地址。
-Future<(DeviceStore, String, String, bool)> _onboard(String storePath, String server) async {
+/// 地址**永不落盘**（与 App 端同构）：`--server` 与引导手输都只本次生效，出厂默认值
+/// 每次启动重读。默认地址连不上时每次启动都会再问一次——那是"该去改 localConfig.json
+/// 或硬编码托底了"的警报，不该被 store 里的旧地址悄悄盖掉。
+Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
   var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
 
-  // ① 服务器地址：--server 参数（仅本次生效）> store 持久化值（用户显式设过的）
-  //    > 本机默认（cli/localConfig.json）> 硬编码
+  // ① 服务器地址：--server 参数（仅本次生效）> 本机默认（cli/localConfig.json）> 硬编码
   if (server.isEmpty) {
-    final saved = store?.server;
-    server = (saved != null && saved.isNotEmpty) ? saved : _defaultServer();
+    server = _defaultServer();
   }
-  // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（回车沿用当前值）
+  // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（仅本次生效）
   // Multiverse：/health 不再返回全局 person 表（名称表保留为空，消息前缀用本地名字）
-  var serverPicked = false; // 地址是否用户在引导里手输（显式选择 → 落盘）
   final (probeOk, _, _) = await _probeServer(server);
   if (!probeOk) {
     stdout.writeln('❌ 无法连接服务器 $server（/health 探测失败）');
-    stdout.write('❓ 输入新服务器地址（回车沿用 $server）: ');
+    stdout.write('❓ 输入新服务器地址（仅本次生效；回车沿用 $server）: ');
     final input = (_readLineCompat() ?? '').trim();
-    if (input.isNotEmpty) {
-      server = input;
-      serverPicked = true;
-    }
+    if (input.isNotEmpty) server = input;
     // 同上：readByteSync 后 stdout 共享 sink 被绑定，紧随的 writeln 会丢失
     // （如上方"已生成凭证/公钥"首启输出）——让步一个事件循环轮次恢复可写。
     await Future<void>.delayed(Duration.zero);
@@ -314,10 +307,7 @@ Future<(DeviceStore, String, String, bool)> _onboard(String storePath, String se
       Directory(dir).createSync(recursive: true);
       storePath = '$dir/myeinz.json';
     }
-    // 新 store 不固化地址：出厂默认值每次启动重读（改 localConfig.json 立即生效）；
-    // 用户在引导里手输过的才算显式选择，照常落盘。
-    store.server = serverPicked ? server : null;
-    store.save(storePath);
+    store.save(storePath); // 地址不落盘：只存设备身份
     stdout.writeln('✅ 新设备公钥已生成: ${store.publicKey}');
     _guidanceNotes.add('✅ 新设备公钥已生成: ${store.publicKey}');
     if (autoName.isNotEmpty) {
@@ -329,7 +319,7 @@ Future<(DeviceStore, String, String, bool)> _onboard(String storePath, String se
   }
   // 引导问答（名称/登记/接入/口令）由 _runGuide 在 TUI 消息流中处理
   // （system 提示 + you> 输入 + 机密 *）——此处仅返回，main 负责启动引导任务与输入循环
-  return (store, server, storePath, serverPicked);
+  return (store, server, storePath);
 }
 
 /// 引导任务（与输入循环并发）：登记/接入/口令问答在 TUI 消息流中进行——
@@ -442,8 +432,7 @@ Future<void> _unlockPin(ChatSession session) async {
   }
 }
 
-Future<void> _runGuide(ChatSession session, String storePath, String server,
-    {bool serverPicked = false}) async {
+Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
 
   // v2 已无「v1 全局 person 名称表」（/health 的 person_names 随 2efad8c 下线）——
@@ -552,12 +541,6 @@ Future<void> _runGuide(ChatSession session, String storePath, String server,
     }
   }
 
-  // 持久化**用户显式选择的** server（引导里手输 / /server 命令）；命令行 --server
-  // 仅本次生效，出厂默认值每次重读——都不写进 store（地址不是设备数据）。
-  if (serverPicked && store.server != server) {
-    store.server = server;
-    store.save(storePath);
-  }
 
   // 已登记但口令密保箱未上传（创建者引导中断）：重启再进引导设置口令。
   // （判据用 partnerSlot == 0 = 创建者/第一人；v1 时代的 personId == 'personA'
@@ -567,7 +550,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server,
     // 先问服务端：本地没标记 ≠ 服务端没有箱。创建空间时密保箱是随 `POST /spaces`
     // 一并上传的（此前没记 escrowUploaded），老 store 重启后会走到这里 —— 直接再问
     // 一遍会让用户以为上次白设了（老板 2026-09-15 反馈）。查到箱就补标记并跳过。
-    final hasBox = await _serverHasEscrow(store);
+    final hasBox = await _serverHasEscrow(store, server);
     if (hasBox == true) {
       store.escrowUploaded = true;
       store.save(storePath);
@@ -782,8 +765,8 @@ String _newCliSpaceId() {
 /// 首个 join token 一并返回；Space Key 由客户端生成，口令加密 sealed 包随
 /// 创建提交，服务端只存密文）。
 Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePath) async {
-  final server = store.server;
-  if (server == null || server.isEmpty) {
+  final server = session.server;
+  if (server.isEmpty) {
     session.messages.add(_systemMessage(session, '⚠️ 未配置服务器地址（引导时输入）'));
     return;
   }
@@ -969,8 +952,8 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
 /// Multiverse：/space join <链接或 token> 加入已有空间（preflight 校验 →
 /// join 设备登记 + 签发绑定 Space 的 session → 口令 escrow 取 Space Key）。
 Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath, String input) async {
-  final server = store.server;
-  if (server == null || server.isEmpty) {
+  final server = session.server;
+  if (server.isEmpty) {
     session.messages.add(_systemMessage(session, '⚠️ 未配置服务器地址（引导时输入）'));
     return;
   }
@@ -1173,7 +1156,6 @@ Future<void> main(List<String> args) async {
   final store = onboard.$1;
   server = onboard.$2;
   storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
-  final serverPicked = onboard.$4; // 地址是否用户手输（显式选择 → 落盘）
 
   // 启动自检：**只有服务端明确撤销本设备**才不进 TUI（清盘 + 提示 + 退出）。
   // 会话被清（/revoke 会 DELETE 该设备的 sessions）→ 清 token 走挑战重认证；挑战返回
@@ -1226,7 +1208,7 @@ Future<void> main(List<String> args) async {
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
   // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
   final guide =
-      _runGuide(session, storePath, server, serverPicked: serverPicked);
+      _runGuide(session, storePath, server);
 
   _render();
 
@@ -1825,7 +1807,7 @@ class _DeviceRow {
 /// ——服务端 /devices 不过滤状态，藏着不显示反而会让人以为"设备凭空消失了"。
 /// 网络/会话异常原样抛出，由调用方提示。
 Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
-  final server = s.session.store.server ?? '';
+  final server = s.session.server;
   final token = s.session.store.sessionToken;
   if (server.isEmpty || token == null) {
     throw StateError('未连接（缺少 server/token）');
@@ -1983,7 +1965,7 @@ void _onPeerStatus(WsPeerStatusEvent event) {
 Future<void> _refreshPeerOnline() async {
   final s = _state;
   if (s == null) return;
-  final server = s.session.store.server ?? '';
+  final server = s.session.server;
   final token = s.session.store.sessionToken;
   if (server.isEmpty || token == null) return;
   try {
@@ -2832,20 +2814,19 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '当前服务器: ${s.session.server}'));
         s.session.messages.add(_systemMessage(
             s.session,
-            '用法: /server <地址> —— 持久化重设并激活服务器（写入 store，下次启动仍生效；'
-                '与启动时 --server 不同，后者仅本次生效。如 /server https://einz.tic.cc）'));
+            '用法: /server <地址> —— 切换本次会话的服务器并激活（仅本次生效，不写入 store；'
+                '要长期换地址请改 cli/localConfig.json。如 /server https://einz.tic.cc）'));
         s.status = '';
       } else {
         try {
           await s.session.auth(serverOverride: arg);
-          s.session.store.server = arg; // 持久化新地址
-          s.session.store.save(s.session.storePath);
+          s.session.server = arg; // 仅本次生效：地址不落盘（与 --server 同语义）
           if (s.session.wsClient == null && s.session.hasSession) {
             s.session.startWs(onMessage: (_) => _refreshGenderForLatest(_state!), onStatus: (_) => _render(), onAutoSync: (_) => _refreshGenderForLatest(_state!),
               onRevoked: _onWsRevoked, onUnrecognized: _onWsUnrecognized);
           }
           s.session.messages.add(_systemMessage(
-              s.session, '✅ 已切换服务器并激活（已写入 store，下次启动仍生效）: $arg'));
+              s.session, '✅ 已切换本次会话的服务器并激活（仅本次生效）: $arg'));
           s.status = ''; // 一次性结果进消息流，清掉旧瞬时通知
         } catch (e) {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 切换服务器失败: $e'));
@@ -2877,6 +2858,10 @@ Future<void> _execCommand(String line) async {
       }
       try {
         await s.session.auth(serverOverride: arg);
+        // 地址同步到本次会话：后续同步/WS/名称刷新都读 session.server，
+        // 否则这条命令只是"对别的服务器做了一次认证"，会话仍走旧地址。
+        // 仅本次生效（不落盘，与 /server、--server 同语义）。
+        s.session.server = arg;
         // 激活结果作为 system 消息进消息流（不占顶部状态栏）
         s.session.messages.add(_systemMessage(s.session, '✅ 成功激活机密线路。'));
         s.status = '';
@@ -3001,7 +2986,7 @@ Future<void> _execCommand(String line) async {
       // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
       // 选设备（序号/设备名）→ 输入 yes 确认目标 → 输入口令。任一步取消都不做任何改动。
       try {
-        final server = s.session.store.server ?? '';
+        final server = s.session.server;
         final token = s.session.store.sessionToken;
         if (server.isEmpty || token == null) {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 未连接（缺少 server/token）'));
@@ -3247,7 +3232,7 @@ Future<void> _execInvite() async {
     return;
   }
   try {
-    final api = ApiClient(store.server ?? '');
+    final api = ApiClient(s.session.server);
     final r = await _busy(s.session, '⏳ 邀请生成中......', () => api.createJoinToken(store.spaceId!, store.sessionToken!));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
     s.session.messages.add(_systemMessage(s.session, '✅ 邀请新设备，24 小时内一次性有效：\n📎 ${r.link}\n🛡️  ${r.joinToken}'));
@@ -3417,7 +3402,7 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
 /// 服务器更新 = 口令已重设——系统消息通知（插入消息流，不弹窗）。
 Future<void> _checkEscrowRotated(ChatSession session) async {
   final store = session.store;
-  final server = store.server ?? '';
+  final server = session.server;
   final token = store.sessionToken;
   if (server.isEmpty || token == null) return;
   try {
@@ -3536,10 +3521,9 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
 /// （它只在"确认服务端无箱"的引导分支里用）。若把"查不到"当成"没有箱"去提示用户
 /// 重设，用户输入新口令就会**顶掉**原有密保箱（等于把伴侣锁在门外）。所以查不到时
 /// 一律不提示，留到下次会话正常时再判定。
-Future<bool?> _serverHasEscrow(DeviceStore store) async {
-  final server = store.server;
+Future<bool?> _serverHasEscrow(DeviceStore store, String server) async {
   final token = store.sessionToken;
-  if (server == null || server.isEmpty || token == null || token.isEmpty) return null;
+  if (server.isEmpty || token == null || token.isEmpty) return null;
   try {
     final res = await ApiClient(server).getKeyEscrow(token);
     return res.file != null;

@@ -75,7 +75,6 @@ DeviceStore _store({
     spaceId: spaceId,
     keyVersion: 1,
     sessionToken: sessionToken,
-    server: server,
   );
   st.deviceId = deviceId;
   st.personId = personId;

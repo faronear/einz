@@ -30,7 +30,6 @@ void main() {
       spaceKey: base64Encode(List<int>.filled(32, 3)),
       spaceId: 'space-x',
       keyVersion: 1,
-      server: '',
     )
       ..personId = 'p1'
       ..deviceId = 'd1';

@@ -69,7 +69,6 @@ DeviceStore _store({
     spaceId: spaceId,
     keyVersion: 1,
     sessionToken: sessionToken,
-    server: server,
   );
   st.deviceId = deviceId;
   st.personId = personId;
@@ -191,8 +190,6 @@ Future<int> _run() async {
       privateKey: 'sk-c',
       spaceKey: spaceKey,
       spaceId: created.spaceId,
-      sessionToken: null, // 未认证 = 离线
-      server: '',
     )
       ..deviceId = 'dev-offline'
       ..personId = 'person-offline';
