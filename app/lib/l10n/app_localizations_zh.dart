@@ -871,5 +871,5 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerLabel => '服务器地址';
 
   @override
-  String get aboutServerLockedNote => '可能与解锁后不同，以解锁后为准';
+  String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
 }

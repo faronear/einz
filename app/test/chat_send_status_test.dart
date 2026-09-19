@@ -154,7 +154,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -208,7 +207,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -253,7 +251,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -306,7 +303,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -348,7 +344,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -390,7 +385,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -435,7 +429,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -489,7 +482,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-test',
         deviceId: 'dev-a',
         spaceKey: spaceKey,

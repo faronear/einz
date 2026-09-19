@@ -15,7 +15,7 @@ import 'chat_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
-import 'data/server_settings.dart';
+import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/passphrase_field.dart';
@@ -37,7 +37,6 @@ class SetupPage extends StatefulWidget {
   const SetupPage({
     super.key,
     this.db,
-    this.initialServer,
     this.probeServer,
     this.preflightOverride,
     this.joinOverride,
@@ -50,11 +49,7 @@ class SetupPage extends StatefulWidget {
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
 
-  /// 命令行 `--server` 传入的本次启动服务器（null = 不覆盖，走本设备持久化/默认）。
-  /// 仅本次启动生效，不写入持久化。
-  final String? initialServer;
-
-  /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 ServerSettings.probe。
+  /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 probeServer。
   /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 person 表，
   /// 角色改由空间入口页让用户选择。
   final Future<(bool, String, List<String>)> Function(String server)? probeServer;
@@ -137,13 +132,6 @@ class _SetupPageState extends State<SetupPage> {
 
   String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
 
-  // 服务器地址：默认 einz.tic.cc；探测失败由自动重试兜底（启动屏不展示输入框）
-  String _server = kEinzServer;
-
-  /// 落盘专用 server（持久层语义）：_initServer 里从 ServerSettings/默认值读出，
-  /// 不随命令行 --server 覆盖。写进锁包/明文配置的 server 必须用它——
-  /// 否则 --server 的本次覆盖值会被固化，下次不带参数仍连覆盖地址。
-  String _persistentServer = kEinzServer;
 
   bool _probeFailed = false;
   bool _probeDone = false; // 探测已成功（区分"探测中"与"已就绪"——入口页显示条件）
@@ -199,8 +187,6 @@ class _SetupPageState extends State<SetupPage> {
     // 方案 1：名字/伴侣名输入框聚焦时，键盘升起后把性别卡滚入可见区（见 _revealGender）
     _nameFocus.addListener(_onNameFocusChange);
     _partnerNameFocus.addListener(_onPartnerNameFocusChange);
-    // 命令行 --server 覆盖本次启动地址（不持久化）；否则走默认 einz.tic.cc。
-    _server = widget.initialServer ?? kEinzServer;
     _initServer();
     _autoGenerateKey(); // 对齐 TUI：本地无设备记录即自动生成公私钥，无需用户点按钮
   }
@@ -231,21 +217,13 @@ class _SetupPageState extends State<SetupPage> {
   /// Multiverse：探测成功不再按 /health person 表自动判定 create/join——停留
   /// 在空间入口页由用户选择（新建空间 / 输入邀请链接加入）；旧服务器
   /// （protocol_version 非 multiverse）标记 _legacyServer 提示升级。
-  /// 无法连接 → 显示输入框引导覆盖（降低小白负担）。
+  /// 无法连接 → splash 底部浮现"正在连接 <地址>"小字并自动重试（降低小白负担）。
   Future<void> _initServer() async {
     try {
-      final db = widget.db ?? LocalDatabase.shared;
-      final settings = ServerSettings(db);
-      // 落盘语义的持久层 server（--server 覆盖时不更新——见 savePlain/setPin 调用点）；
-      // 持久层无记录时 load() 回退默认域名。
-      _persistentServer = await settings.load();
-      // 本次生效地址：命令行 --server 覆盖 > 持久层值。
-      final effective = widget.initialServer ?? _persistentServer;
-      final probe = widget.probeServer ?? ServerSettings.probe;
-      final (ok, pv, caps) = await probe(effective);
+      final probe = widget.probeServer ?? probeServer;
+      final (ok, pv, caps) = await probe(effectiveServer);
       if (!mounted) return;
       setState(() {
-        _server = effective;
         _probeFailed = !ok;
         _probeDone = ok;
         if (!ok) _probeFailCount++;
@@ -255,16 +233,13 @@ class _SetupPageState extends State<SetupPage> {
           _step = 0; // 入口页（角色由用户选择）
         }
       });
-      // 注：探测成功**不写** ServerSettings——持久层只应存"用户显式确认过的地址"，
-      // 而 App 目前没有改地址的入口，写进去只会把当前默认域名固化成本地记录，
-      // 将来换部署域名时老设备反而不跟随（不写则持久层为空、始终取常量默认）。
 
       // 服务端未就绪（probe 正常返回 ok=false，不抛异常）：启动自动重试，
       // 一旦就绪自动进入向导（不必等用户手动输地址）
       if (!ok) _startProbeRetry();
     } catch (e) {
-      // 数据库/探测初始化异常（如 SQLite 锁竞争）→ 标记探测失败（可见），
-      // 避免无限停留在检测页转环；用户可输入服务器地址重试。
+      // 探测初始化异常（如 SQLite 锁竞争）→ 标记探测失败（可见），
+      // 避免无限停留在检测页转环（自动重试会把它拉回来）。
       // 注意：技术细节（如 SqliteException）不展示给用户（老板要求）——
       // 本地库已配 busy_timeout/WAL 容错，此处只给友好提示 + 自动重试。
       if (!mounted) return;
@@ -286,8 +261,8 @@ class _SetupPageState extends State<SetupPage> {
   /// 周期性重试探测：成功 → 停止重试并自动进入（复用 _initServer 的角色判定）。
   Future<void> _reprobe() async {
     if (_busy || !mounted) return;
-    final probe = widget.probeServer ?? ServerSettings.probe;
-    final (ok, pv, caps) = await probe(_server);
+    final probe = widget.probeServer ?? probeServer;
+    final (ok, pv, caps) = await probe(effectiveServer);
     if (!mounted) return;
     if (ok) {
       _probeRetryTimer?.cancel();
@@ -1049,7 +1024,7 @@ class _SetupPageState extends State<SetupPage> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 32),
                   child: Text(
-                    l10n.wizardProbeConnecting(_server),
+                    l10n.wizardProbeConnecting(effectiveServer),
                     style: TextStyle(
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.75)),
@@ -1100,7 +1075,7 @@ class _SetupPageState extends State<SetupPage> {
       return widget.authOverride!(kp, enrolledDeviceId);
     }
     final s = await sodium();
-    final api = ApiClient(_server);
+    final api = ApiClient(effectiveServer);
     final challenge = await api.challenge(enrolledDeviceId);
     final opened = await sealOpen(
       s,
@@ -1114,7 +1089,7 @@ class _SetupPageState extends State<SetupPage> {
   /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
   void _openAboutPage() {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => AboutPage(db: widget.db, server: _server)),
+      MaterialPageRoute(builder: (_) => AboutPage()),
     );
   }
 
@@ -1192,7 +1167,6 @@ class _SetupPageState extends State<SetupPage> {
   /// 校验 PIN 两次一致 → AppLockService.setPin 加密 Space Key 包 → 返回是否完成。
   /// （口令托管上传已与 PIN 解耦：由各 _run* 在设锁/跳过之前统一上传，见 _runPinSetup）
   Future<bool> _setupLockAndEnter({
-    required String server,
     required String spaceId,
     required String deviceId,
     required String spaceKeyB64,
@@ -1217,7 +1191,6 @@ class _SetupPageState extends State<SetupPage> {
     }
     try {
       final payload = AppLockPayload(
-        server: server,
         spaceId: spaceId,
         deviceId: deviceId,
         spaceKeyB64: spaceKeyB64,
@@ -1264,7 +1237,6 @@ class _SetupPageState extends State<SetupPage> {
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
-        server: _server,
         spaceId: _spaceId.text.trim(),
         deviceId: enroll.deviceId,
         spaceKey: sk,
@@ -1576,7 +1548,7 @@ class _SetupPageState extends State<SetupPage> {
     });
     try {
       final pre = await (widget.preflightOverride?.call(token) ??
-          ApiClient(_server).preflightJoin(token));
+          ApiClient(effectiveServer).preflightJoin(token));
       if (!mounted) return false;
       setState(() {
         _joinToken = token;
@@ -1664,7 +1636,7 @@ class _SetupPageState extends State<SetupPage> {
       // Space Key 用 libsodium 的 CSPRNG（与文档口径统一：随机数只走 libsodium；
       // Dart 的 Random.secure() 也是 CSPRNG，但两套来源没必要并存，2026-09-15 评审 S15）
       _spaceKey ??= (await sodium()).randombytes.buf(32);
-      final api = ApiClient(_server);
+      final api = ApiClient(effectiveServer);
       final passphrase = _escrowPassphrase.text.trim();
       final sealed = passphrase.isEmpty
           ? null
@@ -1985,7 +1957,6 @@ class _SetupPageState extends State<SetupPage> {
       if (_pinSkipped) {
         if (!mounted) return;
         await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-          server: _persistentServer,
           spaceId: _spaceId.text.trim(),
           deviceId: _enroll!.deviceId,
           spaceKeyB64: base64Encode(_spaceKey!),
@@ -1998,7 +1969,6 @@ class _SetupPageState extends State<SetupPage> {
         return;
       }
       final ok = await _setupLockAndEnter(
-        server: _persistentServer,
         spaceId: _spaceId.text.trim(),
         deviceId: _enroll!.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
@@ -2138,8 +2108,8 @@ class _SetupPageState extends State<SetupPage> {
       _status = null;
     });
     try {
-      final api = ApiClient(_server);
-      final escrow = widget.escrowOverride?.call(_server) ?? KeyEscrowService(api);
+      final api = ApiClient(effectiveServer);
+      final escrow = widget.escrowOverride?.call(effectiveServer) ?? KeyEscrowService(api);
       // 1) 先验口令取 Space Key（不消费 token；口令错 → ApiException
       //    ESCROW_VERIFY_FAILED / FormatException）
       final file = await escrow.fetchSpaceEscrow(spaceId, passphrase);
@@ -2213,7 +2183,6 @@ class _SetupPageState extends State<SetupPage> {
     if (_pinSkipped) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-        server: _persistentServer,
         spaceId: _spaceId.text,
         deviceId: _enroll!.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
@@ -2226,7 +2195,6 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     final ok = await _setupLockAndEnter(
-      server: _persistentServer,
       spaceId: _spaceId.text,
       deviceId: _enroll!.deviceId,
       spaceKeyB64: base64Encode(_spaceKey!),
@@ -2322,7 +2290,6 @@ class _SetupPageState extends State<SetupPage> {
     if (_pinSkipped) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
-        server: _persistentServer,
         spaceId: enroll.spaceId,
         deviceId: enroll.deviceId,
         spaceKeyB64: base64Encode(_spaceKey!),
@@ -2335,7 +2302,6 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     final ok = await _setupLockAndEnter(
-      server: _persistentServer,
       spaceId: enroll.spaceId,
       deviceId: enroll.deviceId,
       spaceKeyB64: base64Encode(_spaceKey!),

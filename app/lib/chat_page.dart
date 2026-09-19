@@ -23,7 +23,7 @@ import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
-import 'data/server_settings.dart';
+import 'data/server_config.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
@@ -53,7 +53,6 @@ enum _InputMode { text, hint, recording, preview }
 class ChatPage extends StatefulWidget {
   const ChatPage({
     super.key,
-    required this.server,
     required this.spaceId,
     required this.deviceId,
     required this.spaceKey,
@@ -72,7 +71,6 @@ class ChatPage extends StatefulWidget {
     this.privateKeyB64, // 设备私钥（b64，随锁包持久化；补设锁写入新锁包）
   });
 
-  final String server;
   final String spaceId;
   final String deviceId;
   final Uint8List spaceKey;
@@ -104,7 +102,7 @@ class ChatPage extends StatefulWidget {
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
 
-  /// 测试注入用（fake api）；默认按 [server] 新建（生产路径）。
+  /// 测试注入用（fake api）；默认按 [effectiveServer] 新建（生产路径）。
   final ApiClient? api;
 
   /// WS 实时开关（测试环境关闭，避免真实连接与重连 Timer）。
@@ -468,7 +466,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
     _repo = MessageRepository(
       db: db,
-      api: widget.api ?? ApiClient(widget.server),
+      api: widget.api ?? ApiClient(effectiveServer),
       spaceKey: widget.spaceKey,
       spaceId: widget.spaceId,
       deviceId: widget.deviceId,
@@ -501,7 +499,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _registerPushToken();
     if (widget.enableWs) {
       final ws = WsRealtimeService(
-        server: widget.server,
+        server: effectiveServer,
         token: widget.token,
         reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
       );
@@ -566,9 +564,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 写死空串 → 气泡回退灰色）。启动与收到 profile.updated 时调用
   /// （对齐 CLI 的 _refreshPersonNames）。
   Future<void> _refreshProfileFromServer() async {
-    if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
+    if (!mounted || widget.token.isEmpty || effectiveServer.isEmpty) return;
     try {
-      final api = widget.api ?? ApiClient(widget.server);
+      final api = widget.api ?? ApiClient(effectiveServer);
       final space = await api.getSpace(widget.token);
       // 重启（PIN 解锁）路径不传 personId（main.dart 只还原明文 payload）——
       // 从 /space 的设备表里按 deviceId 反查，否则拿不到"我"，校正无从下手
@@ -632,9 +630,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
   /// 服务器更新 = 口令已重设——只发通知不弹窗（修改口令时按需才要求输入新口令）。
   Future<void> _checkEscrowRotated() async {
-    if (!mounted || widget.token.isEmpty || widget.server.isEmpty) return;
+    if (!mounted || widget.token.isEmpty || effectiveServer.isEmpty) return;
     try {
-      final api = widget.api ?? ApiClient(widget.server);
+      final api = widget.api ?? ApiClient(effectiveServer);
       final snap = await api.getKeyEscrow(widget.token);
       final serverAt = snap.updatedAt;
       final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
@@ -851,7 +849,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showInviteDialog() async {
     // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"邀请设备"确认窗）
     try {
-      final api = widget.api ?? ApiClient(widget.server);
+      final api = widget.api ?? ApiClient(effectiveServer);
       final r = await api.createJoinToken(widget.spaceId, widget.token);
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
@@ -948,13 +946,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 补设/重设启动锁（跳过 PIN 后某天想设置时用；复用 PIN 表单）。
   /// 用当前会话的 Space Key 包 setPin 加密落盘（内部会清掉明文副本）。
-  /// 落盘 server 用持久层值（ServerSettings）而非会话覆盖值：命令行 --server
-  /// 仅本次生效，不能被锁包固化（否则重启不带参数仍连覆盖地址）。
   Future<void> _showSetLockDialog() async {
-    final persistentServer =
-        await ServerSettings(widget.db ?? LocalDatabase.shared).load();
     final payload = AppLockPayload(
-      server: persistentServer,
       spaceId: widget.spaceId,
       deviceId: widget.deviceId,
       spaceKeyB64: base64Encode(widget.spaceKey),
@@ -1000,7 +993,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final changed = await showDialog<bool>(
       context: context,
       builder: (_) => _ChangePassphraseDialog(
-        server: widget.server,
+        server: effectiveServer,
         spaceKeyB64: base64Encode(widget.spaceKey),
         spaceId: widget.spaceId,
         keyVersion: widget.keyVersion,
@@ -1019,9 +1012,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
   void _openAboutPage() {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => AboutPage(db: widget.db, server: widget.server),
-      ),
+      MaterialPageRoute(builder: (_) => const AboutPage()),
     );
   }
 
@@ -1030,7 +1021,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// （30s 轮询 + WS 状态变化时刷新）。
   Future<void> _refreshPeerOnline() async {
     try {
-      final api = widget.api ?? ApiClient(widget.server);
+      final api = widget.api ?? ApiClient(effectiveServer);
       final devices = await api.listDevices(widget.token);
       final now = DateTime.now().millisecondsSinceEpoch;
       // 在线是"人"维度的：同一 person 的其它设备是我自己的设备，不算对方
@@ -1075,7 +1066,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     try {
-      final api = widget.api ?? ApiClient(widget.server);
+      final api = widget.api ?? ApiClient(effectiveServer);
       final bytes = await api.getAvatar(pid);
       if (bytes != null && mounted) setState(() => _myAvatarBytes = bytes);
     } catch (_) {
@@ -1097,7 +1088,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return;
     }
     try {
-      final api = widget.api ?? ApiClient(widget.server);
+      final api = widget.api ?? ApiClient(effectiveServer);
       // 服务端在上传响应里回 person_id：上传方收不到自己的 profile.updated 广播，
       // 这个返回值是失效本端头像缓存最可靠的依据（重启路径 widget.personId 为空，
       // 旧实现 invalidate(null) 静默失效失败 — 老板 2026-09-16 报告）
@@ -1278,7 +1269,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 return;
               }
               try {
-                final api = widget.api ?? ApiClient(widget.server);
+                final api = widget.api ?? ApiClient(effectiveServer);
                 if (renameDevice) {
                   await api.updateDeviceName(name, widget.token);
                   _myDeviceName = name;
@@ -2249,7 +2240,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             children: [
               if (!mine) ...[
                 _MessageAvatar(
-                    personId: avatarPersonId, server: widget.server, api: widget.api),
+                    personId: avatarPersonId, server: effectiveServer, api: widget.api),
                 const SizedBox(width: 8),
               ],
               Flexible(
@@ -2272,7 +2263,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (mine) ...[
                 const SizedBox(width: 8),
                 _MessageAvatar(
-                    personId: avatarPersonId, server: widget.server, api: widget.api),
+                    personId: avatarPersonId, server: effectiveServer, api: widget.api),
               ],
             ],
           ),
@@ -3829,7 +3820,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 每条消息前放置发送者头像（点击有头像时放大全屏查看）
                       if (!mine)
                         _MessageAvatar(
-                            personId: avatarPersonId, server: widget.server, api: widget.api),
+                            personId: avatarPersonId, server: effectiveServer, api: widget.api),
                       const SizedBox(width: 6),
                       GestureDetector(
                         // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
@@ -3959,7 +3950,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       if (mine) ...[
                         const SizedBox(width: 6),
                         _MessageAvatar(
-                            personId: avatarPersonId, server: widget.server, api: widget.api),
+                            personId: avatarPersonId, server: effectiveServer, api: widget.api),
                       ],
                     ],
                   ),
@@ -4393,7 +4384,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     }
     // 先取服务端密保箱状态：决定是否需要旧口令、以及确认文案。
     // 无包（服务端数据丢失）时旧口令无从校验——直接重建，不新增权限。
-    final api = widget.api ?? ApiClient(widget.server);
+    final api = widget.api ?? ApiClient(effectiveServer);
     final escrow = KeyEscrowService(api);
     setState(() => _busy = true);
     PassphraseEnvelope? serverFile;
@@ -4796,7 +4787,7 @@ class _MessageAvatarState extends State<_MessageAvatar> {
 
   Future<void> _load(String personId) async {
     try {
-      final api = widget.api ?? ApiClient(widget.server);
+      final api = widget.api ?? ApiClient(effectiveServer);
       final bytes = await api.getAvatar(personId);
       if (bytes == null) return;
       // 缓存写入不看 mounted：失效广播时未挂载的实例（滚出屏幕被回收）若丢弃结果，

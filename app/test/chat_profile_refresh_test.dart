@@ -62,7 +62,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-b',
         spaceKey: await generateSpaceKey(),

@@ -110,7 +110,6 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
     supportedLocales: AppLocalizations.supportedLocales,
     locale: const Locale('zh'),
     home: ChatPage(
-      server: 'https://einz.tic.cc',
       spaceId: 'space-demo',
       deviceId: 'dev-a',
       spaceKey: spaceKey,
@@ -166,7 +165,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -224,7 +222,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -269,7 +266,6 @@ void main() {
     // 先设好一个 PIN（改码场景的前提）
     await AppLockService(db).setPin('123456',
         payload: AppLockPayload(
-          server: 'https://einz.tic.cc',
           spaceKeyB64: base64Encode(spaceKey),
           spaceId: 'space-demo',
           deviceId: 'dev-a',
@@ -281,7 +277,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -347,7 +342,6 @@ void main() {
     final api = _FakeApi();
     await AppLockService(db).setPin('123456',
         payload: AppLockPayload(
-          server: 'https://einz.tic.cc',
           spaceKeyB64: base64Encode(spaceKey),
           spaceId: 'space-demo',
           deviceId: 'dev-a',
@@ -359,7 +353,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -406,7 +399,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -452,7 +444,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -490,7 +481,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -524,7 +514,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -568,7 +557,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -643,7 +631,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-b',
         spaceKey: spaceKey,
@@ -682,7 +669,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-b',
         spaceKey: spaceKey,
@@ -709,7 +695,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -797,7 +782,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -891,7 +875,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -950,7 +933,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,

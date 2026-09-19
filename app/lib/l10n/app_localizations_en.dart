@@ -912,6 +912,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutServerLabel => 'Server';
 
   @override
-  String get aboutServerLockedNote =>
-      'may differ after unlock; the unlocked value prevails';
+  String get aboutServerDevNote =>
+      'Development address (not production), for debugging only';
 }

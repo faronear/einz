@@ -20,7 +20,6 @@ void main() {
   late AppLockService lock;
 
   const payload = AppLockPayload(
-    server: 'https://einz.tic.cc',
     spaceKeyB64: 'dGhlLXNwYWNlLWtleQ==',
     spaceId: 'space-test',
     deviceId: 'dev-a',
@@ -44,7 +43,6 @@ void main() {
 
     expect(await lock.isSetup, true);
     final unlocked = await lock.unlock('1234');
-    expect(unlocked.server, 'https://einz.tic.cc');
     expect(unlocked.spaceKeyB64, 'dGhlLXNwYWNlLWtleQ==');
     expect(unlocked.spaceId, 'space-test');
     expect(unlocked.deviceId, 'dev-a');

@@ -72,7 +72,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -183,7 +182,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -213,7 +211,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,
@@ -260,7 +257,6 @@ void main() {
               padding: const EdgeInsets.only(top: 59, bottom: 34),
             ),
             child: ChatPage(
-              server: 'https://einz.tic.cc',
               spaceId: 'space-demo',
               deviceId: 'dev-a',
               spaceKey: spaceKey,
@@ -325,7 +321,6 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
-        server: 'https://einz.tic.cc',
         spaceId: 'space-demo',
         deviceId: 'dev-a',
         spaceKey: spaceKey,

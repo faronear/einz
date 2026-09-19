@@ -1688,11 +1688,11 @@ abstract class AppLocalizations {
   /// **'Server'**
   String get aboutServerLabel;
 
-  /// No description provided for @aboutServerLockedNote.
+  /// No description provided for @aboutServerDevNote.
   ///
   /// In en, this message translates to:
-  /// **'may differ after unlock; the unlocked value prevails'**
-  String get aboutServerLockedNote;
+  /// **'Development address (not production), for debugging only'**
+  String get aboutServerDevNote;
 }
 
 class _AppLocalizationsDelegate

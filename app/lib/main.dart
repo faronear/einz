@@ -8,31 +8,31 @@ import 'data/app_lock.dart';
 import 'data/launch_args.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
+import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
 
 /// Einz 移动端（及桌面端）入口。
 ///
-/// 启动流程：检查是否已设置启动锁 → 已设置进锁屏页（PIN 解密 Space Key 包），
-/// 未设置进一次性配置页（认证后设置 PIN）。
+/// 启动流程：定好本次生效的服务器地址 → 检查是否已设置启动锁 → 已设置进锁屏页
+/// （PIN 解密 Space Key 包），未设置进一次性配置页（认证后设置 PIN）。
 ///
 /// 桌面端支持一个启动参数：`--server <地址>`（`open -a Einz --args
-/// --server https://host`）。它覆盖本次启动使用的服务器地址，**仅本次生效、
-/// 不写入持久化**，下次不带参数启动即恢复本设备已保存/默认地址。
+/// --server https://host`）。它覆盖本次启动使用的服务器地址，**仅本次生效**，
+/// 下次不带参数启动即回到编译期值/出厂域名（地址从不落盘，见
+/// `data/server_config.dart`）。
 Future<void> main() async {
   // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
   WidgetsFlutterBinding.ensureInitialized();
-  final initialServer = parseServerArg(await readLaunchArgs());
-  runApp(EinzApp(initialServer: initialServer));
+  // 本次生效地址定一次，之后全程只读（页面不再层层透传，锁屏/解锁同源）。
+  effectiveServer = parseServerArg(await readLaunchArgs()) ?? kEinzServer;
+  runApp(const EinzApp());
 }
 
 class EinzApp extends StatefulWidget {
-  const EinzApp({super.key, this.initialServer});
-
-  /// 命令行 `--server` 传入的本次启动服务器（null = 不覆盖，走本设备持久化/默认）。
-  final String? initialServer;
+  const EinzApp({super.key});
 
   @override
   State<EinzApp> createState() => _EinzAppState();
@@ -127,7 +127,7 @@ class _EinzAppState extends State<EinzApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: _locale,
-      home: StartupGate(initialServer: widget.initialServer),
+      home: const StartupGate(),
     );
   }
 }
@@ -135,10 +135,7 @@ class _EinzAppState extends State<EinzApp> {
 /// 启动门：三分支——有锁包 → 锁屏页；无锁但有明文配置（跳过 PIN）→ 直接进聊天；
 /// 都无 → 设置页。
 class StartupGate extends StatefulWidget {
-  const StartupGate({super.key, this.initialServer});
-
-  /// 命令行 `--server` 传入的本次启动服务器（null = 不覆盖）。
-  final String? initialServer;
+  const StartupGate({super.key});
 
   @override
   State<StartupGate> createState() => _StartupGateState();
@@ -252,9 +249,7 @@ class _StartupGateState extends State<StartupGate> {
         ),
       );
     }
-    // 命令行 --server 必须透传到锁屏页：解锁后进聊天页时它覆盖锁包里的地址
-    // （否则设过 PIN 的设备上 --server 完全无效）。
-    if (_hasLock!) return LockPage(initialServer: widget.initialServer);
+    if (_hasLock!) return const LockPage();
     final plain = _plain;
     if (plain != null) {
       // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰；
@@ -263,7 +258,6 @@ class _StartupGateState extends State<StartupGate> {
           ? () => reauthFromPayload(plain)
           : null;
       return ChatPage(
-        server: widget.initialServer ?? plain.server,
         spaceId: plain.spaceId,
         deviceId: plain.deviceId,
         spaceKey: base64Decode(plain.spaceKeyB64),
@@ -274,7 +268,7 @@ class _StartupGateState extends State<StartupGate> {
         privateKeyB64: plain.privateKeyB64,
       );
     }
-    return SetupPage(initialServer: widget.initialServer);
+    return const SetupPage();
   }
 }
 

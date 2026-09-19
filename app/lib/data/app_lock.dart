@@ -7,6 +7,7 @@ import 'package:einz_shared/einz_shared.dart';
 
 import 'local_database.dart';
 import 'secure_store.dart';
+import 'server_config.dart';
 
 /// App 启动锁（方案 B：PIN 加密密钥）。安全口径与威胁模型见 `docs/SECURITY.md`
 /// §2/§4，密钥存储位置见 `docs/DATABASE.md` §4（原先指向的 docs/APP_LOCK.md 从未落地）。
@@ -241,10 +242,13 @@ class AppLockService {
   }
 }
 
-/// 被 PIN/恢复码加密保护的 Space Key 包（解密成功后进入聊天所需的一切）。
+/// 被 PIN 加密保护的 Space Key 包（解密成功后进入聊天所需的一切）。
+///
+/// **不含服务器地址**：地址每次启动由 `--server` > 编译期覆盖 > 出厂域名算出
+/// （见 `data/server_config.dart` 的 `effectiveServer`），不是设备数据。锁包解锁前
+/// 读不到，地址存进来就会出现"锁屏页显示的和解锁后实际连的不一致"。
 class AppLockPayload {
   const AppLockPayload({
-    required this.server,
     required this.spaceKeyB64,
     required this.spaceId,
     required this.deviceId,
@@ -255,7 +259,6 @@ class AppLockPayload {
     this.privateKeyB64,
   });
 
-  final String server;
   final String spaceKeyB64;
   final String spaceId;
   final String deviceId;
@@ -272,7 +275,6 @@ class AppLockPayload {
   final String? privateKeyB64;
 
   Map<String, dynamic> toJson() => {
-        'server': server,
         'space_key': spaceKeyB64,
         'space_id': spaceId,
         'device_id': deviceId,
@@ -284,7 +286,6 @@ class AppLockPayload {
       };
 
   factory AppLockPayload.fromJson(Map<String, dynamic> json) => AppLockPayload(
-        server: json['server'] as String,
         spaceKeyB64: json['space_key'] as String,
         spaceId: json['space_id'] as String,
         deviceId: json['device_id'] as String,
@@ -305,7 +306,7 @@ Future<String> reauthFromPayload(AppLockPayload payload) async {
     throw StateError('锁包无设备密钥对');
   }
   final s = await sodium();
-  final api = ApiClient(payload.server);
+  final api = ApiClient(effectiveServer);
   final challenge = await api.challenge(payload.deviceId);
   final opened = await sealOpen(
     s,
