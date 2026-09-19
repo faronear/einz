@@ -2793,7 +2793,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/server <地址> :: 查看或持久化重设后台服务器地址（与启动时 --server 不同：--server 仅本次生效）',
+        '/server [地址] :: 查看当前服务器；带地址 = 切换本次会话的服务器（仅本次生效）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2825,6 +2825,8 @@ Future<void> _execCommand(String line) async {
             s.session.startWs(onMessage: (_) => _refreshGenderForLatest(_state!), onStatus: (_) => _render(), onAutoSync: (_) => _refreshGenderForLatest(_state!),
               onRevoked: _onWsRevoked, onUnrecognized: _onWsUnrecognized);
           }
+          // 名称表来自服务端：换了服务器就得重拉（否则气泡前缀还是上一台的名字）
+          _refreshPersonNames(s);
           s.session.messages.add(_systemMessage(
               s.session, '✅ 已切换本次会话的服务器并激活（仅本次生效）: $arg'));
           s.status = ''; // 一次性结果进消息流，清掉旧瞬时通知
