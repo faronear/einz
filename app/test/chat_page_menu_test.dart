@@ -123,7 +123,10 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
   await tester.pump(const Duration(milliseconds: 300));
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('密保口令'));
+  // 口令入口现在收在「高级」底部弹层里（对话页菜单 → 高级 → 修改口令）
+  await tester.tap(find.text('高级'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('修改口令'));
   await tester.pumpAndSettle();
   return api;
 }
@@ -177,9 +180,9 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 抬头为品牌名+slogan（不显示空间 ID）；红绿灯已移入顶部条「我的」灯三态
+    // 抬头为品牌名（不显示空间 ID）；红绿灯已移入顶部条「我的」灯三态
     // （enableWs:false → ws 未建立 → 我的灯为灰色「未连接服务」）
-    expect(find.text('Einz 秘境'), findsOneWidget);
+    expect(find.text('我的秘境'), findsOneWidget);
     expect(find.text('离线'), findsNothing); // AppBar 红绿灯文字已随红绿灯移除
     // 顶部条「我的」灯三态：未连接服务（ws null）→ 灰色
     final myDot = tester.widget<Icon>(find.byIcon(Icons.circle).last);
@@ -191,13 +194,14 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
-    expect(find.text('密保口令'), findsOneWidget);
+    // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
+    expect(find.text('高级'), findsOneWidget);
     // 我的身份/设备名称（未传 → 显示「未设置」）+ 退出秘境
     expect(find.text('我的身份'), findsOneWidget);
     expect(find.text('我的设备'), findsOneWidget);
     expect(find.text('退出秘境'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
-    expect(find.text('密保口令'), findsOneWidget);
+    expect(find.text('高级'), findsOneWidget);
     expect(find.text('锁屏码'), findsOneWidget);
     // 点"PIN: 未设置"菜单项
     await tester.tap(find.text('锁屏码'));
@@ -455,6 +459,12 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 菜单项较多（12 项 + 分隔线）会超出默认 800×600 测试视口，「退出秘境」落在
+    // y≈616 点不到；真机屏高（852）能完整显示，所以这里也把测试视口调高。
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
     // 打开菜单 → 点「退出秘境」
     await tester.tap(find.byIcon(Icons.menu));
