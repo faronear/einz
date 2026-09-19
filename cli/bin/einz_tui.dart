@@ -2753,6 +2753,10 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
+        '/status :: 查看服务器/连接/绑定/设备状态（排障用，只读）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
         '/device <设备名> :: 修改当前设备名称',
       ));
       s.session.messages.add(_systemMessage(
@@ -2881,6 +2885,37 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 机密线路激活失败，请稍后再试 /auth'));
         s.status = '';
       }
+    case '/status':
+      // 排障快照：**只读**，不发起任何网络请求——状态取自已有轮询（WS/对方在线）
+      // 与本地 store。用来回答"我到底连的是哪台服务器、激活了没、对方在不在"。
+      final st = s.session.store;
+      // 地址来源：等于本机默认（localConfig.json/硬编码）= 出厂配置；否则是本次覆盖
+      // （--server 启动参数或 /server 命令），只本次生效。
+      final origin = s.session.server == _defaultServer()
+          ? '本机默认'
+          : '本次覆盖（--server 或 /server）';
+      final ws = switch (s.session.wsStatus) {
+        WsStatus.connected => '已连接',
+        WsStatus.connecting => '连接中',
+        WsStatus.reconnecting => '断线重连中',
+        WsStatus.stopped => '未连接',
+      };
+      final slot = st.partnerSlot == null ? '未定' : '#${st.partnerSlot}';
+      s.session.messages.add(_systemMessage(
+          s.session,
+          '📊 状态\n'
+              '   服务器: ${s.session.server}（$origin）\n'
+              '   线路: ${st.sessionToken != null ? '已激活' : '未激活'}\n'
+              '   实时连接: $ws\n'
+              '   对方: ${s.peerOnline ? '在线' : '离线'}\n'
+              '   秘境: ${st.spaceId ?? '未绑定'}'
+              '（Space Key ${st.spaceKey != null ? '已就绪' : '无'}）\n'
+              '   本机设备: ${st.deviceName ?? '未命名'}'
+              '（${st.deviceId ?? '未登记'}）身份 $slot\n'
+              '   同步: seq ${st.lastServerSequence}｜本地历史 ${st.history.length} 条\n'
+              '   数据文件: ${s.storePath}'));
+      s.status = '';
+      break;
     case '/space':
       // Multiverse：空间绑定命令——一设备一空间。
       // /space（无参）显示状态与用法；/space address 显示空间地址；
