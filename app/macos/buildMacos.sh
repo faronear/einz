@@ -88,13 +88,22 @@ if [[ "$MODE" == "adhoc" ]]; then
   codesign -f -s - --timestamp=none --options runtime --entitlements "$TMP_ENT" "$APP"
   rm -f "$TMP_ENT"
 else
-  # Developer ID：entitlements 原样保留（keychain 组合法），Hardened Runtime 必须开
-  # --options runtime；公证人要求。先签嵌套 framework 再签 app（由深到浅）。
-  echo "==> Developer ID 签名（Hardened Runtime）"
+  # Developer ID：Hardened Runtime 必须开（--options runtime，公证要求）。
+  # entitlements 不能直接用仓库里的 Release.entitlements——它带 keychain-access-groups，
+  # 该 entitlement 需要 provisioning profile 背书；Developer ID 分发没有 profile，
+  # 内核 AMFI/Taskgated 会判 Invalid Signature，launchd spawn 即杀（"应用程序无法打开"，
+  # 本机双击复现 + DiagnosticReports 实锤，二分实验锁定 2026-09-20）。
+  # macOS 沙盒 app 访问 Keychain 不需要该组（Keychain item 归属 app 自身命名空间；
+  # keychain-access-groups 缺失报 -34018 是 iOS 的机制，macOS 不适用）。
+  echo "==> Developer ID 签名（Hardened Runtime，去 keychain-access-groups）"
+  ENT="$(mktemp).entitlements"
+  plutil -remove keychain-access-groups "$ENTITLEMENTS" -o "$ENT"
+  # 由深到浅：先签嵌套 framework 再签 app
   find "$APP/Contents/Frameworks" -name "*.framework" \
     -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
   codesign -f -s "$IDENTITY" --timestamp --options runtime \
-    --entitlements "$ENTITLEMENTS" "$APP"
+    --entitlements "$ENT" "$APP"
+  rm -f "$ENT"
   codesign --verify -v --strict "$APP"
 fi
 
