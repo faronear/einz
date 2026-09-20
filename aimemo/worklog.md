@@ -7508,3 +7508,44 @@ profile + spctl accepted + 启动 -34018 计数 0）。
 消息气泡走 `Text`（不可选），长按手势用于"引用/录音"，与 pan 不冲突。
 
 未跑测试（UI 交互由老板真机自测），只 `flutter analyze` 干净。
+
+## 2026-09-21 锁屏：三个入口统一 canDismiss=false，无 PIN 不进锁屏页
+
+老板追问「上次修的锁屏绕过是不是只修了桌面端」→ 查证：`2597415`（8/29 自动锁屏
+功能）起就没平台分支，`73c9842` 改的也是同一份共享代码 `chat_page.dart`，所以
+**手机端一并修好了**；那个 commit 标题写的「桌面端」是误标（bug 是全端的，只是在
+MacBook 上先发现）。真·平台专属的只有「隐藏拍照/拍摄入口」。
+
+### 改动
+
+1. **冷启动锁屏补上 canDismiss=false**（`main.dart`：此前 `const LockPage()` 走
+   默认 true）。现在三个入口（冷启动 / 顶栏手动锁 / 切后台超时自动锁）同口径：
+   返回箭头与返回手势都挡掉，必须输对 PIN。
+2. **`StartupGate` 加可选 `db` 注入**（与 `LockPage.db` 同款约定），并把 db 透传
+   给冷启动 `LockPage`——否则锁屏页会新建 `LocalDatabase.shared`（测试环境触发
+   path_provider 的 MissingPluginException）。
+3. `LockPage` 的 `_noLock` 兜底页**按老板决定保留不动**（防死锁），生产路径已无
+   调用点：没 PIN 就不进锁屏页。
+
+### 测试（新增/补充 8 条，全过）
+
+- `test/lock_page_test.dart`：无 PIN 兜底页不套 PopScope（不死锁）；已设 PIN +
+  canDismiss=false → 无返回箭头、`PopScope.canPop=false`、输对 PIN 仍能正常解锁回
+  上一层；canDismiss=true 对照组 → 返回箭头可点、不输 PIN 就能退。
+- `test/startup_gate_test.dart`（新增）：无锁包 → 不进锁屏页（直接去设置页）；
+  已设 PIN → 进锁屏页且返回被挡。
+- `test/chat_page_menu_test.dart`：未设 PIN → 顶栏无锁屏入口、切后台再回前台也不
+  进锁屏页；已设 PIN → 顶栏锁屏入口进的是严格锁屏（PopScope.canPop=false）。
+
+踩坑两条（下次直接复用）：
+- 生命周期状态机有合法转移约束，`handleAppLifecycleStateChanged` 不能
+  `paused → resumed` 直跳，须按 `paused → hidden → inactive → resumed` 走，否则
+  `AppLifecycleListener` 断言炸。
+- 本机 pub cache 里 flutter-io.cn 镜像目录已不存在，`.dart_tool/package_config.json`
+  仍指向它 → **所有用 l10n 的 widget 测试都编译不过**（`intl.DateSymbols` 找不到）。
+  `flutter pub get` 重新生成即可（会顺带升 5 个传递依赖，我把 `pubspec.lock` 还原
+  了，没把无关升级混进这次提交）。
+
+`flutter test` 全量：135 过，2 条 `chat_quote_video_test.dart` 失败——
+`UnimplementedError: init() has not been implemented`（video 插件在 `flutter test`
+宿主下无实现），与本次改动无关，属既有环境问题。

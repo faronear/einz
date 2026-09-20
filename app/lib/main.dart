@@ -160,9 +160,15 @@ class _EinzAppState extends State<EinzApp> {
 /// 启动门：三分支——有锁包 → 锁屏页；无锁但有明文配置（跳过 PIN）→ 直接进聊天；
 /// 都无 → 设置页。
 ///
+/// 无锁包**根本不进锁屏页**（老板 2026-09-20）：那页在没有 PIN 时只会显示
+/// "尚未设置锁屏码"的死胡同（LockPage 内部保留该兜底仅为防死锁）。
+///
 /// 清空本设备数据不在启动参数里：走「对话页菜单 → 高级 → 重置设备」。
 class StartupGate extends StatefulWidget {
-  const StartupGate({super.key});
+  const StartupGate({super.key, this.db});
+
+  /// 测试注入用；默认 [LocalDatabase.shared]（与 LockPage.db 同款约定）。
+  final LocalDatabase? db;
 
   @override
   State<StartupGate> createState() => _StartupGateState();
@@ -182,7 +188,7 @@ class _StartupGateState extends State<StartupGate> {
 
   Future<void> _check() async {
     try {
-      final lock = AppLockService(LocalDatabase.shared);
+      final lock = AppLockService(widget.db ?? LocalDatabase.shared);
       // 全新安装（沙盒被清过）就清掉上一次安装残留的安全存储条目——语义 = 卸载即重置
       // （安全存储条目活过卸载，drift 不会；老板 2026-09-14 决策）。必须在读
       // isSetup/loadPlain **之前**，否则残留的明文包会把人直接拖进聊天。
@@ -276,7 +282,10 @@ class _StartupGateState extends State<StartupGate> {
         ),
       );
     }
-    if (_hasLock!) return const LockPage();
+    // 有锁包 → 锁屏页（canDismiss=false：返回键/手势都挡掉，必须输对 PIN；
+    // 与对话页两个入口同口径——老板 2026-09-20）。db 透传：启动门注入的库
+    // （测试）与锁屏页共用同一个实例。
+    if (_hasLock!) return LockPage(canDismiss: false, db: widget.db);
     final plain = _plain;
     if (plain != null) {
       // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰；

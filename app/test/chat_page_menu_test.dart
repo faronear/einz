@@ -13,6 +13,7 @@ import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
+import 'package:einz/lock_page.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 /// 最小 fake ApiClient：sync 返回编排好的加密消息（模拟 Server 分配
@@ -1079,5 +1080,86 @@ void main() {
         .openPackage(passphrase: 'newpass123', envelope: api.uploadedPackage!);
     expect(reopened.spaceKeyB64, base64Encode(spaceKey), reason: '箱子仍是同一把 Space Key');
     expect(find.text('修改口令'), findsNothing, reason: '成功应关闭弹窗');
+  });
+
+  testWidgets('未设 PIN：顶栏无锁屏入口，切后台再回前台也不进锁屏页', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync + _hasPin 读取完成
+
+    // 手动锁屏入口：没设 PIN 就不摆（按了也只能进"尚未设置锁屏码"的死胡同）
+    expect(find.byIcon(Icons.lock_outline), findsNothing);
+
+    // 自动锁屏入口：切后台再回前台 → 不锁（老板 2026-09-20：没 PIN 就不进锁屏页）
+    // 注：测试用假时钟，LockTimer 读的是真实 DateTime.now()，此处不便造"离开够久"；
+    // 本例断言的是"无 PIN 时无论计时如何都不进锁屏页"。
+    // 生命周期状态机有合法转移约束（resumed 只能由 inactive/detached 转来），
+    // 按真实序列走：paused → hidden → inactive → resumed
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.byType(LockPage), findsNothing);
+    expect(find.text('尚未设置锁屏码（为空时不启用）'), findsNothing);
+  });
+
+  testWidgets('已设 PIN：顶栏锁屏入口进的是严格锁屏（返回箭头/返回手势都挡掉）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await AppLockService(db).setPin('123456',
+        payload: AppLockPayload(
+          spaceKeyB64: base64Encode(spaceKey),
+          spaceId: 'space-demo',
+          deviceId: 'dev-a',
+          token: 'tok',
+        ));
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 _hasPin 刷新出锁屏入口
+
+    await tester.tap(find.byIcon(Icons.lock_outline));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LockPage), findsOneWidget);
+    // 与冷启动锁屏、切后台自动锁同口径：必须输对 PIN 才回聊天
+    expect(find.byType(BackButton), findsNothing);
+    expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, false);
   });
 }
