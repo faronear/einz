@@ -234,7 +234,7 @@ jobs:
         # 命名与本地打包对齐（buildMacos.sh）：配 secrets = -dist（Developer ID 可分发），
         # 未配 = -dev（ad-hoc 兜底）；CI 无时间串，版本号（APP_BUILD_NAME）已够区分构建
         run: >
-          SUFFIX=$(steps.devid.outputs.configured == 'true' && echo dist || echo dev);
+          SUFFIX=${{ steps.devid.outputs.configured == 'true' && 'dist' || 'dev' }};
           cd app/build/macos/Build/Products/Release &&
           zip -r -y "$GITHUB_WORKSPACE/einz-gui-macos-$SUFFIX.zip" einz.app
       - uses: actions/upload-artifact@v4
@@ -251,10 +251,11 @@ jobs:
           files: |
             einz-gui-macos-*.zip
 
-  # macOS 桌面 CLI（einz-tui-macos）通用二进制：
+  # macOS 桌面 CLI（einz-tui-macos）分架构两个产物：
   # dart compile exe 只产出宿主架构，且 Dart 不支持 macOS 跨架构编译，
-  # 所以分别在 Intel 与 Apple Silicon runner 上各编一份，
-  # 再用 lipo 合成 arm64+x64 通用二进制，Intel Mac 才能跑（否则 Bad CPU type）。
+  # 所以分别在 Intel 与 Apple Silicon runner 上各编一份，直接分架构提供下载
+  # （曾用 lipo 合成通用二进制，但 CI 上合成产物运行异常——双击/执行进 dartvm
+  # 帮助页，未再深究，老板决定取消合成、简化为两包，2026-09-20）。
   # 注意：x64 必须用 macos-15-intel——macos-13 已于 2025-12-04 退役，请求退役标签
   # 的 job 会永远 Queued 不报错；macos-15-intel 是最后的 Intel 镜像（至 2027-08），
   # 之后 GitHub Actions 不再有 x86_64 macOS，届时需另寻方案（如自建 runner）。
@@ -278,38 +279,18 @@ jobs:
         run: |
           dart pub get
           mkdir -p ../_release.gitomit
-          dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-${{ matrix.arch }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: einz-tui-macos-${{ matrix.arch }}
-          path: _release.gitomit/einz-tui-${{ matrix.arch }}
-
-  macos-cli-combine:
-    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
-    needs: macos-cli
-    runs-on: macos-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - name: Combine universal binary
-        run: |
-          # download-artifact@v4 会按 artifact 名建子目录
-          lipo -create -output einz-tui-macos \
-            artifacts/einz-tui-macos-x64/einz-tui-x64 \
-            artifacts/einz-tui-macos-arm64/einz-tui-arm64
-          lipo -info einz-tui-macos
-      - uses: actions/upload-artifact@v4
-        with:
-          name: einz-tui-macos
-          path: einz-tui-macos
+          dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-macos-${{ matrix.arch }}
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest Build
           make_latest: true
-          files: einz-tui-macos
+          files: _release.gitomit/einz-tui-macos-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-tui-macos-${{ matrix.arch }}
+          path: _release.gitomit/einz-tui-macos-${{ matrix.arch }}
 
   ios:
     if: ${{ github.event_name == 'push' || inputs.platform == 'ios' }}
