@@ -8,6 +8,7 @@ CI 统一使用 **GitHub Actions**（工作流文件：`.github/workflows/buildM
 | Windows GUI（`einz-gui-windows.zip`）+ CLI（`einz-tui-windows.zip`，exe+dll 一包） | `windows` | windows-latest | 无需签名 |
 | macOS GUI（`einz-gui-macos.zip`） | `macos` | macos-latest | CI 上临时禁签名（无证书） |
 | macOS CLI 分架构（`einz-tui-macos-x64` / `einz-tui-macos-arm64`，下载对应架构的） | `macos-cli` | macos-15-intel (x64) / macos-latest (arm64) | 无需签名 |
+| Linux CLI（`einz-tui-linux-x64.tar.gz`，含二进制 + 运行说明） | `linux-cli` | ubuntu-latest | 无需签名 |
 | iOS IPA（`einz-ios`，Ad Hoc） | `ios` | macos-latest | 配置 secrets 后签名；未配置则产出未签名 IPA |
 
 ---
@@ -15,7 +16,7 @@ CI 统一使用 **GitHub Actions**（工作流文件：`.github/workflows/buildM
 ## 一、触发方式
 
 1. 打开 GitHub 仓库页 → **Actions** → **Multi Platform Build** → **Run workflow**
-2. `platform` 选择：`all`（默认，Android+Windows+macOS）/ `android` / `ios` / `macos` / `windows`
+2. `platform` 选择：`all`（默认，Android+Windows+macOS+Linux CLI）/ `android` / `ios` / `macos` / `windows` / `linux`（仅 TUI）
 3. 构建完成后：
    - **Artifacts**：构建详情页下载（仅登录用户可见）
    - **Release**：仓库 Releases → `Latest Build`（`latest` tag，每次构建覆盖，访客无需登录即可下载）
@@ -50,6 +51,8 @@ iOS job 检测到 secrets 才会签名打包 Ad Hoc IPA；未配置时自动产�
 - **macOS GUI**：CI 无开发证书，构建前用 sed 临时把 pbxproj 改成 Manual + `-` 签名（不改仓库文件）。
 - **macOS CLI**：Dart 不支持 macOS 跨架构编译，`macos-cli` 用 matrix 在 Intel（macos-15-intel）与 Apple Silicon 两个 runner 上各编一份，**分架构直接提供下载**（曾用 lipo 合成通用二进制，但 CI 合成产物运行异常，已取消）。
 - **Windows libsodium**：GUI（sodium FFI）和 CLI 运行时都需要 `libsodium.dll`，构建时从 libsodium 官方 release 下载 1.0.20 MSVC 版，一份打进 GUI zip，一份与 CLI exe 一起打进 `einz-tui-windows.zip`（exe 运行时按同目录找 dll，解压即用）。
+- **Linux CLI（`linux-cli`，2026-09-21 新增）**：ubuntu-latest 编 x64 一份（Dart 不支持跨架构），打 `einz-tui-linux-x64.tar.gz`（二进制 + `README-linux-tui.txt`）。**不自带 libsodium**：Linux 上打包 `.so` 会被 glibc 版本绑住（runner 是 glibc 2.39，老发行版跑不了），所以只在包里放运行说明，让用户按发行版装（`apt install libsodium23` / `dnf install libsodium`）。ARM 版若要加，换 `ubuntu-24.04-arm` runner 再编一份（该镜像对私有仓库的可用性/计费与 x64 不同，未并入 matrix）。
+- **Linux GUI 未发布**：`video_player` / `mobile_scanner` / `open_filex` / `video_thumbnail` 都没有 Linux 实现，要先按平台把视频播放、扫码、打开附件这些入口藏掉或给替代，才能谈发布。
 - **pub cache 补丁**：Android job 会先跑 `scripts/patchPubCache.sh`（open_filex / video_thumbnail 的 AGP 9 兼容补丁），本地构建同样需要（见 package.json 各构建脚本）。
 - **Android 原生库校验**：`app/android/app/src/main/jniLibs/<abi>/libsodium.so` 是 vendored 预编译库，替换/升级后必须跑 `python3 app/android/checkNativeLibs.py`（校验 16KB 页对齐与符号完整性，配方见脚本头注释）——这两个坑本机模拟器测不出，只有真机暴露。
 

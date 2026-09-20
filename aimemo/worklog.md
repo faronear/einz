@@ -7626,3 +7626,27 @@ bool.fromEnvironment('dart.vm.product')`（VM 自带环境量，Flutter 的 kRel
 - cwd=/tmp/othercwd → 用 4000（cwd 优先 ✅）
 - cwd 无配置 → 用 3999（exe 同目录兜底 ✅）
 - `--server 4100` → 用 4100（**产物同样接受 --server**，优先于任何配置 ✅）
+
+## 2026-09-21 CI 新增 linux-cli job（Linux TUI）
+
+老板问 GitHub CI 能不能构建 Linux 的 GUI / TUI → 结论：**TUI 能且几乎零成本，
+GUI 要先把 4 个无 Linux 实现的插件按平台处理掉**。
+
+**已做（老板选"先加 Linux TUI job"）**：
+- `.github/workflows/buildMultiPlatform.yml` 新增 `linux-cli` job（ubuntu-latest +
+  dart-lang/setup-dart + `dart compile exe bin/einz_tui.dart`），产物
+  `einz-tui-linux-x64.tar.gz`（二进制 + `README-linux-tui.txt`），同 macOS CLI 一样
+  上传 Release(`latest`) + Artifact；`workflow_dispatch` 新增 `linux` 选项。
+- **不自带 libsodium**：Linux 上打包 `.so` 会被 glibc 版本绑住（runner glibc 2.39，
+  老发行版跑不了），只在包里放按发行版安装的说明（apt/dnf）。
+- 只出 x64：Dart 不支持跨架构；ARM 需 `ubuntu-24.04-arm` runner（私有仓库可用性
+  与 x64 不同，未并入 matrix，避免 job 起不来）。
+- `docs/CI.md` 产物表 + 触发选项 + 构建细节备忘同步。YAML 用 `ruby -rpsych` 解析通过。
+
+**Linux GUI 暂不发布的原因**（待老板决策）：插件平台支持实测——
+`video_player`(android/ios/macos/web)、`mobile_scanner`(android/ios/macos/web)、
+`open_filex`(android/ios)、`video_thumbnail`(android/ios) **都没有 Linux 实现**；
+有 Linux 的：flutter_secure_storage、image_picker、record、audioplayers、file_picker、
+path_provider、device_info_plus、package_info_plus。也就是说 Linux GUI 会：视频
+消息播不了、扫码入口报错、附件打不开、视频无缩略图——与桌面端"拍照/拍摄"那类问题
+同款，需先做平台分支。另需 apt 装 GTK/clang/cmake/ninja 等 Linux 桌面构建依赖。

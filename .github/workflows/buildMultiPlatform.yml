@@ -1,6 +1,9 @@
 # Einz 多平台构建（GitHub Actions）
 #
-# 覆盖 Android / iOS / macOS / Windows 四个目标，触发方式：
+# 覆盖 Android / iOS / macOS / Windows 四个目标，另在 Windows / macOS 上顺带出
+# TUI（einz-tui-windows / einz-tui-macos-*），Linux 只出 TUI（einz-tui-linux-x64，
+# 见 linux-cli job；Linux GUI 未发布：video_player / mobile_scanner / open_filex /
+# video_thumbnail 无 Linux 实现，需要先做平台分支）。触发方式：
 #   - workflow_dispatch：手动选择单个平台（push tag 自动构建暂未启用，避免每次 push 都跑 CI）
 #   - push tag（v*）：全平台构建（需要时取消下面注释）
 #
@@ -29,6 +32,7 @@ on:
           - ios
           - macos
           - windows
+          - linux
   # push:
   #   tags:
   #     - 'v*'
@@ -305,6 +309,58 @@ jobs:
         with:
           name: einz-tui-macos-${{ matrix.arch }}
           path: _release.gitomit/einz-tui-macos-${{ matrix.arch }}
+
+  # Linux 桌面 CLI（einz-tui-linux-x64）：
+  # dart compile exe 只产出宿主架构，ubuntu-latest 是 x64 → 只出 x64 一份。
+  # （ARM 版若将来要：换 ubuntu-24.04-arm runner 再编一份；该镜像对私有仓库的可用
+  # 性/计费与 x64 不同，故本次不并入 matrix，避免 job 起不来。）
+  # 注意：产物**不自带 libsodium**（package:sodium 走 FFI 运行时 dlopen）——Linux 上
+  # 打包 .so 会被 glibc 版本绑住（runner 是 glibc 2.39，老发行版跑不了），所以只随包
+  # 放一份运行说明，让用户按发行版装：apt install libsodium23 / dnf install libsodium。
+  linux-cli:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Build CLI
+        working-directory: cli
+        run: |
+          dart pub get
+          mkdir -p ../_release.gitomit
+          dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-linux-x64
+      - name: Package (tar.gz + 运行说明)
+        working-directory: cli
+        run: |
+          cat > ../_release.gitomit/README-linux-tui.txt <<'TXT'
+          einz-tui（Linux x64，AOT 原生，免 Dart 运行时）
+
+          运行前置：系统要装 libsodium（package:sodium 走 FFI，运行时动态加载）
+            Debian/Ubuntu: sudo apt install libsodium23
+            RHEL/Fedora:   sudo dnf install libsodium
+
+          运行：
+            chmod +x einz-tui-linux-x64
+            ./einz-tui-linux-x64 --store ~/.einz/myeinz.json --server https://einz.tic.cc
+
+          不带参数：默认 store + 出厂候选域名；也可在该二进制同目录（或当前目录）放
+          一个 localConfig.json 指定服务器：{"server":"https://your.host"}
+          TXT
+          tar -czf ../einz-tui-linux-x64.tar.gz \
+            -C ../_release.gitomit einz-tui-linux-x64 README-linux-tui.txt
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: einz-tui-linux-x64.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: einz-tui-linux-x64
+          path: einz-tui-linux-x64.tar.gz
 
   ios:
     if: ${{ github.event_name == 'push' || inputs.platform == 'ios' }}
