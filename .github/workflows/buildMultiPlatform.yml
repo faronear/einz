@@ -97,15 +97,14 @@ jobs:
           flutter build windows --release --build-name "$APP_BUILD_NAME"
       - name: Fetch libsodium.dll
         # GUI（package:sodium FFI）和 CLI 运行时都要 libsodium.dll，Flutter/Dart 打包不会自动带上，
-        # 官方也没集成进产物——从 libsodium 官方 release 下载 MSVC 预编译包分发
+        # 官方也没集成进产物——从 libsodium 官方 release 下载 MSVC 预编译包。
+        # 解压到仓库根（libSodium-msvc/），后续 GUI zip 和 CLI zip 两个打包步骤各自取用
         shell: pwsh
         run: |
           curl.exe -L -o libsodium-msvc.zip https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-msvc.zip
           Expand-Archive libsodium-msvc.zip -DestinationPath libsodium-msvc
           # 实际包内路径：libsodium/x64/Release/v142/dynamic/libsodium.dll（顶层还有 libsodium/ 目录 + dynamic 子目录）
           Copy-Item libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll app/build/windows/x64/runner/Release/
-          New-Item -ItemType Directory -Force _release.gitomit
-          Copy-Item libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll _release.gitomit/
       - name: Zip release folder
         run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-gui-windows.zip
       - name: Build CLI
@@ -114,15 +113,18 @@ jobs:
         # -Path，目录已存在即报错；用 New-Item -Force 等价 bash 的 mkdir -p
         run: |
           dart pub get
-          New-Item -ItemType Directory -Force ../_release.gitomit
-          dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-windows.exe
+          # exe + libsodium.dll 合并打进 einz-tui-windows.zip（exe 运行时按同目录找 dll），
+          # 用户下载解压即可运行，无需再单独下 dll
+          New-Item -ItemType Directory -Force ../_release.gitomit/einz-tui-windows
+          dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-windows/einz-tui-windows.exe
+          Copy-Item ../libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll ../_release.gitomit/einz-tui-windows/
+          Compress-Archive -Path ../_release.gitomit/einz-tui-windows/* -DestinationPath ../einz-tui-windows.zip -Force
       - uses: actions/upload-artifact@v4
         with:
           name: einz-windows
           path: |
             einz-gui-windows.zip
-            _release.gitomit/einz-tui-windows.exe
-            _release.gitomit/libsodium.dll
+            einz-tui-windows.zip
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -132,8 +134,7 @@ jobs:
           make_latest: true
           files: |
             einz-gui-windows.zip
-            _release.gitomit/einz-tui-windows.exe
-            _release.gitomit/libsodium.dll
+            einz-tui-windows.zip
 
   macos:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
