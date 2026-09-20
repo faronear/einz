@@ -16,9 +16,22 @@ class SecureStore {
   /// **加密备份/换机恢复**带到新设备——用户换机还原备份即可读到旧消息。
   /// `this_device` 变体不随备份迁移（Apple 文档语义）。`synchronizable` 保持
   /// 默认 false（不走 iCloud Keychain 同步）。
+  ///
+  /// macOS 必须显式关掉**数据保护 Keychain**（`usesDataProtectionKeychain: false`，
+  /// 插件默认是 true）。数据保护 Keychain 要 `keychain-access-groups` entitlement
+  /// 背书，而该 entitlement 只能由 provisioning profile 授权；Developer ID 分发没有
+  /// profile → 每次 SecItem* 都直接 `-34018 A required entitlement isn't present`
+  /// （StartupGate 五连败 → "启动初始化失败，配置未丢失，请重试"）。
+  /// **去沙盒不能解决这个问题**：无沙盒 + 无 entitlement 实测仍是 -34018；改成
+  /// 老式文件型 Keychain 后同一签名下 SecItemAdd status=0（2026-09-20 实测）。
+  /// 语义差异仅在 macOS 桌面端：文件型 Keychain 不支持 iCloud 同步/备份迁移，
+  /// 而本应用本就 `synchronizable=false`（不走 iCloud），故此差异无实际影响。
   static final FlutterSecureStorage _storage = const FlutterSecureStorage(
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
-    mOptions: MacOsOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+    mOptions: MacOsOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+      usesDataProtectionKeychain: false,
+    ),
   );
 
   static String _key(String name) => '$_prefix$name';
