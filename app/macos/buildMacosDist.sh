@@ -6,7 +6,8 @@
 #   app/macos/buildMacosDist.sh                 # 完整流程：签名 + 公证 + staple
 #   app/macos/buildMacosDist.sh --no-notary     # 只 Developer ID 签名，跳过公证（快速自测）
 #   app/macos/buildMacosDist.sh --adhoc         # ad-hoc 签名（无证书机器兜底）
-#                                              #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
+#                                               #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
+#   三个模式最后都会拉起刚构建的 app（--server http://localhost:3000）方便立刻试跑。
 #
 # 前置条件（一次性）：
 #   1. 钥匙串里有 "Developer ID Application: ..." 证书（security find-identity -p codesigning）
@@ -140,3 +141,10 @@ ditto -c -k --keepParent --sequesterRsrc "$APP" "$RELEASE"
 echo
 echo "======= 完成: $RELEASE ======="
 ls -lh "$RELEASE"
+
+# ---------- 立刻试跑 ----------
+# 与 desk-mac-build-dev 同款：打完直接拉起**刚构建的这份 app**（不是解压 zip），
+# 带 --server 指向本机服务，免得再从访达里找包。
+# 注：拉起的是构建产物本身，落盘的 zip 是给分发用的，两者内容一致。
+echo "==> 打开刚构建的 app（--server http://localhost:3000）"
+open "$APP" --args --server http://localhost:3000
