@@ -199,13 +199,8 @@ jobs:
           # -34018 Keychain 全挂。唯一出路=去沙盒（无沙盒进程对 login Keychain
           # 全权）。plutil 的 keypath 按 '.' 分层删不掉带点的键，用 python plistlib
           ENT=/tmp/devid-entitlements.plist
-          python3 -c '
-import plistlib, sys
-d = plistlib.load(open("macos/Runner/Release.entitlements", "rb"))
-d.pop("com.apple.security.app-sandbox", None)
-d.pop("keychain-access-groups", None)
-plistlib.dump(d, open(sys.argv[1], "wb"))
-' "$ENT"
+          # plutil keypath 按 '.' 分层删不掉带点的键，用 python plistlib（单行，避免 YAML 缩进坑）
+          python3 -c 'import plistlib,sys; d=plistlib.load(open("macos/Runner/Release.entitlements","rb")); d.pop("com.apple.security.app-sandbox",None); d.pop("keychain-access-groups",None); plistlib.dump(d,open(sys.argv[1],"wb"))' "$ENT"
           IDENTITY="Developer ID Application"
           find "$APP/Contents/Frameworks" -name "*.framework" \
             -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
