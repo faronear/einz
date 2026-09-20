@@ -252,14 +252,17 @@ jobs:
 
   # macOS 桌面 CLI（einz-tui-macos）通用二进制：
   # dart compile exe 只产出宿主架构，且 Dart 不支持 macOS 跨架构编译，
-  # 所以分别在 Intel(macos-13) 与 Apple Silicon(macos-latest) 上各编一份，
+  # 所以分别在 Intel 与 Apple Silicon runner 上各编一份，
   # 再用 lipo 合成 arm64+x64 通用二进制，Intel Mac 才能跑（否则 Bad CPU type）。
+  # 注意：x64 必须用 macos-15-intel——macos-13 已于 2025-12-04 退役，请求退役标签
+  # 的 job 会永远 Queued 不报错；macos-15-intel 是最后的 Intel 镜像（至 2027-08），
+  # 之后 GitHub Actions 不再有 x86_64 macOS，届时需另寻方案（如自建 runner）。
   macos-cli:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
     strategy:
       matrix:
         include:
-          - runner: macos-13
+          - runner: macos-15-intel
             arch: x64
           - runner: macos-latest
             arch: arm64
