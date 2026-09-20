@@ -146,12 +146,12 @@ void main() {
     return tester;
   }
 
-  /// 消息流里的视频气泡：测试环境 video_player 无法初始化 → 退化成 180×100 占位
-  /// （_VideoPreview 失败态）。占位 SizedBox 本身不参与命中测试，故长按点取包住它
-  /// 的气泡 GestureDetector。
+  /// 消息流里的视频气泡：`_VideoPreview` 三种状态（加载中 / 失败 / 成功）都带
+  /// `ValueKey('videoPreview')`，按 key 定位不依赖具体控件类型（此前按 180×100
+  /// 的 SizedBox 找，失败态改成带图标的 Container 后就找不到了）。占位本身不参与
+  /// 命中测试，故长按点取包住它的气泡 GestureDetector。
   Finder videoBubble() => find.ancestor(
-        of: find.byWidgetPredicate(
-            (w) => w is SizedBox && w.width == 180 && w.height == 100),
+        of: find.byKey(const ValueKey('videoPreview')),
         matching: find.byType(GestureDetector),
       );
 

@@ -7549,3 +7549,22 @@ MacBook 上先发现）。真·平台专属的只有「隐藏拍照/拍摄入口
 `flutter test` 全量：135 过，2 条 `chat_quote_video_test.dart` 失败——
 `UnimplementedError: init() has not been implemented`（video 插件在 `flutter test`
 宿主下无实现），与本次改动无关，属既有环境问题。
+
+## 2026-09-21 补：chat_quote_video_test 两条失败的真因（不是桌面拍照那个）
+
+老板问：这 2 条 `UnimplementedError: init() has not been implemented.` 是不是
+「桌面版拍照/拍摄出错」的根因？**不是**，三件事要分清：
+
+| 现象 | 真因 | 状态 |
+| --- | --- | --- |
+| 桌面端点拍照/拍摄报错 | `image_picker` 桌面平台遇 `ImageSource.camera` 抛 `StateError` | 73c9842 已修（桌面不摆入口） |
+| 桌面端视频在消息流里空白 | `MediaCache` 缓存目录不存在 → `writeAsBytes` 抛异常 | 73c9842 已修（补建目录） |
+| `flutter test` 里 video 预览 `UnimplementedError` | `video_player_platform_interface` 的默认兜底（`.../video_player_platform_interface.dart:43`），**只在没有任何平台实现注册时**走到；`flutter test` 宿主进程不注册插件。真机/桌面 App 由 `video_player_avfoundation` 等注册，73c9842 实测 macOS 上三种样本 `initialize()` 全正常 | 与产品无关 |
+
+**真正的问题是我上次改 UI 留下的测试失效**：`chat_quote_video_test.dart` 的
+`videoBubble()` 找的是 180×100 的 `SizedBox`（旧失败态），而 73c9842 把失败态换成了
+带图标+文案的 `Container` → 查找器找不到气泡 → 2 条失败。
+
+**修复**（老板选「给预览加 Key」）：`_VideoPreview` 三种状态（加载中/失败/成功）
+的根 widget 统一带 `ValueKey('videoPreview')`，测试改按 key 定位，不再依赖具体控件
+类型。全量 `flutter test` 137 过、0 失败；`flutter analyze` 干净。

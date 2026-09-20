@@ -5026,8 +5026,10 @@ class _VideoPreviewState extends State<_VideoPreview> {
   Widget build(BuildContext context) {
     final c = _controller;
     // 初始化失败：给可点重试的明确错误态，而不是一个没有内容的空白框
+    // （三种状态都带同一个 key：测试按 key 定位视频气泡，不受具体控件类型影响）
     if (_failed) {
       return GestureDetector(
+        key: const ValueKey('videoPreview'),
         onTap: _init,
         child: Container(
           width: 180,
@@ -5051,12 +5053,14 @@ class _VideoPreviewState extends State<_VideoPreview> {
     }
     // 初始化中：显示进度（与失败态分开，避免"转圈"和"空白"看起来一样）
     if (c == null) {
-      return const SizedBox(
+      return SizedBox(
+          key: const ValueKey('videoPreview'),
           width: 180,
           height: 100,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
     }
     return GestureDetector(
+      key: const ValueKey('videoPreview'),
       onTap: () => _playFullscreen(c),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
