@@ -102,9 +102,10 @@ jobs:
         run: |
           curl.exe -L -o libsodium-msvc.zip https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-msvc.zip
           Expand-Archive libsodium-msvc.zip -DestinationPath libsodium-msvc
-          Copy-Item libsodium-msvc/x64/Release/v142/libsodium.dll app/build/windows/x64/runner/Release/
+          # 实际包内路径：libsodium/x64/Release/v142/dynamic/libsodium.dll（顶层还有 libsodium/ 目录 + dynamic 子目录）
+          Copy-Item libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll app/build/windows/x64/runner/Release/
           New-Item -ItemType Directory -Force _release.gitomit
-          Copy-Item libsodium-msvc/x64/Release/v142/libsodium.dll _release.gitomit/
+          Copy-Item libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll _release.gitomit/
       - name: Zip release folder
         run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-gui-windows.zip
       - name: Build CLI
