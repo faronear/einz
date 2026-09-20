@@ -7292,3 +7292,60 @@ arm64+x64。出问题的是 `einz-tui-macos` 这个命令行工具，它和 GUI 
 **未本地验证**：workflow 改动无法本地跑（需 CI runner），仅做了 YAML 语法校验
 （`ruby -rpsych` 通过，6 个 job）。`windows` job 的 `einz-tui-windows.exe` 不受影响，
 仍单文件上传。
+
+## 2026-09-20 macOS 桌面版「启动初始化失败」根治：-34018 数据保护 Keychain
+
+老板报：GitHub 打包的 macOS 桌面版，在**本机 iMac 能用**，拷到 **MacBook** 后
+进首屏很快白屏报「启动初始化失败，配置未丢失，请重试」。此前另一个 agent 连提交
+了 3 个 fix（921af86 删 embedded.provisionprofile / 69fa07b 删
+keychain-access-groups / 32a73dc 去沙盒），全部无效。
+
+**真凶：`flutter_secure_storage` 的 macOS 默认值 `usesDataProtectionKeychain: true`。**
+数据保护 Keychain 要 `keychain-access-groups` entitlement 背书，而该 entitlement
+只能由 provisioning profile 授权；Developer ID 分发没有 profile → 每次 `SecItem*`
+直接 `-34018 A required entitlement isn't present`。链路：
+`StartupGate._check()` → `AppLockService.ensureFreshInstall()` →
+`SecureStore.deleteAll()` → 插件 delete → `SecItemDelete` -34018 → PlatformException
+→ 重试 4 次（1s 间隔）仍失败 → 错误页。
+
+**为什么 iMac 能用**（关键误导）：iMac 上 drift 库（`~/Documents/einz.sqlite` 或
+沙盒版容器内）里**已有 install_id**，`ensureFreshInstall` 第一步就 return，从不碰
+Keychain；若 `isSetup` 为真，`loadPlain()` 也被跳过 → 整条 Keychain 路径根本没被走到。
+MacBook 是全新安装 → 第一次就 `deleteAll` → 立刻 -34018。
+
+**实测证据**（macOS 15.7.7 / iMac19,1，`/tmp/kcprobe` Swift 探针 + 真实 App）：
+
+| 签名 | 沙盒 | 数据保护 Keychain | 文件型 Keychain |
+| --- | --- | --- | --- |
+| Developer ID | 无 | -34018 | **status=0** |
+| Developer ID | 有（无 keychain 组） | -34018 | **status=0** |
+| ad-hoc | 有（无 keychain 组） | -34018 | **status=0** |
+
+**修复**（`0acddd7`）：`SecureStore` 的 `MacOsOptions` 显式
+`usesDataProtectionKeychain: false`（仅 macOS；iOS 不受影响）。语义差异：文件型
+Keychain 不支持 iCloud 同步/备份迁移，而本应用本就 `synchronizable=false`。
+
+**验证**：本地 dist（Developer ID + 公证 + staple）修复前 5 次 -34018、修复后 0 次，
+StartupGate 正常放行；把真实 App 重新签成沙盒版并用新 bundle id 跑（全新容器）同样
+启动无错。
+
+**顺带确认的两件事（待老板决策，未动手）**：
+1. **沙盒其实可以恢复**：32a73dc「去沙盒」的理由（沙盒+Keychain+Developer ID 三角
+   死锁）不成立——死锁是数据保护 Keychain 带来的，换文件型 Keychain 后沙盒版同样
+   跑通（上表）。恢复沙盒的好处：数据回到 `~/Library/Containers/cc.tic.einz/`，
+   不必在用户 `~/Documents/` 里丢一个 `einz.sqlite`，也避开 macOS 对 ~/Documents 的
+   TCC 授权弹窗（非沙盒 App 访问 Documents 会弹窗，拒绝即 DB 打开失败）。风险面：
+   沙盒下 `FilePicker.pickFiles`（chat_page 3 处附件入口）需要
+   `com.apple.security.files.user-selected.read-write`，而当前 Release.entitlements
+   没有——需另行确认附件流程。
+2. **CI 本身不用改**：CI 的 dist 分支与本机 `buildMacos.sh --dist` 签名/entitlements
+   完全一致（去沙盒 + Developer ID + 公证），坏的原因是缺这个 Dart 修复。重跑
+   workflow 即可产出可用包。
+
+**流程约定（老板要求）**：打包/签名/CI 这类发布链路改动，先本地出可下载产物让老板
+在真机（MacBook）验证，**通过后**再改 CI。
+
+**产物**：`_release.gitomit/einz-gui-macos-dist-v2609201320.zip`（Developer ID +
+公证 + staple，MacBook 上双击即用）、`einz-gui-macos-dev-v2609201323.zip`（本机
+自动签名，内嵌本机 Mac Development profile，**异机会被 Taskgated 判无效签名**，
+只在 iMac 用）。
