@@ -7488,27 +7488,6 @@ Developer ID 那条能开 runtime，是因为所有组件同属一个 Team ID；
 验证：`ruby -rpsych` 解析 workflow（5 个 job）、`bash -n buildMacos.sh` 均通过；
 ad-hoc 真机 A/B 如上表。dist 侧本机公证产物此前已验证（沙盒 entitlement + 无
 profile + spctl accepted + 启动 -34018 计数 0）。
-
-## 2026-09-20 桌面端鼠标按住拖不动消息流（滚轮可以）
-
-老板报：桌面版按住鼠标上下拖无法滚动，滚轮正常；手机端按住拖正常。
-
-**根因**：Flutter 的默认 `ScrollBehavior.dragDevices` 只含
-`touch / stylus / invertedStylus / trackpad / unknown`
-（源码 `widgets/scroll_configuration.dart` 的 `_kTouchLikeDeviceTypes`），
-**故意不含 `mouse`** —— 桌面端的设计意图是把鼠标拖动留给文本选择。所以滚轮（axis
-事件，不受 dragDevices 限制）能滚，鼠标拖动则完全不被 Scrollable 认。
-
-**修复**（`main.dart`）：新增 `AppScrollBehavior extends MaterialScrollBehavior`，
-`dragDevices = {...super.dragDevices, PointerDeviceKind.mouse}`，挂到 `MaterialApp.scrollBehavior`。
-全 App 只有一个 MaterialApp，一处生效。
-
-**副作用面**（已核对）：全 App 仅 3 处 `SelectableText`（邀请码弹窗、入网口令弹窗、
-「关于秘境」页），在那些地方鼠标拖动会改为滚动而非划选文本；点选/双击选词不受影响。
-消息气泡走 `Text`（不可选），长按手势用于"引用/录音"，与 pan 不冲突。
-
-未跑测试（UI 交互由老板真机自测），只 `flutter analyze` 干净。
-
 ## 2026-09-21 锁屏：三个入口统一 canDismiss=false，无 PIN 不进锁屏页
 
 老板追问「上次修的锁屏绕过是不是只修了桌面端」→ 查证：`2597415`（8/29 自动锁屏
@@ -7650,3 +7629,16 @@ GUI 要先把 4 个无 Linux 实现的插件按平台处理掉**。
 path_provider、device_info_plus、package_info_plus。也就是说 Linux GUI 会：视频
 消息播不了、扫码入口报错、附件打不开、视频无缩略图——与桌面端"拍照/拍摄"那类问题
 同款，需先做平台分支。另需 apt 装 GTK/clang/cmake/ninja 等 Linux 桌面构建依赖。
+
+## 2026-09-21 撤回：桌面端"按住鼠标拖动滚动"（老板决定）
+
+撤回 commit `980660a`（`AppScrollBehavior`：给 `dragDevices` 补
+`PointerDeviceKind.mouse`）。两个理由：
+
+1. **鼠标按住拖动本来就是留给"选文字"的** —— Flutter 默认不含 mouse 是有意为之
+   （`ScrollBehavior._kTouchLikeDeviceTypes`），我那次改动的副作用是：在
+   `SelectableText` 上（邀请码弹窗、入网口令弹窗、关于页）拖不动选区了。
+2. **微信桌面版同样不支持**鼠标点按住上下拖屏幕（老板实测比对）——桌面端的手感
+   本来就应该是"滚轮滚 + 鼠标划选"，不需要跟移动端"按住拉动"对齐。
+
+结论：桌面端的正确手感 = 滚轮滚动 + 鼠标划选文本，**不做**按住拖动滚动。
