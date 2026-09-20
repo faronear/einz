@@ -230,13 +230,17 @@ jobs:
             build/macos/Build/Products/Release/einz.app
           codesign --verify -v build/macos/Build/Products/Release/einz.app
       - name: Zip app bundle
-        # 用 GITHUB_WORKSPACE 绝对路径落盘（曾数错相对层级两次，导致上传的 zip 里只有 TUI）
-        run: cd app/build/macos/Build/Products/Release && zip -r -y "$GITHUB_WORKSPACE/einz-gui-macos.zip" einz.app
+        # 命名与本地打包对齐（buildMacos.sh）：配 secrets = -dist（Developer ID 可分发），
+        # 未配 = -dev（ad-hoc 兜底）；CI 无时间串，版本号（APP_BUILD_NAME）已够区分构建
+        run: >
+          SUFFIX=$(steps.devid.outputs.configured == 'true' && echo dist || echo dev);
+          cd app/build/macos/Build/Products/Release &&
+          zip -r -y "$GITHUB_WORKSPACE/einz-gui-macos-$SUFFIX.zip" einz.app
       - uses: actions/upload-artifact@v4
         with:
           name: einz-macos
           path: |
-            einz-gui-macos.zip
+            einz-gui-macos-*.zip
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -244,7 +248,7 @@ jobs:
           name: Latest Build
           make_latest: true
           files: |
-            einz-gui-macos.zip
+            einz-gui-macos-*.zip
 
   # macOS 桌面 CLI（einz-tui-macos）通用二进制：
   # dart compile exe 只产出宿主架构，且 Dart 不支持 macOS 跨架构编译，
