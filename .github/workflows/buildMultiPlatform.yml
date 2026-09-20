@@ -110,9 +110,11 @@ jobs:
         run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-gui-windows.zip
       - name: Build CLI
         working-directory: cli
+        # Windows 默认 shell 是 PowerShell：mkdir 是 New-Item 的别名，-p 会被解析成
+        # -Path，目录已存在即报错；用 New-Item -Force 等价 bash 的 mkdir -p
         run: |
           dart pub get
-          mkdir -p ../_release.gitomit
+          New-Item -ItemType Directory -Force ../_release.gitomit
           dart compile exe bin/einz_tui.dart -o ../_release.gitomit/einz-tui-windows.exe
       - uses: actions/upload-artifact@v4
         with:
