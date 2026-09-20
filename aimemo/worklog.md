@@ -7446,3 +7446,13 @@ iOS/Android 上该目录恒存在 → 只在桌面端炸）。
 视频显示的是通用摄像机图标而不是首帧（`_buildVideoThumb` 的 hasError 分支，有兜底
 不至于空白）。主消息体的视频预览不走它，不受影响。修法要么换插件、要么桌面端另找取帧
 途径，属独立决策，本次未动。
+
+### 3. 桌面端点「拍视频/拍照」弹错误
+
+老板补报：桌面版点拍视频弹错。原因：`image_picker` 在桌面平台（macOS/Windows/Linux）
+遇到 `ImageSource.camera` 会**直接抛 `StateError`**（源码注释写明需挂 `cameraDelegate`
+才可用），被 `_sendMedia` 的 catch 兜成 `chatPageSendFailed` 提示。
+
+老板拍板：**桌面版不要拍照/拍视频这两个按钮**。落地：`chat_page.dart` 加
+`_hasCameraCapture`（仅 Android/iOS 为真），附件面板里两个 camera 卡片加条件；
+相册/文件入口在桌面走系统文件对话框，照常可用。移动端行为不变。
