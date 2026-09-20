@@ -144,6 +144,23 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Check Developer ID secrets
+        id: devid
+        env:
+          HAS_P12: ${{ secrets.MACOS_DEVID_P12 != '' }}
+        run: echo "configured=${{ env.HAS_P12 }}" >> "$GITHUB_OUTPUT"
+      - name: Import Developer ID certificate
+        if: steps.devid.outputs.configured == 'true'
+        env:
+          MACOS_DEVID_P12: ${{ secrets.MACOS_DEVID_P12 }}
+          MACOS_DEVID_P12_PASSWORD: ${{ secrets.MACOS_DEVID_P12_PASSWORD }}
+        run: |
+          echo "$MACOS_DEVID_P12" | base64 --decode > devid.p12
+          security create-keychain -p build build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p build build.keychain
+          security import devid.p12 -k build.keychain -P "$MACOS_DEVID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k build build.keychain
       - name: Disable Swift Package Manager
         # 与 codemagic ios-release 相同：Podfile 存在时走 CocoaPods，避免 Flutter 3.47 默认 SPM 冲突
         run: flutter config --no-enable-swift-package-manager
@@ -155,18 +172,54 @@ jobs:
         run: |
           # CI 无开发证书/profile：临时禁用签名再构建（工程文件为 Automatic+Team，
           # flutter build 传参会覆盖环境变量，故直接改 pbxproj；不改仓库内文件）
+          # 配了 Developer ID secrets 时也先这样出未签名产物，签名统一在下一步做
+          # （无 profile 时 Xcode 签名会嵌/要求 provisioning，直接禁干净）
           sed -i '' -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/' \
                     -e 's/CODE_SIGN_IDENTITY = "Apple Development";/CODE_SIGN_IDENTITY = "-";/' \
                     -e 's/DEVELOPMENT_TEAM = CQ6733CTMV;//' \
                     macos/Runner.xcodeproj/project.pbxproj
           eval "$(node ../scripts/appVersion.js)"
           flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+      - name: Sign (Developer ID + notarize + staple)
+        if: steps.devid.outputs.configured == 'true'
+        working-directory: app
+        env:
+          MACOS_NOTARY_KEYCHAIN_PROFILE: ${{ secrets.MACOS_NOTARY_KEYCHAIN_PROFILE }}
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+        run: |
+          APP=build/macos/Build/Products/Release/einz.app
+          # flutter 可能嵌入本机 profile（CI 上通常没有，防御性删除）
+          rm -f "$APP/Contents/embedded.provisionprofile"
+          # keychain-access-groups 需要 provisioning profile 背书，Developer ID 签名带它
+          # 会被 Taskgated 判 Invalid Signature（iMac 本机实锤），去掉
+          ENT=/tmp/devid-entitlements.plist
+          plutil -remove keychain-access-groups macos/Runner/Release.entitlements -o "$ENT"
+          IDENTITY="Developer ID Application"
+          find "$APP/Contents/Frameworks" -name "*.framework" \
+            -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
+          codesign -f -s "$IDENTITY" --timestamp --options runtime --entitlements "$ENT" "$APP"
+          codesign --verify -v --strict "$APP"
+          # 公证凭据存入临时 keychain profile（secrets 不落日志）
+          xcrun notarytool store-credentials notary-ci \
+            --apple-id "$MACOS_NOTARY_APPLE_ID" \
+            --team-id "$MACOS_NOTARY_TEAM_ID" \
+            --password "$MACOS_NOTARY_PASSWORD"
+          # zip 必须用 ditto（保留 Frameworks 符号链接，zip 命令会破坏结构导致公证失败）
+          ditto -c -k --keepParent --sequesterRsrc "$APP" notary-upload.zip
+          xcrun notarytool submit notary-upload.zip --keychain-profile notary-ci --wait
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+          spctl -a -vv -t exec "$APP"
+          rm -f notary-upload.zip
       - name: Re-sign ad-hoc without restricted entitlements
+        if: steps.devid.outputs.configured != 'true'
         working-directory: app
         run: |
-          # ad-hoc 签名不能带 keychain-access-groups / get-task-allow 这类需真实身份背书的
-          # 受限 entitlement，否则内核 AMFI 判 Invalid Signature，launchd 启动即 SIGKILL
-          # （表现为"应用程序无法打开"，崩溃日志 indicator=Taskgated Invalid Signature）。
+          # 未配 Developer ID secrets 的兜底：ad-hoc 签名不能带 keychain-access-groups /
+          # get-task-allow 这类需真实身份背书的受限 entitlement，否则内核 AMFI 判
+          # Invalid Signature，launchd 启动即 SIGKILL（表现为"应用程序无法打开"）。
           # 删除受限项后对 frameworks + app 重打 ad-hoc 签名。
           ENT=macos/Runner/Release.entitlements
           plutil -remove keychain-access-groups "$ENT" || true
