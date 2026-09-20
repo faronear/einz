@@ -40,7 +40,7 @@ case "$PLATFORM" in
   MINGW*|MSYS*|CYGWIN*) OS_NAME="windows"; EXT=".exe" ;;
   *)                    OS_NAME="$(printf '%s' "$PLATFORM" | tr '[:upper:]' '[:lower:]')"; EXT="" ;;
 esac
-NAME="${1:-einz-tui-${OS_NAME}-${ARCH_NAME}-${STAMP}${EXT}}"
+NAME="${1:-einz-tui-${OS_NAME}-${ARCH_NAME}-v${STAMP}${EXT}}"
 OUT="$OUT_DIR/$NAME"
 
 # ---- 定位 dart（Linux 常不在 PATH：~/dart-sdk、flutter 自带、apt 安装） ----
