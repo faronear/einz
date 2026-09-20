@@ -76,10 +76,10 @@ case "${1:-setup}" in
     ;;
   build)
     ensure_image
-    echo "==> 容器内执行 cli/build.sh（AOT 编译 → _release.gitomit/einz-tui-linux-<芯片架构>-<时间戳>）…"
-    # 复用 build.sh 单一实现（挂载仓库内 /app/cli/build.sh）：自动探测容器 dart、
+    echo "==> 容器内执行 cli/buildTui.sh（AOT 编译 → _release.gitomit/einz-tui-linux-<芯片架构>-<时间戳>）…"
+    # 复用 buildTui.sh 单一实现（挂载仓库内 /app/cli/buildTui.sh）：自动探测容器 dart、
     # 按平台命名、输出到挂载的 _release.gitomit/，产物直达宿主
-    run_container -i bash build.sh
+    run_container -i bash buildTui.sh
     ;;
   setup | update | "")
     setup

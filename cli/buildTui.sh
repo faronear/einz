@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ein-tui 一键编译脚本：把 einz_tui.dart AOT 编译成免 Dart 运行时的原生可执行文件。
 #
-# 用法:   ./build.sh [输出文件名]      （产物统一放仓库根 _release.gitomit/；默认文件名含系统-架构-时间戳：
+# 用法:   ./buildTui.sh [输出文件名]     （产物统一放仓库根 _release.gitomit/；默认文件名含系统-架构-时间戳：
 #                                        _release.gitomit/einz-tui-<系统>-<架构>-<yymmddhhmm>，如 einz-tui-linux-x64-2609032201）
 # 平台/架构: 操作系统优先于架构排序（不同系统产物互不兼容：Mach-O/ELF/PE）：
 #            产物只能在对应系统+架构上运行，系统与架构已写入文件名便于区分；

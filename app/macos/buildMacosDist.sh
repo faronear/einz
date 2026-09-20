@@ -3,9 +3,9 @@
 # 公证（notarization）→ staple → 落盘 _release.gitomit/。
 #
 # 用法（仓库任意位置都能跑）：
-#   app/macos/buildMacos.sh                    # 完整流程：签名 + 公证 + staple
-#   app/macos/buildMacos.sh --no-notary        # 只 Developer ID 签名，跳过公证（快速自测）
-#   app/macos/buildMacos.sh --adhoc            # ad-hoc 签名（无证书机器兜底）
+#   app/macos/buildMacosDist.sh                 # 完整流程：签名 + 公证 + staple
+#   app/macos/buildMacosDist.sh --no-notary     # 只 Developer ID 签名，跳过公证（快速自测）
+#   app/macos/buildMacosDist.sh --adhoc         # ad-hoc 签名（无证书机器兜底）
 #                                              #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
 #
 # 前置条件（一次性）：
