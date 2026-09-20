@@ -193,10 +193,19 @@ jobs:
           APP=build/macos/Build/Products/Release/einz.app
           # flutter 可能嵌入本机 profile（CI 上通常没有，防御性删除）
           rm -f "$APP/Contents/embedded.provisionprofile"
-          # keychain-access-groups 需要 provisioning profile 背书，Developer ID 签名带它
-          # 会被 Taskgated 判 Invalid Signature（iMac 本机实锤），去掉
+          # 沙盒 + Keychain + Developer ID 三者不兼容（iMac/MacBook 实锤锁定）：
+          # keychain-access-groups 只能由 provisioning profile 授权，Developer ID
+          # 分发无 profile → 带组=Taskgated Invalid Signature 双击即死，无组=
+          # -34018 Keychain 全挂。唯一出路=去沙盒（无沙盒进程对 login Keychain
+          # 全权）。plutil 的 keypath 按 '.' 分层删不掉带点的键，用 python plistlib
           ENT=/tmp/devid-entitlements.plist
-          plutil -remove keychain-access-groups macos/Runner/Release.entitlements -o "$ENT"
+          python3 -c '
+import plistlib, sys
+d = plistlib.load(open("macos/Runner/Release.entitlements", "rb"))
+d.pop("com.apple.security.app-sandbox", None)
+d.pop("keychain-access-groups", None)
+plistlib.dump(d, open(sys.argv[1], "wb"))
+' "$ENT"
           IDENTITY="Developer ID Application"
           find "$APP/Contents/Frameworks" -name "*.framework" \
             -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;

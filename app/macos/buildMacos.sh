@@ -88,16 +88,26 @@ if [[ "$MODE" == "adhoc" ]]; then
   codesign -f -s - --timestamp=none --options runtime --entitlements "$TMP_ENT" "$APP"
   rm -f "$TMP_ENT"
 else
-  # Developer ID：Hardened Runtime 必须开（--options runtime，公证要求）。
-  # entitlements 不能直接用仓库里的 Release.entitlements——它带 keychain-access-groups，
-  # 该 entitlement 需要 provisioning profile 背书；Developer ID 分发没有 profile，
-  # 内核 AMFI/Taskgated 会判 Invalid Signature，launchd spawn 即杀（"应用程序无法打开"，
-  # 本机双击复现 + DiagnosticReports 实锤，二分实验锁定 2026-09-20）。
-  # macOS 沙盒 app 访问 Keychain 不需要该组（Keychain item 归属 app 自身命名空间；
-  # keychain-access-groups 缺失报 -34018 是 iOS 的机制，macOS 不适用）。
-  echo "==> Developer ID 签名（Hardened Runtime，去 keychain-access-groups）"
+  # Developer ID + Hardened Runtime（公证要求）。**必须去沙盒**：
+  # 三者不兼容已实测锁定（2026-09-20）——
+  #   沙盒 + Keychain 访问需要 keychain-access-groups，而该 ent 只能由
+  #   provisioning profile 授权（Developer ID 分发无 profile；ICAPS 特批不对
+  #   个人开放）→ 带组=Taskgated Invalid Signature 双击即死，无组=-34018
+  #   Keychain 全挂（StartupGate"启动初始化失败"）。唯一出路=去沙盒：
+  #   无沙盒进程对 login Keychain 有全权（native SecItemAdd 实测 status=0）。
+  # 代价：数据目录从 ~/Library/Containers/<bundle>/ 移到 ~/Library/Application
+  #   Support/<bundle>/（旧本地缓存不会自动迁移；聊天记录在服务器，无碍）。
+  echo "==> Developer ID 签名（Hardened Runtime，去沙盒）"
   ENT="$(mktemp).entitlements"
-  plutil -remove keychain-access-groups "$ENTITLEMENTS" -o "$ENT"
+  # plutil/PlistBuddy 的 keypath 按 '.' 分层，删不掉带点的键（"com.apple.security.app-sandbox"
+  # 会被拆层级 → "Does Not Exist"），用 python plistlib 最稳
+  python3 -c '
+import plistlib, sys
+d = plistlib.load(open(sys.argv[1], "rb"))
+d.pop("com.apple.security.app-sandbox", None)
+d.pop("keychain-access-groups", None)
+plistlib.dump(d, open(sys.argv[2], "wb"))
+' "$ENTITLEMENTS" "$ENT"
   # 由深到浅：先签嵌套 framework 再签 app
   find "$APP/Contents/Frameworks" -name "*.framework" \
     -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
@@ -135,9 +145,12 @@ fi
 # ---------- 落盘 ----------
 RELEASE_DIR="$REPO_ROOT/_release.gitomit"
 mkdir -p "$RELEASE_DIR"
-RELEASE="$RELEASE_DIR/einz-gui-macos-dist-v${APP_BUILD_STAMP}.app"
-rm -rf "$RELEASE"
-cp -R "$APP" "$RELEASE"
+RELEASE="$RELEASE_DIR/einz-gui-macos-dist-v${APP_BUILD_STAMP}.zip"
+rm -f "$RELEASE"
+# 用 zip 压缩包而非裸 *.app：*.app 在访达/网盘/跨机搬运中易被改坏扩展属性和
+# 签名结构（老板实测：一台 Mac 启动失败后，拷到另一台也跟着"损坏"），
+# ditto 打包能完整保留符号链接、权限和资源 fork，解压即用。
+ditto -c -k --keepParent --sequesterRsrc "$APP" "$RELEASE"
 echo
 echo "======= 完成: $RELEASE ======="
 ls -lh "$RELEASE"
