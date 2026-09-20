@@ -213,27 +213,49 @@ const bool _isPackagedBuild = bool.fromEnvironment('dart.vm.product');
 /// 后走候选域名（不静默：否则会误以为在测开发服务器，实际连的是生产）。
 /// **打包产物（AOT）不打这行提示**：产物里本来就没有 localConfig.json，走出厂候选
 /// 域名是预期行为，提示只是噪音（老板 2026-09-21）——见 [_isPackagedBuild]。
+///
+/// 查找顺序见 [_configCandidates]：cwd 优先（既有语义，必须保住），打包产物再补
+/// "可执行文件同目录"。
 List<String> _configuredServers() {
-  try {
-    final f = File('localConfig.json');
-    if (f.existsSync()) {
-      final v = (jsonDecode(f.readAsStringSync()) as Map<String, dynamic>)['server'];
+  for (final file in _configCandidates()) {
+    try {
+      if (!file.existsSync()) continue;
+      final v = (jsonDecode(file.readAsStringSync()) as Map<String, dynamic>)['server'];
       if (v is String && v.isNotEmpty) return [v];
       if (v is List) {
         final list = v.whereType<String>().where((e) => e.isNotEmpty).toList();
         if (list.isNotEmpty) return list;
       }
-    } else if (!_isPackagedBuild) {
-      // 打包产物里没有 localConfig.json 是**默认状态**（走出厂候选域名），
-      // 只在从源码跑时才提示——那时它说明 cwd 不对、连的其实不是以为的服务器
-      stdout.writeln(
-          '⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），'
-          '改用出厂候选域名（${_kServerCandidates.join(' / ')}）');
+      // 文件在但没写 server：按"没配"处理（再去别处找也没意义）
+      return const [];
+    } catch (_) {
+      // 配置损坏：回退出厂域名
+      return const [];
     }
-  } catch (_) {
-    // 配置损坏：回退出厂域名
+  }
+  if (!_isPackagedBuild) {
+    // 打包产物里没有 localConfig.json 是**默认状态**（走出厂候选域名），
+    // 只在从源码跑时才提示——那时它说明 cwd 不对、连的其实不是以为的服务器
+    stdout.writeln(
+        '⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），'
+        '改用出厂候选域名（${_kServerCandidates.join(' / ')}）');
   }
   return const [];
+}
+
+/// localConfig.json 的查找位置，按序：
+/// 1. **当前工作目录**——既有语义（`cd cli && dart run bin/einz_tui.dart`，即
+///    `npm run tui*-dev`）依赖它，必须保住（老板 2026-09-21）；
+/// 2. **可执行文件同目录**（仅打包产物）——把 localConfig.json 放在二进制旁边就生效，
+///    拷到别的机器也跟着走，符合"绿色软件"直觉；源码运行没有"可执行文件"这一说，
+///    `Platform.resolvedExecutable` 指向 dart 自身，故不参与。
+List<File> _configCandidates() {
+  final files = <File>[File('localConfig.json')];
+  if (_isPackagedBuild) {
+    final exeDir = File(Platform.resolvedExecutable).parent;
+    files.add(File.fromUri(exeDir.uri.resolve('localConfig.json')));
+  }
+  return files;
 }
 
 /// 默认服务器地址（与 App 端 `resolveServer` 同构的优先级链）：

@@ -56,7 +56,14 @@ TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localCo
 | 配置读不到时 | 源码运行（`dart run`）：打一行提示再走候选域名（不静默）；**打包产物（AOT）：不打**——产物里本来就没有 localConfig.json，走出厂候选域名是预期行为（老板 2026-09-21） | —                                                                                       | —                        |
 | 持久化       | **无**                                                                        | **无**                                                                                  | **无**                   |
 
-`cli/localConfig.json` 按**当前工作目录**解析，只有 `cd cli` 之后跑才读得到（npm scripts 都这么干）。
+`cli/localConfig.json` 的查找顺序（TUI）：
+
+1. **当前工作目录**——`cd cli && dart run bin/einz_tui.dart`（npm scripts 都这么干）
+   走的就是这条，既有语义；
+2. **可执行文件同目录**（仅打包产物）——把 `localConfig.json` 放在二进制旁边就生效，
+   拷到别的机器也跟着走。
+
+优先级仍是 `--server > localConfig.json > 出厂候选域名`（产物同样接受 `--server`）。
 
 ⚠ `dart compile exe` **只编译 Dart 代码，不打包任何数据文件**——localConfig.json 不会进
 产物（它本来也是 gitignore 的本地文件，模板 `cli/localConfig.example.json`）。产物运行时若

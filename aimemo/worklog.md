@@ -7615,3 +7615,14 @@ bool.fromEnvironment('dart.vm.product')`（VM 自带环境量，Flutter 的 kRel
 
 **实测**（cwd=/tmp，无终端）：JIT 源码运行首行是 `⚠ 未找到 localConfig.json…`；
 同一份代码编出的 AOT exe 首行直接是界面，无该提示。
+
+### 补：产物也支持"exe 同目录"的 localConfig.json（2026-09-21）
+
+老板确认"cwd 下的 localConfig.json 必须读得到" → 做成**查找顺序**：cwd 优先（既有
+语义不动），打包产物再补"可执行文件同目录"（`Platform.resolvedExecutable` 的目录）。
+源码运行不参与第二条（`resolvedExecutable` 那时指向 dart 自身）。
+
+实测（编一个 exe 放到 /tmp/tuiprobe，旁边放 3999、另一个目录放 4000）：
+- cwd=/tmp/othercwd → 用 4000（cwd 优先 ✅）
+- cwd 无配置 → 用 3999（exe 同目录兜底 ✅）
+- `--server 4100` → 用 4100（**产物同样接受 --server**，优先于任何配置 ✅）
