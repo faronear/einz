@@ -25,7 +25,7 @@ aimemo/      记忆与工作空间（productLens / projectPlan / worklog / userP
 | `docs/SECURITY.md`     | **安全模型与安保政策（威胁模型、现有控制、明确不做、事件处置手册）**         |
 | `docs/DEPLOYMENT.md`   | **部署手册（从零部署 + 快速试用 + 备份恢复/撤销轮换运维 + 故障排查）**       |
 | `docs/ONBOARDING.md`   | **部署与 AB 互通操作手册（从零到双端对话）**                                 |
-| `docs/CI.md`           | **CI 打包指南（Codemagic，无需本机 Xcode / Android SDK）**                   |
+| `docs/CI.md`           | **CI 打包指南（GitHub Actions 多平台构建，产物上传 Release）**               |
 | `docs/IOS.md`          | **iOS 构建与真机验证指引（Mac 环境）**                                       |
 | `docs/updateServer.md` | **服务器更新流程（git push/pull 版，另一台电脑照做即可）**                   |
 | `docs/KEY_ESCROW.md`   | **口令托管密钥方案（换设备/朋友接入凭口令，Server 仍只见密文）**              |
