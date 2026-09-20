@@ -259,8 +259,22 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 周期性重试探测：成功 → 停止重试并自动进入（复用 _initServer 的角色判定）。
+  ///
+  /// 每轮重试**先回候选列表重选一次地址**（老板 2026-09-21）：启动那一刻若网络
+  /// 没就绪，[resolveServer] 会把地址钉死在兜底主域名，此后只死磕它就再也用不上
+  /// 备用入口——而"启动那一刻"恰好是网络最可能还没通的时候。重选后
+  /// `正在连接 <地址>` 那行小字也随之更新（排障时能看出在试哪个入口）。
+  /// 开发覆盖（`--server` / 编译期 dart-define）不动：那种情况是人为指定地址，
+  /// 不该被候选列表劫持。
   Future<void> _reprobe() async {
     if (_busy || !mounted) return;
+    if (!isDevServer) {
+      final picked = await resolveServer(null, probe: widget.probeServer);
+      if (!mounted) return;
+      if (picked != effectiveServer) {
+        setState(() => effectiveServer = picked); // 换入口：小字提示同步更新
+      }
+    }
     final probe = widget.probeServer ?? probeServer;
     final (ok, pv, caps) = await probe(effectiveServer);
     if (!mounted) return;

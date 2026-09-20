@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:einz/brand_logo.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/server_config.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 
@@ -51,5 +52,43 @@ void main() {
     // 空间入口页（创建秘境 / 加入秘境）
     expect(find.text('创建秘境'), findsOneWidget, reason: '应自动进入空间入口页');
     expect(find.text('加入秘境'), findsOneWidget);
+  });
+
+  testWidgets('重试时回到候选列表重选：主域名不通、备用域名通 → 切过去并进入向导',
+      (WidgetTester tester) async {
+    // 老板 2026-09-21：启动那一刻网络没就绪时 resolveServer 会把地址钉死在兜底
+    // 主域名，若重试只死磕它，备用入口就永远用不上。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    addTearDown(() => effectiveServer = kPrimaryServer); // 全局量，别污染其他用例
+    final probed = <String>[];
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: SetupPage(
+        db: db,
+        // 主域名永远不通，备用域名（候选第二项）通
+        probeServer: (server) async {
+          probed.add(server);
+          final ok = server == kServerCandidates[1];
+          return (ok, 'multiverse', const <String>[]);
+        },
+      ),
+    ));
+    await tester.pump(); // probe future 完成 → 主域名失败 → 启动 4s 重试
+    await tester.pump();
+    expect(probed, [kPrimaryServer], reason: '首次只探当前生效地址（兜底主域名）');
+
+    // 4 秒重试：先在候选列表里并发重选（主域名失败、备用域名成功）→ 切过去 →
+    // 探测成功 → 自动进入向导
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(effectiveServer, kServerCandidates[1], reason: '应切到可用的备用入口');
+    expect(find.text('创建秘境'), findsOneWidget, reason: '切换后应自动进入空间入口页');
+    expect(find.byType(SpinningBrandLogo), findsNothing, reason: '进入向导后启动屏应消失');
   });
 }

@@ -69,7 +69,15 @@ bool get isDevServer => !kServerCandidates.contains(effectiveServer);
 /// 2. 编译期覆盖（`kEinzServer != kPrimaryServer`）→ 直接用，不探测；
 /// 3. 否则在 [kServerCandidates] 里并发探测，取第一个 `/health` 成功的；
 ///    全不通 → 回主域名（由 setup_page 的 4s 自动重试兜底）。
-Future<String> resolveServer(String? argServer) async {
+///
+/// [probe] 可注入探测函数（测试用 fake；探测失败重试时复用页面注入的那个）。
+/// 注意：只在**未覆盖**（既无 `--server` 也无编译期覆盖）时才该拿它重选地址——
+/// 覆盖过的情况下传 null 会把开发地址冲掉（调用方负责判 [isDevServer]）。
+Future<String> resolveServer(
+  String? argServer, {
+  Future<(bool, String, List<String>)> Function(String server)? probe,
+}) async {
+  final probeServerFn = probe ?? probeServer;
   if (argServer != null && argServer.isNotEmpty) return argServer;
   if (kEinzServer != kPrimaryServer) return kEinzServer;
   if (kServerCandidates.length == 1) return kPrimaryServer;
@@ -78,7 +86,7 @@ Future<String> resolveServer(String? argServer) async {
   final picked = Completer<String>();
   var pending = kServerCandidates.length;
   for (final candidate in kServerCandidates) {
-    probeServer(candidate).then((r) {
+    probeServerFn(candidate).then((r) {
       if (r.$1 && !picked.isCompleted) picked.complete(candidate);
       pending--;
       if (pending == 0 && !picked.isCompleted) picked.complete(kPrimaryServer);
