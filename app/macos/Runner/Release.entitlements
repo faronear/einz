@@ -8,9 +8,14 @@
 	     networkd settings 读取被拒时 HttpClient 会间歇失败，显式声明 -->
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)cc.tic.einz</string>
-	</array>
+	<!-- 用户经文件选择器挑中的文件（对话页三处附件入口 FilePicker.pickFiles）：
+	     沙盒下必须显式声明，否则 open panel 选完也读不到内容 -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
+	<!-- 这里**不能**再出现 keychain-access-groups：它只能由 provisioning profile
+	     授权，Developer ID 分发没有 profile → 内核 Taskgated 判 Invalid Signature，
+	     双击即「应用程序无法打开」。桌面端已改用文件型 Keychain
+	     （见 app/lib/data/secure_store.dart 的 usesDataProtectionKeychain: false），
+	     根本不需要该 entitlement。详见 aimemo/worklog.md 2026-09-20 两篇。 -->
 </dict>
 </plist>

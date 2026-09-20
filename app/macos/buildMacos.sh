@@ -5,19 +5,22 @@
 # 用法（仓库任意位置都能跑）：
 #   app/macos/buildMacos.sh                    # 完整流程：签名 + 公证 + staple
 #   app/macos/buildMacos.sh --no-notary        # 只 Developer ID 签名，跳过公证（快速自测）
-#   app/macos/buildMacos.sh --adhoc            # ad-hoc 签名（无证书机器兜底；会删 keychain 组，
-#                                              #   Apple Silicon 上 Keychain 不可用——仅本机调试用）
+#   app/macos/buildMacos.sh --adhoc            # ad-hoc 签名（无证书机器兜底）
+#                                              #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
 #
 # 前置条件（一次性）：
 #   1. 钥匙串里有 "Developer ID Application: ..." 证书（security find-identity -p codesigning）
 #   2. 公证凭据已存钥匙串：
 #      xcrun notarytool store-credentials einz-notary --apple-id <邮箱> --team-id CQ6733CTMV --password <App专用密码>
 #
-# 为什么必须走这套流程（背景 2026-09-20）：
-#   CI ad-hoc 产物在 Apple Silicon 上无法用 Keychain（沙盒应用需要 keychain-access-groups，
-#   而 ad-hoc 签名带 keychain 组会被 AMFI 判 Invalid Signature 启动即死）→ StartupGate
-#   报"启动初始化失败"。Developer ID 签名 + Hardened Runtime 可以同时保住
-#   沙盒 + keychain-access-groups，公证后再无 Gatekeeper"已损坏/无法验证"弹窗。
+# 背景（2026-09-20 实测定稿）：
+#   异机能打开的唯一组合 = Developer ID 签名 + Hardened Runtime + 公证。
+#   且 entitlements **不能**带 keychain-access-groups：它只能由 provisioning profile
+#   授权，Developer ID 分发没有 profile → 内核 Taskgated 判 Invalid Signature，双击
+#   即「应用程序无法打开」。桌面端 Keychain 走**文件型**（SecureStore 里
+#   usesDataProtectionKeychain: false），不需要任何 keychain entitlement。
+#   沙盒照常保留 —— 沙盒与 Developer ID 完全兼容（当初「沙盒+Keychain+Developer ID
+#   三角死锁」的真凶是数据保护 Keychain，换文件型后沙盒版实测启动无错）。
 set -euo pipefail
 # 不设 LC_ALL=C：CocoaPods（Ruby）在 C locale 下报 UnicodeNormaliz
 # Encoding::CompatibilityError（本机实跑踩过）；本脚本变量名全 ASCII，无此需求
@@ -72,48 +75,26 @@ APP="build/macos/Build/Products/Release/einz.app"
 # 删掉 flutter 自动嵌入的本机 Mac Development provisioning profile：
 # 它的 ProvisionedDevices 只登记了本机 UUID，拷到别的 Mac 会被内核判
 # Taskgated Invalid Signature，双击即"应用程序无法打开"（SIGKILL 实锤，
-# DiagnosticReports indicator=Taskgated）。Developer ID 分发不需要 profile
-# ——keychain-access-groups 由 Developer ID 签名本身背书。
+# DiagnosticReports indicator=Taskgated）。Developer ID 分发不需要也不该带 profile
+# ——去 profile 后 entitlements 里不能再有任何 profile 背书的项（见 Release.entitlements）。
 rm -f "$APP/Contents/embedded.provisionprofile"
 
 # ---------- 签名 ----------
+# 两个渠道都直接拿仓库里的 Release.entitlements 签：它现在只含三个布尔项
+# （沙盒 / 出站网络 / 用户选择文件），没有任何需要 provisioning profile 背书的受限
+# entitlement，因此 Developer ID 与 ad-hoc 两种签名都能带着它正常启动（2026-09-20 实测）。
 if [[ "$MODE" == "adhoc" ]]; then
-  # ad-hoc：删受限 entitlement（keychain 组带 team 前缀，ad-hoc 下 AMFI 判无效签名）
-  echo "==> ad-hoc 签名（删 keychain-access-groups；Keychain 在沙盒下将不可用）"
-  TMP_ENT="$(mktemp).entitlements"
-  plutil -remove keychain-access-groups "$ENTITLEMENTS" -o "$TMP_ENT" 2>/dev/null \
-    || cp "$ENTITLEMENTS" "$TMP_ENT"
+  echo "==> ad-hoc 签名（沙盒 + Hardened Runtime；仅本机调试用）"
   find "$APP/Contents/Frameworks" -name "*.framework" \
     -exec codesign -f -s - --timestamp=none --options runtime {} \;
-  codesign -f -s - --timestamp=none --options runtime --entitlements "$TMP_ENT" "$APP"
-  rm -f "$TMP_ENT"
+  codesign -f -s - --timestamp=none --options runtime --entitlements "$ENTITLEMENTS" "$APP"
 else
-  # Developer ID + Hardened Runtime（公证要求）。**必须去沙盒**：
-  # 三者不兼容已实测锁定（2026-09-20）——
-  #   沙盒 + Keychain 访问需要 keychain-access-groups，而该 ent 只能由
-  #   provisioning profile 授权（Developer ID 分发无 profile；ICAPS 特批不对
-  #   个人开放）→ 带组=Taskgated Invalid Signature 双击即死，无组=-34018
-  #   Keychain 全挂（StartupGate"启动初始化失败"）。唯一出路=去沙盒：
-  #   无沙盒进程对 login Keychain 有全权（native SecItemAdd 实测 status=0）。
-  # 代价：数据目录从 ~/Library/Containers/<bundle>/ 移到 ~/Library/Application
-  #   Support/<bundle>/（旧本地缓存不会自动迁移；聊天记录在服务器，无碍）。
-  echo "==> Developer ID 签名（Hardened Runtime，去沙盒）"
-  ENT="$(mktemp).entitlements"
-  # plutil/PlistBuddy 的 keypath 按 '.' 分层，删不掉带点的键（"com.apple.security.app-sandbox"
-  # 会被拆层级 → "Does Not Exist"），用 python plistlib 最稳
-  python3 -c '
-import plistlib, sys
-d = plistlib.load(open(sys.argv[1], "rb"))
-d.pop("com.apple.security.app-sandbox", None)
-d.pop("keychain-access-groups", None)
-plistlib.dump(d, open(sys.argv[2], "wb"))
-' "$ENTITLEMENTS" "$ENT"
+  echo "==> Developer ID 签名（沙盒 + Hardened Runtime）"
   # 由深到浅：先签嵌套 framework 再签 app
   find "$APP/Contents/Frameworks" -name "*.framework" \
     -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
   codesign -f -s "$IDENTITY" --timestamp --options runtime \
-    --entitlements "$ENT" "$APP"
-  rm -f "$ENT"
+    --entitlements "$ENTITLEMENTS" "$APP"
   codesign --verify -v --strict "$APP"
 fi
 
