@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'brand_logo.dart';
@@ -39,6 +40,27 @@ class EinzApp extends StatefulWidget {
   State<EinzApp> createState() => _EinzAppState();
 }
 
+/// 全局滚动行为：把**鼠标**也算进"可以用按住拖动来滚动"的设备。
+///
+/// Flutter 默认的 dragDevices 只含 touch / stylus / invertedStylus / trackpad /
+/// unknown（`ScrollBehavior._kTouchLikeDeviceTypes`），**不含 mouse**——桌面端的
+/// 设计意图是把鼠标拖动留给文本选择。结果就是本 App 在桌面上只有滚轮能滚、按住
+/// 鼠标上下拖不动，而同一套界面在手机上本来就是"按住拉动"（老板 2026-09-20 实测
+/// 报出的手感割裂）。
+///
+/// 副作用面很小：全 App 只有 3 处 SelectableText（邀请码弹窗、入网口令弹窗、
+/// 「关于秘境」页），在那些地方鼠标拖动会改为滚动而不是划选文本；点选/双击选词
+/// 不受影响（长按手势用于"引用/录音"，与拖动不冲突）。
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        ...super.dragDevices,
+        PointerDeviceKind.mouse,
+      };
+}
+
 class _EinzAppState extends State<EinzApp> {
   Locale? _locale; // null = 跟随系统
 
@@ -73,6 +95,8 @@ class _EinzAppState extends State<EinzApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Einz',
+      // 桌面端也能"按住鼠标上下拖动"滚动（见 AppScrollBehavior 注释）
+      scrollBehavior: const AppScrollBehavior(),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           // 新 Logo（粉蓝图标）里的天蓝作种子：派生 primary 保持深蓝，交互对比达标

@@ -7488,3 +7488,23 @@ Developer ID 那条能开 runtime，是因为所有组件同属一个 Team ID；
 验证：`ruby -rpsych` 解析 workflow（5 个 job）、`bash -n buildMacos.sh` 均通过；
 ad-hoc 真机 A/B 如上表。dist 侧本机公证产物此前已验证（沙盒 entitlement + 无
 profile + spctl accepted + 启动 -34018 计数 0）。
+
+## 2026-09-20 桌面端鼠标按住拖不动消息流（滚轮可以）
+
+老板报：桌面版按住鼠标上下拖无法滚动，滚轮正常；手机端按住拖正常。
+
+**根因**：Flutter 的默认 `ScrollBehavior.dragDevices` 只含
+`touch / stylus / invertedStylus / trackpad / unknown`
+（源码 `widgets/scroll_configuration.dart` 的 `_kTouchLikeDeviceTypes`），
+**故意不含 `mouse`** —— 桌面端的设计意图是把鼠标拖动留给文本选择。所以滚轮（axis
+事件，不受 dragDevices 限制）能滚，鼠标拖动则完全不被 Scrollable 认。
+
+**修复**（`main.dart`）：新增 `AppScrollBehavior extends MaterialScrollBehavior`，
+`dragDevices = {...super.dragDevices, PointerDeviceKind.mouse}`，挂到 `MaterialApp.scrollBehavior`。
+全 App 只有一个 MaterialApp，一处生效。
+
+**副作用面**（已核对）：全 App 仅 3 处 `SelectableText`（邀请码弹窗、入网口令弹窗、
+「关于秘境」页），在那些地方鼠标拖动会改为滚动而非划选文本；点选/双击选词不受影响。
+消息气泡走 `Text`（不可选），长按手势用于"引用/录音"，与 pan 不冲突。
+
+未跑测试（UI 交互由老板真机自测），只 `flutter analyze` 干净。
