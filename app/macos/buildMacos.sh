@@ -69,6 +69,13 @@ flutter build macos --release --build-name "$APP_BUILD_NAME" --build-number "$AP
 
 APP="build/macos/Build/Products/Release/einz.app"
 
+# 删掉 flutter 自动嵌入的本机 Mac Development provisioning profile：
+# 它的 ProvisionedDevices 只登记了本机 UUID，拷到别的 Mac 会被内核判
+# Taskgated Invalid Signature，双击即"应用程序无法打开"（SIGKILL 实锤，
+# DiagnosticReports indicator=Taskgated）。Developer ID 分发不需要 profile
+# ——keychain-access-groups 由 Developer ID 签名本身背书。
+rm -f "$APP/Contents/embedded.provisionprofile"
+
 # ---------- 签名 ----------
 if [[ "$MODE" == "adhoc" ]]; then
   # ad-hoc：删受限 entitlement（keychain 组带 team 前缀，ad-hoc 下 AMFI 判无效签名）
