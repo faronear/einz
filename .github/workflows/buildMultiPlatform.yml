@@ -95,6 +95,16 @@ jobs:
         run: |
           eval "$(node ../scripts/appVersion.js)"
           flutter build windows --release --build-name "$APP_BUILD_NAME"
+      - name: Fetch libsodium.dll
+        # GUI（package:sodium FFI）和 CLI 运行时都要 libsodium.dll，Flutter/Dart 打包不会自动带上，
+        # 官方也没集成进产物——从 libsodium 官方 release 下载 MSVC 预编译包分发
+        shell: pwsh
+        run: |
+          curl.exe -L -o libsodium-msvc.zip https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-msvc.zip
+          Expand-Archive libsodium-msvc.zip -DestinationPath libsodium-msvc
+          Copy-Item libsodium-msvc/x64/Release/v142/libsodium.dll app/build/windows/x64/runner/Release/
+          New-Item -ItemType Directory -Force _release.gitomit
+          Copy-Item libsodium-msvc/x64/Release/v142/libsodium.dll _release.gitomit/
       - name: Zip release folder
         run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-gui-windows.zip
       - name: Build CLI
