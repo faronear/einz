@@ -7456,3 +7456,35 @@ iOS/Android 上该目录恒存在 → 只在桌面端炸）。
 老板拍板：**桌面版不要拍照/拍视频这两个按钮**。落地：`chat_page.dart` 加
 `_hasCameraCapture`（仅 Android/iOS 为真），附件面板里两个 camera 卡片加条件；
 相册/文件入口在桌面走系统文件对话框，照常可用。移动端行为不变。
+
+## 2026-09-20 CI dist 签名步骤对齐「沙盒 + 文件型 Keychain」
+
+老板拍板改 CI。`.github/workflows/buildMultiPlatform.yml` 的 macos job：
+
+- **dist（配了 Developer ID secrets）**：删掉那段「python 剥掉 app-sandbox +
+  keychain-access-groups」的内联代码（那是 32a73dc 的旧逻辑，现在会**误删沙盒**），
+  改成直接用仓库里的 `macos/Runner/Release.entitlements`（沙盒 + 出站网络 +
+  用户选择文件三个布尔项）。保留 `rm -f embedded.provisionprofile`。
+- **ad-hoc 兜底（未配 secrets）**：两行 `plutil -remove keychain-access-groups /
+  get-task-allow` 已无对应键（entitlements 文件里本来就没有了），删掉；改为直接带
+  `Release.entitlements` 签名。
+- 顶部说明同步：macOS 两渠道（-dist Developer ID+公证+沙盒 / -dev ad-hoc）与所需
+  secrets 列清。
+
+**顺带实测抓到一个真 bug（坑很深）：ad-hoc 签名不能加 `--options runtime`。**
+ad-hoc 没有 Team ID，Hardened Runtime 会打开 Library Validation → dyld 加载内嵌
+framework 时报 `mapping process and mapped file (non-platform) have different Team
+IDs`，进程直接起不来。本机对同一产物做了 A/B：
+
+| ad-hoc 签名 | 结果 |
+| --- | --- |
+| 不带 `--options runtime` | 启动正常（`flags=0x2(adhoc)`），-34018 计数 0 |
+| 带 `--options runtime` | dyld 拒绝加载 framework，起不来 |
+
+Developer ID 那条能开 runtime，是因为所有组件同属一个 Team ID；ad-hoc 没这个前提。
+**`app/macos/buildMacos.sh --adhoc` 分支原来是带 runtime 的 → 该模式产出的包本来就
+起不来**，一并修掉（本地脚本与 CI 口径现在一致）。
+
+验证：`ruby -rpsych` 解析 workflow（5 个 job）、`bash -n buildMacos.sh` 均通过；
+ad-hoc 真机 A/B 如上表。dist 侧本机公证产物此前已验证（沙盒 entitlement + 无
+profile + spctl accepted + 启动 -34018 计数 0）。

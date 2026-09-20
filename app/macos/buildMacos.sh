@@ -84,10 +84,15 @@ rm -f "$APP/Contents/embedded.provisionprofile"
 # （沙盒 / 出站网络 / 用户选择文件），没有任何需要 provisioning profile 背书的受限
 # entitlement，因此 Developer ID 与 ad-hoc 两种签名都能带着它正常启动（2026-09-20 实测）。
 if [[ "$MODE" == "adhoc" ]]; then
-  echo "==> ad-hoc 签名（沙盒 + Hardened Runtime；仅本机调试用）"
+  # **不加 `--options runtime`**：ad-hoc 签名没有 Team ID，Hardened Runtime 会打开
+  # Library Validation，dyld 加载内嵌 framework 时报 "mapping process and mapped file
+  # (non-platform) have different Team IDs" 直接起不来（2026-09-20 本机实测：同一产物
+  # 去掉 runtime 就能启动）。Developer ID 那条能用 runtime，是因为所有组件同属一个
+  # Team ID；ad-hoc 没有这个前提。
+  echo "==> ad-hoc 签名（沙盒；仅本机调试用）"
   find "$APP/Contents/Frameworks" -name "*.framework" \
-    -exec codesign -f -s - --timestamp=none --options runtime {} \;
-  codesign -f -s - --timestamp=none --options runtime --entitlements "$ENTITLEMENTS" "$APP"
+    -exec codesign -f -s - --timestamp=none {} \;
+  codesign -f -s - --timestamp=none --entitlements "$ENTITLEMENTS" "$APP"
 else
   echo "==> Developer ID 签名（沙盒 + Hardened Runtime）"
   # 由深到浅：先签嵌套 framework 再签 app

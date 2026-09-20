@@ -5,7 +5,11 @@
 #   - push tag（v*）：全平台构建（需要时取消下面注释）
 #
 # 说明：
-#   - Android / Windows / macOS 无签名要求，直接出包
+#   - Android / Windows 无签名要求，直接出包
+#   - macOS 分两个渠道：配了 Developer ID secrets = -dist（Developer ID 签名 +
+#     公证 + staple，**沙盒**，异机双击即用）；未配 = -dev（ad-hoc，仅本机调试）
+#     需要的 secrets：MACOS_DEVID_P12(Base64) + MACOS_DEVID_P12_PASSWORD +
+#     MACOS_NOTARY_APPLE_ID + MACOS_NOTARY_PASSWORD + MACOS_NOTARY_TEAM_ID
 #   - iOS 需要 secrets：IOS_P12_CERTIFICATE(Base64) + IOS_P12_PASSWORD + IOS_PROVISIONING_PROFILE(Base64)
 #     未配置 secrets 时 iOS job 自动跳过
 #   - macOS 计费 10x、Windows 2x，注意私有仓库额度
@@ -191,16 +195,18 @@ jobs:
           MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
         run: |
           APP=build/macos/Build/Products/Release/einz.app
-          # flutter 可能嵌入本机 profile（CI 上通常没有，防御性删除）
+          # flutter 可能嵌入本机 profile（CI 上通常没有，防御性删除）。Developer ID
+          # 分发不需要也不该带 profile——去 profile 后 entitlements 里也不能有任何
+          # 需 profile 背书的项（见下面 ENT 与 macos/Runner/Release.entitlements）
           rm -f "$APP/Contents/embedded.provisionprofile"
-          # 沙盒 + Keychain + Developer ID 三者不兼容（iMac/MacBook 实锤锁定）：
-          # keychain-access-groups 只能由 provisioning profile 授权，Developer ID
-          # 分发无 profile → 带组=Taskgated Invalid Signature 双击即死，无组=
-          # -34018 Keychain 全挂。唯一出路=去沙盒（无沙盒进程对 login Keychain
-          # 全权）。plutil 的 keypath 按 '.' 分层删不掉带点的键，用 python plistlib
-          ENT=/tmp/devid-entitlements.plist
-          # plutil keypath 按 '.' 分层删不掉带点的键，用 python plistlib（单行，避免 YAML 缩进坑）
-          python3 -c 'import plistlib,sys; d=plistlib.load(open("macos/Runner/Release.entitlements","rb")); d.pop("com.apple.security.app-sandbox",None); d.pop("keychain-access-groups",None); plistlib.dump(d,open(sys.argv[1],"wb"))' "$ENT"
+          # 直接用仓库里的 Release.entitlements（沙盒 + 出站网络 + 用户选择文件三个
+          # 布尔项），**不要**再像以前那样用 python 剥掉 app-sandbox：
+          # 当初「沙盒 + Keychain + Developer ID 三角死锁」的真凶是 flutter_secure_storage
+          # 默认走数据保护 Keychain（要 keychain-access-groups，而该 entitlement 只能由
+          # provisioning profile 授权 → 无 profile 时每次 SecItem* 都是 -34018）；桌面端
+          # 已改成文件型 Keychain（secure_store.dart 的 usesDataProtectionKeychain: false），
+          # 沙盒与 Developer ID 从此完全兼容，不需要去沙盒。详见 aimemo/worklog.md 2026-09-20。
+          ENT=macos/Runner/Release.entitlements
           IDENTITY="Developer ID Application"
           find "$APP/Contents/Frameworks" -name "*.framework" \
             -exec codesign -f -s "$IDENTITY" --timestamp --options runtime {} \;
@@ -222,13 +228,17 @@ jobs:
         if: steps.devid.outputs.configured != 'true'
         working-directory: app
         run: |
-          # 未配 Developer ID secrets 的兜底：ad-hoc 签名不能带 keychain-access-groups /
-          # get-task-allow 这类需真实身份背书的受限 entitlement，否则内核 AMFI 判
-          # Invalid Signature，launchd 启动即 SIGKILL（表现为"应用程序无法打开"）。
-          # 删除受限项后对 frameworks + app 重打 ad-hoc 签名。
+          # 未配 Developer ID secrets 的兜底：只打 ad-hoc 签名（沙盒照常保留）。
+          # 之所以能直接带 Release.entitlements：它已只含三个布尔项（沙盒/出站网络/
+          # 用户选择文件），没有 keychain-access-groups、get-task-allow 这类需真实
+          # 身份背书的受限 entitlement——带那些才会被内核 AMFI 判 Invalid Signature、
+          # launchd 启动即 SIGKILL（表现为"应用程序无法打开"）。
+          # **不要加 `--options runtime`**：ad-hoc 签名没有 Team ID，Hardened Runtime
+          # 会打开 Library Validation，dyld 加载内嵌 framework 时报
+          # "mapping process and mapped file have different Team IDs" 直接起不来
+          # （2026-09-20 本机实测对比过）。Developer ID 那条能开 runtime 是因为所有
+          # 组件同属一个 Team ID，ad-hoc 没有这个前提。
           ENT=macos/Runner/Release.entitlements
-          plutil -remove keychain-access-groups "$ENT" || true
-          plutil -remove com.apple.security.get-task-allow "$ENT" || true
           find build/macos/Build/Products/Release/einz.app/Contents/Frameworks -name "*.framework" \
             -exec codesign -f -s - --timestamp=none {} \;
           codesign -f -s - --timestamp=none --entitlements "$ENT" \
