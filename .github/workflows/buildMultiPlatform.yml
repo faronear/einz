@@ -119,6 +119,7 @@ jobs:
           path: |
             einz-gui-windows.zip
             _release.gitomit/einz-tui-windows.exe
+            _release.gitomit/libsodium.dll
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -129,6 +130,7 @@ jobs:
           files: |
             einz-gui-windows.zip
             _release.gitomit/einz-tui-windows.exe
+            _release.gitomit/libsodium.dll
 
   macos:
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
