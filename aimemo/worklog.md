@@ -7349,3 +7349,44 @@ StartupGate 正常放行；把真实 App 重新签成沙盒版并用新 bundle i
 公证 + staple，MacBook 上双击即用）、`einz-gui-macos-dev-v2609201323.zip`（本机
 自动签名，内嵌本机 Mac Development profile，**异机会被 Taskgated 判无效签名**，
 只在 iMac 用）。
+
+### 2026-09-20（续）老板拍板：沙盒加回 dist 渠道
+
+老板确认 dist 版能在 MacBook 打开（`-34018` 修复有效），dev 版在 MacBook 报
+「应用程序无法打开」（原因：Apple Development 开发证书 + 无 Hardened Runtime +
+`spctl` rejected + 内嵌只登记本机设备的 Mac Development profile → 异机 Taskgated
+SIGKILL；dev 渠道本就只供本机调试）。老板决定：**沙盒加回**。
+
+回答老板的疑问「有了沙盒，dist 也能在其他 MacBook 上用，对吗」：**对**。跨机可用性
+只取决于 ①Developer ID 签名 ②不内嵌异机不认的 profile ③已公证 + staple；沙盒只是
+一个布尔 entitlement，容器由目标机按 bundle id 自动创建，与跨机无关。
+
+改动：
+
+- `app/macos/Runner/Release.entitlements`：加 `com.apple.security.files.user-selected.read-only`
+  （沙盒下 FilePicker.pickFiles 读用户选中文件所必需；对话页 3 处附件入口），
+  **删** `keychain-access-groups`（文件型 Keychain 不再需要，且它是异机 SIGKILL 元凶）。
+  现在只剩三个布尔项：app-sandbox / network.client / files.user-selected.read-only。
+- `app/macos/buildMacos.sh`：dist 与 adhoc 两条签名分支都**直接**用
+  `Release.entitlements`，删掉原先「python 剥掉 app-sandbox + keychain 组」的那段
+  手术（entitlements 文件本身已干净）；顶部注释与 `--help` 文案同步改写。
+
+验证（`_release.gitomit/einz-gui-macos-dist-v2609201342.zip`）：
+
+- entitlements = app-sandbox + files.user-selected.read-only + network.client；
+  无 `embedded.provisionprofile`；Developer ID + Hardened Runtime(`flags=runtime`)
+  + 公证已 staple；`spctl -a -vv` = `accepted, source=Notarized Developer ID`。
+- 真机启动：`-34018` 计数 0，无 StartupGate 失败日志；DB 落在
+  `~/Library/Containers/cc.tic.einz/Data/Documents/einz.sqlite`（沙盒生效），
+  `~/Documents/einz.sqlite` 不再被触碰（旧文件是去沙盒那版留下的残留）。
+- `log show` 查沙盒拒绝：只有 AppSandbox 初始化 + Xcode keychain 沙盒检查，**无 deny**。
+
+**未实测项（老板真机测试时可顺手看）**：沙盒下附件流程——①「+ → 图片/音频/文件」
+选择器能否选中并上传（靠新加的 user-selected.read-only）；②消息里点附件用系统应用
+打开（`_openFileWith` → OpenFilex，沙盒下走 NSTask 可能被拒）。这两条只做了代码路径
+核对，dev 渠道虽一直带沙盒但附件没在桌面上点过。
+
+**CI 待办（老板确认 MacBook 测试通过后再动）**：`.github/workflows/buildMultiPlatform.yml`
+的 dist Sign 步骤要同步——删掉那段「python 去掉 app-sandbox / keychain 组」的内联代码
+（现在会误删沙盒），以及 ad-hoc 兜底分支里 `plutil -remove keychain-access-groups`
+（已成 no-op，可一并清理）。workflow 本身不需要再改别的。
