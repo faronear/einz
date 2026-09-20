@@ -126,7 +126,7 @@ fi
 # ---------- 落盘 ----------
 RELEASE_DIR="$REPO_ROOT/_release.gitomit"
 mkdir -p "$RELEASE_DIR"
-RELEASE="$RELEASE_DIR/einz-gui-macos.${APP_BUILD_STAMP}.app"
+RELEASE="$RELEASE_DIR/einz-gui-macos-dist.${APP_BUILD_STAMP}.app"
 rm -rf "$RELEASE"
 cp -R "$APP" "$RELEASE"
 echo
