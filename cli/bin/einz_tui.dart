@@ -190,6 +190,15 @@ const List<String> _kServerCandidates = [
   'https://einz.yuanjinx.com', // 中国入口（有备案）——同一台服务器，仅入口不同
 ];
 
+/// 是否**打包好的产物**（`dart compile exe` 出来的 AOT 二进制，含 CI 编的那几份）。
+///
+/// `dart compile exe` 只编译 Dart 代码，**不打包任何数据文件**——localConfig.json
+/// 又是 gitignore 的本地文件（模板 `localConfig.example.json`），所以产物里压根不该
+/// 有它，"没找到"是预期状态而非异常。用 VM 自带的环境量判定（Flutter 的
+/// `kReleaseMode` 就是这么实现的），好处是 CI 那两条 `dart compile exe` 命令不用改，
+/// 自动就对。
+const bool _isPackagedBuild = bool.fromEnvironment('dart.vm.product');
+
 /// 本机配置（cli/localConfig.json 的 server 字段，不入库；模板见
 /// cli/localConfig.example.json）里的服务器地址；没有或损坏 → 空列表。
 ///
@@ -202,6 +211,8 @@ const List<String> _kServerCandidates = [
 /// 注：路径**按当前工作目录**解析（`File('localConfig.json')`），所以只有 `cd cli`
 /// 之后跑（`npm run tui*-dev` 就是这么干的）才读得到——在别的目录跑会打印一行提示
 /// 后走候选域名（不静默：否则会误以为在测开发服务器，实际连的是生产）。
+/// **打包产物（AOT）不打这行提示**：产物里本来就没有 localConfig.json，走出厂候选
+/// 域名是预期行为，提示只是噪音（老板 2026-09-21）——见 [_isPackagedBuild]。
 List<String> _configuredServers() {
   try {
     final f = File('localConfig.json');
@@ -212,7 +223,9 @@ List<String> _configuredServers() {
         final list = v.whereType<String>().where((e) => e.isNotEmpty).toList();
         if (list.isNotEmpty) return list;
       }
-    } else {
+    } else if (!_isPackagedBuild) {
+      // 打包产物里没有 localConfig.json 是**默认状态**（走出厂候选域名），
+      // 只在从源码跑时才提示——那时它说明 cwd 不对、连的其实不是以为的服务器
       stdout.writeln(
           '⚠ 未找到 localConfig.json（cwd=${Directory.current.path}），'
           '改用出厂候选域名（${_kServerCandidates.join(' / ')}）');
@@ -2878,8 +2891,7 @@ Future<void> _execCommand(String line) async {
       // 无参数：先输出当前服务器（状态），再给出详细用法
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '✅ 当前服务器: ${s.session.server}\n\n'
-            '🔧 用法: /server <地址> —— 切换本次会话的服务器并激活，仅本次生效，不长期保留。'
-            '要长期换地址请改 cli/localConfig.json。'));
+            '🔧 用法: /server <地址> —— 切换本次会话的服务器并激活，仅本次生效，不长期保留。'));
         s.status = '';
       } else {
         try {

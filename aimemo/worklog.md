@@ -7593,3 +7593,25 @@ MacBook 上先发现）。真·平台专属的只有「隐藏拍照/拍摄入口
 **测试**：`setup_probe_retry_test.dart` 新增——主域名恒不通、备用域名通 → 4s 重试
 后 `effectiveServer` 切到备用入口并自动进入向导（改动前会一直卡在启动屏）。
 全量 `flutter test` 138 过、0 失败；`flutter analyze` 干净。
+
+## 2026-09-21 TUI：localConfig.json 不进产物，产物也不再打「未找到」提示
+
+老板问 buildTui.sh 会不会把 localConfig.json 打进去 + CI 产物启动总先打一行
+`⚠ 未找到 localConfig.json …`（产物里没意义）。
+
+**结论 1：不会打包。** `dart compile exe` 只编译 Dart 代码，**不打包任何数据文件**；
+localConfig.json 又是 gitignore 的本地文件（模板 `cli/localConfig.example.json`）。
+它按**当前工作目录**在运行时读（`_configuredServers()`），产物放到哪就按哪的 cwd 找。
+
+**结论 2：提示确实只该给源码运行看。** 产物里没有 localConfig.json 是**默认状态**
+（走出厂候选域名），打提示是噪音；从 `dart run` 跑时才有意义（提醒 cwd 不对、
+连的其实不是以为的开发服务器）。
+
+**改动**：`einz_tui.dart` 增 `const bool _isPackagedBuild =
+bool.fromEnvironment('dart.vm.product')`（VM 自带环境量，Flutter 的 kReleaseMode
+就是这么判的）→ 只在 `!_isPackagedBuild` 时打提示。**好处是 CI 那两条
+`dart compile exe` 命令不用改**（用 `--define` 就得同步改 CI + buildTui.sh 两处）。
+`buildTui.sh` 头部与 `docs/SERVER_SETTINGS.md` §3 同步说明。
+
+**实测**（cwd=/tmp，无终端）：JIT 源码运行首行是 `⚠ 未找到 localConfig.json…`；
+同一份代码编出的 AOT exe 首行直接是界面，无该提示。

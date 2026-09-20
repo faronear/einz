@@ -8,6 +8,11 @@
 #            Windows（git-bash/MSYS）产物带 .exe。Dart 官方不支持交叉编译。
 # 依赖:   运行时唯一系统依赖是 libsodium（package:sodium 走 FFI），
 #           目标机也要装（见编译后提示）；其余全为纯 Dart，无其他依赖。
+# 不含:   localConfig.json **不会被打进产物**（dart compile exe 只编译 Dart 代码，
+#           不打包数据文件；它本来也是 gitignore 的本地配置）。产物运行时按**当前
+#           工作目录**找 localConfig.json：有就用（自建服务器场景），没有就走出厂
+#           候选域名——这是预期状态，不再打"未找到"提示（那条只对源码运行的
+#           `dart run bin/einz_tui.dart` 有意义：提醒 cwd 不对、连的不是以为的服务器）。
 # 运行:   ./einz-tui-<系统>-<架构>-<yymmddhhmm> --store <路径> --server <url>   （TUI 需真实终端）
 set -euo pipefail
 # 强制 C locale：非 C locale 下 bash 会把 $VAR 后紧跟的非 ASCII 字节并入变量名

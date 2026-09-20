@@ -53,10 +53,15 @@ TUI 的第 2、3 档是同一套语义、不同载体：第 2 档 = `cli/localCo
 | 配置文件     | `cli/localConfig.json`**运行时**读（`_configuredServers()`）；**支持单个地址或多个地址的数组**——多地址时只在数组内并发探测；没有配置则在出厂候选域名里探测（`_defaultServer()`） | `app/localConfig.*.json`**编译期** `--dart-define-from-file`（`server_config.dart:28`）；没有则并发探测出厂候选域名（`resolveServer()`） | 同桌面端                 |
 | 启动参数     | `--server <地址>`                                                             | `--server <地址>`                                                                       | 无（移动端没有启动参数） |
 | 运行期命令   | `/server [地址]`、`/status`                                                   | 「关于秘境」页显示地址                                                                  | 同桌面端                 |
-| 配置读不到时 | 打一行提示再走候选域名（不静默）                                                  | —                                                                                       | —                        |
+| 配置读不到时 | 源码运行（`dart run`）：打一行提示再走候选域名（不静默）；**打包产物（AOT）：不打**——产物里本来就没有 localConfig.json，走出厂候选域名是预期行为（老板 2026-09-21） | —                                                                                       | —                        |
 | 持久化       | **无**                                                                        | **无**                                                                                  | **无**                   |
 
 `cli/localConfig.json` 按**当前工作目录**解析，只有 `cd cli` 之后跑才读得到（npm scripts 都这么干）。
+
+⚠ `dart compile exe` **只编译 Dart 代码，不打包任何数据文件**——localConfig.json 不会进
+产物（它本来也是 gitignore 的本地文件，模板 `cli/localConfig.example.json`）。产物运行时若
+cwd 下有 localConfig.json 照样读（自建服务器场景）；没有就走出厂候选域名，且**不再打印
+「未找到」提示**（那条只对源码运行有意义：提醒你 cwd 不对、实际连的不是以为的服务器）。
 
 ## 4. 域名容灾：候选列表
 
