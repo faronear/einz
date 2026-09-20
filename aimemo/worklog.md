@@ -7390,3 +7390,59 @@ SIGKILL；dev 渠道本就只供本机调试）。老板决定：**沙盒加回*
 的 dist Sign 步骤要同步——删掉那段「python 去掉 app-sandbox / keychain 组」的内联代码
 （现在会误删沙盒），以及 ad-hoc 兜底分支里 `plutil -remove keychain-access-groups`
 （已成 no-op，可一并清理）。workflow 本身不需要再改别的。
+
+## 2026-09-20 老板真机复测：视频空白 + 锁屏可绕过，两个真 bug
+
+沙盒版 dist 在 MacBook 通过后，老板复测报两条：
+
+### 1. 桌面版消息流里视频是空白（点也没反应）
+
+**真凶：`MediaCache._cacheDirectory()` 只返回 `getTemporaryDirectory()`，从不建目录。**
+macOS 桌面端该函数返回 `<容器>/Data/Library/Caches/<bundle>`，但目录**不一定存在**，
+而且没有任何代码会建它（实测：手动删掉后跑一整轮 App 仍未重建；同一份代码在
+iOS/Android 上该目录恒存在 → 只在桌面端炸）。
+
+链路：`_VideoPreview._init()` → `MediaCache.pathFor()`（返回不存在的目录下的路径）→
+`tmp.writeAsBytes()` → FileSystemException → `catch` 里 `_failed = true` →
+`build()` 返回 `SizedBox(180,100)` 空白框。**这个空白框上没有任何 GestureDetector**，
+所以老板"点视频也没反应"完全对得上（不是插件问题）。
+
+**排除项（实测，别怀疑错方向）**：`video_player` 在 macOS 上工作正常——用 ffmpeg 造
+了三种样本喂给 `VideoPlayerController.file().initialize()`，全部 OK：
+`.mov`、`.mov` 内容装 `.mp4` 名字、`.mp4`（duration/size 都取到了）。
+
+**为什么只有视频中招**：附件存储默认 `stored` 模式 → 图片走 `Image.memory`（字节直显，
+不落盘）、音频走 `AttachmentStore.ensure`（它内部有 `_ensure()` **会建目录**）、文件不
+落盘；只有 `_VideoPreview` 硬编码走 `MediaCache`（不建目录的那条）→ 视频是唯一必炸的。
+
+**修复**：
+- `MediaCache._cacheDirectory()` 里 `if (!await dir.exists()) await dir.create(recursive: true)`。
+- `_VideoPreview`：初始化失败给**可点重试**的错误态（图标 + `chatPageVideoLoadFailed`），
+  初始化中显示转圈——此前"加载中"和"失败"共用同一个空白 SizedBox，这正是这个 bug
+  能藏这么久的原因。catch 里补 `debugPrint`。
+- 新增 l10n 键 `chatPageVideoLoadFailed`（zh/en 双 ARB + 重新 gen-l10n）。
+
+验证（TEMP-PROBE，验证后已删）：删掉缓存目录 → 探针打印
+`cacheDir=... exists=false` → `pathFor=...einz_media_probe-msg-id.mp4` →
+**`write OK len=1024`**，目录与文件都建出来了。与 `_VideoPreview._init` 是同一条代码路径。
+
+### 2. 锁屏页左上角返回箭头能直接回对话（安全漏洞）
+
+`didChangeAppLifecycleState` 的自动锁屏那条路径：①没有判断 `_hasPin`，②构造 LockPage
+时没传 `canDismiss`（默认 true）。于是切后台超时回来 → 覆盖锁屏带返回箭头 →
+`PopScope(canPop: true)` → 一点就绕过锁屏回对话；没设 PIN 的用户还会被推到一个
+"尚未设置锁屏码"的空提示页（老板说这没必要）。
+
+修复（`chat_page.dart`）：不锁的两条路径（没离开够久 / 本机没设锁屏码）统一走
+`_scheduleReadReport()` 后返回；要锁则 `LockPage(asOverlay: true, canDismiss: false)`，
+与顶栏手动锁屏同口径（必须输对 PIN）。
+⚠️ 自查时发现自己第一版把"未超时也要补报已读"顺手吞掉了（原逻辑在 else 分支里报已读），
+已改回并列进同一个"不锁"分支。
+
+### 已知未修（等老板定）
+
+`video_thumbnail` 0.5.6 只声明 android/ios，**没有 macOS 实现** → 桌面端
+`VideoThumbnail.thumbnailData` 抛 `MissingPluginException`。影响面：引用/回复预览里
+视频显示的是通用摄像机图标而不是首帧（`_buildVideoThumb` 的 hasError 分支，有兜底
+不至于空白）。主消息体的视频预览不走它，不受影响。修法要么换插件、要么桌面端另找取帧
+途径，属独立决策，本次未动。

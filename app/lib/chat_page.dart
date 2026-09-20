@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -44,6 +45,16 @@ import 'widgets/ui_style_picker.dart';
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
 enum _AttachmentKind { emoji, photo, galleryImage, videoCamera, videoGallery, audioFile, anyFile }
+
+/// 本平台是否具备**相机采集**能力（拍照/拍摄）。
+///
+/// 桌面端（macOS/Windows/Linux）没有：`image_picker` 在桌面平台遇到
+/// `ImageSource.camera` 会直接抛 `StateError`（除非挂 cameraDelegate），所以附件
+/// 面板在桌面端不摆「拍照/拍摄」两个入口——摆了也只会弹一条"发送失败"
+/// （老板 2026-09-20 在 MacBook 实测：点拍视频报错）。相册/文件入口在桌面端走
+/// 系统文件对话框，照常可用。
+bool get _hasCameraCapture =>
+    !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
 /// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
 /// 点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态（试听/取消，
@@ -1519,13 +1530,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 手动锁屏（顶栏锁图标）：立即推覆盖锁屏 → 解锁成功 pop 回本页（保留消息状态）。
   /// canDismiss=false：返回手势/返回键都被挡，必须输对锁屏码才能回聊天
-  /// （老板 2026-09-16 要求"强化安全性"；切后台超时那条路径仍是可手势退回的旧语义）。
+  /// （老板 2026-09-16 要求"强化安全性"）。
   void _lockNow() {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const LockPage(asOverlay: true, canDismiss: false)));
   }
 
   /// App 生命周期：切后台记时，回前台超过阈值 → 覆盖锁屏（保留聊天页状态）。
+  ///
+  /// 两条硬规则（老板 2026-09-20 实测报的 bug）：
+  /// 1. **没设锁屏码就不要锁**：`_hasPin=false` 时锁屏页只会显示"尚未设置锁屏码"
+  ///    提示页，既没意义又让人以为 App 出了问题——直接不锁，并照常补报已读。
+  /// 2. **锁上就不能一点退回**：原先走的是默认 `canDismiss: true`，覆盖锁屏左上角
+  ///    有返回箭头、点一下就绕过锁屏回到对话（安全漏洞）。改 `canDismiss: false`
+  ///    与手动锁屏同口径：必须输对 PIN 才回聊天。
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appResumed = state == AppLifecycleState.resumed; // 回执：只有前台才允许标已读
@@ -1534,12 +1552,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.resumed) {
       final relock = _lockTimer.shouldRelock(now: DateTime.now());
       _lockTimer.clear();
-      if (relock && mounted) {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LockPage(asOverlay: true)));
-      } else {
-        // 回到前台且未锁屏 → 用户确实在看聊天，可以把底部消息标为已读
+      // 不需要锁的两条路径：没离开够久（用户一直在看）、或本机压根没设锁屏码。
+      // 两种都照常补报已读——别把"未超时不锁"顺手吞掉（原逻辑就在这个分支里报已读）
+      if (!relock || !_hasPin || !mounted) {
         _scheduleReadReport();
+        return;
       }
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const LockPage(asOverlay: true, canDismiss: false)));
     }
   }
 
@@ -2933,21 +2953,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: _buildActionCardGrid([
-            _buildActionCard(
-              icon: Icons.photo_camera,
-              label: l10n.chatPageAttachPhoto,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
-            ),
+            // 拍照/拍摄仅移动端有（桌面无相机采集，见 [_hasCameraCapture]）
+            if (_hasCameraCapture) ...[
+              _buildActionCard(
+                icon: Icons.photo_camera,
+                label: l10n.chatPageAttachPhoto,
+                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.photo),
+              ),
+            ],
             _buildActionCard(
               icon: Icons.photo_library,
               label: l10n.chatPageAttachGalleryImage,
               onTap: () => Navigator.of(ctx).pop(_AttachmentKind.galleryImage),
             ),
-            _buildActionCard(
-              icon: Icons.videocam,
-              label: l10n.chatPageAttachVideoCamera,
-              onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoCamera),
-            ),
+            if (_hasCameraCapture) ...[
+              _buildActionCard(
+                icon: Icons.videocam,
+                label: l10n.chatPageAttachVideoCamera,
+                onTap: () => Navigator.of(ctx).pop(_AttachmentKind.videoCamera),
+              ),
+            ],
             _buildActionCard(
               icon: Icons.movie,
               label: l10n.chatPageAttachVideoGallery,
@@ -4969,6 +4994,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
   }
 
   Future<void> _init() async {
+    if (_failed && mounted) setState(() => _failed = false); // 重试：先清掉上次的失败态
     try {
       // 解密缓存：确定性路径按 messageId 复用（重复打开预览不再重复落盘解密）
       final tmp = await MediaCache.pathFor(widget.messageId, 'mp4');
@@ -4982,7 +5008,10 @@ class _VideoPreviewState extends State<_VideoPreview> {
         return;
       }
       setState(() => _controller = c);
-    } catch (_) {
+    } catch (e) {
+      // 留痕：此前这里静默成空白，桌面端排查时完全看不出线索（老板 2026-09-20
+      // 报「视频在消息流里是空白」就是这么藏了很久）
+      debugPrint('视频预览初始化失败（${widget.messageId}）：$e');
       if (mounted) setState(() => _failed = true);
     }
   }
@@ -4996,8 +5025,36 @@ class _VideoPreviewState extends State<_VideoPreview> {
   @override
   Widget build(BuildContext context) {
     final c = _controller;
-    if (_failed || c == null) {
-      return const SizedBox(width: 180, height: 100);
+    // 初始化失败：给可点重试的明确错误态，而不是一个没有内容的空白框
+    if (_failed) {
+      return GestureDetector(
+        onTap: _init,
+        child: Container(
+          width: 180,
+          height: 100,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.videocam_off_outlined, size: 26),
+              const SizedBox(height: 6),
+              Text(AppLocalizations.of(context)!.chatPageVideoLoadFailed,
+                  style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ),
+      );
+    }
+    // 初始化中：显示进度（与失败态分开，避免"转圈"和"空白"看起来一样）
+    if (c == null) {
+      return const SizedBox(
+          width: 180,
+          height: 100,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
     }
     return GestureDetector(
       onTap: () => _playFullscreen(c),

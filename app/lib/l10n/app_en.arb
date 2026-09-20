@@ -367,6 +367,7 @@
     }
   },
   "chatPageAttachmentTapToDownload": "Not on this device — tap to download again",
+  "chatPageVideoLoadFailed": "Video failed to load — tap to retry",
   "chatPageFileOpenFailed": "Could not open file: {error}",
   "@chatPageFileOpenFailed": {
     "placeholders": {

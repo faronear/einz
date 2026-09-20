@@ -367,6 +367,7 @@
     }
   },
   "chatPageAttachmentTapToDownload": "附件不在本机，点击重新下载",
+  "chatPageVideoLoadFailed": "视频加载失败，点击重试",
   "chatPageFileOpenFailed": "打开文件失败: {error}",
   "@chatPageFileOpenFailed": {
     "placeholders": {

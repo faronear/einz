@@ -832,6 +832,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Not on this device — tap to download again';
 
   @override
+  String get chatPageVideoLoadFailed => 'Video failed to load — tap to retry';
+
+  @override
   String chatPageFileOpenFailed(String error) {
     return 'Could not open file: $error';
   }

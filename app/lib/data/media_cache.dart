@@ -119,8 +119,21 @@ class MediaCache {
       name.startsWith(_prefix) || _legacyPrefixes.any(name.startsWith);
 
   /// App 私有缓存目录（iOS/Android 沙盒 cache；桌面为用户缓存目录）。
-  static Future<Directory> _cacheDirectory() async =>
-      getTemporaryDirectory();
+  ///
+  /// **必须自己建目录**：macOS 桌面端 `getTemporaryDirectory()` 返回
+  /// `<容器>/Data/Library/Caches/<bundle>`，但该目录**不一定存在**，且没有任何
+  /// 东西会替你建（2026-09-20 实测：删掉后跑一轮 App 仍未重建；同一份代码在
+  /// iOS/Android 上该目录恒存在，所以只在桌面端暴露）。不建目录 → 调用方的
+  /// `writeAsBytes` 直接抛 FileSystemException → 视频内联预览/语音播放静默失败
+  /// （老板报「桌面版视频在消息流里是空白」的真凶）。`create(recursive:)` 幂等，
+  /// 已存在时是 no-op。
+  static Future<Directory> _cacheDirectory() async {
+    final dir = await getTemporaryDirectory();
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
 
   /// 尽力而为：平台不可用/文件系统错误静默忽略（缓存卫生不阻塞主流程）。
   static Future<void> _guard(Future<void> Function() action) async {

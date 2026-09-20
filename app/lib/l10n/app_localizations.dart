@@ -1550,6 +1550,12 @@ abstract class AppLocalizations {
   /// **'Not on this device — tap to download again'**
   String get chatPageAttachmentTapToDownload;
 
+  /// No description provided for @chatPageVideoLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Video failed to load — tap to retry'**
+  String get chatPageVideoLoadFailed;
+
   /// No description provided for @chatPageFileOpenFailed.
   ///
   /// In en, this message translates to:

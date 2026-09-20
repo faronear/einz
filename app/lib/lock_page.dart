@@ -19,10 +19,11 @@ import 'widgets/top_notice.dart';
 /// [asOverlay]：true = 聊天中切后台超时返回的覆盖锁屏（解锁成功 pop 回聊天页，
 /// 保留消息状态）；false = 冷启动锁屏（解锁成功 pushReplacement 进聊天页）。
 ///
-/// [canDismiss]：false = 手动点聊天页顶栏「锁屏」进入的严格锁屏——返回手势/返回键
-/// 都被 PopScope 挡掉，必须输对 PIN 才回聊天（老板 2026-09-16 要求"强化安全性"）；
-/// true（默认）= 现有覆盖锁屏语义，允许手势退回。未设置 PIN（无锁包）时恒定可退，
-/// 否则会死锁在提示页。
+/// [canDismiss]：false = 严格锁屏——返回手势/返回键都被 PopScope 挡掉，必须输对
+/// PIN 才回聊天。对话页两个入口（顶栏手动锁屏、切后台超时自动锁）都传 false
+/// （老板 2026-09-16 要求"强化安全性"；2026-09-20 实测自动锁那条漏了，一点返回
+/// 箭头就能绕过锁屏）。true（默认）= 允许手势退回，仅冷启动锁屏在极端场景使用。
+/// 未设置 PIN（无锁包）时恒定可退，否则会死锁在提示页。
 class LockPage extends StatefulWidget {
   const LockPage(
       {super.key, this.asOverlay = false, this.canDismiss = true, this.db});
