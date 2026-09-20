@@ -5,7 +5,7 @@ CI 统一使用 **GitHub Actions**（工作流文件：`.github/workflows/buildM
 | 产物 | job | 构建机 | 签名 |
 | --- | --- | --- | --- |
 | Android APK（`einz-app-android.apk`） | `android` | ubuntu-latest | release 签名，无需 keystore |
-| Windows GUI（`einz-gui-windows.zip`）+ CLI（`einz-tui-windows.exe` + `libsodium.dll`） | `windows` | windows-latest | 无需签名 |
+| Windows GUI（`einz-gui-windows.zip`）+ CLI（`einz-tui-windows.zip`，exe+dll 一包） | `windows` | windows-latest | 无需签名 |
 | macOS GUI（`einz-gui-macos.zip`） | `macos` | macos-latest | CI 上临时禁签名（无证书） |
 | macOS CLI 通用二进制（`einz-tui-macos`，x64+arm64 lipo 合成） | `macos-cli` + `macos-cli-combine` | macos-15-intel (x64) / macos-latest (arm64) | 无需签名 |
 | iOS IPA（`einz-ios`，Ad Hoc） | `ios` | macos-latest | 配置 secrets 后签名；未配置则产出未签名 IPA |
@@ -49,7 +49,7 @@ iOS job 检测到 secrets 才会签名打包 Ad Hoc IPA；未配置时自动产�
 - **Android 内存**：公共 runner 仅 7GB，job 里用 `GRADLE_OPTS=-Xmx3G` 覆盖 gradle.properties 的 `-Xmx8G`，否则 Gradle 跑约 16 分钟被 OOM killer 杀掉（exit 143）。
 - **macOS GUI**：CI 无开发证书，构建前用 sed 临时把 pbxproj 改成 Manual + `-` 签名（不改仓库文件）。
 - **macOS CLI**：Dart 不支持 macOS 跨架构编译，`macos-cli` 用 matrix 在两个 runner 上各编一份，`macos-cli-combine` 用 lipo 合成通用二进制。
-- **Windows libsodium**：GUI（sodium FFI）和 CLI 运行时都需要 `libsodium.dll`，构建时从 libsodium 官方 release 下载 1.0.20 MSVC 版，一份打进 GUI zip，一份与 CLI exe 一同上传；用户解压后 dll 与 exe 同目录即可运行。
+- **Windows libsodium**：GUI（sodium FFI）和 CLI 运行时都需要 `libsodium.dll`，构建时从 libsodium 官方 release 下载 1.0.20 MSVC 版，一份打进 GUI zip，一份与 CLI exe 一起打进 `einz-tui-windows.zip`（exe 运行时按同目录找 dll，解压即用）。
 - **pub cache 补丁**：Android job 会先跑 `scripts/patchPubCache.sh`（open_filex / video_thumbnail 的 AGP 9 兼容补丁），本地构建同样需要（见 package.json 各构建脚本）。
 - **Android 原生库校验**：`app/android/app/src/main/jniLibs/<abi>/libsodium.so` 是 vendored 预编译库，替换/升级后必须跑 `python3 app/android/checkNativeLibs.py`（校验 16KB 页对齐与符号完整性，配方见脚本头注释）——这两个坑本机模拟器测不出，只有真机暴露。
 
