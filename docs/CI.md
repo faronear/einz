@@ -7,7 +7,7 @@ CI 统一使用 **GitHub Actions**（工作流文件：`.github/workflows/buildM
 | Android APK（`einz-app-android.apk`） | `android` | ubuntu-latest | release 签名，无需 keystore |
 | Windows GUI（`einz-gui-windows.zip`）+ CLI（`einz-tui-windows.exe` + `libsodium.dll`） | `windows` | windows-latest | 无需签名 |
 | macOS GUI（`einz-gui-macos.zip`） | `macos` | macos-latest | CI 上临时禁签名（无证书） |
-| macOS CLI 通用二进制（`einz-tui-macos`，x64+arm64 lipo 合成） | `macos-cli` + `macos-cli-combine` | macos-13 (x64) / macos-latest (arm64) | 无需签名 |
+| macOS CLI 通用二进制（`einz-tui-macos`，x64+arm64 lipo 合成） | `macos-cli` + `macos-cli-combine` | macos-15-intel (x64) / macos-latest (arm64) | 无需签名 |
 | iOS IPA（`einz-ios`，Ad Hoc） | `ios` | macos-latest | 配置 secrets 后签名；未配置则产出未签名 IPA |
 
 ---
