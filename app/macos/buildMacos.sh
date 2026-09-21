@@ -11,7 +11,12 @@
 #   app/macos/buildMacos.sh --adhoc         # ad-hoc 签名（无证书机器兜底）
 #                                           #   → …/einz-gui-macos-dev-v<时间>.zip
 #                                           #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
-#   三个模式最后都会拉起刚构建的 app（--server http://localhost:3000）方便立刻试跑。
+#   app/macos/buildMacos.sh --server <地址> # 打完立刻拉起刚构建的 app，并把
+#                                           #   `--server <地址>` 传给它（调试用，如
+#                                           #   --server http://localhost:3000）
+#
+#   **不给 --server 就不自动打开 app**（老板 2026-09-21）：正式打包只想出产物，
+#   不该顺手再起一个 app；要试跑就显式带 --server。
 #
 # 前置条件（一次性）：
 #   1. 钥匙串里有 "Developer ID Application: ..." 证书（security find-identity -p codesigning）
@@ -45,15 +50,25 @@ fi
 
 # ---------- 参数 ----------
 MODE="notary" # notary（默认）| no-notary | adhoc
-for arg in "$@"; do
-  case "$arg" in
-    --no-notary) MODE="no-notary" ;;
-    --adhoc)     MODE="adhoc" ;;
+SERVER_ARG="" # 非空 = 打完拉起 app 并把它作为 --server 的值传给 app
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-notary) MODE="no-notary"; shift ;;
+    --adhoc)     MODE="adhoc"; shift ;;
+    --server)
+      # 值必须跟着给：只写 --server 而没有地址时，app 拿不到目标服务器
+      if [[ $# -lt 2 || "$2" == -* ]]; then
+        echo "❌ --server 需要一个地址参数（如 --server http://localhost:3000）" >&2
+        exit 64
+      fi
+      SERVER_ARG="$2"
+      shift 2
+      ;;
     -h|--help)
-      sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
-    *) echo "未知参数: $arg（见 --help）" >&2; exit 64 ;;
+    *) echo "未知参数: $1（见 --help）" >&2; exit 64 ;;
   esac
 done
 
@@ -157,9 +172,12 @@ echo
 echo "======= 完成: $RELEASE ======="
 ls -lh "$RELEASE"
 
-# ---------- 立刻试跑 ----------
-# 与 desk-mac-build-dev 同款：打完直接拉起**刚构建的这份 app**（不是解压 zip），
-# 带 --server 指向本机服务，免得再从访达里找包。
-# 注：拉起的是构建产物本身，落盘的 zip 是给分发用的，两者内容一致。
-echo "==> 打开刚构建的 app（--server http://localhost:3000）"
-open "$APP" --args --server http://localhost:3000
+# ---------- 立刻试跑（仅显式给了 --server 时） ----------
+# 拉起的是**构建产物本身**（不是解压 zip；落盘的 zip 是给分发用的，两者内容一致），
+# 免得再从访达里找包。默认不拉起——打包就是打包（老板 2026-09-21）。
+if [[ -n "$SERVER_ARG" ]]; then
+  echo "==> 打开刚构建的 app（--server $SERVER_ARG）"
+  open "$APP" --args --server "$SERVER_ARG"
+else
+  echo "==> 未指定 --server：不自动打开 app（产物已落盘，可自行解压运行）"
+fi
