@@ -41,13 +41,19 @@ on:
           - windows
           - linux
       ios_channel:
-        description: 'iOS 包渠道（仅 platform=ios/all 时有意义）'
+        description: 'iOS 包渠道：adhoc / appstore / both（both = 同一次构建出两份）'
         required: false
-        default: 'adhoc'
+        default: 'both'
         type: choice
         options:
-          - adhoc      # Ad Hoc：含设备 UDID 白名单，可 devicectl 直装
-          - appstore   # App Store / TestFlight：无设备列表，不能直装
+          - both     # 一次 archive 导出两份（默认）
+          - adhoc    # Ad Hoc：含 UDID 白名单，可 devicectl 直装
+          - appstore # App Store / TestFlight：无设备列表，不能直装
+      ios_upload:
+        description: 'iOS：打完把 App Store 包传到 TestFlight（需 ASC_* 三个 secrets）'
+        required: false
+        default: false
+        type: boolean
   push:
     # 推 main 就自动跑（老板 2026-09-21）：改代码即验证。
     # 注意 `tags` 与 `branches` 是两个独立过滤：只写 tags 时**推分支不会触发**
@@ -393,28 +399,70 @@ jobs:
     # 它会整 job skip（2026-09-21 老板实测）
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'ios' }}
     runs-on: macos-latest
-    # 渠道由 ios_channel 决定（手动触发才有该输入；push 触发回落 adhoc，保持现状）。
-    # adhoc → Ad Hoc profile（含 UDID 白名单，可直装）；appstore → App Store profile
-    # （无设备列表，只能 TestFlight/上架）。两者 bundle id 相同、证书同为
-    # Apple Distribution，差别只在 method 与描述文件（见 app/ios/exportOptions*.plist）。
+    # 渠道由 ios_channel 决定（手动触发才有该输入；push 触发回落 adhoc，保持现状）：
+    #   adhoc    → 只出 Ad Hoc（含 UDID 白名单，可 devicectl 直装）
+    #   appstore → 只出 App Store / TestFlight 包（无设备列表，不能直装）
+    #   both     → 一次 archive 导出两份（手动触发的默认值）
+    # 两渠道 bundle id 相同、证书同为 Apple Distribution，差别只在 method 与描述文件
+    # （见 app/ios/exportOptions*.plist）。
     env:
       IOS_CHANNEL: ${{ inputs.ios_channel || 'adhoc' }}
-      IOS_PLIST: ${{ (inputs.ios_channel || 'adhoc') == 'appstore' && 'ios/exportOptionsAppStore.plist' || 'ios/exportOptionsAdhoc.plist' }}
+      # 传 TestFlight 是显式开关：只有手动触发且勾了才做（push 触发的构建绝不上传）
+      IOS_UPLOAD: ${{ (github.event_name == 'workflow_dispatch' && inputs.ios_upload) || false }}
     steps:
       - uses: actions/checkout@v4
       - name: Check signing secrets
         id: secrets
         env:
           HAS_P12: ${{ secrets.IOS_P12_CERTIFICATE != '' }}
-          # 按渠道取对应的描述文件 secret：adhoc 用 IOS_PROVISIONING_PROFILE，
-          # appstore 用 IOS_APPSTORE_PROVISIONING_PROFILE（两份内容不同，不能混用）
-          HAS_PROFILE: ${{ ((inputs.ios_channel || 'adhoc') == 'appstore' && secrets.IOS_APPSTORE_PROVISIONING_PROFILE != '') || ((inputs.ios_channel || 'adhoc') != 'appstore' && secrets.IOS_PROVISIONING_PROFILE != '') }}
+          HAS_PROFILE_ADHOC: ${{ secrets.IOS_PROVISIONING_PROFILE != '' }}
+          HAS_PROFILE_STORE: ${{ secrets.IOS_APPSTORE_PROVISIONING_PROFILE != '' }}
+          HAS_ASC_KEY_ID: ${{ secrets.ASC_API_KEY_ID != '' }}
+          HAS_ASC_ISSUER: ${{ secrets.ASC_API_ISSUER != '' }}
+          HAS_ASC_P8: ${{ secrets.ASC_P8_KEY != '' }}
         run: |
+          # 组合判定一律在 shell 里做：GitHub 表达式的 && / || 把 "false" 也当 truthy，
+          # 链式比较（A != '' && B != ''）实际只会返回 B 的比较结果
+          WANT=""
+          [[ "$IOS_CHANNEL" == "adhoc"    || "$IOS_CHANNEL" == "both" ]] && WANT="$WANT adhoc"
+          [[ "$IOS_CHANNEL" == "appstore" || "$IOS_CHANNEL" == "both" ]] && WANT="$WANT appstore"
+          cfg=true
+          [[ "$HAS_P12" == "true" ]] || cfg=false
+          for ch in $WANT; do
+            if [[ "$ch" == "adhoc"    && "$HAS_PROFILE_ADHOC" != "true" ]]; then cfg=false; fi
+            if [[ "$ch" == "appstore" && "$HAS_PROFILE_STORE" != "true" ]]; then cfg=false; fi
+          done
           echo "channel=$IOS_CHANNEL" >> "$GITHUB_OUTPUT"
-          cfg=false
-          [[ "$HAS_P12" == "true" && "$HAS_PROFILE" == "true" ]] && cfg=true
           echo "configured=$cfg" >> "$GITHUB_OUTPUT"
-          echo "渠道=$IOS_CHANNEL 证书=$HAS_P12 描述文件=$HAS_PROFILE → 构建=$cfg"
+          echo "渠道=$IOS_CHANNEL（需描述文件:$WANT）上传=$IOS_UPLOAD 证书=$HAS_P12 描述文件(adhoc=$HAS_PROFILE_ADHOC appstore=$HAS_PROFILE_STORE) ASC(key=$HAS_ASC_KEY_ID issuer=$HAS_ASC_ISSUER p8=$HAS_ASC_P8) → 构建=$cfg"
+      - name: Skip iOS build (no signing secrets)
+        if: steps.secrets.outputs.configured != 'true'
+        run: |
+          echo "未配置 iOS 签名 secrets → 跳过 iOS 构建（渠道=$IOS_CHANNEL）"
+          echo "  需要 IOS_P12_CERTIFICATE + IOS_P12_PASSWORD + 该渠道的描述文件 secret："
+          echo "    adhoc    → IOS_PROVISIONING_PROFILE"
+          echo "    appstore → IOS_APPSTORE_PROVISIONING_PROFILE"
+      - name: Select Xcode (iOS 26 SDK)
+        if: steps.secrets.outputs.configured == 'true'
+        run: |
+          # App Store 只收 iOS 26 SDK 起构建的包（Apple 2026-04-28 起）；挑 runner 上最新的
+          # 一版 Xcode 并显式选中，免得用默认的旧 Xcode 白跑一轮再被 Apple 退回
+          newest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [[ -n "$newest" ]]; then
+            sudo xcode-select -s "$newest/Contents/Developer" 2>/dev/null \
+              || xcode-select -s "$newest/Contents/Developer"
+            echo "选中 $newest"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos || true
+          if [[ "$IOS_CHANNEL" != "adhoc" ]]; then
+            sdk=$(xcodebuild -showsdks | grep -o 'iphoneos[0-9.]*' | sort -V | tail -1)
+            major=${sdk#iphoneos}; major=${major%%.*}
+            if [[ -z "$major" || "$major" -lt 26 ]]; then
+              echo "❌ 该 runner 的 iOS SDK 是 ${sdk:-未知}，低于 iOS 26——App Store 会退回。请改用写死 Xcode 版本的 runner（如 macos-26）" >&2
+              exit 1
+            fi
+          fi
       - uses: subosito/flutter-action@v2
         if: steps.secrets.outputs.configured == 'true'
         with:
@@ -432,58 +480,106 @@ jobs:
           security unlock-keychain -p build build.keychain
           security import cert.p12 -k build.keychain -P "$IOS_P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k build build.keychain
-      - name: Install provisioning profile
+      - name: Install provisioning profile(s)
         if: steps.secrets.outputs.configured == 'true'
         env:
-          # 按渠道二选一（内容不同，绝不能混用）：
+          # 两份描述文件内容不同，绝不能混用：
           #   adhoc    → Einz Dist Adhoc（cc.tic.einz，含 UDID 白名单）
           #   appstore → Einz Dist Appstore（cc.tic.einz，无设备列表）
           # 生成方式：base64 -i 4_Einz_Dist_Adhoc_cc.tic.einz.mobileprovision | pbcopy
           PROFILE_ADHOC: ${{ secrets.IOS_PROVISIONING_PROFILE }}
           PROFILE_STORE: ${{ secrets.IOS_APPSTORE_PROVISIONING_PROFILE }}
         run: |
-          if [[ "$IOS_CHANNEL" == "appstore" ]]; then RAW="$PROFILE_STORE"; else RAW="$PROFILE_ADHOC"; fi
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
-          printf '%s' "$RAW" | base64 --decode > /tmp/einz.mobileprovision
-          # 文件名按描述文件自己的 UUID 落盘：Xcode 从该目录索引描述文件，UUID 命名是它
-          # 自己的约定（本机 app/ios/buildIos.sh 的经验；实测任意名也能找到，这里求稳）
-          UUID=$(security cms -D -i /tmp/einz.mobileprovision | plutil -extract UUID raw -)
-          NAME=$(security cms -D -i /tmp/einz.mobileprovision | plutil -extract Name raw -)
-          cp /tmp/einz.mobileprovision "$PROFILE_DIR/$UUID.mobileprovision"
-          echo "✅ 已安装描述文件: $NAME（$UUID），渠道=$IOS_CHANNEL"
-          # 防呆：装错渠道（如 appstore 任务用了 adhoc profile）在这里就拦掉，
-          # 别等到 export 阶段报一句含糊的 "no profile found"
-          if [[ "$IOS_CHANNEL" == "appstore" && "$NAME" != *Appstore* && "$NAME" != *App\ Store* ]]; then
-            echo "❌ 渠道=appstore 但描述文件是「$NAME」——secret IOS_APPSTORE_PROVISIONING_PROFILE 配错文件了" >&2
-            exit 1
-          fi
-      # 没配签名 secrets → 干净跳过（老板 2026-09-21 定）。
-      # 这里**不能**留一个"未签名构建"兜底：`flutter` 由上面那步安装、而它同样被
-      # `configured == 'true'` 门控，没 secrets 时 runner 上根本没有 flutter，
-      # 那条分支第一行就 `flutter: command not found` → job 假红（2026-09-21 实测）。
-      # 未签名 .app 装不上真机，本来也没有产出价值。
-      - name: Skip iOS build (no signing secrets)
-        if: steps.secrets.outputs.configured != 'true'
-        run: |
-          echo "未配置 iOS 签名 secrets → 跳过 iOS 构建（渠道=$IOS_CHANNEL）"
-          echo "  需要 IOS_P12_CERTIFICATE + IOS_P12_PASSWORD + 该渠道的描述文件 secret："
-          echo "    adhoc    → IOS_PROVISIONING_PROFILE"
-          echo "    appstore → IOS_APPSTORE_PROVISIONING_PROFILE"
+          install_profile () { # $1=base64 内容  $2=期望渠道（防呆）
+            local raw="$1" want="$2" uuid name
+            printf '%s' "$raw" | base64 --decode > "/tmp/einz-$want.mobileprovision"
+            uuid=$(security cms -D -i "/tmp/einz-$want.mobileprovision" | plutil -extract UUID raw -)
+            name=$(security cms -D -i "/tmp/einz-$want.mobileprovision" | plutil -extract Name raw -)
+            # 文件名按描述文件自己的 UUID 落盘：Xcode 从该目录索引描述文件，UUID 命名是它
+            # 自己的约定（本机 app/ios/buildIos.sh 的经验；实测任意名也能找到，这里求稳）
+            cp "/tmp/einz-$want.mobileprovision" "$PROFILE_DIR/$uuid.mobileprovision"
+            echo "✅ 已安装描述文件: $name（$uuid）用于 $want"
+            # 防呆：装错渠道（如 appstore 任务配了 adhoc profile）就在这里拦掉，
+            # 别等到 export 阶段报一句含糊的 "no profile found"
+            case "$want" in
+              adhoc)
+                [[ "$name" == *Adhoc* || "$name" == *Ad\ Hoc* ]] || { echo "❌ 渠道=adhoc 但描述文件是「$name」——IOS_PROVISIONING_PROFILE 配错文件了" >&2; exit 1; } ;;
+              appstore)
+                [[ "$name" == *Appstore* || "$name" == *App\ Store* ]] || { echo "❌ 渠道=appstore 但描述文件是「$name」——IOS_APPSTORE_PROVISIONING_PROFILE 配错文件了" >&2; exit 1; } ;;
+            esac
+          }
+          case "$IOS_CHANNEL" in
+            adhoc)    install_profile "$PROFILE_ADHOC" adhoc ;;
+            appstore) install_profile "$PROFILE_STORE" appstore ;;
+            both)     install_profile "$PROFILE_ADHOC" adhoc; install_profile "$PROFILE_STORE" appstore ;;
+          esac
       - name: Build iOS IPA (signed)
         if: steps.secrets.outputs.configured == 'true'
         working-directory: app
         run: |
           eval "$(node ../scripts/appVersion.js)"
-          echo "==> 渠道=$IOS_CHANNEL，导出配置=$IOS_PLIST"
-          flutter build ipa --release \
-            --build-name "$APP_BUILD_NAME" \
-            --build-number "$APP_BUILD_NUMBER" \
-            --export-options-plist="$IOS_PLIST"
+          OUT=/tmp/einz-out
+          mkdir -p "$OUT"
+          echo "==> 渠道=$IOS_CHANNEL 版本=$APP_BUILD_NAME($APP_BUILD_NUMBER)"
+          if [[ "$IOS_CHANNEL" == "appstore" ]]; then
+            flutter build ipa --release \
+              --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER" \
+              --export-options-plist=ios/exportOptionsAppStore.plist
+            cp build/ios/ipa/*.ipa "$OUT/einz-app-ios-appstore.ipa"
+          else
+            flutter build ipa --release \
+              --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER" \
+              --export-options-plist=ios/exportOptionsAdhoc.plist
+            cp build/ios/ipa/*.ipa "$OUT/einz-app-ios-adhoc.ipa"
+            if [[ "$IOS_CHANNEL" == "both" ]]; then
+              # 同一个 archive 再导出一次 App Store 包，**不重新编译**
+              # （app/ios/exportOptions*.plist 注释里写的就是这条路径）
+              rm -rf /tmp/einz-store-out && mkdir -p /tmp/einz-store-out
+              xcodebuild -exportArchive \
+                -archivePath build/ios/archive/Runner.xcarchive \
+                -exportOptionsPlist ios/exportOptionsAppStore.plist \
+                -exportPath /tmp/einz-store-out
+              cp /tmp/einz-store-out/*.ipa "$OUT/einz-app-ios-appstore.ipa"
+            fi
+          fi
+          ls -lh "$OUT"
       - uses: actions/upload-artifact@v4
         if: steps.secrets.outputs.configured == 'true' # 没构建就没产物，别去 warn 空目录
         with:
           name: einz-ios-${{ steps.secrets.outputs.channel }}
-          path: |
-            app/build/ios/ipa/*.ipa
-            app/build/ios/iphoneos/Runner.app
+          path: /tmp/einz-out/*.ipa
+      # App Store 包进 Releases 的 latest 页（与 android/macos 同款；adhoc 包不进——它
+      # 只对白名单设备有效，摆在下载页没有意义）
+      - name: Upload to Release (appstore ipa)
+        if: steps.secrets.outputs.configured == 'true' && env.IOS_CHANNEL != 'adhoc'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: /tmp/einz-out/einz-app-ios-appstore.ipa
+      # TestFlight：显式勾了 ios_upload 才做（push 触发的构建一律不上传）
+      - name: Upload to TestFlight
+        if: steps.secrets.outputs.configured == 'true' && env.IOS_UPLOAD == 'true'
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER: ${{ secrets.ASC_API_ISSUER }}
+          ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
+        run: |
+          if [[ "$IOS_CHANNEL" == "adhoc" ]]; then
+            echo "❌ ios_upload=true 但 ios_channel=adhoc：Ad Hoc 包不能传 TestFlight（改 appstore 或 both）" >&2
+            exit 1
+          fi
+          if [[ -z "$ASC_API_KEY_ID" || -z "$ASC_API_ISSUER" || -z "$ASC_P8_KEY" ]]; then
+            echo "❌ 缺 ASC secrets（ASC_API_KEY_ID / ASC_API_ISSUER / ASC_P8_KEY，见 docs/IOS.md §4）" >&2
+            exit 1
+          fi
+          # altool 从 ~/private_keys/AuthKey_<KeyID>.p8 读私钥（本机 buildIos.sh 同款路径）
+          mkdir -p ~/private_keys
+          printf '%s' "$ASC_P8_KEY" | base64 --decode > "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          chmod 600 "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          xcrun altool --upload-app -f /tmp/einz-out/einz-app-ios-appstore.ipa -t ios \
+            --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER"
+          echo "✅ 已上传 TestFlight（处理需要几分钟才出现在 App Store Connect）"
