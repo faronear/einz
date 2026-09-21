@@ -7668,3 +7668,49 @@ workflow 里一处注释引用——HEAD 的 `desk-mac-build-dist` / `-no-notary
 Apple Development + 内嵌本机 profile）产出的 zip **也叫 `einz-gui-macos-dev-v*.zip`**，
 与新的 ad-hoc dev 渠道**同名但不同物**（前者只能在本机跑，异机被 Taskgated 杀）——
 正是这次想消除的那类混淆，建议删掉 `-raw`。
+
+## 2026-09-21 三端标识统一为 cc.tic.einz（iOS 去掉 .ios 后缀）
+
+老板在 Developer 后台建了 App ID **cc.tic.einz**（Platform 含 iOS/iPadOS/macOS/
+tvOS/watchOS/visionOS），并下了两个 profile：`Einz Dist Adhoc` 与 `Einz Dist Appstore`
+（都是 `CQ6733CTMV.cc.tic.einz`，iOS，到期 2027-09-14，Adhoc 带 3 台设备）。
+目的是把 android/ios/macos 的标识统一——此前 macOS 与 Android 都已是 `cc.tic.einz`，
+**只有 iOS 是 `cc.tic.einz.ios`**。
+
+**描述文件不进仓库**（老板问"要不要拷进项目目录"，答案是不用）：
+- 安装位置：iOS → `~/Library/MobileDevice/Provisioning Profiles/<UUID>.mobileprovision`
+  （双击 .mobileprovision 即可装）；macOS → `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`
+- 工程里只写 profile **名字**（`PROVISIONING_PROFILE_SPECIFIER`）
+- 不进仓库的三个理由：含证书公钥 + 设备 UDID 列表；一年过期带来二进制 churn；
+  CI 已有更好做法：`IOS_PROVISIONING_PROFILE(Base64)` secret → decode 进那个目录。
+- macOS 侧根本不需要 profile（dist 走 Developer ID 分发，脚本里
+  `rm -f embedded.provisionprofile`；带 profile 反而让异机被 Taskgated 杀）。
+
+改动（4 个文件 + workflow 注释）：
+- `ios/Runner.xcodeproj`：Runner 三个配置 `PRODUCT_BUNDLE_IDENTIFIER` → `cc.tic.einz`
+  （specifier 仍是 "Einz Dist Adhoc"，新 profile 同名，不用改）
+- `ios/exportOptionsAdhoc.plist`：provisioningProfiles 的 key 换 bundle id
+- `ios/exportOptionsAppStore.plist`：key 换 bundle id；**value 的 profile 名从
+  "Einz Dist AppStoreConnect" 改成 "Einz Dist Appstore"**（新 profile 叫后者，注意大小写）
+- `ios/buildIos.sh`：`BUNDLE_ID` 换；`PROFILE_STORE` 同步改成 "Einz Dist Appstore"
+- workflow：Install provisioning profile 步骤注释写明 secret 必须是 cc.tic.einz 的 Ad Hoc
+
+**新旧 profile 同名**（都叫 "Einz Dist Adhoc"）会互相干扰 → 旧的两份
+`cc.tic.einz.ios` profile 已从 Xcode 库移到 `/tmp/profiles-removed-20260921/`
+（原件仍在 simsim_key 目录，随时可还原）。
+
+验证：`flutter build ipa --release --export-options-plist=ios/exportOptionsAdhoc.plist`
+→ Archive `cc.tic.einz` → IPA 内 `CFBundleIdentifier=cc.tic.einz`、
+`embedded.mobileprovision` = Einz Dist Adhoc / `CQ6733CTMV.cc.tic.einz`、
+`codesign` Identifier=cc.tic.einz TeamIdentifier=CQ6733CTMV。
+
+**待老板做**：CI 的 `IOS_PROVISIONING_PROFILE` secret 要换成新 profile 的 base64：
+`base64 -i ".../4_Einz_Dist_Adhoc_cc.tic.einz.mobileprovision" | pbcopy`
+
+**已知代价**：iPhone 11 上已装的 App 要重新走一次入网向导（bundle id 变了 = 另一个
+App，Keychain 按 application-identifier 隔离，旧条目读不到；聊天记录在服务器不丢）。
+
+**未动的残留**（改名有风险/无收益，等老板定）：
+- iOS 测试目标 `com.example.einz.RunnerTests`（自动签名，改了可能要新 App ID）
+- Android `namespace = "com.example.einz"`（只影响 R/BuildConfig 包名；
+  对外标识 `applicationId` 已经是 cc.tic.einz）
