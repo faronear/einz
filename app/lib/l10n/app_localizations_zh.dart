@@ -894,14 +894,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String resetDeviceNameLabel(String name) {
-    return '输入设备名「$name」';
+    return '输入「$name」以确认';
   }
 
   @override
-  String get resetDeviceNameMismatch => '设备名不符';
+  String get resetDeviceNameMismatch => '输入不符，请重输';
 
   @override
-  String get resetDeviceNameMissing => '⚠️ 未设置本设备名称，无法确认重置目标——请先在菜单里设置设备名称';
+  String get resetDeviceConfirmWord => '重置';
 
   @override
   String get resetDevicePinLabel => '本设备锁屏码';

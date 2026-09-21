@@ -2862,20 +2862,19 @@ Future<void> _execReset(String storePath) async {
   final s = _state!;
   final session = s.session;
 
-  // ① 设备名：确认清的是哪一台（空名先让用户 /device 起名，不降级成 deviceId——
-  //    让用户抄一串 id 只会制造新的抄错机会）
+  // ① 设备名：确认清的是哪一台。没有名字（不降级成 deviceId——让用户抄一串 id 只会
+  //    制造新的抄错机会）时退化为固定确认词 RESET：本地缺字段不该让人永远重置不了，
+  //    与 app 端同一口径（reset_device.dart 的 fallback）。
+  const fallbackWord = 'RESET';
   final deviceName = session.store.deviceName?.trim() ?? '';
-  if (deviceName.isEmpty) {
-    session.messages
-        .add(_systemMessage(session, '⚠️ 未设置设备名，无法确认目标——请先 /device <设备名>（未做任何改动）'));
-    return;
-  }
-  final typed =
-      (await _prompt(session, '❓ 确认要重置的是本机「$deviceName」，请输入设备名:', required: true))
-          .trim();
+  final expected = deviceName.isEmpty ? fallbackWord : deviceName;
+  final prompt = deviceName.isEmpty
+      ? '❓ 本机没有设备名，请输入 $fallbackWord 以确认重置:'
+      : '❓ 确认要重置的是本机「$deviceName」，请输入设备名:';
+  final typed = (await _prompt(session, prompt, required: true)).trim();
   if (!s.running) return;
-  if (typed != deviceName) {
-    session.messages.add(_systemMessage(session, '✅ 已取消（设备名不符，未做任何改动）'));
+  if (typed != expected) {
+    session.messages.add(_systemMessage(session, '✅ 已取消（输入不符，未做任何改动）'));
     return;
   }
 

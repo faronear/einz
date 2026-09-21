@@ -1733,20 +1733,20 @@ abstract class AppLocalizations {
   /// No description provided for @resetDeviceNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'Type the device name \"{name}\"'**
+  /// **'Type \"{name}\" to confirm'**
   String resetDeviceNameLabel(String name);
 
   /// No description provided for @resetDeviceNameMismatch.
   ///
   /// In en, this message translates to:
-  /// **'Device name does not match'**
+  /// **'That does not match — try again'**
   String get resetDeviceNameMismatch;
 
-  /// No description provided for @resetDeviceNameMissing.
+  /// No description provided for @resetDeviceConfirmWord.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ This device has no name yet, so there is nothing to confirm against — set a device name first'**
-  String get resetDeviceNameMissing;
+  /// **'RESET'**
+  String get resetDeviceConfirmWord;
 
   /// No description provided for @resetDevicePinLabel.
   ///

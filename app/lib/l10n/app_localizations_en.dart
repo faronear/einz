@@ -936,15 +936,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String resetDeviceNameLabel(String name) {
-    return 'Type the device name \"$name\"';
+    return 'Type \"$name\" to confirm';
   }
 
   @override
-  String get resetDeviceNameMismatch => 'Device name does not match';
+  String get resetDeviceNameMismatch => 'That does not match — try again';
 
   @override
-  String get resetDeviceNameMissing =>
-      '⚠️ This device has no name yet, so there is nothing to confirm against — set a device name first';
+  String get resetDeviceConfirmWord => 'RESET';
 
   @override
   String get resetDevicePinLabel => 'This device\'s PIN';

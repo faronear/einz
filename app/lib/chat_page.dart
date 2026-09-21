@@ -1079,19 +1079,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _showChangePassphraseDialog();
     } else if (picked == 'reset') {
       // 闸门所需的两个输入：设备名（确认清的是这台）与"是否设了锁屏码"（决定要不要验）。
-      // hasPin 是异步 getter，先 await 出来、过一遍 mounted 再传进弹窗。
-      // 设备名取不到（空）时 confirmResetDevice 自己会拦下并提示。
+      // 都用 await 取，过一遍 mounted 再传进弹窗。
+      final deviceName = await _resolveMyDeviceName();
       final hasPin = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
       if (!mounted) return;
       await confirmResetDevice(
         context,
         db: widget.db,
         api: widget.api,
-        deviceName: widget.deviceName ?? '',
+        deviceName: deviceName,
         token: widget.token,
         hasPin: hasPin,
       );
     }
+  }
+
+  /// 重置闸门要用的"本机设备名"。
+  ///
+  /// 不能用 `widget.deviceName`：**只有向导那条路径传它**（setup_page），重启/解锁进
+  /// 聊天的路径（main.dart StartupGate）不带——那边的名字由 [_myDeviceName] 从本地
+  /// profile 恢复。取不到（旧装机快照里没写 deviceName）时再问一次服务端：设备名是
+  /// 入网时自动生成并同步上去的，服务端必定有。都问不出来返回 ''，由重置弹窗退化为
+  /// 固定确认词——本地快照缺字段不该让人永远重置不了（老板 2026-09-21 安卓实测）。
+  Future<String> _resolveMyDeviceName() async {
+    final local = _myDeviceName.trim();
+    if (local.isNotEmpty) return local;
+    if (widget.token.isEmpty || effectiveServer.isEmpty) return '';
+    try {
+      final rows = await (widget.api ?? ApiClient(effectiveServer)).listDevices(widget.token);
+      for (final d in rows) {
+        if (d['device_id'] == widget.deviceId) {
+          return (d['device_name'] as String? ?? '').trim();
+        }
+      }
+    } catch (_) {
+      // 离线/报错：交给上层退化为确认词
+    }
+    return '';
   }
 
   void _openAboutPage() {

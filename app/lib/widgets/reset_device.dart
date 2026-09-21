@@ -40,17 +40,15 @@ Future<void> confirmResetDevice(BuildContext context,
   if (!context.mounted) return;
   final database = db ?? LocalDatabase.shared;
   final l10n = AppLocalizations.of(context)!;
-  // 设备名是确认的凭据之一：取不到（空）就没得核对，先把名字补齐再说
-  if (deviceName.trim().isEmpty) {
-    showTopNotice(context, l10n.resetDeviceNameMissing);
-    return;
-  }
+  // 设备名取不到（本地快照与服务端都问不出来）时退一步：改让用户打一个固定确认词。
+  // 不可用性优先——本地快照缺 deviceName 的旧装机不该因此永远重置不了。
+  final expected = deviceName.trim().isEmpty ? l10n.resetDeviceConfirmWord : deviceName.trim();
   final ok = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => _ResetDeviceDialog(
           db: database,
-          deviceName: deviceName.trim(),
+          deviceName: expected,
           hasPin: hasPin,
         ),
       ) ??
