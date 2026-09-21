@@ -521,7 +521,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageExitTitle => '退出秘境？';
 
   @override
-  String get chatPageExitMessage => '即将退出我的秘境。下次启动可重新进入。';
+  String get chatPageExitMessage => '即将在本机上退出秘境。';
 
   @override
   String get save => '保存';
