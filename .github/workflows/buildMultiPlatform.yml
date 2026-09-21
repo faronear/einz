@@ -20,22 +20,22 @@ name: Multi Platform Build
 
 on:
   workflow_dispatch:
-    inputs:
-      platform:
-        description: 'Platform to build (all = android+windows+macos)'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - android
-          - ios
-          - macos
-          - windows
-          - linux
-  # push:
-  #   tags:
-  #     - 'v*'
+    # inputs:
+    #   platform:
+    #     description: 'Platform to build (all = android+windows+macos+linux)'
+    #     required: true
+    #     default: 'all'
+    #     type: choice
+    #     options:
+    #       - all
+    #       - android
+    #       - ios
+    #       - macos
+    #       - windows
+    #       - linux
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   android:
