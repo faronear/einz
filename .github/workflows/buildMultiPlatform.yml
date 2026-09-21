@@ -14,8 +14,12 @@
 #     公证 + staple，**沙盒**，异机双击即用）；未配 = -dev（ad-hoc，仅本机调试）
 #     需要的 secrets：MACOS_DEVID_P12(Base64) + MACOS_DEVID_P12_PASSWORD +
 #     MACOS_NOTARY_APPLE_ID + MACOS_NOTARY_PASSWORD + MACOS_NOTARY_TEAM_ID
-#   - iOS 需要 secrets：IOS_P12_CERTIFICATE(Base64) + IOS_P12_PASSWORD + IOS_PROVISIONING_PROFILE(Base64)
-#     未配置 secrets 时 job 照常被调度但**干净跳过构建**（只打印一行提示，不红）
+#   - iOS 需要 secrets：IOS_P12_CERTIFICATE(Base64) + IOS_P12_PASSWORD +
+#       adhoc 渠道   → IOS_PROVISIONING_PROFILE（"Einz Dist Adhoc"，含 UDID 白名单）
+#       appstore 渠道 → IOS_APPSTORE_PROVISIONING_PROFILE（"Einz Dist Appstore"，无设备列表）
+#     证书两者同一张（Apple Distribution），只有描述文件不同；渠道由手动触发的
+#     ios_channel 输入选择（push 触发回落 adhoc）。缺 secrets 时 job 照常被调度但
+#     **干净跳过构建**（只打印一行提示，不红）
 #   - macOS 计费 10x、Windows 2x，注意私有仓库额度
 name: Multi Platform Build
 
@@ -36,6 +40,14 @@ on:
           - macos
           - windows
           - linux
+      ios_channel:
+        description: 'iOS 包渠道（仅 platform=ios/all 时有意义）'
+        required: false
+        default: 'adhoc'
+        type: choice
+        options:
+          - adhoc      # Ad Hoc：含设备 UDID 白名单，可 devicectl 直装
+          - appstore   # App Store / TestFlight：无设备列表，不能直装
   push:
     # 推 main 就自动跑（老板 2026-09-21）：改代码即验证。
     # 注意 `tags` 与 `branches` 是两个独立过滤：只写 tags 时**推分支不会触发**
@@ -381,13 +393,28 @@ jobs:
     # 它会整 job skip（2026-09-21 老板实测）
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'ios' }}
     runs-on: macos-latest
+    # 渠道由 ios_channel 决定（手动触发才有该输入；push 触发回落 adhoc，保持现状）。
+    # adhoc → Ad Hoc profile（含 UDID 白名单，可直装）；appstore → App Store profile
+    # （无设备列表，只能 TestFlight/上架）。两者 bundle id 相同、证书同为
+    # Apple Distribution，差别只在 method 与描述文件（见 app/ios/exportOptions*.plist）。
+    env:
+      IOS_CHANNEL: ${{ inputs.ios_channel || 'adhoc' }}
+      IOS_PLIST: ${{ (inputs.ios_channel || 'adhoc') == 'appstore' && 'ios/exportOptionsAppStore.plist' || 'ios/exportOptionsAdhoc.plist' }}
     steps:
       - uses: actions/checkout@v4
       - name: Check signing secrets
         id: secrets
         env:
           HAS_P12: ${{ secrets.IOS_P12_CERTIFICATE != '' }}
-        run: echo "configured=${{ env.HAS_P12 }}" >> "$GITHUB_OUTPUT"
+          # 按渠道取对应的描述文件 secret：adhoc 用 IOS_PROVISIONING_PROFILE，
+          # appstore 用 IOS_APPSTORE_PROVISIONING_PROFILE（两份内容不同，不能混用）
+          HAS_PROFILE: ${{ ((inputs.ios_channel || 'adhoc') == 'appstore' && secrets.IOS_APPSTORE_PROVISIONING_PROFILE != '') || ((inputs.ios_channel || 'adhoc') != 'appstore' && secrets.IOS_PROVISIONING_PROFILE != '') }}
+        run: |
+          echo "channel=$IOS_CHANNEL" >> "$GITHUB_OUTPUT"
+          cfg=false
+          [[ "$HAS_P12" == "true" && "$HAS_PROFILE" == "true" ]] && cfg=true
+          echo "configured=$cfg" >> "$GITHUB_OUTPUT"
+          echo "渠道=$IOS_CHANNEL 证书=$HAS_P12 描述文件=$HAS_PROFILE → 构建=$cfg"
       - uses: subosito/flutter-action@v2
         if: steps.secrets.outputs.configured == 'true'
         with:
@@ -408,20 +435,29 @@ jobs:
       - name: Install provisioning profile
         if: steps.secrets.outputs.configured == 'true'
         env:
-          # 必须是 iOS App ID **cc.tic.einz** 的 Ad Hoc profile（2026-09-21 起三端标识
-          # 统一为 cc.tic.einz，此前用的是 cc.tic.einz.ios，旧 profile 已作废）。
+          # 按渠道二选一（内容不同，绝不能混用）：
+          #   adhoc    → Einz Dist Adhoc（cc.tic.einz，含 UDID 白名单）
+          #   appstore → Einz Dist Appstore（cc.tic.einz，无设备列表）
           # 生成方式：base64 -i 4_Einz_Dist_Adhoc_cc.tic.einz.mobileprovision | pbcopy
-          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          PROFILE_ADHOC: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          PROFILE_STORE: ${{ secrets.IOS_APPSTORE_PROVISIONING_PROFILE }}
         run: |
+          if [[ "$IOS_CHANNEL" == "appstore" ]]; then RAW="$PROFILE_STORE"; else RAW="$PROFILE_ADHOC"; fi
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
-          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > /tmp/einz.mobileprovision
-          # **文件名必须是描述文件自己的 UUID**：Xcode 按 UUID 索引该目录，叫
-          # profile.mobileprovision 会取不到（同 app/ios/buildIos.sh 的本机经验）
+          printf '%s' "$RAW" | base64 --decode > /tmp/einz.mobileprovision
+          # 文件名按描述文件自己的 UUID 落盘：Xcode 从该目录索引描述文件，UUID 命名是它
+          # 自己的约定（本机 app/ios/buildIos.sh 的经验；实测任意名也能找到，这里求稳）
           UUID=$(security cms -D -i /tmp/einz.mobileprovision | plutil -extract UUID raw -)
           NAME=$(security cms -D -i /tmp/einz.mobileprovision | plutil -extract Name raw -)
           cp /tmp/einz.mobileprovision "$PROFILE_DIR/$UUID.mobileprovision"
-          echo "✅ 已安装描述文件: $NAME（$UUID）"
+          echo "✅ 已安装描述文件: $NAME（$UUID），渠道=$IOS_CHANNEL"
+          # 防呆：装错渠道（如 appstore 任务用了 adhoc profile）在这里就拦掉，
+          # 别等到 export 阶段报一句含糊的 "no profile found"
+          if [[ "$IOS_CHANNEL" == "appstore" && "$NAME" != *Appstore* && "$NAME" != *App\ Store* ]]; then
+            echo "❌ 渠道=appstore 但描述文件是「$NAME」——secret IOS_APPSTORE_PROVISIONING_PROFILE 配错文件了" >&2
+            exit 1
+          fi
       # 没配签名 secrets → 干净跳过（老板 2026-09-21 定）。
       # 这里**不能**留一个"未签名构建"兜底：`flutter` 由上面那步安装、而它同样被
       # `configured == 'true'` 门控，没 secrets 时 runner 上根本没有 flutter，
@@ -429,20 +465,25 @@ jobs:
       # 未签名 .app 装不上真机，本来也没有产出价值。
       - name: Skip iOS build (no signing secrets)
         if: steps.secrets.outputs.configured != 'true'
-        run: echo "未配置 iOS 签名 secrets（IOS_P12_CERTIFICATE / IOS_P12_PASSWORD / IOS_PROVISIONING_PROFILE）→ 跳过 iOS 构建"
+        run: |
+          echo "未配置 iOS 签名 secrets → 跳过 iOS 构建（渠道=$IOS_CHANNEL）"
+          echo "  需要 IOS_P12_CERTIFICATE + IOS_P12_PASSWORD + 该渠道的描述文件 secret："
+          echo "    adhoc    → IOS_PROVISIONING_PROFILE"
+          echo "    appstore → IOS_APPSTORE_PROVISIONING_PROFILE"
       - name: Build iOS IPA (signed)
         if: steps.secrets.outputs.configured == 'true'
         working-directory: app
         run: |
           eval "$(node ../scripts/appVersion.js)"
+          echo "==> 渠道=$IOS_CHANNEL，导出配置=$IOS_PLIST"
           flutter build ipa --release \
             --build-name "$APP_BUILD_NAME" \
             --build-number "$APP_BUILD_NUMBER" \
-            --export-options-plist=ios/exportOptionsAdhoc.plist
+            --export-options-plist="$IOS_PLIST"
       - uses: actions/upload-artifact@v4
         if: steps.secrets.outputs.configured == 'true' # 没构建就没产物，别去 warn 空目录
         with:
-          name: einz-ios
+          name: einz-ios-${{ steps.secrets.outputs.channel }}
           path: |
             app/build/ios/ipa/*.ipa
             app/build/ios/iphoneos/Runner.app
