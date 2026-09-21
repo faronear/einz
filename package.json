@@ -39,7 +39,7 @@
     "app-ios-install-adhoc-ip6s": "bash app/ios/buildIos.sh adhoc && ideviceinstaller -u 01418b9159ab75651272f3e5616c3e3fc5dd7d1e install app/build/ios/ipa/einz.ipa",
     "app-ios-upload-appstore": "bash app/ios/buildIos.sh appstore --upload",
     "desk-mac-build-raw": "cd app && find build/macos -name '*.sbak' -print -delete 2>/dev/null; eval \"$(node ../scripts/appVersion.js)\" && flutter build macos --release --build-name \"$APP_BUILD_NAME\" --build-number \"$APP_BUILD_NUMBER\" && mkdir -p ../_release.gitomit && RELEASE=../_release.gitomit/einz-gui-macos-raw-v${APP_BUILD_STAMP}.zip && ditto -c -k --keepParent --sequesterRsrc build/macos/Build/Products/Release/einz.app $RELEASE && echo && echo ======= Zipped to ======= && ls -lh $RELEASE && open build/macos/Build/Products/Release/einz.app --args --server http://localhost:3000",
-    "desk-mac-build-dev": "bash app/macos/buildMacos.sh --adhoc",
+    "desk-mac-build-dev": "bash app/macos/buildMacos.sh --adhoc --server http://localhost:3000",
     "desk-mac-build-dist": "bash app/macos/buildMacos.sh",
     "desk-mac-build-dist-no-notary": "bash app/macos/buildMacos.sh --no-notary",
     "tui2local-1": "cd cli && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
