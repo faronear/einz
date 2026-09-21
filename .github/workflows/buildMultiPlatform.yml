@@ -3,9 +3,10 @@
 # 覆盖 Android / iOS / macOS / Windows 四个目标，另在 Windows / macOS 上顺带出
 # TUI（einz-tui-windows / einz-tui-macos-*），Linux 只出 TUI（einz-tui-linux-x64，
 # 见 linux-cli job；Linux GUI 未发布：video_player / mobile_scanner / open_filex /
-# video_thumbnail 无 Linux 实现，需要先做平台分支）。触发方式：
-#   - workflow_dispatch：手动选择单个平台（push tag 自动构建暂未启用，避免每次 push 都跑 CI）
-#   - push tag（v*）：全平台构建（需要时取消下面注释）
+# video_thumbnail 无 Linux 实现，需要先做平台分支）。触发方式（老板 2026-09-21 定）：
+#   - push main：自动跑全平台（纯文档改动被 paths-ignore 挡掉，不烧额度）
+#   - workflow_dispatch：手动选择单个平台
+#   - push tag v*：全平台（路径过滤对 tag 不生效，发版一律全跑）
 #
 # 说明：
 #   - Android / Windows 无签名要求，直接出包
@@ -19,21 +20,34 @@
 name: Multi Platform Build
 
 on:
-  # workflow_dispatch:
-    # inputs:
-    #   platform:
-    #     description: 'Platform to build (all = android+windows+macos+linux)'
-    #     required: true
-    #     default: 'all'
-    #     type: choice
-    #     options:
-    #       - all
-    #       - android
-    #       - ios
-    #       - macos
-    #       - windows
-    #       - linux
+  # 手动：Actions 页面 Run workflow，可选单个平台（inputs 必须保留——job 的 if 依赖
+  # `inputs.platform`；只解开 workflow_dispatch 而删掉 inputs，手动触发会零 job）
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (all = android+windows+macos+linux)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+          - macos
+          - windows
+          - linux
   push:
+    # 推 main 就自动跑（老板 2026-09-21）：改代码即验证。
+    # 注意 `tags` 与 `branches` 是两个独立过滤：只写 tags 时**推分支不会触发**
+    # （此前就是这么写的，所以 push main 一直不跑，见 124ab0f）。
+    branches:
+      - main
+    # 纯文档/记忆改动不烧额度（私有仓库 macOS 计费 10x、Windows 2x）。
+    # 注：路径过滤对 tag 推送不生效，即发版 tag 一律触发全平台。
+    paths-ignore:
+      - 'docs/**'
+      - 'aimemo/**'
+      - '**.md'
     tags:
       - 'v*'
 
