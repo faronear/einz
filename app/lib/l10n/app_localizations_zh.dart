@@ -404,8 +404,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockTitle => '清空锁屏码？';
 
   @override
-  String get chatPageClearLockMessage =>
-      '新锁屏码留空 = 清空锁屏码——确定要清除吗？清除后下次启动直接进入聊天。';
+  String get chatPageClearLockMessage => '新锁屏码留空 = 清空锁屏码。确定要清除吗？清除后下次启动直接进入聊天。';
 
   @override
   String get chatPageMenuInvite => '邀请码';

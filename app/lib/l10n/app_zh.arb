@@ -165,7 +165,7 @@
   "chatPageSetLockDone": "锁屏码已设置，下次启动需解锁",
   "chatPageSetLockCleared": "已清空锁屏码（下次启动直接进入）",
   "chatPageClearLockTitle": "清空锁屏码？",
-  "chatPageClearLockMessage": "新锁屏码留空 = 清空锁屏码——确定要清除吗？清除后下次启动直接进入聊天。",
+  "chatPageClearLockMessage": "新锁屏码留空 = 清空锁屏码。确定要清除吗？清除后下次启动直接进入聊天。",
   "chatPageMenuInvite": "邀请码",
   "chatPageInviteDialogTitle": "邀请码已生成",
   "chatPageInviteDialogHint": "邀请新设备加入当前秘境。24 小时内一次性有效。",
