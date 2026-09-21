@@ -249,7 +249,7 @@ jobs:
             build/macos/Build/Products/Release/einz.app
           codesign --verify -v build/macos/Build/Products/Release/einz.app
       - name: Zip app bundle
-        # 命名与本地打包对齐（buildMacosDist.sh）：配 secrets = -dist（Developer ID 可分发），
+        # 命名与本地打包对齐（buildMacos.sh）：配 secrets = -dist（Developer ID 可分发），
         # 未配 = -dev（ad-hoc 兜底）；CI 无时间串，版本号（APP_BUILD_NAME）已够区分构建
         run: >
           SUFFIX=${{ steps.devid.outputs.configured == 'true' && 'dist' || 'dev' }};

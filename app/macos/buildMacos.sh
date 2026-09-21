@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# Einz macOS 打包脚本 —— 一条命令完成：flutter 构建 → Developer ID 签名 →
-# 公证（notarization）→ staple → 落盘 _release.gitomit/。
+# Einz macOS 桌面版打包脚本 —— 一条命令完成：flutter 构建 → 签名 →（可选）公证
+# → staple → 落盘 _release.gitomit/。
+# **dev / dist / dist-nonotary 三个渠道都走这一个脚本**，渠道由参数决定（见下）。
 #
 # 用法（仓库任意位置都能跑）：
-#   app/macos/buildMacosDist.sh                 # 完整流程：签名 + 公证 + staple
-#   app/macos/buildMacosDist.sh --no-notary     # 只 Developer ID 签名，跳过公证（快速自测）
-#   app/macos/buildMacosDist.sh --adhoc         # ad-hoc 签名（无证书机器兜底）
-#                                               #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
+#   app/macos/buildMacos.sh                 # 完整流程：签名 + 公证 + staple
+#                                           #   → _release.gitomit/einz-gui-macos-dist-v<时间>.zip
+#   app/macos/buildMacos.sh --no-notary     # 只 Developer ID 签名，跳过公证（快速自测）
+#                                           #   → …/einz-gui-macos-dist-nonotary-v<时间>.zip
+#   app/macos/buildMacos.sh --adhoc         # ad-hoc 签名（无证书机器兜底）
+#                                           #   → …/einz-gui-macos-dev-v<时间>.zip
+#                                           #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
 #   三个模式最后都会拉起刚构建的 app（--server http://localhost:3000）方便立刻试跑。
 #
 # 前置条件（一次性）：
@@ -46,7 +50,7 @@ for arg in "$@"; do
     --no-notary) MODE="no-notary" ;;
     --adhoc)     MODE="adhoc" ;;
     -h|--help)
-      sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) echo "未知参数: $arg（见 --help）" >&2; exit 64 ;;
@@ -130,9 +134,20 @@ if [[ "$MODE" == "notary" ]]; then
 fi
 
 # ---------- 落盘 ----------
+# 产物名跟着**渠道**走（渠道由签名/公证方式决定，与调用者意图无关）：
+#   notary    → -dist           Developer ID + 公证，可分发给任何人
+#   no-notary → -dist-nonotary  Developer ID 已签但没公证：本机与已放行过的机器能跑，
+#                               下载到新机器会被 Gatekeeper 拦——刻意与 -dist 区分，
+#                               免得当成可分发产物发出去
+#   adhoc     → -dev            ad-hoc 签名（无身份），仅本机调试；异机/下载会被拦
 RELEASE_DIR="$REPO_ROOT/_release.gitomit"
 mkdir -p "$RELEASE_DIR"
-RELEASE="$RELEASE_DIR/einz-gui-macos-dist-v${APP_BUILD_STAMP}.zip"
+case "$MODE" in
+  adhoc)     CHANNEL="dev" ;;
+  no-notary) CHANNEL="dist-nonotary" ;;
+  *)         CHANNEL="dist" ;;
+esac
+RELEASE="$RELEASE_DIR/einz-gui-macos-${CHANNEL}-v${APP_BUILD_STAMP}.zip"
 rm -f "$RELEASE"
 # 用 zip 压缩包而非裸 *.app：*.app 在访达/网盘/跨机搬运中易被改坏扩展属性和
 # 签名结构（老板实测：一台 Mac 启动失败后，拷到另一台也跟着"损坏"），
