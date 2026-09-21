@@ -7796,3 +7796,31 @@ to, using or accessing the encryption within Apple's operating system"**，后�
 **教训（可复用）**：凡是"远端已有更严授权通道"的本地破坏性操作，别为了加严就把
 **共享秘密**（空间口令）拉进来——它会同时带来权限倒挂和可用性依赖。要加就加
 **本机独占**的知识因子（PIN / 设备名），并且把"旧网关的自毁信号"留给原来的通道。
+
+## 2026-09-22 多空间方案（aimemo/multiSpaceDesign.zhcn.md）代码核查 + 修订
+
+**做了什么**：老板要求评估该设计文档。我没有只读文档，而是逐条对照 `server/src`
+（db/spaces/auth/guard/push）与 `app/lib`（app_lock/server_config/chat_page/local_database/
+media_cache）核实原稿断言，结果修正 6 处、补入 4 个漏掉的耦合点。
+
+**最有价值的三个发现**：
+
+1. **原稿的核心依据不成立**。文档称 server 会因 `DEVICE_ALREADY_BOUND` 拒绝一设备加第二空间，
+   据此推导"必须 per-space 设备身份"。实际：server 无此错误码、`devices` 表**没有 space_id 列**
+   （`db.ts:19-27`，空间归属在 `sessions`）、create/join 每次都新造 device 行（`spaces.ts:164/324`）。
+   真正的约束只有 `devices.person_id` 单列。且 `guard.ts:84-85`、`auth.ts:91-96` 已明确预期
+   "一个设备持多空间会话"。**结论不变，但理由改写**：per-space 身份是客户端侧最省事的选择，
+   不是绕限制；共用 deviceId 的备选成本远低于原稿估计（只需 device↔(space,person) 映射）。
+2. **🔴 撤销自毁会灭掉所有空间**。`chat_page.dart:705-710` 撤销 = `clear()` + 删全表 +
+   `MediaCache.deleteAll` + `AttachmentStore.clear`。多空间下变成"一个空间被撤销 = 全机归零"。
+   已写进 §4.4 并列为最高优先级。
+3. **附件无 spaceId + `MediaCache.prune(当前空间 ids)`**（`chat_page.dart:1641`）→ 多空间下
+   会删掉其他空间的媒体缓存。已定：加 spaceId + 目录分 space。
+
+**老板拍板**（本轮）：⑤ PIN 为 Vault 级（解一次全通、锁一次全锁）；⑥ 附件加 spaceId；
+⑦ 单空间用户也要有"添加空间"入口（设置页常驻，SpaceListPage 任何情况可达，启动路径仍只在
+多空间时出现）。另已定：一期不支持跨服务器空间（省掉数十处 `ApiClient(effectiveServer)` 改动）、
+取消 Spaces 表的 `spaceKeySealed` 列（Vault 为唯一密钥来源）。
+
+**方法论**：设计文档里的"现状断言"必须回代码核实再评审——这份文档写得相当扎实，但 6 处
+事实偏差里有 2 处（撤销自毁、附件缓存）会直接导致数据丢失，只读文档是发现不了的。
