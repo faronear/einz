@@ -413,8 +413,15 @@ jobs:
           # 生成方式：base64 -i 4_Einz_Dist_Adhoc_cc.tic.einz.mobileprovision | pbcopy
           IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
         run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > /tmp/einz.mobileprovision
+          # **文件名必须是描述文件自己的 UUID**：Xcode 按 UUID 索引该目录，叫
+          # profile.mobileprovision 会取不到（同 app/ios/buildIos.sh 的本机经验）
+          UUID=$(security cms -D -i /tmp/einz.mobileprovision | plutil -extract UUID raw -)
+          NAME=$(security cms -D -i /tmp/einz.mobileprovision | plutil -extract Name raw -)
+          cp /tmp/einz.mobileprovision "$PROFILE_DIR/$UUID.mobileprovision"
+          echo "✅ 已安装描述文件: $NAME（$UUID）"
       # 没配签名 secrets → 干净跳过（老板 2026-09-21 定）。
       # 这里**不能**留一个"未签名构建"兜底：`flutter` 由上面那步安装、而它同样被
       # `configured == 'true'` 门控，没 secrets 时 runner 上根本没有 flutter，
