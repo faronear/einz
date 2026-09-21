@@ -24,6 +24,14 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- 出口合规声明（App Store Connect 的 "Missing Compliance"）：
+	     false = App 只用**公开标准**加密算法、且属于豁免范围 → 上传后自动合规，
+	     不再要求逐 build 手工回答、也不需要提交加密文档。
+	     依据（代码事实）：libsodium 的 crypto_box_seal（X25519 + XChaCha20-Poly1305，
+	     X25519=RFC 7748、ChaCha20-Poly1305=RFC 8439）、crypto_pwhash_str（Argon2，
+	     RFC 9106），传输层 TLS；无自研/专有算法（2026-09-21）。 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
