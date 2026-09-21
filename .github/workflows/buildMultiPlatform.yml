@@ -15,7 +15,7 @@
 #     需要的 secrets：MACOS_DEVID_P12(Base64) + MACOS_DEVID_P12_PASSWORD +
 #     MACOS_NOTARY_APPLE_ID + MACOS_NOTARY_PASSWORD + MACOS_NOTARY_TEAM_ID
 #   - iOS 需要 secrets：IOS_P12_CERTIFICATE(Base64) + IOS_P12_PASSWORD + IOS_PROVISIONING_PROFILE(Base64)
-#     未配置 secrets 时 iOS job 自动跳过
+#     未配置 secrets 时 job 照常被调度但**干净跳过构建**（只打印一行提示，不红）
 #   - macOS 计费 10x、Windows 2x，注意私有仓库额度
 name: Multi Platform Build
 
@@ -377,7 +377,9 @@ jobs:
           path: einz-tui-linux-x64.tar.gz
 
   ios:
-    if: ${{ github.event_name == 'push' || inputs.platform == 'ios' }}
+    # `inputs.platform == 'all'` 不能漏：其余 job 都有，iOS 曾漏掉 → 手动选 all 时
+    # 它会整 job skip（2026-09-21 老板实测）
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'ios' }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -413,12 +415,14 @@ jobs:
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-      - name: Build iOS IPA (unsigned, for device testing)
+      # 没配签名 secrets → 干净跳过（老板 2026-09-21 定）。
+      # 这里**不能**留一个"未签名构建"兜底：`flutter` 由上面那步安装、而它同样被
+      # `configured == 'true'` 门控，没 secrets 时 runner 上根本没有 flutter，
+      # 那条分支第一行就 `flutter: command not found` → job 假红（2026-09-21 实测）。
+      # 未签名 .app 装不上真机，本来也没有产出价值。
+      - name: Skip iOS build (no signing secrets)
         if: steps.secrets.outputs.configured != 'true'
-        working-directory: app
-        run: |
-          eval "$(node ../scripts/appVersion.js)"
-          flutter build ios --release --no-codesign --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+        run: echo "未配置 iOS 签名 secrets（IOS_P12_CERTIFICATE / IOS_P12_PASSWORD / IOS_PROVISIONING_PROFILE）→ 跳过 iOS 构建"
       - name: Build iOS IPA (signed)
         if: steps.secrets.outputs.configured == 'true'
         working-directory: app
@@ -429,6 +433,7 @@ jobs:
             --build-number "$APP_BUILD_NUMBER" \
             --export-options-plist=ios/exportOptionsAdhoc.plist
       - uses: actions/upload-artifact@v4
+        if: steps.secrets.outputs.configured == 'true' # 没构建就没产物，别去 warn 空目录
         with:
           name: einz-ios
           path: |
