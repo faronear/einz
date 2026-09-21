@@ -22,8 +22,9 @@
 #     走，`--export-options-plist` 只管导出阶段），CI 会在工作区里把它改指 App Store，
 #     所以 CI **不需要** Ad Hoc 那份描述文件（2026-09-21 老板实测：删掉它会 archive 报
 #     "No profile ... matching 'Einz Dist Adhoc' found"）。
-#     勾 ios_upload 再传 TestFlight，需 ASC_API_KEY_ID / ASC_API_ISSUER / ASC_P8_KEY。
-#     缺 secrets 时 job 照常被调度但**干净跳过构建**（只打印一行提示，不红）
+#     **构建成功即自动上传 TestFlight**（老板 2026-09-21），另需
+#     ASC_API_KEY_ID / ASC_API_ISSUER / ASC_P8_KEY；缺 ASC 会明确失败（不留"绿但没传"）。
+#     缺**签名** secrets 时 job 照常被调度但**干净跳过构建**（只打印一行提示，不红）
 #   - macOS 计费 10x、Windows 2x，注意私有仓库额度
 name: Multi Platform Build
 
@@ -44,11 +45,6 @@ on:
           - macos
           - windows
           - linux
-      ios_upload:
-        description: 'iOS：打完把 App Store 包传到 TestFlight（需 ASC_* 三个 secrets）'
-        required: false
-        default: false
-        type: boolean
   push:
     # 推 main 就自动跑（老板 2026-09-21）：改代码即验证。
     # 注意 `tags` 与 `branches` 是两个独立过滤：只写 tags 时**推分支不会触发**
@@ -398,9 +394,8 @@ jobs:
     # 本机 `app/ios/buildIos.sh adhoc` 直装更快，CI 上没有它的位置——所以这里不设渠道
     # 参数、不留 Ad Hoc 分支与产物，永远走 exportOptionsAppStore.plist。
     # 证书是 Apple Distribution，描述文件是 "Einz Dist Appstore"（无设备列表）。
-    env:
-      # 传 TestFlight 是显式开关：只有手动触发且勾了才做（push 触发的构建绝不上传）
-      IOS_UPLOAD: ${{ (github.event_name == 'workflow_dispatch' && inputs.ios_upload) || false }}
+    # **构建成功即自动上传 TestFlight**（老板 2026-09-21 定）——push 与手动触发都一样，
+    # 没有"只打包不上传"的开关；要产出包但不传，用本机 buildIos.sh。
     steps:
       - uses: actions/checkout@v4
       - name: Check signing secrets
@@ -415,11 +410,12 @@ jobs:
           cfg=true
           [[ "$HAS_P12" == "true" && "$HAS_PROFILE" == "true" ]] || cfg=false
           echo "configured=$cfg" >> "$GITHUB_OUTPUT"
-          echo "上传=$IOS_UPLOAD 证书=$HAS_P12 描述文件(appstore)=$HAS_PROFILE ASC(key=$HAS_ASC_KEY_ID issuer=$HAS_ASC_ISSUER p8=$HAS_ASC_P8) → 构建=$cfg"
-          # 勾了上传却没配 ASC：当场说清楚（别等构建完才在最后一步报错）。
-          # 只在确实会构建时校验——否则「iOS 根本没配签名」的场景该安静跳过，不是报错
-          if [[ "$cfg" == "true" && "$IOS_UPLOAD" == "true" && ( "$HAS_ASC_KEY_ID" != "true" || "$HAS_ASC_ISSUER" != "true" || "$HAS_ASC_P8" != "true" ) ]]; then
-            echo "❌ ios_upload=true 但缺 ASC secrets（ASC_API_KEY_ID / ASC_API_ISSUER / ASC_P8_KEY，见 docs/IOS.md §4）" >&2
+          echo "证书=$HAS_P12 描述文件(appstore)=$HAS_PROFILE ASC(key=$HAS_ASC_KEY_ID issuer=$HAS_ASC_ISSUER p8=$HAS_ASC_P8) → 构建=$cfg"
+          # 上传已是既定动作，缺 ASC secrets 就当场失败（别等构建完才在最后一步报错，
+          # 更别静默不传——"CI 绿但没传"是最难发现的那种坏）。
+          # 只在确实会构建时校验：签名本身没配时该安静跳过，不是报错。
+          if [[ "$cfg" == "true" && ( "$HAS_ASC_KEY_ID" != "true" || "$HAS_ASC_ISSUER" != "true" || "$HAS_ASC_P8" != "true" ) ]]; then
+            echo "❌ 缺 ASC secrets（ASC_API_KEY_ID / ASC_API_ISSUER / ASC_P8_KEY）——TestFlight 上传是自动动作，见 docs/IOS.md §4.3" >&2
             exit 1
           fi
       - name: Skip iOS build (no signing secrets)
@@ -514,9 +510,15 @@ jobs:
         working-directory: app
         run: |
           eval "$(node ../scripts/appVersion.js)"
-          echo "==> App Store 包 $APP_BUILD_NAME($APP_BUILD_NUMBER)"
+          # 构建号用**到分钟**的 UTC 时间戳（10 位），而不是共享脚本的 APP_BUILD_NUMBER
+          # （yymmddhh，只到小时）：后者受 Android versionCode ≤ 2100000000 的上限约束不能
+          # 加分钟，而 iOS 没有这个限制。自动上传后"同一小时内推两次"＝同一个构建号＝
+          # Apple 拒收第二个包，所以这里加细。CFBundleVersion 只要单调递增即可，数字位数
+          # 不敏感；本地 buildIos.sh 的 8 位戳比它小，不会冲突。
+          IOS_BUILD_NUMBER="$(date -u +%y%m%d%H%M)"
+          echo "==> App Store 包 $APP_BUILD_NAME($IOS_BUILD_NUMBER)"
           flutter build ipa --release \
-            --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER" \
+            --build-name "$APP_BUILD_NAME" --build-number "$IOS_BUILD_NUMBER" \
             --export-options-plist=ios/exportOptionsAppStore.plist
           mkdir -p /tmp/einz-out
           # 固定文件名：Release 资产列表里一眼能认出来（与 einz-app-android.apk 同风格）
@@ -536,9 +538,9 @@ jobs:
           name: Latest Build
           make_latest: true
           files: /tmp/einz-out/einz-app-ios-appstore.ipa
-      # TestFlight：显式勾了 ios_upload 才做（push 触发的构建一律不上传）
+      # TestFlight：构建成功即自动上传（老板 2026-09-21 定），push 与手动触发一视同仁
       - name: Upload to TestFlight
-        if: steps.secrets.outputs.configured == 'true' && env.IOS_UPLOAD == 'true'
+        if: steps.secrets.outputs.configured == 'true'
         env:
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_API_ISSUER: ${{ secrets.ASC_API_ISSUER }}

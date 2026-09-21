@@ -231,11 +231,14 @@ ASC API key（上传用）的创建与三个 secret 的填法见 §4.3——CI �
 
 #### 触发方式
 
-- **push main**：自动跑全平台，iOS 出 App Store 包并更新 Releases 的 `latest` 页
-  （纯文档改动被 `paths-ignore` 挡掉，不触发）；**不传 TestFlight**。
-- **手动 Run workflow**（`gh workflow run` 或 Actions 页面）：
-  - `platform` = `ios`（或 `all`）
-  - `ios_upload` = `true` 才会在构建后传 TestFlight（**push 触发永远不传**）
+- **push main**：自动跑全平台；iOS 出 App Store 包 → 更新 Releases 的 `latest` →
+  **自动传 TestFlight**（纯文档改动被 `paths-ignore` 挡掉，不触发）。
+- **手动 Run workflow**：`platform` = `ios`（或 `all`），行为同上。
+- **没有"只打包不上传"的开关**：上传是既定动作（老板 2026-09-21）。CI 上只要 iOS 构建成功
+  就会传一份 TestFlight；要"只出包不传"，用本机 `buildIos.sh appstore`。
+- **构建号到分钟**：CI 用 `date -u +%y%m%d%H%M`（10 位）覆盖共享脚本的 `yymmddhh`——
+  后者受 Android `versionCode ≤ 2100000000` 限制不能加分钟，而自动上传后"同一小时内推两次"
+  会撞成同一个构建号被 Apple 拒收。
 
 #### 需要的 6 个仓库 secret
 
@@ -277,21 +280,35 @@ gh secret list --repo faronear/einz                     # 应看到上表 6 个
 #### 跑一次验证
 
 ```bash
-gh workflow run buildMultiPlatform.yml --repo faronear/einz -f platform=ios -f ios_upload=true
+# 不用等 push：立刻手动跑一轮（platform=ios 只占一台 macOS runner）
+gh workflow run buildMultiPlatform.yml --repo faronear/einz -f platform=ios
 gh run watch --repo faronear/einz
 ```
 
 日志里看三处：`Check signing secrets` 应打印 `证书=true 描述文件(appstore)=true
 ASC(key=true issuer=true p8=true)`；`Install provisioning profile (appstore)` 打印
 `✅ 已安装描述文件: Einz Dist Appstore（a4efcffa-…）`；末尾 `Upload to TestFlight` 打印
-`✅ 已上传 TestFlight`（之后 Apple 还要 processing 几分钟才可见）。
+`✅ 已上传 TestFlight`（altool 成功时会同时打印 `No errors uploading …` 与 `RequestUUID`）。
+
+**上传成功的三层确认**：
+
+1. CI 日志：`Upload to TestFlight` 这步绿 + `No errors uploading`（只代表 Apple **收下**了）。
+2. **App Store Connect → 我的 App → Einz → TestFlight**：构建出现在「iOS 构建版本」，
+   状态 `正在处理` → 几分钟~几十分钟后可用（**权威**）。
+3. 手机 **TestFlight** App：内部测试员（团队成员）会自动收到；没收到就去 TestFlight →
+   内部测试 里把测试组/人分配上。
+
+上传失败会让 job 变红（不静默），错误原文直接贴日志。
 
 #### 三个容易踩的点
 
 1. **App Store Connect 里必须已有 bundle `cc.tic.einz` 的 App 记录**，否则上传报
    `No suitable application records found`。
-2. **构建号必须递增**：脚本用 `yymmddhh`（`scripts/appVersion.js`），**同一小时内传两次会被
-   Apple 拒**（bundle version 冲突）。同小时重跑请隔一小时。
+2. **构建号必须递增**（Apple 同版本下不许重号）：
+   - CI 用 `date -u +%y%m%d%H%M`（到分钟），同分钟撞车才会冲突；
+   - **本机** `buildIos.sh` 走共享脚本的 `yymmddhh`（只到小时，受 Android `versionCode`
+     上限所限），所以**同一小时内本机传两次会被拒**——隔一小时，或临时改 `--build-number`；
+   - 两者数值上不冲突（10 位 > 8 位，单调）。
 3. **CI 会临时改写工程里的 archive 签名**：`Runner.xcodeproj` 的 Release 配置写的是
    `PROVISIONING_PROFILE_SPECIFIER = "Einz Dist Adhoc"`，而 archive 阶段按工程设置走
    （见 §3）——CI 上没装那份描述文件，所以 workflow 在构建前把它改指 `Einz Dist Appstore`
