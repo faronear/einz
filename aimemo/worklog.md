@@ -7714,3 +7714,34 @@ App，Keychain 按 application-identifier 隔离，旧条目读不到；聊天�
 - iOS 测试目标 `com.example.einz.RunnerTests`（自动签名，改了可能要新 App ID）
 - Android `namespace = "com.example.einz"`（只影响 R/BuildConfig 包名；
   对外标识 `applicationId` 已经是 cc.tic.einz）
+
+### 收尾：清掉 com.example.einz 残留（老板同意的两个名字）
+
+- Android `namespace`：`com.example.einz` → **`cc.tic.einz`**（与 applicationId 一致）
+- iOS RunnerTests：`com.example.einz.RunnerTests` → **`cc.tic.einz.RunnerTests`**
+  （与 macOS 现有的 `cc.tic.einz.RunnerTests` 完全一致），3 处配置
+
+**过程中挖出一个潜伏的坑**（值得记）：`android/.../kotlin/cc/tic/einz/MainActivity.kt`
+原本是个**残缺的桩**（只有 `class MainActivity : FlutterActivity()`），真正带原生代码的
+那份在 `com/example/einz/MainActivity.kt`——里面有 `einz/store` MethodChannel
+（`getStoredDir` → `noBackupFilesDir`）。附件"留存模式"的明文目录就靠这个通道，
+放 `noBackupFilesDir` 才不会被 Auto Backup / 换机还原带走。
+
+而 `AndroidManifest.xml` 里 `android:name=".MainActivity"` 是**按 namespace 解析**的：
+只改 namespace 会让它解析到那个桩 → 通道消失 → 附件明文落到可被备份的目录，
+**静默降级、很难发现**。所以正确做法是：把含 MethodChannel 的完整版本写进
+`cc/tic/einz/MainActivity.kt`（通道名 `einz/store`、方法名 `getStoredDir` 原样不动），
+再删掉 `com/example` 整个目录。
+
+**教训（通用）**：Android 改 `namespace` 不是改个字符串——先确认 manifest 里所有
+相对类名（`.MainActivity` 这类）在新 namespace 下有没有对应的**完整实现**，别只看到
+同名文件就以为没问题。
+
+验证：`flutter build apk --debug` 通过；合并后的 manifest
+`android:name="cc.tic.einz.MainActivity"` / `package="cc.tic.einz"`；
+`kotlin-classes/debug/cc/tic/einz/MainActivity.class` 存在；android/ios 源码里
+`com.example` 已清零。
+
+**另一个教训**：`app/android/app/build.gradle.kts` 是 **CRLF 行尾**的文件。用 Python
+文本模式读写会把 CRLF 全换成 LF，导致 84 行全变（diff 一眼看不出来是行尾问题）。
+改这种文件要用二进制方式（`open(p,'rb')` / `replace` / `wb`）替换。
