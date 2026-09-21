@@ -176,7 +176,12 @@ ls -lh "$RELEASE"
 # 拉起的是**构建产物本身**（不是解压 zip；落盘的 zip 是给分发用的，两者内容一致），
 # 免得再从访达里找包。默认不拉起——打包就是打包（老板 2026-09-21）。
 if [[ -n "$SERVER_ARG" ]]; then
-  echo "==> 打开刚构建的 app（--server $SERVER_ARG）"
+  # 变量紧跟非 ASCII 字符必须加花括号：bash 会把该字符的首字节并进变量名里去查
+  # （`$SERVER_ARG）` → 找 `SERVER_ARG\xef`），set -u 下就报 unbound——**值明明给了
+  # 也照报**（2026-09-21 老板实测 `--server https://einz.tic.cc` 复现）。
+  # cli/buildTui.sh 用 `export LC_ALL=C` 解决同类问题，本脚本**不能**那么干：顶部注释
+  # 记着 C locale 会让 CocoaPods（Ruby）抛 UnicodeNormalization::CompatibilityError。
+  echo "==> 打开刚构建的 app（--server ${SERVER_ARG}）"
   open "$APP" --args --server "$SERVER_ARG"
 else
   echo "==> 未指定 --server：不自动打开 app（产物已落盘，可自行解压运行）"

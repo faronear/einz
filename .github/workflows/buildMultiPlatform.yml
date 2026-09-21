@@ -474,12 +474,12 @@ jobs:
           # 文件名按描述文件自己的 UUID 落盘：Xcode 从该目录索引描述文件，UUID 命名是它
           # 自己的约定（本机 app/ios/buildIos.sh 的经验；实测任意名也能找到，这里求稳）
           cp /tmp/einz-store.mobileprovision "$PROFILE_DIR/$uuid.mobileprovision"
-          echo "✅ 已安装描述文件: $name（$uuid）"
+          echo "✅ 已安装描述文件: ${name}（${uuid}）"
           # 防呆：配成 Ad Hoc 描述文件（或别的 App）当场拦掉，别等到 export 阶段
           # 报一句含糊的 "no profile found"
           # （exportOptionsAppStore.plist 要求 profile 名为 "Einz Dist Appstore"）
           [[ "$name" == "Einz Dist Appstore" ]] || {
-            echo "❌ 描述文件是「$name」，不是「Einz Dist Appstore」——IOS_APPSTORE_PROVISIONING_PROFILE 配错文件了" >&2
+            echo "❌ 描述文件是「${name}」，不是「Einz Dist Appstore」——IOS_APPSTORE_PROVISIONING_PROFILE 配错文件了" >&2
             exit 1
           }
       - name: Build iOS IPA (App Store)
