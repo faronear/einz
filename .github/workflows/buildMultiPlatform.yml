@@ -80,16 +80,56 @@ jobs:
       - name: Patch pub cache (AGP 9 compat)
         working-directory: app
         run: bash ../scripts/patchPubCache.sh
+      - name: Install Android release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          HAS_STORE_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
+          HAS_KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD != '' }}
+        run: |
+          # 用**与本地同一把** release keystore 签名（老板 2026-09-21 定）：签名不同的包不能
+          # 覆盖安装，而 build.gradle.kts 在没有 key.properties 时会静默退回 debug 签名
+          # ——"CI 绿但装不上/与本地包冲突"是最难发现的那种坏，所以这里缺 secrets 直接失败。
+          [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEY_ALIAS" ]] \
+            || { echo "❌ 缺 ANDROID_KEYSTORE_BASE64 / ANDROID_KEY_ALIAS（见 docs/CI.md）" >&2; exit 1; }
+          [[ "$HAS_STORE_PW" == "true" && "$HAS_KEY_PW" == "true" ]] \
+            || { echo "❌ 缺 ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_PASSWORD（见 docs/CI.md）" >&2; exit 1; }
+          # keystore 与 properties 都放到工作区之外，别被 artifact / 缓存带走
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/einz-release.jks"
+          chmod 600 "$RUNNER_TEMP/einz-release.jks"
+          # 口令**不落盘**：gradle 优先读 EINZ_STORE_PASSWORD / EINZ_KEY_PASSWORD 环境变量
+          # （build.gradle.kts 的 C3 设计），properties 里只写 keystore 路径与别名
+          printf 'storeFile=%s\nkeyAlias=%s\n' \
+            "$RUNNER_TEMP/einz-release.jks" "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/android-key.properties"
+          echo "EINZ_ANDROID_KEY_PROPERTIES=$RUNNER_TEMP/android-key.properties" >> "$GITHUB_ENV"
+          echo "✅ 已装入 release keystore（别名 $ANDROID_KEY_ALIAS）"
       - name: Build APK
         working-directory: app
         env:
           # 公共 runner 仅 7GB 内存：覆盖 gradle.properties 里的 -Xmx8G（按本机大内存设置），
           # 避免 OOM killer 杀 Gradle（曾表现为跑约 16 分钟后 exit 143）
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3G -XX:MaxMetaspaceSize=1G"
+          # 签名口令走环境变量（gradle 优先于 properties 文件）；见上一步
+          EINZ_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          EINZ_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           # 版本号 yymm.ddhh.mm / 构建号 yymmddhh，各平台统一（唯一出处 scripts/appVersion.js）
           eval "$(node ../scripts/appVersion.js)"
           flutter build apk --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+      - name: Verify APK is signed with the release key
+        working-directory: app
+        run: |
+          # 防"静默退回 debug 签名"：只断言签名者不是 debug，不写死指纹
+          # （将来换 keystore 不必改这里）
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+          APKSIGNER="$(ls -d "$SDK"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
+          [[ -x "$APKSIGNER" ]] || { echo "❌ 找不到 apksigner（SDK=$SDK）" >&2; exit 1; }
+          OUT="$("$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk)"
+          echo "$OUT" | grep -E "Signer #1 certificate (DN|SHA-256)" || true
+          if echo "$OUT" | grep -q "CN=Android Debug"; then
+            echo "❌ 产物是 debug 签名——release keystore 没生效（查 secrets 与 EINZ_ANDROID_KEY_PROPERTIES）" >&2
+            exit 1
+          fi
       - name: Rename APK
         working-directory: app
         run: mv build/app/outputs/flutter-apk/app-release.apk einz-app-android.apk
