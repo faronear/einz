@@ -1,9 +1,9 @@
 # Einz — iOS 打包与真机安装指引（docs/IOS.md）
 
-> **状态：** v3.0（2026-09-14：切到 Faronear 付费账号 + Ad Hoc 1 年签名，**已实测**——
-> 构建 → 装到 iPhone 11，bundle `cc.tic.einz.ios`）。
-> v1.0（bundle `com.example.onlyspace`、仓库 `git.tic.cc/fon/only`）、v2.0（`cc.tic.einz`
-> + 免费个人团队 7 天 profile）均已过时——以本文档为准。
+> **状态：** v4.0（2026-09-21：bundle id 回到 `cc.tic.einz`，两套描述文件同期换新（Ad Hoc
+> 3 台设备 / App Store），CI 改为只出 App Store 包并支持传 TestFlight，见 §4.3）。
+> v3.0（2026-09-14：Faronear 付费账号 + Ad Hoc；bundle 曾短暂用 `cc.tic.einz.ios`，**已作废**）、
+> v1.0（`com.example.onlyspace`）、v2.0（免费个人团队 7 天 profile）均已过时——以本文档为准。
 
 ---
 
@@ -11,11 +11,11 @@
 
 | 项 | 值 | 备注 |
 | --- | --- | --- |
-| Bundle ID | **`cc.tic.einz.ios`** | 已配在 `app/ios/Runner.xcodeproj` |
+| Bundle ID | **`cc.tic.einz`** | 已配在 `app/ios/Runner.xcodeproj`（2026-09-21 起；此前短暂的 `.ios` 后缀已作废） |
 | Team ID | **`CQ6733CTMV`** | Faronear Co. Ltd.（**付费**账号） |
 | 签名证书 | `Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)` | SHA-1 `5914DE2D…`，2026-09-14 → **2027-09-14**；私钥 `FaronearPrikey` 在本机登录钥匙串 |
-| Ad Hoc profile | **`Einz Dist Adhoc`**（UUID `458acdea-…`） | 1 年，含 iPhone 11 + iPhone XR + 一台旧设备；**已装在本机** |
-| App Store profile | **`Einz Dist AppStoreConnect`**（UUID `eb4be29b-…`） | 1 年，**同 bundle id**；**已装在本机**（2026-09-17 装） |
+| Ad Hoc profile | **`Einz Dist Adhoc`**（UUID `35b8f664-…`） | 1 年 → **2027-09-14**；含 **3 台**（`00008020-00130D3A1E92002E` / `00008030-0005306011F9402E` / `01418b9159ab75651272f3e5616c3e3fc5dd7d1e`）；**已装在本机** |
+| App Store profile | **`Einz Dist Appstore`**（UUID `a4efcffa-…`） | 1 年 → **2027-09-14**，无设备列表；**已装在本机**。CI 用同一份（见 §4.3） |
 | 本机 Xcode | **26.3**（iOS 26.2 SDK），`/Applications/Xcode26.3.app` | App Store 上传的硬要求（iOS 26 SDK 起）；Ad Hoc 也已统一用它，见 §0.1 |
 | 证书/密钥保管位置 | `/Volumes/repodisk/simsim_key/cert-apple-苹果应用证书/20260914/` | `.p12` + `.cer` + CSR + 口令文件（`3_certpassword.simsim.js`）——**勿入 git** |
 | 生产服务器 | `https://einz.tic.cc` | 代码默认值，真机开箱可用 |
@@ -46,9 +46,10 @@
 
 1. **团队换了**：原 `37KQR6645B`（Leiqin Lu 个人）是**免费**团队——它签发的 profile **只有 7 天**，
    App 每 7 天要重装。现已切到 Faronear（付费，1 年）。
-2. **Bundle ID 变了**：App ID 全局唯一，`cc.tic.einz` 已被个人团队占用，所以 Faronear 团队下
-   用 **`cc.tic.einz.ios`**。bundle id 变了 = 手机上是**另一个 App**：
-   - 旧的 `cc.tic.einz` 仍留在手机上（可手动删掉），新版是**全新容器**；
+2. **Bundle ID 曾变动（2026-09-14 → 09-21）**：那段时间 App ID 用 `cc.tic.einz.ios`（当时
+   `cc.tic.einz` 被个人团队占着）。**2026-09-21 已收回到 `cc.tic.einz`**，并同期重新签发了
+   Ad Hoc / App Store 两套描述文件（见 §0 表）。bundle id 变了 = 手机上是**另一个 App**：
+   - 旧的 `cc.tic.einz.ios` 版仍留在手机上（可手动删掉），新版是**全新容器**；
    - 新版首次打开需**用邀请链接 + 密保口令重新接入秘境**（服务端密文还在，历史会回来）。
 
 ---
@@ -63,7 +64,7 @@ flutter doctor                              # iOS 工具链应为 ✅（Xcode / 
 flutter config --list | grep swift          # 必须 enable-swift-package-manager: false
 xcrun devicectl list devices                # 手机需 available (paired)；拿到 UDID
 security find-identity -v -p codesigning    # 需出现 "Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)"
-ls ~/Library/MobileDevice/Provisioning\ Profiles/ | grep -i 458acdea   # Ad Hoc profile 已装
+ls ~/Library/MobileDevice/Provisioning\ Profiles/ | grep -i 35b8f664   # Ad Hoc profile 已装
 ```
 
 手机侧一次性准备：
@@ -118,7 +119,7 @@ xcrun devicectl device install app --device 00008030-0005306011F9402E /tmp/einz-
 
 ```
 DEVELOPMENT_TEAM            = CQ6733CTMV
-PRODUCT_BUNDLE_IDENTIFIER   = cc.tic.einz.ios
+PRODUCT_BUNDLE_IDENTIFIER   = cc.tic.einz
 CODE_SIGN_STYLE             = Manual
 "CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"
 PROVISIONING_PROFILE_SPECIFIER      = "Einz Dist Adhoc"
@@ -135,7 +136,21 @@ Debug / Profile 配置仍是 Automatic（项目默认），用于模拟器开发
 
 ## 3. ad-hoc / app-store / development 的区别（容易搞混）
 
-**编译（archive）完全一样**，差别只在**导出**这一步：
+`flutter build ipa` 一条命令里其实有**两个签名阶段**，用的还是**两套签名来源**——搞混就会
+像下面这样报错：
+
+| 阶段 | 谁决定用哪份描述文件 | 说明 |
+| --- | --- | --- |
+| **编译 / Archive** | **工程里的 Release 设置**（`Runner.xcodeproj` 的 `PROVISIONING_PROFILE_SPECIFIER`，当前写死 `Einz Dist Adhoc`） | 找不到那份描述文件就当场失败：`No profile for team '…' matching 'Einz Dist Adhoc' found` |
+| **Export**（archive → ipa） | `--export-options-plist` 指定的 plist（`method` + `provisioningProfiles`） | 这一步会把 archive 里内嵌的描述文件**整体换掉**再重签 |
+
+> 所以「本地只装了 App Store 描述文件，却想打 Ad Hoc 包」或反之都会先卡在 archive；
+> **本机两套描述文件都要装**（见 §0）。也在意这一点：最终 ipa 挂的是 **export 阶段那份**
+> ——archive 阶段用 Ad Hoc 描述文件、导出成 App Store 包，成品里内嵌的就是
+> `Einz Dist Appstore`（2026-09-21 实测：`embedded.mobileprovision` 的 Name、
+> `beta-reports-active=true`、`get-task-allow=false`、证书 `Apple Distribution`）。
+
+**导出渠道的差别**：
 
 | 目的 | 命令 | exportOptions 的 `method` | 用哪种 profile |
 | --- | --- | --- | --- |
@@ -152,8 +167,8 @@ Debug / Profile 配置仍是 Automatic（项目默认），用于模拟器开发
   ```
 - 本仓库维护两份 plist，由 `buildIos.sh <adhoc|appstore>` 选择：
   - `ios/exportOptionsAdhoc.plist` → `method=ad-hoc`，profile `Einz Dist Adhoc`
-  - `ios/exportOptionsAppStore.plist` → `method=app-store`，profile `Einz Dist AppStoreConnect`
-  **bundle id 相同**（`cc.tic.einz.ios`），所以 Ad Hoc 与 TestFlight/上架是同一个 App，数据容器一致。
+  - `ios/exportOptionsAppStore.plist` → `method=app-store`，profile `Einz Dist Appstore`
+  **bundle id 相同**（`cc.tic.einz`），所以 Ad Hoc 与 TestFlight/上架是同一个 App，数据容器一致。
 
 ---
 
@@ -180,9 +195,12 @@ xcrun altool --upload-app -f build/ios/ipa/einz.ipa -t ios \
   --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER"
 ```
 
-前置（一次性）：① App Store Connect 建 App 记录（bundle `cc.tic.einz.ios`、名称、SKU）；
-② 开发者后台下载 `Einz Dist AppStoreConnect` 并装到本机；③ 每个构建版本回答一次
-**出口合规**（E2EE 需如实申报，`ITSAppUsesNonExemptEncryption`）。
+前置（一次性）：① App Store Connect 建 App 记录（bundle `cc.tic.einz`、名称、SKU）；
+② 开发者后台下载 `Einz Dist Appstore` 并装到本机；③ 每个构建版本回答一次
+**出口合规**（E2EE 需如实申报，`ITSAppUsesNonExemptEncryption`——已写进 `Info.plist`，
+新构建不再被问）。
+
+ASC API key（上传用）的创建与三个 secret 的填法见 §4.3——CI 与本机用的是**同一把 key**。
 
 ### 4.2 TestFlight 与审核、与 APNs
 
@@ -205,17 +223,96 @@ xcrun altool --upload-app -f build/ios/ipa/einz.ipa -t ios \
 
 ---
 
+### 4.3 CI 上打 App Store 包 + 传 TestFlight（GitHub Actions）
+
+工作流：`.github/workflows/buildMultiPlatform.yml` 的 **ios** job（runner `macos-latest`）。
+**CI 只出 App Store 包**——Ad Hoc 不进 CI（它只对白名单那几台有效，本机 `buildIos.sh adhoc`
+直装更快），所以 CI 上**不需要** `IOS_PROVISIONING_PROFILE`。
+
+#### 触发方式
+
+- **push main**：自动跑全平台，iOS 出 App Store 包并更新 Releases 的 `latest` 页
+  （纯文档改动被 `paths-ignore` 挡掉，不触发）；**不传 TestFlight**。
+- **手动 Run workflow**（`gh workflow run` 或 Actions 页面）：
+  - `platform` = `ios`（或 `all`）
+  - `ios_upload` = `true` 才会在构建后传 TestFlight（**push 触发永远不传**）
+
+#### 需要的 6 个仓库 secret
+
+| 用途 | 名字 | 内容 |
+| --- | --- | --- |
+| 签名证书 | `IOS_P12_CERTIFICATE` | `3_20260914_AppleDistribution_20270914.p12` 的 base64 |
+| 证书口令 | `IOS_P12_PASSWORD` | 该 .p12 的口令（`3_certpassword.simsim.js`） |
+| 描述文件 | `IOS_APPSTORE_PROVISIONING_PROFILE` | `4_Einz_Dist_Appstore_cc.tic.einz.mobileprovision` 的 base64 |
+| 上传 | `ASC_API_KEY_ID` / `ASC_API_ISSUER` / `ASC_P8_KEY` | App Store Connect API key（见下） |
+
+生成 base64（macOS `base64 -i` 输出单行，正合 secret 格式）：
+
+```bash
+cd /Volumes/repodisk/simsim_key/cert-apple-苹果应用证书/20260914/
+base64 -i 3_20260914_AppleDistribution_20270914.p12 | gh secret set IOS_P12_CERTIFICATE --repo faronear/einz
+gh secret set IOS_P12_PASSWORD --repo faronear/einz          # 交互粘贴，不回显
+base64 -i 4_Einz_Dist_Appstore_cc.tic.einz.mobileprovision | gh secret set IOS_APPSTORE_PROVISIONING_PROFILE --repo faronear/einz
+```
+
+#### 取一把 App Store Connect API key（本机与 CI 共用，一次性）
+
+1. [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → **用户和访问** →
+   **集成（Integrations）** → **App Store Connect API** → **团队密钥（Team Keys）** → `+`
+2. 名称 `einz-ci-upload`，权限 **App 管理器（App Manager）**（Admin 亦可）→ 生成
+3. **立刻下载 `.p8`**（`AuthKey_XXXXXXXXXX.p8`）——**只能下载一次**，丢了只能吊销重建
+4. 记下 **Key ID**（文件名里那 10 位）与 **Issuer ID**（页面顶部那串 UUID 形式，**不是** Key ID）
+
+```bash
+cd ~/Downloads
+base64 -i AuthKey_XXXXXXXXXX.p8 | gh secret set ASC_P8_KEY --repo faronear/einz
+gh secret set ASC_API_KEY_ID --repo faronear/einz       # 粘 Key ID
+gh secret set ASC_API_ISSUER --repo faronear/einz       # 粘 Issuer ID
+gh secret list --repo faronear/einz                     # 应看到上表 6 个
+```
+
+本机用同一把 key：`.p8` 放到 `~/private_keys/AuthKey_<Key ID>.p8`，再
+`export ASC_API_KEY_ID=… ASC_API_ISSUER=…`（见 §4.1 的 `altool` 命令）。
+
+#### 跑一次验证
+
+```bash
+gh workflow run buildMultiPlatform.yml --repo faronear/einz -f platform=ios -f ios_upload=true
+gh run watch --repo faronear/einz
+```
+
+日志里看三处：`Check signing secrets` 应打印 `证书=true 描述文件(appstore)=true
+ASC(key=true issuer=true p8=true)`；`Install provisioning profile (appstore)` 打印
+`✅ 已安装描述文件: Einz Dist Appstore（a4efcffa-…）`；末尾 `Upload to TestFlight` 打印
+`✅ 已上传 TestFlight`（之后 Apple 还要 processing 几分钟才可见）。
+
+#### 三个容易踩的点
+
+1. **App Store Connect 里必须已有 bundle `cc.tic.einz` 的 App 记录**，否则上传报
+   `No suitable application records found`。
+2. **构建号必须递增**：脚本用 `yymmddhh`（`scripts/appVersion.js`），**同一小时内传两次会被
+   Apple 拒**（bundle version 冲突）。同小时重跑请隔一小时。
+3. **CI 会临时改写工程里的 archive 签名**：`Runner.xcodeproj` 的 Release 配置写的是
+   `PROVISIONING_PROFILE_SPECIFIER = "Einz Dist Adhoc"`，而 archive 阶段按工程设置走
+   （见 §3）——CI 上没装那份描述文件，所以 workflow 在构建前把它改指 `Einz Dist Appstore`
+   （只改 runner 上的工作区副本，仓库与本地流程不受影响；改不到会明确报错）。
+   副作用为零：导出阶段本来就会按 plist 重签，成品 ipa 与「本地用 App Store 描述文件
+   archive」的结果一致。
+
+---
+
 ## 5. 常见问题
 
 | 现象 | 处理 |
 | --- | --- |
-| `No profiles for 'cc.tic.einz.ios' were found` | Ad Hoc profile 没装到本机 → 复制为 `~/Library/MobileDevice/Provisioning Profiles/<UUID>.mobileprovision` |
+| `No profiles for 'cc.tic.einz' were found` | 本机缺描述文件 → 复制为 `~/Library/MobileDevice/Provisioning Profiles/<UUID>.mobileprovision`（**Ad Hoc 与 App Store 两份都要装**：archive 阶段用工程 Release 指定的那份，见 §3） |
+| `No profile for team 'CQ6733CTMV' matching 'Einz Dist Adhoc' found`（archive 阶段） | 工程 Release 写的是 Ad Hoc 描述文件，本机/CI 缺它。本机装 `35b8f664-…`；CI 由 workflow 改指 App Store（§4.3） |
 | 签名失败 / 找不到 `Apple Distribution: …` | 钥匙串缺证书+私钥 → 导入 `3_证书.p12`（口令见 `3_certpassword.simsim.js`）；用 `security find-identity -v -p codesigning` 确认 |
 | 报 `--export-options-plist is not compatible with --export-method` | 两个参数只能用其一 |
 | 这台设备装不上 | UDID 不在 profile 里 → 在开发者后台 Devices 登记，**重新生成 profile**并更新本机那份 |
 | `Unable to launch … device was not, or could not be, unlocked` | 手机锁屏了，解锁后重试（**不是签名问题**） |
 | 手机提示「无法验证 App」 | Ad Hoc/Distribution 不受此限；若出现，先确认 profile 含该设备 UDID |
-| 手机上出现两个 Einz | 旧的 `cc.tic.einz`（个人团队 7 天版）与新的 `cc.tic.einz.ios` 是两个 App → 删掉旧的 |
+| 手机上出现两个 Einz | 只有 2026-09-14~09-21 那段时间装过 `cc.tic.einz.ios` 版才会有两个 App → 删掉**旧的 `.ios`** 那个，现在用的是 `cc.tic.einz` |
 | 报 `libsodium` 链接/加载失败 | 确认 SPM 已关；`flutter build ios` 会自动 `pod install`；release 被 strip 时加 `-Wl,-export_dynamic` |
 | `pod install` 未执行 / `Podfile.lock` 无 libsodium | 同上，先关 SPM 再构建 |
 | `Missing package product 'FlutterGeneratedPluginSwiftPackage'` | pbxproj 曾残留 Flutter SPM（3.35+ 默认开启）生成的 Swift Package 引用，禁用 SPM 后残留导致构建失败；**已随仓库修复**（8 处引用全删）。旧副本请拉最新代码，或手工删 `XCLocalSwiftPackageReference` / `XCSwiftPackageProductDependency` / `packageReferences` / `packageProductDependencies` 相关段落 |
