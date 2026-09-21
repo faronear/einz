@@ -17,7 +17,11 @@
 #   - iOS 只出 **App Store 包**（老板 2026-09-21：CI 不留 Ad Hoc 分支与产物——Ad Hoc
 #     只有白名单里那几台能装，本机 buildIos.sh adhoc 就够；CI 要的是能上 TestFlight
 #     的那一份）。secrets：IOS_P12_CERTIFICATE(Base64) + IOS_P12_PASSWORD +
-#     IOS_APPSTORE_PROVISIONING_PROFILE（"Einz Dist Appstore"，无设备列表）；
+#     IOS_APPSTORE_PROVISIONING_PROFILE（"Einz Dist Appstore"，无设备列表）。
+#     ⚠️ 工程 Runner 的 Release 签名写的是 **Ad Hoc** 描述文件（archive 阶段按工程设置
+#     走，`--export-options-plist` 只管导出阶段），CI 会在工作区里把它改指 App Store，
+#     所以 CI **不需要** Ad Hoc 那份描述文件（2026-09-21 老板实测：删掉它会 archive 报
+#     "No profile ... matching 'Einz Dist Adhoc' found"）。
 #     勾 ios_upload 再传 TestFlight，需 ASC_API_KEY_ID / ASC_API_ISSUER / ASC_P8_KEY。
 #     缺 secrets 时 job 照常被调度但**干净跳过构建**（只打印一行提示，不红）
 #   - macOS 计费 10x、Windows 2x，注意私有仓库额度
@@ -482,6 +486,29 @@ jobs:
             echo "❌ 描述文件是「${name}」，不是「Einz Dist Appstore」——IOS_APPSTORE_PROVISIONING_PROFILE 配错文件了" >&2
             exit 1
           }
+      - name: Point Xcode Release signing at the App Store profile
+        if: steps.secrets.outputs.configured == 'true'
+        working-directory: app
+        run: |
+          # archive 阶段用的是**工程里的 Release 设置**（Runner 的 Release 配置写着
+          # CODE_SIGN_STYLE=Manual + PROVISIONING_PROFILE_SPECIFIER="Einz Dist Adhoc"，
+          # 见 app/ios/Runner.xcodeproj/project.pbxproj），而 `--export-options-plist`
+          # 只作用于之后的**导出**阶段——所以只删 Ad Hoc 描述文件 secret 会让 archive
+          # 直接报 "No profile ... matching 'Einz Dist Adhoc' found"（2026-09-21 实测）。
+          # CI 只出 App Store 包 → 让 archive 也指到 App Store 描述文件，Ad Hoc 那份
+          # 在 CI 上就彻底不需要了。**只改 CI 工作区**，不碰仓库里的工程文件。
+          python3 - <<'PY'
+          import pathlib, sys
+          path = pathlib.Path('ios/Runner.xcodeproj/project.pbxproj')
+          src = path.read_text()
+          old = 'PROVISIONING_PROFILE_SPECIFIER = "Einz Dist Adhoc"'
+          new = 'PROVISIONING_PROFILE_SPECIFIER = "Einz Dist Appstore"'
+          if old not in src:
+              sys.exit('❌ 工程里没有 Ad Hoc 描述文件设置——签名配置结构变了，请更新这一步')
+          path.write_text(src.replace(old, new))
+          print('已把 Release 的签名描述文件改指 App Store 包')
+          PY
+          grep -n 'PROVISIONING_PROFILE_SPECIFIER' ios/Runner.xcodeproj/project.pbxproj
       - name: Build iOS IPA (App Store)
         if: steps.secrets.outputs.configured == 'true'
         working-directory: app
