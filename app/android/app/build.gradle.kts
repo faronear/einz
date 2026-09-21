@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.einz"
+    namespace = "cc.tic.einz"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
