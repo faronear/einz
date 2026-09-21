@@ -19,7 +19,7 @@
 name: Multi Platform Build
 
 on:
-  workflow_dispatch:
+  # workflow_dispatch:
     # inputs:
     #   platform:
     #     description: 'Platform to build (all = android+windows+macos+linux)'
