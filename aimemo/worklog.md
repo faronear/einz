@@ -7745,3 +7745,27 @@ App，Keychain 按 application-identifier 隔离，旧条目读不到；聊天�
 **另一个教训**：`app/android/app/build.gradle.kts` 是 **CRLF 行尾**的文件。用 Python
 文本模式读写会把 CRLF 全换成 LF，导致 84 行全变（diff 一眼看不出来是行尾问题）。
 改这种文件要用二进制方式（`open(p,'rb')` / `replace` / `wb`）替换。
+
+## 2026-09-21 iOS 出口合规：Info.plist 声明 ITSAppUsesNonExemptEncryption=false
+
+TestFlight 里提交的 build 旁出现 "Missing Compliance"，点进去是 App Encryption
+Documentation（问"实现了哪类加密算法"，4 选 1）。
+
+按 Apple 自己的提示，**不用在网页上逐 build 填**，在 Info.plist 里声明一次即可绕过：
+
+```xml
+<key>ITSAppUsesNonExemptEncryption</key><false/>
+```
+
+false = 只用公开标准算法且属豁免范围 → 上传后自动合规，不再要求回答、也不用交文档。
+
+**选哪档的依据（代码事实）**：libsodium `crypto_box_seal`（X25519 + XChaCha20-Poly1305；
+X25519=IETF RFC 7748、ChaCha20-Poly1305=RFC 8439）、`crypto_pwhash_str`（Argon2，
+RFC 9106），传输层 TLS。没有自研/专有算法 → 不属于"proprietary or not accepted as
+standard"；也不是"None"（那是给完全没自己实现加密、只用系统 HTTPS/Keychain 的 App，
+Einz 自己实现了 E2EE，要如实申报）。
+若不得已在网页上答，选 **"Standard encryption algorithms instead of, or in addition
+to, using or accessing the encryption within Apple's operating system"**，后续那步
+"是否用于豁免以外用途"答"否" → 不要求交文档。
+
+**注意**：只对**新上传**的 build 生效，已上传的不追溯（需手工答一次或重传）。
