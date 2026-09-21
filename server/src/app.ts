@@ -22,6 +22,7 @@ import {
 import { getAvatar, storeAvatar, MAX_AVATAR_BYTES } from './avatars.js'
 import {
   listDevices,
+  retireDevice,
   revokeDevice,
   updateDeviceName,
   updatePersonName
@@ -519,6 +520,25 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 注：这里原先还会 notifyKeyRotation()（PROTOCOL.md §8.2 key.rotation），提示剩余
     // 设备轮换 Space Key。2026-09-14 决策：产品不做密钥轮换（App/TUI 无入口、分发链路
     // 不成立、ROI 极低），该通知与 `key_rotation_required` 一并撤除，见 docs/SECURITY.md。
+    sendJson(res, 200, result)
+    return
+  }
+  // 自助退役（2026-09-21 新加，**无请求体**）：客户端"重置设备"在清本地数据之前调用它，
+  // 把自己从服务端注销，避免留下永远删不掉的幽灵设备（/revoke 禁止自撤，谁也收拾不了）。
+  // 与上面 revoke 的关键差异：① 目标恒为自己；② **不校验空间口令**（注销我自己，
+  // session 即所有权；客户端那边已经过了"设备名 + 本机 PIN"闸门）；③ 不发 device.revoked。
+  if (method === 'POST' && path === '/devices/retire') {
+    const token = bearerToken(req)
+    const caller = requireSession(token) // 必须在 retireDevice 之前：删完 session 就查不到身份了
+    const result = retireDevice(token)
+    // 审计：自助退役（与被人撤销区分——kind 不同，operators runbook 据此判断是主动还是被动）
+    logActivity({
+      deviceId: caller.device_id,
+      spaceId: caller.space_id,
+      kind: 'device.retire',
+      detail: {},
+      meta: metaOf(req)
+    })
     sendJson(res, 200, result)
     return
   }

@@ -207,6 +207,7 @@ CREATE TABLE device_activity (
 | `device.rename`   | `POST /devices/name`      | `device_name`                                                                |
 | `person.rename`   | `POST /devices/person-name` | `person_name`                                                              |
 | `device.revoke`   | `POST /devices/:id/revoke` | `target_device_id`（**不记口令**）                                          |
+| `device.retire`   | `POST /devices/retire`     | —（自助退役，目标即自己，无需 detail）                                      |
 
 **说明：**
 

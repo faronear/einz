@@ -1370,19 +1370,15 @@ void _exitRaw() {
   _restoreTerminal();
 }
 
-/// 设备被**明确撤销**（认证 403 `DEVICE_REVOKED` / 在线 WS 广播 device.revoked）→
-/// 同步销毁本地数据、恢复终端、提示后立即退出。**只有这一条路径会删本地数据**：
-/// 未登记（库被重置）/连不上只警告，绝不动本地文件（老板 2026-09-16）。
+/// 删本设备本地数据：store 文件（含同名 .bak）与附件明文缓存目录。
 ///
-/// 清盘范围（与 App 的自毁对齐）：store 文件（含历史信封/附件元数据/离线队列/
-/// space_key/会话 token/设备私钥，以及同名的 .bak 备份）与附件明文缓存目录。
-/// 刻意**不**删 `~/.einz` 整个目录（同机多设备共用）与用户导出的 `einz-backup-*.json`。
+/// 两条路径共用它：`_exitRevoked`（被对方撤销后的自毁）与 `/reset`（用户主动重置）。
+/// 刻意**不**删 `~/.einz` 整个目录（同机多设备共用）、其它设备的 store、以及用户
+/// 导出的 `einz-backup-*.json`。
 ///
-/// 顺序很重要：`exit(0)` 会立即终止进程，之后不会再有 `store.save()` 落盘；若改成
-/// 先退出后异步删、或删完还继续跑，都可能被在途写把文件重建回来——所以"同步删完→再退出"。
-/// 提示写 stderr：pty 下退出瞬间 stdout flush 未决时 stdout.write 会抛
-/// "StreamSink is bound to a stream"——stderr 独立 sink 必达。
-void _exitRevoked(String storePath) {
+/// 注意 `attachmentCacheDir()` 是 `$HOME/.einz/cache`，多 store **共享**：第 2 台设备
+/// 重置会连带删掉第 1 台的附件明文缓存（可重新下载重建，与 App 自毁口径一致）。
+void _deleteLocalData(String storePath) {
   for (final path in [storePath, '$storePath.bak']) {
     try {
       final f = File(path);
@@ -1393,9 +1389,35 @@ void _exitRevoked(String storePath) {
     final cache = Directory(attachmentCacheDir());
     if (cache.existsSync()) cache.deleteSync(recursive: true);
   } catch (_) {}
+}
+
+/// 设备被**明确撤销**（认证 403 `DEVICE_REVOKED` / 在线 WS 广播 device.revoked）→
+/// 同步销毁本地数据、恢复终端、提示后立即退出。
+///
+/// 删本地数据的路径只有两条：这一条（被对方用口令撤销后的自毁）与 `/reset`
+/// （用户自己在本地确认后重置）。未登记（库被重置）/连不上只警告，绝不动本地文件
+/// （老板 2026-09-16）。
+///
+/// 顺序很重要：`exit(0)` 会立即终止进程，之后不会再有 `store.save()` 落盘；若改成
+/// 先退出后异步删、或删完还继续跑，都可能被在途写把文件重建回来——所以"同步删完→再退出"。
+/// 提示写 stderr：pty 下退出瞬间 stdout flush 未决时 stdout.write 会抛
+/// "StreamSink is bound to a stream"——stderr 独立 sink 必达。
+void _exitRevoked(String storePath) {
+  _deleteLocalData(storePath);
   _restoreTerminal();
   try {
     stderr.write('$_clearHome本设备已被撤销，本地数据已清除，请重新入网。\n');
+    stderr.flush();
+  } catch (_) {}
+  exit(0);
+}
+
+/// `/reset` 的收尾：清完本地数据后提示并退出。用户下次启动 TUI 会走全新入网向导。
+void _exitReset(String storePath) {
+  _deleteLocalData(storePath);
+  _restoreTerminal();
+  try {
+    stderr.write('$_clearHome已重置本设备，本地数据已清除，下次启动将重新入网。\n');
     stderr.flush();
   } catch (_) {}
   exit(0);
@@ -2826,6 +2848,77 @@ Future<void> _uploadAttachmentInBackground(ChatSession session, String path) asy
   }
 }
 
+/// `/reset`：重置本设备——三道闸门过后清本地数据并退出（下次启动走全新入网向导）。
+///
+/// 闸门刻意**全离线**：设备名比对 + 本机锁屏码，不联网、不问空间口令。理由见
+/// `server/src/devices.ts` 的 `retireDevice`：空间口令是**共享**给伴侣的加入凭证，
+/// 不该获得销毁我这台设备的权力；而校验它必须联网，会让"连着一台死服务器"这个
+/// 最常见的重置场景直接自锁。
+///
+/// 服务端退役（POST /devices/retire）在确认之后、清数据之前尽力而为：失败了也照清，
+/// 只是明确告诉用户"服务端可能还留着这台设备的记录"。顺序不能反——token 就在
+/// store 里，清完就再也没有调用它的凭证了。
+Future<void> _execReset(String storePath) async {
+  final s = _state!;
+  final session = s.session;
+
+  // ① 设备名：确认清的是哪一台（空名先让用户 /device 起名，不降级成 deviceId——
+  //    让用户抄一串 id 只会制造新的抄错机会）
+  final deviceName = session.store.deviceName?.trim() ?? '';
+  if (deviceName.isEmpty) {
+    session.messages
+        .add(_systemMessage(session, '⚠️ 未设置设备名，无法确认目标——请先 /device <设备名>（未做任何改动）'));
+    return;
+  }
+  final typed =
+      (await _prompt(session, '❓ 确认要重置的是本机「$deviceName」，请输入设备名:', required: true))
+          .trim();
+  if (!s.running) return;
+  if (typed != deviceName) {
+    session.messages.add(_systemMessage(session, '✅ 已取消（设备名不符，未做任何改动）'));
+    return;
+  }
+
+  // ② 本机锁屏码（已设才验：Argon2id，走 /pin 那套；成功会清零尝试计数）
+  final pinHash = session.store.pinHash;
+  if (pinHash != null) {
+    final pin = (await _prompt(session, '❓ 输入本机锁屏码（重置需验证）:', hidden: true, required: true))
+        .trim();
+    if (!s.running) return;
+    if (pin.isEmpty || !await _verifyPin(pinHash, pin)) {
+      session.messages.add(_systemMessage(session, '⚠️ 锁屏码错误——已取消（未做任何改动）'));
+      return;
+    }
+  }
+
+  // ③ 服务端退役：尽力而为。失败不拦清算，只把"可能有残留"如实告知
+  var retired = true;
+  final server = session.server;
+  final token = session.store.sessionToken;
+  if (server.isEmpty || token == null) {
+    retired = false;
+    session.messages.add(_systemMessage(session, '⚠️ 未连接服务端，跳过退役（对方设备列表里可能仍留有本机记录）'));
+  } else {
+    try {
+      await _busy(session, '⏳ 正在从服务端退役本设备......',
+          () => ApiClient(server).retireDevice(token));
+    } on ApiException catch (e) {
+      retired = false;
+      session.messages.add(_systemMessage(session, '⚠️ 服务端退役失败（${e.message}）——本地照常清除'));
+    } catch (e) {
+      retired = false;
+      session.messages.add(_systemMessage(session, '⚠️ 服务端退役失败（$e）——本地照常清除'));
+    }
+  }
+  if (!s.running) return;
+
+  if (retired) {
+    session.messages.add(_systemMessage(session, '✅ 已从服务端退役本设备'));
+  }
+  _scheduleRender();
+  _exitReset(storePath);
+}
+
 Future<void> _execCommand(String line) async {
   final s = _state!;
   final parts = line.split(RegExp(r'\s+'));
@@ -2863,6 +2956,10 @@ Future<void> _execCommand(String line) async {
       s.session.messages.add(_systemMessage(
         s.session,
         '/revoke <序号|设备名> :: 撤销同空间的某台设备（需密保口令；被撤设备将清空本地数据）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '/reset :: 重置本设备（输入本机设备名 + 锁屏码确认，清空本地数据后退出）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3220,6 +3317,16 @@ Future<void> _execCommand(String line) async {
       }
     case '/history':
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));
+    case '/reset':
+      // 重置本设备（老板 2026-09-21）：清掉本地 store 与附件缓存，回到全新入网向导。
+      // 不可逆，故三道闸门：**全部离线**，不依赖网络、不碰密保口令——
+      //   ① 输入本机设备名（确认清的是这台，挡误触/顺手回车）
+      //   ② 本机锁屏码（已设才验；锁屏码只属于本机持有者，不像空间口令那样是共享凭证）
+      //   ③ 服务端退役尽力而为（失败只提示残留，不拦清算——离线也必须能重置）
+      // 为什么不校验空间口令：那是共享给伴侣的加入凭证，不该有销毁我这台设备的权力；
+      // 而且校验必须联网。详见 docs/SECURITY.md。
+      await _execReset(s.storePath);
+      break;
     case '/attach':
       if (arg.isEmpty) {
         s.session.messages.add(_systemMessage(s.session, '🔧 用法: /attach <文件路径> [描述]'));

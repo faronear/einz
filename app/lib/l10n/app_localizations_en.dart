@@ -933,4 +933,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetDeviceConfirm => 'Reset';
+
+  @override
+  String resetDeviceNameLabel(String name) {
+    return 'Type the device name \"$name\"';
+  }
+
+  @override
+  String get resetDeviceNameMismatch => 'Device name does not match';
+
+  @override
+  String get resetDeviceNameMissing =>
+      '⚠️ This device has no name yet, so there is nothing to confirm against — set a device name first';
+
+  @override
+  String get resetDevicePinLabel => 'This device\'s PIN';
+
+  @override
+  String get resetDeviceServerResidualHint =>
+      '⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner\'s device list';
 }

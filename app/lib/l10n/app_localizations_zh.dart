@@ -891,4 +891,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetDeviceConfirm => '确认重置';
+
+  @override
+  String resetDeviceNameLabel(String name) {
+    return '输入设备名「$name」';
+  }
+
+  @override
+  String get resetDeviceNameMismatch => '设备名不符';
+
+  @override
+  String get resetDeviceNameMissing => '⚠️ 未设置本设备名称，无法确认重置目标——请先在菜单里设置设备名称';
+
+  @override
+  String get resetDevicePinLabel => '本设备锁屏码';
+
+  @override
+  String get resetDeviceServerResidualHint =>
+      '⚠️ 本地数据已清除，但服务端退役未完成——对方的设备列表里可能仍留有这台设备';
 }

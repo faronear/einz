@@ -1078,7 +1078,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (picked == 'passphrase') {
       await _showChangePassphraseDialog();
     } else if (picked == 'reset') {
-      await confirmResetDevice(context, db: widget.db);
+      // 闸门所需的两个输入：设备名（确认清的是这台）与"是否设了锁屏码"（决定要不要验）。
+      // hasPin 是异步 getter，先 await 出来、过一遍 mounted 再传进弹窗。
+      // 设备名取不到（空）时 confirmResetDevice 自己会拦下并提示。
+      final hasPin = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
+      if (!mounted) return;
+      await confirmResetDevice(
+        context,
+        db: widget.db,
+        api: widget.api,
+        deviceName: widget.deviceName ?? '',
+        token: widget.token,
+        hasPin: hasPin,
+      );
     }
   }
 

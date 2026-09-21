@@ -5,7 +5,7 @@ import { assertDeviceName } from './deviceName.js'
 import { assertPersonName } from './personName.js'
 import { deviceScopeClause, isSpaceMember, requireSession } from './guard.js'
 import { assertSpacePassphrase } from './escrow.js'
-import { broadcastProfileUpdated, getConnectedAt, getOnlineSince } from './ws.js'
+import { broadcastProfileUpdated, forgetDeviceConnection, getConnectedAt, getOnlineSince } from './ws.js'
 
 /** GET /devices：设备列表（含 person 映射）。
  *  注意：不在本接口刷新调用方 last_seen——last_seen 只由 WS 连接/心跳/断开维护，
@@ -85,6 +85,46 @@ export async function revokeDevice (
   ).run(now, targetDeviceId)
   db.prepare(`DELETE FROM push_tokens WHERE device_id = ?`).run(targetDeviceId)
   db.prepare(`DELETE FROM sessions WHERE device_id = ?`).run(targetDeviceId)
+
+  return { ok: true }
+}
+
+/** POST /devices/retire：**本机自助退役**——把自己从服务端注销，回到从未入网的样子。
+ *
+ * 与 §7.2 撤销（revoke）的区别：
+ * - **目标恒为自己**：撤销是收拾别人的设备（自己被收拾要走对方那台发起），退役是收拾自己；
+ * - **不校验空间口令**：这里是"注销我自己"，session 就是所有权证明；而且客户端在调用它
+ *   之前已经过了「输入设备名 + 本机 PIN」的本地闸门。口令是**共享**给伴侣的加入凭证，
+ *   不该获得"销毁我这台设备"的权力（老板 2026-09-21 定稿）；
+ * - **不发 `device.revoked`**（见 ws.forgetDeviceConnection）：远程触发擦除的授权信号仍然
+ *   只有口令干得动（撤销路径），本接口不打开这条旁路。
+ *
+ * 存在的理由：客户端"重置设备"原先纯本地清数据，服务端这台设备的注册表项、Push Token、
+ *   会话全都留着——对方 /devices 里是一台永远在线的幽灵，而且 revoke 禁止自撤，谁也删不掉它
+ *   （老板 2026-09-21 定：一并处理）。
+ *
+ * 清理范围（比 revoke 多一条 challenges）：
+ * - devices：置 status='revoked'、**不删行**（messages.sender_device_id 会失去归属，
+ *   且配置层 getDeviceStatus 只认 revoked，新增状态会被判成 active 而"复活"）；
+ * - push_tokens（否则继续给一台已经不存在的设备推送）、sessions（持有即为登录态）、
+ *   challenges（无外键，遗留的待签会话可重放签发新 session，让幽灵复活）；
+ * - connection_events / device_activity 是**只追加审计表**，刻意保留——"这台设备来过"
+ *   是事后追溯的依据，且它们不参与任何业务语义。
+ */
+export function retireDevice(token: string): { ok: true } {
+  // 先鉴权（此刻 status 还是 active）：requireSession 自带"已撤销设备不得操作"
+  const caller = requireSession(token)
+
+  const db = getDb()
+  db.prepare(`UPDATE devices SET status = 'revoked', last_seen = 0 WHERE device_id = ?`).run(
+    caller.device_id
+  )
+  db.prepare(`DELETE FROM push_tokens WHERE device_id = ?`).run(caller.device_id)
+  db.prepare(`DELETE FROM sessions WHERE device_id = ?`).run(caller.device_id)
+  db.prepare(`DELETE FROM challenges WHERE device_id = ?`).run(caller.device_id)
+
+  // 自己的 WS 连接还在 conns 里：摘掉并让对端立刻看到下线（不发自毁帧，见 ws 注释）
+  forgetDeviceConnection(caller.device_id)
 
   return { ok: true }
 }

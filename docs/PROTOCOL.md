@@ -78,7 +78,8 @@
 | POST | /attachments | 上传附件 blob（分片可选） | Bearer |
 | GET | /attachments/:id | 下载附件 blob | Bearer |
 | GET | /devices | 设备列表 | Bearer |
-| DELETE | /devices/:id | 撤销设备（标记 revoked + 清 Push Token/会话） | Bearer |
+| POST | /devices/:id/revoke | 撤销**别人**的设备（§7.2，需密保口令） | Bearer |
+| POST | /devices/retire | **本机自助退役**（§7.2.1，无请求体，只认 session） | Bearer |
 | POST | /push/register | 注册 Push Token | Bearer |
 | DELETE | /push/register | 注销 Push Token | Bearer |
 | GET | /space | 空间信息（space_id、成员设备） | Bearer |
@@ -334,6 +335,29 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   返回 `401 UNAUTHORIZED`，重认证时挑战返回 `403 DEVICE_REVOKED`。**这两个信号（帧 / 该 code）
   是客户端唯一被授权清空本地数据的依据**；`403 FORBIDDEN`（未登记）与网络故障都只应警告。
 
+### 7.2.1 自助退役 POST /devices/retire（本机注销，2026-09-21）
+
+无请求体——身份与目标都由 Bearer 会话决定，**目标恒为自己**。
+
+- **为什么单独一个端点**：客户端"重置设备"原先纯本地清数据，服务端这台设备的注册表项、
+  Push Token 与会话全都留着，对方 `/devices` 里是一台永远在线的幽灵；而 §7.2 禁止自撤，
+  谁也删不掉它。
+- **为什么不校验密保口令**（与 §7.2 的关键差异）：这里是"注销我自己"，session 即所有权
+  证明；而且客户端在调用之前已经过了本地闸门（输入本机设备名 + 本机锁屏码）。密保口令是
+  **共享**给伴侣的加入凭证，不该获得销毁我这台设备的权力；校验它还必须联网，会让"本机
+  身份属于一台已经连不上的服务器"这个最常见的重置场景直接自锁。
+- 服务端动作：设备置 `revoked`（**行保留**，否则它被当成"未登记"而非"已退役"，
+  且 `messages.sender_device_id` 会失去归属）+ `last_seen = 0`，清除其 Push Token、
+  活动会话与未被消费的 challenge，并把它的 WS 连接移出在线表。审计 kind 为
+  `device.retire`（区别于被人撤销的 `device.revoke`）。
+- **退役绝不发 `device.revoked` 帧，也不主动关闭 WS**（`ws.forgetDeviceConnection`）：
+  那帧是客户端自毁本地数据的授权信号，而本端点只认 session——若由它发出，偷到 session
+  的人就能远程擦设备，等于给 §7.2 的口令闸门挖了一条旁路。取而代之的是给对端广播一次
+  `peer.offline`，让对方立刻看到这台设备下线。
+- 失败码：无/失效 token → `401 UNAUTHORIZED`；已撤销设备的会话 → `403 DEVICE_REVOKED`。
+  客户端约定：**先调它、再清本地数据**（token 就存在本地，清完就调不动了）；调用失败时
+  是否仍清本地由客户端决定——现实现是照清，并如实提示"服务端可能仍有残留"。
+
 ### 7.3 Push Token POST /push/register
 
 ```json
@@ -420,7 +444,7 @@ Authorization: Bearer <session_token>
 | C→S | `ping` / S→C `pong` | — | 心跳（30s 间隔） |
 | S→C | `sync.advance` | `{ "last_sequence": 105 }` | 提示有新数据，可拉 /sync |
 | S→C | `receipt.updated` | `{ "person_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
-| S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话 |
+| S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
 | S→C | `peer.online` | `{ "device_id": "dev1", "person_id": "per1", "online_since": 1787900000000 }` | 对端设备上线（WS 连接建立时广播；**不发给同 person 的设备**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
 | S→C | `peer.offline` | `{ "device_id": "dev1", "person_id": "per1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 person 设备） |
 | S→C | `passphrase.rotated` | `{ "device_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成邀请码/改口令时按需检测 updated_at 再要求输入新口令） |

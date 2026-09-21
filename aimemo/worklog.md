@@ -7769,3 +7769,30 @@ to, using or accessing the encryption within Apple's operating system"**，后�
 "是否用于豁免以外用途"答"否" → 不要求交文档。
 
 **注意**：只对**新上传**的 build 生效，已上传的不追溯（需手工答一次或重传）。
+
+## 2026-09-21 重置设备：加本地闸门 + 服务端自助退役（/devices/retire）
+
+**起因**：老板要给 TUI 加 `/reset`，并要求输入口令验证。查下来 app 端当时的重置只有
+一个 AlertDialog（点一次红色按钮就清），没有任何知识因子。
+
+**决策过程（与老板两轮往复）**：
+1. 老板原方案是"和 app 一样用空间口令验证"。**我不同意，老板采纳了替代方案**——
+   理由：① 空间口令是**共享**给伴侣的加入凭证，让它能销毁"我这台设备"是权限倒挂；
+   ② 客户端不存任何本地校验因子（"服务器为唯一真相源"），校验必须联网，而重置的头号
+   用途恰是"本机身份属于一台已经连不上的开发/过期服务器"→ 验不了就自锁，放行就等于
+   拔网线可绕过；③ 有些空间压根没有密保箱。
+2. 定稿闸门：**输入本机设备名 + 本机锁屏码（已设才验）**，全离线；服务端退役只认
+   session 且**不发 device.revoked**（否则偷到 session 就能远程擦设备，给口令闸门开旁路）。
+
+**落地**（server / shared / app / cli 四处 + 文档）：
+- `POST /devices/retire`（无请求体）：devices 置 revoked + last_seen=0，清
+  push_tokens/sessions/challenges，**不删 devices 行**；`ws.forgetDeviceConnection`
+  先广播 `peer.offline` 再把 conn 摘出在线表（不 close、不发自毁帧）。
+- app：`reset_device.dart` 换成输入型 dialog；PIN 校验借 `AppLockService.unlock`
+  （同款 Argon2 解包 + 防爆破）。
+- cli：`/reset` 命令；本地删除抽成 `_deleteLocalData`，与 `_exitRevoked` 共用。
+- 退役失败 → **仍清本地**，只如实提示"服务端可能残留"（网络 slack 不能变成自锁）。
+
+**教训（可复用）**：凡是"远端已有更严授权通道"的本地破坏性操作，别为了加严就把
+**共享秘密**（空间口令）拉进来——它会同时带来权限倒挂和可用性依赖。要加就加
+**本机独占**的知识因子（PIN / 设备名），并且把"旧网关的自毁信号"留给原来的通道。

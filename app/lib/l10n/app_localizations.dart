@@ -1729,6 +1729,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset'**
   String get resetDeviceConfirm;
+
+  /// No description provided for @resetDeviceNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the device name \"{name}\"'**
+  String resetDeviceNameLabel(String name);
+
+  /// No description provided for @resetDeviceNameMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name does not match'**
+  String get resetDeviceNameMismatch;
+
+  /// No description provided for @resetDeviceNameMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ This device has no name yet, so there is nothing to confirm against — set a device name first'**
+  String get resetDeviceNameMissing;
+
+  /// No description provided for @resetDevicePinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s PIN'**
+  String get resetDevicePinLabel;
+
+  /// No description provided for @resetDeviceServerResidualHint.
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner\'s device list'**
+  String get resetDeviceServerResidualHint;
 }
 
 class _AppLocalizationsDelegate

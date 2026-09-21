@@ -19,6 +19,9 @@ class Api {
   static const spaceJoin = '/spaces/join';
   // 消息回执（已送达/已读）单调高水位（POST 上报 / GET 回读）
   static const receipts = '/receipts';
+  // 本机自助退役（PROTOCOL.md §7.3）：客户端"重置设备"清本地数据之前调用，把自己
+  // 从服务端注销（清会话/Push/待签 challenge、置 revoked），避免留下幽灵设备。
+  static const deviceRetire = '/devices/retire';
 }
 
 /// 认证挑战结果。

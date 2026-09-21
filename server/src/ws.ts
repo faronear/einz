@@ -260,6 +260,24 @@ export function broadcastNewMessage(exceptDeviceId: string, message: MessageEnve
   }
 }
 
+/** 设备自助退役（`POST /devices/retire`，devices.retireDevice）：让它立刻从在线表消失。
+ *
+ * **这里刻意不发 `device.revoked`，也不主动 close**：
+ * - `device.revoked`（+ 4403）是客户端**自毁本地数据**的授权信号（docs/E2EE.md §9.3）。
+ *   退役接口只认 session token（"注销我自己"），若由它发出这帧，偷到 session 的人就能
+ *   远程擦掉这台设备——把撤销刻意筑起的口令闸门（docs/PROTOCOL.md §7.2）从旁路绕过。
+ * - 任何主动关闭（含 1000）都会让客户端立刻重连，撞上 403 `DEVICE_REVOKED`
+ *   → 同样触发自毁。所以只静默摘出 `conns`，socket 交给客户端自己退出时收尾。
+ *
+ * 摘出的效果：心跳不再给它刷 last_seen（ws.ts 心跳只遍历 conns），也不再收到任何广播，
+ * 对端下一次 /devices 或轮询就看不到它在线——无需等待 30s 轮询兜底。
+ */
+export function forgetDeviceConnection(deviceId: string): void {
+  // 顺序不能反：broadcastPeerStatus 靠 conns 里的连接取空间与人身份，摘掉就广播不了
+  broadcastPeerStatus(deviceId, "peer.offline");
+  conns.delete(deviceId);
+}
+
 /** 通知设备被撤销（PROTOCOL.md §8.2 device.revoked）。
  *  发帧后主动关闭连接并移出 conns——否则被撤销设备仍能持续接收新消息广播（P2 修复）。 */
 export function notifyRevoked(deviceId: string): void {

@@ -416,5 +416,13 @@
   "advancedResetDevice": "Reset device",
   "resetDeviceTitle": "Reset device?",
   "resetDeviceMessage": "This erases every message, attachment and key on this device, and returns to the new-device setup.\n\nThe space itself stays on the server, and neither your other devices nor your partner's are affected.\n\nThis cannot be undone!",
-  "resetDeviceConfirm": "Reset"
+  "resetDeviceConfirm": "Reset",
+  "resetDeviceNameLabel": "Type the device name \"{name}\"",
+  "@resetDeviceNameLabel": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "resetDeviceNameMismatch": "Device name does not match",
+  "resetDeviceNameMissing": "⚠️ This device has no name yet, so there is nothing to confirm against — set a device name first",
+  "resetDevicePinLabel": "This device's PIN",
+  "resetDeviceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner's device list"
 }

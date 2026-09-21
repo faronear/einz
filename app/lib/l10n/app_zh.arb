@@ -416,5 +416,13 @@
   "advancedResetDevice": "重置设备",
   "resetDeviceTitle": "重置设备？",
   "resetDeviceMessage": "将清除本设备上的全部消息、附件与密钥，并回到新设备入网步骤。\n\n秘境本身仍保留在服务器上，你和对方的其他设备不受影响。\n\n此操作无法撤销！",
-  "resetDeviceConfirm": "确认重置"
+  "resetDeviceConfirm": "确认重置",
+  "resetDeviceNameLabel": "输入设备名「{name}」",
+  "@resetDeviceNameLabel": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "resetDeviceNameMismatch": "设备名不符",
+  "resetDeviceNameMissing": "⚠️ 未设置本设备名称，无法确认重置目标——请先在菜单里设置设备名称",
+  "resetDevicePinLabel": "本设备锁屏码",
+  "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成——对方的设备列表里可能仍留有这台设备"
 }
