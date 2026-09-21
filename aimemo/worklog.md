@@ -7642,3 +7642,29 @@ path_provider、device_info_plus、package_info_plus。也就是说 Linux GUI �
    本来就应该是"滚轮滚 + 鼠标划选"，不需要跟移动端"按住拉动"对齐。
 
 结论：桌面端的正确手感 = 滚轮滚动 + 鼠标划选文本，**不做**按住拖动滚动。
+
+## 2026-09-21 打 macOS 包：产物名按渠道区分 + 脚本名改回 buildMacos.sh
+
+老板发现 `--adhoc` 出的包也叫 `einz-gui-macos-dist-v*.zip`（原来不分模式统一用 -dist），
+会误导。改成按渠道命名：
+
+| 模式 | 产物名 |
+| --- | --- |
+| 默认（Developer ID + 公证） | `einz-gui-macos-dist-v<时间>.zip` |
+| `--no-notary` | `einz-gui-macos-dist-nonotary-v<时间>.zip` |
+| `--adhoc` | `einz-gui-macos-dev-v<时间>.zip` |
+
+`--no-notary` 刻意与 `-dist` 分开：Developer ID 已签但没公证，本机/放行过的机器能跑，
+下载到新机器会被 Gatekeeper 拦——不该被当成可分发产物发出去。
+实测：`--adhoc` 跑完落盘 `_release.gitomit/einz-gui-macos-dev-v2609210027.zip`。
+脚本 `--help` 与顶部用法现在把三个渠道和各自产物名列清楚（名字不再骗人）。
+
+另外把 `buildMacosDist.sh` **改名回 `buildMacos.sh`**（老板：名字里的 "Dist" 让他以为
+只能出 dist 包，其实一个脚本覆盖 dev/dist 两渠道）。同步改了 package.json 两处引用和
+workflow 里一处注释引用——HEAD 的 `desk-mac-build-dist` / `-no-notary` 指向该脚本，
+不改会断。
+
+**待老板定**：工作区里 `desk-mac-build-dev-raw`（老板未提交，仍走 flutter 默认签名 =
+Apple Development + 内嵌本机 profile）产出的 zip **也叫 `einz-gui-macos-dev-v*.zip`**，
+与新的 ad-hoc dev 渠道**同名但不同物**（前者只能在本机跑，异机被 Taskgated 杀）——
+正是这次想消除的那类混淆，建议删掉 `-raw`。
