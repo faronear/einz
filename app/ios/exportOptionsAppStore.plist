@@ -8,8 +8,8 @@
 
      ⚠️ 与 Ad Hoc 的差别只在 method 与 provisioningProfiles：
         - Ad Hoc    → method=ad-hoc，profile "Einz Dist Adhoc"（含设备 UDID 白名单）
-        - App Store → method=app-store，profile "Einz Dist AppStoreConnect"（无设备列表）
-    两者 bundle id 相同（cc.tic.einz.ios），所以是同一个 App、同一个数据容器。
+        - App Store → method=app-store，profile "Einz Dist Appstore"（无设备列表）
+    两者 bundle id 相同（cc.tic.einz），所以是同一个 App、同一个数据容器。
     App Store 包只能用 TestFlight / 上架安装，**不能**用 devicectl 直装到手机。
 
     只导出、不重新编译时（同一个 archive 可导出多次）：
@@ -27,8 +27,8 @@
 	<string>Apple Distribution</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>cc.tic.einz.ios</key>
-		<string>Einz Dist AppStoreConnect</string>
+		<key>cc.tic.einz</key>
+		<string>Einz Dist Appstore</string>
 	</dict>
 	<key>compileBitcode</key>
 	<false/>

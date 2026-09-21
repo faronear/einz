@@ -20,7 +20,7 @@
 	<string>Apple Distribution</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>cc.tic.einz.ios</key>
+		<key>cc.tic.einz</key>
 		<string>Einz Dist Adhoc</string>
 	</dict>
 	<key>compileBitcode</key>

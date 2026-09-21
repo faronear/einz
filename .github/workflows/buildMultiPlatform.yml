@@ -392,6 +392,9 @@ jobs:
       - name: Install provisioning profile
         if: steps.secrets.outputs.configured == 'true'
         env:
+          # 必须是 iOS App ID **cc.tic.einz** 的 Ad Hoc profile（2026-09-21 起三端标识
+          # 统一为 cc.tic.einz，此前用的是 cc.tic.einz.ios，旧 profile 已作废）。
+          # 生成方式：base64 -i 4_Einz_Dist_Adhoc_cc.tic.einz.mobileprovision | pbcopy
           IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles

@@ -20,9 +20,9 @@ set -euo pipefail
 
 # ---------- 固定配置（改这里即可换机器/换 App）----------
 readonly TEAM_ID="CQ6733CTMV"                       # Faronear Co. Ltd.（付费账号）
-readonly BUNDLE_ID="cc.tic.einz.ios"
+readonly BUNDLE_ID="cc.tic.einz"
 readonly PROFILE_ADHOC="Einz Dist Adhoc"
-readonly PROFILE_STORE="Einz Dist AppStoreConnect"
+readonly PROFILE_STORE="Einz Dist Appstore"
 readonly DEFAULT_DEVICE="00008030-0005306011F9402E" # iPhone 11（luk_ip11_210700）
 
 # 统一用 Xcode 26.3（iOS 26.2 SDK）：
