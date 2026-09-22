@@ -420,6 +420,8 @@ class MessageRepository {
 
     // 补发离线队列
     await _flushPending();
+    // 对账卡在 failed 但服务端早已收下的行（换设备后的历史消息，见 retryMessage）
+    await _reconcileStuckFailed();
     // 拉取对方回执（已送达/已读）高水位：为将来 UI 准备，失败不影响同步
     try {
       await refreshReceipts();
@@ -540,6 +542,23 @@ class MessageRepository {
       }
     }
     return flushed;
+  }
+
+  /// 对账：把"服务端早已收下（serverSequence 非空）却停在 failed"的行置回 sent。
+  ///
+  /// 为什么要这一步（老板 2026-09-22 实测的线上 bug）：换设备后，本地这些历史消息的
+  /// 信封带着**旧 device_id**（AAD 的一部分，改不了），重投必被服务端 403，客户端又
+  /// 把它判成"服务端明确拒绝"→ 永久 failed；而锚点早已越过这些 seq，服务端不会再下发
+  /// 它们（[_insertLocal] 也因此刷不回来）。于是必须靠本地对账自愈，而不是等用户点按。
+  /// 现在点按也能立刻恢复（见 [retryMessage]），这里让"不点按也能好"。
+  Future<int> _reconcileStuckFailed() async {
+    final rows = await (db.select(db.localMessages)
+          ..where((m) => m.status.equals('failed') & m.serverSequence.isNotNull()))
+        .get();
+    for (final row in rows) {
+      await _setStatus(row.messageId, 'sent');
+    }
+    return rows.length;
   }
 
   /// 读取本地历史（解密为明文，按 server_sequence 升序；未同步的排最后）。
@@ -869,6 +888,13 @@ class MessageRepository {
   /// 手动重发一条 failed 消息（UI 点按「发送失败」图标）：先置 pending（界面立即
   /// 显示发送中）→ 重发 → 成功置 sent、失败回置 failed。无 token 保持 pending
   /// （等联网后由 sync 补发）。已墓碑/不存在的消息忽略。
+  ///
+  /// **已知 server_sequence 的行不重投**（老板 2026-09-22 实测的线上 bug）：seq 只有
+  /// 服务端接受该消息时才会写入（[_markSent] 或 sync），所以"有 seq + failed"= 服务端
+  /// 早已收下、只是本地状态卡住了。此时重投毫无意义，且**必定失败**——信封里的
+  /// sender_device_id 是 AAD 的一部分（shared/lib/src/crypto/message_crypto.dart），
+  /// 换设备后无法改写，服务端设备校验会 403，而客户端又把它判成"服务端明确拒绝"
+  /// （[_isServerRejection]）→ 状态永远回不到 sent。
   Future<void> retryMessage(String messageId) async {
     // 注意：这里**故意不检查** _pendingUploads —— 老板 2026-09-13 的场景正是
     // "请求还在途（响应丢了），本端一直显示小飞机"，此时用户点按就是要**立刻**
@@ -879,6 +905,10 @@ class MessageRepository {
           ..where((m) => m.messageId.equals(messageId)))
         .getSingleOrNull();
     if (row == null) return;
+    if (row.serverSequence != null) {
+      await _setStatus(messageId, 'sent');
+      return;
+    }
     await _setStatus(messageId, 'pending');
     final t = token;
     if (t == null) return; // 离线：留 pending，联网后 sync 补发

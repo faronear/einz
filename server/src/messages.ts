@@ -64,16 +64,25 @@ export function postMessage(token: string, body: unknown): { message_id: string;
   const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
 
   const env = validateEnvelope(body);
-  if (env.sender_device_id !== device_id) {
-    throw new ApiError("FORBIDDEN", "sender_device_id mismatch", 403);
-  }
 
   const db = getDb();
+  // 幂等查询排在设备校验**之前**（老板 2026-09-22 定）：message_id 已是身份，
+  // 已入库的消息写入是 no-op，没有可伪造的归因，因此不必也不该校验
+  // sender_device_id。反过来说，信封里的 sender_device_id 是 AAD 的一部分
+  // （shared/lib/src/crypto/message_crypto.dart），客户端换设备后**无法改写**——
+  // 校验若排在前面，历史消息的重投会永远 403，本地状态再也回不来
+  // （2026-09-22 实测：iMac 客户端两条 9/18 的消息永远停在"点击重发"红色标签）。
+  // 查询按会话 Space 隔离（space_id = ?），因此不会跨空间探测或泄漏。
   const existing = db
     .prepare(`SELECT server_sequence, created_at FROM messages WHERE message_id = ? AND space_id = ?`)
     .get(env.message_id, spaceId) as { server_sequence: number; created_at: number } | undefined;
   if (existing) {
     return { message_id: env.message_id, server_sequence: existing.server_sequence, created_at: existing.created_at };
+  }
+
+  // 未入库的新消息：仍必须由本设备本人投递
+  if (env.sender_device_id !== device_id) {
+    throw new ApiError("FORBIDDEN", "sender_device_id mismatch", 403);
   }
 
   const now = Date.now();

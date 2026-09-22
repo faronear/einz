@@ -1083,14 +1083,21 @@ class _SetupPageState extends State<SetupPage> {
 
   /// challenge-response 认证，返回 session（PROTOCOL.md §4）。
   /// [enrolledDeviceId] 用登记后服务端分配的真实 id（challenge 要求设备已入网）。
-  Future<SessionResult> _authenticate(DeviceKeyPair kp, String enrolledDeviceId) async {
+  /// [spaceId] 必填（Multiverse）：签发的 session 绑定该 Space，缺了服务端返回 400
+  /// （auth.ts:40-42）。会话过期自动续期也走这里，漏传会把本可自动恢复的消息变成
+  /// 永久发送失败（老板 2026-09-22 排查线上红色标签时发现）。
+  Future<SessionResult> _authenticate(
+    DeviceKeyPair kp,
+    String enrolledDeviceId, {
+    required String spaceId,
+  }) async {
     // 测试注入优先（golden 走 PIN/跳过路径时避免真实网络请求）
     if (widget.authOverride != null) {
       return widget.authOverride!(kp, enrolledDeviceId);
     }
     final s = await sodium();
     final api = ApiClient(effectiveServer);
-    final challenge = await api.challenge(enrolledDeviceId);
+    final challenge = await api.challenge(enrolledDeviceId, spaceId: spaceId);
     final opened = await sealOpen(
       s,
       base64Decode(challenge.sealedChallenge),
@@ -1265,7 +1272,9 @@ class _SetupPageState extends State<SetupPage> {
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
-        reauth: () async => (await _authenticate(kp, enroll.deviceId)).sessionToken,
+        reauth: () async =>
+            (await _authenticate(kp, enroll.deviceId, spaceId: _spaceId.text.trim()))
+                .sessionToken,
       ),
     ));
   }
@@ -1962,7 +1971,8 @@ class _SetupPageState extends State<SetupPage> {
       // 2) 认证（缓存 session；用登记后服务端分配的真实 deviceId）
       var token = _sessionToken;
       if (token == null) {
-        final session = await _authenticate(kp, _enroll!.deviceId);
+        final session = await _authenticate(kp, _enroll!.deviceId,
+            spaceId: _spaceId.text.trim());
         token = session.sessionToken;
         _sessionToken = token;
       }
@@ -2296,7 +2306,7 @@ class _SetupPageState extends State<SetupPage> {
     final enroll = _enroll!;
     // 认证（用登记后的真实 deviceId；信封页验证时未认证则这里补上）
     if (_sessionToken == null) {
-      final session = await _authenticate(kp, enroll.deviceId);
+      final session = await _authenticate(kp, enroll.deviceId, spaceId: enroll.spaceId);
       _sessionToken = session.sessionToken;
     }
     if (!mounted) return;

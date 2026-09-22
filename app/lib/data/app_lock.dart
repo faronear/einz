@@ -299,6 +299,11 @@ class AppLockPayload {
 
 /// 用锁包里的设备密钥对完成 challenge-response 重新认证（重启后 reauth 用：
 /// 会话过期 401/4401 时自动续期）。锁包无密钥对（旧包）时抛 [StateError]。
+///
+/// **必须带 spaceId**：challenge 签发的 session 会绑定该 Space（服务端 auth.ts
+/// 自 2026-09-15 起 space_id 必填，缺了直接 400）——会话过期时消息发送会走到这条
+/// 路径，400 又会被 [_isServerRejection] 判成"服务端明确拒绝"，把一条本可自动恢复的
+/// 消息变成**永久**发送失败（老板 2026-09-22 排查线上红色标签时发现）。
 Future<String> reauthFromPayload(AppLockPayload payload) async {
   final pub = payload.publicKeyB64;
   final priv = payload.privateKeyB64;
@@ -307,7 +312,7 @@ Future<String> reauthFromPayload(AppLockPayload payload) async {
   }
   final s = await sodium();
   final api = ApiClient(effectiveServer);
-  final challenge = await api.challenge(payload.deviceId);
+  final challenge = await api.challenge(payload.deviceId, spaceId: payload.spaceId);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
