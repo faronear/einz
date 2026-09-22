@@ -471,10 +471,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
-  String get chatPageRenameDeviceTitle => '我的设备信息';
+  String get chatPageRenameDeviceTitle => '本机信息（本秘境）';
 
   @override
-  String get chatPageRenameDeviceLabel => '设备名称';
+  String get chatPageRenameDeviceLabel => '本秘境里的名称';
+
+  @override
+  String get chatPageDeviceScopeHint => '名称与公钥都属于当前秘境——同一台设备在别的秘境是另一套。';
 
   @override
   String get chatPageRenameDeviceEmptyError => '名称不能为空';
@@ -506,7 +509,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageCopy => '复制';
 
   @override
-  String get chatPagePublicKeyCopied => '已复制设备公钥';
+  String get chatPagePublicKeyCopied => '已复制公钥';
 
   @override
   String get chatPageEdit => '编辑';
@@ -611,7 +614,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
-  String get chatPageMenuDeviceNameLabel => '我的设备';
+  String get chatPageMenuDeviceNameLabel => '本机名称';
 
   @override
   String get chatPagePinLabel => '锁屏码';
@@ -803,7 +806,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageDeviceRevoked => '本设备已被撤销，本地数据已清除，请重新配置';
 
   @override
-  String get chatPageDevicePublicKeyLabel => '设备公钥';
+  String get chatPageDevicePublicKeyLabel => '本秘境里的公钥';
 
   @override
   String get chatPageDevicePublicKeyFailed => '未记录';

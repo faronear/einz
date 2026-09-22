@@ -1285,6 +1285,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 本机信息弹窗：说明"名称与公钥只属于当前秘境"——多空间下同一台设备在
+            // 每个秘境各有一套（名称可不同、公钥必然不同），不点明会让人以为改的是
+            // 全局设备名（老板 2026-09-22 定：承认 per-space，不强行统一）。
+            if (renameDevice) ...[
+              Text(
+                l10n.chatPageDeviceScopeHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.outline,
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             // 名字/设备名输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
             // 白底可编辑、按钮消失（老板要求 2026-09-09）
             ValueListenableBuilder<bool>(

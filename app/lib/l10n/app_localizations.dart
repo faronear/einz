@@ -977,14 +977,20 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameDeviceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Device info'**
+  /// **'This device in this space'**
   String get chatPageRenameDeviceTitle;
 
   /// No description provided for @chatPageRenameDeviceLabel.
   ///
   /// In en, this message translates to:
-  /// **'Device name'**
+  /// **'Name in this space'**
   String get chatPageRenameDeviceLabel;
+
+  /// No description provided for @chatPageDeviceScopeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The name and public key belong to this space only — the same device has its own set in every space.'**
+  String get chatPageDeviceScopeHint;
 
   /// No description provided for @chatPageRenameDeviceEmptyError.
   ///
@@ -1037,7 +1043,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPagePublicKeyCopied.
   ///
   /// In en, this message translates to:
-  /// **'Copied device public key'**
+  /// **'Public key copied'**
   String get chatPagePublicKeyCopied;
 
   /// No description provided for @chatPageEdit.
@@ -1235,7 +1241,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuDeviceNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'Device'**
+  /// **'Device name'**
   String get chatPageMenuDeviceNameLabel;
 
   /// No description provided for @chatPagePinLabel.
@@ -1571,7 +1577,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageDevicePublicKeyLabel.
   ///
   /// In en, this message translates to:
-  /// **'Public key'**
+  /// **'Public key in this space'**
   String get chatPageDevicePublicKeyLabel;
 
   /// No description provided for @chatPageDevicePublicKeyFailed.

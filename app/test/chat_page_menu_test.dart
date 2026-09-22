@@ -199,7 +199,7 @@ void main() {
     expect(find.text('高级'), findsOneWidget);
     // 我的身份/设备名称（未传 → 显示「未设置」）+ 退出秘境
     expect(find.text('我的身份'), findsOneWidget);
-    expect(find.text('我的设备'), findsOneWidget);
+    expect(find.text('本机名称'), findsOneWidget);
     expect(find.text('退出秘境'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text('高级'), findsOneWidget);
@@ -695,7 +695,7 @@ void main() {
     expect(find.text('personB'), findsNothing, reason: '不应回到旧名 personB');
   });
 
-  testWidgets('我的设备弹窗：标题「我的设备信息」、公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
+  testWidgets('本机信息弹窗：标题/公钥标签带「本秘境」限定、公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -723,15 +723,18 @@ void main() {
     // 菜单 → 我的设备
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('我的设备'));
+    await tester.tap(find.text('本机名称'));
     await tester.pumpAndSettle();
 
-    // 标题「我的设备信息」；公钥只读展示（左上角「公钥」标签 + 值）+ 复制按钮；输入框标签「设备名称」
-    expect(find.text('我的设备信息'), findsOneWidget, reason: '弹窗标题应为「我的设备信息」');
-    expect(find.text('设备公钥'), findsOneWidget, reason: '公钥框左上角应有「公钥」标签');
+    // 多空间（老板 2026-09-22）：名称与公钥都是**本秘境**的（同一台设备每个秘境一套），
+    // 标题/标签都必须带这个限定，弹窗顶部还要有一行说明
+    expect(find.text('本机信息（本秘境）'), findsOneWidget, reason: '弹窗标题应限定在本秘境');
+    expect(find.text('名称与公钥都属于当前秘境——同一台设备在别的秘境是另一套。'), findsOneWidget,
+        reason: '应说明该名称/公钥只属于本秘境');
+    expect(find.text('本秘境里的公钥'), findsOneWidget, reason: '公钥标签应限定在本秘境');
     expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
     expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥框右侧应有复制按钮');
-    expect(find.text('设备名称'), findsWidgets, reason: '输入框标签应为「设备名称」');
+    expect(find.text('本秘境里的名称'), findsWidgets, reason: '输入框标签应限定在本秘境');
 
     // 空名点保存 → 红字警示并停留（不静默）；对话框含两个输入框：只读公钥在前、
     // 可编辑设备名在后 → 取 .last
@@ -776,7 +779,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('我的设备信息'), findsNothing, reason: '保存成功应关闭弹窗');
+    expect(find.text('本机信息（本秘境）'), findsNothing, reason: '保存成功应关闭弹窗');
   });
 
   testWidgets('我的个人资料弹窗：标题/标签新文案、名字框下性别图标高亮、空名保存红字', (WidgetTester tester) async {

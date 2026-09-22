@@ -547,21 +547,16 @@ class VaultPayload {
   const VaultPayload({
     required this.spaces,
     this.activeSpaceId,
-    this.deviceName = '',
   });
 
   /// 单空间（旧包归一、首次创建用）。
-  factory VaultPayload.single(AppLockPayload payload, {String deviceName = ''}) =>
-      VaultPayload(spaces: [payload], activeSpaceId: payload.spaceId, deviceName: deviceName);
+  factory VaultPayload.single(AppLockPayload payload) =>
+      VaultPayload(spaces: [payload], activeSpaceId: payload.spaceId);
 
   final List<AppLockPayload> spaces;
 
   /// 当前进入的空间；为 null 或指向不存在的空间时 [active] 退回第一项。
   final String? activeSpaceId;
-
-  /// Vault 级统一设备名（各空间用同一个名字登记——「我的设备」弹窗只显示名字+公钥，
-  /// 统一名字后不同空间看起来是同一台设备，见设计文档 §2.2）。
-  final String deviceName;
 
   /// 当前空间凭证（无空间时 null）。
   AppLockPayload? get active {
@@ -592,19 +587,17 @@ class VaultPayload {
   VaultPayload remove(String spaceId) {
     final next = spaces.where((s) => s.spaceId != spaceId).toList();
     final nextActive = activeSpaceId == spaceId ? (next.isEmpty ? null : next.first.spaceId) : activeSpaceId;
-    return VaultPayload(spaces: next, activeSpaceId: nextActive, deviceName: deviceName);
+    return VaultPayload(spaces: next, activeSpaceId: nextActive);
   }
 
-  VaultPayload copyWith({List<AppLockPayload>? spaces, String? activeSpaceId, String? deviceName}) =>
+  VaultPayload copyWith({List<AppLockPayload>? spaces, String? activeSpaceId}) =>
       VaultPayload(
         spaces: spaces ?? this.spaces,
         activeSpaceId: activeSpaceId ?? this.activeSpaceId,
-        deviceName: deviceName ?? this.deviceName,
       );
 
   Map<String, dynamic> toJson() => {
         'version': 1,
-        'device_name': deviceName,
         'active_space_id': activeSpaceId,
         'spaces': spaces.map((s) => s.toJson()).toList(),
       };
@@ -627,7 +620,8 @@ class VaultPayload {
     return VaultPayload(
       spaces: spaces,
       activeSpaceId: raw['active_space_id'] as String?,
-      deviceName: (raw['device_name'] as String?) ?? '',
+      // 旧 Vault JSON 里的 device_name 已废弃（设备名归 per-space profile，见
+      // multiSpaceDesign §2.2 的 2026-09-22 修订），读到也不处理。
     );
   }
 }

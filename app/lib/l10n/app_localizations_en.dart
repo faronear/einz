@@ -499,10 +499,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGenderLabel => 'Gender';
 
   @override
-  String get chatPageRenameDeviceTitle => 'Device info';
+  String get chatPageRenameDeviceTitle => 'This device in this space';
 
   @override
-  String get chatPageRenameDeviceLabel => 'Device name';
+  String get chatPageRenameDeviceLabel => 'Name in this space';
+
+  @override
+  String get chatPageDeviceScopeHint =>
+      'The name and public key belong to this space only — the same device has its own set in every space.';
 
   @override
   String get chatPageRenameDeviceEmptyError => 'Name cannot be empty';
@@ -536,7 +540,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageCopy => 'Copy';
 
   @override
-  String get chatPagePublicKeyCopied => 'Copied device public key';
+  String get chatPagePublicKeyCopied => 'Public key copied';
 
   @override
   String get chatPageEdit => 'Edit';
@@ -648,7 +652,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMyNameLabel => 'My name';
 
   @override
-  String get chatPageMenuDeviceNameLabel => 'Device';
+  String get chatPageMenuDeviceNameLabel => 'Device name';
 
   @override
   String get chatPagePinLabel => 'PIN';
@@ -844,7 +848,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Device revoked — local data cleared, please set up again';
 
   @override
-  String get chatPageDevicePublicKeyLabel => 'Public key';
+  String get chatPageDevicePublicKeyLabel => 'Public key in this space';
 
   @override
   String get chatPageDevicePublicKeyFailed => 'Not recorded';
