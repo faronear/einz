@@ -7850,3 +7850,21 @@ Vault 猜 active 空间**，结果 7 个 widget 测试挂死（pumpAndSettle 10 
 `video_player_avfoundation-2.11.1`、`windows_file_picker-1.3.0` 是**残缺空目录**，导致
 `build_runner` 起不来（`Could not find a file named "pubspec.yaml"`）。删掉空目录后正常。
 另：`dart pub get` 会顺手升几个传递依赖，`pubspec.lock` 的无关变动已还原、不进分支。
+
+## 2026-09-22 多空间 M1：数据隔离（撤销自毁逐空间化 + 附件 spaceId + per-space 设置）
+
+1. **撤销自毁逐空间化**（最高优先级那条）：`_onDeviceRevoked` 从 `clear() + 删全表 +
+   MediaCache.deleteAll + AttachmentStore.clear` 改为 `removeSpace(widget.spaceId)`，只清
+   该空间；其他空间原样保留。**PIN 模式的坑**：重写密文包需要 pin，但撤销发生在聊天页
+   （那儿没有 pin，也不该为了这个功能把 pin 留在页面里）→ 方案是"数据立刻清 + 该空间记
+   pending，下次 unlockVault 时补摘凭证条目"。宁可多一个 pending 机制，也不降级成明文、
+   也不把 pin 常驻内存。
+2. **附件加 spaceId**（v7 回填）+ **修掉一个既有误删**：媒体缓存孤儿清理原先只传当前空间
+   ��� messageId 集合，多空间下会把其他空间缓存判成孤儿删掉 → 新增
+   `allMessageIdsAcrossSpaces()`。
+3. **目录没有按 space 分**（偏离文档 §3.5）：改目录要动 `cacheFileName` 全部调用点，
+   收益不抵成本；改用"按 messageId 集合定点删除"达到同样隔离效果。已在文档里写明偏离。
+4. per-space 设置键：`space.<spaceId>.<key>`，读不到回退旧全局键（存量设置不丢）。
+
+全量 `flutter test`：**156 过 0 失败**（M0.5 后是 151）。新增 `multi_space_isolation_test.dart`
+5 条用例（只清本空间、PIN pending、per-space 设置互不干扰、缓存保留名单跨空间）。

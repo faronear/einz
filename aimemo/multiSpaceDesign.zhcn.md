@@ -151,8 +151,14 @@ Spaces 表定位为「元数据 + 会话外状态」（名字、排序、最近�
 - `chat_page.dart:1641` 的 `MediaCache.prune(_repo.allMessageIds())` 只保留**当前空间**的 id
   → 多空间下会**删掉其他空间的媒体缓存**。
 
-决策：`local_attachments` **加 `spaceId` 列**（v7 迁移时按 messageId 回填），存储与缓存目录
-**按 space 分目录**；`prune` 的入参改为全库 messageIds。
+**实现注记（M1，2026-09-22）**：`spaceId` 列**加了**，但**没有**把存储/缓存目录按 space
+分——改目录要动 `MediaCache.cacheFileName` 的全部调用点，收益不抵成本。隔离改用
+「按 messageId 集合定点删除」（`MediaCache.deleteFor` / `AttachmentStore.deleteFor`，
+删除空间前先取出该空间的 messageId 集合），效果等价且改动面小得多。
+
+另修掉一个会**误删**的既有 bug：`chat_page.dart` 的媒体缓存孤儿清理原先只传当前空间的
+messageId 集合（`_repo.allMessageIds()`），多空间下会把其他空间的缓存判成孤儿删掉 →
+改为新增的 `MessageRepository.allMessageIdsAcrossSpaces()`。
 
 ### 3.6 per-space 设置迁移
 
@@ -222,11 +228,13 @@ M2 改向导/聊天页时把 `widget.payload.spaceId` 传进去即可。
 现状 `chat_page.dart:705-710`：设备被撤销 → `AppLockService.clear()` + 删全表（attachments /
 messages / sync_state）+ `MediaCache.deleteAll` + `AttachmentStore.clear` + 跳 SetupPage。
 
-多空间下这会变成「**一个空间被撤销 = 全机所有空间数据归零**」。必须改为：
+**已改（M1，2026-09-22）**：`_onDeviceRevoked` 改为 `removeSpace(widget.spaceId)`，只清该
+空间的凭证 + 消息/附件/同步锚点/回执/草稿/Spaces 行/per-space 设置键 + 这些消息的媒体缓存
+与留存明文；**其余空间的会话与数据原样保留**。
 
-1. 只清该空间的凭证（Vault 内条目 / SecureStore 对应项）与 Spaces 行；
-2. 只删该空间 scope 的消息、附件、同步锚点、媒体缓存与 stored 明文；
-3. 其余空间的会话保持在线（若当前正处在被撤销空间 → 退回 SpaceListPage；若不在 → 仅提示）。
+PIN 模式下的额外处理：重写密文包需要 pin，而撤销发生在聊天页（那里没有 pin，也不该把 pin
+留在页面里）→ 先清数据并把该空间记为 pending，下次 `unlockVault(pin)` 时补摘凭证条目。
+M2 补：Vault 里还有其他空间时应回 SpaceListPage 而不是 SetupPage（代码里留了 TODO）。
 
 同一类问题：`local_reset.dart`（用户主动"重置设备"）语义保持全清，但 UI 上需与"删除单个空间"明确区分。
 
@@ -311,7 +319,7 @@ messages / sync_state）+ `MediaCache.deleteAll` + `AttachmentStore.clear` + 跳
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
 | M0.5 数据底座 ✅ **已完成**（2026-09-22，分支 `feature/multiSpace`） | Spaces 表（v7） + Vault 读写 + 迁移（**未做任何 UI**） | 单测 1–3 绿；旧数据升级后单空间行为不变；全量 `flutter test` 无回归 |
-| M1 数据与隔离 | per-space 设置键 + 附件/缓存 spaceId 隔离 + **撤销自毁逐空间化** + removeSpace | 单测 4–6 绿；单空间路径无回归 |
+| M1 数据与隔离 ✅ **已完成**（2026-09-22） | per-space 设置键 + 附件 spaceId + 媒体缓存跨空间保留 + **撤销自毁逐空间化** + removeSpace 数据清理 | 单测 4–6 绿；单空间路径无回归（全量 156 过 0 失败） |
 | M2 会话切换 | StartupGate 分支 + SpaceListPage + 设置页常驻入口 + ChatPage 切换入口 + 向导回调 + WS 随切换重建 | 手动：双空间创建/加入/切换/删除全流程；单测 7–9 绿 |
 | M3 收尾 | 未读（lastReadSequence + 启动/切回轻量 sync）、l10n、`productLens/projectPlan` 更新、「我的设备」文案 | 全量 `flutter test`（基线先实跑确认）；单空间路径 golden 保持绿 |
 

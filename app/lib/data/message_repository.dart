@@ -659,6 +659,15 @@ class MessageRepository {
     return _rowsToHistory(rows);
   }
 
+  /// **全部空间**的 messageId（媒体缓存孤儿清理的保留名单必须用这个）。
+  ///
+  /// 不要用 [allMessageIds]：它只返回当前空间的 id，多空间下会把其他空间的缓存
+  /// 判成孤儿删掉（2026-09-22 修）。
+  Future<Set<String>> allMessageIdsAcrossSpaces() async {
+    final rows = await (db.select(db.localMessages)).get();
+    return {for (final row in rows) row.messageId};
+  }
+
   /// 本 space 全部消息的 messageId（媒体缓存孤儿清理的保留名单用；纯 id 查询，不解密）。
   Future<Set<String>> allMessageIds() async {
     final rows = await (db.select(db.localMessages)

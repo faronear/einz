@@ -5,6 +5,8 @@ import 'package:drift/drift.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 import 'local_database.dart';
+import 'attachment_store.dart';
+import 'media_cache.dart';
 import 'secure_store.dart';
 import 'server_config.dart';
 
@@ -166,15 +168,45 @@ class AppLockService {
     await _syncSpaceRow(payload);
   }
 
-  /// 本地移除一个空间的身份：Vault 条目 + Spaces 行 + per-space 资料键。
-  /// **不动其他空间**。该空间的消息/附件/媒体缓存清理属 M1（多空间数据隔离），
-  /// 见 `aimemo/multiSpaceDesign.zhcn.md` §4.4/§3.5。
+  /// 本地移除一个空间：Vault 条目 + 该空间的全部本地数据。
+  /// **不动其他空间**。
+  ///
+  /// [pin]：PIN 模式下重写密文包必须给；给不了（例如撤销发生在聊天页，那里没有
+  /// pin 也不该留着 pin）时走"挂 pending + 立即清数据"，凭证条目等下次解锁再摘。
   Future<void> removeSpace(String spaceId, {String? pin}) async {
+    if (pin == null && await isSetup) {
+      await _set(_pendingRemoveKey(spaceId), '1');
+      await _deleteSpaceData(spaceId);
+      return;
+    }
     final vault = await loadVault(pin: pin);
-    if (vault == null) return;
-    await saveVault(vault.remove(spaceId), pin: pin);
+    if (vault != null) await saveVault(vault.remove(spaceId), pin: pin);
+    await _deleteSpaceData(spaceId);
+  }
+
+  /// 删除一个空间的全部本地数据（**只动这一个空间**）：消息、附件、回执、同步锚点、
+  /// 草稿、Spaces 行、per-space 资料键与设置键，以及这些消息的媒体缓存/留存明文。
+  Future<void> _deleteSpaceData(String spaceId) async {
+    final rows = await (db.select(db.localMessages)
+          ..where((m) => m.spaceId.equals(spaceId)))
+        .get();
+    final messageIds = {for (final r in rows) r.messageId};
+    await (db.delete(db.localMessages)..where((m) => m.spaceId.equals(spaceId))).go();
+    // 附件按 spaceId 删，并兼容回填失败的空 spaceId 行（按所属消息再兜一遍）
+    await (db.delete(db.localAttachments)
+          ..where((a) => a.spaceId.equals(spaceId) | a.messageId.isIn(messageIds)))
+        .go();
+    await (db.delete(db.peerReceipts)..where((p) => p.spaceId.equals(spaceId))).go();
+    await (db.delete(db.syncState)..where((s) => s.spaceId.equals(spaceId))).go();
+    await (db.delete(db.drafts)..where((d) => d.spaceId.equals(spaceId))).go();
     await (db.delete(db.spaces)..where((s) => s.spaceId.equals(spaceId))).go();
     await _delete(_profileKey(spaceId));
+    await (db.delete(db.appState)..where((a) => a.key.like('space.$spaceId.%'))).go();
+    // 缓存/留存明文按 messageId 定点删（文件名只含 messageId，见 MediaCache）
+    for (final id in messageIds) {
+      await MediaCache.deleteFor(id);
+      await AttachmentStore.deleteFor(id);
+    }
   }
 
   /// 切换当前空间（同时刷新该空间的 lastActiveAt）。
@@ -235,8 +267,9 @@ class AppLockService {
     await (db.delete(db.appState)
           ..where((s) => s.key.isIn({_kPackage, _kAttempts, _kLockedUntil, _kPlain, _kSkipped})))
         .go();
-    // per-space 资料键（app_lock.profile.<spaceId>）与 Spaces 行一并清干净
+    // per-space 资料键（app_lock.profile.<spaceId>）、待摘除标记与 Spaces 行一并清干净
     await (db.delete(db.appState)..where((s) => s.key.like('$_kProfile.%'))).go();
+    await (db.delete(db.appState)..where((s) => s.key.like('app_lock.pending_remove.%'))).go();
     await db.delete(db.spaces).go();
   }
 
@@ -278,7 +311,10 @@ class AppLockService {
     try {
       final plain = await decryptWithPassphrase(envelope: PassphraseEnvelope.fromJson(jsonDecode(raw)), passphrase: pin);
       await _set(_kAttempts, '0');
-      final vault = VaultPayload.fromJson(jsonDecode(utf8.decode(plain)));
+      // 上次退出前挂的"待摘除空间"（当时没有 pin，改不了密文包）在这里补做
+      final cleaned = await _applyPendingRemovals(VaultPayload.fromJson(jsonDecode(utf8.decode(plain))));
+      if (cleaned != null) await writePinVault(pin, cleaned);
+      final vault = cleaned ?? VaultPayload.fromJson(jsonDecode(utf8.decode(plain)));
       final active = vault.active;
       if (active != null) await _syncSpaceRow(active);
       return vault;
@@ -286,6 +322,20 @@ class AppLockService {
       await _registerFailure();
       throw const AppLockException('锁屏码 错误');
     }
+  }
+
+  /// 摘掉所有 pending 空间（数据此前已清，这里只摘凭证条目）；无 pending 返回 null。
+  Future<VaultPayload?> _applyPendingRemovals(VaultPayload vault) async {
+    final rows = await (db.select(db.appState)
+          ..where((s) => s.key.like('app_lock.pending_remove.%')))
+        .get();
+    if (rows.isEmpty) return null;
+    var next = vault;
+    for (final row in rows) {
+      next = next.remove(row.key.substring('app_lock.pending_remove.'.length));
+      await _delete(row.key);
+    }
+    return next;
   }
 
   /// 剩余锁定秒数（0 = 未锁定）。
@@ -331,6 +381,9 @@ class AppLockService {
   /// 资料读写发生在 ChatPage/向导这些没有 Vault 上下文的地方，读 Vault 意味着读
   /// 安全存储（测试环境/平台未支持会抛），不该让"取名字"依赖它。
   static String _profileKey(String spaceId) => '$_kProfile.$spaceId';
+
+  /// 待摘除的空间（PIN 模式下没有 pin 时标记，下次解锁有 pin 了再真正摘凭证）。
+  static String _pendingRemoveKey(String spaceId) => 'app_lock.pending_remove.$spaceId';
 
   /// 用户资料（名字）持久化：向导完成时保存，PIN 解锁/重启后 ChatPage 恢复显示。
   /// （名字不在 AppLockPayload 里——解锁构造 ChatPage 时无法获得，故单独存。）

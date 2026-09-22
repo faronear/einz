@@ -12,6 +12,12 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 part 'local_database.g.dart';
 
+/// per-space 设置键：`space.<spaceId>.<key>`（多空间：设置按空间隔离）。
+///
+/// 读取时回退同名旧全局键（v7 之前的设置没有空间维度），故存量用户的设置不会丢，
+/// 见 `aimemo/multiSpaceDesign.zhcn.md` §3.6。
+String spaceScopedKey(String spaceId, String key) => 'space.$spaceId.$key';
+
 /// 本地消息（与 Server messages 同构 + 本地状态）。
 class LocalMessages extends Table {
   TextColumn get messageId => text()();
@@ -44,6 +50,8 @@ class LocalMessages extends Table {
 class LocalAttachments extends Table {
   TextColumn get attachmentId => text()();
   TextColumn get messageId => text().references(LocalMessages, #messageId)();
+  /// 所属空间（多空间隔离用：删除空间/撤销设备时按 space 清理，见 v7 迁移回填）。
+  TextColumn get spaceId => text().withDefault(const Constant(''))();
   IntColumn get keyVersion => integer()();
   IntColumn get size => integer()();
   TextColumn get sha256 => text()();
@@ -168,6 +176,14 @@ class LocalDatabase extends _$LocalDatabase {
             // v7：新增 spaces 表（多空间元数据）。**不灌数据**——PIN 模式下的旧
             // 锁包在迁移阶段无法解密，改由解锁/读到凭证时补写该行（幂等 upsert）。
             await m.createTable(spaces);
+            // v7：local_attachments 加 spaceId（多空间隔离），按 messageId 从
+            // local_messages 回填（存量库只有单空间，回填写得对；回填不到留空串）
+            await m.addColumn(localAttachments, localAttachments.spaceId);
+            await customStatement(
+              'UPDATE local_attachments SET space_id = '
+              'COALESCE((SELECT m.space_id FROM local_messages m '
+              'WHERE m.message_id = local_attachments.message_id), \'\')',
+            );
           }
         },
       );

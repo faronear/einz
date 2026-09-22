@@ -909,6 +909,18 @@ class $LocalAttachmentsTable extends LocalAttachments
       'REFERENCES local_messages (message_id)',
     ),
   );
+  static const VerificationMeta _spaceIdMeta = const VerificationMeta(
+    'spaceId',
+  );
+  @override
+  late final GeneratedColumn<String> spaceId = GeneratedColumn<String>(
+    'space_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _keyVersionMeta = const VerificationMeta(
     'keyVersion',
   );
@@ -984,6 +996,7 @@ class $LocalAttachmentsTable extends LocalAttachments
   List<GeneratedColumn> get $columns => [
     attachmentId,
     messageId,
+    spaceId,
     keyVersion,
     size,
     sha256,
@@ -1022,6 +1035,12 @@ class $LocalAttachmentsTable extends LocalAttachments
       );
     } else if (isInserting) {
       context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('space_id')) {
+      context.handle(
+        _spaceIdMeta,
+        spaceId.isAcceptableOrUnknown(data['space_id']!, _spaceIdMeta),
+      );
     }
     if (data.containsKey('key_version')) {
       context.handle(
@@ -1093,6 +1112,10 @@ class $LocalAttachmentsTable extends LocalAttachments
         DriftSqlType.string,
         data['${effectivePrefix}message_id'],
       )!,
+      spaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}space_id'],
+      )!,
       keyVersion: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}key_version'],
@@ -1133,6 +1156,9 @@ class $LocalAttachmentsTable extends LocalAttachments
 class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
   final String attachmentId;
   final String messageId;
+
+  /// 所属空间（多空间隔离用：删除空间/撤销设备时按 space 清理，见 v7 迁移回填）。
+  final String spaceId;
   final int keyVersion;
   final int size;
   final String sha256;
@@ -1143,6 +1169,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
   const LocalAttachment({
     required this.attachmentId,
     required this.messageId,
+    required this.spaceId,
     required this.keyVersion,
     required this.size,
     required this.sha256,
@@ -1156,6 +1183,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     final map = <String, Expression>{};
     map['attachment_id'] = Variable<String>(attachmentId);
     map['message_id'] = Variable<String>(messageId);
+    map['space_id'] = Variable<String>(spaceId);
     map['key_version'] = Variable<int>(keyVersion);
     map['size'] = Variable<int>(size);
     map['sha256'] = Variable<String>(sha256);
@@ -1174,6 +1202,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     return LocalAttachmentsCompanion(
       attachmentId: Value(attachmentId),
       messageId: Value(messageId),
+      spaceId: Value(spaceId),
       keyVersion: Value(keyVersion),
       size: Value(size),
       sha256: Value(sha256),
@@ -1196,6 +1225,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     return LocalAttachment(
       attachmentId: serializer.fromJson<String>(json['attachmentId']),
       messageId: serializer.fromJson<String>(json['messageId']),
+      spaceId: serializer.fromJson<String>(json['spaceId']),
       keyVersion: serializer.fromJson<int>(json['keyVersion']),
       size: serializer.fromJson<int>(json['size']),
       sha256: serializer.fromJson<String>(json['sha256']),
@@ -1211,6 +1241,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     return <String, dynamic>{
       'attachmentId': serializer.toJson<String>(attachmentId),
       'messageId': serializer.toJson<String>(messageId),
+      'spaceId': serializer.toJson<String>(spaceId),
       'keyVersion': serializer.toJson<int>(keyVersion),
       'size': serializer.toJson<int>(size),
       'sha256': serializer.toJson<String>(sha256),
@@ -1224,6 +1255,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
   LocalAttachment copyWith({
     String? attachmentId,
     String? messageId,
+    String? spaceId,
     int? keyVersion,
     int? size,
     String? sha256,
@@ -1234,6 +1266,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
   }) => LocalAttachment(
     attachmentId: attachmentId ?? this.attachmentId,
     messageId: messageId ?? this.messageId,
+    spaceId: spaceId ?? this.spaceId,
     keyVersion: keyVersion ?? this.keyVersion,
     size: size ?? this.size,
     sha256: sha256 ?? this.sha256,
@@ -1248,6 +1281,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
           ? data.attachmentId.value
           : this.attachmentId,
       messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
       keyVersion: data.keyVersion.present
           ? data.keyVersion.value
           : this.keyVersion,
@@ -1267,6 +1301,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
     return (StringBuffer('LocalAttachment(')
           ..write('attachmentId: $attachmentId, ')
           ..write('messageId: $messageId, ')
+          ..write('spaceId: $spaceId, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('size: $size, ')
           ..write('sha256: $sha256, ')
@@ -1282,6 +1317,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
   int get hashCode => Object.hash(
     attachmentId,
     messageId,
+    spaceId,
     keyVersion,
     size,
     sha256,
@@ -1296,6 +1332,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
       (other is LocalAttachment &&
           other.attachmentId == this.attachmentId &&
           other.messageId == this.messageId &&
+          other.spaceId == this.spaceId &&
           other.keyVersion == this.keyVersion &&
           other.size == this.size &&
           other.sha256 == this.sha256 &&
@@ -1308,6 +1345,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
 class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
   final Value<String> attachmentId;
   final Value<String> messageId;
+  final Value<String> spaceId;
   final Value<int> keyVersion;
   final Value<int> size;
   final Value<String> sha256;
@@ -1319,6 +1357,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
   const LocalAttachmentsCompanion({
     this.attachmentId = const Value.absent(),
     this.messageId = const Value.absent(),
+    this.spaceId = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.size = const Value.absent(),
     this.sha256 = const Value.absent(),
@@ -1331,6 +1370,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
   LocalAttachmentsCompanion.insert({
     required String attachmentId,
     required String messageId,
+    this.spaceId = const Value.absent(),
     required int keyVersion,
     required int size,
     required String sha256,
@@ -1348,6 +1388,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
   static Insertable<LocalAttachment> custom({
     Expression<String>? attachmentId,
     Expression<String>? messageId,
+    Expression<String>? spaceId,
     Expression<int>? keyVersion,
     Expression<int>? size,
     Expression<String>? sha256,
@@ -1360,6 +1401,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     return RawValuesInsertable({
       if (attachmentId != null) 'attachment_id': attachmentId,
       if (messageId != null) 'message_id': messageId,
+      if (spaceId != null) 'space_id': spaceId,
       if (keyVersion != null) 'key_version': keyVersion,
       if (size != null) 'size': size,
       if (sha256 != null) 'sha256': sha256,
@@ -1374,6 +1416,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
   LocalAttachmentsCompanion copyWith({
     Value<String>? attachmentId,
     Value<String>? messageId,
+    Value<String>? spaceId,
     Value<int>? keyVersion,
     Value<int>? size,
     Value<String>? sha256,
@@ -1386,6 +1429,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     return LocalAttachmentsCompanion(
       attachmentId: attachmentId ?? this.attachmentId,
       messageId: messageId ?? this.messageId,
+      spaceId: spaceId ?? this.spaceId,
       keyVersion: keyVersion ?? this.keyVersion,
       size: size ?? this.size,
       sha256: sha256 ?? this.sha256,
@@ -1405,6 +1449,9 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     }
     if (messageId.present) {
       map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (spaceId.present) {
+      map['space_id'] = Variable<String>(spaceId.value);
     }
     if (keyVersion.present) {
       map['key_version'] = Variable<int>(keyVersion.value);
@@ -1438,6 +1485,7 @@ class LocalAttachmentsCompanion extends UpdateCompanion<LocalAttachment> {
     return (StringBuffer('LocalAttachmentsCompanion(')
           ..write('attachmentId: $attachmentId, ')
           ..write('messageId: $messageId, ')
+          ..write('spaceId: $spaceId, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('size: $size, ')
           ..write('sha256: $sha256, ')
@@ -3681,6 +3729,7 @@ typedef $$LocalAttachmentsTableCreateCompanionBuilder =
     LocalAttachmentsCompanion Function({
       required String attachmentId,
       required String messageId,
+      Value<String> spaceId,
       required int keyVersion,
       required int size,
       required String sha256,
@@ -3694,6 +3743,7 @@ typedef $$LocalAttachmentsTableUpdateCompanionBuilder =
     LocalAttachmentsCompanion Function({
       Value<String> attachmentId,
       Value<String> messageId,
+      Value<String> spaceId,
       Value<int> keyVersion,
       Value<int> size,
       Value<String> sha256,
@@ -3747,6 +3797,11 @@ class $$LocalAttachmentsTableFilterComposer
   });
   ColumnFilters<String> get attachmentId => $composableBuilder(
     column: $table.attachmentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get spaceId => $composableBuilder(
+    column: $table.spaceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3823,6 +3878,11 @@ class $$LocalAttachmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get spaceId => $composableBuilder(
+    column: $table.spaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get keyVersion => $composableBuilder(
     column: $table.keyVersion,
     builder: (column) => ColumnOrderings(column),
@@ -3895,6 +3955,9 @@ class $$LocalAttachmentsTableAnnotationComposer
     column: $table.attachmentId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get spaceId =>
+      $composableBuilder(column: $table.spaceId, builder: (column) => column);
 
   GeneratedColumn<int> get keyVersion => $composableBuilder(
     column: $table.keyVersion,
@@ -3977,6 +4040,7 @@ class $$LocalAttachmentsTableTableManager
               ({
                 Value<String> attachmentId = const Value.absent(),
                 Value<String> messageId = const Value.absent(),
+                Value<String> spaceId = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<int> size = const Value.absent(),
                 Value<String> sha256 = const Value.absent(),
@@ -3988,6 +4052,7 @@ class $$LocalAttachmentsTableTableManager
               }) => LocalAttachmentsCompanion(
                 attachmentId: attachmentId,
                 messageId: messageId,
+                spaceId: spaceId,
                 keyVersion: keyVersion,
                 size: size,
                 sha256: sha256,
@@ -4001,6 +4066,7 @@ class $$LocalAttachmentsTableTableManager
               ({
                 required String attachmentId,
                 required String messageId,
+                Value<String> spaceId = const Value.absent(),
                 required int keyVersion,
                 required int size,
                 required String sha256,
@@ -4012,6 +4078,7 @@ class $$LocalAttachmentsTableTableManager
               }) => LocalAttachmentsCompanion.insert(
                 attachmentId: attachmentId,
                 messageId: messageId,
+                spaceId: spaceId,
                 keyVersion: keyVersion,
                 size: size,
                 sha256: sha256,

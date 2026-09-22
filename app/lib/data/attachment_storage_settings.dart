@@ -19,18 +19,28 @@ final ValueNotifier<String> attachmentStorageNotifier =
     ValueNotifier<String>('stored');
 
 /// 附件存储模式设置（存本设备 app_state，key='attachment_storage'）。
+///
+/// 多空间：给 [spaceId] 时键为 `space.<spaceId>.attachment_storage`；读不到时回退
+/// 旧全局键（存量设置没有空间维度）。
 class AttachmentStorageSettings {
-  AttachmentStorageSettings(this.db);
+  AttachmentStorageSettings(this.db, {this.spaceId});
 
   final LocalDatabase db;
 
+  /// 归属空间；null = 用旧全局键。
+  final String? spaceId;
+
   static const _kKey = 'attachment_storage';
+
+  String get _key => spaceId == null ? _kKey : spaceScopedKey(spaceId!, _kKey);
 
   /// 当前模式（默认 'stored' = 长期保存，老板 2026-09-15；老版本升上来也是它）。
   Future<String> load() async {
-    final row = await (db.select(db.appState)..where((s) => s.key.equals(_kKey)))
+    final row = await (db.select(db.appState)..where((s) => s.key.equals(_key)))
         .getSingleOrNull();
-    final v = row?.value;
+    final v = row?.value ?? (spaceId == null
+        ? null
+        : (await (db.select(db.appState)..where((s) => s.key.equals(_kKey))).getSingleOrNull())?.value);
     return (v == null || !kAttachmentStorageOptions.contains(v)) ? 'stored' : v;
   }
 
@@ -39,7 +49,7 @@ class AttachmentStorageSettings {
   Future<void> save(String mode) async {
     assert(kAttachmentStorageOptions.contains(mode), '非法附件存储模式: $mode');
     await (db.into(db.appState))
-        .insertOnConflictUpdate(AppStateCompanion.insert(key: _kKey, value: mode));
+        .insertOnConflictUpdate(AppStateCompanion.insert(key: _key, value: mode));
     attachmentStorageNotifier.value = mode;
   }
 }

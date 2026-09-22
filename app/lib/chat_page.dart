@@ -485,7 +485,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       deviceId: widget.deviceId,
       keyVersion: widget.keyVersion,
       token: widget.token,
-      settings: BurnAfterSettings(db),
+      settings: BurnAfterSettings(db, spaceId: widget.spaceId),
       reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
       // 本端 personId（向导登记时确定）：种入归属判定映射，离线启动也能
       // 按 person 维度分左右分栏（服务器离线拉不到 device→person 映射）
@@ -702,12 +702,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 单步失败不阻断其余清理
       }
     }
-    await step(() => AppLockService(db).clear());
-    await step(() => (db.delete(db.localAttachments)).go());
-    await step(() => (db.delete(db.localMessages)).go());
-    await step(() => (db.delete(db.syncState)).go());
-    await step(MediaCache.deleteAll); // 媒体解密缓存一并清空
-    await step(AttachmentStore.clear); // stored 模式留存的明文一并清空
+    // **只清这一个空间**（多空间 2026-09-22）：凭证 + 消息/附件/同步锚点/媒体缓存/
+    // 留存明文。PIN 模式下这里没有 pin（也不该在页面里留着 pin），凭证条目会挂
+    // pending，下次解锁时再摘——数据此刻已经清干净，其他空间原样保留。
+    // 此前是全机 clear() + 删全表，多空间下等于"一个空间被撤销 = 全机数据归零"。
+    await step(() => AppLockService(db).removeSpace(widget.spaceId));
+    // TODO(M2)：Vault 里还有其他空间时应回 SpaceListPage，而不是 SetupPage。
     if (!mounted) return;
     showTopNotice(context, AppLocalizations.of(context)!.chatPageDeviceRevoked);
     Navigator.of(context).pushAndRemoveUntil(
@@ -734,7 +734,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
   Future<void> _loadBurnLabel() async {
-    final s = BurnAfterSettings(widget.db ?? LocalDatabase.shared);
+    final s = BurnAfterSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
     final seconds = await s.load();
     if (mounted) setState(() => _burnSeconds = seconds);
   }
@@ -783,7 +783,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadAttachmentStorage() async {
-    final s = AttachmentStorageSettings(widget.db ?? LocalDatabase.shared);
+    final s = AttachmentStorageSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
     final mode = await s.load();
     if (mounted) setState(() => _attachmentStorage = mode);
   }
@@ -834,7 +834,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
         ],
         onApply: (mode) async {
-          await AttachmentStorageSettings(widget.db ?? LocalDatabase.shared).save(mode);
+          await AttachmentStorageSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId).save(mode);
           if (mode == 'secured') {
             // 切回远程托管：把本机留存的明文附件全部清除
             await AttachmentStore.clear();
@@ -1472,7 +1472,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 顶栏 ⏱：选择阅后即焚档位（保存到本设备设置，发送新消息时生效）。
   Future<void> _showBurnPicker() async {
-    final settings = BurnAfterSettings(widget.db ?? LocalDatabase.shared);
+    final settings = BurnAfterSettings(widget.db ?? LocalDatabase.shared, spaceId: widget.spaceId);
     final current = await settings.load();
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
@@ -1638,7 +1638,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 载入对方回执 → 自己消息可显示双勾（sync 内已拉过，此处兜底一次）
       unawaited(_loadPeerReceipts());
       // 启动孤儿清理：本地库已无对应消息的缓存 + 历史遗留 temp 文件（不阻塞首屏）
-      unawaited(_repo.allMessageIds().then(MediaCache.prune));
+      // 保留名单必须跨空间：只给当前空间会把其他空间的缓存当孤儿删掉（多空间）
+      unawaited(_repo.allMessageIdsAcrossSpaces().then(MediaCache.prune));
     } catch (_) {
       // 网络抖动忽略：本地缓存已上屏，等 ticker 重试
     }
