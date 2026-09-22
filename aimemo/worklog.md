@@ -7892,3 +7892,47 @@ pending 分支只剩真正的 pending 会走到。
 
 测试：`chat_send_status_test.dart` 新增一条用例（同身份另一设备发的、无回执 → 单勾、
 不是小飞机、也不是双勾），全量 141 过 1 skip。
+
+## 2026-09-22 macOS debug：连开发服务器的两条路径固化成 npm script + 数据隔离
+
+背景：老板第一次知道 `flutter run -d macos`，问怎么让它连 `http://localhost:3000`，
+以及"想临时改 bundle id，否则 debug 只敢看看不敢动"。
+
+### 两条切服务器的路径（都已固化成脚本）
+
+| 脚本 | 机制 | 等价命令 |
+| --- | --- | --- |
+| `npm run desk-mac-run-local` | 第 1 层：运行期 `--server` | `cd app && flutter run -d macos -a --server=http://localhost:3000` |
+| `npm run desk-mac-run-localConfig` | 第 2 层：编译期 dart-define | `cd app && flutter run -d macos --dart-define-from-file=localConfig.macos.json` |
+
+`-a/--dart-entrypoint-args` 能当 `--server` 用，是因为桌面端工具把它拼进 app 可执行文件的
+argv（`flutter_tools/lib/src/desktop_device.dart:125`），而 `MainFlutterWindow.swift` 的桥读的
+正是 `ProcessInfo.processInfo.arguments` —— 和发布包 `open --args` 同一条路径。
+新增 `app/localConfig.macos.json`（gitignore 的本地文件，之前只有 android/ios 两份）。
+
+### bundle id 那条路走不通（实测，已放弃）
+
+换 bundle id 最直接的想法是 `FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER=cc.tic.einz.dev`
+（Flutter 确实会把 `FLUTTER_XCODE_` 前缀的环境变量透传给 xcodebuild，
+`macos/build_macos.dart:302`），但 **Debug 配置是自动签名 + provisioning profile**，
+新 bundle id 没有对应 profile → 构建直接失败：
+`No profiles for 'cc.tic.einz.dev' were found ... Automatic signing is disabled`。
+而且 `Runner/DebugProfile.entitlements` 里 `keychain-access-groups` 硬编码
+`$(AppIdentifierPrefix)cc.tic.einz`，真要换 id 还得参数化成 `$(PRODUCT_BUNDLE_IDENTIFIER)`。
+老板说他可以去申请单独的测试 id/证书/profile —— 已把清单给他，**当前先不做**。
+
+### 改用等效做法：不动 bundle id，隔离"数据"
+
+新增 `app/lib/data/dev_data_dir.dart`：`--dart-define=einzDevDataDir=dev` 把这次运行用到的
+目录全部挪到基础目录下的 `dev/` 子目录（DB 走 drift 的 `databaseDirectory` 钩子、附件走
+Application Support、媒体缓存走 Caches），再配 `--dart-define=einzSecurePrefix=einz.secure.dev.`
+换 Keychain key 前缀。两个开关都**只在非 release 构建生效**，且发布脚本绝不传。
+
+**实测（2026-09-22 11:54）**：`npm run desk-mac-run-local` 之后
+`~/Library/Containers/cc.tic.einz/Data/Documents/dev/einz.sqlite` 出现，
+而正式库 `.../Documents/einz.sqlite` 的 mtime 与大小**纹丝不动**（11:34:20 / 39555072 字节）。
+即同一个 bundle id、同一个沙盒容器，但 debug 版有自己的一套数据，随便点。
+
+顺带踩到一个 shell 坑（老问题又犯一次）：脚本里 `echo "… bundle id=$ID（独立…"` 中变量紧跟
+全角括号被吃进变量名，输出成了乱码 —— 已按 `feedback_bash_multibyte_var` 的教训避开（现在
+脚本里不再用行内变量）。
