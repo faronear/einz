@@ -785,6 +785,8 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
   // main 的刷新会因 token 未就绪失败静默；此处补齐——否则向导结束直接发消息
   // 时对方气泡按未知性别回退青绿——老板 2026-09-10 实测）
   await _refreshPersonNames(_state!);
+  // 补登安装级设备标识（多空间：存量 store 不重走入网流程，启动时补一次；幂等）
+  await _registerDeviceUid(session, store, storePath, server);
   // 拉一次回执水位：我发出消息的 delivered 状态（单勾→双勾）首屏即正确
   await session.refreshReceipts();
 
@@ -1012,6 +1014,8 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
       escrowPassphrase: passphrase,
       publicKey: store.publicKey,
       deviceName: store.deviceName,
+      // 安装级设备标识（多空间：服务端据此认出同一台物理设备的多行）
+      deviceUid: store.ensureDeviceUid(),
     ));
     store.spaceId = created.spaceId;
     store.spaceAddress = created.spaceAddress;
@@ -1159,6 +1163,8 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
       publicKey: store.publicKey,
       partnerSlot: chosenSlot,
       deviceName: store.deviceName,
+      // 安装级设备标识（多空间：服务端据此认出同一台物理设备的多行）
+      deviceUid: store.ensureDeviceUid(),
     ));
     store.spaceId = join.spaceId;
     store.spaceAddress = join.spaceAddress;
@@ -3833,6 +3839,27 @@ Future<void> _refreshGenderForLatest(_TuiState s) async {
     }
   }
   _scheduleRender();
+}
+
+/// 补登安装级设备标识（POST /devices/uid，幂等）。
+///
+/// 存量 store（多空间上线前入网的）不会重走入网流程，只能在启动时补一次——服务端据此
+/// 把同一台物理设备在各空间的 device_id 认成一台。失败静默：它只是服务端侧认知，
+/// 不参与任何功能（与 App 的 `_registerDeviceUid` 同口径）。
+Future<void> _registerDeviceUid(
+    ChatSession session, DeviceStore store, String storePath, String server) async {
+  if (server.isEmpty) return;
+  final token = store.sessionToken;
+  if (token == null || token.isEmpty) return;
+  final before = store.deviceUid;
+  final uid = store.ensureDeviceUid();
+  // 首次生成先落盘：否则下次启动会换一个新 id（与服务端已登记的对不上）
+  if (before != uid) store.save(storePath);
+  try {
+    await ApiClient(server).registerDeviceUid(uid, token);
+  } catch (_) {
+    // 离线 / 老服务端（无此端点）：静默降级
+  }
 }
 
 /// 拉取空间 person 名称/性别表（GET /space）到缓存（认证后调用；失败静默——

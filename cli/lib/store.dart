@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:einz_shared/einz_shared.dart';
@@ -29,6 +30,7 @@ class DeviceStore {
     this.sessionToken,
     this.pinHash,
     this.escrowUpdatedAt,
+    this.deviceUid,
     this.lastServerSequence = 0,
     this.lastReportedDeliveredSeq = 0,
     this.lastReportedReadSeq = 0,
@@ -67,6 +69,14 @@ class DeviceStore {
   String? sessionToken;
   String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
   int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
+
+  /// 安装级设备标识（服务端 `devices.device_uid` 的来源）：服务端据此把同一台物理设备
+  /// 在各空间的 device_id 认成一台。**TUI 的粒度是"一个 store = 一台设备"**（见
+  /// `_deleteLocalData` 的注释：同机多 store 是刻意的多设备模拟），故各 store 各一份；
+  /// 随 create/join 上报，存量 store 由启动时补登（`_registerDeviceUid`）。
+  /// 惰性生成，见 [ensureDeviceUid]。
+  String? deviceUid;
+
   int lastServerSequence;
 
   /// 已上报过的回执高水位（**仅用于防抖**，不是数据源——真值在服务端）。
@@ -108,6 +118,18 @@ class DeviceStore {
     );
   }
 
+  /// 取安装级设备标识，没有就生成一个（16 字节 hex，与服务端形状约束一致）。
+  /// 只改内存——调用方负责 `save()`，否则下次启动会换一个新的。
+  String ensureDeviceUid() {
+    final existing = deviceUid;
+    if (existing != null && existing.isNotEmpty) return existing;
+    final r = Random.secure();
+    final fresh =
+        List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+    deviceUid = fresh;
+    return fresh;
+  }
+
   Map<String, dynamic> toJson() => {
         'device_id': deviceId,
         'public_key': publicKey,
@@ -128,6 +150,7 @@ class DeviceStore {
         'escrow_uploaded': escrowUploaded,
         'pin_hash': pinHash,
         'escrow_updated_at': escrowUpdatedAt,
+        'device_uid': deviceUid,
         'person_names': personNames,
         'person_genders': personGenders,
         'person_slots': personSlots,
@@ -156,6 +179,7 @@ class DeviceStore {
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pinHash: json['pin_hash'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
+        deviceUid: json['device_uid'] as String?,
         personNames: (json['person_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
         personGenders: (json['person_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
         personSlots: (json['person_slots'] as Map?)?.map((k, v) => MapEntry('$k', v as int)) ?? {},

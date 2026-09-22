@@ -34,6 +34,22 @@ void main() {
     expect(loaded.personNames, isEmpty);
     expect(loaded.personGenders, isEmpty);
     expect(loaded.peerName, isNull); // 旧 store 无预置名 → 顶部条回退 '-'
+    expect(loaded.deviceUid, isNull); // 旧 store 无安装级设备标识 → 启动时补生成
+  });
+
+  test('deviceUid：惰性生成一次、落盘后可读回（多空间关联用，不能每次换）', () {
+    final dir = Directory.systemTemp.createTempSync('einz-store-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/uid.json';
+
+    final st = DeviceStore(publicKey: 'pk', privateKey: 'sk');
+    final first = st.ensureDeviceUid();
+    expect(first.length, 32, reason: '16 字节 hex（服务端形状约束 8–64 位 [0-9A-Za-z_-]）');
+    expect(st.ensureDeviceUid(), first, reason: '同一 store 内稳定，不重复生成');
+    st.save(path);
+
+    // 重启读回：必须还是同一个（否则服务端把同一台设备认成两台）
+    expect(DeviceStore.load(path).deviceUid, first);
   });
 
   // 对方尚未加入时空间里还没有他的 person_id，GET /space 的 person 表拿不到对方
