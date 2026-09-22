@@ -427,9 +427,9 @@
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address (not production), for debugging only",
   "advancedMenuTitle": "Advanced",
-  "advancedLeaveSpace": "Leave and clear this space",
-  "leaveSpaceTitle": "Leave and clear this space?",
-  "leaveSpaceMessage": "This leaves this space and erases its messages and keys from this device.\n\nYour other spaces are untouched, and the space itself with its server-side data is kept.\n\nThis cannot be undone!",
+  "advancedLeaveSpace": "Destroy this entrance",
+  "leaveSpaceTitle": "Destroy this entrance?",
+  "leaveSpaceMessage": "This destroys this device's entrance to this space and erases its messages and keys from this device.\n\nThe space itself and its server-side data are kept, and your other spaces are untouched — you can join again later with a new token.\n\nThis cannot be undone!",
   "resetDeviceNameLabel": "Type \"{name}\" to confirm",
   "@resetDeviceNameLabel": {
     "placeholders": { "name": { "type": "String" } }

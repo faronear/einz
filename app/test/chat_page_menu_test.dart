@@ -1242,7 +1242,7 @@ void main() {
     expect(find.text('我的空间'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
-  testWidgets('高级：破坏性入口改为空间级「退出并清除这个空间」（不再整机重置）',
+  testWidgets('高级：破坏性入口改为空间级「销毁秘境入口」（不再整机重置）',
       (WidgetTester tester) async {
     // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
     // 不该顺手抹掉本机上的其他空间 → 聊天页这格降级为空间级，整机清理由空间列表负责。
@@ -1274,12 +1274,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('高级'));
     await tester.pumpAndSettle();
-    expect(find.text('退出并清除这个空间'), findsOneWidget, reason: '空间级文案');
+    expect(find.text('销毁秘境入口'), findsOneWidget, reason: '空间级文案');
     expect(find.text('重置设备'), findsNothing, reason: '整机重置不该出现在单个空间里');
 
-    await tester.tap(find.text('退出并清除这个空间'));
+    await tester.tap(find.text('销毁秘境入口'));
     await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
-    expect(find.text('退出并清除这个空间？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
+    expect(find.text('销毁秘境入口？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
     expect(find.text('输入「iPhone」以确认'), findsOneWidget, reason: '闸门要求输入本机设备名');
   });
 }

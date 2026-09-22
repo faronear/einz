@@ -8569,3 +8569,17 @@ KEY_ESCROW / E2EE / IOS / SERVER_SETTINGS / updateServer / PROTOCOL_MULTIVERSE�
 
 验证：`flutter analyze` 无 issue、全量 `flutter test` **175 通过 0 失败**、
 shared `dart test` 52 通过、`dart analyze`（cli）无 issue。
+
+### 后续：破坏性入口改名「销毁秘境入口」
+
+老板指出「退出并清除这个空间」不合理——**空间并没有被删**（它还在服务器上，以后能
+凭新令牌重新加入），被清掉的是**这台设备上的数据 + 本机在这个秘境里的入口**。
+改为 **「销毁秘境入口」 / Destroy this entrance**（用上了本轮的"入口"词汇）。
+
+- 菜单项与弹窗标题：`advancedLeaveSpace` / `leaveSpaceTitle` → 销毁秘境入口 / Destroy this entrance；
+- 弹窗正文重写（把这层语义说清）：
+  「将销毁本机在这个秘境里的入口，并清除本机上的聊天记录与密钥。
+   秘境本身与服务器上的数据都还在，其他空间也不受影响——**以后凭新的令牌可以重新加入**。
+   此操作无法撤销！」
+- 测试 4 处断言 + `multiSpaceDesign §5.5` 表格 + `projectPlan` 待办 + 代码注释同步
+  （历史记录 worklog 不改）。

@@ -900,14 +900,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedMenuTitle => '高级';
 
   @override
-  String get advancedLeaveSpace => '退出并清除这个空间';
+  String get advancedLeaveSpace => '销毁秘境入口';
 
   @override
-  String get leaveSpaceTitle => '退出并清除这个空间？';
+  String get leaveSpaceTitle => '销毁秘境入口？';
 
   @override
   String get leaveSpaceMessage =>
-      '将退出这个空间，并清除本机上属于它的聊天记录与密钥。\n\n其他空间不受影响；秘境本身与服务器上的数据仍保留。\n\n此操作无法撤销！';
+      '将销毁本机在这个秘境里的入口，并清除本机上的聊天记录与密钥。\n\n秘境本身与服务器上的数据都还在，其他空间也不受影响——以后凭新的令牌可以重新加入。\n\n此操作无法撤销！';
 
   @override
   String resetDeviceNameLabel(String name) {

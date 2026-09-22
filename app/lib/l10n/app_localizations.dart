@@ -1739,19 +1739,19 @@ abstract class AppLocalizations {
   /// No description provided for @advancedLeaveSpace.
   ///
   /// In en, this message translates to:
-  /// **'Leave and clear this space'**
+  /// **'Destroy this entrance'**
   String get advancedLeaveSpace;
 
   /// No description provided for @leaveSpaceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Leave and clear this space?'**
+  /// **'Destroy this entrance?'**
   String get leaveSpaceTitle;
 
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'This leaves this space and erases its messages and keys from this device.\n\nYour other spaces are untouched, and the space itself with its server-side data is kept.\n\nThis cannot be undone!'**
+  /// **'This destroys this device\'s entrance to this space and erases its messages and keys from this device.\n\nThe space itself and its server-side data are kept, and your other spaces are untouched — you can join again later with a new token.\n\nThis cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetDeviceNameLabel.

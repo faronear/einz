@@ -945,14 +945,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedMenuTitle => 'Advanced';
 
   @override
-  String get advancedLeaveSpace => 'Leave and clear this space';
+  String get advancedLeaveSpace => 'Destroy this entrance';
 
   @override
-  String get leaveSpaceTitle => 'Leave and clear this space?';
+  String get leaveSpaceTitle => 'Destroy this entrance?';
 
   @override
   String get leaveSpaceMessage =>
-      'This leaves this space and erases its messages and keys from this device.\n\nYour other spaces are untouched, and the space itself with its server-side data is kept.\n\nThis cannot be undone!';
+      'This destroys this device\'s entrance to this space and erases its messages and keys from this device.\n\nThe space itself and its server-side data are kept, and your other spaces are untouched — you can join again later with a new token.\n\nThis cannot be undone!';
 
   @override
   String resetDeviceNameLabel(String name) {
