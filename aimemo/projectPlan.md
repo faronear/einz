@@ -17,15 +17,17 @@
 
 | 专项 | 状态 | 细节文档 |
 | --- | --- | --- |
-| **多空间**（一台设备进多个秘境） | M0.5 ✅ / M1 ✅ / M2 ✅ / **M3 [>] 收尾中**（剩：未读） | `aimemo/multiSpaceDesign.zhcn.md` §8（里程碑）、§9（决策） |
+| **多空间**（一台设备进多个秘境） | M0.5 ✅ / M1 ✅ / M2 ✅ / **M3 ✅（2026-09-22 完成）**——剩真机自测 | `aimemo/multiSpaceDesign.zhcn.md` §8（里程碑）、§9（决策） |
 | **字段改名**（`device_id`→`entry_id`、`person_id`→`member_id`） | `[ ]` 计划已定，**等 M3 收尾后执行**（三期 alias） | `aimemo/renamePlan.zhcn.md` |
 | **语音实时通话** | `[⏸]` 待评审（评审通过才拆任务） | `aimemo/voiceCall.zhcn.md` |
 
 ## 待办（跨专项；一行一项，细节在各自文档）
 
-- `[>]` **多空间 M3**：未读（`sync_state.lastReadSequence` + 冷启动/切回各空间轻量 sync +
-  空间列表未读标记）；`productLens` 同步更新
-- `[ ]` 多空间**真机自测**：两档破坏性入口（空间级退出 / 设备级清除）、`device_uid` 回填
+- `[x]` **多空间 M3**（2026-09-22）：未读（服务端派生 `GET /messages/unread` + 数字角标）、
+  术语（`docs/GLOSSARY.md`）、`projectPlan` 索引化
+- `[ ]` 多空间**真机自测**：两档破坏性入口（空间级退出 / 设备级清除）、`device_uid` 回填、
+  未读角标
+- `[ ]` `productLens` 剩余复核：§12 设备管理 / §14 路线图仍是 v1 口径（§2 概念模型已修）
 - `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通
 - `[ ]` 字段改名**执行**（P1 遥测 + 版本双接受 → P2 跨端一轮 → P3 遥测判定后删旧名）
 - `[ ]` **撤销的 App 入口**（设备列表「撤销这台设备」：口令 + 二次确认；`ApiClient.revokeDevice` 已就绪）

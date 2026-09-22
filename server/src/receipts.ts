@@ -118,3 +118,42 @@ export function getReceipts (
     .all(space_id) as ReceiptRow[]
   return { receipts: rows }
 }
+
+/**
+ * GET /messages/unread：本空间里"对方发来的、晚于我读取水位"的消息条数。
+ *
+ * 用途：多空间列表的未读角标（老板 2026-09-22 定：**服务端派生**——不在客户端拉
+ * 各空间的历史、也不加本地 schema；离线时列表不显示未读数，可接受）。
+ *
+ * 数据全是现成的：读取水位 = [receipts.read_upto_seq]（客户端在"用户真看到最新消息"
+ * 时才上报，见 chat_page._scheduleReadReport），消息与发送者分别在 messages / devices。
+ *
+ * 判定"不是我发的"**必须走 person 维度**：同一身份可能有多台登记项，只比 device_id
+ * 会把自己的另一台设备发来的消息算成未读。
+ *
+ * 刻意**不要求** receipts 行存在：没有行 = 从没读过 = 对方的全部消息都算未读。
+ */
+export function unreadCount (token: string): { unread: number } {
+  const { device_id, space_id } = requireSession(token)
+  const personId = personOfDevice(device_id)
+
+  const { read_seq: readSeq } = getDb()
+    .prepare(
+      `SELECT COALESCE(MAX(read_upto_seq), 0) AS read_seq
+       FROM receipts WHERE space_id = ? AND person_id = ?`
+    )
+    .get(space_id, personId) as { read_seq: number }
+
+  const { n } = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM messages m
+         LEFT JOIN devices d ON d.device_id = m.sender_device_id
+        WHERE m.space_id = ?
+          AND m.server_sequence > ?
+          AND (d.person_id IS NULL OR d.person_id != ?)`
+    )
+    .get(space_id, readSeq, personId) as { n: number }
+
+  return { unread: n }
+}

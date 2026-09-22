@@ -8211,3 +8211,44 @@ D5 等 M3 收尾且多空间上线稳定后再执行。另留 **D6**（我的倾
 `person_name`（创建者/slot 0）改 `creator_name`，与既有的 `partner_name`（第二人）成对
 ——即"泛称用 member_*、具体插槽用 creator_*/partner_*"；老板不特别指定就按此执行。
 决定已写回 `aimemo/renamePlan.zhcn.md` §5；执行清单待开工时逐条勾。
+
+## 2026-09-22 多空间 M3 完成：未读（服务端派生）+ projectPlan 索引化
+
+老板：「整理 projectPlan 索引。然后做 M3」。
+
+### 1. projectPlan 改为索引
+
+原来它主体是 Phase 0–4 阶段表（停在 9/09），尾部"待定事项"却还在用（9/18 加过语音通话一行）。
+重排为：文件头立约定（**一行一专项，细节住专项文档**）→ `## 进行中`（多空间 / 字段改名 /
+语音通话，各自指向专项文档）→ `## 待办`（跨专项，一行一项）→ `## 历史：Phase 0–4`（原内容
+逐字保留在文件末尾，不丢信息）。补登记了此前**从未进过本文件**的多空间线，并修正过期描述
+（静态白名单 → Multiverse 多租户 + 一台设备可进多个秘境）。
+
+### 2. 未读：**否决设计文档 §4.2 的本地方案，改服务端派生**
+
+老板拍板前我给了分析，关键发现：**读取水位本来就在服务器上**——ChatPage 已经在"用户真看到
+最新消息"时上报 `read_upto_seq`（前台 + 页面最上层 + 列表贴底才报，`chat_page.dart:1804`），
+服务端 `receipts(space_id, person_id)` 存着。而 §4.2 设想的"冷启动逐空间轻量 sync"其实**不轻**：
+`MessageRepository.sync()` 循环拉到 `hasMore=false`，久未打开的空间等于把积压全量拉下来落库。
+
+于是：
+
+- **服务端**：新增 `GET /messages/unread`（会话绑定空间）。数「`server_sequence > 我的
+  read_upto_seq` 且发送者不是我」——判定"不是我"**走 person 维度**（同一身份可能有多台登记项，
+  只比 device_id 会把自己另一台设备发来的消息算成未读）；没有 receipts 行 = 从没读过 = 全算未读。
+  放在 `receipts.ts`（读取水位语义的归属地），复用 `personOfDevice`。
+- **shared**：`ApiClient.unreadCount(token)` + `Api.messagesUnread`。
+- **App**：空间列表页对**每个空间各调一次**（用各空间自己的 token），显示**数字角标**（>99 → `99+`）；
+  从空间返回时重新拉（`_reload`）。取舍：**离线时列表无角标**（可接受）。
+- 新增测试：服务端 `unread.test.ts` 3 条（水位推进/无 receipts 行/person 维度与跨空间隔离）；
+  App `multi_space_pages_test.dart` 加 1 条（角标只出现在有未读的空间上）。
+
+顺带完成了 M3 的文档项：`multiSpaceDesign` §4.2 改写（记下否决本地方案的理由）+ §5.2/§8/§9；
+`docs/PROTOCOL.md` 端点表加一行；`productLens` §2.1 概念模型按三层重写（§12/§14 仍是 v1 口径，
+已登记进 projectPlan 待办）。
+
+### 验证
+
+- 服务端：`npm run build` + 全套 `npm test` 无回归（含新增 3 条）。
+- App：`flutter analyze` 无 issue；**全量 `flutter test` 168 通过 0 失败**（1 跳过）。
+- 真机自测项（未读角标 / 两档破坏性入口 / device_uid 回填）仍待老板。

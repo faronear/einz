@@ -209,6 +209,16 @@ class ApiClient {
     await _delete(Api.pushRegister, token: token);
   }
 
+  /// 未读条数（GET /messages/unread）：本空间里"对方发来的、晚于我读取水位"的条数。
+  ///
+  /// 多空间列表角标用。读取水位是**服务端**的 `receipts.read_upto_seq`（客户端在
+  /// "用户真看到最新消息"时才上报，见 chat_page._scheduleReadReport），所以这是纯派生量：
+  /// 客户端不必拉各空间的历史、也不需要本地 schema。
+  Future<int> unreadCount(String token) async {
+    final res = await _get(Api.messagesUnread, token: token);
+    return (res['unread'] as num?)?.toInt() ?? 0;
+  }
+
   /// 补登安装级设备标识（POST /devices/uid）：多空间下同一台物理设备在每个空间各有
   /// 一个 device_id，`deviceUid` 是它们共用的那一份（服务端内部认知用）。
   ///

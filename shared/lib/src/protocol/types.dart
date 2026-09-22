@@ -25,6 +25,8 @@ class Api {
   // 补登安装级设备标识（多空间）：存量设备进聊天页时幂等上报一次，服务端据此把
   // 同一物理设备在不同空间的 device_id 关联起来（PROTOCOL.md §7.3）。
   static const deviceUid = '/devices/uid';
+  // 未读条数（多空间列表角标）：服务端派生——消息 + 我上报的读取水位（receipts）。
+  static const messagesUnread = '/messages/unread';
 }
 
 /// 认证挑战结果。

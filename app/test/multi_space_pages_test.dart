@@ -25,6 +25,12 @@ class _SoloDeviceApi extends ApiClient {
   /// 收到退役请求的 token（断言"移除空间顺手退役服务端那一行"用）。
   final List<String> retiredTokens = [];
 
+  /// 各空间的未读数（GET /messages/unread）：按 token 给值，缺省 0。
+  final Map<String, int> unreadByToken = {};
+
+  @override
+  Future<int> unreadCount(String token) async => unreadByToken[token] ?? 0;
+
   @override
   Future<void> retireDevice(String token) async {
     retiredTokens.add(token);
@@ -156,6 +162,28 @@ void main() {
     // 关掉菜单，避免残留 route 影响 teardown
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('空间列表：未读角标只出现在有未读的空间上（服务端派生）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA); // token: tok-a
+    await lock.addSpace(_payloadB); // token: tok-b
+    await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
+
+    final api = _SoloDeviceApi()..unreadByToken['tok-a'] = 3;
+    final vault = (await lock.loadVault())!;
+    await tester.pumpWidget(_app(SpaceListPage(vault: vault, db: db, api: api)));
+    await _settle(tester);
+
+    expect(find.byKey(const ValueKey('unreadBadge-space-a')), findsOneWidget,
+        reason: 'space-a 有 3 条未读 → 显示角标');
+    expect(find.text('3'), findsOneWidget, reason: '角标显示条数');
+    expect(find.byKey(const ValueKey('unreadBadge-space-b')), findsNothing,
+        reason: 'space-b 没未读 → 不显示角标');
   });
 
   testWidgets('切换空间后顶部条显示当前空间的对方名，不串到原空间', (WidgetTester tester) async {

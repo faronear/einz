@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'chat_entry.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
+import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'setup_page.dart';
 import 'widgets/reset_device.dart';
@@ -40,12 +41,40 @@ class _SpaceListPageState extends State<SpaceListPage> {
   late final AppLockService _lock;
   Map<String, ({String name, String peerName})> _names = {};
 
+  /// 各空间未读数（服务端派生，见 [_loadUnread]）。
+  Map<String, int> _unread = {};
+
   @override
   void initState() {
     super.initState();
     _vault = widget.vault;
     _lock = AppLockService(widget.db ?? LocalDatabase.shared);
     _loadNames();
+    _loadUnread();
+  }
+
+  /// 拉各空间未读数：`GET /messages/unread`，用**各空间自己的 token**（会话绑定空间）。
+  ///
+  /// 老板 2026-09-22 定：**服务端派生**，不做"冷启动逐空间拉历史"那套本地方案
+  /// （`repo.sync()` 会循环拉到 hasMore=false，久未打开的空间等于把积压全量拉下来）；
+  /// 读取水位本来就在服务器上（客户端在"用户真看到最新消息"时才上报）。
+  /// 代价：离线时列表没有角标（可接受）。
+  Future<void> _loadUnread() async {
+    final client = widget.api ?? ApiClient(effectiveServer);
+    final spaces = _vault.spaces;
+    final counts = await Future.wait([
+      for (final s in spaces)
+        (s.token ?? '').isEmpty
+            ? Future.value(0)
+            // 单个空间失败（离线/会话过期）不该拖垮其余：吞掉异常，该项按 0 处理
+            : client.unreadCount(s.token!).catchError((_) => 0),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _unread = {
+        for (var i = 0; i < spaces.length; i++) spaces[i].spaceId: counts[i],
+      };
+    });
   }
 
   Future<void> _loadNames() async {
@@ -82,6 +111,7 @@ class _SpaceListPageState extends State<SpaceListPage> {
     }
     setState(() => _vault = v);
     await _loadNames();
+    await _loadUnread(); // 从空间返回时未读会变（那边看过了 / 又来新消息）
   }
 
   /// 进入某个空间：置为 active → push 聊天页（返回即回列表）。
@@ -223,9 +253,31 @@ class _SpaceListPageState extends State<SpaceListPage> {
               ? names!.peerName
               : ((names?.name ?? '').isNotEmpty ? names!.name : space.spaceId);
           final isActive = space.spaceId == _vault.activeSpaceId;
+          final unread = _unread[space.spaceId] ?? 0;
           return ListTile(
             leading: const Icon(Icons.forum_outlined),
-            title: Text(title),
+            title: Row(
+              children: [
+                Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
+                // 未读角标（数字；>99 显示 99+）。0 不显示。
+                if (unread > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    key: ValueKey('unreadBadge-${space.spaceId}'),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.error,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      unread > 99 ? '99+' : '$unread',
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ],
+            ),
             subtitle: names?.name.isNotEmpty == true
                 ? Text(l10n.spaceListMe(names!.name))
                 : null,

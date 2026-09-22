@@ -13,7 +13,7 @@ import {
   verifyChallenge
 } from './auth.js'
 import { postMessage, syncMessages } from './messages.js'
-import { getReceipts, postReceipts } from './receipts.js'
+import { getReceipts, postReceipts, unreadCount } from './receipts.js'
 import {
   getAttachmentBlob,
   storeAttachment,
@@ -393,6 +393,12 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
   if (method === 'GET' && path === '/receipts') {
     sendJson(res, 200, getReceipts(bearerToken(req)))
+    return
+  }
+  // 未读条数（多空间列表的角标用）：服务端派生——消息 + 我上报的读取水位（receipts）。
+  // 不落审计：它是幂等的派生读取，空间数个位数的客户端会常拉（同 /devices/uid 的理由）。
+  if (method === 'GET' && path === '/messages/unread') {
+    sendJson(res, 200, unreadCount(bearerToken(req)))
     return
   }
 

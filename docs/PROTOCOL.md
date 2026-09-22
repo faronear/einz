@@ -86,6 +86,7 @@
 | GET | /space | 空间信息（space_id、成员设备） | Bearer |
 | POST | /receipts | 上报自己的送达/已读高水位（§5.4） | Bearer |
 | GET | /receipts | 拉取本 space 全部回执行（§5.4） | Bearer |
+| GET | /messages/unread | 未读条数（服务端派生：消息 + 我的读取水位；多空间列表角标用） | Bearer |
 | POST | /devices/name | 改本设备显示名 | Bearer |
 | POST | /devices/uid | 补登安装级设备标识 `device_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
 | POST | /devices/person-name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
