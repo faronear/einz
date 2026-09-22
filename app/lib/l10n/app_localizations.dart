@@ -365,13 +365,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardTitleJoinIdentity.
   ///
   /// In en, this message translates to:
-  /// **'Choose your role'**
+  /// **'Choose your identity'**
   String get wizardTitleJoinIdentity;
 
   /// No description provided for @wizardJoinIdentityHint.
   ///
   /// In en, this message translates to:
-  /// **'Limited to two people — pick your identity.'**
+  /// **'One space for two partners. Which one is you?'**
   String get wizardJoinIdentityHint;
 
   /// No description provided for @wizardJoinNoSlots.
@@ -599,7 +599,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'Ask the creator for a one-time invitation'**
+  /// **'An invitation is valid for one-time use within 24 hours.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.

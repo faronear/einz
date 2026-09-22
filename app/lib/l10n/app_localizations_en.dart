@@ -151,11 +151,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitlePeerName => 'About partner';
 
   @override
-  String get wizardTitleJoinIdentity => 'Choose your role';
+  String get wizardTitleJoinIdentity => 'Choose your identity';
 
   @override
   String get wizardJoinIdentityHint =>
-      'Limited to two people — pick your identity.';
+      'One space for two partners. Which one is you?';
 
   @override
   String get wizardJoinNoSlots => 'No preset members — cannot join';
@@ -288,7 +288,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupTokenTitle => 'Verify invitation';
 
   @override
-  String get setupTokenHint => 'Ask the creator for a one-time invitation';
+  String get setupTokenHint =>
+      'An invitation is valid for one-time use within 24 hours.';
 
   @override
   String get setupTokenInputHint => 'Paste the invitation link or code';
