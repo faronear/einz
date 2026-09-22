@@ -43,6 +43,8 @@ class SetupPage extends StatefulWidget {
     this.createOverride,
     this.authOverride,
     this.keyPairOverride,
+    this.existingPin,
+    this.onCompleted,
     this.escrowOverride,
   });
 
@@ -73,6 +75,14 @@ class SetupPage extends StatefulWidget {
 
   /// 测试注入：替换 escrow 服务（join 口令验证；fake 可模拟口令对/错/未托管）。
   final KeyEscrowService Function(String server)? escrowOverride;
+
+  /// 多空间「再加一个空间」：非空 = 本机已设锁屏码（新空间沿用它，向导不再问一次）。
+  /// 单空间首次配置时传 null（照旧在向导里设/跳过）。
+  final String? existingPin;
+
+  /// 多空间：完成回调——把新空间的凭证交给调用方（由它 addSpace + 决定去哪），
+  /// 取代原先"完成即 pushReplacement 进聊天页"的硬编码。null = 旧行为。
+  final Future<void> Function(AppLockPayload payload)? onCompleted;
 
   @override
   State<SetupPage> createState() => _SetupPageState();
@@ -541,6 +551,11 @@ class _SetupPageState extends State<SetupPage> {
   /// 按钮标签本身就是提示，不再弹二次确认弹窗（老板要求 2026-09-13）。
   bool get _pinStepSkippable => _isPinStep && _pin.text.isEmpty && _confirm.text.isEmpty;
 
+  /// 本机已设锁屏码（多空间再加一个空间）：PIN 是 Vault 级的，不该每加一个空间
+  /// 重设一次——页面只提示"沿用当前锁屏码"，且不再 setPin/savePlain（那会用
+  /// 单空间包覆盖 Vault，把其他空间弄丢）。
+  bool get _lockAlreadySet => widget.existingPin != null;
+
   /// 页眉标题（AppBar）：系列标题（如「Einz 秘境：认领中」；第 0 步未选角色时显示引导语）。
   String _appBarTitle(AppLocalizations l10n) {
     if (_role == null || _step == 0) return l10n.wizardStartTitle;
@@ -765,10 +780,21 @@ class _SetupPageState extends State<SetupPage> {
       });
       return;
     }
+    if (_isPinStep && _lockAlreadySet) {
+      // 已设锁：不校验/不重设 PIN，直接跑登记（沿用现有锁屏码）
+      if (_role == _WizardRole.create) {
+        await _runPinSetup();
+      } else if (_role == _WizardRole.join) {
+        await _runJoinAccess();
+      } else {
+        await _runEnvelopeImport();
+      }
+      return;
+    }
     // PIN 步骤（create=5 / join=4 / offline=2）：底部按钮触发校验。
     // 两空 → 跳过设锁（按钮此时标签就是"跳过"，不再弹二次确认弹窗——
     // 老板要求 2026-09-13）；有效 PIN → 设锁后推进；其余 → 输入框下方红色提示。
-    if (_isPinStep) {
+    if (_isPinStep && !_lockAlreadySet) {
       final pin = _pin.text;
       final confirm = _confirm.text;
       if (pin.isEmpty && confirm.isEmpty) {
@@ -905,7 +931,7 @@ class _SetupPageState extends State<SetupPage> {
           case 3:
             return _buildStepPassphrase();
           case 4:
-            return _buildStepPin();
+            return _lockAlreadySet ? _buildStepPinReuse() : _buildStepPin();
           default:
             return _buildStepDone();
         }
@@ -918,7 +944,7 @@ class _SetupPageState extends State<SetupPage> {
           case 3:
             return _buildStepPassphrase();
           case 4:
-            return _buildStepPin();
+            return _lockAlreadySet ? _buildStepPinReuse() : _buildStepPin();
           default:
             return _buildStepDone();
         }
@@ -1190,6 +1216,7 @@ class _SetupPageState extends State<SetupPage> {
     String? privateKeyB64, // 设备私钥（b64）：随锁包持久化（与 Space Key 同库同策略）
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    if (_lockAlreadySet) return true; // 沿用现有锁屏码：不重设（addSpace 由调用方做）
     final pin = _pin.text;
     if (!AppLockService.isPinDigitsOnly(pin)) {
       setState(() => _status = l10n.setPinDialogPinDigitsOnly);
@@ -1235,6 +1262,7 @@ class _SetupPageState extends State<SetupPage> {
     // await 确保 profile 写入完成后再进聊天（消除 unawaited 竞态——2026-09-07
     // 老板实测：设 PIN 重启解锁后顶部条丢名字）
     await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
+      spaceId: _spaceId.text.trim(), // per-space 资料（多空间）
       // 本人名字：join=所选身份（create 预置）；create=自填
       personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
       // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
@@ -1249,6 +1277,20 @@ class _SetupPageState extends State<SetupPage> {
           _role == _WizardRole.join ? _joinPeerGender : (_partnerGender ?? ''),
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
+    final completed = widget.onCompleted;
+    if (completed != null) {
+      // 多空间：凭证交给调用方（它负责 addSpace 与导航），本页不再硬跳聊天页
+      await completed(AppLockPayload(
+        spaceId: _spaceId.text.trim(),
+        deviceId: enroll.deviceId,
+        spaceKeyB64: base64Encode(sk),
+        keyVersion: 1,
+        token: token,
+        publicKeyB64: kp.publicKeyB64,
+        privateKeyB64: kp.privateKeyB64,
+      ));
+      return;
+    }
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
         spaceId: _spaceId.text.trim(),
@@ -1906,6 +1948,22 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 步骤 4：设置启动锁（内嵌表单：PIN 两次确认，提交走底部"下一步"校验/跳过）。
+  /// 多空间再加一个空间：PIN 步骤改为"沿用当前锁屏码"提示（不重设）。
+  Widget _buildStepPinReuse() {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lock_outline, size: 40),
+          const SizedBox(height: 16),
+          Text(l10n.setupPinReuseNotice, style: const TextStyle(fontSize: 16, height: 1.5)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStepPin() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -1968,7 +2026,7 @@ class _SetupPageState extends State<SetupPage> {
       }
       // 3) 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
       // （密保口令不随 AppLockPayload 持久化——服务器为唯一真相源）
-      if (_pinSkipped) {
+      if (_pinSkipped && !_lockAlreadySet) {
         if (!mounted) return;
         await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
           spaceId: _spaceId.text.trim(),
@@ -2194,7 +2252,7 @@ class _SetupPageState extends State<SetupPage> {
     final kp = _keyPair;
     if (kp == null) return;
     // 口令已在口令页（步骤 3）验证通过（_verifyJoinPassphrase），这里仅设锁/完成
-    if (_pinSkipped) {
+    if (_pinSkipped && !_lockAlreadySet) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
         spaceId: _spaceId.text,
@@ -2301,7 +2359,7 @@ class _SetupPageState extends State<SetupPage> {
     }
     if (!mounted) return;
     // 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
-    if (_pinSkipped) {
+    if (_pinSkipped && !_lockAlreadySet) {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
         spaceId: enroll.spaceId,

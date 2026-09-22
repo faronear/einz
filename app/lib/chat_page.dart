@@ -81,6 +81,8 @@ class ChatPage extends StatefulWidget {
     this.peerName, // 对方名字（setup 探测传入；对话顶部条显示）
     this.publicKeyB64, // 设备公钥（b64，随锁包持久化；弹窗展示用）
     this.privateKeyB64, // 设备私钥（b64，随锁包持久化；补设锁写入新锁包）
+    this.onSwitchSpace, // 非空 → 菜单显示「切换空间」（多空间；由空间列表页注入）
+    this.onManageSpaces, // 非空 → 菜单显示「空间管理」（单空间也能加第二个空间）
   });
 
   final String spaceId;
@@ -110,6 +112,13 @@ class ChatPage extends StatefulWidget {
 
   /// 设备 X25519 私钥（b64，随锁包持久化）：补设锁/改口令时写入新锁包。
   final String? privateKeyB64;
+
+  /// 「切换空间」入口（多空间）。null = 单空间，不显示该菜单项。
+  final VoidCallback? onSwitchSpace;
+
+  /// 「空间管理」入口：进入空间列表（单空间用户也能从这里加第二个空间）。
+  /// 需要 Vault/pin 上下文，故由入口注入；null = 不显示。
+  final void Function(BuildContext context)? onManageSpaces;
 
   /// 测试注入用；默认新建（生产路径）。
   final LocalDatabase? db;
@@ -3706,6 +3715,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showAvatarUpload);
                 case 'devname':
                   _menuAction(() => _showRenameDialog(renameDevice: true));
+                case 'switchspace':
+                  widget.onSwitchSpace?.call();
+                case 'manage':
+                  widget.onManageSpaces?.call(context);
                 case 'exit':
                   _menuAction(_showExitAppDialog);
               }
@@ -3718,6 +3731,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
               return [
                 // 「我的」组（关于我的信息）置顶：名字/头像/设备名称
+                // 多空间：置顶「切换空间」（只有从空间列表进来时才注入回调）
+                if (widget.onSwitchSpace != null)
+                  PopupMenuItem(
+                    value: 'switchspace',
+                    child: Text(l10n.spaceListSwitch),
+                  ),
+                // 空间管理（常驻：单空间用户也能从这里加第二个空间）
+                if (widget.onManageSpaces != null)
+                  PopupMenuItem(
+                    value: 'manage',
+                    child: Text(l10n.spaceListManage),
+                  ),
                 PopupMenuItem(
                   value: 'name',
                   child: Row(

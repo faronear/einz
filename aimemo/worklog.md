@@ -7868,3 +7868,23 @@ Vault 猜 active 空间**，结果 7 个 widget 测试挂死（pumpAndSettle 10 
 
 全量 `flutter test`：**156 过 0 失败**（M0.5 后是 151）。新增 `multi_space_isolation_test.dart`
 5 条用例（只清本空间、PIN pending、per-space 设置互不干扰、缓存保留名单跨空间）。
+
+## 2026-09-22 多空间 M2：可见部分（列表/切换/入口）
+
+- StartupGate：解锁/读明文拿到的都是 **Vault** → 0 空间 SetupPage / 1 空间直接进聊天
+  （与旧行为一致）/ N 空间 SpaceListPage。锁屏页改用 `unlockVault`。
+- 新增 `space_list_page.dart`：列表（名字取 Spaces 行，回退 per-space profile）、点击进入、
+  长按删除（二次确认，仅本地）、底部「新建/加入空间」。
+- 新增 `chat_entry.dart`：`buildChatPage` 收敛三处入口的 ChatPage 构造（少传一个 reauth
+  这类问题只会在真机上暴露，不能有三份）。
+- SetupPage 加 `existingPin` / `onCompleted`：已有锁时 PIN 步骤变成"沿用当前锁屏码"，
+  不再 setPin/savePlain（那会用单空间包覆盖 Vault，把其他空间弄丢）；完成后把凭证交回
+  调用方去 addSpace。
+- ⑦ 常驻入口落地在**聊天页菜单「空间管理」**（不是设置页——那要新建页面）：单空间也在，
+  多空间另有「切换空间」。入口需要 Vault/pin，由 StartupGate/LockPage/SpaceListPage 注入回调。
+
+**踩坑**：`savePlain` 没有补写 Spaces 行（只有 loadPlain/unlockVault/addSpace 会补）→
+列表页拿不到名字。已改为任何 Vault 写入后都同步所有空间的 Spaces 行。
+另：测试里必须先 `ensureFreshInstall()`，否则启动门按"全新安装"把安全存储清掉。
+
+全量 `flutter test`：**158 过 0 失败**。UI 交互（向导加第二个空间、切换）交给老板真机自测。

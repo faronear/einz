@@ -424,5 +424,17 @@
   "resetDeviceNameMismatch": "That does not match — try again",
   "resetDeviceConfirmWord": "RESET",
   "resetDevicePinLabel": "This device's PIN",
-  "resetDeviceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner's device list"
+  "resetDeviceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner's device list",
+  "spaceListTitle": "My spaces",
+  "spaceListAdd": "Create or join a space",
+  "spaceListSwitch": "Switch space",
+  "spaceListManage": "Manage spaces",
+  "spaceListDeleteTitle": "Remove this space?",
+  "spaceListDeleteMessage": "This removes the space from this device only. Your other spaces are untouched, and nothing is deleted on the server (this device may still appear in your partner's device list).",
+  "spaceListDeleteConfirm": "Remove",
+  "spaceListMe": "Me: {name}",
+  "@spaceListMe": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "setupPinReuseNotice": "This space will use your current lock screen code."
 }

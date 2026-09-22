@@ -1,9 +1,8 @@
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import 'brand_logo.dart';
-import 'chat_page.dart';
+import 'chat_entry.dart';
 import 'data/app_lock.dart';
 import 'data/launch_args.dart';
 import 'data/local_database.dart';
@@ -11,6 +10,7 @@ import 'data/locale_settings.dart';
 import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
+import 'space_list_page.dart';
 import 'setup_page.dart';
 
 /// Einz 移动端（及桌面端）入口。
@@ -133,8 +133,8 @@ class _EinzAppState extends State<EinzApp> {
   }
 }
 
-/// 启动门：三分支——有锁包 → 锁屏页；无锁但有明文配置（跳过 PIN）→ 直接进聊天；
-/// 都无 → 设置页。
+/// 启动门：有锁包 → 锁屏页；无锁但有明文配置（跳过 PIN）→ 单空间直接进聊天 /
+/// 多空间进空间列表；都无 → 设置页。
 ///
 /// 无锁包**根本不进锁屏页**（老板 2026-09-20）：那页在没有 PIN 时只会显示
 /// "尚未设置锁屏码"的死胡同（LockPage 内部保留该兜底仅为防死锁）。
@@ -152,7 +152,7 @@ class StartupGate extends StatefulWidget {
 
 class _StartupGateState extends State<StartupGate> {
   bool? _hasLock; // 有 PIN 加密锁包
-  AppLockPayload? _plain; // 无锁配置（跳过 PIN 的明文 payload）
+  VaultPayload? _vault; // 无锁配置（跳过 PIN 的明文 Vault：可能含多个空间）
   String? _initError; // 本地库查询持续失败（重试耗尽）→ 展示重试页（不误进向导）
   int _retryCount = 0;
 
@@ -171,11 +171,11 @@ class _StartupGateState extends State<StartupGate> {
       await lock.ensureFreshInstall();
       final hasLock = await lock.isSetup;
       // 无锁包时读明文配置（跳过 PIN 的无锁场景：下次启动直接进聊天）
-      final plain = hasLock ? null : await lock.loadPlain();
+      final vault = hasLock ? null : await lock.loadVault();
       if (!mounted) return;
       setState(() {
         _hasLock = hasLock;
-        _plain = plain;
+        _vault = vault;
         _initError = null;
       });
     } catch (e) {
@@ -262,25 +262,32 @@ class _StartupGateState extends State<StartupGate> {
     // 与对话页两个入口同口径——老板 2026-09-20）。db 透传：启动门注入的库
     // （测试）与锁屏页共用同一个实例。
     if (_hasLock!) return LockPage(canDismiss: false, db: widget.db);
-    final plain = _plain;
-    if (plain != null) {
-      // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰；
-      // 从明文配置恢复设备密钥对 → 注入 reauth（会话过期自动续期）
-      final reauth = (plain.publicKeyB64 != null && plain.privateKeyB64 != null)
-          ? () => reauthFromPayload(plain)
-          : null;
-      return ChatPage(
-        spaceId: plain.spaceId,
-        deviceId: plain.deviceId,
-        spaceKey: base64Decode(plain.spaceKeyB64),
-        keyVersion: plain.keyVersion,
-        token: plain.token ?? '',
-        reauth: reauth,
-        publicKeyB64: plain.publicKeyB64,
-        privateKeyB64: plain.privateKeyB64,
-      );
+    final vault = _vault;
+    if (vault != null) {
+      // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰（多空间则先给列表）。
+      // 构造 ChatPage 收敛在 chat_entry.buildChatPage（三处入口共用）。
+      if (vault.spaces.length > 1) {
+        return SpaceListPage(vault: vault, db: widget.db);
+      }
+      final active = vault.active;
+      if (active != null) {
+        final db = widget.db;
+        return buildChatPage(
+          active,
+          db: db,
+          // 单空间也能从这里加第二个空间（老板 2026-09-22 定：入口常驻）
+          onManageSpaces: (ctx) async {
+            final lock = AppLockService(db ?? LocalDatabase.shared);
+            final v = await lock.loadVault();
+            if (v == null || !ctx.mounted) return;
+            await Navigator.of(ctx).push(MaterialPageRoute(
+              builder: (_) => SpaceListPage(vault: v, db: db),
+            ));
+          },
+        );
+      }
     }
-    return const SetupPage();
+    return SetupPage(db: widget.db);
   }
 }
 

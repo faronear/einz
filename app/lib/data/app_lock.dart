@@ -128,6 +128,7 @@ class AppLockService {
     await SecureStore.write(_securePlain, jsonEncode(vault.toJson()));
     await _set(_kSkipped, '1');
     await _deletePlainFromDb(); // 兼容：清掉旧版本可能残留的明文副本
+    await _syncAllSpaceRows(vault);
   }
 
   /// 写 PIN 加密的 Vault（设置/修改锁屏码）：成功后清除明文副本（同旧 [setPin] 语义）。
@@ -138,6 +139,7 @@ class AppLockService {
     await _set(_kAttempts, '0');
     await _set(_kLockedUntil, '0');
     await clearPlain(); // 补设 PIN 后不再保留明文副本
+    await _syncAllSpaceRows(vault);
   }
 
   /// 读 Vault：PIN 场景传 [pin]（走解锁，含防爆破）；无 PIN 场景读明文。
@@ -223,6 +225,13 @@ class AppLockService {
   Future<VaultPayload> _mergedVault(AppLockPayload payload) async {
     final vault = await loadPlainVault() ?? VaultPayload.single(payload);
     return vault.upsert(payload).copyWith(activeSpaceId: payload.spaceId);
+  }
+
+  /// Vault 里每个空间都保证有 Spaces 行（列表页展示名字/未读用）。
+  Future<void> _syncAllSpaceRows(VaultPayload vault) async {
+    for (final space in vault.spaces) {
+      await _syncSpaceRow(space);
+    }
   }
 
   /// 凭证与 Spaces 表对齐（幂等）：补写该空间的元数据行。

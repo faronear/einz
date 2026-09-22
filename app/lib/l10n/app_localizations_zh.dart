@@ -908,4 +908,34 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get resetDeviceServerResidualHint =>
       '⚠️ 本地数据已清除，但服务端退役未完成——对方的设备列表里可能仍留有这台设备';
+
+  @override
+  String get spaceListTitle => '我的空间';
+
+  @override
+  String get spaceListAdd => '新建/加入空间';
+
+  @override
+  String get spaceListSwitch => '切换空间';
+
+  @override
+  String get spaceListManage => '空间管理';
+
+  @override
+  String get spaceListDeleteTitle => '移除这个空间？';
+
+  @override
+  String get spaceListDeleteMessage =>
+      '仅从这台设备移除该空间：其他空间不受影响，服务器上的数据也不会删除（对方的设备列表里可能仍会看到这台设备）。';
+
+  @override
+  String get spaceListDeleteConfirm => '移除';
+
+  @override
+  String spaceListMe(String name) {
+    return '我：$name';
+  }
+
+  @override
+  String get setupPinReuseNotice => '该空间将沿用你当前的锁屏码。';
 }

@@ -256,11 +256,13 @@ M2 补：Vault 里还有其他空间时应回 SpaceListPage 而不是 SetupPage�
   其他设备」，并提示「对方的设备列表里会残留这台设备的条目」）
 - 「新建/加入空间」按钮 → SetupPage（复用现有向导，完成后 `addSpace` + 直接进入）
 
-**入口可达性** `[已定 ⑦]`：SpaceListPage **不是只在多空间时才存在**——
+**入口可达性** `[已定 ⑦]` + **实现注记（M2）**：SpaceListPage **不是只在多空间时才存在**——
 
 - 启动路径：仅 `spaces.length > 1` 时出现在 StartupGate（保证单空间用户体验零变化）；
-- 设置页：**常驻「添加空间 / 空间管理」入口**（单空间时文案为"添加另一个空间"，多空间时为
-  "空间管理"），任何情况下都能进 SpaceListPage → 新建/加入。
+- 聊天页菜单：**常驻「空间管理」**（单空间也在）→ 进 SpaceListPage → 新建/加入；
+- 多空间时菜单另有「切换空间」（回列表）。
+  入口需要 Vault/pin 上下文，故由入口（StartupGate / LockPage / SpaceListPage）注入回调，
+  ChatPage 自己不读 Vault。
 
 向导收尾改动：`setup_page.dart:1252` 现在完成即 `pushReplacement(ChatPage)` 且**无回调**，
 需改为把 payload 回传（或返回上层），由调用方决定 `addSpace` 后是进新空间还是回列表。
@@ -320,7 +322,7 @@ M2 补：Vault 里还有其他空间时应回 SpaceListPage 而不是 SetupPage�
 | --- | --- | --- |
 | M0.5 数据底座 ✅ **已完成**（2026-09-22，分支 `feature/multiSpace`） | Spaces 表（v7） + Vault 读写 + 迁移（**未做任何 UI**） | 单测 1–3 绿；旧数据升级后单空间行为不变；全量 `flutter test` 无回归 |
 | M1 数据与隔离 ✅ **已完成**（2026-09-22） | per-space 设置键 + 附件 spaceId + 媒体缓存跨空间保留 + **撤销自毁逐空间化** + removeSpace 数据清理 | 单测 4–6 绿；单空间路径无回归（全量 156 过 0 失败） |
-| M2 会话切换 | StartupGate 分支 + SpaceListPage + 设置页常驻入口 + ChatPage 切换入口 + 向导回调 + WS 随切换重建 | 手动：双空间创建/加入/切换/删除全流程；单测 7–9 绿 |
+| M2 会话切换 ✅ **已完成**（2026-09-22） | StartupGate 分支 + SpaceListPage + 常驻入口 + ChatPage 切换入口 + 向导回调 + WS 随切换重建 | 手动：双空间创建/加入/切换/删除全流程（**老板真机自测**）；页面测试 7–9 绿 |
 | M3 收尾 | 未读（lastReadSequence + 启动/切回轻量 sync）、l10n、`productLens/projectPlan` 更新、「我的设备」文案 | 全量 `flutter test`（基线先实跑确认）；单空间路径 golden 保持绿 |
 
 二期（另行评审）：多空间并行 WS、非当前空间后台轮询、跨 server 空间、共用 deviceId

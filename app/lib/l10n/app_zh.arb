@@ -424,5 +424,14 @@
   "resetDeviceNameMismatch": "输入不符，请重输",
   "resetDeviceConfirmWord": "重置",
   "resetDevicePinLabel": "本设备锁屏码",
-  "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成——对方的设备列表里可能仍留有这台设备"
+  "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成——对方的设备列表里可能仍留有这台设备",
+  "spaceListTitle": "我的空间",
+  "spaceListAdd": "新建/加入空间",
+  "spaceListSwitch": "切换空间",
+  "spaceListManage": "空间管理",
+  "spaceListDeleteTitle": "移除这个空间？",
+  "spaceListDeleteMessage": "仅从这台设备移除该空间：其他空间不受影响，服务器上的数据也不会删除（对方的设备列表里可能仍会看到这台设备）。",
+  "spaceListDeleteConfirm": "移除",
+  "spaceListMe": "我：{name}",
+  "setupPinReuseNotice": "该空间将沿用你当前的锁屏码。"
 }

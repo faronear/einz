@@ -951,4 +951,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get resetDeviceServerResidualHint =>
       '⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner\'s device list';
+
+  @override
+  String get spaceListTitle => 'My spaces';
+
+  @override
+  String get spaceListAdd => 'Create or join a space';
+
+  @override
+  String get spaceListSwitch => 'Switch space';
+
+  @override
+  String get spaceListManage => 'Manage spaces';
+
+  @override
+  String get spaceListDeleteTitle => 'Remove this space?';
+
+  @override
+  String get spaceListDeleteMessage =>
+      'This removes the space from this device only. Your other spaces are untouched, and nothing is deleted on the server (this device may still appear in your partner\'s device list).';
+
+  @override
+  String get spaceListDeleteConfirm => 'Remove';
+
+  @override
+  String spaceListMe(String name) {
+    return 'Me: $name';
+  }
+
+  @override
+  String get setupPinReuseNotice =>
+      'This space will use your current lock screen code.';
 }

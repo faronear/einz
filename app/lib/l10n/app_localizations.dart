@@ -1759,6 +1759,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner\'s device list'**
   String get resetDeviceServerResidualHint;
+
+  /// No description provided for @spaceListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My spaces'**
+  String get spaceListTitle;
+
+  /// No description provided for @spaceListAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or join a space'**
+  String get spaceListAdd;
+
+  /// No description provided for @spaceListSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch space'**
+  String get spaceListSwitch;
+
+  /// No description provided for @spaceListManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage spaces'**
+  String get spaceListManage;
+
+  /// No description provided for @spaceListDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this space?'**
+  String get spaceListDeleteTitle;
+
+  /// No description provided for @spaceListDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the space from this device only. Your other spaces are untouched, and nothing is deleted on the server (this device may still appear in your partner\'s device list).'**
+  String get spaceListDeleteMessage;
+
+  /// No description provided for @spaceListDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get spaceListDeleteConfirm;
+
+  /// No description provided for @spaceListMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Me: {name}'**
+  String spaceListMe(String name);
+
+  /// No description provided for @setupPinReuseNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'This space will use your current lock screen code.'**
+  String get setupPinReuseNotice;
 }
 
 class _AppLocalizationsDelegate

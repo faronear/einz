@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' show exit;
 
 import 'package:flutter/material.dart';
 
 import 'about_page.dart';
 import 'brand_logo.dart';
-import 'chat_page.dart';
+import 'chat_entry.dart';
+import 'space_list_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
@@ -87,29 +87,37 @@ class _LockPageState extends State<LockPage> {
     }
   }
 
-  void _enterChat(AppLockPayload payload) {
+  Future<void> _enterChat(String pin) async {
     if (widget.asOverlay) {
       // 覆盖锁屏（聊天中切后台超时返回）：解锁成功 pop 回聊天页，保留消息状态
       Navigator.of(context).pop();
       return;
     }
-    // 冷启动锁屏：解锁成功进入聊天页；从锁包恢复设备密钥对 → 注入 reauth
-    // （会话过期 401/4401 时 challenge-response 重新签发 token；旧包无密钥 → null）
-    final reauth = (payload.publicKeyB64 != null && payload.privateKeyB64 != null)
-        ? () => reauthFromPayload(payload)
-        : null;
+    // 冷启动锁屏：解锁拿到的是**整个 Vault**（旧单空间包已归一）。
+    // 单空间 → 直接进聊天（与旧行为一致）；多空间 → 先给空间列表。
+    final vault = await _lock.unlockVault(pin);
+    if (!mounted) return;
+    final active = vault.active;
+    if (vault.spaces.length > 1) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => SpaceListPage(vault: vault, pin: pin, db: widget.db),
+      ));
+      return;
+    }
+    if (active == null) return;
+    final db = widget.db;
     Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) => ChatPage(
-        // 地址不进锁包：解锁前后读的都是启动时定好的 effectiveServer
-        spaceId: payload.spaceId,
-        deviceId: payload.deviceId,
-        spaceKey: base64Decode(payload.spaceKeyB64),
-        keyVersion: payload.keyVersion,
-        token: payload.token ?? '',
-        escrowUpdatedAt: payload.escrowUpdatedAt,
-        reauth: reauth,
-        publicKeyB64: payload.publicKeyB64,
-        privateKeyB64: payload.privateKeyB64,
+      builder: (_) => buildChatPage(
+        active,
+        db: db,
+        // 单空间也能从这里加第二个空间（PIN 模式下改 Vault 需要 pin）
+        onManageSpaces: (ctx) async {
+          final v = await _lock.unlockVault(pin);
+          if (!ctx.mounted) return;
+          await Navigator.of(ctx).push(MaterialPageRoute(
+            builder: (_) => SpaceListPage(vault: v, pin: pin, db: db),
+          ));
+        },
       ),
     ));
   }
@@ -121,9 +129,9 @@ class _LockPageState extends State<LockPage> {
       _error = null;
     });
     try {
-      final payload = await _lock.unlock(_pin.text);
+      final pin = _pin.text;
+      await _enterChat(pin); // 内部走 unlockVault（多空间需要整个 Vault）
       if (!mounted) return;
-      _enterChat(payload);
     } on AppLockLockedException catch (e) {
       if (!mounted) return;
       setState(() => _error = AppLocalizations.of(context)!.lockPageTooManyAttempts(e.remainingSeconds));
