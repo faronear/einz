@@ -7965,7 +7965,20 @@ app `flutter test` 140 过 1 skip（新增 2 条回归用例）；`flutter analy
 
 - **服务端要重新部署**才生效；客户端要出新包。做完之前老板点一次重发也能立刻恢复
   （修复 2 是纯本地判断）。
-- `chat_page.dart` 状态小标语义（`delivered`/`read` 但无回执 → 现在显示"发送中"，
-  应改单勾「服务器已收下」）：**老板要求单独讨论**，本轮故意没动。
+- `chat_page.dart` 状态小标语义（`delivered`/`read` 但无回执 → 显示"发送中"）：
+  **已修**，见本文档下一条（老板确认现场后拍的）。
 - 这条 bug 已合并进 `feature/multiSpace`（2026-09-22，合并时冲突只在 setup_page.dart
   的 `reauth`/`onManageSpaces` 与本文档，两处都取"双方都保留"）。
+
+## 2026-09-22 状态小标：`delivered`/`read` 无对方回执 → 单勾（堵住上面那条链的第一环）
+
+老板确认了现场：最初显示的是**蓝色小飞机**，他点了几下，之后才变成永久红色「点击重发」。
+所以上一条记录里"delivered + 无回执 → 渲染成发送中"这一环是确定的，也正是诱因。
+
+改动（`chat_page.dart` `_buildSendStatusIcon`）：原来只有 `status == 'sent'` 才给单勾，
+`delivered`/`read` 若拿不到对方回执就一路掉进末尾的 pending 分支 → 蓝飞机。现在
+`sent`/`delivered`/`read` 都渲染成单勾（语义统一为"服务端已收下"），有回执才升双勾；
+pending 分支只剩真正的 pending 会走到。
+
+测试：`chat_send_status_test.dart` 新增一条用例（同身份另一设备发的、无回执 → 单勾、
+不是小飞机、也不是双勾），全量 141 过 1 skip（在 main 上跑的；合并进本分支后 161 过 1 skip）。
