@@ -90,12 +90,16 @@ class _StatusFakeApi extends ApiClient {
         messageId: env.messageId, serverSequence: postedSeq, createdAt: 1000));
   }
 
+  /// GET /space 返回的设备表：决定 device→person 映射（"是否我的消息"）。
+  /// 需要模拟"同一身份的另一台设备"时替换它。
+  List<SpaceDevice> devices = const [
+    SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+  ];
+
   @override
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-test',
-        devices: const [
-          SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
-        ],
+        devices: devices,
       );
 
   /// 回执：测试内不需要真网络（回执数据由测试直接种进库）。
@@ -225,6 +229,58 @@ void main() {
         reason: 'delivered（对方已收到）应显示双勾');
     expect(find.byIcon(Icons.check), findsNothing,
         reason: '有回执时不应再显示单勾');
+  });
+
+  testWidgets('另一台设备发的历史消息：无对方回执 → 单勾（不再假装「发送中」）',
+      (WidgetTester tester) async {
+    // 老板 2026-09-22 线上实测：换设备后同步回来的历史消息，seq 有值（=服务端已收下），
+    // 但对方设备那几天是死的 → 没有回执。旧逻辑走完 failed → receipt → sent 三个分支
+    // 后掉进末尾的 pending 分支，渲染成"发送中"蓝飞机 → 用户以为没发出去、去点重发
+    // → 撞上服务端 403 → 变成永久红色「点击重发」。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    // 同一身份的另一台设备（dev-a2）发的；**不种**任何对方回执
+    final fromMyOtherDevice = await encryptMessage(
+      plaintext: '旧设备发的',
+      spaceKey: spaceKey,
+      spaceId: 'space-test',
+      senderDeviceId: 'dev-a2',
+      messageId: 'old-1',
+      keyVersion: 1,
+    );
+    final api = _StatusFakeApi(peer: [(env: fromMyOtherDevice, seq: 1)], postedSeq: 1)
+      ..devices = const [
+        SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+        SpaceDevice(deviceId: 'dev-a2', personId: 'person-a', status: 'active'),
+      ];
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-test',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('旧设备发的'), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget,
+        reason: '服务端已收下（seq 有值）→ 单勾');
+    expect(find.byTooltip('发送中，点击验证是否已送达并重发'), findsNothing,
+        reason: '不该显示成「发送中」——那会诱导用户点重发，进而撞 403 变永久失败');
+    expect(find.byIcon(Icons.done_all), findsNothing,
+        reason: '还没有对方回执 → 不该显示双勾');
   });
 
   testWidgets('点按「发送中」小飞机：重发并收敛为已发送单勾', (WidgetTester tester) async {

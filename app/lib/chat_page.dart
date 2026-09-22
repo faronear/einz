@@ -328,10 +328,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 自己消息的发送状态小标（老板 2026-09-12）：
   /// - pending → 纸飞机（发送中）
   /// - sent → 单勾（服务端已收下）
-  /// - **delivered / read → 双勾**（对方设备已收到；read 目前**不**单独区分，
-  ///   老板 2026-09-12 定：已读只留数据档位，先不展示）
+  /// - **delivered / read → 单勾**（服务端已收下；这是我同一身份另一台设备发的
+  ///   消息同步回来的状态，对方回执到了才升双勾）
+  /// - 有对方回执（delivered/read）→ 双勾
   /// - failed → 红色警告（点按重发）
   /// 仅自己、非墓碑消息显示。
+  ///
+  /// 注意 `sent` 与 `delivered` 都是"服务端已收下"，**不能**只把 `sent` 当已发送：
+  /// `delivered` 若因为暂时没有对方回执而掉进末尾的 pending 分支，就会被渲染成
+  /// "发送中"蓝飞机 → 用户以为没发出去、去点重发 → 撞上服务端 403 → 变成永久红色
+  /// 「点击重发」（老板 2026-09-22 线上实测的完整链条）。
   Widget _buildSendStatusIcon(HistoryMessage m) {
     final l10n = AppLocalizations.of(context)!;
     final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
@@ -375,7 +381,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: Icon(Icons.done_all, size: 12, color: subtle),
       );
     }
-    if (m.status == 'sent') {
+    if (m.status == 'sent' || m.status == 'delivered' || m.status == 'read') {
       return Tooltip(
         message: l10n.chatPageMsgSent,
         child: Icon(Icons.check, size: 12, color: subtle),
