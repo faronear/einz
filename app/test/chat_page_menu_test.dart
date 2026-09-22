@@ -1166,10 +1166,10 @@ void main() {
     expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, false);
   });
 
-  testWidgets('菜单：空间入口只有一条「切换空间」，点击直接开弹层（不再跳页）',
+  testWidgets('菜单：空间入口只有一条「切换秘境」，点击直接开弹层（不再跳页）',
       (WidgetTester tester) async {
-    // 老板 2026-09-22：原「切换空间 / 空间管理」两条指向同一个东西，合并成一条；
-    // 且现在**不再跳页**（切换空间不需要锁屏码），点击就地弹「选择秘境」。
+    // 老板 2026-09-22：原「切换秘境 / 空间管理」两条指向同一个东西，合并成一条；
+    // 且现在**不再跳页**（切换秘境不需要锁屏码），点击就地弹「选择秘境」。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -1193,12 +1193,12 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('切换空间'), findsOneWidget, reason: '保留的一条');
+    expect(find.text('切换秘境'), findsOneWidget, reason: '保留的一条');
     expect(find.text('空间管理'), findsNothing, reason: '合并后不应再出现');
     // 该项在弹层偏下，先滚到可见再点
-    await tester.ensureVisible(find.text('切换空间'));
+    await tester.ensureVisible(find.text('切换秘境'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('切换空间'));
+    await tester.tap(find.text('切换秘境'));
     await tester.pumpAndSettle();
     expect(switched, 0);
     // 就地弹层（不是新页面）：能看到「选择秘境」内容与通往第一屏的入口
@@ -1206,9 +1206,9 @@ void main() {
     expect(find.text('新建/加入空间'), findsOneWidget, reason: '弹层底部通往第一屏');
   });
 
-  testWidgets('菜单：聊天页不再依赖任何注入也能开「切换空间」（不再需要 pin）',
+  testWidgets('菜单：聊天页不再依赖任何注入也能开「切换秘境」（不再需要 pin）',
       (WidgetTester tester) async {
-    // 以前单空间直达路径必须靠入口注入（因为 push 列表页需要 pin）；现在切换空间
+    // 以前单空间直达路径必须靠入口注入（因为 push 列表页需要 pin）；现在切换秘境
     // 不需要锁屏码（当前空间落明文键 + 内存会话 VaultSession），聊天页自己就能开弹层。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -1233,10 +1233,10 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('切换空间'), findsOneWidget);
-    await tester.ensureVisible(find.text('切换空间'));
+    expect(find.text('切换秘境'), findsOneWidget);
+    await tester.ensureVisible(find.text('切换秘境'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('切换空间'));
+    await tester.tap(find.text('切换秘境'));
     await tester.pumpAndSettle();
     expect(managed, 0);
     expect(find.text('我的空间'), findsOneWidget, reason: '没有任何注入也照常开弹层');

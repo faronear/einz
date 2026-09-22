@@ -937,7 +937,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceListAdd => '新建/加入空间';
 
   @override
-  String get spaceListSwitch => '切换空间';
+  String get spaceListSwitch => '切换秘境';
 
   @override
   String get promptLockCodeTitle => '输入锁屏码';

@@ -441,7 +441,7 @@
   "spaceListTitle": "我的空间",
   "spaceListEmpty": "还没有加入任何空间",
   "spaceListAdd": "新建/加入空间",
-  "spaceListSwitch": "切换空间",
+  "spaceListSwitch": "切换秘境",
   "promptLockCodeTitle": "输入锁屏码",
   "promptLockCodeHint": "新增空间要写入加密锁包，先验证本机锁屏码",
   "spaceListDeleteConfirm": "移除",

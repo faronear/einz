@@ -3808,7 +3808,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               final labelStyle =
                   TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
               return [
-                // 「我的」组（关于我的信息）置顶：名字/头像/设备名称
+                // 菜单分组（老板 2026-09-22 定）：
+                //   ①「我」：我的身份 / 我的头像（关于"我这个人"）
+                //   ②「本入口」：入口名称 / 新入口令牌（关于"本机在这个秘境里的入口"）
+                //   ③ 设置：语言 / 界面主题   ④ 安全：阅后即焚 / 附件存储 / 锁屏码 / 高级
+                //   ⑤ 结尾：关于秘境 / 切换秘境 / 退出本应用
                 PopupMenuItem(
                   value: 'name',
                   child: Row(
@@ -3836,6 +3840,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+                // ①「我」与②「本入口」之间（老板 2026-09-22 要求单独一行）
+                const PopupMenuDivider(),
                 PopupMenuItem(
                   value: 'devname',
                   child: Row(
@@ -3846,8 +3852,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+                PopupMenuItem(
+                  value: 'invite',
+                  child: Text(l10n.chatPageMenuInvite, style: labelStyle),
+                ),
                 const PopupMenuDivider(),
-                // 系统设置组：语言/风格；分隔线以下是安全相关：阅后即焚/附件存储/PIN/邀请
+                // 系统设置组：语言/风格；分隔线以下是安全相关：阅后即焚/附件存储/PIN/高级
                 PopupMenuItem(
                   value: 'locale',
                   child: Row(
@@ -3902,11 +3912,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'invite',
-                  child: Text(l10n.chatPageMenuInvite, style: labelStyle),
-                ),
-                // 高级（二级菜单走底部弹层）——归在安全组，紧跟邀请码
+                // 高级（二级菜单走底部弹层）——归在安全组
                 PopupMenuItem(
                   value: 'advanced',
                   child: Row(
