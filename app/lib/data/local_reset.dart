@@ -3,6 +3,7 @@ import 'attachment_store.dart';
 import 'local_database.dart';
 import 'media_cache.dart';
 import 'secure_store.dart';
+import 'vault_session.dart';
 
 /// 清空本设备全部本地数据，回到"新设备"状态。
 ///
@@ -30,4 +31,5 @@ Future<void> resetLocalData(LocalDatabase db) async {
   await SecureStore.deleteAll(AppLockService.secureKeys);
   await AttachmentStore.clear();
   await MediaCache.deleteAll();
+  VaultSession.publish(null); // 解锁态也一并清掉（内存里别留着已经删掉的密钥）
 }

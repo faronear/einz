@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/secure_store.dart';
+import 'package:einz/data/vault_session.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 void main() {
@@ -45,6 +46,7 @@ void main() {
 
   setUp(() async {
     FlutterSecureStorage.setMockInitialValues({}); // SecureStore（Keychain/Keystore）测试替身
+    VaultSession.publish(null); // 进程级解锁态是静态的，逐用例复位
     db = LocalDatabase.forTesting(NativeDatabase.memory());
     lock = AppLockService(db);
   });
@@ -165,6 +167,61 @@ void main() {
         lock.unlockVault('123456'),
         throwsA(isA<AppLockLockedException>()),
       );
+    });
+  });
+
+  group('当前空间（active）：切换不需要锁屏码', () {
+    test('setActiveSpace 在 PIN 模式下无需 pin 即可生效，且不改写密文包', () async {
+      await lock.setPin('123456', payload: payloadA);
+      await lock.addSpace(payloadB, pin: '123456');
+      // 先用 pin 把"当前空间"落进密文包（addSpace 后是 B，这里改回 A）
+      await lock.setActiveSpace('space-a', pin: '123456');
+      final vault = await lock.unlockVault('123456');
+      expect(vault.activeSpaceId, 'space-a');
+
+      // 密文包原文（无 pin 切换后必须一字未改）
+      Future<String?> pkg() async => (await (db.select(db.appState)
+                ..where((r) => r.key.equals('app_lock.package')))
+              .getSingleOrNull())
+          ?.value;
+      final before = await pkg();
+
+      // 聊天页场景：手里没有 pin，直接切空间
+      await lock.setActiveSpace('space-b');
+      expect(await lock.resolveActiveSpaceId(vault), 'space-b',
+          reason: '明文键应压过锁包内的 activeSpaceId');
+      expect(await pkg(), before, reason: '无 pin 时不应（也无法）改写密文包');
+      expect(VaultSession.current!.activeSpaceId, 'space-b',
+          reason: '内存会话要跟着切（界面据此切空间）');
+      // 归一效果：即便再解锁一次（读回来的是旧包），内存里的当前空间仍是 B
+      await lock.unlockVault('123456');
+      expect(VaultSession.current!.activeSpaceId, 'space-b',
+          reason: '读路径必须按明文键归一，否则一次解锁就把当前空间打回旧值');
+    });
+
+    test('resolveActiveSpaceId 优先级：明文键 → 锁包内 → 第一个；键指向已移除的空间则跳过', () async {
+      await lock.savePlain(payloadA);
+      await lock.addSpace(payloadB); // addSpace 会把 active 设为 B
+      final v1 = (await lock.loadVault())!;
+      expect(await lock.resolveActiveSpaceId(v1), 'space-b', reason: '没记号时用锁包内的 active');
+
+      await lock.setActiveSpace('space-a');
+      expect(await lock.resolveActiveSpaceId(v1), 'space-a');
+      expect((await lock.resolveActivePayload(v1))!.spaceId, 'space-a');
+
+      await lock.removeSpace('space-a'); // 明文键指向的空间没了
+      final v2 = (await lock.loadVault())!;
+      expect(await lock.resolveActiveSpaceId(v2), 'space-b', reason: '指向已移除的空间应跳过');
+      expect((await lock.resolveActivePayload(v2))!.spaceId, 'space-b');
+    });
+
+    test('removeSpace 同步内存会话（撤销自毁那条 no-pin 路径）', () async {
+      await lock.savePlain(payloadA);
+      await lock.addSpace(payloadB);
+      expect(VaultSession.current!.spaces.length, 2);
+      await lock.removeSpace('space-a');
+      expect(VaultSession.current!.spaces.map((s) => s.spaceId), ['space-b'],
+          reason: '内存里的 Vault 也要少一个，否则界面还看得到已删除的空间');
     });
   });
 

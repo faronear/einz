@@ -8365,3 +8365,35 @@ PIN 依旧只在解锁那一刻存在 → 聊天页可直接一跳切空间，�
 "退出并清除这个空间：闸门通过 → 退役那一行 + 本地移除"）；`chat_page_menu_test` 新增
 两条菜单合并用例（含"只注入 onManageSpaces 时也是同一条「切换空间」"）。
 全量 `flutter test` **173 通过 0 失败**（1 跳过）；`flutter analyze` 无 issue。
+
+## 2026-09-22 底座：切换空间不再需要锁屏码（为"聊天页内直接切空间"铺路）
+
+老板定：① 空间选择用**小卡片瀑布流**（强调"空间"概念）；② **冷启动直接进上次的空间**。
+这两条都需要先解决一个底座问题：**切换空间要记录"上次用的是哪个空间"，而 PIN 模式下
+重写加密锁包需要 pin，聊天页刻意不持有**。
+
+### 做法：把"当前空间"从密文包里拿出来，落明文键
+
+- 新增明文键 `app_lock.active_space`（**不是秘密**：Spaces 表本来就明文存着空间 id 与名字）；
+  `setActiveSpace` 改成写这个键 + 更新 Spaces 行 `lastActiveAt`，**不再重写密文包**
+  （给了 pin 时仍顺带同步包内的 activeSpaceId，兼容旧读法）。
+- 新增 `resolveActiveSpaceId(vault)`（明文键 → 包内 activeSpaceId → 第一个空间，键指向已移除
+  的空间则跳过）与 `resolveActivePayload(vault)`；`loadPlain()` 也改走它。
+- 新增 `data/vault_session.dart`：**解锁后的 Vault 只留内存**（进程级）。PIN 依旧只在解锁
+  那一刻存在；内存里多的只是"其他空间的 Space Key"——与现状同量级（当前空间的 Space Key
+  本来就在 `ChatPage.spaceKey` 里）。刻意**不在锁屏时清**（重锁是覆盖在聊天页之上，聊天页
+  与它的 Space Key 本来就活着）。`resetLocalData`（整机清空）时清掉。
+- `addSpace` / `removeSpace` 同步维护明文键（新加的空间成为当前空间；删掉的若是当前空间，
+  让给剩下的第一个）。
+
+### 过程中发现并修掉的一个真 bug
+
+第一版没做归一：`unlockVault` 每次都用**锁包里的旧 activeSpaceId** 覆盖内存会话 →
+"切到 B 之后随便再解锁一次又变回 A"。修法是**读路径统一归一**（`_publishNormalized`）：
+明文键是"当前空间"的真相，锁包里的值可能落后。测试里专门钉了这条。
+
+测试：`vault_test` 新增 3 条（无 pin 切换且**密文包一字未改**、优先级与"键指向已移除空间"、
+removeSpace 同步内存会话）+ 复位全局会话；全量 `flutter test` **176 通过 0 失败**。
+
+**下一步（等老板点头）**：弹层瀑布流 + 菜单「切换空间」直接开弹层 + 冷启动进上次空间 +
+删掉 `SpaceListPage`；其中"从弹层新建/加入空间"需要先输一次锁屏码（`addSpace` 要重写密文包）。
