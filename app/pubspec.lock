@@ -372,10 +372,10 @@ packages:
     dependency: transitive
     description:
       name: file_picker_platform_interface
-      sha256: d35d8cb68446fae921335bb61501d66cb2469d74c8f3103b8c6ccdbe3fe5afd8
+      sha256: "0355558fd9af6da499d18e333d6b3beb44b0bf19e00933fccd15d18eb8d0e9ca"
       url: "https://pub.dev"
     source: hosted
-    version: "3.3.0"
+    version: "3.4.0"
   file_picker_web:
     dependency: transitive
     description:
@@ -1016,10 +1016,10 @@ packages:
     dependency: transitive
     description:
       name: record_windows
-      sha256: e6884f91be4370f122111aca3c04291ae5fe6d8fd045f87afa967635a02dbbac
+      sha256: "8195489a47b5e8246985d6213ff65aae1b14e32a0ca45dc5f680e8d503296e1b"
       url: "https://pub.dev"
     source: hosted
-    version: "2.2.3"
+    version: "2.3.0"
   shelf:
     dependency: transitive
     description:
@@ -1285,10 +1285,10 @@ packages:
     dependency: transitive
     description:
       name: windows_file_picker
-      sha256: d999c1c085374724668af0b674a9758d96255c50933faa2ac1cc51eff8308caf
+      sha256: "62e6e6e115231d1d1d71c7b5883b4091ce3e0190e49548dfb0ff8cba8d91ad96"
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.0"
+    version: "1.3.0"
   xdg_directories:
     dependency: transitive
     description:
