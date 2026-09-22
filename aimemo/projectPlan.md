@@ -1,28 +1,47 @@
 # Einz — 开发计划（projectPlan）
 
-> 项目视角：阶段计划、任务列表、进度跟踪。与 `aimemo/productLens.zhcn.md` 保持同步。
+> **本文件是索引，只放"现在与将来"**：每行一个专项（状态 + 指向细节文档）。
+> 约定（2026-09-22 立）：**细节一律住专项文档**，本文件不展开；
+> 过程与决策流水住 `aimemo/worklog.md`；Phase 0–4 的历史保留在**文件末尾**备查。
 > 状态标记：`[ ]` 待办、`[>]` 进行中、`[⏸]` 被阻塞、`[x]` 已完成。
 
-- **产品：** Einz — 两个人的私密聊天与共享私人空间
-- **部署形态：** 固定两人一空间、不分发（静态白名单，无动态配对）
-- **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.1）
-- **最后更新：** 2026-09-09
+- **产品：** Einz — 两个人的私密秘境（E2EE 聊天 + 共享空间）
+- **部署形态：** Multiverse 多租户（`spaces` 表 + 动态登记；**一台设备可进多个秘境**，
+  见 `docs/GLOSSARY.md` 的术语分层）
+- **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.0）
+- **最后更新：** 2026-09-22
 
 ---
 
-## 当前阶段概览
+## 进行中
 
-| 阶段    | 内容              | 状态                                                              |
-| ------- | ----------------- | ----------------------------------------------------------------- |
-| Phase 0 | 架构 + 密码学 PoC | [x] 已完成（#16 app 骨架于跨机器续接后完成）                      |
-| Phase 1 | 消息 MVP          | [x] 已完成（CLI 测试端：离线队列/自动同步/WS 实时）               |
-| Phase 2 | 媒体              | [x] 已完成（CLI 测试端：附件加密上传/下载/解密闭环）              |
-| Phase 3 | 移动端集成        | [x] 代码层完成（drift 本地库/签名 APK），真机验证待环境           |
-| Phase 4 | 加固              | [x] 已完成（撤销/轮换/备份恢复/安全韧性测试，phase4_e2e.sh 全过） |
+| 专项 | 状态 | 细节文档 |
+| --- | --- | --- |
+| **多空间**（一台设备进多个秘境） | M0.5 ✅ / M1 ✅ / M2 ✅ / **M3 [>] 收尾中**（剩：未读） | `aimemo/multiSpaceDesign.zhcn.md` §8（里程碑）、§9（决策） |
+| **字段改名**（`device_id`→`entry_id`、`person_id`→`member_id`） | `[ ]` 计划已定，**等 M3 收尾后执行**（三期 alias） | `aimemo/renamePlan.zhcn.md` |
+| **语音实时通话** | `[⏸]` 待评审（评审通过才拆任务） | `aimemo/voiceCall.zhcn.md` |
 
-> **环境（macOS 本机，2026-08-30）：** Node 22 / Dart 3.11.0（brew）/ libsodium（brew）/ **Flutter 3.47.2**（`~/development/flutter`，Dart 3.13.2，中国镜像安装）已就绪；app 测试需在纯 ASCII 路径跑（仓库路径含中文触发 analysis_server 崩溃，见 DEPLOYMENT.md §7）；Android SDK / Xcode 未装，真机验证待 Phase 3 环境。
+## 待办（跨专项；一行一项，细节在各自文档）
+
+- `[>]` **多空间 M3**：未读（`sync_state.lastReadSequence` + 冷启动/切回各空间轻量 sync +
+  空间列表未读标记）；`productLens` 同步更新
+- `[ ]` 多空间**真机自测**：两档破坏性入口（空间级退出 / 设备级清除）、`device_uid` 回填
+- `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通
+- `[ ]` 字段改名**执行**（P1 遥测 + 版本双接受 → P2 跨端一轮 → P3 遥测判定后删旧名）
+- `[ ]` **撤销的 App 入口**（设备列表「撤销这台设备」：口令 + 二次确认；`ApiClient.revokeDevice` 已就绪）
+- `[ ]` **macOS 分发签名 + 公证**（2026-09-18 记）：Developer ID Application 证书 →
+  `codesign --options runtime --timestamp` → `notarytool submit` + `stapler staple` →
+  搬进 GitHub Actions（secrets：证书 p12/密码/App 专用密码/AppleID）
+- `[ ]` **TUI/CLI 接入 escrow**（生产化加固候选）：新设备接入改走 `escrow download`
+  （凭口令取 Space Key）替代直接传 sealed 文件；配套考察加密 store
+- `[ ]` 文档债：`projectPlan` 之外的旧文档复核（`docs/DATABASE.md`/`PROTOCOL.md` 的
+  Draft v0.1 头、`aimemo/upgradeToMultiverse.md` 是否仍与实际一致）
+- `[ ]` 待定（承接 productLens §16）：消息删除语义 / 已读回执粒度 / 一次性配置形式（归 SETUP.md）
+- `[ ]` 环境依赖项：Android 真机验证、iOS 真机构建签名（待 Apple 付费账号）
 
 ---
+
+## 历史：Phase 0–4（全部已完成，保留备查）
 
 ## Phase 0 — 架构 + 密码学 PoC（估算 2–5 天）
 
@@ -96,14 +115,3 @@
 - [x] 备份与恢复（模型 A：本地加密备份 + 恢复码，shared backup.dart + CLI backup/restore）
 - [x] 安全测试 / 离线 / 网络故障 / 服务重启测试（phase4_e2e.sh 段 C/D/E/F 全过）
 - [x] Server 备份脚本（SQLite Backup API）与恢复演练（npm run backup/restore，演练通过）
-
----
-
-## 待定事项（承接 productLens §16 Open Questions）
-
-- [ ] 一次性配置的具体操作形式（命令行 / 配置界面 / 二维码）→ 归入 SETUP.md
-- [ ] 消息删除语义
-- [ ] 已读回执粒度
-- [ ] **macOS 分发签名 + 公证**（2026-09-18 记）：目前仅老板自用，development 签名够用；正式分发前需——Xcode 建 Developer ID Application 证书（Account Holder）→ codesign --options runtime --timestamp（Hardened Runtime 为公证硬性要求，现有 entitlements 兼容）→ zip → notarytool submit（App 专用密码 + keychain-profile）→ stapler staple；流程确认后搬进 GitHub Actions（secrets：证书 p12/密码/App 专用密码/AppleID）
-- [ ] **语音实时通话（[待评审]，2026-09-18）**：专题方案见 `aimemo/voiceCall.zhcn.md`（WebRTC + 自建 coturn，只做前台语音通话、不做后台呼入/不接推送、不做视频与桌面端）。**评审通过后才拆成本文件的任务项**；第一步是 Phase A 可行性验证（`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通）。
-- [ ] **TUI/CLI 接入已有 escrow 实现**（生产化安全加固候选）：新设备接入改走 `escrow download`（凭口令取 Space Key），替代直接传输 sealed 文件，降低 store 泄露风险；配套考察加密 store（Keychain/secret-service）——待有空时考察决定是否实施
