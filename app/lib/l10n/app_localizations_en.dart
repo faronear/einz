@@ -648,7 +648,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Switching to \"Remote only\" immediately deletes locally stored attachments';
 
   @override
-  String get chatPageMenuStyleLabel => 'Interface style';
+  String get chatPageMenuStyleLabel => 'Theme';
 
   @override
   String get chatPageUiStylePlain => 'Plain';

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/ui_style_settings.dart';
 import '../l10n/app_localizations.dart';
 
-/// 界面风格选择弹层：列出全部风格（目前：素雅纯色 / 渐变粉蓝），每项 = 一张
+/// 界面主题选择弹层：列出全部风格（目前：素雅纯色 / 渐变粉蓝），每项 = 一张
 /// 预览图 + 名称 + 一句描述；点选即保存并立即生效（uiStyleNotifier 通知聊天页
 /// 重建），并立即关闭弹窗回到对话消息页（老板要求 2026-09-13；此前是保持打开
 /// 供"边看边试"，现改为选完即关）。

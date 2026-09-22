@@ -266,7 +266,7 @@
   "chatPageAttachmentStorageStoredDesc": "Keeps a decrypted copy after the first download, so opening it again is instant",
   "chatPageAttachmentStorageSubmit": "Submit",
   "chatPageAttachmentStorageWarnClear": "Switching to \"Remote only\" immediately deletes locally stored attachments",
-  "chatPageMenuStyleLabel": "Interface style",
+  "chatPageMenuStyleLabel": "Theme",
   "chatPageUiStylePlain": "Plain",
   "chatPageUiStylePlainDesc": "Light pink solid background, clean and calm",
   "chatPageUiStyleGradient": "Gradient",

@@ -266,7 +266,7 @@
   "chatPageAttachmentStorageStoredDesc": "第一次下载附件时保存明文副本，以后本机可直接打开，更方便",
   "chatPageAttachmentStorageSubmit": "提交",
   "chatPageAttachmentStorageWarnClear": "切到「远程托管」会立即删除本机已留存的附件明文",
-  "chatPageMenuStyleLabel": "界面风格",
+  "chatPageMenuStyleLabel": "界面主题",
   "chatPageUiStylePlain": "素雅纯色",
   "chatPageUiStylePlainDesc": "浅粉纯色背景，清淡优雅",
   "chatPageUiStyleGradient": "渐变粉蓝",

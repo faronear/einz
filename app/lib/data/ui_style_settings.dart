@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import 'local_database.dart';
 
-/// 界面风格选项：plain（素雅纯色，默认，即原有浅粉白纸感背景）/
+/// 界面主题选项：plain（素雅纯色，默认，即原有浅粉白纸感背景）/
 /// gradient（渐变粉蓝，与首屏/向导同款品牌渐变）。
 const List<String> kUiStyleOptions = ['plain', 'gradient'];
 
@@ -13,10 +13,10 @@ const LinearGradient kBrandGradient = LinearGradient(
   colors: [Color(0xFF3BAFFD), Color(0xFFD6529C)],
 );
 
-/// 界面风格切换通知：聊天页监听后即时重建（点选即切换，弹窗随即关闭）。
+/// 界面主题切换通知：聊天页监听后即时重建（点选即切换，弹窗随即关闭）。
 final ValueNotifier<String> uiStyleNotifier = ValueNotifier<String>('gradient');
 
-/// 界面风格偏好设置（存本设备 app_state，key='ui_style'）。
+/// 界面主题偏好设置（存本设备 app_state，key='ui_style'）。
 class UiStyleSettings {
   UiStyleSettings(this.db);
 
@@ -24,7 +24,7 @@ class UiStyleSettings {
 
   static const _kKey = 'ui_style';
 
-  /// 当前界面风格（'plain'/'gradient'，默认 gradient——首次进入聊天即粉蓝渐变，
+  /// 当前界面主题（'plain'/'gradient'，默认 gradient——首次进入聊天即粉蓝渐变，
   /// 老板要求 2026-09-17；已保存过偏好的设备沿用其选择）。
   Future<String> load() async {
     final row = await (db.select(db.appState)..where((s) => s.key.equals(_kKey))).getSingleOrNull();
@@ -32,9 +32,9 @@ class UiStyleSettings {
     return (v == null || !kUiStyleOptions.contains(v)) ? 'gradient' : v;
   }
 
-  /// 保存界面风格并通知即时生效。
+  /// 保存界面主题并通知即时生效。
   Future<void> save(String style) async {
-    assert(kUiStyleOptions.contains(style), '非法界面风格: $style');
+    assert(kUiStyleOptions.contains(style), '非法界面主题: $style');
     await (db.into(db.appState))
         .insertOnConflictUpdate(AppStateCompanion.insert(key: _kKey, value: style));
     uiStyleNotifier.value = style;

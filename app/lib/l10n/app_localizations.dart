@@ -1223,7 +1223,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuStyleLabel.
   ///
   /// In en, this message translates to:
-  /// **'Interface style'**
+  /// **'Theme'**
   String get chatPageMenuStyleLabel;
 
   /// No description provided for @chatPageUiStylePlain.

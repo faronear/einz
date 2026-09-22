@@ -227,7 +227,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 气泡尺寸变化已弃用，老板要求 2026-09-10）
   String? _highlightMessageId;
   Timer? _highlightTimer;
-  late String _uiStyle; // 当前界面风格（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
+  late String _uiStyle; // 当前界面主题（'plain'=素雅纯色 / 'gradient'=渐变粉蓝）
 
   /// 当前附件存储模式：'secured'=不留存明文（默认）/ 'stored'=明文留在本机、直接打开。
   late String _attachmentStorage;
@@ -511,7 +511,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
     // 随后用持久化值校正（_loadUiStyle 异步）
     _uiStyle = uiStyleNotifier.value;
-    _loadUiStyle(); // 恢复界面风格（plain/gradient，默认素雅纯色）
+    _loadUiStyle(); // 恢复界面主题（plain/gradient，默认素雅纯色）
     // 风格切换即时生效（弹窗不关闭也能预览）：notifier 通知 → 重建背景
     uiStyleNotifier.addListener(_onUiStyleChanged);
     _attachmentStorage = attachmentStorageNotifier.value;
@@ -782,7 +782,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
-  /// 加载持久化的界面风格（默认素雅纯色，保留原有视觉效果）。
+  /// 加载持久化的界面主题（默认素雅纯色，保留原有视觉效果）。
   /// 同步回 uiStyleNotifier：弹层选中态读的是 notifier，不回写会导致
   /// 冷启动后"页面是渐变、弹层却选中素雅纯色"的不一致。
   Future<void> _loadUiStyle() async {
@@ -811,7 +811,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 顶栏菜单 → 附件存储（安全 / 留存）：本设备设置，两台设备可各选各的。
   /// 切回 secured 时**清空已留存的明文**（否则"安全"名不副实——老板 2026-09-14 定）。
-  /// 界面风格名（按当前语言）。
+  /// 界面主题名（按当前语言）。
   String _uiStyleLabel(String style, AppLocalizations l10n) =>
       style == 'gradient' ? l10n.chatPageUiStyleGradient : l10n.chatPageUiStylePlain;
 
@@ -877,7 +877,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await switchToSpace(context, id, db: widget.db);
   }
 
-  /// 顶栏 🎨：切换界面风格（素雅纯色/渐变粉蓝）。弹窗内点选即生效并立即关闭，
+  /// 顶栏 🎨：切换界面主题（素雅纯色/渐变粉蓝）。弹窗内点选即生效并立即关闭，
   /// 回到对话消息页（老板要求 2026-09-13；此前是保持打开供边看边试）。
   Future<void> _showStylePicker() async {
     await showModalBottomSheet<void>(
@@ -2645,7 +2645,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 输入栏引用条：被引用消息预览 + 取消按钮。
   ///
-  /// 配色**两种界面风格一致**（老板 2026-09-14）：此前 gradient 下用「白 12% 底 +
+  /// 配色**两种界面主题一致**（老板 2026-09-14）：此前 gradient 下用「白 12% 底 +
   /// white70 字/图标」，而 gradient 的输入栏本身就是 85% 白悬浮条——白底上的淡白
   /// 字几乎看不见。改为与素雅纯色同款：黑 6% 半透明底 + 灰字/灰图标（顺带与气泡里
   /// 的引用框保持同一族颜色）；蓝色左边缘也已在 2026-09-13 去掉。
@@ -3950,7 +3950,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
       body: Stack(
         children: [
-          // 界面风格背景层：gradient=品牌粉蓝渐变（首屏/向导同款）；plain=不铺
+          // 界面主题背景层：gradient=品牌粉蓝渐变（首屏/向导同款）；plain=不铺
           // 背景（露出 Scaffold 浅粉白纸感底色，与原有视觉效果完全一致）
           if (_uiStyle == 'gradient')
             const Positioned.fill(

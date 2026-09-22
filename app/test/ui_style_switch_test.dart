@@ -1,4 +1,4 @@
-// 回归测试：界面风格切换（菜单「界面风格」→ 弹窗 → 点选即生效并关窗回到对话页）。
+// 回归测试：界面主题切换（菜单「界面主题」→ 弹窗 → 点选即生效并关窗回到对话页）。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -97,7 +97,7 @@ void main() {
   BoxDecoration? barDecoration(WidgetTester tester, Finder finder) =>
       (tester.widget<Container>(finder).decoration as BoxDecoration?);
 
-  testWidgets('界面风格弹窗：两风格+描述展示；点选即生效并关窗；持久化', (WidgetTester tester) async {
+  testWidgets('界面主题弹窗：两风格+描述展示；点选即生效并关窗；持久化', (WidgetTester tester) async {
     final db = await pumpChatPage(tester);
 
     // 首次进入聊天默认渐变粉蓝（老板要求 2026-09-17）：渐变背景层存在；
@@ -106,15 +106,15 @@ void main() {
     expect(barDecoration(tester, statusBar)?.borderRadius, BorderRadius.circular(24),
         reason: '默认素雅纯色风格的状态条也应为悬浮圆角（不顶左右两头）');
 
-    // 打开菜单 → 界面风格
+    // 打开菜单 → 界面主题
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格'), findsOneWidget, reason: '菜单项应为「界面风格」');
-    await tester.tap(find.text('界面风格'));
+    expect(find.text('界面主题'), findsOneWidget, reason: '菜单项应为「界面主题」');
+    await tester.tap(find.text('界面主题'));
     await tester.pumpAndSettle();
 
     // 弹窗：标题 + 两个风格（名称+描述）
-    expect(find.text('界面风格'), findsOneWidget);
+    expect(find.text('界面主题'), findsOneWidget);
     expect(find.text('素雅纯色'), findsOneWidget);
     expect(find.text('渐变粉蓝'), findsOneWidget);
     expect(find.textContaining('浅粉纯色背景'), findsOneWidget, reason: '纯色风格应有一句描述');
@@ -123,7 +123,7 @@ void main() {
     // 点选渐变粉蓝 → 立即生效并立即关窗回到对话页（老板要求 2026-09-13）
     await tester.tap(find.text('渐变粉蓝'));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格'), findsNothing, reason: '点选后弹窗应立即关闭回到对话页');
+    expect(find.text('界面主题'), findsNothing, reason: '点选后弹窗应立即关闭回到对话页');
     expect(gradientBackground, findsOneWidget, reason: '点选渐变后聊天页背景应切换为渐变');
 
     // 全屏渐变（同向导）：body 延伸到 AppBar 之后、AppBar 透明、状态条/输入条
@@ -144,11 +144,11 @@ void main() {
     // 重新打开弹窗 → 点回素雅纯色 → 关窗、渐变背景消失
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面风格'));
+    await tester.tap(find.text('界面主题'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('素雅纯色'));
     await tester.pumpAndSettle();
-    expect(find.text('界面风格'), findsNothing, reason: '点选后弹窗应立即关闭');
+    expect(find.text('界面主题'), findsNothing, reason: '点选后弹窗应立即关闭');
     expect(gradientBackground, findsNothing, reason: '切回纯色后渐变背景应移除');
     final scaffoldAfter = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffoldAfter.extendBodyBehindAppBar, isFalse, reason: '切回纯色后恢复原有布局（body 不从 AppBar 后延伸）');
@@ -161,12 +161,12 @@ void main() {
     // 改成验证"未点选任何风格时下滑 / 系统返回也能关掉弹窗"
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面风格'));
+    await tester.tap(find.text('界面主题'));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.close), findsNothing, reason: '设置弹层统一不设关闭按钮');
     await tester.binding.handlePopRoute(); // 模拟系统返回/下滑关闭
     await tester.pumpAndSettle();
-    expect(find.text('界面风格'), findsNothing, reason: '返回后弹窗应关闭');
+    expect(find.text('界面主题'), findsNothing, reason: '返回后弹窗应关闭');
     expect(tester.takeException(), isNull);
   });
 
@@ -228,7 +228,7 @@ void main() {
     // 打开风格弹层：渐变粉蓝应有对勾，素雅纯色没有（此前 bug：冷启动后弹层误选纯色）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面风格'));
+    await tester.tap(find.text('界面主题'));
     await tester.pumpAndSettle();
     final gradientRow = find.ancestor(of: find.text('渐变粉蓝'), matching: find.byType(Row)).first;
     expect(find.descendant(of: gradientRow, matching: find.byIcon(Icons.check)), findsOneWidget,
@@ -275,7 +275,7 @@ void main() {
     // 切到渐变风格
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面风格'));
+    await tester.tap(find.text('界面主题'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('渐变粉蓝'));
     await tester.pumpAndSettle();
@@ -339,7 +339,7 @@ void main() {
     // 切到渐变风格
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面风格'));
+    await tester.tap(find.text('界面主题'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('渐变粉蓝'));
     await tester.pumpAndSettle();

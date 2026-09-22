@@ -300,7 +300,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 点击引用卡（msg-5 气泡内的引用块预览）
-    // 先记下原消息气泡此刻的颜色：具体色值随界面风格（plain/gradient）不同，
+    // 先记下原消息气泡此刻的颜色：具体色值随界面主题（plain/gradient）不同，
     // 本测试要验的是"高亮结束后恢复成原来那个色"，不写死任何风格的具体色值
     final bubble = find
         .ancestor(
