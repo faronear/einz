@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | 消息端到端加密 | `shared/lib/src/crypto/message_crypto.dart` | Space Key → 每消息派生密钥；AEAD AAD 绑定 space/message/device/type/key_version |
 | 设备在册状态 | `server/src/config.ts` `getDeviceStatus`（三态）+ `guard.requireSession` | 未登记（403 `FORBIDDEN`）或已撤销（403 `DEVICE_REVOKED`）设备**取不到密文**；会话还必须绑定 space（无 space 会话直接 401）。**两种 code 必须分开**：混淆会让"服务端库被清空"被客户端误判为撤销 |
-| 设备撤销 | `server/src/devices.ts` `revokeDevice`（标记 revoked + 清 Push + 清会话 + 踢 WS） | 被撤销设备无法认证/同步/发送；同一设备重新认证会清掉其旧会话。**授权：同 space 内可互撤，但每次都要校验密保口令**（`assertSpacePassphrase`，与取包共用 argon2id 校验与失败限速）——撤销会让对方自毁本地数据，属不可逆操作；这样伴侣的一台设备被入侵也无法仅凭 session 清掉另一方的设备 |
+| 设备撤销 | `server/src/devices.ts` `revokeDevice`（标记 revoked + 清 Push + 清会话 + 踢 WS） | 被撤销设备无法认证/同步/发送；同一设备重新认证会清掉其旧会话。**授权：同 space 内可互撤，但每次都要校验共享口令**（`assertSpacePassphrase`，与取包共用 argon2id 校验与失败限速）——撤销会让对方自毁本地数据，属不可逆操作；这样伴侣的一台设备被入侵也无法仅凭 session 清掉另一方的设备 |
 | 被撤销设备自毁 | `app/lib/chat_page.dart` `_onDeviceRevoked`；`cli/bin/einz_tui.dart` `_exitRevoked` | **只认明确撤销信号**：`device.revoked` 帧或认证 403 `DEVICE_REVOKED` → 清锁包 + 消息 + 附件 + 媒体缓存（TUI 清 store 文件 + 附件缓存）→ 回设置页 / 退出。未登记（403 `FORBIDDEN`）与连不上**只警告**，本地数据一律保留（2026-09-16） |
 | 自助退役不发自毁信号 | `server/src/ws.ts` `forgetDeviceConnection`；`server/src/devices.ts` `retireDevice` | 本机自助注销（`PROTOCOL.md` §7.2.1）只认 session，**不发 `device.revoked` 帧、也不主动关闭 WS**——否则「偷到 session」即可远程触发擦除，绕过上面那条口令闸门。它只清服务端状态 + 给对端广播一次 `peer.offline`（2026-09-21） |
 | 重置闸门（本地） | `app/lib/widgets/reset_device.dart`；`cli/bin/einz_tui.dart` `/reset` | 不可逆的本机清空要求：① 手动输入本机设备名（确认清的是这台）；② 本机锁屏码（已设才验，走 `AppLockService.unlock` 同款防爆破）。**全离线**，刻意不用空间口令——它是共享凭证，且校验需联网，会让"连着一台死服务器"这一主要重置场景自锁（2026-09-21） |
@@ -58,7 +58,7 @@
 | 会话凭证存储 | `server/src/auth.ts` `hashSessionToken` | `sessions` 表只存 session token 的 sha256（与 `join_tokens` 同标准）；库/备份泄露不能直接冒用会话（2026-09-15 评审 H4 修复） |
 | WS 凭证传输 | `server/src/ws.ts` | 握手用 `Authorization: Bearer`，**不再接受 `?token=`**——URL 会进反代 access log / 代理缓存（2026-09-15 评审 H4 修复） |
 | 口令重设通知 | `server/src/escrow.ts` + WS `passphrase.rotated` | 改口令后其余设备收通知 / 离线补查 `updated_at` |
-| 客户端不缓存密保口令 | `app/lib/data/app_lock.dart`（`AppLockPayload` 无口令字段） | 2026-09-14 起锁包与明文 payload 均不含口令——本地秘密面只剩 Space Key + 设备私钥；代价见 §4.7、§6 |
+| 客户端不缓存共享口令 | `app/lib/data/app_lock.dart`（`AppLockPayload` 无口令字段） | 2026-09-14 起锁包与明文 payload 均不含口令——本地秘密面只剩 Space Key + 设备私钥；代价见 §4.7、§6 |
 | 整机备份 | TUI `/backup`（App 侧恢复码导出已按老板决策删除） | 12 词恢复码（Argon2id 派生）加密；恢复码离线保存 |
 | 附件与媒体 | `MediaCache` + `local_attachments` | 解密副本落 App 私有缓存；焚毁/删除定点清理、启动孤儿清理 |
 | 落库内容 | `DATABASE.md` §3 | 只落密文 + 元数据；明文（草稿/解密缓存）仅本机 |
@@ -128,7 +128,7 @@
 
 - **零新代码**（`create`/`join` 流程已具备）；
 - 保证最强——全新密钥、没有旧 `key_version` 残留、没有归档复杂度；
-- 代价：伴侣设备需重新接入一次（邀请链接 + 密保口令）；历史留在旧空间（可保留只读）。
+- 代价：伴侣设备需重新接入一次（邀请链接 + 共享口令）；历史留在旧空间（可保留只读）。
 
 对两人私聊而言，这在"怀疑密钥泄露"这种低频事件上比造轮换机制划算得多。
 
@@ -151,12 +151,12 @@
 
 1. 在**同空间的另一台设备**上撤销它（2026-09-16：同 space 内可互撤，A 没有第二台设备时
    伴侣 B 也能替他撤；每次都要验口令，因为撤销会让对方自毁本地数据）：
-   - TUI：`/devices` 看序号 → `/revoke <序号>` → 输入 `yes` 确认 → 输入密保口令；
+   - TUI：`/devices` 看序号 → `/revoke <序号>` → 输入 `yes` 确认 → 输入共享口令；
    - 运维/无客户端可用时：`curl -X POST .../devices/<id>/revoke -d '{"passphrase":"…"}'`（`DEPLOYMENT.md` §5.3）；
    - App 里的设备列表入口**尚未做**（届时同样要口令 + 二次确认）。
 2. 该设备：无法再认证/同步/发送；若它上线，App 会**自我销毁**本地数据（§2）。
 3. **不需要**轮换密钥（§3.1）。若担心"它被解锁过"，按 §4.2 处理。
-4. 建议：改一次密保口令（它不是补救，而是把"口令"这条线索也换掉）。
+4. 建议：改一次共享口令（它不是补救，而是把"口令"这条线索也换掉）。
 
 **不保证：** 已被它同步过的消息，永远在它手里。
 
@@ -177,7 +177,7 @@
 3. 检查 `/devices` 有无陌生设备（同空间可见）；
 4. 若服务器数据库里的密文 + 你的口令都泄露 → 按 §4.2。
 
-### 4.4 密保口令泄露或怀疑
+### 4.4 共享口令泄露或怀疑
 
 1. 在任一设备上**修改口令**（App 聊天页 ⋯ / TUI `/passphrase`）：服务端密保箱重加密，旧口令立即失效，其余设备收 `passphrase.rotated` 通知；
    - ⚠️ **改完必须线下把新口令告知伴侣**：新口令不在网络上传递，而且**客户端自 2026-09-14 起
@@ -247,7 +247,7 @@
 | `GET /avatar/:personId` 免认证可读 | **接受** | v2 的 personId 是随机 UUID、不可枚举；头像是本人自愿上传的展示图，同空间成员本就该看到。legacy `personA/personB` 可枚举但只影响 v1 轨道（收敛计划见 D3）。加鉴权需改成带 token 取图 + 客户端缓存失效重做，收益不抵成本（2026-09-15 评审 C1） |
 | 服务端密保箱为无冗余单点 | **接受** | 客户端不再缓存口令（§2）→ 不再有解锁自动重传；丢失后需手动重建（§4.7）。**无任何在网设备持有 Space Key 时**只能走 CLI 备份恢复 |
 | 无前向保密（简单派生，`E2EE.md` §11.1） | **接受** | Space Key 泄露则历史可解；这正是 §4.2 的场景 |
-| 密保口令熵偏低（策略只卡 ≥8 位、不卡字符种类） | **接受** | 老板 2026-09-15 明确取舍：易记优先。在线爆破由服务端限速兜（`429 ESCROW_RATE_LIMITED`，默认 10 次/15 分钟）；**离线爆破只能靠口令熵**——拿到 `key_escrow` 行的攻击者可以无限次跑 Argon2id。缓解：口令由用户自选，建议引导用 12 词随机（`/passphrase random`） |
+| 共享口令熵偏低（策略只卡 ≥8 位、不卡字符种类） | **接受** | 老板 2026-09-15 明确取舍：易记优先。在线爆破由服务端限速兜（`429 ESCROW_RATE_LIMITED`，默认 10 次/15 分钟）；**离线爆破只能靠口令熵**——拿到 `key_escrow` 行的攻击者可以无限次跑 Argon2id。缓解：口令由用户自选，建议引导用 12 词随机（`/passphrase random`） |
 | `x-forwarded-for` / `x-forwarded-proto` / `Host` 被无条件信任 | **接受（部署前提）** | 服务端**假定只经反代暴露**：两个 compose 模板都满足了（`withcaddy` 不发布 server 端口、由同网络 Caddy 反代；`nocaddy` 把端口绑到 `127.0.0.1` 只给宿主 Caddy）。**若有人把 `node dist/app.js` 直接跑在公网端口**，攻击者可伪造来源 IP（污染审计）并让邀请链接指向自己的域名（钓鱼）——此时应改回只监听回环/加反代 |
 
 ---

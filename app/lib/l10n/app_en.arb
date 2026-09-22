@@ -9,8 +9,8 @@
   "skip": "Skip",
   "close": "Close",
   "setupPageEnvelopeKeyHint": "Offline handover text (asymmetric encryption). Get it from your partner.",
-  "setupPageNeedPassphrase": "❗️ Set a passphrase first",
-  "wizardJoinPassphraseRequired": "❗️ Enter the passphrase to verify",
+  "setupPageNeedPassphrase": "❗️ Set a shared passphrase first",
+  "wizardJoinPassphraseRequired": "❗️ Enter the shared passphrase to verify",
   "setupEnrollBoundNotice": "🎉 New entrance opened",
   "wizardStartTitle": "Setup wizard",
   "wizardDetectTitle": "Checking server status…",
@@ -63,8 +63,8 @@
   "wizardSlotRequired": "Pick an identity",
   "wizardSpaceLimit": "Space limit reached (server maxSpaces) — cannot create",
   "wizardTitleInvite": "Verify token",
-  "wizardTitlePassphrase": "Set passphrase",
-  "wizardJoinPassphraseTitle": "Verify passphrase",
+  "wizardTitlePassphrase": "Set shared passphrase",
+  "wizardJoinPassphraseTitle": "Verify shared passphrase",
   "wizardTitlePin": "Set PIN",
   "wizardTitleEnvelope": "Key envelope",
   "wizardTitleIdentity": "I am",
@@ -76,15 +76,15 @@
       "error": {"type": "String"}
     }
   },
-  "wizardPassphraseHint": "The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.",
+  "wizardPassphraseHint": "The shared passphrase is held by you and your partner, and encrypts every message. Memorize it; tell no one but your partner.",
   "wizardPassphraseMinLengthHint": "At least 8 characters",
   "wizardPassphraseTooShort": "Passphrase must be at least 8 characters",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
   "wizardPassphraseMismatch": "Passphrases do not match",
-  "wizardJoinPassphraseHint": "A password shared with your partner to protect messages. Don't know it? Ask your partner.",
+  "wizardJoinPassphraseHint": "The shared passphrase is held by you and your partner to protect messages. Don't know it? Ask your partner.",
   "wizardJoinPassphraseWrong": "Wrong passphrase: use the one set on the first entrance",
   "wizardSwitchToEnvelope": "Use key envelope instead (offline)",
-  "wizardSwitchToPassphrase": "Use passphrase instead",
+  "wizardSwitchToPassphrase": "Use a shared passphrase instead",
   "wizardPinHint": "Device-specific lock PIN. Enter it each time you launch.",
   "welcomeDialogTitleCreate": "All set!",
   "welcomeDialogTitleJoin": "All set!",
@@ -145,8 +145,8 @@
   "setupPageScanInvite": "Scan token QR code",
   "setupPageScannerHint": "Point the camera at the token QR code",
   "wizardInviteWrong": "Invalid token: use a one-time token from an existing entrance",
-  "setupPageNoEscrow": "❌ No escrow package on the server — set a passphrase on the first entrance first",
-  "setupPageEscrowFailed": "❌ Passphrase join failed: {error}",
+  "setupPageNoEscrow": "❌ No escrow package for the shared passphrase on the server — set it on the first entrance first",
+  "setupPageEscrowFailed": "❌ Shared passphrase join failed: {error}",
   "@setupPageEscrowFailed": {
     "placeholders": {
       "error": {"type": "String"}
@@ -193,7 +193,7 @@
     }
   },
   "chatPageTitleBrand": "My Einz",
-  "chatPageMenuChangePassphrase": "Change passphrase",
+  "chatPageMenuChangePassphrase": "Change shared passphrase",
   "chatPageMenuAvatar": "Avatar",
   "chatPageAvatarUploaded": "✅ Avatar updated",
   "chatPageAvatarTooLarge": "Image too large (max 2MB)",
@@ -241,7 +241,7 @@
   "chatPageExitTitle": "Exit?",
   "chatPageExitMessage": "Exits Einz on this device.",
   "save": "Save",
-  "chatPageChangePassphraseTitle": "Change secret passphrase",
+  "chatPageChangePassphraseTitle": "Change shared passphrase",
   "chatPageChangePassphraseSubmit": "Change",
   "chatPageChangePassphraseOldLabel": "Current passphrase",
   "chatPageChangePassphraseNewLabel": "New passphrase",
@@ -250,14 +250,14 @@
   "chatPageChangePassphraseMismatch": "New passphrases do not match",
   "chatPageChangePassphraseSame": "New passphrase is the same as the current one — nothing changed",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
-  "chatPageChangePassphraseDone": "✅ Passphrase updated — tell your partner; new entrances must use the new one",
+  "chatPageChangePassphraseDone": "✅ Shared passphrase updated — tell your partner; new entrances must use the new one",
   "chatPageChangePassphraseFailed": "Failed to change passphrase: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
       "error": {"type": "String"}
     }
   },
-  "chatPageEscrowRotatedNotice": "Your partner reset the passphrase — use the new one to create tokens or change it",
+  "chatPageEscrowRotatedNotice": "Your partner reset the shared passphrase — use the new one to create tokens or change it",
   "chatPageMenuLocaleLabel": "Language",
   "chatPageMenuAttachmentStorage": "Attachment storage",
   "chatPageAttachmentStorageSecured": "Remote only",

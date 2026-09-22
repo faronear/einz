@@ -64,7 +64,7 @@ cd cli && dart pub get
 dart run bin/einz_tui.dart --store /tmp/a.json --server http://localhost:3000
 ```
 
-按引导走：选 `c` 创建秘境 → 输入我的名字/性别、伴侣名字/性别 → 设置密保口令 →
+按引导走：选 `c` 创建秘境 → 输入我的名字/性别、伴侣名字/性别 → 设置共享口令 →
 客户端生成 Space Key、上传口令密保箱、签发会话，直接进入会话（状态栏 ● 在线）。
 在会话里执行 `/invite` 会打印**邀请链接**（`https://<host>/join/<token>`，24 小时一次性）。
 
@@ -75,7 +75,7 @@ dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 ```
 
 选 `j` 加入 → 粘贴 A 给的邀请链接（或令牌）→ 选择自己是哪一个身份（1/2）→
-输入 A 设置的密保口令（用它从口令密保箱取回 Space Key，同时完成设备登记 + 签发会话）→
+输入 A 设置的共享口令（用它从口令密保箱取回 Space Key，同时完成设备登记 + 签发会话）→
 进入会话。
 
 > `server/config/serverConfig.json`（不入 git，可选）里 `maxSpaces` 控制**新空间数量上限**：
@@ -88,7 +88,7 @@ TUI 里**直接输入文字回车即发送**（无需子命令）；对方在线
 `/sync` 或下次启动自动补齐。图片/视频/语音/文件用输入栏的「+」面板或 `/attach <file>`；
 点消息里的附件编号用 `/open <序号>` 打开。
 
-App 端同理：设置页选「创建秘境」或「加入秘境」，扫令牌二维码 / 粘贴邀请链接，再输密保口令。
+App 端同理：设置页选「创建秘境」或「加入秘境」，扫令牌二维码 / 粘贴邀请链接，再输共享口令。
 
 **TUI 命令总览**（`/help` 也能看）：
 
@@ -97,7 +97,7 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫令牌�
 | `/space` | 空间状态 / `/space create` 新建 / `/space join <链接>` 加入 |
 | `/invite` | 生成一次性邀请链接（24h，凭它可开通一个新入口） |
 | `/auth` | 激活/续期会话（challenge-response，对**当前**服务器） |
-| `/passphrase [random]` | 设置/修改密保口令（`random` 生成随机 12 词） |
+| `/passphrase [random]` | 设置/修改共享口令（`random` 生成随机 12 词） |
 | `/pin` | 设置/修改启动锁 PIN |
 | `/devices` | 列出秘境内的设备与在线状态 |
 | `/device <名称>` / `/myname <名称>` | 改本设备名 / 改自己的显示名 |
@@ -249,25 +249,25 @@ npm run restore -- data/backups/backup-<ts>.json
 ```bash
 # 1) 撤销某台设备（POST /devices/<device_id>/revoke）：标记 revoked + 清 Push Token +
 #    清会话，并关闭它的 WS 连接（Server 不再下发 key.rotation —— 轮换方案已决定不做）
-#    **必须带空间密保口令**（2026-09-16）：撤销会让该设备自毁本地数据，属不可逆操作。
+#    **必须带共享口令**（2026-09-16）：撤销会让该设备自毁本地数据，属不可逆操作。
 #    授权范围 = 同 space 内可互撤（自己的另一台设备，或伴侣的设备）。
 curl -X POST http://127.0.0.1:3000/devices/dev-b1/revoke \
   -H "Authorization: Bearer <A的session_token>" \
   -H "Content-Type: application/json" \
-  -d '{"passphrase":"<空间密保口令>"}'
+  -d '{"passphrase":"<共享口令>"}'
 
 # 2) 完成——撤销实时生效，不需要重启服务器、也不需要改任何配置文件
 ```
 - device_id 是 UUID（`GET /devices` 可见），不是 `dev1/dev2` 那种序号（v1 遗留叫法）。
 - 口令错 → `401 ESCROW_VERIFY_FAILED`（设备毫发无损）；同空间口令尝试过多 → `429`；
-  空间还没设置密保口令 → `409 PASSPHRASE_NOT_SET`（先在任一在册设备上 `/passphrase` 设置）。
+  空间还没设置共享口令 → `409 PASSPHRASE_NOT_SET`（先在任一在册设备上 `/passphrase` 设置）。
 
 - 被撤销设备：无法认证（403 `DEVICE_REVOKED`）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
 - 被撤销设备**上线即自毁本地数据**（App `_onDeviceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存；
   TUI `_exitRevoked`：清 store 文件 + 附件缓存后退出）。
 - **别把"清空/重置服务端库"当撤销手段**：库一清，设备行就不存在了，客户端只会收到
   403 `FORBIDDEN`（未登记）→ 按 2026-09-16 的语义**只警告、不清本地数据**，用户仍能看本地历史。
-  要真正撤销请用 §5.3 的 `POST /devices/:id/revoke`（带密保口令；那才会发 `device.revoked` /
+  要真正撤销请用 §5.3 的 `POST /devices/:id/revoke`（带共享口令；那才会发 `device.revoked` /
   返回 `DEVICE_REVOKED`）。
 - **不需要**轮换 Space Key：撤销的效力来自设备被标记 `revoked`（它取不到新密文）+ 自毁。
   怀疑密钥材料被提取（越狱/镜像泄露）时的止损流程见 `docs/SECURITY.md` §4.2（替代方案 = 重建空间）。
@@ -391,7 +391,7 @@ curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 ```bash
 cd cli
 dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
-# 会话里执行 /passphrase 设置或修改密保口令（含密保箱重建）
+# 会话里执行 /passphrase 设置或修改共享口令（含密保箱重建）
 ```
 
 ### 9.5 升级注意事项

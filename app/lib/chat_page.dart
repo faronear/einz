@@ -1034,7 +1034,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 修改口令（escrow 托管口令，空间级）：旧口令验证 → 新口令重加密上传
-  /// （本地不落密保口令，与 TUI 对齐）。
+  /// （本地不落共享口令，与 TUI 对齐）。
   Future<void> _showChangePassphraseDialog() async {
     final changed = await showDialog<bool>(
       context: context,
@@ -4542,7 +4542,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
 /// ① 服务器有密保箱 → 旧口令验证（fetch 解密）→ 新口令重加密上传；
 /// ② 服务器**无**密保箱（数据丢失）→ 无从校验旧口令，跳过校验直接用新口令
 ///    重建（设备已认证且持有 Space Key，不新增权限）。
-/// 本地一律不落密保口令（与 TUI 对齐；服务器为唯一真相源）。
+/// 本地一律不落共享口令（与 TUI 对齐；服务器为唯一真相源）。
 class _ChangePassphraseDialog extends StatefulWidget {
   const _ChangePassphraseDialog({
     required this.server,

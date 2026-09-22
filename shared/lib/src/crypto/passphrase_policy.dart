@@ -1,6 +1,6 @@
-/// 密保口令强度策略（**唯一来源**，由 App / TUI / CLI 共用）。
+/// 共享口令强度策略（**唯一来源**，由 App / TUI / CLI 共用）。
 ///
-/// 为什么需要成文策略：密保口令是**免设备认证**的取包端点
+/// 为什么需要成文策略：共享口令是**免设备认证**的取包端点
 /// （`POST /spaces/{id}/key-escrow`）的唯一凭证——服务端只存 argon2id hash 兜底
 /// （`server/src/escrow.ts`）。也就是说"知道口令"≈"拿到 Space Key"，口令强度是
 /// 这条链路的主要防线（服务端已加失败限速，见 SECURITY.md §2）。
@@ -23,7 +23,7 @@ enum PassphrasePolicyViolation {
   tooShort,
 }
 
-/// 校验密保口令：返回 null = 通过。
+/// 校验共享口令：返回 null = 通过。
 ///
 /// 只校验长度（[kPassphraseMinLength]）；不再要求字母+数字混合——见
 /// [kPassphraseMinLength] 的说明。

@@ -79,7 +79,7 @@
 | POST | /attachments | 上传附件 blob（分片可选） | Bearer |
 | GET | /attachments/:id | 下载附件 blob | Bearer |
 | GET | /devices | 设备列表 | Bearer |
-| POST | /devices/:id/revoke | 撤销**别人**的设备（§7.2，需密保口令） | Bearer |
+| POST | /devices/:id/revoke | 撤销**别人**的设备（§7.2，需共享口令） | Bearer |
 | POST | /devices/retire | **本机自助退役**（§7.2.1，无请求体，只认 session） | Bearer |
 | POST | /push/register | 注册 Push Token | Bearer |
 | DELETE | /push/register | 注销 Push Token | Bearer |
@@ -315,14 +315,14 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 ### 7.2 撤销设备 POST /devices/:id/revoke
 
 ```json
-{ "passphrase": "<空间密保口令>" }
+{ "passphrase": "<共享口令>" }
 ```
 
 - **授权（2026-09-16 定稿）**：
   1. **同 space 内可互撤**——不限于"同一 person 的另一台设备"：A 的手机丢了又没有第二台
      设备时，伴侣 B 也能替他撤掉那台（早期实现是"任何在册设备能撤任何设备"，连空间都不
      校验；文档当时写的是"仅限同 person"，代码比文档更宽，现已按本规则收口）；
-  2. **每次撤销都必须校验密保口令**（argon2id，与取包同一套校验与失败限速）。撤销会让
+  2. **每次撤销都必须校验共享口令**（argon2id，与取包同一套校验与失败限速）。撤销会让
      对方客户端**自毁本地数据**，属不可逆的破坏性操作，必须由口令持有者授权——这样伴侣
      的一台设备即便被入侵，仅凭 session 也清不掉另一方的设备。
   3. 不能撤自己 → `400 INVALID_REQUEST`。
@@ -345,8 +345,8 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 - **为什么单独一个端点**：客户端"重置设备"原先纯本地清数据，服务端这台设备的注册表项、
   Push Token 与会话全都留着，对方 `/devices` 里是一台永远在线的幽灵；而 §7.2 禁止自撤，
   谁也删不掉它。
-- **为什么不校验密保口令**（与 §7.2 的关键差异）：这里是"注销我自己"，session 即所有权
-  证明；而且客户端在调用之前已经过了本地闸门（输入本机设备名 + 本机锁屏码）。密保口令是
+- **为什么不校验共享口令**（与 §7.2 的关键差异）：这里是"注销我自己"，session 即所有权
+  证明；而且客户端在调用之前已经过了本地闸门（输入本机设备名 + 本机锁屏码）。共享口令是
   **共享**给伴侣的加入凭证，不该获得销毁我这台设备的权力；校验它还必须联网，会让"本机
   身份属于一台已经连不上的服务器"这个最常见的重置场景直接自锁。
 - 服务端动作：设备置 `revoked`（**行保留**，否则它被当成"未登记"而非"已退役"，
@@ -406,7 +406,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   仍等价于口令错（AEAD tag 校验）。密文包内容 Server 永不解析。
   （早先版本文档写的"验证在客户端、Server 无法限速"已作废——2026-09-14 改为服务端校验 + 限速。）
 - 客户端接入流程（v2）：口令取钥（`POST /spaces/{id}/key-escrow`，免认证）→ 加入空间
-  → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。客户端**不本地缓存密保口令**
+  → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。客户端**不本地缓存共享口令**
   （服务器为唯一真相源，KEY_ESCROW.md §12）；无解锁自动重传。口令重设/密保箱重建走
   App「修改口令」或 TUI `/passphrase`：**服务器已有箱**时须先验旧口令（解箱成功）才覆盖；**服务器无箱**时跳过旧口令校验、用新口令直接重建（设备已认证且持有 Space Key，不新增权限）。
 - **`/recover`（全丢恢复）已整体移除**（2026-09-13，Server 端点 + TUI 入口 + 客户端方法
@@ -416,7 +416,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   服务器上**所有空间**的设备全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
   只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方设备全丢 =
   双方放弃该空间，重新建一个即可（v1 只有一个空间才不得不支持恢复）。
-  新设备接入仍走：**一次性 join token（邀请链接）/ 密保口令 / 密保信封**
+  新设备接入仍走：**一次性 join token（邀请链接）/ 共享口令 / 密保信封**
   （KEY_ESCROW.md §13；v1 的 20 位邀请码与 `/invites` 已随 2026-09-15 收敛删除）。
 
 ## 8. WebSocket（实时通道）
@@ -472,9 +472,9 @@ Authorization: Bearer <session_token>
 | UNAUTHORIZED | 401 | 未认证 / token 失效 |
 | FORBIDDEN | 403 | 设备不在白名单（**未登记**，含服务端库被清空/重置；客户端只警告，**不得**清空本地数据） |
 | DEVICE_REVOKED | 403 | 本设备已被**明确撤销**（`status='revoked'`，涉嫌被盗用；客户端应清空本地数据后重新入网） |
-| ESCROW_VERIFY_FAILED | 401 | 密保口令错误（取包 / 撤销设备的二次校验） |
+| ESCROW_VERIFY_FAILED | 401 | 共享口令错误（取包 / 撤销设备的二次校验） |
 | ESCROW_RATE_LIMITED | 429 | 口令尝试过多（按 space 计失败次数，滑窗内超限） |
-| PASSPHRASE_NOT_SET | 409 | 该空间未托管密保口令，无法校验（撤销设备要求先设置口令） |
+| PASSPHRASE_NOT_SET | 409 | 该空间未托管共享口令，无法校验（撤销设备要求先设置口令） |
 | NOT_FOUND | 404 | 资源不存在 |
 | CONFLICT | 409 | 重复 / 状态冲突 |
 | RATE_LIMITED | 429 | 触发限流 |

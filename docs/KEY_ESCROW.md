@@ -177,7 +177,7 @@ CLI（`escrow upload`）在**设置/修改**时校验并提示；**输入既有�
 | Server   | 新增 `key_escrow` 表 + 3 个端点（~/40 行）；不解析包内容                             | 小     |
 | shared   | 无新密码学（复用 backup.dart）；可能加一个 `KeyEscrowService` 封装（上传/拉取/解密） | 小     |
 | CLI      | 新增 `escrow upload/download` 命令（便于老板先用 CLI 验证）                          | 小     |
-| App      | 设置页加"密保口令"；新设备接入流程第⑤步；rotate 后自动重传                           | 中     |
+| App      | 设置页加"共享口令"；新设备接入流程第⑤步；rotate 后自动重传                           | 中     |
 | 协议文档 | PROTOCOL.md 增补 §7.4                                                                | 小     |
 
 **明确不改**：消息加解密、同步/锚点、设备在册模型、WS 推送、备份格式——全部保持现状。
@@ -295,5 +295,5 @@ v1 一台服务器只有一个空间、丢了就无法再建；Multiverse 下这
 
 **保留：**
 - CLI 的 `backup`/`restore`（12 词恢复码导出的 EINZ-BACKUP 归档，纯客户端、与 Server 无关）；
-- App 新设备接入方式：邀请链接（二维码/手动，即一次性 join token）/ 密保口令 /
+- App 新设备接入方式：邀请链接（二维码/手动，即一次性 join token）/ 共享口令 /
   密保信封导入（join 口令页次级入口「改用线下密保信封」，离线路径）。

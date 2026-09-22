@@ -148,7 +148,7 @@ void main() {
 
   testWidgets('create 口令页：口令需二次输入确认（两个输入框）', (WidgetTester tester) async {
     await pumpToPassphrase(tester); // create
-    expect(find.text('设置密保口令'), findsOneWidget, reason: 'create 口令页');
+    expect(find.text('设置共享口令'), findsOneWidget, reason: 'create 口令页');
     expect(find.byType(TextField), findsNWidgets(2),
         reason: '首台设备设置口令需输入两次（口令 + 确认）——老板 2026-09-12');
   });
@@ -189,7 +189,7 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.text('两次输入的口令不一致'), findsOneWidget, reason: '不一致应红字提醒');
-    expect(find.text('设置密保口令'), findsOneWidget, reason: '不一致应停留口令页');
+    expect(find.text('设置共享口令'), findsOneWidget, reason: '不一致应停留口令页');
 
     // 改为一致：放行进入 PIN 步骤
     await tester.enterText(find.byType(TextField).at(1), 'secret-pass-1');
@@ -210,7 +210,7 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
-    expect(find.text('设置密保口令'), findsOneWidget, reason: '不足 8 位应停留口令页');
+    expect(find.text('设置共享口令'), findsOneWidget, reason: '不足 8 位应停留口令页');
 
     // 8 位纯数字：放行（老板 2026-09-15：只卡最短长度，字符种类由用户自定）
     await tester.enterText(find.byType(TextField).at(0), '12345678');

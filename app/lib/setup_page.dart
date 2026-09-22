@@ -770,7 +770,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!verified) return;
     }
     // offline 信封页（步骤 1）「下一步」= 回到 join 口令页（步骤 3，信封入口
-    // 所在位置）：信封⇄口令互切仍由页内「改用线上密保口令」承担（老板要求 2026-09-09）
+    // 所在位置）：信封⇄口令互切仍由页内「改用线上共享口令」承担（老板要求 2026-09-09）
     if (_role == _WizardRole.offline && _step == 1) {
       setState(() {
         _role = _preEnvelopeRole;
@@ -1955,7 +1955,7 @@ class _SetupPageState extends State<SetupPage> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 两套标题：首设备「设置密保口令」/ 后续设备「验证密保口令」（老板要求）
+            // 两套标题：首设备「设置共享口令」/ 后续设备「验证共享口令」（老板要求）
             Expanded(
               child: _stepHeader(
                 _role == _WizardRole.join
@@ -2091,7 +2091,7 @@ class _SetupPageState extends State<SetupPage> {
         _sessionToken = token;
       }
       // 3) 设置 PIN；确认"不设置锁屏码"时跳过设锁：明文持久化配置（下次启动直接进聊天）
-      // （密保口令不随 AppLockPayload 持久化——服务器为唯一真相源）
+      // （共享口令不随 AppLockPayload 持久化——服务器为唯一真相源）
       if (_pinSkipped && !_lockAlreadySet) {
         if (!mounted) return;
         await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
@@ -2392,7 +2392,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 从口令页切到密保信封页（offline 步骤 1）：记录来源角色/步骤，便于
-  /// 信封页「改用线上密保口令」切回原地（create 步骤 2 / join 步骤 3）。
+  /// 信封页「改用线上共享口令」切回原地（create 步骤 2 / join 步骤 3）。
   /// 不用 _selectRole（它重置步骤到目标角色步骤 1 且不记来源）。
   void _openEnvelopeImport() {
     setState(() {

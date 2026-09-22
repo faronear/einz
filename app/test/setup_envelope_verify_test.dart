@@ -1,7 +1,7 @@
 // offline 密保信封页回归测试：信封页（步骤 1）的出口行为——
 // 1)「下一步」= 回到前面的令牌页（join 步骤 2），重走登记流程
 //    （老板 2026-09-09 决策：信封页不再验证信封推进，由令牌入口承担登记）；
-// 2)「改用线上密保口令」= 回到口令页，口令⇄信封自由互切。
+// 2)「改用线上共享口令」= 回到口令页，口令⇄信封自由互切。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -67,15 +67,15 @@ void main() {
     await tester.enterText(find.byType(TextField), '随便粘贴的内容');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('验证密保口令'), findsOneWidget, reason: '应回到 join 口令页');
+    expect(find.text('验证共享口令'), findsOneWidget, reason: '应回到 join 口令页');
     expect(find.text('解析密保信封'), findsNothing, reason: '不应停留在信封页');
   });
 
-  testWidgets('信封页「改用线上密保口令」回到口令页（互切保留已填值）', (WidgetTester tester) async {
+  testWidgets('信封页「改用线上共享口令」回到口令页（互切保留已填值）', (WidgetTester tester) async {
     await pumpToEnvelope(tester, kp: kp);
     await tester.tap(find.byIcon(Icons.password)); // 信封页 → 口令页（右上角切换图标）
     await tester.pumpAndSettle();
-    expect(find.text('验证密保口令'), findsOneWidget, reason: '应回到口令页（join 验证标题）');
+    expect(find.text('验证共享口令'), findsOneWidget, reason: '应回到口令页（join 验证标题）');
     expect(find.byIcon(Icons.mail_outline), findsOneWidget, reason: '口令页应仍可再切回信封');
   });
 
@@ -84,7 +84,7 @@ void main() {
     // 信封页「上一步」不应禁用：点击回到 join 口令页（步骤 3，信封入口所在位置）
     await tester.tap(find.text('上一步'));
     await tester.pumpAndSettle();
-    expect(find.text('验证密保口令'), findsOneWidget, reason: '上一步应回到 join 口令页（验证密保口令标题）');
+    expect(find.text('验证共享口令'), findsOneWidget, reason: '上一步应回到 join 口令页（验证共享口令标题）');
     expect(find.byType(TextField), findsOneWidget, reason: '口令输入框应可见');
     expect(find.text('解析密保信封'), findsNothing, reason: '不应停留在信封页');
   });

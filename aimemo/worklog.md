@@ -8539,3 +8539,33 @@ cli `dart analyze` 无 issue。
 - **令牌 / token** = 那条一次性授权本身（"填写令牌""令牌无效""复制令牌"）
 - **邀请链接 / invite link** = 承载令牌的那个链接，落地页是邀请页
 - **入口 / entrance** = 这个秘境里的身份；**本机 / device** = 这台物理机器
+
+## 2026-09-22 密保口令 → 共享口令（shared passphrase）
+
+老板提议改名，理由是强调"双方共同持有"。评估后定案 **共享口令 / shared passphrase**，
+并把「共享密码」「共享密钥」两个候选排除：
+
+- ❌ **共享密钥**：`密钥` 在本产品里指密码学密钥（Space Key、公私钥），而口令**正是用来
+  保护那把密钥的**——改叫密钥会让人以为"拿到它就能解密消息"，含义正好反了（撞车非风格问题）。
+- ⚠️ **共享密码**：中文"密码"默认是账号/登录密码 → 用户会预期"能重置/找回"，而它**不可
+  找回**（服务端只有 argon2id 哈希，零知识）；且已有「锁屏码」，再来一个"密码"会让两组词都糊。
+- ✅ **共享口令**：`口令` 本就是 passphrase 的中文对应（≥8 位、可 12 词随机），英文侧
+  本来就全用 passphrase 且已写 "shared with your partner"，改动最小。
+
+**两条支持改名的硬证据**（不是"更准确"这种主观理由）：
+1. 今天必须靠一整句 hint 去教所有权模型 —— `wizardJoinPassphraseHint`「口令是与伴侣共享的
+   密码…如果不知道口令，请询问伴侣」；改名 = 把解释提到名字里；
+2. 同一个东西在 UI 里既叫「密保口令」（7 处）又叫「口令」（20 多处），而"密保"是**机制词**
+   （密保箱 / key escrow），用户不知道它指什么——顺手治了这个不一致。
+
+**改动**：App zh/en 各 13 处（标题/提示/菜单/通知，含两条 hint 重写：把所有权写进句子而不
+再解释"这是共享的"）；TUI 29 处；docs 43 处（DEPLOYMENT / PROTOCOL / SECURITY / ONBOARDING /
+KEY_ESCROW / E2EE / IOS / SERVER_SETTINGS / updateServer / PROTOCOL_MULTIVERSE，含
+"空间密保口令"→"共享口令"）；代码与测试注释 34 处；测试断言 3 处（hint 原文）+ 3 处
+`find.text('修改口令')`→`'修改共享口令'`。`GLOSSARY.md` 加「共享口令」分层一行 + 命名约定条目。
+
+**保留**：**密保箱**作为机制词（key escrow 的容器）；短引用仍可用「口令」（旧口令/新口令/
+口令错误）。历史记录类文档（worklog 等）不改。
+
+验证：`flutter analyze` 无 issue、全量 `flutter test` **175 通过 0 失败**、
+shared `dart test` 52 通过、`dart analyze`（cli）无 issue。

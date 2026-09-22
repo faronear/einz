@@ -9,8 +9,8 @@
   "skip": "跳过",
   "close": "关闭",
   "setupPageEnvelopeKeyHint": "密保信封是通过不对称加密，进行线下交接的一段文本。请联系秘境伴侣获取。",
-  "setupPageNeedPassphrase": "❗️ 必须设置密保口令",
-  "wizardJoinPassphraseRequired": "❗️ 请输入密保口令进行验证",
+  "setupPageNeedPassphrase": "❗️ 必须设置共享口令",
+  "wizardJoinPassphraseRequired": "❗️ 请输入共享口令进行验证",
   "setupEnrollBoundNotice": "🎉 新入口已开通",
   "wizardStartTitle": "秘境向导",
   "wizardDetectTitle": "正在检测服务器状态…",
@@ -63,8 +63,8 @@
   "wizardSlotRequired": "必须选择一个身份",
   "wizardSpaceLimit": "空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间",
   "wizardTitleInvite": "验证令牌",
-  "wizardTitlePassphrase": "设置密保口令",
-  "wizardJoinPassphraseTitle": "验证密保口令",
+  "wizardTitlePassphrase": "设置共享口令",
+  "wizardJoinPassphraseTitle": "验证共享口令",
   "wizardTitlePin": "设置锁屏码",
   "wizardTitleEnvelope": "解析密保信封",
   "wizardTitleIdentity": "我是",
@@ -76,15 +76,15 @@
       "error": {"type": "String"}
     }
   },
-  "wizardPassphraseHint": "口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。",
+  "wizardPassphraseHint": "共享口令由你和伴侣共同持有，用于加密所有消息。务必牢记；除伴侣外不要告诉任何人。",
   "wizardPassphraseMinLengthHint": "至少 8 位",
   "wizardPassphraseTooShort": "口令不得少于 8 位",
   "wizardPassphraseConfirmHint": "再输一次以确认",
   "wizardPassphraseMismatch": "两次输入的口令不一致",
-  "wizardJoinPassphraseHint": "口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。",
+  "wizardJoinPassphraseHint": "共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。",
   "wizardJoinPassphraseWrong": "口令错误：请确认首个入口创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
-  "wizardSwitchToPassphrase": "改用线上密保口令",
+  "wizardSwitchToPassphrase": "改用共享口令",
   "wizardPinHint": "每次启动秘境，需输入锁屏码才能进入。当前也可先跳过，进入秘境后能够随时设置。",
   "welcomeDialogTitleCreate": "一切就绪！",
   "welcomeDialogTitleJoin": "一切就绪！",
@@ -145,8 +145,8 @@
   "setupPageScanInvite": "扫码填入令牌",
   "setupPageScannerHint": "把令牌二维码对准取景框",
   "wizardInviteWrong": "令牌无效。请使用任意一个已开通的入口生成的 24 小时一次性令牌。",
-  "setupPageNoEscrow": "❌ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。",
-  "setupPageEscrowFailed": "❌ 口令验证失败。请询问秘境伴侣获得口令。",
+  "setupPageNoEscrow": "❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。",
+  "setupPageEscrowFailed": "❌ 共享口令验证失败。请询问你的伴侣。",
   "@setupPageEscrowFailed": {
     "placeholders": {
       "error": {"type": "String"}
@@ -193,7 +193,7 @@
     }
   },
   "chatPageTitleBrand": "我的秘境",
-  "chatPageMenuChangePassphrase": "修改口令",
+  "chatPageMenuChangePassphrase": "修改共享口令",
   "chatPageMenuAvatar": "我的头像",
   "chatPageAvatarUploaded": "✅ 头像已更新",
   "chatPageAvatarTooLarge": "图片过大（最大 2MB）",
@@ -241,7 +241,7 @@
   "chatPageExitTitle": "退出秘境？",
   "chatPageExitMessage": "即将在本机上退出秘境。",
   "save": "保存",
-  "chatPageChangePassphraseTitle": "修改密保口令",
+  "chatPageChangePassphraseTitle": "修改共享口令",
   "chatPageChangePassphraseSubmit": "修改",
   "chatPageChangePassphraseOldLabel": "旧口令",
   "chatPageChangePassphraseNewLabel": "新口令",
@@ -250,14 +250,14 @@
   "chatPageChangePassphraseMismatch": "两次输入的新口令不一致",
   "chatPageChangePassphraseSame": "新口令与旧口令相同，未作修改",
   "chatPageChangePassphraseOldWrong": "旧口令错误",
-  "chatPageChangePassphraseDone": "✅ 口令已修改（请告知伴侣，以后必须使用新口令）",
+  "chatPageChangePassphraseDone": "✅ 共享口令已修改（请告知伴侣，以后必须使用新口令）",
   "chatPageChangePassphraseFailed": "修改口令失败: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
       "error": {"type": "String"}
     }
   },
-  "chatPageEscrowRotatedNotice": "伴侣已重设密保口令，以后必须使用新口令",
+  "chatPageEscrowRotatedNotice": "伴侣已重设共享口令，以后必须使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuAttachmentStorage": "附件存储",
   "chatPageAttachmentStorageSecured": "远程托管",

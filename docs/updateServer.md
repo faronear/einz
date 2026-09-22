@@ -88,7 +88,7 @@ curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 ```bash
 cd /Volumes/repodisk/productX/einz/cli
 dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
-# 会话里执行 /passphrase → 设置或修改密保口令（含密保箱重建）
+# 会话里执行 /passphrase → 设置或修改共享口令（含密保箱重建）
 # 期望：✅ 口令密保箱已上传 / 已更新
 ```
 > `/tmp/a.json` 为设备 store 文件路径（本机 /tmp/ 或按需指定；由 TUI 引导生成）。

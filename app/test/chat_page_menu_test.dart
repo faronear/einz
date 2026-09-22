@@ -98,7 +98,7 @@ Future<_FakeApi> _fakeWithEscrow(Uint8List spaceKey, String passphrase) async =>
       ),
     );
 
-/// 聊天页 + 密保口令弹窗打开（返回 fake api 供断言）。
+/// 聊天页 + 共享口令弹窗打开（返回 fake api 供断言）。
 /// [spaceKey] 传入以便调用方断言「上传包解出的 Space Key 一致」。
 /// [oldPassphrase] 为空 = 服务器无密保箱（走"用新口令重建"路径）。
 Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase db,
@@ -127,7 +127,7 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
   // 口令入口现在收在「高级」底部弹层里（对话页菜单 → 高级 → 修改口令）
   await tester.tap(find.text('高级'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('修改口令'));
+  await tester.tap(find.text('修改共享口令'));
   await tester.pumpAndSettle();
   return api;
 }
@@ -596,7 +596,7 @@ void main() {
     await _enterDialogFields(tester, newPass: 'newpass123');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
-    expect(find.text('修改密保口令？'), findsNothing, reason: '不应再弹第二个确认弹窗');
+    expect(find.text('修改共享口令？'), findsNothing, reason: '不应再弹第二个确认弹窗');
     expect(find.text('旧口令错误'), findsOneWidget, reason: '旧口令没填应红字报出');
   });
 
@@ -613,7 +613,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
-    expect(find.text('修改密保口令？'), findsNothing, reason: '校验未过不应进确认');
+    expect(find.text('修改共享口令？'), findsNothing, reason: '校验未过不应进确认');
 
     // 8 位纯数字：放行（老板 2026-09-15：只卡长度，不卡字符种类）
     await _enterDialogFields(tester, newPass: '12345678');
@@ -626,7 +626,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('口令不得少于 8 位'), findsNothing, reason: '满足策略后旧红字不应残留');
-    expect(find.text('修改密保口令？'), findsNothing, reason: '不再弹第二个确认弹窗');
+    expect(find.text('修改共享口令？'), findsNothing, reason: '不再弹第二个确认弹窗');
   });
 
   testWidgets('菜单改名后写 profile（重启后从 profile 恢复新名字）', (WidgetTester tester) async {
@@ -1002,7 +1002,7 @@ void main() {
     await _confirmChange(tester);
 
     expect(find.text('旧口令错误'), findsOneWidget, reason: '旧口令错应红字');
-    expect(find.text('修改密保口令？'), findsNothing, reason: '未过口令验证不应进显性确认');
+    expect(find.text('修改共享口令？'), findsNothing, reason: '未过口令验证不应进显性确认');
     expect(api.uploadedPackage, isNull, reason: '旧口令错不得上传');
   });
 
@@ -1021,7 +1021,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('新口令与旧口令相同，未作修改'), findsOneWidget, reason: '新旧相同应红字');
-    expect(find.text('修改密保口令？'), findsNothing, reason: '新旧相同不该进显性确认');
+    expect(find.text('修改共享口令？'), findsNothing, reason: '新旧相同不该进显性确认');
     expect(api.uploadedPackage, isNull, reason: '新旧相同不得上传');
   });
 
@@ -1042,7 +1042,7 @@ void main() {
     // 成功：上传 rotated 包 + 附新口令哈希；弹窗关闭 + SnackBar
     expect(api.uploadedRotated, isTrue, reason: '修改口令必须传 rotated: true');
     expect(api.uploadedPassphraseHash, isNotNull);
-    expect(find.text('修改口令'), findsNothing, reason: '成功应关闭弹窗');
+    expect(find.text('修改共享口令'), findsNothing, reason: '成功应关闭弹窗');
     expect(find.textContaining('口令已修改'), findsOneWidget, reason: '成功 SnackBar');
 
     // 上传的包：新口令可解开、Space Key 一致、旧口令解不开
@@ -1073,7 +1073,7 @@ void main() {
 
     // 无密保箱 = 重建路径：同样不再弹第二个确认（原来是"重建密保箱？"确认框）
     expect(find.text('重建密保箱？'), findsNothing, reason: '不再弹第二个确认弹窗');
-    expect(find.text('修改密保口令？'), findsNothing);
+    expect(find.text('修改共享口令？'), findsNothing);
 
     // 旧口令为空也放行：直接上传 rotated 包重建
     expect(api.uploadedRotated, isTrue, reason: '重建同样传 rotated: true（广播口令变更）');
@@ -1082,7 +1082,7 @@ void main() {
     final reopened = await KeyEscrowService(ApiClient('http://fake'))
         .openPackage(passphrase: 'newpass123', envelope: api.uploadedPackage!);
     expect(reopened.spaceKeyB64, base64Encode(spaceKey), reason: '箱子仍是同一把 Space Key');
-    expect(find.text('修改口令'), findsNothing, reason: '成功应关闭弹窗');
+    expect(find.text('修改共享口令'), findsNothing, reason: '成功应关闭弹窗');
   });
 
   testWidgets('未设 PIN：顶栏无锁屏入口，切后台再回前台也不进锁屏页', (WidgetTester tester) async {

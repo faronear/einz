@@ -37,10 +37,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageEnvelopeKeyHint => '密保信封是通过不对称加密，进行线下交接的一段文本。请联系秘境伴侣获取。';
 
   @override
-  String get setupPageNeedPassphrase => '❗️ 必须设置密保口令';
+  String get setupPageNeedPassphrase => '❗️ 必须设置共享口令';
 
   @override
-  String get wizardJoinPassphraseRequired => '❗️ 请输入密保口令进行验证';
+  String get wizardJoinPassphraseRequired => '❗️ 请输入共享口令进行验证';
 
   @override
   String get setupEnrollBoundNotice => '🎉 新入口已开通';
@@ -167,10 +167,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleInvite => '验证令牌';
 
   @override
-  String get wizardTitlePassphrase => '设置密保口令';
+  String get wizardTitlePassphrase => '设置共享口令';
 
   @override
-  String get wizardJoinPassphraseTitle => '验证密保口令';
+  String get wizardJoinPassphraseTitle => '验证共享口令';
 
   @override
   String get wizardTitlePin => '设置锁屏码';
@@ -194,8 +194,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint =>
-      '口令对所有消息进行加密，保障隐私安全。务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣。';
+  String get wizardPassphraseHint => '共享口令由你和伴侣共同持有，用于加密所有消息。务必牢记；除伴侣外不要告诉任何人。';
 
   @override
   String get wizardPassphraseMinLengthHint => '至少 8 位';
@@ -210,7 +209,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseMismatch => '两次输入的口令不一致';
 
   @override
-  String get wizardJoinPassphraseHint => '口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。';
+  String get wizardJoinPassphraseHint => '共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首个入口创建时设置的口令';
@@ -219,7 +218,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToEnvelope => '改用线下密保信封';
 
   @override
-  String get wizardSwitchToPassphrase => '改用线上密保口令';
+  String get wizardSwitchToPassphrase => '改用共享口令';
 
   @override
   String get wizardPinHint => '每次启动秘境，需输入锁屏码才能进入。当前也可先跳过，进入秘境后能够随时设置。';
@@ -346,11 +345,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardInviteWrong => '令牌无效。请使用任意一个已开通的入口生成的 24 小时一次性令牌。';
 
   @override
-  String get setupPageNoEscrow => '❌ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。';
+  String get setupPageNoEscrow => '❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。';
 
   @override
   String setupPageEscrowFailed(String error) {
-    return '❌ 口令验证失败。请询问秘境伴侣获得口令。';
+    return '❌ 共享口令验证失败。请询问你的伴侣。';
   }
 
   @override
@@ -455,7 +454,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageTitleBrand => '我的秘境';
 
   @override
-  String get chatPageMenuChangePassphrase => '修改口令';
+  String get chatPageMenuChangePassphrase => '修改共享口令';
 
   @override
   String get chatPageMenuAvatar => '我的头像';
@@ -548,7 +547,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get save => '保存';
 
   @override
-  String get chatPageChangePassphraseTitle => '修改密保口令';
+  String get chatPageChangePassphraseTitle => '修改共享口令';
 
   @override
   String get chatPageChangePassphraseSubmit => '修改';
@@ -575,7 +574,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseOldWrong => '旧口令错误';
 
   @override
-  String get chatPageChangePassphraseDone => '✅ 口令已修改（请告知伴侣，以后必须使用新口令）';
+  String get chatPageChangePassphraseDone => '✅ 共享口令已修改（请告知伴侣，以后必须使用新口令）';
 
   @override
   String chatPageChangePassphraseFailed(String error) {
@@ -583,7 +582,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEscrowRotatedNotice => '伴侣已重设密保口令，以后必须使用新口令';
+  String get chatPageEscrowRotatedNotice => '伴侣已重设共享口令，以后必须使用新口令';
 
   @override
   String get chatPageMenuLocaleLabel => '界面语言';

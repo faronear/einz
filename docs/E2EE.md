@@ -401,13 +401,13 @@ Client                     Server
 ### 9.3 撤销语义（现行）
 
 - **两种"注销"的分工**（2026-09-21 新增退役）：
-  - **撤销别人**（`POST /devices/:id/revoke`，§7.2）：要空间密保口令 → 发 `device.revoked` → 对方客户端自毁；
+  - **撤销别人**（`POST /devices/:id/revoke`，§7.2）：要共享口令 → 发 `device.revoked` → 对方客户端自毁；
   - **本机自助退役**（`POST /devices/retire`，§7.2.1）：只认 session → 清服务端状态 + 给对端广播
     `peer.offline`，**不发** `device.revoked`、也不主动关 WS。少这一句界线，偷到 session 就能远程擦设备，
     §7.2 的口令闸门会被从旁路绕过；
 - 被撤销设备：无法再认证（标记 revoked，挑战返回 403 `DEVICE_REVOKED`）、无法同步、无法发送；
   其旧 Push Token 一并清除；
-- **撤销的授权**（2026-09-16）：同 space 内可互撤，但每次撤销都必须校验空间密保口令
+- **撤销的授权**（2026-09-16）：同 space 内可互撤，但每次撤销都必须校验共享口令
   （`POST /devices/:id/revoke`）——撤销会触发对方客户端自毁本地数据，属不可逆操作；
 - 被撤销设备**上线即自毁本地数据**（App `chat_page._onDeviceRevoked`；TUI `_exitRevoked`；`SECURITY.md` §2）；
 - **只有这个明确信号才触发自毁**（2026-09-16）：`device.revoked` 帧 / 403 `DEVICE_REVOKED`。

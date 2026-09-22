@@ -102,8 +102,8 @@ Future<void> pumpToJoinPassphrase(
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle(); // → 口令页
   // 口令页应为「验证」语义：标题与提示都是验证措辞
-  expect(find.text('验证密保口令'), findsOneWidget); // 标题（join=验证套，create=设置套）
-  expect(find.text('口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。'),
+  expect(find.text('验证共享口令'), findsOneWidget); // 标题（join=验证套，create=设置套）
+  expect(find.text('共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。'),
       findsOneWidget); // hint
   // join 提交（POST /spaces/join）成功后若出 SnackBar 停留 4 秒：等其消失避免遮挡
   await tester.pump(const Duration(seconds: 5));
@@ -125,7 +125,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('口令错误：请确认首个入口创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
-    expect(find.text('口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。'),
+    expect(find.text('共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。'),
         findsOneWidget, reason: '应停留在口令页');
     expect(find.text('设置锁屏码'), findsNothing, reason: '不应进入 PIN 页');
   });
@@ -198,7 +198,7 @@ void main() {
     // 退回口令页 → 再点下一步：不应再调 joinSpace（token 是一次性的）
     await tester.tap(find.text('上一步'));
     await tester.pumpAndSettle();
-    expect(find.text('验证密保口令'), findsOneWidget, reason: '应退回口令页');
+    expect(find.text('验证共享口令'), findsOneWidget, reason: '应退回口令页');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(joinCalls, 1, reason: '重复前进不应再消费 token');
@@ -247,7 +247,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。'),
+    expect(find.text('共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。'),
         findsOneWidget, reason: '未托管时停留口令页');
   });
 
@@ -259,7 +259,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('令牌无效'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
     expect(find.text('验证令牌'), findsWidgets, reason: '应停留在 token 页（setupTokenTitle）');
-    expect(find.text('验证密保口令'), findsNothing, reason: '不应进入口令页');
+    expect(find.text('验证共享口令'), findsNothing, reason: '不应进入口令页');
   });
 
   testWidgets('正确 token：preflight 通过 → 直接进入身份选择页（无确认卡片）', (WidgetTester tester) async {

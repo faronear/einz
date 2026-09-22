@@ -38,11 +38,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Offline handover text (asymmetric encryption). Get it from your partner.';
 
   @override
-  String get setupPageNeedPassphrase => '❗️ Set a passphrase first';
+  String get setupPageNeedPassphrase => '❗️ Set a shared passphrase first';
 
   @override
   String get wizardJoinPassphraseRequired =>
-      '❗️ Enter the passphrase to verify';
+      '❗️ Enter the shared passphrase to verify';
 
   @override
   String get setupEnrollBoundNotice => '🎉 New entrance opened';
@@ -174,10 +174,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitleInvite => 'Verify token';
 
   @override
-  String get wizardTitlePassphrase => 'Set passphrase';
+  String get wizardTitlePassphrase => 'Set shared passphrase';
 
   @override
-  String get wizardJoinPassphraseTitle => 'Verify passphrase';
+  String get wizardJoinPassphraseTitle => 'Verify shared passphrase';
 
   @override
   String get wizardTitlePin => 'Set PIN';
@@ -202,7 +202,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardPassphraseHint =>
-      'The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.';
+      'The shared passphrase is held by you and your partner, and encrypts every message. Memorize it; tell no one but your partner.';
 
   @override
   String get wizardPassphraseMinLengthHint => 'At least 8 characters';
@@ -219,7 +219,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseHint =>
-      'A password shared with your partner to protect messages. Don\'t know it? Ask your partner.';
+      'The shared passphrase is held by you and your partner to protect messages. Don\'t know it? Ask your partner.';
 
   @override
   String get wizardJoinPassphraseWrong =>
@@ -229,7 +229,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardSwitchToEnvelope => 'Use key envelope instead (offline)';
 
   @override
-  String get wizardSwitchToPassphrase => 'Use passphrase instead';
+  String get wizardSwitchToPassphrase => 'Use a shared passphrase instead';
 
   @override
   String get wizardPinHint =>
@@ -368,11 +368,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupPageNoEscrow =>
-      '❌ No escrow package on the server — set a passphrase on the first entrance first';
+      '❌ No escrow package for the shared passphrase on the server — set it on the first entrance first';
 
   @override
   String setupPageEscrowFailed(String error) {
-    return '❌ Passphrase join failed: $error';
+    return '❌ Shared passphrase join failed: $error';
   }
 
   @override
@@ -483,7 +483,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageTitleBrand => 'My Einz';
 
   @override
-  String get chatPageMenuChangePassphrase => 'Change passphrase';
+  String get chatPageMenuChangePassphrase => 'Change shared passphrase';
 
   @override
   String get chatPageMenuAvatar => 'Avatar';
@@ -579,7 +579,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get save => 'Save';
 
   @override
-  String get chatPageChangePassphraseTitle => 'Change secret passphrase';
+  String get chatPageChangePassphraseTitle => 'Change shared passphrase';
 
   @override
   String get chatPageChangePassphraseSubmit => 'Change';
@@ -609,7 +609,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseDone =>
-      '✅ Passphrase updated — tell your partner; new entrances must use the new one';
+      '✅ Shared passphrase updated — tell your partner; new entrances must use the new one';
 
   @override
   String chatPageChangePassphraseFailed(String error) {
@@ -618,7 +618,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEscrowRotatedNotice =>
-      'Your partner reset the passphrase — use the new one to create tokens or change it';
+      'Your partner reset the shared passphrase — use the new one to create tokens or change it';
 
   @override
   String get chatPageMenuLocaleLabel => 'Language';

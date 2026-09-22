@@ -155,13 +155,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageNeedPassphrase.
   ///
   /// In en, this message translates to:
-  /// **'❗️ Set a passphrase first'**
+  /// **'❗️ Set a shared passphrase first'**
   String get setupPageNeedPassphrase;
 
   /// No description provided for @wizardJoinPassphraseRequired.
   ///
   /// In en, this message translates to:
-  /// **'❗️ Enter the passphrase to verify'**
+  /// **'❗️ Enter the shared passphrase to verify'**
   String get wizardJoinPassphraseRequired;
 
   /// No description provided for @setupEnrollBoundNotice.
@@ -407,13 +407,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardTitlePassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Set passphrase'**
+  /// **'Set shared passphrase'**
   String get wizardTitlePassphrase;
 
   /// No description provided for @wizardJoinPassphraseTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify passphrase'**
+  /// **'Verify shared passphrase'**
   String get wizardJoinPassphraseTitle;
 
   /// No description provided for @wizardTitlePin.
@@ -455,7 +455,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The passphrase encrypts every message. Memorize it and never leak it — share it only with your partner.'**
+  /// **'The shared passphrase is held by you and your partner, and encrypts every message. Memorize it; tell no one but your partner.'**
   String get wizardPassphraseHint;
 
   /// No description provided for @wizardPassphraseMinLengthHint.
@@ -485,7 +485,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'A password shared with your partner to protect messages. Don\'t know it? Ask your partner.'**
+  /// **'The shared passphrase is held by you and your partner to protect messages. Don\'t know it? Ask your partner.'**
   String get wizardJoinPassphraseHint;
 
   /// No description provided for @wizardJoinPassphraseWrong.
@@ -503,7 +503,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardSwitchToPassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Use passphrase instead'**
+  /// **'Use a shared passphrase instead'**
   String get wizardSwitchToPassphrase;
 
   /// No description provided for @wizardPinHint.
@@ -737,13 +737,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageNoEscrow.
   ///
   /// In en, this message translates to:
-  /// **'❌ No escrow package on the server — set a passphrase on the first entrance first'**
+  /// **'❌ No escrow package for the shared passphrase on the server — set it on the first entrance first'**
   String get setupPageNoEscrow;
 
   /// No description provided for @setupPageEscrowFailed.
   ///
   /// In en, this message translates to:
-  /// **'❌ Passphrase join failed: {error}'**
+  /// **'❌ Shared passphrase join failed: {error}'**
   String setupPageEscrowFailed(String error);
 
   /// No description provided for @setPinDialogPinLabel.
@@ -935,7 +935,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuChangePassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Change passphrase'**
+  /// **'Change shared passphrase'**
   String get chatPageMenuChangePassphrase;
 
   /// No description provided for @chatPageMenuAvatar.
@@ -1103,7 +1103,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseTitle.
   ///
   /// In en, this message translates to:
-  /// **'Change secret passphrase'**
+  /// **'Change shared passphrase'**
   String get chatPageChangePassphraseTitle;
 
   /// No description provided for @chatPageChangePassphraseSubmit.
@@ -1157,7 +1157,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseDone.
   ///
   /// In en, this message translates to:
-  /// **'✅ Passphrase updated — tell your partner; new entrances must use the new one'**
+  /// **'✅ Shared passphrase updated — tell your partner; new entrances must use the new one'**
   String get chatPageChangePassphraseDone;
 
   /// No description provided for @chatPageChangePassphraseFailed.
@@ -1169,7 +1169,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEscrowRotatedNotice.
   ///
   /// In en, this message translates to:
-  /// **'Your partner reset the passphrase — use the new one to create tokens or change it'**
+  /// **'Your partner reset the shared passphrase — use the new one to create tokens or change it'**
   String get chatPageEscrowRotatedNotice;
 
   /// No description provided for @chatPageMenuLocaleLabel.

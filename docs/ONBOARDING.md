@@ -92,7 +92,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc \
 # 引导流程：
 #   选 c 创建秘境
 #   我的名字（如 lukas）+ 性别；伴侣名字（如 Alice，预置在 slot=1，等她加入时确认）
-#   设置密保口令（如 faronear，两分钟后对方凭它接入；≥8 位）
+#   设置共享口令（如 faronear，两分钟后对方凭它接入；≥8 位）
 #   ✅ 成功创建秘境！地址: 0x…（自动上传密保箱、签发会话、进入会话）
 ```
 
@@ -114,7 +114,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc `
 #   选 j 加入秘境
 #   粘贴 A 给的邀请链接（或纯 token）
 #   ✅ 令牌验证通过 → 选择身份（1=第一人 / 2=伴侣，一般选 2）
-#   输入 A 设置的密保口令（⚠️ 输口令，不是邀请链接；Windows 隐藏回显无星号）
+#   输入 A 设置的共享口令（⚠️ 输口令，不是邀请链接；Windows 隐藏回显无星号）
 #   ✅ 口令验证通过，成功加入秘境（取回 Space Key + 登记设备 + 签发会话）
 ```
 
@@ -146,7 +146,7 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 | 服务器重设   | `/server https://einz.tic.cc` | 重连并认证                                                 |
 | 补发令牌     | 任一方 `/invite`              | 打印新的 24h 一次性邀请链接（给自己加设备也用它）          |
 | 看设备列表   | 任一方 `/devices`             | 列出**同空间全部设备**（我 + 对方），带序号与在线/已撤销状态 |
-| 撤销设备     | `/revoke`（或 `/revoke <序号\|设备名>`） | 选设备 → 输入 `yes` 确认 → 输入密保口令 → 该设备下次联网时**清空本地数据**（不可逆；口令错/无权则毫发无损） |
+| 撤销设备     | `/revoke`（或 `/revoke <序号\|设备名>`） | 选设备 → 输入 `yes` 确认 → 输入共享口令 → 该设备下次联网时**清空本地数据**（不可逆；口令错/无权则毫发无损） |
 
 ---
 
@@ -175,7 +175,7 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 - **会话必带空间**：认证时 `space_id` 必填；无 space 的会话不存在（也访问不到任何数据）。
 - **两人上限**：一个空间内 distinct person ≤2（同 person 多设备不限）；由 `space_members`
   的两个槽位在数据库层强制。
-- **撤销设备**：`POST /devices/:id/revoke`（需同空间成员认证 + **校验密保口令**）→ 标记
+- **撤销设备**：`POST /devices/:id/revoke`（需同空间成员认证 + **校验共享口令**）→ 标记
   `revoked` + 清会话/Push Token + 关 WS；
   被撤销设备重启不复活（**不**做密钥轮换，见 `SECURITY.md` §3；止损走重建空间）。
 - **服务端监控**：`GET /health`（免鉴权）、`docker compose logs -f server`（含

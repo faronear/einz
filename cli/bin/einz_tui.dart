@@ -120,7 +120,7 @@ class _TuiState {
   /// 等待令牌输入（/auth 未登记引导）：输入循环的下一次输入按令牌处理。
   bool pendingJoinToken = false;
 
-  /// 等待密保口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
+  /// 等待共享口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
   bool pendingSpaceKey = false;
 
   /// person_id → personName（GET /space 拉取，消息前缀显示 personName 用）。
@@ -602,12 +602,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   if (store.spaceKey == null && store.spaceId != null && server.isNotEmpty) {
     while (true) {
       if (!_state!.running) break; // 已退出：结束引导
-      final passphrase = await _prompt(session, '❓ 输入密保口令，才能查看秘境内容：', required: true);
+      final passphrase = await _prompt(session, '❓ 输入共享口令，才能查看秘境内容：', required: true);
       if (!_state!.running) break; // 退出中（/exit 逃生门已触发——_abortPendingGuide 返回空）——立即结束引导，不执行接入
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
         // （此前漏过 / 检查直接进 accessByEscrow——"口令对接中"卡住退不出）
-        session.messages.add(_systemMessage(session, '⚠️ 密保口令不能为空，请重新输入（/exit 可退出）'));
+        session.messages.add(_systemMessage(session, '⚠️ 共享口令不能为空，请重新输入（/exit 可退出）'));
         _scheduleRender();
         continue;
       }
@@ -618,12 +618,12 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
           _state!.running = false;
           break; // running=false 后由 main 收尾 + 2 秒兜底退出（exit(0) 死代码已移除）
         }
-        session.messages.add(_systemMessage(session, '⚠️ 密保口令不能以 / 开头，请重新输入（/exit 可退出）'));
+        session.messages.add(_systemMessage(session, '⚠️ 共享口令不能以 / 开头，请重新输入（/exit 可退出）'));
         _scheduleRender();
         continue;
       }
       try {
-        await _busy(session, '⏳ 密保口令核对中......', () => session.accessByEscrow(passphrase));
+        await _busy(session, '⏳ 共享口令核对中......', () => session.accessByEscrow(passphrase));
         session.messages.add(_systemMessage(session, '✅ 口令核对成功，本设备有权查看秘境内容')); // (space_id=${store.spaceId} key_version=${store.keyVersion})
         session.messages.add(_systemMessage(session, '----------------'));
         store.escrowUploaded = true; // 已通过口令密保箱接入（托管就绪），不再要求设置托管口令
@@ -652,7 +652,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       store.escrowUploaded = true;
       store.save(storePath);
     } else if (hasBox == false && _state!.running) {
-      session.messages.add(_systemMessage(session, '检测到尚未设置密保口令，现在设置: '));
+      session.messages.add(_systemMessage(session, '检测到尚未设置共享口令，现在设置: '));
       _scheduleRender();
       await _setupEscrowPassphrase(store, storePath, session);
     }
@@ -758,7 +758,7 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
       onPassphraseRotated: (_) {
         // 口令被对方重设：只发通知不弹窗（接入 /space 或修改 /passphrase 时使用新口令）
         _state?.session.messages.add(_systemMessage(_state!.session,
-            '⚠️ 对方已重设密保口令——接入或修改口令时请使用新口令'));
+            '⚠️ 对方已重设共享口令——接入或修改口令时请使用新口令'));
         _scheduleRender();
       },
       onProfileUpdated: _onProfileUpdated,
@@ -973,13 +973,13 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
     _scheduleRender();
   }
-  // 密保口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让伴侣无法
+  // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让伴侣无法
   // 凭口令加入、本机也没有口令密保箱可用）
   String passphrase;
   while (true) {
     if (!_state!.running) return; // 口令阶段 /exit：不继续创建
     passphrase = (await _prompt(session,
-            '❓ 设置密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:',
+            '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:',
             required: true))
         .trim();
     if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
@@ -1025,7 +1025,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     store.personId = created.creatorPersonId;
     store.partnerSlot = 0; // 创建者 = 第一人（v2 身份槽位；替代 v1 的 personA 判据）
     // 密保箱已随本次 POST /spaces 上传（sealed/escrowPassphrase 成对提交，口令非空才走到这）
-    // → 标记托管就绪。漏了这行的话，下次启动会被判成"尚未设置密保口令"再问一遍
+    // → 标记托管就绪。漏了这行的话，下次启动会被判成"尚未设置共享口令"再问一遍
     // （老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.personName = displayName;
@@ -1122,7 +1122,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     while (true) {
       if (!_state!.running) return;
       final input =
-          (await _prompt(session, '❓ 验证密保口令:', hidden: false, required: true))
+          (await _prompt(session, '❓ 验证共享口令:', hidden: false, required: true))
               .trim();
       // 留空（含 /exit 中止）→ 重问；输入循环 required 已拦截留空回车
       if (input.isEmpty) continue;
@@ -1175,7 +1175,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     store.partnerSlot = join.partnerSlot; // v2 身份槽位（0=第一人，1=第二人）
     // 密保箱本来就存在（刚才正是靠口令从它取回 Space Key）→ 标记托管就绪。
     // 漏了这行：若加入者选的是 slot=0（同一人的另一台设备），重启后会被判成
-    // "尚未设置密保口令"再问一遍（老板 2026-09-15 反馈）。
+    // "尚未设置共享口令"再问一遍（老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.personName = myName ?? '成员';
     // 对方名字落盘：取另一身份槽位的预置名（create 录入的两人身份）。我选了
@@ -2011,10 +2011,10 @@ List<_DeviceRow> _matchDeviceRows(List<_DeviceRow> rows, String input) {
 /// ——撤销是破坏性操作，用户必须能立刻判断"刚才那下到底生效没有"。
 String _revokeErrorHint(ApiException e) => switch (e.code) {
       'ESCROW_VERIFY_FAILED' =>
-        '⚠️ 密保口令错误——撤销未执行，目标设备毫发无损（重试：/revoke <序号>）',
+        '⚠️ 共享口令错误——撤销未执行，目标设备毫发无损（重试：/revoke <序号>）',
       'ESCROW_RATE_LIMITED' => '⚠️ 口令尝试过多被限流——稍等再试（目标设备未受影响）',
       'PASSPHRASE_NOT_SET' =>
-        '⚠️ 本空间还没有可校验的密保口令（未设置或被清除）——先用 /passphrase 设置口令再撤销',
+        '⚠️ 本空间还没有可校验的共享口令（未设置或被清除）——先用 /passphrase 设置口令再撤销',
       'FORBIDDEN' => '⚠️ 目标设备不在本空间（可能已被移除或撤销）——未做任何改动',
       'NOT_FOUND' => '⚠️ 该设备不存在——未做任何改动',
       'INVALID_REQUEST' => '⚠️ 请求被拒（不能撤销本机）——未做任何改动',
@@ -2960,7 +2960,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/revoke <序号|设备名> :: 撤销同空间的某台设备（需密保口令；被撤设备将清空本地数据）',
+        '/revoke <序号|设备名> :: 撤销同空间的某台设备（需共享口令；被撤设备将清空本地数据）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2980,7 +2980,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/passphrase [random] :: 修改密保口令；random 生成随机 12 词恢复码',
+        '/passphrase [random] :: 修改共享口令；random 生成随机 12 词恢复码',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3177,7 +3177,7 @@ Future<void> _execCommand(String line) async {
             s.session, '🎲 随机恢复码（12 词助记词，请离线妥善保存，Server 不接触）：\n$code'));
         break;
       }
-      // 修改密保口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
+      // 修改共享口令（escrow 托管，空间级）：旧口令验证 → 新口令重加密上传
       if (s.session.store.spaceKey == null || s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 请先 /auth 激活线路、/space 接入领地后再修改口令'));
         break;
@@ -3222,7 +3222,7 @@ Future<void> _execCommand(String line) async {
       break;
     case '/revoke':
       // 撤销同空间某台设备（PROTOCOL.md §7.2，老板 2026-09-16）：
-      // **同 space 内可互撤**（自己的另一台 / 伴侣的设备），但每次都要校验密保口令——
+      // **同 space 内可互撤**（自己的另一台 / 伴侣的设备），但每次都要校验共享口令——
       // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
       // 选设备（序号/设备名）→ 输入 yes 确认目标 → 输入口令。任一步取消都不做任何改动。
       try {
@@ -3292,7 +3292,7 @@ Future<void> _execCommand(String line) async {
         }
         // 口令（隐藏输入）：撤销的授权因子——即使本机已持会话，也必须由口令持有者授权
         final passphrase =
-            (await _prompt(s.session, '❓ 输入密保口令（撤销需校验）:', hidden: true, required: true))
+            (await _prompt(s.session, '❓ 输入共享口令（撤销需校验）:', hidden: true, required: true))
                 .trim();
         if (!s.running) break;
         // 防御：required 已拦空回车，这里兜住 /exit 之类的中断（空口令会被服务端 400）
@@ -3324,7 +3324,7 @@ Future<void> _execCommand(String line) async {
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));
     case '/reset':
       // 重置本设备（老板 2026-09-21）：清掉本地 store 与附件缓存，回到全新入网向导。
-      // 不可逆，故三道闸门：**全部离线**，不依赖网络、不碰密保口令——
+      // 不可逆，故三道闸门：**全部离线**，不依赖网络、不碰共享口令——
       //   ① 输入本机设备名（确认清的是这台，挡误触/顺手回车）
       //   ② 本机锁屏码（已设才验；锁屏码只属于本机持有者，不像空间口令那样是共享凭证）
       //   ③ 服务端退役尽力而为（失败只提示残留，不拦清算——离线也必须能重置）
@@ -3565,7 +3565,7 @@ Future<void> _handleJoinTokenInput(String token) async {
   await _spaceJoin(s.session, s.session.store, s.session.storePath, token);
 }
 
-/// 输入循环接管的密保口令接入（/space 未接入引导）：口令 → accessByEscrow。
+/// 输入循环接管的共享口令接入（/space 未接入引导）：口令 → accessByEscrow。
 Future<void> _handleSpaceKeyInput(String passphrase) async {
   final s = _state!;
   s.pendingSpaceKey = false;
@@ -3579,7 +3579,7 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
       _state!.running = false;
       return;
     }
-    s.session.messages.add(_systemMessage(s.session, '密保口令不能以 / 开头，接入取消（可再输 /space 重试）'));
+    s.session.messages.add(_systemMessage(s.session, '共享口令不能以 / 开头，接入取消（可再输 /space 重试）'));
     return;
   }
   try {
@@ -3661,7 +3661,7 @@ Future<void> _checkEscrowRotated(ChatSession session) async {
     final knownAt = store.escrowUpdatedAt;
     if (serverAt != null && knownAt != null && serverAt > knownAt) {
       session.messages.add(_systemMessage(session,
-          '⚠️ 离线期间密保口令已被重设——接入（/space）或修改（/passphrase）时请使用新口令'));
+          '⚠️ 离线期间共享口令已被重设——接入（/space）或修改（/passphrase）时请使用新口令'));
       // 记录本端已知更新时间（防 WS 重连/重复补查刷屏；下次真正重设再通知）
       store.escrowUpdatedAt = serverAt;
       store.save(session.storePath);
@@ -3694,7 +3694,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   } else {
     while (true) {
       if (!_state!.running) return; // 已退出
-      oldPass = await _prompt(session, '❓ 验证老密保口令：', hidden: false, required: true);
+      oldPass = await _prompt(session, '❓ 验证老共享口令：', hidden: false, required: true);
       if (oldPass.isEmpty) continue;
       try {
         await escrow.openPackage(passphrase: oldPass, envelope: serverFile);
@@ -3708,7 +3708,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
   // 2) 新口令（两次输入一致）
   while (true) {
     if (!_state!.running) return;
-    final p1 = await _prompt(session, '❓ 设置新密保口令（务必牢记，严禁泄漏！）：', hidden: false, required: true);
+    final p1 = await _prompt(session, '❓ 设置新共享口令（务必牢记，严禁泄漏！）：', hidden: false, required: true);
     if (p1.isEmpty) continue;
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
@@ -3786,7 +3786,7 @@ Future<bool?> _serverHasEscrow(DeviceStore store, String server) async {
 Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 设置密保口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
+    final p1 = await _prompt(session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
     if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
@@ -3938,7 +3938,7 @@ String? _sameGenderSecondCyan(String? senderPid) {
   return slots[senderPid] == 1 ? _bgCyan : null;
 }
 
-/// 密保口令策略校验（**设置/修改**时用；输入既有口令不校验，避免把旧短口令用户挡在门外）。
+/// 共享口令策略校验（**设置/修改**时用；输入既有口令不校验，避免把旧短口令用户挡在门外）。
 /// 策略唯一来源：shared 的 passphrase_policy.dart——现在只要求最短
 /// [kPassphraseMinLength] 位，字符种类不限（老板 2026-09-15）。
 String? _passphrasePolicyError(String passphrase) {

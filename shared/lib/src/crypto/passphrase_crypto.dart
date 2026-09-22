@@ -44,7 +44,7 @@ void resetSodiumSumo() {
 /// 派生口令密钥（E2EE.md §4.3 / §10.1）：Argon2id(passphrase, salt) → 32B。
 ///
 /// [passphrase] 是通用的人类可输入口令——按调用方语义不同，实际传入
-/// 12 词恢复码（加密备份）、锁屏码 PIN（App 启动锁）或密保口令（口令密保箱）。
+/// 12 词恢复码（加密备份）、锁屏码 PIN（App 启动锁）或共享口令（口令密保箱）。
 Future<Uint8List> derivePassphraseKey({
   required String passphrase,
   required Uint8List salt,

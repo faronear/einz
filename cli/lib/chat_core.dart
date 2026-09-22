@@ -22,7 +22,7 @@ String attachmentCacheDir() {
 }
 
 /// 展示消息的全局插入序号（仅用于排序平局决胜）。Dart 的 `List.sort` **不稳定**，
-/// 同毫秒创建的系统消息（如 join 向导里「✅ 我是 X」「----------------」「❓ 验证密保口令:」
+/// 同毫秒创建的系统消息（如 join 向导里「✅ 我是 X」「----------------」「❓ 验证共享口令:」
 /// 基本同刻产生）排序后会被打乱（老板 2026-09-13 实测：口令提示跑到"我是 X"之前）。
 int _messageOrderSeq = 0;
 
@@ -69,7 +69,7 @@ class ChatMessage {
 ///   画到最下方、对话消息反而跑到上方）；
 /// - 完全平局（同毫秒 createdAt / 同 seq）时按插入顺序 [ChatMessage.order] 决胜——
 ///   Dart 的 `List.sort` **不稳定**，无此决胜会打乱同刻系统消息（老板 2026-09-13
-///   实测：join 向导里「❓ 验证密保口令」跑到「✅ 我是 X」之前）。
+///   实测：join 向导里「❓ 验证共享口令」跑到「✅ 我是 X」之前）。
 int compareChatMessages(ChatMessage a, ChatMessage b) {
   final an = a.seq;
   final bn = b.seq;

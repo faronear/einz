@@ -86,7 +86,7 @@
 - [x] **App 启动锁（方案 B：PIN 加密密钥）**：AppLockService（Argon2id 派生密钥加密 Space Key 包存 drift app_state，错误 5 次锁定 30s，12 词恢复码兑底）+ 锁屏页 + 启动门 + 认证后设置 PIN；4 项单测，flutter test 10 项全过
 - [x] **后台切回锁定**：ChatPage 生命周期监听（WidgetsBindingObserver：切后台记时、回前台超 30s 覆盖锁屏保留聊天状态）；LockPage 覆盖模式（asOverlay pop）；LockTimer 纯逻辑 + 5 项单测，flutter test 15 项全过
 - [x] **口令托管密钥（KEY_ESCROW.md，已实现）**：Server /key-escrow 三端点（表+冒烟用例）；shared KeyEscrowService（复用 backup.dart Argon2id+XChaCha20）+ 3 项单测；CLI escrow upload/download（全链路 e2e + 双端口令接入 e2e 过）；App 接入口令 + 新设备凭口令接入（③按钮）；flutter test 全过
-      - 2026-09-14 变更：原"rotate 后解锁自动重传（`_syncEscrow`）"**已随轮换撤除一并删除**（客户端不再本地缓存密保口令）；服务器无密保箱时改为走"修改口令"跳过旧口令校验直接重建，或 `cli escrow upload`（见 `docs/SECURITY.md` §4.7）
+      - 2026-09-14 变更：原"rotate 后解锁自动重传（`_syncEscrow`）"**已随轮换撤除一并删除**（客户端不再本地缓存共享口令）；服务器无密保箱时改为走"修改口令"跳过旧口令校验直接重建，或 `cli escrow upload`（见 `docs/SECURITY.md` §4.7）
 - [x] **App 附件消息（语音/图像/视频）**：MessageRepository.sendAttachment（encryptAttachment 加密 blob → /attachments 上传 + caption 消息 + 本地附件元数据落库）+ history 关联附件 + fetchAttachment 下载解密；chat_page：语音（按住说话录音 record → 播放条 audioplayers）、图像（拍照/相册 image_picker → 缩略展示/点击全屏）、视频（拍摄/相册 → 下载解密 video_player 播放）；插件懒构造避免测试环境 MissingPluginException；flutter test 18 项全过 + golden 更新
 - [x] **App 附件扩展（音频文件/任意文件）+ 固定服务器地址**：协议 kMessageTypes/Server ALLOWED_TYPES 加 audio/file；chat_page 附件 sheet 扩至 6 项（file_picker 12.x：FilePicker 静态方法 + readAsBytes）；audio 播放条（与 voice 共用 \_playAudioMessage）、file 文件卡片（下载保存 path_provider）；setup_page 服务器地址改固定常量 kEinzServer（移除输入框）；全量验证过（server 冒烟/shared 16/app 18）
 - [x] **多设备凭证判断（person_id）**：shared ApiClient 加 getSpace + SpaceResult/SpaceDevice（含 person_id 映射，const 构造）；MessageRepository 加 refreshDeviceMap 缓存 + \_isSamePerson（person 优先、device 降级），history sender 按 person 判断——同用户不同设备的消息显示为 me；chat_page \_refresh 拉取映射；单测（shared getSpace 2 项 + app person 判断 1 项），shared 18/app 19 全过
@@ -111,8 +111,8 @@
 - [x] 设备撤销（撤销生效于认证/同步路径 403 + 被撤销设备上线自毁）＋ 轮换相关代码撤除（SpaceKeyRing / einz rotate / key.rotation 广播，2026-09-14）
 - [x] 撤销语义收窄（2026-09-16）：服务端区分 `DEVICE_REVOKED`（明确撤销）与 `FORBIDDEN`（未登记，含库被清空/重置）；客户端**只对明确撤销**自毁（App 清锁包+消息+附件，TUI 清 store+附件缓存后退出），库被重置/连不上只发常驻警告并允许继续读本地消息；撤销自毁覆盖 TUI 所有认证入口（`revoked_check.py` 四场景）
 - [ ] 后台被重置后的"重新入网"入口（TUI `/space reset` 解绑 + App 菜单项）——当前 `spaceKey != null` 时 create/join 会被拒，库被清空后只能离线看历史（2026-09-16 定：本轮不做）
-- [x] 撤销授权收口（2026-09-16）：`POST /devices/:id/revoke` —— **同 space 内可互撤 + 每次校验密保口令**（argon2id，复用取包的校验与失败限速；缺口令哈希 409 `PASSPHRASE_NOT_SET` 拒绝放行）；旧的免口令 `DELETE /devices/:id` 移除；`ApiClient.revokeDevice` 已就绪
-- [x] 撤销的客户端入口（TUI，2026-09-16）：`/devices` 列同空间全部设备（带序号、标注在线/已撤销）＋ `/revoke <序号|设备名>`（三重确认：选设备 → 输入 yes → 隐藏输入密保口令；按 `ESCROW_*` 失败码分别提示且均注明"未做任何改动"）；探针 `cli/test/revoke_command_check.py` 五条全过
+- [x] 撤销授权收口（2026-09-16）：`POST /devices/:id/revoke` —— **同 space 内可互撤 + 每次校验共享口令**（argon2id，复用取包的校验与失败限速；缺口令哈希 409 `PASSPHRASE_NOT_SET` 拒绝放行）；旧的免口令 `DELETE /devices/:id` 移除；`ApiClient.revokeDevice` 已就绪
+- [x] 撤销的客户端入口（TUI，2026-09-16）：`/devices` 列同空间全部设备（带序号、标注在线/已撤销）＋ `/revoke <序号|设备名>`（三重确认：选设备 → 输入 yes → 隐藏输入共享口令；按 `ESCROW_*` 失败码分别提示且均注明"未做任何改动"）；探针 `cli/test/revoke_command_check.py` 五条全过
 - [ ] 撤销的 **App** 入口（设备列表里的"撤销这台设备"）：同样要口令 + 二次确认（`ApiClient.revokeDevice` 已就绪）
 - [x] 备份与恢复（模型 A：本地加密备份 + 恢复码，shared backup.dart + CLI backup/restore）
 - [x] 安全测试 / 离线 / 网络故障 / 服务重启测试（phase4_e2e.sh 段 C/D/E/F 全过）
