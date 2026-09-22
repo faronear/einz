@@ -123,7 +123,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '随便输入的口令');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令错误：请确认首台设备创建时设置的口令'), findsOneWidget,
+    expect(find.text('口令错误：请确认首个入口创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
     expect(find.text('口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。'),
         findsOneWidget, reason: '应停留在口令页');
@@ -160,7 +160,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '随便输入的口令');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令错误：请确认首台设备创建时设置的口令'), findsOneWidget,
+    expect(find.text('口令错误：请确认首个入口创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
     expect(joinCalls, 0, reason: '验口令之前不应消费一次性 token');
 
@@ -205,7 +205,7 @@ void main() {
     expect(find.text('设置锁屏码'), findsWidgets, reason: '应再次放行进 PIN 步骤');
   });
 
-  testWidgets('邀请码验证通过后即锁定：退回本页再前进不重复校验', (WidgetTester tester) async {
+  testWidgets('令牌验证通过后即锁定：退回本页再前进不重复校验', (WidgetTester tester) async {
     var preflightCalls = 0;
     Future<SpaceJoinPreflight> fakePreflight(String token) async {
       preflightCalls++;
@@ -228,12 +228,12 @@ void main() {
     expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应放行到身份选择页');
     expect(preflightCalls, 1);
 
-    // 退回邀请码页：输入框应锁只读（防止改坏已验证的 token）
+    // 退回令牌页：输入框应锁只读（防止改坏已验证的 token）
     await tester.tap(find.text('上一步'));
     await tester.pumpAndSettle();
-    expect(find.text('TOKEN-1'), findsOneWidget, reason: '退回后仍显示原邀请码');
+    expect(find.text('TOKEN-1'), findsOneWidget, reason: '退回后仍显示原令牌');
     expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue,
-        reason: '已验证通过的邀请码应锁为只读');
+        reason: '已验证通过的令牌应锁为只读');
 
     // 再点下一步：不应再发后台校验（否则 token 被消费后必然失败，把用户卡死）
     await tester.tap(find.text('下一步'));
@@ -257,8 +257,8 @@ void main() {
     await tester.enterText(find.byType(TextField), '错误TOKEN');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('邀请码或链接无效'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
-    expect(find.text('验证邀请'), findsWidgets, reason: '应停留在 token 页（setupTokenTitle）');
+    expect(find.text('令牌无效'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
+    expect(find.text('验证令牌'), findsWidgets, reason: '应停留在 token 页（setupTokenTitle）');
     expect(find.text('验证密保口令'), findsNothing, reason: '不应进入口令页');
   });
 

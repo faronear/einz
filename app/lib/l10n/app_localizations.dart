@@ -167,7 +167,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEnrollBoundNotice.
   ///
   /// In en, this message translates to:
-  /// **'🎉 New device bound'**
+  /// **'🎉 New entrance opened'**
   String get setupEnrollBoundNotice;
 
   /// No description provided for @wizardStartTitle.
@@ -185,7 +185,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardDetectHint.
   ///
   /// In en, this message translates to:
-  /// **'Auto-detects if you\'re the first device'**
+  /// **'Auto-detects if this is the first entrance'**
   String get wizardDetectHint;
 
   /// No description provided for @wizardDetectFailed.
@@ -305,7 +305,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardInviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Any bound device can create an invitation (one-time, valid for 24 hours).'**
+  /// **'Any existing entrance can create a token (one-time, valid for 24 hours).'**
   String get wizardInviteHint;
 
   /// No description provided for @wizardRoleOffline.
@@ -401,7 +401,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardTitleInvite.
   ///
   /// In en, this message translates to:
-  /// **'Verify invitation'**
+  /// **'Verify token'**
   String get wizardTitleInvite;
 
   /// No description provided for @wizardTitlePassphrase.
@@ -437,7 +437,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
-  /// **'This server already has a space (created by another device). Use the Join flow with your partner\'s one-time invitation.'**
+  /// **'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time token.'**
   String get wizardEnrollExists;
 
   /// No description provided for @wizardEnrollGoJoin.
@@ -491,7 +491,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseWrong.
   ///
   /// In en, this message translates to:
-  /// **'Wrong passphrase: use the one set on the first device'**
+  /// **'Wrong passphrase: use the one set on the first entrance'**
   String get wizardJoinPassphraseWrong;
 
   /// No description provided for @wizardSwitchToEnvelope.
@@ -551,7 +551,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryHint.
   ///
   /// In en, this message translates to:
-  /// **'Create a secret space for two, or join an existing space via invitation.'**
+  /// **'Create a secret space for two, or join an existing space with a one-time token.'**
   String get setupEntryHint;
 
   /// No description provided for @setupEntryCreate.
@@ -581,55 +581,55 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenRateLimited.
   ///
   /// In en, this message translates to:
-  /// **'Too many requests — retry in {seconds}s (this is not a problem with the invitation)'**
+  /// **'Too many requests — retry in {seconds}s (this is not a problem with the token)'**
   String setupTokenRateLimited(String seconds);
 
   /// No description provided for @setupTokenRateLimitedNoWait.
   ///
   /// In en, this message translates to:
-  /// **'Too many requests — try again later (this is not a problem with the invitation)'**
+  /// **'Too many requests — try again later (this is not a problem with the token)'**
   String get setupTokenRateLimitedNoWait;
 
   /// No description provided for @setupTokenTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify invitation'**
+  /// **'Verify token'**
   String get setupTokenTitle;
 
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'An invitation is valid for one-time use within 24 hours.'**
+  /// **'A token is valid for one-time use within 24 hours.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste the invitation link or code'**
+  /// **'Paste the token'**
   String get setupTokenInputHint;
 
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the invitation code or link'**
+  /// **'Enter the token'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Invalid invitation'**
+  /// **'Invalid token'**
   String get setupTokenInvalid;
 
   /// No description provided for @setupTokenExpired.
   ///
   /// In en, this message translates to:
-  /// **'Invitation expired'**
+  /// **'Token expired'**
   String get setupTokenExpired;
 
   /// No description provided for @setupTokenUsed.
   ///
   /// In en, this message translates to:
-  /// **'Invitation already used'**
+  /// **'Token already used'**
   String get setupTokenUsed;
 
   /// No description provided for @setupTokenSpaceFull.
@@ -641,7 +641,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenOtherServer.
   ///
   /// In en, this message translates to:
-  /// **'the link is from {other} but this app is connected to {current} — both devices must use the same server'**
+  /// **'the token is from {other} but this app is connected to {current}; they cannot work with each other.'**
   String setupTokenOtherServer(String other, String current);
 
   /// No description provided for @setupTokenSpaceInfo.
@@ -659,13 +659,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupCreateShareTitle.
   ///
   /// In en, this message translates to:
-  /// **'Share the invitation with your partner (valid for 24 hours)'**
+  /// **'Send the token to your partner — or use it on another device of your own (valid for 24 hours)'**
   String get setupCreateShareTitle;
 
   /// No description provided for @setupCreateCopy.
   ///
   /// In en, this message translates to:
-  /// **'Copy invitation link'**
+  /// **'Copy token link'**
   String get setupCreateCopy;
 
   /// No description provided for @setupCreateCopied.
@@ -701,43 +701,43 @@ abstract class AppLocalizations {
   /// No description provided for @wizardEnvelopeWrong.
   ///
   /// In en, this message translates to:
-  /// **'Invalid key envelope: paste the full sealed copy from the other device'**
+  /// **'Invalid key envelope: paste the full sealed copy from another entrance'**
   String get wizardEnvelopeWrong;
 
   /// No description provided for @setupPageInviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste or type the invitation'**
+  /// **'Paste or type the token'**
   String get setupPageInviteHint;
 
   /// No description provided for @setupPageNeedInvite.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Enter the one-time invitation'**
+  /// **'⚠️ Enter the one-time token'**
   String get setupPageNeedInvite;
 
   /// No description provided for @setupPageScanInvite.
   ///
   /// In en, this message translates to:
-  /// **'Scan invitation QR code'**
+  /// **'Scan token QR code'**
   String get setupPageScanInvite;
 
   /// No description provided for @setupPageScannerHint.
   ///
   /// In en, this message translates to:
-  /// **'Point the camera at the invitation QR code'**
+  /// **'Point the camera at the token QR code'**
   String get setupPageScannerHint;
 
   /// No description provided for @wizardInviteWrong.
   ///
   /// In en, this message translates to:
-  /// **'Invalid invitation: use a one-time invitation from a bound device'**
+  /// **'Invalid token: use a one-time token from an existing entrance'**
   String get wizardInviteWrong;
 
   /// No description provided for @setupPageNoEscrow.
   ///
   /// In en, this message translates to:
-  /// **'❌ No escrow package on the server — set a passphrase on the other device first'**
+  /// **'❌ No escrow package on the server — set a passphrase on the first entrance first'**
   String get setupPageNoEscrow;
 
   /// No description provided for @setupPageEscrowFailed.
@@ -881,49 +881,49 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuInvite.
   ///
   /// In en, this message translates to:
-  /// **'Invitation'**
+  /// **'New entrance token'**
   String get chatPageMenuInvite;
 
   /// No description provided for @chatPageInviteDialogTitle.
   ///
   /// In en, this message translates to:
-  /// **'Invitation created'**
+  /// **'Token created'**
   String get chatPageInviteDialogTitle;
 
   /// No description provided for @chatPageInviteDialogHint.
   ///
   /// In en, this message translates to:
-  /// **'Invite a new device to this space. One-time use, valid for 24 hours.'**
+  /// **'A one-time token: it opens one new entrance to this space — for your partner, or another device of your own. Valid for 24 hours.'**
   String get chatPageInviteDialogHint;
 
   /// No description provided for @chatPageInviteCopyLinkTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy invitation link'**
+  /// **'Copy token link'**
   String get chatPageInviteCopyLinkTooltip;
 
   /// No description provided for @chatPageInviteCopyCodeTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy invitation code'**
+  /// **'Copy token'**
   String get chatPageInviteCopyCodeTooltip;
 
   /// No description provided for @chatPageInviteLinkCopied.
   ///
   /// In en, this message translates to:
-  /// **'Invitation link copied'**
+  /// **'Token link copied'**
   String get chatPageInviteLinkCopied;
 
   /// No description provided for @chatPageInviteCodeCopied.
   ///
   /// In en, this message translates to:
-  /// **'Invitation code copied'**
+  /// **'Token copied'**
   String get chatPageInviteCodeCopied;
 
   /// No description provided for @chatPageInviteFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to create the invitation: {error}'**
+  /// **'Failed to create the token: {error}'**
   String chatPageInviteFailed(String error);
 
   /// No description provided for @chatPageTitleBrand.
@@ -1001,19 +1001,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameDeviceTitle.
   ///
   /// In en, this message translates to:
-  /// **'This device in this space'**
+  /// **'This entrance in this space'**
   String get chatPageRenameDeviceTitle;
 
   /// No description provided for @chatPageRenameDeviceLabel.
   ///
   /// In en, this message translates to:
-  /// **'Name in this space'**
+  /// **'Name of this entrance'**
   String get chatPageRenameDeviceLabel;
 
   /// No description provided for @chatPageDeviceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'The name and public key belong to this space only — the same device has its own set in every space.'**
+  /// **'They belong to this entrance only — the same phone or computer has its own set in every space.'**
   String get chatPageDeviceScopeHint;
 
   /// No description provided for @chatPageRenameDeviceEmptyError.
@@ -1157,7 +1157,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseDone.
   ///
   /// In en, this message translates to:
-  /// **'✅ Passphrase updated — tell your partner; new devices must use the new one'**
+  /// **'✅ Passphrase updated — tell your partner; new entrances must use the new one'**
   String get chatPageChangePassphraseDone;
 
   /// No description provided for @chatPageChangePassphraseFailed.
@@ -1169,7 +1169,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEscrowRotatedNotice.
   ///
   /// In en, this message translates to:
-  /// **'Your partner reset the passphrase — use the new one to create invites or change it'**
+  /// **'Your partner reset the passphrase — use the new one to create tokens or change it'**
   String get chatPageEscrowRotatedNotice;
 
   /// No description provided for @chatPageMenuLocaleLabel.
@@ -1265,7 +1265,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuDeviceNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'Device name'**
+  /// **'Entrance name'**
   String get chatPageMenuDeviceNameLabel;
 
   /// No description provided for @chatPagePinLabel.
@@ -1409,7 +1409,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageDeviceUnrecognized.
   ///
   /// In en, this message translates to:
-  /// **'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared'**
+  /// **'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared'**
   String get chatPageDeviceUnrecognized;
 
   /// No description provided for @chatPageOfflineLocalOnly.
@@ -1595,13 +1595,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageDeviceRevoked.
   ///
   /// In en, this message translates to:
-  /// **'Device revoked — local data cleared, please set up again'**
+  /// **'Entrance revoked — local data cleared, please set up again'**
   String get chatPageDeviceRevoked;
 
   /// No description provided for @chatPageDevicePublicKeyLabel.
   ///
   /// In en, this message translates to:
-  /// **'Public key in this space'**
+  /// **'Public key of this entrance'**
   String get chatPageDevicePublicKeyLabel;
 
   /// No description provided for @chatPageDevicePublicKeyFailed.
@@ -1781,7 +1781,7 @@ abstract class AppLocalizations {
   /// No description provided for @resetDeviceServerResidualHint.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner\'s device list'**
+  /// **'⚠️ Local data erased, but retiring it on the server failed — this entrance may still show up in your partner\'s entrance list'**
   String get resetDeviceServerResidualHint;
 
   /// No description provided for @spaceListTitle.

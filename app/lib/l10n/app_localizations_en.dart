@@ -45,7 +45,7 @@ class AppLocalizationsEn extends AppLocalizations {
       '❗️ Enter the passphrase to verify';
 
   @override
-  String get setupEnrollBoundNotice => '🎉 New device bound';
+  String get setupEnrollBoundNotice => '🎉 New entrance opened';
 
   @override
   String get wizardStartTitle => 'Space setup';
@@ -54,7 +54,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardDetectTitle => 'Checking server status…';
 
   @override
-  String get wizardDetectHint => 'Auto-detects if you\'re the first device';
+  String get wizardDetectHint => 'Auto-detects if this is the first entrance';
 
   @override
   String get wizardDetectFailed => 'Cannot reach server — retrying…';
@@ -121,7 +121,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardInviteHint =>
-      'Any bound device can create an invitation (one-time, valid for 24 hours).';
+      'Any existing entrance can create a token (one-time, valid for 24 hours).';
 
   @override
   String get wizardRoleOffline => 'Import key envelope (offline)';
@@ -171,7 +171,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Space limit reached (server maxSpaces) — cannot create';
 
   @override
-  String get wizardTitleInvite => 'Verify invitation';
+  String get wizardTitleInvite => 'Verify token';
 
   @override
   String get wizardTitlePassphrase => 'Set passphrase';
@@ -190,7 +190,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      'This server already has a space (created by another device). Use the Join flow with your partner\'s one-time invitation.';
+      'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time token.';
 
   @override
   String get wizardEnrollGoJoin => 'Use Join flow';
@@ -223,7 +223,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseWrong =>
-      'Wrong passphrase: use the one set on the first device';
+      'Wrong passphrase: use the one set on the first entrance';
 
   @override
   String get wizardSwitchToEnvelope => 'Use key envelope instead (offline)';
@@ -258,7 +258,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Create a secret space for two, or join an existing space via invitation.';
+      'Create a secret space for two, or join an existing space with a one-time token.';
 
   @override
   String get setupEntryCreate => 'Create';
@@ -277,41 +277,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return 'Too many requests — retry in ${seconds}s (this is not a problem with the invitation)';
+    return 'Too many requests — retry in ${seconds}s (this is not a problem with the token)';
   }
 
   @override
   String get setupTokenRateLimitedNoWait =>
-      'Too many requests — try again later (this is not a problem with the invitation)';
+      'Too many requests — try again later (this is not a problem with the token)';
 
   @override
-  String get setupTokenTitle => 'Verify invitation';
+  String get setupTokenTitle => 'Verify token';
 
   @override
   String get setupTokenHint =>
-      'An invitation is valid for one-time use within 24 hours.';
+      'A token is valid for one-time use within 24 hours.';
 
   @override
-  String get setupTokenInputHint => 'Paste the invitation link or code';
+  String get setupTokenInputHint => 'Paste the token';
 
   @override
-  String get setupTokenNeedInput => 'Enter the invitation code or link';
+  String get setupTokenNeedInput => 'Enter the token';
 
   @override
-  String get setupTokenInvalid => 'Invalid invitation';
+  String get setupTokenInvalid => 'Invalid token';
 
   @override
-  String get setupTokenExpired => 'Invitation expired';
+  String get setupTokenExpired => 'Token expired';
 
   @override
-  String get setupTokenUsed => 'Invitation already used';
+  String get setupTokenUsed => 'Token already used';
 
   @override
   String get setupTokenSpaceFull => 'Space is full';
 
   @override
   String setupTokenOtherServer(String other, String current) {
-    return 'the link is from $other but this app is connected to $current — both devices must use the same server';
+    return 'the token is from $other but this app is connected to $current; they cannot work with each other.';
   }
 
   @override
@@ -325,10 +325,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupCreateShareTitle =>
-      'Share the invitation with your partner (valid for 24 hours)';
+      'Send the token to your partner — or use it on another device of your own (valid for 24 hours)';
 
   @override
-  String get setupCreateCopy => 'Copy invitation link';
+  String get setupCreateCopy => 'Copy token link';
 
   @override
   String get setupCreateCopied => 'Copied';
@@ -348,28 +348,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardEnvelopeWrong =>
-      'Invalid key envelope: paste the full sealed copy from the other device';
+      'Invalid key envelope: paste the full sealed copy from another entrance';
 
   @override
-  String get setupPageInviteHint => 'Paste or type the invitation';
+  String get setupPageInviteHint => 'Paste or type the token';
 
   @override
-  String get setupPageNeedInvite => '⚠️ Enter the one-time invitation';
+  String get setupPageNeedInvite => '⚠️ Enter the one-time token';
 
   @override
-  String get setupPageScanInvite => 'Scan invitation QR code';
+  String get setupPageScanInvite => 'Scan token QR code';
 
   @override
-  String get setupPageScannerHint =>
-      'Point the camera at the invitation QR code';
+  String get setupPageScannerHint => 'Point the camera at the token QR code';
 
   @override
   String get wizardInviteWrong =>
-      'Invalid invitation: use a one-time invitation from a bound device';
+      'Invalid token: use a one-time token from an existing entrance';
 
   @override
   String get setupPageNoEscrow =>
-      '❌ No escrow package on the server — set a passphrase on the other device first';
+      '❌ No escrow package on the server — set a passphrase on the first entrance first';
 
   @override
   String setupPageEscrowFailed(String error) {
@@ -454,30 +453,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.';
 
   @override
-  String get chatPageMenuInvite => 'Invitation';
+  String get chatPageMenuInvite => 'New entrance token';
 
   @override
-  String get chatPageInviteDialogTitle => 'Invitation created';
+  String get chatPageInviteDialogTitle => 'Token created';
 
   @override
   String get chatPageInviteDialogHint =>
-      'Invite a new device to this space. One-time use, valid for 24 hours.';
+      'A one-time token: it opens one new entrance to this space — for your partner, or another device of your own. Valid for 24 hours.';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => 'Copy invitation link';
+  String get chatPageInviteCopyLinkTooltip => 'Copy token link';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => 'Copy invitation code';
+  String get chatPageInviteCopyCodeTooltip => 'Copy token';
 
   @override
-  String get chatPageInviteLinkCopied => 'Invitation link copied';
+  String get chatPageInviteLinkCopied => 'Token link copied';
 
   @override
-  String get chatPageInviteCodeCopied => 'Invitation code copied';
+  String get chatPageInviteCodeCopied => 'Token copied';
 
   @override
   String chatPageInviteFailed(String error) {
-    return 'Failed to create the invitation: $error';
+    return 'Failed to create the token: $error';
   }
 
   @override
@@ -519,14 +518,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGenderLabel => 'Gender';
 
   @override
-  String get chatPageRenameDeviceTitle => 'This device in this space';
+  String get chatPageRenameDeviceTitle => 'This entrance in this space';
 
   @override
-  String get chatPageRenameDeviceLabel => 'Name in this space';
+  String get chatPageRenameDeviceLabel => 'Name of this entrance';
 
   @override
   String get chatPageDeviceScopeHint =>
-      'The name and public key belong to this space only — the same device has its own set in every space.';
+      'They belong to this entrance only — the same phone or computer has its own set in every space.';
 
   @override
   String get chatPageRenameDeviceEmptyError => 'Name cannot be empty';
@@ -610,7 +609,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseDone =>
-      '✅ Passphrase updated — tell your partner; new devices must use the new one';
+      '✅ Passphrase updated — tell your partner; new entrances must use the new one';
 
   @override
   String chatPageChangePassphraseFailed(String error) {
@@ -619,7 +618,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEscrowRotatedNotice =>
-      'Your partner reset the passphrase — use the new one to create invites or change it';
+      'Your partner reset the passphrase — use the new one to create tokens or change it';
 
   @override
   String get chatPageMenuLocaleLabel => 'Language';
@@ -672,7 +671,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMyNameLabel => 'My name';
 
   @override
-  String get chatPageMenuDeviceNameLabel => 'Device name';
+  String get chatPageMenuDeviceNameLabel => 'Entrance name';
 
   @override
   String get chatPagePinLabel => 'PIN';
@@ -752,7 +751,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageDeviceUnrecognized =>
-      'This device is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
+      'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
 
   @override
   String get chatPageOfflineLocalOnly =>
@@ -865,10 +864,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageDeviceRevoked =>
-      'Device revoked — local data cleared, please set up again';
+      'Entrance revoked — local data cleared, please set up again';
 
   @override
-  String get chatPageDevicePublicKeyLabel => 'Public key in this space';
+  String get chatPageDevicePublicKeyLabel => 'Public key of this entrance';
 
   @override
   String get chatPageDevicePublicKeyFailed => 'Not recorded';
@@ -971,7 +970,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetDeviceServerResidualHint =>
-      '⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner\'s device list';
+      '⚠️ Local data erased, but retiring it on the server failed — this entrance may still show up in your partner\'s entrance list';
 
   @override
   String get spaceListTitle => 'My spaces';

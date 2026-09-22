@@ -43,7 +43,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinPassphraseRequired => '❗️ 请输入密保口令进行验证';
 
   @override
-  String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
+  String get setupEnrollBoundNotice => '🎉 新入口已开通';
 
   @override
   String get wizardStartTitle => '秘境向导';
@@ -52,7 +52,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardDetectTitle => '正在检测服务器状态…';
 
   @override
-  String get wizardDetectHint => '自动判断是否全秘境里的首个设备';
+  String get wizardDetectHint => '自动判断是否全秘境里的首个入口';
 
   @override
   String get wizardDetectFailed => '暂时无法连接服务器，正在自动重试…';
@@ -116,7 +116,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardIdentityFirst => '⚠️ 选择我的身份';
 
   @override
-  String get wizardInviteHint => '邀请可由任意一个已绑定设备生成，24 小时内一次性有效。';
+  String get wizardInviteHint => '令牌可由任意一个已开通的入口生成，24 小时内一次性有效。';
 
   @override
   String get wizardRoleOffline => '导入线下密保信封';
@@ -164,7 +164,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSpaceLimit => '空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间';
 
   @override
-  String get wizardTitleInvite => '验证邀请';
+  String get wizardTitleInvite => '验证令牌';
 
   @override
   String get wizardTitlePassphrase => '设置密保口令';
@@ -182,7 +182,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleIdentity => '我是';
 
   @override
-  String get wizardEnrollExists => '该服务器已有空间（由其他设备创建）。请改用“加入”向导，凭对方提供的一次性邀请加入。';
+  String get wizardEnrollExists =>
+      '该服务器已有空间（由另一个入口创建）。请改用“加入”向导，凭对方提供的一次性令牌加入。';
 
   @override
   String get wizardEnrollGoJoin => '改用“加入”向导';
@@ -212,7 +213,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinPassphraseHint => '口令是与伴侣共享的密码，用于保护私密消息。如果不知道口令，请询问伴侣。';
 
   @override
-  String get wizardJoinPassphraseWrong => '口令错误：请确认首台设备创建时设置的口令';
+  String get wizardJoinPassphraseWrong => '口令错误：请确认首个入口创建时设置的口令';
 
   @override
   String get wizardSwitchToEnvelope => '改用线下密保信封';
@@ -262,39 +263,39 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return '请求太频繁：请 $seconds 秒后再试（这不是邀请本身的问题）';
+    return '请求太频繁：请 $seconds 秒后再试（这不是令牌本身的问题）';
   }
 
   @override
-  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是邀请本身的问题）';
+  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是令牌本身的问题）';
 
   @override
-  String get setupTokenTitle => '验证邀请';
+  String get setupTokenTitle => '验证令牌';
 
   @override
-  String get setupTokenHint => '填写邀请，24 小时内一次性有效';
+  String get setupTokenHint => '填写令牌，24 小时内一次性有效';
 
   @override
-  String get setupTokenInputHint => '邀请链接或邀请码';
+  String get setupTokenInputHint => '填写令牌';
 
   @override
-  String get setupTokenNeedInput => '请填写邀请码或邀请链接';
+  String get setupTokenNeedInput => '请填写令牌';
 
   @override
-  String get setupTokenInvalid => '邀请码或链接无效';
+  String get setupTokenInvalid => '令牌无效';
 
   @override
-  String get setupTokenExpired => '邀请已过期';
+  String get setupTokenExpired => '令牌已过期';
 
   @override
-  String get setupTokenUsed => '邀请已被使用';
+  String get setupTokenUsed => '令牌已被使用';
 
   @override
   String get setupTokenSpaceFull => '空间已满';
 
   @override
   String setupTokenOtherServer(String other, String current) {
-    return '该邀请链接来自 $other，本机连的是 $current——两台设备需要连同一台服务器';
+    return '该令牌来自 $other，本机连的是 $current，不能混用';
   }
 
   @override
@@ -306,10 +307,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenSpacePrivate => '加入私密空间（等待第二位成员）';
 
   @override
-  String get setupCreateShareTitle => '把邀请转发给伴侣';
+  String get setupCreateShareTitle => '把令牌发给对方（也可用在自己的另一台设备上）';
 
   @override
-  String get setupCreateCopy => '复制邀请链接';
+  String get setupCreateCopy => '复制令牌链接';
 
   @override
   String get setupCreateCopied => '已复制';
@@ -330,19 +331,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnvelopeWrong => '密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴';
 
   @override
-  String get setupPageInviteHint => '输入邀请';
+  String get setupPageInviteHint => '输入令牌';
 
   @override
-  String get setupPageNeedInvite => '⚠️ 填写一次性邀请';
+  String get setupPageNeedInvite => '⚠️ 填写一次性令牌';
 
   @override
-  String get setupPageScanInvite => '扫码填入邀请';
+  String get setupPageScanInvite => '扫码填入令牌';
 
   @override
-  String get setupPageScannerHint => '把邀请二维码对准取景框';
+  String get setupPageScannerHint => '把令牌二维码对准取景框';
 
   @override
-  String get wizardInviteWrong => '邀请无效。请使用任意一个已绑定设备生成的 24 小时一次性邀请。';
+  String get wizardInviteWrong => '令牌无效。请使用任意一个已开通的入口生成的 24 小时一次性令牌。';
 
   @override
   String get setupPageNoEscrow => '❌ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。';
@@ -424,29 +425,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockMessage => '新锁屏码留空 = 清空锁屏码。确定要清除吗？清除后下次启动直接进入聊天。';
 
   @override
-  String get chatPageMenuInvite => '邀请';
+  String get chatPageMenuInvite => '新入口令牌';
 
   @override
-  String get chatPageInviteDialogTitle => '邀请已生成';
+  String get chatPageInviteDialogTitle => '令牌已生成';
 
   @override
-  String get chatPageInviteDialogHint => '邀请新设备加入当前秘境。24 小时内一次性有效。';
+  String get chatPageInviteDialogHint =>
+      '一次性令牌：凭它可以开通一个新入口（给对方，也可给自己的另一台设备）。24 小时内有效。';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
+  String get chatPageInviteCopyLinkTooltip => '复制令牌链接';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => '复制邀请码';
+  String get chatPageInviteCopyCodeTooltip => '复制令牌';
 
   @override
-  String get chatPageInviteLinkCopied => '邀请链接已复制';
+  String get chatPageInviteLinkCopied => '令牌链接已复制';
 
   @override
-  String get chatPageInviteCodeCopied => '邀请码已复制';
+  String get chatPageInviteCodeCopied => '令牌已复制';
 
   @override
   String chatPageInviteFailed(String error) {
-    return '邀请生成失败: $error';
+    return '令牌生成失败: $error';
   }
 
   @override
@@ -488,13 +490,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
-  String get chatPageRenameDeviceTitle => '本机信息（本秘境）';
+  String get chatPageRenameDeviceTitle => '入口信息（本秘境）';
 
   @override
-  String get chatPageRenameDeviceLabel => '本秘境里的名称';
+  String get chatPageRenameDeviceLabel => '入口名称';
 
   @override
-  String get chatPageDeviceScopeHint => '名称与公钥都属于当前秘境——同一台设备在别的秘境是另一套。';
+  String get chatPageDeviceScopeHint => '这个入口的名称与公钥只属于当前秘境——同一台机器在别的秘境是另一套入口。';
 
   @override
   String get chatPageRenameDeviceEmptyError => '名称不能为空';
@@ -631,7 +633,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
-  String get chatPageMenuDeviceNameLabel => '本机名称';
+  String get chatPageMenuDeviceNameLabel => '入口名称';
 
   @override
   String get chatPagePinLabel => '锁屏码';
@@ -646,7 +648,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinUnsetValue => '未设置';
 
   @override
-  String get chatPageBurnHeading => '阅后即焚（仅本设备生效）';
+  String get chatPageBurnHeading => '阅后即焚（仅本机生效）';
 
   @override
   String get chatPageBurnOff => '阅后即焚已关闭（消息永久保留）';
@@ -673,7 +675,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageDeleteConfirmMessage =>
-      '删除后仅在本机消失，对方设备不受影响，且无法恢复。确定删除这条消息吗？';
+      '删除后仅在本机消失，对方不受影响，且无法恢复。确定删除这条消息吗？';
 
   @override
   String get chatPageDeleteCancel => '取消';
@@ -711,7 +713,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageDeviceUnrecognized =>
-      '本设备未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
+      '这个入口未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
 
   @override
   String get chatPageOfflineLocalOnly => '离线 · 仅可查看本地消息，无法收发';
@@ -820,10 +822,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageDeviceRevoked => '本设备已被撤销，本地数据已清除，请重新配置';
+  String get chatPageDeviceRevoked => '这个入口已被撤销，本地数据已清除，请重新配置';
 
   @override
-  String get chatPageDevicePublicKeyLabel => '本秘境里的公钥';
+  String get chatPageDevicePublicKeyLabel => '入口公钥';
 
   @override
   String get chatPageDevicePublicKeyFailed => '未记录';
@@ -906,7 +908,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      '将退出这个空间，并清除本设备上属于它的聊天记录与密钥。\n\n其他空间不受影响；秘境本身与服务器上的数据仍保留。\n\n此操作无法撤销！';
+      '将退出这个空间，并清除本机上属于它的聊天记录与密钥。\n\n其他空间不受影响；秘境本身与服务器上的数据仍保留。\n\n此操作无法撤销！';
 
   @override
   String resetDeviceNameLabel(String name) {
@@ -920,11 +922,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resetDeviceConfirmWord => '重置';
 
   @override
-  String get resetDevicePinLabel => '本设备锁屏码';
+  String get resetDevicePinLabel => '本机锁屏码';
 
   @override
   String get resetDeviceServerResidualHint =>
-      '⚠️ 本地数据已清除，但服务端退役未完成——对方的设备列表里可能仍留有这台设备';
+      '⚠️ 本地数据已清除，但服务端退役未完成——对方的入口列表里可能仍留有这个入口';
 
   @override
   String get spaceListTitle => '我的空间';

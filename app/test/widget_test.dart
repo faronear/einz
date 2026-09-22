@@ -81,8 +81,8 @@ void main() {
     await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
 
-    // join token 输入页（标题 setupTokenTitle「验证邀请码」+ 扫码）
-    expect(find.text('验证邀请'), findsOneWidget);
+    // join token 输入页（标题 setupTokenTitle「验证令牌」+ 扫码）
+    expect(find.text('验证令牌'), findsOneWidget);
     expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
   });
 
@@ -109,10 +109,10 @@ void main() {
     expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
   });
 
-  testWidgets('join：RATE_LIMITED 不能算到邀请头上，要说出要等多久', (WidgetTester tester) async {
+  testWidgets('join：RATE_LIMITED 不能算到令牌头上，要说出要等多久', (WidgetTester tester) async {
     // 老板 2026-09-22 实测：两台模拟器都是最新包，加入仍报 "Invalid invitation
     // (RATE_LIMITED)"。真因是**同一 IP 上有别的客户端在死循环重新认证**，把服务端的
-    // auth 配额（60 次 / 5 分钟）吃光了，邀请加入被连坐。把它显示成"邀请无效"会把
+    // auth 配额（60 次 / 5 分钟）吃光了，令牌加入被连坐。把它显示成"令牌无效"会把
     // 排查彻底引偏——必须单列，并把等待秒数说出来。
     await tester.pumpWidget(wrapApp(
       preflightOverride: (token) async => throw ApiException(
@@ -126,14 +126,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('61'), findsOneWidget, reason: '应报出还要等多少秒');
-    expect(find.textContaining('不是邀请本身的问题'), findsOneWidget,
-        reason: '必须说明这不是邀请的问题');
-    expect(find.text('邀请码或链接无效'), findsNothing, reason: '不能伪装成邀请无效');
+    expect(find.textContaining('不是令牌本身的问题'), findsOneWidget,
+        reason: '必须说明这不是令牌的问题');
+    expect(find.text('令牌无效'), findsNothing, reason: '不能伪装成令牌无效');
   });
 
-  testWidgets('join：TOKEN_INVALID + 外域邀请链接 → 报错带出两个域名（跨服务器）',
+  testWidgets('join：TOKEN_INVALID + 外域令牌链接 → 报错带出两个域名（跨服务器）',
       (WidgetTester tester) async {
-    // 老板 2026-09-22 实测：iOS 生成邀请、Android 使用 → 报"邀请链接无效"。
+    // 老板 2026-09-22 实测：iOS 生成令牌、Android 使用 → 报"令牌链接无效"。
     // 客户端解析（粘贴完整链接/扫码）已核正确，最常见的真实成因是**两台设备连的不是
     // 同一台服务器** → 报错必须把域名说出来，否则只能对着"无效"猜。
     await tester.pumpWidget(wrapApp(

@@ -9,8 +9,8 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-/// 邀请码弹窗布局回归测试（2026-09-08 老板真机报告：app 使用一段时间后点
-/// 菜单生成邀请码，经常整个屏幕变暗但弹窗不出现，flutter run 报
+/// 令牌弹窗布局回归测试（2026-09-08 老板真机报告：app 使用一段时间后点
+/// 菜单生成令牌，经常整个屏幕变暗但弹窗不出现，flutter run 报
 /// RenderIntrinsicWidth / RenderBox was not laid out 连锁异常；且弹窗里的
 /// 二维码从未显示过）。
 ///
@@ -54,7 +54,7 @@ class _InviteFakeApi extends ApiClient {
 }
 
 void main() {
-  testWidgets('邀请码弹窗：首帧不抛布局异常且二维码真实可见', (WidgetTester tester) async {
+  testWidgets('令牌弹窗：首帧不抛布局异常且二维码真实可见', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await tester.pumpWidget(MaterialApp(
@@ -74,10 +74,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100)); // 初始加载（空历史）
 
-    // 菜单 → 邀请码
+    // 菜单 → 新入口令牌
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('邀请'));
+    await tester.tap(find.text('新入口令牌'));
     // 菜单 pop 后延迟 300ms 才打开弹窗（chat_page onSelected 设计），
     // 随后 createJoinToken（fake 瞬时返回）→ showDialog
     await tester.pump(const Duration(milliseconds: 350));
@@ -87,8 +87,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 弹窗内容齐全
-    expect(find.text('邀请已生成'), findsOneWidget);
-    // 邀请链接（SelectableText 主展示）+ token（次级小字）
+    expect(find.text('令牌已生成'), findsOneWidget);
+    // 令牌链接（SelectableText 主展示）+ token（次级小字）
     expect(find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
         findsWidgets);
     expect(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), findsWidgets);
