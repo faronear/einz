@@ -8300,3 +8300,26 @@ D5 等 M3 收尾且多空间上线稳定后再执行。另留 **D6**（我的倾
 
 两台模拟器各自连的是哪台服务器？（App「关于秘境」页会显示地址。）若确实一台连开发
 服务器、一台连生产，则现象完全解释得通、且不是代码 bug；新报错文案会直接把域名说出来。
+
+### 续：邀请文案统一为 invitation；真因确认 = 安卓没更新
+
+老板确认：**Android 模拟器连 `10.0.2.2:3000`、iOS 模拟器连 `localhost:3000`**（同一台开发
+服务器），并说"安卓我没更新"——**真因就是旧安卓包**：服务端按协议版本把它的请求挡回来
+（400 `PROTOCOL_VERSION_MISMATCH`），而旧代码把这个码显示成"邀请无效"，把排查引偏了。
+（`/health` 不受协议版本校验，所以旧包能过探测、一路走到邀请页才失败——现象因此看起来
+像"只是邀请有问题"。）
+
+**文案统一成 invitation**（老板要求；zh 同步为「邀请」）：
+`chatPageMenuInvite` 邀请码→**邀请**、`chatPageInviteDialogTitle` 邀请码已生成→**邀请已生成**、
+`wizardTitleInvite`/`setupTokenTitle` 验证邀请码→**验证邀请**、`setupTokenHint`/`InputHint`/
+`setupPageInviteHint`/`setupPageNeedInvite`/`setupPageScanInvite`/`setupPageScannerHint`、
+`wizardInviteHint`/`wizardEnrollExists`/`wizardInviteWrong`、`setupCreateShareTitle`/
+`setupCreateCopy`、`chatPageInviteCopy*`/`*Copied`/`chatPageInviteFailed`
+—— 共 ~20 处（en 用 invitation/umbrella，只在特指某一形式时保留 link / code / QR）。
+
+**新增反向提示** `setupTokenAppTooOld(code)`：`PROTOCOL_VERSION_MISMATCH` → 「本机 App 版本
+过旧，与服务器对不上（{code}）——请更新 App 后重试」。此前只有"服务器过旧"
+（`setupEntryLegacyServer`）的提示，没有反过来的这一档——而这次踩的正是这一档。
+
+测试：3 个测试文件断言随文案更新（invite_dialog_layout / setup_join_passphrase / widget_test）；
+全量 `flutter test` **170 通过 0 失败**（1 跳过）；`flutter analyze` 无 issue。

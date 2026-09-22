@@ -82,7 +82,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // join token 输入页（标题 setupTokenTitle「验证邀请码」+ 扫码）
-    expect(find.text('验证邀请码'), findsOneWidget);
+    expect(find.text('验证邀请'), findsOneWidget);
     expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
   });
 

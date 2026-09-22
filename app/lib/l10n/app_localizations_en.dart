@@ -121,7 +121,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardInviteHint =>
-      'Any bound device can generate an invite code (one-time, valid 24h).';
+      'Any bound device can create an invitation (one-time, valid for 24 hours).';
 
   @override
   String get wizardRoleOffline => 'Import key envelope (offline)';
@@ -171,7 +171,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Space limit reached (server maxSpaces) — cannot create';
 
   @override
-  String get wizardTitleInvite => 'Verify invite code';
+  String get wizardTitleInvite => 'Verify invitation';
 
   @override
   String get wizardTitlePassphrase => 'Set passphrase';
@@ -190,7 +190,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      'This server already has a space (created by another device). Use the Join flow with your partner\'s one-time invite code.';
+      'This server already has a space (created by another device). Use the Join flow with your partner\'s one-time invitation.';
 
   @override
   String get wizardEnrollGoJoin => 'Use Join flow';
@@ -271,14 +271,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Server version too old — please upgrade';
 
   @override
-  String get setupTokenTitle => 'Verify invite link';
+  String setupTokenAppTooOld(String code) {
+    return 'This app is too old for the server ($code) — please update the app and try again';
+  }
 
   @override
-  String get setupTokenHint =>
-      'Ask the creator for a one-time invite link or code';
+  String get setupTokenTitle => 'Verify invitation';
 
   @override
-  String get setupTokenInputHint => 'Paste the invite link or code';
+  String get setupTokenHint => 'Ask the creator for a one-time invitation';
+
+  @override
+  String get setupTokenInputHint => 'Paste the invitation link or code';
 
   @override
   String get setupTokenNeedInput => 'Enter the invitation code or link';
@@ -311,10 +315,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupCreateShareTitle =>
-      'Share invite link with partner (valid 24h)';
+      'Share the invitation with your partner (valid for 24 hours)';
 
   @override
-  String get setupCreateCopy => 'Copy invite link';
+  String get setupCreateCopy => 'Copy invitation link';
 
   @override
   String get setupCreateCopied => 'Copied';
@@ -337,20 +341,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Invalid key envelope: paste the full sealed copy from the other device';
 
   @override
-  String get setupPageInviteHint => 'Paste or type the invite code';
+  String get setupPageInviteHint => 'Paste or type the invitation';
 
   @override
-  String get setupPageNeedInvite => '⚠️ Enter the one-time invite code';
+  String get setupPageNeedInvite => '⚠️ Enter the one-time invitation';
 
   @override
-  String get setupPageScanInvite => 'Scan invite QR';
+  String get setupPageScanInvite => 'Scan invitation QR code';
 
   @override
-  String get setupPageScannerHint => 'Point the camera at the invite QR code';
+  String get setupPageScannerHint =>
+      'Point the camera at the invitation QR code';
 
   @override
   String get wizardInviteWrong =>
-      'Invalid invite code: use a one-time code from a bound device';
+      'Invalid invitation: use a one-time invitation from a bound device';
 
   @override
   String get setupPageNoEscrow =>
@@ -439,30 +444,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.';
 
   @override
-  String get chatPageMenuInvite => 'Invite code';
+  String get chatPageMenuInvite => 'Invitation';
 
   @override
-  String get chatPageInviteDialogTitle => 'Invite code generated';
+  String get chatPageInviteDialogTitle => 'Invitation created';
 
   @override
   String get chatPageInviteDialogHint =>
       'Invite a new device to this space. One-time use, valid for 24 hours.';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
+  String get chatPageInviteCopyLinkTooltip => 'Copy invitation link';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => 'Copy invite code';
+  String get chatPageInviteCopyCodeTooltip => 'Copy invitation code';
 
   @override
-  String get chatPageInviteLinkCopied => 'Invite link copied';
+  String get chatPageInviteLinkCopied => 'Invitation link copied';
 
   @override
-  String get chatPageInviteCodeCopied => 'Invite code copied';
+  String get chatPageInviteCodeCopied => 'Invitation code copied';
 
   @override
   String chatPageInviteFailed(String error) {
-    return 'Failed to generate invite code: $error';
+    return 'Failed to create the invitation: $error';
   }
 
   @override

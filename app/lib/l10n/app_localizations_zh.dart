@@ -116,7 +116,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardIdentityFirst => '⚠️ 选择我的身份';
 
   @override
-  String get wizardInviteHint => '邀请码可由任意一个已绑定设备生成，24 小时内一次性有效。';
+  String get wizardInviteHint => '邀请可由任意一个已绑定设备生成，24 小时内一次性有效。';
 
   @override
   String get wizardRoleOffline => '导入线下密保信封';
@@ -164,7 +164,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSpaceLimit => '空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间';
 
   @override
-  String get wizardTitleInvite => '验证邀请码';
+  String get wizardTitleInvite => '验证邀请';
 
   @override
   String get wizardTitlePassphrase => '设置密保口令';
@@ -182,8 +182,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleIdentity => '我是';
 
   @override
-  String get wizardEnrollExists =>
-      '该服务器已有空间（由其他设备创建）。请改用“加入”向导，凭对方提供的一次性邀请码加入。';
+  String get wizardEnrollExists => '该服务器已有空间（由其他设备创建）。请改用“加入”向导，凭对方提供的一次性邀请加入。';
 
   @override
   String get wizardEnrollGoJoin => '改用“加入”向导';
@@ -257,13 +256,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryLegacyServer => '服务器版本过低，请升级后再使用';
 
   @override
-  String get setupTokenTitle => '验证邀请码';
+  String setupTokenAppTooOld(String code) {
+    return '本机 App 版本过旧，与服务器对不上（$code）——请更新 App 后重试';
+  }
 
   @override
-  String get setupTokenHint => '填写邀请码，24小时内一次性有效';
+  String get setupTokenTitle => '验证邀请';
 
   @override
-  String get setupTokenInputHint => '邀请码';
+  String get setupTokenHint => '填写邀请，24 小时内一次性有效';
+
+  @override
+  String get setupTokenInputHint => '邀请链接或邀请码';
 
   @override
   String get setupTokenNeedInput => '请填写邀请码或邀请链接';
@@ -294,7 +298,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenSpacePrivate => '加入私密空间（等待第二位成员）';
 
   @override
-  String get setupCreateShareTitle => '转发邀请链接给伴侣';
+  String get setupCreateShareTitle => '把邀请转发给伴侣';
 
   @override
   String get setupCreateCopy => '复制邀请链接';
@@ -318,19 +322,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnvelopeWrong => '密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴';
 
   @override
-  String get setupPageInviteHint => '输入邀请码';
+  String get setupPageInviteHint => '输入邀请';
 
   @override
-  String get setupPageNeedInvite => '⚠️ 填写一次性邀请码';
+  String get setupPageNeedInvite => '⚠️ 填写一次性邀请';
 
   @override
-  String get setupPageScanInvite => '扫码填入邀请码';
+  String get setupPageScanInvite => '扫码填入邀请';
 
   @override
-  String get setupPageScannerHint => '将邀请码二维码对准取景框';
+  String get setupPageScannerHint => '把邀请二维码对准取景框';
 
   @override
-  String get wizardInviteWrong => '邀请码无效。请使用任意一个已绑定设备生成的24小时一次性邀请码。';
+  String get wizardInviteWrong => '邀请无效。请使用任意一个已绑定设备生成的 24 小时一次性邀请。';
 
   @override
   String get setupPageNoEscrow => '❌ 找不到受托管的口令密保箱，无法凭口令加入。请尝试其他方式。';
@@ -412,10 +416,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockMessage => '新锁屏码留空 = 清空锁屏码。确定要清除吗？清除后下次启动直接进入聊天。';
 
   @override
-  String get chatPageMenuInvite => '邀请码';
+  String get chatPageMenuInvite => '邀请';
 
   @override
-  String get chatPageInviteDialogTitle => '邀请码已生成';
+  String get chatPageInviteDialogTitle => '邀请已生成';
 
   @override
   String get chatPageInviteDialogHint => '邀请新设备加入当前秘境。24 小时内一次性有效。';
@@ -434,7 +438,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageInviteFailed(String error) {
-    return '邀请码生成失败: $error';
+    return '邀请生成失败: $error';
   }
 
   @override

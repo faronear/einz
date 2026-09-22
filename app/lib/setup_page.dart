@@ -1681,6 +1681,11 @@ class _SetupPageState extends State<SetupPage> {
         return l10n.setupTokenUsed;
       case 'SPACE_FULL':
         return l10n.setupTokenSpaceFull;
+      case 'PROTOCOL_VERSION_MISMATCH':
+        // 反向于 setupEntryLegacyServer：**本机 App 过旧**（服务器按版本把请求挡了）。
+        // 老板 2026-09-22 实测踩到：Android 模拟器跑的是没更新的旧包，请求全被 400
+        // 挡掉，而旧代码把它显示成"邀请无效"，白查了半天。
+        return l10n.setupTokenAppTooOld(code);
       case 'TOKEN_INVALID':
         final other = _linkHost(raw);
         final mine = Uri.tryParse(effectiveServer)?.host ?? '';

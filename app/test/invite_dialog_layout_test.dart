@@ -77,7 +77,7 @@ void main() {
     // 菜单 → 邀请码
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('邀请码'));
+    await tester.tap(find.text('邀请'));
     // 菜单 pop 后延迟 300ms 才打开弹窗（chat_page onSelected 设计），
     // 随后 createJoinToken（fake 瞬时返回）→ showDialog
     await tester.pump(const Duration(milliseconds: 350));
@@ -87,7 +87,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 弹窗内容齐全
-    expect(find.text('邀请码已生成'), findsOneWidget);
+    expect(find.text('邀请已生成'), findsOneWidget);
     // 邀请链接（SelectableText 主展示）+ token（次级小字）
     expect(find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
         findsWidgets);

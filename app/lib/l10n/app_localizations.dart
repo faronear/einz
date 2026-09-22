@@ -305,7 +305,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardInviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Any bound device can generate an invite code (one-time, valid 24h).'**
+  /// **'Any bound device can create an invitation (one-time, valid for 24 hours).'**
   String get wizardInviteHint;
 
   /// No description provided for @wizardRoleOffline.
@@ -401,7 +401,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardTitleInvite.
   ///
   /// In en, this message translates to:
-  /// **'Verify invite code'**
+  /// **'Verify invitation'**
   String get wizardTitleInvite;
 
   /// No description provided for @wizardTitlePassphrase.
@@ -437,7 +437,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
-  /// **'This server already has a space (created by another device). Use the Join flow with your partner\'s one-time invite code.'**
+  /// **'This server already has a space (created by another device). Use the Join flow with your partner\'s one-time invitation.'**
   String get wizardEnrollExists;
 
   /// No description provided for @wizardEnrollGoJoin.
@@ -572,22 +572,28 @@ abstract class AppLocalizations {
   /// **'Server version too old — please upgrade'**
   String get setupEntryLegacyServer;
 
+  /// No description provided for @setupTokenAppTooOld.
+  ///
+  /// In en, this message translates to:
+  /// **'This app is too old for the server ({code}) — please update the app and try again'**
+  String setupTokenAppTooOld(String code);
+
   /// No description provided for @setupTokenTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify invite link'**
+  /// **'Verify invitation'**
   String get setupTokenTitle;
 
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'Ask the creator for a one-time invite link or code'**
+  /// **'Ask the creator for a one-time invitation'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste the invite link or code'**
+  /// **'Paste the invitation link or code'**
   String get setupTokenInputHint;
 
   /// No description provided for @setupTokenNeedInput.
@@ -641,13 +647,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupCreateShareTitle.
   ///
   /// In en, this message translates to:
-  /// **'Share invite link with partner (valid 24h)'**
+  /// **'Share the invitation with your partner (valid for 24 hours)'**
   String get setupCreateShareTitle;
 
   /// No description provided for @setupCreateCopy.
   ///
   /// In en, this message translates to:
-  /// **'Copy invite link'**
+  /// **'Copy invitation link'**
   String get setupCreateCopy;
 
   /// No description provided for @setupCreateCopied.
@@ -689,31 +695,31 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageInviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste or type the invite code'**
+  /// **'Paste or type the invitation'**
   String get setupPageInviteHint;
 
   /// No description provided for @setupPageNeedInvite.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Enter the one-time invite code'**
+  /// **'⚠️ Enter the one-time invitation'**
   String get setupPageNeedInvite;
 
   /// No description provided for @setupPageScanInvite.
   ///
   /// In en, this message translates to:
-  /// **'Scan invite QR'**
+  /// **'Scan invitation QR code'**
   String get setupPageScanInvite;
 
   /// No description provided for @setupPageScannerHint.
   ///
   /// In en, this message translates to:
-  /// **'Point the camera at the invite QR code'**
+  /// **'Point the camera at the invitation QR code'**
   String get setupPageScannerHint;
 
   /// No description provided for @wizardInviteWrong.
   ///
   /// In en, this message translates to:
-  /// **'Invalid invite code: use a one-time code from a bound device'**
+  /// **'Invalid invitation: use a one-time invitation from a bound device'**
   String get wizardInviteWrong;
 
   /// No description provided for @setupPageNoEscrow.
@@ -863,13 +869,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuInvite.
   ///
   /// In en, this message translates to:
-  /// **'Invite code'**
+  /// **'Invitation'**
   String get chatPageMenuInvite;
 
   /// No description provided for @chatPageInviteDialogTitle.
   ///
   /// In en, this message translates to:
-  /// **'Invite code generated'**
+  /// **'Invitation created'**
   String get chatPageInviteDialogTitle;
 
   /// No description provided for @chatPageInviteDialogHint.
@@ -881,31 +887,31 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCopyLinkTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy invite link'**
+  /// **'Copy invitation link'**
   String get chatPageInviteCopyLinkTooltip;
 
   /// No description provided for @chatPageInviteCopyCodeTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy invite code'**
+  /// **'Copy invitation code'**
   String get chatPageInviteCopyCodeTooltip;
 
   /// No description provided for @chatPageInviteLinkCopied.
   ///
   /// In en, this message translates to:
-  /// **'Invite link copied'**
+  /// **'Invitation link copied'**
   String get chatPageInviteLinkCopied;
 
   /// No description provided for @chatPageInviteCodeCopied.
   ///
   /// In en, this message translates to:
-  /// **'Invite code copied'**
+  /// **'Invitation code copied'**
   String get chatPageInviteCodeCopied;
 
   /// No description provided for @chatPageInviteFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to generate invite code: {error}'**
+  /// **'Failed to create the invitation: {error}'**
   String chatPageInviteFailed(String error);
 
   /// No description provided for @chatPageTitleBrand.
