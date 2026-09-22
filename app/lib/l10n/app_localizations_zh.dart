@@ -276,7 +276,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenHint => '填写令牌，24 小时内一次性有效';
 
   @override
-  String get setupTokenInputHint => '填写令牌';
+  String get setupTokenInputHint => '填写令牌或邀请链接';
 
   @override
   String get setupTokenNeedInput => '请填写令牌';
@@ -295,7 +295,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupTokenOtherServer(String other, String current) {
-    return '该令牌来自 $other，本机连的是 $current，不能混用';
+    return '该邀请链接来自 $other，本机连的是 $current，不能混用';
   }
 
   @override
@@ -310,7 +310,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupCreateShareTitle => '把令牌发给对方（也可用在自己的另一台设备上）';
 
   @override
-  String get setupCreateCopy => '复制令牌链接';
+  String get setupCreateCopy => '复制邀请链接';
 
   @override
   String get setupCreateCopied => '已复制';
@@ -435,13 +435,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '一次性令牌：凭它可以开通一个新入口（给对方，也可给自己的另一台设备）。24 小时内有效。';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => '复制令牌链接';
+  String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
 
   @override
   String get chatPageInviteCopyCodeTooltip => '复制令牌';
 
   @override
-  String get chatPageInviteLinkCopied => '令牌链接已复制';
+  String get chatPageInviteLinkCopied => '邀请链接已复制';
 
   @override
   String get chatPageInviteCodeCopied => '令牌已复制';

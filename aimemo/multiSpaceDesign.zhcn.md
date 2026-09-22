@@ -250,7 +250,7 @@ Vault 里有每个空间的 token，逐个调退役即可（见 §5.5）。
 
 - 构造来源：StartupGate 从「唯一 payload」变为「Vault.activeSpace 对应 payload」
 - 菜单新增「切换空间」入口（多空间时显示）：退出当前会话 → 空间列表
-- 补设 PIN / 改口令 / 邀请 / 设备管理：均为 per-space 操作，落当前空间 payload（现逻辑不变）
+- 补设 PIN / 改口令 / 生成令牌 / 入口管理：均为 per-space 操作，落当前空间 payload（现逻辑不变）
 - 内部仍依赖若干全局件，切换时必须显式处理：`WsRealtimeService`（`initState` 内 new，非单例）、
   3s/30s 同步 ticker、30s 对端在线 ticker（`dispose` 已 stop，需确认全部 cancel）、
   `uiStyleNotifier / attachmentStorageNotifier / localeNotifier`（全局，保持全局语义）、

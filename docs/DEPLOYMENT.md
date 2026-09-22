@@ -74,7 +74,7 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server http://localhost:3000
 dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 ```
 
-选 `j` 加入 → 粘贴 A 给的邀请链接（或纯 token）→ 选择自己是哪一个身份（1/2）→
+选 `j` 加入 → 粘贴 A 给的邀请链接（或令牌）→ 选择自己是哪一个身份（1/2）→
 输入 A 设置的密保口令（用它从口令密保箱取回 Space Key，同时完成设备登记 + 签发会话）→
 进入会话。
 
@@ -88,14 +88,14 @@ TUI 里**直接输入文字回车即发送**（无需子命令）；对方在线
 `/sync` 或下次启动自动补齐。图片/视频/语音/文件用输入栏的「+」面板或 `/attach <file>`；
 点消息里的附件编号用 `/open <序号>` 打开。
 
-App 端同理：设置页选「创建秘境」或「加入秘境」，扫邀请二维码/粘贴链接，再输密保口令。
+App 端同理：设置页选「创建秘境」或「加入秘境」，扫令牌二维码 / 粘贴邀请链接，再输密保口令。
 
 **TUI 命令总览**（`/help` 也能看）：
 
 | 命令 | 用途 |
 | --- | --- |
 | `/space` | 空间状态 / `/space create` 新建 / `/space join <链接>` 加入 |
-| `/invite` | 生成一次性邀请链接（24h，把新设备绑进秘境） |
+| `/invite` | 生成一次性邀请链接（24h，凭它可开通一个新入口） |
 | `/auth` | 激活/续期会话（challenge-response，对**当前**服务器） |
 | `/passphrase [random]` | 设置/修改密保口令（`random` 生成随机 12 词） |
 | `/pin` | 设置/修改启动锁 PIN |

@@ -112,13 +112,13 @@
   },
   "setupTokenTitle": "Verify token",
   "setupTokenHint": "A token is valid for one-time use within 24 hours.",
-  "setupTokenInputHint": "Paste the token",
+  "setupTokenInputHint": "Paste the token or invite link",
   "setupTokenNeedInput": "Enter the token",
   "setupTokenInvalid": "Invalid token",
   "setupTokenExpired": "Token expired",
   "setupTokenUsed": "Token already used",
   "setupTokenSpaceFull": "Space is full",
-  "setupTokenOtherServer": "the token is from {other} but this app is connected to {current}; they cannot work with each other.",
+  "setupTokenOtherServer": "the invite link is from {other} but this app is connected to {current}; they cannot work with each other.",
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
   },
@@ -130,7 +130,7 @@
   },
   "setupTokenSpacePrivate": "Join a private space (waiting for the second member)",
   "setupCreateShareTitle": "Send the token to your partner — or use it on another device of your own (valid for 24 hours)",
-  "setupCreateCopy": "Copy token link",
+  "setupCreateCopy": "Copy invite link",
   "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",
   "@setupPageInitFailed": {
@@ -182,9 +182,9 @@
   "chatPageMenuInvite": "New entrance token",
   "chatPageInviteDialogTitle": "Token created",
   "chatPageInviteDialogHint": "A one-time token: it opens one new entrance to this space — for your partner, or another device of your own. Valid for 24 hours.",
-  "chatPageInviteCopyLinkTooltip": "Copy token link",
+  "chatPageInviteCopyLinkTooltip": "Copy invite link",
   "chatPageInviteCopyCodeTooltip": "Copy token",
-  "chatPageInviteLinkCopied": "Token link copied",
+  "chatPageInviteLinkCopied": "Invite link copied",
   "chatPageInviteCodeCopied": "Token copied",
   "chatPageInviteFailed": "Failed to create the token: {error}",
   "@chatPageInviteFailed": {

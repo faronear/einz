@@ -148,7 +148,7 @@ POST /spaces/join
 
 ```text
 POST /spaces/{spaceId}/join-tokens
-  现有成员生成一次性邀请 token（可刷新/撤销）。
+  现有成员生成一次性令牌（join token，可刷新/撤销）。
   请求：{ }  →  201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
   错误：NOT_A_MEMBER / SPACE_FULL（满员后不再生成）
 

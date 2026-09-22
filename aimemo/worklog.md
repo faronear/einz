@@ -8517,3 +8517,25 @@ cli `dart analyze` 无 issue。
 `docs/PROTOCOL.md` / `PROTOCOL_MULTIVERSE.md` 里仍用 "join token / 邀请码" 混称，
 `aimemo/multiSpaceDesign.zhcn.md` 等设计文档也仍写"邀请"——协议层描述 wire 对象，
 暂不动；要在文档层统一说一声。
+
+### 后续：文档层统一 + 「邀请链接」保留
+
+老板两句：
+
+1. **文档层也统一成令牌**：`docs/` 下现行规格文档全部改（`KEY_ESCROW` 邀请码→令牌、
+   `ONBOARDING` 的 TUI 回显与排障表、`DEPLOYMENT` 的 `/invite` 说明、`PROTOCOL` 的
+   passphrase.rotated 说明、`PROTOCOL_MULTIVERSE` 的能力描述）；`multiSpaceDesign` 的
+   能力清单也改（"补设 PIN / 改口令 / 生成令牌 / 入口管理"）。
+   **历史记录类不改**（`aimemo/worklog.md` 113 处、`architectureReview*`、
+   `appWizardMultiverse`/`upgradeToMultiverse` 的迁移设计记录、`projectPlan` 的
+   已完成项、以及 `productLens` 里"邀请陌生人"这个**另一个含义**）——那些是当时的记录，
+   改了会失真。`PROTOCOL.md`/`ONBOARDING.md` 里 v1 时代的"20 位邀请码"是历史物，保留。
+2. **「邀请链接」不必改名**：那个链接指向 `/join/<token>`，打开就是**带欢迎辞与简介的
+   落地页**——"邀请"正是它的含义。于是 `令牌链接` 全部改回 `邀请链接`（App zh/en 各 3 处、
+   TUI 多处），并把 `setupTokenInputHint` 补成"填写令牌或邀请链接"、
+   `setupTokenOtherServer` 改回"该**邀请链接**来自 …"（本来说的就是链接里的域名）。
+
+**最终用词（写进 GLOSSARY）**：
+- **令牌 / token** = 那条一次性授权本身（"填写令牌""令牌无效""复制令牌"）
+- **邀请链接 / invite link** = 承载令牌的那个链接，落地页是邀请页
+- **入口 / entrance** = 这个秘境里的身份；**本机 / device** = 这台物理机器

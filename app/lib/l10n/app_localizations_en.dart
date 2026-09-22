@@ -292,7 +292,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'A token is valid for one-time use within 24 hours.';
 
   @override
-  String get setupTokenInputHint => 'Paste the token';
+  String get setupTokenInputHint => 'Paste the token or invite link';
 
   @override
   String get setupTokenNeedInput => 'Enter the token';
@@ -311,7 +311,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String setupTokenOtherServer(String other, String current) {
-    return 'the token is from $other but this app is connected to $current; they cannot work with each other.';
+    return 'the invite link is from $other but this app is connected to $current; they cannot work with each other.';
   }
 
   @override
@@ -328,7 +328,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Send the token to your partner — or use it on another device of your own (valid for 24 hours)';
 
   @override
-  String get setupCreateCopy => 'Copy token link';
+  String get setupCreateCopy => 'Copy invite link';
 
   @override
   String get setupCreateCopied => 'Copied';
@@ -463,13 +463,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'A one-time token: it opens one new entrance to this space — for your partner, or another device of your own. Valid for 24 hours.';
 
   @override
-  String get chatPageInviteCopyLinkTooltip => 'Copy token link';
+  String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
 
   @override
   String get chatPageInviteCopyCodeTooltip => 'Copy token';
 
   @override
-  String get chatPageInviteLinkCopied => 'Token link copied';
+  String get chatPageInviteLinkCopied => 'Invite link copied';
 
   @override
   String get chatPageInviteCodeCopied => 'Token copied';

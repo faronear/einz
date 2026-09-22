@@ -592,7 +592,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     session.messages.add(_systemMessage(
         session,
         '⚠️ 本机 store 缺少设备登记信息（旧版遗留）\n'
-        '  请用 /space create 新建秘境，或用 /space join <令牌或令牌链接> 加入已有秘境'));
+        '  请用 /space create 新建秘境，或用 /space join <令牌或邀请链接> 加入已有秘境'));
     session.messages.add(_systemMessage(session, '----------------'));
     _scheduleRender();
   }
@@ -1063,10 +1063,10 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
         _systemMessage(session, '✅ 当前设备已绑定空间（一设备一空间，不重复加入）——/space address 查看'));
     return;
   }
-  // 兼容完整令牌链接：https://host/join/<token> → 提取 token
+  // 兼容完整邀请链接：https://host/join/<token> → 提取 token
   final token = input.contains('/join/') ? input.split('/join/').last.trim() : input.trim();
   if (token.isEmpty) {
-    session.messages.add(_systemMessage(session, '🔧 用法: /space join <令牌或令牌链接>'));
+    session.messages.add(_systemMessage(session, '🔧 用法: /space join <令牌或邀请链接>'));
     return;
   }
   try {
@@ -2634,7 +2634,7 @@ Future<void> _runInputLoop(ChatSession session) async {
         }
         busy = true;
         final future = (_state!.pendingJoinToken)
-            ? (line.startsWith('/') ? _execCommand(line) : _handleJoinTokenInput(line)) // / 开头按命令（/exit 退出），否则按令牌链接
+            ? (line.startsWith('/') ? _execCommand(line) : _handleJoinTokenInput(line)) // / 开头按命令（/exit 退出），否则按邀请链接
             : (_state!.pendingSpaceKey)
                 ? (line.startsWith('/') ? _execCommand(line) : _handleSpaceKeyInput(line)) // / 开头按命令（/exit 退出），否则按口令
                 : (line.startsWith('/') ? _execCommand(line) : _sendText(line));
@@ -3038,13 +3038,13 @@ Future<void> _execCommand(String line) async {
     case '/auth':
       // 未绑定（deviceId null，如引导时跳过/加入失败）→ 引导加入秘境后再认证
       if (s.session.store.deviceId == null) {
-        // 提示作为 system 消息进消息流；令牌链接由输入循环接管输入——
+        // 提示作为 system 消息进消息流；邀请链接由输入循环接管输入——
         // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
         s.pendingJoinToken = true;
         s.session.messages.add(_systemMessage(
             s.session,
             '❓ 本设备尚未绑定秘境\n'
-            '   输入令牌（或令牌链接）加入伴侣的秘境；\n'
+            '   输入令牌（或邀请链接）加入伴侣的秘境；\n'
             '   新建秘境请先 /space create'));
         s.status = '⌛️ 等待令牌输入…';
         break;
@@ -3123,19 +3123,19 @@ Future<void> _execCommand(String line) async {
     case '/space':
       // Multiverse：空间绑定命令——一设备一空间。
       // /space（无参）显示状态与用法；/space address 显示空间地址；
-      // /space create 新建空间（生成 Space Key + 口令密封包，打印令牌链接）；
-      // /space join <令牌链接或 token> 加入已有空间（preflight → join → 口令取钥）
+      // /space create 新建空间（生成 Space Key + 口令密封包，打印邀请链接）；
+      // /space join <邀请链接或 token> 加入已有空间（preflight → join → 口令取钥）
       if (arg.trim().isEmpty) {
         final addr = s.session.store.spaceAddress;
         if (s.session.hasSpace) {
           s.session.messages.add(_systemMessage(s.session,
               '✅ 当前设备已绑定到秘境${addr != null ? '（地址: $addr）' : ''}'));
           s.session.messages.add(_systemMessage(
-              s.session, '🔧 用法: /space address | /space create | /space join <令牌链接或 token>'));
+              s.session, '🔧 用法: /space address | /space create | /space join <邀请链接或 token>'));
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未绑定空间'));
           s.session.messages.add(_systemMessage(
-              s.session, '🔧 用法: /space create 新建私密空间；/space join <令牌链接或 token> 加入已有空间'));
+              s.session, '🔧 用法: /space create 新建私密空间；/space join <邀请链接或 token> 加入已有空间'));
         }
         break;
       }
@@ -3159,7 +3159,7 @@ Future<void> _execCommand(String line) async {
         if (sub == 'join') {
           final rest = arg.trim().substring('join'.length).trim();
           if (rest.isEmpty) {
-            s.session.messages.add(_systemMessage(s.session, '🔧 用法: /space join <令牌链接或 token>'));
+            s.session.messages.add(_systemMessage(s.session, '🔧 用法: /space join <邀请链接或 token>'));
             break;
           }
           await _spaceJoin(s.session, s.session.store, s.storePath, rest);
@@ -3549,7 +3549,7 @@ Future<void> _execOpen(List<String> parts) async {
   }
 }
 
-/// 输入循环接管的"令牌链接加入"（/auth 未绑定时的引导）。
+/// 输入循环接管的"邀请链接加入"（/auth 未绑定时的引导）。
 ///
 /// 走 `/space join` 的同一条路径（`_spaceJoin`）：preflight 校验 → 口令取钥 →
 /// joinSpace 登记设备 + 签发空间会话 + 取 Space Key。**v1 的令牌登记已随

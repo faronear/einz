@@ -112,13 +112,13 @@
   },
   "setupTokenTitle": "验证令牌",
   "setupTokenHint": "填写令牌，24 小时内一次性有效",
-  "setupTokenInputHint": "填写令牌",
+  "setupTokenInputHint": "填写令牌或邀请链接",
   "setupTokenNeedInput": "请填写令牌",
   "setupTokenInvalid": "令牌无效",
   "setupTokenExpired": "令牌已过期",
   "setupTokenUsed": "令牌已被使用",
   "setupTokenSpaceFull": "空间已满",
-  "setupTokenOtherServer": "该令牌来自 {other}，本机连的是 {current}，不能混用",
+  "setupTokenOtherServer": "该邀请链接来自 {other}，本机连的是 {current}，不能混用",
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
   },
@@ -130,7 +130,7 @@
   },
   "setupTokenSpacePrivate": "加入私密空间（等待第二位成员）",
   "setupCreateShareTitle": "把令牌发给对方（也可用在自己的另一台设备上）",
-  "setupCreateCopy": "复制令牌链接",
+  "setupCreateCopy": "复制邀请链接",
   "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
   "@setupPageInitFailed": {
@@ -182,9 +182,9 @@
   "chatPageMenuInvite": "新入口令牌",
   "chatPageInviteDialogTitle": "令牌已生成",
   "chatPageInviteDialogHint": "一次性令牌：凭它可以开通一个新入口（给对方，也可给自己的另一台设备）。24 小时内有效。",
-  "chatPageInviteCopyLinkTooltip": "复制令牌链接",
+  "chatPageInviteCopyLinkTooltip": "复制邀请链接",
   "chatPageInviteCopyCodeTooltip": "复制令牌",
-  "chatPageInviteLinkCopied": "令牌链接已复制",
+  "chatPageInviteLinkCopied": "邀请链接已复制",
   "chatPageInviteCodeCopied": "令牌已复制",
   "chatPageInviteFailed": "令牌生成失败: {error}",
   "@chatPageInviteFailed": {

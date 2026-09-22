@@ -605,7 +605,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste the token'**
+  /// **'Paste the token or invite link'**
   String get setupTokenInputHint;
 
   /// No description provided for @setupTokenNeedInput.
@@ -641,7 +641,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenOtherServer.
   ///
   /// In en, this message translates to:
-  /// **'the token is from {other} but this app is connected to {current}; they cannot work with each other.'**
+  /// **'the invite link is from {other} but this app is connected to {current}; they cannot work with each other.'**
   String setupTokenOtherServer(String other, String current);
 
   /// No description provided for @setupTokenSpaceInfo.
@@ -665,7 +665,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupCreateCopy.
   ///
   /// In en, this message translates to:
-  /// **'Copy token link'**
+  /// **'Copy invite link'**
   String get setupCreateCopy;
 
   /// No description provided for @setupCreateCopied.
@@ -899,7 +899,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCopyLinkTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy token link'**
+  /// **'Copy invite link'**
   String get chatPageInviteCopyLinkTooltip;
 
   /// No description provided for @chatPageInviteCopyCodeTooltip.
@@ -911,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteLinkCopied.
   ///
   /// In en, this message translates to:
-  /// **'Token link copied'**
+  /// **'Invite link copied'**
   String get chatPageInviteLinkCopied;
 
   /// No description provided for @chatPageInviteCodeCopied.

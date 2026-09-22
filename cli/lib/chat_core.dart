@@ -189,7 +189,7 @@ class ChatSession {
     // 未登记（登记失败/令牌输错）时 deviceId 为 null——先检查，避免空断言崩溃
     final deviceId = store.deviceId;
     if (deviceId == null) {
-      throw StateError('设备尚未绑定秘境，请先 /space create（新建）或 /space join <令牌或令牌链接>（加入）');
+      throw StateError('设备尚未绑定秘境，请先 /space create（新建）或 /space join <令牌或邀请链接>（加入）');
     }
     // spaceId 必须一并提交：否则拿到的是"无 space 的 legacy 会话"，/sync 与
     // /messages 会落到空 space 桶 → 会话过期自动续期后消息全空（P1 收敛）。
