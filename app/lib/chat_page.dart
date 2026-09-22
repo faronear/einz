@@ -919,14 +919,45 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
               Center(child: _InviteQrCode(data: r.link)),
               const SizedBox(height: 12),
+              // 顺序（老板 2026-09-22）：**纯令牌在上、邀请链接在下**——
+              // 多数人是直接复制令牌；链接留给『点开看邀请页』的场景。
+              Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(r.joinToken,
+                        // 令牌是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
+                        // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                            color: Theme.of(ctx).colorScheme.onSurface)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    tooltip: l10n.chatPageInviteCopyCodeTooltip,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: r.joinToken));
+                      if (!ctx.mounted) return;
+                      showTopNotice(ctx, l10n.chatPageInviteCodeCopied);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
               // 邀请链接 + 拷贝图标（点击即复制，弹窗不关闭——根 Overlay 通知
               // 在弹窗之上可见，老板 2026-09-11）
               Row(
                 children: [
                   Expanded(
                     child: SelectableText(r.link,
+                        // 链接退为次要：字号 14 → 12（保留品牌蓝与加粗，保证小字也看得清）
                         style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+                            fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
                   ),
                   IconButton(
                     icon: const Icon(Icons.copy, size: 16),
@@ -939,30 +970,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       await Clipboard.setData(ClipboardData(text: r.link));
                       if (!ctx.mounted) return;
                       showTopNotice(ctx, l10n.chatPageInviteLinkCopied);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              // 单独 token + 拷贝图标
-              Row(
-                children: [
-                  Expanded(
-                    child: SelectableText(r.joinToken,
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey, letterSpacing: 0.5)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 16),
-                    color: Colors.grey,
-                    tooltip: l10n.chatPageInviteCopyCodeTooltip,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: r.joinToken));
-                      if (!ctx.mounted) return;
-                      showTopNotice(ctx, l10n.chatPageInviteCodeCopied);
                     },
                   ),
                 ],

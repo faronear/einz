@@ -181,7 +181,7 @@
   "chatPageClearLockMessage": "A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.",
   "chatPageMenuInvite": "New entrance token",
   "chatPageInviteDialogTitle": "Token created",
-  "chatPageInviteDialogHint": "Invites my partner or myself to create a new entrance to this space. Valid one-time for 24 hours.",
+  "chatPageInviteDialogHint": "Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.",
   "chatPageInviteCopyLinkTooltip": "Copy invite link",
   "chatPageInviteCopyCodeTooltip": "Copy token",
   "chatPageInviteLinkCopied": "Invite link copied",
@@ -429,7 +429,7 @@
   "advancedMenuTitle": "Advanced",
   "advancedLeaveSpace": "Destroy this entrance",
   "leaveSpaceTitle": "Destroy this entrance?",
-  "leaveSpaceMessage": "Erases space messages, attachments and secrets from this device, and return to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!",
+  "leaveSpaceMessage": "Erases this space's messages, attachments and secrets from this device, then takes you back to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!",
   "resetDeviceNameLabel": "Type \"{name}\" to confirm",
   "@resetDeviceNameLabel": {
     "placeholders": { "name": { "type": "String" } }

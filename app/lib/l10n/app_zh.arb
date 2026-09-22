@@ -181,7 +181,7 @@
   "chatPageClearLockMessage": "新锁屏码留空 = 清空锁屏码。确定要清除吗？清除后下次启动直接进入聊天。",
   "chatPageMenuInvite": "新入口令牌",
   "chatPageInviteDialogTitle": "令牌已生成",
-  "chatPageInviteDialogHint": "邀请伴侣或自己的其他设备，通过令牌开通一个新入口到本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHint": "邀请伴侣或自己的其他设备，开通一个新入口到本秘境。24 小时内一次性有效。",
   "chatPageInviteCopyLinkTooltip": "复制邀请链接",
   "chatPageInviteCopyCodeTooltip": "复制令牌",
   "chatPageInviteLinkCopied": "邀请链接已复制",

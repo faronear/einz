@@ -893,7 +893,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHint.
   ///
   /// In en, this message translates to:
-  /// **'Invites my partner or myself to create a new entrance to this space. Valid one-time for 24 hours.'**
+  /// **'Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHint;
 
   /// No description provided for @chatPageInviteCopyLinkTooltip.
@@ -1751,7 +1751,7 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Erases space messages, attachments and secrets from this device, and return to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!'**
+  /// **'Erases this space\'s messages, attachments and secrets from this device, then takes you back to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetDeviceNameLabel.

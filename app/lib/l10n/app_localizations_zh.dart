@@ -431,7 +431,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHint =>
-      '邀请伴侣或自己的其他设备，通过令牌开通一个新入口到本秘境。24 小时内一次性有效。';
+      '邀请伴侣或自己的其他设备，开通一个新入口到本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteCopyLinkTooltip => '复制邀请链接';

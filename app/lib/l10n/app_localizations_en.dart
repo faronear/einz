@@ -460,7 +460,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHint =>
-      'Invites my partner or myself to create a new entrance to this space. Valid one-time for 24 hours.';
+      'Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
@@ -952,7 +952,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      'Erases space messages, attachments and secrets from this device, and return to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!';
+      'Erases this space\'s messages, attachments and secrets from this device, then takes you back to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!';
 
   @override
   String resetDeviceNameLabel(String name) {

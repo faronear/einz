@@ -88,10 +88,22 @@ void main() {
 
     // 弹窗内容齐全
     expect(find.text('令牌已生成'), findsOneWidget);
-    // 令牌链接（SelectableText 主展示）+ token（次级小字）
+    // token（次级小字，在上）+ 邀请链接（主展示，在下）——顺序见 chat_page 注释
     expect(find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
         findsWidgets);
     expect(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), findsWidgets);
+
+    // 顺序（老板 2026-09-22）：**纯令牌在上、邀请链接在下**——多数人直接复制令牌，
+    // 链接留给"点开看邀请页"的场景。用几何位置钉住，防止以后又被调回去。
+    final tokenY = tester
+        .getTopLeft(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789').first)
+        .dy;
+    final linkY = tester
+        .getTopLeft(find
+            .text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789')
+            .first)
+        .dy;
+    expect(tokenY, lessThan(linkY), reason: '纯令牌应在邀请链接上方');
 
     // 二维码真实可见（原 bug：CustomPaint 绘制面 0x0，从未显示）
     final qrPaint = find.byWidgetPredicate(
