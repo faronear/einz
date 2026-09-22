@@ -41,9 +41,20 @@ class _PassphraseFieldState extends State<PassphraseField> {
   bool _revealed = false;
   Timer? _timer;
 
+  /// 眼睛的焦点节点：`skipTraversal` → 桌面版按 TAB 时**跳过**这个小眼睛，
+  /// 焦点从本输入框直接去下一个输入框（老板 2026-09-22）。
+  ///
+  /// 为什么是"跳过"而不是"把眼睛挪到最后一个输入框"（上一版做法，已撤回）：
+  /// 眼睛留在需要它的输入框上才有用（输错了想看一眼），挪走等于为了绕开 TAB
+  /// 而牺牲功能。skipTraversal 两全——鼠标点、键盘可达性都照旧，只是不挡路。
+  /// 全 App 只有这里做"小眼睛看明文"，改一处即可覆盖创建向导与修改口令弹窗。
+  late final FocusNode _revealFocusNode =
+      FocusNode(skipTraversal: true, debugLabel: 'passphrase-reveal');
+
   @override
   void dispose() {
     _timer?.cancel();
+    _revealFocusNode.dispose();
     super.dispose();
   }
 
@@ -71,6 +82,7 @@ class _PassphraseFieldState extends State<PassphraseField> {
         border: const OutlineInputBorder(),
         suffixIcon: widget.showReveal
             ? IconButton(
+                focusNode: _revealFocusNode, // TAB 跳过（见字段注释）
                 icon: Icon(_revealed ? Icons.visibility : Icons.visibility_off),
                 tooltip: widget.revealTip,
                 onPressed: _toggle,

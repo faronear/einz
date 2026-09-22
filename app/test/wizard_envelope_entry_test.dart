@@ -159,6 +159,26 @@ void main() {
         reason: 'join 是验证已有口令，无需二次确认');
   });
 
+  testWidgets('口令输入框的小眼睛排除在 TAB 序列外（桌面版连续输入不被打断）',
+      (WidgetTester tester) async {
+    // 老板 2026-09-22：桌面版键盘输入时焦点会停到"小眼睛"上，打断
+    // 「输入 → TAB → 再输入」。做法不是把眼睛挪走（那会牺牲"输错了看一眼"），
+    // 而是给它 skipTraversal 的焦点节点——鼠标点、键盘可达性照旧，只是不挡路。
+    await pumpToPassphrase(tester);
+    final eye = find.ancestor(
+      of: find.byIcon(Icons.visibility_off),
+      matching: find.byType(IconButton),
+    );
+    expect(eye, findsOneWidget, reason: '口令框应带小眼睛');
+    final button = tester.widget<IconButton>(eye);
+    expect(button.focusNode?.skipTraversal, isTrue,
+        reason: 'TAB 必须跳过小眼睛，否则会打断连续输入');
+    // 仍然可点：明文揭示功能没被砍掉
+    await tester.tap(eye);
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.visibility), findsOneWidget, reason: '点击后应显示明文');
+  });
+
   testWidgets('create 口令页：两次不一致 → 红字拦截；一致 → 放行进 PIN 页', (WidgetTester tester) async {
     await pumpToPassphrase(tester);
     expect(find.byType(TextField), findsNWidgets(2));
