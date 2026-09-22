@@ -7888,3 +7888,28 @@ Vault 猜 active 空间**，结果 7 个 widget 测试挂死（pumpAndSettle 10 
 另：测试里必须先 `ensureFreshInstall()`，否则启动门按"全新安装"把安全存储清掉。
 
 全量 `flutter test`：**158 过 0 失败**。UI 交互（向导加第二个空间、切换）交给老板真机自测。
+
+## 2026-09-22 清理误提交的 SFConflict 副本（iMac 切机后）
+
+昨晚在 MacBook 上提交的 `b89b14b` 被 Seafile 同步带回了 3 个冲突副本：
+`app/lib/l10n/app_localizations{,_en,_zh} (SFConflict luk 2026-09-22-09-12-36).dart`，
+被 `git add` 一起提交（3792 行）。处理：`git reset --soft HEAD~1` → 删副本 → 重新提交为
+**`3c9c039`**，只含 `app/lib/setup_page.dart`（+16 行，`onManageSpaces` 回调）。
+
+- 删之前用 `diff -q` 逐个比对：3 个副本与真实生成物**逐字节相同**，删除无内容损失；
+  也就是说该 commit 实际内容只有 setup_page.dart 那 16 行，消息里"重新生成 l10n"的部分
+  没有产生 diff（生成物早在 `213bc8c` 就是对的）。
+- 教训：切机后 `git add -A` 之前先 `git status` 看有没有 `* (SFConflict ...)` 文件。
+
+**顺带修掉一个切机副作用**：`app/.dart_tool/package_config.json` 是 MacBook 上生成的
+（指向 pub.dev 路径下的 `file_picker_platform_interface 3.4.0`，而本机 pub.dev 缓存里只有
+3.3.0，3.4.0 只存在于 flutter-io.cn 缓存）→ `flutter analyze` 报 3 个假错误
+`Undefined name 'FileType'`（`chat_page.dart`）+ 一堆 `windows_file_picker` 插件警告。
+`flutter pub get` 后 analyze 清零，同时两个 windows 生成物自动恢复与 HEAD 一致
+（切机时那两处"更旧的 modified"也一并消失，工作区变干净）。
+副作用仍是 lock 被升了 3 个传递依赖（`file_picker_platform_interface 3.3.0→3.4.0`、
+`windows_file_picker 1.2.0→1.3.0`、`2.2.3→2.3.0`）→ 已 `git checkout -- app/pubspec.lock` 还原。
+
+**待老板决策**：两机的 lock / package_config 长期互相漂移（iMac 解出 3.3.0、MacBook 解出
+3.4.0），每次切机 pub get 都会再 bump 一次 lock。要么接受这个 bump 进 lock，要么两机统一
+pub 缓存域名。
