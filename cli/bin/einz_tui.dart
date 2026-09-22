@@ -2976,7 +2976,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: 生成新入口令牌（凭它可开通一个新入口）',
+        '/invite :: 生成一次性令牌，24小时有效，邀请伴侣或自己开通一个新入口到本秘境。',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3485,7 +3485,7 @@ Future<void> _execInvite() async {
     final api = ApiClient(s.session.server);
     final r = await _busy(s.session, '⏳ 令牌生成中......', () => api.createJoinToken(store.spaceId!, store.sessionToken!));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
-    s.session.messages.add(_systemMessage(s.session, '✅ 新入口令牌（24 小时内一次性有效）：\n📎 ${r.link}\n🛡️  ${r.joinToken}'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 令牌已生成（24 小时内一次性有效）：\n📎 ${r.link}\n🛡️  ${r.joinToken}'));
     s.status = ''; // 反馈在消息区，状态栏保持干净
   } catch (e) {
     s.session.messages.add(_systemMessage(s.session, '❌ 令牌生成失败: $e'));

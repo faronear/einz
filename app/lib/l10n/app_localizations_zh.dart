@@ -431,7 +431,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHint =>
-      '一次性令牌：凭它可以开通一个新入口（给对方，也可给自己的另一台设备）。24 小时内有效。';
+      '邀请伴侣或自己的其他设备，通过令牌开通一个新入口到本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
@@ -885,7 +885,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz 是仅限两人的私密聊天和共享空间，端到端加密所有消息和附件，没有任何第三方（包括 Einz 自身）能够读到内容，严格保障隐私安全。';
+      '秘境是仅限两人的私密聊天和共享空间，端到端加密所有消息和附件，没有任何第三方（包括秘境自身）能够读到内容，严格保障隐私安全。';
 
   @override
   String get aboutVersionLabel => '版本号';
@@ -907,7 +907,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      '将销毁本机在这个秘境里的入口，并清除本机上的聊天记录与密钥。\n\n秘境本身与服务器上的数据都还在，其他秘境也不受影响——以后凭新的令牌可以重新加入。\n\n此操作无法撤销！';
+      '将销毁这个秘境在本机上的全部消息、附件和密钥，并回到秘境向导。\n\n秘境本身及其数据仍在，你和伴侣的其他设备不受影响。以后凭新的令牌可以重新加入本秘境。\n\n此操作无法撤销！';
 
   @override
   String resetDeviceNameLabel(String name) {
