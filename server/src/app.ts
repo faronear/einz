@@ -24,6 +24,7 @@ import {
   listDevices,
   retireDevice,
   revokeDevice,
+  setDeviceUid,
   updateDeviceName,
   updatePersonName
 } from './devices.js'
@@ -223,6 +224,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
         : String(body.escrow_passphrase),
       body?.public_key == null ? undefined : String(body.public_key),
       body?.device_name == null ? undefined : String(body.device_name),
+      // 安装级设备标识（多空间）：同一物理设备各空间一行同名，服务端据此做内部关联
+      body?.device_uid == null ? undefined : String(body.device_uid),
       requestBaseUrl(req) // 邀请链接按请求真实 Host 生成
     )
     sendJson(res, 201, r)
@@ -249,7 +252,9 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       String(body?.public_key ?? ''),
       body?.device_name == null ? undefined : String(body.device_name),
       body?.gender == null ? undefined : String(body.gender),
-      body?.partner_slot == null ? undefined : Number(body.partner_slot)
+      body?.partner_slot == null ? undefined : Number(body.partner_slot),
+      // 安装级设备标识（多空间）
+      body?.device_uid == null ? undefined : String(body.device_uid)
     )
     sendJson(res, 200, r)
     return
@@ -460,6 +465,14 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
 
   // 设备
+  if (method === 'POST' && path === '/devices/uid') {
+    // 补登安装级设备标识（多空间：存量设备进聊天页时幂等上报一次，见 devices.setDeviceUid）。
+    // 刻意**不落审计**：它是幂等的元数据补登、不是一次"设备事件"，每个空间每次冷启动都会来
+    // 一次，落审计只会把 device_activity 冲成噪音。
+    const body = await readJsonBody(req)
+    sendJson(res, 200, setDeviceUid(bearerToken(req), body))
+    return
+  }
   if (method === 'POST' && path === '/devices/name') {
     // 更新本设备名称（已登记设备 TUI 改名后同步后台，显示层用）
     const body = await readJsonBody(req)

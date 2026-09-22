@@ -109,6 +109,7 @@ class ApiClient {
     String? deviceName,
     String? gender,
     int? partnerSlot,
+    String? deviceUid,
   }) async {
     final res = await _post(
       Api.spaceJoin,
@@ -118,6 +119,8 @@ class ApiClient {
         if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
         if (gender != null && gender.isNotEmpty) 'gender': gender,
         if (partnerSlot != null) 'partner_slot': partnerSlot,
+        // 安装级设备标识（多空间：同一物理设备各空间同名，服务端内部关联用）
+        if (deviceUid != null && deviceUid.isNotEmpty) 'device_uid': deviceUid,
       },
       withToken: false,
     );
@@ -137,6 +140,7 @@ class ApiClient {
     String? escrowPassphrase,
     String? publicKey,
     String? deviceName,
+    String? deviceUid,
   }) async {
     final res = await _post(
       Api.spaces,
@@ -152,6 +156,8 @@ class ApiClient {
           'escrow_passphrase': escrowPassphrase,
         if (publicKey != null && publicKey.isNotEmpty) 'public_key': publicKey,
         if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
+        // 安装级设备标识（多空间：同一物理设备各空间同名，服务端内部关联用）
+        if (deviceUid != null && deviceUid.isNotEmpty) 'device_uid': deviceUid,
       },
       withToken: false,
     );
@@ -201,6 +207,15 @@ class ApiClient {
   /// 注销 Push Token。
   Future<void> unregisterPushToken(String token) async {
     await _delete(Api.pushRegister, token: token);
+  }
+
+  /// 补登安装级设备标识（POST /devices/uid）：多空间下同一台物理设备在每个空间各有
+  /// 一个 device_id，`deviceUid` 是它们共用的那一份（服务端内部认知用）。
+  ///
+  /// 幂等；只写本会话对应的那一行（一个空间的虚拟设备），别的空间由客户端在那边再登一次。
+  /// 失败不影响聊天——调用方应 best-effort（同 registerPushToken）。
+  Future<void> registerDeviceUid(String deviceUid, String token) async {
+    await _post(Api.deviceUid, {'device_uid': deviceUid}, token: token);
   }
 
   /// 获取空间信息（space_id + 设备列表，含 person_id 映射，PROTOCOL.md §7.3）。

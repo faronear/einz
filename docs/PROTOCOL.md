@@ -86,6 +86,7 @@
 | POST | /receipts | 上报自己的送达/已读高水位（§5.4） | Bearer |
 | GET | /receipts | 拉取本 space 全部回执行（§5.4） | Bearer |
 | POST | /devices/name | 改本设备显示名 | Bearer |
+| POST | /devices/uid | 补登安装级设备标识 `device_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
 | POST | /devices/person-name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
 | POST | /avatar | 上传本人头像 | Bearer |
 | GET | /avatar/:personId | 取头像（免认证，公开可读） | — |

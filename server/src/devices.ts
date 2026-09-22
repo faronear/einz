@@ -2,6 +2,7 @@ import { getDb } from './db.js'
 import { ApiError } from './auth.js'
 import { getDevice } from './config.js'
 import { assertDeviceName } from './deviceName.js'
+import { assertDeviceUid } from './deviceUid.js'
 import { assertPersonName } from './personName.js'
 import { deviceScopeClause, isSpaceMember, requireSession } from './guard.js'
 import { assertSpacePassphrase } from './escrow.js'
@@ -126,6 +127,28 @@ export function retireDevice(token: string): { ok: true } {
   // 自己的 WS 连接还在 conns 里：摘掉并让对端立刻看到下线（不发自毁帧，见 ws 注释）
   forgetDeviceConnection(caller.device_id)
 
+  return { ok: true }
+}
+
+/**
+ * POST /devices/uid：补登本设备的安装级标识（多空间）。
+ *
+ * 存在的理由：`device_uid` 是随 create/join 一起上报的，但**存量设备**（多空间
+ * 上线前入网的那批，生产上已有人在用）不会再走一次入网 → 由客户端在进聊天页时
+ * 幂等补登一次。同一个 uid 下、不同空间的 device_id 由此在服务端对齐。
+ *
+ * 语义边界（老板 2026-09-22 定）：
+ * - 只影响**本会话对应的那一行**（一个空间的虚拟设备）；客户端在别的空间里
+ *   再补登一次才有那两行。不需要、也不该由服务端去猜。
+ * - 不是安全边界：改自己的 device_uid 不改变任何权限——它只用于服务端内部认知
+ *   （审计/运维/将来"整机退役"），**不参与破坏性操作的授权或范围判断**。
+ * - 幂等：重复调用写同一个值。
+ */
+export function setDeviceUid (token: string, body: unknown): { ok: true } {
+  const { device_id } = requireSession(token)
+  const b = (body ?? {}) as { device_uid?: unknown }
+  const uid = assertDeviceUid(b.device_uid)
+  getDb().prepare(`UPDATE devices SET device_uid = ? WHERE device_id = ?`).run(uid, device_id)
   return { ok: true }
 }
 

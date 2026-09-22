@@ -6,6 +6,7 @@ import { parsePackage, type EscrowPackage } from "./escrow.js";
 import { deriveSpaceAddress } from "./address.js";
 import { loadConfig } from "./config.js";
 import { normalizeDeviceName } from "./deviceName.js";
+import { normalizeDeviceUid } from "./deviceUid.js";
 import { assertPersonName } from "./personName.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
@@ -74,6 +75,7 @@ export async function createSpace(
   escrowPassphrase?: string,
   publicKey?: string,
   deviceName?: string,
+  deviceUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
   baseUrl?: string, // 邀请链接 base（按请求真实 Host 生成，2026-09-11）
 ): Promise<{
   spaceId: string;
@@ -164,10 +166,10 @@ export async function createSpace(
     deviceId = randomUUID();
     getDb()
       .prepare(
-        `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at)
-         VALUES (?, ?, ?, 'active', ?, ?)`,
+        `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at, device_uid)
+         VALUES (?, ?, ?, 'active', ?, ?, ?)`,
       )
-      .run(deviceId, creatorPersonId, publicKey, normalizeDeviceName(deviceName), now);
+      .run(deviceId, creatorPersonId, publicKey, normalizeDeviceName(deviceName), now, normalizeDeviceUid(deviceUid));
     sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(
@@ -264,6 +266,7 @@ export function joinSpace(
   deviceName?: string,
   gender?: string,
   partnerSlot?: number,
+  deviceUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
 ): { spaceId: string; personId: string; partnerSlot: number; sessionToken: string; spaceAddress: string } {
   if (publicKey.length === 0) {
     throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入设备公钥）", 400);
@@ -324,10 +327,10 @@ export function joinSpace(
     const deviceId = randomUUID();
     getDb()
       .prepare(
-        `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at)
-         VALUES (?, ?, ?, 'active', ?, ?)`,
+        `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at, device_uid)
+         VALUES (?, ?, ?, 'active', ?, ?, ?)`,
       )
-      .run(deviceId, personId, publicKey, normalizeDeviceName(deviceName), Date.now());
+      .run(deviceId, personId, publicKey, normalizeDeviceName(deviceName), Date.now(), normalizeDeviceUid(deviceUid));
     const sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(

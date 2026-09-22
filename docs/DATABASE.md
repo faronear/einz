@@ -32,7 +32,11 @@ CREATE TABLE devices (
     status      TEXT NOT NULL DEFAULT 'active',  -- active | revoked
     device_name TEXT,                      -- 设备显示名（TUI/App 可改）
     last_seen   INTEGER,                   -- 只由 WS 连接/心跳/断开维护
-    created_at  INTEGER NOT NULL
+    created_at  INTEGER NOT NULL,
+    device_uid  TEXT                       -- 安装级设备标识（客户端生成；同一物理设备各空间同名）
+                                           -- 存量行/未升级客户端为 NULL，由 POST /devices/uid 补登。
+                                           -- **只做服务端内部认知**（运维/审计/将来"整机退役"），
+                                           -- 不参与授权或破坏性操作范围判断，**绝不进任何响应体**。
 );
 
 -- 空间（Multiverse；space_address 由 space_public_key 经 Keccak-256 + EIP-55 派生）

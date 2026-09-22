@@ -23,8 +23,13 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       status      TEXT NOT NULL DEFAULT 'active',
       device_name TEXT,
       last_seen   INTEGER,
-      created_at  INTEGER NOT NULL
+      created_at  INTEGER NOT NULL,
+      -- 客户端生成的**安装级**设备标识（多空间）：同一台物理设备上每个空间一个
+      -- device_id，但它们的 device_uid 相同 → 服务端据此知道"这几行是同一台设备"。
+      -- 存量行/未升级客户端为 NULL。**绝不出现在任何响应体里**（服务端内部认知）。
+      device_uid  TEXT
     );
+    CREATE INDEX IF NOT EXISTS idx_devices_uid ON devices (device_uid);
 
     CREATE TABLE IF NOT EXISTS messages (
       message_id       TEXT PRIMARY KEY,
@@ -186,6 +191,13 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   // 迁移：devices 表补充 device_name（设备名称，显示层用）
   try {
     db.exec(`ALTER TABLE devices ADD COLUMN device_name TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：devices 表补充 device_uid（安装级设备标识；存量行留 NULL，由客户端补登）
+  try {
+    db.exec(`ALTER TABLE devices ADD COLUMN device_uid TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_devices_uid ON devices (device_uid)`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
