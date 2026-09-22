@@ -387,6 +387,52 @@ async function main (): Promise<void> {
       )
     }
 
+    // 5.2) 换设备后的重投必须幂等成功（老板 2026-09-22 实测的线上 bug）：
+    //      信封里的 sender_device_id 是 AAD 的一部分，客户端换了设备也**改不掉**，
+    //      重投旧消息时必然带着旧 device_id。只要 message_id 已在本空间入库，
+    //      就应该返回原 seq —— 此前设备校验排在幂等查询之前，请求永远 403，
+    //      客户端两条消息永久卡在"点击重发"红色标签。
+    const staleDevicePost = await fetch(`http://127.0.0.1:${port}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${devA.sessionToken}`
+      },
+      body: JSON.stringify({
+        ...envA,
+        sender_device_id: '1395a5d0-0000-4000-8000-000000000000'
+      })
+    })
+    assert.equal(
+      staleDevicePost.status,
+      200,
+      '已入库的 message_id：信封带旧设备 id 也应幂等成功（设备校验不得排在幂等之前）'
+    )
+    assert.equal(
+      ((await staleDevicePost.json()) as { server_sequence: number })
+        .server_sequence,
+      1,
+      '幂等返回原 seq（不新增、不改归因）'
+    )
+
+    // 5.3) 但**未入库**的新消息仍必须 403：不能借"幂等优先"把设备校验整体放行
+    const freshMismatch = await fetch(`http://127.0.0.1:${port}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${devA.sessionToken}`
+      },
+      body: JSON.stringify({
+        ...devA.encryptMessage('msg-mismatch', HELLO, spaceId),
+        sender_device_id: '1395a5d0-0000-4000-8000-000000000000'
+      })
+    })
+    assert.equal(
+      freshMismatch.status,
+      403,
+      '未入库的新消息冒用其他 sender_device_id 必须 403'
+    )
+
     // 6) B 用 join token 加入空间 + 认证 + 增量同步（v2 入口，替代 v1 邀请码登记）
     const joinToken = await devA.mintJoinToken(port)
     await devB.joinSpace(port, joinToken)
@@ -1160,7 +1206,7 @@ async function main (): Promise<void> {
     )
 
     console.log(
-      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等 / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members) / 撤销语义与授权'
+      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等（含换设备重投） / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members) / 撤销语义与授权'
     )
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，

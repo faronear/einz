@@ -370,6 +370,48 @@ void main() {
     expect(api.posted.length, 1);
   });
 
+  test('换设备后：已知 server_sequence 的消息点重发不重投，直接恢复 sent', () async {
+    // 回归（老板 2026-09-22 线上实测）：这两条消息早已在服务端（seq 已回填），
+    // 但信封里的 sender_device_id 是**旧设备**——它是 AAD 的一部分，客户端改不了，
+    // 所以重投必然被服务端 403（sender_device_id mismatch），而客户端又把 4xx 判成
+    // "服务端明确拒绝"→ 状态永远回不到 sent，红色标签永远消不掉。
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    final env = await _makeEnv(spaceKey, 'dev-a2', 'msg-old', '换设备前的历史消息');
+    api.pages.add((messages: [env],
+        attachmentsMeta: const [], lastSequence: 1, hasMore: false));
+    await repo.sync();
+    final id = (await repo.history()).single.env.messageId;
+    expect((await repo.history()).single.env.serverSequence, isNotNull,
+        reason: '前提：seq 已从服务端同步回来（=服务端已收下）');
+    await _forceFailed(db, id); // 复现生产库里那两行的实际状态
+
+    api.rejectPostMessage = true; // 若真重投，服务端就是 403
+    await repo.retryMessage(id);
+
+    expect((await repo.history()).single.status, 'sent',
+        reason: '服务端早已收下 → 不该重投，直接置 sent');
+    expect(api.posted, isEmpty, reason: '不该发出注定 403 的重投请求');
+  });
+
+  test('换设备后：sync 自动对账卡在 failed 的历史消息（无需用户点按）', () async {
+    // 锚点早已越过这些 seq，服务端不会再下发它们 → 只能靠本地对账自愈。
+    final api = FakeApi();
+    final repo = makeRepo(api, token: 'tok');
+    final env = await _makeEnv(spaceKey, 'dev-a2', 'msg-old', '历史消息');
+    api.pages.add((messages: [env],
+        attachmentsMeta: const [], lastSequence: 1, hasMore: false));
+    await repo.sync();
+    final id = (await repo.history()).single.env.messageId;
+    await _forceFailed(db, id);
+
+    await repo.sync(); // 第二次 sync：服务端已无新消息，仅剩本地对账
+
+    expect((await repo.history()).single.status, 'sent',
+        reason: '对账自愈，不依赖用户点按');
+    expect(api.posted, isEmpty, reason: '对账是纯本地动作，不该重投');
+  });
+
   test('乐观回调：本地落库后、上传前触发，此时为 pending', () async {
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');
@@ -700,6 +742,15 @@ void main() {
     expect(repo.token, isNull);
   });
 }
+
+/// 复现生产库里的实际状态：把一条"服务端早已收下（server_sequence 非空）"的消息
+/// 置成 failed。老板 2026-09-22 的线上库里那两行就是 failed + seq 123/124。
+/// 直接写库是因为该状态在新代码里已经无法通过 API 触发（retryMessage 不再重投成功过的消息）。
+Future<void> _forceFailed(LocalDatabase db, String messageId) =>
+    db.customStatement(
+      "UPDATE local_messages SET status = 'failed' WHERE message_id = ?",
+      [messageId],
+    );
 
 /// 用 shared 加密构造一个服务端返回的信封（含 server_sequence/created_at）。
 /// 注意：必须使用与 repository 相同的 [key]，否则解密会失败（AAD/密钥不匹配）。

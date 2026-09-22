@@ -140,7 +140,8 @@ Future<void> _cmdAuth(DeviceStore store, String storePath, String server) async 
   final api = ApiClient(server);
   final s = await sodium();
 
-  final challenge = await api.challenge(store.deviceId!);
+  // spaceId 必填（Multiverse）：签发的 session 绑定该 Space，漏传服务端直接 400
+  final challenge = await api.challenge(store.deviceId!, spaceId: store.spaceId);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
