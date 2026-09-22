@@ -12,6 +12,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'about_page.dart';
 import 'brand_logo.dart';
 import 'chat_page.dart';
+import 'space_list_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
@@ -1308,6 +1309,21 @@ class _SetupPageState extends State<SetupPage> {
         privateKeyB64: kp.privateKeyB64,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
         reauth: () async => (await _authenticate(kp, enroll.deviceId)).sessionToken,
+        // 刚配完就进聊天：这里也要给「空间管理」入口，否则用户必须重启 App
+        // 才能加第二个空间（老板 2026-09-22 实测反馈）
+        onManageSpaces: (ctx) async {
+          final pin = _pin.text;
+          final lock = AppLockService(widget.db ?? LocalDatabase.shared);
+          final v = pin.isNotEmpty ? await lock.unlockVault(pin) : await lock.loadVault();
+          if (v == null || !ctx.mounted) return;
+          await Navigator.of(ctx).push(MaterialPageRoute(
+            builder: (_) => SpaceListPage(
+              vault: v,
+              pin: pin.isEmpty ? null : pin,
+              db: widget.db,
+            ),
+          ));
+        },
       ),
     ));
   }
