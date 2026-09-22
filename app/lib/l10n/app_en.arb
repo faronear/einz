@@ -12,7 +12,7 @@
   "setupPageNeedPassphrase": "❗️ Set a passphrase first",
   "wizardJoinPassphraseRequired": "❗️ Enter the passphrase to verify",
   "setupEnrollBoundNotice": "🎉 New entrance opened",
-  "wizardStartTitle": "Space setup",
+  "wizardStartTitle": "Setup wizard",
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "Auto-detects if this is the first entrance",
   "wizardDetectFailed": "Cannot reach server — retrying…",

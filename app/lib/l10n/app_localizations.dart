@@ -173,7 +173,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardStartTitle.
   ///
   /// In en, this message translates to:
-  /// **'Space setup'**
+  /// **'Setup wizard'**
   String get wizardStartTitle;
 
   /// No description provided for @wizardDetectTitle.

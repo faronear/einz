@@ -48,7 +48,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupEnrollBoundNotice => '🎉 New entrance opened';
 
   @override
-  String get wizardStartTitle => 'Space setup';
+  String get wizardStartTitle => 'Setup wizard';
 
   @override
   String get wizardDetectTitle => 'Checking server status…';
