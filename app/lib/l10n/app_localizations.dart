@@ -1697,13 +1697,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuAbout.
   ///
   /// In en, this message translates to:
-  /// **'About'**
+  /// **'About Einz'**
   String get chatPageMenuAbout;
 
   /// No description provided for @aboutPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'About'**
+  /// **'About Einz'**
   String get aboutPageTitle;
 
   /// No description provided for @aboutIntro.

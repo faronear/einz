@@ -922,10 +922,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageMenuAbout => 'About';
+  String get chatPageMenuAbout => 'About Einz';
 
   @override
-  String get aboutPageTitle => 'About';
+  String get aboutPageTitle => 'About Einz';
 
   @override
   String get aboutIntro =>
