@@ -1,6 +1,6 @@
 # 字段改名计划：`device_id` → `entry_id`、`person_id` → `partner_id`/`member_id`
 
-状态：**`[待老板拍板]`**（2026-09-22 起草，**仅计划，未执行**）
+状态：**`[已定，待执行]`**（2026-09-22 起草并拍板；**执行推迟到 M3 收尾、多空间上线稳定之后**）
 关联：`docs/GLOSSARY.md`（术语分层，改名的全部依据）、`aimemo/multiSpaceDesign.zhcn.md` §3.7
 
 ---
@@ -30,9 +30,10 @@
 | 现在 | 改成 | 所属层 |
 | --- | --- | --- |
 | `device_id` / `deviceId` | `entry_id` / `entryId` | **登记项**（安装 × 秘境） |
-| `person_id` / `personId` | `partner_id` / `partnerId`（或 `member_id`，见 §5 D1） | **秘境内的插槽身份** |
-| `person_name` / `person_names` / `person_genders` / `person_slots` | `partner_*`（见 §5 D3） | 同上的显示名 / 性别 / 槽位 |
-| `sender_person_id`（外层信封字段） | `sender_partner_id` | 消息的发送者身份 |
+| `person_id` / `personId` | `member_id` / `memberId`（D1 已定） | **秘境内的插槽身份** |
+| `person_name` / `person_names` / `person_genders` / `person_slots` | `member_*`（D3 已定） | 同上的显示名 / 性别 / 槽位 |
+| `sender_person_id`（外层信封字段） | `sender_member_id` | 消息的发送者身份 |
+| `partner_slot` / `partner_name` / `partner_gender` | **不动** | 它们是"第二人专属"的既有词（见 D1 说明），不在本次范围 |
 | 服务端 DB 列（7 处） | 同左（一次性迁移） | 服务端内部 |
 | （将来）`person_id` | — | 留给**真人**的全局身份，本次不动 |
 
@@ -97,15 +98,26 @@
 | 🟢 R4 | 服务端 DB 列名 | 建议**跟着改**（SQLite `RENAME COLUMN`，一次性迁移、客户端零影响）；客户端 drift 列名**保留**（本地不可见，改要重建表） |
 | 🟢 R5 | 那 4 台生产设备可能长期不升级 → 旧名删不掉 | 接受长期双名；或推动升级后按 §3 P3 判定 |
 
-## 5. 决策点（待老板拍）
+## 5. 决策（2026-09-22 已定）
 
-| # | 问题 | 我的建议 |
-| --- | --- | --- |
-| **D1** | `person_id` 改叫 `partner_id` 还是 `member_id`？ | **见下方专门分析**：两个都行，但 `partner_id` 需要连带改 `partner_slot` 的语义，否则词自相矛盾 |
-| **D2** | HTTP 路径 `/devices/*` 是否也改成 `/entries/*`？ | **不改**。字段名是歧义源头，路径不是；改路径要再多一层 alias（28 处 + 路由双注册），收益低 |
-| **D3** | 名字类字段（`person_name`/`person_names`/`person_genders`/`person_slots`，211 处）一起改？ | **一起改**。否则出现 `partner_id` 配 `person_name`，比现在更割裂（DB 列本来就是中性的 `display_name`） |
-| **D4** | 两个改名（device / person）是否合并到同一个协议窗口？ | **合并**。机制相同，合并只有一次双名期、一次跨端发布、一次遥测判定；分两次就是两轮，且双名期可读性差要承受两遍 |
-| **D5** | 什么时候开始动手？ | 建议**等 M3 收尾、多空间上线稳定之后**单独排；不要和功能改动混在一批（改名机械、量大，混着做会让 review 失效） |
+| # | 决定 |
+| --- | --- |
+| **D1** | `person_id` → **`member_id`**（与表名 `space_members` 一致、不偏袒插槽；见下方分析：`partner` 在本仓库已是"第二人专属"词，用它会让 slot 0 也叫 partner）。`partner_slot` 是否改 `slot` **不在本计划内**（不强求） |
+| **D2** | HTTP 路径**不改**，只改字段。遗留一处表面不一致：`POST /devices/person-name` 的路径里 `devices` / `person` 两个词都旧了——本次保留（路径改名要路由双注册，收益低） |
+| **D3** | 名字类字段**一起改** → `member_name` / `member_names` / `member_genders` / `member_slots`（DB 列本来就是中性的 `display_name`） |
+| **D4** | 两个改名**合并到同一个协议窗口**：一次双名期、一次跨端发布、一次遥测判定 |
+| **D5** | **等 M3 收尾、多空间上线稳定后再执行**；不和功能改动混在一批（改名机械量大，混着做会让 review 失效） |
+
+### D6（执行前定，我的倾向）
+
+`POST /spaces` 创建时带两个名字：`person_name`（创建者/slot 0）与 `partner_name`（第二人/slot 1）。
+机械统一会让这对读成 `member_name` + `partner_name`（不对称）。我倾向：
+
+- **`person_name` → `creator_name`**（与 `partner_name` 成对、更可读），
+- `partner_name` / `partner_gender` / `partner_slot` **保持不动**；
+
+即：**泛称（按 id 索引的表）用 `member_*`，具体插槽用 `creator_*` / `partner_*`**。
+若老板想要"一路机械替换"，那就统一成 `member_name`，也可接受。
 
 ### D1 专门分析：`partner_id` vs `member_id`
 
@@ -128,7 +140,8 @@ slot 0（创建者）的身份也叫 `partner_id` —— 与"partner = 伴侣 = 
 
 ## 6. 执行清单（拍板后按此走）
 
-- [ ] 拍 D1–D5
+- [x] 拍 D1–D5（2026-09-22）
+- [ ] 定 D6（创建时两个名字字段的叫法）
 - [ ] P1：遥测列 + 版本双接受 + `protocolAliases.ts` + 未知键兼容测试
 - [ ] P2：`shared/` 改 → 三端发布 → 客户端读新回退旧 + 锁包老密文测试
 - [ ] 观察 `last_proto_version` 分布（`npm run audit` 或直接 SQL）

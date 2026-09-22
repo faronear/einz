@@ -8203,3 +8203,11 @@ D1–D5 决策点、执行清单。
 
 另：`aimemo/projectPlan.md` 最后更新停在 2026-09-09、内容是 Phase 0–4，与 Multiverse 后
 的现状脱节（多空间一直记在 multiSpaceDesign §8）——待老板决定是刷新还是作废。
+
+**改名计划拍板（2026-09-22）**：D1 `person_id` → **`member_id`**（不叫 partner_id，
+因 `partner` 在本仓库已是"第二人专属"词）、D2 HTTP 路径不改（只改字段）、
+D3 名字类字段一并改 `member_*`、D4 两个改名合并进同一协议窗口、
+D5 等 M3 收尾且多空间上线稳定后再执行。另留 **D6**（我的倾向）：`POST /spaces` 的
+`person_name`（创建者/slot 0）改 `creator_name`，与既有的 `partner_name`（第二人）成对
+——即"泛称用 member_*、具体插槽用 creator_*/partner_*"；老板不特别指定就按此执行。
+决定已写回 `aimemo/renamePlan.zhcn.md` §5；执行清单待开工时逐条勾。
