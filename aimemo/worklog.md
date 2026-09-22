@@ -8252,3 +8252,51 @@ D5 等 M3 收尾且多空间上线稳定后再执行。另留 **D6**（我的倾
 - 服务端：`npm run build` + 全套 `npm test` 无回归（含新增 3 条）。
 - App：`flutter analyze` 无 issue；**全量 `flutter test` 168 通过 0 失败**（1 跳过）。
 - 真机自测项（未读角标 / 两档破坏性入口 / device_uid 回填）仍待老板。
+
+## 2026-09-22 英文文案（首屏之外第一屏）+ 邀请报错可诊断化
+
+老板两件：① 英文第一屏标题 `Setup guide` → `Space setup`，说明改为
+"Create a secret space for two, or join an existing space via invitation."；
+② iOS 模拟器建空间生成邀请码、Android 模拟器使用报错 "Invalid invite link"，
+该文案改成 "Invalid invitation"（输入可能是邀请链接也可能是邀请码）。
+
+### 文案（en 为主，zh 同步跟了四处一致性）
+
+- `wizardStartTitle` en：Setup guide → **Space setup**；`setupEntryHint` en：按老板给的句子；
+- `setupTokenInvalid` en：Invalid invite link → **Invalid invitation**；
+  连带把同一组邀请文案统一成"覆盖链接与码"的口径（zh 也改）：
+  `setupTokenNeedInput`「请填写邀请码或邀请链接」、`setupTokenInvalid`「邀请码或链接无效」、
+  `setupTokenExpired`「邀请已过期」、`setupTokenUsed`「邀请已被使用」。
+
+### 报错为什么看不懂（这才是真问题）——已改造
+
+核了客户端解析路径：粘贴完整链接与扫码都走 `split('/join/')` 正确取出 token
+（`setup_page.dart:1625`），扫码头不过滤内容；服务端 `preflightJoin` **不消费** token
+（`spaces.ts` 只读 `used_at`）——所以**不是客户端 bug**。
+
+真相是**报错把成因吞了**：`_tokenErrorText` 的 `default` 分支把**一切**未知错误码
+（含 `PROTOCOL_VERSION_MISMATCH`、`NOT_FOUND`＝服务器没这个端点、401 等）一律显示成
+"邀请无效"。于是改造：
+
+1. **未知错误码挂上原始码**：`邀请码或链接无效（PROTOCOL_VERSION_MISMATCH）`——
+   不再伪装成邀请问题把人引偏；
+2. **`TOKEN_INVALID` 时把域名说清**：若输入是邀请链接且其域名与本机 `effectiveServer`
+   域名不同，附上"该邀请链接来自 X，本机连的是 Y——两台设备需要连同一台服务器"。
+   `TOKEN_INVALID` 最常见的真实成因就是**两台设备连的不是同一台服务器**（iOS 生成、
+   Android 用，两边各自 `effectiveServer` 可能不同；项目一期也不支持跨服务器空间）。
+   本地开发别名（localhost / 127.0.0.1 / ::1 / 0.0.0.0 / 10.0.2.2）归一后再比较，
+   避免"iOS 连 localhost:3000、Android 连 10.0.2.2:3000 其实是同一台"被误报。
+
+新增 l10n 键 `setupTokenOtherServer(other, current)`（zh+en 带占位符）。
+
+### 测试
+
+`widget_test.dart` 加 2 条：外域链接 → 报错同时含两个域名（用"同一条文案里同时包含"
+精确定位，避免与输入框内容混淆）；未知错误码 → 原样带出。
+`setup_join_passphrase_test.dart` 1 处断言随文案更新。
+全量 `flutter test` **170 通过 0 失败**（1 跳过）；`flutter analyze` 无 issue。
+
+### 待老板确认（真 bug 的定位）
+
+两台模拟器各自连的是哪台服务器？（App「关于秘境」页会显示地址。）若确实一台连开发
+服务器、一台连生产，则现象完全解释得通、且不是代码 bug；新报错文案会直接把域名说出来。

@@ -266,19 +266,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenInputHint => '邀请码';
 
   @override
-  String get setupTokenNeedInput => '必须填写邀请码';
+  String get setupTokenNeedInput => '请填写邀请码或邀请链接';
 
   @override
-  String get setupTokenInvalid => '无效的邀请码';
+  String get setupTokenInvalid => '邀请码或链接无效';
 
   @override
-  String get setupTokenExpired => '邀请码已过期';
+  String get setupTokenExpired => '邀请已过期';
 
   @override
-  String get setupTokenUsed => '邀请码已被使用';
+  String get setupTokenUsed => '邀请已被使用';
 
   @override
   String get setupTokenSpaceFull => '空间已满';
+
+  @override
+  String setupTokenOtherServer(String other, String current) {
+    return '该邀请链接来自 $other，本机连的是 $current——两台设备需要连同一台服务器';
+  }
 
   @override
   String setupTokenSpaceInfo(String name) {

@@ -104,11 +104,15 @@
   "setupTokenTitle": "验证邀请码",
   "setupTokenHint": "填写邀请码，24小时内一次性有效",
   "setupTokenInputHint": "邀请码",
-  "setupTokenNeedInput": "必须填写邀请码",
-  "setupTokenInvalid": "无效的邀请码",
-  "setupTokenExpired": "邀请码已过期",
-  "setupTokenUsed": "邀请码已被使用",
+  "setupTokenNeedInput": "请填写邀请码或邀请链接",
+  "setupTokenInvalid": "邀请码或链接无效",
+  "setupTokenExpired": "邀请已过期",
+  "setupTokenUsed": "邀请已被使用",
   "setupTokenSpaceFull": "空间已满",
+  "setupTokenOtherServer": "该邀请链接来自 {other}，本机连的是 {current}——两台设备需要连同一台服务器",
+  "@setupTokenOtherServer": {
+    "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
+  },
   "setupTokenSpaceInfo": "加入 {name} 的空间",
   "@setupTokenSpaceInfo": {
     "placeholders": {

@@ -1649,7 +1649,7 @@ class _SetupPageState extends State<SetupPage> {
         _joinToken = '';
         _joinSpaceId = null;
         _joinTokenVerified = false;
-        _localError = _tokenErrorText(e.code);
+        _localError = _tokenErrorText(e.code, raw: raw);
       });
       return false;
     } catch (e) {
@@ -1661,8 +1661,18 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 错误码 → 中文提示（PROTOCOL_MULTIVERSE.md §6 错误码表）。
-  String _tokenErrorText(String code) {
+  /// 错误码 → 提示（PROTOCOL_MULTIVERSE.md §6 错误码表）。
+  ///
+  /// [raw] 是用户原始输入：**仅用于把"邀请无效"的成因说清**（见下），不参与判定 token。
+  ///
+  /// 两条经验（老板 2026-09-22 实测"iOS 生成邀请码、Android 用 → 报无效"）：
+  /// 1. `TOKEN_INVALID` 最常见的成因**不是把码打错了**，而是**两台设备连的不是同一台
+  ///    服务器**（客户端侧解析已核：粘贴完整链接、扫码都会正确取出 token）→ 把链接里的
+  ///    域名与本机所连的域名一并报出来，省得对着"无效"猜；
+  /// 2. **未知错误码不许吞**：原先 default 一律显示"无效"，于是
+  ///    `PROTOCOL_VERSION_MISMATCH` / `NOT_FOUND`（服务器没这个端点）这类会被伪装成
+  ///    "邀请无效"，把排查引向错误方向 → 挂上原始码。
+  String _tokenErrorText(String code, {String raw = ''}) {
     final l10n = AppLocalizations.of(context)!;
     switch (code) {
       case 'TOKEN_EXPIRED':
@@ -1671,9 +1681,29 @@ class _SetupPageState extends State<SetupPage> {
         return l10n.setupTokenUsed;
       case 'SPACE_FULL':
         return l10n.setupTokenSpaceFull;
-      default:
+      case 'TOKEN_INVALID':
+        final other = _linkHost(raw);
+        final mine = Uri.tryParse(effectiveServer)?.host ?? '';
+        if (other != null && mine.isNotEmpty && other != mine) {
+          return '${l10n.setupTokenInvalid}（${l10n.setupTokenOtherServer(other, mine)}）';
+        }
         return l10n.setupTokenInvalid;
+      default:
+        return '${l10n.setupTokenInvalid}（$code）';
     }
+  }
+
+  /// 从用户输入取"邀请链接的域名"；不是链接（纯邀请码）返回 null。
+  ///
+  /// 本机开发别名（localhost / 127.0.0.1 / ::1 / 10.0.2.2）归一成同一个标记再比较——
+  /// iOS 模拟器连 `localhost:3000`、Android 模拟器连 `10.0.2.2:3000` 是**同一台**
+  /// 开发服务器，不能因为主机名不同就误报"用了不同服务器"。
+  String? _linkHost(String raw) {
+    if (!raw.contains('/join/')) return null; // 纯邀请码：没有域名可谈
+    final host = Uri.tryParse(raw)?.host ?? '';
+    if (host.isEmpty) return null;
+    const localAliases = {'localhost', '127.0.0.1', '::1', '0.0.0.0', '10.0.2.2'};
+    return localAliases.contains(host) ? 'local' : host;
   }
 
   /// 邀请码页扫码入口（老板要求 2026-09-10）：扫码后自动填入邀请码并自动

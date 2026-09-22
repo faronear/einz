@@ -12,7 +12,7 @@
   "setupPageNeedPassphrase": "❗️ Set a passphrase first",
   "wizardJoinPassphraseRequired": "❗️ Enter the passphrase to verify",
   "setupEnrollBoundNotice": "🎉 New device bound",
-  "wizardStartTitle": "Setup guide",
+  "wizardStartTitle": "Space setup",
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "Auto-detects if you're the first device",
   "wizardDetectFailed": "Cannot reach server — retrying…",
@@ -97,18 +97,22 @@
     }
   },
   "setupEntryTitle": "Choose a space",
-  "setupEntryHint": "Create a private space for two, or join via an invite link",
+  "setupEntryHint": "Create a secret space for two, or join an existing space via invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",
   "setupEntryLegacyServer": "Server version too old — please upgrade",
   "setupTokenTitle": "Verify invite link",
   "setupTokenHint": "Ask the creator for a one-time invite link or code",
   "setupTokenInputHint": "Paste the invite link or code",
-  "setupTokenNeedInput": "Enter the invite link or code",
-  "setupTokenInvalid": "Invalid invite link",
-  "setupTokenExpired": "Invite link expired",
-  "setupTokenUsed": "Invite link already used",
+  "setupTokenNeedInput": "Enter the invitation code or link",
+  "setupTokenInvalid": "Invalid invitation",
+  "setupTokenExpired": "Invitation expired",
+  "setupTokenUsed": "Invitation already used",
   "setupTokenSpaceFull": "Space is full",
+  "setupTokenOtherServer": "the link is from {other} but this app is connected to {current} — both devices must use the same server",
+  "@setupTokenOtherServer": {
+    "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
+  },
   "setupTokenSpaceInfo": "Join {name}'s space",
   "@setupTokenSpaceInfo": {
     "placeholders": {

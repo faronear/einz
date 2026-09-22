@@ -109,6 +109,51 @@ void main() {
     expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
   });
 
+  testWidgets('join：TOKEN_INVALID + 外域邀请链接 → 报错带出两个域名（跨服务器）',
+      (WidgetTester tester) async {
+    // 老板 2026-09-22 实测：iOS 生成邀请、Android 使用 → 报"邀请链接无效"。
+    // 客户端解析（粘贴完整链接/扫码）已核正确，最常见的真实成因是**两台设备连的不是
+    // 同一台服务器** → 报错必须把域名说出来，否则只能对着"无效"猜。
+    await tester.pumpWidget(wrapApp(
+      preflightOverride: (token) async =>
+          throw ApiException('TOKEN_INVALID', 'invalid join token', 400),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入秘境'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'https://other.example/join/ABC123');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+
+    // 一条错误文案里同时含两个域名（输入框里只有链接本身，故用"同时包含"精确定位错误行）
+    expect(
+      find.byWidgetPredicate((w) =>
+          w is Text &&
+          (w.data ?? '').contains('other.example') &&
+          (w.data ?? '').contains('einz.tic.cc')),
+      findsOneWidget,
+      reason: '报错应同时说出"链接来自哪"与"本机连的是哪"',
+    );
+  });
+
+  testWidgets('join：未知错误码不伪装成"邀请无效"，要挂上原始码', (WidgetTester tester) async {
+    // 原先 default 一律显示"邀请无效"，PROTOCOL_VERSION_MISMATCH / NOT_FOUND 这类
+    // 会被伪装成邀请问题，把排查引向错误方向。
+    await tester.pumpWidget(wrapApp(
+      preflightOverride: (token) async =>
+          throw ApiException('PROTOCOL_VERSION_MISMATCH', 'bad version', 400),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入秘境'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'https://einz.tic.cc/join/ABC123');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PROTOCOL_VERSION_MISMATCH'), findsOneWidget,
+        reason: '未知错误码必须原样带出');
+  });
+
   testWidgets('探测失败：启动屏保持旋转 Logo、无失败文字并自动重试（无输入框/信封入口）',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(probeOk: false));

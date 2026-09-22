@@ -173,7 +173,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardStartTitle.
   ///
   /// In en, this message translates to:
-  /// **'Setup guide'**
+  /// **'Space setup'**
   String get wizardStartTitle;
 
   /// No description provided for @wizardDetectTitle.
@@ -551,7 +551,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryHint.
   ///
   /// In en, this message translates to:
-  /// **'Create a private space for two, or join via an invite link'**
+  /// **'Create a secret space for two, or join an existing space via invitation.'**
   String get setupEntryHint;
 
   /// No description provided for @setupEntryCreate.
@@ -593,25 +593,25 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the invite link or code'**
+  /// **'Enter the invitation code or link'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Invalid invite link'**
+  /// **'Invalid invitation'**
   String get setupTokenInvalid;
 
   /// No description provided for @setupTokenExpired.
   ///
   /// In en, this message translates to:
-  /// **'Invite link expired'**
+  /// **'Invitation expired'**
   String get setupTokenExpired;
 
   /// No description provided for @setupTokenUsed.
   ///
   /// In en, this message translates to:
-  /// **'Invite link already used'**
+  /// **'Invitation already used'**
   String get setupTokenUsed;
 
   /// No description provided for @setupTokenSpaceFull.
@@ -619,6 +619,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Space is full'**
   String get setupTokenSpaceFull;
+
+  /// No description provided for @setupTokenOtherServer.
+  ///
+  /// In en, this message translates to:
+  /// **'the link is from {other} but this app is connected to {current} — both devices must use the same server'**
+  String setupTokenOtherServer(String other, String current);
 
   /// No description provided for @setupTokenSpaceInfo.
   ///

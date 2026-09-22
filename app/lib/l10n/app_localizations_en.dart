@@ -48,7 +48,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupEnrollBoundNotice => '🎉 New device bound';
 
   @override
-  String get wizardStartTitle => 'Setup guide';
+  String get wizardStartTitle => 'Space setup';
 
   @override
   String get wizardDetectTitle => 'Checking server status…';
@@ -258,7 +258,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Create a private space for two, or join via an invite link';
+      'Create a secret space for two, or join an existing space via invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
@@ -281,19 +281,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupTokenInputHint => 'Paste the invite link or code';
 
   @override
-  String get setupTokenNeedInput => 'Enter the invite link or code';
+  String get setupTokenNeedInput => 'Enter the invitation code or link';
 
   @override
-  String get setupTokenInvalid => 'Invalid invite link';
+  String get setupTokenInvalid => 'Invalid invitation';
 
   @override
-  String get setupTokenExpired => 'Invite link expired';
+  String get setupTokenExpired => 'Invitation expired';
 
   @override
-  String get setupTokenUsed => 'Invite link already used';
+  String get setupTokenUsed => 'Invitation already used';
 
   @override
   String get setupTokenSpaceFull => 'Space is full';
+
+  @override
+  String setupTokenOtherServer(String other, String current) {
+    return 'the link is from $other but this app is connected to $current — both devices must use the same server';
+  }
 
   @override
   String setupTokenSpaceInfo(String name) {
