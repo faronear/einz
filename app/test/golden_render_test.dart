@@ -373,20 +373,20 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.3.1_envelope.png'));
   });
 
-  testWidgets('向导 ⋯ 菜单：退出秘境确认弹窗（不触发 exit）', (WidgetTester tester) async {
+  testWidgets('向导 ⋯ 菜单：退出本应用确认弹窗（不触发 exit）', (WidgetTester tester) async {
     await pumpSetup(tester, keyPair: _goldenKeyPair); // 空名称表 → create 向导
     await tester.pumpAndSettle();
-    // 打开右上角 ⋯ 菜单（语言 / 退出秘境）
+    // 打开右上角 ⋯ 菜单（语言 / 退出本应用）
     await tester.tap(find.byType(PopupMenuButton<String>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('退出秘境'));
+    await tester.tap(find.text('退出本应用'));
     await tester.pumpAndSettle();
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
-    expect(find.text('退出秘境？'), findsOneWidget);
-    expect(find.text('即将在本机上退出秘境。'), findsOneWidget);
+    expect(find.text('退出本应用？'), findsOneWidget);
+    expect(find.text('即将关闭本应用。'), findsOneWidget);
     // 点取消关闭弹窗（不触发 exit）
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(find.text('退出秘境？'), findsNothing);
+    expect(find.text('退出本应用？'), findsNothing);
   });
 }

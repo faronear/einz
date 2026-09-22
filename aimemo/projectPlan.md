@@ -25,7 +25,7 @@
 
 - `[x]` **多空间 M3**（2026-09-22）：未读（服务端派生 `GET /messages/unread` + 数字角标）、
   术语（`docs/GLOSSARY.md`）、`projectPlan` 索引化
-- `[ ]` 多空间**真机自测**：空间级「销毁秘境入口」、`device_uid` 回填、未读角标、
+- `[ ]` 多空间**真机自测**：空间级「销毁本秘境入口」、`device_uid` 回填、未读角标、
   空间列表不再有破坏性入口
 - `[ ]` `productLens` 剩余复核：§12 设备管理 / §14 路线图仍是 v1 口径（§2 概念模型已修）
 - `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通

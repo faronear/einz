@@ -204,7 +204,7 @@
     }
   },
   "chatPageNameUnset": "未设置",
-  "chatPageMenuExit": "退出秘境",
+  "chatPageMenuExit": "退出本应用",
   "chatPageMenuMore": "菜单",
   "chatPageRenameNameTitle": "我的个人资料",
   "chatPageRenameNameLabel": "我的名字",
@@ -238,8 +238,8 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageExitTitle": "退出秘境？",
-  "chatPageExitMessage": "即将在本机上退出秘境。",
+  "chatPageExitTitle": "退出本应用？",
+  "chatPageExitMessage": "即将关闭本应用。",
   "save": "保存",
   "chatPageChangePassphraseTitle": "修改共享口令",
   "chatPageChangePassphraseSubmit": "修改",
@@ -427,8 +427,8 @@
   "aboutServerLabel": "服务器地址",
   "aboutServerDevNote": "开发地址（非生产），仅用于开发调试",
   "advancedMenuTitle": "高级",
-  "advancedLeaveSpace": "销毁秘境入口",
-  "leaveSpaceTitle": "销毁秘境入口？",
+  "advancedLeaveSpace": "销毁本秘境入口",
+  "leaveSpaceTitle": "销毁本秘境入口？",
   "leaveSpaceMessage": "将销毁本机在这个秘境里的入口，并清除本机上的聊天记录与密钥。\n\n秘境本身与服务器上的数据都还在，其他空间也不受影响——以后凭新的令牌可以重新加入。\n\n此操作无法撤销！",
   "resetDeviceNameLabel": "输入「{name}」以确认",
   "@resetDeviceNameLabel": {

@@ -503,7 +503,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageNameUnset => 'Unset';
 
   @override
-  String get chatPageMenuExit => 'Exit';
+  String get chatPageMenuExit => 'Quit app';
 
   @override
   String get chatPageMenuMore => 'Menu';
@@ -570,7 +570,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageExitTitle => 'Exit?';
+  String get chatPageExitTitle => 'Quit app?';
 
   @override
   String get chatPageExitMessage => 'Exits Einz on this device.';

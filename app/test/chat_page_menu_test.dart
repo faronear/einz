@@ -197,10 +197,10 @@ void main() {
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
     expect(find.text('高级'), findsOneWidget);
-    // 我的身份/入口名称（未传 → 显示「未设置」）+ 退出秘境
+    // 我的身份/入口名称（未传 → 显示「未设置」）+ 退出本应用
     expect(find.text('我的身份'), findsOneWidget);
     expect(find.text('入口名称'), findsOneWidget);
-    expect(find.text('退出秘境'), findsOneWidget);
+    expect(find.text('退出本应用'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text('高级'), findsOneWidget);
     expect(find.text('锁屏码'), findsOneWidget);
@@ -438,7 +438,7 @@ void main() {
     expect(find.text('新名字'), findsOneWidget);
   });
 
-  testWidgets('退出秘境：确认弹窗显示（不触发 exit）', (WidgetTester tester) async {
+  testWidgets('退出本应用：确认弹窗显示（不触发 exit）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -461,24 +461,24 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 菜单项较多（12 项 + 分隔线）会超出默认 800×600 测试视口，「退出秘境」落在
+    // 菜单项较多（12 项 + 分隔线）会超出默认 800×600 测试视口，「退出本应用」落在
     // y≈616 点不到；真机屏高（852）能完整显示，所以这里也把测试视口调高。
     tester.view.physicalSize = const Size(800, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    // 打开菜单 → 点「退出秘境」
+    // 打开菜单 → 点「退出本应用」
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('退出秘境'));
+    await tester.tap(find.text('退出本应用'));
     await tester.pumpAndSettle();
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
-    expect(find.text('退出秘境？'), findsOneWidget);
-    expect(find.text('即将在本机上退出秘境。'), findsOneWidget);
+    expect(find.text('退出本应用？'), findsOneWidget);
+    expect(find.text('即将关闭本应用。'), findsOneWidget);
     // 点取消关闭弹窗（不触发 exit）
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(find.text('退出秘境？'), findsNothing);
+    expect(find.text('退出本应用？'), findsNothing);
   });
 
   testWidgets('回车发送后输入框焦点保持（与图标发送一致）', (WidgetTester tester) async {
@@ -1242,7 +1242,7 @@ void main() {
     expect(find.text('我的空间'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
-  testWidgets('高级：破坏性入口改为空间级「销毁秘境入口」（不再整机重置）',
+  testWidgets('高级：破坏性入口改为空间级「销毁本秘境入口」（不再整机重置）',
       (WidgetTester tester) async {
     // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
     // 不该顺手抹掉本机上的其他空间 → 聊天页这格降级为空间级，整机清理由空间列表负责。
@@ -1274,12 +1274,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('高级'));
     await tester.pumpAndSettle();
-    expect(find.text('销毁秘境入口'), findsOneWidget, reason: '空间级文案');
+    expect(find.text('销毁本秘境入口'), findsOneWidget, reason: '空间级文案');
     expect(find.text('重置设备'), findsNothing, reason: '整机重置不该出现在单个空间里');
 
-    await tester.tap(find.text('销毁秘境入口'));
+    await tester.tap(find.text('销毁本秘境入口'));
     await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
-    expect(find.text('销毁秘境入口？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
+    expect(find.text('销毁本秘境入口？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
     expect(find.text('输入「iPhone」以确认'), findsOneWidget, reason: '闸门要求输入本机设备名');
   });
 }

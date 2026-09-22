@@ -204,7 +204,7 @@
     }
   },
   "chatPageNameUnset": "Unset",
-  "chatPageMenuExit": "Exit",
+  "chatPageMenuExit": "Quit app",
   "chatPageMenuMore": "Menu",
   "chatPageRenameNameTitle": "My profile",
   "chatPageRenameNameLabel": "My name",
@@ -238,7 +238,7 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageExitTitle": "Exit?",
+  "chatPageExitTitle": "Quit app?",
   "chatPageExitMessage": "Exits Einz on this device.",
   "save": "Save",
   "chatPageChangePassphraseTitle": "Change shared passphrase",

@@ -474,7 +474,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageNameUnset => '未设置';
 
   @override
-  String get chatPageMenuExit => '退出秘境';
+  String get chatPageMenuExit => '退出本应用';
 
   @override
   String get chatPageMenuMore => '菜单';
@@ -538,10 +538,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageExitTitle => '退出秘境？';
+  String get chatPageExitTitle => '退出本应用？';
 
   @override
-  String get chatPageExitMessage => '即将在本机上退出秘境。';
+  String get chatPageExitMessage => '即将关闭本应用。';
 
   @override
   String get save => '保存';
@@ -900,10 +900,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedMenuTitle => '高级';
 
   @override
-  String get advancedLeaveSpace => '销毁秘境入口';
+  String get advancedLeaveSpace => '销毁本秘境入口';
 
   @override
-  String get leaveSpaceTitle => '销毁秘境入口？';
+  String get leaveSpaceTitle => '销毁本秘境入口？';
 
   @override
   String get leaveSpaceMessage =>
