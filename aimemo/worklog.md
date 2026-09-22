@@ -7879,3 +7879,16 @@ app `flutter test` 140 过 1 skip（新增 2 条回归用例）；`flutter analy
 - `chat_page.dart` 状态小标语义（`delivered`/`read` 但无回执 → 现在显示"发送中"，
   应改单勾「服务器已收下」）：**老板要求单独讨论**，本轮故意没动。
 - 这条 bug 建议同步合并进 `feature/multiSpace` 分支。
+
+## 2026-09-22 状态小标：`delivered`/`read` 无对方回执 → 单勾（堵住上面那条链的第一环）
+
+老板确认了现场：最初显示的是**蓝色小飞机**，他点了几下，之后才变成永久红色「点击重发」。
+所以上一条记录里"delivered + 无回执 → 渲染成发送中"这一环是确定的，也正是诱因。
+
+改动（`chat_page.dart` `_buildSendStatusIcon`）：原来只有 `status == 'sent'` 才给单勾，
+`delivered`/`read` 若拿不到对方回执就一路掉进末尾的 pending 分支 → 蓝飞机。现在
+`sent`/`delivered`/`read` 都渲染成单勾（语义统一为"服务端已收下"），有回执才升双勾；
+pending 分支只剩真正的 pending 会走到。
+
+测试：`chat_send_status_test.dart` 新增一条用例（同身份另一设备发的、无回执 → 单勾、
+不是小飞机、也不是双勾），全量 141 过 1 skip。
