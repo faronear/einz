@@ -269,12 +269,22 @@ class AppLockService {
 
   /// 清除本地锁与密钥包（设备被撤销时调用：回到未配置状态，防止残留密钥）。
   ///
-  /// 全量清除（含所有空间的 Vault 条目与 Spaces 行）。多空间下**逐空间**的清除走
-  /// [removeSpace]；只有"整库清理/卸载即重置"才用这个。
+  /// 全量清除（含所有空间的 Vault 条目、资料与 Spaces 行）。多空间下**逐空间**的清除
+  /// 走 [removeSpace]；只有"整库清理/卸载即重置"才用这个。
+  ///
+  /// 注意与 [resetLocalData] 的分工：后者直接删 `app_state` 整表（真·全量），
+  /// 本方法是按已知键清单删，**新增 app_state 键时要记得同步到这里**。
   Future<void> clear() async {
     await SecureStore.delete(_securePlain);
     await (db.delete(db.appState)
-          ..where((s) => s.key.isIn({_kPackage, _kAttempts, _kLockedUntil, _kPlain, _kSkipped})))
+          ..where((s) => s.key.isIn({
+                _kPackage,
+                _kAttempts,
+                _kLockedUntil,
+                _kPlain,
+                _kSkipped,
+                _kProfile, // 旧全局资料键（多空间前的唯一一份，别漏）
+              })))
         .go();
     // per-space 资料键（app_lock.profile.<spaceId>）、待摘除标记与 Spaces 行一并清干净
     await (db.delete(db.appState)..where((s) => s.key.like('$_kProfile.%'))).go();

@@ -184,15 +184,21 @@ void main() {
       expect(rowB.keyVersion, 2);
     });
 
-    test('removeSpace 同时删 Spaces 行；clear() 全清', () async {
+    test('removeSpace 同时删 Spaces 行；clear() 全清（含旧全局资料键）', () async {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB);
       await lock.removeSpace('space-a');
       expect(await spaceIds(), ['space-b']);
 
+      // 旧全局资料键（多空间前的唯一一份）也要被 clear() 清掉
+      await lock.saveProfile(personName: '我', peerName: '对方', deviceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
+      expect((await lock.loadProfile(spaceId: 'space-b'))['peerName'], '对方B');
+
       await lock.clear();
       expect(await spaceIds(), isEmpty);
       expect(await lock.hasConfig, false);
+      expect(await lock.loadProfile(), isEmpty, reason: '裸的旧全局资料键也要清掉');
     });
 
     test('saveProfile(spaceId:) 写 per-space 键并同步 Spaces 行的名字', () async {
