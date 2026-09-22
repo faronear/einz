@@ -93,6 +93,11 @@ device↔(space, person) 映射（`devices` 加 `space_id` 列，或新表 `devi
 （App 侧目前没有设备列表界面，所以影响面只在 TUI）。是否改默认值 / 向导里允许改名，
 待老板定。
 
+精度边界：本地资料是按 **space** 存的（`app_lock.profile.<spaceId>`），不是按 `device_id`。
+所以严格说本地保存的是"本机**在这个秘境里**的入口名"。只有当**同一个 install 在同一个
+秘境里存在多行 devices**（例如同一台手机重复 join 同一空间）时，"per-space" 与
+"per-entry" 才会分叉——这种用法罕见，暂不为它增加一层键。
+
 ## 3. 数据设计
 
 ### 3.1 本地库：新增 `Spaces` 表（schemaVersion 6 → 7）
