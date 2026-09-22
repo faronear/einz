@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'dev_data_dir.dart';
 import 'media_cache.dart';
 
 /// 附件明文**长期存放**目录（`stored` 模式用）。
@@ -42,7 +43,7 @@ class AttachmentStore {
       // 其它平台异常：同样回落
     }
     try {
-      return _dir = await _ensure(await getApplicationSupportDirectory());
+      return _dir = await _ensure(await applyDevDataDir(getApplicationSupportDirectory));
     } catch (_) {
       return null; // 平台不可用：调用方按"没有本地副本"处理
     }
