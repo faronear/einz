@@ -67,12 +67,12 @@ void main() {
     expect(await lock.remainingLockSeconds, greaterThan(0));
   });
 
-  test('clear：删除锁包后 isSetup=false，原 PIN 无法再解锁（设备撤销清理）', () async {
+  test('clearPackage：删除锁包后 isSetup=false，原 PIN 无法再解锁', () async {
     await lock.setPin('1234', payload: payload);
     expect(await lock.isSetup, true);
 
-    await lock.clear();
-    expect(await lock.isSetup, false, reason: 'clear 后应回到未配置状态');
+    await lock.clearPackage();
+    expect(await lock.isSetup, false, reason: '锁包已删 → 回到未配置状态');
     await expectLater(lock.unlock('1234'), throwsA(isA<AppLockException>()),
         reason: '锁包已删，原 PIN 不应再能解锁');
   });
@@ -101,15 +101,22 @@ void main() {
     expect(unlocked.spaceId, 'space-test');
   });
 
-  test('clearPlain / clear：清除明文配置后 hasConfig=false', () async {
+  test('clearPlain：清除明文配置后 hasConfig=false', () async {
     await lock.savePlain(payload);
     expect(await lock.hasConfig, true);
     await lock.clearPlain();
-    expect(await lock.hasConfig, false, reason: 'clearPlain 只清无锁配置');
+    expect(await lock.hasConfig, false, reason: 'clearPlain 清无锁配置');
+    expect(await lock.loadPlain(), isNull, reason: '明文包已删');
+  });
 
-    await lock.savePlain(payload);
-    await lock.clear();
-    expect(await lock.hasConfig, false, reason: 'clear 清空全部（含明文）');
+  test('deviceUid：惰性生成并持久化（安装级）；app_state 被清后轮换', () async {
+    final first = await lock.deviceUid();
+    expect(first.length, 32, reason: '16 字节 hex，与服务端形状约束一致');
+    expect(await lock.deviceUid(), first, reason: '同一安装内稳定（每个空间读到同一个）');
+
+    // 「重置设备」= 清空 app_state 整表 → 下次生成新的：不该再被认成同一台设备
+    await db.delete(db.appState).go();
+    expect(await lock.deviceUid(), isNot(first), reason: '重置后应轮换');
   });
 
   test('saveProfile/loadProfile：资料（名字）持久化存取', () async {
@@ -145,13 +152,13 @@ void main() {
     expect(p!.spaceId, 'space-test');
   });
 
-  test('安装标记不影响 clear()：设备被撤销后仍清空密钥条目', () async {
+  test('安装标记不影响配置清除：同一安装内清掉明文包后不再算已配置', () async {
     await lock.ensureFreshInstall();
     await lock.savePlain(payload);
-    await lock.clear();
+    await lock.clearPlain();
     expect(await SecureStore.read('app_lock.plain'), isNull);
     expect(await lock.hasConfig, false);
-    // clear 之后同一安装内再启动：标记仍在 → 不会重复清理（也无残留可清）
+    // 清完之后同一安装内再启动：标记仍在 → 不会重复清理（也无残留可清）
     await lock.ensureFreshInstall();
     expect(await lock.hasConfig, false);
   });

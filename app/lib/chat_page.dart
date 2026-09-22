@@ -527,6 +527,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 每 3 秒轮询同步（WS 连接成功后降频为 30s 兜底；断开恢复高频——见 _onWsStatusChanged）
     _restartTicker(_tickerInterval);
     _registerPushToken();
+    _registerDeviceUid();
     if (widget.enableWs) {
       final ws = WsRealtimeService(
         server: effectiveServer,
@@ -1566,6 +1567,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     } catch (_) {
       // 忽略：APNs 未就绪（模拟器/未配 entitlement）时静默降级
+    }
+  }
+
+  /// 补登安装级设备标识（POST /devices/uid，幂等）。
+  ///
+  /// 用途：多空间下服务端要能知道"这台物理设备上挂了哪几个空间"（运维/审计），而
+  /// device_uid 是随 create/join 上报的——**存量设备**（多空间上线前入网的那批）不再走
+  /// 入网流程，只能在这里补一次。离线/老服务端（无此端点）时静默降级：它只是服务端侧
+  /// 认知，不参与任何功能。
+  ///
+  /// 只写**本空间**那一行：别的空间由客户端在那边进一次时各自补登。
+  Future<void> _registerDeviceUid() async {
+    if (widget.token.isEmpty) return;
+    try {
+      final uid = await AppLockService(widget.db ?? LocalDatabase.shared).deviceUid();
+      await (widget.api ?? ApiClient(effectiveServer)).registerDeviceUid(uid, widget.token);
+    } catch (_) {
+      // 忽略
     }
   }
 

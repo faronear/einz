@@ -121,7 +121,10 @@ VaultPayload = { version: 1, spaces: [AppLockPayload, ...], activeSpaceId: strin
   - `removeSpace(spaceId)`（含清理该空间的 SecureStore/锁包内条目 + Spaces 表行 + 该空间的
     消息/附件/媒体缓存/同步锚点；**不**清其他空间）
   - `setActiveSpace(spaceId)`
-  - `clear()` 语义保留 = 全量清除（仅「卸载即重置」/整库清理场景用）
+  - ~~`clear()` 语义保留 = 全量清除~~ → **2026-09-22 已删除**：M1 把撤销自毁改成
+    `removeSpace` 后它没有任何生产调用点，且它是"按已知键清单删"的实现（新增
+    app_state 键容易漏）。清除范围从此只有两家：**逐空间** `removeSpace(spaceId)`、
+    **全设备** `resetLocalData()`（`data/local_reset.dart`，删 app_state 整表，不会漏键）。
 - `AppLockService.clearPackage()/setPin()` 改为操作 Vault 整体；`saveProfile/loadProfile` 改为
   per-space（key 前缀 `app_lock.profile.<spaceId>`，迁移旧 key 到首个空间）。
 - attempts/lockout（`app_lock.dart:181`）天然是**整包粒度**，改为 Vault 后 = 一次 PIN 守护全部空间。
@@ -225,8 +228,9 @@ M2 改向导/聊天页时把 `widget.payload.spaceId` 传进去即可。
 
 ### 4.4 设备撤销自毁必须逐空间化 🔴（2026-09-22 新增，最高优先级）
 
-现状 `chat_page.dart:705-710`：设备被撤销 → `AppLockService.clear()` + 删全表（attachments /
-messages / sync_state）+ `MediaCache.deleteAll` + `AttachmentStore.clear` + 跳 SetupPage。
+**改前** `chat_page.dart:705-710`：设备被撤销 → `AppLockService.clear()`（该 API 已于
+2026-09-22 删除，见 §3.2）+ 删全表（attachments / messages / sync_state）+ `MediaCache.deleteAll`
++ `AttachmentStore.clear` + 跳 SetupPage。
 
 **已改（M1，2026-09-22）**：`_onDeviceRevoked` 改为 `removeSpace(widget.spaceId)`，只清该
 空间的凭证 + 消息/附件/同步锚点/回执/草稿/Spaces 行/per-space 设置键 + 这些消息的媒体缓存

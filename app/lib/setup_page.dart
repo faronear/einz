@@ -1738,6 +1738,8 @@ class _SetupPageState extends State<SetupPage> {
             escrowPassphrase: passphrase.isEmpty ? null : passphrase,
             publicKey: kp.publicKeyB64,
             deviceName: await _autoDeviceName(),
+            // 安装级设备标识（多空间）：同一台设备各空间共用，服务端内部关联用
+            deviceUid: await AppLockService(widget.db ?? LocalDatabase.shared).deviceUid(),
           ));
       if (!mounted) return;
       _sessionToken = created.sessionToken;
@@ -2232,6 +2234,8 @@ class _SetupPageState extends State<SetupPage> {
               publicKey: kp.publicKeyB64,
               partnerSlot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
               deviceName: await _autoDeviceName(),
+              // 安装级设备标识（多空间）：同一台设备各空间共用，服务端内部关联用
+              deviceUid: await AppLockService(widget.db ?? LocalDatabase.shared).deviceUid(),
             ));
         if (!mounted) return false;
         _sessionToken = join.sessionToken;

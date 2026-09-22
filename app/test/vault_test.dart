@@ -184,21 +184,17 @@ void main() {
       expect(rowB.keyVersion, 2);
     });
 
-    test('removeSpace 同时删 Spaces 行；clear() 全清（含旧全局资料键）', () async {
+    test('removeSpace 只删该空间的 Spaces 行与数据，另一个空间不受影响', () async {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB);
-      await lock.removeSpace('space-a');
-      expect(await spaceIds(), ['space-b']);
-
-      // 旧全局资料键（多空间前的唯一一份）也要被 clear() 清掉
-      await lock.saveProfile(personName: '我', peerName: '对方', deviceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
       await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
-      expect((await lock.loadProfile(spaceId: 'space-b'))['peerName'], '对方B');
 
-      await lock.clear();
-      expect(await spaceIds(), isEmpty);
-      expect(await lock.hasConfig, false);
-      expect(await lock.loadProfile(), isEmpty, reason: '裸的旧全局资料键也要清掉');
+      await lock.removeSpace('space-a');
+      expect(await spaceIds(), ['space-b'], reason: '只删被移除的那一行');
+      expect(await lock.loadProfile(spaceId: 'space-a'), isEmpty, reason: '该空间的资料键一并清掉');
+      expect((await lock.loadProfile(spaceId: 'space-b'))['peerName'], '对方B',
+          reason: '另一个空间完好');
     });
 
     test('saveProfile(spaceId:) 写 per-space 键并同步 Spaces 行的名字', () async {

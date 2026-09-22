@@ -51,6 +51,9 @@ class AppLockService {
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
   static const _kProfile = 'app_lock.profile'; // JSON: {personName, peerName, deviceName}
 
+  /// 安装级设备标识（同一物理设备各空间共用；服务端 devices.device_uid 的来源）。
+  static const _kDeviceUid = 'app_lock.device_uid';
+
   /// 本次安装的标记（随机 id）。**非密钥、非敏感**——它的全部意义就是"沙盒里有没有
   /// 东西"：drift 库随 App 卸载消失，安全存储条目不会，故"标记不在"= 全新安装。
   static const _kInstallId = 'app_lock.install_id';
@@ -83,6 +86,26 @@ class AppLockService {
     final r = Random.secure();
     return List.generate(
         16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  /// 安装级设备标识（服务端 `devices.device_uid`）：同一台物理设备上的所有空间
+  /// **共用这一份**，服务端据此把不同空间的 device_id 认成同一台机器。
+  ///
+  /// 定位（老板 2026-09-22 定）：
+  /// - 只做**服务端侧认知**（运维/审计/将来"整机退役"），不参与任何授权或破坏性
+  ///   操作的范围判断，也**绝不返回给任何客户端**（成员之间互不可见）；
+  /// - 生命周期 = **安装级**：卸载重装即换新；用户「重置设备」时随 app_state 整表
+  ///   清掉，下次调用自动生成新的（= 轮换）。
+  ///
+  /// 存 app_state 而不是 SecureStore：它与密钥无关，且在这里读安全存储会让一次
+  /// "取个 id"依赖平台支持（同 [loadProfile] 的教训，见 multiSpaceDesign §3.6）。
+  /// 惰性生成：首次调用落库，之后每次读回同一个值。
+  Future<String> deviceUid() async {
+    final existing = await _get(_kDeviceUid);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final fresh = _newInstallId(); // 同形状：16 字节 hex
+    await _set(_kDeviceUid, fresh);
+    return fresh;
   }
 
   /// 明文保存 Space Key 包（跳过 PIN 场景）：无锁包但有此明文时，
@@ -172,6 +195,11 @@ class AppLockService {
 
   /// 本地移除一个空间：Vault 条目 + 该空间的全部本地数据。
   /// **不动其他空间**。
+  ///
+  /// 清除范围的分工（别再加"全量清除"的第三个 API）：
+  /// - **逐空间** → 本方法（含被撤销时的自毁，见 chat_page._onDeviceRevoked）；
+  /// - **全设备** → `resetLocalData()`（`data/local_reset.dart`，删 app_state 整表 +
+  ///   安全存储 + 明文缓存，天生不会漏键）。
   ///
   /// [pin]：PIN 模式下重写密文包必须给；给不了（例如撤销发生在聊天页，那里没有
   /// pin 也不该留着 pin）时走"挂 pending + 立即清数据"，凭证条目等下次解锁再摘。
@@ -265,31 +293,6 @@ class AppLockService {
     await SecureStore.delete(_securePlain);
     await _deletePlainFromDb();
     await (db.delete(db.appState)..where((s) => s.key.equals(_kSkipped))).go();
-  }
-
-  /// 清除本地锁与密钥包（设备被撤销时调用：回到未配置状态，防止残留密钥）。
-  ///
-  /// 全量清除（含所有空间的 Vault 条目、资料与 Spaces 行）。多空间下**逐空间**的清除
-  /// 走 [removeSpace]；只有"整库清理/卸载即重置"才用这个。
-  ///
-  /// 注意与 [resetLocalData] 的分工：后者直接删 `app_state` 整表（真·全量），
-  /// 本方法是按已知键清单删，**新增 app_state 键时要记得同步到这里**。
-  Future<void> clear() async {
-    await SecureStore.delete(_securePlain);
-    await (db.delete(db.appState)
-          ..where((s) => s.key.isIn({
-                _kPackage,
-                _kAttempts,
-                _kLockedUntil,
-                _kPlain,
-                _kSkipped,
-                _kProfile, // 旧全局资料键（多空间前的唯一一份，别漏）
-              })))
-        .go();
-    // per-space 资料键（app_lock.profile.<spaceId>）、待摘除标记与 Spaces 行一并清干净
-    await (db.delete(db.appState)..where((s) => s.key.like('$_kProfile.%'))).go();
-    await (db.delete(db.appState)..where((s) => s.key.like('app_lock.pending_remove.%'))).go();
-    await db.delete(db.spaces).go();
   }
 
   /// 删除 app_state 里的旧版明文包（迁移/清理用）。
