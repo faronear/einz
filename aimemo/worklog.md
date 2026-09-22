@@ -8181,3 +8181,25 @@ M1 之后它没有生产调用点（撤销自毁改走 `removeSpace`），且是
 客户端在用旧名字"的遥测（服务端目前不记录客户端版本），且改名是纯可读性收益（用户零
 感知）、代价约 300 处标识符 + DB 列 + 协议字段 + 双名窗口 + 跨端发布一轮，双名窗口期内
 可读性反而更差。
+
+### 后续（同一天 2）：改名计划成文（device_id→entry_id、person_id→partner_id）
+
+老板要求：① 排 `device_id` → `entry_id` 的迁移计划；② 顺带把 `person_id` 改叫
+`partner_id`——理由是 `person` 该留给**真实个人**，而现在那个字段是"一个伴侣的插槽 id"，
+一个真人在多个秘境里会有多个 partner id，将来只应有一个 person id。
+
+产出 **`aimemo/renamePlan.zhcn.md`**（仅计划，未执行）：目标/不变量/非目标、改名对照、
+**实测改动面 ≈976 处标识符**（device 306 + person 459 + 名字类 211）、
+alias 三期机制（遥测列 `last_proto_version` + 版本双接受 + 双名映射集中单文件 + 未知键兼容）、
+风险表（🔴 锁包是 PIN 密文，老密文用旧键，新代码不回退读会让老用户**进不了聊天**）、
+D1–D5 决策点、执行清单。
+
+**D1 的关键发现（我提出保留意见）**：本仓库里 `partner` 已是"**插槽 1 专属**"词——
+`db.ts`/`spaces.ts` 写着"伴侣（partner_slot=1）"，向导的 `partnerName`/`partnerGender`
+是第二人的名字/性别；而 `person_id` 是**两个插槽都有**的。直接改名会让 slot 0（创建者）
+也叫 partner_id，与"partner = 伴侣 = 第二人"打架。→ 给两条路：**(a) `member_id`**
+（与表名 space_members 一致，零冲突，我推荐）；**(b) `partner_id`**（符合产品心智，
+但必须同时把 `partner_slot` 改成 `slot`，否则一词两义）。
+
+另：`aimemo/projectPlan.md` 最后更新停在 2026-09-09、内容是 Phase 0–4，与 Multiverse 后
+的现状脱节（多空间一直记在 multiSpaceDesign §8）——待老板决定是刷新还是作废。

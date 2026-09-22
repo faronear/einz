@@ -215,8 +215,8 @@ M2 改向导/聊天页时把 `widget.payload.spaceId` 传进去即可。
 
 > 术语以 **`docs/GLOSSARY.md`** 为准：物理设备 / **安装**（`device_uid`）/ **登记项**
 > （`devices` 表一行，`device_id`）三层。UI 用词服从用户习惯（保留「设备」并加限定词），
-> 代码与文档用层名。`device_id` → `entry_id` 这类 wire 改名**暂不做**（该文有完整理由与
-> 将来的迁移方案）。
+> 代码与文档用层名。`device_id` → `entry_id`、`person_id` → `partner_id`/`member_id`
+> 这类 wire 改名**暂不执行**，但计划已排：**`aimemo/renamePlan.zhcn.md`**。
 
 多空间让一台物理设备在每个空间各有一套**故意互不关联**的身份（device_id / 公私钥 /
 person_id / device_name）。这在协议上是干净的，但服务端因此**无法知道"这几行其实是

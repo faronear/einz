@@ -45,7 +45,11 @@
 | `device_person_map` | 本机维护的「设备 → 身份」映射（归属判定用） |
 | `push_tokens.device_id` | 登记项 id（一台机器在每个秘境的登记各有一行） |
 
-## 将来若要改 wire 字段名（现在不做）
+## 将来若要改 wire 字段名（**计划已排**：`aimemo/renamePlan.zhcn.md`）
+
+> 改名计划（`device_id` → `entry_id`、`person_id` → `partner_id`/`member_id`）已写成
+> 独立文档：**`aimemo/renamePlan.zhcn.md`**（分期、双名机制、风险、决策点）。本节保留
+> 机制层面的要点；**具体执行时以计划文档为准**。
 
 **地基已有**：REST 用请求头 `X-Protocol-Version`、WS 用握手 `?pv=` 做硬校验
 （`server/src/app.ts`），v1 → v2 那次协议收敛就是靠它切轨道的。
