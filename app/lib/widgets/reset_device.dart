@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
-import '../data/local_reset.dart';
+import '../widgets/top_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
-import '../setup_page.dart';
-import '../widgets/top_notice.dart';
 
 /// 破坏性操作的确认弹窗文案（空间级 / 设备级共用同一套结构，只换字）。
 class ConfirmDialogCopy {
@@ -58,14 +56,16 @@ Future<bool> _confirmDestructive(
 
 /// 尽力而为地让服务端退役**一个空间**的那台虚拟设备（只影响这一个空间的那一行）。
 ///
-/// 失败静默：离线、已被对方撤销、老服务端——都不该阻止本地移除（本地移除才是用户
-/// 要的结果）。服务端是否会残留这台设备，由调用方的确认文案事先说明。
-Future<void> retireSpaceQuietly(String token, {ApiClient? api}) async {
-  if (token.isEmpty) return;
+/// 失败不阻塞本地移除（本地移除才是用户要的结果），但**要把失败如实告诉用户**：
+/// 退役没成功 = 对方设备列表里这台设备仍是 active 的幽灵。返回是否成功，由调用方提示。
+Future<bool> retireSpaceQuietly(String token, {ApiClient? api}) async {
+  if (token.isEmpty) return false;
   try {
     await (api ?? ApiClient(effectiveServer)).retireDevice(token);
+    return true;
   } catch (_) {
-    // 忽略
+    // 离线 / 已被对方撤销 / 老服务端
+    return false;
   }
 }
 
@@ -102,79 +102,22 @@ Future<bool> confirmLeaveSpace(
   if (!ok || !context.mounted) return false;
 
   // 服务端退役：尽力而为（顺序不能反——token 在本地，清完就再也调不动它了）。
-  // 只影响这一个空间那一行，其他空间的设备行不动。
-  await retireSpaceQuietly(token, api: api);
+  // 只影响这一个空间那一行，其他空间的设备行不动。失败如实提示（顶部通知挂在根
+  // Overlay 上，本页随后 pop 也不影响它显示）。
+  final retired = await retireSpaceQuietly(token, api: api);
   // PIN 模式下这里没有 pin（聊天页不持有）→ removeSpace 走"挂 pending + 立即清数据"，
   // 凭证条目等下次解锁再摘（见 AppLockService.removeSpace 文档）。
   await AppLockService(database).removeSpace(spaceId);
+  if (!retired && context.mounted) {
+    showTopNotice(context, l10n.resetDeviceServerResidualHint);
+  }
   return true;
 }
 
-/// 「清除本设备全部数据」——**设备级**破坏性操作（空间列表页入口）。
-///
-/// 清空本机全部空间与数据：逐个空间的会话各退役一次（best-effort）→ resetLocalData()。
-/// 之所以要逐个 token 退役：一个会话只看得到自己那个空间的设备行，客户端手里有全部
-/// 空间的 token（Vault），所以"这台设备整体退网"由客户端逐个调，服务端不需要认识
-/// device_uid（device_uid 只用于服务端内部认知，见 deviceUid.ts）。
-Future<void> confirmResetDevice(
-  BuildContext context, {
-  LocalDatabase? db,
-  ApiClient? api,
-  required String deviceName,
-  required List<String> tokens,
-  bool hasPin = false,
-}) async {
-  if (!context.mounted) return;
-  final database = db ?? LocalDatabase.shared;
-  final l10n = AppLocalizations.of(context)!;
-  final ok = await _confirmDestructive(
-    context,
-    db: database,
-    deviceName: deviceName,
-    hasPin: hasPin,
-    copy: ConfirmDialogCopy(
-      title: l10n.resetDeviceTitle,
-      message: l10n.resetDeviceMessage,
-      confirmLabel: l10n.resetDeviceConfirm,
-    ),
-  );
-  if (!ok) return;
-  if (!context.mounted) return;
+// 「清除本设备全部数据」（设备级）**已删除**（老板 2026-09-22：太危险，不呈现给用户）。
+// 用户的等价路径：逐个空间「退出并清除这个空间」，或直接卸载重装（ensureFreshInstall
+// 会清掉残留密钥）。`data/local_reset.dart` 的 resetLocalData() 作为"整机清空"原语保留。
 
-  // 退役：尽力而为。这一步走网络，放在 dialog pop 之后由外层承担——dialog 内的
-  // busy 只覆盖 Argon2 解锁（毫秒级 vs 网络往返秒级），不顺带卡住 UI。
-  var allRetired = true;
-  final client = api ?? ApiClient(effectiveServer);
-  for (final token in tokens) {
-    if (token.isEmpty) {
-      allRetired = false;
-      continue;
-    }
-    try {
-      await client.retireDevice(token);
-    } catch (_) {
-      allRetired = false;
-    }
-  }
-  if (!context.mounted) return;
-
-  await resetLocalData(database);
-  if (!context.mounted) return;
-  if (!allRetired) {
-    showTopNotice(context, l10n.resetDeviceServerResidualHint);
-  }
-  // 清到根再进向导：中途的锁屏页/聊天页都不能留在栈上（它们的密钥已失效）
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => const SetupPage()),
-    (route) => false,
-  );
-}
-
-/// 重置确认弹窗：输入本机设备名 +（已设时）锁屏码，两道都对才提交。
-///
-/// 结构仿对话页的锁屏码弹窗（`chat_page._SetLockDialog`）：说明小字 + 输入框 +
-/// 行内红字报错 + 忙碌时禁用提交。错误一律在弹窗内红字报出，不叠第二个弹窗
-/// （老板 2026-09-15：两个叠着累赘）。
 /// 破坏性操作共用的确认弹窗：说明小字 + 输入本机设备名（+已设时的锁屏码）。
 ///
 /// 文案由 [copy] 注入（空间级 / 设备级各一套）。

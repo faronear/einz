@@ -946,16 +946,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'This leaves this space and erases its messages and keys from this device.\n\nYour other spaces are untouched, and the space itself with its server-side data is kept.\n\nThis cannot be undone!';
 
   @override
-  String get resetDeviceTitle => 'Erase everything on this device?';
-
-  @override
-  String get resetDeviceMessage =>
-      'This erases **every space** on this device together with its messages, attachments and keys, and returns to the new-device setup.\n\nThe spaces themselves stay on the server, and neither your other devices nor your partner\'s are affected.\n\nThis cannot be undone!';
-
-  @override
-  String get resetDeviceConfirm => 'Reset';
-
-  @override
   String resetDeviceNameLabel(String name) {
     return 'Type \"$name\" to confirm';
   }
@@ -983,20 +973,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListSwitch => 'Switch space';
 
   @override
-  String get spaceListManage => 'Manage spaces';
-
-  @override
-  String get spaceListDeleteTitle => 'Remove this space?';
-
-  @override
-  String get spaceListDeleteMessage =>
-      'This removes the space from this device only. Your other spaces are untouched, and the chat data on the server is kept. Removing it also unregisters this device from that space on the server (your partner\'s device list will show it as retired).';
-
-  @override
   String get spaceListDeleteConfirm => 'Remove';
-
-  @override
-  String get spaceListResetDevice => 'Erase everything on this device…';
 
   @override
   String spaceListMe(String name) {

@@ -15,6 +15,7 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/main.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz/space_list_page.dart';
+import 'package:einz/widgets/reset_device.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 /// 最小 fake：不发网络——/space 只回本设备（对方尚未加入），同步空；退役调用只记录。
@@ -109,12 +110,32 @@ void main() {
     expect(find.byType(SetupPage), findsNothing);
   });
 
-  testWidgets('空间列表：显示两个空间（名字取 Spaces 行），长按删除后只剩一个，并退役服务端那一行',
-      (WidgetTester tester) async {
+  testWidgets('空间列表：显示已绑定的空间（名字取 Spaces 行）+ 底部按钮通往第一屏', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final lock = AppLockService(db);
     await lock.ensureFreshInstall(); // 否则启动门会按"全新安装"清掉安全存储
+    await lock.savePlain(_payloadA);
+    await lock.addSpace(_payloadB);
+    await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
+
+    final vault = (await lock.loadVault())!;
+    await tester.pumpWidget(_app(SpaceListPage(vault: vault, db: db, api: _SoloDeviceApi())));
+    await _settle(tester);
+
+    expect(find.text('对方A'), findsOneWidget);
+    expect(find.text('对方B'), findsOneWidget);
+    expect(find.text('新建/加入空间'), findsOneWidget, reason: '底部按钮通往第一屏（创建/加入）');
+  });
+
+  testWidgets('空间列表：本页不做任何破坏性操作（老板 2026-09-22 定）', (WidgetTester tester) async {
+    // ①「移除某个空间」不在这里——它与聊天页菜单的「退出并清除这个空间」是同一件事；
+    // ②「清除本设备全部数据」太危险，不呈现给用户。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
     await lock.savePlain(_payloadA);
     await lock.addSpace(_payloadB);
     await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
@@ -125,43 +146,14 @@ void main() {
     await tester.pumpWidget(_app(SpaceListPage(vault: vault, db: db, api: api)));
     await _settle(tester);
 
-    expect(find.text('对方A'), findsOneWidget);
-    expect(find.text('对方B'), findsOneWidget);
-
-    // 长按第一个 → 二次确认 → 移除
+    // 没有溢出菜单（设备级清空入口已移除）
+    expect(find.byIcon(Icons.more_vert), findsNothing, reason: '不应再有设备级清空入口');
+    // 长按不弹「移除」确认，也不产生任何服务端退役调用
     await tester.longPress(find.text('对方A'));
     await tester.pumpAndSettle();
-    expect(find.text('移除'), findsOneWidget, reason: '应弹出二次确认');
-    await tester.tap(find.text('移除'));
-    await _settle(tester);
-
-    expect(find.text('对方A'), findsNothing);
-    expect(find.text('对方B'), findsOneWidget);
-    expect((await lock.loadVault())!.spaces.map((s) => s.spaceId), ['space-b']);
-    expect(api.retiredTokens, ['tok-a'],
-        reason: '移除空间应顺手让服务端退役这个空间那一行（只这一行）');
-  });
-
-  testWidgets('空间列表：溢出菜单里有设备级「清除本设备全部数据」入口', (WidgetTester tester) async {
-    final db = LocalDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    final lock = AppLockService(db);
-    await lock.ensureFreshInstall();
-    await lock.savePlain(_payloadA);
-    await lock.addSpace(_payloadB);
-    await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
-
-    final vault = (await lock.loadVault())!;
-    await tester.pumpWidget(_app(SpaceListPage(vault: vault, db: db, api: _SoloDeviceApi())));
-    await _settle(tester);
-
-    await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
-    expect(find.text('清除本设备全部数据…'), findsOneWidget,
-        reason: '设备级重置入口在空间列表页（不在单个空间里）');
-    // 关掉菜单，避免残留 route 影响 teardown
-    await tester.tapAt(const Offset(10, 10));
-    await tester.pumpAndSettle();
+    expect(find.text('移除'), findsNothing, reason: '长按不应再提供移除');
+    expect(api.retiredTokens, isEmpty, reason: '本页不应触发任何退役调用');
+    expect((await lock.loadVault())!.spaces.length, 2, reason: '两个空间都应还在');
   });
 
   testWidgets('空间列表：未读角标只出现在有未读的空间上（服务端派生）', (WidgetTester tester) async {
@@ -184,6 +176,44 @@ void main() {
     expect(find.text('3'), findsOneWidget, reason: '角标显示条数');
     expect(find.byKey(const ValueKey('unreadBadge-space-b')), findsNothing,
         reason: 'space-b 没未读 → 不显示角标');
+  });
+
+  testWidgets('「退出并清除这个空间」（唯一破坏性路径）：闸门通过 → 退役那一行 + 本地移除',
+      (WidgetTester tester) async {
+    // 空间列表页不再提供"移除"，所以这条路径现在是唯一的破坏性入口，单独钉住。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
+    expect((await db.select(db.spaces).get()).map((r) => r.spaceId), contains('space-a'));
+
+    final api = _SoloDeviceApi();
+    bool? left;
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () async {
+            left = await confirmLeaveSpace(ctx,
+                db: db, api: api, spaceId: 'space-a', token: 'tok-a', deviceName: 'iPhone');
+          },
+          child: const Text('开闸'),
+        ),
+      ),
+    )));
+
+    await tester.tap(find.text('开闸'));
+    await tester.pumpAndSettle();
+    expect(find.text('退出并清除这个空间？'), findsOneWidget, reason: '先过闸门');
+    await tester.enterText(find.byType(TextField), 'iPhone');
+    await tester.tap(find.text('移除'));
+    await tester.pumpAndSettle();
+
+    expect(left, isTrue);
+    expect(api.retiredTokens, ['tok-a'], reason: '只退役这一个空间那一行');
+    expect((await db.select(db.spaces).get()).map((r) => r.spaceId), isNot(contains('space-a')),
+        reason: '本地 Spaces 行应被移除');
   });
 
   testWidgets('切换空间后顶部条显示当前空间的对方名，不串到原空间', (WidgetTester tester) async {

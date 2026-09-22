@@ -81,7 +81,7 @@ class ChatPage extends StatefulWidget {
     this.peerName, // 对方名字（setup 探测传入；对话顶部条显示）
     this.publicKeyB64, // 设备公钥（b64，随锁包持久化；弹窗展示用）
     this.privateKeyB64, // 设备私钥（b64，随锁包持久化；补设锁写入新锁包）
-    this.onSwitchSpace, // 非空 → 菜单显示「切换空间」（多空间；由空间列表页注入）
+    this.onSwitchSpace, // 非空 → 菜单显示「切换空间」（回列表；由空间列表页注入）
     this.onManageSpaces, // 非空 → 菜单显示「空间管理」（单空间也能加第二个空间）
   });
 
@@ -116,7 +116,11 @@ class ChatPage extends StatefulWidget {
   /// 「切换空间」入口（多空间）。null = 单空间，不显示该菜单项。
   final VoidCallback? onSwitchSpace;
 
-  /// 「空间管理」入口：进入空间列表（单空间用户也能从这里加第二个空间）。
+  /// 「切换空间」入口的另一半：**手里有 pin 的入口**用它来 push 空间列表（单空间用户
+  /// 也能从这里加第二个空间——聊天页自己不读 Vault，因为它刻意不持有 PIN）。
+  ///
+  /// 与 [onSwitchSpace] 二选一注入，菜单里只出现**一条**「切换空间」（老板 2026-09-22：
+  /// 原来两条「切换空间 / 空间管理」指向的是同一个页面，合并成一条）。
   /// 需要 Vault/pin 上下文，故由入口注入；null = 不显示。
   final void Function(BuildContext context)? onManageSpaces;
 
@@ -3780,9 +3784,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 case 'devname':
                   _menuAction(() => _showRenameDialog(renameDevice: true));
                 case 'switchspace':
-                  widget.onSwitchSpace?.call();
-                case 'manage':
-                  widget.onManageSpaces?.call(context);
+                  // 有列表可退就退回（pop），否则让注入方 push（它手里有 pin）
+                  if (widget.onSwitchSpace != null) {
+                    widget.onSwitchSpace!();
+                  } else {
+                    widget.onManageSpaces?.call(context);
+                  }
                 case 'exit':
                   _menuAction(_showExitAppDialog);
               }
@@ -3909,18 +3916,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
-                // 空间组：紧贴「退出」上方（老板 2026-09-22：切换/管理空间属"离开当前
-                // 空间"一类操作，放在关于之下、退出之上）——「切换空间」只有从空间列表
-                // 进来时才注入回调；「空间管理」常驻（单空间用户也能加第二个空间）
-                if (widget.onSwitchSpace != null)
+                // 空间组：紧贴「退出」上方（老板 2026-09-22：切换空间属"离开当前空间"
+                // 一类操作，放在关于之下、退出之上）。回调由入口注入——聊天页自己不读
+                // Vault（PIN 模式下读/写 Vault 都要 pin，而它刻意不持有 PIN）。
+                // 「切换空间」：唯一的空间入口（2026-09-22 由「切换空间 / 空间管理」合并，
+                // 两者本来就指向同一个页面）。两个回调实际只会有一个非空（取决于谁注入）。
+                if (widget.onSwitchSpace != null || widget.onManageSpaces != null)
                   PopupMenuItem(
                     value: 'switchspace',
                     child: Text(l10n.spaceListSwitch, style: labelStyle),
-                  ),
-                if (widget.onManageSpaces != null)
-                  PopupMenuItem(
-                    value: 'manage',
-                    child: Text(l10n.spaceListManage, style: labelStyle),
                   ),
                 PopupMenuItem(
                   value: 'exit',

@@ -1318,7 +1318,7 @@ class _SetupPageState extends State<SetupPage> {
         reauth: () async =>
             (await _authenticate(kp, enroll.deviceId, spaceId: _spaceId.text.trim()))
                 .sessionToken,
-        // 刚配完就进聊天：这里也要给「空间管理」入口，否则用户必须重启 App
+        // 刚配完就进聊天：这里也要给「切换空间」入口，否则用户必须重启 App
         // 才能加第二个空间（老板 2026-09-22 实测反馈）
         onManageSpaces: (ctx) async {
           final pin = _pin.text;

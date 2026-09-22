@@ -1166,6 +1166,79 @@ void main() {
     expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, false);
   });
 
+  testWidgets('菜单：空间入口只有一条「切换空间」（原「空间管理」已合并）',
+      (WidgetTester tester) async {
+    // 老板 2026-09-22：两条菜单指向的是同一个页面，合并成一条。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    var switched = 0;
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+        onSwitchSpace: () => switched++,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('切换空间'), findsOneWidget, reason: '保留的一条');
+    expect(find.text('空间管理'), findsNothing, reason: '合并后不应再出现');
+    // 该项在弹层偏下，先滚到可见再点（否则 tap 的坐标命中不到它）
+    await tester.ensureVisible(find.text('切换空间'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('切换空间'));
+    await tester.pumpAndSettle();
+    expect(switched, 1, reason: '注入 onSwitchSpace 时应调用它（回列表）');
+  });
+
+  testWidgets('菜单：只注入 onManageSpaces 时也显示同一条「切换空间」',
+      (WidgetTester tester) async {
+    // 单空间直达路径没有列表可退，只能由注入方 push（它手里有 pin）——
+    // 但对用户来说仍是同一条「切换空间」。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    var managed = 0;
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+        onManageSpaces: (_) => managed++,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('切换空间'), findsOneWidget);
+    await tester.ensureVisible(find.text('切换空间'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('切换空间'));
+    await tester.pumpAndSettle();
+    expect(managed, 1, reason: '没有列表可退 → 调 onManageSpaces');
+  });
+
   testWidgets('高级：破坏性入口改为空间级「退出并清除这个空间」（不再整机重置）',
       (WidgetTester tester) async {
     // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
