@@ -66,7 +66,14 @@ class WsRealtimeService {
       onUnauthorized: () async {
         // session 过期（4401）：自动重新认证并更新 token，随后 WsClient 立即重连
         final fresh = await reauth?.call();
-        if (fresh != null) updateToken(fresh);
+        if (fresh == null) return;
+        updateToken(fresh);
+        // ★ 关键：WsClient 持有**自己的那一份** token（构造时拷贝），只更新本类的
+        //   _token 不管用——它会拿旧 token 重连 → 再被 4401 关掉 → 零延迟死循环
+        //   （2026-09-22 实测：把 /auth/challenge 打到 429 RATE_LIMITED，并连累
+        //   同一 IP 的邀请加入一起被限流）。CLI 侧一直是对的（chat_core.dart 更新了
+        //   wsClient），App 侧漏了这一行。
+        _client?.updateToken(fresh);
       },
       onEvent: (e) {
         if (e is WsMessageNewEvent) this.onMessageNew?.call();
