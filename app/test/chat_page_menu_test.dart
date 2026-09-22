@@ -670,8 +670,8 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
-    // profile 应已更新（改名后 _saveProfile 写入）
-    final p = await AppLockService(db).loadProfile();
+    // profile 应已更新（改名后 _saveProfile 按当前空间写入）
+    final p = await AppLockService(db).loadProfile(spaceId: 'space-demo');
     expect(p['personName'], 'Alice', reason: '改名应同步写本地 profile');
 
     // 模拟重启：新 ChatPage 实例（不带名字）→ 从 profile 恢复新名字

@@ -8,12 +8,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/main.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz/space_list_page.dart';
+import 'package:einz_shared/einz_shared.dart';
+
+/// 最小 fake：不发网络——/space 只回本设备（对方尚未加入），同步空。
+/// 用于验证「名字只能来自当前空间的 profile」，不会读到别的空间。
+class _SoloDeviceApi extends ApiClient {
+  _SoloDeviceApi() : super('http://fake');
+
+  @override
+  Future<SpaceResult> getSpace(String token) async => const SpaceResult(
+        spaceId: 'space-b',
+        devices: [
+          SpaceDevice(deviceId: 'dev-b', personId: 'person-b', status: 'active'),
+        ],
+      );
+
+  @override
+  Future<({
+    List<MessageEnvelope> messages,
+    List<Map<String, dynamic>> attachmentsMeta,
+    int lastSequence,
+    bool hasMore,
+  })> sync(String token, {int after = 0, int limit = 100}) async => (
+        messages: <MessageEnvelope>[],
+        attachmentsMeta: <Map<String, dynamic>>[],
+        lastSequence: after,
+        hasMore: false,
+      );
+}
 
 const _payloadA = AppLockPayload(
   spaceKeyB64: 'a2V5LWE=',
@@ -43,6 +72,10 @@ Widget _app(Widget home) => MaterialApp(
     );
 
 void main() {
+  setUpAll(() async {
+    await sodium();
+  });
+
   setUp(() {
     FlutterSecureStorage.setMockInitialValues({});
   });
@@ -90,5 +123,32 @@ void main() {
     expect(find.text('对方A'), findsNothing);
     expect(find.text('对方B'), findsOneWidget);
     expect((await lock.loadVault())!.spaces.map((s) => s.spaceId), ['space-b']);
+  });
+
+  testWidgets('切换空间后顶部条显示当前空间的对方名，不串到原空间', (WidgetTester tester) async {
+    // 回归（老板 2026-09-22）：新建空间对方还没加入时，ChatPage 从全局 profile
+    // 读到了别的空间的对方名 → 不论怎么切空间，顶部条都停在原空间的对方名上。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.saveProfile(
+        spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
+    await lock.saveProfile(
+        spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
+
+    await tester.pumpWidget(_app(ChatPage(
+      spaceId: 'space-b',
+      deviceId: 'dev-b',
+      spaceKey: await generateSpaceKey(),
+      keyVersion: 1,
+      token: 'tok',
+      db: db,
+      api: _SoloDeviceApi(),
+      enableWs: false,
+    )));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('对方B'), findsOneWidget, reason: '应显示 space-b 自己的对方名');
+    expect(find.text('对方A'), findsNothing, reason: '不能串到 space-a 的对方名');
   });
 }

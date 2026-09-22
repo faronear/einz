@@ -476,8 +476,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
     WidgetsBinding.instance.addObserver(this);
     final db = widget.db ?? LocalDatabase.shared;
-    // 名字未由向导传入（如 PIN 解锁后重启进聊天）→ 从本地 profile 恢复
-    AppLockService(db).loadProfile().then((p) {
+    // 名字未由向导传入（如 PIN 解锁后重启进聊天）→ 从本地 profile 恢复。
+    // 必须按 spaceId 读：多空间下全局键是所有空间共用的一格，会被别的空间覆写
+    // （老板 2026-09-22 实测：新建空间对方还没加入，顶部条却显示原空间的对方名）。
+    AppLockService(db).loadProfile(spaceId: widget.spaceId).then((p) {
       if (!mounted) return;
       setState(() {
         if (_myPersonName.isEmpty) _myPersonName = p['personName'] as String? ?? '';
@@ -553,6 +555,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 这里兜住旧服务端——旧 payload 无 person_id 时按原行为处理）
     if (event.personId != null && event.personId == widget.personId) return;
     final online = event.type == kWsTypePeerOnline;
+    // 对方刚上线（多半是刚加入本空间）：initState 那次 /space 只有我一人，
+    // 对方的名字/性别/身份槽位都还是空 → 同性别两人气泡会是同一个颜色
+    // （老板 2026-09-22 实测）。这里补拉一次把身份补齐。
+    if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
     if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
   }
 
@@ -640,8 +646,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _peerSlot = peerSlot;
       });
       // 校正结果回写本地快照：否则下次启动（尤其离线）又用回入网时的旧值
-      // （setState 只覆盖非空值，故不会把已有名字写成空）
+      // （setState 只覆盖非空值，故不会把已有名字写成空）；按 spaceId 写，仅落当前空间
       await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
+        spaceId: widget.spaceId,
         personName: _myPersonName,
         peerName: _peerName,
         deviceName: _myDeviceName,
@@ -1172,6 +1179,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (last is! num) return false;
         return now - last < 60 * 1000;
       });
+      // 对方由离线转在线（含"刚加入空间"——WS 事件可能漏，这里兜底）：补拉身份
+      if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
       if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
     } catch (_) {
       // 网络失败：保持上次状态
@@ -1429,8 +1438,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 同步当前名字到本地 profile（改名/改设备名后调用——重启从 profile 恢复）。
+  /// 按 spaceId 写：多空间下各空间一份，别互相覆写（2026-09-22）。
   Future<void> _saveProfile() async {
     await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
+      spaceId: widget.spaceId,
       personName: _myPersonName,
       peerName: _peerName,
       deviceName: _myDeviceName,
@@ -3737,18 +3748,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
               return [
                 // 「我的」组（关于我的信息）置顶：名字/头像/设备名称
-                // 多空间：置顶「切换空间」（只有从空间列表进来时才注入回调）
-                if (widget.onSwitchSpace != null)
-                  PopupMenuItem(
-                    value: 'switchspace',
-                    child: Text(l10n.spaceListSwitch),
-                  ),
-                // 空间管理（常驻：单空间用户也能从这里加第二个空间）
-                if (widget.onManageSpaces != null)
-                  PopupMenuItem(
-                    value: 'manage',
-                    child: Text(l10n.spaceListManage),
-                  ),
                 PopupMenuItem(
                   value: 'name',
                   child: Row(
@@ -3863,6 +3862,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
+                // 空间组：紧贴「退出」上方（老板 2026-09-22：切换/管理空间属"离开当前
+                // 空间"一类操作，放在关于之下、退出之上）——「切换空间」只有从空间列表
+                // 进来时才注入回调；「空间管理」常驻（单空间用户也能加第二个空间）
+                if (widget.onSwitchSpace != null)
+                  PopupMenuItem(
+                    value: 'switchspace',
+                    child: Text(l10n.spaceListSwitch, style: labelStyle),
+                  ),
+                if (widget.onManageSpaces != null)
+                  PopupMenuItem(
+                    value: 'manage',
+                    child: Text(l10n.spaceListManage, style: labelStyle),
+                  ),
                 PopupMenuItem(
                   value: 'exit',
                   child: Row(

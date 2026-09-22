@@ -8026,3 +8026,46 @@ Application Support、媒体缓存走 Caches），再配 `--dart-define=einzSecu
 顺带踩到一个 shell 坑（老问题又犯一次）：脚本里 `echo "… bundle id=$ID（独立…"` 中变量紧跟
 全角括号被吃进变量名，输出成了乱码 —— 已按 `feedback_bash_multibyte_var` 的教训避开（现在
 脚本里不再用行内变量）。
+
+## 2026-09-22 多空间真机自测反馈 3 条（菜单顺序 + 名字串空间 + 同性别气泡同色）
+
+老板在 `feature/multiSpace` 真机测出的 3 个问题，逐个定位到根因后修掉。
+
+### 1. 「切换空间」菜单位置
+
+菜单原本把 `switchspace` / `manage` 置顶，老板要求挪到「关于秘境」之下、「退出秘境」之上。
+两条空间相关项作为一组整体下移（只挪「切换空间」会让「空间管理」孤零零留在顶部）。
+`chat_page.dart` 的 `PopupMenuButton.itemBuilder`，纯顺序调整。
+
+### 2. 新建空间（对方未加入）后切空间，顶部条对方名停在原空间的名字上
+
+真因：**资料读写没带 spaceId**。`AppLockService.saveProfile/loadProfile` 早就支持
+`spaceId` 参数（M0.5 加了 per-space 键 `app_lock.profile.<spaceId>`），但 ChatPage 三处
+调用点全都没传 → 读写的是全局键 `app_lock.profile`，那是所有空间共用的一格，谁最后写谁说了算
+（`chat_page.dart:480` load、`:646` 校正回写、`:1438` 改名回写）。向导 `setup_page.dart:1272`
+本来就传了 spaceId，所以 per-space 数据是有的，只是 ChatPage 不去读。
+
+修法：三处补 `spaceId: widget.spaceId`。`loadProfile(spaceId:)` 保留「per-space 缺失时回退
+全局键」的兼容分支（v7 迁移不灌数据，老单空间用户的资料只在全局键里，靠这条兜住）。
+
+### 3. 创建空间后对方刚加入、互发消息，我这边两条气泡同色
+
+气泡按性别上色，**同性别**时靠「身份槽位」（slot：0=创建者 / 1=第二人）把第二人染成青色
+（`_bubbleColor`，2026-09-17 老板要求）。创建空间那一刻对方还没加入 → initState 那次
+`GET /space` 只有我一人 → `_peerGender` / `_peerSlot` 全空；对方后来加入时，除了改名或换头像
+收到 `profile.updated` 广播，**没有任何时机去补拉身份** → slot 一直是 null → 同性别两人就同色。
+（第 2 条又让 `_peerGender` 从别的空间读进来，两个 bug 叠加。）
+
+修法：对方「离线 → 在线」跳变时补拉一次 `/space`
+（`_onPeerStatus` 收 WS `peer.online`；`_refreshPeerOnline` 的 30s 轮询兜底，防 WS 事件漏），
+把对方的名字/性别/槽位补齐并回写 per-space profile。
+
+### 验证与测试
+
+- `flutter analyze` 无 issue。
+- 新增 2 条回归：`multi_space_pages_test.dart`（space-b 的 ChatPage 不能显示 space-a 的对方名）、
+  `chat_profile_refresh_test.dart`（对方离线→在线后补拉，名字与 peerSlot 补齐）。
+  另修正 2 处断言：`loadProfile()` → `loadProfile(spaceId: ...)`（改名/校正后应当落 per-space）。
+- 实跑 7 个相关测试文件（新增 2 条 + chat_bubble_gender / chat_page_menu / app_lock / vault /
+  ui_style_switch），全绿（28 + 29 两批）。
+- UI 观感（菜单位置、气泡颜色）仍由老板真机自测。
