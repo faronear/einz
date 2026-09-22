@@ -268,7 +268,7 @@ void main() {
     await tester.tap(find.text('下一步')); // preflight 通过 → 直接进下一页
     await tester.pumpAndSettle();
     expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
-    expect(find.text('加入 Lukas 的空间'), findsNothing, reason: '不再显示空间确认卡片');
+    expect(find.text('加入 Lukas 的秘境'), findsNothing, reason: '不再显示空间确认卡片');
     expect(find.textContaining('Lukas'), findsOneWidget, reason: '身份选择页展示第一人');
     expect(find.textContaining('Alice'), findsOneWidget, reason: '身份选择页展示第二人');
   });

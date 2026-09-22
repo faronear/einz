@@ -1,7 +1,7 @@
 // 多空间页面测试（M2/M3）：启动落点、空间选择弹层、切换秘境。
 //
 // 2026-09-22 重构：空间列表**独立页面已删除**，改为聊天页菜单里的「选择秘境」弹层
-// （小卡片瀑布流 + 底部「新建/加入空间」）；冷启动**直接进上次用的空间**。
+// （小卡片瀑布流 + 底部「新建/加入秘境」）；冷启动**直接进上次用的空间**。
 // 聊天页本身的重活（WS/同步）不在这里拉起——只验证"落点对不对"，
 // 交互细节由真机自测（老板 2026-09-13 的 UI 验证分工）。
 
@@ -117,7 +117,7 @@ void main() {
     expect(find.text('对方A'), findsOneWidget);
     expect(find.text('对方B'), findsOneWidget);
     expect(find.text('3'), findsOneWidget, reason: 'space-a 有 3 条未读');
-    expect(find.text('新建/加入空间'), findsOneWidget, reason: '底部通往第一屏');
+    expect(find.text('新建/加入秘境'), findsOneWidget, reason: '底部通往第一屏');
   });
 
   testWidgets('在弹层里选另一个空间 → 当前空间切换（不需要锁屏码）', (WidgetTester tester) async {

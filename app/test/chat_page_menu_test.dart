@@ -181,7 +181,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 抬头为品牌名（不显示空间 ID）；红绿灯已移入顶部条「我的」灯三态
+    // 抬头为品牌名（不显示秘境 ID）；红绿灯已移入顶部条「我的」灯三态
     // （enableWs:false → ws 未建立 → 我的灯为灰色「未连接服务」）
     expect(find.text('我的秘境'), findsOneWidget);
     expect(find.text('离线'), findsNothing); // AppBar 红绿灯文字已随红绿灯移除
@@ -1202,8 +1202,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(switched, 0);
     // 就地弹层（不是新页面）：能看到「选择秘境」内容与通往第一屏的入口
-    expect(find.text('我的空间'), findsOneWidget, reason: '弹层标题');
-    expect(find.text('新建/加入空间'), findsOneWidget, reason: '弹层底部通往第一屏');
+    expect(find.text('选择秘境'), findsOneWidget, reason: '弹层标题');
+    expect(find.text('新建/加入秘境'), findsOneWidget, reason: '弹层底部通往第一屏');
   });
 
   testWidgets('菜单：聊天页不再依赖任何注入也能开「切换秘境」（不再需要 pin）',
@@ -1239,7 +1239,7 @@ void main() {
     await tester.tap(find.text('切换秘境'));
     await tester.pumpAndSettle();
     expect(managed, 0);
-    expect(find.text('我的空间'), findsOneWidget, reason: '没有任何注入也照常开弹层');
+    expect(find.text('选择秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
   testWidgets('高级：破坏性入口改为空间级「销毁本秘境入口」（不再整机重置）',

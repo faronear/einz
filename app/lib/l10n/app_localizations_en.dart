@@ -973,7 +973,7 @@ class AppLocalizationsEn extends AppLocalizations {
       '⚠️ Local data erased, but retiring it on the server failed — this entrance may still show up in your partner\'s entrance list';
 
   @override
-  String get spaceListTitle => 'My spaces';
+  String get spaceListTitle => 'Choose a space';
 
   @override
   String get spaceListEmpty => 'No spaces joined yet';

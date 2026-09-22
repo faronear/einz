@@ -152,7 +152,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinIdentityHint => '一个秘境仅限两人，选择我的名字。';
 
   @override
-  String get wizardJoinNoSlots => '该空间未预置成员身份，无法加入';
+  String get wizardJoinNoSlots => '该秘境未预置成员身份，无法加入';
 
   @override
   String get wizardSlotOnline => '已在线';
@@ -161,7 +161,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSlotRequired => '必须选择一个身份';
 
   @override
-  String get wizardSpaceLimit => '空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间';
+  String get wizardSpaceLimit => '秘境数量已达上限（服务器 maxSpaces 限制）——暂不能新建秘境';
 
   @override
   String get wizardTitleInvite => '验证令牌';
@@ -183,7 +183,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      '该服务器已有空间（由另一个入口创建）。请改用“加入”向导，凭对方提供的一次性令牌加入。';
+      '该服务器已有秘境（由另一个入口创建）。请改用“加入”向导，凭对方提供的一次性令牌加入。';
 
   @override
   String get wizardEnrollGoJoin => '改用“加入”向导';
@@ -290,7 +290,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenUsed => '令牌已被使用';
 
   @override
-  String get setupTokenSpaceFull => '空间已满';
+  String get setupTokenSpaceFull => '秘境已满';
 
   @override
   String setupTokenOtherServer(String other, String current) {
@@ -299,11 +299,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupTokenSpaceInfo(String name) {
-    return '加入 $name 的空间';
+    return '加入 $name 的秘境';
   }
 
   @override
-  String get setupTokenSpacePrivate => '加入私密空间（等待第二位成员）';
+  String get setupTokenSpacePrivate => '加入私密秘境（等待第二位成员）';
 
   @override
   String get setupCreateShareTitle => '把令牌发给对方（也可用在自己的另一台设备上）';
@@ -907,7 +907,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      '将销毁本机在这个秘境里的入口，并清除本机上的聊天记录与密钥。\n\n秘境本身与服务器上的数据都还在，其他空间也不受影响——以后凭新的令牌可以重新加入。\n\n此操作无法撤销！';
+      '将销毁本机在这个秘境里的入口，并清除本机上的聊天记录与密钥。\n\n秘境本身与服务器上的数据都还在，其他秘境也不受影响——以后凭新的令牌可以重新加入。\n\n此操作无法撤销！';
 
   @override
   String resetDeviceNameLabel(String name) {
@@ -928,13 +928,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '⚠️ 本地数据已清除，但服务端退役未完成——对方的入口列表里可能仍留有这个入口';
 
   @override
-  String get spaceListTitle => '我的空间';
+  String get spaceListTitle => '选择秘境';
 
   @override
-  String get spaceListEmpty => '还没有加入任何空间';
+  String get spaceListEmpty => '还没有加入任何秘境';
 
   @override
-  String get spaceListAdd => '新建/加入空间';
+  String get spaceListAdd => '新建/加入秘境';
 
   @override
   String get spaceListSwitch => '切换秘境';
@@ -943,7 +943,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get promptLockCodeTitle => '输入锁屏码';
 
   @override
-  String get promptLockCodeHint => '新增空间要写入加密锁包，先验证本机锁屏码';
+  String get promptLockCodeHint => '新增秘境要写入加密锁包，先验证本机锁屏码';
 
   @override
   String get spaceListDeleteConfirm => '移除';
@@ -954,5 +954,5 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupPinReuseNotice => '该空间将沿用你当前的锁屏码。';
+  String get setupPinReuseNotice => '该秘境将沿用你当前的锁屏码。';
 }

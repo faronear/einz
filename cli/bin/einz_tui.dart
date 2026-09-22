@@ -871,7 +871,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   }
   if (store.spaceKey != null) {
     session.messages.add(
-        _systemMessage(session, '✅ 当前设备已绑定空间（一设备一空间，不重复创建）——/space address 查看'));
+        _systemMessage(session, '✅ 当前设备已绑定秘境（不重复创建）——/space address 查看'));
     return;
   }
   var displayName = store.personName ?? '';
@@ -1042,9 +1042,9 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   } catch (e) {
     // 空间数量上限：明确禁止提示（serverConfig.json maxSpaces——老板 2026-09-10）
     if (e is ApiException && e.code == 'SPACE_LIMIT_REACHED') {
-      session.messages.add(_systemMessage(session, '⚠️ 空间数量已达上限（服务器 maxSpaces 限制）——暂不能新建空间'));
+      session.messages.add(_systemMessage(session, '⚠️ 秘境数量已达上限（服务器 maxSpaces 限制）——暂不能新建秘境'));
     } else {
-      session.messages.add(_systemMessage(session, '⚠️ 创建空间失败: $e'));
+      session.messages.add(_systemMessage(session, '⚠️ 创建秘境失败: $e'));
     }
     _scheduleRender();
   }
@@ -1060,7 +1060,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
   }
   if (store.spaceKey != null) {
     session.messages.add(
-        _systemMessage(session, '✅ 当前设备已绑定空间（一设备一空间，不重复加入）——/space address 查看'));
+        _systemMessage(session, '✅ 当前设备已绑定秘境（不重复加入）——/space address 查看'));
     return;
   }
   // 兼容完整邀请链接：https://host/join/<token> → 提取 token
@@ -1080,7 +1080,7 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     // 设备，不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）
     final slots = pre.slots;
     if (slots.isEmpty) {
-      session.messages.add(_systemMessage(session, '⚠️ 该空间未预置成员身份，无法加入'));
+      session.messages.add(_systemMessage(session, '⚠️ 该秘境未预置成员身份，无法加入'));
       return;
     }
     session.messages.add(_systemMessage(session, '❓ 我是谁'));
@@ -3133,7 +3133,7 @@ Future<void> _execCommand(String line) async {
           s.session.messages.add(_systemMessage(
               s.session, '🔧 用法: /space address | /space create | /space join <邀请链接或 token>'));
         } else {
-          s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未绑定空间'));
+          s.session.messages.add(_systemMessage(s.session, '⚠️ 当前设备尚未绑定秘境'));
           s.session.messages.add(_systemMessage(
               s.session, '🔧 用法: /space create 新建私密空间；/space join <邀请链接或 token> 加入已有空间'));
         }
@@ -3471,7 +3471,7 @@ Future<void> _execInvite() async {
   final s = _state!;
   final store = s.session.store;
   if (store.spaceKey == null || store.spaceId == null) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 尚未绑定空间（先 /space create 或 /space join）'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 尚未绑定秘境（先 /space create 或 /space join）'));
     s.status = '';
     return;
   }
