@@ -1166,9 +1166,10 @@ void main() {
     expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, false);
   });
 
-  testWidgets('菜单：空间入口只有一条「切换空间」（原「空间管理」已合并）',
+  testWidgets('菜单：空间入口只有一条「切换空间」，点击直接开弹层（不再跳页）',
       (WidgetTester tester) async {
-    // 老板 2026-09-22：两条菜单指向的是同一个页面，合并成一条。
+    // 老板 2026-09-22：原「切换空间 / 空间管理」两条指向同一个东西，合并成一条；
+    // 且现在**不再跳页**（切换空间不需要锁屏码），点击就地弹「选择秘境」。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -1186,7 +1187,6 @@ void main() {
         db: db,
         api: _FakeApi(),
         enableWs: false,
-        onSwitchSpace: () => switched++,
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300));
@@ -1195,18 +1195,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('切换空间'), findsOneWidget, reason: '保留的一条');
     expect(find.text('空间管理'), findsNothing, reason: '合并后不应再出现');
-    // 该项在弹层偏下，先滚到可见再点（否则 tap 的坐标命中不到它）
+    // 该项在弹层偏下，先滚到可见再点
     await tester.ensureVisible(find.text('切换空间'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('切换空间'));
     await tester.pumpAndSettle();
-    expect(switched, 1, reason: '注入 onSwitchSpace 时应调用它（回列表）');
+    expect(switched, 0);
+    // 就地弹层（不是新页面）：能看到「选择秘境」内容与通往第一屏的入口
+    expect(find.text('我的空间'), findsOneWidget, reason: '弹层标题');
+    expect(find.text('新建/加入空间'), findsOneWidget, reason: '弹层底部通往第一屏');
   });
 
-  testWidgets('菜单：只注入 onManageSpaces 时也显示同一条「切换空间」',
+  testWidgets('菜单：聊天页不再依赖任何注入也能开「切换空间」（不再需要 pin）',
       (WidgetTester tester) async {
-    // 单空间直达路径没有列表可退，只能由注入方 push（它手里有 pin）——
-    // 但对用户来说仍是同一条「切换空间」。
+    // 以前单空间直达路径必须靠入口注入（因为 push 列表页需要 pin）；现在切换空间
+    // 不需要锁屏码（当前空间落明文键 + 内存会话 VaultSession），聊天页自己就能开弹层。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -1224,7 +1227,6 @@ void main() {
         db: db,
         api: _FakeApi(),
         enableWs: false,
-        onManageSpaces: (_) => managed++,
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300));
@@ -1236,7 +1238,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('切换空间'));
     await tester.pumpAndSettle();
-    expect(managed, 1, reason: '没有列表可退 → 调 onManageSpaces');
+    expect(managed, 0);
+    expect(find.text('我的空间'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
   testWidgets('高级：破坏性入口改为空间级「退出并清除这个空间」（不再整机重置）',

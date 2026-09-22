@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'about_page.dart';
 import 'brand_logo.dart';
 import 'chat_entry.dart';
-import 'space_list_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
@@ -98,27 +97,11 @@ class _LockPageState extends State<LockPage> {
     final vault = await _lock.unlockVault(pin);
     if (!mounted) return;
     final active = vault.active;
-    if (vault.spaces.length > 1) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => SpaceListPage(vault: vault, pin: pin, db: widget.db),
-      ));
-      return;
-    }
     if (active == null) return;
-    final db = widget.db;
+    // 注意：**不要**把 pin 捕获进任何长命闭包（以前的 onManageSpaces 就是这么把锁屏码
+    // 长期留在内存里的）。现在聊天页自己就能切空间（不需要 pin），这里只传解锁结果。
     Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) => buildChatPage(
-        active,
-        db: db,
-        // 单空间也能从这里加第二个空间（PIN 模式下改 Vault 需要 pin）
-        onManageSpaces: (ctx) async {
-          final v = await _lock.unlockVault(pin);
-          if (!ctx.mounted) return;
-          await Navigator.of(ctx).push(MaterialPageRoute(
-            builder: (_) => SpaceListPage(vault: v, pin: pin, db: db),
-          ));
-        },
-      ),
+      builder: (_) => buildChatPage(active, db: widget.db),
     ));
   }
 

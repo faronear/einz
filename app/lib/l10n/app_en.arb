@@ -434,8 +434,11 @@
   "resetDevicePinLabel": "This device's PIN",
   "resetDeviceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed — this device may still show up in your partner's device list",
   "spaceListTitle": "My spaces",
+  "spaceListEmpty": "No spaces joined yet",
   "spaceListAdd": "Create or join a space",
   "spaceListSwitch": "Switch space",
+  "promptLockCodeTitle": "Enter your lock code",
+  "promptLockCodeHint": "Adding a space rewrites the encrypted vault — confirm with your lock code first",
   "spaceListDeleteConfirm": "Remove",
   "spaceListMe": "Me: {name}",
   "@spaceListMe": {

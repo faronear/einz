@@ -1778,6 +1778,12 @@ abstract class AppLocalizations {
   /// **'My spaces'**
   String get spaceListTitle;
 
+  /// No description provided for @spaceListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No spaces joined yet'**
+  String get spaceListEmpty;
+
   /// No description provided for @spaceListAdd.
   ///
   /// In en, this message translates to:
@@ -1789,6 +1795,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Switch space'**
   String get spaceListSwitch;
+
+  /// No description provided for @promptLockCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your lock code'**
+  String get promptLockCodeTitle;
+
+  /// No description provided for @promptLockCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding a space rewrites the encrypted vault — confirm with your lock code first'**
+  String get promptLockCodeHint;
 
   /// No description provided for @spaceListDeleteConfirm.
   ///

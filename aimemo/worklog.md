@@ -8397,3 +8397,27 @@ removeSpace 同步内存会话）+ 复位全局会话；全量 `flutter test` **
 
 **下一步（等老板点头）**：弹层瀑布流 + 菜单「切换空间」直接开弹层 + 冷启动进上次空间 +
 删掉 `SpaceListPage`；其中"从弹层新建/加入空间"需要先输一次锁屏码（`addSpace` 要重写密文包）。
+
+## 2026-09-22 空间入口终局：删掉独立列表页，改成聊天页内的选择弹层
+
+老板定：① 删掉 `SpaceListPage`；② 弹层里「新建 / 加入空间」先过一次锁屏码；
+③ 选空间用**小卡片瀑布流**（强调"空间"概念）；④ **冷启动直接进上次的空间**。
+
+- 新增 `widgets/space_switcher.dart`：
+  `showSpacePicker`（弹层：小卡片瀑布流 + 未读角标 + 当前打勾 + 底部「＋ 新建/加入空间」）、
+  `switchToSpace`（更新明文键 → `pushReplacement` 新聊天页，**不需要 pin**）、
+  `addSpaceFlow`（先 `promptLockCode` 验锁屏码 → 第一屏向导 → addSpace → 换进新空间）。
+- 新增 `widgets/pin_prompt.dart`：「输入锁屏码」对话框，走 `AppLockService.unlock`
+  （与锁屏同一套 Argon2id + 防爆破）。
+- **删掉 `chat_page` 的 `onSwitchSpace` / `onManageSpaces`** 与全部注入点（main / lock_page /
+  setup_page / 原列表页）——顺带把"PIN 被闭包长期捕获"这条**真实泄漏**一起修掉
+  （见上一条：以前 `lock_page` 注入的回调把 pin 捕获进了聊天页生命周期）。
+- **删掉 `space_list_page.dart`**：它的两个职能（选空间、去第一屏）都被弹层吸收；
+  冷启动也不再落它。
+- 冷启动：`StartupGate` 不再按 `spaces.length > 1` 分支，**总是进 `vault.active`**（= 上次用的
+  空间，由明文键解析 + 读路径归一保证）。
+- 退出空间后：还有别的空间 → 直接切到下一个；一个不剩 → 回向导。
+
+测试：`multi_space_pages_test` 重写（冷启动落点决策 / 弹层瀑布流+角标+新建入口 / 弹层回传所选
+空间）；`chat_page_menu_test` 两条菜单用例改为"无注入也照常开弹层"。
+全量 `flutter test` **173 通过 0 失败**；`flutter analyze` 无 issue。

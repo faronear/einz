@@ -922,10 +922,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceListTitle => '我的空间';
 
   @override
+  String get spaceListEmpty => '还没有加入任何空间';
+
+  @override
   String get spaceListAdd => '新建/加入空间';
 
   @override
   String get spaceListSwitch => '切换空间';
+
+  @override
+  String get promptLockCodeTitle => '输入锁屏码';
+
+  @override
+  String get promptLockCodeHint => '新增空间要写入加密锁包，先验证本机锁屏码';
 
   @override
   String get spaceListDeleteConfirm => '移除';

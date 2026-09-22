@@ -967,10 +967,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListTitle => 'My spaces';
 
   @override
+  String get spaceListEmpty => 'No spaces joined yet';
+
+  @override
   String get spaceListAdd => 'Create or join a space';
 
   @override
   String get spaceListSwitch => 'Switch space';
+
+  @override
+  String get promptLockCodeTitle => 'Enter your lock code';
+
+  @override
+  String get promptLockCodeHint =>
+      'Adding a space rewrites the encrypted vault — confirm with your lock code first';
 
   @override
   String get spaceListDeleteConfirm => 'Remove';

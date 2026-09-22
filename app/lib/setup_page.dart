@@ -12,7 +12,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'about_page.dart';
 import 'brand_logo.dart';
 import 'chat_page.dart';
-import 'space_list_page.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
@@ -1318,21 +1317,8 @@ class _SetupPageState extends State<SetupPage> {
         reauth: () async =>
             (await _authenticate(kp, enroll.deviceId, spaceId: _spaceId.text.trim()))
                 .sessionToken,
-        // 刚配完就进聊天：这里也要给「切换空间」入口，否则用户必须重启 App
-        // 才能加第二个空间（老板 2026-09-22 实测反馈）
-        onManageSpaces: (ctx) async {
-          final pin = _pin.text;
-          final lock = AppLockService(widget.db ?? LocalDatabase.shared);
-          final v = pin.isNotEmpty ? await lock.unlockVault(pin) : await lock.loadVault();
-          if (v == null || !ctx.mounted) return;
-          await Navigator.of(ctx).push(MaterialPageRoute(
-            builder: (_) => SpaceListPage(
-              vault: v,
-              pin: pin.isEmpty ? null : pin,
-              db: widget.db,
-            ),
-          ));
-        },
+        // 「切换空间」不再需要注入回调：聊天页自己从内存会话（VaultSession）里取其他空间，
+        // 也不再需要锁屏码（当前空间落明文键）。刚配完就进聊天即可。
       ),
     ));
   }

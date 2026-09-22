@@ -434,8 +434,11 @@
   "resetDevicePinLabel": "本设备锁屏码",
   "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成——对方的设备列表里可能仍留有这台设备",
   "spaceListTitle": "我的空间",
+  "spaceListEmpty": "还没有加入任何空间",
   "spaceListAdd": "新建/加入空间",
   "spaceListSwitch": "切换空间",
+  "promptLockCodeTitle": "输入锁屏码",
+  "promptLockCodeHint": "新增空间要写入加密锁包，先验证本机锁屏码",
   "spaceListDeleteConfirm": "移除",
   "spaceListMe": "我：{name}",
   "setupPinReuseNotice": "该空间将沿用你当前的锁屏码。"

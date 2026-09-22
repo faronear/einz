@@ -10,7 +10,6 @@ import 'data/locale_settings.dart';
 import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
-import 'space_list_page.dart';
 import 'setup_page.dart';
 
 /// Einz 移动端（及桌面端）入口。
@@ -266,25 +265,11 @@ class _StartupGateState extends State<StartupGate> {
     if (vault != null) {
       // 无锁但已配置（用户确认跳过 PIN）：直接进聊天，免打扰（多空间则先给列表）。
       // 构造 ChatPage 收敛在 chat_entry.buildChatPage（三处入口共用）。
-      if (vault.spaces.length > 1) {
-        return SpaceListPage(vault: vault, db: widget.db);
-      }
+      // 老板 2026-09-22 定：冷启动**直接进上次用的空间**（不再先落一个选择页）。
+      // 切换/新建从聊天页菜单的「切换空间」弹层走（它不需要锁屏码）。
       final active = vault.active;
       if (active != null) {
-        final db = widget.db;
-        return buildChatPage(
-          active,
-          db: db,
-          // 单空间也能从这里加第二个空间（老板 2026-09-22 定：入口常驻）
-          onManageSpaces: (ctx) async {
-            final lock = AppLockService(db ?? LocalDatabase.shared);
-            final v = await lock.loadVault();
-            if (v == null || !ctx.mounted) return;
-            await Navigator.of(ctx).push(MaterialPageRoute(
-              builder: (_) => SpaceListPage(vault: v, db: db),
-            ));
-          },
-        );
+        return buildChatPage(active, db: widget.db);
       }
     }
     return SetupPage(db: widget.db);
