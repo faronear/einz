@@ -922,14 +922,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedMenuTitle => 'Advanced';
 
   @override
-  String get advancedResetDevice => 'Reset device';
+  String get advancedLeaveSpace => 'Leave and clear this space';
 
   @override
-  String get resetDeviceTitle => 'Reset device?';
+  String get leaveSpaceTitle => 'Leave and clear this space?';
+
+  @override
+  String get leaveSpaceMessage =>
+      'This leaves this space and erases its messages and keys from this device.\n\nYour other spaces are untouched, and the space itself with its server-side data is kept.\n\nThis cannot be undone!';
+
+  @override
+  String get resetDeviceTitle => 'Erase everything on this device?';
 
   @override
   String get resetDeviceMessage =>
-      'This erases every message, attachment and key on this device, and returns to the new-device setup.\n\nThe space itself stays on the server, and neither your other devices nor your partner\'s are affected.\n\nThis cannot be undone!';
+      'This erases **every space** on this device together with its messages, attachments and keys, and returns to the new-device setup.\n\nThe spaces themselves stay on the server, and neither your other devices nor your partner\'s are affected.\n\nThis cannot be undone!';
 
   @override
   String get resetDeviceConfirm => 'Reset';
@@ -969,10 +976,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get spaceListDeleteMessage =>
-      'This removes the space from this device only. Your other spaces are untouched, and nothing is deleted on the server (this device may still appear in your partner\'s device list).';
+      'This removes the space from this device only. Your other spaces are untouched, and the chat data on the server is kept. Removing it also unregisters this device from that space on the server (your partner\'s device list will show it as retired).';
 
   @override
   String get spaceListDeleteConfirm => 'Remove';
+
+  @override
+  String get spaceListResetDevice => 'Erase everything on this device…';
 
   @override
   String spaceListMe(String name) {

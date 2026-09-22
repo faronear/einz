@@ -1706,22 +1706,34 @@ abstract class AppLocalizations {
   /// **'Advanced'**
   String get advancedMenuTitle;
 
-  /// No description provided for @advancedResetDevice.
+  /// No description provided for @advancedLeaveSpace.
   ///
   /// In en, this message translates to:
-  /// **'Reset device'**
-  String get advancedResetDevice;
+  /// **'Leave and clear this space'**
+  String get advancedLeaveSpace;
+
+  /// No description provided for @leaveSpaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave and clear this space?'**
+  String get leaveSpaceTitle;
+
+  /// No description provided for @leaveSpaceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This leaves this space and erases its messages and keys from this device.\n\nYour other spaces are untouched, and the space itself with its server-side data is kept.\n\nThis cannot be undone!'**
+  String get leaveSpaceMessage;
 
   /// No description provided for @resetDeviceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Reset device?'**
+  /// **'Erase everything on this device?'**
   String get resetDeviceTitle;
 
   /// No description provided for @resetDeviceMessage.
   ///
   /// In en, this message translates to:
-  /// **'This erases every message, attachment and key on this device, and returns to the new-device setup.\n\nThe space itself stays on the server, and neither your other devices nor your partner\'s are affected.\n\nThis cannot be undone!'**
+  /// **'This erases **every space** on this device together with its messages, attachments and keys, and returns to the new-device setup.\n\nThe spaces themselves stay on the server, and neither your other devices nor your partner\'s are affected.\n\nThis cannot be undone!'**
   String get resetDeviceMessage;
 
   /// No description provided for @resetDeviceConfirm.
@@ -1793,7 +1805,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListDeleteMessage.
   ///
   /// In en, this message translates to:
-  /// **'This removes the space from this device only. Your other spaces are untouched, and nothing is deleted on the server (this device may still appear in your partner\'s device list).'**
+  /// **'This removes the space from this device only. Your other spaces are untouched, and the chat data on the server is kept. Removing it also unregisters this device from that space on the server (your partner\'s device list will show it as retired).'**
   String get spaceListDeleteMessage;
 
   /// No description provided for @spaceListDeleteConfirm.
@@ -1801,6 +1813,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove'**
   String get spaceListDeleteConfirm;
+
+  /// No description provided for @spaceListResetDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Erase everything on this device…'**
+  String get spaceListResetDevice;
 
   /// No description provided for @spaceListMe.
   ///

@@ -17,10 +17,18 @@ import 'package:einz/setup_page.dart';
 import 'package:einz/space_list_page.dart';
 import 'package:einz_shared/einz_shared.dart';
 
-/// 最小 fake：不发网络——/space 只回本设备（对方尚未加入），同步空。
-/// 用于验证「名字只能来自当前空间的 profile」，不会读到别的空间。
+/// 最小 fake：不发网络——/space 只回本设备（对方尚未加入），同步空；退役调用只记录。
+/// 用于验证「名字只能来自当前空间的 profile」与「移除空间会通知服务端退役那一行」。
 class _SoloDeviceApi extends ApiClient {
   _SoloDeviceApi() : super('http://fake');
+
+  /// 收到退役请求的 token（断言"移除空间顺手退役服务端那一行"用）。
+  final List<String> retiredTokens = [];
+
+  @override
+  Future<void> retireDevice(String token) async {
+    retiredTokens.add(token);
+  }
 
   @override
   Future<SpaceResult> getSpace(String token) async => const SpaceResult(
@@ -95,7 +103,7 @@ void main() {
     expect(find.byType(SetupPage), findsNothing);
   });
 
-  testWidgets('空间列表：显示两个空间（名字取 Spaces 行），长按删除后只剩一个',
+  testWidgets('空间列表：显示两个空间（名字取 Spaces 行），长按删除后只剩一个，并退役服务端那一行',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -106,8 +114,9 @@ void main() {
     await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
     await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
 
+    final api = _SoloDeviceApi();
     final vault = (await lock.loadVault())!;
-    await tester.pumpWidget(_app(SpaceListPage(vault: vault, db: db)));
+    await tester.pumpWidget(_app(SpaceListPage(vault: vault, db: db, api: api)));
     await _settle(tester);
 
     expect(find.text('对方A'), findsOneWidget);
@@ -123,6 +132,30 @@ void main() {
     expect(find.text('对方A'), findsNothing);
     expect(find.text('对方B'), findsOneWidget);
     expect((await lock.loadVault())!.spaces.map((s) => s.spaceId), ['space-b']);
+    expect(api.retiredTokens, ['tok-a'],
+        reason: '移除空间应顺手让服务端退役这个空间那一行（只这一行）');
+  });
+
+  testWidgets('空间列表：溢出菜单里有设备级「清除本设备全部数据」入口', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    await lock.addSpace(_payloadB);
+    await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
+
+    final vault = (await lock.loadVault())!;
+    await tester.pumpWidget(_app(SpaceListPage(vault: vault, db: db, api: _SoloDeviceApi())));
+    await _settle(tester);
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('清除本设备全部数据…'), findsOneWidget,
+        reason: '设备级重置入口在空间列表页（不在单个空间里）');
+    // 关掉菜单，避免残留 route 影响 teardown
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('切换空间后顶部条显示当前空间的对方名，不串到原空间', (WidgetTester tester) async {

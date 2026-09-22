@@ -1085,8 +1085,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
               ListTile(
                 leading: Icon(Icons.warning_amber_rounded, color: red),
-                title: Text(l10n.advancedResetDevice),
-                onTap: () => Navigator.of(ctx).pop('reset'),
+                title: Text(l10n.advancedLeaveSpace),
+                onTap: () => Navigator.of(ctx).pop('leave'),
               ),
             ],
           ),
@@ -1100,20 +1100,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     if (picked == 'passphrase') {
       await _showChangePassphraseDialog();
-    } else if (picked == 'reset') {
-      // 闸门所需的两个输入：设备名（确认清的是这台）与"是否设了锁屏码"（决定要不要验）。
+    } else if (picked == 'leave') {
+      // 阀门所需的两个输入：设备名（确认清的是这台）与"是否设了锁屏码"（决定要不要验）。
       // 都用 await 取，过一遍 mounted 再传进弹窗。
       final deviceName = await _resolveMyDeviceName();
       final hasPin = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
       if (!mounted) return;
-      await confirmResetDevice(
+      // **空间级**：只退出并清除当前空间，不动本机上的其他空间（老板 2026-09-22 定）。
+      // 整台设备的清理由空间列表页的「清除本设备全部数据」负责。
+      final left = await confirmLeaveSpace(
         context,
         db: widget.db,
         api: widget.api,
-        deviceName: deviceName,
+        spaceId: widget.spaceId,
         token: widget.token,
+        deviceName: deviceName,
         hasPin: hasPin,
       );
+      if (!left || !mounted) return;
+      // 有列表可退（从空间列表进来的）→ 退回列表，由它刷新/处理"一个不剩"；
+      // 没有列表（单空间直达路径）→ 直接回向导。
+      final back = widget.onSwitchSpace;
+      if (back != null) {
+        back();
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const SetupPage()),
+          (route) => false,
+        );
+      }
     }
   }
 

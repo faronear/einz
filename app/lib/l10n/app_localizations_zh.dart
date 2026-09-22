@@ -879,14 +879,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedMenuTitle => '高级';
 
   @override
-  String get advancedResetDevice => '重置设备';
+  String get advancedLeaveSpace => '退出并清除这个空间';
 
   @override
-  String get resetDeviceTitle => '重置设备？';
+  String get leaveSpaceTitle => '退出并清除这个空间？';
+
+  @override
+  String get leaveSpaceMessage =>
+      '将退出这个空间，并清除本设备上属于它的聊天记录与密钥。\n\n其他空间不受影响；秘境本身与服务器上的数据仍保留。\n\n此操作无法撤销！';
+
+  @override
+  String get resetDeviceTitle => '清除本设备全部数据？';
 
   @override
   String get resetDeviceMessage =>
-      '将清除本设备上的全部消息、附件与密钥，并回到新设备入网步骤。\n\n秘境本身仍保留在服务器上，你和对方的其他设备不受影响。\n\n此操作无法撤销！';
+      '将清除本设备上的**全部空间**及其消息、附件与密钥，并回到新设备入网步骤。\n\n秘境本身仍保留在服务器上，你和对方的其他设备不受影响。\n\n此操作无法撤销！';
 
   @override
   String get resetDeviceConfirm => '确认重置';
@@ -926,10 +933,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get spaceListDeleteMessage =>
-      '仅从这台设备移除该空间：其他空间不受影响，服务器上的数据也不会删除（对方的设备列表里可能仍会看到这台设备）。';
+      '仅从这台设备移除该空间：其他空间不受影响，服务器上的聊天数据也不会删除。移除时会让服务器把本设备从这个空间注销（对方的设备列表里会看到它已退役）。';
 
   @override
   String get spaceListDeleteConfirm => '移除';
+
+  @override
+  String get spaceListResetDevice => '清除本设备全部数据…';
 
   @override
   String spaceListMe(String name) {

@@ -413,9 +413,11 @@
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address (not production), for debugging only",
   "advancedMenuTitle": "Advanced",
-  "advancedResetDevice": "Reset device",
-  "resetDeviceTitle": "Reset device?",
-  "resetDeviceMessage": "This erases every message, attachment and key on this device, and returns to the new-device setup.\n\nThe space itself stays on the server, and neither your other devices nor your partner's are affected.\n\nThis cannot be undone!",
+  "advancedLeaveSpace": "Leave and clear this space",
+  "leaveSpaceTitle": "Leave and clear this space?",
+  "leaveSpaceMessage": "This leaves this space and erases its messages and keys from this device.\n\nYour other spaces are untouched, and the space itself with its server-side data is kept.\n\nThis cannot be undone!",
+  "resetDeviceTitle": "Erase everything on this device?",
+  "resetDeviceMessage": "This erases **every space** on this device together with its messages, attachments and keys, and returns to the new-device setup.\n\nThe spaces themselves stay on the server, and neither your other devices nor your partner's are affected.\n\nThis cannot be undone!",
   "resetDeviceConfirm": "Reset",
   "resetDeviceNameLabel": "Type \"{name}\" to confirm",
   "@resetDeviceNameLabel": {
@@ -430,8 +432,9 @@
   "spaceListSwitch": "Switch space",
   "spaceListManage": "Manage spaces",
   "spaceListDeleteTitle": "Remove this space?",
-  "spaceListDeleteMessage": "This removes the space from this device only. Your other spaces are untouched, and nothing is deleted on the server (this device may still appear in your partner's device list).",
+  "spaceListDeleteMessage": "This removes the space from this device only. Your other spaces are untouched, and the chat data on the server is kept. Removing it also unregisters this device from that space on the server (your partner's device list will show it as retired).",
   "spaceListDeleteConfirm": "Remove",
+  "spaceListResetDevice": "Erase everything on this device…",
   "spaceListMe": "Me: {name}",
   "@spaceListMe": {
     "placeholders": { "name": { "type": "String" } }

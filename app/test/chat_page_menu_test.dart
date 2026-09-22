@@ -1162,4 +1162,45 @@ void main() {
     expect(find.byType(BackButton), findsNothing);
     expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, false);
   });
+
+  testWidgets('高级：破坏性入口改为空间级「退出并清除这个空间」（不再整机重置）',
+      (WidgetTester tester) async {
+    // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
+    // 不该顺手抹掉本机上的其他空间 → 聊天页这格降级为空间级，整机清理由空间列表负责。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    // 预置 profile（含设备名——闸门第一道要它，否则退化为固定确认词）
+    await AppLockService(db).saveProfile(
+        spaceId: 'space-demo', personName: 'Lukas', peerName: 'Alice', deviceName: 'iPhone');
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('高级'));
+    await tester.pumpAndSettle();
+    expect(find.text('退出并清除这个空间'), findsOneWidget, reason: '空间级文案');
+    expect(find.text('重置设备'), findsNothing, reason: '整机重置不该出现在单个空间里');
+
+    await tester.tap(find.text('退出并清除这个空间'));
+    await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
+    expect(find.text('退出并清除这个空间？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
+    expect(find.text('输入「iPhone」以确认'), findsOneWidget, reason: '闸门要求输入本机设备名');
+  });
 }
