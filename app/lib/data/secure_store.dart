@@ -10,7 +10,16 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecureStore {
   SecureStore._();
 
-  static const _prefix = 'einz.secure.';
+  /// key 前缀。默认 `einz.secure.`；桌面端 debug 脚本（package.json 的
+  /// `desk-mac-run-local*`）会用 `--dart-define=einzSecurePrefix=…` 换成独立命名空间，
+  /// 与 `einzDevDataDir`（SQLite/附件/缓存换个目录，见 dev_data_dir.dart）配成一对：
+  /// debug 版和装机那份是同一个 app（同 bundle id、同沙盒容器），Keychain 里若不换
+  /// 前缀，两边就会读写同一批条目——正式那份被覆盖等于丢密钥。
+  /// ⚠ 发布脚本与 CI 绝不传这个 define（同 `docs/SERVER_SETTINGS.md` §6 的红线）。
+  static const _prefix = String.fromEnvironment(
+    'einzSecurePrefix',
+    defaultValue: 'einz.secure.',
+  );
 
   /// 无障碍级别选 `..._this_device`（iOS/macOS）：默认的 `unlocked` 会被
   /// **加密备份/换机恢复**带到新设备——用户换机还原备份即可读到旧消息。

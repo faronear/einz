@@ -113,6 +113,41 @@ open -a Einz --args --server http://localhost:3000      # macOS（走原生桥�
 测完本机数据属于开发服务器（连生产既用不了、也没有别的入口能卸掉），清场用
 **对话页菜单 → 高级 → 解绑设备**（桌面/手机同一入口：清本设备数据 → 回入网起点）。
 
+**macOS debug（源码运行，不打包）**
+
+`flutter run -d macos` 也能临时切服务器，两条路径都固化成 npm script 了：
+
+| 脚本                               | 走哪一层                                                      | 等价命令                                                                          |
+| ---------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `npm run desk-mac-run-local`       | 第 1 层：运行期 `--server`                                    | `cd app && flutter run -d macos -a --server=http://localhost:3000`                 |
+| `npm run desk-mac-run-localConfig` | 第 2 层：编译期 dart-define（读 `app/localConfig.macos.json`） | `cd app && flutter run -d macos --dart-define-from-file=localConfig.macos.json`   |
+
+`-a/--dart-entrypoint-args` 之所以能当 `--server` 用：桌面端工具把它拼进 app 可执行文件的
+argv（`flutter_tools/lib/src/desktop_device.dart:125`），而原生桥读的正是
+`ProcessInfo.processInfo.arguments`——和发布包 `open --args` 走**同一条代码路径**。
+注意 `hot reload / hot restart` 不会重读 dart-define（同移动端），改了要停掉重跑。
+
+**两个脚本都会把这次运行"关进小房间"**，所以可以放开手点。debug 版与装机的那份正式
+客户端**是同一个 app**（同 bundle id → 同沙盒容器 → 同一个 `einz.sqlite`），脚本额外传
+两个 define 把数据分开：
+
+- `--dart-define=einzDevDataDir=dev` → SQLite / 附件 / 媒体缓存统统落进各自基础目录下的
+  `dev/` 子目录（`app/lib/data/dev_data_dir.dart`），正式库一个字节都不动；
+- `--dart-define=einzSecurePrefix=einz.secure.dev.` → SecureStore 换 key 前缀，Keychain
+  条目与正式版分开（**必须**：同前缀会互相覆盖，正式那份被覆盖就是丢密钥）。
+
+两个开关都**只在非 release 构建生效**，且发布脚本与 CI 绝不传（§6 红线）。
+
+⚠ 直接 `flutter run -d macos`（不经过脚本）**没有这层隔离**——它和你装机的那份共用同一个
+容器库，等于拿正式数据连开发服务器。
+
+> 想更彻底（debug 版与正式版是两个 app、两个沙盒容器、各自 TCC 权限、可并排运行）就得换
+> bundle id：需要单独注册 App ID + provisioning profile（Debug 是自动签名，Xcode 对没注册
+> 过的新 id 找不到 profile 会直接构建失败：`No profiles for 'cc.tic.einz.dev' were found`），
+> 而且 `Runner/DebugProfile.entitlements` 里的 `keychain-access-groups` 是硬编码的
+> `cc.tic.einz`，换 id 后还要参数化成 `$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)`。
+> 目前没做，理由见 `app/lib/data/dev_data_dir.dart` 文件头。
+
 **TUI**
 
 ```bash

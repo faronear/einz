@@ -2,6 +2,9 @@ library;
 
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+
+import 'dev_data_dir.dart';
 
 /// Einz 客户端本地库（Local-First 主存储，DATABASE.md §3）。
 ///
@@ -148,6 +151,11 @@ class LocalDatabase extends _$LocalDatabase {
   static QueryExecutor _openConnection() => driftDatabase(
         name: 'einz',
         native: DriftNativeOptions(
+          // dev 运行（npm run desk-mac-run-local*）把库挪到 Documents/dev-*/ 下，
+          // 与装机那份正式库互不干扰；不启用时传 null = 用 drift 默认
+          // （getApplicationDocumentsDirectory()），生产路径一个字节都不动。
+          databaseDirectory:
+              devDataDirIsolated ? () => devSubDir(getApplicationDocumentsDirectory) : null,
           // 锁竞争容错（启动偶发 SqliteException(5) database is locked 根因）：
           // - journal_mode=WAL：读（SELECT）不再被写阻塞——"while selecting"
           //   锁错误来源消除；WAL 模式持久化在库文件头，每次连接再设一遍兜底

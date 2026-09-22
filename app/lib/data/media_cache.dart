@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'dev_data_dir.dart';
+
 /// 附件解密缓存（语音/视频播放用，方案 1+2）。
 ///
 /// 播放器（audioplayers/video_player）只认文件路径，解密后的明文必须落盘；
@@ -128,7 +130,8 @@ class MediaCache {
   /// （老板报「桌面版视频在消息流里是空白」的真凶）。`create(recursive:)` 幂等，
   /// 已存在时是 no-op。
   static Future<Directory> _cacheDirectory() async {
-    final dir = await getTemporaryDirectory();
+    // dev 运行时（npm run desk-mac-run-local*）落进 caches/dev-*/，不污染正式那份
+    final dir = await applyDevDataDir(getTemporaryDirectory);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
