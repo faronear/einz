@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'widgets/menu_metrics.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -3814,6 +3815,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 //   ③ 设置：语言 / 界面主题   ④ 安全：阅后即焚 / 附件存储 / 锁屏码 / 高级
                 //   ⑤ 结尾：关于秘境 / 切换秘境 / 退出本应用
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'name',
                   child: Row(
                     children: [
@@ -3824,6 +3826,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'avatar',
                   child: Row(
                     children: [
@@ -3841,8 +3844,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 // ①「我」与②「本入口」之间（老板 2026-09-22 要求单独一行）
-                const PopupMenuDivider(),
+                const PopupMenuDivider(height: kMenuDividerHeight),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'devname',
                   child: Row(
                     children: [
@@ -3853,12 +3857,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'invite',
                   child: Text(l10n.chatPageMenuInvite, style: labelStyle),
                 ),
-                const PopupMenuDivider(),
+                const PopupMenuDivider(height: kMenuDividerHeight),
                 // 系统设置组：语言/风格；分隔线以下是安全相关：阅后即焚/附件存储/PIN/高级
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'locale',
                   child: Row(
                     children: [
@@ -3869,6 +3875,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'style',
                   child: Row(
                     children: [
@@ -3878,8 +3885,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                const PopupMenuDivider(), // 分隔：以下是安全相关设置（老板要求 2026-09-10）
+                const PopupMenuDivider(height: kMenuDividerHeight), // 分隔：以下是安全相关设置（老板要求 2026-09-10）
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'burn',
                   child: Row(
                     children: [
@@ -3892,6 +3900,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'storage',
                   child: Row(
                     children: [
@@ -3902,6 +3911,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'pin',
                   child: Row(
                     children: [
@@ -3914,6 +3924,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 // 高级（二级菜单走底部弹层）——归在安全组
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'advanced',
                   child: Row(
                     children: [
@@ -3923,9 +3934,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                const PopupMenuDivider(),
+                const PopupMenuDivider(height: kMenuDividerHeight),
                 // 关于与退出一组（都在分割线下方，退出垫底）
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
@@ -3935,10 +3947,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 「切换空间」：唯一的空间入口（2026-09-22 由「切换空间 / 空间管理」合并，
                 // 两者本来就指向同一个页面）。两个回调实际只会有一个非空（取决于谁注入）。
                 PopupMenuItem(
+                    height: kMenuRowHeight,
                     value: 'switchspace',
                     child: Text(l10n.spaceListSwitch, style: labelStyle),
                   ),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'exit',
                   child: Row(
                     children: [

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'widgets/menu_metrics.dart';
 import 'dart:io' show exit;
 
 import 'package:flutter/material.dart';
@@ -152,6 +153,7 @@ class _LockPageState extends State<LockPage> {
             TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
         return [
           PopupMenuItem(
+            height: kMenuRowHeight,
             value: 'locale',
             child: Row(
               children: [
@@ -161,13 +163,15 @@ class _LockPageState extends State<LockPage> {
               ],
             ),
           ),
-          const PopupMenuDivider(),
+          const PopupMenuDivider(height: kMenuDividerHeight),
           // 关于与退出一组（都在分割线下方，退出垫底）——与对话页/向导页菜单一致
           PopupMenuItem(
+            height: kMenuRowHeight,
             value: 'about',
             child: Text(l10n.chatPageMenuAbout, style: labelStyle),
           ),
           PopupMenuItem(
+            height: kMenuRowHeight,
             value: 'exit',
             child: Row(
               children: [

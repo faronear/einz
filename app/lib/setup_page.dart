@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'widgets/menu_metrics.dart';
 import 'dart:convert';
 import 'dart:io' show exit;
 import 'dart:math';
@@ -361,6 +362,7 @@ class _SetupPageState extends State<SetupPage> {
               final langCode = Localizations.localeOf(context).languageCode;
               return [
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'locale',
                   child: Row(
                     children: [
@@ -370,13 +372,15 @@ class _SetupPageState extends State<SetupPage> {
                     ],
                   ),
                 ),
-                const PopupMenuDivider(),
+                const PopupMenuDivider(height: kMenuDividerHeight),
                 // 关于与退出一组（都在分割线下方，退出垫底）
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
                 PopupMenuItem(
+                  height: kMenuRowHeight,
                   value: 'exit',
                   child: Row(
                     children: [
