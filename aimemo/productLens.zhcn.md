@@ -347,6 +347,10 @@ Repositories（SQLite + File Storage）
 ### 8.3 服务端要点
 
 - **无账号体系 + 静态白名单**：不设 username / password / email；身份 = 白名单内的 Device 公钥（由配置文件定义，§5）。认证 = 证明持有对应私钥（challenge-response）。
+- ⚠️ **以下"数据模型要点"是 v1（静态白名单 / config.json）时期的描述，已被 Multiverse（v2）取代**：
+  设备登记改为 create/join 动态写入 `devices` 表，空间归属走 `space_members`，配置只留
+  `maxSpaces` 等服务端参数。**权威来源**：`docs/DATABASE.md`、`docs/PROTOCOL.md`、
+  `aimemo/multiSpaceDesign.zhcn.md`（多空间：per-space 身份 + 服务端侧 `device_uid` 认知）。
 - **数据模型要点：**（固定两人一空间，`spaces` / `space_members` 表不再需要，由配置文件表达）
 
 ```text
