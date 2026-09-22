@@ -7824,3 +7824,58 @@ media_cache）核实原稿断言，结果修正 6 处、补入 4 个漏掉的耦
 
 **方法论**：设计文档里的"现状断言"必须回代码核实再评审——这份文档写得相当扎实，但 6 处
 事实偏差里有 2 处（撤销自毁、附件缓存）会直接导致数据丢失，只读文档是发现不了的。
+
+## 2026-09-22 线上 bug：换设备后消息永远停在「点击重发」（红色标签）
+
+现象：Luk 的 iMac 客户端上，9/18 12:16 / 21:55 发给 Vic 的两条消息永远是红色「点击重发」，
+点按短暂重试后回到红色；Vic 9/21 重装安卓客户端后明明收到了。
+
+### 决定性证据（只读拷贝 iMac 客户端库到 /tmp 查的）
+
+库路径：`~/Library/Containers/cc.tic.einz/Data/Documents/einz.sqlite`（**不是** `~/Documents/
+einz.sqlite`，那是旧文件；macOS 沙盒容器才是真的）。关键三行：
+
+| 项 | 值 |
+| --- | --- |
+| 两条行的 status / server_sequence | `failed` / **123、124（非空！）** |
+| 两条行的 sender_device_id | `1395a5d0`（DoomBase，旧设备） |
+| 全库其它 62 条来自 1395a5d0 的 | 全 `delivered` |
+| local_created_at | 都是 9/21 11:59:52（同批 100+24 行 = 新设备锚点 0 全量拉取） |
+| sync_state 锚点 / peer_receipts | 138 / Vic=137 → 这两条**本该是双勾** |
+
+### 真实因果链（比服务器上那份诊断多一环）
+
+1. `chat_page.dart:369-405` 的状态小标：`delivered` + **回执为 null** 会掉进最后一个分支显示成
+   「发送中」蓝飞机。Vic 老设备 9/18 11:57 后就没同步过，水位停在 ~122 → **全库只有 123/124
+   这两条**没有回执 → 只有它们显示成"发不出去"。
+2. 老板点它（蓝飞机可点）→ `retryMessage` 原样重投旧信封 → 服务端 `messages.ts:67-69` 403
+   sender_device_id mismatch。
+3. `_isServerRejection` 把 4xx 当真拒绝 → 写回 `failed` → 红标。而 `chat_page.dart:350` 的
+   failed 分支排在 receipt 判断（:371）**之前**，所以 Vic 后来收到了也永远是红的。
+4. 永不愈合：`_flushPending` 只挑 pending；锚点 138 已越过 123/124，服务端不再下发；
+   重投永远 403（sender_device_id 是 AAD 的一部分，改不了）。
+
+服务器那份诊断的 §IV（"回程丢失→pending→401→reauth 缺 space_id→400"）**不是本案主因**
+（iMac 这两条本地 seq 是有值的），但它指的 reauth 缺 space_id 是真 bug，已一并修。
+另外报告说"CLI 传了 spaceId"也不准确：`cli/bin/einz_chat.dart:143` 同样漏传。
+
+### 已修（main 分支）
+
+1. **服务端** `messages.ts`：幂等查询提到 `sender_device_id` 校验之前——已入库的 message_id
+   直接返回原 seq，换设备后的重投不再 403（未入库的新消息仍必须 403，测试里正反都断言了）。
+2. **客户端** `message_repository.dart`：`retryMessage` 对已知 `serverSequence` 的行不重投，
+   直接置 `sent`。
+3. **客户端** `message_repository.dart`：`sync()` 增加 `_reconcileStuckFailed()`——failed 且
+   `serverSequence` 非空的行自动置 `sent`，**无需用户点按**即可自愈。
+4. **客户端** reauth 补 spaceId：`app_lock.dart:310`、`setup_page.dart:1093`（外加 cli 那处）。
+
+验证：server `npm test` 全绿（smoke 新增 2 条断言：换设备重投 200、未入库冒用仍 403）；
+app `flutter test` 140 过 1 skip（新增 2 条回归用例）；`flutter analyze` / `dart analyze` 干净。
+
+### 待办 / 未做
+
+- **服务端要重新部署**才生效；客户端要出新包。做完之前老板点一次重发也能立刻恢复
+  （修复 2 是纯本地判断）。
+- `chat_page.dart` 状态小标语义（`delivered`/`read` 但无回执 → 现在显示"发送中"，
+  应改单勾「服务器已收下」）：**老板要求单独讨论**，本轮故意没动。
+- 这条 bug 建议同步合并进 `feature/multiSpace` 分支。
