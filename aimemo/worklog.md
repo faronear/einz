@@ -7824,3 +7824,29 @@ media_cache）核实原稿断言，结果修正 6 处、补入 4 个漏掉的耦
 
 **方法论**：设计文档里的"现状断言"必须回代码核实再评审——这份文档写得相当扎实，但 6 处
 事实偏差里有 2 处（撤销自毁、附件缓存）会直接导致数据丢失，只读文档是发现不了的。
+
+## 2026-09-22 多空间 M0.5 开工（分支 feature/multiSpace）：Spaces 表 + Vault
+
+**做了什么**（数据底座，**没有任何 UI 改动**）：
+- `local_database.dart`：新增 `Spaces` 表（无 server 列、无密钥列），schemaVersion 6→7，
+  v7 迁移只建表——**首行不灌数据**，因为 PIN 模式下迁移阶段解不开密文包，改为解锁/读到
+  凭证时幂等补写（该决策已写进文档 §3.2）。
+- `app_lock.dart`：新增 `VaultPayload`（spaces/activeSpaceId/deviceName，旧单 payload 读时
+  归一，不重写旧密文）；`AppLockService` 加 `loadVault/saveVault/addSpace/removeSpace/
+  setActiveSpace/unlockVault/loadPlainVault/writePinVault/writePlainVault`；`unlock/loadPlain/
+  savePlain/setPin` 语义不变（返回 active 空间）；`clear()` 连 Spaces 行 + per-space 资料键
+  一起清。加了一道护栏：PIN 模式下不传 pin 调 Vault 读写直接 `StateError`（防静默降级明文）。
+- 新增 `test/vault_test.dart` 13 条用例。全量 `flutter test`：main 138 过 0 失败 → 分支
+  **151 过 0 失败**。
+
+**踩的坑（值得记）**：`saveProfile/loadProfile` 里我最初让它在 spaceId 缺省时**自己去读
+Vault 猜 active 空间**，结果 7 个 widget 测试挂死（pumpAndSettle 10 分钟超时）——读 Vault
+等于读安全存储，测试环境没 mock 就抛，把页面异步链打断（表现为"转圈不停"而不是报错）。
+改成 **spaceId 必须由调用点显式传，不传就走旧全局键**，7 个测试立刻全绿。
+**教训**：不要在"取个名字"这种低风险读路径上挂一个可能抛异常的 I/O；多空间化的默认值要
+退化到旧行为，而不是退化到"尽力猜"。
+
+**环境问题**：pub 缓存里 `mobile_scanner-7.4.0`、`record_windows-2.3.0`、
+`video_player_avfoundation-2.11.1`、`windows_file_picker-1.3.0` 是**残缺空目录**，导致
+`build_runner` 起不来（`Could not find a file named "pubspec.yaml"`）。删掉空目录后正常。
+另：`dart pub get` 会顺手升几个传递依赖，`pubspec.lock` 的无关变动已还原、不进分支。

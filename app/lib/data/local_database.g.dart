@@ -2574,6 +2574,562 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   }
 }
 
+class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SpacesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _spaceIdMeta = const VerificationMeta(
+    'spaceId',
+  );
+  @override
+  late final GeneratedColumn<String> spaceId = GeneratedColumn<String>(
+    'space_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _peerNameMeta = const VerificationMeta(
+    'peerName',
+  );
+  @override
+  late final GeneratedColumn<String> peerName = GeneratedColumn<String>(
+    'peer_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _keyVersionMeta = const VerificationMeta(
+    'keyVersion',
+  );
+  @override
+  late final GeneratedColumn<int> keyVersion = GeneratedColumn<int>(
+    'key_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastActiveAtMeta = const VerificationMeta(
+    'lastActiveAt',
+  );
+  @override
+  late final GeneratedColumn<int> lastActiveAt = GeneratedColumn<int>(
+    'last_active_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    spaceId,
+    name,
+    peerName,
+    personId,
+    deviceId,
+    keyVersion,
+    createdAt,
+    lastActiveAt,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'spaces';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Space> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('space_id')) {
+      context.handle(
+        _spaceIdMeta,
+        spaceId.isAcceptableOrUnknown(data['space_id']!, _spaceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_spaceIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    if (data.containsKey('peer_name')) {
+      context.handle(
+        _peerNameMeta,
+        peerName.isAcceptableOrUnknown(data['peer_name']!, _peerNameMeta),
+      );
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    }
+    if (data.containsKey('key_version')) {
+      context.handle(
+        _keyVersionMeta,
+        keyVersion.isAcceptableOrUnknown(data['key_version']!, _keyVersionMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('last_active_at')) {
+      context.handle(
+        _lastActiveAtMeta,
+        lastActiveAt.isAcceptableOrUnknown(
+          data['last_active_at']!,
+          _lastActiveAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {spaceId};
+  @override
+  Space map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Space(
+      spaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}space_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      peerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}peer_name'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      ),
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      keyVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}key_version'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      lastActiveAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_active_at'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $SpacesTable createAlias(String alias) {
+    return $SpacesTable(attachedDatabase, alias);
+  }
+}
+
+class Space extends DataClass implements Insertable<Space> {
+  final String spaceId;
+  final String name;
+  final String peerName;
+  final String? personId;
+  final String deviceId;
+  final int keyVersion;
+  final int createdAt;
+  final int lastActiveAt;
+  final int sortOrder;
+  const Space({
+    required this.spaceId,
+    required this.name,
+    required this.peerName,
+    this.personId,
+    required this.deviceId,
+    required this.keyVersion,
+    required this.createdAt,
+    required this.lastActiveAt,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['space_id'] = Variable<String>(spaceId);
+    map['name'] = Variable<String>(name);
+    map['peer_name'] = Variable<String>(peerName);
+    if (!nullToAbsent || personId != null) {
+      map['person_id'] = Variable<String>(personId);
+    }
+    map['device_id'] = Variable<String>(deviceId);
+    map['key_version'] = Variable<int>(keyVersion);
+    map['created_at'] = Variable<int>(createdAt);
+    map['last_active_at'] = Variable<int>(lastActiveAt);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  SpacesCompanion toCompanion(bool nullToAbsent) {
+    return SpacesCompanion(
+      spaceId: Value(spaceId),
+      name: Value(name),
+      peerName: Value(peerName),
+      personId: personId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(personId),
+      deviceId: Value(deviceId),
+      keyVersion: Value(keyVersion),
+      createdAt: Value(createdAt),
+      lastActiveAt: Value(lastActiveAt),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory Space.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Space(
+      spaceId: serializer.fromJson<String>(json['spaceId']),
+      name: serializer.fromJson<String>(json['name']),
+      peerName: serializer.fromJson<String>(json['peerName']),
+      personId: serializer.fromJson<String?>(json['personId']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      keyVersion: serializer.fromJson<int>(json['keyVersion']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      lastActiveAt: serializer.fromJson<int>(json['lastActiveAt']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'spaceId': serializer.toJson<String>(spaceId),
+      'name': serializer.toJson<String>(name),
+      'peerName': serializer.toJson<String>(peerName),
+      'personId': serializer.toJson<String?>(personId),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'keyVersion': serializer.toJson<int>(keyVersion),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'lastActiveAt': serializer.toJson<int>(lastActiveAt),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  Space copyWith({
+    String? spaceId,
+    String? name,
+    String? peerName,
+    Value<String?> personId = const Value.absent(),
+    String? deviceId,
+    int? keyVersion,
+    int? createdAt,
+    int? lastActiveAt,
+    int? sortOrder,
+  }) => Space(
+    spaceId: spaceId ?? this.spaceId,
+    name: name ?? this.name,
+    peerName: peerName ?? this.peerName,
+    personId: personId.present ? personId.value : this.personId,
+    deviceId: deviceId ?? this.deviceId,
+    keyVersion: keyVersion ?? this.keyVersion,
+    createdAt: createdAt ?? this.createdAt,
+    lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  Space copyWithCompanion(SpacesCompanion data) {
+    return Space(
+      spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
+      name: data.name.present ? data.name.value : this.name,
+      peerName: data.peerName.present ? data.peerName.value : this.peerName,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      keyVersion: data.keyVersion.present
+          ? data.keyVersion.value
+          : this.keyVersion,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastActiveAt: data.lastActiveAt.present
+          ? data.lastActiveAt.value
+          : this.lastActiveAt,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Space(')
+          ..write('spaceId: $spaceId, ')
+          ..write('name: $name, ')
+          ..write('peerName: $peerName, ')
+          ..write('personId: $personId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('keyVersion: $keyVersion, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastActiveAt: $lastActiveAt, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    spaceId,
+    name,
+    peerName,
+    personId,
+    deviceId,
+    keyVersion,
+    createdAt,
+    lastActiveAt,
+    sortOrder,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Space &&
+          other.spaceId == this.spaceId &&
+          other.name == this.name &&
+          other.peerName == this.peerName &&
+          other.personId == this.personId &&
+          other.deviceId == this.deviceId &&
+          other.keyVersion == this.keyVersion &&
+          other.createdAt == this.createdAt &&
+          other.lastActiveAt == this.lastActiveAt &&
+          other.sortOrder == this.sortOrder);
+}
+
+class SpacesCompanion extends UpdateCompanion<Space> {
+  final Value<String> spaceId;
+  final Value<String> name;
+  final Value<String> peerName;
+  final Value<String?> personId;
+  final Value<String> deviceId;
+  final Value<int> keyVersion;
+  final Value<int> createdAt;
+  final Value<int> lastActiveAt;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const SpacesCompanion({
+    this.spaceId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.peerName = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.keyVersion = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastActiveAt = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SpacesCompanion.insert({
+    required String spaceId,
+    this.name = const Value.absent(),
+    this.peerName = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.keyVersion = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastActiveAt = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : spaceId = Value(spaceId);
+  static Insertable<Space> custom({
+    Expression<String>? spaceId,
+    Expression<String>? name,
+    Expression<String>? peerName,
+    Expression<String>? personId,
+    Expression<String>? deviceId,
+    Expression<int>? keyVersion,
+    Expression<int>? createdAt,
+    Expression<int>? lastActiveAt,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (spaceId != null) 'space_id': spaceId,
+      if (name != null) 'name': name,
+      if (peerName != null) 'peer_name': peerName,
+      if (personId != null) 'person_id': personId,
+      if (deviceId != null) 'device_id': deviceId,
+      if (keyVersion != null) 'key_version': keyVersion,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastActiveAt != null) 'last_active_at': lastActiveAt,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SpacesCompanion copyWith({
+    Value<String>? spaceId,
+    Value<String>? name,
+    Value<String>? peerName,
+    Value<String?>? personId,
+    Value<String>? deviceId,
+    Value<int>? keyVersion,
+    Value<int>? createdAt,
+    Value<int>? lastActiveAt,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return SpacesCompanion(
+      spaceId: spaceId ?? this.spaceId,
+      name: name ?? this.name,
+      peerName: peerName ?? this.peerName,
+      personId: personId ?? this.personId,
+      deviceId: deviceId ?? this.deviceId,
+      keyVersion: keyVersion ?? this.keyVersion,
+      createdAt: createdAt ?? this.createdAt,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (spaceId.present) {
+      map['space_id'] = Variable<String>(spaceId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (peerName.present) {
+      map['peer_name'] = Variable<String>(peerName.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (keyVersion.present) {
+      map['key_version'] = Variable<int>(keyVersion.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (lastActiveAt.present) {
+      map['last_active_at'] = Variable<int>(lastActiveAt.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SpacesCompanion(')
+          ..write('spaceId: $spaceId, ')
+          ..write('name: $name, ')
+          ..write('peerName: $peerName, ')
+          ..write('personId: $personId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('keyVersion: $keyVersion, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastActiveAt: $lastActiveAt, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   $LocalDatabaseManager get managers => $LocalDatabaseManager(this);
@@ -2585,6 +3141,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $DraftsTable drafts = $DraftsTable(this);
   late final $AppStateTable appState = $AppStateTable(this);
   late final $PeerReceiptsTable peerReceipts = $PeerReceiptsTable(this);
+  late final $SpacesTable spaces = $SpacesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2596,6 +3153,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     drafts,
     appState,
     peerReceipts,
+    spaces,
   ];
 }
 
@@ -4215,6 +4773,287 @@ typedef $$PeerReceiptsTableProcessedTableManager =
       PeerReceipt,
       PrefetchHooks Function()
     >;
+typedef $$SpacesTableCreateCompanionBuilder = SpacesCompanion Function({
+  required String spaceId,
+  Value<String> name,
+  Value<String> peerName,
+  Value<String?> personId,
+  Value<String> deviceId,
+  Value<int> keyVersion,
+  Value<int> createdAt,
+  Value<int> lastActiveAt,
+  Value<int> sortOrder,
+  Value<int> rowid,
+});
+typedef $$SpacesTableUpdateCompanionBuilder = SpacesCompanion Function({
+  Value<String> spaceId,
+  Value<String> name,
+  Value<String> peerName,
+  Value<String?> personId,
+  Value<String> deviceId,
+  Value<int> keyVersion,
+  Value<int> createdAt,
+  Value<int> lastActiveAt,
+  Value<int> sortOrder,
+  Value<int> rowid,
+});
+
+class $$SpacesTableFilterComposer
+    extends Composer<_$LocalDatabase, $SpacesTable> {
+  $$SpacesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get spaceId => $composableBuilder(
+    column: $table.spaceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get peerName => $composableBuilder(
+    column: $table.peerName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get keyVersion => $composableBuilder(
+    column: $table.keyVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastActiveAt => $composableBuilder(
+    column: $table.lastActiveAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SpacesTableOrderingComposer
+    extends Composer<_$LocalDatabase, $SpacesTable> {
+  $$SpacesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get spaceId => $composableBuilder(
+    column: $table.spaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get peerName => $composableBuilder(
+    column: $table.peerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get keyVersion => $composableBuilder(
+    column: $table.keyVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastActiveAt => $composableBuilder(
+    column: $table.lastActiveAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SpacesTableAnnotationComposer
+    extends Composer<_$LocalDatabase, $SpacesTable> {
+  $$SpacesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get spaceId =>
+      $composableBuilder(column: $table.spaceId, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get peerName =>
+      $composableBuilder(column: $table.peerName, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<int> get keyVersion => $composableBuilder(
+    column: $table.keyVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get lastActiveAt => $composableBuilder(
+    column: $table.lastActiveAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+}
+
+class $$SpacesTableTableManager
+    extends
+        RootTableManager<
+          _$LocalDatabase,
+          $SpacesTable,
+          Space,
+          $$SpacesTableFilterComposer,
+          $$SpacesTableOrderingComposer,
+          $$SpacesTableAnnotationComposer,
+          $$SpacesTableCreateCompanionBuilder,
+          $$SpacesTableUpdateCompanionBuilder,
+          (Space, BaseReferences<_$LocalDatabase, $SpacesTable, Space>),
+          Space,
+          PrefetchHooks Function()
+        > {
+  $$SpacesTableTableManager(_$LocalDatabase db, $SpacesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SpacesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SpacesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SpacesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> spaceId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> peerName = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<int> keyVersion = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> lastActiveAt = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SpacesCompanion(
+                spaceId: spaceId,
+                name: name,
+                peerName: peerName,
+                personId: personId,
+                deviceId: deviceId,
+                keyVersion: keyVersion,
+                createdAt: createdAt,
+                lastActiveAt: lastActiveAt,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String spaceId,
+                Value<String> name = const Value.absent(),
+                Value<String> peerName = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<int> keyVersion = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> lastActiveAt = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SpacesCompanion.insert(
+                spaceId: spaceId,
+                name: name,
+                peerName: peerName,
+                personId: personId,
+                deviceId: deviceId,
+                keyVersion: keyVersion,
+                createdAt: createdAt,
+                lastActiveAt: lastActiveAt,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SpacesTable, Space>(table),
+                  BaseReferences<_$LocalDatabase, $SpacesTable, Space>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SpacesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$LocalDatabase,
+      $SpacesTable,
+      Space,
+      $$SpacesTableFilterComposer,
+      $$SpacesTableOrderingComposer,
+      $$SpacesTableAnnotationComposer,
+      $$SpacesTableCreateCompanionBuilder,
+      $$SpacesTableUpdateCompanionBuilder,
+      (Space, BaseReferences<_$LocalDatabase, $SpacesTable, Space>),
+      Space,
+      PrefetchHooks Function()
+    >;
 
 class $LocalDatabaseManager {
   final _$LocalDatabase _db;
@@ -4231,4 +5070,6 @@ class $LocalDatabaseManager {
       $$AppStateTableTableManager(_db, _db.appState);
   $$PeerReceiptsTableTableManager get peerReceipts =>
       $$PeerReceiptsTableTableManager(_db, _db.peerReceipts);
+  $$SpacesTableTableManager get spaces =>
+      $$SpacesTableTableManager(_db, _db.spaces);
 }

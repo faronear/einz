@@ -92,6 +92,27 @@ class PeerReceipts extends Table {
   Set<Column> get primaryKey => {spaceId, personId};
 }
 
+/// 本地已加入的 Space（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.1）。
+///
+/// 定位是「**元数据 + 会话外状态**」：Space Key 只存在于 Vault（PIN 密文包 /
+/// SecureStore 明文包），本表**不存任何密钥**——避免两处真相。
+///
+/// 行在解锁/读取到该空间凭证时补写（v7 迁移无法解密 PIN 包，故不在迁移里灌数据）。
+class Spaces extends Table {
+  TextColumn get spaceId => text()();
+  TextColumn get name => text().withDefault(const Constant(''))(); // 我的显示名
+  TextColumn get peerName => text().withDefault(const Constant(''))(); // 对端名
+  TextColumn get personId => text().nullable()();
+  TextColumn get deviceId => text().withDefault(const Constant(''))(); // 该空间的设备身份
+  IntColumn get keyVersion => integer().withDefault(const Constant(1))();
+  IntColumn get createdAt => integer().withDefault(const Constant(0))();
+  IntColumn get lastActiveAt => integer().withDefault(const Constant(0))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {spaceId};
+}
+
 /// 本地应用状态（设置等）。
 class AppState extends Table {
   TextColumn get key => text()();
@@ -101,7 +122,8 @@ class AppState extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [LocalMessages, LocalAttachments, SyncState, Drafts, AppState, PeerReceipts])
+@DriftDatabase(
+    tables: [LocalMessages, LocalAttachments, SyncState, Drafts, AppState, PeerReceipts, Spaces])
 class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(_openConnection());
 
@@ -113,7 +135,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -141,6 +163,11 @@ class LocalDatabase extends _$LocalDatabase {
           if (from < 6) {
             // v6：新增 peer_receipts 表（对方已送达/已读高水位；本轮只落库不显示）
             await m.createTable(peerReceipts);
+          }
+          if (from < 7) {
+            // v7：新增 spaces 表（多空间元数据）。**不灌数据**——PIN 模式下的旧
+            // 锁包在迁移阶段无法解密，改由解锁/读到凭证时补写该行（幂等 upsert）。
+            await m.createTable(spaces);
           }
         },
       );

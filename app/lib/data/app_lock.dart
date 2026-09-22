@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
 import 'package:einz_shared/einz_shared.dart';
@@ -87,28 +86,136 @@ class AppLockService {
   /// 明文保存 Space Key 包（跳过 PIN 场景）：无锁包但有此明文时，
   /// 下次启动直接进聊天（免打扰），直到用户在聊天页补设 PIN。
   /// 存系统安全存储（Keychain/Keystore），SQLite 不再保留明文副本。
+  ///
+  /// 多空间下写的是**整个 Vault**：该空间并入现有 Vault 并置为 active
+  /// （旧单包读时自动归一，见 [VaultPayload.fromJson]）。
   Future<void> savePlain(AppLockPayload payload) async {
-    await SecureStore.write(_securePlain, jsonEncode(payload.toJson()));
-    await _set(_kSkipped, '1');
-    await _deletePlainFromDb(); // 兼容：清掉旧版本可能残留的明文副本
+    await writePlainVault(await _mergedVault(payload));
   }
 
   /// 读取明文 Space Key 包（跳过 PIN 的无锁配置）；不存在返回 null。
   ///
   /// 兼容旧版：包还在 app_state（明文落 SQLite）时自动迁移到 SecureStore，
   /// 并删除 app_state 里的明文副本；迁移失败视为未配置（宁可重新引导）。
+  /// 多空间下返回 Vault 里 **active 空间** 的 payload。
   Future<AppLockPayload?> loadPlain() async {
+    final payload = (await loadPlainVault())?.active;
+    if (payload != null) await _syncSpaceRow(payload);
+    return payload;
+  }
+
+  /// 明文 Vault（无 PIN 场景）：读 SecureStore，回退旧版 app_state 明文包并归一。
+  Future<VaultPayload?> loadPlainVault() async {
     final raw = await SecureStore.read(_securePlain) ?? await _get(_kPlain);
     if (raw == null) return null;
     try {
-      final payload = AppLockPayload.fromJson(jsonDecode(raw));
+      final vault = VaultPayload.fromJson(jsonDecode(raw));
       if (await _get(_kPlain) != null) {
-        await SecureStore.write(_securePlain, raw);
+        // 旧版明文包（app_state）→ 归一后写入 SecureStore，删掉 SQLite 副本
+        await SecureStore.write(_securePlain, jsonEncode(vault.toJson()));
         await _deletePlainFromDb();
       }
-      return payload;
+      return vault;
     } catch (_) {
       return null; // 明文损坏视为未配置（宁可重新引导）
+    }
+  }
+
+  /// 写明文 Vault（无 PIN 场景）。
+  Future<void> writePlainVault(VaultPayload vault) async {
+    await SecureStore.write(_securePlain, jsonEncode(vault.toJson()));
+    await _set(_kSkipped, '1');
+    await _deletePlainFromDb(); // 兼容：清掉旧版本可能残留的明文副本
+  }
+
+  /// 写 PIN 加密的 Vault（设置/修改锁屏码）：成功后清除明文副本（同旧 [setPin] 语义）。
+  Future<void> writePinVault(String pin, VaultPayload vault) async {
+    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(vault.toJson())));
+    final pkg = await encryptWithPassphrase(payload: bytes, passphrase: pin);
+    await _set(_kPackage, jsonEncode(pkg.toJson()));
+    await _set(_kAttempts, '0');
+    await _set(_kLockedUntil, '0');
+    await clearPlain(); // 补设 PIN 后不再保留明文副本
+  }
+
+  /// 读 Vault：PIN 场景传 [pin]（走解锁，含防爆破）；无 PIN 场景读明文。
+  Future<VaultPayload?> loadVault({String? pin}) async {
+    if (pin != null) return unlockVault(pin);
+    if (await isSetup) throw StateError('PIN 模式下读写 Vault 必须传入 pin');
+    return loadPlainVault();
+  }
+
+  /// 写 Vault：[pin] 非空 → 重写加密包；否则写明文。
+  /// PIN 模式下不传 [pin] 直接拒绝——否则会静默降级为明文存储。
+  Future<void> saveVault(VaultPayload vault, {String? pin}) async {
+    if (pin != null) {
+      await writePinVault(pin, vault);
+      return;
+    }
+    if (await isSetup) throw StateError('PIN 模式下读写 Vault 必须传入 pin');
+    await writePlainVault(vault);
+  }
+
+  /// 追加一个空间（新空间向导完成后调用）并置为 active。
+  Future<void> addSpace(AppLockPayload payload, {String? pin}) async {
+    final base = await loadVault(pin: pin) ?? const VaultPayload(spaces: []);
+    await saveVault(
+      base.upsert(payload).copyWith(activeSpaceId: payload.spaceId),
+      pin: pin,
+    );
+    await _syncSpaceRow(payload);
+  }
+
+  /// 本地移除一个空间的身份：Vault 条目 + Spaces 行 + per-space 资料键。
+  /// **不动其他空间**。该空间的消息/附件/媒体缓存清理属 M1（多空间数据隔离），
+  /// 见 `aimemo/multiSpaceDesign.zhcn.md` §4.4/§3.5。
+  Future<void> removeSpace(String spaceId, {String? pin}) async {
+    final vault = await loadVault(pin: pin);
+    if (vault == null) return;
+    await saveVault(vault.remove(spaceId), pin: pin);
+    await (db.delete(db.spaces)..where((s) => s.spaceId.equals(spaceId))).go();
+    await _delete(_profileKey(spaceId));
+  }
+
+  /// 切换当前空间（同时刷新该空间的 lastActiveAt）。
+  Future<void> setActiveSpace(String spaceId, {String? pin}) async {
+    final vault = await loadVault(pin: pin);
+    if (vault == null) return;
+    await saveVault(vault.copyWith(activeSpaceId: spaceId), pin: pin);
+    await (db.update(db.spaces)..where((s) => s.spaceId.equals(spaceId))).write(
+      SpacesCompanion(lastActiveAt: Value(DateTime.now().millisecondsSinceEpoch)),
+    );
+  }
+
+  /// 现有 Vault 并入 [payload]（按 spaceId 覆盖或追加），并置为 active。
+  Future<VaultPayload> _mergedVault(AppLockPayload payload) async {
+    final vault = await loadPlainVault() ?? VaultPayload.single(payload);
+    return vault.upsert(payload).copyWith(activeSpaceId: payload.spaceId);
+  }
+
+  /// 凭证与 Spaces 表对齐（幂等）：补写该空间的元数据行。
+  ///
+  /// 首行**不在 v7 迁移里灌**——PIN 包在迁移阶段无法解密，只能等解锁时补。
+  Future<void> _syncSpaceRow(AppLockPayload payload) async {
+    final row = await (db.select(db.spaces)
+          ..where((s) => s.spaceId.equals(payload.spaceId)))
+        .getSingleOrNull();
+    if (row == null) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.into(db.spaces).insert(SpacesCompanion.insert(
+            spaceId: payload.spaceId,
+            deviceId: Value(payload.deviceId),
+            keyVersion: Value(payload.keyVersion),
+            createdAt: Value(now),
+            lastActiveAt: Value(now),
+          ));
+    } else {
+      await (db.update(db.spaces)..where((s) => s.spaceId.equals(payload.spaceId))).write(
+        SpacesCompanion(
+          deviceId: Value(payload.deviceId),
+          keyVersion: Value(payload.keyVersion),
+        ),
+      );
     }
   }
 
@@ -120,11 +227,17 @@ class AppLockService {
   }
 
   /// 清除本地锁与密钥包（设备被撤销时调用：回到未配置状态，防止残留密钥）。
+  ///
+  /// 全量清除（含所有空间的 Vault 条目与 Spaces 行）。多空间下**逐空间**的清除走
+  /// [removeSpace]；只有"整库清理/卸载即重置"才用这个。
   Future<void> clear() async {
     await SecureStore.delete(_securePlain);
     await (db.delete(db.appState)
           ..where((s) => s.key.isIn({_kPackage, _kAttempts, _kLockedUntil, _kPlain, _kSkipped})))
         .go();
+    // per-space 资料键（app_lock.profile.<spaceId>）与 Spaces 行一并清干净
+    await (db.delete(db.appState)..where((s) => s.key.like('$_kProfile.%'))).go();
+    await db.delete(db.spaces).go();
   }
 
   /// 删除 app_state 里的旧版明文包（迁移/清理用）。
@@ -139,27 +252,36 @@ class AppLockService {
         .go();
   }
 
-  /// 设置 PIN 并加密保存 Space Key 包（老板决策：不再生成 12 词恢复码）。
-  /// 注意：PIN 丢失则本设备 Space Key 包无法解密（无恢复副本，纯本地）。
+  /// 设置 PIN 并加密保存 Vault（老板决策：不再生成 12 词恢复码）。
+  /// 注意：PIN 丢失则本设备所有空间的密钥包无法解密（无恢复副本，纯本地）。
+  ///
+  /// [payload] 并入现有 Vault 并置为 active——覆盖写"唯一一个空间"的旧语义在多空间下
+  /// 会丢掉其他空间，故这里只覆盖同 spaceId 的那一项。
   Future<void> setPin(String pin, {required AppLockPayload payload}) async {
-    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload.toJson())));
-    final pkg = await encryptWithPassphrase(payload: bytes, passphrase: pin);
-
-    await _set(_kPackage, jsonEncode(pkg.toJson()));
-    await _set(_kAttempts, '0');
-    await _set(_kLockedUntil, '0');
-    await clearPlain(); // 补设 PIN 后不再保留明文副本
+    await writePinVault(pin, await _mergedVault(payload));
   }
 
   /// 恢复码兑底已删除（老板决策）：PIN 丢失即无法解锁本设备密钥包。
+  ///
+  /// 返回 **active 空间** 的 payload（多空间下 Vault 里可能有多项）。
   Future<AppLockPayload> unlock(String pin) async {
+    final payload = (await unlockVault(pin)).active;
+    if (payload == null) throw const AppLockException('Vault 里没有可用空间');
+    return payload;
+  }
+
+  /// 解锁并取回整个 Vault（多空间切换用）。旧版单 payload 密文自动归一为单元素 Vault。
+  Future<VaultPayload> unlockVault(String pin) async {
     await _ensureNotLocked();
     final raw = await _get(_kPackage);
     if (raw == null) throw const AppLockException('尚未设置锁屏码');
     try {
       final plain = await decryptWithPassphrase(envelope: PassphraseEnvelope.fromJson(jsonDecode(raw)), passphrase: pin);
       await _set(_kAttempts, '0');
-      return AppLockPayload.fromJson(jsonDecode(utf8.decode(plain)));
+      final vault = VaultPayload.fromJson(jsonDecode(utf8.decode(plain)));
+      final active = vault.active;
+      if (active != null) await _syncSpaceRow(active);
+      return vault;
     } on FormatException {
       await _registerFailure();
       throw const AppLockException('锁屏码 错误');
@@ -199,9 +321,24 @@ class AppLockService {
     );
   }
 
+  Future<void> _delete(String key) async {
+    await (db.delete(db.appState)..where((s) => s.key.equals(key))).go();
+  }
+
+  /// per-space 资料键（多空间：每个空间一份名字/性别/槽位）。
+  ///
+  /// 不传 spaceId 时沿用旧全局键 [_kProfile]——**不去读 Vault 猜 active 空间**：
+  /// 资料读写发生在 ChatPage/向导这些没有 Vault 上下文的地方，读 Vault 意味着读
+  /// 安全存储（测试环境/平台未支持会抛），不该让"取名字"依赖它。
+  static String _profileKey(String spaceId) => '$_kProfile.$spaceId';
+
   /// 用户资料（名字）持久化：向导完成时保存，PIN 解锁/重启后 ChatPage 恢复显示。
   /// （名字不在 AppLockPayload 里——解锁构造 ChatPage 时无法获得，故单独存。）
+  ///
+  /// [spaceId] 给出时写 per-space 键（`app_lock.profile.<spaceId>`）并同步 Spaces 行的
+  /// 名字；缺省（单空间旧调用点）回退全局键 [_kProfile]。
   Future<void> saveProfile({
+    String? spaceId,
     required String personName,
     required String peerName,
     required String deviceName,
@@ -210,7 +347,8 @@ class AppLockService {
     int? mySlot, // 本人身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色用）
     int? peerSlot, // 对方身份槽位（同上；对方气泡配色判定用）
   }) async {
-    await _set(_kProfile, jsonEncode({
+    final sid = spaceId;
+    await _set(sid == null ? _kProfile : _profileKey(sid), jsonEncode({
       'personName': personName,
       'peerName': peerName,
       'deviceName': deviceName,
@@ -219,11 +357,20 @@ class AppLockService {
       'mySlot': mySlot,
       'peerSlot': peerSlot,
     }));
+    if (sid != null) {
+      await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(
+        SpacesCompanion(name: Value(personName), peerName: Value(peerName)),
+      );
+    }
   }
 
   /// 读回保存的资料（键缺失返回空串——解锁场景 ChatPage 空名时恢复）。
-  Future<Map<String, Object?>> loadProfile() async {
-    final raw = await _get(_kProfile);
+  ///
+  /// [spaceId] 缺省时先读 active 空间的 per-space 键，再回退旧全局键 [_kProfile]
+  /// （v7 迁移前保存的资料、以及未传 spaceId 的旧调用点）。
+  Future<Map<String, Object?>> loadProfile({String? spaceId}) async {
+    final sid = spaceId;
+    final raw = sid == null ? await _get(_kProfile) : await _get(_profileKey(sid)) ?? await _get(_kProfile);
     if (raw == null) return const {};
     try {
       final m = jsonDecode(raw) as Map<String, dynamic>;
@@ -295,6 +442,102 @@ class AppLockPayload {
         publicKeyB64: json['device_public_key'] as String?,
         privateKeyB64: json['device_private_key'] as String?,
       );
+}
+
+/// 一台设备上的**全部空间凭证**（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.2）。
+///
+/// 存储形态：PIN 模式下整个对象加密后存 `app_lock.package`；跳过 PIN 模式明文存
+/// SecureStore `app_lock.plain`。旧版只有一个 [AppLockPayload] 的包在**读取时归一**
+/// 为单元素 Vault（[VaultPayload.fromJson]），不重写旧密文。
+///
+/// Space Key 只在这里（+ 解锁后的内存），Spaces 表不存任何密钥。
+class VaultPayload {
+  const VaultPayload({
+    required this.spaces,
+    this.activeSpaceId,
+    this.deviceName = '',
+  });
+
+  /// 单空间（旧包归一、首次创建用）。
+  factory VaultPayload.single(AppLockPayload payload, {String deviceName = ''}) =>
+      VaultPayload(spaces: [payload], activeSpaceId: payload.spaceId, deviceName: deviceName);
+
+  final List<AppLockPayload> spaces;
+
+  /// 当前进入的空间；为 null 或指向不存在的空间时 [active] 退回第一项。
+  final String? activeSpaceId;
+
+  /// Vault 级统一设备名（各空间用同一个名字登记——「我的设备」弹窗只显示名字+公钥，
+  /// 统一名字后不同空间看起来是同一台设备，见设计文档 §2.2）。
+  final String deviceName;
+
+  /// 当前空间凭证（无空间时 null）。
+  AppLockPayload? get active {
+    if (spaces.isEmpty) return null;
+    for (final s in spaces) {
+      if (s.spaceId == activeSpaceId) return s;
+    }
+    return spaces.first;
+  }
+
+  /// 按 spaceId 覆盖或追加一项（保持原有顺序）。
+  VaultPayload upsert(AppLockPayload payload) {
+    final next = <AppLockPayload>[];
+    var replaced = false;
+    for (final s in spaces) {
+      if (s.spaceId == payload.spaceId) {
+        next.add(payload);
+        replaced = true;
+      } else {
+        next.add(s);
+      }
+    }
+    if (!replaced) next.add(payload);
+    return copyWith(spaces: next);
+  }
+
+  /// 移除一个空间；移除的是 active 时把 active 让给剩下的第一个。
+  VaultPayload remove(String spaceId) {
+    final next = spaces.where((s) => s.spaceId != spaceId).toList();
+    final nextActive = activeSpaceId == spaceId ? (next.isEmpty ? null : next.first.spaceId) : activeSpaceId;
+    return VaultPayload(spaces: next, activeSpaceId: nextActive, deviceName: deviceName);
+  }
+
+  VaultPayload copyWith({List<AppLockPayload>? spaces, String? activeSpaceId, String? deviceName}) =>
+      VaultPayload(
+        spaces: spaces ?? this.spaces,
+        activeSpaceId: activeSpaceId ?? this.activeSpaceId,
+        deviceName: deviceName ?? this.deviceName,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'version': 1,
+        'device_name': deviceName,
+        'active_space_id': activeSpaceId,
+        'spaces': spaces.map((s) => s.toJson()).toList(),
+      };
+
+  /// 解析：新版 Vault JSON（含 `spaces` 列表）或**旧版单个 payload** 的 JSON。
+  /// 结构不对抛 [FormatException]（调用方据此判定"损坏/未配置"）。
+  static VaultPayload fromJson(Object? raw) {
+    if (raw is! Map<String, dynamic>) throw const FormatException('Vault 格式错误');
+    final list = raw['spaces'];
+    if (list is! List) {
+      // 旧版：单个 AppLockPayload 的 JSON（有 space_key / space_id）
+      if (!raw.containsKey('space_id')) throw const FormatException('Vault 格式错误');
+      return VaultPayload.single(AppLockPayload.fromJson(raw));
+    }
+    final spaces = <AppLockPayload>[];
+    for (final e in list) {
+      if (e is! Map<String, dynamic>) throw const FormatException('Vault.space 格式错误');
+      spaces.add(AppLockPayload.fromJson(e));
+    }
+    return VaultPayload(
+      spaces: spaces,
+      activeSpaceId: raw['active_space_id'] as String?,
+      deviceName: (raw['device_name'] as String?) ?? '',
+    );
+  }
 }
 
 /// 用锁包里的设备密钥对完成 challenge-response 重新认证（重启后 reauth 用：

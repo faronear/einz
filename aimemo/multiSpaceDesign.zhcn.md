@@ -170,6 +170,12 @@ app_state 中无空间维度的键改为 `space.<spaceId>.<key>` 前缀。现有
 v7 迁移：现有值归入当时唯一的空间（迁移后的首个空间）；读取函数改带 spaceId 参数，
 默认回退旧 key 一次以防迁移遗漏。
 
+**实现注记（M0.5，2026-09-22）**：`saveProfile/loadProfile` 的 spaceId **必须由调用点
+显式传入**，不传就走旧全局键——不要在内部去读 Vault 猜 active 空间。原因：资料读写发生在
+ChatPage/向导这些没有 Vault 上下文的地方，读 Vault = 读安全存储，测试环境/平台未支持会抛，
+会让"取个名字"连带把整个页面异步链打断（实测 7 个 widget 测试挂死 10 分钟超时）。
+M2 改向导/聊天页时把 `widget.payload.spaceId` 传进去即可。
+
 ## 4. 会话与实时
 
 ### 4.1 ChatPage
@@ -278,7 +284,7 @@ messages / sync_state）+ `MediaCache.deleteAll` + `AttachmentStore.clear` + 跳
 | 设备名 | Vault 级统一；旧单包无此字段 → 取现有空间已登记的名字，缺省空 |
 | golden 测试 | 单空间用户路径 UI 不变，golden 应保持绿；SpaceListPage 不加 golden（政策：不重刷） |
 | CLI（einz_cli） | 不在本期范围，仅保证协议无变更不会破坏它 |
-| 测试基线 | 原稿"已知 4 个既有失败"**待实跑确认**（worklog 2026-09-21 记 138 过 0 失败，该数字疑似过期） |
+| 测试基线 | 原稿"已知 4 个既有失败"**已过期**：2026-09-22 实跑 `flutter test`：main = **138 过 0 失败**；M0.5 分支（+13 条 Vault 用例）= **151 过 0 失败** |
 
 ## 7. 测试计划
 
@@ -304,7 +310,7 @@ messages / sync_state）+ `MediaCache.deleteAll` + `AttachmentStore.clear` + 跳
 
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
-| M0.5 数据底座 | Spaces 表 + Vault 读写 + v6→v7 迁移（**先不做任何 UI**） | 单测 1–3 绿；旧数据升级后单空间行为不变 |
+| M0.5 数据底座 ✅ **已完成**（2026-09-22，分支 `feature/multiSpace`） | Spaces 表（v7） + Vault 读写 + 迁移（**未做任何 UI**） | 单测 1–3 绿；旧数据升级后单空间行为不变；全量 `flutter test` 无回归 |
 | M1 数据与隔离 | per-space 设置键 + 附件/缓存 spaceId 隔离 + **撤销自毁逐空间化** + removeSpace | 单测 4–6 绿；单空间路径无回归 |
 | M2 会话切换 | StartupGate 分支 + SpaceListPage + 设置页常驻入口 + ChatPage 切换入口 + 向导回调 + WS 随切换重建 | 手动：双空间创建/加入/切换/删除全流程；单测 7–9 绿 |
 | M3 收尾 | 未读（lastReadSequence + 启动/切回轻量 sync）、l10n、`productLens/projectPlan` 更新、「我的设备」文案 | 全量 `flutter test`（基线先实跑确认）；单空间路径 golden 保持绿 |
