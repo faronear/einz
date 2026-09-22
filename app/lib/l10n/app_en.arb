@@ -12,7 +12,7 @@
   "setupPageNeedPassphrase": "❗️ Set a passphrase first",
   "wizardJoinPassphraseRequired": "❗️ Enter the passphrase to verify",
   "setupEnrollBoundNotice": "🎉 New device bound",
-  "wizardStartTitle": "Enter Einz",
+  "wizardStartTitle": "Setup guide",
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "Auto-detects if you're the first device",
   "wizardDetectFailed": "Cannot reach server — retrying…",
@@ -96,7 +96,7 @@
       "error": {"type": "String"}
     }
   },
-  "setupEntryTitle": "Get started with Einz",
+  "setupEntryTitle": "Choose a space",
   "setupEntryHint": "Create a private space for two, or join via an invite link",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",

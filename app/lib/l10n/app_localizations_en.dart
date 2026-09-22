@@ -48,7 +48,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupEnrollBoundNotice => '🎉 New device bound';
 
   @override
-  String get wizardStartTitle => 'Enter Einz';
+  String get wizardStartTitle => 'Setup guide';
 
   @override
   String get wizardDetectTitle => 'Checking server status…';
@@ -254,7 +254,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setupEntryTitle => 'Get started with Einz';
+  String get setupEntryTitle => 'Choose a space';
 
   @override
   String get setupEntryHint =>

@@ -16,6 +16,9 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   db.pragma("foreign_keys = ON");
 
   db.exec(`
+    -- 登记项：一次「安装 × 秘境」的登记（一套密钥对 + 一个身份 + 一个会话锚点）。
+    -- 命名提醒（docs/GLOSSARY.md）：device_id 是**登记项**的 id，不是物理设备 id；
+    -- 物理设备/安装那一层是下面的 device_uid。
     CREATE TABLE IF NOT EXISTS devices (
       device_id   TEXT PRIMARY KEY,
       person_id   TEXT NOT NULL,

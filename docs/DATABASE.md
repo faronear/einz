@@ -2,7 +2,8 @@
 
 > **状态：** Draft v0.1（Phase 0 产出）
 > **权威依据：** `aimemo/productLens.zhcn.md` §8.3（数据模型要点）、§7.4（客户端本地数据）
-> **关联文档：** `docs/PROTOCOL.md`（API 与同步）、`docs/E2EE.md`（密文信封）
+> **关联文档：** `docs/PROTOCOL.md`（API 与同步）、`docs/E2EE.md`（密文信封）、
+> **`docs/GLOSSARY.md`（术语：物理设备 / 安装 / 登记项 三层怎么分，先读它）**
 
 ---
 

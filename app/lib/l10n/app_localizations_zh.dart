@@ -46,7 +46,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEnrollBoundNotice => '🎉 新设备已成功绑定';
 
   @override
-  String get wizardStartTitle => '秘境入口';
+  String get wizardStartTitle => '秘境向导';
 
   @override
   String get wizardDetectTitle => '正在检测服务器状态…';
@@ -242,7 +242,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupEntryTitle => '选择秘境入口';
+  String get setupEntryTitle => '选择秘境';
 
   @override
   String get setupEntryHint => '秘境是仅限两人的私密世界，可以从头创建，或者受邀加入。';

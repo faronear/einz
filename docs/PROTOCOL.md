@@ -3,6 +3,7 @@
 > **状态：** Draft v0.1（Phase 0 产出）
 > **权威性：** 本文档是 REST + WebSocket 协议的**唯一权威定义**；Client 与 Server 必须按本文档实现，任何不一致以本文档为准。
 > **关联文档：** `docs/E2EE.md`（密文信封与密钥）、`docs/DATABASE.md`（存储）、`aimemo/productLens.zhcn.md` §9（同步）、§13.3（时间）。
+> **术语：** `device_id` 是"**登记项**"（安装 × 秘境）的 id，不是物理设备 id——见 `docs/GLOSSARY.md`。
 
 ---
 

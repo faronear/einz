@@ -173,7 +173,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardStartTitle.
   ///
   /// In en, this message translates to:
-  /// **'Enter Einz'**
+  /// **'Setup guide'**
   String get wizardStartTitle;
 
   /// No description provided for @wizardDetectTitle.
@@ -545,7 +545,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryTitle.
   ///
   /// In en, this message translates to:
-  /// **'Get started with Einz'**
+  /// **'Choose a space'**
   String get setupEntryTitle;
 
   /// No description provided for @setupEntryHint.
