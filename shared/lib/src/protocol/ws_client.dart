@@ -145,6 +145,8 @@ class WsClient {
   Timer? _reconnectTimer;
   bool _stopped = true;
   int _attempt = 0;
+  /// 连续"4401 → 续期 → 仍被 4401"的次数（连上就清零，见 [_connect]）。
+  int _unauthorizedStreak = 0;
   WsStatus _status = WsStatus.stopped;
 
   WsStatus get status => _status;
@@ -186,6 +188,8 @@ class WsClient {
       }
       _ws = ws;
       _attempt = 0;
+      // 注意：这里**不能**清零 _unauthorizedStreak —— 服务端是先完成 WS 握手、
+      // 再 4401 关掉（握手成功 ≠ 被接受）。清零放在 [_handleFrame]（真收到帧）。
       _setStatus(WsStatus.connected);
       ws.listen(
         _handleFrame,
@@ -218,6 +222,13 @@ class WsClient {
           _scheduleReconnect();
           return;
         }
+        // 即便拿到了新 token，也要防"服务端照样拒"这一类：连续几次仍被 4401，
+        // 说明不是单纯的会话过期（设备不在册 / 服务端不认本设备），立刻重连会变成
+        // 打服务端的循环（每轮一次 POST /auth/challenge，很快触发限流）。
+        if (++_unauthorizedStreak >= 3) {
+          _scheduleReconnect();
+          return;
+        }
         _attempt = 0;
         _setStatus(WsStatus.reconnecting);
         _connect(); // 用新 token 立即重连
@@ -230,6 +241,8 @@ class WsClient {
   }
 
   void _handleFrame(dynamic data) {
+    // 收到帧 = 服务端真的接受了这条连接 → 续期链路是好的，清零 4401 连续计数
+    _unauthorizedStreak = 0;
     try {
       final frame = jsonDecode(data as String) as Map<String, dynamic>;
       final type = frame['type'] as String;

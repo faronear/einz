@@ -173,6 +173,39 @@ void main() {
     expect(reauthCalls, lessThan(10));
   });
 
+  test('4401 + 每次都拿到新 token 但仍被拒：连续 3 次后转退避', () async {
+    // 上一道兜底只挡"token 没变"；这一类 token **变了**但服务端照样 4401
+    // （设备不在册 / 服务端不认本设备）同样会变成零延迟循环 → 同样打满限流。
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    var attempts = 0;
+    server.listen((req) {
+      if (req.uri.path != '/ws') {
+        req.response.statusCode = 404;
+        req.response.close();
+        return;
+      }
+      WebSocketTransformer.upgrade(req).then((ws) {
+        attempts++;
+        ws.close(4401, 'UNAUTHORIZED'); // 一律拒绝
+      });
+    });
+    addTearDown(() => server.close(force: true));
+
+    var n = 0;
+    late final WsClient client;
+    client = WsClient(
+      server: 'http://127.0.0.1:${server.port}',
+      token: 'tok',
+      onUnauthorized: () async => client.updateToken('tok-${++n}'), // 每次都是新 token
+    );
+    client.start();
+    await Future.delayed(const Duration(milliseconds: 1500));
+    await client.stop();
+
+    expect(n, lessThan(10), reason: '续期链路明显无效时必须退避，不能一直立即重连');
+    expect(attempts, lessThan(10));
+  });
+
   test('4401 + 续期换到新 token：立即重连（无感恢复）', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     var attempts = 0;
