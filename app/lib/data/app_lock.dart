@@ -428,11 +428,14 @@ class AppLockService {
 
   /// 读回保存的资料（键缺失返回空串——解锁场景 ChatPage 空名时恢复）。
   ///
-  /// [spaceId] 缺省时先读 active 空间的 per-space 键，再回退旧全局键 [_kProfile]
-  /// （v7 迁移前保存的资料、以及未传 spaceId 的旧调用点）。
+  /// [spaceId] 给出时读该空间的 per-space 键；读不到才回退旧全局键 [_kProfile]
+  /// （兼容分支，见 [_legacyProfileRaw]）。[spaceId] 缺省时直接读旧全局键
+  /// （未传 spaceId 的旧调用点，如单空间时代的 AppLockPage 流程）。
   Future<Map<String, Object?>> loadProfile({String? spaceId}) async {
     final sid = spaceId;
-    final raw = sid == null ? await _get(_kProfile) : await _get(_profileKey(sid)) ?? await _get(_kProfile);
+    final raw = sid == null
+        ? await _get(_kProfile)
+        : await _get(_profileKey(sid)) ?? await _legacyProfileRaw();
     if (raw == null) return const {};
     try {
       final m = jsonDecode(raw) as Map<String, dynamic>;
@@ -448,6 +451,20 @@ class AppLockService {
     } catch (_) {
       return const {};
     }
+  }
+
+  /// 旧全局键 [_kProfile] 的兼容读：**仅当本机只登记了 ≤1 个空间**时返回。
+  ///
+  /// 背景：v7 迁移故意不搬资料（迁移阶段解不开 PIN 包、也拿不到 spaceId），
+  /// 老安装的名字只存在全局键里 —— 单空间用户必须靠它才不会升级后变空。
+  /// 但多空间下全局键是所有空间共用的一格（会被最后保存的空间覆写），继续回退
+  /// 就会把别的空间的名字/性别读进来（老板 2026-09-22 实测的串台）。用空间条数
+  /// 把这条兼容路径收窄：多空间时宁可先读空（随后 `_refreshProfileFromServer`
+  /// 会从服务端补回），也不要显示另一个空间的身份。
+  Future<String?> _legacyProfileRaw() async {
+    final rows = await (db.select(db.spaces)..limit(2)).get();
+    if (rows.length > 1) return null;
+    return _get(_kProfile);
   }
 }
 

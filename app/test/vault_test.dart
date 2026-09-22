@@ -213,5 +213,21 @@ void main() {
       expect((await lock.loadProfile(spaceId: 'space-b'))['peerName'], 'Alice',
           reason: '两个空间的资料互不覆盖');
     });
+
+    test('loadProfile：多空间时不再回退旧全局键（防跨空间串名字）', () async {
+      await lock.savePlain(payloadA);
+      await lock.addSpace(payloadB); // Spaces 行 = 2（space-a / space-b）
+      // 老库遗留：只有全局键，里面是"另一个空间"的资料
+      await lock.saveProfile(personName: '我A', peerName: '对方A', deviceName: 'iPhone');
+
+      // space-b 还没写过 per-space 资料 → 不得读到全局键里 space-a 的资料
+      expect(await lock.loadProfile(spaceId: 'space-b'), isEmpty,
+          reason: '多空间下回退会串空间，宁可先读空（随后由 /space 校正补齐）');
+
+      // 只剩一个空间（老安装的形态）→ 兼容回退仍然生效，升级不丢名字
+      await lock.removeSpace('space-a');
+      expect((await lock.loadProfile(spaceId: 'space-b'))['peerName'], '对方A',
+          reason: '单空间时保留回退，老安装升级后名字不丢');
+    });
   });
 }
