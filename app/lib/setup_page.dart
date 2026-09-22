@@ -1635,7 +1635,7 @@ class _SetupPageState extends State<SetupPage> {
         _joinToken = '';
         _joinSpaceId = null;
         _joinTokenVerified = false;
-        _localError = _tokenErrorText(e.code, raw: raw);
+        _localError = _tokenErrorText(e.code, raw: raw, message: e.message);
       });
       return false;
     } catch (e) {
@@ -1658,9 +1658,19 @@ class _SetupPageState extends State<SetupPage> {
   /// 2. **未知错误码不许吞**：原先 default 一律显示"无效"，于是
   ///    `PROTOCOL_VERSION_MISMATCH` / `NOT_FOUND`（服务器没这个端点）这类会被伪装成
   ///    "邀请无效"，把排查引向错误方向 → 挂上原始码。
-  String _tokenErrorText(String code, {String raw = ''}) {
+  /// [message] 是服务端原文（如 "too many requests, retry after 61s"）：限流类错误
+  /// 要从中取等待秒数，否则用户只能对着"请稍后再试"干等，不知道等多久。
+  String _tokenErrorText(String code, {String raw = '', String message = ''}) {
     final l10n = AppLocalizations.of(context)!;
     switch (code) {
+      case 'RATE_LIMITED':
+        // 限流**不是邀请的问题**（2026-09-22 实测：同一 IP 上有别的客户端在疯狂
+        // 重新认证，把配额吃光了，邀请加入因此被连坐）。必须把"等几秒"说出来，
+        // 并且别把它混在"邀请无效"里——那会让人一直去查邀请码。
+        final secs = _retryAfterSeconds(message);
+        return secs == null
+            ? l10n.setupTokenRateLimitedNoWait
+            : l10n.setupTokenRateLimited('$secs');
       case 'TOKEN_EXPIRED':
         return l10n.setupTokenExpired;
       case 'TOKEN_USED':
@@ -1682,6 +1692,13 @@ class _SetupPageState extends State<SetupPage> {
       default:
         return '${l10n.setupTokenInvalid}（$code）';
     }
+  }
+
+  /// 从服务端限流原文里取"还要等几秒"：`too many requests, retry after 61s`。
+  /// 取不到返回 null（文案退化为不带秒数的那一版）。
+  int? _retryAfterSeconds(String message) {
+    final m = RegExp(r'retry after (\d+)s').firstMatch(message);
+    return m == null ? null : int.tryParse(m.group(1)!);
   }
 
   /// 从用户输入取"邀请链接的域名"；不是链接（纯邀请码）返回 null。

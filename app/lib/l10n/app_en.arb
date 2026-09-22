@@ -102,6 +102,11 @@
   "setupEntryJoin": "Join",
   "setupEntryLegacyServer": "Server version too old — please upgrade",
   "setupTokenAppTooOld": "This app is too old for the server ({code}) — please update the app and try again",
+  "setupTokenRateLimited": "Too many requests — retry in {seconds}s (this is not a problem with the invitation)",
+  "@setupTokenRateLimited": {
+    "placeholders": { "seconds": { "type": "String" } }
+  },
+  "setupTokenRateLimitedNoWait": "Too many requests — try again later (this is not a problem with the invitation)",
   "@setupTokenAppTooOld": {
     "placeholders": { "code": { "type": "String" } }
   },

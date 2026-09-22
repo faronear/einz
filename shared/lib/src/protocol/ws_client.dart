@@ -206,8 +206,18 @@ class WsClient {
     _ws = null;
     if (ws.closeCode == 4401 && onUnauthorized != null) {
       try {
+        final before = _token;
         await onUnauthorized!(); // 重新认证并 updateToken
         if (_stopped) return;
+        if (_token == before) {
+          // 续期**没有真的换到新 token**（上层忘了 updateToken，或服务端照样拒）→
+          // 立即重连只会拿同一个坏 token 再被 4401 关掉，构成**零延迟死循环**。
+          // 2026-09-22 实测：App 侧就是这样把 POST /auth/challenge 打成
+          // 429 RATE_LIMITED，进而连累同 IP 的邀请加入（也被限流）。
+          // 这里兜底：token 没变就走退避，不让循环失控。
+          _scheduleReconnect();
+          return;
+        }
         _attempt = 0;
         _setStatus(WsStatus.reconnecting);
         _connect(); // 用新 token 立即重连

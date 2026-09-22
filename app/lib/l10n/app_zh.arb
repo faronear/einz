@@ -102,6 +102,11 @@
   "setupEntryJoin": "加入秘境",
   "setupEntryLegacyServer": "服务器版本过低，请升级后再使用",
   "setupTokenAppTooOld": "本机 App 版本过旧，与服务器对不上（{code}）——请更新 App 后重试",
+  "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试（这不是邀请本身的问题）",
+  "@setupTokenRateLimited": {
+    "placeholders": { "seconds": { "type": "String" } }
+  },
+  "setupTokenRateLimitedNoWait": "请求太频繁，请稍后再试（这不是邀请本身的问题）",
   "@setupTokenAppTooOld": {
     "placeholders": { "code": { "type": "String" } }
   },

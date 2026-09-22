@@ -109,6 +109,28 @@ void main() {
     expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
   });
 
+  testWidgets('join：RATE_LIMITED 不能算到邀请头上，要说出要等多久', (WidgetTester tester) async {
+    // 老板 2026-09-22 实测：两台模拟器都是最新包，加入仍报 "Invalid invitation
+    // (RATE_LIMITED)"。真因是**同一 IP 上有别的客户端在死循环重新认证**，把服务端的
+    // auth 配额（60 次 / 5 分钟）吃光了，邀请加入被连坐。把它显示成"邀请无效"会把
+    // 排查彻底引偏——必须单列，并把等待秒数说出来。
+    await tester.pumpWidget(wrapApp(
+      preflightOverride: (token) async => throw ApiException(
+          'RATE_LIMITED', 'too many requests, retry after 61s', 429),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入秘境'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'https://einz.tic.cc/join/ABC123');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('61'), findsOneWidget, reason: '应报出还要等多少秒');
+    expect(find.textContaining('不是邀请本身的问题'), findsOneWidget,
+        reason: '必须说明这不是邀请的问题');
+    expect(find.text('邀请码或链接无效'), findsNothing, reason: '不能伪装成邀请无效');
+  });
+
   testWidgets('join：TOKEN_INVALID + 外域邀请链接 → 报错带出两个域名（跨服务器）',
       (WidgetTester tester) async {
     // 老板 2026-09-22 实测：iOS 生成邀请、Android 使用 → 报"邀请链接无效"。

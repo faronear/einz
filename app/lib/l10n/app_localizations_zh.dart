@@ -261,6 +261,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String setupTokenRateLimited(String seconds) {
+    return '请求太频繁：请 $seconds 秒后再试（这不是邀请本身的问题）';
+  }
+
+  @override
+  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是邀请本身的问题）';
+
+  @override
   String get setupTokenTitle => '验证邀请';
 
   @override

@@ -162,6 +162,7 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 | `/health` 正常但认证握手失败            | 本机翻墙/网络抖动            | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试                              |
 | 发消息一直"发送中"                      | WS 未连上 / 会话失效         | `/auth` 重新激活；看服务端日志 `[req] WS /ws connect`                          |
 | 加入时报 `RATE_LIMITED`（429）          | 同一 IP 的加入/认证请求超限  | 等提示的秒数再试；自用可直接**重启服务端**清空计数（计数在内存），或用 `EINZ_RATELIMIT_AUTH` 调高阈值（默认 60 次 / 5 分钟）。**不是邀请码的问题** |
+| 加入时报 `RATE_LIMITED`（429）且**休息很久后第一次就中** | 同 IP 上有客户端卡在"重新认证"死循环（2026-09-22 定位：`WsRealtimeService` 续期后没更新 `WsClient` 持有的那份 token → WS 被 4401 关掉 → 立即用旧 token 重连 → 零延迟循环，每轮一次 `POST /auth/challenge`） | **先把那个卡住的客户端退掉/重启**（重启服务端只能清计数，循环会立刻再打满）；客户端已修（`ws_client` 在 token 没变时强制退避 + App 侧补上 `updateToken`） |
 
 ---
 

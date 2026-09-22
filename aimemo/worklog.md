@@ -8421,3 +8421,51 @@ removeSpace 同步内存会话）+ 复位全局会话；全量 `flutter test` **
 测试：`multi_space_pages_test` 重写（冷启动落点决策 / 弹层瀑布流+角标+新建入口 / 弹层回传所选
 空间）；`chat_page_menu_test` 两条菜单用例改为"无注入也照常开弹层"。
 全量 `flutter test` **173 通过 0 失败**；`flutter analyze` 无 issue。
+
+## 2026-09-22 邀请报 RATE_LIMITED 的真因：WS 续期死循环（不是限流太紧）
+
+老板：两台模拟器都已跑最新代码，休息几小时后**第一次**邀请加入仍报
+`Invalid invitation (RATE_LIMITED)`。
+
+### 定位过程（用现网数据，不是猜）
+
+1. 直连开发服务器实测两个端点：
+   - `GET /health` → **200**（全站兜底桶 600/min 没满）
+   - `POST /spaces/join/preflight` → **429 `RATE_LIMITED`，retry after 61s**
+   → 满的是 **auth 桶**（60 次 / 5 分钟），成员为 `/spaces/lookup`、
+     `/spaces/join/preflight`、`/spaces/join`、`/auth/challenge`。
+2. `lsof -iTCP:3000` → **单个 dartvm 客户端挂着 ~29 条 ESTABLISHED 连接**
+   （健康客户端只会有个位数）→ 有客户端在疯狂重连。
+3. 顺着 4401 路径读代码，找到真 bug。
+
+### 真 bug：续期后的新 token 没交给 WsClient
+
+- `WsClient` 在构造时把 token **拷贝**成自己的 `_token`；
+- App 的 `WsRealtimeService.onUnauthorized` 只调了自己的 `updateToken(fresh)`，
+  **没调 `_client.updateToken(fresh)`**（CLI 侧一直是对的：`chat_core.dart:540`）；
+- 于是：session 过期 → 服务端 4401 关 WS → 续期成功（新 token 在内存里转了一圈）
+  → `WsClient` 拿**旧 token** 重连 → 又被 4401 → `_attempt = 0` + 立即重连
+  → **零延迟死循环**，每轮消耗一次 `POST /auth/challenge`；
+- 几秒就打满 auth 配额 → 同 IP 的**任何** auth 类请求（包括邀请加入）全部 429。
+
+**为什么"休息几小时后第一次"照样中**：auth 桶是 5 分钟滚动窗口，跟休息多久无关——
+卡住的客户端一直在跑，配额随时是满的。
+**影响面不止开发**：会话 TTL 24h，线上客户端到期后都会进这个循环（耗电 + 打服务端
++ 连累同 IP 的他人加入）。
+
+### 修
+
+- `shared/ws_client.dart`：`_onClosed` 的 4401 分支先记下旧 token，续期后**若 token
+  没变就走退避**，不再立即重连（兜底：将来谁再忘了 updateToken 也不会失控）。
+- `app/ws_realtime_service.dart`：补 `_client?.updateToken(fresh)`。
+- `setup_page._tokenErrorText`：`RATE_LIMITED` **单列**，从服务端原文解析等待秒数
+  （`retry after 61s`）并显示「请求太频繁：请 61 秒后再试（**这不是邀请本身的问题**）」；
+  不再混进"邀请码或链接无效"。新增 l10n `setupTokenRateLimited(seconds)` /
+  `setupTokenRateLimitedNoWait`（zh + en）。
+- `docs/ONBOARDING.md` 排障表加一行：遇到这条先**退掉那个卡住的客户端**
+  （重启服务端只能清计数，循环会立刻再打满）。
+
+测试：shared `ws_client_test` +2（token 没变 → 1.5s 内重试 <10 次；token 变了 →
+立即重连）；app `widget_test` +1（报出 61 秒 + 说明不是邀请的问题 + 不出现"邀请无效"）。
+全量：app `flutter test` **174 通过 0 失败**、shared `dart test` 51 通过、
+cli `dart analyze` 无 issue。

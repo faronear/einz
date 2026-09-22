@@ -578,6 +578,18 @@ abstract class AppLocalizations {
   /// **'This app is too old for the server ({code}) — please update the app and try again'**
   String setupTokenAppTooOld(String code);
 
+  /// No description provided for @setupTokenRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests — retry in {seconds}s (this is not a problem with the invitation)'**
+  String setupTokenRateLimited(String seconds);
+
+  /// No description provided for @setupTokenRateLimitedNoWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests — try again later (this is not a problem with the invitation)'**
+  String get setupTokenRateLimitedNoWait;
+
   /// No description provided for @setupTokenTitle.
   ///
   /// In en, this message translates to:

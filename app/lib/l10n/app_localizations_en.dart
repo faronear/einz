@@ -276,6 +276,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String setupTokenRateLimited(String seconds) {
+    return 'Too many requests — retry in ${seconds}s (this is not a problem with the invitation)';
+  }
+
+  @override
+  String get setupTokenRateLimitedNoWait =>
+      'Too many requests — try again later (this is not a problem with the invitation)';
+
+  @override
   String get setupTokenTitle => 'Verify invitation';
 
   @override
