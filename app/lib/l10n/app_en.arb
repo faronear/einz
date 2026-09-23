@@ -430,16 +430,21 @@
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address (not production), for debugging only",
   "advancedMenuTitle": "Advanced",
-  "advancedLeaveSpace": "Destroy this entrance",
+  "advancedDestroyEntrance": "Destroy this entrance",
   "leaveSpaceTitle": "Destroy this entrance?",
-  "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This device can rejoin the current space later with a new activation code.\n\nThis cannot be undone! Type the current entrance name to confirm.",
+  "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. ❗️This cannot be undone❗️",
   "resetDeviceNameLabel": "{name}",
   "@resetDeviceNameLabel": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "resetDeviceNameHint": "Type the current entrance name “{name}”",
+  "@resetDeviceNameHint": {
     "placeholders": { "name": { "type": "String" } }
   },
   "resetDeviceNameMismatch": "Enter the correct entrance name to confirm",
   "resetDeviceConfirmWord": "RESET",
   "resetDevicePinLabel": "Lock code",
+  "resetDevicePinHint": "Enter this device's lock code",
   "resetDeviceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner's entrance list",
   "spaceListTitle": "Choose a space",
   "spaceListEmpty": "No spaces joined yet",

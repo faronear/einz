@@ -1103,7 +1103,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
               ListTile(
                 leading: Icon(Icons.warning_amber_rounded, color: red),
-                title: Text(l10n.advancedLeaveSpace),
+                title: Text(l10n.advancedDestroyEntrance),
                 onTap: () => Navigator.of(ctx).pop('leave'),
               ),
             ],

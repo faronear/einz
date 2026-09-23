@@ -1241,7 +1241,7 @@ void main() {
     expect(find.text('选择秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
-  testWidgets('高级：破坏性入口改为空间级「销毁本秘境通道」（不再整机重置）',
+  testWidgets('高级：破坏性入口改为空间级「销毁本通道」（不再整机重置）',
       (WidgetTester tester) async {
     // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
     // 不该顺手抹掉本机上的其他空间 → 聊天页这格降级为空间级，整机清理由空间列表负责。
@@ -1273,12 +1273,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('高级'));
     await tester.pumpAndSettle();
-    expect(find.text('销毁本秘境通道'), findsOneWidget, reason: '空间级文案');
+    expect(find.text('销毁本通道'), findsOneWidget, reason: '空间级文案');
     expect(find.text('重置设备'), findsNothing, reason: '整机重置不该出现在单个空间里');
 
-    await tester.tap(find.text('销毁本秘境通道'));
+    await tester.tap(find.text('销毁本通道'));
     await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
-    expect(find.text('销毁本秘境通道？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
-    expect(find.text('iPhone'), findsOneWidget, reason: '闸门输入框 label 显示通道名');
+    expect(find.text('销毁本通道？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
+    expect(find.text('请输入当前通道名称“iPhone”'), findsOneWidget, reason: '闸门框上备注：照抄通道名');
+    expect(find.text('iPhone'), findsWidgets, reason: '框内 hint 显示通道名');
   });
 }

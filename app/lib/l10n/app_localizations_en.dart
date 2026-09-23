@@ -955,18 +955,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedMenuTitle => 'Advanced';
 
   @override
-  String get advancedLeaveSpace => 'Destroy this entrance';
+  String get advancedDestroyEntrance => 'Destroy this entrance';
 
   @override
   String get leaveSpaceTitle => 'Destroy this entrance?';
 
   @override
   String get leaveSpaceMessage =>
-      'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This device can rejoin the current space later with a new activation code.\n\nThis cannot be undone! Type the current entrance name to confirm.';
+      'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. ❗️This cannot be undone❗️';
 
   @override
   String resetDeviceNameLabel(String name) {
     return '$name';
+  }
+
+  @override
+  String resetDeviceNameHint(String name) {
+    return 'Type the current entrance name “$name”';
   }
 
   @override
@@ -978,6 +983,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetDevicePinLabel => 'Lock code';
+
+  @override
+  String get resetDevicePinHint => 'Enter this device\'s lock code';
 
   @override
   String get resetDeviceServerResidualHint =>

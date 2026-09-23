@@ -1754,11 +1754,11 @@ abstract class AppLocalizations {
   /// **'Advanced'**
   String get advancedMenuTitle;
 
-  /// No description provided for @advancedLeaveSpace.
+  /// No description provided for @advancedDestroyEntrance.
   ///
   /// In en, this message translates to:
   /// **'Destroy this entrance'**
-  String get advancedLeaveSpace;
+  String get advancedDestroyEntrance;
 
   /// No description provided for @leaveSpaceTitle.
   ///
@@ -1769,7 +1769,7 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This device can rejoin the current space later with a new activation code.\n\nThis cannot be undone! Type the current entrance name to confirm.'**
+  /// **'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. ❗️This cannot be undone❗️'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetDeviceNameLabel.
@@ -1777,6 +1777,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name}'**
   String resetDeviceNameLabel(String name);
+
+  /// No description provided for @resetDeviceNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the current entrance name “{name}”'**
+  String resetDeviceNameHint(String name);
 
   /// No description provided for @resetDeviceNameMismatch.
   ///
@@ -1795,6 +1801,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lock code'**
   String get resetDevicePinLabel;
+
+  /// No description provided for @resetDevicePinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter this device\'s lock code'**
+  String get resetDevicePinHint;
 
   /// No description provided for @resetDeviceServerResidualHint.
   ///

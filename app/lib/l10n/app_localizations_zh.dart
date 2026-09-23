@@ -913,18 +913,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedMenuTitle => '高级';
 
   @override
-  String get advancedLeaveSpace => '销毁本秘境通道';
+  String get advancedDestroyEntrance => '销毁本通道';
 
   @override
-  String get leaveSpaceTitle => '销毁本秘境通道？';
+  String get leaveSpaceTitle => '销毁本通道？';
 
   @override
   String get leaveSpaceMessage =>
-      '彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。以后本机凭新的开通码可以重新加入当前秘境。\n\n此操作无法撤销！请输入当前通道名称以确认。';
+      '彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。❗️此操作无法撤销❗️';
 
   @override
   String resetDeviceNameLabel(String name) {
     return '$name';
+  }
+
+  @override
+  String resetDeviceNameHint(String name) {
+    return '请输入当前通道名称“$name”';
   }
 
   @override
@@ -935,6 +940,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetDevicePinLabel => '锁屏码';
+
+  @override
+  String get resetDevicePinHint => '请输入本机锁屏码';
 
   @override
   String get resetDeviceServerResidualHint =>

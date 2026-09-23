@@ -221,21 +221,37 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
             ),
           ),
           const SizedBox(height: 10),
+          Text(
+            l10n.resetDeviceNameHint(widget.deviceName),
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
             decoration: InputDecoration(
-              labelText: l10n.resetDeviceNameLabel(widget.deviceName),
+              hintText: l10n.resetDeviceNameLabel(widget.deviceName),
               border: const OutlineInputBorder(),
             ),
           ),
           if (widget.hasPin) ...[
             const SizedBox(height: 8),
+            Text(
+              l10n.resetDevicePinHint,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 6),
             TextField(
               controller: _pinCtrl,
               obscureText: true,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: l10n.resetDevicePinLabel,
+                hintText: l10n.resetDevicePinLabel,
                 border: const OutlineInputBorder(),
               ),
             ),
