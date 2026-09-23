@@ -24,8 +24,8 @@
       }
     }
   },
-  "wizardNameHint": "Your name (you can change it later)",
-  "wizardPeerNameHint": "Your partner's name (you can change it later)",
+  "wizardNameHint": "Name (you can change it later)",
+  "wizardPeerNameHint": "Partner's name (you can change it later)",
   "wizardPeerNameHintInput": "Partner's name",
   "wizardNameRequired": "Enter your name",
   "wizardPeerNameRequired": "Enter your partner's name",
@@ -36,8 +36,8 @@
       "max": {"type": "int"}
     }
   },
-  "wizardNameHintInput": "Your name",
-  "wizardMyGenderLabel": "Your gender",
+  "wizardNameHintInput": "Name",
+  "wizardMyGenderLabel": "Gender",
   "wizardPeerGenderLabel": "Partner's gender",
   "wizardGenderMale": "Male",
   "wizardGenderFemale": "Female",

@@ -203,13 +203,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Your name (you can change it later)'**
+  /// **'Name (you can change it later)'**
   String get wizardNameHint;
 
   /// No description provided for @wizardPeerNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Your partner\'s name (you can change it later)'**
+  /// **'Partner\'s name (you can change it later)'**
   String get wizardPeerNameHint;
 
   /// No description provided for @wizardPeerNameHintInput.
@@ -245,13 +245,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardNameHintInput.
   ///
   /// In en, this message translates to:
-  /// **'Your name'**
+  /// **'Name'**
   String get wizardNameHintInput;
 
   /// No description provided for @wizardMyGenderLabel.
   ///
   /// In en, this message translates to:
-  /// **'Your gender'**
+  /// **'Gender'**
   String get wizardMyGenderLabel;
 
   /// No description provided for @wizardPeerGenderLabel.
