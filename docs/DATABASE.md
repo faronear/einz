@@ -102,7 +102,9 @@ CREATE TABLE messages (
 
 CREATE INDEX idx_messages_seq ON messages (space_id, server_sequence);
 
--- 附件元数据（blob 落盘于 /data/files/<前两位>/<attachment_id>）
+-- 附件元数据（blob 落盘于 /data/files/<space_id>/<前两位>/<attachment_id>；
+--   2026-09-23 起按空间分片——per-space 备份/销毁/用量统计都靠它。
+--   读路径取本行的 storage_path，故分片前的旧行（<前两位>/<id>）照常可读，无需迁移）
 -- 注：message_id **没有**外键约束——两阶段上传（先传 blob 后发消息，PROTOCOL.md §6.1）
 CREATE TABLE attachments (
     attachment_id TEXT PRIMARY KEY,        -- UUIDv7
@@ -371,4 +373,5 @@ CREATE TABLE app_state (
 ## 6. 备份（Server 侧）
 
 - 备份 = `einz.sqlite.db`（用 SQLite 官方 Backup API，禁止直接复制正在写入的 db）+ `/data/files/`，产物加密归档到 `/data/backups/`（productLens §11.2）。v1 的静态白名单 `config.json` 已删（设备与空间都在库里），备份里不再有该条目。
+- **单空间备份**（`npm run backup -- --space <id>`，2026-09-23）：只导出该空间的行 + `/data/files/<space_id>/`，恢复时只覆盖该空间，别的空间与库文件不动；不含审计表。详见 DEPLOYMENT.md §5.1。
 - 客户端备份见 E2EE.md §10（恢复码 + 加密导出，含本库与密钥归档）。

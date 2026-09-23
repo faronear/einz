@@ -225,6 +225,10 @@ export EINZ_DB_BACKUP_KEY="<部署时生成的密钥>"
 npm run backup -- --verify
 # 产物：data/backups/backup-<ts>.json（AES-256-GCM 加密的 einz.sqlite.db + files/）
 
+# 只备份一个秘境（per-space）：该空间的行 + data/files/<space_id>/
+npm run backup -- --space <space_id>
+# 产物：data/backups/backup-space-<space_id>-<ts>.json
+
 # 恢复（覆盖当前数据，先停服务再执行）
 npm run restore -- data/backups/backup-<ts>.json
 ```
@@ -232,6 +236,12 @@ npm run restore -- data/backups/backup-<ts>.json
 - 恢复会**先删后写**：`files/` 整个清空重建，库写到 `EINZ_DB` 指向的文件
   （默认 `data/einz.sqlite.db`，连 `-wal`/`-shm` 一起删，避免旧 WAL 被重放进恢复的库）。
   备份里的 `app.db` 只是内部条目名，不是落盘文件名。
+- **单空间备份（`--space`）是另一条路**：只导出该空间的行 + `files/<space_id>/`
+  （devices/push_tokens 靠 person_id/device_id 反查带出），恢复时也**只覆盖该空间**
+  ——别的空间与库文件都不动，适合"只回滚一个秘境 / 只迁移一个秘境"。
+  刻意不含审计表（`connection_events` / `device_activity`）：它们是只追加留痕，
+  且主键是自增整数，导入会撞别的空间的行。
+  旧备份没有 scope 字段 → 按全量处理（兼容）。
 
 - **为什么用 SQLite Backup API**：`einz.sqlite.db` 运行中直接复制可能损坏；Backup API 在线备份安全（DATABASE.md §6）。
 - **演练建议**：定期执行"备份 → 删除 data → 恢复 → 重启验证消息仍在"（Phase 4 已提供完整演练流程，见 `cli/test/phase4_e2e.sh` 步骤 9–10 及 worklog）。
