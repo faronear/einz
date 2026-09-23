@@ -920,7 +920,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      '彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。❗️此操作无法撤销❗️';
+      '彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。此操作无法撤销！';
 
   @override
   String resetDeviceNameLabel(String name) {

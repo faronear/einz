@@ -803,13 +803,13 @@ abstract class AppLocalizations {
   /// No description provided for @verifyPinRequired.
   ///
   /// In en, this message translates to:
-  /// **'Enter your lock code to verify'**
+  /// **'Enter your PIN to verify'**
   String get verifyPinRequired;
 
   /// No description provided for @verifyPinWrong.
   ///
   /// In en, this message translates to:
-  /// **'Wrong lock code'**
+  /// **'Wrong PIN'**
   String get verifyPinWrong;
 
   /// No description provided for @setPinDialogSetupFailed.
@@ -1769,7 +1769,7 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. ❗️This cannot be undone❗️'**
+  /// **'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetDeviceNameLabel.
@@ -1799,13 +1799,13 @@ abstract class AppLocalizations {
   /// No description provided for @resetDevicePinLabel.
   ///
   /// In en, this message translates to:
-  /// **'Lock code'**
+  /// **'PIN'**
   String get resetDevicePinLabel;
 
   /// No description provided for @resetDevicePinHint.
   ///
   /// In en, this message translates to:
-  /// **'Enter this device\'s lock code'**
+  /// **'Enter this device\'s PIN'**
   String get resetDevicePinHint;
 
   /// No description provided for @resetDeviceServerResidualHint.
@@ -1841,13 +1841,13 @@ abstract class AppLocalizations {
   /// No description provided for @promptLockCodeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Enter your lock code'**
+  /// **'Enter your PIN'**
   String get promptLockCodeTitle;
 
   /// No description provided for @promptLockCodeHint.
   ///
   /// In en, this message translates to:
-  /// **'Adding a space rewrites the encrypted vault — confirm with your lock code first'**
+  /// **'Adding a space rewrites the encrypted vault — confirm with your PIN first'**
   String get promptLockCodeHint;
 
   /// No description provided for @spaceListDeleteConfirm.

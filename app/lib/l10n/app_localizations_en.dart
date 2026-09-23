@@ -403,10 +403,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogOldWrong => 'Wrong current PIN';
 
   @override
-  String get verifyPinRequired => 'Enter your lock code to verify';
+  String get verifyPinRequired => 'Enter your PIN to verify';
 
   @override
-  String get verifyPinWrong => 'Wrong lock code';
+  String get verifyPinWrong => 'Wrong PIN';
 
   @override
   String setPinDialogSetupFailed(String error) {
@@ -962,7 +962,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. ❗️This cannot be undone❗️';
+      'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!';
 
   @override
   String resetDeviceNameLabel(String name) {
@@ -982,10 +982,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetDeviceConfirmWord => 'RESET';
 
   @override
-  String get resetDevicePinLabel => 'Lock code';
+  String get resetDevicePinLabel => 'PIN';
 
   @override
-  String get resetDevicePinHint => 'Enter this device\'s lock code';
+  String get resetDevicePinHint => 'Enter this device\'s PIN';
 
   @override
   String get resetDeviceServerResidualHint =>
@@ -1004,11 +1004,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListSwitch => 'Switch space';
 
   @override
-  String get promptLockCodeTitle => 'Enter your lock code';
+  String get promptLockCodeTitle => 'Enter your PIN';
 
   @override
   String get promptLockCodeHint =>
-      'Adding a space rewrites the encrypted vault — confirm with your lock code first';
+      'Adding a space rewrites the encrypted vault — confirm with your PIN first';
 
   @override
   String get spaceListDeleteConfirm => 'Remove';
