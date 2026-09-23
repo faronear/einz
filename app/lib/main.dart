@@ -104,6 +104,9 @@ class _EinzAppState extends State<EinzApp> {
         ),
         inputDecorationTheme: InputDecorationTheme(
           labelStyle: const TextStyle(fontSize: 16, color: Color(0xFF5C6B82)),
+          // hint（未输入时框内文字）用比 label 更淡的同色系灰蓝，与正文/已输入
+          // 文字明确区分（merge 顺序在 baseStyle 之后，只改色不覆盖各框的字号）
+          hintStyle: const TextStyle(color: Color(0xFFA3AEC0)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
