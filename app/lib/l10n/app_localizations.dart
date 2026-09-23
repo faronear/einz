@@ -812,6 +812,12 @@ abstract class AppLocalizations {
   /// **'Token created'**
   String get chatPageInviteDialogTitle;
 
+  /// No description provided for @chatPageInviteRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate'**
+  String get chatPageInviteRegenerate;
+
   /// No description provided for @chatPageInviteDialogHint.
   ///
   /// In en, this message translates to:

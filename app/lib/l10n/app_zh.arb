@@ -163,6 +163,7 @@
   "chatPageClearLockMessage": "确定要删除锁屏码吗？删除后下次启动将直接进入聊天。",
   "chatPageMenuInvite": "生成开通码",
   "chatPageInviteDialogTitle": "开通码已生成",
+  "chatPageInviteRegenerate": "重新生成",
   "chatPageInviteDialogHint": "邀请伴侣或自己的其他设备，开通一条新通道到本秘境。24 小时内一次性有效。",
   "chatPageInviteCopyLinkTooltip": "复制邀请链接",
   "chatPageInviteCopyCodeTooltip": "复制开通码",

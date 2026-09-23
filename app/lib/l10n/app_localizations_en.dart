@@ -414,6 +414,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogTitle => 'Token created';
 
   @override
+  String get chatPageInviteRegenerate => 'Regenerate';
+
+  @override
   String get chatPageInviteDialogHint =>
       'Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.';
 

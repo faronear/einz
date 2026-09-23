@@ -103,7 +103,7 @@ class _SpacePickerSheet extends StatefulWidget {
 }
 
 class _SpacePickerSheetState extends State<_SpacePickerSheet> {
-  Map<String, ({String name, String peerName})> _names = {};
+  Map<String, ({String name, String peerName, String peerGender})> _names = {};
   Map<String, int> _unread = {};
   String? _activeId;
 
@@ -116,17 +116,20 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
   Future<void> _load() async {
     final lock = AppLockService(widget.db);
     final rows = await widget.db.select(widget.db.spaces).get();
-    final out = <String, ({String name, String peerName})>{};
+    final out = <String, ({String name, String peerName, String peerGender})>{};
     for (final row in rows) {
       var name = row.name;
       var peerName = row.peerName;
+      var peerGender = '';
+      // 性别只在 per-space 资料里（Spaces 表没这一列）→ 一律读一次（本空间 key-value，开销可忽略）
+      final p = await lock.loadProfile(spaceId: row.spaceId);
+      peerGender = (p['peerGender'] as String?) ?? '';
       if (name.isEmpty && peerName.isEmpty) {
-        // Spaces 行还没被 saveProfile 写过（旧空间）：回退 per-space 资料
-        final p = await lock.loadProfile(spaceId: row.spaceId);
+        // Spaces 行还没被 saveProfile 写过（旧空间）：名字也一并回退 per-space 资料
         name = (p['partnerName'] as String?) ?? '';
         peerName = (p['peerName'] as String?) ?? '';
       }
-      out[row.spaceId] = (name: name, peerName: peerName);
+      out[row.spaceId] = (name: name, peerName: peerName, peerGender: peerGender);
     }
     final vault = VaultSession.current;
     final activeId = vault == null ? null : await lock.resolveActiveSpaceId(vault);
@@ -176,6 +179,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                   for (final space in spaces)
                     _SpaceCard(
                       name: _titleOf(space),
+                      peerGender: _names[space.spaceId]?.peerGender ?? '',
                       unread: _unread[space.spaceId] ?? 0,
                       current: space.spaceId == _activeId,
                       onTap: () => Navigator.of(context).pop(SpacePick.space(space.spaceId)),
@@ -208,68 +212,128 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
 class _SpaceCard extends StatelessWidget {
   const _SpaceCard({
     required this.name,
+    required this.peerGender,
     required this.unread,
     required this.current,
     required this.onTap,
   });
 
   final String name;
+  /// 对方性别（male/female/''）：卡片底色按它取色——选中深粉 / 深蓝，未选中淡粉 / 淡蓝；
+  /// 未知 → 不给底色，用 Card 默认表面色。
+  final String peerGender;
   final int unread;
   final bool current;
   final VoidCallback onTap;
 
+  /// 卡片底色（老板 2026-09-23 定的对照关系）：
+  /// - **被选中** → 饱和"深色"：女 #B83D80（深粉）/ 男 #2271F7（深蓝）——与对话里
+  ///   **渐变粉蓝主题** 的气泡同色（见 chat_page.dart 的 _bubbleColor）。
+  /// - **未选中** → 对应的"淡色"：女 #D6529C / 男 #3BAFFD 的 18% tint——与对话里
+  ///   **素雅纯色主题** 的气泡同色。
+  /// - 性别未登记 → 不给底色（选中 / 未选中都不给），用 Card 默认表面色。
+  Color? get _background {
+    if (peerGender == 'female') {
+      return current
+          ? const Color(0xFFB83D80)
+          : const Color(0xFFD6529C).withValues(alpha: 0.18);
+    }
+    if (peerGender == 'male') {
+      return current
+          ? const Color(0xFF2271F7)
+          : const Color(0xFF3BAFFD).withValues(alpha: 0.18);
+    }
+    return null;
+  }
+
+  /// 前景色（名字 / 对勾）：只有"选中 + 有底色"（即深色底）才用白色，
+  /// 淡色底 / 无底色都返回 null → 回退主题默认深色字。
+  Color? get _foreground =>
+      (current && _background != null) ? Colors.white : null;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 底色 / 阴影 / 对勾的**渐变过程**（老板 2026-09-23：只保留颜色渐变，去掉放大动画）。
+    const anim = Duration(milliseconds: 200);
     return SizedBox(
+      // 尺寸**固定** 104×96：选中不放大 → Wrap 不重排、弹层不跳高（老板 2026-09-23）。
       width: 104,
       height: 96,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
+      child: AnimatedContainer(
+        duration: anim,
+        curve: Curves.easeOut,
+        // 立体阴影：只在卡片**四边之外**投一层柔和光晕，绝不在卡片底色上叠东西。
+        // （早先用 Material 的 elevation，它会往底色叠 surfaceTint 把颜色压暗——就是
+        // 老板说的"发暗"；这里改用 BoxDecoration 的纯外阴影，底色永远是 _background 本身。）
+        decoration: BoxDecoration(
+          color: _background,
           borderRadius: BorderRadius.circular(12),
-          side: current
-              ? BorderSide(color: theme.colorScheme.primary, width: 2)
-              : BorderSide.none,
+          boxShadow: current
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.26),
+                    blurRadius: 10,
+                  ),
+                ]
+              : const <BoxShadow>[],
         ),
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.topLeft,
-                  child: Text(
-                    name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              // 名字颜色跟着底色一起渐变（否则底色还在淡粉时字已经先跳成白的）
+              child: AnimatedDefaultTextStyle(
+                duration: anim,
+                curve: Curves.easeOut,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _foreground ?? theme.colorScheme.onSurface,
                 ),
-                if (current)
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary),
-                  ),
-                if (unread > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.error,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.topLeft,
                       child: Text(
-                        unread > 99 ? '99+' : '$unread',
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                        name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-              ],
+                    // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来
+                    AnimatedOpacity(
+                      opacity: current ? 1 : 0,
+                      duration: anim,
+                      child: Align(
+                        alignment: Alignment.bottomRight,
+                        child: Icon(Icons.check_circle,
+                            size: 16, color: _foreground ?? theme.colorScheme.primary),
+                      ),
+                    ),
+                    if (unread > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.error,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            unread > 99 ? '99+' : '$unread',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

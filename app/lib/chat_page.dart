@@ -897,94 +897,117 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      final r = await api.createJoinToken(widget.spaceId, widget.token);
+      var r = await api.createJoinToken(widget.spaceId, widget.token);
       if (!mounted) return;
+      // 「重新生成」进行中的标记（放在 builder 外：StatefulBuilder 用箭头函数，没地方声明）
+      var busy = false;
       final l10n = AppLocalizations.of(context)!;
       await showDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l10n.chatPageInviteDialogTitle),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 说明文案作为大标题的补充说明，置于标题与二维码之间（老板 2026-09-13）；
-              // 靠左对齐——本弹窗除二维码外其余内容均靠左
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(l10n.chatPageInviteDialogHint,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: Text(l10n.chatPageInviteDialogTitle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 说明文案作为大标题的补充说明，置于标题与二维码之间（老板 2026-09-13）；
+                // 靠左对齐——本弹窗除二维码外其余内容均靠左
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(l10n.chatPageInviteDialogHint,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
+                const SizedBox(height: 12),
+                // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
+                // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
+                Center(child: _InviteQrCode(data: r.link)),
+                const SizedBox(height: 12),
+                // 顺序（老板 2026-09-22）：**纯开通码在上、邀请链接在下**——
+                // 多数人是直接复制开通码；链接留给『点开看邀请页』的场景。
+                Row(
+                  children: [
+                    Expanded(
+                      child: SelectableText(r.joinToken,
+                          // 开通码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
+                          // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                              color: Theme.of(ctx).colorScheme.onSurface)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 16),
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      tooltip: l10n.chatPageInviteCopyCodeTooltip,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: r.joinToken));
+                        if (!ctx.mounted) return;
+                        showTopNotice(ctx, l10n.chatPageInviteCodeCopied);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                // 邀请链接 + 拷贝图标（点击即复制，弹窗不关闭——根 Overlay 通知
+                // 在弹窗之上可见，老板 2026-09-11）
+                Row(
+                  children: [
+                    Expanded(
+                      child: SelectableText(r.link,
+                          // 链接退为次要：字号 14 → 12（保留品牌蓝与加粗，保证小字也看得清）
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 16),
+                      color: const Color(0xFF2271F7),
+                      tooltip: l10n.chatPageInviteCopyLinkTooltip,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: r.link));
+                        if (!ctx.mounted) return;
+                        showTopNotice(ctx, l10n.chatPageInviteLinkCopied);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            // 只留一个「关闭」（老板 2026-09-23：原来 Copy/Close 两个纯文字按钮没有主次）。
+            // 去掉了 Copy —— 它复制的是**链接**，而上面 token / 链接两行各自都有复制图标
+            // （带 tooltip 与顶部提示），底部的 Copy 既冗余又没说清复制哪个。
+            // 点弹窗外/返回键本来就能关（showDialog 默认 barrierDismissible:true）；
+            // 留一个 Close 是给"不知道能点外面"的人一条明路。
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  if (busy) return; // 进行中：忽略重复点击
+                  setLocal(() => busy = true);
+                  try {
+                    final fresh = await api.createJoinToken(
+                        widget.spaceId, widget.token);
+                    if (!ctx.mounted) return;
+                    r = fresh; // 就地刷新：二维码 / 开通码 / 链接 ✓
+                    setLocal(() {});
+                  } catch (e) {
+                    if (!ctx.mounted) return;
+                    showTopNotice(ctx, l10n.chatPageInviteFailed('$e'));
+                  } finally {
+                    if (ctx.mounted) setLocal(() => busy = false);
+                  }
+                },
+                child: Text(l10n.chatPageInviteRegenerate),
               ),
-              const SizedBox(height: 12),
-              // 自绘二维码：QrImageView 的 LayoutBuilder 会触发 AlertDialog
-              // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
-              Center(child: _InviteQrCode(data: r.link)),
-              const SizedBox(height: 12),
-              // 顺序（老板 2026-09-22）：**纯开通码在上、邀请链接在下**——
-              // 多数人是直接复制开通码；链接留给『点开看邀请页』的场景。
-              Row(
-                children: [
-                  Expanded(
-                    child: SelectableText(r.joinToken,
-                        // 开通码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
-                        // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                            color: Theme.of(ctx).colorScheme.onSurface)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 16),
-                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                    tooltip: l10n.chatPageInviteCopyCodeTooltip,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: r.joinToken));
-                      if (!ctx.mounted) return;
-                      showTopNotice(ctx, l10n.chatPageInviteCodeCopied);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              // 邀请链接 + 拷贝图标（点击即复制，弹窗不关闭——根 Overlay 通知
-              // 在弹窗之上可见，老板 2026-09-11）
-              Row(
-                children: [
-                  Expanded(
-                    child: SelectableText(r.link,
-                        // 链接退为次要：字号 14 → 12（保留品牌蓝与加粗，保证小字也看得清）
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2271F7))),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 16),
-                    color: const Color(0xFF2271F7),
-                    tooltip: l10n.chatPageInviteCopyLinkTooltip,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: r.link));
-                      if (!ctx.mounted) return;
-                      showTopNotice(ctx, l10n.chatPageInviteLinkCopied);
-                    },
-                  ),
-                ],
-              ),
+              TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.close)),
             ],
           ),
-          // 只留一个「关闭」（老板 2026-09-23：原来 Copy/Close 两个纯文字按钮没有主次）。
-          // 去掉了 Copy —— 它复制的是**链接**，而上面 token / 链接两行各自都有复制图标
-          // （带 tooltip 与顶部提示），底部的 Copy 既冗余又没说清复制哪个。
-          // 点弹窗外/返回键本来就能关（showDialog 默认 barrierDismissible:true）；
-          // 留一个 Close 是给"不知道能点外面"的人一条明路。
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.close)),
-          ],
         ),
       );
     } catch (e) {
@@ -3821,8 +3844,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
               final langCode = Localizations.localeOf(context).languageCode;
               // 行内左侧标签用稍淡色，与右侧当前值文字（默认 onSurface 深色）区分
+              // 左侧标签 = **备注级**（淡色小字，不抢戏）；右侧"当前值" = 深色大字（老板 2026-09-23 定：
+              // 左侧相当于备注，不用强调，右侧才是用户要看的东西 ✓）。
               final labelStyle =
                   TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
+              final captionStyle = TextStyle(
+                  fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant);
+              final valueStyle = TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w500);
               return [
                 // 菜单分组（老板 2026-09-22 定）：
                 //   ①「我」：我的身份 / 我的头像（关于"我这个人"）
@@ -3834,9 +3865,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'name',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuMyNameLabel, style: labelStyle),
+                      Text(l10n.chatPageMenuMyNameLabel, style: captionStyle),
                       const Spacer(),
-                      Text(_myPartnerName.isEmpty ? l10n.chatPageNameUnset : _myPartnerName),
+                      Text(_myPartnerName.isEmpty ? l10n.chatPageNameUnset : _myPartnerName, style: valueStyle),
                     ],
                   ),
                 ),
@@ -3865,9 +3896,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'devname',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuEntranceNameLabel, style: labelStyle),
+                      Text(l10n.chatPageMenuEntranceNameLabel, style: captionStyle),
                       const Spacer(),
-                      Text(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName),
+                      Text(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName, style: valueStyle),
                     ],
                   ),
                 ),
@@ -3883,9 +3914,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'locale',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuLocaleLabel, style: labelStyle),
+                      Text(l10n.chatPageMenuLocaleLabel, style: captionStyle),
                       const Spacer(),
-                      Text(kLocaleLabels[langCode] ?? langCode),
+                      Text(kLocaleLabels[langCode] ?? langCode, style: valueStyle),
                     ],
                   ),
                 ),
@@ -3894,9 +3925,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'style',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuStyleLabel, style: labelStyle),
+                      Text(l10n.chatPageMenuStyleLabel, style: captionStyle),
                       const Spacer(),
-                      Text(_uiStyleLabel(_uiStyle, l10n)),
+                      Text(_uiStyleLabel(_uiStyle, l10n), style: valueStyle),
                     ],
                   ),
                 ),
@@ -3906,11 +3937,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'burn',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuBurnLabel, style: labelStyle),
+                      Text(l10n.chatPageMenuBurnLabel, style: captionStyle),
                       const Spacer(),
                       // 不设期限（0）不显示档位值，菜单项只显示「阅后即焚」；
                       // 选了具体时长才在右侧显示（老板 2026-09-15）
-                      if (_burnSeconds > 0) Text(_burnOptionLabel(_burnSeconds, l10n)),
+                      if (_burnSeconds > 0)
+                        Text(_burnOptionLabel(_burnSeconds, l10n), style: valueStyle),
                     ],
                   ),
                 ),
@@ -3919,9 +3951,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'storage',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuAttachmentStorage, style: labelStyle),
+                      Text(l10n.chatPageMenuAttachmentStorage, style: captionStyle),
                       const Spacer(),
-                      Text(_attachmentStorageLabel(_attachmentStorage, l10n)),
+                      Text(_attachmentStorageLabel(_attachmentStorage, l10n), style: valueStyle),
                     ],
                   ),
                 ),
@@ -3930,10 +3962,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'pin',
                   child: Row(
                     children: [
-                      Text(l10n.chatPagePinLabel, style: labelStyle),
+                      Text(l10n.chatPagePinLabel, style: captionStyle),
                       const Spacer(),
                       // 未设置时只显示「锁屏码」，不显示「未设置」尾缀（老板 2026-09-15）
-                      if (_hasPin) Text(l10n.chatPagePinSetValue),
+                      if (_hasPin) Text(l10n.chatPagePinSetValue, style: valueStyle),
                     ],
                   ),
                 ),

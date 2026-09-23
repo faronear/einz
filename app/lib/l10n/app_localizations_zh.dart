@@ -391,6 +391,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogTitle => '开通码已生成';
 
   @override
+  String get chatPageInviteRegenerate => '重新生成';
+
+  @override
   String get chatPageInviteDialogHint =>
       '邀请伴侣或自己的其他设备，开通一条新通道到本秘境。24 小时内一次性有效。';
 

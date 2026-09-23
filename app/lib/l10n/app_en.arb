@@ -163,6 +163,7 @@
   "chatPageClearLockMessage": "Delete the PIN? After deletion, next app launch will go straight into chat.",
   "chatPageMenuInvite": "Create token",
   "chatPageInviteDialogTitle": "Token created",
+  "chatPageInviteRegenerate": "Regenerate",
   "chatPageInviteDialogHint": "Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.",
   "chatPageInviteCopyLinkTooltip": "Copy invite link",
   "chatPageInviteCopyCodeTooltip": "Copy token",
