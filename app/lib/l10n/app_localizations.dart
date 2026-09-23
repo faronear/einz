@@ -632,12 +632,6 @@ abstract class AppLocalizations {
   /// **'Token already used'**
   String get setupTokenUsed;
 
-  /// No description provided for @setupTokenSpaceFull.
-  ///
-  /// In en, this message translates to:
-  /// **'Space is full'**
-  String get setupTokenSpaceFull;
-
   /// No description provided for @setupTokenOtherServer.
   ///
   /// In en, this message translates to:
@@ -875,7 +869,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageClearLockMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete the PIN? After deletion, the app launch will go straight into chat.'**
+  /// **'Delete the PIN? After deletion, next app launch will go straight into chat.'**
   String get chatPageClearLockMessage;
 
   /// No description provided for @chatPageMenuInvite.

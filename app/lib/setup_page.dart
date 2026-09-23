@@ -1605,7 +1605,7 @@ class _SetupPageState extends State<SetupPage> {
 
   /// join 第一步 token 校验：POST /spaces/join/preflight（不消费 token）。
   /// 成功 → 记录 token/身份 slots（供后续步骤与最终 join 提交）并放行；失败 →
-  /// 错误码映射红字（TOKEN_INVALID/EXPIRED/USED/SPACE_FULL，
+  /// 错误码映射红字（TOKEN_INVALID/EXPIRED/USED，
   /// PROTOCOL_MULTIVERSE.md §6），停留本页。预检返回的 slots 用于身份选择页，
   /// 「对方名字」取另一个 slot 的名字（见 _joinPeerName——**不是**空间名）。
   Future<bool> _verifyJoinToken() async {
@@ -1682,8 +1682,6 @@ class _SetupPageState extends State<SetupPage> {
         return l10n.setupTokenExpired;
       case 'TOKEN_USED':
         return l10n.setupTokenUsed;
-      case 'SPACE_FULL':
-        return l10n.setupTokenSpaceFull;
       case 'PROTOCOL_VERSION_MISMATCH':
         // 反向于 setupEntryLegacyServer：**本机 App 过旧**（服务器按版本把请求挡了）。
         // 老板 2026-09-22 实测踩到：Android 模拟器跑的是没更新的旧包，请求全被 400

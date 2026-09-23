@@ -129,7 +129,8 @@ POST /spaces
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,
           personName?, partnerName?, customId? }   // personName=第一人名字（2026-09-16 由 displayName 改名）
   响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token（含链接）
-  错误：DEVICE_ALREADY_BOUND / ADDRESS_TAKEN / INVALID_ADDRESS
+  错误：DEVICE_ALREADY_BOUND / ADDRESS_TAKEN / INVALID_ADDRESS / SPACE_LIMIT_REACHED
+       （SPACE_LIMIT_REACHED：现有空间数 ≥ serverConfig.json 的 maxSpaces，409）
 
 GET /spaces/lookup?address=... | ?custom_id=...
   精确查找，只返回最小公开信息：
@@ -141,7 +142,8 @@ POST /spaces/join
   请求：{ token, publicKey, deviceName?, partnerSlot?, gender? }
   （无名字字段：身份名取自 create 时为该 slot 预置的名字——2026-09-16）
   响应：200 { spaceId, personId, partnerSlot, sessionToken }
-  错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / SPACE_FULL / DEVICE_ALREADY_BOUND
+  错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND
+  （无"满员"错误：通道数不限，同身份可多设备——见 §6）
 ```
 
 ### 4.2 成员端点（加入后/创建者）
@@ -150,7 +152,7 @@ POST /spaces/join
 POST /spaces/{spaceId}/join-tokens
   现有成员生成一次性开通码（join token，可刷新/撤销）。
   请求：{ }  →  201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
-  错误：NOT_A_MEMBER / SPACE_FULL（满员后不再生成）
+  错误：NOT_A_MEMBER（无满员概念：不限通道数，随时可生成新开通码）
 
 DELETE /spaces/{spaceId}/join-tokens/{tokenHash}
   撤销未用 token（创建者补救手段）。
@@ -165,12 +167,12 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 
 ```text
 ① 输入 token/粘贴链接/扫码        → POST /spaces/join（带 token，未带身份）
-     前置校验：TOKEN_INVALID/EXPIRED/USED/SPACE_FULL 在此拦截（fail fast）
+     前置校验：TOKEN_INVALID/EXPIRED/USED 在此拦截（fail fast）
 ② 空间确认                        → GET /spaces/lookup?address=...（或 join 响应
      携带的 spaceId/名称/状态）
 ③ 身份登记（名字/性别）           → POST /spaces/join（补 identity 字段，
-     服务端事务：锁 Space 行 → 校验 token → 校验成员数 → 标记 used →
-     插入第二个 member）
+     服务端事务：锁 Space 行 → 校验 token → 标记 used → 绑定 partnerSlot
+     （slot 已有人 → 复用其 person_id：同身份多设备；**不校验成员/通道数**））
 ④ 口令 escrow 取 Space Key        → POST /spaces/{spaceId}/key-escrow/verify
      （提交口令，解开创建者托管的口令密封包，返回 space_key 密封内容）
 ⑤ 设置 PIN                       → 本机操作（AppLock），无服务端调用
@@ -192,7 +194,7 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `TOKEN_INVALID` | token 格式错误或不存在（hash 不匹配） | 400 |
 | `TOKEN_EXPIRED` | token 已超过 expires_at | 410 |
 | `TOKEN_USED` | token 已被消费（一次性） | 410 |
-| `SPACE_FULL` | Space 已有 2 人，第三人不接受 | 409 |
+| `SPACE_LIMIT_REACHED` | 空间数量已达上限（serverConfig.json 的 maxSpaces；与"成员/通道数"无关） | 409 |
 | `SPACE_NOT_FOUND` | 空间不存在/已归档 | 404 |
 | `NOT_A_MEMBER` | 当前 session 不是该 Space 成员 | 403 |
 | `DEVICE_ALREADY_BOUND` | 该设备已绑定一个 Space，拒绝再创建/加入 | 409 |

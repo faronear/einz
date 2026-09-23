@@ -117,7 +117,6 @@
   "setupTokenInvalid": "Invalid token",
   "setupTokenExpired": "Token expired",
   "setupTokenUsed": "Token already used",
-  "setupTokenSpaceFull": "Space is full",
   "setupTokenOtherServer": "the invite link is from {other} but this app is connected to {current}; they cannot work with each other.",
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }

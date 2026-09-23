@@ -117,7 +117,6 @@
   "setupTokenInvalid": "开通码无效",
   "setupTokenExpired": "开通码已过期",
   "setupTokenUsed": "开通码已被使用",
-  "setupTokenSpaceFull": "秘境已满",
   "setupTokenOtherServer": "该邀请链接来自 {other}，本机连的是 {current}，不能混用",
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }

@@ -308,9 +308,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupTokenUsed => 'Token already used';
 
   @override
-  String get setupTokenSpaceFull => 'Space is full';
-
-  @override
   String setupTokenOtherServer(String other, String current) {
     return 'the invite link is from $other but this app is connected to $current; they cannot work with each other.';
   }
@@ -448,7 +445,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageClearLockMessage =>
-      'Delete the PIN? After deletion, the app launch will go straight into chat.';
+      'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
   String get chatPageMenuInvite => 'Create activation code';
