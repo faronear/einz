@@ -417,13 +417,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockSameAsOld => '新锁屏码与当前锁屏码相同，未作修改';
 
   @override
-  String get chatPageSetLockNoPinNotice => '锁屏码为空，下次启动可直接进入秘境';
+  String get chatPageSetLockNoPinNotice => '锁屏码仍然为空，下次启动应用可直接进入秘境。';
 
   @override
   String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
 
   @override
-  String get chatPageSetLockCleared => '已删除锁屏码（下次启动直接进入）';
+  String get chatPageSetLockCleared => '已删除锁屏码，下次启动应用可直接进入秘境';
 
   @override
   String get chatPageClearLockTitle => '删除锁屏码？';

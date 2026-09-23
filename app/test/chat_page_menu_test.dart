@@ -591,8 +591,8 @@ void main() {
     await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
     expect(find.text('删除锁屏码？'), findsNothing);
-    expect(find.text('锁屏码为空，下次启动可直接进入秘境'), findsOneWidget); // 顶部通知
-    expect(find.text('设置锁屏码'), findsOneWidget); // 弹窗保持原样
+    expect(find.text('锁屏码仍然为空，下次启动应用可直接进入秘境。'), findsOneWidget); // 顶部通知
+    expect(find.text('设置锁屏码'), findsNothing, reason: '先关弹窗再弹通知（老板 2026-09-23）');
     final lock = AppLockService(db);
     expect(await lock.isSetup, false);
     expect(await lock.hasConfig, false, reason: '本来就没锁可清：不做任何写盘');

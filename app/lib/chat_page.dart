@@ -4447,9 +4447,13 @@ class _SetLockDialogState extends State<_SetLockDialog> {
 
     // 两空 = 清空锁屏码（Space Key 转明文保存，与向导"不设置锁屏码"一致）
     if (pin.isEmpty && confirm.isEmpty) {
-      // 本来就没设锁屏码：没有可清的东西——不调后台、不改动，只提示一句（老板 2026-09-14）
+      // 本来就没设锁屏码：没有可清的东西——不调后台、不改动，只提示一句（老板 2026-09-14）；
+      // 先关弹窗再顶部提示（老板 2026-09-23）：通知浮在弹窗上不合理
       if (!_hasPin) {
-        showTopNotice(context, l10n.chatPageSetLockNoPinNotice);
+        // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活）
+        final overlay = Overlay.of(context, rootOverlay: true);
+        Navigator.of(context).pop(); // 无改动：不回 true（菜单不做无谓刷新）
+        showTopNoticeOn(overlay, l10n.chatPageSetLockNoPinNotice);
         return;
       }
       // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
