@@ -9,8 +9,8 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-/// 令牌弹窗布局回归测试（2026-09-08 老板真机报告：app 使用一段时间后点
-/// 菜单生成令牌，经常整个屏幕变暗但弹窗不出现，flutter run 报
+/// 开通码弹窗布局回归测试（2026-09-08 老板真机报告：app 使用一段时间后点
+/// 菜单生成开通码，经常整个屏幕变暗但弹窗不出现，flutter run 报
 /// RenderIntrinsicWidth / RenderBox was not laid out 连锁异常；且弹窗里的
 /// 二维码从未显示过）。
 ///
@@ -54,7 +54,7 @@ class _InviteFakeApi extends ApiClient {
 }
 
 void main() {
-  testWidgets('令牌弹窗：首帧不抛布局异常且二维码真实可见', (WidgetTester tester) async {
+  testWidgets('开通码弹窗：首帧不抛布局异常且二维码真实可见', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await tester.pumpWidget(MaterialApp(
@@ -74,10 +74,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100)); // 初始加载（空历史）
 
-    // 菜单 → 新通道令牌
+    // 菜单 → 生成开通码
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('新通道令牌'));
+    await tester.tap(find.text('生成开通码'));
     // 菜单 pop 后延迟 300ms 才打开弹窗（chat_page onSelected 设计），
     // 随后 createJoinToken（fake 瞬时返回）→ showDialog
     await tester.pump(const Duration(milliseconds: 350));
@@ -87,13 +87,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // 弹窗内容齐全
-    expect(find.text('令牌已生成'), findsOneWidget);
+    expect(find.text('开通码已生成'), findsOneWidget);
     // token（次级小字，在上）+ 邀请链接（主展示，在下）——顺序见 chat_page 注释
     expect(find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
         findsWidgets);
     expect(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), findsWidgets);
 
-    // 顺序（老板 2026-09-22）：**纯令牌在上、邀请链接在下**——多数人直接复制令牌，
+    // 顺序（老板 2026-09-22）：**纯开通码在上、邀请链接在下**——多数人直接复制开通码，
     // 链接留给"点开看邀请页"的场景。用几何位置钉住，防止以后又被调回去。
     final tokenY = tester
         .getTopLeft(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789').first)
@@ -103,7 +103,7 @@ void main() {
             .text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789')
             .first)
         .dy;
-    expect(tokenY, lessThan(linkY), reason: '纯令牌应在邀请链接上方');
+    expect(tokenY, lessThan(linkY), reason: '纯开通码应在邀请链接上方');
 
     // 二维码真实可见（原 bug：CustomPaint 绘制面 0x0，从未显示）
     final qrPaint = find.byWidgetPredicate(

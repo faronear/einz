@@ -116,7 +116,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardIdentityFirst => '⚠️ 选择我的身份';
 
   @override
-  String get wizardInviteHint => '令牌可由任意一个已开通的通道生成，24 小时内一次性有效。';
+  String get wizardInviteHint => '开通码可由任意一个已开通的通道生成，24 小时内一次性有效。';
 
   @override
   String get wizardRoleOffline => '导入线下密保信封';
@@ -164,7 +164,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSpaceLimit => '秘境数量已达上限（服务器 maxSpaces 限制）——暂不能新建秘境';
 
   @override
-  String get wizardTitleInvite => '验证令牌';
+  String get wizardTitleInvite => '验证开通码';
 
   @override
   String get wizardTitlePassphrase => '设置共享口令';
@@ -183,7 +183,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      '该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性令牌加入。';
+      '该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性开通码加入。';
 
   @override
   String get wizardEnrollGoJoin => '改用“加入”向导';
@@ -262,32 +262,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return '请求太频繁：请 $seconds 秒后再试（这不是令牌本身的问题）';
+    return '请求太频繁：请 $seconds 秒后再试（这不是开通码本身的问题）';
   }
 
   @override
-  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是令牌本身的问题）';
+  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是开通码本身的问题）';
 
   @override
-  String get setupTokenTitle => '验证令牌';
+  String get setupTokenTitle => '验证开通码';
 
   @override
-  String get setupTokenHint => '填写令牌，24 小时内一次性有效';
+  String get setupTokenHint => '填写开通码，24 小时内一次性有效';
 
   @override
-  String get setupTokenInputHint => '填写令牌或邀请链接';
+  String get setupTokenInputHint => '填写开通码或邀请链接';
 
   @override
-  String get setupTokenNeedInput => '请填写令牌';
+  String get setupTokenNeedInput => '请填写开通码';
 
   @override
-  String get setupTokenInvalid => '令牌无效';
+  String get setupTokenInvalid => '开通码无效';
 
   @override
-  String get setupTokenExpired => '令牌已过期';
+  String get setupTokenExpired => '开通码已过期';
 
   @override
-  String get setupTokenUsed => '令牌已被使用';
+  String get setupTokenUsed => '开通码已被使用';
 
   @override
   String get setupTokenSpaceFull => '秘境已满';
@@ -306,7 +306,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenSpacePrivate => '加入私密秘境（等待第二位成员）';
 
   @override
-  String get setupCreateShareTitle => '把令牌发给对方（也可用在自己的另一台设备上）';
+  String get setupCreateShareTitle => '把开通码发给对方（也可用在自己的另一台设备上）';
 
   @override
   String get setupCreateCopy => '复制邀请链接';
@@ -330,19 +330,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardEnvelopeWrong => '密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴';
 
   @override
-  String get setupPageInviteHint => '输入令牌';
+  String get setupPageInviteHint => '输入开通码';
 
   @override
-  String get setupPageNeedInvite => '⚠️ 填写一次性令牌';
+  String get setupPageNeedInvite => '⚠️ 填写一次性开通码';
 
   @override
-  String get setupPageScanInvite => '扫码填入令牌';
+  String get setupPageScanInvite => '扫码填入开通码';
 
   @override
-  String get setupPageScannerHint => '把令牌二维码对准取景框';
+  String get setupPageScannerHint => '把开通码二维码对准取景框';
 
   @override
-  String get wizardInviteWrong => '令牌无效。请使用任意一个已开通的通道生成的 24 小时一次性令牌。';
+  String get wizardInviteWrong => '开通码无效。请使用任意一个已开通的通道生成的 24 小时一次性开通码。';
 
   @override
   String get setupPageNoEscrow => '❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。';
@@ -424,10 +424,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockMessage => '新锁屏码留空 = 清空锁屏码。确定要清除吗？清除后下次启动直接进入聊天。';
 
   @override
-  String get chatPageMenuInvite => '新通道令牌';
+  String get chatPageMenuInvite => '生成开通码';
 
   @override
-  String get chatPageInviteDialogTitle => '令牌已生成';
+  String get chatPageInviteDialogTitle => '开通码已生成';
 
   @override
   String get chatPageInviteDialogHint =>
@@ -437,17 +437,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => '复制令牌';
+  String get chatPageInviteCopyCodeTooltip => '复制开通码';
 
   @override
   String get chatPageInviteLinkCopied => '邀请链接已复制';
 
   @override
-  String get chatPageInviteCodeCopied => '令牌已复制';
+  String get chatPageInviteCodeCopied => '开通码已复制';
 
   @override
   String chatPageInviteFailed(String error) {
-    return '令牌生成失败: $error';
+    return '开通码生成失败: $error';
   }
 
   @override
@@ -908,7 +908,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      '将销毁这个秘境在本机上的全部消息、附件和密钥，并回到秘境向导。\n\n秘境本身及其数据仍在，你和伴侣的其他设备不受影响。以后凭新的令牌可以重新加入本秘境。\n\n此操作无法撤销！';
+      '将销毁这个秘境在本机上的全部消息、附件和密钥，并回到秘境向导。\n\n秘境本身及其数据仍在，你和伴侣的其他设备不受影响。以后凭新的开通码可以重新加入本秘境。\n\n此操作无法撤销！';
 
   @override
   String resetDeviceNameLabel(String name) {

@@ -450,7 +450,7 @@ Authorization: Bearer <session_token>
 | S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
 | S→C | `peer.online` | `{ "device_id": "dev1", "person_id": "per1", "online_since": 1787900000000 }` | 对端设备上线（WS 连接建立时广播；**不发给同 person 的设备**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
 | S→C | `peer.offline` | `{ "device_id": "dev1", "person_id": "per1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 person 设备） |
-| S→C | `passphrase.rotated` | `{ "device_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成令牌/改口令时按需检测 updated_at 再要求输入新口令） |
+| S→C | `passphrase.rotated` | `{ "device_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
 
 ### 8.3 顺序与重连
 
@@ -484,7 +484,7 @@ Authorization: Bearer <session_token>
 
 ## 10. 限流与日志
 
-- 限流（令牌桶）：`/auth/*` 每分钟 10 次/设备；`/messages`、`/attachments` 每分钟 60 次/设备；WS 连接数 ≤ 每设备 3。
+- 限流（令牌桶算法 token bucket）：`/auth/*` 每分钟 10 次/设备；`/messages`、`/attachments` 每分钟 60 次/设备；WS 连接数 ≤ 每设备 3。
 - 日志**禁止包含**：消息明文、附件内容、密钥、私钥、Space Key（允许：device authenticated、message sequence=123、attachment uploaded、sync completed）。
 
 ## 11. 版本演进

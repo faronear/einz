@@ -881,7 +881,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuInvite.
   ///
   /// In en, this message translates to:
-  /// **'New entrance token'**
+  /// **'Create activation code'**
   String get chatPageMenuInvite;
 
   /// No description provided for @chatPageInviteDialogTitle.
@@ -1001,19 +1001,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameDeviceTitle.
   ///
   /// In en, this message translates to:
-  /// **'This entrance in this space'**
+  /// **'Current entrance'**
   String get chatPageRenameDeviceTitle;
 
   /// No description provided for @chatPageRenameDeviceLabel.
   ///
   /// In en, this message translates to:
-  /// **'Name of this entrance'**
+  /// **'Entrance name'**
   String get chatPageRenameDeviceLabel;
 
   /// No description provided for @chatPageDeviceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'They belong to this entrance only — the same phone or computer has its own set in every space.'**
+  /// **'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.'**
   String get chatPageDeviceScopeHint;
 
   /// No description provided for @chatPageRenameDeviceEmptyError.
@@ -1265,7 +1265,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuDeviceNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'Entrance name'**
+  /// **'Current entrance'**
   String get chatPageMenuDeviceNameLabel;
 
   /// No description provided for @chatPagePinLabel.

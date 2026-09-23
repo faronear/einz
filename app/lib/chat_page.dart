@@ -919,13 +919,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
               Center(child: _InviteQrCode(data: r.link)),
               const SizedBox(height: 12),
-              // 顺序（老板 2026-09-22）：**纯令牌在上、邀请链接在下**——
-              // 多数人是直接复制令牌；链接留给『点开看邀请页』的场景。
+              // 顺序（老板 2026-09-22）：**纯开通码在上、邀请链接在下**——
+              // 多数人是直接复制开通码；链接留给『点开看邀请页』的场景。
               Row(
                 children: [
                   Expanded(
                     child: SelectableText(r.joinToken,
-                        // 令牌是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
+                        // 开通码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
                         // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
                         style: TextStyle(
                             fontSize: 12,
@@ -3818,7 +3818,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               return [
                 // 菜单分组（老板 2026-09-22 定）：
                 //   ①「我」：我的身份 / 我的头像（关于"我这个人"）
-                //   ②「本通道」：通道名称 / 新通道令牌（关于"本机在这个秘境里的通道"）
+                //   ②「本通道」：通道名称 / 生成开通码（关于"本机在这个秘境里的通道"）
                 //   ③ 设置：语言 / 界面主题   ④ 安全：阅后即焚 / 附件存储 / 锁屏码 / 高级
                 //   ⑤ 结尾：关于秘境 / 切换秘境 / 退出本应用
                 PopupMenuItem(

@@ -453,7 +453,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.';
 
   @override
-  String get chatPageMenuInvite => 'New entrance token';
+  String get chatPageMenuInvite => 'Create activation code';
 
   @override
   String get chatPageInviteDialogTitle => 'Token created';

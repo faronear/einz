@@ -337,7 +337,7 @@ void main() {
     expect(find.text('进入秘境'), findsOneWidget); // 唯一按钮（点外面不关闭）
   });
 
-  // ---- join（后续设备：探测到 personA → 身份 → 令牌 → …）----
+  // ---- join（后续设备：探测到 personA → 身份 → 开通码 → …）----
 
   testWidgets('golden: 向导1.2.1-身份选择步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
@@ -346,10 +346,10 @@ void main() {
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.1_identity.png'));
   });
 
-  testWidgets('golden: 向导1.2.3-令牌步骤（join）', (WidgetTester tester) async {
+  testWidgets('golden: 向导1.2.3-开通码步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
     await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
-    await tester.tap(find.text('Lukas')); // 选身份（自动进令牌页）
+    await tester.tap(find.text('Lukas')); // 选身份（自动进开通码页）
     await tester.pumpAndSettle();
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.3_invite.png'));
@@ -359,12 +359,12 @@ void main() {
 
   testWidgets('golden: 向导1.3.1-密保信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    // 信封入口仅 join（第二/三台设备）口令页显示：探测到 personA → 身份（自动进令牌页）→ 口令页
+    // 信封入口仅 join（第二/三台设备）口令页显示：探测到 personA → 身份（自动进开通码页）→ 口令页
     await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
-    await tester.tap(find.text('Lukas')); // 选身份（自动进令牌页）
+    await tester.tap(find.text('Lukas')); // 选身份（自动进开通码页）
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 令牌（校验非空）
-    await tester.tap(find.text('下一步')); // 令牌 → 口令页
+    await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 开通码（校验非空）
+    await tester.tap(find.text('下一步')); // 开通码 → 口令页
     await tester.pumpAndSettle();
     // 口令页底部「改用线下密保信封」→ offline 首步即密保信封粘贴页
     await tester.tap(find.text('改用线下密保信封'));

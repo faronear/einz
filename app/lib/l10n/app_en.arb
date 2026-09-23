@@ -179,7 +179,7 @@
   "chatPageSetLockCleared": "App lock cleared (enter directly next time)",
   "chatPageClearLockTitle": "Clear app lock?",
   "chatPageClearLockMessage": "A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.",
-  "chatPageMenuInvite": "New entrance token",
+  "chatPageMenuInvite": "Create activation code",
   "chatPageInviteDialogTitle": "Token created",
   "chatPageInviteDialogHint": "Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.",
   "chatPageInviteCopyLinkTooltip": "Copy invite link",
