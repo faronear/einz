@@ -152,7 +152,7 @@ void main() {
     expect(await BurnAfterSettings(db, spaceId: 'space-a').load(), 0, reason: '已回退到默认（旧全局键也不存在）');
   });
 
-  test('媒体缓存保留名单跨空间（allMessageIdsAcrossSpaces）', () async {
+  test('媒体缓存保留名单只取本空间（缓存已按空间分目录）', () async {
     final repo = MessageRepository(
       db: db,
       api: ApiClient('http://fake'),
@@ -165,8 +165,7 @@ void main() {
     await seedTwoSpaces();
 
     final mine = await repo.allMessageIds();
-    expect(mine, {'msg-space-a'}, reason: '当前空间口径不变');
-    final all = await repo.allMessageIdsAcrossSpaces();
-    expect(all, {'msg-space-a', 'msg-space-b'}, reason: '清理缓存时必须包含其他空间，否则会误删');
+    expect(mine, {'msg-space-a'}, reason: '保留名单只应含本空间');
+    expect(mine.contains('msg-space-b'), isFalse, reason: '别的空间不在清理范围内，不该进名单');
   });
 }

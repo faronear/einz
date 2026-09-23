@@ -56,9 +56,17 @@ class AttachmentStore {
     return dir;
   }
 
-  /// 确定性路径（不创建文件）；平台不可用返回 null。
-  static Future<File?> pathFor(String messageId, String ext) async {
+  /// 空间子目录（与 MediaCache 同构：`<stored>/<safe(spaceId)>/`，老板 2026-09-23）。
+  /// 平台不可用返回 null。
+  static Future<Directory?> directoryFor(String spaceId) async {
     final dir = await directory();
+    if (dir == null) return null;
+    return _ensure(Directory('${dir.path}/${MediaCache.safeName(spaceId)}'));
+  }
+
+  /// 确定性路径（不创建文件）；平台不可用返回 null。
+  static Future<File?> pathFor(String spaceId, String messageId, String ext) async {
+    final dir = await directoryFor(spaceId);
     if (dir == null) return null;
     return File('${dir.path}/${MediaCache.cacheFileName(messageId, ext)}');
   }
@@ -66,12 +74,13 @@ class AttachmentStore {
   /// 本地已有且文件仍在 → 直接返回（零网络、零解密）；否则用 [load] 生成并落盘。
   /// 失败（无目录/下载失败）返回 null——调用方按"没有本地副本"处理并可重试。
   static Future<File?> ensure(
+    String spaceId,
     String messageId,
     String ext,
     Future<Uint8List> Function() load,
   ) async {
     try {
-      final file = await pathFor(messageId, ext);
+      final file = await pathFor(spaceId, messageId, ext);
       if (file == null) return null;
       if (await file.exists()) return file;
       final bytes = await load();
@@ -82,10 +91,21 @@ class AttachmentStore {
     }
   }
 
-  /// 定点删除某条消息的留存明文（消息删除 / 阅后即焚到期时调用）。
-  static Future<void> deleteFor(String messageId) async {
+  /// 清空**单个空间**的留存明文（退出/销毁空间时调用）。
+  static Future<void> clearSpace(String spaceId) async {
     try {
-      final dir = await directory();
+      final dir = await directoryFor(spaceId);
+      if (dir == null) return;
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (_) {
+      // 平台不可用/文件系统错误：忽略
+    }
+  }
+
+  /// 定点删除某条消息的留存明文（消息删除 / 阅后即焚到期时调用）。
+  static Future<void> deleteFor(String spaceId, String messageId) async {
+    try {
+      final dir = await directoryFor(spaceId);
       if (dir == null) return;
       // cacheFileName 形如 `einz_media_<id>.<ext>`，按 `einz_media_<id>.` 前缀匹配
       final target = MediaCache.cacheFileName(messageId, '');

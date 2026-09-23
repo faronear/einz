@@ -1727,8 +1727,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await _repo.sync();
       // 到期焚毁：媒体缓存定点删（尽力而为、不等待——测试/主流程不被文件 I/O 阻塞）
       for (final id in await _repo.tombstoneExpired()) {
-        unawaited(MediaCache.deleteFor(id));
-        unawaited(AttachmentStore.deleteFor(id)); // stored 模式的留存明文同样要删
+        unawaited(MediaCache.deleteFor(widget.spaceId, id));
+        unawaited(AttachmentStore.deleteFor(widget.spaceId, id)); // stored 模式的留存明文同样要删
       }
       await _repo.refreshDeviceMap();
       final recent = await _repo.historyRecent(limit: _pageSize);
@@ -1745,9 +1745,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       unawaited(_reportDeliveredIfAdvanced());
       // 载入对方回执 → 自己消息可显示双勾（sync 内已拉过，此处兜底一次）
       unawaited(_loadPeerReceipts());
-      // 启动孤儿清理：本地库已无对应消息的缓存 + 历史遗留 temp 文件（不阻塞首屏）
-      // 保留名单必须跨空间：只给当前空间会把其他空间的缓存当孤儿删掉（多空间）
-      unawaited(_repo.allMessageIdsAcrossSpaces().then(MediaCache.prune));
+      // 启动孤儿清理：本地库已无对应消息的缓存 + 历史遗留 temp 文件（不阻塞首屏）。
+      // 缓存已按空间分目录 → 只扫本空间，保留名单也只取本空间
+      unawaited(_repo.allMessageIds().then((ids) => MediaCache.prune(widget.spaceId, ids)));
     } catch (_) {
       // 网络抖动忽略：本地缓存已上屏，等 ticker 重试
     }
@@ -1763,8 +1763,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final now = DateTime.now().millisecondsSinceEpoch;
       // 阅后即焚：到期消息打本地墓碑（纯本地）+ 定点删媒体解密缓存（不等待）
       for (final id in await _repo.tombstoneExpired(now: now)) {
-        unawaited(MediaCache.deleteFor(id));
-        unawaited(AttachmentStore.deleteFor(id));
+        unawaited(MediaCache.deleteFor(widget.spaceId, id));
+        unawaited(AttachmentStore.deleteFor(widget.spaceId, id));
       }
       final fresh = await _repo.historySince(afterSequence: _lastLoadedSequence);
       // stored 模式：新到附件的明文**收到即落盘**（消息流里点开就能看）
@@ -2539,8 +2539,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     if (confirmed != true || !mounted) return;
     await _repo.tombstoneMessage(m.env.messageId);
-    await MediaCache.deleteFor(m.env.messageId); // 定点删媒体解密缓存
-    unawaited(AttachmentStore.deleteFor(m.env.messageId)); // 留存明文同样删
+    await MediaCache.deleteFor(widget.spaceId, m.env.messageId); // 定点删媒体解密缓存
+    unawaited(AttachmentStore.deleteFor(widget.spaceId, m.env.messageId)); // 留存明文同样删
     if (!mounted) return;
     setState(() {
       _messages = [
@@ -3048,9 +3048,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 解密落盘：确定性路径按 messageId 复用——重复播放不再重复下载解密
       // stored 模式放长期目录（跨会话保留），否则临时缓存（系统可清）
       final tmp = (_storeAttachments
-              ? await AttachmentStore.ensure(m.env.messageId, ext, load)
+              ? await AttachmentStore.ensure(widget.spaceId, m.env.messageId, ext, load)
               : null) ??
-          await MediaCache.ensure(m.env.messageId, ext, load);
+          await MediaCache.ensure(widget.spaceId, m.env.messageId, ext, load);
       await player.stop();
       await player.play(DeviceFileSource(tmp.path));
       // 真正出声才开始走波形进度（此前是下载解密等待期）
@@ -3232,7 +3232,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       future: _videoBytes(m),
       builder: (context, snap) {
         if (snap.hasData) {
-          return _VideoPreview(bytes: snap.data!, messageId: m.env.messageId);
+          return _VideoPreview(
+              bytes: snap.data!, spaceId: widget.spaceId, messageId: m.env.messageId);
         }
         if (snap.hasError) {
           return GestureDetector(
@@ -3269,7 +3270,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<Uint8List> _videoThumbBytes(HistoryMessage m) =>
       _videoThumbCache.putIfAbsent(m.env.messageId, () async {
         final file =
-            await MediaCache.ensure(m.env.messageId, 'mp4', () => _videoBytes(m));
+            await MediaCache.ensure(widget.spaceId, m.env.messageId, 'mp4', () => _videoBytes(m));
         final thumb = await VideoThumbnail.thumbnailData(
           video: file.path,
           imageFormat: ImageFormat.JPEG,
@@ -3292,7 +3293,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (_storeAttachments) {
       // 顺手落长期目录（下次打开消息流直接命中）
       unawaited(AttachmentStore.ensure(
-          m.env.messageId, _attachmentExtOf(m), () async => bytes));
+          widget.spaceId, m.env.messageId, _attachmentExtOf(m), () async => bytes));
     }
     return bytes;
   }
@@ -3307,7 +3308,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 本机留存的明文副本（stored 模式且文件仍在）→ 直接读；否则 null。
   Future<File?> _storedFile(HistoryMessage m) async {
     if (!_storeAttachments) return null;
-    final f = await AttachmentStore.pathFor(m.env.messageId, _attachmentExtOf(m));
+    final f = await AttachmentStore.pathFor(widget.spaceId, m.env.messageId, _attachmentExtOf(m));
     if (f == null || !await f.exists()) return null;
     return f;
   }
@@ -3726,7 +3727,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
       if (_storeAttachments) {
         final file = await AttachmentStore.ensure(
-            m.env.messageId, _attachmentExtOf(m), () async => bytes);
+            widget.spaceId, m.env.messageId, _attachmentExtOf(m), () async => bytes);
         if (file != null) {
           await _openFileWith(file.path);
           return;
@@ -5162,9 +5163,11 @@ class _InviteQrCode extends StatelessWidget {
 /// 发送端本地密文即时显示（上传完成前/失败后也能看），接收端服务端拉取
 /// （老板 2026-09-11：改回 v1 直接显示视频）。
 class _VideoPreview extends StatefulWidget {
-  const _VideoPreview({required this.bytes, required this.messageId});
+  const _VideoPreview(
+      {required this.bytes, required this.spaceId, required this.messageId});
 
   final Uint8List bytes;
+  final String spaceId; // 缓存按空间分目录（与服务端 files/<space_id>/ 同构）
   final String messageId; // 解密缓存确定性键：重复预览复用同一缓存文件
 
   @override
@@ -5185,7 +5188,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
     if (_failed && mounted) setState(() => _failed = false); // 重试：先清掉上次的失败态
     try {
       // 解密缓存：确定性路径按 messageId 复用（重复打开预览不再重复落盘解密）
-      final tmp = await MediaCache.pathFor(widget.messageId, 'mp4');
+      final tmp = await MediaCache.pathFor(widget.spaceId, widget.messageId, 'mp4');
       if (!await tmp.exists()) {
         await tmp.writeAsBytes(widget.bytes, flush: true);
       }

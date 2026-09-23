@@ -11,6 +11,8 @@ import 'dev_data_dir.dart';
 /// 本类统一管理这些缓存文件的生命周期：
 /// - **确定性路径**（messageId + 扩展名）：同一消息重复播放直接复用，零重复解密
 /// - **App 私有缓存目录**（getTemporaryDirectory，沙盒内，非公共目录）
+/// - **按空间分子目录**（老板 2026-09-23）：`<cache>/<safe(spaceId)>/einz_media_<id>.<ext>`
+///   ——退出/销毁一个空间时删目录即可，不必逐条删；与服务端 `files/<space_id>/` 同构
 /// - **定点删除**：消息焚毁/删除时删对应缓存（[deleteFor]）
 /// - **孤儿清理**：启动时清掉本地库已无对应消息的缓存 + 历史遗留的 systemTemp 文件
 ///
@@ -27,10 +29,10 @@ class MediaCache {
   /// 历史遗留前缀（旧版直接写 Directory.systemTemp、时间戳命名，从未清理）。
   static const _legacyPrefixes = ['einz_audio_', 'einz_preview_'];
 
-  /// 定点删除某条消息的缓存（焚毁/删除消息时调用）。
-  static Future<void> deleteFor(String messageId) async {
+  /// 定点删除某条消息的缓存（焚毁/删除消息时调用）。[spaceId] 定位空间子目录。
+  static Future<void> deleteFor(String spaceId, String messageId) async {
     await _guard(() async {
-      final dir = await _cacheDirectory();
+      final dir = await _spaceDirectory(spaceId);
       final target = '$_prefix${safeName(messageId)}.';
       await for (final entity in dir.list()) {
         if (entity is! File) continue;
@@ -56,11 +58,19 @@ class MediaCache {
     });
   }
 
-  /// 启动孤儿清理：删除 [keepMessageIds] 之外的缓存文件；顺带清历史遗留的
-  /// 旧版 systemTemp 文件（时间戳命名、从未清理过）。
-  static Future<void> prune(Set<String> keepMessageIds) async {
+  /// 清空**单个空间**的缓存目录（退出/销毁空间时调用——比逐条 [deleteFor] 干净）。
+  static Future<void> deleteSpace(String spaceId) async {
     await _guard(() async {
-      final dir = await _cacheDirectory();
+      final dir = await _spaceDirectory(spaceId);
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+  }
+
+  /// 启动孤儿清理：删除 [keepMessageIds] 之外的缓存文件；顺带清历史遗留的
+  /// 旧版 systemTemp 文件（时间戳命名、从未清理过）。**只扫 [spaceId] 子目录**。
+  static Future<void> prune(String spaceId, Set<String> keepMessageIds) async {
+    await _guard(() async {
+      final dir = await _spaceDirectory(spaceId);
       // 与 [cacheFileName] 同一套安全化：文件名里存的是 safeName(id)，保留集合也要
       // 同样处理，否则合法缓存会被误判成孤儿删掉
       final keep = {for (final id in keepMessageIds) safeName(id)};
@@ -138,6 +148,15 @@ class MediaCache {
     return dir;
   }
 
+  /// 空间子目录（确定性：[safeName] 后的 spaceId 一级）。不存在则创建。
+  static Future<Directory> _spaceDirectory(String spaceId) async {
+    final dir = Directory('${(await _cacheDirectory()).path}/${safeName(spaceId)}');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
   /// 尽力而为：平台不可用/文件系统错误静默忽略（缓存卫生不阻塞主流程）。
   static Future<void> _guard(Future<void> Function() action) async {
     try {
@@ -147,20 +166,21 @@ class MediaCache {
     }
   }
 
-  /// 缓存文件路径（确定性：messageId + 扩展名）。不创建文件。
+  /// 缓存文件路径（确定性：空间子目录 + messageId + 扩展名）。不创建文件。
   /// 文件名经 [safeName] 白名单化，杜绝路径越出缓存目录（见 [safeName]）。
-  static Future<File> pathFor(String messageId, String ext) async {
-    final dir = await _cacheDirectory();
+  static Future<File> pathFor(String spaceId, String messageId, String ext) async {
+    final dir = await _spaceDirectory(spaceId);
     return File('${dir.path}/${cacheFileName(messageId, ext)}');
   }
 
   /// 已有缓存则返回（重复播放零解密），否则用 [load] 生成并落盘。
   static Future<File> ensure(
+    String spaceId,
     String messageId,
     String ext,
     Future<Uint8List> Function() load,
   ) async {
-    final file = await pathFor(messageId, ext);
+    final file = await pathFor(spaceId, messageId, ext);
     if (await file.exists()) return file;
     final bytes = await load();
     await file.writeAsBytes(bytes, flush: true);

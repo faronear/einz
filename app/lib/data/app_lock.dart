@@ -254,11 +254,9 @@ class AppLockService {
     await (db.delete(db.spaces)..where((s) => s.spaceId.equals(spaceId))).go();
     await _delete(_profileKey(spaceId));
     await (db.delete(db.appState)..where((a) => a.key.like('space.$spaceId.%'))).go();
-    // 缓存/留存明文按 messageId 定点删（文件名只含 messageId，见 MediaCache）
-    for (final id in messageIds) {
-      await MediaCache.deleteFor(id);
-      await AttachmentStore.deleteFor(id);
-    }
+    // 缓存/留存明文已按空间分目录（2026-09-23）→ 删目录即可，不必逐条删
+    await MediaCache.deleteSpace(spaceId);
+    await AttachmentStore.clearSpace(spaceId);
   }
 
   /// 切换当前空间（同时刷新该空间的 lastActiveAt）。**不需要锁屏码**。
