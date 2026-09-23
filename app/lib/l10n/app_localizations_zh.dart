@@ -880,7 +880,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道';
 
   @override
-  String get spaceListTitle => '选择秘境';
+  String get spaceListTitle => '切换我的秘境';
 
   @override
   String get spaceListEmpty => '还没有加入任何秘境';

@@ -410,7 +410,7 @@
   "resetEntrancePinLabel": "锁屏码",
   "resetEntrancePinHint": "请输入本机锁屏码",
   "resetEntranceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道",
-  "spaceListTitle": "选择秘境",
+  "spaceListTitle": "切换我的秘境",
   "spaceListEmpty": "还没有加入任何秘境",
   "spaceListAdd": "添加秘境",
   "spaceListSwitch": "切换我的秘境",
