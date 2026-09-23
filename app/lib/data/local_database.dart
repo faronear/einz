@@ -194,7 +194,7 @@ class LocalDatabase extends _$LocalDatabase {
   static QueryExecutor _openConnection() => driftDatabase(
         name: 'einz',
         native: DriftNativeOptions(
-          // dev 运行（npm run desk-mac-run-local*）把库挪到 Documents/dev-*/ 下，
+          // dev 运行（npm run app-mac-run-local*）把库挪到 Documents/dev-*/ 下，
           // 与装机那份正式库互不干扰；不启用时传 null = 用 drift 默认
           // （getApplicationDocumentsDirectory()），生产路径一个字节都不动。
           databaseDirectory:

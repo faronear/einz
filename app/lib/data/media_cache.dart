@@ -130,7 +130,7 @@ class MediaCache {
   /// （老板报「桌面版视频在消息流里是空白」的真凶）。`create(recursive:)` 幂等，
   /// 已存在时是 no-op。
   static Future<Directory> _cacheDirectory() async {
-    // dev 运行时（npm run desk-mac-run-local*）落进 caches/dev-*/，不污染正式那份
+    // dev 运行时（npm run app-mac-run-local*）落进 caches/dev-*/，不污染正式那份
     final dir = await applyDevDataDir(getTemporaryDirectory);
     if (!await dir.exists()) {
       await dir.create(recursive: true);

@@ -11,7 +11,7 @@ class SecureStore {
   SecureStore._();
 
   /// key 前缀。默认 `einz.secure.`；桌面端 debug 脚本（package.json 的
-  /// `desk-mac-run-local*`）会用 `--dart-define=einzSecurePrefix=…` 换成独立命名空间，
+  /// `app-mac-run-local*`）会用 `--dart-define=einzSecurePrefix=…` 换成独立命名空间，
   /// 与 `einzDevDataDir`（SQLite/附件/缓存换个目录，见 dev_data_dir.dart）配成一对：
   /// debug 版和装机那份是同一个 app（同 bundle id、同沙盒容器），Keychain 里若不换
   /// 前缀，两边就会读写同一批条目——正式那份被覆盖等于丢密钥。

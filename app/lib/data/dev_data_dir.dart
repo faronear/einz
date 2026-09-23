@@ -19,7 +19,7 @@ import 'package:flutter/foundation.dart';
 /// `einzSecurePrefix` 负责（见 `secure_store.dart`）。两者合起来，debug 版有自己
 /// 的库、自己的附件、自己的缓存、自己的密钥条目，正式那份一个字节都不碰。
 ///
-/// 用法见 `package.json` 的 `desk-mac-run-local` / `desk-mac-run-localConfig`。
+/// 用法见 `package.json` 的 `app-mac-run-local` / `app-mac-run-localConfig`。
 ///
 /// ⚠ 发布脚本与 CI 绝不传这两个 define（同 `docs/SERVER_SETTINGS.md` §6 的红线）。
 /// 另外这里的开关**只在非 release 构建里生效**（[devDataDirIsolated] 内含

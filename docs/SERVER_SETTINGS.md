@@ -119,8 +119,8 @@ open -a Einz --args --server http://localhost:3000      # macOS（走原生桥�
 
 | 脚本                               | 走哪一层                                                      | 等价命令                                                                          |
 | ---------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `npm run desk-mac-run-local`       | 第 1 层：运行期 `--server`                                    | `cd app && flutter run -d macos -a --server=http://localhost:3000`                 |
-| `npm run desk-mac-run-localConfig` | 第 2 层：编译期 dart-define（读 `app/localConfig.macos.json`） | `cd app && flutter run -d macos --dart-define-from-file=localConfig.macos.json`   |
+| `npm run app-mac-run-local`       | 第 1 层：运行期 `--server`                                    | `cd app && flutter run -d macos -a --server=http://localhost:3000`                 |
+| `npm run app-mac-run-localConfig` | 第 2 层：编译期 dart-define（读 `app/localConfig.macos.json`） | `cd app && flutter run -d macos --dart-define-from-file=localConfig.macos.json`   |
 
 `-a/--dart-entrypoint-args` 之所以能当 `--server` 用：桌面端工具把它拼进 app 可执行文件的
 argv（`flutter_tools/lib/src/desktop_device.dart:125`），而原生桥读的正是
