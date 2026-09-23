@@ -296,6 +296,43 @@ curl -X POST http://127.0.0.1:3000/devices/dev-b1/revoke \
 | 客户端密钥 + 历史                      | `backup` 命令（恢复码加密）             | 每次重大变更后  |
 | 恢复码 / 备份密钥                      | 离线多份                                | 永久            |
 
+### 5.5 上线前彻底重置（服务端 + 客户端一起，2026-09-23 定）
+
+适用：**把服务端与本机数据全部丢掉、从头开始**（不是撤销某台设备——那个用 §5.3）。
+两边必须同时做：只清服务端的话，客户端拿着旧凭证只会收到 403 `FORBIDDEN`（未登记），
+按 §5.3 的语义它**只警告、不清本地数据**，于是你会看到"App 能开、连不上、本地还留着旧历史"。
+
+**服务端**
+
+```bash
+# 1) 先停服务（避免删库时还有写入）
+docker compose down          # 或停掉 systemd 里的进程
+
+# 2) 删数据目录内容（库 + WAL + files/ 附件 + backups/ + avatars/）
+rm -rf server/data/*         # Docker 部署删的是**卷内容**，不是容器
+
+# 3) 启动
+python3 -c "import json;print(open('server/config/serverConfig.json').read())"  # 确认配置还在
+docker compose up -d
+```
+
+- **别删配置**：`server/config/serverConfig.json`（Docker 为 `deployment/config/`）在
+  `data/` 之外，保留；顺手确认 `maxSpaces` / `maxEntrancesPerSpace` 已按预期设好
+  （两者都是 `0` = 不限，等于对公网敞开）。
+- 清完 `data/files/` 从第一天起就是**纯 per-space 结构**（`files/<space_id>/<前两位>/<id>`）。
+- 想留旧数据就先 `npm run backup`，且**把备份文件挪出 `data/`**（否则第 2 步一起删掉）。
+
+**客户端（每台设备）**
+
+- App：对话页菜单 → 高级 → **重置设备**（`app/lib/data/local_reset.dart`：清本地全表
+  ——含 `spaces` 空间列表——+ 锁包 + 留存明文/媒体缓存）。
+- 或直接卸载重装。两种方式都会把**安装级 `device_uid`** 换成新的（它存在 `app_state`，
+  重置设备时整表清掉，下次调用惰性重新生成 = 轮换）。
+- TUI：`rm -f ~/.einz/*.json`（或用 `--store` 指定的那个文件）+ 清附件缓存目录。
+
+**作废与后果**：空间 id/地址、设备登记、会话、共享口令密保箱、邀请链接、开通码全部作废；
+历史备份里的恢复码导入的是**旧库内容**，服务端已空 → 不要再导入。
+
 ---
 
 ## 6. 安全边界清单（V1 发布前已审查加固）
