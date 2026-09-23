@@ -488,7 +488,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMore => '菜单';
 
   @override
-  String get chatPageRenameNameTitle => '我的个人资料';
+  String get chatPageRenameNameTitle => '我的身份';
 
   @override
   String get chatPageRenameNameLabel => '我的名字';

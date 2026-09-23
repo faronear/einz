@@ -513,7 +513,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMore => 'Menu';
 
   @override
-  String get chatPageRenameNameTitle => 'My profile';
+  String get chatPageRenameNameTitle => 'My identity';
 
   @override
   String get chatPageRenameNameLabel => 'My name';
@@ -676,7 +676,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuBurnLabel => 'Burn-after-read';
 
   @override
-  String get chatPageMenuMyNameLabel => 'My name';
+  String get chatPageMenuMyNameLabel => 'My identity';
 
   @override
   String get chatPageMenuDeviceNameLabel => 'Current entrance';

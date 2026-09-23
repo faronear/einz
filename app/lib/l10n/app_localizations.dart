@@ -995,7 +995,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameNameTitle.
   ///
   /// In en, this message translates to:
-  /// **'My profile'**
+  /// **'My identity'**
   String get chatPageRenameNameTitle;
 
   /// No description provided for @chatPageRenameNameLabel.
@@ -1277,7 +1277,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuMyNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'My name'**
+  /// **'My identity'**
   String get chatPageMenuMyNameLabel;
 
   /// No description provided for @chatPageMenuDeviceNameLabel.

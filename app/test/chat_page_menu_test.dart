@@ -814,7 +814,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 标题「我的个人资料」、输入框标签「我的名字」、名字框下性别彩色图标（男高亮）
-    expect(find.text('我的个人资料'), findsOneWidget, reason: '弹窗标题应为「我的个人资料」');
+    expect(find.text('我的身份'), findsOneWidget, reason: '弹窗标题应为「我的个人资料」');
     expect(find.text('我的名字'), findsWidgets, reason: '输入框标签应为「我的名字」');
     expect(find.text('性别'), findsOneWidget, reason: '名字框下应显示性别标签');
     expect(find.byIcon(Icons.female), findsNothing,
@@ -857,7 +857,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('我的个人资料'), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
+    expect(find.text('我的身份'), findsNothing, reason: 'emoji 名字应保存成功并关闭弹窗');
   });
 
   testWidgets('长按菜单预览行对齐：我的消息靠右、对方消息靠左', (WidgetTester tester) async {
