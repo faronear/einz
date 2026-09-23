@@ -8740,3 +8740,38 @@ Esc（raw 循环里 ↑↓ 输入历史就是 `\x1b[A`/`\x1b[B`，都以 ESC 开
    向导里锁屏码 → 可空回车跳过；动作（`/revoke`、`/reset`、`/passphrase`）→ 空回车 = 取消。
 3. `guide_input_rules_check.py` 的断言跟着从"等到「请输入内容」"改成 `assert_silent_required`：
    留空回车后 → 不出现任何提示、且下一步提示不出现（证明没被接受）。两个探针都复跑绿。
+
+## 2026-09-23 · `/reset` 原地回到起点 + `/device(s)` 保留为别名
+
+老板两件：
+
+**① `/device` / `/devices` 保留为 `/entrance` / `/entrances` 的别名**（老板原话："从 device 无法确定唯一的
+entrance，但是从一个 entrance 肯定对应一个具体的 device"）。实现：命令 switch 里加空 case 直落
+（`case '/devices':` 落到 `case '/entrances':`；`case '/device':` 落到 `case '/entrance':`）。
+**帮助里仍以规范名为主、别名括注**（`/entrance <通道名>（别名 /device）`）——只教规范词，但让人知道还能这么敲。
+docs/DEPLOYMENT.md、docs/ONBOARDING.md 的命令表同步标注。
+
+**② `/reset` 不再退出进程，改为"回到刚启动 TUI 的样子"**。新增 `_resetToFreshStart()`（替掉 `_exitReset`）：
+停旧会话的 WS 与 30s 在线轮询 → `EntranceStore.create()` 造新凭证（新公私钥 + 新 install_uid）→
+换掉全局 `_state`（输入循环读的就是它，所以换完即生效）→ 欢迎块 + "已重置本通道（…）——重新入网：" 进消息流
+（**不能打 stdout**，raw 模式会糊屏）→ `unawaited(_runGuide(...))` 重跑 c/j 向导。
+与 App 同口径（App 的「销毁本通道」也是清本地 + 回秘境向导页）。顺手把 `/reset` 的帮助行从"…后退出"
+改成"…后回到入网向导"，并让输入循环不再持有旧 session（`session` 参数去掉，改用 `_state!.session`）。
+`_exitRevoked`（被对方撤销的自毁路径）**保持退出**——那是"这条通道被拿走了"，语义不同，本次不动。
+
+**探针**：新增 `cli/test/reset_returns_to_guide_check.py`——断言 ① 闸门后进程仍在且回到「选择秘境入口」；
+② store 已重建（新公钥、未绑定空间）；③ 向导可用（c → 我的名字）。`revoke_command_check.py` 顺带用
+`/devices`、`/device` 各走一次别名（只读路径）。
+
+**踩到的坑（探针侧，都记下来免得再踩）**：
+- `wait_text` 命中即返回，会把同一批输出里更靠后的内容一起吞掉 → 分两次等会假阴性；应"只等最后一个，
+  再在同一条缓冲里断言前面几项"。
+- TUI 在 `processing`（`_busy`：打包/上传/建会话）期间**吞掉所有输入**（`ein_z_tui.dart:2517`）→
+  探针不能"发一次就等"，要按本仓库惯例**重发直到命中**。
+- 断言**别绑 UI 文案**：我原先绑了列表标题「同空间 N 条」，老板当天把它改成「共 N 条」就红了 →
+  改成按**行内容**判定（本机行 / 对方 `[ali]` 行 / 序号）。
+
+**同期发现**：老板自己在同一工作区改了约 10 处 TUI 文案（开通码话术、join 身份问句「完整输入你的名字」、
+reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通道列表标题、`/entrance` 名称块、邀请输出顺序…），
+都**未提交**。我：保留他的措辞、只把探针锚点对齐到当前文案；提交时隔离他的 hunk（只提交我的改动），
+他的文案留给他自己提交。

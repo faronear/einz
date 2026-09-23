@@ -520,7 +520,7 @@ Future<void> _unlockPin(ChatSession session) async {
     if (!_state!.running) return;
     // argon2id str 哈希自含盐：strVerify 返回错误消息（空 = 验证通过）
     if (await _verifyPin(hash, pin)) {
-      session.messages.add(_systemMessage(session, '✅ 锁屏码验证通过'));
+      session.messages.add(_systemMessage(session, '✅ 锁屏码验证成功'));
       _render();
       return;
     }
@@ -566,10 +566,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         while (true) {
           // 必填（老板 2026-09-15）：留空回车不接受，继续等待输入
           final token =
-              (await _prompt(session, '❓ 输入开通码:', required: true)).trim();
+              (await _prompt(session, '❓ 输入开通码或邀请链接:', required: true)).trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 请输入开通码（可由任意一条已开通的通道生成）'));
+            session.messages.add(_systemMessage(session, '⚠️ 请输入开通码或邀请链接（可由任意一条已开通的通道生成）'));
             _scheduleRender();
             continue;
           }
@@ -1072,7 +1072,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
   try {
     final api = ApiClient(server);
     final pre = await _busy(session, '⏳ 校验开通码中......', () => api.preflightJoin(token));
-    session.messages.add(_systemMessage(session, '✅ 开通码验证通过'));
+    session.messages.add(_systemMessage(session, '✅ 开通码验证成功'));
     session.messages.add(_systemMessage(session, '----------------'));
     session.messages.add(_systemMessage(
         session, '✅✅✅ 即将加入秘境！'));
@@ -1083,7 +1083,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
       session.messages.add(_systemMessage(session, '⚠️ 该秘境未预置成员身份，无法加入'));
       return;
     }
-    session.messages.add(_systemMessage(session, '❓ 我是谁'));
+    session.messages.add(_systemMessage(session, '❓ 一个秘境仅限两人。你是哪一位？'));
     session.messages.add(_systemMessage(session, '----------------'));
     for (final s in slots) {
       // 名字背景色按性别（粉/蓝——复用 _genderBubble 与消息气泡背景色一致；
@@ -1095,7 +1095,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     var chosenSlot = -1;
     while (chosenSlot < 0) {
       final choice = (await _prompt(
-              session, '❓ 完整输入我的名字（注意大小写）:', required: true))
+              session, '❓ 完整输入你的名字（注意大小写）:', required: true))
           .trim();
       if (!_state!.running) return;
       final matches = <int>[];
@@ -1334,7 +1334,7 @@ Future<void> main(List<String> args) async {
     // 非 POSIX 平台忽略：尺寸变化不自动重绘，下次输入/消息会触发
   }
 
-  await _runInputLoop(session);
+  await _runInputLoop();
   await guide; // 引导任务收尾（启动同步/WS 已在其内部完成；异常已内部处理）
   _exitRaw();
   session.stopWs();
@@ -1424,14 +1424,46 @@ void _exitRevoked(String storePath) {
 }
 
 /// `/reset` 的收尾：清完本地数据后提示并退出。用户下次启动 TUI 会走全新入网向导。
-void _exitReset(String storePath) {
-  _deleteLocalData(storePath);
-  _restoreTerminal();
-  try {
-    stderr.write('$_clearHome已重置本通道，本地数据已清除，下次启动将重新入网。\n');
-    stderr.flush();
-  } catch (_) {}
-  exit(0);
+/// `/reset` 的收尾：清本地数据后**原地回到"刚启动 TUI 的样子"**（老板 2026-09-23）——
+/// 不退出进程，而是重建一条全新通道并重跑入网引导：新公私钥（+ 新 install_uid）→
+/// 欢迎块 → 秘境入口 c/j → 名字/性别/共享口令 → 锁屏码。
+///
+/// 与 App 同口径：App 的空间级「销毁本通道」也是"清本地 + 回秘境向导页"。
+/// 必须重建 store：`/reset` 的语义就是"这条通道作废、重新登记"，store 文件已被删。
+///
+/// **不能打 stdout**（欢迎块直接进消息流）：raw 模式下写 stdout 会把 TUI 画面糊掉。
+/// [notice] 是给用户交代"为什么回到了起点"（含服务端退役是否成功）。
+Future<void> _resetToFreshStart(
+    String storePath, String server, String notice) async {
+  // ① 停掉旧会话的后台任务：WS 与 30s 在线轮询都读全局 `_state`，不停会串到新会话上
+  final old = _state;
+  old?.session.onChanged = null;
+  old?.session.stopWs();
+  _peerTimer?.cancel();
+
+  // ② 新通道凭证（同 `_onboard` 的"新 store"分支：本地先生成，登记时再上报服务端）
+  final store = await EntranceStore.create();
+  final autoName = _defaultEntranceName();
+  if (autoName.isNotEmpty) store.entranceName = autoName;
+  store.save(storePath); // 地址不落盘：本次沿用当前 server
+
+  // ③ 换掉全局会话/状态（输入循环读的是 `_state!`，换完即生效）
+  final session = ChatSession(store, storePath, server);
+  session.onEntranceRevoked = () => _exitRevoked(storePath);
+  _state = _TuiState(session, storePath);
+  session.onChanged = _scheduleRender;
+  session.messages.add(_systemMessage(session, notice));
+  final welcome = <String>['=== Einz 秘境 ===', '✅ 服务端地址: $server'];
+  final name = store.entranceName;
+  if (name != null && name.isNotEmpty) welcome.add('✅ 新通道名称: $name');
+  welcome.add('✅ 新通道公钥: ${store.publicKey}');
+  welcome.add('----------------');
+  session.messages.add(_systemMessage(session, welcome.join('\n')));
+  _startPeerPolling();
+  _render();
+
+  // ④ 重跑入网引导（消息流内交互：system 提示 + you> 输入）
+  unawaited(_runGuide(session, storePath, server));
 }
 
 // ---------- 渲染 ----------
@@ -2459,7 +2491,7 @@ void _renderInputLine() {
 /// （老板 2026-09-14）。操作结束后由 whenComplete 自动清掉。
 const _kBusyResendHint = '⏳ 上一条还在处理中，稍后回车再发';
 
-Future<void> _runInputLoop(ChatSession session) async {
+Future<void> _runInputLoop() async {
   _enterRaw();
   // 启用终端鼠标事件（滚轮翻页用）：1000 = 按钮事件（按下/释放），1006 = SGR
   // 数字编码（坐标/按钮为纯 ASCII，与下方 CSI 累积解析器兼容）。终端不支持时
@@ -2572,7 +2604,8 @@ Future<void> _runInputLoop(ChatSession session) async {
               Future.delayed(const Duration(seconds: 2), () => exit(0));
               return;
             }
-            session.messages.add(_systemMessage(session, '⚠️ 引导中仅支持 /exit 退出（输入未提交）'));
+            final cur = _state!.session; // 用当前的（/reset 会换掉 _state）
+            cur.messages.add(_systemMessage(cur, '⚠️ 引导中仅支持 /exit 退出（输入未提交）'));
             _scheduleRender();
             inputChanged = true;
             continue;
@@ -2858,7 +2891,8 @@ Future<void> _uploadAttachmentInBackground(ChatSession session, String path) asy
   }
 }
 
-/// `/reset`：重置本通道——三道闸门过后清本地数据并退出（下次启动走全新入网向导）。
+/// `/reset`：重置本通道——三道闸门过后清本地数据，然后**原地回到全新入网向导**
+/// （老板 2026-09-23：以前是清完就退出进程，得自己重新敲命令启动）。
 ///
 /// 闸门刻意**全离线**：通道名比对 + 本机锁屏码，不联网、不问空间口令。理由见
 /// `server/src/entrances.ts` 的 `retireEntrance`：空间口令是**共享**给伴侣的加入凭证，
@@ -2880,7 +2914,7 @@ Future<void> _execReset(String storePath) async {
   final expected = entranceName.isEmpty ? fallbackWord : entranceName;
   final prompt = entranceName.isEmpty
       ? '❓ 本通道还没有名字，请输入 $fallbackWord 以确认重置（留空取消）:'
-      : '❓ 确认要重置的是本通道「$entranceName」，请输入通道名（留空取消）:';
+      : '❓ 请输入通道名「$entranceName」以确认重置本通道（留空取消）:';
   final typed = await _promptAction(session, prompt);
   if (!s.running) return;
   if (typed == null) {
@@ -2929,11 +2963,12 @@ Future<void> _execReset(String storePath) async {
   }
   if (!s.running) return;
 
-  if (retired) {
-    session.messages.add(_systemMessage(session, '✅ 已从服务端退役本通道'));
-  }
-  _scheduleRender();
-  _exitReset(storePath);
+  _deleteLocalData(storePath);
+  final notice = retired
+      ? '✅ 已重置本通道（本地数据已清除；服务端已退役）——重新入网：'
+      : '✅ 已重置本通道（本地数据已清除）——重新入网：\n'
+          '⚠️ 服务端退役未完成，对方通道列表里可能仍留有这条通道';
+  await _resetToFreshStart(storePath, server, notice);
 }
 
 Future<void> _execCommand(String line) async {
@@ -2964,11 +2999,11 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/entrance <通道名> :: 修改当前通道名称',
+        '/entrance <通道名> :: 修改当前通道名称（别名 /device）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/entrances :: 查看秘境里的通道列表（同空间全部通道）',
+        '/entrances :: 查看秘境里的通道列表（同空间全部通道；别名 /devices）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2976,7 +3011,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/reset :: 重置本通道（输入通道名 + 本机锁屏码确认，清空本地数据后退出）',
+        '/reset :: 重置本通道（输入通道名 + 本机锁屏码确认，清空本地数据后回到入网向导）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3219,11 +3254,12 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '✅ 锁屏码已设置'));
       }
       break;
+    case '/devices': // 别名（老板 2026-09-23：/device(s) 留着当肌肉记忆）
     case '/entrances':
       // 同空间**全部**通道（我 + 对方，不只自己的）——序号与 /revoke 的选择一致
       try {
         final rows = await _fetchEntranceRows(s);
-        final sb = StringBuffer('📱 通道列表（同空间 ${rows.length} 条，/revoke <序号> 可撤销）：');
+        final sb = StringBuffer('📱 通道列表（共 ${rows.length} 条，/revoke <序号> 可指定撤销某条通道）：');
         for (final r in rows) {
           sb.write(r.line);
         }
@@ -3408,16 +3444,18 @@ Future<void> _execCommand(String line) async {
           }
         }
       }
+    case '/device': // 别名：TUI 里一个 store = 一条通道 = 一台「设备」，不歧义
     case '/entrance':
       // 重设本通道名称（entranceName）：本地 + 服务端同步
       if (arg.isEmpty) {
         // 先打印当前通道名与公钥，再给出详细用法
         final current =
             s.session.store.entranceName ?? s.session.store.entranceId ?? '(未设置)';
-        s.session.messages.add(_systemMessage(s.session, '当前通道名: $current'));
-        s.session.messages.add(_systemMessage(s.session, '通道公钥: ${s.session.store.publicKey}'));
-        s.session.messages.add(
-            _systemMessage(s.session, '🔧 用法: /entrance <通道名> —— 修改本通道名称（如 /entrance MyMac）'));
+        s.session.messages.add(_systemMessage(s.session, 
+        '当前通道名: $current\n'
+        '通道公钥: ${s.session.store.publicKey}\n'
+        '🔧 用法: /entrance <通道名> —— 修改本通道名称（如 /entrance MyMac）'
+        ));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
@@ -3502,7 +3540,7 @@ Future<void> _execInvite() async {
     final api = ApiClient(s.session.server);
     final r = await _busy(s.session, '⏳ 开通码生成中......', () => api.createJoinToken(store.spaceId!, store.sessionToken!));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
-    s.session.messages.add(_systemMessage(s.session, '✅ 开通码已生成（24 小时内一次性有效）：\n📎 ${r.link}\n🛡️  ${r.joinToken}'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 开通码已生成（24 小时内一次性有效）：\n🛡️  ${r.joinToken}\n📎 ${r.link}'));
     s.status = ''; // 反馈在消息区，状态栏保持干净
   } catch (e) {
     s.session.messages.add(_systemMessage(s.session, '❌ 开通码生成失败: $e'));

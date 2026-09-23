@@ -212,7 +212,7 @@ def main():
         b_steps = [
             ('秘境入口', 'j\r'),
             ('输入开通码', join_token + '\r'),
-            ('完整输入我的名字', 'Alice\r'),
+            ('完整输入你的名字', 'Alice\r'),
         ]
         for i, (expect, payload) in enumerate(b_steps):
             out = wait_text(m2, expect)

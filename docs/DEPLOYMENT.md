@@ -104,8 +104,8 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫开通�
 | `/auth` | 激活/续期会话（challenge-response，对**当前**服务器） |
 | `/passphrase [random]` | 设置/修改共享口令（`random` 生成随机 12 词） |
 | `/pin` | 设置/修改启动锁 PIN |
-| `/entrances` | 列出秘境内的通道与在线状态 |
-| `/entrance <名称>` / `/myname <名称>` | 改本通道名 / 改自己的显示名 |
+| `/entrances`（别名 `/devices`） | 列出秘境内的通道与在线状态 |
+| `/entrance <名称>`（别名 `/device`）/ `/myname <名称>` | 改本通道名 / 改自己的显示名 |
 | `/sync` / `/history` | 手动增量同步 / 看本地解密历史 |
 | `/attach <file>` / `/open <序号>` | 上传附件 / 打开消息里的附件 |
 | `/backup` | 导出加密备份（12 词恢复码） |

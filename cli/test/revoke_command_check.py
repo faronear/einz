@@ -186,8 +186,8 @@ def onboard_join(label, store, port, token, home):
     send(m, 'j\r')
     wait_text(m, '输入开通码', timeout=20)
     send(m, token + '\r')
-    out = wait_text(m, '完整输入我的名字', timeout=20)
-    if '完整输入我的名字' not in out:
+    out = wait_text(m, '完整输入你的名字', timeout=20)
+    if '完整输入你的名字' not in out:
         print(f'❌ {label}: 未到身份选择'); print(out[-600:]); raise SystemExit(1)
     send(m, PARTNER + '\r')
     wait_text(m, '验证共享口令', timeout=20)
@@ -239,9 +239,11 @@ def main():
 
         # ---------- ① /entrances：同空间全部通道（先只有自己） ----------
         send(m_a, '/entrances\r')
+        # 断言只看**行内容**（本机/对方/序号），不看列表标题措辞——标题是 UI 文案，
+        # 老板会改（2026-09-23 就从「同空间 N 条」改成了「共 N 条」），绑标题必红。
         frame = wait_screen(m_a, lambda t: '通道列表' in t, 'A 的通道列表')
-        if '同空间 1 条' not in frame or '本机' not in frame:
-            print(f'❌ ① 只有 A 时应为 1 条且标「本机」:\n{frame[-800:]}'); return 1
+        if '本机' not in frame or ('[%s]' % PARTNER) in frame:
+            print(f'❌ ① 只有 A 时列表应只有本机行:\n{frame[-800:]}'); return 1
 
         m_b, p_b = onboard_join('B', store_b, port, new_join_token(port, store_a), WORK)
         spawned.append((m_b, p_b))
@@ -249,8 +251,8 @@ def main():
 
         send(m_a, '/entrances\r')
         frame = wait_screen(m_a,
-                            lambda t: '同空间 2 条' in t and '在线' in t,
-                            'A 看到同空间 2 条（含对方）')
+                            lambda t: '通道列表' in t and ('[%s]' % PARTNER) in t and '在线' in t,
+                            'A 看到同空间 2 行（含对方）')
         my_no, peer_no = parse_row_numbers(frame)
         if my_no is None or peer_no is None:
             print(f'❌ ① 未能解析序号（本机={my_no} 对方={peer_no}）:\n{frame[-900:]}'); return 1
@@ -279,10 +281,11 @@ def main():
         # ---------- ③ 不能撤销本机（且命令立即结束，不吃后续输入） ----------
         send(m_a, f'/revoke {my_no}\r')
         frame = wait_screen(m_a, lambda t: '不能撤销本机' in t, '拒绝撤销本机')
-        send(m_a, '/entrances\r')
-        frame = wait_screen(m_a, lambda t: '通道列表' in t and '同空间 2 条' in t,
-                            '③ 后仍能正常执行命令')
-        print('✅ ③ /revoke 本机 → 拒绝（未进入确认流程，命令已结束）')
+        # 顺便用**别名** /devices 验证它确实等价于 /entrances（老板 2026-09-23 要求保留）
+        send(m_a, '/devices\r')
+        frame = wait_screen(m_a, lambda t: '通道列表' in t and ('[%s]' % PARTNER) in t,
+                            '③ 后仍能正常执行命令（/devices 别名）')
+        print('✅ ③ /revoke 本机 → 拒绝（未进入确认流程，命令已结束；别名 /devices 可用）')
 
         # ---------- ③b 留空取消：动作内任一步都能退出（2026-09-23 新增） ----------
         # 此前 required: true 拦空回车，用户被困：只能输序号、输乱码（报"无效"）或 /exit。
@@ -290,6 +293,9 @@ def main():
         wait_screen(m_a, lambda t: '输入要撤销的通道序号' in t, '③b 无参 /revoke 询问序号')
         send(m_a, '\r')  # 留空 = 取消
         wait_screen(m_a, lambda t: '已取消（未做任何改动）' in t, '③b 序号步留空取消')
+        # 别名 /device（无参 = 只读地打印当前通道名与用法；不改名）
+        send(m_a, '/device\r')
+        wait_screen(m_a, lambda t: '当前通道名' in t, '③b 别名 /device 只读查看')
         send(m_a, f'/revoke {peer_no}\r')
         wait_screen(m_a, lambda t: '确认请输入 yes' in t, '③b 二次确认')
         send(m_a, 'yes\r')
@@ -297,7 +303,8 @@ def main():
         send(m_a, '\r')  # 留空 = 取消（此前这一步才是真正被困的：只能重输或 /exit）
         wait_screen(m_a, lambda t: '已取消（未做任何改动）' in t, '③b 口令步留空取消')
         send(m_a, '/entrances\r')
-        wait_screen(m_a, lambda t: '通道列表' in t and '同空间 2 条' in t, '③b 取消后可继续用')
+        wait_screen(m_a, lambda t: '通道列表' in t and ('[%s]' % PARTNER) in t,
+                    '③b 取消后可继续用')
         print('✅ ③b 序号步/口令步留空回车 → 已取消，TUI 未被困（命令照常可用）')
 
         # ---------- ④ 正确口令 → 撤销生效：对方清空本地数据并退出 ----------

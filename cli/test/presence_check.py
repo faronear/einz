@@ -174,8 +174,8 @@ def join_flow(label, store, port, token, identity):
     send(master, 'J\r')
     wait_text(master, '输入开通码')
     send(master, token + '\r')
-    out = wait_text(master, '完整输入我的名字')
-    if '完整输入我的名字' not in out:
+    out = wait_text(master, '完整输入你的名字')
+    if '完整输入你的名字' not in out:
         print(f'FAIL {label}: 未等到身份选择（加入失败？）:\n{out[-600:]}')
         sys.exit(1)
     send(master, identity + '\r')

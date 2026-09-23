@@ -99,7 +99,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc \
 进会话后执行 `/invite` 打印**邀请链接**（`https://einz.tic.cc/join/e1_…`，24 小时一次性），
 把链接离线发给 B（或让对方扫码）。
 
-> 命令一览：`/help`；空间状态 `/space`；改口令 `/passphrase`；通道名 `/entrance <名>`；
+> 命令一览：`/help`；空间状态 `/space`；改口令 `/passphrase`；通道名 `/entrance <名>`（别名 `/device`）；
 > 我的显示名 `/myname <名>`。
 
 ---
@@ -145,7 +145,7 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                |
 | 服务器重设   | `/server https://einz.tic.cc` | 重连并认证                                                 |
 | 补发开通码     | 任一方 `/invite`              | 打印新的 24h 一次性邀请链接（给自己加通道也用它）          |
-| 看通道列表   | 任一方 `/entrances`             | 列出**同空间全部通道**（我 + 对方），带序号与在线/已撤销状态 |
+| 看通道列表   | 任一方 `/entrances`（别名 `/devices`） | 列出**同空间全部通道**（我 + 对方），带序号与在线/已撤销状态 |
 | 撤销通道     | `/revoke`（或 `/revoke <序号\|通道名>`） | 选通道 → 输入 `yes` 确认 → 输入共享口令 → 该通道下次联网时**清空本地数据**（不可逆；口令错/无权则毫发无损） |
 
 ---

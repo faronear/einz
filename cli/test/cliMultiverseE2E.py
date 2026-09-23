@@ -159,7 +159,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         time.sleep(2.0)
     send(m, token + "\r")
     name, out, _ = read_until(m, [
-        ("ask_slot", re.compile(r"完整输入我的名字")),
+        ("ask_slot", re.compile(r"完整输入你的名字")),
         ("joined", re.compile(r"成功加入秘境")),
         ("fail", re.compile(r"加入秘境失败")),
     ], prefix=label)
