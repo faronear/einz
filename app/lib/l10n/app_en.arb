@@ -432,7 +432,7 @@
   "advancedMenuTitle": "Advanced",
   "advancedDestroyEntrance": "Destroy this entrance",
   "leaveSpaceTitle": "Destroy this entrance?",
-  "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. ❗️This cannot be undone❗️",
+  "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!",
   "resetDeviceNameLabel": "{name}",
   "@resetDeviceNameLabel": {
     "placeholders": { "name": { "type": "String" } }

@@ -4525,6 +4525,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               controller: _oldCtrl,
               obscureText: true,
               keyboardType: TextInputType.number,
+              autofocus: _hasPin, // 已设锁屏码时这是第一个框
               decoration: InputDecoration(
                 labelText: l10n.chatPageSetLockOldLabel,
                 border: const OutlineInputBorder(),
@@ -4536,6 +4537,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             controller: _pinCtrl,
             obscureText: true,
             keyboardType: TextInputType.number,
+            autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
             decoration: InputDecoration(
               labelText: l10n.setPinDialogPinLabel,
               border: const OutlineInputBorder(),
@@ -4734,6 +4736,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
             controller: _oldCtrl,
             labelText: l10n.chatPageChangePassphraseOldLabel,
             revealTip: l10n.chatPagePassphraseRevealTip,
+            autofocus: true, // 改口令弹窗第一个框
           ),
           const SizedBox(height: 8),
           PassphraseField(

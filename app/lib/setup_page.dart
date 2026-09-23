@@ -1341,6 +1341,7 @@ class _SetupPageState extends State<SetupPage> {
         TextField(
           controller: _personName,
           focusNode: _nameFocus, // 方案 1：聚焦时滚出性别卡
+          autofocus: true,
           style: const TextStyle(fontSize: 20),
           // 开始填写即清除「名字为空」红字（不依赖再点下一步）
           onChanged: (_) {
@@ -1408,6 +1409,7 @@ class _SetupPageState extends State<SetupPage> {
         TextField(
           controller: _partnerNameCtrl,
           focusNode: _partnerNameFocus, // 方案 1：聚焦时滚出性别卡
+          autofocus: true,
           style: const TextStyle(fontSize: 20),
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
@@ -1573,8 +1575,9 @@ class _SetupPageState extends State<SetupPage> {
           controller: _inviteCode,
           style: const TextStyle(fontSize: 20),
           // 已验证通过 → 锁为只读：token 后续会被 joinSpace 消费，回到本页再改/再校验
-          // 都会失败（老板 2026-09-12）
+          // 都会失败（老板 2026-09-12）；只读时不 autofocus（没东西可输，键盘不该弹）
           readOnly: _joinTokenVerified,
+          autofocus: !_joinTokenVerified,
           // 开始填写即清除红字（不依赖再点下一步）
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
@@ -1983,6 +1986,7 @@ class _SetupPageState extends State<SetupPage> {
         PassphraseField(
           controller: _escrowPassphrase,
           style: const TextStyle(fontSize: 20),
+          autofocus: true,
           revealTip: l10n.chatPagePassphraseRevealTip,
           // 开始填写即清除「口令为空」红字（不依赖再点下一步）
           onChanged: (_) {
@@ -2044,6 +2048,7 @@ class _SetupPageState extends State<SetupPage> {
           style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
+          autofocus: true,
           // 开始填写即清除 PIN 红字（不依赖再点下一步）
           onChanged: (_) {
             if (_pinError != null) setState(() => _pinError = null);
@@ -2382,6 +2387,7 @@ class _SetupPageState extends State<SetupPage> {
           controller: _envelopeKey,
           style: const TextStyle(fontSize: 18),
           maxLines: 3,
+          autofocus: true,
           // 开始填写即清除「信封为空」红字（不依赖再点下一步）
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);

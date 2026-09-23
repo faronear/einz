@@ -231,6 +231,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
           const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
+            autofocus: true, // 闸门第一个框：打开弹窗即待输入
             decoration: InputDecoration(
               hintText: l10n.resetDeviceNameLabel(widget.deviceName),
               border: const OutlineInputBorder(),
