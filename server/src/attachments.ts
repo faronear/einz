@@ -6,6 +6,7 @@ import { getDb } from "./db.js";
 import { ApiError, touchLastSeen } from "./auth.js";
 import { requireSession } from "./guard.js";
 import { type ServerConfig } from "./config.js";
+import { assertSafeSpaceId } from "./safeId.js";
 
 // 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -18,6 +19,15 @@ function assertSafeId(id: string, what: string): void {
   if (typeof id !== "string" || !SAFE_ID_RE.test(id)) {
     throw new ApiError("INVALID_REQUEST", `invalid ${what}: illegal characters`, 400);
   }
+}
+
+/** 附件按**空间分片**落盘：`data/files/<space_id>/<前2位>/<attachment_id>`
+ *  （老板 2026-09-23：per-space 备份/销毁/用量统计都依赖它；鉴权早就按 space 隔离了，
+ *  这里补的是文件层）。space_id 由客户端自报 → 入口已收字符集（safeId.assertSafeSpaceId），
+ *  此处再校验一次（纵深防御，拼路径前必过）。 */
+export function spaceFileDir(spaceId: string): string {
+  assertSafeSpaceId(spaceId);
+  return join(FILES_ROOT, spaceId);
 }
 
 /** 确保解析后的路径仍位于 FILES_ROOT 内（纵深防御，读写双侧生效）。 */
@@ -86,11 +96,11 @@ export function storeAttachment(
     return { attachment_id: meta.attachment_id, storage_path: stored.storage_path, created_at: stored.created_at };
   }
 
-  // 按 attachment_id 前两位分片目录
+  // 按空间分片 + attachment_id 前两位二级分片（per-space：`data/files/<space_id>/..`）
   const shard = meta.attachment_id.slice(0, 2);
-  const dir = join(FILES_ROOT, shard);
+  const dir = join(spaceFileDir(spaceId), shard);
   mkdirSync(dir, { recursive: true });
-  const storagePath = `${shard}/${meta.attachment_id}`;
+  const storagePath = `${spaceId}/${shard}/${meta.attachment_id}`;
   const full = join(FILES_ROOT, storagePath);
   assertInsideFilesRoot(full);
   // 记录不存在但文件在（上次写盘后、入库前崩了）：内容一致就复用，不一致说明
