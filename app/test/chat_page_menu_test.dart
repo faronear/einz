@@ -1279,6 +1279,6 @@ void main() {
     await tester.tap(find.text('销毁本秘境通道'));
     await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
     expect(find.text('销毁本秘境通道？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
-    expect(find.text('输入「iPhone」以确认'), findsOneWidget, reason: '闸门要求输入本机设备名');
+    expect(find.text('iPhone'), findsOneWidget, reason: '闸门输入框 label 显示通道名');
   });
 }

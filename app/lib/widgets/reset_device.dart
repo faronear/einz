@@ -166,7 +166,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
     // （连错 5 次锁 30 秒）；这里只是借用它的校验结果，成功即放行。
     if (widget.hasPin) {
       if (pin.isEmpty) {
-        setState(() => _error = l10n.chatPageSetLockOldRequired);
+        setState(() => _error = l10n.verifyPinRequired);
         return;
       }
       setState(() {
@@ -186,7 +186,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
         if (!mounted) return;
         setState(() {
           _busy = false;
-          _error = l10n.setPinDialogOldWrong;
+          _error = l10n.verifyPinWrong;
         });
         return;
       } catch (e) {

@@ -403,6 +403,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogOldWrong => 'Wrong current PIN';
 
   @override
+  String get verifyPinRequired => 'Enter your lock code to verify';
+
+  @override
+  String get verifyPinWrong => 'Wrong lock code';
+
+  @override
   String setPinDialogSetupFailed(String error) {
     return 'Setup failed: $error';
   }
@@ -956,21 +962,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      'Erases this space\'s messages, attachments and secrets from this device, then takes you back to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!';
+      'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This device can rejoin the current space later with a new activation code.\n\nThis cannot be undone! Type the current entrance name to confirm.';
 
   @override
   String resetDeviceNameLabel(String name) {
-    return 'Type \"$name\" to confirm';
+    return '$name';
   }
 
   @override
-  String get resetDeviceNameMismatch => 'That does not match — try again';
+  String get resetDeviceNameMismatch =>
+      'Enter the correct entrance name to confirm';
 
   @override
   String get resetDeviceConfirmWord => 'RESET';
 
   @override
-  String get resetDevicePinLabel => 'This device\'s PIN';
+  String get resetDevicePinLabel => 'Lock code';
 
   @override
   String get resetDeviceServerResidualHint =>

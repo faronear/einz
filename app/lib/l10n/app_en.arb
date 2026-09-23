@@ -161,6 +161,8 @@
   "setPinDialogPinDigitsOnly": "Digits only",
   "setPinDialogPinMismatch": "PINs do not match",
   "setPinDialogOldWrong": "Wrong current PIN",
+  "verifyPinRequired": "Enter your lock code to verify",
+  "verifyPinWrong": "Wrong lock code",
   "setPinDialogSetupFailed": "Setup failed: {error}",
   "@setPinDialogSetupFailed": {
     "placeholders": {
@@ -430,14 +432,14 @@
   "advancedMenuTitle": "Advanced",
   "advancedLeaveSpace": "Destroy this entrance",
   "leaveSpaceTitle": "Destroy this entrance?",
-  "leaveSpaceMessage": "Erases this space's messages, attachments and secrets from this device, then takes you back to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!",
-  "resetDeviceNameLabel": "Type \"{name}\" to confirm",
+  "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This device can rejoin the current space later with a new activation code.\n\nThis cannot be undone! Type the current entrance name to confirm.",
+  "resetDeviceNameLabel": "{name}",
   "@resetDeviceNameLabel": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "resetDeviceNameMismatch": "That does not match — try again",
+  "resetDeviceNameMismatch": "Enter the correct entrance name to confirm",
   "resetDeviceConfirmWord": "RESET",
-  "resetDevicePinLabel": "This device's PIN",
+  "resetDevicePinLabel": "Lock code",
   "resetDeviceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner's entrance list",
   "spaceListTitle": "Choose a space",
   "spaceListEmpty": "No spaces joined yet",

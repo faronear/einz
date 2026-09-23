@@ -161,6 +161,8 @@
   "setPinDialogPinDigitsOnly": "PIN 只能是数字",
   "setPinDialogPinMismatch": "两次输入的 PIN 不一致",
   "setPinDialogOldWrong": "当前锁屏码错误",
+  "verifyPinRequired": "请输入锁屏码以验证",
+  "verifyPinWrong": "锁屏码错误",
   "setPinDialogSetupFailed": "设置失败: {error}",
   "@setPinDialogSetupFailed": {
     "placeholders": {
@@ -430,14 +432,14 @@
   "advancedMenuTitle": "高级",
   "advancedLeaveSpace": "销毁本秘境通道",
   "leaveSpaceTitle": "销毁本秘境通道？",
-  "leaveSpaceMessage": "将销毁这个秘境在本机上的全部消息、附件和密钥，并回到秘境向导。\n\n秘境本身及其数据仍在，你和伴侣的其他设备不受影响。以后凭新的开通码可以重新加入本秘境。\n\n此操作无法撤销！",
-  "resetDeviceNameLabel": "输入「{name}」以确认",
+  "leaveSpaceMessage": "彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。以后本机凭新的开通码可以重新加入当前秘境。\n\n此操作无法撤销！请输入当前通道名称以确认。",
+  "resetDeviceNameLabel": "{name}",
   "@resetDeviceNameLabel": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "resetDeviceNameMismatch": "输入不符，请重输",
+  "resetDeviceNameMismatch": "请输入正确的通道名称以确认",
   "resetDeviceConfirmWord": "重置",
-  "resetDevicePinLabel": "本机锁屏码",
+  "resetDevicePinLabel": "锁屏码",
   "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道",
   "spaceListTitle": "选择秘境",
   "spaceListEmpty": "还没有加入任何秘境",

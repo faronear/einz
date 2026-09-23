@@ -383,6 +383,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogOldWrong => '当前锁屏码错误';
 
   @override
+  String get verifyPinRequired => '请输入锁屏码以验证';
+
+  @override
+  String get verifyPinWrong => '锁屏码错误';
+
+  @override
   String setPinDialogSetupFailed(String error) {
     return '设置失败: $error';
   }
@@ -914,21 +920,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get leaveSpaceMessage =>
-      '将销毁这个秘境在本机上的全部消息、附件和密钥，并回到秘境向导。\n\n秘境本身及其数据仍在，你和伴侣的其他设备不受影响。以后凭新的开通码可以重新加入本秘境。\n\n此操作无法撤销！';
+      '彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。以后本机凭新的开通码可以重新加入当前秘境。\n\n此操作无法撤销！请输入当前通道名称以确认。';
 
   @override
   String resetDeviceNameLabel(String name) {
-    return '输入「$name」以确认';
+    return '$name';
   }
 
   @override
-  String get resetDeviceNameMismatch => '输入不符，请重输';
+  String get resetDeviceNameMismatch => '请输入正确的通道名称以确认';
 
   @override
   String get resetDeviceConfirmWord => '重置';
 
   @override
-  String get resetDevicePinLabel => '本机锁屏码';
+  String get resetDevicePinLabel => '锁屏码';
 
   @override
   String get resetDeviceServerResidualHint =>

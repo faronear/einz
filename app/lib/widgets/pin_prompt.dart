@@ -58,7 +58,7 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
     if (_busy) return;
     final pin = _ctrl.text;
     if (pin.isEmpty) {
-      setState(() => _error = l10n.chatPageSetLockOldRequired);
+      setState(() => _error = l10n.verifyPinRequired);
       return;
     }
     setState(() {
@@ -79,7 +79,7 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = l10n.setPinDialogOldWrong;
+        _error = l10n.verifyPinWrong;
       });
     } catch (e) {
       if (!mounted) return;

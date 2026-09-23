@@ -800,6 +800,18 @@ abstract class AppLocalizations {
   /// **'Wrong current PIN'**
   String get setPinDialogOldWrong;
 
+  /// No description provided for @verifyPinRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your lock code to verify'**
+  String get verifyPinRequired;
+
+  /// No description provided for @verifyPinWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong lock code'**
+  String get verifyPinWrong;
+
   /// No description provided for @setPinDialogSetupFailed.
   ///
   /// In en, this message translates to:
@@ -1757,19 +1769,19 @@ abstract class AppLocalizations {
   /// No description provided for @leaveSpaceMessage.
   ///
   /// In en, this message translates to:
-  /// **'Erases this space\'s messages, attachments and secrets from this device, then takes you back to the space setup wizard.\n\nThe space itself and its server-side data are kept, and your other entrances are untouched. You can join again later with a new token.\n\nThis cannot be undone!'**
+  /// **'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This device can rejoin the current space later with a new activation code.\n\nThis cannot be undone! Type the current entrance name to confirm.'**
   String get leaveSpaceMessage;
 
   /// No description provided for @resetDeviceNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'Type \"{name}\" to confirm'**
+  /// **'{name}'**
   String resetDeviceNameLabel(String name);
 
   /// No description provided for @resetDeviceNameMismatch.
   ///
   /// In en, this message translates to:
-  /// **'That does not match — try again'**
+  /// **'Enter the correct entrance name to confirm'**
   String get resetDeviceNameMismatch;
 
   /// No description provided for @resetDeviceConfirmWord.
@@ -1781,7 +1793,7 @@ abstract class AppLocalizations {
   /// No description provided for @resetDevicePinLabel.
   ///
   /// In en, this message translates to:
-  /// **'This device\'s PIN'**
+  /// **'Lock code'**
   String get resetDevicePinLabel;
 
   /// No description provided for @resetDeviceServerResidualHint.
