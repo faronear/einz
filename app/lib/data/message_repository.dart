@@ -9,7 +9,7 @@ import 'burn_after_settings.dart';
 import 'local_database.dart';
 
 /// 历史消息记录（UI 渲染单元）：env=密文信封、plaintext=明文、
-/// sender=身份判断（'me'/'peer'，person 维度）、attachment=附件元数据、
+/// sender=身份判断（'me'/'peer'，partner 维度）、attachment=附件元数据、
 /// expiresAt=阅后即焚到期时间（null=永久）、createdAt=发送时间戳（毫秒，
 /// 落盘值，未同步消息为本地发送时间）、burnAfterSeconds=焚毁时长（秒，
 /// 归档恢复缺快照时按 到期-创建 反推）、quote=引用快照（{messageId, preview}，
@@ -50,24 +50,24 @@ class MessageRepository {
     required this.api,
     required this.spaceKey,
     required this.spaceId,
-    required this.deviceId,
+    required this.entranceId,
     this.keyVersion = 1,
     this.token,
     this.settings,
     this.reauth,
-    String? personId,
+    String? partnerId,
   }) {
-    // 向导完成时已知本端 personId：立即种入映射，保证首帧就按 person 判定归属
-    // （离线启动时 GET /space 拉不到映射；持久化映射由 refreshDeviceMap 落盘）。
-    final pid = personId;
-    if (pid != null && pid.isNotEmpty) _personByDevice[deviceId] = pid;
+    // 向导完成时已知本端 partnerId：立即种入映射，保证首帧就按 partner 判定归属
+    // （离线启动时 GET /space 拉不到映射；持久化映射由 refreshEntranceMap 落盘）。
+    final pid = partnerId;
+    if (pid != null && pid.isNotEmpty) _partnerByEntrance[entranceId] = pid;
   }
 
   final LocalDatabase db;
   final ApiClient api;
   final Uint8List spaceKey;
   final String spaceId;
-  final String deviceId;
+  final String entranceId;
   final int keyVersion;
 
   /// 阅后即焚设置（可选；未注入时默认 0=无限，行为与旧版一致）。
@@ -119,46 +119,46 @@ class MessageRepository {
     }
   }
 
-  /// 设备 → 用户（person_id）映射（GET /space 缓存，多设备凭证语义）。
-  /// 用于判断消息是否"同一个人"发送：同 person 不同设备显示为 'me'。
-  final Map<String, String> _personByDevice = {};
+  /// 设备 → 用户（partner_id）映射（GET /space 缓存，多设备凭证语义）。
+  /// 用于判断消息是否"同一个人"发送：同 partner 不同设备显示为 'me'。
+  final Map<String, String> _partnerByEntrance = {};
 
-  /// device→person 映射的本地持久化键：离线启动时 GET /space 拿不到，只有靠这份
+  /// entrance→partner 映射的本地持久化键：离线启动时 GET /space 拿不到，只有靠这份
   /// 缓存才认得出"同一身份其他设备"发来的消息（否则一律判成对方、气泡全左对齐——
-  /// 老板 2026-09-13 实测；TUI 侧因持久化 personId 而无此问题）。
-  static const _kDevicePersonMap = 'identity.device_person_map';
+  /// 老板 2026-09-13 实测；TUI 侧因持久化 partnerId 而无此问题）。
+  static const _kEntrancePartnerMap = 'identity.entrance_partner_map';
 
   /// 身份缓存是否已从库里载入（首次判归属 / 发送前惰性载入一次）。
   bool _identityLoaded = false;
 
-  /// 惰性载入持久化的 device→person 映射（离线也能用）。
+  /// 惰性载入持久化的 entrance→partner 映射（离线也能用）。
   Future<void> _ensureIdentityLoaded() async {
     if (_identityLoaded) return;
     _identityLoaded = true;
     try {
       final row = await (db.select(db.appState)
-            ..where((s) => s.key.equals(_kDevicePersonMap)))
+            ..where((s) => s.key.equals(_kEntrancePartnerMap)))
           .getSingleOrNull();
       final raw = row?.value;
       if (raw == null || raw.isEmpty) return;
       final m = jsonDecode(raw) as Map<String, dynamic>;
-      // putIfAbsent：不覆盖构造函数种入的本端 personId（向导已知，优先采信）
+      // putIfAbsent：不覆盖构造函数种入的本端 partnerId（向导已知，优先采信）
       for (final e in m.entries) {
-        _personByDevice.putIfAbsent(e.key, () => e.value as String);
+        _partnerByEntrance.putIfAbsent(e.key, () => e.value as String);
       }
     } catch (_) {
-      // 缓存损坏：忽略（退化为 device 维度判断）
+      // 缓存损坏：忽略（退化为 entrance 维度判断）
     }
   }
 
-  /// 持久化 device→person 映射（GET /space 成功后 / 记录本端 personId 时）。
+  /// 持久化 entrance→partner 映射（GET /space 成功后 / 记录本端 partnerId 时）。
   Future<void> _saveIdentityMap() async {
-    if (_personByDevice.isEmpty) return;
+    if (_partnerByEntrance.isEmpty) return;
     try {
       await db.into(db.appState).insertOnConflictUpdate(
             AppStateCompanion.insert(
-              key: _kDevicePersonMap,
-              value: jsonEncode(_personByDevice),
+              key: _kEntrancePartnerMap,
+              value: jsonEncode(_partnerByEntrance),
             ),
           );
     } catch (_) {
@@ -166,51 +166,51 @@ class MessageRepository {
     }
   }
 
-  /// 拉取空间设备映射（person_id）。映射缺失时 history 的 sender 判断降级为 device 维度。
-  Future<void> refreshDeviceMap() async {
+  /// 拉取空间设备映射（partner_id）。映射缺失时 history 的 sender 判断降级为 entrance 维度。
+  Future<void> refreshEntranceMap() async {
     final t = token;
     if (t == null) return;
     try {
       final space = await _withAutoAuth((tok) => api.getSpace(tok));
-      final seeded = _personByDevice[deviceId]; // 构造函数种入的本端 personId
-      _personByDevice
+      final seeded = _partnerByEntrance[entranceId]; // 构造函数种入的本端 partnerId
+      _partnerByEntrance
         ..clear()
-        ..addEntries(space.devices.map((d) => MapEntry(d.deviceId, d.personId)));
-      if (seeded != null && !_personByDevice.containsKey(deviceId)) {
-        _personByDevice[deviceId] = seeded; // 服务端列表缺本机时兜底保留
+        ..addEntries(space.entrances.map((d) => MapEntry(d.entranceId, d.partnerId)));
+      if (seeded != null && !_partnerByEntrance.containsKey(entranceId)) {
+        _partnerByEntrance[entranceId] = seeded; // 服务端列表缺本机时兜底保留
       }
-      await _saveIdentityMap(); // 落盘：离线启动仍能按 person 判定归属
+      await _saveIdentityMap(); // 落盘：离线启动仍能按 partner 判定归属
     } catch (_) {
       // 网络抖动忽略：保留旧映射（无映射时降级 device 判断）
     }
   }
 
-  /// 消息是否本端（我）发送：**优先 person 维度**——信封自带 senderPersonId，
-  /// 离线也拿得到；映射缺失再依次退到映射查表、device 维度。
+  /// 消息是否本端（我）发送：**优先 partner 维度**——信封自带 senderPartnerId，
+  /// 离线也拿得到；映射缺失再依次退到映射查表、entrance 维度。
   /// （旧实现只看 device：离线映射为空时，"同一身份其他设备"发的消息会被误判成
   /// 对方 → 气泡全左对齐——老板 2026-09-13 实测。）
   bool _isMineMessage(MessageEnvelope env) {
-    final myPerson = _personByDevice[deviceId];
-    final senderPerson =
-        env.senderPersonId ?? _personByDevice[env.senderDeviceId];
-    if (myPerson != null && senderPerson != null) {
-      return myPerson == senderPerson;
+    final myPartner = _partnerByEntrance[entranceId];
+    final senderPartner =
+        env.senderPartnerId ?? _partnerByEntrance[env.senderEntranceId];
+    if (myPartner != null && senderPartner != null) {
+      return myPartner == senderPartner;
     }
-    return env.senderDeviceId == deviceId;
+    return env.senderEntranceId == entranceId;
   }
 
-  /// 设备 → 用户（person_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPersonId）。
-  String? personIdOfDevice(String deviceId) => _personByDevice[deviceId];
+  /// 设备 → 用户（partner_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPartnerId）。
+  String? partnerIdOfEntrance(String entranceId) => _partnerByEntrance[entranceId];
 
-  /// 反查本机 personId（头像上传/缓存失效用）。
-  /// 优先构造时种入的值；缺失（PIN 解锁/明文直进等重启路径不传 personId）时
-  /// 从持久化的 device→person 映射里取——离线启动也拿得到（与归属判定同源，
-  /// 映射由 [refreshDeviceMap] 落盘）。都拿不到才返回 null。
-  Future<String?> resolveMyPersonId() async {
-    final seeded = _personByDevice[deviceId];
+  /// 反查本机 partnerId（头像上传/缓存失效用）。
+  /// 优先构造时种入的值；缺失（PIN 解锁/明文直进等重启路径不传 partnerId）时
+  /// 从持久化的 entrance→partner 映射里取——离线启动也拿得到（与归属判定同源，
+  /// 映射由 [refreshEntranceMap] 落盘）。都拿不到才返回 null。
+  Future<String?> resolveMyPartnerId() async {
+    final seeded = _partnerByEntrance[entranceId];
     if (seeded != null && seeded.isNotEmpty) return seeded;
     await _ensureIdentityLoaded();
-    final pid = _personByDevice[deviceId];
+    final pid = _partnerByEntrance[entranceId];
     return (pid == null || pid.isEmpty) ? null : pid;
   }
 
@@ -237,7 +237,7 @@ class MessageRepository {
     FutureOr<void> Function(String messageId)? onPersisted,
   }) async {
     final messageId = _uuidv7();
-    await _ensureIdentityLoaded(); // 离线也要带上本端 personId（归属判定/展示用）
+    await _ensureIdentityLoaded(); // 离线也要带上本端 partnerId（归属判定/展示用）
     // 引用/附加数据：载荷 = {"plaintext":…, "quote":…, "meta":…} JSON（AEAD 密文内，
     // Server 不可见；旧客户端/CLI 未识别时按整段 JSON 文本展示，仅影响这类消息）
     final payload = encodeMessagePayload(plaintext, quote: quote, meta: meta);
@@ -245,8 +245,8 @@ class MessageRepository {
       plaintext: payload,
       spaceKey: spaceKey,
       spaceId: spaceId,
-      senderDeviceId: deviceId,
-      senderPersonId: _personByDevice[deviceId],
+      senderEntranceId: entranceId,
+      senderPartnerId: _partnerByEntrance[entranceId],
       messageId: messageId,
       type: type,
       keyVersion: keyVersion,
@@ -293,7 +293,7 @@ class MessageRepository {
   }) async {
     final messageId = _uuidv7();
     final attachmentId = _uuidv7();
-    await _ensureIdentityLoaded(); // 离线也要带上本端 personId（归属判定/展示用）
+    await _ensureIdentityLoaded(); // 离线也要带上本端 partnerId（归属判定/展示用）
     final plain = caption ?? (type == 'voice' ? '🎤 语音消息' : '📎 $fileName');
 
     // 1) 加密文件（密文 + sha256 + nonce + size）
@@ -322,8 +322,8 @@ class MessageRepository {
       plaintext: encodeMessagePayload(plain, quote: quote, meta: meta),
       spaceKey: spaceKey,
       spaceId: spaceId,
-      senderDeviceId: deviceId,
-      senderPersonId: _personByDevice[deviceId],
+      senderEntranceId: entranceId,
+      senderPartnerId: _partnerByEntrance[entranceId],
       messageId: messageId,
       type: type,
       keyVersion: keyVersion,
@@ -402,7 +402,7 @@ class MessageRepository {
         final bs = await _burnState();
         await _insertLocal(
           env,
-          status: env.senderDeviceId == deviceId ? 'sent' : 'delivered',
+          status: env.senderEntranceId == entranceId ? 'sent' : 'delivered',
           burnAfterSeconds: bs.burn,
           expiresAt: bs.expiresAt,
         );
@@ -450,7 +450,7 @@ class MessageRepository {
     final rows = await _withAutoAuth((tok) => api.getReceipts(tok));
     for (final r in rows) {
       await upsertPeerReceipt(
-        personId: r.personId,
+        partnerId: r.partnerId,
         deliveredUptoSeq: r.deliveredUptoSeq,
         readUptoSeq: r.readUptoSeq,
         updatedAt: r.updatedAt,
@@ -459,19 +459,19 @@ class MessageRepository {
   }
 
   /// 落库一条对方回执（单调只前进——陈旧的重放不会把高水位拉低）。
-  /// 对方可能有多台设备，任一设备上报即代表该 person；这里取 max 合并。
+  /// 对方可能有多台设备，任一设备上报即代表该 partner；这里取 max 合并。
   Future<void> upsertPeerReceipt({
-    required String personId,
+    required String partnerId,
     required int deliveredUptoSeq,
     required int readUptoSeq,
     int updatedAt = 0,
   }) async {
     final existing = await (db.select(db.peerReceipts)
-          ..where((r) => r.spaceId.equals(spaceId) & r.personId.equals(personId)))
+          ..where((r) => r.spaceId.equals(spaceId) & r.partnerId.equals(partnerId)))
         .getSingleOrNull();
     await db.into(db.peerReceipts).insertOnConflictUpdate(PeerReceiptsCompanion.insert(
           spaceId: spaceId,
-          personId: personId,
+          partnerId: partnerId,
           deliveredUptoSeq:
               Value(max(existing?.deliveredUptoSeq ?? 0, deliveredUptoSeq)),
           readUptoSeq: Value(max(existing?.readUptoSeq ?? 0, readUptoSeq)),
@@ -481,7 +481,7 @@ class MessageRepository {
         ));
   }
 
-  /// 本 space 的对方回执行（仅 peer person——本端自己从不写这张表）。
+  /// 本 space 的对方回执行（仅 peer partner——本端自己从不写这张表）。
   /// 对方的回执行（用于推导"我发出的消息"是否已送达/已读）。
   ///
   /// **必须排除我自己那一行**（老板 2026-09-13 实测的 bug）：`GET /receipts` 返回
@@ -493,9 +493,9 @@ class MessageRepository {
     final rows = await (db.select(db.peerReceipts)
           ..where((r) => r.spaceId.equals(spaceId)))
         .get();
-    final myPersonId = _personByDevice[deviceId];
-    if (myPersonId == null) return rows;
-    return rows.where((r) => r.personId != myPersonId).toList();
+    final myPartnerId = _partnerByEntrance[entranceId];
+    if (myPartnerId == null) return rows;
+    return rows.where((r) => r.partnerId != myPartnerId).toList();
   }
 
   /// 推导自己某条消息的回执状态（纯函数，便于单测）。
@@ -547,7 +547,7 @@ class MessageRepository {
   /// 对账：把"服务端早已收下（serverSequence 非空）却停在 failed"的行置回 sent。
   ///
   /// 为什么要这一步（老板 2026-09-22 实测的线上 bug）：换设备后，本地这些历史消息的
-  /// 信封带着**旧 device_id**（AAD 的一部分，改不了），重投必被服务端 403，客户端又
+  /// 信封带着**旧 entrance_id**（AAD 的一部分，改不了），重投必被服务端 403，客户端又
   /// 把它判成"服务端明确拒绝"→ 永久 failed；而锚点早已越过这些 seq，服务端不会再下发
   /// 它们（[_insertLocal] 也因此刷不回来）。于是必须靠本地对账自愈，而不是等用户点按。
   /// 现在点按也能立刻恢复（见 [retryMessage]），这里让"不点按也能好"。
@@ -688,9 +688,9 @@ class MessageRepository {
     return {for (final row in rows) row.messageId};
   }
 
-  /// 行 → 历史记录（解密 + 附件元数据 + person 身份 + 阅后即焚到期）。
+  /// 行 → 历史记录（解密 + 附件元数据 + partner 身份 + 阅后即焚到期）。
   Future<List<HistoryMessage>> _rowsToHistory(List<LocalMessage> rows) async {
-    await _ensureIdentityLoaded(); // 离线：用持久化的 device→person 映射判定归属
+    await _ensureIdentityLoaded(); // 离线：用持久化的 entrance→partner 映射判定归属
     final out = <HistoryMessage>[];
     for (final row in rows) {
       // 回填 server_sequence：本机发送的消息 ciphertext 落盘时无 seq（由 _markSent
@@ -839,7 +839,7 @@ class MessageRepository {
           LocalMessagesCompanion.insert(
             messageId: env.messageId,
             spaceId: spaceId,
-            senderDeviceId: env.senderDeviceId,
+            senderEntranceId: env.senderEntranceId,
             type: env.type,
             keyVersion: env.keyVersion,
             nonce: env.nonce,
@@ -894,7 +894,7 @@ class MessageRepository {
   /// **已知 server_sequence 的行不重投**（老板 2026-09-22 实测的线上 bug）：seq 只有
   /// 服务端接受该消息时才会写入（[_markSent] 或 sync），所以"有 seq + failed"= 服务端
   /// 早已收下、只是本地状态卡住了。此时重投毫无意义，且**必定失败**——信封里的
-  /// sender_device_id 是 AAD 的一部分（shared/lib/src/crypto/message_crypto.dart），
+  /// sender_entrance_id 是 AAD 的一部分（shared/lib/src/crypto/message_crypto.dart），
   /// 换设备后无法改写，服务端设备校验会 403，而客户端又把它判成"服务端明确拒绝"
   /// （[_isServerRejection]）→ 状态永远回不到 sent。
   Future<void> retryMessage(String messageId) async {

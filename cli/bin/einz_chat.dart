@@ -43,9 +43,9 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  DeviceStore store;
+  EntranceStore store;
   try {
-    store = DeviceStore.load(storePath);
+    store = EntranceStore.load(storePath);
   } on StateError catch (e) {
     _err('$e');
     _info('先用 TUI 引导创建/加入秘境: dart run bin/einz_tui.dart --store $storePath --server <url>');
@@ -54,13 +54,13 @@ Future<void> main(List<String> args) async {
   }
 
   _ok('Einz 聊天 CLI（方案 B 雏形）');
-  _info('设备: ${store.deviceId}  空间: ${store.spaceId ?? '（未导入 Space Key）'}');
+  _info('设备: ${store.entranceId}  空间: ${store.spaceId ?? '（未导入 Space Key）'}');
   if (server.isNotEmpty) _info('服务器: $server');
 
   await _repl(store, storePath, server);
 }
 
-Future<void> _repl(DeviceStore store, String storePath, String server) async {
+Future<void> _repl(EntranceStore store, String storePath, String server) async {
   // 启动即同步一次历史（离线或无 server 时跳过）
   if (server.isNotEmpty && store.spaceKey != null) {
     try {
@@ -135,13 +135,13 @@ void _printHelp() {
 }
 
 // ---------- 认证：challenge → sealOpen → verify ----------
-Future<void> _cmdAuth(DeviceStore store, String storePath, String server) async {
+Future<void> _cmdAuth(EntranceStore store, String storePath, String server) async {
   if (server.isEmpty) throw StateError('缺少服务器地址（/auth <server> 或启动时 --server）');
   final api = ApiClient(server);
   final s = await sodium();
 
   // spaceId 必填（Multiverse）：签发的 session 绑定该 Space，漏传服务端直接 400
-  final challenge = await api.challenge(store.deviceId!, spaceId: store.spaceId);
+  final challenge = await api.challenge(store.entranceId!, spaceId: store.spaceId);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),
@@ -154,14 +154,14 @@ Future<void> _cmdAuth(DeviceStore store, String storePath, String server) async 
 }
 
 // ---------- 发送：加密 → 入队 → 补发 ----------
-Future<void> _sendText(DeviceStore store, String storePath, String server, String text) async {
+Future<void> _sendText(EntranceStore store, String storePath, String server, String text) async {
   store.requireSpace();
   final messageId = await _uuidv7();
   final env = await encryptMessage(
     plaintext: text,
     spaceKey: base64Decode(store.spaceKey!),
     spaceId: store.spaceId!,
-    senderDeviceId: store.deviceId!,
+    senderEntranceId: store.entranceId!,
     messageId: messageId,
     keyVersion: store.keyVersion,
   );
@@ -184,7 +184,7 @@ Future<void> _sendText(DeviceStore store, String storePath, String server, Strin
 }
 
 /// 补发离线队列：成功一条出队一条并写入历史；网络失败停止本轮（下次再试）。
-Future<int> _flushPending(DeviceStore store, String storePath, String server) async {
+Future<int> _flushPending(EntranceStore store, String storePath, String server) async {
   store.requireSession();
   final api = ApiClient(server);
   var sent = 0;
@@ -204,7 +204,7 @@ Future<int> _flushPending(DeviceStore store, String storePath, String server) as
 }
 
 // ---------- 同步：增量拉取 → 落盘历史 → 解密打印新增 ----------
-Future<void> _cmdSync(DeviceStore store, String storePath, String server) async {
+Future<void> _cmdSync(EntranceStore store, String storePath, String server) async {
   if (server.isEmpty) throw StateError('缺少服务器地址（--server）');
   store.requireSpace();
   store.requireSession();
@@ -239,7 +239,7 @@ Future<void> _cmdSync(DeviceStore store, String storePath, String server) async 
 }
 
 // ---------- 历史：解密打印本地全部消息 ----------
-Future<void> _cmdHistory(DeviceStore store) async {
+Future<void> _cmdHistory(EntranceStore store) async {
   final envs = store.historyEnvelopes;
   if (envs.isEmpty) {
     _info('ℹ️  本地暂无消息');
@@ -251,16 +251,16 @@ Future<void> _cmdHistory(DeviceStore store) async {
   _info('ℹ️  共 ${envs.length} 条本地消息（队列剩余 ${store.pendingCount}）');
 }
 
-Future<void> _printEnvelope(DeviceStore store, MessageEnvelope env) async {
+Future<void> _printEnvelope(EntranceStore store, MessageEnvelope env) async {
   final keyB64 = store.spaceKeyForVersion(env.keyVersion) ?? store.spaceKey!;
   final plain = await decryptMessage(
     env: env,
     spaceKey: base64Decode(keyB64),
     spaceId: store.spaceId!,
   );
-  final isMine = env.senderPersonId != null && store.personId != null
-      ? env.senderPersonId == store.personId
-      : env.senderDeviceId == store.deviceId;
+  final isMine = env.senderPartnerId != null && store.partnerId != null
+      ? env.senderPartnerId == store.partnerId
+      : env.senderEntranceId == store.entranceId;
   final sender = isMine ? '我' : '你';
   final color = isMine ? _green : _yellow;
   final seq = env.serverSequence;

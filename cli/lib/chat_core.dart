@@ -87,7 +87,7 @@ int compareChatMessages(ChatMessage a, ChatMessage b) {
 class ChatSession {
   ChatSession(this.store, this.storePath, this.server);
 
-  final DeviceStore store;
+  final EntranceStore store;
   final String storePath;
   String server;
 
@@ -100,10 +100,10 @@ class ChatSession {
   /// 立刻显示离线消息，TUI 之前要等补发网络超时回来才显示）。
   void Function()? onChanged;
 
-  /// 认证时被服务端**明确撤销**（403 `DEVICE_REVOKED`）的回调——UI 据此清盘并退出。
-  /// 与其它撤销路径（WS `device.revoked` 帧、启动自检、引导认证）语义一致：
+  /// 认证时被服务端**明确撤销**（403 `ENTRANCE_REVOKED`）的回调——UI 据此清盘并退出。
+  /// 与其它撤销路径（WS `entrance.revoked` 帧、启动自检、引导认证）语义一致：
   /// **只有明确撤销才清空本地数据**；`FORBIDDEN`（库被重置/未登记）不走这里。
-  void Function()? onDeviceRevoked;
+  void Function()? onEntranceRevoked;
 
   /// WS 实时监听（null = 未启动）。
   WsClient? wsClient;
@@ -112,12 +112,12 @@ class ChatSession {
   /// 供 UI 状态栏显示"已断线 Ns"。
   DateTime? wsDownSince;
 
-  /// 对方（接收方）已送达高水位：personId → seq，只前进不倒退。
+  /// 对方（接收方）已送达高水位：partnerId → seq，只前进不倒退。
   /// 用于推导"我发出的消息"是否已送达（delivered）。**不含本端自己那行**——
   /// 自己的水位描述的是"我收到对方哪些消息"，与我发出的消息无关（App 同款坑）。
   final Map<String, int> peerDeliveredUpto = {};
 
-  /// 对方已读高水位：personId → seq，只前进不倒退（语义同 [peerDeliveredUpto]）。
+  /// 对方已读高水位：partnerId → seq，只前进不倒退（语义同 [peerDeliveredUpto]）。
   /// 服务端保证 read ≤ delivered；TUI 据此把"已读"的消息状态字符标蓝。
   final Map<String, int> peerReadUpto = {};
 
@@ -157,9 +157,9 @@ class ChatSession {
         env: env,
         plain: dec.plain,
         meta: dec.meta,
-        isMine: env.senderPersonId != null && store.personId != null
-            ? env.senderPersonId == store.personId
-            : env.senderDeviceId == store.deviceId,
+        isMine: env.senderPartnerId != null && store.partnerId != null
+            ? env.senderPartnerId == store.partnerId
+            : env.senderEntranceId == store.entranceId,
         createdAt: env.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         serverSequence: env.serverSequence,
       ));
@@ -186,20 +186,20 @@ class ChatSession {
     final api = ApiClient(target);
     final s = await sodium();
 
-    // 未登记（登记失败/开通码输错）时 deviceId 为 null——先检查，避免空断言崩溃
-    final deviceId = store.deviceId;
-    if (deviceId == null) {
+    // 未登记（登记失败/开通码输错）时 entranceId 为 null——先检查，避免空断言崩溃
+    final entranceId = store.entranceId;
+    if (entranceId == null) {
       throw StateError('设备尚未绑定秘境，请先 /space create（新建）或 /space join <开通码或邀请链接>（加入）');
     }
     // spaceId 必须一并提交：否则拿到的是"无 space 的 legacy 会话"，/sync 与
     // /messages 会落到空 space 桶 → 会话过期自动续期后消息全空（P1 收敛）。
     final ChallengeResult challenge;
     try {
-      challenge = await api.challenge(deviceId, spaceId: store.spaceId);
+      challenge = await api.challenge(entranceId, spaceId: store.spaceId);
     } on ApiException catch (e) {
       // 挑战被明确拒绝为"设备已撤销" → 通知 UI 清盘退出（其他失败原样抛出：
       // FORBIDDEN 只是"服务器不认本设备"，最常见的原因是后台库被重置，绝不能删数据）
-      if (e.code == 'DEVICE_REVOKED') onDeviceRevoked?.call();
+      if (e.code == 'ENTRANCE_REVOKED') onEntranceRevoked?.call();
       rethrow;
     }
     final opened = await sealOpen(
@@ -251,8 +251,8 @@ class ChatSession {
       plaintext: text,
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
-      senderDeviceId: store.deviceId!,
-      senderPersonId: store.personId,
+      senderEntranceId: store.entranceId!,
+      senderPartnerId: store.partnerId,
       messageId: messageId,
       keyVersion: store.keyVersion,
     );
@@ -310,9 +310,9 @@ class ChatSession {
           env: env,
           plain: dec.plain,
           meta: dec.meta,
-          isMine: env.senderPersonId != null && store.personId != null
-              ? env.senderPersonId == store.personId
-              : env.senderDeviceId == store.deviceId,
+          isMine: env.senderPartnerId != null && store.partnerId != null
+              ? env.senderPartnerId == store.partnerId
+              : env.senderEntranceId == store.entranceId,
           createdAt: result.createdAt,
           serverSequence: result.serverSequence,
         ));
@@ -374,11 +374,11 @@ class ChatSession {
     try {
       final rows = await _withAutoAuth((token) => ApiClient(server).getReceipts(token));
       for (final r in rows) {
-        if (r.personId == store.personId) continue;
-        final cur = peerDeliveredUpto[r.personId] ?? 0;
-        if (r.deliveredUptoSeq > cur) peerDeliveredUpto[r.personId] = r.deliveredUptoSeq;
-        final curRead = peerReadUpto[r.personId] ?? 0;
-        if (r.readUptoSeq > curRead) peerReadUpto[r.personId] = r.readUptoSeq;
+        if (r.partnerId == store.partnerId) continue;
+        final cur = peerDeliveredUpto[r.partnerId] ?? 0;
+        if (r.deliveredUptoSeq > cur) peerDeliveredUpto[r.partnerId] = r.deliveredUptoSeq;
+        final curRead = peerReadUpto[r.partnerId] ?? 0;
+        if (r.readUptoSeq > curRead) peerReadUpto[r.partnerId] = r.readUptoSeq;
       }
     } catch (_) {
       // 网络抖动忽略
@@ -472,9 +472,9 @@ class ChatSession {
         env: env,
         plain: dec.plain,
         meta: dec.meta,
-        isMine: env.senderPersonId != null && store.personId != null
-            ? env.senderPersonId == store.personId
-            : env.senderDeviceId == store.deviceId,
+        isMine: env.senderPartnerId != null && store.partnerId != null
+            ? env.senderPartnerId == store.partnerId
+            : env.senderEntranceId == store.entranceId,
         createdAt: env.createdAt ?? seq ?? 0,
         serverSequence: seq,
       );
@@ -525,7 +525,7 @@ class ChatSession {
     void Function(WsPeerStatusEvent event)? onPeerStatus,
     void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
     void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
-    void Function(WsDeviceRevokedEvent event)? onRevoked,
+    void Function(WsEntranceRevokedEvent event)? onRevoked,
     void Function()? onUnrecognized,
     void Function()? onReceiptUpdated,
   }) {
@@ -541,11 +541,11 @@ class ChatSession {
         } on ApiException catch (e) {
           // 重新认证失败要区分语义（老板 2026-09-16）——异常被 ws_client 吞掉的话，
           // 后台库被重置时客户端会无限静默退避重连，用户看不到任何解释。
-          if (e.code == 'DEVICE_REVOKED') {
+          if (e.code == 'ENTRANCE_REVOKED') {
             // 设备被明确撤销：交给 UI 走"自毁 + 退出"（WS 就此结束，不必再重连）
-            onRevoked?.call(WsDeviceRevokedEvent(
-              type: kWsTypeDeviceRevoked,
-              deviceId: store.deviceId ?? '',
+            onRevoked?.call(WsEntranceRevokedEvent(
+              type: kWsTypeEntranceRevoked,
+              entranceId: store.entranceId ?? '',
             ));
             wsClient?.stop();
             return;
@@ -570,9 +570,9 @@ class ChatSession {
             env: env,
             plain: dec.plain,
             meta: dec.meta,
-            isMine: env.senderPersonId != null && store.personId != null
-            ? env.senderPersonId == store.personId
-            : env.senderDeviceId == store.deviceId,
+            isMine: env.senderPartnerId != null && store.partnerId != null
+            ? env.senderPartnerId == store.partnerId
+            : env.senderEntranceId == store.entranceId,
             createdAt: env.createdAt ?? event.serverSequence,
             serverSequence: event.serverSequence,
           );
@@ -593,19 +593,19 @@ class ChatSession {
         }
         if (event is WsReceiptUpdatedEvent) {
           // 对方送达/已读水位更新：合并到本地（排除自己那行——见 peerDeliveredUpto）
-          if (event.personId != store.personId) {
-            final cur = peerDeliveredUpto[event.personId] ?? 0;
+          if (event.partnerId != store.partnerId) {
+            final cur = peerDeliveredUpto[event.partnerId] ?? 0;
             if (event.deliveredUptoSeq > cur) {
-              peerDeliveredUpto[event.personId] = event.deliveredUptoSeq;
+              peerDeliveredUpto[event.partnerId] = event.deliveredUptoSeq;
             }
-            final curRead = peerReadUpto[event.personId] ?? 0;
+            final curRead = peerReadUpto[event.partnerId] ?? 0;
             if (event.readUptoSeq > curRead) {
-              peerReadUpto[event.personId] = event.readUptoSeq;
+              peerReadUpto[event.partnerId] = event.readUptoSeq;
             }
           }
           onReceiptUpdated?.call();
         }
-        if (event is WsDeviceRevokedEvent) {
+        if (event is WsEntranceRevokedEvent) {
           // 本设备已被撤销（Server 发帧后随即断开）：UI 应立即提示并退出
           onRevoked?.call(event);
         }
@@ -693,8 +693,8 @@ class ChatSession {
       plaintext: cap,
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
-      senderDeviceId: store.deviceId!,
-      senderPersonId: store.personId,
+      senderEntranceId: store.entranceId!,
+      senderPartnerId: store.partnerId,
       messageId: messageId,
       type: type,
       keyVersion: store.keyVersion,

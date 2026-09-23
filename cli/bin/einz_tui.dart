@@ -55,28 +55,28 @@ class _TuiState {
   /// 存储文件路径（/pin 设置后保存用）。
   final String storePath;
 
-  /// 对方是否在线（listDevices last_seen<60s 轮询 + peer.online/offline 广播更新）。
-  /// 判定维度是"人"：同一 person 的多台设备是我自己的设备，不算对方。
+  /// 对方是否在线（listEntrances last_seen<60s 轮询 + peer.online/offline 广播更新）。
+  /// 判定维度是"人"：同一 partner 的多台设备是我自己的设备，不算对方。
   bool peerOnline = false;
 
-  /// 我的**其它设备**总数（不含本机；listDevices 轮询统计）——右段 `#n/m` 的分母。
+  /// 我的**其它设备**总数（不含本机；listEntrances 轮询统计）——右段 `#n/m` 的分母。
   /// 本机由 `@设备名` 独立表示，不计入这一对数字（老板 2026-09-16）。
-  int myOtherDeviceTotal = 0;
+  int myOtherEntranceTotal = 0;
 
-  /// 对方设备：在线数 / 总数（同一 person 的多设备；listDevices 轮询统计）。
-  int peerDeviceOnline = 0;
-  int peerDeviceTotal = 0;
+  /// 对方设备：在线数 / 总数（同一 partner 的多设备；listEntrances 轮询统计）。
+  int peerEntranceOnline = 0;
+  int peerEntranceTotal = 0;
 
-  /// 设备名映射（device_id → device_name——listDevices 轮询更新；顶部条对方 #设备名）。
-  final Map<String, String> deviceNames = {};
+  /// 设备名映射（entrance_id → entrance_name——listEntrances 轮询更新；顶部条对方 #设备名）。
+  final Map<String, String> entranceNames = {};
 
-  /// 对方**在线设备**表：device_id → 上线时刻（ms，`online_since`；重连不刷新）。
+  /// 对方**在线设备**表：entrance_id → 上线时刻（ms，`online_since`；重连不刷新）。
   /// 顶部条逐个列出这些设备（按上线时刻降序 = 最新上线紧挨名字）；离线设备不在表内，
-  /// 只计入 peerDeviceOnline/Total 的分母（老板 2026-09-16）。
+  /// 只计入 peerEntranceOnline/Total 的分母（老板 2026-09-16）。
   final Map<String, int> peerOnlineSince = {};
 
-  /// 我的**其它在线设备**表：device_id → 上线时刻（ms）——右段逐个列出
-  /// （数据同样来自 /devices，客户端对本方/对方的掌握是对称的）。
+  /// 我的**其它在线设备**表：entrance_id → 上线时刻（ms）——右段逐个列出
+  /// （数据同样来自 /entrances，客户端对本方/对方的掌握是对称的）。
   /// **不含本机**：本机由 `@设备名` 单独表示（不论在线与否都显示），
   /// 故本表长度即 `#n/m` 里的 n，与后面列出的设备名严格一一对应。
   final Map<String, int> myOtherOnlineSince = {};
@@ -123,15 +123,15 @@ class _TuiState {
   /// 等待共享口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
   bool pendingSpaceKey = false;
 
-  /// person_id → personName（GET /space 拉取，消息前缀显示 personName 用）。
-  Map<String, String> personNames = {};
+  /// partner_id → partnerName（GET /space 拉取，消息前缀显示 partnerName 用）。
+  Map<String, String> partnerNames = {};
 
-  /// person_id → gender（GET /health、/space 拉取，对方消息背景色用）。
-  Map<String, String> personGenders = {};
+  /// partner_id → gender（GET /health、/space 拉取，对方消息背景色用）。
+  Map<String, String> partnerGenders = {};
 
-  /// person_id → partner_slot（GET /space 拉取，0=第一人/创建者，1=第二人/伴侣；
+  /// partner_id → slot（GET /space 拉取，0=第一人/创建者，1=第二人/伴侣；
   /// 同性别时第二人气泡取青色用）。
-  Map<String, int> personSlots = {};
+  Map<String, int> partnerSlots = {};
 
   /// 引导问答等待类型（非 null 时输入循环的下一次输入按此问答处理）。
   String? pendingGuidance;
@@ -148,9 +148,9 @@ class _TuiState {
 _TuiState? _state;
 
 /// 首设备 create 时询问的性别（我的/伴侣）：仅接受 男/女（否则重新询问），
-/// 登记时随名字一并提交服务端（person_gender/partner_gender）。
+/// 登记时随名字一并提交服务端（person_gender/peer_gender）。
 String? myGender;
-String? partnerGender;
+String? peerGender;
 
 /// 性别提交规范化：中文 男/女 → 服务端规范值 male/female（与 App 一致；
 /// 服务端 meta person_gender:* 以 male/female 为规范，旧 TUI 直传中文导致
@@ -312,7 +312,7 @@ String _resolveAutoStore() {
   final f = File(path);
   if (!f.existsSync()) return '';
   try {
-    DeviceStore.load(path);
+    EntranceStore.load(path);
     return path;
   } catch (_) {
     // 损坏/非 store 文件：备份保留现场后引导 init（不丢私钥数据）
@@ -326,7 +326,7 @@ String _resolveAutoStore() {
 
 /// 启动探测（GET {server}/health，3s 超时，不重试）：
 /// 能连（HTTP 200）→ (true, 协议版本, 能力清单)；连接失败/超时 → (false, '', [])。
-/// Multiverse：/health 不再返回全局 person 表——person 名字改由空间成员信息提供，
+/// Multiverse：/health 不再返回全局 partner 表——partner 名字改由空间成员信息提供，
 /// 消息前缀用本地 store 的名字（自己/对方由空间成员填充）。
 Future<(bool, String, List<String>)> _probeServer(String server) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
@@ -357,15 +357,15 @@ Future<(bool, String, List<String>)> _probeServer(String server) async {
 /// 地址**永不落盘**（与 App 端同构）：`--server` 与引导手输都只本次生效，出厂默认值
 /// 每次启动重读。默认地址连不上时每次启动都会再问一次——那是"该去改 localConfig.json
 /// 或硬编码托底了"的警报，不该被 store 里的旧地址悄悄盖掉。
-Future<(DeviceStore, String, String)> _onboard(String storePath, String server) async {
-  var store = storePath.isNotEmpty && File(storePath).existsSync() ? DeviceStore.load(storePath) : null;
+Future<(EntranceStore, String, String)> _onboard(String storePath, String server) async {
+  var store = storePath.isNotEmpty && File(storePath).existsSync() ? EntranceStore.load(storePath) : null;
 
   // ① 服务器地址：--server 参数（仅本次生效）> 本机默认（cli/localConfig.json）> 硬编码
   if (server.isEmpty) {
     server = await _defaultServer();
   }
   // ② 健康探测：能连 → 直接用（不询问）；无法连接 → 引导输入新地址（仅本次生效）
-  // Multiverse：/health 不再返回全局 person 表（名称表保留为空，消息前缀用本地名字）
+  // Multiverse：/health 不再返回全局 partner 表（名称表保留为空，消息前缀用本地名字）
   final (probeOk, _, _) = await _probeServer(server);
   if (!probeOk) {
     stdout.writeln('❌ 无法连接服务器 $server（/health 探测失败）');
@@ -379,13 +379,13 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
 
   if (store == null) {
     // 设备 id 由服务端在登记时分配规范 id（dev1/dev2…），本地不预设（null，
-    // 与 personId 一致），无需用户输入
-    store = await DeviceStore.create();
+    // 与 partnerId 一致），无需用户输入
+    store = await EntranceStore.create();
     // 设备默认名与公私钥生成同步设置（宿主机名去 .local；可随时 /device 修改）——
     // store 为空即生成身份并命名，不拖到引导阶段（产品决定）
-    final autoName = _defaultDeviceName();
+    final autoName = _defaultEntranceName();
     if (autoName.isNotEmpty) {
-      store.deviceName = autoName;
+      store.entranceName = autoName;
     }
     // 自动模式（无 --store）→ 存默认目录 ~/.einz/myeinz.json（固定文件名，无临时名/重命名）
     if (storePath.isEmpty) {
@@ -403,9 +403,9 @@ Future<(DeviceStore, String, String)> _onboard(String storePath, String server) 
   // 混在一起——与"选择秘境入口"那段 _prompt 同一写法）。
   if (store.spaceId == null) {
     final welcome = <String>['=== Einz 秘境 ===', '✅ 当前服务器: $server'];
-    final deviceName = store.deviceName;
-    if (deviceName != null && deviceName.isNotEmpty) {
-      welcome.add('✅ 新设备默认名称: $deviceName');
+    final entranceName = store.entranceName;
+    if (entranceName != null && entranceName.isNotEmpty) {
+      welcome.add('✅ 新设备默认名称: $entranceName');
     }
     welcome.add('✅ 新设备公钥: ${store.publicKey}');
     welcome.add('----------------');
@@ -532,8 +532,8 @@ Future<void> _unlockPin(ChatSession session) async {
 Future<void> _runGuide(ChatSession session, String storePath, String server) async {
   final store = session.store;
 
-  // v2 已无「v1 全局 person 名称表」（/health 的 person_names 随 2efad8c 下线）——
-  // 原先据此做的 personA/personB 身份选择块是死代码（_probePersonNames 恒为空），
+  // v2 已无「v1 全局 partner 名称表」（/health 的 partner_names 随 2efad8c 下线）——
+  // 原先据此做的 partnerA/partnerB 身份选择块是死代码（_probePartnerNames 恒为空），
   // 已移除（老板 2026-09-15）。身份现在由 /space join 的 preflight slots 选择。
   store.save(storePath);
 
@@ -586,9 +586,9 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   }
 
   // 旧版 store（v1 时代留下：有 Space Key 但没有设备登记/空间绑定信息）不再走
-  // enroll——v1 的 /devices/enroll 已随 Multiverse 收敛下线，设备登记 + 空间会话
+  // enroll——v1 的 /entrances/enroll 已随 Multiverse 收敛下线，设备登记 + 空间会话
   // 一律由 /space create、/space join 一步完成（2026-09-15 P1）。
-  if (server.isNotEmpty && (store.deviceId == null || store.spaceId == null)) {
+  if (server.isNotEmpty && (store.entranceId == null || store.spaceId == null)) {
     session.messages.add(_systemMessage(
         session,
         '⚠️ 本机 store 缺少设备登记信息（旧版遗留）\n'
@@ -640,10 +640,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 
 
   // 已登记但口令密保箱未上传（创建者引导中断）：重启再进引导设置口令。
-  // （判据用 partnerSlot == 0 = 创建者/第一人；v1 时代的 personId == 'personA'
+  // （判据用 slot == 0 = 创建者/第一人；v1 时代的 partnerId == 'partnerA'
   //   在 v2 下恒不成立，会让这条恢复路径永不触发）
   // （running 检查：口令阶段 /exit 退出后不再进入——否则退出又被要求设置口令）
-  if (_state!.running && store.spaceId != null && store.partnerSlot == 0 && !store.escrowUploaded) {
+  if (_state!.running && store.spaceId != null && store.slot == 0 && !store.escrowUploaded) {
     // 先问服务端：本地没标记 ≠ 服务端没有箱。创建空间时密保箱是随 `POST /spaces`
     // 一并上传的（此前没记 escrowUploaded），老 store 重启后会走到这里 —— 直接再问
     // 一遍会让用户以为上次白设了（老板 2026-09-15 反馈）。查到箱就补标记并跳过。
@@ -672,7 +672,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       final code = e is ApiException ? e.code : '';
       // 只有"设备被明确撤销"才清盘退出（老板 2026-09-16；此前任何 403 都当撤销，
       // 后台库被重置时用户既丢了数据、也没法看本地历史）
-      if (code == 'DEVICE_REVOKED') {
+      if (code == 'ENTRANCE_REVOKED') {
         _exitRevoked(storePath); // 不返回
       }
       if (code == 'FORBIDDEN') {
@@ -700,26 +700,26 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
 /// **入网向导期间不 sync、不启 WS**（老板 2026-09-14）：否则对方消息会直接流进
 /// 消息流、插在向导的 system 消息之间。入网期间错过的消息由回车后的那次增量同步
 /// 一次性补齐。
-Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String storePath, String server) async {
+Future<void> _activateAfterBind(ChatSession session, EntranceStore store, String storePath, String server) async {
   // 已登记设备启动时把本地设备名称同步到后台（TUI 里改名后服务端 dev1 的
-  // deviceName 同步更新；首设备 enroll 已带上 deviceName，此处幂等覆盖）
-  final storedDeviceName = store.deviceName;
-  if (storedDeviceName != null && storedDeviceName.isNotEmpty) {
+  // entranceName 同步更新；首设备 enroll 已带上 entranceName，此处幂等覆盖）
+  final storedEntranceName = store.entranceName;
+  if (storedEntranceName != null && storedEntranceName.isNotEmpty) {
     // 存量名（本机自动取的宿主机名可能含空格等）按新规则消毒后再上传——否则
     // 服务端会拒收不合规字符，名字永远同步不上去
-    final fixed = sanitizeDeviceName(storedDeviceName);
-    if (fixed != storedDeviceName) {
-      store.deviceName = fixed;
+    final fixed = sanitizeEntranceName(storedEntranceName);
+    if (fixed != storedEntranceName) {
+      store.entranceName = fixed;
       store.save(storePath);
     }
   }
-  if (store.deviceId != null &&
+  if (store.entranceId != null &&
       store.spaceId != null &&
-      (store.deviceName?.isNotEmpty ?? false) &&
+      (store.entranceName?.isNotEmpty ?? false) &&
       store.sessionToken != null &&
       server.isNotEmpty) {
     try {
-      await ApiClient(server).updateDeviceName(store.deviceName!, store.sessionToken!);
+      await ApiClient(server).updateEntranceName(store.entranceName!, store.sessionToken!);
     } catch (e) {
       _state!.status = '设备名称同步失败（稍后重试）: $e';
     }
@@ -781,12 +781,12 @@ Future<void> _activateAfterBind(ChatSession session, DeviceStore store, String s
     await _askSetPin(session, storePath);
   }
 
-  // 认证后立即拉取 person 名称/性别表（向导刚结束时 token 才就绪——启动时
+  // 认证后立即拉取 partner 名称/性别表（向导刚结束时 token 才就绪——启动时
   // main 的刷新会因 token 未就绪失败静默；此处补齐——否则向导结束直接发消息
   // 时对方气泡按未知性别回退青绿——老板 2026-09-10 实测）
-  await _refreshPersonNames(_state!);
+  await _refreshPartnerNames(_state!);
   // 补登安装级设备标识（多空间：存量 store 不重走入网流程，启动时补一次；幂等）
-  await _registerDeviceUid(session, store, storePath, server);
+  await _registerInstallUid(session, store, storePath, server);
   // 拉一次回执水位：我发出消息的 delivered 状态（单勾→双勾）首屏即正确
   await session.refreshReceipts();
 
@@ -863,7 +863,7 @@ String _newCliSpaceId() {
 /// Multiverse：/space create 新建空间（POST /spaces——创建者登记 + session +
 /// 首个 join token 一并返回；Space Key 由客户端生成，口令加密 sealed 包随
 /// 创建提交，服务端只存密文）。
-Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePath) async {
+Future<void> _spaceCreate(ChatSession session, EntranceStore store, String storePath) async {
   final server = session.server;
   if (server.isEmpty) {
     session.messages.add(_systemMessage(session, '⚠️ 未配置服务器地址（引导时输入）'));
@@ -874,7 +874,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
         _systemMessage(session, '✅ 当前设备已绑定秘境（不重复创建）——/space address 查看'));
     return;
   }
-  var displayName = store.personName ?? '';
+  var displayName = store.partnerName ?? '';
   if (displayName.isEmpty) {
     // 我的名字必填（老板 2026-09-10：创建空间时我和对方的名字都必填，不允许空）
     while (true) {
@@ -882,14 +882,14 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
           (await _prompt(session, '❓ 我的名字（后期可改）:', required: true)).trim();
       if (!_state!.running) return;
       // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，最长 32
-      final violation = checkPersonNamePolicy(displayName);
-      if (violation == PersonNameViolation.empty) {
+      final violation = checkPartnerNamePolicy(displayName);
+      if (violation == PartnerNameViolation.empty) {
         session.messages.add(_systemMessage(session, '❌ 名字必填，请输入'));
         _scheduleRender();
         continue;
       }
       if (violation != null) {
-        session.messages.add(_systemMessage(session, _personNameRuleHint(violation)));
+        session.messages.add(_systemMessage(session, _partnerNameRuleHint(violation)));
         _scheduleRender();
         continue;
       }
@@ -922,51 +922,51 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
   }
   // 伴侣（第二人）名字/性别必填（老板 2026-09-10 定稿——create 录入两人身份，
   // join 时按身份选择而非自填名字）
-  String partnerName;
+  String peerName;
   while (true) {
-    partnerName = (await _prompt(session, '❓ 伴侣的名字（后期可改）:',
+    peerName = (await _prompt(session, '❓ 伴侣的名字（后期可改）:',
             required: true))
         .trim();
     if (!_state!.running) return;
-    if (partnerName.isEmpty) {
+    if (peerName.isEmpty) {
       session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
       _scheduleRender();
       continue;
     }
     // 用户名称白名单（同"我的名字"）：不合规提示重输
-    final partnerViolation = checkPersonNamePolicy(partnerName);
-    if (partnerViolation != null) {
-      session.messages.add(_systemMessage(session, _personNameRuleHint(partnerViolation)));
+    final nameViolation = checkPartnerNamePolicy(peerName);
+    if (nameViolation != null) {
+      session.messages.add(_systemMessage(session, _partnerNameRuleHint(nameViolation)));
       _scheduleRender();
       continue;
     }
     // 不允许和第一人同名（老板 2026-09-10）
-    if (partnerName == displayName) {
+    if (peerName == displayName) {
       session.messages.add(
           _systemMessage(session, '⚠️ 伴侣名字不能与我的名字相同（$displayName），请重新输入'));
       _scheduleRender();
       continue;
     }
-    session.messages.add(_systemMessage(session, '✅ ${partnerName}'));
+    session.messages.add(_systemMessage(session, '✅ ${peerName}'));
     session.messages.add(_systemMessage(session, '----------------'));
     break;
   }
-  String partnerGender;
+  String peerGender;
   // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
   while (true) {
-    partnerGender = (await _prompt(session, '❓ 伴侣的性别是\n  1: 男\n  2: 女',
+    peerGender = (await _prompt(session, '❓ 伴侣的性别是\n  1: 男\n  2: 女',
             required: true))
         .trim();
     if (!_state!.running) return;
-    if (partnerGender == '1') {
-      partnerGender = '男';
-      session.messages.add(_systemMessage(session, '✅ ${partnerGender}'));
+    if (peerGender == '1') {
+      peerGender = '男';
+      session.messages.add(_systemMessage(session, '✅ ${peerGender}'));
       session.messages.add(_systemMessage(session, '----------------'));
       break;
     }
-    if (partnerGender == '2') {
-      partnerGender = '女';
-      session.messages.add(_systemMessage(session, '✅ ${partnerGender}'));
+    if (peerGender == '2') {
+      peerGender = '女';
+      session.messages.add(_systemMessage(session, '✅ ${peerGender}'));
       session.messages.add(_systemMessage(session, '----------------'));
       break;
     }
@@ -1006,32 +1006,32 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
     session.messages.add(_systemMessage(session, '----------------'));
     final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
       spaceId: spaceId,
-      personName: displayName,
-      gender: _genderCode(myGender), // 中文 → male/female（与 enroll 一致——老板 2026-09-10）
-      partnerName: partnerName,
-      partnerGender: _genderCode(partnerGender),
+      creatorName: displayName,
+      creatorGender: _genderCode(myGender), // 中文 → male/female（与 enroll 一致——老板 2026-09-10）
+      peerName: peerName,
+      peerGender: _genderCode(peerGender),
       sealedSpaceKey: sealed,
       escrowPassphrase: passphrase,
       publicKey: store.publicKey,
-      deviceName: store.deviceName,
+      entranceName: store.entranceName,
       // 安装级设备标识（多空间：服务端据此认出同一台物理设备的多行）
-      deviceUid: store.ensureDeviceUid(),
+      installUid: store.ensureInstallUid(),
     ));
     store.spaceId = created.spaceId;
     store.spaceAddress = created.spaceAddress;
     store.spaceKey = spaceKeyB64;
     store.sessionToken = created.sessionToken;
-    store.deviceId = created.deviceId;
-    store.personId = created.creatorPersonId;
-    store.partnerSlot = 0; // 创建者 = 第一人（v2 身份槽位；替代 v1 的 personA 判据）
+    store.entranceId = created.entranceId;
+    store.partnerId = created.creatorPartnerId;
+    store.slot = 0; // 创建者 = 第一人（v2 身份槽位；替代 v1 的 partnerA 判据）
     // 密保箱已随本次 POST /spaces 上传（sealed/escrowPassphrase 成对提交，口令非空才走到这）
     // → 标记托管就绪。漏了这行的话，下次启动会被判成"尚未设置共享口令"再问一遍
     // （老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
-    store.personName = displayName;
-    // 伴侣名字落盘：对方尚未加入时 GET /space 的 person 表里没有他（person_id 未
+    store.partnerName = displayName;
+    // 伴侣名字落盘：对方尚未加入时 GET /space 的 partner 表里没有他（partner_id 未
     // 由加入者生成），顶部条左段靠这条兜底显示名字（否则刚创建后一直是 '-'）
-    store.peerName = partnerName;
+    store.peerName = peerName;
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
     // session.messages.add(_systemMessage(session, '📎 邀请新设备（24 小时有效、仅可用一次）：\n ${created.link}\n🛡️  ${created.joinToken}''));
@@ -1052,7 +1052,7 @@ Future<void> _spaceCreate(ChatSession session, DeviceStore store, String storePa
 
 /// Multiverse：/space join <链接或 token> 加入已有空间（preflight 校验 →
 /// join 设备登记 + 签发绑定 Space 的 session → 口令 escrow 取 Space Key）。
-Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath, String input) async {
+Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePath, String input) async {
   final server = session.server;
   if (server.isEmpty) {
     session.messages.add(_systemMessage(session, '⚠️ 未配置服务器地址（引导时输入）'));
@@ -1161,25 +1161,25 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
     final join = await _busy(session, '⏳ 正在加入秘境...', () => api.joinSpace(
       token: token,
       publicKey: store.publicKey,
-      partnerSlot: chosenSlot,
-      deviceName: store.deviceName,
+      slot: chosenSlot,
+      entranceName: store.entranceName,
       // 安装级设备标识（多空间：服务端据此认出同一台物理设备的多行）
-      deviceUid: store.ensureDeviceUid(),
+      installUid: store.ensureInstallUid(),
     ));
     store.spaceId = join.spaceId;
     store.spaceAddress = join.spaceAddress;
     store.spaceKey = payload.spaceKeyB64;
     store.sessionToken = join.sessionToken;
-    store.deviceId = join.deviceId;
-    store.personId = join.personId;
-    store.partnerSlot = join.partnerSlot; // v2 身份槽位（0=第一人，1=第二人）
+    store.entranceId = join.entranceId;
+    store.partnerId = join.partnerId;
+    store.slot = join.slot; // v2 身份槽位（0=第一人，1=第二人）
     // 密保箱本来就存在（刚才正是靠口令从它取回 Space Key）→ 标记托管就绪。
     // 漏了这行：若加入者选的是 slot=0（同一人的另一台设备），重启后会被判成
     // "尚未设置共享口令"再问一遍（老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
-    store.personName = myName ?? '成员';
+    store.partnerName = myName ?? '成员';
     // 对方名字落盘：取另一身份槽位的预置名（create 录入的两人身份）。我选了
-    // slot=0（同第一人的另一台设备）而第二人还没加入时，GET /space 的 person 表里
+    // slot=0（同第一人的另一台设备）而第二人还没加入时，GET /space 的 partner 表里
     // 没有他 → 顶部条左段靠这条兜底显示名字，而不是 '-'
     for (final slot in slots) {
       if (slot.slot != chosenSlot && slot.displayName != null) {
@@ -1267,7 +1267,7 @@ Future<void> main(List<String> args) async {
 
   // 启动自检：**只有服务端明确撤销本设备**才不进 TUI（清盘 + 提示 + 退出）。
   // 会话被清（/revoke 会 DELETE 该设备的 sessions）→ 清 token 走挑战重认证；挑战返回
-  // 403 DEVICE_REVOKED 同样清盘退出、FORBIDDEN（库被重置/未登记）只警告继续（见 _runGuide）。
+  // 403 ENTRANCE_REVOKED 同样清盘退出、FORBIDDEN（库被重置/未登记）只警告继续（见 _runGuide）。
   final probe = await _probeRevoked(store, server);
   if (probe == 1) {
     _exitRevoked(storePath); // 不返回
@@ -1282,10 +1282,10 @@ Future<void> main(List<String> args) async {
   }
 
   final session = ChatSession(store, storePath, server);
-  // 运行期任何一次认证拿到 403 DEVICE_REVOKED（会话过期自动续期 / /auth / 切换服务器）
+  // 运行期任何一次认证拿到 403 ENTRANCE_REVOKED（会话过期自动续期 / /auth / 切换服务器）
   // → 立即清盘退出：撤销语义在"所有已开通的通道"上一致（老板 2026-09-16）。
   // FORBIDDEN（库被重置/未登记）不会走这里，只在消息流里警告。
-  session.onDeviceRevoked = () => _exitRevoked(storePath);
+  session.onEntranceRevoked = () => _exitRevoked(storePath);
   // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
   // _state 赋值之后（否则 Null check 崩溃——2026-09-08 老板实测）
   _state = _TuiState(session, storePath);
@@ -1308,10 +1308,10 @@ Future<void> main(List<String> args) async {
   _checkEscrowRotated(session); // 上线补查：离线期间口令被重设则系统消息通知
   // 成员名称/性别表：优先用上次 GET /space 落盘的本地缓存——服务器离线启动时
   // 仍能显示正确名字、气泡仍按性别配色（否则全部回退"对方"/青绿——老板 2026-09-13）。
-  _state!.personNames = Map.of(store.personNames);
-  _state!.personGenders = Map.of(store.personGenders);
-  _state!.personSlots = Map.of(store.personSlots);
-  _refreshPersonNames(_state!); // 认证后刷新（保持最新，并回写缓存）
+  _state!.partnerNames = Map.of(store.partnerNames);
+  _state!.partnerGenders = Map.of(store.partnerGenders);
+  _state!.partnerSlots = Map.of(store.partnerSlots);
+  _refreshPartnerNames(_state!); // 认证后刷新（保持最新，并回写缓存）
 
   // 引导任务（登记/接入/口令问答——消息流交互：system 提示 + you> 输入 + 机密 *）
   // 与输入循环并发启动；引导完成后的启动同步与 WS 由 _runGuide 负责。
@@ -1402,7 +1402,7 @@ void _deleteLocalData(String storePath) {
   } catch (_) {}
 }
 
-/// 设备被**明确撤销**（认证 403 `DEVICE_REVOKED` / 在线 WS 广播 device.revoked）→
+/// 设备被**明确撤销**（认证 403 `ENTRANCE_REVOKED` / 在线 WS 广播 entrance.revoked）→
 /// 同步销毁本地数据、恢复终端、提示后立即退出。
 ///
 /// 删本地数据的路径只有两条：这一条（被对方用口令撤销后的自毁）与 `/reset`
@@ -1671,10 +1671,10 @@ void _render() {
   // 对方消息在左、我的消息在右）、品牌名 "Einz TUI" 居中。
   // 三段各占全宽 1/3 上限、互不挤压，超宽的一段自己截断（含品牌名）；
   // 因此每段都是"尾部先丢"——两侧的灯与名字在前，设备名在后最先被截。
-  final peerDevices = _peerDeviceLabel(s);
+  final peerEntrances = _peerEntranceLabel(s);
   final titleText = _titleBarThree(
     '$peerDot $peerName'
-        '${_deviceCountLabel(s.peerDeviceOnline, s.peerDeviceTotal)}$peerDevices',
+        '${_entranceCountLabel(s.peerEntranceOnline, s.peerEntranceTotal)}$peerEntrances',
     // 品牌名 bold 展示后必须关闭粗体（ESC[22m）再继续——否则 bold 状态泄漏到
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
@@ -1682,10 +1682,10 @@ void _render() {
     // 右段（我）：`灯 名字 @本机名 #n/m#其它在线设备…`（老板 2026-09-16）——
     // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
     // 后面的 #n/m 与设备列表**扣除本机**，两者严格一一对应。
-    '$myDot ${_personLabel(s.session.store, s.personNames)}'
-        '${_myDeviceTag(s)}'
-        '${_deviceCountLabel(s.myOtherOnlineSince.length, s.myOtherDeviceTotal)}'
-        '${_myOtherDevicesLabel(s)}',
+    '$myDot ${_partnerLabel(s.session.store, s.partnerNames)}'
+        '${_myEntranceTag(s)}'
+        '${_entranceCountLabel(s.myOtherOnlineSince.length, s.myOtherEntranceTotal)}'
+        '${_myOtherEntrancesLabel(s)}',
     cols,
   );
   buf.write(titleText);
@@ -1782,14 +1782,14 @@ void _render() {
   }
 }
 
-/// 状态条我的显示名（远程名称表优先——同 person 多设备同步显示最新名字；
+/// 状态条我的显示名（远程名称表优先——同 partner 多设备同步显示最新名字；
 /// 未拉取/未知回退本地 store，再回退规范 id）。
 /// 返回纯文本（不含颜色），由调用方（标题栏）统一着色。
-String _personLabel(DeviceStore store, Map<String, String> personNames) {
-  final pid = store.personId;
-  return (pid != null ? personNames[pid] : null) ??
-      store.personName ??
-      store.personId ??
+String _partnerLabel(EntranceStore store, Map<String, String> partnerNames) {
+  final pid = store.partnerId;
+  return (pid != null ? partnerNames[pid] : null) ??
+      store.partnerName ??
+      store.partnerId ??
       '-';
 }
 
@@ -1801,23 +1801,23 @@ List<String> _byOnlineOrder(Map<String, int> sinceById) {
   return [for (final e in entries) e.key];
 }
 
-/// 对方显示名：personNames 里非我的一项 → store.peerName（create 预置的伴侣名 /
+/// 对方显示名：partnerNames 里非我的一项 → store.peerName（create 预置的伴侣名 /
 /// join 时另一身份槽位的名字）→ '-'。
-/// 本设备身份未确认（新设备引导中/未登记，personId 为空）时对方是谁不确定——
-/// 不猜测名称表第一项（此前会把 personA 的名字当成对方展示，引导中左右两侧
+/// 本设备身份未确认（新设备引导中/未登记，partnerId 为空）时对方是谁不确定——
+/// 不猜测名称表第一项（此前会把 partnerA 的名字当成对方展示，引导中左右两侧
 /// 甚至显示同一个人——老板实测反馈），显示中性占位「?」（老板要求，不写"对方"）。
 String _peerNameOf(_TuiState s) {
-  final myPid = s.session.store.personId;
+  final myPid = s.session.store.partnerId;
   if (myPid == null) {
     return '?';
   }
-  // v2：对方 = personNames 里非我的 personId（空间两人——多设备同身份共享同一
-  // personId；不再用 v1 的 personA/personB 假 id 查询——老板 2026-09-10 反馈
+  // v2：对方 = partnerNames 里非我的 partnerId（空间两人——多设备同身份共享同一
+  // partnerId；不再用 v1 的 partnerA/partnerB 假 id 查询——老板 2026-09-10 反馈
   // 一直显示 '-'）
-  for (final entry in s.personNames.entries) {
+  for (final entry in s.partnerNames.entries) {
     if (entry.key != myPid) return entry.value;
   }
-  // 对方还没加入：空间里没有他的 person_id → GET /space 的 person 表里没有他，
+  // 对方还没加入：空间里没有他的 partner_id → GET /space 的 partner 表里没有他，
   // 回落到创建/加入时已知的名字（老板 2026-09-16：刚创建就进聊天窗口时要显示
   // 对方名字，而不是 '-'）
   final preset = s.session.store.peerName;
@@ -1831,7 +1831,7 @@ String _peerNameOf(_TuiState s) {
 /// 一眼看出这一段是设备信息而非人名。
 /// totalCount ≤ 0（没有这类设备，如我的其它设备为 0 台）时整段省略——本机那台由
 /// `@设备名` 表示，不参与这对数字（老板 2026-09-16）。
-String _deviceCountLabel(int onlineCount, int totalCount) {
+String _entranceCountLabel(int onlineCount, int totalCount) {
   if (totalCount <= 0) return '';
   return ' #$onlineCount/$totalCount';
 }
@@ -1840,23 +1840,23 @@ String _deviceCountLabel(int onlineCount, int totalCount) {
 /// （最新上线的紧挨名字，最早上线的在最右 = 最先被截断丢弃）。
 /// 刻意不按"最近一条消息发自哪台"（老板 2026-09-16）：多设备时应展示谁在线、
 /// 谁刚上线，而不是最后发言的那台（它可能早已离线）。
-/// 名字取 listDevices 的 device_name，未知名回退 device_id；无在线设备时空串。
-String _peerDeviceLabel(_TuiState s) {
+/// 名字取 listEntrances 的 entrance_name，未知名回退 entrance_id；无在线设备时空串。
+String _peerEntranceLabel(_TuiState s) {
   final buf = StringBuffer();
   for (final id in _byOnlineOrder(s.peerOnlineSince)) {
-    buf.write('#${s.deviceNames[id] ?? id}');
+    buf.write('#${s.entranceNames[id] ?? id}');
   }
   return buf.toString();
 }
 
 /// 我的在线设备片段：`#A#B#C`——**其它**在线设备，按上线时刻降序（与左段同构）。
-/// **不含本机**：本机由 `_myDeviceTag` 的 `@设备名` 单独表示，故本表数量与
+/// **不含本机**：本机由 `_myEntranceTag` 的 `@设备名` 单独表示，故本表数量与
 /// `#n/m` 的 n 一致。
-/// 名字取 listDevices 的 device_name，未知名回退 device_id；无其它在线设备时空串。
-String _myOtherDevicesLabel(_TuiState s) {
+/// 名字取 listEntrances 的 entrance_name，未知名回退 entrance_id；无其它在线设备时空串。
+String _myOtherEntrancesLabel(_TuiState s) {
   final buf = StringBuffer();
   for (final id in _byOnlineOrder(s.myOtherOnlineSince)) {
-    buf.write('#${s.deviceNames[id] ?? id}');
+    buf.write('#${s.entranceNames[id] ?? id}');
   }
   return buf.toString();
 }
@@ -1864,12 +1864,12 @@ String _myOtherDevicesLabel(_TuiState s) {
 /// 右段本机标识：` @设备名`——把"我此刻在哪台"从设备列表里**独立**出来
 /// （老板 2026-09-16）：本机可能在线也可能离线，但总要说清我坐在哪台机器前，
 /// 且它不该混进后面的 `#n/m` 与在线设备列表里（否则本机离线时计数与列表对不上）。
-/// 名字优先取 /devices 的 device_name，缺失回退本地 store；未登记显示 `@-`。
-String _myDeviceTag(_TuiState s) {
+/// 名字优先取 /entrances 的 entrance_name，缺失回退本地 store；未登记显示 `@-`。
+String _myEntranceTag(_TuiState s) {
   final store = s.session.store;
-  final myId = store.deviceId;
-  final myName = (myId != null ? s.deviceNames[myId] : null) ??
-      store.deviceName ??
+  final myId = store.entranceId;
+  final myName = (myId != null ? s.entranceNames[myId] : null) ??
+      store.entranceName ??
       myId ??
       '-';
   return ' @$myName';
@@ -1877,9 +1877,9 @@ String _myDeviceTag(_TuiState s) {
 
 /// 设备上下线时刻（毫秒 epoch）→ 本地时间文本：今天 HH:mm / 昨天 HH:mm / M/d HH:mm。
 ///
-/// **只给人一眼看**：跨时区核对另有 UTC（见 `_fmtDeviceTimeUtc`）——老板 2026-09-17
+/// **只给人一眼看**：跨时区核对另有 UTC（见 `_fmtEntranceTimeUtc`）——老板 2026-09-17
 /// 要求两个都在：本地时间直观，UTC 用来保证中美两台机器看到的能互相对上。
-String _fmtDeviceTimeLocal(int ms) {
+String _fmtEntranceTimeLocal(int ms) {
   final t = DateTime.fromMillisecondsSinceEpoch(ms);
   final now = DateTime.now();
   final hhmm =
@@ -1894,21 +1894,21 @@ String _fmtDeviceTimeLocal(int ms) {
 ///
 /// 不带分隔符是老板 2026-09-17 定的：秒级精度足够，去掉分隔符后宽度小，设备列表
 /// 一行里塞得下；末尾 `Z` 明说是 UTC。
-String _fmtDeviceTimeUtc(int ms) {
+String _fmtEntranceTimeUtc(int ms) {
   final t = DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
   String two(int v) => v.toString().padLeft(2, '0');
   return '${t.year.toString().padLeft(4, '0')}${two(t.month)}${two(t.day)}'
       'T${two(t.hour)}${two(t.minute)}${two(t.second)}Z';
 }
 
-/// 同空间设备列表的一行（`/devices` 与 `/revoke` **共用同一份编号**——两个命令看到的
+/// 同空间设备列表的一行（`/entrances` 与 `/revoke` **共用同一份编号**——两个命令看到的
 /// 序号必须一致，所以不可撤销的本机、已被撤销的设备也照常占号，由 `/revoke` 拒绝）。
-class _DeviceRow {
-  _DeviceRow({
+class _EntranceRow {
+  _EntranceRow({
     required this.no,
-    required this.deviceId,
+    required this.entranceId,
     required this.label,
-    required this.personName,
+    required this.partnerName,
     required this.online,
     required this.tag,
     required this.when,
@@ -1916,42 +1916,42 @@ class _DeviceRow {
     required this.revoked,
   });
 
-  final int no; // 1 基序号（与 /devices 输出一致；/revoke 按它选设备）
-  final String deviceId;
-  final String label; // 设备名（缺失回退 device_id）
-  final String personName; // 使用者名字（缺失回退 person_id）
+  final int no; // 1 基序号（与 /entrances 输出一致；/revoke 按它选设备）
+  final String entranceId;
+  final String label; // 设备名（缺失回退 entrance_id）
+  final String partnerName; // 使用者名字（缺失回退 partner_id）
   final bool online;
   final String tag; // 本机 / 已撤销 / 在线 / 离线
   final String when; // since 上线时刻（在线）/ since 最后活跃时刻（离线，≈下线时刻）
   final bool isMe;
   final bool revoked;
 
-  /// 列表行文本（/devices 与 /revoke 的列表、确认提示共用，保证逐字一致）。
-  String get line => '\n  $no) ${online ? '🟢' : '⚪'} $label [$personName] $tag$when';
+  /// 列表行文本（/entrances 与 /revoke 的列表、确认提示共用，保证逐字一致）。
+  String get line => '\n  $no) ${online ? '🟢' : '⚪'} $label [$partnerName] $tag$when';
 }
 
 /// 拉取**同空间全部设备**（我 + 对方，不只是自己的设备）并格式化为带序号的行。
 ///
 /// 在线判定与顶部条同源：本机以本地 WS 状态为准；其余看 `connected_at`（旧服务端无该
 /// 字段时退回 last_seen<60s）。已被撤销的设备（`status != 'active'`）也列出来并标注
-/// ——服务端 /devices 不过滤状态，藏着不显示反而会让人以为"设备凭空消失了"。
+/// ——服务端 /entrances 不过滤状态，藏着不显示反而会让人以为"设备凭空消失了"。
 /// 网络/会话异常原样抛出，由调用方提示。
-Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
+Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
   final server = s.session.server;
   final token = s.session.store.sessionToken;
   if (server.isEmpty || token == null) {
     throw StateError('未连接（缺少 server/token）');
   }
-  final devices = await ApiClient(server).listDevices(token);
-  final myId = s.session.store.deviceId;
+  final entrances = await ApiClient(server).listEntrances(token);
+  final myId = s.session.store.entranceId;
   final now = DateTime.now().millisecondsSinceEpoch;
   final myWsOnline = s.session.wsStatus == WsStatus.connected;
-  final rows = <_DeviceRow>[];
+  final rows = <_EntranceRow>[];
   var no = 0;
-  for (final d in devices) {
-    final devId = (d['device_id'] ?? '-') as String;
-    final devName = (d['device_name'] as String? ?? '');
-    final person = (d['person_id'] ?? '-') as String;
+  for (final d in entrances) {
+    final devId = (d['entrance_id'] ?? '-') as String;
+    final devName = (d['entrance_name'] as String? ?? '');
+    final partner = (d['partner_id'] ?? '-') as String;
     final last = d['last_seen'];
     final connectedAt = d['connected_at'];
     final revoked = d['status'] != null && d['status'] != 'active';
@@ -1983,13 +1983,13 @@ Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
       stamp = 0;
     }
     final when = stamp > 0
-        ? ' since ${_fmtDeviceTimeLocal(stamp)} (${_fmtDeviceTimeUtc(stamp)})'
+        ? ' since ${_fmtEntranceTimeLocal(stamp)} (${_fmtEntranceTimeUtc(stamp)})'
         : '';
-    rows.add(_DeviceRow(
+    rows.add(_EntranceRow(
       no: ++no,
-      deviceId: devId,
+      entranceId: devId,
       label: devName.isNotEmpty ? devName : devId,
-      personName: s.personNames[person] ?? person,
+      partnerName: s.partnerNames[partner] ?? partner,
       online: online,
       tag: isMe ? '本机' : (revoked ? '已撤销' : (online ? '在线' : '离线')),
       when: when,
@@ -2000,16 +2000,16 @@ Future<List<_DeviceRow>> _fetchDeviceRows(_TuiState s) async {
   return rows;
 }
 
-/// 按序号（1 基，与 /devices 一致）/ 设备名 / device_id 匹配设备行。
+/// 按序号（1 基，与 /entrances 一致）/ 设备名 / entrance_id 匹配设备行。
 /// 返回全部匹配项（调用方区分"没匹配"与"同名多台"——后者不能猜，必须让用户用序号）。
-List<_DeviceRow> _matchDeviceRows(List<_DeviceRow> rows, String input) {
+List<_EntranceRow> _matchEntranceRows(List<_EntranceRow> rows, String input) {
   final key = input.trim();
   if (key.isEmpty) return const [];
   final no = int.tryParse(key);
   if (no != null) {
     return [for (final r in rows) if (r.no == no) r];
   }
-  return [for (final r in rows) if (r.deviceId == key || r.label == key) r];
+  return [for (final r in rows) if (r.entranceId == key || r.label == key) r];
 }
 
 /// 撤销失败的按码提示（PROTOCOL.md §7.2 的失败码）。**每次都要说清"目标设备未受影响"**
@@ -2031,27 +2031,27 @@ String _revokeErrorHint(ApiException e) => switch (e.code) {
 void _onProfileUpdated(WsProfileUpdatedEvent e) {
   final s = _state;
   if (s == null) return;
-  if (e.personId != null && e.personName != null && e.personName!.isNotEmpty) {
-    s.personNames[e.personId!] = e.personName!;
+  if (e.partnerId != null && e.partnerName != null && e.partnerName!.isNotEmpty) {
+    s.partnerNames[e.partnerId!] = e.partnerName!;
     // 回写本地缓存：离线启动时仍显示改名后的名字
-    s.session.store.personNames = Map.of(s.personNames);
+    s.session.store.partnerNames = Map.of(s.partnerNames);
     // 对方改名 → 同步预置名快照：/myname 的同名判据与顶部条兜底都用它，不跟上的话
     // 旧名字会一直卡在判据里（明明已没人叫那个名字，却仍不许我用）。与 App 的
     // _onProfileUpdated 同向（它用广播里的新名字覆盖 _peerName）。
-    if (e.personId != s.session.store.personId) {
-      s.session.store.peerName = e.personName;
+    if (e.partnerId != s.session.store.partnerId) {
+      s.session.store.peerName = e.partnerName;
     }
     s.session.store.save(s.session.storePath);
   }
-  if (e.deviceName != null && e.deviceName!.isNotEmpty) {
-    s.deviceNames[e.deviceId] = e.deviceName!;
+  if (e.entranceName != null && e.entranceName!.isNotEmpty) {
+    s.entranceNames[e.entranceId] = e.entranceName!;
   }
   _scheduleRender();
 }
 
-/// 在线期间收到 device.revoked（被 /revoke 撤销）→ 立刻回命令行：
+/// 在线期间收到 entrance.revoked（被 /revoke 撤销）→ 立刻回命令行：
 /// 恢复终端、提示"本设备已被撤销。"后退出。
-void _onWsRevoked(WsDeviceRevokedEvent event) {
+void _onWsRevoked(WsEntranceRevokedEvent event) {
   final s = _state;
   if (s == null) return;
   _exitRevoked(s.session.storePath);
@@ -2072,26 +2072,26 @@ void _onPeerStatus(WsPeerStatusEvent event) {
   final s = _state;
   if (s == null) return;
   // 与我同身份的设备（我自己的另一台）上下线不算"对方"——新服务端已不推这类
-  // 广播，这里兜住旧服务端（旧 payload 无 person_id 时按原行为处理）
-  if (event.personId != null && event.personId == s.session.store.personId) return;
+  // 广播，这里兜住旧服务端（旧 payload 无 partner_id 时按原行为处理）
+  if (event.partnerId != null && event.partnerId == s.session.store.partnerId) return;
   final online = event.type == kWsTypePeerOnline;
   if (online != s.peerOnline) {
     s.peerOnline = online;
     _render();
-    // 对方上线（join 后新成员在线）→ 立即刷新 person 名称/性别表：第二人的
-    // 性别创建时就已写入 space_members（slot 预置），join 后 person_id 落位，
+    // 对方上线（join 后新成员在线）→ 立即刷新 partner 名称/性别表：第二人的
+    // 性别创建时就已写入 space_members（slot 预置），join 后 partner_id 落位，
     // getSpace 即可返回——不必等收到第一条消息才按需刷新
     // （老板 2026-09-10："第二人的性别创建时就设置，应该第一个消息之前就知道"）
     if (online) {
-      _refreshPersonNames(s);
+      _refreshPartnerNames(s);
     }
   }
-  // 广播只带 device_id（+上线时刻），设备名/总数仍来自 /devices——立刻重拉一次，
+  // 广播只带 entrance_id（+上线时刻），设备名/总数仍来自 /entrances——立刻重拉一次，
   // 否则新上线的设备名要等 30s 轮询才出现在顶部条（老板 2026-09-16）
   _refreshPeerOnline();
 }
 
-/// 查询对方在线状态（listDevices last_seen<60s——同 App 判定），更新顶部条。
+/// 查询对方在线状态（listEntrances last_seen<60s——同 App 判定），更新顶部条。
 Future<void> _refreshPeerOnline() async {
   final s = _state;
   if (s == null) return;
@@ -2099,43 +2099,43 @@ Future<void> _refreshPeerOnline() async {
   final token = s.session.store.sessionToken;
   if (server.isEmpty || token == null) return;
   try {
-    final devices = await ApiClient(server).listDevices(token);
+    final entrances = await ApiClient(server).listEntrances(token);
     final now = DateTime.now().millisecondsSinceEpoch;
-    final myId = s.session.store.deviceId;
-    final myPid = s.session.store.personId;
+    final myId = s.session.store.entranceId;
+    final myPid = s.session.store.partnerId;
     // 本机是否在线取本地 WS 状态（首屏轮询常早于 WS 建连，此时服务端 connected_at
     // 还是 null —— 否则刚启动会先显示"0/2台在线"再跳成 1/2）
     final myWsOnline = s.session.wsStatus == WsStatus.connected;
     // 设备在线 = 有实时 WS 连接（connected_at 非 null）；旧服务器无该字段时退回
     // last_seen<60s（last_seen 会被轮询 touchLastSeen 持续刷新，不代表实时连接）
-    bool deviceOnline(Map d) {
+    bool entranceOnline(Map d) {
       // 本机一律以本地 WS 状态为准，**不回退服务端**：服务端要等心跳超时（最多 30s）
       // 才把本机判离线，那段时间会出现"本机灯已红/↻、而 #n/m 仍把自己算作在线"的
       // 自相矛盾（老板 2026-09-16）。
-      if (d['device_id'] == myId) return myWsOnline;
+      if (d['entrance_id'] == myId) return myWsOnline;
       if (d.containsKey('connected_at')) return d['connected_at'] != null;
       final last = d['last_seen'];
       if (last is! num) return false;
       return now - last < 60 * 1000;
     }
     // 顺带维护设备名映射、对方在线设备（顶部条对方 #设备名）与双方设备计数。
-    // 关键：在线是"人"维度的——同一 person 的其它设备是我自己的设备，不能点亮
-    // 对方（此前只按 device_id != 自己 判定 → 我的第二台设备一上线，尚未加入的
+    // 关键：在线是"人"维度的——同一 partner 的其它设备是我自己的设备，不能点亮
+    // 对方（此前只按 entrance_id != 自己 判定 → 我的第二台设备一上线，尚未加入的
     // 对方 B 就显示绿灯——老板 2026-09-16 实测）。
-    s.deviceNames.clear();
+    s.entranceNames.clear();
     int myOtherTotal = 0; // 我的其它设备总数（不含本机——它由 @设备名 表示）
     int peerTotal = 0;
     int peerOnline = 0;
     final peerSince = <String, int>{}; // 在线对方设备 → 上线时刻（降序展示）
     // 在线我方**其它**设备 → 上线时刻（降序展示；不含本机）
     final myOtherSince = <String, int>{};
-    for (final d in devices) {
+    for (final d in entrances) {
       if (d['status'] != null && d['status'] != 'active') continue; // 已撤销不计
-      final devId = (d['device_id'] as String?) ?? '';
-      final devName = (d['device_name'] as String?) ?? '';
-      if (devId.isNotEmpty && devName.isNotEmpty) s.deviceNames[devId] = devName;
-      final pid = d['person_id'] as String?;
-      final isOnline = deviceOnline(d);
+      final devId = (d['entrance_id'] as String?) ?? '';
+      final devName = (d['entrance_name'] as String?) ?? '';
+      if (devId.isNotEmpty && devName.isNotEmpty) s.entranceNames[devId] = devName;
+      final pid = d['partner_id'] as String?;
+      final isOnline = entranceOnline(d);
       // 上线时刻：online_since（进入在线态，重连不刷新）→ 退回 connected_at → 0
       final since = (d['online_since'] as num?)?.toInt() ??
           (d['connected_at'] as num?)?.toInt() ??
@@ -2163,19 +2163,19 @@ Future<void> _refreshPeerOnline() async {
     }
     final online = peerOnline > 0;
     // 设备集合变化也要重绘：A 下 B 上（在线数不变）时顶部条应换成 B 的名字
-    final devicesChanged = peerSince.length != s.peerOnlineSince.length ||
+    final entrancesChanged = peerSince.length != s.peerOnlineSince.length ||
         peerSince.entries.any((e) => s.peerOnlineSince[e.key] != e.value) ||
         myOtherSince.length != s.myOtherOnlineSince.length ||
         myOtherSince.entries.any((e) => s.myOtherOnlineSince[e.key] != e.value);
     final changed = online != s.peerOnline ||
-        myOtherTotal != s.myOtherDeviceTotal ||
-        peerOnline != s.peerDeviceOnline ||
-        peerTotal != s.peerDeviceTotal ||
-        devicesChanged;
+        myOtherTotal != s.myOtherEntranceTotal ||
+        peerOnline != s.peerEntranceOnline ||
+        peerTotal != s.peerEntranceTotal ||
+        entrancesChanged;
     s.peerOnline = online;
-    s.myOtherDeviceTotal = myOtherTotal;
-    s.peerDeviceOnline = peerOnline;
-    s.peerDeviceTotal = peerTotal;
+    s.myOtherEntranceTotal = myOtherTotal;
+    s.peerEntranceOnline = peerOnline;
+    s.peerEntranceTotal = peerTotal;
     s.peerOnlineSince
       ..clear()
       ..addAll(peerSince);
@@ -2328,8 +2328,8 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
     // 两人同性别时第二个人取亮青——2026-09-17 老板要求），
     // [时间] 黑字标签嵌在气泡左缘（首行，长消息标签跟首行文字走）、正文白字；
     // 气泡矩形 col 1 → cols - rightPad，与右侧我方气泡（col 9 → cols）左右对称
-    final bubbleBackground = _sameGenderSecondCyan(m.env.senderPersonId) ??
-        _genderBubble(_state?.personGenders[m.env.senderPersonId]);
+    final bubbleBackground = _sameGenderSecondCyan(m.env.senderPartnerId) ??
+        _genderBubble(_state?.partnerGenders[m.env.senderPartnerId]);
     final label = '[$time]';
     final labelW = _displayWidth(label);
     final lane = labelW + 1; // 气泡内左侧标签栏宽（含标签后一个空格）
@@ -2359,8 +2359,8 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
   // 标签贴最右），背景按我的性别配色——男蓝、女品红、性别未知（旧空间未登记/尚未拉取）
   // 青绿底；两人同性别时第二个人（我）取亮青（2026-09-17 老板要求）；前导留白不上色。
   // 兼容服务端两种取值：App 提交规范 male/female，旧 TUI 提交过中文 男/女。
-  final rawGender = _state?.personGenders[m.env.senderPersonId];
-  final String partnerBackground = _sameGenderSecondCyan(m.env.senderPersonId) ??
+  final rawGender = _state?.partnerGenders[m.env.senderPartnerId];
+  final String peerBackground = _sameGenderSecondCyan(m.env.senderPartnerId) ??
       (rawGender == 'male' || rawGender == '男'
           ? _bgBlue
           : rawGender == 'female' || rawGender == '女'
@@ -2392,7 +2392,7 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
       final chunk = wrapped[i];
       final fill = textWidth - _displayWidth(chunk);
       lines.add(
-          '${' ' * leftPad}$partnerBackground$_white$chunk${' ' * (fill < 0 ? 0 : fill)} $suffix');
+          '${' ' * leftPad}$peerBackground$_white$chunk${' ' * (fill < 0 ? 0 : fill)} $suffix');
     } else if (i == wrapped.length - 1) {
       // 单行短消息：气泡整块从左缘 leftPad 起铺满到屏缘（左缘与长消息统一对齐、
       // 消除锯齿），但正文右对齐、贴着 [我 时间] 标签（标签仍贴最右）——
@@ -2400,13 +2400,13 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
       final chunk = wrapped[i];
       final fill = textWidth - _displayWidth(chunk);
       lines.add(
-          '${' ' * leftPad}$partnerBackground$_white${' ' * (fill < 0 ? 0 : fill)}$chunk $suffix');
+          '${' ' * leftPad}$peerBackground$_white${' ' * (fill < 0 ? 0 : fill)}$chunk $suffix');
     } else {
       // 非末行：固定左侧留白，正文 + 背景色填充到整行右缘（col cols）——
       // 标签栏所在的右侧留白一并上色，避免中英文折行宽度差造成气泡右缘锯齿
       final fill = (cols - leftPad) - _displayWidth(wrapped[i]);
       final content =
-          '$partnerBackground$_white${wrapped[i]}${' ' * (fill < 0 ? 0 : fill)}$_reset';
+          '$peerBackground$_white${wrapped[i]}${' ' * (fill < 0 ? 0 : fill)}$_reset';
       lines.add('${' ' * leftPad}$content');
     }
   }
@@ -2862,26 +2862,26 @@ Future<void> _uploadAttachmentInBackground(ChatSession session, String path) asy
 /// `/reset`：重置本设备——三道闸门过后清本地数据并退出（下次启动走全新入网向导）。
 ///
 /// 闸门刻意**全离线**：设备名比对 + 本机锁屏码，不联网、不问空间口令。理由见
-/// `server/src/devices.ts` 的 `retireDevice`：空间口令是**共享**给伴侣的加入凭证，
+/// `server/src/entrances.ts` 的 `retireEntrance`：空间口令是**共享**给伴侣的加入凭证，
 /// 不该获得销毁我这台设备的权力；而校验它必须联网，会让"连着一台死服务器"这个
 /// 最常见的重置场景直接自锁。
 ///
-/// 服务端退役（POST /devices/retire）在确认之后、清数据之前尽力而为：失败了也照清，
+/// 服务端退役（POST /entrances/retire）在确认之后、清数据之前尽力而为：失败了也照清，
 /// 只是明确告诉用户"服务端可能还留着这台设备的记录"。顺序不能反——token 就在
 /// store 里，清完就再也没有调用它的凭证了。
 Future<void> _execReset(String storePath) async {
   final s = _state!;
   final session = s.session;
 
-  // ① 设备名：确认清的是哪一台。没有名字（不降级成 deviceId——让用户抄一串 id 只会
+  // ① 设备名：确认清的是哪一台。没有名字（不降级成 entranceId——让用户抄一串 id 只会
   //    制造新的抄错机会）时退化为固定确认词 RESET：本地缺字段不该让人永远重置不了，
-  //    与 app 端同一口径（reset_device.dart 的 fallback）。
+  //    与 app 端同一口径（reset_install.dart 的 fallback）。
   const fallbackWord = 'RESET';
-  final deviceName = session.store.deviceName?.trim() ?? '';
-  final expected = deviceName.isEmpty ? fallbackWord : deviceName;
-  final prompt = deviceName.isEmpty
+  final entranceName = session.store.entranceName?.trim() ?? '';
+  final expected = entranceName.isEmpty ? fallbackWord : entranceName;
+  final prompt = entranceName.isEmpty
       ? '❓ 本机没有设备名，请输入 $fallbackWord 以确认重置:'
-      : '❓ 确认要重置的是本机「$deviceName」，请输入设备名:';
+      : '❓ 确认要重置的是本机「$entranceName」，请输入设备名:';
   final typed = (await _prompt(session, prompt, required: true)).trim();
   if (!s.running) return;
   if (typed != expected) {
@@ -2911,7 +2911,7 @@ Future<void> _execReset(String storePath) async {
   } else {
     try {
       await _busy(session, '⏳ 正在从服务端退役本设备......',
-          () => ApiClient(server).retireDevice(token));
+          () => ApiClient(server).retireEntrance(token));
     } on ApiException catch (e) {
       retired = false;
       session.messages.add(_systemMessage(session, '⚠️ 服务端退役失败（${e.message}）——本地照常清除'));
@@ -2961,7 +2961,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/devices :: 查看秘境里的设备列表（同空间全部设备）',
+        '/entrances :: 查看秘境里的设备列表（同空间全部设备）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3031,7 +3031,7 @@ Future<void> _execCommand(String line) async {
               onRevoked: _onWsRevoked, onUnrecognized: _onWsUnrecognized);
           }
           // 名称表来自服务端：换了服务器就得重拉（否则气泡前缀还是上一台的名字）
-          _refreshPersonNames(s);
+          _refreshPartnerNames(s);
           s.session.messages.add(_systemMessage(
               s.session, '✅ 已切换本次会话的服务器并激活（仅本次生效）: $arg'));
           s.status = ''; // 一次性结果进消息流，清掉旧瞬时通知
@@ -3041,8 +3041,8 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/auth':
-      // 未绑定（deviceId null，如引导时跳过/加入失败）→ 引导加入秘境后再认证
-      if (s.session.store.deviceId == null) {
+      // 未绑定（entranceId null，如引导时跳过/加入失败）→ 引导加入秘境后再认证
+      if (s.session.store.entranceId == null) {
         // 提示作为 system 消息进消息流；邀请链接由输入循环接管输入——
         // TUI 运行期 stdin 已被输入循环订阅，不能再用 readLineSync（会挂起）
         s.pendingJoinToken = true;
@@ -3077,7 +3077,7 @@ Future<void> _execCommand(String line) async {
         // 激活结果作为 system 消息进消息流（不占顶部状态栏）
         s.session.messages.add(_systemMessage(s.session, '✅ 成功激活机密线路。'));
         s.status = '';
-        _refreshPersonNames(s); // 刷新 person 名称表（对方消息前缀显示其 personName）
+        _refreshPartnerNames(s); // 刷新 partner 名称表（对方消息前缀显示其 partnerName）
         // 激活成功后启动 WS 实时监听
         if (s.session.wsClient == null && s.session.hasSession) {
           s.session.startWs(
@@ -3107,7 +3107,7 @@ Future<void> _execCommand(String line) async {
         WsStatus.reconnecting => '断线重连中',
         WsStatus.stopped => '未连接',
       };
-      final slot = st.partnerSlot == null ? '未定' : '#${st.partnerSlot}';
+      final slot = st.slot == null ? '未定' : '#${st.slot}';
       s.session.messages.add(_systemMessage(
           s.session,
           '📊 状态\n'
@@ -3117,8 +3117,8 @@ Future<void> _execCommand(String line) async {
               '   对方: ${s.peerOnline ? '在线' : '离线'}\n'
               '   秘境 id: ${st.spaceId ?? '未绑定'}\n'
               '   秘境密钥: ${st.spaceKey != null ? '已就绪' : '无'}）\n'
-              '   本机名称: ${st.deviceName ?? '未命名'}\n'
-              '   本机 id: ${st.deviceId ?? '未登记'}\n'
+              '   本机名称: ${st.entranceName ?? '未命名'}\n'
+              '   本机 id: ${st.entranceId ?? '未登记'}\n'
               '   本机编号: $slot\n'
               '   本机公钥: ${st.publicKey}\n'
               '   消息同步: seq ${st.lastServerSequence}｜本地历史 ${st.history.length} 条\n'
@@ -3212,10 +3212,10 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, '✅ 锁屏码已设置'));
       }
       break;
-    case '/devices':
+    case '/entrances':
       // 同空间**全部**设备（我 + 对方，不只自己的）——序号与 /revoke 的选择一致
       try {
-        final rows = await _fetchDeviceRows(s);
+        final rows = await _fetchEntranceRows(s);
         final sb = StringBuffer('📱 设备列表（同空间 ${rows.length} 台，/revoke <序号> 可撤销）：');
         for (final r in rows) {
           sb.write(r.line);
@@ -3237,14 +3237,14 @@ Future<void> _execCommand(String line) async {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 未连接（缺少 server/token）'));
           break;
         }
-        final rows = await _fetchDeviceRows(s);
+        final rows = await _fetchEntranceRows(s);
         if (!s.running) break;
-        _DeviceRow? picked;
+        _EntranceRow? picked;
         if (arg.isNotEmpty) {
-          final matches = _matchDeviceRows(rows, arg);
+          final matches = _matchEntranceRows(rows, arg);
           if (matches.isEmpty) {
             s.session.messages.add(_systemMessage(
-                s.session, '⚠️ 没有匹配的设备「$arg」——用 /devices 查看序号或设备名'));
+                s.session, '⚠️ 没有匹配的设备「$arg」——用 /entrances 查看序号或设备名'));
             break;
           }
           if (matches.length > 1) {
@@ -3261,7 +3261,7 @@ Future<void> _execCommand(String line) async {
           s.session.messages.add(_systemMessage(s.session, sb.toString()));
           final answer = (await _prompt(s.session, '❓ 输入要撤销的设备序号:', required: true)).trim();
           if (!s.running) break;
-          final matches = _matchDeviceRows(rows, answer);
+          final matches = _matchEntranceRows(rows, answer);
           if (matches.length != 1) {
             s.session.messages.add(_systemMessage(
                 s.session,
@@ -3286,7 +3286,7 @@ Future<void> _execCommand(String line) async {
         // 二次确认：必须让用户看清"撤的是哪一台"——选错序号就是不可逆的数据销毁
         s.session.messages.add(_systemMessage(
             s.session,
-            '⚠️ 即将撤销 #${target.no} ${target.label}（使用者：${target.personName}）——\n'
+            '⚠️ 即将撤销 #${target.no} ${target.label}（使用者：${target.partnerName}）——\n'
             '   该设备下次联网认证时会**清空本地数据**（含历史消息与附件），不可逆。'));
         final confirm =
             (await _prompt(s.session, '❓ 确认请输入 yes（其他任意输入取消）:', required: true)).trim();
@@ -3306,11 +3306,11 @@ Future<void> _execCommand(String line) async {
           break;
         }
         await _busy(s.session, '⏳ 正在撤销 ${target.label}......',
-            () => ApiClient(server).revokeDevice(target.deviceId, passphrase, token));
+            () => ApiClient(server).revokeEntrance(target.entranceId, passphrase, token));
         s.session.messages.add(_systemMessage(
             s.session,
             '✅ 已撤销 #${target.no} ${target.label}——该设备下次联网认证时会清空本地数据；'
-            '已在线则立即被服务端断开（/devices 可复查）'));
+            '已在线则立即被服务端断开（/entrances 可复查）'));
         _refreshPeerOnline(); // 顶部条的在线数/设备列表立即去掉它
       } on ApiException catch (e) {
         s.session.messages.add(_systemMessage(s.session, _revokeErrorHint(e)));
@@ -3352,11 +3352,11 @@ Future<void> _execCommand(String line) async {
       await _execInvite();
       break;
     case '/myname':
-      // 重设个人显示名（personName）：本地 + 服务端同步 + 刷新名称表
+      // 重设个人显示名（partnerName）：本地 + 服务端同步 + 刷新名称表
       if (arg.isEmpty) {
         // 先输出当前名字（状态），再给出详细用法
-        final current = s.session.store.personName ??
-            s.personNames[s.session.store.personId] ??
+        final current = s.session.store.partnerName ??
+            s.partnerNames[s.session.store.partnerId] ??
             '(未设置)';
         s.session.messages.add(_systemMessage(s.session, '当前名字: $current'));
         s.session.messages.add(
@@ -3366,18 +3366,18 @@ Future<void> _execCommand(String line) async {
         s.status = '';
       } else {
         // 字符白名单 + 长度上限（老板 2026-09-16）：不合规提示重输（服务端
-        // POST /devices/person-name 同样 400 兜底）
-        final violation = checkPersonNamePolicy(arg);
+        // POST /partners/name 同样 400 兜底）
+        final violation = checkPartnerNamePolicy(arg);
         if (violation != null) {
-          s.session.messages.add(_systemMessage(s.session, _personNameRuleHint(violation)));
+          s.session.messages.add(_systemMessage(s.session, _partnerNameRuleHint(violation)));
           break;
         }
         final name = arg.trim();
-        // 不允许改成与对方相同的名字（老板 2026-09-10）：服务端 person 表里的对方
-        // 名字 + 预置名快照（对方还没加入时 person 表里没有他——老板 2026-09-16）
+        // 不允许改成与对方相同的名字（老板 2026-09-10）：服务端 partner 表里的对方
+        // 名字 + 预置名快照（对方还没加入时 partner 表里没有他——老板 2026-09-16）
         final peerNames = <String>[
-          for (final e in s.personNames.entries)
-            if (e.key != s.session.store.personId) e.value,
+          for (final e in s.partnerNames.entries)
+            if (e.key != s.session.store.partnerId) e.value,
           if ((s.session.store.peerName ?? '').isNotEmpty) s.session.store.peerName!,
         ];
         if (peerNames.contains(name)) {
@@ -3385,11 +3385,11 @@ Future<void> _execCommand(String line) async {
           s.status = '';
         } else {
           try {
-            final old = s.session.store.personName ?? '(未设置)';
-            s.session.store.personName = name;
+            final old = s.session.store.partnerName ?? '(未设置)';
+            s.session.store.partnerName = name;
             s.session.store.save(s.session.storePath);
-            await ApiClient(s.session.server).updatePersonName(name, s.session.store.sessionToken!);
-            await _refreshPersonNames(s);
+            await ApiClient(s.session.server).updatePartnerName(name, s.session.store.sessionToken!);
+            await _refreshPartnerNames(s);
             s.session.messages.add(_systemMessage(s.session, '✅ 我的名字已更新: $old → $name'));
           } catch (e) {
             s.session.messages.add(_systemMessage(s.session, '❌ 我的名字修改失败: $e'));
@@ -3397,11 +3397,11 @@ Future<void> _execCommand(String line) async {
         }
       }
     case '/device':
-      // 重设本设备名称（deviceName）：本地 + 服务端同步
+      // 重设本设备名称（entranceName）：本地 + 服务端同步
       if (arg.isEmpty) {
         // 先打印当前设备名与公钥，再给出详细用法
         final current =
-            s.session.store.deviceName ?? s.session.store.deviceId ?? '(未设置)';
+            s.session.store.entranceName ?? s.session.store.entranceId ?? '(未设置)';
         s.session.messages.add(_systemMessage(s.session, '当前设备名: $current'));
         s.session.messages.add(_systemMessage(s.session, '设备公钥: ${s.session.store.publicKey}'));
         s.session.messages.add(
@@ -3411,18 +3411,18 @@ Future<void> _execCommand(String line) async {
         s.status = '';
       } else {
         // 字符白名单 + 长度上限（老板 2026-09-16）：不合规就提示重输，不静默改写
-        // 用户的输入（服务端 POST /devices/name 同样会 400 兜底）
-        final violation = checkDeviceNamePolicy(arg);
+        // 用户的输入（服务端 POST /entrances/name 同样会 400 兜底）
+        final violation = checkEntranceNamePolicy(arg);
         if (violation != null) {
-          s.session.messages.add(_systemMessage(s.session, _deviceNameRuleHint()));
+          s.session.messages.add(_systemMessage(s.session, _entranceNameRuleHint()));
           break;
         }
         final name = arg.trim();
         try {
-          final old = s.session.store.deviceName ?? '(未设置)';
-          s.session.store.deviceName = name;
+          final old = s.session.store.entranceName ?? '(未设置)';
+          s.session.store.entranceName = name;
           s.session.store.save(s.session.storePath);
-          await ApiClient(s.session.server).updateDeviceName(name, s.session.store.sessionToken!);
+          await ApiClient(s.session.server).updateEntranceName(name, s.session.store.sessionToken!);
           s.session.messages.add(_systemMessage(s.session, '✅ 设备名已更新: $old → $name'));
         } catch (e) {
           s.session.messages.add(_systemMessage(s.session, '❌ 设备名修改失败: $e'));
@@ -3443,7 +3443,7 @@ Future<void> _execCommand(String line) async {
           : '${File(s.storePath).parent.path}/einz-backup-${DateTime.now().toIso8601String().substring(0, 10)}.json';
       final store = s.session.store;
       final payload = jsonEncode({
-        'device_id': store.deviceId,
+        'entrance_id': store.entranceId,
         'space_id': store.spaceId,
         'key_version': store.keyVersion,
         'space_key': store.spaceKey,
@@ -3470,8 +3470,8 @@ Future<void> _execCommand(String line) async {
   }
 }
 
-/// /invite [personA|personB] [对方名称]：补发一次性开通码（默认 personB=邀请对方，
-/// 给第二使用者；personA=给自己加新设备）。需先 /auth 激活。
+/// /invite [partnerA|partnerB] [对方名称]：补发一次性开通码（默认 partnerB=邀请对方，
+/// 给第二使用者；partnerA=给自己加新设备）。需先 /auth 激活。
 Future<void> _execInvite() async {
   final s = _state!;
   final store = s.session.store;
@@ -3623,10 +3623,10 @@ bool _unrecognizedShown = false;
 
 /// 启动自检结果：0=正常/离线（可看本地历史）；1=设备被**明确撤销**（自毁+退出）；
 /// 2=会话已失效（/revoke 会 DELETE 该设备的 sessions，缓存 token 死 → 401）需清除
-/// token 走引导挑战重认证——挑战阶段若设备被撤销会 403 `DEVICE_REVOKED`（由引导兜底
+/// token 走引导挑战重认证——挑战阶段若设备被撤销会 403 `ENTRANCE_REVOKED`（由引导兜底
 /// 识别）；3=服务器不认本设备（库被重置/未登记，403 `FORBIDDEN`）→ 只警告，继续离线可用。
-Future<int> _probeRevoked(DeviceStore store, String server) async {
-  if (store.deviceId == null || store.spaceId == null || store.sessionToken == null) {
+Future<int> _probeRevoked(EntranceStore store, String server) async {
+  if (store.entranceId == null || store.spaceId == null || store.sessionToken == null) {
     return 0;
   }
   try {
@@ -3636,7 +3636,7 @@ Future<int> _probeRevoked(DeviceStore store, String server) async {
     // 只有服务端**明确说"这台设备被撤销了"**才自毁（老板 2026-09-16）。
     // FORBIDDEN 表示"服务器不认本设备"——库被清空/重置是最常见原因，属运维失误，
     // 只警告，本地数据一条都不能删（此前 403 一律当撤销，把本地数据全删了）。
-    if (e.code == 'DEVICE_REVOKED') return 1; // 被明确撤销 → 自毁 + 退出
+    if (e.code == 'ENTRANCE_REVOKED') return 1; // 被明确撤销 → 自毁 + 退出
     if (e.code == 'FORBIDDEN') return 3; // 未登记（库被重置）→ 警告，继续离线可用
     if (e.code == 'UNAUTHORIZED') return 2; // 会话被清/过期：清 token 走重认证
     return 0;
@@ -3677,7 +3677,7 @@ Future<void> _checkEscrowRotated(ChatSession session) async {
   }
 }
 
-Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) async {
+Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) async {
   final api = ApiClient(session.server);
   final escrow = KeyEscrowService(api);
   // 1) 先取服务端密保箱：有包 → 必须验证旧口令；无包（服务端数据丢失）→
@@ -3776,7 +3776,7 @@ Future<void> _changeEscrowPassphrase(DeviceStore store, ChatSession session) asy
 /// （它只在"确认服务端无箱"的引导分支里用）。若把"查不到"当成"没有箱"去提示用户
 /// 重设，用户输入新口令就会**顶掉**原有密保箱（等于把伴侣锁在门外）。所以查不到时
 /// 一律不提示，留到下次会话正常时再判定。
-Future<bool?> _serverHasEscrow(DeviceStore store, String server) async {
+Future<bool?> _serverHasEscrow(EntranceStore store, String server) async {
   final token = store.sessionToken;
   if (server.isEmpty || token == null || token.isEmpty) return null;
   try {
@@ -3788,7 +3788,7 @@ Future<bool?> _serverHasEscrow(DeviceStore store, String server) async {
 }
 
 /// 继续输入；成功标记 store.escrowUploaded 并落盘）。中断（Ctrl+C）后重启会再进此引导。
-Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSession session) async {
+Future<void> _setupEscrowPassphrase(EntranceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
     final p1 = await _prompt(session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
@@ -3827,7 +3827,7 @@ Future<void> _setupEscrowPassphrase(DeviceStore store, String storePath, ChatSes
   }
 }
 
-/// 收到对方消息后按需刷新 person 名称/性别表：新成员 join 后本端仍是加入时的
+/// 收到对方消息后按需刷新 partner 名称/性别表：新成员 join 后本端仍是加入时的
 /// 快照（无后来加入的发送者）——不刷新则对方气泡按未知性别回退青绿
 /// （老板 2026-09-10：同性别空间第二人发消息，对方 TUI 收到青色）。
 Future<void> _refreshGenderForLatest(_TuiState s) async {
@@ -3835,10 +3835,10 @@ Future<void> _refreshGenderForLatest(_TuiState s) async {
   for (var i = msgs.length - 1; i >= 0; i--) {
     final m = msgs[i];
     if (m.isSystem) continue;
-    final pid = m.env.senderPersonId;
-    if (pid != null && pid != s.session.store.personId) {
-      if (!s.personGenders.containsKey(pid)) {
-        await _refreshPersonNames(s);
+    final pid = m.env.senderPartnerId;
+    if (pid != null && pid != s.session.store.partnerId) {
+      if (!s.partnerGenders.containsKey(pid)) {
+        await _refreshPartnerNames(s);
       }
       break;
     }
@@ -3846,46 +3846,46 @@ Future<void> _refreshGenderForLatest(_TuiState s) async {
   _scheduleRender();
 }
 
-/// 补登安装级设备标识（POST /devices/uid，幂等）。
+/// 补登安装级设备标识（POST /entrances/uid，幂等）。
 ///
 /// 存量 store（多空间上线前入网的）不会重走入网流程，只能在启动时补一次——服务端据此
-/// 把同一台物理设备在各空间的 device_id 认成一台。失败静默：它只是服务端侧认知，
-/// 不参与任何功能（与 App 的 `_registerDeviceUid` 同口径）。
-Future<void> _registerDeviceUid(
-    ChatSession session, DeviceStore store, String storePath, String server) async {
+/// 把同一台物理设备在各空间的 entrance_id 认成一台。失败静默：它只是服务端侧认知，
+/// 不参与任何功能（与 App 的 `_registerInstallUid` 同口径）。
+Future<void> _registerInstallUid(
+    ChatSession session, EntranceStore store, String storePath, String server) async {
   if (server.isEmpty) return;
   final token = store.sessionToken;
   if (token == null || token.isEmpty) return;
-  final before = store.deviceUid;
-  final uid = store.ensureDeviceUid();
+  final before = store.installUid;
+  final uid = store.ensureInstallUid();
   // 首次生成先落盘：否则下次启动会换一个新 id（与服务端已登记的对不上）
   if (before != uid) store.save(storePath);
   try {
-    await ApiClient(server).registerDeviceUid(uid, token);
+    await ApiClient(server).registerInstallUid(uid, token);
   } catch (_) {
     // 离线 / 老服务端（无此端点）：静默降级
   }
 }
 
-/// 拉取空间 person 名称/性别表（GET /space）到缓存（认证后调用；失败静默——
+/// 拉取空间 partner 名称/性别表（GET /space）到缓存（认证后调用；失败静默——
 /// 前缀回退"我/对方"）。成功后回写 store 落盘：服务器离线启动时用缓存兜底
 /// （名字/性别不丢——老板 2026-09-13）。
-Future<void> _refreshPersonNames(_TuiState s) async {
+Future<void> _refreshPartnerNames(_TuiState s) async {
   final token = s.session.store.sessionToken;
   if (token == null) return;
   try {
     final r = await ApiClient(s.session.server).getSpace(token);
-    s.personNames = r.personNames;
-    s.personGenders = r.personGenders;
-    s.personSlots = r.personSlots;
+    s.partnerNames = r.partnerNames;
+    s.partnerGenders = r.partnerGenders;
+    s.partnerSlots = r.partnerSlots;
     final store = s.session.store;
-    // 对方**真实**名字（对方已加入才有——同一身份多设备共享同一 personId）→ 校正
+    // 对方**真实**名字（对方已加入才有——同一身份多设备共享同一 partnerId）→ 校正
     // 预置名快照：否则对方改名后旧预置名会一直留着，把 /myname 的同名判据误伤
     // （明明已没人叫那个名字，却仍不许我用）。对齐 App 的 _refreshProfileFromServer。
-    final myPid = store.personId;
+    final myPid = store.partnerId;
     String? peer;
     if (myPid != null) {
-      for (final e in r.personNames.entries) {
+      for (final e in r.partnerNames.entries) {
         if (e.key != myPid) {
           peer = e.value;
           break;
@@ -3894,13 +3894,13 @@ Future<void> _refreshPersonNames(_TuiState s) async {
     }
     final peerChanged = peer != null && peer.isNotEmpty && peer != store.peerName;
     // 回写本地缓存（离线启动兜底）；只有内容变化才落盘，避免频繁刷新时反复写盘
-    if (!_sameStringMap(store.personNames, r.personNames) ||
-        !_sameStringMap(store.personGenders, r.personGenders) ||
-        !_sameIntMap(store.personSlots, r.personSlots) ||
+    if (!_sameStringMap(store.partnerNames, r.partnerNames) ||
+        !_sameStringMap(store.partnerGenders, r.partnerGenders) ||
+        !_sameIntMap(store.partnerSlots, r.partnerSlots) ||
         peerChanged) {
-      store.personNames = Map.of(r.personNames);
-      store.personGenders = Map.of(r.personGenders);
-      store.personSlots = Map.of(r.personSlots);
+      store.partnerNames = Map.of(r.partnerNames);
+      store.partnerGenders = Map.of(r.partnerGenders);
+      store.partnerSlots = Map.of(r.partnerSlots);
       if (peerChanged) store.peerName = peer;
       store.save(s.session.storePath);
     }
@@ -3919,7 +3919,7 @@ bool _sameStringMap(Map<String, String> a, Map<String, String> b) {
   return true;
 }
 
-/// 两个 String→int 映射内容是否完全一致（同上，personSlots 落盘防抖用）。
+/// 两个 String→int 映射内容是否完全一致（同上，partnerSlots 落盘防抖用）。
 bool _sameIntMap(Map<String, int> a, Map<String, int> b) {
   if (a.length != b.length) return false;
   for (final e in a.entries) {
@@ -3929,15 +3929,15 @@ bool _sameIntMap(Map<String, int> a, Map<String, int> b) {
 }
 
 /// 同性别第二人的气泡背景色（2026-09-17 老板要求）：空间两人性别都已登记且相同
-/// 时，第二个人（partner_slot=1）的消息气泡取亮青——否则两蓝/两粉无法区分谁发的。
-/// [senderPid] 发言人 person_id；槽位表 person_slots 来自 GET /space
+/// 时，第二个人（slot=1）的消息气泡取亮青——否则两蓝/两粉无法区分谁发的。
+/// [senderPid] 发言人 partner_id；槽位表 partner_slots 来自 GET /space
 /// （老服务端无此键 → 空表 → 不适用）。返回 null = 不适用（性别不同/未登记/
 /// 槽位未知），调用方沿用原性别配色。
 String? _sameGenderSecondCyan(String? senderPid) {
-  final slots = _state?.personSlots;
+  final slots = _state?.partnerSlots;
   if (senderPid == null || slots == null || slots.length < 2) return null;
   // 两人性别都必须已登记（规范值 male/female）且完全相同才启用青色
-  final genders = slots.keys.map((pid) => _state?.personGenders[pid]).toSet();
+  final genders = slots.keys.map((pid) => _state?.partnerGenders[pid]).toSet();
   if (genders.length != 1) return null;
   if (genders.first != 'male' && genders.first != 'female') return null;
   return slots[senderPid] == 1 ? _bgCyan : null;
@@ -3963,7 +3963,7 @@ ChatMessage _systemMessage(ChatSession session, String text) {
       type: 'text',
       keyVersion: session.store.keyVersion,
       messageId: 'sys-${_systemMessageSeq++}',
-      senderDeviceId: session.store.deviceId ?? '-',
+      senderEntranceId: session.store.entranceId ?? '-',
       nonce: '',
       ciphertext: '',
     ),
@@ -3999,8 +3999,8 @@ void _abortPendingGuide() {
 
 /// 新设备的默认名称：宿主机名去 .local 后缀（Platform.localHostname 形如
 /// 'lukde-MacBook-Pro.local'），再按设备名规则消毒（不合规字符 → `_`、截断 32）；
-/// 异常/空值/localhost 回退空串（不设置 deviceName，展示层用 device_id 兜底）。
-String _defaultDeviceName() {
+/// 异常/空值/localhost 回退空串（不设置 entranceName，展示层用 entrance_id 兜底）。
+String _defaultEntranceName() {
   try {
     var name = Platform.localHostname.trim();
     if (name.toLowerCase() == 'localhost') return '';
@@ -4009,21 +4009,21 @@ String _defaultDeviceName() {
     }
     name = name.trim();
     if (name.isEmpty) return '';
-    return sanitizeDeviceName(name);
+    return sanitizeEntranceName(name);
   } catch (_) {
     return '';
   }
 }
 
-/// 设备名不合规时的提示（规则见 device_name_policy：中英文/数字/`_`/`-`，≤32）。
-String _deviceNameRuleHint() {
-  return '⚠️ 设备名只能用中文字、英文字母、数字、下划线(_)、中划线(-)，最长 $kDeviceNameMaxLength 个字符';
+/// 设备名不合规时的提示（规则见 entrance_name_policy：中英文/数字/`_`/`-`，≤32）。
+String _entranceNameRuleHint() {
+  return '⚠️ 设备名只能用中文字、英文字母、数字、下划线(_)、中划线(-)，最长 $kEntranceNameMaxLength 个字符';
 }
 
-/// 用户名称不合规时的提示（规则见 person_name_policy：中英文/数字/`_`/`-`/emoji，≤32）。
-String _personNameRuleHint(PersonNameViolation violation) {
-  if (violation == PersonNameViolation.tooLong) {
-    return '⚠️ 名字最长 $kPersonNameMaxLength 个字符（一个表情符算 1 个）';
+/// 用户名称不合规时的提示（规则见 partner_name_policy：中英文/数字/`_`/`-`/emoji，≤32）。
+String _partnerNameRuleHint(PartnerNameViolation violation) {
+  if (violation == PartnerNameViolation.tooLong) {
+    return '⚠️ 名字最长 $kPartnerNameMaxLength 个字符（一个表情符算 1 个）';
   }
   return '⚠️ 名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符';
 }

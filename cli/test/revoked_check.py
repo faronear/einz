@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # 撤销语义回归（老板 2026-09-16 修订）：**只有"明确针对本设备的撤销"才清空本地数据**。
 #
-#   ① 在线被明确撤销（TUI 收到 device.revoked 帧）→ 提示"本设备已被撤销，本地数据已清除"
+#   ① 在线被明确撤销（TUI 收到 entrance.revoked 帧）→ 提示"本设备已被撤销，本地数据已清除"
 #      后自动退出，且 store 文件与附件缓存已删；
-#   ② 离线期间被撤销（重启才认证，挑战返回 403 DEVICE_REVOKED）→ 同上；
+#   ② 离线期间被撤销（重启才认证，挑战返回 403 ENTRANCE_REVOKED）→ 同上；
 #   ③ **后台数据库被清空/重置**（设备行不存在 → 403 FORBIDDEN）→ **绝不清数据**：
 #      TUI 照常启动、提示"本设备未被服务器识别"、本地历史一条不少、进程不退出。
 #
@@ -165,12 +165,12 @@ def join_revoker(port, store_path):
               token=st['session_token'])['joinToken']
     revoker = http(port, 'POST', '/spaces/join', {
         'token': jt, 'public_key': 'pk-revoker',
-        'partner_slot': 1, 'device_name': 'revoker'})
+        'slot': 1, 'entrance_name': 'revoker'})
     return revoker['sessionToken']
 
-def revoke(port, device_id, passphrase, token):
-    """POST /devices/:id/revoke：撤销本空间另一台设备——**每次都要校验密保口令**（2026-09-16）。"""
-    status, body = http_status(port, 'POST', f'/devices/{device_id}/revoke',
+def revoke(port, entrance_id, passphrase, token):
+    """POST /entrances/:id/revoke：撤销本空间另一台设备——**每次都要校验密保口令**（2026-09-16）。"""
+    status, body = http_status(port, 'POST', f'/entrances/{entrance_id}/revoke',
                                {'passphrase': passphrase}, token)
     if status != 200:
         print(f'❌ 撤销失败 HTTP {status}: {body}')
@@ -194,7 +194,7 @@ def main():
         spawned.append((m1, p1))
 
         st = json.load(open(store_a))
-        my_device = st['device_id']
+        my_entrance = st['entrance_id']
 
         # 离线撤销的对照组：撤销前备份 store（模拟"设备离线时被撤销，本地数据还在"）
         store_offline = f'{WORK}/a-offline.json'
@@ -210,13 +210,13 @@ def main():
         # ① 口令错 → 401，且设备**毫发无损**（在线 TUI 不得退出、不得清盘）；
         # ② 不带口令 → 400。两条都在"正确口令"之前跑，确保撤销确实被拦住。
         bad_status, bad_body = http_status(
-            port_a, 'POST', f'/devices/{my_device}/revoke',
+            port_a, 'POST', f'/entrances/{my_entrance}/revoke',
             {'passphrase': 'wrong-passphrase'}, revoker_token)
         if bad_status != 401 or bad_body.get('error', {}).get('code') != 'ESCROW_VERIFY_FAILED':
             print(f'❌ 口令错误应 401 ESCROW_VERIFY_FAILED，实际 {bad_status} {bad_body}')
             return 1
         no_pass_status, _ = http_status(
-            port_a, 'POST', f'/devices/{my_device}/revoke', {}, revoker_token)
+            port_a, 'POST', f'/entrances/{my_entrance}/revoke', {}, revoker_token)
         if no_pass_status != 400:
             print(f'❌ 不带口令应 400，实际 {no_pass_status}')
             return 1
@@ -226,9 +226,9 @@ def main():
             return 1
         print('✅ 口令错 → 401、缺口令 → 400，且设备未受影响（在线 TUI 仍运行）')
 
-        revoke(port_a, my_device, PASSPHRASE, revoker_token)
+        revoke(port_a, my_entrance, PASSPHRASE, revoker_token)
 
-        # ① 在线被撤销：收到 device.revoked 帧 → 清盘 + 提示 + 自退
+        # ① 在线被撤销：收到 entrance.revoked 帧 → 清盘 + 提示 + 自退
         out = wait_text(m1, '本设备已被撤销', timeout=15)
         if '本设备已被撤销' not in out:
             print('❌ 在线 TUI 未收到撤销广播'); print(out[-800:]); return 1
@@ -242,7 +242,7 @@ def main():
             print('❌ 明确撤销后附件缓存目录仍在'); return 1
         print('✅ ① 在线撤销 → 提示后自退，store 与附件缓存已清除')
 
-        # ② 离线期间被撤销（重启才发现）：挑战 403 DEVICE_REVOKED → 同样清盘退出
+        # ② 离线期间被撤销（重启才发现）：挑战 403 ENTRANCE_REVOKED → 同样清盘退出
         m2, p2 = start_tui(store_offline, port_a, WORK)
         spawned.append((m2, p2))
         out = wait_text(m2, '输入锁屏码', timeout=30)
@@ -262,7 +262,7 @@ def main():
         kill_proc(p2, m2)
         if os.path.exists(store_offline):
             print('❌ 明确撤销后 store 文件仍在'); return 1
-        print('✅ ② 离线撤销（重启认证 403 DEVICE_REVOKED）→ 提示后自退，store 已清除')
+        print('✅ ② 离线撤销（重启认证 403 ENTRANCE_REVOKED）→ 提示后自退，store 已清除')
 
         # ---------- 场景 ③：后台库被清空（设备不在册）→ 只警告，绝不清数据 ----------
         server_c = start_server(port_c, f'{WORK}/c/einz.sqlite.db')

@@ -204,13 +204,13 @@
   "chatPageRenameNameTitle": "我的身份",
   "chatPageRenameNameLabel": "我的名字",
   "chatPageGenderLabel": "性别",
-  "chatPageRenameDeviceTitle": "当前通道",
-  "chatPageRenameDeviceLabel": "通道名称",
-  "chatPageDeviceScopeHint": "通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。",
-  "chatPageRenameDeviceEmptyError": "请填写通道名称",
-  "chatPageRenameDeviceInvalidError": "只能用中文字、英文字母、数字、下划线(_)、中划线(-)",
-  "chatPageRenameDeviceTooLongError": "最多 {max} 个字符",
-  "@chatPageRenameDeviceTooLongError": {
+  "chatPageRenameEntranceTitle": "当前通道",
+  "chatPageRenameEntranceLabel": "通道名称",
+  "chatPageEntranceScopeHint": "通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。",
+  "chatPageRenameEntranceEmptyError": "请填写通道名称",
+  "chatPageRenameEntranceInvalidError": "只能用中文字、英文字母、数字、下划线(_)、中划线(-)",
+  "chatPageRenameEntranceTooLongError": "最多 {max} 个字符",
+  "@chatPageRenameEntranceTooLongError": {
     "placeholders": {
       "max": {"type": "int"}
     }
@@ -269,7 +269,7 @@
   "chatPageUiStyleGradientDesc": "粉蓝渐变背景，深情典雅",
   "chatPageMenuBurnLabel": "阅后即焚",
   "chatPageMenuMyNameLabel": "我的身份",
-  "chatPageMenuDeviceNameLabel": "当前通道",
+  "chatPageMenuEntranceNameLabel": "当前通道",
   "chatPagePinLabel": "锁屏码",
   "chatPageLockNow": "锁屏",
   "chatPagePinSetValue": "已设置",
@@ -313,7 +313,7 @@
       "count": {"type": "int"}
     }
   },
-  "chatPageDeviceUnrecognized": "这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除",
+  "chatPageEntranceUnrecognized": "这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除",
   "chatPageOfflineLocalOnly": "离线 · 仅可查看本地消息，无法收发",
   "chatPageMsgResending": "重发中…",
   "chatPageMsgSpeedingUp": "加速中…",
@@ -384,9 +384,9 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageDeviceRevoked": "这条通道已被撤销，本地数据已清除，请重新配置",
-  "chatPageDevicePublicKeyLabel": "通道公钥",
-  "chatPageDevicePublicKeyFailed": "未记录",
+  "chatPageEntranceRevoked": "这条通道已被撤销，本地数据已清除，请重新配置",
+  "chatPageEntrancePublicKeyLabel": "通道公钥",
+  "chatPageEntrancePublicKeyFailed": "未记录",
   "burnOptionOff": "关闭",
   "burnOption1Minute": "1 分钟",
   "burnOption5Minutes": "5 分钟",
@@ -426,19 +426,19 @@
   "advancedDestroyEntrance": "销毁本通道",
   "leaveSpaceTitle": "销毁本通道？",
   "leaveSpaceMessage": "彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。此操作无法撤销！",
-  "resetDeviceNameLabel": "{name}",
-  "@resetDeviceNameLabel": {
+  "resetEntranceNameLabel": "{name}",
+  "@resetEntranceNameLabel": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "resetDeviceNameHint": "请输入当前通道名称“{name}”",
-  "@resetDeviceNameHint": {
+  "resetEntranceNameHint": "请输入当前通道名称“{name}”",
+  "@resetEntranceNameHint": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "resetDeviceNameMismatch": "请输入正确的通道名称以确认",
-  "resetDeviceConfirmWord": "重置",
-  "resetDevicePinLabel": "锁屏码",
-  "resetDevicePinHint": "请输入本机锁屏码",
-  "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道",
+  "resetEntranceNameMismatch": "请输入正确的通道名称以确认",
+  "resetInstallConfirmWord": "重置",
+  "resetInstallPinLabel": "锁屏码",
+  "resetInstallPinHint": "请输入本机锁屏码",
+  "resetInstallServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道",
   "spaceListTitle": "选择秘境",
   "spaceListEmpty": "还没有加入任何秘境",
   "spaceListAdd": "新建/加入秘境",

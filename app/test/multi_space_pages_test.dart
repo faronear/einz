@@ -18,8 +18,8 @@ import 'package:einz/widgets/space_switcher.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 /// 最小 fake：不发网络——未读按 token 给值，退役调用只记录。
-class _SoloDeviceApi extends ApiClient {
-  _SoloDeviceApi() : super('http://fake');
+class _SoloEntranceApi extends ApiClient {
+  _SoloEntranceApi() : super('http://fake');
 
   /// 各空间的未读数（GET /messages/unread）：按 token 给值，缺省 0。
   final Map<String, int> unreadByToken = {};
@@ -31,7 +31,7 @@ class _SoloDeviceApi extends ApiClient {
   Future<int> unreadCount(String token) async => unreadByToken[token] ?? 0;
 
   @override
-  Future<void> retireDevice(String token) async {
+  Future<void> retireEntrance(String token) async {
     retiredTokens.add(token);
   }
 }
@@ -39,13 +39,13 @@ class _SoloDeviceApi extends ApiClient {
 const _payloadA = AppLockPayload(
   spaceKeyB64: 'a2V5LWE=',
   spaceId: 'space-a',
-  deviceId: 'dev-a',
+  entranceId: 'dev-a',
   token: 'tok-a',
 );
 const _payloadB = AppLockPayload(
   spaceKeyB64: 'a2V5LWI=',
   spaceId: 'space-b',
-  deviceId: 'dev-b',
+  entranceId: 'dev-b',
   token: 'tok-b',
 );
 
@@ -97,11 +97,11 @@ void main() {
     await lock.ensureFreshInstall();
     await lock.savePlain(_payloadA);
     await lock.addSpace(_payloadB);
-    await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
-    await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-a', partnerName: '我A', peerName: '对方A', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-b', partnerName: '我B', peerName: '对方B', entranceName: 'iPhone');
     await lock.loadVault(); // 解锁态进内存会话（弹层从这里读空间列表）
 
-    final api = _SoloDeviceApi()..unreadByToken['tok-a'] = 3;
+    final api = _SoloEntranceApi()..unreadByToken['tok-a'] = 3;
     await tester.pumpWidget(_app(Scaffold(
       body: Builder(
         builder: (ctx) => TextButton(
@@ -136,7 +136,7 @@ void main() {
         builder: (ctx) => TextButton(
           onPressed: () async {
             // 弹层只负责"回传选择"，真正的切换由调用方执行（switchToSpace）
-            picked = await showSpacePicker(ctx, db: db, api: _SoloDeviceApi());
+            picked = await showSpacePicker(ctx, db: db, api: _SoloEntranceApi());
           },
           child: const Text('开'),
         ),

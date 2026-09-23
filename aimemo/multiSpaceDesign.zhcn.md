@@ -13,7 +13,7 @@
 
 当前 app 全链路假设「一台设备 = 一个 Space」：
 
-- 凭证托管只有一份（`AppLockPayload`：spaceId/spaceKey/deviceId/token/设备密钥对）
+- 凭证托管只有一份（`AppLockPayload`：spaceId/spaceKey/entranceId/token/设备密钥对）
 - 启动流程 StartupGate → 直接进唯一 ChatPage，无空间列表概念
 - 部分设置（阅后即焚、附件存储等）存 app_state 无空间维度
 
@@ -37,28 +37,28 @@
 | --- | --- |
 | 协议 §8.2 有此约束 | 该文只有 7 节，这句话在 **§7**；且是"要求"而非已实现描述 |
 | server 会返回 `DEVICE_ALREADY_BOUND` | server 代码 **grep 零命中**，无此错误码 |
-| `devices` 表 `device_id` 主键、归属单个 `space_id` | `devices` 表**没有 space_id 列**（`server/src/db.ts:19-27`）；device 是全局表，空间归属在 `sessions(session_token, device_id, space_id)`（`db.ts:80-86`） |
-| （隐含）设备会被 server 拒绝二次加入 | `createSpace`/`joinSpace` **每次都新造一行 devices**（`spaces.ts:164`、`:324`），从不复用 deviceId |
+| `entrances` 表 `entrance_id` 主键、归属单个 `space_id` | `entrances` 表**没有 space_id 列**（`server/src/db.ts:19-27`）；device 是全局表，空间归属在 `sessions(session_token, entrance_id, space_id)`（`db.ts:80-86`） |
+| （隐含）设备会被 server 拒绝二次加入 | `createSpace`/`joinSpace` **每次都新造一行 entrances**（`spaces.ts:164`、`:324`），从不复用 entranceId |
 
-真正的约束只有一个：`devices.person_id` 是单列（`db.ts:21`）——**一行 device 只能属于一个
-person**，而 person_id 是 per-space 生成的（`spaces.ts:302-311`）。
+真正的约束只有一个：`entrances.partner_id` 是单列（`db.ts:21`）——**一行 device 只能属于一个
+person**，而 partner_id 是 per-space 生成的（`spaces.ts:302-311`）。
 
 反向证据：server 已经预期「一个设备持多空间会话」——
 
-- `guard.ts:84-85`：成员判定走 `devices.person_id → space_members(space_id)`，"同一身份多台设备、
+- `guard.ts:84-85`：成员判定走 `entrances.partner_id → space_members(space_id)`，"同一身份多台设备、
   或将来一个设备持多空间会话都不受影响"；
-- `auth.ts:91-96`：续期只删 `WHERE device_id = ? AND space_id = ?`，即"同一设备在同一 Space
+- `auth.ts:91-96`：续期只删 `WHERE entrance_id = ? AND space_id = ?`，即"同一设备在同一 Space
   只保留一个会话"，多空间并列是其既有语义。
 
 **结论不变**（仍采用 per-space 设备身份），但性质要改写：这不是"绕开 server 限制"，而是
-**客户端侧成本最低的选择**。备选方案（共用 deviceId）的真实成本比原稿估计的低——只需
-device↔(space, person) 映射（`devices` 加 `space_id` 列，或新表 `device_space_members`），
+**客户端侧成本最低的选择**。备选方案（共用 entranceId）的真实成本比原稿估计的低——只需
+device↔(space, person) 映射（`entrances` 加 `space_id` 列，或新表 `device_space_members`），
 不需要协议大改。仍留作二期备选，本期理由变为「不该为客户端功能动 server」。
 
 ### 2.2 决策
 
-**每个 Space 使用独立的设备身份**（device 密钥对 + deviceId 在 join/create 时新生成），
-客户端本地维护「物理设备 → 多个空间身份」的映射（即 Vault）。server 视角每个 deviceId
+**每个 Space 使用独立的设备身份**（device 密钥对 + entranceId 在 join/create 时新生成），
+客户端本地维护「物理设备 → 多个空间身份」的映射（即 Vault）。server 视角每个 entranceId
 仍只属于一个 Space，协议零改动、server 零改动。
 
 推论与代价：
@@ -68,34 +68,34 @@ device↔(space, person) 映射（`devices` 加 `space_id` 列，或新表 `devi
 | server 改动 | 无（create/join/reauth/challenge 全部按现有语义，因为本来就是每次新造 device 行） |
 | 「我的空间列表」 | 纯本地（Vault 就是列表），server 无需 `GET /my/spaces` |
 | 重装恢复 | 与现状一致：凭 join token 重新加入，或口令 escrow 取回 Space Key；Vault 本身不参与恢复 |
-| 「本机信息」弹窗 | 每个空间一套（不同 deviceId、**不同公钥**、各自的名称）。弹窗只显示**名称 + 公钥**（`chat_page.dart`，不显示 deviceId）。`[2026-09-22 修订]` ~~Vault 级统一设备名~~ → **承认 per-space**：见下方注 |
+| 「本机信息」弹窗 | 每个空间一套（不同 entranceId、**不同公钥**、各自的名称）。弹窗只显示**名称 + 公钥**（`chat_page.dart`，不显示 entranceId）。`[2026-09-22 修订]` ~~Vault 级统一设备名~~ → **承认 per-space**：见下方注 |
 | 设备撤销 | 按空间独立撤销，只摘除该空间的身份（现有语义不变） |
-| 推送 | `push_tokens` PK 是 `device_id`（`db.ts:57-62`），per-space deviceId 天然可用；但只在 ChatPage initState 注册当前空间 → **非当前空间无推送**（一期接受，二期再做多空间注册） |
+| 推送 | `push_tokens` PK 是 `entrance_id`（`db.ts:57-62`），per-space entranceId 天然可用；但只在 ChatPage initState 注册当前空间 → **非当前空间无推送**（一期接受，二期再做多空间注册） |
 
 **注（2026-09-22 定）：设备名是「通道名」，归 per-space，不做 Vault 级统一。**
 
 老板一句话点破：「我的设备名其实是**我的通道名**，只不过从前一设备一通道一空间，所以用了
-物理设备名做默认值。」——正是这个历史遗留让 `device_name` 看起来像"物理设备的名字"：
+物理设备名做默认值。」——正是这个历史遗留让 `entrance_name` 看起来像"物理设备的名字"：
 
 - **语义** = 本机**在这个秘境里**的称呼（对方设备列表里看到的就是这个名字）；
-- **默认值** = 设备型号（`_autoDeviceName()`，`setup_page.dart`）——一设备一通道时代够用，
+- **默认值** = 设备型号（`_autoEntranceName()`，`setup_page.dart`）——一设备一通道时代够用，
   因为一台机器在一个空间只会有一条记录；
-- 于是 `device_name` 存在 **per-space profile**（`app_lock.profile.<spaceId>`），
+- 于是 `entrance_name` 存在 **per-space profile**（`app_lock.profile.<spaceId>`），
   同一台手机在"家人"秘境可以叫「我的手机」、在"工作"秘境叫「工作机」，这是**合理的**；
-- 曾写进 §2.2 的 `[已定]` "Vault 级统一设备名"**从未实现**（`VaultPayload.deviceName`
+- 曾写进 §2.2 的 `[已定]` "Vault 级统一设备名"**从未实现**（`VaultPayload.entranceName`
   三个构造点都没传值，恒为空串），2026-09-22 直接删掉该字段，改为承认 per-space。
 
 代价与消歧手段：同一台设备在不同秘境的**公钥必然不同**（per-space 密钥对），只看公钥会
 让人以为"换了台设备" → 用**文案限定**（标题「本机信息（本秘境）」、标签「本秘境里的名称 /
 公钥」）+ 弹窗内一行说明来消歧，而不是把名字强行统一。
 
-已知遗留：默认名取型号，若双方用同型号机器，TUI `/devices` 里会出现两行同名条目
+已知遗留：默认名取型号，若双方用同型号机器，TUI `/entrances` 里会出现两行同名条目
 （App 侧目前没有设备列表界面，所以影响面只在 TUI）。是否改默认值 / 向导里允许改名，
 待老板定。
 
-精度边界：本地资料是按 **space** 存的（`app_lock.profile.<spaceId>`），不是按 `device_id`。
+精度边界：本地资料是按 **space** 存的（`app_lock.profile.<spaceId>`），不是按 `entrance_id`。
 所以严格说本地保存的是"本机**在这个秘境里**的通道名"。只有当**同一个 install 在同一个
-秘境里存在多行 devices**（例如同一台手机重复 join 同一空间）时，"per-space" 与
+秘境里存在多行 entrances**（例如同一台手机重复 join 同一空间）时，"per-space" 与
 "per-entry" 才会分叉——这种用法罕见，暂不为它增加一层键。
 
 ## 3. 数据设计
@@ -107,8 +107,8 @@ Spaces
   spaceId          TEXT PRIMARY KEY
   name             TEXT NOT NULL DEFAULT ''   // 显示名（对端名 or 自定义）
   peerName         TEXT NOT NULL DEFAULT ''
-  personId         TEXT
-  deviceId         TEXT NOT NULL
+  partnerId         TEXT
+  entranceId         TEXT NOT NULL
   keyVersion       INTEGER NOT NULL DEFAULT 1
   createdAt        INTEGER NOT NULL
   lastActiveAt     INTEGER NOT NULL DEFAULT 0
@@ -133,10 +133,10 @@ Spaces
 `AppLockPayload` 不改（它本来就是"一个空间的完整凭证"），在外面包一层：
 
 ```
-VaultPayload = { version: 1, spaces: [AppLockPayload, ...], activeSpaceId: string, deviceName: string }
+VaultPayload = { version: 1, spaces: [AppLockPayload, ...], activeSpaceId: string, entranceName: string }
 ```
 
-（**2026-09-22 修订**：`VaultPayload.deviceName` 已**删除**——设备名归 per-space profile，见 §2.2 的注。）
+（**2026-09-22 修订**：`VaultPayload.entranceName` 已**删除**——设备名归 per-space profile，见 §2.2 的注。）
 
 - **PIN 模式**：PIN 加密整个 `VaultPayload`（一次解锁全部空间可用），仍存 app_state
   `app_lock.package`，序列化格式兼容——旧格式单 payload 解出后包成单元素 Vault（读时归一，无需迁移旧密文）。
@@ -199,7 +199,7 @@ app_state 中无空间维度的键改为 `space.<spaceId>.<key>` 前缀。现有
 | `attachment_storage` | `attachment_storage_settings.dart:27` | 是 |
 | `ui_style` | `ui_style_settings.dart:25` | 否（全局外观） |
 | `locale` | `locale_settings.dart:24` | 否（全局） |
-| `identity.device_person_map` | `message_repository.dart:129` | 全局单表，需补"删除空间时清理该空间条目" |
+| `identity.entrance_partner_map` | `message_repository.dart:129` | 全局单表，需补"删除空间时清理该空间条目" |
 | `app_lock.*` | `app_lock.dart:46-55` | Vault 化（§3.2） |
 
 v7 迁移：现有值归入当时唯一的空间（迁移后的首个空间）；读取函数改带 spaceId 参数，
@@ -211,35 +211,36 @@ ChatPage/向导这些没有 Vault 上下文的地方，读 Vault = 读安全存�
 会让"取个名字"连带把整个页面异步链打断（实测 7 个 widget 测试挂死 10 分钟超时）。
 M2 改向导/聊天页时把 `widget.payload.spaceId` 传进去即可。
 
-### 3.7 服务端侧设备认知：`device_uid`（2026-09-22 定，M3 落地）
+### 3.7 服务端侧设备认知：`install_uid`（2026-09-22 定，M3 落地）
 
-> 术语以 **`docs/GLOSSARY.md`** 为准：物理设备 / **安装**（`device_uid`）/ **登记项**
-> （`devices` 表一行，`device_id`）三层。UI 用词服从用户习惯（保留「设备」并加限定词），
-> 代码与文档用层名。`device_id` → `entry_id`、`person_id` → `partner_id`/`member_id`
-> 这类 wire 改名**暂不执行**，但计划已排：**`aimemo/renamePlan.zhcn.md`**。
+> 术语以 **`docs/GLOSSARY.md`** 为准：物理设备 / **安装**（`install_uid`）/ **登记项**
+> （`entrances` 表一行，`entrance_id`）三层。UI 用词服从用户习惯（保留「设备」并加限定词），
+> 代码与文档用层名（`install` / `entrance` / `partner`）。曾经的 wire 改名（`device_id` →
+> `entrance_id`、`person_id` → `partner_id`）**已于 2026-09-23 全量落地**，见
+> **`aimemo/renamePlan.zhcn.md`**。
 
-多空间让一台物理设备在每个空间各有一套**故意互不关联**的身份（device_id / 公私钥 /
-person_id / device_name）。这在协议上是干净的，但服务端因此**无法知道"这几行其实是
+多空间让一台物理设备在每个空间各有一套**故意互不关联**的身份（entrance_id / 公私钥 /
+partner_id / entrance_name）。这在协议上是干净的，但服务端因此**无法知道"这几行其实是
 同一台机器"**——运维、审计、将来"整机退役"都需要这个认知。补一个显式标识：
 
 ```
-devices.device_uid  TEXT NULL   -- 索引 idx_devices_uid
+entrances.install_uid  TEXT NULL   -- 索引 idx_entrances_uid
 ```
 
 | 项 | 约定 |
 | --- | --- |
 | 谁生成 | **客户端**（32 位 hex），随 `POST /spaces`、`POST /spaces/join` 上报 |
-| 存量设备 | 不重走入网流程 → 客户端进聊天页时 `POST /devices/uid` 幂等补登（只写本会话那一行） |
+| 存量设备 | 不重走入网流程 → 客户端进聊天页时 `POST /entrances/install-uid` 幂等补登（只写本会话那一行） |
 | 粒度 | **安装级**：同一台设备的所有空间共用一份；卸载重装 / 「重置设备」清掉即轮换 |
-| 存哪（App） | `app_state` 的 `app_lock.device_uid`（`AppLockService.deviceUid()` 惰性生成）。**不放 SecureStore**：与密钥无关，而在这里读安全存储会让"取个 id"依赖平台支持（同 §3.6 的教训） |
-| 存哪（TUI） | `DeviceStore.deviceUid`（TUI 的粒度是"一个 store = 一台设备"，见 `_deleteLocalData`） |
-| **不外泄** | `/space`、`/devices`、WS 广播**都不带**该字段（两者都是显式列投影）——成员之间互不可见 |
+| 存哪（App） | `app_state` 的 `app_lock.install_uid`（`AppLockService.installUid()` 惰性生成）。**不放 SecureStore**：与密钥无关，而在这里读安全存储会让"取个 id"依赖平台支持（同 §3.6 的教训） |
+| 存哪（TUI） | `EntranceStore.installUid`（TUI 的粒度是"一个 store = 一台设备"，见 `_deleteLocalData`） |
+| **不外泄** | `/space`、`/entrances`、WS 广播**都不带**该字段（两者都是显式列投影）——成员之间互不可见 |
 | 权限 | **不参与**任何授权、认证或破坏性操作的范围判断。定位就是"服务端内部认知" |
 
-与之相对，**服务端本来就能靠旁证关联**（IP/时间/push token/同名 device_name），那些是
+与之相对，**服务端本来就能靠旁证关联**（IP/时间/push token/同名 entrance_name），那些是
 概率性的、会误伤也会漏；显式标识把它变成确定性事实，代价只是一个自报字段。
 
-**反向约定**：需要"整台设备退网"这种客户端能力时，**不要**用 device_uid 当依据——客户端
+**反向约定**：需要"整台设备退网"这种客户端能力时，**不要**用 install_uid 当依据——客户端
 Vault 里有每个空间的 token，逐个调退役即可（见 §5.5）。
 
 ## 4. 会话与实时
@@ -254,7 +255,7 @@ Vault 里有每个空间的 token，逐个调退役即可（见 §5.5）。
 - 内部仍依赖若干全局件，切换时必须显式处理：`WsRealtimeService`（`initState` 内 new，非单例）、
   3s/30s 同步 ticker、30s 对端在线 ticker（`dispose` 已 stop，需确认全部 cancel）、
   `uiStyleNotifier / attachmentStorageNotifier / localeNotifier`（全局，保持全局语义）、
-  静态头像缓存（键为 personId，天然 per-space）。
+  静态头像缓存（键为 partnerId，天然 per-space）。
 
 ### 4.2 切换流程与未读数（2026-09-22 更正）
 
@@ -283,12 +284,12 @@ Vault 里有每个空间的 token，逐个调退役即可（见 §5.5）。
 
 1. **"轻量 sync"并不轻**：`MessageRepository.sync()` 是循环拉到 `hasMore=false`，冷启动等于把
    每个空间**积压的全部消息**拉下来落库（久未打开的空间尤其重）；
-2. **读取水位本来就在服务器上**：`receipts(space_id, person_id) → read_upto_seq`，由客户端在
+2. **读取水位本来就在服务器上**：`receipts(space_id, partner_id) → read_upto_seq`，由客户端在
    "用户真看到最新消息"时才上报（前台 + 页面最上层 + 列表贴底，`chat_page._scheduleReadReport`）。
 
 于是新增 `GET /messages/unread`（会话绑定空间）：服务端数
 「`server_sequence > 我的 read_upto_seq` 且发送者不是我」的消息条数——
-判定"不是我"**走 person 维度**（同一身份可能有多台登记项，只比 device_id 会把自己的另一台
+判定"不是我"**走 person 维度**（同一身份可能有多台登记项，只比 entrance_id 会把自己的另一台
 设备发来的消息算成未读）；没有 receipts 行 = 从没读过 = 全都算未读。
 
 客户端在空间列表页对**每个空间各调一次**（用各空间自己的 token，空间数个位数），显示**数字角标**
@@ -309,7 +310,7 @@ Vault 里有每个空间的 token，逐个调退役即可（见 §5.5）。
 2026-09-22 删除，见 §3.2）+ 删全表（attachments / messages / sync_state）+ `MediaCache.deleteAll`
 + `AttachmentStore.clear` + 跳 SetupPage。
 
-**已改（M1，2026-09-22）**：`_onDeviceRevoked` 改为 `removeSpace(widget.spaceId)`，只清该
+**已改（M1，2026-09-22）**：`_onEntranceRevoked` 改为 `removeSpace(widget.spaceId)`，只清该
 空间的凭证 + 消息/附件/同步锚点/回执/草稿/Spaces 行/per-space 设置键 + 这些消息的媒体缓存
 与留存明文；**其余空间的会话与数据原样保留**。
 
@@ -360,7 +361,7 @@ M2 补：Vault 里还有其他空间时应回 SpaceListPage 而不是 SetupPage�
 - `data/local_reset.dart` 的 `resetLocalData()` 作为"整机清空"**原语保留**（当前无 UI 调用点，
   将来若做桌面 `--reset` 逃生口会用到）。
 
-**空间级退出失败要说话**：退役（`POST /devices/retire`）是 best-effort，但失败**不再静默**
+**空间级退出失败要说话**：退役（`POST /entrances/retire`）是 best-effort，但失败**不再静默**
 ——顶部提示「服务端退役未完成，对方设备列表里可能仍留有这台设备」，避免留下 active 幽灵
 而用户不知道。
 
@@ -372,8 +373,8 @@ M2 补：Vault 里还有其他空间时应回 SpaceListPage 而不是 SetupPage�
 + 退役该空间那一行；导航上：还有别的空间 → **直接切到下一个**（`VaultPayload.remove` 已把
 active 让给剩下的第一个），一个都不剩 → 回向导。
 
-**为什么不靠 device_uid 来"一次退役整台设备"**：设备级那档本来就需要逐空间各一次会话，
-而客户端 Vault 里存着每个空间的 token，逐个调即可；device_uid 只是**服务端内部认知**
+**为什么不靠 install_uid 来"一次退役整台设备"**：设备级那档本来就需要逐空间各一次会话，
+而客户端 Vault 里存着每个空间的 token，逐个调即可；install_uid 只是**服务端内部认知**
 （见 §3.7），不参与任何破坏性操作的范围或授权判断。
 
 **入口可达性** `[已定 ⑦]` + **实现注记（M2）**：SpaceListPage **不是只在多空间时才存在**——
@@ -418,7 +419,7 @@ active 让给剩下的第一个），一个都不剩 → 回向导。
 | `_kProfile` 旧 key | v7 迁移到 `app_lock.profile.<首个空间>` |
 | per-space 设置键 | v7 迁移 + `BurnAfterSettings` 等读取函数改带 spaceId 参数（默认回退旧 key 一次） |
 | `local_attachments` | v7 加 spaceId 列并按 messageId 回填；目录按 space 分（§3.5） |
-| `identity.device_person_map` | 删除空间时清理该空间条目（§3.6） |
+| `identity.entrance_partner_map` | 删除空间时清理该空间条目（§3.6） |
 | 撤销自毁路径 | 改逐空间 scope（§4.4） |
 | 设备名 | Vault 级统一；旧单包无此字段 → 取现有空间已登记的名字，缺省空 |
 | golden 测试 | 单空间用户路径 UI 不变，golden 应保持绿；SpaceListPage 不加 golden（政策：不重刷） |
@@ -452,9 +453,9 @@ active 让给剩下的第一个），一个都不剩 → 回向导。
 | M0.5 数据底座 ✅ **已完成**（2026-09-22，分支 `feature/multiSpace`） | Spaces 表（v7） + Vault 读写 + 迁移（**未做任何 UI**） | 单测 1–3 绿；旧数据升级后单空间行为不变；全量 `flutter test` 无回归 |
 | M1 数据与隔离 ✅ **已完成**（2026-09-22） | per-space 设置键 + 附件 spaceId + 媒体缓存跨空间保留 + **撤销自毁逐空间化** + removeSpace 数据清理 | 单测 4–6 绿；单空间路径无回归（全量 156 过 0 失败） |
 | M2 会话切换 ✅ **已完成**（2026-09-22） | StartupGate 分支 + SpaceListPage + 常驻入口 + ChatPage 切换入口 + 向导回调 + WS 随切换重建 | 手动：双空间创建/加入/切换/删除全流程（**老板真机自测**）；页面测试 7–9 绿 |
-| M3 收尾 ✅ **已完成**（2026-09-22） | ✅ `device_uid` 服务端认知（§3.7）✅ 破坏性入口两档化（§5.5）✅ 真机自测 3 条 bug（菜单顺序 / 对方名串空间 / 同性别气泡同色）✅ 删除孤儿 `clear()` ✅ 术语（`docs/GLOSSARY.md` + 文案限定）✅ **未读（服务端派生 `GET /messages/unread` + 数字角标，§4.2）** ✅ `projectPlan` 改为索引；⏳ 真机自测未读角标 | 全量 `flutter test` 167→**168 通过 0 失败**；服务端全套 `npm test` 无回归（含新增 unread 3 条） |
+| M3 收尾 ✅ **已完成**（2026-09-22） | ✅ `install_uid` 服务端认知（§3.7）✅ 破坏性入口两档化（§5.5）✅ 真机自测 3 条 bug（菜单顺序 / 对方名串空间 / 同性别气泡同色）✅ 删除孤儿 `clear()` ✅ 术语（`docs/GLOSSARY.md` + 文案限定）✅ **未读（服务端派生 `GET /messages/unread` + 数字角标，§4.2）** ✅ `projectPlan` 改为索引；⏳ 真机自测未读角标 | 全量 `flutter test` 167→**168 通过 0 失败**；服务端全套 `npm test` 无回归（含新增 unread 3 条） |
 
-二期（另行评审）：多空间并行 WS、非当前空间后台轮询、跨 server 空间、共用 deviceId
+二期（另行评审）：多空间并行 WS、非当前空间后台轮询、跨 server 空间、共用 entranceId
 （真实成本比原估低，见 §2.1）。
 
 ## 9. 决策记录
@@ -471,7 +472,7 @@ active 让给剩下的第一个），一个都不剩 → 回向导。
 | — | 设备撤销自毁**必须逐空间化**（§4.4，最高优先级） |
 | — | 非当前空间**不周期轮询**，但冷启动/切回时对所有空间做一次轻量 sync |
 | — | **破坏性入口分两档**（§5.5）：聊天页只做空间级「销毁本秘境通道」；整机清理只在空间列表页 |
-| — | **`device_uid` 只做服务端内部认知**（§3.7），不参与授权/范围判断、绝不进响应体 |
+| — | **`install_uid` 只做服务端内部认知**（§3.7），不参与授权/范围判断、绝不进响应体 |
 | — | 旧 `AppLockService.clear()` **删除**（无生产调用点 + 清单式删除易漏键）：清除只有 `removeSpace(spaceId)` 与 `resetLocalData()` 两家 |
 | — | **破坏性入口只保留空间级**（§5.5）：空间列表页不做任何破坏性操作；整机清空不呈现给用户（等价路径＝逐个退出 / 卸载重装） |
 | — | **未读走服务端派生**（§4.2）：新增 `GET /messages/unread`，客户端列表按空间各调一次显示数字角标；**不做**本地 `lastReadSequence` + 逐空间拉历史（离线无角标，可接受） |
@@ -481,5 +482,5 @@ active 让给剩下的第一个），一个都不剩 → 回向导。
 | # | 问题 | 建议 |
 | --- | --- | --- |
 | ② | 非当前空间的未读及时性：轻量 sync + 红点够不够？还是要精确计数 + 后台轮询？ | 先红点，精确计数随 `lastReadSequence` 一起上 |
-| ③ | 每空间独立设备身份 → 「本机信息」在不同空间是不同条目（只显示名称+公钥，不显示 deviceId） | 接受。~~用 Vault 级统一设备名抹平视觉差异~~ → **2026-09-22 修订为 per-space**（见 §2.2 注）：名字本质是**通道名**，同一台设备在不同秘境叫不同名字是合理的；改用文案限定 + 一行说明来消歧 |
+| ③ | 每空间独立设备身份 → 「本机信息」在不同空间是不同条目（只显示名称+公钥，不显示 entranceId） | 接受。~~用 Vault 级统一设备名抹平视觉差异~~ → **2026-09-22 修订为 per-space**（见 §2.2 注）：名字本质是**通道名**，同一台设备在不同秘境叫不同名字是合理的；改用文案限定 + 一行说明来消歧 |
 | ④ | ~~删除空间的本地语义：仅本地移除（server 端该设备行残留）~~ **2026-09-22 修订为：本地移除 + 服务端退役该空间那一行**（原方案会留下 active 幽灵设备；有了逐空间退役能力后没理由不顺手清干净） | 已按修订落地 |

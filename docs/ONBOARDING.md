@@ -41,9 +41,9 @@ B 加入（口令取钥）→ 双端互通对话。
 | **Space Key** | 32B 随机空间密钥（端到端加密用），创建者本地生成；加入方凭**口令**从口令密保箱取回 |
 | **口令（passphrase）** | 创建空间时设定，两人共用；对方凭它解出 Space Key。**别和邀请链接混淆** |
 | **邀请链接 / join token** | 一次性（默认 24h、用后作废），创建者 `/invite` 生成；B 拿它加入空间 |
-| **person / partner_slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。person_id 是空间内随机 UUID；同一身份可多台设备（"自己/对方"按 person_id 判断） |
+| **person / slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。partner_id 是空间内随机 UUID；同一身份可多台设备（"自己/对方"按 partner_id 判断） |
 | **设备登记** | 由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭 join token）完成，**同时签发绑定该空间的会话**——没有独立的登记步骤 |
-| **设备在册状态** | `devices` 表（`active` / `revoked`）；未登记 → 401/403 `FORBIDDEN`（只警告），已撤销 → 403 `DEVICE_REVOKED`（客户端自毁本地数据），无需任何配置文件 |
+| **设备在册状态** | `entrances` 表（`active` / `revoked`）；未登记 → 401/403 `FORBIDDEN`（只警告），已撤销 → 403 `ENTRANCE_REVOKED`（客户端自毁本地数据），无需任何配置文件 |
 
 ---
 
@@ -145,7 +145,7 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                |
 | 服务器重设   | `/server https://einz.tic.cc` | 重连并认证                                                 |
 | 补发开通码     | 任一方 `/invite`              | 打印新的 24h 一次性邀请链接（给自己加设备也用它）          |
-| 看设备列表   | 任一方 `/devices`             | 列出**同空间全部设备**（我 + 对方），带序号与在线/已撤销状态 |
+| 看设备列表   | 任一方 `/entrances`             | 列出**同空间全部设备**（我 + 对方），带序号与在线/已撤销状态 |
 | 撤销设备     | `/revoke`（或 `/revoke <序号\|设备名>`） | 选设备 → 输入 `yes` 确认 → 输入共享口令 → 该设备下次联网时**清空本地数据**（不可逆；口令错/无权则毫发无损） |
 
 ---
@@ -168,14 +168,14 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 
 ## 说明
 
-- **无配置文件**：设备与空间全在库里（`spaces` / `space_members` / `devices`）；`config.json`
+- **无配置文件**：设备与空间全在库里（`spaces` / `space_members` / `entrances`）；`config.json`
   这类静态白名单与 v1 脚本 CLI 已随 2026-09-15 收敛删除。
 - **信任模型**：`POST /spaces` 免认证（创建者此刻还没有凭证）——所以 `maxSpaces` 是开放注册的
   总闸；私有部署建议设成 1~2。空间一旦建立，只有持口令 + 有效 join token 的人能进来。
 - **会话必带空间**：认证时 `space_id` 必填；无 space 的会话不存在（也访问不到任何数据）。
 - **两人上限**：一个空间内 distinct person ≤2（同 person 多设备不限）；由 `space_members`
   的两个槽位在数据库层强制。
-- **撤销设备**：`POST /devices/:id/revoke`（需同空间成员认证 + **校验共享口令**）→ 标记
+- **撤销设备**：`POST /entrances/:id/revoke`（需同空间成员认证 + **校验共享口令**）→ 标记
   `revoked` + 清会话/Push Token + 关 WS；
   被撤销设备重启不复活（**不**做密钥轮换，见 `SECURITY.md` §3；止损走重建空间）。
 - **服务端监控**：`GET /health`（免鉴权）、`docker compose logs -f server`（含

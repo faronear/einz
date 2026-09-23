@@ -1,14 +1,14 @@
 /**
  * Multiverse 空间隔离测试（v2-native）。
  *
- * v1 收敛后（2026-09-15）不再有 `/devices/enroll` + 邀请码那一套：设备登记由
+ * v1 收敛后（2026-09-15）不再有 `/entrances/enroll` + 邀请码那一套：设备登记由
  * `POST /spaces`（创建者）/ `POST /spaces/join`（加入者）一步完成，会话必定绑定
  * 一个 space。本测试因此**只用 v2 入口**搭建两个互不相干的空间。
  *
  * 验证：
  *   1) 消息隔离：A 空间的 /sync 看不到 B 空间的消息，server_sequence 各自独立从 1 起；
  *   2) C1 回归：空间级端点必须持该空间成员会话（join-tokens / key-escrow 上传分支）；
- *   3) C2 回归：/devices 与 /space 只返回本空间设备；附件读写校验空间归属（含幂等重传）；
+ *   3) C2 回归：/entrances 与 /space 只返回本空间设备；附件读写校验空间归属（含幂等重传）；
  *   4) H4 回归：sessions 表只存 sha256，明文 token 不入库。
  *
  * 运行：npm test（需先 npm run build 生成 dist/）
@@ -68,8 +68,8 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
 /** 一个"空间 + 其创建者设备"的最小句柄（v2 入口：POST /spaces 一步登记 + 发会话）。 */
 interface SpacePeer {
   spaceId: string
-  deviceId: string
-  personId: string
+  entranceId: string
+  partnerId: string
   sessionToken: string
 }
 
@@ -79,23 +79,23 @@ async function createSpace (port: number, label: string): Promise<SpacePeer> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      person_name: label,
+      creator_name: label,
       public_key: sodium.to_base64(kp.publicKey, B64),
-      device_name: label
+      entrance_name: label
     })
   })
   assert.equal(res.status, 201, `create ${label} should succeed`)
   const b = (await res.json()) as {
     spaceId: string
-    deviceId: string
-    creatorPersonId: string
+    entranceId: string
+    creatorPartnerId: string
     sessionToken: string
   }
-  assert.ok(b.deviceId.length > 0 && b.sessionToken.length > 0, '创建者应直接拿到设备与会话')
+  assert.ok(b.entranceId.length > 0 && b.sessionToken.length > 0, '创建者应直接拿到设备与会话')
   return {
     spaceId: b.spaceId,
-    deviceId: b.deviceId,
-    personId: b.creatorPersonId,
+    entranceId: b.entranceId,
+    partnerId: b.creatorPartnerId,
     sessionToken: b.sessionToken
   }
 }
@@ -112,7 +112,7 @@ async function postMessage (port: number, peer: SpacePeer, messageId: string): P
       type: 'text',
       key_version: 1,
       message_id: messageId,
-      sender_device_id: peer.deviceId,
+      sender_entrance_id: peer.entranceId,
       nonce: 'x',
       ciphertext: 'y'
     })
@@ -221,28 +221,28 @@ async function main (): Promise<void> {
     )
 
     // ── C2 回归：设备列表 / 空间信息只含本空间设备 ──
-    const devicesOf = async (token: string): Promise<string[]> => {
-      const res = await fetch(`http://127.0.0.1:${port}/devices`, {
+    const entrancesOf = async (token: string): Promise<string[]> => {
+      const res = await fetch(`http://127.0.0.1:${port}/entrances`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      assert.equal(res.status, 200, '/devices should succeed')
-      const body = (await res.json()) as { devices: Array<{ device_id: string }> }
-      return body.devices.map(d => d.device_id)
+      assert.equal(res.status, 200, '/entrances should succeed')
+      const body = (await res.json()) as { entrances: Array<{ entrance_id: string }> }
+      return body.entrances.map(d => d.entrance_id)
     }
-    const devIdsA = await devicesOf(spaceA.sessionToken)
-    assert.ok(devIdsA.includes(spaceA.deviceId), 'A 的 /devices 应包含自己')
-    assert.ok(!devIdsA.includes(spaceB.deviceId), 'A 的 /devices 不得含 B 空间设备')
+    const devIdsA = await entrancesOf(spaceA.sessionToken)
+    assert.ok(devIdsA.includes(spaceA.entranceId), 'A 的 /entrances 应包含自己')
+    assert.ok(!devIdsA.includes(spaceB.entranceId), 'A 的 /entrances 不得含 B 空间设备')
 
-    const spaceDevices = async (token: string): Promise<string[]> => {
+    const spaceEntrances = async (token: string): Promise<string[]> => {
       const res = await fetch(`http://127.0.0.1:${port}/space`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       assert.equal(res.status, 200, '/space should succeed')
-      const body = (await res.json()) as { devices: Array<{ device_id: string }> }
-      return body.devices.map(d => d.device_id)
+      const body = (await res.json()) as { entrances: Array<{ entrance_id: string }> }
+      return body.entrances.map(d => d.entrance_id)
     }
-    const spaceDevA = await spaceDevices(spaceA.sessionToken)
-    assert.ok(!spaceDevA.includes(spaceB.deviceId), '/space 不得含 B 空间设备')
+    const spaceDevA = await spaceEntrances(spaceA.sessionToken)
+    assert.ok(!spaceDevA.includes(spaceB.entranceId), '/space 不得含 B 空间设备')
 
     // ── C2 回归：跨空间附件——A 发消息并挂附件，B 读 404、挂 403 ──
     assert.equal(await postMessage(port, spaceA, 'c0001aaaa'), 2, 'A 第二条消息')

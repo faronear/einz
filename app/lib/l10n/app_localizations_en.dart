@@ -517,24 +517,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGenderLabel => 'Gender';
 
   @override
-  String get chatPageRenameDeviceTitle => 'Current entrance';
+  String get chatPageRenameEntranceTitle => 'Current entrance';
 
   @override
-  String get chatPageRenameDeviceLabel => 'Entrance name';
+  String get chatPageRenameEntranceLabel => 'Entrance name';
 
   @override
-  String get chatPageDeviceScopeHint =>
+  String get chatPageEntranceScopeHint =>
       'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.';
 
   @override
-  String get chatPageRenameDeviceEmptyError => 'Enter the entrance name';
+  String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';
 
   @override
-  String get chatPageRenameDeviceInvalidError =>
+  String get chatPageRenameEntranceInvalidError =>
       'Only Chinese/English letters, digits, _ and - are allowed';
 
   @override
-  String chatPageRenameDeviceTooLongError(int max) {
+  String chatPageRenameEntranceTooLongError(int max) {
     return 'At most $max characters';
   }
 
@@ -674,7 +674,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMyNameLabel => 'My identity';
 
   @override
-  String get chatPageMenuDeviceNameLabel => 'Current entrance';
+  String get chatPageMenuEntranceNameLabel => 'Current entrance';
 
   @override
   String get chatPagePinLabel => 'PIN';
@@ -753,7 +753,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageDeviceUnrecognized =>
+  String get chatPageEntranceUnrecognized =>
       'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared';
 
   @override
@@ -866,14 +866,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageDeviceRevoked =>
+  String get chatPageEntranceRevoked =>
       'Entrance revoked — local data cleared, please set up again';
 
   @override
-  String get chatPageDevicePublicKeyLabel => 'Public key of this entrance';
+  String get chatPageEntrancePublicKeyLabel => 'Public key of this entrance';
 
   @override
-  String get chatPageDevicePublicKeyFailed => 'Not recorded';
+  String get chatPageEntrancePublicKeyFailed => 'Not recorded';
 
   @override
   String get burnOptionOff => 'Off';
@@ -958,30 +958,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!';
 
   @override
-  String resetDeviceNameLabel(String name) {
+  String resetEntranceNameLabel(String name) {
     return '$name';
   }
 
   @override
-  String resetDeviceNameHint(String name) {
+  String resetEntranceNameHint(String name) {
     return 'Type the current entrance name “$name”';
   }
 
   @override
-  String get resetDeviceNameMismatch =>
+  String get resetEntranceNameMismatch =>
       'Enter the correct entrance name to confirm';
 
   @override
-  String get resetDeviceConfirmWord => 'RESET';
+  String get resetInstallConfirmWord => 'RESET';
 
   @override
-  String get resetDevicePinLabel => 'PIN';
+  String get resetInstallPinLabel => 'PIN';
 
   @override
-  String get resetDevicePinHint => 'Enter this device\'s PIN';
+  String get resetInstallPinHint => 'Enter this device\'s PIN';
 
   @override
-  String get resetDeviceServerResidualHint =>
+  String get resetInstallServerResidualHint =>
       '⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list';
 
   @override

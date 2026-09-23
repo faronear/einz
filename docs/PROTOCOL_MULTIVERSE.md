@@ -77,28 +77,28 @@ spaces (
 
 space_members (
   space_id          TEXT NOT NULL REFERENCES spaces(space_id),
-  person_id         TEXT NOT NULL,           -- 空间内 UUID
-  partner_slot      INTEGER NOT NULL,        -- 0/1，UNIQUE(space_id, partner_slot)
+  partner_id         TEXT NOT NULL,           -- 空间内 UUID
+  slot      INTEGER NOT NULL,        -- 0/1，UNIQUE(space_id, slot)
   display_name      TEXT,
   gender            TEXT,
   status            TEXT NOT NULL DEFAULT 'active',
   joined_at         INTEGER NOT NULL,
-  PRIMARY KEY (space_id, person_id)
+  PRIMARY KEY (space_id, partner_id)
 )
 
 join_tokens (
   space_id          TEXT NOT NULL REFERENCES spaces(space_id),
   token_hash        TEXT PRIMARY KEY,
-  created_by_device TEXT NOT NULL,
+  created_by_entrance TEXT NOT NULL,
   expires_at        INTEGER NOT NULL,
   used_at           INTEGER,                 -- NULL=未用
   created_at        INTEGER NOT NULL
 )
 
-devices（v1 表增加空间归属）
-  device_id         TEXT PRIMARY KEY,        -- UUIDv4（或保留 v1 现有 id 迁移）
+entrances（v1 表增加空间归属）
+  entrance_id         TEXT PRIMARY KEY,        -- UUIDv4（或保留 v1 现有 id 迁移）
   space_id          TEXT NOT NULL REFERENCES spaces(space_id),
-  person_id         TEXT NOT NULL,
+  partner_id         TEXT NOT NULL,
   public_key        TEXT NOT NULL UNIQUE,
   status            TEXT NOT NULL DEFAULT 'active',
   UNIQUE (space_id, public_key)
@@ -127,7 +127,7 @@ GET /health
 POST /spaces
   创建 Space（首设备自举，无 token）。
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,
-          personName?, partnerName?, customId? }   // personName=第一人名字（2026-09-16 由 displayName 改名）
+          partnerName?, peerName?, customId? }   // partnerName=第一人名字（2026-09-16 由 displayName 改名）
   响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token（含链接）
   错误：DEVICE_ALREADY_BOUND / ADDRESS_TAKEN / INVALID_ADDRESS / SPACE_LIMIT_REACHED
        （SPACE_LIMIT_REACHED：现有空间数 ≥ serverConfig.json 的 maxSpaces，409）
@@ -139,9 +139,9 @@ GET /spaces/lookup?address=... | ?custom_id=...
 
 POST /spaces/join
   用 join token 完成加入（第 3 步身份登记 + 取钥可在此前后拆分，见 §5）。
-  请求：{ token, publicKey, deviceName?, partnerSlot?, gender? }
+  请求：{ token, publicKey, entranceName?, slot?, gender? }
   （无名字字段：身份名取自 create 时为该 slot 预置的名字——2026-09-16）
-  响应：200 { spaceId, personId, partnerSlot, sessionToken }
+  响应：200 { spaceId, partnerId, slot, sessionToken }
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
        ENTRANCE_LIMIT_REACHED（该空间通道数已达 maxEntrancesPerSpace，409）
   （无"满员"错误：同身份可多设备，通道数只受 maxEntrancesPerSpace 约束——见 §6）
@@ -172,8 +172,8 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 ② 空间确认                        → GET /spaces/lookup?address=...（或 join 响应
      携带的 spaceId/名称/状态）
 ③ 身份登记（名字/性别）           → POST /spaces/join（补 identity 字段，
-     服务端事务：锁 Space 行 → 校验 token → 标记 used → 绑定 partnerSlot
-     （slot 已有人 → 复用其 person_id：同身份多设备；**不校验成员/通道数**））
+     服务端事务：锁 Space 行 → 校验 token → 标记 used → 绑定 slot
+     （slot 已有人 → 复用其 partner_id：同身份多设备；**不校验成员/通道数**））
 ④ 口令 escrow 取 Space Key        → POST /spaces/{spaceId}/key-escrow/verify
      （提交口令，解开创建者托管的口令密封包，返回 space_key 密封内容）
 ⑤ 设置 PIN                       → 本机操作（AppLock），无服务端调用
@@ -205,7 +205,7 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `ESCROW_VERIFY_FAILED` | 口令 escrow 验证失败（口令错误；取包与撤销设备共用） | 401 |
 | `ESCROW_RATE_LIMITED` | 口令尝试过多（按 space 计失败次数，滑窗内超限） | 429 |
 | `PASSPHRASE_NOT_SET` | 该空间未托管共享口令，无法做二次校验（撤销设备要求先设置口令） | 409 |
-| `DEVICE_REVOKED` | 本设备已被明确撤销（`/auth/challenge`、会话校验）：客户端应清空本地数据后重新入网 | 403 |
+| `ENTRANCE_REVOKED` | 本设备已被明确撤销（`/auth/challenge`、会话校验）：客户端应清空本地数据后重新入网 | 403 |
 | `FORBIDDEN` | 设备未登记（含服务端库被清空/重置）：客户端**只应警告**，不得清空本地数据 | 403 |
 
 ## 7. 安全要求与待定项

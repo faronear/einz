@@ -9,7 +9,7 @@ import 'package:einz_cli/store.dart';
 
 void main() {
   test('spaceKeyForVersion：当前版本可取，未知版本返回 null', () {
-    final store = DeviceStore(publicKey: 'pk', privateKey: 'sk')
+    final store = EntranceStore(publicKey: 'pk', privateKey: 'sk')
       ..spaceKey = 'CURRENT'
       ..spaceId = 'space-1'
       ..keyVersion = 1;

@@ -53,7 +53,7 @@ class SetupPage extends StatefulWidget {
   final LocalDatabase? db;
 
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 probeServer。
-  /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 person 表，
+  /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 partner 表，
   /// 角色改由空间入口页让用户选择。
   final Future<(bool, String, List<String>)> Function(String server)? probeServer;
 
@@ -68,11 +68,11 @@ class SetupPage extends StatefulWidget {
 
   /// 测试注入：challenge-response 认证（生产走真实 ApiClient.challenge/verify；
   /// 注入后不发起网络请求，供 golden 走 PIN/跳过路径）。
-  final Future<SessionResult> Function(DeviceKeyPair kp, String enrolledDeviceId)? authOverride;
+  final Future<SessionResult> Function(EntranceKeyPair kp, String enrolledEntranceId)? authOverride;
 
   /// 测试注入：固定设备密钥对（登记/认证需要确定性密钥；生产传 null 则自动生成。
   /// 名字步骤的密钥信息卡已移除——技术细节不展示给用户）。
-  final DeviceKeyPair? keyPairOverride;
+  final EntranceKeyPair? keyPairOverride;
 
   /// 测试注入：替换 escrow 服务（join 口令验证；fake 可模拟口令对/错/未托管）。
   final KeyEscrowService Function(String server)? escrowOverride;
@@ -90,13 +90,13 @@ class SetupPage extends StatefulWidget {
 }
 
 class _SetupPageState extends State<SetupPage> {
-  String? _autoDeviceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
-  final _personName = TextEditingController(); // 首设备：第一个用户的名字
-  String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 person_name 同步服务端）
+  String? _autoEntranceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
+  final _creatorName = TextEditingController(); // 首设备：第一个用户的名字
+  String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 creator_name 同步服务端）
   String? _genderError; // 性别未选提醒（红字显示在选项卡下方；选中即清除）
-  final _partnerNameCtrl = TextEditingController(); // create 步骤 2：伴侣（第二人）名字（必填）
-  String? _partnerGender; // create 步骤 2：伴侣性别（'male'/'female'，必选）
-  String? _partnerGenderError; // 伴侣性别未选提醒
+  final _peerNameCtrl = TextEditingController(); // create 步骤 2：伴侣（第二人）名字（必填）
+  String? _peerGender; // create 步骤 2：伴侣性别（'male'/'female'，必选）
+  String? _peerGenderError; // 伴侣性别未选提醒
   List<SpaceMemberSlot> _joinSlots = const []; // join：preflight 返回的两身份 slot（身份选择页展示）
   int? _chosenSlot; // join 步骤 2：所选身份（0=第一人/创建者，1=第二人/伴侣）
   String? _slotError; // 身份未选提醒
@@ -123,9 +123,9 @@ class _SetupPageState extends State<SetupPage> {
   // FocusScope.unfocus，依赖 Scaffold 的 resizeToAvoidBottomInset——
   // Android 已配 adjustResize，行为同 iOS。
   final _nameFocus = FocusNode();
-  final _partnerNameFocus = FocusNode();
+  final _peerNameFocus = FocusNode();
   final _myGenderRevealKey = GlobalKey();
-  final _partnerGenderRevealKey = GlobalKey();
+  final _peerGenderRevealKey = GlobalKey();
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
   // 空间显示名（进入聊天页的对方名字）
   String _joinToken = '';
@@ -157,7 +157,7 @@ class _SetupPageState extends State<SetupPage> {
   // 向导状态：角色分流 + 步骤索引 + 跨步骤共享数据
   _WizardRole? _role;
   int _step = 0;
-  DeviceKeyPair? _keyPair;
+  EntranceKeyPair? _keyPair;
   Uint8List? _spaceKey;
   String? _sessionToken;
   int _joinKeyVersion = 1; // join 口令验证时记录的 Space Key 版本（_verifyJoinPassphrase 填充）
@@ -169,9 +169,9 @@ class _SetupPageState extends State<SetupPage> {
   /// （create 回步骤 2 / join 回步骤 3），实现口令⇄信封自由互切。
   _WizardRole _preEnvelopeRole = _WizardRole.join;
 
-  /// 设备登记结果（服务端分配的真实 deviceId/personId/spaceId）。
-  /// 认证（challenge）与进聊天页一律用它，不用本地临时 deviceId。
-  DeviceBinding? _enroll;
+  /// 设备登记结果（服务端分配的真实 entranceId/partnerId/spaceId）。
+  /// 认证（challenge）与进聊天页一律用它，不用本地临时 entranceId。
+  EntranceBinding? _enroll;
 
   /// create 自举失败（服务器已有空间设备）时为 true → 展示改用"加入"的引导。
   bool _bootstrapFailed = false;
@@ -179,8 +179,8 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     _nameFocus.dispose();
-    _partnerNameFocus.dispose();
-    _personName.dispose();
+    _peerNameFocus.dispose();
+    _creatorName.dispose();
     _spaceId.dispose();
     _envelopeKey.dispose();
     _escrowPassphrase.dispose();
@@ -197,7 +197,7 @@ class _SetupPageState extends State<SetupPage> {
     super.initState();
     // 方案 1：名字/伴侣名输入框聚焦时，键盘升起后把性别卡滚入可见区（见 _revealGender）
     _nameFocus.addListener(_onNameFocusChange);
-    _partnerNameFocus.addListener(_onPartnerNameFocusChange);
+    _peerNameFocus.addListener(_onPeerNameFocusChange);
     _initServer();
     _autoGenerateKey(); // 对齐 TUI：本地无设备记录即自动生成公私钥，无需用户点按钮
   }
@@ -212,8 +212,8 @@ class _SetupPageState extends State<SetupPage> {
     }
     setState(() => _busy = true);
     try {
-      final pair = await DeviceKeyPair.generate(
-          deviceId: 'dev-mobile'); // 本地占位 id；登记后一律以服务端分配的真实 id 为准
+      final pair = await EntranceKeyPair.generate(
+          entranceId: 'dev-mobile'); // 本地占位 id；登记后一律以服务端分配的真实 id 为准
       if (!mounted) return;
       setState(() => _keyPair = pair);
     } catch (e) {
@@ -225,7 +225,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 服务器地址初始化：读持久化值（无则默认 einz.tic.cc）→ 快速探测。
-  /// Multiverse：探测成功不再按 /health person 表自动判定 create/join——停留
+  /// Multiverse：探测成功不再按 /health partner 表自动判定 create/join——停留
   /// 在空间入口页由用户选择（新建空间 / 输入邀请链接加入）；旧服务器
   /// （protocol_version 非 multiverse）标记 _legacyServer 提示升级。
   /// 无法连接 → splash 底部浮现"正在连接 <地址>"小字并自动重试（降低小白负担）。
@@ -616,8 +616,8 @@ class _SetupPageState extends State<SetupPage> {
     if (_nameFocus.hasFocus) _revealGender(_myGenderRevealKey, 1.0);
   }
 
-  void _onPartnerNameFocusChange() {
-    if (_partnerNameFocus.hasFocus) _revealGender(_partnerGenderRevealKey, 1.0);
+  void _onPeerNameFocusChange() {
+    if (_peerNameFocus.hasFocus) _revealGender(_peerGenderRevealKey, 1.0);
   }
 
   // 把指定 key 的控件滚入最近滚动视图的可见区；延迟一拍等键盘收起动画结束再算视口
@@ -640,17 +640,17 @@ class _SetupPageState extends State<SetupPage> {
     if (_role == _WizardRole.create && _step == 1) {
       key = _myGenderRevealKey;
     } else if (_role == _WizardRole.create && _step == 2) {
-      key = _partnerGenderRevealKey;
+      key = _peerGenderRevealKey;
     }
     if (key != null) _revealGender(key);
   }
 
-  /// 用户名称不合规 → 红字文案（规则见 shared person_name_policy：中英文/数字/
+  /// 用户名称不合规 → 红字文案（规则见 shared partner_name_policy：中英文/数字/
   /// `_`/`-`/emoji，≤32；名字一律是用户输入的，不静默改写）。
-  String _nameRuleError(PersonNameViolation violation) {
+  String _nameRuleError(PartnerNameViolation violation) {
     final l10n = AppLocalizations.of(context)!;
-    return violation == PersonNameViolation.tooLong
-        ? l10n.wizardNameTooLongError(kPersonNameMaxLength)
+    return violation == PartnerNameViolation.tooLong
+        ? l10n.wizardNameTooLongError(kPartnerNameMaxLength)
         : l10n.wizardNameInvalidError;
   }
 
@@ -675,11 +675,11 @@ class _SetupPageState extends State<SetupPage> {
     var invalid = false;
     // 名字+性别页（create 步骤 1——Multiverse join 改为身份选择页，不再自填名字）
     if (_role == _WizardRole.create && _step == 1) {
-      final mine = _personName.text.trim();
+      final mine = _creatorName.text.trim();
       if (mine.isEmpty) {
         localError = l10n.wizardNameRequired;
         invalid = true;
-      } else if (checkPersonNamePolicy(mine) case final v?) {
+      } else if (checkPartnerNamePolicy(mine) case final v?) {
         // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
         localError = _nameRuleError(v);
         invalid = true;
@@ -699,18 +699,18 @@ class _SetupPageState extends State<SetupPage> {
     }
     // 伴侣页（create 步骤 2）：名字与性别都必填（老板 2026-09-10 定稿——
     // create 录入两人身份，join 时按身份选择而非自填名字）
-    String? partnerGenderError;
+    String? peerGenderError;
     if (_role == _WizardRole.create && _step == 2) {
-      final partner = _partnerNameCtrl.text.trim();
+      final partner = _peerNameCtrl.text.trim();
       if (partner.isEmpty) {
         localError = l10n.wizardPeerNameRequired;
         invalid = true;
-      } else if (checkPersonNamePolicy(partner) case final v?) {
+      } else if (checkPartnerNamePolicy(partner) case final v?) {
         localError = _nameRuleError(v);
         invalid = true;
       }
-      if (_partnerGender == null) {
-        partnerGenderError = l10n.wizardGenderRequired;
+      if (_peerGender == null) {
+        peerGenderError = l10n.wizardGenderRequired;
         invalid = true;
       }
     }
@@ -746,7 +746,7 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _localError = localError;
         _genderError = genderError;
-        _partnerGenderError = partnerGenderError;
+        _peerGenderError = peerGenderError;
         _slotError = slotError;
       });
       // 性别未选等红字警告：滚入可见区（键盘已收起，整页露出，用户看得到该怎么改）
@@ -931,7 +931,7 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepName();
           case 2:
-            return _buildStepPartner();
+            return _buildStepPeer();
           case 3:
             return _buildStepPassphrase();
           case 4:
@@ -1084,7 +1084,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 第 0 步（角色未判定时）：显示探测状态（密保信封导入在口令页有次级入口）。
-  /// 角色由服务器探测自动判定（person 名称表空=首设备 create，非空=后续设备 join），
+  /// 角色由服务器探测自动判定（partner 名称表空=首设备 create，非空=后续设备 join），
   /// 不再让用户手动选择。
   Widget _buildDetectAndEnvelope() {
     final l10n = AppLocalizations.of(context)!;
@@ -1112,22 +1112,22 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 辅助：认证 / PIN 设置 / 进聊天页 ----
 
   /// challenge-response 认证，返回 session（PROTOCOL.md §4）。
-  /// [enrolledDeviceId] 用登记后服务端分配的真实 id（challenge 要求设备已入网）。
+  /// [enrolledEntranceId] 用登记后服务端分配的真实 id（challenge 要求设备已入网）。
   /// [spaceId] 必填（Multiverse）：签发的 session 绑定该 Space，缺了服务端返回 400
   /// （auth.ts:40-42）。会话过期自动续期也走这里，漏传会把本可自动恢复的消息变成
   /// 永久发送失败（老板 2026-09-22 排查线上红色标签时发现）。
   Future<SessionResult> _authenticate(
-    DeviceKeyPair kp,
-    String enrolledDeviceId, {
+    EntranceKeyPair kp,
+    String enrolledEntranceId, {
     required String spaceId,
   }) async {
     // 测试注入优先（golden 走 PIN/跳过路径时避免真实网络请求）
     if (widget.authOverride != null) {
-      return widget.authOverride!(kp, enrolledDeviceId);
+      return widget.authOverride!(kp, enrolledEntranceId);
     }
     final s = await sodium();
     final api = ApiClient(effectiveServer);
-    final challenge = await api.challenge(enrolledDeviceId, spaceId: spaceId);
+    final challenge = await api.challenge(enrolledEntranceId, spaceId: spaceId);
     final opened = await sealOpen(
       s,
       base64Decode(challenge.sealedChallenge),
@@ -1201,16 +1201,16 @@ class _SetupPageState extends State<SetupPage> {
   /// "SM-S918B"）；平台通道不可用（widget 测试等）时回退 'dev-mobile'。
   /// 型号里的空格/符号按设备名规则换成 `_`（老板 2026-09-16：只允许中英文、
   /// 数字、`_`、`-`，≤32）——"iPhone 15 Pro" → "iPhone_15_Pro"。
-  Future<String> _autoDeviceName() async {
-    if (_autoDeviceNameCache != null) return _autoDeviceNameCache!;
+  Future<String> _autoEntranceName() async {
+    if (_autoEntranceNameCache != null) return _autoEntranceNameCache!;
     var name = 'dev-mobile';
     try {
       final info = await DeviceInfoPlugin().deviceInfo;
       final model = (info as dynamic).model?.toString().trim();
       if (model != null && model.isNotEmpty) name = model;
     } catch (_) {}
-    name = sanitizeDeviceName(name);
-    _autoDeviceNameCache = name;
+    name = sanitizeEntranceName(name);
+    _autoEntranceNameCache = name;
     return name;
   }
 
@@ -1219,7 +1219,7 @@ class _SetupPageState extends State<SetupPage> {
   /// （口令托管上传已与 PIN 解耦：由各 _run* 在设锁/跳过之前统一上传，见 _runPinSetup）
   Future<bool> _setupLockAndEnter({
     required String spaceId,
-    required String deviceId,
+    required String entranceId,
     required String spaceKeyB64,
     required int keyVersion,
     required String token,
@@ -1244,7 +1244,7 @@ class _SetupPageState extends State<SetupPage> {
     try {
       final payload = AppLockPayload(
         spaceId: spaceId,
-        deviceId: deviceId,
+        entranceId: entranceId,
         spaceKeyB64: spaceKeyB64,
         keyVersion: keyVersion,
         token: token,
@@ -1261,31 +1261,31 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 完成动作：进入聊天页（create/join/offline 填充数据后统一调用；
-  /// deviceId/spaceId 一律用登记后服务端返回的真实值）。
+  /// entranceId/spaceId 一律用登记后服务端返回的真实值）。
   Future<void> _finish() async {
     final kp = _keyPair;
     final enroll = _enroll;
     final sk = _spaceKey;
     final token = _sessionToken;
     if (kp == null || enroll == null || sk == null || token == null) return;
-    final deviceName = await _autoDeviceName(); // 设备型号（async 主体内计算，避免在 builder 闭包 await）
+    final entranceName = await _autoEntranceName(); // 设备型号（async 主体内计算，避免在 builder 闭包 await）
     // 名字持久化：PIN 解锁/重启后 ChatPage 恢复显示（AppLockPayload 不含名字）。
     // await 确保 profile 写入完成后再进聊天（消除 unawaited 竞态——2026-09-07
     // 老板实测：设 PIN 重启解锁后顶部条丢名字）
     await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
       spaceId: _spaceId.text.trim(), // per-space 资料（多空间）
       // 本人名字：join=所选身份（create 预置）；create=自填
-      personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
+      partnerName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
       // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
       // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
-      peerName: _role == _WizardRole.join ? _joinPeerName : _partnerNameCtrl.text.trim(),
-      deviceName: deviceName,
+      peerName: _role == _WizardRole.join ? _joinPeerName : _peerNameCtrl.text.trim(),
+      entranceName: entranceName,
       // 本人性别：join=所选身份性别；create=自填
       myGender: _role == _WizardRole.join ? _joinSelectedGender : (_myGender ?? ''),
       // 对方性别：join=另一个身份 slot 的性别；create=向导所选伴侣性别
       // （v1 语义；v2 曾写死空串 → 对方气泡一律灰色——老板 2026-09-11）
       peerGender:
-          _role == _WizardRole.join ? _joinPeerGender : (_partnerGender ?? ''),
+          _role == _WizardRole.join ? _joinPeerGender : (_peerGender ?? ''),
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     final completed = widget.onCompleted;
@@ -1293,7 +1293,7 @@ class _SetupPageState extends State<SetupPage> {
       // 多空间：凭证交给调用方（它负责 addSpace 与导航），本页不再硬跳聊天页
       await completed(AppLockPayload(
         spaceId: _spaceId.text.trim(),
-        deviceId: enroll.deviceId,
+        entranceId: enroll.entranceId,
         spaceKeyB64: base64Encode(sk),
         keyVersion: 1,
         token: token,
@@ -1305,21 +1305,21 @@ class _SetupPageState extends State<SetupPage> {
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => ChatPage(
         spaceId: _spaceId.text.trim(),
-        deviceId: enroll.deviceId,
+        entranceId: enroll.entranceId,
         spaceKey: sk,
         keyVersion: 1,
         token: token,
-        personName: _role == _WizardRole.join ? _joinSelectedName : _personName.text.trim(),
-        personId: enroll.personId,
+        partnerName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
+        partnerId: enroll.partnerId,
         // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
         // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
-        peerName: _role == _WizardRole.join ? _joinPeerName : _partnerNameCtrl.text.trim(),
-        deviceName: deviceName,
+        peerName: _role == _WizardRole.join ? _joinPeerName : _peerNameCtrl.text.trim(),
+        entranceName: entranceName,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
         // session 过期自动续期：复用本页 challenge-response 流程重新签发 token
         reauth: () async =>
-            (await _authenticate(kp, enroll.deviceId, spaceId: _spaceId.text.trim()))
+            (await _authenticate(kp, enroll.entranceId, spaceId: _spaceId.text.trim()))
                 .sessionToken,
         // 「切换空间」不再需要注入回调：聊天页自己从内存会话（VaultSession）里取其他空间，
         // 也不再需要锁屏码（当前空间落明文键）。刚配完就进聊天即可。
@@ -1339,7 +1339,7 @@ class _SetupPageState extends State<SetupPage> {
       children: [
         _stepHeader(l10n.wizardTitleName, l10n.wizardNameHint),
         TextField(
-          controller: _personName,
+          controller: _creatorName,
           focusNode: _nameFocus, // 方案 1：聚焦时滚出性别卡
           autofocus: true,
           style: const TextStyle(fontSize: 20),
@@ -1400,15 +1400,15 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 步骤 2（create，Multiverse）：伴侣（第二人）的名字/性别——必填（老板
   /// 2026-09-10 定稿：create 录入两人身份，join 时按身份选择而非自填名字）。
-  Widget _buildStepPartner() {
+  Widget _buildStepPeer() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _stepHeader(l10n.wizardTitlePeerName, l10n.wizardPeerNameHint),
         TextField(
-          controller: _partnerNameCtrl,
-          focusNode: _partnerNameFocus, // 方案 1：聚焦时滚出性别卡
+          controller: _peerNameCtrl,
+          focusNode: _peerNameFocus, // 方案 1：聚焦时滚出性别卡
           autofocus: true,
           style: const TextStyle(fontSize: 20),
           onChanged: (_) {
@@ -1422,21 +1422,21 @@ class _SetupPageState extends State<SetupPage> {
         if (_localError != null) _localErrorHint(_localError!),
         const SizedBox(height: 20),
         Container(
-          key: _partnerGenderRevealKey, // 校验失败红字警告滚入可见区的锚点
+          key: _peerGenderRevealKey, // 校验失败红字警告滚入可见区的锚点
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildGenderSelector(
-                selected: _partnerGender,
+                selected: _peerGender,
                 label: l10n.wizardPeerGenderLabel,
                 maleLabel: l10n.wizardGenderMale,
                 femaleLabel: l10n.wizardGenderFemale,
                 onChanged: (g) => setState(() {
-                  _partnerGender = g;
-                  _partnerGenderError = null; // 选中即清除未选提醒
+                  _peerGender = g;
+                  _peerGenderError = null; // 选中即清除未选提醒
                 }),
               ),
-              if (_partnerGenderError != null) _localErrorHint(_partnerGenderError!),
+              if (_peerGenderError != null) _localErrorHint(_peerGenderError!),
             ],
           ),
         ),
@@ -1773,22 +1773,22 @@ class _SetupPageState extends State<SetupPage> {
       final created = await (widget.createOverride?.call() ??
           api.createSpace(
             spaceId: spaceId,
-            personName: _personName.text.trim(),
-            gender: _myGender,
-            partnerName: _partnerNameCtrl.text.trim(),
-            partnerGender: _partnerGender,
+            creatorName: _creatorName.text.trim(),
+            creatorGender: _myGender,
+            peerName: _peerNameCtrl.text.trim(),
+            peerGender: _peerGender,
             sealedSpaceKey: sealed,
             escrowPassphrase: passphrase.isEmpty ? null : passphrase,
             publicKey: kp.publicKeyB64,
-            deviceName: await _autoDeviceName(),
+            entranceName: await _autoEntranceName(),
             // 安装级设备标识（多空间）：同一台设备各空间共用，服务端内部关联用
-            deviceUid: await AppLockService(widget.db ?? LocalDatabase.shared).deviceUid(),
+            installUid: await AppLockService(widget.db ?? LocalDatabase.shared).installUid(),
           ));
       if (!mounted) return;
       _sessionToken = created.sessionToken;
-      _enroll = DeviceBinding(
-        deviceId: created.deviceId,
-        personId: created.creatorPersonId,
+      _enroll = EntranceBinding(
+        entranceId: created.entranceId,
+        partnerId: created.creatorPartnerId,
         spaceId: created.spaceId,
       );
       // 此前 create 流程漏填 _spaceId.text（仅 join/offline 填写）→ ChatPage 拿空
@@ -2089,10 +2089,10 @@ class _SetupPageState extends State<SetupPage> {
       // Space Key 用 libsodium 的 CSPRNG（与文档口径统一：随机数只走 libsodium；
       // Dart 的 Random.secure() 也是 CSPRNG，但两套来源没必要并存，2026-09-15 评审 S15）
       _spaceKey ??= (await sodium()).randombytes.buf(32);
-      // 2) 认证（缓存 session；用登记后服务端分配的真实 deviceId）
+      // 2) 认证（缓存 session；用登记后服务端分配的真实 entranceId）
       var token = _sessionToken;
       if (token == null) {
-        final session = await _authenticate(kp, _enroll!.deviceId,
+        final session = await _authenticate(kp, _enroll!.entranceId,
             spaceId: _spaceId.text.trim());
         token = session.sessionToken;
         _sessionToken = token;
@@ -2103,7 +2103,7 @@ class _SetupPageState extends State<SetupPage> {
         if (!mounted) return;
         await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
           spaceId: _spaceId.text.trim(),
-          deviceId: _enroll!.deviceId,
+          entranceId: _enroll!.entranceId,
           spaceKeyB64: base64Encode(_spaceKey!),
           keyVersion: 1,
           token: token,
@@ -2115,7 +2115,7 @@ class _SetupPageState extends State<SetupPage> {
       }
       final ok = await _setupLockAndEnter(
         spaceId: _spaceId.text.trim(),
-        deviceId: _enroll!.deviceId,
+        entranceId: _enroll!.entranceId,
         spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: 1,
         token: token,
@@ -2277,16 +2277,16 @@ class _SetupPageState extends State<SetupPage> {
             api.joinSpace(
               token: _joinToken,
               publicKey: kp.publicKeyB64,
-              partnerSlot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
-              deviceName: await _autoDeviceName(),
+              slot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
+              entranceName: await _autoEntranceName(),
               // 安装级设备标识（多空间）：同一台设备各空间共用，服务端内部关联用
-              deviceUid: await AppLockService(widget.db ?? LocalDatabase.shared).deviceUid(),
+              installUid: await AppLockService(widget.db ?? LocalDatabase.shared).installUid(),
             ));
         if (!mounted) return false;
         _sessionToken = join.sessionToken;
-        _enroll = DeviceBinding(
-          deviceId: join.deviceId,
-          personId: join.personId,
+        _enroll = EntranceBinding(
+          entranceId: join.entranceId,
+          partnerId: join.partnerId,
           spaceId: join.spaceId,
         );
         _joinedToken = _joinToken;
@@ -2335,7 +2335,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
         spaceId: _spaceId.text,
-        deviceId: _enroll!.deviceId,
+        entranceId: _enroll!.entranceId,
         spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: _joinKeyVersion,
         token: _sessionToken!,
@@ -2347,7 +2347,7 @@ class _SetupPageState extends State<SetupPage> {
     }
     final ok = await _setupLockAndEnter(
       spaceId: _spaceId.text,
-      deviceId: _enroll!.deviceId,
+      entranceId: _enroll!.entranceId,
       spaceKeyB64: base64Encode(_spaceKey!),
       keyVersion: _joinKeyVersion,
       token: _sessionToken!,
@@ -2432,9 +2432,9 @@ class _SetupPageState extends State<SetupPage> {
     final kp = _keyPair;
     if (kp == null) return;
     final enroll = _enroll!;
-    // 认证（用登记后的真实 deviceId；信封页验证时未认证则这里补上）
+    // 认证（用登记后的真实 entranceId；信封页验证时未认证则这里补上）
     if (_sessionToken == null) {
-      final session = await _authenticate(kp, enroll.deviceId, spaceId: enroll.spaceId);
+      final session = await _authenticate(kp, enroll.entranceId, spaceId: enroll.spaceId);
       _sessionToken = session.sessionToken;
     }
     if (!mounted) return;
@@ -2443,7 +2443,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       await AppLockService(widget.db ?? LocalDatabase.shared).savePlain(AppLockPayload(
         spaceId: enroll.spaceId,
-        deviceId: enroll.deviceId,
+        entranceId: enroll.entranceId,
         spaceKeyB64: base64Encode(_spaceKey!),
         keyVersion: 1,
         token: _sessionToken!,
@@ -2455,7 +2455,7 @@ class _SetupPageState extends State<SetupPage> {
     }
     final ok = await _setupLockAndEnter(
       spaceId: enroll.spaceId,
-      deviceId: enroll.deviceId,
+      entranceId: enroll.entranceId,
       spaceKeyB64: base64Encode(_spaceKey!),
       keyVersion: 1,
       token: _sessionToken!,

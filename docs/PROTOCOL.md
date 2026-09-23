@@ -3,7 +3,7 @@
 > **状态：** Draft v0.1（Phase 0 产出）
 > **权威性：** 本文档是 REST + WebSocket 协议的**唯一权威定义**；Client 与 Server 必须按本文档实现，任何不一致以本文档为准。
 > **关联文档：** `docs/E2EE.md`（密文信封与密钥）、`docs/DATABASE.md`（存储）、`aimemo/productLens.zhcn.md` §9（同步）、§13.3（时间）。
-> **术语：** `device_id` 是"**登记项**"（安装 × 秘境）的 id，不是物理设备 id——见 `docs/GLOSSARY.md`。
+> **术语：** `entrance_id` 是"**登记项**"（安装 × 秘境）的 id，不是物理设备 id——见 `docs/GLOSSARY.md`。
 
 ---
 
@@ -35,7 +35,7 @@
 
 ```json
 // 请求
-{ "device_id": "dev-a1", "space_id": "…" }
+{ "entrance_id": "dev-a1", "space_id": "…" }
 
 // 响应 200
 {
@@ -45,14 +45,14 @@
 }
 ```
 
-- challenge = 32 随机字节；Server 记录 `{challenge_id → challenge, device_id, space_id, 过期 5min, 一次性}`。
+- challenge = 32 随机字节；Server 记录 `{challenge_id → challenge, entrance_id, space_id, 过期 5min, 一次性}`。
 - **`space_id` 必填**（2026-09-15 v1 收敛后）：Multiverse 下所有数据按 space 隔离，会话必须绑定
   一个 space；缺省 → `400 INVALID_REQUEST`。v1 时代允许不带（签出"无 space 会话"），
   那类会话什么也访问不了，所以直接拒绝而不是让下游各自兜底。
-- **仅 devices 表内在册（且未撤销）的设备可发起**（E2EE.md §7.3、§8）。拒绝时**两种 code
+- **仅 entrances 表内在册（且未撤销）的设备可发起**（E2EE.md §7.3、§8）。拒绝时**两种 code
   必须区分**（2026-09-16）：
-  - 设备行存在但 `status='revoked'` → `403 DEVICE_REVOKED`（客户端据此清空本地数据）；
-  - devices 表**没有这一行**（库被清空/重置、从未登记）→ `403 FORBIDDEN`
+  - 设备行存在但 `status='revoked'` → `403 ENTRANCE_REVOKED`（客户端据此清空本地数据）；
+  - entrances 表**没有这一行**（库被清空/重置、从未登记）→ `403 FORBIDDEN`
     （客户端**只应警告**，绝不清空本地数据——运维失误不该导致客户端抹数据）。
 
 ### POST /auth/verify
@@ -72,26 +72,26 @@
 
 | 方法 | 路径 | 用途 | 鉴权 |
 | --- | --- | --- | --- |
-| POST | /auth/challenge | 获取密封 challenge（`device_id` + `space_id`） | 设备公钥 |
+| POST | /auth/challenge | 获取密封 challenge（`entrance_id` + `space_id`） | 设备公钥 |
 | POST | /auth/verify | 提交明文换取 session | challenge |
 | POST | /messages | 上传新消息密文 | Bearer |
 | GET | /sync?after=<seq>&limit=<n> | 增量拉取（§5） | Bearer |
 | POST | /attachments | 上传附件 blob（分片可选） | Bearer |
 | GET | /attachments/:id | 下载附件 blob | Bearer |
-| GET | /devices | 设备列表 | Bearer |
-| POST | /devices/:id/revoke | 撤销**别人**的设备（§7.2，需共享口令） | Bearer |
-| POST | /devices/retire | **本机自助退役**（§7.2.1，无请求体，只认 session） | Bearer |
+| GET | /entrances | 设备列表 | Bearer |
+| POST | /entrances/:id/revoke | 撤销**别人**的设备（§7.2，需共享口令） | Bearer |
+| POST | /entrances/retire | **本机自助退役**（§7.2.1，无请求体，只认 session） | Bearer |
 | POST | /push/register | 注册 Push Token | Bearer |
 | DELETE | /push/register | 注销 Push Token | Bearer |
 | GET | /space | 空间信息（space_id、成员设备） | Bearer |
 | POST | /receipts | 上报自己的送达/已读高水位（§5.4） | Bearer |
 | GET | /receipts | 拉取本 space 全部回执行（§5.4） | Bearer |
 | GET | /messages/unread | 未读条数（服务端派生：消息 + 我的读取水位；多空间列表角标用） | Bearer |
-| POST | /devices/name | 改本设备显示名 | Bearer |
-| POST | /devices/uid | 补登安装级设备标识 `device_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
-| POST | /devices/person-name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
+| POST | /entrances/name | 改本设备显示名 | Bearer |
+| POST | /entrances/install-uid | 补登安装级设备标识 `install_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
+| POST | /partners/name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
 | POST | /avatar | 上传本人头像 | Bearer |
-| GET | /avatar/:personId | 取头像（免认证，公开可读） | — |
+| GET | /avatar/:partnerId | 取头像（免认证，公开可读） | — |
 | GET | /join/:token | 邀请落地页（提示用 App 打开） | — |
 
 **Multiverse（v2）空间端点**（详见 `PROTOCOL_MULTIVERSE.md` §4）：
@@ -119,7 +119,7 @@
   "type": "text",
   "key_version": 1,
   "message_id": "uuidv7",
-  "sender_device_id": "dev-a1",
+  "sender_entrance_id": "dev-a1",
   "nonce": "base64(24B)",
   "ciphertext": "base64"
 }
@@ -178,7 +178,7 @@ Server 从不解析 ciphertext，所以载荷形状是**客户端约定**，编�
 {
   "messages": [
     { "v":1, "type":"text", "key_version":1, "message_id":"…",
-      "sender_device_id":"dev-b1", "nonce":"…", "ciphertext":"…",
+      "sender_entrance_id":"dev-b1", "nonce":"…", "ciphertext":"…",
       "server_sequence": 103, "created_at": … }
   ],
   "attachments_meta": [ /* 消息引用的附件元数据，§6 */ ],
@@ -198,11 +198,11 @@ Server 从不解析 ciphertext，所以载荷形状是**客户端约定**，编�
 
 ### 5.4 消息回执（已送达 / 已读）
 
-回执**不是逐条 ACK**，而是按 `(space_id, person_id)` 存一条**单调高水位（HWM）**：
+回执**不是逐条 ACK**，而是按 `(space_id, partner_id)` 存一条**单调高水位（HWM）**：
 
 ```sql
-receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
-  PRIMARY KEY (space_id, person_id)
+receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
+  PRIMARY KEY (space_id, partner_id)
 ```
 
 推导（客户端）：我的消息 `seq = S` ——
@@ -234,7 +234,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 #### GET /receipts（拉取本 space 全部回执行）
 
 ```json
-{ "receipts": [ { "person_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10, "updated_at": 1789215936509 } ] }
+{ "receipts": [ { "partner_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10, "updated_at": 1789215936509 } ] }
 ```
 
 重连/补拉用；实时路径是 WS `receipt.updated`（§8）。
@@ -292,17 +292,17 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 ## 7. 设备与推送
 
-### 7.1 设备列表 GET /devices
+### 7.1 设备列表 GET /entrances
 
-**范围：只返回本会话所属空间成员名下的设备**（2026-09-15 评审 C2）——devices 表本身是
+**范围：只返回本会话所属空间成员名下的设备**（2026-09-15 评审 C2）——entrances 表本身是
 全局表，此前直出会跨空间泄漏 person、在线状态与公钥。**不返回 `public_key`**
 （2026-09-15 评审 C5：列表接口没有消费它的场景，challenge 由服务端用公钥密封）。
 
 ```json
 // 响应 200
-{ "devices": [
-    { "device_id": "…", "person_id": "…", "status": "active", "last_seen": 1787900000000,
-      "device_name": "MacBook", "connected_at": 1787900000000, "online_since": 1787900000000 }
+{ "entrances": [
+    { "entrance_id": "…", "partner_id": "…", "status": "active", "last_seen": 1787900000000,
+      "entrance_name": "MacBook", "connected_at": 1787900000000, "online_since": 1787900000000 }
 ] }
 ```
 
@@ -312,7 +312,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   **重连不刷新**（被新连接踢掉后又连上不算重新上线），客户端据此按上线顺序排列
   对端的多台在线设备（最新上线在最前）。
 
-### 7.2 撤销设备 POST /devices/:id/revoke
+### 7.2 撤销设备 POST /entrances/:id/revoke
 
 ```json
 { "passphrase": "<共享口令>" }
@@ -332,32 +332,32 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   （**拒绝放行**，不放宽成"无需口令"）。
 - Server 把设备标记为 `revoked`、清除其 Push Token 与活动会话，并关闭其 WS 连接；**不**通知 Space Key 轮换
   （轮换方案 2026-09-14 决定不做，见 `SECURITY.md` §3）。
-- 注：早期版本是 `DELETE /devices/:id` 且**无需口令**——该形态已移除（口令要求无法可靠地
+- 注：早期版本是 `DELETE /entrances/:id` 且**无需口令**——该形态已移除（口令要求无法可靠地
   放在 DELETE 请求体里，且旧形态允许空间内任意设备远程抹掉别人的数据）。
-- 被撤销的设备随后：在线 → 收到 `device.revoked` 帧 + close `4403`；离线/重连 → 会话已被删
-  返回 `401 UNAUTHORIZED`，重认证时挑战返回 `403 DEVICE_REVOKED`。**这两个信号（帧 / 该 code）
+- 被撤销的设备随后：在线 → 收到 `entrance.revoked` 帧 + close `4403`；离线/重连 → 会话已被删
+  返回 `401 UNAUTHORIZED`，重认证时挑战返回 `403 ENTRANCE_REVOKED`。**这两个信号（帧 / 该 code）
   是客户端唯一被授权清空本地数据的依据**；`403 FORBIDDEN`（未登记）与网络故障都只应警告。
 
-### 7.2.1 自助退役 POST /devices/retire（本机注销，2026-09-21）
+### 7.2.1 自助退役 POST /entrances/retire（本机注销，2026-09-21）
 
 无请求体——身份与目标都由 Bearer 会话决定，**目标恒为自己**。
 
 - **为什么单独一个端点**：客户端"重置设备"原先纯本地清数据，服务端这台设备的注册表项、
-  Push Token 与会话全都留着，对方 `/devices` 里是一台永远在线的幽灵；而 §7.2 禁止自撤，
+  Push Token 与会话全都留着，对方 `/entrances` 里是一台永远在线的幽灵；而 §7.2 禁止自撤，
   谁也删不掉它。
 - **为什么不校验共享口令**（与 §7.2 的关键差异）：这里是"注销我自己"，session 即所有权
   证明；而且客户端在调用之前已经过了本地闸门（输入本机设备名 + 本机锁屏码）。共享口令是
   **共享**给伴侣的加入凭证，不该获得销毁我这台设备的权力；校验它还必须联网，会让"本机
   身份属于一台已经连不上的服务器"这个最常见的重置场景直接自锁。
 - 服务端动作：设备置 `revoked`（**行保留**，否则它被当成"未登记"而非"已退役"，
-  且 `messages.sender_device_id` 会失去归属）+ `last_seen = 0`，清除其 Push Token、
+  且 `messages.sender_entrance_id` 会失去归属）+ `last_seen = 0`，清除其 Push Token、
   活动会话与未被消费的 challenge，并把它的 WS 连接移出在线表。审计 kind 为
-  `device.retire`（区别于被人撤销的 `device.revoke`）。
-- **退役绝不发 `device.revoked` 帧，也不主动关闭 WS**（`ws.forgetDeviceConnection`）：
+  `entrance.retire`（区别于被人撤销的 `entrance.revoke`）。
+- **退役绝不发 `entrance.revoked` 帧，也不主动关闭 WS**（`ws.forgetEntranceConnection`）：
   那帧是客户端自毁本地数据的授权信号，而本端点只认 session——若由它发出，偷到 session
   的人就能远程擦设备，等于给 §7.2 的口令闸门挖了一条旁路。取而代之的是给对端广播一次
   `peer.offline`，让对方立刻看到这台设备下线。
-- 失败码：无/失效 token → `401 UNAUTHORIZED`；已撤销设备的会话 → `403 DEVICE_REVOKED`。
+- 失败码：无/失效 token → `401 UNAUTHORIZED`；已撤销设备的会话 → `403 ENTRANCE_REVOKED`。
   客户端约定：**先调它、再清本地数据**（token 就存在本地，清完就调不动了）；调用失败时
   是否仍清本地由客户端决定——现实现是照清，并如实提示"服务端可能仍有残留"。
 
@@ -397,7 +397,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
 { "ok": true }
 ```
 
-- 鉴权：Bearer session_token（challenge-response 后）；设备须在 devices 表内且未撤销（403）。
+- 鉴权：Bearer session_token（challenge-response 后）；设备须在 entrances 表内且未撤销（403）。
   包按**会话绑定的 space** 存取（`escrowSpaceId`）——Multiverse 下同一台服务器有多个空间，
   各存各的一份（2026-09-12 修的 space_id 错位 bug，见 escrow.ts 注释）。
 - 包结构校验仅限字段类型（`format`/`salt`/`nonce`/`ciphertext` 均为非空 base64 字符串，400 拒绝坏字段）；**Server 永不解析包内容**。
@@ -411,7 +411,7 @@ receipts(space_id, person_id, delivered_upto_seq, read_upto_seq, updated_at)
   App「修改口令」或 TUI `/passphrase`：**服务器已有箱**时须先验旧口令（解箱成功）才覆盖；**服务器无箱**时跳过旧口令校验、用新口令直接重建（设备已认证且持有 Space Key，不新增权限）。
 - **`/recover`（全丢恢复）已整体移除**（2026-09-13，Server 端点 + TUI 入口 + 客户端方法
   全部删除）。理由：① 它按 `space_id=''` 那一行读包，Multiverse 下本就永远读不到；
-  ② 它的撤销逻辑是**全库范围**的（`UPDATE devices … WHERE status='active'`、
+  ② 它的撤销逻辑是**全库范围**的（`UPDATE entrances … WHERE status='active'`、
   `DELETE FROM sessions/push_tokens/invites` 都无 space 过滤）——修好 ① 反而会把该
   服务器上**所有空间**的设备全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
   只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方设备全丢 =
@@ -442,15 +442,15 @@ Authorization: Bearer <session_token>
 
 | 方向 | type | payload | 说明 |
 | --- | --- | --- | --- |
-| S→C | `hello` | `{ "device_id": "…", "space_id": "…", "last_sequence": 104 }` | 连接确认 |
+| S→C | `hello` | `{ "entrance_id": "…", "space_id": "…", "last_sequence": 104 }` | 连接确认 |
 | S→C | `message.new` | `{ "message": {…信封…}, "server_sequence": 105 }` | 对端新消息（已持久化后广播） |
 | C→S | `ping` / S→C `pong` | — | 心跳（30s 间隔） |
 | S→C | `sync.advance` | `{ "last_sequence": 105 }` | 提示有新数据，可拉 /sync |
-| S→C | `receipt.updated` | `{ "person_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
-| S→C | `device.revoked` | `{ "device_id": "…" }` | 本设备被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
-| S→C | `peer.online` | `{ "device_id": "dev1", "person_id": "per1", "online_since": 1787900000000 }` | 对端设备上线（WS 连接建立时广播；**不发给同 person 的设备**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
-| S→C | `peer.offline` | `{ "device_id": "dev1", "person_id": "per1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 person 设备） |
-| S→C | `passphrase.rotated` | `{ "device_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
+| S→C | `receipt.updated` | `{ "partner_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
+| S→C | `entrance.revoked` | `{ "entrance_id": "…" }` | 本设备被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
+| S→C | `peer.online` | `{ "entrance_id": "dev1", "partner_id": "per1", "online_since": 1787900000000 }` | 对端设备上线（WS 连接建立时广播；**不发给同 person 的设备**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
+| S→C | `peer.offline` | `{ "entrance_id": "dev1", "partner_id": "per1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 person 设备） |
+| S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
 
 ### 8.3 顺序与重连
 
@@ -471,7 +471,7 @@ Authorization: Bearer <session_token>
 | INVALID_REQUEST | 400 | 请求格式错误 |
 | UNAUTHORIZED | 401 | 未认证 / token 失效 |
 | FORBIDDEN | 403 | 设备不在白名单（**未登记**，含服务端库被清空/重置；客户端只警告，**不得**清空本地数据） |
-| DEVICE_REVOKED | 403 | 本设备已被**明确撤销**（`status='revoked'`，涉嫌被盗用；客户端应清空本地数据后重新入网） |
+| ENTRANCE_REVOKED | 403 | 本设备已被**明确撤销**（`status='revoked'`，涉嫌被盗用；客户端应清空本地数据后重新入网） |
 | ESCROW_VERIFY_FAILED | 401 | 共享口令错误（取包 / 撤销设备的二次校验） |
 | ESCROW_RATE_LIMITED | 429 | 口令尝试过多（按 space 计失败次数，滑窗内超限） |
 | PASSPHRASE_NOT_SET | 409 | 该空间未托管共享口令，无法校验（撤销设备要求先设置口令） |

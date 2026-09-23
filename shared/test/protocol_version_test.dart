@@ -30,9 +30,9 @@ void main() {
         'session_token': 'tok',
         'space_id': 'space-1',
         'expires_in': 60,
-        'devices': <Map<String, dynamic>>[],
-        'person_names': <String, String>{},
-        'person_genders': <String, String>{},
+        'entrances': <Map<String, dynamic>>[],
+        'partner_names': <String, String>{},
+        'partner_genders': <String, String>{},
         'package': null,
         'updated_at': null,
         'joinToken': 'e1_stub',
@@ -40,10 +40,10 @@ void main() {
         'expiresAt': 1,
         'spaceId': 'space-1',
         'spaceAddress': '0xstub',
-        'deviceId': 'dev-stub',
-        'personId': 'person-stub',
-        'creatorPersonId': 'person-stub',
-        'partnerSlot': 1,
+        'entranceId': 'dev-stub',
+        'partnerId': 'partner-stub',
+        'creatorPartnerId': 'partner-stub',
+        'slot': 1,
         'messages': <Map<String, dynamic>>[],
         'attachments_meta': <Map<String, dynamic>>[],
         'last_sequence': 0,
@@ -104,7 +104,7 @@ void main() {
     await apiFor().uploadAvatar(Uint8List.fromList([1, 2, 3]), 'tok');
     expectVersionOnAll('uploadAvatar');
     received.clear();
-    await apiFor().getAvatar('person-1');
+    await apiFor().getAvatar('partner-1');
     expectVersionOnAll('getAvatar');
   });
 
@@ -112,8 +112,8 @@ void main() {
     await apiFor().getSpace('tok');
     expectVersionOnAll('getSpace');
     received.clear();
-    await apiFor().listDevices('tok');
-    expectVersionOnAll('listDevices');
+    await apiFor().listEntrances('tok');
+    expectVersionOnAll('listEntrances');
     received.clear();
     await apiFor().deleteKeyEscrow('tok');
     expectVersionOnAll('deleteKeyEscrow');

@@ -26,7 +26,7 @@ void main() {
     final file = File('${dir.path}/note.txt')..writeAsStringSync('hello');
 
     // 有 Space Key + session token，但 server 留空 → 网络阶段必失败（离线/不可达等价）
-    final store = DeviceStore(
+    final store = EntranceStore(
       publicKey: base64Encode(List<int>.filled(32, 1)),
       privateKey: base64Encode(List<int>.filled(32, 2)),
       spaceKey: base64Encode(List<int>.filled(32, 3)),
@@ -34,8 +34,8 @@ void main() {
       keyVersion: 1,
       sessionToken: 'token-x',
     )
-      ..personId = 'p1'
-      ..deviceId = 'd1';
+      ..partnerId = 'p1'
+      ..entranceId = 'd1';
     final session = ChatSession(store, path, '');
 
     // 每次重绘（onChanged）时快照一次：气泡可见吗？可见时状态是 pending 吗？
@@ -60,15 +60,15 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('einz-attach-missing-');
     addTearDown(() => dir.deleteSync(recursive: true));
 
-    final store = DeviceStore(
+    final store = EntranceStore(
       publicKey: base64Encode(List<int>.filled(32, 1)),
       privateKey: base64Encode(List<int>.filled(32, 2)),
       spaceKey: base64Encode(List<int>.filled(32, 3)),
       spaceId: 'space-x',
       sessionToken: 'token-x',
     )
-      ..personId = 'p1'
-      ..deviceId = 'd1';
+      ..partnerId = 'p1'
+      ..entranceId = 'd1';
     final session = ChatSession(store, '${dir.path}/s.json', '');
 
     await expectLater(

@@ -22,9 +22,9 @@ Future<Uint8List> generateSpaceKey() async {
 Future<Map<String, dynamic>> buildConfigPayload({
   required Uint8List spaceKey,
   required String spaceId,
-  required String deviceIdA,
+  required String entranceIdA,
   required Uint8List publicKeyA,
-  required String deviceIdB,
+  required String entranceIdB,
   required Uint8List publicKeyB,
   int keyVersion = 1,
 }) async {
@@ -36,8 +36,8 @@ Future<Map<String, dynamic>> buildConfigPayload({
     'space_id': spaceId,
     'key_version': keyVersion,
     'sealed_space_keys': [
-      {'device_id': deviceIdA, 'sealed': base64Encode(sealedA)},
-      {'device_id': deviceIdB, 'sealed': base64Encode(sealedB)},
+      {'entrance_id': entranceIdA, 'sealed': base64Encode(sealedA)},
+      {'entrance_id': entranceIdB, 'sealed': base64Encode(sealedB)},
     ],
   };
 }

@@ -4,9 +4,9 @@ import { getDb } from "./db.js";
 
 const HERE = resolve(import.meta.dirname ?? process.cwd());
 
-export interface DeviceConfig {
-  device_id: string;
-  person_id: string;
+export interface EntranceConfig {
+  entrance_id: string;
+  partner_id: string;
   public_key: string; // base64(X25519 公钥)
   status: "active" | "revoked";
 }
@@ -73,32 +73,32 @@ export function loadConfig(): ServerConfig {
 /** 设备在库里的三种状态。**revoked 与 missing 是不同产品语义，禁止再合并成一个布尔**：
  * 前者是"这台设备被明确撤销"（可能涉嫌被盗用 → 客户端自毁本地数据），后者是
  * "此设备不在册"（库被清/从未登记 → 客户端只应离线警告，绝不销毁数据）。 */
-export type DeviceStatus = "active" | "revoked" | "missing";
+export type EntranceStatus = "active" | "revoked" | "missing";
 
 /**
- * 设备状态（判定源 = 数据库 devices 表）。撤销（status='revoked'）实时生效（E2EE.md §9.3）。
+ * 设备状态（判定源 = 数据库 entrances 表）。撤销（status='revoked'）实时生效（E2EE.md §9.3）。
  *
  * 注：v1 时代白名单来自 config.json 的静态数组，Multiverse 改成动态登记后
  * 配置参数已无用——2026-09-15 收敛时去掉（评审架构项 #2）。
  */
-export function getDeviceStatus(deviceId: string): DeviceStatus {
+export function getEntranceStatus(entranceId: string): EntranceStatus {
   const row = getDb()
-    .prepare(`SELECT status FROM devices WHERE device_id = ?`)
-    .get(deviceId) as { status: string } | undefined;
+    .prepare(`SELECT status FROM entrances WHERE entrance_id = ?`)
+    .get(entranceId) as { status: string } | undefined;
   if (row == null) return "missing"; // db 无记录 = 未登记（含库被重置）
   return row.status === "revoked" ? "revoked" : "active";
 }
 
-/** 取设备信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 devices 表。 */
-export function getDevice(deviceId: string): DeviceConfig | undefined {
+/** 取设备信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 entrances 表。 */
+export function getEntrance(entranceId: string): EntranceConfig | undefined {
   const row = getDb()
-    .prepare(`SELECT device_id, person_id, public_key, status FROM devices WHERE device_id = ?`)
-    .get(deviceId) as { device_id: string; person_id: string; public_key: string; status: string } | undefined;
+    .prepare(`SELECT entrance_id, partner_id, public_key, status FROM entrances WHERE entrance_id = ?`)
+    .get(entranceId) as { entrance_id: string; partner_id: string; public_key: string; status: string } | undefined;
   if (!row) return undefined;
   return {
-    device_id: row.device_id,
-    person_id: row.person_id,
+    entrance_id: row.entrance_id,
+    partner_id: row.partner_id,
     public_key: row.public_key,
-    status: row.status as DeviceConfig["status"],
+    status: row.status as EntranceConfig["status"],
   };
 }

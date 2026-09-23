@@ -1,8 +1,8 @@
 // 启动校正回归：本机 profile 只是入网时的快照，对方改名后（或没收到广播时）
 // App 重启必须按服务端（GET /space）的名字/性别校正——否则一直显示旧的对方名字。
 //
-// 重点覆盖重启路径：main.dart 用明文 payload 构造 ChatPage 时**不传 personId**，
-// 校正必须能从 /space 的设备表按 deviceId 反查"我是谁"。
+// 重点覆盖重启路径：main.dart 用明文 payload 构造 ChatPage 时**不传 partnerId**，
+// 校正必须能从 /space 的设备表按 entranceId 反查"我是谁"。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -20,12 +20,12 @@ class _FakeSpaceApi extends ApiClient {
   @override
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-demo',
-        devices: const [
-          SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
-          SpaceDevice(deviceId: 'dev-b', personId: 'person-b', status: 'active'),
+        entrances: const [
+          SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+          SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'),
         ],
-        personNames: const {'person-a': 'Alice-新名字', 'person-b': 'Bob'},
-        personGenders: const {'person-a': 'female', 'person-b': 'male'},
+        partnerNames: const {'partner-a': 'Alice-新名字', 'partner-b': 'Bob'},
+        partnerGenders: const {'partner-a': 'female', 'partner-b': 'male'},
       );
 
   @override
@@ -42,7 +42,7 @@ class _FakeSpaceApi extends ApiClient {
       );
 }
 
-/// fake：对方"稍后加入"——[peerJoined] 置真后 /space 与 /devices 才带上对方。
+/// fake：对方"稍后加入"——[peerJoined] 置真后 /space 与 /entrances 才带上对方。
 /// 用于验证"对方刚加入 → 我方补拉身份（名字/性别/槽位）"。
 class _JoiningPeerApi extends ApiClient {
   _JoiningPeerApi() : super('http://fake');
@@ -52,30 +52,30 @@ class _JoiningPeerApi extends ApiClient {
   @override
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-late',
-        devices: [
-          const SpaceDevice(deviceId: 'dev-me', personId: 'person-me', status: 'active'),
+        entrances: [
+          const SpaceEntrance(entranceId: 'dev-me', partnerId: 'partner-me', status: 'active'),
           if (peerJoined)
-            const SpaceDevice(deviceId: 'dev-peer', personId: 'person-peer', status: 'active'),
+            const SpaceEntrance(entranceId: 'dev-peer', partnerId: 'partner-peer', status: 'active'),
         ],
-        personNames: {
-          'person-me': '我',
-          if (peerJoined) 'person-peer': '新来的对方',
+        partnerNames: {
+          'partner-me': '我',
+          if (peerJoined) 'partner-peer': '新来的对方',
         },
-        personGenders: {
-          'person-me': 'male',
-          if (peerJoined) 'person-peer': 'male',
+        partnerGenders: {
+          'partner-me': 'male',
+          if (peerJoined) 'partner-peer': 'male',
         },
-        personSlots: {
-          'person-me': 0,
-          if (peerJoined) 'person-peer': 1,
+        partnerSlots: {
+          'partner-me': 0,
+          if (peerJoined) 'partner-peer': 1,
         },
       );
 
   @override
-  Future<List<Map<String, dynamic>>> listDevices(String token) async => [
-        {'device_id': 'dev-me', 'person_id': 'person-me', 'connected_at': 1},
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async => [
+        {'entrance_id': 'dev-me', 'partner_id': 'partner-me', 'connected_at': 1},
         if (peerJoined)
-          {'device_id': 'dev-peer', 'person_id': 'person-peer', 'connected_at': 1},
+          {'entrance_id': 'dev-peer', 'partner_id': 'partner-peer', 'connected_at': 1},
       ];
 
   @override
@@ -97,14 +97,14 @@ void main() {
     await sodium();
   });
 
-  testWidgets('重启（无 personId）：按服务端名称表校正旧的本地快照', (tester) async {
+  testWidgets('重启（无 partnerId）：按服务端名称表校正旧的本地快照', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     // 本地快照：入网时写入的旧名字 + 空的对方性别（v2 早期的实际数据形态）
     await AppLockService(db).saveProfile(
-      personName: 'Bob',
+      partnerName: 'Bob',
       peerName: 'Alice-老名字',
-      deviceName: 'dev-b',
+      entranceName: 'dev-b',
     );
 
     await tester.pumpWidget(MaterialApp(
@@ -113,14 +113,14 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-b',
+        entranceId: 'dev-b',
         spaceKey: await generateSpaceKey(),
         keyVersion: 1,
         token: 'tok',
         db: db,
         api: _FakeSpaceApi(),
         enableWs: false,
-        // 模拟重启路径：不传 personId / peerName（main.dart 即如此）
+        // 模拟重启路径：不传 partnerId / peerName（main.dart 即如此）
       ),
     ));
     // 等 profile 读取 + /space 校正两轮异步完成
@@ -144,9 +144,9 @@ void main() {
     addTearDown(db.close);
     await AppLockService(db).saveProfile(
       spaceId: 'space-late',
-      personName: '我',
+      partnerName: '我',
       peerName: '待加入',
-      deviceName: 'dev-me',
+      entranceName: 'dev-me',
       myGender: 'male',
       peerGender: 'male', // 同性别：必须靠 slot 才能区分气泡颜色
     );
@@ -158,14 +158,14 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-late',
-        deviceId: 'dev-me',
+        entranceId: 'dev-me',
         spaceKey: await generateSpaceKey(),
         keyVersion: 1,
         token: 'tok',
         db: db,
         api: api,
         enableWs: false,
-        personId: 'person-me',
+        partnerId: 'partner-me',
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300));

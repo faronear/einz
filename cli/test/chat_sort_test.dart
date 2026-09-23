@@ -22,7 +22,7 @@ ChatMessage _msg({
         type: 'text',
         keyVersion: 1,
         messageId: id,
-        senderDeviceId: 'd',
+        senderEntranceId: 'd',
         nonce: '',
         ciphertext: '',
       ),

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# /devices 与 /revoke 回归（老板 2026-09-16）：
-#   ① `/devices` 输出**同空间全部设备**（我 + 对方，不只自己的）：A 创建、B 以伴侣身份
+# /entrances 与 /revoke 回归（老板 2026-09-16）：
+#   ① `/entrances` 输出**同空间全部设备**（我 + 对方，不只自己的）：A 创建、B 以伴侣身份
 #      加入后，A 的列表里应同时有「本机 A」和「在线 B」，并带序号（供 /revoke 使用）；
 #   ② `/revoke` 三重确认（选设备 → 输入 yes → 密保口令）+ 口令校验：
 #      - 口令错 → 提示且**目标毫发无损**（B 的 TUI 仍在跑、store 还在）；
-#      - 正确口令 → 服务端撤销 → B 收到 device.revoked → **清空本地数据并退出**（store 被删）；
+#      - 正确口令 → 服务端撤销 → B 收到 entrance.revoked → **清空本地数据并退出**（store 被删）；
 #   ③ 负例：不能撤销本机（拒绝后命令即结束，不会被后续输入喂成确认）；
-#   ④ 撤销后 /devices 把该设备标为「已撤销」。
+#   ④ 撤销后 /entrances 把该设备标为「已撤销」。
 #
 # 断言用**整帧**（snapshot：按清屏序列切出最后一屏）而不是原始流：消息区是从下往上
 # 逐行定位重绘的，原始流里同一屏的行序是反的、且每屏重复出现，逐行解析会错。
@@ -216,16 +216,16 @@ def new_join_token(port, store_path):
 
 def parse_row_numbers(frame):
     """从设备列表帧里解析 (我的序号, 对方序号)。行形如 `  2) 🟢 DoomBase [ali] 在线 ...`。"""
-    my_no = partner_no = None
+    my_no = peer_no = None
     for line in frame.splitlines():
         m_no = re.match(r'\s*(\d+)\)', line)
         if not m_no:
             continue
         if '[%s]' % PARTNER in line:
-            partner_no = int(m_no.group(1))
+            peer_no = int(m_no.group(1))
         elif '本机' in line:
             my_no = int(m_no.group(1))
-    return my_no, partner_no
+    return my_no, peer_no
 
 def main():
     port = free_port()
@@ -237,8 +237,8 @@ def main():
         m_a, p_a = onboard_create('A', store_a, port, WORK)
         spawned.append((m_a, p_a))
 
-        # ---------- ① /devices：同空间全部设备（先只有自己） ----------
-        send(m_a, '/devices\r')
+        # ---------- ① /entrances：同空间全部设备（先只有自己） ----------
+        send(m_a, '/entrances\r')
         frame = wait_screen(m_a, lambda t: '设备列表' in t, 'A 的设备列表')
         if '同空间 1 台' not in frame or '本机' not in frame:
             print(f'❌ ① 只有 A 时应为 1 台且标「本机」:\n{frame[-800:]}'); return 1
@@ -247,19 +247,19 @@ def main():
         spawned.append((m_b, p_b))
         time.sleep(2.0)  # 等 A 侧刷新在线状态与名称表
 
-        send(m_a, '/devices\r')
+        send(m_a, '/entrances\r')
         frame = wait_screen(m_a,
                             lambda t: '同空间 2 台' in t and '在线' in t,
                             'A 看到同空间 2 台（含对方）')
-        my_no, partner_no = parse_row_numbers(frame)
-        if my_no is None or partner_no is None:
-            print(f'❌ ① 未能解析序号（本机={my_no} 对方={partner_no}）:\n{frame[-900:]}'); return 1
+        my_no, peer_no = parse_row_numbers(frame)
+        if my_no is None or peer_no is None:
+            print(f'❌ ① 未能解析序号（本机={my_no} 对方={peer_no}）:\n{frame[-900:]}'); return 1
         if '[%s]' % PARTNER not in frame:
-            print(f'❌ ① 列表应含对方 person「{PARTNER}」:\n{frame[-900:]}'); return 1
-        print(f'✅ ① /devices 列出同空间 2 台（本机 #{my_no}、对方 #{partner_no} 在线、带序号）')
+            print(f'❌ ① 列表应含对方 partner「{PARTNER}」:\n{frame[-900:]}'); return 1
+        print(f'✅ ① /entrances 列出同空间 2 台（本机 #{my_no}、对方 #{peer_no} 在线、带序号）')
 
         # ---------- ② 口令错 → 撤销不生效（目标毫发无损） ----------
-        send(m_a, f'/revoke {partner_no}\r')
+        send(m_a, f'/revoke {peer_no}\r')
         frame = wait_screen(m_a, lambda t: '确认请输入 yes' in t, '撤销二次确认')
         if '清空本地数据' not in frame:
             print(f'❌ ② 确认提示应写明不可逆后果:\n{frame[-900:]}'); return 1
@@ -279,7 +279,7 @@ def main():
         # ---------- ③ 不能撤销本机（且命令立即结束，不吃后续输入） ----------
         send(m_a, f'/revoke {my_no}\r')
         frame = wait_screen(m_a, lambda t: '不能撤销本机' in t, '拒绝撤销本机')
-        send(m_a, '/devices\r')
+        send(m_a, '/entrances\r')
         frame = wait_screen(m_a, lambda t: '设备列表' in t and '同空间 2 台' in t,
                             '③ 后仍能正常执行命令')
         print('✅ ③ /revoke 本机 → 拒绝（未进入确认流程，命令已结束）')
@@ -287,12 +287,12 @@ def main():
         # ---------- ④ 正确口令 → 撤销生效：对方清空本地数据并退出 ----------
         send(m_a, '/revoke\r')  # 无参：走"列出设备 → 询问序号"的交互路径
         wait_screen(m_a, lambda t: '输入要撤销的设备序号' in t, '无参 /revoke 询问序号')
-        send(m_a, f'{partner_no}\r')
+        send(m_a, f'{peer_no}\r')
         wait_screen(m_a, lambda t: '确认请输入 yes' in t, '④ 二次确认')
         send(m_a, 'yes\r')
         wait_screen(m_a, lambda t: '输入密保口令' in t, '④ 口令输入')
         send(m_a, PASSPHRASE + '\r')
-        frame = wait_screen(m_a, lambda t: f'已撤销 #{partner_no}' in t, '④ 撤销成功')
+        frame = wait_screen(m_a, lambda t: f'已撤销 #{peer_no}' in t, '④ 撤销成功')
         deadline = time.time() + 20
         while time.time() < deadline and p_b.poll() is None:
             drain(m_b, 0.5)
@@ -304,15 +304,15 @@ def main():
         print('✅ ④ 正确口令 → 撤销生效：B 清空本地数据并退出')
 
         # ---------- ⑤ 撤销后列表标注「已撤销」 ----------
-        send(m_a, '/devices\r')
+        send(m_a, '/entrances\r')
         frame = wait_screen(m_a, lambda t: '设备列表' in t and '已撤销' in t, '列表标注已撤销')
-        print('✅ ⑤ 撤销后 /devices 把该设备标为「已撤销」')
+        print('✅ ⑤ 撤销后 /entrances 把该设备标为「已撤销」')
 
         send(m_a, '/exit\r')
         time.sleep(1.5)
         if p_a.poll() is None:
             p_a.kill()
-        print('🎉 /devices 与 /revoke 全部通过')
+        print('🎉 /entrances 与 /revoke 全部通过')
         return 0
     finally:
         for m, p in spawned:

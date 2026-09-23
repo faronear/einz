@@ -39,11 +39,11 @@
 | 控制 | 实现位置 | 说明 |
 | --- | --- | --- |
 | 消息端到端加密 | `shared/lib/src/crypto/message_crypto.dart` | Space Key → 每消息派生密钥；AEAD AAD 绑定 space/message/device/type/key_version |
-| 设备在册状态 | `server/src/config.ts` `getDeviceStatus`（三态）+ `guard.requireSession` | 未登记（403 `FORBIDDEN`）或已撤销（403 `DEVICE_REVOKED`）设备**取不到密文**；会话还必须绑定 space（无 space 会话直接 401）。**两种 code 必须分开**：混淆会让"服务端库被清空"被客户端误判为撤销 |
-| 设备撤销 | `server/src/devices.ts` `revokeDevice`（标记 revoked + 清 Push + 清会话 + 踢 WS） | 被撤销设备无法认证/同步/发送；同一设备重新认证会清掉其旧会话。**授权：同 space 内可互撤，但每次都要校验共享口令**（`assertSpacePassphrase`，与取包共用 argon2id 校验与失败限速）——撤销会让对方自毁本地数据，属不可逆操作；这样伴侣的一台设备被入侵也无法仅凭 session 清掉另一方的设备 |
-| 被撤销设备自毁 | `app/lib/chat_page.dart` `_onDeviceRevoked`；`cli/bin/einz_tui.dart` `_exitRevoked` | **只认明确撤销信号**：`device.revoked` 帧或认证 403 `DEVICE_REVOKED` → 清锁包 + 消息 + 附件 + 媒体缓存（TUI 清 store 文件 + 附件缓存）→ 回设置页 / 退出。未登记（403 `FORBIDDEN`）与连不上**只警告**，本地数据一律保留（2026-09-16） |
-| 自助退役不发自毁信号 | `server/src/ws.ts` `forgetDeviceConnection`；`server/src/devices.ts` `retireDevice` | 本机自助注销（`PROTOCOL.md` §7.2.1）只认 session，**不发 `device.revoked` 帧、也不主动关闭 WS**——否则「偷到 session」即可远程触发擦除，绕过上面那条口令闸门。它只清服务端状态 + 给对端广播一次 `peer.offline`（2026-09-21） |
-| 重置闸门（本地） | `app/lib/widgets/reset_device.dart`；`cli/bin/einz_tui.dart` `/reset` | 不可逆的本机清空要求：① 手动输入本机设备名（确认清的是这台）；② 本机锁屏码（已设才验，走 `AppLockService.unlock` 同款防爆破）。**全离线**，刻意不用空间口令——它是共享凭证，且校验需联网，会让"连着一台死服务器"这一主要重置场景自锁（2026-09-21） |
+| 设备在册状态 | `server/src/config.ts` `getEntranceStatus`（三态）+ `guard.requireSession` | 未登记（403 `FORBIDDEN`）或已撤销（403 `ENTRANCE_REVOKED`）设备**取不到密文**；会话还必须绑定 space（无 space 会话直接 401）。**两种 code 必须分开**：混淆会让"服务端库被清空"被客户端误判为撤销 |
+| 设备撤销 | `server/src/entrances.ts` `revokeEntrance`（标记 revoked + 清 Push + 清会话 + 踢 WS） | 被撤销设备无法认证/同步/发送；同一设备重新认证会清掉其旧会话。**授权：同 space 内可互撤，但每次都要校验共享口令**（`assertSpacePassphrase`，与取包共用 argon2id 校验与失败限速）——撤销会让对方自毁本地数据，属不可逆操作；这样伴侣的一台设备被入侵也无法仅凭 session 清掉另一方的设备 |
+| 被撤销设备自毁 | `app/lib/chat_page.dart` `_onEntranceRevoked`；`cli/bin/einz_tui.dart` `_exitRevoked` | **只认明确撤销信号**：`entrance.revoked` 帧或认证 403 `ENTRANCE_REVOKED` → 清锁包 + 消息 + 附件 + 媒体缓存（TUI 清 store 文件 + 附件缓存）→ 回设置页 / 退出。未登记（403 `FORBIDDEN`）与连不上**只警告**，本地数据一律保留（2026-09-16） |
+| 自助退役不发自毁信号 | `server/src/ws.ts` `forgetEntranceConnection`；`server/src/entrances.ts` `retireEntrance` | 本机自助注销（`PROTOCOL.md` §7.2.1）只认 session，**不发 `entrance.revoked` 帧、也不主动关闭 WS**——否则「偷到 session」即可远程触发擦除，绕过上面那条口令闸门。它只清服务端状态 + 给对端广播一次 `peer.offline`（2026-09-21） |
+| 重置闸门（本地） | `app/lib/widgets/reset_install.dart`；`cli/bin/einz_tui.dart` `/reset` | 不可逆的本机清空要求：① 手动输入本机设备名（确认清的是这台）；② 本机锁屏码（已设才验，走 `AppLockService.unlock` 同款防爆破）。**全离线**，刻意不用空间口令——它是共享凭证，且校验需联网，会让"连着一台死服务器"这一主要重置场景自锁（2026-09-21） |
 | App 启动锁（PIN） | `app/lib/data/app_lock.dart` | PIN 派生密钥加密 Space Key 包；防偷看与离线取证 |
 | 密钥安全存储 | `app/lib/data/secure_store.dart` | Keychain/Keystore；iOS/macOS 用 `first_unlock_this_device`（**不随备份/换机迁移**） |
 | 卸载即重置 | `app_lock.ensureFreshInstall()` + `main.dart` `StartupGate` | 安全存储条目活过卸载 → 全新安装时清残留（`DATABASE.md` §4.1） |
@@ -52,7 +52,7 @@
 | 取包失败限速 | `server/src/escrow.ts`（`ESCROW_RATE_LIMITED`） | 免认证取包端点按 space 计失败次数，超限 429（默认 10 次/15 分钟） |
 | space 级端点鉴权 | `server/src/guard.ts` `requireSpaceMember` | `/spaces/{id}/join-tokens` 与 `/spaces/{id}/key-escrow` **上传分支**必须持该空间成员会话（2026-09-15 评审 C1 修复：此前完全无鉴权，拿到 spaceId 即可自签邀请 / 覆盖别人的口令托管包）。**口令取包分支仍刻意免认证**（加入方尚无 session，口令即凭证） |
 | 会话必带 space | `guard.ts` `requireSession` + `auth.createChallenge` | 无 space 的会话一律 401（v1 收敛后不再有空空间会话这种形态）；challenge 的 `space_id` 必填 |
-| 空间隔离 | `guard.ts` `deviceScopeClause` + `attachments.ts` | `GET /space`、`GET /devices` 只返回本空间成员设备；附件读写校验 `attachments.space_id` 与会话一致（2026-09-15 评审 C2 修复）。legacy 无 space 会话只看到"不属于任何空间"的设备——**不回落成全局**，否则等于留后门 |
+| 空间隔离 | `guard.ts` `entranceScopeClause` + `attachments.ts` | `GET /space`、`GET /entrances` 只返回本空间成员设备；附件读写校验 `attachments.space_id` 与会话一致（2026-09-15 评审 C2 修复）。legacy 无 space 会话只看到"不属于任何空间"的设备——**不回落成全局**，否则等于留后门 |
 | 请求体上限 | `server/src/body.ts` | JSON 1 MiB / 附件 64 MiB / 头像 2 MiB，超限 413（2026-09-15 评审 H1 修复）。可用 `EINZ_MAX_JSON_BYTES`、`EINZ_MAX_ATTACHMENT_BYTES` 覆盖 |
 | 全局限速 | `server/src/ratelimit.ts` | 按来源 IP 固定窗口：建空间 20/小时、认证与加入类 30/5 分钟、全站兜底 600/分钟（2026-09-15 评审 H2 修复，防公网开放注册被刷） |
 | 会话凭证存储 | `server/src/auth.ts` `hashSessionToken` | `sessions` 表只存 session token 的 sha256（与 `join_tokens` 同标准）；库/备份泄露不能直接冒用会话（2026-09-15 评审 H4 修复） |
@@ -98,11 +98,11 @@
 | 位置 | 原内容 | 撤除方式 |
 | --- | --- | --- |
 | `server/src/ws.ts` | `notifyKeyRotation()`（广播 `key.rotation`） | 删除函数；`app.ts` 调用点一并删除 |
-| `server/src/devices.ts` | 撤销响应里的 `key_rotation_required: true` | 返回 `{ ok: true }` |
+| `server/src/entrances.ts` | 撤销响应里的 `key_rotation_required: true` | 返回 `{ ok: true }` |
 | `shared/lib/src/crypto/keyring.dart` | `SpaceKeyRing`（含 `rotate()`） | 整文件删除（**仅测试引用，无生产调用点**） |
 | `shared/lib/src/protocol/ws_client.dart` | `kWsTypeKeyRotation` + `WsKeyRotationEvent` + 分发 | 删除（该帧退回"未知帧被忽略"路径） |
 | `cli/bin/einz.dart` | `rotate` 命令 + `_cmdRotate` + `key.rotation` 帧处理 | 删除；`--key-version` 文案去掉轮换暗示 |
-| `cli/lib/store.dart` | `DeviceStore.rotateSpaceKey()` | 删除 |
+| `cli/lib/store.dart` | `EntranceStore.rotateSpaceKey()` | 删除 |
 
 ### 3.3 留下的只有 `key_version` 本身（无归档层）
 
@@ -134,7 +134,7 @@
 
 ### 3.5 若将来要恢复轮换（前置条件，缺一不可）
 
-1. **分发链路**：`GET /space` 暴露设备公钥（当前 `SpaceDevice` 无此字段）+ 密封密钥的
+1. **分发链路**：`GET /space` 暴露设备公钥（当前 `SpaceEntrance` 无此字段）+ 密封密钥的
    投递方式（可用新消息类型承载 sealed box，服务端零改动）；
 2. **归档随密保箱分发**：`aimemo/escrowArchivedKeys.md`（现为 `[搁置]`）——否则新设备接入后旧消息解不开；
 3. **口令同步轮换 + 线下告知伴侣**：否则被撤销设备凭口令仍可取到新密钥（§3.1 不对称）；
@@ -151,8 +151,8 @@
 
 1. 在**同空间的另一台设备**上撤销它（2026-09-16：同 space 内可互撤，A 没有第二台设备时
    伴侣 B 也能替他撤；每次都要验口令，因为撤销会让对方自毁本地数据）：
-   - TUI：`/devices` 看序号 → `/revoke <序号>` → 输入 `yes` 确认 → 输入共享口令；
-   - 运维/无客户端可用时：`curl -X POST .../devices/<id>/revoke -d '{"passphrase":"…"}'`（`DEPLOYMENT.md` §5.3）；
+   - TUI：`/entrances` 看序号 → `/revoke <序号>` → 输入 `yes` 确认 → 输入共享口令；
+   - 运维/无客户端可用时：`curl -X POST .../entrances/<id>/revoke -d '{"passphrase":"…"}'`（`DEPLOYMENT.md` §5.3）；
    - App 里的设备列表入口**尚未做**（届时同样要口令 + 二次确认）。
 2. 该设备：无法再认证/同步/发送；若它上线，App 会**自我销毁**本地数据（§2）。
 3. **不需要**轮换密钥（§3.1）。若担心"它被解锁过"，按 §4.2 处理。
@@ -174,7 +174,7 @@
 
 1. 密文本身**不构成泄露**（§1.1）——不要慌着重建空间；
 2. 检查口令强度：取包免设备认证，弱口令可被离线爆破 → 若口令弱，**立即改口令**（旧口令作废，见 `KEY_ESCROW.md` §7）；
-3. 检查 `/devices` 有无陌生设备（同空间可见）；
+3. 检查 `/entrances` 有无陌生设备（同空间可见）；
 4. 若服务器数据库里的密文 + 你的口令都泄露 → 按 §4.2。
 
 ### 4.4 共享口令泄露或怀疑
@@ -244,7 +244,7 @@
 | 草稿表（明文）在本地库 | **接受** | 仅本机；`DATABASE.md` §3 |
 | 附件/媒体解密缓存（明文文件） | **已缓解** | `MediaCache` 生命周期 + 焚毁/撤销时清理 |
 | CLI `store.json` 明文密钥 | **接受** | 开发者/测试工具属性，非用户路径（App 走 Keychain/Keystore） |
-| `GET /avatar/:personId` 免认证可读 | **接受** | v2 的 personId 是随机 UUID、不可枚举；头像是本人自愿上传的展示图，同空间成员本就该看到。legacy `personA/personB` 可枚举但只影响 v1 轨道（收敛计划见 D3）。加鉴权需改成带 token 取图 + 客户端缓存失效重做，收益不抵成本（2026-09-15 评审 C1） |
+| `GET /avatar/:partnerId` 免认证可读 | **接受** | v2 的 partnerId 是随机 UUID、不可枚举；头像是本人自愿上传的展示图，同空间成员本就该看到。legacy `partnerA/partnerB` 可枚举但只影响 v1 轨道（收敛计划见 D3）。加鉴权需改成带 token 取图 + 客户端缓存失效重做，收益不抵成本（2026-09-15 评审 C1） |
 | 服务端密保箱为无冗余单点 | **接受** | 客户端不再缓存口令（§2）→ 不再有解锁自动重传；丢失后需手动重建（§4.7）。**无任何在网设备持有 Space Key 时**只能走 CLI 备份恢复 |
 | 无前向保密（简单派生，`E2EE.md` §11.1） | **接受** | Space Key 泄露则历史可解；这正是 §4.2 的场景 |
 | 共享口令熵偏低（策略只卡 ≥8 位、不卡字符种类） | **接受** | 老板 2026-09-15 明确取舍：易记优先。在线爆破由服务端限速兜（`429 ESCROW_RATE_LIMITED`，默认 10 次/15 分钟）；**离线爆破只能靠口令熵**——拿到 `key_escrow` 行的攻击者可以无限次跑 Argon2id。缓解：口令由用户自选，建议引导用 12 词随机（`/passphrase random`） |

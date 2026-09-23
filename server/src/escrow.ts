@@ -56,7 +56,7 @@ export function uploadKeyEscrow (
   token: string,
   body: unknown
 ): { ok: true } {
-  const { device_id } = requireSession(token)
+  const { entrance_id } = requireSession(token)
   const spaceId = escrowSpaceId(token)
 
   const pkg = parsePackage((body as { package?: unknown })?.package)
@@ -90,7 +90,7 @@ export function uploadKeyEscrow (
            updated_at = excluded.updated_at`
       )
       .run(spaceId, JSON.stringify(pkg), passphraseHash ?? null, Date.now())
-    broadcastPassphraseRotated(device_id)
+    broadcastPassphraseRotated(entrance_id)
   } else if (!hasPrev) {
     // 首次托管：写入 updated_at 作为基线（后续真正重设才可对比），不广播
     getDb()
@@ -114,7 +114,7 @@ export function uploadKeyEscrow (
 export function getKeyEscrow (
   token: string
 ): { package?: EscrowPackage; updated_at?: number } {
-  const { device_id } = requireSession(token)
+  const { entrance_id } = requireSession(token)
 
   const spaceId = escrowSpaceId(token)
   const row = getDb()
@@ -132,7 +132,7 @@ export function getKeyEscrow (
 export function deleteKeyEscrow (
   token: string
 ): { ok: true } {
-  const { device_id } = requireSession(token)
+  const { entrance_id } = requireSession(token)
 
   const spaceId = escrowSpaceId(token)
   getDb().prepare(`DELETE FROM key_escrow WHERE space_id = ?`).run(spaceId)

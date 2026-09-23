@@ -18,7 +18,7 @@ Future<(HttpServer, List<WebSocket>)> _startWsServer() async {
         ws.add(jsonEncode({
           'id': 0,
           'type': 'hello',
-          'payload': {'device_id': 'dev-a', 'space_id': 'space-test'},
+          'payload': {'entrance_id': 'dev-a', 'space_id': 'space-test'},
         }));
       });
     } else {
@@ -50,7 +50,7 @@ void main() {
           'v': 1,
           'message_id': 'm1',
           'space_id': 'space-test',
-          'sender_device_id': 'dev-b',
+          'sender_entrance_id': 'dev-b',
           'type': 'text',
           'key_version': 1,
           'nonce': 'AA==',
@@ -65,24 +65,24 @@ void main() {
     expect(service.connected.value, isFalse, reason: 'stop 后 connected 应为 false');
   });
 
-  test('device.revoked 广播 → onDeviceRevoked 触发（撤销登出）', () async {
+  test('entrance.revoked 广播 → onEntranceRevoked 触发（撤销登出）', () async {
     final (server, conns) = await _startWsServer();
     addTearDown(() => server.close(force: true));
 
     final service = WsRealtimeService(server: 'http://127.0.0.1:${server.port}', token: 'tok');
     var revoked = 0;
-    service.start(onDeviceRevoked: () => revoked++);
+    service.start(onEntranceRevoked: () => revoked++);
     await Future.delayed(const Duration(milliseconds: 400));
     expect(service.connected.value, isTrue);
 
-    // Server 广播 device.revoked → 客户端触发 onDeviceRevoked（chat_page 据此清理并登出）
+    // Server 广播 entrance.revoked → 客户端触发 onEntranceRevoked（chat_page 据此清理并登出）
     conns.first.add(jsonEncode({
       'id': 0,
-      'type': 'device.revoked',
-      'payload': {'device_id': 'dev-a'},
+      'type': 'entrance.revoked',
+      'payload': {'entrance_id': 'dev-a'},
     }));
     await Future.delayed(const Duration(milliseconds: 200));
-    expect(revoked, 1, reason: '收到 device.revoked 应触发一次 onDeviceRevoked');
+    expect(revoked, 1, reason: '收到 entrance.revoked 应触发一次 onEntranceRevoked');
 
     await service.stop();
   });

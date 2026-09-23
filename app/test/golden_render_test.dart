@@ -34,8 +34,8 @@ import 'package:einz_shared/einz_shared.dart';
 // golden 固定设备密钥对：登记/认证等步骤需要确定性密钥，真实随机密钥会使
 // golden 每次渲染不同而失配；测试注入固定值保证确定性。
 // （名字步骤的密钥信息卡已移除——技术细节不展示给用户。）
-final DeviceKeyPair _goldenKeyPair = DeviceKeyPair(
-  deviceId: 'dev-golden',
+final EntranceKeyPair _goldenKeyPair = EntranceKeyPair(
+  entranceId: 'dev-golden',
   publicKey: Uint8List(32),
   privateKey: Uint8List(32),
 );
@@ -131,7 +131,7 @@ void main() {
   });
 
   // 测试注入：认证（真实路径走 ApiClient.challenge/verify；此处绕开网络）。
-  Future<SessionResult> fakeAuth(DeviceKeyPair kp, String enrolledDeviceId) async =>
+  Future<SessionResult> fakeAuth(EntranceKeyPair kp, String enrolledEntranceId) async =>
       SessionResult(sessionToken: 'tok-fake', spaceId: 'space-test', expiresIn: 86400);
 
   testWidgets('golden: 检测页（服务器不可达）', (WidgetTester tester) async {
@@ -172,7 +172,7 @@ void main() {
       plaintext: '你好，这是我加密发送的第一条消息',
       spaceKey: spaceKey,
       spaceId: 'space-demo',
-      senderDeviceId: 'dev-b',
+      senderEntranceId: 'dev-b',
       messageId: 'msg-0001',
       keyVersion: 1,
     );
@@ -180,7 +180,7 @@ void main() {
       plaintext: '收到！第二条消息（我发送的）',
       spaceKey: spaceKey,
       spaceId: 'space-demo',
-      senderDeviceId: 'dev-a',
+      senderEntranceId: 'dev-a',
       messageId: 'msg-0002',
       keyVersion: 1,
     );
@@ -197,7 +197,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -220,8 +220,8 @@ void main() {
     WidgetTester tester, {
     Map<String, String> probeNames = const {},
     bool probeOk = true,
-    Future<SessionResult> Function(DeviceKeyPair kp, String enrolledDeviceId)? auth,
-    DeviceKeyPair? keyPair,
+    Future<SessionResult> Function(EntranceKeyPair kp, String enrolledEntranceId)? auth,
+    EntranceKeyPair? keyPair,
   }) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -337,18 +337,18 @@ void main() {
     expect(find.text('进入秘境'), findsOneWidget); // 唯一按钮（点外面不关闭）
   });
 
-  // ---- join（后续设备：探测到 personA → 身份 → 开通码 → …）----
+  // ---- join（后续设备：探测到 partnerA → 身份 → 开通码 → …）----
 
   testWidgets('golden: 向导1.2.1-身份选择步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, probeNames: {'personA': 'Lukas'}); // 非空 → join 步骤 1
+    await pumpSetup(tester, probeNames: {'partnerA': 'Lukas'}); // 非空 → join 步骤 1
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.1_identity.png'));
   });
 
   testWidgets('golden: 向导1.2.3-开通码步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
+    await pumpSetup(tester, probeNames: {'partnerA': 'Lukas'});
     await tester.tap(find.text('Lukas')); // 选身份（自动进开通码页）
     await tester.pumpAndSettle();
     await expectLater(
@@ -359,8 +359,8 @@ void main() {
 
   testWidgets('golden: 向导1.3.1-密保信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    // 信封入口仅 join（第二/三台设备）口令页显示：探测到 personA → 身份（自动进开通码页）→ 口令页
-    await pumpSetup(tester, probeNames: {'personA': 'Lukas'});
+    // 信封入口仅 join（第二/三台设备）口令页显示：探测到 partnerA → 身份（自动进开通码页）→ 口令页
+    await pumpSetup(tester, probeNames: {'partnerA': 'Lukas'});
     await tester.tap(find.text('Lukas')); // 选身份（自动进开通码页）
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 开通码（校验非空）

@@ -70,7 +70,7 @@ def main():
             sys.exit(1)
 
     # 0) server 健康
-    code = run_capture(['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', f'{SERVER}/devices'])
+    code = run_capture(['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', f'{SERVER}/entrances'])
     print(f'[0] server 探测: HTTP {code}')
     if code.startswith('000') or code.startswith('5'):
         print('❌ server 未就绪'); sys.exit(1)

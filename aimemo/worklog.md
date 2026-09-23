@@ -8608,3 +8608,47 @@ shared `dart test` 52 通过、`dart analyze`（cli）无 issue。
   「所有认证入口」→「所有已开通的通道」）；两文件里剩下的"入口"（切换空间入口 / 破坏性入口 /
   扫码入口 / 撤销入口 / 由入口注入 / 入口可达性）都是 entry point 语义，**保留**。
   commit 另开一条（worklog 作为历史记录不动）。
+
+## 2026-09-23 · 字段/标识符全量改名落地（device→entrance、person→partner、device_uid→install_uid）
+
+老板要求：把 `renamePlan` 里待办的代码变量改名做实，"不考虑历史数据/老客户端兼容，我会全新上线，
+关键是代码清晰准确、不留历史缺陷"。讨论后拍 D1–D6，一次做完、一次提交。
+
+**与旧计划的三处关键差异**（旧 `renamePlan` 整篇重写）：
+1. **目标名 `entry_id` 作废** → 改 **`entrance_id`**。旧名早于 2026-09-23 的「入口→通道 / entrance」
+   定名，而代码里 `entrance` 已是既成事实（`maxEntrancesPerSpace`、`advancedDestroyEntrance`、
+   `entrance_limit.test.ts`），叫 `entry_id` 会造出第三个词。
+2. **三期 alias 机制整体删除**：`last_proto_version` 遥测列、`protocolAliases.ts`、版本双接受、
+   跨端灰度、锁包/store/drift 的"读旧回退"全部不需要——无老客户端、无历史数据。**改为一次机械替换**。
+3. **`partner_id` 的 D1 矛盾重新拍**：旧计划因 `partner` 在本仓库已是"slot1 第二人专属"而选
+   `member_id`；老板这次明确要 `partner_id`（person 留给真人）。于是**连带清理**：
+   `partner_slot`→`slot`、第二人的 `partner_name/gender`→`peer_name/peer_gender`、
+   创建者一侧→`creator_name/creator_gender`。选 `peer` 而非老板提的 `follower`：加入方不一定是
+   slot1（`setup_page.dart:1448` 明写"也可能是第一人的其他设备"），且 `peer` 是仓库既有词。
+
+**执行方式**：一个显式映射脚本（193 个不同标识符，按 `\b` 整词匹配 + 保护 v1 老字面量），
+自动跑完 115 个代码文件；再手工收口语义分裂点。脚本之外手工处理：
+- `person_name` 的**两个去向**（创建者 vs 泛称成员名）——不能全局替换；
+- HTTP 路径：`/devices/*`→`/entrances/*`，`/devices/uid`→`/entrances/install-uid`，
+  `POST /devices/person-name`→**`POST /partners/name`**（它改的是"我"这位成员的名字）；
+- 审计 kind：`device.{rename,revoke,retire,revoked}`→`entrance.*`、`person.rename`→`partner.rename`；
+- WS 帧字符串 `"device.revoked"`→`"entrance.revoked"`（双引号漏网，客户端常量早已改，差点两头不一致）；
+- 表名 `devices`→`entrances`、`device_activity`→`entrance_activity`；13 个文件 `git mv` 改名；
+- 顺手删掉死协议：join 请求里没人传、服务端也从不读的 `gender` 字段；`Api.entrancesEnroll`/`Api.invites`
+  两个 v1 死常量。
+- **l10n**：`.arb` 只改 key（18 个）、**value 一律不动**；`flutter gen-l10n` 重生成后再 analyze。
+
+**踩到的坑**：① 自动化脚本的扩展名清单漏了 `.arb`，先只改了生成的 localizations → 两边不一致，
+补上后 gen-l10n 拉齐；② 注释清扫用 `\bperson\b` 时误伤 `Icons.person`（Flutter 图标），
+analyze 立刻报错，已回滚；③ drain 到中文注释时把"设备"当通道替换会误伤"本机/物理设备"语义，
+**不做**，列进下一批（见下）。
+
+**验证**：server `npm run build` ✅ + `npm test` 28 项全绿；`shared`/`app`/`cli` 三包 `flutter analyze`
+无 issue；残留 grep 只剩保留项（`device_info_plus`/`DeviceFileSource`/`devicePixelRatioOf`/
+`first_unlock_this_device`/wordlist `'device'`/`device-width`/UI value 'device'=本机/goldens 文件名/
+v1 老 meta 字面量）。drift 本地库升 v8，用 `ALTER TABLE RENAME COLUMN` 保数据（非破坏性）。
+
+**留给下一批**（写进 `renamePlan` §7，别把这批 diff 冲淡）：
+1. 中文「设备」→「通道」注释/文档清扫（代码 ~780 处）——**必须逐处判断**通道 vs 本机，禁止全局替换；
+2. CLI 命令 `/device`（改名通道）与 App 菜单项「通道名称」不一致，是否改 `/entrance` 由老板定（UI 词归老板）；
+3. 带日期的历史快照（`architectureReview*`、`upgradeToMultiverse`、`worklog`、`db.ts` 清理 v1 meta 的字面量）保持原样。

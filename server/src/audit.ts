@@ -4,7 +4,7 @@ import { getDb } from "./db.js";
 /**
  * 审计日志（只追加，永久保留）。
  *
- * 目的：回答"谁（person）在哪台设备（device）上、什么时候、做了什么"——
+ * 目的：回答"谁（partner）在哪条通道（entrance）上、什么时候、做了什么"——
  * 上下线事件流、sync 拉取进度、回执上报明细、消息发送、push token 变更等。
  * 老板 2026-09-13 要求后台记录尽可能详尽。
  *
@@ -52,7 +52,7 @@ export function metaOf(req: IncomingMessage): RequestMeta {
 }
 
 export interface ConnectionEventInput {
-  deviceId: string;
+  entranceId: string;
   spaceId?: string | null;
   event: ConnectionEventKind;
   atMs?: number;
@@ -71,11 +71,11 @@ export function logConnection(e: ConnectionEventInput): void {
     getDb()
       .prepare(
         `INSERT INTO connection_events
-           (device_id, space_id, event, at_ms, duration_ms, close_code, close_reason, ip, user_agent)
+           (entrance_id, space_id, event, at_ms, duration_ms, close_code, close_reason, ip, user_agent)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
-        e.deviceId,
+        e.entranceId,
         normalizeSpaceId(e.spaceId),
         e.event,
         e.atMs ?? Date.now(),
@@ -91,7 +91,7 @@ export function logConnection(e: ConnectionEventInput): void {
 }
 
 export interface ActivityInput {
-  deviceId: string;
+  entranceId: string;
   spaceId?: string | null;
   /** 活动类型，见 docs/DATABASE.md §2.1。 */
   kind: string;
@@ -107,12 +107,12 @@ export function logActivity(e: ActivityInput): void {
     const meta = e.meta ?? NO_META;
     getDb()
       .prepare(
-        `INSERT INTO device_activity
-           (device_id, space_id, kind, at_ms, detail, ip, user_agent)
+        `INSERT INTO entrance_activity
+           (entrance_id, space_id, kind, at_ms, detail, ip, user_agent)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
-        e.deviceId,
+        e.entranceId,
         normalizeSpaceId(e.spaceId),
         e.kind,
         e.atMs ?? Date.now(),
@@ -131,12 +131,12 @@ export function logActivity(e: ActivityInput): void {
  * 只记"进度前进"的 sync：例行轮询没拉到新消息时不产生记录
  * （老板 2026-09-13 定）。轮询频率：App WS 在线 30s / 离线 3s 退避到 60s，
  * TUI 固定 30s——若每次轮询都记，绝大多数行都是重复值且毫无信息量。
- * 设备"还在不在"由 connection_events 与 devices.last_seen 负责。
+ * 设备"还在不在"由 connection_events 与 entrances.last_seen 负责。
  */
-const lastSyncByDevice = new Map<string, number>();
+const lastSyncByEntrance = new Map<string, number>();
 
 export interface SyncActivityInput {
-  deviceId: string;
+  entranceId: string;
   spaceId?: string | null;
   /** 请求参数 after。 */
   afterSequence: number;
@@ -153,13 +153,13 @@ export interface SyncActivityInput {
  * 仅当 last_sequence 前进（真正拉到新消息）时落一条；没新结果的例行轮询不记。
  */
 export function logSyncActivity(e: SyncActivityInput): void {
-  const key = `${e.deviceId}|${normalizeSpaceId(e.spaceId)}`;
+  const key = `${e.entranceId}|${normalizeSpaceId(e.spaceId)}`;
   // 首次：last_sequence=0（还没消息）也不记——没有"收到"发生
-  if (e.lastSequence <= (lastSyncByDevice.get(key) ?? 0)) return;
-  lastSyncByDevice.set(key, e.lastSequence);
+  if (e.lastSequence <= (lastSyncByEntrance.get(key) ?? 0)) return;
+  lastSyncByEntrance.set(key, e.lastSequence);
 
   logActivity({
-    deviceId: e.deviceId,
+    entranceId: e.entranceId,
     spaceId: e.spaceId,
     kind: "sync",
     detail: {

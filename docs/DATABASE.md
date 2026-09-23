@@ -25,17 +25,17 @@
 
 ```sql
 -- 设备（v2：由 POST /spaces / POST /spaces/join 登记；表本身是全局表，
--- 归属空间靠 devices.person_id → space_members 推导）
-CREATE TABLE devices (
-    device_id   TEXT PRIMARY KEY,          -- UUIDv7（服务端生成）
-    person_id   TEXT NOT NULL,             -- 空间内身份 UUID（v2；见 space_members.person_id）
+-- 归属空间靠 entrances.partner_id → space_members 推导）
+CREATE TABLE entrances (
+    entrance_id   TEXT PRIMARY KEY,          -- UUIDv7（服务端生成）
+    partner_id   TEXT NOT NULL,             -- 空间内身份 UUID（v2；见 space_members.partner_id）
     public_key  TEXT NOT NULL,             -- base64(X25519 公钥)
     status      TEXT NOT NULL DEFAULT 'active',  -- active | revoked
-    device_name TEXT,                      -- 设备显示名（TUI/App 可改）
+    entrance_name TEXT,                      -- 设备显示名（TUI/App 可改）
     last_seen   INTEGER,                   -- 只由 WS 连接/心跳/断开维护
     created_at  INTEGER NOT NULL,
-    device_uid  TEXT                       -- 安装级设备标识（客户端生成；同一物理设备各空间同名）
-                                           -- 存量行/未升级客户端为 NULL，由 POST /devices/uid 补登。
+    install_uid  TEXT                       -- 安装级设备标识（客户端生成；同一物理设备各空间同名）
+                                           -- 存量行/未升级客户端为 NULL，由 POST /entrances/install-uid 补登。
                                            -- **只做服务端内部认知**（运维/审计/将来"整机退役"），
                                            -- 不参与授权或破坏性操作范围判断，**绝不进任何响应体**。
 );
@@ -52,25 +52,25 @@ CREATE TABLE spaces (
 );
 
 -- 空间成员（两个身份槽位：0=创建者/第一人，1=伴侣/第二人。
--- person_id 是身份锚点，同一身份多设备共享；伴侣预置行 person_id 为 NULL 直到加入）
--- 名称的唯一数据源就是这里的 display_name（v1 的 meta person_name:* 已删除）
+-- partner_id 是身份锚点，同一身份多设备共享；伴侣预置行 partner_id 为 NULL 直到加入）
+-- 名称的唯一数据源就是这里的 display_name（v1 的 meta partner_name:* 已删除）
 CREATE TABLE space_members (
     space_id     TEXT NOT NULL REFERENCES spaces(space_id),
-    person_id    TEXT,
-    partner_slot INTEGER NOT NULL,
+    partner_id    TEXT,
+    slot INTEGER NOT NULL,
     display_name TEXT,
     gender       TEXT,                     -- male | female
     status       TEXT NOT NULL DEFAULT 'active',  -- active | pending
     joined_at    INTEGER,
-    PRIMARY KEY (space_id, person_id),
-    UNIQUE (space_id, partner_slot)
+    PRIMARY KEY (space_id, partner_id),
+    UNIQUE (space_id, slot)
 );
 
 -- 一次性加入凭证（邀请链接里的 token；**只存 SHA-256 hash**，24h 过期、用后作废）
 CREATE TABLE join_tokens (
     space_id          TEXT NOT NULL REFERENCES spaces(space_id),
     token_hash        TEXT PRIMARY KEY,
-    created_by_device TEXT NOT NULL,
+    created_by_entrance TEXT NOT NULL,
     expires_at        INTEGER NOT NULL,
     used_at           INTEGER,
     created_at        INTEGER NOT NULL
@@ -89,8 +89,8 @@ CREATE TABLE key_escrow (
 CREATE TABLE messages (
     message_id       TEXT PRIMARY KEY,     -- UUIDv7（客户端生成，幂等键）
     space_id         TEXT NOT NULL,
-    sender_device_id TEXT NOT NULL,
-    sender_person_id TEXT,
+    sender_entrance_id TEXT NOT NULL,
+    sender_partner_id TEXT,
     type             TEXT NOT NULL,        -- text|image|video|voice|audio|file|system
     key_version      INTEGER NOT NULL,
     nonce            TEXT NOT NULL,        -- base64(24B)
@@ -122,7 +122,7 @@ CREATE INDEX idx_attachments_msg ON attachments (message_id);
 
 -- Push Token
 CREATE TABLE push_tokens (
-    device_id  TEXT PRIMARY KEY REFERENCES devices(device_id) ON DELETE CASCADE,
+    entrance_id  TEXT PRIMARY KEY REFERENCES entrances(entrance_id) ON DELETE CASCADE,
     platform   TEXT NOT NULL,              -- ios | android
     token      TEXT NOT NULL,
     updated_at INTEGER NOT NULL
@@ -132,7 +132,7 @@ CREATE TABLE push_tokens (
 -- space_id 必填（v1 收敛后）：签出的会话绑定该空间
 CREATE TABLE challenges (
     challenge_id TEXT PRIMARY KEY,
-    device_id    TEXT NOT NULL,
+    entrance_id    TEXT NOT NULL,
     space_id     TEXT,
     challenge    TEXT NOT NULL,            -- 32B 随机（base64）
     expires_at   INTEGER NOT NULL,
@@ -143,7 +143,7 @@ CREATE TABLE challenges (
 -- 同一设备同一 space 同时只有一个会话（重新认证即清旧行）
 CREATE TABLE sessions (
     session_token TEXT PRIMARY KEY,        -- sha256 十六进制
-    device_id     TEXT NOT NULL,
+    entrance_id     TEXT NOT NULL,
     space_id      TEXT,                    -- 会话绑定的空间（新会话必填）
     expires_at    INTEGER NOT NULL,
     created_at    INTEGER NOT NULL
@@ -152,14 +152,14 @@ CREATE TABLE sessions (
 -- 消息回执（已送达/已读）单调高水位，按 (space, person) 一行（PROTOCOL.md §5.4）
 CREATE TABLE receipts (
     space_id           TEXT NOT NULL,
-    person_id          TEXT NOT NULL,
+    partner_id          TEXT NOT NULL,
     delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
     read_upto_seq      INTEGER NOT NULL DEFAULT 0,
     updated_at         INTEGER NOT NULL,
-    PRIMARY KEY (space_id, person_id)
+    PRIMARY KEY (space_id, partner_id)
 );
 
--- 键值（目前只用于 schema_version 标记；v1 的 person_name:* / person_gender:*/
+-- 键值（目前只用于 schema_version 标记；v1 的 partner_name:* / person_gender:*/
 -- creator_person_id 已随 v1 收敛删除，启动迁移会清掉存量行）
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
@@ -169,7 +169,7 @@ CREATE TABLE meta (
 
 ### 2.1 审计表（只追加，永久保留）
 
-业务表只保存"当前状态"（`devices.last_seen` 会被覆盖、`receipts` 是 person 级
+业务表只保存"当前状态"（`entrances.last_seen` 会被覆盖、`receipts` 是 person 级
 高水位），无法回答"谁在哪台设备上、什么时候做了什么"。以下两张表专为此补上历史，
 **只追加、不更新、不删除**，且**不参与业务语义**——清空它们不影响聊天功能。
 
@@ -177,7 +177,7 @@ CREATE TABLE meta (
 -- 连接事件流：WS 每次连上/断开各一行（可算在线时长、掉线次数、断线原因）
 CREATE TABLE connection_events (
     event_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-    device_id    TEXT NOT NULL,
+    entrance_id    TEXT NOT NULL,
     space_id     TEXT,                  -- 连接绑定的 Space（legacy 为空串）
     event        TEXT NOT NULL,         -- connect | disconnect | heartbeat_timeout
     at_ms        INTEGER NOT NULL,      -- 事件时刻（ms）
@@ -189,9 +189,9 @@ CREATE TABLE connection_events (
 );
 
 -- 设备活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
-CREATE TABLE device_activity (
+CREATE TABLE entrance_activity (
     activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    device_id   TEXT NOT NULL,
+    entrance_id   TEXT NOT NULL,
     space_id    TEXT,
     kind        TEXT NOT NULL,
     at_ms       INTEGER NOT NULL,
@@ -201,7 +201,7 @@ CREATE TABLE device_activity (
 );
 ```
 
-`device_activity.kind` 一览：
+`entrance_activity.kind` 一览：
 
 | kind              | 触发点                    | detail 主要字段                                                              |
 | ----------------- | ------------------------- | ---------------------------------------------------------------------------- |
@@ -211,23 +211,23 @@ CREATE TABLE device_activity (
 | `receipt`         | `POST /receipts`          | `reported_delivered`、`reported_read`、`delivered_upto_seq`、`read_upto_seq` |
 | `push.register`   | `POST /push/register`     | `platform`、`token_prefix`（**只落前 8 位**，不落完整推送凭证）              |
 | `push.unregister` | `DELETE /push/register`   | —                                                                            |
-| `device.rename`   | `POST /devices/name`      | `device_name`                                                                |
-| `person.rename`   | `POST /devices/person-name` | `person_name`                                                              |
-| `device.revoke`   | `POST /devices/:id/revoke` | `target_device_id`（**不记口令**）                                          |
-| `device.retire`   | `POST /devices/retire`     | —（自助退役，目标即自己，无需 detail）                                      |
+| `entrance.rename`   | `POST /entrances/name`      | `entrance_name`                                                                |
+| `person.rename`   | `POST /partners/name` | `partner_name`                                                              |
+| `entrance.revoke`   | `POST /entrances/:id/revoke` | `target_entrance_id`（**不记口令**）                                          |
+| `entrance.retire`   | `POST /entrances/retire`     | —（自助退役，目标即自己，无需 detail）                                      |
 
 **说明：**
 
 - `sync` **只在 `last_sequence` 前进时记**（=真正拉到新消息）。没新结果的例行
   轮询不产生记录——轮询频率是 App WS 在线 30s / 离线 3s 起退避到 60s、TUI 固定
   30s，全量记录绝大部分行都是重复值。设备"还在不在"由 `connection_events` 与
-  `devices.last_seen` 负责。
+  `entrances.last_seen` 负责。
 - 回执语义**未改**：`receipts` 表仍是 person 级 HWM（"该 person 至少一台设备
-  已读"），`device_activity.receipt` 只是额外记下"是哪台设备上报的"。
+  已读"），`entrance_activity.receipt` 只是额外记下"是哪台设备上报的"。
 - 红线：审计表只记元数据，**绝不含密文 / nonce / 明文 / 完整 push token**
   （`test/audit.test.ts` 有断言守着）。
-- 查询：`npm run audit -- devices | timeline <device_id> | online <space_id> [天] |
-  activity [n] | receipts | search <device_id>`。
+- 查询：`npm run audit -- entrances | timeline <entrance_id> | online <space_id> [天] |
+  activity [n] | receipts | search <entrance_id>`。
 
 **业务表说明：**
 
@@ -249,7 +249,7 @@ CREATE TABLE device_activity (
 CREATE TABLE local_messages (
     message_id       TEXT PRIMARY KEY,
     space_id         TEXT NOT NULL,
-    sender_device_id TEXT NOT NULL,
+    sender_entrance_id TEXT NOT NULL,
     type             TEXT NOT NULL,
     key_version      INTEGER NOT NULL,
     nonce            TEXT NOT NULL,
@@ -301,11 +301,11 @@ CREATE TABLE sync_state (
 -- 对方回执（已送达/已读）单调高水位（App v6 起；本协议只落库，UI 暂不展示）
 CREATE TABLE peer_receipts (
     space_id           TEXT NOT NULL,
-    person_id          TEXT NOT NULL,      -- 对方身份锚点（同人多设备共享一行）
+    partner_id          TEXT NOT NULL,      -- 对方身份锚点（同人多设备共享一行）
     delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
     read_upto_seq      INTEGER NOT NULL DEFAULT 0,
     updated_at         INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (space_id, person_id)
+    PRIMARY KEY (space_id, partner_id)
 );
 
 -- 草稿
@@ -337,7 +337,7 @@ CREATE TABLE app_state (
 
 ```json
 {
-  "device": { "device_id": "…", "public_key": "…", "private_key": "…" },
+  "device": { "entrance_id": "…", "public_key": "…", "private_key": "…" },
   "space_key": { "key_version": 1, "key": "base64(32B)" }
 }
 ```

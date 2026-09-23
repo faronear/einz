@@ -57,8 +57,8 @@ export function storeAttachment(
   meta: { message_id: string; attachment_id: string; key_version: number; size: number; sha256: string; nonce: string },
   blob: Buffer
 ): { attachment_id: string; storage_path: string; created_at: number } {
-  const { device_id, space_id: spaceId } = requireSession(token);
-  touchLastSeen(device_id);
+  const { entrance_id, space_id: spaceId } = requireSession(token);
+  touchLastSeen(entrance_id);
 
   // P1 路径遍历防御：attachment_id/message_id 必须在安全字符集内（拒绝 / . \ 等）
   assertSafeId(meta.attachment_id, "attachment_id");
@@ -129,8 +129,8 @@ export function storeAttachment(
 
 /** 下载附件 blob（PROTOCOL.md §6.2）：鉴权 + 白名单校验 + **空间归属**校验。 */
 export function getAttachmentBlob(token: string, attachmentId: string): Buffer {
-  const { device_id, space_id: spaceId } = requireSession(token);
-  touchLastSeen(device_id);
+  const { entrance_id, space_id: spaceId } = requireSession(token);
+  touchLastSeen(entrance_id);
 
   assertSafeId(attachmentId, "attachment_id");
 

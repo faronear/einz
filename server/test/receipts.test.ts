@@ -1,7 +1,7 @@
 /**
  * 消息回执（已送达/已读）回归测试。
  *
- * 模型：按 (space, person) 存单调高水位（HWM）——
+ * 模型：按 (space, partner) 存单调高水位（HWM）——
  *   我的消息 seq=S 已送达 ⟺ 对方 delivered_upto_seq ≥ S；已读 ⟺ read_upto_seq ≥ S。
  * 本测试覆盖：单调只前进、夹紧到真实 max seq、读隐含送达、GET 回读、WS 广播。
  *
@@ -44,7 +44,7 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/devices`)
+      const res = await fetch(`http://127.0.0.1:${port}/entrances`)
       void res
       return
     } catch {
@@ -55,17 +55,17 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
 }
 
 interface ReceiptRow {
-  person_id: string
+  partner_id: string
   delivered_upto_seq: number
   read_upto_seq: number
   updated_at: number
 }
 
 /** 极简客户端：只做 Multiverse 创建/加入 + 发消息 + 回执。 */
-class Device {
+class Entrance {
   sessionToken = ''
-  deviceId = ''
-  personId = ''
+  entranceId = ''
+  partnerId = ''
 
   constructor (private readonly label: string) {}
 
@@ -75,8 +75,8 @@ class Device {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         public_key: `pk-${this.label}`,
-        person_name: 'Lukas',
-        partner_name: 'Alice',
+        creator_name: 'Lukas',
+        peer_name: 'Alice',
         escrow_passphrase: 'pass123',
         sealed_space_key: {
           format: 'einz-backup-v1',
@@ -90,12 +90,12 @@ class Device {
     const body = (await res.json()) as {
       spaceId: string
       joinToken: string
-      deviceId: string
-      creatorPersonId: string
+      entranceId: string
+      creatorPartnerId: string
       sessionToken: string
     }
-    this.deviceId = body.deviceId
-    this.personId = body.creatorPersonId
+    this.entranceId = body.entranceId
+    this.partnerId = body.creatorPartnerId
     this.sessionToken = body.sessionToken
     return body.joinToken
   }
@@ -107,19 +107,19 @@ class Device {
       body: JSON.stringify({
         token,
         public_key: `pk-${this.label}`,
-        partner_slot: 1,
-        device_name: this.label
+        slot: 1,
+        entrance_name: this.label
       })
     })
     assert.equal(res.status, 200, 'join space should succeed')
     const body = (await res.json()) as {
       spaceId: string
-      personId: string
-      deviceId: string
+      partnerId: string
+      entranceId: string
       sessionToken: string
     }
-    this.deviceId = body.deviceId
-    this.personId = body.personId
+    this.entranceId = body.entranceId
+    this.partnerId = body.partnerId
     this.sessionToken = body.sessionToken
     return body.spaceId
   }
@@ -137,7 +137,7 @@ class Device {
         type: 'text',
         key_version: 1,
         message_id: messageId,
-        sender_device_id: this.deviceId,
+        sender_entrance_id: this.entranceId,
         nonce: 'bm9uY2U=',
         ciphertext: 'Y2lwaGVy'
       })
@@ -189,9 +189,9 @@ async function main (): Promise<void> {
   await waitReady(port)
 
   try {
-    const alice = new Device('alice')
+    const alice = new Entrance('alice')
     const joinToken = await alice.createSpace(port)
-    const bob = new Device('bob')
+    const bob = new Entrance('bob')
     await bob.joinSpace(port, joinToken)
 
     // Alice 发两条 → seq 1、2
@@ -220,7 +220,7 @@ async function main (): Promise<void> {
     // 5) Alice 侧 GET /receipts 看到 Bob 的行（自己没报过 → 只有 Bob 一行）
     const rows = await alice.getReceipts(port)
     assert.equal(rows.length, 1, 'Alice 侧应只看到 Bob 的一条回执行')
-    assert.equal(rows[0].person_id, bob.personId, 'person_id 应为 Bob')
+    assert.equal(rows[0].partner_id, bob.partnerId, 'partner_id 应为 Bob')
     assert.equal(rows[0].delivered_upto_seq, 2)
     assert.equal(rows[0].read_upto_seq, 1)
 
@@ -247,7 +247,7 @@ async function main (): Promise<void> {
         if (frame.type === 'hello') {
           void bob.postReceipt(port, { read_upto_seq: 2 })
         } else if (frame.type === 'receipt.updated') {
-          assert.equal(frame.payload.person_id, bob.personId, 'payload.person_id 应为 Bob')
+          assert.equal(frame.payload.partner_id, bob.partnerId, 'payload.partner_id 应为 Bob')
           assert.equal(frame.payload.read_upto_seq, 2, 'payload.read_upto_seq 应为 2')
           assert.equal(frame.payload.delivered_upto_seq, 2, '读隐含送达 → delivered 应为 2')
           clearTimeout(timer)

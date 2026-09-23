@@ -18,7 +18,7 @@ Future<(HttpServer, String, List<WebSocket>)> _startWsServer() async {
         ws.add(jsonEncode({
           'id': 0,
           'type': 'hello',
-          'payload': {'device_id': 'dev-a', 'space_id': 'space-test'},
+          'payload': {'entrance_id': 'dev-a', 'space_id': 'space-test'},
         }));
       });
     } else {
@@ -38,7 +38,7 @@ Map<String, dynamic> _messageNewFrame(int seq) => {
           'v': 1,
           'message_id': 'msg-$seq',
           'space_id': 'space-test',
-          'sender_device_id': 'dev-b',
+          'sender_entrance_id': 'dev-b',
           'type': 'text',
           'key_version': 1,
           'nonce': 'AA==',
@@ -59,7 +59,7 @@ void main() {
 
     expect(statuses, contains(WsStatus.connected));
     final hello = events.whereType<WsHelloEvent>().single;
-    expect(hello.deviceId, 'dev-a');
+    expect(hello.entranceId, 'dev-a');
     expect(hello.spaceId, 'space-test');
     await client.stop();
   });
@@ -82,7 +82,7 @@ void main() {
     await client.stop();
   });
 
-  test('peer.online/peer.offline：解析 device_id/person_id/online_since', () async {
+  test('peer.online/peer.offline：解析 entrance_id/partner_id/online_since', () async {
     final (server, base, conns) = await _startWsServer();
     addTearDown(() => server.close(force: true));
     final events = <WsEvent>[];
@@ -94,21 +94,21 @@ void main() {
       'id': 0,
       'type': 'peer.online',
       'payload': {
-        'device_id': 'dev-b',
-        'person_id': 'per-b',
+        'entrance_id': 'dev-b',
+        'partner_id': 'per-b',
         'online_since': 1787900000000,
       },
     }));
     conns.first.add(jsonEncode({
       'id': 0,
       'type': 'peer.offline',
-      'payload': {'device_id': 'dev-b', 'person_id': 'per-b'},
+      'payload': {'entrance_id': 'dev-b', 'partner_id': 'per-b'},
     }));
     await Future.delayed(const Duration(milliseconds: 200));
 
     final online = events.whereType<WsPeerStatusEvent>().first;
-    expect(online.deviceId, 'dev-b');
-    expect(online.personId, 'per-b');
+    expect(online.entranceId, 'dev-b');
+    expect(online.partnerId, 'per-b');
     expect(online.onlineSince, 1787900000000);
     // 离线帧不带该字段（已下线，上线时刻无意义）
     expect(events.whereType<WsPeerStatusEvent>().last.onlineSince, isNull);
@@ -223,7 +223,7 @@ void main() {
           ws.add(jsonEncode({
             'id': 0,
             'type': 'hello',
-            'payload': {'device_id': 'dev-a', 'space_id': 'space-test'},
+            'payload': {'entrance_id': 'dev-a', 'space_id': 'space-test'},
           }));
         }
       });

@@ -3,9 +3,9 @@
  *
  * 验证"谁在哪台设备上、什么时候做了什么"确实落到了库里：
  *   - WS 上线/下线事件流（含在线时长、关闭码、来源 IP）
- *   - 消息「发送」是设备级（sender_device_id 已入库）
+ *   - 消息「发送」是设备级（sender_entrance_id 已入库）
  *   - 消息「接收」有证据（sync 拉取进度，设备级）
- *   - 回执「已读」上报有设备级明细（receipts 表本身仍是 person 级 HWM）
+ *   - 回执「已读」上报有设备级明细（receipts 表本身仍是 partner 级 HWM）
  *   - push token 变更有记录
  *   - **红线**：审计表不得出现密文 / nonce / 明文
  *
@@ -81,15 +81,15 @@ async function main (): Promise<void> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        person_name: 'luk',
+        creator_name: 'luk',
         public_key: Buffer.alloc(32, 7).toString('base64'),
-        device_name: '老板的 iPhone'
+        entrance_name: '老板的 iPhone'
       })
     })
     assert.equal(create.status, 201, 'create space should succeed')
     const created = (await create.json()) as {
       spaceId: string
-      deviceId: string
+      entranceId: string
       sessionToken: string
     }
     const auth = { Authorization: `Bearer ${created.sessionToken}` }
@@ -122,7 +122,7 @@ async function main (): Promise<void> {
         type: 'text',
         key_version: 1,
         message_id: messageId,
-        sender_device_id: created.deviceId,
+        sender_entrance_id: created.entranceId,
         nonce,
         ciphertext: CIPHERTEXT
       })
@@ -155,11 +155,11 @@ async function main (): Promise<void> {
     // A) 上下线事件流：一 connect 一 disconnect，都带设备、空间、IP
     const conns = db
       .prepare(
-        `SELECT device_id, space_id, event, duration_ms, close_code, ip
+        `SELECT entrance_id, space_id, event, duration_ms, close_code, ip
          FROM connection_events ORDER BY event_id`
       )
       .all() as Array<{
-      device_id: string
+      entrance_id: string
       space_id: string
       event: string
       duration_ms: number | null
@@ -169,7 +169,7 @@ async function main (): Promise<void> {
     assert.equal(conns.length, 2, '应有一条 connect + 一条 disconnect')
     assert.equal(conns[0]!.event, 'connect', '首条应为 connect')
     assert.equal(conns[1]!.event, 'disconnect', '次条应为 disconnect')
-    assert.equal(conns[0]!.device_id, created.deviceId, '上线事件须记 device_id')
+    assert.equal(conns[0]!.entrance_id, created.entranceId, '上线事件须记 entrance_id')
     assert.equal(conns[0]!.space_id, created.spaceId, '上线事件须记 space_id')
     assert.ok(conns[0]!.ip, '上线事件须记来源 IP')
     assert.ok((conns[1]!.duration_ms ?? 0) > 0, '下线事件须记本次在线时长')
@@ -178,22 +178,22 @@ async function main (): Promise<void> {
     // B) 发送 / 接收 / 已读 / push：四种活动都按设备记了
     const kinds = (
       db
-        .prepare(`SELECT DISTINCT kind FROM device_activity ORDER BY kind`)
+        .prepare(`SELECT DISTINCT kind FROM entrance_activity ORDER BY kind`)
         .all() as Array<{ kind: string }>
     ).map(r => r.kind)
     for (const k of ['message.post', 'sync', 'receipt', 'push.register']) {
-      assert.ok(kinds.includes(k), `device_activity 应含 ${k}（实际：${kinds.join(',')}）`)
+      assert.ok(kinds.includes(k), `entrance_activity 应含 ${k}（实际：${kinds.join(',')}）`)
     }
 
     const postRow = db
-      .prepare(`SELECT device_id, space_id, detail FROM device_activity WHERE kind = 'message.post'`)
-      .get() as { device_id: string; space_id: string; detail: string }
-    assert.equal(postRow.device_id, created.deviceId, '发送明细须记发送设备')
+      .prepare(`SELECT entrance_id, space_id, detail FROM entrance_activity WHERE kind = 'message.post'`)
+      .get() as { entrance_id: string; space_id: string; detail: string }
+    assert.equal(postRow.entrance_id, created.entranceId, '发送明细须记发送设备')
     assert.equal(postRow.space_id, created.spaceId, '发送明细须记 space')
     assert.ok(postRow.detail.includes(messageId), '发送明细须含 message_id')
 
     const syncRow = db
-      .prepare(`SELECT detail FROM device_activity WHERE kind = 'sync'`)
+      .prepare(`SELECT detail FROM entrance_activity WHERE kind = 'sync'`)
       .get() as { detail: string }
     assert.ok(
       JSON.parse(syncRow.detail).last_sequence >= 1,
@@ -201,21 +201,21 @@ async function main (): Promise<void> {
     )
 
     const receiptRow = db
-      .prepare(`SELECT device_id, detail FROM device_activity WHERE kind = 'receipt'`)
-      .get() as { device_id: string; detail: string }
-    assert.equal(receiptRow.device_id, created.deviceId, '回执明细须记上报设备')
+      .prepare(`SELECT entrance_id, detail FROM entrance_activity WHERE kind = 'receipt'`)
+      .get() as { entrance_id: string; detail: string }
+    assert.equal(receiptRow.entrance_id, created.entranceId, '回执明细须记上报设备')
     assert.equal(JSON.parse(receiptRow.detail).reported_read, 1, '回执明细须记原始上报值')
 
     // C) 红线：审计表不得出现密文 / nonce
     const dump = JSON.stringify(
-      db.prepare(`SELECT * FROM device_activity`).all()
+      db.prepare(`SELECT * FROM entrance_activity`).all()
     )
     assert.ok(!dump.includes(CIPHERTEXT), '审计表绝不能含密文')
     assert.ok(!dump.includes(nonce), '审计表绝不能含 nonce')
 
     // D) push token 只落前缀，不落完整 token
     const pushRow = db
-      .prepare(`SELECT detail FROM device_activity WHERE kind = 'push.register'`)
+      .prepare(`SELECT detail FROM entrance_activity WHERE kind = 'push.register'`)
       .get() as { detail: string }
     assert.ok(!pushRow.detail.includes('apns-token-abcdef123456'), '审计表不得落完整 push token')
     assert.ok(pushRow.detail.includes('apns-tok'), 'push 明细应落 token 前缀便于比对')

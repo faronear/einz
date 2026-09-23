@@ -12,8 +12,8 @@ export interface MessageEnvelope {
   type: string;
   key_version: number;
   message_id: string;
-  sender_device_id: string;
-  sender_person_id?: string;
+  sender_entrance_id: string;
+  sender_partner_id?: string;
   nonce: string;
   ciphertext: string;
 }
@@ -30,7 +30,7 @@ function validateEnvelope(body: unknown): MessageEnvelope {
     typeof b.type !== "string" || !ALLOWED_TYPES.has(b.type) ||
     typeof b.key_version !== "number" || b.key_version < 1 ||
     typeof b.message_id !== "string" || b.message_id.length === 0 ||
-    typeof b.sender_device_id !== "string" ||
+    typeof b.sender_entrance_id !== "string" ||
     typeof b.nonce !== "string" ||
     typeof b.ciphertext !== "string" || b.ciphertext.length === 0
   ) {
@@ -39,17 +39,17 @@ function validateEnvelope(body: unknown): MessageEnvelope {
   // P1 路径遍历防御：message_id 会被客户端当作文件路径片段（App 媒体解密缓存
   // 按 message_id 拼缓存文件名）——此前只查了"非空字符串"（老板 2026-09-14）
   assertSafeMessageId(b.message_id);
-  const sp = b.sender_person_id;
+  const sp = b.sender_partner_id;
   if (sp !== undefined && typeof sp !== "string") {
-    throw new ApiError("INVALID_REQUEST", "invalid sender_person_id", 400);
+    throw new ApiError("INVALID_REQUEST", "invalid sender_partner_id", 400);
   }
   return {
     v: b.v,
     type: b.type,
     key_version: b.key_version,
     message_id: b.message_id,
-    sender_device_id: b.sender_device_id,
-    ...(sp !== undefined ? { sender_person_id: sp as string } : {}),
+    sender_entrance_id: b.sender_entrance_id,
+    ...(sp !== undefined ? { sender_partner_id: sp as string } : {}),
     nonce: b.nonce,
     ciphertext: b.ciphertext,
   };
@@ -59,8 +59,8 @@ function validateEnvelope(body: unknown): MessageEnvelope {
  *  Multiverse：写入 session 绑定的 Space（legacy 回落 cfg.space_id），幂等与
  *  server_sequence 均按 Space 隔离（PROTOCOL_MULTIVERSE.md §3.6）。 */
 export function postMessage(token: string, body: unknown): { message_id: string; server_sequence: number; created_at: number } {
-  const { device_id, space_id: sessionSpace } = requireSession(token);
-  touchLastSeen(device_id);
+  const { entrance_id, space_id: sessionSpace } = requireSession(token);
+  touchLastSeen(entrance_id);
   const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
 
   const env = validateEnvelope(body);
@@ -68,7 +68,7 @@ export function postMessage(token: string, body: unknown): { message_id: string;
   const db = getDb();
   // 幂等查询排在设备校验**之前**（老板 2026-09-22 定）：message_id 已是身份，
   // 已入库的消息写入是 no-op，没有可伪造的归因，因此不必也不该校验
-  // sender_device_id。反过来说，信封里的 sender_device_id 是 AAD 的一部分
+  // sender_entrance_id。反过来说，信封里的 sender_entrance_id 是 AAD 的一部分
   // （shared/lib/src/crypto/message_crypto.dart），客户端换设备后**无法改写**——
   // 校验若排在前面，历史消息的重投会永远 403，本地状态再也回不来
   // （2026-09-22 实测：iMac 客户端两条 9/18 的消息永远停在"点击重发"红色标签）。
@@ -81,8 +81,8 @@ export function postMessage(token: string, body: unknown): { message_id: string;
   }
 
   // 未入库的新消息：仍必须由本设备本人投递
-  if (env.sender_device_id !== device_id) {
-    throw new ApiError("FORBIDDEN", "sender_device_id mismatch", 403);
+  if (env.sender_entrance_id !== entrance_id) {
+    throw new ApiError("FORBIDDEN", "sender_entrance_id mismatch", 403);
   }
 
   const now = Date.now();
@@ -92,9 +92,9 @@ export function postMessage(token: string, body: unknown): { message_id: string;
     .get(spaceId) as { next: number };
 
   db.prepare(
-    `INSERT INTO messages (message_id, space_id, sender_device_id, sender_person_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
+    `INSERT INTO messages (message_id, space_id, sender_entrance_id, sender_partner_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(env.message_id, spaceId, env.sender_device_id, env.sender_person_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
+  ).run(env.message_id, spaceId, env.sender_entrance_id, env.sender_partner_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
 
   return { message_id: env.message_id, server_sequence: nextSeq.next, created_at: now };
 }
@@ -105,15 +105,15 @@ export function syncMessages(
   after: number,
   limit: number
 ): { messages: StoredMessage[]; attachments_meta: AttachmentMeta[]; last_sequence: number; has_more: boolean } {
-  const { device_id, space_id: sessionSpace } = requireSession(token);
-  touchLastSeen(device_id);
+  const { entrance_id, space_id: sessionSpace } = requireSession(token);
+  touchLastSeen(entrance_id);
   const spaceId = sessionSpace ?? ""; // v2：session 必带 Space（legacy 无空间 → 空串）
 
   const safeLimit = Math.min(Math.max(limit, 1), 500);
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT message_id, sender_device_id, sender_person_id, type, key_version, nonce, ciphertext, server_sequence, created_at
+      `SELECT message_id, sender_entrance_id, sender_partner_id, type, key_version, nonce, ciphertext, server_sequence, created_at
        FROM messages WHERE space_id = ? AND server_sequence > ?
        ORDER BY server_sequence ASC LIMIT ?`
     )

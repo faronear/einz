@@ -7,7 +7,7 @@ import 'vault_session.dart';
 
 /// 清空本设备全部本地数据，回到"新设备"状态。
 ///
-/// 由界面入口触发：对话页菜单 → 高级 → 重置设备（`widgets/reset_device.dart`）。
+/// 由界面入口触发：对话页菜单 → 高级 → 重置设备（`widgets/reset_install.dart`）。
 /// 开发时用 `--server` 连开发服务器测完之后，本机的 `spaceId` / `token` / 设备密钥对
 /// 都属于那台开发服务器——连回生产既用不了，也需要一个出口清库重新入网。
 ///

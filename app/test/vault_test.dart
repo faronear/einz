@@ -25,21 +25,21 @@ void main() {
   const payloadA = AppLockPayload(
     spaceKeyB64: 'a2V5LWE=',
     spaceId: 'space-a',
-    deviceId: 'dev-a',
+    entranceId: 'dev-a',
     keyVersion: 1,
     token: 'tok-a',
   );
   const payloadB = AppLockPayload(
     spaceKeyB64: 'a2V5LWI=',
     spaceId: 'space-b',
-    deviceId: 'dev-b',
+    entranceId: 'dev-b',
     keyVersion: 2,
     token: 'tok-b',
   );
   const payloadB2 = AppLockPayload(
     spaceKeyB64: 'a2V5LWI=',
     spaceId: 'space-b',
-    deviceId: 'dev-b',
+    entranceId: 'dev-b',
     keyVersion: 2,
     token: 'tok-b2',
   );
@@ -61,7 +61,7 @@ void main() {
   group('旧单包归一', () {
     test('旧明文包（单个 payload JSON）读成单元素 Vault，active 指向它', () async {
       // 模拟 v7 之前写入的明文包：SecureStore 里是单独一个 AppLockPayload
-      await SecureStore.write('app_lock.plain', '{"space_key":"a2V5LWE=","space_id":"space-a","device_id":"dev-a","key_version":1,"token":"tok-a"}');
+      await SecureStore.write('app_lock.plain', '{"space_key":"a2V5LWE=","space_id":"space-a","entrance_id":"dev-a","key_version":1,"token":"tok-a"}');
 
       final vault = await lock.loadVault();
       expect(vault, isNotNull);
@@ -237,15 +237,15 @@ void main() {
       final rowB = await (db.select(db.spaces)
             ..where((s) => s.spaceId.equals('space-b')))
           .getSingle();
-      expect(rowB.deviceId, 'dev-b');
+      expect(rowB.entranceId, 'dev-b');
       expect(rowB.keyVersion, 2);
     });
 
     test('removeSpace 只删该空间的 Spaces 行与数据，另一个空间不受影响', () async {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB);
-      await lock.saveProfile(spaceId: 'space-a', personName: '我A', peerName: '对方A', deviceName: 'iPhone');
-      await lock.saveProfile(spaceId: 'space-b', personName: '我B', peerName: '对方B', deviceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-a', partnerName: '我A', peerName: '对方A', entranceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-b', partnerName: '我B', peerName: '对方B', entranceName: 'iPhone');
 
       await lock.removeSpace('space-a');
       expect(await spaceIds(), ['space-b'], reason: '只删被移除的那一行');
@@ -258,7 +258,7 @@ void main() {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB);
 
-      await lock.saveProfile(spaceId: 'space-b', personName: 'Lukas', peerName: 'Alice', deviceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-b', partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
       final rowB = await (db.select(db.spaces)
             ..where((s) => s.spaceId.equals('space-b')))
           .getSingle();
@@ -266,8 +266,8 @@ void main() {
       expect(rowB.peerName, 'Alice');
 
       final pB = await lock.loadProfile(spaceId: 'space-b');
-      expect(pB['personName'], 'Lukas');
-      await lock.saveProfile(spaceId: 'space-a', personName: 'Me', peerName: 'Bob', deviceName: 'iPhone');
+      expect(pB['partnerName'], 'Lukas');
+      await lock.saveProfile(spaceId: 'space-a', partnerName: 'Me', peerName: 'Bob', entranceName: 'iPhone');
       expect((await lock.loadProfile(spaceId: 'space-a'))['peerName'], 'Bob');
       expect((await lock.loadProfile(spaceId: 'space-b'))['peerName'], 'Alice',
           reason: '两个空间的资料互不覆盖');
@@ -277,7 +277,7 @@ void main() {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB); // Spaces 行 = 2（space-a / space-b）
       // 老库遗留：只有全局键，里面是"另一个空间"的资料
-      await lock.saveProfile(personName: '我A', peerName: '对方A', deviceName: 'iPhone');
+      await lock.saveProfile(partnerName: '我A', peerName: '对方A', entranceName: 'iPhone');
 
       // space-b 还没写过 per-space 资料 → 不得读到全局键里 space-a 的资料
       expect(await lock.loadProfile(spaceId: 'space-b'), isEmpty,

@@ -12,7 +12,7 @@ void main() {
   group('设备密钥', () {
     test('生成 + 密封/解封闭环', () async {
       final s = await sodium();
-      final kp = await DeviceKeyPair.generate();
+      final kp = await EntranceKeyPair.generate();
       expect(kp.publicKey.length, 32);
       expect(kp.privateKey.length, 32);
 
@@ -23,8 +23,8 @@ void main() {
 
     test('错误私钥无法解封', () async {
       final s = await sodium();
-      final a = await DeviceKeyPair.generate();
-      final b = await DeviceKeyPair.generate();
+      final a = await EntranceKeyPair.generate();
+      final b = await EntranceKeyPair.generate();
       final sealed = await sealFor(s, a.publicKey, Uint8List.fromList(utf8.encode('x')));
       expect(
         () => sealOpen(s, sealed, b.publicKey, b.privateKey),
@@ -41,7 +41,7 @@ void main() {
         plaintext: plain,
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        senderDeviceId: 'dev-a',
+        senderEntranceId: 'dev-a',
         messageId: 'msg-0001',
       );
       expect(env.ciphertext, isNot(contains(plain)));
@@ -66,7 +66,7 @@ void main() {
         plaintext: 'bound',
         spaceKey: spaceKey,
         spaceId: 'space-a',
-        senderDeviceId: 'dev-a',
+        senderEntranceId: 'dev-a',
         messageId: 'msg-1',
       );
       expect(
@@ -129,15 +129,15 @@ void main() {
     test('config payload 生成 + 各自解封出同一 Space Key', () async {
       final spaceKey = await generateSpaceKey();
       final s = await sodium();
-      final a = await DeviceKeyPair.generate();
-      final b = await DeviceKeyPair.generate();
+      final a = await EntranceKeyPair.generate();
+      final b = await EntranceKeyPair.generate();
 
       final payload = await buildConfigPayload(
         spaceKey: spaceKey,
         spaceId: 'space-1',
-        deviceIdA: a.deviceId,
+        entranceIdA: a.entranceId,
         publicKeyA: a.publicKey,
-        deviceIdB: b.deviceId,
+        entranceIdB: b.entranceId,
         publicKeyB: b.publicKey,
       );
       expect(payload['format'], 'einz-config-v1');

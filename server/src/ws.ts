@@ -6,11 +6,11 @@ import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 
 interface Conn {
   ws: WebSocket;
-  deviceId: string;
-  personId: string | null; // 设备归属身份（同一人的多设备共享 person_id）
+  entranceId: string;
+  partnerId: string | null; // 设备归属身份（同一人的多设备共享 partner_id）
   spaceId: string; // 连接绑定的 Space（会话必带 space）
   alive: boolean;
-  connectedAt: number; // 本次 WS 连接建立时刻（ms）——/devices 显示"上线时间"
+  connectedAt: number; // 本次 WS 连接建立时刻（ms）——/entrances 显示"上线时间"
   onlineSince: number; // 进入在线态的时刻（ms）——与 connectedAt 的区别：重连
   // （被新连接踢掉后又连上）不刷新它，只有"从无连接变成有连接"才置 now。
   // 用途：客户端按"上线顺序"排列对端的多台在线设备（最新上线在最前），
@@ -19,16 +19,16 @@ interface Conn {
   timedOut: boolean; // 已被心跳判定为超时（close 时据此记 heartbeat_timeout）
 }
 
-const conns = new Map<string, Conn>(); // device_id → 连接（一人一机 V1：每设备至多 1 条连接）
+const conns = new Map<string, Conn>(); // entrance_id → 连接（一人一机 V1：每设备至多 1 条连接）
 
 /** 设备当前 WS 连接的建立时刻（ms；离线设备返回 null）。 */
-export function getConnectedAt(deviceId: string): number | null {
-  return conns.get(deviceId)?.connectedAt ?? null;
+export function getConnectedAt(entranceId: string): number | null {
+  return conns.get(entranceId)?.connectedAt ?? null;
 }
 
 /** 设备进入在线态的时刻（ms；离线返回 null）——重连不刷新，见 Conn.onlineSince。 */
-export function getOnlineSince(deviceId: string): number | null {
-  return conns.get(deviceId)?.onlineSince ?? null;
+export function getOnlineSince(entranceId: string): number | null {
+  return conns.get(entranceId)?.onlineSince ?? null;
 }
 
 /** 发起方设备所属 Space：优先其在线连接；**不在线时回退查 sessions**
@@ -36,68 +36,68 @@ export function getOnlineSince(deviceId: string): number | null {
  *  背景：广播此前只认发起方的在线连接（sameSpace），发起方 WS 不在（移动端切
  *  后台/断线）就一条都不发 → 对端改名/换头像后 TUI 一直显示旧名
  *  （老板 2026-09-11 实测）。 */
-function spaceOfDevice(deviceId: string): string | null {
-  const online = conns.get(deviceId)?.spaceId;
+function spaceOfEntrance(entranceId: string): string | null {
+  const online = conns.get(entranceId)?.spaceId;
   if (online != null && online !== "") return online;
   const row = getDb()
     .prepare(
-      `SELECT space_id FROM sessions WHERE device_id = ? AND space_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`
+      `SELECT space_id FROM sessions WHERE entrance_id = ? AND space_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`
     )
-    .get(deviceId) as { space_id: string } | undefined;
+    .get(entranceId) as { space_id: string } | undefined;
   return row?.space_id ?? null;
 }
 
-/** 广播只发给**另一个人**的在线设备：同一 person 的多台设备（同一人的手机+电脑）
+/** 广播只发给**另一个人**的在线设备：同一 partner 的多台设备（同一人的手机+电脑）
  *  不算"对方"——此前只排除发起设备本身，自己的第二台设备一上线，第一台就把
  *  对方灯点亮（老板 2026-09-16 实测：B 从未加入却显示在线）。
- *  payload 带 person_id：客户端（可能连着旧版服务端）据此二次过滤。
+ *  payload 带 partner_id：客户端（可能连着旧版服务端）据此二次过滤。
  *  peer.online 另带 online_since：接收方据此把该设备插到"在线设备列表"的正确
- *  位置（按上线顺序，最新上线在最前），省掉一次 /devices 往返（老板 2026-09-16）。 */
-function broadcastPeerStatus(exceptDeviceId: string, type: "peer.online" | "peer.offline"): void {
-  const origin = conns.get(exceptDeviceId);
+ *  位置（按上线顺序，最新上线在最前），省掉一次 /entrances 往返（老板 2026-09-16）。 */
+function broadcastPeerStatus(exceptEntranceId: string, type: "peer.online" | "peer.offline"): void {
+  const origin = conns.get(exceptEntranceId);
   const spaceId = origin?.spaceId ?? null;
   if (spaceId == null) return;
-  const originPersonId = origin?.personId ?? null;
+  const originPartnerId = origin?.partnerId ?? null;
   const payload: Record<string, unknown> = {
-    device_id: exceptDeviceId,
-    person_id: originPersonId,
+    entrance_id: exceptEntranceId,
+    partner_id: originPartnerId,
   };
   if (type === "peer.online") payload.online_since = origin?.onlineSince ?? null;
   const frame = JSON.stringify({ id: 0, type, payload });
-  for (const [deviceId, conn] of conns) {
-    if (deviceId === exceptDeviceId) continue;
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
     if (conn.spaceId !== spaceId) continue;
-    if (originPersonId != null && conn.personId === originPersonId) continue;
+    if (originPartnerId != null && conn.partnerId === originPartnerId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) conn.ws.send(frame);
   }
 }
 
 /** 空间口令已被重设：通知其余在线设备（客户端收到后只发通知不弹窗）。 */
-export function broadcastPassphraseRotated(exceptDeviceId: string): void {
-  const spaceId = spaceOfDevice(exceptDeviceId);
+export function broadcastPassphraseRotated(exceptEntranceId: string): void {
+  const spaceId = spaceOfEntrance(exceptEntranceId);
   if (spaceId == null) return;
-  for (const [deviceId, conn] of conns) {
-    if (deviceId === exceptDeviceId) continue;
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
     if (conn.spaceId !== spaceId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(
-        JSON.stringify({ id: 0, type: "passphrase.rotated", payload: { device_id: exceptDeviceId } })
+        JSON.stringify({ id: 0, type: "passphrase.rotated", payload: { entrance_id: exceptEntranceId } })
       );
     }
   }
 }
 
 /** 消息回执（已送达/已读）更新：通知同 Space 的其他设备。
- *  用 spaceOfDevice（带 sessions 兜底）——上报设备可能没有活跃 WS 连接
+ *  用 spaceOfEntrance（带 sessions 兜底）——上报设备可能没有活跃 WS 连接
  *  （移动端切后台后仍在同步）。 */
 export function broadcastReceiptUpdated(
-  exceptDeviceId: string,
-  payload: { person_id: string; delivered_upto_seq: number; read_upto_seq: number }
+  exceptEntranceId: string,
+  payload: { partner_id: string; delivered_upto_seq: number; read_upto_seq: number }
 ): void {
-  const spaceId = spaceOfDevice(exceptDeviceId);
+  const spaceId = spaceOfEntrance(exceptEntranceId);
   if (spaceId == null) return;
-  for (const [deviceId, conn] of conns) {
-    if (deviceId === exceptDeviceId) continue;
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
     if (conn.spaceId !== spaceId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(JSON.stringify({ id: 0, type: "receipt.updated", payload }));
@@ -107,13 +107,13 @@ export function broadcastReceiptUpdated(
 
 /** 改名/改设备名：通知其余在线设备立即更新对方名称（App/TUI 顶部条）。 */
 export function broadcastProfileUpdated(
-  exceptDeviceId: string,
-  payload: { person_id?: string; device_id: string; person_name?: string; device_name?: string }
+  exceptEntranceId: string,
+  payload: { partner_id?: string; entrance_id: string; partner_name?: string; entrance_name?: string }
 ): void {
-  const spaceId = spaceOfDevice(exceptDeviceId);
+  const spaceId = spaceOfEntrance(exceptEntranceId);
   if (spaceId == null) return;
-  for (const [deviceId, conn] of conns) {
-    if (deviceId === exceptDeviceId) continue;
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
     if (conn.spaceId !== spaceId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(JSON.stringify({ id: 0, type: "profile.updated", payload }));
@@ -136,30 +136,30 @@ export function attachWs(wss: WebSocketServer): void {
       return;
     }
 
-    let deviceId: string;
+    let entranceId: string;
     let spaceId: string;
-    let personId: string | null;
+    let partnerId: string | null;
     try {
       // requireSession 同时完成：会话有效 + 设备在册 + 会话带 space（v1 收敛后必备）
       const sess = requireSession(token);
-      deviceId = sess.device_id;
+      entranceId = sess.entrance_id;
       spaceId = sess.space_id;
       // 设备归属身份：peer 广播据此跳过同一人的其它设备（同人≠对方）
-      personId = sess.person_id === "" ? null : sess.person_id;
+      partnerId = sess.partner_id === "" ? null : sess.partner_id;
     } catch {
       ws.close(4401, "UNAUTHORIZED");
       return;
     }
     // V1 一人一机：重复连接踢掉旧连接
-    const old = conns.get(deviceId);
+    const old = conns.get(entranceId);
     if (old) old.ws.close(4408, "duplicate connection");
 
     const now = Date.now();
     const meta = metaOf(req);
     const conn: Conn = {
       ws,
-      deviceId,
-      personId,
+      entranceId,
+      partnerId,
       spaceId,
       alive: true,
       connectedAt: now,
@@ -168,14 +168,14 @@ export function attachWs(wss: WebSocketServer): void {
       meta,
       timedOut: false,
     };
-    conns.set(deviceId, conn);
+    conns.set(entranceId, conn);
     // WS 连接 = 在线：刷新 last_seen（App 判定对方在线）
-    getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(now, deviceId);
-    logConnection({ deviceId, spaceId, event: "connect", atMs: now, meta });
-    broadcastPeerStatus(deviceId, "peer.online");
-    console.log(`[req] WS /ws connect device=${deviceId} space=${spaceId} total=${conns.size}`);
+    getDb().prepare(`UPDATE entrances SET last_seen = ? WHERE entrance_id = ?`).run(now, entranceId);
+    logConnection({ entranceId, spaceId, event: "connect", atMs: now, meta });
+    broadcastPeerStatus(entranceId, "peer.online");
+    console.log(`[req] WS /ws connect entrance=${entranceId} space=${spaceId} total=${conns.size}`);
 
-    ws.send(JSON.stringify({ id: 1, type: "hello", payload: { device_id: deviceId, space_id: spaceId } }));
+    ws.send(JSON.stringify({ id: 1, type: "hello", payload: { entrance_id: entranceId, space_id: spaceId } }));
 
     ws.on("message", (data) => {
       try {
@@ -195,12 +195,12 @@ export function attachWs(wss: WebSocketServer): void {
     ws.on("close", (code, reason) => {
       const atMs = Date.now();
       // 先广播离线（peer 广播按发起方空间分组，此时 conn 还在 conns）再删除
-      broadcastPeerStatus(deviceId, "peer.offline");
-      if (conns.get(deviceId) === conn) conns.delete(deviceId);
+      broadcastPeerStatus(entranceId, "peer.offline");
+      if (conns.get(entranceId) === conn) conns.delete(entranceId);
       // WS 断开 = 离线：last_seen 置 0（App 判定离线）
-      getDb().prepare(`UPDATE devices SET last_seen = 0 WHERE device_id = ?`).run(deviceId);
+      getDb().prepare(`UPDATE entrances SET last_seen = 0 WHERE entrance_id = ?`).run(entranceId);
       logConnection({
-        deviceId,
+        entranceId,
         spaceId,
         event: conn.timedOut ? "heartbeat_timeout" : "disconnect",
         atMs,
@@ -209,13 +209,13 @@ export function attachWs(wss: WebSocketServer): void {
         closeReason: reason?.toString("utf8") ?? null,
         meta: conn.meta,
       });
-      console.log(`[req] WS /ws disconnect device=${deviceId} total=${conns.size}`);
+      console.log(`[req] WS /ws disconnect entrance=${entranceId} total=${conns.size}`);
     });
   });
 
   // 心跳：每 30s 检测，不活则断开
   const heartbeat = setInterval(() => {
-    for (const [deviceId, conn] of conns) {
+    for (const [entranceId, conn] of conns) {
       if (!conn.alive) {
         // 心跳超时：先打标（随后的 close 事件据此记 heartbeat_timeout，并带上
         // 来源 IP/UA），再 terminate——审计需要区分"客户端主动断"与"超时失联"。
@@ -226,13 +226,13 @@ export function attachWs(wss: WebSocketServer): void {
         // 看到离线），不是 bug，别"顺手"改成先广播再删（会让在线状态抖动）。
         conn.timedOut = true;
         conn.ws.terminate();
-        conns.delete(deviceId);
+        conns.delete(entranceId);
         continue;
       }
       conn.alive = false;
       conn.ws.ping();
       // 心跳存活 = 在线中：刷新 last_seen（避免运行超 60s 被 App 误判离线）
-      getDb().prepare(`UPDATE devices SET last_seen = ? WHERE device_id = ?`).run(Date.now(), deviceId);
+      getDb().prepare(`UPDATE entrances SET last_seen = ? WHERE entrance_id = ?`).run(Date.now(), entranceId);
     }
   }, 30_000);
   wss.on("close", () => clearInterval(heartbeat));
@@ -240,13 +240,13 @@ export function attachWs(wss: WebSocketServer): void {
 
 /** 向对端广播新消息（先持久化后广播，PROTOCOL.md §8.3）。
  *  Multiverse：按消息落库的 Space 分组（发信方可能无 WS 连接，故查库而非取 conn）。 */
-export function broadcastNewMessage(exceptDeviceId: string, message: MessageEnvelope & { server_sequence: number; created_at: number }): void {
+export function broadcastNewMessage(exceptEntranceId: string, message: MessageEnvelope & { server_sequence: number; created_at: number }): void {
   const row = getDb()
     .prepare(`SELECT space_id FROM messages WHERE message_id = ?`)
     .get(message.message_id) as { space_id: string } | undefined;
   if (!row) return;
-  for (const [deviceId, conn] of conns) {
-    if (deviceId === exceptDeviceId) continue;
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
     if (conn.spaceId !== row.space_id) continue;
     if (conn.ws.readyState === WebSocket.OPEN) {
       conn.ws.send(
@@ -260,32 +260,32 @@ export function broadcastNewMessage(exceptDeviceId: string, message: MessageEnve
   }
 }
 
-/** 设备自助退役（`POST /devices/retire`，devices.retireDevice）：让它立刻从在线表消失。
+/** 设备自助退役（`POST /entrances/retire`，entrances.retireEntrance）：让它立刻从在线表消失。
  *
- * **这里刻意不发 `device.revoked`，也不主动 close**：
- * - `device.revoked`（+ 4403）是客户端**自毁本地数据**的授权信号（docs/E2EE.md §9.3）。
+ * **这里刻意不发 `entrance.revoked`，也不主动 close**：
+ * - `entrance.revoked`（+ 4403）是客户端**自毁本地数据**的授权信号（docs/E2EE.md §9.3）。
  *   退役接口只认 session token（"注销我自己"），若由它发出这帧，偷到 session 的人就能
  *   远程擦掉这台设备——把撤销刻意筑起的口令闸门（docs/PROTOCOL.md §7.2）从旁路绕过。
- * - 任何主动关闭（含 1000）都会让客户端立刻重连，撞上 403 `DEVICE_REVOKED`
+ * - 任何主动关闭（含 1000）都会让客户端立刻重连，撞上 403 `ENTRANCE_REVOKED`
  *   → 同样触发自毁。所以只静默摘出 `conns`，socket 交给客户端自己退出时收尾。
  *
  * 摘出的效果：心跳不再给它刷 last_seen（ws.ts 心跳只遍历 conns），也不再收到任何广播，
- * 对端下一次 /devices 或轮询就看不到它在线——无需等待 30s 轮询兜底。
+ * 对端下一次 /entrances 或轮询就看不到它在线——无需等待 30s 轮询兜底。
  */
-export function forgetDeviceConnection(deviceId: string): void {
+export function forgetEntranceConnection(entranceId: string): void {
   // 顺序不能反：broadcastPeerStatus 靠 conns 里的连接取空间与人身份，摘掉就广播不了
-  broadcastPeerStatus(deviceId, "peer.offline");
-  conns.delete(deviceId);
+  broadcastPeerStatus(entranceId, "peer.offline");
+  conns.delete(entranceId);
 }
 
-/** 通知设备被撤销（PROTOCOL.md §8.2 device.revoked）。
+/** 通知设备被撤销（PROTOCOL.md §8.2 entrance.revoked）。
  *  发帧后主动关闭连接并移出 conns——否则被撤销设备仍能持续接收新消息广播（P2 修复）。 */
-export function notifyRevoked(deviceId: string): void {
-  const conn = conns.get(deviceId);
+export function notifyRevoked(entranceId: string): void {
+  const conn = conns.get(entranceId);
   if (!conn) return;
   if (conn.ws.readyState === WebSocket.OPEN) {
-    conn.ws.send(JSON.stringify({ id: 0, type: "device.revoked", payload: { device_id: deviceId } }));
+    conn.ws.send(JSON.stringify({ id: 0, type: "entrance.revoked", payload: { entrance_id: entranceId } }));
     conn.ws.close(4403, "REVOKED");
   }
-  conns.delete(deviceId);
+  conns.delete(entranceId);
 }

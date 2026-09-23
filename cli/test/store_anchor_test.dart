@@ -10,7 +10,7 @@ import 'package:einz_cli/store.dart';
 
 void main() {
   test('advanceAnchor：锚点只前进不倒退', () {
-    final store = DeviceStore(publicKey: 'pk', privateKey: 'sk')
+    final store = EntranceStore(publicKey: 'pk', privateKey: 'sk')
       ..spaceId = 'space-1'
       ..lastServerSequence = 0;
 

@@ -57,7 +57,7 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/devices`)
+      const res = await fetch(`http://127.0.0.1:${port}/entrances`)
       void res // 任何 HTTP 响应都说明 Server 已就绪
       return
     } catch {
@@ -78,21 +78,21 @@ interface MessageEnvelope {
   type: string
   key_version: number
   message_id: string
-  sender_device_id: string
+  sender_entrance_id: string
   nonce: string
   ciphertext: string
 }
 
 // ---------- 模拟设备（扮演未来 Dart 客户端） ----------
 
-class TestDevice {
-  deviceId = ''
-  personId = ''
+class TestEntrance {
+  entranceId = ''
+  partnerId = ''
   keypair: KeyPair
   sessionToken = ''
   spaceKey: Uint8Array
   spaceId = ''
-  partnerSlot = -1
+  slot = -1
 
   constructor (spaceKey: Uint8Array) {
     this.keypair = sodium.crypto_box_keypair()
@@ -100,30 +100,30 @@ class TestDevice {
   }
 
   /** 创建空间（v2 入口）：**一步完成设备登记 + 签发绑定该空间的会话**。
-   *  替代已删除的 v1 `POST /devices/enroll`（v1 收敛，2026-09-15）。 */
-  async createSpace (port: number, personName = '测试空间', partnerName?: string): Promise<string> {
+   *  替代已删除的 v1 `POST /entrances/enroll`（v1 收敛，2026-09-15）。 */
+  async createSpace (port: number, creatorName = '测试空间', peerName?: string): Promise<string> {
     const res = await fetch(`http://127.0.0.1:${port}/spaces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        person_name: personName,
-        ...(partnerName ? { partner_name: partnerName } : {}),
+        creator_name: creatorName,
+        ...(peerName ? { peer_name: peerName } : {}),
         public_key: sodium.to_base64(this.keypair.publicKey, B64),
-        device_name: 'dev-a'
+        entrance_name: 'dev-a'
       })
     })
     assert.equal(res.status, 201, 'create space should succeed')
     const body = (await res.json()) as {
       spaceId: string
-      deviceId: string
-      creatorPersonId: string
+      entranceId: string
+      creatorPartnerId: string
       sessionToken: string
     }
     this.spaceId = body.spaceId
-    this.deviceId = body.deviceId
-    this.personId = body.creatorPersonId
+    this.entranceId = body.entranceId
+    this.partnerId = body.creatorPartnerId
     this.sessionToken = body.sessionToken
-    this.partnerSlot = 0
+    this.slot = 0
     return body.spaceId
   }
 
@@ -138,30 +138,30 @@ class TestDevice {
   }
 
   /** 加入空间（v2 入口）：登记设备 + 签发会话 + 返回自己的身份槽位。 */
-  async joinSpace (port: number, token: string, partnerSlot = 1): Promise<void> {
+  async joinSpace (port: number, token: string, slot = 1): Promise<void> {
     const res = await fetch(`http://127.0.0.1:${port}/spaces/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token,
         public_key: sodium.to_base64(this.keypair.publicKey, B64),
-        device_name: 'dev-b',
-        partner_slot: partnerSlot
+        entrance_name: 'dev-b',
+        slot: slot
       })
     })
     assert.equal(res.status, 200, 'join space should succeed')
     const body = (await res.json()) as {
       spaceId: string
-      personId: string
-      partnerSlot: number
+      partnerId: string
+      slot: number
       sessionToken: string
-      deviceId: string
+      entranceId: string
     }
     this.spaceId = body.spaceId
-    this.personId = body.personId
-    this.partnerSlot = body.partnerSlot
+    this.partnerId = body.partnerId
+    this.slot = body.slot
     this.sessionToken = body.sessionToken
-    this.deviceId = body.deviceId
+    this.entranceId = body.entranceId
   }
 
   /** challenge-response 重新认证（已登记设备冷启动路径）。
@@ -172,7 +172,7 @@ class TestDevice {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: this.deviceId, space_id: this.spaceId })
+        body: JSON.stringify({ entrance_id: this.entranceId, space_id: this.spaceId })
       }
     )
     assert.equal(challengeRes.status, 200, 'challenge should succeed')
@@ -216,7 +216,7 @@ class TestDevice {
     )
     const nonce = sodium.randombytes_buf(24)
     const aad = sodium.from_string(
-      `einz-v1${spaceId}${messageId}${this.deviceId}text1`
+      `einz-v1${spaceId}${messageId}${this.entranceId}text1`
     )
     const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
       sodium.from_string(plaintext),
@@ -230,7 +230,7 @@ class TestDevice {
       type: 'text',
       key_version: 1,
       message_id: messageId,
-      sender_device_id: this.deviceId,
+      sender_entrance_id: this.entranceId,
       nonce: sodium.to_base64(nonce, B64),
       ciphertext: sodium.to_base64(ciphertext, B64)
     }
@@ -245,7 +245,7 @@ class TestDevice {
     )
     const nonce = sodium.from_base64(env.nonce, B64)
     const aad = sodium.from_string(
-      `einz-v1${spaceId}${env.message_id}${env.sender_device_id}text1`
+      `einz-v1${spaceId}${env.message_id}${env.sender_entrance_id}text1`
     )
     const plain = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
       null,
@@ -295,8 +295,8 @@ async function main (): Promise<void> {
 
   tempDir = mkdtempSync(join(tmpdir(), 'einz-smoke-'))
   const spaceKey = sodium.randombytes_buf(32)
-  const devA = new TestDevice(spaceKey)
-  const devB = new TestDevice(spaceKey)
+  const devA = new TestEntrance(spaceKey)
+  const devB = new TestEntrance(spaceKey)
 
   const port = await freePort()
   serverProc = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
@@ -325,19 +325,19 @@ async function main (): Promise<void> {
     const healthNoVersion = await RAW_FETCH(`http://127.0.0.1:${port}/health`)
     assert.equal(healthNoVersion.status, 200, '/health 免协议版本校验（监控/curl 用）')
 
-    // 1) 未登记设备挑战 → 403 FORBIDDEN（带了 space_id 仍应拒绝：设备不在 devices 表）
-    //    **code 必须是 FORBIDDEN，不能是 DEVICE_REVOKED**：库被清/从未登记≠被撤销，
+    // 1) 未登记设备挑战 → 403 FORBIDDEN（带了 space_id 仍应拒绝：设备不在 entrances 表）
+    //    **code 必须是 FORBIDDEN，不能是 ENTRANCE_REVOKED**：库被清/从未登记≠被撤销，
     //    客户端据此只警告、不清空本地数据（老板 2026-09-16）。
     const evil = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: 'dev-evil', space_id: 'space-evil' })
+      body: JSON.stringify({ entrance_id: 'dev-evil', space_id: 'space-evil' })
     })
-    assert.equal(evil.status, 403, 'non-enrolled device must be rejected')
+    assert.equal(evil.status, 403, 'non-enrolled entrance must be rejected')
     assert.equal(
       ((await evil.json()) as { error: { code: string } }).error.code,
       'FORBIDDEN',
-      '未登记设备必须是 FORBIDDEN（与 DEVICE_REVOKED 区分：未登记不得触发客户端自毁）'
+      '未登记设备必须是 FORBIDDEN（与 ENTRANCE_REVOKED 区分：未登记不得触发客户端自毁）'
     )
 
     // 2) A 创建空间（v2 入口：登记设备 + 签发会话）
@@ -348,7 +348,7 @@ async function main (): Promise<void> {
     const noSpace = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: devA.deviceId })
+      body: JSON.stringify({ entrance_id: devA.entranceId })
     })
     assert.equal(noSpace.status, 400, 'challenge without space_id must be rejected')
 
@@ -388,11 +388,11 @@ async function main (): Promise<void> {
     }
 
     // 5.2) 换设备后的重投必须幂等成功（老板 2026-09-22 实测的线上 bug）：
-    //      信封里的 sender_device_id 是 AAD 的一部分，客户端换了设备也**改不掉**，
-    //      重投旧消息时必然带着旧 device_id。只要 message_id 已在本空间入库，
+    //      信封里的 sender_entrance_id 是 AAD 的一部分，客户端换了设备也**改不掉**，
+    //      重投旧消息时必然带着旧 entrance_id。只要 message_id 已在本空间入库，
     //      就应该返回原 seq —— 此前设备校验排在幂等查询之前，请求永远 403，
     //      客户端两条消息永久卡在"点击重发"红色标签。
-    const staleDevicePost = await fetch(`http://127.0.0.1:${port}/messages`, {
+    const staleEntrancePost = await fetch(`http://127.0.0.1:${port}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -400,16 +400,16 @@ async function main (): Promise<void> {
       },
       body: JSON.stringify({
         ...envA,
-        sender_device_id: '1395a5d0-0000-4000-8000-000000000000'
+        sender_entrance_id: '1395a5d0-0000-4000-8000-000000000000'
       })
     })
     assert.equal(
-      staleDevicePost.status,
+      staleEntrancePost.status,
       200,
       '已入库的 message_id：信封带旧设备 id 也应幂等成功（设备校验不得排在幂等之前）'
     )
     assert.equal(
-      ((await staleDevicePost.json()) as { server_sequence: number })
+      ((await staleEntrancePost.json()) as { server_sequence: number })
         .server_sequence,
       1,
       '幂等返回原 seq（不新增、不改归因）'
@@ -424,13 +424,13 @@ async function main (): Promise<void> {
       },
       body: JSON.stringify({
         ...devA.encryptMessage('msg-mismatch', HELLO, spaceId),
-        sender_device_id: '1395a5d0-0000-4000-8000-000000000000'
+        sender_entrance_id: '1395a5d0-0000-4000-8000-000000000000'
       })
     })
     assert.equal(
       freshMismatch.status,
       403,
-      '未入库的新消息冒用其他 sender_device_id 必须 403'
+      '未入库的新消息冒用其他 sender_entrance_id 必须 403'
     )
 
     // 6) B 用 join token 加入空间 + 认证 + 增量同步（v2 入口，替代 v1 邀请码登记）
@@ -569,39 +569,39 @@ async function main (): Promise<void> {
       'escrow cleared after delete'
     )
 
-    // 12) 名称表（v2）：创建空间时带 partner_name → 落 space_members.display_name，
-    //     GET /space 的 person_names 应含双方名字。**名称的唯一数据源是
+    // 12) 名称表（v2）：创建空间时带 peer_name → 落 space_members.display_name，
+    //     GET /space 的 partner_names 应含双方名字。**名称的唯一数据源是
     //     space_members**——v1 的 meta `person_name:*` 表已随收敛删除，所以这里
     //     按 v2 的读法断言（此前两个用例查 meta，已作废）。
-    const preset = new TestDevice(sodium.randombytes_buf(32))
+    const preset = new TestEntrance(sodium.randombytes_buf(32))
     await preset.createSpace(port, '我', 'Alice')
     const infoRes = await fetch(`http://127.0.0.1:${port}/space`, {
       headers: { Authorization: `Bearer ${preset.sessionToken}` }
     })
     assert.equal(infoRes.status, 200, 'GET /space should succeed')
     const info = (await infoRes.json()) as {
-      person_names: Record<string, string>
+      partner_names: Record<string, string>
     }
     assert.equal(
-      info.person_names[preset.personId],
+      info.partner_names[preset.partnerId],
       '我',
       '创建者名字应落 space_members.display_name'
     )
-    // partner 预置名落在 space_members 的 slot=1 行（该行 person_id 仍为 NULL，
-    // 等伴侣加入后才出现在 /space 的 person_names —— 这是"预置"语义，不是丢数据）
+    // partner 预置名落在 space_members 的 slot=1 行（该行 partner_id 仍为 NULL，
+    // 等伴侣加入后才出现在 /space 的 partner_names —— 这是"预置"语义，不是丢数据）
     const dbPreset = new Database(join(tempDir, 'einz.sqlite.db'), { readonly: true })
-    const partnerRow = dbPreset
-      .prepare(`SELECT display_name FROM space_members WHERE space_id = ? AND partner_slot = 1`)
+    const peerRow = dbPreset
+      .prepare(`SELECT display_name FROM space_members WHERE space_id = ? AND slot = 1`)
       .get(preset.spaceId) as { display_name: string | null } | undefined
     dbPreset.close()
     assert.equal(
-      partnerRow?.display_name,
+      peerRow?.display_name,
       'Alice',
-      'partner_name 预置应落 space_members slot=1（后续设备引导可按名字选身份）'
+      'peer_name 预置应落 space_members slot=1（后续设备引导可按名字选身份）'
     )
 
     // 12b) 改名后名称表即时更新（回归：90ec740 把 getSpace 改读 space_members，
-    //      但 updatePersonName 仍只写 meta → GET /space 返回旧名——TUI 右上角自己
+    //      但 updatePartnerName 仍只写 meta → GET /space 返回旧名——TUI 右上角自己
     //      的名字不刷新、对方改名后我方名称表被旧值覆盖）。验证：创建空间 →
     //      GET /space 旧名 → 改名 → GET /space 新名。
     const tempDir4 = mkdtempSync(join(tmpdir(), 'einz-rename-'))
@@ -627,15 +627,15 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          person_name: 'luk',
+          creator_name: 'luk',
           public_key: creatorPk,
-          device_name: 'dev-a'
+          entrance_name: 'dev-a'
         })
       })
       assert.equal(create.status, 201, 'create space should succeed')
       const created = (await create.json()) as {
         spaceId: string
-        creatorPersonId: string
+        creatorPartnerId: string
         sessionToken: string
       }
 
@@ -644,24 +644,24 @@ async function main (): Promise<void> {
       })
       assert.equal(before.status, 200, 'get space should succeed')
       const beforeBody = (await before.json()) as {
-        person_names: Record<string, string>
+        partner_names: Record<string, string>
       }
       assert.equal(
-        beforeBody.person_names[created.creatorPersonId],
+        beforeBody.partner_names[created.creatorPartnerId],
         'luk',
         'create 后名称表应为创建名'
       )
 
       // /myname 改名 → GET /space 必须返回新名（meta 与 space_members 同步）
       const rename = await fetch(
-        `http://127.0.0.1:${port4}/devices/person-name`,
+        `http://127.0.0.1:${port4}/partners/name`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${created.sessionToken}`
           },
-          body: JSON.stringify({ person_name: 'lukas' })
+          body: JSON.stringify({ partner_name: 'lukas' })
         }
       )
       assert.equal(rename.status, 200, 'rename should succeed')
@@ -669,10 +669,10 @@ async function main (): Promise<void> {
         headers: { Authorization: `Bearer ${created.sessionToken}` }
       })
       const afterBody = (await after.json()) as {
-        person_names: Record<string, string>
+        partner_names: Record<string, string>
       }
       assert.equal(
-        afterBody.person_names[created.creatorPersonId],
+        afterBody.partner_names[created.creatorPartnerId],
         'lukas',
         '改名后 GET /space 名称表应即时反映新名'
       )
@@ -730,15 +730,15 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          person_name: 'luk',
+          creator_name: 'luk',
           public_key: creatorPk5,
-          device_name: 'dev-a'
+          entrance_name: 'dev-a'
         })
       })
       assert.equal(create5.status, 201, 'create space should succeed')
       const created5 = (await create5.json()) as {
         spaceId: string
-        deviceId: string
+        entranceId: string
         sessionToken: string
       }
       const auth5 = { Authorization: `Bearer ${created5.sessionToken}` }
@@ -779,7 +779,7 @@ async function main (): Promise<void> {
           type: 'image',
           key_version: 1,
           message_id: messageId5,
-          sender_device_id: created5.deviceId,
+          sender_entrance_id: created5.entranceId,
           nonce: sodium.to_base64(sodium.randombytes_buf(24), B64),
           ciphertext: sodium.to_base64(sodium.randombytes_buf(32), B64)
         })
@@ -861,15 +861,15 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          person_name: 'alice',
+          creator_name: 'alice',
           public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
-          device_name: 'dev-a'
+          entrance_name: 'dev-a'
         })
       })
       assert.equal(create6.status, 201, 'create space should succeed')
       const a6 = (await create6.json()) as {
         spaceId: string
-        creatorPersonId: string
+        creatorPartnerId: string
         sessionToken: string
       }
       const tk6 = await fetch(
@@ -888,7 +888,7 @@ async function main (): Promise<void> {
         body: JSON.stringify({
           token: joinToken,
           public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
-          device_name: 'dev-b'
+          entrance_name: 'dev-b'
         })
       })
       assert.equal(join6.status, 200, 'join should succeed')
@@ -922,28 +922,28 @@ async function main (): Promise<void> {
       await new Promise<void>(done => ws6.on('open', () => done()))
 
       const rename6 = await fetch(
-        `http://127.0.0.1:${port6}/devices/person-name`,
+        `http://127.0.0.1:${port6}/partners/name`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${a6.sessionToken}`
           },
-          body: JSON.stringify({ person_name: 'alice-new' })
+          body: JSON.stringify({ partner_name: 'alice-new' })
         }
       )
       assert.equal(rename6.status, 200, 'rename should succeed')
 
       const payload6 = await got
       assert.equal(
-        payload6.person_id,
-        a6.creatorPersonId,
-        'broadcast must carry the renamed person_id'
+        payload6.partner_id,
+        a6.creatorPartnerId,
+        'broadcast must carry the renamed partner_id'
       )
       assert.equal(
-        payload6.person_name,
+        payload6.partner_name,
         'alice-new',
-        'broadcast must carry the new person_name'
+        'broadcast must carry the new partner_name'
       )
       ws6.close()
     } finally {
@@ -1009,9 +1009,9 @@ async function main (): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          person_name: '限速测试空间',
+          creator_name: '限速测试空间',
           public_key: sodium.to_base64(sodium.randombytes_buf(32), B64),
-          device_name: 'dev-rate'
+          entrance_name: 'dev-rate'
         })
       })
       assert.equal(r.status, 201, 'create space for rate-limit test should succeed')
@@ -1073,12 +1073,12 @@ async function main (): Promise<void> {
     console.log('✅ 取包限速：2 次失败后第 3 次 429（免认证端点防在线爆破）')
 
     // 12) 撤销语义（老板 2026-09-16）分两件事：
-    //     ① **只有明确撤销**才给 DEVICE_REVOKED（此前 revoked 与"库被重置/未登记"
+    //     ① **只有明确撤销**才给 ENTRANCE_REVOKED（此前 revoked 与"库被重置/未登记"
     //        都返回 FORBIDDEN，客户端只能把 403 一律当撤销 → 后台 DB 被清空时客户端
     //        自毁本地数据，不可挽回）；
     //     ② **授权边界**（2026-09-16 定稿）：同 space 内可互撤，但每次都要验密保口令。
     const pass = 'smoke-revoke-pass'
-    const revokeUrl = `http://127.0.0.1:${port}/devices/${devB.deviceId}/revoke`
+    const revokeUrl = `http://127.0.0.1:${port}/entrances/${devB.entranceId}/revoke`
     const revokeReq = async (
       passphrase: unknown,
       token: string
@@ -1141,10 +1141,10 @@ async function main (): Promise<void> {
       '口令错 → ESCROW_VERIFY_FAILED'
     )
     await devB.auth(port) // 口令错**不得**产生任何效果：目标设备仍能正常认证
-    assert.equal(devB.sessionToken.length > 0, true, 'target device unaffected by failed revoke')
+    assert.equal(devB.sessionToken.length > 0, true, 'target entrance unaffected by failed revoke')
 
     // 12e) 不能撤自己 → 400
-    const self = await fetch(`http://127.0.0.1:${port}/devices/${devA.deviceId}/revoke`, {
+    const self = await fetch(`http://127.0.0.1:${port}/entrances/${devA.entranceId}/revoke`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${devA.sessionToken}` },
       body: JSON.stringify({ passphrase: pass })
@@ -1155,37 +1155,37 @@ async function main (): Promise<void> {
     const revokeB = await revokeReq(pass, devA.sessionToken)
     assert.equal(revokeB.status, 200, 'revoke with correct passphrase should succeed')
 
-    // 12g) 已撤销设备挑战 → 403 DEVICE_REVOKED
+    // 12g) 已撤销设备挑战 → 403 ENTRANCE_REVOKED
     const revokedCh = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: devB.deviceId, space_id: spaceId })
+      body: JSON.stringify({ entrance_id: devB.entranceId, space_id: spaceId })
     })
-    assert.equal(revokedCh.status, 403, 'revoked device must be rejected')
+    assert.equal(revokedCh.status, 403, 'revoked entrance must be rejected')
     assert.equal(
       ((await revokedCh.json()) as { error: { code: string } }).error.code,
-      'DEVICE_REVOKED',
-      '已撤销设备必须返回 DEVICE_REVOKED（客户端据此清空本地数据）'
+      'ENTRANCE_REVOKED',
+      '已撤销设备必须返回 ENTRANCE_REVOKED（客户端据此清空本地数据）'
     )
     // 撤销同时清掉该设备的会话（PROTOCOL.md §7.2）→ 旧 token 落到 401
     const revokedSync = await fetch(`http://127.0.0.1:${port}/sync?after=0`, {
       headers: { Authorization: `Bearer ${devB.sessionToken}` }
     })
-    assert.equal(revokedSync.status, 401, 'revoked device session must be gone')
+    assert.equal(revokedSync.status, 401, 'revoked entrance session must be gone')
 
     // 12h) guard.requireSession 的 revoked 分支（防御性）：revoke 已删会话，正常路径
     //      走不到，这里直接种一条属于该 revoked 设备的会话——若该分支被误删，
     //      被撤销设备就能拿着旧会话继续同步消息（安全缺口）
-    const staleToken = 'revoked-device-stale-session'
+    const staleToken = 'revoked-entrance-stale-session'
     const seedDb = new Database(join(tempDir, 'einz.sqlite.db'))
     seedDb
       .prepare(
-        `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at)
+        `INSERT INTO sessions (session_token, entrance_id, space_id, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?)`
       )
       .run(
         createHash('sha256').update(staleToken).digest('hex'),
-        devB.deviceId,
+        devB.entranceId,
         spaceId,
         Date.now() + 3_600_000,
         Date.now()
@@ -1194,14 +1194,14 @@ async function main (): Promise<void> {
     const staleSync = await fetch(`http://127.0.0.1:${port}/sync?after=0`, {
       headers: { Authorization: `Bearer ${staleToken}` }
     })
-    assert.equal(staleSync.status, 403, 'revoked device with a live session must be rejected')
+    assert.equal(staleSync.status, 403, 'revoked entrance with a live session must be rejected')
     assert.equal(
       ((await staleSync.json()) as { error: { code: string } }).error.code,
-      'DEVICE_REVOKED',
-      'requireSession 对 revoked 设备也必须 DEVICE_REVOKED'
+      'ENTRANCE_REVOKED',
+      'requireSession 对 revoked 设备也必须 ENTRANCE_REVOKED'
     )
     console.log(
-      '✅ 撤销语义：已撤销 → DEVICE_REVOKED（挑战与会话校验两处），未登记 → FORBIDDEN；' +
+      '✅ 撤销语义：已撤销 → ENTRANCE_REVOKED（挑战与会话校验两处），未登记 → FORBIDDEN；' +
         '授权：缺口令哈希 409 / 缺口令 400 / 跨空间 403 / 口令错 401（目标无损）/ 撤自己 400'
     )
 

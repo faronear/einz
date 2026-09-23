@@ -123,7 +123,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
       if (name.isEmpty && peerName.isEmpty) {
         // Spaces 行还没被 saveProfile 写过（旧空间）：回退 per-space 资料
         final p = await lock.loadProfile(spaceId: row.spaceId);
-        name = (p['personName'] as String?) ?? '';
+        name = (p['partnerName'] as String?) ?? '';
         peerName = (p['peerName'] as String?) ?? '';
       }
       out[row.spaceId] = (name: name, peerName: peerName);

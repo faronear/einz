@@ -13,7 +13,7 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 
 /// 走到信封页：入口页 → 加入 → token（preflight）→ 名字 → 口令页 → 切「改用线下密保信封」。
-Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) async {
+Future<void> pumpToEnvelope(WidgetTester tester, {required EntranceKeyPair kp}) async {
   final db = LocalDatabase.forTesting(NativeDatabase.memory());
   addTearDown(db.close);
   await tester.pumpWidget(MaterialApp(
@@ -54,11 +54,11 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required DeviceKeyPair kp}) as
 }
 
 void main() {
-  late final DeviceKeyPair kp;
+  late final EntranceKeyPair kp;
 
   setUpAll(() async {
     // 真实密钥对：向导 keyPairOverride 需要合法 x25519 密钥
-    kp = await DeviceKeyPair.generate(deviceId: 'dev1');
+    kp = await EntranceKeyPair.generate(entranceId: 'dev1');
   });
 
   testWidgets('信封页「下一步」回到 join 口令页（不验证信封推进）', (WidgetTester tester) async {

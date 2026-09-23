@@ -5,9 +5,9 @@ import { pwhashStr, toB64 } from "./crypto.js";
 import { parsePackage, type EscrowPackage } from "./escrow.js";
 import { deriveSpaceAddress } from "./address.js";
 import { loadConfig } from "./config.js";
-import { normalizeDeviceName } from "./deviceName.js";
-import { normalizeDeviceUid } from "./deviceUid.js";
-import { assertPersonName } from "./personName.js";
+import { normalizeEntranceName } from "./entranceName.js";
+import { normalizeInstallUid } from "./installUid.js";
+import { assertPartnerName } from "./partnerName.js";
 import { assertSafeSpaceId } from "./safeId.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
@@ -38,21 +38,21 @@ function base58url(bytes: Buffer): string {
 /** 生成一次性 join token（e1_ 前缀），写库（只存 hash），返回明文与到期时间。 */
 export function newJoinToken(
   spaceId: string,
-  createdByDevice: string,
+  createdByEntrance: string,
 ): { token: string; hash: string; expiresAt: number } {
   const token = "e1_" + base58url(randomBytes(32));
   const hash = createHash("sha256").update(token).digest("hex");
   const expiresAt = Date.now() + TOKEN_TTL_MS;
   getDb()
     .prepare(
-      `INSERT INTO join_tokens (space_id, token_hash, created_by_device, expires_at, created_at)
+      `INSERT INTO join_tokens (space_id, token_hash, created_by_entrance, expires_at, created_at)
        VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(spaceId, hash, createdByDevice, expiresAt, Date.now());
+    .run(spaceId, hash, createdByEntrance, expiresAt, Date.now());
   return { token, hash, expiresAt };
 }
 
-/** 创建 Space（首设备自举）：创建者为第一位成员（partner_slot 0），返回首个
+/** 创建 Space（首设备自举）：创建者为第一位成员（slot 0），返回首个
  *  join token 供分享。U2 密钥分发：可一并提交"口令加密的 Space Key 密封包"
  *  （escrow，按空间隔离）——后续加入方凭同一口令从 key-escrow 取回 Space Key
  *  （PROTOCOL_MULTIVERSE.md §5 ④）。sealedSpaceKey 与 escrowPassphrase 需成对。 */
@@ -68,15 +68,15 @@ function normGender(g?: string): string | undefined {
 
 export async function createSpace(
   clientSpaceId?: string,
-  personName?: string, // 创建者（第一人）的显示名——落 space_members，不落 spaces
-  gender?: string,
-  partnerName?: string,
-  partnerGender?: string,
+  creatorName?: string, // 创建者（第一人）的显示名——落 space_members，不落 spaces
+  creatorGender?: string,
+  peerName?: string,
+  peerGender?: string,
   sealedSpaceKey?: unknown,
   escrowPassphrase?: string,
   publicKey?: string,
-  deviceName?: string,
-  deviceUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
+  entranceName?: string,
+  installUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
   baseUrl?: string, // 邀请链接 base（按请求真实 Host 生成，2026-09-11）
 ): Promise<{
   spaceId: string;
@@ -84,8 +84,8 @@ export async function createSpace(
   joinToken: string;
   link: string;
   expiresAt: number;
-  deviceId: string;
-  creatorPersonId: string;
+  entranceId: string;
+  creatorPartnerId: string;
   sessionToken: string;
 }> {
   // 协议 §3.4：space_id/space_key 由客户端生成（包内容需含 space_id）——
@@ -109,8 +109,8 @@ export async function createSpace(
   // 用户名称白名单（老板 2026-09-16）：create 录入的是**两人**的名字（我的 +
   // 伴侣），都是用户自己输入的 → 不合规直接 400，让客户端提示重输。
   // 只有传了才校验（未传维持现状——服务端不强制必填，必填由客户端引导负责）
-  if (personName != null) assertPersonName(personName);
-  if (partnerName != null) assertPersonName(partnerName);
+  if (creatorName != null) assertPartnerName(creatorName);
+  if (peerName != null) assertPartnerName(peerName);
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
   const spacePublicKey = publicKey ?? "pending:" + randomUUID();
   // 地址 = Keccak-256(space_public_key) 后 20 字节 + EIP-55（确定性；公钥缺失回退随机）
@@ -125,22 +125,22 @@ export async function createSpace(
        VALUES (?, ?, ?, 'waiting', ?, ?)`,
     )
     .run(spaceId, spaceAddress, spacePublicKey, now, now);
-  const creatorPersonId = randomUUID();
+  const creatorPartnerId = randomUUID();
   getDb()
     .prepare(
-      `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
+      `INSERT INTO space_members (space_id, partner_id, slot, display_name, gender, status, joined_at)
        VALUES (?, ?, 0, ?, ?, 'active', ?)`,
     )
-    .run(spaceId, creatorPersonId, personName ?? null, normGender(gender) ?? null, now);
+    .run(spaceId, creatorPartnerId, creatorName ?? null, normGender(creatorGender) ?? null, now);
   // 伴侣（第二人）预置：名字/性别必填（老板 2026-09-10 定稿——create 时录入两人
-  // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，person_id 由
+  // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，partner_id 由
   // 首个加入该 slot 的设备生成。
   getDb()
     .prepare(
-      `INSERT INTO space_members (space_id, person_id, partner_slot, display_name, gender, status, joined_at)
+      `INSERT INTO space_members (space_id, partner_id, slot, display_name, gender, status, joined_at)
        VALUES (?, NULL, 1, ?, ?, 'pending', NULL)`,
     )
-    .run(spaceId, partnerName ?? null, normGender(partnerGender) ?? null);
+    .run(spaceId, peerName ?? null, normGender(peerGender) ?? null);
   // U2：Space Key 口令密封包（可选；成对提供时写入 key_escrow）
   if (sealedSpaceKey != null || (escrowPassphrase != null && escrowPassphrase.length > 0)) {
     if (sealedSpaceKey == null) {
@@ -164,24 +164,24 @@ export async function createSpace(
   }
   // U3：创建者设备登记（提供 publicKey 时）+ 签发绑定该 Space 的 session——
   // 创建者可立即进聊天，无需二次流程
-  let deviceId = "";
+  let entranceId = "";
   let sessionToken = "";
   if (publicKey != null && publicKey.length > 0) {
-    deviceId = randomUUID();
+    entranceId = randomUUID();
     getDb()
       .prepare(
-        `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at, device_uid)
+        `INSERT INTO entrances (entrance_id, partner_id, public_key, status, entrance_name, created_at, install_uid)
          VALUES (?, ?, ?, 'active', ?, ?, ?)`,
       )
-      .run(deviceId, creatorPersonId, publicKey, normalizeDeviceName(deviceName), now, normalizeDeviceUid(deviceUid));
+      .run(entranceId, creatorPartnerId, publicKey, normalizeEntranceName(entranceName), now, normalizeInstallUid(installUid));
     sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(
-        `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at)
+        `INSERT INTO sessions (session_token, entrance_id, space_id, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
       // 库中存 sha256（明文只回给客户端；见 auth.hashSessionToken）
-      .run(hashSessionToken(sessionToken), deviceId, spaceId, now + SESSION_TTL_MS, now);
+      .run(hashSessionToken(sessionToken), entranceId, spaceId, now + SESSION_TTL_MS, now);
   }
   const t = newJoinToken(spaceId, "creator");
   return {
@@ -190,8 +190,8 @@ export async function createSpace(
     joinToken: t.token,
     link: (baseUrl ?? DEFAULT_LINK_BASE) + "/join/" + t.token,
     expiresAt: t.expiresAt,
-    deviceId,
-    creatorPersonId,
+    entranceId,
+    creatorPartnerId,
     sessionToken,
   };
 }
@@ -241,17 +241,17 @@ export function preflightJoin(
   // 加入者可能是第二人，也可能是第一人的其他设备（老板 2026-09-10 定稿）
   const members = getDb()
     .prepare(
-      `SELECT partner_slot, display_name, gender, status FROM space_members
-       WHERE space_id = ? ORDER BY partner_slot`,
+      `SELECT slot, display_name, gender, status FROM space_members
+       WHERE space_id = ? ORDER BY slot`,
     )
     .all(tk.space_id) as {
-    partner_slot: number;
+    slot: number;
     display_name: string | null;
     gender: string | null;
     status: string;
   }[];
   const slots = members.map((m) => ({
-    slot: m.partner_slot,
+    slot: m.slot,
     displayName: m.display_name,
     gender: m.gender,
     status: m.status,
@@ -262,16 +262,15 @@ export function preflightJoin(
 }
 
 /** 加入 Space：事务内消费 token（未用/未过期/未满员）并插入第二位成员；
- *  满员后空间转 active。U3：加入设备登记（devices，服务端分配 UUID）并签发
+ *  满员后空间转 active。U3：加入设备登记（entrances，服务端分配 UUID）并签发
  *  绑定该 Space 的 session——加入后可立即进聊天（PROTOCOL_MULTIVERSE.md §4.1）。 */
 export function joinSpace(
   token: string,
   publicKey: string,
-  deviceName?: string,
-  gender?: string,
-  partnerSlot?: number,
-  deviceUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
-): { spaceId: string; personId: string; partnerSlot: number; sessionToken: string; spaceAddress: string } {
+  entranceName?: string,
+  slot?: number,
+  installUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
+): { spaceId: string; partnerId: string; slot: number; sessionToken: string; spaceAddress: string } {
   if (publicKey.length === 0) {
     throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入设备公钥）", 400);
   }
@@ -292,49 +291,49 @@ export function joinSpace(
     }
     // 身份 slot：加入者选择（0=第一人/创建者，1=第二人/伴侣）；缺省第二人。
     // 同一身份可有多台设备（创建者换设备加入选 0）——不再有「满」。
-    const slot = partnerSlot === 0 || partnerSlot === 1 ? partnerSlot : 1;
+    const chosenSlot = slot === 0 || slot === 1 ? slot : 1;
     let member = getDb()
-      .prepare(`SELECT person_id, status FROM space_members WHERE space_id = ? AND partner_slot = ?`)
-      .get(tk.space_id, slot) as { person_id: string | null; status: string } | undefined;
+      .prepare(`SELECT partner_id, status FROM space_members WHERE space_id = ? AND slot = ?`)
+      .get(tk.space_id, chosenSlot) as { partner_id: string | null; status: string } | undefined;
     if (!member) {
       // 容错：slot 行缺失（理论上 create 已预置两身份）→ 补建
       getDb()
         .prepare(
-          `INSERT INTO space_members (space_id, person_id, partner_slot, status, joined_at)
+          `INSERT INTO space_members (space_id, partner_id, slot, status, joined_at)
            VALUES (?, NULL, ?, 'active', ?)`,
         )
-        .run(tk.space_id, slot, Date.now());
-      member = { person_id: null, status: "active" };
+        .run(tk.space_id, chosenSlot, Date.now());
+      member = { partner_id: null, status: "active" };
     }
-    let personId = member.person_id;
-    if (personId == null) {
-      // 该身份首次加入：生成 person_id 并激活
-      personId = randomUUID();
+    let partnerId = member.partner_id;
+    if (partnerId == null) {
+      // 该身份首次加入：生成 partner_id 并激活
+      partnerId = randomUUID();
       getDb()
         .prepare(
-          `UPDATE space_members SET person_id = ?, status = 'active', joined_at = ?
-           WHERE space_id = ? AND partner_slot = ?`,
+          `UPDATE space_members SET partner_id = ?, status = 'active', joined_at = ?
+           WHERE space_id = ? AND slot = ?`,
         )
-        .run(personId, Date.now(), tk.space_id, slot);
+        .run(partnerId, Date.now(), tk.space_id, chosenSlot);
     } else if (member.status !== "active") {
       getDb()
         .prepare(
-          `UPDATE space_members SET status = 'active', joined_at = ? WHERE space_id = ? AND partner_slot = ?`,
+          `UPDATE space_members SET status = 'active', joined_at = ? WHERE space_id = ? AND slot = ?`,
         )
-        .run(Date.now(), tk.space_id, slot);
+        .run(Date.now(), tk.space_id, chosenSlot);
     }
     // 通道数量上限（serverConfig.json 的 maxEntrancesPerSpace：0=不限）——
     // **必须在事务内**计：preflight 不消费 token，并发两个 join 会同时通过预检
     // 然后双双插设备 → 超额。计数按"该空间登记过的通道总数"，**含已撤销**：
-    // 销毁/撤销是软标记（devices.status='revoked'，行不删），若只数 active，
+    // 销毁/撤销是软标记（entrances.status='revoked'，行不删），若只数 active，
     // "开通→销毁→再开通"就能无限刷额度，防滥用等于没做（老板 2026-09-23 定）。
     const cfg = loadConfig();
     if (cfg.max_entrances_per_space > 0) {
       const cnt = (
         getDb()
           .prepare(
-            `SELECT COUNT(*) AS n FROM devices d
-             JOIN space_members sm ON sm.person_id = d.person_id
+            `SELECT COUNT(*) AS n FROM entrances d
+             JOIN space_members sm ON sm.partner_id = d.partner_id
              WHERE sm.space_id = ?`,
           )
           .get(tk.space_id) as { n: number }
@@ -351,26 +350,26 @@ export function joinSpace(
     getDb()
       .prepare(`UPDATE join_tokens SET used_at = ? WHERE token_hash = ?`)
       .run(Date.now(), hash);
-    // 加入设备登记（同一身份多设备共享 person_id）+ 签发绑定该 Space 的 session
-    const deviceId = randomUUID();
+    // 加入设备登记（同一身份多设备共享 partner_id）+ 签发绑定该 Space 的 session
+    const entranceId = randomUUID();
     getDb()
       .prepare(
-        `INSERT INTO devices (device_id, person_id, public_key, status, device_name, created_at, device_uid)
+        `INSERT INTO entrances (entrance_id, partner_id, public_key, status, entrance_name, created_at, install_uid)
          VALUES (?, ?, ?, 'active', ?, ?, ?)`,
       )
-      .run(deviceId, personId, publicKey, normalizeDeviceName(deviceName), Date.now(), normalizeDeviceUid(deviceUid));
+      .run(entranceId, partnerId, publicKey, normalizeEntranceName(entranceName), Date.now(), normalizeInstallUid(installUid));
     const sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(
-        `INSERT INTO sessions (session_token, device_id, space_id, expires_at, created_at)
+        `INSERT INTO sessions (session_token, entrance_id, space_id, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
       // 库中存 sha256（明文只回给客户端；见 auth.hashSessionToken）
-      .run(hashSessionToken(sessionToken), deviceId, tk.space_id, Date.now() + SESSION_TTL_MS, Date.now());
+      .run(hashSessionToken(sessionToken), entranceId, tk.space_id, Date.now() + SESSION_TTL_MS, Date.now());
     getDb()
       .prepare(`UPDATE spaces SET status = 'active', updated_at = ? WHERE space_id = ?`)
       .run(Date.now(), tk.space_id);
-    return { spaceId: tk.space_id, personId, partnerSlot: slot, sessionToken, deviceId, spaceAddress: sp.space_address };
+    return { spaceId: tk.space_id, partnerId, slot: chosenSlot, sessionToken, entranceId, spaceAddress: sp.space_address };
   });
   return doJoin();
 }

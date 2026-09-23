@@ -19,7 +19,7 @@
 - **一个空间 = 两个人**（`space_members` 两个身份槽位），同一身份可多台设备；一个 Server
   可承载**多个互不可见的空间**（Multiverse，2026-09-12 起）。
 - **E2EE 全链路**：Server 只见密文（消息、附件均为密文 + 元数据）。
-- **设备白名单在数据库里**（`devices` 表）：设备由 `POST /spaces` / `POST /spaces/join`
+- **设备白名单在数据库里**（`entrances` 表）：设备由 `POST /spaces` / `POST /spaces/join`
   自助登记，无需服务器配置文件；未登记/已撤销设备一律拒绝（401/403）。
 - **撤销语义**：撤销 = 标记 `revoked` + 清会话/Push Token + WS 断开；**不**轮换 Space Key
   （见 `docs/SECURITY.md` §3）。
@@ -104,7 +104,7 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫开通�
 | `/auth` | 激活/续期会话（challenge-response，对**当前**服务器） |
 | `/passphrase [random]` | 设置/修改共享口令（`random` 生成随机 12 词） |
 | `/pin` | 设置/修改启动锁 PIN |
-| `/devices` | 列出秘境内的设备与在线状态 |
+| `/entrances` | 列出秘境内的设备与在线状态 |
 | `/device <名称>` / `/myname <名称>` | 改本设备名 / 改自己的显示名 |
 | `/sync` / `/history` | 手动增量同步 / 看本地解密历史 |
 | `/attach <file>` / `/open <序号>` | 上传附件 / 打开消息里的附件 |
@@ -172,11 +172,11 @@ curl -s https://<你的域名>/health | head -c 200       # 期望 {"status":"ok
 curl -s -H 'X-Protocol-Version: 1' https://<你的域名>/space | head -c 200   # 期望 401/403 JSON
 # 缺协议版本头 → 400（硬校验）
 curl -s -o /dev/null -w '%{http_code}\n' https://<你的域名>/space            # 期望 400
-# 未登记设备拒绝（dev-evil 不在 devices 表）
+# 未登记设备拒绝（dev-evil 不在 entrances 表）
 curl -s -o /dev/null -w '%{http_code}\n' \
   -X POST https://<你的域名>/auth/challenge \
   -H 'Content-Type: application/json' -H 'X-Protocol-Version: 1' \
-  -d '{"device_id":"dev-evil","space_id":"whatever"}'   # 期望 403
+  -d '{"entrance_id":"dev-evil","space_id":"whatever"}'   # 期望 403
 ```
 
 客户端改用 `--server https://<你的域名>`（TUI）/ 设置页填域名（App）即可远程使用（WS 自动为 `wss://`）。
@@ -237,9 +237,9 @@ npm run restore -- data/backups/backup-<ts>.json
   （默认 `data/einz.sqlite.db`，连 `-wal`/`-shm` 一起删，避免旧 WAL 被重放进恢复的库）。
   备份里的 `app.db` 只是内部条目名，不是落盘文件名。
 - **单空间备份（`--space`）是另一条路**：只导出该空间的行 + `files/<space_id>/`
-  （devices/push_tokens 靠 person_id/device_id 反查带出），恢复时也**只覆盖该空间**
+  （entrances/push_tokens 靠 partner_id/entrance_id 反查带出），恢复时也**只覆盖该空间**
   ——别的空间与库文件都不动，适合"只回滚一个秘境 / 只迁移一个秘境"。
-  刻意不含审计表（`connection_events` / `device_activity`）：它们是只追加留痕，
+  刻意不含审计表（`connection_events` / `entrance_activity`）：它们是只追加留痕，
   且主键是自增整数，导入会撞别的空间的行。
   旧备份没有 scope 字段 → 按全量处理（兼容）。
 
@@ -262,28 +262,28 @@ npm run restore -- data/backups/backup-<ts>.json
 **场景：** 手机丢失/失窃 → 撤销该设备，阻止它继续收新消息。
 
 ```bash
-# 1) 撤销某台设备（POST /devices/<device_id>/revoke）：标记 revoked + 清 Push Token +
+# 1) 撤销某台设备（POST /entrances/<entrance_id>/revoke）：标记 revoked + 清 Push Token +
 #    清会话，并关闭它的 WS 连接（Server 不再下发 key.rotation —— 轮换方案已决定不做）
 #    **必须带共享口令**（2026-09-16）：撤销会让该设备自毁本地数据，属不可逆操作。
 #    授权范围 = 同 space 内可互撤（自己的另一台设备，或伴侣的设备）。
-curl -X POST http://127.0.0.1:3000/devices/dev-b1/revoke \
+curl -X POST http://127.0.0.1:3000/entrances/dev-b1/revoke \
   -H "Authorization: Bearer <A的session_token>" \
   -H "Content-Type: application/json" \
   -d '{"passphrase":"<共享口令>"}'
 
 # 2) 完成——撤销实时生效，不需要重启服务器、也不需要改任何配置文件
 ```
-- device_id 是 UUID（`GET /devices` 可见），不是 `dev1/dev2` 那种序号（v1 遗留叫法）。
+- entrance_id 是 UUID（`GET /entrances` 可见），不是 `dev1/dev2` 那种序号（v1 遗留叫法）。
 - 口令错 → `401 ESCROW_VERIFY_FAILED`（设备毫发无损）；同空间口令尝试过多 → `429`；
   空间还没设置共享口令 → `409 PASSPHRASE_NOT_SET`（先在任一在册设备上 `/passphrase` 设置）。
 
-- 被撤销设备：无法认证（403 `DEVICE_REVOKED`）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
-- 被撤销设备**上线即自毁本地数据**（App `_onDeviceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存；
+- 被撤销设备：无法认证（403 `ENTRANCE_REVOKED`）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
+- 被撤销设备**上线即自毁本地数据**（App `_onEntranceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存；
   TUI `_exitRevoked`：清 store 文件 + 附件缓存后退出）。
 - **别把"清空/重置服务端库"当撤销手段**：库一清，设备行就不存在了，客户端只会收到
   403 `FORBIDDEN`（未登记）→ 按 2026-09-16 的语义**只警告、不清本地数据**，用户仍能看本地历史。
-  要真正撤销请用 §5.3 的 `POST /devices/:id/revoke`（带共享口令；那才会发 `device.revoked` /
-  返回 `DEVICE_REVOKED`）。
+  要真正撤销请用 §5.3 的 `POST /entrances/:id/revoke`（带共享口令；那才会发 `entrance.revoked` /
+  返回 `ENTRANCE_REVOKED`）。
 - **不需要**轮换 Space Key：撤销的效力来自设备被标记 `revoked`（它取不到新密文）+ 自毁。
   怀疑密钥材料被提取（越狱/镜像泄露）时的止损流程见 `docs/SECURITY.md` §4.2（替代方案 = 重建空间）。
 - 已同步的历史密文不可追回（设备端已解密数据的固有属性）。
@@ -326,7 +326,7 @@ docker compose up -d
 
 - App：对话页菜单 → 高级 → **重置设备**（`app/lib/data/local_reset.dart`：清本地全表
   ——含 `spaces` 空间列表——+ 锁包 + 留存明文/媒体缓存）。
-- 或直接卸载重装。两种方式都会把**安装级 `device_uid`** 换成新的（它存在 `app_state`，
+- 或直接卸载重装。两种方式都会把**安装级 `install_uid`** 换成新的（它存在 `app_state`，
   重置设备时整表清掉，下次调用惰性重新生成 = 轮换）。
 - TUI：`rm -f ~/.einz/*.json`（或用 `--store` 指定的那个文件）+ 清附件缓存目录。
 
@@ -339,7 +339,7 @@ docker compose up -d
 
 | 边界           | 机制                                                                            | 说明                                                |
 | -------------- | ------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 设备在册状态   | `devices` 表 + `isActiveDevice`（v2：由 spaces create/join 自助登记）           | 未登记设备 403；撤销后立即拒绝认证/同步/发送        |
+| 设备在册状态   | `entrances` 表 + `isActiveDevice`（v2：由 spaces create/join 自助登记）           | 未登记设备 403；撤销后立即拒绝认证/同步/发送        |
 | 服务端只见密文 | E2EE 全链路（消息/附件均为密文 + 元数据）                                       | `messages` 表只有 ciphertext（冒烟测试验证）        |
 | 路径遍历       | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧）               | 失陷白名单设备也无法越出`files/`（V1 审查 P1 修复） |
 | WS 撤销实时性  | 撤销即关闭被撤销设备连接（close 4403）                                          | 无法继续收新消息广播（P2 修复）                     |
@@ -359,8 +359,8 @@ docker compose up -d
 | Server 起不来 / 端口占用               | 端口被占或 Node 版本过低（需 ≥20）                        | 换 `PORT=`；`node -v` 确认版本                              |
 | `curl /space` 401/403                  | 正常（未认证）                                            | 按 §3.3 验证                                                |
 | CLI 报 libsodium 加载失败              | 未设`LIBSODIUM_PATH`（或 libsodium 装在非标准路径）       | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"` |
-| `/auth` 失败 403 `FORBIDDEN`           | 设备未登记（常见：**服务端库被清空/重置**，或换了新库）    | 客户端只警告、数据不丢；查 devices 表是否有该 device_id。库被重置时用备份恢复库，或让设备重新 `/space join` |
-| `/auth` 失败 403 `DEVICE_REVOKED`      | 该设备已被明确撤销（§5.3）                                | 设备端已自毁本地数据，只能重新 `/space join` 入网           |
+| `/auth` 失败 403 `FORBIDDEN`           | 设备未登记（常见：**服务端库被清空/重置**，或换了新库）    | 客户端只警告、数据不丢；查 entrances 表是否有该 entrance_id。库被重置时用备份恢复库，或让设备重新 `/space join` |
+| `/auth` 失败 403 `ENTRANCE_REVOKED`      | 该设备已被明确撤销（§5.3）                                | 设备端已自毁本地数据，只能重新 `/space join` 入网           |
 | 发消息一直"发送中"                    | WS 未连上 / 会话失效                                      | `/auth` 重新激活；或看服务端日志 `[req] WS /ws connect`     |
 | `/sync` 拉不到对方消息                 | 锚点已推进 / 网络 / 设备被撤销                            | 用 `/sync` 前先在本地库清锚点排查（或看服务端审计表）        |
 | `fetch` 报 sha256 不匹配               | 附件密文损坏或元数据过期                                  | 重新`sync` 拉元数据后重试                                   |
@@ -450,7 +450,7 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
 
 | 项                       | 说明                                                                                                                                                     |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 存量数据                 | 不受影响（messages/devices/会话等全部不动，新表初始为空）                                                                                                |
+| 存量数据                 | 不受影响（messages/entrances/会话等全部不动，新表初始为空）                                                                                                |
 | 设备在册状态             | 无需改动（既有设备与会话不受影响）                                                                                                                         |
 | Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖）                                                                                                 |
 | App 侧                   | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                             |

@@ -17,28 +17,28 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
   db.exec(`
     -- 登记项：一次「安装 × 秘境」的登记（一套密钥对 + 一个身份 + 一个会话锚点）。
-    -- 命名提醒（docs/GLOSSARY.md）：device_id 是**登记项**的 id，不是物理设备 id；
-    -- 物理设备/安装那一层是下面的 device_uid。
-    CREATE TABLE IF NOT EXISTS devices (
-      device_id   TEXT PRIMARY KEY,
-      person_id   TEXT NOT NULL,
+    -- 命名提醒（docs/GLOSSARY.md）：entrance_id 是**登记项**的 id，不是物理设备 id；
+    -- 物理设备/安装那一层是下面的 install_uid。
+    CREATE TABLE IF NOT EXISTS entrances (
+      entrance_id   TEXT PRIMARY KEY,
+      partner_id   TEXT NOT NULL,
       public_key  TEXT NOT NULL,
       status      TEXT NOT NULL DEFAULT 'active',
-      device_name TEXT,
+      entrance_name TEXT,
       last_seen   INTEGER,
       created_at  INTEGER NOT NULL,
       -- 客户端生成的**安装级**设备标识（多空间）：同一台物理设备上每个空间一个
-      -- device_id，但它们的 device_uid 相同 → 服务端据此知道"这几行是同一台设备"。
+      -- entrance_id，但它们的 install_uid 相同 → 服务端据此知道"这几行是同一台设备"。
       -- 存量行/未升级客户端为 NULL。**绝不出现在任何响应体里**（服务端内部认知）。
-      device_uid  TEXT
+      install_uid  TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_devices_uid ON devices (device_uid);
+    CREATE INDEX IF NOT EXISTS idx_entrances_uid ON entrances (install_uid);
 
     CREATE TABLE IF NOT EXISTS messages (
       message_id       TEXT PRIMARY KEY,
       space_id         TEXT NOT NULL,
-      sender_device_id TEXT NOT NULL,
-      sender_person_id TEXT,
+      sender_entrance_id TEXT NOT NULL,
+      sender_partner_id TEXT,
       type             TEXT NOT NULL,
       key_version      INTEGER NOT NULL,
       nonce            TEXT NOT NULL,
@@ -63,7 +63,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     CREATE INDEX IF NOT EXISTS idx_attachments_msg ON attachments (message_id);
 
     CREATE TABLE IF NOT EXISTS push_tokens (
-      device_id  TEXT PRIMARY KEY REFERENCES devices(device_id) ON DELETE CASCADE,
+      entrance_id  TEXT PRIMARY KEY REFERENCES entrances(entrance_id) ON DELETE CASCADE,
       platform   TEXT NOT NULL,
       token      TEXT NOT NULL,
       updated_at INTEGER NOT NULL
@@ -78,7 +78,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     CREATE TABLE IF NOT EXISTS challenges (
       challenge_id TEXT PRIMARY KEY,
-      device_id    TEXT NOT NULL,
+      entrance_id    TEXT NOT NULL,
       space_id     TEXT,  -- 目标 Space（v1 收敛后必填；NULL 只可能是存量旧行）
       challenge    TEXT NOT NULL,
       expires_at   INTEGER NOT NULL,
@@ -87,7 +87,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     CREATE TABLE IF NOT EXISTS sessions (
       session_token TEXT PRIMARY KEY,
-      device_id     TEXT NOT NULL,
+      entrance_id     TEXT NOT NULL,
       space_id      TEXT,  -- 绑定 Space（v1 收敛后必填；NULL 只可能是存量旧行）
       expires_at    INTEGER NOT NULL,
       created_at    INTEGER NOT NULL
@@ -100,7 +100,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     -- Multiverse（v2）：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3）
     -- 刻意**没有** display_name：v1 曾把创建者名字快照在这里，但它是只写不读的死字段，
-    -- 且创建者改名（POST /devices/person-name）不会同步 → 会与真实名字冲突。
+    -- 且创建者改名（POST /partners/name）不会同步 → 会与真实名字冲突。
     -- 人的名字唯一数据源是 space_members.display_name（老板 2026-09-16）。
     CREATE TABLE IF NOT EXISTS spaces (
       space_id         TEXT PRIMARY KEY,
@@ -113,40 +113,40 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     CREATE TABLE IF NOT EXISTS space_members (
       space_id     TEXT NOT NULL REFERENCES spaces(space_id),
-      -- person_id 是身份锚点（同一身份多设备共享）；伴侣（partner_slot=1）
+      -- partner_id 是身份锚点（同一身份多设备共享）；伴侣（slot=1）
       -- 预置时尚未加入 → 为 NULL，由首个加入该 slot 的设备生成（老板定稿）
-      person_id    TEXT,
-      partner_slot INTEGER NOT NULL,
+      partner_id    TEXT,
+      slot INTEGER NOT NULL,
       display_name TEXT,
       gender       TEXT,
       status       TEXT NOT NULL DEFAULT 'active',
       -- 伴侣预置行未加入 → joined_at 为 NULL，激活时写入
       joined_at    INTEGER,
-      PRIMARY KEY (space_id, person_id),
-      UNIQUE (space_id, partner_slot)
+      PRIMARY KEY (space_id, partner_id),
+      UNIQUE (space_id, slot)
     );
 
     CREATE TABLE IF NOT EXISTS join_tokens (
       space_id          TEXT NOT NULL REFERENCES spaces(space_id),
       token_hash        TEXT PRIMARY KEY,
-      created_by_device TEXT NOT NULL,
+      created_by_entrance TEXT NOT NULL,
       expires_at        INTEGER NOT NULL,
       used_at           INTEGER,
       created_at        INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_join_tokens_space ON join_tokens (space_id, used_at);
 
-    -- 消息回执（已送达/已读）单调高水位：按 (space, person) 一行。
+    -- 消息回执（已送达/已读）单调高水位：按 (space, partner) 一行。
     -- 语义：我的消息 seq=S 已送达 ⟺ 对方 delivered_upto_seq ≥ S；已读 ⟺ read_upto_seq ≥ S。
-    -- 按 person 记 → "该 person 至少一台设备已收到/已读"（不保证所有设备）。
+    -- 按 partner 记 → "该 partner 至少一台设备已收到/已读"（不保证所有设备）。
     -- 不变式：只前进；delivered_upto_seq ≥ read_upto_seq（读隐含送达）。
     CREATE TABLE IF NOT EXISTS receipts (
       space_id           TEXT NOT NULL,
-      person_id          TEXT NOT NULL,
+      partner_id          TEXT NOT NULL,
       delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
       read_upto_seq      INTEGER NOT NULL DEFAULT 0,
       updated_at         INTEGER NOT NULL,
-      PRIMARY KEY (space_id, person_id)
+      PRIMARY KEY (space_id, partner_id)
     );
 
     -- ── 审计表（只追加，永久保留；供"谁在哪台设备上、什么时候做了什么"回溯）──
@@ -155,7 +155,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     -- 连接事件流：WS 每次连上/断开各一行（可算在线时长、掉线次数、断线原因）
     CREATE TABLE IF NOT EXISTS connection_events (
       event_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-      device_id    TEXT NOT NULL,
+      entrance_id    TEXT NOT NULL,
       space_id     TEXT,                  -- 连接绑定的 Space（legacy 为空串）
       event        TEXT NOT NULL,         -- connect | disconnect | heartbeat_timeout
       at_ms        INTEGER NOT NULL,      -- 事件时刻（ms）
@@ -165,14 +165,14 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       ip           TEXT,                  -- 来源 IP（Caddy 反代下取 x-forwarded-for）
       user_agent   TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_conn_events_device_at ON connection_events (device_id, at_ms);
+    CREATE INDEX IF NOT EXISTS idx_conn_events_entrance_at ON connection_events (entrance_id, at_ms);
     CREATE INDEX IF NOT EXISTS idx_conn_events_space_at  ON connection_events (space_id, at_ms);
 
     -- 设备活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
     -- detail 为 JSON，字段按 kind 各异（见 docs/DATABASE.md §2.1）
-    CREATE TABLE IF NOT EXISTS device_activity (
+    CREATE TABLE IF NOT EXISTS entrance_activity (
       activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      device_id   TEXT NOT NULL,
+      entrance_id   TEXT NOT NULL,
       space_id    TEXT,
       kind        TEXT NOT NULL,
       at_ms       INTEGER NOT NULL,
@@ -180,27 +180,27 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       ip          TEXT,
       user_agent  TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_dev_act_device_at ON device_activity (device_id, at_ms);
-    CREATE INDEX IF NOT EXISTS idx_dev_act_kind_at   ON device_activity (kind, at_ms);
-    CREATE INDEX IF NOT EXISTS idx_dev_act_space_at  ON device_activity (space_id, at_ms);
+    CREATE INDEX IF NOT EXISTS idx_dev_act_entrance_at ON entrance_activity (entrance_id, at_ms);
+    CREATE INDEX IF NOT EXISTS idx_dev_act_kind_at   ON entrance_activity (kind, at_ms);
+    CREATE INDEX IF NOT EXISTS idx_dev_act_space_at  ON entrance_activity (space_id, at_ms);
   `);
 
-  // 迁移：messages 表补充 sender_person_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
+  // 迁移：messages 表补充 sender_partner_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
   try {
-    db.exec(`ALTER TABLE messages ADD COLUMN sender_person_id TEXT`);
+    db.exec(`ALTER TABLE messages ADD COLUMN sender_partner_id TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
-  // 迁移：devices 表补充 device_name（设备名称，显示层用）
+  // 迁移：entrances 表补充 entrance_name（设备名称，显示层用）
   try {
-    db.exec(`ALTER TABLE devices ADD COLUMN device_name TEXT`);
+    db.exec(`ALTER TABLE entrances ADD COLUMN entrance_name TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
-  // 迁移：devices 表补充 device_uid（安装级设备标识；存量行留 NULL，由客户端补登）
+  // 迁移：entrances 表补充 install_uid（安装级设备标识；存量行留 NULL，由客户端补登）
   try {
-    db.exec(`ALTER TABLE devices ADD COLUMN device_uid TEXT`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_devices_uid ON devices (device_uid)`);
+    db.exec(`ALTER TABLE entrances ADD COLUMN install_uid TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_entrances_uid ON entrances (install_uid)`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
@@ -244,8 +244,8 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
         CREATE TABLE messages_new (
           message_id       TEXT PRIMARY KEY,
           space_id         TEXT NOT NULL,
-          sender_device_id TEXT NOT NULL,
-          sender_person_id TEXT,
+          sender_entrance_id TEXT NOT NULL,
+          sender_partner_id TEXT,
           type             TEXT NOT NULL,
           key_version      INTEGER NOT NULL,
           nonce            TEXT NOT NULL,
@@ -254,7 +254,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
           created_at       INTEGER NOT NULL,
           UNIQUE (space_id, server_sequence)
         );
-        INSERT INTO messages_new SELECT message_id, space_id, sender_device_id, sender_person_id, type, key_version, nonce, ciphertext, server_sequence, created_at FROM messages;
+        INSERT INTO messages_new SELECT message_id, space_id, sender_entrance_id, sender_partner_id, type, key_version, nonce, ciphertext, server_sequence, created_at FROM messages;
         DROP TABLE messages;
         ALTER TABLE messages_new RENAME TO messages;
         CREATE INDEX idx_messages_seq ON messages (space_id, server_sequence);
@@ -293,7 +293,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   db.prepare(`INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '2')`).run();
 
   // 迁移（2026-09-15 v1 收敛）：drop invites 表 + 清 meta 里的 v1 名称/创建者键。
-  // v1 的邀请码登记（/invites、/devices/enroll）与 meta 名称表（person_name:* /
+  // v1 的邀请码登记（/invites、/entrances/enroll）与 meta 名称表（person_name:* /
   // person_gender:* / creator_person_id）已删除；名称的唯一数据源是
   // space_members.display_name。此语句对已迁移库是空操作。
   db.exec(`DROP TABLE IF EXISTS invites`);

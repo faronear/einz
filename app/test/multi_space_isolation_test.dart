@@ -28,13 +28,13 @@ void main() {
   const payloadA = AppLockPayload(
     spaceKeyB64: 'a2V5LWE=',
     spaceId: 'space-a',
-    deviceId: 'dev-a',
+    entranceId: 'dev-a',
     token: 'tok-a',
   );
   const payloadB = AppLockPayload(
     spaceKeyB64: 'a2V5LWI=',
     spaceId: 'space-b',
-    deviceId: 'dev-b',
+    entranceId: 'dev-b',
     token: 'tok-b',
   );
 
@@ -54,7 +54,7 @@ void main() {
       await db.into(db.localMessages).insert(LocalMessagesCompanion.insert(
             messageId: 'msg-$sid',
             spaceId: sid,
-            senderDeviceId: 'dev',
+            senderEntranceId: 'dev',
             type: 'text',
             keyVersion: 1,
             nonce: 'n',
@@ -158,7 +158,7 @@ void main() {
       api: ApiClient('http://fake'),
       spaceKey: await generateSpaceKey(),
       spaceId: 'space-a',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: 'tok-a',
     );

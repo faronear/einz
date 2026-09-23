@@ -2,7 +2,7 @@
 
 > **状态：** 密码学部分 `[已实现]`；配置分发部分已按 **Multiverse（v2）** 更新
 > （2026-09-15 v1 收敛：设备登记改为 `POST /spaces` / `POST /spaces/join` 自助完成，
-> 静态白名单 `config.json` 与脚本 CLI 已删除。下文凡涉及"白名单"处均指 `devices` 表的
+> 静态白名单 `config.json` 与脚本 CLI 已删除。下文凡涉及"白名单"处均指 `entrances` 表的
 > 在册状态；协议细节见 `PROTOCOL_MULTIVERSE.md`）。
 > **权威依据：** `aimemo/productLens.zhcn.md` §4（密码学与密钥层级）、§5（一次性配置）
 > **阅读对象：** 客户端与服务端开发者；实现时必须与本文档逐条对齐。
@@ -49,7 +49,7 @@
 ```text
 Device Identity Key（长期，X25519 keypair，每台设备一对）
     │  私钥：仅存本机 Keychain / Keystore，永不离开设备，永不写入磁盘明文
-    │  公钥：经 POST /spaces 登记进 devices 表（签发绑定空间的会话）
+    │  公钥：经 POST /spaces 登记进 entrances 表（签发绑定空间的会话）
     ▼
 Space Key（长期，每 Space 一个，32 字节对称密钥）
     │  明文：仅存在于两端设备的安全存储中；Server 永不接触明文
@@ -123,7 +123,7 @@ BackupKey = crypto_pwhash(
   "type": "text",
   "key_version": 1,
   "message_id": "0192…",
-  "sender_device_id": "dev-a1",
+  "sender_entrance_id": "dev-a1",
   "nonce": "base64(24B)",
   "ciphertext": "base64"
 }
@@ -135,7 +135,7 @@ BackupKey = crypto_pwhash(
 | `type`             | text / image / video / voice / system             |
 | `key_version`      | 加密所用 Space Key 版本（解密时选择归档密钥）     |
 | `message_id`       | UUIDv7，派生 Message Key 的输入之一               |
-| `sender_device_id` | 发送设备                                          |
+| `sender_entrance_id` | 发送设备                                          |
 | `nonce`            | 24 字节随机 nonce，**每条消息重新生成，禁止复用** |
 | `ciphertext`       | AEAD 密文（含 16 字节 tag）                       |
 
@@ -144,7 +144,7 @@ BackupKey = crypto_pwhash(
 ```text
 明文 = UTF-8(消息正文)
 nonce = randombytes(24)
-AAD  = "einz-v1" ‖ space_id ‖ message_id ‖ sender_device_id ‖ type ‖ key_version
+AAD  = "einz-v1" ‖ space_id ‖ message_id ‖ sender_entrance_id ‖ type ‖ key_version
 ciphertext = crypto_aead_xchacha20poly1305_ietf_encrypt(
                  message = 明文, aad = AAD, nonce = nonce, key = MessageKey)
 ```
@@ -207,11 +207,11 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
   "key_version": 1,
   "sealed_space_keys": [
     {
-      "device_id": "dev-a1",
+      "entrance_id": "dev-a1",
       "sealed": "base64(crypto_box_seal(SpaceKey, pubKeyA))"
     },
     {
-      "device_id": "dev-b1",
+      "entrance_id": "dev-b1",
       "sealed": "base64(crypto_box_seal(SpaceKey, pubKeyB))"
     }
   ]
@@ -227,30 +227,30 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
 1. 设备 A 首次启动 → 生成 X25519 身份密钥对 → 导出公钥
 2. 设备 B 首次启动 → 生成 X25519 身份密钥对 → 导出公钥
 3. 配置工具：生成 Space Key → 分别 crypto_box_seal 给 A、B 公钥
-4. 设备登记：创建者 `POST /spaces` 携带设备公钥 → 服务端写入 `devices` 表 + `space_members` 身份槽位，并签发绑定该空间的会话
+4. 设备登记：创建者 `POST /spaces` 携带设备公钥 → 服务端写入 `entrances` 表 + `space_members` 身份槽位，并签发绑定该空间的会话
 5. 设备 A：导入配置产物 → crypto_box_seal_open 自己的密封副本 → Space Key 存入安全存储
 6. 设备 B：同上
-7. Server：以 `devices` 表（status=active）为在册设备清单（§8）
+7. Server：以 `entrances` 表（status=active）为在册设备清单（§8）
 ```
 
 - 身份私钥始终在设备内生成、设备内保管；公钥外传。
 - 密封副本只在配置现场流转一次；此后设备各自持有 Space Key 明文。
 
-### 7.3 设备在册状态（devices 表；v1 的静态白名单 config.json 已删除）
+### 7.3 设备在册状态（entrances 表；v1 的静态白名单 config.json 已删除）
 
 ```json
 {
   "space_id": "UUIDv7",
-  "devices": [
+  "entrances": [
     {
-      "device_id": "dev-a1",
-      "person_id": "person-a",
+      "entrance_id": "dev-a1",
+      "partner_id": "person-a",
       "public_key": "base64(X25519公钥)",
       "status": "active"
     },
     {
-      "device_id": "dev-b1",
-      "person_id": "person-b",
+      "entrance_id": "dev-b1",
+      "partner_id": "person-b",
       "public_key": "base64(X25519公钥)",
       "status": "active"
     }
@@ -314,7 +314,7 @@ seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线
 
 | 关卡                           | 作用                   | 控制者                 |
 | ------------------------------ | ---------------------- | ---------------------- |
-| 设备在册状态（`isActiveDevice`） | 能否认证 / 同步 | `devices` 表（由 `/spaces create|join` 自助登记） |
+| 设备在册状态（`isActiveDevice`） | 能否认证 / 同步 | `entrances` 表（由 `/spaces create|join` 自助登记） |
 | 口令（Argon2id 解密密文包）    | 能否解出 Space Key     | A 离线告知             |
 
 **口令泄漏应对（按严重程度递进）：**
@@ -323,7 +323,7 @@ seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线
 | ---- | -------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------- |
 | 轻   | 换口令               | 新口令重新加密包并 `POST /key-escrow` 覆盖（UPSERT 最新者胜），旧口令立即失效；CLI `escrow upload` 可随时重传 | 口令可能外泄、设备面可控   |
 | 重   | 轮换 Space Key（§9） | 轮换后旧密文包作废（解出的是旧密钥），需**手动**用新 Space Key 重新上传密文包（`cli escrow upload`；客户端不自动重传） | 怀疑密钥已实际落入他人之手 |
-| 定向 | 撤销设备（§9.3）     | `device.revoked` 标记撤销并通知其清理本地数据                                                               | 已知攻击设备已加入白名单   |
+| 定向 | 撤销设备（§9.3）     | `entrance.revoked` 标记撤销并通知其清理本地数据                                                               | 已知攻击设备已加入白名单   |
 
 **风险点：**
 
@@ -341,9 +341,9 @@ seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线
 ```text
 Client                     Server
   │  POST /auth/challenge    │
-  │  {device_id}             │
+  │  {entrance_id}             │
   │                          │ challenge = randombytes(32)
-  │                          │ 记录 {device_id → challenge, 过期 5min, 一次性}
+  │                          │ 记录 {entrance_id → challenge, 过期 5min, 一次性}
   │  ← {challenge_id,        │
   │     sealed_challenge=     │
   │     seal(challenge,pubKey)}│
@@ -366,7 +366,7 @@ Client                     Server
 ### 8.2 会话
 
 - REST：`Authorization: Bearer <session_token>`。
-- WebSocket：连接建立时携带 session_token；Server 校验通过后绑定 device_id。
+- WebSocket：连接建立时携带 session_token；Server 校验通过后绑定 entrance_id。
 - 会话过期 → 重新 challenge-response。
 
 ---
@@ -388,7 +388,7 @@ Client                     Server
 ### 9.2 密钥版本（保留）与归档层（**已删除**）
 
 - **`key_version` 保留**：每条密文携带它，且它**参与 AAD**
-  （`'einz-v1' ‖ space_id ‖ message_id ‖ sender_device_id ‖ type ‖ key_version`，
+  （`'einz-v1' ‖ space_id ‖ message_id ‖ sender_entrance_id ‖ type ‖ key_version`，
   `shared/lib/src/crypto/message_crypto.dart:64`）——是"这条密文该用哪把钥匙"的自描述标签。
 - **一个 Space 一把钥匙**：解密侧的 `spaceKeyForVersion()` / `_keyForVersion()` 只认当前
   版本，其它版本返回 null（报错，而不是硬解）。
@@ -401,16 +401,16 @@ Client                     Server
 ### 9.3 撤销语义（现行）
 
 - **两种"注销"的分工**（2026-09-21 新增退役）：
-  - **撤销别人**（`POST /devices/:id/revoke`，§7.2）：要共享口令 → 发 `device.revoked` → 对方客户端自毁；
-  - **本机自助退役**（`POST /devices/retire`，§7.2.1）：只认 session → 清服务端状态 + 给对端广播
-    `peer.offline`，**不发** `device.revoked`、也不主动关 WS。少这一句界线，偷到 session 就能远程擦设备，
+  - **撤销别人**（`POST /entrances/:id/revoke`，§7.2）：要共享口令 → 发 `entrance.revoked` → 对方客户端自毁；
+  - **本机自助退役**（`POST /entrances/retire`，§7.2.1）：只认 session → 清服务端状态 + 给对端广播
+    `peer.offline`，**不发** `entrance.revoked`、也不主动关 WS。少这一句界线，偷到 session 就能远程擦设备，
     §7.2 的口令闸门会被从旁路绕过；
-- 被撤销设备：无法再认证（标记 revoked，挑战返回 403 `DEVICE_REVOKED`）、无法同步、无法发送；
+- 被撤销设备：无法再认证（标记 revoked，挑战返回 403 `ENTRANCE_REVOKED`）、无法同步、无法发送；
   其旧 Push Token 一并清除；
 - **撤销的授权**（2026-09-16）：同 space 内可互撤，但每次撤销都必须校验共享口令
-  （`POST /devices/:id/revoke`）——撤销会触发对方客户端自毁本地数据，属不可逆操作；
-- 被撤销设备**上线即自毁本地数据**（App `chat_page._onDeviceRevoked`；TUI `_exitRevoked`；`SECURITY.md` §2）；
-- **只有这个明确信号才触发自毁**（2026-09-16）：`device.revoked` 帧 / 403 `DEVICE_REVOKED`。
+  （`POST /entrances/:id/revoke`）——撤销会触发对方客户端自毁本地数据，属不可逆操作；
+- 被撤销设备**上线即自毁本地数据**（App `chat_page._onEntranceRevoked`；TUI `_exitRevoked`；`SECURITY.md` §2）；
+- **只有这个明确信号才触发自毁**（2026-09-16）：`entrance.revoked` 帧 / 403 `ENTRANCE_REVOKED`。
   403 `FORBIDDEN`（设备未登记，常见于服务端库被清空或换了新库）与网络故障一律只警告，
   客户端保留本地数据并允许继续查看本地消息——服务端库的运维失误不该销毁客户端数据。
   本机自助退役（§7.2.1）**不属于**这一信号：它不触发自毁，本地清空由用户自己在本地确认；
@@ -465,7 +465,7 @@ Client                     Server
 - 禁止将 Space Key / 身份私钥以明文写入日志、错误信息、数据库。
 - 禁止在 Server 保存 Space Key 明文或身份私钥。
 - 禁止使用密码/恢复码直接作为消息加密密钥（必须经 Argon2id 派生）。
-- 禁止信任客户端自报的成员资格（服务端按 `space_members` / `devices` 表校验）。
+- 禁止信任客户端自报的成员资格（服务端按 `space_members` / `entrances` 表校验）。
 - 禁止将密文与明文混合存储（附件 blob 一律密文；本地明文缓存仅限 App 私有目录）。
 
 ### 附录：密钥命名对照（防混淆）

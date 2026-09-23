@@ -74,12 +74,12 @@ class _FakeApi extends ApiClient {
   }
 
   @override
-  Future<void> updatePersonName(String personName, String token) async {
+  Future<void> updatePartnerName(String partnerName, String token) async {
     // 改名成功（无网络，供保存路径测试）
   }
 
   @override
-  Future<void> updateDeviceName(String deviceName, String token) async {
+  Future<void> updateEntranceName(String entranceName, String token) async {
     // 改设备名成功（无网络，供保存路径测试）
   }
 }
@@ -112,7 +112,7 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
     locale: const Locale('zh'),
     home: ChatPage(
       spaceId: 'space-demo',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       spaceKey: spaceKey,
       keyVersion: 1,
       token: 'tok',
@@ -170,7 +170,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -188,7 +188,7 @@ void main() {
     // 顶部条「我的」灯三态：未连接服务（ws null）→ 灰色
     final myDot = tester.widget<Icon>(find.byIcon(Icons.circle).last);
     expect(myDot.color, Colors.grey);
-    // 对话顶部条：身份名字为空时不显示文本（未传 personName/peerName → 只留在线圆点）
+    // 对话顶部条：身份名字为空时不显示文本（未传 partnerName/peerName → 只留在线圆点）
     expect(find.text('未设置'), findsNothing);
 
     // 打开顶栏菜单
@@ -228,7 +228,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -273,7 +273,7 @@ void main() {
         payload: AppLockPayload(
           spaceKeyB64: base64Encode(spaceKey),
           spaceId: 'space-demo',
-          deviceId: 'dev-a',
+          entranceId: 'dev-a',
           token: 'tok',
         ));
 
@@ -283,7 +283,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -349,7 +349,7 @@ void main() {
         payload: AppLockPayload(
           spaceKeyB64: base64Encode(spaceKey),
           spaceId: 'space-demo',
-          deviceId: 'dev-a',
+          entranceId: 'dev-a',
           token: 'tok',
         ));
 
@@ -359,7 +359,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -405,7 +405,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -416,7 +416,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → 点「我的身份」（未传 personName → 显示"我的身份: 未设置"）
+    // 打开菜单 → 点「我的身份」（未传 partnerName → 显示"我的身份: 未设置"）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('我的身份'));
@@ -450,7 +450,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -493,7 +493,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -536,7 +536,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -569,7 +569,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -603,16 +603,16 @@ void main() {
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
     // 模拟向导完成时已写入 profile（setup _finish 的 saveProfile）
-    await AppLockService(db).saveProfile(personName: 'Lukas', peerName: 'Alice', deviceName: 'iPhone');
+    await AppLockService(db).saveProfile(partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
 
-    // 不带 personName/peerName——模拟 PIN 解锁重进（lock_page._enterChat 不传名字）
+    // 不带 partnerName/peerName——模拟 PIN 解锁重进（lock_page._enterChat 不传名字）
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -677,8 +677,8 @@ void main() {
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
     final api = _FakeApi();
-    // 预置 profile（向导完成时的旧名 personB——老板实测场景）
-    await AppLockService(db).saveProfile(personName: 'personB', peerName: 'TUI', deviceName: 'iPhone');
+    // 预置 profile（向导完成时的旧名 partnerB——老板实测场景）
+    await AppLockService(db).saveProfile(partnerName: 'partnerB', peerName: 'TUI', entranceName: 'iPhone');
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -686,7 +686,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-b',
+        entranceId: 'dev-b',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -696,8 +696,8 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300));
-    // initState loadProfile 补名（personB——顶部条/菜单显示）
-    expect(find.text('personB'), findsWidgets);
+    // initState loadProfile 补名（partnerB——顶部条/菜单显示）
+    expect(find.text('partnerB'), findsWidgets);
 
     // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.menu));
@@ -715,7 +715,7 @@ void main() {
 
     // profile 应已更新（改名后 _saveProfile 按当前空间写入）
     final p = await AppLockService(db).loadProfile(spaceId: 'space-demo');
-    expect(p['personName'], 'Alice', reason: '改名应同步写本地 profile');
+    expect(p['partnerName'], 'Alice', reason: '改名应同步写本地 profile');
 
     // 模拟重启：新 ChatPage 实例（不带名字）→ 从 profile 恢复新名字
     await tester.pumpWidget(MaterialApp(
@@ -724,7 +724,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-b',
+        entranceId: 'dev-b',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -735,7 +735,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('Alice'), findsWidgets, reason: '重启后应从 profile 恢复新名字');
-    expect(find.text('personB'), findsNothing, reason: '不应回到旧名 personB');
+    expect(find.text('partnerB'), findsNothing, reason: '不应回到旧名 partnerB');
   });
 
   testWidgets('当前通道弹窗：标题/备注/公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
@@ -750,7 +750,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -831,7 +831,7 @@ void main() {
     final api = _FakeApi();
     // 预置 profile 带本人性别（模拟向导完成时写入）
     await AppLockService(db).saveProfile(
-        personName: 'Lukas', peerName: 'Alice', deviceName: 'Phone', myGender: 'male');
+        partnerName: 'Lukas', peerName: 'Alice', entranceName: 'Phone', myGender: 'male');
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -839,7 +839,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -912,7 +912,7 @@ void main() {
         plaintext: '我的消息',
         spaceKey: spaceKey,
         spaceId: 'space-demo',
-        senderDeviceId: 'dev-a', // 本人
+        senderEntranceId: 'dev-a', // 本人
         messageId: 'msg-1',
         keyVersion: 1,
       ),
@@ -920,7 +920,7 @@ void main() {
         plaintext: '对方消息',
         spaceKey: spaceKey,
         spaceId: 'space-demo',
-        senderDeviceId: 'dev-b', // 对方
+        senderEntranceId: 'dev-b', // 对方
         messageId: 'msg-2',
         keyVersion: 1,
       ),
@@ -932,7 +932,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -977,7 +977,7 @@ void main() {
       plaintext: encodeMessagePayload('', meta: {kMetaAudioDurationSeconds: 25}),
       spaceKey: spaceKey,
       spaceId: 'space-demo',
-      senderDeviceId: 'dev-a',
+      senderEntranceId: 'dev-a',
       messageId: 'msg-voice-1',
       keyVersion: 1,
       type: 'voice',
@@ -990,7 +990,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -1138,7 +1138,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -1178,7 +1178,7 @@ void main() {
         payload: AppLockPayload(
           spaceKeyB64: base64Encode(spaceKey),
           spaceId: 'space-demo',
-          deviceId: 'dev-a',
+          entranceId: 'dev-a',
           token: 'tok',
         ));
 
@@ -1188,7 +1188,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -1222,7 +1222,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -1262,7 +1262,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -1293,7 +1293,7 @@ void main() {
     final spaceKey = await generateSpaceKey();
     // 预置 profile（含设备名——闸门第一道要它，否则退化为固定确认词）
     await AppLockService(db).saveProfile(
-        spaceId: 'space-demo', personName: 'Lukas', peerName: 'Alice', deviceName: 'iPhone');
+        spaceId: 'space-demo', partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1301,7 +1301,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',

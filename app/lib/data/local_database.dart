@@ -25,7 +25,7 @@ String spaceScopedKey(String spaceId, String key) => 'space.$spaceId.$key';
 class LocalMessages extends Table {
   TextColumn get messageId => text()();
   TextColumn get spaceId => text()();
-  TextColumn get senderDeviceId => text()();
+  TextColumn get senderEntranceId => text()();
   TextColumn get type => text()();
   IntColumn get keyVersion => integer()();
   TextColumn get nonce => text()();
@@ -87,20 +87,20 @@ class Drafts extends Table {
   Set<Column> get primaryKey => {messageId};
 }
 
-/// 对方消息回执（已送达/已读）单调高水位，按 (space, person) 一行。
+/// 对方消息回执（已送达/已读）单调高水位，按 (space, partner) 一行。
 ///
 /// 语义：我发的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
-/// `readUptoSeq ≥ S`。按 person 记 → "该 person 至少一台设备已收到/已读"。
+/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一台设备已收到/已读"。
 /// 目前只落库供将来 UI 使用（本轮不显示）。
 class PeerReceipts extends Table {
   TextColumn get spaceId => text()();
-  TextColumn get personId => text()();
+  TextColumn get partnerId => text()();
   IntColumn get deliveredUptoSeq => integer().withDefault(const Constant(0))();
   IntColumn get readUptoSeq => integer().withDefault(const Constant(0))();
   IntColumn get updatedAt => integer().withDefault(const Constant(0))();
 
   @override
-  Set<Column> get primaryKey => {spaceId, personId};
+  Set<Column> get primaryKey => {spaceId, partnerId};
 }
 
 /// 本地已加入的 Space（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.1）。
@@ -113,8 +113,8 @@ class Spaces extends Table {
   TextColumn get spaceId => text()();
   TextColumn get name => text().withDefault(const Constant(''))(); // 我的显示名
   TextColumn get peerName => text().withDefault(const Constant(''))(); // 对端名
-  TextColumn get personId => text().nullable()();
-  TextColumn get deviceId => text().withDefault(const Constant(''))(); // 该空间的设备身份
+  TextColumn get partnerId => text().nullable()();
+  TextColumn get entranceId => text().withDefault(const Constant(''))(); // 该空间的通道身份
   IntColumn get keyVersion => integer().withDefault(const Constant(1))();
   IntColumn get createdAt => integer().withDefault(const Constant(0))();
   IntColumn get lastActiveAt => integer().withDefault(const Constant(0))();
@@ -146,7 +146,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -187,6 +187,15 @@ class LocalDatabase extends _$LocalDatabase {
               'COALESCE((SELECT m.space_id FROM local_messages m '
               'WHERE m.message_id = local_attachments.message_id), \'\')',
             );
+          }
+          if (from < 8) {
+            // v8：术语改名（device→entrance、partner→partner）。纯列改名，数据保留
+            // （ALTER TABLE RENAME COLUMN，SQLite ≥3.25）
+            await m.renameColumn(
+              localMessages, 'sender_device_id', localMessages.senderEntranceId);
+            await m.renameColumn(peerReceipts, 'person_id', peerReceipts.partnerId);
+            await m.renameColumn(spaces, 'person_id', spaces.partnerId);
+            await m.renameColumn(spaces, 'device_id', spaces.entranceId);
           }
         },
       );

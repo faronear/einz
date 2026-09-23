@@ -11,7 +11,7 @@ import 'package:einz_cli/chat_core.dart';
 
 Future<void> main() async {
   await sodium();
-  final store = DeviceStore.load('demo/store-a.json');
+  final store = EntranceStore.load('demo/store-a.json');
   final server = 'http://127.0.0.1:3901';
   final session = ChatSession(store, 'demo/store-a.json', server);
   await session.auth();

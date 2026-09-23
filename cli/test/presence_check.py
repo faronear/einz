@@ -3,7 +3,7 @@
 #
 #   场景：A 创建空间（Lukas，伴侣 Alice 尚未加入）→ A 的第二台设备 C 用**同一身份**
 #   Lukas 加入 → 两台 TUI 都把尚未加入的对方显示成绿灯在线。
-#   根因：在线状态按 device 判定、却按 person 展示——同一 person 的新 device 被当成"对方"。
+#   根因：在线状态按 device 判定、却按 partner 展示——同一 partner 的新 device 被当成"对方"。
 #
 #   断言（抓 pty 真实渲染的标题栏最后一帧）：
 #     ① A/C 两台 TUI：对方始终是 ○（离线），不得出现 "● Alice"（绿灯 + 对方名）；
@@ -13,7 +13,7 @@
 #
 #   附带覆盖（老板 2026-09-16 修复）：**对方尚未加入**时左段也要显示对方名字——
 #   create 录入的伴侣预置名落盘 store.peer_name 兜底（此前是只读不写的死变量
-#   partnerPresetName，恒为 null → 一直显示 '-'）。
+#   peerPresetName，恒为 null → 一直显示 '-'）。
 #
 # 运行：cd server && npm run build（本用例跑 dist）&& python3 cli/test/presence_check.py
 import fcntl
@@ -247,7 +247,7 @@ def main():
         print('A: 空间创建完成并进入聊天态')
 
         # 基线：只有 A 一台设备 → 右段无 #n/m（我的其它设备 0 台，整段省略）；
-        # 对方未加入 → 左段 "○ Alice"（create 录入的伴侣预置名；person 表里查不到他）
+        # 对方未加入 → 左段 "○ Alice"（create 录入的伴侣预置名；partner 表里查不到他）
         text = wait_screen(m_a, lambda t: '○ Alice' in t or '● Alice' in t,
                            'A 进入稳定态（左段显示对方名字）')
         left, _, right = split_bar(title_bar(text))
@@ -264,7 +264,7 @@ def main():
             sys.exit(1)
         print(f'A: 基线通过（左段 {left}、右段 {right} 无计数）')
 
-        # 附（老板 2026-09-16）：对方未加入时 person 表里没有他，"/myname 不许与对方
+        # 附（老板 2026-09-16）：对方未加入时 partner 表里没有他，"/myname 不许与对方
         # 同名"的判据也要算上预置名（否则我能改成和伴侣预置名一样，加入时撞同名）
         send(m_a, '/myname Alice\r')
         wait_screen(m_a, lambda t: '名字不能与对方相同' in t,

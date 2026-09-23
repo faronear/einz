@@ -1,6 +1,6 @@
 # 术语：东西都叫什么（命名分层）
 
-状态：**2026-09-22 定稿**（老板；同日晚做了 UI 用词修订；**2026-09-23**：界面用词「入口」→「通道」（英文仍 `entrance`），见「命名约定」第 1 条）。本文是**唯一**的分层定义，`docs/DATABASE.md`、
+状态：**2026-09-22 定稿**（老板；同日晚做了 UI 用词修订；**2026-09-23**：界面用词「入口」→「通道」（英文仍 `entrance`），见「命名约定」第 1 条；**同日代码/wire/DB 全量改名落地**，见「wire 字段改名」一节）。本文是**唯一**的分层定义，`docs/DATABASE.md`、
 `docs/PROTOCOL.md`、`aimemo/` 下的设计与产品文档都以此为准。
 
 ## 为什么需要这份东西
@@ -14,11 +14,11 @@
 | 层 | 定义 | 代码 / 字段 | 界面用词 |
 | --- | --- | --- | --- |
 | **物理设备** | 一台真实的机器（iPhone、MacBook…） | 无字段。只能靠旁证推断（IP、时间、push token、同型号同名，见下） | 不提（用户自己会说"我的手机"） |
-| **安装** | 一台机器上的一份 App / TUI 部署（一份本地数据） | `device_uid`（客户端生成，**安装级**，卸载重装/重置即轮换） | 「本机」 |
-| **登记项（通道）** | 某安装在某秘境里的一次登记：**本机 ⇄ 秘境的一条加密链路**（一套密钥对 + 一个身份 + 一个会话锚点） | `devices` 表的**一行**；`device_id` | **「通道」**（英文 **entrance**，中英不同名，见命名约定 1） |
-| **开通码** | 一次性进入授权：凭它可在某秘境里**开通一条新通道**。接收方中立——可给伴侣，也可给自己的另一台设备 | `join_tokens` 表、`POST /spaces/{id}/join-tokens` | **「开通码」**（英文仍 **token**，中英不同名） |
-| **共享口令** | **两人共同持有**的口令，用于把 Space Key 封进服务器上的密保箱（key escrow）：新设备凭它取回密钥；任一方也能用它做撤销设备的二次校验 | `key_escrow` 表（argon2id 哈希）；**客户端不落盘** | **「共享口令」**（英文 **shared passphrase**；短引用可用「口令」） |
-| **伴侣 / 成员** | 秘境里的两个身份（slot 0 = 创建者，1 = 第二人） | `space_members.person_id`（同一身份可多台设备共享） | 「我的身份 / 对方」 |
+| **安装** | 一台机器上的一份 App / TUI 部署（一份本地数据） | `install_uid`（客户端生成，**安装级**，卸载重装/重置即轮换） | 「本机」 |
+| **登记项（通道）** | 某安装在某秘境里的一次登记：**本机 ⇄ 秘境的一条加密链路**（一套密钥对 + 一个身份 + 一个会话锚点） | `entrances` 表的**一行**；`entrance_id` | **「通道」**（英文 **entrance**，中英不同名，见命名约定 1） |
+| **开通码** | 一次性进入授权：凭它可在某秘境里**开通一条新通道**。接收方中立——可给伴侣，也可给自己的另一条通道 | `join_tokens` 表、`POST /spaces/{id}/join-tokens` | **「开通码」**（英文仍 **token**，中英不同名） |
+| **共享口令** | **两人共同持有**的口令，用于把 Space Key 封进服务器上的密保箱（key escrow）：新通道凭它取回密钥；任一方也能用它做撤销通道的二次校验 | `key_escrow` 表（argon2id 哈希）；**客户端不落盘** | **「共享口令」**（英文 **shared passphrase**；短引用可用「口令」） |
+| **伴侣 / 成员** | 秘境里的两个身份（slot 0 = 创建者，1 = 第二人） | `space_members.partner_id`、`space_members.slot`（同一身份可多条通道共享） | 「我的身份 / 对方」 |
 | **秘境（空间）** | 两位伴侣的私密世界 | `spaces.space_id` | 「秘境」（空间列表页叫「我的空间」） |
 
 一句话记忆：**一台机器 = 一个安装；一个安装 × 一个秘境 = 一个登记项 = 一条通道。**
@@ -60,51 +60,47 @@
      「公钥通道」已改称**「链路」**（`SECURITY.md` / `E2EE.md` / `KEY_ESCROW.md`）；
      「平台通道」（Flutter MethodChannel）、「实时通道」「厂商通道（推送）」属平台实现语境，
      与界面术语不同层，维持原样。
-2. **代码与文档用层名。** 新增代码/注释/日志一律用 `install` / `entry` / `member`
-   语义命名，不要再造新的 "device" 概念。存量命名不强制迁移（见 `AGENTS.md`
-   命名规范：存量保持既有命名）。
-3. **wire 字段名暂不改。** `device_id` 这个名字不准确（它其实是登记项 id），但改名
-   是纯可读性收益、用户零感知，代价见下节。**`device_id` 的含义一律按"登记项 id"读。**
+2. **代码与文档用层名。** 代码/注释/日志一律用 `install` / `entrance` / `partner`
+   语义命名，不要再造新的 "device" 概念（UI 层「本机 / device」除外）。
+   **存量命名已于 2026-09-23 全量迁移**（见下节）。
+3. **wire 字段名与界面用词同名分层。** `device_id` → `entrance_id`、`person_id` →
+   `partner_id` 已落地（2026-09-23）：登记项一律叫 `entrance`，秘境内的身份一律叫
+   `partner`，安装一律叫 `install`。
 
 ### 字段对照速查
 
 | 看到 | 实际是 |
 | --- | --- |
-| `device_id`（表列 / JSON 键 / 路径参数） | 一个**登记项**的 id（安装 × 秘境），服务端 `randomUUID()` 生成 |
-| `device_uid` | 一个**安装**的 id，客户端生成、随 create/join 上报、可补登；**绝不进响应体** |
-| `device_name` | 登记项的显示名（老板 2026-09-22：**它本质是"通道名"**）。默认取设备型号——这是"一设备一通道一秘境"时代的历史遗留，用户可以改 |
-| `person_id` | 秘境内的**身份** id（两位伴侣各一），同身份多设备共享 |
-| `device_person_map` | 本机维护的「设备 → 身份」映射（归属判定用） |
-| `push_tokens.device_id` | 登记项 id（一台机器在每个秘境的登记各有一行） |
+| `entrance_id`（表列 / JSON 键 / 路径参数） | 一个**登记项（通道）**的 id（安装 × 秘境），服务端 `randomUUID()` 生成 |
+| `install_uid` | 一个**安装**的 id，客户端生成、随 create/join 上报、可补登；**绝不进响应体** |
+| `entrance_name` | 登记项的显示名（老板 2026-09-22：**它本质是"通道名"**）。默认取设备型号——这是"一设备一通道一秘境"时代的历史遗留，用户可以改 |
+| `partner_id` | 秘境内的**身份** id（两位伴侣各一），同身份多通道共享 |
+| `slot` | 身份在秘境里的槽位（0=创建者，1=第二人）；旧名 `partner_slot` 已废弃 |
+| `entrance_partner_map` | 本机维护的「通道 → 身份」映射（归属判定用） |
+| `push_tokens.entrance_id` | 登记项 id（一个安装在每个秘境的通道各有一行） |
 
-## 将来若要改 wire 字段名（**计划已排**：`aimemo/renamePlan.zhcn.md`）
+## wire 字段改名（**2026-09-23 已完成**）
 
-> 改名计划（`device_id` → `entry_id`、`person_id` → `partner_id`/`member_id`）已写成
-> 独立文档：**`aimemo/renamePlan.zhcn.md`**（分期、双名机制、风险、决策点）。本节保留
-> 机制层面的要点；**具体执行时以计划文档为准**。
+改名计划与完整映射表见 **`aimemo/renamePlan.zhcn.md`**。要点：
 
-**地基已有**：REST 用请求头 `X-Protocol-Version`、WS 用握手 `?pv=` 做硬校验
-（`server/src/app.ts`），v1 → v2 那次协议收敛就是靠它切轨道的。
+- `device_id` / `device_name` → **`entrance_id` / `entrance_name`**（登记项）；
+- `device_uid` → **`install_uid`**（安装）；
+- `person_id` / `person_name` → **`partner_id` / `partner_name`**（秘境内的身份）；
+- `partner_slot` → **`slot`**；旧 `partner_name`（第二人）→ **`peer_name`**，
+  创建者一侧用 **`creator_name`**；
+- 表 `devices` → `entrances`、`device_activity` → `entrance_activity`；
+  路由 `/devices/*` → `/entrances/*`，成员改名 → `POST /partners/name`。
 
-**有利条件**：`device_id` 几乎只出现在**响应**里。客户端主动发送它的地方只有**两处**：
-`POST /auth/challenge` 的请求体（`{device_id, space_id}`，续期用）与
-`POST /devices/:id/revoke` 的路径参数。所以"双名并存"很好做：服务端**同时接受**两个名字
-（读新名回退旧名），并在响应里**同时输出** `device_id` 与 `entry_id` —— 老客户端继续能用，
-新客户端读新名，**不需要客户端先升级也不会坏**。
+**为什么这次能一次做完**：全新上线、无老客户端、无历史数据 → 不需要双名窗口 /
+协议版本双接受 / 读旧回退；**一次机械替换 + 一次提交**即可，故不做三期 alias。
 
-**缺的一块**：要"慢慢等所有客户端换新后再删老名字"，得先能**判定**还有没有老客户端在用
-旧名字——服务端目前不记录每台设备用的客户端版本。补法很便宜：`devices` 加一列（或复用
-`device_activity.detail`）记录每次请求的协议版本/客户端构建号，之后一条 SQL 就能查
-"近 N 天是否还有老版本设备" → 没有才删老名字。
-
-**暂不做的理由**：纯可读性收益（用户零感知），代价是 ~300 处标识符（`server/src` 141 处、
-`app/lib` 99 处、`cli` 56 处、`shared` 10 处）+ DB 列 + 协议字段 + 双名窗口 + 跨端发布一轮；
-且双名窗口期内文档/日志/审计脚本里两套名字并存，**可读性反而比现在差**。
+**HTTP 路径**：`POST /auth/challenge` 的请求体字段已随改名变成 `{entrance_id, space_id}`；
+撤销走 `POST /entrances/:id/revoke`。
 
 ## 物理设备的旁证（为什么真有需要时也能认出来）
 
 服务端本来就能概率性地把同一台机器的多个登记项关联起来：审计表里的 `ip`
-（`connection_events` / `device_activity`）、在线时间互斥的切换模式、push token
-（同一安装注册的是同一个 APNs token）、以及默认取型号的 `device_name`。
-`device_uid` 的作用是把这件事从"概率推断"变成"确定性事实"——它只做**服务端内部认知**，
+（`connection_events` / `entrance_activity`）、在线时间互斥的切换模式、push token
+（同一安装注册的是同一个 APNs token）、以及默认取型号的 `entrance_name`。
+`install_uid` 的作用是把这件事从"概率推断"变成"确定性事实"——它只做**服务端内部认知**，
 不参与授权，也不进任何响应体（见 `aimemo/multiSpaceDesign.zhcn.md` §3.7）。

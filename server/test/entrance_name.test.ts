@@ -4,11 +4,11 @@
  * 只允许中文字 / 英文字母 / 数字 / `_` / `-`，最长 32。
  *  - create/join 携带的名字（多由客户端自动取，如宿主机名、手机型号）→ 消毒
  *    （不合规字符换 `_`），保证**落库的一定合规**；
- *  - POST /devices/name（用户主动改名）→ 不合规直接 400，让客户端提示重输。
+ *  - POST /entrances/name（用户主动改名）→ 不合规直接 400，让客户端提示重输。
  *
- * 客户端同款规则在 shared/lib/src/policy/device_name_policy.dart（改动请同步）。
+ * 客户端同款规则在 shared/lib/src/policy/entrance_name_policy.dart（改动请同步）。
  *
- * 运行：npm test（tsx test/device_name.test.ts）
+ * 运行：npm test（tsx test/entrance_name.test.ts）
  */
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -18,7 +18,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 import { ApiError } from '../src/auth.js'
-import { assertDeviceName, normalizeDeviceName } from '../src/deviceName.js'
+import { assertEntranceName, normalizeEntranceName } from '../src/entranceName.js'
 
 const ROOT = join(import.meta.dirname, '..')
 
@@ -46,30 +46,30 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
   throw new Error('server not ready')
 }
 
-test('normalizeDeviceName：create/join 的自动名消毒', () => {
-  assert.equal(normalizeDeviceName('lukde-MacBook-Pro'), 'lukde-MacBook-Pro') // 合规原样
-  assert.equal(normalizeDeviceName('MacBook Pro'), 'MacBook_Pro')
-  assert.equal(normalizeDeviceName('iPhone 15 Pro'), 'iPhone_15_Pro')
-  assert.equal(normalizeDeviceName('老板的 iPhone'), '老板的_iPhone')
-  assert.equal(normalizeDeviceName('  doomship  '), 'doomship') // 首尾空白不是 `_`
-  assert.equal(normalizeDeviceName('???'), '___') // 全不合规 → 一串 `_`
-  assert.equal(normalizeDeviceName('测'.repeat(50)).length, 32) // 截断到 32
-  assert.equal(normalizeDeviceName(''), null) // 空 → null（展示层用 device_id 兜底）
-  assert.equal(normalizeDeviceName(undefined), null)
-  assert.equal(normalizeDeviceName(42), null)
+test('normalizeEntranceName：create/join 的自动名消毒', () => {
+  assert.equal(normalizeEntranceName('lukde-MacBook-Pro'), 'lukde-MacBook-Pro') // 合规原样
+  assert.equal(normalizeEntranceName('MacBook Pro'), 'MacBook_Pro')
+  assert.equal(normalizeEntranceName('iPhone 15 Pro'), 'iPhone_15_Pro')
+  assert.equal(normalizeEntranceName('老板的 iPhone'), '老板的_iPhone')
+  assert.equal(normalizeEntranceName('  doomship  '), 'doomship') // 首尾空白不是 `_`
+  assert.equal(normalizeEntranceName('???'), '___') // 全不合规 → 一串 `_`
+  assert.equal(normalizeEntranceName('测'.repeat(50)).length, 32) // 截断到 32
+  assert.equal(normalizeEntranceName(''), null) // 空 → null（展示层用 entrance_id 兜底）
+  assert.equal(normalizeEntranceName(undefined), null)
+  assert.equal(normalizeEntranceName(42), null)
 })
 
-test('assertDeviceName：用户改名不合规 → 400', () => {
-  assert.doesNotThrow(() => assertDeviceName('My-Mac_01'))
-  assert.doesNotThrow(() => assertDeviceName('老板的电脑'))
-  assert.doesNotThrow(() => assertDeviceName('a'.repeat(32))) // 边界：32 正好
-  assert.doesNotThrow(() => assertDeviceName('𠮷')) // 扩展 B 汉字（Script=Han）
-  assert.doesNotThrow(() => assertDeviceName('㐀')) // 扩展 A 汉字
-  assert.throws(() => assertDeviceName('あ')) // 假名不是汉字
-  assert.throws(() => assertDeviceName('Ａ')) // 全角字母不是汉字
+test('assertEntranceName：用户改名不合规 → 400', () => {
+  assert.doesNotThrow(() => assertEntranceName('My-Mac_01'))
+  assert.doesNotThrow(() => assertEntranceName('老板的电脑'))
+  assert.doesNotThrow(() => assertEntranceName('a'.repeat(32))) // 边界：32 正好
+  assert.doesNotThrow(() => assertEntranceName('𠮷')) // 扩展 B 汉字（Script=Han）
+  assert.doesNotThrow(() => assertEntranceName('㐀')) // 扩展 A 汉字
+  assert.throws(() => assertEntranceName('あ')) // 假名不是汉字
+  assert.throws(() => assertEntranceName('Ａ')) // 全角字母不是汉字
   for (const bad of ['', '   ', 'MacBook Pro', 'iPhone15!', '设备。一号', '📱phone', 'a'.repeat(33)]) {
     assert.throws(
-      () => assertDeviceName(bad),
+      () => assertEntranceName(bad),
       (e: unknown) => e instanceof ApiError && e.code === 'INVALID_REQUEST',
       `应拒收: ${JSON.stringify(bad)}`
     )
@@ -91,40 +91,40 @@ test('端到端：create 消毒入库，改名不合规被拒', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        person_name: 'luk',
+        creator_name: 'luk',
         public_key: Buffer.alloc(32, 7).toString('base64'),
-        device_name: '老板的 iPhone'
+        entrance_name: '老板的 iPhone'
       })
     })
     assert.equal(create.status, 201, 'create space should succeed')
     const { sessionToken } = (await create.json()) as { sessionToken: string }
     const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }
 
-    const list = await req(port, '/devices', { headers: auth })
-    const devices = ((await list.json()) as { devices: Array<{ device_name: string }> }).devices
-    assert.equal(devices.length, 1)
-    assert.equal(devices[0].device_name, '老板的_iPhone', 'create 应把空格换成 _')
+    const list = await req(port, '/entrances', { headers: auth })
+    const entrances = ((await list.json()) as { entrances: Array<{ entrance_name: string }> }).entrances
+    assert.equal(entrances.length, 1)
+    assert.equal(entrances[0].entrance_name, '老板的_iPhone', 'create 应把空格换成 _')
 
     // 2) 改名：不合规 400（服务端这道是约束，不只是前端体验）
     for (const bad of ['MacBook Pro', 'iPhone!', '📱', 'a'.repeat(33)]) {
-      const res = await req(port, '/devices/name', {
+      const res = await req(port, '/entrances/name', {
         method: 'POST',
         headers: auth,
-        body: JSON.stringify({ device_name: bad })
+        body: JSON.stringify({ entrance_name: bad })
       })
       assert.equal(res.status, 400, `不合规改名应被拒: ${bad}`)
     }
 
     // 3) 改名：合规 200 且生效
-    const ok = await req(port, '/devices/name', {
+    const ok = await req(port, '/entrances/name', {
       method: 'POST',
       headers: auth,
-      body: JSON.stringify({ device_name: '书房-Mac_01' })
+      body: JSON.stringify({ entrance_name: '书房-Mac_01' })
     })
     assert.equal(ok.status, 200, '合规改名应成功')
-    const list2 = await req(port, '/devices', { headers: auth })
-    const devices2 = ((await list2.json()) as { devices: Array<{ device_name: string }> }).devices
-    assert.equal(devices2[0].device_name, '书房-Mac_01')
+    const list2 = await req(port, '/entrances', { headers: auth })
+    const entrances2 = ((await list2.json()) as { entrances: Array<{ entrance_name: string }> }).entrances
+    assert.equal(entrances2[0].entrance_name, '书房-Mac_01')
   } finally {
     proc.kill()
   }

@@ -8,8 +8,6 @@ class Api {
   static const messages = '/messages';
   static const sync = '/sync';
   static const attachments = '/attachments';
-  static const devicesEnroll = '/devices/enroll';
-  static const invites = '/invites';
   static const pushRegister = '/push/register';
   static const space = '/space';
   static const keyEscrow = '/key-escrow';
@@ -19,12 +17,12 @@ class Api {
   static const spaceJoin = '/spaces/join';
   // 消息回执（已送达/已读）单调高水位（POST 上报 / GET 回读）
   static const receipts = '/receipts';
-  // 本机自助退役（PROTOCOL.md §7.3）：客户端"重置设备"清本地数据之前调用，把自己
-  // 从服务端注销（清会话/Push/待签 challenge、置 revoked），避免留下幽灵设备。
-  static const deviceRetire = '/devices/retire';
-  // 补登安装级设备标识（多空间）：存量设备进聊天页时幂等上报一次，服务端据此把
-  // 同一物理设备在不同空间的 device_id 关联起来（PROTOCOL.md §7.3）。
-  static const deviceUid = '/devices/uid';
+  // 本机自助退役（PROTOCOL.md §7.3）：客户端"重置本机"清本地数据之前调用，把自己
+  // 从服务端注销（清会话/Push/待签 challenge、置 revoked），避免留下幽灵通道。
+  static const entranceRetire = '/entrances/retire';
+  // 补登安装级标识（多空间）：存量安装进聊天页时幂等上报一次，服务端据此把
+  // 同一安装在不同空间的 entrance_id 关联起来（PROTOCOL.md §7.3）。
+  static const installUid = '/entrances/install-uid';
   // 未读条数（多空间列表角标）：服务端派生——消息 + 我上报的读取水位（receipts）。
   static const messagesUnread = '/messages/unread';
 }
@@ -62,13 +60,13 @@ class SessionResult {
 /// 设备绑定结果（v2）：`POST /spaces` 与 `POST /spaces/join` 都直接返回这三个 id，
 /// App 向导用它聚合"本次绑定拿到的身份"。
 ///
-/// 历史：v1 时代这是 `POST /devices/enroll` 的响应类型（`EnrollResult`）。该端点与
+/// 历史：v1 时代这是 `POST /entrances/enroll` 的响应类型（`EnrollResult`）。该端点与
 /// v1 邀请码已随 Multiverse 收敛删除（2026-09-15），所以它不再是"某个端点的响应"。
-class DeviceBinding {
-  const DeviceBinding({required this.deviceId, required this.personId, required this.spaceId});
+class EntranceBinding {
+  const EntranceBinding({required this.entranceId, required this.partnerId, required this.spaceId});
 
-  final String deviceId;
-  final String personId;
+  final String entranceId;
+  final String partnerId;
   final String spaceId;
 }
 
@@ -129,26 +127,26 @@ class SpaceJoinPreflight {
 class SpaceJoinResult {
   const SpaceJoinResult({
     required this.spaceId,
-    required this.personId,
-    required this.partnerSlot,
+    required this.partnerId,
+    required this.slot,
     required this.sessionToken,
-    required this.deviceId,
+    required this.entranceId,
     required this.spaceAddress,
   });
 
   final String spaceId;
-  final String personId;
-  final int partnerSlot;
+  final String partnerId;
+  final int slot;
   final String sessionToken;
-  final String deviceId;
+  final String entranceId;
   final String spaceAddress;
 
   factory SpaceJoinResult.fromJson(Map<String, dynamic> json) => SpaceJoinResult(
         spaceId: json['spaceId'] as String,
-        personId: json['personId'] as String,
-        partnerSlot: json['partnerSlot'] as int,
+        partnerId: json['partnerId'] as String,
+        slot: json['slot'] as int,
         sessionToken: json['sessionToken'] as String,
-        deviceId: json['deviceId'] as String,
+        entranceId: json['entranceId'] as String,
         spaceAddress: json['spaceAddress'] as String,
       );
 }
@@ -162,8 +160,8 @@ class SpaceCreateResult {
     required this.joinToken,
     required this.link,
     required this.expiresAt,
-    required this.deviceId,
-    required this.creatorPersonId,
+    required this.entranceId,
+    required this.creatorPartnerId,
     required this.sessionToken,
   });
 
@@ -172,8 +170,8 @@ class SpaceCreateResult {
   final String joinToken;
   final String link;
   final int expiresAt;
-  final String deviceId;
-  final String creatorPersonId;
+  final String entranceId;
+  final String creatorPartnerId;
   final String sessionToken;
 
   factory SpaceCreateResult.fromJson(Map<String, dynamic> json) =>
@@ -183,8 +181,8 @@ class SpaceCreateResult {
         joinToken: json['joinToken'] as String,
         link: json['link'] as String,
         expiresAt: json['expiresAt'] as int,
-        deviceId: json['deviceId'] as String,
-        creatorPersonId: json['creatorPersonId'] as String,
+        entranceId: json['entranceId'] as String,
+        creatorPartnerId: json['creatorPartnerId'] as String,
         sessionToken: json['sessionToken'] as String,
       );
 }
@@ -209,24 +207,24 @@ class JoinTokenResult {
       );
 }
 
-/// 空间设备信息（GET /space 返回）：device_id → person_id 映射，
+/// 空间设备信息（GET /space 返回）：entrance_id → partner_id 映射，
 /// 用于判断消息是否"同一个人"发送（多设备凭证语义，PROTOCOL.md §7.3）。
-class SpaceDevice {
-  const SpaceDevice({
-    required this.deviceId,
-    required this.personId,
+class SpaceEntrance {
+  const SpaceEntrance({
+    required this.entranceId,
+    required this.partnerId,
     required this.status,
     this.lastSeen,
   });
 
-  final String deviceId;
-  final String personId;
+  final String entranceId;
+  final String partnerId;
   final String status;
   final int? lastSeen;
 
-  factory SpaceDevice.fromJson(Map<String, dynamic> json) => SpaceDevice(
-        deviceId: json['device_id'] as String,
-        personId: json['person_id'] as String,
+  factory SpaceEntrance.fromJson(Map<String, dynamic> json) => SpaceEntrance(
+        entranceId: json['entrance_id'] as String,
+        partnerId: json['partner_id'] as String,
         status: json['status'] as String,
         lastSeen: json['last_seen'] as int?,
       );
@@ -236,35 +234,35 @@ class SpaceDevice {
 class SpaceResult {
   const SpaceResult({
     required this.spaceId,
-    required this.devices,
-    this.personNames = const {},
-    this.personGenders = const {},
-    this.personSlots = const {},
+    required this.entrances,
+    this.partnerNames = const {},
+    this.partnerGenders = const {},
+    this.partnerSlots = const {},
   });
 
   final String spaceId;
-  final List<SpaceDevice> devices;
+  final List<SpaceEntrance> entrances;
 
-  /// person_id → person_name（创建者/邀请时设置，显示层用）。
-  final Map<String, String> personNames;
+  /// partner_id → partner_name（创建者/邀请时设置，显示层用）。
+  final Map<String, String> partnerNames;
 
-  /// person_id → gender（male/female，显示层用）。
-  final Map<String, String> personGenders;
+  /// partner_id → gender（male/female，显示层用）。
+  final Map<String, String> partnerGenders;
 
-  /// person_id → partner_slot（0=第一人/创建者，1=第二人/伴侣；
+  /// partner_id → slot（0=第一人/创建者，1=第二人/伴侣；
   /// 同性别气泡配色区分「第二个人」用，老服务端无此键时为空表）。
-  final Map<String, int> personSlots;
+  final Map<String, int> partnerSlots;
 
   factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(
         spaceId: json['space_id'] as String,
-        devices: (json['devices'] as List)
-            .map((d) => SpaceDevice.fromJson(d as Map<String, dynamic>))
+        entrances: (json['entrances'] as List)
+            .map((d) => SpaceEntrance.fromJson(d as Map<String, dynamic>))
             .toList(),
-        personNames: (json['person_names'] as Map<String, dynamic>? ?? {})
+        partnerNames: (json['partner_names'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as String)),
-        personGenders: (json['person_genders'] as Map<String, dynamic>? ?? {})
+        partnerGenders: (json['partner_genders'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as String)),
-        personSlots: (json['person_slots'] as Map<String, dynamic>? ?? {})
+        partnerSlots: (json['partner_slots'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as int)),
       );
 }
@@ -284,26 +282,26 @@ class PostMessageResult {
       );
 }
 
-/// 消息回执（已送达/已读）单调高水位，按 (space, person) 一行。
+/// 消息回执（已送达/已读）单调高水位，按 (space, partner) 一行。
 ///
 /// 语义：我的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
-/// `readUptoSeq ≥ S`。按 person 记 → "该 person 至少一台设备已收到/已读"
+/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一台设备已收到/已读"
 /// （不保证其所有设备）。回执只前进，且 `deliveredUptoSeq ≥ readUptoSeq`。
 class ReceiptRow {
   ReceiptRow({
-    required this.personId,
+    required this.partnerId,
     required this.deliveredUptoSeq,
     required this.readUptoSeq,
     required this.updatedAt,
   });
 
-  final String personId;
+  final String partnerId;
   final int deliveredUptoSeq;
   final int readUptoSeq;
   final int updatedAt;
 
   factory ReceiptRow.fromJson(Map<String, dynamic> json) => ReceiptRow(
-        personId: json['person_id'] as String,
+        partnerId: json['partner_id'] as String,
         deliveredUptoSeq: (json['delivered_upto_seq'] as int?) ?? 0,
         readUptoSeq: (json['read_upto_seq'] as int?) ?? 0,
         updatedAt: (json['updated_at'] as int?) ?? 0,
@@ -313,10 +311,10 @@ class ReceiptRow {
 /// 服务端错误（PROTOCOL.md §9）。
 ///
 /// 错误码语义（客户端**只应**按下述处理，2026-09-16）：
-/// - `DEVICE_REVOKED`（403）：本设备被**明确撤销**（涉嫌被盗用）——唯一授权客户端
+/// - `ENTRANCE_REVOKED`（403）：本设备被**明确撤销**（涉嫌被盗用）——唯一授权客户端
 ///   清空本地数据的错误码；
 /// - `FORBIDDEN`（403）：设备**未登记**（最常见原因是服务端库被清空/重置，属运维失误）
-///   ——只警告，绝不清空本地数据，允许继续查看本地消息（`device.revoked` 帧同理是明确撤销）。
+///   ——只警告，绝不清空本地数据，允许继续查看本地消息（`entrance.revoked` 帧同理是明确撤销）。
 class ApiException implements Exception {
   ApiException(this.code, this.message, [this.httpStatus = 0]);
 

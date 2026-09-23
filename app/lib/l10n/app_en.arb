@@ -204,13 +204,13 @@
   "chatPageRenameNameTitle": "My identity",
   "chatPageRenameNameLabel": "My name",
   "chatPageGenderLabel": "Gender",
-  "chatPageRenameDeviceTitle": "Current entrance",
-  "chatPageRenameDeviceLabel": "Entrance name",
-  "chatPageDeviceScopeHint": "An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.",
-  "chatPageRenameDeviceEmptyError": "Enter the entrance name",
-  "chatPageRenameDeviceInvalidError": "Only Chinese/English letters, digits, _ and - are allowed",
-  "chatPageRenameDeviceTooLongError": "At most {max} characters",
-  "@chatPageRenameDeviceTooLongError": {
+  "chatPageRenameEntranceTitle": "Current entrance",
+  "chatPageRenameEntranceLabel": "Entrance name",
+  "chatPageEntranceScopeHint": "An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.",
+  "chatPageRenameEntranceEmptyError": "Enter the entrance name",
+  "chatPageRenameEntranceInvalidError": "Only Chinese/English letters, digits, _ and - are allowed",
+  "chatPageRenameEntranceTooLongError": "At most {max} characters",
+  "@chatPageRenameEntranceTooLongError": {
     "placeholders": {
       "max": {"type": "int"}
     }
@@ -269,7 +269,7 @@
   "chatPageUiStyleGradientDesc": "Pink-blue gradient in the brand colors",
   "chatPageMenuBurnLabel": "Burn-after-read",
   "chatPageMenuMyNameLabel": "My identity",
-  "chatPageMenuDeviceNameLabel": "Current entrance",
+  "chatPageMenuEntranceNameLabel": "Current entrance",
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
   "chatPagePinSetValue": "Set",
@@ -313,7 +313,7 @@
       "count": {"type": "int"}
     }
   },
-  "chatPageDeviceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared",
+  "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared",
   "chatPageOfflineLocalOnly": "Offline · local messages only, cannot send or receive",
   "chatPageMsgResending": "Resending…",
   "chatPageMsgSpeedingUp": "Speeding up…",
@@ -384,9 +384,9 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageDeviceRevoked": "Entrance revoked — local data cleared, please set up again",
-  "chatPageDevicePublicKeyLabel": "Public key of this entrance",
-  "chatPageDevicePublicKeyFailed": "Not recorded",
+  "chatPageEntranceRevoked": "Entrance revoked — local data cleared, please set up again",
+  "chatPageEntrancePublicKeyLabel": "Public key of this entrance",
+  "chatPageEntrancePublicKeyFailed": "Not recorded",
   "burnOptionOff": "Off",
   "burnOption1Minute": "1 minute",
   "burnOption5Minutes": "5 minutes",
@@ -426,19 +426,19 @@
   "advancedDestroyEntrance": "Destroy this entrance",
   "leaveSpaceTitle": "Destroy this entrance?",
   "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!",
-  "resetDeviceNameLabel": "{name}",
-  "@resetDeviceNameLabel": {
+  "resetEntranceNameLabel": "{name}",
+  "@resetEntranceNameLabel": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "resetDeviceNameHint": "Type the current entrance name “{name}”",
-  "@resetDeviceNameHint": {
+  "resetEntranceNameHint": "Type the current entrance name “{name}”",
+  "@resetEntranceNameHint": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "resetDeviceNameMismatch": "Enter the correct entrance name to confirm",
-  "resetDeviceConfirmWord": "RESET",
-  "resetDevicePinLabel": "PIN",
-  "resetDevicePinHint": "Enter this device's PIN",
-  "resetDeviceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner's entrance list",
+  "resetEntranceNameMismatch": "Enter the correct entrance name to confirm",
+  "resetInstallConfirmWord": "RESET",
+  "resetInstallPinLabel": "PIN",
+  "resetInstallPinHint": "Enter this device's PIN",
+  "resetInstallServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner's entrance list",
   "spaceListTitle": "Choose a space",
   "spaceListEmpty": "No spaces joined yet",
   "spaceListAdd": "Create or join a space",

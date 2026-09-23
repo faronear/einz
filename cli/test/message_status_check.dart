@@ -52,17 +52,17 @@ Future<Process> _startServer(int port, String workDir) async {
   throw StateError('服务端未就绪');
 }
 
-DeviceStore _store({
+EntranceStore _store({
   required String publicKey,
   required String privateKey,
   required String spaceKeyB64,
   required String spaceId,
-  required String deviceId,
-  required String personId,
+  required String entranceId,
+  required String partnerId,
   required String sessionToken,
   required String server,
 }) {
-  final st = DeviceStore(
+  final st = EntranceStore(
     publicKey: publicKey,
     privateKey: privateKey,
     spaceKey: spaceKeyB64,
@@ -70,8 +70,8 @@ DeviceStore _store({
     keyVersion: 1,
     sessionToken: sessionToken,
   );
-  st.deviceId = deviceId;
-  st.personId = personId;
+  st.entranceId = entranceId;
+  st.partnerId = partnerId;
   return st;
 }
 
@@ -91,8 +91,8 @@ Future<int> _run() async {
     final api = ApiClient(server);
     final created = await api.createSpace(
       publicKey: 'pk-a',
-      personName: 'Lukas',
-      partnerName: 'Alice',
+      creatorName: 'Lukas',
+      peerName: 'Alice',
       escrowPassphrase: kPassphrase,
       sealedSpaceKey: PassphraseEnvelope(
         salt: Uint8List.fromList(List.filled(16, 1)),
@@ -103,8 +103,8 @@ Future<int> _run() async {
     final joined = await api.joinSpace(
       token: created.joinToken,
       publicKey: 'pk-b',
-      partnerSlot: 1,
-      deviceName: 'b',
+      slot: 1,
+      entranceName: 'b',
     );
 
     final spaceKey = base64Encode(Uint8List.fromList(
@@ -114,8 +114,8 @@ Future<int> _run() async {
       privateKey: 'sk-a',
       spaceKeyB64: spaceKey,
       spaceId: created.spaceId,
-      deviceId: created.deviceId,
-      personId: created.creatorPersonId,
+      entranceId: created.entranceId,
+      partnerId: created.creatorPartnerId,
       sessionToken: created.sessionToken,
       server: server,
     );
@@ -124,8 +124,8 @@ Future<int> _run() async {
       privateKey: 'sk-b',
       spaceKeyB64: spaceKey,
       spaceId: joined.spaceId,
-      deviceId: joined.deviceId,
-      personId: joined.personId,
+      entranceId: joined.entranceId,
+      partnerId: joined.partnerId,
       sessionToken: joined.sessionToken,
       server: server,
     );
@@ -171,8 +171,8 @@ Future<int> _run() async {
       plaintext: encodeMessagePayload('语音', meta: {kMetaAudioDurationSeconds: 18}),
       spaceKey: base64Decode(spaceKey),
       spaceId: created.spaceId,
-      senderDeviceId: storeA.deviceId!,
-      senderPersonId: storeA.personId,
+      senderEntranceId: storeA.entranceId!,
+      senderPartnerId: storeA.partnerId,
       messageId: 'voice-${DateTime.now().microsecondsSinceEpoch}',
       type: 'voice',
     );
@@ -185,14 +185,14 @@ Future<int> _run() async {
     }
 
     // 4) 离线发出 → pending（进入离线队列，未确认）
-    final storeOffline = DeviceStore(
+    final storeOffline = EntranceStore(
       publicKey: 'pk-c',
       privateKey: 'sk-c',
       spaceKey: spaceKey,
       spaceId: created.spaceId,
     )
-      ..deviceId = 'dev-offline'
-      ..personId = 'person-offline';
+      ..entranceId = 'dev-offline'
+      ..partnerId = 'partner-offline';
     final sessionOffline = ChatSession(storeOffline, '${work.path}/c.json', '');
     if (await sessionOffline.sendText('offline-probe')) {
       stderr.writeln('❌ 离线发送不应返回成功');

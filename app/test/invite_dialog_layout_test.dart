@@ -63,7 +63,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: Uint8List(32),
         keyVersion: 1,
         token: 'tok',

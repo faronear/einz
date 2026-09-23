@@ -24,15 +24,15 @@ void main() {
     final path = '${dir.path}/s.json';
 
     // 已绑定空间（有 Space Key）但未配置 server/无 session = 离线
-    final store = DeviceStore(
+    final store = EntranceStore(
       publicKey: base64Encode(List<int>.filled(32, 1)),
       privateKey: base64Encode(List<int>.filled(32, 2)),
       spaceKey: base64Encode(List<int>.filled(32, 3)),
       spaceId: 'space-x',
       keyVersion: 1,
     )
-      ..personId = 'p1'
-      ..deviceId = 'd1';
+      ..partnerId = 'p1'
+      ..entranceId = 'd1';
     final session = ChatSession(store, path, '');
     var changed = 0;
     session.onChanged = () => changed++;

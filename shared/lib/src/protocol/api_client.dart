@@ -65,11 +65,11 @@ class ApiClient {
   /// `/sync`、`/messages`、escrow 都按会话里的 space 定位数据。不传 → 服务端
   /// 落"无 space 的 legacy 会话"，该会话看不到任何空间的数据（P1 收敛前 CLI 的
   /// `/auth` 就是漏传，导致会话过期续期后消息全空）。
-  Future<ChallengeResult> challenge(String deviceId, {String? spaceId}) async {
+  Future<ChallengeResult> challenge(String entranceId, {String? spaceId}) async {
     final res = await _post(
       Api.challenge,
       {
-        'device_id': deviceId,
+        'entrance_id': entranceId,
         if (spaceId != null && spaceId.isNotEmpty) 'space_id': spaceId,
       },
       withToken: false,
@@ -86,7 +86,7 @@ class ApiClient {
     return SessionResult.fromJson(res);
   }
 
-  /// 新设备凭一次性邀请码动态登记（POST /devices/enroll，免认证——邀请码即准入令牌）。
+  /// 新设备凭一次性邀请码动态登记（POST /entrances/enroll，免认证——邀请码即准入令牌）。
   /// 登记成功后设备立即在服务端白名单生效（无需人工改 config.json / 重启）。
   
   /// Multiverse：join token 轻量校验（不消费），返回空间公开信息供确认
@@ -101,63 +101,62 @@ class ApiClient {
     return SpaceJoinPreflight.fromJson(res);
   }
 
-  /// Multiverse：加入空间（POST /spaces/join——设备登记 + session 签发，绑定该
+  /// Multiverse：加入空间（POST /spaces/join——通道登记 + session 签发，绑定该
   /// Space，PROTOCOL_MULTIVERSE.md §4.1）。
   Future<SpaceJoinResult> joinSpace({
     required String token,
     required String publicKey,
-    String? deviceName,
-    String? gender,
-    int? partnerSlot,
-    String? deviceUid,
+    String? entranceName,
+    int? slot,
+    String? installUid,
   }) async {
     final res = await _post(
       Api.spaceJoin,
       {
         'token': token,
         'public_key': publicKey,
-        if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
-        if (gender != null && gender.isNotEmpty) 'gender': gender,
-        if (partnerSlot != null) 'partner_slot': partnerSlot,
-        // 安装级设备标识（多空间：同一物理设备各空间同名，服务端内部关联用）
-        if (deviceUid != null && deviceUid.isNotEmpty) 'device_uid': deviceUid,
+        if (entranceName != null && entranceName.isNotEmpty) 'entrance_name': entranceName,
+        if (slot != null) 'slot': slot,
+        // 安装级标识（多空间：同一安装各空间同名，服务端内部关联用）
+        if (installUid != null && installUid.isNotEmpty) 'install_uid': installUid,
       },
       withToken: false,
     );
     return SpaceJoinResult.fromJson(res);
   }
 
-  /// Multiverse：创建空间（POST /spaces——创建者设备登记 + session + 首个
-  /// join token，PROTOCOL_MULTIVERSE.md §4.1）。personName/partnerName 为
-  /// 第一人（创建者）与第二人（伴侣）的名字（create 时预置两身份，join 按身份选择）。
+  /// Multiverse：创建空间（POST /spaces——创建者通道登记 + session + 首个
+  /// join token，PROTOCOL_MULTIVERSE.md §4.1）。creatorName/peerName 为
+  /// 第一人（创建者）与第二人（对方）的名字（create 时预置两身份，join 按身份选择）。
   Future<SpaceCreateResult> createSpace({
     String? spaceId,
-    String? personName,
-    String? gender,
-    String? partnerName,
-    String? partnerGender,
+    String? creatorName,
+    String? creatorGender,
+    String? peerName,
+    String? peerGender,
     PassphraseEnvelope? sealedSpaceKey,
     String? escrowPassphrase,
     String? publicKey,
-    String? deviceName,
-    String? deviceUid,
+    String? entranceName,
+    String? installUid,
   }) async {
     final res = await _post(
       Api.spaces,
       {
         if (spaceId != null && spaceId.isNotEmpty) 'space_id': spaceId,
-        if (personName != null && personName.isNotEmpty) 'person_name': personName,
-        if (gender != null && gender.isNotEmpty) 'gender': gender,
-        if (partnerName != null && partnerName.isNotEmpty) 'partner_name': partnerName,
-        if (partnerGender != null && partnerGender.isNotEmpty)
-          'partner_gender': partnerGender,
+        if (creatorName != null && creatorName.isNotEmpty) 'creator_name': creatorName,
+        if (creatorGender != null && creatorGender.isNotEmpty)
+          'creator_gender': creatorGender,
+        if (peerName != null && peerName.isNotEmpty) 'peer_name': peerName,
+        if (peerGender != null && peerGender.isNotEmpty)
+          'peer_gender': peerGender,
         if (sealedSpaceKey != null) 'sealed_space_key': sealedSpaceKey.toJson(),
         if (escrowPassphrase != null && escrowPassphrase.isNotEmpty)
           'escrow_passphrase': escrowPassphrase,
         if (publicKey != null && publicKey.isNotEmpty) 'public_key': publicKey,
-        if (deviceName != null && deviceName.isNotEmpty) 'device_name': deviceName,
-        // 安装级设备标识（多空间：同一物理设备各空间同名，服务端内部关联用）
-        if (deviceUid != null && deviceUid.isNotEmpty) 'device_uid': deviceUid,
+        if (entranceName != null && entranceName.isNotEmpty) 'entrance_name': entranceName,
+        // 安装级标识（多空间：同一安装各空间同名，服务端内部关联用）
+        if (installUid != null && installUid.isNotEmpty) 'install_uid': installUid,
       },
       withToken: false,
     );
@@ -191,7 +190,7 @@ class ApiClient {
     return PassphraseEnvelope.fromJson(pkg);
   }
 
-  /// 生成邀请码（POST /invites，需认证 token）：person_id 为规范 id（personA/personB）。
+  /// 生成邀请码（POST /invites，需认证 token）：partner_id 为规范 id（partnerA/partnerB）。
   
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
     final res = await _post(Api.messages, env.toJson(), token: token);
@@ -219,69 +218,69 @@ class ApiClient {
     return (res['unread'] as num?)?.toInt() ?? 0;
   }
 
-  /// 补登安装级设备标识（POST /devices/uid）：多空间下同一台物理设备在每个空间各有
-  /// 一个 device_id，`deviceUid` 是它们共用的那一份（服务端内部认知用）。
+  /// 补登安装级设备标识（POST /entrances/uid）：多空间下同一台物理设备在每个空间各有
+  /// 一个 entrance_id，`installUid` 是它们共用的那一份（服务端内部认知用）。
   ///
   /// 幂等；只写本会话对应的那一行（一个空间的虚拟设备），别的空间由客户端在那边再登一次。
   /// 失败不影响聊天——调用方应 best-effort（同 registerPushToken）。
-  Future<void> registerDeviceUid(String deviceUid, String token) async {
-    await _post(Api.deviceUid, {'device_uid': deviceUid}, token: token);
+  Future<void> registerInstallUid(String installUid, String token) async {
+    await _post(Api.installUid, {'install_uid': installUid}, token: token);
   }
 
-  /// 获取空间信息（space_id + 设备列表，含 person_id 映射，PROTOCOL.md §7.3）。
+  /// 获取空间信息（space_id + 设备列表，含 partner_id 映射，PROTOCOL.md §7.3）。
   Future<SpaceResult> getSpace(String token) async {
     final res = await _get(Api.space, token: token);
     return SpaceResult.fromJson(res);
   }
 
   /// 设备列表（含 last_seen 活跃时间戳（毫秒）；对方在线状态判定用）。
-  Future<List<Map<String, dynamic>>> listDevices(String token) async {
-    final res = await _get('/devices', token: token);
-    return (res['devices'] as List<dynamic>).cast<Map<String, dynamic>>();
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async {
+    final res = await _get('/entrances', token: token);
+    return (res['entrances'] as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
   /// 更新本设备名称（TUI 改名后同步后台，显示层用）。
-  Future<void> updateDeviceName(String deviceName, String token) async {
-    await _post('/devices/name', {'device_name': deviceName}, token: token);
+  Future<void> updateEntranceName(String entranceName, String token) async {
+    await _post('/entrances/name', {'entrance_name': entranceName}, token: token);
   }
 
-  /// 更新本设备 person 显示名（/rename 命令，显示层用）。
-  Future<void> updatePersonName(String personName, String token) async {
-    await _post('/devices/person-name', {'person_name': personName}, token: token);
+  /// 更新本设备 partner 显示名（/rename 命令，显示层用）。
+  Future<void> updatePartnerName(String partnerName, String token) async {
+    await _post('/partners/name', {'partner_name': partnerName}, token: token);
   }
 
-  /// 撤销**本空间内**的另一台设备（POST /devices/:id/revoke，PROTOCOL.md §7.2）。
+  /// 撤销**本空间内**的另一台设备（POST /entrances/:id/revoke，PROTOCOL.md §7.2）。
   ///
   /// 授权（2026-09-16）：同 space 内可互撤，但**每次都要校验共享口令**——撤销会让  /// 对方客户端自毁本地数据，属不可逆操作。失败码：口令错 401 `ESCROW_VERIFY_FAILED`、
   /// 尝试过多 429 `ESCROW_RATE_LIMITED`、该空间未托管口令 409 `PASSPHRASE_NOT_SET`、
   /// 目标不在本空间 403 `FORBIDDEN`。**调用方必须在成功后才提示/清理**（失败时目标
   /// 设备不受任何影响）。
-  Future<void> revokeDevice(String deviceId, String passphrase, String token) async {
-    await _post('/devices/$deviceId/revoke', {'passphrase': passphrase}, token: token);
+  Future<void> revokeEntrance(String entranceId, String passphrase, String token) async {
+    await _post('/entrances/$entranceId/revoke', {'passphrase': passphrase}, token: token);
   }
 
-  /// 上传本人头像（raw 图片 bytes，服务端按 person 存储覆盖）。
+  /// 上传本人头像（raw 图片 bytes，服务端按 partner 存储覆盖）。
   ///
-  /// 返回服务端确认的 person_id：上传方**收不到**自己的 profile.updated 广播
+  /// 返回服务端确认的 partner_id：上传方**收不到**自己的 profile.updated 广播
   /// （ws.ts 的 broadcastProfileUpdated 跳过发送设备），客户端只能靠这个返回值
-  /// 失效本端头像缓存（重启路径 widget.personId 为空 → 旧实现静默失效失败，
+  /// 失效本端头像缓存（重启路径 widget.partnerId 为空 → 旧实现静默失效失败，
   /// 老板 2026-09-16 实测：上传后消息流仍显示旧头像，重启才更新）。
-  /// 响应体不合法/缺字段时返回 null（person_id 只用于本地缓存失效，
+  /// 响应体不合法/缺字段时返回 null（partner_id 只用于本地缓存失效，
   /// 不能让解析失败把已经成功的一次上传报成失败）。
   Future<String?> uploadAvatar(Uint8List bytes, String token) async {
     final text = await _postBytes('/avatar', bytes, token: token);
     if (text.isEmpty) return null;
     try {
       final json = jsonDecode(text) as Map<String, dynamic>;
-      return json['person_id'] as String?;
+      return json['partner_id'] as String?;
     } catch (_) {
       return null;
     }
   }
 
-  /// 获取指定 person 的头像 bytes；未设置返回 null。
-  Future<Uint8List?> getAvatar(String personId) async {
-    return _getBytes('/avatar/$personId');
+  /// 获取指定 partner 的头像 bytes；未设置返回 null。
+  Future<Uint8List?> getAvatar(String partnerId) async {
+    return _getBytes('/avatar/$partnerId');
   }
 
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
@@ -422,15 +421,15 @@ class ApiClient {
         .toList();
   }
 
-  /// **本机自助退役**（POST /devices/retire，PROTOCOL.md §7.3）：把自己从服务端注销
-  /// ——清会话/Push Token/待签 challenge，设备置 revoked。与 [revokeDevice] 的区别：
+  /// **本机自助退役**（POST /entrances/retire，PROTOCOL.md §7.3）：把自己从服务端注销
+  /// ——清会话/Push Token/待签 challenge，设备置 revoked。与 [revokeEntrance] 的区别：
   /// 目标恒为自己、**不校验共享口令**（口令是共享给伴侣的加入凭证，不该有销毁我这台
   /// 设备的权力），调用方在此之前应已完成本地闸门（输入设备名 + 本机 PIN）。
   ///
   /// 调用约定：**先调它、成功之后再清本地数据**——token 存在本地，清完就再也调不动了。
   /// 异常按 [ApiException] 上抛，由调用方决定「退役失败是否仍要清本地」。
-  Future<void> retireDevice(String token) async {
-    await _post(Api.deviceRetire, {}, token: token);
+  Future<void> retireEntrance(String token) async {
+    await _post(Api.entranceRetire, {}, token: token);
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body,
@@ -497,7 +496,7 @@ class ApiClient {
   }
 
   /// raw bytes 上传（头像等二进制）：image/png + Bearer token。
-  /// 返回响应体文本（调用方按需解析，如 /avatar 的 person_id）。
+  /// 返回响应体文本（调用方按需解析，如 /avatar 的 partner_id）。
   Future<String> _postBytes(String path, Uint8List bytes, {String? token}) {
     return _withRetry(() async {
       final client = _client;

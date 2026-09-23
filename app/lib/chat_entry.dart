@@ -24,7 +24,7 @@ Widget buildChatPage(
     // 地址不进锁包：解锁前后读的都是启动时定好的 effectiveServer
     db: db,
     spaceId: payload.spaceId,
-    deviceId: payload.deviceId,
+    entranceId: payload.entranceId,
     spaceKey: base64Decode(payload.spaceKeyB64),
     keyVersion: payload.keyVersion,
     token: payload.token ?? '',

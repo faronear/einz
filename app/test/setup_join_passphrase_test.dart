@@ -70,10 +70,10 @@ Future<void> pumpToJoinToken(
       joinOverride: join ??
           (token) async => const SpaceJoinResult(
               spaceId: 'space-test',
-              personId: 'personB',
-              partnerSlot: 1,
+              partnerId: 'partnerB',
+              slot: 1,
               sessionToken: 'tok',
-              deviceId: 'dev2',
+              entranceId: 'dev2',
               spaceAddress: '0x00'),
       escrowOverride: (server) => _FakeEscrow(correctPass, payload),
     ),
@@ -146,10 +146,10 @@ void main() {
       if (joinCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
       return const SpaceJoinResult(
           spaceId: 'space-test',
-          personId: 'personB',
-          partnerSlot: 1,
+          partnerId: 'partnerB',
+          slot: 1,
           sessionToken: 'tok',
-          deviceId: 'dev2',
+          entranceId: 'dev2',
           spaceAddress: '0x00');
     }
 
@@ -180,10 +180,10 @@ void main() {
       if (joinCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
       return const SpaceJoinResult(
           spaceId: 'space-test',
-          personId: 'personB',
-          partnerSlot: 1,
+          partnerId: 'partnerB',
+          slot: 1,
           sessionToken: 'tok',
-          deviceId: 'dev2',
+          entranceId: 'dev2',
           spaceAddress: '0x00');
     }
 

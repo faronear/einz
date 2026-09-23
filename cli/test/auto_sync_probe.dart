@@ -18,7 +18,7 @@ Future<void> main(List<String> args) async {
   final timeoutSec = args.length > 1 ? int.parse(args[1]) : 90;
   final storePath = args.length > 2 ? args[2] : 'demo/store-a.json';
   final server = args.length > 3 ? args[3] : 'http://127.0.0.1:3901';
-  final store = DeviceStore.load(storePath);
+  final store = EntranceStore.load(storePath);
   final session = ChatSession(store, storePath, server);
 
   await session.auth();

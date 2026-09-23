@@ -25,28 +25,28 @@ class ConfirmDialogCopy {
 /// **闸门故意只用本机独占的因子**（老板 2026-09-22 定稿）：设备名确认清的是这台，
 /// 锁屏码是本地秘密。刻意**不校验空间口令**——那是**共享**给伴侣的加入凭证，不该获得
 /// 销毁我这台设备的权力；而且校验它必须联网，会让"本机身份属于一台已经连不上的服务器"
-/// 这个最常见的重置场景直接自锁（详情见 `server/src/devices.ts` 的 retireDevice）。
+/// 这个最常见的重置场景直接自锁（详情见 `server/src/entrances.ts` 的 retireEntrance）。
 ///
 /// 两个场景共用它：空间级「销毁本秘境通道」与设备级「清除本设备全部数据」。
 Future<bool> _confirmDestructive(
   BuildContext context, {
   required LocalDatabase db,
-  required String deviceName,
+  required String entranceName,
   required bool hasPin,
   required ConfirmDialogCopy copy,
 }) async {
   if (!context.mounted) return false;
   // 设备名取不到（本地快照与服务端都问不出来）时退一步：改让用户打一个固定确认词。
-  // 不可用性优先——本地快照缺 deviceName 的旧装机不该因此永远清不掉。
+  // 不可用性优先——本地快照缺 entranceName 的旧装机不该因此永远清不掉。
   final l10n = AppLocalizations.of(context)!;
   final expected =
-      deviceName.trim().isEmpty ? l10n.resetDeviceConfirmWord : deviceName.trim();
+      entranceName.trim().isEmpty ? l10n.resetInstallConfirmWord : entranceName.trim();
   final ok = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => _ConfirmDestructiveDialog(
       db: db,
-      deviceName: expected,
+      entranceName: expected,
       hasPin: hasPin,
       copy: copy,
     ),
@@ -61,7 +61,7 @@ Future<bool> _confirmDestructive(
 Future<bool> retireSpaceQuietly(String token, {ApiClient? api}) async {
   if (token.isEmpty) return false;
   try {
-    await (api ?? ApiClient(effectiveServer)).retireDevice(token);
+    await (api ?? ApiClient(effectiveServer)).retireEntrance(token);
     return true;
   } catch (_) {
     // 离线 / 已被对方撤销 / 老服务端
@@ -83,7 +83,7 @@ Future<bool> confirmLeaveSpace(
   ApiClient? api,
   required String spaceId,
   required String token,
-  required String deviceName,
+  required String entranceName,
   bool hasPin = false,
 }) async {
   final database = db ?? LocalDatabase.shared;
@@ -91,7 +91,7 @@ Future<bool> confirmLeaveSpace(
   final ok = await _confirmDestructive(
     context,
     db: database,
-    deviceName: deviceName,
+    entranceName: entranceName,
     hasPin: hasPin,
     copy: ConfirmDialogCopy(
       title: l10n.leaveSpaceTitle,
@@ -109,7 +109,7 @@ Future<bool> confirmLeaveSpace(
   // 凭证条目等下次解锁再摘（见 AppLockService.removeSpace 文档）。
   await AppLockService(database).removeSpace(spaceId);
   if (!retired && context.mounted) {
-    showTopNotice(context, l10n.resetDeviceServerResidualHint);
+    showTopNotice(context, l10n.resetInstallServerResidualHint);
   }
   return true;
 }
@@ -124,13 +124,13 @@ Future<bool> confirmLeaveSpace(
 class _ConfirmDestructiveDialog extends StatefulWidget {
   const _ConfirmDestructiveDialog({
     required this.db,
-    required this.deviceName,
+    required this.entranceName,
     required this.hasPin,
     required this.copy,
   });
 
   final LocalDatabase db;
-  final String deviceName;
+  final String entranceName;
   final bool hasPin;
   final ConfirmDialogCopy copy;
 
@@ -158,8 +158,8 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
     final pin = _pinCtrl.text;
 
     // ① 设备名：精确比对（trim 后大小写敏感——设备名是用户自己起的，不像邮箱该宽容）
-    if (name != widget.deviceName) {
-      setState(() => _error = l10n.resetDeviceNameMismatch);
+    if (name != widget.entranceName) {
+      setState(() => _error = l10n.resetEntranceNameMismatch);
       return;
     }
     // ② 锁屏码（已设才验）：走 AppLockService.unlock —— 与锁屏同一套防爆破
@@ -222,7 +222,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
           ),
           const SizedBox(height: 10),
           Text(
-            l10n.resetDeviceNameHint(widget.deviceName),
+            l10n.resetEntranceNameHint(widget.entranceName),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.outline,
@@ -233,14 +233,14 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
             controller: _nameCtrl,
             autofocus: true, // 闸门第一个框：打开弹窗即待输入
             decoration: InputDecoration(
-              hintText: l10n.resetDeviceNameLabel(widget.deviceName),
+              hintText: l10n.resetEntranceNameLabel(widget.entranceName),
               border: const OutlineInputBorder(),
             ),
           ),
           if (widget.hasPin) ...[
             const SizedBox(height: 8),
             Text(
-              l10n.resetDevicePinHint,
+              l10n.resetInstallPinHint,
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.outline,
@@ -252,7 +252,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
               obscureText: true,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                hintText: l10n.resetDevicePinLabel,
+                hintText: l10n.resetInstallPinLabel,
                 border: const OutlineInputBorder(),
               ),
             ),

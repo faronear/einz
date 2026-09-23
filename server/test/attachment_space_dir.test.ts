@@ -77,7 +77,7 @@ test('两个空间的附件各自成目录，互不串', async () => {
 test('下载按库里的 storage_path 读（旧规则的存量行仍可读）', async () => {
   await withDb(async () => {
     const space = await createSpace(undefined, '我', 'male', '伴侣', 'female', undefined, undefined, 'pk-a', 'iPhone')
-    const joined = joinSpace(space.joinToken, 'pk-b', 'Pixel', 'female', 1)
+    const joined = joinSpace(space.joinToken, 'pk-b', 'Pixel', 1)
     const { blob, sha256 } = makeBlob('read')
     const attachmentId = 'cccccccc-2222-3333-4444-555555555555'
     storeAttachment(

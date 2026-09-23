@@ -28,7 +28,7 @@ Future<void> main() async {
   var ready = false;
   for (var i = 0; i < 60; i++) {
     try {
-      final req = await client.getUrl(Uri.parse('$base/devices'));
+      final req = await client.getUrl(Uri.parse('$base/entrances'));
     req.headers.set('X-Protocol-Version', '1'); // 协议硬校验（PROTOCOL.md §1）
       final res = await req.close();
       res.drain<void>();
@@ -47,7 +47,7 @@ Future<void> main() async {
 
   try {
     final storePath = 'demo/store-a.json';
-    final store = DeviceStore.load(storePath);
+    final store = EntranceStore.load(storePath);
     final badBefore =
         store.history.where((m) => (m['created_at'] as int? ?? 0) < 100000000000).length;
     stdout.writeln('修复前坏时间戳条数: $badBefore / ${store.history.length}');
@@ -57,7 +57,7 @@ Future<void> main() async {
     await session.auth();
     await session.sync(); // 内部触发 _backfillTimestamps
 
-    final store2 = DeviceStore.load(storePath); // 重新读盘确认已修复
+    final store2 = EntranceStore.load(storePath); // 重新读盘确认已修复
     final badAfter =
         store2.history.where((m) => (m['created_at'] as int? ?? 0) < 100000000000).length;
     stdout.writeln('修复后坏时间戳条数: $badAfter / ${store2.history.length}');

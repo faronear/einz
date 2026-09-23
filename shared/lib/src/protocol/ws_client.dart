@@ -7,7 +7,7 @@ import '../crypto/message_crypto.dart';
 /// WS 事件帧类型（PROTOCOL.md §8）。
 const String kWsTypeHello = 'hello';
 const String kWsTypeMessageNew = 'message.new';
-const String kWsTypeDeviceRevoked = 'device.revoked';
+const String kWsTypeEntranceRevoked = 'entrance.revoked';
 const String kWsTypePeerOnline = 'peer.online';
 const String kWsTypePeerOffline = 'peer.offline';
 const String kWsTypePassphraseRotated = 'passphrase.rotated';
@@ -26,9 +26,9 @@ sealed class WsEvent {
 
 /// hello：连接建立（Server 返回设备/空间信息）。
 class WsHelloEvent extends WsEvent {
-  const WsHelloEvent({required super.type, required this.deviceId, required this.spaceId});
+  const WsHelloEvent({required super.type, required this.entranceId, required this.spaceId});
 
-  final String deviceId;
+  final String entranceId;
   final String spaceId;
 }
 
@@ -44,64 +44,64 @@ class WsMessageNewEvent extends WsEvent {
   final int serverSequence;
 }
 
-/// device.revoked：本设备被撤销（Server 发帧后主动断开）。
-class WsDeviceRevokedEvent extends WsEvent {
-  const WsDeviceRevokedEvent({required super.type, required this.deviceId});
+/// entrance.revoked：本通道被撤销（Server 发帧后主动断开）。
+class WsEntranceRevokedEvent extends WsEvent {
+  const WsEntranceRevokedEvent({required super.type, required this.entranceId});
 
-  final String deviceId;
+  final String entranceId;
 }
 
 /// peer.online/peer.offline：对端设备上下线通知（App 实时更新对方在线状态）。
-/// [personId] 为上下线设备所属身份：与其相同身份的设备（我自己的另一台）不算
+/// [partnerId] 为上下线设备所属身份：与其相同身份的设备（我自己的另一台）不算
 /// "对方"，接收方须忽略（旧服务端不带该字段时为 null——按原行为处理）。
 /// [onlineSince] 仅 peer.online 携带：该设备进入在线态的时刻（ms，重连不刷新），
 /// 接收方据此按上线顺序排列对端的在线设备（最新上线在最前；旧服务端为 null）。
 class WsPeerStatusEvent extends WsEvent {
   const WsPeerStatusEvent({
     required super.type,
-    required this.deviceId,
-    this.personId,
+    required this.entranceId,
+    this.partnerId,
     this.onlineSince,
   });
 
-  final String deviceId;
-  final String? personId;
+  final String entranceId;
+  final String? partnerId;
   final int? onlineSince;
 }
 
 /// passphrase.rotated：空间口令已被重设（客户端收到后只发通知，不弹窗）。
 class WsPassphraseRotatedEvent extends WsEvent {
-  const WsPassphraseRotatedEvent({required super.type, required this.deviceId});
+  const WsPassphraseRotatedEvent({required super.type, required this.entranceId});
 
-  final String deviceId;
+  final String entranceId;
 }
 
 /// profile.updated：对端改名/改设备名（App/TUI 立即更新对方名称）。
 class WsProfileUpdatedEvent extends WsEvent {
   const WsProfileUpdatedEvent({
     required super.type,
-    required this.deviceId,
-    this.personId,
-    this.personName,
-    this.deviceName,
+    required this.entranceId,
+    this.partnerId,
+    this.partnerName,
+    this.entranceName,
   });
 
-  final String deviceId;
-  final String? personId;
-  final String? personName;
-  final String? deviceName;
+  final String entranceId;
+  final String? partnerId;
+  final String? partnerName;
+  final String? entranceName;
 }
 
-/// 对方回执（已送达/已读）更新：单调高水位，按 person 一行。
+/// 对方回执（已送达/已读）更新：单调高水位，按 partner 一行。
 class WsReceiptUpdatedEvent extends WsEvent {
   const WsReceiptUpdatedEvent({
     required super.type,
-    required this.personId,
+    required this.partnerId,
     required this.deliveredUptoSeq,
     required this.readUptoSeq,
   });
 
-  final String personId;
+  final String partnerId;
   final int deliveredUptoSeq;
   final int readUptoSeq;
 }
@@ -251,7 +251,7 @@ class WsClient {
         case kWsTypeHello:
           onEvent?.call(WsHelloEvent(
             type: type,
-            deviceId: payload['device_id'] as String? ?? '',
+            entranceId: payload['entrance_id'] as String? ?? '',
             spaceId: payload['space_id'] as String? ?? '',
           ));
           break;
@@ -262,40 +262,40 @@ class WsClient {
             serverSequence: payload['server_sequence'] as int,
           ));
           break;
-        case kWsTypeDeviceRevoked:
-          onEvent?.call(WsDeviceRevokedEvent(
+        case kWsTypeEntranceRevoked:
+          onEvent?.call(WsEntranceRevokedEvent(
             type: type,
-            deviceId: payload['device_id'] as String? ?? '',
+            entranceId: payload['entrance_id'] as String? ?? '',
           ));
           break;
         case kWsTypePeerOnline:
         case kWsTypePeerOffline:
           onEvent?.call(WsPeerStatusEvent(
             type: type,
-            deviceId: payload['device_id'] as String? ?? '',
-            personId: payload['person_id'] as String?,
+            entranceId: payload['entrance_id'] as String? ?? '',
+            partnerId: payload['partner_id'] as String?,
             onlineSince: payload['online_since'] as int?,
           ));
           break;
         case kWsTypePassphraseRotated:
           onEvent?.call(WsPassphraseRotatedEvent(
             type: type,
-            deviceId: payload['device_id'] as String? ?? '',
+            entranceId: payload['entrance_id'] as String? ?? '',
           ));
           break;
         case kWsTypeProfileUpdated:
           onEvent?.call(WsProfileUpdatedEvent(
             type: type,
-            deviceId: payload['device_id'] as String? ?? '',
-            personId: payload['person_id'] as String?,
-            personName: payload['person_name'] as String?,
-            deviceName: payload['device_name'] as String?,
+            entranceId: payload['entrance_id'] as String? ?? '',
+            partnerId: payload['partner_id'] as String?,
+            partnerName: payload['partner_name'] as String?,
+            entranceName: payload['entrance_name'] as String?,
           ));
           break;
         case kWsTypeReceiptUpdated:
           onEvent?.call(WsReceiptUpdatedEvent(
             type: type,
-            personId: payload['person_id'] as String? ?? '',
+            partnerId: payload['partner_id'] as String? ?? '',
             deliveredUptoSeq: (payload['delivered_upto_seq'] as int?) ?? 0,
             readUptoSeq: (payload['read_upto_seq'] as int?) ?? 0,
           ));

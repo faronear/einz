@@ -58,17 +58,17 @@ Future<Process> _startServer(int port, String workDir) async {
   throw StateError('服务端未就绪');
 }
 
-DeviceStore _store({
+EntranceStore _store({
   required String publicKey,
   required String privateKey,
   required String spaceKeyB64,
   required String spaceId,
-  required String deviceId,
-  required String personId,
+  required String entranceId,
+  required String partnerId,
   required String sessionToken,
   required String server,
 }) {
-  final st = DeviceStore(
+  final st = EntranceStore(
     publicKey: publicKey,
     privateKey: privateKey,
     spaceKey: spaceKeyB64,
@@ -76,8 +76,8 @@ DeviceStore _store({
     keyVersion: 1,
     sessionToken: sessionToken,
   );
-  st.deviceId = deviceId;
-  st.personId = personId;
+  st.entranceId = entranceId;
+  st.partnerId = partnerId;
   return st;
 }
 
@@ -109,8 +109,8 @@ Future<int> _run() async {
     // A 创建空间（sealedSpaceKey 仅需结构合法；本测试不跑 escrow 解密流程）
     final created = await api.createSpace(
       publicKey: 'pk-a',
-      personName: 'Lukas',
-      partnerName: 'Alice',
+      creatorName: 'Lukas',
+      peerName: 'Alice',
       escrowPassphrase: kPassphrase,
       sealedSpaceKey: PassphraseEnvelope(
         salt: Uint8List.fromList(List.filled(16, 1)),
@@ -122,8 +122,8 @@ Future<int> _run() async {
     final joined = await api.joinSpace(
       token: created.joinToken,
       publicKey: 'pk-b',
-      partnerSlot: 1,
-      deviceName: 'b',
+      slot: 1,
+      entranceName: 'b',
     );
 
     // 两端共享同一个 spaceKey（真实流程里由 escrow 口令包传递，这里直接给定——
@@ -137,8 +137,8 @@ Future<int> _run() async {
       privateKey: 'sk-a',
       spaceKeyB64: keyB64,
       spaceId: created.spaceId,
-      deviceId: created.deviceId,
-      personId: created.creatorPersonId,
+      entranceId: created.entranceId,
+      partnerId: created.creatorPartnerId,
       sessionToken: created.sessionToken,
       server: server,
     );
@@ -147,8 +147,8 @@ Future<int> _run() async {
       privateKey: 'sk-b',
       spaceKeyB64: keyB64,
       spaceId: joined.spaceId,
-      deviceId: joined.deviceId,
-      personId: joined.personId,
+      entranceId: joined.entranceId,
+      partnerId: joined.partnerId,
       sessionToken: joined.sessionToken,
       server: server,
     );
@@ -180,7 +180,7 @@ Future<int> _run() async {
     final receipts = (await _getReceipts(server, storeB.sessionToken!))['receipts']
         as List<dynamic>;
     final row = receipts.cast<Map<String, dynamic>>().firstWhere(
-          (r) => r['person_id'] == storeB.personId,
+          (r) => r['partner_id'] == storeB.partnerId,
           orElse: () => <String, dynamic>{},
         );
     if (row.isEmpty) {

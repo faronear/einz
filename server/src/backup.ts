@@ -21,9 +21,9 @@ import { assertSafeSpaceId } from "./safeId.js";
 const FORMAT = "einz-server-backup-v1";
 
 /** per-space 备份导出的表（都有 space_id 列，按它过滤）。
- *  **不含审计表**（connection_events / device_activity）：只追加、无业务语义，且
+ *  **不含审计表**（connection_events / entrance_activity）：只追加、无业务语义，且
  *  主键是 AUTOINCREMENT 整数——导入时用原 id 会撞上别的空间的行并被 REPLACE 覆盖。
- *  **不含 devices / push_tokens**：它们没有 space_id，靠 person_id/device_id 反查。 */
+ *  **不含 entrances / push_tokens**：它们没有 space_id，靠 partner_id/entrance_id 反查。 */
 const SPACE_TABLES = [
   "spaces",
   "space_members",
@@ -76,7 +76,7 @@ function collectFilesRecursive(dir: string, base: string): { path: string; data:
 }
 
 /** 导出**单个空间**的行（逻辑导出，非整库物理备份）：按 space_id 过滤，
- *  devices/push_tokens 靠 person_id/device_id 反查带出。 */
+ *  entrances/push_tokens 靠 partner_id/entrance_id 反查带出。 */
 function exportSpaceRows(spaceId: string): Record<string, Record<string, unknown>[]> {
   assertSafeSpaceId(spaceId);
   const db = getDb();
@@ -84,20 +84,20 @@ function exportSpaceRows(spaceId: string): Record<string, Record<string, unknown
   for (const table of SPACE_TABLES) {
     rows[table] = db.prepare(`SELECT * FROM ${table} WHERE space_id = ?`).all(spaceId) as Record<string, unknown>[];
   }
-  // 设备（登记项）没有 space_id：走 person_id → space_members 反查
-  const devices = db
+  // 设备（登记项）没有 space_id：走 partner_id → space_members 反查
+  const entrances = db
     .prepare(
-      `SELECT * FROM devices WHERE person_id IN
-       (SELECT person_id FROM space_members WHERE space_id = ? AND person_id IS NOT NULL)`,
+      `SELECT * FROM entrances WHERE partner_id IN
+       (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL)`,
     )
     .all(spaceId) as Record<string, unknown>[];
-  rows.devices = devices;
-  // push_tokens 挂在 device_id 上
-  const ids = devices.map((d) => d.device_id as string);
+  rows.entrances = entrances;
+  // push_tokens 挂在 entrance_id 上
+  const ids = entrances.map((d) => d.entrance_id as string);
   rows.push_tokens = ids.length === 0
     ? []
     : (db
-        .prepare(`SELECT * FROM push_tokens WHERE device_id IN (${ids.map(() => "?").join(",")})`)
+        .prepare(`SELECT * FROM push_tokens WHERE entrance_id IN (${ids.map(() => "?").join(",")})`)
         .all(...ids) as Record<string, unknown>[]);
   return rows;
 }
@@ -226,12 +226,12 @@ function restoreSpace(
   const db = getDb();
   // 删除顺序：子表先行（外键若启用也不会撞约束）；审计表刻意不动
   const cleanup = db.transaction(() => {
-    db.prepare(`DELETE FROM push_tokens WHERE device_id IN (SELECT device_id FROM devices WHERE person_id IN (SELECT person_id FROM space_members WHERE space_id = ? AND person_id IS NOT NULL))`).run(spaceId);
-    db.prepare(`DELETE FROM devices WHERE person_id IN (SELECT person_id FROM space_members WHERE space_id = ? AND person_id IS NOT NULL)`).run(spaceId);
+    db.prepare(`DELETE FROM push_tokens WHERE entrance_id IN (SELECT entrance_id FROM entrances WHERE partner_id IN (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL))`).run(spaceId);
+    db.prepare(`DELETE FROM entrances WHERE partner_id IN (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL)`).run(spaceId);
     for (const table of ["attachments", "messages", "receipts", "join_tokens", "challenges", "sessions", "key_escrow", "space_members", "spaces"]) {
       db.prepare(`DELETE FROM ${table} WHERE space_id = ?`).run(spaceId);
     }
-    for (const table of ["spaces", "space_members", "join_tokens", "receipts", "key_escrow", "messages", "attachments", "sessions", "challenges", "devices", "push_tokens"]) {
+    for (const table of ["spaces", "space_members", "join_tokens", "receipts", "key_escrow", "messages", "attachments", "sessions", "challenges", "entrances", "push_tokens"]) {
       const list = rows[table] ?? [];
       for (const row of list) {
         const cols = Object.keys(row);

@@ -489,23 +489,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
-  String get chatPageRenameDeviceTitle => '当前通道';
+  String get chatPageRenameEntranceTitle => '当前通道';
 
   @override
-  String get chatPageRenameDeviceLabel => '通道名称';
+  String get chatPageRenameEntranceLabel => '通道名称';
 
   @override
-  String get chatPageDeviceScopeHint =>
+  String get chatPageEntranceScopeHint =>
       '通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。';
 
   @override
-  String get chatPageRenameDeviceEmptyError => '请填写通道名称';
+  String get chatPageRenameEntranceEmptyError => '请填写通道名称';
 
   @override
-  String get chatPageRenameDeviceInvalidError => '只能用中文字、英文字母、数字、下划线(_)、中划线(-)';
+  String get chatPageRenameEntranceInvalidError =>
+      '只能用中文字、英文字母、数字、下划线(_)、中划线(-)';
 
   @override
-  String chatPageRenameDeviceTooLongError(int max) {
+  String chatPageRenameEntranceTooLongError(int max) {
     return '最多 $max 个字符';
   }
 
@@ -636,7 +637,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
-  String get chatPageMenuDeviceNameLabel => '当前通道';
+  String get chatPageMenuEntranceNameLabel => '当前通道';
 
   @override
   String get chatPagePinLabel => '锁屏码';
@@ -715,7 +716,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageDeviceUnrecognized =>
+  String get chatPageEntranceUnrecognized =>
       '这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除';
 
   @override
@@ -825,13 +826,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageDeviceRevoked => '这条通道已被撤销，本地数据已清除，请重新配置';
+  String get chatPageEntranceRevoked => '这条通道已被撤销，本地数据已清除，请重新配置';
 
   @override
-  String get chatPageDevicePublicKeyLabel => '通道公钥';
+  String get chatPageEntrancePublicKeyLabel => '通道公钥';
 
   @override
-  String get chatPageDevicePublicKeyFailed => '未记录';
+  String get chatPageEntrancePublicKeyFailed => '未记录';
 
   @override
   String get burnOptionOff => '关闭';
@@ -914,29 +915,29 @@ class AppLocalizationsZh extends AppLocalizations {
       '彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。此操作无法撤销！';
 
   @override
-  String resetDeviceNameLabel(String name) {
+  String resetEntranceNameLabel(String name) {
     return '$name';
   }
 
   @override
-  String resetDeviceNameHint(String name) {
+  String resetEntranceNameHint(String name) {
     return '请输入当前通道名称“$name”';
   }
 
   @override
-  String get resetDeviceNameMismatch => '请输入正确的通道名称以确认';
+  String get resetEntranceNameMismatch => '请输入正确的通道名称以确认';
 
   @override
-  String get resetDeviceConfirmWord => '重置';
+  String get resetInstallConfirmWord => '重置';
 
   @override
-  String get resetDevicePinLabel => '锁屏码';
+  String get resetInstallPinLabel => '锁屏码';
 
   @override
-  String get resetDevicePinHint => '请输入本机锁屏码';
+  String get resetInstallPinHint => '请输入本机锁屏码';
 
   @override
-  String get resetDeviceServerResidualHint =>
+  String get resetInstallServerResidualHint =>
       '⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道';
 
   @override

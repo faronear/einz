@@ -62,7 +62,7 @@ cd /Volumes/repodisk/productX/einz/app
 
 flutter doctor                              # iOS 工具链应为 ✅（Xcode / CocoaPods）
 flutter config --list | grep swift          # 必须 enable-swift-package-manager: false
-xcrun devicectl list devices                # 手机需 available (paired)；拿到 UDID
+xcrun devicectl list entrances                # 手机需 available (paired)；拿到 UDID
 security find-identity -v -p codesigning    # 需出现 "Apple Distribution: Faronear Co. Ltd. (CQ6733CTMV)"
 ls ~/Library/MobileDevice/Provisioning\ Profiles/ | grep -i 35b8f664   # Ad Hoc profile 已装
 ```

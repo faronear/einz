@@ -63,7 +63,7 @@ void main() {
         payload: const AppLockPayload(
           spaceKeyB64: 'dGhlLXNwYWNlLWtleQ==',
           spaceId: 'space-test',
-          deviceId: 'dev-a',
+          entranceId: 'dev-a',
           keyVersion: 1,
           token: 'tok-123',
         ));

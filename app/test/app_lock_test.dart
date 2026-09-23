@@ -22,7 +22,7 @@ void main() {
   const payload = AppLockPayload(
     spaceKeyB64: 'dGhlLXNwYWNlLWtleQ==',
     spaceId: 'space-test',
-    deviceId: 'dev-a',
+    entranceId: 'dev-a',
     keyVersion: 1,
     token: 'tok-123',
   );
@@ -45,7 +45,7 @@ void main() {
     final unlocked = await lock.unlock('1234');
     expect(unlocked.spaceKeyB64, 'dGhlLXNwYWNlLWtleQ==');
     expect(unlocked.spaceId, 'space-test');
-    expect(unlocked.deviceId, 'dev-a');
+    expect(unlocked.entranceId, 'dev-a');
     expect(unlocked.keyVersion, 1);
     expect(unlocked.token, 'tok-123');
   });
@@ -109,14 +109,14 @@ void main() {
     expect(await lock.loadPlain(), isNull, reason: '明文包已删');
   });
 
-  test('deviceUid：惰性生成并持久化（安装级）；app_state 被清后轮换', () async {
-    final first = await lock.deviceUid();
+  test('installUid：惰性生成并持久化（安装级）；app_state 被清后轮换', () async {
+    final first = await lock.installUid();
     expect(first.length, 32, reason: '16 字节 hex，与服务端形状约束一致');
-    expect(await lock.deviceUid(), first, reason: '同一安装内稳定（每个空间读到同一个）');
+    expect(await lock.installUid(), first, reason: '同一安装内稳定（每个空间读到同一个）');
 
     // 「重置设备」= 清空 app_state 整表 → 下次生成新的：不该再被认成同一台设备
     await db.delete(db.appState).go();
-    expect(await lock.deviceUid(), isNot(first), reason: '重置后应轮换');
+    expect(await lock.installUid(), isNot(first), reason: '重置后应轮换');
   });
 
   test('saveProfile/loadProfile：资料（名字）持久化存取', () async {
@@ -124,11 +124,11 @@ void main() {
     addTearDown(db.close);
     final lock = AppLockService(db);
     expect(await lock.loadProfile(), isEmpty, reason: '未保存时返回空');
-    await lock.saveProfile(personName: 'Lukas', peerName: 'Alice', deviceName: 'iPhone');
+    await lock.saveProfile(partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
     final p = await lock.loadProfile();
-    expect(p['personName'], 'Lukas');
+    expect(p['partnerName'], 'Lukas');
     expect(p['peerName'], 'Alice');
-    expect(p['deviceName'], 'iPhone');
+    expect(p['entranceName'], 'iPhone');
   });
 
   // ---- 卸载即重置（老板 2026-09-14 决策）：安全存储条目活过 App 卸载，drift 不会 ----

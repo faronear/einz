@@ -44,9 +44,9 @@ class _FakeApi extends ApiClient {
   Future<SpaceResult> getSpace(String token) async {
     return SpaceResult(
       spaceId: 'space-demo',
-      devices: const [
-        SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
-        SpaceDevice(deviceId: 'dev-b', personId: 'person-b', status: 'active'),
+      entrances: const [
+        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'),
       ],
     );
   }
@@ -73,7 +73,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -183,7 +183,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -212,7 +212,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -258,7 +258,7 @@ void main() {
             ),
             child: ChatPage(
               spaceId: 'space-demo',
-              deviceId: 'dev-a',
+              entranceId: 'dev-a',
               spaceKey: spaceKey,
               keyVersion: 1,
               token: 'tok',
@@ -293,9 +293,9 @@ void main() {
     final spaceKey = await generateSpaceKey();
     // 预置双性别（模拟向导完成时写入）
     await AppLockService(db).saveProfile(
-        personName: 'Lukas',
+        partnerName: 'Lukas',
         peerName: 'Alice',
-        deviceName: 'Phone',
+        entranceName: 'Phone',
         myGender: 'male',
         peerGender: 'female');
 
@@ -303,7 +303,7 @@ void main() {
       plaintext: '我的消息',
       spaceKey: spaceKey,
       spaceId: 'space-demo',
-      senderDeviceId: 'dev-a',
+      senderEntranceId: 'dev-a',
       messageId: 'msg-me-1',
       keyVersion: 1,
     );
@@ -311,7 +311,7 @@ void main() {
       plaintext: '对方的消息',
       spaceKey: spaceKey,
       spaceId: 'space-demo',
-      senderDeviceId: 'dev-b',
+      senderEntranceId: 'dev-b',
       messageId: 'msg-peer-1',
       keyVersion: 1,
     );
@@ -322,7 +322,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-demo',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',

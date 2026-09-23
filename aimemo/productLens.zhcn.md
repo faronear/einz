@@ -72,10 +72,10 @@ Einz 是一个专门为**两个确定的人**设计的私密通信与共享私�
 | 实体 | 定义 | 关键约束 |
 | ---------- | -------------------------- | ----------------------------------- |
 | **秘境（Space）** | 两位伴侣的私有空间 | 一台服务器上可有**多个**（多租户，不再是全系统唯一） |
-| **伴侣身份（member，原 `person_id`）** | 秘境里的一个槽位身份（slot 0 = 创建者 / 1 = 第二人） | 每个秘境**恰好两个**；同一真人在不同秘境各有一个，**跨秘境不等同** |
-| **登记项（entry，原 `device_id`）** | 某安装在某秘境的一次登记：一套密钥对 + 一个身份 | 由 create/join **动态登记**（静态白名单早已废除） |
-| **安装（install，`device_uid`）** | 一台机器上的一份 App/TUI 部署 | 可同时持有**多个**秘境；服务端据此把多行认成同一台机器 |
-| **真人（person）** | 真实的人（产品概念） | **目前没有全局标识**；"一个真人一个 `person_id`"是将来项（见 `renamePlan.zhcn.md`） |
+| **伴侣身份（member，原 `partner_id`）** | 秘境里的一个槽位身份（slot 0 = 创建者 / 1 = 第二人） | 每个秘境**恰好两个**；同一真人在不同秘境各有一个，**跨秘境不等同** |
+| **登记项（entry，原 `entrance_id`）** | 某安装在某秘境的一次登记：一套密钥对 + 一个身份 | 由 create/join **动态登记**（静态白名单早已废除） |
+| **安装（install，`install_uid`）** | 一台机器上的一份 App/TUI 部署 | 可同时持有**多个**秘境；服务端据此把多行认成同一台机器 |
+| **真人（person）** | 真实的人（产品概念） | **目前没有全局标识**；"一个真人一个 `partner_id`"是将来项（见 `renamePlan.zhcn.md`） |
 | Message / Attachment | 消息 / 大文件附件（图/视频/语音） | 密文存储 / 独立加密 blob，消息只存元数据 |
 
 ### 2.2 Person 与 Device 分离
@@ -125,7 +125,7 @@ Device A ──(TLS)── Internet ──(TLS)── Server ──(TLS)── I
 | 威胁                       | 防护                                         |
 | -------------------------- | -------------------------------------------- |
 | 白名单外设备访问           | 静态白名单：配置之外一律拒绝（§2.3、§8.3）   |
-| 手机丢失                   | 设备撤销（白名单）+ 被撤销设备上线自毁（§4、§12）。**自毁只认明确撤销信号**（`device.revoked` 帧 / 403 `DEVICE_REVOKED`）——服务端库被清空/重置（403 `FORBIDDEN`）或连不上只警告、不清数据（2026-09-16） |
+| 手机丢失                   | 设备撤销（白名单）+ 被撤销设备上线自毁（§4、§12）。**自毁只认明确撤销信号**（`entrance.revoked` 帧 / 403 `ENTRANCE_REVOKED`）——服务端库被清空/重置（403 `FORBIDDEN`）或连不上只警告、不清数据（2026-09-16） |
 | Server 被入侵 / 管理员看库 | 只见密文 + 元数据，不见明文（E2EE 核心价值） |
 | Backup 泄露                | 备份保持加密，密钥不随备份明文保存（§11）    |
 | Push 泄露正文              | 推送不含消息正文，仅提示（§10）              |
@@ -182,11 +182,11 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
   但撤销（掐密文通道）、设备上线自毁、安全存储隔离各自覆盖了更大的风险面；而轮换的成本集中在
   **分发**（新密钥要在不给被撤销设备的前提下送到剩余设备），任一环失败 = 消息永久不可解。
 - **撤销的效力来自白名单**（`/sync` 要求白名单设备 → 被撤销设备取不到新密文）+ 被撤销设备
-  **上线自毁**（App `_onDeviceRevoked`），不依赖轮换。架构上"取密钥"比"取密文"容易
+  **上线自毁**（App `_onEntranceRevoked`），不依赖轮换。架构上"取密钥"比"取密文"容易
   （密保箱取包免设备认证，密文必须持白名单 token），所以撤销优先级更高。
 - **替代方案（怀疑密钥泄露时）：重建空间**——新建空间 + 重新邀请伴侣，零新代码、保证最强
   （全新密钥、无旧 key_version 残留），代价是伴侣重新接入一次、历史留在旧空间。
-- **已撤除的代码**：`SpaceKeyRing`、`einz rotate`、`DeviceStore.rotateSpaceKey()`、服务端
+- **已撤除的代码**：`SpaceKeyRing`、`einz rotate`、`EntranceStore.rotateSpaceKey()`、服务端
   `key.rotation` 广播与 `key_rotation_required`；**归档密钥层一并删除**（`archived_space_keys`
   / `archivedKeys` / "高版本即归档"守卫——无生产者且无存量数据，不背兼容包袱）。
   唯一留下的是 **`key_version` 本身**（信封/AAD 一部分，见 §4.2）+ 按版本取钥的收口。
@@ -229,7 +229,7 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 
 ### 5.3 配置产物
 
-- Server：`config.json`（两台设备的 device_id + public_key + 所属 Person，§8.3）。
+- Server：`config.json`（两台设备的 entrance_id + public_key + 所属 Person，§8.3）。
 - 客户端：导入自己的密封 Space Key；身份私钥不出设备。
 - 配置只做一次；未来增加设备（预留的多设备能力）时，用已有可信设备作保（§16）。
 
@@ -356,17 +356,17 @@ Repositories（SQLite + File Storage）
 
 - **无账号体系 + 静态白名单**：不设 username / password / email；身份 = 白名单内的 Device 公钥（由配置文件定义，§5）。认证 = 证明持有对应私钥（challenge-response）。
 - ⚠️ **以下"数据模型要点"是 v1（静态白名单 / config.json）时期的描述，已被 Multiverse（v2）取代**：
-  设备登记改为 create/join 动态写入 `devices` 表，空间归属走 `space_members`，配置只留
+  设备登记改为 create/join 动态写入 `entrances` 表，空间归属走 `space_members`，配置只留
   `maxSpaces` 等服务端参数。**权威来源**：`docs/DATABASE.md`、`docs/PROTOCOL.md`、
-  `aimemo/multiSpaceDesign.zhcn.md`（多空间：per-space 身份 + 服务端侧 `device_uid` 认知）。
+  `aimemo/multiSpaceDesign.zhcn.md`（多空间：per-space 身份 + 服务端侧 `install_uid` 认知）。
 - **数据模型要点：**（固定两人一空间，`spaces` / `space_members` 表不再需要，由配置文件表达）
 
 ```text
-config.json：{ space_id, devices: [{device_id, person_id, public_key, status}] }
-messages(id, space_id, sender_device_id, type, key_version, nonce, ciphertext,
+config.json：{ space_id, entrances: [{entrance_id, partner_id, public_key, status}] }
+messages(id, space_id, sender_entrance_id, type, key_version, nonce, ciphertext,
          created_at, server_sequence)   ← server_sequence 为 per-space 单调序列
 attachments(id, message_id, storage_path, encrypted_size, sha256, key_version, created_at)
-push_tokens(device_id, platform, token, updated_at)
+push_tokens(entrance_id, platform, token, updated_at)
 sync_state(...)                          ← 客户端增量同步锚点
 ```
 
@@ -407,7 +407,7 @@ sync_state(...)                          ← 客户端增量同步锚点
   - 客户端：AppDelegate（iOS）已注册通知、`chat_page._registerPushToken()` 已调 `POST /push/register`；
     Android 侧**无**任何推送依赖（pubspec / Manifest 都干净）。
   - Server：`sendPushHint()` **仍为日志占位**（无 APNs/FCM 实际发送），且当前**无人调用**。
-  - 已按 Space 收敛（2026-09-14 修）：`sendPushHint` 经 `person_id → space_members` 只投同 Space
+  - 已按 Space 收敛（2026-09-14 修）：`sendPushHint` 经 `partner_id → space_members` 只投同 Space
     的在用设备——此前只排自己，接上真推送就会把提示推给**所有空间**的设备。
     真要接推送前的缺口见 `docs/IOS.md` §4.2（iOS：Push capability + entitlements + 服务端 APNs .p8；
     Android：国行 ROM 需厂商通道/聚合 SDK）。

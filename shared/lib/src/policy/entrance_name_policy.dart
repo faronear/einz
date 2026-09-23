@@ -1,4 +1,4 @@
-/// 设备名规则（**唯一来源**，App / TUI / CLI 共用；服务端 `server/src/deviceName.ts`
+/// 设备名规则（**唯一来源**，App / TUI / CLI 共用；服务端 `server/src/entranceName.ts`
 /// 是同一约定的 TS 版本，改动请两边同步）。
 ///
 /// 老板 2026-09-16 定：设备名只允许 **中文字、英文字母、数字 0-9、下划线 `_`、
@@ -11,30 +11,30 @@
 library;
 
 /// 最长字符数（与 TUI 此前对宿主名的截断一致；顶部条/设备列表放得下）。
-const int kDeviceNameMaxLength = 32;
+const int kEntranceNameMaxLength = 32;
 
 /// 单个合规字符：中文字 / 英文字母 / 数字 / `_` / `-`。
 ///
 /// 中文用 Unicode 属性 `\p{Script=Han}`（覆盖全部汉字区：基本区 + 扩展 A~G +
 /// 兼容汉字，包括 `𠮷` 这类罕见姓名用字），且**不含**日文假名、韩文、全角字母
 /// 与中文标点——它们不是汉字。
-final RegExp kDeviceNameAllowedChar = RegExp(
+final RegExp kEntranceNameAllowedChar = RegExp(
   r'[0-9A-Za-z_\-\p{Script=Han}]',
   unicode: true,
 );
 
-/// 整个名字是否合规（配合 [checkDeviceNamePolicy] 用；单独用于逐字符替换）。
-final RegExp kDeviceNamePattern = RegExp(
+/// 整个名字是否合规（配合 [checkEntranceNamePolicy] 用；单独用于逐字符替换）。
+final RegExp kEntranceNamePattern = RegExp(
   r'^[0-9A-Za-z_\-\p{Script=Han}]+$',
   unicode: true,
 );
 
 /// 违规原因（稳定码；各端自行映射文案 / l10n key，不把文案写进策略层）。
-enum DeviceNameViolation {
+enum EntranceNameViolation {
   /// 空（或 trim 后为空）。
   empty,
 
-  /// 超过 [kDeviceNameMaxLength] 个字符。
+  /// 超过 [kEntranceNameMaxLength] 个字符。
   tooLong,
 
   /// 含白名单之外的字符（空格、emoji、标点……）。
@@ -45,32 +45,32 @@ enum DeviceNameViolation {
 ///
 /// 用户输入（TUI `/device <名字>`、App 改名弹窗）走这里——不合规就拒绝并提示重输，
 /// **不静默改写**用户的输入（改了不告诉用户 = 名字莫名变了）。
-DeviceNameViolation? checkDeviceNamePolicy(String name) {
+EntranceNameViolation? checkEntranceNamePolicy(String name) {
   final value = name.trim();
-  if (value.isEmpty) return DeviceNameViolation.empty;
+  if (value.isEmpty) return EntranceNameViolation.empty;
   // 长度按**字符**算（Dart String.length 是 UTF-16 码元；emoji 等代理对会算 2，
   // 但这类字符本就不合规，先判字符集再判长度更准）
-  if (!kDeviceNamePattern.hasMatch(value)) {
-    return DeviceNameViolation.illegalCharacter;
+  if (!kEntranceNamePattern.hasMatch(value)) {
+    return EntranceNameViolation.illegalCharacter;
   }
-  if (value.length > kDeviceNameMaxLength) return DeviceNameViolation.tooLong;
+  if (value.length > kEntranceNameMaxLength) return EntranceNameViolation.tooLong;
   return null;
 }
 
 /// 自动生成名（宿主机名 / 设备型号）的消毒：不合规字符**逐个**换成 `_`，再截断到
-/// [kDeviceNameMaxLength]。
+/// [kEntranceNameMaxLength]。
 ///
 /// 只用于"系统自动取名"这条路（用户没有表达过意愿，换成 `_` 不违背他的意图）；
 /// 全是不合规字符时会得到一串 `_`——仍是合法名（例如型号 `???` → `___`）。
-String sanitizeDeviceName(String raw) {
+String sanitizeEntranceName(String raw) {
   final source = raw.trim();
   final buf = StringBuffer();
   for (final rune in source.runes) {
     final ch = String.fromCharCode(rune);
-    buf.write(kDeviceNameAllowedChar.hasMatch(ch) ? ch : '_');
+    buf.write(kEntranceNameAllowedChar.hasMatch(ch) ? ch : '_');
   }
   final out = buf.toString();
-  return out.length > kDeviceNameMaxLength
-      ? out.substring(0, kDeviceNameMaxLength)
+  return out.length > kEntranceNameMaxLength
+      ? out.substring(0, kEntranceNameMaxLength)
       : out;
 }

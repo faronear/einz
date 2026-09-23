@@ -1,149 +1,131 @@
-# 字段改名计划：`device_id` → `entry_id`、`person_id` → `partner_id`/`member_id`
+# 字段/标识符改名计划：`device_*` → `entrance_*`/`install_*`、`person_*` → `partner_*`
 
-状态：**`[已定，待执行]`**（2026-09-22 起草并拍板；**执行推迟到 M3 收尾、多空间上线稳定之后**）
-关联：`docs/GLOSSARY.md`（术语分层，改名的全部依据）、`aimemo/multiSpaceDesign.zhcn.md` §3.7
+状态：**`[执行中]`**（2026-09-23 重新拍板并开工；原 2026-09-22 三期 alias 计划**作废**）
+关联：`docs/GLOSSARY.md`（术语分层的唯一权威）、`aimemo/multiSpaceDesign.zhcn.md` §3.7
 
 ---
 
-## 0. 目标、不变量、非目标
+## 0. 为什么推翻旧计划
 
-**目标**：把 `docs/GLOSSARY.md` 定的三层（物理设备 / 安装 / 登记项）与"人"的层在
-**wire + DB + 代码 + 文档**里一次理清。当前 `device_id` 实际是"登记项 id"、
-`person_id` 实际是"秘境内的插槽身份 id"，两个名字都名不副实。
-
-**不变量**（任何一步都不许破）：
-
-1. **用户零感知**：界面文案、功能、数据一律不变（UI 用词已单独定过，见 GLOSSARY §命名约定）；
-2. **老客户端不坏**：双名期内新旧客户端都能正常收发，**含生产上那 4 台设备**；
-3. **老本地数据不丢**：老锁包 / 老 store / 老 drift 行必须仍能读出身份（🔴 最容易出事，见 §4）。
-
-**非目标**：
-
-- **不引入全局 person 身份**。老板的方向是"一个真人（person）→ 多个秘境里的多个 partner"，
-  但那是**产品/隐私决策**（服务器将能确定"同一个真人出现在多个秘境"，比 `device_uid`
-  更进一步），要单独设计；本次改名只是**把 `person_id` 这个名字腾出来**，不改数据模型。
-- **不改 UI 用词**（界面继续用「设备」，只在跨秘境歧义处加限定词，已落地）。
-- **不改 `/devices/*` HTTP 路径**（见 §5 D2）。
-
-## 1. 改名对照
-
-| 现在 | 改成 | 所属层 |
+| | 旧计划（2026-09-22） | 新计划（2026-09-23） |
 | --- | --- | --- |
-| `device_id` / `deviceId` | `entry_id` / `entryId` | **登记项**（安装 × 秘境） |
-| `person_id` / `personId` | `member_id` / `memberId`（D1 已定） | **秘境内的插槽身份** |
-| `person_name` / `person_names` / `person_genders` / `person_slots` | `member_*`（D3 已定） | 同上的显示名 / 性别 / 槽位 |
-| `sender_person_id`（外层信封字段） | `sender_member_id` | 消息的发送者身份 |
-| `partner_slot` / `partner_name` / `partner_gender` | **不动** | 它们是"第二人专属"的既有词（见 D1 说明），不在本次范围 |
-| 服务端 DB 列（7 处） | 同左（一次性迁移） | 服务端内部 |
-| （将来）`person_id` | — | 留给**真人**的全局身份，本次不动 |
+| 前提 | 有存量用户、有老客户端、有老本地数据 | **全新上线**：无老客户端、无历史数据、上线前重置设备 |
+| 目标名 | `entry_id`（早于术语改「通道」） | **`entrance_id`**（与已落地的 `entrance` 一致） |
+| 机制 | 三期 alias：遥测列 + 版本双接受 + 双名映射文件 + 跨端发布 + 读旧回退 | **一次性机械替换**，一次提交 |
+| 风险 | 🔴 锁包旧密文、drift 旧列、TUI store 旧键回退 | 归零（直接按新语义写新格式，本地库/商店重建） |
+| 待删资产 | `last_proto_version`、`protocolAliases.ts`、`assertProtocolVersion` 双接受 | 全部不需要 |
 
-## 2. 改动面（实测计数，2026-09-22）
+**关键更正**：旧计划的 `entry_id` 已过期——2026-09-23 界面术语定为「通道 / **entrance**」，
+代码里 `entrance` 已成既成事实（`maxEntrancesPerSpace`、`advancedDestroyEntrance`、
+`entrance_limit.test.ts`）。改叫 `entry_id` 反而会造出第三个词。
 
-| 类别 | server/src | shared/lib | app/lib | cli | 合计 |
-| --- | --- | --- | --- | --- | --- |
-| `device_id` / `deviceId` | 141（含 19 个 JSON 键） | 10 | 99 | 56 | **306** |
-| `person_id` / `personId` | 114 | 36 | 172 | 137 | **459** |
-| `person_name` 类 | 35 | 26 | 43 | 107 | **211** |
-| 合计（wire + 代码） | | | | | **≈ 976** |
-
-另有：服务端 DB 列 7 处、drift 本地表列、TUI store JSON 键、**锁包 JSON 键**；
-`docs/` + `aimemo/` 约 166 处文字需同步。绝大多数是机械替换，**难点在边界与兼容，不在数量**。
-
-## 3. 迁移机制（alias 三期）
-
-**地基已有**：REST 用请求头 `X-Protocol-Version`、WS 用握手 `?pv=` 做硬校验
-（`server/src/app.ts:assertProtocolVersion`），v1 → v2 那次协议收敛就是靠它切轨道；
-`VaultPayload.fromJson` 也有"旧格式读取时归一"的先例。**双名并存在本项目很好做**：
-`device_id` 几乎只出现在响应里，客户端主动发送它的只有
-`POST /auth/challenge` 请求体与 `POST /devices/:id/revoke` 路径参数两处。
-
-### P1 准备（服务端单侧，零客户端影响）
-
-1. `devices` 加一列 `last_proto_version INTEGER`（WS 里也记 `?pv=`）：**只在值变化时写**
-   （进程内缓存去重，仿 `server/src/audit.ts` 的 `lastSyncByDevice` 手法），避免写风暴；
-2. `assertProtocolVersion` 从"必须等于 1"改为**接受 {1, 2}**（唯一改动点，一行集合判断）；
-3. **双名映射集中在一个文件**（新增 `server/src/protocolAliases.ts`）：入参读新回退旧、
-   出参同时写新旧两套键。**禁止散落到各 handler** —— 否则 P3 永远删不干净；
-4. 兼容性回归测试：老客户端对响应里**多出来的未知键必须宽容**（Dart 按 key 取，多余键无害，
-   但要用测试钉住，别让它哪天变成严格校验）。
-
-### P2 客户端切新名（跨端发布一轮）
-
-1. `shared/`（App 与 TUI 共用）先改 → **App iOS/Android/macOS + TUI 一起发**；
-2. 客户端**读新键、回退旧键**（新客户端也能连未升级的服务端，灰度更稳），并上报 `pv=2`；
-3. 本地持久化三处一律"**读旧回退、写新**"：
-   - 锁包 `AppLockPayload`（PIN 密文，见 §4 R1）、
-   - TUI `DeviceStore`（store.json，含 `history` 里的老信封）、
-   - App drift 本地表（`sender_person_id` 等列）。
-
-### P3 收尾（服务端单侧，由遥测触发，不拍脑袋）
-
-1. 判定可以删旧名：
-
-   ```sql
-   SELECT COUNT(*) FROM devices
-    WHERE status = 'active' AND (last_proto_version IS NULL OR last_proto_version < 2);
-   ```
-
-   结果为 0 且**持续 ≥ 30 天**才动手；
-2. `protocolAliases.ts` 删旧读旧写；`assertProtocolVersion` 收紧；文档/术语表收尾。
-
-## 4. 风险（按严重度）
-
-| 级别 | 风险 | 处理 |
-| --- | --- | --- |
-| 🔴 R1 | **锁包是 PIN 密文**：老密文解出来的 JSON 用的是旧键。新代码若不回退读，老用户解锁后 `deviceId` 读成 null → **直接进不了聊天**（比"显示错名字"严重得多） | P2 必须"读旧回退、写新"，且**加一条用真·旧格式密文的测试**；不改写老密文（下次写盘自然升级） |
-| 🟡 R2 | 老本地历史：drift `local_messages.sender_person_id`、TUI store 的 `history` 信封 | 渲染路径回退读旧键；TUI store 老文件必须能读 |
-| 🟡 R3 | 双名期内两套名字并存 → 可读性反而不如现在 | 用"只在序列化边界映射 + 单文件"把并存限制住；P3 尽早删 |
-| 🟢 R4 | 服务端 DB 列名 | 建议**跟着改**（SQLite `RENAME COLUMN`，一次性迁移、客户端零影响）；客户端 drift 列名**保留**（本地不可见，改要重建表） |
-| 🟢 R5 | 那 4 台生产设备可能长期不升级 → 旧名删不掉 | 接受长期双名；或推动升级后按 §3 P3 判定 |
-
-## 5. 决策（2026-09-22 已定）
+## 1. 命名口径（2026-09-23 老板拍板）
 
 | # | 决定 |
 | --- | --- |
-| **D1** | `person_id` → **`member_id`**（与表名 `space_members` 一致、不偏袒插槽；见下方分析：`partner` 在本仓库已是"第二人专属"词，用它会让 slot 0 也叫 partner）。`partner_slot` 是否改 `slot` **不在本计划内**（不强求） |
-| **D2** | HTTP 路径**不改**，只改字段。遗留一处表面不一致：`POST /devices/person-name` 的路径里 `devices` / `person` 两个词都旧了——本次保留（路径改名要路由双注册，收益低） |
-| **D3** | 名字类字段**一起改** → `member_name` / `member_names` / `member_genders` / `member_slots`（DB 列本来就是中性的 `display_name`） |
-| **D4** | 两个改名**合并到同一个协议窗口**：一次双名期、一次跨端发布、一次遥测判定 |
-| **D5** | **等 M3 收尾、多空间上线稳定后再执行**；不和功能改动混在一批（改名机械量大，混着做会让 review 失效） |
+| D1 | `person_id` → **`partner_id`**（partner = 秘境内的一位身份，两个 slot 都是 partner）；`person` 一词**腾给真人**（将来若做全局 person 身份） |
+| D2 | `partner_slot` → **`slot`**（它本就是泛型槽位列，存 0/1，两个槽位都用；旧名会让人误以为专指 slot1） |
+| D3 | device 家族**全量改**，**连 HTTP 路径也改**（`/devices/*` → `/entrances/*`、成员改名 → `/partners/name`） |
+| D4 | `device_uid` → **`install_uid`**（GLOSSARY 的「安装」层；改后代码里 device 一词只剩 UI 的「本机 / device」） |
+| D5 | 创建时四个字段：**`creator_*`（创建者/slot0）+ `peer_*`（第二人/slot1）**；成员改名接口 body 用泛称 `partner_name`。选 `peer` 而非 `follower`/`joiner`：加入方不一定是 slot1（`setup_page.dart:1448`「加入者可能是第二人，也可能是第一人的其他设备」），且 `peer` 是仓库既有词 |
+| D6 | 审计 kind **一起改**：`device.{rename,revoke,retire,revoked}` → `entrance.*`，`person.rename` → `partner.rename` |
 
-### D6（执行前定，我的倾向）
+## 2. 命名分层总表
 
-`POST /spaces` 创建时带两个名字：`person_name`（创建者/slot 0）与 `partner_name`（第二人/slot 1）。
-机械统一会让这对读成 `member_name` + `partner_name`（不对称）。我倾向：
+一句话：**一台机器 = 一个 `install`；一个安装 × 一个秘境 = 一个 `entrance` = 一条通道；
+秘境里的一位 = 一个 `partner`。**
 
-- **`person_name` → `creator_name`**（与 `partner_name` 成对、更可读），
-- `partner_name` / `partner_gender` / `partner_slot` **保持不动**；
+| 概念 | 旧 | 新 |
+| --- | --- | --- |
+| 登记项 id（表行） | `device_id` / `deviceId` | `entrance_id` / `entranceId` |
+| 登记项显示名 | `device_name` / `deviceName` | `entrance_name` / `entranceName` |
+| 安装 id | `device_uid` / `deviceUid` | `install_uid` / `installUid` |
+| 表 | `devices` | `entrances` |
+| 审计表 | `device_activity` | `entrance_activity` |
+| 身份 id | `person_id` / `personId` | `partner_id` / `partnerId` |
+| 身份显示名（泛称） | `person_name` / `personName` | `partner_name` / `partnerName` |
+| 创建者的名字/性别 | `person_name` / `gender` | `creator_name` / `creator_gender` |
+| 第二人的名字/性别 | `partner_name` / `partner_gender` | `peer_name` / `peer_gender` |
+| 槽位（0/1） | `partner_slot` / `partnerSlot` | `slot` |
+| 消息发送者 | `sender_device_id` / `sender_person_id` | `sender_entrance_id` / `sender_partner_id` |
+| 身份名单 map | `person_names` / `person_genders` / `person_slots` | `partner_names` / `partner_genders` / `partner_slots` |
+| 名字策略 | `person_name_policy` / `PersonNameViolation` | `partner_name_policy` / `PartnerNameViolation` |
+| 通道名策略 | `device_name_policy` / `DeviceNameViolation` | `entrance_name_policy` / `EntranceNameViolation` |
 
-即：**泛称（按 id 索引的表）用 `member_*`，具体插槽用 `creator_*` / `partner_*`**。
-若老板想要"一路机械替换"，那就统一成 `member_name`，也可接受。
+**HTTP 路径**（D3）：
 
-### D1 专门分析：`partner_id` vs `member_id`
+| 旧 | 新 |
+| --- | --- |
+| `POST /devices` 系列（uid/name/list/revoke/retire） | `POST /entrances/*`（uid → **`/entrances/install-uid`**） |
+| `POST /devices/person-name` | **`POST /partners/name`**（它改的是"我"这位成员的名字，与通道无关） |
+| `POST /spaces`、`/spaces/join` 等 | 不变 |
 
-老板的模型是"一个真人（person）→ 多个秘境里的多个 partner"，`partner` 指"秘境里的一位"。
-**方向没问题，但本仓库里 `partner` 已经有既定含义，且是"插槽 1 专属"**：
+**不动的**：`space_id`、`space_members`、`key_escrow`、`join_tokens`、`receipts`、
+`messages` 表名；`/spaces/*`、`/auth/*`、`/messages/*` 路径；UI 文案（界面词已单独定过）。
 
-- `db.ts`："伴侣（partner_slot=1）"；`spaces.ts`："伴侣（第二人）预置"；
-- 向导的 `partnerName` / `partnerGender` = **第二人（slot 1）**的名字/性别。
+## 3. 必须小心的边界（自动化替换的红线）
 
-也就是说，现在 `partner` ≈ `slot 1`，而 `person_id` 是**两个插槽都有**的。直接改名会让
-slot 0（创建者）的身份也叫 `partner_id` —— 与"partner = 伴侣 = 第二人"直接打架。
+1. **平台同名 API，绝不能改**：`device_info_plus`、`DeviceInfoPlugin`、`.deviceInfo`、
+   `DeviceFileSource`（video_player）、`MediaQuery.devicePixelRatioOf`、
+   `KeychainAccessibility.first_unlock_this_device`（Apple 常量）、
+   `width=device-width`（HTML viewport）。
+2. **语义分裂，不能全局替换**：
+   - `person_name` / `personName` 有两个去向：**创建者**（`POST /spaces` / 向导里的"我的名字"）
+     → `creator_*`；**泛称成员名**（`/partners/name`、ws、store、profile）→ `partner_*`。
+   - `partner_name` / `partnerName` / `partner_gender` / `partnerGender` 是**第二人** → `peer_*`。
+     顺序上必须先做这步，再做 `person_name` → `partner_name`，否则会互相踩。
+   - `resetDevice*`：三个 `resetDeviceName*`（比对的其实是**通道名**）→ `resetEntranceName*`；
+     其余（确认词 / 本机 PIN / 服务端残留）→ `resetInstall*`。
+3. **历史字面量保留**：`db.ts` 清理 v1 meta 的字面量 `'creator_person_id'`、`'person_name:%'`、
+   `'person_gender:%'`（引用的是老数据里的键名，改了就没意义）；`cli/bin/einz_tui.dart`
+   注释里的 v1 `/health person_names` 同理。
+4. **UI 文案不变**：`app_*.arb` 的 **value** 一律不动，只改 **key**（`chatPageDevice*`
+   → `chatPageEntrance*` 等）。
 
-两条路都可行，选一条：
+## 4. 文件/目录改名
 
-- **(a) `member_id`（我推荐）**：与表名 `space_members` 一致、不偏袒任何插槽，
-  零语义冲突，改动最省（`partner_slot` 也可择机改 `slot`，但不强求）；
-- **(b) `partner_id`**：符合老板的产品心智，但**必须同时**把 `partner_slot` 改名
-  （建议 → `slot`），并把 create 向导里"伴侣"字样只留给第二人 —— 否则 `partner`
-  一词同时表示"两位之一"和"第二位"。
+| 旧 | 新 |
+| --- | --- |
+| `server/src/devices.ts` | `entrances.ts` |
+| `server/src/deviceName.ts` | `entranceName.ts` |
+| `server/src/deviceUid.ts` | `installUid.ts` |
+| `server/src/personName.ts` | `partnerName.ts` |
+| `shared/lib/src/policy/person_name_policy.dart` | `partner_name_policy.dart` |
+| `app/lib/widgets/reset_device.dart` | `reset_install.dart` |
+| `server/test/device_name.test.ts` | `entrance_name.test.ts` |
+| `server/test/device_retire.test.ts` | `entrance_retire.test.ts` |
+| `server/test/device_uid.test.ts` | `install_uid.test.ts` |
+| `server/test/person_name.test.ts` | `partner_name.test.ts` |
 
-## 6. 执行清单（拍板后按此走）
+## 5. 执行步骤
 
-- [x] 拍 D1–D5（2026-09-22）
-- [ ] 定 D6（创建时两个名字字段的叫法）
-- [ ] P1：遥测列 + 版本双接受 + `protocolAliases.ts` + 未知键兼容测试
-- [ ] P2：`shared/` 改 → 三端发布 → 客户端读新回退旧 + 锁包老密文测试
-- [ ] 观察 `last_proto_version` 分布（`npm run audit` 或直接 SQL）
-- [ ] P3：删旧名（≥30 天无老版本活跃设备）
-- [ ] 文档收尾：`docs/GLOSSARY.md` 的"暂不改"段落改写为"已改"；术语表加版本对照
+- [x] 定 D1–D6（2026-09-23）
+- [x] 改写 `docs/GLOSSARY.md`（`entry`→`entrance`、字段对照、wire 改名段改为"已改"）
+- [x] server：库表/列名 + 源码标识符 + 路由 + 审计 kind + 测试
+- [x] shared：协议类型 / api_client / ws_client / policy
+- [x] app：字段 + l10n key（values 不动）+ drift 列（v8 `renameColumn`）+ store/profile 键
+- [x] cli：store / TUI / demo JSON / 探针
+- [x] docs（PROTOCOL/DATABASE/E2EE/SECURITY/KEY_ESCROW/DEPLOYMENT/ONBOARDING/IOS/updateServer）
+- [x] 验证：`server npm run build + test`（28 项全过）、三包 `flutter analyze` 无 issue、残留 grep
+- [x] 提交
+
+## 6. 验证口径
+
+- 残留扫描：三个家族只剩 §3 的保留项与 UI value（`device`=本机、wordlist、Apple/平台 API、
+  `device-width`、goldens 文件名）。
+- `server`：`npm run build` + `npm test` 全绿。
+- `app`：`flutter analyze` / `flutter gen-l10n` 无 issue（goldens 不跑、UI 由老板自测）。
+- 本地库：drift 升到 **v8**，用 `ALTER TABLE RENAME COLUMN` 保数据；锁包/store 的 JSON 键
+  不做回退读（按"全新上线"口径，老板会重置设备）。
+
+## 7. 本次**没做**、留给下一批的（避免把这批 diff 冲淡）
+
+1. **中文「设备」→「通道」注释/文档清扫**（代码 ~780 处、docs 若干）。**不能全局替换**：
+   同一段里「设备」可能指**通道**（登记项）也可能指**本机/物理设备**（UI 保留词），
+   必须逐处判断。规则：能换成「通道」且读得通 → 改；指本机/型号/硬件 → 保留。
+2. **CLI 命令 `/device`（改名通道）**：是 UI 面，与 App 菜单项「通道名称」不一致。
+   要不要改成 `/entrance`（或加别名）由老板定（UI 用词归老板）。
+3. **历史快照不动**：`aimemo/architectureReview*.md`、`upgradeToMultiverse.md`、
+   `appWizardMultiverse.md`、`escrowArchivedKeys.md`、`voiceCall.zhcn.md`、`worklog.md`
+   是**带日期的记录**，里面的旧名保持原样（改了就是篡改历史）；`db.ts` 清理 v1 meta 的
+   字面量 `'creator_person_id'` / `'person_name:%'` / `'person_gender:%'` 同理保留。

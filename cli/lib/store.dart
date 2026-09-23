@@ -13,55 +13,55 @@ import 'package:einz_shared/einz_shared.dart';
 ///
 /// Phase 1 扩展：离线发送队列（pending）与本地消息历史（history）都落盘，
 /// 支持"离线发送 → 恢复网络 → 自动补发 → 无重复无乱序"的验证。
-class DeviceStore {
-  DeviceStore({
-    this.deviceId,
+class EntranceStore {
+  EntranceStore({
+    this.entranceId,
     required this.publicKey,
     required this.privateKey,
-    this.personId,
-    this.personName,
+    this.partnerId,
+    this.partnerName,
     this.peerName,
-    this.deviceName,
+    this.entranceName,
     this.spaceKey,
     this.spaceId,
     this.spaceAddress,
-    this.partnerSlot,
+    this.slot,
     this.keyVersion = 1,
     this.sessionToken,
     this.pinHash,
     this.escrowUpdatedAt,
-    this.deviceUid,
+    this.installUid,
     this.lastServerSequence = 0,
     this.lastReportedDeliveredSeq = 0,
     this.lastReportedReadSeq = 0,
     this.escrowUploaded = false,
-    Map<String, String>? personNames,
-    Map<String, String>? personGenders,
-    Map<String, int>? personSlots,
+    Map<String, String>? partnerNames,
+    Map<String, String>? partnerGenders,
+    Map<String, int>? partnerSlots,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
     List<Map<String, dynamic>>? attachments,
-  })  : personNames = personNames ?? {},
-        personGenders = personGenders ?? {},
-        personSlots = personSlots ?? {},
+  })  : partnerNames = partnerNames ?? {},
+        partnerGenders = partnerGenders ?? {},
+        partnerSlots = partnerSlots ?? {},
         pending = pending ?? [],
         history = history ?? [],
         attachments = attachments ?? [];
 
-  String? deviceId; // 规范设备 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 personId 一致）
+  String? entranceId; // 规范设备 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 partnerId 一致）
   final String publicKey; // base64
   final String privateKey; // base64（测试用明文存储）
-  String? personId; // 空间内身份 id（v2：createSpace 返回 creatorPersonId / joinSpace 返回 personId，均为 UUID）
-  int? partnerSlot; // 本设备在空间里的身份槽位（0=创建者/第一人，1=伴侣/第二人；v2 create/join 返回）
-  String? personName; // 使用者自定义名称（如 lukas），显示层用
+  String? partnerId; // 空间内身份 id（v2：createSpace 返回 creatorPartnerId / joinSpace 返回 partnerId，均为 UUID）
+  int? slot; // 本设备在空间里的身份槽位（0=创建者/第一人，1=伴侣/第二人；v2 create/join 返回）
+  String? partnerName; // 使用者自定义名称（如 lukas），显示层用
 
   /// 对方（另一身份）名字：create 录入的伴侣名 / join 时另一身份槽位的名字。
-  /// 对方**尚未加入**时空间里还没有他的 person_id，GET /space 的 person 表拿不到
+  /// 对方**尚未加入**时空间里还没有他的 partner_id，GET /space 的 partner 表拿不到
   /// 这个名字 → 顶部条用本字段兜底（否则刚创建/刚加入后一直显示 '-'；老板 2026-09-16）。
-  /// 对方加入后以其真实名字为准（personNames 优先），本字段只是离线/未加入时的兜底。
+  /// 对方加入后以其真实名字为准（partnerNames 优先），本字段只是离线/未加入时的兜底。
   String? peerName;
 
-  String? deviceName; // 设备自定义名称（如 MacBook），显示层用
+  String? entranceName; // 设备自定义名称（如 MacBook），显示层用
   String? spaceKey; // base64，config/import 后填充
   String? spaceId;
   String? spaceAddress; // 空间地址（Multiverse create/join 后填充；旧 store 迁移后为 null）
@@ -70,12 +70,12 @@ class DeviceStore {
   String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
   int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
 
-  /// 安装级设备标识（服务端 `devices.device_uid` 的来源）：服务端据此把同一台物理设备
-  /// 在各空间的 device_id 认成一台。**TUI 的粒度是"一个 store = 一台设备"**（见
+  /// 安装级设备标识（服务端 `entrances.install_uid` 的来源）：服务端据此把同一台物理设备
+  /// 在各空间的 entrance_id 认成一台。**TUI 的粒度是"一个 store = 一台设备"**（见
   /// `_deleteLocalData` 的注释：同机多 store 是刻意的多设备模拟），故各 store 各一份；
-  /// 随 create/join 上报，存量 store 由启动时补登（`_registerDeviceUid`）。
-  /// 惰性生成，见 [ensureDeviceUid]。
-  String? deviceUid;
+  /// 随 create/join 上报，存量 store 由启动时补登（`_registerInstallUid`）。
+  /// 惰性生成，见 [ensureInstallUid]。
+  String? installUid;
 
   int lastServerSequence;
 
@@ -88,17 +88,17 @@ class DeviceStore {
   /// 创建者口令密保箱是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
   bool escrowUploaded;
 
-  /// 空间成员名称缓存（person_id → personName）：GET /space 成功后落盘。
+  /// 空间成员名称缓存（partner_id → partnerName）：GET /space 成功后落盘。
   /// 服务器离线启动时仍能显示正确名字/对方身份（否则回退"对方"）。
-  Map<String, String> personNames;
+  Map<String, String> partnerNames;
 
-  /// 空间成员性别缓存（person_id → male/female）：同上，离线启动仍能按性别配色
+  /// 空间成员性别缓存（partner_id → male/female）：同上，离线启动仍能按性别配色
   /// （否则所有气泡回退青绿——老板 2026-09-13）。
-  Map<String, String> personGenders;
+  Map<String, String> partnerGenders;
 
-  /// 空间成员槽位缓存（person_id → 0=第一人/创建者，1=第二人/伴侣）：
-  /// 同性别时第二人气泡取青色（GET /space 的 person_slots，离线兜底用）。
-  Map<String, int> personSlots;
+  /// 空间成员槽位缓存（partner_id → 0=第一人/创建者，1=第二人/伴侣）：
+  /// 同性别时第二人气泡取青色（GET /space 的 partner_slots，离线兜底用）。
+  Map<String, int> partnerSlots;
 
   /// 离线发送队列：MessageEnvelope 的 JSON 字符串（已加密，落盘安全）。
   final List<String> pending;
@@ -109,10 +109,10 @@ class DeviceStore {
   /// 本地附件元数据（上传/同步后落盘，解密需要 nonce/sha256/key_version）。
   final List<Map<String, dynamic>> attachments;
 
-  static Future<DeviceStore> create({String? deviceId}) async {
-    final kp = await DeviceKeyPair.generate(deviceId: deviceId);
-    return DeviceStore(
-      deviceId: deviceId, // 显式临时 id；默认 null（登记后由服务端分配规范 id）
+  static Future<EntranceStore> create({String? entranceId}) async {
+    final kp = await EntranceKeyPair.generate(entranceId: entranceId);
+    return EntranceStore(
+      entranceId: entranceId, // 显式临时 id；默认 null（登记后由服务端分配规范 id）
       publicKey: kp.publicKeyB64,
       privateKey: kp.privateKeyB64,
     );
@@ -120,25 +120,25 @@ class DeviceStore {
 
   /// 取安装级设备标识，没有就生成一个（16 字节 hex，与服务端形状约束一致）。
   /// 只改内存——调用方负责 `save()`，否则下次启动会换一个新的。
-  String ensureDeviceUid() {
-    final existing = deviceUid;
+  String ensureInstallUid() {
+    final existing = installUid;
     if (existing != null && existing.isNotEmpty) return existing;
     final r = Random.secure();
     final fresh =
         List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-    deviceUid = fresh;
+    installUid = fresh;
     return fresh;
   }
 
   Map<String, dynamic> toJson() => {
-        'device_id': deviceId,
+        'entrance_id': entranceId,
         'public_key': publicKey,
         'private_key': privateKey,
-        'person_id': personId,
-        'partner_slot': partnerSlot,
-        'person_name': personName,
+        'partner_id': partnerId,
+        'slot': slot,
+        'partner_name': partnerName,
         'peer_name': peerName,
-        'device_name': deviceName,
+        'entrance_name': entranceName,
         'space_key': spaceKey,
         'space_id': spaceId,
         'space_address': spaceAddress,
@@ -150,24 +150,24 @@ class DeviceStore {
         'escrow_uploaded': escrowUploaded,
         'pin_hash': pinHash,
         'escrow_updated_at': escrowUpdatedAt,
-        'device_uid': deviceUid,
-        'person_names': personNames,
-        'person_genders': personGenders,
-        'person_slots': personSlots,
+        'install_uid': installUid,
+        'partner_names': partnerNames,
+        'partner_genders': partnerGenders,
+        'partner_slots': partnerSlots,
         'pending': pending,
         'history': history,
         'attachments': attachments,
       };
 
-  static DeviceStore fromJson(Map<String, dynamic> json) => DeviceStore(
-        deviceId: json['device_id'] as String?,
+  static EntranceStore fromJson(Map<String, dynamic> json) => EntranceStore(
+        entranceId: json['entrance_id'] as String?,
         publicKey: json['public_key'] as String,
         privateKey: json['private_key'] as String,
-        personId: json['person_id'] as String?,
-        partnerSlot: json['partner_slot'] as int?,
-        personName: json['person_name'] as String?,
+        partnerId: json['partner_id'] as String?,
+        slot: json['slot'] as int?,
+        partnerName: json['partner_name'] as String?,
         peerName: json['peer_name'] as String?,
-        deviceName: json['device_name'] as String?,
+        entranceName: json['entrance_name'] as String?,
         spaceKey: json['space_key'] as String?,
         spaceId: json['space_id'] as String?,
         spaceAddress: json['space_address'] as String?,
@@ -179,10 +179,10 @@ class DeviceStore {
         escrowUploaded: (json['escrow_uploaded'] as bool?) ?? false,
         pinHash: json['pin_hash'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
-        deviceUid: json['device_uid'] as String?,
-        personNames: (json['person_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
-        personGenders: (json['person_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
-        personSlots: (json['person_slots'] as Map?)?.map((k, v) => MapEntry('$k', v as int)) ?? {},
+        installUid: json['install_uid'] as String?,
+        partnerNames: (json['partner_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
+        partnerGenders: (json['partner_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
+        partnerSlots: (json['partner_slots'] as Map?)?.map((k, v) => MapEntry('$k', v as int)) ?? {},
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],
@@ -192,7 +192,7 @@ class DeviceStore {
     File(path).writeAsStringSync(JsonEncoder.withIndent('  ').convert(toJson()));
   }
 
-  static DeviceStore load(String path) {
+  static EntranceStore load(String path) {
     if (!File(path).existsSync()) {
       throw StateError('存储文件不存在: $path（先运行 init）');
     }

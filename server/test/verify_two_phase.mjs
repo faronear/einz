@@ -34,7 +34,7 @@ async function waitReady(port, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      await fetch(`http://127.0.0.1:${port}/devices`);
+      await fetch(`http://127.0.0.1:${port}/entrances`);
       return;
     } catch {
       await new Promise((r) => setTimeout(r, 100));
@@ -62,22 +62,22 @@ function main() {
       await waitReady(port);
 
       const base = `http://127.0.0.1:${port}`;
-      // 1) 首设备自举登记（自主模式：白名单在 devices 表）
-      const enrollRes = await fetch(`${base}/devices/enroll`, {
+      // 1) 首设备自举登记（自主模式：白名单在 entrances 表）
+      const enrollRes = await fetch(`${base}/entrances/enroll`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_key: sodium.to_base64(keypair.publicKey, B64), device_name: "verify-a" }),
+        body: JSON.stringify({ public_key: sodium.to_base64(keypair.publicKey, B64), entrance_name: "verify-a" }),
       });
       assert.equal(enrollRes.status, 200, "enroll should succeed");
       const enroll = await enrollRes.json();
-      const deviceId = enroll.device_id;
+      const entranceId = enroll.entrance_id;
       assert.equal(enroll.ok, true, "enroll ok");
 
       // 2) 认证
       const ch = await fetch(`${base}/auth/challenge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: deviceId }),
+        body: JSON.stringify({ entrance_id: entranceId }),
       });
       assert.equal(ch.status, 200, "challenge should succeed");
       const { challenge_id, sealed_challenge } = await ch.json();
@@ -123,7 +123,7 @@ function main() {
       // 4) 再发消息 → 关联成功
       const env = {
         v: 1, type: "image", key_version: 1,
-        message_id: messageId, sender_device_id: deviceId,
+        message_id: messageId, sender_entrance_id: entranceId,
         nonce: sodium.to_base64(sodium.randombytes_buf(24), B64),
         ciphertext: sodium.to_base64(sodium.randombytes_buf(64), B64),
       };

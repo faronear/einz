@@ -31,12 +31,12 @@ class $LocalMessagesTable extends LocalMessages
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _senderDeviceIdMeta = const VerificationMeta(
-    'senderDeviceId',
+  static const VerificationMeta _senderEntranceIdMeta = const VerificationMeta(
+    'senderEntranceId',
   );
   @override
-  late final GeneratedColumn<String> senderDeviceId = GeneratedColumn<String>(
-    'sender_device_id',
+  late final GeneratedColumn<String> senderEntranceId = GeneratedColumn<String>(
+    'sender_entrance_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -178,7 +178,7 @@ class $LocalMessagesTable extends LocalMessages
   List<GeneratedColumn> get $columns => [
     messageId,
     spaceId,
-    senderDeviceId,
+    senderEntranceId,
     type,
     keyVersion,
     nonce,
@@ -220,16 +220,16 @@ class $LocalMessagesTable extends LocalMessages
     } else if (isInserting) {
       context.missing(_spaceIdMeta);
     }
-    if (data.containsKey('sender_device_id')) {
+    if (data.containsKey('sender_entrance_id')) {
       context.handle(
-        _senderDeviceIdMeta,
-        senderDeviceId.isAcceptableOrUnknown(
-          data['sender_device_id']!,
-          _senderDeviceIdMeta,
+        _senderEntranceIdMeta,
+        senderEntranceId.isAcceptableOrUnknown(
+          data['sender_entrance_id']!,
+          _senderEntranceIdMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_senderDeviceIdMeta);
+      context.missing(_senderEntranceIdMeta);
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -341,9 +341,9 @@ class $LocalMessagesTable extends LocalMessages
         DriftSqlType.string,
         data['${effectivePrefix}space_id'],
       )!,
-      senderDeviceId: attachedDatabase.typeMapping.read(
+      senderEntranceId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}sender_device_id'],
+        data['${effectivePrefix}sender_entrance_id'],
       )!,
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -405,7 +405,7 @@ class $LocalMessagesTable extends LocalMessages
 class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   final String messageId;
   final String spaceId;
-  final String senderDeviceId;
+  final String senderEntranceId;
   final String type;
   final int keyVersion;
   final String nonce;
@@ -421,7 +421,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   const LocalMessage({
     required this.messageId,
     required this.spaceId,
-    required this.senderDeviceId,
+    required this.senderEntranceId,
     required this.type,
     required this.keyVersion,
     required this.nonce,
@@ -440,7 +440,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     final map = <String, Expression>{};
     map['message_id'] = Variable<String>(messageId);
     map['space_id'] = Variable<String>(spaceId);
-    map['sender_device_id'] = Variable<String>(senderDeviceId);
+    map['sender_entrance_id'] = Variable<String>(senderEntranceId);
     map['type'] = Variable<String>(type);
     map['key_version'] = Variable<int>(keyVersion);
     map['nonce'] = Variable<String>(nonce);
@@ -466,7 +466,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     return LocalMessagesCompanion(
       messageId: Value(messageId),
       spaceId: Value(spaceId),
-      senderDeviceId: Value(senderDeviceId),
+      senderEntranceId: Value(senderEntranceId),
       type: Value(type),
       keyVersion: Value(keyVersion),
       nonce: Value(nonce),
@@ -496,7 +496,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     return LocalMessage(
       messageId: serializer.fromJson<String>(json['messageId']),
       spaceId: serializer.fromJson<String>(json['spaceId']),
-      senderDeviceId: serializer.fromJson<String>(json['senderDeviceId']),
+      senderEntranceId: serializer.fromJson<String>(json['senderEntranceId']),
       type: serializer.fromJson<String>(json['type']),
       keyVersion: serializer.fromJson<int>(json['keyVersion']),
       nonce: serializer.fromJson<String>(json['nonce']),
@@ -517,7 +517,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     return <String, dynamic>{
       'messageId': serializer.toJson<String>(messageId),
       'spaceId': serializer.toJson<String>(spaceId),
-      'senderDeviceId': serializer.toJson<String>(senderDeviceId),
+      'senderEntranceId': serializer.toJson<String>(senderEntranceId),
       'type': serializer.toJson<String>(type),
       'keyVersion': serializer.toJson<int>(keyVersion),
       'nonce': serializer.toJson<String>(nonce),
@@ -536,7 +536,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   LocalMessage copyWith({
     String? messageId,
     String? spaceId,
-    String? senderDeviceId,
+    String? senderEntranceId,
     String? type,
     int? keyVersion,
     String? nonce,
@@ -552,7 +552,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   }) => LocalMessage(
     messageId: messageId ?? this.messageId,
     spaceId: spaceId ?? this.spaceId,
-    senderDeviceId: senderDeviceId ?? this.senderDeviceId,
+    senderEntranceId: senderEntranceId ?? this.senderEntranceId,
     type: type ?? this.type,
     keyVersion: keyVersion ?? this.keyVersion,
     nonce: nonce ?? this.nonce,
@@ -572,9 +572,9 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     return LocalMessage(
       messageId: data.messageId.present ? data.messageId.value : this.messageId,
       spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
-      senderDeviceId: data.senderDeviceId.present
-          ? data.senderDeviceId.value
-          : this.senderDeviceId,
+      senderEntranceId: data.senderEntranceId.present
+          ? data.senderEntranceId.value
+          : this.senderEntranceId,
       type: data.type.present ? data.type.value : this.type,
       keyVersion: data.keyVersion.present
           ? data.keyVersion.value
@@ -607,7 +607,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     return (StringBuffer('LocalMessage(')
           ..write('messageId: $messageId, ')
           ..write('spaceId: $spaceId, ')
-          ..write('senderDeviceId: $senderDeviceId, ')
+          ..write('senderEntranceId: $senderEntranceId, ')
           ..write('type: $type, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('nonce: $nonce, ')
@@ -628,7 +628,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   int get hashCode => Object.hash(
     messageId,
     spaceId,
-    senderDeviceId,
+    senderEntranceId,
     type,
     keyVersion,
     nonce,
@@ -648,7 +648,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       (other is LocalMessage &&
           other.messageId == this.messageId &&
           other.spaceId == this.spaceId &&
-          other.senderDeviceId == this.senderDeviceId &&
+          other.senderEntranceId == this.senderEntranceId &&
           other.type == this.type &&
           other.keyVersion == this.keyVersion &&
           other.nonce == this.nonce &&
@@ -666,7 +666,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
 class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
   final Value<String> messageId;
   final Value<String> spaceId;
-  final Value<String> senderDeviceId;
+  final Value<String> senderEntranceId;
   final Value<String> type;
   final Value<int> keyVersion;
   final Value<String> nonce;
@@ -683,7 +683,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
   const LocalMessagesCompanion({
     this.messageId = const Value.absent(),
     this.spaceId = const Value.absent(),
-    this.senderDeviceId = const Value.absent(),
+    this.senderEntranceId = const Value.absent(),
     this.type = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.nonce = const Value.absent(),
@@ -701,7 +701,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
   LocalMessagesCompanion.insert({
     required String messageId,
     required String spaceId,
-    required String senderDeviceId,
+    required String senderEntranceId,
     required String type,
     required int keyVersion,
     required String nonce,
@@ -717,7 +717,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     this.rowid = const Value.absent(),
   }) : messageId = Value(messageId),
        spaceId = Value(spaceId),
-       senderDeviceId = Value(senderDeviceId),
+       senderEntranceId = Value(senderEntranceId),
        type = Value(type),
        keyVersion = Value(keyVersion),
        nonce = Value(nonce),
@@ -727,7 +727,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
   static Insertable<LocalMessage> custom({
     Expression<String>? messageId,
     Expression<String>? spaceId,
-    Expression<String>? senderDeviceId,
+    Expression<String>? senderEntranceId,
     Expression<String>? type,
     Expression<int>? keyVersion,
     Expression<String>? nonce,
@@ -745,7 +745,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     return RawValuesInsertable({
       if (messageId != null) 'message_id': messageId,
       if (spaceId != null) 'space_id': spaceId,
-      if (senderDeviceId != null) 'sender_device_id': senderDeviceId,
+      if (senderEntranceId != null) 'sender_entrance_id': senderEntranceId,
       if (type != null) 'type': type,
       if (keyVersion != null) 'key_version': keyVersion,
       if (nonce != null) 'nonce': nonce,
@@ -765,7 +765,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
   LocalMessagesCompanion copyWith({
     Value<String>? messageId,
     Value<String>? spaceId,
-    Value<String>? senderDeviceId,
+    Value<String>? senderEntranceId,
     Value<String>? type,
     Value<int>? keyVersion,
     Value<String>? nonce,
@@ -783,7 +783,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     return LocalMessagesCompanion(
       messageId: messageId ?? this.messageId,
       spaceId: spaceId ?? this.spaceId,
-      senderDeviceId: senderDeviceId ?? this.senderDeviceId,
+      senderEntranceId: senderEntranceId ?? this.senderEntranceId,
       type: type ?? this.type,
       keyVersion: keyVersion ?? this.keyVersion,
       nonce: nonce ?? this.nonce,
@@ -809,8 +809,8 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     if (spaceId.present) {
       map['space_id'] = Variable<String>(spaceId.value);
     }
-    if (senderDeviceId.present) {
-      map['sender_device_id'] = Variable<String>(senderDeviceId.value);
+    if (senderEntranceId.present) {
+      map['sender_entrance_id'] = Variable<String>(senderEntranceId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -859,7 +859,7 @@ class LocalMessagesCompanion extends UpdateCompanion<LocalMessage> {
     return (StringBuffer('LocalMessagesCompanion(')
           ..write('messageId: $messageId, ')
           ..write('spaceId: $spaceId, ')
-          ..write('senderDeviceId: $senderDeviceId, ')
+          ..write('senderEntranceId: $senderEntranceId, ')
           ..write('type: $type, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('nonce: $nonce, ')
@@ -2267,12 +2267,12 @@ class $PeerReceiptsTable extends PeerReceipts
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _personIdMeta = const VerificationMeta(
-    'personId',
+  static const VerificationMeta _partnerIdMeta = const VerificationMeta(
+    'partnerId',
   );
   @override
-  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
-    'person_id',
+  late final GeneratedColumn<String> partnerId = GeneratedColumn<String>(
+    'partner_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -2317,7 +2317,7 @@ class $PeerReceiptsTable extends PeerReceipts
   @override
   List<GeneratedColumn> get $columns => [
     spaceId,
-    personId,
+    partnerId,
     deliveredUptoSeq,
     readUptoSeq,
     updatedAt,
@@ -2342,13 +2342,13 @@ class $PeerReceiptsTable extends PeerReceipts
     } else if (isInserting) {
       context.missing(_spaceIdMeta);
     }
-    if (data.containsKey('person_id')) {
+    if (data.containsKey('partner_id')) {
       context.handle(
-        _personIdMeta,
-        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+        _partnerIdMeta,
+        partnerId.isAcceptableOrUnknown(data['partner_id']!, _partnerIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_personIdMeta);
+      context.missing(_partnerIdMeta);
     }
     if (data.containsKey('delivered_upto_seq')) {
       context.handle(
@@ -2378,7 +2378,7 @@ class $PeerReceiptsTable extends PeerReceipts
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {spaceId, personId};
+  Set<GeneratedColumn> get $primaryKey => {spaceId, partnerId};
   @override
   PeerReceipt map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -2387,9 +2387,9 @@ class $PeerReceiptsTable extends PeerReceipts
         DriftSqlType.string,
         data['${effectivePrefix}space_id'],
       )!,
-      personId: attachedDatabase.typeMapping.read(
+      partnerId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}person_id'],
+        data['${effectivePrefix}partner_id'],
       )!,
       deliveredUptoSeq: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -2414,13 +2414,13 @@ class $PeerReceiptsTable extends PeerReceipts
 
 class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   final String spaceId;
-  final String personId;
+  final String partnerId;
   final int deliveredUptoSeq;
   final int readUptoSeq;
   final int updatedAt;
   const PeerReceipt({
     required this.spaceId,
-    required this.personId,
+    required this.partnerId,
     required this.deliveredUptoSeq,
     required this.readUptoSeq,
     required this.updatedAt,
@@ -2429,7 +2429,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['space_id'] = Variable<String>(spaceId);
-    map['person_id'] = Variable<String>(personId);
+    map['partner_id'] = Variable<String>(partnerId);
     map['delivered_upto_seq'] = Variable<int>(deliveredUptoSeq);
     map['read_upto_seq'] = Variable<int>(readUptoSeq);
     map['updated_at'] = Variable<int>(updatedAt);
@@ -2439,7 +2439,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   PeerReceiptsCompanion toCompanion(bool nullToAbsent) {
     return PeerReceiptsCompanion(
       spaceId: Value(spaceId),
-      personId: Value(personId),
+      partnerId: Value(partnerId),
       deliveredUptoSeq: Value(deliveredUptoSeq),
       readUptoSeq: Value(readUptoSeq),
       updatedAt: Value(updatedAt),
@@ -2453,7 +2453,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return PeerReceipt(
       spaceId: serializer.fromJson<String>(json['spaceId']),
-      personId: serializer.fromJson<String>(json['personId']),
+      partnerId: serializer.fromJson<String>(json['partnerId']),
       deliveredUptoSeq: serializer.fromJson<int>(json['deliveredUptoSeq']),
       readUptoSeq: serializer.fromJson<int>(json['readUptoSeq']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
@@ -2464,7 +2464,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'spaceId': serializer.toJson<String>(spaceId),
-      'personId': serializer.toJson<String>(personId),
+      'partnerId': serializer.toJson<String>(partnerId),
       'deliveredUptoSeq': serializer.toJson<int>(deliveredUptoSeq),
       'readUptoSeq': serializer.toJson<int>(readUptoSeq),
       'updatedAt': serializer.toJson<int>(updatedAt),
@@ -2473,13 +2473,13 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
 
   PeerReceipt copyWith({
     String? spaceId,
-    String? personId,
+    String? partnerId,
     int? deliveredUptoSeq,
     int? readUptoSeq,
     int? updatedAt,
   }) => PeerReceipt(
     spaceId: spaceId ?? this.spaceId,
-    personId: personId ?? this.personId,
+    partnerId: partnerId ?? this.partnerId,
     deliveredUptoSeq: deliveredUptoSeq ?? this.deliveredUptoSeq,
     readUptoSeq: readUptoSeq ?? this.readUptoSeq,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2487,7 +2487,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   PeerReceipt copyWithCompanion(PeerReceiptsCompanion data) {
     return PeerReceipt(
       spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
-      personId: data.personId.present ? data.personId.value : this.personId,
+      partnerId: data.partnerId.present ? data.partnerId.value : this.partnerId,
       deliveredUptoSeq: data.deliveredUptoSeq.present
           ? data.deliveredUptoSeq.value
           : this.deliveredUptoSeq,
@@ -2502,7 +2502,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   String toString() {
     return (StringBuffer('PeerReceipt(')
           ..write('spaceId: $spaceId, ')
-          ..write('personId: $personId, ')
+          ..write('partnerId: $partnerId, ')
           ..write('deliveredUptoSeq: $deliveredUptoSeq, ')
           ..write('readUptoSeq: $readUptoSeq, ')
           ..write('updatedAt: $updatedAt')
@@ -2512,13 +2512,13 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
 
   @override
   int get hashCode =>
-      Object.hash(spaceId, personId, deliveredUptoSeq, readUptoSeq, updatedAt);
+      Object.hash(spaceId, partnerId, deliveredUptoSeq, readUptoSeq, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is PeerReceipt &&
           other.spaceId == this.spaceId &&
-          other.personId == this.personId &&
+          other.partnerId == this.partnerId &&
           other.deliveredUptoSeq == this.deliveredUptoSeq &&
           other.readUptoSeq == this.readUptoSeq &&
           other.updatedAt == this.updatedAt);
@@ -2526,14 +2526,14 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
 
 class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   final Value<String> spaceId;
-  final Value<String> personId;
+  final Value<String> partnerId;
   final Value<int> deliveredUptoSeq;
   final Value<int> readUptoSeq;
   final Value<int> updatedAt;
   final Value<int> rowid;
   const PeerReceiptsCompanion({
     this.spaceId = const Value.absent(),
-    this.personId = const Value.absent(),
+    this.partnerId = const Value.absent(),
     this.deliveredUptoSeq = const Value.absent(),
     this.readUptoSeq = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -2541,16 +2541,16 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   });
   PeerReceiptsCompanion.insert({
     required String spaceId,
-    required String personId,
+    required String partnerId,
     this.deliveredUptoSeq = const Value.absent(),
     this.readUptoSeq = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : spaceId = Value(spaceId),
-       personId = Value(personId);
+       partnerId = Value(partnerId);
   static Insertable<PeerReceipt> custom({
     Expression<String>? spaceId,
-    Expression<String>? personId,
+    Expression<String>? partnerId,
     Expression<int>? deliveredUptoSeq,
     Expression<int>? readUptoSeq,
     Expression<int>? updatedAt,
@@ -2558,7 +2558,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   }) {
     return RawValuesInsertable({
       if (spaceId != null) 'space_id': spaceId,
-      if (personId != null) 'person_id': personId,
+      if (partnerId != null) 'partner_id': partnerId,
       if (deliveredUptoSeq != null) 'delivered_upto_seq': deliveredUptoSeq,
       if (readUptoSeq != null) 'read_upto_seq': readUptoSeq,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -2568,7 +2568,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
 
   PeerReceiptsCompanion copyWith({
     Value<String>? spaceId,
-    Value<String>? personId,
+    Value<String>? partnerId,
     Value<int>? deliveredUptoSeq,
     Value<int>? readUptoSeq,
     Value<int>? updatedAt,
@@ -2576,7 +2576,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   }) {
     return PeerReceiptsCompanion(
       spaceId: spaceId ?? this.spaceId,
-      personId: personId ?? this.personId,
+      partnerId: partnerId ?? this.partnerId,
       deliveredUptoSeq: deliveredUptoSeq ?? this.deliveredUptoSeq,
       readUptoSeq: readUptoSeq ?? this.readUptoSeq,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -2590,8 +2590,8 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
     if (spaceId.present) {
       map['space_id'] = Variable<String>(spaceId.value);
     }
-    if (personId.present) {
-      map['person_id'] = Variable<String>(personId.value);
+    if (partnerId.present) {
+      map['partner_id'] = Variable<String>(partnerId.value);
     }
     if (deliveredUptoSeq.present) {
       map['delivered_upto_seq'] = Variable<int>(deliveredUptoSeq.value);
@@ -2612,7 +2612,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   String toString() {
     return (StringBuffer('PeerReceiptsCompanion(')
           ..write('spaceId: $spaceId, ')
-          ..write('personId: $personId, ')
+          ..write('partnerId: $partnerId, ')
           ..write('deliveredUptoSeq: $deliveredUptoSeq, ')
           ..write('readUptoSeq: $readUptoSeq, ')
           ..write('updatedAt: $updatedAt, ')
@@ -2660,23 +2660,23 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
-  static const VerificationMeta _personIdMeta = const VerificationMeta(
-    'personId',
+  static const VerificationMeta _partnerIdMeta = const VerificationMeta(
+    'partnerId',
   );
   @override
-  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
-    'person_id',
+  late final GeneratedColumn<String> partnerId = GeneratedColumn<String>(
+    'partner_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
-    'deviceId',
+  static const VerificationMeta _entranceIdMeta = const VerificationMeta(
+    'entranceId',
   );
   @override
-  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
-    'device_id',
+  late final GeneratedColumn<String> entranceId = GeneratedColumn<String>(
+    'entrance_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -2736,8 +2736,8 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
     spaceId,
     name,
     peerName,
-    personId,
-    deviceId,
+    partnerId,
+    entranceId,
     keyVersion,
     createdAt,
     lastActiveAt,
@@ -2775,16 +2775,16 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
         peerName.isAcceptableOrUnknown(data['peer_name']!, _peerNameMeta),
       );
     }
-    if (data.containsKey('person_id')) {
+    if (data.containsKey('partner_id')) {
       context.handle(
-        _personIdMeta,
-        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+        _partnerIdMeta,
+        partnerId.isAcceptableOrUnknown(data['partner_id']!, _partnerIdMeta),
       );
     }
-    if (data.containsKey('device_id')) {
+    if (data.containsKey('entrance_id')) {
       context.handle(
-        _deviceIdMeta,
-        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+        _entranceIdMeta,
+        entranceId.isAcceptableOrUnknown(data['entrance_id']!, _entranceIdMeta),
       );
     }
     if (data.containsKey('key_version')) {
@@ -2835,13 +2835,13 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
         DriftSqlType.string,
         data['${effectivePrefix}peer_name'],
       )!,
-      personId: attachedDatabase.typeMapping.read(
+      partnerId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}person_id'],
+        data['${effectivePrefix}partner_id'],
       ),
-      deviceId: attachedDatabase.typeMapping.read(
+      entranceId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}device_id'],
+        data['${effectivePrefix}entrance_id'],
       )!,
       keyVersion: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -2872,8 +2872,8 @@ class Space extends DataClass implements Insertable<Space> {
   final String spaceId;
   final String name;
   final String peerName;
-  final String? personId;
-  final String deviceId;
+  final String? partnerId;
+  final String entranceId;
   final int keyVersion;
   final int createdAt;
   final int lastActiveAt;
@@ -2882,8 +2882,8 @@ class Space extends DataClass implements Insertable<Space> {
     required this.spaceId,
     required this.name,
     required this.peerName,
-    this.personId,
-    required this.deviceId,
+    this.partnerId,
+    required this.entranceId,
     required this.keyVersion,
     required this.createdAt,
     required this.lastActiveAt,
@@ -2895,10 +2895,10 @@ class Space extends DataClass implements Insertable<Space> {
     map['space_id'] = Variable<String>(spaceId);
     map['name'] = Variable<String>(name);
     map['peer_name'] = Variable<String>(peerName);
-    if (!nullToAbsent || personId != null) {
-      map['person_id'] = Variable<String>(personId);
+    if (!nullToAbsent || partnerId != null) {
+      map['partner_id'] = Variable<String>(partnerId);
     }
-    map['device_id'] = Variable<String>(deviceId);
+    map['entrance_id'] = Variable<String>(entranceId);
     map['key_version'] = Variable<int>(keyVersion);
     map['created_at'] = Variable<int>(createdAt);
     map['last_active_at'] = Variable<int>(lastActiveAt);
@@ -2911,10 +2911,10 @@ class Space extends DataClass implements Insertable<Space> {
       spaceId: Value(spaceId),
       name: Value(name),
       peerName: Value(peerName),
-      personId: personId == null && nullToAbsent
+      partnerId: partnerId == null && nullToAbsent
           ? const Value.absent()
-          : Value(personId),
-      deviceId: Value(deviceId),
+          : Value(partnerId),
+      entranceId: Value(entranceId),
       keyVersion: Value(keyVersion),
       createdAt: Value(createdAt),
       lastActiveAt: Value(lastActiveAt),
@@ -2931,8 +2931,8 @@ class Space extends DataClass implements Insertable<Space> {
       spaceId: serializer.fromJson<String>(json['spaceId']),
       name: serializer.fromJson<String>(json['name']),
       peerName: serializer.fromJson<String>(json['peerName']),
-      personId: serializer.fromJson<String?>(json['personId']),
-      deviceId: serializer.fromJson<String>(json['deviceId']),
+      partnerId: serializer.fromJson<String?>(json['partnerId']),
+      entranceId: serializer.fromJson<String>(json['entranceId']),
       keyVersion: serializer.fromJson<int>(json['keyVersion']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       lastActiveAt: serializer.fromJson<int>(json['lastActiveAt']),
@@ -2946,8 +2946,8 @@ class Space extends DataClass implements Insertable<Space> {
       'spaceId': serializer.toJson<String>(spaceId),
       'name': serializer.toJson<String>(name),
       'peerName': serializer.toJson<String>(peerName),
-      'personId': serializer.toJson<String?>(personId),
-      'deviceId': serializer.toJson<String>(deviceId),
+      'partnerId': serializer.toJson<String?>(partnerId),
+      'entranceId': serializer.toJson<String>(entranceId),
       'keyVersion': serializer.toJson<int>(keyVersion),
       'createdAt': serializer.toJson<int>(createdAt),
       'lastActiveAt': serializer.toJson<int>(lastActiveAt),
@@ -2959,8 +2959,8 @@ class Space extends DataClass implements Insertable<Space> {
     String? spaceId,
     String? name,
     String? peerName,
-    Value<String?> personId = const Value.absent(),
-    String? deviceId,
+    Value<String?> partnerId = const Value.absent(),
+    String? entranceId,
     int? keyVersion,
     int? createdAt,
     int? lastActiveAt,
@@ -2969,8 +2969,8 @@ class Space extends DataClass implements Insertable<Space> {
     spaceId: spaceId ?? this.spaceId,
     name: name ?? this.name,
     peerName: peerName ?? this.peerName,
-    personId: personId.present ? personId.value : this.personId,
-    deviceId: deviceId ?? this.deviceId,
+    partnerId: partnerId.present ? partnerId.value : this.partnerId,
+    entranceId: entranceId ?? this.entranceId,
     keyVersion: keyVersion ?? this.keyVersion,
     createdAt: createdAt ?? this.createdAt,
     lastActiveAt: lastActiveAt ?? this.lastActiveAt,
@@ -2981,8 +2981,8 @@ class Space extends DataClass implements Insertable<Space> {
       spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
       name: data.name.present ? data.name.value : this.name,
       peerName: data.peerName.present ? data.peerName.value : this.peerName,
-      personId: data.personId.present ? data.personId.value : this.personId,
-      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      partnerId: data.partnerId.present ? data.partnerId.value : this.partnerId,
+      entranceId: data.entranceId.present ? data.entranceId.value : this.entranceId,
       keyVersion: data.keyVersion.present
           ? data.keyVersion.value
           : this.keyVersion,
@@ -3000,8 +3000,8 @@ class Space extends DataClass implements Insertable<Space> {
           ..write('spaceId: $spaceId, ')
           ..write('name: $name, ')
           ..write('peerName: $peerName, ')
-          ..write('personId: $personId, ')
-          ..write('deviceId: $deviceId, ')
+          ..write('partnerId: $partnerId, ')
+          ..write('entranceId: $entranceId, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastActiveAt: $lastActiveAt, ')
@@ -3015,8 +3015,8 @@ class Space extends DataClass implements Insertable<Space> {
     spaceId,
     name,
     peerName,
-    personId,
-    deviceId,
+    partnerId,
+    entranceId,
     keyVersion,
     createdAt,
     lastActiveAt,
@@ -3029,8 +3029,8 @@ class Space extends DataClass implements Insertable<Space> {
           other.spaceId == this.spaceId &&
           other.name == this.name &&
           other.peerName == this.peerName &&
-          other.personId == this.personId &&
-          other.deviceId == this.deviceId &&
+          other.partnerId == this.partnerId &&
+          other.entranceId == this.entranceId &&
           other.keyVersion == this.keyVersion &&
           other.createdAt == this.createdAt &&
           other.lastActiveAt == this.lastActiveAt &&
@@ -3041,8 +3041,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
   final Value<String> spaceId;
   final Value<String> name;
   final Value<String> peerName;
-  final Value<String?> personId;
-  final Value<String> deviceId;
+  final Value<String?> partnerId;
+  final Value<String> entranceId;
   final Value<int> keyVersion;
   final Value<int> createdAt;
   final Value<int> lastActiveAt;
@@ -3052,8 +3052,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     this.spaceId = const Value.absent(),
     this.name = const Value.absent(),
     this.peerName = const Value.absent(),
-    this.personId = const Value.absent(),
-    this.deviceId = const Value.absent(),
+    this.partnerId = const Value.absent(),
+    this.entranceId = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.lastActiveAt = const Value.absent(),
@@ -3064,8 +3064,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     required String spaceId,
     this.name = const Value.absent(),
     this.peerName = const Value.absent(),
-    this.personId = const Value.absent(),
-    this.deviceId = const Value.absent(),
+    this.partnerId = const Value.absent(),
+    this.entranceId = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.lastActiveAt = const Value.absent(),
@@ -3076,8 +3076,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     Expression<String>? spaceId,
     Expression<String>? name,
     Expression<String>? peerName,
-    Expression<String>? personId,
-    Expression<String>? deviceId,
+    Expression<String>? partnerId,
+    Expression<String>? entranceId,
     Expression<int>? keyVersion,
     Expression<int>? createdAt,
     Expression<int>? lastActiveAt,
@@ -3088,8 +3088,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
       if (spaceId != null) 'space_id': spaceId,
       if (name != null) 'name': name,
       if (peerName != null) 'peer_name': peerName,
-      if (personId != null) 'person_id': personId,
-      if (deviceId != null) 'device_id': deviceId,
+      if (partnerId != null) 'partner_id': partnerId,
+      if (entranceId != null) 'entrance_id': entranceId,
       if (keyVersion != null) 'key_version': keyVersion,
       if (createdAt != null) 'created_at': createdAt,
       if (lastActiveAt != null) 'last_active_at': lastActiveAt,
@@ -3102,8 +3102,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     Value<String>? spaceId,
     Value<String>? name,
     Value<String>? peerName,
-    Value<String?>? personId,
-    Value<String>? deviceId,
+    Value<String?>? partnerId,
+    Value<String>? entranceId,
     Value<int>? keyVersion,
     Value<int>? createdAt,
     Value<int>? lastActiveAt,
@@ -3114,8 +3114,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
       spaceId: spaceId ?? this.spaceId,
       name: name ?? this.name,
       peerName: peerName ?? this.peerName,
-      personId: personId ?? this.personId,
-      deviceId: deviceId ?? this.deviceId,
+      partnerId: partnerId ?? this.partnerId,
+      entranceId: entranceId ?? this.entranceId,
       keyVersion: keyVersion ?? this.keyVersion,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
@@ -3136,11 +3136,11 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     if (peerName.present) {
       map['peer_name'] = Variable<String>(peerName.value);
     }
-    if (personId.present) {
-      map['person_id'] = Variable<String>(personId.value);
+    if (partnerId.present) {
+      map['partner_id'] = Variable<String>(partnerId.value);
     }
-    if (deviceId.present) {
-      map['device_id'] = Variable<String>(deviceId.value);
+    if (entranceId.present) {
+      map['entrance_id'] = Variable<String>(entranceId.value);
     }
     if (keyVersion.present) {
       map['key_version'] = Variable<int>(keyVersion.value);
@@ -3166,8 +3166,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
           ..write('spaceId: $spaceId, ')
           ..write('name: $name, ')
           ..write('peerName: $peerName, ')
-          ..write('personId: $personId, ')
-          ..write('deviceId: $deviceId, ')
+          ..write('partnerId: $partnerId, ')
+          ..write('entranceId: $entranceId, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastActiveAt: $lastActiveAt, ')
@@ -3209,7 +3209,7 @@ typedef $$LocalMessagesTableCreateCompanionBuilder =
     LocalMessagesCompanion Function({
       required String messageId,
       required String spaceId,
-      required String senderDeviceId,
+      required String senderEntranceId,
       required String type,
       required int keyVersion,
       required String nonce,
@@ -3228,7 +3228,7 @@ typedef $$LocalMessagesTableUpdateCompanionBuilder =
     LocalMessagesCompanion Function({
       Value<String> messageId,
       Value<String> spaceId,
-      Value<String> senderDeviceId,
+      Value<String> senderEntranceId,
       Value<String> type,
       Value<int> keyVersion,
       Value<String> nonce,
@@ -3295,8 +3295,8 @@ class $$LocalMessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get senderDeviceId => $composableBuilder(
-    column: $table.senderDeviceId,
+  ColumnFilters<String> get senderEntranceId => $composableBuilder(
+    column: $table.senderEntranceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3405,8 +3405,8 @@ class $$LocalMessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get senderDeviceId => $composableBuilder(
-    column: $table.senderDeviceId,
+  ColumnOrderings<String> get senderEntranceId => $composableBuilder(
+    column: $table.senderEntranceId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3486,8 +3486,8 @@ class $$LocalMessagesTableAnnotationComposer
   GeneratedColumn<String> get spaceId =>
       $composableBuilder(column: $table.spaceId, builder: (column) => column);
 
-  GeneratedColumn<String> get senderDeviceId => $composableBuilder(
-    column: $table.senderDeviceId,
+  GeneratedColumn<String> get senderEntranceId => $composableBuilder(
+    column: $table.senderEntranceId,
     builder: (column) => column,
   );
 
@@ -3597,7 +3597,7 @@ class $$LocalMessagesTableTableManager
               ({
                 Value<String> messageId = const Value.absent(),
                 Value<String> spaceId = const Value.absent(),
-                Value<String> senderDeviceId = const Value.absent(),
+                Value<String> senderEntranceId = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<String> nonce = const Value.absent(),
@@ -3614,7 +3614,7 @@ class $$LocalMessagesTableTableManager
               }) => LocalMessagesCompanion(
                 messageId: messageId,
                 spaceId: spaceId,
-                senderDeviceId: senderDeviceId,
+                senderEntranceId: senderEntranceId,
                 type: type,
                 keyVersion: keyVersion,
                 nonce: nonce,
@@ -3633,7 +3633,7 @@ class $$LocalMessagesTableTableManager
               ({
                 required String messageId,
                 required String spaceId,
-                required String senderDeviceId,
+                required String senderEntranceId,
                 required String type,
                 required int keyVersion,
                 required String nonce,
@@ -3650,7 +3650,7 @@ class $$LocalMessagesTableTableManager
               }) => LocalMessagesCompanion.insert(
                 messageId: messageId,
                 spaceId: spaceId,
-                senderDeviceId: senderDeviceId,
+                senderEntranceId: senderEntranceId,
                 type: type,
                 keyVersion: keyVersion,
                 nonce: nonce,
@@ -4630,7 +4630,7 @@ typedef $$AppStateTableProcessedTableManager =
 typedef $$PeerReceiptsTableCreateCompanionBuilder =
     PeerReceiptsCompanion Function({
       required String spaceId,
-      required String personId,
+      required String partnerId,
       Value<int> deliveredUptoSeq,
       Value<int> readUptoSeq,
       Value<int> updatedAt,
@@ -4639,7 +4639,7 @@ typedef $$PeerReceiptsTableCreateCompanionBuilder =
 typedef $$PeerReceiptsTableUpdateCompanionBuilder =
     PeerReceiptsCompanion Function({
       Value<String> spaceId,
-      Value<String> personId,
+      Value<String> partnerId,
       Value<int> deliveredUptoSeq,
       Value<int> readUptoSeq,
       Value<int> updatedAt,
@@ -4660,8 +4660,8 @@ class $$PeerReceiptsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get personId => $composableBuilder(
-    column: $table.personId,
+  ColumnFilters<String> get partnerId => $composableBuilder(
+    column: $table.partnerId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4695,8 +4695,8 @@ class $$PeerReceiptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get personId => $composableBuilder(
-    column: $table.personId,
+  ColumnOrderings<String> get partnerId => $composableBuilder(
+    column: $table.partnerId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4728,8 +4728,8 @@ class $$PeerReceiptsTableAnnotationComposer
   GeneratedColumn<String> get spaceId =>
       $composableBuilder(column: $table.spaceId, builder: (column) => column);
 
-  GeneratedColumn<String> get personId =>
-      $composableBuilder(column: $table.personId, builder: (column) => column);
+  GeneratedColumn<String> get partnerId =>
+      $composableBuilder(column: $table.partnerId, builder: (column) => column);
 
   GeneratedColumn<int> get deliveredUptoSeq => $composableBuilder(
     column: $table.deliveredUptoSeq,
@@ -4777,14 +4777,14 @@ class $$PeerReceiptsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> spaceId = const Value.absent(),
-                Value<String> personId = const Value.absent(),
+                Value<String> partnerId = const Value.absent(),
                 Value<int> deliveredUptoSeq = const Value.absent(),
                 Value<int> readUptoSeq = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeerReceiptsCompanion(
                 spaceId: spaceId,
-                personId: personId,
+                partnerId: partnerId,
                 deliveredUptoSeq: deliveredUptoSeq,
                 readUptoSeq: readUptoSeq,
                 updatedAt: updatedAt,
@@ -4793,14 +4793,14 @@ class $$PeerReceiptsTableTableManager
           createCompanionCallback:
               ({
                 required String spaceId,
-                required String personId,
+                required String partnerId,
                 Value<int> deliveredUptoSeq = const Value.absent(),
                 Value<int> readUptoSeq = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeerReceiptsCompanion.insert(
                 spaceId: spaceId,
-                personId: personId,
+                partnerId: partnerId,
                 deliveredUptoSeq: deliveredUptoSeq,
                 readUptoSeq: readUptoSeq,
                 updatedAt: updatedAt,
@@ -4844,8 +4844,8 @@ typedef $$SpacesTableCreateCompanionBuilder = SpacesCompanion Function({
   required String spaceId,
   Value<String> name,
   Value<String> peerName,
-  Value<String?> personId,
-  Value<String> deviceId,
+  Value<String?> partnerId,
+  Value<String> entranceId,
   Value<int> keyVersion,
   Value<int> createdAt,
   Value<int> lastActiveAt,
@@ -4856,8 +4856,8 @@ typedef $$SpacesTableUpdateCompanionBuilder = SpacesCompanion Function({
   Value<String> spaceId,
   Value<String> name,
   Value<String> peerName,
-  Value<String?> personId,
-  Value<String> deviceId,
+  Value<String?> partnerId,
+  Value<String> entranceId,
   Value<int> keyVersion,
   Value<int> createdAt,
   Value<int> lastActiveAt,
@@ -4889,13 +4889,13 @@ class $$SpacesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get personId => $composableBuilder(
-    column: $table.personId,
+  ColumnFilters<String> get partnerId => $composableBuilder(
+    column: $table.partnerId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get deviceId => $composableBuilder(
-    column: $table.deviceId,
+  ColumnFilters<String> get entranceId => $composableBuilder(
+    column: $table.entranceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4944,13 +4944,13 @@ class $$SpacesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get personId => $composableBuilder(
-    column: $table.personId,
+  ColumnOrderings<String> get partnerId => $composableBuilder(
+    column: $table.partnerId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get deviceId => $composableBuilder(
-    column: $table.deviceId,
+  ColumnOrderings<String> get entranceId => $composableBuilder(
+    column: $table.entranceId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4993,11 +4993,11 @@ class $$SpacesTableAnnotationComposer
   GeneratedColumn<String> get peerName =>
       $composableBuilder(column: $table.peerName, builder: (column) => column);
 
-  GeneratedColumn<String> get personId =>
-      $composableBuilder(column: $table.personId, builder: (column) => column);
+  GeneratedColumn<String> get partnerId =>
+      $composableBuilder(column: $table.partnerId, builder: (column) => column);
 
-  GeneratedColumn<String> get deviceId =>
-      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+  GeneratedColumn<String> get entranceId =>
+      $composableBuilder(column: $table.entranceId, builder: (column) => column);
 
   GeneratedColumn<int> get keyVersion => $composableBuilder(
     column: $table.keyVersion,
@@ -5047,8 +5047,8 @@ class $$SpacesTableTableManager
                 Value<String> spaceId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> peerName = const Value.absent(),
-                Value<String?> personId = const Value.absent(),
-                Value<String> deviceId = const Value.absent(),
+                Value<String?> partnerId = const Value.absent(),
+                Value<String> entranceId = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> lastActiveAt = const Value.absent(),
@@ -5058,8 +5058,8 @@ class $$SpacesTableTableManager
                 spaceId: spaceId,
                 name: name,
                 peerName: peerName,
-                personId: personId,
-                deviceId: deviceId,
+                partnerId: partnerId,
+                entranceId: entranceId,
                 keyVersion: keyVersion,
                 createdAt: createdAt,
                 lastActiveAt: lastActiveAt,
@@ -5071,8 +5071,8 @@ class $$SpacesTableTableManager
                 required String spaceId,
                 Value<String> name = const Value.absent(),
                 Value<String> peerName = const Value.absent(),
-                Value<String?> personId = const Value.absent(),
-                Value<String> deviceId = const Value.absent(),
+                Value<String?> partnerId = const Value.absent(),
+                Value<String> entranceId = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> lastActiveAt = const Value.absent(),
@@ -5082,8 +5082,8 @@ class $$SpacesTableTableManager
                 spaceId: spaceId,
                 name: name,
                 peerName: peerName,
-                personId: personId,
-                deviceId: deviceId,
+                partnerId: partnerId,
+                entranceId: entranceId,
                 keyVersion: keyVersion,
                 createdAt: createdAt,
                 lastActiveAt: lastActiveAt,

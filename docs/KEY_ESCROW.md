@@ -2,7 +2,7 @@
 
 > **状态：`[已实现]`**（2026-08-29 落地：Server 三端点 + shared KeyEscrowService + CLI escrow 命令 + App 接入口令/凭口令接入/rotate 自动重传；Server 冒烟、shared 16 项、App 18 项、CLI 全链路与双端 e2e 全过）。
 > **版本适用：** 主体描述**口令托管的机制**（与空间模型无关，v1/v2 通用）；
-> 文中"白名单"一律指 `devices` 表的在册状态。空间与成员由 `POST /spaces` / `/spaces/join`
+> 文中"白名单"一律指 `entrances` 表的在册状态。空间与成员由 `POST /spaces` / `/spaces/join`
 > 建立、按 `space_id` 隔离，托管包读写见 `PROTOCOL_MULTIVERSE.md` §4.2（2026-09-15 起上传
 > 分支需该空间成员会话，口令取包分支仍免认证）。
 > **定位：** 在**不推倒现有 E2EE**（Server 只见密文）的前提下，解决"换设备 / 朋友新接入门槛高"的痛点。
@@ -95,7 +95,7 @@ CLI（`escrow upload`）在**设置/修改**时校验并提示；**输入既有�
 
 - 认证：现有 Bearer session_token（challenge-response 后获得），与消息接口一致；
 - 权限：**空间内任一在册设备**可 GET（两人中任一人持口令即可帮对方接入）；POST/DELETE 仅限本人设备；
-- Server 存储：复用现有 SQLite（新增 `key_escrow` 表：`device_id` 主键 + `package` + `updated_at`）；
+- Server 存储：复用现有 SQLite（新增 `key_escrow` 表：`entrance_id` 主键 + `package` + `updated_at`）；
 - Server **永远不解析 package 内容**（存原样 JSON，校验仅限字段类型）。
 
 ### 4.2 幂等与冲突
@@ -283,7 +283,7 @@ v1 一台服务器只有一个空间、丢了就无法再建；Multiverse 下这
 - Server `POST /recover` 端点与 `recoverSpace()` 实现**整体删除**。三层原因：
   ① 它读的是 `key_escrow.space_id = ''` 那一行（v1 遗留），Multiverse 下密保箱存在
   `space_id = <真实 spaceId>`，所以**它本就永远读不到包**（线上只会 403）；
-  ② 它的撤销逻辑是**全库范围**的——`UPDATE devices … WHERE status='active'`、
+  ② 它的撤销逻辑是**全库范围**的——`UPDATE entrances … WHERE status='active'`、
   `DELETE FROM sessions`、`DELETE FROM push_tokens`、`DELETE FROM invites` 都没有
   space 过滤，所以"把 ① 修好"反而会引爆成"撤销该服务器上**所有空间**的设备"；
   ③ "仅凭口令定位空间"根本做不到：服务端每个 space 只存一份 argon2id 哈希

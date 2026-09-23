@@ -49,8 +49,8 @@ class _ImageFakeApi extends ApiClient {
   @override
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-test',
-        devices: const [
-          SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+        entrances: const [
+          SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
         ],
       );
 
@@ -83,7 +83,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: null,
     );
@@ -96,7 +96,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',

@@ -1,9 +1,9 @@
 /**
  * 回归：sendPushHint 只投给**同一 Space** 的设备（老板 2026-09-14 要求修）。
  *
- * 此前它只按 `device_id != 自己` 取 push_tokens —— 一旦接上真实推送，
+ * 此前它只按 `entrance_id != 自己` 取 push_tokens —— 一旦接上真实推送，
  * 一条消息会把"有新消息"提示推给这台服务器上**所有空间**的设备（跨空间泄露
- * "谁在发消息"）。现在设备经 person_id → space_members 归属 Space，按 Space 收敛。
+ * "谁在发消息"）。现在设备经 partner_id → space_members 归属 Space，按 Space 收敛。
  *
  * 运行：npm test（tsx test/push_scope.test.ts）
  */
@@ -28,7 +28,7 @@ function seed (): void {
   space.run('space-b', 'addr-b', 'pk-b', now, now)
 
   const dev = db.prepare(
-    `INSERT INTO devices (device_id, person_id, public_key, status, created_at)
+    `INSERT INTO entrances (entrance_id, partner_id, public_key, status, created_at)
      VALUES (?, ?, 'pk', 'active', ?)`,
   )
   dev.run('a1', 'p1', now)
@@ -36,12 +36,12 @@ function seed (): void {
   dev.run('b1', 'p3', now)
   // 已撤销的设备：即使在同一 Space 也不该收到
   db.prepare(
-    `INSERT INTO devices (device_id, person_id, public_key, status, created_at)
+    `INSERT INTO entrances (entrance_id, partner_id, public_key, status, created_at)
      VALUES (?, ?, 'pk', 'revoked', ?)`,
   ).run('a3', 'p1', now)
 
   const member = db.prepare(
-    `INSERT INTO space_members (space_id, person_id, partner_slot, status, joined_at)
+    `INSERT INTO space_members (space_id, partner_id, slot, status, joined_at)
      VALUES (?, ?, ?, 'active', ?)`,
   )
   member.run('space-a', 'p1', 0, now)
@@ -49,7 +49,7 @@ function seed (): void {
   member.run('space-b', 'p3', 0, now)
 
   const token = db.prepare(
-    `INSERT INTO push_tokens (device_id, platform, token, updated_at) VALUES (?, 'ios', ?, ?)`,
+    `INSERT INTO push_tokens (entrance_id, platform, token, updated_at) VALUES (?, 'ios', ?, ?)`,
   )
   token.run('a1', 'apns-a1', now)
   token.run('a2', 'apns-a2', now)
@@ -76,10 +76,10 @@ test('sendPushHint：只投给同一 Space 的在用设备，不跨空间、不�
     }
 
     assert.equal(lines.length, 1, 'A 空间除 a1 外只有 a2 该收到：\n' + lines.join('\n'))
-    assert.match(lines[0], /device=a2/, '应投给同空间的 a2')
-    assert.doesNotMatch(lines[0], /device=b1/, '不得跨 Space 投给 b1')
-    assert.doesNotMatch(lines[0], /device=a1/, '不得投给发送者自己')
-    assert.doesNotMatch(lines[0], /device=a3/, '不得投给已撤销的设备')
+    assert.match(lines[0], /entrance=a2/, '应投给同空间的 a2')
+    assert.doesNotMatch(lines[0], /entrance=b1/, '不得跨 Space 投给 b1')
+    assert.doesNotMatch(lines[0], /entrance=a1/, '不得投给发送者自己')
+    assert.doesNotMatch(lines[0], /entrance=a3/, '不得投给已撤销的设备')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

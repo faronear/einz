@@ -998,41 +998,41 @@ abstract class AppLocalizations {
   /// **'Gender'**
   String get chatPageGenderLabel;
 
-  /// No description provided for @chatPageRenameDeviceTitle.
+  /// No description provided for @chatPageRenameEntranceTitle.
   ///
   /// In en, this message translates to:
   /// **'Current entrance'**
-  String get chatPageRenameDeviceTitle;
+  String get chatPageRenameEntranceTitle;
 
-  /// No description provided for @chatPageRenameDeviceLabel.
+  /// No description provided for @chatPageRenameEntranceLabel.
   ///
   /// In en, this message translates to:
   /// **'Entrance name'**
-  String get chatPageRenameDeviceLabel;
+  String get chatPageRenameEntranceLabel;
 
-  /// No description provided for @chatPageDeviceScopeHint.
+  /// No description provided for @chatPageEntranceScopeHint.
   ///
   /// In en, this message translates to:
   /// **'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.'**
-  String get chatPageDeviceScopeHint;
+  String get chatPageEntranceScopeHint;
 
-  /// No description provided for @chatPageRenameDeviceEmptyError.
+  /// No description provided for @chatPageRenameEntranceEmptyError.
   ///
   /// In en, this message translates to:
   /// **'Enter the entrance name'**
-  String get chatPageRenameDeviceEmptyError;
+  String get chatPageRenameEntranceEmptyError;
 
-  /// No description provided for @chatPageRenameDeviceInvalidError.
+  /// No description provided for @chatPageRenameEntranceInvalidError.
   ///
   /// In en, this message translates to:
   /// **'Only Chinese/English letters, digits, _ and - are allowed'**
-  String get chatPageRenameDeviceInvalidError;
+  String get chatPageRenameEntranceInvalidError;
 
-  /// No description provided for @chatPageRenameDeviceTooLongError.
+  /// No description provided for @chatPageRenameEntranceTooLongError.
   ///
   /// In en, this message translates to:
   /// **'At most {max} characters'**
-  String chatPageRenameDeviceTooLongError(int max);
+  String chatPageRenameEntranceTooLongError(int max);
 
   /// No description provided for @chatPageRenameMyselfEmptyError.
   ///
@@ -1268,11 +1268,11 @@ abstract class AppLocalizations {
   /// **'My identity'**
   String get chatPageMenuMyNameLabel;
 
-  /// No description provided for @chatPageMenuDeviceNameLabel.
+  /// No description provided for @chatPageMenuEntranceNameLabel.
   ///
   /// In en, this message translates to:
   /// **'Current entrance'**
-  String get chatPageMenuDeviceNameLabel;
+  String get chatPageMenuEntranceNameLabel;
 
   /// No description provided for @chatPagePinLabel.
   ///
@@ -1412,11 +1412,11 @@ abstract class AppLocalizations {
   /// **'Offline · {count} unsent'**
   String chatPageOfflineUnsent(int count);
 
-  /// No description provided for @chatPageDeviceUnrecognized.
+  /// No description provided for @chatPageEntranceUnrecognized.
   ///
   /// In en, this message translates to:
   /// **'This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared'**
-  String get chatPageDeviceUnrecognized;
+  String get chatPageEntranceUnrecognized;
 
   /// No description provided for @chatPageOfflineLocalOnly.
   ///
@@ -1598,23 +1598,23 @@ abstract class AppLocalizations {
   /// **'Could not open file: {error}'**
   String chatPageFileOpenFailed(String error);
 
-  /// No description provided for @chatPageDeviceRevoked.
+  /// No description provided for @chatPageEntranceRevoked.
   ///
   /// In en, this message translates to:
   /// **'Entrance revoked — local data cleared, please set up again'**
-  String get chatPageDeviceRevoked;
+  String get chatPageEntranceRevoked;
 
-  /// No description provided for @chatPageDevicePublicKeyLabel.
+  /// No description provided for @chatPageEntrancePublicKeyLabel.
   ///
   /// In en, this message translates to:
   /// **'Public key of this entrance'**
-  String get chatPageDevicePublicKeyLabel;
+  String get chatPageEntrancePublicKeyLabel;
 
-  /// No description provided for @chatPageDevicePublicKeyFailed.
+  /// No description provided for @chatPageEntrancePublicKeyFailed.
   ///
   /// In en, this message translates to:
   /// **'Not recorded'**
-  String get chatPageDevicePublicKeyFailed;
+  String get chatPageEntrancePublicKeyFailed;
 
   /// No description provided for @burnOptionOff.
   ///
@@ -1760,47 +1760,47 @@ abstract class AppLocalizations {
   /// **'Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!'**
   String get leaveSpaceMessage;
 
-  /// No description provided for @resetDeviceNameLabel.
+  /// No description provided for @resetEntranceNameLabel.
   ///
   /// In en, this message translates to:
   /// **'{name}'**
-  String resetDeviceNameLabel(String name);
+  String resetEntranceNameLabel(String name);
 
-  /// No description provided for @resetDeviceNameHint.
+  /// No description provided for @resetEntranceNameHint.
   ///
   /// In en, this message translates to:
   /// **'Type the current entrance name “{name}”'**
-  String resetDeviceNameHint(String name);
+  String resetEntranceNameHint(String name);
 
-  /// No description provided for @resetDeviceNameMismatch.
+  /// No description provided for @resetEntranceNameMismatch.
   ///
   /// In en, this message translates to:
   /// **'Enter the correct entrance name to confirm'**
-  String get resetDeviceNameMismatch;
+  String get resetEntranceNameMismatch;
 
-  /// No description provided for @resetDeviceConfirmWord.
+  /// No description provided for @resetInstallConfirmWord.
   ///
   /// In en, this message translates to:
   /// **'RESET'**
-  String get resetDeviceConfirmWord;
+  String get resetInstallConfirmWord;
 
-  /// No description provided for @resetDevicePinLabel.
+  /// No description provided for @resetInstallPinLabel.
   ///
   /// In en, this message translates to:
   /// **'PIN'**
-  String get resetDevicePinLabel;
+  String get resetInstallPinLabel;
 
-  /// No description provided for @resetDevicePinHint.
+  /// No description provided for @resetInstallPinHint.
   ///
   /// In en, this message translates to:
   /// **'Enter this device\'s PIN'**
-  String get resetDevicePinHint;
+  String get resetInstallPinHint;
 
-  /// No description provided for @resetDeviceServerResidualHint.
+  /// No description provided for @resetInstallServerResidualHint.
   ///
   /// In en, this message translates to:
   /// **'⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list'**
-  String get resetDeviceServerResidualHint;
+  String get resetInstallServerResidualHint;
 
   /// No description provided for @spaceListTitle.
   ///

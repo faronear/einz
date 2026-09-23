@@ -30,8 +30,8 @@ class WsRealtimeService {
   /// 新消息到达回调（WS 在线时 chat_page 收到即增量刷新，无需等轮询）。
   void Function()? onMessageNew;
 
-  /// 本设备被撤销回调（Server 广播 device.revoked——App 应清理本地数据并强制登出）。
-  void Function()? onDeviceRevoked;
+  /// 本通道被撤销回调（Server 广播 entrance.revoked——App 应清理本地数据并强制登出）。
+  void Function()? onEntranceRevoked;
 
   /// 对端上下线回调（Server 广播 peer.online/peer.offline——App 实时更新对方在线状态）。
   void Function(WsPeerStatusEvent event)? onPeerStatus;
@@ -48,14 +48,14 @@ class WsRealtimeService {
   /// 建立连接（自动重连直到 [stop]）。
   void start({
     void Function()? onMessageNew,
-    void Function()? onDeviceRevoked,
+    void Function()? onEntranceRevoked,
     void Function(WsPeerStatusEvent event)? onPeerStatus,
     void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
     void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
     void Function(WsReceiptUpdatedEvent event)? onReceiptUpdated,
   }) {
     this.onMessageNew = onMessageNew;
-    this.onDeviceRevoked = onDeviceRevoked;
+    this.onEntranceRevoked = onEntranceRevoked;
     this.onPeerStatus = onPeerStatus;
     this.onPassphraseRotated = onPassphraseRotated;
     this.onProfileUpdated = onProfileUpdated;
@@ -77,7 +77,7 @@ class WsRealtimeService {
       },
       onEvent: (e) {
         if (e is WsMessageNewEvent) this.onMessageNew?.call();
-        if (e is WsDeviceRevokedEvent) this.onDeviceRevoked?.call();
+        if (e is WsEntranceRevokedEvent) this.onEntranceRevoked?.call();
         if (e is WsPeerStatusEvent) this.onPeerStatus?.call(e);
         if (e is WsPassphraseRotatedEvent) this.onPassphraseRotated?.call(e);
         if (e is WsProfileUpdatedEvent) this.onProfileUpdated?.call(e);

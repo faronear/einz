@@ -46,8 +46,8 @@ class _FakeApi extends ApiClient {
   Future<SpaceResult> getSpace(String token) async {
     return SpaceResult(
       spaceId: 'space-test',
-      devices: const [
-        SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+      entrances: const [
+        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
       ],
     );
   }
@@ -87,8 +87,8 @@ class _FixedSeqApi extends ApiClient {
   Future<SpaceResult> getSpace(String token) async {
     return SpaceResult(
       spaceId: 'space-test',
-      devices: const [
-        SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+      entrances: const [
+        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
       ],
     );
   }
@@ -110,7 +110,7 @@ void main() {
         plaintext: '消息 $i',
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        senderDeviceId: 'dev-a',
+        senderEntranceId: 'dev-a',
         messageId: 'msg-$i',
         keyVersion: 1,
       ));
@@ -122,7 +122,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -160,7 +160,7 @@ void main() {
         plaintext: payload,
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        senderDeviceId: 'dev-a',
+        senderEntranceId: 'dev-a',
         messageId: 'msg-$i',
         keyVersion: 1,
       ));
@@ -172,7 +172,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -201,7 +201,7 @@ void main() {
         plaintext: '消息 $i',
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        senderDeviceId: 'dev-a',
+        senderEntranceId: 'dev-a',
         messageId: 'msg-$i',
         keyVersion: 1,
       ));
@@ -213,7 +213,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -245,7 +245,7 @@ void main() {
       plaintext: '新消息 41',
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      senderDeviceId: 'dev-a',
+      senderEntranceId: 'dev-a',
       messageId: 'msg-41',
       keyVersion: 1,
     ));
@@ -275,7 +275,7 @@ void main() {
         plaintext: payload,
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        senderDeviceId: 'dev-a',
+        senderEntranceId: 'dev-a',
         messageId: 'msg-$i',
         keyVersion: 1,
       ));
@@ -287,7 +287,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',

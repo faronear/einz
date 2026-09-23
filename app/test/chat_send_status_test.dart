@@ -26,7 +26,7 @@ import 'package:einz_shared/einz_shared.dart';
 class _StatusFakeApi extends ApiClient {
   _StatusFakeApi({required this.peer, required this.postedSeq}) : super('http://fake');
 
-  /// 对方消息（senderDeviceId != 本机），携带指定 server_sequence。
+  /// 对方消息（senderEntranceId != 本机），携带指定 server_sequence。
   final List<({MessageEnvelope env, int seq})> peer;
   final int postedSeq;
 
@@ -90,16 +90,16 @@ class _StatusFakeApi extends ApiClient {
         messageId: env.messageId, serverSequence: postedSeq, createdAt: 1000));
   }
 
-  /// GET /space 返回的设备表：决定 device→person 映射（"是否我的消息"）。
+  /// GET /space 返回的设备表：决定 entrance→partner 映射（"是否我的消息"）。
   /// 需要模拟"同一身份的另一台设备"时替换它。
-  List<SpaceDevice> devices = const [
-    SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
+  List<SpaceEntrance> entrances = const [
+    SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
   ];
 
   @override
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-test',
-        devices: devices,
+        entrances: entrances,
       );
 
   /// 回执：测试内不需要真网络（回执数据由测试直接种进库）。
@@ -146,7 +146,7 @@ void main() {
       plaintext: '对方消息',
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      senderDeviceId: 'dev-b',
+      senderEntranceId: 'dev-b',
       messageId: 'peer-1',
       keyVersion: 1,
     );
@@ -159,7 +159,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -186,12 +186,12 @@ void main() {
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
 
-    // 我发的一条（senderDeviceId == 本机 → 渲染为"我的消息"），seq=1
+    // 我发的一条（senderEntranceId == 本机 → 渲染为"我的消息"），seq=1
     final mine = await encryptMessage(
       plaintext: '我发的',
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      senderDeviceId: 'dev-a',
+      senderEntranceId: 'dev-a',
       messageId: 'mine-1',
       keyVersion: 1,
     );
@@ -200,7 +200,7 @@ void main() {
     // 种入对方回执：delivered=1（对方设备已收到）、read=0
     await db.into(db.peerReceipts).insert(PeerReceiptsCompanion.insert(
           spaceId: 'space-test',
-          personId: 'person-b',
+          partnerId: 'partner-b',
           deliveredUptoSeq: const Value(1),
           readUptoSeq: const Value(0),
           updatedAt: const Value(1),
@@ -212,7 +212,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -242,18 +242,18 @@ void main() {
     final spaceKey = await generateSpaceKey();
 
     // 同一身份的另一台设备（dev-a2）发的；**不种**任何对方回执
-    final fromMyOtherDevice = await encryptMessage(
+    final fromMyOtherEntrance = await encryptMessage(
       plaintext: '旧设备发的',
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      senderDeviceId: 'dev-a2',
+      senderEntranceId: 'dev-a2',
       messageId: 'old-1',
       keyVersion: 1,
     );
-    final api = _StatusFakeApi(peer: [(env: fromMyOtherDevice, seq: 1)], postedSeq: 1)
-      ..devices = const [
-        SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
-        SpaceDevice(deviceId: 'dev-a2', personId: 'person-a', status: 'active'),
+    final api = _StatusFakeApi(peer: [(env: fromMyOtherEntrance, seq: 1)], postedSeq: 1)
+      ..entrances = const [
+        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-a2', partnerId: 'partner-a', status: 'active'),
       ];
 
     await tester.pumpWidget(MaterialApp(
@@ -262,7 +262,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -296,7 +296,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: null, // 无 token → 保持 pending
     );
@@ -308,7 +308,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok', // 有 token → 点按后能重发
@@ -348,7 +348,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: 'tok',
     );
@@ -360,7 +360,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -388,7 +388,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: 'tok',
     );
@@ -401,7 +401,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -431,7 +431,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: 'tok',
     ).send('离线时写的消息');
@@ -442,7 +442,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -475,7 +475,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: 'tok',
     ).send('待加速的消息');
@@ -486,7 +486,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
@@ -528,7 +528,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       token: 'tok',
     ).send('会被再次拒绝的');
@@ -539,7 +539,7 @@ void main() {
       locale: const Locale('zh'),
       home: ChatPage(
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',

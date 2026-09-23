@@ -216,11 +216,11 @@ def main():
     ], prefix="A")
     send(m_a, "1\r")  # 我的性别：1=男（数字输入——老板定稿）
     name, out, _ = read_until(m_a, [
-        ("ask_partner_name", re.compile(r"伴侣的名字")),
+        ("ask_peer_name", re.compile(r"伴侣的名字")),
     ], prefix="A")
     send(m_a, "Alice\r")
     name, out, _ = read_until(m_a, [
-        ("ask_partner_gender", re.compile(r"伴侣的性别")),
+        ("ask_peer_gender", re.compile(r"伴侣的性别")),
     ], prefix="A")
     send(m_a, "2\r")  # 伴侣性别：2=女（数字输入——老板定稿）
     name, out, _ = read_until(m_a, [

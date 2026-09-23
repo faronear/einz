@@ -50,10 +50,10 @@ class AppLockService {
   static const _kLockedUntil = 'app_lock.locked_until';
   static const _kPlain = 'app_lock.plain'; // 【遗留】旧版明文包在 app_state 的键（仅迁移读取）
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
-  static const _kProfile = 'app_lock.profile'; // JSON: {personName, peerName, deviceName}
+  static const _kProfile = 'app_lock.profile'; // JSON: {partnerName, peerName, entranceName}
 
-  /// 安装级设备标识（同一物理设备各空间共用；服务端 devices.device_uid 的来源）。
-  static const _kDeviceUid = 'app_lock.device_uid';
+  /// 安装级设备标识（同一物理设备各空间共用；服务端 entrances.install_uid 的来源）。
+  static const _kInstallUid = 'app_lock.install_uid';
 
   /// "上次用的是哪个空间"（**明文**，非秘密）：Spaces 表本来就明文存着空间 id 与名字，
   /// 单独记一份是为了让**切换空间不需要锁屏码**——PIN 模式下重写加密锁包要 pin，
@@ -94,8 +94,8 @@ class AppLockService {
         16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
   }
 
-  /// 安装级设备标识（服务端 `devices.device_uid`）：同一台物理设备上的所有空间
-  /// **共用这一份**，服务端据此把不同空间的 device_id 认成同一台机器。
+  /// 安装级设备标识（服务端 `entrances.install_uid`）：同一台物理设备上的所有空间
+  /// **共用这一份**，服务端据此把不同空间的 entrance_id 认成同一台机器。
   ///
   /// 定位（老板 2026-09-22 定）：
   /// - 只做**服务端侧认知**（运维/审计/将来"整机退役"），不参与任何授权或破坏性
@@ -106,11 +106,11 @@ class AppLockService {
   /// 存 app_state 而不是 SecureStore：它与密钥无关，且在这里读安全存储会让一次
   /// "取个 id"依赖平台支持（同 [loadProfile] 的教训，见 multiSpaceDesign §3.6）。
   /// 惰性生成：首次调用落库，之后每次读回同一个值。
-  Future<String> deviceUid() async {
-    final existing = await _get(_kDeviceUid);
+  Future<String> installUid() async {
+    final existing = await _get(_kInstallUid);
     if (existing != null && existing.isNotEmpty) return existing;
     final fresh = _newInstallId(); // 同形状：16 字节 hex
-    await _set(_kDeviceUid, fresh);
+    await _set(_kInstallUid, fresh);
     return fresh;
   }
 
@@ -211,7 +211,7 @@ class AppLockService {
   /// **不动其他空间**。
   ///
   /// 清除范围的分工（别再加"全量清除"的第三个 API）：
-  /// - **逐空间** → 本方法（含被撤销时的自毁，见 chat_page._onDeviceRevoked）；
+  /// - **逐空间** → 本方法（含被撤销时的自毁，见 chat_page._onEntranceRevoked）；
   /// - **全设备** → `resetLocalData()`（`data/local_reset.dart`，删 app_state 整表 +
   ///   安全存储 + 明文缓存，天生不会漏键）。
   ///
@@ -348,7 +348,7 @@ class AppLockService {
       final now = DateTime.now().millisecondsSinceEpoch;
       await db.into(db.spaces).insert(SpacesCompanion.insert(
             spaceId: payload.spaceId,
-            deviceId: Value(payload.deviceId),
+            entranceId: Value(payload.entranceId),
             keyVersion: Value(payload.keyVersion),
             createdAt: Value(now),
             lastActiveAt: Value(now),
@@ -356,7 +356,7 @@ class AppLockService {
     } else {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(payload.spaceId))).write(
         SpacesCompanion(
-          deviceId: Value(payload.deviceId),
+          entranceId: Value(payload.entranceId),
           keyVersion: Value(payload.keyVersion),
         ),
       );
@@ -489,9 +489,9 @@ class AppLockService {
   /// 名字；缺省（单空间旧调用点）回退全局键 [_kProfile]。
   Future<void> saveProfile({
     String? spaceId,
-    required String personName,
+    required String partnerName,
     required String peerName,
-    required String deviceName,
+    required String entranceName,
     String myGender = '', // 本人性别（male/female；个人资料弹窗图标展示用）
     String peerGender = '', // 对方性别（male/female；消息气泡配色用）
     int? mySlot, // 本人身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色用）
@@ -499,9 +499,9 @@ class AppLockService {
   }) async {
     final sid = spaceId;
     await _set(sid == null ? _kProfile : _profileKey(sid), jsonEncode({
-      'personName': personName,
+      'partnerName': partnerName,
       'peerName': peerName,
-      'deviceName': deviceName,
+      'entranceName': entranceName,
       'myGender': myGender,
       'peerGender': peerGender,
       'mySlot': mySlot,
@@ -509,7 +509,7 @@ class AppLockService {
     }));
     if (sid != null) {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(
-        SpacesCompanion(name: Value(personName), peerName: Value(peerName)),
+        SpacesCompanion(name: Value(partnerName), peerName: Value(peerName)),
       );
     }
   }
@@ -528,9 +528,9 @@ class AppLockService {
     try {
       final m = jsonDecode(raw) as Map<String, dynamic>;
       return {
-        'personName': (m['personName'] as String?) ?? '',
+        'partnerName': (m['partnerName'] as String?) ?? '',
         'peerName': (m['peerName'] as String?) ?? '',
-        'deviceName': (m['deviceName'] as String?) ?? '',
+        'entranceName': (m['entranceName'] as String?) ?? '',
         'myGender': (m['myGender'] as String?) ?? '',
         'peerGender': (m['peerGender'] as String?) ?? '',
         'mySlot': (m['mySlot'] as num?)?.toInt(),
@@ -565,7 +565,7 @@ class AppLockPayload {
   const AppLockPayload({
     required this.spaceKeyB64,
     required this.spaceId,
-    required this.deviceId,
+    required this.entranceId,
     this.keyVersion = 1,
     this.token,
     this.escrowUpdatedAt,
@@ -575,7 +575,7 @@ class AppLockPayload {
 
   final String spaceKeyB64;
   final String spaceId;
-  final String deviceId;
+  final String entranceId;
   final int keyVersion;
   final String? token;
 
@@ -591,23 +591,23 @@ class AppLockPayload {
   Map<String, dynamic> toJson() => {
         'space_key': spaceKeyB64,
         'space_id': spaceId,
-        'device_id': deviceId,
+        'entrance_id': entranceId,
         'key_version': keyVersion,
         'token': token,
         'escrow_updated_at': escrowUpdatedAt,
-        'device_public_key': publicKeyB64,
-        'device_private_key': privateKeyB64,
+        'entrance_public_key': publicKeyB64,
+        'entrance_private_key': privateKeyB64,
       };
 
   factory AppLockPayload.fromJson(Map<String, dynamic> json) => AppLockPayload(
         spaceKeyB64: json['space_key'] as String,
         spaceId: json['space_id'] as String,
-        deviceId: json['device_id'] as String,
+        entranceId: json['entrance_id'] as String,
         keyVersion: (json['key_version'] as int?) ?? 1,
         token: json['token'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
-        publicKeyB64: json['device_public_key'] as String?,
-        privateKeyB64: json['device_private_key'] as String?,
+        publicKeyB64: json['entrance_public_key'] as String?,
+        privateKeyB64: json['entrance_private_key'] as String?,
       );
 }
 
@@ -695,7 +695,7 @@ class VaultPayload {
     return VaultPayload(
       spaces: spaces,
       activeSpaceId: raw['active_space_id'] as String?,
-      // 旧 Vault JSON 里的 device_name 已废弃（设备名归 per-space profile，见
+      // 旧 Vault JSON 里的 entrance_name 已废弃（设备名归 per-space profile，见
       // multiSpaceDesign §2.2 的 2026-09-22 修订），读到也不处理。
     );
   }
@@ -716,7 +716,7 @@ Future<String> reauthFromPayload(AppLockPayload payload) async {
   }
   final s = await sodium();
   final api = ApiClient(effectiveServer);
-  final challenge = await api.challenge(payload.deviceId, spaceId: payload.spaceId);
+  final challenge = await api.challenge(payload.entranceId, spaceId: payload.spaceId);
   final opened = await sealOpen(
     s,
     base64Decode(challenge.sealedChallenge),

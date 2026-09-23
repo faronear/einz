@@ -23,8 +23,8 @@ class FakeApi extends ApiClient {
   /// 编排的 sync 页（每页是一个 SyncPage）。
   List<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> pages = [];
 
-  /// 编排的 /space 设备列表（person 映射测试用）。
-  List<SpaceDevice> spaceDevices = [];
+  /// 编排的 /space 设备列表（partner 映射测试用）。
+  List<SpaceEntrance> spaceEntrances = [];
 
   /// 是否让附件上传抛异常（模拟服务端 500 等上传失败）。
   bool failAttachmentUpload = false;
@@ -57,7 +57,7 @@ class FakeApi extends ApiClient {
 
   @override
   Future<SpaceResult> getSpace(String token) async {
-    return SpaceResult(spaceId: 'space-test', devices: spaceDevices);
+    return SpaceResult(spaceId: 'space-test', entrances: spaceEntrances);
   }
 
   @override
@@ -134,27 +134,27 @@ void main() {
         api: api,
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        deviceId: 'dev-a',
+        entranceId: 'dev-a',
         keyVersion: 1,
         token: token,
       );
 
-  test('person 身份判断：同 person 不同设备显示 me，对方设备显示 peer', () async {
+  test('partner 身份判断：同 partner 不同设备显示 me，对方设备显示 peer', () async {
     final api = FakeApi();
-    api.spaceDevices = [
-      const SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'),
-      const SpaceDevice(deviceId: 'dev-a2', personId: 'person-a', status: 'active'),
-      const SpaceDevice(deviceId: 'dev-b', personId: 'person-b', status: 'active'),
+    api.spaceEntrances = [
+      const SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+      const SpaceEntrance(entranceId: 'dev-a2', partnerId: 'partner-a', status: 'active'),
+      const SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'),
     ];
     final repo = makeRepo(api, token: 'tok');
-    await repo.refreshDeviceMap();
+    await repo.refreshEntranceMap();
 
-    // 同 person 的另一设备（dev-a2）与对方设备（dev-b）各发一条消息
+    // 同 partner 的另一设备（dev-a2）与对方设备（dev-b）各发一条消息
     final fromA2 = await encryptMessage(
       plaintext: '来自我的另一台设备',
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      senderDeviceId: 'dev-a2',
+      senderEntranceId: 'dev-a2',
       messageId: 'msg-a2-1',
       keyVersion: 1,
     );
@@ -162,7 +162,7 @@ void main() {
       plaintext: '来自对方',
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      senderDeviceId: 'dev-b',
+      senderEntranceId: 'dev-b',
       messageId: 'msg-b-1',
       keyVersion: 1,
     );
@@ -176,7 +176,7 @@ void main() {
     await repo.sync();
     final hist = await repo.history();
     final byMsg = {for (final h in hist) h.env.messageId: h.sender};
-    expect(byMsg['msg-a2-1'], 'me', reason: '同 person 的另一设备消息应显示为 me');
+    expect(byMsg['msg-a2-1'], 'me', reason: '同 partner 的另一设备消息应显示为 me');
     expect(byMsg['msg-b-1'], 'peer', reason: '对方设备消息显示为 peer');
   });
 
@@ -188,7 +188,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       settings: settings,
     );
@@ -228,7 +228,7 @@ void main() {
         plaintext: 'msg-$i',
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        senderDeviceId: 'dev-b',
+        senderEntranceId: 'dev-b',
         messageId: 'msg-$i',
         keyVersion: 1,
       ));
@@ -258,7 +258,7 @@ void main() {
         plaintext: 'msg-$i',
         spaceKey: spaceKey,
         spaceId: 'space-test',
-        senderDeviceId: 'dev-b',
+        senderEntranceId: 'dev-b',
         messageId: 'msg-$i',
         keyVersion: 1,
       ));
@@ -372,8 +372,8 @@ void main() {
 
   test('换设备后：已知 server_sequence 的消息点重发不重投，直接恢复 sent', () async {
     // 回归（老板 2026-09-22 线上实测）：这两条消息早已在服务端（seq 已回填），
-    // 但信封里的 sender_device_id 是**旧设备**——它是 AAD 的一部分，客户端改不了，
-    // 所以重投必然被服务端 403（sender_device_id mismatch），而客户端又把 4xx 判成
+    // 但信封里的 sender_entrance_id 是**旧设备**——它是 AAD 的一部分，客户端改不了，
+    // 所以重投必然被服务端 403（sender_entrance_id mismatch），而客户端又把 4xx 判成
     // "服务端明确拒绝"→ 状态永远回不到 sent，红色标签永远消不掉。
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');
@@ -626,7 +626,7 @@ void main() {
       api: api,
       spaceKey: spaceKey,
       spaceId: 'space-test',
-      deviceId: 'dev-a',
+      entranceId: 'dev-a',
       keyVersion: 1,
       settings: settings,
       token: 'tok',
@@ -673,12 +673,12 @@ void main() {
     final repo = makeRepo(api, token: 'tok');
     api.receiptRows = [
       ReceiptRow(
-          personId: 'person-b', deliveredUptoSeq: 10, readUptoSeq: 5, updatedAt: 111),
+          partnerId: 'partner-b', deliveredUptoSeq: 10, readUptoSeq: 5, updatedAt: 111),
     ];
     await repo.sync();
 
     final rows = await repo.peerReceipts();
-    expect(rows.single.personId, 'person-b');
+    expect(rows.single.partnerId, 'partner-b');
     expect(rows.single.deliveredUptoSeq, 10);
     expect(rows.single.readUptoSeq, 5);
 
@@ -694,22 +694,22 @@ void main() {
 
   test('回执：我自己那一行不参与推导（否则我发出的消息永远停在单勾）', () async {
     final api = FakeApi();
-    api.spaceDevices = [
-      const SpaceDevice(deviceId: 'dev-a', personId: 'person-a', status: 'active'), // 我
-      const SpaceDevice(deviceId: 'dev-b', personId: 'person-b', status: 'active'), // 对方
+    api.spaceEntrances = [
+      const SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'), // 我
+      const SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'), // 对方
     ];
     final repo = makeRepo(api, token: 'tok');
-    await repo.refreshDeviceMap(); // 建立 device→person 映射（peerReceipts 据此排除自己）
+    await repo.refreshEntranceMap(); // 建立 entrance→partner 映射（peerReceipts 据此排除自己）
 
     // 我自己上报的水位很低（我只把"对方的消息"读到 seq=1），对方的 delivered 已到 5。
     // GET /receipts 会把两行都返回，于是整张表里既有我也对方。
     await repo.upsertPeerReceipt(
-        personId: 'person-a', deliveredUptoSeq: 1, readUptoSeq: 1);
+        partnerId: 'partner-a', deliveredUptoSeq: 1, readUptoSeq: 1);
     await repo.upsertPeerReceipt(
-        personId: 'person-b', deliveredUptoSeq: 5, readUptoSeq: 0);
+        partnerId: 'partner-b', deliveredUptoSeq: 5, readUptoSeq: 0);
 
     final peers = await repo.peerReceipts();
-    expect(peers.map((p) => p.personId).toList(), ['person-b'],
+    expect(peers.map((p) => p.partnerId).toList(), ['partner-b'],
         reason: 'peerReceipts 必须排除我自己那一行');
 
     // 我发出的 seq=5：对方已收到 → delivered（不受我自己水位影响）——老板 2026-09-13 实测的 bug
@@ -725,10 +725,10 @@ void main() {
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');
     await repo.upsertPeerReceipt(
-        personId: 'person-b', deliveredUptoSeq: 20, readUptoSeq: 10);
+        partnerId: 'partner-b', deliveredUptoSeq: 20, readUptoSeq: 10);
     // 重放一个更旧的值（如乱序的 WS 帧/过期 GET）
     await repo.upsertPeerReceipt(
-        personId: 'person-b', deliveredUptoSeq: 5, readUptoSeq: 1);
+        partnerId: 'partner-b', deliveredUptoSeq: 5, readUptoSeq: 1);
     final rows = await repo.peerReceipts();
     expect(rows.single.deliveredUptoSeq, 20, reason: '单调：不得回退');
     expect(rows.single.readUptoSeq, 10, reason: '单调：不得回退');
@@ -759,7 +759,7 @@ Future<MessageEnvelope> _makeEnv(Uint8List key, String sender, String messageId,
     plaintext: plaintext,
     spaceKey: key,
     spaceId: 'space-test',
-    senderDeviceId: sender,
+    senderEntranceId: sender,
     messageId: messageId,
   );
   return MessageEnvelope(
@@ -767,7 +767,7 @@ Future<MessageEnvelope> _makeEnv(Uint8List key, String sender, String messageId,
     type: env.type,
     keyVersion: env.keyVersion,
     messageId: env.messageId,
-    senderDeviceId: env.senderDeviceId,
+    senderEntranceId: env.senderEntranceId,
     nonce: env.nonce,
     ciphertext: env.ciphertext,
     serverSequence: 1,

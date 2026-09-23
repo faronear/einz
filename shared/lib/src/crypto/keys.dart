@@ -6,25 +6,25 @@ import 'package:sodium/sodium.dart';
 import '../sodium.dart';
 
 /// X25519 设备凭证密钥对（E2EE.md §3）。
-class DeviceKeyPair {
-  DeviceKeyPair({required this.deviceId, required this.publicKey, required this.privateKey});
+class EntranceKeyPair {
+  EntranceKeyPair({required this.entranceId, required this.publicKey, required this.privateKey});
 
-  final String deviceId;
+  final String entranceId;
   final Uint8List publicKey; // 32B
   final Uint8List privateKey; // 32B（仅本机安全存储）
 
   /// 生成新设备密钥对。
-  static Future<DeviceKeyPair> generate({String? deviceId}) async {
+  static Future<EntranceKeyPair> generate({String? entranceId}) async {
     final s = await sodium();
     final kp = s.crypto.box.keyPair();
-    return DeviceKeyPair(
-      deviceId: deviceId ?? _randomDeviceId(s),
+    return EntranceKeyPair(
+      entranceId: entranceId ?? _randomEntranceId(s),
       publicKey: kp.publicKey,
       privateKey: kp.secretKey.extractBytes(),
     );
   }
 
-  static String _randomDeviceId(Sodium s) {
+  static String _randomEntranceId(Sodium s) {
     final bytes = s.randombytes.buf(8);
     return 'dev-${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
   }
