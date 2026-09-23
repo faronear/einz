@@ -599,7 +599,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'The entrance opens only after this code is verified. A one-time code, valid for 24 hours, generated from any verified entrance in the space.'**
+  /// **'The entrance is go live only after an activation code is verified. A code is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
@@ -761,7 +761,7 @@ abstract class AppLocalizations {
   /// No description provided for @setPinDialogConfirmLabel.
   ///
   /// In en, this message translates to:
-  /// **'Confirm PIN'**
+  /// **'Confirm new PIN'**
   String get setPinDialogConfirmLabel;
 
   /// No description provided for @setPinDialogConfirmHint.
@@ -827,19 +827,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockTitle.
   ///
   /// In en, this message translates to:
-  /// **'Set app lock'**
+  /// **'Set PIN'**
   String get chatPageSetLockTitle;
 
   /// No description provided for @chatPageSetLockClearHint.
   ///
   /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you enter the space — safer. You can also leave the new PIN blank to clear it.'**
+  /// **'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to delete the current PIN.'**
   String get chatPageSetLockClearHint;
 
   /// No description provided for @chatPageSetLockHintNoPin.
   ///
   /// In en, this message translates to:
-  /// **'Once set, you\'ll unlock every time you enter the space — safer.'**
+  /// **'Once set, you\'ll unlock every time you enter the space.'**
   String get chatPageSetLockHintNoPin;
 
   /// No description provided for @chatPageSetLockOldLabel.
@@ -851,7 +851,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockOldRequired.
   ///
   /// In en, this message translates to:
-  /// **'Enter your current PIN first'**
+  /// **'Enter current PIN first'**
   String get chatPageSetLockOldRequired;
 
   /// No description provided for @chatPageSetLockSameAsOld.
@@ -869,25 +869,25 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockDone.
   ///
   /// In en, this message translates to:
-  /// **'App lock set — PIN required at next launch'**
+  /// **'PIN set — PIN required at next launch'**
   String get chatPageSetLockDone;
 
   /// No description provided for @chatPageSetLockCleared.
   ///
   /// In en, this message translates to:
-  /// **'App lock cleared (enter directly next time)'**
+  /// **'PIN deleted (enter directly next time)'**
   String get chatPageSetLockCleared;
 
   /// No description provided for @chatPageClearLockTitle.
   ///
   /// In en, this message translates to:
-  /// **'Clear app lock?'**
+  /// **'Delete PIN?'**
   String get chatPageClearLockTitle;
 
   /// No description provided for @chatPageClearLockMessage.
   ///
   /// In en, this message translates to:
-  /// **'A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.'**
+  /// **'Delete the PIN? After deletion, the app launch will go straight into chat.'**
   String get chatPageClearLockMessage;
 
   /// No description provided for @chatPageMenuInvite.
@@ -953,7 +953,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuAvatar.
   ///
   /// In en, this message translates to:
-  /// **'My Avatar'**
+  /// **'My avatar'**
   String get chatPageMenuAvatar;
 
   /// No description provided for @chatPageAvatarUploaded.
@@ -1313,7 +1313,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnHeading.
   ///
   /// In en, this message translates to:
-  /// **'Burn-after-read (this device only)'**
+  /// **'Burn-after-read'**
   String get chatPageBurnHeading;
 
   /// No description provided for @chatPageBurnOff.
@@ -1628,11 +1628,11 @@ abstract class AppLocalizations {
   /// **'Not recorded'**
   String get chatPageDevicePublicKeyFailed;
 
-  /// No description provided for @burnOptionKeepIndefinitely.
+  /// No description provided for @burnOptionOff.
   ///
   /// In en, this message translates to:
-  /// **'Keep indefinitely'**
-  String get burnOptionKeepIndefinitely;
+  /// **'Off'**
+  String get burnOptionOff;
 
   /// No description provided for @burnOption1Minute.
   ///
@@ -1691,7 +1691,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockPageNoPinSet.
   ///
   /// In en, this message translates to:
-  /// **'No app lock set (lock screen activates only with a PIN)'**
+  /// **'No PIN set (lock screen activates only with a PIN)'**
   String get lockPageNoPinSet;
 
   /// No description provided for @lockPageUnlock.
@@ -1751,7 +1751,7 @@ abstract class AppLocalizations {
   /// No description provided for @advancedMenuTitle.
   ///
   /// In en, this message translates to:
-  /// **'Advanced'**
+  /// **'Advanced features'**
   String get advancedMenuTitle;
 
   /// No description provided for @advancedDestroyEntrance.
@@ -1835,7 +1835,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListSwitch.
   ///
   /// In en, this message translates to:
-  /// **'Switch space'**
+  /// **'Switch my space'**
   String get spaceListSwitch;
 
   /// No description provided for @promptLockCodeTitle.

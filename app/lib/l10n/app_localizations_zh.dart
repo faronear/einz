@@ -362,7 +362,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setPinDialogPinHint => '至少 6 位数字';
 
   @override
-  String get setPinDialogConfirmLabel => '确认 PIN';
+  String get setPinDialogConfirmLabel => '确认新 PIN';
 
   @override
   String get setPinDialogConfirmHint => '再输一次以确认';
@@ -402,8 +402,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockTitle => '设置锁屏码';
 
   @override
-  String get chatPageSetLockClearHint =>
-      '设置后，每次进入秘境都要解锁，更安全。修改或清空都需先输入当前锁屏码；新锁屏码留空 = 清空。';
+  String get chatPageSetLockClearHint => '设置后，每次进入秘境都要解锁。也可设为空，即可删除当前锁屏码。';
 
   @override
   String get chatPageSetLockHintNoPin => '设置后，每次进入秘境都要解锁，更安全。';
@@ -424,13 +423,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
 
   @override
-  String get chatPageSetLockCleared => '已清空锁屏码（下次启动直接进入）';
+  String get chatPageSetLockCleared => '已删除锁屏码（下次启动直接进入）';
 
   @override
-  String get chatPageClearLockTitle => '清空锁屏码？';
+  String get chatPageClearLockTitle => '删除锁屏码？';
 
   @override
-  String get chatPageClearLockMessage => '新锁屏码留空 = 清空锁屏码。确定要清除吗？清除后下次启动直接进入聊天。';
+  String get chatPageClearLockMessage => '确定要删除锁屏码吗？删除后下次启动将直接进入聊天。';
 
   @override
   String get chatPageMenuInvite => '生成开通码';
@@ -660,7 +659,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinUnsetValue => '未设置';
 
   @override
-  String get chatPageBurnHeading => '阅后即焚（仅本机生效）';
+  String get chatPageBurnHeading => '阅后即焚';
 
   @override
   String get chatPageBurnOff => '阅后即焚已关闭（消息永久保留）';
@@ -843,7 +842,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageDevicePublicKeyFailed => '未记录';
 
   @override
-  String get burnOptionKeepIndefinitely => '不设期限';
+  String get burnOptionOff => '关闭';
 
   @override
   String get burnOption1Minute => '1 分钟';
@@ -910,7 +909,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
 
   @override
-  String get advancedMenuTitle => '高级';
+  String get advancedMenuTitle => '高级功能';
 
   @override
   String get advancedDestroyEntrance => '销毁本通道';
@@ -958,7 +957,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceListAdd => '新建/加入秘境';
 
   @override
-  String get spaceListSwitch => '切换秘境';
+  String get spaceListSwitch => '切换我的秘境';
 
   @override
   String get promptLockCodeTitle => '输入锁屏码';

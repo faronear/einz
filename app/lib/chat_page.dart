@@ -254,7 +254,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String _burnOptionLabel(int seconds, AppLocalizations l10n) {
     switch (seconds) {
       case 0:
-        return l10n.burnOptionKeepIndefinitely;
+        return l10n.burnOptionOff;
       case 60:
         return l10n.burnOption1Minute;
       case 300:

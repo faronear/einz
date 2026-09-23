@@ -125,7 +125,7 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
   // 口令入口现在收在「高级」底部弹层里（对话页菜单 → 高级 → 修改口令）
-  await tester.tap(find.text('高级'));
+  await tester.tap(find.text('高级功能'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('修改共享口令'));
   await tester.pumpAndSettle();
@@ -196,13 +196,13 @@ void main() {
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
-    expect(find.text('高级'), findsOneWidget);
+    expect(find.text('高级功能'), findsOneWidget);
     // 我的身份/当前通道（未传 → 显示「未设置」）+ 退出本应用
     expect(find.text('我的身份'), findsOneWidget);
     expect(find.text('当前通道'), findsOneWidget);
     expect(find.text('退出本应用'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
-    expect(find.text('高级'), findsOneWidget);
+    expect(find.text('高级功能'), findsOneWidget);
     expect(find.text('锁屏码'), findsOneWidget);
     // 点"PIN: 未设置"菜单项
     await tester.tap(find.text('锁屏码'));
@@ -330,7 +330,7 @@ void main() {
     await tester.enterText(fields.at(2), '');
     await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
-    expect(find.text('清空锁屏码？'), findsOneWidget);
+    expect(find.text('删除锁屏码？'), findsOneWidget);
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
     await tester.pumpAndSettle();
@@ -338,7 +338,7 @@ void main() {
     expect(await AppLockService(db).isSetup, true, reason: '取消不清锁');
   });
 
-  testWidgets('有 PIN 时清空锁屏码：菜单项立即刷新（不再显示「已设置」）', (WidgetTester tester) async {
+  testWidgets('有 PIN 时删除锁屏码：菜单项立即刷新（不再显示「已设置」）', (WidgetTester tester) async {
     // 回归：清空成功后弹窗也 pop(true)，调用方此前写死 _hasPin=true——
     // 锁已清但菜单仍显示「锁屏码 已设置」（老板 2026-09-15 实测）。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
@@ -547,7 +547,7 @@ void main() {
     // 不调后台、不做任何写盘，只在顶部通知里说一句
     await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
-    expect(find.text('清空锁屏码？'), findsNothing);
+    expect(find.text('删除锁屏码？'), findsNothing);
     expect(find.text('锁屏码为空，下次启动可直接进入秘境'), findsOneWidget); // 顶部通知
     expect(find.text('设置锁屏码'), findsOneWidget); // 弹窗保持原样
     final lock = AppLockService(db);
@@ -1192,12 +1192,12 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('切换秘境'), findsOneWidget, reason: '保留的一条');
+    expect(find.text('切换我的秘境'), findsOneWidget, reason: '保留的一条');
     expect(find.text('空间管理'), findsNothing, reason: '合并后不应再出现');
     // 该项在弹层偏下，先滚到可见再点
-    await tester.ensureVisible(find.text('切换秘境'));
+    await tester.ensureVisible(find.text('切换我的秘境'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('切换秘境'));
+    await tester.tap(find.text('切换我的秘境'));
     await tester.pumpAndSettle();
     expect(switched, 0);
     // 就地弹层（不是新页面）：能看到「选择秘境」内容与通往第一屏的入口
@@ -1232,16 +1232,16 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('切换秘境'), findsOneWidget);
-    await tester.ensureVisible(find.text('切换秘境'));
+    expect(find.text('切换我的秘境'), findsOneWidget);
+    await tester.ensureVisible(find.text('切换我的秘境'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('切换秘境'));
+    await tester.tap(find.text('切换我的秘境'));
     await tester.pumpAndSettle();
     expect(managed, 0);
     expect(find.text('选择秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
-  testWidgets('高级：破坏性入口改为空间级「销毁本通道」（不再整机重置）',
+  testWidgets('高级功能：破坏性入口改为空间级「销毁本通道」（不再整机重置）',
       (WidgetTester tester) async {
     // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
     // 不该顺手抹掉本机上的其他空间 → 聊天页这格降级为空间级，整机清理由空间列表负责。
@@ -1271,7 +1271,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('高级'));
+    await tester.tap(find.text('高级功能'));
     await tester.pumpAndSettle();
     expect(find.text('销毁本通道'), findsOneWidget, reason: '空间级文案');
     expect(find.text('重置设备'), findsNothing, reason: '整机重置不该出现在单个空间里');

@@ -289,7 +289,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenHint =>
-      'The entrance opens only after this code is verified. A one-time code, valid for 24 hours, generated from any verified entrance in the space.';
+      'The entrance is go live only after an activation code is verified. A code is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
 
   @override
   String get setupTokenInputHint => 'Paste the token or invite link';
@@ -382,7 +382,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setPinDialogPinHint => 'At least 6 digits';
 
   @override
-  String get setPinDialogConfirmLabel => 'Confirm PIN';
+  String get setPinDialogConfirmLabel => 'Confirm new PIN';
 
   @override
   String get setPinDialogConfirmHint => 'Type it again to confirm';
@@ -419,21 +419,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageSetLockTitle => 'Set app lock';
+  String get chatPageSetLockTitle => 'Set PIN';
 
   @override
   String get chatPageSetLockClearHint =>
-      'Once set, you\'ll unlock every time you enter the space — safer. You can also leave the new PIN blank to clear it.';
+      'Once set, you\'ll unlock every time you enter the space. You can also leave the new PIN blank to delete the current PIN.';
 
   @override
   String get chatPageSetLockHintNoPin =>
-      'Once set, you\'ll unlock every time you enter the space — safer.';
+      'Once set, you\'ll unlock every time you enter the space.';
 
   @override
   String get chatPageSetLockOldLabel => 'Current PIN';
 
   @override
-  String get chatPageSetLockOldRequired => 'Enter your current PIN first';
+  String get chatPageSetLockOldRequired => 'Enter current PIN first';
 
   @override
   String get chatPageSetLockSameAsOld =>
@@ -444,19 +444,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'No PIN set — next launch goes straight into the space';
 
   @override
-  String get chatPageSetLockDone =>
-      'App lock set — PIN required at next launch';
+  String get chatPageSetLockDone => 'PIN set — PIN required at next launch';
 
   @override
-  String get chatPageSetLockCleared =>
-      'App lock cleared (enter directly next time)';
+  String get chatPageSetLockCleared => 'PIN deleted (enter directly next time)';
 
   @override
-  String get chatPageClearLockTitle => 'Clear app lock?';
+  String get chatPageClearLockTitle => 'Delete PIN?';
 
   @override
   String get chatPageClearLockMessage =>
-      'A blank new PIN clears the app lock — clear it? Next launch will go straight into chat.';
+      'Delete the PIN? After deletion, the app launch will go straight into chat.';
 
   @override
   String get chatPageMenuInvite => 'Create activation code';
@@ -492,7 +490,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuChangePassphrase => 'Change shared passphrase';
 
   @override
-  String get chatPageMenuAvatar => 'My Avatar';
+  String get chatPageMenuAvatar => 'My avatar';
 
   @override
   String get chatPageAvatarUploaded => '✅ Avatar updated';
@@ -696,7 +694,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePinUnsetValue => 'Not set';
 
   @override
-  String get chatPageBurnHeading => 'Burn-after-read (this device only)';
+  String get chatPageBurnHeading => 'Burn-after-read';
 
   @override
   String get chatPageBurnOff => 'Burn-after-read off (messages kept forever)';
@@ -883,7 +881,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageDevicePublicKeyFailed => 'Not recorded';
 
   @override
-  String get burnOptionKeepIndefinitely => 'Keep indefinitely';
+  String get burnOptionOff => 'Off';
 
   @override
   String get burnOption1Minute => '1 minute';
@@ -916,7 +914,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lockPageNoPinSet =>
-      'No app lock set (lock screen activates only with a PIN)';
+      'No PIN set (lock screen activates only with a PIN)';
 
   @override
   String get lockPageUnlock => 'Unlock';
@@ -952,7 +950,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Development address (not production), for debugging only';
 
   @override
-  String get advancedMenuTitle => 'Advanced';
+  String get advancedMenuTitle => 'Advanced features';
 
   @override
   String get advancedDestroyEntrance => 'Destroy this entrance';
@@ -1001,7 +999,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListAdd => 'Create or join a space';
 
   @override
-  String get spaceListSwitch => 'Switch space';
+  String get spaceListSwitch => 'Switch my space';
 
   @override
   String get promptLockCodeTitle => 'Enter your PIN';
