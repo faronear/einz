@@ -496,7 +496,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      '通道是本机连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。';
+      '通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。';
 
   @override
   String get chatPageRenameEntranceEmptyError => '请填写通道名称';
@@ -928,16 +928,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resetEntranceNameMismatch => '请输入正确的通道名称以确认';
 
   @override
-  String get resetInstallConfirmWord => '重置';
+  String get resetEntranceConfirmWord => '重置';
 
   @override
-  String get resetInstallPinLabel => '锁屏码';
+  String get resetEntrancePinLabel => '锁屏码';
 
   @override
-  String get resetInstallPinHint => '请输入本机锁屏码';
+  String get resetEntrancePinHint => '请输入本机锁屏码';
 
   @override
-  String get resetInstallServerResidualHint =>
+  String get resetEntranceServerResidualHint =>
       '⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道';
 
   @override

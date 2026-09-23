@@ -17,7 +17,7 @@ class Api {
   static const spaceJoin = '/spaces/join';
   // 消息回执（已送达/已读）单调高水位（POST 上报 / GET 回读）
   static const receipts = '/receipts';
-  // 本机自助退役（PROTOCOL.md §7.3）：客户端"重置本机"清本地数据之前调用，把自己
+  // 本机自助退役（PROTOCOL.md §7.3）：客户端"重置本通道"清本地数据之前调用，把自己
   // 从服务端注销（清会话/Push/待签 challenge、置 revoked），避免留下幽灵通道。
   static const entranceRetire = '/entrances/retire';
   // 补登安装级标识（多空间）：存量安装进聊天页时幂等上报一次，服务端据此把

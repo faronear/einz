@@ -541,7 +541,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     sendJson(res, 200, result)
     return
   }
-  // 自助退役（2026-09-21 新加，**无请求体**）：客户端"重置本机"在清本地数据之前调用它，
+  // 自助退役（2026-09-21 新加，**无请求体**）：客户端"重置本通道"在清本地数据之前调用它，
   // 把自己从服务端注销，避免留下永远删不掉的幽灵通道（/revoke 禁止自撤，谁也收拾不了）。
   // 与上面 revoke 的关键差异：① 目标恒为自己；② **不校验空间口令**（注销我自己，
   // session 即所有权；客户端那边已经过了"通道名 + 本机 PIN"闸门）；③ 不发 entrance.revoked。

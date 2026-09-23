@@ -100,7 +100,7 @@ export async function revokeEntrance (
  * - **不发 `entrance.revoked`**（见 ws.forgetEntranceConnection）：远程触发擦除的授权信号仍然
  *   只有口令干得动（撤销路径），本接口不打开这条旁路。
  *
- * 存在的理由：客户端"重置本机"原先纯本地清数据，服务端这条通道的注册表项、Push Token、
+ * 存在的理由：客户端"重置本通道"原先纯本地清数据，服务端这条通道的注册表项、Push Token、
  *   会话全都留着——对方 /entrances 里是一台永远在线的幽灵，而且 revoke 禁止自撤，谁也删不掉它
  *   （老板 2026-09-21 定：一并处理）。
  *

@@ -231,7 +231,7 @@ entrances.install_uid  TEXT NULL   -- 索引 idx_entrances_uid
 | --- | --- |
 | 谁生成 | **客户端**（32 位 hex），随 `POST /spaces`、`POST /spaces/join` 上报 |
 | 存量通道 | 不重走入网流程 → 客户端进聊天页时 `POST /entrances/install-uid` 幂等补登（只写本会话那一行） |
-| 粒度 | **安装级**：同一台设备的所有空间共用一份；卸载重装 / 「重置本机」清掉即轮换 |
+| 粒度 | **安装级**：同一台设备的所有空间共用一份；卸载重装 / 「整机清空」清掉即轮换 |
 | 存哪（App） | `app_state` 的 `app_lock.install_uid`（`AppLockService.installUid()` 惰性生成）。**不放 SecureStore**：与密钥无关，而在这里读安全存储会让"取个 id"依赖平台支持（同 §3.6 的教训） |
 | 存哪（TUI） | `EntranceStore.installUid`（TUI 的粒度是"一个 store = 一条通道"，见 `_deleteLocalData`） |
 | **不外泄** | `/space`、`/entrances`、WS 广播**都不带**该字段（两者都是显式列投影）——成员之间互不可见 |
@@ -318,7 +318,7 @@ PIN 模式下的额外处理：重写密文包需要 pin，而撤销发生在聊
 留在页面里）→ 先清数据并把该空间记为 pending，下次 `unlockVault(pin)` 时补摘凭证条目。
 M2 补：Vault 里还有其他空间时应回 SpaceListPage 而不是 SetupPage（代码里留了 TODO）。
 
-同一类问题：`local_reset.dart`（用户主动"重置本机"）语义保持全清，但 UI 上需与"删除单个空间"明确区分。
+同一类问题：`local_reset.dart`（用户主动"整机清空"）语义保持全清，但 UI 上需与"删除单个空间"明确区分。
 
 ## 5. UI 设计
 
@@ -343,7 +343,7 @@ M2 补：Vault 里还有其他空间时应回 SpaceListPage 而不是 SetupPage�
 
 ### 5.5 破坏性入口的两档语义（2026-09-22 定，M3 落地）
 
-多空间把"通道"拆成了"每空间一台虚拟通道"，于是原来那个唯一的「重置本机」在不同位置
+多空间把"通道"拆成了"每空间一台虚拟通道"，于是原来那个唯一的「重置本机」（整机级）在不同位置
 含义不清：站在某个空间里点它，用户想的是"结束这个空间"，实际却抹掉本机所有空间。定为两档：
 
 | 档 | 语义 | 影响范围 | 入口 | 服务端 |

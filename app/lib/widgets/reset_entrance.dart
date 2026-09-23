@@ -7,7 +7,7 @@ import '../widgets/top_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
 
-/// 破坏性操作的确认弹窗文案（空间级 / 本机级共用同一套结构，只换字）。
+/// 破坏性操作的确认弹窗文案（当前只有空间级「销毁本秘境通道」用，结构留给将来的破坏性操作）。
 class ConfirmDialogCopy {
   const ConfirmDialogCopy({
     required this.title,
@@ -20,14 +20,14 @@ class ConfirmDialogCopy {
   final String confirmLabel;
 }
 
-/// 弹出闸门（本机通道名 + 已设时的锁屏码），两道都对返回 true。
+/// 弹出闸门（通道名 + 已设时的锁屏码），两道都对返回 true。
 ///
 /// **闸门故意只用本机独占的因子**（老板 2026-09-22 定稿）：通道名确认清的是这条，
 /// 锁屏码是本地秘密。刻意**不校验空间口令**——那是**共享**给伴侣的加入凭证，不该获得
-/// 销毁我这条通道的权力；而且校验它必须联网，会让"本机身份属于一台已经连不上的服务器"
+/// 销毁我这条通道的权力；而且校验它必须联网，会让"这条通道连的服务器已经连不上"
 /// 这个最常见的重置场景直接自锁（详情见 `server/src/entrances.ts` 的 retireEntrance）。
 ///
-/// 两个场景共用它：空间级「销毁本秘境通道」与本机级「清除本设备全部数据」。
+/// 本机级的「清除本设备全部数据」已删除（2026-09-22）→ 当前只有空间级「销毁本秘境通道」用它。
 Future<bool> _confirmDestructive(
   BuildContext context, {
   required LocalDatabase db,
@@ -40,7 +40,7 @@ Future<bool> _confirmDestructive(
   // 不可用性优先——本地快照缺 entranceName 的旧装机不该因此永远清不掉。
   final l10n = AppLocalizations.of(context)!;
   final expected =
-      entranceName.trim().isEmpty ? l10n.resetInstallConfirmWord : entranceName.trim();
+      entranceName.trim().isEmpty ? l10n.resetEntranceConfirmWord : entranceName.trim();
   final ok = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
@@ -109,7 +109,7 @@ Future<bool> confirmLeaveSpace(
   // 凭证条目等下次解锁再摘（见 AppLockService.removeSpace 文档）。
   await AppLockService(database).removeSpace(spaceId);
   if (!retired && context.mounted) {
-    showTopNotice(context, l10n.resetInstallServerResidualHint);
+    showTopNotice(context, l10n.resetEntranceServerResidualHint);
   }
   return true;
 }
@@ -118,7 +118,7 @@ Future<bool> confirmLeaveSpace(
 // 用户的等价路径：逐个空间「销毁本秘境通道」，或直接卸载重装（ensureFreshInstall
 // 会清掉残留密钥）。`data/local_reset.dart` 的 resetLocalData() 作为"整机清空"原语保留。
 
-/// 破坏性操作共用的确认弹窗：说明小字 + 输入本机通道名（+已设时的锁屏码）。
+/// 破坏性操作共用的确认弹窗：说明小字 + 输入通道名（+已设时的锁屏码）。
 ///
 /// 文案由 [copy] 注入（空间级 / 本机级各一套）。
 class _ConfirmDestructiveDialog extends StatefulWidget {
@@ -240,7 +240,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
           if (widget.hasPin) ...[
             const SizedBox(height: 8),
             Text(
-              l10n.resetInstallPinHint,
+              l10n.resetEntrancePinHint,
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.outline,
@@ -252,7 +252,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
               obscureText: true,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                hintText: l10n.resetInstallPinLabel,
+                hintText: l10n.resetEntrancePinLabel,
                 border: const OutlineInputBorder(),
               ),
             ),

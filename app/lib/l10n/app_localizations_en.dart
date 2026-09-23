@@ -524,7 +524,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      'An entrance is the secure line between this device and a space, opened only after verification. This entrance works only on this device and in this space.';
+      'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.';
 
   @override
   String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';
@@ -972,16 +972,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter the correct entrance name to confirm';
 
   @override
-  String get resetInstallConfirmWord => 'RESET';
+  String get resetEntranceConfirmWord => 'RESET';
 
   @override
-  String get resetInstallPinLabel => 'PIN';
+  String get resetEntrancePinLabel => 'PIN';
 
   @override
-  String get resetInstallPinHint => 'Enter this device\'s PIN';
+  String get resetEntrancePinHint => 'Enter this device\'s PIN';
 
   @override
-  String get resetInstallServerResidualHint =>
+  String get resetEntranceServerResidualHint =>
       '⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list';
 
   @override

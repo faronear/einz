@@ -771,7 +771,7 @@ void main() {
 
     // 弹窗标题与备注（老板 2026-09-23 新文案）
     expect(find.text('当前通道'), findsWidgets, reason: '弹窗标题应为「当前通道」');
-    expect(find.text('通道是本机连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。'), findsOneWidget,
+    expect(find.text('通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。'), findsOneWidget,
         reason: '应显示通道备注说明');
     expect(find.text('通道公钥'), findsOneWidget, reason: '公钥标签');
     expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
@@ -1317,7 +1317,7 @@ void main() {
     await tester.tap(find.text('高级功能'));
     await tester.pumpAndSettle();
     expect(find.text('销毁本通道'), findsOneWidget, reason: '空间级文案');
-    expect(find.text('重置本机'), findsNothing, reason: '整机重置不该出现在单个空间里');
+    expect(find.text('清除本设备全部数据'), findsNothing, reason: '整机清空不该出现在单个空间里');
 
     await tester.tap(find.text('销毁本通道'));
     await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗

@@ -35,7 +35,7 @@ import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
-import 'widgets/reset_install.dart';
+import 'widgets/reset_entrance.dart';
 import 'widgets/space_switcher.dart';
 import 'data/vault_session.dart';
 import 'widgets/emoji_panel.dart';
@@ -1073,7 +1073,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
-  /// 「高级」底部弹层（二级菜单：修改口令 / 重置本机）。两项都只给标题——
+  /// 「高级」底部弹层（二级菜单：修改口令 / 销毁本通道）。两项都只给标题——
   /// 具体后果留给点进去的弹窗说明（弹层本身不解释）。
   ///
   /// 为什么用弹层而不是 MenuAnchor + SubmenuButton 的级联子菜单：手机宽度下

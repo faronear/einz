@@ -1013,7 +1013,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance is the secure line between this device and a space, opened only after verification. This entrance works only on this device and in this space.'**
+  /// **'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.'**
   String get chatPageEntranceScopeHint;
 
   /// No description provided for @chatPageRenameEntranceEmptyError.
@@ -1778,29 +1778,29 @@ abstract class AppLocalizations {
   /// **'Enter the correct entrance name to confirm'**
   String get resetEntranceNameMismatch;
 
-  /// No description provided for @resetInstallConfirmWord.
+  /// No description provided for @resetEntranceConfirmWord.
   ///
   /// In en, this message translates to:
   /// **'RESET'**
-  String get resetInstallConfirmWord;
+  String get resetEntranceConfirmWord;
 
-  /// No description provided for @resetInstallPinLabel.
+  /// No description provided for @resetEntrancePinLabel.
   ///
   /// In en, this message translates to:
   /// **'PIN'**
-  String get resetInstallPinLabel;
+  String get resetEntrancePinLabel;
 
-  /// No description provided for @resetInstallPinHint.
+  /// No description provided for @resetEntrancePinHint.
   ///
   /// In en, this message translates to:
   /// **'Enter this device\'s PIN'**
-  String get resetInstallPinHint;
+  String get resetEntrancePinHint;
 
-  /// No description provided for @resetInstallServerResidualHint.
+  /// No description provided for @resetEntranceServerResidualHint.
   ///
   /// In en, this message translates to:
   /// **'⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list'**
-  String get resetInstallServerResidualHint;
+  String get resetEntranceServerResidualHint;
 
   /// No description provided for @spaceListTitle.
   ///

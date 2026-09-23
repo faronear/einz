@@ -8681,3 +8681,18 @@ shared/app/cli 三包 `flutter analyze` 无 issue；`flutter gen-l10n` 重生成
 **未做**：cli 探针实跑（要真 server + pty），只把期望串对齐。
 
 **遗留**：`productLens` §12/§14 仍是 v1 口径（已在 projectPlan 待办里）；历史快照按老板意见保持旧名。
+
+**更正（同日，老板指出）**：
+1. 「**重置本机**」用词错——那个动作只清**一个通道/空间**的数据（App 的空间级「销毁本通道」= `removeSpace`；
+   CLI `/reset` = 删这个 store），不是清本机所有空间。全部改回 **「重置本通道」**。
+   连带把这一批里被我误命名的东西一起纠正：文件 `app/lib/widgets/reset_install.dart` → **`reset_entrance.dart`**
+   （它当前只承载空间级「销毁本秘境通道」流程）；l10n key `resetInstall{ConfirmWord,PinLabel,PinHint,ServerResidualHint}`
+   → `resetEntrance*`；DEPLOYMENT/SECURITY/PROTOCOL 与注释里的路径/措辞同步；
+   `install_uid` 的生命周期说明也改准（它随 **app_state 整表清除**轮换 = 卸载重装 / 整机清空；
+   **App 里销毁单个通道不动它**）。
+   「整机清空」(`resetLocalData()`) 是另一个**当前无 UI 入口**的原语，文档已写明。
+2. `chatPageEntranceScopeHint` 里「通道是**设备**连接到秘境的安全线路」**不是**笔误——它想说通道的**通用定义**
+   （任意设备 ↔ 任意秘境），下一句「本通道仅能用于本机和当前秘境」才收窄到本机。已把两处（zh/en）改回 `设备` /
+   `a device`。老板同时问"两句放一起是否多余"——**结论：保留**。第一句给**定义**（通道是什么：任意设备 ↔
+   任意秘境的安全线路），第二句给**适用范围**（这条通道只对"本机 + 当前秘境"有效）；两句各答一个问题，
+   删掉任一句都会缺信息。若嫌长，可只压缩措辞、不删句。

@@ -9,7 +9,7 @@
 
 | | 旧计划（2026-09-22） | 新计划（2026-09-23） |
 | --- | --- | --- |
-| 前提 | 有存量用户、有老客户端、有老本地数据 | **全新上线**：无老客户端、无历史数据、上线前重置本机 |
+| 前提 | 有存量用户、有老客户端、有老本地数据 | **全新上线**：无老客户端、无历史数据、上线前整机清空 |
 | 目标名 | `entry_id`（早于术语改「通道」） | **`entrance_id`**（与已落地的 `entrance` 一致） |
 | 机制 | 三期 alias：遥测列 + 版本双接受 + 双名映射文件 + 跨端发布 + 读旧回退 | **一次性机械替换**，一次提交 |
 | 风险 | 🔴 锁包旧密文、drift 旧列、TUI store 旧键回退 | 归零（直接按新语义写新格式，本地库/商店重建） |
@@ -75,7 +75,7 @@
    - `partner_name` / `partnerName` / `partner_gender` / `partnerGender` 是**第二人** → `peer_*`。
      顺序上必须先做这步，再做 `person_name` → `partner_name`，否则会互相踩。
    - `resetDevice*`：三个 `resetDeviceName*`（比对的其实是**通道名**）→ `resetEntranceName*`；
-     其余（确认词 / 本机 PIN / 服务端残留）→ `resetInstall*`。
+     其余（确认词 / 本机 PIN / 服务端残留）→ `resetEntrance*`（二次更正：动作是**按通道**的，不是安装级）。
 3. **历史字面量保留**：`db.ts` 清理 v1 meta 的字面量 `'creator_person_id'`、`'person_name:%'`、
    `'person_gender:%'`（引用的是老数据里的键名，改了就没意义）；`cli/bin/einz_tui.dart`
    注释里的 v1 `/health person_names` 同理。
@@ -91,7 +91,7 @@
 | `server/src/deviceUid.ts` | `installUid.ts` |
 | `server/src/personName.ts` | `partnerName.ts` |
 | `shared/lib/src/policy/person_name_policy.dart` | `partner_name_policy.dart` |
-| `app/lib/widgets/reset_device.dart` | `reset_install.dart` |
+| `app/lib/widgets/reset_device.dart` | `reset_entrance.dart`（2026-09-23 二次更正：该文件当前只有**空间级**「销毁本秘境通道」流程，不是安装级）|
 | `server/test/device_name.test.ts` | `entrance_name.test.ts` |
 | `server/test/device_retire.test.ts` | `entrance_retire.test.ts` |
 | `server/test/device_uid.test.ts` | `install_uid.test.ts` |
@@ -116,7 +116,7 @@
 - `server`：`npm run build` + `npm test` 全绿。
 - `app`：`flutter analyze` / `flutter gen-l10n` 无 issue（goldens 不跑、UI 由老板自测）。
 - 本地库：drift 升到 **v8**，用 `ALTER TABLE RENAME COLUMN` 保数据；锁包/store 的 JSON 键
-  不做回退读（按"全新上线"口径，老板会重置本机）。
+  不做回退读（按"全新上线"口径，老板会整机清空）。
 
 ## 7. 中文「设备」→「通道」清扫（2026-09-23 **第二批**，已完成）
 
@@ -125,7 +125,9 @@
 **规则**（逐处判断，**不**全局替换）：
 - 指**登记项** → 「通道」（量词用「条」：一条通道，不是一台通道）；
 - 指**本机 / 物理机器 / 型号** → 保留「设备」（GLOSSARY 许可 UI 这么说）；
-- 指**安装** → 「本机」（如「重置本机」）；
+- 指**安装** → 「本机」（如「本机锁屏码」「两台设备需要连同一台服务器」）；
+  注意：**按通道的重置动作叫「重置本通道」**，不要写「重置本机」——它只清一个通道/空间；
+  「整机清空」是另一个（当前无 UI 入口）的原语。
 - 平台实现语境 → 「平台通道」保留。
 
 **范围**：server/src + server/test、shared/lib + shared/test、app/lib + app/test、

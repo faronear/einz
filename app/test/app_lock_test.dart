@@ -114,7 +114,7 @@ void main() {
     expect(first.length, 32, reason: '16 字节 hex，与服务端形状约束一致');
     expect(await lock.installUid(), first, reason: '同一安装内稳定（每个空间读到同一个）');
 
-    // 「重置本机」= 清空 app_state 整表 → 下次生成新的：不该再被认成同一台设备
+    // 整机清空 = 清空 app_state 整表 → 下次生成新的：不该再被认成同一台设备
     await db.delete(db.appState).go();
     expect(await lock.installUid(), isNot(first), reason: '重置后应轮换');
   });

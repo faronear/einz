@@ -21,7 +21,7 @@ import 'setup_page.dart';
 /// （`open -a Einz --args --server https://host`），覆盖本次启动使用的服务器地址，
 /// **仅本次生效**（地址从不落盘，见 `data/server_config.dart`）。
 ///
-/// 清空本设备数据走界面：对话页菜单 → 高级 → 重置本机（手机/桌面同一入口）。
+/// 清空数据走界面：对话页菜单 → 高级 → 销毁本通道（空间级——只清当前秘境那条通道）。
 Future<void> main() async {
   // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
@@ -141,7 +141,7 @@ class _EinzAppState extends State<EinzApp> {
 /// 无锁包**根本不进锁屏页**（老板 2026-09-20）：那页在没有 PIN 时只会显示
 /// "尚未设置锁屏码"的死胡同（LockPage 内部保留该兜底仅为防死锁）。
 ///
-/// 清空本设备数据不在启动参数里：走「对话页菜单 → 高级 → 重置本机」。
+/// 清空数据不在启动参数里：走「对话页菜单 → 高级 → 销毁本通道」。
 class StartupGate extends StatefulWidget {
   const StartupGate({super.key, this.db});
 

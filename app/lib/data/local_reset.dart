@@ -5,11 +5,13 @@ import 'media_cache.dart';
 import 'secure_store.dart';
 import 'vault_session.dart';
 
-/// 清空本设备全部本地数据，回到"新设备"状态。
+/// 清空**整机**全部本地数据，回到"新设备"状态（"整机清空"原语）。
 ///
-/// 由界面入口触发：对话页菜单 → 高级 → 重置本机（`widgets/reset_install.dart`）。
-/// 开发时用 `--server` 连开发服务器测完之后，本机的 `spaceId` / `token` / 通道密钥对
-/// 都属于那台开发服务器——连回生产既用不了，也需要一个出口清库重新入网。
+/// **当前没有 UI 入口**：界面上能做的破坏性操作是空间级的「销毁本通道」
+/// （`widgets/reset_entrance.dart` 的 `confirmLeaveSpace` → `removeSpace`，只清一个空间）。
+/// 本函数留给"整机重来"：开发时用 `--server` 连开发服务器测完之后，本机的
+/// `spaceId` / `token` / 通道密钥对都属于那台开发服务器——连回生产既用不了，
+/// 也需要一个出口清库重新入网。
 ///
 /// 清的范围：
 /// - drift 全表：消息、附件元数据、同步锚点、草稿、回执、`spaces`（空间列表——漏了

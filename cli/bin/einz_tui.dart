@@ -1428,7 +1428,7 @@ void _exitReset(String storePath) {
   _deleteLocalData(storePath);
   _restoreTerminal();
   try {
-    stderr.write('$_clearHome已重置本机，本地数据已清除，下次启动将重新入网。\n');
+    stderr.write('$_clearHome已重置本通道，本地数据已清除，下次启动将重新入网。\n');
     stderr.flush();
   } catch (_) {}
   exit(0);
@@ -2859,7 +2859,7 @@ Future<void> _uploadAttachmentInBackground(ChatSession session, String path) asy
   }
 }
 
-/// `/reset`：重置本机——三道闸门过后清本地数据并退出（下次启动走全新入网向导）。
+/// `/reset`：重置本通道——三道闸门过后清本地数据并退出（下次启动走全新入网向导）。
 ///
 /// 闸门刻意**全离线**：通道名比对 + 本机锁屏码，不联网、不问空间口令。理由见
 /// `server/src/entrances.ts` 的 `retireEntrance`：空间口令是**共享**给伴侣的加入凭证，
@@ -2875,13 +2875,13 @@ Future<void> _execReset(String storePath) async {
 
   // ① 通道名：确认清的是哪一条。没有名字（不降级成 entranceId——让用户抄一串 id 只会
   //    制造新的抄错机会）时退化为固定确认词 RESET：本地缺字段不该让人永远重置不了，
-  //    与 app 端同一口径（reset_install.dart 的 fallback）。
+  //    与 app 端同一口径（reset_entrance.dart 的 fallback）。
   const fallbackWord = 'RESET';
   final entranceName = session.store.entranceName?.trim() ?? '';
   final expected = entranceName.isEmpty ? fallbackWord : entranceName;
   final prompt = entranceName.isEmpty
       ? '❓ 本机没有通道名，请输入 $fallbackWord 以确认重置:'
-      : '❓ 确认要重置的是本机「$entranceName」，请输入通道名:';
+      : '❓ 确认要重置的是本通道「$entranceName」，请输入通道名:';
   final typed = (await _prompt(session, prompt, required: true)).trim();
   if (!s.running) return;
   if (typed != expected) {
@@ -2969,7 +2969,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/reset :: 重置本机（输入本机通道名 + 锁屏码确认，清空本地数据后退出）',
+        '/reset :: 重置本通道（输入通道名 + 本机锁屏码确认，清空本地数据后退出）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3328,7 +3328,7 @@ Future<void> _execCommand(String line) async {
     case '/history':
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));
     case '/reset':
-      // 重置本机（老板 2026-09-21）：清掉本地 store 与附件缓存，回到全新入网向导。
+      // 重置本通道（老板 2026-09-21）：清掉本地 store 与附件缓存，回到全新入网向导。
       // 不可逆，故三道闸门：**全部离线**，不依赖网络、不碰共享口令——
       //   ① 输入本机通道名（确认清的是这条，挡误触/顺手回车）
       //   ② 本机锁屏码（已设才验；锁屏码只属于本机持有者，不像空间口令那样是共享凭证）

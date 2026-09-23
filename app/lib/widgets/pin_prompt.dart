@@ -110,7 +110,7 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
             keyboardType: TextInputType.number,
             autofocus: true,
             decoration: InputDecoration(
-              hintText: l10n.resetInstallPinLabel,
+              hintText: l10n.resetEntrancePinLabel,
               border: const OutlineInputBorder(),
             ),
             onSubmitted: (_) => _submit(),
