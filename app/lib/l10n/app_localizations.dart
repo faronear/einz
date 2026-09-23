@@ -203,13 +203,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Name (you can change it later)'**
+  /// **'Name (can be changed later)'**
   String get wizardNameHint;
 
   /// No description provided for @wizardPeerNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Partner\'s name (you can change it later)'**
+  /// **'Partner\'s name (can be changed later)'**
   String get wizardPeerNameHint;
 
   /// No description provided for @wizardPeerNameHintInput.

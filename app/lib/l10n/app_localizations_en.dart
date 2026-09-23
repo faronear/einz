@@ -65,10 +65,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get wizardNameHint => 'Name (you can change it later)';
+  String get wizardNameHint => 'Name (can be changed later)';
 
   @override
-  String get wizardPeerNameHint => 'Partner\'s name (you can change it later)';
+  String get wizardPeerNameHint => 'Partner\'s name (can be changed later)';
 
   @override
   String get wizardPeerNameHintInput => 'Partner\'s name';

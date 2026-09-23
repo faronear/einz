@@ -24,8 +24,8 @@
       }
     }
   },
-  "wizardNameHint": "Name (you can change it later)",
-  "wizardPeerNameHint": "Partner's name (you can change it later)",
+  "wizardNameHint": "Name (can be changed later)",
+  "wizardPeerNameHint": "Partner's name (can be changed later)",
   "wizardPeerNameHintInput": "Partner's name",
   "wizardNameRequired": "Enter your name",
   "wizardPeerNameRequired": "Enter your partner's name",
