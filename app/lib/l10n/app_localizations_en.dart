@@ -292,13 +292,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenHint =>
-      'The entrance is go live only after an activation code is verified. A code is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
+      'The entrance goes live only after a token is verified. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
 
   @override
   String get setupTokenInputHint => 'Paste the token or invite link';
 
   @override
-  String get setupTokenNeedInput => 'Enter the activation code';
+  String get setupTokenNeedInput => 'Enter the token';
 
   @override
   String get setupTokenInvalid => 'Invalid token';
@@ -345,7 +345,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageInviteHint => 'Paste or type the token';
 
   @override
-  String get setupPageNeedInvite => '⚠️ Enter the one-time activation code';
+  String get setupPageNeedInvite => '⚠️ Enter the one-time token';
 
   @override
   String get setupPageScanInvite => 'Scan token QR code';
@@ -454,7 +454,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
-  String get chatPageMenuInvite => 'Create activation code';
+  String get chatPageMenuInvite => 'Create token';
 
   @override
   String get chatPageInviteDialogTitle => 'Token created';

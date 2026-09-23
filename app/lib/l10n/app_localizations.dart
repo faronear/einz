@@ -605,7 +605,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'The entrance is go live only after an activation code is verified. A code is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
+  /// **'The entrance goes live only after a token is verified. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
@@ -617,7 +617,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the activation code'**
+  /// **'Enter the token'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
@@ -701,7 +701,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageNeedInvite.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Enter the one-time activation code'**
+  /// **'⚠️ Enter the one-time token'**
   String get setupPageNeedInvite;
 
   /// No description provided for @setupPageScanInvite.
@@ -887,7 +887,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuInvite.
   ///
   /// In en, this message translates to:
-  /// **'Create activation code'**
+  /// **'Create token'**
   String get chatPageMenuInvite;
 
   /// No description provided for @chatPageInviteDialogTitle.
