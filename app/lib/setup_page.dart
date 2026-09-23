@@ -124,6 +124,11 @@ class _SetupPageState extends State<SetupPage> {
   // Android 已配 adjustResize，行为同 iOS。
   final _nameFocus = FocusNode();
   final _peerNameFocus = FocusNode();
+  // 其余步骤的「首框」节点：切步骤后由 [_focusFirstFieldOfStep] 显式 requestFocus
+  final _passphraseFocus = FocusNode(); // create/join 第 3 步（共享口令）
+  final _inviteFocus = FocusNode(); // join 第 1 步（开通码）
+  final _envelopeFocus = FocusNode(); // offline 第 1 步（密保信封）
+  final _pinFocus = FocusNode(); // 第 4 步 / offline 第 2 步（锁屏码）
   final _myGenderRevealKey = GlobalKey();
   final _peerGenderRevealKey = GlobalKey();
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
@@ -157,6 +162,8 @@ class _SetupPageState extends State<SetupPage> {
   // 向导状态：角色分流 + 步骤索引 + 跨步骤共享数据
   _WizardRole? _role;
   int _step = 0;
+  /// 已做过"切步骤后交还焦点"的 (角色, 步骤) 标记，避免每帧重复处理。
+  String _focusedStepKey = '';
   EntranceKeyPair? _keyPair;
   Uint8List? _spaceKey;
   String? _sessionToken;
@@ -180,6 +187,10 @@ class _SetupPageState extends State<SetupPage> {
   void dispose() {
     _nameFocus.dispose();
     _peerNameFocus.dispose();
+    _passphraseFocus.dispose();
+    _inviteFocus.dispose();
+    _envelopeFocus.dispose();
+    _pinFocus.dispose();
     _creatorName.dispose();
     _spaceId.dispose();
     _envelopeKey.dispose();
@@ -314,8 +325,53 @@ class _SetupPageState extends State<SetupPage> {
   // _escrowAccess 等）已重构为向导步骤（_buildStep* 系列，见下方各场景实现），
   // 认证/托管/二维码逻辑按步骤迁移重建。
 
+  /// 本步骤「第一个输入框」的焦点节点（没有输入框的步骤返回 null）。
+  FocusNode? _firstFieldNodeOfStep() {
+    if (_role == null) return null;
+    return switch (_role!) {
+      _WizardRole.create => switch (_step) {
+          1 => _nameFocus, // 我的名字
+          2 => _peerNameFocus, // 对方名字
+          3 => _passphraseFocus, // 共享口令
+          4 => _pinFocus, // 锁屏码（已设锁屏码时该步无输入框，requestFocus 自然空转）
+          _ => null,
+        },
+      _WizardRole.join => switch (_step) {
+          1 => _inviteFocus, // 开通码
+          // 2 = 选择身份（只有卡片，没有输入框）
+          3 => _passphraseFocus,
+          4 => _pinFocus,
+          _ => null,
+        },
+      _WizardRole.offline => switch (_step) {
+          1 => _envelopeFocus, // 密信信封
+          2 => _pinFocus,
+          _ => null,
+        },
+    };
+  }
+
+  /// 切步骤/角色后，**显式**把焦点交给新步骤的第一个输入框。
+  ///
+  /// 为什么不能只靠 `autofocus`（老板 2026-09-23 实测：切到新步骤不聚焦、键盘不弹）：
+  /// 步骤体外面套着 `AnimatedSwitcher`，过渡的 200ms 里**旧步骤仍在树上**——旧输入框
+  /// 既持有焦点、自己又带 `autofocus`，于是新框插入时"scope 已有焦点"→ 它的 autofocus
+  /// 被忽略；等旧框移除、焦点退回 scope 时已经没人再请求 → 焦点停在 scope 上。
+  /// 试过"先 unfocus 再让 autofocus 生效"也不行：此时树上新旧两个框都带 autofocus，
+  /// scope 会挑到正在退场的那一个。所以这里直接点名新步骤的节点。
+  void _focusFirstFieldOfStep() {
+    final key = '$_role-$_step';
+    if (key == _focusedStepKey) return;
+    _focusedStepKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _firstFieldNodeOfStep()?.requestFocus();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _focusFirstFieldOfStep();
     final l10n = AppLocalizations.of(context)!;
     // 探测中/失败（角色未判定）→ 品牌启动屏——全屏粉蓝渐变 + 上半部旋转 Logo
     // （无文字）；无 AppBar/菜单/服务器输入框（老板决策 2026-09-08）。
@@ -1578,6 +1634,7 @@ class _SetupPageState extends State<SetupPage> {
         _stepHeader(l10n.setupTokenTitle, l10n.setupTokenHint),
         TextField(
           controller: _inviteCode,
+          focusNode: _inviteFocus,
           style: const TextStyle(fontSize: 20),
           // 已验证通过 → 锁为只读：token 后续会被 joinSpace 消费，回到本页再改/再校验
           // 都会失败（老板 2026-09-12）；只读时不 autofocus（没东西可输，键盘不该弹）
@@ -1988,6 +2045,7 @@ class _SetupPageState extends State<SetupPage> {
         // 下面的**确认框刻意不给眼睛**——确认是用来复核的，能顺手点开就失去意义。
         PassphraseField(
           controller: _escrowPassphrase,
+          focusNode: _passphraseFocus,
           style: const TextStyle(fontSize: 20),
           autofocus: true,
           revealTip: l10n.chatPagePassphraseRevealTip,
@@ -2048,6 +2106,7 @@ class _SetupPageState extends State<SetupPage> {
         _stepHeader(l10n.wizardTitlePin, l10n.wizardPinHint),
         TextField(
           controller: _pin,
+          focusNode: _pinFocus,
           style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
@@ -2392,6 +2451,7 @@ class _SetupPageState extends State<SetupPage> {
         ),
         TextField(
           controller: _envelopeKey,
+          focusNode: _envelopeFocus,
           style: const TextStyle(fontSize: 18),
           maxLines: 3,
           autofocus: true,

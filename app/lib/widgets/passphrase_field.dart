@@ -19,6 +19,7 @@ class PassphraseField extends StatefulWidget {
     this.style,
     this.onChanged,
     this.autofocus = false,
+    this.focusNode,
   });
 
   final TextEditingController controller;
@@ -27,6 +28,9 @@ class PassphraseField extends StatefulWidget {
 
   /// 是否进入时自动聚焦（向导步骤首框用，让键盘直接弹起待输入）。
   final bool autofocus;
+
+  /// 外部焦点节点：向导切步骤后由页面显式 requestFocus（见 SetupPage 的同名说明）。
+  final FocusNode? focusNode;
 
   /// 眼睛的 tooltip 文案（`showReveal: false` 时可省）。
   final String? revealTip;
@@ -81,6 +85,7 @@ class _PassphraseFieldState extends State<PassphraseField> {
       obscureText: !_revealed,
       onChanged: widget.onChanged,
       autofocus: widget.autofocus,
+      focusNode: widget.focusNode,
       decoration: InputDecoration(
         labelText: widget.labelText,
         hintText: widget.hintText,
