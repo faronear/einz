@@ -518,14 +518,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGenderLabel => 'Gender';
 
   @override
-  String get chatPageRenameDeviceTitle => 'This entrance in this space';
+  String get chatPageRenameDeviceTitle => 'Current entrance';
 
   @override
-  String get chatPageRenameDeviceLabel => 'Name of this entrance';
+  String get chatPageRenameDeviceLabel => 'Entrance name';
 
   @override
   String get chatPageDeviceScopeHint =>
-      'They belong to this entrance only — the same phone or computer has its own set in every space.';
+      'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.';
 
   @override
   String get chatPageRenameDeviceEmptyError => 'Name cannot be empty';
@@ -671,7 +671,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMyNameLabel => 'My name';
 
   @override
-  String get chatPageMenuDeviceNameLabel => 'Entrance name';
+  String get chatPageMenuDeviceNameLabel => 'Current entrance';
 
   @override
   String get chatPagePinLabel => 'PIN';

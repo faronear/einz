@@ -489,13 +489,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
-  String get chatPageRenameDeviceTitle => '通道信息（本秘境）';
+  String get chatPageRenameDeviceTitle => '当前通道';
 
   @override
   String get chatPageRenameDeviceLabel => '通道名称';
 
   @override
-  String get chatPageDeviceScopeHint => '这条通道的名称与公钥只属于当前秘境——同一台机器在别的秘境是另一条通道。';
+  String get chatPageDeviceScopeHint =>
+      '通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。';
 
   @override
   String get chatPageRenameDeviceEmptyError => '名称不能为空';
@@ -632,7 +633,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
-  String get chatPageMenuDeviceNameLabel => '通道名称';
+  String get chatPageMenuDeviceNameLabel => '当前通道';
 
   @override
   String get chatPagePinLabel => '锁屏码';
