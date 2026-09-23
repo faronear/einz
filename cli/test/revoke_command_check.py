@@ -2,7 +2,7 @@
 # /entrances 与 /revoke 回归（老板 2026-09-16）：
 #   ① `/entrances` 输出**同空间全部通道**（我 + 对方，不只自己的）：A 创建、B 以伴侣身份
 #      加入后，A 的列表里应同时有「本机 A」和「在线 B」，并带序号（供 /revoke 使用）；
-#   ② `/revoke` 三重确认（选通道 → 输入 yes → 密保口令）+ 口令校验：
+#   ② `/revoke` 三重确认（选通道 → 输入 yes → 共享口令）+ 口令校验：
 #      - 口令错 → 提示且**目标毫发无损**（B 的 TUI 仍在跑、store 还在）；
 #      - 正确口令 → 服务端撤销 → B 收到 entrance.revoked → **清空本地数据并退出**（store 被删）；
 #   ③ 负例：不能撤销本机（拒绝后命令即结束，不会被后续输入喂成确认）；
@@ -171,7 +171,7 @@ def onboard_create(label, store, port, home):
         if expect not in out:
             print(f'❌ {label}: 未到「{expect}」问答'); print(out[-600:]); raise SystemExit(1)
         send(m, payload)
-    if '设置密保口令' not in wait_text(m, '设置密保口令', timeout=30):
+    if '设置共享口令' not in wait_text(m, '设置共享口令', timeout=30):
         print(f'❌ {label}: 未到口令问答'); raise SystemExit(1)
     send(m, PASSPHRASE + '\r')
     finish_onboarding(m, label)
@@ -184,13 +184,13 @@ def onboard_join(label, store, port, token, home):
     if '创建秘境' not in wait_text(m, '创建秘境', timeout=30):
         print(f'❌ {label}: 未等到入口'); raise SystemExit(1)
     send(m, 'j\r')
-    wait_text(m, '输入邀请码', timeout=20)
+    wait_text(m, '输入开通码', timeout=20)
     send(m, token + '\r')
-    out = wait_text(m, '我是谁', timeout=20)
-    if '我是谁' not in out:
+    out = wait_text(m, '完整输入我的名字', timeout=20)
+    if '完整输入我的名字' not in out:
         print(f'❌ {label}: 未到身份选择'); print(out[-600:]); raise SystemExit(1)
     send(m, PARTNER + '\r')
-    wait_text(m, '验证密保口令', timeout=20)
+    wait_text(m, '验证共享口令', timeout=20)
     send(m, PASSPHRASE + '\r')
     if '成功加入秘境' not in wait_text(m, '成功加入秘境', timeout=30):
         print(f'❌ {label}: 加入未成功'); raise SystemExit(1)
@@ -240,8 +240,8 @@ def main():
         # ---------- ① /entrances：同空间全部通道（先只有自己） ----------
         send(m_a, '/entrances\r')
         frame = wait_screen(m_a, lambda t: '通道列表' in t, 'A 的通道列表')
-        if '同空间 1 台' not in frame or '本机' not in frame:
-            print(f'❌ ① 只有 A 时应为 1 台且标「本机」:\n{frame[-800:]}'); return 1
+        if '同空间 1 条' not in frame or '本机' not in frame:
+            print(f'❌ ① 只有 A 时应为 1 条且标「本机」:\n{frame[-800:]}'); return 1
 
         m_b, p_b = onboard_join('B', store_b, port, new_join_token(port, store_a), WORK)
         spawned.append((m_b, p_b))
@@ -264,9 +264,9 @@ def main():
         if '清空本地数据' not in frame:
             print(f'❌ ② 确认提示应写明不可逆后果:\n{frame[-900:]}'); return 1
         send(m_a, 'yes\r')
-        wait_screen(m_a, lambda t: '输入密保口令' in t, '撤销要求密保口令')
+        wait_screen(m_a, lambda t: '输入共享口令' in t, '撤销要求共享口令')
         send(m_a, 'wrong-passphrase\r')
-        frame = wait_screen(m_a, lambda t: '密保口令错误' in t, '口令错提示')
+        frame = wait_screen(m_a, lambda t: '共享口令错误' in t, '口令错提示')
         if '目标通道毫发无损' not in frame:
             print(f'❌ ② 口令错应说明目标未受影响:\n{frame[-900:]}'); return 1
         time.sleep(2.0)
@@ -284,13 +284,29 @@ def main():
                             '③ 后仍能正常执行命令')
         print('✅ ③ /revoke 本机 → 拒绝（未进入确认流程，命令已结束）')
 
+        # ---------- ③b 留空取消：动作内任一步都能退出（2026-09-23 新增） ----------
+        # 此前 required: true 拦空回车，用户被困：只能输序号、输乱码（报"无效"）或 /exit。
+        send(m_a, '/revoke\r')
+        wait_screen(m_a, lambda t: '输入要撤销的通道序号' in t, '③b 无参 /revoke 询问序号')
+        send(m_a, '\r')  # 留空 = 取消
+        wait_screen(m_a, lambda t: '已取消（未做任何改动）' in t, '③b 序号步留空取消')
+        send(m_a, f'/revoke {peer_no}\r')
+        wait_screen(m_a, lambda t: '确认请输入 yes' in t, '③b 二次确认')
+        send(m_a, 'yes\r')
+        wait_screen(m_a, lambda t: '输入共享口令' in t, '③b 口令步')
+        send(m_a, '\r')  # 留空 = 取消（此前这一步才是真正被困的：只能重输或 /exit）
+        wait_screen(m_a, lambda t: '已取消（未做任何改动）' in t, '③b 口令步留空取消')
+        send(m_a, '/entrances\r')
+        wait_screen(m_a, lambda t: '通道列表' in t and '同空间 2 条' in t, '③b 取消后可继续用')
+        print('✅ ③b 序号步/口令步留空回车 → 已取消，TUI 未被困（命令照常可用）')
+
         # ---------- ④ 正确口令 → 撤销生效：对方清空本地数据并退出 ----------
         send(m_a, '/revoke\r')  # 无参：走"列出通道 → 询问序号"的交互路径
         wait_screen(m_a, lambda t: '输入要撤销的通道序号' in t, '无参 /revoke 询问序号')
         send(m_a, f'{peer_no}\r')
         wait_screen(m_a, lambda t: '确认请输入 yes' in t, '④ 二次确认')
         send(m_a, 'yes\r')
-        wait_screen(m_a, lambda t: '输入密保口令' in t, '④ 口令输入')
+        wait_screen(m_a, lambda t: '输入共享口令' in t, '④ 口令输入')
         send(m_a, PASSPHRASE + '\r')
         frame = wait_screen(m_a, lambda t: f'已撤销 #{peer_no}' in t, '④ 撤销成功')
         deadline = time.time() + 20

@@ -172,14 +172,14 @@ def join_flow(label, store, port, token, identity):
         print(f'FAIL {label}: 未等到创建/加入选择')
         sys.exit(1)
     send(master, 'J\r')
-    wait_text(master, '输入邀请码')
+    wait_text(master, '输入开通码')
     send(master, token + '\r')
-    out = wait_text(master, '我是谁')
-    if '我是谁' not in out:
+    out = wait_text(master, '完整输入我的名字')
+    if '完整输入我的名字' not in out:
         print(f'FAIL {label}: 未等到身份选择（加入失败？）:\n{out[-600:]}')
         sys.exit(1)
     send(master, identity + '\r')
-    wait_text(master, '验证密保口令')
+    wait_text(master, '验证共享口令')
     send(master, PASSPHRASE + '\r')
     if '成功加入秘境' not in wait_text(master, '成功加入秘境'):
         print(f'FAIL {label}: 加入未成功')
@@ -238,7 +238,7 @@ def main():
         send(m_a, 'Alice\r')
         wait_text(m_a, '伴侣的性别')
         send(m_a, '2\r')
-        wait_text(m_a, '设置密保口令')
+        wait_text(m_a, '设置共享口令')
         send(m_a, PASSPHRASE + '\r')
         if '成功创建秘境' not in wait_text(m_a, '成功创建秘境'):
             print('FAIL A: 空间创建未成功')

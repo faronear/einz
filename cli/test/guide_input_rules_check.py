@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # 引导输入规则回归（老板 2026-09-11）
 #   0) create 各必填问答（秘境入口/我的名字/我的性别/伴侣的名字/伴侣的性别）
-#      留空回车 → 必须被拦住（提示「此项不能为空」，继续等同一问答）
+#      留空回车 → 必须被拦住（提示「请输入内容」，继续等同一问答）
 #      （老板 2026-09-15：入网向导要求必须输入时不允许直接回车跳过）
-#   1) create 口令必填：走到「设置密保口令」留空回车 → 必须被拦住（提示
-#      「此项不能为空」，且不进入创建）；补输口令后创建成功
+#   1) create 口令必填：走到「设置共享口令」留空回车 → 必须被拦住（提示
+#      「请输入内容」，且不进入创建）；补输口令后创建成功
 #   2) 锁屏码规则（与 App 一致：纯数字 + 至少 6 位）：字母 → 提示「锁屏码只能是
 #      数字」；5 位数字 → 提示「锁屏码至少 6 位数字」；6 位数字 → 设置成功
-#   3) join 口令必填：第二条通道走到「验证密保口令」留空回车 → 同样被拦住
+#   3) join 口令必填：第二条通道走到「验证共享口令」留空回车 → 同样被拦住
 #      （不进入加入——否则会先 joinSpace 再取不到 Space Key，通道卡在
 #      "已登记但无密钥"的坏状态）；补输同一口令后加入成功
 #   4) join 口令输错：应停在口令环节提示重输，且**同一个** join token 仍可用
@@ -108,23 +108,23 @@ def main():
                 return 1
             # 必填：留空回车不接受（老板 2026-09-15）—— 提示后仍停在原问答
             send(m, '\r')
-            out = wait_text(m, '此项不能为空', timeout=10)
-            if '此项不能为空' not in out:
-                print(f'❌ 「{expect}」留空回车未被拦住（未提示此项不能为空）')
+            out = wait_text(m, '请输入内容', timeout=10)
+            if '请输入内容' not in out:
+                print(f'❌ 「{expect}」留空回车未被拦住（未提示请输入内容）')
                 print(out[-600:])
                 return 1
             send(m, payload)
 
         # 关键：口令留空回车 → 必须拦住
-        out = wait_text(m, '设置密保口令')
-        if '设置密保口令' not in out:
+        out = wait_text(m, '设置共享口令')
+        if '设置共享口令' not in out:
             print('❌ 未到口令问答')
             print(out[-600:])
             return 1
         send(m, '\r')
-        out = wait_text(m, '此项不能为空', timeout=10)
-        if '此项不能为空' not in out:
-            print('❌ 留空口令未被拦住（未提示此项不能为空）')
+        out = wait_text(m, '请输入内容', timeout=10)
+        if '请输入内容' not in out:
+            print('❌ 留空口令未被拦住（未提示请输入内容）')
             print(out[-600:])
             return 1
         if '正在创建秘境' in out or '成功创建秘境' in out:
@@ -200,8 +200,8 @@ def main():
         spawned.append((m2, p2))
         for expect, payload in [
             ('秘境入口', 'j\r'),
-            ('输入邀请码', join_token + '\r'),
-            ('我是谁', 'Alice\r'),
+            ('输入开通码', join_token + '\r'),
+            ('完整输入我的名字', 'Alice\r'),
         ]:
             out = wait_text(m2, expect)
             if expect not in out:
@@ -210,22 +210,22 @@ def main():
                 return 1
             # 必填：留空回车不接受（老板 2026-09-15）—— 邀请码尤其不能放空
             send(m2, '\r')
-            out = wait_text(m2, '此项不能为空', timeout=10)
-            if '此项不能为空' not in out:
-                print(f'❌ B「{expect}」留空回车未被拦住（未提示此项不能为空）')
+            out = wait_text(m2, '请输入内容', timeout=10)
+            if '请输入内容' not in out:
+                print(f'❌ B「{expect}」留空回车未被拦住（未提示请输入内容）')
                 print(out[-600:])
                 return 1
             send(m2, payload)
 
-        out = wait_text(m2, '验证密保口令')
-        if '验证密保口令' not in out:
+        out = wait_text(m2, '验证共享口令')
+        if '验证共享口令' not in out:
             print('❌ B 未到口令问答')
             print(out[-600:])
             return 1
         send(m2, '\r')
-        out = wait_text(m2, '此项不能为空', timeout=10)
-        if '此项不能为空' not in out:
-            print('❌ B 留空口令未被拦住（未提示此项不能为空）')
+        out = wait_text(m2, '请输入内容', timeout=10)
+        if '请输入内容' not in out:
+            print('❌ B 留空口令未被拦住（未提示请输入内容）')
             print(out[-600:])
             return 1
         if '正在加入秘境' in out or '成功加入秘境' in out:
@@ -242,7 +242,7 @@ def main():
             print('❌ B 输错口令未被拦在口令环节（未提示重新输入）')
             print(out[-800:])
             return 1
-        if '加入秘境失败' in out or '输入邀请码' in out:
+        if '加入秘境失败' in out or '输入开通码' in out:
             print('❌ B 输错口令竟退回邀请码环节（token 被烧掉）')
             print(out[-800:])
             return 1

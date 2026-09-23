@@ -93,7 +93,7 @@ def start_server(port, db_path):
     raise RuntimeError('server 未就绪')
 
 def onboard(label, store, port, home):
-    """入网全流程：入口 → 我的名字/性别 → 伴侣名字/性别 → 密保口令 → 锁屏码 → 进入聊天态。"""
+    """入网全流程：入口 → 我的名字/性别 → 伴侣名字/性别 → 共享口令 → 锁屏码 → 进入聊天态。"""
     m, p = start_tui(store, port, home)
     for expect, payload in [
         ('秘境入口', 'c\r'),
@@ -106,8 +106,8 @@ def onboard(label, store, port, home):
         if expect not in out:
             print(f'❌ {label}: 未到「{expect}」问答'); print(out[-600:]); raise SystemExit(1)
         send(m, payload)
-    out = wait_text(m, '设置密保口令', timeout=30)
-    if '设置密保口令' not in out:
+    out = wait_text(m, '设置共享口令', timeout=30)
+    if '设置共享口令' not in out:
         print(f'❌ {label}: 未到 escrow 口令问答'); print(out[-600:]); raise SystemExit(1)
     send(m, PASSPHRASE + '\r')
     # 锁屏码：TUI 阻塞读键盘期间不重绘，提示要等下一次按键才出现 → 重发直到命中
@@ -169,7 +169,7 @@ def join_revoker(port, store_path):
     return revoker['sessionToken']
 
 def revoke(port, entrance_id, passphrase, token):
-    """POST /entrances/:id/revoke：撤销本空间另一条通道——**每次都要校验密保口令**（2026-09-16）。"""
+    """POST /entrances/:id/revoke：撤销本空间另一条通道——**每次都要校验共享口令**（2026-09-16）。"""
     status, body = http_status(port, 'POST', f'/entrances/{entrance_id}/revoke',
                                {'passphrase': passphrase}, token)
     if status != 200:
@@ -206,7 +206,7 @@ def main():
 
         revoker_token = join_revoker(port_a, store_a)
 
-        # 口令校验（老板 2026-09-16 定稿：同 space 内可互撤，但每次撤销都要验密保口令）：
+        # 口令校验（老板 2026-09-16 定稿：同 space 内可互撤，但每次撤销都要验共享口令）：
         # ① 口令错 → 401，且通道**毫发无损**（在线 TUI 不得退出、不得清盘）；
         # ② 不带口令 → 400。两条都在"正确口令"之前跑，确保撤销确实被拦住。
         bad_status, bad_body = http_status(

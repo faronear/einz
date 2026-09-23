@@ -402,10 +402,10 @@ Future<(EntranceStore, String, String)> _onboard(String storePath, String server
   // 终端逐行打印；进 TUI 后并成**一条** system 消息（\n 连接，块内紧贴、不与其他消息
   // 混在一起——与"选择秘境入口"那段 _prompt 同一写法）。
   if (store.spaceId == null) {
-    final welcome = <String>['=== Einz 秘境 ===', '✅ 当前服务器: $server'];
+    final welcome = <String>['=== Einz 秘境 ===', '✅ 服务端地址: $server'];
     final entranceName = store.entranceName;
     if (entranceName != null && entranceName.isNotEmpty) {
-      welcome.add('✅ 新通道默认名称: $entranceName');
+      welcome.add('✅ 新通道名称: $entranceName');
     }
     welcome.add('✅ 新通道公钥: ${store.publicKey}');
     welcome.add('----------------');
@@ -569,7 +569,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
               (await _prompt(session, '❓ 输入开通码:', required: true)).trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 请输入开通码！可从任意一条已开通的通道生成开通码.'));
+            session.messages.add(_systemMessage(session, '⚠️ 请输入开通码（可由任意一条已开通的通道生成）'));
             _scheduleRender();
             continue;
           }
@@ -1002,7 +1002,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       spaceId: spaceId,
       keyVersion: 1,
     );
-    session.messages.add(_systemMessage(session, '✅ 口令已设置。请将口令通过安全的方式分享给伴侣。'));
+    session.messages.add(_systemMessage(session, '✅ 共享口令已设置，请通过安全的方式分享给伴侣。'));
     session.messages.add(_systemMessage(session, '----------------'));
     final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
       spaceId: spaceId,
@@ -2880,10 +2880,14 @@ Future<void> _execReset(String storePath) async {
   final entranceName = session.store.entranceName?.trim() ?? '';
   final expected = entranceName.isEmpty ? fallbackWord : entranceName;
   final prompt = entranceName.isEmpty
-      ? '❓ 本机没有通道名，请输入 $fallbackWord 以确认重置:'
-      : '❓ 确认要重置的是本通道「$entranceName」，请输入通道名:';
-  final typed = (await _prompt(session, prompt, required: true)).trim();
+      ? '❓ 本通道还没有名字，请输入 $fallbackWord 以确认重置（留空取消）:'
+      : '❓ 确认要重置的是本通道「$entranceName」，请输入通道名（留空取消）:';
+  final typed = await _promptAction(session, prompt);
   if (!s.running) return;
+  if (typed == null) {
+    session.messages.add(_systemMessage(session, '✅ 已取消（未做任何改动）'));
+    return;
+  }
   if (typed != expected) {
     session.messages.add(_systemMessage(session, '✅ 已取消（输入不符，未做任何改动）'));
     return;
@@ -2892,10 +2896,14 @@ Future<void> _execReset(String storePath) async {
   // ② 本机锁屏码（已设才验：Argon2id，走 /pin 那套；成功会清零尝试计数）
   final pinHash = session.store.pinHash;
   if (pinHash != null) {
-    final pin = (await _prompt(session, '❓ 输入本机锁屏码（重置需验证）:', hidden: true, required: true))
-        .trim();
+    final pin = await _promptAction(session, '❓ 输入本机锁屏码（重置需验证；留空取消）:',
+        hidden: true);
     if (!s.running) return;
-    if (pin.isEmpty || !await _verifyPin(pinHash, pin)) {
+    if (pin == null) {
+      session.messages.add(_systemMessage(session, '✅ 已取消（未做任何改动）'));
+      return;
+    }
+    if (!await _verifyPin(pinHash, pin)) {
       session.messages.add(_systemMessage(session, '⚠️ 锁屏码错误——已取消（未做任何改动）'));
       return;
     }
@@ -2945,7 +2953,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/attach <file> :: 上传文件',
+        '/attach <文件路径> :: 上传文件',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2965,7 +2973,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/revoke <序号|通道名> :: 撤销同空间的某条通道（需共享口令；被撤通道将清空本地数据）',
+        '/revoke <通道序号> :: 强制撤销某条通道（需共享口令；被撤通道将清空本地数据）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -2985,11 +2993,11 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/passphrase [random] :: 修改共享口令；random 生成随机 12 词恢复码',
+        '/passphrase <random> :: 修改共享口令；random 生成随机 12 词恢复码',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/backup [路径] :: 导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）',
+        '/backup <路径> :: 导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3001,11 +3009,11 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/server [地址] :: 查看当前服务器；带地址 = 切换本次会话的服务器（仅本次生效）',
+        '/server <地址> :: 查看当前服务端；带地址参数：切换服务端（仅本次生效）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/space :: 查看当前接入的秘境',
+        '/space :: 查看当前连接的秘境',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3013,7 +3021,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/open <序号> :: 打开带 #序号 的附件消息',
+        '/open <附件序号> :: 打开 #序号 的附件消息',
       ));
       s.status = '';
     case '/server':
@@ -3100,7 +3108,7 @@ Future<void> _execCommand(String line) async {
       // （--server 启动参数或 /server 命令），只本次生效。
       final origin = s.session.server == await _defaultServer()
           ? '本机默认'
-          : '本次覆盖（--server 或 /server）';
+          : '本次覆盖 --server 或 /server';
       final ws = switch (s.session.wsStatus) {
         WsStatus.connected => '已连接',
         WsStatus.connecting => '连接中',
@@ -3116,11 +3124,11 @@ Future<void> _execCommand(String line) async {
               '   实时连接 ws: $ws\n'
               '   对方: ${s.peerOnline ? '在线' : '离线'}\n'
               '   秘境 id: ${st.spaceId ?? '未绑定'}\n'
-              '   秘境密钥: ${st.spaceKey != null ? '已就绪' : '无'}）\n'
-              '   本机名称: ${st.entranceName ?? '未命名'}\n'
-              '   本机 id: ${st.entranceId ?? '未登记'}\n'
-              '   本机编号: $slot\n'
-              '   本机公钥: ${st.publicKey}\n'
+              '   秘境密钥: ${st.spaceKey != null ? '已就位' : '无'}\n'
+              '   通道名称: ${st.entranceName ?? '未命名'}\n'
+              '   通道 id: ${st.entranceId ?? '未登记'}\n'
+              '   通道编号: $slot\n'
+              '   通道公钥: ${st.publicKey}\n'
               '   消息同步: seq ${st.lastServerSequence}｜本地历史 ${st.history.length} 条\n'
               '   数据文件: ${s.storePath}'));
       s.status = '';
@@ -3230,6 +3238,8 @@ Future<void> _execCommand(String line) async {
       // **同 space 内可互撤**（自己的另一条 / 伴侣的通道），但每次都要校验共享口令——
       // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
       // 选通道（序号/通道名）→ 输入 yes 确认目标 → 输入口令。任一步取消都不做任何改动。
+      // **任一步留空回车即取消**（老板 2026-09-23：此前 required 拦空回车，用户被困，
+      // 只剩"输乱码报无效"和 /exit 两条别扭的路）。
       try {
         final server = s.session.server;
         final token = s.session.store.sessionToken;
@@ -3259,8 +3269,13 @@ Future<void> _execCommand(String line) async {
             sb.write(r.line);
           }
           s.session.messages.add(_systemMessage(s.session, sb.toString()));
-          final answer = (await _prompt(s.session, '❓ 输入要撤销的通道序号:', required: true)).trim();
+          final answer =
+              await _promptAction(s.session, '❓ 输入要撤销的通道序号（留空取消）:');
           if (!s.running) break;
+          if (answer == null) {
+            s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
+            break;
+          }
           final matches = _matchEntranceRows(rows, answer);
           if (matches.length != 1) {
             s.session.messages.add(_systemMessage(
@@ -3288,20 +3303,18 @@ Future<void> _execCommand(String line) async {
             s.session,
             '⚠️ 即将撤销 #${target.no} ${target.label}（使用者：${target.partnerName}）——\n'
             '   该通道下次联网认证时会**清空本地数据**（含历史消息与附件），不可逆。'));
-        final confirm =
-            (await _prompt(s.session, '❓ 确认请输入 yes（其他任意输入取消）:', required: true)).trim();
+        final confirm = await _promptAction(s.session, '❓ 确认请输入 yes（留空或其它任意输入取消）:');
         if (!s.running) break;
-        if (confirm.toLowerCase() != 'yes') {
+        if (confirm == null || confirm.toLowerCase() != 'yes') {
           s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
           break;
         }
         // 口令（隐藏输入）：撤销的授权因子——即使本机已持会话，也必须由口令持有者授权
-        final passphrase =
-            (await _prompt(s.session, '❓ 输入共享口令（撤销需校验）:', hidden: true, required: true))
-                .trim();
+        final passphrase = await _promptAction(
+            s.session, '❓ 输入共享口令（撤销需校验；留空取消）:',
+            hidden: true);
         if (!s.running) break;
-        // 防御：required 已拦空回车，这里兜住 /exit 之类的中断（空口令会被服务端 400）
-        if (passphrase.isEmpty) {
+        if (passphrase == null) {
           s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
           break;
         }
@@ -3699,13 +3712,18 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
   } else {
     while (true) {
       if (!_state!.running) return; // 已退出
-      oldPass = await _prompt(session, '❓ 验证老共享口令：', hidden: false, required: true);
-      if (oldPass.isEmpty) continue;
+      final entered = await _promptAction(session, '❓ 验证老共享口令（留空取消）:');
+      if (!_state!.running) return;
+      if (entered == null) {
+        session.messages.add(_systemMessage(session, '✅ 已取消（未修改共享口令）'));
+        return;
+      }
       try {
-        await escrow.openPackage(passphrase: oldPass, envelope: serverFile);
-        break; // 旧口令验证通过
+        await escrow.openPackage(passphrase: entered, envelope: serverFile);
+        oldPass = entered; // 旧口令验证通过
+        break;
       } on FormatException {
-        session.messages.add(_systemMessage(session, '⚠️ 旧口令错误，请重新输入（或 /exit 退出）'));
+        session.messages.add(_systemMessage(session, '⚠️ 老口令错误，请重新输入（留空取消）'));
         continue;
       }
     }
@@ -3713,8 +3731,12 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
   // 2) 新口令（两次输入一致）
   while (true) {
     if (!_state!.running) return;
-    final p1 = await _prompt(session, '❓ 设置新共享口令（务必牢记，严禁泄漏！）：', hidden: false, required: true);
-    if (p1.isEmpty) continue;
+    final p1 = await _promptAction(session, '❓ 设置新共享口令（务必牢记，严禁泄漏！；留空取消）:');
+    if (!_state!.running) return;
+    if (p1 == null) {
+      session.messages.add(_systemMessage(session, '✅ 已取消（未修改共享口令）'));
+      return;
+    }
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
       session.messages.add(_systemMessage(session, policyError));
@@ -3791,8 +3813,13 @@ Future<bool?> _serverHasEscrow(EntranceStore store, String server) async {
 Future<void> _setupEscrowPassphrase(EntranceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _prompt(session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:', required: true);
-    if (p1.isEmpty) continue; // 防御：正常不会到这（输入循环 required 拦截留空回车）
+    final p1 = await _promptAction(
+        session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣；留空取消）:');
+    if (!_state!.running) break;
+    if (p1 == null) {
+      session.messages.add(_systemMessage(session, '✅ 已跳过（之后可用 /passphrase 设置）'));
+      break;
+    }
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
       session.messages.add(_systemMessage(session, policyError));
@@ -3976,6 +4003,12 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 
 /// 引导问答：提示作为 system 消息进消息流，回答由输入循环接管（you> 输入；
 /// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
+///
+/// **选哪个提示函数**（2026-09-23 定的规则）：
+/// - **向导必填**（名字/性别/开通码/身份选择/口令接入）→ 用本函数 + `required: true`：
+///   留空回车被拦，避免误提交空值；那里的"取消"= 不做这件事 = 离开向导，逃生门是 `/exit`。
+/// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase` 这类可从聊天里放弃的操作）
+///   → 用 [_promptAction]：留空回车 = 放弃这个动作。
 Future<String> _prompt(ChatSession session, String message,
     {bool hidden = false, bool required = false}) {
   final s = _state!;
@@ -3987,6 +4020,21 @@ Future<String> _prompt(ChatSession session, String message,
   final completer = Completer<String>();
   s.pendingGuideCompleter = completer;
   return completer.future;
+}
+
+/// 动作内的一步问答：**留空回车 = 放弃当前动作**，返回 null（调用方打印"已取消"收场）。
+///
+/// 为什么单独一个函数（老板 2026-09-23 反馈）：这些问答原先借 `_prompt(required: true)`
+/// 拦空回车（那是给向导必填做的），结果是**用户被困在动作里**——`/revoke` 只能输序号、
+/// 输乱码（还报"无效"）或 `/exit`（杀掉整个 App）；`/passphrase` 更是 `while(true)`
+/// 重试循环，提示语自己写着"（或 /exit 退出）"。
+///
+/// 与 [_prompt] 的差别只在意图：调用方拿到 null 就"已取消 + 不做任何改动"，无需再判空串。
+/// 退出（`/exit`）时 [_abortPendingGuide] 也会 complete 空回答 → 这里同样返回 null，
+/// 故调用方**必须先判 `running`**，否则退出时会多打一条"已取消"。
+Future<String?> _promptAction(ChatSession session, String message, {bool hidden = false}) async {
+  final answer = (await _prompt(session, message, hidden: hidden)).trim();
+  return answer.isEmpty ? null : answer;
 }
 
 /// 退出时释放引导问答等待（complete 空回答），避免 _runGuide 的 await 挂起。

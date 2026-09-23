@@ -41,7 +41,7 @@ STORE_A = "/tmp/einz-e2e-a.json"
 STORE_B = "/tmp/einz-e2e-b.json"
 STORE_C = "/tmp/einz-e2e-c.json"
 
-# 密保口令：必须满足强度策略（shared/passphrase_policy.dart）。
+# 共享口令：必须满足强度策略（shared/passphrase_policy.dart）。
 # 2026-09-14 起三端强制校验——原脚本用的 "abc123"（6 位）已被拒，脚本因此失效。
 PASSPHRASE = "einzpass2026"
 
@@ -127,7 +127,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         sys.exit(1)
     send(m, "J\r")  # 输入 J（join）——大小写均可
     name, out, _ = read_until(m, [
-        ("ask_token", re.compile(r"输入邀请码")),
+        ("ask_token", re.compile(r"输入开通码")),
     ], prefix=label)
     if wrong_token:
         send(m, wrong_token + "\r")
@@ -141,7 +141,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
             print(f"FAIL {label}: 错误 token 未被拒绝。输出:\n", out[-600:])
             sys.exit(1)
         name, out, _ = read_until(m, [
-            ("ask_token_again", re.compile(r"输入邀请码")),
+            ("ask_token_again", re.compile(r"输入开通码")),
         ], prefix=label)
         if name != "ask_token_again":
             print(f"FAIL {label}: 被拒后未直接重输 token（回到首问？）。输出:\n", out[-600:])
@@ -159,14 +159,14 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         time.sleep(2.0)
     send(m, token + "\r")
     name, out, _ = read_until(m, [
-        ("ask_slot", re.compile(r"我是谁")),
+        ("ask_slot", re.compile(r"完整输入我的名字")),
         ("joined", re.compile(r"成功加入秘境")),
         ("fail", re.compile(r"加入秘境失败")),
     ], prefix=label)
     if name == "ask_slot":
         send(m, identity_name + "\r")  # 输入完整名字选择身份（老板 2026-09-10——不再输编号）
         name, out, _ = read_until(m, [
-            ("ask_passphrase", re.compile(r"验证密保口令")),
+            ("ask_passphrase", re.compile(r"验证共享口令")),
         ], prefix=label)
         send(m, PASSPHRASE + "\r")
         name, out, _ = read_until(m, [
@@ -224,7 +224,7 @@ def main():
     ], prefix="A")
     send(m_a, "2\r")  # 伴侣性别：2=女（数字输入——老板定稿）
     name, out, _ = read_until(m_a, [
-        ("ask_passphrase", re.compile(r"设置密保口令")),
+        ("ask_passphrase", re.compile(r"设置共享口令")),
     ], prefix="A")
     send(m_a, PASSPHRASE + "\r")
     name, out, _ = read_until(m_a, [
