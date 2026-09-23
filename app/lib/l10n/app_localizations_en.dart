@@ -993,7 +993,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListEmpty => 'No spaces joined yet';
 
   @override
-  String get spaceListAdd => 'Create or join a space';
+  String get spaceListAdd => 'Add a space';
 
   @override
   String get spaceListSwitch => 'Switch my space';

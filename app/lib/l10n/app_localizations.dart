@@ -1823,7 +1823,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListAdd.
   ///
   /// In en, this message translates to:
-  /// **'Create or join a space'**
+  /// **'Add a space'**
   String get spaceListAdd;
 
   /// No description provided for @spaceListSwitch.

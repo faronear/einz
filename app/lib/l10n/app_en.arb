@@ -442,7 +442,7 @@
   "resetEntranceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner's entrance list",
   "spaceListTitle": "Choose a space",
   "spaceListEmpty": "No spaces joined yet",
-  "spaceListAdd": "Create or join a space",
+  "spaceListAdd": "Add a space",
   "spaceListSwitch": "Switch my space",
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Adding a space rewrites the encrypted vault — confirm with your PIN first",
