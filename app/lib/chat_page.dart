@@ -1301,6 +1301,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final nameError = ValueNotifier<String?>(null);
     // 名字/设备名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
     final editing = ValueNotifier<bool>(false);
+    // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
+    final nameFocus = FocusNode();
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1323,12 +1325,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               const SizedBox(height: 10),
             ],
             // 名字/设备名输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
-            // 白底可编辑、按钮消失（老板要求 2026-09-09）
+            // 白底可编辑、按钮消失（老板要求 2026-09-09）。
+            // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
+            // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
             ValueListenableBuilder<bool>(
               valueListenable: editing,
               builder: (_, isEditing, _) => TextField(
                 controller: ctrl,
+                focusNode: nameFocus,
                 readOnly: !isEditing,
+                onTap: () {
+                  if (editing.value) return;
+                  editing.value = true;
+                  nameFocus.requestFocus();
+                },
                 decoration: InputDecoration(
                   labelText: renameDevice ? l10n.chatPageRenameDeviceLabel : l10n.chatPageRenameNameLabel,
                   border: const OutlineInputBorder(),
@@ -1486,6 +1496,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       genderCtrl.dispose();
       nameError.dispose();
       editing.dispose();
+      nameFocus.dispose();
     });
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
   }

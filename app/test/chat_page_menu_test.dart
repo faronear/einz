@@ -438,6 +438,49 @@ void main() {
     expect(find.text('新名字'), findsOneWidget);
   });
 
+  testWidgets('改名对话框：点输入框任意位置即进编辑态（不必点编辑图标）', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _FakeApi();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        deviceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('我的身份'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
+    // 点名字输入框本身（不是右侧编辑图标）→ 也应切到编辑态
+    await tester.tap(
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first);
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.edit), findsNothing, reason: '点输入框内任意位置后应进入编辑态');
+    await tester.enterText(
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
+        '新名字');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500)); // 触发 400ms 延迟 dispose
+    expect(tester.takeException(), isNull);
+    expect(find.text('新名字'), findsOneWidget);
+  });
+
   testWidgets('退出本应用：确认弹窗显示（不触发 exit）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
