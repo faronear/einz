@@ -410,7 +410,7 @@
   "resetEntrancePinLabel": "PIN",
   "resetEntrancePinHint": "Enter this device's PIN",
   "resetEntranceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner's entrance list",
-  "spaceListTitle": "Choose a space",
+  "spaceListTitle": "Switch my space",
   "spaceListEmpty": "No spaces joined yet",
   "spaceListAdd": "Add a space",
   "spaceListSwitch": "Switch my space",

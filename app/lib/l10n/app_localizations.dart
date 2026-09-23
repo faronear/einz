@@ -1691,7 +1691,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListTitle.
   ///
   /// In en, this message translates to:
-  /// **'Choose a space'**
+  /// **'Switch my space'**
   String get spaceListTitle;
 
   /// No description provided for @spaceListEmpty.
