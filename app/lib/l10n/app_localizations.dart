@@ -230,6 +230,12 @@ abstract class AppLocalizations {
   /// **'Enter your partner\'s name'**
   String get wizardPeerNameRequired;
 
+  /// No description provided for @wizardPeerNameSameName.
+  ///
+  /// In en, this message translates to:
+  /// **'The two names must be different'**
+  String get wizardPeerNameSameName;
+
   /// No description provided for @wizardNameInvalidError.
   ///
   /// In en, this message translates to:

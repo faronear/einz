@@ -29,6 +29,7 @@
   "wizardPeerNameHintInput": "Partner's name",
   "wizardNameRequired": "Enter your name",
   "wizardPeerNameRequired": "Enter your partner's name",
+  "wizardPeerNameSameName": "The two names must be different",
   "wizardNameInvalidError": "Only Chinese/English letters, digits, _ , - and emoji are allowed.",
   "wizardNameTooLongError": "At most {max} characters",
   "@wizardNameTooLongError": {

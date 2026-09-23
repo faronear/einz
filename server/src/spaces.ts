@@ -111,6 +111,11 @@ export async function createSpace(
   // 只有传了才校验（未传维持现状——服务端不强制必填，必填由客户端引导负责）
   if (creatorName != null) assertPartnerName(creatorName);
   if (peerName != null) assertPartnerName(peerName);
+  // 两人不能同名（老板 2026-09-10 定）：join 是"按名字选身份"，同名会让
+  // "你是哪一位"无法判别（App/TUI 客户端也各自拦，这里是兜底）
+  if (creatorName != null && peerName != null && creatorName === peerName) {
+    throw new ApiError("INVALID_REQUEST", "两人的名字不能相同", 400);
+  }
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
   const spacePublicKey = publicKey ?? "pending:" + randomUUID();
   // 地址 = Keccak-256(space_public_key) 后 20 字节 + EIP-55（确定性；公钥缺失回退随机）

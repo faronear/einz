@@ -80,6 +80,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardPeerNameRequired => 'Enter your partner\'s name';
 
   @override
+  String get wizardPeerNameSameName => 'The two names must be different';
+
+  @override
   String get wizardNameInvalidError =>
       'Only Chinese/English letters, digits, _ , - and emoji are allowed.';
 

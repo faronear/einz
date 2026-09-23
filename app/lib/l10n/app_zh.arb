@@ -29,6 +29,7 @@
   "wizardPeerNameHintInput": "伴侣的昵称",
   "wizardNameRequired": "请填写我的名字",
   "wizardPeerNameRequired": "请填写伴侣的名字",
+  "wizardPeerNameSameName": "两人的名字不能相同",
   "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。",
   "wizardNameTooLongError": "名字最多 {max} 个字符",
   "@wizardNameTooLongError": {

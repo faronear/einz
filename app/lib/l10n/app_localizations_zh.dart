@@ -78,6 +78,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameRequired => '请填写伴侣的名字';
 
   @override
+  String get wizardPeerNameSameName => '两人的名字不能相同';
+
+  @override
   String get wizardNameInvalidError => '名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。';
 
   @override

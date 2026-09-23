@@ -708,6 +708,11 @@ class _SetupPageState extends State<SetupPage> {
       } else if (checkPartnerNamePolicy(partner) case final v?) {
         localError = _nameRuleError(v);
         invalid = true;
+      } else if (partner == _creatorName.text.trim()) {
+        // 两人不能同名（老板 2026-09-10 定；TUI 早已收口，App 此前漏了——2026-09-23 实测）：
+        // join 时是"按名字选身份"，两个名字相同就没法判别你是哪一位
+        localError = l10n.wizardPeerNameSameName;
+        invalid = true;
       }
       if (_peerGender == null) {
         peerGenderError = l10n.wizardGenderRequired;

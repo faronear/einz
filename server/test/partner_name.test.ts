@@ -86,6 +86,8 @@ test('端到端：create 的两个名字与改名都按白名单收口', async (
     }
     assert.equal(await createWith('Mr Lukas', 'Alice'), 400, '我的名字含空格应被拒')
     assert.equal(await createWith('Lukas', 'My Love'), 400, '伴侣名字含空格应被拒')
+    // 1b) 两人同名 → 400（老板 2026-09-10 定：join 按名字选身份，同名无法判别）
+    assert.equal(await createWith('Lukas', 'Lukas'), 400, '两人同名应被拒')
 
     // 2) create：合规名字（含 emoji）→ 201
     const create = await req(port, '/spaces', {
