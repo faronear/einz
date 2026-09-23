@@ -3818,7 +3818,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               return [
                 // 菜单分组（老板 2026-09-22 定）：
                 //   ①「我」：我的身份 / 我的头像（关于"我这个人"）
-                //   ②「本入口」：入口名称 / 新入口令牌（关于"本机在这个秘境里的入口"）
+                //   ②「本通道」：通道名称 / 新通道令牌（关于"本机在这个秘境里的通道"）
                 //   ③ 设置：语言 / 界面主题   ④ 安全：阅后即焚 / 附件存储 / 锁屏码 / 高级
                 //   ⑤ 结尾：关于秘境 / 切换秘境 / 退出本应用
                 PopupMenuItem(
@@ -3850,7 +3850,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                // ①「我」与②「本入口」之间（老板 2026-09-22 要求单独一行）
+                // ①「我」与②「本通道」之间（老板 2026-09-22 要求单独一行）
                 const PopupMenuDivider(height: kMenuDividerHeight),
                 PopupMenuItem(
                   height: kMenuRowHeight,

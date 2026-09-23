@@ -569,7 +569,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
               (await _prompt(session, '❓ 输入令牌:', required: true)).trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 必须输入令牌！可从任意一个已开通的入口生成令牌.'));
+            session.messages.add(_systemMessage(session, '⚠️ 必须输入令牌！可从任意一条已开通的通道生成令牌.'));
             _scheduleRender();
             continue;
           }
@@ -1278,7 +1278,7 @@ Future<void> main(List<String> args) async {
 
   final session = ChatSession(store, storePath, server);
   // 运行期任何一次认证拿到 403 DEVICE_REVOKED（会话过期自动续期 / /auth / 切换服务器）
-  // → 立即清盘退出：撤销语义在"所有认证入口"上一致（老板 2026-09-16）。
+  // → 立即清盘退出：撤销语义在"所有已开通的通道"上一致（老板 2026-09-16）。
   // FORBIDDEN（库被重置/未登记）不会走这里，只在消息流里警告。
   session.onDeviceRevoked = () => _exitRevoked(storePath);
   // 全局状态提前初始化：_unlockPin 内用 _state!.running——解锁必须在
@@ -1757,7 +1757,7 @@ void _render() {
   } else {
     buf.write(_barLine(
         _bgBlack,
-        '⚙ ${_truncateByWidth('/help 查看命令 /invite 开通新入口 /attach 发送文件', cols - 4)}',
+        '⚙ ${_truncateByWidth('/help 查看命令 /invite 开通新通道 /attach 发送文件', cols - 4)}',
         cols));
   }
   // 光标定位到输入编辑位置（与 _renderInputLine 一致，←→ 移动后光标跟随）
@@ -2976,7 +2976,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: 生成一次性令牌，24小时有效，邀请伴侣或自己开通一个新入口到本秘境。',
+        '/invite :: 生成一次性令牌，24小时有效，邀请伴侣或自己开通一条新通道到本秘境。',
       ));
       s.session.messages.add(_systemMessage(
         s.session,

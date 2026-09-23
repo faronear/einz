@@ -123,7 +123,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '随便输入的口令');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令错误：请确认首个入口创建时设置的口令'), findsOneWidget,
+    expect(find.text('口令错误：请确认首条通道创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
     expect(find.text('共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。'),
         findsOneWidget, reason: '应停留在口令页');
@@ -160,7 +160,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '随便输入的口令');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('口令错误：请确认首个入口创建时设置的口令'), findsOneWidget,
+    expect(find.text('口令错误：请确认首条通道创建时设置的口令'), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
     expect(joinCalls, 0, reason: '验口令之前不应消费一次性 token');
 

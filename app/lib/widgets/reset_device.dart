@@ -27,7 +27,7 @@ class ConfirmDialogCopy {
 /// 销毁我这台设备的权力；而且校验它必须联网，会让"本机身份属于一台已经连不上的服务器"
 /// 这个最常见的重置场景直接自锁（详情见 `server/src/devices.ts` 的 retireDevice）。
 ///
-/// 两个场景共用它：空间级「销毁本秘境入口」与设备级「清除本设备全部数据」。
+/// 两个场景共用它：空间级「销毁本秘境通道」与设备级「清除本设备全部数据」。
 Future<bool> _confirmDestructive(
   BuildContext context, {
   required LocalDatabase db,
@@ -69,7 +69,7 @@ Future<bool> retireSpaceQuietly(String token, {ApiClient? api}) async {
   }
 }
 
-/// 「销毁本秘境入口」——**空间级**破坏性操作（聊天页菜单 → 高级）。
+/// 「销毁本秘境通道」——**空间级**破坏性操作（聊天页菜单 → 高级）。
 ///
 /// 语义（老板 2026-09-22 定）：站在某个空间里点破坏性入口，用户心里想的就是"结束这个
 /// 空间"，不该顺手抹掉本机上的其他空间。所以这里只做：
@@ -115,7 +115,7 @@ Future<bool> confirmLeaveSpace(
 }
 
 // 「清除本设备全部数据」（设备级）**已删除**（老板 2026-09-22：太危险，不呈现给用户）。
-// 用户的等价路径：逐个空间「销毁本秘境入口」，或直接卸载重装（ensureFreshInstall
+// 用户的等价路径：逐个空间「销毁本秘境通道」，或直接卸载重装（ensureFreshInstall
 // 会清掉残留密钥）。`data/local_reset.dart` 的 resetLocalData() 作为"整机清空"原语保留。
 
 /// 破坏性操作共用的确认弹窗：说明小字 + 输入本机设备名（+已设时的锁屏码）。

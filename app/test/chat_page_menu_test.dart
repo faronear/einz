@@ -197,9 +197,9 @@ void main() {
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
     expect(find.text('高级'), findsOneWidget);
-    // 我的身份/入口名称（未传 → 显示「未设置」）+ 退出本应用
+    // 我的身份/通道名称（未传 → 显示「未设置」）+ 退出本应用
     expect(find.text('我的身份'), findsOneWidget);
-    expect(find.text('入口名称'), findsOneWidget);
+    expect(find.text('通道名称'), findsOneWidget);
     expect(find.text('退出本应用'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
     expect(find.text('高级'), findsOneWidget);
@@ -695,7 +695,7 @@ void main() {
     expect(find.text('personB'), findsNothing, reason: '不应回到旧名 personB');
   });
 
-  testWidgets('入口信息弹窗：标题/标签带「本秘境」限定、公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
+  testWidgets('通道信息弹窗：标题/标签带「本秘境」限定、公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -720,27 +720,27 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 菜单 → 本入口（入口名称）
+    // 菜单 → 本通道（通道名称）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('入口名称'));
+    await tester.tap(find.text('通道名称'));
     await tester.pumpAndSettle();
 
     // 多空间（老板 2026-09-22）：名称与公钥都是**本秘境**的（同一台设备每个秘境一套），
     // 标题/标签都必须带这个限定，弹窗顶部还要有一行说明
-    expect(find.text('入口信息（本秘境）'), findsOneWidget, reason: '弹窗标题应限定在本秘境');
-    expect(find.text('这个入口的名称与公钥只属于当前秘境——同一台机器在别的秘境是另一套入口。'), findsOneWidget,
+    expect(find.text('通道信息（本秘境）'), findsOneWidget, reason: '弹窗标题应限定在本秘境');
+    expect(find.text('这条通道的名称与公钥只属于当前秘境——同一台机器在别的秘境是另一条通道。'), findsOneWidget,
         reason: '应说明该名称/公钥只属于本秘境');
-    expect(find.text('入口公钥'), findsOneWidget, reason: '公钥标签应限定在本秘境');
+    expect(find.text('通道公钥'), findsOneWidget, reason: '公钥标签应限定在本秘境');
     expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
     expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥框右侧应有复制按钮');
-    expect(find.text('入口名称'), findsWidgets, reason: '输入框标签应限定在本秘境');
+    expect(find.text('通道名称'), findsWidgets, reason: '输入框标签应限定在本秘境');
 
     // 空名点保存 → 红字警示并停留（不静默）；对话框含两个输入框：只读公钥在前、
     // 可编辑设备名在后 → 取 .last
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
-        .first; // 入口名称已排到公钥之前：可编辑名称框在前、只读公钥在后
+        .first; // 通道名称已排到公钥之前：可编辑名称框在前、只读公钥在后
     expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
     await tester.tap(find.byIcon(Icons.edit)); // 点编辑 → 白底可编辑、按钮消失
     await tester.pumpAndSettle();
@@ -779,7 +779,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('入口信息（本秘境）'), findsNothing, reason: '保存成功应关闭弹窗');
+    expect(find.text('通道信息（本秘境）'), findsNothing, reason: '保存成功应关闭弹窗');
   });
 
   testWidgets('我的个人资料弹窗：标题/标签新文案、名字框下性别图标高亮、空名保存红字', (WidgetTester tester) async {
@@ -1242,7 +1242,7 @@ void main() {
     expect(find.text('选择秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
-  testWidgets('高级：破坏性入口改为空间级「销毁本秘境入口」（不再整机重置）',
+  testWidgets('高级：破坏性入口改为空间级「销毁本秘境通道」（不再整机重置）',
       (WidgetTester tester) async {
     // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
     // 不该顺手抹掉本机上的其他空间 → 聊天页这格降级为空间级，整机清理由空间列表负责。
@@ -1274,12 +1274,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('高级'));
     await tester.pumpAndSettle();
-    expect(find.text('销毁本秘境入口'), findsOneWidget, reason: '空间级文案');
+    expect(find.text('销毁本秘境通道'), findsOneWidget, reason: '空间级文案');
     expect(find.text('重置设备'), findsNothing, reason: '整机重置不该出现在单个空间里');
 
-    await tester.tap(find.text('销毁本秘境入口'));
+    await tester.tap(find.text('销毁本秘境通道'));
     await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
-    expect(find.text('销毁本秘境入口？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
+    expect(find.text('销毁本秘境通道？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
     expect(find.text('输入「iPhone」以确认'), findsOneWidget, reason: '闸门要求输入本机设备名');
   });
 }

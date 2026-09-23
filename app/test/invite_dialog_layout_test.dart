@@ -74,10 +74,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100)); // 初始加载（空历史）
 
-    // 菜单 → 新入口令牌
+    // 菜单 → 新通道令牌
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('新入口令牌'));
+    await tester.tap(find.text('新通道令牌'));
     // 菜单 pop 后延迟 300ms 才打开弹窗（chat_page onSelected 设计），
     // 随后 createJoinToken（fake 瞬时返回）→ showDialog
     await tester.pump(const Duration(milliseconds: 350));
