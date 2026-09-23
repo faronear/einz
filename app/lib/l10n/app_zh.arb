@@ -11,7 +11,6 @@
   "setupPageEnvelopeKeyHint": "密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境伴侣获取。",
   "setupPageNeedPassphrase": "请设置共享口令",
   "wizardJoinPassphraseRequired": "请输入共享口令进行验证",
-  "setupEnrollBoundNotice": "🎉 新通道已开通",
   "wizardStartTitle": "秘境向导",
   "wizardDetectTitle": "正在检测服务器状态…",
   "wizardDetectHint": "自动判断是否全秘境里的首条通道",
@@ -43,12 +42,6 @@
   "wizardGenderMale": "男",
   "wizardGenderFemale": "女",
   "wizardGenderRequired": "请选择性别",
-  "wizardIdentityHint": "秘境仅限两人，选择我的身份",
-  "wizardIdentityCreator": "秘境创建者",
-  "wizardIdentityPartner": "秘境共有者",
-  "wizardIdentityFirst": "⚠️ 选择我的身份",
-  "wizardInviteHint": "开通码可由任意一个已开通的通道生成，24 小时内一次性有效。",
-  "wizardRoleOffline": "导入线下密保信封",
   "wizardAppBarCreate": "创建秘境",
   "wizardAppBarJoin": "加入秘境",
   "wizardAppBarOffline": "导入密保信封",
@@ -60,15 +53,12 @@
   "wizardTitleJoinIdentity": "选择身份",
   "wizardJoinIdentityHint": "一个秘境仅限两人，你是哪一位？",
   "wizardJoinNoSlots": "该秘境未预置成员身份，无法加入",
-  "wizardSlotOnline": "已在线",
   "wizardSlotRequired": "必须选择一个身份",
   "wizardSpaceLimit": "秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境",
-  "wizardTitleInvite": "验证开通码",
   "wizardTitlePassphrase": "设置共享口令",
   "wizardJoinPassphraseTitle": "验证共享口令",
   "wizardTitlePin": "设置锁屏码",
   "wizardTitleEnvelope": "解析密保信封",
-  "wizardTitleIdentity": "我是",
   "wizardEnrollExists": "该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性开通码加入。",
   "wizardEnrollGoJoin": "改用“加入”向导",
   "wizardEnrollFailed": "❌ 登记失败: {error}",
@@ -132,12 +122,8 @@
   "startupInitFailed": "启动初始化失败，配置未丢失，请重试",
   "startupInitRetry": "重试",
   "setupPagePasteEnvelope": "⚠️ 请粘贴密保信封（base64）",
-  "wizardEnvelopeWrong": "密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴",
-  "setupPageInviteHint": "输入开通码",
-  "setupPageNeedInvite": "⚠️ 请填写一次性开通码",
   "setupPageScanInvite": "扫码填入开通码",
   "setupPageScannerHint": "把开通码二维码对准取景框",
-  "wizardInviteWrong": "开通码无效。请使用任意一个已开通的通道生成的 24 小时一次性开通码。",
   "setupPageNoEscrow": "❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。",
   "setupPageEscrowFailed": "❌ 共享口令验证失败。请询问你的伴侣。",
   "@setupPageEscrowFailed": {
@@ -203,7 +189,7 @@
   "chatPageMenuExit": "退出本应用",
   "chatPageMenuMore": "菜单",
   "chatPageRenameNameTitle": "我的身份",
-  "chatPageRenameNameLabel": "我的名字",
+  "chatPageRenameNameLabel": "名字",
   "chatPageGenderLabel": "性别",
   "chatPageRenameEntranceTitle": "当前通道",
   "chatPageRenameEntranceLabel": "通道名称",
@@ -274,7 +260,6 @@
   "chatPagePinLabel": "锁屏码",
   "chatPageLockNow": "锁屏",
   "chatPagePinSetValue": "已设置",
-  "chatPagePinUnsetValue": "未设置",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}
@@ -302,7 +287,6 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageMsgSending": "发送中…",
   "chatPageMsgSent": "已发送",
   "chatPageMsgSendingTap": "发送中，点击验证是否已送达并重发",
   "chatPageMsgDelivered": "已送达",
@@ -349,19 +333,6 @@
   "chatPageAttachVideoGallery": "相册视频",
   "chatPageAttachAudioFile": "音频文件",
   "chatPageAttachAnyFile": "任意文件",
-  "chatPageVideoMetaMissing": "视频附件元数据缺失",
-  "chatPageVideoPlayFailed": "视频播放失败: {error}",
-  "@chatPageVideoPlayFailed": {
-    "placeholders": {
-      "error": {"type": "String"}
-    }
-  },
-  "chatPageImageLoadFailed": "{plaintext}\n（加载失败）",
-  "@chatPageImageLoadFailed": {
-    "placeholders": {
-      "plaintext": {"type": "String"}
-    }
-  },
   "chatPagePlaying": "播放中…",
   "chatPageVoiceLabel": "语音",
   "chatPageAttachmentMetaMissing": "附件元数据缺失",
@@ -402,7 +373,6 @@
       "seconds": {"type": "int"}
     }
   },
-  "lockPagePinLabel": "锁屏码",
   "lockPageNoPinSet": "尚未设置锁屏码（为空时不启用）",
   "lockPageUnlock": "解锁",
   "lockPageTooManyAttempts": "尝试次数过多，请 {seconds} 秒后再试",
@@ -447,6 +417,5 @@
   "promptLockCodeTitle": "输入锁屏码",
   "promptLockCodeHint": "新增秘境要写入加密锁包，先验证本机锁屏码",
   "spaceListDeleteConfirm": "移除",
-  "spaceListMe": "我：{name}",
   "setupPinReuseNotice": "该秘境将沿用你当前的锁屏码。"
 }

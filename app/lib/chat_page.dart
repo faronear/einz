@@ -976,16 +976,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ],
           ),
+          // 只留一个「关闭」（老板 2026-09-23：原来 Copy/Close 两个纯文字按钮没有主次）。
+          // 去掉了 Copy —— 它复制的是**链接**，而上面 token / 链接两行各自都有复制图标
+          // （带 tooltip 与顶部提示），底部的 Copy 既冗余又没说清复制哪个。
+          // 点弹窗外/返回键本来就能关（showDialog 默认 barrierDismissible:true）；
+          // 留一个 Close 是给"不知道能点外面"的人一条明路。
           actions: [
-            TextButton(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: r.link));
-                if (!ctx.mounted) return;
-                showTopNotice(ctx, l10n.chatPageInviteLinkCopied);
-                Navigator.of(ctx).pop();
-              },
-              child: Text(l10n.chatPageCopy),
-            ),
             TextButton(
                 onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.close)),
           ],

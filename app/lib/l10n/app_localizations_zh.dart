@@ -43,9 +43,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinPassphraseRequired => '请输入共享口令进行验证';
 
   @override
-  String get setupEnrollBoundNotice => '🎉 新通道已开通';
-
-  @override
   String get wizardStartTitle => '秘境向导';
 
   @override
@@ -107,24 +104,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardGenderRequired => '请选择性别';
 
   @override
-  String get wizardIdentityHint => '秘境仅限两人，选择我的身份';
-
-  @override
-  String get wizardIdentityCreator => '秘境创建者';
-
-  @override
-  String get wizardIdentityPartner => '秘境共有者';
-
-  @override
-  String get wizardIdentityFirst => '⚠️ 选择我的身份';
-
-  @override
-  String get wizardInviteHint => '开通码可由任意一个已开通的通道生成，24 小时内一次性有效。';
-
-  @override
-  String get wizardRoleOffline => '导入线下密保信封';
-
-  @override
   String get wizardAppBarCreate => '创建秘境';
 
   @override
@@ -158,16 +137,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardJoinNoSlots => '该秘境未预置成员身份，无法加入';
 
   @override
-  String get wizardSlotOnline => '已在线';
-
-  @override
   String get wizardSlotRequired => '必须选择一个身份';
 
   @override
   String get wizardSpaceLimit => '秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境';
-
-  @override
-  String get wizardTitleInvite => '验证开通码';
 
   @override
   String get wizardTitlePassphrase => '设置共享口令';
@@ -180,9 +153,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardTitleEnvelope => '解析密保信封';
-
-  @override
-  String get wizardTitleIdentity => '我是';
 
   @override
   String get wizardEnrollExists =>
@@ -322,22 +292,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPagePasteEnvelope => '⚠️ 请粘贴密保信封（base64）';
 
   @override
-  String get wizardEnvelopeWrong => '密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴';
-
-  @override
-  String get setupPageInviteHint => '输入开通码';
-
-  @override
-  String get setupPageNeedInvite => '⚠️ 请填写一次性开通码';
-
-  @override
   String get setupPageScanInvite => '扫码填入开通码';
 
   @override
   String get setupPageScannerHint => '把开通码二维码对准取景框';
-
-  @override
-  String get wizardInviteWrong => '开通码无效。请使用任意一个已开通的通道生成的 24 小时一次性开通码。';
 
   @override
   String get setupPageNoEscrow => '❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。';
@@ -486,7 +444,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameNameTitle => '我的身份';
 
   @override
-  String get chatPageRenameNameLabel => '我的名字';
+  String get chatPageRenameNameLabel => '名字';
 
   @override
   String get chatPageGenderLabel => '性别';
@@ -652,9 +610,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinSetValue => '已设置';
 
   @override
-  String get chatPagePinUnsetValue => '未设置';
-
-  @override
   String get chatPageBurnHeading => '阅后即焚';
 
   @override
@@ -694,9 +649,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String chatPageSendFailed(String error) {
     return '发送失败: $error';
   }
-
-  @override
-  String get chatPageMsgSending => '发送中…';
 
   @override
   String get chatPageMsgSent => '已发送';
@@ -786,19 +738,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachAnyFile => '任意文件';
 
   @override
-  String get chatPageVideoMetaMissing => '视频附件元数据缺失';
-
-  @override
-  String chatPageVideoPlayFailed(String error) {
-    return '视频播放失败: $error';
-  }
-
-  @override
-  String chatPageImageLoadFailed(String plaintext) {
-    return '$plaintext\n（加载失败）';
-  }
-
-  @override
   String get chatPagePlaying => '播放中…';
 
   @override
@@ -865,9 +804,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String lockPageLockedSeconds(int seconds) {
     return '已锁定 $seconds 秒';
   }
-
-  @override
-  String get lockPagePinLabel => '锁屏码';
 
   @override
   String get lockPageNoPinSet => '尚未设置锁屏码（为空时不启用）';
@@ -963,11 +899,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get spaceListDeleteConfirm => '移除';
-
-  @override
-  String spaceListMe(String name) {
-    return '我：$name';
-  }
 
   @override
   String get setupPinReuseNotice => '该秘境将沿用你当前的锁屏码。';

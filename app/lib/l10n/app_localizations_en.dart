@@ -45,9 +45,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Please enter the shared passphrase to verify';
 
   @override
-  String get setupEnrollBoundNotice => '🎉 New entrance opened';
-
-  @override
   String get wizardStartTitle => 'Setup wizard';
 
   @override
@@ -110,26 +107,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardGenderRequired => 'Select a gender';
 
   @override
-  String get wizardIdentityHint =>
-      'Limited to two people — choose your identity';
-
-  @override
-  String get wizardIdentityCreator => 'Creator';
-
-  @override
-  String get wizardIdentityPartner => 'Partner';
-
-  @override
-  String get wizardIdentityFirst => '⚠️ Pick your identity first';
-
-  @override
-  String get wizardInviteHint =>
-      'Any existing entrance can create a token (one-time, valid for 24 hours).';
-
-  @override
-  String get wizardRoleOffline => 'Import key envelope (offline)';
-
-  @override
   String get wizardAppBarCreate => 'Create a space';
 
   @override
@@ -164,17 +141,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardJoinNoSlots => 'No preset members — cannot join';
 
   @override
-  String get wizardSlotOnline => 'online';
-
-  @override
   String get wizardSlotRequired => 'Pick an identity';
 
   @override
   String get wizardSpaceLimit =>
       'Space limit reached (server maxSpaces), cannot create';
-
-  @override
-  String get wizardTitleInvite => 'Verify token';
 
   @override
   String get wizardTitlePassphrase => 'Set passphrase';
@@ -187,9 +158,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardTitleEnvelope => 'Key envelope';
-
-  @override
-  String get wizardTitleIdentity => 'I am';
 
   @override
   String get wizardEnrollExists =>
@@ -338,24 +306,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPagePasteEnvelope => '⚠️ Paste the key envelope (base64)';
 
   @override
-  String get wizardEnvelopeWrong =>
-      'Invalid key envelope: paste the full sealed copy from another entrance';
-
-  @override
-  String get setupPageInviteHint => 'Paste or type the token';
-
-  @override
-  String get setupPageNeedInvite => '⚠️ Enter the one-time token';
-
-  @override
   String get setupPageScanInvite => 'Scan token QR code';
 
   @override
   String get setupPageScannerHint => 'Point the camera at the token QR code';
-
-  @override
-  String get wizardInviteWrong =>
-      'Invalid token: use a one-time token from an existing entrance';
 
   @override
   String get setupPageNoEscrow =>
@@ -513,7 +467,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRenameNameTitle => 'My identity';
 
   @override
-  String get chatPageRenameNameLabel => 'My name';
+  String get chatPageRenameNameLabel => 'Name';
 
   @override
   String get chatPageGenderLabel => 'Gender';
@@ -688,9 +642,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePinSetValue => 'Set';
 
   @override
-  String get chatPagePinUnsetValue => 'Not set';
-
-  @override
   String get chatPageBurnHeading => 'Burn-after-read';
 
   @override
@@ -730,9 +681,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String chatPageSendFailed(String error) {
     return 'Send failed: $error';
   }
-
-  @override
-  String get chatPageMsgSending => 'Sending…';
 
   @override
   String get chatPageMsgSent => 'Sent';
@@ -824,19 +772,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageAttachAnyFile => 'Any file';
 
   @override
-  String get chatPageVideoMetaMissing => 'Video metadata missing';
-
-  @override
-  String chatPageVideoPlayFailed(String error) {
-    return 'Video playback failed: $error';
-  }
-
-  @override
-  String chatPageImageLoadFailed(String plaintext) {
-    return '$plaintext\n(failed to load)';
-  }
-
-  @override
   String get chatPagePlaying => 'Playing…';
 
   @override
@@ -905,9 +840,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String lockPageLockedSeconds(int seconds) {
     return 'Locked for ${seconds}s';
   }
-
-  @override
-  String get lockPagePinLabel => 'PIN';
 
   @override
   String get lockPageNoPinSet =>
@@ -1007,11 +939,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get spaceListDeleteConfirm => 'Remove';
-
-  @override
-  String spaceListMe(String name) {
-    return 'Me: $name';
-  }
 
   @override
   String get setupPinReuseNotice =>

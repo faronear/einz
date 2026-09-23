@@ -164,12 +164,6 @@ abstract class AppLocalizations {
   /// **'Please enter the shared passphrase to verify'**
   String get wizardJoinPassphraseRequired;
 
-  /// No description provided for @setupEnrollBoundNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'🎉 New entrance opened'**
-  String get setupEnrollBoundNotice;
-
   /// No description provided for @wizardStartTitle.
   ///
   /// In en, this message translates to:
@@ -284,42 +278,6 @@ abstract class AppLocalizations {
   /// **'Select a gender'**
   String get wizardGenderRequired;
 
-  /// No description provided for @wizardIdentityHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Limited to two people — choose your identity'**
-  String get wizardIdentityHint;
-
-  /// No description provided for @wizardIdentityCreator.
-  ///
-  /// In en, this message translates to:
-  /// **'Creator'**
-  String get wizardIdentityCreator;
-
-  /// No description provided for @wizardIdentityPartner.
-  ///
-  /// In en, this message translates to:
-  /// **'Partner'**
-  String get wizardIdentityPartner;
-
-  /// No description provided for @wizardIdentityFirst.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Pick your identity first'**
-  String get wizardIdentityFirst;
-
-  /// No description provided for @wizardInviteHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Any existing entrance can create a token (one-time, valid for 24 hours).'**
-  String get wizardInviteHint;
-
-  /// No description provided for @wizardRoleOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Import key envelope (offline)'**
-  String get wizardRoleOffline;
-
   /// No description provided for @wizardAppBarCreate.
   ///
   /// In en, this message translates to:
@@ -386,12 +344,6 @@ abstract class AppLocalizations {
   /// **'No preset members — cannot join'**
   String get wizardJoinNoSlots;
 
-  /// No description provided for @wizardSlotOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'online'**
-  String get wizardSlotOnline;
-
   /// No description provided for @wizardSlotRequired.
   ///
   /// In en, this message translates to:
@@ -403,12 +355,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Space limit reached (server maxSpaces), cannot create'**
   String get wizardSpaceLimit;
-
-  /// No description provided for @wizardTitleInvite.
-  ///
-  /// In en, this message translates to:
-  /// **'Verify token'**
-  String get wizardTitleInvite;
 
   /// No description provided for @wizardTitlePassphrase.
   ///
@@ -433,12 +379,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Key envelope'**
   String get wizardTitleEnvelope;
-
-  /// No description provided for @wizardTitleIdentity.
-  ///
-  /// In en, this message translates to:
-  /// **'I am'**
-  String get wizardTitleIdentity;
 
   /// No description provided for @wizardEnrollExists.
   ///
@@ -686,24 +626,6 @@ abstract class AppLocalizations {
   /// **'⚠️ Paste the key envelope (base64)'**
   String get setupPagePasteEnvelope;
 
-  /// No description provided for @wizardEnvelopeWrong.
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid key envelope: paste the full sealed copy from another entrance'**
-  String get wizardEnvelopeWrong;
-
-  /// No description provided for @setupPageInviteHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Paste or type the token'**
-  String get setupPageInviteHint;
-
-  /// No description provided for @setupPageNeedInvite.
-  ///
-  /// In en, this message translates to:
-  /// **'⚠️ Enter the one-time token'**
-  String get setupPageNeedInvite;
-
   /// No description provided for @setupPageScanInvite.
   ///
   /// In en, this message translates to:
@@ -715,12 +637,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Point the camera at the token QR code'**
   String get setupPageScannerHint;
-
-  /// No description provided for @wizardInviteWrong.
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid token: use a one-time token from an existing entrance'**
-  String get wizardInviteWrong;
 
   /// No description provided for @setupPageNoEscrow.
   ///
@@ -995,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'My name'**
+  /// **'Name'**
   String get chatPageRenameNameLabel;
 
   /// No description provided for @chatPageGenderLabel.
@@ -1298,12 +1214,6 @@ abstract class AppLocalizations {
   /// **'Set'**
   String get chatPagePinSetValue;
 
-  /// No description provided for @chatPagePinUnsetValue.
-  ///
-  /// In en, this message translates to:
-  /// **'Not set'**
-  String get chatPagePinUnsetValue;
-
   /// No description provided for @chatPageBurnHeading.
   ///
   /// In en, this message translates to:
@@ -1375,12 +1285,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send failed: {error}'**
   String chatPageSendFailed(String error);
-
-  /// No description provided for @chatPageMsgSending.
-  ///
-  /// In en, this message translates to:
-  /// **'Sending…'**
-  String get chatPageMsgSending;
 
   /// No description provided for @chatPageMsgSent.
   ///
@@ -1538,24 +1442,6 @@ abstract class AppLocalizations {
   /// **'Any file'**
   String get chatPageAttachAnyFile;
 
-  /// No description provided for @chatPageVideoMetaMissing.
-  ///
-  /// In en, this message translates to:
-  /// **'Video metadata missing'**
-  String get chatPageVideoMetaMissing;
-
-  /// No description provided for @chatPageVideoPlayFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Video playback failed: {error}'**
-  String chatPageVideoPlayFailed(String error);
-
-  /// No description provided for @chatPageImageLoadFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'{plaintext}\n(failed to load)'**
-  String chatPageImageLoadFailed(String plaintext);
-
   /// No description provided for @chatPagePlaying.
   ///
   /// In en, this message translates to:
@@ -1675,12 +1561,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Locked for {seconds}s'**
   String lockPageLockedSeconds(int seconds);
-
-  /// No description provided for @lockPagePinLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'PIN'**
-  String get lockPagePinLabel;
 
   /// No description provided for @lockPageNoPinSet.
   ///
@@ -1849,12 +1729,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove'**
   String get spaceListDeleteConfirm;
-
-  /// No description provided for @spaceListMe.
-  ///
-  /// In en, this message translates to:
-  /// **'Me: {name}'**
-  String spaceListMe(String name);
 
   /// No description provided for @setupPinReuseNotice.
   ///

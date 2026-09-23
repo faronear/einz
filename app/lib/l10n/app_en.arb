@@ -11,7 +11,6 @@
   "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.",
   "setupPageNeedPassphrase": "Please set a shared passphrase",
   "wizardJoinPassphraseRequired": "Please enter the shared passphrase to verify",
-  "setupEnrollBoundNotice": "🎉 New entrance opened",
   "wizardStartTitle": "Setup wizard",
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "Auto-detects if this is the first entrance",
@@ -43,12 +42,6 @@
   "wizardGenderMale": "Male",
   "wizardGenderFemale": "Female",
   "wizardGenderRequired": "Select a gender",
-  "wizardIdentityHint": "Limited to two people — choose your identity",
-  "wizardIdentityCreator": "Creator",
-  "wizardIdentityPartner": "Partner",
-  "wizardIdentityFirst": "⚠️ Pick your identity first",
-  "wizardInviteHint": "Any existing entrance can create a token (one-time, valid for 24 hours).",
-  "wizardRoleOffline": "Import key envelope (offline)",
   "wizardAppBarCreate": "Create a space",
   "wizardAppBarJoin": "Join a space",
   "wizardAppBarOffline": "Import key envelope",
@@ -60,15 +53,12 @@
   "wizardTitleJoinIdentity": "Choose your identity",
   "wizardJoinIdentityHint": "One space has only two partners. Which one is you?",
   "wizardJoinNoSlots": "No preset members — cannot join",
-  "wizardSlotOnline": "online",
   "wizardSlotRequired": "Pick an identity",
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
-  "wizardTitleInvite": "Verify token",
   "wizardTitlePassphrase": "Set passphrase",
   "wizardJoinPassphraseTitle": "Verify passphrase",
   "wizardTitlePin": "Set PIN",
   "wizardTitleEnvelope": "Key envelope",
-  "wizardTitleIdentity": "I am",
   "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with your partner's one-time token.",
   "wizardEnrollGoJoin": "Use Join flow",
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",
@@ -132,12 +122,8 @@
   "startupInitFailed": "Startup failed — your data is safe, please retry",
   "startupInitRetry": "Retry",
   "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
-  "wizardEnvelopeWrong": "Invalid key envelope: paste the full sealed copy from another entrance",
-  "setupPageInviteHint": "Paste or type the token",
-  "setupPageNeedInvite": "⚠️ Enter the one-time token",
   "setupPageScanInvite": "Scan token QR code",
   "setupPageScannerHint": "Point the camera at the token QR code",
-  "wizardInviteWrong": "Invalid token: use a one-time token from an existing entrance",
   "setupPageNoEscrow": "❌ No escrow package for the shared passphrase on the server — set it on the first entrance first",
   "setupPageEscrowFailed": "❌ Shared passphrase join failed: {error}",
   "@setupPageEscrowFailed": {
@@ -203,7 +189,7 @@
   "chatPageMenuExit": "Quit app",
   "chatPageMenuMore": "Menu",
   "chatPageRenameNameTitle": "My identity",
-  "chatPageRenameNameLabel": "My name",
+  "chatPageRenameNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",
   "chatPageRenameEntranceLabel": "Entrance name",
@@ -274,7 +260,6 @@
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
   "chatPagePinSetValue": "Set",
-  "chatPagePinUnsetValue": "Not set",
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {"type": "String"}
@@ -302,7 +287,6 @@
       "error": {"type": "String"}
     }
   },
-  "chatPageMsgSending": "Sending…",
   "chatPageMsgSent": "Sent",
   "chatPageMsgSendingTap": "Sending… tap to verify and resend",
   "chatPageMsgDelivered": "Delivered",
@@ -349,19 +333,6 @@
   "chatPageAttachVideoGallery": "Gallery video",
   "chatPageAttachAudioFile": "Audio file",
   "chatPageAttachAnyFile": "Any file",
-  "chatPageVideoMetaMissing": "Video metadata missing",
-  "chatPageVideoPlayFailed": "Video playback failed: {error}",
-  "@chatPageVideoPlayFailed": {
-    "placeholders": {
-      "error": {"type": "String"}
-    }
-  },
-  "chatPageImageLoadFailed": "{plaintext}\n(failed to load)",
-  "@chatPageImageLoadFailed": {
-    "placeholders": {
-      "plaintext": {"type": "String"}
-    }
-  },
   "chatPagePlaying": "Playing…",
   "chatPageVoiceLabel": "Voice",
   "chatPageAttachmentMetaMissing": "Attachment metadata missing",
@@ -402,7 +373,6 @@
       "seconds": {"type": "int"}
     }
   },
-  "lockPagePinLabel": "PIN",
   "lockPageNoPinSet": "No PIN set (lock screen activates only with a PIN)",
   "lockPageUnlock": "Unlock",
   "lockPageTooManyAttempts": "Too many attempts, try again in {seconds}s",
@@ -447,9 +417,5 @@
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Adding a space rewrites the encrypted vault — confirm with your PIN first",
   "spaceListDeleteConfirm": "Remove",
-  "spaceListMe": "Me: {name}",
-  "@spaceListMe": {
-    "placeholders": { "name": { "type": "String" } }
-  },
   "setupPinReuseNotice": "This space will use your current lock screen code."
 }
