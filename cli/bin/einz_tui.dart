@@ -2913,8 +2913,8 @@ Future<void> _execReset(String storePath) async {
   final entranceName = session.store.entranceName?.trim() ?? '';
   final expected = entranceName.isEmpty ? fallbackWord : entranceName;
   final prompt = entranceName.isEmpty
-      ? '❓ 本通道还没有名字，请输入 $fallbackWord 以确认重置（留空取消）:'
-      : '❓ 请输入通道名「$entranceName」以确认重置本通道（留空取消）:';
+      ? '❓ 本通道还没有名字，请输入 $fallbackWord 以确认重置，或直接回车取消:'
+      : '❓ 请输入通道名「$entranceName」以确认重置本通道，或直接回车取消:';
   final typed = await _promptAction(session, prompt);
   if (!s.running) return;
   if (typed == null) {
@@ -2929,15 +2929,15 @@ Future<void> _execReset(String storePath) async {
   // ② 本机锁屏码（已设才验：Argon2id，走 /pin 那套；成功会清零尝试计数）
   final pinHash = session.store.pinHash;
   if (pinHash != null) {
-    final pin = await _promptAction(session, '❓ 输入本机锁屏码（重置需验证；留空取消）:',
+    final pin = await _promptAction(session, '❓ 输入本机锁屏码，或直接回车取消:',
         hidden: true);
     if (!s.running) return;
     if (pin == null) {
-      session.messages.add(_systemMessage(session, '✅ 已取消（未做任何改动）'));
+      session.messages.add(_systemMessage(session, '✅ 已取消，未做任何改动'));
       return;
     }
     if (!await _verifyPin(pinHash, pin)) {
-      session.messages.add(_systemMessage(session, '⚠️ 锁屏码错误——已取消（未做任何改动）'));
+      session.messages.add(_systemMessage(session, '⚠️ 锁屏码错误。未做任何改动'));
       return;
     }
   }
@@ -3305,7 +3305,7 @@ Future<void> _execCommand(String line) async {
           }
           s.session.messages.add(_systemMessage(s.session, sb.toString()));
           final answer =
-              await _promptAction(s.session, '❓ 输入要撤销的通道序号（留空取消）:');
+              await _promptAction(s.session, '❓ 输入要撤销的通道序号，或直接回车取消:');
           if (!s.running) break;
           if (answer == null) {
             s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
@@ -3346,7 +3346,7 @@ Future<void> _execCommand(String line) async {
         }
         // 口令（隐藏输入）：撤销的授权因子——即使本机已持会话，也必须由口令持有者授权
         final passphrase = await _promptAction(
-            s.session, '❓ 输入共享口令（撤销需校验；留空取消）:',
+            s.session, '❓ 输入共享口令以确认操作，或直接回车取消:',
             hidden: true);
         if (!s.running) break;
         if (passphrase == null) {
@@ -3749,7 +3749,7 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
   } else {
     while (true) {
       if (!_state!.running) return; // 已退出
-      final entered = await _promptAction(session, '❓ 验证老共享口令（留空取消）:');
+      final entered = await _promptAction(session, '❓ 验证当前共享口令，或直接回车取消:');
       if (!_state!.running) return;
       if (entered == null) {
         session.messages.add(_systemMessage(session, '✅ 已取消（未修改共享口令）'));
@@ -3760,7 +3760,7 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
         oldPass = entered; // 旧口令验证通过
         break;
       } on FormatException {
-        session.messages.add(_systemMessage(session, '⚠️ 老口令错误，请重新输入（留空取消）'));
+        session.messages.add(_systemMessage(session, '⚠️ 当前口令错误，请重新输入，或直接回车取消'));
         continue;
       }
     }
@@ -3768,10 +3768,10 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
   // 2) 新口令（两次输入一致）
   while (true) {
     if (!_state!.running) return;
-    final p1 = await _promptAction(session, '❓ 设置新共享口令（务必牢记，严禁泄漏！；留空取消）:');
+    final p1 = await _promptAction(session, '❓ 设置新共享口令（务必牢记，严禁泄漏！），或直接回车取消:');
     if (!_state!.running) return;
     if (p1 == null) {
-      session.messages.add(_systemMessage(session, '✅ 已取消（未修改共享口令）'));
+      session.messages.add(_systemMessage(session, '✅ 已取消，未修改共享口令'));
       return;
     }
     final policyError = _passphrasePolicyError(p1);
@@ -3784,7 +3784,7 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
     // 放在旧口令校验之后：先验旧再比，避免把"你猜对了旧口令"当提示漏出去
     if (oldPass != null && p1 == oldPass) {
       session.messages.add(
-          _systemMessage(session, '⚠️ 新口令与旧口令相同，未作修改——请换一个新口令'));
+          _systemMessage(session, '⚠️ 新口令不能与旧口令相同。请换一个新口令'));
       _scheduleRender();
       continue;
     }
