@@ -231,7 +231,7 @@
   "chatPageChangePassphraseConfirmLabel": "Confirm new passphrase",
   "chatPagePassphraseRevealTip": "Show plain text (auto-hides after 3s)",
   "chatPageChangePassphraseMismatch": "New passphrases do not match",
-  "chatPageChangePassphraseSame": "New passphrase is the same as the current one — nothing changed",
+  "chatPageChangePassphraseSame": "New passphrase cannot be the same as the current one",
   "chatPageChangePassphraseOldRequired": "Enter your current passphrase first",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
   "chatPageChangePassphraseDone": "✅ Shared passphrase updated — tell your partner; new entrances must use the new one",

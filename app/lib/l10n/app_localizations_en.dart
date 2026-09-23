@@ -560,7 +560,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageChangePassphraseSame =>
-      'New passphrase is the same as the current one — nothing changed';
+      'New passphrase cannot be the same as the current one';
 
   @override
   String get chatPageChangePassphraseOldRequired =>

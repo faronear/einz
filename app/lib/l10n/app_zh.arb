@@ -231,7 +231,7 @@
   "chatPageChangePassphraseConfirmLabel": "确认新口令",
   "chatPagePassphraseRevealTip": "查看明文（3 秒后自动变回暗码）",
   "chatPageChangePassphraseMismatch": "两次输入的新口令不一致",
-  "chatPageChangePassphraseSame": "新口令与当前口令相同，未作修改",
+  "chatPageChangePassphraseSame": "新口令不能与当前口令相同",
   "chatPageChangePassphraseOldRequired": "请先输入当前口令",
   "chatPageChangePassphraseOldWrong": "当前口令错误",
   "chatPageChangePassphraseDone": "✅ 共享口令已修改（请告知伴侣，以后必须使用新口令）",

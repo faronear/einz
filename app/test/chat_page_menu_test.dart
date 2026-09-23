@@ -1062,7 +1062,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
 
-    expect(find.text('新口令与当前口令相同，未作修改'), findsOneWidget, reason: '新旧相同应红字');
+    expect(find.text('新口令不能与当前口令相同'), findsOneWidget, reason: '新旧相同应红字');
     expect(find.text('修改共享口令？'), findsNothing, reason: '新旧相同不该进显性确认');
     expect(api.uploadedPackage, isNull, reason: '新旧相同不得上传');
   });

@@ -534,7 +534,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseMismatch => '两次输入的新口令不一致';
 
   @override
-  String get chatPageChangePassphraseSame => '新口令与当前口令相同，未作修改';
+  String get chatPageChangePassphraseSame => '新口令不能与当前口令相同';
 
   @override
   String get chatPageChangePassphraseOldRequired => '请先输入当前口令';

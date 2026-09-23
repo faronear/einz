@@ -1073,7 +1073,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseSame.
   ///
   /// In en, this message translates to:
-  /// **'New passphrase is the same as the current one — nothing changed'**
+  /// **'New passphrase cannot be the same as the current one'**
   String get chatPageChangePassphraseSame;
 
   /// No description provided for @chatPageChangePassphraseOldRequired.
