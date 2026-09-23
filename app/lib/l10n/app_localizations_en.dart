@@ -156,7 +156,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinIdentityHint =>
-      'One space for two partners. Which one is you?';
+      'One space has only two partners. Which one is you?';
 
   @override
   String get wizardJoinNoSlots => 'No preset members — cannot join';
@@ -316,17 +316,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String setupTokenSpaceInfo(String name) {
-    return 'Join $name\'s space';
-  }
-
-  @override
-  String get setupTokenSpacePrivate =>
-      'Join a private space (waiting for the second member)';
-
-  @override
   String get setupCreateShareTitle =>
-      'Send the token to your partner — or use it on another device of your own (valid for 24 hours)';
+      'Send the link to your partner to join you in the secret space';
 
   @override
   String get setupCreateCopy => 'Copy invite link';
@@ -438,17 +429,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageSetLockSameAsOld =>
-      'New PIN is the same as the current one — nothing changed';
+      'New PIN is the same as the current one, nothing is changed.';
 
   @override
   String get chatPageSetLockNoPinNotice =>
-      'No PIN set — next launch goes straight into the space';
+      'No PIN set. Next launch goes straight into the space.';
 
   @override
-  String get chatPageSetLockDone => 'PIN set — PIN required at next launch';
+  String get chatPageSetLockDone =>
+      'PIN set. You must enter PIN to unlock the space at next launch.';
 
   @override
-  String get chatPageSetLockCleared => 'PIN deleted (enter directly next time)';
+  String get chatPageSetLockCleared =>
+      'PIN deleted. You can enter the space directly at next launch.';
 
   @override
   String get chatPageClearLockTitle => 'Delete PIN?';

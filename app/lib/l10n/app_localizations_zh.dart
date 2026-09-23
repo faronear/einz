@@ -149,7 +149,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleJoinIdentity => '选择身份';
 
   @override
-  String get wizardJoinIdentityHint => '一个秘境仅限两人，选择我的名字。';
+  String get wizardJoinIdentityHint => '一个秘境仅限两人，你是哪一位？';
 
   @override
   String get wizardJoinNoSlots => '该秘境未预置成员身份，无法加入';
@@ -301,15 +301,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String setupTokenSpaceInfo(String name) {
-    return '加入 $name 的秘境';
-  }
-
-  @override
-  String get setupTokenSpacePrivate => '加入私密秘境（等待第二位成员）';
-
-  @override
-  String get setupCreateShareTitle => '把开通码发给对方（也可用在自己的另一台设备上）';
+  String get setupCreateShareTitle => '把邀请链接发给伴侣，快来一起体验秘境';
 
   @override
   String get setupCreateCopy => '复制邀请链接';
@@ -423,7 +415,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageSetLockDone => '锁屏码已设置，下次启动需解锁';
 
   @override
-  String get chatPageSetLockCleared => '已删除锁屏码，下次启动应用可直接进入秘境';
+  String get chatPageSetLockCleared => '已删除锁屏码，下次启动应用可直接进入秘境。';
 
   @override
   String get chatPageClearLockTitle => '删除锁屏码？';

@@ -57,7 +57,7 @@
   "wizardTitleName": "About me",
   "wizardTitlePeerName": "About partner",
   "wizardTitleJoinIdentity": "Choose your identity",
-  "wizardJoinIdentityHint": "One space for two partners. Which one is you?",
+  "wizardJoinIdentityHint": "One space has only two partners. Which one is you?",
   "wizardJoinNoSlots": "No preset members — cannot join",
   "wizardSlotOnline": "online",
   "wizardSlotRequired": "Pick an identity",
@@ -122,14 +122,7 @@
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
   },
-  "setupTokenSpaceInfo": "Join {name}'s space",
-  "@setupTokenSpaceInfo": {
-    "placeholders": {
-      "name": {"type": "String"}
-    }
-  },
-  "setupTokenSpacePrivate": "Join a private space (waiting for the second member)",
-  "setupCreateShareTitle": "Send the token to your partner — or use it on another device of your own (valid for 24 hours)",
+  "setupCreateShareTitle": "Send the link to your partner to join you in the secret space",
   "setupCreateCopy": "Copy invite link",
   "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",
@@ -175,12 +168,12 @@
   "chatPageSetLockHintNoPin": "Once set, you'll unlock every time you enter the space.",
   "chatPageSetLockOldLabel": "Current PIN",
   "chatPageSetLockOldRequired": "Enter current PIN first",
-  "chatPageSetLockSameAsOld": "New PIN is the same as the current one — nothing changed",
-  "chatPageSetLockNoPinNotice": "No PIN set — next launch goes straight into the space",
-  "chatPageSetLockDone": "PIN set — PIN required at next launch",
-  "chatPageSetLockCleared": "PIN deleted (enter directly next time)",
+  "chatPageSetLockSameAsOld": "New PIN is the same as the current one, nothing is changed.",
+  "chatPageSetLockNoPinNotice": "No PIN set. Next launch goes straight into the space.",
+  "chatPageSetLockDone": "PIN set. You must enter PIN to unlock the space at next launch.",
+  "chatPageSetLockCleared": "PIN deleted. You can enter the space directly at next launch.",
   "chatPageClearLockTitle": "Delete PIN?",
-  "chatPageClearLockMessage": "Delete the PIN? After deletion, the app launch will go straight into chat.",
+  "chatPageClearLockMessage": "Delete the PIN? After deletion, next app launch will go straight into chat.",
   "chatPageMenuInvite": "Create activation code",
   "chatPageInviteDialogTitle": "Token created",
   "chatPageInviteDialogHint": "Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.",

@@ -371,7 +371,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinIdentityHint.
   ///
   /// In en, this message translates to:
-  /// **'One space for two partners. Which one is you?'**
+  /// **'One space has only two partners. Which one is you?'**
   String get wizardJoinIdentityHint;
 
   /// No description provided for @wizardJoinNoSlots.
@@ -644,22 +644,10 @@ abstract class AppLocalizations {
   /// **'the invite link is from {other} but this app is connected to {current}; they cannot work with each other.'**
   String setupTokenOtherServer(String other, String current);
 
-  /// No description provided for @setupTokenSpaceInfo.
-  ///
-  /// In en, this message translates to:
-  /// **'Join {name}\'s space'**
-  String setupTokenSpaceInfo(String name);
-
-  /// No description provided for @setupTokenSpacePrivate.
-  ///
-  /// In en, this message translates to:
-  /// **'Join a private space (waiting for the second member)'**
-  String get setupTokenSpacePrivate;
-
   /// No description provided for @setupCreateShareTitle.
   ///
   /// In en, this message translates to:
-  /// **'Send the token to your partner — or use it on another device of your own (valid for 24 hours)'**
+  /// **'Send the link to your partner to join you in the secret space'**
   String get setupCreateShareTitle;
 
   /// No description provided for @setupCreateCopy.
@@ -857,25 +845,25 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageSetLockSameAsOld.
   ///
   /// In en, this message translates to:
-  /// **'New PIN is the same as the current one — nothing changed'**
+  /// **'New PIN is the same as the current one, nothing is changed.'**
   String get chatPageSetLockSameAsOld;
 
   /// No description provided for @chatPageSetLockNoPinNotice.
   ///
   /// In en, this message translates to:
-  /// **'No PIN set — next launch goes straight into the space'**
+  /// **'No PIN set. Next launch goes straight into the space.'**
   String get chatPageSetLockNoPinNotice;
 
   /// No description provided for @chatPageSetLockDone.
   ///
   /// In en, this message translates to:
-  /// **'PIN set — PIN required at next launch'**
+  /// **'PIN set. You must enter PIN to unlock the space at next launch.'**
   String get chatPageSetLockDone;
 
   /// No description provided for @chatPageSetLockCleared.
   ///
   /// In en, this message translates to:
-  /// **'PIN deleted (enter directly next time)'**
+  /// **'PIN deleted. You can enter the space directly at next launch.'**
   String get chatPageSetLockCleared;
 
   /// No description provided for @chatPageClearLockTitle.

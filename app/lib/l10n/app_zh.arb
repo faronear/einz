@@ -57,7 +57,7 @@
   "wizardTitleName": "关于我",
   "wizardTitlePeerName": "关于伴侣",
   "wizardTitleJoinIdentity": "选择身份",
-  "wizardJoinIdentityHint": "一个秘境仅限两人，选择我的名字。",
+  "wizardJoinIdentityHint": "一个秘境仅限两人，你是哪一位？",
   "wizardJoinNoSlots": "该秘境未预置成员身份，无法加入",
   "wizardSlotOnline": "已在线",
   "wizardSlotRequired": "必须选择一个身份",
@@ -122,14 +122,7 @@
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
   },
-  "setupTokenSpaceInfo": "加入 {name} 的秘境",
-  "@setupTokenSpaceInfo": {
-    "placeholders": {
-      "name": {"type": "String"}
-    }
-  },
-  "setupTokenSpacePrivate": "加入私密秘境（等待第二位成员）",
-  "setupCreateShareTitle": "把开通码发给对方（也可用在自己的另一台设备上）",
+  "setupCreateShareTitle": "把邀请链接发给伴侣，快来一起体验秘境",
   "setupCreateCopy": "复制邀请链接",
   "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
@@ -178,7 +171,7 @@
   "chatPageSetLockSameAsOld": "新锁屏码与当前锁屏码相同，未作修改",
   "chatPageSetLockNoPinNotice": "锁屏码仍然为空，下次启动应用可直接进入秘境。",
   "chatPageSetLockDone": "锁屏码已设置，下次启动需解锁",
-  "chatPageSetLockCleared": "已删除锁屏码，下次启动应用可直接进入秘境",
+  "chatPageSetLockCleared": "已删除锁屏码，下次启动应用可直接进入秘境。",
   "chatPageClearLockTitle": "删除锁屏码？",
   "chatPageClearLockMessage": "确定要删除锁屏码吗？删除后下次启动将直接进入聊天。",
   "chatPageMenuInvite": "生成开通码",
