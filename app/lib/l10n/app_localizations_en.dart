@@ -365,6 +365,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get setupJoinEntranceLimitReached =>
+      'This space has reached the server\'s entrance limit — no new entrance can be opened.';
+
+  @override
   String get setPinDialogPinLabel => 'New PIN (at least 6 digits)';
 
   @override

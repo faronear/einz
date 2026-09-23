@@ -2306,6 +2306,10 @@ class _SetupPageState extends State<SetupPage> {
         setState(() => _status = e.httpStatus == 404
             ? AppLocalizations.of(context)!.setupPageNoEscrow
             : AppLocalizations.of(context)!.wizardJoinPassphraseWrong);
+      } else if (e.code == 'ENTRANCE_LIMIT_REACHED') {
+        // 通道数量上限（serverConfig.json maxEntrancesPerSpace，服务端 joinSpace
+        // 校验）：与口令无关，不能显示成"口令验证失败"——那是另一回事
+        setState(() => _status = AppLocalizations.of(context)!.setupJoinEntranceLimitReached);
       } else {
         setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFailed('$e'));
       }

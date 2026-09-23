@@ -18,20 +18,29 @@ export interface ServerConfig {
   capabilities: string[];
   /** 空间数量上限（serverConfig.json 的 maxSpaces：0=不限；1=单空间即退回 v1 模式；n=最多 n 个）。 */
   max_spaces: number;
+  /** 单空间的通道（登记项）数量上限（serverConfig.json 的 maxEntrancesPerSpace：
+   *  0=不限；n=该空间最多 n 条通道）。**防滥用**（老板 2026-09-23）：不限设备数是
+   *  产品的本意（同身份多设备），但一个空间被灌进成百上千条通道会白吃存储与推送
+   *  资源——用它做总闸。计数含已撤销（revoked）的通道：**销毁不退还额度**，否则
+   *  "反复开通/销毁"可无限刷（老板 2026-09-23 定）。 */
+  max_entrances_per_space: number;
 }
 
 /** 读取 serverConfig.json（默认 server/config/serverConfig.json——本机配置
  *  不入 git；可用环境变量 `EINZ_CONFIG` 指向别处，Docker 部署靠它读挂载进来的
  *  /config/serverConfig.json，两种形态都是"config/ 目录 + 同名文件"）。
  *  服务端每次启动读取一次（改配置需重启生效；文件缺失或解析失败按默认值处理）。
- *  当前支持字段：maxSpaces。 */
-let fileConfigCache: { maxSpaces?: number } | null = null;
-function readFileConfig(): { maxSpaces?: number } {
+ *  当前支持字段：maxSpaces、maxEntrancesPerSpace。 */
+let fileConfigCache: { maxSpaces?: number; maxEntrancesPerSpace?: number } | null = null;
+function readFileConfig(): { maxSpaces?: number; maxEntrancesPerSpace?: number } {
   if (fileConfigCache != null) return fileConfigCache;
   const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../config/serverConfig.json");
   if (existsSync(path)) {
     try {
-      fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as { maxSpaces?: number };
+      fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as {
+        maxSpaces?: number;
+        maxEntrancesPerSpace?: number;
+      };
     } catch (e) {
       console.warn(`[einz] serverConfig.json 解析失败（按默认配置继续）: ${e}`);
       fileConfigCache = {};
@@ -49,10 +58,15 @@ export function loadConfig(): ServerConfig {
   const fc = readFileConfig();
   const maxSpaces =
     typeof fc.maxSpaces === "number" && fc.maxSpaces >= 0 ? Math.floor(fc.maxSpaces) : 0;
+  const maxEntrancesPerSpace =
+    typeof fc.maxEntrancesPerSpace === "number" && fc.maxEntrancesPerSpace >= 0
+      ? Math.floor(fc.maxEntrancesPerSpace)
+      : 0;
   return {
     protocol_version: "v2-multiverse",
     capabilities: ["spaces", "join-tokens"],
     max_spaces: maxSpaces,
+    max_entrances_per_space: maxEntrancesPerSpace,
   };
 }
 

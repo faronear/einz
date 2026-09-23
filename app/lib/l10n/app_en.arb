@@ -144,6 +144,7 @@
       "error": {"type": "String"}
     }
   },
+  "setupJoinEntranceLimitReached": "This space has reached the server's entrance limit — no new entrance can be opened.",
   "setPinDialogPinLabel": "New PIN (at least 6 digits)",
   "setPinDialogPinHint": "At least 6 digits",
   "setPinDialogConfirmLabel": "Confirm new PIN",

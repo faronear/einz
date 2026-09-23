@@ -319,6 +319,30 @@ export function joinSpace(
         )
         .run(Date.now(), tk.space_id, slot);
     }
+    // 通道数量上限（serverConfig.json 的 maxEntrancesPerSpace：0=不限）——
+    // **必须在事务内**计：preflight 不消费 token，并发两个 join 会同时通过预检
+    // 然后双双插设备 → 超额。计数按"该空间登记过的通道总数"，**含已撤销**：
+    // 销毁/撤销是软标记（devices.status='revoked'，行不删），若只数 active，
+    // "开通→销毁→再开通"就能无限刷额度，防滥用等于没做（老板 2026-09-23 定）。
+    const cfg = loadConfig();
+    if (cfg.max_entrances_per_space > 0) {
+      const cnt = (
+        getDb()
+          .prepare(
+            `SELECT COUNT(*) AS n FROM devices d
+             JOIN space_members sm ON sm.person_id = d.person_id
+             WHERE sm.space_id = ?`,
+          )
+          .get(tk.space_id) as { n: number }
+      ).n;
+      if (cnt >= cfg.max_entrances_per_space) {
+        throw new ApiError(
+          "ENTRANCE_LIMIT_REACHED",
+          `通道数量已达上限（${cfg.max_entrances_per_space}）`,
+          409,
+        );
+      }
+    }
     // 一次性：先标记 token 已用，再插设备（同事务，防并发双加入）
     getDb()
       .prepare(`UPDATE join_tokens SET used_at = ? WHERE token_hash = ?`)

@@ -142,8 +142,9 @@ POST /spaces/join
   请求：{ token, publicKey, deviceName?, partnerSlot?, gender? }
   （无名字字段：身份名取自 create 时为该 slot 预置的名字——2026-09-16）
   响应：200 { spaceId, personId, partnerSlot, sessionToken }
-  错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND
-  （无"满员"错误：通道数不限，同身份可多设备——见 §6）
+  错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
+       ENTRANCE_LIMIT_REACHED（该空间通道数已达 maxEntrancesPerSpace，409）
+  （无"满员"错误：同身份可多设备，通道数只受 maxEntrancesPerSpace 约束——见 §6）
 ```
 
 ### 4.2 成员端点（加入后/创建者）
@@ -195,6 +196,7 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `TOKEN_EXPIRED` | token 已超过 expires_at | 410 |
 | `TOKEN_USED` | token 已被消费（一次性） | 410 |
 | `SPACE_LIMIT_REACHED` | 空间数量已达上限（serverConfig.json 的 maxSpaces；与"成员/通道数"无关） | 409 |
+| `ENTRANCE_LIMIT_REACHED` | 该空间的通道（登记项）数量已达上限（serverConfig.json 的 maxEntrancesPerSpace；**计数含已撤销**——销毁不退额度，防反复开通/销毁刷量） | 409 |
 | `SPACE_NOT_FOUND` | 空间不存在/已归档 | 404 |
 | `NOT_A_MEMBER` | 当前 session 不是该 Space 成员 | 403 |
 | `DEVICE_ALREADY_BOUND` | 该设备已绑定一个 Space，拒绝再创建/加入 | 409 |

@@ -728,6 +728,12 @@ abstract class AppLocalizations {
   /// **'❌ Shared passphrase join failed: {error}'**
   String setupPageEscrowFailed(String error);
 
+  /// No description provided for @setupJoinEntranceLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'This space has reached the server\'s entrance limit — no new entrance can be opened.'**
+  String get setupJoinEntranceLimitReached;
+
   /// No description provided for @setPinDialogPinLabel.
   ///
   /// In en, this message translates to:

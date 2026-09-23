@@ -1204,6 +1204,11 @@ Future<void> _spaceJoin(ChatSession session, DeviceStore store, String storePath
           session, '⚠️ 操作太频繁，被服务端限流了（保护机制，不是你的开通码有问题）'));
       session.messages.add(_systemMessage(
           session, '   $e —— 等提示的秒数过后再试；自用服务器也可以直接重启服务端清空计数。'));
+    } else if (e.code == 'ENTRANCE_LIMIT_REACHED') {
+      // 通道数量上限（serverConfig.json maxEntrancesPerSpace）：不是开通码的问题，
+      // 是这个秘境的通道已经开满了（含已销毁的——销毁不退额度）
+      session.messages.add(_systemMessage(
+          session, '⚠️ 该秘境的通道数量已达服务器上限，无法再开通新通道（$e）'));
     } else {
       session.messages.add(_systemMessage(session, '⚠️ 加入秘境失败: $e'));
     }

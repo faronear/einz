@@ -345,6 +345,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get setupJoinEntranceLimitReached => '该秘境的通道数量已达服务器上限，无法再开通新通道。';
+
+  @override
   String get setPinDialogPinLabel => '新 PIN（至少 6 位数字）';
 
   @override

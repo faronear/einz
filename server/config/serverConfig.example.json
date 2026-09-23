@@ -1,3 +1,4 @@
 {
-  "maxSpaces": 0
+  "maxSpaces": 0,
+  "maxEntrancesPerSpace": 0
 }
