@@ -442,7 +442,7 @@
   "resetEntranceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道",
   "spaceListTitle": "选择秘境",
   "spaceListEmpty": "还没有加入任何秘境",
-  "spaceListAdd": "新建/加入秘境",
+  "spaceListAdd": "添加秘境",
   "spaceListSwitch": "切换我的秘境",
   "promptLockCodeTitle": "输入锁屏码",
   "promptLockCodeHint": "新增秘境要写入加密锁包，先验证本机锁屏码",

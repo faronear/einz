@@ -65,7 +65,7 @@
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
   "wizardTitleInvite": "Verify token",
   "wizardTitlePassphrase": "Set passphrase",
-  "wizardJoinPassphraseTitle": "Verify shared passphrase",
+  "wizardJoinPassphraseTitle": "Verify passphrase",
   "wizardTitlePin": "Set PIN",
   "wizardTitleEnvelope": "Key envelope",
   "wizardTitleIdentity": "I am",

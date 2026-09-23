@@ -419,7 +419,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify shared passphrase'**
+  /// **'Verify passphrase'**
   String get wizardJoinPassphraseTitle;
 
   /// No description provided for @wizardTitlePin.

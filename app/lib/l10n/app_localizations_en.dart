@@ -180,7 +180,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitlePassphrase => 'Set passphrase';
 
   @override
-  String get wizardJoinPassphraseTitle => 'Verify shared passphrase';
+  String get wizardJoinPassphraseTitle => 'Verify passphrase';
 
   @override
   String get wizardTitlePin => 'Set PIN';

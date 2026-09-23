@@ -950,7 +950,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceListEmpty => '还没有加入任何秘境';
 
   @override
-  String get spaceListAdd => '新建/加入秘境';
+  String get spaceListAdd => '添加秘境';
 
   @override
   String get spaceListSwitch => '切换我的秘境';
