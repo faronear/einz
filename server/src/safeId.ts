@@ -21,3 +21,17 @@ export function assertSafeMessageId(id: string): void {
     throw new ApiError("INVALID_REQUEST", "invalid message_id: illegal characters", 400);
   }
 }
+
+/** space_id 的字符集白名单：**客户端可自报**（`POST /spaces` 的 body.space_id，
+ *  协议 §3.4——space_id/space_key 由客户端生成），而它将来会被用作**附件存储目录的
+ *  一级目录名**（per-space 文件分片），所以必须在入库前就收紧字符集，杜绝 `/`、
+ *  `\`、`.` 等路径字符——否则等于给了客户端一个"写任意路径"的原语。
+ *  正常取值是客户端生成的 UUIDv4（含连字符），本白名单与之兼容。
+ *  服务端自生成的（randomUUID）恒合规，故只在收到客户端值时校验。 */
+export const SAFE_SPACE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function assertSafeSpaceId(id: string): void {
+  if (typeof id !== "string" || !SAFE_SPACE_ID_RE.test(id)) {
+    throw new ApiError("INVALID_REQUEST", "invalid space_id: illegal characters", 400);
+  }
+}

@@ -8,6 +8,7 @@ import { loadConfig } from "./config.js";
 import { normalizeDeviceName } from "./deviceName.js";
 import { normalizeDeviceUid } from "./deviceUid.js";
 import { assertPersonName } from "./personName.js";
+import { assertSafeSpaceId } from "./safeId.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
 // - space_address 由 space_public_key（创建者公钥）经 Keccak-256 + EIP-55 派生
@@ -88,9 +89,12 @@ export async function createSpace(
   sessionToken: string;
 }> {
   // 协议 §3.4：space_id/space_key 由客户端生成（包内容需含 space_id）——
-  // 接受客户端 space_id（校验非空字符串），缺省回退服务端生成
+  // 接受客户端 space_id（校验非空字符串），缺省回退服务端生成。
+  // **字符集必须收紧**：客户端可自报，而 space_id 后续会被用作附件存储的一级
+  // 目录名（per-space 分片）——放行 `/`、`.` 就等于给出"写任意路径"的原语
+  // （见 safeId.assertSafeSpaceId）。服务端自生成的 randomUUID 恒合规。
   const spaceId = (clientSpaceId != null && clientSpaceId.trim().length > 0)
-    ? clientSpaceId.trim()
+    ? (assertSafeSpaceId(clientSpaceId.trim()), clientSpaceId.trim())
     : randomUUID();
   // 空间数量上限（config.json 的 maxSpaces：0=不限；≥1 时现有空间数 ≥ 上限即
   // 禁止新建并返回 SPACE_LIMIT_REACHED——maxSpaces=1 即退回 v1 单空间模式，

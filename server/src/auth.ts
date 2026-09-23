@@ -2,6 +2,7 @@ import { getDb } from "./db.js";
 import { getDevice, getDeviceStatus } from "./config.js";
 import { constantTimeEqualB64, randomBytes, sealFor, toB64 } from "./crypto.js";
 import { createHash, randomBytes as nodeRandomBytes } from "node:crypto";
+import { assertSafeSpaceId } from "./safeId.js";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 分钟
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 小时
@@ -40,6 +41,9 @@ export async function createChallenge(deviceId: string, spaceId: string): Promis
   if (spaceId == null || spaceId.length === 0) {
     throw new ApiError("INVALID_REQUEST", "space_id 必填（Multiverse：会话必须绑定空间）", 400);
   }
+  // 字符集收紧：space_id 由客户端自报，且后续会成为会话的绑定空间、进而被用作附件
+  // 存储的一级目录名（per-space 分片）——放行 `/`、`.` 就是"写任意路径"的原语
+  assertSafeSpaceId(spaceId);
   const device = getDevice(deviceId)!;
   const challenge = await randomBytes(32);
   const challengeId = toB64(await randomBytes(16));
