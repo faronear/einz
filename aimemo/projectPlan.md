@@ -25,7 +25,7 @@
 
 - `[x]` **多空间 M3**（2026-09-22）：未读（服务端派生 `GET /messages/unread` + 数字角标）、
   术语（`docs/GLOSSARY.md`）、`projectPlan` 索引化
-- `[ ]` 多空间**真机自测**：空间级「销毁本秘境入口」、`device_uid` 回填、未读角标、
+- `[ ]` 多空间**真机自测**：空间级「销毁本秘境通道」、`device_uid` 回填、未读角标、
   空间列表不再有破坏性入口
 - `[ ]` `productLens` 剩余复核：§12 设备管理 / §14 路线图仍是 v1 口径（§2 概念模型已修）
 - `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通
@@ -109,7 +109,7 @@
 - [x] 设备撤销（白名单 + 上线自毁）——**Space Key 轮换不做**（2026-09-14 决策，见 SECURITY.md §3）
 - [ ] 备份与恢复（模型 A：本地加密备份 + 恢复码）
 - [x] 设备撤销（撤销生效于认证/同步路径 403 + 被撤销设备上线自毁）＋ 轮换相关代码撤除（SpaceKeyRing / einz rotate / key.rotation 广播，2026-09-14）
-- [x] 撤销语义收窄（2026-09-16）：服务端区分 `DEVICE_REVOKED`（明确撤销）与 `FORBIDDEN`（未登记，含库被清空/重置）；客户端**只对明确撤销**自毁（App 清锁包+消息+附件，TUI 清 store+附件缓存后退出），库被重置/连不上只发常驻警告并允许继续读本地消息；撤销自毁覆盖 TUI 所有认证入口（`revoked_check.py` 四场景）
+- [x] 撤销语义收窄（2026-09-16）：服务端区分 `DEVICE_REVOKED`（明确撤销）与 `FORBIDDEN`（未登记，含库被清空/重置）；客户端**只对明确撤销**自毁（App 清锁包+消息+附件，TUI 清 store+附件缓存后退出），库被重置/连不上只发常驻警告并允许继续读本地消息；撤销自毁覆盖 TUI 所有已开通的通道（`revoked_check.py` 四场景）
 - [ ] 后台被重置后的"重新入网"入口（TUI `/space reset` 解绑 + App 菜单项）——当前 `spaceKey != null` 时 create/join 会被拒，库被清空后只能离线看历史（2026-09-16 定：本轮不做）
 - [x] 撤销授权收口（2026-09-16）：`POST /devices/:id/revoke` —— **同 space 内可互撤 + 每次校验共享口令**（argon2id，复用取包的校验与失败限速；缺口令哈希 409 `PASSPHRASE_NOT_SET` 拒绝放行）；旧的免口令 `DELETE /devices/:id` 移除；`ApiClient.revokeDevice` 已就绪
 - [x] 撤销的客户端入口（TUI，2026-09-16）：`/devices` 列同空间全部设备（带序号、标注在线/已撤销）＋ `/revoke <序号|设备名>`（三重确认：选设备 → 输入 yes → 隐藏输入共享口令；按 `ESCROW_*` 失败码分别提示且均注明"未做任何改动"）；探针 `cli/test/revoke_command_check.py` 五条全过
