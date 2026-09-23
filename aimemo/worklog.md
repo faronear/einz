@@ -8795,3 +8795,40 @@ reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通�
 
 **③ 我的身份弹窗**字段标签去人称，与向导页对齐：zh「我的名字」→「名字」，en `My name` → `Name`。
 同一弹窗里的空值报错 `chatPageRenameMyselfEmptyError`（请填写名字 / Enter your name）已是"无人称 + 指令句"，不动。
+
+## 2026-09-23 · 切换秘境卡片配色 / 菜单左右层级 / 开通码「重新生成」（commit `cec7892`）
+
+老板要求：先把之前两个 UI 提交**撤回**（`git reset --soft`），改完他认可后才一次性提交。这条流程照做即可。
+
+**① 卡片配色**（改了三轮才对，记下最终语义）：**被选中 → 饱和深色，未选中 → 对应淡色**。
+两档都直接对齐对话里的气泡色：
+- 选中 = 「渐变粉蓝」主题的气泡色 → 女 `#B83D80`（深粉）/ 男 `#2271F7`（深蓝）
+- 未选中 = 「素雅纯色」主题的气泡色 → 女 `#D6529C` / 男 `#3BAFFD` 的 **18% tint**
+- 共同源头：`chat_page.dart` 的 `_bubbleColor({required bool mine})`（gradient 分支 / plain 分支）
+- 选中卡：只在**四边之外** `BoxShadow`（无偏移、blur 10、黑 26%），底色 200ms 渐变过去；
+  **不放大**（放大过会带动 `Wrap` 重排 + 弹层跳高）；无边框；深色底上名字与对勾转白
+  （名字 `AnimatedDefaultTextStyle`、对勾 `AnimatedOpacity`，与底色同步，避免"底还淡着字先白"）
+
+**复盘：两轮"发暗"的真凶是 Material 的 elevation**——它在 `elevation > 0` 时往底色叠一层
+`surfaceTint`（且 `Card` 的 `color:` 并不会关掉它）。要"纯外阴影 + 底色不变"，就得离开 `Card`，
+改用 `AnimatedContainer` + `BoxDecoration(boxShadow: …)`，并自备
+`Material(type: MaterialType.transparency)` 给 `InkWell` 当宿主。这个坑值得记住。
+
+**② 菜单左右层级**：左标签 13px 次级灰（备注级）/ 右值 14px 主文本色 + w500。
+**踩过的坑**：我把 `Text(标签) + Spacer()` 改成 `Flexible(标签) + 固定间距` 之后，值**不再靠右**了——
+`Flexible(flex:1)` 与 `Spacer(flex:1)` 平分剩余空间，标签只占自身宽度时它那份没用完的空白**留在行尾**
+（`mainAxisAlignment.start` 把余量放末尾），于是值往左跑。**要靠右就必须用 `Spacer`（或 `Expanded` 包标签），
+不能给标签配 `Flexible`**。
+
+**③ 开通码弹窗加「重新生成」**：弹窗内就地换新 token / 链接 / 二维码，不关窗。
+**服务端刻意不动**：`createJoinToken` → `newJoinToken` 只 `INSERT`，不废旧码。老板明确这是想要的语义
+（可以同时生成多个，发给多台设备）——所以"重新生成"= 多配一把钥匙，不是换锁，别再自作主张加 revoke。
+
+**过程教训（重要）**：我一度用 python 脚本大段 splice `chat_page.dart`（弹窗 ≈ 80 行），
+脚本被重复执行 + 模板里混进了非代码字符，把文件改坏两次（一度 43 个 analyze 报错）。
+**结论：这个仓库里改 Dart 一律用 Edit 逐处精确替换，绝不用 python 整块 splice**；
+真要大改就先 `git checkout HEAD -- <file>` 回干净基线再重做。本次文件较多、又和别的改动混在一起，
+**提交前用「过滤 hunk → `git apply --cached`」隔离**（脚本只挑含自己标记的 hunk，全程不碰工作区，
+比"临时改回去再 add"安全，后者有和并发写者互相覆盖的风险）。
+本次隔离出去、留给老板自己的：`cli/bin/einz_tui.dart` 文案、`app_zh.arb` +
+`app_localizations_zh.dart` + `chat_page_menu_test.dart` 的「新口令不能与当前口令相同」。
