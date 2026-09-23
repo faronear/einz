@@ -281,7 +281,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardIdentityHint.
   ///
   /// In en, this message translates to:
-  /// **'Limited to two people — choose your role'**
+  /// **'Limited to two people — choose your identity'**
   String get wizardIdentityHint;
 
   /// No description provided for @wizardIdentityCreator.
@@ -299,7 +299,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardIdentityFirst.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Pick your role first'**
+  /// **'⚠️ Pick your identity first'**
   String get wizardIdentityFirst;
 
   /// No description provided for @wizardInviteHint.

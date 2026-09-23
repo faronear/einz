@@ -108,7 +108,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardGenderRequired => 'Select a gender';
 
   @override
-  String get wizardIdentityHint => 'Limited to two people — choose your role';
+  String get wizardIdentityHint =>
+      'Limited to two people — choose your identity';
 
   @override
   String get wizardIdentityCreator => 'Creator';
@@ -117,7 +118,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardIdentityPartner => 'Partner';
 
   @override
-  String get wizardIdentityFirst => '⚠️ Pick your role first';
+  String get wizardIdentityFirst => '⚠️ Pick your identity first';
 
   @override
   String get wizardInviteHint =>
