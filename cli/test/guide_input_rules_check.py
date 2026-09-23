@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # 引导输入规则回归（老板 2026-09-11）
 #   0) create 各必填问答（秘境入口/我的名字/我的性别/伴侣的名字/伴侣的性别）
-#      留空回车 → 必须被拦住（提示「请输入内容」，继续等同一问答）
-#      （老板 2026-09-15：入网向导要求必须输入时不允许直接回车跳过）
-#   1) create 口令必填：走到「设置共享口令」留空回车 → 必须被拦住（提示
-#      「请输入内容」，且不进入创建）；补输口令后创建成功
+#      留空回车 → 必须被**静默拒绝**：不提交、不前进，也**不打印任何提示**
+#      （老板 2026-09-23：早先会打一条「请输入内容」，每按一次回车就把提问往上顶
+#       一行、屏幕跟着跳；提示还在上面、光标还在输入行就够了）
+#   1) create 口令必填：走到「设置共享口令」留空回车 → 同样静默拒绝、不进入创建；
+#      补输口令后创建成功
+#      （向导里**只有锁屏码**可以空回车跳过——`_askSetPin` 不带 required）
 #   2) 锁屏码规则（与 App 一致：纯数字 + 至少 6 位）：字母 → 提示「锁屏码只能是
 #      数字」；5 位数字 → 提示「锁屏码至少 6 位数字」；6 位数字 → 设置成功
-#   3) join 口令必填：第二条通道走到「验证共享口令」留空回车 → 同样被拦住
+#   3) join 口令必填：第二条通道走到「验证共享口令」留空回车 → 同样静默拒绝
 #      （不进入加入——否则会先 joinSpace 再取不到 Space Key，通道卡在
 #      "已登记但无密钥"的坏状态）；补输同一口令后加入成功
 #   4) join 口令输错：应停在口令环节提示重输，且**同一个** join token 仍可用
@@ -50,6 +52,28 @@ def drain(master, seconds=1.0):
 
 def send(master, s):
     os.write(master, s.encode())
+
+
+def assert_silent_required(master, label, forbid, wait=1.5):
+    """必填问答留空回车：必须**静默拒绝**（老板 2026-09-23）。
+
+    判据：① 不出现「请输入内容」这类反馈；② 后续步骤的提示不出现（说明没被接受而前进）。
+    forbid 可为字符串或字符串列表。
+    """
+    forbids = [forbid] if isinstance(forbid, str) else list(forbid)
+    send(master, '\r')
+    out = ''
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        out += drain(master, 0.4)  # 本探针的 drain 已解码（无 strip_ansi）
+    if '请输入内容' in out:
+        print(f'❌ {label}：留空回车仍打印了提示（应为静默拒绝）')
+        print(out[-500:]); raise SystemExit(1)
+    for f in forbids:
+        if f and f in out:
+            print(f'❌ {label}：留空回车竟被接受（出现了「{f}」）')
+            print(out[-500:]); raise SystemExit(1)
+    return out
 
 
 def wait_text(master, text, timeout=40):
@@ -100,19 +124,15 @@ def main():
             ('伴侣的名字', 'Alice\r'),
             ('伴侣的性别', '2\r'),
         ]
-        for expect, payload in steps:
+        for i, (expect, payload) in enumerate(steps):
             out = wait_text(m, expect)
             if expect not in out:
                 print(f'❌ 未到「{expect}」问答')
                 print(out[-600:])
                 return 1
-            # 必填：留空回车不接受（老板 2026-09-15）—— 提示后仍停在原问答
-            send(m, '\r')
-            out = wait_text(m, '请输入内容', timeout=10)
-            if '请输入内容' not in out:
-                print(f'❌ 「{expect}」留空回车未被拦住（未提示请输入内容）')
-                print(out[-600:])
-                return 1
+            # 必填：留空回车静默拒绝（老板 2026-09-23）——不提交、不打提示
+            nxt = steps[i + 1][0] if i + 1 < len(steps) else '设置共享口令'
+            assert_silent_required(m, f'「{expect}」', nxt)
             send(m, payload)
 
         # 关键：口令留空回车 → 必须拦住
@@ -121,16 +141,7 @@ def main():
             print('❌ 未到口令问答')
             print(out[-600:])
             return 1
-        send(m, '\r')
-        out = wait_text(m, '请输入内容', timeout=10)
-        if '请输入内容' not in out:
-            print('❌ 留空口令未被拦住（未提示请输入内容）')
-            print(out[-600:])
-            return 1
-        if '正在创建秘境' in out or '成功创建秘境' in out:
-            print('❌ 留空口令竟继续创建空间')
-            print(out[-600:])
-            return 1
+        assert_silent_required(m, '设置共享口令', ['正在创建秘境', '成功创建秘境'])
 
         # 补输口令 → 创建成功（≥ kPassphraseMinLength=8 位——老板 2026-09-15 起）
         send(m, 'abc12345\r')
@@ -198,23 +209,19 @@ def main():
         store_b = os.path.join(WORK, 'b.json')
         m2, p2 = start_tui(store_b, port)
         spawned.append((m2, p2))
-        for expect, payload in [
+        b_steps = [
             ('秘境入口', 'j\r'),
             ('输入开通码', join_token + '\r'),
             ('完整输入我的名字', 'Alice\r'),
-        ]:
+        ]
+        for i, (expect, payload) in enumerate(b_steps):
             out = wait_text(m2, expect)
             if expect not in out:
                 print(f'❌ B 未到「{expect}」问答')
                 print(out[-600:])
                 return 1
-            # 必填：留空回车不接受（老板 2026-09-15）—— 邀请码尤其不能放空
-            send(m2, '\r')
-            out = wait_text(m2, '请输入内容', timeout=10)
-            if '请输入内容' not in out:
-                print(f'❌ B「{expect}」留空回车未被拦住（未提示请输入内容）')
-                print(out[-600:])
-                return 1
+            nxt = b_steps[i + 1][0] if i + 1 < len(b_steps) else '验证共享口令'
+            assert_silent_required(m2, f'B「{expect}」', nxt)
             send(m2, payload)
 
         out = wait_text(m2, '验证共享口令')
@@ -222,16 +229,7 @@ def main():
             print('❌ B 未到口令问答')
             print(out[-600:])
             return 1
-        send(m2, '\r')
-        out = wait_text(m2, '请输入内容', timeout=10)
-        if '请输入内容' not in out:
-            print('❌ B 留空口令未被拦住（未提示请输入内容）')
-            print(out[-600:])
-            return 1
-        if '正在加入秘境' in out or '成功加入秘境' in out:
-            print('❌ B 留空口令竟继续加入（会卡在无 Space Key 的坏状态）')
-            print(out[-600:])
-            return 1
+        assert_silent_required(m2, 'B 验证共享口令', ['正在加入秘境', '成功加入秘境'])
 
         # ---------- 口令错误：必须停在口令环节重输，且不能烧掉 join token ----------
         # （旧实现：先 joinSpace 消费一次性 token 再验口令 → 失败即落到「加入秘境

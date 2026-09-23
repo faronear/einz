@@ -2578,13 +2578,12 @@ Future<void> _runInputLoop(ChatSession session) async {
             continue;
           }
           if (answer.isEmpty && (_state?.pendingGuideRequired ?? false)) {
-            // 必填问答（口令）留空回车：不提交——提示继续输入（不弹"请重新输入"，
-            // 输入行保留直接继续敲）
+            // 必填问答留空回车：**静默拒绝**——不提交，也**不往消息流里加提示**。
+            // 老板 2026-09-23：早先会打一条"⚠️ 请输入内容"，每按一次回车就把提问往上顶
+            // 一行、屏幕跟着跳；其实提示还在上面、光标还在输入行，用户自然知道要继续输。
             _state!.input.clear();
             _state!.cursor = 0; // 同步复位光标，避免越界崩溃
-            session.messages.add(_systemMessage(session, '⚠️ 请输入内容'));
-            _scheduleRender();
-            inputChanged = true;
+            inputChanged = true; // 只重绘输入行（清掉可能输入过的全角空格时可见）
             continue;
           }
           _state!.input.clear();
@@ -3813,13 +3812,12 @@ Future<bool?> _serverHasEscrow(EntranceStore store, String server) async {
 Future<void> _setupEscrowPassphrase(EntranceStore store, String storePath, ChatSession session) async {
   while (true) {
     if (!_state!.running) break; // 已退出：结束口令设置
-    final p1 = await _promptAction(
-        session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣；留空取消）:');
+    // 向导里的一步（不是"动作"）：**只有锁屏码可以空回车跳过**（老板 2026-09-23 定），
+    // 共享口令必须给值 → required（留空回车被输入循环静默拒绝，停在原地继续等）
+    final p1 = await _prompt(
+        session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:',
+        required: true);
     if (!_state!.running) break;
-    if (p1 == null) {
-      session.messages.add(_systemMessage(session, '✅ 已跳过（之后可用 /passphrase 设置）'));
-      break;
-    }
     final policyError = _passphrasePolicyError(p1);
     if (policyError != null) {
       session.messages.add(_systemMessage(session, policyError));
@@ -4005,8 +4003,10 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 /// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
 ///
 /// **选哪个提示函数**（2026-09-23 定的规则）：
-/// - **向导必填**（名字/性别/开通码/身份选择/口令接入）→ 用本函数 + `required: true`：
-///   留空回车被拦，避免误提交空值；那里的"取消"= 不做这件事 = 离开向导，逃生门是 `/exit`。
+/// - **向导必填**（秘境入口 c/j、名字、性别、开通码、身份选择、共享口令、口令接入）
+///   → 用本函数 + `required: true`：留空回车**静默拒绝**（不提交、也不打提示，原地继续等）。
+///   向导里**唯一允许空回车跳过的是锁屏码**（`_askSetPin` 不带 `required`）。
+///   这里的"取消"= 不做这件事 = 离开向导，逃生门是 `/exit` / Ctrl+C。
 /// - **动作内的一步**（`/revoke`、`/reset`、`/passphrase` 这类可从聊天里放弃的操作）
 ///   → 用 [_promptAction]：留空回车 = 放弃这个动作。
 Future<String> _prompt(ChatSession session, String message,
