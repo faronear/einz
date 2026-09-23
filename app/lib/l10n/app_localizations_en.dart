@@ -288,14 +288,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupTokenTitle => 'Verify token';
 
   @override
-  String get setupTokenHint =>
-      'A token is valid for one-time use within 24 hours.';
+  String get setupTokenHint => 'A one-time code, valid for 24 hours.';
 
   @override
   String get setupTokenInputHint => 'Paste the token or invite link';
 
   @override
-  String get setupTokenNeedInput => 'Enter the token';
+  String get setupTokenNeedInput => 'Enter the activation code';
 
   @override
   String get setupTokenInvalid => 'Invalid token';
@@ -354,7 +353,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageInviteHint => 'Paste or type the token';
 
   @override
-  String get setupPageNeedInvite => '⚠️ Enter the one-time token';
+  String get setupPageNeedInvite => '⚠️ Enter the one-time activation code';
 
   @override
   String get setupPageScanInvite => 'Scan token QR code';
@@ -528,7 +527,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.';
 
   @override
-  String get chatPageRenameDeviceEmptyError => 'Name cannot be empty';
+  String get chatPageRenameDeviceEmptyError => 'Enter the entrance name';
 
   @override
   String get chatPageRenameDeviceInvalidError =>
@@ -540,7 +539,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageRenameMyselfEmptyError => 'Name cannot be empty';
+  String get chatPageRenameMyselfEmptyError => 'Enter your name';
 
   @override
   String get chatPageRenameNameInvalidError =>

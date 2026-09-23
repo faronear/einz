@@ -599,7 +599,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'A token is valid for one-time use within 24 hours.'**
+  /// **'A one-time code, valid for 24 hours.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
@@ -611,7 +611,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the token'**
+  /// **'Enter the activation code'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
@@ -713,7 +713,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageNeedInvite.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Enter the one-time token'**
+  /// **'⚠️ Enter the one-time activation code'**
   String get setupPageNeedInvite;
 
   /// No description provided for @setupPageScanInvite.
@@ -1019,7 +1019,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameDeviceEmptyError.
   ///
   /// In en, this message translates to:
-  /// **'Name cannot be empty'**
+  /// **'Enter the entrance name'**
   String get chatPageRenameDeviceEmptyError;
 
   /// No description provided for @chatPageRenameDeviceInvalidError.
@@ -1037,7 +1037,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameMyselfEmptyError.
   ///
   /// In en, this message translates to:
-  /// **'Name cannot be empty'**
+  /// **'Enter your name'**
   String get chatPageRenameMyselfEmptyError;
 
   /// No description provided for @chatPageRenameNameInvalidError.

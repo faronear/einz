@@ -569,7 +569,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
               (await _prompt(session, '❓ 输入开通码:', required: true)).trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 必须输入开通码！可从任意一条已开通的通道生成开通码.'));
+            session.messages.add(_systemMessage(session, '⚠️ 请输入开通码！可从任意一条已开通的通道生成开通码.'));
             _scheduleRender();
             continue;
           }
@@ -607,7 +607,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       if (passphrase.isEmpty) {
         // 防御：空口令（_abortPendingGuide 的 complete('') 等）不发送核对
         // （此前漏过 / 检查直接进 accessByEscrow——"口令对接中"卡住退不出）
-        session.messages.add(_systemMessage(session, '⚠️ 共享口令不能为空，请重新输入（/exit 可退出）'));
+        session.messages.add(_systemMessage(session, '⚠️ 请输入共享口令（/exit 可退出）'));
         _scheduleRender();
         continue;
       }
@@ -2577,7 +2577,7 @@ Future<void> _runInputLoop(ChatSession session) async {
             // 输入行保留直接继续敲）
             _state!.input.clear();
             _state!.cursor = 0; // 同步复位光标，避免越界崩溃
-            session.messages.add(_systemMessage(session, '⚠️ 此项不能为空，请继续输入'));
+            session.messages.add(_systemMessage(session, '⚠️ 请输入内容'));
             _scheduleRender();
             inputChanged = true;
             continue;

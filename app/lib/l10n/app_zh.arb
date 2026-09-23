@@ -27,8 +27,8 @@
   "wizardNameHint": "我的名字（以后可以随时修改）",
   "wizardPeerNameHint": "伴侣的名字（以后可以随时修改）",
   "wizardPeerNameHintInput": "伴侣的昵称",
-  "wizardNameRequired": "填写我的名字",
-  "wizardPeerNameRequired": "填写我的秘境伴侣的名字",
+  "wizardNameRequired": "请填写我的名字",
+  "wizardPeerNameRequired": "请填写伴侣的名字",
   "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符",
   "wizardNameTooLongError": "名字最多 {max} 个字符",
   "@wizardNameTooLongError": {
@@ -36,7 +36,7 @@
       "max": {"type": "int"}
     }
   },
-  "wizardNameHintInput": "输入我的昵称",
+  "wizardNameHintInput": "我的昵称",
   "wizardMyGenderLabel": "我的性别",
   "wizardPeerGenderLabel": "伴侣的性别",
   "wizardGenderMale": "男",
@@ -111,8 +111,8 @@
     "placeholders": { "code": { "type": "String" } }
   },
   "setupTokenTitle": "验证开通码",
-  "setupTokenHint": "填写开通码，24 小时内一次性有效",
-  "setupTokenInputHint": "填写开通码或邀请链接",
+  "setupTokenHint": "开通码 24 小时内一次性有效",
+  "setupTokenInputHint": "开通码或邀请链接",
   "setupTokenNeedInput": "请填写开通码",
   "setupTokenInvalid": "开通码无效",
   "setupTokenExpired": "开通码已过期",
@@ -141,7 +141,7 @@
   "setupPagePasteEnvelope": "⚠️ 请粘贴密保信封（base64）",
   "wizardEnvelopeWrong": "密保信封无效：请确认对方「导出线下密保信封」的完整内容已粘贴",
   "setupPageInviteHint": "输入开通码",
-  "setupPageNeedInvite": "⚠️ 填写一次性开通码",
+  "setupPageNeedInvite": "⚠️ 请填写一次性开通码",
   "setupPageScanInvite": "扫码填入开通码",
   "setupPageScannerHint": "把开通码二维码对准取景框",
   "wizardInviteWrong": "开通码无效。请使用任意一个已开通的通道生成的 24 小时一次性开通码。",
@@ -212,7 +212,7 @@
   "chatPageRenameDeviceTitle": "当前通道",
   "chatPageRenameDeviceLabel": "通道名称",
   "chatPageDeviceScopeHint": "通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。",
-  "chatPageRenameDeviceEmptyError": "名称不能为空",
+  "chatPageRenameDeviceEmptyError": "请填写通道名称",
   "chatPageRenameDeviceInvalidError": "只能用中文字、英文字母、数字、下划线(_)、中划线(-)",
   "chatPageRenameDeviceTooLongError": "最多 {max} 个字符",
   "@chatPageRenameDeviceTooLongError": {
@@ -220,7 +220,7 @@
       "max": {"type": "int"}
     }
   },
-  "chatPageRenameMyselfEmptyError": "名字不能为空",
+  "chatPageRenameMyselfEmptyError": "请填写名字",
   "chatPageRenameNameInvalidError": "只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符",
   "chatPageRenameNameTooLongError": "最多 {max} 个字符",
   "@chatPageRenameNameTooLongError": {

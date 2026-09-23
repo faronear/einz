@@ -746,13 +746,13 @@ void main() {
     expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.text('名称不能为空'), findsOneWidget, reason: '空设备名保存应红字警示');
+    expect(find.text('请填写通道名称'), findsOneWidget, reason: '空设备名保存应红字警示');
 
     // 全空格同样警示
     await tester.enterText(dialogField, '   ');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.text('名称不能为空'), findsOneWidget, reason: '全空格设备名保存应红字警示');
+    expect(find.text('请填写通道名称'), findsOneWidget, reason: '全空格设备名保存应红字警示');
 
     // 不合规字符（空格、标点）→ 红字警示并停留（老板 2026-09-16：设备名只允许
     // 中文字/英文字母/数字/`_`/`-`）
@@ -771,7 +771,7 @@ void main() {
     // 开始填写即消红字
     await tester.enterText(dialogField, '我的手机');
     await tester.pumpAndSettle();
-    expect(find.text('名称不能为空'), findsNothing, reason: '开始填写后红字应消失');
+    expect(find.text('请填写通道名称'), findsNothing, reason: '开始填写后红字应消失');
 
     // 有效名称 → 保存成功关闭弹窗（400ms 延迟 dispose 不红屏）
     await tester.tap(find.text('保存'));
@@ -832,7 +832,7 @@ void main() {
     await tester.enterText(dialogField, '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.text('名字不能为空'), findsOneWidget, reason: '空名字保存应红字警示（人名专用提示）');
+    expect(find.text('请填写名字'), findsOneWidget, reason: '空名字保存应红字警示（人名专用提示）');
 
     // 不合规字符（空格、@）→ 红字警示并停留（老板 2026-09-16：名字只允许
     // 中文字/英文字母/数字/`_`/`-`/emoji）
@@ -852,7 +852,7 @@ void main() {
     // 表情符在人名里是允许的）
     await tester.enterText(dialogField, '阿猪\u{1F437}_01');
     await tester.pumpAndSettle();
-    expect(find.text('名字不能为空'), findsNothing, reason: '开始填写后红字应消失');
+    expect(find.text('请填写名字'), findsNothing, reason: '开始填写后红字应消失');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));

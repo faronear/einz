@@ -72,10 +72,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameHintInput => '伴侣的昵称';
 
   @override
-  String get wizardNameRequired => '填写我的名字';
+  String get wizardNameRequired => '请填写我的名字';
 
   @override
-  String get wizardPeerNameRequired => '填写我的秘境伴侣的名字';
+  String get wizardPeerNameRequired => '请填写伴侣的名字';
 
   @override
   String get wizardNameInvalidError => '名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符';
@@ -86,7 +86,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardNameHintInput => '输入我的昵称';
+  String get wizardNameHintInput => '我的昵称';
 
   @override
   String get wizardMyGenderLabel => '我的性别';
@@ -272,10 +272,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenTitle => '验证开通码';
 
   @override
-  String get setupTokenHint => '填写开通码，24 小时内一次性有效';
+  String get setupTokenHint => '开通码 24 小时内一次性有效';
 
   @override
-  String get setupTokenInputHint => '填写开通码或邀请链接';
+  String get setupTokenInputHint => '开通码或邀请链接';
 
   @override
   String get setupTokenNeedInput => '请填写开通码';
@@ -333,7 +333,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageInviteHint => '输入开通码';
 
   @override
-  String get setupPageNeedInvite => '⚠️ 填写一次性开通码';
+  String get setupPageNeedInvite => '⚠️ 请填写一次性开通码';
 
   @override
   String get setupPageScanInvite => '扫码填入开通码';
@@ -499,7 +499,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。';
 
   @override
-  String get chatPageRenameDeviceEmptyError => '名称不能为空';
+  String get chatPageRenameDeviceEmptyError => '请填写通道名称';
 
   @override
   String get chatPageRenameDeviceInvalidError => '只能用中文字、英文字母、数字、下划线(_)、中划线(-)';
@@ -510,7 +510,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageRenameMyselfEmptyError => '名字不能为空';
+  String get chatPageRenameMyselfEmptyError => '请填写名字';
 
   @override
   String get chatPageRenameNameInvalidError =>

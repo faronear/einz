@@ -111,9 +111,9 @@
     "placeholders": { "code": { "type": "String" } }
   },
   "setupTokenTitle": "Verify token",
-  "setupTokenHint": "A token is valid for one-time use within 24 hours.",
+  "setupTokenHint": "A one-time code, valid for 24 hours.",
   "setupTokenInputHint": "Paste the token or invite link",
-  "setupTokenNeedInput": "Enter the token",
+  "setupTokenNeedInput": "Enter the activation code",
   "setupTokenInvalid": "Invalid token",
   "setupTokenExpired": "Token expired",
   "setupTokenUsed": "Token already used",
@@ -141,7 +141,7 @@
   "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
   "wizardEnvelopeWrong": "Invalid key envelope: paste the full sealed copy from another entrance",
   "setupPageInviteHint": "Paste or type the token",
-  "setupPageNeedInvite": "⚠️ Enter the one-time token",
+  "setupPageNeedInvite": "⚠️ Enter the one-time activation code",
   "setupPageScanInvite": "Scan token QR code",
   "setupPageScannerHint": "Point the camera at the token QR code",
   "wizardInviteWrong": "Invalid token: use a one-time token from an existing entrance",
@@ -212,7 +212,7 @@
   "chatPageRenameDeviceTitle": "Current entrance",
   "chatPageRenameDeviceLabel": "Entrance name",
   "chatPageDeviceScopeHint": "An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.",
-  "chatPageRenameDeviceEmptyError": "Name cannot be empty",
+  "chatPageRenameDeviceEmptyError": "Enter the entrance name",
   "chatPageRenameDeviceInvalidError": "Only Chinese/English letters, digits, _ and - are allowed",
   "chatPageRenameDeviceTooLongError": "At most {max} characters",
   "@chatPageRenameDeviceTooLongError": {
@@ -220,7 +220,7 @@
       "max": {"type": "int"}
     }
   },
-  "chatPageRenameMyselfEmptyError": "Name cannot be empty",
+  "chatPageRenameMyselfEmptyError": "Enter your name",
   "chatPageRenameNameInvalidError": "Only Chinese/English letters, digits, _ , - and emoji are allowed",
   "chatPageRenameNameTooLongError": "At most {max} characters",
   "@chatPageRenameNameTooLongError": {

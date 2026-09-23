@@ -127,14 +127,14 @@ void main() {
     // 名字与性别都未填：点下一步 → 两项红字同时出现（统一检查，不因首个失败跳过其余）
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('填写我的名字'), findsOneWidget, reason: '名字必填：未填应红字提醒');
+    expect(find.text('请填写我的名字'), findsOneWidget, reason: '名字必填：未填应红字提醒');
     expect(find.text('请选择性别'), findsOneWidget, reason: '性别必选：未选应红字提醒');
     expect(find.text('关于我'), findsOneWidget, reason: '应停留在步骤 1（我的名字页）');
     // 只填名字：旧「名字为空」红字不残留（每轮先清 + 填写即消），性别红字保留
     await tester.enterText(find.byType(TextField), 'Lukas');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('填写我的名字'), findsNothing, reason: '名字已填：旧红字不应残留');
+    expect(find.text('请填写我的名字'), findsNothing, reason: '名字已填：旧红字不应残留');
     expect(find.text('请选择性别'), findsOneWidget, reason: '性别仍未选，红字保留');
     // 选中「男」后下一步 → 放行进入步骤 2（伴侣页）
     await tester.tap(find.byIcon(Icons.male));
