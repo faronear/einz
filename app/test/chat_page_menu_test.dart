@@ -592,12 +592,12 @@ void main() {
     await _openChangePassphraseDialog(tester, db,
         oldPassphrase: 'oldpass1', spaceKey: spaceKey);
 
-    // 输入新口令 + 确认（匹配）；旧口令留空 → 应红字"旧口令错误"，不改、不弹二次确认
+    // 输入新口令 + 确认（匹配）；旧口令留空 → 应红字"请先输入当前口令"，不改、不弹二次确认
     await _enterDialogFields(tester, newPass: 'newpass123');
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
     expect(find.text('修改共享口令？'), findsNothing, reason: '不应再弹第二个确认弹窗');
-    expect(find.text('旧口令错误'), findsOneWidget, reason: '旧口令没填应红字报出');
+    expect(find.text('请先输入当前口令'), findsOneWidget, reason: '旧口令没填应红字报出');
   });
 
   testWidgets('修改口令：新口令不满足强度（长度/字母数字）→ 红字拦截，不弹显性确认', (WidgetTester tester) async {
@@ -1000,7 +1000,7 @@ void main() {
     await _enterDialogFields(tester, oldPass: 'wrongpass', newPass: 'newpass123');
     await _confirmChange(tester);
 
-    expect(find.text('旧口令错误'), findsOneWidget, reason: '旧口令错应红字');
+    expect(find.text('当前口令错误'), findsOneWidget, reason: '旧口令错应红字');
     expect(find.text('修改共享口令？'), findsNothing, reason: '未过口令验证不应进显性确认');
     expect(api.uploadedPackage, isNull, reason: '旧口令错不得上传');
   });
@@ -1019,7 +1019,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '修改'));
     await tester.pumpAndSettle();
 
-    expect(find.text('新口令与旧口令相同，未作修改'), findsOneWidget, reason: '新旧相同应红字');
+    expect(find.text('新口令与当前口令相同，未作修改'), findsOneWidget, reason: '新旧相同应红字');
     expect(find.text('修改共享口令？'), findsNothing, reason: '新旧相同不该进显性确认');
     expect(api.uploadedPackage, isNull, reason: '新旧相同不得上传');
   });

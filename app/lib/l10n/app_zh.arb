@@ -8,9 +8,9 @@
   "settings": "设置",
   "skip": "跳过",
   "close": "关闭",
-  "setupPageEnvelopeKeyHint": "密保信封是通过不对称加密，进行线下交接的一段文本。请联系秘境伴侣获取。",
-  "setupPageNeedPassphrase": "❗️ 必须设置共享口令",
-  "wizardJoinPassphraseRequired": "❗️ 请输入共享口令进行验证",
+  "setupPageEnvelopeKeyHint": "密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境伴侣获取。",
+  "setupPageNeedPassphrase": "请设置共享口令",
+  "wizardJoinPassphraseRequired": "请输入共享口令进行验证",
   "setupEnrollBoundNotice": "🎉 新通道已开通",
   "wizardStartTitle": "秘境向导",
   "wizardDetectTitle": "正在检测服务器状态…",
@@ -29,7 +29,7 @@
   "wizardPeerNameHintInput": "伴侣的昵称",
   "wizardNameRequired": "请填写我的名字",
   "wizardPeerNameRequired": "请填写伴侣的名字",
-  "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符",
+  "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。",
   "wizardNameTooLongError": "名字最多 {max} 个字符",
   "@wizardNameTooLongError": {
     "placeholders": {
@@ -61,7 +61,7 @@
   "wizardJoinNoSlots": "该秘境未预置成员身份，无法加入",
   "wizardSlotOnline": "已在线",
   "wizardSlotRequired": "必须选择一个身份",
-  "wizardSpaceLimit": "秘境数量已达上限（服务器 maxSpaces 限制）——暂不能新建秘境",
+  "wizardSpaceLimit": "秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境",
   "wizardTitleInvite": "验证开通码",
   "wizardTitlePassphrase": "设置共享口令",
   "wizardJoinPassphraseTitle": "验证共享口令",
@@ -76,12 +76,12 @@
       "error": {"type": "String"}
     }
   },
-  "wizardPassphraseHint": "共享口令由你和伴侣共同持有，用于加密所有消息。务必牢记；除伴侣外不要告诉任何人。",
+  "wizardPassphraseHint": "共享口令由你和伴侣共同持有，用于保护私密消息。务必牢记，不可泄漏；只可与秘境伴侣分享。",
   "wizardPassphraseMinLengthHint": "至少 8 位",
   "wizardPassphraseTooShort": "口令不得少于 8 位",
   "wizardPassphraseConfirmHint": "再输一次以确认",
   "wizardPassphraseMismatch": "两次输入的口令不一致",
-  "wizardJoinPassphraseHint": "共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。",
+  "wizardJoinPassphraseHint": "共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？询问你的秘境伴侣。",
   "wizardJoinPassphraseWrong": "口令错误：请确认首条通道创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
   "wizardSwitchToPassphrase": "改用共享口令",
@@ -101,7 +101,7 @@
   "setupEntryCreate": "创建秘境",
   "setupEntryJoin": "加入秘境",
   "setupEntryLegacyServer": "服务器版本过低，请升级后再使用",
-  "setupTokenAppTooOld": "本机 App 版本过旧，与服务器对不上（{code}）——请更新 App 后重试",
+  "setupTokenAppTooOld": "本机 App 版本过旧，与服务器对不上（{code}）。请更新 App 后重试",
   "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试（这不是开通码本身的问题）",
   "@setupTokenRateLimited": {
     "placeholders": { "seconds": { "type": "String" } }
@@ -111,7 +111,7 @@
     "placeholders": { "code": { "type": "String" } }
   },
   "setupTokenTitle": "验证开通码",
-  "setupTokenHint": "开通码 24 小时内一次性有效",
+  "setupTokenHint": "验证成功后，才能开通本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。",
   "setupTokenInputHint": "开通码或邀请链接",
   "setupTokenNeedInput": "请填写开通码",
   "setupTokenInvalid": "开通码无效",
@@ -134,7 +134,7 @@
   "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
   "@setupPageInitFailed": {
-    "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示——不展示技术细节（如 SqliteException），自动重试中"
+    "description": "启动初始化（本地数据库/服务器探测）异常时的友好提示，不展示技术细节（如 SqliteException），自动重试中"
   },
   "startupInitFailed": "启动初始化失败，配置未丢失，请重试",
   "startupInitRetry": "重试",
@@ -152,7 +152,7 @@
       "error": {"type": "String"}
     }
   },
-  "setPinDialogPinLabel": "PIN（至少 6 位数字）",
+  "setPinDialogPinLabel": "新 PIN（至少 6 位数字）",
   "setPinDialogPinHint": "至少 6 位数字",
   "setPinDialogConfirmLabel": "确认 PIN",
   "setPinDialogConfirmHint": "再输一次以确认",
@@ -243,13 +243,14 @@
   "save": "保存",
   "chatPageChangePassphraseTitle": "修改共享口令",
   "chatPageChangePassphraseSubmit": "修改",
-  "chatPageChangePassphraseOldLabel": "旧口令",
+  "chatPageChangePassphraseOldLabel": "当前口令",
   "chatPageChangePassphraseNewLabel": "新口令",
   "chatPageChangePassphraseConfirmLabel": "确认新口令",
   "chatPagePassphraseRevealTip": "查看明文（3 秒后自动变回暗码）",
   "chatPageChangePassphraseMismatch": "两次输入的新口令不一致",
-  "chatPageChangePassphraseSame": "新口令与旧口令相同，未作修改",
-  "chatPageChangePassphraseOldWrong": "旧口令错误",
+  "chatPageChangePassphraseSame": "新口令与当前口令相同，未作修改",
+  "chatPageChangePassphraseOldRequired": "请先输入当前口令",
+  "chatPageChangePassphraseOldWrong": "当前口令错误",
   "chatPageChangePassphraseDone": "✅ 共享口令已修改（请告知伴侣，以后必须使用新口令）",
   "chatPageChangePassphraseFailed": "修改口令失败: {error}",
   "@chatPageChangePassphraseFailed": {
@@ -261,9 +262,9 @@
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuAttachmentStorage": "附件存储",
   "chatPageAttachmentStorageSecured": "远程托管",
-  "chatPageAttachmentStorageSecuredDesc": "每次打开附件都重新下载并解密，本机不留明文副本，更私密",
+  "chatPageAttachmentStorageSecuredDesc": "每次打开都重新下载并解密，本机不留明文副本，更私密。",
   "chatPageAttachmentStorageStored": "本地留存",
-  "chatPageAttachmentStorageStoredDesc": "第一次下载附件时保存明文副本，以后本机可直接打开，更方便",
+  "chatPageAttachmentStorageStoredDesc": "第一次下载时保存明文副本，以后本机可直接打开，更方便。",
   "chatPageAttachmentStorageSubmit": "提交",
   "chatPageAttachmentStorageWarnClear": "切到「远程托管」会立即删除本机已留存的附件明文",
   "chatPageMenuStyleLabel": "界面主题",
@@ -437,7 +438,7 @@
   "resetDeviceNameMismatch": "输入不符，请重输",
   "resetDeviceConfirmWord": "重置",
   "resetDevicePinLabel": "本机锁屏码",
-  "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成——对方的通道列表里可能仍留有这条通道",
+  "resetDeviceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道",
   "spaceListTitle": "选择秘境",
   "spaceListEmpty": "还没有加入任何秘境",
   "spaceListAdd": "新建/加入秘境",

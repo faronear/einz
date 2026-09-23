@@ -34,13 +34,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get close => '关闭';
 
   @override
-  String get setupPageEnvelopeKeyHint => '密保信封是通过不对称加密，进行线下交接的一段文本。请联系秘境伴侣获取。';
+  String get setupPageEnvelopeKeyHint => '密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境伴侣获取。';
 
   @override
-  String get setupPageNeedPassphrase => '❗️ 必须设置共享口令';
+  String get setupPageNeedPassphrase => '请设置共享口令';
 
   @override
-  String get wizardJoinPassphraseRequired => '❗️ 请输入共享口令进行验证';
+  String get wizardJoinPassphraseRequired => '请输入共享口令进行验证';
 
   @override
   String get setupEnrollBoundNotice => '🎉 新通道已开通';
@@ -78,7 +78,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPeerNameRequired => '请填写伴侣的名字';
 
   @override
-  String get wizardNameInvalidError => '名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符';
+  String get wizardNameInvalidError => '名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。';
 
   @override
   String wizardNameTooLongError(int max) {
@@ -161,7 +161,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSlotRequired => '必须选择一个身份';
 
   @override
-  String get wizardSpaceLimit => '秘境数量已达上限（服务器 maxSpaces 限制）——暂不能新建秘境';
+  String get wizardSpaceLimit => '秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境';
 
   @override
   String get wizardTitleInvite => '验证开通码';
@@ -194,7 +194,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint => '共享口令由你和伴侣共同持有，用于加密所有消息。务必牢记；除伴侣外不要告诉任何人。';
+  String get wizardPassphraseHint =>
+      '共享口令由你和伴侣共同持有，用于保护私密消息。务必牢记，不可泄漏；只可与秘境伴侣分享。';
 
   @override
   String get wizardPassphraseMinLengthHint => '至少 8 位';
@@ -209,7 +210,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseMismatch => '两次输入的口令不一致';
 
   @override
-  String get wizardJoinPassphraseHint => '共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？问你的伴侣。';
+  String get wizardJoinPassphraseHint =>
+      '共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？询问你的秘境伴侣。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首条通道创建时设置的口令';
@@ -257,7 +259,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupTokenAppTooOld(String code) {
-    return '本机 App 版本过旧，与服务器对不上（$code）——请更新 App 后重试';
+    return '本机 App 版本过旧，与服务器对不上（$code）。请更新 App 后重试';
   }
 
   @override
@@ -272,7 +274,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenTitle => '验证开通码';
 
   @override
-  String get setupTokenHint => '开通码 24 小时内一次性有效';
+  String get setupTokenHint =>
+      '验证成功后，才能开通本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
 
   @override
   String get setupTokenInputHint => '开通码或邀请链接';
@@ -353,7 +356,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setPinDialogPinLabel => 'PIN（至少 6 位数字）';
+  String get setPinDialogPinLabel => '新 PIN（至少 6 位数字）';
 
   @override
   String get setPinDialogPinHint => '至少 6 位数字';
@@ -554,7 +557,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseSubmit => '修改';
 
   @override
-  String get chatPageChangePassphraseOldLabel => '旧口令';
+  String get chatPageChangePassphraseOldLabel => '当前口令';
 
   @override
   String get chatPageChangePassphraseNewLabel => '新口令';
@@ -569,10 +572,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseMismatch => '两次输入的新口令不一致';
 
   @override
-  String get chatPageChangePassphraseSame => '新口令与旧口令相同，未作修改';
+  String get chatPageChangePassphraseSame => '新口令与当前口令相同，未作修改';
 
   @override
-  String get chatPageChangePassphraseOldWrong => '旧口令错误';
+  String get chatPageChangePassphraseOldRequired => '请先输入当前口令';
+
+  @override
+  String get chatPageChangePassphraseOldWrong => '当前口令错误';
 
   @override
   String get chatPageChangePassphraseDone => '✅ 共享口令已修改（请告知伴侣，以后必须使用新口令）';
@@ -596,14 +602,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageAttachmentStorageSecuredDesc =>
-      '每次打开附件都重新下载并解密，本机不留明文副本，更私密';
+      '每次打开都重新下载并解密，本机不留明文副本，更私密。';
 
   @override
   String get chatPageAttachmentStorageStored => '本地留存';
 
   @override
   String get chatPageAttachmentStorageStoredDesc =>
-      '第一次下载附件时保存明文副本，以后本机可直接打开，更方便';
+      '第一次下载时保存明文副本，以后本机可直接打开，更方便。';
 
   @override
   String get chatPageAttachmentStorageSubmit => '提交';
@@ -926,7 +932,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetDeviceServerResidualHint =>
-      '⚠️ 本地数据已清除，但服务端退役未完成——对方的通道列表里可能仍留有这条通道';
+      '⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道';
 
   @override
   String get spaceListTitle => '选择秘境';

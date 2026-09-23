@@ -67,7 +67,7 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'Mr Lukas');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符'),
+    expect(find.text('名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。'),
         findsOneWidget, reason: '含空格的名字必须被拦下并提示');
     // 仍停在名字步骤（没被放行到下一页）
     expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);

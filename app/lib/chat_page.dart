@@ -4651,6 +4651,12 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     if (!mounted) return;
     setState(() => _busy = false);
     final rebuilding = serverFile == null;
+    // 旧口令没填 → 先报第一个框的错（老板 2026-09-23：三框全空报"请设置共享口令"
+    // 不合理，第一个空的是当前口令）。重建路径（无密保箱）不需要旧口令，不拦。
+    if (!rebuilding && oldPass.isEmpty) {
+      setState(() => _error = l10n.chatPageChangePassphraseOldRequired);
+      return;
+    }
     // 新口令与旧口令相同 → 红字提示，不真去改（老板 2026-09-14）。放在拿到服务端状态
     // 之后：无密保箱（重建路径）本就不用旧口令，那种情况下不该拦（用户可能只是重填同一个口令重建）
     if (!rebuilding && oldPass == newPass) {

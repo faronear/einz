@@ -35,14 +35,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupPageEnvelopeKeyHint =>
-      'Offline handover text (asymmetric encryption). Get it from your partner.';
+      'A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.';
 
   @override
-  String get setupPageNeedPassphrase => '❗️ Set a shared passphrase first';
+  String get setupPageNeedPassphrase => 'Please set a shared passphrase';
 
   @override
   String get wizardJoinPassphraseRequired =>
-      '❗️ Enter the shared passphrase to verify';
+      'Please enter the shared passphrase to verify';
 
   @override
   String get setupEnrollBoundNotice => '🎉 New entrance opened';
@@ -82,7 +82,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardNameInvalidError =>
-      'Only Chinese/English letters, digits, _ , - and emoji are allowed';
+      'Only Chinese/English letters, digits, _ , - and emoji are allowed.';
 
   @override
   String wizardNameTooLongError(int max) {
@@ -168,7 +168,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardSpaceLimit =>
-      'Space limit reached (server maxSpaces) — cannot create';
+      'Space limit reached (server maxSpaces), cannot create';
 
   @override
   String get wizardTitleInvite => 'Verify token';
@@ -202,7 +202,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardPassphraseHint =>
-      'The shared passphrase is held by you and your partner, and encrypts every message. Memorize it; tell no one but your partner.';
+      'The shared passphrase is held by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.';
 
   @override
   String get wizardPassphraseMinLengthHint => 'At least 8 characters';
@@ -219,7 +219,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseHint =>
-      'The shared passphrase is held by you and your partner to protect messages. Don\'t know it? Ask your partner.';
+      'The shared passphrase is held by you and your partner to protect private messages. Don\'t know it? Ask your partner.';
 
   @override
   String get wizardJoinPassphraseWrong =>
@@ -272,7 +272,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String setupTokenAppTooOld(String code) {
-    return 'This app is too old for the server ($code) — please update the app and try again';
+    return 'This app is too old for the server ($code). Please update the app and try again';
   }
 
   @override
@@ -288,7 +288,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupTokenTitle => 'Verify token';
 
   @override
-  String get setupTokenHint => 'A one-time code, valid for 24 hours.';
+  String get setupTokenHint =>
+      'The entrance opens only after this code is verified. A one-time code, valid for 24 hours, generated from any verified entrance in the space.';
 
   @override
   String get setupTokenInputHint => 'Paste the token or invite link';
@@ -375,7 +376,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setPinDialogPinLabel => 'PIN (at least 6 digits)';
+  String get setPinDialogPinLabel => 'New PIN (at least 6 digits)';
 
   @override
   String get setPinDialogPinHint => 'At least 6 digits';
@@ -485,7 +486,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuChangePassphrase => 'Change shared passphrase';
 
   @override
-  String get chatPageMenuAvatar => 'Avatar';
+  String get chatPageMenuAvatar => 'My Avatar';
 
   @override
   String get chatPageAvatarUploaded => '✅ Avatar updated';
@@ -604,6 +605,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'New passphrase is the same as the current one — nothing changed';
 
   @override
+  String get chatPageChangePassphraseOldRequired =>
+      'Enter your current passphrase first';
+
+  @override
   String get chatPageChangePassphraseOldWrong => 'Wrong current passphrase';
 
   @override
@@ -630,14 +635,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAttachmentStorageSecuredDesc =>
-      'Downloads and decrypts the attachment every time it is opened; no plaintext copy is kept';
+      'Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.';
 
   @override
   String get chatPageAttachmentStorageStored => 'Keep locally';
 
   @override
   String get chatPageAttachmentStorageStoredDesc =>
-      'Keeps a decrypted copy after the first download, so opening it again is instant';
+      'Keeps a plaintext copy after the first download, so you can open it directly on this device. More convenient.';
 
   @override
   String get chatPageAttachmentStorageSubmit => 'Submit';
@@ -969,7 +974,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetDeviceServerResidualHint =>
-      '⚠️ Local data erased, but retiring it on the server failed — this entrance may still show up in your partner\'s entrance list';
+      '⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list';
 
   @override
   String get spaceListTitle => 'Choose a space';

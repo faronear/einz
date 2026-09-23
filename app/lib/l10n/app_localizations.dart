@@ -149,19 +149,19 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageEnvelopeKeyHint.
   ///
   /// In en, this message translates to:
-  /// **'Offline handover text (asymmetric encryption). Get it from your partner.'**
+  /// **'A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.'**
   String get setupPageEnvelopeKeyHint;
 
   /// No description provided for @setupPageNeedPassphrase.
   ///
   /// In en, this message translates to:
-  /// **'❗️ Set a shared passphrase first'**
+  /// **'Please set a shared passphrase'**
   String get setupPageNeedPassphrase;
 
   /// No description provided for @wizardJoinPassphraseRequired.
   ///
   /// In en, this message translates to:
-  /// **'❗️ Enter the shared passphrase to verify'**
+  /// **'Please enter the shared passphrase to verify'**
   String get wizardJoinPassphraseRequired;
 
   /// No description provided for @setupEnrollBoundNotice.
@@ -233,7 +233,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardNameInvalidError.
   ///
   /// In en, this message translates to:
-  /// **'Only Chinese/English letters, digits, _ , - and emoji are allowed'**
+  /// **'Only Chinese/English letters, digits, _ , - and emoji are allowed.'**
   String get wizardNameInvalidError;
 
   /// No description provided for @wizardNameTooLongError.
@@ -395,7 +395,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardSpaceLimit.
   ///
   /// In en, this message translates to:
-  /// **'Space limit reached (server maxSpaces) — cannot create'**
+  /// **'Space limit reached (server maxSpaces), cannot create'**
   String get wizardSpaceLimit;
 
   /// No description provided for @wizardTitleInvite.
@@ -455,7 +455,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The shared passphrase is held by you and your partner, and encrypts every message. Memorize it; tell no one but your partner.'**
+  /// **'The shared passphrase is held by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.'**
   String get wizardPassphraseHint;
 
   /// No description provided for @wizardPassphraseMinLengthHint.
@@ -485,7 +485,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The shared passphrase is held by you and your partner to protect messages. Don\'t know it? Ask your partner.'**
+  /// **'The shared passphrase is held by you and your partner to protect private messages. Don\'t know it? Ask your partner.'**
   String get wizardJoinPassphraseHint;
 
   /// No description provided for @wizardJoinPassphraseWrong.
@@ -575,7 +575,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenAppTooOld.
   ///
   /// In en, this message translates to:
-  /// **'This app is too old for the server ({code}) — please update the app and try again'**
+  /// **'This app is too old for the server ({code}). Please update the app and try again'**
   String setupTokenAppTooOld(String code);
 
   /// No description provided for @setupTokenRateLimited.
@@ -599,7 +599,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'A one-time code, valid for 24 hours.'**
+  /// **'The entrance opens only after this code is verified. A one-time code, valid for 24 hours, generated from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
@@ -749,7 +749,7 @@ abstract class AppLocalizations {
   /// No description provided for @setPinDialogPinLabel.
   ///
   /// In en, this message translates to:
-  /// **'PIN (at least 6 digits)'**
+  /// **'New PIN (at least 6 digits)'**
   String get setPinDialogPinLabel;
 
   /// No description provided for @setPinDialogPinHint.
@@ -941,7 +941,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuAvatar.
   ///
   /// In en, this message translates to:
-  /// **'Avatar'**
+  /// **'My Avatar'**
   String get chatPageMenuAvatar;
 
   /// No description provided for @chatPageAvatarUploaded.
@@ -1148,6 +1148,12 @@ abstract class AppLocalizations {
   /// **'New passphrase is the same as the current one — nothing changed'**
   String get chatPageChangePassphraseSame;
 
+  /// No description provided for @chatPageChangePassphraseOldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your current passphrase first'**
+  String get chatPageChangePassphraseOldRequired;
+
   /// No description provided for @chatPageChangePassphraseOldWrong.
   ///
   /// In en, this message translates to:
@@ -1193,7 +1199,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageSecuredDesc.
   ///
   /// In en, this message translates to:
-  /// **'Downloads and decrypts the attachment every time it is opened; no plaintext copy is kept'**
+  /// **'Downloads and decrypts every time it is opened; no plaintext copy is kept on this device. More private.'**
   String get chatPageAttachmentStorageSecuredDesc;
 
   /// No description provided for @chatPageAttachmentStorageStored.
@@ -1205,7 +1211,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageStoredDesc.
   ///
   /// In en, this message translates to:
-  /// **'Keeps a decrypted copy after the first download, so opening it again is instant'**
+  /// **'Keeps a plaintext copy after the first download, so you can open it directly on this device. More convenient.'**
   String get chatPageAttachmentStorageStoredDesc;
 
   /// No description provided for @chatPageAttachmentStorageSubmit.
@@ -1781,7 +1787,7 @@ abstract class AppLocalizations {
   /// No description provided for @resetDeviceServerResidualHint.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Local data erased, but retiring it on the server failed — this entrance may still show up in your partner\'s entrance list'**
+  /// **'⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list'**
   String get resetDeviceServerResidualHint;
 
   /// No description provided for @spaceListTitle.
