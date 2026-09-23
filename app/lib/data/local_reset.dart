@@ -12,7 +12,8 @@ import 'vault_session.dart';
 /// 都属于那台开发服务器——连回生产既用不了，也需要一个出口清库重新入网。
 ///
 /// 清的范围：
-/// - drift 全表：消息、附件元数据、同步锚点、草稿、回执、`app_state`（含锁包、
+/// - drift 全表：消息、附件元数据、同步锚点、草稿、回执、`spaces`（空间列表——漏了
+///   它，重置后空间切换器里会留着已经不存在的旧空间）、`app_state`（含锁包、
 ///   profile、安装标记）；
 /// - 系统安全存储里的明文密钥包（`SecureStore`）——漏掉的话"跳过 PIN"的配置会把
 ///   人直接拖回聊天页，等于没清；
@@ -27,6 +28,7 @@ Future<void> resetLocalData(LocalDatabase db) async {
   await db.delete(db.syncState).go();
   await db.delete(db.drafts).go();
   await db.delete(db.peerReceipts).go();
+  await db.delete(db.spaces).go(); // 空间列表：不清则重置后切换器里仍是旧空间
   await db.delete(db.appState).go();
   await SecureStore.deleteAll(AppLockService.secureKeys);
   await AttachmentStore.clear();
