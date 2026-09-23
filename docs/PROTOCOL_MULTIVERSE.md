@@ -121,11 +121,11 @@ Bearer <session_token>`），且鉴权上下文一律取自 session 的 `space_i
 
 ```text
 GET /health
-  只返回服务健康、协议版本、能力（不再返回全局 person 名称表）。
+  只返回服务健康、协议版本、能力（不再返回全局 partner 名称表）。
   响应示例：{ "ok": true, "protocolVersion": "v2-multiverse", "capabilities": [...] }
 
 POST /spaces
-  创建 Space（首设备自举，无 token）。
+  创建 Space（首条通道自举，无 token）。
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,
           partnerName?, peerName?, customId? }   // partnerName=第一人名字（2026-09-16 由 displayName 改名）
   响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token（含链接）
@@ -135,7 +135,7 @@ POST /spaces
 GET /spaces/lookup?address=... | ?custom_id=...
   精确查找，只返回最小公开信息：
   { spaceId, status, memberCount }   （1/2 状态；无空间名——2026-09-16 起）
-  不返回成员姓名、性别、消息数量、设备信息。
+  不返回成员姓名、性别、消息数量、通道信息。
 
 POST /spaces/join
   用 join token 完成加入（第 3 步身份登记 + 取钥可在此前后拆分，见 §5）。
@@ -144,7 +144,7 @@ POST /spaces/join
   响应：200 { spaceId, partnerId, slot, sessionToken }
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
        ENTRANCE_LIMIT_REACHED（该空间通道数已达 maxEntrancesPerSpace，409）
-  （无"满员"错误：同身份可多设备，通道数只受 maxEntrancesPerSpace 约束——见 §6）
+  （无"满员"错误：同身份可多通道，通道数只受 maxEntrancesPerSpace 约束——见 §6）
 ```
 
 ### 4.2 成员端点（加入后/创建者）
@@ -173,7 +173,7 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
      携带的 spaceId/名称/状态）
 ③ 身份登记（名字/性别）           → POST /spaces/join（补 identity 字段，
      服务端事务：锁 Space 行 → 校验 token → 标记 used → 绑定 slot
-     （slot 已有人 → 复用其 partner_id：同身份多设备；**不校验成员/通道数**））
+     （slot 已有人 → 复用其 partner_id：同身份多通道；**不校验成员/通道数**））
 ④ 口令 escrow 取 Space Key        → POST /spaces/{spaceId}/key-escrow/verify
      （提交口令，解开创建者托管的口令密封包，返回 space_key 密封内容）
 ⑤ 设置 PIN                       → 本机操作（AppLock），无服务端调用
@@ -186,7 +186,7 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
   再让用户填身份；协议层两个字段都是可选组，服务端在 ③ 时做事务提交。
 - ① 的 fail-fast 校验要求服务端能按 token 查出 Space 状态且不消费 token
   （新增轻量 `POST /spaces/join/preflight` 或复用 lookup 语义）。
-- create（首设备）流程不变：身份 → 设口令（escrow）→ PIN，无 token。
+- create（首条通道）流程不变：身份 → 设口令（escrow）→ PIN，无 token。
 
 ## 6. 错误码（Multiverse 加入相关）
 
@@ -199,25 +199,25 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `ENTRANCE_LIMIT_REACHED` | 该空间的通道（登记项）数量已达上限（serverConfig.json 的 maxEntrancesPerSpace；**计数含已撤销**——销毁不退额度，防反复开通/销毁刷量） | 409 |
 | `SPACE_NOT_FOUND` | 空间不存在/已归档 | 404 |
 | `NOT_A_MEMBER` | 当前 session 不是该 Space 成员 | 403 |
-| `DEVICE_ALREADY_BOUND` | 该设备已绑定一个 Space，拒绝再创建/加入 | 409 |
+| `DEVICE_ALREADY_BOUND` | 该通道已绑定一个 Space，拒绝再创建/加入 | 409 |
 | `ADDRESS_TAKEN` | space_address 冲突（碰撞），需重新生成 Identity Key | 409 |
 | `INVALID_ADDRESS` | EIP-55 校验失败或格式错误 | 400 |
-| `ESCROW_VERIFY_FAILED` | 口令 escrow 验证失败（口令错误；取包与撤销设备共用） | 401 |
+| `ESCROW_VERIFY_FAILED` | 口令 escrow 验证失败（口令错误；取包与撤销通道共用） | 401 |
 | `ESCROW_RATE_LIMITED` | 口令尝试过多（按 space 计失败次数，滑窗内超限） | 429 |
-| `PASSPHRASE_NOT_SET` | 该空间未托管共享口令，无法做二次校验（撤销设备要求先设置口令） | 409 |
-| `ENTRANCE_REVOKED` | 本设备已被明确撤销（`/auth/challenge`、会话校验）：客户端应清空本地数据后重新入网 | 403 |
-| `FORBIDDEN` | 设备未登记（含服务端库被清空/重置）：客户端**只应警告**，不得清空本地数据 | 403 |
+| `PASSPHRASE_NOT_SET` | 该空间未托管共享口令，无法做二次校验（撤销通道要求先设置口令） | 409 |
+| `ENTRANCE_REVOKED` | 本通道已被明确撤销（`/auth/challenge`、会话校验）：客户端应清空本地数据后重新入网 | 403 |
+| `FORBIDDEN` | 通道未登记（含服务端库被清空/重置）：客户端**只应警告**，不得清空本地数据 | 403 |
 
 ## 7. 安全要求与待定项
 
 - token 只存 hash；lookup/join 有频率限制；custom_id 精确匹配、保留字过滤、
   长度限制、抢注限制。
 - 满员检查必须事务化（锁 Space 行），并发加入只能一个成功。
-- 已绑 Space 的设备再创建/加入一律 `DEVICE_ALREADY_BOUND`（一台客户端
+- 已绑 Space 的通道再创建/加入一律 `DEVICE_ALREADY_BOUND`（一台客户端
   只属于一个 Space）。
 - join token 与口令的分工明确：token 管"能否加入"，口令管"能否解 Space Key"；
   两者都不应被地址替代（地址只定位）。
 - 已定（2026-09-10 老板拍板）：token 默认 TTL = 24 小时；第一版**不做创建者
   确认（模型 B）**，`join_requests` 暂不建表（将来需要时再补）；口令 escrow
-  MVP 保持空间级口令（不做分设备密封包）。
+  MVP 保持空间级口令（不做分通道密封包）。
 

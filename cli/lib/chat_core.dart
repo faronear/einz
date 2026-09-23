@@ -83,7 +83,7 @@ int compareChatMessages(ChatMessage a, ChatMessage b) {
   return a.order.compareTo(b.order);
 }
 
-/// 聊天会话：封装设备状态、服务器交互与消息缓存。
+/// 聊天会话：封装通道状态、服务器交互与消息缓存。
 class ChatSession {
   ChatSession(this.store, this.storePath, this.server);
 
@@ -189,7 +189,7 @@ class ChatSession {
     // 未登记（登记失败/开通码输错）时 entranceId 为 null——先检查，避免空断言崩溃
     final entranceId = store.entranceId;
     if (entranceId == null) {
-      throw StateError('设备尚未绑定秘境，请先 /space create（新建）或 /space join <开通码或邀请链接>（加入）');
+      throw StateError('通道尚未绑定秘境，请先 /space create（新建）或 /space join <开通码或邀请链接>（加入）');
     }
     // spaceId 必须一并提交：否则拿到的是"无 space 的 legacy 会话"，/sync 与
     // /messages 会落到空 space 桶 → 会话过期自动续期后消息全空（P1 收敛）。
@@ -197,8 +197,8 @@ class ChatSession {
     try {
       challenge = await api.challenge(entranceId, spaceId: store.spaceId);
     } on ApiException catch (e) {
-      // 挑战被明确拒绝为"设备已撤销" → 通知 UI 清盘退出（其他失败原样抛出：
-      // FORBIDDEN 只是"服务器不认本设备"，最常见的原因是后台库被重置，绝不能删数据）
+      // 挑战被明确拒绝为"通道已撤销" → 通知 UI 清盘退出（其他失败原样抛出：
+      // FORBIDDEN 只是"服务器不认本通道"，最常见的原因是后台库被重置，绝不能删数据）
       if (e.code == 'ENTRANCE_REVOKED') onEntranceRevoked?.call();
       rethrow;
     }
@@ -228,7 +228,7 @@ class ChatSession {
 
   /// 凭口令接入（escrow download，KEY_ESCROW.md §4）：先认证拿到 token，
   /// 再从 Server 拉取口令密保箱解出 Space Key 写回 store。
-  /// 新设备接入无需对方公钥（与 App「加入」流程一致）；口令错误抛 [FormatException]。
+  /// 新通道接入无需对方公钥（与 App「加入」流程一致）；口令错误抛 [FormatException]。
   Future<void> accessByEscrow(String passphrase) async {
     await auth(); // 拉取口令密保箱需要 session_token
     final api = ApiClient(server);
@@ -542,7 +542,7 @@ class ChatSession {
           // 重新认证失败要区分语义（老板 2026-09-16）——异常被 ws_client 吞掉的话，
           // 后台库被重置时客户端会无限静默退避重连，用户看不到任何解释。
           if (e.code == 'ENTRANCE_REVOKED') {
-            // 设备被明确撤销：交给 UI 走"自毁 + 退出"（WS 就此结束，不必再重连）
+            // 通道被明确撤销：交给 UI 走"自毁 + 退出"（WS 就此结束，不必再重连）
             onRevoked?.call(WsEntranceRevokedEvent(
               type: kWsTypeEntranceRevoked,
               entranceId: store.entranceId ?? '',
@@ -551,7 +551,7 @@ class ChatSession {
             return;
           }
           if (e.code == 'FORBIDDEN') {
-            // 服务器不认本设备（最可能是后台库被重置）→ 只警告。异常**照旧抛出**：
+            // 服务器不认本通道（最可能是后台库被重置）→ 只警告。异常**照旧抛出**：
             // ws_client 只在 onUnauthorized 抛异常时走退避重连（正常返回会立刻重连
             // → 每次 4401 就重连一次，等于打服务端）；退避重连也保证库被复原后自动恢复
             onUnrecognized?.call();
@@ -606,7 +606,7 @@ class ChatSession {
           onReceiptUpdated?.call();
         }
         if (event is WsEntranceRevokedEvent) {
-          // 本设备已被撤销（Server 发帧后随即断开）：UI 应立即提示并退出
+          // 本通道已被撤销（Server 发帧后随即断开）：UI 应立即提示并退出
           onRevoked?.call(event);
         }
       },
@@ -844,7 +844,7 @@ class ChatSession {
   }
 
   /// 按 key_version 选密钥解密（轮换后旧消息用归档密钥），返回载荷解析结果
-  /// （正文 + meta）。设备未接入空间（spaceKey 为 null）时返回占位文本，避免
+  /// （正文 + meta）。通道未接入空间（spaceKey 为 null）时返回占位文本，避免
   /// sync/WS 解密崩溃。
   /// 载荷可能是裸文本，也可能是 `{"plaintext":…,"quote":…,"meta":…}` JSON
   /// （App 引用/meta 扩展）——统一走 shared 的 [decodeMessagePayload]；TUI 不做

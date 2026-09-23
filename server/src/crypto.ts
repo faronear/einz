@@ -19,7 +19,7 @@ async function ensureReady(): Promise<void> {
   }
 }
 
-/** 用设备公钥"密封"一段明文（crypto_box_seal，匿名发送方加密，E2EE.md §7）。 */
+/** 用通道公钥"密封"一段明文（crypto_box_seal，匿名发送方加密，E2EE.md §7）。 */
 export async function sealFor(pubKeyB64: string, plaintext: Uint8Array): Promise<string> {
   await ensureReady();
   const pubKey = sodium.from_base64(pubKeyB64, B64);

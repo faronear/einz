@@ -1,9 +1,9 @@
 /**
- * 回归：sendPushHint 只投给**同一 Space** 的设备（老板 2026-09-14 要求修）。
+ * 回归：sendPushHint 只投给**同一 Space** 的通道（老板 2026-09-14 要求修）。
  *
  * 此前它只按 `entrance_id != 自己` 取 push_tokens —— 一旦接上真实推送，
- * 一条消息会把"有新消息"提示推给这台服务器上**所有空间**的设备（跨空间泄露
- * "谁在发消息"）。现在设备经 partner_id → space_members 归属 Space，按 Space 收敛。
+ * 一条消息会把"有新消息"提示推给这台服务器上**所有空间**的通道（跨空间泄露
+ * "谁在发消息"）。现在通道经 partner_id → space_members 归属 Space，按 Space 收敛。
  *
  * 运行：npm test（tsx test/push_scope.test.ts）
  */
@@ -34,7 +34,7 @@ function seed (): void {
   dev.run('a1', 'p1', now)
   dev.run('a2', 'p2', now)
   dev.run('b1', 'p3', now)
-  // 已撤销的设备：即使在同一 Space 也不该收到
+  // 已撤销的通道：即使在同一 Space 也不该收到
   db.prepare(
     `INSERT INTO entrances (entrance_id, partner_id, public_key, status, created_at)
      VALUES (?, ?, 'pk', 'revoked', ?)`,
@@ -57,7 +57,7 @@ function seed (): void {
   token.run('b1', 'apns-b1', now)
 }
 
-test('sendPushHint：只投给同一 Space 的在用设备，不跨空间、不投已撤销', () => {
+test('sendPushHint：只投给同一 Space 的在用通道，不跨空间、不投已撤销', () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-push-'))
   try {
     openDb(join(dir, 'push.db'))
@@ -79,7 +79,7 @@ test('sendPushHint：只投给同一 Space 的在用设备，不跨空间、不�
     assert.match(lines[0], /entrance=a2/, '应投给同空间的 a2')
     assert.doesNotMatch(lines[0], /entrance=b1/, '不得跨 Space 投给 b1')
     assert.doesNotMatch(lines[0], /entrance=a1/, '不得投给发送者自己')
-    assert.doesNotMatch(lines[0], /entrance=a3/, '不得投给已撤销的设备')
+    assert.doesNotMatch(lines[0], /entrance=a3/, '不得投给已撤销的通道')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

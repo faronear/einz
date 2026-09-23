@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI Multiverse pty e2e：真实 server + 三台设备 create→join 实测（U4/U5 验收）。
+"""CLI Multiverse pty e2e：真实 server + 三条通道 create→join 实测（U4/U5 验收）。
 
 前置：
   1. server 已在 3999 端口运行（PORT=3999 node v22 tsx src/app.ts）
@@ -10,11 +10,11 @@
 
 流程（2026-09-10 老板定稿引导：第一步输入 C/create（创建）或 J/join（加入），
       大小写均可；create 录入两人名字/性别；join 按身份选择而非自填名字）：
-  设备 A：输入 C → 名字 Lukas → 性别 男 → 伴侣名字 Alice → 伴侣性别 女
+  通道 A：输入 C → 名字 Lukas → 性别 男 → 伴侣名字 Alice → 伴侣性别 女
           → 口令 einzpass2026 → 抓邀请 token
-  设备 B：输入 J → 粘贴 token → 选择身份 1（第二人 Alice）→ 口令 → 加入成功
-  设备 C：第一人的其他设备——curl 生成第二个 token → 选择身份 0（第一人 Lukas）
-          → 口令 → 加入成功（验证「同身份多设备」）
+  通道 B：输入 J → 粘贴 token → 选择身份 1（第二人 Alice）→ 口令 → 加入成功
+  通道 C：第一人的其他通道——curl 生成第二个 token → 选择身份 0（第一人 Lukas）
+          → 口令 → 加入成功（验证「同身份多通道」）
   断言①（老板 2026-09-14）：B 向导未按回车「显性进入聊天态」前，A 发的消息**不得**
           进 B 的消息流；B 回车后才由增量同步补齐。
   断言②：B/C 的空间地址与 A 一致（读 store 的 space_address，不抓终端渲染）。
@@ -197,7 +197,7 @@ def main():
         print("FAIL: server 未就绪（请先起 PORT=3999 的 server）")
         sys.exit(1)
 
-    # ---------- 设备 A：输入 C（create，伴侣名字/性别必填）----------
+    # ---------- 通道 A：输入 C（create，伴侣名字/性别必填）----------
     p_a, m_a = spawn_tui(STORE_A)
     name, out, _ = read_until(m_a, [
         ("ask_choice", re.compile(r"创建秘境")),
@@ -254,7 +254,7 @@ def main():
     token1 = new_join_token()
     print("B: 生成 token =", token1)
 
-    # ---------- 设备 B：第二人加入（选身份 1 = Alice）----------
+    # ---------- 通道 B：第二人加入（选身份 1 = Alice）----------
     # B1：错误 token 被拒后直接重输验证（会话到此退出——不 join）
     join_flow("B", STORE_B, token1, identity_name="Alice",
               wrong_token="e1_WrongToken999", quit_after_wrong=True)
@@ -262,7 +262,7 @@ def main():
     # 注意：join_flow 返回时 B 才刚「加入成功」，仍在向导里（锁屏码 → 欢迎辞回车）。
     p_b, m_b = join_flow("B", STORE_B, token1, identity_name="Alice")
 
-    # ---------- 设备 C：第一人的其他设备（选身份 0 = Lukas）----------
+    # ---------- 通道 C：第一人的其他通道（选身份 0 = Lukas）----------
     # A 先走完自己的向导（跳过锁屏码 → 欢迎辞回车显性进入聊天态），否则后面的
     # /invite 与聊天消息会被未完成的向导问答吞掉。
     if not wait_welcome_and_enter(m_a, "A"):
@@ -271,13 +271,13 @@ def main():
     print("A: 向导收尾完成（回车进入聊天态）")
     send(m_a, "/invite\r")
     name, out3, _ = read_until(m_a, [
-        ("invite", re.compile(r"邀请新设备")),
+        ("invite", re.compile(r"开通码已生成")),
         ("fail", re.compile(r"邀请生成失败")),
     ], timeout=20, prefix="A-invite")
     if name != "invite":
         print("FAIL A: /invite 未生成绑定邀请。输出:\n", out3[-600:])
         sys.exit(1)
-    print("A: /invite 命令工作（生成新设备绑定邀请）")
+    print("A: /invite 命令工作（生成新通道绑定邀请）")
 
     # ---------- 断言①：向导未显性结束前，对方消息不得进消息流（老板 2026-09-14）----------
     # 此刻 B 仍停在向导里（锁屏码询问，尚未按回车进聊天态）。
@@ -318,7 +318,7 @@ def main():
     print("C: 生成新 token =", token2)
     p_c, m_c = join_flow("C", STORE_C, token2, identity_name="Lukas")
 
-    # ---------- 断言②：三台设备的空间地址一致（读 store，不抓终端）----------
+    # ---------- 断言②：三条通道的空间地址一致（读 store，不抓终端）----------
     addr_a = store_address(STORE_A)
     addr_b = store_address(STORE_B)
     addr_c = store_address(STORE_C)
@@ -344,7 +344,7 @@ def main():
             p.wait(timeout=5)
         except Exception:
             p.kill()
-    print("PASS: CLI Multiverse create→join→多设备 e2e 全通")
+    print("PASS: CLI Multiverse create→join→多通道 e2e 全通")
 
 
 if __name__ == "__main__":

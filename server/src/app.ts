@@ -130,10 +130,10 @@ server.on('upgrade', (req, socket, head) => {
  *
  * **鉴权约定（2026-09-15 评审后收口，新增端点务必遵守）**：
  * - 每条处理受保护资源的路径，都必须显式回答"凭什么能访问"——二选一：
- *   ① 在路由里调 `requireSession(token)`（设备级）或
+ *   ① 在路由里调 `requireSession(token)`（通道级）或
  *      `requireSpaceMember(token, spaceId)`（空间级，见 guard.ts）；
  *   ② 把 token 交给**已内置鉴权**的模块函数（各模块第一件事就是
- *      resolveSession + 设备状态校验，例如 messages/receipts/entrances/escrow/push）。
+ *      resolveSession + 通道状态校验，例如 messages/receipts/entrances/escrow/push）。
  * - 免鉴权端点只有这几个，且都是有意为之：`GET /health`、`GET /join/:token`（落地页）、
  *   `POST /spaces`（空间自举，创建者还没有凭证）、`POST /spaces/join{,/preflight}`、
  *   `GET /spaces/lookup`（按地址定位，给未入网者用）、
@@ -224,7 +224,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
         : String(body.escrow_passphrase),
       body?.public_key == null ? undefined : String(body.public_key),
       body?.entrance_name == null ? undefined : String(body.entrance_name),
-      // 安装级设备标识（多空间）：同一物理设备各空间一行同名，服务端据此做内部关联
+      // 安装级标识（多空间）：同一物理设备各空间一行同名，服务端据此做内部关联
       body?.install_uid == null ? undefined : String(body.install_uid),
       requestBaseUrl(req) // 邀请链接按请求真实 Host 生成
     )
@@ -252,7 +252,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       String(body?.public_key ?? ''),
       body?.entrance_name == null ? undefined : String(body.entrance_name),
       body?.slot == null ? undefined : Number(body.slot),
-      // 安装级设备标识（多空间）
+      // 安装级标识（多空间）
       body?.install_uid == null ? undefined : String(body.install_uid)
     )
     sendJson(res, 200, r)
@@ -265,7 +265,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   ) {
     const spaceId = path.slice('/spaces/'.length, -'/join-tokens'.length)
     // C1 修复：签发邀请凭证 = 空间级操作，必须持该空间成员会话（此前任何人
-    // 拿到 spaceId 就能自签邀请码、以 slot=0 冒充创建者加设备）
+    // 拿到 spaceId 就能自签邀请码、以 slot=0 冒充创建者加通道）
     requireSpaceMember(optionalBearerToken(req), spaceId)
     const r = createJoinToken(spaceId, requestBaseUrl(req))
     sendJson(res, 201, r)
@@ -285,7 +285,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
 
   // 认证（challenge-response）
-  // 签发 session = 设备重新取得访问权（App 冷启动/会话过期重登），审计记一笔
+  // 签发 session = 通道重新取得访问权（App 冷启动/会话过期重登），审计记一笔
   if (method === 'POST' && path === '/auth/verify') {
     const body = await readJsonBody(req)
     const result = verifyChallenge(
@@ -333,7 +333,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       created_at: result.created_at
     }
     broadcastNewMessage(envelope.sender_entrance_id ?? '', stored as never)
-    // 审计：消息「发送」证据（设备级；只记元数据，不碰密文）
+    // 审计：消息「发送」证据（通道级；只记元数据，不碰密文）
     logActivity({
       entranceId: sess.entrance_id,
       spaceId: sess.space_id,
@@ -354,7 +354,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     const after = Number(url.searchParams.get('after') ?? 0)
     const limit = Number(url.searchParams.get('limit') ?? 100)
     const result = syncMessages(token, after, limit)
-    // 审计：消息「接收」证据（该设备拉到第几条；空闲轮询受节流，见 audit.ts）
+    // 审计：消息「接收」证据（该通道拉到第几条；空闲轮询受节流，见 audit.ts）
     logSyncActivity({
       entranceId: sess.entrance_id,
       spaceId: sess.space_id,
@@ -374,7 +374,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     const sess = requireSession(token)
     const b = (body ?? {}) as Record<string, unknown>
     const result = postReceipts(token, body)
-    // 审计：回执上报明细（设备级；receipts 表本身仍是 partner 级 HWM，语义不变）
+    // 审计：回执上报明细（通道级；receipts 表本身仍是 partner 级 HWM，语义不变）
     logActivity({
       entranceId: sess.entrance_id,
       spaceId: sess.space_id,
@@ -395,13 +395,13 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     return
   }
   // 未读条数（多空间列表的角标用）：服务端派生——消息 + 我上报的读取水位（receipts）。
-  // 不落审计：它是幂等的派生读取，空间数个位数的客户端会常拉（同 /entrances/uid 的理由）。
+  // 不落审计：它是幂等的派生读取，空间数个位数的客户端会常拉（同 /entrances/install-uid 的理由）。
   if (method === 'GET' && path === '/messages/unread') {
     sendJson(res, 200, unreadCount(bearerToken(req)))
     return
   }
 
-  // 附件（两条都要求有效会话 + 在册设备：收口在 requireSession，模块内仍各自校验空间归属）
+  // 附件（两条都要求有效会话 + 在册通道：收口在 requireSession，模块内仍各自校验空间归属）
   if (method === 'POST' && path === '/attachments') {
     const token = bearerToken(req)
     requireSession(token)
@@ -446,7 +446,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // H1：头像上限 2MB（与 storeAvatar 内的校验同一个常量，提前在这里拒绝）
     const blob = await readBody(req, MAX_AVATAR_BYTES)
     const stored = storeAvatar(token, blob)
-    // 广播：伴侣（及本人其他设备）在线时立即重拉头像——否则要等重启 App
+    // 广播：伴侣（及本人其他通道）在线时立即重拉头像——否则要等重启 App
     // （客户端静态缓存只在进程内失效——老板 2026-09-11）
     broadcastProfileUpdated(entrance_id, {
       entrance_id,
@@ -526,7 +526,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       entranceRevokeMatch[1],
       (body as { passphrase?: unknown } | null)?.passphrase
     )
-    // 审计：设备撤销（谁撤的、撤了谁）——**不记口令**
+    // 审计：通道撤销（谁撤的、撤了谁）——**不记口令**
     logActivity({
       entranceId: caller.entrance_id,
       spaceId: caller.space_id,
@@ -536,15 +536,15 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     })
     notifyRevoked(entranceRevokeMatch[1])
     // 注：这里原先还会 notifyKeyRotation()（PROTOCOL.md §8.2 key.rotation），提示剩余
-    // 设备轮换 Space Key。2026-09-14 决策：产品不做密钥轮换（App/TUI 无入口、分发链路
+    // 通道轮换 Space Key。2026-09-14 决策：产品不做密钥轮换（App/TUI 无入口、分发链路
     // 不成立、ROI 极低），该通知与 `key_rotation_required` 一并撤除，见 docs/SECURITY.md。
     sendJson(res, 200, result)
     return
   }
-  // 自助退役（2026-09-21 新加，**无请求体**）：客户端"重置设备"在清本地数据之前调用它，
-  // 把自己从服务端注销，避免留下永远删不掉的幽灵设备（/revoke 禁止自撤，谁也收拾不了）。
+  // 自助退役（2026-09-21 新加，**无请求体**）：客户端"重置本机"在清本地数据之前调用它，
+  // 把自己从服务端注销，避免留下永远删不掉的幽灵通道（/revoke 禁止自撤，谁也收拾不了）。
   // 与上面 revoke 的关键差异：① 目标恒为自己；② **不校验空间口令**（注销我自己，
-  // session 即所有权；客户端那边已经过了"设备名 + 本机 PIN"闸门）；③ 不发 entrance.revoked。
+  // session 即所有权；客户端那边已经过了"通道名 + 本机 PIN"闸门）；③ 不发 entrance.revoked。
   if (method === 'POST' && path === '/entrances/retire') {
     const token = bearerToken(req)
     const caller = requireSession(token) // 必须在 retireEntrance 之前：删完 session 就查不到身份了

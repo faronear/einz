@@ -496,7 +496,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      '通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。';
+      '通道是本机连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。';
 
   @override
   String get chatPageRenameEntranceEmptyError => '请填写通道名称';

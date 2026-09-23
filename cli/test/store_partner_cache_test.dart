@@ -1,4 +1,4 @@
-// 设备存储：成员名称/性别缓存落盘往返（离线启动兜底配色用）。
+// 通道存储：成员名称/性别缓存落盘往返（离线启动兜底配色用）。
 //
 // 老板 2026-09-13：服务器离线启动时 TUI 仍要按性别配色，不能全回退青绿——
 // 因此 GET /space 的 partner_names/partner_genders 要落盘、启动时读回。
@@ -34,7 +34,7 @@ void main() {
     expect(loaded.partnerNames, isEmpty);
     expect(loaded.partnerGenders, isEmpty);
     expect(loaded.peerName, isNull); // 旧 store 无预置名 → 顶部条回退 '-'
-    expect(loaded.installUid, isNull); // 旧 store 无安装级设备标识 → 启动时补生成
+    expect(loaded.installUid, isNull); // 旧 store 无安装级标识 → 启动时补生成
   });
 
   test('installUid：惰性生成一次、落盘后可读回（多空间关联用，不能每次换）', () {

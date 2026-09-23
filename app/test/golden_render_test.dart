@@ -83,7 +83,7 @@ void _usePhoneSize(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
-/// 跳过像素比较的 golden 列表：设备名步骤含真实随机公钥
+/// 跳过像素比较的 golden 列表：通道名步骤含真实随机公钥
 /// （sodium 2.x Randombytes 无 setImplementation 可注入），像素必然不同；
 /// 截图仍随 --update-goldens 生成，供人工审核，仅全量测试时跳过比较。
 class _SkipListGoldenComparator implements GoldenFileComparator {
@@ -119,7 +119,7 @@ void main() {
   setUpAll(() async {
     await _loadChineseFont();
     await sodium();
-    // 设备名步骤含随机公钥 → 全量测试时跳过像素比较
+    // 通道名步骤含随机公钥 → 全量测试时跳过像素比较
     goldenFileComparator = _SkipListGoldenComparator(
       goldenFileComparator,
       {
@@ -214,7 +214,7 @@ void main() {
 
   // ---------- 向导步骤渲染（真实交互路径走到目标步骤再截图）----------
 
-  /// 启动 SetupPage。probeNames 空=首设备（create）；非空=后续设备（join）。
+  /// 启动 SetupPage。probeNames 空=首条通道（create）；非空=后续通道（join）。
   /// probeOk=false 模拟服务器不可达（检测页）。
   Future<void> pumpSetup(
     WidgetTester tester, {
@@ -239,7 +239,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  // ---- create（首设备：探测空名称表 → 自动建钥 → 名字 → 设备名 → …）----
+  // ---- create（首条通道：探测空名称表 → 自动建钥 → 名字 → 通道名 → …）----
 
   testWidgets('golden: 向导1.1.1-身份名字步骤（create）', (WidgetTester tester) async {
     _usePhoneSize(tester);
@@ -337,7 +337,7 @@ void main() {
     expect(find.text('进入秘境'), findsOneWidget); // 唯一按钮（点外面不关闭）
   });
 
-  // ---- join（后续设备：探测到 partnerA → 身份 → 开通码 → …）----
+  // ---- join（后续通道：探测到 partnerA → 身份 → 开通码 → …）----
 
   testWidgets('golden: 向导1.2.1-身份选择步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
@@ -359,7 +359,7 @@ void main() {
 
   testWidgets('golden: 向导1.3.1-密保信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    // 信封入口仅 join（第二/三台设备）口令页显示：探测到 partnerA → 身份（自动进开通码页）→ 口令页
+    // 信封入口仅 join（第二/三条通道）口令页显示：探测到 partnerA → 身份（自动进开通码页）→ 口令页
     await pumpSetup(tester, probeNames: {'partnerA': 'Lukas'});
     await tester.tap(find.text('Lukas')); // 选身份（自动进开通码页）
     await tester.pumpAndSettle();

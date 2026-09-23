@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'package:einz_shared/einz_shared.dart';
 
-/// CLI 设备状态存储（测试用）。
+/// CLI 通道状态存储（测试用）。
 ///
 /// ⚠️ 注意：这是**测试驱动**，密钥以明文 JSON 落在磁盘；真实 App 必须用
 /// Keychain / Keystore（productLens §7.1）。此设计有意为之——CLI 只用于
@@ -48,11 +48,11 @@ class EntranceStore {
         history = history ?? [],
         attachments = attachments ?? [];
 
-  String? entranceId; // 规范设备 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 partnerId 一致）
+  String? entranceId; // 规范通道 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 partnerId 一致）
   final String publicKey; // base64
   final String privateKey; // base64（测试用明文存储）
   String? partnerId; // 空间内身份 id（v2：createSpace 返回 creatorPartnerId / joinSpace 返回 partnerId，均为 UUID）
-  int? slot; // 本设备在空间里的身份槽位（0=创建者/第一人，1=伴侣/第二人；v2 create/join 返回）
+  int? slot; // 本通道在空间里的身份槽位（0=创建者/第一人，1=伴侣/第二人；v2 create/join 返回）
   String? partnerName; // 使用者自定义名称（如 lukas），显示层用
 
   /// 对方（另一身份）名字：create 录入的伴侣名 / join 时另一身份槽位的名字。
@@ -61,7 +61,7 @@ class EntranceStore {
   /// 对方加入后以其真实名字为准（partnerNames 优先），本字段只是离线/未加入时的兜底。
   String? peerName;
 
-  String? entranceName; // 设备自定义名称（如 MacBook），显示层用
+  String? entranceName; // 通道自定义名称（如 MacBook），显示层用
   String? spaceKey; // base64，config/import 后填充
   String? spaceId;
   String? spaceAddress; // 空间地址（Multiverse create/join 后填充；旧 store 迁移后为 null）
@@ -70,9 +70,9 @@ class EntranceStore {
   String? pinHash; // PIN 锁屏哈希（argon2id，crypto_pwhash_str 自含盐；null = 未设置）
   int? escrowUpdatedAt; // 本端已知服务端口令更新时间（上线补查：口令被重设则提示）
 
-  /// 安装级设备标识（服务端 `entrances.install_uid` 的来源）：服务端据此把同一台物理设备
-  /// 在各空间的 entrance_id 认成一台。**TUI 的粒度是"一个 store = 一台设备"**（见
-  /// `_deleteLocalData` 的注释：同机多 store 是刻意的多设备模拟），故各 store 各一份；
+  /// 安装级标识（服务端 `entrances.install_uid` 的来源）：服务端据此把同一台物理设备
+  /// 在各空间的 entrance_id 认成一台。**TUI 的粒度是"一个 store = 一条通道"**（见
+  /// `_deleteLocalData` 的注释：同机多 store 是刻意的多通道模拟），故各 store 各一份；
   /// 随 create/join 上报，存量 store 由启动时补登（`_registerInstallUid`）。
   /// 惰性生成，见 [ensureInstallUid]。
   String? installUid;
@@ -118,7 +118,7 @@ class EntranceStore {
     );
   }
 
-  /// 取安装级设备标识，没有就生成一个（16 字节 hex，与服务端形状约束一致）。
+  /// 取安装级标识，没有就生成一个（16 字节 hex，与服务端形状约束一致）。
   /// 只改内存——调用方负责 `save()`，否则下次启动会换一个新的。
   String ensureInstallUid() {
     final existing = installUid;
@@ -205,7 +205,7 @@ class EntranceStore {
 
   void requireSpace() {
     if (spaceKey == null || spaceId == null) {
-      throw StateError('设备尚未导入 Space Key（先运行 config 或 import）');
+      throw StateError('通道尚未导入 Space Key（先运行 config 或 import）');
     }
   }
 

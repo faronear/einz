@@ -5,7 +5,7 @@
  *       + /data/files/（附件密文 blob）
  * 产物 = 单文件，AES-256-GCM 加密归档到 <data>/backups/。
  *
- * 注：v1 的静态白名单 config.json 已随 Multiverse 删除（设备与空间都在库里），
+ * 注：v1 的静态白名单 config.json 已随 Multiverse 删除（通道与空间都在库里），
  *     备份里不再有该条目——`EINZ_CONFIG` 一并移除（老板 2026-09-17 确认无老备份）。
  *
  * 密钥：环境变量 EINZ_DB_BACKUP_KEY（base64 32B）。未设置时拒绝执行（防误备份明文）。
@@ -84,7 +84,7 @@ function exportSpaceRows(spaceId: string): Record<string, Record<string, unknown
   for (const table of SPACE_TABLES) {
     rows[table] = db.prepare(`SELECT * FROM ${table} WHERE space_id = ?`).all(spaceId) as Record<string, unknown>[];
   }
-  // 设备（登记项）没有 space_id：走 partner_id → space_members 反查
+  // 通道（登记项）没有 space_id：走 partner_id → space_members 反查
   const entrances = db
     .prepare(
       `SELECT * FROM entrances WHERE partner_id IN

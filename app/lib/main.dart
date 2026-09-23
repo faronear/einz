@@ -21,7 +21,7 @@ import 'setup_page.dart';
 /// （`open -a Einz --args --server https://host`），覆盖本次启动使用的服务器地址，
 /// **仅本次生效**（地址从不落盘，见 `data/server_config.dart`）。
 ///
-/// 清空本设备数据走界面：对话页菜单 → 高级 → 重置设备（手机/桌面同一入口）。
+/// 清空本设备数据走界面：对话页菜单 → 高级 → 重置本机（手机/桌面同一入口）。
 Future<void> main() async {
   // 必须先初始化 services 绑定再读参数：平台通道依赖它，未初始化时
   // readLaunchArgs 的桥调用会抛错，--server 永远收不到。
@@ -141,7 +141,7 @@ class _EinzAppState extends State<EinzApp> {
 /// 无锁包**根本不进锁屏页**（老板 2026-09-20）：那页在没有 PIN 时只会显示
 /// "尚未设置锁屏码"的死胡同（LockPage 内部保留该兜底仅为防死锁）。
 ///
-/// 清空本设备数据不在启动参数里：走「对话页菜单 → 高级 → 重置设备」。
+/// 清空本设备数据不在启动参数里：走「对话页菜单 → 高级 → 重置本机」。
 class StartupGate extends StatefulWidget {
   const StartupGate({super.key, this.db});
 
@@ -182,8 +182,8 @@ class _StartupGateState extends State<StartupGate> {
       });
     } catch (e) {
       // 本地锁查询失败（如 SQLite 锁竞争/初始化竞态——热重启、异常退出后偶发）。
-      // 不能降级为"未配置"进设置向导：数据仍在，向导会让用户误以为设备被清空
-      // （且重走向导会重复登记设备）。改为短暂延迟后自动重试；重试耗尽仍失败
+      // 不能降级为"未配置"进设置向导：数据仍在，向导会让用户误以为本机被清空
+      // （且重走向导会重复登记通道）。改为短暂延迟后自动重试；重试耗尽仍失败
       // 则展示"重试"错误页（保留数据，不丢配置）。
       debugPrint('StartupGate 锁状态查询失败（第 ${_retryCount + 1} 次）: $e');
       if (!mounted) return;

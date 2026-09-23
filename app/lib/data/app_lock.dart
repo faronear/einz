@@ -52,7 +52,7 @@ class AppLockService {
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
   static const _kProfile = 'app_lock.profile'; // JSON: {partnerName, peerName, entranceName}
 
-  /// 安装级设备标识（同一物理设备各空间共用；服务端 entrances.install_uid 的来源）。
+  /// 安装级标识（同一物理设备各空间共用；服务端 entrances.install_uid 的来源）。
   static const _kInstallUid = 'app_lock.install_uid';
 
   /// "上次用的是哪个空间"（**明文**，非秘密）：Spaces 表本来就明文存着空间 id 与名字，
@@ -94,13 +94,13 @@ class AppLockService {
         16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
   }
 
-  /// 安装级设备标识（服务端 `entrances.install_uid`）：同一台物理设备上的所有空间
+  /// 安装级标识（服务端 `entrances.install_uid`）：同一台物理设备上的所有空间
   /// **共用这一份**，服务端据此把不同空间的 entrance_id 认成同一台机器。
   ///
   /// 定位（老板 2026-09-22 定）：
   /// - 只做**服务端侧认知**（运维/审计/将来"整机退役"），不参与任何授权或破坏性
   ///   操作的范围判断，也**绝不返回给任何客户端**（成员之间互不可见）；
-  /// - 生命周期 = **安装级**：卸载重装即换新；用户「重置设备」时随 app_state 整表
+  /// - 生命周期 = **安装级**：卸载重装即换新；用户「重置本机」时随 app_state 整表
   ///   清掉，下次调用自动生成新的（= 轮换）。
   ///
   /// 存 app_state 而不是 SecureStore：它与密钥无关，且在这里读安全存储会让一次
@@ -583,8 +583,8 @@ class AppLockPayload {
   /// 服务器更新 = 离线期间口令被重设（应弹窗重新验证）。
   final int? escrowUpdatedAt;
 
-  /// 设备 X25519 密钥对（b64）：随锁包持久化——重启后 challenge-response
-  /// 重新认证（reauth）需用私钥签名；「我的设备」弹窗展示公钥。旧包无此字段。
+  /// 通道 X25519 密钥对（b64）：随锁包持久化——重启后 challenge-response
+  /// 重新认证（reauth）需用私钥签名；「我的通道」弹窗展示公钥。旧包无此字段。
   final String? publicKeyB64;
   final String? privateKeyB64;
 
@@ -611,7 +611,7 @@ class AppLockPayload {
       );
 }
 
-/// 一台设备上的**全部空间凭证**（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.2）。
+/// 一条通道上的**全部空间凭证**（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.2）。
 ///
 /// 存储形态：PIN 模式下整个对象加密后存 `app_lock.package`；跳过 PIN 模式明文存
 /// SecureStore `app_lock.plain`。旧版只有一个 [AppLockPayload] 的包在**读取时归一**
@@ -695,13 +695,13 @@ class VaultPayload {
     return VaultPayload(
       spaces: spaces,
       activeSpaceId: raw['active_space_id'] as String?,
-      // 旧 Vault JSON 里的 entrance_name 已废弃（设备名归 per-space profile，见
+      // 旧 Vault JSON 里的 entrance_name 已废弃（通道名归 per-space profile，见
       // multiSpaceDesign §2.2 的 2026-09-22 修订），读到也不处理。
     );
   }
 }
 
-/// 用锁包里的设备密钥对完成 challenge-response 重新认证（重启后 reauth 用：
+/// 用锁包里的通道密钥对完成 challenge-response 重新认证（重启后 reauth 用：
 /// 会话过期 401/4401 时自动续期）。锁包无密钥对（旧包）时抛 [StateError]。
 ///
 /// **必须带 spaceId**：challenge 签发的 session 会绑定该 Space（服务端 auth.ts
@@ -712,7 +712,7 @@ Future<String> reauthFromPayload(AppLockPayload payload) async {
   final pub = payload.publicKeyB64;
   final priv = payload.privateKeyB64;
   if (pub == null || priv == null || pub.isEmpty || priv.isEmpty) {
-    throw StateError('锁包无设备密钥对');
+    throw StateError('锁包无通道密钥对');
   }
   final s = await sodium();
   final api = ApiClient(effectiveServer);

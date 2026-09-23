@@ -23,7 +23,7 @@ function assertSafePartnerId(partnerId: string): void {
  *  把超大 body 读进内存再判超限（2026-09-15 评审 H1）。 */
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-/** 上传本人头像：token 认证 → 解析设备 → 查 partner_id → 写文件（覆盖旧头像）。 */
+/** 上传本人头像：token 认证 → 解析通道 → 查 partner_id → 写文件（覆盖旧头像）。 */
 export function storeAvatar(
   token: string,
   blob: Buffer

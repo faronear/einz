@@ -1013,7 +1013,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.'**
+  /// **'An entrance is the secure line between this device and a space, opened only after verification. This entrance works only on this device and in this space.'**
   String get chatPageEntranceScopeHint;
 
   /// No description provided for @chatPageRenameEntranceEmptyError.

@@ -8652,3 +8652,32 @@ v1 老 meta 字面量）。drift 本地库升 v8，用 `ALTER TABLE RENAME COLUM
 1. 中文「设备」→「通道」注释/文档清扫（代码 ~780 处）——**必须逐处判断**通道 vs 本机，禁止全局替换；
 2. CLI 命令 `/device`（改名通道）与 App 菜单项「通道名称」不一致，是否改 `/entrance` 由老板定（UI 词归老板）；
 3. 带日期的历史快照（`architectureReview*`、`upgradeToMultiverse`、`worklog`、`db.ts` 清理 v1 meta 的字面量）保持原样。
+
+## 2026-09-23 · 第二批：中文「设备」→「通道」清扫 + CLI `/device`→`/entrance`
+
+老板三件：① 中文清扫单独一批做、**一个个核对**；② CLI `/device` 改成 `/entrance`；③ 同意历史快照保持原样。
+
+**规则（逐处判断，不全局替换）**：指登记项 → 「通道」（量词「条」）；指本机/物理机器/型号 → 保留「设备」；
+指安装 → 「本机」（如「重置本机」）；平台实现 → 「平台通道」保留。总体约 780 处代码 + 600 处 docs。
+
+**范围**：server/src+test、shared/lib+test、app/lib+test、cli/bin+lib+test、`docs/*.md`（8 个技术文档全量，
+其余小文档按语境点改）、README.md、`aimemo/{multiSpaceDesign,productLens,renamePlan,projectPlan}`。
+
+**UI 只动了 1 条**：`chatPageEntranceScopeHint` 中文「通道是**本机**连接到秘境的安全线路…」
+（原文"设备"，与同句后面的「本机」自相矛盾；en 同步 `this device`）。CLI 命令 `/device` → `/entrance`
+（help/usage/`case`/policy 注释）。
+
+**踩到的坑（都靠 grep 复核抓回来）**：
+- 盲目 `设备→通道` 会造出「多**台**通道」「某**台**通道」「这台通道」——量词必须是「条」，逐处改成 `台通道→条通道`；
+- 「安装级**设备**标识」一度变成「安装级**通道**标识」（install_uid 是安装层，不是通道层）→ 统一为「安装级标识」；
+- 「**重置设备**」（安装层动作）一度变成「重置**通道**」→ 统一为「重置本机」；
+- 「一设备一通道一秘境」时代引文被改成「一通道一通道一秘境」→ 回改；
+- 「物理设备名」「同一台物理设备」「设备型号」必须原位保留（物理层），靠保护串绕过；
+- **cli 探针期望串**（`设备列表`/`输入要撤销的设备序号`/`本设备已被撤销`/`目标设备毫发无损`）
+  必须跟 TUI 一起改，否则静默失效；app 测试里那条 UI 断言同步改。
+
+**验证**：server `npm run build` + `npm test` 28 项全绿；shared `flutter test` 52 项通过；
+shared/app/cli 三包 `flutter analyze` 无 issue；`flutter gen-l10n` 重生成。
+**未做**：cli 探针实跑（要真 server + pty），只把期望串对齐。
+
+**遗留**：`productLens` §12/§14 仍是 v1 口径（已在 projectPlan 待办里）；历史快照按老板意见保持旧名。

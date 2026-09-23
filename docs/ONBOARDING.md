@@ -4,7 +4,7 @@
 B 加入（口令取钥）→ 双端互通对话。
 
 > 适用：两人私密空间，服务器自建，客户端 TUI（Mac / Windows）或 App。
-> **Multiverse（v2）**：一个 Server 可承载多个互不可见的空间；设备登记与白名单都在数据库里，
+> **Multiverse（v2）**：一个 Server 可承载多个互不可见的空间；通道登记与白名单都在数据库里，
 > 没有静态配置文件。v1 时代的脚本 CLI（`cli/bin/einz.dart`）、20 位邀请码、密保信封分发
 > 已随 2026-09-15 收敛删除，本文流程全部按 v2。
 
@@ -41,9 +41,9 @@ B 加入（口令取钥）→ 双端互通对话。
 | **Space Key** | 32B 随机空间密钥（端到端加密用），创建者本地生成；加入方凭**口令**从口令密保箱取回 |
 | **口令（passphrase）** | 创建空间时设定，两人共用；对方凭它解出 Space Key。**别和邀请链接混淆** |
 | **邀请链接 / join token** | 一次性（默认 24h、用后作废），创建者 `/invite` 生成；B 拿它加入空间 |
-| **person / slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。partner_id 是空间内随机 UUID；同一身份可多台设备（"自己/对方"按 partner_id 判断） |
-| **设备登记** | 由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭 join token）完成，**同时签发绑定该空间的会话**——没有独立的登记步骤 |
-| **设备在册状态** | `entrances` 表（`active` / `revoked`）；未登记 → 401/403 `FORBIDDEN`（只警告），已撤销 → 403 `ENTRANCE_REVOKED`（客户端自毁本地数据），无需任何配置文件 |
+| **partner / slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。partner_id 是空间内随机 UUID；同一身份可多条通道（"自己/对方"按 partner_id 判断） |
+| **通道登记** | 由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭 join token）完成，**同时签发绑定该空间的会话**——没有独立的登记步骤 |
+| **通道在册状态** | `entrances` 表（`active` / `revoked`）；未登记 → 401/403 `FORBIDDEN`（只警告），已撤销 → 403 `ENTRANCE_REVOKED`（客户端自毁本地数据），无需任何配置文件 |
 
 ---
 
@@ -62,12 +62,12 @@ python3 -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"  
 docker compose up -d --build server
 curl -s https://einz.tic.cc/health
 # {"status":"ok","protocol_version":"v2-multiverse","version":"1.0.0","capabilities":["spaces","join-tokens"],...}
-docker compose logs -f server   # 查看日志（启动/建空间/设备登记等事件；Ctrl+C 停止跟踪）
+docker compose logs -f server   # 查看日志（启动/建空间/通道登记等事件；Ctrl+C 停止跟踪）
 
 # ② 本机（Mac）：拉最新代码
 cd /Users/Shared/productX/only && git pull
 
-# ③ 可选：清掉旧设备凭证（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
+# ③ 可选：清掉旧通道凭证（重走会生成全新空间；不清也能走，旧 store 会被覆盖）
 rm -f ~/.einz/*.json
 mkdir -p ~/.einz
 ```
@@ -82,7 +82,7 @@ mkdir -p ~/.einz
 
 ## 阶段 1：A 创建空间（Mac）
 
-TUI 引导会一次完成：生成设备身份 → `POST /spaces` 建空间（登记设备 + 签发会话）→
+TUI 引导会一次完成：生成通道身份 → `POST /spaces` 建空间（登记通道 + 签发会话）→
 本地生成 Space Key → 用口令加密上传密保箱 → 打印邀请链接。
 
 ```bash
@@ -99,7 +99,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc \
 进会话后执行 `/invite` 打印**邀请链接**（`https://einz.tic.cc/join/e1_…`，24 小时一次性），
 把链接离线发给 B（或让对方扫码）。
 
-> 命令一览：`/help`；空间状态 `/space`；改口令 `/passphrase`；设备名 `/device <名>`；
+> 命令一览：`/help`；空间状态 `/space`；改口令 `/passphrase`；通道名 `/entrance <名>`；
 > 我的显示名 `/myname <名>`。
 
 ---
@@ -115,11 +115,11 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc `
 #   粘贴 A 给的邀请链接（或纯 token）
 #   ✅ 开通码验证通过 → 选择身份（1=第一人 / 2=伴侣，一般选 2）
 #   输入 A 设置的共享口令（⚠️ 输口令，不是邀请链接；Windows 隐藏回显无星号）
-#   ✅ 口令验证通过，成功加入秘境（取回 Space Key + 登记设备 + 签发会话）
+#   ✅ 口令验证通过，成功加入秘境（取回 Space Key + 登记通道 + 签发会话）
 ```
 
-> 同一人加第二台设备：同样选 `j` 加入，身份选**同一个人**（1 或 2 与已有设备一致）——
-> 同一 person 多设备不受"两人上限"限制（那限制只针对新增 person）。
+> 同一人加第二条通道：同样选 `j` 加入，身份选**同一个人**（1 或 2 与已有通道一致）——
+> 同一 partner 多通道不受"两人上限"限制（那限制只针对新增 partner）。
 
 ---
 
@@ -127,7 +127,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc `
 
 ```bash
 cd /Users/Shared/productX/only/cli
-dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ 下的设备后列出选择
+dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ 下的通道后列出选择
 # 启动探测 /health → 能连 → 直接进 TUI（不询问服务器）；状态栏 ● 在线
 # 输入消息回车即发送（无需子命令）
 ```
@@ -141,12 +141,12 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 | A/B 在线     | 各自 TUI 状态栏               | `● 在线`                                                   |
 | A→B 消息     | A 输入消息回车                | B 消息区实时出现（WS 推送）                                |
 | B→A 消息     | B 输入消息回车                | A 消息区实时出现                                           |
-| 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀（**同 person 多设备互显"我"**） |
+| 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀（**同 partner 多通道互显"我"**） |
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                |
 | 服务器重设   | `/server https://einz.tic.cc` | 重连并认证                                                 |
-| 补发开通码     | 任一方 `/invite`              | 打印新的 24h 一次性邀请链接（给自己加设备也用它）          |
-| 看设备列表   | 任一方 `/entrances`             | 列出**同空间全部设备**（我 + 对方），带序号与在线/已撤销状态 |
-| 撤销设备     | `/revoke`（或 `/revoke <序号\|设备名>`） | 选设备 → 输入 `yes` 确认 → 输入共享口令 → 该设备下次联网时**清空本地数据**（不可逆；口令错/无权则毫发无损） |
+| 补发开通码     | 任一方 `/invite`              | 打印新的 24h 一次性邀请链接（给自己加通道也用它）          |
+| 看通道列表   | 任一方 `/entrances`             | 列出**同空间全部通道**（我 + 对方），带序号与在线/已撤销状态 |
+| 撤销通道     | `/revoke`（或 `/revoke <序号\|通道名>`） | 选通道 → 输入 `yes` 确认 → 输入共享口令 → 该通道下次联网时**清空本地数据**（不可逆；口令错/无权则毫发无损） |
 
 ---
 
@@ -156,8 +156,8 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 | --------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
 | 口令接入报解密失败 / `FormatException`  | **把邀请链接当成口令输了**   | 口令是创建空间时设的那串（如 faronear）；邀请链接是 `/invite` 打印的 24h 一次性凭证 |
 | 加入时报 `TOKEN_EXPIRED` / `TOKEN_USED` | 邀请链接过期或已被用过       | 让创建者重新 `/invite` 生成一个                                               |
-| `/auth` 报"设备尚未绑定秘境"            | 新 store 还没加入/创建空间   | 先 `/space create` 或 `/space join <链接>`                                     |
-| 加入时报 `FORBIDDEN not a member`       | 会话的空间与目标空间不一致   | 该设备已属于另一个空间（一设备一空间）：换 store 或用新设备                    |
+| `/auth` 报"通道尚未绑定秘境"            | 新 store 还没加入/创建空间   | 先 `/space create` 或 `/space join <链接>`                                     |
+| 加入时报 `FORBIDDEN not a member`       | 会话的空间与目标空间不一致   | 该通道已属于另一个空间（一通道一空间）：换 store 或用新通道                    |
 | 启动 255 崩溃                           | 旧代码渲染/终端问题          | 已修复（`git pull` 后重试）                                                    |
 | `/health` 正常但认证握手失败            | 本机翻墙/网络抖动            | 关闭翻墙或加直连规则；ApiClient 已带 3 次瞬时重试                              |
 | 发消息一直"发送中"                      | WS 未连上 / 会话失效         | `/auth` 重新激活；看服务端日志 `[req] WS /ws connect`                          |
@@ -168,15 +168,15 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 
 ## 说明
 
-- **无配置文件**：设备与空间全在库里（`spaces` / `space_members` / `entrances`）；`config.json`
+- **无配置文件**：通道与空间全在库里（`spaces` / `space_members` / `entrances`）；`config.json`
   这类静态白名单与 v1 脚本 CLI 已随 2026-09-15 收敛删除。
 - **信任模型**：`POST /spaces` 免认证（创建者此刻还没有凭证）——所以 `maxSpaces` 是开放注册的
   总闸；私有部署建议设成 1~2。空间一旦建立，只有持口令 + 有效 join token 的人能进来。
 - **会话必带空间**：认证时 `space_id` 必填；无 space 的会话不存在（也访问不到任何数据）。
-- **两人上限**：一个空间内 distinct person ≤2（同 person 多设备不限）；由 `space_members`
+- **两人上限**：一个空间内 distinct partner ≤2（同 partner 多通道不限）；由 `space_members`
   的两个槽位在数据库层强制。
-- **撤销设备**：`POST /entrances/:id/revoke`（需同空间成员认证 + **校验共享口令**）→ 标记
+- **撤销通道**：`POST /entrances/:id/revoke`（需同空间成员认证 + **校验共享口令**）→ 标记
   `revoked` + 清会话/Push Token + 关 WS；
-  被撤销设备重启不复活（**不**做密钥轮换，见 `SECURITY.md` §3；止损走重建空间）。
+  被撤销通道重启不复活（**不**做密钥轮换，见 `SECURITY.md` §3；止损走重建空间）。
 - **服务端监控**：`GET /health`（免鉴权）、`docker compose logs -f server`（含
   `[req]` 请求日志与 WS 连接数）、`server/data/einz.sqlite.db` 的审计表（上下线/发送/接收）。

@@ -38,13 +38,13 @@ export function unregisterPushToken(token: string): { ok: true } {
 /**
  * 推送通知（PROTOCOL.md §7.3 / productLens §10）：
  * V1 只发"有新消息"提示，绝不携带正文。APNs/FCM 实际下发在 Phase 3 接入；
- * 当前实现为占位：从 push_tokens 取目标设备，记录日志（不泄露内容）。
+ * 当前实现为占位：从 push_tokens 取目标通道，记录日志（不泄露内容）。
  */
 export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
-  // **只投给同一 Space 的其他设备**：entrances 表没有 space_id，设备经
+  // **只投给同一 Space 的其他通道**：entrances 表没有 space_id，通道经
   // partner_id → space_members 归属 Space。此前只按 `entrance_id != 自己` 过滤 →
-  // 会把提示推给这台服务器上**所有空间**的设备（跨空间泄露"谁在发消息"）。
-  // 同时跳过已撤销的设备（status != 'active'）。
+  // 会把提示推给这台服务器上**所有空间**的通道（跨空间泄露"谁在发消息"）。
+  // 同时跳过已撤销的通道（status != 'active'）。
   const rows = getDb()
     .prepare(
       `SELECT p.entrance_id, p.platform, p.token
@@ -62,11 +62,11 @@ export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
   }
 }
 
-/** GET /space：空间信息（space_id + 成员设备 + partner 名称/性别表）。
+/** GET /space：空间信息（space_id + 成员的通道 + partner 名称/性别表）。
  *  v2：名称/性别从 space_members 表读（display_name/gender——create/join 写入），
  *  不再读 v1 的 meta person_name:* 与 person_gender:* 键（v2 不写 meta——老板 2026-09-10
  *  反馈：标题栏对方名字一直 '-'、气泡全青色）。
- *  设备范围：**仅本空间成员设备**（guard.entranceScopeClause）——此前直出全局
+ *  通道范围：**仅本空间成员的通道**（guard.entranceScopeClause）——此前直出全局
  *  entrances 表，跨空间泄漏 partner/在线状态（2026-09-15 评审 C2）。 */
 export function getSpace(
   token: string
@@ -76,7 +76,7 @@ export function getSpace(
   const entrances = getDb()
     .prepare(`SELECT d.entrance_id, d.partner_id, d.status, d.last_seen FROM entrances d WHERE d.status = 'active' AND (${scope.sql})`)
     .all(...scope.params);
-  // v2：成员名称/性别表（space_members——按 partner_id；同一身份多设备共享）
+  // v2：成员名称/性别表（space_members——按 partner_id；同一身份多通道共享）
   const partnerNames: Record<string, string> = {};
   const partnerGenders: Record<string, string> = {};
   const partnerSlots: Record<string, number> = {};

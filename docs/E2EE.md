@@ -1,7 +1,7 @@
 # Einz — E2EE 设计（docs/E2EE.md）
 
 > **状态：** 密码学部分 `[已实现]`；配置分发部分已按 **Multiverse（v2）** 更新
-> （2026-09-15 v1 收敛：设备登记改为 `POST /spaces` / `POST /spaces/join` 自助完成，
+> （2026-09-15 v1 收敛：通道登记改为 `POST /spaces` / `POST /spaces/join` 自助完成，
 > 静态白名单 `config.json` 与脚本 CLI 已删除。下文凡涉及"白名单"处均指 `entrances` 表的
 > 在册状态；协议细节见 `PROTOCOL_MULTIVERSE.md`）。
 > **权威依据：** `aimemo/productLens.zhcn.md` §4（密码学与密钥层级）、§5（一次性配置）
@@ -16,7 +16,7 @@
 **目标：**
 
 - Server 永远只接触密文与元数据，无法读取消息正文、图片、视频、语音、笔记。
-- 设备凭证 = 密码学公钥；私钥永不离开设备。
+- 通道凭证 = 密码学公钥；私钥永不离开通道。
 - 一个空间固定两人（两个身份槽位）；一个 Server 可承载**多个互不可见的空间**（Multiverse）。
 
 **范围外（明确不做）：**
@@ -33,7 +33,7 @@
 
 | 用途                       | 原语                                         | libsodium 函数                             |
 | -------------------------- | -------------------------------------------- | ------------------------------------------ |
-| 设备凭证密钥               | X25519 密钥对                                | `crypto_box_keypair`                       |
+| 通道凭证密钥               | X25519 密钥对                                | `crypto_box_keypair`                       |
 | Space Key 包装（配置分发） | 匿名发送方加密（X25519 + XSalsa20-Poly1305） | `crypto_box_seal` / `crypto_box_seal_open` |
 | 消息/附件加密              | XChaCha20-Poly1305（AEAD）                   | `crypto_aead_xchacha20poly1305_ietf_*`     |
 | 密钥派生（消息/附件）      | 带密钥 BLAKE2b-256                           | `crypto_generichash`（keyed 模式）         |
@@ -47,13 +47,13 @@
 ## 3. 密钥层级
 
 ```text
-Device Identity Key（长期，X25519 keypair，每台设备一对）
-    │  私钥：仅存本机 Keychain / Keystore，永不离开设备，永不写入磁盘明文
+Entrance Identity Key（长期，X25519 keypair，每条通道一对）
+    │  私钥：仅存本机 Keychain / Keystore，永不离开通道，永不写入磁盘明文
     │  公钥：经 POST /spaces 登记进 entrances 表（签发绑定空间的会话）
     ▼
 Space Key（长期，每 Space 一个，32 字节对称密钥）
-    │  明文：仅存在于两端设备的安全存储中；Server 永不接触明文
-    │  分发：用两端设备公钥分别 crypto_box_seal 后写入配置产物（§7）
+    │  明文：仅存在于两端通道的安全存储中；Server 永不接触明文
+    │  分发：用两端通道公钥分别 crypto_box_seal 后写入配置产物（§7）
     ├── crypto_generichash(key=SpaceKey, input="m:"‖message_id) ──► Message Key（每消息一个）
     └── crypto_generichash(key=SpaceKey, input="a:"‖attachment_id) ──► Attachment Key（每附件一个）
 ```
@@ -62,15 +62,15 @@ Space Key（长期，每 Space 一个，32 字节对称密钥）
 
 | 密钥                | 生成时机           | 销毁                 | 轮换                        |
 | ------------------- | ------------------ | -------------------- | --------------------------- |
-| Device Identity Key | 设备首次启动       | 随设备撤销废弃       | 换机时重新生成（§10）       |
-| Space Key           | 一次性配置阶段     | 设备撤销时（§9）     | 撤销触发 `key_version` 递增 |
+| Entrance Identity Key | 通道首次启动       | 随通道撤销废弃       | 换机时重新生成（§10）       |
+| Space Key           | 一次性配置阶段     | 通道撤销时（§9）     | 撤销触发 `key_version` 递增 |
 | Message Key         | 每条消息发送时派生 | 用完即弃（不持久化） | 无                          |
 | Attachment Key      | 每个附件加密时派生 | 用完即弃             | 无                          |
 
 **要点：**
 
 - 消息/附件密钥按需派生、用完即弃：一个消息密钥泄露不影响其他消息。
-- `key_version` 随每条密文记录；轮换后旧密文仍用旧版本密钥解密（设备保留归档密钥，§9）。
+- `key_version` 随每条密文记录；轮换后旧密文仍用旧版本密钥解密（通道保留归档密钥，§9）。
 - Server 只保存包装后的 Space Key 密文与每条密文；永远没有解密所需的任何密钥。
 
 ---
@@ -135,7 +135,7 @@ BackupKey = crypto_pwhash(
 | `type`             | text / image / video / voice / system             |
 | `key_version`      | 加密所用 Space Key 版本（解密时选择归档密钥）     |
 | `message_id`       | UUIDv7，派生 Message Key 的输入之一               |
-| `sender_entrance_id` | 发送设备                                          |
+| `sender_entrance_id` | 发送通道                                          |
 | `nonce`            | 24 字节随机 nonce，**每条消息重新生成，禁止复用** |
 | `ciphertext`       | AEAD 密文（含 16 字节 tag）                       |
 
@@ -224,19 +224,19 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
 ### 7.2 配置流程（对应 productLens §5.1）
 
 ```text
-1. 设备 A 首次启动 → 生成 X25519 身份密钥对 → 导出公钥
-2. 设备 B 首次启动 → 生成 X25519 身份密钥对 → 导出公钥
+1. 通道 A 首次启动 → 生成 X25519 身份密钥对 → 导出公钥
+2. 通道 B 首次启动 → 生成 X25519 身份密钥对 → 导出公钥
 3. 配置工具：生成 Space Key → 分别 crypto_box_seal 给 A、B 公钥
-4. 设备登记：创建者 `POST /spaces` 携带设备公钥 → 服务端写入 `entrances` 表 + `space_members` 身份槽位，并签发绑定该空间的会话
-5. 设备 A：导入配置产物 → crypto_box_seal_open 自己的密封副本 → Space Key 存入安全存储
-6. 设备 B：同上
-7. Server：以 `entrances` 表（status=active）为在册设备清单（§8）
+4. 通道登记：创建者 `POST /spaces` 携带通道公钥 → 服务端写入 `entrances` 表 + `space_members` 身份槽位，并签发绑定该空间的会话
+5. 通道 A：导入配置产物 → crypto_box_seal_open 自己的密封副本 → Space Key 存入安全存储
+6. 通道 B：同上
+7. Server：以 `entrances` 表（status=active）为在册通道清单（§8）
 ```
 
-- 身份私钥始终在设备内生成、设备内保管；公钥外传。
-- 密封副本只在配置现场流转一次；此后设备各自持有 Space Key 明文。
+- 身份私钥始终在通道内生成、通道内保管；公钥外传。
+- 密封副本只在配置现场流转一次；此后通道各自持有 Space Key 明文。
 
-### 7.3 设备在册状态（entrances 表；v1 的静态白名单 config.json 已删除）
+### 7.3 通道在册状态（entrances 表；v1 的静态白名单 config.json 已删除）
 
 ```json
 {
@@ -244,13 +244,13 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
   "entrances": [
     {
       "entrance_id": "dev-a1",
-      "partner_id": "person-a",
+      "partner_id": "partner-a",
       "public_key": "base64(X25519公钥)",
       "status": "active"
     },
     {
       "entrance_id": "dev-b1",
-      "partner_id": "person-b",
+      "partner_id": "partner-b",
       "public_key": "base64(X25519公钥)",
       "status": "active"
     }
@@ -258,7 +258,7 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
 }
 ```
 
-- 不在册（未登记或已撤销）的设备一律拒绝认证、同步、上传（productLens §2.3）。
+- 不在册（未登记或已撤销）的通道一律拒绝认证、同步、上传（productLens §2.3）。
 
 ### 7.4 两种密钥分发方案：seal 密封交换 vs escrow 口令托管
 
@@ -267,10 +267,10 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
 **方案一：seal 密封交换（§7.1-7.2，CLI `config`/`import`、app「线下导入」）**
 
 ```text
-A 生成 Space Key → 用 B 的设备公钥 crypto_box_seal → 密封副本离线给 B → B 用自己私钥打开
+A 生成 Space Key → 用 B 的通道公钥 crypto_box_seal → 密封副本离线给 B → B 用自己私钥打开
 ```
 
-- 前置条件：**双方设备已在同一空间登记**（创建者 `POST /spaces`、加入者 `POST /spaces/join`）。
+- 前置条件：**双方通道已在同一空间登记**（创建者 `POST /spaces`、加入者 `POST /spaces/join`）。
 - 密钥传递**不经 Server**（离线文件/二维码），Server 泄露不影响该路径。
 - 安全边界：依赖对方私钥保管。
 
@@ -285,8 +285,8 @@ B（持口令即可，取包端点免认证）拉取密文包 → 用同一口�
 - Server 只存被口令加密的包（`{format,salt,nonce,ciphertext}`），无口令解不开。
 - 安全边界：依赖**口令强度** + 口令的离线告知渠道。
 
-**为什么默认走 escrow：** 首设备初次创建空间时**不存在第二个使用者的公钥**，无法 seal；
-口令托管只要求一个口令；设备公钥随 `/spaces/join` 一并提交（登记与会话由该请求一次完成）。
+**为什么默认走 escrow：** 首条通道初次创建空间时**不存在第二个使用者的公钥**，无法 seal；
+口令托管只要求一个口令；通道公钥随 `/spaces/join` 一并提交（登记与会话由该请求一次完成）。
 seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线下导入」选项。
 
 | 维度            | seal 密封交换                    | escrow 口令托管           |
@@ -297,16 +297,16 @@ seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线
 | 安全边界        | 对方私钥保管                     | 口令强度 + 离线告知渠道   |
 | 使用方          | CLI / app 线下导入               | **app 默认**（创建/加入） |
 
-> 两者均不替代设备登记：无论哪条路径，B 都要先凭 A 签发的 join token 完成
+> 两者均不替代通道登记：无论哪条路径，B 都要先凭 A 签发的 join token 完成
 > `POST /spaces/join`（§7.3 在册 + 签发会话）才能认证与同步；口令取包本身免认证。
 
-### 7.5 多设备加入与口令泄漏应对
+### 7.5 多通道加入与口令泄漏应对
 
-**口令是空间级、共享的**（`server/src/escrow.ts` 按 `space_id` 存**一份**密文包，空间内任一在册设备可拉取）：
-后续所有新设备（第一/第二使用者的任何设备）都凭**同一口令**接入，但每台设备必须**先完成空间登记**。
+**口令是空间级、共享的**（`server/src/escrow.ts` 按 `space_id` 存**一份**密文包，空间内任一在册通道可拉取）：
+后续所有新通道（第一/第二使用者的任何通道）都凭**同一口令**接入，但每条通道必须**先完成空间登记**。
 
 ```text
-新设备接入：生成身份密钥对 → 凭 join token 加入空间（POST /spaces/join：登记 + 发会话）→ 口令取钥 → 认证
+新通道接入：生成身份密钥对 → 凭 join token 加入空间（POST /spaces/join：登记 + 发会话）→ 口令取钥 → 认证
            → 输入口令(Argon2id 派生)解密 → 获得 Space Key
 ```
 
@@ -314,16 +314,16 @@ seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线
 
 | 关卡                           | 作用                   | 控制者                 |
 | ------------------------------ | ---------------------- | ---------------------- |
-| 设备在册状态（`isActiveDevice`） | 能否认证 / 同步 | `entrances` 表（由 `/spaces create|join` 自助登记） |
+| 通道在册状态（`isActiveDevice`） | 能否认证 / 同步 | `entrances` 表（由 `/spaces create|join` 自助登记） |
 | 口令（Argon2id 解密密文包）    | 能否解出 Space Key     | A 离线告知             |
 
 **口令泄漏应对（按严重程度递进）：**
 
 | 级别 | 措施                 | 操作                                                                                                          | 适用                       |
 | ---- | -------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| 轻   | 换口令               | 新口令重新加密包并 `POST /key-escrow` 覆盖（UPSERT 最新者胜），旧口令立即失效；CLI `escrow upload` 可随时重传 | 口令可能外泄、设备面可控   |
+| 轻   | 换口令               | 新口令重新加密包并 `POST /key-escrow` 覆盖（UPSERT 最新者胜），旧口令立即失效；CLI `escrow upload` 可随时重传 | 口令可能外泄、通道面可控   |
 | 重   | 轮换 Space Key（§9） | 轮换后旧密文包作废（解出的是旧密钥），需**手动**用新 Space Key 重新上传密文包（`cli escrow upload`；客户端不自动重传） | 怀疑密钥已实际落入他人之手 |
-| 定向 | 撤销设备（§9.3）     | `entrance.revoked` 标记撤销并通知其清理本地数据                                                               | 已知攻击设备已加入白名单   |
+| 定向 | 撤销通道（§9.3）     | `entrance.revoked` 标记撤销并通知其清理本地数据                                                               | 已知攻击通道已加入白名单   |
 
 **风险点：**
 
@@ -334,7 +334,7 @@ seal 密封交换在双方公钥互知后才可用，保留为 CLI 与「app 线
 
 ## 8. 认证（challenge-response）
 
-身份 = 在册设备的公钥；认证 = 证明持有对应私钥。
+身份 = 在册通道的公钥；认证 = 证明持有对应私钥。
 
 ### 8.1 握手
 
@@ -359,7 +359,7 @@ Client                     Server
   │     space_id}            │
 ```
 
-- **为什么 Server 把 challenge 密封而不是明文发送：** 只有持有私钥的设备能打开并回传，Server 据此确认"你确实拥有这把私钥"。
+- **为什么 Server 把 challenge 密封而不是明文发送：** 只有持有私钥的通道能打开并回传，Server 据此确认"你确实拥有这把私钥"。
 - challenge 一次性、5 分钟过期；防止重放。
 - 通过后签发 `session_token`（随机 32 字节，Server 侧记录过期时间），REST/WS 后续请求携带。
 
@@ -378,11 +378,11 @@ Client                     Server
 
 ### 9.1 决策摘要
 
-- 撤销的效力来自**设备在册状态**（`/sync` 要求 active 设备 → 被撤销设备取不到新密文）+
-  被撤销设备的**上线自毁**，不依赖轮换；
+- 撤销的效力来自**通道在册状态**（`/sync` 要求 active 通道 → 被撤销通道取不到新密文）+
+  被撤销通道的**上线自毁**，不依赖轮换；
 - 轮换唯一独占的能力是"让**已泄露**的密钥对**未来**消息失效"；该场景（越狱/镜像泄露）
   低频，用「**重建空间**」止损更便宜（零新代码：create/join 已具备）；
-- 轮换的成本集中在**分发**：新密钥要在不给被撤销设备的前提下送到剩余设备，需要设备公钥
+- 轮换的成本集中在**分发**：新密钥要在不给被撤销通道的前提下送到剩余通道，需要通道公钥
   链路 + 可靠投递 + 归档缺口补偿 + 轮换协调，任一环失败 = 消息**永久不可解**。
 
 ### 9.2 密钥版本（保留）与归档层（**已删除**）
@@ -403,18 +403,18 @@ Client                     Server
 - **两种"注销"的分工**（2026-09-21 新增退役）：
   - **撤销别人**（`POST /entrances/:id/revoke`，§7.2）：要共享口令 → 发 `entrance.revoked` → 对方客户端自毁；
   - **本机自助退役**（`POST /entrances/retire`，§7.2.1）：只认 session → 清服务端状态 + 给对端广播
-    `peer.offline`，**不发** `entrance.revoked`、也不主动关 WS。少这一句界线，偷到 session 就能远程擦设备，
+    `peer.offline`，**不发** `entrance.revoked`、也不主动关 WS。少这一句界线，偷到 session 就能远程擦通道，
     §7.2 的口令闸门会被从旁路绕过；
-- 被撤销设备：无法再认证（标记 revoked，挑战返回 403 `ENTRANCE_REVOKED`）、无法同步、无法发送；
+- 被撤销通道：无法再认证（标记 revoked，挑战返回 403 `ENTRANCE_REVOKED`）、无法同步、无法发送；
   其旧 Push Token 一并清除；
 - **撤销的授权**（2026-09-16）：同 space 内可互撤，但每次撤销都必须校验共享口令
   （`POST /entrances/:id/revoke`）——撤销会触发对方客户端自毁本地数据，属不可逆操作；
-- 被撤销设备**上线即自毁本地数据**（App `chat_page._onEntranceRevoked`；TUI `_exitRevoked`；`SECURITY.md` §2）；
+- 被撤销通道**上线即自毁本地数据**（App `chat_page._onEntranceRevoked`；TUI `_exitRevoked`；`SECURITY.md` §2）；
 - **只有这个明确信号才触发自毁**（2026-09-16）：`entrance.revoked` 帧 / 403 `ENTRANCE_REVOKED`。
-  403 `FORBIDDEN`（设备未登记，常见于服务端库被清空或换了新库）与网络故障一律只警告，
+  403 `FORBIDDEN`（通道未登记，常见于服务端库被清空或换了新库）与网络故障一律只警告，
   客户端保留本地数据并允许继续查看本地消息——服务端库的运维失误不该销毁客户端数据。
   本机自助退役（§7.2.1）**不属于**这一信号：它不触发自毁，本地清空由用户自己在本地确认；
-- 被撤销设备已持有的历史密文无法收回——这是设备端已解密数据的固有属性，非协议漏洞；
+- 被撤销通道已持有的历史密文无法收回——这是通道端已解密数据的固有属性，非协议漏洞；
 - 事件处置手册见 `SECURITY.md` §4。
 
 ---
@@ -436,7 +436,7 @@ Client                     Server
 1. 新设备安装 App → 输入恢复码
 2. BackupKey = crypto_pwhash(恢复码, 备份头中的 salt)
 3. 解密备份 → 恢复 SQLite、附件、Space Key 归档
-4. 新设备生成新的 X25519 身份密钥 → 由空间成员签发的 join token 加入空间
+4. 新通道生成新的 X25519 身份密钥 → 由空间成员签发的 join token 加入空间
 5. 完成：历史消息与密钥全部恢复
 ```
 
@@ -474,7 +474,7 @@ Einz 涉及多个"密钥"概念，命名与用途对照如下：
 
 | 名称                   | 实体类型                                 | 用途                                                                                   | 谁持有                                    |
 | ---------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **Space Key**          | 32B 对称密钥                             | 消息/附件 E2EE 加密（§5/§6）；key_version 轮换 + 归档（§9.2）                          | 双方设备（App 锁 PIN 包 / 口令托管保管）  |
+| **Space Key**          | 32B 对称密钥                             | 消息/附件 E2EE 加密（§5/§6）；key_version 轮换 + 归档（§9.2）                          | 双方通道（App 锁 PIN 包 / 口令托管保管）  |
 | **口令派生密钥**       | 无独立实体（口令经 Argon2id 派生，§4.3） | CLI backup/restore 备份文件、App 锁 PIN/恢复码、口令密保箱加密（三处复用 backup.dart） | 口令持有者（恢复码 / PIN / 接入口令）     |
 | **EINZ_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B）        | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文）                 | 部署者（deployment/.env，gitignore 保护） |
 

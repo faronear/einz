@@ -1,5 +1,5 @@
 // 自动补拉断线场景探测脚本（2026-09-02，验证用）：
-// A 设备加载指定 store（默认 demo/store-a.json），auth 后 startWs 常驻；等待目标消息出现。
+// A 通道加载指定 store（默认 demo/store-a.json），auth 后 startWs 常驻；等待目标消息出现。
 // 输出：STATUS xxx（WS 状态）、PUSH plain=xxx（WS 实时推送到达）、
 //      AUTOSYNC added=N（断线重连/周期兜底的自动同步完成）。
 // 用法（在 cli/ 下）：

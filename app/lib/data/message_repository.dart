@@ -94,7 +94,7 @@ class MessageRepository {
 
   /// 该异常是否属于「服务端**明确拒绝**」——只有这类才该标 failed。
   ///
-  /// 4xx = 信封不合法 / 未授权 / 设备被撤销 → 重试也不会成功，必须让用户看到。
+  /// 4xx = 信封不合法 / 未授权 / 通道被撤销 → 重试也不会成功，必须让用户看到。
   /// 其余（网络异常、连接/响应超时、5xx）都属于**不确定**：服务端可能其实已存
   /// （响应丢在回程），保持 pending 交给 [_flushPending] 幂等重试即可自动收敛。
   static bool _isServerRejection(Object e) =>
@@ -119,12 +119,12 @@ class MessageRepository {
     }
   }
 
-  /// 设备 → 用户（partner_id）映射（GET /space 缓存，多设备凭证语义）。
-  /// 用于判断消息是否"同一个人"发送：同 partner 不同设备显示为 'me'。
+  /// 通道 → 用户（partner_id）映射（GET /space 缓存，多通道凭证语义）。
+  /// 用于判断消息是否"同一个人"发送：同 partner 不同通道显示为 'me'。
   final Map<String, String> _partnerByEntrance = {};
 
   /// entrance→partner 映射的本地持久化键：离线启动时 GET /space 拿不到，只有靠这份
-  /// 缓存才认得出"同一身份其他设备"发来的消息（否则一律判成对方、气泡全左对齐——
+  /// 缓存才认得出"同一身份其他通道"发来的消息（否则一律判成对方、气泡全左对齐——
   /// 老板 2026-09-13 实测；TUI 侧因持久化 partnerId 而无此问题）。
   static const _kEntrancePartnerMap = 'identity.entrance_partner_map';
 
@@ -166,7 +166,7 @@ class MessageRepository {
     }
   }
 
-  /// 拉取空间设备映射（partner_id）。映射缺失时 history 的 sender 判断降级为 entrance 维度。
+  /// 拉取空间通道映射（partner_id）。映射缺失时 history 的 sender 判断降级为 entrance 维度。
   Future<void> refreshEntranceMap() async {
     final t = token;
     if (t == null) return;
@@ -187,7 +187,7 @@ class MessageRepository {
 
   /// 消息是否本端（我）发送：**优先 partner 维度**——信封自带 senderPartnerId，
   /// 离线也拿得到；映射缺失再依次退到映射查表、entrance 维度。
-  /// （旧实现只看 device：离线映射为空时，"同一身份其他设备"发的消息会被误判成
+  /// （旧实现只看 device：离线映射为空时，"同一身份其他通道"发的消息会被误判成
   /// 对方 → 气泡全左对齐——老板 2026-09-13 实测。）
   bool _isMineMessage(MessageEnvelope env) {
     final myPartner = _partnerByEntrance[entranceId];
@@ -199,7 +199,7 @@ class MessageRepository {
     return env.senderEntranceId == entranceId;
   }
 
-  /// 设备 → 用户（partner_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPartnerId）。
+  /// 通道 → 用户（partner_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPartnerId）。
   String? partnerIdOfEntrance(String entranceId) => _partnerByEntrance[entranceId];
 
   /// 反查本机 partnerId（头像上传/缓存失效用）。
@@ -420,7 +420,7 @@ class MessageRepository {
 
     // 补发离线队列
     await _flushPending();
-    // 对账卡在 failed 但服务端早已收下的行（换设备后的历史消息，见 retryMessage）
+    // 对账卡在 failed 但服务端早已收下的行（换通道后的历史消息，见 retryMessage）
     await _reconcileStuckFailed();
     // 拉取对方回执（已送达/已读）高水位：为将来 UI 准备，失败不影响同步
     try {
@@ -459,7 +459,7 @@ class MessageRepository {
   }
 
   /// 落库一条对方回执（单调只前进——陈旧的重放不会把高水位拉低）。
-  /// 对方可能有多台设备，任一设备上报即代表该 partner；这里取 max 合并。
+  /// 对方可能有多条通道，任一条通道上报即代表该 partner；这里取 max 合并。
   Future<void> upsertPeerReceipt({
     required String partnerId,
     required int deliveredUptoSeq,
@@ -546,7 +546,7 @@ class MessageRepository {
 
   /// 对账：把"服务端早已收下（serverSequence 非空）却停在 failed"的行置回 sent。
   ///
-  /// 为什么要这一步（老板 2026-09-22 实测的线上 bug）：换设备后，本地这些历史消息的
+  /// 为什么要这一步（老板 2026-09-22 实测的线上 bug）：换通道后，本地这些历史消息的
   /// 信封带着**旧 entrance_id**（AAD 的一部分，改不了），重投必被服务端 403，客户端又
   /// 把它判成"服务端明确拒绝"→ 永久 failed；而锚点早已越过这些 seq，服务端不会再下发
   /// 它们（[_insertLocal] 也因此刷不回来）。于是必须靠本地对账自愈，而不是等用户点按。
@@ -863,7 +863,7 @@ class MessageRepository {
       ),
     );
     // 注意：不在这里推进锚点。锚点只在 /sync 响应时推进（P2 修复）——
-    // 否则新设备未同步先发消息会跳过对方历史（PROTOCOL.md §5.2）。
+    // 否则新通道未同步先发消息会跳过对方历史（PROTOCOL.md §5.2）。
   }
 
   /// 只改本地投递状态（pending/sent/failed）。
@@ -895,7 +895,7 @@ class MessageRepository {
   /// 服务端接受该消息时才会写入（[_markSent] 或 sync），所以"有 seq + failed"= 服务端
   /// 早已收下、只是本地状态卡住了。此时重投毫无意义，且**必定失败**——信封里的
   /// sender_entrance_id 是 AAD 的一部分（shared/lib/src/crypto/message_crypto.dart），
-  /// 换设备后无法改写，服务端设备校验会 403，而客户端又把它判成"服务端明确拒绝"
+  /// 换通道后无法改写，服务端通道校验会 403，而客户端又把它判成"服务端明确拒绝"
   /// （[_isServerRejection]）→ 状态永远回不到 sent。
   Future<void> retryMessage(String messageId) async {
     // 注意：这里**故意不检查** _pendingUploads —— 老板 2026-09-13 的场景正是

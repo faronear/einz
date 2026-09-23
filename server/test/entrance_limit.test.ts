@@ -1,7 +1,7 @@
 /**
  * `maxEntrancesPerSpace`（单空间通道数量上限）回归：**防滥用**（老板 2026-09-23）。
  *
- * 产品上通道不限量（同身份多设备是设计本意），但一个秘境被灌进成百上千条通道
+ * 产品上通道不限量（同身份多通道是设计本意），但一个秘境被灌进成百上千条通道
  * 会白吃存储与推送资源——用 serverConfig.json 的 maxEntrancesPerSpace 做总闸。
  *
  * 三条边界：① 超限加入被拒（409 ENTRANCE_LIMIT_REACHED）；② **撤销/退役不退
@@ -77,7 +77,7 @@ test('销毁不退额度：退役（revoked）后仍占额度，不能靠反复�
       undefined, undefined, 'pk-a', 'iPhone',
     )
     const second = joinSpace(space.joinToken, 'pk-b', 'Pixel', 1)
-    // 第二台设备自助退役：entrances 行只标记 revoked、不删除
+    // 第二条通道自助退役：entrances 行只标记 revoked、不删除
     retireEntrance(second.sessionToken)
     const revoked = getDb()
       .prepare(`SELECT status FROM entrances WHERE entrance_id = ?`)

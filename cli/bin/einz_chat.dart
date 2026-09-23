@@ -54,7 +54,7 @@ Future<void> main(List<String> args) async {
   }
 
   _ok('Einz 聊天 CLI（方案 B 雏形）');
-  _info('设备: ${store.entranceId}  空间: ${store.spaceId ?? '（未导入 Space Key）'}');
+  _info('通道: ${store.entranceId}  空间: ${store.spaceId ?? '（未导入 Space Key）'}');
   if (server.isNotEmpty) _info('服务器: $server');
 
   await _repl(store, storePath, server);
@@ -127,7 +127,7 @@ Future<void> _repl(EntranceStore store, String storePath, String server) async {
 void _printHelp() {
   _info('--- 命令 ---');
   _info('  直接输入文本         发送消息（加密后经 server 投递）');
-  _info('  /auth [server]       （重新）认证设备');
+  _info('  /auth [server]       （重新）认证通道');
   _info('  /sync                增量同步并显示新消息');
   _info('  /history             显示本地历史消息');
   _info('  /help                显示本帮助');

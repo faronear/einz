@@ -13,7 +13,7 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 /// 最小 fake ApiClient：sync 返回编排好的加密消息（并模拟 Server 分配
-/// server_sequence）；getSpace 返回设备表（dev-a=本人 / dev-b=对方）供 sender 判定。
+/// server_sequence）；getSpace 返回通道表（dev-a=本人 / dev-b=对方）供 sender 判定。
 class _FakeApi extends ApiClient {
   _FakeApi(this.messages) : super('http://fake');
 

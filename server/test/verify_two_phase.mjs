@@ -62,7 +62,7 @@ function main() {
       await waitReady(port);
 
       const base = `http://127.0.0.1:${port}`;
-      // 1) 首设备自举登记（自主模式：白名单在 entrances 表）
+      // 1) 首通道自举登记（自主模式：白名单在 entrances 表）
       const enrollRes = await fetch(`${base}/entrances/enroll`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

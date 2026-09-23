@@ -111,7 +111,7 @@ cd deployment && docker compose up -d --build server
 | 项                | 说明                                                                                                                                                                                           |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 存量数据          | 不受影响（messages/entrances/会话等不动，新表初始为空）                                                                                                                                          |
-| 设备在册状态      | 无需改动（既有设备与会话不受影响）                                                                                                                                                               |
+| 通道在册状态      | 无需改动（既有设备与会话不受影响）                                                                                                                                                               |
 | Caddy / HTTPS     | 无需改动（Caddyfile 已 assume-unchanged）                                                                                                                                                      |
 | 备份密钥          | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose             |
 | 旧部署升级        | 若 .env 里还是旧变量名 `EINZ_BACKUP_KEY`（2026-08 前部署）：手动改名为 `EINZ_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |

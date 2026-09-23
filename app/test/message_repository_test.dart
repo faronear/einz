@@ -23,7 +23,7 @@ class FakeApi extends ApiClient {
   /// 编排的 sync 页（每页是一个 SyncPage）。
   List<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> pages = [];
 
-  /// 编排的 /space 设备列表（partner 映射测试用）。
+  /// 编排的 /space 通道列表（partner 映射测试用）。
   List<SpaceEntrance> spaceEntrances = [];
 
   /// 是否让附件上传抛异常（模拟服务端 500 等上传失败）。
@@ -139,7 +139,7 @@ void main() {
         token: token,
       );
 
-  test('partner 身份判断：同 partner 不同设备显示 me，对方设备显示 peer', () async {
+  test('partner 身份判断：同 partner 不同通道显示 me，对方通道显示 peer', () async {
     final api = FakeApi();
     api.spaceEntrances = [
       const SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
@@ -149,9 +149,9 @@ void main() {
     final repo = makeRepo(api, token: 'tok');
     await repo.refreshEntranceMap();
 
-    // 同 partner 的另一设备（dev-a2）与对方设备（dev-b）各发一条消息
+    // 同 partner 的另一条通道（dev-a2）与对方通道（dev-b）各发一条消息
     final fromA2 = await encryptMessage(
-      plaintext: '来自我的另一台设备',
+      plaintext: '来自我的另一条通道',
       spaceKey: spaceKey,
       spaceId: 'space-test',
       senderEntranceId: 'dev-a2',
@@ -176,8 +176,8 @@ void main() {
     await repo.sync();
     final hist = await repo.history();
     final byMsg = {for (final h in hist) h.env.messageId: h.sender};
-    expect(byMsg['msg-a2-1'], 'me', reason: '同 partner 的另一设备消息应显示为 me');
-    expect(byMsg['msg-b-1'], 'peer', reason: '对方设备消息显示为 peer');
+    expect(byMsg['msg-a2-1'], 'me', reason: '同 partner 的另一条通道消息应显示为 me');
+    expect(byMsg['msg-b-1'], 'peer', reason: '对方通道消息显示为 peer');
   });
 
   test('tombstoneExpired：到期消息打墓碑（记录保留、内容隐藏），未到期不动', () async {
@@ -301,7 +301,7 @@ void main() {
 
     expect(api.posted.length, 1);
     expect(await repo.pendingCount, 0);
-    // P2 修复：锚点只随 /sync 推进，send/补发不推进——否则新设备未同步先发消息会跳过对方历史
+    // P2 修复：锚点只随 /sync 推进，send/补发不推进——否则新通道未同步先发消息会跳过对方历史
     expect(await repo.lastSequence, 0, reason: 'send 不应推进锚点（锚点只随 /sync 推进）');
   });
 
@@ -370,14 +370,14 @@ void main() {
     expect(api.posted.length, 1);
   });
 
-  test('换设备后：已知 server_sequence 的消息点重发不重投，直接恢复 sent', () async {
+  test('换通道后：已知 server_sequence 的消息点重发不重投，直接恢复 sent', () async {
     // 回归（老板 2026-09-22 线上实测）：这两条消息早已在服务端（seq 已回填），
-    // 但信封里的 sender_entrance_id 是**旧设备**——它是 AAD 的一部分，客户端改不了，
+    // 但信封里的 sender_entrance_id 是**旧通道**——它是 AAD 的一部分，客户端改不了，
     // 所以重投必然被服务端 403（sender_entrance_id mismatch），而客户端又把 4xx 判成
     // "服务端明确拒绝"→ 状态永远回不到 sent，红色标签永远消不掉。
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');
-    final env = await _makeEnv(spaceKey, 'dev-a2', 'msg-old', '换设备前的历史消息');
+    final env = await _makeEnv(spaceKey, 'dev-a2', 'msg-old', '换通道前的历史消息');
     api.pages.add((messages: [env],
         attachmentsMeta: const [], lastSequence: 1, hasMore: false));
     await repo.sync();
@@ -394,7 +394,7 @@ void main() {
     expect(api.posted, isEmpty, reason: '不该发出注定 403 的重投请求');
   });
 
-  test('换设备后：sync 自动对账卡在 failed 的历史消息（无需用户点按）', () async {
+  test('换通道后：sync 自动对账卡在 failed 的历史消息（无需用户点按）', () async {
     // 锚点早已越过这些 seq，服务端不会再下发它们 → 只能靠本地对账自愈。
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');

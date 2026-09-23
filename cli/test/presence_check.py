@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-# 在线状态回归（老板 2026-09-16 实测）：同一身份的第二台设备 ≠ 对方
+# 在线状态回归（老板 2026-09-16 实测）：同一身份的第二条通道 ≠ 对方
 #
-#   场景：A 创建空间（Lukas，伴侣 Alice 尚未加入）→ A 的第二台设备 C 用**同一身份**
+#   场景：A 创建空间（Lukas，伴侣 Alice 尚未加入）→ A 的第二条通道 C 用**同一身份**
 #   Lukas 加入 → 两台 TUI 都把尚未加入的对方显示成绿灯在线。
 #   根因：在线状态按 device 判定、却按 partner 展示——同一 partner 的新 device 被当成"对方"。
 #
 #   断言（抓 pty 真实渲染的标题栏最后一帧）：
 #     ① A/C 两台 TUI：对方始终是 ○（离线），不得出现 "● Alice"（绿灯 + 对方名）；
-#     ② 我的多设备计数生效：两台右段都显示 "#1/1"（其它设备 = 1 台，它在线；本机那台
-#        由 "@设备名" 表示、不参与这对数字——老板 2026-09-16 改版）；
+#     ② 我的多通道计数生效：两台右段都显示 "#1/1"（其它通道 = 1 台，它在线；本机那台
+#        由 "@通道名" 表示、不参与这对数字——老板 2026-09-16 改版）；
 #     ③ 正控制：真正的第二人 B（Alice）加入后，A/C 显示 "● Alice"（绿灯没被改坏）。
 #
 #   附带覆盖（老板 2026-09-16 修复）：**对方尚未加入**时左段也要显示对方名字——
@@ -79,7 +79,7 @@ def wait_text(master, text, timeout=60):
 
 def start_tui(store, port, cols=130, rows=30):
     master, slave = pty.openpty()
-    # 默认 80 列会截断右段的「#n/m#设备名」（每段上限 = 全宽 1/3 - 1）
+    # 默认 80 列会截断右段的「#n/m#通道名」（每段上限 = 全宽 1/3 - 1）
     fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
     env = dict(os.environ, TERM='xterm-256color')
     p = subprocess.Popen(
@@ -110,7 +110,7 @@ def snapshot(master, wait=0.5):
 def title_bar(frame):
     """从一帧里取出标题栏那一行（含品牌名 Einz TUI），去首尾空白。
 
-    标题栏三段：左 = 对方「灯 名字 #n/m#设备名」、中 = 品牌名、右 = 我。
+    标题栏三段：左 = 对方「灯 名字 #n/m#通道名」、中 = 品牌名、右 = 我。
     直接断言整行里的子串会把两段混在一起（左段 "○ Alice" 与右段 "● Lukas" 都可
     误命中 "● …"），故按行取、再按 "Einz TUI" 切三段判定。
     """
@@ -246,20 +246,20 @@ def main():
         finish_onboarding(m_a, 'A')
         print('A: 空间创建完成并进入聊天态')
 
-        # 基线：只有 A 一台设备 → 右段无 #n/m（我的其它设备 0 台，整段省略）；
+        # 基线：只有 A 一条通道 → 右段无 #n/m（我的其它通道 0 台，整段省略）；
         # 对方未加入 → 左段 "○ Alice"（create 录入的伴侣预置名；partner 表里查不到他）
         text = wait_screen(m_a, lambda t: '○ Alice' in t or '● Alice' in t,
                            'A 进入稳定态（左段显示对方名字）')
         left, _, right = split_bar(title_bar(text))
         if '● Alice' in left:
-            print('FAIL 基线: A 只有一台设备时对方就显示在线:\n', text[-600:])
+            print('FAIL 基线: A 只有一条通道时对方就显示在线:\n', text[-600:])
             sys.exit(1)
         if left != '○ Alice':
             print(f'FAIL 基线: 对方未加入时左段应为「○ Alice」（预置名兜底），实际「{left}」:\n',
                   text[-600:])
             sys.exit(1)
         if '#' in right:
-            print(f'FAIL 基线: A 只有一台设备时右段不该有设备计数，实际「{right}」:\n',
+            print(f'FAIL 基线: A 只有一条通道时右段不该有通道计数，实际「{right}」:\n',
                   text[-600:])
             sys.exit(1)
         print(f'A: 基线通过（左段 {left}、右段 {right} 无计数）')
@@ -277,27 +277,27 @@ def main():
         wait_screen(m_a, lambda t: '我的名字已更新: LukasX → Lukas' in t, 'A 改回 Lukas')
         print('A: /myname LukasX → Lukas 正常 ✓（判据没误伤）')
 
-        # ---------- C：A 的第二台设备（选同一身份 Lukas）----------
+        # ---------- C：A 的第二条通道（选同一身份 Lukas）----------
         store_c = os.path.join(WORK, 'c.json')
         m_c, p_c = join_flow('C', store_c, port, new_join_token(port, store_a), 'Lukas')
         spawned += [p_c]
         finish_onboarding(m_c, 'C')
 
-        # ① ②：C 上线后两台右段都该显示 #1/1（我的另一台设备在线），且对方仍离线
-        # （修复后同一人的设备上下线不再互推广播，A 要等下一次 30s 轮询才刷新计数）
+        # ① ②：C 上线后两台右段都该显示 #1/1（我的另一条通道在线），且对方仍离线
+        # （修复后同一人的通道上下线不再互推广播，A 要等下一次 30s 轮询才刷新计数）
         for label, m in (('C', m_c), ('A', m_a)):
             t = wait_screen(m, lambda t: '#1/1' in t or '● Alice' in t,
-                            f'{label} 更新我的设备计数', timeout=90)
+                            f'{label} 更新我的通道计数', timeout=90)
             left, _, right = split_bar(title_bar(t))
             if '● Alice' in left:
-                print(f'FAIL {label}: 同身份设备上线后，尚未加入的对方被显示在线:\n', t[-600:])
+                print(f'FAIL {label}: 同身份通道上线后，尚未加入的对方被显示在线:\n', t[-600:])
                 sys.exit(1)
             if left != '○ Alice':
                 print(f'FAIL {label}: 尚未加入的对方应显示「○ Alice」（预置名兜底），实际「{left}」:\n',
                       t[-600:])
                 sys.exit(1)
             if '#1/1' not in right:
-                print(f'FAIL {label}: 右段应显示「#1/1」（我的另一台设备在线），实际「{right}」:\n',
+                print(f'FAIL {label}: 右段应显示「#1/1」（我的另一条通道在线），实际「{right}」:\n',
                       t[-600:])
                 sys.exit(1)
             print(f'{label}: #1/1 ✓ 且对方仍离线（○ Alice）✓')
@@ -334,7 +334,7 @@ def main():
         wait_screen(m_a, lambda t: '我的名字已更新: Lukas → Alice' in t,
                     'A 可以改用已空出的旧预置名 Alice')
         print('A: /myname Alice 成功 ✓（预置名快照已跟上改名，未误拒）')
-        print('PASS: 多设备在线状态回归 4 项全过')
+        print('PASS: 多通道在线状态回归 4 项全过')
     finally:
         for p in spawned:
             try:

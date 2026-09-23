@@ -86,9 +86,6 @@ class ApiClient {
     return SessionResult.fromJson(res);
   }
 
-  /// 新设备凭一次性邀请码动态登记（POST /entrances/enroll，免认证——邀请码即准入令牌）。
-  /// 登记成功后设备立即在服务端白名单生效（无需人工改 config.json / 重启）。
-  
   /// Multiverse：join token 轻量校验（不消费），返回空间公开信息供确认
   /// （POST /spaces/join/preflight，PROTOCOL_MULTIVERSE.md §5——App 向导
   /// 第一步 fail-fast：无效/过期/已用/已满在此拦截）。
@@ -163,8 +160,8 @@ class ApiClient {
     return SpaceCreateResult.fromJson(res);
   }
 
-  /// Multiverse：生成绑定新设备的邀请（POST /spaces/{id}/join-tokens——
-  /// 24h 一次性 token，新设备 /space join 绑定）。
+  /// Multiverse：生成绑定新通道的邀请（POST /spaces/{id}/join-tokens——
+  /// 24h 一次性 token，新通道 /space join 绑定）。
   ///
   /// 需认证：签发邀请凭证 = 空间级操作，服务端要求调用方持该空间成员会话
   /// （2026-09-15 评审 C1 修复；此前免认证，任何人拿到 spaceId 即可自签）。
@@ -178,7 +175,7 @@ class ApiClient {
   }
 
   /// Multiverse：按空间口令取回 Space Key 密封包（POST /spaces/{id}/key-escrow，
-  /// 口令正确才返回，PROTOCOL_MULTIVERSE.md §4.2——join 方取钥，不撤销设备）。
+  /// 口令正确才返回，PROTOCOL_MULTIVERSE.md §4.2——join 方取钥，不撤销通道）。
   Future<PassphraseEnvelope?> fetchSpaceEscrow(String spaceId, String passphrase) async {
     final res = await _post(
       '/spaces/$spaceId/key-escrow',
@@ -218,43 +215,43 @@ class ApiClient {
     return (res['unread'] as num?)?.toInt() ?? 0;
   }
 
-  /// 补登安装级设备标识（POST /entrances/uid）：多空间下同一台物理设备在每个空间各有
+  /// 补登安装级标识（POST /entrances/install-uid）：多空间下同一台物理设备在每个空间各有
   /// 一个 entrance_id，`installUid` 是它们共用的那一份（服务端内部认知用）。
   ///
-  /// 幂等；只写本会话对应的那一行（一个空间的虚拟设备），别的空间由客户端在那边再登一次。
+  /// 幂等；只写本会话对应的那一行（一个空间的虚拟通道），别的空间由客户端在那边再登一次。
   /// 失败不影响聊天——调用方应 best-effort（同 registerPushToken）。
   Future<void> registerInstallUid(String installUid, String token) async {
     await _post(Api.installUid, {'install_uid': installUid}, token: token);
   }
 
-  /// 获取空间信息（space_id + 设备列表，含 partner_id 映射，PROTOCOL.md §7.3）。
+  /// 获取空间信息（space_id + 通道列表，含 partner_id 映射，PROTOCOL.md §7.3）。
   Future<SpaceResult> getSpace(String token) async {
     final res = await _get(Api.space, token: token);
     return SpaceResult.fromJson(res);
   }
 
-  /// 设备列表（含 last_seen 活跃时间戳（毫秒）；对方在线状态判定用）。
+  /// 通道列表（含 last_seen 活跃时间戳（毫秒）；对方在线状态判定用）。
   Future<List<Map<String, dynamic>>> listEntrances(String token) async {
     final res = await _get('/entrances', token: token);
     return (res['entrances'] as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
-  /// 更新本设备名称（TUI 改名后同步后台，显示层用）。
+  /// 更新本通道名称（TUI 改名后同步后台，显示层用）。
   Future<void> updateEntranceName(String entranceName, String token) async {
     await _post('/entrances/name', {'entrance_name': entranceName}, token: token);
   }
 
-  /// 更新本设备 partner 显示名（/rename 命令，显示层用）。
+  /// 更新本通道 partner 显示名（/rename 命令，显示层用）。
   Future<void> updatePartnerName(String partnerName, String token) async {
     await _post('/partners/name', {'partner_name': partnerName}, token: token);
   }
 
-  /// 撤销**本空间内**的另一台设备（POST /entrances/:id/revoke，PROTOCOL.md §7.2）。
+  /// 撤销**本空间内**的另一条通道（POST /entrances/:id/revoke，PROTOCOL.md §7.2）。
   ///
   /// 授权（2026-09-16）：同 space 内可互撤，但**每次都要校验共享口令**——撤销会让  /// 对方客户端自毁本地数据，属不可逆操作。失败码：口令错 401 `ESCROW_VERIFY_FAILED`、
   /// 尝试过多 429 `ESCROW_RATE_LIMITED`、该空间未托管口令 409 `PASSPHRASE_NOT_SET`、
   /// 目标不在本空间 403 `FORBIDDEN`。**调用方必须在成功后才提示/清理**（失败时目标
-  /// 设备不受任何影响）。
+  /// 通道不受任何影响）。
   Future<void> revokeEntrance(String entranceId, String passphrase, String token) async {
     await _post('/entrances/$entranceId/revoke', {'passphrase': passphrase}, token: token);
   }
@@ -262,7 +259,7 @@ class ApiClient {
   /// 上传本人头像（raw 图片 bytes，服务端按 partner 存储覆盖）。
   ///
   /// 返回服务端确认的 partner_id：上传方**收不到**自己的 profile.updated 广播
-  /// （ws.ts 的 broadcastProfileUpdated 跳过发送设备），客户端只能靠这个返回值
+  /// （ws.ts 的 broadcastProfileUpdated 跳过发送通道），客户端只能靠这个返回值
   /// 失效本端头像缓存（重启路径 widget.partnerId 为空 → 旧实现静默失效失败，
   /// 老板 2026-09-16 实测：上传后消息流仍显示旧头像，重启才更新）。
   /// 响应体不合法/缺字段时返回 null（partner_id 只用于本地缓存失效，
@@ -422,9 +419,9 @@ class ApiClient {
   }
 
   /// **本机自助退役**（POST /entrances/retire，PROTOCOL.md §7.3）：把自己从服务端注销
-  /// ——清会话/Push Token/待签 challenge，设备置 revoked。与 [revokeEntrance] 的区别：
+  /// ——清会话/Push Token/待签 challenge，通道置 revoked。与 [revokeEntrance] 的区别：
   /// 目标恒为自己、**不校验共享口令**（口令是共享给伴侣的加入凭证，不该有销毁我这台
-  /// 设备的权力），调用方在此之前应已完成本地闸门（输入设备名 + 本机 PIN）。
+  /// 通道的权力），调用方在此之前应已完成本地闸门（输入通道名 + 本机 PIN）。
   ///
   /// 调用约定：**先调它、成功之后再清本地数据**——token 存在本地，清完就再也调不动了。
   /// 异常按 [ApiException] 上抛，由调用方决定「退役失败是否仍要清本地」。

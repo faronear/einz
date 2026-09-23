@@ -18,7 +18,7 @@ Future<Uint8List> generateSpaceKey() async {
   return s.randombytes.buf(32);
 }
 
-/// 一次性配置产物（E2EE.md §7.1）：Space Key 分别密封给两台设备。
+/// 一次性配置产物（E2EE.md §7.1）：Space Key 分别密封给两条通道。
 Future<Map<String, dynamic>> buildConfigPayload({
   required Uint8List spaceKey,
   required String spaceId,

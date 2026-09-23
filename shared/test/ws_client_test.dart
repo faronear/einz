@@ -175,7 +175,7 @@ void main() {
 
   test('4401 + 每次都拿到新 token 但仍被拒：连续 3 次后转退避', () async {
     // 上一道兜底只挡"token 没变"；这一类 token **变了**但服务端照样 4401
-    // （设备不在册 / 服务端不认本设备）同样会变成零延迟循环 → 同样打满限流。
+    // （通道不在册 / 服务端不认本通道）同样会变成零延迟循环 → 同样打满限流。
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     var attempts = 0;
     server.listen((req) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# partner 预置名走查：首设备 TUI 入网时，名字问答后应追加"第二用户的名字"问答；
+# partner 预置名走查：首通道 TUI 入网时，名字问答后应追加"第二用户的名字"问答；
 # 输入 steffi → enroll 自举附 peer_name → /health 名称表 partnerB=steffi。
 import os, pty, subprocess, select, time, sys, socket, tempfile, shutil, urllib.request
 

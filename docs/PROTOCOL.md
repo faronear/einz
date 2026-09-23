@@ -23,7 +23,7 @@
 | 项 | 约定 |
 | --- | --- |
 | 时间 | 一律 Unix 毫秒（UTC），如 `1787900000000`；展示时客户端转本地 |
-| ID | UUIDv7（消息、附件、空间、设备）；不使用 SQLite 自增作为跨端 ID |
+| ID | UUIDv7（消息、附件、空间、通道）；不使用 SQLite 自增作为跨端 ID |
 | 二进制 | base64（无填充）编码后传输 |
 | 鉴权 | `Authorization: Bearer <session_token>`（§3） |
 | 请求体/响应体 | JSON（UTF-8） |
@@ -40,7 +40,7 @@
 // 响应 200
 {
   "challenge_id": "uuidv7",
-  "sealed_challenge": "base64(seal(challenge, 设备公钥))",
+  "sealed_challenge": "base64(seal(challenge, 通道公钥))",
   "expires_in": 300
 }
 ```
@@ -49,9 +49,9 @@
 - **`space_id` 必填**（2026-09-15 v1 收敛后）：Multiverse 下所有数据按 space 隔离，会话必须绑定
   一个 space；缺省 → `400 INVALID_REQUEST`。v1 时代允许不带（签出"无 space 会话"），
   那类会话什么也访问不了，所以直接拒绝而不是让下游各自兜底。
-- **仅 entrances 表内在册（且未撤销）的设备可发起**（E2EE.md §7.3、§8）。拒绝时**两种 code
+- **仅 entrances 表内在册（且未撤销）的通道可发起**（E2EE.md §7.3、§8）。拒绝时**两种 code
   必须区分**（2026-09-16）：
-  - 设备行存在但 `status='revoked'` → `403 ENTRANCE_REVOKED`（客户端据此清空本地数据）；
+  - 通道行存在但 `status='revoked'` → `403 ENTRANCE_REVOKED`（客户端据此清空本地数据）；
   - entrances 表**没有这一行**（库被清空/重置、从未登记）→ `403 FORBIDDEN`
     （客户端**只应警告**，绝不清空本地数据——运维失误不该导致客户端抹数据）。
 
@@ -72,23 +72,23 @@
 
 | 方法 | 路径 | 用途 | 鉴权 |
 | --- | --- | --- | --- |
-| POST | /auth/challenge | 获取密封 challenge（`entrance_id` + `space_id`） | 设备公钥 |
+| POST | /auth/challenge | 获取密封 challenge（`entrance_id` + `space_id`） | 通道公钥 |
 | POST | /auth/verify | 提交明文换取 session | challenge |
 | POST | /messages | 上传新消息密文 | Bearer |
 | GET | /sync?after=<seq>&limit=<n> | 增量拉取（§5） | Bearer |
 | POST | /attachments | 上传附件 blob（分片可选） | Bearer |
 | GET | /attachments/:id | 下载附件 blob | Bearer |
-| GET | /entrances | 设备列表 | Bearer |
-| POST | /entrances/:id/revoke | 撤销**别人**的设备（§7.2，需共享口令） | Bearer |
+| GET | /entrances | 通道列表 | Bearer |
+| POST | /entrances/:id/revoke | 撤销**别人**的通道（§7.2，需共享口令） | Bearer |
 | POST | /entrances/retire | **本机自助退役**（§7.2.1，无请求体，只认 session） | Bearer |
 | POST | /push/register | 注册 Push Token | Bearer |
 | DELETE | /push/register | 注销 Push Token | Bearer |
-| GET | /space | 空间信息（space_id、成员设备） | Bearer |
+| GET | /space | 空间信息（space_id、成员通道） | Bearer |
 | POST | /receipts | 上报自己的送达/已读高水位（§5.4） | Bearer |
 | GET | /receipts | 拉取本 space 全部回执行（§5.4） | Bearer |
 | GET | /messages/unread | 未读条数（服务端派生：消息 + 我的读取水位；多空间列表角标用） | Bearer |
-| POST | /entrances/name | 改本设备显示名 | Bearer |
-| POST | /entrances/install-uid | 补登安装级设备标识 `install_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
+| POST | /entrances/name | 改本通道显示名 | Bearer |
+| POST | /entrances/install-uid | 补登安装级标识 `install_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
 | POST | /partners/name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
 | POST | /avatar | 上传本人头像 | Bearer |
 | GET | /avatar/:partnerId | 取头像（免认证，公开可读） | — |
@@ -98,10 +98,10 @@
 
 | 方法 | 路径 | 用途 | 鉴权 |
 | --- | --- | --- | --- |
-| POST | /spaces | 创建空间（登记创建者设备 + 签发会话） | — （自举） |
+| POST | /spaces | 创建空间（登记创建者通道 + 签发会话） | — （自举） |
 | GET | /spaces/lookup?address= | 按地址定位空间（最小公开信息） | — |
 | POST | /spaces/join/preflight | 校验 join token（**不消费**） | — |
-| POST | /spaces/join | 用 join token 加入（登记设备 + 签发会话） | — |
+| POST | /spaces/join | 用 join token 加入（登记通道 + 签发会话） | — |
 | POST | /spaces/{id}/join-tokens | 生成一次性邀请链接 | **空间成员** |
 | POST | /spaces/{id}/key-escrow | `{passphrase}` 取密文包（免认证）；`{package,…}` 上传/更新（**空间成员**） | 分支不同 |
 
@@ -218,7 +218,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 语义取舍（明确）：
 
-- 按 **person** 记 → "该 person **至少一台**设备已收到/已读"，不保证其所有设备。
+- 按 **partner** 记 → "该 partner **至少一台**通道已收到/已读"，不保证其所有通道。
 - HWM 是粗粒度：`read_upto_seq = N` 会把发送方所有 ≤N 的消息一并标为已读
   （与主流 IM 一致）。因此**上报侧必须严格把关**（见下），否则会虚标。
 
@@ -241,7 +241,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 #### 上报时机（决定会不会虚标）
 
-- **已送达**：本设备确实收到了 → `delivered_upto_seq = 本端同步锚点`。
+- **已送达**：本通道确实收到了 → `delivered_upto_seq = 本端同步锚点`。
   含首屏/断线回填，安全（"收到"是客观事实）。
 - **已读**：**只在用户真的看着对话时**上报——补拉/首屏同步的历史**不算已读**
   （高水位的 read_upto=N 会把 ≤N 全部标已读，若补拉即上报，对方离线期间的历史
@@ -290,12 +290,12 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 - 鉴权 + 白名单校验后返回加密 blob（二进制流）。
 - 客户端解密后缓存于 App 私有目录（E2EE.md §6）。
 
-## 7. 设备与推送
+## 7. 通道与推送
 
-### 7.1 设备列表 GET /entrances
+### 7.1 通道列表 GET /entrances
 
-**范围：只返回本会话所属空间成员名下的设备**（2026-09-15 评审 C2）——entrances 表本身是
-全局表，此前直出会跨空间泄漏 person、在线状态与公钥。**不返回 `public_key`**
+**范围：只返回本会话所属空间成员名下的通道**（2026-09-15 评审 C2）——entrances 表本身是
+全局表，此前直出会跨空间泄漏 partner、在线状态与公钥。**不返回 `public_key`**
 （2026-09-15 评审 C5：列表接口没有消费它的场景，challenge 由服务端用公钥密封）。
 
 ```json
@@ -310,31 +310,31 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
   `connected_at` = 当前 WS 连接的建立时刻（离线为 null）；
   `online_since` = 进入**在线态**的时刻（离线为 null）——与 `connected_at` 的区别是
   **重连不刷新**（被新连接踢掉后又连上不算重新上线），客户端据此按上线顺序排列
-  对端的多台在线设备（最新上线在最前）。
+  对端的多台在线通道（最新上线在最前）。
 
-### 7.2 撤销设备 POST /entrances/:id/revoke
+### 7.2 撤销通道 POST /entrances/:id/revoke
 
 ```json
 { "passphrase": "<共享口令>" }
 ```
 
 - **授权（2026-09-16 定稿）**：
-  1. **同 space 内可互撤**——不限于"同一 person 的另一台设备"：A 的手机丢了又没有第二台
-     设备时，伴侣 B 也能替他撤掉那台（早期实现是"任何在册设备能撤任何设备"，连空间都不
-     校验；文档当时写的是"仅限同 person"，代码比文档更宽，现已按本规则收口）；
+  1. **同 space 内可互撤**——不限于"同一 partner 的另一条通道"：A 的手机丢了又没有第二台
+     通道时，伴侣 B 也能替他撤掉那台（早期实现是"任何在册通道能撤任何通道"，连空间都不
+     校验；文档当时写的是"仅限同 partner"，代码比文档更宽，现已按本规则收口）；
   2. **每次撤销都必须校验共享口令**（argon2id，与取包同一套校验与失败限速）。撤销会让
      对方客户端**自毁本地数据**，属不可逆的破坏性操作，必须由口令持有者授权——这样伴侣
-     的一台设备即便被入侵，仅凭 session 也清不掉另一方的设备。
+     的一条通道即便被入侵，仅凭 session 也清不掉另一方的通道。
   3. 不能撤自己 → `400 INVALID_REQUEST`。
 - 失败码：缺口令 → `400 INVALID_REQUEST`；目标不在本空间 → `403 FORBIDDEN`；
   口令错 → `401 ESCROW_VERIFY_FAILED`；尝试过多 → `429 ESCROW_RATE_LIMITED`；
   该空间未托管口令（从未设置或被 `DELETE /key-escrow` 清除）→ `409 PASSPHRASE_NOT_SET`
   （**拒绝放行**，不放宽成"无需口令"）。
-- Server 把设备标记为 `revoked`、清除其 Push Token 与活动会话，并关闭其 WS 连接；**不**通知 Space Key 轮换
+- Server 把通道标记为 `revoked`、清除其 Push Token 与活动会话，并关闭其 WS 连接；**不**通知 Space Key 轮换
   （轮换方案 2026-09-14 决定不做，见 `SECURITY.md` §3）。
 - 注：早期版本是 `DELETE /entrances/:id` 且**无需口令**——该形态已移除（口令要求无法可靠地
-  放在 DELETE 请求体里，且旧形态允许空间内任意设备远程抹掉别人的数据）。
-- 被撤销的设备随后：在线 → 收到 `entrance.revoked` 帧 + close `4403`；离线/重连 → 会话已被删
+  放在 DELETE 请求体里，且旧形态允许空间内任意通道远程抹掉别人的数据）。
+- 被撤销的通道随后：在线 → 收到 `entrance.revoked` 帧 + close `4403`；离线/重连 → 会话已被删
   返回 `401 UNAUTHORIZED`，重认证时挑战返回 `403 ENTRANCE_REVOKED`。**这两个信号（帧 / 该 code）
   是客户端唯一被授权清空本地数据的依据**；`403 FORBIDDEN`（未登记）与网络故障都只应警告。
 
@@ -342,22 +342,22 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 无请求体——身份与目标都由 Bearer 会话决定，**目标恒为自己**。
 
-- **为什么单独一个端点**：客户端"重置设备"原先纯本地清数据，服务端这台设备的注册表项、
+- **为什么单独一个端点**：客户端"重置本机"原先纯本地清数据，服务端这条通道的注册表项、
   Push Token 与会话全都留着，对方 `/entrances` 里是一台永远在线的幽灵；而 §7.2 禁止自撤，
   谁也删不掉它。
 - **为什么不校验共享口令**（与 §7.2 的关键差异）：这里是"注销我自己"，session 即所有权
-  证明；而且客户端在调用之前已经过了本地闸门（输入本机设备名 + 本机锁屏码）。共享口令是
-  **共享**给伴侣的加入凭证，不该获得销毁我这台设备的权力；校验它还必须联网，会让"本机
+  证明；而且客户端在调用之前已经过了本地闸门（输入本机通道名 + 本机锁屏码）。共享口令是
+  **共享**给伴侣的加入凭证，不该获得销毁我这条通道的权力；校验它还必须联网，会让"本机
   身份属于一台已经连不上的服务器"这个最常见的重置场景直接自锁。
-- 服务端动作：设备置 `revoked`（**行保留**，否则它被当成"未登记"而非"已退役"，
+- 服务端动作：通道置 `revoked`（**行保留**，否则它被当成"未登记"而非"已退役"，
   且 `messages.sender_entrance_id` 会失去归属）+ `last_seen = 0`，清除其 Push Token、
   活动会话与未被消费的 challenge，并把它的 WS 连接移出在线表。审计 kind 为
   `entrance.retire`（区别于被人撤销的 `entrance.revoke`）。
 - **退役绝不发 `entrance.revoked` 帧，也不主动关闭 WS**（`ws.forgetEntranceConnection`）：
   那帧是客户端自毁本地数据的授权信号，而本端点只认 session——若由它发出，偷到 session
-  的人就能远程擦设备，等于给 §7.2 的口令闸门挖了一条旁路。取而代之的是给对端广播一次
-  `peer.offline`，让对方立刻看到这台设备下线。
-- 失败码：无/失效 token → `401 UNAUTHORIZED`；已撤销设备的会话 → `403 ENTRANCE_REVOKED`。
+  的人就能远程擦通道，等于给 §7.2 的口令闸门挖了一条旁路。取而代之的是给对端广播一次
+  `peer.offline`，让对方立刻看到这条通道下线。
+- 失败码：无/失效 token → `401 UNAUTHORIZED`；已撤销通道的会话 → `403 ENTRANCE_REVOKED`。
   客户端约定：**先调它、再清本地数据**（token 就存在本地，清完就调不动了）；调用失败时
   是否仍清本地由客户端决定——现实现是照清，并如实提示"服务端可能仍有残留"。
 
@@ -371,7 +371,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 { "ok": true }
 ```
 
-- 设备撤销时其 Token 一并清除。
+- 通道撤销时其 Token 一并清除。
 - **推送永不携带消息正文**，只发 `{ "type": "new_message", "space_id": "…" }` 提示（productLens §10）。
 
 ### 7.4 密钥托管 POST/GET/DELETE /key-escrow（口令托管）
@@ -379,7 +379,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 > 口令托管密钥（KEY_ESCROW.md §4）：客户端用**口令**（Argon2id）派生密钥把
 > `{space_key, space_id, key_version}` 加密成密文包后托管到 Server。Server 只存
 > **被口令加密的密文包**，不解析内容——没有口令任何一方（含 Server 本身）都无法解开。
-> 用途：换设备/朋友新接入时凭口令拉取解密，免 sealed 副本离线传递。
+> 用途：换通道/朋友新接入时凭口令拉取解密，免 sealed 副本离线传递。
 
 ```json
 // POST /key-escrow（上传/更新，按 space 一份，UPSERT）
@@ -389,7 +389,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 // 响应 200
 { "ok": true }
 
-// GET /key-escrow（拉取；在册设备可读，按会话绑定的 space 取那一份）
+// GET /key-escrow（拉取；在册通道可读，按会话绑定的 space 取那一份）
 // 响应 200（未托管时为空对象）
 { "package": { "format": "backup-v1", "salt": "b64", "nonce": "b64", "ciphertext": "b64" } }
 
@@ -397,7 +397,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 { "ok": true }
 ```
 
-- 鉴权：Bearer session_token（challenge-response 后）；设备须在 entrances 表内且未撤销（403）。
+- 鉴权：Bearer session_token（challenge-response 后）；通道须在 entrances 表内且未撤销（403）。
   包按**会话绑定的 space** 存取（`escrowSpaceId`）——Multiverse 下同一台服务器有多个空间，
   各存各的一份（2026-09-12 修的 space_id 错位 bug，见 escrow.ts 注释）。
 - 包结构校验仅限字段类型（`format`/`salt`/`nonce`/`ciphertext` 均为非空 base64 字符串，400 拒绝坏字段）；**Server 永不解析包内容**。
@@ -408,15 +408,15 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 - 客户端接入流程（v2）：口令取钥（`POST /spaces/{id}/key-escrow`，免认证）→ 加入空间
   → 认证 → `GET /key-escrow` → 口令解密 → 进入空间。客户端**不本地缓存共享口令**
   （服务器为唯一真相源，KEY_ESCROW.md §12）；无解锁自动重传。口令重设/密保箱重建走
-  App「修改口令」或 TUI `/passphrase`：**服务器已有箱**时须先验旧口令（解箱成功）才覆盖；**服务器无箱**时跳过旧口令校验、用新口令直接重建（设备已认证且持有 Space Key，不新增权限）。
+  App「修改口令」或 TUI `/passphrase`：**服务器已有箱**时须先验旧口令（解箱成功）才覆盖；**服务器无箱**时跳过旧口令校验、用新口令直接重建（通道已认证且持有 Space Key，不新增权限）。
 - **`/recover`（全丢恢复）已整体移除**（2026-09-13，Server 端点 + TUI 入口 + 客户端方法
   全部删除）。理由：① 它按 `space_id=''` 那一行读包，Multiverse 下本就永远读不到；
   ② 它的撤销逻辑是**全库范围**的（`UPDATE entrances … WHERE status='active'`、
   `DELETE FROM sessions/push_tokens/invites` 都无 space 过滤）——修好 ① 反而会把该
-  服务器上**所有空间**的设备全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
-  只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方设备全丢 =
+  服务器上**所有空间**的通道全部撤销；③ "仅凭口令定位空间"做不到：服务端每个 space
+  只存一份 argon2id 哈希，遍历校验既慢又是放大攻击面。产品结论：双方通道全丢 =
   双方放弃该空间，重新建一个即可（v1 只有一个空间才不得不支持恢复）。
-  新设备接入仍走：**一次性 join token（邀请链接）/ 共享口令 / 密保信封**
+  新通道接入仍走：**一次性 join token（邀请链接）/ 共享口令 / 密保信封**
   （KEY_ESCROW.md §13；v1 的 20 位邀请码与 `/invites` 已随 2026-09-15 收敛删除）。
 
 ## 8. WebSocket（实时通道）
@@ -447,9 +447,9 @@ Authorization: Bearer <session_token>
 | C→S | `ping` / S→C `pong` | — | 心跳（30s 间隔） |
 | S→C | `sync.advance` | `{ "last_sequence": 105 }` | 提示有新数据，可拉 /sync |
 | S→C | `receipt.updated` | `{ "partner_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
-| S→C | `entrance.revoked` | `{ "entrance_id": "…" }` | 本设备被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
-| S→C | `peer.online` | `{ "entrance_id": "dev1", "partner_id": "per1", "online_since": 1787900000000 }` | 对端设备上线（WS 连接建立时广播；**不发给同 person 的设备**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
-| S→C | `peer.offline` | `{ "entrance_id": "dev1", "partner_id": "per1" }` | 对端设备下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 person 设备） |
+| S→C | `entrance.revoked` | `{ "entrance_id": "…" }` | 本通道被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
+| S→C | `peer.online` | `{ "entrance_id": "dev1", "partner_id": "per1", "online_since": 1787900000000 }` | 对端通道上线（WS 连接建立时广播；**不发给同 partner 的通道**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
+| S→C | `peer.offline` | `{ "entrance_id": "dev1", "partner_id": "per1" }` | 对端通道下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 partner 通道） |
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
 
 ### 8.3 顺序与重连
@@ -470,11 +470,11 @@ Authorization: Bearer <session_token>
 | PROTOCOL_VERSION_MISMATCH | 400 | 协议版本不匹配 |
 | INVALID_REQUEST | 400 | 请求格式错误 |
 | UNAUTHORIZED | 401 | 未认证 / token 失效 |
-| FORBIDDEN | 403 | 设备不在白名单（**未登记**，含服务端库被清空/重置；客户端只警告，**不得**清空本地数据） |
-| ENTRANCE_REVOKED | 403 | 本设备已被**明确撤销**（`status='revoked'`，涉嫌被盗用；客户端应清空本地数据后重新入网） |
-| ESCROW_VERIFY_FAILED | 401 | 共享口令错误（取包 / 撤销设备的二次校验） |
+| FORBIDDEN | 403 | 通道不在白名单（**未登记**，含服务端库被清空/重置；客户端只警告，**不得**清空本地数据） |
+| ENTRANCE_REVOKED | 403 | 本通道已被**明确撤销**（`status='revoked'`，涉嫌被盗用；客户端应清空本地数据后重新入网） |
+| ESCROW_VERIFY_FAILED | 401 | 共享口令错误（取包 / 撤销通道的二次校验） |
 | ESCROW_RATE_LIMITED | 429 | 口令尝试过多（按 space 计失败次数，滑窗内超限） |
-| PASSPHRASE_NOT_SET | 409 | 该空间未托管共享口令，无法校验（撤销设备要求先设置口令） |
+| PASSPHRASE_NOT_SET | 409 | 该空间未托管共享口令，无法校验（撤销通道要求先设置口令） |
 | NOT_FOUND | 404 | 资源不存在 |
 | CONFLICT | 409 | 重复 / 状态冲突 |
 | RATE_LIMITED | 429 | 触发限流 |
@@ -484,8 +484,8 @@ Authorization: Bearer <session_token>
 
 ## 10. 限流与日志
 
-- 限流（令牌桶算法 token bucket）：`/auth/*` 每分钟 10 次/设备；`/messages`、`/attachments` 每分钟 60 次/设备；WS 连接数 ≤ 每设备 3。
-- 日志**禁止包含**：消息明文、附件内容、密钥、私钥、Space Key（允许：device authenticated、message sequence=123、attachment uploaded、sync completed）。
+- 限流（令牌桶算法 token bucket）：`/auth/*` 每分钟 10 次/通道；`/messages`、`/attachments` 每分钟 60 次/通道；WS 连接数 ≤ 每通道 3。
+- 日志**禁止包含**：消息明文、附件内容、密钥、私钥、Space Key（允许：entrance authenticated、message sequence=123、attachment uploaded、sync completed）。
 
 ## 11. 版本演进
 

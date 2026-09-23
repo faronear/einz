@@ -3,7 +3,7 @@
  *
  * 模拟两台设备（Node 侧用 libsodium-wrappers 扮演客户端）：
  *   A 认证 → A 加密发送 → B 认证 → B 增量同步 → B 解密
- * 同时验证：Server 只见密文（明文不出现在任何响应与数据库）、幂等、未登记设备拒绝。
+ * 同时验证：Server 只见密文（明文不出现在任何响应与数据库）、幂等、未登记通道拒绝。
  *
  * 运行：npm test（需先 npm run build 生成 dist/）
  */
@@ -99,7 +99,7 @@ class TestEntrance {
     this.spaceKey = spaceKey
   }
 
-  /** 创建空间（v2 入口）：**一步完成设备登记 + 签发绑定该空间的会话**。
+  /** 创建空间（v2 入口）：**一步完成通道登记 + 签发绑定该空间的会话**。
    *  替代已删除的 v1 `POST /entrances/enroll`（v1 收敛，2026-09-15）。 */
   async createSpace (port: number, creatorName = '测试空间', peerName?: string): Promise<string> {
     const res = await fetch(`http://127.0.0.1:${port}/spaces`, {
@@ -137,7 +137,7 @@ class TestEntrance {
     return ((await res.json()) as { joinToken: string }).joinToken
   }
 
-  /** 加入空间（v2 入口）：登记设备 + 签发会话 + 返回自己的身份槽位。 */
+  /** 加入空间（v2 入口）：登记通道 + 签发会话 + 返回自己的身份槽位。 */
   async joinSpace (port: number, token: string, slot = 1): Promise<void> {
     const res = await fetch(`http://127.0.0.1:${port}/spaces/join`, {
       method: 'POST',
@@ -164,7 +164,7 @@ class TestEntrance {
     this.entranceId = body.entranceId
   }
 
-  /** challenge-response 重新认证（已登记设备冷启动路径）。
+  /** challenge-response 重新认证（已登记通道冷启动路径）。
    *  **challenge 必须带 space_id**（v2：会话绑定空间；不带会拿到无 space 的会话）。 */
   async auth (port: number): Promise<void> {
     const challengeRes = await fetch(
@@ -325,7 +325,7 @@ async function main (): Promise<void> {
     const healthNoVersion = await RAW_FETCH(`http://127.0.0.1:${port}/health`)
     assert.equal(healthNoVersion.status, 200, '/health 免协议版本校验（监控/curl 用）')
 
-    // 1) 未登记设备挑战 → 403 FORBIDDEN（带了 space_id 仍应拒绝：设备不在 entrances 表）
+    // 1) 未登记通道挑战 → 403 FORBIDDEN（带了 space_id 仍应拒绝：通道不在 entrances 表）
     //    **code 必须是 FORBIDDEN，不能是 ENTRANCE_REVOKED**：库被清/从未登记≠被撤销，
     //    客户端据此只警告、不清空本地数据（老板 2026-09-16）。
     const evil = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
@@ -337,14 +337,14 @@ async function main (): Promise<void> {
     assert.equal(
       ((await evil.json()) as { error: { code: string } }).error.code,
       'FORBIDDEN',
-      '未登记设备必须是 FORBIDDEN（与 ENTRANCE_REVOKED 区分：未登记不得触发客户端自毁）'
+      '未登记通道必须是 FORBIDDEN（与 ENTRANCE_REVOKED 区分：未登记不得触发客户端自毁）'
     )
 
-    // 2) A 创建空间（v2 入口：登记设备 + 签发会话）
+    // 2) A 创建空间（v2 入口：登记通道 + 签发会话）
     const spaceId = await devA.createSpace(port)
 
-    // 2b) 已登记设备但不带 space_id → 400（v1 收敛：会话必须绑定空间；
-    //     顺序上设备校验在前，所以这条要用**已登记**的设备验）
+    // 2b) 已登记通道但不带 space_id → 400（v1 收敛：会话必须绑定空间；
+    //     顺序上通道校验在前，所以这条要用**已登记**的通道验）
     const noSpace = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -387,10 +387,10 @@ async function main (): Promise<void> {
       )
     }
 
-    // 5.2) 换设备后的重投必须幂等成功（老板 2026-09-22 实测的线上 bug）：
-    //      信封里的 sender_entrance_id 是 AAD 的一部分，客户端换了设备也**改不掉**，
+    // 5.2) 换通道后的重投必须幂等成功（老板 2026-09-22 实测的线上 bug）：
+    //      信封里的 sender_entrance_id 是 AAD 的一部分，客户端换了通道也**改不掉**，
     //      重投旧消息时必然带着旧 entrance_id。只要 message_id 已在本空间入库，
-    //      就应该返回原 seq —— 此前设备校验排在幂等查询之前，请求永远 403，
+    //      就应该返回原 seq —— 此前通道校验排在幂等查询之前，请求永远 403，
     //      客户端两条消息永久卡在"点击重发"红色标签。
     const staleEntrancePost = await fetch(`http://127.0.0.1:${port}/messages`, {
       method: 'POST',
@@ -406,7 +406,7 @@ async function main (): Promise<void> {
     assert.equal(
       staleEntrancePost.status,
       200,
-      '已入库的 message_id：信封带旧设备 id 也应幂等成功（设备校验不得排在幂等之前）'
+      '已入库的 message_id：信封带旧通道 id 也应幂等成功（通道校验不得排在幂等之前）'
     )
     assert.equal(
       ((await staleEntrancePost.json()) as { server_sequence: number })
@@ -415,7 +415,7 @@ async function main (): Promise<void> {
       '幂等返回原 seq（不新增、不改归因）'
     )
 
-    // 5.3) 但**未入库**的新消息仍必须 403：不能借"幂等优先"把设备校验整体放行
+    // 5.3) 但**未入库**的新消息仍必须 403：不能借"幂等优先"把通道校验整体放行
     const freshMismatch = await fetch(`http://127.0.0.1:${port}/messages`, {
       method: 'POST',
       headers: {
@@ -597,7 +597,7 @@ async function main (): Promise<void> {
     assert.equal(
       peerRow?.display_name,
       'Alice',
-      'peer_name 预置应落 space_members slot=1（后续设备引导可按名字选身份）'
+      'peer_name 预置应落 space_members slot=1（后续通道引导可按名字选身份）'
     )
 
     // 12b) 改名后名称表即时更新（回归：90ec740 把 getSpace 改读 space_members，
@@ -999,7 +999,7 @@ async function main (): Promise<void> {
       '/recover（全丢恢复）应已移除——该功能在 v2 无意义（见 docs/PROTOCOL.md）'
     )
 
-    // 13) 取包端点限速（2026-09-14）：`POST /spaces/{id}/key-escrow` 是**免设备认证**的
+    // 13) 取包端点限速（2026-09-14）：`POST /spaces/{id}/key-escrow` 是**免通道认证**的
     //     口令校验端点，若不限速即可在线爆破口令（口令 = 拿到 Space Key 的凭证）。
     //     阈值由 EINZ_ESCROW_RATE_MAX 压到 2：两次失败后第 3 次起 429。
     //     注（2026-09-15 C1）：取包分支仍免认证，但**上传分支要成员会话**——所以
@@ -1108,7 +1108,7 @@ async function main (): Promise<void> {
     const noPass = await revokeReq(undefined, devA.sessionToken)
     assert.equal(noPass.status, 400, 'missing passphrase → 400')
 
-    // 12c) 跨空间撤销 → 403：另一空间的设备不能撤本空间的设备
+    // 12c) 跨空间撤销 → 403：另一空间的通道不能撤本空间的通道
     const cross = await revokeReq(pass, preset.sessionToken)
     assert.equal(cross.status, 403, 'cross-space revoke must be rejected')
     assert.equal(
@@ -1117,7 +1117,7 @@ async function main (): Promise<void> {
       '跨空间撤销 → FORBIDDEN'
     )
 
-    // 12d) 上传带口令哈希的密保箱 → 口令错 → 401 且**目标设备毫发无损**
+    // 12d) 上传带口令哈希的密保箱 → 口令错 → 401 且**目标通道毫发无损**
     const upHash = await fetch(`http://127.0.0.1:${port}/spaces/${spaceId}/key-escrow`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${devA.sessionToken}` },
@@ -1140,7 +1140,7 @@ async function main (): Promise<void> {
       'ESCROW_VERIFY_FAILED',
       '口令错 → ESCROW_VERIFY_FAILED'
     )
-    await devB.auth(port) // 口令错**不得**产生任何效果：目标设备仍能正常认证
+    await devB.auth(port) // 口令错**不得**产生任何效果：目标通道仍能正常认证
     assert.equal(devB.sessionToken.length > 0, true, 'target entrance unaffected by failed revoke')
 
     // 12e) 不能撤自己 → 400
@@ -1151,11 +1151,11 @@ async function main (): Promise<void> {
     })
     assert.equal(self.status, 400, 'cannot revoke self')
 
-    // 12f) 口令正确 → 200，目标设备被撤销
+    // 12f) 口令正确 → 200，目标通道被撤销
     const revokeB = await revokeReq(pass, devA.sessionToken)
     assert.equal(revokeB.status, 200, 'revoke with correct passphrase should succeed')
 
-    // 12g) 已撤销设备挑战 → 403 ENTRANCE_REVOKED
+    // 12g) 已撤销通道挑战 → 403 ENTRANCE_REVOKED
     const revokedCh = await fetch(`http://127.0.0.1:${port}/auth/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1165,17 +1165,17 @@ async function main (): Promise<void> {
     assert.equal(
       ((await revokedCh.json()) as { error: { code: string } }).error.code,
       'ENTRANCE_REVOKED',
-      '已撤销设备必须返回 ENTRANCE_REVOKED（客户端据此清空本地数据）'
+      '已撤销通道必须返回 ENTRANCE_REVOKED（客户端据此清空本地数据）'
     )
-    // 撤销同时清掉该设备的会话（PROTOCOL.md §7.2）→ 旧 token 落到 401
+    // 撤销同时清掉该通道的会话（PROTOCOL.md §7.2）→ 旧 token 落到 401
     const revokedSync = await fetch(`http://127.0.0.1:${port}/sync?after=0`, {
       headers: { Authorization: `Bearer ${devB.sessionToken}` }
     })
     assert.equal(revokedSync.status, 401, 'revoked entrance session must be gone')
 
     // 12h) guard.requireSession 的 revoked 分支（防御性）：revoke 已删会话，正常路径
-    //      走不到，这里直接种一条属于该 revoked 设备的会话——若该分支被误删，
-    //      被撤销设备就能拿着旧会话继续同步消息（安全缺口）
+    //      走不到，这里直接种一条属于该 revoked 通道的会话——若该分支被误删，
+    //      被撤销通道就能拿着旧会话继续同步消息（安全缺口）
     const staleToken = 'revoked-entrance-stale-session'
     const seedDb = new Database(join(tempDir, 'einz.sqlite.db'))
     seedDb
@@ -1198,7 +1198,7 @@ async function main (): Promise<void> {
     assert.equal(
       ((await staleSync.json()) as { error: { code: string } }).error.code,
       'ENTRANCE_REVOKED',
-      'requireSession 对 revoked 设备也必须 ENTRANCE_REVOKED'
+      'requireSession 对 revoked 通道也必须 ENTRANCE_REVOKED'
     )
     console.log(
       '✅ 撤销语义：已撤销 → ENTRANCE_REVOKED（挑战与会话校验两处），未登记 → FORBIDDEN；' +
@@ -1206,7 +1206,7 @@ async function main (): Promise<void> {
     )
 
     console.log(
-      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等（含换设备重投） / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members) / 撤销语义与授权'
+      '✅ 冒烟测试全部通过：建空间+加入 / 认证 / E2EE 密文 / 幂等（含换通道重投） / 同步 / 未登记拒绝 / 明文隔离 / WS 实时 / 密钥托管 / 取包限速 / 名称表(space_members) / 撤销语义与授权'
     )
   } finally {
     // Windows 上 SIGTERM 后子进程退出是异步的，必须先等它真正退出，

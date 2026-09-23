@@ -19,11 +19,11 @@ export interface SessionResult {
   expires_in: number;
 }
 
-/** 阶段 1：生成密封 challenge（PROTOCOL.md §3）。仅在册且未撤销的设备可发起。
+/** 阶段 1：生成密封 challenge（PROTOCOL.md §3）。仅在册且未撤销的通道可发起。
  *
  * 两种拒绝**必须给不同 code**（老板 2026-09-16）：
- * - 设备被明确撤销 → `ENTRANCE_REVOKED`（客户端据此自毁本地数据）；
- * - 设备不在册（库被清/从未登记）→ `FORBIDDEN`（客户端**只应警告**，绝不销毁数据）。
+ * - 通道被明确撤销 → `ENTRANCE_REVOKED`（客户端据此自毁本地数据）；
+ * - 通道不在册（库被清/从未登记）→ `FORBIDDEN`（客户端**只应警告**，绝不销毁数据）。
  * 此前两者都返回 FORBIDDEN，导致"后台数据库被重置"被客户端误判为"本通道被撤销"
  * 而清空本地数据——运维失误造成不可挽回的数据损失。
  *
@@ -92,8 +92,8 @@ export function verifyChallenge(challengeId: string, plaintextB64: string): Sess
   const sessionToken = toB64(new Uint8Array(nodeRandomBytes(32)));
   const now = Date.now();
   const sessionSpaceId = row.space_id; // 上面已保证非空
-  // 同一设备在同一 Space 只保留一个会话：重装/换机/续期后旧 token 立即失效。
-  // 此前旧会话会一直累积到过期（24h），而产品上唯一的吊销手段是"整体撤销设备"
+  // 同一通道在同一 Space 只保留一个会话：重装/换机/续期后旧 token 立即失效。
+  // 此前旧会话会一直累积到过期（24h），而产品上唯一的吊销手段是"整体撤销通道"
   // （2026-09-15 评审）。COALESCE 兼容 ALTER 前写入的 NULL 行。
   db.prepare(`DELETE FROM sessions WHERE entrance_id = ? AND COALESCE(space_id, '') = ?`).run(
     row.entrance_id,
@@ -117,7 +117,7 @@ export function hashSessionToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** 通过 session_token 解析设备（Multiverse：附带 session 绑定的 space_id，
+/** 通过 session_token 解析通道（Multiverse：附带 session 绑定的 space_id，
  *  NULL 只可能来自 v1 收敛前的存量行；新写入一律带 space（createChallenge 强制），
  *  调用方不必再回落——guard.requireSession 直接拒绝无 space 的会话。
  *  库中存的是 token 的 sha256（见 hashSessionToken）——传入的是客户端持有的明文。 */

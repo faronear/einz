@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # /entrances 与 /revoke 回归（老板 2026-09-16）：
-#   ① `/entrances` 输出**同空间全部设备**（我 + 对方，不只自己的）：A 创建、B 以伴侣身份
+#   ① `/entrances` 输出**同空间全部通道**（我 + 对方，不只自己的）：A 创建、B 以伴侣身份
 #      加入后，A 的列表里应同时有「本机 A」和「在线 B」，并带序号（供 /revoke 使用）；
-#   ② `/revoke` 三重确认（选设备 → 输入 yes → 密保口令）+ 口令校验：
+#   ② `/revoke` 三重确认（选通道 → 输入 yes → 密保口令）+ 口令校验：
 #      - 口令错 → 提示且**目标毫发无损**（B 的 TUI 仍在跑、store 还在）；
 #      - 正确口令 → 服务端撤销 → B 收到 entrance.revoked → **清空本地数据并退出**（store 被删）；
 #   ③ 负例：不能撤销本机（拒绝后命令即结束，不会被后续输入喂成确认）；
-#   ④ 撤销后 /entrances 把该设备标为「已撤销」。
+#   ④ 撤销后 /entrances 把该通道标为「已撤销」。
 #
 # 断言用**整帧**（snapshot：按清屏序列切出最后一屏）而不是原始流：消息区是从下往上
 # 逐行定位重绘的，原始流里同一屏的行序是反的、且每屏重复出现，逐行解析会错。
@@ -215,7 +215,7 @@ def new_join_token(port, store_path):
                 token=st['session_token'])['joinToken']
 
 def parse_row_numbers(frame):
-    """从设备列表帧里解析 (我的序号, 对方序号)。行形如 `  2) 🟢 DoomBase [ali] 在线 ...`。"""
+    """从通道列表帧里解析 (我的序号, 对方序号)。行形如 `  2) 🟢 DoomBase [ali] 在线 ...`。"""
     my_no = peer_no = None
     for line in frame.splitlines():
         m_no = re.match(r'\s*(\d+)\)', line)
@@ -237,9 +237,9 @@ def main():
         m_a, p_a = onboard_create('A', store_a, port, WORK)
         spawned.append((m_a, p_a))
 
-        # ---------- ① /entrances：同空间全部设备（先只有自己） ----------
+        # ---------- ① /entrances：同空间全部通道（先只有自己） ----------
         send(m_a, '/entrances\r')
-        frame = wait_screen(m_a, lambda t: '设备列表' in t, 'A 的设备列表')
+        frame = wait_screen(m_a, lambda t: '通道列表' in t, 'A 的通道列表')
         if '同空间 1 台' not in frame or '本机' not in frame:
             print(f'❌ ① 只有 A 时应为 1 台且标「本机」:\n{frame[-800:]}'); return 1
 
@@ -249,14 +249,14 @@ def main():
 
         send(m_a, '/entrances\r')
         frame = wait_screen(m_a,
-                            lambda t: '同空间 2 台' in t and '在线' in t,
-                            'A 看到同空间 2 台（含对方）')
+                            lambda t: '同空间 2 条' in t and '在线' in t,
+                            'A 看到同空间 2 条（含对方）')
         my_no, peer_no = parse_row_numbers(frame)
         if my_no is None or peer_no is None:
             print(f'❌ ① 未能解析序号（本机={my_no} 对方={peer_no}）:\n{frame[-900:]}'); return 1
         if '[%s]' % PARTNER not in frame:
             print(f'❌ ① 列表应含对方 partner「{PARTNER}」:\n{frame[-900:]}'); return 1
-        print(f'✅ ① /entrances 列出同空间 2 台（本机 #{my_no}、对方 #{peer_no} 在线、带序号）')
+        print(f'✅ ① /entrances 列出同空间 2 条（本机 #{my_no}、对方 #{peer_no} 在线、带序号）')
 
         # ---------- ② 口令错 → 撤销不生效（目标毫发无损） ----------
         send(m_a, f'/revoke {peer_no}\r')
@@ -267,7 +267,7 @@ def main():
         wait_screen(m_a, lambda t: '输入密保口令' in t, '撤销要求密保口令')
         send(m_a, 'wrong-passphrase\r')
         frame = wait_screen(m_a, lambda t: '密保口令错误' in t, '口令错提示')
-        if '目标设备毫发无损' not in frame:
+        if '目标通道毫发无损' not in frame:
             print(f'❌ ② 口令错应说明目标未受影响:\n{frame[-900:]}'); return 1
         time.sleep(2.0)
         if p_b.poll() is not None:
@@ -280,13 +280,13 @@ def main():
         send(m_a, f'/revoke {my_no}\r')
         frame = wait_screen(m_a, lambda t: '不能撤销本机' in t, '拒绝撤销本机')
         send(m_a, '/entrances\r')
-        frame = wait_screen(m_a, lambda t: '设备列表' in t and '同空间 2 台' in t,
+        frame = wait_screen(m_a, lambda t: '通道列表' in t and '同空间 2 条' in t,
                             '③ 后仍能正常执行命令')
         print('✅ ③ /revoke 本机 → 拒绝（未进入确认流程，命令已结束）')
 
         # ---------- ④ 正确口令 → 撤销生效：对方清空本地数据并退出 ----------
-        send(m_a, '/revoke\r')  # 无参：走"列出设备 → 询问序号"的交互路径
-        wait_screen(m_a, lambda t: '输入要撤销的设备序号' in t, '无参 /revoke 询问序号')
+        send(m_a, '/revoke\r')  # 无参：走"列出通道 → 询问序号"的交互路径
+        wait_screen(m_a, lambda t: '输入要撤销的通道序号' in t, '无参 /revoke 询问序号')
         send(m_a, f'{peer_no}\r')
         wait_screen(m_a, lambda t: '确认请输入 yes' in t, '④ 二次确认')
         send(m_a, 'yes\r')
@@ -305,8 +305,8 @@ def main():
 
         # ---------- ⑤ 撤销后列表标注「已撤销」 ----------
         send(m_a, '/entrances\r')
-        frame = wait_screen(m_a, lambda t: '设备列表' in t and '已撤销' in t, '列表标注已撤销')
-        print('✅ ⑤ 撤销后 /entrances 把该设备标为「已撤销」')
+        frame = wait_screen(m_a, lambda t: '通道列表' in t and '已撤销' in t, '列表标注已撤销')
+        print('✅ ⑤ 撤销后 /entrances 把该通道标为「已撤销」')
 
         send(m_a, '/exit\r')
         time.sleep(1.5)

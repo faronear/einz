@@ -90,8 +90,8 @@ class _StatusFakeApi extends ApiClient {
         messageId: env.messageId, serverSequence: postedSeq, createdAt: 1000));
   }
 
-  /// GET /space 返回的设备表：决定 entrance→partner 映射（"是否我的消息"）。
-  /// 需要模拟"同一身份的另一台设备"时替换它。
+  /// GET /space 返回的通道表：决定 entrance→partner 映射（"是否我的消息"）。
+  /// 需要模拟"同一身份的另一条通道"时替换它。
   List<SpaceEntrance> entrances = const [
     SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
   ];
@@ -197,7 +197,7 @@ void main() {
     );
     final api = _StatusFakeApi(peer: [(env: mine, seq: 1)], postedSeq: 1);
 
-    // 种入对方回执：delivered=1（对方设备已收到）、read=0
+    // 种入对方回执：delivered=1（对方通道已收到）、read=0
     await db.into(db.peerReceipts).insert(PeerReceiptsCompanion.insert(
           spaceId: 'space-test',
           partnerId: 'partner-b',
@@ -231,17 +231,17 @@ void main() {
         reason: '有回执时不应再显示单勾');
   });
 
-  testWidgets('另一台设备发的历史消息：无对方回执 → 单勾（不再假装「发送中」）',
+  testWidgets('另一条通道发的历史消息：无对方回执 → 单勾（不再假装「发送中」）',
       (WidgetTester tester) async {
-    // 老板 2026-09-22 线上实测：换设备后同步回来的历史消息，seq 有值（=服务端已收下），
-    // 但对方设备那几天是死的 → 没有回执。旧逻辑走完 failed → receipt → sent 三个分支
+    // 老板 2026-09-22 线上实测：换通道后同步回来的历史消息，seq 有值（=服务端已收下），
+    // 但对方通道那几天是死的 → 没有回执。旧逻辑走完 failed → receipt → sent 三个分支
     // 后掉进末尾的 pending 分支，渲染成"发送中"蓝飞机 → 用户以为没发出去、去点重发
     // → 撞上服务端 403 → 变成永久红色「点击重发」。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
 
-    // 同一身份的另一台设备（dev-a2）发的；**不种**任何对方回执
+    // 同一身份的另一条通道（dev-a2）发的；**不种**任何对方回执
     final fromMyOtherEntrance = await encryptMessage(
       plaintext: '旧设备发的',
       spaceKey: spaceKey,

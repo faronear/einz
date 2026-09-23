@@ -524,7 +524,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.';
+      'An entrance is the secure line between this device and a space, opened only after verification. This entrance works only on this device and in this space.';
 
   @override
   String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';

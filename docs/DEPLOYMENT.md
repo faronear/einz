@@ -10,17 +10,17 @@
 
 ```text
 ┌─────────────┐   REST / WS   ┌──────────────┐   REST / WS   ┌─────────────┐
-│  设备 A      │◄────────────►│  Server       │◄────────────►│  设备 B      │
-│  (TUI/App)  │  只见密文     │  在册设备表   │  只见密文     │  (TUI/App)  │
+│  通道 A      │◄────────────►│  Server       │◄────────────►│  通道 B      │
+│  (TUI/App)  │  只见密文     │  在册通道表   │  只见密文     │  (TUI/App)  │
 └─────────────┘   E2EE        │  哑转发器     │   E2EE        └─────────────┘
                               └──────────────┘
 ```
 
-- **一个空间 = 两个人**（`space_members` 两个身份槽位），同一身份可多台设备；一个 Server
+- **一个空间 = 两个人**（`space_members` 两个身份槽位），同一身份可多条通道；一个 Server
   可承载**多个互不可见的空间**（Multiverse，2026-09-12 起）。
 - **E2EE 全链路**：Server 只见密文（消息、附件均为密文 + 元数据）。
-- **设备白名单在数据库里**（`entrances` 表）：设备由 `POST /spaces` / `POST /spaces/join`
-  自助登记，无需服务器配置文件；未登记/已撤销设备一律拒绝（401/403）。
+- **通道白名单在数据库里**（`entrances` 表）：通道由 `POST /spaces` / `POST /spaces/join`
+  自助登记，无需服务器配置文件；未登记/已撤销通道一律拒绝（401/403）。
 - **撤销语义**：撤销 = 标记 `revoked` + 清会话/Push Token + WS 断开；**不**轮换 Space Key
   （见 `docs/SECURITY.md` §3）。
 
@@ -39,7 +39,7 @@
 ## 2. 快速试用（本机 5 分钟，无 Docker）
 
 > 前置：Node ≥ 20、Dart ≥ 3.12；libsodium（Windows 需设 `LIBSODIUM_PATH`，见 §7）。
-> **不需要任何服务器配置文件**：设备登记与白名单都在数据库里，由客户端自助完成
+> **不需要任何服务器配置文件**：通道登记与白名单都在数据库里，由客户端自助完成
 > （Multiverse）。v1 时代的静态白名单 `server/config/config.json` 与脚本 CLI
 > `cli/bin/einz.dart` 已随 2026-09-15 收敛删除。
 
@@ -57,7 +57,7 @@ node dist/app.js         # 默认 :3000；PORT=3000 可指定；数据落在 ser
 
 ### 2.2 两台设备接入（TUI）
 
-**终端 A —— 第一台设备（创建秘境）：**
+**终端 A —— 第一条通道（创建秘境）：**
 
 ```bash
 cd cli && dart pub get
@@ -68,14 +68,14 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server http://localhost:3000
 客户端生成 Space Key、上传口令密保箱、签发会话，直接进入会话（状态栏 ● 在线）。
 在会话里执行 `/invite` 会打印**邀请链接**（`https://<host>/join/<token>`，24 小时一次性）。
 
-**终端 B —— 第二台设备（加入秘境）：**
+**终端 B —— 第二条通道（加入秘境）：**
 
 ```bash
 dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 ```
 
 选 `j` 加入 → 粘贴 A 给的邀请链接（或开通码）→ 选择自己是哪一个身份（1/2）→
-输入 A 设置的共享口令（用它从口令密保箱取回 Space Key，同时完成设备登记 + 签发会话）→
+输入 A 设置的共享口令（用它从口令密保箱取回 Space Key，同时完成通道登记 + 签发会话）→
 进入会话。
 
 > `server/config/serverConfig.json`（不入 git，可选）里 `maxSpaces` 控制**新空间数量上限**：
@@ -104,13 +104,13 @@ App 端同理：设置页选「创建秘境」或「加入秘境」，扫开通�
 | `/auth` | 激活/续期会话（challenge-response，对**当前**服务器） |
 | `/passphrase [random]` | 设置/修改共享口令（`random` 生成随机 12 词） |
 | `/pin` | 设置/修改启动锁 PIN |
-| `/entrances` | 列出秘境内的设备与在线状态 |
-| `/device <名称>` / `/myname <名称>` | 改本设备名 / 改自己的显示名 |
+| `/entrances` | 列出秘境内的通道与在线状态 |
+| `/entrance <名称>` / `/myname <名称>` | 改本通道名 / 改自己的显示名 |
 | `/sync` / `/history` | 手动增量同步 / 看本地解密历史 |
 | `/attach <file>` / `/open <序号>` | 上传附件 / 打开消息里的附件 |
 | `/backup` | 导出加密备份（12 词恢复码） |
 | `/server [url]` | 不带参数 = 显示当前服务器地址；带地址 = 切换本次会话的服务器（仅本次生效，不落盘） |
-| `/status` | 排障快照（只读）：服务器地址与来源、线路、实时连接、对方在线、绑定、设备、同步锚点、数据文件路径 |
+| `/status` | 排障快照（只读）：服务器地址与来源、线路、实时连接、对方在线、绑定、通道、同步锚点、数据文件路径 |
 | `/exit` | 退出 |
 
 > 更完整的操作手册见 `docs/ONBOARDING.md`；协议细节见 `docs/PROTOCOL.md`。
@@ -172,7 +172,7 @@ curl -s https://<你的域名>/health | head -c 200       # 期望 {"status":"ok
 curl -s -H 'X-Protocol-Version: 1' https://<你的域名>/space | head -c 200   # 期望 401/403 JSON
 # 缺协议版本头 → 400（硬校验）
 curl -s -o /dev/null -w '%{http_code}\n' https://<你的域名>/space            # 期望 400
-# 未登记设备拒绝（dev-evil 不在 entrances 表）
+# 未登记通道拒绝（dev-evil 不在 entrances 表）
 curl -s -o /dev/null -w '%{http_code}\n' \
   -X POST https://<你的域名>/auth/challenge \
   -H 'Content-Type: application/json' -H 'X-Protocol-Version: 1' \
@@ -185,7 +185,7 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 
 | 项               | 位置（容器内）           | 说明                                         |
 | ---------------- | ------------------------ | -------------------------------------------- |
-| `einz.sqlite.db` | `/data/einz.sqlite.db`   | SQLite（消息密文、设备表、会话、push token） |
+| `einz.sqlite.db` | `/data/einz.sqlite.db`   | SQLite（消息密文、通道表、会话、push token） |
 | 附件 blob        | `/data/files/`           | 密文文件，按 attachment_id 前 2 位分片       |
 | 备份产物         | `/data/backups/`         | `npm run backup` 的加密归档                  |
 | 空间与成员       | `/data/einz.sqlite.db`   | `spaces` / `space_members` / `join_tokens` 同库 |
@@ -198,18 +198,18 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 v1 时代那份《一次性配置手册》（静态白名单 config.json + 密保信封离线分发 Space Key 的
 设计稿）已随 Multiverse 删除——当前流程看 `docs/ONBOARDING.md` 与本文 §2.2。要点重申：
 
-1. **身份密钥**：客户端首启生成 X25519 密钥对，私钥只留在设备（App 用 Keychain/Keystore，
+1. **身份密钥**：客户端首启生成 X25519 密钥对，私钥只留在通道（App 用 Keychain/Keystore，
    TUI store 是明文 JSON 的测试驱动）。
 2. **Space Key 分发**：创建者本地生成 32B Space Key，用**口令（Argon2id）加密**成密保箱托管
    到 Server（`POST /spaces` 创建时一并上传）；加入方用同一口令取回
    （`POST /spaces/{id}/key-escrow`，免认证、防爆破靠限速）。另有密保信封（用对方公钥
    `crypto_box_seal` 密封）作为离线备用路径（E2EE.md §7.1）。
-3. **设备登记**：由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭一次性 join token）完成，
+3. **通道登记**：由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭一次性 join token）完成，
    同时签发绑定该空间的会话——不再有独立的登记步骤，也没有静态白名单文件。
 4. **恢复码**：TUI `/backup` 生成 12 词恢复码（E2EE.md §10；App 侧导出入口已删），
    **离线保存多份，Server 不接触**。
 
-> 安全操作建议：口令、设备私钥、恢复码三者分开存放——任一单独泄露都不足以解密历史消息。
+> 安全操作建议：口令、通道私钥、恢复码三者分开存放——任一单独泄露都不足以解密历史消息。
 
 ---
 
@@ -250,22 +250,22 @@ npm run restore -- data/backups/backup-<ts>.json
 ### 5.2 客户端备份 / 恢复（恢复码，模型 A）
 
 **导出**：TUI 里 `/backup`（生成 12 词恢复码）。⚠️ App 侧的恢复码导出入口已按老板决策删除
-（`app_lock.dart`：PIN 丢失即无法解锁本设备密钥包），所以**恢复码目前只能从 TUI/CLI 侧产生**。
+（`app_lock.dart`：PIN 丢失即无法解锁本通道密钥包），所以**恢复码目前只能从 TUI/CLI 侧产生**。
 ⚠️ 恢复码打印后请立即离线妥善保存（丢失即无法恢复）。
 
-**换机恢复**：新设备先正常接入（`/space join` 拿回 Space Key）后，用恢复码在 App 里
+**换机恢复**：新通道先正常接入（`/space join` 拿回 Space Key）后，用恢复码在 App 里
 导入历史备份（E2EE.md §10.2）。v1 时代的 `einz.dart backup/restore` 命令行已随脚本 CLI
 删除。
 
-### 5.3 设备撤销（**不**轮换 Space Key）
+### 5.3 通道撤销（**不**轮换 Space Key）
 
-**场景：** 手机丢失/失窃 → 撤销该设备，阻止它继续收新消息。
+**场景：** 手机丢失/失窃 → 撤销该通道，阻止它继续收新消息。
 
 ```bash
-# 1) 撤销某台设备（POST /entrances/<entrance_id>/revoke）：标记 revoked + 清 Push Token +
+# 1) 撤销某条通道（POST /entrances/<entrance_id>/revoke）：标记 revoked + 清 Push Token +
 #    清会话，并关闭它的 WS 连接（Server 不再下发 key.rotation —— 轮换方案已决定不做）
-#    **必须带共享口令**（2026-09-16）：撤销会让该设备自毁本地数据，属不可逆操作。
-#    授权范围 = 同 space 内可互撤（自己的另一台设备，或伴侣的设备）。
+#    **必须带共享口令**（2026-09-16）：撤销会让该通道自毁本地数据，属不可逆操作。
+#    授权范围 = 同 space 内可互撤（自己的另一条通道，或伴侣的通道）。
 curl -X POST http://127.0.0.1:3000/entrances/dev-b1/revoke \
   -H "Authorization: Bearer <A的session_token>" \
   -H "Content-Type: application/json" \
@@ -274,19 +274,19 @@ curl -X POST http://127.0.0.1:3000/entrances/dev-b1/revoke \
 # 2) 完成——撤销实时生效，不需要重启服务器、也不需要改任何配置文件
 ```
 - entrance_id 是 UUID（`GET /entrances` 可见），不是 `dev1/dev2` 那种序号（v1 遗留叫法）。
-- 口令错 → `401 ESCROW_VERIFY_FAILED`（设备毫发无损）；同空间口令尝试过多 → `429`；
-  空间还没设置共享口令 → `409 PASSPHRASE_NOT_SET`（先在任一在册设备上 `/passphrase` 设置）。
+- 口令错 → `401 ESCROW_VERIFY_FAILED`（通道毫发无损）；同空间口令尝试过多 → `429`；
+  空间还没设置共享口令 → `409 PASSPHRASE_NOT_SET`（先在任一在册通道上 `/passphrase` 设置）。
 
-- 被撤销设备：无法认证（403 `ENTRANCE_REVOKED`）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
-- 被撤销设备**上线即自毁本地数据**（App `_onEntranceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存；
+- 被撤销通道：无法认证（403 `ENTRANCE_REVOKED`）/ 同步 / 发送；其旧 WS 连接已被服务端关闭。
+- 被撤销通道**上线即自毁本地数据**（App `_onEntranceRevoked`：清锁包 + 消息 + 附件 + 媒体缓存；
   TUI `_exitRevoked`：清 store 文件 + 附件缓存后退出）。
-- **别把"清空/重置服务端库"当撤销手段**：库一清，设备行就不存在了，客户端只会收到
+- **别把"清空/重置服务端库"当撤销手段**：库一清，通道行就不存在了，客户端只会收到
   403 `FORBIDDEN`（未登记）→ 按 2026-09-16 的语义**只警告、不清本地数据**，用户仍能看本地历史。
   要真正撤销请用 §5.3 的 `POST /entrances/:id/revoke`（带共享口令；那才会发 `entrance.revoked` /
   返回 `ENTRANCE_REVOKED`）。
-- **不需要**轮换 Space Key：撤销的效力来自设备被标记 `revoked`（它取不到新密文）+ 自毁。
+- **不需要**轮换 Space Key：撤销的效力来自通道被标记 `revoked`（它取不到新密文）+ 自毁。
   怀疑密钥材料被提取（越狱/镜像泄露）时的止损流程见 `docs/SECURITY.md` §4.2（替代方案 = 重建空间）。
-- 已同步的历史密文不可追回（设备端已解密数据的固有属性）。
+- 已同步的历史密文不可追回（通道端已解密数据的固有属性）。
 
 ### 5.4 数据目录备份策略（汇总）
 
@@ -298,7 +298,7 @@ curl -X POST http://127.0.0.1:3000/entrances/dev-b1/revoke \
 
 ### 5.5 上线前彻底重置（服务端 + 客户端一起，2026-09-23 定）
 
-适用：**把服务端与本机数据全部丢掉、从头开始**（不是撤销某台设备——那个用 §5.3）。
+适用：**把服务端与本机数据全部丢掉、从头开始**（不是撤销某条通道——那个用 §5.3）。
 两边必须同时做：只清服务端的话，客户端拿着旧凭证只会收到 403 `FORBIDDEN`（未登记），
 按 §5.3 的语义它**只警告、不清本地数据**，于是你会看到"App 能开、连不上、本地还留着旧历史"。
 
@@ -322,15 +322,15 @@ docker compose up -d
 - 清完 `data/files/` 从第一天起就是**纯 per-space 结构**（`files/<space_id>/<前两位>/<id>`）。
 - 想留旧数据就先 `npm run backup`，且**把备份文件挪出 `data/`**（否则第 2 步一起删掉）。
 
-**客户端（每台设备）**
+**客户端（每条通道）**
 
-- App：对话页菜单 → 高级 → **重置设备**（`app/lib/data/local_reset.dart`：清本地全表
+- App：对话页菜单 → 高级 → **重置本机**（`app/lib/data/local_reset.dart`：清本地全表
   ——含 `spaces` 空间列表——+ 锁包 + 留存明文/媒体缓存）。
 - 或直接卸载重装。两种方式都会把**安装级 `install_uid`** 换成新的（它存在 `app_state`，
-  重置设备时整表清掉，下次调用惰性重新生成 = 轮换）。
+  重置本机时整表清掉，下次调用惰性重新生成 = 轮换）。
 - TUI：`rm -f ~/.einz/*.json`（或用 `--store` 指定的那个文件）+ 清附件缓存目录。
 
-**作废与后果**：空间 id/地址、设备登记、会话、共享口令密保箱、邀请链接、开通码全部作废；
+**作废与后果**：空间 id/地址、通道登记、会话、共享口令密保箱、邀请链接、开通码全部作废；
 历史备份里的恢复码导入的是**旧库内容**，服务端已空 → 不要再导入。
 
 ---
@@ -339,16 +339,16 @@ docker compose up -d
 
 | 边界           | 机制                                                                            | 说明                                                |
 | -------------- | ------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 设备在册状态   | `entrances` 表 + `isActiveDevice`（v2：由 spaces create/join 自助登记）           | 未登记设备 403；撤销后立即拒绝认证/同步/发送        |
+| 通道在册状态   | `entrances` 表 + `isActiveDevice`（v2：由 spaces create/join 自助登记）           | 未登记通道 403；撤销后立即拒绝认证/同步/发送        |
 | 服务端只见密文 | E2EE 全链路（消息/附件均为密文 + 元数据）                                       | `messages` 表只有 ciphertext（冒烟测试验证）        |
-| 路径遍历       | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧）               | 失陷白名单设备也无法越出`files/`（V1 审查 P1 修复） |
-| WS 撤销实时性  | 撤销即关闭被撤销设备连接（close 4403）                                          | 无法继续收新消息广播（P2 修复）                     |
+| 路径遍历       | `attachment_id` 字符集白名单 + `resolve` 路径包含检查（读写双侧）               | 失陷白名单通道也无法越出`files/`（V1 审查 P1 修复） |
+| WS 撤销实时性  | 撤销即关闭被撤销通道连接（close 4403）                                          | 无法继续收新消息广播（P2 修复）                     |
 | 备份加密       | Server 备份 AES-256-GCM（`EINZ_DB_BACKUP_KEY`）；客户端备份恢复码 Argon2id 派生 | 备份文件离库不泄露                                  |
 | 供应链         | Gradle 镜像`distributionSha256Sum` 锁定官方校验和                               | 构建工具链不可被镜像篡改（P3 修复）                 |
 | 认证           | challenge-response（一次性、5 分钟过期）；session_token 服务端签发              | 防重放                                              |
 | 前向保密       | Space Key 简单派生（已接受的代价，E2EE.md §11.1）                               | 安全存储隔离；不轮换的取舍见 SECURITY.md §3        |
 
-**威胁模型提醒（SECURITY.md §3/§4.1）：** 被撤销设备已持有的历史密文无法收回（设备端已解密数据的固有属性）；它读不到**之后**的新消息，靠的是设备在册状态（`/sync` 403）而非轮换。
+**威胁模型提醒（SECURITY.md §3/§4.1）：** 被撤销通道已持有的历史密文无法收回（通道端已解密数据的固有属性）；它读不到**之后**的新消息，靠的是通道在册状态（`/sync` 403）而非轮换。
 
 ---
 
@@ -359,14 +359,14 @@ docker compose up -d
 | Server 起不来 / 端口占用               | 端口被占或 Node 版本过低（需 ≥20）                        | 换 `PORT=`；`node -v` 确认版本                              |
 | `curl /space` 401/403                  | 正常（未认证）                                            | 按 §3.3 验证                                                |
 | CLI 报 libsodium 加载失败              | 未设`LIBSODIUM_PATH`（或 libsodium 装在非标准路径）       | `export LIBSODIUM_PATH="/opt/homebrew/lib/libsodium.dylib"` |
-| `/auth` 失败 403 `FORBIDDEN`           | 设备未登记（常见：**服务端库被清空/重置**，或换了新库）    | 客户端只警告、数据不丢；查 entrances 表是否有该 entrance_id。库被重置时用备份恢复库，或让设备重新 `/space join` |
-| `/auth` 失败 403 `ENTRANCE_REVOKED`      | 该设备已被明确撤销（§5.3）                                | 设备端已自毁本地数据，只能重新 `/space join` 入网           |
+| `/auth` 失败 403 `FORBIDDEN`           | 通道未登记（常见：**服务端库被清空/重置**，或换了新库）    | 客户端只警告、数据不丢；查 entrances 表是否有该 entrance_id。库被重置时用备份恢复库，或让通道重新 `/space join` |
+| `/auth` 失败 403 `ENTRANCE_REVOKED`      | 该通道已被明确撤销（§5.3）                                | 通道端已自毁本地数据，只能重新 `/space join` 入网           |
 | 发消息一直"发送中"                    | WS 未连上 / 会话失效                                      | `/auth` 重新激活；或看服务端日志 `[req] WS /ws connect`     |
-| `/sync` 拉不到对方消息                 | 锚点已推进 / 网络 / 设备被撤销                            | 用 `/sync` 前先在本地库清锚点排查（或看服务端审计表）        |
+| `/sync` 拉不到对方消息                 | 锚点已推进 / 网络 / 通道被撤销                            | 用 `/sync` 前先在本地库清锚点排查（或看服务端审计表）        |
 | `fetch` 报 sha256 不匹配               | 附件密文损坏或元数据过期                                  | 重新`sync` 拉元数据后重试                                   |
 | WS 连不上                              | 反代未开 WSS / token 未 URL 编码                          | 检查 Caddy；token 含`+`/`=` 需编码（客户端自动处理）        |
 | `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷）                            | 拷贝到纯 ASCII 路径构建（如`/tmp/einz-build`），产物拷回    |
-| 撤销后设备仍能认证                     | Server 版本过旧（未含 Phase 4 撤销感知）                  | 重新`npm run build` 部署                                    |
+| 撤销后通道仍能认证                     | Server 版本过旧（未含 Phase 4 撤销感知）                  | 重新`npm run build` 部署                                    |
 | 备份命令拒绝执行                       | 未设置`EINZ_DB_BACKUP_KEY`                                | 设置 base64 32B 密钥（§3.2/§5.1）                           |
 
 ---
@@ -374,7 +374,7 @@ docker compose up -d
 ## 8. 验收清单（部署完成后逐项打勾）
 
 - [ ] `https://<域名>/space` 返回鉴权错误（TLS 正常）
-- [ ] 未登记设备认证 403
+- [ ] 未登记通道认证 403
 - [ ] A→B 发消息，B 同步解出明文；Server 数据库无明文
 - [ ] `listen` 实时收到 `message.new`
 - [ ] 附件上传→下载解密与原文件一致
@@ -451,7 +451,7 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
 | 项                       | 说明                                                                                                                                                     |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 存量数据                 | 不受影响（messages/entrances/会话等全部不动，新表初始为空）                                                                                                |
-| 设备在册状态             | 无需改动（既有设备与会话不受影响）                                                                                                                         |
+| 通道在册状态             | 无需改动（既有通道与会话不受影响）                                                                                                                         |
 | Caddy / HTTPS / 备份密钥 | 均无需改动（Caddyfile 已 assume-unchanged，pull 不覆盖）                                                                                                 |
 | App 侧                   | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                             |
 | 回滚                     | `cd $EINZ_ROOT && git log --oneline -5` 找上一版本 → `git checkout <commit> -- server/ deployment/ shared/` → 重新 `docker compose up -d --build server` |

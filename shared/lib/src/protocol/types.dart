@@ -57,7 +57,7 @@ class SessionResult {
       );
 }
 
-/// 设备绑定结果（v2）：`POST /spaces` 与 `POST /spaces/join` 都直接返回这三个 id，
+/// 通道绑定结果（v2）：`POST /spaces` 与 `POST /spaces/join` 都直接返回这三个 id，
 /// App 向导用它聚合"本次绑定拿到的身份"。
 ///
 /// 历史：v1 时代这是 `POST /entrances/enroll` 的响应类型（`EnrollResult`）。该端点与
@@ -74,7 +74,7 @@ class EntranceBinding {
 /// 验 token 不消费——空间公开信息供客户端确认，PROTOCOL_MULTIVERSE.md §5）。
 /// Multiverse：join preflight 返回的成员身份信息（create 时预置两身份 slot；
 /// join 时客户端据此展示「选择是哪一个用户」——加入者可能是第二人，也可能
-/// 是第一人的其他设备，不能靠名字判别身份，老板 2026-09-10 定稿）。
+/// 是第一人的其他通道，不能靠名字判别身份，老板 2026-09-10 定稿）。
 class SpaceMemberSlot {
   const SpaceMemberSlot({
     required this.slot,
@@ -122,7 +122,7 @@ class SpaceJoinPreflight {
       );
 }
 
-/// Multiverse：加入结果（POST /spaces/join 返回——设备已登记、session 已签发，
+/// Multiverse：加入结果（POST /spaces/join 返回——通道已登记、session 已签发，
 /// 绑定该 Space，PROTOCOL_MULTIVERSE.md §4.1）。
 class SpaceJoinResult {
   const SpaceJoinResult({
@@ -151,7 +151,7 @@ class SpaceJoinResult {
       );
 }
 
-/// Multiverse：创建结果（POST /spaces 返回——创建者设备已登记、session 已签发，
+/// Multiverse：创建结果（POST /spaces 返回——创建者通道已登记、session 已签发，
 /// 绑定该 Space，PROTOCOL_MULTIVERSE.md §4.1）。
 class SpaceCreateResult {
   const SpaceCreateResult({
@@ -188,7 +188,7 @@ class SpaceCreateResult {
 }
 
 /// 邀请码生成结果（POST /invites 返回，创建者调用）。
-/// Multiverse：POST /spaces/{id}/join-tokens 生成的绑定新设备的邀请（24h 一次性）。
+/// Multiverse：POST /spaces/{id}/join-tokens 生成的绑定新通道的邀请（24h 一次性）。
 class JoinTokenResult {
   const JoinTokenResult({
     required this.joinToken,
@@ -207,8 +207,8 @@ class JoinTokenResult {
       );
 }
 
-/// 空间设备信息（GET /space 返回）：entrance_id → partner_id 映射，
-/// 用于判断消息是否"同一个人"发送（多设备凭证语义，PROTOCOL.md §7.3）。
+/// 空间通道信息（GET /space 返回）：entrance_id → partner_id 映射，
+/// 用于判断消息是否"同一个人"发送（多通道凭证语义，PROTOCOL.md §7.3）。
 class SpaceEntrance {
   const SpaceEntrance({
     required this.entranceId,
@@ -285,8 +285,8 @@ class PostMessageResult {
 /// 消息回执（已送达/已读）单调高水位，按 (space, partner) 一行。
 ///
 /// 语义：我的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
-/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一台设备已收到/已读"
-/// （不保证其所有设备）。回执只前进，且 `deliveredUptoSeq ≥ readUptoSeq`。
+/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一条通道已收到/已读"
+/// （不保证其所有通道）。回执只前进，且 `deliveredUptoSeq ≥ readUptoSeq`。
 class ReceiptRow {
   ReceiptRow({
     required this.partnerId,
@@ -311,9 +311,9 @@ class ReceiptRow {
 /// 服务端错误（PROTOCOL.md §9）。
 ///
 /// 错误码语义（客户端**只应**按下述处理，2026-09-16）：
-/// - `ENTRANCE_REVOKED`（403）：本设备被**明确撤销**（涉嫌被盗用）——唯一授权客户端
+/// - `ENTRANCE_REVOKED`（403）：本通道被**明确撤销**（涉嫌被盗用）——唯一授权客户端
 ///   清空本地数据的错误码；
-/// - `FORBIDDEN`（403）：设备**未登记**（最常见原因是服务端库被清空/重置，属运维失误）
+/// - `FORBIDDEN`（403）：通道**未登记**（最常见原因是服务端库被清空/重置，属运维失误）
 ///   ——只警告，绝不清空本地数据，允许继续查看本地消息（`entrance.revoked` 帧同理是明确撤销）。
 class ApiException implements Exception {
   ApiException(this.code, this.message, [this.httpStatus = 0]);

@@ -4,7 +4,7 @@
  * 多空间列表角标的依据：**服务端派生**——消息 + 我上报的读取水位（receipts.read_upto_seq）。
  * 四个必须立住的点：
  * 1. 只数"晚于我读取水位"的；
- * 2. **必须走 partner 维度**排除自己：同一身份的第二台设备发来的消息不是未读
+ * 2. **必须走 partner 维度**排除自己：同一身份的第二条通道发来的消息不是未读
  *    （只比 entrance_id 会把它算进来——这是最容易错的点）；
  * 3. 没有 receipts 行 = 从没读过 = 对方的全部消息都算未读；
  * 4. 只数本空间（跨空间不串）。
@@ -69,7 +69,7 @@ function seed (): void {
   )
   msg.run('m1', SPACE, MY_DEVICE, 1, now) // 我发的
   msg.run('m2', SPACE, PEER_DEVICE, 2, now) // 对方
-  msg.run('m3', SPACE, MY_OTHER_DEVICE, 3, now) // 我的另一台设备发的
+  msg.run('m3', SPACE, MY_OTHER_DEVICE, 3, now) // 我的另一条通道发的
   msg.run('m4', SPACE, PEER_DEVICE, 4, now) // 对方
   msg.run('m5', SPACE, PEER_DEVICE, 5, now) // 对方
   msg.run('x1', OTHER_SPACE, PEER_DEVICE, 1, now) // 别的空间，不该被算进来
@@ -93,7 +93,7 @@ function withDb (fn: () => void): void {
 
 test('unread：只数"晚于我读取水位"的对方消息（partner 维度排除我自己）', () => {
   withDb(() => {
-    // 读到 seq=3 → seq4 / seq5 是未读；seq3 虽然晚于水位但**是我另一台设备发的**，不算
+    // 读到 seq=3 → seq4 / seq5 是未读；seq3 虽然晚于水位但**是我另一条通道发的**，不算
     assert.equal(unreadCount('tok-me').unread, 2)
   })
 })
@@ -105,7 +105,7 @@ test('unread：水位推进到最新 → 0；没有 receipts 行 → 对方的�
     assert.equal(unreadCount('tok-me').unread, 0, '读到最新 → 没有未读')
 
     db.prepare(`DELETE FROM receipts WHERE space_id = ? AND partner_id = ?`).run(SPACE, ME)
-    // 没读过：m2 / m4 / m5 三条（m1 我发的、m3 我另一台设备发的都不算）
+    // 没读过：m2 / m4 / m5 三条（m1 我发的、m3 我另一条通道发的都不算）
     assert.equal(unreadCount('tok-me').unread, 3, '没有 receipts 行 = 全部未读')
   })
 })

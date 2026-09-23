@@ -120,7 +120,7 @@ class AttachmentStore {
     }
   }
 
-  /// 清空所有留存明文（切回 `secured` 模式 / 设备被撤销时调用）。
+  /// 清空所有留存明文（切回 `secured` 模式 / 通道被撤销时调用）。
   static Future<void> clear() async {
     try {
       final dir = await directory();

@@ -9,7 +9,7 @@ void main() {
     await sodium();
   });
 
-  group('设备密钥', () {
+  group('通道密钥', () {
     test('生成 + 密封/解封闭环', () async {
       final s = await sodium();
       final kp = await EntranceKeyPair.generate();

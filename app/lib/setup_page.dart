@@ -25,13 +25,13 @@ import 'widgets/cute_house_icon.dart';
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
 enum _WizardRole { create, join, offline }
 
-/// 设置页：一次性配置（生成设备凭证 → 建立/加入空间 → 获得 Space Key → 设置启动锁）。
+/// 设置页：一次性配置（生成通道凭证 → 建立/加入空间 → 获得 Space Key → 设置启动锁）。
 ///
-/// 全部走 Multiverse（v2）闭环，**不再有 v1 的设备登记与邀请码**（2026-09-15 P1 收敛）：
-/// - create（第一个使用者）：`POST /spaces` 一步完成设备登记 + 签发空间会话 →
+/// 全部走 Multiverse（v2）闭环，**不再有 v1 的通道登记与邀请码**（2026-09-15 P1 收敛）：
+/// - create（第一个使用者）：`POST /spaces` 一步完成通道登记 + 签发空间会话 →
 ///   设接入口令托管 Space Key → 进聊天页（邀请由聊天页顶栏调 `/spaces/{id}/join-tokens`
 ///   生成链接/二维码；口令由加入方另行输入）；
-/// - join：邀请链接/token → preflight → 口令取钥 → `POST /spaces/join` 登记设备 + 发会话；
+/// - join：邀请链接/token → preflight → 口令取钥 → `POST /spaces/join` 登记通道 + 发会话；
 /// - offline：密保信封导入（用对方公钥密封的 Space Key，口令页的平行替代）。
 /// 会话由 create/join 直接签发（绑定该 Space），无需再单独登记。
 class SetupPage extends StatefulWidget {
@@ -70,7 +70,7 @@ class SetupPage extends StatefulWidget {
   /// 注入后不发起网络请求，供 golden 走 PIN/跳过路径）。
   final Future<SessionResult> Function(EntranceKeyPair kp, String enrolledEntranceId)? authOverride;
 
-  /// 测试注入：固定设备密钥对（登记/认证需要确定性密钥；生产传 null 则自动生成。
+  /// 测试注入：固定通道密钥对（登记/认证需要确定性密钥；生产传 null 则自动生成。
   /// 名字步骤的密钥信息卡已移除——技术细节不展示给用户）。
   final EntranceKeyPair? keyPairOverride;
 
@@ -91,7 +91,7 @@ class SetupPage extends StatefulWidget {
 
 class _SetupPageState extends State<SetupPage> {
   String? _autoEntranceNameCache; // 登记用设备型号缓存（避免重复走平台通道）
-  final _creatorName = TextEditingController(); // 首设备：第一个用户的名字
+  final _creatorName = TextEditingController(); // 首条通道：第一个用户的名字
   String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 creator_name 同步服务端）
   String? _genderError; // 性别未选提醒（红字显示在选项卡下方；选中即清除）
   final _peerNameCtrl = TextEditingController(); // create 步骤 2：伴侣（第二人）名字（必填）
@@ -103,7 +103,7 @@ class _SetupPageState extends State<SetupPage> {
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
-  // create 首台设备：口令二次确认（避免设错口令后无法再入）。join 是验证已有
+  // create 首条通道：口令二次确认（避免设错口令后无法再入）。join 是验证已有
   // 口令，无需确认，故仅 create 用。
   final _escrowPassphraseConfirm = TextEditingController();
   // 接入口令强度（仅 create 设置时校验；join 是验证已有口令不限制，避免历史短口令
@@ -115,7 +115,7 @@ class _SetupPageState extends State<SetupPage> {
   late final Listenable _pinInputsChanged = Listenable.merge([_pin, _confirm]);
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户选择"不设置锁屏码"（底部按钮=跳过时）：跳过 setPin，仍完成前置并进下一步
-  final _inviteCode = TextEditingController(); // 加入/导入设备时的一次性邀请码
+  final _inviteCode = TextEditingController(); // 加入通道时的一次性邀请码
   // 键盘遮挡处理：
   // 方案 1（聚焦即滚出性别卡）：名字/伴侣名输入框聚焦时把性别卡滚入可见区；
   // 方案 2（点下一步收键盘并滚到警告）：_nextStep 先收键盘再把红字警告滚入可见区。
@@ -169,11 +169,11 @@ class _SetupPageState extends State<SetupPage> {
   /// （create 回步骤 2 / join 回步骤 3），实现口令⇄信封自由互切。
   _WizardRole _preEnvelopeRole = _WizardRole.join;
 
-  /// 设备登记结果（服务端分配的真实 entranceId/partnerId/spaceId）。
+  /// 通道登记结果（服务端分配的真实 entranceId/partnerId/spaceId）。
   /// 认证（challenge）与进聊天页一律用它，不用本地临时 entranceId。
   EntranceBinding? _enroll;
 
-  /// create 自举失败（服务器已有空间设备）时为 true → 展示改用"加入"的引导。
+  /// create 自举失败（服务器已有空间通道）时为 true → 展示改用"加入"的引导。
   bool _bootstrapFailed = false;
 
   @override
@@ -199,10 +199,10 @@ class _SetupPageState extends State<SetupPage> {
     _nameFocus.addListener(_onNameFocusChange);
     _peerNameFocus.addListener(_onPeerNameFocusChange);
     _initServer();
-    _autoGenerateKey(); // 对齐 TUI：本地无设备记录即自动生成公私钥，无需用户点按钮
+    _autoGenerateKey(); // 对齐 TUI：本地无通道记录即自动生成公私钥，无需用户点按钮
   }
 
-  /// 自动生成设备密钥（本地无记录时调用；不阻塞 UI，完成后刷新设备名步骤）。
+  /// 自动生成通道密钥（本地无记录时调用；不阻塞 UI，完成后刷新通道名步骤）。
   Future<void> _autoGenerateKey() async {
     if (_keyPair != null || _busy) return;
     final override = widget.keyPairOverride;
@@ -531,7 +531,7 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---------- 向导框架 ----------
 
-  /// 步骤总数（角色由探测自动判定：create=首设备 / join=后续设备 / offline=密保信封）。
+  /// 步骤总数（角色由探测自动判定：create=首条通道 / join=后续通道 / offline=密保信封）。
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
@@ -718,14 +718,14 @@ class _SetupPageState extends State<SetupPage> {
         (_role == _WizardRole.join && _step == 3)) {
       final pass = _escrowPassphrase.text.trim();
       if (pass.isEmpty) {
-        // 两套错误提示：首设备「必须设置」/ 后续设备「验证」语气（老板要求）
+        // 两套错误提示：首条通道「必须设置」/ 后续通道「验证」语气（老板要求）
         localError = _role == _WizardRole.join
             ? l10n.wizardJoinPassphraseRequired
             : l10n.setupPageNeedPassphrase;
         invalid = true;
       } else if (_role == _WizardRole.create && pass.isNotEmpty) {
-        // 首台设备：口令策略（只要求最短 8 位，见 shared passphrase_policy.dart）；
-        // 后续设备（join）是「验证既有口令」，不套策略（老短口令也要能进来）
+        // 首条通道：口令策略（只要求最短 8 位，见 shared passphrase_policy.dart）；
+        // 后续通道（join）是「验证既有口令」，不套策略（老短口令也要能进来）
         if (checkPassphrasePolicy(pass) != null) {
           localError = l10n.wizardPassphraseTooShort;
           invalid = true;
@@ -733,7 +733,7 @@ class _SetupPageState extends State<SetupPage> {
       }
       if (!invalid && _role == _WizardRole.create &&
           _escrowPassphraseConfirm.text.trim() != pass) {
-        // 首台设备：口令需二次输入一致（老板要求 2026-09-12）
+        // 首条通道：口令需二次输入一致（老板要求 2026-09-12）
         localError = l10n.wizardPassphraseMismatch;
         invalid = true;
       }
@@ -766,7 +766,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!mounted) return;
       if (!ok) return;
     }
-    // join 口令页（步骤 3）：输入口令必须与首台设备创建时一致（解密 escrow
+    // join 口令页（步骤 3）：输入口令必须与首条通道创建时一致（解密 escrow
     // 口令密保箱成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
     if (_role == _WizardRole.join && _step == 3) {
       final verified = await _verifyJoinPassphrase();
@@ -827,7 +827,7 @@ class _SetupPageState extends State<SetupPage> {
       return; // _run* 内部推进 _step
     }
     // create 步骤 3（口令页）→ 自动自举登记（登记时上传本人+伴侣名字/性别；
-    // 设备名已自动设置不再询问），成功才进口令之后的 PIN 步骤
+    // 通道名已自动设置不再询问），成功才进口令之后的 PIN 步骤
     if (_role == _WizardRole.create && _step == 3 && _enroll == null) {
       await _runBootstrap();
       if (!mounted) return;
@@ -1084,7 +1084,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 第 0 步（角色未判定时）：显示探测状态（密保信封导入在口令页有次级入口）。
-  /// 角色由服务器探测自动判定（partner 名称表空=首设备 create，非空=后续设备 join），
+  /// 角色由服务器探测自动判定（partner 名称表空=首条通道 create，非空=后续通道 join），
   /// 不再让用户手动选择。
   Widget _buildDetectAndEnvelope() {
     final l10n = AppLocalizations.of(context)!;
@@ -1112,7 +1112,7 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 辅助：认证 / PIN 设置 / 进聊天页 ----
 
   /// challenge-response 认证，返回 session（PROTOCOL.md §4）。
-  /// [enrolledEntranceId] 用登记后服务端分配的真实 id（challenge 要求设备已入网）。
+  /// [enrolledEntranceId] 用登记后服务端分配的真实 id（challenge 要求通道已入网）。
   /// [spaceId] 必填（Multiverse）：签发的 session 绑定该 Space，缺了服务端返回 400
   /// （auth.ts:40-42）。会话过期自动续期也走这里，漏传会把本可自动恢复的消息变成
   /// 永久发送失败（老板 2026-09-22 排查线上红色标签时发现）。
@@ -1197,9 +1197,9 @@ class _SetupPageState extends State<SetupPage> {
     showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
-  /// 登记用默认设备名：设备型号（device_info_plus，如 "iPhone 15 Pro" /
+  /// 登记用默认通道名：设备型号（device_info_plus，如 "iPhone 15 Pro" /
   /// "SM-S918B"）；平台通道不可用（widget 测试等）时回退 'dev-mobile'。
-  /// 型号里的空格/符号按设备名规则换成 `_`（老板 2026-09-16：只允许中英文、
+  /// 型号里的空格/符号按通道名规则换成 `_`（老板 2026-09-16：只允许中英文、
   /// 数字、`_`、`-`，≤32）——"iPhone 15 Pro" → "iPhone_15_Pro"。
   Future<String> _autoEntranceName() async {
     if (_autoEntranceNameCache != null) return _autoEntranceNameCache!;
@@ -1223,8 +1223,8 @@ class _SetupPageState extends State<SetupPage> {
     required String spaceKeyB64,
     required int keyVersion,
     required String token,
-    String? publicKeyB64, // 设备公钥（b64）：随锁包持久化，重启后 reauth + 弹窗展示
-    String? privateKeyB64, // 设备私钥（b64）：随锁包持久化（与 Space Key 同库同策略）
+    String? publicKeyB64, // 通道公钥（b64）：随锁包持久化，重启后 reauth + 弹窗展示
+    String? privateKeyB64, // 通道私钥（b64）：随锁包持久化（与 Space Key 同库同策略）
   }) async {
     final l10n = AppLocalizations.of(context)!;
     if (_lockAlreadySet) return true; // 沿用现有锁屏码：不重设（addSpace 由调用方做）
@@ -1327,11 +1327,11 @@ class _SetupPageState extends State<SetupPage> {
     ));
   }
 
-  // ---- 场景 A（create）：身份名字 → 口令 → PIN → 完成（设备名已自动设置，不再询问） ----
+  // ---- 场景 A（create）：身份名字 → 口令 → PIN → 完成（通道名已自动设置，不再询问） ----
 
   /// 步骤 1（create）：第一个用户的名字；密钥已由 [_autoGenerateKey] 自动生成
   /// （不展示密钥信息——技术细节，小白用户不需要看）；"下一步"触发自举登记
-  /// （设备名已自动设置，不再单独询问）。
+  /// （通道名已自动设置，不再单独询问）。
   Widget _buildStepName() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -1445,7 +1445,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 步骤 2（join，Multiverse）：选择「选择身份」——create 已录入两人
-  /// 身份（preflight slots），加入者可能是第二人，也可能是第一人的其他设备，
+  /// 身份（preflight slots），加入者可能是第二人，也可能是第一人的其他通道，
   /// 不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）。
   /// 样式沿用 v1 性别选择卡（老板 2026-09-11）：左右双卡片、粉蓝表性别、
   /// 男女图标 + 各自名字、无在线状态、选中放大覆盖相邻未选中卡。
@@ -1540,7 +1540,7 @@ class _SetupPageState extends State<SetupPage> {
 
   /// join 时对方（另一个身份 slot）的名字——对话顶部条左侧显示用。
   /// **不能**用预检返回的 `displayName`（那是**空间名**，create 时写入的是创建者
-  /// 自己的名字）：A 创建空间、A 的第二台设备（App）加入、B 尚未加入时，
+  /// 自己的名字）：A 创建空间、A 的第二条通道（App）加入、B 尚未加入时，
   /// 空间名就是 A → 顶部条两边都显示 A（老板 2026-09-16 实测）。
   /// 与 [_joinPeerGender] 对称：对方 = 另一个身份 slot 的预置名字
   /// （create 时录入的伴侣名字，B 未加入也有值）。
@@ -1781,7 +1781,7 @@ class _SetupPageState extends State<SetupPage> {
             escrowPassphrase: passphrase.isEmpty ? null : passphrase,
             publicKey: kp.publicKeyB64,
             entranceName: await _autoEntranceName(),
-            // 安装级设备标识（多空间）：同一台设备各空间共用，服务端内部关联用
+            // 安装级标识（多空间）：同一条通道各空间共用，服务端内部关联用
             installUid: await AppLockService(widget.db ?? LocalDatabase.shared).installUid(),
           ));
       if (!mounted) return;
@@ -1956,11 +1956,11 @@ class _SetupPageState extends State<SetupPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
-        // 文字链接；仅后续设备 join 适用——首台设备无对端可导出密封信封）
+        // 文字链接；仅后续通道 join 适用——首条通道无对端可导出密封信封）
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 两套标题：首设备「设置共享口令」/ 后续设备「验证共享口令」（老板要求）
+            // 两套标题：首条通道「设置共享口令」/ 后续通道「验证共享口令」（老板要求）
             Expanded(
               child: _stepHeader(
                 _role == _WizardRole.join
@@ -1990,13 +1990,13 @@ class _SetupPageState extends State<SetupPage> {
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
           },
-          // 仅首台设备设置时提示最短长度（join 是验证已有口令）
+          // 仅首条通道设置时提示最短长度（join 是验证已有口令）
           hintText: _role == _WizardRole.create
               ? l10n.wizardPassphraseMinLengthHint
               : null,
         ),
-        // 首台设备：口令需二次输入确认（避免设错口令后无法再入；老板要求 2026-09-12）。
-        // 后续设备是「验证」已有口令，无需确认。
+        // 首条通道：口令需二次输入确认（避免设错口令后无法再入；老板要求 2026-09-12）。
+        // 后续通道是「验证」已有口令，无需确认。
         if (_role == _WizardRole.create) ...[
           const SizedBox(height: 12),
           TextField(
@@ -2265,7 +2265,7 @@ class _SetupPageState extends State<SetupPage> {
       }
       final payload = await escrow.openPackage(passphrase: passphrase, envelope: file);
       if (!mounted) return false;
-      // 2) 口令通过 → 才 join 提交（设备登记 + session 签发，真正消费 token）。
+      // 2) 口令通过 → 才 join 提交（通道登记 + session 签发，真正消费 token）。
       //    已经用同一 token+身份 join 过就不再重复提交（如从 PIN 步点「上一步」
       //    退回口令页再点「下一步」——重复 joinSpace 会撞"token 已用"而卡死）
       final alreadyJoined = _sessionToken != null &&
@@ -2279,7 +2279,7 @@ class _SetupPageState extends State<SetupPage> {
               publicKey: kp.publicKeyB64,
               slot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
               entranceName: await _autoEntranceName(),
-              // 安装级设备标识（多空间）：同一台设备各空间共用，服务端内部关联用
+              // 安装级标识（多空间）：同一条通道各空间共用，服务端内部关联用
               installUid: await AppLockService(widget.db ?? LocalDatabase.shared).installUid(),
             ));
         if (!mounted) return false;
@@ -2362,8 +2362,8 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---- 场景 C（offline）：密保信封导入 ----
 
-  /// 步骤 1（offline）：粘贴密保信封（对方用本设备公钥密封的 Space Key）。
-  /// 同时需填写一次性邀请码（非首台设备必须凭码登记后才能认证）。
+  /// 步骤 1（offline）：粘贴密保信封（对方用本通道公钥密封的 Space Key）。
+  /// 同时需填写一次性邀请码（非首条通道必须凭码登记后才能认证）。
   Widget _buildStepEnvelope() {
     final l10n = AppLocalizations.of(context)!;
     return Column(

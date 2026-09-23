@@ -1,9 +1,9 @@
 /**
- * 回归：peer.online/peer.offline 只广播给**另一个人**的设备（老板 2026-09-16 实测）。
+ * 回归：peer.online/peer.offline 只广播给**另一个人**的通道（老板 2026-09-16 实测）。
  *
- * 此前广播只排除发起设备本身（`entrance_id != 自己`），于是同一 partner 的第二台设备
+ * 此前广播只排除发起通道本身（`entrance_id != 自己`），于是同一 partner 的第二条通道
  * 一上线，第一台就把"对方"灯点亮——对方（B）压根还没加入空间却显示在线。
- * 现在：广播跳过与发起设备同 partner 的连接，且 payload 带 partner_id 供客户端自校。
+ * 现在：广播跳过与发起通道同 partner 的连接，且 payload 带 partner_id 供客户端自校。
  *
  * 运行：npm test（tsx test/peer_status.test.ts）
  */
@@ -19,7 +19,7 @@ import { listEntrances } from '../src/entrances.js'
 import { getDb, openDb } from '../src/db.js'
 import { attachWs } from '../src/ws.js'
 
-/** 一个 Space 两人：p1 有两台设备（a1/a2——同一人），p2 一台（b1——对方）。 */
+/** 一个 Space 两人：p1 有两条通道（a1/a2——同一人），p2 一条（b1——对方）。 */
 function seed (): void {
   const db = getDb()
   const now = Date.now()
@@ -85,7 +85,7 @@ async function waitFor (what: string, cond: () => boolean, timeoutMs = 3000): Pr
 
 const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
 
-test('peer 上下线广播：跳过同一 partner 的设备，只给对方', async () => {
+test('peer 上下线广播：跳过同一 partner 的通道，只给对方', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-peer-'))
   const wss = new WebSocketServer({ port: 0 })
   attachWs(wss)
@@ -95,14 +95,14 @@ test('peer 上下线广播：跳过同一 partner 的设备，只给对方', asy
     seed()
 
     const a1 = await connect(port, 'tok-a1')
-    const a2 = await connect(port, 'tok-a2') // 同一人的第二台设备
+    const a2 = await connect(port, 'tok-a2') // 同一人的第二条通道
 
     // 关键断言：a2 上线不得让 a1 以为"对方"上线（B 此时还没连）
     await sleep(300)
     assert.deepEqual(
       a1.frames.filter(f => f.type.startsWith('peer.')),
       [],
-      '同一人的另一台设备上线，不该给 a1 发 peer 广播',
+      '同一人的另一条通道上线，不该给 a1 发 peer 广播',
     )
 
     const b1 = await connect(port, 'tok-b1') // 真正的对方
@@ -112,7 +112,7 @@ test('peer 上下线广播：跳过同一 partner 的设备，只给对方', asy
       a2.frames.some(f => f.type === 'peer.online' && f.payload.entrance_id === 'b1'))
 
     const online = a1.frames.find(f => f.type === 'peer.online')
-    assert.equal(online?.payload.partner_id, 'p2', 'payload 应带上设备所属 partner_id')
+    assert.equal(online?.payload.partner_id, 'p2', 'payload 应带上通道所属 partner_id')
 
     b1.ws.close()
     await waitFor('a1 收到 b1 的 peer.offline', () =>
@@ -167,10 +167,10 @@ test('online_since：进入在线态的时刻——重连不刷新；peer.offlin
       | Record<string, unknown>
       | undefined
     assert.equal(row?.online_since, first.online_since, '/entrances 的 online_since 应与广播一致')
-    assert.ok(row?.connected_at != null, '在线设备应有 connected_at')
+    assert.ok(row?.connected_at != null, '在线通道应有 connected_at')
 
     // 重连（旧连接被踢、再连上）：不算"重新上线"→ online_since 不变，
-    // 客户端列表里该设备不该跳到队首（老板 2026-09-16）
+    // 客户端列表里该通道不该跳到队首（老板 2026-09-16）
     await sleep(20)
     const b1Again = await connect(port, 'tok-b1')
     await waitFor('a1 收到 b1 重连后的 peer.online', () =>
@@ -179,7 +179,7 @@ test('online_since：进入在线态的时刻——重连不刷新；peer.offlin
     assert.equal(
       second.online_since,
       first.online_since,
-      '重连不得刷新 online_since（否则设备会跳到"最新上线"的位置）',
+      '重连不得刷新 online_since（否则通道会跳到"最新上线"的位置）',
     )
     const rowAgain = listEntrances('tok-a1').entrances.find(d => d.entrance_id === 'b1') as
       | Record<string, unknown>

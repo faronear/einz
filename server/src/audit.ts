@@ -19,7 +19,7 @@ import { getDb } from "./db.js";
 
 export type ConnectionEventKind =
   | "connect" // WS 连上（上线）
-  | "disconnect" // WS 断开（下线；close_code=4408 表示被同一设备的新连接顶掉）
+  | "disconnect" // WS 断开（下线；close_code=4408 表示被同一通道的新连接顶掉）
   | "heartbeat_timeout"; // 心跳超时，被服务端 terminate
 
 /** 请求侧元数据（IP / UA）——从 IncomingMessage 提取，审计落库用。 */
@@ -101,7 +101,7 @@ export interface ActivityInput {
   meta?: RequestMeta;
 }
 
-/** 记一条设备活动明细。 */
+/** 记一条通道活动明细。 */
 export function logActivity(e: ActivityInput): void {
   try {
     const meta = e.meta ?? NO_META;
@@ -126,12 +126,12 @@ export function logActivity(e: ActivityInput): void {
 }
 
 /**
- * 每设备每 Space 已记过的最高 last_sequence（进程内缓存，重启丢失只会多记一行）。
+ * 每通道每 Space 已记过的最高 last_sequence（进程内缓存，重启丢失只会多记一行）。
  *
  * 只记"进度前进"的 sync：例行轮询没拉到新消息时不产生记录
  * （老板 2026-09-13 定）。轮询频率：App WS 在线 30s / 离线 3s 退避到 60s，
  * TUI 固定 30s——若每次轮询都记，绝大多数行都是重复值且毫无信息量。
- * 设备"还在不在"由 connection_events 与 entrances.last_seen 负责。
+ * 通道"还在不在"由 connection_events 与 entrances.last_seen 负责。
  */
 const lastSyncByEntrance = new Map<string, number>();
 
@@ -140,7 +140,7 @@ export interface SyncActivityInput {
   spaceId?: string | null;
   /** 请求参数 after。 */
   afterSequence: number;
-  /** 本次返回的最大 server_sequence（=该设备已拉取到的进度）。 */
+  /** 本次返回的最大 server_sequence（=该通道已拉取到的进度）。 */
   lastSequence: number;
   /** 本次返回的消息条数。 */
   count: number;
@@ -149,7 +149,7 @@ export interface SyncActivityInput {
 }
 
 /**
- * 记 sync 拉取进度（=该设备的"接收"证据）。
+ * 记 sync 拉取进度（=该通道的"接收"证据）。
  * 仅当 last_sequence 前进（真正拉到新消息）时落一条；没新结果的例行轮询不记。
  */
 export function logSyncActivity(e: SyncActivityInput): void {

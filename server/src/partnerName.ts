@@ -3,7 +3,7 @@ import { ApiError } from "./auth.js";
 /** 用户名称（partner 显示名）规则（老板 2026-09-16 定）：最多 32 字符，只允许
  *  **中文字、英文字母、数字、`_` `-`、表情符 emoji**。
  *
- *  与设备名的差别是**允许 emoji**——名字是给人看的亲昵称呼（"小猪🐷"），设备名
+ *  与通道名的差别是**允许 emoji**——名字是给人看的亲昵称呼（"小猪🐷"），通道名
  *  是给机器看的短标识，所以两条规则不合并（见 entranceName.ts）。
  *
  *  客户端同款规则在 `shared/lib/src/policy/partner_name_policy.dart`（Dart/TS 无法

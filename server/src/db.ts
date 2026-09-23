@@ -27,7 +27,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       entrance_name TEXT,
       last_seen   INTEGER,
       created_at  INTEGER NOT NULL,
-      -- 客户端生成的**安装级**设备标识（多空间）：同一台物理设备上每个空间一个
+      -- 客户端生成的**安装级**标识（多空间）：同一台物理设备上每个空间一个
       -- entrance_id，但它们的 install_uid 相同 → 服务端据此知道"这几行是同一台设备"。
       -- 存量行/未升级客户端为 NULL。**绝不出现在任何响应体里**（服务端内部认知）。
       install_uid  TEXT
@@ -113,8 +113,8 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     CREATE TABLE IF NOT EXISTS space_members (
       space_id     TEXT NOT NULL REFERENCES spaces(space_id),
-      -- partner_id 是身份锚点（同一身份多设备共享）；伴侣（slot=1）
-      -- 预置时尚未加入 → 为 NULL，由首个加入该 slot 的设备生成（老板定稿）
+      -- partner_id 是身份锚点（同一身份多通道共享）；伴侣（slot=1）
+      -- 预置时尚未加入 → 为 NULL，由首个加入该 slot 的通道生成（老板定稿）
       partner_id    TEXT,
       slot INTEGER NOT NULL,
       display_name TEXT,
@@ -138,7 +138,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     -- 消息回执（已送达/已读）单调高水位：按 (space, partner) 一行。
     -- 语义：我的消息 seq=S 已送达 ⟺ 对方 delivered_upto_seq ≥ S；已读 ⟺ read_upto_seq ≥ S。
-    -- 按 partner 记 → "该 partner 至少一台设备已收到/已读"（不保证所有设备）。
+    -- 按 partner 记 → "该 partner 至少一条通道已收到/已读"（不保证所有通道）。
     -- 不变式：只前进；delivered_upto_seq ≥ read_upto_seq（读隐含送达）。
     CREATE TABLE IF NOT EXISTS receipts (
       space_id           TEXT NOT NULL,
@@ -149,7 +149,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       PRIMARY KEY (space_id, partner_id)
     );
 
-    -- ── 审计表（只追加，永久保留；供"谁在哪台设备上、什么时候做了什么"回溯）──
+    -- ── 审计表（只追加，永久保留；供"谁在哪条通道上、什么时候做了什么"回溯）──
     -- 不参与业务语义：删除或清空不影响聊天功能（老板 2026-09-13 要求详尽留痕）。
 
     -- 连接事件流：WS 每次连上/断开各一行（可算在线时长、掉线次数、断线原因）
@@ -168,7 +168,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     CREATE INDEX IF NOT EXISTS idx_conn_events_entrance_at ON connection_events (entrance_id, at_ms);
     CREATE INDEX IF NOT EXISTS idx_conn_events_space_at  ON connection_events (space_id, at_ms);
 
-    -- 设备活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
+    -- 通道活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
     -- detail 为 JSON，字段按 kind 各异（见 docs/DATABASE.md §2.1）
     CREATE TABLE IF NOT EXISTS entrance_activity (
       activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,13 +191,13 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   } catch {
     // 列已存在（新库）→ 忽略
   }
-  // 迁移：entrances 表补充 entrance_name（设备名称，显示层用）
+  // 迁移：entrances 表补充 entrance_name（通道名称，显示层用）
   try {
     db.exec(`ALTER TABLE entrances ADD COLUMN entrance_name TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
-  // 迁移：entrances 表补充 install_uid（安装级设备标识；存量行留 NULL，由客户端补登）
+  // 迁移：entrances 表补充 install_uid（安装级标识；存量行留 NULL，由客户端补登）
   try {
     db.exec(`ALTER TABLE entrances ADD COLUMN install_uid TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_entrances_uid ON entrances (install_uid)`);
@@ -316,7 +316,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   // 迁移：sessions.session_token 由明文改为 sha256 十六进制（2026-09-15 评审 H4）。
   // 存量明文行既无法反推出哈希（伪造一个哈希也没有意义——查库时是拿客户端明文
   // 现算哈希），也**不能**保留：注释见 auth.resolveSession。会话本就 24h TTL、
-  // 客户端冷启动会用设备私钥自动重新 challenge-response，故直接清掉。
+  // 客户端冷启动会用通道私钥自动重新 challenge-response，故直接清掉。
   // 判定：sha256 十六进制 = 64 位 [0-9a-f]。此语句对已迁移库是空操作。
   const droppedSessions = db
     .prepare(`DELETE FROM sessions WHERE length(session_token) != 64 OR session_token GLOB '*[^0-9a-f]*'`)

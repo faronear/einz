@@ -2,7 +2,7 @@
 // App 重启必须按服务端（GET /space）的名字/性别校正——否则一直显示旧的对方名字。
 //
 // 重点覆盖重启路径：main.dart 用明文 payload 构造 ChatPage 时**不传 partnerId**，
-// 校正必须能从 /space 的设备表按 entranceId 反查"我是谁"。
+// 校正必须能从 /space 的通道表按 entranceId 反查"我是谁"。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';

@@ -1,14 +1,14 @@
 /**
  * 回归：本机自助退役 `POST /entrances/retire`（2026-09-21 新增）。
  *
- * 客户端"重置设备"原先只清本地数据，服务端这台设备的注册表项、Push Token、会话全留着，
+ * 客户端"重置本机"原先只清本地数据，服务端这条通道的注册表项、Push Token、会话全留着，
  * 对方 /entrances 里是一台永远在线的幽灵——而 POST /entrances/:id/revoke 禁止自撤，谁也删不掉它。
  *
  * 两条**必须立住**的边界（老板 2026-09-21 定稿）：
  * 1. 退役**不发 entrance.revoked**：那是客户端自毁本地数据的授权信号。退役只认 session，
- *    若由它发出这帧，偷到 session 的人就能远程擦设备，等于给口令闸门挖了条旁路。
+ *    若由它发出这帧，偷到 session 的人就能远程擦通道，等于给口令闸门挖了条旁路。
  * 2. 退役要**立刻让对端看到下线**：光靠客户端自己断连不可靠（客户端可能迟迟不退），
- *    而心跳每 30s 还会给连接续 last_seen，把已退役的设备刷成在线。
+ *    而心跳每 30s 还会给连接续 last_seen，把已退役的通道刷成在线。
  *
  * 运行：npm test（tsx test/entrance_retire.test.ts）
  */
@@ -106,7 +106,7 @@ async function waitFor (what: string, cond: () => boolean, timeoutMs = 3000): Pr
 
 const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
 
-test('retireEntrance：清会话/Push/待签 challenge，设备置 revoked，且不波及其他设备', () => {
+test('retireEntrance：清会话/Push/待签 challenge，通道置 revoked，且不波及其他通道', () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-retire-'))
   try {
     openDb(join(dir, 'retire.db'))
@@ -126,7 +126,7 @@ test('retireEntrance：清会话/Push/待签 challenge，设备置 revoked，且
 
     for (const [table, why] of [
       ['sessions', '会话即登录态'],
-      ['push_tokens', '否则继续给一台已经不存在的设备推送'],
+      ['push_tokens', '否则继续给一条已经不存在的通道推送'],
       ['challenges', '待签会话可重放签发新会话，让幽灵复活'],
     ] as const) {
       assert.equal(count(`SELECT COUNT(*) AS n FROM ${table} WHERE entrance_id = ?`, 'a1'), 0, why)
@@ -136,7 +136,7 @@ test('retireEntrance：清会话/Push/待签 challenge，设备置 revoked，且
     const peerRow = getDb()
       .prepare(`SELECT status FROM entrances WHERE entrance_id = 'b1'`)
       .get() as { status: string }
-    assert.equal(peerRow.status, 'active', '不得动对方设备')
+    assert.equal(peerRow.status, 'active', '不得动对方通道')
     assert.equal(count(`SELECT COUNT(*) AS n FROM push_tokens WHERE entrance_id = ?`, 'b1'), 1)
     assert.equal(count(`SELECT COUNT(*) AS n FROM sessions WHERE entrance_id = ?`, 'b1'), 1)
     assert.equal(count(`SELECT COUNT(*) AS n FROM challenges WHERE entrance_id = ?`, 'b1'), 1)
@@ -194,7 +194,7 @@ test('retireEntrance：对端收到 peer.offline，**绝无** entrance.revoked�
     await waitFor('b1 收到 a1 的 peer.offline', () =>
       b1.frames.some(f => f.type === 'peer.offline' && f.payload.entrance_id === 'a1'))
 
-    // 2) 自毁信号绝不由退役发出：否则"偷到 session"等同于"远程擦设备"
+    // 2) 自毁信号绝不由退役发出：否则"偷到 session"等同于"远程擦通道"
     await sleep(300)
     assert.deepEqual(
       [...a1.frames, ...b1.frames].filter(f => f.type === 'entrance.revoked'),
@@ -217,7 +217,7 @@ test('retireEntrance：对端收到 peer.offline，**绝无** entrance.revoked�
       | Record<string, unknown>
       | undefined
     assert.equal(caller?.status, 'revoked', '对方 /entrances 应看到 a1 已退役')
-    assert.equal(caller?.online_since, null, '退役设备没有在线时刻')
+    assert.equal(caller?.online_since, null, '退役通道没有在线时刻')
 
     b1.ws.close()
     a1.ws.close()

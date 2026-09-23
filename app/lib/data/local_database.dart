@@ -53,7 +53,7 @@ class LocalMessages extends Table {
 class LocalAttachments extends Table {
   TextColumn get attachmentId => text()();
   TextColumn get messageId => text().references(LocalMessages, #messageId)();
-  /// 所属空间（多空间隔离用：删除空间/撤销设备时按 space 清理，见 v7 迁移回填）。
+  /// 所属空间（多空间隔离用：删除空间/撤销通道时按 space 清理，见 v7 迁移回填）。
   TextColumn get spaceId => text().withDefault(const Constant(''))();
   IntColumn get keyVersion => integer()();
   IntColumn get size => integer()();
@@ -90,7 +90,7 @@ class Drafts extends Table {
 /// 对方消息回执（已送达/已读）单调高水位，按 (space, partner) 一行。
 ///
 /// 语义：我发的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
-/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一台设备已收到/已读"。
+/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一条通道已收到/已读"。
 /// 目前只落库供将来 UI 使用（本轮不显示）。
 class PeerReceipts extends Table {
   TextColumn get spaceId => text()();

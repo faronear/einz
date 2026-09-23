@@ -23,7 +23,7 @@ import 'dart:io';
 /// 手段）：正式打包一律走 package.json 里的 release 脚本，它们都不传该参数。
 ///
 /// **扩展提示**：将来若要支持用户自建服务器，地址要变回持久数据（放 `app_state`，
-/// 不要放锁包），且"换服务器"不只是改地址——`spaceId`/`token`/设备密钥对全是那台
+/// 不要放锁包），且"换服务器"不只是改地址——`spaceId`/`token`/通道密钥对全是那台
 /// 服务器上的身份，换服务器 = 清库 + 重新入网。详见 docs/SERVER_SETTINGS.md。
 const String kEinzServer =
     String.fromEnvironment('kEinzServer', defaultValue: kPrimaryServer);
@@ -42,7 +42,7 @@ const String kPrimaryServer = 'https://einz.tic.cc';
 
 /// 出厂域名候选（按优先级，第一个是主域名）。
 ///
-/// 这是**同一服务的多个入口**，不是多台服务器：身份（spaceId / token / 设备密钥对）
+/// 这是**同一服务的多个入口**，不是多台服务器：身份（spaceId / token / 通道密钥对）
 /// 在任何入口上都一样，切换入口不需要清库、不需要重新入网。用途是域名容灾——
 /// 主域名失效（如需要切到备案域名）时，老 App 自己连上备用入口，无需用户更新，
 /// 也无需在 App 里做任何操作。

@@ -7,7 +7,7 @@ import '../widgets/top_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
 
-/// 破坏性操作的确认弹窗文案（空间级 / 设备级共用同一套结构，只换字）。
+/// 破坏性操作的确认弹窗文案（空间级 / 本机级共用同一套结构，只换字）。
 class ConfirmDialogCopy {
   const ConfirmDialogCopy({
     required this.title,
@@ -20,14 +20,14 @@ class ConfirmDialogCopy {
   final String confirmLabel;
 }
 
-/// 弹出闸门（本机设备名 + 已设时的锁屏码），两道都对返回 true。
+/// 弹出闸门（本机通道名 + 已设时的锁屏码），两道都对返回 true。
 ///
-/// **闸门故意只用本机独占的因子**（老板 2026-09-22 定稿）：设备名确认清的是这台，
+/// **闸门故意只用本机独占的因子**（老板 2026-09-22 定稿）：通道名确认清的是这条，
 /// 锁屏码是本地秘密。刻意**不校验空间口令**——那是**共享**给伴侣的加入凭证，不该获得
-/// 销毁我这台设备的权力；而且校验它必须联网，会让"本机身份属于一台已经连不上的服务器"
+/// 销毁我这条通道的权力；而且校验它必须联网，会让"本机身份属于一台已经连不上的服务器"
 /// 这个最常见的重置场景直接自锁（详情见 `server/src/entrances.ts` 的 retireEntrance）。
 ///
-/// 两个场景共用它：空间级「销毁本秘境通道」与设备级「清除本设备全部数据」。
+/// 两个场景共用它：空间级「销毁本秘境通道」与本机级「清除本设备全部数据」。
 Future<bool> _confirmDestructive(
   BuildContext context, {
   required LocalDatabase db,
@@ -36,7 +36,7 @@ Future<bool> _confirmDestructive(
   required ConfirmDialogCopy copy,
 }) async {
   if (!context.mounted) return false;
-  // 设备名取不到（本地快照与服务端都问不出来）时退一步：改让用户打一个固定确认词。
+  // 通道名取不到（本地快照与服务端都问不出来）时退一步：改让用户打一个固定确认词。
   // 不可用性优先——本地快照缺 entranceName 的旧装机不该因此永远清不掉。
   final l10n = AppLocalizations.of(context)!;
   final expected =
@@ -54,10 +54,10 @@ Future<bool> _confirmDestructive(
   return ok ?? false;
 }
 
-/// 尽力而为地让服务端退役**一个空间**的那台虚拟设备（只影响这一个空间的那一行）。
+/// 尽力而为地让服务端退役**一个空间**的那条虚拟通道（只影响这一个空间的那一行）。
 ///
 /// 失败不阻塞本地移除（本地移除才是用户要的结果），但**要把失败如实告诉用户**：
-/// 退役没成功 = 对方设备列表里这台设备仍是 active 的幽灵。返回是否成功，由调用方提示。
+/// 退役没成功 = 对方通道列表里这条通道仍是 active 的幽灵。返回是否成功，由调用方提示。
 Future<bool> retireSpaceQuietly(String token, {ApiClient? api}) async {
   if (token.isEmpty) return false;
   try {
@@ -102,7 +102,7 @@ Future<bool> confirmLeaveSpace(
   if (!ok || !context.mounted) return false;
 
   // 服务端退役：尽力而为（顺序不能反——token 在本地，清完就再也调不动它了）。
-  // 只影响这一个空间那一行，其他空间的设备行不动。失败如实提示（顶部通知挂在根
+  // 只影响这一个空间那一行，其他空间的通道行不动。失败如实提示（顶部通知挂在根
   // Overlay 上，本页随后 pop 也不影响它显示）。
   final retired = await retireSpaceQuietly(token, api: api);
   // PIN 模式下这里没有 pin（聊天页不持有）→ removeSpace 走"挂 pending + 立即清数据"，
@@ -114,13 +114,13 @@ Future<bool> confirmLeaveSpace(
   return true;
 }
 
-// 「清除本设备全部数据」（设备级）**已删除**（老板 2026-09-22：太危险，不呈现给用户）。
+// 「清除本设备全部数据」（本机级）**已删除**（老板 2026-09-22：太危险，不呈现给用户）。
 // 用户的等价路径：逐个空间「销毁本秘境通道」，或直接卸载重装（ensureFreshInstall
 // 会清掉残留密钥）。`data/local_reset.dart` 的 resetLocalData() 作为"整机清空"原语保留。
 
-/// 破坏性操作共用的确认弹窗：说明小字 + 输入本机设备名（+已设时的锁屏码）。
+/// 破坏性操作共用的确认弹窗：说明小字 + 输入本机通道名（+已设时的锁屏码）。
 ///
-/// 文案由 [copy] 注入（空间级 / 设备级各一套）。
+/// 文案由 [copy] 注入（空间级 / 本机级各一套）。
 class _ConfirmDestructiveDialog extends StatefulWidget {
   const _ConfirmDestructiveDialog({
     required this.db,
@@ -157,7 +157,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
     final name = _nameCtrl.text.trim();
     final pin = _pinCtrl.text;
 
-    // ① 设备名：精确比对（trim 后大小写敏感——设备名是用户自己起的，不像邮箱该宽容）
+    // ① 通道名：精确比对（trim 后大小写敏感——通道名是用户自己起的，不像邮箱该宽容）
     if (name != widget.entranceName) {
       setState(() => _error = l10n.resetEntranceNameMismatch);
       return;

@@ -44,7 +44,7 @@ class MediaCache {
     });
   }
 
-  /// 全量清理（设备撤销清空本地数据时用）。
+  /// 全量清理（通道撤销清空本地数据时用）。
   static Future<void> deleteAll() async {
     await _guard(() async {
       final dir = await _cacheDirectory();

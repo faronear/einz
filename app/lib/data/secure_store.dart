@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// 密钥安全存储封装（iOS Keychain / Android Keystore / 桌面等价物）。
 ///
-/// - 承载不落 SQLite 的敏感材料：Space Key 包、token、设备密钥对等（DATABASE.md §4）
+/// - 承载不落 SQLite 的敏感材料：Space Key 包、token、通道密钥对等（DATABASE.md §4）
 /// - 所有 key 统一 `einz.secure.` 前缀，避免与其他应用数据混淆；
 ///   deleteAll 只清理本前缀，不误伤 Keychain 里其他条目
 /// - 单例持有，进程内复用同一份平台配置
@@ -22,7 +22,7 @@ class SecureStore {
   );
 
   /// 无障碍级别选 `..._this_device`（iOS/macOS）：默认的 `unlocked` 会被
-  /// **加密备份/换机恢复**带到新设备——用户换机还原备份即可读到旧消息。
+  /// **加密备份/换机恢复**带到新通道——用户换机还原备份即可读到旧消息。
   /// `this_device` 变体不随备份迁移（Apple 文档语义）。`synchronizable` 保持
   /// 默认 false（不走 iCloud Keychain 同步）。
   ///

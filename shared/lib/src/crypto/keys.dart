@@ -5,7 +5,7 @@ import 'package:sodium/sodium.dart';
 
 import '../sodium.dart';
 
-/// X25519 设备凭证密钥对（E2EE.md §3）。
+/// X25519 通道凭证密钥对（E2EE.md §3）。
 class EntranceKeyPair {
   EntranceKeyPair({required this.entranceId, required this.publicKey, required this.privateKey});
 
@@ -13,7 +13,7 @@ class EntranceKeyPair {
   final Uint8List publicKey; // 32B
   final Uint8List privateKey; // 32B（仅本机安全存储）
 
-  /// 生成新设备密钥对。
+  /// 生成新通道密钥对。
   static Future<EntranceKeyPair> generate({String? entranceId}) async {
     final s = await sodium();
     final kp = s.crypto.box.keyPair();

@@ -1,11 +1,11 @@
 /**
  * 审计日志测试（2026-09-13 新增）
  *
- * 验证"谁在哪台设备上、什么时候做了什么"确实落到了库里：
+ * 验证"谁在哪条通道上、什么时候做了什么"确实落到了库里：
  *   - WS 上线/下线事件流（含在线时长、关闭码、来源 IP）
- *   - 消息「发送」是设备级（sender_entrance_id 已入库）
- *   - 消息「接收」有证据（sync 拉取进度，设备级）
- *   - 回执「已读」上报有设备级明细（receipts 表本身仍是 partner 级 HWM）
+ *   - 消息「发送」是通道级（sender_entrance_id 已入库）
+ *   - 消息「接收」有证据（sync 拉取进度，通道级）
+ *   - 回执「已读」上报有通道级明细（receipts 表本身仍是 partner 级 HWM）
  *   - push token 变更有记录
  *   - **红线**：审计表不得出现密文 / nonce / 明文
  *
@@ -76,7 +76,7 @@ async function main (): Promise<void> {
   try {
     await waitReady(port)
 
-    // 1) 建空间 → 拿到设备与会话
+    // 1) 建空间 → 拿到通道与会话
     const create = await fetch(`http://127.0.0.1:${port}/spaces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -112,7 +112,7 @@ async function main (): Promise<void> {
     })
     await sleep(400)
 
-    // 3) 发一条消息（设备级发送证据）
+    // 3) 发一条消息（通道级发送证据）
     const messageId = '01a0ffff-cccc-7ddd-9eee-0123456789ab'
     const post = await fetch(`http://127.0.0.1:${port}/messages`, {
       method: 'POST',
@@ -129,11 +129,11 @@ async function main (): Promise<void> {
     })
     assert.equal(post.status, 200, 'post message should succeed')
 
-    // 4) 同步（设备级接收证据）
+    // 4) 同步（通道级接收证据）
     const sync = await fetch(`http://127.0.0.1:${port}/sync?after=0`, { headers: auth })
     assert.equal(sync.status, 200, 'sync should succeed')
 
-    // 5) 回执上报（设备级已读明细）
+    // 5) 回执上报（通道级已读明细）
     const receipt = await fetch(`http://127.0.0.1:${port}/receipts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth },
@@ -152,7 +152,7 @@ async function main (): Promise<void> {
     // ---------- 断言 ----------
     const db = new Database(join(tempDir, 'einz.sqlite.db'), { readonly: true })
 
-    // A) 上下线事件流：一 connect 一 disconnect，都带设备、空间、IP
+    // A) 上下线事件流：一 connect 一 disconnect，都带通道、空间、IP
     const conns = db
       .prepare(
         `SELECT entrance_id, space_id, event, duration_ms, close_code, ip
@@ -175,7 +175,7 @@ async function main (): Promise<void> {
     assert.ok((conns[1]!.duration_ms ?? 0) > 0, '下线事件须记本次在线时长')
     assert.equal(conns[1]!.close_code, 1000, '下线事件须记 WS 关闭码')
 
-    // B) 发送 / 接收 / 已读 / push：四种活动都按设备记了
+    // B) 发送 / 接收 / 已读 / push：四种活动都按通道记了
     const kinds = (
       db
         .prepare(`SELECT DISTINCT kind FROM entrance_activity ORDER BY kind`)
@@ -188,7 +188,7 @@ async function main (): Promise<void> {
     const postRow = db
       .prepare(`SELECT entrance_id, space_id, detail FROM entrance_activity WHERE kind = 'message.post'`)
       .get() as { entrance_id: string; space_id: string; detail: string }
-    assert.equal(postRow.entrance_id, created.entranceId, '发送明细须记发送设备')
+    assert.equal(postRow.entrance_id, created.entranceId, '发送明细须记发送通道')
     assert.equal(postRow.space_id, created.spaceId, '发送明细须记 space')
     assert.ok(postRow.detail.includes(messageId), '发送明细须含 message_id')
 
@@ -197,13 +197,13 @@ async function main (): Promise<void> {
       .get() as { detail: string }
     assert.ok(
       JSON.parse(syncRow.detail).last_sequence >= 1,
-      'sync 明细须记录该设备拉取到的进度（接收证据）'
+      'sync 明细须记录该通道拉取到的进度（接收证据）'
     )
 
     const receiptRow = db
       .prepare(`SELECT entrance_id, detail FROM entrance_activity WHERE kind = 'receipt'`)
       .get() as { entrance_id: string; detail: string }
-    assert.equal(receiptRow.entrance_id, created.entranceId, '回执明细须记上报设备')
+    assert.equal(receiptRow.entrance_id, created.entranceId, '回执明细须记上报通道')
     assert.equal(JSON.parse(receiptRow.detail).reported_read, 1, '回执明细须记原始上报值')
 
     // C) 红线：审计表不得出现密文 / nonce
@@ -221,7 +221,7 @@ async function main (): Promise<void> {
     assert.ok(pushRow.detail.includes('apns-tok'), 'push 明细应落 token 前缀便于比对')
 
     db.close()
-    console.log('✅ 审计日志测试通过：上下线事件流 / 发送·接收·已读设备级明细 / push 变更 / 密文隔离')
+    console.log('✅ 审计日志测试通过：上下线事件流 / 发送·接收·已读通道级明细 / push 变更 / 密文隔离')
   } finally {
     await new Promise<void>(done => {
       if (!serverProc || serverProc.exitCode !== null) {

@@ -7,32 +7,32 @@ import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 interface Conn {
   ws: WebSocket;
   entranceId: string;
-  partnerId: string | null; // 设备归属身份（同一人的多设备共享 partner_id）
+  partnerId: string | null; // 通道归属身份（同一人的多通道共享 partner_id）
   spaceId: string; // 连接绑定的 Space（会话必带 space）
   alive: boolean;
   connectedAt: number; // 本次 WS 连接建立时刻（ms）——/entrances 显示"上线时间"
   onlineSince: number; // 进入在线态的时刻（ms）——与 connectedAt 的区别：重连
   // （被新连接踢掉后又连上）不刷新它，只有"从无连接变成有连接"才置 now。
-  // 用途：客户端按"上线顺序"排列对端的多台在线设备（最新上线在最前），
-  // 重连不应让设备跳到队首（老板 2026-09-16）。
+  // 用途：客户端按"上线顺序"排列对端的多条在线通道（最新上线在最前），
+  // 重连不应让通道跳到队首（老板 2026-09-16）。
   meta: RequestMeta; // 来源 IP / UA（建连时的 req），审计落库用
   timedOut: boolean; // 已被心跳判定为超时（close 时据此记 heartbeat_timeout）
 }
 
-const conns = new Map<string, Conn>(); // entrance_id → 连接（一人一机 V1：每设备至多 1 条连接）
+const conns = new Map<string, Conn>(); // entrance_id → 连接（一人一机 V1：每通道至多 1 条连接）
 
-/** 设备当前 WS 连接的建立时刻（ms；离线设备返回 null）。 */
+/** 通道当前 WS 连接的建立时刻（ms；离线通道返回 null）。 */
 export function getConnectedAt(entranceId: string): number | null {
   return conns.get(entranceId)?.connectedAt ?? null;
 }
 
-/** 设备进入在线态的时刻（ms；离线返回 null）——重连不刷新，见 Conn.onlineSince。 */
+/** 通道进入在线态的时刻（ms；离线返回 null）——重连不刷新，见 Conn.onlineSince。 */
 export function getOnlineSince(entranceId: string): number | null {
   return conns.get(entranceId)?.onlineSince ?? null;
 }
 
-/** 发起方设备所属 Space：优先其在线连接；**不在线时回退查 sessions**
- *  （同一设备可能有多条历史会话——取最新的非空 space_id）。
+/** 发起方通道所属 Space：优先其在线连接；**不在线时回退查 sessions**
+ *  （同一通道可能有多条历史会话——取最新的非空 space_id）。
  *  背景：广播此前只认发起方的在线连接（sameSpace），发起方 WS 不在（移动端切
  *  后台/断线）就一条都不发 → 对端改名/换头像后 TUI 一直显示旧名
  *  （老板 2026-09-11 实测）。 */
@@ -47,11 +47,11 @@ function spaceOfEntrance(entranceId: string): string | null {
   return row?.space_id ?? null;
 }
 
-/** 广播只发给**另一个人**的在线设备：同一 partner 的多台设备（同一人的手机+电脑）
- *  不算"对方"——此前只排除发起设备本身，自己的第二台设备一上线，第一台就把
+/** 广播只发给**另一个人**的在线通道：同一 partner 的多条通道（同一人的手机+电脑）
+ *  不算"对方"——此前只排除发起通道本身，自己的第二条通道一上线，第一条就把
  *  对方灯点亮（老板 2026-09-16 实测：B 从未加入却显示在线）。
  *  payload 带 partner_id：客户端（可能连着旧版服务端）据此二次过滤。
- *  peer.online 另带 online_since：接收方据此把该设备插到"在线设备列表"的正确
+ *  peer.online 另带 online_since：接收方据此把该通道插到"在线通道列表"的正确
  *  位置（按上线顺序，最新上线在最前），省掉一次 /entrances 往返（老板 2026-09-16）。 */
 function broadcastPeerStatus(exceptEntranceId: string, type: "peer.online" | "peer.offline"): void {
   const origin = conns.get(exceptEntranceId);
@@ -72,7 +72,7 @@ function broadcastPeerStatus(exceptEntranceId: string, type: "peer.online" | "pe
   }
 }
 
-/** 空间口令已被重设：通知其余在线设备（客户端收到后只发通知不弹窗）。 */
+/** 空间口令已被重设：通知其余在线通道（客户端收到后只发通知不弹窗）。 */
 export function broadcastPassphraseRotated(exceptEntranceId: string): void {
   const spaceId = spaceOfEntrance(exceptEntranceId);
   if (spaceId == null) return;
@@ -87,8 +87,8 @@ export function broadcastPassphraseRotated(exceptEntranceId: string): void {
   }
 }
 
-/** 消息回执（已送达/已读）更新：通知同 Space 的其他设备。
- *  用 spaceOfEntrance（带 sessions 兜底）——上报设备可能没有活跃 WS 连接
+/** 消息回执（已送达/已读）更新：通知同 Space 的其他通道。
+ *  用 spaceOfEntrance（带 sessions 兜底）——上报通道可能没有活跃 WS 连接
  *  （移动端切后台后仍在同步）。 */
 export function broadcastReceiptUpdated(
   exceptEntranceId: string,
@@ -105,7 +105,7 @@ export function broadcastReceiptUpdated(
   }
 }
 
-/** 改名/改设备名：通知其余在线设备立即更新对方名称（App/TUI 顶部条）。 */
+/** 改名/改通道名：通知其余在线通道立即更新对方名称（App/TUI 顶部条）。 */
 export function broadcastProfileUpdated(
   exceptEntranceId: string,
   payload: { partner_id?: string; entrance_id: string; partner_name?: string; entrance_name?: string }
@@ -140,11 +140,11 @@ export function attachWs(wss: WebSocketServer): void {
     let spaceId: string;
     let partnerId: string | null;
     try {
-      // requireSession 同时完成：会话有效 + 设备在册 + 会话带 space（v1 收敛后必备）
+      // requireSession 同时完成：会话有效 + 通道在册 + 会话带 space（v1 收敛后必备）
       const sess = requireSession(token);
       entranceId = sess.entrance_id;
       spaceId = sess.space_id;
-      // 设备归属身份：peer 广播据此跳过同一人的其它设备（同人≠对方）
+      // 通道归属身份：peer 广播据此跳过同一人的其它通道（同人≠对方）
       partnerId = sess.partner_id === "" ? null : sess.partner_id;
     } catch {
       ws.close(4401, "UNAUTHORIZED");
@@ -163,7 +163,7 @@ export function attachWs(wss: WebSocketServer): void {
       spaceId,
       alive: true,
       connectedAt: now,
-      // 重连（旧连接尚在，被本次踢掉）沿用旧上线时刻：设备没有真正"下线又上线"
+      // 重连（旧连接尚在，被本次踢掉）沿用旧上线时刻：通道没有真正"下线又上线"
       onlineSince: old?.onlineSince ?? now,
       meta,
       timedOut: false,
@@ -260,12 +260,12 @@ export function broadcastNewMessage(exceptEntranceId: string, message: MessageEn
   }
 }
 
-/** 设备自助退役（`POST /entrances/retire`，entrances.retireEntrance）：让它立刻从在线表消失。
+/** 通道自助退役（`POST /entrances/retire`，entrances.retireEntrance）：让它立刻从在线表消失。
  *
  * **这里刻意不发 `entrance.revoked`，也不主动 close**：
  * - `entrance.revoked`（+ 4403）是客户端**自毁本地数据**的授权信号（docs/E2EE.md §9.3）。
  *   退役接口只认 session token（"注销我自己"），若由它发出这帧，偷到 session 的人就能
- *   远程擦掉这台设备——把撤销刻意筑起的口令闸门（docs/PROTOCOL.md §7.2）从旁路绕过。
+ *   远程擦掉这条通道——把撤销刻意筑起的口令闸门（docs/PROTOCOL.md §7.2）从旁路绕过。
  * - 任何主动关闭（含 1000）都会让客户端立刻重连，撞上 403 `ENTRANCE_REVOKED`
  *   → 同样触发自毁。所以只静默摘出 `conns`，socket 交给客户端自己退出时收尾。
  *
@@ -278,8 +278,8 @@ export function forgetEntranceConnection(entranceId: string): void {
   conns.delete(entranceId);
 }
 
-/** 通知设备被撤销（PROTOCOL.md §8.2 entrance.revoked）。
- *  发帧后主动关闭连接并移出 conns——否则被撤销设备仍能持续接收新消息广播（P2 修复）。 */
+/** 通知通道被撤销（PROTOCOL.md §8.2 entrance.revoked）。
+ *  发帧后主动关闭连接并移出 conns——否则被撤销通道仍能持续接收新消息广播（P2 修复）。 */
 export function notifyRevoked(entranceId: string): void {
   const conn = conns.get(entranceId);
   if (!conn) return;

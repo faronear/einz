@@ -80,7 +80,7 @@ class _FakeApi extends ApiClient {
 
   @override
   Future<void> updateEntranceName(String entranceName, String token) async {
-    // 改设备名成功（无网络，供保存路径测试）
+    // 改通道名成功（无网络，供保存路径测试）
   }
 }
 
@@ -771,7 +771,7 @@ void main() {
 
     // 弹窗标题与备注（老板 2026-09-23 新文案）
     expect(find.text('当前通道'), findsWidgets, reason: '弹窗标题应为「当前通道」');
-    expect(find.text('通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。'), findsOneWidget,
+    expect(find.text('通道是本机连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。'), findsOneWidget,
         reason: '应显示通道备注说明');
     expect(find.text('通道公钥'), findsOneWidget, reason: '公钥标签');
     expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
@@ -779,7 +779,7 @@ void main() {
     expect(find.text('通道名称'), findsWidgets, reason: '输入框标签');
 
     // 空名点保存 → 红字警示并停留（不静默）；对话框含两个输入框：只读公钥在前、
-    // 可编辑设备名在后 → 取 .last
+    // 可编辑通道名在后 → 取 .last
     final dialogField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first; // 通道名称已排到公钥之前：可编辑名称框在前、只读公钥在后
@@ -789,27 +789,27 @@ void main() {
     expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.text('请填写通道名称'), findsOneWidget, reason: '空设备名保存应红字警示');
+    expect(find.text('请填写通道名称'), findsOneWidget, reason: '空通道名保存应红字警示');
 
     // 全空格同样警示
     await tester.enterText(dialogField, '   ');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.text('请填写通道名称'), findsOneWidget, reason: '全空格设备名保存应红字警示');
+    expect(find.text('请填写通道名称'), findsOneWidget, reason: '全空格通道名保存应红字警示');
 
-    // 不合规字符（空格、标点）→ 红字警示并停留（老板 2026-09-16：设备名只允许
+    // 不合规字符（空格、标点）→ 红字警示并停留（老板 2026-09-16：通道名只允许
     // 中文字/英文字母/数字/`_`/`-`）
     await tester.enterText(dialogField, 'My Phone!');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('只能用中文字、英文字母、数字、下划线(_)、中划线(-)'), findsOneWidget,
-        reason: '含空格/感叹号的设备名保存应红字警示');
+        reason: '含空格/感叹号的通道名保存应红字警示');
 
     // 超长（>32）→ 红字警示
     await tester.enterText(dialogField, 'a' * 33);
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.text('最多 32 个字符'), findsOneWidget, reason: '超长设备名应红字警示');
+    expect(find.text('最多 32 个字符'), findsOneWidget, reason: '超长通道名应红字警示');
 
     // 开始填写即消红字
     await tester.enterText(dialogField, '我的手机');
@@ -891,7 +891,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('最多 32 个字符'), findsOneWidget, reason: '超长名字应红字警示');
 
-    // 填写即消红字 → 保存成功关窗（名字用带 emoji 的——与设备名规则的差别：
+    // 填写即消红字 → 保存成功关窗（名字用带 emoji 的——与通道名规则的差别：
     // 表情符在人名里是允许的）
     await tester.enterText(dialogField, '阿猪\u{1F437}_01');
     await tester.pumpAndSettle();
@@ -1291,7 +1291,7 @@ void main() {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
-    // 预置 profile（含设备名——闸门第一道要它，否则退化为固定确认词）
+    // 预置 profile（含通道名——闸门第一道要它，否则退化为固定确认词）
     await AppLockService(db).saveProfile(
         spaceId: 'space-demo', partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
 
@@ -1317,11 +1317,11 @@ void main() {
     await tester.tap(find.text('高级功能'));
     await tester.pumpAndSettle();
     expect(find.text('销毁本通道'), findsOneWidget, reason: '空间级文案');
-    expect(find.text('重置设备'), findsNothing, reason: '整机重置不该出现在单个空间里');
+    expect(find.text('重置本机'), findsNothing, reason: '整机重置不该出现在单个空间里');
 
     await tester.tap(find.text('销毁本通道'));
     await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
-    expect(find.text('销毁本通道？'), findsOneWidget, reason: '闸门弹窗（设备名 + 锁屏码）');
+    expect(find.text('销毁本通道？'), findsOneWidget, reason: '闸门弹窗（通道名 + 锁屏码）');
     expect(find.text('请输入当前通道名称“iPhone”'), findsOneWidget, reason: '闸门框上备注：照抄通道名');
     expect(find.text('iPhone'), findsWidgets, reason: '框内 hint 显示通道名');
   });

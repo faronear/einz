@@ -52,7 +52,7 @@ export function newJoinToken(
   return { token, hash, expiresAt };
 }
 
-/** 创建 Space（首设备自举）：创建者为第一位成员（slot 0），返回首个
+/** 创建 Space（首通道自举）：创建者为第一位成员（slot 0），返回首个
  *  join token 供分享。U2 密钥分发：可一并提交"口令加密的 Space Key 密封包"
  *  （escrow，按空间隔离）——后续加入方凭同一口令从 key-escrow 取回 Space Key
  *  （PROTOCOL_MULTIVERSE.md §5 ④）。sealedSpaceKey 与 escrowPassphrase 需成对。 */
@@ -76,7 +76,7 @@ export async function createSpace(
   escrowPassphrase?: string,
   publicKey?: string,
   entranceName?: string,
-  installUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
+  installUid?: string, // 安装级标识（多空间：同一物理设备各空间一行同名）
   baseUrl?: string, // 邀请链接 base（按请求真实 Host 生成，2026-09-11）
 ): Promise<{
   spaceId: string;
@@ -134,7 +134,7 @@ export async function createSpace(
     .run(spaceId, creatorPartnerId, creatorName ?? null, normGender(creatorGender) ?? null, now);
   // 伴侣（第二人）预置：名字/性别必填（老板 2026-09-10 定稿——create 时录入两人
   // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，partner_id 由
-  // 首个加入该 slot 的设备生成。
+  // 首个加入该 slot 的通道生成。
   getDb()
     .prepare(
       `INSERT INTO space_members (space_id, partner_id, slot, display_name, gender, status, joined_at)
@@ -162,7 +162,7 @@ export async function createSpace(
       )
       .run(spaceId, JSON.stringify(pkg), passphraseHash, now);
   }
-  // U3：创建者设备登记（提供 publicKey 时）+ 签发绑定该 Space 的 session——
+  // U3：创建者通道登记（提供 publicKey 时）+ 签发绑定该 Space 的 session——
   // 创建者可立即进聊天，无需二次流程
   let entranceId = "";
   let sessionToken = "";
@@ -238,7 +238,7 @@ export function preflightJoin(
     throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
   }
   // 成员（两身份 slot）公开信息：join 时客户端据此展示「选择是哪一个用户」——
-  // 加入者可能是第二人，也可能是第一人的其他设备（老板 2026-09-10 定稿）
+  // 加入者可能是第二人，也可能是第一人的其他通道（老板 2026-09-10 定稿）
   const members = getDb()
     .prepare(
       `SELECT slot, display_name, gender, status FROM space_members
@@ -257,22 +257,22 @@ export function preflightJoin(
     status: m.status,
   }));
   const memberCount = slots.filter((s) => s.status === "active").length;
-  // 多设备语义（同一身份可多台设备）：不再有「满」——身份由加入者选择
+  // 多通道语义（同一身份可多条通道）：不再有「满」——身份由加入者选择
   return { spaceId: tk.space_id, status: sp.status, memberCount, slots };
 }
 
 /** 加入 Space：事务内消费 token（未用/未过期/未满员）并插入第二位成员；
- *  满员后空间转 active。U3：加入设备登记（entrances，服务端分配 UUID）并签发
+ *  满员后空间转 active。U3：加入通道登记（entrances，服务端分配 UUID）并签发
  *  绑定该 Space 的 session——加入后可立即进聊天（PROTOCOL_MULTIVERSE.md §4.1）。 */
 export function joinSpace(
   token: string,
   publicKey: string,
   entranceName?: string,
   slot?: number,
-  installUid?: string, // 安装级设备标识（多空间：同一物理设备各空间一行同名）
+  installUid?: string, // 安装级标识（多空间：同一物理设备各空间一行同名）
 ): { spaceId: string; partnerId: string; slot: number; sessionToken: string; spaceAddress: string } {
   if (publicKey.length === 0) {
-    throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入设备公钥）", 400);
+    throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入通道公钥）", 400);
   }
   const hash = createHash("sha256").update(token).digest("hex");
   const tk = getDb()
@@ -290,7 +290,7 @@ export function joinSpace(
       throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
     }
     // 身份 slot：加入者选择（0=第一人/创建者，1=第二人/伴侣）；缺省第二人。
-    // 同一身份可有多台设备（创建者换设备加入选 0）——不再有「满」。
+    // 同一身份可有多条通道（创建者换通道加入选 0）——不再有「满」。
     const chosenSlot = slot === 0 || slot === 1 ? slot : 1;
     let member = getDb()
       .prepare(`SELECT partner_id, status FROM space_members WHERE space_id = ? AND slot = ?`)
@@ -324,7 +324,7 @@ export function joinSpace(
     }
     // 通道数量上限（serverConfig.json 的 maxEntrancesPerSpace：0=不限）——
     // **必须在事务内**计：preflight 不消费 token，并发两个 join 会同时通过预检
-    // 然后双双插设备 → 超额。计数按"该空间登记过的通道总数"，**含已撤销**：
+    // 然后双双插通道 → 超额。计数按"该空间登记过的通道总数"，**含已撤销**：
     // 销毁/撤销是软标记（entrances.status='revoked'，行不删），若只数 active，
     // "开通→销毁→再开通"就能无限刷额度，防滥用等于没做（老板 2026-09-23 定）。
     const cfg = loadConfig();
@@ -346,11 +346,11 @@ export function joinSpace(
         );
       }
     }
-    // 一次性：先标记 token 已用，再插设备（同事务，防并发双加入）
+    // 一次性：先标记 token 已用，再插通道（同事务，防并发双加入）
     getDb()
       .prepare(`UPDATE join_tokens SET used_at = ? WHERE token_hash = ?`)
       .run(Date.now(), hash);
-    // 加入设备登记（同一身份多设备共享 partner_id）+ 签发绑定该 Space 的 session
+    // 加入通道登记（同一身份多通道共享 partner_id）+ 签发绑定该 Space 的 session
     const entranceId = randomUUID();
     getDb()
       .prepare(

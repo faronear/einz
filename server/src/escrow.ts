@@ -79,7 +79,7 @@ export function uploadKeyEscrow (
       .prepare(`SELECT 1 FROM key_escrow WHERE space_id = ?`)
       .get(spaceId) !== undefined
   if (rotated) {
-    // 真正重设：推进 updated_at（离线补查凭它识别）+ 通知其余在线设备
+    // 真正重设：推进 updated_at（离线补查凭它识别）+ 通知其余在线通道
     getDb()
       .prepare(
         `INSERT INTO key_escrow (space_id, package, passphrase_hash, updated_at)
@@ -141,7 +141,7 @@ export function deleteKeyEscrow (
 
 
 /**
- * 取包口令尝试限速（2026-09-14）：口令是**免设备认证**端点的唯一凭证，无限次尝试
+ * 取包口令尝试限速（2026-09-14）：口令是**免通道认证**端点的唯一凭证，无限次尝试
  * 等于允许在线爆破（每次尝试都要跑一遍 argon2id，代价高但可无限重复）。
  * 按 space_id 计失败次数：窗口内超过上限 → 429，直到窗口滑过；成功一次即重置。
  *
@@ -188,12 +188,12 @@ function clearEscrowFailures (spaceId: string): void {
 }
 
 /**
- * 校验某空间的**密保口令**（argon2id + 同一套失败限速），供"撤销设备"这类敏感操作复用。
+ * 校验某空间的**密保口令**（argon2id + 同一套失败限速），供"撤销通道"这类敏感操作复用。
  *
  * 为什么复用同一套（而不是各写一份）：
- * - 口令是"销毁本空间某台设备本地数据"的授权凭证，校验强度必须与取钥同级；
+ * - 口令是"销毁本空间某条通道本地数据"的授权凭证，校验强度必须与取钥同级；
  * - 限速窗口按 space 共享（`escrowFailures`）：错误口令的尝试不分来源地计入同一预算，
- *   在空间内被入侵的设备无法靠换端点绕过限速去爆破口令。
+ *   在空间内被入侵的通道无法靠换端点绕过限速去爆破口令。
  *
  * 失败码与取包分支保持一致，便于客户端统一提示：
  * - 无口令可校验（从未设置 / 被 `DELETE /key-escrow` 清除）→ 409 `PASSPHRASE_NOT_SET`
@@ -206,16 +206,16 @@ export async function assertSpacePassphrase (
   passphrase: unknown
 ): Promise<void> {
   if (typeof passphrase !== 'string' || passphrase.length === 0) {
-    throw new ApiError('INVALID_REQUEST', 'passphrase 必填（撤销设备需校验密保口令）', 400)
+    throw new ApiError('INVALID_REQUEST', 'passphrase 必填（撤销通道需校验密保口令）', 400)
   }
-  assertEscrowNotRateLimited(spaceId) // 限速：防空间内被入侵设备在线爆破口令
+  assertEscrowNotRateLimited(spaceId) // 限速：防空间内被入侵通道在线爆破口令
   const row = getDb()
     .prepare(`SELECT passphrase_hash FROM key_escrow WHERE space_id = ?`)
     .get(spaceId) as { passphrase_hash: string | null } | undefined
   if (!row || !row.passphrase_hash) {
     throw new ApiError(
       'PASSPHRASE_NOT_SET',
-      '该空间未托管密保口令，无法校验；请先在任一在册设备上设置密保口令',
+      '该空间未托管密保口令，无法校验；请先在任一在册通道上设置密保口令',
       409
     )
   }
@@ -233,7 +233,7 @@ export async function assertSpacePassphrase (
  *   ——**必须持该空间成员会话**（2026-09-15 评审 C1：此前任何人拿到 spaceId 就能
  *   覆盖别人的口令托管包与 passphrase_hash，把真实用户顶掉）；
  * - 取包：{ passphrase } → argon2id 校验口令，正确才返回密封包（加入方取钥，
- *   不撤销任何设备、不消耗任何凭证）。
+ *   不撤销任何通道、不消耗任何凭证）。
  *
  * 取包分支**刻意保持免认证**：调用方是还没入空间的加入方（它只持口令，尚无
  * session），免认证是这套"口令即凭证"设计的前提；防爆破靠下面的限速。

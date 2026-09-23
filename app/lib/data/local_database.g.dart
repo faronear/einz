@@ -1157,7 +1157,7 @@ class LocalAttachment extends DataClass implements Insertable<LocalAttachment> {
   final String attachmentId;
   final String messageId;
 
-  /// 所属空间（多空间隔离用：删除空间/撤销设备时按 space 清理，见 v7 迁移回填）。
+  /// 所属空间（多空间隔离用：删除空间/撤销通道时按 space 清理，见 v7 迁移回填）。
   final String spaceId;
   final int keyVersion;
   final int size;

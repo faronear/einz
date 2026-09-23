@@ -15,13 +15,13 @@ import { getEntrance, getEntranceStatus } from "./config.js";
  * 约定：
  * - 本文件只做认证/授权判定，**不刷新 last_seen**（轮询端点不应让自己"永远新鲜"，
  *   见 entrances.ts listEntrances 注释），需要时调用方自己 touchLastSeen；
- * - space 级端点一律用 requireSpaceMember：必须显式回答"这个设备凭什么能操作这个空间"；
+ * - space 级端点一律用 requireSpaceMember：必须显式回答"这个通道凭什么能操作这个空间"；
  * - **会话必须带 space**（2026-09-15 v1 收敛后）：Multiverse 下所有数据都按 space 隔离，
  *   没有 space 的会话什么也访问不了——所以这里直接拒绝，而不是让每个调用点各自
  *   `?? ""` 回落（v1 时代那 8 处回落既是复杂度也是漏洞温床）。
  */
 
-/** 会话 + 设备身份（partner_id 用于空间成员判定）。space_id 保证非空。 */
+/** 会话 + 通道身份（partner_id 用于空间成员判定）。space_id 保证非空。 */
 export interface EntranceSession {
   entrance_id: string;
   space_id: string;
@@ -44,9 +44,9 @@ export function optionalBearerToken(req: IncomingMessage): string | null {
 }
 
 /**
- * 认证 + 设备状态校验 + **会话必须绑定 space**。
- * token 为 null（未带凭证）→ 401；设备**被明确撤销** → 403 `ENTRANCE_REVOKED`
- * （客户端据此自毁本地数据）；设备不在册（库被清/未登记）→ 403 `FORBIDDEN`
+ * 认证 + 通道状态校验 + **会话必须绑定 space**。
+ * token 为 null（未带凭证）→ 401；通道**被明确撤销** → 403 `ENTRANCE_REVOKED`
+ * （客户端据此自毁本地数据）；通道不在册（库被清/未登记）→ 403 `FORBIDDEN`
  * （客户端只应警告，绝不销毁数据）；
  * 会话没有 space（v1 遗留会话）→ 401（重新认证即可拿到绑定 space 的会话）。
  */
@@ -80,9 +80,9 @@ export function isSpaceMember(spaceId: string, partnerId: string): boolean {
 }
 
 /**
- * 认证 + **该设备身份属于目标 space**（space 级端点的统一入口）。
+ * 认证 + **该通道身份属于目标 space**（space 级端点的统一入口）。
  * 判定依据是 entrances.partner_id → space_members(space_id)，而不是会话里的
- * space_id：同一身份多台设备、或将来一个设备持多空间会话都不受影响。
+ * space_id：同一身份多条通道、或将来一个通道持多空间会话都不受影响。
  */
 export function requireSpaceMember(token: string | null, spaceId: string): EntranceSession {
   const sess = requireSession(token);
@@ -93,14 +93,14 @@ export function requireSpaceMember(token: string | null, spaceId: string): Entra
 }
 
 /**
- * "这个会话能看见哪些设备"的 WHERE 子句（C2 隔离修复的唯一实现处）。
+ * "这个会话能看见哪些通道"的 WHERE 子句（C2 隔离修复的唯一实现处）。
  *
- * entrances 表在 v1 就是一张**全局表**（没有 space_id 列），因此所有列设备的接口
- * 都必须自己过滤，此前 /space 与 /entrances 都漏了——A 空间设备能看到 B 空间设备
+ * entrances 表在 v1 就是一张**全局表**（没有 space_id 列），因此所有列通道的接口
+ * 都必须自己过滤，此前 /space 与 /entrances 都漏了——A 空间通道能看到 B 空间通道
  * 的 partner、在线状态与公钥（2026-09-15 评审 C2）。
  *
  * v1 收敛后 spaceId 恒非空（requireSession 保证），因此**不再有 legacy 分支**：
- * 只返回该空间在册成员名下的设备。调用方须给 entrances 表起别名 `d`。
+ * 只返回该空间在册成员名下的通道。调用方须给 entrances 表起别名 `d`。
  */
 export function entranceScopeClause(spaceId: string): { sql: string; params: string[] } {
   return {

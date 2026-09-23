@@ -19,8 +19,8 @@ export interface ServerConfig {
   /** 空间数量上限（serverConfig.json 的 maxSpaces：0=不限；1=单空间即退回 v1 模式；n=最多 n 个）。 */
   max_spaces: number;
   /** 单空间的通道（登记项）数量上限（serverConfig.json 的 maxEntrancesPerSpace：
-   *  0=不限；n=该空间最多 n 条通道）。**防滥用**（老板 2026-09-23）：不限设备数是
-   *  产品的本意（同身份多设备），但一个空间被灌进成百上千条通道会白吃存储与推送
+   *  0=不限；n=该空间最多 n 条通道）。**防滥用**（老板 2026-09-23）：不限通道数是
+   *  产品的本意（同身份多通道），但一个空间被灌进成百上千条通道会白吃存储与推送
    *  资源——用它做总闸。计数含已撤销（revoked）的通道：**销毁不退还额度**，否则
    *  "反复开通/销毁"可无限刷（老板 2026-09-23 定）。 */
   max_entrances_per_space: number;
@@ -70,13 +70,13 @@ export function loadConfig(): ServerConfig {
   };
 }
 
-/** 设备在库里的三种状态。**revoked 与 missing 是不同产品语义，禁止再合并成一个布尔**：
- * 前者是"这台设备被明确撤销"（可能涉嫌被盗用 → 客户端自毁本地数据），后者是
- * "此设备不在册"（库被清/从未登记 → 客户端只应离线警告，绝不销毁数据）。 */
+/** 通道在库里的三种状态。**revoked 与 missing 是不同产品语义，禁止再合并成一个布尔**：
+ * 前者是"这条通道被明确撤销"（可能涉嫌被盗用 → 客户端自毁本地数据），后者是
+ * "此通道不在册"（库被清/从未登记 → 客户端只应离线警告，绝不销毁数据）。 */
 export type EntranceStatus = "active" | "revoked" | "missing";
 
 /**
- * 设备状态（判定源 = 数据库 entrances 表）。撤销（status='revoked'）实时生效（E2EE.md §9.3）。
+ * 通道状态（判定源 = 数据库 entrances 表）。撤销（status='revoked'）实时生效（E2EE.md §9.3）。
  *
  * 注：v1 时代白名单来自 config.json 的静态数组，Multiverse 改成动态登记后
  * 配置参数已无用——2026-09-15 收敛时去掉（评审架构项 #2）。
@@ -89,7 +89,7 @@ export function getEntranceStatus(entranceId: string): EntranceStatus {
   return row.status === "revoked" ? "revoked" : "active";
 }
 
-/** 取设备信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 entrances 表。 */
+/** 取通道信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 entrances 表。 */
 export function getEntrance(entranceId: string): EntranceConfig | undefined {
   const row = getDb()
     .prepare(`SELECT entrance_id, partner_id, public_key, status FROM entrances WHERE entrance_id = ?`)

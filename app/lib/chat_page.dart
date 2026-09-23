@@ -79,11 +79,11 @@ class ChatPage extends StatefulWidget {
     this.reauth,
     this.escrowUpdatedAt,
     this.partnerName, // 我的名字（登记时设置；菜单显示/修改）
-    this.entranceName, // 我的设备名（登记时自动获取；菜单显示/修改）
+    this.entranceName, // 我的通道名（登记时自动获取；菜单显示/修改）
     this.partnerId, // 我的 partnerId（头像上传/获取用）
     this.peerName, // 对方名字（setup 探测传入；对话顶部条显示）
-    this.publicKeyB64, // 设备公钥（b64，随锁包持久化；弹窗展示用）
-    this.privateKeyB64, // 设备私钥（b64，随锁包持久化；补设锁写入新锁包）
+    this.publicKeyB64, // 通道公钥（b64，随锁包持久化；弹窗展示用）
+    this.privateKeyB64, // 通道私钥（b64，随锁包持久化；补设锁写入新锁包）
   });
 
   final String spaceId;
@@ -99,7 +99,7 @@ class ChatPage extends StatefulWidget {
   /// 我的名字（向导登记时设置；顶栏菜单显示/修改，服务端同步）。
   final String? partnerName;
 
-  /// 我的设备名（向导登记时自动获取设备型号；顶栏菜单显示/修改，服务端同步）。
+  /// 我的通道名（向导登记时自动获取设备型号；顶栏菜单显示/修改，服务端同步）。
   final String? entranceName;
 
   /// 我的 partnerId（向导登记时确定；头像上传/消息身份标识用）。
@@ -108,10 +108,10 @@ class ChatPage extends StatefulWidget {
   /// 对方名字（向导探测时确定；对话顶部条显示，无则占位）。
   final String? peerName;
 
-  /// 设备 X25519 公钥（b64，随锁包持久化）：「我的设备」弹窗展示用。
+  /// 通道 X25519 公钥（b64，随锁包持久化）：「我的通道」弹窗展示用。
   final String? publicKeyB64;
 
-  /// 设备 X25519 私钥（b64，随锁包持久化）：补设锁/改口令时写入新锁包。
+  /// 通道 X25519 私钥（b64，随锁包持久化）：补设锁/改口令时写入新锁包。
   final String? privateKeyB64;
 
   /// 测试注入用；默认新建（生产路径）。
@@ -184,9 +184,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 若仍每 3s 发一轮会并发堆积 → 必须重入保护 + 退避。
   int _consecutiveSyncFailures = 0;
 
-  /// 服务器不认这台设备（认证 403 `FORBIDDEN`：后台库被重置 / 本设备未登记）。
+  /// 服务器不认这条通道（认证 403 `FORBIDDEN`：后台库被重置 / 本通道未登记）。
   /// **只警告，绝不销毁本地数据**（老板 2026-09-16：运维失误不该导致客户端抹数据）——
-  /// 与"设备被明确撤销"（403 `ENTRANCE_REVOKED` / `entrance.revoked` 帧）严格区分：
+  /// 与"通道被明确撤销"（403 `ENTRANCE_REVOKED` / `entrance.revoked` 帧）严格区分：
   /// 只有后者才自毁。库复原后同步成功即自动复位。
   bool _entranceUnrecognized = false;
 
@@ -235,7 +235,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
   late String _myPartnerName; // 我的名字（菜单显示；改名后 setState 刷新）
-  late String _myEntranceName; // 我的设备名（菜单显示；改名后 setState 刷新）
+  late String _myEntranceName; // 我的通道名（菜单显示；改名后 setState 刷新）
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
   int? _mySlot; // 我的身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色判定用）
@@ -288,7 +288,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 常驻提示条（老板 2026-09-16：连不上/未被识别要持续可见，不能只弹一次通知）。
   /// 三档优先级：
-  /// - 服务器不认本设备（库被重置）→ 淡红：明确"数据没被清除"，用户可继续读本地消息；
+  /// - 服务器不认本通道（库被重置）→ 淡红：明确"数据没被清除"，用户可继续读本地消息；
   /// - 有 pending 消息 + 连接异常 → 淡琥珀（原有：解释"小飞机停了很久"）；
   /// - 仅连续同步失败（无 pending）→ 淡琥珀「离线 · 仅可查看本地消息」。
   /// 判定用 `_consecutiveSyncFailures > 0` 而不是 `!_ws.connected`，避免普通重连闪条。
@@ -331,7 +331,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 自己消息的发送状态小标（老板 2026-09-12）：
   /// - pending → 纸飞机（发送中）
   /// - sent → 单勾（服务端已收下）
-  /// - **delivered / read → 单勾**（服务端已收下；这是我同一身份另一台设备发的
+  /// - **delivered / read → 单勾**（服务端已收下；这是我同一身份另一条通道发的
   ///   消息同步回来的状态，对方回执到了才升双勾）
   /// - 有对方回执（delivered/read）→ 双勾
   /// - failed → 红色警告（点按重发）
@@ -545,8 +545,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 对端上下线（Server 广播——立即更新对方在线状态，不等 30s 轮询）。
   void _onPeerStatus(WsPeerStatusEvent event) {
-    if (event.entranceId == widget.entranceId) return; // 本设备自身的事件忽略
-    // 与我同身份的设备（我自己的另一台）不算"对方"（新服务端已不推这类广播，
+    if (event.entranceId == widget.entranceId) return; // 本通道自身的事件忽略
+    // 与我同身份的通道（我自己的另一条）不算"对方"（新服务端已不推这类广播，
     // 这里兜住旧服务端——旧 payload 无 partner_id 时按原行为处理）
     if (event.partnerId != null && event.partnerId == widget.partnerId) return;
     final online = event.type == kWsTypePeerOnline;
@@ -598,7 +598,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final api = widget.api ?? ApiClient(effectiveServer);
       final space = await api.getSpace(widget.token);
       // 重启（PIN 解锁）路径不传 partnerId（main.dart 只还原明文 payload）——
-      // 从 /space 的设备表里按 entranceId 反查，否则拿不到"我"，校正无从下手
+      // 从 /space 的通道表里按 entranceId 反查，否则拿不到"我"，校正无从下手
       var mine = widget.partnerId;
       if (mine == null || mine.isEmpty) {
         for (final d in space.entrances) {
@@ -679,11 +679,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// session 过期自动续期（WS 4401 / 请求 401）：challenge-response 重新签发 token。
   ///
   /// 撤销毁数据**只认两个明确信号**（老板 2026-09-16）：
-  /// - `ENTRANCE_REVOKED`：服务端明确说"这台设备被撤销了"（涉嫌被盗用）→ [_onEntranceRevoked]
+  /// - `ENTRANCE_REVOKED`：服务端明确说"这条通道被撤销了"（涉嫌被盗用）→ [_onEntranceRevoked]
   ///   清空本地数据 → 提示 → 回设置页；
   /// - `entrance.revoked` 帧（见 [_onEntranceRevoked] 的另一挂点）。
   ///
-  /// `FORBIDDEN` 只表示"服务器不认这台设备"——**最可能是后台数据库被清空/重置**，
+  /// `FORBIDDEN` 只表示"服务器不认这条通道"——**最可能是后台数据库被清空/重置**，
   /// 这是运维失误而非撤销，只置 [_entranceUnrecognized] 让常驻提示条说明情况，
   /// 本地消息仍然可读（此前一律当撤销处理，把本地数据全删了，不可挽回）。
   /// 其他异常原样抛出（调用方退避/提示）。
@@ -889,12 +889,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 邀请设备：生成一次性 join token（POST /spaces/{id}/join-tokens，Multiverse
+  /// 开通通道：生成一次性 join token（POST /spaces/{id}/join-tokens，Multiverse
   /// v2，24h 一次性、需本人会话认证；旧 v1 createInvite 已废弃，不再生成 v1 邀请码）。
   /// 二维码与展示内容 = 邀请链接（`https://einz.tic.cc/join/<token>`），对方 App/
   /// CLI 可扫码或粘贴链接加入；口令由对方加入时另行输入（降级 B，与 TUI 一致）。
   Future<void> _showInviteDialog() async {
-    // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"邀请设备"确认窗）
+    // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
       final r = await api.createJoinToken(widget.spaceId, widget.token);
@@ -1073,7 +1073,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
-  /// 「高级」底部弹层（二级菜单：修改口令 / 重置设备）。两项都只给标题——
+  /// 「高级」底部弹层（二级菜单：修改口令 / 重置本机）。两项都只给标题——
   /// 具体后果留给点进去的弹窗说明（弹层本身不解释）。
   ///
   /// 为什么用弹层而不是 MenuAnchor + SubmenuButton 的级联子菜单：手机宽度下
@@ -1119,7 +1119,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (picked == 'passphrase') {
       await _showChangePassphraseDialog();
     } else if (picked == 'leave') {
-      // 阀门所需的两个输入：设备名（确认清的是这台）与"是否设了锁屏码"（决定要不要验）。
+      // 阀门所需的两个输入：通道名（确认清的是这条）与"是否设了锁屏码"（决定要不要验）。
       // 都用 await 取，过一遍 mounted 再传进弹窗。
       final entranceName = await _resolveMyEntranceName();
       final hasPin = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
@@ -1156,11 +1156,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 重置闸门要用的"本机设备名"。
+  /// 重置闸门要用的"本机通道名"。
   ///
   /// 不能用 `widget.entranceName`：**只有向导那条路径传它**（setup_page），重启/解锁进
   /// 聊天的路径（main.dart StartupGate）不带——那边的名字由 [_myEntranceName] 从本地
-  /// profile 恢复。取不到（旧装机快照里没写 entranceName）时再问一次服务端：设备名是
+  /// profile 恢复。取不到（旧装机快照里没写 entranceName）时再问一次服务端：通道名是
   /// 入网时自动生成并同步上去的，服务端必定有。都问不出来返回 ''，由重置弹窗退化为
   /// 固定确认词——本地快照缺字段不该让人永远重置不了（老板 2026-09-21 安卓实测）。
   Future<String> _resolveMyEntranceName() async {
@@ -1194,8 +1194,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final api = widget.api ?? ApiClient(effectiveServer);
       final entrances = await api.listEntrances(widget.token);
       final now = DateTime.now().millisecondsSinceEpoch;
-      // 在线是"人"维度的：同一 partner 的其它设备是我自己的设备，不算对方
-      // （重启路径不传 partnerId → 从设备表里按本设备反查；查不到才退回按设备判定）
+      // 在线是"人"维度的：同一 partner 的其它通道是我自己开的通道，不算对方
+      // （重启路径不传 partnerId → 从通道表里按本通道反查；查不到才退回按通道判定）
       var mine = widget.partnerId;
       if (mine == null || mine.isEmpty) {
         for (final d in entrances) {
@@ -1281,11 +1281,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 修改我的名字/设备名称（服务端同步 + 本地刷新菜单显示）。
+  /// 修改我的名字/通道名称（服务端同步 + 本地刷新菜单显示）。
   Future<void> _showRenameDialog({required bool renameEntrance}) async {
     final l10n = AppLocalizations.of(context)!;
     final ctrl = TextEditingController(text: renameEntrance ? _myEntranceName : _myPartnerName);
-    // 公钥只读展示（我的设备弹窗）：静态文本控制器，随对话框关闭释放
+    // 公钥只读展示（我的通道弹窗）：静态文本控制器，随对话框关闭释放
     final pubKeyCtrl = TextEditingController(
       text: widget.publicKeyB64 ?? l10n.chatPageEntrancePublicKeyFailed,
     );
@@ -1299,7 +1299,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     // 名称为空/全空格警示（红字显示在输入框下方；开始填写即消）
     final nameError = ValueNotifier<String?>(null);
-    // 名字/设备名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
+    // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
     final editing = ValueNotifier<bool>(false);
     // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
     final nameFocus = FocusNode();
@@ -1311,9 +1311,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 本机信息弹窗：说明"名称与公钥只属于当前秘境"——多空间下同一台设备在
+            // 本机信息弹窗：说明"名称与公钥只属于当前秘境"——多空间下同一条通道在
             // 每个秘境各有一套（名称可不同、公钥必然不同），不点明会让人以为改的是
-            // 全局设备名（老板 2026-09-22 定：承认 per-space，不强行统一）。
+            // 全局通道名（老板 2026-09-22 定：承认 per-space，不强行统一）。
             if (renameEntrance) ...[
               Text(
                 l10n.chatPageEntranceScopeHint,
@@ -1324,7 +1324,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 10),
             ],
-            // 名字/设备名输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+            // 名字/通道名输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
             // 白底可编辑、按钮消失（老板要求 2026-09-09）。
             // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
             // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
@@ -1375,7 +1375,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
             ),
-            // 我的设备弹窗：公钥只读展示——放在设备名称之后（textarea 样式，边框
+            // 我的通道弹窗：公钥只读展示——放在通道名称之后（textarea 样式，边框
             // 左上角「公钥」标签，右侧拷贝按钮；只读不加背景色，沿用弹窗背景）
             if (renameEntrance) ...[
               const SizedBox(height: 12),
@@ -1387,7 +1387,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 decoration: InputDecoration(
                   labelText: l10n.chatPageEntrancePublicKeyLabel,
                   border: const OutlineInputBorder(),
-                  // 公钥只读：不加背景色，沿用弹窗背景（可编辑的设备名称才是白底）
+                  // 公钥只读：不加背景色，沿用弹窗背景（可编辑的通道名称才是白底）
                   suffixIcon: IconButton(
                     tooltip: l10n.chatPageCopy,
                     icon: const Icon(Icons.copy, size: 18),
@@ -1431,13 +1431,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             onPressed: () async {
               final name = ctrl.text.trim();
               if (name.isEmpty) {
-                // 空/全空格：红字警示并停留（不再静默跳过）；人名与设备名各用各的提示
+                // 空/全空格：红字警示并停留（不再静默跳过）；人名与通道名各用各的提示
                 nameError.value = renameEntrance
                     ? l10n.chatPageRenameEntranceEmptyError
                     : l10n.chatPageRenameMyselfEmptyError;
                 return;
               }
-              // 设备名字符白名单 + 长度上限（老板 2026-09-16）：只允许中英文、
+              // 通道名字符白名单 + 长度上限（老板 2026-09-16）：只允许中英文、
               // 数字、`_`、`-`，≤32；不合规提示重输（服务端另有 400 兜底）
               if (renameEntrance) {
                 final violation = checkEntranceNamePolicy(name);
@@ -1501,7 +1501,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (saved == true && mounted) setState(() {}); // 刷新菜单显示的新名字
   }
 
-  /// 同步当前名字到本地 profile（改名/改设备名后调用——重启从 profile 恢复）。
+  /// 同步当前名字到本地 profile（改名/改通道名后调用——重启从 profile 恢复）。
   /// 按 spaceId 写：多空间下各空间一份，别互相覆写（2026-09-22）。
   Future<void> _saveProfile() async {
     await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
@@ -1633,10 +1633,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 补登安装级设备标识（POST /entrances/uid，幂等）。
+  /// 补登安装级标识（POST /entrances/install-uid，幂等）。
   ///
   /// 用途：多空间下服务端要能知道"这台物理设备上挂了哪几个空间"（运维/审计），而
-  /// install_uid 是随 create/join 上报的——**存量设备**（多空间上线前入网的那批）不再走
+  /// install_uid 是随 create/join 上报的——**存量通道**（多空间上线前入网的那批）不再走
   /// 入网流程，只能在这里补一次。离线/老服务端（无此端点）时静默降级：它只是服务端侧
   /// 认知，不参与任何功能。
   ///
@@ -2040,7 +2040,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 同步成功：复位退避（周期回到基准），并清掉"服务器不认本设备"的常驻提示
+  /// 同步成功：复位退避（周期回到基准），并清掉"服务器不认本通道"的常驻提示
   /// （后台库被复原后应自动恢复正常，无需用户干预）。
   void _onSyncSucceeded() {
     if (_entranceUnrecognized && mounted) {
@@ -2517,7 +2517,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
 
   /// 删除消息：确认弹窗 → 本机打墓碑标记（内容隐藏、时间+焚毁记录保留；
-  /// 对方设备不受影响；重启后记录仍在、内容仍隐藏）。
+  /// 对方通道不受影响；重启后记录仍在、内容仍隐藏）。
   Future<void> _deleteMessage(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -4071,7 +4071,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               itemBuilder: (context, i) {
                 final m = _messages[i];
                 final mine = m.sender == 'me';
-                // 头像 partnerId：信封字段优先，缺失（旧版附件/语音消息）用设备映射兜底
+                // 头像 partnerId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底
                 final avatarPartnerId =
                     m.env.senderPartnerId ?? _repo.partnerIdOfEntrance(m.env.senderEntranceId);
                 return Align(
@@ -4586,7 +4586,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
 /// 修改口令弹窗（StatefulWidget）。两种情形：
 /// ① 服务器有密保箱 → 旧口令验证（fetch 解密）→ 新口令重加密上传；
 /// ② 服务器**无**密保箱（数据丢失）→ 无从校验旧口令，跳过校验直接用新口令
-///    重建（设备已认证且持有 Space Key，不新增权限）。
+///    重建（通道已认证且持有 Space Key，不新增权限）。
 /// 本地一律不落共享口令（与 TUI 对齐；服务器为唯一真相源）。
 class _ChangePassphraseDialog extends StatefulWidget {
   const _ChangePassphraseDialog({

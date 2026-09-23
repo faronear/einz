@@ -1,10 +1,10 @@
 /**
- * `install_uid`（安装级设备标识）回归：多空间下服务端能识别"同一台物理设备"。
+ * `install_uid`（安装级标识）回归：多空间下服务端能识别"同一台物理设备"。
  *
  * 背景（老板 2026-09-22 定）：多空间后一台设备在每个空间各有一套独立身份
  * （entrance_id / 公私钥 / entrance_name），这些**故意互不关联**；但服务端需要知道
  * "这几行其实是同一台设备"，于是客户端生成一个安装级 `install_uid`，随
- * create/join 上报，存量设备由 `POST /entrances/uid` 幂等补登。
+ * create/join 上报，存量通道由 `POST /entrances/install-uid` 幂等补登。
  *
  * 三条边界：① create/join 落库；② 补登幂等、非法输入 400；③ **绝不外泄**——
  * `/space` 与 `/entrances` 的响应体里都不能出现 install_uid（成员之间不可见）。
@@ -62,17 +62,17 @@ test('create/join 落库：同一 install_uid 把不同空间的 entrance_id 关
 
     assert.equal(uidOf(spaceA.entranceId), UID_D, 'create 应落 install_uid')
     assert.equal(uidOf(joined.entranceId), UID_D, '同一设备的 join 应落同一个 install_uid')
-    assert.equal(uidOf(spaceB.entranceId), UID_E, '另一台设备是另一个 install_uid')
+    assert.equal(uidOf(spaceB.entranceId), UID_E, '另一条通道是另一个 install_uid')
 
     // 服务端据此能一眼看出"这台物理设备挂了两个空间"
     const rows = getDb()
       .prepare(`SELECT COUNT(DISTINCT entrance_id) AS n FROM entrances WHERE install_uid = ?`)
       .get(UID_D) as { n: number }
-    assert.equal(rows.n, 2, '同一 install_uid 下应有两行设备');
+    assert.equal(rows.n, 2, '同一 install_uid 下应有两行通道');
   })
 })
 
-test('补登：存量行（NULL）由 POST /entrances/uid 幂等填上，非法输入 400', async () => {
+test('补登：存量行（NULL）由 POST /entrances/install-uid 幂等填上，非法输入 400', async () => {
   await withDb(async () => {
     const space = await createSpace(
       undefined, '我', 'male', '伴侣', 'female',

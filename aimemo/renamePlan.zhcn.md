@@ -9,7 +9,7 @@
 
 | | 旧计划（2026-09-22） | 新计划（2026-09-23） |
 | --- | --- | --- |
-| 前提 | 有存量用户、有老客户端、有老本地数据 | **全新上线**：无老客户端、无历史数据、上线前重置设备 |
+| 前提 | 有存量用户、有老客户端、有老本地数据 | **全新上线**：无老客户端、无历史数据、上线前重置本机 |
 | 目标名 | `entry_id`（早于术语改「通道」） | **`entrance_id`**（与已落地的 `entrance` 一致） |
 | 机制 | 三期 alias：遥测列 + 版本双接受 + 双名映射文件 + 跨端发布 + 读旧回退 | **一次性机械替换**，一次提交 |
 | 风险 | 🔴 锁包旧密文、drift 旧列、TUI store 旧键回退 | 归零（直接按新语义写新格式，本地库/商店重建） |
@@ -27,7 +27,7 @@
 | D2 | `partner_slot` → **`slot`**（它本就是泛型槽位列，存 0/1，两个槽位都用；旧名会让人误以为专指 slot1） |
 | D3 | device 家族**全量改**，**连 HTTP 路径也改**（`/devices/*` → `/entrances/*`、成员改名 → `/partners/name`） |
 | D4 | `device_uid` → **`install_uid`**（GLOSSARY 的「安装」层；改后代码里 device 一词只剩 UI 的「本机 / device」） |
-| D5 | 创建时四个字段：**`creator_*`（创建者/slot0）+ `peer_*`（第二人/slot1）**；成员改名接口 body 用泛称 `partner_name`。选 `peer` 而非 `follower`/`joiner`：加入方不一定是 slot1（`setup_page.dart:1448`「加入者可能是第二人，也可能是第一人的其他设备」），且 `peer` 是仓库既有词 |
+| D5 | 创建时四个字段：**`creator_*`（创建者/slot0）+ `peer_*`（第二人/slot1）**；成员改名接口 body 用泛称 `partner_name`。选 `peer` 而非 `follower`/`joiner`：加入方不一定是 slot1（`setup_page.dart:1448`「加入者可能是第二人，也可能是第一人的其他通道」），且 `peer` 是仓库既有词 |
 | D6 | 审计 kind **一起改**：`device.{rename,revoke,retire,revoked}` → `entrance.*`，`person.rename` → `partner.rename` |
 
 ## 2. 命名分层总表
@@ -116,16 +116,32 @@
 - `server`：`npm run build` + `npm test` 全绿。
 - `app`：`flutter analyze` / `flutter gen-l10n` 无 issue（goldens 不跑、UI 由老板自测）。
 - 本地库：drift 升到 **v8**，用 `ALTER TABLE RENAME COLUMN` 保数据；锁包/store 的 JSON 键
-  不做回退读（按"全新上线"口径，老板会重置设备）。
+  不做回退读（按"全新上线"口径，老板会重置本机）。
 
-## 7. 本次**没做**、留给下一批的（避免把这批 diff 冲淡）
+## 7. 中文「设备」→「通道」清扫（2026-09-23 **第二批**，已完成）
 
-1. **中文「设备」→「通道」注释/文档清扫**（代码 ~780 处、docs 若干）。**不能全局替换**：
-   同一段里「设备」可能指**通道**（登记项）也可能指**本机/物理设备**（UI 保留词），
-   必须逐处判断。规则：能换成「通道」且读得通 → 改；指本机/型号/硬件 → 保留。
-2. **CLI 命令 `/device`（改名通道）**：是 UI 面，与 App 菜单项「通道名称」不一致。
-   要不要改成 `/entrance`（或加别名）由老板定（UI 用词归老板）。
-3. **历史快照不动**：`aimemo/architectureReview*.md`、`upgradeToMultiverse.md`、
-   `appWizardMultiverse.md`、`escrowArchivedKeys.md`、`voiceCall.zhcn.md`、`worklog.md`
-   是**带日期的记录**，里面的旧名保持原样（改了就是篡改历史）；`db.ts` 清理 v1 meta 的
-   字面量 `'creator_person_id'` / `'person_name:%'` / `'person_gender:%'` 同理保留。
+老板 2026-09-23 拍板：① 单独一批做、逐处核对；② CLI `/device` → `/entrance`；③ 历史快照保持原样。
+
+**规则**（逐处判断，**不**全局替换）：
+- 指**登记项** → 「通道」（量词用「条」：一条通道，不是一台通道）；
+- 指**本机 / 物理机器 / 型号** → 保留「设备」（GLOSSARY 许可 UI 这么说）；
+- 指**安装** → 「本机」（如「重置本机」）；
+- 平台实现语境 → 「平台通道」保留。
+
+**范围**：server/src + server/test、shared/lib + shared/test、app/lib + app/test、
+cli/bin + cli/lib + cli/test、`docs/*.md`（技术文档全量）、`README.md`、
+`aimemo/{multiSpaceDesign,productLens,renamePlan,projectPlan}`。
+**UI 文案只动了 1 条**：`chatPageEntranceScopeHint` zh「通道是**本机**连接到秘境的安全线路…」
+（原为"设备"，与同句后面的「本机」不一致；en 同步为 `this device`）。
+CLI 命令 `/device` → `/entrance`（help、usage、`case`、policy 注释同步）。
+
+**注意**（这批的坑）：cli 探针里的**期望字符串**（`设备列表`/`输入要撤销的设备序号`/
+`本设备已被撤销`/`目标设备毫发无损`）必须跟着 TUI 一起改，否则探针静默失效；
+app 测试里那条 UI 断言也同步改了。**探针未实跑**（需真 server + pty），只是把期望串对齐。
+
+## 8. 历史快照不动（老板 2026-09-23 同意）
+
+`aimemo/architectureReview*.md`、`upgradeToMultiverse.md`、`appWizardMultiverse.md`、
+`escrowArchivedKeys.md`、`voiceCall.zhcn.md`、`worklog.md` 是**带日期的记录**，旧名保持原样
+（改了就是篡改历史）；`db.ts` 清理 v1 meta 的字面量 `'creator_person_id'` /
+`'person_name:%'` / `'person_gender:%'` 同理保留；goldens 文件名 `..._device.png` 也不动。

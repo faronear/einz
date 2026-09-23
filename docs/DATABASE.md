@@ -24,17 +24,17 @@
 ## 2. Server SQLite（einz.sqlite.db）
 
 ```sql
--- 设备（v2：由 POST /spaces / POST /spaces/join 登记；表本身是全局表，
+-- 通道（v2：由 POST /spaces / POST /spaces/join 登记；表本身是全局表，
 -- 归属空间靠 entrances.partner_id → space_members 推导）
 CREATE TABLE entrances (
     entrance_id   TEXT PRIMARY KEY,          -- UUIDv7（服务端生成）
     partner_id   TEXT NOT NULL,             -- 空间内身份 UUID（v2；见 space_members.partner_id）
     public_key  TEXT NOT NULL,             -- base64(X25519 公钥)
     status      TEXT NOT NULL DEFAULT 'active',  -- active | revoked
-    entrance_name TEXT,                      -- 设备显示名（TUI/App 可改）
+    entrance_name TEXT,                      -- 通道显示名（TUI/App 可改）
     last_seen   INTEGER,                   -- 只由 WS 连接/心跳/断开维护
     created_at  INTEGER NOT NULL,
-    install_uid  TEXT                       -- 安装级设备标识（客户端生成；同一物理设备各空间同名）
+    install_uid  TEXT                       -- 安装级标识（客户端生成；同一物理设备各空间同名）
                                            -- 存量行/未升级客户端为 NULL，由 POST /entrances/install-uid 补登。
                                            -- **只做服务端内部认知**（运维/审计/将来"整机退役"），
                                            -- 不参与授权或破坏性操作范围判断，**绝不进任何响应体**。
@@ -52,7 +52,7 @@ CREATE TABLE spaces (
 );
 
 -- 空间成员（两个身份槽位：0=创建者/第一人，1=伴侣/第二人。
--- partner_id 是身份锚点，同一身份多设备共享；伴侣预置行 partner_id 为 NULL 直到加入）
+-- partner_id 是身份锚点，同一身份多通道共享；伴侣预置行 partner_id 为 NULL 直到加入）
 -- 名称的唯一数据源就是这里的 display_name（v1 的 meta partner_name:* 已删除）
 CREATE TABLE space_members (
     space_id     TEXT NOT NULL REFERENCES spaces(space_id),
@@ -140,7 +140,7 @@ CREATE TABLE challenges (
 );
 
 -- 会话令牌（**只存 sha256(token)**，明文只回给客户端；2026-09-15 评审 H4）
--- 同一设备同一 space 同时只有一个会话（重新认证即清旧行）
+-- 同一通道同一 space 同时只有一个会话（重新认证即清旧行）
 CREATE TABLE sessions (
     session_token TEXT PRIMARY KEY,        -- sha256 十六进制
     entrance_id     TEXT NOT NULL,
@@ -149,7 +149,7 @@ CREATE TABLE sessions (
     created_at    INTEGER NOT NULL
 );
 
--- 消息回执（已送达/已读）单调高水位，按 (space, person) 一行（PROTOCOL.md §5.4）
+-- 消息回执（已送达/已读）单调高水位，按 (space, partner) 一行（PROTOCOL.md §5.4）
 CREATE TABLE receipts (
     space_id           TEXT NOT NULL,
     partner_id          TEXT NOT NULL,
@@ -169,8 +169,8 @@ CREATE TABLE meta (
 
 ### 2.1 审计表（只追加，永久保留）
 
-业务表只保存"当前状态"（`entrances.last_seen` 会被覆盖、`receipts` 是 person 级
-高水位），无法回答"谁在哪台设备上、什么时候做了什么"。以下两张表专为此补上历史，
+业务表只保存"当前状态"（`entrances.last_seen` 会被覆盖、`receipts` 是 partner 级
+高水位），无法回答"谁在哪条通道上、什么时候做了什么"。以下两张表专为此补上历史，
 **只追加、不更新、不删除**，且**不参与业务语义**——清空它们不影响聊天功能。
 
 ```sql
@@ -188,7 +188,7 @@ CREATE TABLE connection_events (
     user_agent   TEXT
 );
 
--- 设备活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
+-- 通道活动明细：sync 拉取进度 / 回执上报 / 消息发送 / push token 变更 / 登记撤销…
 CREATE TABLE entrance_activity (
     activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
     entrance_id   TEXT NOT NULL,
@@ -206,13 +206,13 @@ CREATE TABLE entrance_activity (
 | kind              | 触发点                    | detail 主要字段                                                              |
 | ----------------- | ------------------------- | ---------------------------------------------------------------------------- |
 | `auth.login`      | `POST /auth/verify`       | `expires_in`                                                                 |
-| `message.post`    | `POST /messages`          | `message_id`、`server_sequence`、`type`（**发送**证据，设备级）              |
+| `message.post`    | `POST /messages`          | `message_id`、`server_sequence`、`type`（**发送**证据，通道级）              |
 | `sync`            | `GET /sync`               | `after_sequence`、`last_sequence`、`received`、`has_more`（**接收**证据）      |
 | `receipt`         | `POST /receipts`          | `reported_delivered`、`reported_read`、`delivered_upto_seq`、`read_upto_seq` |
 | `push.register`   | `POST /push/register`     | `platform`、`token_prefix`（**只落前 8 位**，不落完整推送凭证）              |
 | `push.unregister` | `DELETE /push/register`   | —                                                                            |
 | `entrance.rename`   | `POST /entrances/name`      | `entrance_name`                                                                |
-| `person.rename`   | `POST /partners/name` | `partner_name`                                                              |
+| `partner.rename`   | `POST /partners/name` | `partner_name`                                                              |
 | `entrance.revoke`   | `POST /entrances/:id/revoke` | `target_entrance_id`（**不记口令**）                                          |
 | `entrance.retire`   | `POST /entrances/retire`     | —（自助退役，目标即自己，无需 detail）                                      |
 
@@ -220,10 +220,10 @@ CREATE TABLE entrance_activity (
 
 - `sync` **只在 `last_sequence` 前进时记**（=真正拉到新消息）。没新结果的例行
   轮询不产生记录——轮询频率是 App WS 在线 30s / 离线 3s 起退避到 60s、TUI 固定
-  30s，全量记录绝大部分行都是重复值。设备"还在不在"由 `connection_events` 与
+  30s，全量记录绝大部分行都是重复值。通道"还在不在"由 `connection_events` 与
   `entrances.last_seen` 负责。
-- 回执语义**未改**：`receipts` 表仍是 person 级 HWM（"该 person 至少一台设备
-  已读"），`entrance_activity.receipt` 只是额外记下"是哪台设备上报的"。
+- 回执语义**未改**：`receipts` 表仍是 partner 级 HWM（"该 partner 至少一条通道
+  已读"），`entrance_activity.receipt` 只是额外记下"是哪条通道上报的"。
 - 红线：审计表只记元数据，**绝不含密文 / nonce / 明文 / 完整 push token**
   （`test/audit.test.ts` 有断言守着）。
 - 查询：`npm run audit -- entrances | timeline <entrance_id> | online <space_id> [天] |
@@ -236,7 +236,7 @@ CREATE TABLE entrance_activity (
 - `challenges` / `sessions` 是短期数据：定期清理过期行（如每小时一次）。
 - `receipts` 只前进：上报用 `MAX()` upsert（回退值被忽略），且
   `delivered_upto_seq ≥ read_upto_seq`（读隐含送达），并夹紧到本 space 真实
-  `MAX(server_sequence)`。按 person 记 = "该 person 至少一台设备已收到/已读"。
+  `MAX(server_sequence)`。按 partner 记 = "该 partner 至少一条通道已收到/已读"。
 
 ---
 
@@ -259,7 +259,7 @@ CREATE TABLE local_messages (
     -- **出站流水线**语义：
     --   pending = 还没确认（离线队列 / 在途 / 响应丢失）→ 由 sync 幂等补发自动收敛
     --   sent    = 服务端已收下（拿到 server_sequence）
-    --   failed  = **服务端明确拒绝**（4xx：信封不合法 / 未授权 / 设备被撤销）→ 需用户点按重发
+    --   failed  = **服务端明确拒绝**（4xx：信封不合法 / 未授权 / 通道被撤销）→ 需用户点按重发
     --   注：网络异常、连接/响应超时、5xx **不**标 failed，保持 pending 自动重试；
     --       只有服务端明确拒绝才 failed（老板 2026-09-13 定）
     -- 注意：sync() 会把**入站**（对方）消息写成 'delivered'——那是历史遗留的
@@ -273,7 +273,7 @@ CREATE INDEX idx_local_messages_seq ON local_messages (server_sequence);
 
 -- 阅后即焚 / 本地墓碑（后续版本增列）：burn_after_seconds、expires_at、
 --   burn_manual、deleted_at
--- 语义（老板 2026-09-13 明确）：**删除/焚毁只是"在本设备隐藏正文"**——打
+-- 语义（老板 2026-09-13 明确）：**删除/焚毁只是"在本通道隐藏正文"**——打
 --   `deleted_at` 本地墓碑、行与信封保留，不通知服务端、也不改变消息在服务器与
 --   对方那里的路径。因此：
 --   · 尚未确认（pending）的墓碑消息**仍会继续补发**，气泡里的状态小标照旧显示
@@ -301,7 +301,7 @@ CREATE TABLE sync_state (
 -- 对方回执（已送达/已读）单调高水位（App v6 起；本协议只落库，UI 暂不展示）
 CREATE TABLE peer_receipts (
     space_id           TEXT NOT NULL,
-    partner_id          TEXT NOT NULL,      -- 对方身份锚点（同人多设备共享一行）
+    partner_id          TEXT NOT NULL,      -- 对方身份锚点（同人多通道共享一行）
     delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
     read_upto_seq      INTEGER NOT NULL DEFAULT 0,
     updated_at         INTEGER NOT NULL DEFAULT 0,
@@ -327,7 +327,7 @@ CREATE TABLE app_state (
 
 - `status='pending'` 且 `server_sequence IS NULL` = 离线发送队列成员；收到 Server ACK 后写回 `server_sequence` 并置 `sent`。
 - 同步：`last_server_sequence` 记录已落库的最大序号；`/sync?after=` 补缺。
-- 明文（草稿）只存在于客户端本地库，**永不进入 Server**；若设备被攻破，本库可泄露已解密内容——这是设备信任模型的一部分（productLens §3.1）。
+- 明文（草稿）只存在于客户端本地库，**永不进入 Server**；若通道被攻破，本库可泄露已解密内容——这是通道信任模型的一部分（productLens §3.1）。
 
 ---
 
@@ -337,7 +337,7 @@ CREATE TABLE app_state (
 
 ```json
 {
-  "device": { "entrance_id": "…", "public_key": "…", "private_key": "…" },
+  "entrance": { "entrance_id": "…", "public_key": "…", "private_key": "…" },
   "space_key": { "key_version": 1, "key": "base64(32B)" }
 }
 ```
@@ -372,6 +372,6 @@ CREATE TABLE app_state (
 
 ## 6. 备份（Server 侧）
 
-- 备份 = `einz.sqlite.db`（用 SQLite 官方 Backup API，禁止直接复制正在写入的 db）+ `/data/files/`，产物加密归档到 `/data/backups/`（productLens §11.2）。v1 的静态白名单 `config.json` 已删（设备与空间都在库里），备份里不再有该条目。
+- 备份 = `einz.sqlite.db`（用 SQLite 官方 Backup API，禁止直接复制正在写入的 db）+ `/data/files/`，产物加密归档到 `/data/backups/`（productLens §11.2）。v1 的静态白名单 `config.json` 已删（通道与空间都在库里），备份里不再有该条目。
 - **单空间备份**（`npm run backup -- --space <id>`，2026-09-23）：只导出该空间的行 + `/data/files/<space_id>/`，恢复时只覆盖该空间，别的空间与库文件不动；不含审计表。详见 DEPLOYMENT.md §5.1。
 - 客户端备份见 E2EE.md §10（恢复码 + 加密导出，含本库与密钥归档）。

@@ -13,8 +13,8 @@ import { broadcastReceiptUpdated } from './ws.js'
  * 语义与不变式：
  * - 我的消息 seq=S 已送达 ⟺ 对方 delivered_upto_seq ≥ S；已读 ⟺ read_upto_seq ≥ S。
  * - 只前进（max 夹紧），且 delivered_upto_seq ≥ read_upto_seq（读隐含送达）。
- * - 按 partner 记 → "该 partner 至少一台设备已收到/已读"，不保证其所有设备。
- *   2 人空间足够；将来要"所有设备"需改为按设备记。
+ * - 按 partner 记 → "该 partner 至少一条通道已收到/已读"，不保证其所有通道。
+ *   2 人空间足够；将来要"所有通道"需改为按通道记。
  */
 
 export interface ReceiptRow {
@@ -91,7 +91,7 @@ export function postReceipts (
     )
     .get(space_id, partnerId) as ReceiptRow
 
-  // 通知同空间的其他设备（含自己 partner 的其他设备与对方）
+  // 通知同空间的其他通道（含自己 partner 的其他通道与对方）
   broadcastReceiptUpdated(entrance_id, {
     partner_id: row.partner_id,
     delivered_upto_seq: row.delivered_upto_seq,
@@ -129,7 +129,7 @@ export function getReceipts (
  * 时才上报，见 chat_page._scheduleReadReport），消息与发送者分别在 messages / entrances。
  *
  * 判定"不是我发的"**必须走 partner 维度**：同一身份可能有多台登记项，只比 entrance_id
- * 会把自己的另一台设备发来的消息算成未读。
+ * 会把自己的另一条通道发来的消息算成未读。
  *
  * 刻意**不要求** receipts 行存在：没有行 = 从没读过 = 对方的全部消息都算未读。
  */

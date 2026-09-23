@@ -24,7 +24,7 @@ sealed class WsEvent {
   final String type;
 }
 
-/// hello：连接建立（Server 返回设备/空间信息）。
+/// hello：连接建立（Server 返回通道/空间信息）。
 class WsHelloEvent extends WsEvent {
   const WsHelloEvent({required super.type, required this.entranceId, required this.spaceId});
 
@@ -51,11 +51,11 @@ class WsEntranceRevokedEvent extends WsEvent {
   final String entranceId;
 }
 
-/// peer.online/peer.offline：对端设备上下线通知（App 实时更新对方在线状态）。
-/// [partnerId] 为上下线设备所属身份：与其相同身份的设备（我自己的另一台）不算
+/// peer.online/peer.offline：对端通道上下线通知（App 实时更新对方在线状态）。
+/// [partnerId] 为上下线通道所属身份：与其相同身份的通道（我自己的另一条）不算
 /// "对方"，接收方须忽略（旧服务端不带该字段时为 null——按原行为处理）。
-/// [onlineSince] 仅 peer.online 携带：该设备进入在线态的时刻（ms，重连不刷新），
-/// 接收方据此按上线顺序排列对端的在线设备（最新上线在最前；旧服务端为 null）。
+/// [onlineSince] 仅 peer.online 携带：该通道进入在线态的时刻（ms，重连不刷新），
+/// 接收方据此按上线顺序排列对端的在线通道（最新上线在最前；旧服务端为 null）。
 class WsPeerStatusEvent extends WsEvent {
   const WsPeerStatusEvent({
     required super.type,
@@ -76,7 +76,7 @@ class WsPassphraseRotatedEvent extends WsEvent {
   final String entranceId;
 }
 
-/// profile.updated：对端改名/改设备名（App/TUI 立即更新对方名称）。
+/// profile.updated：对端改名/改通道名（App/TUI 立即更新对方名称）。
 class WsProfileUpdatedEvent extends WsEvent {
   const WsProfileUpdatedEvent({
     required super.type,
@@ -223,7 +223,7 @@ class WsClient {
           return;
         }
         // 即便拿到了新 token，也要防"服务端照样拒"这一类：连续几次仍被 4401，
-        // 说明不是单纯的会话过期（设备不在册 / 服务端不认本设备），立刻重连会变成
+        // 说明不是单纯的会话过期（通道不在册 / 服务端不认本通道），立刻重连会变成
         // 打服务端的循环（每轮一次 POST /auth/challenge，很快触发限流）。
         if (++_unauthorizedStreak >= 3) {
           _scheduleReconnect();

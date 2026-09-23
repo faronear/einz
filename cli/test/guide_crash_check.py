@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 引导阶段崩溃回归验证（2026-09-02 临时）：复现老板步骤——
-# 新设备引导问答中输入 '/' 回车（提示"引导中仅支持 /exit 退出"）后再输入任意字符。
+# 新通道引导问答中输入 '/' 回车（提示"引导中仅支持 /exit 退出"）后再输入任意字符。
 # 修复前：_insertAtCursor 光标越界 RangeError 崩溃且终端不回显；
 # 修复后：进程存活、无 RangeError、输入正常回显，/exit 可退出。
 import os, pty, subprocess, select, time, sys
@@ -11,7 +11,7 @@ STORE = '/tmp/einz_guide_repro.json'
 
 def start_tui():
     if os.path.exists(STORE):
-        os.remove(STORE)  # 全新 store → 进入新设备引导（名字/设备名称问答）
+        os.remove(STORE)  # 全新 store → 进入新通道引导（名字/通道名称问答）
     master, slave = pty.openpty()
     env = dict(os.environ, TERM='xterm-256color')
     cmd = ['dart', 'run', 'bin/einz_tui.dart', '--store', STORE,

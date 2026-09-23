@@ -1,6 +1,6 @@
 // 共享口令强度策略单测（唯一来源，三端共用）。
 //
-// 背景：口令是**免设备认证**的取包端点（POST /spaces/{id}/key-escrow）的唯一凭证，
+// 背景：口令是**免通道认证**的取包端点（POST /spaces/{id}/key-escrow）的唯一凭证，
 // 服务端只存 argon2id hash → 强度是这条链路的主要防线（见 docs/SECURITY.md §2）。
 import 'package:test/test.dart';
 

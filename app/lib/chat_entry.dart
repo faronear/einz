@@ -15,7 +15,7 @@ Widget buildChatPage(
   AppLockPayload payload, {
   LocalDatabase? db,
 }) {
-  // 从锁包恢复设备密钥对 → 注入 reauth（会话过期 401/4401 时 challenge-response
+  // 从锁包恢复通道密钥对 → 注入 reauth（会话过期 401/4401 时 challenge-response
   // 重新签发 token）；旧包无密钥对 → null
   final reauth = (payload.publicKeyB64 != null && payload.privateKeyB64 != null)
       ? () => reauthFromPayload(payload)

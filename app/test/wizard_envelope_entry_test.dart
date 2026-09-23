@@ -1,6 +1,6 @@
-// 密保信封入口可见性回归测试：信封（及邀请码）是"后续设备加入"机制——
-// 仅 join（第二/三台设备）口令页显示「改用线下密保信封」入口；
-// 首设备（create）没有对端设备可用信封，口令页不显示该入口。
+// 密保信封入口可见性回归测试：信封（及邀请码）是"后续通道加入"机制——
+// 仅 join（第二/三条通道）口令页显示「改用线下密保信封」入口；
+// 首条通道（create）没有对端通道可用信封，口令页不显示该入口。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +12,7 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 
 /// 打开向导并走到口令页。join=true 走 Multiverse join 路径（入口页 → token
-/// preflight → 名字 → 口令）；false=create（首设备，名字页——createSpace 无
+/// preflight → 名字 → 口令）；false=create（首条通道，名字页——createSpace 无
 /// fake 注入，名字页下一步即红字拦截，断言只查"无信封入口"仍成立）。
 Future<void> pumpToPassphrase(
   WidgetTester tester, {
@@ -84,13 +84,13 @@ Future<void> pumpToPassphrase(
 }
 
 void main() {
-  testWidgets('首设备 create 口令页：不显示信封导入入口', (WidgetTester tester) async {
+  testWidgets('首条通道 create 口令页：不显示信封导入入口', (WidgetTester tester) async {
     await pumpToPassphrase(tester);
     expect(find.byIcon(Icons.mail_outline), findsNothing,
-        reason: '首设备没有对端设备导出的信封，不应提供信封导入入口');
+        reason: '首条通道没有对端通道导出的信封，不应提供信封导入入口');
   });
 
-  testWidgets('后续设备 join 口令页：显示信封导入入口', (WidgetTester tester) async {
+  testWidgets('后续通道 join 口令页：显示信封导入入口', (WidgetTester tester) async {
     await pumpToPassphrase(tester, join: true);
     expect(find.byIcon(Icons.mail_outline), findsOneWidget,
         reason: 'join 用户可用对端导出的信封替代口令获取 Space Key（标题行右上角切换图标）');
@@ -150,7 +150,7 @@ void main() {
     await pumpToPassphrase(tester); // create
     expect(find.text('设置共享口令'), findsOneWidget, reason: 'create 口令页');
     expect(find.byType(TextField), findsNWidgets(2),
-        reason: '首台设备设置口令需输入两次（口令 + 确认）——老板 2026-09-12');
+        reason: '首条通道设置口令需输入两次（口令 + 确认）——老板 2026-09-12');
   });
 
   testWidgets('join 口令页：仅一个口令输入框（验证已有口令，无需确认）', (WidgetTester tester) async {

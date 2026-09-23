@@ -1,14 +1,14 @@
 /**
  * Multiverse 空间隔离测试（v2-native）。
  *
- * v1 收敛后（2026-09-15）不再有 `/entrances/enroll` + 邀请码那一套：设备登记由
+ * v1 收敛后（2026-09-15）不再有 `/entrances/enroll` + 邀请码那一套：通道登记由
  * `POST /spaces`（创建者）/ `POST /spaces/join`（加入者）一步完成，会话必定绑定
  * 一个 space。本测试因此**只用 v2 入口**搭建两个互不相干的空间。
  *
  * 验证：
  *   1) 消息隔离：A 空间的 /sync 看不到 B 空间的消息，server_sequence 各自独立从 1 起；
  *   2) C1 回归：空间级端点必须持该空间成员会话（join-tokens / key-escrow 上传分支）；
- *   3) C2 回归：/entrances 与 /space 只返回本空间设备；附件读写校验空间归属（含幂等重传）；
+ *   3) C2 回归：/entrances 与 /space 只返回本空间通道；附件读写校验空间归属（含幂等重传）；
  *   4) H4 回归：sessions 表只存 sha256，明文 token 不入库。
  *
  * 运行：npm test（需先 npm run build 生成 dist/）
@@ -65,7 +65,7 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
   throw new Error('server did not become ready in time')
 }
 
-/** 一个"空间 + 其创建者设备"的最小句柄（v2 入口：POST /spaces 一步登记 + 发会话）。 */
+/** 一个"空间 + 其创建者通道"的最小句柄（v2 入口：POST /spaces 一步登记 + 发会话）。 */
 interface SpacePeer {
   spaceId: string
   entranceId: string
@@ -91,7 +91,7 @@ async function createSpace (port: number, label: string): Promise<SpacePeer> {
     creatorPartnerId: string
     sessionToken: string
   }
-  assert.ok(b.entranceId.length > 0 && b.sessionToken.length > 0, '创建者应直接拿到设备与会话')
+  assert.ok(b.entranceId.length > 0 && b.sessionToken.length > 0, '创建者应直接拿到通道与会话')
   return {
     spaceId: b.spaceId,
     entranceId: b.entranceId,
@@ -150,7 +150,7 @@ async function main (): Promise<void> {
   await waitReady(port)
 
   try {
-    // 1) 两个互不相干的空间（各自带创建者设备与空间会话）
+    // 1) 两个互不相干的空间（各自带创建者通道与空间会话）
     const spaceA = await createSpace(port, '空间A')
     const spaceB = await createSpace(port, '空间B')
     assert.notEqual(spaceA.spaceId, spaceB.spaceId, 'two spaces must be distinct')
@@ -220,7 +220,7 @@ async function main (): Promise<void> {
       'A 可上传自己空间的托管包'
     )
 
-    // ── C2 回归：设备列表 / 空间信息只含本空间设备 ──
+    // ── C2 回归：通道列表 / 空间信息只含本空间通道 ──
     const entrancesOf = async (token: string): Promise<string[]> => {
       const res = await fetch(`http://127.0.0.1:${port}/entrances`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -231,7 +231,7 @@ async function main (): Promise<void> {
     }
     const devIdsA = await entrancesOf(spaceA.sessionToken)
     assert.ok(devIdsA.includes(spaceA.entranceId), 'A 的 /entrances 应包含自己')
-    assert.ok(!devIdsA.includes(spaceB.entranceId), 'A 的 /entrances 不得含 B 空间设备')
+    assert.ok(!devIdsA.includes(spaceB.entranceId), 'A 的 /entrances 不得含 B 空间通道')
 
     const spaceEntrances = async (token: string): Promise<string[]> => {
       const res = await fetch(`http://127.0.0.1:${port}/space`, {
@@ -242,7 +242,7 @@ async function main (): Promise<void> {
       return body.entrances.map(d => d.entrance_id)
     }
     const spaceDevA = await spaceEntrances(spaceA.sessionToken)
-    assert.ok(!spaceDevA.includes(spaceB.entranceId), '/space 不得含 B 空间设备')
+    assert.ok(!spaceDevA.includes(spaceB.entranceId), '/space 不得含 B 空间通道')
 
     // ── C2 回归：跨空间附件——A 发消息并挂附件，B 读 404、挂 403 ──
     assert.equal(await postMessage(port, spaceA, 'c0001aaaa'), 2, 'A 第二条消息')
@@ -318,7 +318,7 @@ async function main (): Promise<void> {
     )
 
     console.log(
-      '✅ 双 Space 隔离测试通过：消息互不可见、sequence 独立、空间级端点鉴权与设备/附件隔离生效、会话只存哈希'
+      '✅ 双 Space 隔离测试通过：消息互不可见、sequence 独立、空间级端点鉴权与通道/附件隔离生效、会话只存哈希'
     )
   } finally {
     if (serverProc && serverProc.exitCode === null) serverProc.kill()

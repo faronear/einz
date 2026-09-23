@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-# 撤销语义回归（老板 2026-09-16 修订）：**只有"明确针对本设备的撤销"才清空本地数据**。
+# 撤销语义回归（老板 2026-09-16 修订）：**只有"明确针对本通道的撤销"才清空本地数据**。
 #
-#   ① 在线被明确撤销（TUI 收到 entrance.revoked 帧）→ 提示"本设备已被撤销，本地数据已清除"
+#   ① 在线被明确撤销（TUI 收到 entrance.revoked 帧）→ 提示"本通道已被撤销，本地数据已清除"
 #      后自动退出，且 store 文件与附件缓存已删；
 #   ② 离线期间被撤销（重启才认证，挑战返回 403 ENTRANCE_REVOKED）→ 同上；
-#   ③ **后台数据库被清空/重置**（设备行不存在 → 403 FORBIDDEN）→ **绝不清数据**：
-#      TUI 照常启动、提示"本设备未被服务器识别"、本地历史一条不少、进程不退出。
+#   ③ **后台数据库被清空/重置**（通道行不存在 → 403 FORBIDDEN）→ **绝不清数据**：
+#      TUI 照常启动、提示"本通道未被服务器识别"、本地历史一条不少、进程不退出。
 #
-# 为什么要有 ③：服务端此前把"设备被撤销"和"设备不在册"都返回 403 FORBIDDEN，
+# 为什么要有 ③：服务端此前把"通道被撤销"和"通道不在册"都返回 403 FORBIDDEN，
 # 客户端只能一律当撤销处理 → 运维清一次库，客户端就把本地消息全抹了（不可挽回）。
 #
 # 注：v1 的 /recover（全丢恢复）已整体移除（Multiverse 下"仅凭口令重置空间"既不
@@ -158,7 +158,7 @@ def http(port, method, path, body=None, token=None):
     return body
 
 def join_revoker(port, store_path):
-    """让"另一台设备"从 HTTP 侧加入本空间，返回它的会话（撤销不允许撤自己，需要第三方）。"""
+    """让"另一条通道"从 HTTP 侧加入本空间，返回它的会话（撤销不允许撤自己，需要第三方）。"""
     st = json.load(open(store_path))
     # 签发加入码要**空间成员会话**（C1 回归后该端点必须带 Bearer；旧版探针漏了 → 401）
     jt = http(port, 'POST', f'/spaces/{st["space_id"]}/join-tokens',
@@ -169,7 +169,7 @@ def join_revoker(port, store_path):
     return revoker['sessionToken']
 
 def revoke(port, entrance_id, passphrase, token):
-    """POST /entrances/:id/revoke：撤销本空间另一台设备——**每次都要校验密保口令**（2026-09-16）。"""
+    """POST /entrances/:id/revoke：撤销本空间另一条通道——**每次都要校验密保口令**（2026-09-16）。"""
     status, body = http_status(port, 'POST', f'/entrances/{entrance_id}/revoke',
                                {'passphrase': passphrase}, token)
     if status != 200:
@@ -196,7 +196,7 @@ def main():
         st = json.load(open(store_a))
         my_entrance = st['entrance_id']
 
-        # 离线撤销的对照组：撤销前备份 store（模拟"设备离线时被撤销，本地数据还在"）
+        # 离线撤销的对照组：撤销前备份 store（模拟"通道离线时被撤销，本地数据还在"）
         store_offline = f'{WORK}/a-offline.json'
         shutil.copy2(store_a, store_offline)
         # 预置一个假的附件缓存文件，验证自毁确实清了缓存（真实下载才产生，这里造一个）
@@ -207,7 +207,7 @@ def main():
         revoker_token = join_revoker(port_a, store_a)
 
         # 口令校验（老板 2026-09-16 定稿：同 space 内可互撤，但每次撤销都要验密保口令）：
-        # ① 口令错 → 401，且设备**毫发无损**（在线 TUI 不得退出、不得清盘）；
+        # ① 口令错 → 401，且通道**毫发无损**（在线 TUI 不得退出、不得清盘）；
         # ② 不带口令 → 400。两条都在"正确口令"之前跑，确保撤销确实被拦住。
         bad_status, bad_body = http_status(
             port_a, 'POST', f'/entrances/{my_entrance}/revoke',
@@ -224,13 +224,13 @@ def main():
         if p1.poll() is not None:
             print('❌ 撤销被口令拦下，但在线 TUI 却退出了（口令校验没生效？）')
             return 1
-        print('✅ 口令错 → 401、缺口令 → 400，且设备未受影响（在线 TUI 仍运行）')
+        print('✅ 口令错 → 401、缺口令 → 400，且通道未受影响（在线 TUI 仍运行）')
 
         revoke(port_a, my_entrance, PASSPHRASE, revoker_token)
 
         # ① 在线被撤销：收到 entrance.revoked 帧 → 清盘 + 提示 + 自退
-        out = wait_text(m1, '本设备已被撤销', timeout=15)
-        if '本设备已被撤销' not in out:
+        out = wait_text(m1, '本通道已被撤销', timeout=15)
+        if '本通道已被撤销' not in out:
             print('❌ 在线 TUI 未收到撤销广播'); print(out[-800:]); return 1
         if not wait_exit(m1, p1):
             p1.kill()
@@ -251,20 +251,20 @@ def main():
         unlocked = ''
         for _ in range(6):
             send(m2, PIN + '\r')
-            unlocked += wait_text(m2, '本设备已被撤销', timeout=8)
-            if '本设备已被撤销' in unlocked:
+            unlocked += wait_text(m2, '本通道已被撤销', timeout=8)
+            if '本通道已被撤销' in unlocked:
                 break
-        if '本设备已被撤销' not in unlocked:
-            print('❌ 离线撤销的设备重启后未提示撤销'); print(unlocked[-800:]); return 1
+        if '本通道已被撤销' not in unlocked:
+            print('❌ 离线撤销的通道重启后未提示撤销'); print(unlocked[-800:]); return 1
         if not wait_exit(m2, p2):
             p2.kill()
-            print('❌ 撤销设备重启后未自动退出'); return 1
+            print('❌ 撤销通道重启后未自动退出'); return 1
         kill_proc(p2, m2)
         if os.path.exists(store_offline):
             print('❌ 明确撤销后 store 文件仍在'); return 1
         print('✅ ② 离线撤销（重启认证 403 ENTRANCE_REVOKED）→ 提示后自退，store 已清除')
 
-        # ---------- 场景 ③：后台库被清空（设备不在册）→ 只警告，绝不清数据 ----------
+        # ---------- 场景 ③：后台库被清空（通道不在册）→ 只警告，绝不清数据 ----------
         server_c = start_server(port_c, f'{WORK}/c/einz.sqlite.db')
         store_c = f'{WORK}/c.json'
         m3, p3 = onboard('sam', store_c, port_c, WORK)
@@ -300,10 +300,10 @@ def main():
         warning = ''
         for _ in range(6):
             send(m4, PIN + '\r')
-            warning += wait_text(m4, '本设备未被服务器识别', timeout=8)
-            if '本设备未被服务器识别' in warning:
+            warning += wait_text(m4, '本通道未被服务器识别', timeout=8)
+            if '本通道未被服务器识别' in warning:
                 break
-        if '本设备未被服务器识别' not in warning:
+        if '本通道未被服务器识别' not in warning:
             print('❌ 场景③：库被清空后未给出"未被服务器识别"警告'); print(warning[-900:]); return 1
         if p4.poll() is not None:
             print('❌ 场景③：库被清空后 TUI 竟然退出了（应只警告并继续）'); return 1
@@ -315,7 +315,7 @@ def main():
             print('❌ 场景③：本地历史被清空了！'); return 1
         if after.get('space_key') != space_key_before:
             print('❌ 场景③：Space Key 被改动了（本地数据被动过）'); return 1
-        print('✅ ③ 后台库被清空 → 只警告「本设备未被服务器识别」，进程仍在、本地历史完好')
+        print('✅ ③ 后台库被清空 → 只警告「本通道未被服务器识别」，进程仍在、本地历史完好')
 
         # 收尾：/exit 正常退出（不因警告而无法使用）
         send(m4, '/exit\r')
