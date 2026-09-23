@@ -177,7 +177,7 @@ jobs:
           # 实际包内路径：libsodium/x64/Release/v142/dynamic/libsodium.dll（顶层还有 libsodium/ 目录 + dynamic 子目录）
           Copy-Item libsodium-msvc/libsodium/x64/Release/v142/dynamic/libsodium.dll app/build/windows/x64/runner/Release/
       - name: Zip release folder
-        run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-gui-windows.zip
+        run: Compress-Archive -Path app/build/windows/x64/runner/Release/* -DestinationPath einz-app-windows.zip
       - name: Build CLI
         working-directory: cli
         # Windows 默认 shell 是 PowerShell：mkdir 是 New-Item 的别名，-p 会被解析成
@@ -194,7 +194,7 @@ jobs:
         with:
           name: einz-windows
           path: |
-            einz-gui-windows.zip
+            einz-app-windows.zip
             einz-tui-windows.zip
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
@@ -204,7 +204,7 @@ jobs:
           # 每次构建覆盖 latest release，访客始终在同一地址取最新包
           make_latest: true
           files: |
-            einz-gui-windows.zip
+            einz-app-windows.zip
             einz-tui-windows.zip
 
   macos:
@@ -317,12 +317,12 @@ jobs:
         run: >
           SUFFIX=${{ steps.devid.outputs.configured == 'true' && 'dist' || 'dev' }};
           cd app/build/macos/Build/Products/Release &&
-          zip -r -y "$GITHUB_WORKSPACE/einz-gui-macos-$SUFFIX.zip" einz.app
+          zip -r -y "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.zip" einz.app
       - uses: actions/upload-artifact@v4
         with:
           name: einz-macos
           path: |
-            einz-gui-macos-*.zip
+            einz-app-macos-*.zip
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -330,7 +330,7 @@ jobs:
           name: Latest Build
           make_latest: true
           files: |
-            einz-gui-macos-*.zip
+            einz-app-macos-*.zip
 
   # macOS 桌面 CLI（einz-tui-macos）分架构两个产物：
   # dart compile exe 只产出宿主架构，且 Dart 不支持 macOS 跨架构编译，

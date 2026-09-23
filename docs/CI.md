@@ -5,8 +5,8 @@ CI 统一使用 **GitHub Actions**（工作流文件：`.github/workflows/buildM
 | 产物 | job | 构建机 | 签名 |
 | --- | --- | --- | --- |
 | Android APK（`einz-app-android.apk`） | `android` | ubuntu-latest | **release 签名**，用 secrets 里的 keystore（**与本地同一把**，可互相覆盖安装） |
-| Windows GUI（`einz-gui-windows.zip`）+ CLI（`einz-tui-windows.zip`，exe+dll 一包） | `windows` | windows-latest | 无需签名 |
-| macOS GUI（`einz-gui-macos.zip`） | `macos` | macos-latest | 配了 Developer ID secrets 则签名+公证；未配则 ad-hoc |
+| Windows GUI（`einz-app-windows.zip`）+ CLI（`einz-tui-windows.zip`，exe+dll 一包） | `windows` | windows-latest | 无需签名 |
+| macOS GUI（`einz-app-macos.zip`） | `macos` | macos-latest | 配了 Developer ID secrets 则签名+公证；未配则 ad-hoc |
 | macOS CLI 分架构（`einz-tui-macos-x64` / `einz-tui-macos-arm64`，下载对应架构的） | `macos-cli` | macos-15-intel (x64) / macos-latest (arm64) | 无需签名 |
 | Linux CLI（`einz-tui-linux-x64.tar.gz`，含二进制 + 运行说明） | `linux-cli` | ubuntu-latest | 无需签名 |
 | iOS（`einz-app-ios-appstore.ipa`，**App Store 包**） | `ios` | macos-latest | 签名 + 进 latest；**构建成功即自动传 TestFlight**（见 `IOS.md` §4.3） |

@@ -5,11 +5,11 @@
 #
 # 用法（仓库任意位置都能跑）：
 #   app/macos/buildMacos.sh                 # 完整流程：签名 + 公证 + staple
-#                                           #   → _release.gitomit/einz-gui-macos-dist-v<时间>.zip
+#                                           #   → _release.gitomit/einz-app-macos-dist-v<时间>.zip
 #   app/macos/buildMacos.sh --no-notary     # 只 Developer ID 签名，跳过公证（快速自测）
-#                                           #   → …/einz-gui-macos-dist-nonotary-v<时间>.zip
+#                                           #   → …/einz-app-macos-dist-nonotary-v<时间>.zip
 #   app/macos/buildMacos.sh --adhoc         # ad-hoc 签名（无证书机器兜底）
-#                                           #   → …/einz-gui-macos-dev-v<时间>.zip
+#                                           #   → …/einz-app-macos-dev-v<时间>.zip
 #                                           #   异机/从网上下载会被 Gatekeeper 拦，仅本机调试
 #   app/macos/buildMacos.sh --server <地址> # 打完立刻拉起刚构建的 app，并把
 #                                           #   `--server <地址>` 传给它（调试用，如
@@ -162,7 +162,7 @@ case "$MODE" in
   no-notary) CHANNEL="dist-nonotary" ;;
   *)         CHANNEL="dist" ;;
 esac
-RELEASE="$RELEASE_DIR/einz-gui-macos-${CHANNEL}-v${APP_BUILD_STAMP}.zip"
+RELEASE="$RELEASE_DIR/einz-app-macos-${CHANNEL}-v${APP_BUILD_STAMP}.zip"
 rm -f "$RELEASE"
 # 用 zip 压缩包而非裸 *.app：*.app 在访达/网盘/跨机搬运中易被改坏扩展属性和
 # 签名结构（老板实测：一台 Mac 启动失败后，拷到另一台也跟着"损坏"），
