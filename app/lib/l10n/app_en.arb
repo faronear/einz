@@ -64,7 +64,7 @@
   "wizardSlotRequired": "Pick an identity",
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
   "wizardTitleInvite": "Verify token",
-  "wizardTitlePassphrase": "Set shared passphrase",
+  "wizardTitlePassphrase": "Set passphrase",
   "wizardJoinPassphraseTitle": "Verify shared passphrase",
   "wizardTitlePin": "Set PIN",
   "wizardTitleEnvelope": "Key envelope",

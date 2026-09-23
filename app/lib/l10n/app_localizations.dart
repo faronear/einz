@@ -413,7 +413,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardTitlePassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Set shared passphrase'**
+  /// **'Set passphrase'**
   String get wizardTitlePassphrase;
 
   /// No description provided for @wizardJoinPassphraseTitle.
