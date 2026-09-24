@@ -949,5 +949,5 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupPinReuseNotice =>
-      'This space will use your current lock screen code.';
+      'This space will share the current lock screen PIN.';
 }

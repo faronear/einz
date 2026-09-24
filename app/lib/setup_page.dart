@@ -2126,7 +2126,8 @@ class _SetupPageState extends State<SetupPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lock_outline, size: 40),
+          // 锁图标居中（老板 2026-09-23）；下面的文案仍靠左——只调图标
+          const Center(child: Icon(Icons.lock_outline, size: 40)),
           const SizedBox(height: 16),
           Text(l10n.setupPinReuseNotice, style: const TextStyle(fontSize: 16, height: 1.5)),
         ],

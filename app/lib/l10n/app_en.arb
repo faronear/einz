@@ -419,5 +419,5 @@
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Adding a space rewrites the encrypted vault — confirm with your PIN first",
   "spaceListDeleteConfirm": "Remove",
-  "setupPinReuseNotice": "This space will use your current lock screen code."
+  "setupPinReuseNotice": "This space will share the current lock screen PIN."
 }

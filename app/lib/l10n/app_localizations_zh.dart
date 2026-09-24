@@ -907,5 +907,5 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceListDeleteConfirm => '移除';
 
   @override
-  String get setupPinReuseNotice => '该秘境将沿用你当前的锁屏码。';
+  String get setupPinReuseNotice => '本秘境将共用当前的锁屏码。';
 }
