@@ -9,6 +9,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:einz/about_page.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/burn_after_settings.dart';
@@ -1339,6 +1340,67 @@ void main() {
     expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
   });
 
+  testWidgets('顶栏 logo + 品牌名可点：等同菜单里的「关于秘境」', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 标题（品牌名）整块可点 → 进关于秘境页
+    await tester.tap(find.text('我的秘境'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AboutPage), findsOneWidget, reason: '点标题应打开「关于秘境」页');
+  });
+
+  testWidgets('顶栏标题的可点区域四周留边距（按住高亮不贴文字边缘）',
+      (WidgetTester tester) async {
+    // 老板 2026-09-24：按住 logo+标题时，半透明高亮只贴到文字最右缘、没有余量。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final ink = tester.getSize(find
+        .ancestor(of: find.text('我的秘境'), matching: find.byType(InkWell))
+        .first);
+    final row = tester.getSize(find
+        .ancestor(of: find.text('我的秘境'), matching: find.byType(Row))
+        .first);
+    expect(ink.width, closeTo(row.width + 16, 0.5), reason: '高亮左右各留 8px 边距');
+  });
+
   testWidgets('只有一个空间时：状态条不出现下拉箭头，也不给可按芯片底色',
       (WidgetTester tester) async {
     // 老板 2026-09-24：单空间常常就是"只想和某一个人用"，别暗示这里能切换；
@@ -1382,11 +1444,6 @@ void main() {
   testWidgets('阅后即焚开启时顶栏出现沙漏+档位标记，点击直接进档位弹层',
       (WidgetTester tester) async {
     // 老板 2026-09-24：开了焚毁是"会丢消息"的状态，值得在顶栏一直看得见。
-    // 用手机尺寸渲染：档位弹层在默认 800x600 测试窗口里会被压到 9/16 高而溢出
-    // （OptionPickerSheet 既有问题，与标记无关）
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();

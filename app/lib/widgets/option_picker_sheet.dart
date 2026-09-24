@@ -88,24 +88,36 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
                         fontWeight: FontWeight.w600, fontSize: 16)),
               ),
             ),
-            for (final option in widget.options)
-              _OptionRow(
-                option: option,
-                // 提交模式高亮"待提交的选择"；点选即生效模式高亮当前生效值
-                active: option.value == _picked,
-                onTap: _needsSubmit
-                    ? () => setSheetState(() => _picked = option.value)
-                    : () => _apply(option.value),
-              ),
-            if (warning != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(warning,
-                      style: TextStyle(fontSize: 12, color: scheme.error)),
+            // 选项区可滚动：档位多（阅后即焚 6 档）+ 窗口不高时，原先是死 Column →
+            // 底部内容被裁掉并报 RenderFlex overflow（老板 2026-09-24 要求改可滚动）。
+            // 标题与底部「提交」按钮固定，只有中间这几行滚。
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final option in widget.options)
+                      _OptionRow(
+                        option: option,
+                        // 提交模式高亮"待提交的选择"；点选即生效模式高亮当前生效值
+                        active: option.value == _picked,
+                        onTap: _needsSubmit
+                            ? () => setSheetState(() => _picked = option.value)
+                            : () => _apply(option.value),
+                      ),
+                    if (warning != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(warning,
+                              style: TextStyle(fontSize: 12, color: scheme.error)),
+                        ),
+                      ),
+                  ],
                 ),
               ),
+            ),
             if (_needsSubmit)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),

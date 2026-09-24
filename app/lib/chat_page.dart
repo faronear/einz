@@ -3910,20 +3910,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       extendBodyBehindAppBar: _uiStyle == 'gradient',
       appBar: AppBar(
         backgroundColor: _uiStyle == 'gradient' ? Colors.transparent : null,
+        // titleSpacing 8 + 内边距 8 = 原来的 16：logo 位置不变，
+        // 但按住高亮的左缘退到 8（老板 2026-09-24）
+        titleSpacing: 8,
         // 抬头只显示品牌名+slogan（不暴露空间 ID，对普通用户无意义）；
         // 在线状态由对话顶部条双灯呈现（「我的」灯三态：灰=未连接服务/绿=已连接/红=断线）
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const BrandLogo(),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(l10n.chatPageTitleBrand,
-                  style: const TextStyle(fontSize: 17),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+        //
+        // logo + 品牌名**整块可点** → 等同菜单里的「关于秘境」（老板 2026-09-24：
+        // 别闲着）。命中区含 logo 与标题文字。
+        title: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: _openAboutPage,
+          child: Padding(
+            // 给按住/长按的半透明高亮留出边距（否则会紧贴标题文字的最右缘）
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const BrandLogo(),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(l10n.chatPageTitleBrand,
+                      style: const TextStyle(fontSize: 17),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         actions: [
           // 阅后即焚生效时的小标记（火苗 + 档位）：点击**直接**进档位弹层。
