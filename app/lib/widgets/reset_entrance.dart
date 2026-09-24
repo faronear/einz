@@ -1,5 +1,6 @@
 import 'package:einz_shared/einz_shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
@@ -251,6 +252,7 @@ class _ConfirmDestructiveDialogState extends State<_ConfirmDestructiveDialog> {
               controller: _pinCtrl,
               obscureText: true,
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
                 hintText: l10n.resetEntrancePinLabel,
                 border: const OutlineInputBorder(),

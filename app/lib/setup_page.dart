@@ -2149,6 +2149,7 @@ class _SetupPageState extends State<SetupPage> {
           style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           autofocus: true,
           // 开始填写即清除 PIN 红字（不依赖再点下一步）
           onChanged: (_) {
@@ -2165,6 +2166,7 @@ class _SetupPageState extends State<SetupPage> {
           style: const TextStyle(fontSize: 20),
           obscureText: true,
           keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           // 开始填写即清除 PIN 红字（不依赖再点下一步）
           onChanged: (_) {
             if (_pinError != null) setState(() => _pinError = null);

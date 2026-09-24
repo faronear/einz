@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
@@ -108,6 +109,7 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
             controller: _ctrl,
             obscureText: true,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             autofocus: true,
             decoration: InputDecoration(
               hintText: l10n.resetEntrancePinLabel,

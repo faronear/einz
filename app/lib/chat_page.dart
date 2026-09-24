@@ -4739,6 +4739,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
               controller: _oldCtrl,
               obscureText: true,
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               autofocus: _hasPin, // 已设锁屏码时这是第一个框
               decoration: InputDecoration(
                 labelText: l10n.chatPageSetLockOldLabel,
@@ -4751,6 +4752,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             controller: _pinCtrl,
             obscureText: true,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             autofocus: !_hasPin, // 未设锁屏码时 PIN 是第一个框
             decoration: InputDecoration(
               labelText: l10n.setPinDialogPinLabel,
@@ -4762,6 +4764,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
             controller: _confirmCtrl,
             obscureText: true,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: InputDecoration(
               labelText: l10n.setPinDialogConfirmLabel,
               border: const OutlineInputBorder(),

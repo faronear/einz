@@ -3,6 +3,7 @@ import 'widgets/menu_metrics.dart';
 import 'dart:io' show exit;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'about_page.dart';
 import 'brand_logo.dart';
@@ -343,6 +344,7 @@ class _LockPageState extends State<LockPage> {
                 obscureText: true,
                 enabled: !locked,
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 // 居中 + 大字号 + 字距（老板 2026-09-15）：像输手机验证码那样——
                 // PIN 是短数字串，靠左小字既不明显也不好确认位数
                 textAlign: TextAlign.center,
