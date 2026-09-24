@@ -69,4 +69,50 @@ void main() {
     expect(loaded.peerName, 'Alice');
     expect(loaded.memberName, 'Lukas');
   });
+
+  // 2026-09-24 老板实测：旧 store 的历史信封只有 sender_device_id，新代码读
+  // sender_entrance_id → null cast 抛崩 → TUI 连 /reset 都进不去。回归：
+  // ① 旧键名自动归一（值不变，AAD 用值 → 仍可解密）；② 坏信封跳过、不抛。
+  test('旧版键名的历史/待发信封可读回（自动归一，不崩）', () {
+    final st = EntranceStore(publicKey: 'pk', privateKey: 'sk')
+      ..history.add(const {
+        'v': 1,
+        'type': 'text',
+        'key_version': 1,
+        'message_id': 'm1',
+        'sender_device_id': 'dev1',
+        'sender_person_id': 'mem1',
+        'nonce': 'n',
+        'ciphertext': 'c',
+        'server_sequence': 5,
+        'created_at': 100,
+      })
+      ..pending.add(
+          '{"v":1,"type":"text","key_version":1,"message_id":"m2","sender_device_id":"dev1","nonce":"n","ciphertext":"c"}');
+
+    final envs = st.historyEnvelopes;
+    expect(envs.length, 1);
+    expect(envs.first.senderEntranceId, 'dev1'); // 旧 sender_device_id 归一
+    expect(envs.first.senderMemberId, 'mem1'); // 旧 sender_person_id 归一
+    expect(envs.first.serverSequence, 5);
+    expect(st.pendingEnvelopes.single.senderEntranceId, 'dev1');
+  });
+
+  test('损坏/无法解析的信封被跳过，不抛错', () {
+    final st = EntranceStore(publicKey: 'pk', privateKey: 'sk')
+      ..history.add(const {'garbage': true})
+      ..history.add(const {
+        'v': 1,
+        'type': 'text',
+        'key_version': 1,
+        'message_id': 'ok',
+        'sender_entrance_id': 'dev1',
+        'nonce': 'n',
+        'ciphertext': 'c',
+      })
+      ..pending.add('{ not json');
+
+    expect(st.historyEnvelopes.map((e) => e.messageId), ['ok']); // 坏的跳过、好的保留
+    expect(st.pendingEnvelopes, isEmpty);
+  });
 }

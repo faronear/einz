@@ -9306,3 +9306,29 @@ await m.addColumn(localAttachments, spaceId);    // ✗ 列已存在 → "duplic
 - app：`flutter gen-l10n` + `flutter analyze` 无 issue。
 - cli：`flutter analyze` 无 issue；`dart test` 21 例全过。
 - **未跑**：App 启动失败页逃生口、TUI `--reset` 的真机/交互测试（需老板自测）。
+
+## 2026-09-24 修复：TUI 因旧 store 历史信封键名不匹配而崩溃（`sender_device_id` → null cast）
+
+**现象**：`npm run tui2remote-cli`（无参数）→ 连不上 `einz.tic.cc`（GFW/TLS，见环境）
+→ 回车沿用 → 启动即崩：
+`type 'Null' is not a subtype of type 'String'` @ `MessageEnvelope.fromJson`
+(`message_crypto.dart:53`) ← `EntranceStore.historyEnvelopes`(`store.dart:302`) ←
+`ChatSession.loadHistory`(`chat_core.dart:153`)。进程直接死，连 `/reset` 都到不了——
+正是老板指出的"历史数据不匹配新后台就罢工"。
+
+**根因**：旧 store 的 `history`/`pending` 信封是改名前的键（`sender_device_id`/
+`sender_person_id`），新代码读 `sender_entrance_id` → null → `as String` 抛。
+App 侧不中招（drift 列由迁移 `renameColumn` 改过）。
+
+**修复**（`cli/lib/store.dart`）：
+- `_normalizeEnvelopeKeys()`：旧键→现键（**只改键名、值不变**；AAD 用的是值 → 旧历史仍可
+  解密），且**非破坏性**（返回副本，兼容 `const` map）。
+- `historyEnvelopes` / `pendingEnvelopes`：逐条 try/catch，坏/无法解析的**跳过**，
+  绝不因一条坏数据把整机 TUI 打崩。
+
+**验证**：cli `flutter analyze` 无 issue；`dart test` **23 例全过**（新增 2 条：旧键归一
+可读回、坏信封跳过不抛）。
+
+**遗留（非本次，已问老板）**：`cli/localConfig.json` 是单值 `https://einz.tic.cc` →
+`_pickReachable` 单值**短路不探测** → 本机跑 TUI **不会**试 `einz.yuanjinx.com`（备案域名）
+容灾。想启用：把该文件写成数组，或删掉；或按提议收紧代码（命中出厂域名时仍走候选探测）。
