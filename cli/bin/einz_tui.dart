@@ -1209,6 +1209,11 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
       // 是这个秘境的通道已经开满了（含已销毁的——销毁不退额度）
       session.messages.add(_systemMessage(
           session, '⚠️ 该秘境的通道数量已达服务器上限，无法再开通新通道（$e）'));
+    } else if (e.code == 'ENTRANCE_ALREADY_EXISTS') {
+      // 与 App 同一条规则（老板 2026-09-23：前后端一致）：本机在这个秘境已有通道，
+      // 重复加入只会把原来那条变成孤儿（服务端还留着），所以服务端直接拒。
+      session.messages.add(_systemMessage(session,
+          '⚠️ 本机在这个秘境里已经有通道了（一台设备对一个秘境只能有一条），不能重复加入（$e）'));
     } else {
       session.messages.add(_systemMessage(session, '⚠️ 加入秘境失败: $e'));
     }

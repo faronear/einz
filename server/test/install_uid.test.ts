@@ -6,8 +6,13 @@
  * "这几行其实是同一台设备"，于是客户端生成一个安装级 `install_uid`，随
  * create/join 上报，存量通道由 `POST /entrances/install-uid` 幂等补登。
  *
- * 三条边界：① create/join 落库；② 补登幂等、非法输入 400；③ **绝不外泄**——
- * `/space` 与 `/entrances` 的响应体里都不能出现 install_uid（成员之间不可见）。
+  * 三条边界：① create/join 落库；② 补登幂等、非法输入 400；③ **绝不外泄**——
+  * `/space` 与 `/entrances` 的响应体里都不能出现 install_uid（成员之间不可见）。
+  *
+  * ④（2026-09-23 老板定为"前后端一致"）：**同设备重复加入同一空间必须被拒**
+  * （`ENTRANCE_ALREADY_EXISTS` 409）。一台设备对一个空间只有一条通道，重复加入不是
+  * "加第二条"而是让第一条变孤儿；客户端已先拦一道，服务端这道兜旧客户端/并发。
+  * 注意这是**否决**，不是授权——install_uid 仍不参与任何操作的授权与范围判断。
  *
  * 运行：npm test（tsx test/install_uid.test.ts）
  */
@@ -19,9 +24,9 @@ import { test } from 'node:test'
 
 import { ApiError } from '../src/auth.js'
 import { getDb, openDb } from '../src/db.js'
-import { listEntrances, setInstallUid } from '../src/entrances.js'
+import { listEntrances, retireEntrance, setInstallUid } from '../src/entrances.js'
 import { getSpace } from '../src/push.js'
-import { createSpace, joinSpace } from '../src/spaces.js'
+import { createJoinToken, createSpace, joinSpace } from '../src/spaces.js'
 
 /** 同一台物理设备的标识（32 位 hex，与客户端的生成形状一致）。 */
 const UID_D = 'd'.repeat(32)
@@ -111,5 +116,58 @@ test('不外泄：/space 与 /entrances 的响应体里都不能出现 install_u
       assert.ok(!body.includes('install_uid'), `${what} 不得返回 install_uid`)
       assert.ok(!body.includes(UID_D), `${what} 不得泄漏 install_uid 的值`)
     }
+  })
+})
+
+test('同设备重复加入同一空间 → 409 ENTRANCE_ALREADY_EXISTS，且不消费开通码', async () => {
+  await withDb(async () => {
+    const space = await createSpace(
+      undefined, '我', 'male', '伴侣', 'female',
+      undefined, undefined, 'pk-d', 'iPhone', UID_D,
+    )
+    const token = createJoinToken(space.spaceId).joinToken
+
+    // 同一个 install_uid 再来一次 → 拒（它在这个空间已经有未撤销的通道了）
+    assert.throws(
+      () => joinSpace(token, 'pk-d2', 'iPhone', 1, UID_D),
+      (e: unknown) =>
+        e instanceof ApiError && e.code === 'ENTRANCE_ALREADY_EXISTS' && e.httpStatus === 409,
+      '同一设备重复加入必须被拒',
+    )
+    assert.equal(
+      (getDb().prepare(`SELECT COUNT(*) AS n FROM entrances WHERE install_uid = ?`).get(UID_D) as { n: number }).n,
+      1,
+      '被拒时不得插进第二条通道',
+    )
+    // 被拒发生在消费 token 之前 → 这个开通码还能给别的设备用
+    const other = joinSpace(token, 'pk-e', 'Pixel', 1, UID_E)
+    assert.ok(other.sessionToken, '另一个设备应能用同一个开通码加入')
+  })
+})
+
+test('原通道已退役（revoked）→ 同设备允许重新加入', async () => {
+  await withDb(async () => {
+    const space = await createSpace(
+      undefined, '我', 'male', '伴侣', 'female',
+      undefined, undefined, 'pk-d', 'iPhone', UID_D,
+    )
+    retireEntrance(space.sessionToken) // 本机这条通道不要了
+    const token = createJoinToken(space.spaceId).joinToken
+
+    const again = joinSpace(token, 'pk-d2', 'iPhone', 1, UID_D)
+    assert.ok(again.entranceId, '退役后同设备应能重新加入')
+  })
+})
+
+test('不带 install_uid（存量/未升级客户端）→ 服务端不拦', async () => {
+  await withDb(async () => {
+    const space = await createSpace(
+      undefined, '我', 'male', '伴侣', 'female',
+      undefined, undefined, 'pk-d', 'iPhone', undefined,
+    )
+    const token = createJoinToken(space.spaceId).joinToken
+
+    const joined = joinSpace(token, 'pk-d2', 'iPhone', 1, undefined)
+    assert.ok(joined.entranceId, '缺 install_uid 时不拦（那道闸门在客户端）')
   })
 })

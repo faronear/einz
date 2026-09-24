@@ -2410,6 +2410,11 @@ class _SetupPageState extends State<SetupPage> {
         // 通道数量上限（serverConfig.json maxEntrancesPerSpace，服务端 joinSpace
         // 校验）：与口令无关，不能显示成"口令验证失败"——那是另一回事
         setState(() => _status = AppLocalizations.of(context)!.setupJoinEntranceLimitReached);
+      } else if (e.code == 'ENTRANCE_ALREADY_EXISTS') {
+        // 服务端侧的同一条规则（老板 2026-09-23：前后端一致）——本机在这个秘境里
+        // 已经有通道了。正常流程会被 `_verifyJoinToken` 那道闸门先拦下，这里兜住
+        // 旧客户端 / 并发 / 本地状态被清过的情况。复用同一条文案。
+        setState(() => _status = AppLocalizations.of(context)!.setupTokenSpaceAlreadyAdded);
       } else {
         setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFailed('$e'));
       }

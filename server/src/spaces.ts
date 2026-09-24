@@ -327,6 +327,36 @@ export function joinSpace(
         )
         .run(Date.now(), tk.space_id, chosenSlot);
     }
+    // 同一台设备（install_uid）在这个空间里**已经有通道** → 拒绝再次加入。
+    //
+    // 为什么要有（老板 2026-09-23 定：前后端保持一致）：一台设备对一个空间只该有一条
+    // 通道。客户端（setup_page._verifyJoinToken）已经先拦一道，这里再拦一道兜住
+    // 旧客户端 / 并发 / 本地状态被清过的情况——否则会插进第二条，把第一条变成孤儿
+    // （客户端侧凭证被覆盖，服务端这条却还活着、还占着通道额度）。
+    //
+    // 只数**未撤销**的：status='revoked' = 那条通道已主动退役，允许重新加入。
+    // install_uid 缺失/非法（存量行、未升级客户端）为 null → 不拦（客户端那道闸门仍在）。
+    //
+    // 注意：这是**否决**（denylist），不是授权——与 installUid.ts 的定位不冲突：
+    // 它绝不参与任何操作的授权、也不决定任何破坏性操作的范围。
+    const uid = normalizeInstallUid(installUid);
+    if (uid != null) {
+      const dup = getDb()
+        .prepare(
+          `SELECT 1 FROM entrances e
+           JOIN space_members sm ON sm.partner_id = e.partner_id
+           WHERE sm.space_id = ? AND e.install_uid = ? AND e.status != 'revoked'
+           LIMIT 1`,
+        )
+        .get(tk.space_id, uid);
+      if (dup) {
+        throw new ApiError(
+          "ENTRANCE_ALREADY_EXISTS",
+          "this device already has an entrance in this space",
+          409,
+        );
+      }
+    }
     // 通道数量上限（serverConfig.json 的 maxEntrancesPerSpace：0=不限）——
     // **必须在事务内**计：preflight 不消费 token，并发两个 join 会同时通过预检
     // 然后双双插通道 → 超额。计数按"该空间登记过的通道总数"，**含已撤销**：
