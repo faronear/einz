@@ -6,7 +6,7 @@
 // （Vault 按 spaceId 存一份凭证），所以重复添加必须拦。
 //
 // 拦点在 `_verifyJoinToken`：preflight 之后（此时才知道目标 spaceId）、**消费一次性
-// 邀请码之前**（被拒绝的邀请码还能发给别的设备用，且没有任何服务端副作用）。
+// 之前**（被拒绝的开通码还能发给别的设备用，且没有任何服务端副作用）。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';

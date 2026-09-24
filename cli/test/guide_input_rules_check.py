@@ -13,7 +13,7 @@
 #      （不进入加入——否则会先 joinSpace 再取不到 Space Key，通道卡在
 #      "已登记但无密钥"的坏状态）；补输同一口令后加入成功
 #   4) join 口令输错：应停在口令环节提示重输，且**同一个** join token 仍可用
-#      （旧实现先 joinSpace 消费 token 再验口令 → 一输错就被踢回邀请码环节，
+#      （旧实现先 joinSpace 消费 token 再验口令 → 一输错就被踢回开通码环节，
 #      已接受的 token 作废——老板 2026-09-12 反馈）
 #
 # 运行：python3 cli/test/guide_input_rules_check.py
@@ -192,7 +192,7 @@ def main():
         # ---------- 通道 B：join 的口令也必须必填 ----------
         with open(store) as f:
             store_a = json.load(f)
-        # 签发邀请码是空间级操作，必须带本空间成员会话（server C1 修复后要求
+        # 签发开通码是空间级操作，必须带本空间成员会话（server C1 修复后要求
         # 认证——此前裸 POST 也能签，现已 400）
         req = urllib.request.Request(
             f'http://127.0.0.1:{port}/spaces/{store_a["space_id"]}/join-tokens',
@@ -203,7 +203,7 @@ def main():
             with urllib.request.urlopen(req, timeout=5) as r:
                 join_token = json.load(r)['joinToken']
         except urllib.error.HTTPError as e:
-            print(f'❌ 签发邀请码失败（HTTP {e.code}）: {e.read().decode("utf-8", "replace")[:300]}')
+            print(f'❌ 签发开通码失败（HTTP {e.code}）: {e.read().decode("utf-8", "replace")[:300]}')
             return 1
 
         store_b = os.path.join(WORK, 'b.json')
@@ -233,7 +233,7 @@ def main():
 
         # ---------- 口令错误：必须停在口令环节重输，且不能烧掉 join token ----------
         # （旧实现：先 joinSpace 消费一次性 token 再验口令 → 失败即落到「加入秘境
-        #   失败」并退回邀请码环节，已接受的 token 作废——老板 2026-09-12 反馈）
+        #   失败」并退回开通码环节，已接受的 token 作废——老板 2026-09-12 反馈）
         send(m2, 'wrong-pass\r')
         out = wait_text(m2, '口令错误', timeout=30)
         if '口令错误，请重新输入' not in out:
@@ -241,7 +241,7 @@ def main():
             print(out[-800:])
             return 1
         if '加入秘境失败' in out or '输入开通码' in out:
-            print('❌ B 输错口令竟退回邀请码环节（token 被烧掉）')
+            print('❌ B 输错口令竟退回开通码环节（token 被烧掉）')
             print(out[-800:])
             return 1
 

@@ -166,7 +166,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         # 消息区（重绘再现），不可用作"回到首问"信号——若真的回到首问，
         # 重输 token 提示等不到（read_until 超时）即失败
         name, out, _ = read_until(m, [
-            ("rejected", re.compile(r"加入秘境失败|邀请码验证失败|邀请码无效")),
+            ("rejected", re.compile(r"加入秘境失败")),
         ], prefix=label)
         if name != "rejected":
             print(f"FAIL {label}: 错误 token 未被拒绝。输出:\n", out[-600:])
@@ -281,7 +281,7 @@ def main():
             SERVER + "/spaces/" + store_a["space_id"] + "/join-tokens", method="POST")
         # 服务端后来加的两道收口，缺任一都会让本函数失败（探针曾因此静默失效很久）：
         # ① 协议版本头——缺 → 400 PROTOCOL_VERSION_MISMATCH；
-        # ② 成员会话——C1 修复后「签发邀请码」必须持该空间成员会话，缺 → 401。
+        # ② 成员会话——C1 修复后「签发开通码」必须持该空间成员会话，缺 → 401。
         req.add_header("X-Protocol-Version", "1")
         req.add_header("Authorization", "Bearer " + store_a["session_token"])
         with urllib.request.urlopen(req, timeout=5) as r:

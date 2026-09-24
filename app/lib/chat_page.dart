@@ -894,7 +894,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 二维码与展示内容 = 邀请链接（`https://einz.tic.cc/join/<token>`），对方 App/
   /// CLI 可扫码或粘贴链接加入；口令由对方加入时另行输入（降级 B，与 TUI 一致）。
   Future<void> _showInviteDialog() async {
-    // 老板决策：点顶栏添加按钮直接生成邀请码（不再先弹"开通通道"确认窗）
+    // 老板决策：点顶栏添加按钮直接生成开通码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
       var r = await api.createJoinToken(widget.spaceId, widget.token);
@@ -3827,7 +3827,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               tooltip: l10n.chatPageLockNow,
               onPressed: _lockNow,
             ),
-          // 顶栏统一入口：语言/阅后即焚/邀请码/本机 PIN（显示各功能当前值）
+          // 顶栏统一入口：语言/阅后即焚/开通码/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu),
             tooltip: l10n.chatPageMenuMore,
@@ -4785,7 +4785,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 说明文字（与创建向导**共用同一句** wizardPassphraseHint，老板 2026-09-15
-          // 要求统一口径；样式与邀请码 / PIN 弹窗一致：大标题下小字说明）
+          // 要求统一口径；样式与开通码 / PIN 弹窗一致：大标题下小字说明）
           Text(
             l10n.wizardPassphraseHint,
             style: TextStyle(
@@ -5175,9 +5175,9 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   }
 }
 
-/// 邀请码二维码（自绘，替代 QrImageView）。
+/// 邀请链接二维码（自绘，替代 QrImageView）。
 ///
-/// QrImageView（qr_flutter 4.1.0）两个坑（2026-09-08 老板真机报告：生成邀请码
+/// QrImageView（qr_flutter 4.1.0）两个坑（2026-09-08 老板真机报告：生成开通码
 /// 时屏幕变暗但弹窗不出现；且弹窗里的二维码从未显示）：
 /// 1. 内部无条件包 LayoutBuilder，而 AlertDialog 用 IntrinsicWidth 包裹内容做
 ///    固有尺寸测量 → performLayout 抛 "LayoutBuilder does not support returning

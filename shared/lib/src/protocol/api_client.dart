@@ -187,8 +187,6 @@ class ApiClient {
     return PassphraseEnvelope.fromJson(pkg);
   }
 
-  /// 生成邀请码（POST /invites，需认证 token）：partner_id 为规范 id（partnerA/partnerB）。
-  
   Future<PostMessageResult> postMessage(MessageEnvelope env, String token) async {
     final res = await _post(Api.messages, env.toJson(), token: token);
     return PostMessageResult.fromJson(res);

@@ -187,8 +187,8 @@ class SpaceCreateResult {
       );
 }
 
-/// 邀请码生成结果（POST /invites 返回，创建者调用）。
-/// Multiverse：POST /spaces/{id}/join-tokens 生成的绑定新通道的邀请（24h 一次性）。
+/// 开通码生成结果（创建者调用）：POST /spaces/{id}/join-tokens 生成的、绑定一条新通道的
+/// 一次性授权（24h 内一次性有效）。
 class JoinTokenResult {
   const JoinTokenResult({
     required this.joinToken,

@@ -166,7 +166,7 @@ def finish_onboarding(master, label):
 
 
 def join_flow(label, store, port, token, identity):
-    """加入流程：J → 邀请码 → 完整名字选身份 → 口令 → 加入成功。"""
+    """加入流程：J → 开通码 → 完整名字选身份 → 口令 → 加入成功。"""
     master, p = start_tui(store, port)
     if '创建秘境' not in wait_text(master, '创建秘境'):
         print(f'FAIL {label}: 未等到创建/加入选择')
