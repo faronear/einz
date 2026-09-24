@@ -9213,6 +9213,61 @@ Vault）走另一分支，不受影响。老板的 macOS 实例设了 PIN，故�
 彻底退出 App（**Cmd+Q，而非关窗**——macOS 关窗不杀进程，`VaultSession` 是进程内存）后重开，
 解锁一次即让存量 pending 生效（也可直接让新包跑一次解锁）。
 
+## 2026-09-24 修复：本地库迁移不幂等 → 版本戳落后的库把生产版 App brick 在"启动初始化失败"
+
+### 现象（老板 iMac 生产版）
+
+装了生产版 macOS App，一启动就停在**"启动初始化失败，配置未丢失，请重试"**（= `StartupGate`
+重试 4 次仍抛异常后展示的那页），无法进入 App，也就没法"销毁本通道再重建"。
+
+### 根因
+
+本机那份默认库（`~/Library/Containers/cc.tic.einz/Data/Documents/einz.sqlite`）
+**`user_version = 6`，但实际 schema 已经含 v7 才引入的对象**：`spaces` 表存在、
+`local_attachments.space_id` 存在（另见 `spaces.person_id/device_id`、`sender_device_id`
+等改名前列，`identity.device_person_map`）。
+
+于是新 App（`schemaVersion = 9`）打开时跑 `onUpgrade(from=6)` → 命中 `from < 7` 分支：
+
+```
+await m.createTable(spaces);                     // 安全：CREATE TABLE IF NOT EXISTS
+await m.addColumn(localAttachments, spaceId);    // ✗ 列已存在 → "duplicate column name: space_id" 抛错
+```
+
+`addColumn` 就是 `ALTER TABLE ... ADD COLUMN`（实测 `duplicate column name` 报错），
+迁移一抛 → 库打不开 → `_check()` 每次都在这里抛 → 重试耗尽 → 启动失败。**界面只有"重试"，
+无出路**（这也是个独立的健壮性缺口）。
+
+至于"版本戳为什么落后于 schema"：该库由某个 schema 尚含 `spaces`/`space_id` 但
+`user_version` 仍为 6 的历史/开发构建写出（`spaces` 于 `1dd2b89` 引入并同步 bump 到 v7，
+但这份库早于那次 bump 或来自分支工作区）。**结论：与本次 partner→member / 锁屏码改动无关，
+是既有的迁移脆弱点**；生产用户全新安装无此库，不会命中，但开发机/半升级库会。
+
+### 修复
+
+`app/lib/data/local_database.dart`：给迁移加**幂等**——每步 `addColumn` / `renameColumn`
+前先查 `PRAGMA table_info`（新增 `_hasColumn`），已存在/已改名就跳过。`createTable` 本就是
+`IF NOT EXISTS` 无需处理。这样版本戳落后于实际 schema 的库也能一路升到 v9，不再 brick。
+（逐列判存在也顺带覆盖"超前"库。）
+
+### 验证
+
+- 新增 `app/test/local_database_migration_test.dart`：用 `sqlite3` CLI 造出
+  "`user_version=6` 但已含 `spaces`+`space_id`+改名前列"的库，断言迁到 9 且列改名正确
+  （旧列不残留）。
+- **对老板真库的副本实跑**：迁移前 `user_version=6` → 迁移后 `9`，
+  `spaces` 列变 `[…, member_id, entrance_id, …]`、`local_messages.sender_entrance_id=true`。
+- `flutter analyze` 无 issue。
+
+### 老板侧（如何让当前那台启动）
+
+- **首选**：用带本修复的代码**重新构建/安装**生产版 → 启动时会自动把旧库迁到 v9 并正常进入。
+- **或**：想彻底从头来（本来就打算销毁重建）→ 清掉本机数据再启（沙盒库 + Keychain 条目）。
+  可让我代做，或卸装重装（`ensureFreshInstall` 会清残留 SecureStore）。
+- 待办（建议）：`StartupGate` 的失败页目前只有"重试"——可加一个「清除本机数据并重来」
+  逃生口，避免任何迁移失败都把 App 锁死（本次没做，等老板定）。
+
+
 
 
 

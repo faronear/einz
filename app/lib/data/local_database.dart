@@ -151,37 +151,54 @@ class LocalDatabase extends _$LocalDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
+          // 幂等：某些历史/开发库的 `user_version` 会**落后于实际 schema**（例如
+          // version 记 6 但已存在 v7 才引入的 `spaces` 表与 `local_attachments.space_id`）。
+          // 直接 `ALTER TABLE ADD COLUMN` 会抛 "duplicate column name" → 迁移失败 →
+          // 启动门重试耗尽 → "启动初始化失败"，且界面无出路。此处在每一步前先查
+          // `PRAGMA table_info`，已存在就跳过（2026-09-24 iMac 生产库实测到该状态）。
           if (from < 2) {
             // v2：local_messages 加阅后即焚列（burn_after_seconds 默认 0、expires_at 可空）
-            await m.addColumn(localMessages, localMessages.burnAfterSeconds);
-            await m.addColumn(localMessages, localMessages.expiresAt);
+            if (!await _hasColumn('local_messages', 'burn_after_seconds')) {
+              await m.addColumn(localMessages, localMessages.burnAfterSeconds);
+            }
+            if (!await _hasColumn('local_messages', 'expires_at')) {
+              await m.addColumn(localMessages, localMessages.expiresAt);
+            }
           }
           if (from < 3) {
             // v3：local_messages 加本地墓碑列（deleted_at 可空）——删除/焚毁改为
             // 打标记（内容隐藏、记录保留），不再彻底删行（老板决策 2026-09-09）
-            await m.addColumn(localMessages, localMessages.deletedAt);
+            if (!await _hasColumn('local_messages', 'deleted_at')) {
+              await m.addColumn(localMessages, localMessages.deletedAt);
+            }
           }
           if (from < 4) {
             // v4：local_attachments 加本地密文副本列（发送端即时显示/离线兜底，
             // 图片视频直接展示，老板 2026-09-11）
-            await m.addColumn(localAttachments, localAttachments.localCipher);
+            if (!await _hasColumn('local_attachments', 'local_cipher')) {
+              await m.addColumn(localAttachments, localAttachments.localCipher);
+            }
           }
           if (from < 5) {
             // v5：local_messages 加单条焚毁「是否手动设置」列（默认 false=全局设置）。
             // 仅手动设置的消息在气泡里标注「设置(修改)时间+时长」（老板 2026-09-12）
-            await m.addColumn(localMessages, localMessages.burnManual);
+            if (!await _hasColumn('local_messages', 'burn_manual')) {
+              await m.addColumn(localMessages, localMessages.burnManual);
+            }
           }
           if (from < 6) {
             // v6：新增 peer_receipts 表（对方已送达/已读高水位；本轮只落库不显示）
-            await m.createTable(peerReceipts);
+            await m.createTable(peerReceipts); // CREATE TABLE IF NOT EXISTS
           }
           if (from < 7) {
             // v7：新增 spaces 表（多空间元数据）。**不灌数据**——PIN 模式下的旧
             // 锁包在迁移阶段无法解密，改由解锁/读到凭证时补写该行（幂等 upsert）。
-            await m.createTable(spaces);
+            await m.createTable(spaces); // CREATE TABLE IF NOT EXISTS
             // v7：local_attachments 加 spaceId（多空间隔离），按 messageId 从
             // local_messages 回填（存量库只有单空间，回填写得对；回填不到留空串）
-            await m.addColumn(localAttachments, localAttachments.spaceId);
+            if (!await _hasColumn('local_attachments', 'space_id')) {
+              await m.addColumn(localAttachments, localAttachments.spaceId);
+            }
             await customStatement(
               'UPDATE local_attachments SET space_id = '
               'COALESCE((SELECT m.space_id FROM local_messages m '
@@ -192,20 +209,39 @@ class LocalDatabase extends _$LocalDatabase {
             // v8（历史，2026-09-23）：术语改名 device→entrance、person→partner。纯列改名，
             // 数据保留（ALTER TABLE RENAME COLUMN，SQLite ≥3.25）。身份列这里直接落到
             // **最终列名 member_id**——partner→member 已合入同一批（v9），无需两跳。
-            await m.renameColumn(
-              localMessages, 'sender_device_id', localMessages.senderEntranceId);
-            await m.renameColumn(peerReceipts, 'person_id', peerReceipts.memberId);
-            await m.renameColumn(spaces, 'person_id', spaces.memberId);
-            await m.renameColumn(spaces, 'device_id', spaces.entranceId);
+            // 逐列判存在：落后/超前库可能只有其中之一。
+            if (await _hasColumn('local_messages', 'sender_device_id')) {
+              await m.renameColumn(
+                localMessages, 'sender_device_id', localMessages.senderEntranceId);
+            }
+            if (await _hasColumn('peer_receipts', 'person_id')) {
+              await m.renameColumn(peerReceipts, 'person_id', peerReceipts.memberId);
+            }
+            if (await _hasColumn('spaces', 'person_id')) {
+              await m.renameColumn(spaces, 'person_id', spaces.memberId);
+            }
+            if (await _hasColumn('spaces', 'device_id')) {
+              await m.renameColumn(spaces, 'device_id', spaces.entranceId);
+            }
           } else if (from < 9) {
             // v9（2026-09-24）：串术语改名 partner→member（列 partner_id→member_id）。
             // 只服务“已升到 v8（列名还是 partner_id）的存量库”；from<8 的库在上一分支
             // 已直接落到 member_id，故不重复改名。
-            await m.renameColumn(peerReceipts, 'partner_id', peerReceipts.memberId);
-            await m.renameColumn(spaces, 'partner_id', spaces.memberId);
+            if (await _hasColumn('peer_receipts', 'partner_id')) {
+              await m.renameColumn(peerReceipts, 'partner_id', peerReceipts.memberId);
+            }
+            if (await _hasColumn('spaces', 'partner_id')) {
+              await m.renameColumn(spaces, 'partner_id', spaces.memberId);
+            }
           }
         },
       );
+
+  /// 表 [table] 是否有列 [column]（迁移幂等用；表不存在时返回 false）。
+  Future<bool> _hasColumn(String table, String column) async {
+    final rows = await customSelect('PRAGMA table_info($table)').get();
+    return rows.any((r) => r.read<String>('name') == column);
+  }
 
   static QueryExecutor _openConnection() => driftDatabase(
         name: 'einz',
