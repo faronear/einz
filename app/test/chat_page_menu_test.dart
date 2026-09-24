@@ -13,6 +13,7 @@ import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
 import 'package:einz_shared/einz_shared.dart';
@@ -157,6 +158,8 @@ void main() {
   setUp(() {
     // PIN 设置/清除走 SecureStore（Keychain/Keystore），测试环境用插件 mock
     FlutterSecureStorage.setMockInitialValues({});
+    // 进程级解锁态是静态的（状态条据它判断单/多空间）→ 逐用例复位
+    VaultSession.publish(null);
   });
 
   testWidgets('顶栏菜单→本机PIN→返回 不崩溃（_dependents.isEmpty 回归）', (WidgetTester tester) async {
@@ -1289,9 +1292,18 @@ void main() {
       (WidgetTester tester) async {
     // 老板动机：从对话页切空间原先是「☰ → 扫菜单 → 点『切换我的秘境』」三步；
     // 改为状态条上对方名字旁一个下拉箭头，一点即开——省一次跳转 + 一次扫菜单。
+    // 注意：箭头**只在有 2 个及以上空间时**出现（单空间不给切换暗示）。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
+    // 两个空间 + 进内存会话（状态条从 VaultSession 读空间数）
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(const AppLockPayload(
+        spaceKeyB64: 'a2V5LWE=', spaceId: 'space-a', entranceId: 'dev-a', token: 'tok-a'));
+    await lock.addSpace(const AppLockPayload(
+        spaceKeyB64: 'a2V5LWI=', spaceId: 'space-b', entranceId: 'dev-b', token: 'tok-b'));
+    await lock.loadVault();
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1312,7 +1324,7 @@ void main() {
 
     // 箭头在顶部状态条内（对方在线圆点/名字旁），不是别处的图标
     final chevron = find.byIcon(Icons.arrow_drop_down);
-    expect(chevron, findsOneWidget, reason: '状态条应出现下拉箭头');
+    expect(chevron, findsOneWidget, reason: '多空间时状态条应出现下拉箭头');
     expect(
       find.ancestor(
           of: chevron,
@@ -1325,6 +1337,46 @@ void main() {
     await tester.tap(chevron);
     await tester.pumpAndSettle();
     expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
+  });
+
+  testWidgets('只有一个空间时：状态条不出现下拉箭头，也不给可按芯片底色',
+      (WidgetTester tester) async {
+    // 老板 2026-09-24：单空间常常就是"只想和某一个人用"，别暗示这里能切换；
+    // 真要加空间，去汉堡菜单里找（菜单项保留）。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(const AppLockPayload(
+        spaceKeyB64: 'a2V5LWE=', spaceId: 'space-a', entranceId: 'dev-a', token: 'tok-a'));
+    await lock.loadVault(); // 只有 1 个空间
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-a',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final statusBar = find.byKey(const ValueKey('chatPageStatusBar'));
+    expect(statusBar, findsOneWidget);
+    expect(find.descendant(of: statusBar, matching: find.byIcon(Icons.arrow_drop_down)),
+        findsNothing, reason: '单空间不给下拉箭头');
+    expect(find.descendant(of: statusBar, matching: find.byType(Tooltip)),
+        findsNothing, reason: '单空间没有「切换我的秘境」的芯片（无 Tooltip）');
+    expect(find.descendant(of: statusBar, matching: find.byIcon(Icons.circle)),
+        findsWidgets, reason: '圆点（在线状态）仍应在');
   });
 
   testWidgets('阅后即焚开启时顶栏出现沙漏+档位标记，点击直接进档位弹层',

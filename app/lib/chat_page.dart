@@ -914,6 +914,61 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       );
 
+  /// 顶栏状态条左侧的「对方」这一块。
+  ///
+  /// - **2 个及以上空间** → 做成可按芯片（底色比胶囊略深一档 + 右侧圆角 + 下拉箭头），
+  ///   一点打开「选择秘境」弹层（老板 2026-09-24：省掉「☰ → 眼扫菜单 → 点切换」，
+  ///   与微信「左上角返回→选人」同一肌肉记忆）。位置放**对方名字**旁：空间卡片上
+  ///   显示的就是对方名字，语义同源。
+  /// - **只有 1 个空间** → 纯"圆点 + 名字"，**不给箭头、不给底色**（老板 2026-09-24：
+  ///   单空间往往就是想和一个人用，别暗示这里能切；真要加空间去汉堡菜单里找）。
+  ///
+  /// 空间数取自内存里已解锁的 [VaultSession]（不触安全存储、不需要 PIN）；
+  /// 取不到时（如测试直接构造 ChatPage）按单空间处理——最保守，入口仍在菜单里。
+  Widget _buildPeerStatus(AppLocalizations l10n) {
+    final multiSpace = (VaultSession.current?.spaces.length ?? 0) > 1;
+    // 左 16 = 原胶囊的左内边距；右 10 给箭头/右缘留白
+    const pad = EdgeInsets.fromLTRB(16, 6, 10, 6);
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.circle, size: 8,
+            color: _peerOnline ? Colors.green : Colors.red),
+        if (_peerName.isNotEmpty) ...[
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(_peerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          ),
+        ],
+        if (multiSpace) ...[
+          // 与人名拉开 6px：线箭头和人名笔画相近，贴太近不好区分（老板 2026-09-24）；
+          // 实心三角比线箭头更像「下拉」。
+          const SizedBox(width: 6),
+          Icon(Icons.arrow_drop_down,
+              size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ],
+      ],
+    );
+    if (!multiSpace) return Padding(padding: pad, child: content);
+    return Tooltip(
+      message: l10n.spaceListSwitch,
+      child: Material(
+        // 比胶囊底（白 85%）略深一档：做出"这一块能按"的暗示
+        color: Colors.black.withValues(alpha: 0.055),
+        elevation: 0,
+        // 只圆右边：左边上下角交给外层胶囊的 clip 对齐（三边完全贴合）
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: _openSpacePicker, child: Padding(padding: pad, child: content)),
+      ),
+    );
+  }
+
   /// 「切换空间」：弹「选择秘境」弹层（小卡片瀑布流）→ 选中即**直接换到那个空间**（不跳页）。
   /// 弹层底部还有「＋ 新建/加入空间」通往第一屏（需要先过一次锁屏码，见 addSpaceFlow）。
   ///
@@ -4146,57 +4201,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 子项撑满高度 → 左侧那块上下与胶囊贴合
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 对方（左）：在线圆点 + 名字 + 「切换我的秘境」下拉箭头。
-                  // **整块做成一个"可按区域"**（底色比胶囊略深一档 + 右侧圆角，暗示可点），
-                  // 一步打开空间选择弹层（老板 2026-09-24）：省掉「☰ → 眼睛扫菜单 →
-                  // 点『切换我的秘境』」，与微信「左上角返回→选人」同一肌肉记忆。
-                  // 位置放**对方名字**旁：空间卡片上显示的就是对方名字，语义同源。
-                  Flexible(
-                    child: Tooltip(
-                      message: l10n.spaceListSwitch,
-                      child: Material(
-                        // 比胶囊底（白 85%）略深一档：做出"这一块能按"的暗示
-                        color: Colors.black.withValues(alpha: 0.055),
-                        elevation: 0,
-                        // 只圆右边：左边上下角交给外层胶囊的 clip 对齐（三边完全贴合）
-                        shape: const RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.horizontal(right: Radius.circular(24)),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: _openSpacePicker,
-                          child: Padding(
-                            // 左 16 = 原胶囊的左内边距；右 10 给箭头留白
-                            padding: const EdgeInsets.fromLTRB(16, 6, 10, 6),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.circle, size: 8,
-                                    color: _peerOnline ? Colors.green : Colors.red),
-                                if (_peerName.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(_peerName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                            fontSize: 13, fontWeight: FontWeight.w500)),
-                                  ),
-                                ],
-                                // 与人名拉开 6px：线箭头和人名笔画相近，贴太近不好区分
-                                // （老板 2026-09-24）；实心三角比线箭头更像「下拉」。
-                                const SizedBox(width: 6),
-                                Icon(Icons.arrow_drop_down,
-                                    size: 20,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  // 对方（左）：圆点 + 名字（多空间时再加下拉箭头与可按底色）
+                  Flexible(child: _buildPeerStatus(l10n)),
                   // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
                   // 名字为空则不显示文本，只留圆点）。名字同样在本侧一半内省略。
                   Flexible(
