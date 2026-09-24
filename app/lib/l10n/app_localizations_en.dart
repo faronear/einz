@@ -229,7 +229,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Create a secret space for two, or join an existing space with a one-time token.';
+      'Einz is a secret space for just two. You can create a new one, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
