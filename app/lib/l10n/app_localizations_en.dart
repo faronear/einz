@@ -260,7 +260,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenHint =>
-      'The entrance goes live only after a token is verified. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
+      'Open the dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
 
   @override
   String get setupTokenInputHint => 'Paste the token or invite link';
@@ -942,7 +942,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get promptLockCodeHint =>
-      'Adding a space rewrites the encrypted vault — confirm with your PIN first';
+      'Verify this device\'s lock screen code first';
 
   @override
   String get spaceListDeleteConfirm => 'Remove';

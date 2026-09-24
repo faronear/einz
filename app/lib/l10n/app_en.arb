@@ -102,7 +102,7 @@
     "placeholders": { "code": { "type": "String" } }
   },
   "setupTokenTitle": "Verify token",
-  "setupTokenHint": "The entrance goes live only after a token is verified. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
+  "setupTokenHint": "Open the dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
   "setupTokenInputHint": "Paste the token or invite link",
   "setupTokenNeedInput": "Enter the token",
   "setupTokenInvalid": "Invalid token",
@@ -417,7 +417,7 @@
   "spaceListAdd": "Add a space",
   "spaceListSwitch": "Switch my space",
   "promptLockCodeTitle": "Enter your PIN",
-  "promptLockCodeHint": "Adding a space rewrites the encrypted vault — confirm with your PIN first",
+  "promptLockCodeHint": "Verify this device's lock screen code first",
   "spaceListDeleteConfirm": "Remove",
   "setupPinReuseNotice": "This space will share the current PIN."
 }

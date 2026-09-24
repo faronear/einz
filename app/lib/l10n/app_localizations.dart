@@ -545,7 +545,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'The entrance goes live only after a token is verified. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
+  /// **'Open the dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
@@ -1733,7 +1733,7 @@ abstract class AppLocalizations {
   /// No description provided for @promptLockCodeHint.
   ///
   /// In en, this message translates to:
-  /// **'Adding a space rewrites the encrypted vault — confirm with your PIN first'**
+  /// **'Verify this device\'s lock screen code first'**
   String get promptLockCodeHint;
 
   /// No description provided for @spaceListDeleteConfirm.

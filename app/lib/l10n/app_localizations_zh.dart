@@ -247,8 +247,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenTitle => '验证开通码';
 
   @override
-  String get setupTokenHint =>
-      '验证成功后，才能开通本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
+  String get setupTokenHint => '开启本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
 
   @override
   String get setupTokenInputHint => '开通码或邀请链接';
@@ -901,7 +900,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get promptLockCodeTitle => '输入锁屏码';
 
   @override
-  String get promptLockCodeHint => '新增秘境要写入加密锁包，先验证本机锁屏码';
+  String get promptLockCodeHint => '请先验证本机锁屏码';
 
   @override
   String get spaceListDeleteConfirm => '移除';
