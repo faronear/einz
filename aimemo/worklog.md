@@ -9075,4 +9075,26 @@ EINZ_E2E_PORT=3991 python3 cli/test/guide_input_rules_check.py   # 它自己起 
 worklog 拖到下一轮，导致复盘要靠 `git log` 反推——这条已写入长期记忆
 （`memory/feedback_worklog_with_code.md`）。本条目正是一次"事后补账"。
 
+## 2026-09-24 · `feature/multiSpace` 合并回 `main`（正式启用）
+
+- **合并形态：fast-forward**。`git merge-base main feature/multiSpace` 就是 `main`
+  当时的 HEAD（`d476080`），即 main 是 feature 的**严格祖先**（main 领先 feature 的提交数 = 0）
+  → 无冲突、无需 merge commit，main 直接推进到 `fd6f7ad`。仓库历史里此前的 merge
+  commit 都是"把 main 合进 feature"，方向相反，所以这次不需要。
+- **规模**：177 个文件，+13642/−5696。含 01→02 协议改名（device→entrance、
+  person→partner、wire v1→v2）、多空间（Vault/Spaces 表/空间切换/未读）、
+  `install_uid`、破坏性入口两档化、`docs/GLOSSARY.md`、
+  以及这一轮顶栏与空间卡片打磨。
+- **合并前验证（全绿才动手）**：
+  - App `flutter test`：**198 过 / 1 跳过 / 0 失败**
+  - Server `npm test`：**31 条 / 15 个 suite / fail 0**（exit 0）
+  - Shared `dart test`：**52 过**
+- **状态**：`main` 领先 `origin/main` **141** 个提交，**未推送**（推送与部署按惯例留给老板）。
+  `feature/multiSpace` 仍指向同一提交，未删除。
+- **版本号无需 bump**：`scripts/appVersion.js` 是打包时按 UTC 现算
+  （`yymmddhhmm`），不依赖 git tag。
+- CI 改动（`buildMultiPlatform.yml`）只是 Windows/macOS 产物改名
+  `einz-gui-*` → `einz-app-*`，不影响启用流程。
+
+
 
