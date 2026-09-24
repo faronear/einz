@@ -3867,8 +3867,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 行内左侧标签用稍淡色，与右侧当前值文字（默认 onSurface 深色）区分
               // 左侧标签 = **备注级**（淡色小字，不抢戏）；右侧"当前值" = 深色大字（老板 2026-09-23 定：
               // 左侧相当于备注，不用强调，右侧才是用户要看的东西 ✓）。
-              final labelStyle =
-                  TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
+              // 显式钉死 13，与 captionStyle 一致——否则没写 fontSize 会落到平台默认
+              // （macOS 偏大），同一菜单里纯标签行（头像/生成开通码/高级安全/关于/切换/退出）
+              // 会比带值的行（我的身份/语言/主题/通道名称/阅后即焚/附件/锁屏码）显大一号
+              final labelStyle = TextStyle(
+                  fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant);
               final captionStyle = TextStyle(
                   fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant);
               final valueStyle = TextStyle(
