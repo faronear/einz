@@ -10,3 +10,9 @@ const double kMenuRowHeight = 40;
 
 /// 分割线占位高度（线本身 1px 居中）：16 → 8，上下各留 ~3.5px。
 const double kMenuDividerHeight = 8;
+
+/// 菜单行右侧「当前值」的最大宽度：名字 / 通道名是用户可任意填的长文本，
+/// 不给上限会撑破 PopupMenu——老板 2026-09-24 实测长名字触发
+/// `right overflowed by 69 pixels`（黄黑条 + 红字）。
+/// 超出即省略号；**带值的行共用同一个上限**，避免逐行各写一个数而漂移。
+const double kMenuValueMaxWidth = 180;

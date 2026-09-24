@@ -422,7 +422,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHint =>
-      'Send it to your partner — or another device of your own — to start a new channel into this space. One-time use, valid for 24 hours.';
+      'Send it to your partner — or another device of your own — to setup a new entrance into this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
@@ -487,7 +487,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.';
+      'An entrance is the dedicated line between a device and a space. Settings on this entrance works only between this device and the current space.';
 
   @override
   String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';

@@ -827,7 +827,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHint.
   ///
   /// In en, this message translates to:
-  /// **'Send it to your partner — or another device of your own — to start a new channel into this space. One-time use, valid for 24 hours.'**
+  /// **'Send it to your partner — or another device of your own — to setup a new entrance into this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHint;
 
   /// No description provided for @chatPageInviteCopyLinkTooltip.
@@ -947,7 +947,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance is the secure line between a device and a space, opened only after verification. This entrance works only on this device and in this space.'**
+  /// **'An entrance is the dedicated line between a device and a space. Settings on this entrance works only between this device and the current space.'**
   String get chatPageEntranceScopeHint;
 
   /// No description provided for @chatPageRenameEntranceEmptyError.

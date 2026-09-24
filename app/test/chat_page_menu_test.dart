@@ -771,7 +771,7 @@ void main() {
 
     // 弹窗标题与备注（老板 2026-09-23 新文案）
     expect(find.text('当前通道'), findsWidgets, reason: '弹窗标题应为「当前通道」');
-    expect(find.text('通道是设备连接到秘境的安全线路，必须经过认证才能开通。本通道仅能用于本机和当前秘境。'), findsOneWidget,
+    expect(find.text('通道是设备连接到秘境的专属线路。当前通道的设置仅对本机和当前秘境有效。'), findsOneWidget,
         reason: '应显示通道备注说明');
     expect(find.text('通道公钥'), findsOneWidget, reason: '公钥标签');
     expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
@@ -1284,6 +1284,48 @@ void main() {
     expect(find.text('切换我的秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
+  testWidgets('状态条（对方名字旁）下拉箭头：一步打开空间弹层（老板 2026-09-24）',
+      (WidgetTester tester) async {
+    // 老板动机：从对话页切空间原先是「☰ → 扫菜单 → 点『切换我的秘境』」三步；
+    // 改为状态条上对方名字旁一个下拉箭头，一点即开——省一次跳转 + 一次扫菜单。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
+
+    // 箭头在顶部状态条内（对方在线圆点/名字旁），不是别处的图标
+    final chevron = find.byIcon(Icons.arrow_drop_down);
+    expect(chevron, findsOneWidget, reason: '状态条应出现下拉箭头');
+    expect(
+      find.ancestor(
+          of: chevron,
+          matching: find.byKey(const ValueKey('chatPageStatusBar'))),
+      findsOneWidget,
+      reason: '箭头应落在 chatPageStatusBar 内',
+    );
+
+    // 一步点开：直接进空间选择弹层（标题即证明弹层已弹出；文案由老板润色，不 assert 按钮文案）
+    await tester.tap(chevron);
+    await tester.pumpAndSettle();
+    expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
+  });
+
   testWidgets('高级功能：破坏性入口改为空间级「销毁本通道」（不再整机重置）',
       (WidgetTester tester) async {
     // 老板 2026-09-22：多空间下站在某个空间里点破坏性入口，用户想的是"结束这个空间"，
@@ -1324,5 +1366,47 @@ void main() {
     expect(find.text('销毁本通道？'), findsOneWidget, reason: '闸门弹窗（通道名 + 锁屏码）');
     expect(find.text('请输入当前通道名称“iPhone”'), findsOneWidget, reason: '闸门框上备注：照抄通道名');
     expect(find.text('iPhone'), findsWidgets, reason: '框内 hint 显示通道名');
+  });
+
+  testWidgets('长名字不撑破状态条与汉堡菜单（老板 2026-09-24 实测溢出）',
+      (WidgetTester tester) async {
+    // 老板实测：把名字改长后 ① 菜单出现黄条 + "right overflowed by 69 pixels"；
+    // ② 状态条里名字越过中线、冲出胶囊条直到屏幕边缘。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final longName = '我的名字被改得特别特别长以至于一定会溢出边界' * 2;
+    await AppLockService(db).saveProfile(
+        spaceId: 'space-demo',
+        partnerName: longName,
+        peerName: longName,
+        entranceName: longName);
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull, reason: '状态条：长名字不应溢出（越过中线/出胶囊条）');
+
+    // 状态条每一方只占一半：名字文本仍是完整数据，只是被「…」截断
+    expect(find.textContaining('我的名字被改得特别特别长'), findsWidgets,
+        reason: '名字仍在（省略号截断，而非隐藏）');
+
+    // 打开汉堡菜单：所有带值的行共用同一长度上限，不再溢出
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: '菜单：长名字不应溢出行宽');
   });
 }

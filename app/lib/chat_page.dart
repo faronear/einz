@@ -861,6 +861,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 菜单行右侧「当前值」：超过 [kMenuValueMaxWidth] 即省略号、右对齐。
+  ///
+  /// 名字 / 通道名是用户可任意填的长文本，原先直接 `Text(value)` 无上限 → 撑破
+  /// PopupMenu（老板 2026-09-24 实测 `right overflowed by 69 pixels`）。这里收口：
+  /// **整菜单所有带值的行共用同一个上限**，不逐行各设一个数。
+  Widget _menuValue(String value, TextStyle style) => ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: kMenuValueMaxWidth),
+        child: Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.end,
+          style: style,
+        ),
+      );
+
   /// 「切换空间」：弹「选择秘境」弹层（小卡片瀑布流）→ 选中即**直接换到那个空间**（不跳页）。
   /// 弹层底部还有「＋ 新建/加入空间」通往第一屏（需要先过一次锁屏码，见 addSpaceFlow）。
   ///
@@ -3891,7 +3907,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuLocaleLabel, style: captionStyle),
                       const Spacer(),
-                      Text(kLocaleLabels[langCode] ?? langCode, style: valueStyle),
+                      _menuValue(kLocaleLabels[langCode] ?? langCode, valueStyle),
                     ],
                   ),
                 ),
@@ -3902,7 +3918,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuStyleLabel, style: captionStyle),
                       const Spacer(),
-                      Text(_uiStyleLabel(_uiStyle, l10n), style: valueStyle),
+                      _menuValue(_uiStyleLabel(_uiStyle, l10n), valueStyle),
                     ],
                   ),
                 ),
@@ -3914,7 +3930,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(l10n.chatPagePinLabel, style: captionStyle),
                       const Spacer(),
                       // 未设置时只显示「锁屏码」，不显示「未设置」尾缀（老板 2026-09-15）
-                      if (_hasPin) Text(l10n.chatPagePinSetValue, style: valueStyle),
+                      if (_hasPin) _menuValue(l10n.chatPagePinSetValue, valueStyle),
                     ],
                   ),
                 ),
@@ -3926,7 +3942,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuMyNameLabel, style: captionStyle),
                       const Spacer(),
-                      Text(_myPartnerName.isEmpty ? l10n.chatPageNameUnset : _myPartnerName, style: valueStyle),
+                      _menuValue(_myPartnerName.isEmpty ? l10n.chatPageNameUnset : _myPartnerName, valueStyle),
                     ],
                   ),
                 ),
@@ -3955,7 +3971,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuEntranceNameLabel, style: captionStyle),
                       const Spacer(),
-                      Text(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName, style: valueStyle),
+                      _menuValue(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName, valueStyle),
                     ],
                   ),
                 ),
@@ -3974,7 +3990,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 不设期限（0）不显示档位值，菜单项只显示「阅后即焚」；
                       // 选了具体时长才在右侧显示（老板 2026-09-15）
                       if (_burnSeconds > 0)
-                        Text(_burnOptionLabel(_burnSeconds, l10n), style: valueStyle),
+                        _menuValue(_burnOptionLabel(_burnSeconds, l10n), valueStyle),
                     ],
                   ),
                 ),
@@ -3985,7 +4001,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuAttachmentStorage, style: captionStyle),
                       const Spacer(),
-                      Text(_attachmentStorageLabel(_attachmentStorage, l10n), style: valueStyle),
+                      _menuValue(_attachmentStorageLabel(_attachmentStorage, l10n), valueStyle),
                     ],
                   ),
                 ),
@@ -4077,33 +4093,82 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ],
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // 对方（左）：在线圆点 + 名字（名字为空则不显示文本，只留圆点）
-                Row(
-                  children: [
-                    Icon(Icons.circle, size: 8, color: _peerOnline ? Colors.green : Colors.red),
-                    if (_peerName.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Text(_peerName,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                    ],
-                  ],
+                // 对方（左）：在线圆点 + 名字 + 「切换我的秘境」下拉箭头。
+                // **整簇可点** → 一步打开空间选择弹层（老板 2026-09-24）：省掉
+                // 「☰ → 眼睛扫菜单 → 点『切换我的秘境』」，与微信「左上角返回→选人」同一
+                // 肌肉记忆；命中区取整簇（不是只点那根细箭头）。位置放**对方名字**旁：
+                // 空间卡片上显示的就是对方名字，语义同源。
+                //
+                // Expanded（左右各占一半）+ 名字 Flexible 省略：名字是用户可任意填的长文本，
+                // 原先两侧都按内容宽度撑开、没有上限 → 长名字会越过中线顶到对面名字旁、
+                // 并冲出胶囊条直到屏幕边缘（老板 2026-09-24 实测）。现在每一方**绝不越过
+                // 中线**、也不出胶囊条，多余的一律「…」。圆点与箭头是固定项，永不被压掉。
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Tooltip(
+                      message: l10n.spaceListSwitch,
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: _openSpacePicker,
+                          child: Padding(
+                            // 纵向只加 2：状态条胶囊本来只有 6 的内边距，别把条撑高
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.circle, size: 8,
+                                    color: _peerOnline ? Colors.green : Colors.red),
+                                if (_peerName.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(_peerName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontSize: 13, fontWeight: FontWeight.w500)),
+                                  ),
+                                ],
+                                // 与人名拉开 6px：线箭头和人名笔画相近，贴太近不好区分
+                                // （老板 2026-09-24）；实心三角比线箭头更像「下拉」。
+                                const SizedBox(width: 6),
+                                Icon(Icons.arrow_drop_down,
+                                    size: 20,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
-                // 名字为空则不显示文本，只留圆点）
-                Row(
-                  children: [
-                    if (_myPartnerName.isNotEmpty) ...[
-                      Text(_myPartnerName,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                      const SizedBox(width: 6),
+                // 名字为空则不显示文本，只留圆点）。名字同样在本侧一半内省略。
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (_myPartnerName.isNotEmpty) ...[
+                        Flexible(
+                          child: Text(_myPartnerName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500)),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Icon(Icons.circle, size: 8,
+                          color: _ws == null
+                              ? Colors.grey
+                              : (_ws!.connected.value ? Colors.green : Colors.red)),
                     ],
-                    Icon(Icons.circle, size: 8,
-                        color: _ws == null
-                            ? Colors.grey
-                            : (_ws!.connected.value ? Colors.green : Colors.red)),
-                  ],
+                  ),
                 ),
               ],
             ),
