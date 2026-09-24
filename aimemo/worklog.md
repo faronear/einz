@@ -8902,3 +8902,49 @@ PROTOCOL_VERSION_MISMATCH；② 不发 Authorization → join-tokens 早已要�
 **验证手段记录**：服务端全量 `npm test` 31 pass；`cli/test/guide_input_rules_check.py`（自己
 起 `node server/dist/app.js` + 两个 TUI 进程的加入 E2E）通过——**注意它跑的是 `dist/`，改完
 `src/` 必须先 `npm run build`**，否则验的是旧代码（`dist/` 在 .gitignore 里，不用提交）。
+
+## 2026-09-23 · 修好过期探针 cliMultiverseE2E（commit `0458cc3`）
+
+**它为什么坏**（三处互不相干，都是"后来的改动没跟上"，与功能无关）：
+① `new_join_token()` 不发 `X-Protocol-Version: 1` → 400 PROTOCOL_VERSION_MISMATCH；
+② 同一请求不发 Authorization → `POST /spaces/:id/join-tokens` 早就要成员会话（C1 修复），
+  而它**读了 store 里的 session_token 却没用上**；
+③ 收尾锚点 `输入回车` 没了——2026-09-15 起向导收尾改成「欢迎辞 + 自动倒计时」，不按回车了。
+
+**第 4 个坑才是真难查的（值得单独记住）**：
+入网收尾期间 TUI 的 `processing=true`，输入循环对每个字节 `continue`（**逐字节丢弃**，
+见 `einz_tui.dart` 的 `(_state?.processing ?? false) && code != 3 → continue`），而收尾 =
+倒计时 5s **加上**收尾的网络步骤（实测：欢迎辞出现后约 **6 秒**才能输入 = 倒计时 5s + 收尾 1s）。
+所以探针里"睡固定秒数再发一条命令"会**静默丢行**——现象是"命令没反应"、进程却活得好好的。
+解法：`send_when_ready()` 反复重发到出现预期输出为止（只用于可重复的命令：发消息 / `/invite`）。
+本次实跑里 `/invite` 第 3 次才被接受，证明重发不是保险而是必需。
+
+**收尾期"输入被丢弃"的窗口有多长 —— 别被自己的量测骗了（重要教训）**：
+我第一版量出"欢迎辞后约 **13 秒**"，老板真机实测是 **5 秒倒计时后立刻能打字**，他是对的。
+重测（全程**持续读 pty**，不停读）得到 **约 6.4 秒** = 倒计时 5s + 收尾 1s，与设计一致。
+13 秒从哪来：我的排查脚本在 `time.sleep(2)` 期间**不读 pty** → TUI 的同步 `_render()` 写满
+pty 缓冲被阻塞 → 倒计时循环里 `await Future.delayed(1s)` 的续体被一起拖后 → 窗口看起来变长。
+**结论/教训：用 pty 跑 TUI，任何时候都不能"停止读取再 sleep"**——那不只是丢输出，会反过来
+把被测程序卡住、让所有时间量测失真。要计时就用持续 select 的 drain 循环（见
+`send_when_ready` 的写法）。
+顺带：既然只有 ~6 秒且就是设计里的倒计时，**原本那条"要不要缩短 UX"的观察作废**，不是问题。
+
+**App 侧没有这个问题**（2026-09-23 老板追问后核实）：
+- App 的「一切就绪！」是**模态对话框**（`setup_page._showWelcomeDialog`，`barrierDismissible:
+  false`）——期间本来就不能打字，也不假装接受输入；
+- 点「开始聊天」→ `_finish()`：`saveProfile`（本地库）→ `onCompleted`（addSpace + switchToSpace）
+  → 聊天页，全是本地写 + 导航，这一路径上没有长的网络等待；
+- 聊天页的输入 `TextField`（chat_page.dart 的 composer）**没有任何基于同步状态的
+  enabled/readOnly 门**（唯一的可见性开关是录音态的 `Visibility`）。
+结论：**App 不存在"能打却被打字丢弃"的机制**。注意这是**读代码**得出的，不是真机量测——
+要绝对确定可以真机上试，或我补一条"进聊天页立刻输入"的 widget 测试。
+
+**本地跑这套 E2E 的标准姿势**（别用默认 3999，避免误杀别人实例）：
+```bash
+mkdir -p /tmp/einz-e2e/files /tmp/einz-e2e/avatars
+PORT=3991 EINZ_DB=/tmp/einz-e2e/einz.sqlite.db EINZ_FILES=/tmp/einz-e2e/files \
+  EINZ_AVATARS=/tmp/einz-e2e/avatars LOG_LEVEL=quiet node dist/app.js &   # 先 npm run build
+EINZ_E2E_PORT=3991 python3 cli/test/cliMultiverseE2E.py
+EINZ_E2E_PORT=3991 python3 cli/test/guide_input_rules_check.py   # 它自己起 server，不需要上面这步
+```
+注意 `cliMultiverseE2E` 要外部先起 server，`guide_input_rules_check` 自己会起。
