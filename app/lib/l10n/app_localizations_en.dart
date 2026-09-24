@@ -412,7 +412,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
-  String get chatPageMenuInvite => 'Create token';
+  String get chatPageMenuInvite => 'New entrance token';
 
   @override
   String get chatPageInviteDialogTitle => 'Token created';
@@ -886,7 +886,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Development address (not production), for debugging only';
 
   @override
-  String get advancedMenuTitle => 'Advanced features';
+  String get advancedMenuTitle => 'Advanced security';
 
   @override
   String get advancedDestroyEntrance => 'Destroy this entrance';

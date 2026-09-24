@@ -125,7 +125,7 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
   // 口令入口现在收在「高级」底部弹层里（对话页菜单 → 高级 → 修改口令）
-  await tester.tap(find.text('高级功能'));
+  await tester.tap(find.text('高级安全'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('修改共享口令'));
   await tester.pumpAndSettle();
@@ -196,13 +196,13 @@ void main() {
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
-    expect(find.text('高级功能'), findsOneWidget);
+    expect(find.text('高级安全'), findsOneWidget);
     // 我的身份/当前通道（未传 → 显示「未设置」）+ 退出本应用
     expect(find.text('我的身份'), findsOneWidget);
     expect(find.text('当前通道'), findsOneWidget);
     expect(find.text('退出本应用'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
-    expect(find.text('高级功能'), findsOneWidget);
+    expect(find.text('高级安全'), findsOneWidget);
     expect(find.text('锁屏码'), findsOneWidget);
     // 点"PIN: 未设置"菜单项
     await tester.tap(find.text('锁屏码'));
@@ -1314,7 +1314,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('高级功能'));
+    await tester.tap(find.text('高级安全'));
     await tester.pumpAndSettle();
     expect(find.text('销毁本通道'), findsOneWidget, reason: '空间级文案');
     expect(find.text('清除本设备全部数据'), findsNothing, reason: '整机清空不该出现在单个空间里');

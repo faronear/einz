@@ -809,7 +809,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuInvite.
   ///
   /// In en, this message translates to:
-  /// **'Create token'**
+  /// **'New entrance token'**
   String get chatPageMenuInvite;
 
   /// No description provided for @chatPageInviteDialogTitle.
@@ -1637,7 +1637,7 @@ abstract class AppLocalizations {
   /// No description provided for @advancedMenuTitle.
   ///
   /// In en, this message translates to:
-  /// **'Advanced features'**
+  /// **'Advanced security'**
   String get advancedMenuTitle;
 
   /// No description provided for @advancedDestroyEntrance.

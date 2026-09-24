@@ -3876,11 +3876,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w500);
               return [
-                // 菜单分组（老板 2026-09-22 定）：
-                //   ①「我」：我的身份 / 我的头像（关于"我这个人"）
+                // 菜单分组（老板 2026-09-22 定；2026-09-24 语言/界面主题并入①组）：
+                //   ①「我」：我的身份 / 我的头像 / 语言 / 界面主题（关于"我这个人"）
                 //   ②「本通道」：通道名称 / 生成开通码（关于"本机在这个秘境里的通道"）
-                //   ③ 设置：语言 / 界面主题   ④ 安全：阅后即焚 / 附件存储 / 锁屏码 / 高级
-                //   ⑤ 结尾：关于秘境 / 切换秘境 / 退出本应用
+                //   ③ 安全：阅后即焚 / 附件存储 / 锁屏码 / 高级安全
+                //   ④ 结尾：关于秘境 / 切换秘境 / 退出本应用
                 PopupMenuItem(
                   height: kMenuRowHeight,
                   value: 'name',
@@ -3910,26 +3910,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                // ①「我」与②「本通道」之间（老板 2026-09-22 要求单独一行）
-                const PopupMenuDivider(height: kMenuDividerHeight),
-                PopupMenuItem(
-                  height: kMenuRowHeight,
-                  value: 'devname',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuEntranceNameLabel, style: captionStyle),
-                      const Spacer(),
-                      Text(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName, style: valueStyle),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  height: kMenuRowHeight,
-                  value: 'invite',
-                  child: Text(l10n.chatPageMenuInvite, style: labelStyle),
-                ),
-                const PopupMenuDivider(height: kMenuDividerHeight),
-                // 系统设置组：语言/风格；分隔线以下是安全相关：阅后即焚/附件存储/PIN/高级
+                // 语言 / 界面主题（2026-09-24 老板定：并入①「我」组）
                 PopupMenuItem(
                   height: kMenuRowHeight,
                   value: 'locale',
@@ -3951,6 +3932,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(_uiStyleLabel(_uiStyle, l10n), style: valueStyle),
                     ],
                   ),
+                ),
+                // ①「我」与②「本通道」之间（老板 2026-09-22 要求单独一行）
+                const PopupMenuDivider(height: kMenuDividerHeight),
+                PopupMenuItem(
+                  height: kMenuRowHeight,
+                  value: 'devname',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuEntranceNameLabel, style: captionStyle),
+                      const Spacer(),
+                      Text(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName, style: valueStyle),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  height: kMenuRowHeight,
+                  value: 'invite',
+                  child: Text(l10n.chatPageMenuInvite, style: labelStyle),
                 ),
                 const PopupMenuDivider(height: kMenuDividerHeight), // 分隔：以下是安全相关设置（老板要求 2026-09-10）
                 PopupMenuItem(

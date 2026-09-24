@@ -846,7 +846,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutServerDevNote => '开发地址（非生产），仅用于开发调试';
 
   @override
-  String get advancedMenuTitle => '高级功能';
+  String get advancedMenuTitle => '高级安全';
 
   @override
   String get advancedDestroyEntrance => '销毁本通道';

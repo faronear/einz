@@ -395,7 +395,7 @@
   "aboutVersionLabel": "版本号",
   "aboutServerLabel": "服务器地址",
   "aboutServerDevNote": "开发地址（非生产），仅用于开发调试",
-  "advancedMenuTitle": "高级功能",
+  "advancedMenuTitle": "高级安全",
   "advancedDestroyEntrance": "销毁本通道",
   "leaveSpaceTitle": "销毁本通道？",
   "leaveSpaceMessage": "彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。此操作无法撤销！",
