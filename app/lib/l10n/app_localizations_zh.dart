@@ -266,6 +266,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenUsed => '开通码已被使用';
 
   @override
+  String get setupTokenSpaceAlreadyAdded => '这个秘境已经添加过了（一台设备只能有一条通道到同一个秘境）';
+
+  @override
   String setupTokenOtherServer(String other, String current) {
     return '该邀请链接来自 $other，本机连的是 $current，不能混用';
   }

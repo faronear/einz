@@ -108,6 +108,7 @@
   "setupTokenInvalid": "Invalid token",
   "setupTokenExpired": "Token expired",
   "setupTokenUsed": "Token already used",
+  "setupTokenSpaceAlreadyAdded": "This space is already added (one device can hold only one entrance to a space)",
   "setupTokenOtherServer": "the invite link is from {other} but this app is connected to {current}; they cannot work with each other.",
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }

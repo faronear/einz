@@ -278,6 +278,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupTokenUsed => 'Token already used';
 
   @override
+  String get setupTokenSpaceAlreadyAdded =>
+      'This space is already added (one device can hold only one entrance to a space)';
+
+  @override
   String setupTokenOtherServer(String other, String current) {
     return 'the invite link is from $other but this app is connected to $current; they cannot work with each other.';
   }

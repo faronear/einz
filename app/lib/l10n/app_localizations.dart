@@ -578,6 +578,12 @@ abstract class AppLocalizations {
   /// **'Token already used'**
   String get setupTokenUsed;
 
+  /// No description provided for @setupTokenSpaceAlreadyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'This space is already added (one device can hold only one entrance to a space)'**
+  String get setupTokenSpaceAlreadyAdded;
+
   /// No description provided for @setupTokenOtherServer.
   ///
   /// In en, this message translates to:

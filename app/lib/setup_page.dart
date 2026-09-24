@@ -17,6 +17,7 @@ import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/server_config.dart';
+import 'data/vault_session.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/passphrase_field.dart';
@@ -1686,6 +1687,22 @@ class _SetupPageState extends State<SetupPage> {
       final pre = await (widget.preflightOverride?.call(token) ??
           ApiClient(effectiveServer).preflightJoin(token));
       if (!mounted) return false;
+      // 「本机已经有这个秘境」当场拦下（老板 2026-09-23 报的 bug）：同一个 spaceId 再走一遍
+      // 向导，本机会把原有那条通道 upsert **顶替**掉——旧通道凭证消失、本地消息却被新通道
+      // 继承，而服务端并不知情、旧通道也没退役（既丢数据、又在服务端留孤儿）。
+      //
+      // 放在这里（preflight 之后、**消费 token 之前**）：邀请码是一次性的，此时还没被消费，
+      // 拒绝后仍可发给别的设备用；也没有任何服务端副作用。
+      if (await _isSpaceAlreadyAdded(pre.spaceId)) {
+        if (!mounted) return false;
+        setState(() {
+          _joinToken = '';
+          _joinSpaceId = null;
+          _joinTokenVerified = false;
+          _localError = AppLocalizations.of(context)!.setupTokenSpaceAlreadyAdded;
+        });
+        return false;
+      }
       setState(() {
         _joinToken = token;
         _joinSpaceId = pre.spaceId; // 供口令页先验口令（不消费 token）
@@ -1714,6 +1731,25 @@ class _SetupPageState extends State<SetupPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// 本机是否**已经有这个秘境**（按 spaceId 判）。两个来源都查，任一命中即算已添加：
+  ///
+  /// ① 内存 Vault（`VaultSession`）——权威来源：`addSpace` / 向导写盘时顶替的就是它，
+  ///    且它是 PIN 包解开后的那份，`VaultSession.current` 在解锁后一直与盘上同步；
+  /// ② Spaces 表——明文缓存（不依赖 PIN），VaultSession 尚未发布时也能拦住。
+  ///
+  /// 为什么要有这道闸门：一台设备对一个秘境只存**一条**通道（Vault 按 spaceId 存一份
+  /// 凭证）。再走一遍加入向导不是"加第二条通道"，而是**覆盖**掉原有那条。
+  Future<bool> _isSpaceAlreadyAdded(String spaceId) async {
+    final id = spaceId.trim();
+    if (id.isEmpty) return false;
+    final spaces = VaultSession.current?.spaces;
+    if (spaces != null && spaces.any((s) => s.spaceId == id)) return true;
+    final db = widget.db ?? LocalDatabase.shared;
+    final row = await (db.select(db.spaces)..where((s) => s.spaceId.equals(id)))
+        .getSingleOrNull();
+    return row != null;
   }
 
   /// 错误码 → 提示（PROTOCOL_MULTIVERSE.md §6 错误码表）。
