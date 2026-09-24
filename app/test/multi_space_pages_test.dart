@@ -48,6 +48,18 @@ const _payloadB = AppLockPayload(
   entranceId: 'dev-b',
   token: 'tok-b',
 );
+const _payloadC = AppLockPayload(
+  spaceKeyB64: 'a2V5LWM=',
+  spaceId: 'space-c',
+  entranceId: 'dev-c',
+  token: 'tok-c',
+);
+const _payloadD = AppLockPayload(
+  spaceKeyB64: 'a2V5LWQ=',
+  spaceId: 'space-d',
+  entranceId: 'dev-d',
+  token: 'tok-d',
+);
 
 Future<void> _settle(WidgetTester tester) async {
   for (var round = 0; round < 6; round++) {
@@ -118,6 +130,87 @@ void main() {
     expect(find.text('对方B'), findsOneWidget);
     expect(find.text('3'), findsOneWidget, reason: 'space-a 有 3 条未读');
     expect(find.text('添加秘境'), findsOneWidget, reason: '底部通往第一屏');
+  });
+
+  testWidgets('空间卡片：长名字不撑破卡片（省略号 + 不溢出）', (WidgetTester tester) async {
+    // 老板 2026-09-24：头像调大、名字字号调大后，要防止长名字撑破卡片。
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    await lock.addSpace(_payloadB);
+    final longName = '对方名字被改得特别特别长以至于一定会撑破卡片' * 2;
+    await lock.saveProfile(
+        spaceId: 'space-a', partnerName: '我', peerName: longName, entranceName: 'iPhone');
+    await lock.loadVault();
+
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showSpacePicker(ctx, db: db, api: _SoloEntranceApi()),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await _settle(tester);
+
+    expect(tester.takeException(), isNull, reason: '长名字不应撑破卡片');
+    expect(find.textContaining('对方名字被改得特别特别长'), findsOneWidget,
+        reason: '名字仍在（仅省略号截断，而非隐藏）');
+  });
+
+  testWidgets('空间卡片：按屏幕宽度反算，一行正好 3 张（iPhone 16 尺寸）',
+      (WidgetTester tester) async {
+    // 老板 2026-09-24：固定 120 时 2 张空太多、3 张放不下 → 边长按可用宽度反算。
+    tester.view.physicalSize = const Size(393, 852); // iPhone 16
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    await lock.addSpace(_payloadB);
+    await lock.addSpace(_payloadC);
+    await lock.addSpace(_payloadD);
+    // 名字等长（都是 2 字）：卡片里名字居中，两卡名字左边缘之差 = 卡宽 + 间距
+    await lock.saveProfile(spaceId: 'space-a', partnerName: '我', peerName: '甲一', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-b', partnerName: '我', peerName: '乙二', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-c', partnerName: '我', peerName: '丙三', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-d', partnerName: '我', peerName: '丁四', entranceName: 'iPhone');
+    await lock.loadVault();
+
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showSpacePicker(ctx, db: db, api: _SoloEntranceApi()),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await _settle(tester);
+    expect(tester.takeException(), isNull);
+
+    final p1 = tester.getTopLeft(find.text('甲一'));
+    final p2 = tester.getTopLeft(find.text('乙二'));
+    final p3 = tester.getTopLeft(find.text('丙三'));
+    final p4 = tester.getTopLeft(find.text('丁四'));
+
+    // 前 3 张同一行，第 4 张换行且与第 1 张左对齐（不满 3 张靠左）
+    expect(p1.dy, p2.dy);
+    expect(p2.dy, p3.dy);
+    expect(p4.dy, greaterThan(p1.dy), reason: '第 4 张应换到下一行');
+    expect(p4.dx, closeTo(p1.dx, 0.5), reason: '不满 3 张的行靠左对齐');
+
+    // 卡宽 + 间距 = 弹层可用宽度 361 平分成 3 份（(393-32-24)/3 = 112.33 → 向下取整 112）
+    expect(p2.dx - p1.dx, closeTo(112 + 12, 0.5), reason: '卡片边长按可用宽度反算');
+    expect(p3.dx - p2.dx, closeTo(112 + 12, 0.5));
   });
 
   testWidgets('在弹层里选另一个空间 → 当前空间切换（不需要锁屏码）', (WidgetTester tester) async {

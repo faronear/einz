@@ -23,6 +23,24 @@ class SpacePick {
   final bool add;
 }
 
+/// 卡片间距（横竖同值）+ 每行张数。
+const double _kCardSpacing = 12;
+const int _kCardsPerRow = 3;
+
+/// 桌面大窗口的卡片边长上限：不设的话窗口一宽卡片会离谱地大。
+/// 手机上（可用宽度 < 3*160+2*12 = 504）不影响"正好 3 张"。
+const double _kCardMaxSize = 160;
+
+/// 一张卡片的边长：由弹层**可用宽度反算**，保证一行正好放下 [_kCardsPerRow] 张
+/// （老板 2026-09-24：iPhone 16 上固定 120 时，2 张空太多、3 张放不下）。
+/// 向下取整，避免浮点误差把最后一张挤到下一行。
+double _cardSizeFor(double availableWidth) {
+  final raw =
+      (availableWidth - _kCardSpacing * (_kCardsPerRow - 1)) / _kCardsPerRow;
+  return raw.floorToDouble().clamp(64.0, _kCardMaxSize).toDouble();
+}
+
+
 /// 弹出「选择秘境」弹层：**小卡片瀑布流**（每张卡片 = 一个已加入的空间，写对方名字；
 /// 右上角未读数字角标；当前空间描边 + 打勾），底部一条「＋ 新建/加入空间」通往第一屏。
 ///
@@ -183,22 +201,32 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                     style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.outline)),
               )
             else
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final space in spaces)
-                    _SpaceCard(
-                      name: _titleOf(space),
-                      peerGender: _names[space.spaceId]?.peerGender ?? '',
-                      peerPartnerId: _names[space.spaceId]?.peerPartnerId ?? '',
-                      server: effectiveServer,
-                      api: widget.api,
-                      unread: _unread[space.spaceId] ?? 0,
-                      current: space.spaceId == _activeId,
-                      onTap: () => Navigator.of(context).pop(SpacePick.space(space.spaceId)),
-                    ),
-                ],
+              // 卡片**边长按可用宽度反算**，保证一行正好 3 张（老板 2026-09-24：
+              // iPhone 16 上固定 120 时，2 张空太多、3 张放不下）。
+              // 不满 3 张的行由 Wrap 默认的 `WrapAlignment.start` 靠左。
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final size = _cardSizeFor(constraints.maxWidth);
+                  return Wrap(
+                    spacing: _kCardSpacing,
+                    runSpacing: _kCardSpacing,
+                    children: [
+                      for (final space in spaces)
+                        _SpaceCard(
+                          size: size,
+                          name: _titleOf(space),
+                          peerGender: _names[space.spaceId]?.peerGender ?? '',
+                          peerPartnerId: _names[space.spaceId]?.peerPartnerId ?? '',
+                          server: effectiveServer,
+                          api: widget.api,
+                          unread: _unread[space.spaceId] ?? 0,
+                          current: space.spaceId == _activeId,
+                          onTap: () =>
+                              Navigator.of(context).pop(SpacePick.space(space.spaceId)),
+                        ),
+                    ],
+                  );
+                },
               ),
             const SizedBox(height: 12),
             const Divider(height: 1),
@@ -225,6 +253,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
 
 class _SpaceCard extends StatelessWidget {
   const _SpaceCard({
+    required this.size,
     required this.name,
     required this.peerGender,
     required this.peerPartnerId,
@@ -235,6 +264,8 @@ class _SpaceCard extends StatelessWidget {
     required this.onTap,
   });
 
+  /// 卡片边长（正方形，含内边距）——由 [_cardSizeFor] 按弹层宽度算出。
+  final double size;
   final String name;
   /// 对方性别（male/female/''）：卡片底色按它取色——选中深粉 / 深蓝，未选中淡粉 / 淡蓝；
   /// 未知 → 不给底色，用 Card 默认表面色。
@@ -278,9 +309,11 @@ class _SpaceCard extends StatelessWidget {
     // 底色 / 阴影 / 对勾的**渐变过程**（老板 2026-09-23：只保留颜色渐变，去掉放大动画）。
     const anim = Duration(milliseconds: 200);
     return SizedBox(
-      // 尺寸**固定** 104×96：选中不放大 → Wrap 不重排、弹层不跳高（老板 2026-09-23）。
-      width: 104,
-      height: 96,
+      // 尺寸**固定正方形**，边长按可用宽度反算，保证一行正好 3 张
+      // （老板 2026-09-24：长方形不好看；iPhone 16 上 2 张空太多、3 张放不下）。
+      // 选中不放大 → Wrap 不重排、弹层不跳高（老板 2026-09-23）。
+      width: size,
+      height: size,
       child: AnimatedContainer(
         duration: anim,
         curve: Curves.easeOut,
@@ -305,49 +338,58 @@ class _SpaceCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              // 内边距 8（原 10）：卡片边长在 3 张/行时约 112，留出空间给
+              //「头像 48 + 名字两行」
+              padding: const EdgeInsets.all(8),
               // 名字颜色跟着底色一起渐变（否则底色还在淡粉时字已经先跳成白的）
               child: AnimatedDefaultTextStyle(
                 duration: anim,
                 curve: Curves.easeOut,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: _foreground ?? theme.colorScheme.onSurface,
                 ),
+                // StackFit.expand：让非定位子项吃满整块，Column 才能真正**居中**
+                // （默认 loose 下 Column 会缩到内容宽度并被摆到左上角 → 看着像靠左）
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    // 头像在上、名字在下，整块居中（老板 2026-09-23）
-                    Align(
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _PeerAvatar(
-                            partnerId: peerPartnerId,
-                            server: server,
-                            api: api,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
+                    // 头像在上、名字在下，整块**居中**（老板 2026-09-23 / 2026-09-24）
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _PeerAvatar(
+                          partnerId: peerPartnerId,
+                          server: server,
+                          api: api,
+                        ),
+                        const SizedBox(height: 6),
+                        // Flexible：名字最多 2 行、超出「…」，空间不够时也只会被压缩
+                        // 而不会把卡片撑破（老板 2026-09-24）
+                        Flexible(
+                          child: Text(
                             name,
                             maxLines: 2,
                             textAlign: TextAlign.center,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来
+                    // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来。
+                    // **左上角**（老板 2026-09-24）：右下角会盖住名字；与右上角的未读角标各占一角。
                     AnimatedOpacity(
                       opacity: current ? 1 : 0,
                       duration: anim,
                       child: Align(
-                        alignment: Alignment.bottomRight,
+                        alignment: Alignment.topLeft,
                         child: Icon(Icons.check_circle,
-                            size: 16, color: _foreground ?? theme.colorScheme.primary),
+                            size: 20, color: _foreground ?? theme.colorScheme.primary),
                       ),
                     ),
+                    // 未读角标 → **右上角**（与左上角的对勾分居两角，互不遮挡）
                     if (unread > 0)
                       Positioned(
                         right: 0,
@@ -394,7 +436,8 @@ class _PeerAvatar extends StatefulWidget {
   final String server;
   final ApiClient? api;
 
-  static const double radius = 18;
+  /// 头像半径：18 → 24（老板 2026-09-24：空间的核心是对方是谁，头像再大两号）
+  static const double radius = 24;
 
   @override
   State<_PeerAvatar> createState() => _PeerAvatarState();
@@ -427,8 +470,8 @@ class _PeerAvatarState extends State<_PeerAvatar> {
       radius: _PeerAvatar.radius,
       backgroundColor: Colors.grey.shade300,
       backgroundImage: bytes != null ? MemoryImage(bytes) : null,
-      // 默认头像：人形图标（尺寸按半径等比，与消息流的 16/18 比例一致）
-      child: bytes == null ? const Icon(Icons.person, size: 20) : null,
+      // 默认头像：人形图标（尺寸按半径等比：radius 24 → 26）
+      child: bytes == null ? const Icon(Icons.person, size: 26) : null,
     );
   }
 }
