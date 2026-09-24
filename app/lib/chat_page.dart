@@ -3879,11 +3879,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w500);
               return [
-                // 菜单分组（老板 2026-09-22 定；2026-09-24 语言/界面主题并入①组）：
-                //   ①「我」：我的身份 / 我的头像 / 语言 / 界面主题（关于"我这个人"）
-                //   ②「本通道」：通道名称 / 生成开通码（关于"本机在这个秘境里的通道"）
-                //   ③ 安全：阅后即焚 / 附件存储 / 锁屏码 / 高级安全
-                //   ④ 结尾：关于秘境 / 切换秘境 / 退出本应用
+                // 菜单分组（老板 2026-09-24 定）：
+                //   ① 外观与锁：界面语言 / 界面主题 / 锁屏码
+                //   ② 身份·通道·内容：我的身份 / 我的头像 / 当前通道 / 生成开通码 /
+                //      阅后即焚 / 附件存储 / 高级安全
+                //   ③ 结尾：关于秘境 / 切换我的秘境 / 退出本应用
+                PopupMenuItem(
+                  height: kMenuRowHeight,
+                  value: 'locale',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuLocaleLabel, style: captionStyle),
+                      const Spacer(),
+                      Text(kLocaleLabels[langCode] ?? langCode, style: valueStyle),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  height: kMenuRowHeight,
+                  value: 'style',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuStyleLabel, style: captionStyle),
+                      const Spacer(),
+                      Text(_uiStyleLabel(_uiStyle, l10n), style: valueStyle),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  height: kMenuRowHeight,
+                  value: 'pin',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPagePinLabel, style: captionStyle),
+                      const Spacer(),
+                      // 未设置时只显示「锁屏码」，不显示「未设置」尾缀（老板 2026-09-15）
+                      if (_hasPin) Text(l10n.chatPagePinSetValue, style: valueStyle),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(height: kMenuDividerHeight),
                 PopupMenuItem(
                   height: kMenuRowHeight,
                   value: 'name',
@@ -3913,31 +3948,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                // 语言 / 界面主题（2026-09-24 老板定：并入①「我」组）
-                PopupMenuItem(
-                  height: kMenuRowHeight,
-                  value: 'locale',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuLocaleLabel, style: captionStyle),
-                      const Spacer(),
-                      Text(kLocaleLabels[langCode] ?? langCode, style: valueStyle),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  height: kMenuRowHeight,
-                  value: 'style',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuStyleLabel, style: captionStyle),
-                      const Spacer(),
-                      Text(_uiStyleLabel(_uiStyle, l10n), style: valueStyle),
-                    ],
-                  ),
-                ),
-                // ①「我」与②「本通道」之间（老板 2026-09-22 要求单独一行）
-                const PopupMenuDivider(height: kMenuDividerHeight),
                 PopupMenuItem(
                   height: kMenuRowHeight,
                   value: 'devname',
@@ -3954,7 +3964,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'invite',
                   child: Text(l10n.chatPageMenuInvite, style: labelStyle),
                 ),
-                const PopupMenuDivider(height: kMenuDividerHeight), // 分隔：以下是安全相关设置（老板要求 2026-09-10）
                 PopupMenuItem(
                   height: kMenuRowHeight,
                   value: 'burn',
@@ -3980,19 +3989,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
-                  height: kMenuRowHeight,
-                  value: 'pin',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPagePinLabel, style: captionStyle),
-                      const Spacer(),
-                      // 未设置时只显示「锁屏码」，不显示「未设置」尾缀（老板 2026-09-15）
-                      if (_hasPin) Text(l10n.chatPagePinSetValue, style: valueStyle),
-                    ],
-                  ),
-                ),
-                // 高级（二级菜单走底部弹层）——归在安全组
+                // 高级（二级菜单走底部弹层）
                 PopupMenuItem(
                   height: kMenuRowHeight,
                   value: 'advanced',
