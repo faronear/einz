@@ -1,6 +1,20 @@
 /// 协议常量与类型（PROTOCOL.md）。
 library;
 
+/// wire 协议版本（PROTOCOL.md §1）：REST 用请求头 `X-Protocol-Version`，
+/// WS 用握手 query `?pv=`。改了**任何** wire 契约（字段名 / 路径 / WS 事件名 /
+/// 错误码）都必须 bump。
+///
+/// - `1` = device→entrance / person→partner 全量改名**之前**的旧 wire；
+/// - `2` = 该次改名之后的 wire（`sender_device_id`→`sender_entrance_id`、
+///   `person_id`→`partner_id`、WS 帧 `device.revoked`→`entrance.revoked`、
+///   错误码 `DEVICE_REVOKED`→`ENTRANCE_REVOKED`、`/devices/*`→`/entrances/*` 等，
+///   见 docs/GLOSSARY.md「wire 字段改名」）。
+///
+/// REST（[ApiClient]）与 WS（ws_client）共用这一份，别再各写一个字面量。
+/// 服务端对应 `server/src/protocolVersion.ts`（改动请两端同步）。
+const String kProtocolVersion = '2';
+
 /// 认证 / 同步相关 REST 端点（PROTOCOL.md §4）。
 class Api {
   static const challenge = '/auth/challenge';

@@ -82,7 +82,7 @@ interface Client {
 }
 
 function connect (port: number, token: string): Promise<Client> {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?pv=1`, {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?pv=2`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const client: Client = { ws, frames: [] }

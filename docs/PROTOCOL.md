@@ -10,11 +10,18 @@
 ## 1. 传输与版本
 
 - 生产环境强制 HTTPS / WSS（Caddy 终结 TLS），禁止 HTTP / WS。
-- 所有请求/帧携带 `X-Protocol-Version: 1`（或 WS 握手 query `?pv=1`）；版本不匹配 → `400 PROTOCOL_VERSION_MISMATCH`。
+- 所有请求/帧携带 `X-Protocol-Version: 2`（或 WS 握手 query `?pv=2`）；版本不匹配 → `400 PROTOCOL_VERSION_MISMATCH`。
 - 服务端与客户端必须校验对方版本；V1 阶段两端同时升级，不做多版本兼容矩阵。
   - **实现状态（2026-09-15 补）**：REST 由 `app.ts` 的 `assertProtocolVersion` 硬校验；
     `shared/lib/src/protocol/api_client.dart` 在所有请求上带该头（`ApiClient.protocolVersionHeader`）；
-    WS 握手校验 `?pv=1`（不匹配关闭 4400）。
+    WS 握手校验 `?pv=2`（不匹配关闭 4400）。
+  - **版本 2（2026-09-24）**：wire 字段/路径/事件名/错误码随 2026-09-23 的
+    device→entrance / person→partner 全量改名而变（`sender_device_id`→`sender_entrance_id`、
+    `device.revoked`→`entrance.revoked`、`DEVICE_REVOKED`→`ENTRANCE_REVOKED`、
+    `/devices/*`→`/entrances/*` 等，见 GLOSSARY.md「wire 字段改名」）。改名无兼容窗口，
+    故服务端不双接受 v1——旧客户端会明确收到 `400 PROTOCOL_VERSION_MISMATCH`。
+    版本号单一来源：`server/src/protocolVersion.ts` 与 `shared/.../types.dart` 的
+    `kProtocolVersion`。
   - **豁免**：`GET /health`（外部监控 / curl 健康检查）与 `GET /join/:token`
     （浏览器打开的邀请落地页，无法自定义请求头）。
 
@@ -424,7 +431,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 ### 8.1 连接
 
 ```text
-wss://host/ws?pv=1
+wss://host/ws?pv=2
 Authorization: Bearer <session_token>
 ```
 
@@ -489,6 +496,6 @@ Authorization: Bearer <session_token>
 
 ## 11. 版本演进
 
-- `X-Protocol-Version` / `?pv=1` 为硬校验；不匹配拒绝服务。
+- `X-Protocol-Version` / `?pv=2` 为硬校验；不匹配拒绝服务。
 - V1 阶段 Client 与 Server 一起发布、一起升级，不承诺跨版本兼容。
 - 未来若需兼容：只允许向后兼容的字段新增（未知字段忽略），结构性变更必须升 `pv` 并双端同步上线。

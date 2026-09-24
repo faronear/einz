@@ -133,7 +133,7 @@ def http_status(port, method, path, body=None, token=None):
     req = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method)
     req.add_header('Content-Type', 'application/json')
     # 协议版本头是硬校验（PROTOCOL.md §1）：缺头 → 400 PROTOCOL_VERSION_MISMATCH
-    req.add_header('X-Protocol-Version', '1')
+    req.add_header('X-Protocol-Version', '2')
     if token:
         req.add_header('Authorization', f'Bearer {token}')
 

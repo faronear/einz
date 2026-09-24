@@ -41,6 +41,7 @@ import {
   broadcastProfileUpdated,
   notifyRevoked
 } from './ws.js'
+import { PROTOCOL_VERSION } from './protocolVersion.js'
 import {
   bearerToken,
   optionalBearerToken,
@@ -61,8 +62,8 @@ import { logActivity, logSyncActivity, metaOf } from './audit.js'
 const PORT = Number(process.env.PORT ?? 3000)
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? 'info') !== 'quiet'
 const SERVER_VERSION = '1.0.0'
-/** 协议版本（PROTOCOL.md §1）：REST 用请求头 X-Protocol-Version，WS 用握手 ?pv= */
-const PROTOCOL_VERSION = 1
+// 协议版本（PROTOCOL.md §1）：REST 头 X-Protocol-Version / WS 握手 ?pv=。
+// 单一来源见 ./protocolVersion.ts（与 ws.ts 共用，别再各写一份）。
 openDb() // 先开库（所有路由依赖 db 就绪）
 const cfg: ServerConfig = loadConfig()
 // 免认证的 POST /spaces 会一直开着（新空间创建者没有任何凭证可用），所以
@@ -621,7 +622,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
 }
 
 /**
- * 协议版本硬校验（PROTOCOL.md §1：所有请求携带 `X-Protocol-Version: 1`，不匹配 →
+ * 协议版本硬校验（PROTOCOL.md §1：所有请求携带 `X-Protocol-Version`，不匹配 →
  * 400 PROTOCOL_VERSION_MISMATCH）。2026-09-15 评审 S7：文档承诺了但服务端从没实现，
  * 客户端也从不设这个头——现在双侧都补上。
  *

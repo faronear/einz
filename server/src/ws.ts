@@ -3,6 +3,7 @@ import { optionalBearerToken, requireSession } from "./guard.js";
 import type { MessageEnvelope } from "./messages.js";
 import { getDb } from "./db.js";
 import { logConnection, metaOf, type RequestMeta } from "./audit.js";
+import { PROTOCOL_VERSION } from "./protocolVersion.js";
 
 interface Conn {
   ws: WebSocket;
@@ -131,7 +132,7 @@ export function attachWs(wss: WebSocketServer): void {
     // 落在这些地方（此前是 `?pv=1&token=<session_token>`）。
     const token = optionalBearerToken(req);
 
-    if (pv !== "1") {
+    if (pv !== PROTOCOL_VERSION) {
       ws.close(4400, "PROTOCOL_VERSION_MISMATCH");
       return;
     }

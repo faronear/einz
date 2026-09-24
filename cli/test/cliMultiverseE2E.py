@@ -282,7 +282,7 @@ def main():
         # 服务端后来加的两道收口，缺任一都会让本函数失败（探针曾因此静默失效很久）：
         # ① 协议版本头——缺 → 400 PROTOCOL_VERSION_MISMATCH；
         # ② 成员会话——C1 修复后「签发开通码」必须持该空间成员会话，缺 → 401。
-        req.add_header("X-Protocol-Version", "1")
+        req.add_header("X-Protocol-Version", "2")
         req.add_header("Authorization", "Bearer " + store_a["session_token"])
         with urllib.request.urlopen(req, timeout=5) as r:
             return json.load(r)["joinToken"]

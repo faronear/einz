@@ -196,7 +196,7 @@ def new_join_token(port, store_path):
         f'http://127.0.0.1:{port}/spaces/{store["space_id"]}/join-tokens',
         method='POST',
         headers={'Authorization': 'Bearer ' + store['session_token'],
-                 'X-Protocol-Version': '1'})
+                 'X-Protocol-Version': '2'})
     with urllib.request.urlopen(req, timeout=5) as r:
         return json.load(r)['joinToken']
 

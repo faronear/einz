@@ -41,7 +41,7 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
 function req (port: number, path: string, init?: RequestInit): Promise<Response> {
   return fetch(`http://127.0.0.1:${port}${path}`, {
     ...init,
-    headers: { 'X-Protocol-Version': '1', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
   })
 }
 

@@ -16,9 +16,9 @@ class ApiClient {
   final String baseUrl;
 
   /// 协议版本头（PROTOCOL.md §1）：服务端做硬校验，缺失/不匹配 → 400。
-  /// 所有 REST 请求都带上（WS 用握手的 `?pv=`）。
+  /// 所有 REST 请求都带上（WS 用握手的 `?pv=`，见 [kProtocolVersion]）。
   static const protocolVersionHeader = 'X-Protocol-Version';
-  static const protocolVersion = '1';
+  static const protocolVersion = kProtocolVersion;
 
   /// 瞬时网络错误自动重试次数（翻墙/网络抖动下的间歇性握手失败不致命）。
   static const retryCount = 3;

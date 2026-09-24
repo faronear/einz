@@ -203,7 +203,7 @@ def http(port, method, path, body=None, token=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method)
     req.add_header('Content-Type', 'application/json')
-    req.add_header('X-Protocol-Version', '1')
+    req.add_header('X-Protocol-Version', '2')
     if token:
         req.add_header('Authorization', f'Bearer {token}')
     with urllib.request.urlopen(req, timeout=10) as r:

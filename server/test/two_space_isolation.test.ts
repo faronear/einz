@@ -33,7 +33,7 @@ const RAW_FETCH = globalThis.fetch
 globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
   RAW_FETCH(input, {
     ...init,
-    headers: { 'X-Protocol-Version': '1', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
   })) as typeof fetch
 
 const ROOT = resolve(import.meta.dirname, '..')

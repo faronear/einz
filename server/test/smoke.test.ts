@@ -32,7 +32,7 @@ const RAW_FETCH = globalThis.fetch
 globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
   RAW_FETCH(input, {
     ...init,
-    headers: { 'X-Protocol-Version': '1', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
   })) as typeof fetch
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -469,7 +469,7 @@ async function main (): Promise<void> {
     await new Promise<void>((done, fail) => {
       // 凭证走握手头（PROTOCOL.md §8.1：token 不放 URL query）
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=1`,
+        `ws://127.0.0.1:${port}/ws?pv=2`,
         { headers: { Authorization: `Bearer ${devA.sessionToken}` } }
       )
       const timer = setTimeout(
@@ -896,7 +896,7 @@ async function main (): Promise<void> {
 
       // B 在线（WS）；A 始终不连 WS
       const ws6 = new WebSocket(
-        `ws://127.0.0.1:${port6}/ws?pv=1`,
+        `ws://127.0.0.1:${port6}/ws?pv=2`,
         { headers: { Authorization: `Bearer ${b6.sessionToken}` } }
       )
       const got = new Promise<Record<string, string>>((done, fail) => {

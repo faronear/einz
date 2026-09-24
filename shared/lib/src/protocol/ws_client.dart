@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../crypto/message_crypto.dart';
+import 'types.dart';
 
 /// WS 事件帧类型（PROTOCOL.md §8）。
 const String kWsTypeHello = 'hello';
@@ -177,7 +178,7 @@ class WsClient {
     final wsUrl = server.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
     // 凭证走握手头，**不放 URL query**（2026-09-15 评审 H4）：URL 会进反代
     // access log / 代理缓存 / 浏览器历史，session token 不该落在这些地方。
-    final uri = Uri.parse('$wsUrl/ws?pv=1');
+    final uri = Uri.parse('$wsUrl/ws?pv=$kProtocolVersion');
     WebSocket.connect(
       uri.toString(),
       headers: {'Authorization': 'Bearer $_token'},

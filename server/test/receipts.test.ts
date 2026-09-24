@@ -22,7 +22,7 @@ const RAW_FETCH = globalThis.fetch
 globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
   RAW_FETCH(input, {
     ...init,
-    headers: { 'X-Protocol-Version': '1', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
   })) as typeof fetch
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -238,7 +238,7 @@ async function main (): Promise<void> {
     // 7) Alice 在线时，Bob 上报 read=2 → Alice 应通过 WS 收到 receipt.updated
     await new Promise<void>((done, fail) => {
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=1`,
+        `ws://127.0.0.1:${port}/ws?pv=2`,
         { headers: { Authorization: `Bearer ${alice.sessionToken}` } }
       )
       const timer = setTimeout(() => fail(new Error('WS receipt.updated timeout')), 5000)
