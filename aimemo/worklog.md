@@ -9272,3 +9272,37 @@ await m.addColumn(localAttachments, spaceId);    // ✗ 列已存在 → "duplic
 
 
 
+
+## 2026-09-24 逃生口：App 启动失败页「清除本机数据并重来」；TUI `--reset` + 坏 store 兜底
+
+承接上一条（迁移 brick）。老板同意加逃生口，并要求修 TUI 同款"历史数据不匹配新后台就
+罢工、连 /reset 都进不去"的问题。
+
+### App：启动失败页逃生口
+
+- `StartupGate` 失败页新增「清除本机数据并重来」（红色 TextButton + 确认弹窗，不可逆）。
+- **两条路**：① 本地库还能打开 → `resetLocalData`（按行清）→ **原地**回向导；
+  ② 库打不开（迁移失败/损坏，按行清也走不动）→ 兜底 `hardResetLocalData`（`close` 连接
+  + 删 `Documents[/dev-*]/einz.sqlite{,-wal,-shm}` + 清安全存储/附件·媒体缓存）→ 提示
+  "请完全退出并重新打开 App"。
+  - 为什么②必须重启：drift 的 `LazyDatabase` **一旦 `close()` 不能重开**，本进程的
+    `LocalDatabase` 不可再用（`main.dart` 里已注明）。
+- 新 l10n 键：`startupInitClearData` / `-Title` / `-Message`、`startupInitClearedRestart`
+  （en 为模板 + zh，同步生成 `app_localizations*`）。
+
+### TUI：不再需要手删 store 文件
+
+- **`--reset` 启动参数**：先清 store 文件（含 `.bak`）与附件缓存，再照常走全新入网引导。
+  这是"TUI 因历史/损坏数据罢工、连 `/reset` 都进不去"时的无手删文件出口。
+- **坏/不兼容 store 兜底**：`_onboard` 加载**显式 `--store`** 的 store 失败时，备份
+  `.bak` 保留现场后按全新处理——此前只有自动发现路径（`_resolveAutoStore`）有这层兜底，
+  显式 `--store` 会直接把引导抛崩、只能手动删文件。
+- **提示补路**：`_unrecognizedNotice` 与"旧版遗留"警告都补上「`/reset` 清除本地数据并
+  重新入网，或重启加 `--reset`」；保留原"本通道未被服务器识别"子串（`revoked_check.py`
+  的断言不破）。
+
+### 验证
+
+- app：`flutter gen-l10n` + `flutter analyze` 无 issue。
+- cli：`flutter analyze` 无 issue；`dart test` 21 例全过。
+- **未跑**：App 启动失败页逃生口、TUI `--reset` 的真机/交互测试（需老板自测）。

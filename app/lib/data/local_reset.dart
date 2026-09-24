@@ -1,5 +1,10 @@
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
+
 import 'app_lock.dart';
 import 'attachment_store.dart';
+import 'dev_data_dir.dart';
 import 'local_database.dart';
 import 'media_cache.dart';
 import 'secure_store.dart';
@@ -36,4 +41,44 @@ Future<void> resetLocalData(LocalDatabase db) async {
   await AttachmentStore.clear();
   await MediaCache.deleteAll();
   VaultSession.publish(null); // 解锁态也一并清掉（内存里别留着已经删掉的密钥）
+}
+
+/// **兜底清空**（当 [resetLocalData] 本身失败时用——本地库**打不开**：迁移抛错 / 文件
+/// 损坏）。`resetLocalData` 是按行删、经 drift 走，库打不开就没法删；这里改成
+/// **关连接 + 删库文件**（含 `-wal`/`-shm`，dev 隔离目录同款路径）+ 清安全存储与缓存。
+///
+/// ⚠️ drift 的 `LazyDatabase` 一旦 `close()` **不能重开**，故调用后本进程的
+/// `LocalDatabase` 不可再用——调用方**必须退出/重启 App**（下次启动是全新安装）。
+///
+/// 用途：`StartupGate` 启动失败页的「清除本机数据并重来」逃生口（2026-09-24 老板同意）。
+Future<void> hardResetLocalData(LocalDatabase db) async {
+  // 1) 释放库连接（关不掉也要继续删文件，尽力而为）
+  try {
+    await db.close();
+  } catch (_) {}
+  // 2) 删库文件：drift_flutter 固定 `<Documents|dev-/ >/einz.sqlite`
+  try {
+    final dir = devDataDirIsolated
+        ? await devSubDir(getApplicationDocumentsDirectory)
+        : await getApplicationDocumentsDirectory();
+    for (final suffix in const ['', '-wal', '-shm']) {
+      final f = File('${dir.path}${Platform.pathSeparator}einz.sqlite$suffix');
+      if (f.existsSync()) {
+        try {
+          f.deleteSync();
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  // 3) 安全存储 + 附件/媒体明文缓存 + 内存解锁态
+  try {
+    await SecureStore.deleteAll(AppLockService.secureKeys);
+  } catch (_) {}
+  try {
+    await AttachmentStore.clear();
+  } catch (_) {}
+  try {
+    await MediaCache.deleteAll();
+  } catch (_) {}
+  VaultSession.publish(null);
 }

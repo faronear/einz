@@ -122,6 +122,13 @@
   },
   "startupInitFailed": "Startup failed — your data is safe, please retry",
   "startupInitRetry": "Retry",
+  "startupInitClearData": "Clear local data & start over",
+  "@startupInitClearData": {
+    "description": "Escape hatch on the startup-failure page: erase all local data and return to onboarding"
+  },
+  "startupInitClearDataTitle": "Clear local data?",
+  "startupInitClearDataMessage": "Erases everything stored on this device — secret spaces, messages, attachments, lock screen code and keys — and returns to setup. Use only when retry keeps failing; this cannot be undone.",
+  "startupInitClearedRestart": "Local data cleared. Fully quit and reopen the app.",
   "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
   "setupPageScanInvite": "Scan token QR code",
   "setupPageScannerHint": "Point the camera at the token QR code",

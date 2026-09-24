@@ -122,6 +122,13 @@
   },
   "startupInitFailed": "启动初始化失败，配置未丢失，请重试",
   "startupInitRetry": "重试",
+  "startupInitClearData": "清除本机数据并重来",
+  "@startupInitClearData": {
+    "description": "启动失败页的逃生口：清空本机全部本地数据并回到入网向导"
+  },
+  "startupInitClearDataTitle": "清除本机数据？",
+  "startupInitClearDataMessage": "这会清除本机全部本地数据（秘境、消息、附件、锁屏码与密钥），并回到入网向导。仅在反复重试仍失败时使用——不可恢复。",
+  "startupInitClearedRestart": "本机数据已清除。请完全退出并重新打开 App。",
   "setupPagePasteEnvelope": "⚠️ 请粘贴密保信封（base64）",
   "setupPageScanInvite": "扫码填入开通码",
   "setupPageScannerHint": "把开通码二维码对准取景框",

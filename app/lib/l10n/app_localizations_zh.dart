@@ -291,6 +291,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupInitRetry => '重试';
 
   @override
+  String get startupInitClearData => '清除本机数据并重来';
+
+  @override
+  String get startupInitClearDataTitle => '清除本机数据？';
+
+  @override
+  String get startupInitClearDataMessage =>
+      '这会清除本机全部本地数据（秘境、消息、附件、锁屏码与密钥），并回到入网向导。仅在反复重试仍失败时使用——不可恢复。';
+
+  @override
+  String get startupInitClearedRestart => '本机数据已清除。请完全退出并重新打开 App。';
+
+  @override
   String get setupPagePasteEnvelope => '⚠️ 请粘贴密保信封（base64）';
 
   @override

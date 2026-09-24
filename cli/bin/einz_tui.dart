@@ -358,7 +358,21 @@ Future<(bool, String, List<String>)> _probeServer(String server) async {
 /// 每次启动重读。默认地址连不上时每次启动都会再问一次——那是"该去改 localConfig.json
 /// 或硬编码托底了"的警报，不该被 store 里的旧地址悄悄盖掉。
 Future<(EntranceStore, String, String)> _onboard(String storePath, String server) async {
-  var store = storePath.isNotEmpty && File(storePath).existsSync() ? EntranceStore.load(storePath) : null;
+  // 加载已有 store：**损坏 / 版本不兼容**（缺字段、非法 JSON）时不让它抛崩——
+  // 备份 `.bak` 保留现场后按全新处理（与 `_resolveAutoStore` 同口径）。此前显式
+  // `--store` 路径没有兜底，坏 store 会直接把引导炸掉、只能手动删文件（2026-09-24 修）。
+  EntranceStore? store;
+  if (storePath.isNotEmpty && File(storePath).existsSync()) {
+    try {
+      store = EntranceStore.load(storePath);
+    } catch (_) {
+      try {
+        File(storePath).renameSync('$storePath.bak');
+      } catch (_) {}
+      stdout.writeln('⚠️ $storePath 无法加载（损坏或版本不兼容），已备份为 .bak，将重新初始化');
+      store = null;
+    }
+  }
 
   // ① 服务器地址：--server 参数（仅本次生效）> 本机默认（cli/localConfig.json）> 硬编码
   if (server.isEmpty) {
@@ -592,7 +606,8 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     session.messages.add(_systemMessage(
         session,
         '⚠️ 本机 store 缺少通道登记信息（旧版遗留）\n'
-        '  请用 /space create 新建秘境，或用 /space join <开通码或邀请链接> 加入已有秘境'));
+        '  请用 /space create 新建秘境，或用 /space join <开通码或邀请链接> 加入已有秘境；\n'
+        '  若想彻底重来：/reset 清除本地数据并重新入网（或退出后加 --reset 重启）'));
     session.messages.add(_systemMessage(session, '----------------'));
     _scheduleRender();
   }
@@ -1233,6 +1248,7 @@ Future<void> main(List<String> args) async {
   var storePath = '';
   var server = '';
   var explicitStore = false; // 是否显式传 --store（自动发现 vs 手动指定）
+  var doReset = false; // 启动即清除本地数据后重新入网（逃生口，见下）
   for (var i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--store':
@@ -1240,6 +1256,8 @@ Future<void> main(List<String> args) async {
         explicitStore = true;
       case '--server':
         server = args[++i];
+      case '--reset':
+        doReset = true;
     }
   }
 
@@ -1249,6 +1267,15 @@ Future<void> main(List<String> args) async {
     stderr.writeln('未检测到交互终端，请用: dart run bin/einz_chat.dart --store $storePath ${server.isEmpty ? '' : '--server $server'}');
     exitCode = 1;
     return;
+  }
+
+  // 逃生口 `--reset`：不等进 TUI 就先清本地数据（store 文件 + 附件明文缓存），
+  // 之后照常走全新入网引导。这是"tui 因历史/损坏数据罢工、连 /reset 都进不去"时的
+  // 无手删文件出口（2026-09-24 老板要求）。
+  if (doReset) {
+    final target = explicitStore ? storePath : '${_defaultStoreDir()}/myeinz.json';
+    _deleteLocalData(target);
+    stdout.writeln('🧹 已清除本机数据（$target 与附件缓存），重新入网…');
   }
 
   // 无显式 --store：默认目录（~/.einz）自动发现已有通道；
@@ -3671,7 +3698,8 @@ final List<String> _guidanceNotes = [];
 /// 刻意写明"本地数据未清除"——老板 2026-09-16：此前客户端把这种情况当"本通道已被撤销"
 /// 直接退出/抹数据，运维失误造成不可挽回的损失；现在只警告，历史照常可看。
 const String _unrecognizedNotice =
-    '⚠️ 本通道未被服务器识别（服务器数据可能已重置）——仍可查看本地历史，联网功能暂停；本地数据未清除';
+    '⚠️ 本通道未被服务器识别（服务器数据可能已重置）——仍可查看本地历史，联网功能暂停；本地数据未清除。\n'
+    '   如需重新入网：输入 /reset 清除本地数据并重新入网，或退出后加 --reset 重启';
 
 /// 是否已提示过"服务器不认本通道"（每进程只提示一次，避免退避重连每分钟刷屏）。
 bool _unrecognizedShown = false;

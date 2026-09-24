@@ -626,6 +626,30 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get startupInitRetry;
 
+  /// Escape hatch on the startup-failure page: erase all local data and return to onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Clear local data & start over'**
+  String get startupInitClearData;
+
+  /// No description provided for @startupInitClearDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear local data?'**
+  String get startupInitClearDataTitle;
+
+  /// No description provided for @startupInitClearDataMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Erases everything stored on this device — secret spaces, messages, attachments, lock screen code and keys — and returns to setup. Use only when retry keeps failing; this cannot be undone.'**
+  String get startupInitClearDataMessage;
+
+  /// No description provided for @startupInitClearedRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Local data cleared. Fully quit and reopen the app.'**
+  String get startupInitClearedRestart;
+
   /// No description provided for @setupPagePasteEnvelope.
   ///
   /// In en, this message translates to:

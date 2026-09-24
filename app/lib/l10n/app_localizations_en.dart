@@ -307,6 +307,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get startupInitRetry => 'Retry';
 
   @override
+  String get startupInitClearData => 'Clear local data & start over';
+
+  @override
+  String get startupInitClearDataTitle => 'Clear local data?';
+
+  @override
+  String get startupInitClearDataMessage =>
+      'Erases everything stored on this device — secret spaces, messages, attachments, lock screen code and keys — and returns to setup. Use only when retry keeps failing; this cannot be undone.';
+
+  @override
+  String get startupInitClearedRestart =>
+      'Local data cleared. Fully quit and reopen the app.';
+
+  @override
   String get setupPagePasteEnvelope => '⚠️ Paste the key envelope (base64)';
 
   @override

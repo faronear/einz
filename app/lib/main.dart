@@ -6,6 +6,7 @@ import 'chat_entry.dart';
 import 'data/app_lock.dart';
 import 'data/launch_args.dart';
 import 'data/local_database.dart';
+import 'data/local_reset.dart';
 import 'data/locale_settings.dart';
 import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
@@ -197,6 +198,54 @@ class _StartupGateState extends State<StartupGate> {
     }
   }
 
+  /// 逃生口：清空本机全部本地数据并重来（启动失败页）。
+  ///
+  /// 两条路：① 本地库还能打开 → 按行清（`resetLocalData`）后**原地**回向导；
+  /// ② 本地库打不开（迁移失败/损坏，`resetLocalData` 也走不动）→ 兜底
+  /// `hardResetLocalData`（关连接 + 删库文件 + 清安全存储），此时本进程的库不可再用，
+  /// 提示用户彻底退出重开。两条路都**不可逆**，故先过确认弹窗。
+  Future<void> _clearLocalDataEscape() async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.startupInitClearDataTitle),
+        content: Text(l10n.startupInitClearDataMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.startupInitClearData),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final db = widget.db ?? LocalDatabase.shared;
+    try {
+      await resetLocalData(db); // 库还能打开：清完可原地重来
+    } catch (_) {
+      await hardResetLocalData(db); // 库打不开：删库文件兜底（须重启）
+      if (!mounted) return;
+      setState(() => _initError = l10n.startupInitClearedRestart);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _initError = null;
+      _retryCount = 0;
+      _hasLock = null; // 回到加载态，_check 会重判（应直接进向导）
+    });
+    _check();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_hasLock == null) {
@@ -223,6 +272,16 @@ class _StartupGateState extends State<StartupGate> {
                       _check();
                     },
                     child: Text(l10n.startupInitRetry),
+                  ),
+                  const SizedBox(height: 8),
+                  // 逃生口（2026-09-24 老板同意）：迁移失败等会把 App 锁死在启动页，
+                  // 给一个"清本机数据并重来"，免去手动删库文件。
+                  TextButton(
+                    onPressed: _clearLocalDataEscape,
+                    child: Text(
+                      l10n.startupInitClearData,
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
                   ),
                 ],
               ),
