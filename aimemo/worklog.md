@@ -9151,9 +9151,14 @@ worklog 拖到下一轮，导致复盘要靠 `git log` 反推——这条已写�
 
 ### 遗留 / 注意
 
-- 未跑 cli 的 pty e2e 探针（需真 server，且按惯例不改）；`member_preset_check.py`
-  原就读 `/health['member_names']` 而 `/health` 早已不返回名称表 → 该探针**本就是死的**
-  （probe rot，非本次引入）。
+- **删除死探针** `cli/test/member_preset_check.py`（原 `partner_preset_check.py`）：它已彻底
+  失效——硬编码 `ROOT=/Users/Shared/productX/einz`（本机真实路径不是它）、期望的 TUI 串
+  （`请输入您的名字`/`第二用户的名字`/`请设置内容安全口令`/`● 在线`）在当前 TUI 0 命中、
+  读 `/health['member_names']`（`/health` 早已不吐业务量）、依赖已删除的 `/entrances/enroll`
+  端点；且唯一独有断言（预置名 pre-join 可观测）已无法经公开 API 观察（`/space` 名称表按
+  `member_id IS NOT NULL` 过滤）。保留只会误导 → 删除；其覆盖已由 `presence_check.py` 等
+  探针与 `server/test/smoke.test.ts` 承担。
+- 未跑 cli 的其余 pty e2e 探针（需真 server，按惯例不改）。
 - 服务端/App 真机自测仍待老板；推送与部署按惯例留给老板。
 
 

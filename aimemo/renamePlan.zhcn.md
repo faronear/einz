@@ -191,6 +191,14 @@ app 测试里那条 UI 断言也同步改了。**探针未实跑**（需真 serv
   multi_space_pages）61 例全过（goldens 按惯例不跑）。
 - 残留 grep：code/test/demo/docs 内 `partner` 归零；仅剩 **l10n UI 文案值**（有意保留）与
   历史快照。
-- 已知遗留（**非本次引入**）：`cli/test/member_preset_check.py` 原就读 `/health['member_names']`，
-  而 `/health` 早已不返回名称表 → 该探针本就是死的（probe rot）。
+- **删除死探针**：`cli/test/partner_preset_check.py`（改名后 `member_preset_check.py`）
+  已彻底失效——① `ROOT` 硬编码 `/Users/Shared/productX/einz`（本机真实路径不是它）；
+  ② 期望的 TUI 串（`请输入您的名字`/`第二用户的名字`/`请设置内容安全口令`/`● 在线`）在当前
+  TUI 里 0 命中（现为 `❓ 我的名字`/`❓ 伴侣的名字`/`❓ 设置共享口令`）；③ 读
+  `/health['member_names']`，而 `/health` 早已按"免鉴权端点不吐业务量"原则只返回
+  status/协议版本/能力/uptime；④ 依赖的 `/entrances/enroll` 端点早已删除。且它唯一的
+  独有断言（"预置名 pre-join 可观测"）**已无法经公开 API 观察**（`/space` 的名称表按
+  `member_id IS NOT NULL` 过滤，预置行加入前无 member_id）——保留只会误导，故删除。
+  其覆盖（create 流程问「伴侣的名字」、预置名落 `space_members` slot=1）已分别由
+  `presence_check.py` 等探针与 `server/test/smoke.test.ts` 覆盖。
 
