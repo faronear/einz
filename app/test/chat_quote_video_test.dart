@@ -58,7 +58,7 @@ class _VideoFakeApi extends ApiClient {
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-test',
         entrances: const [
-          SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+          SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
         ],
       );
 

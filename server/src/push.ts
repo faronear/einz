@@ -42,7 +42,7 @@ export function unregisterPushToken(token: string): { ok: true } {
  */
 export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
   // **只投给同一 Space 的其他通道**：entrances 表没有 space_id，通道经
-  // partner_id → space_members 归属 Space。此前只按 `entrance_id != 自己` 过滤 →
+  // member_id → space_members 归属 Space。此前只按 `entrance_id != 自己` 过滤 →
   // 会把提示推给这台服务器上**所有空间**的通道（跨空间泄露"谁在发消息"）。
   // 同时跳过已撤销的通道（status != 'active'）。
   const rows = getDb()
@@ -50,7 +50,7 @@ export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
       `SELECT p.entrance_id, p.platform, p.token
          FROM push_tokens p
          JOIN entrances d  ON d.entrance_id = p.entrance_id
-         JOIN space_members sm ON sm.partner_id = d.partner_id AND sm.space_id = ?
+         JOIN space_members sm ON sm.member_id = d.member_id AND sm.space_id = ?
         WHERE p.entrance_id != ?
           AND d.status = 'active'`,
     )
@@ -62,31 +62,31 @@ export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
   }
 }
 
-/** GET /space：空间信息（space_id + 成员的通道 + partner 名称/性别表）。
+/** GET /space：空间信息（space_id + 成员的通道 + member 名称/性别表）。
  *  v2：名称/性别从 space_members 表读（display_name/gender——create/join 写入），
  *  不再读 v1 的 meta person_name:* 与 person_gender:* 键（v2 不写 meta——老板 2026-09-10
  *  反馈：标题栏对方名字一直 '-'、气泡全青色）。
  *  通道范围：**仅本空间成员的通道**（guard.entranceScopeClause）——此前直出全局
- *  entrances 表，跨空间泄漏 partner/在线状态（2026-09-15 评审 C2）。 */
+ *  entrances 表，跨空间泄漏 member/在线状态（2026-09-15 评审 C2）。 */
 export function getSpace(
   token: string
-): { space_id: string; entrances: unknown[]; partner_names: Record<string, string>; partner_genders: Record<string, string>; partner_slots: Record<string, number> } {
+): { space_id: string; entrances: unknown[]; member_names: Record<string, string>; member_genders: Record<string, string>; member_slots: Record<string, number> } {
   const sess = requireSession(token);
   const scope = entranceScopeClause(sess.space_id);
   const entrances = getDb()
-    .prepare(`SELECT d.entrance_id, d.partner_id, d.status, d.last_seen FROM entrances d WHERE d.status = 'active' AND (${scope.sql})`)
+    .prepare(`SELECT d.entrance_id, d.member_id, d.status, d.last_seen FROM entrances d WHERE d.status = 'active' AND (${scope.sql})`)
     .all(...scope.params);
-  // v2：成员名称/性别表（space_members——按 partner_id；同一身份多通道共享）
-  const partnerNames: Record<string, string> = {};
-  const partnerGenders: Record<string, string> = {};
-  const partnerSlots: Record<string, number> = {};
+  // v2：成员名称/性别表（space_members——按 member_id；同一身份多通道共享）
+  const memberNames: Record<string, string> = {};
+  const memberGenders: Record<string, string> = {};
+  const memberSlots: Record<string, number> = {};
   const members = getDb()
-    .prepare(`SELECT partner_id, display_name, gender, slot FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL`)
-    .all(sess.space_id) as { partner_id: string; display_name: string | null; gender: string | null; slot: number }[];
+    .prepare(`SELECT member_id, display_name, gender, slot FROM space_members WHERE space_id = ? AND member_id IS NOT NULL`)
+    .all(sess.space_id) as { member_id: string; display_name: string | null; gender: string | null; slot: number }[];
   for (const m of members) {
-    if (m.display_name != null) partnerNames[m.partner_id] = m.display_name;
-    if (m.gender != null) partnerGenders[m.partner_id] = m.gender;
-    partnerSlots[m.partner_id] = m.slot;
+    if (m.display_name != null) memberNames[m.member_id] = m.display_name;
+    if (m.gender != null) memberGenders[m.member_id] = m.gender;
+    memberSlots[m.member_id] = m.slot;
   }
-  return { space_id: sess.space_id, entrances, partner_names: partnerNames, partner_genders: partnerGenders, partner_slots: partnerSlots };
+  return { space_id: sess.space_id, entrances, member_names: memberNames, member_genders: memberGenders, member_slots: memberSlots };
 }

@@ -18,7 +18,7 @@
 | 专项 | 状态 | 细节文档 |
 | --- | --- | --- |
 | **多空间**（一条通道进多个秘境） | M0.5 ✅ / M1 ✅ / M2 ✅ / **M3 ✅（2026-09-22 完成）**——剩真机自测 | `aimemo/multiSpaceDesign.zhcn.md` §8（里程碑）、§9（决策） |
-| **字段改名**（`device_id`→`entrance_id`、`person_id`→`partner_id`、`device_uid`→`install_uid`） | `[x]` **2026-09-23 已完成**（一次性机械替换，无 alias） | `aimemo/renamePlan.zhcn.md` |
+| **字段改名**（`device_id`→`entrance_id`、`person_id`→**`member_id`**、`device_uid`→`install_uid`） | `[x]` **2026-09-23 主线完成**（一次性机械替换，无 alias）；身份词 **2026-09-24 续改 `partner`→`member`**（界面文案不动） | `aimemo/renamePlan.zhcn.md` §9 |
 | **语音实时通话** | `[⏸]` 待评审（评审通过才拆任务） | `aimemo/voiceCall.zhcn.md` |
 
 ## 待办（跨专项；一行一项，细节在各自文档）

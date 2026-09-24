@@ -23,7 +23,7 @@ const FORMAT = "einz-server-backup-v1";
 /** per-space 备份导出的表（都有 space_id 列，按它过滤）。
  *  **不含审计表**（connection_events / entrance_activity）：只追加、无业务语义，且
  *  主键是 AUTOINCREMENT 整数——导入时用原 id 会撞上别的空间的行并被 REPLACE 覆盖。
- *  **不含 entrances / push_tokens**：它们没有 space_id，靠 partner_id/entrance_id 反查。 */
+ *  **不含 entrances / push_tokens**：它们没有 space_id，靠 member_id/entrance_id 反查。 */
 const SPACE_TABLES = [
   "spaces",
   "space_members",
@@ -76,7 +76,7 @@ function collectFilesRecursive(dir: string, base: string): { path: string; data:
 }
 
 /** 导出**单个空间**的行（逻辑导出，非整库物理备份）：按 space_id 过滤，
- *  entrances/push_tokens 靠 partner_id/entrance_id 反查带出。 */
+ *  entrances/push_tokens 靠 member_id/entrance_id 反查带出。 */
 function exportSpaceRows(spaceId: string): Record<string, Record<string, unknown>[]> {
   assertSafeSpaceId(spaceId);
   const db = getDb();
@@ -84,11 +84,11 @@ function exportSpaceRows(spaceId: string): Record<string, Record<string, unknown
   for (const table of SPACE_TABLES) {
     rows[table] = db.prepare(`SELECT * FROM ${table} WHERE space_id = ?`).all(spaceId) as Record<string, unknown>[];
   }
-  // 通道（登记项）没有 space_id：走 partner_id → space_members 反查
+  // 通道（登记项）没有 space_id：走 member_id → space_members 反查
   const entrances = db
     .prepare(
-      `SELECT * FROM entrances WHERE partner_id IN
-       (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL)`,
+      `SELECT * FROM entrances WHERE member_id IN
+       (SELECT member_id FROM space_members WHERE space_id = ? AND member_id IS NOT NULL)`,
     )
     .all(spaceId) as Record<string, unknown>[];
   rows.entrances = entrances;
@@ -227,15 +227,15 @@ function restoreSpace(
   // 删除顺序：子表先行（外键若启用也不会撞约束）；审计表刻意不动
   //
   // **不变式：清理与导出必须同口径。** entrances 无 space_id 列，靠
-  // `partner_id IN (本空间 space_members 的 partner_id)` 反查；`exportSpaceRows`
+  // `member_id IN (本空间 space_members 的 member_id)` 反查；`exportSpaceRows`
   // 用同一个子查询带出这些行，恢复时再 INSERT 回来，两侧口径必须逐字一致，
-  // 否则会删掉导不出（或反之）的行。这里本来就只落在本空间：partner_id 是
+  // 否则会删掉导不出（或反之）的行。这里本来就只落在本空间：member_id 是
   // create/join 时按 (space_id, slot) 现生成的 UUID（spaces.ts），不跨空间共享，
-  // 所以同一个人在别的空间是**另一个 partner_id**，不会被这一刀波及；同空间内
+  // 所以同一个人在别的空间是**另一个 member_id**，不会被这一刀波及；同空间内
   // 同一身份的多条通道则本就该一起导出/清理。
   const cleanup = db.transaction(() => {
-    db.prepare(`DELETE FROM push_tokens WHERE entrance_id IN (SELECT entrance_id FROM entrances WHERE partner_id IN (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL))`).run(spaceId);
-    db.prepare(`DELETE FROM entrances WHERE partner_id IN (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL)`).run(spaceId);
+    db.prepare(`DELETE FROM push_tokens WHERE entrance_id IN (SELECT entrance_id FROM entrances WHERE member_id IN (SELECT member_id FROM space_members WHERE space_id = ? AND member_id IS NOT NULL))`).run(spaceId);
+    db.prepare(`DELETE FROM entrances WHERE member_id IN (SELECT member_id FROM space_members WHERE space_id = ? AND member_id IS NOT NULL)`).run(spaceId);
     for (const table of ["attachments", "messages", "receipts", "join_tokens", "challenges", "sessions", "key_escrow", "space_members", "spaces"]) {
       db.prepare(`DELETE FROM ${table} WHERE space_id = ?`).run(spaceId);
     }

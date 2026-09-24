@@ -20,7 +20,7 @@ CLI = f'{ROOT}/cli'
 WORK = tempfile.mkdtemp(prefix='einz-revoke-cmd-')
 PASSPHRASE = 'pass-123'
 CREATOR = 'luk'
-PARTNER = 'ali'
+MEMBER = 'ali'
 CLEAR_HOME = b'\x1b[2J\x1b[3J\x1b[H'
 ANSI = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
 ROW_POS = re.compile(r'\x1b\[(\d+);1H')  # TUI 逐行定位重绘的序列
@@ -164,7 +164,7 @@ def onboard_create(label, store, port, home):
         ('秘境入口', 'c\r'),
         ('我的名字', f'{CREATOR}\r'),
         ('我的性别', '1\r'),
-        ('伴侣的名字', f'{PARTNER}\r'),
+        ('伴侣的名字', f'{MEMBER}\r'),
         ('伴侣的性别', '2\r'),
     ]:
         out = wait_text(m, expect, timeout=30)
@@ -189,13 +189,13 @@ def onboard_join(label, store, port, token, home):
     out = wait_text(m, '完整输入你的名字', timeout=20)
     if '完整输入你的名字' not in out:
         print(f'❌ {label}: 未到身份选择'); print(out[-600:]); raise SystemExit(1)
-    send(m, PARTNER + '\r')
+    send(m, MEMBER + '\r')
     wait_text(m, '验证共享口令', timeout=20)
     send(m, PASSPHRASE + '\r')
     if '成功加入秘境' not in wait_text(m, '成功加入秘境', timeout=30):
         print(f'❌ {label}: 加入未成功'); raise SystemExit(1)
     finish_onboarding(m, label)
-    wait_connected(m, PARTNER)  # 等 B 的 WS 连上，A 侧才会看到它"在线"
+    wait_connected(m, MEMBER)  # 等 B 的 WS 连上，A 侧才会看到它"在线"
     print(f'✅ {label}: 已加入并进入聊天态（WS 已连接）')
     return m, p
 
@@ -221,7 +221,7 @@ def parse_row_numbers(frame):
         m_no = re.match(r'\s*(\d+)\)', line)
         if not m_no:
             continue
-        if '[%s]' % PARTNER in line:
+        if '[%s]' % MEMBER in line:
             peer_no = int(m_no.group(1))
         elif '本机' in line:
             my_no = int(m_no.group(1))
@@ -242,7 +242,7 @@ def main():
         # 断言只看**行内容**（本机/对方/序号），不看列表标题措辞——标题是 UI 文案，
         # 老板会改（2026-09-23 就从「同空间 N 条」改成了「共 N 条」），绑标题必红。
         frame = wait_screen(m_a, lambda t: '通道列表' in t, 'A 的通道列表')
-        if '本机' not in frame or ('[%s]' % PARTNER) in frame:
+        if '本机' not in frame or ('[%s]' % MEMBER) in frame:
             print(f'❌ ① 只有 A 时列表应只有本机行:\n{frame[-800:]}'); return 1
 
         m_b, p_b = onboard_join('B', store_b, port, new_join_token(port, store_a), WORK)
@@ -251,13 +251,13 @@ def main():
 
         send(m_a, '/entrances\r')
         frame = wait_screen(m_a,
-                            lambda t: '通道列表' in t and ('[%s]' % PARTNER) in t and '在线' in t,
+                            lambda t: '通道列表' in t and ('[%s]' % MEMBER) in t and '在线' in t,
                             'A 看到同空间 2 行（含对方）')
         my_no, peer_no = parse_row_numbers(frame)
         if my_no is None or peer_no is None:
             print(f'❌ ① 未能解析序号（本机={my_no} 对方={peer_no}）:\n{frame[-900:]}'); return 1
-        if '[%s]' % PARTNER not in frame:
-            print(f'❌ ① 列表应含对方 partner「{PARTNER}」:\n{frame[-900:]}'); return 1
+        if '[%s]' % MEMBER not in frame:
+            print(f'❌ ① 列表应含对方 member「{MEMBER}」:\n{frame[-900:]}'); return 1
         print(f'✅ ① /entrances 列出同空间 2 条（本机 #{my_no}、对方 #{peer_no} 在线、带序号）')
 
         # ---------- ② 口令错 → 撤销不生效（目标毫发无损） ----------
@@ -283,7 +283,7 @@ def main():
         frame = wait_screen(m_a, lambda t: '不能撤销本机' in t, '拒绝撤销本机')
         # 顺便用**别名** /devices 验证它确实等价于 /entrances（老板 2026-09-23 要求保留）
         send(m_a, '/devices\r')
-        frame = wait_screen(m_a, lambda t: '通道列表' in t and ('[%s]' % PARTNER) in t,
+        frame = wait_screen(m_a, lambda t: '通道列表' in t and ('[%s]' % MEMBER) in t,
                             '③ 后仍能正常执行命令（/devices 别名）')
         print('✅ ③ /revoke 本机 → 拒绝（未进入确认流程，命令已结束；别名 /devices 可用）')
 
@@ -303,7 +303,7 @@ def main():
         send(m_a, '\r')  # 留空 = 取消（此前这一步才是真正被困的：只能重输或 /exit）
         wait_screen(m_a, lambda t: '已取消（未做任何改动）' in t, '③b 口令步留空取消')
         send(m_a, '/entrances\r')
-        wait_screen(m_a, lambda t: '通道列表' in t and ('[%s]' % PARTNER) in t,
+        wait_screen(m_a, lambda t: '通道列表' in t and ('[%s]' % MEMBER) in t,
                     '③b 取消后可继续用')
         print('✅ ③b 序号步/口令步留空回车 → 已取消，TUI 未被困（命令照常可用）')
 

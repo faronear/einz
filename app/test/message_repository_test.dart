@@ -23,7 +23,7 @@ class FakeApi extends ApiClient {
   /// 编排的 sync 页（每页是一个 SyncPage）。
   List<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> pages = [];
 
-  /// 编排的 /space 通道列表（partner 映射测试用）。
+  /// 编排的 /space 通道列表（member 映射测试用）。
   List<SpaceEntrance> spaceEntrances = [];
 
   /// 是否让附件上传抛异常（模拟服务端 500 等上传失败）。
@@ -139,17 +139,17 @@ void main() {
         token: token,
       );
 
-  test('partner 身份判断：同 partner 不同通道显示 me，对方通道显示 peer', () async {
+  test('member 身份判断：同 member 不同通道显示 me，对方通道显示 peer', () async {
     final api = FakeApi();
     api.spaceEntrances = [
-      const SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
-      const SpaceEntrance(entranceId: 'dev-a2', partnerId: 'partner-a', status: 'active'),
-      const SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'),
+      const SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
+      const SpaceEntrance(entranceId: 'dev-a2', memberId: 'member-a', status: 'active'),
+      const SpaceEntrance(entranceId: 'dev-b', memberId: 'member-b', status: 'active'),
     ];
     final repo = makeRepo(api, token: 'tok');
     await repo.refreshEntranceMap();
 
-    // 同 partner 的另一条通道（dev-a2）与对方通道（dev-b）各发一条消息
+    // 同 member 的另一条通道（dev-a2）与对方通道（dev-b）各发一条消息
     final fromA2 = await encryptMessage(
       plaintext: '来自我的另一条通道',
       spaceKey: spaceKey,
@@ -176,7 +176,7 @@ void main() {
     await repo.sync();
     final hist = await repo.history();
     final byMsg = {for (final h in hist) h.env.messageId: h.sender};
-    expect(byMsg['msg-a2-1'], 'me', reason: '同 partner 的另一条通道消息应显示为 me');
+    expect(byMsg['msg-a2-1'], 'me', reason: '同 member 的另一条通道消息应显示为 me');
     expect(byMsg['msg-b-1'], 'peer', reason: '对方通道消息显示为 peer');
   });
 
@@ -673,12 +673,12 @@ void main() {
     final repo = makeRepo(api, token: 'tok');
     api.receiptRows = [
       ReceiptRow(
-          partnerId: 'partner-b', deliveredUptoSeq: 10, readUptoSeq: 5, updatedAt: 111),
+          memberId: 'member-b', deliveredUptoSeq: 10, readUptoSeq: 5, updatedAt: 111),
     ];
     await repo.sync();
 
     final rows = await repo.peerReceipts();
-    expect(rows.single.partnerId, 'partner-b');
+    expect(rows.single.memberId, 'member-b');
     expect(rows.single.deliveredUptoSeq, 10);
     expect(rows.single.readUptoSeq, 5);
 
@@ -695,21 +695,21 @@ void main() {
   test('回执：我自己那一行不参与推导（否则我发出的消息永远停在单勾）', () async {
     final api = FakeApi();
     api.spaceEntrances = [
-      const SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'), // 我
-      const SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'), // 对方
+      const SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'), // 我
+      const SpaceEntrance(entranceId: 'dev-b', memberId: 'member-b', status: 'active'), // 对方
     ];
     final repo = makeRepo(api, token: 'tok');
-    await repo.refreshEntranceMap(); // 建立 entrance→partner 映射（peerReceipts 据此排除自己）
+    await repo.refreshEntranceMap(); // 建立 entrance→member 映射（peerReceipts 据此排除自己）
 
     // 我自己上报的水位很低（我只把"对方的消息"读到 seq=1），对方的 delivered 已到 5。
     // GET /receipts 会把两行都返回，于是整张表里既有我也对方。
     await repo.upsertPeerReceipt(
-        partnerId: 'partner-a', deliveredUptoSeq: 1, readUptoSeq: 1);
+        memberId: 'member-a', deliveredUptoSeq: 1, readUptoSeq: 1);
     await repo.upsertPeerReceipt(
-        partnerId: 'partner-b', deliveredUptoSeq: 5, readUptoSeq: 0);
+        memberId: 'member-b', deliveredUptoSeq: 5, readUptoSeq: 0);
 
     final peers = await repo.peerReceipts();
-    expect(peers.map((p) => p.partnerId).toList(), ['partner-b'],
+    expect(peers.map((p) => p.memberId).toList(), ['member-b'],
         reason: 'peerReceipts 必须排除我自己那一行');
 
     // 我发出的 seq=5：对方已收到 → delivered（不受我自己水位影响）——老板 2026-09-13 实测的 bug
@@ -725,10 +725,10 @@ void main() {
     final api = FakeApi();
     final repo = makeRepo(api, token: 'tok');
     await repo.upsertPeerReceipt(
-        partnerId: 'partner-b', deliveredUptoSeq: 20, readUptoSeq: 10);
+        memberId: 'member-b', deliveredUptoSeq: 20, readUptoSeq: 10);
     // 重放一个更旧的值（如乱序的 WS 帧/过期 GET）
     await repo.upsertPeerReceipt(
-        partnerId: 'partner-b', deliveredUptoSeq: 5, readUptoSeq: 1);
+        memberId: 'member-b', deliveredUptoSeq: 5, readUptoSeq: 1);
     final rows = await repo.peerReceipts();
     expect(rows.single.deliveredUptoSeq, 20, reason: '单调：不得回退');
     expect(rows.single.readUptoSeq, 10, reason: '单调：不得回退');

@@ -222,7 +222,7 @@ class ApiClient {
     await _post(Api.installUid, {'install_uid': installUid}, token: token);
   }
 
-  /// 获取空间信息（space_id + 通道列表，含 partner_id 映射，PROTOCOL.md §7.3）。
+  /// 获取空间信息（space_id + 通道列表，含 member_id 映射，PROTOCOL.md §7.3）。
   Future<SpaceResult> getSpace(String token) async {
     final res = await _get(Api.space, token: token);
     return SpaceResult.fromJson(res);
@@ -239,9 +239,9 @@ class ApiClient {
     await _post('/entrances/name', {'entrance_name': entranceName}, token: token);
   }
 
-  /// 更新本通道 partner 显示名（/rename 命令，显示层用）。
-  Future<void> updatePartnerName(String partnerName, String token) async {
-    await _post('/partners/name', {'partner_name': partnerName}, token: token);
+  /// 更新本通道 member 显示名（/rename 命令，显示层用）。
+  Future<void> updateMemberName(String memberName, String token) async {
+    await _post('/members/name', {'member_name': memberName}, token: token);
   }
 
   /// 撤销**本空间内**的另一条通道（POST /entrances/:id/revoke，PROTOCOL.md §7.2）。
@@ -254,28 +254,28 @@ class ApiClient {
     await _post('/entrances/$entranceId/revoke', {'passphrase': passphrase}, token: token);
   }
 
-  /// 上传本人头像（raw 图片 bytes，服务端按 partner 存储覆盖）。
+  /// 上传本人头像（raw 图片 bytes，服务端按 member 存储覆盖）。
   ///
-  /// 返回服务端确认的 partner_id：上传方**收不到**自己的 profile.updated 广播
+  /// 返回服务端确认的 member_id：上传方**收不到**自己的 profile.updated 广播
   /// （ws.ts 的 broadcastProfileUpdated 跳过发送通道），客户端只能靠这个返回值
-  /// 失效本端头像缓存（重启路径 widget.partnerId 为空 → 旧实现静默失效失败，
+  /// 失效本端头像缓存（重启路径 widget.memberId 为空 → 旧实现静默失效失败，
   /// 老板 2026-09-16 实测：上传后消息流仍显示旧头像，重启才更新）。
-  /// 响应体不合法/缺字段时返回 null（partner_id 只用于本地缓存失效，
+  /// 响应体不合法/缺字段时返回 null（member_id 只用于本地缓存失效，
   /// 不能让解析失败把已经成功的一次上传报成失败）。
   Future<String?> uploadAvatar(Uint8List bytes, String token) async {
     final text = await _postBytes('/avatar', bytes, token: token);
     if (text.isEmpty) return null;
     try {
       final json = jsonDecode(text) as Map<String, dynamic>;
-      return json['partner_id'] as String?;
+      return json['member_id'] as String?;
     } catch (_) {
       return null;
     }
   }
 
-  /// 获取指定 partner 的头像 bytes；未设置返回 null。
-  Future<Uint8List?> getAvatar(String partnerId) async {
-    return _getBytes('/avatar/$partnerId');
+  /// 获取指定 member 的头像 bytes；未设置返回 null。
+  Future<Uint8List?> getAvatar(String memberId) async {
+    return _getBytes('/avatar/$memberId');
   }
 
   /// 上传口令托管密文包（KEY_ESCROW.md §4）：Server 只存密文，不解析内容。
@@ -491,7 +491,7 @@ class ApiClient {
   }
 
   /// raw bytes 上传（头像等二进制）：image/png + Bearer token。
-  /// 返回响应体文本（调用方按需解析，如 /avatar 的 partner_id）。
+  /// 返回响应体文本（调用方按需解析，如 /avatar 的 member_id）。
   Future<String> _postBytes(String path, Uint8List bytes, {String? token}) {
     return _withRetry(() async {
       final client = _client;

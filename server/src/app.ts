@@ -26,7 +26,7 @@ import {
   revokeEntrance,
   setInstallUid,
   updateEntranceName,
-  updatePartnerName
+  updateMemberName
 } from './entrances.js'
 import { getSpace, registerPushToken, unregisterPushToken } from './push.js'
 import {
@@ -138,7 +138,7 @@ server.on('upgrade', (req, socket, head) => {
  * - 免鉴权端点只有这几个，且都是有意为之：`GET /health`、`GET /join/:token`（落地页）、
  *   `POST /spaces`（空间自举，创建者还没有凭证）、`POST /spaces/join{,/preflight}`、
  *   `GET /spaces/lookup`（按地址定位，给未入网者用）、
- *   `GET /avatar/:partnerId`（本人自愿上传的展示图）、
+ *   `GET /avatar/:memberId`（本人自愿上传的展示图）、
  *   `POST /spaces/{id}/key-escrow` 的**口令取包分支**（加入方只有口令）。
  *   新增免鉴权端点必须在此处登记并说明理由。
  */
@@ -368,14 +368,14 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     sendJson(res, 200, result)
     return
   }
-  // 消息回执（已送达/已读）：单调高水位，按 (space, partner) 一行
+  // 消息回执（已送达/已读）：单调高水位，按 (space, member) 一行
   if (method === 'POST' && path === '/receipts') {
     const body = await readJsonBody(req)
     const token = bearerToken(req)
     const sess = requireSession(token)
     const b = (body ?? {}) as Record<string, unknown>
     const result = postReceipts(token, body)
-    // 审计：回执上报明细（通道级；receipts 表本身仍是 partner 级 HWM，语义不变）
+    // 审计：回执上报明细（通道级；receipts 表本身仍是 member 级 HWM，语义不变）
     logActivity({
       entranceId: sess.entrance_id,
       spaceId: sess.space_id,
@@ -440,7 +440,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     return
   }
 
-  // 头像（per-partner）：上传（token 认证，写本人头像文件）/ 获取（公开，404=未设置）
+  // 头像（per-member）：上传（token 认证，写本人头像文件）/ 获取（公开，404=未设置）
   if (method === 'POST' && path === '/avatar') {
     const token = bearerToken(req)
     const { entrance_id } = requireSession(token)
@@ -451,7 +451,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // （客户端静态缓存只在进程内失效——老板 2026-09-11）
     broadcastProfileUpdated(entrance_id, {
       entrance_id,
-      partner_id: stored.partner_id
+      member_id: stored.member_id
     })
     sendJson(res, 200, stored)
     return
@@ -495,18 +495,18 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     })
     return
   }
-  if (method === 'POST' && path === '/partners/name') {
-    // 更新本人（partner）显示名（/rename 命令，显示层用）
+  if (method === 'POST' && path === '/members/name') {
+    // 更新本人（member）显示名（/rename 命令，显示层用）
     const body = await readJsonBody(req)
     const token = bearerToken(req)
     const sess = requireSession(token)
     const b = (body ?? {}) as Record<string, unknown>
-    sendJson(res, 200, updatePartnerName(token, body))
+    sendJson(res, 200, updateMemberName(token, body))
     logActivity({
       entranceId: sess.entrance_id,
       spaceId: sess.space_id,
-      kind: 'partner.rename',
-      detail: { partner_name: b.partner_name ?? null },
+      kind: 'member.rename',
+      detail: { member_name: b.member_name ?? null },
       meta: metaOf(req)
     })
     return

@@ -53,7 +53,7 @@ class WsEntranceRevokedEvent extends WsEvent {
 }
 
 /// peer.online/peer.offline：对端通道上下线通知（App 实时更新对方在线状态）。
-/// [partnerId] 为上下线通道所属身份：与其相同身份的通道（我自己的另一条）不算
+/// [memberId] 为上下线通道所属身份：与其相同身份的通道（我自己的另一条）不算
 /// "对方"，接收方须忽略（旧服务端不带该字段时为 null——按原行为处理）。
 /// [onlineSince] 仅 peer.online 携带：该通道进入在线态的时刻（ms，重连不刷新），
 /// 接收方据此按上线顺序排列对端的在线通道（最新上线在最前；旧服务端为 null）。
@@ -61,12 +61,12 @@ class WsPeerStatusEvent extends WsEvent {
   const WsPeerStatusEvent({
     required super.type,
     required this.entranceId,
-    this.partnerId,
+    this.memberId,
     this.onlineSince,
   });
 
   final String entranceId;
-  final String? partnerId;
+  final String? memberId;
   final int? onlineSince;
 }
 
@@ -82,27 +82,27 @@ class WsProfileUpdatedEvent extends WsEvent {
   const WsProfileUpdatedEvent({
     required super.type,
     required this.entranceId,
-    this.partnerId,
-    this.partnerName,
+    this.memberId,
+    this.memberName,
     this.entranceName,
   });
 
   final String entranceId;
-  final String? partnerId;
-  final String? partnerName;
+  final String? memberId;
+  final String? memberName;
   final String? entranceName;
 }
 
-/// 对方回执（已送达/已读）更新：单调高水位，按 partner 一行。
+/// 对方回执（已送达/已读）更新：单调高水位，按 member 一行。
 class WsReceiptUpdatedEvent extends WsEvent {
   const WsReceiptUpdatedEvent({
     required super.type,
-    required this.partnerId,
+    required this.memberId,
     required this.deliveredUptoSeq,
     required this.readUptoSeq,
   });
 
-  final String partnerId;
+  final String memberId;
   final int deliveredUptoSeq;
   final int readUptoSeq;
 }
@@ -274,7 +274,7 @@ class WsClient {
           onEvent?.call(WsPeerStatusEvent(
             type: type,
             entranceId: payload['entrance_id'] as String? ?? '',
-            partnerId: payload['partner_id'] as String?,
+            memberId: payload['member_id'] as String?,
             onlineSince: payload['online_since'] as int?,
           ));
           break;
@@ -288,15 +288,15 @@ class WsClient {
           onEvent?.call(WsProfileUpdatedEvent(
             type: type,
             entranceId: payload['entrance_id'] as String? ?? '',
-            partnerId: payload['partner_id'] as String?,
-            partnerName: payload['partner_name'] as String?,
+            memberId: payload['member_id'] as String?,
+            memberName: payload['member_name'] as String?,
             entranceName: payload['entrance_name'] as String?,
           ));
           break;
         case kWsTypeReceiptUpdated:
           onEvent?.call(WsReceiptUpdatedEvent(
             type: type,
-            partnerId: payload['partner_id'] as String? ?? '',
+            memberId: payload['member_id'] as String? ?? '',
             deliveredUptoSeq: (payload['delivered_upto_seq'] as int?) ?? 0,
             readUptoSeq: (payload['read_upto_seq'] as int?) ?? 0,
           ));

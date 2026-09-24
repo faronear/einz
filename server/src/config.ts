@@ -6,7 +6,7 @@ const HERE = resolve(import.meta.dirname ?? process.cwd());
 
 export interface EntranceConfig {
   entrance_id: string;
-  partner_id: string;
+  member_id: string;
   public_key: string; // base64(X25519 公钥)
   status: "active" | "revoked";
 }
@@ -92,12 +92,12 @@ export function getEntranceStatus(entranceId: string): EntranceStatus {
 /** 取通道信息（含公钥，用于 challenge seal 等）。判定源 = 数据库 entrances 表。 */
 export function getEntrance(entranceId: string): EntranceConfig | undefined {
   const row = getDb()
-    .prepare(`SELECT entrance_id, partner_id, public_key, status FROM entrances WHERE entrance_id = ?`)
-    .get(entranceId) as { entrance_id: string; partner_id: string; public_key: string; status: string } | undefined;
+    .prepare(`SELECT entrance_id, member_id, public_key, status FROM entrances WHERE entrance_id = ?`)
+    .get(entranceId) as { entrance_id: string; member_id: string; public_key: string; status: string } | undefined;
   if (!row) return undefined;
   return {
     entrance_id: row.entrance_id,
-    partner_id: row.partner_id,
+    member_id: row.member_id,
     public_key: row.public_key,
     status: row.status as EntranceConfig["status"],
   };

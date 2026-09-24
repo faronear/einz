@@ -123,7 +123,7 @@ class _SpacePickerSheet extends StatefulWidget {
 }
 
 class _SpacePickerSheetState extends State<_SpacePickerSheet> {
-  Map<String, ({String name, String peerName, String peerGender, String peerPartnerId})>
+  Map<String, ({String name, String peerName, String peerGender, String peerMemberId})>
       _names = {};
   Map<String, int> _unread = {};
   String? _activeId;
@@ -138,7 +138,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
     final lock = AppLockService(widget.db);
     final rows = await widget.db.select(widget.db.spaces).get();
     final out =
-        <String, ({String name, String peerName, String peerGender, String peerPartnerId})>{};
+        <String, ({String name, String peerName, String peerGender, String peerMemberId})>{};
     for (final row in rows) {
       var name = row.name;
       var peerName = row.peerName;
@@ -148,7 +148,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
       peerGender = (p['peerGender'] as String?) ?? '';
       if (name.isEmpty && peerName.isEmpty) {
         // Spaces 行还没被 saveProfile 写过（旧空间）：名字也一并回退 per-space 资料
-        name = (p['partnerName'] as String?) ?? '';
+        name = (p['memberName'] as String?) ?? '';
         peerName = (p['peerName'] as String?) ?? '';
       }
       out[row.spaceId] = (
@@ -157,7 +157,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
         peerGender: peerGender,
         // 与 peerName/peerGender 同源：都是这份 per-space 资料里的并列字段。
         // 取不到（还没连过服务端 / 对方还没加入）→ 空串：卡片显示默认头像。
-        peerPartnerId: (p['peerPartnerId'] as String?) ?? '',
+        peerMemberId: (p['peerMemberId'] as String?) ?? '',
       );
     }
     final vault = VaultSession.current;
@@ -216,7 +216,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                           size: size,
                           name: _titleOf(space),
                           peerGender: _names[space.spaceId]?.peerGender ?? '',
-                          peerPartnerId: _names[space.spaceId]?.peerPartnerId ?? '',
+                          peerMemberId: _names[space.spaceId]?.peerMemberId ?? '',
                           server: effectiveServer,
                           api: widget.api,
                           unread: _unread[space.spaceId] ?? 0,
@@ -268,7 +268,7 @@ class _SpaceCard extends StatelessWidget {
     required this.size,
     required this.name,
     required this.peerGender,
-    required this.peerPartnerId,
+    required this.peerMemberId,
     required this.server,
     required this.api,
     required this.unread,
@@ -282,8 +282,8 @@ class _SpaceCard extends StatelessWidget {
   /// 对方性别（male/female/''）：卡片底色按它取色——选中深粉 / 深蓝，未选中淡粉 / 淡蓝；
   /// 未知 → 不给底色，用 Card 默认表面色。
   final String peerGender;
-  /// 该空间里对方的 partner_id（头像用；空串 → 显示默认头像）。
-  final String peerPartnerId;
+  /// 该空间里对方的 member_id（头像用；空串 → 显示默认头像）。
+  final String peerMemberId;
   final String server;
   final ApiClient? api;
   final int unread;
@@ -373,7 +373,7 @@ class _SpaceCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         _PeerAvatar(
-                          partnerId: peerPartnerId,
+                          memberId: peerMemberId,
                           server: server,
                           api: api,
                         ),
@@ -432,19 +432,19 @@ class _SpaceCard extends StatelessWidget {
 
 /// 空间卡片上的**对方头像**（老板 2026-09-23：头像在上、名字在下，居中）。
 ///
-/// - 有头像就用头像；没有（partnerId 未知 / 服务端没有 / 网络失败）→ **默认头像**：
+/// - 有头像就用头像；没有（memberId 未知 / 服务端没有 / 网络失败）→ **默认头像**：
 ///   灰底 + 人形图标，与消息流那套 `chat_page._MessageAvatar` 观感一致（同一组色值/图标）。
 /// - 刻意**不做跨开合缓存**：弹层每次打开都重拉一次。这样对方换了头像立刻就对，
 ///   不必再维护一套失效广播；成本与弹层已有的「每空间一次 unreadCount」同量级。
 class _PeerAvatar extends StatefulWidget {
   const _PeerAvatar({
-    required this.partnerId,
+    required this.memberId,
     required this.server,
     this.api,
   });
 
-  /// 对方的 partner_id（空串 = 未知 → 直接显示默认头像，不发请求）。
-  final String partnerId;
+  /// 对方的 member_id（空串 = 未知 → 直接显示默认头像，不发请求）。
+  final String memberId;
   final String server;
   final ApiClient? api;
 
@@ -465,7 +465,7 @@ class _PeerAvatarState extends State<_PeerAvatar> {
   }
 
   Future<void> _load() async {
-    final pid = widget.partnerId;
+    final pid = widget.memberId;
     if (pid.isEmpty) return; // 未知：保持默认头像
     try {
       final bytes = await (widget.api ?? ApiClient(widget.server)).getAvatar(pid);

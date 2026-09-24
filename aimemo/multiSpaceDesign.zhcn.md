@@ -40,19 +40,19 @@
 | `entrances` 表 `entrance_id` 主键、归属单个 `space_id` | `entrances` 表**没有 space_id 列**（`server/src/db.ts:19-27`）；entrance 是全局表，空间归属在 `sessions(session_token, entrance_id, space_id)`（`db.ts:80-86`） |
 | （隐含）通道会被 server 拒绝二次加入 | `createSpace`/`joinSpace` **每次都新造一行 entrances**（`spaces.ts:164`、`:324`），从不复用 entranceId |
 
-真正的约束只有一个：`entrances.partner_id` 是单列（`db.ts:21`）——**一行 entrance 只能属于一个
-partner**，而 partner_id 是 per-space 生成的（`spaces.ts:302-311`）。
+真正的约束只有一个：`entrances.member_id` 是单列（`db.ts:21`）——**一行 entrance 只能属于一个
+member**，而 member_id 是 per-space 生成的（`spaces.ts:302-311`）。
 
 反向证据：server 已经预期「一个通道持多空间会话」——
 
-- `guard.ts:84-85`：成员判定走 `entrances.partner_id → space_members(space_id)`，"同一身份多条通道、
+- `guard.ts:84-85`：成员判定走 `entrances.member_id → space_members(space_id)`，"同一身份多条通道、
   或将来一个通道持多空间会话都不受影响"；
 - `auth.ts:91-96`：续期只删 `WHERE entrance_id = ? AND space_id = ?`，即"同一通道在同一 Space
   只保留一个会话"，多空间并列是其既有语义。
 
 **结论不变**（仍采用 per-space 通道身份），但性质要改写：这不是"绕开 server 限制"，而是
 **客户端侧成本最低的选择**。备选方案（共用 entranceId）的真实成本比原稿估计的低——只需
-entrance↔(space, partner) 映射（`entrances` 加 `space_id` 列，或新表 `entrance_space_members`），
+entrance↔(space, member) 映射（`entrances` 加 `space_id` 列，或新表 `entrance_space_members`），
 不需要协议大改。仍留作二期备选，本期理由变为「不该为客户端功能动 server」。
 
 ### 2.2 决策
@@ -107,7 +107,7 @@ Spaces
   spaceId          TEXT PRIMARY KEY
   name             TEXT NOT NULL DEFAULT ''   // 显示名（对端名 or 自定义）
   peerName         TEXT NOT NULL DEFAULT ''
-  partnerId         TEXT
+  memberId         TEXT
   entranceId         TEXT NOT NULL
   keyVersion       INTEGER NOT NULL DEFAULT 1
   createdAt        INTEGER NOT NULL
@@ -199,7 +199,7 @@ app_state 中无空间维度的键改为 `space.<spaceId>.<key>` 前缀。现有
 | `attachment_storage` | `attachment_storage_settings.dart:27` | 是 |
 | `ui_style` | `ui_style_settings.dart:25` | 否（全局外观） |
 | `locale` | `locale_settings.dart:24` | 否（全局） |
-| `identity.entrance_partner_map` | `message_repository.dart:129` | 全局单表，需补"删除空间时清理该空间条目" |
+| `identity.entrance_member_map` | `message_repository.dart:129` | 全局单表，需补"删除空间时清理该空间条目" |
 | `app_lock.*` | `app_lock.dart:46-55` | Vault 化（§3.2） |
 
 v7 迁移：现有值归入当时唯一的空间（迁移后的首个空间）；读取函数改带 spaceId 参数，
@@ -215,12 +215,13 @@ M2 改向导/聊天页时把 `widget.payload.spaceId` 传进去即可。
 
 > 术语以 **`docs/GLOSSARY.md`** 为准：物理设备 / **安装**（`install_uid`）/ **登记项**
 > （`entrances` 表一行，`entrance_id`）三层。UI 用词服从用户习惯（保留「通道」并加限定词），
-> 代码与文档用层名（`install` / `entrance` / `partner`）。曾经的 wire 改名（`device_id` →
-> `entrance_id`、`person_id` → `partner_id`）**已于 2026-09-23 全量落地**，见
+> 代码与文档用层名（`install` / `entrance` / `member`）。曾经的 wire 改名（`device_id` →
+> `entrance_id`、`person_id` → `partner_id`，2026-09-23）**已于 2026-09-23 全量落地**；
+> 其中身份词 `partner` 又于 **2026-09-24 续改为 `member`**（界面文案不动），见
 > **`aimemo/renamePlan.zhcn.md`**。
 
 多空间让一台物理设备在每个空间各有一套**故意互不关联**的身份（entrance_id / 公私钥 /
-partner_id / entrance_name）。这在协议上是干净的，但服务端因此**无法知道"这几行其实是
+member_id / entrance_name）。这在协议上是干净的，但服务端因此**无法知道"这几行其实是
 同一台机器"**——运维、审计、将来"整机退役"都需要这个认知。补一个显式标识：
 
 ```
@@ -255,7 +256,7 @@ Vault 里有每个空间的 token，逐个调退役即可（见 §5.5）。
 - 内部仍依赖若干全局件，切换时必须显式处理：`WsRealtimeService`（`initState` 内 new，非单例）、
   3s/30s 同步 ticker、30s 对端在线 ticker（`dispose` 已 stop，需确认全部 cancel）、
   `uiStyleNotifier / attachmentStorageNotifier / localeNotifier`（全局，保持全局语义）、
-  静态头像缓存（键为 partnerId，天然 per-space）。
+  静态头像缓存（键为 memberId，天然 per-space）。
 
 ### 4.2 切换流程与未读数（2026-09-22 更正）
 
@@ -284,12 +285,12 @@ Vault 里有每个空间的 token，逐个调退役即可（见 §5.5）。
 
 1. **"轻量 sync"并不轻**：`MessageRepository.sync()` 是循环拉到 `hasMore=false`，冷启动等于把
    每个空间**积压的全部消息**拉下来落库（久未打开的空间尤其重）；
-2. **读取水位本来就在服务器上**：`receipts(space_id, partner_id) → read_upto_seq`，由客户端在
+2. **读取水位本来就在服务器上**：`receipts(space_id, member_id) → read_upto_seq`，由客户端在
    "用户真看到最新消息"时才上报（前台 + 页面最上层 + 列表贴底，`chat_page._scheduleReadReport`）。
 
 于是新增 `GET /messages/unread`（会话绑定空间）：服务端数
 「`server_sequence > 我的 read_upto_seq` 且发送者不是我」的消息条数——
-判定"不是我"**走 partner 维度**（同一身份可能有多台登记项，只比 entrance_id 会把自己的另一台
+判定"不是我"**走 member 维度**（同一身份可能有多台登记项，只比 entrance_id 会把自己的另一台
 通道发来的消息算成未读）；没有 receipts 行 = 从没读过 = 全都算未读。
 
 客户端在空间列表页对**每个空间各调一次**（用各空间自己的 token，空间数个位数），显示**数字角标**
@@ -442,7 +443,7 @@ active 让给剩下的第一个），一个都不剩 → 回向导。
 | `_kProfile` 旧 key | v7 迁移到 `app_lock.profile.<首个空间>` |
 | per-space 设置键 | v7 迁移 + `BurnAfterSettings` 等读取函数改带 spaceId 参数（默认回退旧 key 一次） |
 | `local_attachments` | v7 加 spaceId 列并按 messageId 回填；目录按 space 分（§3.5） |
-| `identity.entrance_partner_map` | 删除空间时清理该空间条目（§3.6） |
+| `identity.entrance_member_map` | 删除空间时清理该空间条目（§3.6） |
 | 撤销自毁路径 | 改逐空间 scope（§4.4） |
 | 通道名 | Vault 级统一；旧单包无此字段 → 取现有空间已登记的名字，缺省空 |
 | golden 测试 | 单空间用户路径 UI 不变，golden 应保持绿；SpaceListPage 不加 golden（政策：不重刷） |

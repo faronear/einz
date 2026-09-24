@@ -2267,12 +2267,12 @@ class $PeerReceiptsTable extends PeerReceipts
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _partnerIdMeta = const VerificationMeta(
-    'partnerId',
+  static const VerificationMeta _memberIdMeta = const VerificationMeta(
+    'memberId',
   );
   @override
-  late final GeneratedColumn<String> partnerId = GeneratedColumn<String>(
-    'partner_id',
+  late final GeneratedColumn<String> memberId = GeneratedColumn<String>(
+    'member_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -2317,7 +2317,7 @@ class $PeerReceiptsTable extends PeerReceipts
   @override
   List<GeneratedColumn> get $columns => [
     spaceId,
-    partnerId,
+    memberId,
     deliveredUptoSeq,
     readUptoSeq,
     updatedAt,
@@ -2342,13 +2342,13 @@ class $PeerReceiptsTable extends PeerReceipts
     } else if (isInserting) {
       context.missing(_spaceIdMeta);
     }
-    if (data.containsKey('partner_id')) {
+    if (data.containsKey('member_id')) {
       context.handle(
-        _partnerIdMeta,
-        partnerId.isAcceptableOrUnknown(data['partner_id']!, _partnerIdMeta),
+        _memberIdMeta,
+        memberId.isAcceptableOrUnknown(data['member_id']!, _memberIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_partnerIdMeta);
+      context.missing(_memberIdMeta);
     }
     if (data.containsKey('delivered_upto_seq')) {
       context.handle(
@@ -2378,7 +2378,7 @@ class $PeerReceiptsTable extends PeerReceipts
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {spaceId, partnerId};
+  Set<GeneratedColumn> get $primaryKey => {spaceId, memberId};
   @override
   PeerReceipt map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -2387,9 +2387,9 @@ class $PeerReceiptsTable extends PeerReceipts
         DriftSqlType.string,
         data['${effectivePrefix}space_id'],
       )!,
-      partnerId: attachedDatabase.typeMapping.read(
+      memberId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}partner_id'],
+        data['${effectivePrefix}member_id'],
       )!,
       deliveredUptoSeq: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -2414,13 +2414,13 @@ class $PeerReceiptsTable extends PeerReceipts
 
 class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   final String spaceId;
-  final String partnerId;
+  final String memberId;
   final int deliveredUptoSeq;
   final int readUptoSeq;
   final int updatedAt;
   const PeerReceipt({
     required this.spaceId,
-    required this.partnerId,
+    required this.memberId,
     required this.deliveredUptoSeq,
     required this.readUptoSeq,
     required this.updatedAt,
@@ -2429,7 +2429,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['space_id'] = Variable<String>(spaceId);
-    map['partner_id'] = Variable<String>(partnerId);
+    map['member_id'] = Variable<String>(memberId);
     map['delivered_upto_seq'] = Variable<int>(deliveredUptoSeq);
     map['read_upto_seq'] = Variable<int>(readUptoSeq);
     map['updated_at'] = Variable<int>(updatedAt);
@@ -2439,7 +2439,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   PeerReceiptsCompanion toCompanion(bool nullToAbsent) {
     return PeerReceiptsCompanion(
       spaceId: Value(spaceId),
-      partnerId: Value(partnerId),
+      memberId: Value(memberId),
       deliveredUptoSeq: Value(deliveredUptoSeq),
       readUptoSeq: Value(readUptoSeq),
       updatedAt: Value(updatedAt),
@@ -2453,7 +2453,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return PeerReceipt(
       spaceId: serializer.fromJson<String>(json['spaceId']),
-      partnerId: serializer.fromJson<String>(json['partnerId']),
+      memberId: serializer.fromJson<String>(json['memberId']),
       deliveredUptoSeq: serializer.fromJson<int>(json['deliveredUptoSeq']),
       readUptoSeq: serializer.fromJson<int>(json['readUptoSeq']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
@@ -2464,7 +2464,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'spaceId': serializer.toJson<String>(spaceId),
-      'partnerId': serializer.toJson<String>(partnerId),
+      'memberId': serializer.toJson<String>(memberId),
       'deliveredUptoSeq': serializer.toJson<int>(deliveredUptoSeq),
       'readUptoSeq': serializer.toJson<int>(readUptoSeq),
       'updatedAt': serializer.toJson<int>(updatedAt),
@@ -2473,13 +2473,13 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
 
   PeerReceipt copyWith({
     String? spaceId,
-    String? partnerId,
+    String? memberId,
     int? deliveredUptoSeq,
     int? readUptoSeq,
     int? updatedAt,
   }) => PeerReceipt(
     spaceId: spaceId ?? this.spaceId,
-    partnerId: partnerId ?? this.partnerId,
+    memberId: memberId ?? this.memberId,
     deliveredUptoSeq: deliveredUptoSeq ?? this.deliveredUptoSeq,
     readUptoSeq: readUptoSeq ?? this.readUptoSeq,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2487,7 +2487,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   PeerReceipt copyWithCompanion(PeerReceiptsCompanion data) {
     return PeerReceipt(
       spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
-      partnerId: data.partnerId.present ? data.partnerId.value : this.partnerId,
+      memberId: data.memberId.present ? data.memberId.value : this.memberId,
       deliveredUptoSeq: data.deliveredUptoSeq.present
           ? data.deliveredUptoSeq.value
           : this.deliveredUptoSeq,
@@ -2502,7 +2502,7 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
   String toString() {
     return (StringBuffer('PeerReceipt(')
           ..write('spaceId: $spaceId, ')
-          ..write('partnerId: $partnerId, ')
+          ..write('memberId: $memberId, ')
           ..write('deliveredUptoSeq: $deliveredUptoSeq, ')
           ..write('readUptoSeq: $readUptoSeq, ')
           ..write('updatedAt: $updatedAt')
@@ -2512,13 +2512,13 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
 
   @override
   int get hashCode =>
-      Object.hash(spaceId, partnerId, deliveredUptoSeq, readUptoSeq, updatedAt);
+      Object.hash(spaceId, memberId, deliveredUptoSeq, readUptoSeq, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is PeerReceipt &&
           other.spaceId == this.spaceId &&
-          other.partnerId == this.partnerId &&
+          other.memberId == this.memberId &&
           other.deliveredUptoSeq == this.deliveredUptoSeq &&
           other.readUptoSeq == this.readUptoSeq &&
           other.updatedAt == this.updatedAt);
@@ -2526,14 +2526,14 @@ class PeerReceipt extends DataClass implements Insertable<PeerReceipt> {
 
 class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   final Value<String> spaceId;
-  final Value<String> partnerId;
+  final Value<String> memberId;
   final Value<int> deliveredUptoSeq;
   final Value<int> readUptoSeq;
   final Value<int> updatedAt;
   final Value<int> rowid;
   const PeerReceiptsCompanion({
     this.spaceId = const Value.absent(),
-    this.partnerId = const Value.absent(),
+    this.memberId = const Value.absent(),
     this.deliveredUptoSeq = const Value.absent(),
     this.readUptoSeq = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -2541,16 +2541,16 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   });
   PeerReceiptsCompanion.insert({
     required String spaceId,
-    required String partnerId,
+    required String memberId,
     this.deliveredUptoSeq = const Value.absent(),
     this.readUptoSeq = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : spaceId = Value(spaceId),
-       partnerId = Value(partnerId);
+       memberId = Value(memberId);
   static Insertable<PeerReceipt> custom({
     Expression<String>? spaceId,
-    Expression<String>? partnerId,
+    Expression<String>? memberId,
     Expression<int>? deliveredUptoSeq,
     Expression<int>? readUptoSeq,
     Expression<int>? updatedAt,
@@ -2558,7 +2558,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   }) {
     return RawValuesInsertable({
       if (spaceId != null) 'space_id': spaceId,
-      if (partnerId != null) 'partner_id': partnerId,
+      if (memberId != null) 'member_id': memberId,
       if (deliveredUptoSeq != null) 'delivered_upto_seq': deliveredUptoSeq,
       if (readUptoSeq != null) 'read_upto_seq': readUptoSeq,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -2568,7 +2568,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
 
   PeerReceiptsCompanion copyWith({
     Value<String>? spaceId,
-    Value<String>? partnerId,
+    Value<String>? memberId,
     Value<int>? deliveredUptoSeq,
     Value<int>? readUptoSeq,
     Value<int>? updatedAt,
@@ -2576,7 +2576,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   }) {
     return PeerReceiptsCompanion(
       spaceId: spaceId ?? this.spaceId,
-      partnerId: partnerId ?? this.partnerId,
+      memberId: memberId ?? this.memberId,
       deliveredUptoSeq: deliveredUptoSeq ?? this.deliveredUptoSeq,
       readUptoSeq: readUptoSeq ?? this.readUptoSeq,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -2590,8 +2590,8 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
     if (spaceId.present) {
       map['space_id'] = Variable<String>(spaceId.value);
     }
-    if (partnerId.present) {
-      map['partner_id'] = Variable<String>(partnerId.value);
+    if (memberId.present) {
+      map['member_id'] = Variable<String>(memberId.value);
     }
     if (deliveredUptoSeq.present) {
       map['delivered_upto_seq'] = Variable<int>(deliveredUptoSeq.value);
@@ -2612,7 +2612,7 @@ class PeerReceiptsCompanion extends UpdateCompanion<PeerReceipt> {
   String toString() {
     return (StringBuffer('PeerReceiptsCompanion(')
           ..write('spaceId: $spaceId, ')
-          ..write('partnerId: $partnerId, ')
+          ..write('memberId: $memberId, ')
           ..write('deliveredUptoSeq: $deliveredUptoSeq, ')
           ..write('readUptoSeq: $readUptoSeq, ')
           ..write('updatedAt: $updatedAt, ')
@@ -2660,12 +2660,12 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
-  static const VerificationMeta _partnerIdMeta = const VerificationMeta(
-    'partnerId',
+  static const VerificationMeta _memberIdMeta = const VerificationMeta(
+    'memberId',
   );
   @override
-  late final GeneratedColumn<String> partnerId = GeneratedColumn<String>(
-    'partner_id',
+  late final GeneratedColumn<String> memberId = GeneratedColumn<String>(
+    'member_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -2736,7 +2736,7 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
     spaceId,
     name,
     peerName,
-    partnerId,
+    memberId,
     entranceId,
     keyVersion,
     createdAt,
@@ -2775,10 +2775,10 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
         peerName.isAcceptableOrUnknown(data['peer_name']!, _peerNameMeta),
       );
     }
-    if (data.containsKey('partner_id')) {
+    if (data.containsKey('member_id')) {
       context.handle(
-        _partnerIdMeta,
-        partnerId.isAcceptableOrUnknown(data['partner_id']!, _partnerIdMeta),
+        _memberIdMeta,
+        memberId.isAcceptableOrUnknown(data['member_id']!, _memberIdMeta),
       );
     }
     if (data.containsKey('entrance_id')) {
@@ -2835,9 +2835,9 @@ class $SpacesTable extends Spaces with TableInfo<$SpacesTable, Space> {
         DriftSqlType.string,
         data['${effectivePrefix}peer_name'],
       )!,
-      partnerId: attachedDatabase.typeMapping.read(
+      memberId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}partner_id'],
+        data['${effectivePrefix}member_id'],
       ),
       entranceId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -2872,7 +2872,7 @@ class Space extends DataClass implements Insertable<Space> {
   final String spaceId;
   final String name;
   final String peerName;
-  final String? partnerId;
+  final String? memberId;
   final String entranceId;
   final int keyVersion;
   final int createdAt;
@@ -2882,7 +2882,7 @@ class Space extends DataClass implements Insertable<Space> {
     required this.spaceId,
     required this.name,
     required this.peerName,
-    this.partnerId,
+    this.memberId,
     required this.entranceId,
     required this.keyVersion,
     required this.createdAt,
@@ -2895,8 +2895,8 @@ class Space extends DataClass implements Insertable<Space> {
     map['space_id'] = Variable<String>(spaceId);
     map['name'] = Variable<String>(name);
     map['peer_name'] = Variable<String>(peerName);
-    if (!nullToAbsent || partnerId != null) {
-      map['partner_id'] = Variable<String>(partnerId);
+    if (!nullToAbsent || memberId != null) {
+      map['member_id'] = Variable<String>(memberId);
     }
     map['entrance_id'] = Variable<String>(entranceId);
     map['key_version'] = Variable<int>(keyVersion);
@@ -2911,9 +2911,9 @@ class Space extends DataClass implements Insertable<Space> {
       spaceId: Value(spaceId),
       name: Value(name),
       peerName: Value(peerName),
-      partnerId: partnerId == null && nullToAbsent
+      memberId: memberId == null && nullToAbsent
           ? const Value.absent()
-          : Value(partnerId),
+          : Value(memberId),
       entranceId: Value(entranceId),
       keyVersion: Value(keyVersion),
       createdAt: Value(createdAt),
@@ -2931,7 +2931,7 @@ class Space extends DataClass implements Insertable<Space> {
       spaceId: serializer.fromJson<String>(json['spaceId']),
       name: serializer.fromJson<String>(json['name']),
       peerName: serializer.fromJson<String>(json['peerName']),
-      partnerId: serializer.fromJson<String?>(json['partnerId']),
+      memberId: serializer.fromJson<String?>(json['memberId']),
       entranceId: serializer.fromJson<String>(json['entranceId']),
       keyVersion: serializer.fromJson<int>(json['keyVersion']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
@@ -2946,7 +2946,7 @@ class Space extends DataClass implements Insertable<Space> {
       'spaceId': serializer.toJson<String>(spaceId),
       'name': serializer.toJson<String>(name),
       'peerName': serializer.toJson<String>(peerName),
-      'partnerId': serializer.toJson<String?>(partnerId),
+      'memberId': serializer.toJson<String?>(memberId),
       'entranceId': serializer.toJson<String>(entranceId),
       'keyVersion': serializer.toJson<int>(keyVersion),
       'createdAt': serializer.toJson<int>(createdAt),
@@ -2959,7 +2959,7 @@ class Space extends DataClass implements Insertable<Space> {
     String? spaceId,
     String? name,
     String? peerName,
-    Value<String?> partnerId = const Value.absent(),
+    Value<String?> memberId = const Value.absent(),
     String? entranceId,
     int? keyVersion,
     int? createdAt,
@@ -2969,7 +2969,7 @@ class Space extends DataClass implements Insertable<Space> {
     spaceId: spaceId ?? this.spaceId,
     name: name ?? this.name,
     peerName: peerName ?? this.peerName,
-    partnerId: partnerId.present ? partnerId.value : this.partnerId,
+    memberId: memberId.present ? memberId.value : this.memberId,
     entranceId: entranceId ?? this.entranceId,
     keyVersion: keyVersion ?? this.keyVersion,
     createdAt: createdAt ?? this.createdAt,
@@ -2981,8 +2981,10 @@ class Space extends DataClass implements Insertable<Space> {
       spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
       name: data.name.present ? data.name.value : this.name,
       peerName: data.peerName.present ? data.peerName.value : this.peerName,
-      partnerId: data.partnerId.present ? data.partnerId.value : this.partnerId,
-      entranceId: data.entranceId.present ? data.entranceId.value : this.entranceId,
+      memberId: data.memberId.present ? data.memberId.value : this.memberId,
+      entranceId: data.entranceId.present
+          ? data.entranceId.value
+          : this.entranceId,
       keyVersion: data.keyVersion.present
           ? data.keyVersion.value
           : this.keyVersion,
@@ -3000,7 +3002,7 @@ class Space extends DataClass implements Insertable<Space> {
           ..write('spaceId: $spaceId, ')
           ..write('name: $name, ')
           ..write('peerName: $peerName, ')
-          ..write('partnerId: $partnerId, ')
+          ..write('memberId: $memberId, ')
           ..write('entranceId: $entranceId, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('createdAt: $createdAt, ')
@@ -3015,7 +3017,7 @@ class Space extends DataClass implements Insertable<Space> {
     spaceId,
     name,
     peerName,
-    partnerId,
+    memberId,
     entranceId,
     keyVersion,
     createdAt,
@@ -3029,7 +3031,7 @@ class Space extends DataClass implements Insertable<Space> {
           other.spaceId == this.spaceId &&
           other.name == this.name &&
           other.peerName == this.peerName &&
-          other.partnerId == this.partnerId &&
+          other.memberId == this.memberId &&
           other.entranceId == this.entranceId &&
           other.keyVersion == this.keyVersion &&
           other.createdAt == this.createdAt &&
@@ -3041,7 +3043,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
   final Value<String> spaceId;
   final Value<String> name;
   final Value<String> peerName;
-  final Value<String?> partnerId;
+  final Value<String?> memberId;
   final Value<String> entranceId;
   final Value<int> keyVersion;
   final Value<int> createdAt;
@@ -3052,7 +3054,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     this.spaceId = const Value.absent(),
     this.name = const Value.absent(),
     this.peerName = const Value.absent(),
-    this.partnerId = const Value.absent(),
+    this.memberId = const Value.absent(),
     this.entranceId = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -3064,7 +3066,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     required String spaceId,
     this.name = const Value.absent(),
     this.peerName = const Value.absent(),
-    this.partnerId = const Value.absent(),
+    this.memberId = const Value.absent(),
     this.entranceId = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -3076,7 +3078,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     Expression<String>? spaceId,
     Expression<String>? name,
     Expression<String>? peerName,
-    Expression<String>? partnerId,
+    Expression<String>? memberId,
     Expression<String>? entranceId,
     Expression<int>? keyVersion,
     Expression<int>? createdAt,
@@ -3088,7 +3090,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
       if (spaceId != null) 'space_id': spaceId,
       if (name != null) 'name': name,
       if (peerName != null) 'peer_name': peerName,
-      if (partnerId != null) 'partner_id': partnerId,
+      if (memberId != null) 'member_id': memberId,
       if (entranceId != null) 'entrance_id': entranceId,
       if (keyVersion != null) 'key_version': keyVersion,
       if (createdAt != null) 'created_at': createdAt,
@@ -3102,7 +3104,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     Value<String>? spaceId,
     Value<String>? name,
     Value<String>? peerName,
-    Value<String?>? partnerId,
+    Value<String?>? memberId,
     Value<String>? entranceId,
     Value<int>? keyVersion,
     Value<int>? createdAt,
@@ -3114,7 +3116,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
       spaceId: spaceId ?? this.spaceId,
       name: name ?? this.name,
       peerName: peerName ?? this.peerName,
-      partnerId: partnerId ?? this.partnerId,
+      memberId: memberId ?? this.memberId,
       entranceId: entranceId ?? this.entranceId,
       keyVersion: keyVersion ?? this.keyVersion,
       createdAt: createdAt ?? this.createdAt,
@@ -3136,8 +3138,8 @@ class SpacesCompanion extends UpdateCompanion<Space> {
     if (peerName.present) {
       map['peer_name'] = Variable<String>(peerName.value);
     }
-    if (partnerId.present) {
-      map['partner_id'] = Variable<String>(partnerId.value);
+    if (memberId.present) {
+      map['member_id'] = Variable<String>(memberId.value);
     }
     if (entranceId.present) {
       map['entrance_id'] = Variable<String>(entranceId.value);
@@ -3166,7 +3168,7 @@ class SpacesCompanion extends UpdateCompanion<Space> {
           ..write('spaceId: $spaceId, ')
           ..write('name: $name, ')
           ..write('peerName: $peerName, ')
-          ..write('partnerId: $partnerId, ')
+          ..write('memberId: $memberId, ')
           ..write('entranceId: $entranceId, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('createdAt: $createdAt, ')
@@ -4630,7 +4632,7 @@ typedef $$AppStateTableProcessedTableManager =
 typedef $$PeerReceiptsTableCreateCompanionBuilder =
     PeerReceiptsCompanion Function({
       required String spaceId,
-      required String partnerId,
+      required String memberId,
       Value<int> deliveredUptoSeq,
       Value<int> readUptoSeq,
       Value<int> updatedAt,
@@ -4639,7 +4641,7 @@ typedef $$PeerReceiptsTableCreateCompanionBuilder =
 typedef $$PeerReceiptsTableUpdateCompanionBuilder =
     PeerReceiptsCompanion Function({
       Value<String> spaceId,
-      Value<String> partnerId,
+      Value<String> memberId,
       Value<int> deliveredUptoSeq,
       Value<int> readUptoSeq,
       Value<int> updatedAt,
@@ -4660,8 +4662,8 @@ class $$PeerReceiptsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get partnerId => $composableBuilder(
-    column: $table.partnerId,
+  ColumnFilters<String> get memberId => $composableBuilder(
+    column: $table.memberId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4695,8 +4697,8 @@ class $$PeerReceiptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get partnerId => $composableBuilder(
-    column: $table.partnerId,
+  ColumnOrderings<String> get memberId => $composableBuilder(
+    column: $table.memberId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4728,8 +4730,8 @@ class $$PeerReceiptsTableAnnotationComposer
   GeneratedColumn<String> get spaceId =>
       $composableBuilder(column: $table.spaceId, builder: (column) => column);
 
-  GeneratedColumn<String> get partnerId =>
-      $composableBuilder(column: $table.partnerId, builder: (column) => column);
+  GeneratedColumn<String> get memberId =>
+      $composableBuilder(column: $table.memberId, builder: (column) => column);
 
   GeneratedColumn<int> get deliveredUptoSeq => $composableBuilder(
     column: $table.deliveredUptoSeq,
@@ -4777,14 +4779,14 @@ class $$PeerReceiptsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> spaceId = const Value.absent(),
-                Value<String> partnerId = const Value.absent(),
+                Value<String> memberId = const Value.absent(),
                 Value<int> deliveredUptoSeq = const Value.absent(),
                 Value<int> readUptoSeq = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeerReceiptsCompanion(
                 spaceId: spaceId,
-                partnerId: partnerId,
+                memberId: memberId,
                 deliveredUptoSeq: deliveredUptoSeq,
                 readUptoSeq: readUptoSeq,
                 updatedAt: updatedAt,
@@ -4793,14 +4795,14 @@ class $$PeerReceiptsTableTableManager
           createCompanionCallback:
               ({
                 required String spaceId,
-                required String partnerId,
+                required String memberId,
                 Value<int> deliveredUptoSeq = const Value.absent(),
                 Value<int> readUptoSeq = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeerReceiptsCompanion.insert(
                 spaceId: spaceId,
-                partnerId: partnerId,
+                memberId: memberId,
                 deliveredUptoSeq: deliveredUptoSeq,
                 readUptoSeq: readUptoSeq,
                 updatedAt: updatedAt,
@@ -4844,7 +4846,7 @@ typedef $$SpacesTableCreateCompanionBuilder = SpacesCompanion Function({
   required String spaceId,
   Value<String> name,
   Value<String> peerName,
-  Value<String?> partnerId,
+  Value<String?> memberId,
   Value<String> entranceId,
   Value<int> keyVersion,
   Value<int> createdAt,
@@ -4856,7 +4858,7 @@ typedef $$SpacesTableUpdateCompanionBuilder = SpacesCompanion Function({
   Value<String> spaceId,
   Value<String> name,
   Value<String> peerName,
-  Value<String?> partnerId,
+  Value<String?> memberId,
   Value<String> entranceId,
   Value<int> keyVersion,
   Value<int> createdAt,
@@ -4889,8 +4891,8 @@ class $$SpacesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get partnerId => $composableBuilder(
-    column: $table.partnerId,
+  ColumnFilters<String> get memberId => $composableBuilder(
+    column: $table.memberId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4944,8 +4946,8 @@ class $$SpacesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get partnerId => $composableBuilder(
-    column: $table.partnerId,
+  ColumnOrderings<String> get memberId => $composableBuilder(
+    column: $table.memberId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4993,11 +4995,13 @@ class $$SpacesTableAnnotationComposer
   GeneratedColumn<String> get peerName =>
       $composableBuilder(column: $table.peerName, builder: (column) => column);
 
-  GeneratedColumn<String> get partnerId =>
-      $composableBuilder(column: $table.partnerId, builder: (column) => column);
+  GeneratedColumn<String> get memberId =>
+      $composableBuilder(column: $table.memberId, builder: (column) => column);
 
-  GeneratedColumn<String> get entranceId =>
-      $composableBuilder(column: $table.entranceId, builder: (column) => column);
+  GeneratedColumn<String> get entranceId => $composableBuilder(
+    column: $table.entranceId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get keyVersion => $composableBuilder(
     column: $table.keyVersion,
@@ -5047,7 +5051,7 @@ class $$SpacesTableTableManager
                 Value<String> spaceId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> peerName = const Value.absent(),
-                Value<String?> partnerId = const Value.absent(),
+                Value<String?> memberId = const Value.absent(),
                 Value<String> entranceId = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
@@ -5058,7 +5062,7 @@ class $$SpacesTableTableManager
                 spaceId: spaceId,
                 name: name,
                 peerName: peerName,
-                partnerId: partnerId,
+                memberId: memberId,
                 entranceId: entranceId,
                 keyVersion: keyVersion,
                 createdAt: createdAt,
@@ -5071,7 +5075,7 @@ class $$SpacesTableTableManager
                 required String spaceId,
                 Value<String> name = const Value.absent(),
                 Value<String> peerName = const Value.absent(),
-                Value<String?> partnerId = const Value.absent(),
+                Value<String?> memberId = const Value.absent(),
                 Value<String> entranceId = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
@@ -5082,7 +5086,7 @@ class $$SpacesTableTableManager
                 spaceId: spaceId,
                 name: name,
                 peerName: peerName,
-                partnerId: partnerId,
+                memberId: memberId,
                 entranceId: entranceId,
                 keyVersion: keyVersion,
                 createdAt: createdAt,

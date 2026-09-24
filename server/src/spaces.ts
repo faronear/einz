@@ -7,7 +7,7 @@ import { deriveSpaceAddress } from "./address.js";
 import { loadConfig } from "./config.js";
 import { normalizeEntranceName } from "./entranceName.js";
 import { normalizeInstallUid } from "./installUid.js";
-import { assertPartnerName, isSamePartnerName } from "./partnerName.js";
+import { assertMemberName, isSameMemberName } from "./memberName.js";
 import { assertSafeSpaceId } from "./safeId.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
@@ -85,7 +85,7 @@ export async function createSpace(
   link: string;
   expiresAt: number;
   entranceId: string;
-  creatorPartnerId: string;
+  creatorMemberId: string;
   sessionToken: string;
 }> {
   // 协议 §3.4：space_id/space_key 由客户端生成（包内容需含 space_id）——
@@ -109,12 +109,12 @@ export async function createSpace(
   // 用户名称白名单（老板 2026-09-16）：create 录入的是**两人**的名字（我的 +
   // 伴侣），都是用户自己输入的 → 不合规直接 400，让客户端提示重输。
   // 只有传了才校验（未传维持现状——服务端不强制必填，必填由客户端引导负责）
-  if (creatorName != null) assertPartnerName(creatorName);
-  if (peerName != null) assertPartnerName(peerName);
+  if (creatorName != null) assertMemberName(creatorName);
+  if (peerName != null) assertMemberName(peerName);
   // 两人不能同名（老板 2026-09-10 定；2026-09-24 收紧为 trim + 大小写不敏感）：
   // join 是"按名字选身份"，同名会让"你是哪一位"无法判别（App/TUI 客户端也各自拦，
   // 这里是兜底）
-  if (creatorName != null && peerName != null && isSamePartnerName(creatorName, peerName)) {
+  if (creatorName != null && peerName != null && isSameMemberName(creatorName, peerName)) {
     throw new ApiError("INVALID_REQUEST", "两人的名字不能相同", 400);
   }
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
@@ -131,19 +131,19 @@ export async function createSpace(
        VALUES (?, ?, ?, 'waiting', ?, ?)`,
     )
     .run(spaceId, spaceAddress, spacePublicKey, now, now);
-  const creatorPartnerId = randomUUID();
+  const creatorMemberId = randomUUID();
   getDb()
     .prepare(
-      `INSERT INTO space_members (space_id, partner_id, slot, display_name, gender, status, joined_at)
+      `INSERT INTO space_members (space_id, member_id, slot, display_name, gender, status, joined_at)
        VALUES (?, ?, 0, ?, ?, 'active', ?)`,
     )
-    .run(spaceId, creatorPartnerId, creatorName ?? null, normGender(creatorGender) ?? null, now);
+    .run(spaceId, creatorMemberId, creatorName ?? null, normGender(creatorGender) ?? null, now);
   // 伴侣（第二人）预置：名字/性别必填（老板 2026-09-10 定稿——create 时录入两人
-  // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，partner_id 由
+  // 身份，join 时按身份选择而非自填名字）；status=pending 待加入，member_id 由
   // 首个加入该 slot 的通道生成。
   getDb()
     .prepare(
-      `INSERT INTO space_members (space_id, partner_id, slot, display_name, gender, status, joined_at)
+      `INSERT INTO space_members (space_id, member_id, slot, display_name, gender, status, joined_at)
        VALUES (?, NULL, 1, ?, ?, 'pending', NULL)`,
     )
     .run(spaceId, peerName ?? null, normGender(peerGender) ?? null);
@@ -176,10 +176,10 @@ export async function createSpace(
     entranceId = randomUUID();
     getDb()
       .prepare(
-        `INSERT INTO entrances (entrance_id, partner_id, public_key, status, entrance_name, created_at, install_uid)
+        `INSERT INTO entrances (entrance_id, member_id, public_key, status, entrance_name, created_at, install_uid)
          VALUES (?, ?, ?, 'active', ?, ?, ?)`,
       )
-      .run(entranceId, creatorPartnerId, publicKey, normalizeEntranceName(entranceName), now, normalizeInstallUid(installUid));
+      .run(entranceId, creatorMemberId, publicKey, normalizeEntranceName(entranceName), now, normalizeInstallUid(installUid));
     sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(
@@ -199,7 +199,7 @@ export async function createSpace(
     link: (baseUrl ?? DEFAULT_LINK_BASE) + "/join/" + t.token,
     expiresAt: t.expiresAt,
     entranceId,
-    creatorPartnerId,
+    creatorMemberId,
     sessionToken,
   };
 }
@@ -278,7 +278,7 @@ export function joinSpace(
   entranceName?: string,
   slot?: number,
   installUid?: string, // 安装级标识（多空间：同一物理设备各空间一行同名）
-): { spaceId: string; partnerId: string; slot: number; sessionToken: string; spaceAddress: string } {
+): { spaceId: string; memberId: string; slot: number; sessionToken: string; spaceAddress: string } {
   if (publicKey.length === 0) {
     throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入通道公钥）", 400);
   }
@@ -301,28 +301,28 @@ export function joinSpace(
     // 同一身份可有多条通道（创建者换通道加入选 0）——不再有「满」。
     const chosenSlot = slot === 0 || slot === 1 ? slot : 1;
     let member = getDb()
-      .prepare(`SELECT partner_id, status FROM space_members WHERE space_id = ? AND slot = ?`)
-      .get(tk.space_id, chosenSlot) as { partner_id: string | null; status: string } | undefined;
+      .prepare(`SELECT member_id, status FROM space_members WHERE space_id = ? AND slot = ?`)
+      .get(tk.space_id, chosenSlot) as { member_id: string | null; status: string } | undefined;
     if (!member) {
       // 容错：slot 行缺失（理论上 create 已预置两身份）→ 补建
       getDb()
         .prepare(
-          `INSERT INTO space_members (space_id, partner_id, slot, status, joined_at)
+          `INSERT INTO space_members (space_id, member_id, slot, status, joined_at)
            VALUES (?, NULL, ?, 'active', ?)`,
         )
         .run(tk.space_id, chosenSlot, Date.now());
-      member = { partner_id: null, status: "active" };
+      member = { member_id: null, status: "active" };
     }
-    let partnerId = member.partner_id;
-    if (partnerId == null) {
-      // 该身份首次加入：生成 partner_id 并激活
-      partnerId = randomUUID();
+    let memberId = member.member_id;
+    if (memberId == null) {
+      // 该身份首次加入：生成 member_id 并激活
+      memberId = randomUUID();
       getDb()
         .prepare(
-          `UPDATE space_members SET partner_id = ?, status = 'active', joined_at = ?
+          `UPDATE space_members SET member_id = ?, status = 'active', joined_at = ?
            WHERE space_id = ? AND slot = ?`,
         )
-        .run(partnerId, Date.now(), tk.space_id, chosenSlot);
+        .run(memberId, Date.now(), tk.space_id, chosenSlot);
     } else if (member.status !== "active") {
       getDb()
         .prepare(
@@ -347,7 +347,7 @@ export function joinSpace(
       const dup = getDb()
         .prepare(
           `SELECT 1 FROM entrances e
-           JOIN space_members sm ON sm.partner_id = e.partner_id
+           JOIN space_members sm ON sm.member_id = e.member_id
            WHERE sm.space_id = ? AND e.install_uid = ? AND e.status != 'revoked'
            LIMIT 1`,
         )
@@ -371,7 +371,7 @@ export function joinSpace(
         getDb()
           .prepare(
             `SELECT COUNT(*) AS n FROM entrances d
-             JOIN space_members sm ON sm.partner_id = d.partner_id
+             JOIN space_members sm ON sm.member_id = d.member_id
              WHERE sm.space_id = ?`,
           )
           .get(tk.space_id) as { n: number }
@@ -388,14 +388,14 @@ export function joinSpace(
     getDb()
       .prepare(`UPDATE join_tokens SET used_at = ? WHERE token_hash = ?`)
       .run(Date.now(), hash);
-    // 加入通道登记（同一身份多通道共享 partner_id）+ 签发绑定该 Space 的 session
+    // 加入通道登记（同一身份多通道共享 member_id）+ 签发绑定该 Space 的 session
     const entranceId = randomUUID();
     getDb()
       .prepare(
-        `INSERT INTO entrances (entrance_id, partner_id, public_key, status, entrance_name, created_at, install_uid)
+        `INSERT INTO entrances (entrance_id, member_id, public_key, status, entrance_name, created_at, install_uid)
          VALUES (?, ?, ?, 'active', ?, ?, ?)`,
       )
-      .run(entranceId, partnerId, publicKey, normalizeEntranceName(entranceName), Date.now(), normalizeInstallUid(installUid));
+      .run(entranceId, memberId, publicKey, normalizeEntranceName(entranceName), Date.now(), normalizeInstallUid(installUid));
     const sessionToken = toB64(new Uint8Array(randomBytes(32)));
     getDb()
       .prepare(
@@ -407,7 +407,7 @@ export function joinSpace(
     getDb()
       .prepare(`UPDATE spaces SET status = 'active', updated_at = ? WHERE space_id = ?`)
       .run(Date.now(), tk.space_id);
-    return { spaceId: tk.space_id, partnerId, slot: chosenSlot, sessionToken, entranceId, spaceAddress: sp.space_address };
+    return { spaceId: tk.space_id, memberId, slot: chosenSlot, sessionToken, entranceId, spaceAddress: sp.space_address };
   });
   return doJoin();
 }

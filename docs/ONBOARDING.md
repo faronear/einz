@@ -41,7 +41,7 @@ B 加入（口令取钥）→ 双端互通对话。
 | **Space Key** | 32B 随机空间密钥（端到端加密用），创建者本地生成；加入方凭**口令**从口令密保箱取回 |
 | **口令（passphrase）** | 创建空间时设定，两人共用；对方凭它解出 Space Key。**别和邀请链接混淆** |
 | **邀请链接 / join token** | 一次性（默认 24h、用后作废），创建者 `/invite` 生成；B 拿它加入空间 |
-| **partner / slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。partner_id 是空间内随机 UUID；同一身份可多条通道（"自己/对方"按 partner_id 判断） |
+| **member / slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。member_id 是空间内随机 UUID；同一身份可多条通道（"自己/对方"按 member_id 判断） |
 | **通道登记** | 由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭 join token）完成，**同时签发绑定该空间的会话**——没有独立的登记步骤 |
 | **通道在册状态** | `entrances` 表（`active` / `revoked`）；未登记 → 401/403 `FORBIDDEN`（只警告），已撤销 → 403 `ENTRANCE_REVOKED`（客户端自毁本地数据），无需任何配置文件 |
 
@@ -119,7 +119,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc `
 ```
 
 > 同一人加第二条通道：同样选 `j` 加入，身份选**同一个人**（1 或 2 与已有通道一致）——
-> 同一 partner 多通道不受"两人上限"限制（那限制只针对新增 partner）。
+> 同一 member 多通道不受"两人上限"限制（那限制只针对新增 member）。
 
 ---
 
@@ -141,7 +141,7 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 | A/B 在线     | 各自 TUI 状态栏               | `● 在线`                                                   |
 | A→B 消息     | A 输入消息回车                | B 消息区实时出现（WS 推送）                                |
 | B→A 消息     | B 输入消息回车                | A 消息区实时出现                                           |
-| 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀（**同 partner 多通道互显"我"**） |
+| 对方消息样式 | 看消息区                      | 对方粉色背景、自己绿色前缀（**同 member 多通道互显"我"**） |
 | 退出恢复     | `/exit`                       | 正常回命令行（无需 Ctrl-C）                                |
 | 服务器重设   | `/server https://einz.tic.cc` | 重连并认证                                                 |
 | 补发开通码     | 任一方 `/invite`              | 打印新的 24h 一次性邀请链接（给自己加通道也用它）          |
@@ -173,7 +173,7 @@ dart run bin/einz_tui.dart            # 不传 --store：自动发现 ~/.einz/ �
 - **信任模型**：`POST /spaces` 免认证（创建者此刻还没有凭证）——所以 `maxSpaces` 是开放注册的
   总闸；私有部署建议设成 1~2。空间一旦建立，只有持口令 + 有效 join token 的人能进来。
 - **会话必带空间**：认证时 `space_id` 必填；无 space 的会话不存在（也访问不到任何数据）。
-- **两人上限**：一个空间内 distinct partner ≤2（同 partner 多通道不限）；由 `space_members`
+- **两人上限**：一个空间内 distinct member ≤2（同 member 多通道不限）；由 `space_members`
   的两个槽位在数据库层强制。
 - **撤销通道**：`POST /entrances/:id/revoke`（需同空间成员认证 + **校验共享口令**）→ 标记
   `revoked` + 清会话/Push Token + 关 WS；

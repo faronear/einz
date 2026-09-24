@@ -337,18 +337,18 @@ void main() {
     expect(find.text('进入秘境'), findsOneWidget); // 唯一按钮（点外面不关闭）
   });
 
-  // ---- join（后续通道：探测到 partnerA → 身份 → 开通码 → …）----
+  // ---- join（后续通道：探测到 memberA → 身份 → 开通码 → …）----
 
   testWidgets('golden: 向导1.2.1-身份选择步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, probeNames: {'partnerA': 'Lukas'}); // 非空 → join 步骤 1
+    await pumpSetup(tester, probeNames: {'memberA': 'Lukas'}); // 非空 → join 步骤 1
     await expectLater(
         find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1.2.1_identity.png'));
   });
 
   testWidgets('golden: 向导1.2.3-开通码步骤（join）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    await pumpSetup(tester, probeNames: {'partnerA': 'Lukas'});
+    await pumpSetup(tester, probeNames: {'memberA': 'Lukas'});
     await tester.tap(find.text('Lukas')); // 选身份（自动进开通码页）
     await tester.pumpAndSettle();
     await expectLater(
@@ -359,8 +359,8 @@ void main() {
 
   testWidgets('golden: 向导1.3.1-密保信封步骤（offline）', (WidgetTester tester) async {
     _usePhoneSize(tester);
-    // 信封入口仅 join（第二/三条通道）口令页显示：探测到 partnerA → 身份（自动进开通码页）→ 口令页
-    await pumpSetup(tester, probeNames: {'partnerA': 'Lukas'});
+    // 信封入口仅 join（第二/三条通道）口令页显示：探测到 memberA → 身份（自动进开通码页）→ 口令页
+    await pumpSetup(tester, probeNames: {'memberA': 'Lukas'});
     await tester.tap(find.text('Lukas')); // 选身份（自动进开通码页）
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'INVITE-ABC'); // 开通码（校验非空）

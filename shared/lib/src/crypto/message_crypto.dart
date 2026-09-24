@@ -14,7 +14,7 @@ class MessageEnvelope {
     required this.keyVersion,
     required this.messageId,
     required this.senderEntranceId,
-    this.senderPartnerId,
+    this.senderMemberId,
     required this.nonce,
     required this.ciphertext,
     this.serverSequence,
@@ -26,7 +26,7 @@ class MessageEnvelope {
   final int keyVersion;
   final String messageId;
   final String senderEntranceId;
-  final String? senderPartnerId; // 发送者归属 partner（"自己/对方"判断维度，旧消息可能缺失）
+  final String? senderMemberId; // 发送者归属 member（"自己/对方"判断维度，旧消息可能缺失）
   final String nonce; // base64(24B)
   final String ciphertext; // base64(密文+MAC)
   final int? serverSequence; // Server 分配（同步响应中携带）
@@ -38,7 +38,7 @@ class MessageEnvelope {
         'key_version': keyVersion,
         'message_id': messageId,
         'sender_entrance_id': senderEntranceId,
-        if (senderPartnerId != null) 'sender_partner_id': senderPartnerId,
+        if (senderMemberId != null) 'sender_member_id': senderMemberId,
         'nonce': nonce,
         'ciphertext': ciphertext,
         if (serverSequence != null) 'server_sequence': serverSequence,
@@ -51,7 +51,7 @@ class MessageEnvelope {
         keyVersion: json['key_version'] as int,
         messageId: json['message_id'] as String,
         senderEntranceId: json['sender_entrance_id'] as String,
-        senderPartnerId: json['sender_partner_id'] as String?,
+        senderMemberId: json['sender_member_id'] as String?,
         nonce: json['nonce'] as String,
         ciphertext: json['ciphertext'] as String,
         serverSequence: json['server_sequence'] as int?,
@@ -71,7 +71,7 @@ Future<MessageEnvelope> encryptMessage({
   required Uint8List spaceKey,
   required String spaceId,
   required String senderEntranceId,
-  String? senderPartnerId,
+  String? senderMemberId,
   required String messageId,
   String type = 'text',
   int keyVersion = 1,
@@ -85,7 +85,7 @@ Future<MessageEnvelope> encryptMessage({
     keyVersion: keyVersion,
     messageId: messageId,
     senderEntranceId: senderEntranceId,
-    senderPartnerId: senderPartnerId,
+    senderMemberId: senderMemberId,
     nonce: base64Encode(nonce),
     ciphertext: '',
   );
@@ -104,7 +104,7 @@ Future<MessageEnvelope> encryptMessage({
     keyVersion: keyVersion,
     messageId: messageId,
     senderEntranceId: senderEntranceId,
-    senderPartnerId: senderPartnerId,
+    senderMemberId: senderMemberId,
     nonce: env.nonce,
     ciphertext: base64Encode(cipher),
   );

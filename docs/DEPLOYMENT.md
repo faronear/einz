@@ -237,7 +237,7 @@ npm run restore -- data/backups/backup-<ts>.json
   （默认 `data/einz.sqlite.db`，连 `-wal`/`-shm` 一起删，避免旧 WAL 被重放进恢复的库）。
   备份里的 `app.db` 只是内部条目名，不是落盘文件名。
 - **单空间备份（`--space`）是另一条路**：只导出该空间的行 + `files/<space_id>/`
-  （entrances/push_tokens 靠 partner_id/entrance_id 反查带出），恢复时也**只覆盖该空间**
+  （entrances/push_tokens 靠 member_id/entrance_id 反查带出），恢复时也**只覆盖该空间**
   ——别的空间与库文件都不动，适合"只回滚一个秘境 / 只迁移一个秘境"。
   刻意不含审计表（`connection_events` / `entrance_activity`）：它们是只追加留痕，
   且主键是自增整数，导入会撞别的空间的行。

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-# partner 预置名走查：首通道 TUI 入网时，名字问答后应追加"第二用户的名字"问答；
-# 输入 steffi → enroll 自举附 peer_name → /health 名称表 partnerB=steffi。
+# member 预置名走查：首通道 TUI 入网时，名字问答后应追加"第二用户的名字"问答；
+# 输入 steffi → enroll 自举附 peer_name → /health 名称表 memberB=steffi。
 import os, pty, subprocess, select, time, sys, socket, tempfile, shutil, urllib.request
 
 ROOT = '/Users/Shared/productX/einz'
 CLI = f'{ROOT}/cli'
-WORK = tempfile.mkdtemp(prefix='einz-partner-')
+WORK = tempfile.mkdtemp(prefix='einz-member-')
 
 def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
@@ -72,16 +72,16 @@ def main():
         try: os.close(m)
         except OSError: pass
 
-        # /health 名称表应含 partnerB=steffi
+        # /health 名称表应含 memberB=steffi
         names = {}
         for _ in range(20):
             try:
-                names = json_load(f'http://127.0.0.1:{port}/health')['partner_names']; break
+                names = json_load(f'http://127.0.0.1:{port}/health')['member_names']; break
             except Exception: time.sleep(0.3)
-        if names.get('partnerB') != 'steffi':
-            print(f'❌ partnerB 名称未预置: {names}'); return 1
-        print(f'✅ /health 名称表 partnerB={names["partnerB"]}（预置成功）')
-        print('🎉 partner 预置名走查通过')
+        if names.get('memberB') != 'steffi':
+            print(f'❌ memberB 名称未预置: {names}'); return 1
+        print(f'✅ /health 名称表 memberB={names["memberB"]}（预置成功）')
+        print('🎉 member 预置名走查通过')
         return 0
     finally:
         if server:

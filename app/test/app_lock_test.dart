@@ -124,9 +124,9 @@ void main() {
     addTearDown(db.close);
     final lock = AppLockService(db);
     expect(await lock.loadProfile(), isEmpty, reason: '未保存时返回空');
-    await lock.saveProfile(partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
+    await lock.saveProfile(memberName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
     final p = await lock.loadProfile();
-    expect(p['partnerName'], 'Lukas');
+    expect(p['memberName'], 'Lukas');
     expect(p['peerName'], 'Alice');
     expect(p['entranceName'], 'iPhone');
   });

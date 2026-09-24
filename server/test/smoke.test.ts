@@ -87,7 +87,7 @@ interface MessageEnvelope {
 
 class TestEntrance {
   entranceId = ''
-  partnerId = ''
+  memberId = ''
   keypair: KeyPair
   sessionToken = ''
   spaceKey: Uint8Array
@@ -116,12 +116,12 @@ class TestEntrance {
     const body = (await res.json()) as {
       spaceId: string
       entranceId: string
-      creatorPartnerId: string
+      creatorMemberId: string
       sessionToken: string
     }
     this.spaceId = body.spaceId
     this.entranceId = body.entranceId
-    this.partnerId = body.creatorPartnerId
+    this.memberId = body.creatorMemberId
     this.sessionToken = body.sessionToken
     this.slot = 0
     return body.spaceId
@@ -152,13 +152,13 @@ class TestEntrance {
     assert.equal(res.status, 200, 'join space should succeed')
     const body = (await res.json()) as {
       spaceId: string
-      partnerId: string
+      memberId: string
       slot: number
       sessionToken: string
       entranceId: string
     }
     this.spaceId = body.spaceId
-    this.partnerId = body.partnerId
+    this.memberId = body.memberId
     this.slot = body.slot
     this.sessionToken = body.sessionToken
     this.entranceId = body.entranceId
@@ -570,7 +570,7 @@ async function main (): Promise<void> {
     )
 
     // 12) 名称表（v2）：创建空间时带 peer_name → 落 space_members.display_name，
-    //     GET /space 的 partner_names 应含双方名字。**名称的唯一数据源是
+    //     GET /space 的 member_names 应含双方名字。**名称的唯一数据源是
     //     space_members**——v1 的 meta `person_name:*` 表已随收敛删除，所以这里
     //     按 v2 的读法断言（此前两个用例查 meta，已作废）。
     const preset = new TestEntrance(sodium.randombytes_buf(32))
@@ -580,15 +580,15 @@ async function main (): Promise<void> {
     })
     assert.equal(infoRes.status, 200, 'GET /space should succeed')
     const info = (await infoRes.json()) as {
-      partner_names: Record<string, string>
+      member_names: Record<string, string>
     }
     assert.equal(
-      info.partner_names[preset.partnerId],
+      info.member_names[preset.memberId],
       '我',
       '创建者名字应落 space_members.display_name'
     )
-    // partner 预置名落在 space_members 的 slot=1 行（该行 partner_id 仍为 NULL，
-    // 等伴侣加入后才出现在 /space 的 partner_names —— 这是"预置"语义，不是丢数据）
+    // member 预置名落在 space_members 的 slot=1 行（该行 member_id 仍为 NULL，
+    // 等伴侣加入后才出现在 /space 的 member_names —— 这是"预置"语义，不是丢数据）
     const dbPreset = new Database(join(tempDir, 'einz.sqlite.db'), { readonly: true })
     const peerRow = dbPreset
       .prepare(`SELECT display_name FROM space_members WHERE space_id = ? AND slot = 1`)
@@ -601,7 +601,7 @@ async function main (): Promise<void> {
     )
 
     // 12b) 改名后名称表即时更新（回归：90ec740 把 getSpace 改读 space_members，
-    //      但 updatePartnerName 仍只写 meta → GET /space 返回旧名——TUI 右上角自己
+    //      但 updateMemberName 仍只写 meta → GET /space 返回旧名——TUI 右上角自己
     //      的名字不刷新、对方改名后我方名称表被旧值覆盖）。验证：创建空间 →
     //      GET /space 旧名 → 改名 → GET /space 新名。
     const tempDir4 = mkdtempSync(join(tmpdir(), 'einz-rename-'))
@@ -635,7 +635,7 @@ async function main (): Promise<void> {
       assert.equal(create.status, 201, 'create space should succeed')
       const created = (await create.json()) as {
         spaceId: string
-        creatorPartnerId: string
+        creatorMemberId: string
         sessionToken: string
       }
 
@@ -644,24 +644,24 @@ async function main (): Promise<void> {
       })
       assert.equal(before.status, 200, 'get space should succeed')
       const beforeBody = (await before.json()) as {
-        partner_names: Record<string, string>
+        member_names: Record<string, string>
       }
       assert.equal(
-        beforeBody.partner_names[created.creatorPartnerId],
+        beforeBody.member_names[created.creatorMemberId],
         'luk',
         'create 后名称表应为创建名'
       )
 
       // /myname 改名 → GET /space 必须返回新名（meta 与 space_members 同步）
       const rename = await fetch(
-        `http://127.0.0.1:${port4}/partners/name`,
+        `http://127.0.0.1:${port4}/members/name`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${created.sessionToken}`
           },
-          body: JSON.stringify({ partner_name: 'lukas' })
+          body: JSON.stringify({ member_name: 'lukas' })
         }
       )
       assert.equal(rename.status, 200, 'rename should succeed')
@@ -669,10 +669,10 @@ async function main (): Promise<void> {
         headers: { Authorization: `Bearer ${created.sessionToken}` }
       })
       const afterBody = (await after.json()) as {
-        partner_names: Record<string, string>
+        member_names: Record<string, string>
       }
       assert.equal(
-        afterBody.partner_names[created.creatorPartnerId],
+        afterBody.member_names[created.creatorMemberId],
         'lukas',
         '改名后 GET /space 名称表应即时反映新名'
       )
@@ -869,7 +869,7 @@ async function main (): Promise<void> {
       assert.equal(create6.status, 201, 'create space should succeed')
       const a6 = (await create6.json()) as {
         spaceId: string
-        creatorPartnerId: string
+        creatorMemberId: string
         sessionToken: string
       }
       const tk6 = await fetch(
@@ -922,28 +922,28 @@ async function main (): Promise<void> {
       await new Promise<void>(done => ws6.on('open', () => done()))
 
       const rename6 = await fetch(
-        `http://127.0.0.1:${port6}/partners/name`,
+        `http://127.0.0.1:${port6}/members/name`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${a6.sessionToken}`
           },
-          body: JSON.stringify({ partner_name: 'alice-new' })
+          body: JSON.stringify({ member_name: 'alice-new' })
         }
       )
       assert.equal(rename6.status, 200, 'rename should succeed')
 
       const payload6 = await got
       assert.equal(
-        payload6.partner_id,
-        a6.creatorPartnerId,
-        'broadcast must carry the renamed partner_id'
+        payload6.member_id,
+        a6.creatorMemberId,
+        'broadcast must carry the renamed member_id'
       )
       assert.equal(
-        payload6.partner_name,
+        payload6.member_name,
         'alice-new',
-        'broadcast must carry the new partner_name'
+        'broadcast must carry the new member_name'
       )
       ws6.close()
     } finally {

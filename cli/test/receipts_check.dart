@@ -64,7 +64,7 @@ EntranceStore _store({
   required String spaceKeyB64,
   required String spaceId,
   required String entranceId,
-  required String partnerId,
+  required String memberId,
   required String sessionToken,
   required String server,
 }) {
@@ -77,7 +77,7 @@ EntranceStore _store({
     sessionToken: sessionToken,
   );
   st.entranceId = entranceId;
-  st.partnerId = partnerId;
+  st.memberId = memberId;
   return st;
 }
 
@@ -138,7 +138,7 @@ Future<int> _run() async {
       spaceKeyB64: keyB64,
       spaceId: created.spaceId,
       entranceId: created.entranceId,
-      partnerId: created.creatorPartnerId,
+      memberId: created.creatorMemberId,
       sessionToken: created.sessionToken,
       server: server,
     );
@@ -148,7 +148,7 @@ Future<int> _run() async {
       spaceKeyB64: keyB64,
       spaceId: joined.spaceId,
       entranceId: joined.entranceId,
-      partnerId: joined.partnerId,
+      memberId: joined.memberId,
       sessionToken: joined.sessionToken,
       server: server,
     );
@@ -180,7 +180,7 @@ Future<int> _run() async {
     final receipts = (await _getReceipts(server, storeB.sessionToken!))['receipts']
         as List<dynamic>;
     final row = receipts.cast<Map<String, dynamic>>().firstWhere(
-          (r) => r['partner_id'] == storeB.partnerId,
+          (r) => r['member_id'] == storeB.memberId,
           orElse: () => <String, dynamic>{},
         );
     if (row.isEmpty) {

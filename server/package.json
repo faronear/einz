@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "tsx src/app.ts",
-    "test": "tsx test/smoke.test.ts && tsx test/two_space_isolation.test.ts && tsx test/receipts.test.ts && tsx test/audit.test.ts && tsx test/push_scope.test.ts && tsx test/peer_status.test.ts && tsx test/entrance_name.test.ts && tsx test/partner_name.test.ts && tsx test/entrance_retire.test.ts && tsx test/install_uid.test.ts && tsx test/entrance_limit.test.ts && tsx test/space_id.test.ts && tsx test/attachment_space_dir.test.ts && tsx test/backup_space.test.ts && tsx test/unread.test.ts",
+    "test": "tsx test/smoke.test.ts && tsx test/two_space_isolation.test.ts && tsx test/receipts.test.ts && tsx test/audit.test.ts && tsx test/push_scope.test.ts && tsx test/peer_status.test.ts && tsx test/entrance_name.test.ts && tsx test/member_name.test.ts && tsx test/entrance_retire.test.ts && tsx test/install_uid.test.ts && tsx test/entrance_limit.test.ts && tsx test/space_id.test.ts && tsx test/attachment_space_dir.test.ts && tsx test/backup_space.test.ts && tsx test/unread.test.ts",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
     "audit": "tsx scripts/audit.ts"

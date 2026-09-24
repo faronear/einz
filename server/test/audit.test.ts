@@ -5,7 +5,7 @@
  *   - WS 上线/下线事件流（含在线时长、关闭码、来源 IP）
  *   - 消息「发送」是通道级（sender_entrance_id 已入库）
  *   - 消息「接收」有证据（sync 拉取进度，通道级）
- *   - 回执「已读」上报有通道级明细（receipts 表本身仍是 partner 级 HWM）
+ *   - 回执「已读」上报有通道级明细（receipts 表本身仍是 member 级 HWM）
  *   - push token 变更有记录
  *   - **红线**：审计表不得出现密文 / nonce / 明文
  *

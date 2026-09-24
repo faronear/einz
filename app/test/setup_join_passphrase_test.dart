@@ -70,7 +70,7 @@ Future<void> pumpToJoinToken(
       joinOverride: join ??
           (token) async => const SpaceJoinResult(
               spaceId: 'space-test',
-              partnerId: 'partnerB',
+              memberId: 'memberB',
               slot: 1,
               sessionToken: 'tok',
               entranceId: 'dev2',
@@ -146,7 +146,7 @@ void main() {
       if (joinCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
       return const SpaceJoinResult(
           spaceId: 'space-test',
-          partnerId: 'partnerB',
+          memberId: 'memberB',
           slot: 1,
           sessionToken: 'tok',
           entranceId: 'dev2',
@@ -180,7 +180,7 @@ void main() {
       if (joinCalls > 1) throw ApiException('TOKEN_USED', 'token 已使用');
       return const SpaceJoinResult(
           spaceId: 'space-test',
-          partnerId: 'partnerB',
+          memberId: 'memberB',
           slot: 1,
           sessionToken: 'tok',
           entranceId: 'dev2',

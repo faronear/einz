@@ -97,7 +97,7 @@ Future<String> resolveServer(
 
 /// 快速健康探测（GET {server}/health，3s 超时）。
 ///
-/// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不返回全局 partner 表
+/// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不返回全局 member 表
 /// （PROTOCOL_MULTIVERSE.md §4.1）；协议版本用于旧服务器提示（不支持 spaces 的
 /// 旧 Server 明确升级提示，§8.1）。
 Future<(bool, String, List<String>)> probeServer(String server) async {

@@ -82,7 +82,7 @@ void main() {
     await client.stop();
   });
 
-  test('peer.online/peer.offline：解析 entrance_id/partner_id/online_since', () async {
+  test('peer.online/peer.offline：解析 entrance_id/member_id/online_since', () async {
     final (server, base, conns) = await _startWsServer();
     addTearDown(() => server.close(force: true));
     final events = <WsEvent>[];
@@ -95,20 +95,20 @@ void main() {
       'type': 'peer.online',
       'payload': {
         'entrance_id': 'dev-b',
-        'partner_id': 'per-b',
+        'member_id': 'per-b',
         'online_since': 1787900000000,
       },
     }));
     conns.first.add(jsonEncode({
       'id': 0,
       'type': 'peer.offline',
-      'payload': {'entrance_id': 'dev-b', 'partner_id': 'per-b'},
+      'payload': {'entrance_id': 'dev-b', 'member_id': 'per-b'},
     }));
     await Future.delayed(const Duration(milliseconds: 200));
 
     final online = events.whereType<WsPeerStatusEvent>().first;
     expect(online.entranceId, 'dev-b');
-    expect(online.partnerId, 'per-b');
+    expect(online.memberId, 'per-b');
     expect(online.onlineSince, 1787900000000);
     // 离线帧不带该字段（已下线，上线时刻无意义）
     expect(events.whereType<WsPeerStatusEvent>().last.onlineSince, isNull);

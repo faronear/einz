@@ -35,14 +35,14 @@ function seed (): void {
   ).run('space-a', 'addr-a', 'pk-a', now, now)
 
   const dev = db.prepare(
-    `INSERT INTO entrances (entrance_id, partner_id, public_key, status, last_seen, created_at)
+    `INSERT INTO entrances (entrance_id, member_id, public_key, status, last_seen, created_at)
      VALUES (?, ?, 'pk', 'active', ?, ?)`,
   )
   dev.run('a1', 'p1', now, now)
   dev.run('b1', 'p2', now, now)
 
   const member = db.prepare(
-    `INSERT INTO space_members (space_id, partner_id, slot, status, joined_at)
+    `INSERT INTO space_members (space_id, member_id, slot, status, joined_at)
      VALUES (?, ?, ?, 'active', ?)`,
   )
   member.run('space-a', 'p1', 0, now)

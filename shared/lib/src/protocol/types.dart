@@ -5,9 +5,9 @@ library;
 /// WS 用握手 query `?pv=`。改了**任何** wire 契约（字段名 / 路径 / WS 事件名 /
 /// 错误码）都必须 bump。
 ///
-/// - `1` = device→entrance / person→partner 全量改名**之前**的旧 wire；
+/// - `1` = device→entrance / person→member 全量改名**之前**的旧 wire；
 /// - `2` = 该次改名之后的 wire（`sender_device_id`→`sender_entrance_id`、
-///   `person_id`→`partner_id`、WS 帧 `device.revoked`→`entrance.revoked`、
+///   `person_id`→`member_id`、WS 帧 `device.revoked`→`entrance.revoked`、
 ///   错误码 `DEVICE_REVOKED`→`ENTRANCE_REVOKED`、`/devices/*`→`/entrances/*` 等，
 ///   见 docs/GLOSSARY.md「wire 字段改名」）。
 ///
@@ -77,10 +77,10 @@ class SessionResult {
 /// 历史：v1 时代这是 `POST /entrances/enroll` 的响应类型（`EnrollResult`）。该端点与
 /// v1 邀请码已随 Multiverse 收敛删除（2026-09-15），所以它不再是"某个端点的响应"。
 class EntranceBinding {
-  const EntranceBinding({required this.entranceId, required this.partnerId, required this.spaceId});
+  const EntranceBinding({required this.entranceId, required this.memberId, required this.spaceId});
 
   final String entranceId;
-  final String partnerId;
+  final String memberId;
   final String spaceId;
 }
 
@@ -141,7 +141,7 @@ class SpaceJoinPreflight {
 class SpaceJoinResult {
   const SpaceJoinResult({
     required this.spaceId,
-    required this.partnerId,
+    required this.memberId,
     required this.slot,
     required this.sessionToken,
     required this.entranceId,
@@ -149,7 +149,7 @@ class SpaceJoinResult {
   });
 
   final String spaceId;
-  final String partnerId;
+  final String memberId;
   final int slot;
   final String sessionToken;
   final String entranceId;
@@ -157,7 +157,7 @@ class SpaceJoinResult {
 
   factory SpaceJoinResult.fromJson(Map<String, dynamic> json) => SpaceJoinResult(
         spaceId: json['spaceId'] as String,
-        partnerId: json['partnerId'] as String,
+        memberId: json['memberId'] as String,
         slot: json['slot'] as int,
         sessionToken: json['sessionToken'] as String,
         entranceId: json['entranceId'] as String,
@@ -175,7 +175,7 @@ class SpaceCreateResult {
     required this.link,
     required this.expiresAt,
     required this.entranceId,
-    required this.creatorPartnerId,
+    required this.creatorMemberId,
     required this.sessionToken,
   });
 
@@ -185,7 +185,7 @@ class SpaceCreateResult {
   final String link;
   final int expiresAt;
   final String entranceId;
-  final String creatorPartnerId;
+  final String creatorMemberId;
   final String sessionToken;
 
   factory SpaceCreateResult.fromJson(Map<String, dynamic> json) =>
@@ -196,7 +196,7 @@ class SpaceCreateResult {
         link: json['link'] as String,
         expiresAt: json['expiresAt'] as int,
         entranceId: json['entranceId'] as String,
-        creatorPartnerId: json['creatorPartnerId'] as String,
+        creatorMemberId: json['creatorMemberId'] as String,
         sessionToken: json['sessionToken'] as String,
       );
 }
@@ -221,24 +221,24 @@ class JoinTokenResult {
       );
 }
 
-/// 空间通道信息（GET /space 返回）：entrance_id → partner_id 映射，
+/// 空间通道信息（GET /space 返回）：entrance_id → member_id 映射，
 /// 用于判断消息是否"同一个人"发送（多通道凭证语义，PROTOCOL.md §7.3）。
 class SpaceEntrance {
   const SpaceEntrance({
     required this.entranceId,
-    required this.partnerId,
+    required this.memberId,
     required this.status,
     this.lastSeen,
   });
 
   final String entranceId;
-  final String partnerId;
+  final String memberId;
   final String status;
   final int? lastSeen;
 
   factory SpaceEntrance.fromJson(Map<String, dynamic> json) => SpaceEntrance(
         entranceId: json['entrance_id'] as String,
-        partnerId: json['partner_id'] as String,
+        memberId: json['member_id'] as String,
         status: json['status'] as String,
         lastSeen: json['last_seen'] as int?,
       );
@@ -249,34 +249,34 @@ class SpaceResult {
   const SpaceResult({
     required this.spaceId,
     required this.entrances,
-    this.partnerNames = const {},
-    this.partnerGenders = const {},
-    this.partnerSlots = const {},
+    this.memberNames = const {},
+    this.memberGenders = const {},
+    this.memberSlots = const {},
   });
 
   final String spaceId;
   final List<SpaceEntrance> entrances;
 
-  /// partner_id → partner_name（创建者/邀请时设置，显示层用）。
-  final Map<String, String> partnerNames;
+  /// member_id → member_name（创建者/邀请时设置，显示层用）。
+  final Map<String, String> memberNames;
 
-  /// partner_id → gender（male/female，显示层用）。
-  final Map<String, String> partnerGenders;
+  /// member_id → gender（male/female，显示层用）。
+  final Map<String, String> memberGenders;
 
-  /// partner_id → slot（0=第一人/创建者，1=第二人/伴侣；
+  /// member_id → slot（0=第一人/创建者，1=第二人/伴侣；
   /// 同性别气泡配色区分「第二个人」用，老服务端无此键时为空表）。
-  final Map<String, int> partnerSlots;
+  final Map<String, int> memberSlots;
 
   factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(
         spaceId: json['space_id'] as String,
         entrances: (json['entrances'] as List)
             .map((d) => SpaceEntrance.fromJson(d as Map<String, dynamic>))
             .toList(),
-        partnerNames: (json['partner_names'] as Map<String, dynamic>? ?? {})
+        memberNames: (json['member_names'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as String)),
-        partnerGenders: (json['partner_genders'] as Map<String, dynamic>? ?? {})
+        memberGenders: (json['member_genders'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as String)),
-        partnerSlots: (json['partner_slots'] as Map<String, dynamic>? ?? {})
+        memberSlots: (json['member_slots'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as int)),
       );
 }
@@ -296,26 +296,26 @@ class PostMessageResult {
       );
 }
 
-/// 消息回执（已送达/已读）单调高水位，按 (space, partner) 一行。
+/// 消息回执（已送达/已读）单调高水位，按 (space, member) 一行。
 ///
 /// 语义：我的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
-/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一条通道已收到/已读"
+/// `readUptoSeq ≥ S`。按 member 记 → "该 member 至少一条通道已收到/已读"
 /// （不保证其所有通道）。回执只前进，且 `deliveredUptoSeq ≥ readUptoSeq`。
 class ReceiptRow {
   ReceiptRow({
-    required this.partnerId,
+    required this.memberId,
     required this.deliveredUptoSeq,
     required this.readUptoSeq,
     required this.updatedAt,
   });
 
-  final String partnerId;
+  final String memberId;
   final int deliveredUptoSeq;
   final int readUptoSeq;
   final int updatedAt;
 
   factory ReceiptRow.fromJson(Map<String, dynamic> json) => ReceiptRow(
-        partnerId: json['partner_id'] as String,
+        memberId: json['member_id'] as String,
         deliveredUptoSeq: (json['delivered_upto_seq'] as int?) ?? 0,
         readUptoSeq: (json['read_upto_seq'] as int?) ?? 0,
         updatedAt: (json['updated_at'] as int?) ?? 0,

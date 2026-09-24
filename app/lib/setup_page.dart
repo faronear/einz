@@ -54,7 +54,7 @@ class SetupPage extends StatefulWidget {
   final LocalDatabase? db;
 
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 probeServer。
-  /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 partner 表，
+  /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 member 表，
   /// 角色改由空间入口页让用户选择。
   final Future<(bool, String, List<String>)> Function(String server)? probeServer;
 
@@ -177,7 +177,7 @@ class _SetupPageState extends State<SetupPage> {
   /// （create 回步骤 2 / join 回步骤 3），实现口令⇄信封自由互切。
   _WizardRole _preEnvelopeRole = _WizardRole.join;
 
-  /// 通道登记结果（服务端分配的真实 entranceId/partnerId/spaceId）。
+  /// 通道登记结果（服务端分配的真实 entranceId/memberId/spaceId）。
   /// 认证（challenge）与进聊天页一律用它，不用本地临时 entranceId。
   EntranceBinding? _enroll;
 
@@ -237,7 +237,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 服务器地址初始化：读持久化值（无则默认 einz.tic.cc）→ 快速探测。
-  /// Multiverse：探测成功不再按 /health partner 表自动判定 create/join——停留
+  /// Multiverse：探测成功不再按 /health member 表自动判定 create/join——停留
   /// 在空间入口页由用户选择（新建空间 / 输入邀请链接加入）；旧服务器
   /// （protocol_version 非 multiverse）标记 _legacyServer 提示升级。
   /// 无法连接 → splash 底部浮现"正在连接 <地址>"小字并自动重试（降低小白负担）。
@@ -592,7 +592,7 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 6; // name/partner/passphrase/pin/done（伴侣名字/性别必填，老板 2026-09-10 定稿）
+        return 6; // name/member/passphrase/pin/done（伴侣名字/性别必填，老板 2026-09-10 定稿）
       case _WizardRole.join:
         return 5; // identity/invite/passphrase/pin/done
       case _WizardRole.offline:
@@ -702,12 +702,12 @@ class _SetupPageState extends State<SetupPage> {
     if (key != null) _revealGender(key);
   }
 
-  /// 用户名称不合规 → 红字文案（规则见 shared partner_name_policy：中英文/数字/
+  /// 用户名称不合规 → 红字文案（规则见 shared member_name_policy：中英文/数字/
   /// `_`/`-`/emoji，≤32；名字一律是用户输入的，不静默改写）。
-  String _nameRuleError(PartnerNameViolation violation) {
+  String _nameRuleError(MemberNameViolation violation) {
     final l10n = AppLocalizations.of(context)!;
-    return violation == PartnerNameViolation.tooLong
-        ? l10n.wizardNameTooLongError(kPartnerNameMaxLength)
+    return violation == MemberNameViolation.tooLong
+        ? l10n.wizardNameTooLongError(kMemberNameMaxLength)
         : l10n.wizardNameInvalidError;
   }
 
@@ -736,7 +736,7 @@ class _SetupPageState extends State<SetupPage> {
       if (mine.isEmpty) {
         localError = l10n.wizardNameRequired;
         invalid = true;
-      } else if (checkPartnerNamePolicy(mine) case final v?) {
+      } else if (checkMemberNamePolicy(mine) case final v?) {
         // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
         localError = _nameRuleError(v);
         invalid = true;
@@ -758,14 +758,14 @@ class _SetupPageState extends State<SetupPage> {
     // create 录入两人身份，join 时按身份选择而非自填名字）
     String? peerGenderError;
     if (_role == _WizardRole.create && _step == 2) {
-      final partner = _peerNameCtrl.text.trim();
-      if (partner.isEmpty) {
+      final member = _peerNameCtrl.text.trim();
+      if (member.isEmpty) {
         localError = l10n.wizardPeerNameRequired;
         invalid = true;
-      } else if (checkPartnerNamePolicy(partner) case final v?) {
+      } else if (checkMemberNamePolicy(member) case final v?) {
         localError = _nameRuleError(v);
         invalid = true;
-      } else if (isSamePartnerName(partner, _creatorName.text.trim())) {
+      } else if (isSameMemberName(member, _creatorName.text.trim())) {
         // 两人不能同名（老板 2026-09-10 定，2026-09-24 收紧为大小写不敏感；TUI 早已
         // 收口，App 此前漏了——2026-09-23 实测）：join 时是"按名字选身份"，两个名字
         // 相同（含仅大小写不同）就没法判别你是哪一位
@@ -1147,7 +1147,7 @@ class _SetupPageState extends State<SetupPage> {
   }
 
   /// 第 0 步（角色未判定时）：显示探测状态（密保信封导入在口令页有次级入口）。
-  /// 角色由服务器探测自动判定（partner 名称表空=首条通道 create，非空=后续通道 join），
+  /// 角色由服务器探测自动判定（member 名称表空=首条通道 create，非空=后续通道 join），
   /// 不再让用户手动选择。
   Widget _buildDetectAndEnvelope() {
     final l10n = AppLocalizations.of(context)!;
@@ -1338,7 +1338,7 @@ class _SetupPageState extends State<SetupPage> {
     await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
       spaceId: _spaceId.text.trim(), // per-space 资料（多空间）
       // 本人名字：join=所选身份（create 预置）；create=自填
-      partnerName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
+      memberName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
       // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
       // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
       peerName: _role == _WizardRole.join ? _joinPeerName : _peerNameCtrl.text.trim(),
@@ -1372,8 +1372,8 @@ class _SetupPageState extends State<SetupPage> {
         spaceKey: sk,
         keyVersion: 1,
         token: token,
-        partnerName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
-        partnerId: enroll.partnerId,
+        memberName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
+        memberId: enroll.memberId,
         // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
         // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
         peerName: _role == _WizardRole.join ? _joinPeerName : _peerNameCtrl.text.trim(),
@@ -1887,7 +1887,7 @@ class _SetupPageState extends State<SetupPage> {
       _sessionToken = created.sessionToken;
       _enroll = EntranceBinding(
         entranceId: created.entranceId,
-        partnerId: created.creatorPartnerId,
+        memberId: created.creatorMemberId,
         spaceId: created.spaceId,
       );
       // 此前 create 流程漏填 _spaceId.text（仅 join/offline 填写）→ ChatPage 拿空
@@ -2389,7 +2389,7 @@ class _SetupPageState extends State<SetupPage> {
         _sessionToken = join.sessionToken;
         _enroll = EntranceBinding(
           entranceId: join.entranceId,
-          partnerId: join.partnerId,
+          memberId: join.memberId,
           spaceId: join.spaceId,
         );
         _joinedToken = _joinToken;

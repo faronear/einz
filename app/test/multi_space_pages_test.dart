@@ -109,8 +109,8 @@ void main() {
     await lock.ensureFreshInstall();
     await lock.savePlain(_payloadA);
     await lock.addSpace(_payloadB);
-    await lock.saveProfile(spaceId: 'space-a', partnerName: '我A', peerName: '对方A', entranceName: 'iPhone');
-    await lock.saveProfile(spaceId: 'space-b', partnerName: '我B', peerName: '对方B', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-a', memberName: '我A', peerName: '对方A', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-b', memberName: '我B', peerName: '对方B', entranceName: 'iPhone');
     await lock.loadVault(); // 解锁态进内存会话（弹层从这里读空间列表）
 
     final api = _SoloEntranceApi()..unreadByToken['tok-a'] = 3;
@@ -150,7 +150,7 @@ void main() {
     await lock.addSpace(_payloadB);
     final longName = '对方名字被改得特别特别长以至于一定会撑破卡片' * 2;
     await lock.saveProfile(
-        spaceId: 'space-a', partnerName: '我', peerName: longName, entranceName: 'iPhone');
+        spaceId: 'space-a', memberName: '我', peerName: longName, entranceName: 'iPhone');
     await lock.loadVault();
 
     await tester.pumpWidget(_app(Scaffold(
@@ -184,10 +184,10 @@ void main() {
     await lock.addSpace(_payloadC);
     await lock.addSpace(_payloadD);
     // 名字等长（都是 2 字）：卡片里名字居中，两卡名字左边缘之差 = 卡宽 + 间距
-    await lock.saveProfile(spaceId: 'space-a', partnerName: '我', peerName: '甲一', entranceName: 'iPhone');
-    await lock.saveProfile(spaceId: 'space-b', partnerName: '我', peerName: '乙二', entranceName: 'iPhone');
-    await lock.saveProfile(spaceId: 'space-c', partnerName: '我', peerName: '丙三', entranceName: 'iPhone');
-    await lock.saveProfile(spaceId: 'space-d', partnerName: '我', peerName: '丁四', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-a', memberName: '我', peerName: '甲一', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-b', memberName: '我', peerName: '乙二', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-c', memberName: '我', peerName: '丙三', entranceName: 'iPhone');
+    await lock.saveProfile(spaceId: 'space-d', memberName: '我', peerName: '丁四', entranceName: 'iPhone');
     await lock.loadVault();
 
     await tester.pumpWidget(_app(Scaffold(

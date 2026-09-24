@@ -50,7 +50,7 @@ class AppLockService {
   static const _kLockedUntil = 'app_lock.locked_until';
   static const _kPlain = 'app_lock.plain'; // 【遗留】旧版明文包在 app_state 的键（仅迁移读取）
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
-  static const _kProfile = 'app_lock.profile'; // JSON: {partnerName, peerName, entranceName, myGender, peerGender, mySlot, peerSlot, peerPartnerId}
+  static const _kProfile = 'app_lock.profile'; // JSON: {memberName, peerName, entranceName, myGender, peerGender, mySlot, peerSlot, peerMemberId}
 
   /// 安装级标识（同一物理设备各空间共用；服务端 entrances.install_uid 的来源）。
   static const _kInstallUid = 'app_lock.install_uid';
@@ -489,7 +489,7 @@ class AppLockService {
   /// 名字；缺省（单空间旧调用点）回退全局键 [_kProfile]。
   Future<void> saveProfile({
     String? spaceId,
-    required String partnerName,
+    required String memberName,
     required String peerName,
     required String entranceName,
     String myGender = '', // 本人性别（male/female；个人资料弹窗图标展示用）
@@ -499,7 +499,7 @@ class AppLockService {
   }) async {
     final sid = spaceId;
     await _set(sid == null ? _kProfile : _profileKey(sid), jsonEncode({
-      'partnerName': partnerName,
+      'memberName': memberName,
       'peerName': peerName,
       'entranceName': entranceName,
       'myGender': myGender,
@@ -509,7 +509,7 @@ class AppLockService {
     }));
     if (sid != null) {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(
-        SpacesCompanion(name: Value(partnerName), peerName: Value(peerName)),
+        SpacesCompanion(name: Value(memberName), peerName: Value(peerName)),
       );
     }
   }
@@ -528,33 +528,33 @@ class AppLockService {
     try {
       final m = jsonDecode(raw) as Map<String, dynamic>;
       return {
-        'partnerName': (m['partnerName'] as String?) ?? '',
+        'memberName': (m['memberName'] as String?) ?? '',
         'peerName': (m['peerName'] as String?) ?? '',
         'entranceName': (m['entranceName'] as String?) ?? '',
         'myGender': (m['myGender'] as String?) ?? '',
         'peerGender': (m['peerGender'] as String?) ?? '',
         'mySlot': (m['mySlot'] as num?)?.toInt(),
         'peerSlot': (m['peerSlot'] as num?)?.toInt(),
-        'peerPartnerId': (m['peerPartnerId'] as String?) ?? '',
+        'peerMemberId': (m['peerMemberId'] as String?) ?? '',
       };
     } catch (_) {
       return const {};
     }
   }
 
-  /// 记下本空间**对方**的 partner_id（头像等按 partner 维度取数据时用）。
+  /// 记下本空间**对方**的 member_id（头像等按 member 维度取数据时用）。
   ///
   /// 为什么需要单独存：对方的身份 id 原本只在"取数据那一刻"现算——从服务端 `GET /space`
-  /// 的通道表取 `entranceId → partnerId` 再排掉自己，**算完即丢**；而对方的名字/性别/槽位
+  /// 的通道表取 `entranceId → memberId` 再排掉自己，**算完即丢**；而对方的名字/性别/槽位
   /// 都早已落进 per-space 资料。于是会出现"卡片有对方名字、却不知道对方是谁、头像只能给默认"
   /// 的不对称（老板 2026-09-23 指出）。这里把它与 peerName 并列存进同一份资料。
   ///
   /// 读改写、只加这一个键（不碰其它键），幂等——值没变不写盘。
-  Future<void> savePeerPartnerId({
+  Future<void> savePeerMemberId({
     required String spaceId,
-    required String peerPartnerId,
+    required String peerMemberId,
   }) async {
-    final pid = peerPartnerId.trim();
+    final pid = peerMemberId.trim();
     if (spaceId.isEmpty || pid.isEmpty) return;
     final key = _profileKey(spaceId);
     var m = <String, dynamic>{};
@@ -566,8 +566,8 @@ class AppLockService {
         m = <String, dynamic>{}; // 坏 JSON：重写一份干净的
       }
     }
-    if (m['peerPartnerId'] == pid) return; // 幂等
-    await _set(key, jsonEncode({...m, 'peerPartnerId': pid}));
+    if (m['peerMemberId'] == pid) return; // 幂等
+    await _set(key, jsonEncode({...m, 'peerMemberId': pid}));
   }
 
   /// 旧全局键 [_kProfile] 的兼容读：**仅当本机只登记了 ≤1 个空间**时返回。

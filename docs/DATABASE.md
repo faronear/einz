@@ -25,10 +25,10 @@
 
 ```sql
 -- 通道（v2：由 POST /spaces / POST /spaces/join 登记；表本身是全局表，
--- 归属空间靠 entrances.partner_id → space_members 推导）
+-- 归属空间靠 entrances.member_id → space_members 推导）
 CREATE TABLE entrances (
     entrance_id   TEXT PRIMARY KEY,          -- UUIDv7（服务端生成）
-    partner_id   TEXT NOT NULL,             -- 空间内身份 UUID（v2；见 space_members.partner_id）
+    member_id   TEXT NOT NULL,             -- 空间内身份 UUID（v2；见 space_members.member_id）
     public_key  TEXT NOT NULL,             -- base64(X25519 公钥)
     status      TEXT NOT NULL DEFAULT 'active',  -- active | revoked
     entrance_name TEXT,                      -- 通道显示名（TUI/App 可改）
@@ -52,17 +52,17 @@ CREATE TABLE spaces (
 );
 
 -- 空间成员（两个身份槽位：0=创建者/第一人，1=伴侣/第二人。
--- partner_id 是身份锚点，同一身份多通道共享；伴侣预置行 partner_id 为 NULL 直到加入）
--- 名称的唯一数据源就是这里的 display_name（v1 的 meta partner_name:* 已删除）
+-- member_id 是身份锚点，同一身份多通道共享；伴侣预置行 member_id 为 NULL 直到加入）
+-- 名称的唯一数据源就是这里的 display_name（v1 的 meta person_name:* 已删除）
 CREATE TABLE space_members (
     space_id     TEXT NOT NULL REFERENCES spaces(space_id),
-    partner_id    TEXT,
+    member_id    TEXT,
     slot INTEGER NOT NULL,
     display_name TEXT,
     gender       TEXT,                     -- male | female
     status       TEXT NOT NULL DEFAULT 'active',  -- active | pending
     joined_at    INTEGER,
-    PRIMARY KEY (space_id, partner_id),
+    PRIMARY KEY (space_id, member_id),
     UNIQUE (space_id, slot)
 );
 
@@ -90,7 +90,7 @@ CREATE TABLE messages (
     message_id       TEXT PRIMARY KEY,     -- UUIDv7（客户端生成，幂等键）
     space_id         TEXT NOT NULL,
     sender_entrance_id TEXT NOT NULL,
-    sender_partner_id TEXT,
+    sender_member_id TEXT,
     type             TEXT NOT NULL,        -- text|image|video|voice|audio|file|system
     key_version      INTEGER NOT NULL,
     nonce            TEXT NOT NULL,        -- base64(24B)
@@ -149,17 +149,17 @@ CREATE TABLE sessions (
     created_at    INTEGER NOT NULL
 );
 
--- 消息回执（已送达/已读）单调高水位，按 (space, partner) 一行（PROTOCOL.md §5.4）
+-- 消息回执（已送达/已读）单调高水位，按 (space, member) 一行（PROTOCOL.md §5.4）
 CREATE TABLE receipts (
     space_id           TEXT NOT NULL,
-    partner_id          TEXT NOT NULL,
+    member_id          TEXT NOT NULL,
     delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
     read_upto_seq      INTEGER NOT NULL DEFAULT 0,
     updated_at         INTEGER NOT NULL,
-    PRIMARY KEY (space_id, partner_id)
+    PRIMARY KEY (space_id, member_id)
 );
 
--- 键值（目前只用于 schema_version 标记；v1 的 partner_name:* / person_gender:*/
+-- 键值（目前只用于 schema_version 标记；v1 的 person_name:* / person_gender:*/
 -- creator_person_id 已随 v1 收敛删除，启动迁移会清掉存量行）
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
@@ -169,7 +169,7 @@ CREATE TABLE meta (
 
 ### 2.1 审计表（只追加，永久保留）
 
-业务表只保存"当前状态"（`entrances.last_seen` 会被覆盖、`receipts` 是 partner 级
+业务表只保存"当前状态"（`entrances.last_seen` 会被覆盖、`receipts` 是 member 级
 高水位），无法回答"谁在哪条通道上、什么时候做了什么"。以下两张表专为此补上历史，
 **只追加、不更新、不删除**，且**不参与业务语义**——清空它们不影响聊天功能。
 
@@ -212,7 +212,7 @@ CREATE TABLE entrance_activity (
 | `push.register`   | `POST /push/register`     | `platform`、`token_prefix`（**只落前 8 位**，不落完整推送凭证）              |
 | `push.unregister` | `DELETE /push/register`   | —                                                                            |
 | `entrance.rename`   | `POST /entrances/name`      | `entrance_name`                                                                |
-| `partner.rename`   | `POST /partners/name` | `partner_name`                                                              |
+| `member.rename`   | `POST /members/name` | `member_name`                                                              |
 | `entrance.revoke`   | `POST /entrances/:id/revoke` | `target_entrance_id`（**不记口令**）                                          |
 | `entrance.retire`   | `POST /entrances/retire`     | —（自助退役，目标即自己，无需 detail）                                      |
 
@@ -222,7 +222,7 @@ CREATE TABLE entrance_activity (
   轮询不产生记录——轮询频率是 App WS 在线 30s / 离线 3s 起退避到 60s、TUI 固定
   30s，全量记录绝大部分行都是重复值。通道"还在不在"由 `connection_events` 与
   `entrances.last_seen` 负责。
-- 回执语义**未改**：`receipts` 表仍是 partner 级 HWM（"该 partner 至少一条通道
+- 回执语义**未改**：`receipts` 表仍是 member 级 HWM（"该 member 至少一条通道
   已读"），`entrance_activity.receipt` 只是额外记下"是哪条通道上报的"。
 - 红线：审计表只记元数据，**绝不含密文 / nonce / 明文 / 完整 push token**
   （`test/audit.test.ts` 有断言守着）。
@@ -236,7 +236,7 @@ CREATE TABLE entrance_activity (
 - `challenges` / `sessions` 是短期数据：定期清理过期行（如每小时一次）。
 - `receipts` 只前进：上报用 `MAX()` upsert（回退值被忽略），且
   `delivered_upto_seq ≥ read_upto_seq`（读隐含送达），并夹紧到本 space 真实
-  `MAX(server_sequence)`。按 partner 记 = "该 partner 至少一条通道已收到/已读"。
+  `MAX(server_sequence)`。按 member 记 = "该 member 至少一条通道已收到/已读"。
 
 ---
 
@@ -301,11 +301,11 @@ CREATE TABLE sync_state (
 -- 对方回执（已送达/已读）单调高水位（App v6 起；本协议只落库，UI 暂不展示）
 CREATE TABLE peer_receipts (
     space_id           TEXT NOT NULL,
-    partner_id          TEXT NOT NULL,      -- 对方身份锚点（同人多通道共享一行）
+    member_id          TEXT NOT NULL,      -- 对方身份锚点（同人多通道共享一行）
     delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
     read_upto_seq      INTEGER NOT NULL DEFAULT 0,
     updated_at         INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (space_id, partner_id)
+    PRIMARY KEY (space_id, member_id)
 );
 
 -- 草稿

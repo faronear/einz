@@ -9,7 +9,7 @@ import 'burn_after_settings.dart';
 import 'local_database.dart';
 
 /// 历史消息记录（UI 渲染单元）：env=密文信封、plaintext=明文、
-/// sender=身份判断（'me'/'peer'，partner 维度）、attachment=附件元数据、
+/// sender=身份判断（'me'/'peer'，member 维度）、attachment=附件元数据、
 /// expiresAt=阅后即焚到期时间（null=永久）、createdAt=发送时间戳（毫秒，
 /// 落盘值，未同步消息为本地发送时间）、burnAfterSeconds=焚毁时长（秒，
 /// 归档恢复缺快照时按 到期-创建 反推）、quote=引用快照（{messageId, preview}，
@@ -55,12 +55,12 @@ class MessageRepository {
     this.token,
     this.settings,
     this.reauth,
-    String? partnerId,
+    String? memberId,
   }) {
-    // 向导完成时已知本端 partnerId：立即种入映射，保证首帧就按 partner 判定归属
+    // 向导完成时已知本端 memberId：立即种入映射，保证首帧就按 member 判定归属
     // （离线启动时 GET /space 拉不到映射；持久化映射由 refreshEntranceMap 落盘）。
-    final pid = partnerId;
-    if (pid != null && pid.isNotEmpty) _partnerByEntrance[entranceId] = pid;
+    final pid = memberId;
+    if (pid != null && pid.isNotEmpty) _memberByEntrance[entranceId] = pid;
   }
 
   final LocalDatabase db;
@@ -119,46 +119,46 @@ class MessageRepository {
     }
   }
 
-  /// 通道 → 用户（partner_id）映射（GET /space 缓存，多通道凭证语义）。
-  /// 用于判断消息是否"同一个人"发送：同 partner 不同通道显示为 'me'。
-  final Map<String, String> _partnerByEntrance = {};
+  /// 通道 → 用户（member_id）映射（GET /space 缓存，多通道凭证语义）。
+  /// 用于判断消息是否"同一个人"发送：同 member 不同通道显示为 'me'。
+  final Map<String, String> _memberByEntrance = {};
 
-  /// entrance→partner 映射的本地持久化键：离线启动时 GET /space 拿不到，只有靠这份
+  /// entrance→member 映射的本地持久化键：离线启动时 GET /space 拿不到，只有靠这份
   /// 缓存才认得出"同一身份其他通道"发来的消息（否则一律判成对方、气泡全左对齐——
-  /// 老板 2026-09-13 实测；TUI 侧因持久化 partnerId 而无此问题）。
-  static const _kEntrancePartnerMap = 'identity.entrance_partner_map';
+  /// 老板 2026-09-13 实测；TUI 侧因持久化 memberId 而无此问题）。
+  static const _kEntranceMemberMap = 'identity.entrance_member_map';
 
   /// 身份缓存是否已从库里载入（首次判归属 / 发送前惰性载入一次）。
   bool _identityLoaded = false;
 
-  /// 惰性载入持久化的 entrance→partner 映射（离线也能用）。
+  /// 惰性载入持久化的 entrance→member 映射（离线也能用）。
   Future<void> _ensureIdentityLoaded() async {
     if (_identityLoaded) return;
     _identityLoaded = true;
     try {
       final row = await (db.select(db.appState)
-            ..where((s) => s.key.equals(_kEntrancePartnerMap)))
+            ..where((s) => s.key.equals(_kEntranceMemberMap)))
           .getSingleOrNull();
       final raw = row?.value;
       if (raw == null || raw.isEmpty) return;
       final m = jsonDecode(raw) as Map<String, dynamic>;
-      // putIfAbsent：不覆盖构造函数种入的本端 partnerId（向导已知，优先采信）
+      // putIfAbsent：不覆盖构造函数种入的本端 memberId（向导已知，优先采信）
       for (final e in m.entries) {
-        _partnerByEntrance.putIfAbsent(e.key, () => e.value as String);
+        _memberByEntrance.putIfAbsent(e.key, () => e.value as String);
       }
     } catch (_) {
       // 缓存损坏：忽略（退化为 entrance 维度判断）
     }
   }
 
-  /// 持久化 entrance→partner 映射（GET /space 成功后 / 记录本端 partnerId 时）。
+  /// 持久化 entrance→member 映射（GET /space 成功后 / 记录本端 memberId 时）。
   Future<void> _saveIdentityMap() async {
-    if (_partnerByEntrance.isEmpty) return;
+    if (_memberByEntrance.isEmpty) return;
     try {
       await db.into(db.appState).insertOnConflictUpdate(
             AppStateCompanion.insert(
-              key: _kEntrancePartnerMap,
-              value: jsonEncode(_partnerByEntrance),
+              key: _kEntranceMemberMap,
+              value: jsonEncode(_memberByEntrance),
             ),
           );
     } catch (_) {
@@ -166,63 +166,63 @@ class MessageRepository {
     }
   }
 
-  /// 拉取空间通道映射（partner_id）。映射缺失时 history 的 sender 判断降级为 entrance 维度。
+  /// 拉取空间通道映射（member_id）。映射缺失时 history 的 sender 判断降级为 entrance 维度。
   Future<void> refreshEntranceMap() async {
     final t = token;
     if (t == null) return;
     try {
       final space = await _withAutoAuth((tok) => api.getSpace(tok));
-      final seeded = _partnerByEntrance[entranceId]; // 构造函数种入的本端 partnerId
-      _partnerByEntrance
+      final seeded = _memberByEntrance[entranceId]; // 构造函数种入的本端 memberId
+      _memberByEntrance
         ..clear()
-        ..addEntries(space.entrances.map((d) => MapEntry(d.entranceId, d.partnerId)));
-      if (seeded != null && !_partnerByEntrance.containsKey(entranceId)) {
-        _partnerByEntrance[entranceId] = seeded; // 服务端列表缺本机时兜底保留
+        ..addEntries(space.entrances.map((d) => MapEntry(d.entranceId, d.memberId)));
+      if (seeded != null && !_memberByEntrance.containsKey(entranceId)) {
+        _memberByEntrance[entranceId] = seeded; // 服务端列表缺本机时兜底保留
       }
-      await _saveIdentityMap(); // 落盘：离线启动仍能按 partner 判定归属
+      await _saveIdentityMap(); // 落盘：离线启动仍能按 member 判定归属
     } catch (_) {
       // 网络抖动忽略：保留旧映射（无映射时降级 device 判断）
     }
   }
 
-  /// 消息是否本端（我）发送：**优先 partner 维度**——信封自带 senderPartnerId，
+  /// 消息是否本端（我）发送：**优先 member 维度**——信封自带 senderMemberId，
   /// 离线也拿得到；映射缺失再依次退到映射查表、entrance 维度。
   /// （旧实现只看 device：离线映射为空时，"同一身份其他通道"发的消息会被误判成
   /// 对方 → 气泡全左对齐——老板 2026-09-13 实测。）
   bool _isMineMessage(MessageEnvelope env) {
-    final myPartner = _partnerByEntrance[entranceId];
-    final senderPartner =
-        env.senderPartnerId ?? _partnerByEntrance[env.senderEntranceId];
-    if (myPartner != null && senderPartner != null) {
-      return myPartner == senderPartner;
+    final myMember = _memberByEntrance[entranceId];
+    final senderMember =
+        env.senderMemberId ?? _memberByEntrance[env.senderEntranceId];
+    if (myMember != null && senderMember != null) {
+      return myMember == senderMember;
     }
     return env.senderEntranceId == entranceId;
   }
 
-  /// 通道 → 用户（partner_id）查询（渲染兜底：旧版附件消息信封可能缺 senderPartnerId）。
-  String? partnerIdOfEntrance(String entranceId) => _partnerByEntrance[entranceId];
+  /// 通道 → 用户（member_id）查询（渲染兜底：旧版附件消息信封可能缺 senderMemberId）。
+  String? memberIdOfEntrance(String entranceId) => _memberByEntrance[entranceId];
 
-  /// 反查本机 partnerId（头像上传/缓存失效用）。
-  /// 优先构造时种入的值；缺失（PIN 解锁/明文直进等重启路径不传 partnerId）时
-  /// 从持久化的 entrance→partner 映射里取——离线启动也拿得到（与归属判定同源，
+  /// 反查本机 memberId（头像上传/缓存失效用）。
+  /// 优先构造时种入的值；缺失（PIN 解锁/明文直进等重启路径不传 memberId）时
+  /// 从持久化的 entrance→member 映射里取——离线启动也拿得到（与归属判定同源，
   /// 映射由 [refreshEntranceMap] 落盘）。都拿不到才返回 null。
-  Future<String?> resolveMyPartnerId() async {
-    final seeded = _partnerByEntrance[entranceId];
+  Future<String?> resolveMyMemberId() async {
+    final seeded = _memberByEntrance[entranceId];
     if (seeded != null && seeded.isNotEmpty) return seeded;
     await _ensureIdentityLoaded();
-    final pid = _partnerByEntrance[entranceId];
+    final pid = _memberByEntrance[entranceId];
     return (pid == null || pid.isEmpty) ? null : pid;
   }
 
-  /// 本空间的**对方** partner_id：持久化映射里"不是我"的那个。
+  /// 本空间的**对方** member_id：持久化映射里"不是我"的那个。
   ///
-  /// 用途：给 per-space 资料落一份对方的身份 id（`savePeerPartnerId`），
-  /// 否则"对方是谁"只能现算现丢，卡片就没法按 partner 维度取头像。
+  /// 用途：给 per-space 资料落一份对方的身份 id（`savePeerMemberId`），
+  /// 否则"对方是谁"只能现算现丢，卡片就没法按 member 维度取头像。
   /// 映射由 [refreshEntranceMap] 从服务端通道表落盘；拿不到（离线/映射为空/只有我一人）
   /// 返回 null —— 调用方保持不动即可。
-  String? resolvePeerPartnerId() {
-    final mine = _partnerByEntrance[entranceId];
-    for (final pid in _partnerByEntrance.values) {
+  String? resolvePeerMemberId() {
+    final mine = _memberByEntrance[entranceId];
+    for (final pid in _memberByEntrance.values) {
       if (pid.isNotEmpty && pid != mine) return pid;
     }
     return null;
@@ -251,7 +251,7 @@ class MessageRepository {
     FutureOr<void> Function(String messageId)? onPersisted,
   }) async {
     final messageId = _uuidv7();
-    await _ensureIdentityLoaded(); // 离线也要带上本端 partnerId（归属判定/展示用）
+    await _ensureIdentityLoaded(); // 离线也要带上本端 memberId（归属判定/展示用）
     // 引用/附加数据：载荷 = {"plaintext":…, "quote":…, "meta":…} JSON（AEAD 密文内，
     // Server 不可见；旧客户端/CLI 未识别时按整段 JSON 文本展示，仅影响这类消息）
     final payload = encodeMessagePayload(plaintext, quote: quote, meta: meta);
@@ -260,7 +260,7 @@ class MessageRepository {
       spaceKey: spaceKey,
       spaceId: spaceId,
       senderEntranceId: entranceId,
-      senderPartnerId: _partnerByEntrance[entranceId],
+      senderMemberId: _memberByEntrance[entranceId],
       messageId: messageId,
       type: type,
       keyVersion: keyVersion,
@@ -307,7 +307,7 @@ class MessageRepository {
   }) async {
     final messageId = _uuidv7();
     final attachmentId = _uuidv7();
-    await _ensureIdentityLoaded(); // 离线也要带上本端 partnerId（归属判定/展示用）
+    await _ensureIdentityLoaded(); // 离线也要带上本端 memberId（归属判定/展示用）
     final plain = caption ?? (type == 'voice' ? '🎤 语音消息' : '📎 $fileName');
 
     // 1) 加密文件（密文 + sha256 + nonce + size）
@@ -337,7 +337,7 @@ class MessageRepository {
       spaceKey: spaceKey,
       spaceId: spaceId,
       senderEntranceId: entranceId,
-      senderPartnerId: _partnerByEntrance[entranceId],
+      senderMemberId: _memberByEntrance[entranceId],
       messageId: messageId,
       type: type,
       keyVersion: keyVersion,
@@ -464,7 +464,7 @@ class MessageRepository {
     final rows = await _withAutoAuth((tok) => api.getReceipts(tok));
     for (final r in rows) {
       await upsertPeerReceipt(
-        partnerId: r.partnerId,
+        memberId: r.memberId,
         deliveredUptoSeq: r.deliveredUptoSeq,
         readUptoSeq: r.readUptoSeq,
         updatedAt: r.updatedAt,
@@ -473,19 +473,19 @@ class MessageRepository {
   }
 
   /// 落库一条对方回执（单调只前进——陈旧的重放不会把高水位拉低）。
-  /// 对方可能有多条通道，任一条通道上报即代表该 partner；这里取 max 合并。
+  /// 对方可能有多条通道，任一条通道上报即代表该 member；这里取 max 合并。
   Future<void> upsertPeerReceipt({
-    required String partnerId,
+    required String memberId,
     required int deliveredUptoSeq,
     required int readUptoSeq,
     int updatedAt = 0,
   }) async {
     final existing = await (db.select(db.peerReceipts)
-          ..where((r) => r.spaceId.equals(spaceId) & r.partnerId.equals(partnerId)))
+          ..where((r) => r.spaceId.equals(spaceId) & r.memberId.equals(memberId)))
         .getSingleOrNull();
     await db.into(db.peerReceipts).insertOnConflictUpdate(PeerReceiptsCompanion.insert(
           spaceId: spaceId,
-          partnerId: partnerId,
+          memberId: memberId,
           deliveredUptoSeq:
               Value(max(existing?.deliveredUptoSeq ?? 0, deliveredUptoSeq)),
           readUptoSeq: Value(max(existing?.readUptoSeq ?? 0, readUptoSeq)),
@@ -495,7 +495,7 @@ class MessageRepository {
         ));
   }
 
-  /// 本 space 的对方回执行（仅 peer partner——本端自己从不写这张表）。
+  /// 本 space 的对方回执行（仅 peer member——本端自己从不写这张表）。
   /// 对方的回执行（用于推导"我发出的消息"是否已送达/已读）。
   ///
   /// **必须排除我自己那一行**（老板 2026-09-13 实测的 bug）：`GET /receipts` 返回
@@ -507,9 +507,9 @@ class MessageRepository {
     final rows = await (db.select(db.peerReceipts)
           ..where((r) => r.spaceId.equals(spaceId)))
         .get();
-    final myPartnerId = _partnerByEntrance[entranceId];
-    if (myPartnerId == null) return rows;
-    return rows.where((r) => r.partnerId != myPartnerId).toList();
+    final myMemberId = _memberByEntrance[entranceId];
+    if (myMemberId == null) return rows;
+    return rows.where((r) => r.memberId != myMemberId).toList();
   }
 
   /// 推导自己某条消息的回执状态（纯函数，便于单测）。
@@ -702,9 +702,9 @@ class MessageRepository {
     return {for (final row in rows) row.messageId};
   }
 
-  /// 行 → 历史记录（解密 + 附件元数据 + partner 身份 + 阅后即焚到期）。
+  /// 行 → 历史记录（解密 + 附件元数据 + member 身份 + 阅后即焚到期）。
   Future<List<HistoryMessage>> _rowsToHistory(List<LocalMessage> rows) async {
-    await _ensureIdentityLoaded(); // 离线：用持久化的 entrance→partner 映射判定归属
+    await _ensureIdentityLoaded(); // 离线：用持久化的 entrance→member 映射判定归属
     final out = <HistoryMessage>[];
     for (final row in rows) {
       // 回填 server_sequence：本机发送的消息 ciphertext 落盘时无 seq（由 _markSent

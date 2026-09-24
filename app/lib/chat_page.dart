@@ -78,9 +78,9 @@ class ChatPage extends StatefulWidget {
     this.enableWs = true,
     this.reauth,
     this.escrowUpdatedAt,
-    this.partnerName, // 我的名字（登记时设置；菜单显示/修改）
+    this.memberName, // 我的名字（登记时设置；菜单显示/修改）
     this.entranceName, // 我的通道名（登记时自动获取；菜单显示/修改）
-    this.partnerId, // 我的 partnerId（头像上传/获取用）
+    this.memberId, // 我的 memberId（头像上传/获取用）
     this.peerName, // 对方名字（setup 探测传入；对话顶部条显示）
     this.publicKeyB64, // 通道公钥（b64，随锁包持久化；弹窗展示用）
     this.privateKeyB64, // 通道私钥（b64，随锁包持久化；补设锁写入新锁包）
@@ -97,13 +97,13 @@ class ChatPage extends StatefulWidget {
   final int? escrowUpdatedAt;
 
   /// 我的名字（向导登记时设置；顶栏菜单显示/修改，服务端同步）。
-  final String? partnerName;
+  final String? memberName;
 
   /// 我的通道名（向导登记时自动获取设备型号；顶栏菜单显示/修改，服务端同步）。
   final String? entranceName;
 
-  /// 我的 partnerId（向导登记时确定；头像上传/消息身份标识用）。
-  final String? partnerId;
+  /// 我的 memberId（向导登记时确定；头像上传/消息身份标识用）。
+  final String? memberId;
 
   /// 对方名字（向导探测时确定；对话顶部条显示，无则占位）。
   final String? peerName;
@@ -234,17 +234,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _attachmentStorage;
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
-  late String _myPartnerName; // 我的名字（菜单显示；改名后 setState 刷新）
+  late String _myMemberName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myEntranceName; // 我的通道名（菜单显示；改名后 setState 刷新）
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
   int? _mySlot; // 我的身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色判定用）
   int? _peerSlot; // 对方身份槽位（同上）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
-  /// 我的 partnerId（头像上传/缓存失效/归属判定用）：向导路径由 widget 传入；
-  /// 重启（PIN 解锁/明文直进）路径 widget.partnerId 为空 → 运行时反查补齐
+  /// 我的 memberId（头像上传/缓存失效/归属判定用）：向导路径由 widget 传入；
+  /// 重启（PIN 解锁/明文直进）路径 widget.memberId 为空 → 运行时反查补齐
   /// （见 [_loadMyAvatar] / [_refreshProfileFromServer]）。
-  String? _myPartnerId;
+  String? _myMemberId;
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
@@ -495,14 +495,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    _myPartnerName = widget.partnerName ?? '';
+    _myMemberName = widget.memberName ?? '';
     _myEntranceName = widget.entranceName ?? '';
     _myGender = ''; // 个人资料弹窗性别图标：由 profile 恢复（向导完成时写入）
     _peerGender = ''; // 消息气泡配色：由 profile 恢复（向导完成时写入）
     _mySlot = null; // 身份槽位（0=第一人/1=第二人）：由 profile 恢复 + /space 校正
     _peerSlot = null;
     _peerName = widget.peerName ?? '';
-    _myPartnerId = widget.partnerId; // 向导路径已知；重启路径为 null → 稍后反查补齐
+    _myMemberId = widget.memberId; // 向导路径已知；重启路径为 null → 稍后反查补齐
     _refreshPeerOnline();
     _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
     WidgetsBinding.instance.addObserver(this);
@@ -513,7 +513,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     AppLockService(db).loadProfile(spaceId: widget.spaceId).then((p) {
       if (!mounted) return;
       setState(() {
-        if (_myPartnerName.isEmpty) _myPartnerName = p['partnerName'] as String? ?? '';
+        if (_myMemberName.isEmpty) _myMemberName = p['memberName'] as String? ?? '';
         if (_myEntranceName.isEmpty) _myEntranceName = p['entranceName'] as String? ?? '';
         if (_peerName.isEmpty) _peerName = p['peerName'] as String? ?? '';
         if (_myGender.isEmpty) _myGender = p['myGender'] as String? ?? '';
@@ -535,11 +535,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       token: widget.token,
       settings: BurnAfterSettings(db, spaceId: widget.spaceId),
       reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
-      // 本端 partnerId（向导登记时确定）：种入归属判定映射，离线启动也能
-      // 按 partner 维度分左右分栏（服务器离线拉不到 entrance→partner 映射）
-      partnerId: widget.partnerId,
+      // 本端 memberId（向导登记时确定）：种入归属判定映射，离线启动也能
+      // 按 member 维度分左右分栏（服务器离线拉不到 entrance→member 映射）
+      memberId: widget.memberId,
     );
-    // 头像加载要在 _repo 就绪后（重启路径要靠它反查本机 partnerId）
+    // 头像加载要在 _repo 就绪后（重启路径要靠它反查本机 memberId）
     _loadMyAvatar();
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
@@ -584,8 +584,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void _onPeerStatus(WsPeerStatusEvent event) {
     if (event.entranceId == widget.entranceId) return; // 本通道自身的事件忽略
     // 与我同身份的通道（我自己的另一条）不算"对方"（新服务端已不推这类广播，
-    // 这里兜住旧服务端——旧 payload 无 partner_id 时按原行为处理）
-    if (event.partnerId != null && event.partnerId == widget.partnerId) return;
+    // 这里兜住旧服务端——旧 payload 无 member_id 时按原行为处理）
+    if (event.memberId != null && event.memberId == widget.memberId) return;
     final online = event.type == kWsTypePeerOnline;
     // 对方刚上线（多半是刚加入本空间）：initState 那次 /space 只有我一人，
     // 对方的名字/性别/身份槽位都还是空 → 同性别两人气泡会是同一个颜色
@@ -604,10 +604,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方改名/换头像（Server 广播 profile.updated）：立即更新顶部条对方名；
   /// 头像则让缓存失效重拉（广播由改名或 POST /avatar 触发）。
   void _onProfileUpdated(WsProfileUpdatedEvent event) {
-    // 头像：无论改名还是换头像都刷一次（同一 per-partner 头像文件可能已变）
-    _MessageAvatarState.invalidate(event.partnerId);
+    // 头像：无论改名还是换头像都刷一次（同一 per-member 头像文件可能已变）
+    _MessageAvatarState.invalidate(event.memberId);
     _refreshProfileFromServer();
-    final name = event.partnerName;
+    final name = event.memberName;
     if (name == null || name.isEmpty || !mounted) return;
     setState(() => _peerName = name);
   }
@@ -617,60 +617,60 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void _onReceiptUpdated(WsReceiptUpdatedEvent event) {
     unawaited(_repo
         .upsertPeerReceipt(
-          partnerId: event.partnerId,
+          memberId: event.memberId,
           deliveredUptoSeq: event.deliveredUptoSeq,
           readUptoSeq: event.readUptoSeq,
         )
         .then((_) => _loadPeerReceipts()));
   }
 
-  /// 从服务端校正双方名字与性别（GET /space 的 partnerNames/partnerGenders）。
+  /// 从服务端校正双方名字与性别（GET /space 的 memberNames/memberGenders）。
   /// 本机 profile 只是入网时的快照：对方改名后若没收到广播（或广播前就重启），
   /// App 会一直显示旧名字（老板 2026-09-11 实测）；性别同理（v2 早期把对方性别
   /// 写死空串 → 气泡回退灰色）。启动与收到 profile.updated 时调用
-  /// （对齐 CLI 的 _refreshPartnerNames）。
+  /// （对齐 CLI 的 _refreshMemberNames）。
   Future<void> _refreshProfileFromServer() async {
     if (!mounted || widget.token.isEmpty || effectiveServer.isEmpty) return;
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
       final space = await api.getSpace(widget.token);
-      // 重启（PIN 解锁）路径不传 partnerId（main.dart 只还原明文 payload）——
+      // 重启（PIN 解锁）路径不传 memberId（main.dart 只还原明文 payload）——
       // 从 /space 的通道表里按 entranceId 反查，否则拿不到"我"，校正无从下手
-      var mine = widget.partnerId;
+      var mine = widget.memberId;
       if (mine == null || mine.isEmpty) {
         for (final d in space.entrances) {
           if (d.entranceId == widget.entranceId) {
-            mine = d.partnerId;
+            mine = d.memberId;
             break;
           }
         }
       }
       if (mine == null || mine.isEmpty) return;
-      // 反查到的本机 partnerId 落地：头像加载/上传后的缓存失效都要用它
-      // （重启路径 widget.partnerId 为空，否则上传头像后消息流不刷新）
-      final mineChanged = _myPartnerId != mine;
-      _myPartnerId = mine;
-      // 启动时没有 partnerId（重启路径）或反查值与服务器不一致 → 重拉头像
+      // 反查到的本机 memberId 落地：头像加载/上传后的缓存失效都要用它
+      // （重启路径 widget.memberId 为空，否则上传头像后消息流不刷新）
+      final mineChanged = _myMemberId != mine;
+      _myMemberId = mine;
+      // 启动时没有 memberId（重启路径）或反查值与服务器不一致 → 重拉头像
       if ((mineChanged || _myAvatarBytes == null) && mounted) unawaited(_loadMyAvatar());
-      final myG = space.partnerGenders[mine] ?? '';
+      final myG = space.memberGenders[mine] ?? '';
       var peerG = '';
       var peerName = '';
       var peerId = '';
-      for (final entry in space.partnerNames.entries) {
+      for (final entry in space.memberNames.entries) {
         if (entry.key == mine) continue;
         peerName = entry.value;
-        peerG = space.partnerGenders[entry.key] ?? '';
+        peerG = space.memberGenders[entry.key] ?? '';
         peerId = entry.key;
         break;
       }
-      final myName = space.partnerNames[mine] ?? '';
+      final myName = space.memberNames[mine] ?? '';
       // 身份槽位（0=第一人/创建者，1=第二人）：同性别第二人气泡取青色的判据
-      // （老服务端 partner_slots 为空表 → 保持 null，不启用青色）
-      final mySlot = space.partnerSlots[mine];
-      final peerSlot = peerId.isEmpty ? null : space.partnerSlots[peerId];
+      // （老服务端 member_slots 为空表 → 保持 null，不启用青色）
+      final mySlot = space.memberSlots[mine];
+      final peerSlot = peerId.isEmpty ? null : space.memberSlots[peerId];
       if (!mounted) return;
       setState(() {
-        if (myName.isNotEmpty) _myPartnerName = myName;
+        if (myName.isNotEmpty) _myMemberName = myName;
         if (peerName.isNotEmpty) _peerName = peerName;
         if (myG.isNotEmpty) _myGender = myG;
         if (peerG.isNotEmpty) _peerGender = peerG;
@@ -681,7 +681,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // （setState 只覆盖非空值，故不会把已有名字写成空）；按 spaceId 写，仅落当前空间
       await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
         spaceId: widget.spaceId,
-        partnerName: _myPartnerName,
+        memberName: _myMemberName,
         peerName: _peerName,
         entranceName: _myEntranceName,
         myGender: _myGender,
@@ -1321,20 +1321,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final api = widget.api ?? ApiClient(effectiveServer);
       final entrances = await api.listEntrances(widget.token);
       final now = DateTime.now().millisecondsSinceEpoch;
-      // 在线是"人"维度的：同一 partner 的其它通道是我自己开的通道，不算对方
-      // （重启路径不传 partnerId → 从通道表里按本通道反查；查不到才退回按通道判定）
-      var mine = widget.partnerId;
+      // 在线是"人"维度的：同一 member 的其它通道是我自己开的通道，不算对方
+      // （重启路径不传 memberId → 从通道表里按本通道反查；查不到才退回按通道判定）
+      var mine = widget.memberId;
       if (mine == null || mine.isEmpty) {
         for (final d in entrances) {
           if (d['entrance_id'] == widget.entranceId) {
-            mine = d['partner_id'] as String?;
+            mine = d['member_id'] as String?;
             break;
           }
         }
       }
       final peer = entrances.where((d) {
         if (d['entrance_id'] == widget.entranceId) return false;
-        final pid = d['partner_id'] as String?;
+        final pid = d['member_id'] as String?;
         if (pid == null || mine == null || mine.isEmpty) return true;
         return pid != mine;
       }).toList();
@@ -1355,32 +1355,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 加载我的头像（异步；未设置/失败 → 保持默认图标）。
-  /// partnerId 缺失时（重启路径）从本地持久化的 entrance→partner 映射反查。
-  /// 把"本空间对方是谁"（partner_id）落进 per-space 资料，与 peerName 并列。
+  /// memberId 缺失时（重启路径）从本地持久化的 entrance→member 映射反查。
+  /// 把"本空间对方是谁"（member_id）落进 per-space 资料，与 peerName 并列。
   ///
-  /// 为什么要在 `refreshEntranceMap()` 之后做：对方的 partner_id 只在那份通道表映射里
-  /// 出现过（服务端 `GET /space` 的 `entranceId → partnerId`，排掉自己就是对方），
+  /// 为什么要在 `refreshEntranceMap()` 之后做：对方的 member_id 只在那份通道表映射里
+  /// 出现过（服务端 `GET /space` 的 `entranceId → memberId`，排掉自己就是对方），
   /// 而映射只在内存 + 一张全局表里，**没有"按空间"的落点**。不落的话，切换秘境弹层的卡片
   /// 就只能显示默认头像——明明有对方名字却不知道对方是谁（老板 2026-09-23 指出）。
   ///
   /// best-effort：拿不到（离线/只有我一人）就什么都不做，卡片保持默认头像。
-  Future<void> _persistPeerPartnerId() async {
-    final pid = _repo.resolvePeerPartnerId();
+  Future<void> _persistPeerMemberId() async {
+    final pid = _repo.resolvePeerMemberId();
     if (pid == null || pid.isEmpty) return;
     try {
       await AppLockService(widget.db ?? LocalDatabase.shared)
-          .savePeerPartnerId(spaceId: widget.spaceId, peerPartnerId: pid);
+          .savePeerMemberId(spaceId: widget.spaceId, peerMemberId: pid);
     } catch (_) {
       // 落盘失败不影响聊天；下次刷新再试
     }
   }
 
   Future<void> _loadMyAvatar() async {
-    var pid = _myPartnerId;
+    var pid = _myMemberId;
     if (pid == null || pid.isEmpty) {
-      pid = await _repo.resolveMyPartnerId();
+      pid = await _repo.resolveMyMemberId();
       if (pid == null || pid.isEmpty) return;
-      _myPartnerId = pid;
+      _myMemberId = pid;
     }
     if (!mounted) return;
     try {
@@ -1392,7 +1392,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 修改我的头像：选图 → 上传服务端（per-partner 覆盖）→ 本地缓存刷新菜单显示。
+  /// 修改我的头像：选图 → 上传服务端（per-member 覆盖）→ 本地缓存刷新菜单显示。
   Future<void> _showAvatarUpload() async {
     final l10n = AppLocalizations.of(context)!;
     final picked = await FilePicker.pickFiles(type: FileType.image);
@@ -1407,16 +1407,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      // 服务端在上传响应里回 partner_id：上传方收不到自己的 profile.updated 广播，
-      // 这个返回值是失效本端头像缓存最可靠的依据（重启路径 widget.partnerId 为空，
+      // 服务端在上传响应里回 member_id：上传方收不到自己的 profile.updated 广播，
+      // 这个返回值是失效本端头像缓存最可靠的依据（重启路径 widget.memberId 为空，
       // 旧实现 invalidate(null) 静默失效失败 — 老板 2026-09-16 报告）
-      final partnerId = await api.uploadAvatar(bytes, widget.token);
+      final memberId = await api.uploadAvatar(bytes, widget.token);
       // 服务端回的是权威值；响应异常/旧服务端缺字段 → 退到本地反查
-      final pid = (partnerId != null && partnerId.isNotEmpty)
-          ? partnerId
-          : (_myPartnerId ?? await _repo.resolveMyPartnerId());
+      final pid = (memberId != null && memberId.isNotEmpty)
+          ? memberId
+          : (_myMemberId ?? await _repo.resolveMyMemberId());
       if (!mounted) return;
-      if (pid != null && pid.isNotEmpty) _myPartnerId = pid;
+      if (pid != null && pid.isNotEmpty) _myMemberId = pid;
       // 消息流里的头像走静态缓存：主动失效才会重拉（否则要重启才更新）
       _MessageAvatarState.invalidate(pid);
       setState(() => _myAvatarBytes = bytes);
@@ -1430,7 +1430,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 修改我的名字/通道名称（服务端同步 + 本地刷新菜单显示）。
   Future<void> _showRenameDialog({required bool renameEntrance}) async {
     final l10n = AppLocalizations.of(context)!;
-    final ctrl = TextEditingController(text: renameEntrance ? _myEntranceName : _myPartnerName);
+    final ctrl = TextEditingController(text: renameEntrance ? _myEntranceName : _myMemberName);
     // 公钥只读展示（我的通道弹窗）：静态文本控制器，随对话框关闭释放
     final pubKeyCtrl = TextEditingController(
       text: widget.publicKeyB64 ?? l10n.chatPageEntrancePublicKeyFailed,
@@ -1596,10 +1596,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               }
               // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
               if (!renameEntrance) {
-                final violation = checkPartnerNamePolicy(name);
+                final violation = checkMemberNamePolicy(name);
                 if (violation != null) {
-                  nameError.value = violation == PartnerNameViolation.tooLong
-                      ? l10n.chatPageRenameNameTooLongError(kPartnerNameMaxLength)
+                  nameError.value = violation == MemberNameViolation.tooLong
+                      ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
                       : l10n.chatPageRenameNameInvalidError;
                   return;
                 }
@@ -1615,12 +1615,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   await api.updateEntranceName(name, widget.token);
                   _myEntranceName = name;
                 } else {
-                  await api.updatePartnerName(name, widget.token);
-                  _myPartnerName = name;
+                  await api.updateMemberName(name, widget.token);
+                  _myMemberName = name;
                 }
                 // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
                 // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
-                // app 菜单改名后退出重进回到 partnerB）
+                // app 菜单改名后退出重进回到 memberB）
                 await _saveProfile();
                 if (ctx.mounted) Navigator.of(ctx).pop(true);
               } catch (e) {
@@ -1652,7 +1652,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _saveProfile() async {
     await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
       spaceId: widget.spaceId,
-      partnerName: _myPartnerName,
+      memberName: _myMemberName,
       peerName: _peerName,
       entranceName: _myEntranceName,
       myGender: _myGender,
@@ -1877,7 +1877,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         unawaited(AttachmentStore.deleteFor(widget.spaceId, id)); // stored 模式的留存明文同样要删
       }
       await _repo.refreshEntranceMap();
-      await _persistPeerPartnerId();
+      await _persistPeerMemberId();
       final recent = await _repo.historyRecent(limit: _pageSize);
       if (!mounted) return;
       setState(() => _messages = recent);
@@ -2177,7 +2177,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     try {
       await _repo.sync();
       await _repo.refreshEntranceMap();
-      await _persistPeerPartnerId();
+      await _persistPeerMemberId();
       // 同步时顺带拉了对方回执（repo.sync 内）→ 载入渲染缓存
       await _loadPeerReceipts();
       await _refreshLocal(realtime: realtime);
@@ -2257,7 +2257,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (!mounted) return;
       final changed = rows.length != _peerReceipts.length ||
           Iterable.generate(rows.length).any((i) =>
-              rows[i].partnerId != _peerReceipts[i].partnerId ||
+              rows[i].memberId != _peerReceipts[i].memberId ||
               rows[i].deliveredUptoSeq != _peerReceipts[i].deliveredUptoSeq ||
               rows[i].readUptoSeq != _peerReceipts[i].readUptoSeq);
       if (changed) setState(() => _peerReceipts = rows);
@@ -2553,8 +2553,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 2026-09-10 修复）。
   Widget _buildMessagePreviewRow(HistoryMessage m) {
     final mine = m.sender == 'me';
-    final avatarPartnerId =
-        m.env.senderPartnerId ?? _repo.partnerIdOfEntrance(m.env.senderEntranceId);
+    final avatarMemberId =
+        m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
     final preview = m.plaintext.trim();
     // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长，可点按播放
     // （老板要求 2026-09-13）；文件消息显示文件图标 + 文件名（老板要求 2026-09-15）；
@@ -2614,7 +2614,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             children: [
               if (!mine) ...[
                 _MessageAvatar(
-                    partnerId: avatarPartnerId, server: effectiveServer, api: widget.api),
+                    memberId: avatarMemberId, server: effectiveServer, api: widget.api),
                 const SizedBox(width: 8),
               ],
               Flexible(
@@ -2637,7 +2637,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               if (mine) ...[
                 const SizedBox(width: 8),
                 _MessageAvatar(
-                    partnerId: avatarPartnerId, server: effectiveServer, api: widget.api),
+                    memberId: avatarMemberId, server: effectiveServer, api: widget.api),
               ],
             ],
           ),
@@ -4052,7 +4052,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuMyNameLabel, style: captionStyle),
                       const Spacer(),
-                      _menuValue(_myPartnerName.isEmpty ? l10n.chatPageNameUnset : _myPartnerName, valueStyle),
+                      _menuValue(_myMemberName.isEmpty ? l10n.chatPageNameUnset : _myMemberName, valueStyle),
                     ],
                   ),
                 ),
@@ -4225,9 +4225,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          if (_myPartnerName.isNotEmpty) ...[
+                          if (_myMemberName.isNotEmpty) ...[
                             Flexible(
-                              child: Text(_myPartnerName,
+                              child: Text(_myMemberName,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.end,
@@ -4259,9 +4259,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               itemBuilder: (context, i) {
                 final m = _messages[i];
                 final mine = m.sender == 'me';
-                // 头像 partnerId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底
-                final avatarPartnerId =
-                    m.env.senderPartnerId ?? _repo.partnerIdOfEntrance(m.env.senderEntranceId);
+                // 头像 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底
+                final avatarMemberId =
+                    m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Row(
@@ -4270,7 +4270,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 每条消息前放置发送者头像（点击有头像时放大全屏查看）
                       if (!mine)
                         _MessageAvatar(
-                            partnerId: avatarPartnerId, server: effectiveServer, api: widget.api),
+                            memberId: avatarMemberId, server: effectiveServer, api: widget.api),
                       const SizedBox(width: 6),
                       GestureDetector(
                         // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
@@ -4400,7 +4400,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       if (mine) ...[
                         const SizedBox(width: 6),
                         _MessageAvatar(
-                            partnerId: avatarPartnerId, server: effectiveServer, api: widget.api),
+                            memberId: avatarMemberId, server: effectiveServer, api: widget.api),
                       ],
                     ],
                   ),
@@ -5198,12 +5198,12 @@ class _WaveformPainter extends CustomPainter {
       oldDelegate.inactiveColor != inactiveColor;
 }
 
-/// 消息发送者头像：按 partnerId 从服务端加载（静态缓存避免重复请求），
+/// 消息发送者头像：按 memberId 从服务端加载（静态缓存避免重复请求），
 /// 未设置/加载失败显示默认图标；点击有头像时放大到全屏查看。
 class _MessageAvatar extends StatefulWidget {
-  const _MessageAvatar({this.partnerId, required this.server, this.api});
+  const _MessageAvatar({this.memberId, required this.server, this.api});
 
-  final String? partnerId;
+  final String? memberId;
   final String server;
   final ApiClient? api;
 
@@ -5212,24 +5212,24 @@ class _MessageAvatar extends StatefulWidget {
 }
 
 class _MessageAvatarState extends State<_MessageAvatar> {
-  static final Map<String, Uint8List> _cache = {}; // partnerId → 头像 bytes
+  static final Map<String, Uint8List> _cache = {}; // memberId → 头像 bytes
 
-  /// 头像失效广播（partnerId）：通知当前在树上的头像重拉——否则静态缓存只在
+  /// 头像失效广播（memberId）：通知当前在树上的头像重拉——否则静态缓存只在
   /// 进程内有效，换了头像要重启 App 才看得到（老板 2026-09-11）。
   static final ValueNotifier<String?> invalidated = ValueNotifier<String?>(null);
 
   /// 让某人的头像失效：上传本人头像 / 收到对方 profile.updated 时调用。
-  static void invalidate(String? partnerId) {
-    if (partnerId == null || partnerId.isEmpty) return;
-    invalidated.value = partnerId;
+  static void invalidate(String? memberId) {
+    if (memberId == null || memberId.isEmpty) return;
+    invalidated.value = memberId;
   }
 
-  Uint8List? get _bytes => widget.partnerId == null ? null : _cache[widget.partnerId];
+  Uint8List? get _bytes => widget.memberId == null ? null : _cache[widget.memberId];
 
   @override
   void initState() {
     super.initState();
-    final pid = widget.partnerId;
+    final pid = widget.memberId;
     if (pid != null && !_cache.containsKey(pid)) {
       _load(pid);
     }
@@ -5243,19 +5243,19 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   }
 
   void _onInvalidated() {
-    final pid = widget.partnerId;
+    final pid = widget.memberId;
     if (pid == null || invalidated.value != pid) return;
     _load(pid); // 覆盖旧缓存后再 setState（不先清空——避免闪成默认图标）
   }
 
-  Future<void> _load(String partnerId) async {
+  Future<void> _load(String memberId) async {
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      final bytes = await api.getAvatar(partnerId);
+      final bytes = await api.getAvatar(memberId);
       if (bytes == null) return;
       // 缓存写入不看 mounted：失效广播时未挂载的实例（滚出屏幕被回收）若丢弃结果，
       // 静态缓存会一直留着旧图，滚动回来 initState 见缓存命中也不再重拉
-      _cache[partnerId] = bytes;
+      _cache[memberId] = bytes;
       if (mounted) setState(() {});
     } catch (_) {
       // 网络失败：保持默认图标

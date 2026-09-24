@@ -13,7 +13,7 @@ export interface MessageEnvelope {
   key_version: number;
   message_id: string;
   sender_entrance_id: string;
-  sender_partner_id?: string;
+  sender_member_id?: string;
   nonce: string;
   ciphertext: string;
 }
@@ -39,9 +39,9 @@ function validateEnvelope(body: unknown): MessageEnvelope {
   // P1 路径遍历防御：message_id 会被客户端当作文件路径片段（App 媒体解密缓存
   // 按 message_id 拼缓存文件名）——此前只查了"非空字符串"（老板 2026-09-14）
   assertSafeMessageId(b.message_id);
-  const sp = b.sender_partner_id;
+  const sp = b.sender_member_id;
   if (sp !== undefined && typeof sp !== "string") {
-    throw new ApiError("INVALID_REQUEST", "invalid sender_partner_id", 400);
+    throw new ApiError("INVALID_REQUEST", "invalid sender_member_id", 400);
   }
   return {
     v: b.v,
@@ -49,7 +49,7 @@ function validateEnvelope(body: unknown): MessageEnvelope {
     key_version: b.key_version,
     message_id: b.message_id,
     sender_entrance_id: b.sender_entrance_id,
-    ...(sp !== undefined ? { sender_partner_id: sp as string } : {}),
+    ...(sp !== undefined ? { sender_member_id: sp as string } : {}),
     nonce: b.nonce,
     ciphertext: b.ciphertext,
   };
@@ -92,9 +92,9 @@ export function postMessage(token: string, body: unknown): { message_id: string;
     .get(spaceId) as { next: number };
 
   db.prepare(
-    `INSERT INTO messages (message_id, space_id, sender_entrance_id, sender_partner_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
+    `INSERT INTO messages (message_id, space_id, sender_entrance_id, sender_member_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(env.message_id, spaceId, env.sender_entrance_id, env.sender_partner_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
+  ).run(env.message_id, spaceId, env.sender_entrance_id, env.sender_member_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
 
   return { message_id: env.message_id, server_sequence: nextSeq.next, created_at: now };
 }
@@ -113,7 +113,7 @@ export function syncMessages(
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT message_id, sender_entrance_id, sender_partner_id, type, key_version, nonce, ciphertext, server_sequence, created_at
+      `SELECT message_id, sender_entrance_id, sender_member_id, type, key_version, nonce, ciphertext, server_sequence, created_at
        FROM messages WHERE space_id = ? AND server_sequence > ?
        ORDER BY server_sequence ASC LIMIT ?`
     )

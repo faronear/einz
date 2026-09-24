@@ -12,7 +12,7 @@
 ## 0. 文档约定
 
 - 状态标记：`[待评审]`、`[待开发]`、`[已实现]` 区分设想与现实，避免混淆。
-- 术语：`person` = 真人（将来）；`entrance` = 通道（登记项）；`partner` = 秘境内的身份；Space = 空间（一个 Space 恰含两个 partner）。
+- 术语：`person` = 真人（将来）；`entrance` = 通道（登记项）；`member` = 秘境内的身份；Space = 空间（一个 Space 恰含两个 member）。
 - 配套记忆文档：`aimemo/projectPlan.md`（开发计划）、`aimemo/worklog.md`（工作日志）、`aimemo/userProfile.md`（老板画像）。
 - 每个事实只在本文档出现一次，详细规格一律下沉到 `docs/` 专项文档。
 
@@ -72,31 +72,31 @@ Einz 是一个专门为**两个确定的人**设计的私密通信与共享私�
 | 实体 | 定义 | 关键约束 |
 | ---------- | -------------------------- | ----------------------------------- |
 | **秘境（Space）** | 两位伴侣的私有空间 | 一台服务器上可有**多个**（多租户，不再是全系统唯一） |
-| **伴侣身份（member，原 `partner_id`）** | 秘境里的一个槽位身份（slot 0 = 创建者 / 1 = 第二人） | 每个秘境**恰好两个**；同一真人在不同秘境各有一个，**跨秘境不等同** |
+| **伴侣身份（member，原 `partner_id`；更早 `person_id`）** | 秘境里的一个槽位身份（slot 0 = 创建者 / 1 = 第二人） | 每个秘境**恰好两个**；同一真人在不同秘境各有一个，**跨秘境不等同** |
 | **登记项（entry，原 `entrance_id`）** | 某安装在某秘境的一次登记：一套密钥对 + 一个身份 | 由 create/join **动态登记**（静态白名单早已废除） |
 | **安装（install，`install_uid`）** | 一台机器上的一份 App/TUI 部署 | 可同时持有**多个**秘境；服务端据此把多行认成同一台机器 |
-| **真人（person）** | 真实的人（产品概念） | **目前没有全局标识**；"一个真人一个 `partner_id`"是将来项（见 `renamePlan.zhcn.md`） |
+| **真人（person）** | 真实的人（产品概念） | **目前没有全局标识**；"一个真人一个 `member_id`"是将来项（见 `renamePlan.zhcn.md`） |
 | Message / Attachment | 消息 / 大文件附件（图/视频/语音） | 密文存储 / 独立加密 blob，消息只存元数据 |
 
 ### 2.2 真人（person）与通道（entrance）分离
 
-> 命名已随 `docs/GLOSSARY.md` 定稿：本文里的 "Person" 现在叫**秘境内的身份（`partner`）**，
+> 命名已随 `docs/GLOSSARY.md` 定稿：本文里的 "Person" 现在叫**秘境内的身份（`member`）**，
 > "Device" 拆成**登记项/通道（`entrance`）**与**安装（`install`）**两层。
 > 分离的**原则不变**，只是层更细（2026-09-23 代码/wire 已全量改名）。
 
-身份（`partner`）与通道（`entrance`）**不是一个概念**，数据库设计不得合并：
+身份（`member`）与通道（`entrance`）**不是一个概念**，数据库设计不得合并：
 
 ```text
 Space
-├── partner A（身份槽位 0 = 创建者）
+├── member A（身份槽位 0 = 创建者）
 │     ├── entrance A1   ← V1：一身份一通道
 │     └── entrance A2   ← 预留
-└── partner B（身份槽位 1 = 第二人）
+└── member B（身份槽位 1 = 第二人）
       └── entrance B1
 ```
 
-- **V1 约束：一个 `partner` = 一个活跃 `entrance`。**
-- 预留扩展：一个 `partner` = 多个 `entrance`（影响同步协议与密钥包装，见 §4、§9）。
+- **V1 约束：一个 `member` = 一个活跃 `entrance`。**
+- 预留扩展：一个 `member` = 多个 `entrance`（影响同步协议与密钥包装，见 §4、§9）。
 
 ### 2.3 "永远两个人"的服务端强制：静态白名单
 
@@ -363,7 +363,7 @@ Repositories（SQLite + File Storage）
 - **数据模型要点：**（固定两人一空间，`spaces` / `space_members` 表不再需要，由配置文件表达）
 
 ```text
-config.json：{ space_id, entrances: [{entrance_id, partner_id, public_key, status}] }
+config.json：{ space_id, entrances: [{entrance_id, member_id, public_key, status}] }
 messages(id, space_id, sender_entrance_id, type, key_version, nonce, ciphertext,
          created_at, server_sequence)   ← server_sequence 为 per-space 单调序列
 attachments(id, message_id, storage_path, encrypted_size, sha256, key_version, created_at)
@@ -408,7 +408,7 @@ sync_state(...)                          ← 客户端增量同步锚点
   - 客户端：AppDelegate（iOS）已注册通知、`chat_page._registerPushToken()` 已调 `POST /push/register`；
     Android 侧**无**任何推送依赖（pubspec / Manifest 都干净）。
   - Server：`sendPushHint()` **仍为日志占位**（无 APNs/FCM 实际发送），且当前**无人调用**。
-  - 已按 Space 收敛（2026-09-14 修）：`sendPushHint` 经 `partner_id → space_members` 只投同 Space
+  - 已按 Space 收敛（2026-09-14 修）：`sendPushHint` 经 `member_id → space_members` 只投同 Space
     的在用通道——此前只排自己，接上真推送就会把提示推给**所有空间**的通道。
     真要接推送前的缺口见 `docs/IOS.md` §4.2（iOS：Push capability + entitlements + 服务端 APNs .p8；
     Android：国行 ROM 需厂商通道/聚合 SDK）。

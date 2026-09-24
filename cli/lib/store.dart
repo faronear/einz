@@ -18,8 +18,8 @@ class EntranceStore {
     this.entranceId,
     required this.publicKey,
     required this.privateKey,
-    this.partnerId,
-    this.partnerName,
+    this.memberId,
+    this.memberName,
     this.peerName,
     this.entranceName,
     this.spaceKey,
@@ -35,30 +35,30 @@ class EntranceStore {
     this.lastReportedDeliveredSeq = 0,
     this.lastReportedReadSeq = 0,
     this.escrowUploaded = false,
-    Map<String, String>? partnerNames,
-    Map<String, String>? partnerGenders,
-    Map<String, int>? partnerSlots,
+    Map<String, String>? memberNames,
+    Map<String, String>? memberGenders,
+    Map<String, int>? memberSlots,
     List<String>? pending,
     List<Map<String, dynamic>>? history,
     List<Map<String, dynamic>>? attachments,
-  })  : partnerNames = partnerNames ?? {},
-        partnerGenders = partnerGenders ?? {},
-        partnerSlots = partnerSlots ?? {},
+  })  : memberNames = memberNames ?? {},
+        memberGenders = memberGenders ?? {},
+        memberSlots = memberSlots ?? {},
         pending = pending ?? [],
         history = history ?? [],
         attachments = attachments ?? [];
 
-  String? entranceId; // 规范通道 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 partnerId 一致）
+  String? entranceId; // 规范通道 id（dev1/dev2…），登记后由服务端返回写入；登记前为 null（与 memberId 一致）
   final String publicKey; // base64
   final String privateKey; // base64（测试用明文存储）
-  String? partnerId; // 空间内身份 id（v2：createSpace 返回 creatorPartnerId / joinSpace 返回 partnerId，均为 UUID）
+  String? memberId; // 空间内身份 id（v2：createSpace 返回 creatorMemberId / joinSpace 返回 memberId，均为 UUID）
   int? slot; // 本通道在空间里的身份槽位（0=创建者/第一人，1=伴侣/第二人；v2 create/join 返回）
-  String? partnerName; // 使用者自定义名称（如 lukas），显示层用
+  String? memberName; // 使用者自定义名称（如 lukas），显示层用
 
   /// 对方（另一身份）名字：create 录入的伴侣名 / join 时另一身份槽位的名字。
-  /// 对方**尚未加入**时空间里还没有他的 partner_id，GET /space 的 partner 表拿不到
+  /// 对方**尚未加入**时空间里还没有他的 member_id，GET /space 的 member 表拿不到
   /// 这个名字 → 顶部条用本字段兜底（否则刚创建/刚加入后一直显示 '-'；老板 2026-09-16）。
-  /// 对方加入后以其真实名字为准（partnerNames 优先），本字段只是离线/未加入时的兜底。
+  /// 对方加入后以其真实名字为准（memberNames 优先），本字段只是离线/未加入时的兜底。
   String? peerName;
 
   String? entranceName; // 通道自定义名称（如 MacBook），显示层用
@@ -88,17 +88,17 @@ class EntranceStore {
   /// 创建者口令密保箱是否已上传（escrow）：引导中断后重启据此再进引导设置口令。
   bool escrowUploaded;
 
-  /// 空间成员名称缓存（partner_id → partnerName）：GET /space 成功后落盘。
+  /// 空间成员名称缓存（member_id → memberName）：GET /space 成功后落盘。
   /// 服务器离线启动时仍能显示正确名字/对方身份（否则回退"对方"）。
-  Map<String, String> partnerNames;
+  Map<String, String> memberNames;
 
-  /// 空间成员性别缓存（partner_id → male/female）：同上，离线启动仍能按性别配色
+  /// 空间成员性别缓存（member_id → male/female）：同上，离线启动仍能按性别配色
   /// （否则所有气泡回退青绿——老板 2026-09-13）。
-  Map<String, String> partnerGenders;
+  Map<String, String> memberGenders;
 
-  /// 空间成员槽位缓存（partner_id → 0=第一人/创建者，1=第二人/伴侣）：
-  /// 同性别时第二人气泡取青色（GET /space 的 partner_slots，离线兜底用）。
-  Map<String, int> partnerSlots;
+  /// 空间成员槽位缓存（member_id → 0=第一人/创建者，1=第二人/伴侣）：
+  /// 同性别时第二人气泡取青色（GET /space 的 member_slots，离线兜底用）。
+  Map<String, int> memberSlots;
 
   /// 离线发送队列：MessageEnvelope 的 JSON 字符串（已加密，落盘安全）。
   final List<String> pending;
@@ -134,9 +134,9 @@ class EntranceStore {
         'entrance_id': entranceId,
         'public_key': publicKey,
         'private_key': privateKey,
-        'partner_id': partnerId,
+        'member_id': memberId,
         'slot': slot,
-        'partner_name': partnerName,
+        'member_name': memberName,
         'peer_name': peerName,
         'entrance_name': entranceName,
         'space_key': spaceKey,
@@ -151,9 +151,9 @@ class EntranceStore {
         'pin_hash': pinHash,
         'escrow_updated_at': escrowUpdatedAt,
         'install_uid': installUid,
-        'partner_names': partnerNames,
-        'partner_genders': partnerGenders,
-        'partner_slots': partnerSlots,
+        'member_names': memberNames,
+        'member_genders': memberGenders,
+        'member_slots': memberSlots,
         'pending': pending,
         'history': history,
         'attachments': attachments,
@@ -163,9 +163,9 @@ class EntranceStore {
         entranceId: json['entrance_id'] as String?,
         publicKey: json['public_key'] as String,
         privateKey: json['private_key'] as String,
-        partnerId: json['partner_id'] as String?,
+        memberId: json['member_id'] as String?,
         slot: json['slot'] as int?,
-        partnerName: json['partner_name'] as String?,
+        memberName: json['member_name'] as String?,
         peerName: json['peer_name'] as String?,
         entranceName: json['entrance_name'] as String?,
         spaceKey: json['space_key'] as String?,
@@ -180,9 +180,9 @@ class EntranceStore {
         pinHash: json['pin_hash'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
         installUid: json['install_uid'] as String?,
-        partnerNames: (json['partner_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
-        partnerGenders: (json['partner_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
-        partnerSlots: (json['partner_slots'] as Map?)?.map((k, v) => MapEntry('$k', v as int)) ?? {},
+        memberNames: (json['member_names'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
+        memberGenders: (json['member_genders'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ?? {},
+        memberSlots: (json['member_slots'] as Map?)?.map((k, v) => MapEntry('$k', v as int)) ?? {},
         pending: (json['pending'] as List?)?.cast<String>() ?? [],
         history: (json['history'] as List?)?.cast<Map<String, dynamic>>() ?? [],
         attachments: (json['attachments'] as List?)?.cast<Map<String, dynamic>>() ?? [],

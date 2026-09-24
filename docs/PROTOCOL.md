@@ -16,7 +16,7 @@
     `shared/lib/src/protocol/api_client.dart` 在所有请求上带该头（`ApiClient.protocolVersionHeader`）；
     WS 握手校验 `?pv=2`（不匹配关闭 4400）。
   - **版本 2（2026-09-24）**：wire 字段/路径/事件名/错误码随 2026-09-23 的
-    device→entrance / person→partner 全量改名而变（`sender_device_id`→`sender_entrance_id`、
+    device→entrance / person→member 全量改名而变（`sender_device_id`→`sender_entrance_id`、
     `device.revoked`→`entrance.revoked`、`DEVICE_REVOKED`→`ENTRANCE_REVOKED`、
     `/devices/*`→`/entrances/*` 等，见 GLOSSARY.md「wire 字段改名」）。改名无兼容窗口，
     故服务端不双接受 v1——旧客户端会明确收到 `400 PROTOCOL_VERSION_MISMATCH`。
@@ -96,9 +96,9 @@
 | GET | /messages/unread | 未读条数（服务端派生：消息 + 我的读取水位；多空间列表角标用） | Bearer |
 | POST | /entrances/name | 改本通道显示名 | Bearer |
 | POST | /entrances/install-uid | 补登安装级标识 `install_uid`（多空间：幂等，仅写本会话那一行） | Bearer |
-| POST | /partners/name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
+| POST | /members/name | 改本人显示名（同步 `space_members.display_name`） | Bearer |
 | POST | /avatar | 上传本人头像 | Bearer |
-| GET | /avatar/:partnerId | 取头像（免认证，公开可读） | — |
+| GET | /avatar/:memberId | 取头像（免认证，公开可读） | — |
 | GET | /join/:token | 邀请落地页（提示用 App 打开） | — |
 
 **Multiverse（v2）空间端点**（详见 `PROTOCOL_MULTIVERSE.md` §4）：
@@ -205,11 +205,11 @@ Server 从不解析 ciphertext，所以载荷形状是**客户端约定**，编�
 
 ### 5.4 消息回执（已送达 / 已读）
 
-回执**不是逐条 ACK**，而是按 `(space_id, partner_id)` 存一条**单调高水位（HWM）**：
+回执**不是逐条 ACK**，而是按 `(space_id, member_id)` 存一条**单调高水位（HWM）**：
 
 ```sql
-receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
-  PRIMARY KEY (space_id, partner_id)
+receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
+  PRIMARY KEY (space_id, member_id)
 ```
 
 推导（客户端）：我的消息 `seq = S` ——
@@ -225,7 +225,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 语义取舍（明确）：
 
-- 按 **partner** 记 → "该 partner **至少一台**通道已收到/已读"，不保证其所有通道。
+- 按 **member** 记 → "该 member **至少一台**通道已收到/已读"，不保证其所有通道。
 - HWM 是粗粒度：`read_upto_seq = N` 会把发送方所有 ≤N 的消息一并标为已读
   （与主流 IM 一致）。因此**上报侧必须严格把关**（见下），否则会虚标。
 
@@ -241,7 +241,7 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 #### GET /receipts（拉取本 space 全部回执行）
 
 ```json
-{ "receipts": [ { "partner_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10, "updated_at": 1789215936509 } ] }
+{ "receipts": [ { "member_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10, "updated_at": 1789215936509 } ] }
 ```
 
 重连/补拉用；实时路径是 WS `receipt.updated`（§8）。
@@ -302,13 +302,13 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 ### 7.1 通道列表 GET /entrances
 
 **范围：只返回本会话所属空间成员名下的通道**（2026-09-15 评审 C2）——entrances 表本身是
-全局表，此前直出会跨空间泄漏 partner、在线状态与公钥。**不返回 `public_key`**
+全局表，此前直出会跨空间泄漏 member、在线状态与公钥。**不返回 `public_key`**
 （2026-09-15 评审 C5：列表接口没有消费它的场景，challenge 由服务端用公钥密封）。
 
 ```json
 // 响应 200
 { "entrances": [
-    { "entrance_id": "…", "partner_id": "…", "status": "active", "last_seen": 1787900000000,
+    { "entrance_id": "…", "member_id": "…", "status": "active", "last_seen": 1787900000000,
       "entrance_name": "MacBook", "connected_at": 1787900000000, "online_since": 1787900000000 }
 ] }
 ```
@@ -326,9 +326,9 @@ receipts(space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
 ```
 
 - **授权（2026-09-16 定稿）**：
-  1. **同 space 内可互撤**——不限于"同一 partner 的另一条通道"：A 的手机丢了又没有第二台
+  1. **同 space 内可互撤**——不限于"同一 member 的另一条通道"：A 的手机丢了又没有第二台
      通道时，伴侣 B 也能替他撤掉那台（早期实现是"任何在册通道能撤任何通道"，连空间都不
-     校验；文档当时写的是"仅限同 partner"，代码比文档更宽，现已按本规则收口）；
+     校验；文档当时写的是"仅限同 member"，代码比文档更宽，现已按本规则收口）；
   2. **每次撤销都必须校验共享口令**（argon2id，与取包同一套校验与失败限速）。撤销会让
      对方客户端**自毁本地数据**，属不可逆的破坏性操作，必须由口令持有者授权——这样伴侣
      的一条通道即便被入侵，仅凭 session 也清不掉另一方的通道。
@@ -453,10 +453,10 @@ Authorization: Bearer <session_token>
 | S→C | `message.new` | `{ "message": {…信封…}, "server_sequence": 105 }` | 对端新消息（已持久化后广播） |
 | C→S | `ping` / S→C `pong` | — | 心跳（30s 间隔） |
 | S→C | `sync.advance` | `{ "last_sequence": 105 }` | 提示有新数据，可拉 /sync |
-| S→C | `receipt.updated` | `{ "partner_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
+| S→C | `receipt.updated` | `{ "member_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
 | S→C | `entrance.revoked` | `{ "entrance_id": "…" }` | 本通道被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
-| S→C | `peer.online` | `{ "entrance_id": "dev1", "partner_id": "per1", "online_since": 1787900000000 }` | 对端通道上线（WS 连接建立时广播；**不发给同 partner 的通道**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
-| S→C | `peer.offline` | `{ "entrance_id": "dev1", "partner_id": "per1" }` | 对端通道下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 partner 通道） |
+| S→C | `peer.online` | `{ "entrance_id": "dev1", "member_id": "per1", "online_since": 1787900000000 }` | 对端通道上线（WS 连接建立时广播；**不发给同 member 的通道**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
+| S→C | `peer.offline` | `{ "entrance_id": "dev1", "member_id": "per1" }` | 对端通道下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 member 通道） |
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
 
 ### 8.3 顺序与重连

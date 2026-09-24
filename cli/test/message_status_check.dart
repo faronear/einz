@@ -58,7 +58,7 @@ EntranceStore _store({
   required String spaceKeyB64,
   required String spaceId,
   required String entranceId,
-  required String partnerId,
+  required String memberId,
   required String sessionToken,
   required String server,
 }) {
@@ -71,7 +71,7 @@ EntranceStore _store({
     sessionToken: sessionToken,
   );
   st.entranceId = entranceId;
-  st.partnerId = partnerId;
+  st.memberId = memberId;
   return st;
 }
 
@@ -115,7 +115,7 @@ Future<int> _run() async {
       spaceKeyB64: spaceKey,
       spaceId: created.spaceId,
       entranceId: created.entranceId,
-      partnerId: created.creatorPartnerId,
+      memberId: created.creatorMemberId,
       sessionToken: created.sessionToken,
       server: server,
     );
@@ -125,7 +125,7 @@ Future<int> _run() async {
       spaceKeyB64: spaceKey,
       spaceId: joined.spaceId,
       entranceId: joined.entranceId,
-      partnerId: joined.partnerId,
+      memberId: joined.memberId,
       sessionToken: joined.sessionToken,
       server: server,
     );
@@ -172,7 +172,7 @@ Future<int> _run() async {
       spaceKey: base64Decode(spaceKey),
       spaceId: created.spaceId,
       senderEntranceId: storeA.entranceId!,
-      senderPartnerId: storeA.partnerId,
+      senderMemberId: storeA.memberId,
       messageId: 'voice-${DateTime.now().microsecondsSinceEpoch}',
       type: 'voice',
     );
@@ -192,7 +192,7 @@ Future<int> _run() async {
       spaceId: created.spaceId,
     )
       ..entranceId = 'dev-offline'
-      ..partnerId = 'partner-offline';
+      ..memberId = 'member-offline';
     final sessionOffline = ChatSession(storeOffline, '${work.path}/c.json', '');
     if (await sessionOffline.sendText('offline-probe')) {
       stderr.writeln('❌ 离线发送不应返回成功');

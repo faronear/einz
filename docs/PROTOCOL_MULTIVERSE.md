@@ -77,13 +77,13 @@ spaces (
 
 space_members (
   space_id          TEXT NOT NULL REFERENCES spaces(space_id),
-  partner_id         TEXT NOT NULL,           -- 空间内 UUID
+  member_id         TEXT NOT NULL,           -- 空间内 UUID
   slot      INTEGER NOT NULL,        -- 0/1，UNIQUE(space_id, slot)
   display_name      TEXT,
   gender            TEXT,
   status            TEXT NOT NULL DEFAULT 'active',
   joined_at         INTEGER NOT NULL,
-  PRIMARY KEY (space_id, partner_id)
+  PRIMARY KEY (space_id, member_id)
 )
 
 join_tokens (
@@ -98,7 +98,7 @@ join_tokens (
 entrances（v1 表增加空间归属）
   entrance_id         TEXT PRIMARY KEY,        -- UUIDv4（或保留 v1 现有 id 迁移）
   space_id          TEXT NOT NULL REFERENCES spaces(space_id),
-  partner_id         TEXT NOT NULL,
+  member_id         TEXT NOT NULL,
   public_key        TEXT NOT NULL UNIQUE,
   status            TEXT NOT NULL DEFAULT 'active',
   UNIQUE (space_id, public_key)
@@ -121,13 +121,13 @@ Bearer <session_token>`），且鉴权上下文一律取自 session 的 `space_i
 
 ```text
 GET /health
-  只返回服务健康、协议版本、能力（不再返回全局 partner 名称表）。
+  只返回服务健康、协议版本、能力（不再返回全局 member 名称表）。
   响应示例：{ "ok": true, "protocolVersion": "v2-multiverse", "capabilities": [...] }
 
 POST /spaces
   创建 Space（首条通道自举，无 token）。
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,
-          partnerName?, peerName?, customId? }   // partnerName=第一人名字（2026-09-16 由 displayName 改名）
+          memberName?, peerName?, customId? }   // memberName=第一人名字（2026-09-16 由 displayName 改名）
   响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token（含链接）
   错误：DEVICE_ALREADY_BOUND / ADDRESS_TAKEN / INVALID_ADDRESS / SPACE_LIMIT_REACHED
        （SPACE_LIMIT_REACHED：现有空间数 ≥ serverConfig.json 的 maxSpaces，409）
@@ -141,7 +141,7 @@ POST /spaces/join
   用 join token 完成加入（第 3 步身份登记 + 取钥可在此前后拆分，见 §5）。
   请求：{ token, publicKey, entranceName?, slot?, gender? }
   （无名字字段：身份名取自 create 时为该 slot 预置的名字——2026-09-16）
-  响应：200 { spaceId, partnerId, slot, sessionToken }
+  响应：200 { spaceId, memberId, slot, sessionToken }
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
        ENTRANCE_LIMIT_REACHED（该空间通道数已达 maxEntrancesPerSpace，409）
   （无"满员"错误：同身份可多通道，通道数只受 maxEntrancesPerSpace 约束——见 §6）
@@ -173,7 +173,7 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
      携带的 spaceId/名称/状态）
 ③ 身份登记（名字/性别）           → POST /spaces/join（补 identity 字段，
      服务端事务：锁 Space 行 → 校验 token → 标记 used → 绑定 slot
-     （slot 已有人 → 复用其 partner_id：同身份多通道；**不校验成员/通道数**））
+     （slot 已有人 → 复用其 member_id：同身份多通道；**不校验成员/通道数**））
 ④ 口令 escrow 取 Space Key        → POST /spaces/{spaceId}/key-escrow/verify
      （提交口令，解开创建者托管的口令密封包，返回 space_key 密封内容）
 ⑤ 设置 PIN                       → 本机操作（AppLock），无服务端调用

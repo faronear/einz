@@ -258,8 +258,8 @@ Future<void> _printEnvelope(EntranceStore store, MessageEnvelope env) async {
     spaceKey: base64Decode(keyB64),
     spaceId: store.spaceId!,
   );
-  final isMine = env.senderPartnerId != null && store.partnerId != null
-      ? env.senderPartnerId == store.partnerId
+  final isMine = env.senderMemberId != null && store.memberId != null
+      ? env.senderMemberId == store.memberId
       : env.senderEntranceId == store.entranceId;
   final sender = isMine ? '我' : '你';
   final color = isMine ? _green : _yellow;

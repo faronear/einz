@@ -23,7 +23,7 @@ CLI = os.path.join(ROOT, 'cli')
 WORK = tempfile.mkdtemp(prefix='einz-reset-restart-')
 PASSPHRASE = 'abc12345'  # ≥ 8 位（策略要求）
 CREATOR = 'Lukas'
-PARTNER = 'Alice'
+MEMBER = 'Alice'
 
 
 def free_port():
@@ -105,7 +105,7 @@ def main():
             ('秘境入口', 'c\r'),
             ('我的名字', f'{CREATOR}\r'),
             ('我的性别', '1\r'),
-            ('伴侣的名字', f'{PARTNER}\r'),
+            ('伴侣的名字', f'{MEMBER}\r'),
             ('伴侣的性别', '2\r'),
         ]:
             out = wait_text(m, expect, timeout=30)

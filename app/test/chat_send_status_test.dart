@@ -90,10 +90,10 @@ class _StatusFakeApi extends ApiClient {
         messageId: env.messageId, serverSequence: postedSeq, createdAt: 1000));
   }
 
-  /// GET /space 返回的通道表：决定 entrance→partner 映射（"是否我的消息"）。
+  /// GET /space 返回的通道表：决定 entrance→member 映射（"是否我的消息"）。
   /// 需要模拟"同一身份的另一条通道"时替换它。
   List<SpaceEntrance> entrances = const [
-    SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+    SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
   ];
 
   @override
@@ -200,7 +200,7 @@ void main() {
     // 种入对方回执：delivered=1（对方通道已收到）、read=0
     await db.into(db.peerReceipts).insert(PeerReceiptsCompanion.insert(
           spaceId: 'space-test',
-          partnerId: 'partner-b',
+          memberId: 'member-b',
           deliveredUptoSeq: const Value(1),
           readUptoSeq: const Value(0),
           updatedAt: const Value(1),
@@ -252,8 +252,8 @@ void main() {
     );
     final api = _StatusFakeApi(peer: [(env: fromMyOtherEntrance, seq: 1)], postedSeq: 1)
       ..entrances = const [
-        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
-        SpaceEntrance(entranceId: 'dev-a2', partnerId: 'partner-a', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-a2', memberId: 'member-a', status: 'active'),
       ];
 
     await tester.pumpWidget(MaterialApp(

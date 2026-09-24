@@ -87,20 +87,20 @@ class Drafts extends Table {
   Set<Column> get primaryKey => {messageId};
 }
 
-/// 对方消息回执（已送达/已读）单调高水位，按 (space, partner) 一行。
+/// 对方消息回执（已送达/已读）单调高水位，按 (space, member) 一行。
 ///
 /// 语义：我发的消息 seq=S 已送达 ⟺ 对方 `deliveredUptoSeq ≥ S`；已读 ⟺
-/// `readUptoSeq ≥ S`。按 partner 记 → "该 partner 至少一条通道已收到/已读"。
+/// `readUptoSeq ≥ S`。按 member 记 → "该 member 至少一条通道已收到/已读"。
 /// 目前只落库供将来 UI 使用（本轮不显示）。
 class PeerReceipts extends Table {
   TextColumn get spaceId => text()();
-  TextColumn get partnerId => text()();
+  TextColumn get memberId => text()();
   IntColumn get deliveredUptoSeq => integer().withDefault(const Constant(0))();
   IntColumn get readUptoSeq => integer().withDefault(const Constant(0))();
   IntColumn get updatedAt => integer().withDefault(const Constant(0))();
 
   @override
-  Set<Column> get primaryKey => {spaceId, partnerId};
+  Set<Column> get primaryKey => {spaceId, memberId};
 }
 
 /// 本地已加入的 Space（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.1）。
@@ -113,7 +113,7 @@ class Spaces extends Table {
   TextColumn get spaceId => text()();
   TextColumn get name => text().withDefault(const Constant(''))(); // 我的显示名
   TextColumn get peerName => text().withDefault(const Constant(''))(); // 对端名
-  TextColumn get partnerId => text().nullable()();
+  TextColumn get memberId => text().nullable()();
   TextColumn get entranceId => text().withDefault(const Constant(''))(); // 该空间的通道身份
   IntColumn get keyVersion => integer().withDefault(const Constant(1))();
   IntColumn get createdAt => integer().withDefault(const Constant(0))();
@@ -146,7 +146,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -189,13 +189,20 @@ class LocalDatabase extends _$LocalDatabase {
             );
           }
           if (from < 8) {
-            // v8：术语改名（device→entrance、partner→partner）。纯列改名，数据保留
-            // （ALTER TABLE RENAME COLUMN，SQLite ≥3.25）
+            // v8（历史，2026-09-23）：术语改名 device→entrance、person→partner。纯列改名，
+            // 数据保留（ALTER TABLE RENAME COLUMN，SQLite ≥3.25）。身份列这里直接落到
+            // **最终列名 member_id**——partner→member 已合入同一批（v9），无需两跳。
             await m.renameColumn(
               localMessages, 'sender_device_id', localMessages.senderEntranceId);
-            await m.renameColumn(peerReceipts, 'person_id', peerReceipts.partnerId);
-            await m.renameColumn(spaces, 'person_id', spaces.partnerId);
+            await m.renameColumn(peerReceipts, 'person_id', peerReceipts.memberId);
+            await m.renameColumn(spaces, 'person_id', spaces.memberId);
             await m.renameColumn(spaces, 'device_id', spaces.entranceId);
+          } else if (from < 9) {
+            // v9（2026-09-24）：串术语改名 partner→member（列 partner_id→member_id）。
+            // 只服务“已升到 v8（列名还是 partner_id）的存量库”；from<8 的库在上一分支
+            // 已直接落到 member_id，故不重复改名。
+            await m.renameColumn(peerReceipts, 'partner_id', peerReceipts.memberId);
+            await m.renameColumn(spaces, 'partner_id', spaces.memberId);
           }
         },
       );

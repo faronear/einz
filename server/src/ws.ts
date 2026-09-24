@@ -8,7 +8,7 @@ import { PROTOCOL_VERSION } from "./protocolVersion.js";
 interface Conn {
   ws: WebSocket;
   entranceId: string;
-  partnerId: string | null; // 通道归属身份（同一人的多通道共享 partner_id）
+  memberId: string | null; // 通道归属身份（同一人的多通道共享 member_id）
   spaceId: string; // 连接绑定的 Space（会话必带 space）
   alive: boolean;
   connectedAt: number; // 本次 WS 连接建立时刻（ms）——/entrances 显示"上线时间"
@@ -48,27 +48,27 @@ function spaceOfEntrance(entranceId: string): string | null {
   return row?.space_id ?? null;
 }
 
-/** 广播只发给**另一个人**的在线通道：同一 partner 的多条通道（同一人的手机+电脑）
+/** 广播只发给**另一个人**的在线通道：同一 member 的多条通道（同一人的手机+电脑）
  *  不算"对方"——此前只排除发起通道本身，自己的第二条通道一上线，第一条就把
  *  对方灯点亮（老板 2026-09-16 实测：B 从未加入却显示在线）。
- *  payload 带 partner_id：客户端（可能连着旧版服务端）据此二次过滤。
+ *  payload 带 member_id：客户端（可能连着旧版服务端）据此二次过滤。
  *  peer.online 另带 online_since：接收方据此把该通道插到"在线通道列表"的正确
  *  位置（按上线顺序，最新上线在最前），省掉一次 /entrances 往返（老板 2026-09-16）。 */
 function broadcastPeerStatus(exceptEntranceId: string, type: "peer.online" | "peer.offline"): void {
   const origin = conns.get(exceptEntranceId);
   const spaceId = origin?.spaceId ?? null;
   if (spaceId == null) return;
-  const originPartnerId = origin?.partnerId ?? null;
+  const originMemberId = origin?.memberId ?? null;
   const payload: Record<string, unknown> = {
     entrance_id: exceptEntranceId,
-    partner_id: originPartnerId,
+    member_id: originMemberId,
   };
   if (type === "peer.online") payload.online_since = origin?.onlineSince ?? null;
   const frame = JSON.stringify({ id: 0, type, payload });
   for (const [entranceId, conn] of conns) {
     if (entranceId === exceptEntranceId) continue;
     if (conn.spaceId !== spaceId) continue;
-    if (originPartnerId != null && conn.partnerId === originPartnerId) continue;
+    if (originMemberId != null && conn.memberId === originMemberId) continue;
     if (conn.ws.readyState === WebSocket.OPEN) conn.ws.send(frame);
   }
 }
@@ -93,7 +93,7 @@ export function broadcastPassphraseRotated(exceptEntranceId: string): void {
  *  （移动端切后台后仍在同步）。 */
 export function broadcastReceiptUpdated(
   exceptEntranceId: string,
-  payload: { partner_id: string; delivered_upto_seq: number; read_upto_seq: number }
+  payload: { member_id: string; delivered_upto_seq: number; read_upto_seq: number }
 ): void {
   const spaceId = spaceOfEntrance(exceptEntranceId);
   if (spaceId == null) return;
@@ -109,7 +109,7 @@ export function broadcastReceiptUpdated(
 /** 改名/改通道名：通知其余在线通道立即更新对方名称（App/TUI 顶部条）。 */
 export function broadcastProfileUpdated(
   exceptEntranceId: string,
-  payload: { partner_id?: string; entrance_id: string; partner_name?: string; entrance_name?: string }
+  payload: { member_id?: string; entrance_id: string; member_name?: string; entrance_name?: string }
 ): void {
   const spaceId = spaceOfEntrance(exceptEntranceId);
   if (spaceId == null) return;
@@ -139,14 +139,14 @@ export function attachWs(wss: WebSocketServer): void {
 
     let entranceId: string;
     let spaceId: string;
-    let partnerId: string | null;
+    let memberId: string | null;
     try {
       // requireSession 同时完成：会话有效 + 通道在册 + 会话带 space（v1 收敛后必备）
       const sess = requireSession(token);
       entranceId = sess.entrance_id;
       spaceId = sess.space_id;
       // 通道归属身份：peer 广播据此跳过同一人的其它通道（同人≠对方）
-      partnerId = sess.partner_id === "" ? null : sess.partner_id;
+      memberId = sess.member_id === "" ? null : sess.member_id;
     } catch {
       ws.close(4401, "UNAUTHORIZED");
       return;
@@ -160,7 +160,7 @@ export function attachWs(wss: WebSocketServer): void {
     const conn: Conn = {
       ws,
       entranceId,
-      partnerId,
+      memberId,
       spaceId,
       alive: true,
       connectedAt: now,

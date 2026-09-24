@@ -147,3 +147,50 @@ app 测试里那条 UI 断言也同步改了。**探针未实跑**（需真 serv
 `escrowArchivedKeys.md`、`voiceCall.zhcn.md`、`worklog.md` 是**带日期的记录**，旧名保持原样
 （改了就是篡改历史）；`db.ts` 清理 v1 meta 的字面量 `'creator_person_id'` /
 `'person_name:%'` / `'person_gender:%'` 同理保留；goldens 文件名 `..._device.png` 也不动。
+
+## 9. 续改：`partner` → `member`（2026-09-24，已执行）
+
+老板拍板：新版本尚未上线（计划 2026-09-25 上线），为将来"一个秘境可能不止两人"留弹性，
+把指代「秘境内一个身份」的 **`partner` 全线改为中性的 `member`**。**界面文案不改**——
+中文仍「伴侣」、英文 UI 仍 `partner`（凸显情侣私密空间气质），代码层与界面词中英不同名，
+同「通道 / entrance」先例。
+
+**决策**：方案 A（只改代码层）；不碰 `peer`（第二人）/`creator`（创建者）/`entrance` /
+`install` / `slot` / `space_members` 表名。
+
+### 9.1 映射（现名）
+
+| 概念 | 09-23 名 | 09-24 现名 |
+| --- | --- | --- |
+| 身份 id | `partner_id` / `partnerId` | **`member_id` / `memberId`** |
+| 身份显示名 | `partner_name` / `partnerName` | **`member_name` / `memberName`** |
+| 消息发送者身份 | `sender_partner_id` | **`sender_member_id`** |
+| 身份名单/性别/槽位 map | `partner_names` / `partner_genders` / `partner_slots` | **`member_names` / `member_genders` / `member_slots`** |
+| 创建响应 | `creatorPartnerId` | **`creatorMemberId`** |
+| 本机通道→身份映射键 | `identity.entrance_partner_map` | **`identity.entrance_member_map`** |
+| 成员改名路由 | `POST /partners/name`（body `partner_name`） | **`POST /members/name`**（body `member_name`） |
+| 审计 kind | `partner.rename` | **`member.rename`** |
+| 名字策略 | `partner_name_policy` / `PartnerNameViolation` / `checkPartnerNamePolicy` | **`member_name_policy` / `MemberNameViolation` / `checkMemberNamePolicy`** |
+| 服务端文件 | `server/src/partnerName.ts`、`test/partner_name.test.ts` | **`memberName.ts`、`test/member_name.test.ts`** |
+
+### 9.2 复用 09-23 的处置结论（因同一"未上线、无数据"前提）
+
+- **wire**：合入**同一个尚未发布的 v2 窗口**（`PROTOCOL_VERSION` 仍为 `2`，不另起 v3）。
+- **服务端 DB**：无生产库 → 只改建表语句，**零迁移**。
+- **客户端本地库**：drift `schemaVersion` **8→9**，`from==8` 时 `renameColumn`
+  `partner_id`→`member_id`；`from<8` 的旧库在 v8 分支直接落到最终列名（不两跳）。
+- **TUI store / App profile JSON**：键名随改；按"全新上线、整机清空"口径**不做旧键回退读**。
+- **历史快照**：`aimemo/architectureReview*`、`upgradeToMultiverse`、`renameReview20260923`、
+  `worklog` 既有条目**一字不动**；`db.ts` 的 v1 meta 字面量同理保留。
+
+### 9.3 验证
+
+- 服务端 `npm run build` + 全套 `npm test` 全绿（0 fail）；
+- `app` / `shared` / `cli` 三包 `flutter analyze` 无 issue；`shared`(52) / `cli`(21) dart 测试全过；
+  app 抽测与本次契约直接相关的 4 个测试文件（message_repository / app_lock / vault /
+  multi_space_pages）61 例全过（goldens 按惯例不跑）。
+- 残留 grep：code/test/demo/docs 内 `partner` 归零；仅剩 **l10n UI 文案值**（有意保留）与
+  历史快照。
+- 已知遗留（**非本次引入**）：`cli/test/member_preset_check.py` 原就读 `/health['member_names']`，
+  而 `/health` 早已不返回名称表 → 该探针本就是死的（probe rot）。
+

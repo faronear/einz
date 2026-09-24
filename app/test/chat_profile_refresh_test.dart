@@ -1,7 +1,7 @@
 // 启动校正回归：本机 profile 只是入网时的快照，对方改名后（或没收到广播时）
 // App 重启必须按服务端（GET /space）的名字/性别校正——否则一直显示旧的对方名字。
 //
-// 重点覆盖重启路径：main.dart 用明文 payload 构造 ChatPage 时**不传 partnerId**，
+// 重点覆盖重启路径：main.dart 用明文 payload 构造 ChatPage 时**不传 memberId**，
 // 校正必须能从 /space 的通道表按 entranceId 反查"我是谁"。
 
 import 'package:drift/native.dart';
@@ -21,11 +21,11 @@ class _FakeSpaceApi extends ApiClient {
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-demo',
         entrances: const [
-          SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
-          SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'),
+          SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
+          SpaceEntrance(entranceId: 'dev-b', memberId: 'member-b', status: 'active'),
         ],
-        partnerNames: const {'partner-a': 'Alice-新名字', 'partner-b': 'Bob'},
-        partnerGenders: const {'partner-a': 'female', 'partner-b': 'male'},
+        memberNames: const {'member-a': 'Alice-新名字', 'member-b': 'Bob'},
+        memberGenders: const {'member-a': 'female', 'member-b': 'male'},
       );
 
   @override
@@ -53,29 +53,29 @@ class _JoiningPeerApi extends ApiClient {
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-late',
         entrances: [
-          const SpaceEntrance(entranceId: 'dev-me', partnerId: 'partner-me', status: 'active'),
+          const SpaceEntrance(entranceId: 'dev-me', memberId: 'member-me', status: 'active'),
           if (peerJoined)
-            const SpaceEntrance(entranceId: 'dev-peer', partnerId: 'partner-peer', status: 'active'),
+            const SpaceEntrance(entranceId: 'dev-peer', memberId: 'member-peer', status: 'active'),
         ],
-        partnerNames: {
-          'partner-me': '我',
-          if (peerJoined) 'partner-peer': '新来的对方',
+        memberNames: {
+          'member-me': '我',
+          if (peerJoined) 'member-peer': '新来的对方',
         },
-        partnerGenders: {
-          'partner-me': 'male',
-          if (peerJoined) 'partner-peer': 'male',
+        memberGenders: {
+          'member-me': 'male',
+          if (peerJoined) 'member-peer': 'male',
         },
-        partnerSlots: {
-          'partner-me': 0,
-          if (peerJoined) 'partner-peer': 1,
+        memberSlots: {
+          'member-me': 0,
+          if (peerJoined) 'member-peer': 1,
         },
       );
 
   @override
   Future<List<Map<String, dynamic>>> listEntrances(String token) async => [
-        {'entrance_id': 'dev-me', 'partner_id': 'partner-me', 'connected_at': 1},
+        {'entrance_id': 'dev-me', 'member_id': 'member-me', 'connected_at': 1},
         if (peerJoined)
-          {'entrance_id': 'dev-peer', 'partner_id': 'partner-peer', 'connected_at': 1},
+          {'entrance_id': 'dev-peer', 'member_id': 'member-peer', 'connected_at': 1},
       ];
 
   @override
@@ -97,12 +97,12 @@ void main() {
     await sodium();
   });
 
-  testWidgets('重启（无 partnerId）：按服务端名称表校正旧的本地快照', (tester) async {
+  testWidgets('重启（无 memberId）：按服务端名称表校正旧的本地快照', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     // 本地快照：入网时写入的旧名字 + 空的对方性别（v2 早期的实际数据形态）
     await AppLockService(db).saveProfile(
-      partnerName: 'Bob',
+      memberName: 'Bob',
       peerName: 'Alice-老名字',
       entranceName: 'dev-b',
     );
@@ -120,7 +120,7 @@ void main() {
         db: db,
         api: _FakeSpaceApi(),
         enableWs: false,
-        // 模拟重启路径：不传 partnerId / peerName（main.dart 即如此）
+        // 模拟重启路径：不传 memberId / peerName（main.dart 即如此）
       ),
     ));
     // 等 profile 读取 + /space 校正两轮异步完成
@@ -144,7 +144,7 @@ void main() {
     addTearDown(db.close);
     await AppLockService(db).saveProfile(
       spaceId: 'space-late',
-      partnerName: '我',
+      memberName: '我',
       peerName: '待加入',
       entranceName: 'dev-me',
       myGender: 'male',
@@ -165,7 +165,7 @@ void main() {
         db: db,
         api: api,
         enableWs: false,
-        partnerId: 'partner-me',
+        memberId: 'member-me',
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300));

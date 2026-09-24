@@ -244,8 +244,8 @@ void main() {
     test('removeSpace 只删该空间的 Spaces 行与数据，另一个空间不受影响', () async {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB);
-      await lock.saveProfile(spaceId: 'space-a', partnerName: '我A', peerName: '对方A', entranceName: 'iPhone');
-      await lock.saveProfile(spaceId: 'space-b', partnerName: '我B', peerName: '对方B', entranceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-a', memberName: '我A', peerName: '对方A', entranceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-b', memberName: '我B', peerName: '对方B', entranceName: 'iPhone');
 
       await lock.removeSpace('space-a');
       expect(await spaceIds(), ['space-b'], reason: '只删被移除的那一行');
@@ -258,7 +258,7 @@ void main() {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB);
 
-      await lock.saveProfile(spaceId: 'space-b', partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
+      await lock.saveProfile(spaceId: 'space-b', memberName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
       final rowB = await (db.select(db.spaces)
             ..where((s) => s.spaceId.equals('space-b')))
           .getSingle();
@@ -266,8 +266,8 @@ void main() {
       expect(rowB.peerName, 'Alice');
 
       final pB = await lock.loadProfile(spaceId: 'space-b');
-      expect(pB['partnerName'], 'Lukas');
-      await lock.saveProfile(spaceId: 'space-a', partnerName: 'Me', peerName: 'Bob', entranceName: 'iPhone');
+      expect(pB['memberName'], 'Lukas');
+      await lock.saveProfile(spaceId: 'space-a', memberName: 'Me', peerName: 'Bob', entranceName: 'iPhone');
       expect((await lock.loadProfile(spaceId: 'space-a'))['peerName'], 'Bob');
       expect((await lock.loadProfile(spaceId: 'space-b'))['peerName'], 'Alice',
           reason: '两个空间的资料互不覆盖');
@@ -277,7 +277,7 @@ void main() {
       await lock.savePlain(payloadA);
       await lock.addSpace(payloadB); // Spaces 行 = 2（space-a / space-b）
       // 老库遗留：只有全局键，里面是"另一个空间"的资料
-      await lock.saveProfile(partnerName: '我A', peerName: '对方A', entranceName: 'iPhone');
+      await lock.saveProfile(memberName: '我A', peerName: '对方A', entranceName: 'iPhone');
 
       // space-b 还没写过 per-space 资料 → 不得读到全局键里 space-a 的资料
       expect(await lock.loadProfile(spaceId: 'space-b'), isEmpty,

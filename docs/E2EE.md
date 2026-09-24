@@ -244,13 +244,13 @@ sha256 = SHA-256(blob)              // 密文哈希，用于完整性校验（ba
   "entrances": [
     {
       "entrance_id": "dev-a1",
-      "partner_id": "partner-a",
+      "member_id": "member-a",
       "public_key": "base64(X25519公钥)",
       "status": "active"
     },
     {
       "entrance_id": "dev-b1",
-      "partner_id": "partner-b",
+      "member_id": "member-b",
       "public_key": "base64(X25519公钥)",
       "status": "active"
     }

@@ -9096,5 +9096,66 @@ worklog 拖到下一轮，导致复盘要靠 `git log` 反推——这条已写�
 - CI 改动（`buildMultiPlatform.yml`）只是 Windows/macOS 产物改名
   `einz-gui-*` → `einz-app-*`，不影响启用流程。
 
+---
+
+## 2026-09-24 代码层串术语改名 `partner` → `member`（上线前）
+
+### 背景与决策
+
+老板：「新版本尚未上线（计划明天上线），我想在上线前再做一个较大改动——考虑到将来有一定
+可能支持一个空间 2 人以上成员，`partner` 就应该叫 `member`，请评估牵涉面/风险/收益/工作量」。
+
+我的评估（要点）：
+
+- `partner` 是 **09-23 才落地的词**（person→partner），不是历史包袱；与平台 API 无撞名、
+  未写进任何加密派生串（HKDF/AAD/salt），所以无"解不开老密文"暗雷（与 device 那次最大区别）。
+- **时机是这个改名最便宜的时刻**：全新上线、无生产库 → 改列名=改建表语句，**零迁移**；
+  协议版本已因上一批改名升到 `2` 且未发布 → 可**搭同一个 v2 窗口**，协议治理成本=0。
+  上线后再做则要付服务端库迁移 + 客户端本地 drift 迁移 + 协议 v3 + 旧键回退。
+- 牵涉面 ≈1,289 行（≈上批 device/person 的 60–70%），50 个不同标识符；CLI 段约 20%
+  且 CI 无覆盖，是静默失效高发区。
+- 独立判断：若多人空间概率 ≥50% 就现在做；收益是"未来可选性 + `space_members` 表名自洽"，
+  代价是"两人产品气质被中性词替换"。
+
+**老板拍板：同意 A——只改代码、理顺词汇、为未来留弹性；界面文案不改**（当前仍要凸显
+情侣私密空间气质）。`peer` / `creator` / `entrance` / `install` / `slot` / `space_members`
+表名均不动。
+
+### 执行
+
+- 一次机械替换：`partner`/`Partner`/`PARTNER` → `member`/`Member`/`MEMBER`，覆盖
+  server/src+test、shared/lib+test、app/lib+test、cli/lib+bin+test+demo、`docs/*.md`、
+  server/package.json（185 个文件）。
+- 文件改名：`partnerName.ts`→`memberName.ts`、`partner_name.test.ts`→`member_name.test.ts`、
+  `partner_name_policy.dart`→`member_name_policy.dart`（+test）、
+  `store_partner_cache_test.dart`→`store_member_cache_test.dart`、
+  `partner_preset_check.py`→`member_preset_check.py` 同批。
+- 契约面：wire 全量 `member_*`；路由 `POST /members/name`（body `member_name`）；
+  审计 `member.rename`；本机键 `identity.entrance_member_map`；App profile `peerMemberId`。
+- App drift `schemaVersion` **8→9**：`from==8` 走 `renameColumn partner_id→member_id`；
+  `from<8` 在 v8 分支直接落到最终列名（不两跳）。
+- 红线：`app/lib/l10n/*`（中英 UI 文案值）**一字不动**；`aimemo` 历史快照
+  （architectureReview* / upgradeToMultiverse / renameReview20260923 / worklog 既有条目）
+  一字不动；`db.ts` 的 v1 meta 字面量 `person_name:%` 等保留。
+- 顺带修正：`docs/DATABASE.md` 两处 v1 meta 键名原写 `partner_name:*` 与代码字面量
+  `person_name:%` 不符 → 校正为 `person_name:*`。
+
+### 验证（全绿）
+
+- Server：`npm run build` + `npm test` 全绿（fail 0，exit 0）。
+- `app` / `shared` / `cli`：`flutter analyze` 均 **No issues**；shared 52 过、cli 21 过；
+  app 抽测与本次契约直接相关的 4 个文件（message_repository / app_lock / vault /
+  multi_space_pages）**61 过**（goldens 按惯例不跑）。
+- `build_runner` 重生成 `local_database.g.dart`（0 残留 partner）；`pubspec.lock` 未污染。
+- 残留 grep：code/test/demo/docs 内 `partner` **归零**；仅剩 l10n UI 文案与历史快照。
+
+### 遗留 / 注意
+
+- 未跑 cli 的 pty e2e 探针（需真 server，且按惯例不改）；`member_preset_check.py`
+  原就读 `/health['member_names']` 而 `/health` 早已不返回名称表 → 该探针**本就是死的**
+  （probe rot，非本次引入）。
+- 服务端/App 真机自测仍待老板；推送与部署按惯例留给老板。
+
+
 
 

@@ -3,7 +3,7 @@
  *
  * 此前它只按 `entrance_id != 自己` 取 push_tokens —— 一旦接上真实推送，
  * 一条消息会把"有新消息"提示推给这台服务器上**所有空间**的通道（跨空间泄露
- * "谁在发消息"）。现在通道经 partner_id → space_members 归属 Space，按 Space 收敛。
+ * "谁在发消息"）。现在通道经 member_id → space_members 归属 Space，按 Space 收敛。
  *
  * 运行：npm test（tsx test/push_scope.test.ts）
  */
@@ -28,7 +28,7 @@ function seed (): void {
   space.run('space-b', 'addr-b', 'pk-b', now, now)
 
   const dev = db.prepare(
-    `INSERT INTO entrances (entrance_id, partner_id, public_key, status, created_at)
+    `INSERT INTO entrances (entrance_id, member_id, public_key, status, created_at)
      VALUES (?, ?, 'pk', 'active', ?)`,
   )
   dev.run('a1', 'p1', now)
@@ -36,12 +36,12 @@ function seed (): void {
   dev.run('b1', 'p3', now)
   // 已撤销的通道：即使在同一 Space 也不该收到
   db.prepare(
-    `INSERT INTO entrances (entrance_id, partner_id, public_key, status, created_at)
+    `INSERT INTO entrances (entrance_id, member_id, public_key, status, created_at)
      VALUES (?, ?, 'pk', 'revoked', ?)`,
   ).run('a3', 'p1', now)
 
   const member = db.prepare(
-    `INSERT INTO space_members (space_id, partner_id, slot, status, joined_at)
+    `INSERT INTO space_members (space_id, member_id, slot, status, joined_at)
      VALUES (?, ?, ?, 'active', ?)`,
   )
   member.run('space-a', 'p1', 0, now)

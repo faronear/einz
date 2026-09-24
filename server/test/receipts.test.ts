@@ -1,7 +1,7 @@
 /**
  * 消息回执（已送达/已读）回归测试。
  *
- * 模型：按 (space, partner) 存单调高水位（HWM）——
+ * 模型：按 (space, member) 存单调高水位（HWM）——
  *   我的消息 seq=S 已送达 ⟺ 对方 delivered_upto_seq ≥ S；已读 ⟺ read_upto_seq ≥ S。
  * 本测试覆盖：单调只前进、夹紧到真实 max seq、读隐含送达、GET 回读、WS 广播。
  *
@@ -55,7 +55,7 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
 }
 
 interface ReceiptRow {
-  partner_id: string
+  member_id: string
   delivered_upto_seq: number
   read_upto_seq: number
   updated_at: number
@@ -65,7 +65,7 @@ interface ReceiptRow {
 class Entrance {
   sessionToken = ''
   entranceId = ''
-  partnerId = ''
+  memberId = ''
 
   constructor (private readonly label: string) {}
 
@@ -91,11 +91,11 @@ class Entrance {
       spaceId: string
       joinToken: string
       entranceId: string
-      creatorPartnerId: string
+      creatorMemberId: string
       sessionToken: string
     }
     this.entranceId = body.entranceId
-    this.partnerId = body.creatorPartnerId
+    this.memberId = body.creatorMemberId
     this.sessionToken = body.sessionToken
     return body.joinToken
   }
@@ -114,12 +114,12 @@ class Entrance {
     assert.equal(res.status, 200, 'join space should succeed')
     const body = (await res.json()) as {
       spaceId: string
-      partnerId: string
+      memberId: string
       entranceId: string
       sessionToken: string
     }
     this.entranceId = body.entranceId
-    this.partnerId = body.partnerId
+    this.memberId = body.memberId
     this.sessionToken = body.sessionToken
     return body.spaceId
   }
@@ -220,7 +220,7 @@ async function main (): Promise<void> {
     // 5) Alice 侧 GET /receipts 看到 Bob 的行（自己没报过 → 只有 Bob 一行）
     const rows = await alice.getReceipts(port)
     assert.equal(rows.length, 1, 'Alice 侧应只看到 Bob 的一条回执行')
-    assert.equal(rows[0].partner_id, bob.partnerId, 'partner_id 应为 Bob')
+    assert.equal(rows[0].member_id, bob.memberId, 'member_id 应为 Bob')
     assert.equal(rows[0].delivered_upto_seq, 2)
     assert.equal(rows[0].read_upto_seq, 1)
 
@@ -247,7 +247,7 @@ async function main (): Promise<void> {
         if (frame.type === 'hello') {
           void bob.postReceipt(port, { read_upto_seq: 2 })
         } else if (frame.type === 'receipt.updated') {
-          assert.equal(frame.payload.partner_id, bob.partnerId, 'payload.partner_id 应为 Bob')
+          assert.equal(frame.payload.member_id, bob.memberId, 'payload.member_id 应为 Bob')
           assert.equal(frame.payload.read_upto_seq, 2, 'payload.read_upto_seq 应为 2')
           assert.equal(frame.payload.delivered_upto_seq, 2, '读隐含送达 → delivered 应为 2')
           clearTimeout(timer)

@@ -21,11 +21,11 @@ import { getEntrance, getEntranceStatus } from "./config.js";
  *   `?? ""` 回落（v1 时代那 8 处回落既是复杂度也是漏洞温床）。
  */
 
-/** 会话 + 通道身份（partner_id 用于空间成员判定）。space_id 保证非空。 */
+/** 会话 + 通道身份（member_id 用于空间成员判定）。space_id 保证非空。 */
 export interface EntranceSession {
   entrance_id: string;
   space_id: string;
-  partner_id: string;
+  member_id: string;
 }
 
 /** 取 Bearer token，缺失即 401。 */
@@ -67,26 +67,26 @@ export function requireSession(token: string | null): EntranceSession {
     // 不静默当空串处理——那正是 v1 时代 8 处回落的来源。
     throw new ApiError("UNAUTHORIZED", "session has no space, re-authenticate", 401);
   }
-  return { entrance_id, space_id, partner_id: getEntrance(entrance_id)?.partner_id ?? "" };
+  return { entrance_id, space_id, member_id: getEntrance(entrance_id)?.member_id ?? "" };
 }
 
-/** 该 partner 是否为该空间的在册成员（status='active'）。 */
-export function isSpaceMember(spaceId: string, partnerId: string): boolean {
-  if (spaceId.length === 0 || partnerId.length === 0) return false;
+/** 该 member 是否为该空间的在册成员（status='active'）。 */
+export function isSpaceMember(spaceId: string, memberId: string): boolean {
+  if (spaceId.length === 0 || memberId.length === 0) return false;
   const row = getDb()
-    .prepare(`SELECT 1 FROM space_members WHERE space_id = ? AND partner_id = ? AND status = 'active'`)
-    .get(spaceId, partnerId);
+    .prepare(`SELECT 1 FROM space_members WHERE space_id = ? AND member_id = ? AND status = 'active'`)
+    .get(spaceId, memberId);
   return row != null;
 }
 
 /**
  * 认证 + **该通道身份属于目标 space**（space 级端点的统一入口）。
- * 判定依据是 entrances.partner_id → space_members(space_id)，而不是会话里的
+ * 判定依据是 entrances.member_id → space_members(space_id)，而不是会话里的
  * space_id：同一身份多条通道、或将来一个通道持多空间会话都不受影响。
  */
 export function requireSpaceMember(token: string | null, spaceId: string): EntranceSession {
   const sess = requireSession(token);
-  if (!isSpaceMember(spaceId, sess.partner_id)) {
+  if (!isSpaceMember(spaceId, sess.member_id)) {
     throw new ApiError("FORBIDDEN", "not a member of this space", 403);
   }
   return sess;
@@ -97,14 +97,14 @@ export function requireSpaceMember(token: string | null, spaceId: string): Entra
  *
  * entrances 表在 v1 就是一张**全局表**（没有 space_id 列），因此所有列通道的接口
  * 都必须自己过滤，此前 /space 与 /entrances 都漏了——A 空间通道能看到 B 空间通道
- * 的 partner、在线状态与公钥（2026-09-15 评审 C2）。
+ * 的 member、在线状态与公钥（2026-09-15 评审 C2）。
  *
  * v1 收敛后 spaceId 恒非空（requireSession 保证），因此**不再有 legacy 分支**：
  * 只返回该空间在册成员名下的通道。调用方须给 entrances 表起别名 `d`。
  */
 export function entranceScopeClause(spaceId: string): { sql: string; params: string[] } {
   return {
-    sql: `d.partner_id IN (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL)`,
+    sql: `d.member_id IN (SELECT member_id FROM space_members WHERE space_id = ? AND member_id IS NOT NULL)`,
     params: [spaceId],
   };
 }

@@ -47,7 +47,7 @@ class _FakeApi extends ApiClient {
     return SpaceResult(
       spaceId: 'space-test',
       entrances: const [
-        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
       ],
     );
   }
@@ -88,7 +88,7 @@ class _FixedSeqApi extends ApiClient {
     return SpaceResult(
       spaceId: 'space-test',
       entrances: const [
-        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
       ],
     );
   }

@@ -31,8 +31,8 @@ void main() {
         'space_id': 'space-1',
         'expires_in': 60,
         'entrances': <Map<String, dynamic>>[],
-        'partner_names': <String, String>{},
-        'partner_genders': <String, String>{},
+        'member_names': <String, String>{},
+        'member_genders': <String, String>{},
         'package': null,
         'updated_at': null,
         'joinToken': 'e1_stub',
@@ -41,8 +41,8 @@ void main() {
         'spaceId': 'space-1',
         'spaceAddress': '0xstub',
         'entranceId': 'dev-stub',
-        'partnerId': 'partner-stub',
-        'creatorPartnerId': 'partner-stub',
+        'memberId': 'member-stub',
+        'creatorMemberId': 'member-stub',
         'slot': 1,
         'messages': <Map<String, dynamic>>[],
         'attachments_meta': <Map<String, dynamic>>[],
@@ -104,7 +104,7 @@ void main() {
     await apiFor().uploadAvatar(Uint8List.fromList([1, 2, 3]), 'tok');
     expectVersionOnAll('uploadAvatar');
     received.clear();
-    await apiFor().getAvatar('partner-1');
+    await apiFor().getAvatar('member-1');
     expectVersionOnAll('getAvatar');
   });
 

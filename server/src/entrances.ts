@@ -3,16 +3,16 @@ import { ApiError } from './auth.js'
 import { getEntrance } from './config.js'
 import { assertEntranceName } from './entranceName.js'
 import { assertInstallUid } from './installUid.js'
-import { assertPartnerName } from './partnerName.js'
+import { assertMemberName } from './memberName.js'
 import { entranceScopeClause, isSpaceMember, requireSession } from './guard.js'
 import { assertSpacePassphrase } from './escrow.js'
 import { broadcastProfileUpdated, forgetEntranceConnection, getConnectedAt, getOnlineSince } from './ws.js'
 
-/** GET /entrances：通道列表（含 partner 映射）。
+/** GET /entrances：通道列表（含 member 映射）。
  *  注意：不在本接口刷新调用方 last_seen——last_seen 只由 WS 连接/心跳/断开维护，
  *  否则任何轮询客户端都会让自己"永远新鲜"（对方误判在线，见 chat_page 在线判定）。
  *  范围：**仅本会话可见的通道**（该空间成员；见 guard.entranceScopeClause）——
- *  此前直出全局 entrances 表，跨空间泄漏 partner/公钥/在线状态（2026-09-15 评审 C2）。
+ *  此前直出全局 entrances 表，跨空间泄漏 member/公钥/在线状态（2026-09-15 评审 C2）。
  *  刻意**不返回 public_key**（2026-09-15 评审 C5）：通道公钥是密码学标识，
  *  列表接口没有使用它的场景（challenge 由服务端用公钥密封，客户端用不到对端公钥），
  *  少一个可被批量采集的字段就少一分元数据面。 */
@@ -24,14 +24,14 @@ export function listEntrances (
   const scope = entranceScopeClause(space_id)
   const rows = getDb()
     .prepare(
-      `SELECT d.entrance_id, d.partner_id, d.status, d.last_seen, d.entrance_name
+      `SELECT d.entrance_id, d.member_id, d.status, d.last_seen, d.entrance_name
          FROM entrances d
         WHERE ${scope.sql}
         ORDER BY d.created_at`
     )
     .all(...scope.params) as {
     entrance_id: string
-    partner_id: string
+    member_id: string
     status: string
     last_seen: number | null
     entrance_name: string
@@ -50,9 +50,9 @@ export function listEntrances (
  *  （白名单移除 + 清 Push Token + 清会话，PROTOCOL.md §7.2）。
  *
  * 授权规则（老板 2026-09-16 定稿）：
- * 1. **同 space 内可互撤**——不限于"同一 partner 的另一条通道"：A 的手机丢了、A 又没有
+ * 1. **同 space 内可互撤**——不限于"同一 member 的另一条通道"：A 的手机丢了、A 又没有
  *    第二条通道时，伴侣 B 也能替他撤掉那条（此前的实现是"任何在册通道能撤任何通道"，
- *    连空间都不校验；而文档写的是"仅限同 partner"，代码比文档更宽）；
+ *    连空间都不校验；而文档写的是"仅限同 member"，代码比文档更宽）；
  * 2. **每次撤销都要校验密保口令**（`assertSpacePassphrase`：argon2id + 失败限速）——
  *    撤销会让对方客户端**自毁本地数据**，属于不可逆的破坏性操作，必须由"口令持有者"
  *    授权；这样即使伴侣的一条通道被入侵，仅凭 session 也清不掉另一方的通道。
@@ -72,8 +72,8 @@ export async function revokeEntrance (
   if (target.entrance_id === caller.entrance_id)
     throw new ApiError('INVALID_REQUEST', 'cannot revoke self', 400)
   // 目标通道必须属于**本会话所在空间**（entrances 表没有 space 列，空间归属走
-  // entrances.partner_id → space_members）
-  if (target.partner_id.length === 0 || !isSpaceMember(caller.space_id, target.partner_id)) {
+  // entrances.member_id → space_members）
+  if (target.member_id.length === 0 || !isSpaceMember(caller.space_id, target.member_id)) {
     throw new ApiError('FORBIDDEN', 'target entrance is not in this space', 403)
   }
   // 口令校验放在"目标合法性"之后：错误的目标不该消耗口令尝试预算
@@ -178,40 +178,40 @@ export function updateEntranceName (
 }
 
 /**
- * POST /partners/name：更新本通道的 partner 显示名（/rename 命令，显示层用）。
- * - 认证：session token（bearer）；仅 active 通道可改自己 partner 的名称。
+ * POST /members/name：更新本通道的 member 显示名（/rename 命令，显示层用）。
+ * - 认证：session token（bearer）；仅 active 通道可改自己 member 的名称。
  */
-export function updatePartnerName (
+export function updateMemberName (
   token: string,
   body: unknown
 ): { ok: true } {
   const { entrance_id, space_id } = requireSession(token)
 
-  const b = (body ?? {}) as { partner_name?: string }
-  const partnerName = (b.partner_name ?? '').trim()
+  const b = (body ?? {}) as { member_name?: string }
+  const memberName = (b.member_name ?? '').trim()
   // 用户名称白名单 + 长度上限（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，
   // 最长 32；不合规直接 400 让客户端提示重输（名字是用户自己输的，不静默改写）
-  assertPartnerName(partnerName)
+  assertMemberName(memberName)
 
   const row = getDb()
-    .prepare(`SELECT partner_id FROM entrances WHERE entrance_id = ?`)
-    .get(entrance_id) as { partner_id: string } | undefined
+    .prepare(`SELECT member_id FROM entrances WHERE entrance_id = ?`)
+    .get(entrance_id) as { member_id: string } | undefined
   if (!row) throw new ApiError('NOT_FOUND', 'entrance not found', 404)
 
   // 名称的**唯一数据源是 space_members.display_name**（GET /space 从这里读）。
   // v1 时代还写一份 meta `person_name:*`，收敛后删除——两处写必然漂移。
-  if (row.partner_id) {
+  if (row.member_id) {
     getDb()
-      .prepare(`UPDATE space_members SET display_name = ? WHERE space_id = ? AND partner_id = ?`)
-      .run(partnerName, space_id, row.partner_id)
+      .prepare(`UPDATE space_members SET display_name = ? WHERE space_id = ? AND member_id = ?`)
+      .run(memberName, space_id, row.member_id)
   }
   console.log(
-    `[einz] 更新 partner 名称: partner=${row.partner_id}（${partnerName}）`
+    `[einz] 更新 member 名称: member=${row.member_id}（${memberName}）`
   )
   broadcastProfileUpdated(entrance_id, {
     entrance_id,
-    partner_id: row.partner_id,
-    partner_name: partnerName
+    member_id: row.member_id,
+    member_name: memberName
   })
   return { ok: true }
 }

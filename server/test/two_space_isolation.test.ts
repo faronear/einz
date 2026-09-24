@@ -69,7 +69,7 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
 interface SpacePeer {
   spaceId: string
   entranceId: string
-  partnerId: string
+  memberId: string
   sessionToken: string
 }
 
@@ -88,14 +88,14 @@ async function createSpace (port: number, label: string): Promise<SpacePeer> {
   const b = (await res.json()) as {
     spaceId: string
     entranceId: string
-    creatorPartnerId: string
+    creatorMemberId: string
     sessionToken: string
   }
   assert.ok(b.entranceId.length > 0 && b.sessionToken.length > 0, '创建者应直接拿到通道与会话')
   return {
     spaceId: b.spaceId,
     entranceId: b.entranceId,
-    partnerId: b.creatorPartnerId,
+    memberId: b.creatorMemberId,
     sessionToken: b.sessionToken
   }
 }

@@ -31,7 +31,7 @@ void main() {
       spaceId: 'space-x',
       keyVersion: 1,
     )
-      ..partnerId = 'p1'
+      ..memberId = 'p1'
       ..entranceId = 'd1';
     final session = ChatSession(store, path, '');
     var changed = 0;

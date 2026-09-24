@@ -1,6 +1,6 @@
 # 术语：东西都叫什么（命名分层）
 
-状态：**2026-09-22 定稿**（老板；同日晚做了 UI 用词修订；**2026-09-23**：界面用词「入口」→「通道」（英文仍 `entrance`），见「命名约定」第 1 条；**同日代码/wire/DB 全量改名落地**，见「wire 字段改名」一节）。本文是**唯一**的分层定义，`docs/DATABASE.md`、
+状态：**2026-09-22 定稿**（老板；同日晚做了 UI 用词修订；**2026-09-23**：界面用词「入口」→「通道」（英文仍 `entrance`），见「命名约定」第 1 条；**同日代码/wire/DB 全量改名落地**；**2026-09-24**：代码层 `partner`→`member`（界面文案不动），见「wire 字段改名」一节）。本文是**唯一**的分层定义，`docs/DATABASE.md`、
 `docs/PROTOCOL.md`、`aimemo/` 下的设计与产品文档都以此为准。
 
 ## 为什么需要这份东西
@@ -18,7 +18,7 @@
 | **登记项（通道）** | 某安装在某秘境里的一次登记：**本机 ⇄ 秘境的一条加密链路**（一套密钥对 + 一个身份 + 一个会话锚点） | `entrances` 表的**一行**；`entrance_id` | **「通道」**（英文 **entrance**，中英不同名，见命名约定 1） |
 | **开通码** | 一次性进入授权：凭它可在某秘境里**开通一条新通道**。接收方中立——可给伴侣，也可给自己的另一条通道 | `join_tokens` 表、`POST /spaces/{id}/join-tokens` | **「开通码」**（英文仍 **token**，中英不同名） |
 | **共享口令** | **两人共同持有**的口令，用于把 Space Key 封进服务器上的密保箱（key escrow）：新通道凭它取回密钥；任一方也能用它做撤销通道的二次校验 | `key_escrow` 表（argon2id 哈希）；**客户端不落盘** | **「共享口令」**（英文 **shared passphrase**；短引用可用「口令」） |
-| **伴侣 / 成员** | 秘境里的两个身份（slot 0 = 创建者，1 = 第二人） | `space_members.partner_id`、`space_members.slot`（同一身份可多条通道共享） | 「我的身份 / 对方」 |
+| **伴侣 / 成员** | 秘境里的两个身份（slot 0 = 创建者，1 = 第二人） | `space_members.member_id`、`space_members.slot`（同一身份可多条通道共享） | 「我的身份 / 对方」 |
 | **秘境（空间）** | 两位伴侣的私密世界 | `spaces.space_id` | 「秘境」（空间列表页叫「我的空间」） |
 
 一句话记忆：**一台机器 = 一个安装；一个安装 × 一个秘境 = 一个登记项 = 一条通道。**
@@ -42,8 +42,8 @@
 
 | 层 | 它那一半是什么 |
 | --- | --- |
-| **通道级** | entrance 自己的 X25519 **身份密钥对**（challenge-response 认证用）、`entrance_id`、`partner_id`、session token、`entrance_name`、指向安装的 `install_uid`、`status` |
-| **秘境级** | **Space Key**（内容密钥，两位 partner 共享，走密保箱分发）、消息、附件、读水位（`receipts`） |
+| **通道级** | entrance 自己的 X25519 **身份密钥对**（challenge-response 认证用）、`entrance_id`、`member_id`、session token、`entrance_name`、指向安装的 `install_uid`、`status` |
+| **秘境级** | **Space Key**（内容密钥，两位 member 共享，走密保箱分发）、消息、附件、读水位（`receipts`） |
 
 客户端里"本安装 ↔ 本秘境"是**一一对应**，所以本地数据一律按 `spaceId` 分命名空间
 （`space.<spaceId>.*`、`local_messages.space_id`）——"这条通道"与"这个秘境"的本地足迹
@@ -99,12 +99,12 @@
      「公钥通道」已改称**「链路」**（`SECURITY.md` / `E2EE.md` / `KEY_ESCROW.md`）；
      「平台通道」（Flutter MethodChannel）、「实时通道」「厂商通道（推送）」属平台实现语境，
      与界面术语不同层，维持原样。
-2. **代码与文档用层名。** 代码/注释/日志一律用 `install` / `entrance` / `partner`
+2. **代码与文档用层名。** 代码/注释/日志一律用 `install` / `entrance` / `member`
    语义命名，不要再造新的 "device" 概念（UI 层「本机 / device」除外）。
-   **存量命名已于 2026-09-23 全量迁移**（见下节）。
+   **存量命名已于 2026-09-23（device/person 线）与 2026-09-24（partner→member）全量迁移**（见下节）。
 3. **wire 字段名与界面用词同名分层。** `device_id` → `entrance_id`、`person_id` →
-   `partner_id` 已落地（2026-09-23）：登记项一律叫 `entrance`，秘境内的身份一律叫
-   `partner`，安装一律叫 `install`。
+   `member_id` 已落地（2026-09-23 person→partner，2026-09-24 partner→member）：登记项
+   一律叫 `entrance`，秘境内的身份一律叫 `member`，安装一律叫 `install`。
 
 ### 字段对照速查
 
@@ -113,25 +113,35 @@
 | `entrance_id`（表列 / JSON 键 / 路径参数） | 一个**登记项（通道）**的 id（安装 × 秘境），服务端 `randomUUID()` 生成 |
 | `install_uid` | 一个**安装**的 id，客户端生成、随 create/join 上报、可补登；**绝不进响应体** |
 | `entrance_name` | 登记项的显示名（老板 2026-09-22：**它本质是"通道名"**）。默认取设备型号——这是"一设备一通道一秘境"时代的历史遗留，用户可以改 |
-| `partner_id` | 秘境内的**身份** id（两位伴侣各一），同身份多通道共享 |
-| `slot` | 身份在秘境里的槽位（0=创建者，1=第二人）；旧名 `partner_slot` 已废弃 |
-| `entrance_partner_map` | 本机维护的「通道 → 身份」映射（归属判定用） |
+| `member_id` | 秘境内的**身份** id（两位伴侣各一），同身份多通道共享 |
+| `slot` | 身份在秘境里的槽位（0=创建者，1=第二人）；更早的名字 `partner_slot` 已废弃 |
+| `entrance_member_map` | 本机维护的「通道 → 身份」映射（归属判定用） |
 | `push_tokens.entrance_id` | 登记项 id（一个安装在每个秘境的通道各有一行） |
 
-## wire 字段改名（**2026-09-23 已完成**）
+## wire 字段改名（**2026-09-23 主线；2026-09-24 续改 `partner`→`member`**）
 
-改名计划与完整映射表见 **`aimemo/renamePlan.zhcn.md`**。要点：
+09-23 计划与完整映射表见 **`aimemo/renamePlan.zhcn.md`**。**当前**字段名要点：
 
 - `device_id` / `device_name` → **`entrance_id` / `entrance_name`**（登记项）；
 - `device_uid` → **`install_uid`**（安装）；
-- `person_id` / `person_name` → **`partner_id` / `partner_name`**（秘境内的身份）；
-- `partner_slot` → **`slot`**；旧 `partner_name`（第二人）→ **`peer_name`**，
+- `person_id` → `partner_id` → **`member_id`**；`person_name` → `partner_name` → **`member_name`**（秘境内的身份）；
+- 槽位 `partner_slot` → **`slot`**；第二人的旧 `partner_name` → **`peer_name`**，
   创建者一侧用 **`creator_name`**；
 - 表 `devices` → `entrances`、`device_activity` → `entrance_activity`；
-  路由 `/devices/*` → `/entrances/*`，成员改名 → `POST /partners/name`。
+  路由 `/devices/*` → `/entrances/*`，成员改名 → `POST /members/name`；
+- 审计 kind `partner.rename` → **`member.rename`**；WS 帧 `profile.updated` 的
+  `partner_id` → `member_id`；本机持久化键 `identity.entrance_partner_map` →
+  **`identity.entrance_member_map`**。
 
-**为什么这次能一次做完**：全新上线、无老客户端、无历史数据 → 不需要双名窗口 /
-协议版本双接受 / 读旧回退；**一次机械替换 + 一次提交**即可，故不做三期 alias。
+**2026-09-24 续改 `partner`→`member`**：为将来"一个秘境可能不止两人"留弹性，把指代
+「秘境内一个身份」的 `partner` 全线改为中性的 `member`（与既有 `space_members` 表名一致，
+去掉"`partner_id` 也指自己"的别扭）。**界面文案不动**——中文仍「伴侣」、英文 UI 仍
+`partner`（凸显情侣私密空间气质）；故代码层与界面词**中英不同名**，同「通道 / entrance」
+先例。`peer`（第二人）/ `creator`（创建者）/ `entrance` / `install` / `slot` 均不变。
+
+**为什么能一次做完**：全新上线、无老客户端、无历史数据 → 不需要双名窗口 /
+协议版本双接受 / 读旧回退；09-24 的 `partner`→`member` 更**合入同一个尚未发布的 v2
+窗口**（协议版本不另起 v3）。**一次机械替换 + 一次提交**即可，故不做三期 alias。
 
 **HTTP 路径**：`POST /auth/challenge` 的请求体字段已随改名变成 `{entrance_id, space_id}`；
 撤销走 `POST /entrances/:id/revoke`。

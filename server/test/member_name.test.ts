@@ -1,14 +1,14 @@
 /**
- * 回归：用户名称（partner 显示名）规则（老板 2026-09-16 定）——最多 32 字符，
+ * 回归：用户名称（member 显示名）规则（老板 2026-09-16 定）——最多 32 字符，
  * 只允许中文字 / 英文字母 / 数字 / `_` `-` / emoji。
  *
  * 与通道名（entrance_name.test.ts）的差别是**允许 emoji**：名字是给人看的亲昵称呼。
  * 名字一律由用户输入（没有自动取名这条路），所以服务端只做**拒绝**（400），
  * 不做消毒——静默改写人的名字等于名字莫名变了。
  *
- * 客户端同款规则在 shared/lib/src/policy/partner_name_policy.dart（改动请同步）。
+ * 客户端同款规则在 shared/lib/src/policy/member_name_policy.dart（改动请同步）。
  *
- * 运行：npm test（tsx test/partner_name.test.ts）
+ * 运行：npm test（tsx test/member_name.test.ts）
  */
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -18,7 +18,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 import { ApiError } from '../src/auth.js'
-import { assertPartnerName } from '../src/partnerName.js'
+import { assertMemberName } from '../src/memberName.js'
 
 const ROOT = join(import.meta.dirname, '..')
 
@@ -45,16 +45,16 @@ function req (port: number, path: string, init?: RequestInit): Promise<Response>
   })
 }
 
-test('assertPartnerName：合规放行（含 emoji），不合规 400', () => {
+test('assertMemberName：合规放行（含 emoji），不合规 400', () => {
   // 𠮷 = 扩展 B 汉字（罕见姓名用字，老板 2026-09-16 要求放行）
   for (const ok of ['Lukas', '小猪🐷', 'a_张-1', '😀', '🇨🇳', '👨‍👩‍👧', '❤️', '✨', '𠮷', '㐀', 'a'.repeat(32)]) {
-    assert.doesNotThrow(() => assertPartnerName(ok), `应放行: ${ok}`)
+    assert.doesNotThrow(() => assertMemberName(ok), `应放行: ${ok}`)
   }
   // 空格、中文标点、@、全角字母、超长 —— 都不合规
   // 假名 / 谚文 / 全角字母不是汉字，仍拒
   for (const bad of ['', '   ', 'Mr Lukas', '名字。', 'a@b', 'Ｌｕｋａｓ', 'あ', '한', 'Ａ', 'a'.repeat(33), '😀'.repeat(33)]) {
     assert.throws(
-      () => assertPartnerName(bad),
+      () => assertMemberName(bad),
       (e: unknown) => e instanceof ApiError && e.code === 'INVALID_REQUEST',
       `应拒收: ${JSON.stringify(bad)}`
     )
@@ -62,7 +62,7 @@ test('assertPartnerName：合规放行（含 emoji），不合规 400', () => {
 })
 
 test('端到端：create 的两个名字与改名都按白名单收口', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'einz-partner-'))
+  const dir = mkdtempSync(join(tmpdir(), 'einz-member-'))
   const port = freePort()
   const proc: ChildProcess = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
     env: { ...process.env, PORT: String(port), EINZ_DB: join(dir, 'einz.sqlite.db'), EINZ_FILES: join(dir, 'files') },
@@ -106,29 +106,29 @@ test('端到端：create 的两个名字与改名都按白名单收口', async (
     const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }
 
     const space = (await (await req(port, '/space', { headers: auth })).json()) as {
-      partner_names: Record<string, string>
+      member_names: Record<string, string>
     }
-    assert.ok(Object.values(space.partner_names).includes('小猪🐷'), 'emoji 名字应原样入库')
+    assert.ok(Object.values(space.member_names).includes('小猪🐷'), 'emoji 名字应原样入库')
 
     // 3) 改名：不合规 400；合规（emoji）200 生效
     for (const bad of ['Mr Lukas', '名字。', 'a'.repeat(33)]) {
-      const res = await req(port, '/partners/name', {
+      const res = await req(port, '/members/name', {
         method: 'POST',
         headers: auth,
-        body: JSON.stringify({ partner_name: bad })
+        body: JSON.stringify({ member_name: bad })
       })
       assert.equal(res.status, 400, `不合规改名应被拒: ${bad}`)
     }
-    const ok = await req(port, '/partners/name', {
+    const ok = await req(port, '/members/name', {
       method: 'POST',
       headers: auth,
-      body: JSON.stringify({ partner_name: '阿猪🐷_01' })
+      body: JSON.stringify({ member_name: '阿猪🐷_01' })
     })
     assert.equal(ok.status, 200, '合规改名应成功')
     const space2 = (await (await req(port, '/space', { headers: auth })).json()) as {
-      partner_names: Record<string, string>
+      member_names: Record<string, string>
     }
-    assert.ok(Object.values(space2.partner_names).includes('阿猪🐷_01'), '改名应生效')
+    assert.ok(Object.values(space2.member_names).includes('阿猪🐷_01'), '改名应生效')
   } finally {
     proc.kill()
   }

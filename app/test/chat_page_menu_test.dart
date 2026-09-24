@@ -77,7 +77,7 @@ class _FakeApi extends ApiClient {
   }
 
   @override
-  Future<void> updatePartnerName(String partnerName, String token) async {
+  Future<void> updateMemberName(String memberName, String token) async {
     // 改名成功（无网络，供保存路径测试）
   }
 
@@ -193,7 +193,7 @@ void main() {
     // 顶部条「我的」灯三态：未连接服务（ws null）→ 灰色
     final myDot = tester.widget<Icon>(find.byIcon(Icons.circle).last);
     expect(myDot.color, Colors.grey);
-    // 对话顶部条：身份名字为空时不显示文本（未传 partnerName/peerName → 只留在线圆点）
+    // 对话顶部条：身份名字为空时不显示文本（未传 memberName/peerName → 只留在线圆点）
     expect(find.text('未设置'), findsNothing);
 
     // 打开顶栏菜单
@@ -421,7 +421,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 打开菜单 → 点「我的身份」（未传 partnerName → 显示"我的身份: 未设置"）
+    // 打开菜单 → 点「我的身份」（未传 memberName → 显示"我的身份: 未设置"）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('我的身份'));
@@ -608,9 +608,9 @@ void main() {
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
     // 模拟向导完成时已写入 profile（setup _finish 的 saveProfile）
-    await AppLockService(db).saveProfile(partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
+    await AppLockService(db).saveProfile(memberName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
 
-    // 不带 partnerName/peerName——模拟 PIN 解锁重进（lock_page._enterChat 不传名字）
+    // 不带 memberName/peerName——模拟 PIN 解锁重进（lock_page._enterChat 不传名字）
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -682,8 +682,8 @@ void main() {
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
     final api = _FakeApi();
-    // 预置 profile（向导完成时的旧名 partnerB——老板实测场景）
-    await AppLockService(db).saveProfile(partnerName: 'partnerB', peerName: 'TUI', entranceName: 'iPhone');
+    // 预置 profile（向导完成时的旧名 memberB——老板实测场景）
+    await AppLockService(db).saveProfile(memberName: 'memberB', peerName: 'TUI', entranceName: 'iPhone');
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -701,8 +701,8 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300));
-    // initState loadProfile 补名（partnerB——顶部条/菜单显示）
-    expect(find.text('partnerB'), findsWidgets);
+    // initState loadProfile 补名（memberB——顶部条/菜单显示）
+    expect(find.text('memberB'), findsWidgets);
 
     // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.menu));
@@ -720,7 +720,7 @@ void main() {
 
     // profile 应已更新（改名后 _saveProfile 按当前空间写入）
     final p = await AppLockService(db).loadProfile(spaceId: 'space-demo');
-    expect(p['partnerName'], 'Alice', reason: '改名应同步写本地 profile');
+    expect(p['memberName'], 'Alice', reason: '改名应同步写本地 profile');
 
     // 模拟重启：新 ChatPage 实例（不带名字）→ 从 profile 恢复新名字
     await tester.pumpWidget(MaterialApp(
@@ -740,7 +740,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('Alice'), findsWidgets, reason: '重启后应从 profile 恢复新名字');
-    expect(find.text('partnerB'), findsNothing, reason: '不应回到旧名 partnerB');
+    expect(find.text('memberB'), findsNothing, reason: '不应回到旧名 memberB');
   });
 
   testWidgets('当前通道弹窗：标题/备注/公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
@@ -836,7 +836,7 @@ void main() {
     final api = _FakeApi();
     // 预置 profile 带本人性别（模拟向导完成时写入）
     await AppLockService(db).saveProfile(
-        partnerName: 'Lukas', peerName: 'Alice', entranceName: 'Phone', myGender: 'male');
+        memberName: 'Lukas', peerName: 'Alice', entranceName: 'Phone', myGender: 'male');
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1509,7 +1509,7 @@ void main() {
     final spaceKey = await generateSpaceKey();
     // 预置 profile（含通道名——闸门第一道要它，否则退化为固定确认词）
     await AppLockService(db).saveProfile(
-        spaceId: 'space-demo', partnerName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
+        spaceId: 'space-demo', memberName: 'Lukas', peerName: 'Alice', entranceName: 'iPhone');
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1552,7 +1552,7 @@ void main() {
     final longName = '我的名字被改得特别特别长以至于一定会溢出边界' * 2;
     await AppLockService(db).saveProfile(
         spaceId: 'space-demo',
-        partnerName: longName,
+        memberName: longName,
         peerName: longName,
         entranceName: longName);
 

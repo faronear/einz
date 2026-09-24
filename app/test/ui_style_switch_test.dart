@@ -45,8 +45,8 @@ class _FakeApi extends ApiClient {
     return SpaceResult(
       spaceId: 'space-demo',
       entrances: const [
-        SpaceEntrance(entranceId: 'dev-a', partnerId: 'partner-a', status: 'active'),
-        SpaceEntrance(entranceId: 'dev-b', partnerId: 'partner-b', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-a', memberId: 'member-a', status: 'active'),
+        SpaceEntrance(entranceId: 'dev-b', memberId: 'member-b', status: 'active'),
       ],
     );
   }
@@ -293,7 +293,7 @@ void main() {
     final spaceKey = await generateSpaceKey();
     // 预置双性别（模拟向导完成时写入）
     await AppLockService(db).saveProfile(
-        partnerName: 'Lukas',
+        memberName: 'Lukas',
         peerName: 'Alice',
         entranceName: 'Phone',
         myGender: 'male',

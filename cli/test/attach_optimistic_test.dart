@@ -34,7 +34,7 @@ void main() {
       keyVersion: 1,
       sessionToken: 'token-x',
     )
-      ..partnerId = 'p1'
+      ..memberId = 'p1'
       ..entranceId = 'd1';
     final session = ChatSession(store, path, '');
 
@@ -67,7 +67,7 @@ void main() {
       spaceId: 'space-x',
       sessionToken: 'token-x',
     )
-      ..partnerId = 'p1'
+      ..memberId = 'p1'
       ..entranceId = 'd1';
     final session = ChatSession(store, '${dir.path}/s.json', '');
 

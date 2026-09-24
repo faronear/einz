@@ -112,12 +112,12 @@ class ChatSession {
   /// 供 UI 状态栏显示"已断线 Ns"。
   DateTime? wsDownSince;
 
-  /// 对方（接收方）已送达高水位：partnerId → seq，只前进不倒退。
+  /// 对方（接收方）已送达高水位：memberId → seq，只前进不倒退。
   /// 用于推导"我发出的消息"是否已送达（delivered）。**不含本端自己那行**——
   /// 自己的水位描述的是"我收到对方哪些消息"，与我发出的消息无关（App 同款坑）。
   final Map<String, int> peerDeliveredUpto = {};
 
-  /// 对方已读高水位：partnerId → seq，只前进不倒退（语义同 [peerDeliveredUpto]）。
+  /// 对方已读高水位：memberId → seq，只前进不倒退（语义同 [peerDeliveredUpto]）。
   /// 服务端保证 read ≤ delivered；TUI 据此把"已读"的消息状态字符标蓝。
   final Map<String, int> peerReadUpto = {};
 
@@ -157,8 +157,8 @@ class ChatSession {
         env: env,
         plain: dec.plain,
         meta: dec.meta,
-        isMine: env.senderPartnerId != null && store.partnerId != null
-            ? env.senderPartnerId == store.partnerId
+        isMine: env.senderMemberId != null && store.memberId != null
+            ? env.senderMemberId == store.memberId
             : env.senderEntranceId == store.entranceId,
         createdAt: env.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         serverSequence: env.serverSequence,
@@ -252,7 +252,7 @@ class ChatSession {
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
       senderEntranceId: store.entranceId!,
-      senderPartnerId: store.partnerId,
+      senderMemberId: store.memberId,
       messageId: messageId,
       keyVersion: store.keyVersion,
     );
@@ -310,8 +310,8 @@ class ChatSession {
           env: env,
           plain: dec.plain,
           meta: dec.meta,
-          isMine: env.senderPartnerId != null && store.partnerId != null
-              ? env.senderPartnerId == store.partnerId
+          isMine: env.senderMemberId != null && store.memberId != null
+              ? env.senderMemberId == store.memberId
               : env.senderEntranceId == store.entranceId,
           createdAt: result.createdAt,
           serverSequence: result.serverSequence,
@@ -374,11 +374,11 @@ class ChatSession {
     try {
       final rows = await _withAutoAuth((token) => ApiClient(server).getReceipts(token));
       for (final r in rows) {
-        if (r.partnerId == store.partnerId) continue;
-        final cur = peerDeliveredUpto[r.partnerId] ?? 0;
-        if (r.deliveredUptoSeq > cur) peerDeliveredUpto[r.partnerId] = r.deliveredUptoSeq;
-        final curRead = peerReadUpto[r.partnerId] ?? 0;
-        if (r.readUptoSeq > curRead) peerReadUpto[r.partnerId] = r.readUptoSeq;
+        if (r.memberId == store.memberId) continue;
+        final cur = peerDeliveredUpto[r.memberId] ?? 0;
+        if (r.deliveredUptoSeq > cur) peerDeliveredUpto[r.memberId] = r.deliveredUptoSeq;
+        final curRead = peerReadUpto[r.memberId] ?? 0;
+        if (r.readUptoSeq > curRead) peerReadUpto[r.memberId] = r.readUptoSeq;
       }
     } catch (_) {
       // 网络抖动忽略
@@ -472,8 +472,8 @@ class ChatSession {
         env: env,
         plain: dec.plain,
         meta: dec.meta,
-        isMine: env.senderPartnerId != null && store.partnerId != null
-            ? env.senderPartnerId == store.partnerId
+        isMine: env.senderMemberId != null && store.memberId != null
+            ? env.senderMemberId == store.memberId
             : env.senderEntranceId == store.entranceId,
         createdAt: env.createdAt ?? seq ?? 0,
         serverSequence: seq,
@@ -570,8 +570,8 @@ class ChatSession {
             env: env,
             plain: dec.plain,
             meta: dec.meta,
-            isMine: env.senderPartnerId != null && store.partnerId != null
-            ? env.senderPartnerId == store.partnerId
+            isMine: env.senderMemberId != null && store.memberId != null
+            ? env.senderMemberId == store.memberId
             : env.senderEntranceId == store.entranceId,
             createdAt: env.createdAt ?? event.serverSequence,
             serverSequence: event.serverSequence,
@@ -593,14 +593,14 @@ class ChatSession {
         }
         if (event is WsReceiptUpdatedEvent) {
           // 对方送达/已读水位更新：合并到本地（排除自己那行——见 peerDeliveredUpto）
-          if (event.partnerId != store.partnerId) {
-            final cur = peerDeliveredUpto[event.partnerId] ?? 0;
+          if (event.memberId != store.memberId) {
+            final cur = peerDeliveredUpto[event.memberId] ?? 0;
             if (event.deliveredUptoSeq > cur) {
-              peerDeliveredUpto[event.partnerId] = event.deliveredUptoSeq;
+              peerDeliveredUpto[event.memberId] = event.deliveredUptoSeq;
             }
-            final curRead = peerReadUpto[event.partnerId] ?? 0;
+            final curRead = peerReadUpto[event.memberId] ?? 0;
             if (event.readUptoSeq > curRead) {
-              peerReadUpto[event.partnerId] = event.readUptoSeq;
+              peerReadUpto[event.memberId] = event.readUptoSeq;
             }
           }
           onReceiptUpdated?.call();
@@ -694,7 +694,7 @@ class ChatSession {
       spaceKey: base64Decode(store.spaceKey!),
       spaceId: store.spaceId!,
       senderEntranceId: store.entranceId!,
-      senderPartnerId: store.partnerId,
+      senderMemberId: store.memberId,
       messageId: messageId,
       type: type,
       keyVersion: store.keyVersion,

@@ -21,7 +21,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     -- 物理设备/安装那一层是下面的 install_uid。
     CREATE TABLE IF NOT EXISTS entrances (
       entrance_id   TEXT PRIMARY KEY,
-      partner_id   TEXT NOT NULL,
+      member_id   TEXT NOT NULL,
       public_key  TEXT NOT NULL,
       status      TEXT NOT NULL DEFAULT 'active',
       entrance_name TEXT,
@@ -38,7 +38,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       message_id       TEXT PRIMARY KEY,
       space_id         TEXT NOT NULL,
       sender_entrance_id TEXT NOT NULL,
-      sender_partner_id TEXT,
+      sender_member_id TEXT,
       type             TEXT NOT NULL,
       key_version      INTEGER NOT NULL,
       nonce            TEXT NOT NULL,
@@ -100,7 +100,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     -- Multiverse（v2）：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3）
     -- 刻意**没有** display_name：v1 曾把创建者名字快照在这里，但它是只写不读的死字段，
-    -- 且创建者改名（POST /partners/name）不会同步 → 会与真实名字冲突。
+    -- 且创建者改名（POST /members/name）不会同步 → 会与真实名字冲突。
     -- 人的名字唯一数据源是 space_members.display_name（老板 2026-09-16）。
     CREATE TABLE IF NOT EXISTS spaces (
       space_id         TEXT PRIMARY KEY,
@@ -113,16 +113,16 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
 
     CREATE TABLE IF NOT EXISTS space_members (
       space_id     TEXT NOT NULL REFERENCES spaces(space_id),
-      -- partner_id 是身份锚点（同一身份多通道共享）；伴侣（slot=1）
+      -- member_id 是身份锚点（同一身份多通道共享）；伴侣（slot=1）
       -- 预置时尚未加入 → 为 NULL，由首个加入该 slot 的通道生成（老板定稿）
-      partner_id    TEXT,
+      member_id    TEXT,
       slot INTEGER NOT NULL,
       display_name TEXT,
       gender       TEXT,
       status       TEXT NOT NULL DEFAULT 'active',
       -- 伴侣预置行未加入 → joined_at 为 NULL，激活时写入
       joined_at    INTEGER,
-      PRIMARY KEY (space_id, partner_id),
+      PRIMARY KEY (space_id, member_id),
       UNIQUE (space_id, slot)
     );
 
@@ -136,17 +136,17 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     );
     CREATE INDEX IF NOT EXISTS idx_join_tokens_space ON join_tokens (space_id, used_at);
 
-    -- 消息回执（已送达/已读）单调高水位：按 (space, partner) 一行。
+    -- 消息回执（已送达/已读）单调高水位：按 (space, member) 一行。
     -- 语义：我的消息 seq=S 已送达 ⟺ 对方 delivered_upto_seq ≥ S；已读 ⟺ read_upto_seq ≥ S。
-    -- 按 partner 记 → "该 partner 至少一条通道已收到/已读"（不保证所有通道）。
+    -- 按 member 记 → "该 member 至少一条通道已收到/已读"（不保证所有通道）。
     -- 不变式：只前进；delivered_upto_seq ≥ read_upto_seq（读隐含送达）。
     CREATE TABLE IF NOT EXISTS receipts (
       space_id           TEXT NOT NULL,
-      partner_id          TEXT NOT NULL,
+      member_id          TEXT NOT NULL,
       delivered_upto_seq INTEGER NOT NULL DEFAULT 0,
       read_upto_seq      INTEGER NOT NULL DEFAULT 0,
       updated_at         INTEGER NOT NULL,
-      PRIMARY KEY (space_id, partner_id)
+      PRIMARY KEY (space_id, member_id)
     );
 
     -- ── 审计表（只追加，永久保留；供"谁在哪条通道上、什么时候做了什么"回溯）──
@@ -185,9 +185,9 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     CREATE INDEX IF NOT EXISTS idx_dev_act_space_at  ON entrance_activity (space_id, at_ms);
   `);
 
-  // 迁移：messages 表补充 sender_partner_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
+  // 迁移：messages 表补充 sender_member_id（存量库 ALTER；新库 CREATE 已含该列 → 报错忽略）
   try {
-    db.exec(`ALTER TABLE messages ADD COLUMN sender_partner_id TEXT`);
+    db.exec(`ALTER TABLE messages ADD COLUMN sender_member_id TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
@@ -245,7 +245,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
           message_id       TEXT PRIMARY KEY,
           space_id         TEXT NOT NULL,
           sender_entrance_id TEXT NOT NULL,
-          sender_partner_id TEXT,
+          sender_member_id TEXT,
           type             TEXT NOT NULL,
           key_version      INTEGER NOT NULL,
           nonce            TEXT NOT NULL,
@@ -254,7 +254,7 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
           created_at       INTEGER NOT NULL,
           UNIQUE (space_id, server_sequence)
         );
-        INSERT INTO messages_new SELECT message_id, space_id, sender_entrance_id, sender_partner_id, type, key_version, nonce, ciphertext, server_sequence, created_at FROM messages;
+        INSERT INTO messages_new SELECT message_id, space_id, sender_entrance_id, sender_member_id, type, key_version, nonce, ciphertext, server_sequence, created_at FROM messages;
         DROP TABLE messages;
         ALTER TABLE messages_new RENAME TO messages;
         CREATE INDEX idx_messages_seq ON messages (space_id, server_sequence);

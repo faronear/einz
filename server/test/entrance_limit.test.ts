@@ -42,7 +42,7 @@ function entranceCount (spaceId: string): number {
   const row = getDb()
     .prepare(
       `SELECT COUNT(*) AS n FROM entrances d
-       JOIN space_members sm ON sm.partner_id = d.partner_id
+       JOIN space_members sm ON sm.member_id = d.member_id
        WHERE sm.space_id = ?`,
     )
     .get(spaceId) as { n: number }

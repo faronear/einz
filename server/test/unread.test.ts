@@ -4,7 +4,7 @@
  * 多空间列表角标的依据：**服务端派生**——消息 + 我上报的读取水位（receipts.read_upto_seq）。
  * 四个必须立住的点：
  * 1. 只数"晚于我读取水位"的；
- * 2. **必须走 partner 维度**排除自己：同一身份的第二条通道发来的消息不是未读
+ * 2. **必须走 member 维度**排除自己：同一身份的第二条通道发来的消息不是未读
  *    （只比 entrance_id 会把它算进来——这是最容易错的点）；
  * 3. 没有 receipts 行 = 从没读过 = 对方的全部消息都算未读；
  * 4. 只数本空间（跨空间不串）。
@@ -23,8 +23,8 @@ import { unreadCount } from '../src/receipts.js'
 
 const SPACE = 'space-a'
 const OTHER_SPACE = 'space-b'
-const ME = 'partner-me'
-const PEER = 'partner-peer'
+const ME = 'member-me'
+const PEER = 'member-peer'
 const MY_DEVICE = 'dev-me'
 const MY_OTHER_DEVICE = 'dev-me-2'
 const PEER_DEVICE = 'dev-peer'
@@ -42,7 +42,7 @@ function seed (): void {
   space.run(OTHER_SPACE, 'addr-b', 'pk-b', now, now)
 
   const dev = db.prepare(
-    `INSERT INTO entrances (entrance_id, partner_id, public_key, status, last_seen, created_at)
+    `INSERT INTO entrances (entrance_id, member_id, public_key, status, last_seen, created_at)
      VALUES (?, ?, 'pk', 'active', ?, ?)`,
   )
   dev.run(MY_DEVICE, ME, now, now)
@@ -50,7 +50,7 @@ function seed (): void {
   dev.run(PEER_DEVICE, PEER, now, now)
 
   const member = db.prepare(
-    `INSERT INTO space_members (space_id, partner_id, slot, status, joined_at)
+    `INSERT INTO space_members (space_id, member_id, slot, status, joined_at)
      VALUES (?, ?, ?, 'active', ?)`,
   )
   member.run(SPACE, ME, 0, now)
@@ -75,7 +75,7 @@ function seed (): void {
   msg.run('x1', OTHER_SPACE, PEER_DEVICE, 1, now) // 别的空间，不该被算进来
 
   db.prepare(
-    `INSERT INTO receipts (space_id, partner_id, delivered_upto_seq, read_upto_seq, updated_at)
+    `INSERT INTO receipts (space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
      VALUES (?, ?, ?, ?, ?)`,
   ).run(SPACE, ME, 3, 3, now)
 }
@@ -91,7 +91,7 @@ function withDb (fn: () => void): void {
   }
 }
 
-test('unread：只数"晚于我读取水位"的对方消息（partner 维度排除我自己）', () => {
+test('unread：只数"晚于我读取水位"的对方消息（member 维度排除我自己）', () => {
   withDb(() => {
     // 读到 seq=3 → seq4 / seq5 是未读；seq3 虽然晚于水位但**是我另一条通道发的**，不算
     assert.equal(unreadCount('tok-me').unread, 2)
@@ -101,16 +101,16 @@ test('unread：只数"晚于我读取水位"的对方消息（partner 维度排�
 test('unread：水位推进到最新 → 0；没有 receipts 行 → 对方的全部消息都算未读', () => {
   withDb(() => {
     const db = getDb()
-    db.prepare(`UPDATE receipts SET read_upto_seq = 5 WHERE space_id = ? AND partner_id = ?`).run(SPACE, ME)
+    db.prepare(`UPDATE receipts SET read_upto_seq = 5 WHERE space_id = ? AND member_id = ?`).run(SPACE, ME)
     assert.equal(unreadCount('tok-me').unread, 0, '读到最新 → 没有未读')
 
-    db.prepare(`DELETE FROM receipts WHERE space_id = ? AND partner_id = ?`).run(SPACE, ME)
+    db.prepare(`DELETE FROM receipts WHERE space_id = ? AND member_id = ?`).run(SPACE, ME)
     // 没读过：m2 / m4 / m5 三条（m1 我发的、m3 我另一条通道发的都不算）
     assert.equal(unreadCount('tok-me').unread, 3, '没有 receipts 行 = 全部未读')
   })
 })
 
-test('unread：按 partner 看（对方的角度与我不同），且不串其他空间', () => {
+test('unread：按 member 看（对方的角度与我不同），且不串其他空间', () => {
   withDb(() => {
     // 对方：我的 m1 与 m3 对它都是未读（它没有 receipts 行）；其他空间的消息不算
     assert.equal(unreadCount('tok-peer').unread, 2)

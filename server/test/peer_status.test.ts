@@ -1,9 +1,9 @@
 /**
  * 回归：peer.online/peer.offline 只广播给**另一个人**的通道（老板 2026-09-16 实测）。
  *
- * 此前广播只排除发起通道本身（`entrance_id != 自己`），于是同一 partner 的第二条通道
+ * 此前广播只排除发起通道本身（`entrance_id != 自己`），于是同一 member 的第二条通道
  * 一上线，第一台就把"对方"灯点亮——对方（B）压根还没加入空间却显示在线。
- * 现在：广播跳过与发起通道同 partner 的连接，且 payload 带 partner_id 供客户端自校。
+ * 现在：广播跳过与发起通道同 member 的连接，且 payload 带 member_id 供客户端自校。
  *
  * 运行：npm test（tsx test/peer_status.test.ts）
  */
@@ -30,7 +30,7 @@ function seed (): void {
   ).run('space-a', 'addr-a', 'pk-a', now, now)
 
   const dev = db.prepare(
-    `INSERT INTO entrances (entrance_id, partner_id, public_key, status, created_at)
+    `INSERT INTO entrances (entrance_id, member_id, public_key, status, created_at)
      VALUES (?, ?, 'pk', 'active', ?)`,
   )
   dev.run('a1', 'p1', now)
@@ -38,7 +38,7 @@ function seed (): void {
   dev.run('b1', 'p2', now)
 
   const member = db.prepare(
-    `INSERT INTO space_members (space_id, partner_id, slot, status, joined_at)
+    `INSERT INTO space_members (space_id, member_id, slot, status, joined_at)
      VALUES (?, ?, ?, 'active', ?)`,
   )
   member.run('space-a', 'p1', 0, now)
@@ -85,7 +85,7 @@ async function waitFor (what: string, cond: () => boolean, timeoutMs = 3000): Pr
 
 const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
 
-test('peer 上下线广播：跳过同一 partner 的通道，只给对方', async () => {
+test('peer 上下线广播：跳过同一 member 的通道，只给对方', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-peer-'))
   const wss = new WebSocketServer({ port: 0 })
   attachWs(wss)
@@ -112,7 +112,7 @@ test('peer 上下线广播：跳过同一 partner 的通道，只给对方', asy
       a2.frames.some(f => f.type === 'peer.online' && f.payload.entrance_id === 'b1'))
 
     const online = a1.frames.find(f => f.type === 'peer.online')
-    assert.equal(online?.payload.partner_id, 'p2', 'payload 应带上通道所属 partner_id')
+    assert.equal(online?.payload.member_id, 'p2', 'payload 应带上通道所属 member_id')
 
     b1.ws.close()
     await waitFor('a1 收到 b1 的 peer.offline', () =>
