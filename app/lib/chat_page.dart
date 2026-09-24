@@ -761,13 +761,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // pending，下次解锁时再摘——数据此刻已经清干净，其他空间原样保留。
     // 此前是全机 clear() + 删全表，多空间下等于"一个空间被撤销 = 全机数据归零"。
     await step(() => AppLockService(db).removeSpace(widget.spaceId));
-    // TODO(M2)：Vault 里还有其他空间时应回 SpaceListPage，而不是 SetupPage。
     if (!mounted) return;
     showTopNotice(context, AppLocalizations.of(context)!.chatPageEntranceRevoked);
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const SetupPage()),
-      (route) => false,
-    );
+    // 还有其他空间 → 切到下一个；一个都不剩 → 回向导（2026-09-24：不再一律回向导，
+    // 多空间下被撤销的只是一条通道，其他秘境应当照常可用）。
+    final vault = VaultSession.current;
+    final next = vault == null
+        ? null
+        : await AppLockService(db).resolveActivePayload(vault);
+    if (!mounted) return;
+    if (next == null) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const SetupPage()),
+        (route) => false,
+      );
+      return;
+    }
+    await switchToSpace(context, next.spaceId, db: widget.db);
   }
 
   /// 重建轮询 ticker（WS 状态变化时切换间隔）。

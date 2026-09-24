@@ -15,6 +15,7 @@ import 'package:einz/data/attachment_storage_settings.dart';
 import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/data/message_repository.dart';
+import 'package:einz/data/vault_session.dart';
 import 'package:einz_shared/einz_shared.dart';
 
 void main() {
@@ -117,12 +118,27 @@ void main() {
     expect(remaining.map((r) => r.read<String>('space_id')), ['space-b']);
     expect(await count('local_attachments'), 1);
 
+    // 回归（2026-09-24）：内存会话必须**立即**同步移除——否则聊天页导航判定与空间列表
+    // 仍读到这条已销毁的空间，表现就是"销毁后停在原对话页 / 空间卡片显示 UUID 名"。
+    expect(VaultSession.current?.spaces.map((s) => s.spaceId), ['space-b'],
+        reason: '内存 Vault 应立即移除已销毁空间（不等下次解锁）');
+
     // 密文包此时还没改（没有 pin 改不了），下次解锁补做
     final before = await lock.unlockVault('123456');
     expect(before.spaces.map((s) => s.spaceId), ['space-b'], reason: '解锁时自动应用 pending');
     final after = await lock.unlockVault('123456');
     expect(after.spaces.map((s) => s.spaceId), ['space-b'], reason: 'pending 只应用一次');
     expect(after.activeSpaceId, 'space-b');
+  });
+
+  test('回归 2026-09-24：PIN 模式销毁唯一空间后，内存 Vault 立即清空（→ 不再停在对话页）', () async {
+    await lock.setPin('123456', payload: payloadA); // 只有 space-a
+
+    await lock.removeSpace('space-a');
+
+    expect(VaultSession.current?.spaces, isEmpty, reason: '内存 Vault 应立即清空');
+    final next = await lock.resolveActivePayload(VaultSession.current!);
+    expect(next == null, isTrue, reason: '解析不出 active → 聊天页应回向导（不再是已销毁的空间）');
   });
 
   test('per-space 设置互不干扰，且读得到 v7 之前的旧全局键', () async {

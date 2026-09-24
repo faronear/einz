@@ -9161,6 +9161,59 @@ worklog 拖到下一轮，导致复盘要靠 `git log` 反推——这条已写�
 - 未跑 cli 的其余 pty e2e 探针（需真 server，按惯例不改）。
 - 服务端/App 真机自测仍待老板；推送与部署按惯例留给老板。
 
+## 2026-09-24 修复：PIN 模式下「销毁本通道」后卡在原对话页（多空间回归）
+
+### 现象（老板 iMac 实测）
+
+服务端（新代码 + 空库）重置后 App 提示"这条通道未被服务器识别（服务器数据可能已重置）"
+→ 菜单-高级-销毁本通道 → **销毁成功却仍停在对话页**（预期回秘境向导）；彻底重启后仍进对话页；
+再点「切换我的秘境」看到一张 **UUID 名（`b2b3d9ee-1379-4405-af4b-5f482…`）、无粉蓝底、一团阴影**
+的空间卡片。
+
+### 根因
+
+多空间 M1（`986a9ec`）给 `AppLockService.removeSpace` 加了
+"PIN 模式且没传 pin → 挂 pending、等下次解锁再摘密文条目"的**早返回分支**，但漏了同步
+**内存里的 `VaultSession`**：
+
+- 聊天页销毁后按 `VaultSession.current` 判定去向 → 仍解析出**这条刚被销毁的空间** →
+  `switchToSpace(自己)` = 原地不动 → 停在对话页；
+- 空间列表（`space_switcher`）也读 `VaultSession.current.spaces` → 幽灵卡片；而该空间的
+  Spaces 行与 per-space 资料已被 `_deleteSpaceData` 删掉 → 标题回退成 `spaceId`（UUID）、
+  性别取不到 → 无粉蓝底、默认阴影。
+
+### 定位证据（dev 沙盒库）
+
+`app_lock.pending_remove.b2b3d9ee…=1`、`app_lock.active_space=b2b3d9ee…`、
+Spaces 表只剩 `99ff790b…`（被销毁的 `b2b3d9ee` 已无行）——与症状一一对上。
+
+### 是否 macOS 专属
+
+**不是**。与平台无关，**凡设了锁屏码（`isSetup == true`）的平台都会中招**；无 PIN（明文
+Vault）走另一分支，不受影响。老板的 macOS 实例设了 PIN，故命中。
+
+### 修复
+
+1. `removeSpace` 的 pending 分支**立即** `VaultSession.publish(mem.remove(spaceId))` +
+   `_syncActiveKey(next)`（密文包仍等下次解锁补做，内存视图先更新）。
+2. `LockPage._enterChat`：解锁后若 `vault.active == null`（空间全被销毁）→ 跳 `SetupPage`
+   （原来直接 `return`，会卡死在锁屏页）。
+3. `ChatPage._onEntranceRevoked`（被撤销自毁）同款收口：还有其他空间→切过去，否则回向导；
+   清掉原 `TODO(M2)`。
+
+### 验证
+
+- 新增 2 条回归断言（`multi_space_isolation_test`：pending 后内存立即移除；销毁唯一空间后
+  `resolveActivePayload == null`）。
+- `flutter analyze` 无 issue；`multi_space_isolation` / `vault` / `app_lock` /
+  `chat_page_menu` / `multi_space_pages` 共 **61 例全过**。
+
+### 老板侧
+
+彻底退出 App（**Cmd+Q，而非关窗**——macOS 关窗不杀进程，`VaultSession` 是进程内存）后重开，
+解锁一次即让存量 pending 生效（也可直接让新包跑一次解锁）。
+
+
 
 
 

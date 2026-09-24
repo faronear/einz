@@ -11,6 +11,7 @@ import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'l10n/app_localizations.dart';
+import 'setup_page.dart';
 import 'widgets/top_notice.dart';
 
 /// 锁屏页：输入 PIN 解密 Space Key 包 → 进入聊天页。
@@ -98,7 +99,14 @@ class _LockPageState extends State<LockPage> {
     final vault = await _lock.unlockVault(pin);
     if (!mounted) return;
     final active = vault.active;
-    if (active == null) return;
+    if (active == null) {
+      // 所有空间都已销毁（含"销毁本通道"挂的 pending 在解锁时被摘掉）→ 回向导。
+      // 否则会停在锁屏页无路可走（2026-09-24 修）。
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => SetupPage(db: widget.db)),
+      );
+      return;
+    }
     // 注意：**不要**把 pin 捕获进任何长命闭包（以前的 onManageSpaces 就是这么把锁屏码
     // 长期留在内存里的）。现在聊天页自己就能切空间（不需要 pin），这里只传解锁结果。
     Navigator.of(context).pushReplacement(MaterialPageRoute(

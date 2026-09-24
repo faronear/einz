@@ -220,6 +220,16 @@ class AppLockService {
   Future<void> removeSpace(String spaceId, {String? pin}) async {
     if (pin == null && await isSetup) {
       await _set(_pendingRemoveKey(spaceId), '1');
+      // 内存里的 Vault 必须**立即同步移除**：密文包没有 pin 改不了（挂 pending 等下次
+      // 解锁补做），但界面读的是内存 Vault——不更新的话，销毁后聊天页的导航判定
+      // （`resolveActivePayload`）与空间列表仍会看到这条已销毁的空间。
+      //（2026-09-24 修：这正是"销毁后停在原对话页 / 空间卡片显示 UUID 名"的根因。）
+      final mem = VaultSession.current;
+      if (mem != null) {
+        final next = mem.remove(spaceId);
+        VaultSession.publish(next);
+        await _syncActiveKey(next); // 删的是当前空间时，把明文 active 键让给剩下的
+      }
       await _deleteSpaceData(spaceId);
       return;
     }
