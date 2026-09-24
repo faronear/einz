@@ -8863,3 +8863,42 @@ reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通�
   命中 → 拦下；本机没有该秘境 → 照常放行（防误伤）。向导相关 4 个文件 24 例全绿。
 - **已经踩过这个 bug 的历史数据**：服务端那条孤儿通道可以用 TUI 的 `/撤销` 清掉——
   它按"同空间 N 条通道"列全部通道、按序号撤销，所以在当前通道里也能撤掉那条孤儿。
+
+## 2026-09-23 · 服务端补齐同一规则 + 全仓 upsert 落点扫描（commit `ca4a363`）
+
+**① 服务端也拒（老板："前后端要保持一致"）**——`joinSpace` 事务内，按 `install_uid` 查该空间
+是否已有**未撤销**（`status != 'revoked'`）的通道，命中抛新码 `ENTRANCE_ALREADY_EXISTS`（409）。
+三个位置细节都是有意的：
+- 放在**消费开通码之前**（token 的一次性 UPDATE 前）→ 被拒的邀请码还能给别的设备用，零写入；
+- 放在**通道上限检查之前** → 设备重复是更可操作的错因，先报它不会把人引去看额度；
+- `install_uid` 为 null（存量行 / 未升级客户端）→ **不拦**，那道闸门在客户端。
+App 与 TUI 都把新错误码接上了（原先会落进"通用失败"，用户看不懂）。
+
+⚠️ **与 `installUid.ts` 既有定位的张力**：那里 2026-09-22 明确写过这个字段"不参与任何破坏性
+操作的授权或范围判断"。本次用法是**否决**（denylist），不是授权，也没扩大任何操作范围——所以我
+在注释里补了一条"这是唯一否决用途，别再拿它授权"，让两条决定能一起读。**下次再想用
+install_uid 做判断前先看这段。**
+
+**② 全仓 upsert / 冲突覆盖落点扫描**（老板要求）。结论：**除 Vault 按 spaceId 那份，没有同类
+"静默销毁用户数据"的风险**。
+
+App 侧 `insertOnConflictUpdate` 共 7 处，全是**键值 / 设置 / 可重算缓存**，覆盖即预期；
+`upsertPeerReceipt` 还是**先读 + `max()` 合并**（显式防回退），是正确写法的样板。
+唯一危险的是 `VaultPayload.upsert` 家族（`addSpace` / `savePlain` / `writePinVault` 都经
+`_mergedVault`）——按 spaceId 覆盖**整份凭证**，就是本次那个 bug，已在入口 + 服务端两道拦住。
+
+服务端 `ON CONFLICT` 共 6 处：`push.ts`（push token 重注册即替换）、`db.ts`（meta 键值）、
+`receipts.ts`（`MAX()` 合并，注释明确"只前进，禁止先读后写"）、`backup.ts`（恢复导入就是覆盖）
+都无风险；只有 `escrow.ts` 两处是"后写覆盖先写"——但一个空间一个密保箱、口令本来共享，
+轮换时替换属预期，**不算 bug**。
+
+**③ 扫出来的副产品：一个过期探针**。`cli/test/cliMultiverseE2E.py` 跑不起来，缺两样（都与本次
+改动无关，是后来加的服务端收口）：① 不发 `X-Protocol-Version: 1` → 400
+PROTOCOL_VERSION_MISMATCH；② 不发 Authorization → join-tokens 早已要求成员会话（C1 修复），
+而它**读了 store 里的 session_token 却没用上**。同一批探针里 `guide_input_rules_check.py` /
+`revoke_command_check.py` / `presence_check.py` / `revoked_check.py` 都记得发协议头，所以只是
+这一个漏了。待单独修。
+
+**验证手段记录**：服务端全量 `npm test` 31 pass；`cli/test/guide_input_rules_check.py`（自己
+起 `node server/dist/app.js` + 两个 TUI 进程的加入 E2E）通过——**注意它跑的是 `dist/`，改完
+`src/` 必须先 `npm run build`**，否则验的是旧代码（`dist/` 在 .gitignore 里，不用提交）。
