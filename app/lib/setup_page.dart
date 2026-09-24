@@ -765,9 +765,10 @@ class _SetupPageState extends State<SetupPage> {
       } else if (checkPartnerNamePolicy(partner) case final v?) {
         localError = _nameRuleError(v);
         invalid = true;
-      } else if (partner == _creatorName.text.trim()) {
-        // 两人不能同名（老板 2026-09-10 定；TUI 早已收口，App 此前漏了——2026-09-23 实测）：
-        // join 时是"按名字选身份"，两个名字相同就没法判别你是哪一位
+      } else if (isSamePartnerName(partner, _creatorName.text.trim())) {
+        // 两人不能同名（老板 2026-09-10 定，2026-09-24 收紧为大小写不敏感；TUI 早已
+        // 收口，App 此前漏了——2026-09-23 实测）：join 时是"按名字选身份"，两个名字
+        // 相同（含仅大小写不同）就没法判别你是哪一位
         localError = l10n.wizardPeerNameSameName;
         invalid = true;
       }

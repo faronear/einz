@@ -50,7 +50,7 @@ class AppLockService {
   static const _kLockedUntil = 'app_lock.locked_until';
   static const _kPlain = 'app_lock.plain'; // 【遗留】旧版明文包在 app_state 的键（仅迁移读取）
   static const _kSkipped = 'app_lock.skipped'; // '1' = 用户确认暂不设锁
-  static const _kProfile = 'app_lock.profile'; // JSON: {partnerName, peerName, entranceName}
+  static const _kProfile = 'app_lock.profile'; // JSON: {partnerName, peerName, entranceName, myGender, peerGender, mySlot, peerSlot, peerPartnerId}
 
   /// 安装级标识（同一物理设备各空间共用；服务端 entrances.install_uid 的来源）。
   static const _kInstallUid = 'app_lock.install_uid';

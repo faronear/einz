@@ -45,10 +45,14 @@ class MediaCache {
   }
 
   /// 全量清理（通道撤销清空本地数据时用）。
+  ///
+  /// **递归**遍历：缓存文件已按空间分片到 `<cache>/<safe(spaceId)>/` 子目录，
+  /// 只 list 顶层会一个文件都删不到（留一地解密明文）。仍按 [_isOwned] 过滤，
+  /// 目录里非本类文件不动。
   static Future<void> deleteAll() async {
     await _guard(() async {
       final dir = await _cacheDirectory();
-      await for (final entity in dir.list()) {
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
         if (entity is! File) continue;
         final name = entity.uri.pathSegments.last;
         if (_isOwned(name)) {

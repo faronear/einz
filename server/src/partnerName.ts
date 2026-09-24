@@ -44,3 +44,10 @@ export function assertPartnerName(name: string): void {
     );
   }
 }
+
+/** 两个名字是否算"同一个名字"（创建空间时两人同名校验用）：trim + 大小写不敏感。
+ *  老板 2026-09-24 定：`lukas` 与 `Lukas` 视作同名。Dart 同款在
+ *  `shared/lib/src/policy/partner_name_policy.dart`，改动务必两边同步。 */
+export function isSamePartnerName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}

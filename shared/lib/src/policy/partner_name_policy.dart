@@ -60,3 +60,11 @@ PartnerNameViolation? checkPartnerNamePolicy(String name) {
   if (value.runes.length > kPartnerNameMaxLength) return PartnerNameViolation.tooLong;
   return null;
 }
+
+/// 两个名字是否算"同一个名字"（取名空间的两人同名校验用）：**trim + 大小写不敏感**。
+///
+/// 老板 2026-09-24 定：`lukas` 与 `Lukas` 视作同名，不允许作为新建空间里的两人。
+/// 名字白名单只含 Han / 拉丁 / 数字 / `_` / `-` / emoji，中文与 emoji 无大小写概念，
+/// 故 casefold 实际只对拉丁字母生效。
+bool isSamePartnerName(String a, String b) =>
+    a.trim().toLowerCase() == b.trim().toLowerCase();

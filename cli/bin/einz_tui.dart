@@ -940,8 +940,8 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       _scheduleRender();
       continue;
     }
-    // 不允许和第一人同名（老板 2026-09-10）
-    if (peerName == displayName) {
+    // 不允许和第一人同名（老板 2026-09-10 定；2026-09-24 收紧为大小写不敏感）
+    if (isSamePartnerName(peerName, displayName)) {
       session.messages.add(
           _systemMessage(session, '⚠️ 伴侣名字不能与我的名字相同（$displayName），请重新输入'));
       _scheduleRender();
@@ -1252,7 +1252,7 @@ Future<void> main(List<String> args) async {
   }
 
   // 无显式 --store：默认目录（~/.einz）自动发现已有通道；
-  // 无通道 → 引导 init（存 [device-id].json）；损坏文件自动备份 .bak 后重新初始化。
+  // 无通道 → 引导 init（存 myeinz.json）；损坏文件自动备份 .bak 后重新初始化。
   if (!explicitStore) {
     storePath = _resolveAutoStore();
   }
@@ -1268,7 +1268,7 @@ Future<void> main(List<String> args) async {
   if (exitCode != 0) return; // 引导中选择 sealed 导入 → 提示后退出
   final store = onboard.$1;
   server = onboard.$2;
-  storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/[device-id].json）
+  storePath = onboard.$3; // 自动模式下 init 后的实际路径（~/.einz/myeinz.json）
 
   // 启动自检：**只有服务端明确撤销本通道**才不进 TUI（清盘 + 提示 + 退出）。
   // 会话被清（/revoke 会 DELETE 该通道的 sessions）→ 清 token 走挑战重认证；挑战返回

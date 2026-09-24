@@ -7,7 +7,7 @@ import { deriveSpaceAddress } from "./address.js";
 import { loadConfig } from "./config.js";
 import { normalizeEntranceName } from "./entranceName.js";
 import { normalizeInstallUid } from "./installUid.js";
-import { assertPartnerName } from "./partnerName.js";
+import { assertPartnerName, isSamePartnerName } from "./partnerName.js";
 import { assertSafeSpaceId } from "./safeId.js";
 
 // Multiverse：多租户空间与一次性加入凭证（docs/PROTOCOL_MULTIVERSE.md §3/§4）。
@@ -111,9 +111,10 @@ export async function createSpace(
   // 只有传了才校验（未传维持现状——服务端不强制必填，必填由客户端引导负责）
   if (creatorName != null) assertPartnerName(creatorName);
   if (peerName != null) assertPartnerName(peerName);
-  // 两人不能同名（老板 2026-09-10 定）：join 是"按名字选身份"，同名会让
-  // "你是哪一位"无法判别（App/TUI 客户端也各自拦，这里是兜底）
-  if (creatorName != null && peerName != null && creatorName === peerName) {
+  // 两人不能同名（老板 2026-09-10 定；2026-09-24 收紧为 trim + 大小写不敏感）：
+  // join 是"按名字选身份"，同名会让"你是哪一位"无法判别（App/TUI 客户端也各自拦，
+  // 这里是兜底）
+  if (creatorName != null && peerName != null && isSamePartnerName(creatorName, peerName)) {
     throw new ApiError("INVALID_REQUEST", "两人的名字不能相同", 400);
   }
   // 占位地址：正式版由 space_public_key 派生（Keccak-256 + EIP-55）
@@ -188,6 +189,8 @@ export async function createSpace(
       // 库中存 sha256（明文只回给客户端；见 auth.hashSessionToken）
       .run(hashSessionToken(sessionToken), entranceId, spaceId, now + SESSION_TTL_MS, now);
   }
+  // created_by_entrance 列存的是**创建者角色字面量**（"creator"/"member"），
+  // 不是某条 entrance_id——列名沿用历史，勿据此列反查通道。
   const t = newJoinToken(spaceId, "creator");
   return {
     spaceId,
@@ -352,7 +355,7 @@ export function joinSpace(
       if (dup) {
         throw new ApiError(
           "ENTRANCE_ALREADY_EXISTS",
-          "this device already has an entrance in this space",
+          "本设备在该空间已有通道",
           409,
         );
       }

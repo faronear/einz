@@ -225,6 +225,14 @@ function restoreSpace(
   assertSafeSpaceId(spaceId);
   const db = getDb();
   // 删除顺序：子表先行（外键若启用也不会撞约束）；审计表刻意不动
+  //
+  // **不变式：清理与导出必须同口径。** entrances 无 space_id 列，靠
+  // `partner_id IN (本空间 space_members 的 partner_id)` 反查；`exportSpaceRows`
+  // 用同一个子查询带出这些行，恢复时再 INSERT 回来，两侧口径必须逐字一致，
+  // 否则会删掉导不出（或反之）的行。这里本来就只落在本空间：partner_id 是
+  // create/join 时按 (space_id, slot) 现生成的 UUID（spaces.ts），不跨空间共享，
+  // 所以同一个人在别的空间是**另一个 partner_id**，不会被这一刀波及；同空间内
+  // 同一身份的多条通道则本就该一起导出/清理。
   const cleanup = db.transaction(() => {
     db.prepare(`DELETE FROM push_tokens WHERE entrance_id IN (SELECT entrance_id FROM entrances WHERE partner_id IN (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL))`).run(spaceId);
     db.prepare(`DELETE FROM entrances WHERE partner_id IN (SELECT partner_id FROM space_members WHERE space_id = ? AND partner_id IS NOT NULL)`).run(spaceId);
