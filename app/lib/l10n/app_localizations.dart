@@ -1745,7 +1745,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupPinReuseNotice.
   ///
   /// In en, this message translates to:
-  /// **'This space will share the current lock screen PIN.'**
+  /// **'This space will share the current PIN.'**
   String get setupPinReuseNotice;
 }
 

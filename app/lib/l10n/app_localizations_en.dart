@@ -948,6 +948,5 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListDeleteConfirm => 'Remove';
 
   @override
-  String get setupPinReuseNotice =>
-      'This space will share the current lock screen PIN.';
+  String get setupPinReuseNotice => 'This space will share the current PIN.';
 }
