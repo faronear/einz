@@ -130,6 +130,11 @@ void main() {
     expect(find.text('对方B'), findsOneWidget);
     expect(find.text('3'), findsOneWidget, reason: 'space-a 有 3 条未读');
     expect(find.text('添加秘境'), findsOneWidget, reason: '底部通往第一屏');
+    // 「添加秘境」常态就有淡灰底（提示可点）；与卡片之间不再要分隔线
+    final addBg = tester.widget<Material>(
+        find.ancestor(of: find.text('添加秘境'), matching: find.byType(Material)).first);
+    expect(addBg.color, isNotNull, reason: '常态底色，不是按下去才有');
+    expect(find.byType(Divider), findsNothing, reason: '分隔线已去掉');
   });
 
   testWidgets('空间卡片：长名字不撑破卡片（省略号 + 不溢出）', (WidgetTester tester) async {

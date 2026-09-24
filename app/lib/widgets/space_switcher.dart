@@ -228,12 +228,24 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                   );
                 },
               ),
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: Text(l10n.spaceListAdd),
-              onTap: () => Navigator.of(context).pop(const SpacePick.add()),
+            const SizedBox(height: 8),
+            // 「添加秘境」：**常态就是淡灰底**，提示"这里可以点"；鼠标悬浮/按住再渐变深色
+            // （老板 2026-09-24：原先只有按住才有底色，看不出可点）。
+            // 与卡片之间不再要分隔线（老板 2026-09-24）。
+            Material(
+              color: Colors.black.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
+              child: InkWell(
+                onTap: () => Navigator.of(context).pop(const SpacePick.add()),
+                hoverColor: Colors.black.withValues(alpha: 0.10),
+                highlightColor: Colors.black.withValues(alpha: 0.14),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  leading: const Icon(Icons.add),
+                  title: Text(l10n.spaceListAdd),
+                ),
+              ),
             ),
           ],
         ),
