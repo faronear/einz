@@ -121,11 +121,15 @@ class AttachmentStore {
   }
 
   /// 清空所有留存明文（切回 `secured` 模式 / 通道被撤销时调用）。
+  ///
+  /// **递归**遍历：留存明文已按空间分片在 `<dir>/<safe(spaceId)>/` 子目录里，
+  /// 只 list 顶层会一个文件都删不掉 —— "切回安全模式"形同虚设，解密明文残留。
+  /// 仍按 [MediaCache.fileNamePrefix] 过滤，非本类文件不动。
   static Future<void> clear() async {
     try {
       final dir = await directory();
       if (dir == null) return;
-      await for (final entity in dir.list()) {
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
         if (entity is! File) continue;
         if (entity.uri.pathSegments.last.startsWith(MediaCache.fileNamePrefix)) {
           await entity.delete().catchError((_) => entity);
