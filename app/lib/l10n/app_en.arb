@@ -418,6 +418,6 @@
   "spaceListSwitch": "Switch my space",
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Verify this device's lock screen code first",
-  "spaceListDeleteConfirm": "Remove",
+  "leaveSpaceConfirm": "Destroy",
   "setupPinReuseNotice": "This space will share the current PIN."
 }

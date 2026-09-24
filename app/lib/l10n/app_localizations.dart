@@ -1736,11 +1736,11 @@ abstract class AppLocalizations {
   /// **'Verify this device\'s lock screen code first'**
   String get promptLockCodeHint;
 
-  /// No description provided for @spaceListDeleteConfirm.
+  /// No description provided for @leaveSpaceConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Remove'**
-  String get spaceListDeleteConfirm;
+  /// **'Destroy'**
+  String get leaveSpaceConfirm;
 
   /// No description provided for @setupPinReuseNotice.
   ///

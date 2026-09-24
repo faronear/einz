@@ -902,7 +902,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get promptLockCodeHint => '请先验证本机锁屏码';
 
   @override
-  String get spaceListDeleteConfirm => '移除';
+  String get leaveSpaceConfirm => '销毁';
 
   @override
   String get setupPinReuseNotice => '本秘境将共用当前的锁屏码。';

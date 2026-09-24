@@ -97,7 +97,7 @@ Future<bool> confirmLeaveSpace(
     copy: ConfirmDialogCopy(
       title: l10n.leaveSpaceTitle,
       message: l10n.leaveSpaceMessage,
-      confirmLabel: l10n.spaceListDeleteConfirm,
+      confirmLabel: l10n.leaveSpaceConfirm,
     ),
   );
   if (!ok || !context.mounted) return false;

@@ -945,7 +945,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Verify this device\'s lock screen code first';
 
   @override
-  String get spaceListDeleteConfirm => 'Remove';
+  String get leaveSpaceConfirm => 'Destroy';
 
   @override
   String get setupPinReuseNotice => 'This space will share the current PIN.';
