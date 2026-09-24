@@ -8832,3 +8832,34 @@ reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通�
 比"临时改回去再 add"安全，后者有和并发写者互相覆盖的风险）。
 本次隔离出去、留给老板自己的：`cli/bin/einz_tui.dart` 文案、`app_zh.arb` +
 `app_localizations_zh.dart` + `chat_page_menu_test.dart` 的「新口令不能与当前口令相同」。
+
+## 2026-09-23 · bug：加入向导可重复添加同一秘境 → 静默顶替原通道（commit `13a48a3`）
+
+老板报的：**同一个秘境再走一遍加入向导，本机会把原有那条通道顶替掉**，旧通道默默消失、
+服务端也没退役。
+
+**成因（一句话）**：Vault 按 `spaceId` 存一份凭证，`VaultPayload.upsert` 同名即**覆盖**——
+所以"再加一次同一秘境"不是加第二条通道，而是覆盖第一条。而向导原先**不做任何"是否已添加"
+的判断**。一台设备对一个秘境只有一条通道，这是模型层面的约束，不是实现 bug。
+
+**拦点**：`setup_page._verifyJoinToken` —— preflight 之后（此时才知道目标 spaceId）、
+**消费一次性邀请码之前**。这三条都是选它而不是选 `addSpace` 的理由：
+1. 能判断的最早时机，用户不用白走完身份/口令/锁屏码几步；
+2. token 还没被 `joinSpace` 消费 → 被拒的邀请码**仍可发给别的设备用**，且零服务端副作用；
+3. join 流程的必经关口（`_joinSpaceId` 只在此设置，口令页依赖它）→ 一处拦住，
+   后面所有写盘路径（向导自己的 `savePlain`/`setPin` + `addSpaceFlow` 的 `addSpace`）全被挡住。
+   **注意向导自己就会写盘**（`_runJoinAccess` → `savePlain`），所以"只在 `addSpace` 加闸"是不够的。
+
+**判据** `_isSpaceAlreadyAdded(spaceId)` 查两处，任一命中即拒：
+① `VaultSession.current`（内存 Vault，权威，被顶替的就是它）；② `db.spaces` 表（明文缓存，
+不依赖 PIN，VaultSession 还没发布时也拦得住）。VaultSession 是**进程级静态**，
+测试里必须 `setUp(() => VaultSession.publish(null))` 复位，否则串味。
+
+**顺带查清的两件事**：
+- 已有测试 `vault_test.dart` 的「同 spaceId 再次 addSpace 是覆盖，不产生重复项」**故意**文档化了
+  upsert=覆盖这个原语。所以这次**没动 `addSpace` 语义**（入口已拦；改语义要连带改这条测试）。
+  真要在 `addSpace` 也硬拦，得先把那个测试的语义重写——留给老板决定。
+- 本次新增 `app/test/setup_join_duplicate_space_test.dart`（3 例）：Spaces 表命中 / 内存 Vault
+  命中 → 拦下；本机没有该秘境 → 照常放行（防误伤）。向导相关 4 个文件 24 例全绿。
+- **已经踩过这个 bug 的历史数据**：服务端那条孤儿通道可以用 TUI 的 `/撤销` 清掉——
+  它按"同空间 N 条通道"列全部通道、按序号撤销，所以在当前通道里也能撤掉那条孤儿。
