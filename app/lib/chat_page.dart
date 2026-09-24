@@ -1243,6 +1243,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 title: Text(l10n.advancedDestroyEntrance),
                 onTap: () => Navigator.of(ctx).pop('leave'),
               ),
+              // 底部留白：与「切换我的秘境」弹层一致（那边是外层 Padding 的 bottom 16），
+              // 这里标题只包了 12 的 Padding → 单独给末行留 16，不然紧贴屏幕底边
+              const SizedBox(height: 16),
             ],
           ),
         );
