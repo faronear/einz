@@ -87,7 +87,7 @@
       "error": {"type": "String"}
     }
   },
-  "setupEntryTitle": "选择秘境",
+  "setupEntryTitle": "秘境入口",
   "setupEntryHint": "秘境是仅限两人的私密世界，可以从头创建，或者受邀加入。",
   "setupEntryCreate": "创建秘境",
   "setupEntryJoin": "加入秘境",

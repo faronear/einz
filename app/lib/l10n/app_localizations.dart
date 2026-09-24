@@ -491,7 +491,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryTitle.
   ///
   /// In en, this message translates to:
-  /// **'Choose a space'**
+  /// **'Getting started'**
   String get setupEntryTitle;
 
   /// No description provided for @setupEntryHint.

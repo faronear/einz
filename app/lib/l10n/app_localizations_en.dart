@@ -225,7 +225,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setupEntryTitle => 'Choose a space';
+  String get setupEntryTitle => 'Getting started';
 
   @override
   String get setupEntryHint =>

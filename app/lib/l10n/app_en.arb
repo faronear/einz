@@ -87,7 +87,7 @@
       "error": {"type": "String"}
     }
   },
-  "setupEntryTitle": "Choose a space",
+  "setupEntryTitle": "Getting started",
   "setupEntryHint": "Einz is a secret space for just two. You can create a new one, or join an existing one by invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",

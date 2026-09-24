@@ -216,7 +216,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupEntryTitle => '选择秘境';
+  String get setupEntryTitle => '秘境入口';
 
   @override
   String get setupEntryHint => '秘境是仅限两人的私密世界，可以从头创建，或者受邀加入。';
