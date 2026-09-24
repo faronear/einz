@@ -7891,7 +7891,9 @@ Vault 猜 active 空间**，结果 7 个 widget 测试挂死（pumpAndSettle 10 
 
 ## 2026-09-22 清理误提交的 SFConflict 副本（iMac 切机后）
 
-昨晚在 MacBook 上提交的 `b89b14b` 被 Seafile 同步带回了 3 个冲突副本：
+昨晚在 MacBook 上提交的 `b89b14b`（**注：已被本段末尾的 `3c9c039` 取代——那次 `reset --soft` 重提后
+它就成了悬空对象，不在任何分支上；此处的号只作历史指代，`git show` 仍可在 reflog 有效期内找到**）
+被 Seafile 同步带回了 3 个冲突副本：
 `app/lib/l10n/app_localizations{,_en,_zh} (SFConflict luk 2026-09-22-09-12-36).dart`，
 被 `git add` 一起提交（3792 行）。处理：`git reset --soft HEAD~1` → 删副本 → 重新提交为
 **`3c9c039`**，只含 `app/lib/setup_page.dart`（+16 行，`onManageSpaces` 回调）。
