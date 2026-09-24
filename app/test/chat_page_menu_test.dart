@@ -11,6 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
+import 'package:einz/data/burn_after_settings.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
@@ -1324,6 +1325,70 @@ void main() {
     await tester.tap(chevron);
     await tester.pumpAndSettle();
     expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
+  });
+
+  testWidgets('阅后即焚开启时顶栏出现沙漏+档位标记，点击直接进档位弹层',
+      (WidgetTester tester) async {
+    // 老板 2026-09-24：开了焚毁是"会丢消息"的状态，值得在顶栏一直看得见。
+    // 用手机尺寸渲染：档位弹层在默认 800x600 测试窗口里会被压到 9/16 高而溢出
+    // （OptionPickerSheet 既有问题，与标记无关）
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await BurnAfterSettings(db, spaceId: 'space-demo').save(3600); // 1 小时
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byIcon(Icons.hourglass_top), findsOneWidget, reason: '沙漏标记');
+    expect(find.text('1h'), findsOneWidget, reason: '档位用 d/h/m/s 单位（不是「1 小时」）');
+
+    // 点击标记 → 直接进档位弹层
+    await tester.tap(find.byIcon(Icons.hourglass_top));
+    await tester.pumpAndSettle();
+    expect(find.text('阅后即焚'), findsOneWidget, reason: '档位弹层标题');
+  });
+
+  testWidgets('阅后即焚关闭（Off）时顶栏不出现焚毁标记', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byIcon(Icons.hourglass_top), findsNothing,
+        reason: '未开启焚毁 → 顶栏没有标记');
   });
 
   testWidgets('高级功能：破坏性入口改为空间级「销毁本通道」（不再整机重置）',

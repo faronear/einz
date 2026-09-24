@@ -270,6 +270,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 顶栏阅后即焚标记的档位文字：**只用量纲单位** d/h/m/s（老板 2026-09-24：
+  /// 不用中文单位——横向更省，也不随界面语言变化）。取能整除的最大单位。
+  String _burnBadgeText(int seconds) {
+    if (seconds >= 86400 && seconds % 86400 == 0) return '${seconds ~/ 86400}d';
+    if (seconds >= 3600 && seconds % 3600 == 0) return '${seconds ~/ 3600}h';
+    if (seconds >= 60 && seconds % 60 == 0) return '${seconds ~/ 60}m';
+    return '${seconds}s';
+  }
+
+  /// 顶栏的阅后即焚标记：沙漏 + 档位（如 `⧗ 1h`）。**点击直接进档位弹层**
+  /// （与菜单里的「阅后即焚」是同一个动作，只是把这个"会丢消息"的状态提到明面上）。
+  ///
+  /// 图标与消息气泡里同族（`_BurnHourglass` 的 `hourglass_top/bottom`），但这里是
+  /// **静态**的（不翻转）；尺寸 24 = 锁屏等顶栏图标同大（老板 2026-09-24，火苗太小时改）。
+  /// 配色不单独指定：跟锁屏等顶栏图标同色。
+  Widget _buildBurnBadge(AppLocalizations l10n) {
+    return Tooltip(
+      message: l10n.chatPageBurnHeading,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: _showBurnPicker,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.hourglass_top, size: 24),
+              const SizedBox(width: 2),
+              Text(_burnBadgeText(_burnSeconds),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 消息发送时间标注：当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM。
   String _messageTimeLabel(HistoryMessage m) {
     final local = DateTime.fromMillisecondsSinceEpoch(m.createdAt).toLocal();
@@ -3834,6 +3871,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ],
         ),
         actions: [
+          // 阅后即焚生效时的小标记（火苗 + 档位）：点击**直接**进档位弹层。
+          // 放最左（锁屏按钮 / 汉堡菜单的左侧）。老板 2026-09-24：开了焚毁是一个
+          // "会丢消息"的状态，值得在顶栏一直看得见，而不是藏进菜单里才发现。
+          if (_burnSeconds > 0) _buildBurnBadge(l10n),
           // 锁屏（老板要求 2026-09-16）：一键立即锁屏，放在下拉菜单图标左侧。
           // 仅在已设置锁屏码时出现——没设 PIN 时锁屏不激活（LockPage 只会显示
           // "尚未设置锁屏码"提示页），摆一个按了没用的按钮反而误导。
@@ -4080,7 +4121,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             key: const ValueKey('chatPageStatusBar'),
             width: double.infinity,
             margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(24),
@@ -4092,31 +4132,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                // 对方（左）：在线圆点 + 名字 + 「切换我的秘境」下拉箭头。
-                // **整簇可点** → 一步打开空间选择弹层（老板 2026-09-24）：省掉
-                // 「☰ → 眼睛扫菜单 → 点『切换我的秘境』」，与微信「左上角返回→选人」同一
-                // 肌肉记忆；命中区取整簇（不是只点那根细箭头）。位置放**对方名字**旁：
-                // 空间卡片上显示的就是对方名字，语义同源。
-                //
-                // Expanded（左右各占一半）+ 名字 Flexible 省略：名字是用户可任意填的长文本，
-                // 原先两侧都按内容宽度撑开、没有上限 → 长名字会越过中线顶到对面名字旁、
-                // 并冲出胶囊条直到屏幕边缘（老板 2026-09-24 实测）。现在每一方**绝不越过
-                // 中线**、也不出胶囊条，多余的一律「…」。圆点与箭头是固定项，永不被压掉。
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
+            // 内边距不再挂在胶囊上，改由左右两块各自持有——这样左侧那块能**上/下/左
+            // 三边完全贴合**胶囊边框（老板 2026-09-24）；clip 让它的方角被胶囊圆角裁掉。
+            clipBehavior: Clip.antiAlias,
+            // IntrinsicHeight：给这行一个确定高度，左侧那块才能用 stretch 撑满
+            //（父级 Column 不限高，直接 stretch 会得到 Infinity 高度）
+            child: IntrinsicHeight(
+              child: Row(
+                // spaceBetween + 两侧都 Flexible：名字短时左边贴左、右边贴右；名字长时
+                // 各自最多占一半、超出「…」（老板 2026-09-24 实测：长名字会越过中线、
+                // 冲出胶囊条）。圆点与箭头是固定项，永不被压掉。
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // 子项撑满高度 → 左侧那块上下与胶囊贴合
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 对方（左）：在线圆点 + 名字 + 「切换我的秘境」下拉箭头。
+                  // **整块做成一个"可按区域"**（底色比胶囊略深一档 + 右侧圆角，暗示可点），
+                  // 一步打开空间选择弹层（老板 2026-09-24）：省掉「☰ → 眼睛扫菜单 →
+                  // 点『切换我的秘境』」，与微信「左上角返回→选人」同一肌肉记忆。
+                  // 位置放**对方名字**旁：空间卡片上显示的就是对方名字，语义同源。
+                  Flexible(
                     child: Tooltip(
                       message: l10n.spaceListSwitch,
                       child: Material(
-                        type: MaterialType.transparency,
+                        // 比胶囊底（白 85%）略深一档：做出"这一块能按"的暗示
+                        color: Colors.black.withValues(alpha: 0.055),
+                        elevation: 0,
+                        // 只圆右边：左边上下角交给外层胶囊的 clip 对齐（三边完全贴合）
+                        shape: const RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.horizontal(right: Radius.circular(24)),
+                        ),
+                        clipBehavior: Clip.antiAlias,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
                           onTap: _openSpacePicker,
                           child: Padding(
-                            // 纵向只加 2：状态条胶囊本来只有 6 的内边距，别把条撑高
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            // 左 16 = 原胶囊的左内边距；右 10 给箭头留白
+                            padding: const EdgeInsets.fromLTRB(16, 6, 10, 6),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -4145,32 +4197,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                ),
-                // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
-                // 名字为空则不显示文本，只留圆点）。名字同样在本侧一半内省略。
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (_myPartnerName.isNotEmpty) ...[
-                        Flexible(
-                          child: Text(_myPartnerName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.end,
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w500)),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      Icon(Icons.circle, size: 8,
-                          color: _ws == null
-                              ? Colors.grey
-                              : (_ws!.connected.value ? Colors.green : Colors.red)),
-                    ],
+                  // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
+                  // 名字为空则不显示文本，只留圆点）。名字同样在本侧一半内省略。
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 6, 16, 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (_myPartnerName.isNotEmpty) ...[
+                            Flexible(
+                              child: Text(_myPartnerName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.end,
+                                  style: const TextStyle(
+                                      fontSize: 13, fontWeight: FontWeight.w500)),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Icon(Icons.circle, size: 8,
+                              color: _ws == null
+                                  ? Colors.grey
+                                  : (_ws!.connected.value ? Colors.green : Colors.red)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           // 离线提示条（老板 2026-09-13）：只在"有还没确认的消息 **且** 连接有问题"
