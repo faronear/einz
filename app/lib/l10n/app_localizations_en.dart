@@ -487,7 +487,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      'An entrance is the dedicated line between a device and a space. Settings on this entrance works only between this device and the current space.';
+      'An entrance is the dedicated line between a device and a space. Settings here apply only to this entrance.';
 
   @override
   String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';

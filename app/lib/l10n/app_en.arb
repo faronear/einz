@@ -195,7 +195,7 @@
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",
   "chatPageRenameEntranceLabel": "Entrance name",
-  "chatPageEntranceScopeHint": "An entrance is the dedicated line between a device and a space. Settings on this entrance works only between this device and the current space.",
+  "chatPageEntranceScopeHint": "An entrance is the dedicated line between a device and a space. Settings here apply only to this entrance.",
   "chatPageRenameEntranceEmptyError": "Enter the entrance name",
   "chatPageRenameEntranceInvalidError": "Only Chinese/English letters, digits, _ and - are allowed",
   "chatPageRenameEntranceTooLongError": "At most {max} characters",
