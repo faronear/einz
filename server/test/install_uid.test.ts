@@ -58,7 +58,7 @@ test('create/join 落库：同一 install_uid 把不同空间的 entrance_id 关
       undefined, '我', 'male', '伴侣', 'female',
       undefined, undefined, 'pk-d', 'iPhone', UID_D,
     )
-    // 另一台设备 E 创建空间 B，然后设备 D 用邀请码加入 B（同一个 install_uid）
+    // 另一台设备 E 创建空间 B，然后设备 D 用开通码加入 B（同一个 install_uid）
     const spaceB = await createSpace(
       undefined, '对方', 'female', '伴侣', 'male',
       undefined, undefined, 'pk-e', 'Pixel', UID_E,

@@ -409,7 +409,7 @@ export function joinSpace(
   return doJoin();
 }
 
-/** 生成一次性邀请 token（骨架：成员认证由 U1 Space-scoped session 补齐）。 */
+/** 生成一次性开通码（英文仍称 token；成员认证由 U1 Space-scoped session 补齐）。 */
 export function createJoinToken(
   spaceId: string,
   baseUrl?: string, // 邀请链接 base（按请求真实 Host 生成，2026-09-11）

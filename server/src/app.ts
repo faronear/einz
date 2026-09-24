@@ -195,9 +195,9 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
 <div class="card">
   <h1>💌 Einz 私密空间邀请</h1>
   <p>这是一份 <strong>Einz</strong>（双人私密加密聊天空间）的加入邀请。</p>
-  <p>请使用 Einz App 打开本链接，或在 App 中加入时粘贴下面的邀请码：</p>
+  <p>请使用 Einz App 打开本链接，或在 App 中加入时粘贴下面的开通码：</p>
   <div class="token">${token}</div>
-  <p class="hint">邀请码 24 小时内有效、仅可使用一次。</p>
+  <p class="hint">开通码 24 小时内有效、仅可使用一次。</p>
 </div>
 </body>
 </html>`
@@ -264,8 +264,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     path.endsWith('/join-tokens')
   ) {
     const spaceId = path.slice('/spaces/'.length, -'/join-tokens'.length)
-    // C1 修复：签发邀请凭证 = 空间级操作，必须持该空间成员会话（此前任何人
-    // 拿到 spaceId 就能自签邀请码、以 slot=0 冒充创建者加通道）
+    // C1 修复：签发开通码 = 空间级操作，必须持该空间成员会话（此前任何人
+    // 拿到 spaceId 就能自签开通码、以 slot=0 冒充创建者加通道）
     requireSpaceMember(optionalBearerToken(req), spaceId)
     const r = createJoinToken(spaceId, requestBaseUrl(req))
     sendJson(res, 201, r)

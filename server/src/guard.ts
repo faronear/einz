@@ -9,7 +9,7 @@ import { getEntrance, getEntranceStatus } from "./config.js";
  *
  * 为什么要有这个文件（2026-09-15 评审 C1）：app.ts 是手写路由，鉴权靠每个分支
  * 自己记得写——`POST /spaces/{id}/join-tokens` 与 `POST /spaces/{id}/key-escrow`
- * 上传分支就是漏写了的两个，任何人拿到 spaceId 就能给自己签邀请码、或覆盖掉
+ * 上传分支就是漏写了的两个，任何人拿到 spaceId 就能给自己签开通码、或覆盖掉
  * 口令托管包。把校验收口成显式调用（漏挂会一眼看出来），是这类漏洞的结构性解法。
  *
  * 约定：
