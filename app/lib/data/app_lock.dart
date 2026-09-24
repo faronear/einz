@@ -535,10 +535,39 @@ class AppLockService {
         'peerGender': (m['peerGender'] as String?) ?? '',
         'mySlot': (m['mySlot'] as num?)?.toInt(),
         'peerSlot': (m['peerSlot'] as num?)?.toInt(),
+        'peerPartnerId': (m['peerPartnerId'] as String?) ?? '',
       };
     } catch (_) {
       return const {};
     }
+  }
+
+  /// 记下本空间**对方**的 partner_id（头像等按 partner 维度取数据时用）。
+  ///
+  /// 为什么需要单独存：对方的身份 id 原本只在"取数据那一刻"现算——从服务端 `GET /space`
+  /// 的通道表取 `entranceId → partnerId` 再排掉自己，**算完即丢**；而对方的名字/性别/槽位
+  /// 都早已落进 per-space 资料。于是会出现"卡片有对方名字、却不知道对方是谁、头像只能给默认"
+  /// 的不对称（老板 2026-09-23 指出）。这里把它与 peerName 并列存进同一份资料。
+  ///
+  /// 读改写、只加这一个键（不碰其它键），幂等——值没变不写盘。
+  Future<void> savePeerPartnerId({
+    required String spaceId,
+    required String peerPartnerId,
+  }) async {
+    final pid = peerPartnerId.trim();
+    if (spaceId.isEmpty || pid.isEmpty) return;
+    final key = _profileKey(spaceId);
+    var m = <String, dynamic>{};
+    final raw = await _get(key);
+    if (raw != null) {
+      try {
+        m = jsonDecode(raw) as Map<String, dynamic>;
+      } catch (_) {
+        m = <String, dynamic>{}; // 坏 JSON：重写一份干净的
+      }
+    }
+    if (m['peerPartnerId'] == pid) return; // 幂等
+    await _set(key, jsonEncode({...m, 'peerPartnerId': pid}));
   }
 
   /// 旧全局键 [_kProfile] 的兼容读：**仅当本机只登记了 ≤1 个空间**时返回。

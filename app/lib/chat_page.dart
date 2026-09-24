@@ -1248,6 +1248,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 加载我的头像（异步；未设置/失败 → 保持默认图标）。
   /// partnerId 缺失时（重启路径）从本地持久化的 entrance→partner 映射反查。
+  /// 把"本空间对方是谁"（partner_id）落进 per-space 资料，与 peerName 并列。
+  ///
+  /// 为什么要在 `refreshEntranceMap()` 之后做：对方的 partner_id 只在那份通道表映射里
+  /// 出现过（服务端 `GET /space` 的 `entranceId → partnerId`，排掉自己就是对方），
+  /// 而映射只在内存 + 一张全局表里，**没有"按空间"的落点**。不落的话，切换秘境弹层的卡片
+  /// 就只能显示默认头像——明明有对方名字却不知道对方是谁（老板 2026-09-23 指出）。
+  ///
+  /// best-effort：拿不到（离线/只有我一人）就什么都不做，卡片保持默认头像。
+  Future<void> _persistPeerPartnerId() async {
+    final pid = _repo.resolvePeerPartnerId();
+    if (pid == null || pid.isEmpty) return;
+    try {
+      await AppLockService(widget.db ?? LocalDatabase.shared)
+          .savePeerPartnerId(spaceId: widget.spaceId, peerPartnerId: pid);
+    } catch (_) {
+      // 落盘失败不影响聊天；下次刷新再试
+    }
+  }
+
   Future<void> _loadMyAvatar() async {
     var pid = _myPartnerId;
     if (pid == null || pid.isEmpty) {
@@ -1750,6 +1769,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         unawaited(AttachmentStore.deleteFor(widget.spaceId, id)); // stored 模式的留存明文同样要删
       }
       await _repo.refreshEntranceMap();
+      await _persistPeerPartnerId();
       final recent = await _repo.historyRecent(limit: _pageSize);
       if (!mounted) return;
       setState(() => _messages = recent);
@@ -2049,6 +2069,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     try {
       await _repo.sync();
       await _repo.refreshEntranceMap();
+      await _persistPeerPartnerId();
       // 同步时顺带拉了对方回执（repo.sync 内）→ 载入渲染缓存
       await _loadPeerReceipts();
       await _refreshLocal(realtime: realtime);

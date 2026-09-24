@@ -214,6 +214,20 @@ class MessageRepository {
     return (pid == null || pid.isEmpty) ? null : pid;
   }
 
+  /// 本空间的**对方** partner_id：持久化映射里"不是我"的那个。
+  ///
+  /// 用途：给 per-space 资料落一份对方的身份 id（`savePeerPartnerId`），
+  /// 否则"对方是谁"只能现算现丢，卡片就没法按 partner 维度取头像。
+  /// 映射由 [refreshEntranceMap] 从服务端通道表落盘；拿不到（离线/映射为空/只有我一人）
+  /// 返回 null —— 调用方保持不动即可。
+  String? resolvePeerPartnerId() {
+    final mine = _partnerByEntrance[entranceId];
+    for (final pid in _partnerByEntrance.values) {
+      if (pid.isNotEmpty && pid != mine) return pid;
+    }
+    return null;
+  }
+
   /// 当前同步锚点（本地库 sync_state）。
   Future<int> get lastSequence async {
     final row = await (db.select(db.syncState)

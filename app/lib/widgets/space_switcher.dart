@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:einz_shared/einz_shared.dart';
 import 'package:flutter/material.dart';
 
@@ -103,7 +105,8 @@ class _SpacePickerSheet extends StatefulWidget {
 }
 
 class _SpacePickerSheetState extends State<_SpacePickerSheet> {
-  Map<String, ({String name, String peerName, String peerGender})> _names = {};
+  Map<String, ({String name, String peerName, String peerGender, String peerPartnerId})>
+      _names = {};
   Map<String, int> _unread = {};
   String? _activeId;
 
@@ -116,7 +119,8 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
   Future<void> _load() async {
     final lock = AppLockService(widget.db);
     final rows = await widget.db.select(widget.db.spaces).get();
-    final out = <String, ({String name, String peerName, String peerGender})>{};
+    final out =
+        <String, ({String name, String peerName, String peerGender, String peerPartnerId})>{};
     for (final row in rows) {
       var name = row.name;
       var peerName = row.peerName;
@@ -129,7 +133,14 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
         name = (p['partnerName'] as String?) ?? '';
         peerName = (p['peerName'] as String?) ?? '';
       }
-      out[row.spaceId] = (name: name, peerName: peerName, peerGender: peerGender);
+      out[row.spaceId] = (
+        name: name,
+        peerName: peerName,
+        peerGender: peerGender,
+        // 与 peerName/peerGender 同源：都是这份 per-space 资料里的并列字段。
+        // 取不到（还没连过服务端 / 对方还没加入）→ 空串：卡片显示默认头像。
+        peerPartnerId: (p['peerPartnerId'] as String?) ?? '',
+      );
     }
     final vault = VaultSession.current;
     final activeId = vault == null ? null : await lock.resolveActiveSpaceId(vault);
@@ -180,6 +191,9 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                     _SpaceCard(
                       name: _titleOf(space),
                       peerGender: _names[space.spaceId]?.peerGender ?? '',
+                      peerPartnerId: _names[space.spaceId]?.peerPartnerId ?? '',
+                      server: effectiveServer,
+                      api: widget.api,
                       unread: _unread[space.spaceId] ?? 0,
                       current: space.spaceId == _activeId,
                       onTap: () => Navigator.of(context).pop(SpacePick.space(space.spaceId)),
@@ -213,6 +227,9 @@ class _SpaceCard extends StatelessWidget {
   const _SpaceCard({
     required this.name,
     required this.peerGender,
+    required this.peerPartnerId,
+    required this.server,
+    required this.api,
     required this.unread,
     required this.current,
     required this.onTap,
@@ -222,6 +239,10 @@ class _SpaceCard extends StatelessWidget {
   /// 对方性别（male/female/''）：卡片底色按它取色——选中深粉 / 深蓝，未选中淡粉 / 淡蓝；
   /// 未知 → 不给底色，用 Card 默认表面色。
   final String peerGender;
+  /// 该空间里对方的 partner_id（头像用；空串 → 显示默认头像）。
+  final String peerPartnerId;
+  final String server;
+  final ApiClient? api;
   final int unread;
   final bool current;
   final VoidCallback onTap;
@@ -296,12 +317,25 @@ class _SpaceCard extends StatelessWidget {
                 ),
                 child: Stack(
                   children: [
+                    // 头像在上、名字在下，整块居中（老板 2026-09-23）
                     Align(
-                      alignment: Alignment.topLeft,
-                      child: Text(
-                        name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _PeerAvatar(
+                            partnerId: peerPartnerId,
+                            server: server,
+                            api: api,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            name,
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                     // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来
@@ -338,6 +372,63 @@ class _SpaceCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 空间卡片上的**对方头像**（老板 2026-09-23：头像在上、名字在下，居中）。
+///
+/// - 有头像就用头像；没有（partnerId 未知 / 服务端没有 / 网络失败）→ **默认头像**：
+///   灰底 + 人形图标，与消息流那套 `chat_page._MessageAvatar` 观感一致（同一组色值/图标）。
+/// - 刻意**不做跨开合缓存**：弹层每次打开都重拉一次。这样对方换了头像立刻就对，
+///   不必再维护一套失效广播；成本与弹层已有的「每空间一次 unreadCount」同量级。
+class _PeerAvatar extends StatefulWidget {
+  const _PeerAvatar({
+    required this.partnerId,
+    required this.server,
+    this.api,
+  });
+
+  /// 对方的 partner_id（空串 = 未知 → 直接显示默认头像，不发请求）。
+  final String partnerId;
+  final String server;
+  final ApiClient? api;
+
+  static const double radius = 18;
+
+  @override
+  State<_PeerAvatar> createState() => _PeerAvatarState();
+}
+
+class _PeerAvatarState extends State<_PeerAvatar> {
+  Uint8List? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final pid = widget.partnerId;
+    if (pid.isEmpty) return; // 未知：保持默认头像
+    try {
+      final bytes = await (widget.api ?? ApiClient(widget.server)).getAvatar(pid);
+      if (bytes != null && mounted) setState(() => _bytes = bytes);
+    } catch (_) {
+      // 网络失败：保持默认头像
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _bytes;
+    return CircleAvatar(
+      radius: _PeerAvatar.radius,
+      backgroundColor: Colors.grey.shade300,
+      backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+      // 默认头像：人形图标（尺寸按半径等比，与消息流的 16/18 比例一致）
+      child: bytes == null ? const Icon(Icons.person, size: 20) : null,
     );
   }
 }
