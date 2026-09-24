@@ -856,9 +856,9 @@ void main() {
     await tester.tap(find.text('我的身份'));
     await tester.pumpAndSettle();
 
-    // 标题「我的个人资料」、输入框标签「我的名字」、名字框下性别彩色图标（男高亮）
-    expect(find.text('我的身份'), findsOneWidget, reason: '弹窗标题应为「我的个人资料」');
-    expect(find.text('我的名字'), findsWidgets, reason: '输入框标签应为「我的名字」');
+    // 标题「我的身份」、输入框标签「名字」、名字框下性别彩色图标（男高亮）
+    expect(find.text('我的身份'), findsOneWidget, reason: '弹窗标题应为「我的身份」');
+    expect(find.text('名字'), findsWidgets, reason: '输入框标签应为「名字」');
     expect(find.text('性别'), findsOneWidget, reason: '名字框下应显示性别标签');
     expect(find.byIcon(Icons.female), findsNothing,
         reason: '只显示本人性别图标，不应显示女图标');
@@ -1243,9 +1243,9 @@ void main() {
     await tester.tap(find.text('切换我的秘境'));
     await tester.pumpAndSettle();
     expect(switched, 0);
-    // 就地弹层（不是新页面）：能看到「选择秘境」内容与通往第一屏的入口
-    expect(find.text('选择秘境'), findsOneWidget, reason: '弹层标题');
-    expect(find.text('新建/加入秘境'), findsOneWidget, reason: '弹层底部通往第一屏');
+    // 就地弹层（不是新页面）：能看到「切换我的秘境」内容与通往第一屏的入口
+    expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
+    expect(find.text('添加秘境'), findsOneWidget, reason: '弹层底部通往第一屏');
   });
 
   testWidgets('菜单：聊天页不再依赖任何注入也能开「切换秘境」（不再需要 pin）',
@@ -1281,7 +1281,7 @@ void main() {
     await tester.tap(find.text('切换我的秘境'));
     await tester.pumpAndSettle();
     expect(managed, 0);
-    expect(find.text('选择秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
+    expect(find.text('切换我的秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
   testWidgets('高级功能：破坏性入口改为空间级「销毁本通道」（不再整机重置）',
