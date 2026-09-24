@@ -422,7 +422,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHint =>
-      'Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.';
+      'Send it to your partner — or another device of your own — to start a new channel into this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteCopyLinkTooltip => 'Copy invite link';

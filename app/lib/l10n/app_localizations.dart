@@ -827,7 +827,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHint.
   ///
   /// In en, this message translates to:
-  /// **'Invite your partner — or another device of your own — to open a new entrance to this space. One-time use, valid for 24 hours.'**
+  /// **'Send it to your partner — or another device of your own — to start a new channel into this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHint;
 
   /// No description provided for @chatPageInviteCopyLinkTooltip.
