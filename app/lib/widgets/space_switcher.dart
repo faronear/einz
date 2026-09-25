@@ -240,10 +240,17 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                 onTap: () => Navigator.of(context).pop(const SpacePick.add()),
                 hoverColor: Colors.black.withValues(alpha: 0.10),
                 highlightColor: Colors.black.withValues(alpha: 0.14),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  leading: const Icon(Icons.add),
-                  title: Text(l10n.spaceListAdd),
+                // 图标 + 文字整体**居中**（老板 2026-09-25；原 ListTile 的 leading 靠左）
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.add),
+                      const SizedBox(width: 6),
+                      Text(l10n.spaceListAdd),
+                    ],
+                  ),
                 ),
               ),
             ),

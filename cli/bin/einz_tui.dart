@@ -414,7 +414,7 @@ Future<(EntranceStore, String, String)> _onboard(String storePath, String server
   // 连的是哪台服务器、生成了什么身份。老通道（已绑定空间）**不打印**，直接进聊天；
   // 要看服务器/连接/公钥等，用户自己敲 /status（只读，不发请求）。
   // 终端逐行打印；进 TUI 后并成**一条** system 消息（\n 连接，块内紧贴、不与其他消息
-  // 混在一起——与"选择秘境入口"那段 _prompt 同一写法）。
+  // 混在一起——与"秘境向导"那段 _prompt 同一写法）。
   if (store.spaceId == null) {
     final welcome = <String>['=== Einz 秘境 ===', '✅ 服务端地址: $server'];
     final entranceName = store.entranceName;
@@ -560,7 +560,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
       // 一条系统消息内多行（\n 分隔）：整体被消息间空行隔开、又不会
       // 被拆成多条消息——比连发三条 _systemMessage 更紧凑（2026-09-11）
       final choice = (await _prompt(
-              session, '❓ 选择秘境入口\n   c: 创建秘境\n   j: 加入秘境',
+              session, '❓ 秘境向导\n   c: 创建秘境\n   j: 加入秘境',
               required: true)) // 必填：留空回车不接受
           .trim()
           .toLowerCase();

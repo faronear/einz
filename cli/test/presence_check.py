@@ -95,37 +95,37 @@ def snapshot(master, wait=0.5):
 
     TUI 只在**状态变化**时全量重绘（敲空回车只重绘输入行）→ 不能靠"戳一戳"取屏，
     只能持续收流、按清屏序列切分：最后一段是写了一半的尾巴（留存拼接），从倒数
-    第二段往回找第一个像样的帧（含标题栏 "Einz TUI"）。
+    第二段往回找第一个像样的帧（含标题栏 "Einz"）。
     """
     raw = _TAILS.get(master, b'') + drain(master, wait)
     parts = raw.split(CLEAR_HOME)
     _TAILS[master] = parts[-1]
     for part in reversed(parts[:-1]):
         text = strip_ansi(part.decode('utf-8', errors='replace'))
-        if 'Einz TUI' in text:
+        if 'Einz' in text:
             return text
     return ''
 
 
 def title_bar(frame):
-    """从一帧里取出标题栏那一行（含品牌名 Einz TUI），去首尾空白。
+    """从一帧里取出标题栏那一行（含品牌名 Einz），去首尾空白。
 
     标题栏三段：左 = 对方「灯 名字 #n/m#通道名」、中 = 品牌名、右 = 我。
     直接断言整行里的子串会把两段混在一起（左段 "○ Alice" 与右段 "● Lukas" 都可
-    误命中 "● …"），故按行取、再按 "Einz TUI" 切三段判定。
+    误命中 "● …"），故按行取、再按 "Einz" 切三段判定。
     """
     for line in frame.splitlines():
-        if 'Einz TUI' in line:
+        if 'Einz' in line:
             return line.strip()
     return ''
 
 
 def split_bar(bar):
-    """标题栏三段 → (左, 中, 右)。以品牌名 "Einz TUI" 为界切分。"""
-    if 'Einz TUI' not in bar:
+    """标题栏三段 → (左, 中, 右)。以品牌名 "Einz" 为界切分。"""
+    if 'Einz' not in bar:
         return '', '', ''
-    left, rest = bar.split('Einz TUI', 1)
-    return left.strip(), 'Einz TUI', rest.strip()
+    left, rest = bar.split('Einz', 1)
+    return left.strip(), 'Einz', rest.strip()
 
 
 def wait_screen(master, cond, what, timeout=70):
@@ -158,7 +158,7 @@ def finish_onboarding(master, label):
     deadline = time.time() + 40  # ② 倒计时结束 → system 消息清空 = 进入聊天态
     while time.time() < deadline:
         text = snapshot(master, wait=1.0)
-        if 'Einz TUI' in text and '一切就绪' not in text:
+        if 'Einz' in text and '一切就绪' not in text:
             return text
         time.sleep(1.0)
     print(f'FAIL {label}: 未进入聊天态:\n{text[-900:]}')

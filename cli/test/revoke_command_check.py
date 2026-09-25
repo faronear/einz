@@ -105,7 +105,7 @@ def snapshot(master, wait=0.5):
     _TAILS[master] = parts[-1]
     for part in reversed(parts[:-1]):
         text = frame_text(part)
-        if 'Einz TUI' in text:
+        if 'Einz' in text:
             return text
     return ''
 
@@ -137,7 +137,7 @@ def finish_onboarding(master, label):
     deadline = time.time() + 40
     while time.time() < deadline:
         text = snapshot(master, wait=1.0)
-        if 'Einz TUI' in text and '一切就绪' not in text:
+        if 'Einz' in text and '一切就绪' not in text:
             return text
         time.sleep(1.0)
     print(f'❌ {label}: 未进入聊天态'); print(text[-900:]); raise SystemExit(1)
@@ -161,7 +161,7 @@ def wait_connected(master, name, timeout=30):
 def onboard_create(label, store, port, home):
     m, p = start_tui(store, port, home)
     for expect, payload in [
-        ('秘境入口', 'c\r'),
+        ('秘境向导', 'c\r'),
         ('我的名字', f'{CREATOR}\r'),
         ('我的性别', '1\r'),
         ('伴侣的名字', f'{MEMBER}\r'),

@@ -926,10 +926,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 顶栏状态条左侧的「对方」这一块。
   ///
-  /// - **2 个及以上空间** → 做成可按芯片（底色比胶囊略深一档 + 右侧圆角 + 下拉箭头），
-  ///   一点打开「选择秘境」弹层（老板 2026-09-24：省掉「☰ → 眼扫菜单 → 点切换」，
-  ///   与微信「左上角返回→选人」同一肌肉记忆）。位置放**对方名字**旁：空间卡片上
-  ///   显示的就是对方名字，语义同源。
+  /// - **2 个及以上空间** → 做成可按芯片（底色按对方性别取**淡粉/淡蓝** + 右侧圆角
+  ///   + 下拉箭头），一点打开「选择秘境」弹层（老板 2026-09-24：省掉「☰ → 眼扫菜单 →
+  ///   点切换」，与微信「左上角返回→选人」同一肌肉记忆）。位置放**对方名字**旁：空间
+  ///   卡片上显示的就是对方名字，语义同源。
   /// - **只有 1 个空间** → 纯"圆点 + 名字"，**不给箭头、不给底色**（老板 2026-09-24：
   ///   单空间往往就是想和一个人用，别暗示这里能切；真要加空间去汉堡菜单里找）。
   ///
@@ -963,11 +963,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ],
     );
     if (!multiSpace) return Padding(padding: pad, child: content);
+    // 底色按对方性别（老板 2026-09-25）：淡粉（女）/ 淡蓝（男）——与消息气泡、空间卡片
+    // 同一组性别色（品牌粉 #D6529C / 品牌天蓝 #3BAFFD 的 18% tint，见 _bubbleColor /
+    // _SpaceCard._background）。
+    // **用不透明色、不再半透明**：外层胶囊是 85% 透明白，半透明 tint 叠上去会把胶囊后面
+    // 那 15% 的页面背景（粉蓝渐变）透出来混色，观感发脏（老板 2026-09-25 模拟器实测）。
+    // 这里把 tint 预乘到白底上得到纯色，观感与"纯白上 18% 粉/蓝"一致且与背景无关；
+    // 性别未登记回退预乘后的淡灰（仍保留"这一块能按"的暗示）
+    final chipColor = _peerGender == 'female'
+        ? const Color(0xFFF8E0ED) // ≈ #D6529C 18% 预乘到白
+        : _peerGender == 'male'
+            ? const Color(0xFFDCF1FF) // ≈ #3BAFFD 18% 预乘到白
+            : const Color(0xFFF1F1F1); // ≈ 黑 5.5% 预乘到白（原淡灰）
     return Tooltip(
       message: l10n.spaceListSwitch,
       child: Material(
-        // 比胶囊底（白 85%）略深一档：做出"这一块能按"的暗示
-        color: Colors.black.withValues(alpha: 0.055),
+        color: chipColor,
         elevation: 0,
         // 只圆右边：左边上下角交给外层胶囊的 clip 对齐（三边完全贴合）
         shape: const RoundedRectangleBorder(

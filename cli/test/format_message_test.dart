@@ -29,14 +29,14 @@ void main() {
 
   test('系统消息保留显式换行：每条物理行单独渲染、前缀仅首行', () {
     final lines = formatMessage(
-      _sys('❓ 秘境入口\n   c: 创建秘境\n   j: 加入秘境'),
+      _sys('❓ 秘境向导\n   c: 创建秘境\n   j: 加入秘境'),
       80,
     );
     // 3 条物理行 → 3 个渲染行（窄屏不触发额外折行）
     expect(lines, hasLength(3));
     // 首行带 [时间 秘境] 前缀
     expect(lines[0], contains('秘境]'));
-    expect(lines[0], contains('❓ 秘境入口'));
+    expect(lines[0], contains('❓ 秘境向导'));
     // 后续行不带前缀、缩进对齐首行正文左缘（含显式前导空格）
     expect(lines[1], isNot(contains('秘境]')));
     expect(lines[1], contains('c: 创建秘境'));

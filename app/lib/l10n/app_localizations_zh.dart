@@ -205,7 +205,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogTitleJoin => '一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '仅限两人，所有消息端到端加密，确保绝对隐私！进入秘境，开始聊天吧。';
+  String get welcomeDialogMessage => '仅限两人，所有消息端到端加密，确保绝对隐私！';
 
   @override
   String get welcomeDialogStart => '进入秘境';
@@ -273,7 +273,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupCreateShareTitle => '把邀请链接发给伴侣，快来一起体验秘境';
+  String get setupCreateShareTitle => '快把邀请链接发给伴侣，一起体验秘境吧';
 
   @override
   String get setupCreateCopy => '复制邀请链接';

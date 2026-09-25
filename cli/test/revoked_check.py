@@ -96,7 +96,7 @@ def onboard(label, store, port, home):
     """入网全流程：入口 → 我的名字/性别 → 伴侣名字/性别 → 共享口令 → 锁屏码 → 进入聊天态。"""
     m, p = start_tui(store, port, home)
     for expect, payload in [
-        ('秘境入口', 'c\r'),
+        ('秘境向导', 'c\r'),
         ('我的名字', f'{label}\r'),
         ('我的性别', '1\r'),
         ('伴侣的名字', f'{label}-p\r'),

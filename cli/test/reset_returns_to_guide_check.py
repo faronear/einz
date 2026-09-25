@@ -2,7 +2,7 @@
 # /reset 「回到起点」回归（老板 2026-09-23）：
 #   老板要求：`/reset` 之后**不要直接退出 TUI**，而是回到刚启动时的样子（重新入网）。
 #   断言：
-#     ① /reset 走完闸门后进程**仍在**，出现「重新入网」交代 + 全新「选择秘境入口」向导；
+#     ① /reset 走完闸门后进程**仍在**，出现「重新入网」交代 + 全新「秘境向导」向导；
 #     ② store 已重建：文件在、公钥与旧的不同、spaceId 为空（= 确实是一条全新通道）；
 #     ③ 向导真的可用：再输 c → 走到「我的名字」问答。
 #
@@ -102,7 +102,7 @@ def main():
 
         # ---------- 入网：create（锁屏码留空跳过，/reset 就只需通道名一道闸门） ----------
         for expect, payload in [
-            ('秘境入口', 'c\r'),
+            ('秘境向导', 'c\r'),
             ('我的名字', f'{CREATOR}\r'),
             ('我的性别', '1\r'),
             ('伴侣的名字', f'{MEMBER}\r'),
@@ -152,16 +152,16 @@ def main():
 
         # 只等**最后**出现的那一项，再在同一条缓冲里断言前面几项：
         # wait_text 命中即返回，会把同一批输出里更靠后的内容一起吞掉，分两次等会假阴性。
-        out = wait_text(m, '选择秘境入口', timeout=60)
+        out = wait_text(m, '秘境向导', timeout=60)
         if '重新入网' not in out:
             print('❌ /reset 后没看到「重新入网」交代'); print(strip(out[-1200:])); return 1
         # ① 进程仍在（没有 exit(0)）
         if p.poll() is not None:
             print('❌ /reset 把 TUI 退掉了（应停在新向导里）'); return 1
-        # ② 回到向导：全新「选择秘境入口」
-        if '选择秘境入口' not in out:
-            print('❌ /reset 后没有回到「选择秘境入口」向导'); print(strip(out[-1200:])); return 1
-        print('✅ ① /reset 后进程仍在，且回到「选择秘境入口」向导')
+        # ② 回到向导：全新「秘境向导」
+        if '秘境向导' not in out:
+            print('❌ /reset 后没有回到「秘境向导」向导'); print(strip(out[-1200:])); return 1
+        print('✅ ① /reset 后进程仍在，且回到「秘境向导」向导')
 
         # ③ store 已重建：新公钥、且还没绑定空间
         new = load_store(store)

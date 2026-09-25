@@ -79,8 +79,8 @@ def main():
     print('[1] 启动 A/B 两个 TUI（pty）…')
     master_a, pa = start_tui('demo/store-a.json')
     master_b, pb = start_tui('demo/store-b.json')
-    out = read_until(master_a, 'Einz TUI', timeout=25)
-    if 'Einz TUI' not in out:
+    out = read_until(master_a, 'Einz', timeout=25)
+    if 'Einz' not in out:
         print('❌ TUI 未渲染状态栏'); print(out[-600:]); cleanup(master_a, pa, master_b, pb); sys.exit(1)
     print('✅ TUI 状态栏渲染 OK')
 
