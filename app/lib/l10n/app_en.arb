@@ -11,7 +11,7 @@
   "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.",
   "setupPageNeedPassphrase": "Please set a shared passphrase",
   "wizardJoinPassphraseRequired": "Please enter the shared passphrase to verify",
-  "wizardStartTitle": "Setup wizard",
+  "wizardStartTitle": "Einz",
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "Auto-detects if this is the first entrance",
   "wizardDetectFailed": "Cannot reach server — retrying…",
@@ -51,7 +51,7 @@
   "wizardTitleName": "About me",
   "wizardTitlePeerName": "About partner",
   "wizardTitleJoinIdentity": "Choose your identity",
-  "wizardJoinIdentityHint": "One space has only two partners. Which one is you?",
+  "wizardJoinIdentityHint": "One space has exactly two partners. Which one is you?",
   "wizardJoinNoSlots": "No preset members — cannot join",
   "wizardSlotRequired": "Pick an identity",
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
@@ -87,8 +87,8 @@
       "error": {"type": "String"}
     }
   },
-  "setupEntryTitle": "Getting started",
-  "setupEntryHint": "Einz is a secret space for just two. You can create a new one, or join an existing one by invitation.",
+  "setupEntryTitle": "Einz wizard",
+  "setupEntryHint": "Einz is a secret space for two partners. You can create a new one, or join an existing one by invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",
   "setupEntryLegacyServer": "Server version too old — please upgrade",

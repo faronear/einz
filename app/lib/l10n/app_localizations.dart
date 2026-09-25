@@ -167,7 +167,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardStartTitle.
   ///
   /// In en, this message translates to:
-  /// **'Setup wizard'**
+  /// **'Einz'**
   String get wizardStartTitle;
 
   /// No description provided for @wizardDetectTitle.
@@ -335,7 +335,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinIdentityHint.
   ///
   /// In en, this message translates to:
-  /// **'One space has only two partners. Which one is you?'**
+  /// **'One space has exactly two partners. Which one is you?'**
   String get wizardJoinIdentityHint;
 
   /// No description provided for @wizardJoinNoSlots.
@@ -491,13 +491,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryTitle.
   ///
   /// In en, this message translates to:
-  /// **'Getting started'**
+  /// **'Einz wizard'**
   String get setupEntryTitle;
 
   /// No description provided for @setupEntryHint.
   ///
   /// In en, this message translates to:
-  /// **'Einz is a secret space for just two. You can create a new one, or join an existing one by invitation.'**
+  /// **'Einz is a secret space for two partners. You can create a new one, or join an existing one by invitation.'**
   String get setupEntryHint;
 
   /// No description provided for @setupEntryCreate.

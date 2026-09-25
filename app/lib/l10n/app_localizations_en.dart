@@ -45,7 +45,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Please enter the shared passphrase to verify';
 
   @override
-  String get wizardStartTitle => 'Setup wizard';
+  String get wizardStartTitle => 'Einz';
 
   @override
   String get wizardDetectTitle => 'Checking server status…';
@@ -135,7 +135,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinIdentityHint =>
-      'One space has only two partners. Which one is you?';
+      'One space has exactly two partners. Which one is you?';
 
   @override
   String get wizardJoinNoSlots => 'No preset members — cannot join';
@@ -225,11 +225,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setupEntryTitle => 'Getting started';
+  String get setupEntryTitle => 'Einz wizard';
 
   @override
   String get setupEntryHint =>
-      'Einz is a secret space for just two. You can create a new one, or join an existing one by invitation.';
+      'Einz is a secret space for two partners. You can create a new one, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';

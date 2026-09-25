@@ -1732,7 +1732,7 @@ void _render() {
   final peerName = _peerNameOf(s);
   final peerDot = s.peerOnline ? '$_green●$_white' : '${_white}○';
   // 三段式标题栏：对方状态贴左缘、我的状态贴右缘（与消息左右分栏一致——
-  // 对方消息在左、我的消息在右）、品牌名 "Einz TUI" 居中。
+  // 对方消息在左、我的消息在右）、品牌名 "Einz" 居中。
   // 三段各占全宽 1/3 上限、互不挤压，超宽的一段自己截断（含品牌名）；
   // 因此每段都是"尾部先丢"——两侧的灯与名字在前，通道名在后最先被截。
   final peerEntrances = _peerEntranceLabel(s);
@@ -1742,7 +1742,7 @@ void _render() {
     // 品牌名 bold 展示后必须关闭粗体（ESC[22m）再继续——否则 bold 状态泄漏到
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
-    '${_bold}Einz TUI\x1B[22m$_white',
+    '${_bold}Einz\x1B[22m$_white',
     // 右段（我）：`灯 名字 @本机名 #n/m#其它在线通道…`（老板 2026-09-16）——
     // 本机用 @ 独立出来（它可能在线也可能离线，但总要说明"我此刻在哪台"），
     // 后面的 #n/m 与通道列表**扣除本机**，两者严格一一对应。
@@ -3687,7 +3687,7 @@ void _printFarewell(ChatSession session) {
   // 退出信息尽力而为——写入失败忽略，避免 "StreamSink is bound to a stream" 崩溃
   try {
     stdout.writeln();
-    stdout.writeln('${_gray}已退出 Einz TUI（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
+    stdout.writeln('${_gray}已退出 Einz（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
   } catch (_) {}
 }
 
