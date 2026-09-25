@@ -9770,3 +9770,29 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 - 新增：服务端拒绝发送 → 顶部提示带「后台：」（chat_send_status_test）。
 - 既有 4 例按新语义更新（4xx 的 send 现在会抛：`expectLater(...throwsA(isA<ApiException>()))`）。
 - `flutter analyze` 无告警，全量 213 项通过。
+
+## 2026-09-25 【bug】空间卡片永远是默认头像（对方明明设了头像）
+
+老板："对方设置了头像，但在『切换我的秘境』的空间卡片里看不到，只有默认虚拟头像"；
+确认是「朵」那张卡，且**聊天页能看到、只有卡片不行** → 客户端问题。
+
+### 排查
+- 服务端直连验证（带 `X-Protocol-Version: 2` 头，否则一律 400）：
+  `GET /avatar/a02ef9c4…`（朵）→ **200，1.36MB**；`GET /avatar/2ad87f7f…`（Vic）→ **404**（服务端没这份图）；
+  Hardservice（040aa7cd）本机 per-space 资料里**没有 peerMemberId** → 卡片连请求都不发。
+  → 服务端有图、聊天页也能显示 ⇒ 图没问题，是卡片那一环。
+
+### 根因：异步数据 + StatefulWidget 只在 initState 拉一次
+- 弹层 `_SpacePickerSheetState._load()` 是异步的（先读 Spaces 表、再逐空间读 per-space 资料），
+  **首帧**建卡片时 `_names` 还是空 → `_PeerAvatar` 拿到 `memberId = ""` →
+  `initState` 那次 `_load()` 直接 return。
+- memberId 到位后父级 setState 重建，但 `_PeerAvatar` 的 **State 被复用**（同类型、无 key），
+  `initState` 不会再走 → 从此再没人去拉头像。
+- 同一原因**不影响未读角标**：`unread` 每次 build 都从 `_unread` map 现读；
+  而头像把结果存在 State 里，所以必须自己补拉。
+
+### 修法
+- `_PeerAvatarState` 加 `didUpdateWidget`：memberId 变了且还没图 → 补拉一次（`space_switcher.dart`）。
+- 回归测试 `test/space_switcher_avatar_test.dart`：假 ApiClient 记录 getAvatar 调用 +
+  断言默认人形图标消失。**已验证撤掉修复时该测试会红**（不是事后补个永远绿的测试）。
+- `flutter analyze` 无告警，全量 214 项通过。

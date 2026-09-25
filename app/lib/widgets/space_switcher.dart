@@ -479,6 +479,18 @@ class _PeerAvatarState extends State<_PeerAvatar> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(covariant _PeerAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 必须补这一下（老板 2026-09-25 实测的 bug：对方明明有头像，卡片却永远是默认人形）：
+    // 弹层的 `_load()` 是**异步**的（先读 Spaces 表、再逐空间读 per-space 资料），
+    // 首帧建卡片时 memberId 还是空串 → `initState` 那次 `_load()` 直接 return；
+    // memberId 到位后父级重建，State 复用、不会重走 initState，于是再没人去拉头像。
+    // （同一原因不影响未读角标：它每次 build 都从 `_unread` 现读，而头像把结果
+    //   存在 State 里，所以必须自己补拉一次。）
+    if (widget.memberId != oldWidget.memberId && _bytes == null) _load();
+  }
+
   Future<void> _load() async {
     final pid = widget.memberId;
     if (pid.isEmpty) return; // 未知：保持默认头像
