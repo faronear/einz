@@ -18,7 +18,7 @@ import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
-import 'about_page.dart';
+import 'widgets/about_sheet.dart';
 import 'brand_logo.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/attachment_store.dart';
@@ -1603,10 +1603,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '';
   }
 
+  /// 打开「关于秘境」底部弹层（版本号 / 服务器地址 / 一句话说明）。
   void _openAboutPage() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => const AboutPage()),
-    );
+    AboutSheet.show(context);
   }
 
   /// 对方在线判定：对方有实时 WS 连接（connected_at 非 null）= 在线；

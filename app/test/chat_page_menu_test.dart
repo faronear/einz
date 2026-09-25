@@ -9,7 +9,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:einz/about_page.dart';
+import 'package:einz/widgets/about_sheet.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
 import 'package:einz/data/burn_after_settings.dart';
@@ -1362,10 +1362,12 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300));
 
-    // 标题（品牌名）整块可点 → 进关于秘境页
+    // 标题（品牌名）整块可点 → 弹出「关于秘境」弹层（2026-09-25 起为底部弹层）
     await tester.tap(find.text('我的秘境'));
     await tester.pumpAndSettle();
-    expect(find.byType(AboutPage), findsOneWidget, reason: '点标题应打开「关于秘境」页');
+    expect(find.byType(AboutSheet), findsOneWidget,
+        reason: '点标题应弹出「关于秘境」弹层');
+    expect(find.byType(BottomSheet), findsOneWidget);
   });
 
   testWidgets('顶栏标题的可点区域四周留边距（按住高亮不贴文字边缘）',

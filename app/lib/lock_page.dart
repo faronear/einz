@@ -5,7 +5,7 @@ import 'dart:io' show exit;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'about_page.dart';
+import 'widgets/about_sheet.dart';
 import 'brand_logo.dart';
 import 'chat_entry.dart';
 import 'data/app_lock.dart';
@@ -228,12 +228,10 @@ class _LockPageState extends State<LockPage> {
     showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
-  /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
+  /// 打开「关于秘境」底部弹层（版本号 / 服务器地址 / 一句话说明）。
   /// 地址不进锁包，锁屏态与解锁后读的是同一个 [effectiveServer]，无需附注。
   void _openAboutPage() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => const AboutPage()),
-    );
+    AboutSheet.show(context);
   }
 
   /// 退出应用（等价 TUI /exit）：确认后彻底关闭（锁屏页无聊天可回，不回任何页）。

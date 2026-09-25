@@ -185,14 +185,22 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
     final spaces = VaultSession.current?.spaces ?? const <AppLockPayload>[];
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        // 顶边 0：标题自己的 Padding 负责上 14 留白（同参照弹层）
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(l10n.spaceListTitle,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」/「界面主题」
+            // /「附件存储」/「阅后即焚」弹层标题的居中与留白口径对齐）
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Center(
+                child: Text(l10n.spaceListTitle,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 16)),
+              ),
+            ),
             // 小卡片瀑布流：每张卡片 = 一个空间（强调"空间"概念，而不是聊天对象）
             if (spaces.isEmpty)
               Padding(
