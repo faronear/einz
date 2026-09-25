@@ -1,0 +1,220 @@
+// 「通道列表」菜单弹层（老板 2026-09-25）：列出本空间里**我本人的其他通道**
+// （排除当前通道；对方 member 的通道不列）。
+//
+// 数据源 = GET /entrances（fake api 编排）；行内 = 通道名 + member 名字（/space
+// 名字表）+ 性别图标 + 在线灯 + 标签。已撤销的本人通道照列并标「已撤销」。
+
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:einz/chat_page.dart';
+import 'package:einz/data/local_database.dart';
+import 'package:einz/l10n/app_localizations.dart';
+import 'package:einz_shared/einz_shared.dart';
+
+/// fake api：/entrances 与 /space 都按编排返回（无网络）。
+class _FakeEntranceApi extends ApiClient {
+  _FakeEntranceApi(this.entranceRows) : super('http://fake');
+
+  /// listEntrances 返回的行（服务端 /entrances 口径）。
+  final List<Map<String, dynamic>> entranceRows;
+
+  @override
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async =>
+      entranceRows;
+
+  @override
+  Future<SpaceResult> getSpace(String token) async => SpaceResult(
+        spaceId: 'space-demo',
+        entrances: const [
+          SpaceEntrance(entranceId: 'dev-a', memberId: 'member-me', status: 'active'),
+          SpaceEntrance(entranceId: 'dev-b2', memberId: 'member-me', status: 'active'),
+          SpaceEntrance(entranceId: 'dev-peer', memberId: 'member-peer', status: 'active'),
+        ],
+        memberNames: const {'member-me': 'Lukas', 'member-peer': 'Alice'},
+        memberGenders: const {'member-me': 'male', 'member-peer': 'female'},
+        memberSlots: const {'member-me': 0, 'member-peer': 1},
+      );
+
+  @override
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+    String token, {
+    int after = 0,
+    int limit = 100,
+  }) async =>
+      (
+        messages: <MessageEnvelope>[],
+        attachmentsMeta: <Map<String, dynamic>>[],
+        lastSequence: after,
+        hasMore: false,
+      );
+}
+
+/// 只让 /entrances 抛错的 fake（离线/出错 → 弹层显示失败提示）。
+class _BrokenEntranceApi extends ApiClient {
+  _BrokenEntranceApi() : super('http://fake');
+
+  @override
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async =>
+      throw StateError('offline');
+
+  @override
+  Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
+    String token, {
+    int after = 0,
+    int limit = 100,
+  }) async =>
+      (
+        messages: <MessageEnvelope>[],
+        attachmentsMeta: <Map<String, dynamic>>[],
+        lastSequence: after,
+        hasMore: false,
+      );
+}
+
+Future<void> _openEntranceListSheet(
+  WidgetTester tester,
+  LocalDatabase db,
+  ApiClient api,
+) async {
+  final spaceKey = await generateSpaceKey();
+  await tester.pumpWidget(MaterialApp(
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    locale: const Locale('zh'),
+    home: ChatPage(
+      spaceId: 'space-demo',
+      entranceId: 'dev-a',
+      spaceKey: spaceKey,
+      keyVersion: 1,
+      token: 'tok',
+      db: db,
+      api: api,
+      enableWs: false,
+      memberId: 'member-me',
+      memberName: 'Lukas',
+      entranceName: 'iPhone',
+      peerName: 'Alice',
+    ),
+  ));
+  // 等 initState 的异步（profile 校正 / 对方在线刷新）落地
+  await tester.pump(const Duration(milliseconds: 300));
+
+  await tester.tap(find.byIcon(Icons.menu));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text('通道列表'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('通道列表'));
+  await tester.pumpAndSettle();
+}
+
+/// 作用域限定在底部弹层内的查找（顶栏也有「Lukas / 通道名」，全局 find 会撞车）。
+Finder sheetText(String text) =>
+    find.descendant(of: find.byType(BottomSheet), matching: find.text(text));
+
+Finder sheetTextContaining(String text) =>
+    find.descendant(of: find.byType(BottomSheet), matching: find.textContaining(text));
+
+Finder sheetIcon(IconData icon) =>
+    find.descendant(of: find.byType(BottomSheet), matching: find.byIcon(icon));
+
+void main() {
+  setUpAll(() async {
+    await sodium();
+  });
+
+  testWidgets('只列本人其他通道：对方的通道不列、当前通道不列', (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      // 当前通道（dev-a）——必须被排除
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      // 我本人的另一条通道（在线）——应列出
+      {
+        'entrance_id': 'dev-b2',
+        'entrance_name': 'iPad',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      // 我本人一条已撤销的旧通道——照列并标注
+      {
+        'entrance_id': 'dev-old',
+        'entrance_name': '旧手机',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': now - 3600 * 1000,
+        'status': 'revoked',
+      },
+      // 对方的通道（在线）——不列（老板要求：只列**我本人**的）
+      {
+        'entrance_id': 'dev-peer',
+        'entrance_name': 'Alice的iPad',
+        'member_id': 'member-peer',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    // 弹层标题（菜单已关，文本只在弹层里）
+    expect(sheetText('通道列表'), findsOneWidget);
+    // 本人在线通道：通道名 + member 名字 + 「在线」
+    expect(sheetText('iPad'), findsOneWidget);
+    expect(sheetText('Lukas'), findsNWidgets(2),
+        reason: '两条本人通道行各显示一次 member 名字');
+    expect(sheetText('在线'), findsOneWidget);
+    // 性别图标：我 male → Icons.male ×2（两行）；对方 female 行被排除
+    expect(sheetIcon(Icons.male), findsNWidgets(2));
+    expect(sheetIcon(Icons.female), findsNothing);
+    // 已撤销通道照列并标注
+    expect(sheetText('旧手机'), findsOneWidget);
+    expect(sheetText('已撤销'), findsOneWidget);
+    // 当前通道与对方通道都不出现
+    expect(sheetText('iPhone'), findsNothing);
+    expect(sheetText('Alice的iPad'), findsNothing);
+  });
+
+  testWidgets('只有当前通道时显示空提示', (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    expect(sheetText('通道列表'), findsOneWidget);
+    expect(sheetTextContaining('本秘境里只有当前这一条通道'), findsOneWidget);
+    expect(sheetText('在线'), findsNothing);
+  });
+
+  testWidgets('离线时显示失败提示', (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await _openEntranceListSheet(tester, db, _BrokenEntranceApi());
+
+    expect(sheetText('通道列表'), findsOneWidget);
+    expect(sheetTextContaining('无法获取通道列表'), findsOneWidget);
+  });
+}

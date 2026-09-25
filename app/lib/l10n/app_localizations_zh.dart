@@ -618,6 +618,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuEntranceNameLabel => '当前通道';
 
   @override
+  String get chatPageMenuEntranceList => '通道列表';
+
+  @override
+  String get chatPageEntranceListEmpty =>
+      '本秘境里只有当前这一条通道。用「生成开通码」可以让你的另一台设备也加入。';
+
+  @override
+  String get chatPageEntranceListFailed => '无法获取通道列表（当前离线？）';
+
+  @override
+  String get chatPageEntranceTagOnline => '在线';
+
+  @override
+  String get chatPageEntranceTagOffline => '离线';
+
+  @override
+  String get chatPageEntranceTagRevoked => '已撤销';
+
+  @override
   String get chatPagePinLabel => '锁屏码';
 
   @override

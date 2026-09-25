@@ -238,6 +238,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _myEntranceName; // 我的通道名（菜单显示；改名后 setState 刷新）
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
+  Map<String, String> _memberNames = const {}; // 本空间 member_id→名字（/space 校正刷新，通道列表弹层显示用）
+  Map<String, String> _memberGenders = const {}; // 本空间 member_id→性别（同上，行内性别图标）
   int? _mySlot; // 我的身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色判定用）
   int? _peerSlot; // 对方身份槽位（同上）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
@@ -308,8 +310,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 消息发送时间标注：当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM。
-  String _messageTimeLabel(HistoryMessage m) {
-    final local = DateTime.fromMillisecondsSinceEpoch(m.createdAt).toLocal();
+  String _messageTimeLabel(HistoryMessage m) => _timeStampLabel(m.createdAt);
+
+  /// 时间戳标注（消息 / 通道列表共用）：当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM。
+  String _timeStampLabel(int ms) {
+    final local = DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
     final now = DateTime.now();
     String two(int n) => n.toString().padLeft(2, '0');
     if (local.year == now.year &&
@@ -674,6 +679,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (peerName.isNotEmpty) _peerName = peerName;
         if (myG.isNotEmpty) _myGender = myG;
         if (peerG.isNotEmpty) _peerGender = peerG;
+        _memberNames = space.memberNames; // 通道列表弹层的行内名字
+        _memberGenders = space.memberGenders;
         _mySlot = mySlot;
         _peerSlot = peerSlot;
       });
@@ -1219,6 +1226,166 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (!mounted) return;
       action();
     });
+  }
+
+  /// 「通道列表」底部弹层：列出**本空间里我本人的其他通道**（排除当前通道）——
+  /// 老板 2026-09-25：多设备登录时一眼看到"我还有哪些线挂着、在不在线"。
+  ///
+  /// 数据源 = GET /entrances（与顶栏在线判定同源：connected_at 非 null 即在线，
+  /// 旧服务端无该字段时退回 last_seen<60s）；行内显示 名字（/space 的名字表，
+  /// 兜底 member_id）+ 通道名 + 性别图标 + 在线灯 + 最近活跃时刻。
+  /// 已撤销的通道照列并标注（与 CLI /entrances 同口径：藏着不显示反而像凭空消失）。
+  Future<void> _showEntranceListSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    // 本空间的 member_id 集合（/entrances 行只有 member_id，名字/性别查本地名字表）
+    // 与"我是谁"：先反查一次本通道的 member（_refreshProfileFromServer 已缓存过，
+    // 这里兜底离线场景——名字表空时用 member_id 原样显示）。
+    List<Map<String, dynamic>>? rows;
+    String? myMemberId = _myMemberId;
+    try {
+      final api = widget.api ?? ApiClient(effectiveServer);
+      rows = await api.listEntrances(widget.token);
+      if (myMemberId == null || myMemberId.isEmpty) {
+        for (final d in rows) {
+          if (d['entrance_id'] == widget.entranceId) {
+            myMemberId = d['member_id'] as String?;
+            break;
+          }
+        }
+      }
+    } catch (_) {
+      rows = null; // 离线/出错：显示失败提示（保留弹层，说明原因）
+    }
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        // 行：排除当前通道；只留**我本人**的（同 member）——老板要求"我本人的其他通道"
+        final myRows = <Map<String, dynamic>>[
+          if (rows != null)
+            for (final d in rows)
+              if (d['entrance_id'] != widget.entranceId &&
+                  myMemberId != null &&
+                  myMemberId.isNotEmpty &&
+                  d['member_id'] == myMemberId)
+                d,
+        ];
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.chatPageMenuEntranceList,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (rows == null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(l10n.chatPageEntranceListFailed,
+                        style: TextStyle(fontSize: 13, color: scheme.outline)),
+                  )
+                else if (myRows.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(l10n.chatPageEntranceListEmpty,
+                        style: TextStyle(fontSize: 13, color: scheme.outline)),
+                  )
+                else
+                  for (final d in myRows)
+                    () {
+                      final name = (d['entrance_name'] as String? ?? '').trim();
+                      final entranceId = d['entrance_id'] as String? ?? '';
+                      final pid = d['member_id'] as String? ?? '';
+                      final revoked = d['status'] != null && d['status'] != 'active';
+                      final connectedAt = d['connected_at'];
+                      final last = d['last_seen'];
+                      final online = !revoked &&
+                          (d.containsKey('connected_at')
+                              ? connectedAt != null
+                              : (last is num && now - last < 60 * 1000));
+                      // 最近时刻：在线 → 上线时刻（online_since→connected_at）；
+                      // 离线 → 最后活跃 last_seen（服务端干净下线时置 0 → 不显示，
+                      // 直接格式化会变 1970-01-01——同 CLI 的口径）
+                      final sinceMs = (d['online_since'] as num?)?.toInt() ??
+                          (connectedAt is num ? connectedAt.toInt() : null);
+                      final int stamp = online
+                          ? (sinceMs ?? 0)
+                          : (!revoked && last is num ? last.toInt() : 0);
+                      final memberName = _memberNames[pid] ?? (pid.isEmpty ? '' : pid);
+                      final gender = _memberGenders[pid] ?? '';
+                      final tag = revoked
+                          ? l10n.chatPageEntranceTagRevoked
+                          : (online
+                              ? l10n.chatPageEntranceTagOnline
+                              : l10n.chatPageEntranceTagOffline);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.circle, size: 8,
+                                color: revoked
+                                    ? scheme.outline
+                                    : (online
+                                        ? Colors.green
+                                        : Colors.red)),
+                            const SizedBox(width: 8),
+                            // 性别图标（同个人资料/向导口径）：女粉 Icons.female / 男蓝 Icons.male
+                            if (gender == 'female') ...[
+                              const Icon(Icons.female, size: 14,
+                                  color: Color(0xFFD6529C)),
+                              const SizedBox(width: 4),
+                            ] else if (gender == 'male') ...[
+                              const Icon(Icons.male, size: 14,
+                                  color: Color(0xFF3BAFFD)),
+                              const SizedBox(width: 4),
+                            ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name.isNotEmpty ? name : entranceId,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w500),
+                                  ),
+                                  if (memberName.isNotEmpty)
+                                    Text(memberName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 12, color: scheme.outline)),
+                                ],
+                              ),
+                            ),
+                            if (stamp > 0)
+                              Text(_timeStampLabel(stamp),
+                                  style: TextStyle(
+                                      fontSize: 12, color: scheme.outline)),
+                            const SizedBox(width: 8),
+                            Text(tag,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: revoked
+                                        ? scheme.outline
+                                        : (online
+                                            ? Colors.green
+                                            : scheme.onSurfaceVariant))),
+                          ],
+                        ),
+                      );
+                    }(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// 「高级」底部弹层（二级菜单：修改口令 / 销毁本通道）。两项都只给标题——
@@ -4005,6 +4172,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showAvatarUpload);
                 case 'devname':
                   _menuAction(() => _showRenameDialog(renameEntrance: true));
+                case 'entrancelist':
+                  _menuAction(_showEntranceListSheet);
                 case 'switchspace':
                   _menuAction(_openSpacePicker);
                 case 'exit':
@@ -4108,6 +4277,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       _menuValue(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName, valueStyle),
                     ],
                   ),
+                ),
+                // 「通道列表」：我本人在本空间的其他通道（老板 2026-09-25：多设备登录
+                // 时看一眼"我还有哪些线挂着、在不在线"）
+                PopupMenuItem(
+                  height: kMenuRowHeight,
+                  value: 'entrancelist',
+                  child: Text(l10n.chatPageMenuEntranceList, style: captionStyle),
                 ),
                 PopupMenuItem(
                   height: kMenuRowHeight,
