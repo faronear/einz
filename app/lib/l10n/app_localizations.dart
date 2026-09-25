@@ -1238,17 +1238,17 @@ abstract class AppLocalizations {
   /// **'Entrances'**
   String get chatPageMenuEntranceList;
 
-  /// No description provided for @chatPageEntranceListEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'Only this entrance is in this space. Use “New entrance token” to add another device of yours.'**
-  String get chatPageEntranceListEmpty;
-
   /// No description provided for @chatPageEntranceListFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not load entrances (offline?)'**
+  /// **'Could not load other entrances (offline?)'**
   String get chatPageEntranceListFailed;
+
+  /// No description provided for @chatPageEntranceTagLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get chatPageEntranceTagLocal;
 
   /// No description provided for @chatPageEntranceTagOnline.
   ///
@@ -1267,6 +1267,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Revoked'**
   String get chatPageEntranceTagRevoked;
+
+  /// No description provided for @chatPageEntranceListNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New entrance'**
+  String get chatPageEntranceListNew;
 
   /// No description provided for @chatPagePinLabel.
   ///

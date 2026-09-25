@@ -1,5 +1,6 @@
-// 「通道列表」菜单弹层（老板 2026-09-25）：列出本空间里**我本人的其他通道**
-// （排除当前通道；对方 member 的通道不列）。
+// 「通道列表」菜单弹层（老板 2026-09-25）：列出**当前通道（标「本机」）+ 我本人的
+// 其他通道**（对方 member 的通道不列；离线时当前通道照列）；列表下方「新建通道」
+// 链接 → 生成开通码弹窗。
 //
 // 数据源 = GET /entrances（fake api 编排）；行内 = 通道名 + member 名字（/space
 // 名字表）+ 性别图标 + 在线灯 + 标签。已撤销的本人通道照列并标「已撤销」。
@@ -48,9 +49,17 @@ class _FakeEntranceApi extends ApiClient {
         lastSequence: after,
         hasMore: false,
       );
+
+  @override
+  Future<JoinTokenResult> createJoinToken(String spaceId, String token) async =>
+      const JoinTokenResult(
+        joinToken: 'e1-TESTTOKEN123456789012345678901234567890',
+        link: 'https://einz.tic.cc/join/e1-TESTTOKEN12345678901234567890',
+        expiresAt: 0,
+      );
 }
 
-/// 只让 /entrances 抛错的 fake（离线/出错 → 弹层显示失败提示）。
+/// 只让 /entrances 抛错的 fake（离线/出错 → 其他通道区显示失败提示，当前通道照列）。
 class _BrokenEntranceApi extends ApiClient {
   _BrokenEntranceApi() : super('http://fake');
 
@@ -170,23 +179,29 @@ void main() {
 
     // 弹层标题（菜单已关，文本只在弹层里）
     expect(sheetText('通道列表'), findsOneWidget);
-    // 本人在线通道：通道名 + member 名字 + 「在线」
+    // 当前通道必列：标「本机」，不显示 member 名字/时刻
+    expect(sheetText('iPhone'), findsOneWidget);
+    expect(sheetText('本机'), findsOneWidget);
+    // 本人其他通道：iPad（在线）+ 旧手机（已撤销照列）
     expect(sheetText('iPad'), findsOneWidget);
     expect(sheetText('Lukas'), findsNWidgets(2),
-        reason: '两条本人通道行各显示一次 member 名字');
+        reason: '两条非本机本人通道行各显示一次 member 名字（本机行不显示）');
     expect(sheetText('在线'), findsOneWidget);
-    // 性别图标：我 male → Icons.male ×2（两行）；对方 female 行被排除
-    expect(sheetIcon(Icons.male), findsNWidgets(2));
-    expect(sheetIcon(Icons.female), findsNothing);
-    // 已撤销通道照列并标注
     expect(sheetText('旧手机'), findsOneWidget);
     expect(sheetText('已撤销'), findsOneWidget);
-    // 当前通道与对方通道都不出现
-    expect(sheetText('iPhone'), findsNothing);
+    // 性别图标：我 male → Icons.male ×3（三条行）；对方 female 行被排除
+    expect(sheetIcon(Icons.male), findsNWidgets(3));
+    expect(sheetIcon(Icons.female), findsNothing);
+    // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
+    // 列表下方「新建通道」链接，点击打开生成开通码弹窗
+    expect(sheetText('新建通道'), findsOneWidget);
+    await tester.tap(sheetText('新建通道'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    expect(find.text('开通码已生成'), findsOneWidget);
   });
 
-  testWidgets('只有当前通道时显示空提示', (tester) async {
+  testWidgets('只有自己一条通道时也要显示自己（标「本机」）', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -203,18 +218,28 @@ void main() {
 
     await _openEntranceListSheet(tester, db, api);
 
+    // 只有一行：当前通道 + 「本机」标签
     expect(sheetText('通道列表'), findsOneWidget);
-    expect(sheetTextContaining('本秘境里只有当前这一条通道'), findsOneWidget);
+    expect(sheetText('iPhone'), findsOneWidget);
+    expect(sheetText('本机'), findsOneWidget);
     expect(sheetText('在线'), findsNothing);
+    expect(sheetText('Lukas'), findsNothing);
+    // 「新建通道」链接在
+    expect(sheetText('新建通道'), findsOneWidget);
   });
 
-  testWidgets('离线时显示失败提示', (tester) async {
+  testWidgets('离线时当前通道照列，其他通道区显示失败提示', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
     await _openEntranceListSheet(tester, db, _BrokenEntranceApi());
 
+    // 当前通道（本机）照常显示
     expect(sheetText('通道列表'), findsOneWidget);
-    expect(sheetTextContaining('无法获取通道列表'), findsOneWidget);
+    expect(sheetText('iPhone'), findsOneWidget);
+    expect(sheetText('本机'), findsOneWidget);
+    // 其他通道区失败提示 + 「新建通道」仍在
+    expect(sheetTextContaining('无法获取其他通道'), findsOneWidget);
+    expect(sheetText('新建通道'), findsOneWidget);
   });
 }

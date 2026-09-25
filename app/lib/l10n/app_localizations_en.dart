@@ -657,12 +657,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuEntranceList => 'Entrances';
 
   @override
-  String get chatPageEntranceListEmpty =>
-      'Only this entrance is in this space. Use “New entrance token” to add another device of yours.';
+  String get chatPageEntranceListFailed =>
+      'Could not load other entrances (offline?)';
 
   @override
-  String get chatPageEntranceListFailed =>
-      'Could not load entrances (offline?)';
+  String get chatPageEntranceTagLocal => 'This device';
 
   @override
   String get chatPageEntranceTagOnline => 'Online';
@@ -672,6 +671,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceTagRevoked => 'Revoked';
+
+  @override
+  String get chatPageEntranceListNew => 'New entrance';
 
   @override
   String get chatPagePinLabel => 'PIN';

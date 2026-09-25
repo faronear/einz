@@ -621,11 +621,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuEntranceList => '通道列表';
 
   @override
-  String get chatPageEntranceListEmpty =>
-      '本秘境里只有当前这一条通道。用「生成开通码」可以让你的另一台设备也加入。';
+  String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
 
   @override
-  String get chatPageEntranceListFailed => '无法获取通道列表（当前离线？）';
+  String get chatPageEntranceTagLocal => '本机';
 
   @override
   String get chatPageEntranceTagOnline => '在线';
@@ -635,6 +634,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceTagRevoked => '已撤销';
+
+  @override
+  String get chatPageEntranceListNew => '新建通道';
 
   @override
   String get chatPagePinLabel => '锁屏码';

@@ -1228,18 +1228,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
-  /// 「通道列表」底部弹层：列出**本空间里我本人的其他通道**（排除当前通道）——
-  /// 老板 2026-09-25：多设备登录时一眼看到"我还有哪些线挂着、在不在线"。
+  /// 「通道列表」底部弹层：**当前通道（标「本机」）+ 我本人在本空间的其他通道**
+  /// （老板 2026-09-25：多设备登录时一眼看到"我还有哪些线挂着、在不在线"；
+  /// 即使只有自己一条通道也要显示自己；对方 member 的通道不列）。
+  /// 列表下方「新建通道」链接 → 生成开通码弹窗（_showInviteDialog）。
   ///
   /// 数据源 = GET /entrances（与顶栏在线判定同源：connected_at 非 null 即在线，
-  /// 旧服务端无该字段时退回 last_seen<60s）；行内显示 名字（/space 的名字表，
-  /// 兜底 member_id）+ 通道名 + 性别图标 + 在线灯 + 最近活跃时刻。
+  /// 旧服务端无该字段时退回 last_seen<60s）；行内显示 通道名 + 名字（/space 的名字表，
+  /// 兜底 member_id）+ 性别图标 + 在线灯 + 最近活跃时刻。
   /// 已撤销的通道照列并标注（与 CLI /entrances 同口径：藏着不显示反而像凭空消失）。
+  /// 服务端拉不到时仍显示当前通道（离线不影响"我是谁"），只把其他通道区换成失败提示。
   Future<void> _showEntranceListSheet() async {
     final l10n = AppLocalizations.of(context)!;
-    // 本空间的 member_id 集合（/entrances 行只有 member_id，名字/性别查本地名字表）
-    // 与"我是谁"：先反查一次本通道的 member（_refreshProfileFromServer 已缓存过，
-    // 这里兜底离线场景——名字表空时用 member_id 原样显示）。
+    // "我是谁"（_myMemberId 可能为 null：离线且 profile 未缓存）：兜底反查一次
     List<Map<String, dynamic>>? rows;
     String? myMemberId = _myMemberId;
     try {
@@ -1254,7 +1255,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         }
       }
     } catch (_) {
-      rows = null; // 离线/出错：显示失败提示（保留弹层，说明原因）
+      rows = null; // 离线/出错：当前通道照列，其他通道区显示失败提示
     }
     if (!mounted) return;
     showModalBottomSheet<void>(
@@ -1262,8 +1263,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (ctx) {
         final scheme = Theme.of(ctx).colorScheme;
         final now = DateTime.now().millisecondsSinceEpoch;
-        // 行：排除当前通道；只留**我本人**的（同 member）——老板要求"我本人的其他通道"
+        // 行 = 当前通道（必有，标「本机」）+ 我本人的其他通道（同 member，排除当前）
         final myRows = <Map<String, dynamic>>[
+          {
+            'entrance_id': widget.entranceId,
+            'entrance_name': _myEntranceName,
+            'member_id': myMemberId ?? '',
+            'connected_at': DateTime.now().millisecondsSinceEpoch,
+            'status': 'active',
+            '_local': true,
+          },
           if (rows != null)
             for (final d in rows)
               if (d['entrance_id'] != widget.entranceId &&
@@ -1282,104 +1291,114 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 Text(l10n.chatPageMenuEntranceList,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
+                for (final d in myRows)
+                  () {
+                    final name = (d['entrance_name'] as String? ?? '').trim();
+                    final entranceId = d['entrance_id'] as String? ?? '';
+                    final pid = d['member_id'] as String? ?? '';
+                    final isLocal = d['_local'] == true;
+                    final revoked = !isLocal &&
+                        d['status'] != null &&
+                        d['status'] != 'active';
+                    final connectedAt = d['connected_at'];
+                    final last = d['last_seen'];
+                    final online = !revoked &&
+                        (d.containsKey('connected_at')
+                            ? connectedAt != null
+                            : (last is num && now - last < 60 * 1000));
+                    // 最近时刻：在线 → 上线时刻（online_since→connected_at）；
+                    // 离线 → 最后活跃 last_seen（服务端干净下线时置 0 → 不显示，
+                    // 直接格式化会变 1970-01-01——同 CLI 的口径）；本机 → 不显示
+                    final sinceMs = (d['online_since'] as num?)?.toInt() ??
+                        (connectedAt is num ? connectedAt.toInt() : null);
+                    final int stamp = online
+                        ? (sinceMs ?? 0)
+                        : (!revoked && last is num ? last.toInt() : 0);
+                    final memberName = _memberNames[pid] ?? (pid.isEmpty ? '' : pid);
+                    final gender = _memberGenders[pid] ?? '';
+                    final tag = isLocal
+                        ? l10n.chatPageEntranceTagLocal
+                        : (revoked
+                            ? l10n.chatPageEntranceTagRevoked
+                            : (online
+                                ? l10n.chatPageEntranceTagOnline
+                                : l10n.chatPageEntranceTagOffline));
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, size: 8,
+                              color: revoked
+                                  ? scheme.outline
+                                  : (online
+                                      ? Colors.green
+                                      : Colors.red)),
+                          const SizedBox(width: 8),
+                          // 性别图标（同个人资料/向导口径）：女粉 Icons.female / 男蓝 Icons.male
+                          if (gender == 'female') ...[
+                            const Icon(Icons.female, size: 14,
+                                color: Color(0xFFD6529C)),
+                            const SizedBox(width: 4),
+                          ] else if (gender == 'male') ...[
+                            const Icon(Icons.male, size: 14,
+                                color: Color(0xFF3BAFFD)),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name.isNotEmpty ? name : entranceId,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 14, fontWeight: FontWeight.w500),
+                                ),
+                                if (memberName.isNotEmpty && !isLocal)
+                                  Text(memberName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontSize: 12, color: scheme.outline)),
+                              ],
+                            ),
+                          ),
+                          if (!isLocal && stamp > 0)
+                            Text(_timeStampLabel(stamp),
+                                style: TextStyle(
+                                    fontSize: 12, color: scheme.outline)),
+                          const SizedBox(width: 8),
+                          Text(tag,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: revoked
+                                      ? scheme.outline
+                                      : (online
+                                          ? Colors.green
+                                          : scheme.onSurfaceVariant))),
+                        ],
+                      ),
+                    );
+                  }(),
                 if (rows == null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(l10n.chatPageEntranceListFailed,
                         style: TextStyle(fontSize: 13, color: scheme.outline)),
-                  )
-                else if (myRows.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(l10n.chatPageEntranceListEmpty,
-                        style: TextStyle(fontSize: 13, color: scheme.outline)),
-                  )
-                else
-                  for (final d in myRows)
-                    () {
-                      final name = (d['entrance_name'] as String? ?? '').trim();
-                      final entranceId = d['entrance_id'] as String? ?? '';
-                      final pid = d['member_id'] as String? ?? '';
-                      final revoked = d['status'] != null && d['status'] != 'active';
-                      final connectedAt = d['connected_at'];
-                      final last = d['last_seen'];
-                      final online = !revoked &&
-                          (d.containsKey('connected_at')
-                              ? connectedAt != null
-                              : (last is num && now - last < 60 * 1000));
-                      // 最近时刻：在线 → 上线时刻（online_since→connected_at）；
-                      // 离线 → 最后活跃 last_seen（服务端干净下线时置 0 → 不显示，
-                      // 直接格式化会变 1970-01-01——同 CLI 的口径）
-                      final sinceMs = (d['online_since'] as num?)?.toInt() ??
-                          (connectedAt is num ? connectedAt.toInt() : null);
-                      final int stamp = online
-                          ? (sinceMs ?? 0)
-                          : (!revoked && last is num ? last.toInt() : 0);
-                      final memberName = _memberNames[pid] ?? (pid.isEmpty ? '' : pid);
-                      final gender = _memberGenders[pid] ?? '';
-                      final tag = revoked
-                          ? l10n.chatPageEntranceTagRevoked
-                          : (online
-                              ? l10n.chatPageEntranceTagOnline
-                              : l10n.chatPageEntranceTagOffline);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            Icon(Icons.circle, size: 8,
-                                color: revoked
-                                    ? scheme.outline
-                                    : (online
-                                        ? Colors.green
-                                        : Colors.red)),
-                            const SizedBox(width: 8),
-                            // 性别图标（同个人资料/向导口径）：女粉 Icons.female / 男蓝 Icons.male
-                            if (gender == 'female') ...[
-                              const Icon(Icons.female, size: 14,
-                                  color: Color(0xFFD6529C)),
-                              const SizedBox(width: 4),
-                            ] else if (gender == 'male') ...[
-                              const Icon(Icons.male, size: 14,
-                                  color: Color(0xFF3BAFFD)),
-                              const SizedBox(width: 4),
-                            ],
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    name.isNotEmpty ? name : entranceId,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontSize: 14, fontWeight: FontWeight.w500),
-                                  ),
-                                  if (memberName.isNotEmpty)
-                                    Text(memberName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontSize: 12, color: scheme.outline)),
-                                ],
-                              ),
-                            ),
-                            if (stamp > 0)
-                              Text(_timeStampLabel(stamp),
-                                  style: TextStyle(
-                                      fontSize: 12, color: scheme.outline)),
-                            const SizedBox(width: 8),
-                            Text(tag,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: revoked
-                                        ? scheme.outline
-                                        : (online
-                                            ? Colors.green
-                                            : scheme.onSurfaceVariant))),
-                          ],
-                        ),
-                      );
-                    }(),
+                  ),
+                const SizedBox(height: 4),
+                // 「新建通道」：生成开通码，给另一台设备（老板 2026-09-25）
+                TextButton(
+                  onPressed: () => _menuAction(_showInviteDialog),
+                  child: Text(
+                    l10n.chatPageEntranceListNew,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2271F7)),
+                  ),
+                ),
               ],
             ),
           ),
