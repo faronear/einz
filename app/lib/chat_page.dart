@@ -145,11 +145,12 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-/// 消息流正文（气泡内跟随默认样式的文字）字号（老板 2026-09-15 定：15）。
-/// 原样：跟着 Flutter 默认 14，比微信小一圈；试过 16，老板取中间值 15。
+/// 消息流正文（气泡内跟随默认样式的文字）字号（老板 2026-09-25 定：16）。
+/// 演变：原样跟 Flutter 默认 14（比微信小一圈）→ 2026-09-15 取中间值 15 →
+/// 2026-09-25 老板看 15 仍偏小，定 16。
 /// 只作用于气泡内跟随默认样式的文字——时间戳/焚毁标签/引用块/长按预览行都显式
 /// 设了字号，不受影响。
-const double kMessageFontSize = 15;
+const double kMessageFontSize = 16;
 
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
@@ -420,7 +421,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(busyLabel ?? l10n.chatPageMsgFailedTap,
-                  style: TextStyle(fontSize: 10, color: Colors.red.shade600)),
+                  style: TextStyle(fontSize: 11, color: Colors.red.shade600)),
               const SizedBox(width: 2),
               Icon(Icons.error_outline, size: 12, color: Colors.red.shade600),
             ],
@@ -456,7 +457,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (busyLabel != null) ...[
-              Text(busyLabel, style: TextStyle(fontSize: 10, color: subtle)),
+              Text(busyLabel, style: TextStyle(fontSize: 11, color: subtle)),
               const SizedBox(width: 2),
             ],
             _SendingPlane(
@@ -4777,7 +4778,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         ],
                                         Text(_messageTimeLabel(m),
                                             style: TextStyle(
-                                                fontSize: 10,
+                                                fontSize: 11,
                                                 color: _uiStyle == 'gradient'
                                                     ? Colors.white70
                                                     : Colors.grey)),
@@ -4793,7 +4794,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
                                                   manual: m.burnManual),
                                               style: TextStyle(
-                                                  fontSize: 10,
+                                                  fontSize: 11,
                                                   color: _uiStyle == 'gradient'
                                                       ? Colors.white70
                                                       : Colors.grey)),
