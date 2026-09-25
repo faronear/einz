@@ -1416,8 +1416,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 就地重拉 /entrances 重建卡片，不用退出弹层、也不用等 30s 轮询。
                   // 横向 padding 由 16 收到 0，让刷新按钮与下面的卡片**右对齐**；
                   // 左边放同宽占位，标题仍在弹层正中（不会被按钮推歪）。
+                  // 纵向 14/10 → 4/0：这一行的高度由 40 的按钮撑起（标题文字只占约 19），
+                  // 减掉上下各约 10.5 的盒子余量后，标题**看上去**离顶边/卡片仍是 14/10。
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 14, 0, 10),
+                    padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
                     child: Row(
                       children: [
                         const SizedBox(width: _entranceRefreshSize),

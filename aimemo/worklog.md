@@ -9896,6 +9896,8 @@ app 全量 **218 项通过**（goldens 跳过）；`app/pubspec.lock` 未被镜�
   横向 padding 16→0（标题仍在弹层正中，因为 Center 后面的可用宽度是对称的），
   这样按钮右缘才与卡片对齐。这个 40 = `kMinInteractiveDimension` 48 − `visualDensity.compact`
   各 4（沿用菜单统一的 compact 触控盒，`menu_metrics.dart` 同款取舍）。
+  **纵向 14/10 → 4/0**：这一行的高度由 40 的按钮撑起（标题文字只占约 19），减掉上下各
+  约 10.5 的盒子余量后，标题**看上去**离顶边/卡片仍是 14/10（与其他弹层口径一致）。
 - **就地重建，不关弹层**：`showModalBottomSheet` 的主体套 `StatefulBuilder`。
   刻意**不用**「pop 再 show」——那会有"收起+展开"两段动画（还得叠 `_menuAction` 的
   300ms 错峰），看着像卡了一下。
