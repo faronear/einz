@@ -538,9 +538,13 @@ class AppLockService {
     try {
       final m = jsonDecode(raw) as Map<String, dynamic>;
       return {
-        'memberName': (m['memberName'] as String?) ?? '',
+        // 名字类字段经历两轮改名（person→partner→member、device→entrance），
+        // 老安装落盘的 JSON 还是旧键；不回退的话升级后名字全变空。
+        'memberName':
+            _pickStringOrNull(m, const ['memberName', 'partnerName', 'personName']) ?? '',
         'peerName': (m['peerName'] as String?) ?? '',
-        'entranceName': (m['entranceName'] as String?) ?? '',
+        'entranceName':
+            _pickStringOrNull(m, const ['entranceName', 'deviceName']) ?? '',
         'myGender': (m['myGender'] as String?) ?? '',
         'peerGender': (m['peerGender'] as String?) ?? '',
         'mySlot': (m['mySlot'] as num?)?.toInt(),
@@ -639,15 +643,45 @@ class AppLockPayload {
       };
 
   factory AppLockPayload.fromJson(Map<String, dynamic> json) => AppLockPayload(
-        spaceKeyB64: json['space_key'] as String,
-        spaceId: json['space_id'] as String,
-        entranceId: json['entrance_id'] as String,
+        spaceKeyB64: _pickString(json, const ['space_key']),
+        spaceId: _pickString(json, const ['space_id']),
+        // 2026-09-23 的 device→entrance 改名把键名写进了**已加密的锁包内部**，
+        // 而密文只能在解锁后才可读 —— 迁移阶段无法改写这些键，只能读时归一。
+        entranceId: _pickString(json, const ['entrance_id', 'device_id']),
         keyVersion: (json['key_version'] as int?) ?? 1,
         token: json['token'] as String?,
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
-        publicKeyB64: json['entrance_public_key'] as String?,
-        privateKeyB64: json['entrance_private_key'] as String?,
+        publicKeyB64: _pickStringOrNull(
+            json, const ['entrance_public_key', 'device_public_key']),
+        privateKeyB64: _pickStringOrNull(
+            json, const ['entrance_private_key', 'device_private_key']),
       );
+}
+
+/// 按候选键序取第一个**存在的字符串**（旧键归一，见 [_pickString] 的注释）。
+/// 全部缺失返回 null（可选字段用）。
+String? _pickStringOrNull(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final value = json[key];
+    if (value is String) return value;
+  }
+  return null;
+}
+
+/// 必填字段取值：候选键全不在 → [FormatException]（调用方据此判"锁包损坏"）。
+///
+/// 背景（2026-09-25 老板实测：新包跑老数据，PIN 输对也报
+/// "type 'Null' is not a subtype of type 'String'"）：老锁包是在 2026-09-23
+/// device→entrance 改名**之前**加密写的，里面的键还是 `device_id`。它不像 drift 列
+/// 能被 migration 的 `renameColumn` 改写（密文不解锁就看不到），故只能在读路径兼容。
+/// 值本身没变，换个键名读就行。
+///
+/// 显式抛 [FormatException] 而不是让 `as String` 抛 TypeError：锁包真缺字段时，
+/// [AppLockService.unlockVault] 会把它当"锁屏码错误"处理，界面给的是人话。
+String _pickString(Map<String, dynamic> json, List<String> keys) {
+  final value = _pickStringOrNull(json, keys);
+  if (value == null) throw FormatException('锁包缺少字段 ${keys.join(' / ')}');
+  return value;
 }
 
 /// 一条通道上的**全部空间凭证**（多空间支持，见 `aimemo/multiSpaceDesign.zhcn.md` §3.2）。

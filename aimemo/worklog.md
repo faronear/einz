@@ -9332,3 +9332,36 @@ App 侧不中招（drift 列由迁移 `renameColumn` 改过）。
 **遗留（非本次，已问老板）**：`cli/localConfig.json` 是单值 `https://einz.tic.cc` →
 `_pickReachable` 单值**短路不探测** → 本机跑 TUI **不会**试 `einz.yuanjinx.com`（备案域名）
 容灾。想启用：把该文件写成数组，或删掉；或按提议收紧代码（命中出厂域名时仍走候选探测）。
+
+## 2026-09-25 修复：App 用新包跑老数据，PIN 解锁报 `type 'Null' is not a subtype of type 'String'`
+
+**现象**：macOS 装机版 `einz.app`（最新代码）跑在老板 MacBook 的老数据上（计划：启动 →
+销毁老通道 → 变全新），能启动到锁屏页，输 PIN 提交即报错：
+`解锁失败: type 'Null' is not a subtype of type 'String' in type cast`。
+
+**根因**：老数据写于 2026-09-23 `device→entrance` 改名**之前**，PIN 密文包内部（明文 JSON）
+的键还是 `device_id` / `device_public_key` / `device_private_key`；新代码
+`AppLockPayload.fromJson` 读 `entrance_id` → null → `as String` 抛 TypeError（没被
+`unlockVault` 的 `FormatException` 捕获，漏到 LockPage 的兜底 catch → 显示原始类型报错）。
+**PIN 是对的**（密文已解开），错的是解开之后的键名读取。
+
+佐证（本机真实数据 `~/Library/Containers/cc.tic.einz/Data/Documents/einz.sqlite`）：
+`app_state.app_lock.profile` = `{"personName":"Luk","peerName":"Fanr","deviceName":"…"}`
+—— 还是 `personName/deviceName`，即改名前的落盘形状。
+
+与昨晚 CLI 那条同根：drift 列能被 migration 的 `renameColumn` 改写，**密文里的键名改不了**
+（不解锁就看不见），只能在读路径归一。
+
+**修复**（`app/lib/data/app_lock.dart`）：
+- `AppLockPayload.fromJson` 改走 `_pickString/_pickStringOrNull`（按候选键序取第一个存在的
+  字符串）：`entrance_id ← device_id`、两把通道密钥同理（**值不变**，换键名读）。
+- 必填字段全缺失时显式抛 `FormatException`（调用方按"锁屏码错误"处理），不再让裸 TypeError
+  漏到界面。
+- 顺带：`loadProfile` 加同样的旧键回退——`memberName ← partnerName/personName`、
+  `entranceName ← deviceName`。同一轮改名落到 profile JSON，不回退则老用户升级后**名字全空**。
+
+**验证**：app `dart analyze` 无 issue；`flutter test` 全项通过（**204 全过**，其中 vault 新增
+3 条：单 payload 老包解锁归一、Vault 老 JSON 条目归一、缺键走 FormatException；
+app_lock 新增 1 条：旧 profile 键读回）。
+
+**未测（需老板自测）**：装机版真机跑老数据的完整路径——解锁 → 进聊天 → 销毁老通道 → 全新。
