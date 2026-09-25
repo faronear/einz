@@ -851,7 +851,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntrancePublicKeyFailed => 'Not recorded';
 
   @override
-  String get burnOptionOff => 'Off';
+  String get burnOptionOff => 'Off (Do not burn anymore)';
 
   @override
   String get burnOption1Minute => '1 minute';

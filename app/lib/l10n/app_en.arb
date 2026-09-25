@@ -378,7 +378,7 @@
   "chatPageEntranceRevoked": "Entrance revoked — local data cleared, please set up again",
   "chatPageEntrancePublicKeyLabel": "Public key of this entrance",
   "chatPageEntrancePublicKeyFailed": "Not recorded",
-  "burnOptionOff": "Off (Do not delete)",
+  "burnOptionOff": "Off (Do not burn anymore)",
   "burnOption1Minute": "1 minute",
   "burnOption5Minutes": "5 minutes",
   "burnOption1Hour": "1 hour",

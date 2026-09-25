@@ -1577,7 +1577,7 @@ abstract class AppLocalizations {
   /// No description provided for @burnOptionOff.
   ///
   /// In en, this message translates to:
-  /// **'Off'**
+  /// **'Off (Do not burn anymore)'**
   String get burnOptionOff;
 
   /// No description provided for @burnOption1Minute.

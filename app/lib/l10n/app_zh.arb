@@ -378,7 +378,7 @@
   "chatPageEntranceRevoked": "这条通道已被撤销，本地数据已清除，请重新配置",
   "chatPageEntrancePublicKeyLabel": "通道公钥",
   "chatPageEntrancePublicKeyFailed": "未记录",
-  "burnOptionOff": "关闭",
+  "burnOptionOff": "关闭（不再自动焚毁）",
   "burnOption1Minute": "1 分钟",
   "burnOption5Minutes": "5 分钟",
   "burnOption1Hour": "1 小时",

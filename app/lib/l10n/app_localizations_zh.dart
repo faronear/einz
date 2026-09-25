@@ -811,7 +811,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntrancePublicKeyFailed => '未记录';
 
   @override
-  String get burnOptionOff => '关闭';
+  String get burnOptionOff => '关闭（不再自动焚毁）';
 
   @override
   String get burnOption1Minute => '1 分钟';
