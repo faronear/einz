@@ -170,8 +170,11 @@ export function attachWs(wss: WebSocketServer): void {
       timedOut: false,
     };
     conns.set(entranceId, conn);
-    // WS 连接 = 在线：刷新 last_seen（App 判定对方在线）
-    getDb().prepare(`UPDATE entrances SET last_seen = ? WHERE entrance_id = ?`).run(now, entranceId);
+    // WS 连接 = 在线：刷新 last_seen（App 判定对方在线），并清掉断开时刻
+    // （offline_since 只在"断开那一刻"有意义，重连后它就是陈旧数据）
+    getDb()
+      .prepare(`UPDATE entrances SET last_seen = ?, offline_since = NULL WHERE entrance_id = ?`)
+      .run(now, entranceId);
     logConnection({ entranceId, spaceId, event: "connect", atMs: now, meta });
     broadcastPeerStatus(entranceId, "peer.online");
     console.log(`[req] WS /ws connect entrance=${entranceId} space=${spaceId} total=${conns.size}`);
@@ -198,8 +201,12 @@ export function attachWs(wss: WebSocketServer): void {
       // 先广播离线（peer 广播按发起方空间分组，此时 conn 还在 conns）再删除
       broadcastPeerStatus(entranceId, "peer.offline");
       if (conns.get(entranceId) === conn) conns.delete(entranceId);
-      // WS 断开 = 离线：last_seen 置 0（App 判定离线）
-      getDb().prepare(`UPDATE entrances SET last_seen = 0 WHERE entrance_id = ?`).run(entranceId);
+      // WS 断开 = 离线：last_seen 置 0（App 判定离线），断线时刻落到 offline_since
+      // —— 显示层的"离线时间"取 max(last_seen, offline_since)（见 entrances.listEntrances）。
+      // 心跳超时走的也是这个 close 事件，所以两条路都被覆盖。
+      getDb()
+        .prepare(`UPDATE entrances SET last_seen = 0, offline_since = ? WHERE entrance_id = ?`)
+        .run(atMs, entranceId);
       logConnection({
         entranceId,
         spaceId,

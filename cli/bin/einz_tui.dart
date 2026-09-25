@@ -1986,7 +1986,7 @@ class _EntranceRow {
   final String memberName; // 使用者名字（缺失回退 member_id）
   final bool online;
   final String tag; // 本机 / 已撤销 / 在线 / 离线
-  final String when; // since 上线时刻（在线）/ since 最后活跃时刻（离线，≈下线时刻）
+  final String when; // since 上线时刻（在线）/ since 下线时刻（离线/已撤销）
   final bool isMe;
   final bool revoked;
 
@@ -2031,20 +2031,20 @@ Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
                 ? connectedAt != null
                 : (last is num && now - last < 60 * 1000)));
     final isMe = devId == myId;
-    // 在线 → "since 上线时刻"；离线 → "上次活跃 时刻"（**不显示上线时刻**：服务端
-    // 离线时 last_seen 置 0，直接格式化会变成 1970-01-01——老板 2026-09-16 实测）。
-    // 在线 → 上线时刻；离线 → **最后一次活跃**时刻（≈ 下线时刻，老板 2026-09-17：
-    // 两种都用 `since` 一个词就行）。两点说明：
-    // - 服务端 WS 断开时把 last_seen 置 0（ws.ts），所以干净下线的通道这里 stamp=0
-    //   → 不显示时间（直接格式化会变成 1970-01-01，老板 2026-09-16 实测）；
-    // - 非 0 时它是最后一次心跳/认证的时刻，比真正断线早 ≤1 个心跳周期（30s）。
+    // 在线 → 上线时刻；离线/已撤销 → **下线时刻**（老板 2026-09-17：两种都用 `since`
+    // 一个词就行）。下线时刻 = max(last_seen, offline_since)：
+    // - 服务端 WS 断开时把 last_seen 置 0（ws.ts），断线时刻只落在 offline_since
+    //   （2026-09-26 新增该字段；在此之前这里 stamp=0，干净下线的通道根本不显示时间）；
+    // - last_seen 会被心跳/REST 刷新，服务端重启这类"close 没跑到"的情况它反倒是更新的
+    //   证据（比上一次会话留下的 offline_since 新），故取两者较晚者；
+    // - 两个都是 0 → 不显示（直接格式化会变成 1970-01-01，老板 2026-09-16 实测）。
+    final offlineSince = (d['offline_since'] as num?)?.toInt() ?? 0;
+    final lastSeen = last is num ? last.toInt() : 0;
     final int stamp;
     if (online) {
       stamp = sinceMs ?? 0;
-    } else if (!revoked && last is num) {
-      stamp = last.toInt();
     } else {
-      stamp = 0;
+      stamp = lastSeen > offlineSince ? lastSeen : offlineSince;
     }
     final when = stamp > 0
         ? ' since ${_fmtEntranceTimeLocal(stamp)} (${_fmtEntranceTimeUtc(stamp)})'

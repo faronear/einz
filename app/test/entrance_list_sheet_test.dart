@@ -2,9 +2,13 @@
 // 我本人的其他通道**（对方 member 的通道不列；离线时当前通道照列）；列表下方
 // 「新建通道」链接 → 生成开通码弹窗。
 //
-// 数据源 = GET /entrances（fake api 编排）；卡片 = 通道名 + 状态红绿灯 + since。
-// 已撤销的本人通道照列（灰灯）。本机那张不用文字标签（英文 "This device" 会吃掉
-// 近半张卡宽），改用绿勾 —— 见 `chat_page._showEntranceListSheet`。
+// 数据源 = GET /entrances（fake api 编排）；卡片 = 通道名 + 状态红绿灯 + 时间。
+// 时间**不带 "since" 前缀**（老板 2026-09-26：太占地方），且所有卡片等高
+// （第二行恒占一行高度——离线卡原先没有文字，会矮一截）。
+// 右上角固定角标（老板 2026-09-26）：本机 = 绿勾（原先紧贴名称，位置随名字跑）、
+// 已撤销 = 阻止图标 + 整卡蒙版；两者互斥，共用一个角标位。
+// 离线时刻 = max(last_seen, offline_since)：服务端干净断开时 last_seen 归零，
+// 断线时刻只落在 offline_since —— 见 `chat_page._showEntranceListSheet`。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -139,6 +143,37 @@ Finder sheetLocalCheck() => find.descendant(
           find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.check_circle),
     );
 
+/// 弹层内的**已撤销角标**（Icons.block）。
+Finder sheetRevokedMark() => find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.block),
+    );
+
+/// 弹层内的**时间文本**（卡片第二行；无 "since" 前缀，故按时间格式匹配）：
+/// 当天 `HH:MM` / 当年 `MM-DD HH:MM` / 跨年 `YYYY-MM-DD HH:MM`。
+Finder sheetTimeText() => find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byWidgetPredicate((w) =>
+          w is Text &&
+          w.data != null &&
+          RegExp(r'^(\d{2}-\d{2} |\d{4}-\d{2}-\d{2} )?\d{2}:\d{2}$')
+              .hasMatch(w.data!)),
+    );
+
+/// 某张卡片（名称文字最近的 Container 祖先）的矩形——角标/等高断言用。
+Rect cardOf(WidgetTester tester, String name) => tester.getRect(
+      find
+          .ancestor(of: sheetText(name), matching: find.byType(Container))
+          .first,
+    );
+
+/// 已撤销卡的蒙版（整卡降透明度的 Opacity 祖先）。
+Finder dimmedCardOf(String name) => find.ancestor(
+      of: sheetText(name),
+      matching:
+          find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1),
+    );
+
 void main() {
   setUpAll(() async {
     await sodium();
@@ -167,6 +202,17 @@ void main() {
         'last_seen': now,
         'status': 'active',
       },
+      // 我本人一条**离线**的通道——服务端干净断开时 last_seen 归零，
+      // 断线时刻落在 offline_since（老板 2026-09-26：离线卡也要有时间，否则矮一截）
+      {
+        'entrance_id': 'dev-off',
+        'entrance_name': 'MacBook',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': 0,
+        'offline_since': now - 2 * 3600 * 1000,
+        'status': 'active',
+      },
       // 我本人一条已撤销的旧通道——照列并标注
       {
         'entrance_id': 'dev-old',
@@ -174,6 +220,7 @@ void main() {
         'member_id': 'member-me',
         'connected_at': null,
         'last_seen': now - 3600 * 1000,
+        'offline_since': now - 3600 * 1000,
         'status': 'revoked',
       },
       // 对方的通道（在线）——不列（老板要求：只列**我本人**的）
@@ -191,9 +238,10 @@ void main() {
 
     // 弹层标题（菜单已关，文本只在弹层里）
     expect(sheetText('更多通道'), findsOneWidget);
-    // 三张卡片：iPhone（本机·在线）/ iPad（在线）/ 旧手机（已撤销）
+    // 四张卡片：iPhone（本机·在线）/ iPad（在线）/ MacBook（离线）/ 旧手机（已撤销）
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('iPad'), findsOneWidget);
+    expect(sheetText('MacBook'), findsOneWidget);
     expect(sheetText('旧手机'), findsOneWidget);
     // 本机绿勾只在当前通道那张卡上（恒列第一位）
     expect(sheetLocalCheck(), findsOneWidget);
@@ -203,11 +251,45 @@ void main() {
       lessThan(tester.getTopLeft(sheetText('iPad')).dx),
       reason: '本机通道应排在我本人的其他通道之前',
     );
-    // 红绿灯：2 绿（本机+iPad 在线）+ 1 灰（已撤销），无红
+    // 红绿灯：2 绿（本机+iPad 在线）+ 1 红（MacBook 离线）+ 1 灰（已撤销）
     expect(sheetDot(Colors.green), findsNWidgets(2));
-    expect(sheetDot(Colors.red), findsNothing);
-    // since 时间：三张卡都有（在线→上线时刻；已撤销→撤销前最后活跃）
-    expect(sheetTextContaining('since'), findsNWidgets(3));
+    expect(sheetDot(Colors.red), findsOneWidget);
+    expect(sheetDot(Colors.black.withValues(alpha: 0.30)), findsOneWidget);
+    // 时间行：四张卡都有（在线→上线时刻；离线/已撤销→下线时刻），且**不带 since**
+    expect(sheetTimeText(), findsNWidgets(4));
+    expect(sheetTextContaining('since'), findsNothing);
+    // 四张卡等高（老板 2026-09-26：离线卡原先没有文字，会比别的矮一截）
+    final heights = <double>{
+      for (final n in ['iPhone', 'iPad', 'MacBook', '旧手机']) cardOf(tester, n).height,
+    };
+    expect(heights.length, 1, reason: '所有通道卡片应等高（时间行恒占一行）');
+    // 已撤销卡：右上角阻止图标 + 整卡蒙版；本机卡：右上角绿勾、不蒙版
+    expect(sheetRevokedMark(), findsOneWidget);
+    expect(dimmedCardOf('旧手机'), findsOneWidget, reason: '已撤销卡应有蒙版（整卡降透明度）');
+    expect(dimmedCardOf('iPad'), findsNothing, reason: '正常卡不该蒙版');
+    // 角标**固定在卡片右上角**（与名称长短无关）：两种角标到各自卡片右上角的
+    // 内缩量应一致（老板 2026-09-26：绿勾原先紧贴名称，位置随名字跑）
+    final checkRect = tester.getRect(sheetLocalCheck());
+    final markRect = tester.getRect(sheetRevokedMark());
+    final phoneCard = cardOf(tester, 'iPhone');
+    final oldCard = cardOf(tester, '旧手机');
+    double insetRight(double cardRight, Rect badge) => cardRight - badge.right;
+    double insetTop(double cardTop, Rect badge) => badge.top - cardTop;
+    expect(
+      insetRight(phoneCard.right, checkRect),
+      closeTo(insetRight(oldCard.right, markRect), 1),
+      reason: '两种角标距卡片右边缘的距离应一致（固定位，不随名称长短跑）',
+    );
+    expect(
+      insetTop(phoneCard.top, checkRect),
+      closeTo(insetTop(oldCard.top, markRect), 1),
+      reason: '两种角标距卡片上边缘的距离应一致',
+    );
+    // 角标该在右上角：位于卡片右上象限，且在名称右侧
+    expect(checkRect.right, greaterThan(phoneCard.center.dx));
+    expect(checkRect.top, lessThan(phoneCard.center.dy));
+    expect(checkRect.right, greaterThan(tester.getRect(sheetText('iPhone')).right),
+        reason: '绿勾不该再贴名称右缘');
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
     // 「新建通道」按钮（图标+文字居中、有背景）：点击后通道列表弹层收起，
@@ -237,15 +319,56 @@ void main() {
 
     await _openEntranceListSheet(tester, db, api);
 
-    // 只有一张卡：当前通道 + 绿勾 + 绿灯 + since
+    // 只有一张卡：当前通道 + 绿勾 + 绿灯 + 时间
     expect(sheetText('更多通道'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetLocalCheck(), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);
     expect(sheetDot(Colors.red), findsNothing);
-    expect(sheetTextContaining('since'), findsOneWidget);
+    expect(sheetTimeText(), findsOneWidget);
     // 「新建通道」按钮在
     expect(sheetText('新建通道'), findsOneWidget);
+  });
+
+  testWidgets('没有时间可显示的卡片也与别的等高（时间行恒占一行，老板 2026-09-26）',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _FakeEntranceApi([
+      // 当前通道（有上线时刻 → 有时间可显示）
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      // 我本人的另一条通道：**两个时间字段都空**（存量行——last_seen 早已被服务端
+      // 归零，offline_since 还没落过）→ 时间行为空。它必须和上面那张一样高
+      {
+        'entrance_id': 'dev-ghost',
+        'entrance_name': 'Ghost',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': 0,
+        'offline_since': null,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    expect(sheetText('iPhone'), findsOneWidget);
+    expect(sheetText('Ghost'), findsOneWidget);
+    // 只有一张卡有时间
+    expect(sheetTimeText(), findsOneWidget);
+    expect(
+      cardOf(tester, 'iPhone').height,
+      cardOf(tester, 'Ghost').height,
+      reason: '没有时间可显示的卡片也要占住时间行的高度，否则会矮一截',
+    );
   });
 
   testWidgets('离线时当前通道照列，其他通道区显示失败提示', (tester) async {
@@ -254,12 +377,12 @@ void main() {
 
     await _openEntranceListSheet(tester, db, _BrokenEntranceApi());
 
-    // 当前通道（本机）照常显示（绿勾 + 绿灯；拉不到服务端时间 → 不显示 since）
+    // 当前通道（本机）照常显示（绿勾 + 绿灯；拉不到服务端时间 → 不显示时间）
     expect(sheetText('更多通道'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetLocalCheck(), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);
-    expect(sheetTextContaining('since'), findsNothing);
+    expect(sheetTimeText(), findsNothing);
     // 其他通道区失败提示 + 「新建通道」仍在
     expect(sheetTextContaining('无法获取其他通道'), findsOneWidget);
     expect(sheetText('新建通道'), findsOneWidget);

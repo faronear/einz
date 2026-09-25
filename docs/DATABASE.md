@@ -33,6 +33,9 @@ CREATE TABLE entrances (
     status      TEXT NOT NULL DEFAULT 'active',  -- active | revoked
     entrance_name TEXT,                      -- 通道显示名（TUI/App 可改）
     last_seen   INTEGER,                   -- 只由 WS 连接/心跳/断开维护
+                                           -- （"最后一份存活证据"：心跳与 REST 都刷，干净断开时置 0）
+    offline_since INTEGER,                 -- 最后一次 WS 断开的时刻（ms；建连时清空）
+                                           -- 与 last_seen 分工见 PROTOCOL §7.1
     created_at  INTEGER NOT NULL,
     install_uid  TEXT                       -- 安装级标识（客户端生成；同一物理设备各空间同名）
                                            -- 存量行/未升级客户端为 NULL，由 POST /entrances/install-uid 补登。

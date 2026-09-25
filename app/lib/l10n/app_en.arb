@@ -269,12 +269,6 @@
   "chatPageMenuEntranceList": "More entrances",
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
   "chatPageEntranceListNew": "Generate entrance token",
-  "chatPageEntranceSince": "since {time}",
-  "@chatPageEntranceSince": {
-    "placeholders": {
-      "time": {}
-    }
-  },
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
   "chatPagePinSetValue": "Set",

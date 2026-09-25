@@ -26,6 +26,11 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       status      TEXT NOT NULL DEFAULT 'active',
       entrance_name TEXT,
       last_seen   INTEGER,
+      -- 最后一次 WS 断开的时刻（ms）——"这条通道什么时候下的线"。
+      -- 与 last_seen 分工：last_seen 是"最后活动证据"（心跳/REST 都会刷，
+      -- 断开时归零），offline_since 只在断开那一刻落一次、建连时清空。
+      -- 显示层取 max(last_seen, offline_since) 当离线时刻（见 entrances.listEntrances）。
+      offline_since INTEGER,
       created_at  INTEGER NOT NULL,
       -- 客户端生成的**安装级**标识（多空间）：同一台物理设备上每个空间一个
       -- entrance_id，但它们的 install_uid 相同 → 服务端据此知道"这几行是同一台设备"。
@@ -203,6 +208,41 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
     db.exec(`CREATE INDEX IF NOT EXISTS idx_entrances_uid ON entrances (install_uid)`);
   } catch {
     // 列已存在（新库）→ 忽略
+  }
+  // 迁移：entrances 表补充 offline_since（最后断开时刻；App/CLI 显示"离线 since 时刻"用）
+  try {
+    db.exec(`ALTER TABLE entrances ADD COLUMN offline_since INTEGER`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 一次性回填 offline_since：此刻**已经离线**的通道，它的断线时刻只存在于审计表
+  // `connection_events.at_ms`（disconnect / heartbeat_timeout 各记一行），新列是空的。
+  // 不回填的话，这些通道要等各自重连一次才显示得出时间。
+  //
+  // 这是**唯一**一次从审计表取业务值的地方（迁移期的一次性历史回填，不是长期读路径）——
+  // 审计表"不参与业务语义"的原则（见本文件 §审计表注释）仍然成立：清空 connection_events
+  // 只会让下一次启动的回填少捞到一些值，不影响聊天与显示。
+  // 幂等：只填 offline_since IS NULL 的行，重跑即空操作。
+  const backfilled = db
+    .prepare(
+      `UPDATE entrances SET offline_since = (
+         SELECT e.at_ms FROM connection_events e
+          WHERE e.entrance_id = entrances.entrance_id
+            AND e.event IN ('disconnect', 'heartbeat_timeout')
+          ORDER BY e.at_ms DESC LIMIT 1
+       )
+       WHERE offline_since IS NULL
+         AND status = 'active'
+         AND (last_seen IS NULL OR last_seen = 0)
+         AND EXISTS (
+           SELECT 1 FROM connection_events e
+            WHERE e.entrance_id = entrances.entrance_id
+              AND e.event IN ('disconnect', 'heartbeat_timeout')
+         )`
+    )
+    .run().changes;
+  if (backfilled > 0) {
+    console.log(`[einz] 迁移：回填 ${backfilled} 条已离线通道的 offline_since（取自 connection_events）`);
   }
   // 迁移：key_escrow 表补充 passphrase_hash（口令哈希，恢复接口验证用；存量库 ALTER）
   try {

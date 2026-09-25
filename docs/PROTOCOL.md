@@ -309,7 +309,8 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
 // 响应 200
 { "entrances": [
     { "entrance_id": "…", "member_id": "…", "status": "active", "last_seen": 1787900000000,
-      "entrance_name": "MacBook", "connected_at": 1787900000000, "online_since": 1787900000000 }
+      "offline_since": null, "entrance_name": "MacBook",
+      "connected_at": 1787900000000, "online_since": 1787900000000 }
 ] }
 ```
 
@@ -318,6 +319,11 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
   `online_since` = 进入**在线态**的时刻（离线为 null）——与 `connected_at` 的区别是
   **重连不刷新**（被新连接踢掉后又连上不算重新上线），客户端据此按上线顺序排列
   对端的多台在线通道（最新上线在最前）。
+- `offline_since` = **最后一次 WS 断开的时刻**（建连时清空；撤销/退役时写撤销时刻）——
+  与 `last_seen` 分工：`last_seen` 是"最后一份存活证据"（心跳与 REST 都刷、干净断开置 0），
+  `offline_since` 只在断开那一刻落一次。**显示层取 `max(last_seen, offline_since)` 当离线
+  时刻**：干净断开时只剩 `offline_since` 有值（否则离线通道没有时间可显示）；服务端重启这类
+  "close 事件没跑到"的情况反倒是 `last_seen` 更新。两者都为 0/null 才不显示。
 
 ### 7.2 撤销通道 POST /entrances/:id/revoke
 
@@ -357,7 +363,8 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
   **共享**给伴侣的加入凭证，不该获得销毁我这条通道的权力；校验它还必须联网，会让"本机
   身份属于一台已经连不上的服务器"这个最常见的重置场景直接自锁。
 - 服务端动作：通道置 `revoked`（**行保留**，否则它被当成"未登记"而非"已退役"，
-  且 `messages.sender_entrance_id` 会失去归属）+ `last_seen = 0`，清除其 Push Token、
+  且 `messages.sender_entrance_id` 会失去归属）+ `last_seen = 0`、`offline_since = 退役时刻`
+  （显示层要有一行时间，见 §7.1），清除其 Push Token、
   活动会话与未被消费的 challenge，并把它的 WS 连接移出在线表。审计 kind 为
   `entrance.retire`（区别于被人撤销的 `entrance.revoke`）。
 - **退役绝不发 `entrance.revoked` 帧，也不主动关闭 WS**（`ws.forgetEntranceConnection`）：

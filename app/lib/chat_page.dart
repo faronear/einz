@@ -1308,13 +1308,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 「通道列表」底部弹层：**当前通道（带绿勾、列第一位）+ 我本人在本空间的其他通道**
   /// （老板 2026-09-25：多设备登录时一眼看到"我还有哪些线挂着、在不在线"；
   /// 即使只有自己一条通道也要显示自己；对方 member 的通道不列）。
-  /// 每条通道 = **卡片**（边框 + 名称 + 状态红绿灯；本机那张加一个**绿勾**、恒列第一位）；
+  /// 每条通道 = **卡片**（边框 + 名称 + 状态红绿灯；本机那张右上角一个**绿勾**、恒列第一位）；
   /// 列表下方「新建通道」（与「切换我的秘境」弹层的「添加秘境」同款外观：
   /// 常态淡灰底、图标+文字居中）→ 生成开通码弹窗（_showInviteDialog）。
   ///
   /// 数据源 = GET /entrances（在线判定与顶栏同源：connected_at 非 null 即在线，
   /// 旧服务端无该字段时退回 last_seen<60s）。红绿灯：绿=在线 红=离线 灰=已撤销
-  /// （已撤销的通道照列，与 CLI /entrances 同口径：藏着不显示反而像凭空消失）。
+  /// （已撤销的通道照列，并给整卡蒙版 + 右上角阻止图标）。
+  /// 时间行：在线显示上线时刻，离线/已撤销显示**下线时刻**
+  /// （max(last_seen, offline_since)，见卡片内注释）。
   /// 服务端拉不到时仍显示当前通道（离线不影响"我是谁"），只把其他通道区换成失败提示。
   Future<void> _showEntranceListSheet() async {
     final l10n = AppLocalizations.of(context)!;
@@ -1392,8 +1394,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 const SizedBox(height: 2),
                 // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
                 // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
-                // 灰已撤销）+ since 时间（在线→上线时刻；离线→最后活跃；已撤销→撤销前
-                // 最后活跃；无数据不显示）；本机卡另加「本机」标签
+                // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
+                // 右上角固定角标：本机=绿勾、已撤销=阻止图标+整卡蒙版（老板 2026-09-26）
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final size = _entranceCardSizeFor(constraints.maxWidth);
@@ -1415,86 +1417,132 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 (d.containsKey('connected_at')
                                     ? connectedAt != null
                                     : (last is num && now - last < 60 * 1000));
-                            // since 时刻：在线 → 上线（online_since 兜底 connected_at）；
-                            // 离线/已撤销 → 最后活跃 last_seen（服务端干净下线置 0 →
-                            // 不显示，直接格式化会变 1970-01-01——同 CLI 口径）
+                            // 时间戳：在线 → 上线时刻（online_since 兜底 connected_at）；
+                            // 离线/已撤销 → **下线时刻**（老板 2026-09-26）＝
+                            // max(last_seen, offline_since)：offline_since 是服务端断开
+                            // 那一刻落的（干净下线时 last_seen 归零，只剩它有值）；
+                            // last_seen 会被心跳/REST 刷新，服务端重启这类"close 没跑到"
+                            // 的情况反而是更新的证据 → 取两者较晚者最准。都是 0 才不显示。
                             final sinceMs = (d['online_since'] as num?)?.toInt() ??
                                 (connectedAt is num ? connectedAt.toInt() : null);
-                            final int stamp = isLocal
-                                ? localSinceMs
-                                : (online
-                                    ? (sinceMs ?? 0)
-                                    : (last is num ? last.toInt() : 0));
+                            final offlineSince =
+                                (d['offline_since'] as num?)?.toInt() ?? 0;
+                            final lastSeen = last is num ? last.toInt() : 0;
+                            final int stamp;
+                            if (isLocal) {
+                              stamp = localSinceMs;
+                            } else if (online) {
+                              stamp = sinceMs ?? 0;
+                            } else {
+                              stamp = lastSeen > offlineSince
+                                  ? lastSeen
+                                  : offlineSince;
+                            }
+                            // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
+                            // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
+                            final hasBadge = isLocal || revoked;
                             return SizedBox(
                               width: size,
                               child: Container(
-                                padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                       color:
                                           Colors.black.withValues(alpha: 0.12)),
+                                  // 已撤销：极淡灰底 —— "这张卡失效了"的第一层蒙版
+                                  // （第二层是整个内容降透明度，见下面的 Opacity）
+                                  color: revoked
+                                      ? Colors.black.withValues(alpha: 0.04)
+                                      : null,
                                 ),
-                                // mainAxisSize.min：Wrap 给子项的高度约束无限，不能用
-                                // Spacer/flex（RenderFlex 断言）；卡片内容本就等高
-                                // （名称行 + since 行），收缩即可
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                // Stack：内容照常流式排布，角标**固定**在卡片右上角
+                                // （老板 2026-09-26：绿勾原先紧贴名称，位置随名字长短跑）
+                                child: Stack(
                                   children: [
-                                    // 第一行：名称 + 本机绿勾（老板 2026-09-25）
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            name.isNotEmpty ? name : entranceId,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500),
-                                          ),
-                                        ),
-                                        if (isLocal) ...[
-                                          const SizedBox(width: 4),
-                                          // 本机标记：**绿勾**（老板 2026-09-25）——原先
-                                          // 用「本机 / This device」文字标签，英文那个在
-                                          // 一行三张的卡里要吃掉近半张宽度，名字被挤没。
-                                          // 语义同空间卡片上的对勾（`_SpaceCard` 也用它
-                                          // 标"当前这个"）。本机卡恒列第一位。
-                                          const Icon(Icons.check_circle,
-                                              size: 14, color: Colors.green),
-                                        ],
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    // 第二行：状态红绿灯 + since 时间（绿在线/红离线/
-                                    // 灰已撤销；无 since 数据时只有灯）
-                                    Row(
-                                      children: [
-                                        Icon(Icons.circle, size: 8,
-                                            color: revoked
-                                                ? Colors.black
-                                                        .withValues(alpha: 0.30)
-                                                : (online
-                                                    ? Colors.green
-                                                    : Colors.red)),
-                                        if (stamp > 0) ...[
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                                l10n
-                                                    .chatPageEntranceSince(
-                                                        _timeStampLabel(stamp)),
+                                    Opacity(
+                                      opacity: revoked ? 0.55 : 1,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        // mainAxisSize.min：Wrap 给子项的高度约束无限，
+                                        // 不能用 Spacer/flex（RenderFlex 断言）
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // 第一行：名称（角标位由右上角预留）
+                                            Padding(
+                                              // 有角标的卡让出角标宽度，长名字不会钻到
+                                              // 图标底下
+                                              padding: EdgeInsets.only(
+                                                  right: hasBadge ? 18 : 0),
+                                              child: Text(
+                                                name.isNotEmpty
+                                                    ? name
+                                                    : entranceId,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: scheme.outline)),
-                                          ),
-                                        ],
-                                      ],
+                                                style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight:
+                                                        FontWeight.w500),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            // 第二行：状态红绿灯 + 时间（绿在线/红离线/
+                                            // 灰已撤销）。时间**恒定占一行**：没有时间可显示
+                                            // 时给一个空格（不是空串——空串在部分平台量出 0
+                                            // 高），否则这张卡会比别的矮一截
+                                            // （老板 2026-09-26 实测：离线卡没有文字时矮一截）
+                                            Row(
+                                              children: [
+                                                Icon(Icons.circle, size: 8,
+                                                    color: revoked
+                                                        ? Colors.black
+                                                                .withValues(
+                                                                    alpha: 0.30)
+                                                        : (online
+                                                            ? Colors.green
+                                                            : Colors.red)),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  // 直接写时间，不带 "since" 前缀
+                                                  // （老板 2026-09-26：太占地方）
+                                                  child: Text(
+                                                      stamp > 0
+                                                          ? _timeStampLabel(stamp)
+                                                          : ' ',
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow
+                                                          .ellipsis,
+                                                      style: TextStyle(
+                                                          fontSize: 11,
+                                                          color:
+                                                              scheme.outline)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
+                                    if (hasBadge)
+                                      Positioned(
+                                        top: 6,
+                                        right: 6,
+                                        // 本机绿勾语义同空间卡片上的对勾（标"当前这个"）；
+                                        // 已撤销用阻止图标，比文字更省宽度
+                                        child: Icon(
+                                          isLocal
+                                              ? Icons.check_circle
+                                              : Icons.block,
+                                          size: 14,
+                                          color: isLocal
+                                              ? Colors.green
+                                              : Colors.black.withValues(
+                                                  alpha: 0.45),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),

@@ -204,3 +204,52 @@ test('online_since：进入在线态的时刻——重连不刷新；peer.offlin
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('offline_since：断线时刻落库并可查；重连清空（离线卡片显示"什么时候下的线"）', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'einz-offline-'))
+  const wss = new WebSocketServer({ port: 0 })
+  attachWs(wss)
+  const port = (wss.address() as { port: number }).port
+  try {
+    openDb(join(dir, 'offline.db'))
+    seed()
+
+    const rowOf = (id: string): Record<string, unknown> | undefined =>
+      listEntrances('tok-a1').entrances.find(d => d.entrance_id === id) as
+        | Record<string, unknown>
+        | undefined
+
+    const a1 = await connect(port, 'tok-a1')
+    const b1 = await connect(port, 'tok-b1')
+
+    // 在线：没有"离线时刻"（登出后它是陈旧数据，建连时被清空）
+    assert.equal(rowOf('b1')?.offline_since, null, '在线通道不应有 offline_since')
+
+    const beforeClose = Date.now()
+    b1.ws.close()
+    await waitFor('a1 收到 b1 的 peer.offline', () =>
+      a1.frames.some(f => f.type === 'peer.offline' && f.payload.entrance_id === 'b1'))
+
+    // 干净下线：last_seen 归零（离线判定靠它），断线时刻落在 offline_since
+    const offline = rowOf('b1')
+    assert.equal(offline?.last_seen, 0, 'last_seen 归零是"离线"的判定依据，不能动')
+    assert.equal(typeof offline?.offline_since, 'number', '断开应落 offline_since')
+    const since = offline?.offline_since as number
+    assert.ok(
+      since >= beforeClose && since <= Date.now(),
+      `offline_since 应落在断开前后（before=${beforeClose} got=${since}）`,
+    )
+
+    // 重连 → 清空（下次断开重新落）。不清的话，重新在线的通道会挂着一个旧时刻
+    const b1Again = await connect(port, 'tok-b1')
+    assert.equal(rowOf('b1')?.offline_since, null, '重连应清空 offline_since')
+
+    b1Again.ws.close()
+    a1.ws.close()
+    await sleep(50)
+  } finally {
+    wss.close()
+    for (const c of wss.clients) c.terminate()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

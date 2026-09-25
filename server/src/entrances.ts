@@ -11,6 +11,11 @@ import { broadcastProfileUpdated, forgetEntranceConnection, getConnectedAt, getO
 /** GET /entrances：通道列表（含 member 映射）。
  *  注意：不在本接口刷新调用方 last_seen——last_seen 只由 WS 连接/心跳/断开维护，
  *  否则任何轮询客户端都会让自己"永远新鲜"（对方误判在线，见 chat_page 在线判定）。
+ *  离线时刻：`offline_since`（断开那一刻落的，见 ws.ts close 处理）。它与 `last_seen`
+ *  的分工——`last_seen` 是"最后活动证据"（心跳/REST 都刷，干净断开时归零），
+ *  `offline_since` 是"最后一次 WS 断开时刻"。显示层取两者较晚者当离线时间：
+ *  干净断开取 offline_since（精确），服务端重启过（close 没跑到）则 last_seen 更新，
+ *  取它更准。两个字段都给出去，让客户端自己按这个规则算。
  *  范围：**仅本会话可见的通道**（该空间成员；见 guard.entranceScopeClause）——
  *  此前直出全局 entrances 表，跨空间泄漏 member/公钥/在线状态（2026-09-15 评审 C2）。
  *  刻意**不返回 public_key**（2026-09-15 评审 C5）：通道公钥是密码学标识，
@@ -24,7 +29,7 @@ export function listEntrances (
   const scope = entranceScopeClause(space_id)
   const rows = getDb()
     .prepare(
-      `SELECT d.entrance_id, d.member_id, d.status, d.last_seen, d.entrance_name
+      `SELECT d.entrance_id, d.member_id, d.status, d.last_seen, d.offline_since, d.entrance_name
          FROM entrances d
         WHERE ${scope.sql}
         ORDER BY d.created_at`
@@ -34,6 +39,7 @@ export function listEntrances (
     member_id: string
     status: string
     last_seen: number | null
+    offline_since: number | null
     entrance_name: string
   }[]
   return {
@@ -81,9 +87,11 @@ export async function revokeEntrance (
 
   const db = getDb()
   const now = Date.now()
+  // offline_since 也写：已撤销的通道不再有 WS 连接，显示层要有一行"什么时候不在的"
+  // （撤销时刻）——否则撤销后离线时间会停在上一次断开，或干脆没有。
   db.prepare(
-    `UPDATE entrances SET status = 'revoked', last_seen = ? WHERE entrance_id = ?`
-  ).run(now, targetEntranceId)
+    `UPDATE entrances SET status = 'revoked', last_seen = ?, offline_since = ? WHERE entrance_id = ?`
+  ).run(now, now, targetEntranceId)
   db.prepare(`DELETE FROM push_tokens WHERE entrance_id = ?`).run(targetEntranceId)
   db.prepare(`DELETE FROM sessions WHERE entrance_id = ?`).run(targetEntranceId)
 
@@ -117,9 +125,10 @@ export function retireEntrance(token: string): { ok: true } {
   const caller = requireSession(token)
 
   const db = getDb()
-  db.prepare(`UPDATE entrances SET status = 'revoked', last_seen = 0 WHERE entrance_id = ?`).run(
-    caller.entrance_id
-  )
+  // offline_since 同 revoke：退役后显示层要有一行时间（= 退役时刻）
+  db.prepare(
+    `UPDATE entrances SET status = 'revoked', last_seen = 0, offline_since = ? WHERE entrance_id = ?`
+  ).run(Date.now(), caller.entrance_id)
   db.prepare(`DELETE FROM push_tokens WHERE entrance_id = ?`).run(caller.entrance_id)
   db.prepare(`DELETE FROM sessions WHERE entrance_id = ?`).run(caller.entrance_id)
   db.prepare(`DELETE FROM challenges WHERE entrance_id = ?`).run(caller.entrance_id)

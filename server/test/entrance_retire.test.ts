@@ -115,10 +115,11 @@ test('retireEntrance：清会话/Push/待签 challenge，通道置 revoked，且
     assert.equal(retireEntrance('tok-a1').ok, true, '自助退役应成功')
 
     const row = getDb()
-      .prepare(`SELECT status, last_seen FROM entrances WHERE entrance_id = 'a1'`)
-      .get() as { status: string; last_seen: number | null }
+      .prepare(`SELECT status, last_seen, offline_since FROM entrances WHERE entrance_id = 'a1'`)
+      .get() as { status: string; last_seen: number | null; offline_since: number | null }
     assert.equal(row.status, 'revoked', '退役后须为 revoked（配置层只认这个状态）')
     assert.equal(row.last_seen, 0, 'last_seen 归零：已退役不该显示为在线')
+    assert.equal(typeof row.offline_since, 'number', '退役即"不在"，应落 offline_since（显示用）')
 
     // entrances 行**保留**：删了它，messages.sender_entrance_id 会失去归属，且配置层会把它
     // 当成"未登记"（FORBIDDEN）而非"已退役"（ENTRANCE_REVOKED）——两者在客户端语义不同
