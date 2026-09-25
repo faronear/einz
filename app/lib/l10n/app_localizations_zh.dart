@@ -627,6 +627,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListNew => '新建通道';
 
   @override
+  String get chatPageEntranceListRefresh => '刷新';
+
+  @override
   String get chatPagePinLabel => '锁屏码';
 
   @override

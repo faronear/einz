@@ -71,6 +71,11 @@ const double _entranceCardSpacing = 12;
 const int _entranceCardsPerRow = 3;
 const double _entranceCardMaxSize = 160;
 
+/// 「更多通道」弹层标题右端「刷新」按钮的边长 = IconButton 的 compact 触控盒
+/// （`kMinInteractiveDimension` 48 − visualDensity.compact 各 4）。左侧放同宽占位，
+/// 标题才**恰好居中**（卡片在下面，标题不能被按钮推歪）。
+const double _entranceRefreshSize = 40;
+
 double _entranceCardSizeFor(double availableWidth) {
   final raw =
       (availableWidth - _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
@@ -1318,283 +1323,344 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 时间行：在线显示上线时刻，离线/已撤销显示**下线时刻**
   /// （max(last_seen, offline_since)，见卡片内注释）。
   /// 服务端拉不到时仍显示当前通道（离线不影响"我是谁"），只把其他通道区换成失败提示。
+  ///
+  /// **标题右端的「刷新」**（老板 2026-09-26）：就地重拉 /entrances 重建卡片——只想看
+  /// "现在谁在线"时不用退出弹层，也不用等 30s 的对方在线轮询。为它把弹层主体套进
+  /// StatefulBuilder（卡片/失败提示读它承载的可变状态），拉取逻辑收在 `load()` 里
+  /// 供"初次打开"与"刷新"共用。
   Future<void> _showEntranceListSheet() async {
     final l10n = AppLocalizations.of(context)!;
-    // "我是谁"（_myMemberId 可能为 null：离线且 profile 未缓存）：兜底反查一次
+    final api = widget.api ?? ApiClient(effectiveServer);
+    // 弹层内的可变状态（StatefulBuilder 重建时读它；标题右端的「刷新」就地重拉）
     List<Map<String, dynamic>>? rows;
+    // "我是谁"（_myMemberId 可能为 null：离线且 profile 未缓存）：兜底反查一次
     String? myMemberId = _myMemberId;
-    try {
-      final api = widget.api ?? ApiClient(effectiveServer);
-      rows = await api.listEntrances(widget.token);
-      if (myMemberId == null || myMemberId.isEmpty) {
-        for (final d in rows) {
+    int localSinceMs = 0;
+    bool refreshing = false;
+
+    /// 拉一次 /entrances 并算好展示所需的状态；失败 → rows = null
+    /// （弹层里只显示当前通道 + 「无法获取其他通道」提示）。初次打开与点「刷新」共用。
+    Future<void> load() async {
+      List<Map<String, dynamic>>? fetched;
+      try {
+        fetched = await api.listEntrances(widget.token);
+        // 局部副本：myMemberId 是被闭包改写的捕获变量，Dart 不对它做空提升
+        final known = myMemberId;
+        if (known == null || known.isEmpty) {
+          for (final d in fetched) {
+            if (d['entrance_id'] == widget.entranceId) {
+              myMemberId = d['member_id'] as String?;
+              break;
+            }
+          }
+        }
+      } catch (_) {
+        fetched = null; // 离线/出错：当前通道照列，其他通道区显示失败提示
+      }
+      // 本机卡片的 since = 服务端自己这一行的上线时刻（online_since，兜底 connected_at；
+      // 服务端拉不到时 0 → 不显示，避免显示"当前时刻"这种假上线时间）
+      var since = 0;
+      if (fetched != null) {
+        for (final d in fetched) {
           if (d['entrance_id'] == widget.entranceId) {
-            myMemberId = d['member_id'] as String?;
+            since = (d['online_since'] as num?)?.toInt() ??
+                (d['connected_at'] is num ? (d['connected_at'] as num).toInt() : 0);
             break;
           }
         }
       }
-    } catch (_) {
-      rows = null; // 离线/出错：当前通道照列，其他通道区显示失败提示
+      rows = fetched;
+      localSinceMs = since;
     }
+
+    await load();
     if (!mounted) return;
-    // 本机卡片的 since = 服务端自己这一行的上线时刻（online_since，兜底 connected_at；
-    // 服务端拉不到时 0 → 不显示，避免显示"当前时刻"这种假上线时间）
-    int localSinceMs = 0;
-    if (rows != null) {
-      for (final d in rows) {
-        if (d['entrance_id'] == widget.entranceId) {
-          localSinceMs = (d['online_since'] as num?)?.toInt() ??
-              (d['connected_at'] is num ? (d['connected_at'] as num).toInt() : 0);
-          break;
-        }
-      }
-    }
     showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) {
-        final scheme = Theme.of(ctx).colorScheme;
-        final now = DateTime.now().millisecondsSinceEpoch;
-        // 行 = 当前通道（必有，标「本机」）+ 我本人的其他通道（同 member，排除当前）
-        final myRows = <Map<String, dynamic>>[
-          {
-            'entrance_id': widget.entranceId,
-            'entrance_name': _myEntranceName,
-            'member_id': myMemberId ?? '',
-            'connected_at': DateTime.now().millisecondsSinceEpoch,
-            'status': 'active',
-            '_local': true,
-          },
-          if (rows != null)
-            for (final d in rows)
-              if (d['entrance_id'] != widget.entranceId &&
-                  myMemberId != null &&
-                  myMemberId.isNotEmpty &&
-                  d['member_id'] == myMemberId)
-                d,
-        ];
-        return SafeArea(
-          child: Padding(
-            // 顶边 0：标题自己的 Padding 负责上 14 留白（同参照弹层）
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」等
-                // 弹层标题的居中与留白口径对齐）
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                  child: Center(
-                    child: Text(l10n.chatPageMenuEntranceList,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 16)),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
-                // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
-                // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
-                // 右上角固定角标：本机=绿勾、已撤销=阻止图标+整卡蒙版（老板 2026-09-26）
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final size = _entranceCardSizeFor(constraints.maxWidth);
-                    return Wrap(
-                      spacing: _entranceCardSpacing,
-                      runSpacing: _entranceCardSpacing,
-                      children: [
-                        for (final d in myRows)
-                          () {
-                            final name = (d['entrance_name'] as String? ?? '').trim();
-                            final entranceId = d['entrance_id'] as String? ?? '';
-                            final isLocal = d['_local'] == true;
-                            final revoked = !isLocal &&
-                                d['status'] != null &&
-                                d['status'] != 'active';
-                            final connectedAt = d['connected_at'];
-                            final last = d['last_seen'];
-                            final online = !revoked &&
-                                (d.containsKey('connected_at')
-                                    ? connectedAt != null
-                                    : (last is num && now - last < 60 * 1000));
-                            // 时间戳：在线 → 上线时刻（online_since 兜底 connected_at）；
-                            // 离线/已撤销 → **下线时刻**（老板 2026-09-26）＝
-                            // max(last_seen, offline_since)：offline_since 是服务端断开
-                            // 那一刻落的（干净下线时 last_seen 归零，只剩它有值）；
-                            // last_seen 会被心跳/REST 刷新，服务端重启这类"close 没跑到"
-                            // 的情况反而是更新的证据 → 取两者较晚者最准。都是 0 才不显示。
-                            final sinceMs = (d['online_since'] as num?)?.toInt() ??
-                                (connectedAt is num ? connectedAt.toInt() : null);
-                            final offlineSince =
-                                (d['offline_since'] as num?)?.toInt() ?? 0;
-                            final lastSeen = last is num ? last.toInt() : 0;
-                            final int stamp;
-                            if (isLocal) {
-                              stamp = localSinceMs;
-                            } else if (online) {
-                              stamp = sinceMs ?? 0;
-                            } else {
-                              stamp = lastSeen > offlineSince
-                                  ? lastSeen
-                                  : offlineSince;
-                            }
-                            // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
-                            // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
-                            final hasBadge = isLocal || revoked;
-                            return SizedBox(
-                              width: size,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.12)),
-                                  // 已撤销：极淡灰底 —— "这张卡失效了"的第一层蒙版
-                                  // （第二层是整个内容降透明度，见下面的 Opacity）
-                                  color: revoked
-                                      ? Colors.black.withValues(alpha: 0.04)
-                                      : null,
-                                ),
-                                // Stack：内容照常流式排布，角标**固定**在卡片右上角
-                                // （老板 2026-09-26：绿勾原先紧贴名称，位置随名字长短跑）
-                                child: Stack(
-                                  children: [
-                                    Opacity(
-                                      opacity: revoked ? 0.55 : 1,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8),
-                                        // mainAxisSize.min：Wrap 给子项的高度约束无限，
-                                        // 不能用 Spacer/flex（RenderFlex 断言）
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            // 第一行：名称（角标位由右上角预留）
-                                            Padding(
-                                              // 有角标的卡让出角标宽度，长名字不会钻到
-                                              // 图标底下
-                                              padding: EdgeInsets.only(
-                                                  right: hasBadge ? 18 : 0),
-                                              child: Text(
-                                                name.isNotEmpty
-                                                    ? name
-                                                    : entranceId,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight:
-                                                        FontWeight.w500),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            // 第二行：状态红绿灯 + 时间（绿在线/红离线/
-                                            // 灰已撤销）。时间**恒定占一行**：没有时间可显示
-                                            // 时给一个空格（不是空串——空串在部分平台量出 0
-                                            // 高），否则这张卡会比别的矮一截
-                                            // （老板 2026-09-26 实测：离线卡没有文字时矮一截）
-                                            Row(
-                                              children: [
-                                                Icon(Icons.circle, size: 8,
-                                                    color: revoked
-                                                        ? Colors.black
-                                                                .withValues(
-                                                                    alpha: 0.30)
-                                                        : (online
-                                                            ? Colors.green
-                                                            : Colors.red)),
-                                                const SizedBox(width: 6),
-                                                Expanded(
-                                                  // 直接写时间，不带 "since" 前缀
-                                                  // （老板 2026-09-26：太占地方）
-                                                  child: Text(
-                                                      stamp > 0
-                                                          ? _timeStampLabel(stamp)
-                                                          : ' ',
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow
-                                                          .ellipsis,
-                                                      style: TextStyle(
-                                                          fontSize: 11,
-                                                          color:
-                                                              scheme.outline)),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    if (hasBadge)
-                                      Positioned(
-                                        top: 6,
-                                        right: 6,
-                                        // 本机绿勾语义同空间卡片上的对勾（标"当前这个"）；
-                                        // 已撤销用阻止图标，比文字更省宽度
-                                        child: Icon(
-                                          isLocal
-                                              ? Icons.check_circle
-                                              : Icons.block,
-                                          size: 14,
-                                          color: isLocal
-                                              ? Colors.green
-                                              : Colors.black.withValues(
-                                                  alpha: 0.45),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }(),
-                      ],
-                    );
-                  },
-                ),
-                if (rows == null)
+      // StatefulBuilder：「刷新」按钮要就地重建卡片（老板 2026-09-26）——关掉弹层
+      // 再开一次会有"收起+展开"两段动画，看着像卡了一下
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final scheme = Theme.of(ctx).colorScheme;
+          final now = DateTime.now().millisecondsSinceEpoch;
+          // 局部 final：rows / myMemberId 是被 load() 改写的捕获变量，Dart 不做空提升
+          final loaded = rows;
+          final myId = myMemberId ?? '';
+          // 行 = 当前通道（必有，标「本机」）+ 我本人的其他通道（同 member，排除当前）
+          final myRows = <Map<String, dynamic>>[
+            {
+              'entrance_id': widget.entranceId,
+              'entrance_name': _myEntranceName,
+              'member_id': myId,
+              'connected_at': DateTime.now().millisecondsSinceEpoch,
+              'status': 'active',
+              '_local': true,
+            },
+            if (loaded != null)
+              for (final d in loaded)
+                if (d['entrance_id'] != widget.entranceId &&
+                    myId.isNotEmpty &&
+                    d['member_id'] == myId)
+                  d,
+          ];
+          return SafeArea(
+            child: Padding(
+              // 顶边 0：标题自己的 Padding 负责上 14 留白（同参照弹层）
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」等
+                  // 弹层标题的居中与留白口径对齐）。右端挂「刷新」（老板 2026-09-26）：
+                  // 就地重拉 /entrances 重建卡片，不用退出弹层、也不用等 30s 轮询。
+                  // 横向 padding 由 16 收到 0，让刷新按钮与下面的卡片**右对齐**；
+                  // 左边放同宽占位，标题仍在弹层正中（不会被按钮推歪）。
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(l10n.chatPageEntranceListFailed,
-                        style: TextStyle(fontSize: 13, color: scheme.outline)),
+                    padding: const EdgeInsets.fromLTRB(0, 14, 0, 10),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: _entranceRefreshSize),
+                        Expanded(
+                          child: Center(
+                            child: Text(l10n.chatPageMenuEntranceList,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 16)),
+                          ),
+                        ),
+                        SizedBox(
+                          width: _entranceRefreshSize,
+                          height: _entranceRefreshSize,
+                          // 拉取中换成同尺寸的转圈：位置与大小都不跳
+                          child: refreshing
+                              ? const Center(
+                                  child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2)),
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.refresh, size: 20),
+                                  tooltip: l10n.chatPageEntranceListRefresh,
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () async {
+                                    setSheetState(() => refreshing = true);
+                                    await load();
+                                    // 弹层可能在这期间被关掉 → 不能再 setState
+                                    if (!ctx.mounted) return;
+                                    setSheetState(() => refreshing = false);
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
-                // 卡片与「新建通道」之间的留白（老板 2026-09-25：原先紧挨着）
-                const SizedBox(height: 12),
-                // 「新建通道」：与「切换我的秘境」弹层的「添加秘境」同款外观——常态淡灰底
-                // 提示可点、图标+文字居中（老板 2026-09-25）；点击生成开通码
-                Material(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
-                  child: InkWell(
-                    // 点「新建通道」：**先收起通道列表弹层**，再弹开通码
-                    // （老板 2026-09-25）；_menuAction 内部 300ms 错峰，等弹层
-                    // 收起动画跑完再 show（同菜单项开新 route 的口径，避免
-                    // Overlay 交叉卸载断言）
-                    onTap: () {
-                      Navigator.of(ctx).pop();
-                      _menuAction(_showInviteDialog);
-                    },
-                    hoverColor: Colors.black.withValues(alpha: 0.10),
-                    highlightColor: Colors.black.withValues(alpha: 0.14),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                  const SizedBox(height: 2),
+                  // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
+                  // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
+                  // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
+                  // 右上角固定角标：本机=绿勾、已撤销=阻止图标+整卡蒙版（老板 2026-09-26）
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final size = _entranceCardSizeFor(constraints.maxWidth);
+                      return Wrap(
+                        spacing: _entranceCardSpacing,
+                        runSpacing: _entranceCardSpacing,
                         children: [
-                          const Icon(Icons.add),
-                          const SizedBox(width: 6),
-                          Text(l10n.chatPageEntranceListNew),
+                          for (final d in myRows)
+                            () {
+                              final name = (d['entrance_name'] as String? ?? '').trim();
+                              final entranceId = d['entrance_id'] as String? ?? '';
+                              final isLocal = d['_local'] == true;
+                              final revoked = !isLocal &&
+                                  d['status'] != null &&
+                                  d['status'] != 'active';
+                              final connectedAt = d['connected_at'];
+                              final last = d['last_seen'];
+                              final online = !revoked &&
+                                  (d.containsKey('connected_at')
+                                      ? connectedAt != null
+                                      : (last is num && now - last < 60 * 1000));
+                              // 时间戳：在线 → 上线时刻（online_since 兜底 connected_at）；
+                              // 离线/已撤销 → **下线时刻**（老板 2026-09-26）＝
+                              // max(last_seen, offline_since)：offline_since 是服务端断开
+                              // 那一刻落的（干净下线时 last_seen 归零，只剩它有值）；
+                              // last_seen 会被心跳/REST 刷新，服务端重启这类"close 没跑到"
+                              // 的情况反而是更新的证据 → 取两者较晚者最准。都是 0 才不显示。
+                              final sinceMs = (d['online_since'] as num?)?.toInt() ??
+                                  (connectedAt is num ? connectedAt.toInt() : null);
+                              final offlineSince =
+                                  (d['offline_since'] as num?)?.toInt() ?? 0;
+                              final lastSeen = last is num ? last.toInt() : 0;
+                              final int stamp;
+                              if (isLocal) {
+                                stamp = localSinceMs;
+                              } else if (online) {
+                                stamp = sinceMs ?? 0;
+                              } else {
+                                stamp = lastSeen > offlineSince
+                                    ? lastSeen
+                                    : offlineSince;
+                              }
+                              // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
+                              // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
+                              final hasBadge = isLocal || revoked;
+                              return SizedBox(
+                                width: size,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.12)),
+                                    // 已撤销：极淡灰底 —— "这张卡失效了"的第一层蒙版
+                                    // （第二层是整个内容降透明度，见下面的 Opacity）
+                                    color: revoked
+                                        ? Colors.black.withValues(alpha: 0.04)
+                                        : null,
+                                  ),
+                                  // Stack：内容照常流式排布，角标**固定**在卡片右上角
+                                  // （老板 2026-09-26：绿勾原先紧贴名称，位置随名字长短跑）
+                                  child: Stack(
+                                    children: [
+                                      Opacity(
+                                        opacity: revoked ? 0.55 : 1,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(8),
+                                          // mainAxisSize.min：Wrap 给子项的高度约束无限，
+                                          // 不能用 Spacer/flex（RenderFlex 断言）
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              // 第一行：名称（角标位由右上角预留）
+                                              Padding(
+                                                // 有角标的卡让出角标宽度，长名字不会钻到
+                                                // 图标底下
+                                                padding: EdgeInsets.only(
+                                                    right: hasBadge ? 18 : 0),
+                                                child: Text(
+                                                  name.isNotEmpty
+                                                      ? name
+                                                      : entranceId,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w500),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              // 第二行：状态红绿灯 + 时间（绿在线/红离线/
+                                              // 灰已撤销）。时间**恒定占一行**：没有时间可显示
+                                              // 时给一个空格（不是空串——空串在部分平台量出 0
+                                              // 高），否则这张卡会比别的矮一截
+                                              // （老板 2026-09-26 实测：离线卡没有文字时矮一截）
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.circle, size: 8,
+                                                      color: revoked
+                                                          ? Colors.black
+                                                                  .withValues(
+                                                                      alpha: 0.30)
+                                                          : (online
+                                                              ? Colors.green
+                                                              : Colors.red)),
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    // 直接写时间，不带 "since" 前缀
+                                                    // （老板 2026-09-26：太占地方）
+                                                    child: Text(
+                                                        stamp > 0
+                                                            ? _timeStampLabel(stamp)
+                                                            : ' ',
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                            fontSize: 11,
+                                                            color:
+                                                                scheme.outline)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (hasBadge)
+                                        Positioned(
+                                          top: 6,
+                                          right: 6,
+                                          // 本机绿勾语义同空间卡片上的对勾（标"当前这个"）；
+                                          // 已撤销用阻止图标，比文字更省宽度
+                                          child: Icon(
+                                            isLocal
+                                                ? Icons.check_circle
+                                                : Icons.block,
+                                            size: 14,
+                                            color: isLocal
+                                                ? Colors.green
+                                                : Colors.black.withValues(
+                                                    alpha: 0.45),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }(),
                         ],
+                      );
+                    },
+                  ),
+                  if (loaded == null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(l10n.chatPageEntranceListFailed,
+                          style: TextStyle(fontSize: 13, color: scheme.outline)),
+                    ),
+                  // 卡片与「新建通道」之间的留白（老板 2026-09-25：原先紧挨着）
+                  const SizedBox(height: 12),
+                  // 「新建通道」：与「切换我的秘境」弹层的「添加秘境」同款外观——常态淡灰底
+                  // 提示可点、图标+文字居中（老板 2026-09-25）；点击生成开通码
+                  Material(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
+                    child: InkWell(
+                      // 点「新建通道」：**先收起通道列表弹层**，再弹开通码
+                      // （老板 2026-09-25）；_menuAction 内部 300ms 错峰，等弹层
+                      // 收起动画跑完再 show（同菜单项开新 route 的口径，避免
+                      // Overlay 交叉卸载断言）
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        _menuAction(_showInviteDialog);
+                      },
+                      hoverColor: Colors.black.withValues(alpha: 0.10),
+                      highlightColor: Colors.black.withValues(alpha: 0.14),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.add),
+                            const SizedBox(width: 6),
+                            Text(l10n.chatPageEntranceListNew),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

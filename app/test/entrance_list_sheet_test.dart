@@ -22,12 +22,19 @@ import 'package:einz_shared/einz_shared.dart';
 class _FakeEntranceApi extends ApiClient {
   _FakeEntranceApi(this.entranceRows) : super('http://fake');
 
-  /// listEntrances 返回的行（服务端 /entrances 口径）。
-  final List<Map<String, dynamic>> entranceRows;
+  /// listEntrances 返回的行（服务端 /entrances 口径）。测试可在两次调用之间**改写**它，
+  /// 模拟"点刷新时服务端的状态变了"。
+  List<Map<String, dynamic>> entranceRows;
+
+  /// listEntrances 被调用的次数（刷新断言用；注意 ChatPage 自己也会轮询对方在线状态，
+  /// 所以测试里比的是**增量**，不是绝对值）。
+  int listCalls = 0;
 
   @override
-  Future<List<Map<String, dynamic>>> listEntrances(String token) async =>
-      entranceRows;
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async {
+    listCalls++;
+    return entranceRows;
+  }
 
   @override
   Future<SpaceResult> getSpace(String token) async => SpaceResult(
@@ -158,6 +165,12 @@ Finder sheetTimeText() => find.descendant(
           w.data != null &&
           RegExp(r'^(\d{2}-\d{2} |\d{4}-\d{2}-\d{2} )?\d{2}:\d{2}$')
               .hasMatch(w.data!)),
+    );
+
+/// 弹层标题右端的**刷新**按钮。
+Finder sheetRefresh() => find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byIcon(Icons.refresh),
     );
 
 /// 某张卡片（名称文字最近的 Container 祖先）的矩形——角标/等高断言用。
@@ -386,5 +399,72 @@ void main() {
     // 其他通道区失败提示 + 「新建通道」仍在
     expect(sheetTextContaining('无法获取其他通道'), findsOneWidget);
     expect(sheetText('新建通道'), findsOneWidget);
+  });
+
+  testWidgets('点标题右端的刷新：就地重拉 /entrances，卡片在线状况跟着变', (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // 当前通道（本机）+ 我本人的另一条通道：此刻都在线
+    final api = _FakeEntranceApi([
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      {
+        'entrance_id': 'dev-b2',
+        'entrance_name': 'iPad',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ]);
+
+    await _openEntranceListSheet(tester, db, api);
+
+    expect(sheetRefresh(), findsOneWidget, reason: '弹层标题右端应有刷新按钮');
+    expect(sheetDot(Colors.green), findsNWidgets(2));
+    expect(sheetDot(Colors.red), findsNothing);
+
+    // 那台下线了：下一次拉取时 connected_at 为 null、last_seen 归零、
+    // 断线时刻落在 offline_since
+    api.entranceRows = [
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      {
+        'entrance_id': 'dev-b2',
+        'entrance_name': 'iPad',
+        'member_id': 'member-me',
+        'connected_at': null,
+        'last_seen': 0,
+        'offline_since': now - 60 * 1000,
+        'status': 'active',
+      },
+    ];
+    final callsBefore = api.listCalls;
+    await tester.tap(sheetRefresh());
+    await tester.pumpAndSettle();
+
+    expect(api.listCalls, callsBefore + 1, reason: '点刷新应重新拉一次 /entrances');
+    expect(find.byType(BottomSheet), findsOneWidget,
+        reason: '刷新是就地重建，不该把弹层关掉再开');
+    // 灯变色：iPad 在线 → 离线（本机卡恒绿）
+    expect(sheetDot(Colors.green), findsOneWidget);
+    expect(sheetDot(Colors.red), findsOneWidget);
+    // 时间行两张都在（离线那张显示下线时刻）
+    expect(sheetTimeText(), findsNWidgets(2));
+    // 转圈收起、刷新按钮回到常态
+    expect(sheetRefresh(), findsOneWidget);
   });
 }

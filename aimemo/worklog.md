@@ -9885,3 +9885,33 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 **验证**：`npx tsc --noEmit` 干净；server `npm test` 全过；`flutter analyze`（app / cli）无告警；
 app 全量 **218 项通过**（goldens 跳过）；`app/pubspec.lock` 未被镜像污染（跑完比对无差异）。
 
+## 2026-09-26 「更多通道」弹层加「刷新」
+
+老板："放一个刷新图标，点击就刷新卡片里每个通道的在线状况"——只想看"现在谁在线"
+时不用退出弹层、也不用等 30s 的对方在线轮询。
+
+- **放在标题右端**，与下面卡片**右对齐**：标题原来是 `Padding(fromLTRB(16,14,16,10)) +
+  Center` 居中；改成一行 `Row`，中间 `Expanded(Center(标题))`，左端放一个与按钮**等宽
+  的占位**（`_entranceRefreshSize = 40`）——左右对称，标题仍**恰好居中**，不会被按钮推歪。
+  横向 padding 16→0（标题仍在弹层正中，因为 Center 后面的可用宽度是对称的），
+  这样按钮右缘才与卡片对齐。这个 40 = `kMinInteractiveDimension` 48 − `visualDensity.compact`
+  各 4（沿用菜单统一的 compact 触控盒，`menu_metrics.dart` 同款取舍）。
+- **就地重建，不关弹层**：`showModalBottomSheet` 的主体套 `StatefulBuilder`。
+  刻意**不用**「pop 再 show」——那会有"收起+展开"两段动画（还得叠 `_menuAction` 的
+  300ms 错峰），看着像卡了一下。
+- 拉取逻辑收成一个 `load()`（初次打开与刷新共用），刷新的可变状态就三份 + `refreshing`。
+  拉取中转圈（同尺寸 16，位置不跳）；拉取期间弹层被关掉 → `if (!ctx.mounted) return;`
+  再 setState（否则对已卸载的 State 调 setState 会抛）。
+- 踩到 Dart 的空提升：`rows` / `myMemberId` 现在是被闭包改写的捕获变量，
+  **Dart 不再做空提升**（analyze 直接报 3 处 unchecked_use_of_nullable_value）。
+  修法：在 `load()` 内和 builder 内各取一个局部 `final`（`known` / `loaded` / `myId`）
+  再用——顺带把 `myMemberId != null && myMemberId.isNotEmpty` 的判空化简成一句。
+- 失败时（`rows == null`）刷新按钮照常在 → 那个「无法获取其他通道（当前离线？）」
+  提示旁边现在有事可做（点一下重试）。
+- l10n：`chatPageEntranceListRefresh`（zh 刷新 / en Refresh），`flutter gen-l10n` 重新生成。
+- 测试：`entrance_list_sheet_test.dart` 的 fake api 改成可**改写**行 + 计 `listCalls`
+  （ChatPage 自己也会轮询对方在线，所以断言比的是**增量**）；新增一例——点刷新后
+  重拉一次、弹层仍在、iPad 那张的灯由绿转红、两张卡的时间行都还在、转圈收起。
+
+**验证**：`flutter analyze` 无告警；app 全量 **219 项通过**（goldens 跳过）。
+

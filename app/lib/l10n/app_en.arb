@@ -269,6 +269,7 @@
   "chatPageMenuEntranceList": "More entrances",
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
   "chatPageEntranceListNew": "Generate entrance token",
+  "chatPageEntranceListRefresh": "Refresh",
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
   "chatPagePinSetValue": "Set",

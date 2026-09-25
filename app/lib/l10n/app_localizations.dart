@@ -1250,6 +1250,12 @@ abstract class AppLocalizations {
   /// **'Generate entrance token'**
   String get chatPageEntranceListNew;
 
+  /// No description provided for @chatPageEntranceListRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get chatPageEntranceListRefresh;
+
   /// No description provided for @chatPagePinLabel.
   ///
   /// In en, this message translates to:

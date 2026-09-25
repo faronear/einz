@@ -662,6 +662,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListNew => 'Generate entrance token';
 
   @override
+  String get chatPageEntranceListRefresh => 'Refresh';
+
+  @override
   String get chatPagePinLabel => 'PIN';
 
   @override
