@@ -135,7 +135,8 @@ class AppLockService {
     // "当前空间"以明文键为准（见 setActiveSpace）——不能只用 Vault 里的 activeSpaceId，
     // 否则"在聊天页里无 pin 切换过空间"之后，这里会读出上一个空间。
     final payload = await resolveActivePayload(vault);
-    if (payload != null) await _syncSpaceRow(payload);
+    // 对齐整张表（含清残档）：只同步 active 那一行的话，其它空间的行要靠下次写包才补。
+    await _syncSpaceRows(vault);
     return payload;
   }
 
@@ -162,7 +163,7 @@ class AppLockService {
     await SecureStore.write(_securePlain, jsonEncode(vault.toJson()));
     await _set(_kSkipped, '1');
     await _deletePlainFromDb(); // 兼容：清掉旧版本可能残留的明文副本
-    await _syncAllSpaceRows(vault);
+    await _syncSpaceRows(vault);
   }
 
   /// 写 PIN 加密的 Vault（设置/修改锁屏码）：成功后清除明文副本（同旧 [setPin] 语义）。
@@ -174,7 +175,7 @@ class AppLockService {
     await _set(_kAttempts, '0');
     await _set(_kLockedUntil, '0');
     await clearPlain(); // 补设 PIN 后不再保留明文副本
-    await _syncAllSpaceRows(vault);
+    await _syncSpaceRows(vault);
   }
 
   /// 读 Vault：PIN 场景传 [pin]（走解锁，含防爆破）；无 PIN 场景读明文。
@@ -340,11 +341,25 @@ class AppLockService {
     return vault.upsert(payload).copyWith(activeSpaceId: payload.spaceId);
   }
 
-  /// Vault 里每个空间都保证有 Spaces 行（列表页展示名字/未读用）。
-  Future<void> _syncAllSpaceRows(VaultPayload vault) async {
+  /// Vault 与 Spaces 表对齐（列表页展示名字/未读用）：Vault 里每个空间都保证有行，
+  /// 反过来**没有凭证的行要删掉**（自愈）。
+  ///
+  /// 为什么要删：Spaces 行只是 Vault 的明文缓存（名字/末次活跃）。凭证可能在别的环节
+  /// 丢掉（Keychain 条目被清、换了 build 的命名空间…），行却留在库里 → 变成**残档**：
+  ///   - 空间卡片只认 Vault（`space_switcher` 只读 `VaultSession.current?.spaces`）→ 看不见；
+  ///   - 加入向导的重复闸门（`setup_page._isSpaceAlreadyAdded`）却认这行 → 报"已经添加过了"。
+  /// 于是"看不到却加不进来"，死锁（老板 2026-09-25 在本机实测）。清掉残档即解。
+  ///
+  /// 只在"Vault 已知"的时刻调用（解锁 / 读明文包 / 写包），故不会误伤 PIN 模式下尚未
+  /// 解锁的状态——那时 Vault 不发布，本方法不会被调用。Vault 为空时不删（无法区分
+  /// "真的没有空间"与"这份 Vault 不完整"）。
+  Future<void> _syncSpaceRows(VaultPayload vault) async {
     for (final space in vault.spaces) {
       await _syncSpaceRow(space);
     }
+    if (vault.spaces.isEmpty) return;
+    final keep = [for (final s in vault.spaces) s.spaceId];
+    await (db.delete(db.spaces)..where((s) => s.spaceId.isNotIn(keep))).go();
   }
 
   /// 凭证与 Spaces 表对齐（幂等）：补写该空间的元数据行。
@@ -422,8 +437,7 @@ class AppLockService {
       final cleaned = await _applyPendingRemovals(VaultPayload.fromJson(jsonDecode(utf8.decode(plain))));
       if (cleaned != null) await writePinVault(pin, cleaned);
       final vault = cleaned ?? VaultPayload.fromJson(jsonDecode(utf8.decode(plain)));
-      final active = vault.active;
-      if (active != null) await _syncSpaceRow(active);
+      await _syncSpaceRows(vault); // 含清残档（同 loadPlain）
       return await _publishNormalized(vault) ?? vault;
     } on FormatException {
       await _registerFailure();

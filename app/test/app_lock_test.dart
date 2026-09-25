@@ -162,4 +162,29 @@ void main() {
     await lock.ensureFreshInstall();
     expect(await lock.hasConfig, false);
   });
+
+  // ---- Spaces 行自愈（老板 2026-09-25 本机实测的死锁）----
+  //
+  // 残档 = 库里有一行、Vault 里没有凭证：空间卡片只认 Vault（看不见），
+  // 加入向导的重复闸门却认这行（加不进来）→ 自愈必须在读到 Vault 时清掉它。
+
+  test('读到 Vault 时清掉没有凭证的 Spaces 残档行', () async {
+    await lock.savePlain(payload); // Vault 里只有 space-test
+    // 残档：模拟凭证在别处丢失（换 build 命名空间 / Keychain 被清）后留下的那一行
+    await db.into(db.spaces).insert(SpacesCompanion.insert(spaceId: 'space-zombie'));
+    expect(await db.select(db.spaces).get(), hasLength(2), reason: '此刻两行都在');
+
+    final loaded = await lock.loadPlain(); // 冷启动读 Vault
+    expect(loaded, isNotNull);
+    final ids = [for (final r in await db.select(db.spaces).get()) r.spaceId];
+    expect(ids, ['space-test'], reason: '残档行被清掉，真·已添加的那个不动');
+  });
+
+  test('Vault 为空时不删 Spaces 行（无法区分"没空间"与"Vault 不完整"）', () async {
+    await db.into(db.spaces).insert(SpacesCompanion.insert(spaceId: 'space-zombie'));
+    await SecureStore.write('app_lock.plain',
+        '{"version":1,"active_space_id":null,"spaces":[]}');
+    expect(await lock.loadPlain(), isNull);
+    expect(await db.select(db.spaces).get(), hasLength(1), reason: '空 Vault 不动表');
+  });
 }

@@ -9675,3 +9675,33 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 - `kBurnAfterOptions` 里 0（不设期限/Off）挪到第一项：档位多 + 矮窗口时底部要滚动，
   "取消焚毁"是关键项，不该被藏在滚动区外；顺序即展示顺序，无其它依赖。
 - 测试：option_picker_sheet_test.dart 加「可超过 9/16 上限」（20 项 @600 → 高度 >400 且 ≤540）。
+
+## 2026-09-25 【线上事故】本机 Hardservice 空间：vault 凭证丢失 + 残档行卡住加入向导
+
+老板："macOS 正式版只有一个空间（Vic），用 /invite 加 Hardservice 报『这个秘境已经添加过了』。"
+
+### 根因：凭证与缓存不一致（死锁）
+- 报错点 `setup_page.dart:1702` `_isSpaceAlreadyAdded()`：查 **Vault（内存/Keychain）** 与 **spaces 表**，
+  任一命中即拦；而空间卡片**只认 Vault**（`space_switcher.dart:185`）→ "② 有行、① 没凭证"时，
+  用户既看不到、也加不进来。
+- 本机实测（沙盒真库 `~/Library/Containers/cc.tic.einz/Data/Documents/einz.sqlite`）：
+  | | Hardservice 040aa7cd | Vic 65d729d3 |
+  |---|---|---|
+  | spaces 表 | ✅ 有（entrance 9ad2eea4，09-24 23:42） | ✅ 有（f12ab434，23:44） |
+  | Keychain `einz.secure.app_lock.plain` | ❌ 无 | ✅ 唯一一条 |
+  dev 前缀那份 vault 只有 Nv/Fan/link（且 dev 库在 Documents/dev/）→ 与本案无关。
+  → Hardservice 的 space key/token/通道密钥对在本机**已彻底丢失**；老通道 9ad2eea4 成了服务端孤儿。
+- vault 条目 cdat=mdat=09-25 11:30:51（**新建**而非更新）→ 那之前被清过一次，随后只重加了 Vic。
+  清 vault 的路径：`ensureFreshInstall()`（`app_lock.dart:84`）/ `resetLocalData` / 手工删 Keychain 条目。
+  **最可疑**：一个用**默认前缀**跑的 macOS debug 实例（build/macos/.../Debug/einz.app，
+  `--server=http://localhost:3000`）与正式版共用同一个库和同一条 Keychain —— 已 kill。
+  教训：本机跑 macOS 只能走 `npm run app-mac-run-local`（带 `einzSecurePrefix=einz.secure.dev.`）。
+
+### 处理
+- 立刻解卡：退出全部 einz 实例（含那个 debug）→ 备份到 /tmp/einz_backup_0925 →
+  删掉 spaces 表里 040aa7cd 那一行（该空间在本机 0 消息/0 附件/0 锚点，不丢东西）→ 可重新 /invite 加入。
+- 代码自愈（方案 2）：`app_lock.dart` 的 `_syncAllSpaceRows` 改名为 `_syncSpaceRows` 并**顺带删掉**
+  "Vault 里没有凭证的 spaces 行"；调用点扩到 `loadPlain` / `unlockVault` / `writePlainVault` / `writePinVault`
+  （即所有"Vault 已知"的时刻）。Vault 为空时不删（区分不了"真没空间"和"这份 Vault 不完整"）。
+  闸门 `_isSpaceAlreadyAdded` 逻辑不动 —— 自愈后 spaces 表就是 Vault 的准确镜像，真·重复加入照样拦。
+- 测试：`app_lock_test.dart` 加两例（残档被清 / 空 Vault 不动表）。
