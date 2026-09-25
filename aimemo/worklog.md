@@ -9529,8 +9529,10 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 - `flutter test test/peer_invite_link_test.dart`：5 过。
 - 界面观感由老板真机/模拟器自测（惯例：我不代跑 UI 验证；goldens 默认跳过）。
 
-### 遗留（待老板定）
+### 补充（老板 2026-09-25 定）
 
-- 「邀请加入」底色口径与「添加秘境」只对齐了圆角，ink 透明度仍不同（常态全透明 / hover 5% /
-  press 8%，而「添加秘境」是常驻 5% / 10% / 14%）→ 常态看不出"能点"。
-- `app/lib/data/server_config.dart:12` 注释仍引用已删除的 `AboutPage.isLocked`。
+- 「邀请加入」底色/ink 改成与「添加秘境」**完全同款**：常态黑 5% 底 + 悬浮 10% + 按住 14%
+  + `clipBehavior: Clip.antiAlias`（原先常态全透明、悬浮 5%、按住 8%，看不出能点）。
+  侧内边距 4 → 6：有了可见底色后 4 太挤。老板要"先体验一下"。
+- `app/lib/data/server_config.dart` 里对已删除 `AboutPage.isLocked` 的引用清掉，
+  改写成不带文件名的历史说明。

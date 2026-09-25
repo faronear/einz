@@ -993,15 +993,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         : Padding(
             padding: const EdgeInsets.only(left: 15),
             child: Material(
-              color: Colors.transparent,
+              // 常态淡灰底 + 悬浮/按住渐深 = 「添加秘境」/「新建通道」同款口径
+              // （老板 2026-09-25）：原先常态全透明，看不出这里能点。
+              color: Colors.black.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
               child: InkWell(
                 onTap: _showInviteDialog,
-                borderRadius: BorderRadius.circular(12),
-                hoverColor: Colors.black.withValues(alpha: 0.05),
-                highlightColor: Colors.black.withValues(alpha: 0.08),
+                hoverColor: Colors.black.withValues(alpha: 0.10),
+                highlightColor: Colors.black.withValues(alpha: 0.14),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                   child: Text(l10n.chatPageInviteJoinLink,
                       style: TextStyle(
                           fontSize: 12,
