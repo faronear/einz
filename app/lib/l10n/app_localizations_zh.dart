@@ -624,18 +624,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
 
   @override
-  String get chatPageEntranceTagLocal => '本机';
-
-  @override
-  String get chatPageEntranceTagOnline => '在线';
-
-  @override
-  String get chatPageEntranceTagOffline => '离线';
-
-  @override
-  String get chatPageEntranceTagRevoked => '已撤销';
-
-  @override
   String get chatPageEntranceListNew => '新建通道';
 
   @override

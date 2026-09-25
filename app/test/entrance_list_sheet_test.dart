@@ -1,9 +1,10 @@
-// 「更多通道」菜单弹层（老板 2026-09-25）：列出**当前通道（标「本机」）+ 我本人的
-// 其他通道**（对方 member 的通道不列；离线时当前通道照列）；列表下方「新建通道」
-// 链接 → 生成开通码弹窗。
+// 「更多通道」菜单弹层（老板 2026-09-25）：列出**当前通道（带绿勾、列第一位）+
+// 我本人的其他通道**（对方 member 的通道不列；离线时当前通道照列）；列表下方
+// 「新建通道」链接 → 生成开通码弹窗。
 //
-// 数据源 = GET /entrances（fake api 编排）；行内 = 通道名 + member 名字（/space
-// 名字表）+ 性别图标 + 在线灯 + 标签。已撤销的本人通道照列并标「已撤销」。
+// 数据源 = GET /entrances（fake api 编排）；卡片 = 通道名 + 状态红绿灯 + since。
+// 已撤销的本人通道照列（灰灯）。本机那张不用文字标签（英文 "This device" 会吃掉
+// 近半张卡宽），改用绿勾 —— 见 `chat_page._showEntranceListSheet`。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -131,6 +132,13 @@ Finder sheetDot(Color color) => find.descendant(
           w is Icon && w.icon == Icons.circle && w.color == color),
     );
 
+/// 弹层内的**本机绿勾**（Icons.check_circle；与状态灯的实心圆是两个图标，不会撞）。
+Finder sheetLocalCheck() => find.descendant(
+      of: find.byType(BottomSheet),
+      matching:
+          find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.check_circle),
+    );
+
 void main() {
   setUpAll(() async {
     await sodium();
@@ -187,8 +195,14 @@ void main() {
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('iPad'), findsOneWidget);
     expect(sheetText('旧手机'), findsOneWidget);
-    // 本机标签只在本机卡
-    expect(sheetText('本机'), findsOneWidget);
+    // 本机绿勾只在当前通道那张卡上（恒列第一位）
+    expect(sheetLocalCheck(), findsOneWidget);
+    // 第一张卡就是本机那张（老板 2026-09-25：恒列首位，作为区分依据之一）
+    expect(
+      tester.getTopLeft(sheetText('iPhone')).dx,
+      lessThan(tester.getTopLeft(sheetText('iPad')).dx),
+      reason: '本机通道应排在我本人的其他通道之前',
+    );
     // 红绿灯：2 绿（本机+iPad 在线）+ 1 灰（已撤销），无红
     expect(sheetDot(Colors.green), findsNWidgets(2));
     expect(sheetDot(Colors.red), findsNothing);
@@ -206,7 +220,7 @@ void main() {
         reason: '点「新建通道」后通道列表弹层应已收起');
   });
 
-  testWidgets('只有自己一条通道时也要显示自己（标「本机」）', (tester) async {
+  testWidgets('只有自己一条通道时也要显示自己（带绿勾）', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -223,10 +237,10 @@ void main() {
 
     await _openEntranceListSheet(tester, db, api);
 
-    // 只有一张卡：当前通道 + 「本机」标签 + 绿灯 + since
+    // 只有一张卡：当前通道 + 绿勾 + 绿灯 + since
     expect(sheetText('更多通道'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
-    expect(sheetText('本机'), findsOneWidget);
+    expect(sheetLocalCheck(), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);
     expect(sheetDot(Colors.red), findsNothing);
     expect(sheetTextContaining('since'), findsOneWidget);
@@ -240,10 +254,10 @@ void main() {
 
     await _openEntranceListSheet(tester, db, _BrokenEntranceApi());
 
-    // 当前通道（本机）照常显示（绿灯；拉不到服务端时间 → 不显示 since）
+    // 当前通道（本机）照常显示（绿勾 + 绿灯；拉不到服务端时间 → 不显示 since）
     expect(sheetText('更多通道'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
-    expect(sheetText('本机'), findsOneWidget);
+    expect(sheetLocalCheck(), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);
     expect(sheetTextContaining('since'), findsNothing);
     // 其他通道区失败提示 + 「新建通道」仍在

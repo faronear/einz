@@ -1244,30 +1244,6 @@ abstract class AppLocalizations {
   /// **'Could not load other entrances (offline?)'**
   String get chatPageEntranceListFailed;
 
-  /// No description provided for @chatPageEntranceTagLocal.
-  ///
-  /// In en, this message translates to:
-  /// **'This device'**
-  String get chatPageEntranceTagLocal;
-
-  /// No description provided for @chatPageEntranceTagOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'Online'**
-  String get chatPageEntranceTagOnline;
-
-  /// No description provided for @chatPageEntranceTagOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Offline'**
-  String get chatPageEntranceTagOffline;
-
-  /// No description provided for @chatPageEntranceTagRevoked.
-  ///
-  /// In en, this message translates to:
-  /// **'Revoked'**
-  String get chatPageEntranceTagRevoked;
-
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
@@ -1685,7 +1661,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutIntro.
   ///
   /// In en, this message translates to:
-  /// **'Einz is a private chat and shared space for two: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.'**
+  /// **'Einz is a secret space for just two partners: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.'**
   String get aboutIntro;
 
   /// No description provided for @aboutVersionLabel.
@@ -1703,7 +1679,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutServerDevNote.
   ///
   /// In en, this message translates to:
-  /// **'Development address (not production), for debugging only'**
+  /// **'Development address for debugging only'**
   String get aboutServerDevNote;
 
   /// No description provided for @advancedMenuTitle.

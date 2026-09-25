@@ -660,18 +660,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load other entrances (offline?)';
 
   @override
-  String get chatPageEntranceTagLocal => 'This device';
-
-  @override
-  String get chatPageEntranceTagOnline => 'Online';
-
-  @override
-  String get chatPageEntranceTagOffline => 'Offline';
-
-  @override
-  String get chatPageEntranceTagRevoked => 'Revoked';
-
-  @override
   String get chatPageEntranceListNew => 'New entrance';
 
   @override
@@ -913,7 +901,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is a private chat and shared space for two: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.';
+      'Einz is a secret space for just two partners: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';
@@ -922,8 +910,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutServerLabel => 'Server';
 
   @override
-  String get aboutServerDevNote =>
-      'Development address (not production), for debugging only';
+  String get aboutServerDevNote => 'Development address for debugging only';
 
   @override
   String get advancedMenuTitle => 'Advanced security';

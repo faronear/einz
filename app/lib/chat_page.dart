@@ -980,31 +980,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ],
     );
-    // 「对方尚未加入」的「邀请加入」淡色链接：**芯片外**并排、间距约 15
-    // （老板 2026-09-25：方位贴名字/箭头右侧，但不属于芯片——点击语义只有邀请）。
-    // 淡色小字与人名区分；悬浮/按住有淡灰变色（InkWell，同「添加秘境」按钮口径）；
+    // 「对方尚未加入」的「邀请加入」链接：**芯片外**并排（老板 2026-09-25：方位贴
+    // 名字/箭头右侧，但不属于芯片——点击语义只有邀请）。
+    // 淡色小字与人名区分；常态淡灰底、悬浮/按住渐深（同「添加秘境」按钮口径）；
     // 对方加入后自动消失。
-    // 圆角 12 = 「添加秘境」/「新建通道」那类可点击文案的口径（老板 2026-09-25：
-    // 原 8 偏方，与全应用同族按钮的弧度对不上）。
+    // 弧角与相邻的状态芯片**同值 24**（老板 2026-09-25 实测：比芯片小看着不对，
+    // 芯片是 `Radius.circular(24)`）。
     // 只在**确知**对方未加入（[_peerJoined] == false）时才挂：null（还没问到）不挂，
     // 否则每次进页面都要先闪一下、离线时更是常驻（老板 2026-09-25 定）。
     final Widget inviteLink = _peerJoined != false
         ? const SizedBox.shrink()
         : Padding(
-            padding: const EdgeInsets.only(left: 15),
+            // 与芯片的间距 15 → 8（老板 2026-09-25：内边距变成芯片那套之后，
+            // 15 显得两块离太远）
+            padding: const EdgeInsets.only(left: 8),
             child: Material(
               // 常态淡灰底 + 悬浮/按住渐深 = 「添加秘境」/「新建通道」同款口径
               // （老板 2026-09-25）：原先常态全透明，看不出这里能点。
               color: Colors.black.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(24),
               clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
               child: InkWell(
                 onTap: _showInviteDialog,
                 hoverColor: Colors.black.withValues(alpha: 0.10),
                 highlightColor: Colors.black.withValues(alpha: 0.14),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  // 内边距与状态芯片**同一个 `pad`**（老板 2026-09-25：invite 的
+                  // 左右留白要和芯片一致，别贴着灰底框）。芯片右 10 是给下拉箭头
+                  // 留的，链接没有箭头，跟着用同一个常量 → 文字偏左 3px，看不出。
+                  padding: pad,
                   child: Text(l10n.chatPageInviteJoinLink,
                       style: TextStyle(
                           fontSize: 12,
@@ -1287,10 +1291,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
-  /// 「通道列表」底部弹层：**当前通道（标「本机」）+ 我本人在本空间的其他通道**
+  /// 「通道列表」底部弹层：**当前通道（带绿勾、列第一位）+ 我本人在本空间的其他通道**
   /// （老板 2026-09-25：多设备登录时一眼看到"我还有哪些线挂着、在不在线"；
   /// 即使只有自己一条通道也要显示自己；对方 member 的通道不列）。
-  /// 每条通道 = **卡片**（边框 + 名称 + 状态红绿灯，本机加「本机」标签）；
+  /// 每条通道 = **卡片**（边框 + 名称 + 状态红绿灯；本机那张加一个**绿勾**、恒列第一位）；
   /// 列表下方「新建通道」（与「切换我的秘境」弹层的「添加秘境」同款外观：
   /// 常态淡灰底、图标+文字居中）→ 生成开通码弹窗（_showInviteDialog）。
   ///
@@ -1424,7 +1428,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // 第一行：名称 + 「本机」标签（老板 2026-09-25）
+                                    // 第一行：名称 + 本机绿勾（老板 2026-09-25）
                                     Row(
                                       children: [
                                         Flexible(
@@ -1439,24 +1443,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         ),
                                         if (isLocal) ...[
                                           const SizedBox(width: 4),
-                                          // 「本机」标签：名称旁的灰色小标签
-                                          Container(
-                                            padding:
-                                                const EdgeInsets.symmetric(
-                                                    horizontal: 5,
-                                                    vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.06),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                                l10n.chatPageEntranceTagLocal,
-                                                style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: scheme.outline)),
-                                          ),
+                                          // 本机标记：**绿勾**（老板 2026-09-25）——原先
+                                          // 用「本机 / This device」文字标签，英文那个在
+                                          // 一行三张的卡里要吃掉近半张宽度，名字被挤没。
+                                          // 语义同空间卡片上的对勾（`_SpaceCard` 也用它
+                                          // 标"当前这个"）。本机卡恒列第一位。
+                                          const Icon(Icons.check_circle,
+                                              size: 14, color: Colors.green),
                                         ],
                                       ],
                                     ),
@@ -4586,28 +4579,54 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Flexible(child: _buildPeerStatus(l10n)),
                   // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
                   // 名字为空则不显示文本，只留圆点）。名字同样在本侧一半内省略。
+                  //
+                  // 整块可点 → 「更多通道」弹层（老板 2026-09-25："我的状态信息也别闲着"）。
+                  // **常态不留底色**：Material 全透明，只有悬浮/按住才由 InkWell 变色
+                  // （不要芯片那种常驻底色）。
+                  // Align 把可点区收到内容大小——不加的话 Padding/Row 会撑满右半边，
+                  // 悬浮高亮就变成横贯半个胶囊的长条。
                   Flexible(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 6, 16, 6),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (_myMemberName.isNotEmpty) ...[
-                            Flexible(
-                              child: Text(_myMemberName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.end,
-                                  style: const TextStyle(
-                                      fontSize: 13, fontWeight: FontWeight.w500)),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(24), // 与状态芯片同弧
+                        clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
+                        child: InkWell(
+                          onTap: _showEntranceListSheet,
+                          // 没有常驻底色，所以比 invite 那档淡：那个是 5% 底上再叠
+                          // 10%/14%，这里从 0 起叠
+                          hoverColor: Colors.black.withValues(alpha: 0.05),
+                          highlightColor: Colors.black.withValues(alpha: 0.08),
+                          child: Padding(
+                            // 左 10 → 16（老板 2026-09-25：左边留白比右边那颗状态灯
+                            // 的留白小，看着偏）。现在左右都是 16。
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_myMemberName.isNotEmpty) ...[
+                                  Flexible(
+                                    child: Text(_myMemberName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.end,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500)),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Icon(Icons.circle, size: 8,
+                                    color: _ws == null
+                                        ? Colors.grey
+                                        : (_ws!.connected.value
+                                            ? Colors.green
+                                            : Colors.red)),
+                              ],
                             ),
-                            const SizedBox(width: 6),
-                          ],
-                          Icon(Icons.circle, size: 8,
-                              color: _ws == null
-                                  ? Colors.grey
-                                  : (_ws!.connected.value ? Colors.green : Colors.red)),
-                        ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
