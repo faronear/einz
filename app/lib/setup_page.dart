@@ -610,7 +610,13 @@ class _SetupPageState extends State<SetupPage> {
 
   /// PIN 步骤上「两个输入框都空」：此时底部按钮=跳过设锁（标签「跳过」），
   /// 按钮标签本身就是提示，不再弹二次确认弹窗（老板要求 2026-09-13）。
-  bool get _pinStepSkippable => _isPinStep && _pin.text.isEmpty && _confirm.text.isEmpty;
+  /// 本机已有锁屏码时**不可跳过**（老板 2026-09-25）：PIN 是 Vault 级共用的，
+  /// 此时按钮应为「下一步」而不是「跳过」（没有"跳过"可言之——锁已经在）。
+  bool get _pinStepSkippable =>
+      _isPinStep &&
+      !_lockAlreadySet &&
+      _pin.text.isEmpty &&
+      _confirm.text.isEmpty;
 
   /// 本机已设锁屏码（多空间再加一个空间）：PIN 是 Vault 级的，不该每加一个空间
   /// 重设一次——页面只提示"沿用当前锁屏码"，且不再 setPin/savePlain（那会用
