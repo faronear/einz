@@ -163,6 +163,26 @@ void main() {
     expect(await lock.hasConfig, false);
   });
 
+  // ---- 对方的身份状态（空间卡片「待加入」用）----
+
+  test('savePeerPresence：对方的 member_id 与「是否已加入」一起落盘', () async {
+    await lock.savePeerPresence(spaceId: 'space-a', peerMemberId: 'peer-1');
+    var p = await lock.loadProfile(spaceId: 'space-a');
+    expect(p['peerMemberId'], 'peer-1');
+    expect(p['peerJoined'], true);
+
+    // 对方尚未加入：清掉 id，并明确落 false（卡片据此显示「待加入」）
+    await lock.savePeerPresence(spaceId: 'space-a');
+    p = await lock.loadProfile(spaceId: 'space-a');
+    expect(p['peerMemberId'], '');
+    expect(p['peerJoined'], false, reason: '确定的"没加入"要能落下来');
+
+    // 状态未知（资料里没这键）→ null，卡片什么都不显示（不误报「待加入」）
+    await lock.saveProfile(
+        spaceId: 'space-b', memberName: '我', peerName: '对方', entranceName: 'iMac');
+    expect((await lock.loadProfile(spaceId: 'space-b'))['peerJoined'], isNull);
+  });
+
   // ---- Spaces 行自愈（老板 2026-09-25 本机实测的死锁）----
   //
   // 残档 = 库里有一行、Vault 里没有凭证：空间卡片只认 Vault（看不见），

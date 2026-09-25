@@ -1735,13 +1735,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 而映射只在内存 + 一张全局表里，**没有"按空间"的落点**。不落的话，切换秘境弹层的卡片
   /// 就只能显示默认头像——明明有对方名字却不知道对方是谁（老板 2026-09-23 指出）。
   ///
-  /// best-effort：拿不到（离线/只有我一人）就什么都不做，卡片保持默认头像。
+  /// 落两份结论：对方的 member_id（有的话）+ **对方是否已入网**（[savePeerPresence]）。
+  /// 后者让空间卡片能显示「待加入」——只有这里分得清"对方还没来"与"来了但没设头像"。
+  ///
+  /// best-effort，但**前提是通道表新鲜**：本方法只在 `refreshEntranceMap()` 成功之后调用，
+  /// 表非空才说明"排掉我之后没有别人"是确定结论；表为空（离线/还没拉过）时状态未知，
+  /// 直接返回、什么都不写（否则卡片会误报「待加入」）。
   Future<void> _persistPeerMemberId() async {
-    final pid = _repo.resolvePeerMemberId();
-    if (pid == null || pid.isEmpty) return;
+    if (!_repo.hasEntranceMap) return;
     try {
-      await AppLockService(widget.db ?? LocalDatabase.shared)
-          .savePeerMemberId(spaceId: widget.spaceId, peerMemberId: pid);
+      await AppLockService(widget.db ?? LocalDatabase.shared).savePeerPresence(
+        spaceId: widget.spaceId,
+        peerMemberId: _repo.resolvePeerMemberId(),
+      );
     } catch (_) {
       // 落盘失败不影响聊天；下次刷新再试
     }

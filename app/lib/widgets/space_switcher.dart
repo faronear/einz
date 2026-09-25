@@ -123,8 +123,15 @@ class _SpacePickerSheet extends StatefulWidget {
 }
 
 class _SpacePickerSheetState extends State<_SpacePickerSheet> {
-  Map<String, ({String name, String peerName, String peerGender, String peerMemberId})>
-      _names = {};
+  Map<
+      String,
+      ({
+        String name,
+        String peerName,
+        String peerGender,
+        String peerMemberId,
+        bool peerJoined,
+      })> _names = {};
   Map<String, int> _unread = {};
   String? _activeId;
 
@@ -137,8 +144,15 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
   Future<void> _load() async {
     final lock = AppLockService(widget.db);
     final rows = await widget.db.select(widget.db.spaces).get();
-    final out =
-        <String, ({String name, String peerName, String peerGender, String peerMemberId})>{};
+    final out = <
+        String,
+        ({
+          String name,
+          String peerName,
+          String peerGender,
+          String peerMemberId,
+          bool peerJoined,
+        })>{};
     for (final row in rows) {
       var name = row.name;
       var peerName = row.peerName;
@@ -158,6 +172,9 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
         // 与 peerName/peerGender 同源：都是这份 per-space 资料里的并列字段。
         // 取不到（还没连过服务端 / 对方还没加入）→ 空串：卡片显示默认头像。
         peerMemberId: (p['peerMemberId'] as String?) ?? '',
+        // 对方是否已入网：**只有明确的 false 才显示「待加入」**（null = 本机还没判断过，
+        // 什么都不说——宁可少显示，也不要把"还没刷新"误报成"对方没来"）。
+        peerJoined: (p['peerJoined'] as bool?) != false,
       );
     }
     final vault = VaultSession.current;
@@ -225,6 +242,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                           name: _titleOf(space),
                           peerGender: _names[space.spaceId]?.peerGender ?? '',
                           peerMemberId: _names[space.spaceId]?.peerMemberId ?? '',
+                          peerPending: _names[space.spaceId]?.peerJoined == false,
                           server: effectiveServer,
                           api: widget.api,
                           unread: _unread[space.spaceId] ?? 0,
@@ -284,6 +302,7 @@ class _SpaceCard extends StatelessWidget {
     required this.name,
     required this.peerGender,
     required this.peerMemberId,
+    required this.peerPending,
     required this.server,
     required this.api,
     required this.unread,
@@ -299,6 +318,10 @@ class _SpaceCard extends StatelessWidget {
   final String peerGender;
   /// 该空间里对方的 member_id（头像用；空串 → 显示默认头像）。
   final String peerMemberId;
+
+  /// 对方**明确尚未加入**（服务端通道表里除我之外没有别的成员）→ 名字下显示「待加入」。
+  /// 注意与 `peerMemberId` 为空的区别：后者也可能是"本机还没刷新过"，那种情况不该报状态。
+  final bool peerPending;
   final String server;
   final ApiClient? api;
   final int unread;
@@ -394,15 +417,29 @@ class _SpaceCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         // Flexible：名字最多 2 行、超出「…」，空间不够时也只会被压缩
-                        // 而不会把卡片撑破（老板 2026-09-24）
+                        // 而不会把卡片撑破（老板 2026-09-24）。
+                        // 「待加入」时收到 1 行：卡片是固定正方形，要给下面那行状态留位置。
                         Flexible(
                           child: Text(
                             name,
-                            maxLines: 2,
+                            maxLines: peerPending ? 1 : 2,
                             textAlign: TextAlign.center,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        // 「待加入」（老板 2026-09-25）：把"对方还没来"与"来了但没设头像"
+                        // 区分开——后者不显示任何状态行。
+                        if (peerPending) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            AppLocalizations.of(context)!.spaceListPeerPending,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: (_foreground ?? theme.colorScheme.onSurfaceVariant)
+                                  .withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来。

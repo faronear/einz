@@ -228,6 +228,13 @@ class MessageRepository {
     return null;
   }
 
+  /// 通道表拿到过没有（`GET /space` 成功过）。
+  ///
+  /// 区分两种"取不到对方"——[resolvePeerMemberId] 返回 null 可能是：
+  /// ① 表非空、但里面只有我自己 → **对方还没加入**（确定结论，该落盘）；
+  /// ② 表是空的（离线/还没拉过）→ 状态未知（不该落盘，否则会误报「待加入」）。
+  bool get hasEntranceMap => _memberByEntrance.isNotEmpty;
+
   /// 当前同步锚点（本地库 sync_state）。
   Future<int> get lastSequence async {
     final row = await (db.select(db.syncState)

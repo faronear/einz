@@ -1807,6 +1807,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Server: {message}'**
   String errorBackend(String message);
+
+  /// Status line on a space card when the other side has not joined yet
+  ///
+  /// In en, this message translates to:
+  /// **'Not joined yet'**
+  String get spaceListPeerPending;
 }
 
 class _AppLocalizationsDelegate

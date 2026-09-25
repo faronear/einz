@@ -560,26 +560,35 @@ class AppLockService {
         'mySlot': (m['mySlot'] as num?)?.toInt(),
         'peerSlot': (m['peerSlot'] as num?)?.toInt(),
         'peerMemberId': (m['peerMemberId'] as String?) ?? '',
+        // 对方是否已入网（null = 还判断过/本机没刷新过，卡片据此显示「待加入」）
+        'peerJoined': m['peerJoined'] as bool?,
       };
     } catch (_) {
       return const {};
     }
   }
 
-  /// 记下本空间**对方**的 member_id（头像等按 member 维度取数据时用）。
+  /// 记下本空间**对方**的身份状态：`peerMemberId`（有则写）+ `peerJoined`（对方是否已入网）。
   ///
   /// 为什么需要单独存：对方的身份 id 原本只在"取数据那一刻"现算——从服务端 `GET /space`
   /// 的通道表取 `entranceId → memberId` 再排掉自己，**算完即丢**；而对方的名字/性别/槽位
   /// 都早已落进 per-space 资料。于是会出现"卡片有对方名字、却不知道对方是谁、头像只能给默认"
   /// 的不对称（老板 2026-09-23 指出）。这里把它与 peerName 并列存进同一份资料。
   ///
-  /// 读改写、只加这一个键（不碰其它键），幂等——值没变不写盘。
-  Future<void> savePeerMemberId({
+  /// 为什么还要 `peerJoined`（老板 2026-09-25）：卡片上"**对方还没加入**"与"对方已加入但
+  /// 没设头像 / 本机还没刷新过"长得一模一样（都是默认人形），前者该显示「待加入」。
+  /// 只有拿到服务端通道表的那一刻才分得清，所以由调用方（`ChatPage._persistPeerMemberId`，
+  /// 它在 `refreshEntranceMap()` **成功之后**才调）把结论落下来：
+  /// [peerMemberId] 为空 = 这个空间里除我没有别的成员 = 对方尚未加入。
+  ///
+  /// 读改写、只动这两个键（不碰其它键），幂等——值没变不写盘。
+  Future<void> savePeerPresence({
     required String spaceId,
-    required String peerMemberId,
+    String? peerMemberId,
   }) async {
-    final pid = peerMemberId.trim();
-    if (spaceId.isEmpty || pid.isEmpty) return;
+    if (spaceId.isEmpty) return;
+    final pid = (peerMemberId ?? '').trim();
+    final joined = pid.isNotEmpty;
     final key = _profileKey(spaceId);
     var m = <String, dynamic>{};
     final raw = await _get(key);
@@ -590,8 +599,18 @@ class AppLockService {
         m = <String, dynamic>{}; // 坏 JSON：重写一份干净的
       }
     }
-    if (m['peerMemberId'] == pid) return; // 幂等
-    await _set(key, jsonEncode({...m, 'peerMemberId': pid}));
+    // 幂等：现有值已经就是这个结论 → 不写盘（这个方法每次刷新都会调）
+    if (((m['peerMemberId'] as String?) ?? '') == pid &&
+        (m['peerJoined'] as bool?) == joined) {
+      return;
+    }
+    final next = <String, dynamic>{...m, 'peerJoined': joined};
+    if (joined) {
+      next['peerMemberId'] = pid;
+    } else {
+      next.remove('peerMemberId'); // 对方没加入：不留下会误导人的僵尸 id
+    }
+    await _set(key, jsonEncode(next));
   }
 
   /// 旧全局键 [_kProfile] 的兼容读：**仅当本机只登记了 ≤1 个空间**时返回。

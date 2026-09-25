@@ -984,4 +984,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String errorBackend(String message) {
     return 'Server: $message';
   }
+
+  @override
+  String get spaceListPeerPending => 'Not joined yet';
 }

@@ -441,5 +441,9 @@
   "@errorBackend": {
     "description": "Prefix for errors reported by the server; errors decided on this device carry no prefix",
     "placeholders": { "message": { "type": "String" } }
+  },
+  "spaceListPeerPending": "Not joined yet",
+  "@spaceListPeerPending": {
+    "description": "Status line on a space card when the other side has not joined yet"
   }
 }

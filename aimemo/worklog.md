@@ -9796,3 +9796,21 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 - 回归测试 `test/space_switcher_avatar_test.dart`：假 ApiClient 记录 getAvatar 调用 +
   断言默认人形图标消失。**已验证撤掉修复时该测试会红**（不是事后补个永远绿的测试）。
 - `flutter analyze` 无告警，全量 214 项通过。
+
+## 2026-09-25 空间卡片加「待加入」状态行
+
+老板："加一行待加入状态"（起因：Hardservice 那个空间的对方从未登录，卡片只显示默认人形，
+与"对方已加入但没设头像"长得一模一样，分不清）。
+
+- 判定不许用"peerMemberId 为空"——那还可能是"本机没刷新过"。改为由**唯一分得清的地方**落结论：
+  `ChatPage._persistPeerMemberId` 在 `refreshEntranceMap()` **成功之后**才跑，此时通道表非空，
+  "排掉我之后没有别人"就是确定结论 → 落 `peerJoined: false`。
+  表为空（离线/还没拉过）→ 直接返回，什么都不写（新增 `MessageRepository.hasEntranceMap` 判这个）。
+- `AppLockService.savePeerMemberId` → `savePeerPresence({spaceId, peerMemberId?})`：
+  有 id → 写 id + `peerJoined: true`；无 id → **删掉** id + 落 `false`（不留会误导的僵尸 id）。
+  幂等（每次刷新都调），只动这两个键。`loadProfile` 读出 `peerJoined`（null = 未知）。
+- 卡片：`peerJoined == false` → 名字下加一行 11px「待加入」，名字 maxLines 从 2 收到 1（卡片是
+  固定正方形，得给这行留位置；测试里断言无 overflow）。null/true → 什么都不显示。
+- l10n：`spaceListPeerPending` zh「待加入」/ en「Not joined yet」。
+- 测试：3 例弹层（已加入不显示 / 明确未加入显示 / 状态未知不误报）+ 1 例 per-space 资料往返。
+  `flutter analyze` 无告警，全量 217 项通过。

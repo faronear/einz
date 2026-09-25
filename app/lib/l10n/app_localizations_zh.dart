@@ -941,4 +941,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String errorBackend(String message) {
     return '后台：$message';
   }
+
+  @override
+  String get spaceListPeerPending => '待加入';
 }

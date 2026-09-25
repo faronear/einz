@@ -441,5 +441,9 @@
   "@errorBackend": {
     "description": "后台（服务端）错误的前缀：只有服务端响应产出的错误才带它，本机判定的错误不带",
     "placeholders": { "message": { "type": "String" } }
+  },
+  "spaceListPeerPending": "待加入",
+  "@spaceListPeerPending": {
+    "description": "空间卡片上对方尚未加入时的状态行（区别于“已加入但没设头像”）"
   }
 }
