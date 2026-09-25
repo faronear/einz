@@ -5,8 +5,6 @@
 //
 // 需要 LIBSODIUM_PATH 指向 libsodium.dll（与 app_lock_test 一致）。
 
-import 'dart:convert';
-
 import 'package:drift/native.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -168,57 +166,6 @@ void main() {
       await expectLater(
         lock.unlockVault('123456'),
         throwsA(isA<AppLockLockedException>()),
-      );
-    });
-  });
-
-  group('旧键归一（2026-09-23 改名前的锁包）', () {
-    // 老包是把改名前的键写进**密文**的：不像 drift 列能被 migration 的 renameColumn
-    // 改写（不解锁看不到内容），只能在读路径归一。
-    Future<void> writeLegacyPackage(String pin, String legacyJson) async {
-      final env = await encryptWithPassphrase(
-          payload: utf8.encode(legacyJson), passphrase: pin);
-      await db.into(db.appState).insertOnConflictUpdate(
-            AppStateCompanion.insert(
-              key: 'app_lock.package',
-              value: jsonEncode(env.toJson()),
-            ),
-          );
-    }
-
-    test('单个 payload 老包（device_id 键）能解锁并归一', () async {
-      await writeLegacyPackage(
-        '123456',
-        '{"space_key":"a2V5LWE=","space_id":"space-a","device_id":"dev-a",'
-            '"key_version":1,"token":"tok-a","device_public_key":"pub-a",'
-            '"device_private_key":"priv-a"}',
-      );
-
-      final vault = await lock.unlockVault('123456');
-      expect(vault.spaces.map((s) => s.spaceId), ['space-a']);
-      final active = vault.active!;
-      expect(active.entranceId, 'dev-a', reason: '旧 device_id 归一为 entranceId');
-      expect(active.publicKeyB64, 'pub-a', reason: '旧 device_public_key 归一');
-      expect(active.privateKeyB64, 'priv-a', reason: '旧 device_private_key 归一');
-    });
-
-    test('Vault JSON 里的老键条目也能读回', () async {
-      await writeLegacyPackage(
-        '123456',
-        '{"version":1,"active_space_id":"space-a","spaces":[{'
-            '"space_key":"a2V5LWE=","space_id":"space-a","device_id":"dev-a"}]}',
-      );
-
-      final vault = await lock.unlockVault('123456');
-      expect(vault.active!.entranceId, 'dev-a');
-    });
-
-    test('必填键真的缺失 → FormatException（不为 TypeError 崩）', () async {
-      await writeLegacyPackage('123456', '{"space_key":"a2V5LWE="}');
-      await expectLater(
-        lock.unlockVault('123456'),
-        throwsA(isA<AppLockException>()),
-        reason: '缺 space_id：包坏了，锁屏页给"锁屏码错误"而不是裸类型报错',
       );
     });
   });

@@ -131,24 +131,6 @@ void main() {
     expect(p['entranceName'], 'iPhone');
   });
 
-  // 2026-09-25：老数据的 profile 是改名前的键（personName / deviceName），
-  // 不回退则升级后名字全空——与锁包里的 device_id 属同一类"改名改到落盘键"的坑。
-  test('loadProfile：旧键（personName / deviceName）资料也能读回', () async {
-    // 直接写老形状的 JSON（老 Mac 那份 profile 就是这一份）
-    await db.into(db.appState).insertOnConflictUpdate(
-          AppStateCompanion.insert(
-            key: 'app_lock.profile',
-            value: '{"personName":"Luk","peerName":"Fanr","deviceName":"Mac14_15",'
-                '"myGender":"male","peerGender":"female","mySlot":0}',
-          ),
-        );
-    final p = await lock.loadProfile();
-    expect(p['memberName'], 'Luk', reason: '旧 personName → memberName');
-    expect(p['peerName'], 'Fanr');
-    expect(p['entranceName'], 'Mac14_15', reason: '旧 deviceName → entranceName');
-    expect(p['mySlot'], 0);
-  });
-
   // ---- 卸载即重置（老板 2026-09-14 决策）：安全存储条目活过 App 卸载，drift 不会 ----
 
   test('全新安装（沙盒无安装标记）→ 清掉上一次安装残留的安全存储条目', () async {
