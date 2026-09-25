@@ -836,6 +836,12 @@ abstract class AppLocalizations {
   /// **'Token created'**
   String get chatPageInviteDialogTitle;
 
+  /// No description provided for @chatPageInviteJoinLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get chatPageInviteJoinLink;
+
   /// No description provided for @chatPageInviteRegenerate.
   ///
   /// In en, this message translates to:

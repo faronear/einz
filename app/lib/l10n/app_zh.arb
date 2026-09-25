@@ -170,6 +170,7 @@
   "chatPageClearLockTitle": "删除锁屏码？",
   "chatPageClearLockMessage": "确定要删除锁屏码吗？删除后下次启动将直接进入聊天。",
   "chatPageInviteDialogTitle": "开通码已生成",
+  "chatPageInviteJoinLink": "邀请加入",
   "chatPageInviteRegenerate": "重新生成",
   "chatPageInviteDialogHint": "发送给伴侣或自己的其他设备，开启一条新通道加入当前秘境。24 小时内一次性有效。",
   "chatPageInviteCopyLinkTooltip": "复制邀请链接",

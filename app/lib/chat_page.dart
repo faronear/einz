@@ -955,6 +955,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final multiSpace = (VaultSession.current?.spaces.length ?? 0) > 1;
     // 左 16 = 原胶囊的左内边距；右 10 给箭头/右缘留白
     const pad = EdgeInsets.fromLTRB(16, 6, 10, 6);
+    // 芯片内容**只到箭头为止**（老板 2026-09-25）：「邀请加入」链接在芯片外
+    // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -978,7 +980,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       ],
     );
-    if (!multiSpace) return Padding(padding: pad, child: content);
+    // 「对方尚未加入」的「邀请加入」淡色链接：**芯片外**并排、间距约 15
+    // （老板 2026-09-25：方位贴名字/箭头右侧，但不属于芯片——点击语义只有邀请）。
+    // 淡色小字与人名区分；悬浮/按住有淡灰变色（InkWell，同「添加秘境」按钮口径）；
+    // 对方加入后自动消失。
+    // 圆角 12 = 「添加秘境」/「新建通道」那类可点击文案的口径（老板 2026-09-25：
+    // 原 8 偏方，与全应用同族按钮的弧度对不上）。
+    // 只在**确知**对方未加入（[_peerJoined] == false）时才挂：null（还没问到）不挂，
+    // 否则每次进页面都要先闪一下、离线时更是常驻（老板 2026-09-25 定）。
+    final Widget inviteLink = _peerJoined != false
+        ? const SizedBox.shrink()
+        : Padding(
+            padding: const EdgeInsets.only(left: 15),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _showInviteDialog,
+                borderRadius: BorderRadius.circular(12),
+                hoverColor: Colors.black.withValues(alpha: 0.05),
+                highlightColor: Colors.black.withValues(alpha: 0.08),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Text(l10n.chatPageInviteJoinLink,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant)),
+                ),
+              ),
+            ),
+          );
+    // 芯片包 Flexible：本 Row 处于状态条 Flexible 的有界宽度里，非 flex 子项会被
+    // Row 放到无界宽度 → 长名字不再被省略、冲出胶囊（长名字回归测试 2026-09-24）。
+    // Flexible 让芯片先让出链接的宽度，剩下的给芯片内部继续省略。
+    if (!multiSpace) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        Flexible(child: Padding(padding: pad, child: content)),
+        inviteLink,
+      ]);
+    }
     // 底色按对方性别（老板 2026-09-25）：淡粉（女）/ 淡蓝（男）——与消息气泡、空间卡片
     // 同一组性别色（品牌粉 #D6529C / 品牌天蓝 #3BAFFD 的 18% tint，见 _bubbleColor /
     // _SpaceCard._background）。
@@ -991,19 +1032,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         : _peerGender == 'male'
             ? const Color(0xFFDCF1FF) // ≈ #3BAFFD 18% 预乘到白
             : const Color(0xFFF1F1F1); // ≈ 黑 5.5% 预乘到白（原淡灰）
-    return Tooltip(
-      message: l10n.spaceListSwitch,
-      child: Material(
-        color: chipColor,
-        elevation: 0,
-        // 只圆右边：左边上下角交给外层胶囊的 clip 对齐（三边完全贴合）
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Flexible(
+        child: Tooltip(
+          message: l10n.spaceListSwitch,
+          child: Material(
+            color: chipColor,
+            elevation: 0,
+            // 只圆右边：左边上下角交给外层胶囊的 clip 对齐（三边完全贴合）
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child:
+                InkWell(onTap: _openSpacePicker, child: Padding(padding: pad, child: content)),
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(onTap: _openSpacePicker, child: Padding(padding: pad, child: content)),
       ),
-    );
+      inviteLink,
+    ]);
   }
 
   /// 「切换空间」：弹「选择秘境」弹层（小卡片瀑布流）→ 选中即**直接换到那个空间**（不跳页）。
@@ -1608,6 +1655,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     AboutSheet.show(context);
   }
 
+  /// 对方是否已加入本空间（有**在用**通道）。**null = 还没问到**，此时不显示
+  /// 「邀请加入」——首帧与离线（请求失败）都停在 null，不会误挂一个链接。
+  /// 未加入时状态条对方芯片右侧显示「邀请加入」链接（老板 2026-09-25）。
+  bool? _peerJoined;
+
   /// 对方在线判定：对方有实时 WS 连接（connected_at 非 null）= 在线；
   /// 旧服务器无 connected_at 字段时退回 last_seen 距今 < 60s 兜底
   /// （30s 轮询 + WS 状态变化时刷新）。
@@ -1643,7 +1695,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
       // 对方由离线转在线（含"刚加入空间"——WS 事件可能漏，这里兜底）：补拉身份
       if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
-      if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
+      // 「对方已加入」= 有**在用**通道。撤销不会删行，只把 status 标成 revoked
+      // （server/src/entrances.ts）——拿"行存在"当已加入，会让密友重置设备/通道被撤
+      // 之后反而不给邀请入口，恰恰丢了最该邀请的那一刻。status 缺省（老服务端）按
+      // 在用算，与通道列表弹层的 revoked 判定同口径。
+      final joined = peer.any((d) {
+        final status = d['status'];
+        return status == null || status == 'active';
+      });
+      if (mounted && (online != _peerOnline || joined != _peerJoined)) {
+        setState(() {
+          _peerOnline = online;
+          _peerJoined = joined;
+        });
+      }
     } catch (_) {
       // 网络失败：保持上次状态
     }
@@ -4513,7 +4578,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 子项撑满高度 → 左侧那块上下与胶囊贴合
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 对方（左）：圆点 + 名字（多空间时再加下拉箭头与可按底色）
+                  // 对方（左）：圆点 + 名字（多空间时再加下拉箭头与可按底色；
+                  // 对方未加入时紧跟其后的「邀请加入」链接，见 _buildPeerStatus）
                   Flexible(child: _buildPeerStatus(l10n)),
                   // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
                   // 名字为空则不显示文本，只留圆点）。名字同样在本侧一半内省略。

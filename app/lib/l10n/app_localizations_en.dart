@@ -429,6 +429,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogTitle => 'Token created';
 
   @override
+  String get chatPageInviteJoinLink => 'Invite';
+
+  @override
   String get chatPageInviteRegenerate => 'Regenerate';
 
   @override

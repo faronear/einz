@@ -403,6 +403,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogTitle => '开通码已生成';
 
   @override
+  String get chatPageInviteJoinLink => '邀请加入';
+
+  @override
   String get chatPageInviteRegenerate => '重新生成';
 
   @override
