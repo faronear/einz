@@ -826,7 +826,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
     var picked = current;
-    await showModalBottomSheet<void>(
+    await showOptionPickerSheet<void>(
       context: context,
       builder: (ctx) => OptionPickerSheet(
         title: l10n.chatPageMenuLocaleLabel,
@@ -895,7 +895,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 会立刻删掉已留存的明文，是有害操作；选中该项时弹层里给红字警示。
   Future<void> _showAttachmentStoragePicker() async {
     final l10n = AppLocalizations.of(context)!;
-    await showModalBottomSheet<void>(
+    await showOptionPickerSheet<void>(
       context: context,
       builder: (ctx) => OptionPickerSheet(
         title: l10n.chatPageMenuAttachmentStorage,
@@ -2056,7 +2056,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<int?> _pickBurnSeconds({required int current}) async {
     final l10n = AppLocalizations.of(context)!;
     String? picked;
-    await showModalBottomSheet<void>(
+    await showOptionPickerSheet<void>(
       context: context,
       builder: (ctx) => OptionPickerSheet(
         title: l10n.chatPageBurnHeading,

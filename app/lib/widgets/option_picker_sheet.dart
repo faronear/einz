@@ -1,5 +1,23 @@
 import 'package:flutter/material.dart';
 
+/// 打开选项弹层（界面语言 / 阅后即焚 / 附件存储共用的入口）。
+///
+/// 抬高高宽上限：Flutter 底部弹层**不** `isScrollControlled` 时，最高只占窗口
+/// `9/16`（56%）；手机竖屏够用，桌面版窗口可以是扁而宽的，高度不够时阅后即焚
+/// 6 档的底部选项（尤其「关闭」）会被裁在滚动区外面（老板 2026-09-25）。
+/// 0.9 = 最高占窗口 90% 高；内容矮时仍贴合内容（弹层本身是 shrink-to-fit），
+/// 手机上看不出差别。
+Future<T?> showOptionPickerSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    scrollControlDisabledMaxHeightRatio: 0.9,
+    builder: builder,
+  );
+}
+
 /// 统一的选项弹层（界面语言 / 阅后即焚 / 附件存储共用，老板要求 2026-09-15）。
 ///
 /// 约定（与界面主题弹层一致）：

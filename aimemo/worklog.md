@@ -9659,3 +9659,19 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
   一个小月牙缺口。要真·无缝（接缝是一条直线）就得把 invite 的左角改成 0
   （芯片右角保持圆）—— 那样两块会连成一条，又回到"分不清是两个命中区"的老问题，
   故没做，等老板看后再定。
+
+## 2026-09-25 阅后即焚弹层：抬高高度上限 + 「关闭」档位放第一项
+
+老板："手机屏幕窄而高，桌面版可以是扁的，窗口高度不够时阅后即焚弹层底下的选项可能看不见
+→ 1）允许弹窗占据更多高度（原先看着像 50% 上限），2）把 Off 放到第一个。"
+
+- 高度上限的真凶是 Flutter SDK：底部弹层不 `isScrollControlled` 时，子项最高
+  `constraints.maxHeight * 9/16`（56.25%，不是 50%）。传 `constraints` 没用——
+  `ConstrainedBox` 会被父级（Align，0..H）`enforce` 回 H，再乘 9/16，永远上不去。
+  正确开关是 `scrollControlDisabledMaxHeightRatio`（showModalBottomSheet 有这个参数）。
+- 新增 `showOptionPickerSheet()`（option_picker_sheet.dart）统一入口，ratio = 0.9；
+  三处调用（界面语言 / 附件存储 / 阅后即焚）都改成它，比例和理由只写一份。
+  内容矮时弹层仍贴合内容（shrink-to-fit），手机上观感不变。
+- `kBurnAfterOptions` 里 0（不设期限/Off）挪到第一项：档位多 + 矮窗口时底部要滚动，
+  "取消焚毁"是关键项，不该被藏在滚动区外；顺序即展示顺序，无其它依赖。
+- 测试：option_picker_sheet_test.dart 加「可超过 9/16 上限」（20 项 @600 → 高度 >400 且 ≤540）。
