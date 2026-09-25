@@ -210,7 +210,8 @@ class _StartupGateState extends State<StartupGate> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.startupInitClearDataTitle),
+        // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+        title: Center(child: Text(l10n.startupInitClearDataTitle)),
         content: Text(l10n.startupInitClearDataMessage),
         actions: [
           TextButton(

@@ -1105,7 +1105,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setLocal) => AlertDialog(
-            title: Text(l10n.chatPageInviteDialogTitle),
+            // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中，不居左）——
+            // 与底部弹层的标题口径一致（Center；正文/字段仍靠左）
+            title: Center(child: Text(l10n.chatPageInviteDialogTitle)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1552,11 +1554,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」/「更多通道」
+              // 等弹层标题口径一致——原来是自己一套 left + all 12 + 无字号）
               Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  l10n.advancedMenuTitle,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Center(
+                  child: Text(l10n.advancedMenuTitle,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
                 ),
               ),
               ListTile(
@@ -1808,7 +1813,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(renameEntrance ? l10n.chatPageRenameEntranceTitle : l10n.chatPageRenameNameTitle),
+        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+        title: Center(
+            child: Text(renameEntrance
+                ? l10n.chatPageRenameEntranceTitle
+                : l10n.chatPageRenameNameTitle)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2025,7 +2034,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.chatPageExitTitle),
+        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+        title: Center(child: Text(l10n.chatPageExitTitle)),
         content: Text(l10n.chatPageExitMessage),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
@@ -3027,7 +3037,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.chatPageDeleteConfirmTitle),
+        title: Center(child: Text(l10n.chatPageDeleteConfirmTitle)),
         content: Text(l10n.chatPageDeleteConfirmMessage),
         actions: [
           TextButton(
@@ -5038,7 +5048,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          title: Text(l10n.chatPageClearLockTitle),
+          title: Center(child: Text(l10n.chatPageClearLockTitle)),
           content: Text(l10n.chatPageClearLockMessage),
           actions: [
             TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
@@ -5095,10 +5105,11 @@ class _SetLockDialogState extends State<_SetLockDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: Text(l10n.chatPageSetLockTitle),
+      title: Center(child: Text(l10n.chatPageSetLockTitle)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start, // 小字/输入框与大标题左对齐（老板要求）
+        // 正文（小字提示/输入框）保持靠左——居中的只是标题（老板 2026-09-25）
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 提示：设置后，每次进入秘境都要解锁，更安全。已设锁屏码时另有说明（修改/清空需验旧码）。大标题下、输入框上方——老板要求
           Text(
@@ -5307,7 +5318,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: Text(l10n.chatPageChangePassphraseTitle),
+      title: Center(child: Text(l10n.chatPageChangePassphraseTitle)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -1219,7 +1219,8 @@ class _SetupPageState extends State<SetupPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.chatPageExitTitle),
+        // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+        title: Center(child: Text(l10n.chatPageExitTitle)),
         content: Text(l10n.chatPageExitMessage),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
@@ -2264,17 +2265,20 @@ class _SetupPageState extends State<SetupPage> {
       context: context,
       barrierDismissible: false, // 只有一个按钮：开始聊天
       builder: (ctx) => AlertDialog(
-        // 标题左侧放品牌 Logo（替代通用 🎉 庆祝图标，老板 2026-09-13）
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const BrandLogo(size: 26),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                  isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
-            ),
-          ],
+        // 标题左侧放品牌 Logo（替代通用 🎉 庆祝图标，老板 2026-09-13）；
+        // 整行**居中**（老板 2026-09-25：弹窗标题一律居中，不居左）
+        title: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const BrandLogo(size: 26),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                    isCreate ? l10n.welcomeDialogTitleCreate : l10n.welcomeDialogTitleJoin),
+              ),
+            ],
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,

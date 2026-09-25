@@ -241,7 +241,8 @@ class _LockPageState extends State<LockPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.chatPageExitTitle),
+        // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+        title: Center(child: Text(l10n.chatPageExitTitle)),
         content: Text(l10n.chatPageExitMessage),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),

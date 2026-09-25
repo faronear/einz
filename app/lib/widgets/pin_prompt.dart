@@ -95,7 +95,8 @@ class _LockCodeDialogState extends State<_LockCodeDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: Text(widget.title),
+      // 标题居中（老板 2026-09-25：弹窗标题一律居中，不居左）
+      title: Center(child: Text(widget.title)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

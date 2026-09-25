@@ -9553,3 +9553,21 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
   看着偏）。
 - `app/lib/data/server_config.dart` 里对已删除 `AboutPage.isLocked` 的引用清掉，
   改写成不带文件名的历史说明。
+
+### 弹窗标题一律居中（老板 2026-09-25）
+
+老板："把汉堡菜单下那些 dialog 都做成标题居中，而不是居左。"
+
+底部弹层（`OptionPickerSheet` / `UiStylePickerSheet` / 空间切换 / 「更多通道」/ 关于）上
+一轮就已经是居中标题（`Center` + 上 14 下 10 + w600 16），剩下的只有 **`AlertDialog`**——
+`AlertDialog` 的 `title` 默认靠左。逐个改成 `title: Center(child: Text(...))`。
+
+- 汉堡菜单直接可达：开通码 / 改名（我的身份、当前通道）/ 退出 / 清空锁屏码确认 /
+  设置锁屏码 / 修改口令 / 销毁通道确认（`_ConfirmDestructiveDialog`）。
+- 「高级安全」弹层自己的标题也一并归位：它原是 `Padding(all 12)` + 无字号的老写法（全应用
+  唯一没跟上弹层标题口径的），改成 `fromLTRB(16,14,16,10)` + `Center` + `fontSize 16 w600`。
+- **顺手统一到菜单之外的同族弹窗**（同一个规则，避免一半居中一半靠左）：删除消息确认、
+  PIN 弹窗（`widgets/pin_prompt.dart`，新增空间/破坏性操作都用它）、锁屏页退出、启动
+  初始化失败清数据、向导页退出、创建/加入完成欢迎窗（那个标题是 Logo+文字一行，整行居中）。
+  → 全部 `AlertDialog` 现在都是居中标题；正文、字段、按钮仍靠左/右不变。
+- 全量 `flutter test`：**208 过 / 1 跳过 / 0 失败**。
