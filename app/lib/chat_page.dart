@@ -982,8 +982,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     // 「对方尚未加入」的「邀请加入」链接：**芯片外**并排（老板 2026-09-25：方位贴
     // 名字/箭头右侧，但不属于芯片——点击语义只有邀请）。
-    // 淡色小字与人名区分；常态淡灰底、悬浮/按住渐深（同「添加秘境」按钮口径）；
-    // 对方加入后自动消失。
+    //
+    // 常态**只有蓝色链接色、没有底色**（老板 2026-09-25：状态条里可点的东西已经够多，
+    // 再挂一块灰底就成了第三个按钮）。可点性由蓝色暗示，底色只在悬浮/按住时出现，
+    // 与「我的」那块同口径（黑 5% / 8%）。
     // 弧角与相邻的状态芯片**同值 24**（老板 2026-09-25 实测：比芯片小看着不对，
     // 芯片是 `Radius.circular(24)`）。
     // 只在**确知**对方未加入（[_peerJoined] == false）时才挂：null（还没问到）不挂，
@@ -995,25 +997,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 15 显得两块离太远）
             padding: const EdgeInsets.only(left: 8),
             child: Material(
-              // 常态淡灰底 + 悬浮/按住渐深 = 「添加秘境」/「新建通道」同款口径
-              // （老板 2026-09-25）：原先常态全透明，看不出这里能点。
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(24),
               clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
               child: InkWell(
                 onTap: _showInviteDialog,
-                hoverColor: Colors.black.withValues(alpha: 0.10),
-                highlightColor: Colors.black.withValues(alpha: 0.14),
+                // 与「我的」状态芯片同一档（那块也没有常驻底色）
+                hoverColor: Colors.black.withValues(alpha: 0.05),
+                highlightColor: Colors.black.withValues(alpha: 0.08),
                 child: Padding(
                   // 内边距与状态芯片**同一个 `pad`**（老板 2026-09-25：invite 的
-                  // 左右留白要和芯片一致，别贴着灰底框）。芯片右 10 是给下拉箭头
-                  // 留的，链接没有箭头，跟着用同一个常量 → 文字偏左 3px，看不出。
+                  // 左右留白要和芯片一致）。芯片右 10 是给下拉箭头留的，链接没有
+                  // 箭头，跟着用同一个常量 → 文字偏左 3px，看不出。
                   padding: pad,
                   child: Text(l10n.chatPageInviteJoinLink,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontSize: 12,
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant)),
+                          // 链接蓝 = 品牌深蓝 #2271F7，与开通码弹窗里那条邀请链接
+                          // （本文件 `_showInviteDialog`）同一个蓝，语义同源。
+                          color: Color(0xFF2271F7))),
                 ),
               ),
             ),
