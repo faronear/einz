@@ -992,31 +992,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 否则每次进页面都要先闪一下、离线时更是常驻（老板 2026-09-25 定）。
     final Widget inviteLink = _peerJoined != false
         ? const SizedBox.shrink()
-        : Padding(
-            // 与芯片的间距 15 → 8（老板 2026-09-25：内边距变成芯片那套之后，
-            // 15 显得两块离太远）
-            padding: const EdgeInsets.only(left: 8),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(24),
-              clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
-              child: InkWell(
-                onTap: _showInviteDialog,
-                // 与「我的」状态芯片同一档（那块也没有常驻底色）
-                hoverColor: Colors.black.withValues(alpha: 0.05),
-                highlightColor: Colors.black.withValues(alpha: 0.08),
-                child: Padding(
-                  // 内边距与状态芯片**同一个 `pad`**（老板 2026-09-25：invite 的
-                  // 左右留白要和芯片一致）。芯片右 10 是给下拉箭头留的，链接没有
-                  // 箭头，跟着用同一个常量 → 文字偏左 3px，看不出。
-                  padding: pad,
-                  child: Text(l10n.chatPageInviteJoinLink,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          // 链接蓝 = 品牌深蓝 #2271F7，与开通码弹窗里那条邀请链接
-                          // （本文件 `_showInviteDialog`）同一个蓝，语义同源。
-                          color: Color(0xFF2271F7))),
-                ),
+        : Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
+            child: InkWell(
+              onTap: _showInviteDialog,
+              // 与「我的」状态芯片同一档（那块也没有常驻底色）
+              hoverColor: Colors.black.withValues(alpha: 0.05),
+              highlightColor: Colors.black.withValues(alpha: 0.08),
+              child: Padding(
+                // 与芯片**之间不再留间隙**（老板 2026-09-25：去掉常驻灰底之后，
+                // 8px 的空隙看着像断开的；现在两块底色悬浮/按住时**边缘相碰**，
+                // 看起来是连着的一排）。文字之间的距离由两侧各自的 `pad` 撑着
+                //（芯片右 10 + 链接左 16），不靠这个间隙。
+                //
+                // 内边距与状态芯片**同一个 `pad`**（老板 2026-09-25：invite 的
+                // 左右留白要和芯片一致）。芯片右 10 是给下拉箭头留的，链接没有
+                // 箭头，跟着用同一个常量 → 文字偏左 3px，看不出。
+                padding: pad,
+                child: Text(l10n.chatPageInviteJoinLink,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        // 链接蓝 = 品牌深蓝 #2271F7，与开通码弹窗里那条邀请链接
+                        // （本文件 `_showInviteDialog`）同一个蓝，语义同源。
+                        color: Color(0xFF2271F7))),
               ),
             ),
           );
