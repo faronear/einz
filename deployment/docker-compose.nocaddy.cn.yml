@@ -1,0 +1,87 @@
+# Einz 服务端单机部署 —— 中国 origin + Cloudflare 隧道双入口版（无内置 Caddy）
+#
+# 拓扑（同一台中国服务器、同一份数据、两个入口，不分叉）：
+#
+#   境内用户 ──► einz.yuanjinx.com（备案）──► 系统级 Caddy ──► 127.0.0.1:3000
+#   境外用户 ──► einz.tic.cc（无备案）──► Cloudflare 边缘 ──► cloudflared 隧道
+#                                                              └──► server:3000
+#
+#   - 系统级 Caddy（systemd）服务备案域名，TLS 自动签发；本 compose 不含 Caddy 容器。
+#   - cloudflared 只**出站**连 Cloudflare，不开任何入站端口；tic.cc 从不解析到
+#     中国 IP，故不涉及备案。
+#   - 两个入口指向同一台 origin（同一 SQLite 库），App/CLI 候选列表并发探测、
+#     谁快用谁——境内自然走 yuanjinx 直连，境外自然走 tic.cc；**绝不要两边各跑一套库**。
+#
+# 使用前：
+#   1. Cloudflare Zero Trust 控制台建隧道：
+#        Networks → Tunnels → Create a tunnel → Cloudflared → 命名（如 einz-cn）
+#        → 复制 token；Public Hostnames 加一条：
+#          Subdomain: einz   Domain: tic.cc
+#          Service: HTTP   URL: http://server:3000
+#        （URL 写容器名 server——cloudflared 与 server 在本 compose 的 einz 网络内；
+#          不要写 caddy:443，CF 已在边缘终止客户端 TLS。）
+#        DNS 里那条指向 127.0.0.1 的旧 A 记录要先删掉，否则与自动建的
+#        proxied CNAME（→ <tunnel-id>.cfargotunnel.com）冲突。
+#   2. deployment/.env 里补一行（.env 已在 .gitignore，不入库）：
+#        CF_TUNNEL_TOKEN=<第 1 步复制的 token>
+#      同时确认 EINZ_DB_BACKUP_KEY 已由 `bash deployment/env.sh` 生成。
+#   3. 系统级 Caddy（如 /etc/caddy/Caddyfile）配置备案域名站点，例如：
+#        einz.yuanjinx.com {
+#            reverse_proxy 127.0.0.1:3000
+#            encode gzip
+#            header {
+#                Strict-Transport-Security "max-age=31536000; includeSubDomains"
+#                X-Content-Type-Options "nosniff"
+#            }
+#        }
+#      （WS 升级由 reverse_proxy 自动处理）
+#   4. 启动：docker compose -f deployment/docker-compose.nocaddy.cn.yml up -d
+#      查看隧道连接：docker compose -f deployment/docker-compose.nocaddy.cn.yml \
+#                      logs -f cloudflared     # 期望 4 条 "Registered tunnel connection"
+#
+# ⚠ 与 deployment/docker-compose.nocaddy.yml **不能同时启动**（两者都发布
+#   127.0.0.1:3000，会抢端口）；本文件是它的中国双入口升级版，二选一。
+# ⚠ 中国大陆对 UDP/QUIC 常有干扰：若 cloudflared 反复掉线，把下面 command 换成
+#   `tunnel --no-autoupdate --protocol http2 run`（强制走 TCP 443）。
+#
+# 注：**配置文件是可选的**——设备与空间都在库里（v1 的静态白名单 config.json 已废），
+#     `./config` 里现在只放 `serverConfig.json`（当前字段：maxSpaces，改后重启
+#     生效）；目录为空或文件缺失都照常启动（走默认值）。
+services:
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      # 服务端配置文件（可选）：宿主机 ./config/serverConfig.json → 容器 /config/。
+      # 文件缺失时服务端按默认值启动（当前唯一字段 maxSpaces：0=不限 / n=上限）。
+      - EINZ_CONFIG=/config/serverConfig.json
+      - EINZ_DB=/data/einz.sqlite.db
+      - EINZ_FILES=/data/files
+      # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
+      # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore）。
+      - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
+    ports:
+      - "127.0.0.1:3000:3000" # 仅宿主回环可见：系统级 Caddy 反代到这里，不对外直开
+    volumes:
+      - ./config:/config:ro
+      - ./data:/data
+    networks:
+      - einz
+
+  # Cloudflare 隧道连接器：承载无备案的 einz.tic.cc，出站连 CF，无入站端口。
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    depends_on:
+      - server
+    networks:
+      - einz
+
+networks:
+  einz:

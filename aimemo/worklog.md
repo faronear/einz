@@ -9387,3 +9387,25 @@ app_lock 新增 1 条：旧 profile 键读回）。
 
 **环境备注（非本次改动）**：本机 `~/.pub-cache/hosted/pub.dev/test-1.32.0` 曾缺失 →
 cli 的 `dart analyze`/`dart test` 报 152 错、"找不到 package:test"，`flutter pub get` 后恢复。
+
+## 2026-09-25 部署模板：中国 origin + CF 隧道双入口（docker-compose.nocaddy.cn.yml）
+
+**背景**：服务器从甲骨文云（海外）搬到中国大陆。备案域名 `einz.yuanjinx.com` 指向中国机；
+`einz.tic.cc` 因无备案，大陆 443 无法服务，已在 CF 里指到 127.0.0.1（等于停用）。
+
+**方案（老板拍板）**：不做"两台服务器 + 数据同步"——better-sqlite3 单写者 + E2EE 密文无语义
+可合并，必分叉；以现有规模不值当。改成**单 origin 多入口**：中国机是唯一数据源，`tic.cc`
+由 Cloudflare 隧道（cloudflared 只出站连 CF，无入站端口、tic.cc 不解析到中国 IP，绕开备案）
+回到同一台 `server:3000`。App/CLI 候选列表本就按"同一服务多入口"设计
+（`docs/SERVER_SETTINGS.md §4`），零改动即可按地理就近选路：境内走 yuanjinx 直连，境外走
+tic.cc（CF）。
+
+**本次改动**：新增模板 `deployment/docker-compose.nocaddy.cn.yml` —— 以 nocaddy 版为底
+（系统级 Caddy 服务备案域名 → 127.0.0.1:3000），加一个 `cloudflared` 服务（同一 `einz`
+网络、连 `server:3000`、token 走 `.env` 的 `CF_TUNNEL_TOKEN`）。头注释写清：CF 后台建隧道
+与 Public Hostname 步骤、DNS 旧 A 记录需先删、与 nocaddy 版抢 127.0.0.1:3000 不可并存、
+大陆 QUIC 被限时改 `--protocol http2`。
+
+**验证**：`docker compose -f deployment/docker-compose.nocaddy.cn.yml config` 解析通过
+（两服务 + `einz` 网络正确展开）。**未做**：真机上行验证——需老板在 CF 建隧道并实测境内外
+延迟，尤其 cloudflared 出中国那段（就是海外体验的上限；若太差，回退"甲骨文自建中继"）。
