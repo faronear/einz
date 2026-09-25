@@ -265,10 +265,9 @@ class EntranceStore {
     final out = <MessageEnvelope>[];
     for (final json in pending) {
       try {
-        final m = jsonDecode(json) as Map<String, dynamic>;
-        out.add(MessageEnvelope.fromJson(_normalizeEnvelopeKeys(m)));
+        out.add(MessageEnvelope.fromJson(jsonDecode(json) as Map<String, dynamic>));
       } catch (_) {
-        // 旧版/损坏的待发信封：跳过（不外发坏内容），**绝不因一条坏数据打崩 TUI**
+        // 解析不了的待发信封：跳过（不外发坏内容），**绝不因一条坏数据打崩 TUI**
       }
     }
     return out;
@@ -307,18 +306,18 @@ class EntranceStore {
 
   /// 历史消息信封列表（按 server_sequence 升序；未同步的排最后，P3 修复与注释一致）。
   ///
-  /// 逐条 try/catch：旧版（device/person/partner 术语）或损坏的信封**跳过**，不让
-  /// `MessageEnvelope.fromJson` 的类型转换把整机 TUI 打崩（2026-09-24 老板实测：
-  /// 旧 store 的历史信封只有 `sender_device_id`，新代码读 `sender_entrance_id` → null
-  /// cast 抛错 → 进程崩，连 /reset 都进不去）。
+  /// 逐条 try/catch：**解析不了的坏信封跳过**，不让 `MessageEnvelope.fromJson`
+  /// 的类型转换把整机 TUI 打崩（2026-09-24 老板实测：一条坏历史就让进程直接死，
+  /// 连 `/reset` 逃生口都到不了）。**只容灾，不做旧键名归一**——旧键兼容已被明确
+  /// 否掉（无外部用户、无老数据留存，见 aimemo/worklog.md 2026-09-25 决策）。
   List<MessageEnvelope> get historyEnvelopes {
     final list = <({MessageEnvelope env, int? seq})>[];
     for (final m in history) {
       try {
-        final env = MessageEnvelope.fromJson(_normalizeEnvelopeKeys(m));
+        final env = MessageEnvelope.fromJson(m);
         list.add((env: env, seq: m['server_sequence'] as int?));
       } catch (_) {
-        // 跳过这条坏/旧信封（保住其余历史与整个界面）
+        // 跳过这条坏信封（保住其余历史与整个界面）
       }
     }
     list.sort((a, b) {
@@ -382,18 +381,3 @@ class EntranceStore {
   int get attachmentCount => attachments.length;
 }
 
-/// 旧版信封键 → 现行键（**只改键名，值不变**——AAD 用的是值，见
-/// `message_crypto._buildAad`，故改键后旧历史仍可解密）。
-///
-/// 术语演进：`sender_device_id`→`sender_entrance_id`（2026-09-23）、
-/// `sender_person_id`→`sender_partner_id`（09-23）→`sender_member_id`（09-24）。
-/// 旧 store 的历史/待发信封可能仍是这些旧名；不归一化就会在
-/// `MessageEnvelope.fromJson` 的 `as String` 上抛桥崩。
-///
-/// **不改原 map**（返回副本）：入参可能是 `const`/不可变 map，就地写会抛。
-Map<String, dynamic> _normalizeEnvelopeKeys(Map<String, dynamic> e) {
-  final out = Map<String, dynamic>.of(e);
-  out['sender_entrance_id'] ??= e['sender_device_id'];
-  out['sender_member_id'] ??= e['sender_partner_id'] ?? e['sender_person_id'];
-  return out;
-}

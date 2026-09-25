@@ -70,34 +70,8 @@ void main() {
     expect(loaded.memberName, 'Lukas');
   });
 
-  // 2026-09-24 老板实测：旧 store 的历史信封只有 sender_device_id，新代码读
-  // sender_entrance_id → null cast 抛崩 → TUI 连 /reset 都进不去。回归：
-  // ① 旧键名自动归一（值不变，AAD 用值 → 仍可解密）；② 坏信封跳过、不抛。
-  test('旧版键名的历史/待发信封可读回（自动归一，不崩）', () {
-    final st = EntranceStore(publicKey: 'pk', privateKey: 'sk')
-      ..history.add(const {
-        'v': 1,
-        'type': 'text',
-        'key_version': 1,
-        'message_id': 'm1',
-        'sender_device_id': 'dev1',
-        'sender_person_id': 'mem1',
-        'nonce': 'n',
-        'ciphertext': 'c',
-        'server_sequence': 5,
-        'created_at': 100,
-      })
-      ..pending.add(
-          '{"v":1,"type":"text","key_version":1,"message_id":"m2","sender_device_id":"dev1","nonce":"n","ciphertext":"c"}');
-
-    final envs = st.historyEnvelopes;
-    expect(envs.length, 1);
-    expect(envs.first.senderEntranceId, 'dev1'); // 旧 sender_device_id 归一
-    expect(envs.first.senderMemberId, 'mem1'); // 旧 sender_person_id 归一
-    expect(envs.first.serverSequence, 5);
-    expect(st.pendingEnvelopes.single.senderEntranceId, 'dev1');
-  });
-
+  // 2026-09-24 老板实测：一条坏历史信封就让 TUI 进程崩掉，连 /reset 都进不去。
+  // 旧键归一那条路已经否掉（无存量数据要兼容），**容灾跳过**保留。
   test('损坏/无法解析的信封被跳过，不抛错', () {
     final st = EntranceStore(publicKey: 'pk', privateKey: 'sk')
       ..history.add(const {'garbage': true})
