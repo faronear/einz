@@ -117,15 +117,19 @@ Future<void> _openEntranceListSheet(
   await tester.pumpAndSettle();
 }
 
-/// 作用域限定在底部弹层内的查找（顶栏也有「Lukas / 通道名」，全局 find 会撞车）。
+/// 作用域限定在底部弹层内的查找（顶栏也有「通道名」，全局 find 会撞车）。
 Finder sheetText(String text) =>
     find.descendant(of: find.byType(BottomSheet), matching: find.text(text));
 
 Finder sheetTextContaining(String text) =>
     find.descendant(of: find.byType(BottomSheet), matching: find.textContaining(text));
 
-Finder sheetIcon(IconData icon) =>
-    find.descendant(of: find.byType(BottomSheet), matching: find.byIcon(icon));
+/// 弹层内指定颜色的状态灯（Icons.circle）。
+Finder sheetDot(Color color) => find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byWidgetPredicate((w) =>
+          w is Icon && w.icon == Icons.circle && w.color == color),
+    );
 
 void main() {
   setUpAll(() async {
@@ -179,22 +183,20 @@ void main() {
 
     // 弹层标题（菜单已关，文本只在弹层里）
     expect(sheetText('通道列表'), findsOneWidget);
-    // 当前通道必列：标「本机」，不显示 member 名字/时刻
+    // 三张卡片：iPhone（本机·在线）/ iPad（在线）/ 旧手机（已撤销）
     expect(sheetText('iPhone'), findsOneWidget);
-    expect(sheetText('本机'), findsOneWidget);
-    // 本人其他通道：iPad（在线）+ 旧手机（已撤销照列）
     expect(sheetText('iPad'), findsOneWidget);
-    expect(sheetText('Lukas'), findsNWidgets(2),
-        reason: '两条非本机本人通道行各显示一次 member 名字（本机行不显示）');
-    expect(sheetText('在线'), findsOneWidget);
     expect(sheetText('旧手机'), findsOneWidget);
-    expect(sheetText('已撤销'), findsOneWidget);
-    // 性别图标：我 male → Icons.male ×3（三条行）；对方 female 行被排除
-    expect(sheetIcon(Icons.male), findsNWidgets(3));
-    expect(sheetIcon(Icons.female), findsNothing);
+    // 本机标签只在本机卡
+    expect(sheetText('本机'), findsOneWidget);
+    // 红绿灯：2 绿（本机+iPad 在线）+ 1 灰（已撤销），无红
+    expect(sheetDot(Colors.green), findsNWidgets(2));
+    expect(sheetDot(Colors.red), findsNothing);
+    // since 时间：三张卡都有（在线→上线时刻；已撤销→撤销前最后活跃）
+    expect(sheetTextContaining('since'), findsNWidgets(3));
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
-    // 列表下方「新建通道」链接，点击打开生成开通码弹窗
+    // 「新建通道」按钮（图标+文字居中、有背景），点击打开生成开通码弹窗
     expect(sheetText('新建通道'), findsOneWidget);
     await tester.tap(sheetText('新建通道'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
@@ -218,13 +220,14 @@ void main() {
 
     await _openEntranceListSheet(tester, db, api);
 
-    // 只有一行：当前通道 + 「本机」标签
+    // 只有一张卡：当前通道 + 「本机」标签 + 绿灯 + since
     expect(sheetText('通道列表'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('本机'), findsOneWidget);
-    expect(sheetText('在线'), findsNothing);
-    expect(sheetText('Lukas'), findsNothing);
-    // 「新建通道」链接在
+    expect(sheetDot(Colors.green), findsOneWidget);
+    expect(sheetDot(Colors.red), findsNothing);
+    expect(sheetTextContaining('since'), findsOneWidget);
+    // 「新建通道」按钮在
     expect(sheetText('新建通道'), findsOneWidget);
   });
 
@@ -234,10 +237,12 @@ void main() {
 
     await _openEntranceListSheet(tester, db, _BrokenEntranceApi());
 
-    // 当前通道（本机）照常显示
+    // 当前通道（本机）照常显示（绿灯；拉不到服务端时间 → 不显示 since）
     expect(sheetText('通道列表'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('本机'), findsOneWidget);
+    expect(sheetDot(Colors.green), findsOneWidget);
+    expect(sheetTextContaining('since'), findsNothing);
     // 其他通道区失败提示 + 「新建通道」仍在
     expect(sheetTextContaining('无法获取其他通道'), findsOneWidget);
     expect(sheetText('新建通道'), findsOneWidget);

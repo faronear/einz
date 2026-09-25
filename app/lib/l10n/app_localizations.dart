@@ -1274,6 +1274,12 @@ abstract class AppLocalizations {
   /// **'New entrance'**
   String get chatPageEntranceListNew;
 
+  /// No description provided for @chatPageEntranceSince.
+  ///
+  /// In en, this message translates to:
+  /// **'since {time}'**
+  String chatPageEntranceSince(Object time);
+
   /// No description provided for @chatPagePinLabel.
   ///
   /// In en, this message translates to:

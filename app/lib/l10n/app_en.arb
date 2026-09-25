@@ -273,6 +273,12 @@
   "chatPageEntranceTagOffline": "Offline",
   "chatPageEntranceTagRevoked": "Revoked",
   "chatPageEntranceListNew": "New entrance",
+  "chatPageEntranceSince": "since {time}",
+  "@chatPageEntranceSince": {
+    "placeholders": {
+      "time": {}
+    }
+  },
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
   "chatPagePinSetValue": "Set",

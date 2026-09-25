@@ -273,6 +273,12 @@
   "chatPageEntranceTagOffline": "离线",
   "chatPageEntranceTagRevoked": "已撤销",
   "chatPageEntranceListNew": "新建通道",
+  "chatPageEntranceSince": "since {time}",
+  "@chatPageEntranceSince": {
+    "placeholders": {
+      "time": {}
+    }
+  },
   "chatPagePinLabel": "锁屏码",
   "chatPageLockNow": "锁屏",
   "chatPagePinSetValue": "已设置",

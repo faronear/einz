@@ -676,6 +676,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListNew => 'New entrance';
 
   @override
+  String chatPageEntranceSince(Object time) {
+    return 'since $time';
+  }
+
+  @override
   String get chatPagePinLabel => 'PIN';
 
   @override

@@ -64,6 +64,19 @@ bool get _hasCameraCapture =>
 /// 发送复用右侧发送键）。
 enum _InputMode { text, hint, recording, preview }
 
+/// 「通道列表」卡片间距 + 每行张数（与「切换我的秘境」弹层同口径：一行正好 3 张，
+/// 老板 2026-09-25；边长按可用宽度反算，桌面大窗口设上限）。
+const double _entranceCardSpacing = 12;
+const int _entranceCardsPerRow = 3;
+const double _entranceCardMaxSize = 160;
+
+double _entranceCardSizeFor(double availableWidth) {
+  final raw =
+      (availableWidth - _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
+          _entranceCardsPerRow;
+  return raw.floorToDouble().clamp(64.0, _entranceCardMaxSize).toDouble();
+}
+
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -238,8 +251,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _myEntranceName; // 我的通道名（菜单显示；改名后 setState 刷新）
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
   late String _peerGender; // 对方性别（male/female/''；profile 恢复，消息气泡配色用）
-  Map<String, String> _memberNames = const {}; // 本空间 member_id→名字（/space 校正刷新，通道列表弹层显示用）
-  Map<String, String> _memberGenders = const {}; // 本空间 member_id→性别（同上，行内性别图标）
   int? _mySlot; // 我的身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色判定用）
   int? _peerSlot; // 对方身份槽位（同上）
   Uint8List? _myAvatarBytes; // 我的头像 bytes 缓存（菜单显示；上传后刷新）
@@ -679,8 +690,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (peerName.isNotEmpty) _peerName = peerName;
         if (myG.isNotEmpty) _myGender = myG;
         if (peerG.isNotEmpty) _peerGender = peerG;
-        _memberNames = space.memberNames; // 通道列表弹层的行内名字
-        _memberGenders = space.memberGenders;
         _mySlot = mySlot;
         _peerSlot = peerSlot;
       });
@@ -1231,12 +1240,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 「通道列表」底部弹层：**当前通道（标「本机」）+ 我本人在本空间的其他通道**
   /// （老板 2026-09-25：多设备登录时一眼看到"我还有哪些线挂着、在不在线"；
   /// 即使只有自己一条通道也要显示自己；对方 member 的通道不列）。
-  /// 列表下方「新建通道」链接 → 生成开通码弹窗（_showInviteDialog）。
+  /// 每条通道 = **卡片**（边框 + 名称 + 状态红绿灯，本机加「本机」标签）；
+  /// 列表下方「新建通道」（与「切换我的秘境」弹层的「添加秘境」同款外观：
+  /// 常态淡灰底、图标+文字居中）→ 生成开通码弹窗（_showInviteDialog）。
   ///
-  /// 数据源 = GET /entrances（与顶栏在线判定同源：connected_at 非 null 即在线，
-  /// 旧服务端无该字段时退回 last_seen<60s）；行内显示 通道名 + 名字（/space 的名字表，
-  /// 兜底 member_id）+ 性别图标 + 在线灯 + 最近活跃时刻。
-  /// 已撤销的通道照列并标注（与 CLI /entrances 同口径：藏着不显示反而像凭空消失）。
+  /// 数据源 = GET /entrances（在线判定与顶栏同源：connected_at 非 null 即在线，
+  /// 旧服务端无该字段时退回 last_seen<60s）。红绿灯：绿=在线 红=离线 灰=已撤销
+  /// （已撤销的通道照列，与 CLI /entrances 同口径：藏着不显示反而像凭空消失）。
   /// 服务端拉不到时仍显示当前通道（离线不影响"我是谁"），只把其他通道区换成失败提示。
   Future<void> _showEntranceListSheet() async {
     final l10n = AppLocalizations.of(context)!;
@@ -1258,6 +1268,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       rows = null; // 离线/出错：当前通道照列，其他通道区显示失败提示
     }
     if (!mounted) return;
+    // 本机卡片的 since = 服务端自己这一行的上线时刻（online_since，兜底 connected_at；
+    // 服务端拉不到时 0 → 不显示，避免显示"当前时刻"这种假上线时间）
+    int localSinceMs = 0;
+    if (rows != null) {
+      for (final d in rows) {
+        if (d['entrance_id'] == widget.entranceId) {
+          localSinceMs = (d['online_since'] as num?)?.toInt() ??
+              (d['connected_at'] is num ? (d['connected_at'] as num).toInt() : 0);
+          break;
+        }
+      }
+    }
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) {
@@ -1291,112 +1313,146 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 Text(l10n.chatPageMenuEntranceList,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                for (final d in myRows)
-                  () {
-                    final name = (d['entrance_name'] as String? ?? '').trim();
-                    final entranceId = d['entrance_id'] as String? ?? '';
-                    final pid = d['member_id'] as String? ?? '';
-                    final isLocal = d['_local'] == true;
-                    final revoked = !isLocal &&
-                        d['status'] != null &&
-                        d['status'] != 'active';
-                    final connectedAt = d['connected_at'];
-                    final last = d['last_seen'];
-                    final online = !revoked &&
-                        (d.containsKey('connected_at')
-                            ? connectedAt != null
-                            : (last is num && now - last < 60 * 1000));
-                    // 最近时刻：在线 → 上线时刻（online_since→connected_at）；
-                    // 离线 → 最后活跃 last_seen（服务端干净下线时置 0 → 不显示，
-                    // 直接格式化会变 1970-01-01——同 CLI 的口径）；本机 → 不显示
-                    final sinceMs = (d['online_since'] as num?)?.toInt() ??
-                        (connectedAt is num ? connectedAt.toInt() : null);
-                    final int stamp = online
-                        ? (sinceMs ?? 0)
-                        : (!revoked && last is num ? last.toInt() : 0);
-                    final memberName = _memberNames[pid] ?? (pid.isEmpty ? '' : pid);
-                    final gender = _memberGenders[pid] ?? '';
-                    final tag = isLocal
-                        ? l10n.chatPageEntranceTagLocal
-                        : (revoked
-                            ? l10n.chatPageEntranceTagRevoked
-                            : (online
-                                ? l10n.chatPageEntranceTagOnline
-                                : l10n.chatPageEntranceTagOffline));
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Icon(Icons.circle, size: 8,
-                              color: revoked
-                                  ? scheme.outline
-                                  : (online
-                                      ? Colors.green
-                                      : Colors.red)),
-                          const SizedBox(width: 8),
-                          // 性别图标（同个人资料/向导口径）：女粉 Icons.female / 男蓝 Icons.male
-                          if (gender == 'female') ...[
-                            const Icon(Icons.female, size: 14,
-                                color: Color(0xFFD6529C)),
-                            const SizedBox(width: 4),
-                          ] else if (gender == 'male') ...[
-                            const Icon(Icons.male, size: 14,
-                                color: Color(0xFF3BAFFD)),
-                            const SizedBox(width: 4),
-                          ],
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name.isNotEmpty ? name : entranceId,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 14, fontWeight: FontWeight.w500),
+                // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
+                // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
+                // 灰已撤销）+ since 时间（在线→上线时刻；离线→最后活跃；已撤销→撤销前
+                // 最后活跃；无数据不显示）；本机卡另加「本机」标签
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final size = _entranceCardSizeFor(constraints.maxWidth);
+                    return Wrap(
+                      spacing: _entranceCardSpacing,
+                      runSpacing: _entranceCardSpacing,
+                      children: [
+                        for (final d in myRows)
+                          () {
+                            final name = (d['entrance_name'] as String? ?? '').trim();
+                            final entranceId = d['entrance_id'] as String? ?? '';
+                            final isLocal = d['_local'] == true;
+                            final revoked = !isLocal &&
+                                d['status'] != null &&
+                                d['status'] != 'active';
+                            final connectedAt = d['connected_at'];
+                            final last = d['last_seen'];
+                            final online = !revoked &&
+                                (d.containsKey('connected_at')
+                                    ? connectedAt != null
+                                    : (last is num && now - last < 60 * 1000));
+                            // since 时刻：在线 → 上线（online_since 兜底 connected_at）；
+                            // 离线/已撤销 → 最后活跃 last_seen（服务端干净下线置 0 →
+                            // 不显示，直接格式化会变 1970-01-01——同 CLI 口径）
+                            final sinceMs = (d['online_since'] as num?)?.toInt() ??
+                                (connectedAt is num ? connectedAt.toInt() : null);
+                            final int stamp = isLocal
+                                ? localSinceMs
+                                : (online
+                                    ? (sinceMs ?? 0)
+                                    : (last is num ? last.toInt() : 0));
+                            return SizedBox(
+                              width: size,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.12)),
                                 ),
-                                if (memberName.isNotEmpty && !isLocal)
-                                  Text(memberName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          fontSize: 12, color: scheme.outline)),
-                              ],
-                            ),
-                          ),
-                          if (!isLocal && stamp > 0)
-                            Text(_timeStampLabel(stamp),
-                                style: TextStyle(
-                                    fontSize: 12, color: scheme.outline)),
-                          const SizedBox(width: 8),
-                          Text(tag,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: revoked
-                                      ? scheme.outline
-                                      : (online
-                                          ? Colors.green
-                                          : scheme.onSurfaceVariant))),
-                        ],
-                      ),
+                                // mainAxisSize.min：Wrap 给子项的高度约束无限，不能用
+                                // Spacer/flex（RenderFlex 断言）；卡片内容本就等高
+                                // （名称行 + since 行），收缩即可
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.circle, size: 8,
+                                            color: revoked
+                                                ? Colors.black
+                                                        .withValues(alpha: 0.30)
+                                                : (online
+                                                    ? Colors.green
+                                                    : Colors.red)),
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            name.isNotEmpty ? name : entranceId,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500),
+                                          ),
+                                        ),
+                                        if (isLocal) ...[
+                                          const SizedBox(width: 4),
+                                          // 「本机」标签：名称旁的灰色小标签
+                                          Container(
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 5,
+                                                    vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.06),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                                l10n.chatPageEntranceTagLocal,
+                                                style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: scheme.outline)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    if (stamp > 0)
+                                      Text(l10n.chatPageEntranceSince(
+                                          _timeStampLabel(stamp)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: scheme.outline)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }(),
+                      ],
                     );
-                  }(),
+                  },
+                ),
                 if (rows == null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(l10n.chatPageEntranceListFailed,
                         style: TextStyle(fontSize: 13, color: scheme.outline)),
                   ),
-                const SizedBox(height: 4),
-                // 「新建通道」：生成开通码，给另一台设备（老板 2026-09-25）
-                TextButton(
-                  onPressed: () => _menuAction(_showInviteDialog),
-                  child: Text(
-                    l10n.chatPageEntranceListNew,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2271F7)),
+                // 「新建通道」：与「切换我的秘境」弹层的「添加秘境」同款外观——常态淡灰底
+                // 提示可点、图标+文字居中（老板 2026-09-25）；点击生成开通码
+                Material(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
+                  child: InkWell(
+                    onTap: () => _menuAction(_showInviteDialog),
+                    hoverColor: Colors.black.withValues(alpha: 0.10),
+                    highlightColor: Colors.black.withValues(alpha: 0.14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add),
+                          const SizedBox(width: 6),
+                          Text(l10n.chatPageEntranceListNew),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
