@@ -9,8 +9,8 @@
   "skip": "Skip",
   "close": "Close",
   "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.",
-  "setupPageNeedPassphrase": "Please set a shared passphrase",
-  "wizardJoinPassphraseRequired": "Please enter the shared passphrase to verify",
+  "setupPageNeedPassphrase": "Enter a shared passphrase",
+  "wizardJoinPassphraseRequired": "Enter the shared passphrase",
   "wizardStartTitle": "Einz",
   "wizardDetectTitle": "Checking server status…",
   "wizardDetectHint": "Auto-detects if this is the first entrance",
@@ -67,12 +67,12 @@
       "error": {"type": "String"}
     }
   },
-  "wizardPassphraseHint": "The shared passphrase is held by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.",
+  "wizardPassphraseHint": "The passphrase is shared by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.",
   "wizardPassphraseMinLengthHint": "At least 8 characters",
   "wizardPassphraseTooShort": "Passphrase must be at least 8 characters",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
   "wizardPassphraseMismatch": "Passphrases do not match",
-  "wizardJoinPassphraseHint": "The shared passphrase is held by you and your partner to protect private messages. Don't know it? Ask your partner.",
+  "wizardJoinPassphraseHint": "The passphrase is shared by you and your partner to protect private messages. Don't know it? Ask your partner.",
   "wizardJoinPassphraseWrong": "Wrong passphrase: use the one set on the first entrance",
   "wizardSwitchToEnvelope": "Use key envelope instead (offline)",
   "wizardSwitchToPassphrase": "Use a shared passphrase instead",
@@ -232,7 +232,7 @@
   "chatPageExitTitle": "Quit app?",
   "chatPageExitMessage": "Exits Einz on this device.",
   "save": "Save",
-  "chatPageChangePassphraseTitle": "Change shared passphrase",
+  "chatPageChangePassphraseTitle": "Change passphrase",
   "chatPageChangePassphraseSubmit": "Change",
   "chatPageChangePassphraseOldLabel": "Current passphrase",
   "chatPageChangePassphraseNewLabel": "New passphrase",
@@ -268,7 +268,7 @@
   "chatPageMenuEntranceNameLabel": "Current entrance",
   "chatPageMenuEntranceList": "More entrances",
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
-  "chatPageEntranceListNew": "New entrance",
+  "chatPageEntranceListNew": "Generate entrance token",
   "chatPageEntranceSince": "since {time}",
   "@chatPageEntranceSince": {
     "placeholders": {

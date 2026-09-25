@@ -38,11 +38,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.';
 
   @override
-  String get setupPageNeedPassphrase => 'Please set a shared passphrase';
+  String get setupPageNeedPassphrase => 'Enter a shared passphrase';
 
   @override
-  String get wizardJoinPassphraseRequired =>
-      'Please enter the shared passphrase to verify';
+  String get wizardJoinPassphraseRequired => 'Enter the shared passphrase';
 
   @override
   String get wizardStartTitle => 'Einz';
@@ -173,7 +172,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardPassphraseHint =>
-      'The shared passphrase is held by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.';
+      'The passphrase is shared by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.';
 
   @override
   String get wizardPassphraseMinLengthHint => 'At least 8 characters';
@@ -190,7 +189,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseHint =>
-      'The shared passphrase is held by you and your partner to protect private messages. Don\'t know it? Ask your partner.';
+      'The passphrase is shared by you and your partner to protect private messages. Don\'t know it? Ask your partner.';
 
   @override
   String get wizardJoinPassphraseWrong =>
@@ -554,7 +553,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get save => 'Save';
 
   @override
-  String get chatPageChangePassphraseTitle => 'Change shared passphrase';
+  String get chatPageChangePassphraseTitle => 'Change passphrase';
 
   @override
   String get chatPageChangePassphraseSubmit => 'Change';
@@ -660,7 +659,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load other entrances (offline?)';
 
   @override
-  String get chatPageEntranceListNew => 'New entrance';
+  String get chatPageEntranceListNew => 'Generate entrance token';
 
   @override
   String chatPageEntranceSince(Object time) {

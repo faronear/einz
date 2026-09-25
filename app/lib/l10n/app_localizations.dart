@@ -155,13 +155,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageNeedPassphrase.
   ///
   /// In en, this message translates to:
-  /// **'Please set a shared passphrase'**
+  /// **'Enter a shared passphrase'**
   String get setupPageNeedPassphrase;
 
   /// No description provided for @wizardJoinPassphraseRequired.
   ///
   /// In en, this message translates to:
-  /// **'Please enter the shared passphrase to verify'**
+  /// **'Enter the shared passphrase'**
   String get wizardJoinPassphraseRequired;
 
   /// No description provided for @wizardStartTitle.
@@ -401,7 +401,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The shared passphrase is held by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.'**
+  /// **'The passphrase is shared by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.'**
   String get wizardPassphraseHint;
 
   /// No description provided for @wizardPassphraseMinLengthHint.
@@ -431,7 +431,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The shared passphrase is held by you and your partner to protect private messages. Don\'t know it? Ask your partner.'**
+  /// **'The passphrase is shared by you and your partner to protect private messages. Don\'t know it? Ask your partner.'**
   String get wizardJoinPassphraseHint;
 
   /// No description provided for @wizardJoinPassphraseWrong.
@@ -1061,7 +1061,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseTitle.
   ///
   /// In en, this message translates to:
-  /// **'Change shared passphrase'**
+  /// **'Change passphrase'**
   String get chatPageChangePassphraseTitle;
 
   /// No description provided for @chatPageChangePassphraseSubmit.
@@ -1247,7 +1247,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
-  /// **'New entrance'**
+  /// **'Generate entrance token'**
   String get chatPageEntranceListNew;
 
   /// No description provided for @chatPageEntranceSince.
