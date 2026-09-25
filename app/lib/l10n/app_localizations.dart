@@ -1801,6 +1801,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This space will share the current PIN.'**
   String get setupPinReuseNotice;
+
+  /// Prefix for errors reported by the server; errors decided on this device carry no prefix
+  ///
+  /// In en, this message translates to:
+  /// **'Server: {message}'**
+  String errorBackend(String message);
 }
 
 class _AppLocalizationsDelegate

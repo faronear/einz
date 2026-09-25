@@ -18,6 +18,7 @@ import 'data/local_database.dart';
 import 'data/locale_settings.dart';
 import 'data/server_config.dart';
 import 'data/vault_session.dart';
+import 'error_text.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/passphrase_field.dart';
@@ -1727,7 +1728,10 @@ class _SetupPageState extends State<SetupPage> {
         _joinToken = '';
         _joinSpaceId = null;
         _joinTokenVerified = false;
-        _localError = _tokenErrorText(e.code, raw: raw, message: e.message);
+        // 后台：这一支的文案全部由服务端错误码映射而来（含未知码的兜底）
+        _localError = backendError(
+            AppLocalizations.of(context)!,
+            _tokenErrorText(e.code, raw: raw, message: e.message));
       });
       return false;
     } catch (e) {
@@ -1902,12 +1906,16 @@ class _SetupPageState extends State<SetupPage> {
       _createLink = created.link; // 完成页展示空间邀请链接
     } on ApiException catch (e) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       setState(() {
         _bootstrapFailed = e.code == 'INVALID_REQUEST';
         // 空间数量上限：明确禁止提示（config.json maxSpaces——老板 2026-09-10）
-        _status = e.code == 'SPACE_LIMIT_REACHED'
-            ? AppLocalizations.of(context)!.wizardSpaceLimit
-            : AppLocalizations.of(context)!.wizardEnrollFailed('$e');
+        // 后台：这一支的文案全部由服务端错误码映射而来
+        _status = backendError(
+            l10n,
+            e.code == 'SPACE_LIMIT_REACHED'
+                ? l10n.wizardSpaceLimit
+                : l10n.wizardEnrollFailed('$e'));
       });
     } catch (e) {
       if (!mounted) return;
@@ -2412,24 +2420,30 @@ class _SetupPageState extends State<SetupPage> {
       return true;
     } on ApiException catch (e) {
       if (!mounted) return false;
+      final l10n = AppLocalizations.of(context)!;
       // 口令校验失败（401）→ 停在口令页重输；"空间无密保箱"（404，同码）→ 明确
       // 提示（否则用户会一直重输一个根本不存在的口令）；其余（如 join 时 token
       // 已用/失效）→ 走通用失败提示
+      //
+      // 后台：整支都由服务端错误码映射而来 → 统一加「后台：」前缀。其中
+      // `ENTRANCE_ALREADY_EXISTS` 与本机闸门（`setupTokenSpaceAlreadyAdded`）**同一句
+      // 文案但成因不同**（2026-09-25 的教训）：有前缀的那句是服务端按 install_uid
+      // 判的（要先退役旧通道），没前缀的那句是本机查库判的（清残档即可）。
       if (e.code == 'ESCROW_VERIFY_FAILED') {
-        setState(() => _status = e.httpStatus == 404
-            ? AppLocalizations.of(context)!.setupPageNoEscrow
-            : AppLocalizations.of(context)!.wizardJoinPassphraseWrong);
+        setState(() => _status = backendError(l10n, e.httpStatus == 404
+            ? l10n.setupPageNoEscrow
+            : l10n.wizardJoinPassphraseWrong));
       } else if (e.code == 'ENTRANCE_LIMIT_REACHED') {
         // 通道数量上限（serverConfig.json maxEntrancesPerSpace，服务端 joinSpace
         // 校验）：与口令无关，不能显示成"口令验证失败"——那是另一回事
-        setState(() => _status = AppLocalizations.of(context)!.setupJoinEntranceLimitReached);
+        setState(() => _status = backendError(l10n, l10n.setupJoinEntranceLimitReached));
       } else if (e.code == 'ENTRANCE_ALREADY_EXISTS') {
         // 服务端侧的同一条规则（老板 2026-09-23：前后端一致）——本机在这个秘境里
         // 已经有通道了。正常流程会被 `_verifyJoinToken` 那道闸门先拦下，这里兜住
-        // 旧客户端 / 并发 / 本地状态被清过的情况。复用同一条文案。
-        setState(() => _status = AppLocalizations.of(context)!.setupTokenSpaceAlreadyAdded);
+        // 旧客户端 / 并发 / 本地状态被清过的情况。复用同一条文案（靠前缀区分）。
+        setState(() => _status = backendError(l10n, l10n.setupTokenSpaceAlreadyAdded));
       } else {
-        setState(() => _status = AppLocalizations.of(context)!.setupPageEscrowFailed('$e'));
+        setState(() => _status = backendError(l10n, l10n.setupPageEscrowFailed('$e')));
       }
       return false;
     } on FormatException {

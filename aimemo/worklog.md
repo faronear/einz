@@ -9705,3 +9705,32 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
   （即所有"Vault 已知"的时刻）。Vault 为空时不删（区分不了"真没空间"和"这份 Vault 不完整"）。
   闸门 `_isSpaceAlreadyAdded` 逻辑不动 —— 自愈后 spaces 表就是 Vault 的准确镜像，真·重复加入照样拦。
 - 测试：`app_lock_test.dart` 加两例（残档被清 / 空 Vault 不动表）。
+
+## 2026-09-25 错误文案分两类：后台错误统一带「后台：」前缀
+
+老板："应该所有错误都分两类，后台的和前端的，通过不同的编码、文案特征来区分。
+建议后台错误就报错：『后台：......』"（起因：同一句"这个秘境已经添加过了"既可能来自
+本机闸门、也可能来自服务端 ENTRANCE_ALREADY_EXISTS，两者处置完全不同，白绕一轮排查）。
+
+### 定的口径（老板三选一拍板）
+- **只标后台**：后台错误加「后台：」；本机（前端）错误保持原文案、不加前缀。
+  两类仍一眼可分（有前缀 vs 无），且不给日常本地校验提示增加噪音。
+- **判定口径严格：只认 `ApiException`**——服务端响应构造出的异常（含 `HTTP_<status>`
+  兜底码）及其错误码映射出的文案才算后台；本地校验/体积/权限/PIN/加密一律算本机。
+- **范围：只改 Flutter app**（TUI 的 ⚠️ 提示暂不动——它连统一报错函数都没有，另议）。
+
+### 落地
+- `app/lib/error_text.dart`（新）：`backendError(l10n, message)`。全仓库搜 `backendError(`
+  即得后台错误的完整清单——这是"编码特征"那一半：分类不靠人记，靠函数入口。
+- l10n 新增 `errorBackend`：zh「后台：{message}」/ en「Server: {message}」（句首大写）。
+- 应用点（app 里所有"拿到 ApiException 且产出 UI 文案"的地方，共 3 处捕获 / 8 条分支）：
+  | 位置 | 分支 |
+  |---|---|
+  | `setup_page.dart:1724` 开通码校验 | TOKEN_INVALID/EXPIRED/USED、RATE_LIMITED、PROTOCOL_VERSION_MISMATCH + 未知码兜底 |
+  | `setup_page.dart:1903` 入网注册 | SPACE_LIMIT_REACHED + 兜底 wizardEnrollFailed |
+  | `setup_page.dart:2413` 口令/加入 | ESCROW_VERIFY_FAILED(404 与非 404)、ENTRANCE_LIMIT_REACHED、ENTRANCE_ALREADY_EXISTS + 兜底 |
+- 未标（按严格口径）：发送失败/同步失败/拉取失败——它们没捕获 ApiException，拿不到
+  "服务端说的"证据。要覆盖需在那些链路上补 catch ApiException 并把 e.code 带出来（下一步可选）。
+- 测试：新增「服务端判已有通道 → 带『后台：』前缀」；既有「错误 token」用例的断言
+  `开通码无效` → `后台：开通码无效`（预期内的改动）。本机闸门那条仍是**无前缀**的原句。
+  `flutter analyze` 无告警，全量 212 项测试通过。

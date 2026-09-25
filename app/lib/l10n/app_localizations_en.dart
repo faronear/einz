@@ -979,4 +979,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupPinReuseNotice => 'This space will share the current PIN.';
+
+  @override
+  String errorBackend(String message) {
+    return 'Server: $message';
+  }
 }

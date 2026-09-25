@@ -173,6 +173,24 @@ void main() {
     expect(joinCalls, 1, reason: 'token 只应被消费一次');
   });
 
+  // 同一句"已经添加过了"有两个成因（老板 2026-09-25 的教训）：本机闸门查本地库 /
+  // 服务端按 install_uid 判。前者无前缀，后者必须带「后台：」——处置完全不同
+  // （前者清本地残档，后者要先退役旧通道），看文案就该分得出来。
+  testWidgets('服务端判「本机已有通道」→ 文案带「后台：」前缀', (WidgetTester tester) async {
+    Future<SpaceJoinResult> fakeJoin(String token) async =>
+        throw ApiException('ENTRANCE_ALREADY_EXISTS', '本设备在该空间已有通道', 409);
+
+    await pumpToJoinPassphrase(
+        tester, correctPass: '正确口令-abc', payload: payload, join: fakeJoin);
+    await tester.enterText(find.byType(TextField), '正确口令-abc');
+    await tester.tap(find.text('下一步'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('后台：这个秘境已经添加过了'), findsOneWidget,
+        reason: '服务端说的错误必须带「后台：」前缀');
+    expect(find.text('设置锁屏码'), findsNothing, reason: '被拒后不得放行');
+  });
+
   testWidgets('PIN 页退回口令页再前进：不重复消费 token（仍能进 PIN 页）', (WidgetTester tester) async {
     var joinCalls = 0;
     Future<SpaceJoinResult> fakeJoin(String token) async {
@@ -257,7 +275,8 @@ void main() {
     await tester.enterText(find.byType(TextField), '错误TOKEN');
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
-    expect(find.text('开通码无效'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
+    // 后台：TOKEN_INVALID 是服务端说的（2026-09-25 起统一带「后台：」前缀）
+    expect(find.text('后台：开通码无效'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
     expect(find.text('验证开通码'), findsWidgets, reason: '应停留在 token 页（setupTokenTitle）');
     expect(find.text('验证共享口令'), findsNothing, reason: '不应进入口令页');
   });

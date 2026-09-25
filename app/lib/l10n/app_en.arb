@@ -436,5 +436,10 @@
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Verify this device's lock screen code first",
   "leaveSpaceConfirm": "Destroy",
-  "setupPinReuseNotice": "This space will share the current PIN."
+  "setupPinReuseNotice": "This space will share the current PIN.",
+  "errorBackend": "Server: {message}",
+  "@errorBackend": {
+    "description": "Prefix for errors reported by the server; errors decided on this device carry no prefix",
+    "placeholders": { "message": { "type": "String" } }
+  }
 }

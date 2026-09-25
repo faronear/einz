@@ -936,4 +936,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setupPinReuseNotice => '本秘境将共用当前的锁屏码。';
+
+  @override
+  String errorBackend(String message) {
+    return '后台：$message';
+  }
 }
