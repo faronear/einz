@@ -9409,3 +9409,36 @@ tic.cc（CF）。
 **验证**：`docker compose -f deployment/docker-compose.nocaddy.cn.yml config` 解析通过
 （两服务 + `einz` 网络正确展开）。**未做**：真机上行验证——需老板在 CF 建隧道并实测境内外
 延迟，尤其 cloudflared 出中国那段（就是海外体验的上限；若太差，回退"甲骨文自建中继"）。
+
+## 2026-09-25 CF 隧道打通并实测（tic.cc 双入口正式生效）
+
+**两个坑（都排掉了）**：
+1. **重复连接器**：host 上按早期指引装过一个 cloudflared，与 docker 内那个是**同一条隧道**
+   （token 是隧道级凭证，可被任意实例复用）→ 两个连接器、回源地址不同（一个只能
+   `server:3000`、一个只能 `127.0.0.1:3000`）→ CF 轮询到谁谁 502。删 host 那个 + 删旧
+   tunnel 重建 `einz-cn`。
+2. **CF 2026 版 UI 改名**：没有 "Public Hostname" 页了，改叫 **Routes → Add route →
+   Published application**（入口在账号级 **Networking → Tunnels**）。路由没建时连接器即使
+   `Registered` 也一律 502。加了 `einz.tic.cc → http://server:3000`（HTTP）才通。
+   token 放 `.env` 的 `CF_TUNNEL_TOKEN`，改了要**替换不是追加**。
+
+**实测（本机中国大陆）**：
+
+| 路径 | tic.cc | yuanjinx（对照） |
+| --- | --- | --- |
+| `/health` | 200 ok | 200（~22ms） |
+| `/space` 缺/带 `X-Protocol-Version` | 400 / 401 | 400 / 401 |
+| WS 升级（HTTP/1.1`101`） | ✓ 101 Switching Protocols | ✓ |
+| 连测稳定性 | 200/200/200 | — |
+
+tic.cc 总耗时 ~1.2–1.7s（`colo=PDX`），yuanjinx ~22ms。→ 境内该走 yuanjinx，候选列表并发
+探测会自动这么选，符合设计；tic.cc 留给境外。cloudflared 已改 `--protocol http2`（QUIC 在大
+陆出境不稳）；只注册上 **2/4** 连接（`connIndex=1/3`，`location=lax01`），可用但冗余下降，
+CF 状态可能 Display Degraded，待观察。
+
+**待办（老板）**：境外实测 tic.cc 延迟——海外体验上限 = cloudflared 出中国那段；太差则回退
+"甲骨文自建 L7 中继 + WireGuard"。另：模板头注释里 "Public Hostname" 是旧名，待改成
+"Routes → Add route → Published application"。
+
+**注记（排障经验，值得复用）**：`curl` 验 WS 必须 `--http1.1`（HTTP/2 下 `/ws` 会落到普通
+路由返回 404）；且服务端 HTTP 层要 `X-Protocol-Version: 2`、WS 层要 `?pv=2`。
