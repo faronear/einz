@@ -45,6 +45,17 @@ class _InviteFakeApi extends ApiClient {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async => [
+    {
+      'entrance_id': 'dev-a',
+      'entrance_name': 'iPhone',
+      'member_id': 'member-me',
+      'connected_at': DateTime.now().millisecondsSinceEpoch,
+      'status': 'active',
+    },
+  ];
+
+  @override
   Future<JoinTokenResult> createJoinToken(String spaceId, String token) async =>
       const JoinTokenResult(
         joinToken: 'e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
@@ -74,12 +85,17 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100)); // 初始加载（空历史）
 
-    // 菜单 → 生成开通码
+    // 菜单 → 更多通道 → 新建通道（2026-09-25 起菜单不再有「生成开通码」项，
+    // 入口移到「更多通道」弹层里的「新建通道」按钮）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('生成开通码'));
-    // 菜单 pop 后延迟 300ms 才打开弹窗（chat_page onSelected 设计），
-    // 随后 createJoinToken（fake 瞬时返回）→ showDialog
+    await tester.ensureVisible(find.text('更多通道'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('更多通道'));
+    await tester.pumpAndSettle();
+    // 点「新建通道」：通道列表弹层收起，300ms 错峰后才打开弹窗（chat_page
+    // _menuAction 设计），随后 createJoinToken（fake 瞬时返回）→ showDialog
+    await tester.tap(find.text('新建通道'));
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(); // 弹窗首帧（原 bug：此帧抛固有尺寸异常 → 遮罩变暗）
     expect(tester.takeException(), isNull,

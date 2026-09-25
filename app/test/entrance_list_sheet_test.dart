@@ -1,4 +1,4 @@
-// 「通道列表」菜单弹层（老板 2026-09-25）：列出**当前通道（标「本机」）+ 我本人的
+// 「更多通道」菜单弹层（老板 2026-09-25）：列出**当前通道（标「本机」）+ 我本人的
 // 其他通道**（对方 member 的通道不列；离线时当前通道照列）；列表下方「新建通道」
 // 链接 → 生成开通码弹窗。
 //
@@ -111,9 +111,9 @@ Future<void> _openEntranceListSheet(
 
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.text('通道列表'));
+  await tester.ensureVisible(find.text('更多通道'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('通道列表'));
+  await tester.tap(find.text('更多通道'));
   await tester.pumpAndSettle();
 }
 
@@ -182,7 +182,7 @@ void main() {
     await _openEntranceListSheet(tester, db, api);
 
     // 弹层标题（菜单已关，文本只在弹层里）
-    expect(sheetText('通道列表'), findsOneWidget);
+    expect(sheetText('更多通道'), findsOneWidget);
     // 三张卡片：iPhone（本机·在线）/ iPad（在线）/ 旧手机（已撤销）
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('iPad'), findsOneWidget);
@@ -196,11 +196,14 @@ void main() {
     expect(sheetTextContaining('since'), findsNWidgets(3));
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
-    // 「新建通道」按钮（图标+文字居中、有背景），点击打开生成开通码弹窗
+    // 「新建通道」按钮（图标+文字居中、有背景）：点击后通道列表弹层收起，
+    // 再弹出生成开通码弹窗（老板 2026-09-25）
     expect(sheetText('新建通道'), findsOneWidget);
     await tester.tap(sheetText('新建通道'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     expect(find.text('开通码已生成'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing,
+        reason: '点「新建通道」后通道列表弹层应已收起');
   });
 
   testWidgets('只有自己一条通道时也要显示自己（标「本机」）', (tester) async {
@@ -221,7 +224,7 @@ void main() {
     await _openEntranceListSheet(tester, db, api);
 
     // 只有一张卡：当前通道 + 「本机」标签 + 绿灯 + since
-    expect(sheetText('通道列表'), findsOneWidget);
+    expect(sheetText('更多通道'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('本机'), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);
@@ -238,7 +241,7 @@ void main() {
     await _openEntranceListSheet(tester, db, _BrokenEntranceApi());
 
     // 当前通道（本机）照常显示（绿灯；拉不到服务端时间 → 不显示 since）
-    expect(sheetText('通道列表'), findsOneWidget);
+    expect(sheetText('更多通道'), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('本机'), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);

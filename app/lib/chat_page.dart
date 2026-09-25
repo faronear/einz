@@ -1305,14 +1305,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ];
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            // 顶边 0：标题自己的 Padding 负责上 14 留白（同参照弹层）
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(l10n.chatPageMenuEntranceList,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」等
+                // 弹层标题的居中与留白口径对齐）
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                  child: Center(
+                    child: Text(l10n.chatPageMenuEntranceList,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(height: 2),
                 // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
                 // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
                 // 灰已撤销）+ since 时间（在线→上线时刻；离线→最后活跃；已撤销→撤销前
@@ -1453,7 +1462,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   borderRadius: BorderRadius.circular(12),
                   clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
                   child: InkWell(
-                    onTap: () => _menuAction(_showInviteDialog),
+                    // 点「新建通道」：**先收起通道列表弹层**，再弹开通码
+                    // （老板 2026-09-25）；_menuAction 内部 300ms 错峰，等弹层
+                    // 收起动画跑完再 show（同菜单项开新 route 的口径，避免
+                    // Overlay 交叉卸载断言）
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _menuAction(_showInviteDialog);
+                    },
                     hoverColor: Colors.black.withValues(alpha: 0.10),
                     highlightColor: Colors.black.withValues(alpha: 0.14),
                     child: Padding(
@@ -4233,7 +4249,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               tooltip: l10n.chatPageLockNow,
               onPressed: _lockNow,
             ),
-          // 顶栏统一入口：语言/阅后即焚/开通码/本机 PIN（显示各功能当前值）
+          // 顶栏统一入口：语言/阅后即焚/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu),
             tooltip: l10n.chatPageMenuMore,
@@ -4247,8 +4263,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showAttachmentStoragePicker);
                 case 'burn':
                   _menuAction(_showBurnPicker);
-                case 'invite':
-                  _menuAction(_showInviteDialog);
                 case 'advanced':
                   _menuAction(_showAdvancedSheet);
                 case 'pin':
@@ -4276,7 +4290,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 左侧标签 = **备注级**（淡色小字，不抢戏）；右侧"当前值" = 深色大字（老板 2026-09-23 定：
               // 左侧相当于备注，不用强调，右侧才是用户要看的东西 ✓）。
               // 显式钉死 13，与 captionStyle 一致——否则没写 fontSize 会落到平台默认
-              // （macOS 偏大），同一菜单里纯标签行（头像/生成开通码/高级安全/关于/切换/退出）
+              // （macOS 偏大），同一菜单里纯标签行（头像/高级安全/关于/切换/退出）
               // 会比带值的行（我的身份/语言/主题/通道名称/阅后即焚/附件/锁屏码）显大一号
               final labelStyle = TextStyle(
                   fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant);
@@ -4287,9 +4301,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w500);
               return [
-                // 菜单分组（老板 2026-09-24 定）：
+                // 菜单分组（老板 2026-09-24 定；2026-09-25 删「生成开通码」项，
+                // 改由「通道列表」弹层里的「新建通道」按钮承担）：
                 //   ① 外观与锁：界面语言 / 界面主题 / 锁屏码
-                //   ② 身份·通道·内容：我的身份 / 我的头像 / 当前通道 / 生成开通码 /
+                //   ② 身份·通道·内容：我的身份 / 我的头像 / 当前通道 / 通道列表 /
                 //      阅后即焚 / 附件存储 / 高级安全
                 //   ③ 结尾：关于秘境 / 切换我的秘境 / 退出本应用
                 PopupMenuItem(
@@ -4373,11 +4388,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   height: kMenuRowHeight,
                   value: 'entrancelist',
                   child: Text(l10n.chatPageMenuEntranceList, style: captionStyle),
-                ),
-                PopupMenuItem(
-                  height: kMenuRowHeight,
-                  value: 'invite',
-                  child: Text(l10n.chatPageMenuInvite, style: labelStyle),
                 ),
                 PopupMenuItem(
                   height: kMenuRowHeight,

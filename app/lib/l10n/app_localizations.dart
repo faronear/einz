@@ -830,12 +830,6 @@ abstract class AppLocalizations {
   /// **'Delete the PIN? After deletion, next app launch will go straight into chat.'**
   String get chatPageClearLockMessage;
 
-  /// No description provided for @chatPageMenuInvite.
-  ///
-  /// In en, this message translates to:
-  /// **'New entrance token'**
-  String get chatPageMenuInvite;
-
   /// No description provided for @chatPageInviteDialogTitle.
   ///
   /// In en, this message translates to:
@@ -1235,7 +1229,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuEntranceList.
   ///
   /// In en, this message translates to:
-  /// **'Entrances'**
+  /// **'More entrances'**
   String get chatPageMenuEntranceList;
 
   /// No description provided for @chatPageEntranceListFailed.

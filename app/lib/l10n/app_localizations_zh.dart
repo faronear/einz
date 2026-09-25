@@ -400,9 +400,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockMessage => '确定要删除锁屏码吗？删除后下次启动将直接进入聊天。';
 
   @override
-  String get chatPageMenuInvite => '生成开通码';
-
-  @override
   String get chatPageInviteDialogTitle => '开通码已生成';
 
   @override
@@ -618,7 +615,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuEntranceNameLabel => '当前通道';
 
   @override
-  String get chatPageMenuEntranceList => '通道列表';
+  String get chatPageMenuEntranceList => '更多通道';
 
   @override
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
