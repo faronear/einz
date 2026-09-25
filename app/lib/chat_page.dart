@@ -1365,16 +1365,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    // 第一行：名称 + 「本机」标签（老板 2026-09-25）
                                     Row(
                                       children: [
-                                        Icon(Icons.circle, size: 8,
-                                            color: revoked
-                                                ? Colors.black
-                                                        .withValues(alpha: 0.30)
-                                                : (online
-                                                    ? Colors.green
-                                                    : Colors.red)),
-                                        const SizedBox(width: 6),
                                         Flexible(
                                           child: Text(
                                             name.isNotEmpty ? name : entranceId,
@@ -1409,14 +1402,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       ],
                                     ),
                                     const SizedBox(height: 4),
-                                    if (stamp > 0)
-                                      Text(l10n.chatPageEntranceSince(
-                                          _timeStampLabel(stamp)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color: scheme.outline)),
+                                    // 第二行：状态红绿灯 + since 时间（绿在线/红离线/
+                                    // 灰已撤销；无 since 数据时只有灯）
+                                    Row(
+                                      children: [
+                                        Icon(Icons.circle, size: 8,
+                                            color: revoked
+                                                ? Colors.black
+                                                        .withValues(alpha: 0.30)
+                                                : (online
+                                                    ? Colors.green
+                                                    : Colors.red)),
+                                        if (stamp > 0) ...[
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                                l10n
+                                                    .chatPageEntranceSince(
+                                                        _timeStampLabel(stamp)),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: scheme.outline)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1432,6 +1444,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     child: Text(l10n.chatPageEntranceListFailed,
                         style: TextStyle(fontSize: 13, color: scheme.outline)),
                   ),
+                // 卡片与「新建通道」之间的留白（老板 2026-09-25：原先紧挨着）
+                const SizedBox(height: 12),
                 // 「新建通道」：与「切换我的秘境」弹层的「添加秘境」同款外观——常态淡灰底
                 // 提示可点、图标+文字居中（老板 2026-09-25）；点击生成开通码
                 Material(
