@@ -2060,6 +2060,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => OptionPickerSheet(
         title: l10n.chatPageBurnHeading,
+        // 标题下居中一行说明这层是干什么的（老板 2026-09-25）
+        note: l10n.chatPageBurnNote,
         selected: '$current',
         options: [
           for (final entry in kBurnAfterOptions.entries)

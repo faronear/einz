@@ -1280,6 +1280,12 @@ abstract class AppLocalizations {
   /// **'Burn-after-read'**
   String get chatPageBurnHeading;
 
+  /// No description provided for @chatPageBurnNote.
+  ///
+  /// In en, this message translates to:
+  /// **'New messages are deleted on a countdown once read'**
+  String get chatPageBurnNote;
+
   /// No description provided for @chatPageBurnOff.
   ///
   /// In en, this message translates to:

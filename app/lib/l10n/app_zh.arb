@@ -284,6 +284,7 @@
     }
   },
   "chatPageBurnHeading": "阅后即焚",
+  "chatPageBurnNote": "倒计时删除已阅读的新消息",
   "chatPageBurnOff": "阅后即焚已关闭（消息永久保留）",
   "chatPageBurnFailed": "设置阅后即焚失败",
   "chatPageBurnWillDelete": "新的消息将在 {duration} 后自动删除",

@@ -679,6 +679,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageBurnHeading => 'Burn-after-read';
 
   @override
+  String get chatPageBurnNote =>
+      'New messages are deleted on a countdown once read';
+
+  @override
   String get chatPageBurnOff => 'Burn-after-read off (messages kept forever)';
 
   @override

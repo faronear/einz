@@ -17,10 +17,18 @@ class OptionPickerSheet extends StatefulWidget {
     required this.onApply,
     this.submitLabel,
     this.warningFor,
+    this.note,
   });
 
   /// 标题（弹层顶部居中/左对齐的一行）。
   final String title;
+
+  /// 标题下方那行**居中的小字备注**（null = 不显示）。
+  ///
+  /// 用来把这层是干什么的一句话说清楚（阅后即焚："倒计时删除已阅读的新消息"）。
+  /// 与标题**同居中**、字号更小更淡，靠"贴近标题、离选项更远"的间距表明它属于
+  /// 标题那一组，而不是内容主体。
+  final String? note;
 
   /// 可选项（按给定顺序展示）。
   final List<OptionPickerItem> options;
@@ -88,6 +96,28 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
                         fontWeight: FontWeight.w600, fontSize: 16)),
               ),
             ),
+            // 标题下的小备注（老板 2026-09-25）。三级区分全靠字号/字重/颜色：
+            // 标题 16/w600/主色 · 备注 12/常规/**outline**（比选项说明更淡一档，
+            // 老板 2026-09-25：onSurfaceVariant 和选项的 12px 说明同色，看着糊）·
+            // 选项 15/w600 + 12 说明。
+            // 间距上贴着标题（上 0）、离选项远一点（下 14），表明它归标题那一组。
+            if (widget.note != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+                child: Center(
+                  child: Text(
+                    widget.note!,
+                    // 换行后的每一行都要居中（Center 只管整块，不管行内对齐）
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        // outline 比 onSurfaceVariant 更淡：不用和选项的 12px 说明
+                        // 撞成同一档灰；弹窗内"大标题下的小字说明"本就用这一档
+                        color: scheme.outline),
+                  ),
+                ),
+              ),
             // 选项区可滚动：档位多（阅后即焚 6 档）+ 窗口不高时，原先是死 Column →
             // 底部内容被裁掉并报 RenderFlex overflow（老板 2026-09-24 要求改可滚动）。
             // 标题与底部「提交」按钮固定，只有中间这几行滚。
