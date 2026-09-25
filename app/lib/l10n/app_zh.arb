@@ -79,7 +79,7 @@
   "wizardPinHint": "每次启动秘境，需输入锁屏码才能进入。当前也可先跳过，进入秘境后能够随时设置。",
   "welcomeDialogTitleCreate": "一切就绪！",
   "welcomeDialogTitleJoin": "一切就绪！",
-  "welcomeDialogMessage": "仅限两人，所有消息端到端加密，确保绝对隐私！",
+  "welcomeDialogMessage": "仅限两人，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！",
   "welcomeDialogStart": "进入秘境",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
@@ -113,7 +113,7 @@
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
   },
-  "setupCreateShareTitle": "快把邀请链接发给伴侣，一起体验秘境吧",
+  "setupCreateShareTitle": "快把邀请链接发给伴侣，一起体验秘境：",
   "setupCreateCopy": "复制邀请链接",
   "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",

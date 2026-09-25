@@ -333,7 +333,7 @@ void main() {
     await tester.tap(find.text('跳过')); // PIN 页两空 → 底部按钮=跳过 → 完成
     await tester.pumpAndSettle();
     expect(find.text('🎉 成功创建我的领地'), findsOneWidget); // 对话框标题（create）
-    expect(find.text('仅限两人，所有消息端到端加密，确保绝对隐私！'), findsOneWidget);
+    expect(find.text('仅限两人，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！'), findsOneWidget);
     expect(find.text('进入秘境'), findsOneWidget); // 唯一按钮（点外面不关闭）
   });
 

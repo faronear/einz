@@ -473,7 +473,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeDialogMessage.
   ///
   /// In en, this message translates to:
-  /// **'Just the two of you, end-to-end encrypted for total privacy. Enter Einz and start chatting.'**
+  /// **'Just the two of you, end-to-end encrypted for total privacy. Enter now and start chatting!'**
   String get welcomeDialogMessage;
 
   /// No description provided for @welcomeDialogStart.
@@ -593,7 +593,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupCreateShareTitle.
   ///
   /// In en, this message translates to:
-  /// **'Send the link to your partner to join you in the secret space'**
+  /// **'Send the invite link to your partner:'**
   String get setupCreateShareTitle;
 
   /// No description provided for @setupCreateCopy.

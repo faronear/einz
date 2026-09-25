@@ -79,7 +79,7 @@
   "wizardPinHint": "Device-specific lock PIN. Enter it each time you launch.",
   "welcomeDialogTitleCreate": "All set!",
   "welcomeDialogTitleJoin": "All set!",
-  "welcomeDialogMessage": "Just the two of you, end-to-end encrypted for total privacy. Enter Einz and start chatting.",
+  "welcomeDialogMessage": "Just the two of you, end-to-end encrypted for total privacy. Enter now and start chatting!",
   "welcomeDialogStart": "Enter Einz",
   "setupPageKeyGenFailed": "❌ Key generation failed: {error}",
   "@setupPageKeyGenFailed": {
@@ -113,7 +113,7 @@
   "@setupTokenOtherServer": {
     "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
   },
-  "setupCreateShareTitle": "Send the link to your partner to join you in the secret space",
+  "setupCreateShareTitle": "Send the invite link to your partner:",
   "setupCreateCopy": "Copy invite link",
   "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",

@@ -214,7 +214,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeDialogMessage =>
-      'Just the two of you, end-to-end encrypted for total privacy. Enter Einz and start chatting.';
+      'Just the two of you, end-to-end encrypted for total privacy. Enter now and start chatting!';
 
   @override
   String get welcomeDialogStart => 'Enter Einz';
@@ -287,8 +287,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setupCreateShareTitle =>
-      'Send the link to your partner to join you in the secret space';
+  String get setupCreateShareTitle => 'Send the invite link to your partner:';
 
   @override
   String get setupCreateCopy => 'Copy invite link';
