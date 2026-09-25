@@ -9442,3 +9442,32 @@ CF 状态可能 Display Degraded，待观察。
 
 **注记（排障经验，值得复用）**：`curl` 验 WS 必须 `--http1.1`（HTTP/2 下 `/ws` 会落到普通
 路由返回 404）；且服务端 HTTP 层要 `X-Protocol-Version: 2`、WS 层要 `?pv=2`。
+
+## 2026-09-25 CF 隧道多地点实测 → 判定不值当，撤回（tic.cc 改回 127.0.0.1）
+
+**决定（老板拍板）**：CF 隧道不保留。`einz.tic.cc` DNS 改回指向 `127.0.0.1`（灰云），
+所有流量只走 `einz.yuanjinx.com`（国内服务器）。将来若服务器搬回海外，两个域名再都指向
+海外 origin。
+
+**依据（`t <url>/health`，增量：TCP=TLS前、TLS、稳态往返=TTFB−TLS）**：
+
+| 位置 | tic.cc total | yuanjinx total | tic.cc 稳态往返 | yuanjinx 稳态往返 |
+| --- | --- | --- | --- | --- |
+| 中国 iMac | 1546ms | **25ms** | 858ms | ~0 |
+| 波兰 | 1006ms | **766ms** | 887ms | 223ms |
+| 德国 | **853ms** | 877ms | 711ms | 277ms |
+| 美西 | **678ms** | 764ms | 269ms | 208ms |
+
+- 只有美西 tic.cc 快（11%），且全靠**握手便宜**；聊天是长连接 WS，握手只付一次，
+  **稳态每条消息往返 tic.cc 在四个点全都 ≥ 直连**（美西 269 vs 208ms）。
+- 根因：连接器注册在 `location=lax01`，CF 必须把所有隧道流量先送到 LAX 再跨境，边缘优势被
+  绕行吃掉。欧洲/波兰因此净变慢。
+- 单次采样、无丢包/稳定性数据；美西那组 `tls=312ms` 与 `conn=21ms` 不自洽，有噪声。
+
+**撤回收尾（待做）**：停掉并删掉 compose 里的 `cloudflared` 服务；CF 里删该隧道的
+published route（`einz.tic.cc`）；DNS `einz` 设 A `127.0.0.1` **灰云**；App/CLI 候选列表里
+tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选路，下次发版再清
+`kPrimaryServer`/`kServerCandidates`。
+
+**复用结论**：以后"两个域名指同一台海外 origin"时，要**一个直连 + 一个走 CF 代理**才
+是真冗余（同 origin、两条独立网络路径）；两个都直连同一 IP = 零冗余。
