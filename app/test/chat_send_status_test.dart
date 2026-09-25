@@ -352,7 +352,8 @@ void main() {
       keyVersion: 1,
       token: 'tok',
     );
-    await seedRepo.send('会被服务端拒绝的');
+    // 服务端明确拒绝（4xx）→ 标 failed 并**上抛**（上层据此报「后台：…」）
+    await expectLater(seedRepo.send('会被服务端拒绝的'), throwsA(isA<ApiException>()));
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -374,6 +375,38 @@ void main() {
 
     expect(find.text('点击重发'), findsOneWidget, reason: '失败气泡应有显式文字标签');
     expect(find.byIcon(Icons.error_outline), findsOneWidget);
+  });
+
+  testWidgets('服务端明确拒绝发送 → 顶部提示带「后台：」前缀', (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    final api = _StatusFakeApi(peer: const [], postedSeq: 1)..rejectPostMessage = true;
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-test',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: api,
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, '会被服务端拒绝的');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('后台：发送失败'), findsOneWidget,
+        reason: '服务端拒绝属于后台错误，文案必须带「后台：」');
   });
 
   testWidgets('墓碑消息（删除/焚毁）仍显示发送状态图标（删除只是本设备隐藏正文）',
@@ -531,7 +564,7 @@ void main() {
       entranceId: 'dev-a',
       keyVersion: 1,
       token: 'tok',
-    ).send('会被再次拒绝的');
+    ).send('会被再次拒绝的').catchError((Object _) => ''); // 4xx → failed 并上抛（此处只关心气泡）
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,

@@ -9734,3 +9734,39 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 - 测试：新增「服务端判已有通道 → 带『后台：』前缀」；既有「错误 token」用例的断言
   `开通码无效` → `后台：开通码无效`（预期内的改动）。本机闸门那条仍是**无前缀**的原句。
   `flutter analyze` 无告警，全量 212 项测试通过。
+
+## 2026-09-25 后台错误前缀：补上高频网络链路（发送/附件/邀请码/头像/改名/下载/口令）
+
+上一轮只覆盖了显式 `on ApiException` 的向导三处；发送失败、附件失败这类高频错误
+因为 `message_repository` 把异常吞了，上层根本拿不到 ApiException。老板："做"。
+
+### 前提：让上层拿得到服务端的话
+- `message_repository.dart` `send()`：服务端明确拒绝（4xx，[_isServerRejection]）时
+  标 failed **后继续 rethrow**；网络类失败照旧不上抛（pending 交给 _flushPending 幂等重试，
+  弹提示只会吵）。语义不变：**只有"重试也没用"的才上报**。
+- `sendAttachment()`：同理，4xx 上抛（仍不标 failed——附件 blob 无法自动补传，
+  标失败会误导用户重试；但用户至少能知道为什么卡住）。
+
+### 新增 10 个 `on ApiException` 分支（都在泛型 catch 之前）
+| 位置 | 文案 |
+|---|---|
+| chat_page `_send` | 发送失败 |
+| chat_page 邀请码（生成 + 重新生成，2 处） | 开通码生成失败 |
+| chat_page 头像上传 | 头像上传失败 |
+| chat_page 改名 | 修改失败 |
+| chat_page 语音发送 | 录音失败 |
+| chat_page 文件/媒体发送 | 发送失败 |
+| chat_page 附件下载 | 下载失败 |
+| chat_page 改口令（取密保箱 + 上传，2 处） | 修改口令失败 |
+都走 `backendError(l10n, <原文案>(e.message))`——用服务端给的 message，不是 code（用户看得懂）。
+
+### 刻意没做
+- **同步/拉取失败**：它是后台重试的状态（顶部常驻「离线 · N 条待发送」），不是一次用户动作。
+  给它弹错误条会随轮询每几十秒闪一次。要标的话应把原因并进常驻条，另议。
+- 静默链路（GET /space 资料、头像拉取、entrance 列表、媒体渲染）本来就不给用户看文案，
+  加前缀无从加起。
+
+### 测试
+- 新增：服务端拒绝发送 → 顶部提示带「后台：」（chat_send_status_test）。
+- 既有 4 例按新语义更新（4xx 的 send 现在会抛：`expectLater(...throwsA(isA<ApiException>()))`）。
+- `flutter analyze` 无告警，全量 213 项通过。

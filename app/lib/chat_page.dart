@@ -26,6 +26,7 @@ import 'data/burn_after_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/server_config.dart';
+import 'error_text.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
@@ -1198,6 +1199,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     if (!ctx.mounted) return;
                     r = fresh; // 就地刷新：二维码 / 开通码 / 链接 ✓
                     setLocal(() {});
+                  } on ApiException catch (e) {
+                    if (!ctx.mounted) return;
+                    showTopNotice(
+                        ctx, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
                   } catch (e) {
                     if (!ctx.mounted) return;
                     showTopNotice(ctx, l10n.chatPageInviteFailed('$e'));
@@ -1213,6 +1218,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ),
       );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      showTopNotice(context, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
       showTopNotice(
@@ -1784,6 +1793,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _MessageAvatarState.invalidate(pid);
       setState(() => _myAvatarBytes = bytes);
       showTopNotice(context, l10n.chatPageAvatarUploaded);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showTopNotice(context, backendError(l10n, l10n.chatPageAvatarFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, l10n.chatPageAvatarFailed('$e'));
@@ -1990,6 +2002,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // app 菜单改名后退出重进回到 memberB）
                 await _saveProfile();
                 if (ctx.mounted) Navigator.of(ctx).pop(true);
+              } on ApiException catch (e) {
+                if (ctx.mounted) {
+                  showTopNotice(ctx, backendError(l10n, l10n.chatPageRenameFailed(e.message)));
+                }
               } catch (e) {
                 if (ctx.mounted) {
                   showTopNotice(ctx, l10n.chatPageRenameFailed('$e'));
@@ -2668,6 +2684,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
       // 上传已尝试完成：刷新状态（pending→sent/failed）
       await _refreshLocal();
+    } on ApiException catch (e) {
+      // 后台：服务端明确拒绝（4xx）——气泡已标 failed，这里把服务端给的理由说出来
+      if (!mounted) return;
+      showTopNotice(
+          context,
+          backendError(AppLocalizations.of(context)!,
+              AppLocalizations.of(context)!.chatPageSendFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
@@ -3396,6 +3419,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _recordingPath = null;
         _voiceSamples.clear();
       });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      showTopNotice(context, backendError(l10n, l10n.chatPageVoiceFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
@@ -3732,6 +3759,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             caption: anyName,
           );
       }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      showTopNotice(context, backendError(l10n, l10n.chatPageSendFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
@@ -4256,6 +4287,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       await file.writeAsBytes(bytes);
       if (!mounted) return;
       showTopNotice(context, l10n.chatPageSaved(file.path));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showTopNotice(context, backendError(l10n, l10n.chatPageDownloadFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
       showTopNotice(context, l10n.chatPageDownloadFailed('$e'));
@@ -5250,6 +5284,13 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     PassphraseEnvelope? serverFile;
     try {
       serverFile = (await api.getKeyEscrow(widget.token)).file;
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = backendError(l10n, l10n.chatPageChangePassphraseFailed(e.message));
+      });
+      return;
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -5310,6 +5351,9 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       widget.onPassphraseUpdated(serverUpdatedAt); // 聊天页记录已知时间
       if (!mounted) return;
       Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = backendError(l10n, l10n.chatPageChangePassphraseFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = l10n.chatPageChangePassphraseFailed('$e'));

@@ -280,7 +280,12 @@ class MessageRepository {
         // （老板 2026-09-13 定：pending = "还没确认"，交给 _flushPending 幂等重试
         //   自动收敛——服务端已存则返回原 seq、未存则本次存入，最终都变"已发送"，
         //   用户无需手动点按；failed 只留给重试也没用的明确拒绝。）
-        if (_isServerRejection(e)) await _setStatus(messageId, 'failed');
+        if (_isServerRejection(e)) {
+          await _setStatus(messageId, 'failed');
+          // 继续上抛：让上层把**服务端给的理由**报出来（带「后台：」前缀，老板
+          // 2026-09-25 定）。网络类失败照旧不上抛——那是"还没确认"，弹提示只会吵。
+          rethrow;
+        }
       } finally {
         _pendingUploads.remove(messageId);
       }
@@ -364,9 +369,12 @@ class MessageRepository {
         // 5) 发消息
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
-      } on Exception {
+      } on Exception catch (e) {
         // 失败：消息留 pending（补发时消息会重发，但附件 blob 未上传 v1 不自动补传）。
         // 不标 failed——附件 blob 本就无法自动补传，标失败会误导用户重试。
+        // 但**服务端明确拒绝**（4xx）要上抛给上层报「后台：…」：否则用户只看到
+        // 一个永远转圈的气泡，连为什么都不知道（老板 2026-09-25）。
+        if (_isServerRejection(e)) rethrow;
       }
     }
     return messageId;

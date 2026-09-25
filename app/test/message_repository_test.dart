@@ -309,7 +309,8 @@ void main() {
     final api = FakeApi()..rejectPostMessage = true;
     final repo = makeRepo(api, token: 'tok');
 
-    await repo.send('会被服务端拒绝的消息');
+    // 4xx → 标 failed，并**上抛**给调用方（上层据此报「后台：…」，见 error_text.dart）
+    await expectLater(repo.send('会被服务端拒绝的消息'), throwsA(isA<ApiException>()));
 
     final hist = await repo.history();
     expect(hist.single.status, 'failed');
@@ -357,7 +358,7 @@ void main() {
   test('重发：retryMessage 成功后置 sent 且回填 server_sequence', () async {
     final api = FakeApi()..rejectPostMessage = true;
     final repo = makeRepo(api, token: 'tok');
-    await repo.send('待重发');
+    await repo.send('待重发').catchError((Object _) => ''); // 4xx 上抛，这里只关心后续重发
     final failed = (await repo.history()).single;
     expect(failed.status, 'failed');
 
