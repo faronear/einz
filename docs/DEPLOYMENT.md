@@ -125,7 +125,15 @@ deployment/
 ├── docker-compose.withcaddy.yml  # 模板：内置 caddy + server 两个服务（部署时拷贝为 docker-compose.yml）
 ├── docker-compose.nocaddy.yml    # 模板：无内置 Caddy，由系统级 Caddy 反代 127.0.0.1:3000（可选）
 ├── config/               # 可选：serverConfig.json（服务端参数，见下；整个目录已 gitignore）
-└── data/                 # 数据卷映射：einz.sqlite.db + files/ + backups/
+└── data/                 # 数据卷映射：einz.sqlite.db + files/ + avatars/ + backups/
+```
+
+> ⚠️ **头像目录必须挂在卷上**：server 的默认路径是容器内 `/app/data/avatars`，
+> **不在任何卷里**——每次 `docker compose up -d --build server` 重建容器都会清空，
+> 表现是所有人的头像同时消失（2026-09-26 实测踩到）。compose 里必须有：
+> `EINZ_AVATARS=/data/avatars`（`docker-compose.*.yml` 模板已加；VPS 上的
+> `docker-compose.yml` 是部署时从模板拷贝的、不入库，**升级时要手动补这一行**）。
+```
 ```
 
 前置：一台 VPS（域名 DNS 指向它，开放 80/443）、Docker + Compose。

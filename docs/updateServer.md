@@ -113,6 +113,7 @@ cd deployment && docker compose up -d --build server
 | 存量数据          | 不受影响（messages/entrances/会话等不动，新表初始为空）                                                                                                                                          |
 | 通道在册状态      | 无需改动（既有设备与会话不受影响）                                                                                                                                                               |
 | Caddy / HTTPS     | 无需改动（Caddyfile 已 assume-unchanged）                                                                                                                                                      |
+| **头像目录**      | 必须配 `EINZ_AVATARS=/data/avatars`。默认路径在**容器内**（`/app/data/avatars`），不在卷里 → 每次 `--build` 重建容器会把所有人的头像清空（2026-09-26 实测）。模板已加，VPS 上那份 `docker-compose.yml` 是拷贝出来的、不入库，**要手动补** |
 | 备份密钥          | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose             |
 | 旧部署升级        | 若 .env 里还是旧变量名 `EINZ_BACKUP_KEY`（2026-08 前部署）：手动改名为 `EINZ_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |
 | App 侧            | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                                                                   |

@@ -32,6 +32,10 @@ services:
       # 文件缺失时服务端按默认值启动（当前唯一字段 maxSpaces：0=不限 / n=上限）。
       - EINZ_CONFIG=/config/serverConfig.json
       - EINZ_DB=/data/einz.sqlite.db
+      # 头像目录：默认路径是容器内 /app/data/avatars（**不在任何卷里**），
+      # 每次 `docker compose up -d --build server` 重建容器就会被清空——
+      # 表现是所有人的头像同时消失（2026-09-26 实测踩到）。必须指到卷上。
+      - EINZ_AVATARS=/data/avatars
       - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
       # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore）。
