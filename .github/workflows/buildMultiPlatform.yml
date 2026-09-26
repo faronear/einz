@@ -112,10 +112,26 @@ jobs:
           # 签名口令走环境变量（gradle 优先于 properties 文件）；见上一步
           EINZ_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           EINZ_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # 语音通话的 TURN 配置（docs/TURN.md）：配了就带上，没配照出包。
+          VOICE_TURN_URLS: ${{ secrets.VOICE_TURN_URLS }}
+          VOICE_TURN_USERNAME: ${{ secrets.VOICE_TURN_USERNAME }}
+          VOICE_TURN_CREDENTIAL: ${{ secrets.VOICE_TURN_CREDENTIAL }}
         run: |
           # 版本号 yymm.ddhh.mm / 构建号 yymmddhh，各平台统一（唯一出处 scripts/appVersion.js）
           eval "$(node ../scripts/appVersion.js)"
-          flutter build apk --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER"
+          # 语音通话的 TURN（跨网打洞必需）：有 secrets 就带上，没有也照出包——
+          # 只是那个包跨网打不通（不因为缺配置让 CI 变红）
+          TURN_DEFINES=()
+          if [[ -n "${VOICE_TURN_URLS}" ]]; then
+            TURN_DEFINES+=(--dart-define="VOICE_TURN_URLS=${VOICE_TURN_URLS}")
+          fi
+          if [[ -n "${VOICE_TURN_USERNAME}" ]]; then
+            TURN_DEFINES+=(--dart-define="VOICE_TURN_USERNAME=${VOICE_TURN_USERNAME}")
+          fi
+          if [[ -n "${VOICE_TURN_CREDENTIAL}" ]]; then
+            TURN_DEFINES+=(--dart-define="VOICE_TURN_CREDENTIAL=${VOICE_TURN_CREDENTIAL}")
+          fi
+          flutter build apk --release --build-name "$APP_BUILD_NAME" --build-number "$APP_BUILD_NUMBER" "${TURN_DEFINES[@]}"
       - name: Verify APK is signed with the release key
         working-directory: app
         run: |
@@ -548,6 +564,11 @@ jobs:
       - name: Build iOS IPA (App Store)
         if: steps.secrets.outputs.configured == 'true'
         working-directory: app
+        env:
+          # 语音通话的 TURN 配置（docs/TURN.md）：配了就带上，没配照出包。
+          VOICE_TURN_URLS: ${{ secrets.VOICE_TURN_URLS }}
+          VOICE_TURN_USERNAME: ${{ secrets.VOICE_TURN_USERNAME }}
+          VOICE_TURN_CREDENTIAL: ${{ secrets.VOICE_TURN_CREDENTIAL }}
         run: |
           eval "$(node ../scripts/appVersion.js)"
           # 构建号用**到分钟**的 UTC 时间戳（10 位），而不是共享脚本的 APP_BUILD_NUMBER
@@ -557,9 +578,22 @@ jobs:
           # 不敏感；本地 buildIos.sh 的 8 位戳比它小，不会冲突。
           IOS_BUILD_NUMBER="$(date -u +%y%m%d%H%M)"
           echo "==> App Store 包 $APP_BUILD_NAME($IOS_BUILD_NUMBER)"
+          # 语音通话的 TURN（跨网打洞必需，见 docs/TURN.md）：配了 secrets 就带上，
+          # 没配也照出包——只是那个包跨网打不通（不因为缺配置让 CI 变红）。
+          TURN_DEFINES=()
+          if [[ -n "${VOICE_TURN_URLS}" ]]; then
+            TURN_DEFINES+=(--dart-define="VOICE_TURN_URLS=${VOICE_TURN_URLS}")
+          fi
+          if [[ -n "${VOICE_TURN_USERNAME}" ]]; then
+            TURN_DEFINES+=(--dart-define="VOICE_TURN_USERNAME=${VOICE_TURN_USERNAME}")
+          fi
+          if [[ -n "${VOICE_TURN_CREDENTIAL}" ]]; then
+            TURN_DEFINES+=(--dart-define="VOICE_TURN_CREDENTIAL=${VOICE_TURN_CREDENTIAL}")
+          fi
           flutter build ipa --release \
             --build-name "$APP_BUILD_NAME" --build-number "$IOS_BUILD_NUMBER" \
-            --export-options-plist=ios/exportOptionsAppStore.plist
+            --export-options-plist=ios/exportOptionsAppStore.plist \
+            "${TURN_DEFINES[@]}"
           mkdir -p /tmp/einz-out
           # 固定文件名：Release 资产列表里一眼能认出来（与 einz-app-android.apk 同风格）
           cp build/ios/ipa/*.ipa /tmp/einz-out/einz-app-ios-appstore.ipa
