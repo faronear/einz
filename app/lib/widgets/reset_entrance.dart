@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
+import '../data/space_session.dart';
 import '../widgets/top_notice.dart';
 import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
@@ -59,10 +60,15 @@ Future<bool> _confirmDestructive(
 ///
 /// 失败不阻塞本地移除（本地移除才是用户要的结果），但**要把失败如实告诉用户**：
 /// 退役没成功 = 对方通道列表里这条通道仍是 active 的幽灵。返回是否成功，由调用方提示。
-Future<bool> retireSpaceQuietly(String token, {ApiClient? api}) async {
-  if (token.isEmpty) return false;
+///
+/// 走 [SpaceSession] 而不是裸 token（2026-09-26 修）：会话 24h 就过期，拿旧 token 直接
+/// 请求只会 401「invalid session」→ 这里原本 catch 掉 → 用户只看到"服务端可能还留着"，
+/// 却永远留着一行幽灵通道。
+Future<bool> retireSpaceQuietly(SpaceSession session, {ApiClient? api}) async {
+  if (session.token.isEmpty) return false;
   try {
-    await (api ?? ApiClient(effectiveServer)).retireEntrance(token);
+    await session.call(
+        (t) => (api ?? ApiClient(effectiveServer)).retireEntrance(t));
     return true;
   } catch (_) {
     // 离线 / 已被对方撤销 / 老服务端
@@ -83,7 +89,7 @@ Future<bool> confirmLeaveSpace(
   LocalDatabase? db,
   ApiClient? api,
   required String spaceId,
-  required String token,
+  required SpaceSession session,
   required String entranceName,
   bool hasPin = false,
 }) async {
@@ -102,10 +108,10 @@ Future<bool> confirmLeaveSpace(
   );
   if (!ok || !context.mounted) return false;
 
-  // 服务端退役：尽力而为（顺序不能反——token 在本地，清完就再也调不动它了）。
+  // 服务端退役：尽力而为（顺序不能反——凭证在本地，清完就再也调不动它了）。
   // 只影响这一个空间那一行，其他空间的通道行不动。失败如实提示（顶部通知挂在根
   // Overlay 上，本页随后 pop 也不影响它显示）。
-  final retired = await retireSpaceQuietly(token, api: api);
+  final retired = await retireSpaceQuietly(session, api: api);
   // PIN 模式下这里没有 pin（聊天页不持有）→ removeSpace 走"挂 pending + 立即清数据"，
   // 凭证条目等下次解锁再摘（见 AppLockService.removeSpace 文档）。
   await AppLockService(database).removeSpace(spaceId);

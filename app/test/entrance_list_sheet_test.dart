@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/local_database.dart';
+import 'package:einz/data/space_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 
@@ -96,8 +97,10 @@ class _BrokenEntranceApi extends ApiClient {
 Future<void> _openEntranceListSheet(
   WidgetTester tester,
   LocalDatabase db,
-  ApiClient api,
-) async {
+  ApiClient api, {
+  String token = 'tok',
+  Future<String> Function()? reauth,
+}) async {
   final spaceKey = await generateSpaceKey();
   await tester.pumpWidget(MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -108,7 +111,8 @@ Future<void> _openEntranceListSheet(
       entranceId: 'dev-a',
       spaceKey: spaceKey,
       keyVersion: 1,
-      token: 'tok',
+      token: token,
+      reauth: reauth,
       db: db,
       api: api,
       enableWs: false,
@@ -187,10 +191,33 @@ Finder dimmedCardOf(String name) => find.ancestor(
           find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1),
     );
 
+/// 「旧 token 一律 401 invalid session、续期后的新 token 才正常」的 fake：
+/// 复现老板 2026-09-26 的线上场景（会话过期后，页面的直接请求全挂）。
+class _StaleTokenApi extends _FakeEntranceApi {
+  _StaleTokenApi(super.rows, {required this.staleToken});
+
+  final String staleToken;
+
+  /// 每次 listEntrances 收到的 token（断言"确实用新 token 重发过"）。
+  final List<String> tokensSeen = [];
+
+  @override
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async {
+    tokensSeen.add(token);
+    if (token == staleToken) {
+      throw ApiException('UNAUTHORIZED', 'invalid session', 401);
+    }
+    return super.listEntrances(token);
+  }
+}
+
 void main() {
   setUpAll(() async {
     await sodium();
   });
+
+  // 会话注册表是进程级静态的：逐用例复位，别让上一个用例的会话（含旧 token）串进来
+  setUp(() => SpaceSessions.clear());
 
   testWidgets('只列本人其他通道：对方的通道不列、当前通道不列', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
@@ -478,5 +505,47 @@ void main() {
     expect(sheetTimeText(), findsNWidgets(2));
     // 转圈收起、刷新按钮回到常态
     expect(sheetRefresh(), findsOneWidget);
+  });
+
+  testWidgets('旧 token 已过期（401 invalid session）→ 自动续期 + 重试，卡片照常列出',
+      (tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final api = _StaleTokenApi([
+      {
+        'entrance_id': 'dev-a',
+        'entrance_name': 'iPhone',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+      {
+        'entrance_id': 'dev-b2',
+        'entrance_name': 'iPad',
+        'member_id': 'member-me',
+        'connected_at': now,
+        'last_seen': now,
+        'status': 'active',
+      },
+    ], staleToken: 'tok');
+    var reauthCalls = 0;
+
+    // 老板 2026-09-26 实测的场景：Vault 里那份 token 已过 24h（服务端 session TTL）
+    await _openEntranceListSheet(tester, db, api,
+        reauth: () async {
+          reauthCalls++;
+          return 'fresh';
+        });
+
+    // 续期后重试成功：其他通道照常列出，而不是"无法获取其他通道（当前离线？）"
+    expect(sheetText('iPhone'), findsOneWidget);
+    expect(sheetText('iPad'), findsOneWidget,
+        reason: '401 的直接请求应被续期后重试，而不是把失败亮给用户');
+    expect(sheetTextContaining('无法获取其他通道'), findsNothing);
+    expect(reauthCalls, 1, reason: '一处过期只该续期一次');
+    expect(api.tokensSeen, contains('tok'), reason: '第一次确实用旧 token 发了（才 401）');
+    expect(api.tokensSeen, contains('fresh'), reason: '重试用的是续期后的新 token');
   });
 }

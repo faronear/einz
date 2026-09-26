@@ -649,6 +649,13 @@ class AppLockPayload {
   final String spaceId;
   final String entranceId;
   final int keyVersion;
+
+  /// session token（**可能是旧的**：服务端 24h 过期后，只有续期那一刻才知道新的）。
+  ///
+  /// **别直接拿它去发请求**——会话续期只更新内存与（无 PIN 时的）这份 Vault，
+  /// 拿旧副本请求就是 401「invalid session」，且重启也不恢复（2026-09-26 老板
+  /// 线上实测的 bug）。带鉴权的请求一律走 `data/space_session.dart` 的
+  /// [SpaceSessions] / [SpaceSession.call]，由它保证"401 → 续期 → 重试"。
   final String? token;
 
   /// 本端已知的服务端口令更新时间（ms）：上线时与服务器对比，
@@ -680,6 +687,18 @@ class AppLockPayload {
         escrowUpdatedAt: json['escrow_updated_at'] as int?,
         publicKeyB64: json['entrance_public_key'] as String?,
         privateKeyB64: json['entrance_private_key'] as String?,
+      );
+
+  /// 只换 token（会话续期后写回 Vault 用；其余字段原样）。
+  AppLockPayload copyWith({String? token}) => AppLockPayload(
+        spaceKeyB64: spaceKeyB64,
+        spaceId: spaceId,
+        entranceId: entranceId,
+        keyVersion: keyVersion,
+        token: token ?? this.token,
+        escrowUpdatedAt: escrowUpdatedAt,
+        publicKeyB64: publicKeyB64,
+        privateKeyB64: privateKeyB64,
       );
 }
 
@@ -741,6 +760,14 @@ class VaultPayload {
       VaultPayload(
         spaces: spaces ?? this.spaces,
         activeSpaceId: activeSpaceId ?? this.activeSpaceId,
+      );
+
+  /// 只替换某个空间的 token（会话续期后写回 Vault 用，见 `data/space_session.dart`）。
+  VaultPayload updateToken(String spaceId, String token) => copyWith(
+        spaces: [
+          for (final s in spaces)
+            s.spaceId == spaceId ? s.copyWith(token: token) : s,
+        ],
       );
 
   Map<String, dynamic> toJson() => {

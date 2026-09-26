@@ -9990,3 +9990,76 @@ app 全量 **218 项通过**（goldens 跳过）；`app/pubspec.lock` 未被镜�
   对齐刷新按钮右缘（= 内容区右缘，最多差取整那 2px）——后者顺带是"上限漂了"的报警器。
 - `flutter analyze` 无告警；app 全量 **219 项通过**（goldens 跳过）。
 
+## 2026-09-26 【线上 bug】会话过期后，页面里的直接请求全 401「invalid session」
+
+老板："给「朵」「Hardservice」空间加头像都成功，给「我和 Vic」就报错 后台：头像上传失败
+invalid session"。→ 一查是个**结构性**问题，不是头像的事。
+
+### 机制（用老板真机的库 + 服务端 TTL 交叉验证）
+
+- 服务端 session TTL = **24h**（`auth.ts:8`）。
+- App 只在**内存**里续期：`MessageRepository._withAutoAuth`、`WsRealtimeService.updateToken`
+  各写**自己那份** token；**没有任何路径把新 token 写回 Vault**。
+- 于是每个空间超过 24h 后，Vault 里那份 token 就是死的；而页面里那些"直接拿
+  `widget.token`（构造时固化的死副本）去请求"的地方**全部 401**，且**重启也不恢复**。
+
+**证据**（`spaces.created_at` = 该空间写进 Vault 的时刻 = token 签发时刻，
+`_syncSpaceRow` 首次插入取 `DateTime.now()`）：
+
+| 空间 | token 签发 | 距 08:14 | session | 头像 |
+|---|---|---|---|---|
+| **我和 Vic** | 09-24 23:44 | **32.5h** | ✗ | **invalid session** |
+| Hardservice | 09-25 20:24 | 11.8h | ✓ | 成功 |
+| 朵 | 09-25 22:28 | 9.8h | ✓ | 成功 |
+
+旁证：Vic 空间**聊天是正常的**（本地 5 条消息，最新 07:58:45，就在报错前后）——同步/WS
+走内存续期。同一个空间里只有"非同步/WS"的请求在挂。
+
+### 炸伤面（所以老板说"这将会频繁发生"是对的）
+
+头像上传 `chat_page.dart:1964`、改名 `:2173/:2176`、开通码 `:1126/:1164`、
+「更多通道」`load()`、`未读角标`（`space_switcher.dart` 里 `catchError` → **静默归零**）、
+退役（`reset_entrance.dart` 里 `catch` → 静默失败 → 服务端留**幽灵通道**）、改共享口令
+（`_ChangePassphraseDialog`）、push token / install-uid / `/space` 资料。
+
+### 修法：`SpaceSession`（一个空间一份活的 token）
+
+新增 `app/lib/data/space_session.dart`：
+
+- `SpaceSession`：**唯一权威 token**（可变）；`call(fn)` = 401 → 续期 → 用新 token
+  **重试一次**；`renew()` **并发去重**（同步/WS/直接请求同时过期只发一次 challenge——
+  AUTH 限流 60 次/5 分钟）；续期成功后**尽力写回 Vault**。
+- `SpaceSessions`：按 spaceId 一份，全 App 共用（注册表）；`forget/clear` 在空间被移除/
+  撤销/全量重置时调用，免得同名空间重新加入后还攥着上一轮的凭证。
+- **只在无 PIN（明文包）时写回**：token 是 bearer 凭证，PIN 模式下绝不能落到密文包之外
+  （聊天页也没有 PIN，写不了密文包）；写不了也不影响本次会话（内存里已经续期，
+  用户无感），只是下次冷启动再续一次。
+- 接线：聊天页所有直接请求走 `_withAuth`（内含副作用：`ENTRANCE_REVOKED` → 自毁、
+  `FORBIDDEN` → 未识别提示）；`_ChangePassphraseDialog` / `confirmLeaveSpace` /
+  `retireSpaceQuietly` 改成收 `SpaceSession`（不再收裸 token）；空间列表的未读角标
+  也走各空间的会话。`AppLockPayload.token` 上写明"**别直接拿它发请求**"。
+- 踩坑：`_withAuth` 的返回值直接赋给可空变量会让 `T` 被推成可空 → 空提升断掉
+  （analyze 报 `unchecked_use_of_nullable_value`）；先落到**非空局部**再赋值即可。
+- 踩坑（差点上线）：`late final _session` 一开始放在 initState 中段（`_repo` 之前），而
+  initState **开头**就调 `_refreshPeerOnline()` → 读 `_session.token` 抛
+  `LateInitializationError` → 被那里的 `catch (_)` 吞掉 → 对方在线状态与「邀请加入」全失效。
+  跑全量测试时被 `peer_invite_link_test` 两例抓出来（**只有"期望看到链接"的两例会红，
+  期望"看不到"的三例照样绿**——正是这种不对称最容易漏）。改法：会话在 initState 最开头就赋值。
+
+**为什么不上移到 `shared/ApiClient`**：它拿的是"一次请求的 token 字符串"，不知道 spaceId、
+也改不了调用方那份 → 每次请求都要先撞一次 401；而 App 侧 ~8 处构造点也都得补 reauth 句柄。
+会话策略留在 App 层（它才持有该空间的密钥对）更对。CLI 不受影响（它本来就是单一可变会话）。
+
+### 测试
+
+- 新增 `app/test/space_session_test.dart`（8 例）：401→续期→用新 token 重试、并发只续期一次、
+  续期失败后还能再试、非 401 不续期、无密钥对时照抛、注册表只建一份/forget 后重建、
+  **无 PIN 写回 Vault**（重新读盘确认）、**PIN 模式不写**（内存仍续期）。
+- `entrance_list_sheet_test.dart` 补一例端到端：旧 token 401 → 更多通道照常列出
+  （并断言 `tokensSeen` 里出现过旧 token 与新 token）。**撤回 `_withAuth` 时该例会红**
+  （实测：`Found 0 widgets with text "iPad"`），不是事后补的绿测试。
+
+**验证**：`flutter analyze` 无告警；app 全量 **228 项通过**（goldens 跳过）。
+**老板侧立即生效须知**：这是纯客户端修复——重新打包安装后，「我和 Vic」这个空间
+（以及任何超 24h 的空间）会自动续期，头像/改名/更多通道都会恢复正常。
+

@@ -8,6 +8,7 @@ import 'dev_data_dir.dart';
 import 'local_database.dart';
 import 'media_cache.dart';
 import 'secure_store.dart';
+import 'space_session.dart';
 import 'vault_session.dart';
 
 /// 清空**整机**全部本地数据，回到"新设备"状态（"整机清空"原语）。
@@ -41,6 +42,7 @@ Future<void> resetLocalData(LocalDatabase db) async {
   await AttachmentStore.clear();
   await MediaCache.deleteAll();
   VaultSession.publish(null); // 解锁态也一并清掉（内存里别留着已经删掉的密钥）
+  SpaceSessions.clear(); // 会话（含续期闭包）也不能留着——凭证已经删了
 }
 
 /// **兜底清空**（当 [resetLocalData] 本身失败时用——本地库**打不开**：迁移抛错 / 文件
@@ -81,4 +83,5 @@ Future<void> hardResetLocalData(LocalDatabase db) async {
     await MediaCache.deleteAll();
   } catch (_) {}
   VaultSession.publish(null);
+  SpaceSessions.clear();
 }

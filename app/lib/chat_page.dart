@@ -31,6 +31,7 @@ import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
 import 'data/message_repository.dart';
+import 'data/space_session.dart';
 import 'data/ui_style_settings.dart';
 import 'data/ws_realtime_service.dart';
 import 'l10n/app_localizations.dart';
@@ -179,6 +180,11 @@ const double kMessageFontSize = 16;
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   late final MessageRepository _repo;
+
+  /// 本空间的会话（**本页唯一权威 token**）：所有带鉴权的请求都走 `_withAuth`，
+  /// 由它保证"401 → 续期 → 重试"。别再直接把 `widget.token` 塞给 ApiClient——
+  /// 那是构造时的死副本，24h 后必 401（2026-09-26 老板线上实测的头像上传 bug）。
+  late final SpaceSession _session;
   final _input = TextEditingController();
   final _inputFocusNode = FocusNode(); // 回车发送后重新聚焦（与图标发送一致保持焦点）
   final _lockTimer = LockTimer();
@@ -537,6 +543,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // **会话先建**：下面每一步（含 initState 里就发起的 _refreshPeerOnline）
+    // 都可能读 `_session.token`，late final 没赋值就抛 LateInitializationError
+    // （2026-09-26 加会话时踩过一次：被 catch 吞掉 → 对方在线/「邀请加入」全失效）。
+    final db = widget.db ?? LocalDatabase.shared;
+    _session = SpaceSessions.of(
+      spaceId: widget.spaceId,
+      token: widget.token,
+      // 续期用注入的 challenge-response（chat_entry 从锁包密钥对拼的）；
+      // 旧锁包没有密钥对 → reauth 为 null → 会话续不了期，401 照抛
+      refresh: widget.reauth,
+      db: db,
+    );
     _myMemberName = widget.memberName ?? '';
     _myEntranceName = widget.entranceName ?? '';
     _myGender = ''; // 个人资料弹窗性别图标：由 profile 恢复（向导完成时写入）
@@ -548,7 +566,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _refreshPeerOnline();
     _peerTicker = Timer.periodic(const Duration(seconds: 30), (_) => _refreshPeerOnline());
     WidgetsBinding.instance.addObserver(this);
-    final db = widget.db ?? LocalDatabase.shared;
     // 名字未由向导传入（如 PIN 解锁后重启进聊天）→ 从本地 profile 恢复。
     // 必须按 spaceId 读：多空间下全局键是所有空间共用的一格，会被别的空间覆写
     // （老板 2026-09-22 实测：新建空间对方还没加入，顶部条却显示原空间的对方名）。
@@ -672,10 +689,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 写死空串 → 气泡回退灰色）。启动与收到 profile.updated 时调用
   /// （对齐 CLI 的 _refreshMemberNames）。
   Future<void> _refreshProfileFromServer() async {
-    if (!mounted || widget.token.isEmpty || effectiveServer.isEmpty) return;
+    if (!mounted || _session.token.isEmpty || effectiveServer.isEmpty) return;
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      final space = await api.getSpace(widget.token);
+      final space = await _withAuth((t) => api.getSpace(t));
       // 重启（PIN 解锁）路径不传 memberId（main.dart 只还原明文 payload）——
       // 从 /space 的通道表里按 entranceId 反查，否则拿不到"我"，校正无从下手
       var mine = widget.memberId;
@@ -739,10 +756,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 上线补查（离线期间口令被重设）：启动/WS 连接后对比服务端 updated_at，
   /// 服务器更新 = 口令已重设——只发通知不弹窗（修改口令时按需才要求输入新口令）。
   Future<void> _checkEscrowRotated() async {
-    if (!mounted || widget.token.isEmpty || effectiveServer.isEmpty) return;
+    if (!mounted || _session.token.isEmpty || effectiveServer.isEmpty) return;
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      final snap = await api.getKeyEscrow(widget.token);
+      final snap = await _withAuth((t) => api.getKeyEscrow(t));
       final serverAt = snap.updatedAt;
       final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
       if (serverAt != null && knownAt != null && serverAt > knownAt) {
@@ -752,6 +769,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
     } catch (_) {
       // 查询失败（网络/未托管）静默：不打断正常使用
+    }
+  }
+
+  /// 本页所有**带鉴权**的请求的统一入口：走本空间的会话（401 自动续期 + 重试一次），
+  /// 并把"被撤销 / 服务器不认这条通道"的副作用补上（会话层只负责续期，不碰 UI 与数据清理）。
+  ///
+  /// 为什么必须有它：会话 24h 过期后，只有同步/WS 会续期（各写自己那份 token），
+  /// 而头像上传/改名/开通码/更多通道/未读角标这些**直接请求**原来拿的是构造时固化的
+  /// `widget.token` → 全部 401「invalid session」且重启不恢复（2026-09-26 老板实测）。
+  Future<T> _withAuth<T>(Future<T> Function(String token) fn) async {
+    try {
+      return await _session.call(fn);
+    } on ApiException catch (e) {
+      await _handleAuthError(e);
+      rethrow;
+    }
+  }
+
+  /// 续期失败时的副作用（`ENTRANCE_REVOKED` → 自毁；`FORBIDDEN` → 常驻提示），
+  /// 由 [_withAuth] 与 [_reauthWithRevokedFallback] 共用。
+  Future<void> _handleAuthError(ApiException e) async {
+    if (e.code == 'ENTRANCE_REVOKED') {
+      await _onEntranceRevoked();
+    } else if (e.code == 'FORBIDDEN' && mounted && !_entranceUnrecognized) {
+      setState(() => _entranceUnrecognized = true);
     }
   }
 
@@ -766,15 +808,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 这是运维失误而非撤销，只置 [_entranceUnrecognized] 让常驻提示条说明情况，
   /// 本地消息仍然可读（此前一律当撤销处理，把本地数据全删了，不可挽回）。
   /// 其他异常原样抛出（调用方退避/提示）。
+  ///
+  /// 去重（同时多处 401 只发一次 challenge）在 [SpaceSession.renew] 里。
   Future<String> _reauthWithRevokedFallback() async {
     try {
-      return await widget.reauth!();
+      return await _session.renew();
     } on ApiException catch (e) {
-      if (e.code == 'ENTRANCE_REVOKED') {
-        await _onEntranceRevoked();
-      } else if (e.code == 'FORBIDDEN' && mounted && !_entranceUnrecognized) {
-        setState(() => _entranceUnrecognized = true);
-      }
+      await _handleAuthError(e);
       rethrow;
     }
   }
@@ -803,6 +843,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // pending，下次解锁时再摘——数据此刻已经清干净，其他空间原样保留。
     // 此前是全机 clear() + 删全表，多空间下等于"一个空间被撤销 = 全机数据归零"。
     await step(() => AppLockService(db).removeSpace(widget.spaceId));
+    SpaceSessions.forget(widget.spaceId); // 凭证已删：会话（含 refresh 闭包）一并丢掉
     if (!mounted) return;
     showTopNotice(context, AppLocalizations.of(context)!.chatPageEntranceRevoked);
     // 还有其他空间 → 切到下一个；一个都不剩 → 回向导（2026-09-24：不再一律回向导，
@@ -1124,7 +1165,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 老板决策：点顶栏添加按钮直接生成开通码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      var r = await api.createJoinToken(widget.spaceId, widget.token);
+      var r = await _withAuth((t) => api.createJoinToken(widget.spaceId, t));
       if (!mounted) return;
       // 「重新生成」进行中的标记（放在 builder 外：StatefulBuilder 用箭头函数，没地方声明）
       var busy = false;
@@ -1219,8 +1260,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   if (busy) return; // 进行中：忽略重复点击
                   setLocal(() => busy = true);
                   try {
-                    final fresh = await api.createJoinToken(
-                        widget.spaceId, widget.token);
+                    final fresh = await _withAuth(
+                        (t) => api.createJoinToken(widget.spaceId, t));
                     if (!ctx.mounted) return;
                     r = fresh; // 就地刷新：二维码 / 开通码 / 链接 ✓
                     setLocal(() {});
@@ -1262,7 +1303,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       entranceId: widget.entranceId,
       spaceKeyB64: base64Encode(widget.spaceKey),
       keyVersion: widget.keyVersion,
-      token: widget.token,
+      token: _session.token, // 会话里的**当前** token（不写旧副本进锁包）
       publicKeyB64: widget.publicKeyB64,
       privateKeyB64: widget.privateKeyB64,
     );
@@ -1307,7 +1348,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         spaceKeyB64: base64Encode(widget.spaceKey),
         spaceId: widget.spaceId,
         keyVersion: widget.keyVersion,
-        token: widget.token,
+        session: _session,
         api: widget.api,
         onPassphraseUpdated: (updatedAt) {
           if (mounted) _escrowUpdatedAt = updatedAt ?? _escrowUpdatedAt;
@@ -1362,11 +1403,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     Future<void> load() async {
       List<Map<String, dynamic>>? fetched;
       try {
-        fetched = await api.listEntrances(widget.token);
+        // 先落到**非空**局部：直接赋给可空变量的话，_withAuth 的 T 会被推成可空，
+        // 后面的空提升就断了（analyze 的 unchecked_use_of_nullable_value）
+        final fresh = await _withAuth((t) => api.listEntrances(t));
+        fetched = fresh;
         // 局部副本：myMemberId 是被闭包改写的捕获变量，Dart 不对它做空提升
         final known = myMemberId;
         if (known == null || known.isEmpty) {
-          for (final d in fetched) {
+          for (final d in fresh) {
             if (d['entrance_id'] == widget.entranceId) {
               myMemberId = d['member_id'] as String?;
               break;
@@ -1749,11 +1793,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         db: widget.db,
         api: widget.api,
         spaceId: widget.spaceId,
-        token: widget.token,
+        session: _session,
         entranceName: entranceName,
         hasPin: hasPin,
       );
       if (!left || !mounted) return;
+      SpaceSessions.forget(widget.spaceId); // 凭证已随 removeSpace 删掉，会话一并丢掉
       // 退出后：还有别的空间 → 直接切到下一个（VaultPayload.remove 已把 active 让给剩下的
       // 第一个）；一个都不剩 → 回向导。
       final vault = VaultSession.current;
@@ -1784,9 +1829,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<String> _resolveMyEntranceName() async {
     final local = _myEntranceName.trim();
     if (local.isNotEmpty) return local;
-    if (widget.token.isEmpty || effectiveServer.isEmpty) return '';
+    if (_session.token.isEmpty || effectiveServer.isEmpty) return '';
     try {
-      final rows = await (widget.api ?? ApiClient(effectiveServer)).listEntrances(widget.token);
+      final rows = await _withAuth((t) => (widget.api ?? ApiClient(effectiveServer)).listEntrances(t));
       for (final d in rows) {
         if (d['entrance_id'] == widget.entranceId) {
           return (d['entrance_name'] as String? ?? '').trim();
@@ -1814,7 +1859,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _refreshPeerOnline() async {
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      final entrances = await api.listEntrances(widget.token);
+      final entrances = await _withAuth((t) => api.listEntrances(t));
       final now = DateTime.now().millisecondsSinceEpoch;
       // 在线是"人"维度的：同一 member 的其它通道是我自己开的通道，不算对方
       // （重启路径不传 memberId → 从通道表里按本通道反查；查不到才退回按通道判定）
@@ -1924,7 +1969,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 服务端在上传响应里回 member_id：上传方收不到自己的 profile.updated 广播，
       // 这个返回值是失效本端头像缓存最可靠的依据（重启路径 widget.memberId 为空，
       // 旧实现 invalidate(null) 静默失效失败 — 老板 2026-09-16 报告）
-      final memberId = await api.uploadAvatar(bytes, widget.token);
+      final memberId = await _withAuth((t) => api.uploadAvatar(bytes, t));
       // 服务端回的是权威值；响应异常/旧服务端缺字段 → 退到本地反查
       final pid = (memberId != null && memberId.isNotEmpty)
           ? memberId
@@ -2133,10 +2178,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               try {
                 final api = widget.api ?? ApiClient(effectiveServer);
                 if (renameEntrance) {
-                  await api.updateEntranceName(name, widget.token);
+                  await _withAuth((t) => api.updateEntranceName(name, t));
                   _myEntranceName = name;
                 } else {
-                  await api.updateMemberName(name, widget.token);
+                  await _withAuth((t) => api.updateMemberName(name, t));
                   _myMemberName = name;
                 }
                 // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
@@ -2300,7 +2345,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       const channel = MethodChannel('einz/apns');
       final apnsToken = await channel.invokeMethod<String>('getToken');
       if (apnsToken != null && apnsToken.isNotEmpty) {
-        await _repo.api.registerPushToken('ios', apnsToken, widget.token);
+        await _withAuth((t) => _repo.api.registerPushToken('ios', apnsToken, t));
       }
     } catch (_) {
       // 忽略：APNs 未就绪（模拟器/未配 entitlement）时静默降级
@@ -2316,10 +2361,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// 只写**本空间**那一行：别的空间由客户端在那边进一次时各自补登。
   Future<void> _registerInstallUid() async {
-    if (widget.token.isEmpty) return;
+    if (_session.token.isEmpty) return;
     try {
       final uid = await AppLockService(widget.db ?? LocalDatabase.shared).installUid();
-      await (widget.api ?? ApiClient(effectiveServer)).registerInstallUid(uid, widget.token);
+      await _withAuth((t) => (widget.api ?? ApiClient(effectiveServer)).registerInstallUid(uid, t));
     } catch (_) {
       // 忽略
     }
@@ -5362,7 +5407,7 @@ class _ChangePassphraseDialog extends StatefulWidget {
     required this.spaceKeyB64,
     required this.spaceId,
     required this.keyVersion,
-    required this.token,
+    required this.session,
     required this.onPassphraseUpdated,
     this.api, // 测试注入（fake api，不触网）；默认按 server 新建
   });
@@ -5372,7 +5417,10 @@ class _ChangePassphraseDialog extends StatefulWidget {
   final String spaceKeyB64;
   final String spaceId;
   final int keyVersion;
-  final String token;
+
+  /// 本空间的会话（**不是裸 token**）：改口令要连发两次带鉴权请求（读密保箱 + 上传），
+  /// 拿裸 token 的话 24h 后这两步都会 401「invalid session」（见 data/space_session.dart）。
+  final SpaceSession session;
 
   /// 上传成功后回传服务端 updated_at（聊天页记录已知时间，防下次补查误报自己改了口令）。
   final ValueChanged<int?> onPassphraseUpdated;
@@ -5425,7 +5473,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
     setState(() => _busy = true);
     PassphraseEnvelope? serverFile;
     try {
-      serverFile = (await api.getKeyEscrow(widget.token)).file;
+      serverFile = (await widget.session.call((t) => api.getKeyEscrow(t))).file;
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -5474,19 +5522,20 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         }
       }
       // 2) 新口令重加密 + 上传（rotated: true → 服务端广播口令重设通知并推进 updated_at）
-      await escrow.upload(
-        passphrase: newPass,
-        spaceKeyB64: widget.spaceKeyB64,
-        spaceId: widget.spaceId,
-        keyVersion: widget.keyVersion,
-        token: widget.token,
-        rotated: true,
-      );
+      await widget.session.call((t) => escrow.upload(
+            passphrase: newPass,
+            spaceKeyB64: widget.spaceKeyB64,
+            spaceId: widget.spaceId,
+            keyVersion: widget.keyVersion,
+            token: t,
+            rotated: true,
+          ));
       // 3) 记录本端已知口令更新时间（避免下次上线补查误报"对方重设"——
       //    其实是自己刚改的）。本地不存口令（服务器为唯一真相源）。
       int? serverUpdatedAt;
       try {
-        serverUpdatedAt = (await api.getKeyEscrow(widget.token)).updatedAt;
+        serverUpdatedAt =
+            (await widget.session.call((t) => api.getKeyEscrow(t))).updatedAt;
       } catch (_) {
         // 记录失败不影响结果（下次上线补查再对比）
       }

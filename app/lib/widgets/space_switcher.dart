@@ -7,6 +7,7 @@ import '../chat_entry.dart';
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
 import '../data/server_config.dart';
+import '../data/space_session.dart';
 import '../data/vault_session.dart';
 import '../l10n/app_localizations.dart';
 import '../setup_page.dart';
@@ -194,14 +195,18 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
     }
     final vault = VaultSession.current;
     final activeId = vault == null ? null : await lock.resolveActiveSpaceId(vault);
-    // 未读：服务端派生（GET /messages/unread），逐个空间 best-effort
+    // 未读：服务端派生（GET /messages/unread），逐个空间 best-effort。
+    // **走各空间的会话**（不是裸 token）：会话 24h 过期，拿 Vault 里那份旧 token 直接
+    // 请求会 401 → 被 catchError 吞成 0 → 未读角标静默消失（2026-09-26 修）。
     final client = widget.api ?? ApiClient(effectiveServer);
     final spaces = vault?.spaces ?? const <AppLockPayload>[];
     final counts = await Future.wait([
       for (final s in spaces)
         (s.token ?? '').isEmpty
             ? Future.value(0)
-            : client.unreadCount(s.token!).catchError((_) => 0),
+            : SpaceSessions.ofPayload(s, db: widget.db)
+                .call((t) => client.unreadCount(t))
+                .catchError((_) => 0),
     ]);
     if (!mounted) return;
     setState(() {
