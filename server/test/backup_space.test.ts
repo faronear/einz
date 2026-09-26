@@ -20,7 +20,9 @@ import { createBackup, restoreBackup, verifyBackup, type BackupPaths } from '../
 
 /** FILES_ROOT 是模块加载期常量 → 先设 env 再动态 import。 */
 const filesRoot = mkdtempSync(join(tmpdir(), 'einz-bk-files-'))
+const avatarsRoot = mkdtempSync(join(tmpdir(), 'einz-bk-avatars-'))
 process.env.EINZ_FILES = filesRoot
+process.env.EINZ_AVATARS = avatarsRoot
 process.env.EINZ_DB_BACKUP_KEY = Buffer.alloc(32, 7).toString('base64')
 const { storeAttachment } = await import('../src/attachments.js')
 
@@ -30,6 +32,7 @@ function withPaths (fn: (paths: BackupPaths) => Promise<void>): Promise<void> {
   const paths: BackupPaths = {
     db: join(dataDir, 'einz.sqlite.db'),
     files: filesRoot,
+    avatars: avatarsRoot,
     dataDir,
   }
   openDb(paths.db)

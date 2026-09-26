@@ -42,6 +42,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export interface BackupPaths {
   db: string; // einz.sqlite.db 路径
   files: string; // 附件根目录
+  avatars: string; // 头像根目录（文件名 = member_id，见 avatars.ts）
   dataDir: string; // <data>/ 根目录（backups/ 也在这里）
 }
 
@@ -49,8 +50,9 @@ export interface BackupPaths {
 export function resolveBackupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
   const db = env.EINZ_DB ?? resolve(HERE, "../data/einz.sqlite.db");
   const files = env.EINZ_FILES ?? resolve(HERE, "../data/files");
+  const avatars = env.EINZ_AVATARS ?? resolve(HERE, "../data/avatars");
   const dataDir = resolve(dirname(db));
-  return { db, files, dataDir };
+  return { db, files, avatars, dataDir };
 }
 
 function backupKey(): Buffer {
@@ -115,16 +117,27 @@ export async function createBackup(paths = resolveBackupPaths(), spaceId?: strin
   if (spaceId != null && spaceId.length > 0) {
     assertSafeSpaceId(spaceId);
     const spaceFiles = join(paths.files, spaceId);
+    const rows = exportSpaceRows(spaceId);
     const entries = collectFilesRecursive(spaceFiles, spaceFiles).map((f) => ({
       // 备份内路径统一带 files/<space_id>/ 前缀，恢复时按同一规则剥前缀
       path: `files/${spaceId}/${f.path}`,
       b64: f.data.toString("base64"),
     }));
+    // 头像（按 member_id 存，不分空间）：只带**本空间成员**的那几份，
+    // 恢复时也只覆盖这几份，不动别的空间成员的头像。
+    const memberIds = new Set(
+      (rows.entrances ?? []).map((r) => r.member_id).filter((v): v is string => typeof v === "string" && v.length > 0),
+    );
+    for (const memberId of memberIds) {
+      const full = join(paths.avatars, memberId);
+      if (!existsSync(full)) continue;
+      entries.push({ path: `avatars/${memberId}`, b64: readFileSync(full).toString("base64") });
+    }
     const payload = JSON.stringify({
       format: FORMAT,
       created_at: now,
       scope: { type: "space", space_id: spaceId },
-      rows: exportSpaceRows(spaceId),
+      rows,
       entries,
     });
     return encryptBackup(payload, now, backupsDir, `space-${spaceId}`);
@@ -145,6 +158,11 @@ export async function createBackup(paths = resolveBackupPaths(), spaceId?: strin
   const entries = [
     { path: "app.db", data: dbBytes },
     ...collectFilesRecursive(paths.files, paths.files),
+    // 头像：路径带 `avatars/` 前缀（与 files/ 并列），恢复时据此分流
+    ...collectFilesRecursive(paths.avatars, paths.avatars).map((f) => ({
+      path: `avatars/${f.path}`,
+      data: f.data,
+    })),
   ];
   const payload = JSON.stringify({
     format: FORMAT,
@@ -256,6 +274,15 @@ function restoreSpace(
   const spaceFiles = join(paths.files, spaceId);
   if (existsSync(spaceFiles)) rmSync(spaceFiles, { recursive: true, force: true });
   for (const entry of entries) {
+    // 头像（`avatars/<member_id>`）按 member_id 存、**不分空间**，所以这里只覆盖
+    // 备份里带的那几份本空间成员头像，**绝不整目录清空**（否则会删掉别人的头像）。
+    if (entry.path.startsWith("avatars/")) {
+      const target = join(paths.avatars, entry.path.slice("avatars/".length));
+      assertInsideRoot(paths.avatars, target);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, Buffer.from(entry.b64, "base64"));
+      continue;
+    }
     const rel = entry.path.startsWith(`files/${spaceId}/`)
       ? entry.path.slice(`files/${spaceId}/`.length)
       : entry.path;
@@ -298,6 +325,13 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
   // 先清空旧 files/（恢复为备份时的精确状态）
   if (existsSync(paths.files)) rmSync(paths.files, { recursive: true, force: true });
 
+  // 头像同口径清空——**但只在这份备份真的含头像条目时**（2026-09-26 之前的备份
+  // 都没有）。否则"恢复一份老备份"会顺手把现存的头像全删光，比不恢复还糟。
+  const hasAvatarEntries = parsed.entries.some((e) => e.path.startsWith("avatars/"));
+  if (hasAvatarEntries && existsSync(paths.avatars)) {
+    rmSync(paths.avatars, { recursive: true, force: true });
+  }
+
   // 库：连 -wal / -shm 一起删——只覆盖主库的话，残留的 WAL 会被 SQLite 重放进
   // 刚恢复的库里，恢复出"半新半旧"的数据（老板 2026-09-17）。
   for (const suffix of ["", "-wal", "-shm"]) rmSync(paths.db + suffix, { force: true });
@@ -308,6 +342,14 @@ export function restoreBackup(backupPath: string, paths = resolveBackupPaths()):
     if (entry.path === "app.db") {
       mkdirSync(dirname(paths.db), { recursive: true });
       writeFileSync(paths.db, Buffer.from(entry.b64, "base64"));
+      continue;
+    }
+    // 头像：`avatars/<member_id>`，落盘位置取 paths.avatars（同 EINZ_AVATARS）
+    if (entry.path.startsWith("avatars/")) {
+      const avatarTarget = join(paths.avatars, entry.path.slice("avatars/".length));
+      assertInsideRoot(paths.avatars, avatarTarget);
+      mkdirSync(dirname(avatarTarget), { recursive: true });
+      writeFileSync(avatarTarget, Buffer.from(entry.b64, "base64"));
       continue;
     }
     // 其余一律当附件：备份里的路径是 files/ 内的相对路径，早期备份可能带

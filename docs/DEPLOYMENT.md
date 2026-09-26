@@ -242,6 +242,10 @@ npm run restore -- data/backups/backup-<ts>.json
 ```
 
 - 恢复会**先删后写**：`files/` 整个清空重建，库写到 `EINZ_DB` 指向的文件
+- **头像也在备份里**（2026-09-26 起）：条目路径 `avatars/<member_id>`，恢复时写回
+  `EINZ_AVATARS`。**恢复没有头像条目的老备份时不会清空现有头像**——否则一次恢复
+  就把所有人的头像删光，比不恢复更糟。
+
   （默认 `data/einz.sqlite.db`，连 `-wal`/`-shm` 一起删，避免旧 WAL 被重放进恢复的库）。
   备份里的 `app.db` 只是内部条目名，不是落盘文件名。
 - **单空间备份（`--space`）是另一条路**：只导出该空间的行 + `files/<space_id>/`
