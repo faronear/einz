@@ -140,8 +140,15 @@ class VoiceCallService {
   String? _remoteOfferSdp; // 被叫：接听前先存着对方的 offer
   final List<Map<String, dynamic>> _pendingIce = []; // pc 还没建好时先攒着
   Timer? _ringTimer;
+  Timer? _connectTimer;
 
   static const Duration _ringTimeout = Duration(seconds: 60);
+
+  /// 接通阶段（已接听、正在打洞）的超时。
+  ///
+  /// 没有它，ICE 打不通时会**永远停在「正在接通…」**——用户以为卡死，其实是在
+  /// 干等一个永远不会来的 connected（跨运营商无 TURN 时就是这样）。
+  static const Duration _connectTimeout = Duration(seconds: 30);
 
   // ─────────────────────────── 对外动作 ───────────────────────────
 
@@ -174,6 +181,7 @@ class VoiceCallService {
     _ringTimer?.cancel();
     final callId = s.callId!;
     _emit(s.copyWith(phase: VoiceCallPhase.connecting));
+    _startConnectTimer();
     _send(kWsTypeCallAccept, callId);
     try {
       await _ensureMic();
@@ -259,6 +267,7 @@ class VoiceCallService {
         if (s.phase == VoiceCallPhase.calling && s.callId == callId) {
           _ringTimer?.cancel();
           _emit(s.copyWith(phase: VoiceCallPhase.connecting));
+          _startConnectTimer();
         }
         break;
       case kWsTypeCallReject:
@@ -304,6 +313,7 @@ class VoiceCallService {
   /// 彻底清理（页面销毁时调用）。
   Future<void> dispose() async {
     _ringTimer?.cancel();
+    _connectTimer?.cancel();
     await _teardown();
     state.dispose();
   }
@@ -327,6 +337,15 @@ class VoiceCallService {
   void _startRingTimer() {
     _ringTimer?.cancel();
     _ringTimer = Timer(_ringTimeout, () => _end(VoiceCallEndReason.timeout));
+  }
+
+  /// 开始计时"接通"阶段：超时就判定连接失败（不让它无限转圈）。
+  void _startConnectTimer() {
+    _connectTimer?.cancel();
+    _connectTimer = Timer(_connectTimeout, () {
+      final s = state.value;
+      if (s.phase == VoiceCallPhase.connecting) _end(VoiceCallEndReason.failed);
+    });
   }
 
   Future<void> _ensureMic() async {
@@ -415,6 +434,7 @@ class VoiceCallService {
     final s = state.value;
     if (s.phase == VoiceCallPhase.idle) return;
     _ringTimer?.cancel();
+    _connectTimer?.cancel();
     final duration = s.startedAt == null ? null : DateTime.now().difference(s.startedAt!);
     _emit(s.copyWith(phase: VoiceCallPhase.ended, endReason: reason));
     unawaited(WakelockPlus.disable().catchError((_) => null));
@@ -425,6 +445,7 @@ class VoiceCallService {
   /// 回到 idle（UI 收完结束提示后调用，避免一直停在 ended）。
   void reset() {
     _ringTimer?.cancel();
+    _connectTimer?.cancel();
     _emit(const VoiceCallState());
   }
 
