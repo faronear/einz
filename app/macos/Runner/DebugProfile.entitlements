@@ -10,6 +10,12 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- 用户经文件选择器挑中的文件：对话页的附件入口/换头像走 FilePicker.pickFiles。
+	     沙盒下**必须显式声明**，否则 open panel 起不来、点了没反应（老板 2026-09-26
+	     实测：本地 debug 构建里「My avatar」点击无反应，而 CI 的 Release 包正常——
+	     就是这个差异：Release.entitlements 早就有这一项，DebugProfile 漏了）。 -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)cc.tic.einz</string>
