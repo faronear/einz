@@ -69,7 +69,26 @@ enum _InputMode { text, hint, recording, preview }
 /// 老板 2026-09-25；边长按可用宽度反算，桌面大窗口设上限）。
 const double _entranceCardSpacing = 12;
 const int _entranceCardsPerRow = 3;
-const double _entranceCardMaxSize = 160;
+
+/// 弹层**内容区**的最大宽度：modal bottom sheet 在 M3 下把内容限在 640，窗口再宽也不再长
+/// （实测 800 / 1600 宽的视口，内容区都是 640、居中）。
+const double _entranceSheetMaxWidth = 640;
+
+/// 弹层内容区左右的内边距（下面 Padding 的 16）。
+const double _entranceSheetHPadding = 16;
+
+/// 卡片边长上限 = **弹层最大宽度**下"一行 3 张"的边长：
+/// 640 − 左右各 16 = 608 可用，减去两条 12 的间距，再均分 3 份 = 194.67
+/// （`_entranceCardSizeFor` 向下取整到 194，右边最多余 2px）。
+///
+/// 老板 2026-09-26：桌面窗口拉宽到弹层不再增长之后，卡片也不能先停止增长——原来上限
+/// 硬写 160，宽窗口下三张卡只铺到 504，右边空一大截（弹层 640 里空 100+）。
+/// 手机上可用宽度够不到这个上限（< 3*160+2*12 = 504），不影响"一行正好 3 张"。
+/// 「切换我的秘境」弹层有一份同口径的 `_kCardMaxSize`（space_switcher.dart），改一处要改两处。
+const double _entranceCardMaxSize = (_entranceSheetMaxWidth -
+        _entranceSheetHPadding * 2 -
+        _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
+    _entranceCardsPerRow;
 
 /// 「更多通道」弹层标题右端「刷新」按钮的边长 = IconButton 的 compact 触控盒
 /// （`kMinInteractiveDimension` 48 − visualDensity.compact 各 4）。左侧放同宽占位，

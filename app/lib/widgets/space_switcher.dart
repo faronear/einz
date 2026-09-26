@@ -27,9 +27,24 @@ class SpacePick {
 const double _kCardSpacing = 12;
 const int _kCardsPerRow = 3;
 
-/// 桌面大窗口的卡片边长上限：不设的话窗口一宽卡片会离谱地大。
-/// 手机上（可用宽度 < 3*160+2*12 = 504）不影响"正好 3 张"。
-const double _kCardMaxSize = 160;
+/// 弹层**内容区**的最大宽度：modal bottom sheet 在 M3 下把内容限在 640，窗口再宽也不再长
+/// （实测 800 / 1600 宽的视口，内容区都是 640、居中）。
+const double _kSheetMaxWidth = 640;
+
+/// 弹层内容区左右的内边距（下面 Padding 的 16）。
+const double _kSheetHPadding = 16;
+
+/// 卡片边长上限 = **弹层最大宽度**下"一行 3 张"的边长：608 − 两条 12 的间距，再均分
+/// 3 份 = 194.67（`_cardSizeFor` 向下取整到 194，右边最多余 2px）。
+///
+/// 老板 2026-09-26：桌面窗口拉宽到弹层不再增长之后，卡片也不能先停止增长——原来上限
+/// 硬写 160，宽窗口下三张卡只铺到 504，右边空一大截。手机上可用宽度够不到它，
+/// 不影响"一行正好 3 张"。
+/// 「更多通道」弹层有一份同口径的 `_entranceCardMaxSize`（chat_page.dart），改一处要改两处。
+const double _kCardMaxSize = (_kSheetMaxWidth -
+        _kSheetHPadding * 2 -
+        _kCardSpacing * (_kCardsPerRow - 1)) /
+    _kCardsPerRow;
 
 /// 一张卡片的边长：由弹层**可用宽度反算**，保证一行正好放下 [_kCardsPerRow] 张
 /// （老板 2026-09-24：iPhone 16 上固定 120 时，2 张空太多、3 张放不下）。

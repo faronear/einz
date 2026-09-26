@@ -276,6 +276,18 @@ void main() {
       for (final n in ['iPhone', 'iPad', 'MacBook', '旧手机']) cardOf(tester, n).height,
     };
     expect(heights.length, 1, reason: '所有通道卡片应等高（时间行恒占一行）');
+    // 卡片边长上限 = 弹层最大宽度下"一行 3 张"的边长（老板 2026-09-26）：
+    // 弹层内容限在 640、减左右各 16 = 608 可用 → (608 − 2×12) / 3 = 194.67 → 取整 194。
+    // 原来硬写 160 时，三张卡只铺到 504，宽窗口里右边空一大截。
+    expect(cardOf(tester, 'iPhone').width, 194,
+        reason: '卡片上限应跟着弹层最大宽度走，不再卡在 160');
+    // 第一行三张（iPhone / iPad / MacBook）铺满内容宽度：右缘应对齐刷新按钮的右缘
+    // （刷新按钮与卡片是同层 Padding 的两个兄弟 → 它的右缘 = 内容区右缘）
+    final contentRight = tester
+        .getRect(find.ancestor(of: sheetRefresh(), matching: find.byType(IconButton)))
+        .right;
+    expect(cardOf(tester, 'MacBook').right, closeTo(contentRight, 3),
+        reason: '一行 3 张应铺满弹层内容宽度（最多差向下取整的那 2px）');
     // 已撤销卡：右上角阻止图标 + 整卡蒙版；本机卡：右上角绿勾、不蒙版
     expect(sheetRevokedMark(), findsOneWidget);
     expect(dimmedCardOf('旧手机'), findsOneWidget, reason: '已撤销卡应有蒙版（整卡降透明度）');
