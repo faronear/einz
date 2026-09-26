@@ -251,6 +251,11 @@ export function attachWs(wss: WebSocketServer): void {
             out.reason = payload.reason;
           }
           broadcastCall(entranceId, frame.type, out);
+          // 只记"通话级"事件（invite/accept/reject/hangup），不记 offer/answer/ice：
+          // 后三者一通电话几十条，会把日志刷满。排障用：确认本版服务端是否真的在转发。
+          if (frame.type !== "call.offer" && frame.type !== "call.answer" && frame.type !== "call.ice") {
+            console.log(`[req] WS ${frame.type} entrance=${entranceId} call=${callId}`);
+          }
         }
       } catch {
         // 忽略非法帧
