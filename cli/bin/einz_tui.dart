@@ -1972,6 +1972,7 @@ class _EntranceRow {
     required this.no,
     required this.entranceId,
     required this.label,
+    required this.hasName,
     required this.memberName,
     required this.online,
     required this.tag,
@@ -1983,6 +1984,7 @@ class _EntranceRow {
   final int no; // 1 基序号（与 /entrances 输出一致；/revoke 按它选通道）
   final String entranceId;
   final String label; // 通道名（缺失回退 entrance_id）
+  final bool hasName; // 通道是否真有名字（label 是回退出来的 id 时为 false）——/revoke 抄名字用
   final String memberName; // 使用者名字（缺失回退 member_id）
   final bool online;
   final String tag; // 本机 / 已撤销 / 在线 / 离线
@@ -2014,7 +2016,9 @@ Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
   var no = 0;
   for (final d in entrances) {
     final devId = (d['entrance_id'] ?? '-') as String;
-    final devName = (d['entrance_name'] as String? ?? '');
+    // trim：/revoke 的确认步要用户**逐字抄**这个名字，label 里的空白字符会变成
+    // 抄不对的坑（App 侧同样是 trim 后再显示/比对）
+    final devName = (d['entrance_name'] as String? ?? '').trim();
     final member = (d['member_id'] ?? '-') as String;
     final last = d['last_seen'];
     final connectedAt = d['connected_at'];
@@ -2053,6 +2057,7 @@ Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
       no: ++no,
       entranceId: devId,
       label: devName.isNotEmpty ? devName : devId,
+      hasName: devName.isNotEmpty,
       memberName: s.memberNames[member] ?? member,
       online: online,
       tag: isMe ? '本机' : (revoked ? '已撤销' : (online ? '在线' : '离线')),
@@ -3304,9 +3309,11 @@ Future<void> _execCommand(String line) async {
       // 撤销同空间某条通道（PROTOCOL.md §7.2，老板 2026-09-16）：
       // **同 space 内可互撤**（自己的另一条 / 伴侣的通道），但每次都要校验共享口令——
       // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
-      // 选通道（序号/通道名）→ 输入 yes 确认目标 → 输入口令。任一步取消都不做任何改动。
+      // 选通道（序号/通道名）→ **抄一遍目标通道名** → 输入口令。任一步取消都不做任何改动。
       // **任一步留空回车即取消**（老板 2026-09-23：此前 required 拦空回车，用户被困，
       // 只剩"输乱码报无效"和 /exit 两条别扭的路）。
+      // 第二步由 `yes` 改成抄名字（老板 2026-09-26）：`yes` 太机械、闭着眼也能敲过去，
+      // 抄名字逼人看清"撤的是哪一台"。
       try {
         final server = s.session.server;
         final token = s.session.store.sessionToken;
@@ -3365,15 +3372,28 @@ Future<void> _execCommand(String line) async {
               _systemMessage(s.session, '⚠️ #${target.no} ${target.label} 已经是「已撤销」状态（未做任何改动）'));
           break;
         }
-        // 二次确认：必须让用户看清"撤的是哪一台"——选错序号就是不可逆的数据销毁
+        // 二次确认：先亮明"撤的是哪一台"（选错序号就是不可逆的数据销毁），
+        // 再让用户**抄一遍**它的通道名（老板 2026-09-26：由输入 `yes` 改成抄名字——
+        // `yes` 太机械、闭着眼也能敲过去）。没有名字时退化为固定确认词 REVOKE，
+        // 与 /reset 同一口径（不降级成 entranceId：抄一串 UUID 只会制造新的抄错机会）。
         s.session.messages.add(_systemMessage(
             s.session,
             '⚠️ 即将撤销 #${target.no} ${target.label}（使用者：${target.memberName}）——\n'
             '   该通道下次联网认证时会**清空本地数据**（含历史消息与附件），不可逆。'));
-        final confirm = await _promptAction(s.session, '❓ 确认请输入 yes（留空或其它任意输入取消）:');
+        const fallbackWord = 'REVOKE';
+        final expected = target.hasName ? target.label : fallbackWord;
+        final confirm = await _promptAction(
+            s.session,
+            target.hasName
+                ? '❓ 请输入通道名「${target.label}」以确认撤销，或直接回车取消:'
+                : '❓ 该通道没有名字，请输入 $fallbackWord 以确认撤销，或直接回车取消:');
         if (!s.running) break;
-        if (confirm == null || confirm.toLowerCase() != 'yes') {
+        if (confirm == null) {
           s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未做任何改动）'));
+          break;
+        }
+        if (confirm != expected) {
+          s.session.messages.add(_systemMessage(s.session, '✅ 已取消（输入不符，未做任何改动）'));
           break;
         }
         // 口令（隐藏输入）：撤销的授权因子——即使本机已持会话，也必须由口令持有者授权

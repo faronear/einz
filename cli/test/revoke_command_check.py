@@ -2,7 +2,8 @@
 # /entrances 与 /revoke 回归（老板 2026-09-16）：
 #   ① `/entrances` 输出**同空间全部通道**（我 + 对方，不只自己的）：A 创建、B 以伴侣身份
 #      加入后，A 的列表里应同时有「本机 A」和「在线 B」，并带序号（供 /revoke 使用）；
-#   ② `/revoke` 三重确认（选通道 → 输入 yes → 共享口令）+ 口令校验：
+#   ② `/revoke` 三重确认（选通道 → **抄一遍目标通道名** → 共享口令）+ 口令校验：
+#      - 确认步只认通道名：旧的固定词 `yes` → 「输入不符」，未做任何改动（2026-09-26 改）；
 #      - 口令错 → 提示且**目标毫发无损**（B 的 TUI 仍在跑、store 还在）；
 #      - 正确口令 → 服务端撤销 → B 收到 entrance.revoked → **清空本地数据并退出**（store 被删）；
 #   ③ 负例：不能撤销本机（拒绝后命令即结束，不会被后续输入喂成确认）；
@@ -227,6 +228,18 @@ def parse_row_numbers(frame):
             my_no = int(m_no.group(1))
     return my_no, peer_no
 
+def parse_peer_name(frame):
+    """抠出对方的**通道名**（`/revoke` 确认步要抄的就是屏幕上显示的这个）。
+
+    名字由宿主名派生（`_defaultEntranceName`），探针预知不了，只能从列表帧里读回来——
+    这也正是"抄名字"这条闸门的用意：抄的是**用户眼前看到的那一行**。
+    行形如 `  2) 🟢 DoomBase [ali] 在线 ...`。"""
+    for line in frame.splitlines():
+        m = re.match(r'\s*\d+\)\s*[🟢⚪]\s*(.+?)\s*\[%s\]' % re.escape(MEMBER), line)
+        if m:
+            return m.group(1)
+    return None
+
 def main():
     port = free_port()
     server = None
@@ -260,12 +273,21 @@ def main():
             print(f'❌ ① 列表应含对方 member「{MEMBER}」:\n{frame[-900:]}'); return 1
         print(f'✅ ① /entrances 列出同空间 2 条（本机 #{my_no}、对方 #{peer_no} 在线、带序号）')
 
+        # 对方通道名只能从列表里读回来（宿主名派生，探针预知不了）——
+        # /revoke 第二步要抄的就是它
+        peer_name = parse_peer_name(frame)
+        if not peer_name:
+            print(f'❌ ① 未能从列表解析对方通道名:\n{frame[-900:]}'); return 1
+        print('   （对方通道名 =「%s」）' % peer_name)
+
         # ---------- ② 口令错 → 撤销不生效（目标毫发无损） ----------
         send(m_a, f'/revoke {peer_no}\r')
-        frame = wait_screen(m_a, lambda t: '确认请输入 yes' in t, '撤销二次确认')
+        frame = wait_screen(m_a, lambda t: '确认撤销' in t, '撤销二次确认')
         if '清空本地数据' not in frame:
             print(f'❌ ② 确认提示应写明不可逆后果:\n{frame[-900:]}'); return 1
-        send(m_a, 'yes\r')
+        if peer_name not in frame:
+            print(f'❌ ② 确认提示应带出目标通道名「{peer_name}」:\n{frame[-900:]}'); return 1
+        send(m_a, peer_name + '\r')
         wait_screen(m_a, lambda t: '输入共享口令' in t, '撤销要求共享口令')
         send(m_a, 'wrong-passphrase\r')
         frame = wait_screen(m_a, lambda t: '共享口令错误' in t, '口令错提示')
@@ -297,8 +319,8 @@ def main():
         send(m_a, '/device\r')
         wait_screen(m_a, lambda t: '当前通道名' in t, '③b 别名 /device 只读查看')
         send(m_a, f'/revoke {peer_no}\r')
-        wait_screen(m_a, lambda t: '确认请输入 yes' in t, '③b 二次确认')
-        send(m_a, 'yes\r')
+        wait_screen(m_a, lambda t: '确认撤销' in t, '③b 二次确认')
+        send(m_a, peer_name + '\r')
         wait_screen(m_a, lambda t: '输入共享口令' in t, '③b 口令步')
         send(m_a, '\r')  # 留空 = 取消（此前这一步才是真正被困的：只能重输或 /exit）
         wait_screen(m_a, lambda t: '已取消（未做任何改动）' in t, '③b 口令步留空取消')
@@ -307,12 +329,23 @@ def main():
                     '③b 取消后可继续用')
         print('✅ ③b 序号步/口令步留空回车 → 已取消，TUI 未被困（命令照常可用）')
 
+        # ---------- ③c 确认步只认通道名：旧的固定词 yes 必须被拒（2026-09-26 新增） ----------
+        send(m_a, f'/revoke {peer_no}\r')
+        frame = wait_screen(m_a, lambda t: '确认撤销' in t, '③c 二次确认')
+        if peer_name not in frame:
+            print(f'❌ ③c 确认提示应带出目标通道名「{peer_name}」:\n{frame[-900:]}'); return 1
+        send(m_a, 'yes\r')  # 改语义之前就是靠它过关的
+        frame = wait_screen(m_a, lambda t: '输入不符' in t, '③c 旧固定词应被拒')
+        if '未做任何改动' not in frame:
+            print(f'❌ ③c 抄错名字应说明未做任何改动:\n{frame[-900:]}'); return 1
+        print('✅ ③c 确认步只认通道名：输入 yes → 「输入不符」，未做任何改动')
+
         # ---------- ④ 正确口令 → 撤销生效：对方清空本地数据并退出 ----------
         send(m_a, '/revoke\r')  # 无参：走"列出通道 → 询问序号"的交互路径
         wait_screen(m_a, lambda t: '输入要撤销的通道序号' in t, '无参 /revoke 询问序号')
         send(m_a, f'{peer_no}\r')
-        wait_screen(m_a, lambda t: '确认请输入 yes' in t, '④ 二次确认')
-        send(m_a, 'yes\r')
+        wait_screen(m_a, lambda t: '确认撤销' in t, '④ 二次确认')
+        send(m_a, peer_name + '\r')
         wait_screen(m_a, lambda t: '输入共享口令' in t, '④ 口令输入')
         send(m_a, PASSPHRASE + '\r')
         frame = wait_screen(m_a, lambda t: f'已撤销 #{peer_no}' in t, '④ 撤销成功')
