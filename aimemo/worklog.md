@@ -10063,3 +10063,37 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 **老板侧立即生效须知**：这是纯客户端修复——重新打包安装后，「我和 Vic」这个空间
 （以及任何超 24h 的空间）会自动续期，头像/改名/更多通道都会恢复正常。
 
+
+## 2026-09-26 语音通话：转 Phase B，按最终产品做（新分支 feat/voiceCall）
+
+**转折点**：老板受够了手工粘贴 SDP 跨机互传——切到微信就把 Einz 断线（iOS 前台限制），
+而且 Phase A 该拿的结论已经拿到了（能编、能通、能听到）。拍板：
+**不再折腾手工验证，直接从 main 开分支按最终产品做**（失败就回撤）。
+
+### 已完成（分支 `feat/voiceCall`，领先 main 3 个提交）
+
+1. **信令通路**（B-1）：`PROTOCOL.md` §8.4（7 个 call.* 帧 + 服务端约定）；
+   `shared/ws_client.dart` 加 `kWsTypeCall*` / `WsCallEvent` / **新的 `send()`**
+   （此前 WsClient 只有 `listen` 没有 `add`，客户端根本发不出帧）；
+   `server/ws.ts` 加 `CALL_TYPES` 白名单 + `broadcastCall()`（同空间转发、补 `from_entrance_id`）
+   + 形状校验 + **按通道限流 120 帧/10s**（WS 路径此前完全没接限流）。
+2. **通话服务**（B-2）`app/lib/data/voice_call_service.dart`：状态机
+   （calling/ringing/connecting/active/ended + 6 种结束原因）、trickle ICE、
+   忙线自动回 `reject(busy)`、振铃 60s 超时；**接通后重设音频会话 + 通话期间常亮**
+   （两条都来自 Phase A 真机教训：不重设会「connected 但没声音」，息屏会断通话）。
+3. **UI**（B-3）`app/lib/voice_call_sheet.dart` + chat_page 接线：顶部栏通话按钮、
+   振铃/通话中全屏层（静音/免提/挂断/计时）、结束走顶部提示条；l10n 19 键。
+
+### 关键设计决定
+
+- **TURN 走 `dart-define`（`VOICE_TURN_URLS`），不写死**：coturn 部署好之后填一下就能启用，
+  不用改代码。默认只有 STUN（`stun:stun.miwifi.com:3478`）。
+- 服务端**只转发认识字段**（call_id/sdp/candidate/reason），客户端塞的其它内容一律丢弃。
+- 通话状态机**全在客户端**，服务端不参与——断线重连不补通话信令。
+
+### 待办
+
+- B-4 通话记录（双向同步为 system 消息）
+- **服务端需老板重启**才生效（call.* 转发）
+- 真机自测：iOS 走 Ad Hoc（正式 bundle `cc.tic.einz`，会覆盖手机上 CI 版，测完重装即可）；
+  Android 用 debug APK

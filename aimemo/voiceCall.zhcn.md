@@ -82,15 +82,24 @@ TURN 兜底          →  国内服务器                   ← 关键：跨境 
 
 > 这是唯一可能翻车的点。先试掉它，后面的工作量预估才有意义。
 
-### Phase B — 前台语音通话 MVP
+### Phase B — 前台语音通话 MVP（进行中）
 
-- [ ] **协议**：`docs/PROTOCOL.md` §8 新增「通话信令」小节（草案见 §5），同步更新 `shared/` 帧类型常量
-- [ ] **服务端**：`call.*` 帧在同一 space 内转发（复用 `guard` 的空间隔离 + `ratelimit.ts`）；**不落库、不进 `server_sequence`**
-- [ ] **客户端媒体**：`flutter_webrtc` 接入，权限复用现有语音消息的麦克风声明（需核对 Info.plist / AndroidManifest）
-- [ ] **UI**：发起/振铃/通话中（静音、免提、挂断、计时）/ 未接 / 拒绝 / 忙线
-- [ ] **通话记录**：聊天流里的记录气泡（已接/未接/时长）——是否**双向同步**待定（倾向同步为 system 消息，
-      meta 沿用现有 `audioDurationSeconds` 的登记机制）
-- [ ] 多语言：`app_zh.arb` / `app_en.arb` 补齐通话相关键
+分支 **`feat/voiceCall`**（从 `main` 开出，按最终产品做；Phase A 的验证分支 `feat/voiceCallPhaseA` 保留）
+
+- [x] **协议**（2026-09-26）：`docs/PROTOCOL.md` §8.4「通话信令」；`shared` 加 `kWsTypeCall*` 常量与
+      `WsCallEvent`，并**给 `WsClient` 补了发送能力**（此前只有 `listen` 没有 `add`，客户端根本发不出帧）
+- [x] **服务端**（2026-09-26）：`call.*` 同 space 哑转发——只转发认识字段、`call_id` 1–64 字符、
+      `sdp` ≤32KiB、**按通道限流 120 帧/10s**（`call.ice` 一通电话几十条，不限流等于免费放大器）；
+      不落库、不进 `server_sequence`、不参与状态机。**改动需老板重启服务端生效**
+- [x] **客户端服务**（2026-09-26）：`VoiceCallService`——发起/振铃/接听/拒接/挂断/忙线/超时状态机，
+      trickle ICE，接通后重设音频会话（Phase A 教训：不重设会出现「connected 但没声音」）+ 通话期间常亮
+- [x] **UI**（2026-09-26）：聊天页顶部栏通话按钮；振铃（来电=接听/拒绝、去电=取消）与通话中
+      （静音/免提/挂断/计时）全屏层；振铃时写明「双方都要在前台」；结束走顶部提示条
+- [x] 权限与依赖：`flutter_webrtc` + `wakelock_plus`；iOS `UIBackgroundModes=audio`；
+      Android `MODIFY_AUDIO_SETTINGS` / `CHANGE_NETWORK_STATE`
+- [x] 多语言：19 个通话键（中英）
+- [ ] **通话记录**：聊天流里的记录（已接/未接/时长）——**双向同步为 system 消息**
+- [ ] **真机自测**：两端装包后跑通一次（服务端需先重启）
 
 ### Phase C — TURN 兜底（按需，观察后再做）
 
