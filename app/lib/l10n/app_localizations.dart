@@ -1289,7 +1289,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageBurnOff.
   ///
   /// In en, this message translates to:
-  /// **'Burn-after-read off (messages kept forever)'**
+  /// **'Burn-after-read is off (this message will be kept)'**
   String get chatPageBurnOff;
 
   /// No description provided for @chatPageBurnFailed.

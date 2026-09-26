@@ -280,7 +280,7 @@
   },
   "chatPageBurnHeading": "Burn-after-read",
   "chatPageBurnNote": "New messages are deleted on a countdown once read",
-  "chatPageBurnOff": "Burn-after-read off (messages kept forever)",
+  "chatPageBurnOff": "Burn-after-read is off (this message will be kept)",
   "chatPageBurnFailed": "Failed to set burn-after-read",
   "chatPageBurnWillDelete": "New messages auto-delete after {duration}",
   "@chatPageBurnWillDelete": {

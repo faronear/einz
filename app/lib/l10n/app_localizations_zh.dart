@@ -645,7 +645,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageBurnNote => '倒计时删除已阅读的新消息';
 
   @override
-  String get chatPageBurnOff => '阅后即焚已关闭（消息永久保留）';
+  String get chatPageBurnOff => '阅后即焚已关闭（这一消息将会保留）';
 
   @override
   String get chatPageBurnFailed => '设置阅后即焚失败';

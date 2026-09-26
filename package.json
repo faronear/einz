@@ -46,7 +46,6 @@
     "app-mac-build-dist-no-notary": "bash app/macos/buildMacos.sh --no-notary",
     "app-mac-run-local": "cd app; echo \"▶ macOS debug · 连 localhost:3000（路径①：--server 运行期覆盖，同 buildMacos.sh --server）· 数据落在容器内 dev/ 子目录 + 独立 Keychain 前缀，不碰正式客户端\"; flutter run -d macos -a --server=http://localhost:3000 --dart-define=einzDevDataDir=dev --dart-define=einzSecurePrefix=einz.secure.dev.",
     "app-mac-run-localConfig": "cd app; if [ ! -f localConfig.macos.json ]; then echo '❌ 缺 app/localConfig.macos.json，内容形如 {\"kEinzServer\":\"http://localhost:3000\"}'; exit 1; fi; echo \"▶ macOS debug · 连 localConfig.macos.json 里的地址（路径②：--dart-define-from-file 编译期烘入）· 数据落在容器内 dev/ 子目录 + 独立 Keychain 前缀，不碰正式客户端\"; flutter run -d macos --dart-define-from-file=localConfig.macos.json --dart-define=einzDevDataDir=dev --dart-define=einzSecurePrefix=einz.secure.dev.",
-    "app-mac-run-remote": "cd app; flutter run -d macos",
     "tui2local-1": "cd cli && dart run bin/einz_tui.dart --store demo/s1.json --server http://localhost:3000",
     "tui2local-2": "cd cli && dart run bin/einz_tui.dart --store demo/s2.json --server http://localhost:3000",
     "tui2local-3": "cd cli && dart run bin/einz_tui.dart --store demo/s3.json --server http://localhost:3000",
