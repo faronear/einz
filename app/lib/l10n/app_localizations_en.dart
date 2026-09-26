@@ -986,4 +986,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get spaceListPeerPending => 'Not joined yet';
+
+  @override
+  String get voiceCallMenuCall => 'Voice call';
+
+  @override
+  String get voiceCallIncoming => 'Incoming call';
+
+  @override
+  String get voiceCallCalling => 'Calling…';
+
+  @override
+  String get voiceCallConnecting => 'Connecting…';
+
+  @override
+  String get voiceCallAccept => 'Accept';
+
+  @override
+  String get voiceCallDecline => 'Decline';
+
+  @override
+  String get voiceCallCancel => 'Cancel';
+
+  @override
+  String get voiceCallHangUp => 'Hang up';
+
+  @override
+  String get voiceCallMute => 'Mute';
+
+  @override
+  String get voiceCallUnmute => 'Unmute';
+
+  @override
+  String get voiceCallSpeaker => 'Speaker';
+
+  @override
+  String get voiceCallSpeakerOff => 'Speaker off';
+
+  @override
+  String get voiceCallEnded => 'Call ended';
+
+  @override
+  String get voiceCallEndedDeclined => 'Call declined';
+
+  @override
+  String get voiceCallEndedBusy => 'Busy';
+
+  @override
+  String get voiceCallEndedNoAnswer => 'No answer';
+
+  @override
+  String get voiceCallEndedCanceled => 'Call canceled';
+
+  @override
+  String get voiceCallEndedFailed => 'Call failed';
+
+  @override
+  String get voiceCallForegroundOnly =>
+      'Calls connect only while both sides have Einz open';
 }

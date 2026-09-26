@@ -33,7 +33,9 @@
   "wizardNameTooLongError": "名字最多 {max} 个字符",
   "@wizardNameTooLongError": {
     "placeholders": {
-      "max": {"type": "int"}
+      "max": {
+        "type": "int"
+      }
     }
   },
   "wizardNameHintInput": "我的昵称",
@@ -64,7 +66,9 @@
   "wizardEnrollFailed": "❌ 登记失败: {error}",
   "@wizardEnrollFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "wizardPassphraseHint": "共享口令由你和伴侣共同持有，用于保护私密消息。务必牢记，不可泄漏；只可与秘境伴侣分享。",
@@ -84,7 +88,9 @@
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "setupEntryTitle": "秘境向导",
@@ -95,11 +101,19 @@
   "setupTokenAppTooOld": "本机 App 版本过旧，与服务器对不上（{code}）。请更新 App 后重试",
   "setupTokenRateLimited": "请求太频繁：请 {seconds} 秒后再试（这不是开通码本身的问题）",
   "@setupTokenRateLimited": {
-    "placeholders": { "seconds": { "type": "String" } }
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
   },
   "setupTokenRateLimitedNoWait": "请求太频繁，请稍后再试（这不是开通码本身的问题）",
   "@setupTokenAppTooOld": {
-    "placeholders": { "code": { "type": "String" } }
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
   },
   "setupTokenTitle": "验证开通码",
   "setupTokenHint": "开启本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。",
@@ -111,7 +125,14 @@
   "setupTokenSpaceAlreadyAdded": "这个秘境已经添加过了（一台设备只能有一条通道到同一个秘境）",
   "setupTokenOtherServer": "该邀请链接来自 {other}，本机连的是 {current}，不能混用",
   "@setupTokenOtherServer": {
-    "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
+    "placeholders": {
+      "other": {
+        "type": "String"
+      },
+      "current": {
+        "type": "String"
+      }
+    }
   },
   "setupCreateShareTitle": "快把邀请链接发给伴侣，一起体验秘境：",
   "setupCreateCopy": "复制邀请链接",
@@ -136,7 +157,9 @@
   "setupPageEscrowFailed": "❌ 共享口令验证失败。请询问你的伴侣。",
   "@setupPageEscrowFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "setupJoinEntranceLimitReached": "该秘境的通道数量已达服务器上限，无法再开通新通道。",
@@ -154,7 +177,9 @@
   "setPinDialogSetupFailed": "设置失败: {error}",
   "@setPinDialogSetupFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageLocaleSwitched": "已切换：{label}",
@@ -180,7 +205,9 @@
   "chatPageInviteFailed": "开通码生成失败: {error}",
   "@chatPageInviteFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageTitleBrand": "我的秘境",
@@ -191,7 +218,9 @@
   "chatPageAvatarFailed": "头像上传失败: {error}",
   "@chatPageAvatarFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageNameUnset": "未设置",
@@ -208,7 +237,9 @@
   "chatPageRenameEntranceTooLongError": "最多 {max} 个字符",
   "@chatPageRenameEntranceTooLongError": {
     "placeholders": {
-      "max": {"type": "int"}
+      "max": {
+        "type": "int"
+      }
     }
   },
   "chatPageRenameMyselfEmptyError": "请填写名字",
@@ -216,7 +247,9 @@
   "chatPageRenameNameTooLongError": "最多 {max} 个字符",
   "@chatPageRenameNameTooLongError": {
     "placeholders": {
-      "max": {"type": "int"}
+      "max": {
+        "type": "int"
+      }
     }
   },
   "chatPageRenameSameAsPeerError": "不能与对方同名，请换个名字",
@@ -226,7 +259,9 @@
   "chatPageRenameFailed": "修改失败: {error}",
   "@chatPageRenameFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageExitTitle": "退出本应用？",
@@ -246,7 +281,9 @@
   "chatPageChangePassphraseFailed": "修改口令失败: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageEscrowRotatedNotice": "伴侣已重设共享口令，以后必须使用新口令",
@@ -275,7 +312,9 @@
   "chatPagePinSetValue": "已设置",
   "@chatPageLocaleSwitched": {
     "placeholders": {
-      "label": {"type": "String"}
+      "label": {
+        "type": "String"
+      }
     }
   },
   "chatPageBurnHeading": "阅后即焚",
@@ -285,7 +324,9 @@
   "chatPageBurnWillDelete": "新的消息将在 {duration} 后自动删除",
   "@chatPageBurnWillDelete": {
     "placeholders": {
-      "duration": {"type": "String"}
+      "duration": {
+        "type": "String"
+      }
     }
   },
   "chatPageActionDelete": "立刻删除",
@@ -298,7 +339,9 @@
   "chatPageSendFailed": "发送失败: {error}",
   "@chatPageSendFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageMsgSent": "已发送",
@@ -309,7 +352,9 @@
   "chatPageOfflineUnsent": "离线 · {count} 条待发送",
   "@chatPageOfflineUnsent": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "chatPageEntranceUnrecognized": "这条通道未被服务器识别（服务器数据可能已重置）· 仅可查看本地消息，联网功能暂停；本地数据未清除",
@@ -319,13 +364,17 @@
   "chatPageVoiceStartFailed": "录音启动失败: {error}",
   "@chatPageVoiceStartFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageVoiceFailed": "录音失败: {error}",
   "@chatPageVoiceFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageVoicePermissionDenied": "麦克风权限被拒绝，请到系统设置里开启。",
@@ -336,7 +385,9 @@
   "chatPageAudioPlayFailed": "音频播放失败",
   "@chatPageAudioPlayFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageAttachEmoji": "表情符",
@@ -353,13 +404,17 @@
   "chatPageSaved": "已保存: {path}",
   "@chatPageSaved": {
     "placeholders": {
-      "path": {"type": "String"}
+      "path": {
+        "type": "String"
+      }
     }
   },
   "chatPageDownloadFailed": "下载失败: {error}",
   "@chatPageDownloadFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageAttachmentTapToDownload": "附件不在本机，点击重新下载",
@@ -367,7 +422,9 @@
   "chatPageFileOpenFailed": "打开文件失败: {error}",
   "@chatPageFileOpenFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageEntranceRevoked": "这条通道已被撤销，本地数据已清除，请重新配置",
@@ -384,7 +441,9 @@
   "lockPageLockedSeconds": "已锁定 {seconds} 秒",
   "@lockPageLockedSeconds": {
     "placeholders": {
-      "seconds": {"type": "int"}
+      "seconds": {
+        "type": "int"
+      }
     }
   },
   "lockPageNoPinSet": "尚未设置锁屏码（为空时不启用）",
@@ -392,13 +451,17 @@
   "lockPageTooManyAttempts": "尝试次数过多，请 {seconds} 秒后再试",
   "@lockPageTooManyAttempts": {
     "placeholders": {
-      "seconds": {"type": "int"}
+      "seconds": {
+        "type": "int"
+      }
     }
   },
   "lockPageUnlockFailed": "解锁失败: {error}",
   "@lockPageUnlockFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageMenuAbout": "关于秘境",
@@ -413,11 +476,19 @@
   "leaveSpaceMessage": "彻底删除当前秘境在本机上的全部消息、附件和凭证，并回到秘境向导页。秘境本身及其数据仍在，其他通道不受影响。此操作无法撤销！",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
-    "placeholders": { "name": { "type": "String" } }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "resetEntranceNameHint": "请输入当前通道名称“{name}”",
   "@resetEntranceNameHint": {
-    "placeholders": { "name": { "type": "String" } }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "resetEntranceNameMismatch": "请输入正确的通道名称以确认",
   "resetEntranceConfirmWord": "重置",
@@ -435,10 +506,90 @@
   "errorBackend": "后台：{message}",
   "@errorBackend": {
     "description": "后台（服务端）错误的前缀：只有服务端响应产出的错误才带它，本机判定的错误不带",
-    "placeholders": { "message": { "type": "String" } }
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
   },
   "spaceListPeerPending": "待加入",
   "@spaceListPeerPending": {
     "description": "空间卡片上对方尚未加入时的状态行（区别于“已加入但没设头像”）"
+  },
+  "voiceCallMenuCall": "语音通话",
+  "@voiceCallMenuCall": {
+    "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"
+  },
+  "voiceCallIncoming": "来电",
+  "@voiceCallIncoming": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallCalling": "正在呼叫…",
+  "@voiceCallCalling": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallConnecting": "正在接通…",
+  "@voiceCallConnecting": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallAccept": "接听",
+  "@voiceCallAccept": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallDecline": "拒绝",
+  "@voiceCallDecline": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallCancel": "取消",
+  "@voiceCallCancel": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallHangUp": "挂断",
+  "@voiceCallHangUp": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallMute": "静音",
+  "@voiceCallMute": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallUnmute": "取消静音",
+  "@voiceCallUnmute": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallSpeaker": "免提",
+  "@voiceCallSpeaker": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallSpeakerOff": "关闭免提",
+  "@voiceCallSpeakerOff": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEnded": "通话结束",
+  "@voiceCallEnded": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedDeclined": "对方拒绝了通话",
+  "@voiceCallEndedDeclined": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedBusy": "对方忙线中",
+  "@voiceCallEndedBusy": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedNoAnswer": "对方未接听",
+  "@voiceCallEndedNoAnswer": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedCanceled": "已取消通话",
+  "@voiceCallEndedCanceled": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedFailed": "通话连接失败",
+  "@voiceCallEndedFailed": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallForegroundOnly": "只有双方都打开 Einz 时才能接通",
+  "@voiceCallForegroundOnly": {
+    "description": "Hint under the ringing UI: no background incoming calls, so both sides must be in foreground / 振铃界面下方提示：不做后台呼入，双方都要在前台"
   }
 }

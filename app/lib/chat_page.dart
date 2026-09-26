@@ -34,9 +34,11 @@ import 'data/message_repository.dart';
 import 'data/space_session.dart';
 import 'data/ui_style_settings.dart';
 import 'data/ws_realtime_service.dart';
+import 'data/voice_call_service.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
+import 'voice_call_sheet.dart';
 import 'widgets/reset_entrance.dart';
 import 'widgets/space_switcher.dart';
 import 'data/vault_session.dart';
@@ -279,6 +281,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _attachmentStorage;
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
+  VoiceCallService? _voiceCall; // 语音通话（前台通话；信令走 WS，PROTOCOL.md §8.4）
   late String _myMemberName; // 我的名字（菜单显示；改名后 setState 刷新）
   late String _myEntranceName; // 我的通道名（菜单显示；改名后 setState 刷新）
   late String _myGender; // 我的性别（male/female/''；profile 恢复，个人资料弹窗图标展示）
@@ -635,8 +638,57 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         onPassphraseRotated: _onPassphraseRotated,
         onProfileUpdated: _onProfileUpdated,
         onReceiptUpdated: _onReceiptUpdated,
+        onCall: _onCallSignal,
       );
+      final call = VoiceCallService(ws: ws)..onEnded = _onCallEnded;
+      _voiceCall = call;
+      call.state.addListener(_onVoiceCallStateChanged);
     }
+  }
+
+  /// 顶部栏的通话按钮：发起呼叫（振铃界面由状态监听弹出）。
+  void _startVoiceCall() {
+    unawaited(_voiceCall?.invite());
+  }
+
+  /// 通话信令（Server 哑转发 call.*，PROTOCOL.md §8.4）：交给通话服务处理。
+  void _onCallSignal(WsCallEvent event) {
+    unawaited(_voiceCall?.handleRemote(event));
+  }
+
+  bool _callSheetShown = false;
+
+  /// 通话状态变化：振铃（来电/去电）时弹出通话界面；结束由界面自己关。
+  void _onVoiceCallStateChanged() {
+    final call = _voiceCall;
+    final s = call?.state.value;
+    if (call == null || s == null) return;
+    final shouldShow =
+        s.phase == VoiceCallPhase.calling || s.phase == VoiceCallPhase.ringing;
+    if (!shouldShow || _callSheetShown) return;
+    _callSheetShown = true;
+    unawaited(
+      showVoiceCallDialog(context, call: call, peerName: _peerName)
+          .whenComplete(() => _callSheetShown = false),
+    );
+  }
+
+  /// 通话结束：顶部提示条说明怎么结束的（未接/拒接/忙线/结束），并回到空闲。
+  ///
+  /// 注意：不做后台呼入，所以「对方没接」是常态——文案必须说清是"没接"而不是"坏了"。
+  void _onCallEnded(VoiceCallEndReason reason, bool wasCaller, Duration? duration) {
+    final l10n = AppLocalizations.of(context)!;
+    final message = switch (reason) {
+      VoiceCallEndReason.hungUp => l10n.voiceCallEnded,
+      VoiceCallEndReason.canceled => l10n.voiceCallEndedCanceled,
+      VoiceCallEndReason.declined => l10n.voiceCallEndedDeclined,
+      VoiceCallEndReason.busy => l10n.voiceCallEndedBusy,
+      VoiceCallEndReason.timeout => l10n.voiceCallEndedNoAnswer,
+      VoiceCallEndReason.failed => l10n.voiceCallEndedFailed,
+    };
+    final overlay = Overlay.of(context, rootOverlay: true);
+    showTopNoticeOn(overlay, message);
+    _voiceCall?.reset();
   }
 
   /// 对端上下线（Server 广播——立即更新对方在线状态，不等 30s 轮询）。
@@ -2382,6 +2434,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _ampSub?.cancel();
     _ws?.connected.removeListener(_onWsStatusChanged);
     _ws?.stop();
+    _voiceCall?.state.removeListener(_onVoiceCallStateChanged);
+    _voiceCall?.dispose();
     _scrollController.removeListener(_maybeLoadOlder);
     _inputFocusNode.removeListener(_onInputFocusChanged);
     _scrollController.dispose();
@@ -4531,6 +4585,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ),
         actions: [
+          // 语音通话（放最左）：点一下发起呼叫。只做**前台通话**——对方不在
+          // 前台就是振铃到超时（界面上会写明，见 voiceCallForegroundOnly）。
+          IconButton(
+            icon: const Icon(Icons.call_outlined),
+            tooltip: l10n.voiceCallMenuCall,
+            onPressed: _startVoiceCall,
+          ),
           // 阅后即焚生效时的小标记（火苗 + 档位）：点击**直接**进档位弹层。
           // 放最左（锁屏按钮 / 汉堡菜单的左侧）。老板 2026-09-24：开了焚毁是一个
           // "会丢消息"的状态，值得在顶栏一直看得见，而不是藏进菜单里才发现。

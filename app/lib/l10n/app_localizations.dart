@@ -1813,6 +1813,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not joined yet'**
   String get spaceListPeerPending;
+
+  /// Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Voice call'**
+  String get voiceCallMenuCall;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming call'**
+  String get voiceCallIncoming;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Calling…'**
+  String get voiceCallCalling;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting…'**
+  String get voiceCallConnecting;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get voiceCallAccept;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get voiceCallDecline;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get voiceCallCancel;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Hang up'**
+  String get voiceCallHangUp;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get voiceCallMute;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get voiceCallUnmute;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker'**
+  String get voiceCallSpeaker;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker off'**
+  String get voiceCallSpeakerOff;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Call ended'**
+  String get voiceCallEnded;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Call declined'**
+  String get voiceCallEndedDeclined;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Busy'**
+  String get voiceCallEndedBusy;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'No answer'**
+  String get voiceCallEndedNoAnswer;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Call canceled'**
+  String get voiceCallEndedCanceled;
+
+  /// Voice call UI / 语音通话界面文案
+  ///
+  /// In en, this message translates to:
+  /// **'Call failed'**
+  String get voiceCallEndedFailed;
+
+  /// Hint under the ringing UI: no background incoming calls, so both sides must be in foreground / 振铃界面下方提示：不做后台呼入，双方都要在前台
+  ///
+  /// In en, this message translates to:
+  /// **'Calls connect only while both sides have Einz open'**
+  String get voiceCallForegroundOnly;
 }
 
 class _AppLocalizationsDelegate

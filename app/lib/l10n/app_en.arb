@@ -33,7 +33,9 @@
   "wizardNameTooLongError": "At most {max} characters",
   "@wizardNameTooLongError": {
     "placeholders": {
-      "max": {"type": "int"}
+      "max": {
+        "type": "int"
+      }
     }
   },
   "wizardNameHintInput": "Name",
@@ -64,7 +66,9 @@
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",
   "@wizardEnrollFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "wizardPassphraseHint": "The passphrase is shared by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.",
@@ -84,7 +88,9 @@
   "setupPageKeyGenFailed": "❌ Key generation failed: {error}",
   "@setupPageKeyGenFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "setupEntryTitle": "Einz wizard",
@@ -95,11 +101,19 @@
   "setupTokenAppTooOld": "This app is too old for the server ({code}). Please update the app and try again",
   "setupTokenRateLimited": "Too many requests — retry in {seconds}s (this is not a problem with the token)",
   "@setupTokenRateLimited": {
-    "placeholders": { "seconds": { "type": "String" } }
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
   },
   "setupTokenRateLimitedNoWait": "Too many requests — try again later (this is not a problem with the token)",
   "@setupTokenAppTooOld": {
-    "placeholders": { "code": { "type": "String" } }
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
   },
   "setupTokenTitle": "Verify token",
   "setupTokenHint": "Open the dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
@@ -111,7 +125,14 @@
   "setupTokenSpaceAlreadyAdded": "This space is already added (one device can hold only one entrance to a space)",
   "setupTokenOtherServer": "the invite link is from {other} but this app is connected to {current}; they cannot work with each other.",
   "@setupTokenOtherServer": {
-    "placeholders": { "other": { "type": "String" }, "current": { "type": "String" } }
+    "placeholders": {
+      "other": {
+        "type": "String"
+      },
+      "current": {
+        "type": "String"
+      }
+    }
   },
   "setupCreateShareTitle": "Send the invite link to your partner:",
   "setupCreateCopy": "Copy invite link",
@@ -136,7 +157,9 @@
   "setupPageEscrowFailed": "❌ Shared passphrase join failed: {error}",
   "@setupPageEscrowFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "setupJoinEntranceLimitReached": "This space has reached the server's entrance limit — no new entrance can be opened.",
@@ -154,7 +177,9 @@
   "setPinDialogSetupFailed": "Setup failed: {error}",
   "@setPinDialogSetupFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageLocaleSwitched": "Switched to {label}",
@@ -180,7 +205,9 @@
   "chatPageInviteFailed": "Failed to create the token: {error}",
   "@chatPageInviteFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageTitleBrand": "My Einz",
@@ -191,7 +218,9 @@
   "chatPageAvatarFailed": "Avatar upload failed: {error}",
   "@chatPageAvatarFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageNameUnset": "Unset",
@@ -208,7 +237,9 @@
   "chatPageRenameEntranceTooLongError": "At most {max} characters",
   "@chatPageRenameEntranceTooLongError": {
     "placeholders": {
-      "max": {"type": "int"}
+      "max": {
+        "type": "int"
+      }
     }
   },
   "chatPageRenameMyselfEmptyError": "Enter your name",
@@ -216,7 +247,9 @@
   "chatPageRenameNameTooLongError": "At most {max} characters",
   "@chatPageRenameNameTooLongError": {
     "placeholders": {
-      "max": {"type": "int"}
+      "max": {
+        "type": "int"
+      }
     }
   },
   "chatPageRenameSameAsPeerError": "Can't match your partner's name — pick another",
@@ -226,7 +259,9 @@
   "chatPageRenameFailed": "Rename failed: {error}",
   "@chatPageRenameFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageExitTitle": "Quit app?",
@@ -246,7 +281,9 @@
   "chatPageChangePassphraseFailed": "Failed to change passphrase: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageEscrowRotatedNotice": "Your partner reset the shared passphrase — use the new one to create tokens or change it",
@@ -275,7 +312,9 @@
   "chatPagePinSetValue": "Set",
   "@chatPageLocaleSwitched": {
     "placeholders": {
-      "label": {"type": "String"}
+      "label": {
+        "type": "String"
+      }
     }
   },
   "chatPageBurnHeading": "Burn-after-read",
@@ -285,7 +324,9 @@
   "chatPageBurnWillDelete": "New messages auto-delete after {duration}",
   "@chatPageBurnWillDelete": {
     "placeholders": {
-      "duration": {"type": "String"}
+      "duration": {
+        "type": "String"
+      }
     }
   },
   "chatPageActionDelete": "Delete now",
@@ -298,7 +339,9 @@
   "chatPageSendFailed": "Send failed: {error}",
   "@chatPageSendFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageMsgSent": "Sent",
@@ -309,7 +352,9 @@
   "chatPageOfflineUnsent": "Offline · {count} unsent",
   "@chatPageOfflineUnsent": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "chatPageEntranceUnrecognized": "This entrance is not recognized by the server (its data may have been reset) · local messages only, no sync; your local data is NOT cleared",
@@ -319,13 +364,17 @@
   "chatPageVoiceStartFailed": "Recording start failed: {error}",
   "@chatPageVoiceStartFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageVoiceFailed": "Recording failed: {error}",
   "@chatPageVoiceFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageVoicePermissionDenied": "Microphone permission denied. Please enable it in system settings.",
@@ -336,7 +385,9 @@
   "chatPageAudioPlayFailed": "Audio playback failed: {error}",
   "@chatPageAudioPlayFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageAttachEmoji": "Emoji",
@@ -353,13 +404,17 @@
   "chatPageSaved": "Saved: {path}",
   "@chatPageSaved": {
     "placeholders": {
-      "path": {"type": "String"}
+      "path": {
+        "type": "String"
+      }
     }
   },
   "chatPageDownloadFailed": "Download failed: {error}",
   "@chatPageDownloadFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageAttachmentTapToDownload": "Not on this device — tap to download again",
@@ -367,7 +422,9 @@
   "chatPageFileOpenFailed": "Could not open file: {error}",
   "@chatPageFileOpenFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageEntranceRevoked": "Entrance revoked — local data cleared, please set up again",
@@ -384,7 +441,9 @@
   "lockPageLockedSeconds": "Locked for {seconds}s",
   "@lockPageLockedSeconds": {
     "placeholders": {
-      "seconds": {"type": "int"}
+      "seconds": {
+        "type": "int"
+      }
     }
   },
   "lockPageNoPinSet": "No PIN set (lock screen activates only with a PIN)",
@@ -392,13 +451,17 @@
   "lockPageTooManyAttempts": "Too many attempts, try again in {seconds}s",
   "@lockPageTooManyAttempts": {
     "placeholders": {
-      "seconds": {"type": "int"}
+      "seconds": {
+        "type": "int"
+      }
     }
   },
   "lockPageUnlockFailed": "Unlock failed: {error}",
   "@lockPageUnlockFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "chatPageMenuAbout": "About Einz",
@@ -413,11 +476,19 @@
   "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current space from this device, then takes you back to the space wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!",
   "resetEntranceNameLabel": "{name}",
   "@resetEntranceNameLabel": {
-    "placeholders": { "name": { "type": "String" } }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "resetEntranceNameHint": "Type the current entrance name “{name}”",
   "@resetEntranceNameHint": {
-    "placeholders": { "name": { "type": "String" } }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "resetEntranceNameMismatch": "Enter the correct entrance name to confirm",
   "resetEntranceConfirmWord": "RESET",
@@ -435,10 +506,90 @@
   "errorBackend": "Server: {message}",
   "@errorBackend": {
     "description": "Prefix for errors reported by the server; errors decided on this device carry no prefix",
-    "placeholders": { "message": { "type": "String" } }
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
   },
   "spaceListPeerPending": "Not joined yet",
   "@spaceListPeerPending": {
     "description": "Status line on a space card when the other side has not joined yet"
+  },
+  "voiceCallMenuCall": "Voice call",
+  "@voiceCallMenuCall": {
+    "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"
+  },
+  "voiceCallIncoming": "Incoming call",
+  "@voiceCallIncoming": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallCalling": "Calling…",
+  "@voiceCallCalling": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallConnecting": "Connecting…",
+  "@voiceCallConnecting": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallAccept": "Accept",
+  "@voiceCallAccept": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallDecline": "Decline",
+  "@voiceCallDecline": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallCancel": "Cancel",
+  "@voiceCallCancel": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallHangUp": "Hang up",
+  "@voiceCallHangUp": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallMute": "Mute",
+  "@voiceCallMute": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallUnmute": "Unmute",
+  "@voiceCallUnmute": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallSpeaker": "Speaker",
+  "@voiceCallSpeaker": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallSpeakerOff": "Speaker off",
+  "@voiceCallSpeakerOff": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEnded": "Call ended",
+  "@voiceCallEnded": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedDeclined": "Call declined",
+  "@voiceCallEndedDeclined": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedBusy": "Busy",
+  "@voiceCallEndedBusy": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedNoAnswer": "No answer",
+  "@voiceCallEndedNoAnswer": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedCanceled": "Call canceled",
+  "@voiceCallEndedCanceled": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallEndedFailed": "Call failed",
+  "@voiceCallEndedFailed": {
+    "description": "Voice call UI / 语音通话界面文案"
+  },
+  "voiceCallForegroundOnly": "Calls connect only while both sides have Einz open",
+  "@voiceCallForegroundOnly": {
+    "description": "Hint under the ringing UI: no background incoming calls, so both sides must be in foreground / 振铃界面下方提示：不做后台呼入，双方都要在前台"
   }
 }

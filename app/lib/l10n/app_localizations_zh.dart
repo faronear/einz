@@ -942,4 +942,61 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get spaceListPeerPending => '待加入';
+
+  @override
+  String get voiceCallMenuCall => '语音通话';
+
+  @override
+  String get voiceCallIncoming => '来电';
+
+  @override
+  String get voiceCallCalling => '正在呼叫…';
+
+  @override
+  String get voiceCallConnecting => '正在接通…';
+
+  @override
+  String get voiceCallAccept => '接听';
+
+  @override
+  String get voiceCallDecline => '拒绝';
+
+  @override
+  String get voiceCallCancel => '取消';
+
+  @override
+  String get voiceCallHangUp => '挂断';
+
+  @override
+  String get voiceCallMute => '静音';
+
+  @override
+  String get voiceCallUnmute => '取消静音';
+
+  @override
+  String get voiceCallSpeaker => '免提';
+
+  @override
+  String get voiceCallSpeakerOff => '关闭免提';
+
+  @override
+  String get voiceCallEnded => '通话结束';
+
+  @override
+  String get voiceCallEndedDeclined => '对方拒绝了通话';
+
+  @override
+  String get voiceCallEndedBusy => '对方忙线中';
+
+  @override
+  String get voiceCallEndedNoAnswer => '对方未接听';
+
+  @override
+  String get voiceCallEndedCanceled => '已取消通话';
+
+  @override
+  String get voiceCallEndedFailed => '通话连接失败';
+
+  @override
+  String get voiceCallForegroundOnly => '只有双方都打开 Einz 时才能接通';
 }
