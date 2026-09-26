@@ -173,6 +173,8 @@ Server 从不解析 ciphertext，所以载荷形状是**客户端约定**，编�
 | meta 键                 | 类型 | 含义                                       | 引入 |
 | ----------------------- | ---- | ------------------------------------------ | ---- |
 | `audioDurationSeconds`  | int  | 语音（录音）/ 音频文件时长（秒）；气泡展示 | 2026-09-13 |
+| `callState`             | str  | 通话结果：`completed` / `missed` / `declined` / `busy` / `canceled` / `failed` | 2026-09-26 |
+| `callDurationSeconds`   | int  | 通话时长（秒）；仅 `callState=completed` 时带 | 2026-09-26 |
 
 **兼容规则（双向）**：老客户端遇到未知键忽略（仍按 `plaintext` 显示）；新客户端
 遇到缺键或裸文本按缺省处理。因此往 `meta` 加键是安全的渐进升级，**不需要**

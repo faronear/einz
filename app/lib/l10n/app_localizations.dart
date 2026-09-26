@@ -1927,6 +1927,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Calls connect only while both sides have Einz open'**
   String get voiceCallForegroundOnly;
+
+  /// Call record line in the chat flow, with mm:ss duration / 聊天流里的通话记录行，带 mm:ss 时长
+  ///
+  /// In en, this message translates to:
+  /// **'Call duration {duration}'**
+  String voiceCallRecordDuration(String duration);
 }
 
 class _AppLocalizationsDelegate

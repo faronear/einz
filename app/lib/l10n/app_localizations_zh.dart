@@ -999,4 +999,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get voiceCallForegroundOnly => '只有双方都打开 Einz 时才能接通';
+
+  @override
+  String voiceCallRecordDuration(String duration) {
+    return '通话时长 $duration';
+  }
 }

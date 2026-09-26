@@ -688,7 +688,51 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     };
     final overlay = Overlay.of(context, rootOverlay: true);
     showTopNoticeOn(overlay, message);
+    unawaited(_recordCallInChat(reason, wasCaller, duration));
     _voiceCall?.reset();
+  }
+
+  /// 通话记录：往聊天流发一条 `system` 消息（对端靠正常同步看到，即"双向同步"）。
+  ///
+  /// **一通电话只发一条**，否则两端各插一条就成了双份。分工：
+  /// - 主叫方（`wasCaller`）负责：正常结束、取消、超时未接、连接失败；
+  /// - 被叫方负责：拒接与忙线——这两件事只有他自己知道，主叫只看到"没接"。
+  ///
+  /// 明文留空：**文案由各自客户端按自己的语言渲染**（meta 里只放结果与时长），
+  /// 不然就把一方的语言塞给了另一方。
+  Future<void> _recordCallInChat(
+    VoiceCallEndReason reason,
+    bool wasCaller,
+    Duration? duration,
+  ) async {
+    final state = switch (reason) {
+      VoiceCallEndReason.hungUp => kCallStateCompleted,
+      VoiceCallEndReason.canceled => kCallStateCanceled,
+      VoiceCallEndReason.timeout => kCallStateMissed,
+      VoiceCallEndReason.failed => kCallStateFailed,
+      VoiceCallEndReason.declined => kCallStateDeclined,
+      VoiceCallEndReason.busy => kCallStateBusy,
+    };
+    final mine = switch (reason) {
+      // 拒接/忙线只有被叫方知情 → 由被叫方发
+      VoiceCallEndReason.declined || VoiceCallEndReason.busy => !wasCaller,
+      _ => wasCaller,
+    };
+    if (!mine) return;
+    try {
+      await _repo.send(
+        '',
+        type: 'system',
+        meta: <String, dynamic>{
+          kMetaCallState: state,
+          if (duration != null) kMetaCallDurationSeconds: duration.inSeconds,
+        },
+        onPersisted: (_) => _refreshLocal(),
+      );
+      await _refreshLocal();
+    } catch (_) {
+      // 记录没写进去不影响通话本身（也不该为此弹错误打扰用户）
+    }
   }
 
   /// 对端上下线（Server 广播——立即更新对方在线状态，不等 30s 轮询）。
@@ -3205,6 +3249,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       case 'video':
         bubbleContent = _buildVideoThumb(m, size: 48);
         break;
+      case 'system':
+        // 通话记录：明文为空，内容在 meta 里——复用消息流那条的渲染
+        bubbleContent = _buildSystemHint(m);
+        break;
       case 'file':
         // 附件消息明文自带 📎 前缀（发送端兜底文案）；预览行已有文件图标，去掉
         var fileName = preview;
@@ -4332,9 +4380,55 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         return _buildVideo(m);
       case 'file':
         return _buildFileCard(m);
+      case 'system':
+        return _buildSystemHint(m);
       default:
         return Text(m.plaintext);
     }
+  }
+
+  /// 系统提示条（当前只有通话记录）：灰字 + 小图标的一行，不显示明文
+  /// （明文是空的——文案由本端按自己的语言渲染）。
+  Widget _buildSystemHint(HistoryMessage m) {
+    final l10n = AppLocalizations.of(context)!;
+    final meta = m.meta;
+    final state = meta?[kMetaCallState] as String?;
+    final seconds = meta?[kMetaCallDurationSeconds];
+    final text = switch (state) {
+      kCallStateCompleted => l10n.voiceCallRecordDuration(_formatCallDuration(seconds)),
+      kCallStateMissed => l10n.voiceCallEndedNoAnswer,
+      kCallStateDeclined => l10n.voiceCallEndedDeclined,
+      kCallStateBusy => l10n.voiceCallEndedBusy,
+      kCallStateCanceled => l10n.voiceCallEndedCanceled,
+      kCallStateFailed => l10n.voiceCallEndedFailed,
+      _ => m.plaintext,
+    };
+    final icon = switch (state) {
+      kCallStateMissed || kCallStateDeclined || kCallStateBusy => Icons.call_missed_outlined,
+      kCallStateFailed || kCallStateCanceled => Icons.call_end_outlined,
+      _ => Icons.call_outlined,
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: Colors.black54),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: Colors.black54),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 通话时长 `mm:ss`（超过 1 小时时分钟位继续累加，如 `83:20`）。
+  String _formatCallDuration(Object? seconds) {
+    final total = seconds is int ? seconds : (seconds is num ? seconds.round() : 0);
+    final mm = (total ~/ 60).toString().padLeft(2, '0');
+    final ss = (total % 60).toString().padLeft(2, '0');
+    return '$mm:$ss';
   }
 
   /// 音频气泡：语音（录音）=播放键 + 固定波形图 + 秒数（25s）；音频文件=播放键

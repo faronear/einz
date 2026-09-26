@@ -1044,4 +1044,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get voiceCallForegroundOnly =>
       'Calls connect only while both sides have Einz open';
+
+  @override
+  String voiceCallRecordDuration(String duration) {
+    return 'Call duration $duration';
+  }
 }

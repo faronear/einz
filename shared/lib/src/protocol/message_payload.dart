@@ -16,6 +16,24 @@ import 'dart:convert';
 /// 新增 meta 键请在此登记并同步到 docs/PROTOCOL.md 的载荷小节。
 const String kMetaAudioDurationSeconds = 'audioDurationSeconds';
 
+/// meta 键：通话记录（语音通话结束时在聊天流里留的一条 `system` 消息）。
+///
+/// 通话结果本身**说不清是哪一方的**（"未接"对主叫是没打通、对被叫是没接到），
+/// 所以只在 meta 里记结果与时长，**具体文案由各自客户端按自己的语言渲染**——
+/// 明文留空，避免把一方的语言塞给另一方。
+const String kMetaCallState = 'callState';
+
+/// meta 键：通话时长（秒，整数；仅 `kMetaCallState == kCallStateCompleted` 时有意义）。
+const String kMetaCallDurationSeconds = 'callDurationSeconds';
+
+/// [kMetaCallState] 取值。
+const String kCallStateCompleted = 'completed'; // 已接通并结束（有 duration）
+const String kCallStateMissed = 'missed'; // 振铃超时没人接（**不做后台呼入，这是常态**）
+const String kCallStateDeclined = 'declined'; // 被叫拒接
+const String kCallStateBusy = 'busy'; // 被叫忙线
+const String kCallStateCanceled = 'canceled'; // 主叫在接通前取消
+const String kCallStateFailed = 'failed'; // 连接失败（ICE 没打通等）
+
 /// 载荷编码：[quote]/[meta] 都为 null 时返回裸 [plaintext]（与旧版完全一致）。
 String encodeMessagePayload(
   String plaintext, {

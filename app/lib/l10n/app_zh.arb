@@ -591,5 +591,14 @@
   "voiceCallForegroundOnly": "只有双方都打开 Einz 时才能接通",
   "@voiceCallForegroundOnly": {
     "description": "Hint under the ringing UI: no background incoming calls, so both sides must be in foreground / 振铃界面下方提示：不做后台呼入，双方都要在前台"
+  },
+  "voiceCallRecordDuration": "通话时长 {duration}",
+  "@voiceCallRecordDuration": {
+    "description": "Call record line in the chat flow, with mm:ss duration / 聊天流里的通话记录行，带 mm:ss 时长",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }
