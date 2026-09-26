@@ -295,6 +295,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _myMemberId;
   late String _peerName; // 对方名字（对话顶部条显示）
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
+  String? _peerMemberId; // 对方 memberId（状态条头像用；来自 /space 成员表）
+  Uint8List? _peerAvatarBytes; // 对方头像 bytes（状态条显示；拿不到就默认人形）
+  /// 状态条要显示的「上线 / 下线时刻」（ms；null = 还不知道，不显示）：
+  /// 对方与我方各一份，口径与「更多通道」卡片一致（见 [_sinceOfRow]）。
+  int? _peerSinceMs;
+  int? _mySinceMs;
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
@@ -761,6 +767,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void _onProfileUpdated(WsProfileUpdatedEvent event) {
     // 头像：无论改名还是换头像都刷一次（同一 per-member 头像文件可能已变）
     _MessageAvatarState.invalidate(event.memberId);
+    unawaited(_loadPeerAvatar()); // 状态条那份（自己存 bytes，不走上面那个缓存）
     _refreshProfileFromServer();
     final name = event.memberName;
     if (name == null || name.isEmpty || !mounted) return;
@@ -827,6 +834,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       setState(() {
         if (myName.isNotEmpty) _myMemberName = myName;
         if (peerName.isNotEmpty) _peerName = peerName;
+        if (peerId.isNotEmpty && peerId != _peerMemberId) {
+          _peerMemberId = peerId; // 状态条头像要用
+          unawaited(_loadPeerAvatar());
+        }
         if (myG.isNotEmpty) _myGender = myG;
         if (peerG.isNotEmpty) _peerGender = peerG;
         _mySlot = mySlot;
@@ -1103,6 +1114,119 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       );
 
+    /// 状态条上的头像边长（= 名字 + 红绿灯两行的高度）。头像**上下不留白**，
+  /// 三面贴住胶囊内壁（老板 2026-09-26）。
+  static const double kStatusAvatarSize = 40;
+
+  /// 状态条上的头像。
+  ///
+  /// 边长 = [kStatusAvatarSize]：跟随"名字 + 红绿灯"两行的高度，**上下不留白**，
+  /// 看着像嵌在胶囊两端（老板 2026-09-26）。
+  ///
+  /// - 没设头像时，底色按**性别**取淡粉/淡蓝（与空间卡片、状态芯片同一组色），
+  ///   未登记性别回退淡灰；
+  /// - 有头像时可点开**全屏大图**（老板 2026-09-26）。
+  Widget _statusAvatar({Uint8List? bytes, String gender = ''}) {
+    final avatar = CircleAvatar(
+      backgroundColor: _genderTint(gender),
+      backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+      child: bytes == null ? const Icon(Icons.person, size: 22) : null,
+    );
+    return SizedBox(
+      width: kStatusAvatarSize,
+      height: kStatusAvatarSize,
+      child: bytes == null
+          ? avatar
+          : GestureDetector(
+              onTap: () => unawaited(_showAvatarFullscreen(bytes)),
+              child: avatar,
+            ),
+    );
+  }
+
+  /// 性别底色：淡粉（女）/ 淡蓝（男）/ 淡灰（未登记）。
+  /// 用**预乘到白的不透明色**，与状态芯片、空间卡片同一组（品牌粉 #D6529C /
+  /// 品牌天蓝 #3BAFFD 的 18% tint）——半透明 tint 叠在 85% 白的胶囊上会透出背景
+  /// 混色、观感发脏（老板 2026-09-25 模拟器实测）。
+  Color _genderTint(String gender) {
+    if (gender == 'female') return const Color(0xFFF8E0ED);
+    if (gender == 'male') return const Color(0xFFDCF1FF);
+    return const Color(0xFFF1F1F1);
+  }
+
+  /// 全屏看头像大图（点状态条上的头像触发）。
+  Future<void> _showAvatarFullscreen(Uint8List bytes) async {
+    await withImmersiveFullscreen(() => showDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          useSafeArea: false,
+          builder: (ctx) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: EdgeInsets.zero,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            child: SizedBox.expand(
+              child: DecoratedBox(
+                decoration: const BoxDecoration(gradient: kBrandGradient),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(ctx).pop(),
+                        child: InteractiveViewer(
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Image.memory(bytes, fit: BoxFit.contain),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: SafeArea(
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ));
+  }
+
+  /// 状态灯 + 时刻（老板 2026-09-26 新设计）：**绿灯旁是上线时间、红灯旁是下线时间**。
+  ///
+  /// [sinceMs] 缺失（还没问到 / 服务端没给）就只留灯：宁可少显示，也不摆一个假的
+  /// 00:00。格式复用 [_timeStampLabel]——当天 `HH:MM`、当年 `mm-dd HH:MM`、跨年带年份。
+  Widget _statusLine({
+    required bool online,
+    required Color offlineColor,
+    int? sinceMs,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.circle, size: 8, color: online ? Colors.green : offlineColor),
+        if (sinceMs != null && sinceMs > 0) ...[
+          const SizedBox(width: 4),
+          Text(
+            _timeStampLabel(sinceMs),
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withValues(alpha: 0.55),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   /// 顶栏状态条左侧的「对方」这一块。
   ///
   /// - **2 个及以上空间** → 做成可按芯片（底色按对方性别取**淡粉/淡蓝** + 右侧圆角
@@ -1116,48 +1240,72 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 取不到时（如测试直接构造 ChatPage）按单空间处理——最保守，入口仍在菜单里。
   Widget _buildPeerStatus(AppLocalizations l10n) {
     final multiSpace = (VaultSession.current?.spaces.length ?? 0) > 1;
-    // 左 16 = 原胶囊的左内边距；右 10 给箭头/右缘留白
-    const pad = EdgeInsets.fromLTRB(16, 6, 10, 6);
+    // 左/上/下都 0：这一格以**头像**打头，头像要**三面贴住胶囊内壁**（老板
+    // 2026-09-26）；右 10 给箭头/右缘留白。行高由头像决定，头像即贴边。
+    const pad = EdgeInsets.fromLTRB(0, 0, 10, 0);
     // 芯片内容**只到箭头为止**（老板 2026-09-25）：「邀请加入」链接在芯片外
     // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.circle, size: 8,
-            color: _peerOnline ? Colors.green : Colors.red),
-        if (_peerName.isNotEmpty) ...[
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(_peerName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        // 对方头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
+        _statusAvatar(bytes: _peerAvatarBytes, gender: _peerGender),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_peerName.isNotEmpty)
+                Flexible(
+                  child: Text(_peerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                ),
+              const SizedBox(height: 2),
+              // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）
+              _statusLine(
+                online: _peerOnline,
+                offlineColor: Colors.red,
+                sinceMs: _peerSinceMs,
+              ),
+            ],
           ),
-        ],
+        ),
         if (multiSpace) ...[
-          // 与人名拉开 6px：线箭头和人名笔画相近，贴太近不好区分（老板 2026-09-24）；
-          // 实心三角比线箭头更像「下拉」。
-          const SizedBox(width: 6),
-          Icon(Icons.arrow_drop_down,
-              size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          // 与人名的间距（老板 2026-09-26：箭头和电话图标是**一类**——都是操作控件，
+          // 该抱团在右侧，与"名字/状态"这组信息拉开）。原来 6px 反而比它到电话图标的
+          // 距离还小，看着像贴在名字上。
+          const SizedBox(width: 16),
+          // 下拉箭头**独立成可点对象**（老板 2026-09-26）：去掉芯片之后，切换空间
+          // 只剩它这一个入口——所以点击区给足（36 × 头像高），常态无底色。
+          Material(
+            color: Colors.transparent,
+            shape: const StadiumBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: _openSpacePicker,
+              hoverColor: Colors.black.withValues(alpha: 0.05),
+              highlightColor: Colors.black.withValues(alpha: 0.08),
+              child: SizedBox(
+                width: 36,
+                height: kStatusAvatarSize,
+                child: Icon(Icons.arrow_drop_down,
+                    size: 22,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ),
         ],
       ],
     );
-    // 「对方尚未加入」的「邀请加入」链接：**芯片外**并排（老板 2026-09-25：方位贴
-    // 名字/箭头右侧，但不属于芯片——点击语义只有邀请）。
-    //
-    // 常态**只有蓝色链接色、没有底色**（老板 2026-09-25：状态条里可点的东西已经够多，
-    // 再挂一块灰底就成了第三个按钮）。可点性由蓝色暗示，底色只在悬浮/按住时出现，
-    // 与「我的」那块同口径（黑 5% / 8%）。
-    // 弧角与相邻的状态芯片**同值 24**（老板 2026-09-25 实测：比芯片小看着不对，
-    // 芯片是 `Radius.circular(24)`）。
-    // 只在**确知**对方未加入（[_peerJoined] == false）时才挂：null（还没问到）不挂，
-    // 否则每次进页面都要先闪一下、离线时更是常驻（老板 2026-09-25 定）。
+
     final Widget inviteLink = _peerJoined != false
         ? const SizedBox.shrink()
         : Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
+            shape: const StadiumBorder(), // 胶囊：随状态条高度自适应（写死 24 会变圆角矩形）
             clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
             child: InkWell(
               onTap: _showInviteDialog,
@@ -1188,20 +1336,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // hover/highlight、同一个 `pad`、同一个 24 圆角；蓝色电话图标（品牌深蓝
     // #2271F7 与 invite 链接同源），文字省掉——电话图标语义够明确，状态条也挤。
     final Widget callButton = _peerJoined == true
-        ? Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-            clipBehavior: Clip.antiAlias,
-            child: Tooltip(
-              message: l10n.voiceCallMenuCall,
+        ? Tooltip(
+            message: l10n.voiceCallMenuCall,
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(), // 真圆：状态条加高后 24 圆角成了圆角矩形
+              clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _startVoiceCall,
                 hoverColor: Colors.black.withValues(alpha: 0.05),
                 highlightColor: Colors.black.withValues(alpha: 0.08),
-                child: Padding(
-                  padding: pad,
-                  child: const Icon(Icons.call_outlined,
-                      size: 16, color: Color(0xFF2271F7)),
+                child: const SizedBox(
+                  width: kStatusAvatarSize,
+                  height: kStatusAvatarSize,
+                  child: Icon(Icons.call_outlined,
+                      size: 20, color: Color(0xFF2271F7)),
                 ),
               ),
             ),
@@ -1216,41 +1365,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 芯片包 Flexible：本 Row 处于状态条 Flexible 的有界宽度里，非 flex 子项会被
     // Row 放到无界宽度 → 长名字不再被省略、冲出胶囊（长名字回归测试 2026-09-24）。
     // Flexible 让芯片先让出链接的宽度，剩下的给芯片内部继续省略。
-    if (!multiSpace) {
-      return Row(mainAxisSize: MainAxisSize.min, children: [
-        Flexible(child: Padding(padding: pad, child: content)),
-        trailing,
-      ]);
-    }
-    // 底色按对方性别（老板 2026-09-25）：淡粉（女）/ 淡蓝（男）——与消息气泡、空间卡片
-    // 同一组性别色（品牌粉 #D6529C / 品牌天蓝 #3BAFFD 的 18% tint，见 _bubbleColor /
-    // _SpaceCard._background）。
-    // **用不透明色、不再半透明**：外层胶囊是 85% 透明白，半透明 tint 叠上去会把胶囊后面
-    // 那 15% 的页面背景（粉蓝渐变）透出来混色，观感发脏（老板 2026-09-25 模拟器实测）。
-    // 这里把 tint 预乘到白底上得到纯色，观感与"纯白上 18% 粉/蓝"一致且与背景无关；
-    // 性别未登记回退预乘后的淡灰（仍保留"这一块能按"的暗示）
-    final chipColor = _peerGender == 'female'
-        ? const Color(0xFFF8E0ED) // ≈ #D6529C 18% 预乘到白
-        : _peerGender == 'male'
-            ? const Color(0xFFDCF1FF) // ≈ #3BAFFD 18% 预乘到白
-            : const Color(0xFFF1F1F1); // ≈ 黑 5.5% 预乘到白（原淡灰）
+    // 芯片**已去掉**（老板 2026-09-26）：对方这一格不再是"整块可按 + 常驻底色"的
+    // 芯片，切换空间的入口交给箭头自己（见 content 里那个箭头按钮）。这样底色不再
+    // 与头像的性别底色打架，也不会让人误以为点名字/头像能切换空间。
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      Flexible(
-        child: Tooltip(
-          message: l10n.spaceListSwitch,
-          child: Material(
-            color: chipColor,
-            elevation: 0,
-            // 只圆右边：左边上下角交给外层胶囊的 clip 对齐（三边完全贴合）
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child:
-                InkWell(onTap: _openSpacePicker, child: Padding(padding: pad, child: content)),
-          ),
-        ),
-      ),
+      Flexible(child: Padding(padding: pad, child: content)),
       trailing,
     ]);
   }
@@ -1982,6 +2101,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方在线判定：对方有实时 WS 连接（connected_at 非 null）= 在线；
   /// 旧服务器无 connected_at 字段时退回 last_seen 距今 < 60s 兜底
   /// （30s 轮询 + WS 状态变化时刷新）。
+  /// 一行通道是否在线：有实时 WS 连接即在线（server 重启/未入网时立即准确）；
+  /// 没有 `connected_at` 字段的老服务端回退看 `last_seen`（60s 内算在线）——
+  /// last_seen 会被轮询 touchLastSeen 持续刷新，不能单独代表实时连接
+  /// （修复"未入网却显示绿灯"）。
+  bool _isRowOnline(Map<String, dynamic> d, int now) {
+    if (d.containsKey('connected_at')) return d['connected_at'] != null;
+    final last = d['last_seen'];
+    if (last is! num) return false;
+    return now - last < 60 * 1000;
+  }
+
+  /// 一行通道数据里"当前状态的时刻"（ms；0/缺失 → null）——与「更多通道」卡片
+  /// 同一口径（那里有详细注释）：在线取 `online_since`（兜底 `connected_at`）；
+  /// 离线取 `max(last_seen, offline_since)`（干净下线时 last_seen 归零，只剩
+  /// offline_since；服务端重启等"close 没跑到"的情况反而 last_seen 更新）。
+  int? _sinceOfRow(Map<String, dynamic> d, {required bool online}) {
+    if (online) {
+      final connectedAt = d['connected_at'];
+      return (d['online_since'] as num?)?.toInt() ??
+          (connectedAt is num ? connectedAt.toInt() : null);
+    }
+    final lastSeen = (d['last_seen'] as num?)?.toInt() ?? 0;
+    final offlineSince = (d['offline_since'] as num?)?.toInt() ?? 0;
+    final stamp = lastSeen > offlineSince ? lastSeen : offlineSince;
+    return stamp > 0 ? stamp : null;
+  }
+
   Future<void> _refreshPeerOnline() async {
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
@@ -2004,14 +2150,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (pid == null || mine == null || mine.isEmpty) return true;
         return pid != mine;
       }).toList();
-      final online = peer.isNotEmpty && peer.any((d) {
-        // 实时 WS 连接 = 真在线（server 重启/未入网时立即准确）；last_seen 会被
-        // 轮询 touchLastSeen 持续刷新，不能代表实时连接（修复"未入网却显示绿灯"）。
-        if (d.containsKey('connected_at')) return d['connected_at'] != null;
-        final last = d['last_seen'];
-        if (last is! num) return false;
-        return now - last < 60 * 1000;
-      });
+      final online = peer.isNotEmpty && peer.any((d) => _isRowOnline(d, now));
       // 对方由离线转在线（含"刚加入空间"——WS 事件可能漏，这里兜底）：补拉身份
       if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
       // 「对方已加入」= 有**在用**通道。撤销不会删行，只把 status 标成 revoked
@@ -2022,10 +2161,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final status = d['status'];
         return status == null || status == 'active';
       });
-      if (mounted && (online != _peerOnline || joined != _peerJoined)) {
+      // 状态条上的「上线/下线时刻」：对方取"在线的那条通道"（没有就取第一条），
+      // 我方取本机通道；口径统一走 _sinceOfRow。
+      final peerOnlineRow = peer.where((d) => _isRowOnline(d, now)).firstOrNull;
+      final peerRow = peerOnlineRow ?? (peer.isEmpty ? null : peer.first);
+      final int? peerSince = peerRow == null
+          ? null
+          : _sinceOfRow(peerRow, online: peerOnlineRow != null);
+      int? mySince;
+      for (final d in entrances) {
+        if (d['entrance_id'] != widget.entranceId) continue;
+        mySince = _sinceOfRow(d, online: _ws?.connected.value ?? false);
+        break;
+      }
+      if (mounted &&
+          (online != _peerOnline ||
+              joined != _peerJoined ||
+              peerSince != _peerSinceMs ||
+              mySince != _mySinceMs)) {
         setState(() {
           _peerOnline = online;
           _peerJoined = joined;
+          _peerSinceMs = peerSince;
+          _mySinceMs = mySince;
         });
       }
     } catch (_) {
@@ -2072,6 +2230,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final api = widget.api ?? ApiClient(effectiveServer);
       final bytes = await api.getAvatar(pid);
       if (bytes != null && mounted) setState(() => _myAvatarBytes = bytes);
+    } catch (_) {
+      // 网络失败：保持默认图标
+    }
+  }
+
+  /// 加载对方头像（状态条显示用）。
+  ///
+  /// 为什么不复用消息流的 [_MessageAvatar]：那个直径写死 16（radius 16，是消息头像的
+  /// 尺寸），状态条这里要更大，所以自己存一份 bytes 自己画。失败/未设置就保持默认人形。
+  Future<void> _loadPeerAvatar() async {
+    final pid = _peerMemberId;
+    if (pid == null || pid.isEmpty) return;
+    try {
+      final api = widget.api ?? ApiClient(effectiveServer);
+      final bytes = await api.getAvatar(pid);
+      if (!mounted) return;
+      setState(() => _peerAvatarBytes = bytes);
     } catch (_) {
       // 网络失败：保持默认图标
     }
@@ -4992,12 +5167,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 对方（左）：圆点 + 名字（多空间时再加下拉箭头与可按底色；
                   // 对方未加入时紧跟其后的「邀请加入」链接，见 _buildPeerStatus）
                   Flexible(child: _buildPeerStatus(l10n)),
-                  // 我的（右）：身份名字 + 在线圆点（三态：灰=未连接服务 / 绿=已连接 / 红=断线；
-                  // 名字为空则不显示文本，只留圆点）。名字同样在本侧一半内省略。
+                  // 我的（右）：名字 + 状态灯/时刻 + 头像（老板 2026-09-26 新设计：
+                  // 状态条加高到能放头像，**我方头像在最右**，文字在头像左侧）。
+                  // 名字为空则不显示文本，只留灯与时刻。
                   //
                   // 整块可点 → 「更多通道」弹层（老板 2026-09-25："我的状态信息也别闲着"）。
-                  // **常态不留底色**：Material 全透明，只有悬浮/按住才由 InkWell 变色
-                  // （不要芯片那种常驻底色）。
+                  // **常态不留底色**：Material 全透明，只有悬浮/按住才由 InkWell 变色。
                   // Align 把可点区收到内容大小——不加的话 Padding/Row 会撑满右半边，
                   // 悬浮高亮就变成横贯半个胶囊的长条。
                   Flexible(
@@ -5009,35 +5184,40 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
                         child: InkWell(
                           onTap: _showEntranceListSheet,
-                          // 没有常驻底色，所以比 invite 那档淡：那个是 5% 底上再叠
-                          // 10%/14%，这里从 0 起叠
                           hoverColor: Colors.black.withValues(alpha: 0.05),
                           highlightColor: Colors.black.withValues(alpha: 0.08),
                           child: Padding(
-                            // 左 10 → 16（老板 2026-09-25：左边留白比右边那颗状态灯
-                            // 的留白小，看着偏）。现在左右都是 16。
-                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                            // 右/上/下都 0：我方头像同样三面贴住胶囊内壁（与左侧对称）
+                            padding: const EdgeInsets.fromLTRB(12, 0, 0, 0),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (_myMemberName.isNotEmpty) ...[
-                                  Flexible(
-                                    child: Text(_myMemberName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.end,
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500)),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                Icon(Icons.circle, size: 8,
-                                    color: _ws == null
-                                        ? Colors.grey
-                                        : (_ws!.connected.value
-                                            ? Colors.green
-                                            : Colors.red)),
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    if (_myMemberName.isNotEmpty)
+                                      Flexible(
+                                        child: Text(_myMemberName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            textAlign: TextAlign.end,
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500)),
+                                      ),
+                                    const SizedBox(height: 2),
+                                    _statusLine(
+                                      online: _ws?.connected.value ?? false,
+                                      offlineColor: _ws == null
+                                          ? Colors.grey
+                                          : Colors.red,
+                                      sinceMs: _mySinceMs,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 8),
+                                _statusAvatar(bytes: _myAvatarBytes, gender: _myGender),
                               ],
                             ),
                           ),
@@ -5060,19 +5240,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               itemBuilder: (context, i) {
                 final m = _messages[i];
                 final mine = m.sender == 'me';
-                // 头像 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底
-                final avatarMemberId =
-                    m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 每条消息前放置发送者头像（点击有头像时放大全屏查看）
-                      if (!mine)
-                        _MessageAvatar(
-                            memberId: avatarMemberId, server: effectiveServer, api: widget.api),
-                      const SizedBox(width: 6),
+                      // 气泡旁**不再放头像**（老板 2026-09-26）：状态条里已有双方头像，
+                      // 每条消息再挂一个就成了重复。点状态条上的头像可看大图。
                       GestureDetector(
                         // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
                         // 其余项无 key，不阻碍懒构建回收
@@ -5198,11 +5372,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      if (mine) ...[
-                        const SizedBox(width: 6),
-                        _MessageAvatar(
-                            memberId: avatarMemberId, server: effectiveServer, api: widget.api),
-                      ],
                     ],
                   ),
                 );
