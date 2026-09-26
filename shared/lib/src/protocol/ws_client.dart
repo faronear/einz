@@ -15,6 +15,19 @@ const String kWsTypePassphraseRotated = 'passphrase.rotated';
 const String kWsTypeProfileUpdated = 'profile.updated';
 const String kWsTypeReceiptUpdated = 'receipt.updated';
 
+/// 语音通话信令（PROTOCOL.md §8.4）。
+///
+/// 服务端只做**同空间哑转发**：不解析 sdp/candidate、不落库、不进 `server_sequence`。
+/// 通话状态机（振铃超时、忙线判定）全在客户端，服务端不参与——避免与断线重连纠缠。
+/// 注意：服务端用的是裸字符串字面量（`server/src/ws.ts`），改名要两边一起改。
+const String kWsTypeCallInvite = 'call.invite';
+const String kWsTypeCallAccept = 'call.accept';
+const String kWsTypeCallReject = 'call.reject';
+const String kWsTypeCallHangup = 'call.hangup';
+const String kWsTypeCallOffer = 'call.offer';
+const String kWsTypeCallAnswer = 'call.answer';
+const String kWsTypeCallIce = 'call.ice';
+
 /// WS 连接状态（App 据此切换轮询策略：connected → 降频兜底，断开 → 恢复高频轮询）。
 enum WsStatus { stopped, connecting, connected, reconnecting }
 
@@ -107,6 +120,35 @@ class WsReceiptUpdatedEvent extends WsEvent {
   final int readUptoSeq;
 }
 
+/// 通话信令事件（call.*，PROTOCOL.md §8.4）。
+///
+/// 服务端转发时会补 `from_entrance_id`（发起方通道 id），便于接收端判断是谁打来的、
+/// 以及忽略自己另一条通道回显的帧。[sdp] / [candidate] 原样搬运，本层不解析。
+class WsCallEvent extends WsEvent {
+  const WsCallEvent({
+    required super.type,
+    required this.callId,
+    this.fromEntranceId,
+    this.sdp,
+    this.candidate,
+    this.reason,
+  });
+
+  final String callId;
+
+  /// 帧的发起方通道（S→C 才有；C→S 时为空）。
+  final String? fromEntranceId;
+
+  /// offer / answer 的 SDP 全文。
+  final String? sdp;
+
+  /// ICE 候选（RTCIceCandidate.toMap() 的形状）。
+  final Map<String, dynamic>? candidate;
+
+  /// reject 的原因：`declined`（拒接）/ `busy`（忙线）。
+  final String? reason;
+}
+
 /// WS 实时客户端：连接 / 事件回调 / 自动重连（指数退避，上限 30s）。
 ///
 /// - [server] 传 http(s) 基址（https://einz.tic.cc），内部转换为 ws(s)://
@@ -142,12 +184,28 @@ class WsClient {
     _token = newToken;
   }
 
+  /// 发一个帧（通话信令用；此前本类只有 `listen` 没有发送能力）。
+  ///
+  /// 未连接时静默丢弃——通话信令是"尽力而为"，丢了由上层状态机（超时/挂断）兜底，
+  /// 不需要在这里抛错打断 UI。
+  void send(String type, Map<String, dynamic> payload) {
+    final ws = _ws;
+    if (ws == null) return;
+    ws.add(jsonEncode(<String, dynamic>{
+      'id': ++_frameId,
+      'type': type,
+      'payload': payload,
+    }));
+  }
+
   WebSocket? _ws;
   Timer? _reconnectTimer;
   bool _stopped = true;
   int _attempt = 0;
   /// 连续"4401 → 续期 → 仍被 4401"的次数（连上就清零，见 [_connect]）。
   int _unauthorizedStreak = 0;
+  /// 发出去的帧序号（PROTOCOL.md §8.2 的 `id`；只用于日志/排障，非请求-响应配对）。
+  int _frameId = 0;
   WsStatus _status = WsStatus.stopped;
 
   WsStatus get status => _status;
@@ -299,6 +357,22 @@ class WsClient {
             memberId: payload['member_id'] as String? ?? '',
             deliveredUptoSeq: (payload['delivered_upto_seq'] as int?) ?? 0,
             readUptoSeq: (payload['read_upto_seq'] as int?) ?? 0,
+          ));
+          break;
+        case kWsTypeCallInvite:
+        case kWsTypeCallAccept:
+        case kWsTypeCallReject:
+        case kWsTypeCallHangup:
+        case kWsTypeCallOffer:
+        case kWsTypeCallAnswer:
+        case kWsTypeCallIce:
+          onEvent?.call(WsCallEvent(
+            type: type,
+            callId: payload['call_id'] as String? ?? '',
+            fromEntranceId: payload['from_entrance_id'] as String?,
+            sdp: payload['sdp'] as String?,
+            candidate: (payload['candidate'] as Map<String, dynamic>?),
+            reason: payload['reason'] as String?,
           ));
           break;
       }

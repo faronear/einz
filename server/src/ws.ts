@@ -4,6 +4,7 @@ import type { MessageEnvelope } from "./messages.js";
 import { getDb } from "./db.js";
 import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 import { PROTOCOL_VERSION } from "./protocolVersion.js";
+import { checkRateLimit } from "./ratelimit.js";
 
 interface Conn {
   ws: WebSocket;
@@ -122,6 +123,44 @@ export function broadcastProfileUpdated(
   }
 }
 
+/** 通话信令帧类型（PROTOCOL.md §8.4；与 shared 的 `kWsTypeCall*` 手工对齐）。 */
+const CALL_TYPES = new Set([
+  "call.invite",
+  "call.accept",
+  "call.reject",
+  "call.hangup",
+  "call.offer",
+  "call.answer",
+  "call.ice",
+]);
+
+/**
+ * 通话信令转发（PROTOCOL.md §8.4）：**只搬、不解析、不落库、不进 server_sequence**。
+ *
+ * - 只发给同 Space 的其它通道（与 peer 广播同一套循环），天然空间隔离；
+ * - 补 `from_entrance_id`，让接收端知道是谁打来的、并能忽略自己另一条通道的回显；
+ * - sdp / candidate 原样透传——服务端手里没有密钥，也看不懂（保持哑转发器性质）。
+ * 断线重连不需要补通话信令（通话状态机在客户端），所以不做持久化。
+ */
+function broadcastCall(
+  exceptEntranceId: string,
+  type: string,
+  payload: Record<string, unknown>
+): void {
+  const spaceId = spaceOfEntrance(exceptEntranceId);
+  if (spaceId == null) return;
+  const frame = JSON.stringify({
+    id: 0,
+    type,
+    payload: { ...payload, from_entrance_id: exceptEntranceId },
+  });
+  for (const [entranceId, conn] of conns) {
+    if (entranceId === exceptEntranceId) continue;
+    if (conn.spaceId !== spaceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) conn.ws.send(frame);
+  }
+}
+
 /** 注册 WS 服务（PROTOCOL.md §8）。 */
 export function attachWs(wss: WebSocketServer): void {
   wss.on("connection", (ws, req) => {
@@ -186,6 +225,32 @@ export function attachWs(wss: WebSocketServer): void {
         const frame = JSON.parse(data.toString());
         if (frame.type === "ping") {
           ws.send(JSON.stringify({ id: frame.id ?? 0, type: "pong", payload: {} }));
+          return;
+        }
+        // ── 通话信令（§8.4）：形状校验 + 按通道限流 + 同空间转发 ──
+        // 限流放在这里而不是 ratelimit.limitByIp：那是 HTTP 专用，WS 路径没接限流，
+        // 而 call.ice 一通电话能来几十条，不限流等于给了一个免费放大器。
+        if (typeof frame.type === "string" && CALL_TYPES.has(frame.type)) {
+          const payload = (frame.payload ?? {}) as Record<string, unknown>;
+          const callId = payload.call_id;
+          if (typeof callId !== "string" || callId.length === 0 || callId.length > 64) return;
+          try {
+            checkRateLimit(`call:${entranceId}`, 120, 10_000);
+          } catch {
+            return; // 超限速静默丢弃：通话信令丢了由客户端状态机（超时/挂断）兜底
+          }
+          // 只转发认识的字段，别把客户端塞进来的任意内容转给对端
+          const out: Record<string, unknown> = { call_id: callId };
+          if (typeof payload.sdp === "string" && payload.sdp.length <= 32_768) {
+            out.sdp = payload.sdp;
+          }
+          if (payload.candidate != null && typeof payload.candidate === "object") {
+            out.candidate = payload.candidate;
+          }
+          if (payload.reason === "declined" || payload.reason === "busy") {
+            out.reason = payload.reason;
+          }
+          broadcastCall(entranceId, frame.type, out);
         }
       } catch {
         // 忽略非法帧

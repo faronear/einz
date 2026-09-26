@@ -45,6 +45,9 @@ class WsRealtimeService {
   /// 对方回执更新回调（Server 广播 receipt.updated——已送达/已读高水位）。
   void Function(WsReceiptUpdatedEvent event)? onReceiptUpdated;
 
+  /// 通话信令回调（Server 哑转发 call.*——PROTOCOL.md §8.4）。
+  void Function(WsCallEvent event)? onCall;
+
   /// 建立连接（自动重连直到 [stop]）。
   void start({
     void Function()? onMessageNew,
@@ -53,6 +56,7 @@ class WsRealtimeService {
     void Function(WsPassphraseRotatedEvent event)? onPassphraseRotated,
     void Function(WsProfileUpdatedEvent event)? onProfileUpdated,
     void Function(WsReceiptUpdatedEvent event)? onReceiptUpdated,
+    void Function(WsCallEvent event)? onCall,
   }) {
     this.onMessageNew = onMessageNew;
     this.onEntranceRevoked = onEntranceRevoked;
@@ -60,6 +64,7 @@ class WsRealtimeService {
     this.onPassphraseRotated = onPassphraseRotated;
     this.onProfileUpdated = onProfileUpdated;
     this.onReceiptUpdated = onReceiptUpdated;
+    this.onCall = onCall;
     _client = WsClient(
       server: server,
       token: _token,
@@ -82,9 +87,15 @@ class WsRealtimeService {
         if (e is WsPassphraseRotatedEvent) this.onPassphraseRotated?.call(e);
         if (e is WsProfileUpdatedEvent) this.onProfileUpdated?.call(e);
         if (e is WsReceiptUpdatedEvent) this.onReceiptUpdated?.call(e);
+        if (e is WsCallEvent) this.onCall?.call(e);
       },
       onStatus: (s) => connected.value = s == WsStatus.connected,
     )..start();
+  }
+
+  /// 发一个通话信令帧（未连接时静默丢弃——由上层通话状态机的超时/挂断兜底）。
+  void sendCall(String type, Map<String, dynamic> payload) {
+    _client?.send(type, payload);
   }
 
   /// 停止连接。

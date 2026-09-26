@@ -471,6 +471,37 @@ Authorization: Bearer <session_token>
 - **先持久化、后广播**：`message.new` 仅在消息落库并分配 `server_sequence` 后发送。
 - 断线重连：客户端以 `last_server_sequence` 重新 `/sync` 补齐断线期间消息，再继续监听 WS（不依赖 WS 保证消息不丢，WS 只是实时加速）。
 
+### 8.4 通话信令（语音通话；哑转发）
+
+语音通话的**媒体是端到端 DTLS-SRTP**（服务端与 TURN 都拿不到密钥），这里只搬**信令**。
+服务端**不解析** `sdp` / `candidate`、**不落库、不进 `server_sequence`**、**不参与通话状态机**
+——振铃超时、忙线、挂断全部由客户端自行判定，避免服务端状态与断线重连纠缠。
+断线重连**不补**通话信令（通话已随连接断开而结束）。
+
+| 方向 | type | payload | 说明 |
+| --- | --- | --- | --- |
+| C→S→C | `call.invite` | `{ "call_id": "…" }` | 发起通话（广播给同 Space 的对端全部通道） |
+| C→S→C | `call.accept` | `{ "call_id": "…" }` | 接听 |
+| C→S→C | `call.reject` | `{ "call_id": "…", "reason": "declined" \| "busy" }` | 拒接（`declined`）／忙线（`busy`） |
+| C→S→C | `call.hangup` | `{ "call_id": "…" }` | 挂断（通话中或振铃中均可） |
+| C→S→C | `call.offer` | `{ "call_id": "…", "sdp": "…" }` | SDP offer |
+| C→S→C | `call.answer` | `{ "call_id": "…", "sdp": "…" }` | SDP answer |
+| C→S→C | `call.ice` | `{ "call_id": "…", "candidate": {…} }` | ICE 候选（一通电话多条） |
+
+S→C 时服务端**统一补** `from_entrance_id`（帧的发起方通道），接收端据此判断是谁打来的，
+并忽略自己另一条通道回显的帧。
+
+服务端约定：
+
+- 只转发认识的字段（`call_id` / `sdp` / `candidate` / `reason`），客户端塞的其它内容一律丢弃；
+  `call_id` 必须是 1–64 字符的字符串，`sdp` 上限 32 KiB。
+- **按通道限流** 120 帧 / 10 秒（`call.ice` 一通电话能来几十条，不限流等于给一个免费放大器）。
+  超限静默丢弃——信令丢了由客户端状态机（振铃超时／挂断）兜底。
+- 只发给**同 Space** 的其它通道，与其它广播同一套循环，天然空间隔离。
+
+> 帧类型常量在 `shared/lib/src/protocol/ws_client.dart`（`kWsTypeCall*`）；
+> 服务端是裸字符串字面量（`server/src/ws.ts` 的 `CALL_TYPES`），**改名要两边一起改**。
+
 ## 9. 错误格式
 
 所有错误响应统一结构：
