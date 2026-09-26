@@ -10097,3 +10097,19 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 - **服务端需老板重启**才生效（call.* 转发）
 - 真机自测：iOS 走 Ad Hoc（正式 bundle `cc.tic.einz`，会覆盖手机上 CI 版，测完重装即可）；
   Android 用 debug APK
+
+## 2026-09-26 语音通话：跨网打通（Phase C 完成，全链路可用）
+
+**结果链**：同 WiFi 双机能通 → 跨网（XR 4G ↔ 安卓 WiFi）**无 TURN 打不通** →
+在国内机 `einz.yuanjinx.com` 部署 coturn 后 **跨网打通** ✅
+
+- coturn：`deployment/docker-compose.coturn.yml`（host 网络，3478 + 中继段
+  49152–65535，长期凭证，拒绝中继到私有网段防当跳板）。**云安全组要放行 UDP 3478 与
+  49152–65535**——只开 3478 不够（中继端口段不通的话表现仍是"卡在正在接通"）。
+- 客户端：TURN 走 `dart-define`，凭据放 `app/localConfig.turn.json`（gitignore 覆盖，
+  密码不进仓库）。构建时 `--dart-define-from-file=localConfig.turn.json`。
+- 期间修的真 bug：connecting 阶段**没有超时**，ICE 打不通会永远停在「正在接通…」——
+  补了 30s 超时（Phase A 验证页有 8s ICE 超时，正式实现漏了）。
+
+**待办**：正式打包（buildIos.sh / GitHub Actions）要带上 TURN 的 dart-define，
+否则 CI 产物跨网打不通；之后把 feat/voiceCall 合并进 main。

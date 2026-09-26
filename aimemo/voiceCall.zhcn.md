@@ -108,10 +108,13 @@ TURN 兜底          →  国内服务器                   ← 关键：跨境 
 
 - [x] 部署文件：`deployment/docker-compose.coturn.yml` + `deployment/coturn/turnserver.conf.example`
       （host 网络、3478 + 中继段 49152–65535、长期凭证、拒绝中继到私有网段）
-- [ ] **老板在 `einz.yuanjinx.com` 上跑起来**：改密码/realm → `docker compose -f
-      docker-compose.coturn.yml up -d` → **云安全组放行 UDP 3478 与 49152–65535**
-- [ ] 客户端用 `--dart-define=VOICE_TURN_URLS=turn:einz.yuanjinx.com:3478`
-      （+ `VOICE_TURN_USERNAME` / `VOICE_TURN_CREDENTIAL`）重打包 → 跨网复测
+- [x] **已部署并验证（2026-09-26）**：coturn 跑在 `einz.yuanjinx.com`（3478 端口已通），
+      **XR 走 4G ↔ 安卓走 WiFi 打通** ✅ —— 跨网通话成立
+- [x] 客户端接入：`--dart-define-from-file=app/localConfig.turn.json`
+      （该文件被 gitignore，密码不进仓库；键：`VOICE_TURN_URLS` / `VOICE_TURN_USERNAME` / `VOICE_TURN_CREDENTIAL`）
+- [ ] **收尾**：`buildIos.sh` 与 GitHub Actions 出正式包时也要带上这些 dart-define，
+      否则 CI 产物没有 TURN、跨网打不通（凭据下发到客户端是 WebRTC 常态，
+      反滥用靠 coturn 配额，不是靠"藏"）
 - [ ] 观察：P2P 直连成功时不会走 TURN（ICE 优先 host/srflx），只有打不通才吃中继带宽
 
 ### 真机实测记录（2026-09-26）
@@ -121,7 +124,8 @@ TURN 兜底          →  国内服务器                   ← 关键：跨境 
 | Phase A 验证页：同 WiFi 双机（XR ↔ 安卓） | ✅ 两边都听到 |
 | Phase A 验证页：跨网（XR 走 4G） | ❌ 打不通（无 TURN，符合预期） |
 | Phase B 正式实现：同 WiFi 两真机 | ✅ 能通话（信令走 WS，`call.invite` 已见服务端日志） |
-| Phase B 正式实现：跨网 | ❌ 卡在「正在接通…」→ 已补 30s 超时，改为明确报「连接失败」 |
+| Phase B 正式实现：跨网（无 TURN） | ❌ 卡在「正在接通…」→ 已补 30s 超时，改为明确报「连接失败」 |
+| Phase C 正式实现：跨网（**有 TURN**） | ✅ **4G ↔ WiFi 打通**（2026-09-26） |
 
 ### 明确不做
 
