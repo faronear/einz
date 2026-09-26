@@ -5,6 +5,9 @@
     <!-- 媒体（Phase 3：相机/麦克风，Phase 2 媒体上传用） -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- 语音通话（WebRTC）：改音频路由（免提/听筒）+ ICE 期间切换网络 -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application

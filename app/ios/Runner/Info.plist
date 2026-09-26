@@ -37,7 +37,11 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Einz 需要使用相机拍摄照片或视频并加密发送给对方。</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Einz 需要使用麦克风录制语音消息并加密发送给对方。</string>
+	<string>Einz 需要使用麦克风录制语音消息、进行语音通话，并加密发送给对方。</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Einz 需要保存下载解密的照片/视频到相册。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
