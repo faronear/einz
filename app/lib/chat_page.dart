@@ -1183,13 +1183,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           );
+    // 「语音通话」：对方**已加入**才挂（未加入时这块位置让给「邀请加入」——
+    // 两个互斥，见下面的 `trailing`）。与 invite 同口径：常态无底色、同一档
+    // hover/highlight、同一个 `pad`、同一个 24 圆角；蓝色电话图标（品牌深蓝
+    // #2271F7 与 invite 链接同源），文字省掉——电话图标语义够明确，状态条也挤。
+    final Widget callButton = _peerJoined == true
+        ? Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            clipBehavior: Clip.antiAlias,
+            child: Tooltip(
+              message: l10n.voiceCallMenuCall,
+              child: InkWell(
+                onTap: _startVoiceCall,
+                hoverColor: Colors.black.withValues(alpha: 0.05),
+                highlightColor: Colors.black.withValues(alpha: 0.08),
+                child: Padding(
+                  padding: pad,
+                  child: const Icon(Icons.call_outlined,
+                      size: 16, color: Color(0xFF2271F7)),
+                ),
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+
+    // 芯片右侧挂一块：**未加入=邀请加入 / 已加入=语音通话**（老板 2026-09-26）。
+    // 对方加入状态未知（null）时两块都不挂——与 invite 原本的口径一致，
+    // 避免进页面先闪一下。
+    final Widget trailing = _peerJoined == false ? inviteLink : callButton;
+
     // 芯片包 Flexible：本 Row 处于状态条 Flexible 的有界宽度里，非 flex 子项会被
     // Row 放到无界宽度 → 长名字不再被省略、冲出胶囊（长名字回归测试 2026-09-24）。
     // Flexible 让芯片先让出链接的宽度，剩下的给芯片内部继续省略。
     if (!multiSpace) {
       return Row(mainAxisSize: MainAxisSize.min, children: [
         Flexible(child: Padding(padding: pad, child: content)),
-        inviteLink,
+        trailing,
       ]);
     }
     // 底色按对方性别（老板 2026-09-25）：淡粉（女）/ 淡蓝（男）——与消息气泡、空间卡片
@@ -1221,7 +1251,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ),
       ),
-      inviteLink,
+      trailing,
     ]);
   }
 
@@ -4679,13 +4709,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ),
         actions: [
-          // 语音通话（放最左）：点一下发起呼叫。只做**前台通话**——对方不在
-          // 前台就是振铃到超时（界面上会写明，见 voiceCallForegroundOnly）。
-          IconButton(
-            icon: const Icon(Icons.call_outlined),
-            tooltip: l10n.voiceCallMenuCall,
-            onPressed: _startVoiceCall,
-          ),
+          // （语音通话按钮在**状态条**里、对方芯片旁边——已加入才显示；
+          //  未加入时那块位置显示「邀请加入」。见 _buildPeerChip 的 trailing）
           // 阅后即焚生效时的小标记（火苗 + 档位）：点击**直接**进档位弹层。
           // 放最左（锁屏按钮 / 汉堡菜单的左侧）。老板 2026-09-24：开了焚毁是一个
           // "会丢消息"的状态，值得在顶栏一直看得见，而不是藏进菜单里才发现。
