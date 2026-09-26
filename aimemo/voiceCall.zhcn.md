@@ -101,11 +101,27 @@ TURN 兜底          →  国内服务器                   ← 关键：跨境 
 - [ ] **通话记录**：聊天流里的记录（已接/未接/时长）——**双向同步为 system 消息**
 - [ ] **真机自测**：两端装包后跑通一次（服务端需先重启）
 
-### Phase C — TURN 兜底（按需，观察后再做）
+### Phase C — TURN 兜底（**已确认必要**：2026-09-26 真机实测）
 
-- [ ] 美国机部署 coturn（仅 STUN），客户端接入
-- [ ] **上线后统计实际 P2P 成功率**
-- [ ] 若经常打不通 → 国内机部署 TURN，客户端配置（主备双 TURN）
+**实测结论（2026-09-26）**：同一个 WiFi 下两机通话**正常**；一旦走不同网络（XR 切 4G）
+就卡在「正在接通…」直到超时——**跨网打洞失败，必须上 TURN**。这不再是"观察后再定"。
+
+- [x] 部署文件：`deployment/docker-compose.coturn.yml` + `deployment/coturn/turnserver.conf.example`
+      （host 网络、3478 + 中继段 49152–65535、长期凭证、拒绝中继到私有网段）
+- [ ] **老板在 `einz.yuanjinx.com` 上跑起来**：改密码/realm → `docker compose -f
+      docker-compose.coturn.yml up -d` → **云安全组放行 UDP 3478 与 49152–65535**
+- [ ] 客户端用 `--dart-define=VOICE_TURN_URLS=turn:einz.yuanjinx.com:3478`
+      （+ `VOICE_TURN_USERNAME` / `VOICE_TURN_CREDENTIAL`）重打包 → 跨网复测
+- [ ] 观察：P2P 直连成功时不会走 TURN（ICE 优先 host/srflx），只有打不通才吃中继带宽
+
+### 真机实测记录（2026-09-26）
+
+| 场景 | 结果 |
+| ---- | ---- |
+| Phase A 验证页：同 WiFi 双机（XR ↔ 安卓） | ✅ 两边都听到 |
+| Phase A 验证页：跨网（XR 走 4G） | ❌ 打不通（无 TURN，符合预期） |
+| Phase B 正式实现：同 WiFi 两真机 | ✅ 能通话（信令走 WS，`call.invite` 已见服务端日志） |
+| Phase B 正式实现：跨网 | ❌ 卡在「正在接通…」→ 已补 30s 超时，改为明确报「连接失败」 |
 
 ### 明确不做
 

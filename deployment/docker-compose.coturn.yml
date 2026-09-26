@@ -1,0 +1,29 @@
+# Einz 语音通话的 STUN/TURN（coturn）——**独立 compose**，不并入主 compose。
+#
+# 为什么独立：
+#   - 主 compose 的日常操作是 `docker compose up -d --build server`（只动 server），
+#     把 coturn 塞进去会让每次重建 server 都多带一个容器；
+#   - TURN 只在跨网打洞失败时才用得上，可单独启停、单独观察。
+#
+# 用法（在 deployment/ 目录下）：
+#   1) cp coturn/turnserver.conf.example coturn/turnserver.conf
+#   2) 编辑 turnserver.conf：填 user= 的密码、realm、external-ip（若在 NAT 后）
+#   3) docker compose -f docker-compose.coturn.yml up -d
+#   4) docker compose -f docker-compose.coturn.yml logs -f
+#
+# 用 host 网络：TURN 要用 49152–65535 这一大段 UDP 端口，且需要知道真实公网 IP，
+# 走 docker 桥接 + 端口映射既麻烦又容易在 external-ip 上踩坑。
+services:
+  coturn:
+    image: coturn/coturn:latest
+    container_name: einz-coturn
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,51 @@
+# coturn 配置样例（复制为 turnserver.conf 后改这几处：**密码、realm、external-ip**）
+#
+# 生成密码：openssl rand -hex 16
+# 客户端侧对应：--dart-define=VOICE_TURN_USERNAME=einz --dart-define=VOICE_TURN_CREDENTIAL=<同一个密码>
+
+listening-port=3478
+# 先不开 TLS：TURN over TLS 要证书，纯 UDP/TCP 已够用；DTLS-SRTP 的加密在媒体层，
+# TURN 看到的始终是密文（voiceCall.zhcn.md §3.1）
+fingerprint
+lt-cred-mech
+
+# 长期凭证（改成你自己的密码；用户名随取，客户端填一样的即可）
+user=einz:CHANGE_ME
+realm=einz.yuanjinx.com
+
+# 中继端口段（安全组要放行这段 UDP）
+min-port=49152
+max-port=65535
+
+# 云主机若在 NAT 之后（如内网 IP + 端口转发），必须写明公网 IP，否则 candidate 里
+# 给出的是内网地址，对端连不上。多数云主机直接有公网网卡，可注释掉。
+# external-ip=1.2.3.4
+
+# 安全：拒绝把流量中继到私有/保留网段，防止被人当跳板打内网
+no-multicast-peers
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=100.64.0.0-100.127.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.0.0.0-192.0.0.255
+denied-peer-ip=192.88.99.0-192.88.99.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=198.18.0.0-198.19.255.255
+denied-peer-ip=198.51.100.0-198.51.100.255
+denied-peer-ip=203.0.113.0-203.0.113.255
+denied-peer-ip=240.0.0.0-255.255.255.255
+
+# 防滥用（熟人小范围使用，给足余量即可）
+stale-nonce=600
+# 每用户并发上限 / 带宽上限：0=不限；想收紧就填具体值
+user-quota=0
+total-quota=0
+max-bps=0
+
+no-cli
+no-tlsv1
+no-tlsv1_1
+log-file=stdout
+simple-log
