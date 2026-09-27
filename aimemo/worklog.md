@@ -10326,3 +10326,27 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 **没动**：气泡的长按（= 操作菜单）**不受影响**——内层只有 onTap、没有 onLongPress，
 长按仍由外层气泡的 GestureDetector 接住（`chat_page_menu_test` 里 longPress '25s' 的
 断言因此照旧有效）。
+
+## 2026-09-27 音频文件气泡改两行，与录音同构
+
+**老板要求**：① 菜单预览行的音频条也要有播放键；② 音频文件气泡改两行——上行「播放键 +
+波形图 + 时长」（与录音**完全一样**），下行「乐符 + 文件名」；③ 时长、乐符、文件名都
+要纳入单击范围，否则"点文件名没反应"就不整齐。
+
+**实现**（`_buildAudioBarBody`）：
+
+- 抽出共用的 `topRow`（播放键 + `_VoiceWaveform` + 时长），voice 直接用它，audio 用一个
+  `Column(crossAxisAlignment: start)` 把它和「🎵 + 文件名」摞起来。波形是按 messageId
+  生成的**装饰**波形（不是真实波形），所以音频文件也能直接复用。
+- 时长格式**不统一**：录音仍只写秒数（上限 60s），音频文件用 h/m/s——几小时的音频写成
+  "7200s" 没法看。60s 以内两者显示一致（都是 `25s`）。
+- 播放态**不再**把文件名顶掉（原来是"播放中…"占位）：播放中改由停止图标 + 波形走进度
+  表达，文件名始终可见，两行高度不跳。`chatPagePlaying` 这个 l10n key 因此没人用了
+  （未删——删它要动两个 .arb + 三个生成文件，收益低，留着不影响）。
+- 单击范围：整块 `Clickable(opaque)` 包住 Column → 两行、行间空隙、时长、乐符、文件名
+  全在范围内。`opaque` 是必须的（容器自身不参与命中测试，否则空隙点不到）。
+
+**关于 ①**：菜单预览行**本来就有播放键**——`_buildMessagePreviewRow` 的 voice/audio 分支
+直接复用 `_buildAudioBar`，`chat_page_menu_test` 里就有
+`find.descendant(of: previewRow, matching: find.byIcon(Icons.play_circle))` 的断言。
+这条无需改动，改完后预览行的音频条同样变成两行。
