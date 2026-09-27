@@ -5552,11 +5552,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   // 边框到文字的间距：主题里默认 16/16（那是给
                                   // 口令、名字这类表单用的，字段少、留白宽好读），
                                   // 聊天输入框是"反复打字、希望一行多放字"的场景，
-                                  // 左右收到 10（左右各省 6px ≈ 一个字），垂直同步
-                                  // 收到 10——顺带让输入框高度更贴近两侧按钮
-                                  // （老板 2026-09-26）
+                                  // 左右收到 12（左右各省 4px），垂直同步收到 12——
+                                  // 顺带让输入框高度更贴近两侧按钮（老板 2026-09-26）
                                   contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 10),
+                                      horizontal: 12, vertical: 12),
                                 ),
                                 // 回车发送后焦点回到输入框（键盘完成动作默认失焦——补回聚焦）
                                 onSubmitted: (_) {
