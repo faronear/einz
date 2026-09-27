@@ -10350,3 +10350,17 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 直接复用 `_buildAudioBar`，`chat_page_menu_test` 里就有
 `find.descendant(of: previewRow, matching: find.byIcon(Icons.play_circle))` 的断言。
 这条无需改动，改完后预览行的音频条同样变成两行。
+
+**后续修正（同日）**：乐符图标删掉，文件名改为**与波形图左对齐**——之前那版第二行贴着
+气泡左边缘、跟播放键不齐（老板 2026-09-27）。
+
+改成"**播放键独占左列 + 右列两行**"的 Row/Column 结构：文件名与波形同在一个
+`Column(crossAxisAlignment: start)` 里，左对齐**由结构天然保证**，不用去量 IconButton
+的实际宽度再凑缩进（IconButton 的宽度受默认 padding 与 visualDensity 影响，硬编码必错）。
+
+顺带两个坑记一下：
+
+- `Flexible` 放在 `Column` 里管的是**高度**、放在 `Row` 里才管**宽度**——要让文件名
+  单行截断（ellipsis），得把它再套一层 `Row(min)`；直接放 Column 里会换行而不截断。
+- 同一个 widget 实例（这里是 `playButton` / `waveformRow`）在 if/else 两支里各用一次是
+  安全的（没有 GlobalKey 时，Flutter 允许同一个配置对象出现在多处）。

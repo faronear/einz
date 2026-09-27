@@ -4723,10 +4723,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '$mm:$ss';
   }
 
-  /// 音频气泡：**第一行两者同构** = 播放键 + 固定波形图 + 时长（录音只写秒数
-  /// `25s`，上限 60s；音频文件用 h/m/s，零的部分省略）。音频文件**多一行**：
-  /// 乐符 + 文件名（老板 2026-09-27）。点击下载解密后播放（老板要求 2026-09-13）；
-  /// **整块**可点（含时长、乐符、文件名），不必非点中播放键（老板 2026-09-27）。
+  /// 音频气泡：播放键 + 固定波形图 + 时长（录音只写秒数 `25s`，上限 60s；音频文件
+  /// 用 h/m/s，零的部分省略）。音频文件**多一行文件名**，与波形左对齐（老板
+  /// 2026-09-27）。点击下载解密后播放（老板要求 2026-09-13）；**整块**可点（含
+  /// 时长、文件名），不必非点中播放键（老板 2026-09-27）。
   ///
   /// 消息流气泡与长按菜单预览行共用（后者 [waveformWidth] 小一点，避免挤爆
   /// 弹窗）：外层监听播放状态版本，菜单在独立路由、页面 setState 重建不到它。
@@ -4747,17 +4747,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         : Theme.of(context).colorScheme.primary; // 气泡上的前景色（波形/图标）
     final seconds = _audioDurationSeconds(m);
     final isVoice = m.env.type == 'voice';
-    // 第一行：**录音与音频文件完全同构**——播放键 + 波形图 + 时长
-    // （老板 2026-09-27；此前音频文件这一行是"播放键 + 文件名 + 时长"）。
-    // 波形只是"形状由 messageId 决定"的装饰，不是真实波形，两种消息都能用。
-    final Widget topRow = Row(
+    final Widget playButton = IconButton(
+      icon: Icon(playing ? Icons.stop_circle : Icons.play_circle),
+      onPressed: () => _playAudioMessage(m),
+      visualDensity: VisualDensity.compact,
+    );
+    // 波形图 + 时长：**录音与音频文件共用同一段**（老板 2026-09-27）。波形只是
+    // "形状由 messageId 决定"的装饰（不是真实波形），两种消息都能用。
+    final Widget waveformRow = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          icon: Icon(playing ? Icons.stop_circle : Icons.play_circle),
-          onPressed: () => _playAudioMessage(m),
-          visualDensity: VisualDensity.compact,
-        ),
         // 固定波形图：形状由 messageId 决定（同一条消息每次渲染一致），
         // 播放时已播部分染高亮色 + 竖线从左往右走，走完复原。
         _VoiceWaveform(
@@ -4782,35 +4781,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     final Widget body;
     if (isVoice) {
-      body = topRow;
-    } else {
-      // 音频文件：两行（老板 2026-09-27）——上行与录音同构，下行是**乐符 + 文件名**。
-      // 播放态不再把文件名顶掉（原来下行位置显示"播放中"）：播放中由停止图标 +
-      // 波形走进度表达，文件名始终可见，两行高度不跳。
-      // 两行都左对齐（crossAxisAlignment.start）：长文件名换行/截断时，下行左边缘
-      // 仍与播放键对齐；整体靠左还是靠右由气泡决定（我的消息在右）。
-      body = Column(
+      body = Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [playButton, waveformRow],
+      );
+    } else {
+      // 音频文件：播放键独占左列，右边一列两行（老板 2026-09-27）——上行波形+时长、
+      // 下行文件名。**文件名与波形左对齐**靠这个"左列/右列"结构天然保证，不用
+      // 量播放键宽度再去凑缩进（之前那版第二行贴着气泡左边缘，跟播放键不齐）。
+      // 乐符图标已按老板要求删掉：文件名本身就是"这是一首歌"的最好说明。
+      body = Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          topRow,
-          Row(
+          playButton,
+          Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('🎵'), // 与消息流其它音频位置同一个乐符（emoji，不用图标字体）
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              waveformRow,
+              // 单行 + 截断：Flexible 放在 Row 里才管**宽度**（放 Column 里变成管高度）
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ],
       );
     }
-    // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长、乐符、文件名都在范围里
+    // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长、文件名都在范围里
     // （老板 2026-09-27，与图片"点消息本体就是看大图"对齐）。播放键保留（它仍能点）。
     // behavior=opaque：否则容器自身不参与命中测试，只有子控件占的那几块能点——
     // 播放键与波形之间的空隙、两行之间的空隙都会漏掉（文件卡片同理）。
