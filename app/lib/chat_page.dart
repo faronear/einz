@@ -180,6 +180,11 @@ class ChatPage extends StatefulWidget {
 /// 设了字号，不受影响。
 const double kMessageFontSize = 16;
 
+/// **引用里**图片/视频缩略图的边长：输入栏引用条与气泡里的引用块**同尺寸**
+/// （老板 2026-09-27：引用条里已经不显示文件名了，有的是空间，放大到和引用块一样）。
+/// 改这里两处一起变——此前引用条 24、引用块 40，两处各写各的。
+const double kQuoteThumbSize = 40;
+
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   late final MessageRepository _repo;
@@ -3726,11 +3731,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final type = quote['type'] as String?;
     if (type == 'image') {
       final quoted = _messageById(quote['messageId'] as String? ?? '');
-      if (quoted != null) return _buildImageThumb(quoted, size: 40);
+      if (quoted != null) return _buildImageThumb(quoted, size: kQuoteThumbSize);
     }
     if (type == 'video') {
       final quoted = _messageById(quote['messageId'] as String? ?? '');
-      if (quoted != null) return _buildVideoThumb(quoted, size: 40);
+      if (quoted != null) return _buildVideoThumb(quoted, size: kQuoteThumbSize);
     }
     if (type == 'file') {
       // 原消息已加载 → **复用消息流那张文件名片**（图标 + 文件名 + 尺寸），与菜单
@@ -3850,13 +3855,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 引用块一致（视频显示首帧 + 播放三角，老板要求 2026-09-15）。
           // 语音/音频、文件**不加**引号图标：下面那条音频条/文件名片自带图标，
           // 再挂一个引号既重复又把行撑宽（老板 2026-09-27）
-          if (isImage) ...[
-            _buildImageThumb(quote, size: 24),
-            const SizedBox(width: 6),
-          ] else if (isVideo) ...[
-            _buildVideoThumb(quote, size: 24),
-            const SizedBox(width: 6),
-          ] else if (!isAudio && !isFile) ...[
+          // 图片/视频**只放缩略图**（文件名已按老板要求删掉），尺寸与气泡引用块
+          // 一致（[kQuoteThumbSize]）；后面没有别的预览内容，不再留 6px 间距
+          if (isImage)
+            _buildImageThumb(quote, size: kQuoteThumbSize)
+          else if (isVideo)
+            _buildVideoThumb(quote, size: kQuoteThumbSize)
+          else if (!isAudio && !isFile) ...[
             const Icon(Icons.format_quote, size: 14, color: Colors.grey),
             const SizedBox(width: 6),
           ],
