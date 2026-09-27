@@ -4725,7 +4725,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 音频气泡：语音（录音）=播放键 + 固定波形图 + 秒数（25s）；音频文件=播放键
   /// + 文件名 + h/m/s 时长（零的部分省略）。点击下载解密后播放
-  /// （老板要求 2026-09-13）。
+  /// （老板要求 2026-09-13）；**整条**可点，不必非点中播放键（老板 2026-09-27）。
   ///
   /// 消息流气泡与长按菜单预览行共用（后者 [waveformWidth] 小一点，避免挤爆
   /// 弹窗）：外层监听播放状态版本，菜单在独立路由、页面 setState 重建不到它。
@@ -4744,8 +4744,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final onBubble = _uiStyle == 'gradient'
         ? Colors.white
         : Theme.of(context).colorScheme.primary; // 气泡上的前景色（波形/图标）
+    final Widget row;
     if (m.env.type != 'voice') {
-      return Row(
+      row = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
@@ -4768,33 +4769,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ],
         ],
       );
-    }
-    final seconds = _audioDurationSeconds(m);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: Icon(playing ? Icons.stop_circle : Icons.play_circle),
-          onPressed: () => _playAudioMessage(m),
-          visualDensity: VisualDensity.compact,
-        ),
-        // 固定波形图：形状由 messageId 决定（同一条消息每次渲染一致），
-        // 播放时已播部分染高亮色 + 竖线从左往右走，走完复原。
-        _VoiceWaveform(
-          playing: _audioStartedMessageId == m.env.messageId,
-          durationSeconds: seconds,
-          seed: m.env.messageId,
-          width: waveformWidth,
-          activeColor: onBubble,
-          inactiveColor: onBubble.withValues(alpha: 0.4),
-        ),
-        // 时长未知时不显示任何文字（播放键 + 波形已足够表达"这是录音"，
-        // 老板要求 2026-09-13）
-        if (seconds > 0) ...[
-          const SizedBox(width: 6),
-          Text(_formatVoiceDuration(seconds), style: const TextStyle(fontSize: 12)),
+    } else {
+      final seconds = _audioDurationSeconds(m);
+      row = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(playing ? Icons.stop_circle : Icons.play_circle),
+            onPressed: () => _playAudioMessage(m),
+            visualDensity: VisualDensity.compact,
+          ),
+          // 固定波形图：形状由 messageId 决定（同一条消息每次渲染一致），
+          // 播放时已播部分染高亮色 + 竖线从左往右走，走完复原。
+          _VoiceWaveform(
+            playing: _audioStartedMessageId == m.env.messageId,
+            durationSeconds: seconds,
+            seed: m.env.messageId,
+            width: waveformWidth,
+            activeColor: onBubble,
+            inactiveColor: onBubble.withValues(alpha: 0.4),
+          ),
+          // 时长未知时不显示任何文字（播放键 + 波形已足够表达"这是录音"，
+          // 老板要求 2026-09-13）
+          if (seconds > 0) ...[
+            const SizedBox(width: 6),
+            Text(_formatVoiceDuration(seconds), style: const TextStyle(fontSize: 12)),
+          ],
         ],
-      ],
+      );
+    }
+    // 整条可点 = 播放/停止：**不必非点中那个播放键**（老板 2026-09-27，与图片
+    // "点消息本体就是看大图"对齐）。播放键保留（它仍能点，行为一致）。
+    // behavior=opaque：否则 Row 只有**子控件占据的那几块**参与命中测试，点按键
+    // 与波形之间的空隙没反应（文件卡片同理，见 _buildFileCard）。
+    return Clickable(
+      onTap: () => _playAudioMessage(m),
+      behavior: HitTestBehavior.opaque,
+      child: row,
     );
   }
 

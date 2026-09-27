@@ -10305,3 +10305,24 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 
 **教训**：改交互手势前，先把"这个区域现有的单击/长按分别是什么"列全——气泡不是一个
 整体，内层还有图片/视频/文件/播放键四个可点子区。
+
+## 2026-09-27 录音/音频气泡：整条可点播放（不必点中播放键）
+
+**老板要求**：录音消息和图片消息对齐——**单击消息就播放**，包括播放键与波形区在内，
+不非得点中那个播放按钮。
+
+**做法**：`_buildAudioBarBody()` 两个分支（voice 波形 / audio 文件名）的 Row 统一包一层
+`Clickable(onTap: () => _playAudioMessage(m), behavior: HitTestBehavior.opaque)`。
+`_playAudioMessage` 本身是**开关**（正在播同一条 → 停止），所以"点整条"=播放/停止切换。
+
+**两个坑**：
+
+1. `Clickable` 默认 `behavior: HitTestBehavior.deferToChild`，而 Row 自身不参与命中测试
+   ——只有子控件占的那几块算命中，**播放键与波形之间的空隙点不到**。必须显式
+   `opaque`（文件卡片 `_buildFileCard` 早就这么做了，同一条规则）。
+2. 播放键保留 `IconButton`（行为与整条一致，点它也能播），没有降级成纯 Icon——它是
+   既成的可点提示，没必要动。
+
+**没动**：气泡的长按（= 操作菜单）**不受影响**——内层只有 onTap、没有 onLongPress，
+长按仍由外层气泡的 GestureDetector 接住（`chat_page_menu_test` 里 longPress '25s' 的
+断言因此照旧有效）。
