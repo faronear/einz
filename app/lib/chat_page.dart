@@ -1336,11 +1336,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 按住时的底色紧贴着 "I"（老板 2026-09-26 实测）。
                 // 文字链接用左右**匀称**的留白，底色两边都留得出来。
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                // 高度与电话图标 / 下拉箭头的点击区**同高**（都是 kStatusAvatarSize）：
-                // 三个都是"胶囊外侧的操作控件"，背景区高度不一致会显得参差
-                // （老板 2026-09-26）
+                // 背景高度取控件的统一值（32）而不是头像的 40：胶囊形是满高直边，
+                // 撑到 40 会直接贴住状态条的上下边缘（老板 2026-09-26 实测）
                 child: SizedBox(
-                  height: kStatusAvatarSize,
+                  height: kStatusControlSize,
                   child: Center(
                     child: Text(l10n.chatPageInviteJoinLink,
                         style: const TextStyle(
@@ -5242,8 +5241,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 hoverColor: Colors.black.withValues(alpha: 0.05),
                                 highlightColor: Colors.black.withValues(alpha: 0.08),
                                 child: SizedBox(
-                                  width: 32,
-                                  height: kStatusAvatarSize,
+                                  // 正圆：非正方形会被 CircleBorder 拉成椭圆、顶到
+                                  // 状态条上下边缘（与 invite 同源的问题）
+                                  width: kStatusControlSize,
+                                  height: kStatusControlSize,
                                   child: Icon(Icons.arrow_drop_down,
                                       size: 22,
                                       color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -6297,6 +6298,13 @@ class _WaveformPainter extends CustomPainter {
 /// 用 `bool.fromEnvironment`（编译期常量、但分析器不知道值）而不是写死 false：
 /// 写死会让整段 `if` 被判定为死代码，将来改开关时反而不好维护。
 const bool kShowMessageAvatars = bool.fromEnvironment('SHOW_MESSAGE_AVATARS');
+
+/// 状态条里**操作控件**（电话图标 / 下拉箭头 / 邀请链接）的背景高度。
+///
+/// 比头像（[kStatusAvatarSize]=40）矮：圆形控件的圆弧在上下顶点附近会收窄，
+/// 视觉上"离胶囊边缘有距离"；而胶囊形（邀请链接）是**满高的直边**——同样给 40
+/// 就直接顶住状态条上下边缘（老板 2026-09-26 实测）。所以统一的背景高度取 32。
+const double kStatusControlSize = 32;
 
 /// 状态条上的头像边长（= 名字 + 红绿灯两行的高度）。头像**上下不留白**，
 /// 三面贴住胶囊内壁（老板 2026-09-26）。
