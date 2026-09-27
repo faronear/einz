@@ -3836,6 +3836,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
+        // spaceBetween：音频条/文件名片**贴合内容靠左**、取消按钮**贴右边框**，
+        // 空余留在两者中间（老板 2026-09-27 指出：macOS 宽窗口下 X 离右边框一大段，
+        // 还随文件名长短浮动）。
+        // 不能用 `Flexible + Spacer` 来顶：两个都是 flex 子项，剩余空间被**平分**，
+        // X 前面永远留着约一半空余；而内容越长、剩余越少 → 空隙跟着文件名浮动。
+        // 文字引用那条是 Expanded（tight），本来就撑满整行，不受影响。
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // 引用图片/视频时显示原附件缩略图（否则双引号图标）——与发送后的
           // 引用块一致（视频显示首帧 + 播放三角，老板要求 2026-09-15）。
@@ -3864,7 +3871,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 foreground: Theme.of(context).colorScheme.primary,
               ),
             ),
-            const Spacer(), // 取消按钮仍靠右（与文字引用时一致）
           ] else if (isFile) ...[
             Flexible(
               child: _buildFileCard(
@@ -3872,7 +3878,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 foreground: Theme.of(context).colorScheme.primary,
               ),
             ),
-            const Spacer(),
           ] else
             Expanded(
               child: Text(
