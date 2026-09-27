@@ -10364,3 +10364,19 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
   单行截断（ellipsis），得把它再套一层 `Row(min)`；直接放 Column 里会换行而不截断。
 - 同一个 widget 实例（这里是 `playButton` / `waveformRow`）在 if/else 两支里各用一次是
   安全的（没有 GlobalKey 时，Flutter 允许同一个配置对象出现在多处）。
+
+## 2026-09-27 坑：音频播放图标在菜单预览条里是黑的、在气泡里是白的
+
+**现象**：老板实测——同一条音频条，消息气泡里播放键是白的，长按菜单预览条里是黑的。
+
+**根因**：图标颜色**没显式给**，靠 ambient IconTheme。消息气泡外层有一层
+`IconTheme.merge(color: gradient ? white : null)`，预览条（`_buildMessagePreviewRow`）
+只 merge 了 `DefaultTextStyle`（文字），**没有** IconTheme → 落到主题默认深色。
+`_buildMessagePreviewRow` 的 file 分支早就手动给 `insert_drive_file` 上色了，只有
+`_buildAudioBarBody` 里的 IconButton 漏了这层。
+
+**修法**：`Icon(..., color: onBubble)` —— 与波形图同源（gradient 白 / plain 主题蓝），
+一处定色、两处一致，不再依赖调用方有没有套 IconTheme。
+
+**教训**：抽出来被**多处复用**的 widget（消息流气泡 / 菜单预览条 / 引用块…）不要依赖
+调用方的 ambient 样式，前景色要自己显式给——每处调用方的 IconTheme 未必一样。

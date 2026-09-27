@@ -4748,7 +4748,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final seconds = _audioDurationSeconds(m);
     final isVoice = m.env.type == 'voice';
     final Widget playButton = IconButton(
-      icon: Icon(playing ? Icons.stop_circle : Icons.play_circle),
+      // 图标颜色**显式给**（跟波形同源 [onBubble]，不再依赖外部 IconTheme）：
+      // 消息气泡有 IconTheme.merge 把图标染白，而长按菜单预览条**没有**那一层
+      // → 同一条音频条在两处两个颜色（老板 2026-09-27 实测：气泡白、弹窗黑）。
+      icon: Icon(playing ? Icons.stop_circle : Icons.play_circle, color: onBubble),
       onPressed: () => _playAudioMessage(m),
       visualDensity: VisualDensity.compact,
     );
