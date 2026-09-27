@@ -1331,15 +1331,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               hoverColor: Colors.black.withValues(alpha: 0.05),
               highlightColor: Colors.black.withValues(alpha: 0.08),
               child: Padding(
-                // 与芯片**之间不再留间隙**（老板 2026-09-25：去掉常驻灰底之后，
-                // 8px 的空隙看着像断开的；现在两块底色悬浮/按住时**边缘相碰**，
-                // 看起来是连着的一排）。文字之间的距离由两侧各自的 `pad` 撑着
-                //（芯片右 10 + 链接左 16），不靠这个间隙。
-                //
-                // 内边距与状态芯片**同一个 `pad`**（老板 2026-09-25：invite 的
-                // 左右留白要和芯片一致）。芯片右 10 是给下拉箭头留的，链接没有
-                // 箭头，跟着用同一个常量 → 文字偏左 3px，看不出。
-                padding: pad,
+                // **不能共用左块的 `pad`**（那个是给头像定制的：左/上/下都是 0，
+                // 好让头像三面贴住胶囊内壁）。共用会让这里的左内边距变成 0——
+                // 按住时的底色紧贴着 "I"（老板 2026-09-26 实测）。
+                // 文字链接用左右**匀称**的留白，底色两边都留得出来。
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(l10n.chatPageInviteJoinLink,
                     style: const TextStyle(
                         fontSize: 12,
