@@ -10467,3 +10467,19 @@ Spacer 分走一半，长歌名能多显示一些字。
 **教训**：`Spacer` 不是"把右边的推到边上"的万能写法——只要同级还有别的 flex 子项
 （`Flexible`/`Expanded`），它就是**按比例分剩余**，不是"吃掉全部剩余"。
 要"左右贴边、中间留白"用 `mainAxisAlignment: spaceBetween`。
+
+## 2026-09-27 引用条：图片/视频不再显示（假的）文件名
+
+**现象**：引用图片/视频时，输入栏引用条里永远显示 `image.jpg` / `video.mp4`。
+
+**根因**：`_sendMedia` 里拍照/相册/录像发出来的消息，明文（plaintext）是**硬编码**的
+`fileName = 'image.jpg'` / `'video.mp4'`（XFile 的真实名字根本没取），引用快照的 preview
+来自明文 → 于是引用条显示一个假名字。气泡里 image/video 走缩略图、不显示明文，所以这个
+假名只在引用条（以及任何读 preview 的地方）暴露。
+
+**处理**（按老板意思"不如删掉"）：引用条里 image/video **只显示缩略图**，不再拼文本。
+气泡里的引用块本来就是走 `_buildImageThumb`/`_buildVideoThumb`，不受影响。
+
+**遗留（未改，问过再动）**：发送端明文仍是假名。若哪天要在别处显示真名，得改
+`_sendMedia` 用 XFile 的真实文件名（`image.name` / `video.name`）——老消息的明文已经存成
+假名了（产品未上线、设备会重置，不必写迁移）。

@@ -3827,6 +3827,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildQuoteBanner(HistoryMessage quote) {
     final isAudio = quote.env.type == 'voice' || quote.env.type == 'audio';
     final isFile = quote.env.type == 'file';
+    final isImage = quote.env.type == 'image';
+    final isVideo = quote.env.type == 'video';
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -3848,10 +3850,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 引用块一致（视频显示首帧 + 播放三角，老板要求 2026-09-15）。
           // 语音/音频、文件**不加**引号图标：下面那条音频条/文件名片自带图标，
           // 再挂一个引号既重复又把行撑宽（老板 2026-09-27）
-          if (quote.env.type == 'image') ...[
+          if (isImage) ...[
             _buildImageThumb(quote, size: 24),
             const SizedBox(width: 6),
-          ] else if (quote.env.type == 'video') ...[
+          ] else if (isVideo) ...[
             _buildVideoThumb(quote, size: 24),
             const SizedBox(width: 6),
           ] else if (!isAudio && !isFile) ...[
@@ -3878,7 +3880,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 foreground: Theme.of(context).colorScheme.primary,
               ),
             ),
-          ] else
+          ] else if (!isImage && !isVideo)
+            // 图片/视频**只显示缩略图，不再显示文件名**：发送端写进明文的本来就是
+            // 硬编码的 `image.jpg` / `video.mp4`（见 _sendMedia），不是真名——显示
+            // 一个假名字还不如不显示（老板 2026-09-27）。
             Expanded(
               child: Text(
                 // 双引号图标已足够表达引用，不再加「引用：」前缀（老板要求 2026-09-09）
