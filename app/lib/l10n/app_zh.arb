@@ -600,5 +600,9 @@
         "type": "String"
       }
     }
+  },
+  "chatPageAvatarChange": "更换头像",
+  "@chatPageAvatarChange": {
+    "description": "头像大图上的按钮：点了去选图（空头像时点状态条头像直接走这个动作）"
   }
 }

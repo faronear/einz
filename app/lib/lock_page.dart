@@ -166,7 +166,7 @@ class _LockPageState extends State<LockPage> {
         final labelStyle =
             TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
         return [
-          PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
+          PopupMenuItem(mouseCursor: SystemMouseCursors.click,
             height: kMenuRowHeight,
             value: 'locale',
             child: Row(
@@ -179,12 +179,12 @@ class _LockPageState extends State<LockPage> {
           ),
           const PopupMenuDivider(height: kMenuDividerHeight),
           // 关于与退出一组（都在分割线下方，退出垫底）——与对话页/向导页菜单一致
-          PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
+          PopupMenuItem(mouseCursor: SystemMouseCursors.click,
             height: kMenuRowHeight,
             value: 'about',
             child: Text(l10n.chatPageMenuAbout, style: labelStyle),
           ),
-          PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
+          PopupMenuItem(mouseCursor: SystemMouseCursors.click,
             height: kMenuRowHeight,
             value: 'exit',
             child: Row(

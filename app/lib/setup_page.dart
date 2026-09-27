@@ -425,7 +425,7 @@ class _SetupPageState extends State<SetupPage> {
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
               final langCode = Localizations.localeOf(context).languageCode;
               return [
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'locale',
                   child: Row(
@@ -438,12 +438,12 @@ class _SetupPageState extends State<SetupPage> {
                 ),
                 const PopupMenuDivider(height: kMenuDividerHeight),
                 // 关于与退出一组（都在分割线下方，退出垫底）
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'exit',
                   child: Row(
@@ -2033,7 +2033,7 @@ class _SetupPageState extends State<SetupPage> {
           color: Color.lerp(color.withValues(alpha: 0.35), color, t),
           elevation: 4 * t,
           borderRadius: BorderRadius.circular(14),
-          child: InkWell(mouseCursor: SystemMouseCursors.click, 
+          child: InkWell(mouseCursor: SystemMouseCursors.click,
             onTap: onTap,
             borderRadius: BorderRadius.circular(14),
             child: Container(
@@ -2762,7 +2762,7 @@ class _EntryCard extends StatelessWidget {
     return Material(
       color: backgroundColor,
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(mouseCursor: SystemMouseCursors.click, 
+      child: InkWell(mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: SizedBox(

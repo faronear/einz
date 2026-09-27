@@ -154,7 +154,7 @@ class _EmojiPanelState extends State<EmojiPanel> {
                 crossAxisSpacing: 4,
               ),
               itemCount: group.emojis.length,
-              itemBuilder: (context, index) => InkWell(mouseCursor: SystemMouseCursors.click, 
+              itemBuilder: (context, index) => InkWell(mouseCursor: SystemMouseCursors.click,
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => widget.onEmojiSelected(group.emojis[index]),
                 child: Center(
@@ -225,7 +225,7 @@ class _EmojiTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(mouseCursor: SystemMouseCursors.click, 
+    return InkWell(mouseCursor: SystemMouseCursors.click,
       onTap: onTap,
       child: Container(
         width: 44,

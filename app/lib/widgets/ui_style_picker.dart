@@ -109,7 +109,7 @@ class _StyleOptionCard extends StatelessWidget {
       child: Material(
         color: active ? scheme.secondaryContainer.withValues(alpha: 0.55) : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
-        child: InkWell(mouseCursor: SystemMouseCursors.click, 
+        child: InkWell(mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           child: Padding(

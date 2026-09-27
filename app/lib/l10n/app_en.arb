@@ -600,5 +600,9 @@
         "type": "String"
       }
     }
+  },
+  "chatPageAvatarChange": "Change avatar",
+  "@chatPageAvatarChange": {
+    "description": "Button on the fullscreen avatar: opens the picker (an empty avatar goes straight here)"
   }
 }

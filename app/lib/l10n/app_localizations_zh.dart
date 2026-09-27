@@ -1004,4 +1004,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String voiceCallRecordDuration(String duration) {
     return '通话时长 $duration';
   }
+
+  @override
+  String get chatPageAvatarChange => '更换头像';
 }

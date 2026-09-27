@@ -1933,6 +1933,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Call duration {duration}'**
   String voiceCallRecordDuration(String duration);
+
+  /// Button on the fullscreen avatar: opens the picker (an empty avatar goes straight here)
+  ///
+  /// In en, this message translates to:
+  /// **'Change avatar'**
+  String get chatPageAvatarChange;
 }
 
 class _AppLocalizationsDelegate

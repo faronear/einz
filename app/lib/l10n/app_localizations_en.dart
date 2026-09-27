@@ -1049,4 +1049,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String voiceCallRecordDuration(String duration) {
     return 'Call duration $duration';
   }
+
+  @override
+  String get chatPageAvatarChange => 'Change avatar';
 }
