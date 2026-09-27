@@ -20,7 +20,6 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'widgets/about_sheet.dart';
 import 'brand_logo.dart';
-import 'call_tones.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
@@ -307,7 +306,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// **其它**空间（非当前）的未读数：spaceId → 条数。用于顶部「切换秘境」旁的汇总角标。
   final Map<String, int> _otherUnread = {};
   Timer? _unreadTimer;
-  AudioPlayer? _notifyPlayer; // 新消息提示音（播一次，不循环）
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
@@ -638,7 +636,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 其它空间的未读：30s 问一次（WS 只管当前空间，别的收不到实时事件）
     _unreadTimer = Timer.periodic(
         const Duration(seconds: 30), (_) => unawaited(_refreshOtherUnread()));
-    unawaited(_refreshOtherUnread(soundOnIncrease: false));
+    unawaited(_refreshOtherUnread());
   }
 
   /// 顶部栏的通话按钮：发起呼叫（振铃界面由状态监听弹出）。
@@ -975,14 +973,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 为什么要单独拉：WS 只连着当前空间，其它空间的消息**收不到实时事件**，
   /// 只能定时问一次（30s）。未读角标不需要秒级实时，这个延迟可以接受。
   ///
-  /// [soundOnIncrease] 为 true 时，某个空间的未读**变多**就响一声提示音
-  /// （老板 2026-09-26：先加上体验，之后想删再说）。
-  Future<void> _refreshOtherUnread({bool soundOnIncrease = true}) async {
+  /// 只更角标、**不再响提示音**（老板 2026-09-27：取消其它空间来消息的声音）。
+  Future<void> _refreshOtherUnread() async {
     final vault = VaultSession.current;
     final spaces = vault?.spaces ?? const <AppLockPayload>[];
     if (spaces.length < 2) return; // 只有一个空间就没什么"其它"可言
     final client = widget.api ?? ApiClient(effectiveServer);
-    var increased = false;
     for (final space in spaces) {
       if (space.spaceId == widget.spaceId) continue;
       if ((space.token ?? '').isEmpty) continue;
@@ -991,24 +987,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final count = await SpaceSessions.ofPayload(space, db: widget.db)
           .call((t) => client.unreadCount(t))
           .catchError((_) => 0);
-      if (count > (_otherUnread[space.spaceId] ?? 0)) increased = true;
       _otherUnread[space.spaceId] = count;
     }
     if (!mounted) return;
     setState(() {});
-    if (increased && soundOnIncrease) unawaited(_playNotificationTone());
-  }
-
-  /// 新消息提示音：播一次（不循环）。播不出来不影响别的，异常吞掉。
-  Future<void> _playNotificationTone() async {
-    try {
-      await _notifyPlayer?.stop();
-      final player = AudioPlayer();
-      _notifyPlayer = player;
-      await player.play(BytesSource(CallTones.notification()));
-    } catch (_) {
-      // 静音/无音频设备：算了
-    }
   }
 
   /// 建立 / 重连实时链路（WS + 通话服务）。
@@ -1471,9 +1453,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 锁屏码**（当前空间落明文键），其它空间的凭证在内存会话 [VaultSession] 里。
   Future<void> _openSpacePicker() async {
     final pick = await showSpacePicker(context, db: widget.db, api: widget.api);
-    // 弹层关掉后刷新一次未读（可能刚切过空间，也可能只是看了看）——不响提示音，
-    // 因为这次是**用户自己**去看的，不需要提醒
-    unawaited(_refreshOtherUnread(soundOnIncrease: false));
+    // 弹层关掉后刷新一次未读（可能刚切过空间，也可能只是看了看）
+    unawaited(_refreshOtherUnread());
     if (!mounted || pick == null) return;
     if (pick.add) {
       await addSpaceFlow(context, db: widget.db, api: widget.api);
@@ -2779,7 +2760,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _voiceCall?.state.removeListener(_onVoiceCallStateChanged);
     _voiceCall?.dispose();
     _unreadTimer?.cancel();
-    unawaited(_notifyPlayer?.dispose());
     _scrollController.removeListener(_maybeLoadOlder);
     _inputFocusNode.removeListener(_onInputFocusChanged);
     _scrollController.dispose();
@@ -2822,7 +2802,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.resumed) {
       // 回到前台：把后台时停掉的 WS 接回来（通话中的那次没停，这里幂等重连）
       _startRealtime();
-      unawaited(_refreshOtherUnread(soundOnIncrease: false));
+      unawaited(_refreshOtherUnread());
       final relock = _lockTimer.shouldRelock(now: DateTime.now());
       _lockTimer.clear();
       // 不需要锁的两条路径：没离开够久（用户一直在看）、或本机压根没设锁屏码。
