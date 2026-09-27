@@ -22,6 +22,7 @@ class CallTones {
 
   static Uint8List? _ringbackCache;
   static Uint8List? _ringtoneCache;
+  static Uint8List? _notificationCache;
 
   /// 主叫侧：回铃音。450Hz，**响 1 秒、停 4 秒**（一回 5 秒循环）。
   static Uint8List ringback() => _ringbackCache ??= _encode(_synth(<_Tone>[
@@ -41,8 +42,19 @@ class CallTones {
         const _Tone(frequency: 0, seconds: 0.9),
       ]));
 
+  /// **新消息提示音**（其它秘境来消息时响一声）：两声上行短嘀（988 → 1319Hz）。
+  ///
+  /// 刻意做得比来电铃声**短很多**、音高也不同——一声"叮咚"，不让人误以为来电话了。
+  /// 声压也更低（0.22）：它是背景提示，不是要你立刻行动的信号
+  /// （老板 2026-09-26：先加上体验，之后想删再说）。
+  static Uint8List notification() => _notificationCache ??= _encode(_synth(<_Tone>[
+        const _Tone(frequency: 988, seconds: 0.12),
+        const _Tone(frequency: 1319, seconds: 0.16),
+        const _Tone(frequency: 0, seconds: 0.6),
+      ], gain: 0.22));
+
   /// 按音序合成采样点（-1..1）。每个音首尾各 8ms 淡入淡出，避免"咔哒"爆音。
-  static List<double> _synth(List<_Tone> sequence) {
+  static List<double> _synth(List<_Tone> sequence, {double gain = 0.35}) {
     const fadeSeconds = 0.008;
     final out = <double>[];
     for (final tone in sequence) {
@@ -56,8 +68,8 @@ class CallTones {
         final value = tone.frequency <= 0
             ? 0.0
             : sin(2 * pi * tone.frequency * i / _sampleRate);
-        // 幅度 0.35：提示音不该太吵
-        out.add(value * amplitude * 0.35);
+        // 幅度默认 0.35：提示音不该太吵（消息提示音更低，见 notification）
+        out.add(value * amplitude * gain);
       }
     }
     return out;

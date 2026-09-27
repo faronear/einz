@@ -20,6 +20,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'widgets/about_sheet.dart';
 import 'brand_logo.dart';
+import 'call_tones.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
@@ -302,6 +303,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方与我方各一份，口径与「更多通道」卡片一致（见 [_sinceOfRow]）。
   int? _peerSinceMs;
   int? _mySinceMs;
+
+  /// **其它**空间（非当前）的未读数：spaceId → 条数。用于顶部「切换秘境」旁的汇总角标。
+  final Map<String, int> _otherUnread = {};
+  Timer? _unreadTimer;
+  AudioPlayer? _notifyPlayer; // 新消息提示音（播一次，不循环）
   int? _escrowUpdatedAt; // 本端已知口令更新时间（上线补查对比用；沿用 widget 初值）
   Timer? _peerTicker; // 对方在线轮询（30s）
 
@@ -629,6 +635,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _registerPushToken();
     _registerInstallUid();
     _startRealtime();
+    // 其它空间的未读：30s 问一次（WS 只管当前空间，别的收不到实时事件）
+    _unreadTimer = Timer.periodic(
+        const Duration(seconds: 30), (_) => unawaited(_refreshOtherUnread()));
+    unawaited(_refreshOtherUnread(soundOnIncrease: false));
   }
 
   /// 顶部栏的通话按钮：发起呼叫（振铃界面由状态监听弹出）。
@@ -954,6 +964,51 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _ticker?.cancel();
     _currentTickerInterval = interval;
     _ticker = Timer.periodic(interval, (_) => _onTick());
+  }
+
+  /// 其它空间未读的合计（顶部角标显示这个）。
+  int get _otherUnreadTotal =>
+      _otherUnread.values.fold(0, (int sum, int n) => sum + n);
+
+  /// 拉取**其它空间**的未读数（当前空间不算——它正在眼前，不需要角标提醒）。
+  ///
+  /// 为什么要单独拉：WS 只连着当前空间，其它空间的消息**收不到实时事件**，
+  /// 只能定时问一次（30s）。未读角标不需要秒级实时，这个延迟可以接受。
+  ///
+  /// [soundOnIncrease] 为 true 时，某个空间的未读**变多**就响一声提示音
+  /// （老板 2026-09-26：先加上体验，之后想删再说）。
+  Future<void> _refreshOtherUnread({bool soundOnIncrease = true}) async {
+    final vault = VaultSession.current;
+    final spaces = vault?.spaces ?? const <AppLockPayload>[];
+    if (spaces.length < 2) return; // 只有一个空间就没什么"其它"可言
+    final client = widget.api ?? ApiClient(effectiveServer);
+    var increased = false;
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue;
+      if ((space.token ?? '').isEmpty) continue;
+      // 走**各空间的会话**（不是裸 token）：会话 24h 过期，直接用 Vault 里的旧
+      // token 会 401 → 未读静默变 0（space_switcher 里同样处理过，2026-09-26 修）
+      final count = await SpaceSessions.ofPayload(space, db: widget.db)
+          .call((t) => client.unreadCount(t))
+          .catchError((_) => 0);
+      if (count > (_otherUnread[space.spaceId] ?? 0)) increased = true;
+      _otherUnread[space.spaceId] = count;
+    }
+    if (!mounted) return;
+    setState(() {});
+    if (increased && soundOnIncrease) unawaited(_playNotificationTone());
+  }
+
+  /// 新消息提示音：播一次（不循环）。播不出来不影响别的，异常吞掉。
+  Future<void> _playNotificationTone() async {
+    try {
+      await _notifyPlayer?.stop();
+      final player = AudioPlayer();
+      _notifyPlayer = player;
+      await player.play(BytesSource(CallTones.notification()));
+    } catch (_) {
+      // 静音/无音频设备：算了
+    }
   }
 
   /// 建立 / 重连实时链路（WS + 通话服务）。
@@ -1416,6 +1471,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 锁屏码**（当前空间落明文键），其它空间的凭证在内存会话 [VaultSession] 里。
   Future<void> _openSpacePicker() async {
     final pick = await showSpacePicker(context, db: widget.db, api: widget.api);
+    // 弹层关掉后刷新一次未读（可能刚切过空间，也可能只是看了看）——不响提示音，
+    // 因为这次是**用户自己**去看的，不需要提醒
+    unawaited(_refreshOtherUnread(soundOnIncrease: false));
     if (!mounted || pick == null) return;
     if (pick.add) {
       await addSpaceFlow(context, db: widget.db, api: widget.api);
@@ -2720,6 +2778,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _ws?.stop();
     _voiceCall?.state.removeListener(_onVoiceCallStateChanged);
     _voiceCall?.dispose();
+    _unreadTimer?.cancel();
+    unawaited(_notifyPlayer?.dispose());
     _scrollController.removeListener(_maybeLoadOlder);
     _inputFocusNode.removeListener(_onInputFocusChanged);
     _scrollController.dispose();
@@ -2762,6 +2822,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.resumed) {
       // 回到前台：把后台时停掉的 WS 接回来（通话中的那次没停，这里幂等重连）
       _startRealtime();
+      unawaited(_refreshOtherUnread(soundOnIncrease: false));
       final relock = _lockTimer.shouldRelock(now: DateTime.now());
       _lockTimer.clear();
       // 不需要锁的两条路径：没离开够久（用户一直在看）、或本机压根没设锁屏码。
@@ -4943,6 +5004,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 tooltip: l10n.spaceListSwitch,
                 onPressed: _openSpacePicker,
               ),
+            // 其它秘境有未读 → 汇总角标（老板 2026-09-26）：不打开「选择秘境」
+            // 也能一眼看到"别的秘境来消息了"。
+            if (_otherUnreadTotal > 0) _UnreadBadge(count: _otherUnreadTotal),
           ],
         ),
         actions: [
@@ -6340,6 +6404,42 @@ const double kStatusControlSize = 32;
 /// 状态条上的头像边长（= 名字 + 红绿灯两行的高度）。头像**上下不留白**，
 /// 三面贴住胶囊内壁（老板 2026-09-26）。
 const double kStatusAvatarSize = 40;
+
+/// 顶部「切换秘境」旁的**未读汇总角标**（其它空间的未读总数）。
+///
+/// 数字变化时用 [AnimatedSwitcher] 缩放一下（老板 2026-09-26 要的"闪动"）——
+/// key 取数字本身，数字一变就重建 child、触发一次缩放动画。
+/// 只有**多空间**时才可能出现（单空间没有"其它空间"）。
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      transitionBuilder: (child, animation) =>
+          ScaleTransition(scale: animation, child: child),
+      child: Container(
+        key: ValueKey<int>(count),
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.error,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        // 与空间卡片上的角标同口径：>99 折成 "99+"
+        child: Text(
+          count > 99 ? '99+' : '$count',
+          style: const TextStyle(
+              color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}
 
 /// 状态条上的头像（可点开全屏大图）。
 ///
