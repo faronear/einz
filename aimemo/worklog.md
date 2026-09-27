@@ -10149,3 +10149,43 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 - **修复**：补齐该项，两套 entitlements 现在只差 debug 该有的 `cs.allow-jit` /
   `network.server`。构建产物用 `codesign -d --entitlements -` 确认已带上。
 - **这是长期存在的差异**，与本次语音通话改动无关。
+
+## 2026-09-26 桌面端交互细节：光标统一 + 状态条悬停 + 切换入口搬家
+
+### 光标统一（可点即手型）
+
+老板实测发现：只有我改过的头像/气泡是手型，**弹窗按钮、输入栏按钮仍是箭头**——
+我原先"Material 按钮在桌面端默认就是手型"的判断是**错的**。结论：推进全局，理由有二——
+① 状态条头像悬浮时已经压暗+放大，再配箭头光标自相矛盾；② 成本低、只碰光标不碰命中。
+
+落点（三层，覆盖全项目）：
+
+| 层 | 手段 | 覆盖量 |
+| --- | --- | --- |
+| Material 按钮 / ListTile | `main.dart` 的 Theme（iconButton/textButton/elevated/outlined/filled + listTileTheme） | 59 处 + `PopupMenuButton` 内部 |
+| `InkWell` | 逐处补 `mouseCursor`（脚本批量，跨 7 文件） | 17 处 |
+| 裸手势 | 换成新组件 `widgets/clickable.dart`（MouseRegion + GestureDetector 同名透传；回调全 null 时不变手型） | 17 处 |
+| `PopupMenuItem` | **框架内建 InkWell、不吃 Theme**，只能逐处传 `mouseCursor` | 19 处 |
+| `PopupMenuButton` 图标 | 框架不接受 `mouseCursor` 参数 → 包一层 `MouseRegion`（只覆盖图标区，外圈留白仍是箭头） | 3 处 |
+
+已扫过其它框架级可点组件（Dropdown/ExpansionTile/MenuAnchor/Chip/SwitchListTile…）：项目里没用。
+
+### 状态条：切换秘境入口搬到标题栏
+
+老板体验后指出：箭头挂在**对方名字**旁边，点它的人文义是"要换掉对方"，**有点伤人**——
+移到标题栏「logo + 我的秘境」右侧，主语变成"我所在的秘境"，语义对了。
+只有 2 个及以上空间才显示（沿用 2026-09-24 口径）。抽了 `_multiSpace` getter 共用。
+箭头搬走后，电话图标与"名字/状态"之间补了 12px 间距（原来是给箭头的 16px）。
+
+### 状态条头像悬浮反馈
+
+桌面端鼠标移上去：手型光标 + 放大 1.06（`ClipOval` 关住，避免顶出胶囊被裁）+ 压暗一层。
+**只要遮罩**（老板否掉了放大镜图标），遮罩从 28% 降到 18%（纯遮罩时 28% 显脏）。
+抽成 `_StatusAvatar` 小组件（方法形态存不下 hover 状态）。
+
+### 消息气泡头像：代码回来，开关默认关
+
+`kShowMessageAvatars`（`bool.fromEnvironment('SHOW_MESSAGE_AVATARS')`，默认 false）。
+理由：状态条已有双方头像、逐条再挂是重复；但**将来多人秘境**必须逐条标注"谁说的"，
+所以通路留着，`--dart-define=SHOW_MESSAGE_AVATARS=true` 可开（老板已在本地 macOS
+开发脚本里打开，方便评估）。

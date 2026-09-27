@@ -282,7 +282,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
               color: Colors.black.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
               clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
-              child: InkWell(
+              child: InkWell(mouseCursor: SystemMouseCursors.click, 
                 onTap: () => Navigator.of(context).pop(const SpacePick.add()),
                 hoverColor: Colors.black.withValues(alpha: 0.10),
                 highlightColor: Colors.black.withValues(alpha: 0.14),
@@ -404,7 +404,7 @@ class _SpaceCard extends StatelessWidget {
         ),
         child: Material(
           type: MaterialType.transparency,
-          child: InkWell(
+          child: InkWell(mouseCursor: SystemMouseCursors.click, 
             borderRadius: BorderRadius.circular(12),
             onTap: onTap,
             child: Padding(

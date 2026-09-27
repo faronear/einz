@@ -124,7 +124,32 @@ class _EinzAppState extends State<EinzApp> {
             minimumSize: const Size(96, 50),
             textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ).copyWith(
+            mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
           ),
+        ),
+        // ── 桌面端鼠标光标：可点的一律手型 ──
+        //
+        // 背景（老板 2026-09-26）：Flutter 的 Material 按钮在桌面端**默认不会**变手型，
+        // 所以同一界面里有的地方是手型、有的还是箭头，用户得靠猜。集中治理：
+        // 按钮与 ListTile 走 Theme（一处覆盖），裸手势走 Clickable，
+        // InkWell 逐处补 mouseCursor（见 widgets/clickable.dart 的文件头注释）。
+        //
+        // 只改光标，不动命中测试/布局/配色 → 想撤销删掉这一段即可。
+        iconButtonTheme: const IconButtonThemeData(
+          style: ButtonStyle(mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click)),
+        ),
+        textButtonTheme: const TextButtonThemeData(
+          style: ButtonStyle(mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click)),
+        ),
+        elevatedButtonTheme: const ElevatedButtonThemeData(
+          style: ButtonStyle(mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click)),
+        ),
+        outlinedButtonTheme: const OutlinedButtonThemeData(
+          style: ButtonStyle(mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click)),
+        ),
+        listTileTheme: const ListTileThemeData(
+          mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click),
         ),
       ),
       // l10n：中英文资源 + 跟随系统/手动覆盖（locale=null 时跟随系统）

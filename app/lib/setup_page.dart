@@ -23,6 +23,7 @@ import 'l10n/app_localizations.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/passphrase_field.dart';
 import 'widgets/cute_house_icon.dart';
+import 'widgets/clickable.dart';
 
 /// 向导角色（第 0 步选择）：创建新空间 / 加入现有空间。
 enum _WizardRole { create, join, offline }
@@ -401,7 +402,12 @@ class _SetupPageState extends State<SetupPage> {
           // 右上角菜单：语言切换 + 退出（全丢恢复按老板决策已移除，仅 TUI 保留；
           // 密保信封导入在 join 口令页次级入口）
           PopupMenuButton<String>(
-            icon: const Icon(Icons.menu),
+            // 菜单按钮：框架内部用 InkWell 且不接受 mouseCursor 参数，只能自己包一层
+            // （覆盖视觉上的可点区＝图标本身；外圈 12px 留白仍是箭头）
+            icon: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: const Icon(Icons.menu),
+            ),
             tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言）
@@ -419,7 +425,7 @@ class _SetupPageState extends State<SetupPage> {
               // 语言当前值：取实际生效 locale 的语言码 → 中文/English 名
               final langCode = Localizations.localeOf(context).languageCode;
               return [
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'locale',
                   child: Row(
@@ -432,12 +438,12 @@ class _SetupPageState extends State<SetupPage> {
                 ),
                 const PopupMenuDivider(height: kMenuDividerHeight),
                 // 关于与退出一组（都在分割线下方，退出垫底）
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
                 ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'exit',
                   child: Row(
@@ -2027,7 +2033,7 @@ class _SetupPageState extends State<SetupPage> {
           color: Color.lerp(color.withValues(alpha: 0.35), color, t),
           elevation: 4 * t,
           borderRadius: BorderRadius.circular(14),
-          child: InkWell(
+          child: InkWell(mouseCursor: SystemMouseCursors.click, 
             onTap: onTap,
             borderRadius: BorderRadius.circular(14),
             child: Container(
@@ -2681,7 +2687,7 @@ class _DogEarSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
+      child: Clickable(
         onTap: onTap,
         child: SizedBox(
           width: 40,
@@ -2756,7 +2762,7 @@ class _EntryCard extends StatelessWidget {
     return Material(
       color: backgroundColor,
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(
+      child: InkWell(mouseCursor: SystemMouseCursors.click, 
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: SizedBox(

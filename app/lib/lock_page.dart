@@ -143,7 +143,12 @@ class _LockPageState extends State<LockPage> {
   /// 当前值靠右，标签用 onSurfaceVariant 淡色）。
   Widget _buildMenu(AppLocalizations l10n) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.menu),
+      // 菜单按钮：框架内部用 InkWell 且不接受 mouseCursor 参数，只能自己包一层
+      // （覆盖视觉上的可点区＝图标本身；外圈 12px 留白仍是箭头）
+      icon: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: const Icon(Icons.menu),
+      ),
       tooltip: l10n.chatPageMenuMore,
       onSelected: (value) {
         // 等菜单 Route 完全关闭再动作（避免 MenuRoute/DialogRoute 交叉卸载断言崩溃）
@@ -161,7 +166,7 @@ class _LockPageState extends State<LockPage> {
         final labelStyle =
             TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant);
         return [
-          PopupMenuItem(
+          PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
             height: kMenuRowHeight,
             value: 'locale',
             child: Row(
@@ -174,12 +179,12 @@ class _LockPageState extends State<LockPage> {
           ),
           const PopupMenuDivider(height: kMenuDividerHeight),
           // 关于与退出一组（都在分割线下方，退出垫底）——与对话页/向导页菜单一致
-          PopupMenuItem(
+          PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
             height: kMenuRowHeight,
             value: 'about',
             child: Text(l10n.chatPageMenuAbout, style: labelStyle),
           ),
-          PopupMenuItem(
+          PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
             height: kMenuRowHeight,
             value: 'exit',
             child: Row(

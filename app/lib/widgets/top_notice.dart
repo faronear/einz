@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../brand_logo.dart';
+import 'clickable.dart';
 
 OverlayEntry? _currentEntry;
 Timer? _dismissTimer;
@@ -107,7 +108,7 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
       top: MediaQuery.paddingOf(context).top + kToolbarHeight + 4,
       left: 0,
       right: 0,
-      child: GestureDetector(
+      child: Clickable(
         onTap: _dismiss,
         child: FadeTransition(
           opacity: _slide,

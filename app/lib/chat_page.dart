@@ -48,6 +48,7 @@ import 'widgets/passphrase_field.dart';
 import 'widgets/option_picker_sheet.dart';
 import 'widgets/top_notice.dart';
 import 'widgets/ui_style_picker.dart';
+import 'widgets/clickable.dart';
 
 /// 选择弹层返回项：图像/视频用 image_picker，音频/文件用 file_picker；emoji 不
 /// 上传附件，只打开输入栏内的表情面板（在 _showAttachmentSheet 里单独分流）。
@@ -342,7 +343,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildBurnBadge(AppLocalizations l10n) {
     return Tooltip(
       message: l10n.chatPageBurnHeading,
-      child: InkWell(
+      child: InkWell(mouseCursor: SystemMouseCursors.click, 
         borderRadius: BorderRadius.circular(16),
         onTap: _showBurnPicker,
         child: Padding(
@@ -454,7 +455,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 文字标签 + 红色警告图标（老板 2026-09-13：光一个 ⚠️ 看不出能点）
       return Tooltip(
         message: l10n.chatPageMsgFailed,
-        child: GestureDetector(
+        child: Clickable(
           onTap: () => _tapRetryMessage(m, asResend: true),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -490,7 +491,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 还提示可点"的矛盾。
     return Tooltip(
       message: l10n.chatPageMsgSendingTap,
-      child: GestureDetector(
+      child: Clickable(
         onTap: () => _tapRetryMessage(m, asResend: false),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1114,9 +1115,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       );
 
-    /// 状态条上的头像边长（= 名字 + 红绿灯两行的高度）。头像**上下不留白**，
-  /// 三面贴住胶囊内壁（老板 2026-09-26）。
-  static const double kStatusAvatarSize = 40;
+  
+
+  /// 是否有 2 个及以上空间（决定要不要给「切换秘境」入口）。
+  ///
+  /// 取自内存里已解锁的 [VaultSession]（不触安全存储、不需要 PIN）；取不到时
+  /// （如测试直接构造 ChatPage）按单空间处理——最保守：单空间往往就是想和一个人用，
+  /// 别暗示这里能切（老板 2026-09-24 定）。
+  bool get _multiSpace => (VaultSession.current?.spaces.length ?? 0) > 1;
 
   /// 状态条上的头像。
   ///
@@ -1127,20 +1133,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   未登记性别回退淡灰；
   /// - 有头像时可点开**全屏大图**（老板 2026-09-26）。
   Widget _statusAvatar({Uint8List? bytes, String gender = ''}) {
-    final avatar = CircleAvatar(
-      backgroundColor: _genderTint(gender),
-      backgroundImage: bytes != null ? MemoryImage(bytes) : null,
-      child: bytes == null ? const Icon(Icons.person, size: 22) : null,
-    );
-    return SizedBox(
-      width: kStatusAvatarSize,
-      height: kStatusAvatarSize,
-      child: bytes == null
-          ? avatar
-          : GestureDetector(
-              onTap: () => unawaited(_showAvatarFullscreen(bytes)),
-              child: avatar,
-            ),
+    return _StatusAvatar(
+      bytes: bytes,
+      tint: _genderTint(gender),
+      onTap: bytes == null ? null : () => unawaited(_showAvatarFullscreen(bytes)),
     );
   }
 
@@ -1170,7 +1166,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: GestureDetector(
+                      child: Clickable(
                         onTap: () => Navigator.of(ctx).pop(),
                         child: InteractiveViewer(
                           child: Center(
@@ -1239,7 +1235,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 空间数取自内存里已解锁的 [VaultSession]（不触安全存储、不需要 PIN）；
   /// 取不到时（如测试直接构造 ChatPage）按单空间处理——最保守，入口仍在菜单里。
   Widget _buildPeerStatus(AppLocalizations l10n) {
-    final multiSpace = (VaultSession.current?.spaces.length ?? 0) > 1;
     // 左/上/下都 0：这一格以**头像**打头，头像要**三面贴住胶囊内壁**（老板
     // 2026-09-26）；右 10 给箭头/右缘留白。行高由头像决定，头像即贴边。
     const pad = EdgeInsets.fromLTRB(0, 0, 10, 0);
@@ -1273,31 +1268,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ],
           ),
         ),
-        if (multiSpace) ...[
-          // 与人名的间距（老板 2026-09-26：箭头和电话图标是**一类**——都是操作控件，
-          // 该抱团在右侧，与"名字/状态"这组信息拉开）。原来 6px 反而比它到电话图标的
-          // 距离还小，看着像贴在名字上。
-          const SizedBox(width: 16),
-          // 下拉箭头**独立成可点对象**（老板 2026-09-26）：去掉芯片之后，切换空间
-          // 只剩它这一个入口——所以点击区给足（36 × 头像高），常态无底色。
-          Material(
-            color: Colors.transparent,
-            shape: const StadiumBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: _openSpacePicker,
-              hoverColor: Colors.black.withValues(alpha: 0.05),
-              highlightColor: Colors.black.withValues(alpha: 0.08),
-              child: SizedBox(
-                width: 36,
-                height: kStatusAvatarSize,
-                child: Icon(Icons.arrow_drop_down,
-                    size: 22,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ),
-        ],
+        // 切换秘境的入口**不在这里**——已挪到顶部标题栏「logo + 我的秘境」右侧
+        // （老板 2026-09-26：挂在对方名字旁边，点它等于"要换掉对方"，有点伤人）。
       ],
     );
 
@@ -1307,7 +1279,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             color: Colors.transparent,
             shape: const StadiumBorder(), // 胶囊：随状态条高度自适应（写死 24 会变圆角矩形）
             clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
-            child: InkWell(
+            child: InkWell(mouseCursor: SystemMouseCursors.click, 
               onTap: _showInviteDialog,
               // 与「我的」状态芯片同一档（那块也没有常驻底色）
               hoverColor: Colors.black.withValues(alpha: 0.05),
@@ -1342,7 +1314,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               color: Colors.transparent,
               shape: const CircleBorder(), // 真圆：状态条加高后 24 圆角成了圆角矩形
               clipBehavior: Clip.antiAlias,
-              child: InkWell(
+              child: InkWell(mouseCursor: SystemMouseCursors.click, 
                 onTap: _startVoiceCall,
                 hoverColor: Colors.black.withValues(alpha: 0.05),
                 highlightColor: Colors.black.withValues(alpha: 0.08),
@@ -1370,7 +1342,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 与头像的性别底色打架，也不会让人误以为点名字/头像能切换空间。
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Flexible(child: Padding(padding: pad, child: content)),
-      trailing,
+      // 与「名字/状态」这组信息拉开：电话图标是**操作控件**，不该贴在文字上
+      // （老板 2026-09-26：箭头搬走后，这里要自己留出这段间距）
+      Padding(padding: const EdgeInsets.only(left: 12), child: trailing),
     ]);
   }
 
@@ -1941,7 +1915,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     color: Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                     clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
-                    child: InkWell(
+                    child: InkWell(mouseCursor: SystemMouseCursors.click, 
                       // 点「新建通道」：**先收起通道列表弹层**，再弹开通码
                       // （老板 2026-09-25）；_menuAction 内部 300ms 错峰，等弹层
                       // 收起动画跑完再 show（同菜单项开新 route 的口径，避免
@@ -3403,7 +3377,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       color: Colors.black.withValues(alpha: 0.05),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      child: InkWell(mouseCursor: SystemMouseCursors.click, 
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
@@ -3742,7 +3716,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
               ),
             ),
-          InkWell(
+          InkWell(mouseCursor: SystemMouseCursors.click, 
             onTap: () => setState(() => _quoteTarget = null),
             child: const Padding(
               padding: EdgeInsets.all(4),
@@ -4279,7 +4253,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               bytes: snap.data!, spaceId: widget.spaceId, messageId: m.env.messageId);
         }
         if (snap.hasError) {
-          return GestureDetector(
+          return Clickable(
             onTap: () => _retryAttachment(m),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -4393,7 +4367,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       future: _imageBytes(m),
       builder: (context, snap) {
         if (snap.hasData) {
-          return GestureDetector(
+          return Clickable(
             onTap: () => _showFullImage(snap.data!),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -4402,7 +4376,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           );
         }
         if (snap.hasError) {
-          return GestureDetector(
+          return Clickable(
             onTap: () => _retryAttachment(m),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -4761,7 +4735,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 附件消息明文是「📎 文件名」（发送端兜底文案）；名片里已有文件图标，前缀去掉
     var name = m.plaintext.trim();
     if (name.startsWith('📎')) name = name.replaceFirst('📎', '').trim();
-    return GestureDetector(
+    return Clickable(
       onTap: () => _downloadFile(m),
       behavior: HitTestBehavior.opaque,
       child: Row(
@@ -4862,26 +4836,42 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         //
         // logo + 品牌名**整块可点** → 等同菜单里的「关于秘境」（老板 2026-09-24：
         // 别闲着）。命中区含 logo 与标题文字。
-        title: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: _openAboutPage,
-          child: Padding(
-            // 给按住/长按的半透明高亮留出边距（否则会紧贴标题文字的最右缘）
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const BrandLogo(),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(l10n.chatPageTitleBrand,
-                      style: const TextStyle(fontSize: 17),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: InkWell(mouseCursor: SystemMouseCursors.click, 
+                borderRadius: BorderRadius.circular(10),
+                onTap: _openAboutPage,
+                child: Padding(
+                  // 给按住/长按的半透明高亮留出边距（否则会紧贴标题文字的最右缘）
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const BrandLogo(),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(l10n.chatPageTitleBrand,
+                            style: const TextStyle(fontSize: 17),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
-          ),
+            // 「切换秘境」：放在「logo + 我的秘境」右侧（老板 2026-09-26 挪过来——
+            // 原先挂在状态条的对方名字旁，点它等于"要换掉对方"，有点伤人）。
+            // 只在 2 个及以上空间时给：单空间别暗示这里能切（2026-09-24 定）。
+            if (_multiSpace)
+              IconButton(
+                icon: const Icon(Icons.arrow_drop_down),
+                tooltip: l10n.spaceListSwitch,
+                onPressed: _openSpacePicker,
+              ),
+          ],
         ),
         actions: [
           // （语音通话按钮在**状态条**里、对方芯片旁边——已加入才显示；
@@ -4901,7 +4891,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           // 顶栏统一入口：语言/阅后即焚/本机 PIN（显示各功能当前值）
           PopupMenuButton<String>(
-            icon: const Icon(Icons.menu),
+            // 菜单按钮：框架内部用 InkWell 且不接受 mouseCursor 参数，只能自己包一层
+            // （覆盖视觉上的可点区＝图标本身；外圈 12px 留白仍是箭头）
+            icon: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: const Icon(Icons.menu),
+            ),
             tooltip: l10n.chatPageMenuMore,
             onSelected: (value) {
               switch (value) {
@@ -4957,7 +4952,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 //   ② 身份·通道·内容：我的身份 / 我的头像 / 当前通道 / 通道列表 /
                 //      阅后即焚 / 附件存储 / 高级安全
                 //   ③ 结尾：关于秘境 / 切换我的秘境 / 退出本应用
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'locale',
                   child: Row(
@@ -4968,7 +4963,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'style',
                   child: Row(
@@ -4979,7 +4974,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'pin',
                   child: Row(
@@ -4992,7 +4987,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const PopupMenuDivider(height: kMenuDividerHeight),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'name',
                   child: Row(
@@ -5003,7 +4998,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'avatar',
                   child: Row(
@@ -5021,7 +5016,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'devname',
                   child: Row(
@@ -5034,12 +5029,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 // 「通道列表」：我本人在本空间的其他通道（老板 2026-09-25：多设备登录
                 // 时看一眼"我还有哪些线挂着、在不在线"）
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'entrancelist',
                   child: Text(l10n.chatPageMenuEntranceList, style: captionStyle),
                 ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'burn',
                   child: Row(
@@ -5053,7 +5048,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'storage',
                   child: Row(
@@ -5065,7 +5060,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                 ),
                 // 高级（二级菜单走底部弹层）
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'advanced',
                   child: Row(
@@ -5078,7 +5073,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
                 const PopupMenuDivider(height: kMenuDividerHeight),
                 // 关于与退出一组（都在分割线下方，退出垫底）
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'about',
                   child: Text(l10n.chatPageMenuAbout, style: labelStyle),
@@ -5088,12 +5083,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // Vault（PIN 模式下读/写 Vault 都要 pin，而它刻意不持有 PIN）。
                 // 「切换空间」：唯一的空间入口（2026-09-22 由「切换空间 / 空间管理」合并，
                 // 两者本来就指向同一个页面）。两个回调实际只会有一个非空（取决于谁注入）。
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                     height: kMenuRowHeight,
                     value: 'switchspace',
                     child: Text(l10n.spaceListSwitch, style: labelStyle),
                   ),
-                PopupMenuItem(
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click, 
                   height: kMenuRowHeight,
                   value: 'exit',
                   child: Row(
@@ -5182,7 +5177,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24), // 与状态芯片同弧
                         clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
-                        child: InkWell(
+                        child: InkWell(mouseCursor: SystemMouseCursors.click, 
                           onTap: _showEntranceListSheet,
                           hoverColor: Colors.black.withValues(alpha: 0.05),
                           highlightColor: Colors.black.withValues(alpha: 0.08),
@@ -5240,14 +5235,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               itemBuilder: (context, i) {
                 final m = _messages[i];
                 final mine = m.sender == 'me';
+                // 发送者 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底。
+                // 只在开关打开时才需要（关掉时不做无谓的查表，也避免"变量未使用"）
+                final avatarMemberId = kShowMessageAvatars
+                    ? (m.env.senderMemberId ??
+                        _repo.memberIdOfEntrance(m.env.senderEntranceId))
+                    : null;
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 气泡旁**不再放头像**（老板 2026-09-26）：状态条里已有双方头像，
-                      // 每条消息再挂一个就成了重复。点状态条上的头像可看大图。
-                      GestureDetector(
+                      // 气泡旁的头像：默认**关**（状态条里已有双方头像，逐条再挂一个是
+                      // 重复），但代码留着 —— 将来**多人秘境**里"这句是谁说的"必须逐条
+                      // 标注，那时打开开关即可（老板 2026-09-26）。
+                      if (kShowMessageAvatars && !mine) ...[
+                        _MessageAvatar(
+                            memberId: avatarMemberId,
+                            server: effectiveServer,
+                            api: widget.api),
+                        const SizedBox(width: 6),
+                      ],
+                      Clickable(
                         // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
                         // 其余项无 key，不阻碍懒构建回收
                         key: m.env.messageId == _jumpTargetId ? _jumpTargetKey : null,
@@ -5344,7 +5353,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     // 引用块应在消息正文下面，而不是上面）
                                     // 点击引用卡跳转到原消息位置（老板要求 2026-09-10）
                                     if (m.quote != null)
-                                      GestureDetector(
+                                      Clickable(
                                         onTap: () => _jumpToMessage(
                                             m.quote!['messageId'] as String? ?? ''),
                                         child: Container(
@@ -5372,6 +5381,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
+                      if (kShowMessageAvatars && mine) ...[
+                        const SizedBox(width: 6),
+                        _MessageAvatar(
+                            memberId: avatarMemberId,
+                            server: effectiveServer,
+                            api: widget.api),
+                      ],
                     ],
                   ),
                 );
@@ -5418,7 +5434,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         icon: const Icon(Icons.add_circle_outline),
                       ),
                       // 语音入口：点按=切提示态/回文字态；长按=直接开始录音（与长按录音条等价）
-                      GestureDetector(
+                      Clickable(
                         onLongPressStart: (_) => _startVoice(),
                         onLongPressEnd: (_) => _stopVoice(),
                         child: IconButton(
@@ -5474,7 +5490,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               // 进入录音态后此层不重建，松手能正常触发停止；预览态由
                               // _startVoice 直接忽略（长按不重录，防误触冲掉刚录好的一条）
                               Positioned.fill(
-                                child: GestureDetector(
+                                child: Clickable(
                                   onLongPressStart: (_) => _startVoice(),
                                   onLongPressEnd: (_) => _stopVoice(),
                                   child: _buildVoiceBar(),
@@ -6188,6 +6204,87 @@ class _WaveformPainter extends CustomPainter {
 
 /// 消息发送者头像：按 memberId 从服务端加载（静态缓存避免重复请求），
 /// 未设置/加载失败显示默认图标；点击有头像时放大到全屏查看。
+/// 是否在每条消息气泡旁显示发送者头像。
+///
+/// 默认**关**（2026-09-26）：状态条里已经有双方头像，逐条消息再挂一个是重复。
+/// 保留这条通路是因为**将来的多人秘境**——多人时"这句是谁说的"必须逐条标注，
+/// 那时把它打开即可；临时验证效果可以 `--dart-define=SHOW_MESSAGE_AVATARS=true`。
+///
+/// 用 `bool.fromEnvironment`（编译期常量、但分析器不知道值）而不是写死 false：
+/// 写死会让整段 `if` 被判定为死代码，将来改开关时反而不好维护。
+const bool kShowMessageAvatars = bool.fromEnvironment('SHOW_MESSAGE_AVATARS');
+
+/// 状态条上的头像边长（= 名字 + 红绿灯两行的高度）。头像**上下不留白**，
+/// 三面贴住胶囊内壁（老板 2026-09-26）。
+const double kStatusAvatarSize = 40;
+
+/// 状态条上的头像（可点开全屏大图）。
+///
+/// **桌面端的悬浮反馈**（老板 2026-09-26）：鼠标移上去变手型 + 头像轻微放大（1.06，
+/// 用 [ClipOval] 关住，避免放大后顶出胶囊被裁）+ 压暗一层。触屏没有 hover，
+/// 这些层不会出现，等于零影响。
+class _StatusAvatar extends StatefulWidget {
+  const _StatusAvatar({this.bytes, required this.tint, this.onTap});
+
+  final Uint8List? bytes;
+  final Color tint;
+  final VoidCallback? onTap;
+
+  @override
+  State<_StatusAvatar> createState() => _StatusAvatarState();
+}
+
+class _StatusAvatarState extends State<_StatusAvatar> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = CircleAvatar(
+      backgroundColor: widget.tint,
+      backgroundImage: widget.bytes != null ? MemoryImage(widget.bytes!) : null,
+      child: widget.bytes == null ? const Icon(Icons.person, size: 22) : null,
+    );
+    final body = SizedBox(
+      width: kStatusAvatarSize,
+      height: kStatusAvatarSize,
+      child: ClipOval(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AnimatedScale(
+              scale: _hovered ? 1.06 : 1,
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              child: avatar,
+            ),
+            // 悬浮压暗一层（**只留遮罩**，不放放大镜图标——老板 2026-09-26）
+            if (widget.onTap != null)
+              IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: _hovered ? 1 : 0,
+                  duration: const Duration(milliseconds: 120),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (widget.onTap == null) return body;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Clickable(onTap: widget.onTap, child: body),
+    );
+  }
+}
+
 class _MessageAvatar extends StatefulWidget {
   const _MessageAvatar({this.memberId, required this.server, this.api});
 
@@ -6290,7 +6387,7 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
-    return GestureDetector(
+    return Clickable(
       onTap: bytes != null ? _showFullscreen : null,
       child: CircleAvatar(
         radius: 16,
@@ -6395,7 +6492,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
     // 初始化失败：给可点重试的明确错误态，而不是一个没有内容的空白框
     // （三种状态都带同一个 key：测试按 key 定位视频气泡，不受具体控件类型影响）
     if (_failed) {
-      return GestureDetector(
+      return Clickable(
         key: const ValueKey('videoPreview'),
         onTap: _init,
         child: Container(
@@ -6426,7 +6523,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
           height: 100,
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
     }
-    return GestureDetector(
+    return Clickable(
       key: const ValueKey('videoPreview'),
       onTap: () => _playFullscreen(c),
       child: ClipRRect(

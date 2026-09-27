@@ -226,7 +226,7 @@ class _CallButton extends StatelessWidget {
           color: color,
           shape: const CircleBorder(),
           clipBehavior: Clip.antiAlias,
-          child: InkWell(
+          child: InkWell(mouseCursor: SystemMouseCursors.click, 
             onTap: onTap,
             child: SizedBox(
               width: 68,
