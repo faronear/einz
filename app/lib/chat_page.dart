@@ -3244,6 +3244,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 语音/音频时长：引用块据此画波形 + 秒数（原消息未加载也能显示）
       if (quote.env.type == 'voice' || quote.env.type == 'audio')
         'seconds': _audioDurationSeconds(quote),
+      // 文件大小：引用块据此显示尺寸（老板 2026-09-27——与时长同理，原消息未加载
+      // 也能显示）。老快照没这个字段 → 尺寸那行不显示，产品未上线不必兼容。
+      if (quote.env.type == 'file')
+        'size': (quote.attachment?['size'] as int?) ?? 0,
     };
   }
 
@@ -3526,15 +3530,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final avatarMemberId =
         m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
     final preview = m.plaintext.trim();
-    // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长，可点按播放
-    // （老板要求 2026-09-13）；文件消息显示文件图标 + 文件名（老板要求 2026-09-15）；
+    // 音频类（语音/音频文件）与消息流一致：播放键 + 波形图 + 时长（+ 音频文件的
+    // 文件名一行），可点按播放（老板要求 2026-09-13）；文件消息**复用消息流那张
+    // 文件名片**（图标 + 文件名 + 尺寸，老板 2026-09-27），整块可点打开。
     // 其余类型沿用单行文本（空正文显示类型占位）。
     final Widget bubbleContent;
     switch (m.env.type) {
       case 'voice':
       case 'audio':
         bubbleContent =
-            _buildAudioBar(m, waveformWidth: 88, foreground: _audioForegroundOnBubble);
+            _buildAudioBar(m, waveformWidth: 88, foreground: _mediaForegroundOnBubble);
         break;
       case 'image':
         bubbleContent = _buildImageThumb(m, size: 48);
@@ -3547,24 +3552,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         bubbleContent = _buildSystemHint(m);
         break;
       case 'file':
-        // 附件消息明文自带 📎 前缀（发送端兜底文案）；预览行已有文件图标，去掉
-        var fileName = preview;
-        if (fileName.startsWith('📎')) fileName = fileName.replaceFirst('📎', '').trim();
-        bubbleContent = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.insert_drive_file, size: 20,
-                color: _uiStyle == 'gradient' ? Colors.white : null),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                fileName.isEmpty ? m.env.type : fileName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        );
+        // 与音频条同一套：直接用消息流那张**文件名片**（图标 + 文件名 + 尺寸），
+        // 整块可点 = 用系统应用打开（老板 2026-09-27）。不再自己拼一个"图标 + 文件名"
+        // 的只读行——那样既跟气泡长得不一样，点了也没反应。
+        bubbleContent = _buildFileCard(m, foreground: _mediaForegroundOnBubble);
         break;
       default:
         bubbleContent = Text(
@@ -3727,10 +3718,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 引用块内容：原消息是图片/视频就显示它的缩略图（视频取首帧 + 播放三角，
-  /// 老板要求 2026-09-15）、是文件就显示文件图标 + 文件名（老板要求 2026-09-15）；
-  /// 语音/音频**复用消息流那条音频条**（播放键 + 波形 + 时长，老板 2026-09-27——
-  /// 引用块要和原始气泡一个样）；原消息**尚未加载**时才退回只读的波形 + 秒数
-  /// （引用快照里只有 messageId 和 seconds）。其余沿用文字预览。
+  /// 老板要求 2026-09-15）；语音/音频**复用消息流那条音频条**、文件**复用消息流那张
+  /// 文件名片**（图标 + 文件名 + 尺寸）——老板 2026-09-27：引用块要和原始气泡一个样。
+  /// 原消息**尚未加载**时才退回只读的简版（引用快照里只有 messageId / preview /
+  /// seconds / size）。其余沿用文字预览。
   Widget _buildQuoteBlockContent(Map<String, dynamic> quote) {
     final type = quote['type'] as String?;
     if (type == 'image') {
@@ -3742,26 +3733,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (quoted != null) return _buildVideoThumb(quoted, size: 40);
     }
     if (type == 'file') {
-      // 原消息已加载 → 用消息流同款文件名片（图标 + 名字/尺寸）；未加载时退回
-      // preview 文本（剥 📎 前缀）+ 文件图标——引用快照的 preview 就是文件名
+      // 原消息已加载 → **复用消息流那张文件名片**（图标 + 文件名 + 尺寸），与菜单
+      // 预览条同一个 widget（老板 2026-09-27）。
+      // tappable:false —— 引用块的单击是"跳到原消息"，不能被"整块打开"抢掉；
+      // 文件**图标**本身仍可点 = 打开（与音频条的播放键对称）。
+      final quoted = _messageById(quote['messageId'] as String? ?? '');
+      if (quoted != null) {
+        return _buildFileCard(
+          quoted,
+          tappable: false,
+          foreground: _uiStyle == 'gradient'
+              ? Colors.white70
+              : Theme.of(context).colorScheme.primary,
+        );
+      }
+      // 原消息不在已加载范围：只有引用快照（preview 就是文件名，可能还有 size）
       var fileName = _quotePreview(quote['preview'] as String? ?? '');
       if (fileName.startsWith('📎')) fileName = fileName.replaceFirst('📎', '').trim();
-      final quoted = _messageById(quote['messageId'] as String? ?? '');
-      if (quoted != null) return _buildFileCard(quoted);
+      final size = (quote['size'] is num) ? (quote['size'] as num).round() : 0;
+      final detailColor =
+          _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700;
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.insert_drive_file, size: 16,
-              color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700),
+          Icon(Icons.insert_drive_file, size: 16, color: detailColor),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(
-              fileName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: _uiStyle == 'gradient' ? Colors.white70 : Colors.grey.shade700),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: detailColor),
+                ),
+                // 尺寸随引用快照一起走（老快照没有 size 字段 → 不显示这一行）
+                if (size > 0)
+                  Text(_formatSize(size),
+                      style: TextStyle(fontSize: 11, color: detailColor)),
+              ],
             ),
           ),
         ],
@@ -3814,6 +3826,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 的引用框保持同一族颜色）；蓝色左边缘也已在 2026-09-13 去掉。
   Widget _buildQuoteBanner(HistoryMessage quote) {
     final isAudio = quote.env.type == 'voice' || quote.env.type == 'audio';
+    final isFile = quote.env.type == 'file';
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -3826,28 +3839,40 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         children: [
           // 引用图片/视频时显示原附件缩略图（否则双引号图标）——与发送后的
           // 引用块一致（视频显示首帧 + 播放三角，老板要求 2026-09-15）。
-          // 语音/音频**不加**引号图标：下面那条音频条自带播放键，再挂一个引号
-          // 既重复又把行撑宽（老板 2026-09-27）
+          // 语音/音频、文件**不加**引号图标：下面那条音频条/文件名片自带图标，
+          // 再挂一个引号既重复又把行撑宽（老板 2026-09-27）
           if (quote.env.type == 'image') ...[
             _buildImageThumb(quote, size: 24),
             const SizedBox(width: 6),
           ] else if (quote.env.type == 'video') ...[
             _buildVideoThumb(quote, size: 24),
             const SizedBox(width: 6),
-          ] else if (!isAudio) ...[
+          ] else if (!isAudio && !isFile) ...[
             const Icon(Icons.format_quote, size: 14, color: Colors.grey),
             const SizedBox(width: 6),
           ],
-          // 语音/音频：**复用消息流那条音频条**（播放键 + 波形 + 时长，音频文件还有
-          // 文件名一行），整块可点播放（老板 2026-09-27：与菜单预览条一个样）。
+          // 语音/音频/文件：**复用消息流那条音频条 / 那张文件名片**（老板 2026-09-27：
+          // 与菜单预览条一个样）。整块可点——音频是播放，文件是用系统应用打开。
+          // Flexible 是必须的：Row 的非 flex 子项宽度**无界**，不套一层的话长歌名/
+          // 长文件名会撑破整条引用条（框架行为，见 _buildFileCard 里的注释）。
           // 颜色用主题蓝——引用条是 6% 黑的浅底，跟着气泡走白的话在这里看不见。
           if (isAudio) ...[
-            _buildAudioBar(
-              quote,
-              waveformWidth: 88,
-              foreground: Theme.of(context).colorScheme.primary,
+            Flexible(
+              child: _buildAudioBar(
+                quote,
+                waveformWidth: 88,
+                foreground: Theme.of(context).colorScheme.primary,
+              ),
             ),
             const Spacer(), // 取消按钮仍靠右（与文字引用时一致）
+          ] else if (isFile) ...[
+            Flexible(
+              child: _buildFileCard(
+                quote,
+                foreground: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const Spacer(),
           ] else
             Expanded(
               child: Text(
@@ -4688,14 +4713,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
   }
 
-  /// 音频条在**气泡上**的前景色（播放键/波形/时长）：gradient 深色气泡用白，素雅
-  /// 浅色 tint 用主题蓝。
+  /// **气泡上**的媒体前景色（音频播放键/波形、文件图标）：gradient 深色气泡用白，
+  /// 素雅浅色 tint 用主题蓝。
   ///
   /// 消息流气泡与**长按菜单预览条**共用——菜单里那条也是按性别配的同款气泡底色，
   /// 只是波形窄一点，配色必须跟气泡一致（2026-09-27 踩过：预览条漏了这层 → 图标黑、
   /// 气泡里白）。**改配色改这里，两处一起变。**
   /// 引用条/引用块底色不同（6% 黑的浅底），各自传自己的颜色，不走这个 getter。
-  Color get _audioForegroundOnBubble => _uiStyle == 'gradient'
+  Color get _mediaForegroundOnBubble => _uiStyle == 'gradient'
       ? Colors.white
       : Theme.of(context).colorScheme.primary;
 
@@ -4705,13 +4730,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     switch (m.env.type) {
       case 'voice':
       case 'audio':
-        return _buildAudioBar(m, foreground: _audioForegroundOnBubble);
+        return _buildAudioBar(m, foreground: _mediaForegroundOnBubble);
       case 'image':
         return _buildImage(m);
       case 'video':
         return _buildVideo(m);
       case 'file':
-        return _buildFileCard(m);
+        // 与音频条同一套前景色（气泡里 gradient 白 / 素雅主题蓝）：此前文件图标
+        // 靠 ambient IconTheme，素雅模式下是默认黑，跟旁边音频播放键的蓝不是一个色
+        return _buildFileCard(m, foreground: _mediaForegroundOnBubble);
       case 'system':
         return _buildSystemHint(m);
       default:
@@ -4848,25 +4875,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         mainAxisSize: MainAxisSize.min,
         children: [
           playButton,
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              waveformRow,
-              // 单行 + 截断：Flexible 放在 Row 里才管**宽度**（放 Column 里变成管高度）
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+          // Flexible 包住右列：它是这个 Row 里唯一的 flex 子项 → 拿到**有界**宽度
+          // （父给的上限减去播放键），里面那行文件名才会按 ellipsis 截断。
+          // 少了这一层，右列变成非 flex 子项、宽度**无界**，长歌名直接撑破气泡
+          // （老板 2026-09-27 实测四处都破）。
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                waveformRow,
+                // 单行 + 截断：Flexible 放在 Row 里才管**宽度**（放 Column 里变成管高度）
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        m.plaintext.trim().isEmpty ? m.env.type : m.plaintext.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       );
@@ -4924,37 +4957,56 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
 
-  /// 文件消息：文件图标 + 文件信息（上=文件名、下=尺寸）。整块正文可点按
-  /// （含文件图标），触摸即下载/打开（本机有留存副本则直接用系统应用打开；
-  /// 老板 2026-09-15：实测点文件名就能打开，下载图标不必要，删掉）。
+  /// 文件消息名片：文件图标 + 文件信息（上=文件名、下=尺寸）。
+  ///
+  /// 消息流气泡、长按菜单预览条、输入栏引用条、气泡里的引用块**共用这一个 widget**
+  /// （老板 2026-09-27：与音频条同样处理）。
+  /// - [tappable] 为 true（气泡/菜单预览条/引用条）：**整块**可点 = 下载/打开
+  ///   （本机有留存副本则直接用系统应用打开；老板 2026-09-15）。
+  /// - [tappable] 为 false（**气泡引用块**）：整块单击让给外层的"跳到原消息"，
+  ///   只有**文件图标**本身可点 = 打开（老板 2026-09-27）。
+  /// 图标颜色**显式给**：复用它的几处 ambient IconTheme 不一样（踩过"菜单里变黑"）。
   Widget _buildFileCard(
-      HistoryMessage m) {
+      HistoryMessage m, {bool tappable = true, Color? foreground}) {
     final size = (m.attachment?['size'] as int?) ?? 0;
     final subtitleColor = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
     // 附件消息明文是「📎 文件名」（发送端兜底文案）；名片里已有文件图标，前缀去掉
     var name = m.plaintext.trim();
     if (name.startsWith('📎')) name = name.replaceFirst('📎', '').trim();
+    // 图标**单独可点**（整块不可点时——引用块——就只剩它能打开）。
+    // opaque：整个 30×30 的方块都可点，不只落在字形上的那几个像素。
+    final Widget icon = Clickable(
+      onTap: () => _downloadFile(m),
+      behavior: HitTestBehavior.opaque,
+      child: Icon(Icons.insert_drive_file, size: 30, color: foreground),
+    );
+    // Flexible 套右列：它是 Row 里唯一的 flex 子项，拿到的是**有界**宽度（父给的
+    // 上限减去图标），文件名才能按 maxLines:1 + ellipsis 截断。去掉它 → 右列变成
+    // 非 flex 子项、宽度无界 → 长文件名撑破气泡（老板 2026-09-27 实测）。
+    final Widget card = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        icon,
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // maxLines:1 + ellipsis：长文件名**压成一行**，不换行、不撑破区域
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(_formatSize(size),
+                  style: TextStyle(fontSize: 11, color: subtitleColor)),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (!tappable) return card;
     return Clickable(
       onTap: () => _downloadFile(m),
       behavior: HitTestBehavior.opaque,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.insert_drive_file, size: 30),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(name, overflow: TextOverflow.ellipsis),
-                Text(_formatSize(size),
-                    style: TextStyle(fontSize: 11, color: subtitleColor)),
-              ],
-            ),
-          ),
-        ],
-      ),
+      child: card,
     );
   }
 

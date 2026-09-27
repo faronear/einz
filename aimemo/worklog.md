@@ -10410,3 +10410,42 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 **顺带发现（未改，等老板定）**：`_buildQuoteBlockContent` 的 **file** 分支直接用
 `_buildFileCard(quoted)`，它自带 `Clickable(onTap: 下载/打开)` → **文件消息的引用块点了是
 打开文件，不是跳转**，和 voice/audio 同一个问题。要不要也关掉整块点击，待定。
+
+## 2026-09-27 文件消息：四处统一复用同一张名片（含尺寸），并修长文本撑破区域
+
+**老板要求**：① 文件消息被预览、被引用时也要**带文件大小**，各处尽量保持结构不动；
+② 引用预览/引用块都要有文件图标；菜单预览与引用预览**点整体**=用系统应用打开，
+引用块**点图标**=打开、**点其它**=跳转；③ 长歌名/长文件名在主消息、菜单预览、引用
+预览、引用块里都会**突破区域限制**，要用省略号压缩。
+
+**做法**
+
+1. `_buildFileCard` 加 `tappable` / `foreground` 两个参数，四处共用（与音频条对称）：
+
+   | 调用处 | tappable | foreground |
+   | ------ | -------- | ---------- |
+   | 消息流气泡 | true | `_mediaForegroundOnBubble` |
+   | 菜单预览条（改用完整名片，不再自己拼"图标+文件名"只读行） | true | 同上 |
+   | 输入栏引用条（新增 file 分支） | true | 主题蓝（浅底） |
+   | 气泡引用块 | **false** | 白70 / 主题蓝 |
+
+   tappable=false 时**整块点击让给外层的"跳到原消息"**，但**文件图标单独可点**（`Clickable`
+   + `behavior: opaque`，30×30 整块命中，不只字形那几个像素）——与音频条的"播放键仍可点"
+   完全对称。
+2. 引用快照新增 `size` 字段（file 类型才有），这样原消息**未加载**时引用块的兜底简版
+   也能显示尺寸；老快照没有这个字段 → 不显示那行（产品未上线，不必兼容）。
+3. 引用条里 file/audio 都用 `Flexible` 包一层（下面第 4 点的原因），并顺手去掉多余的
+   双引号图标（名片自带图标）。
+
+**长文本撑破区域的根因（框架行为，读 `rendering/flex.dart` 确认）**：
+
+- `Row` 的**非 flex 子项**在主轴（宽度）上拿到的是**无界**约束（`_constraintsForNonFlexChild`
+  只约束 cross 轴）；`canFlex = incoming constraints.biggest.isFinite`，与 `mainAxisSize`
+  **无关**——父约束无界时，`Flexible` 会被当成非 flex 子项、拿到无限宽度 → `maxLines +
+  ellipsis` 根本不触发，长文本一路撑出去。
+- 所以音频文件名那行（`Row[playButton, Column[波形行, Row[Flexible(Text)]]]` 的第二层）
+  在四处都破：内层 Row 是外层 Row 的非 flex 子项 → 无限宽。修法是给**右列 Column 套
+  `Flexible`**，让它变成外层 Row 唯一的 flex 子项 → 拿到"父上限 − 播放键"的**有界**宽度
+  → 往下传就有界 → ellipsis 生效。
+- 同理：引用条里直接放音频条/名片（非 flex 子项，无界）→ 必须包 `Flexible`。
+- 另外给文件名 Text 补了 `maxLines: 1`（原来只有 ellipsis，长名会换行而不是截断）。
