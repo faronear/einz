@@ -10380,3 +10380,33 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 
 **教训**：抽出来被**多处复用**的 widget（消息流气泡 / 菜单预览条 / 引用块…）不要依赖
 调用方的 ambient 样式，前景色要自己显式给——每处调用方的 IconTheme 未必一样。
+
+## 2026-09-27 音频消息：四处预览统一成同一个 widget
+
+**老板要求**：被引用时的 voice/audio——输入栏**引用条**、以及发送后气泡里的**引用块**——
+都要和菜单预览条、原始气泡**结构一样**（他特意澄清："结构一样，不是颜色一样"）。
+
+**做法**：`_buildAudioBar` 之前只有消息气泡和菜单预览条两处用，现在四处共用：
+
+| 调用处 | waveformWidth | foreground | tappable |
+| ------ | ------------- | ---------- | -------- |
+| 消息流气泡 `_buildMessageContent` | 120 | `_audioForegroundOnBubble` | true |
+| 菜单预览条 `_buildMessagePreviewRow` | 88 | `_audioForegroundOnBubble` | true |
+| 输入栏引用条 `_buildQuoteBanner` | 88 | 主题蓝（浅底，跟气泡走白会看不见） | true |
+| 气泡引用块 `_buildQuoteBlockContent` | 88 | gradient 白70 / 主题蓝 | **false** |
+
+- `foreground` 做成**必填参数**而不是内部按主题算：四处底色不同（深色气泡 / 6% 黑引用条
+  / 引用块），靠 ambient 或统一按气泡取色必然有一处看不见（当天刚踩过"菜单里图标变黑"）。
+  气泡与菜单预览条共用一个 getter `_audioForegroundOnBubble`（改配色改一处）。
+- `tappable: false` 只给**气泡引用块**：引用块的单击是"跳到原消息"（老板 2026-09-10 定的），
+  不能被"点哪都播放"抢掉。关掉的只是**整块**点击，播放键（内层 IconButton）仍可点 →
+  最终手感：点播放键=播放，点引用块其余地方=跳转。
+- 引用条里**去掉了双引号图标**（音频条自带播放键，再挂一个引号既重复又撑宽）；
+  image/video 的缩略图仍在前面，文本引用仍有引号图标。
+- `_buildVoiceQuoteRow` 保留，但降级为**兜底**：原消息没加载进内存时，引用块手里只有
+  引用快照（messageId + seconds），只能画只读波形 + 秒数；点它跳过去补载后，自动换成
+  完整音频条。
+
+**顺带发现（未改，等老板定）**：`_buildQuoteBlockContent` 的 **file** 分支直接用
+`_buildFileCard(quoted)`，它自带 `Clickable(onTap: 下载/打开)` → **文件消息的引用块点了是
+打开文件，不是跳转**，和 voice/audio 同一个问题。要不要也关掉整块点击，待定。

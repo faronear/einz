@@ -3533,7 +3533,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     switch (m.env.type) {
       case 'voice':
       case 'audio':
-        bubbleContent = _buildAudioBar(m, waveformWidth: 88);
+        bubbleContent =
+            _buildAudioBar(m, waveformWidth: 88, foreground: _audioForegroundOnBubble);
         break;
       case 'image':
         bubbleContent = _buildImageThumb(m, size: 48);
@@ -3690,9 +3691,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return index < 0 ? null : _messages[index];
   }
 
-  /// 语音/音频引用的只读外观：**波形图 + 秒数**（不带播放键——引用条/引用块只做
-  /// 展示）。波形与消息流气泡同源（seed=messageId，形状一致）、时长未知时不显示
-  /// 秒数，与气泡规则相同（老板要求 2026-09-13：录音消息到处一个样）。
+  /// 语音/音频引用的**兜底**外观：波形图 + 秒数（不带播放键）。
+  ///
+  /// 只在**原消息还没加载进内存**时用（引用块手里只有引用快照：messageId + seconds），
+  /// 点它会跳到原消息、补载后就换成 [_buildAudioBar] 那条完整音频条。波形与消息流
+  /// 同源（seed=messageId，形状一致）、时长未知时不显示秒数（老板要求 2026-09-13：
+  /// 录音消息到处一个样）。
   Widget _buildVoiceQuoteRow({
     required String messageId,
     required int seconds,
@@ -3723,9 +3727,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 引用块内容：原消息是图片/视频就显示它的缩略图（视频取首帧 + 播放三角，
-  /// 老板要求 2026-09-15）、是语音/音频就显示波形图 + 秒数（老板要求
-  /// 2026-09-13）、是文件就显示文件图标 + 文件名（老板要求 2026-09-15），
-  /// 其余（含原消息尚未加载/无附件）沿用文字预览。
+  /// 老板要求 2026-09-15）、是文件就显示文件图标 + 文件名（老板要求 2026-09-15）；
+  /// 语音/音频**复用消息流那条音频条**（播放键 + 波形 + 时长，老板 2026-09-27——
+  /// 引用块要和原始气泡一个样）；原消息**尚未加载**时才退回只读的波形 + 秒数
+  /// （引用快照里只有 messageId 和 seconds）。其余沿用文字预览。
   Widget _buildQuoteBlockContent(Map<String, dynamic> quote) {
     final type = quote['type'] as String?;
     if (type == 'image') {
@@ -3763,6 +3768,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
     if (type == 'voice' || type == 'audio') {
+      // 原消息已加载 → **复用消息流那条音频条**（播放键 + 波形 + 时长，音频文件还有
+      // 文件名一行），与菜单预览条同一个 widget（老板 2026-09-27）。
+      // tappable:false —— 引用块的单击是"跳到原消息"，不能被播放抢掉；播放键
+      // 本身仍可点（它只是内层 IconButton）。
+      final quoted = _messageById(quote['messageId'] as String? ?? '');
+      if (quoted != null) {
+        return _buildAudioBar(
+          quoted,
+          waveformWidth: 88,
+          foreground: _uiStyle == 'gradient'
+              ? Colors.white70
+              : Theme.of(context).colorScheme.primary,
+          tappable: false,
+        );
+      }
+      // 原消息不在已加载范围：只有引用快照（messageId + seconds），退回只读的
+      // 波形 + 秒数（点它仍然跳过去，跳到后会自动补载成上面那条完整音频条）
       final seconds =
           (quote['seconds'] is num) ? (quote['seconds'] as num).round() : 0;
       return _buildVoiceQuoteRow(
@@ -3791,6 +3813,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 字几乎看不见。改为与素雅纯色同款：黑 6% 半透明底 + 灰字/灰图标（顺带与气泡里
   /// 的引用框保持同一族颜色）；蓝色左边缘也已在 2026-09-13 去掉。
   Widget _buildQuoteBanner(HistoryMessage quote) {
+    final isAudio = quote.env.type == 'voice' || quote.env.type == 'audio';
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -3802,21 +3825,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       child: Row(
         children: [
           // 引用图片/视频时显示原附件缩略图（否则双引号图标）——与发送后的
-          // 引用块一致（视频显示首帧 + 播放三角，老板要求 2026-09-15）
-          quote.env.type == 'image'
-              ? _buildImageThumb(quote, size: 24)
-              : quote.env.type == 'video'
-                  ? _buildVideoThumb(quote, size: 24)
-                  : const Icon(Icons.format_quote, size: 14, color: Colors.grey),
-          const SizedBox(width: 6),
-          // 语音/音频：波形图 + 秒数（与气泡/发送后的引用块一致，不再显示「语音」
-          // 这类文字——老板要求 2026-09-13）
-          if (quote.env.type == 'voice' || quote.env.type == 'audio') ...[
-            _buildVoiceQuoteRow(
-              messageId: quote.env.messageId,
-              seconds: _audioDurationSeconds(quote),
-              isVoice: quote.env.type == 'voice',
-              color: Theme.of(context).colorScheme.primary,
+          // 引用块一致（视频显示首帧 + 播放三角，老板要求 2026-09-15）。
+          // 语音/音频**不加**引号图标：下面那条音频条自带播放键，再挂一个引号
+          // 既重复又把行撑宽（老板 2026-09-27）
+          if (quote.env.type == 'image') ...[
+            _buildImageThumb(quote, size: 24),
+            const SizedBox(width: 6),
+          ] else if (quote.env.type == 'video') ...[
+            _buildVideoThumb(quote, size: 24),
+            const SizedBox(width: 6),
+          ] else if (!isAudio) ...[
+            const Icon(Icons.format_quote, size: 14, color: Colors.grey),
+            const SizedBox(width: 6),
+          ],
+          // 语音/音频：**复用消息流那条音频条**（播放键 + 波形 + 时长，音频文件还有
+          // 文件名一行），整块可点播放（老板 2026-09-27：与菜单预览条一个样）。
+          // 颜色用主题蓝——引用条是 6% 黑的浅底，跟着气泡走白的话在这里看不见。
+          if (isAudio) ...[
+            _buildAudioBar(
+              quote,
+              waveformWidth: 88,
+              foreground: Theme.of(context).colorScheme.primary,
             ),
             const Spacer(), // 取消按钮仍靠右（与文字引用时一致）
           ] else
@@ -4659,13 +4688,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
   }
 
+  /// 音频条在**气泡上**的前景色（播放键/波形/时长）：gradient 深色气泡用白，素雅
+  /// 浅色 tint 用主题蓝。
+  ///
+  /// 消息流气泡与**长按菜单预览条**共用——菜单里那条也是按性别配的同款气泡底色，
+  /// 只是波形窄一点，配色必须跟气泡一致（2026-09-27 踩过：预览条漏了这层 → 图标黑、
+  /// 气泡里白）。**改配色改这里，两处一起变。**
+  /// 引用条/引用块底色不同（6% 黑的浅底），各自传自己的颜色，不走这个 getter。
+  Color get _audioForegroundOnBubble => _uiStyle == 'gradient'
+      ? Colors.white
+      : Theme.of(context).colorScheme.primary;
+
   /// 消息内容按类型渲染（text 文本 / voice、audio 播放条 / image、video、file 各自卡片）。
   Widget _buildMessageContent(
       HistoryMessage m) {
     switch (m.env.type) {
       case 'voice':
       case 'audio':
-        return _buildAudioBar(m);
+        return _buildAudioBar(m, foreground: _audioForegroundOnBubble);
       case 'image':
         return _buildImage(m);
       case 'video':
@@ -4723,35 +4763,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return '$mm:$ss';
   }
 
-  /// 音频气泡：播放键 + 固定波形图 + 时长（录音只写秒数 `25s`，上限 60s；音频文件
+  /// 音频条：播放键 + 固定波形图 + 时长（录音只写秒数 `25s`，上限 60s；音频文件
   /// 用 h/m/s，零的部分省略）。音频文件**多一行文件名**，与波形左对齐（老板
   /// 2026-09-27）。点击下载解密后播放（老板要求 2026-09-13）；**整块**可点（含
   /// 时长、文件名），不必非点中播放键（老板 2026-09-27）。
   ///
-  /// 消息流气泡与长按菜单预览行共用（后者 [waveformWidth] 小一点，避免挤爆
-  /// 弹窗）：外层监听播放状态版本，菜单在独立路由、页面 setState 重建不到它。
+  /// 消息流气泡、长按菜单预览行、输入栏引用条、气泡里的引用块**共用这一个 widget**
+  /// （老板 2026-09-27：这几处要一个样）。
+  /// - [foreground] 由**调用方**给：四处底色不同（深色气泡 / 6% 黑引用条 / 引用块），
+  ///   靠 ambient 主题必然有一处看不见（已踩过：菜单里图标变黑）。
+  /// - [tappable] 为 false 时不挂整块点击：**气泡引用块的单击是"跳到原消息"**，不能
+  ///   被"点哪都播放"抢掉；播放键本身仍可点（内层 IconButton 照旧）。
+  ///
+  /// 外层监听播放状态版本：菜单在独立路由、页面 setState 重建不到它。
   Widget _buildAudioBar(
-      HistoryMessage m, {double waveformWidth = 120}) {
+      HistoryMessage m,
+      {double waveformWidth = 120,
+      required Color foreground,
+      bool tappable = true}) {
     return ValueListenableBuilder<int>(
       valueListenable: _audioPlaybackVersion,
-      builder: (context, _, child) =>
-          _buildAudioBarBody(m, waveformWidth: waveformWidth),
+      builder: (context, _, child) => _buildAudioBarBody(m,
+          waveformWidth: waveformWidth,
+          foreground: foreground,
+          tappable: tappable),
     );
   }
 
   Widget _buildAudioBarBody(
-      HistoryMessage m, {required double waveformWidth}) {
+      HistoryMessage m,
+      {required double waveformWidth,
+      required Color foreground,
+      required bool tappable}) {
     final playing = _playingMessageId == m.env.messageId;
-    final onBubble = _uiStyle == 'gradient'
-        ? Colors.white
-        : Theme.of(context).colorScheme.primary; // 气泡上的前景色（波形/图标）
     final seconds = _audioDurationSeconds(m);
     final isVoice = m.env.type == 'voice';
     final Widget playButton = IconButton(
-      // 图标颜色**显式给**（跟波形同源 [onBubble]，不再依赖外部 IconTheme）：
+      // 图标颜色**显式给**（跟波形同源 [foreground]，不再依赖外部 IconTheme）：
       // 消息气泡有 IconTheme.merge 把图标染白，而长按菜单预览条**没有**那一层
       // → 同一条音频条在两处两个颜色（老板 2026-09-27 实测：气泡白、弹窗黑）。
-      icon: Icon(playing ? Icons.stop_circle : Icons.play_circle, color: onBubble),
+      icon: Icon(playing ? Icons.stop_circle : Icons.play_circle, color: foreground),
       onPressed: () => _playAudioMessage(m),
       visualDensity: VisualDensity.compact,
     );
@@ -4767,8 +4818,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           durationSeconds: seconds,
           seed: m.env.messageId,
           width: waveformWidth,
-          activeColor: onBubble,
-          inactiveColor: onBubble.withValues(alpha: 0.4),
+          activeColor: foreground,
+          inactiveColor: foreground.withValues(alpha: 0.4),
         ),
         // 时长未知时不显示任何文字（播放键 + 波形已足够表达"这是音频"，
         // 老板要求 2026-09-13）。录音只写秒数（上限 60s），音频文件用 h/m/s
@@ -4820,6 +4871,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
       );
     }
+    // 气泡引用块（[tappable] = false）：不挂整块点击，把单击让给外层的"跳到原消息"。
+    if (!tappable) return body;
     // 整块可点 = 播放/停止：**不必非点中那个播放键**，时长、文件名都在范围里
     // （老板 2026-09-27，与图片"点消息本体就是看大图"对齐）。播放键保留（它仍能点）。
     // behavior=opaque：否则容器自身不参与命中测试，只有子控件占的那几块能点——
