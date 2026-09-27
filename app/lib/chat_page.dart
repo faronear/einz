@@ -628,29 +628,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _restartTicker(_tickerInterval);
     _registerPushToken();
     _registerInstallUid();
-    if (widget.enableWs) {
-      final ws = WsRealtimeService(
-        server: effectiveServer,
-        token: widget.token,
-        reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
-      );
-      _ws = ws;
-      ws.connected.addListener(_onWsStatusChanged);
-      ws.start(
-        // WS 实时新消息：标记为 realtime，允许把消息标为"已读"（下面的补拉路径
-        // 只标"已送达"——老板 2026-09-12：补拉的历史不等于人看过）
-        onMessageNew: () => _refresh(realtime: true),
-        onEntranceRevoked: _onEntranceRevoked,
-        onPeerStatus: _onPeerStatus,
-        onPassphraseRotated: _onPassphraseRotated,
-        onProfileUpdated: _onProfileUpdated,
-        onReceiptUpdated: _onReceiptUpdated,
-        onCall: _onCallSignal,
-      );
-      final call = VoiceCallService(ws: ws)..onEnded = _onCallEnded;
-      _voiceCall = call;
-      call.state.addListener(_onVoiceCallStateChanged);
-    }
+    _startRealtime();
   }
 
   /// 顶部栏的通话按钮：发起呼叫（振铃界面由状态监听弹出）。
@@ -976,6 +954,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _ticker?.cancel();
     _currentTickerInterval = interval;
     _ticker = Timer.periodic(interval, (_) => _onTick());
+  }
+
+  /// 建立 / 重连实时链路（WS + 通话服务）。
+  ///
+  /// 首次进入与**回到前台**都走这里（后台时我们主动断开，见
+  /// [didChangeAppLifecycleState]）。[VoiceCallService] **只创建一次**——它持有
+  /// 通话状态与 WebRTC 连接，重建会把正在进行的通话弄丢。
+  void _startRealtime() {
+    if (!widget.enableWs) return;
+    final ws = _ws ??
+        WsRealtimeService(
+          server: effectiveServer,
+          token: widget.token,
+          reauth: widget.reauth == null ? null : _reauthWithRevokedFallback,
+        );
+    _ws = ws;
+    if (_voiceCall == null) {
+      ws.connected.addListener(_onWsStatusChanged);
+      final call = VoiceCallService(ws: ws)..onEnded = _onCallEnded;
+      _voiceCall = call;
+      call.state.addListener(_onVoiceCallStateChanged);
+    }
+    ws.start(
+      // WS 实时新消息：标记为 realtime，允许把消息标为"已读"（下面的补拉路径
+      // 只标"已送达"——老板 2026-09-12：补拉的历史不等于人看过）
+      onMessageNew: () => _refresh(realtime: true),
+      onEntranceRevoked: _onEntranceRevoked,
+      onPeerStatus: _onPeerStatus,
+      onPassphraseRotated: _onPassphraseRotated,
+      onProfileUpdated: _onProfileUpdated,
+      onReceiptUpdated: _onReceiptUpdated,
+      onCall: _onCallSignal,
+    );
   }
 
   /// WS 状态变化：在线 → 降频兜底（30s）；离线 → 恢复高频轮询（3s）。
@@ -2739,7 +2750,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _appResumed = state == AppLifecycleState.resumed; // 回执：只有前台才允许标已读
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _lockTimer.recordBackgrounded(DateTime.now());
+      // 进后台（含息屏）：**主动**断开 WS，让对端几秒内就看到离线。
+      // 不这么做的话要等服务端的 30s 心跳超时、再等对端 30s 轮询，最长约 90 秒里
+      // 对方还以为你在线（老板 2026-09-26）。
+      //
+      // **通话中绝不停**：贴耳通话必然息屏，停了就直接把通话掐断——通话期间靠
+      // iOS 的 audio 后台模式 + 常亮维持，本来也不会进到这里断链。
+      if (state == AppLifecycleState.paused && _voiceCall?.state.value.inCall != true) {
+        unawaited(_ws?.stop());
+      }
     } else if (state == AppLifecycleState.resumed) {
+      // 回到前台：把后台时停掉的 WS 接回来（通话中的那次没停，这里幂等重连）
+      _startRealtime();
       final relock = _lockTimer.shouldRelock(now: DateTime.now());
       _lockTimer.clear();
       // 不需要锁的两条路径：没离开够久（用户一直在看）、或本机压根没设锁屏码。
