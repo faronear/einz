@@ -49,6 +49,13 @@ class WsRealtimeService {
   void Function(WsCallEvent event)? onCall;
 
   /// 建立连接（自动重连直到 [stop]）。
+  ///
+  /// **幂等**：已有连接（或正在重连）时直接返回，**不建第二条**。
+  ///
+  /// 为什么必须：服务端 V1 一人一机——同一通道的第二条连接会把第一条以
+  /// `duplicate connection`(4408) 踢掉，被踢的那条又自动退避重连、反过来把新的踢掉……
+  /// 两条互踢，表现为**在线状态灯红绿秒闪**（2026-09-26 在 macOS 上实测）。
+  /// 触发场景是"回到前台重连"：`resumed` 会重复调用，而窗口激活在桌面端很频繁。
   void start({
     void Function()? onMessageNew,
     void Function()? onEntranceRevoked,
@@ -58,6 +65,7 @@ class WsRealtimeService {
     void Function(WsReceiptUpdatedEvent event)? onReceiptUpdated,
     void Function(WsCallEvent event)? onCall,
   }) {
+    if (_client != null) return; // 幂等：已有连接就不再建（见方法头注释）
     this.onMessageNew = onMessageNew;
     this.onEntranceRevoked = onEntranceRevoked;
     this.onPeerStatus = onPeerStatus;
@@ -99,9 +107,14 @@ class WsRealtimeService {
   }
 
   /// 停止连接。
+  ///
+  /// **先把 `_client` 置空再 await 关闭**：否则在关闭还没跑完时若有人调 [start]，
+  /// 幂等判断会看到 `_client != null` 而拒绝重连，于是这条连接**永远不会再连上**
+  /// （进后台→回前台的时序里完全可能撞上）。
   Future<void> stop() async {
-    await _client?.stop();
+    final client = _client;
     _client = null;
     connected.value = false;
+    await client?.stop();
   }
 }
