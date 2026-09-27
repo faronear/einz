@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import '../call_tones.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -137,6 +139,7 @@ class VoiceCallService {
 
   RTCPeerConnection? _pc;
   MediaStream? _localStream;
+  AudioPlayer? _tonePlayer; // 拨号音（主叫=回铃音 / 被叫=来电铃声），循环播放
   String? _remoteOfferSdp; // 被叫：接听前先存着对方的 offer
   final List<Map<String, dynamic>> _pendingIce = []; // pc 还没建好时先攒着
   Timer? _ringTimer;
@@ -160,6 +163,7 @@ class VoiceCallService {
     _emit(state.value.copyWith(phase: VoiceCallPhase.calling, isCaller: true, callId: callId));
     _send(kWsTypeCallInvite, callId);
     _startRingTimer();
+    await _startTone(caller: true); // 回铃音：听声就知道"已经拨出、在等对方接"
     try {
       await _ensureMic();
       final pc = await _createPc();
@@ -262,6 +266,7 @@ class VoiceCallService {
           callId: callId,
         ));
         _startRingTimer(); // 一直不接 = 未接来电
+        await _startTone(caller: false); // 来电铃声（与主叫那声不同）
         break;
       case kWsTypeCallAccept:
         if (s.phase == VoiceCallPhase.calling && s.callId == callId) {
@@ -314,6 +319,7 @@ class VoiceCallService {
   Future<void> dispose() async {
     _ringTimer?.cancel();
     _connectTimer?.cancel();
+    await _stopTone();
     await _teardown();
     state.dispose();
   }
@@ -371,6 +377,7 @@ class VoiceCallService {
       final s = state.value;
       if (connState == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
         if (s.phase != VoiceCallPhase.active) {
+          await _stopTone(); // 接通 → 停掉拨号音，把音频交给通话本身
           await _activateAudioRoute();
           _emit(s.copyWith(phase: VoiceCallPhase.active, startedAt: DateTime.now()));
         }
@@ -379,6 +386,40 @@ class VoiceCallService {
       }
     };
     return pc;
+  }
+
+  /// 开始播拨号音（循环），直到 [_stopTone]。
+  ///
+  /// 两端音不同（[caller] = 主叫回铃音 / false = 被叫来电铃声），听声即知在等谁。
+  /// 播不出来不影响通话本身——所以异常一律吞掉，只记在注释里。
+  Future<void> _startTone({required bool caller}) async {
+    await _stopTone();
+    try {
+      final player = AudioPlayer();
+      _tonePlayer = player;
+      await player.setReleaseMode(ReleaseMode.loop);
+      // 铃声阶段还没建立通话：走扬声器（铃声就是要响出来，贴耳听不见）
+      try {
+        await Helper.setSpeakerphoneOn(true);
+      } catch (_) {
+        // 桌面端没有音频路由 API
+      }
+      await player.play(BytesSource(caller ? CallTones.ringback() : CallTones.ringtone()));
+    } catch (_) {
+      _tonePlayer = null;
+    }
+  }
+
+  Future<void> _stopTone() async {
+    final player = _tonePlayer;
+    _tonePlayer = null;
+    if (player == null) return;
+    try {
+      await player.stop();
+      await player.dispose();
+    } catch (_) {
+      // 停不掉就算了
+    }
   }
 
   Future<void> _activateAudioRoute() async {
@@ -437,6 +478,7 @@ class VoiceCallService {
     _connectTimer?.cancel();
     final duration = s.startedAt == null ? null : DateTime.now().difference(s.startedAt!);
     _emit(s.copyWith(phase: VoiceCallPhase.ended, endReason: reason));
+    unawaited(_stopTone()); // 拒接/挂断/超时/失败 → 停
     unawaited(WakelockPlus.disable().catchError((_) => null));
     unawaited(_teardown());
     onEnded?.call(reason, _isCaller, duration);
