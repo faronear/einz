@@ -1336,12 +1336,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 按住时的底色紧贴着 "I"（老板 2026-09-26 实测）。
                 // 文字链接用左右**匀称**的留白，底色两边都留得出来。
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(l10n.chatPageInviteJoinLink,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        // 链接蓝 = 品牌深蓝 #2271F7，与开通码弹窗里那条邀请链接
-                        // （本文件 `_showInviteDialog`）同一个蓝，语义同源。
-                        color: Color(0xFF2271F7))),
+                // 高度与电话图标 / 下拉箭头的点击区**同高**（都是 kStatusAvatarSize）：
+                // 三个都是"胶囊外侧的操作控件"，背景区高度不一致会显得参差
+                // （老板 2026-09-26）
+                child: SizedBox(
+                  height: kStatusAvatarSize,
+                  child: Center(
+                    child: Text(l10n.chatPageInviteJoinLink,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            // 链接蓝 = 品牌深蓝 #2271F7，与开通码弹窗里那条邀请链接
+                            // （本文件 `_showInviteDialog`）同一个蓝，语义同源。
+                            color: Color(0xFF2271F7))),
+                  ),
+                ),
               ),
             ),
           );
