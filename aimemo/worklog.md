@@ -10483,3 +10483,26 @@ Spacer 分走一半，长歌名能多显示一些字。
 **遗留（未改，问过再动）**：发送端明文仍是假名。若哪天要在别处显示真名，得改
 `_sendMedia` 用 XFile 的真实文件名（`image.name` / `video.name`）——老消息的明文已经存成
 假名了（产品未上线、设备会重置，不必写迁移）。
+
+## 2026-09-27 发送端：图片/视频的明文改用选择器给的真实文件名
+
+**老板要求**：`_sendMedia` 里四处硬编码的 `image.jpg` / `video.mp4` 改成 `image.name` /
+`video.name`。
+
+**改动**：加 `_pickedFileName(XFile, {fallback})`（`file.name` 非空就用它，否则兜底占位名），
+四个 case（photo / galleryImage / videoCamera / videoGallery）统一改用它。
+
+**几点要记住**：
+
+- `XFile.name` 是**非空** `String`（io 实现 = path 的最后一段），所以只需要防**空串**。
+- 这个文件名会写进**消息明文**（`MessageRepository.sendAttachment`：`'📎 $fileName'`），
+  引用快照的 preview、以及附件落盘的**扩展名**（`_attachmentExtOf` 按明文后缀取）都跟它走。
+  所以真名一改，扩展名可能是 `.HEIC` / `.MOV` 这种——解码端（`Image.memory`、
+  `video_player`、`video_thumbnail`）都是**按内容**解码，不看后缀，暂无影响；真出问题再说。
+- **拍照/录像没有"原名"**：选择器给的是它自己的临时名（`image_picker_2F3A…jpg`），
+  比占位名更长更丑。要不要在 photo / videoCamera 两个 case 退回 `image.jpg` / `video.mp4`，
+  待老板定（2026-09-27 先一律用选择器给的名字）。
+- 当前 UI 上**几乎看不出变化**：引用条刚按老板要求删掉了图片/视频的文件名显示，气泡里
+  image/video 走缩略图也不显示明文。真名的价值是"明文里存的是真东西"——将来要在任何
+  地方显示（文件卡片、搜索、导出）都有得用；现在唯一露出来的是附件加载失败时的兜底
+  文案 `📷 <真名>`。

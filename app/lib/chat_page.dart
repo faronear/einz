@@ -4341,6 +4341,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await _sendMedia(kind);
   }
 
+  /// 选择器给出的文件名：**相册/文件库里是真名**（`IMG_1234.HEIC`、`假期.mp4`），
+  /// 拍照/录像则是选择器自己的临时名（没有"原名"可言，各家插件给的形如
+  /// `image_picker_2F3A…jpg`）。取不到（路径为空）才用 [fallback] 占位名。
+  ///
+  /// 它写进**消息明文**（`📎 <fileName>`，见 `MessageRepository.sendAttachment`），
+  /// 于是引用快照、附件落盘的扩展名（`_attachmentExtOf` 按明文后缀取）都跟它走——
+  /// 这就是为什么此前硬编码 `image.jpg`/`video.mp4` 会让引用条显示假名（老板
+  /// 2026-09-27 发现）。产品未上线，老的假名消息不必迁移。
+  String _pickedFileName(XFile file, {required String fallback}) =>
+      file.name.isNotEmpty ? file.name : fallback;
+
   Future<void> _sendMedia(_AttachmentKind kind) async {
     try {
       final XFile? image;
@@ -4352,25 +4363,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         case _AttachmentKind.photo:
           image = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1600);
           if (image == null) return;
-          fileName = 'image.jpg';
+          fileName = _pickedFileName(image, fallback: 'image.jpg');
           type = 'image';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.galleryImage:
           image = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1600);
           if (image == null) return;
-          fileName = 'image.jpg';
+          fileName = _pickedFileName(image, fallback: 'image.jpg');
           type = 'image';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.videoCamera:
           image = await _picker.pickVideo(source: ImageSource.camera, maxDuration: const Duration(minutes: 1));
           if (image == null) return;
-          fileName = 'video.mp4';
+          fileName = _pickedFileName(image, fallback: 'video.mp4');
           type = 'video';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.videoGallery:
           image = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 1));
           if (image == null) return;
-          fileName = 'video.mp4';
+          fileName = _pickedFileName(image, fallback: 'video.mp4');
           type = 'video';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.audioFile:
