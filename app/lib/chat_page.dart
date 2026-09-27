@@ -5240,14 +5240,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 onTap: _showEntranceListSheet,
                                 hoverColor: Colors.black.withValues(alpha: 0.05),
                                 highlightColor: Colors.black.withValues(alpha: 0.08),
-                                child: SizedBox(
-                                  // 正圆：非正方形会被 CircleBorder 拉成椭圆、顶到
-                                  // 状态条上下边缘（与 invite 同源的问题）
-                                  width: kStatusControlSize,
-                                  height: kStatusControlSize,
-                                  child: Icon(Icons.arrow_drop_down,
-                                      size: 22,
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                child: Tooltip(
+                                  // 桌面端悬停提示：光看图标不一定看得出是"多设备"
+                                  message: l10n.chatPageMenuEntranceList,
+                                  child: SizedBox(
+                                    // 正圆：非正方形会被 CircleBorder 拉成椭圆、顶到
+                                    // 状态条上下边缘（与 invite 同源的问题）
+                                    width: kStatusControlSize,
+                                    height: kStatusControlSize,
+                                    // 「手机 + 显示器」并排：比下拉箭头更能表达
+                                    // "我有多条通道/设备"（老板 2026-09-26）
+                                    child: Icon(Icons.devices,
+                                        size: 20,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
+                                  ),
                                 ),
                               ),
                             ),
