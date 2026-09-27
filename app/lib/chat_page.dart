@@ -1391,9 +1391,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 与头像的性别底色打架，也不会让人误以为点名字/头像能切换空间。
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Flexible(child: Padding(padding: pad, child: content)),
-      // 与「名字/状态」这组信息拉开：电话图标是**操作控件**，不该贴在文字上
-      // （老板 2026-09-26：箭头搬走后，这里要自己留出这段间距）
-      Padding(padding: const EdgeInsets.only(left: 12), child: trailing),
+      // 与「名字/状态」的间距：靠 pad.right(10) + Invite 自带的内边距(12) = 22px。
+      // **两侧要一样宽**（老板 2026-09-26）——此前这里额外加了 12px，导致对方一侧
+      // 的间距（34）明显比我方（22）宽，看着不匀。
+      trailing,
     ]);
   }
 
@@ -5259,9 +5260,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                            // 箭头与「名字/时间」的间距：与左侧"名字 → 电话图标"的 12px
-                            // 对称——把箭头视作胶囊**之外**的控件（老板 2026-09-26）
-                            const SizedBox(width: 12),
+                            // 与「名字/时间」的间距 16px：加上图标在 32 宽容器里的
+                            // 居中余量（(32-20)/2 = 6），到图标**视觉边缘**正好 22px，
+                            // 与对方一侧（Invite 文字 22px）一致（老板 2026-09-26）
+                            const SizedBox(width: 16),
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.end,
