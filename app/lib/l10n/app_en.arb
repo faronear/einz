@@ -512,7 +512,7 @@
       }
     }
   },
-  "spaceListPeerPending": "Not joined yet",
+  "spaceListPeerPending": "Waiting",
   "@spaceListPeerPending": {
     "description": "Status line on a space card when the other side has not joined yet"
   },

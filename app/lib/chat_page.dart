@@ -1200,16 +1200,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// [sinceMs] 缺失（还没问到 / 服务端没给）就只留灯：宁可少显示，也不摆一个假的
   /// 00:00。格式复用 [_timeStampLabel]——当天 `HH:MM`、当年 `mm-dd HH:MM`、跨年带年份。
+  /// [label] 用于"既不在线也不是普通离线"的状态（当前只有**对方尚未加入**）：
+  /// 灯变灰、右侧显示这个短标签而不是时间（老板 2026-09-26：未加入时时间没有意义，
+  /// 摆一个"上次离线时间"反而误导）。
   Widget _statusLine({
     required bool online,
     required Color offlineColor,
     int? sinceMs,
+    String? label,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.circle, size: 8, color: online ? Colors.green : offlineColor),
-        if (sinceMs != null && sinceMs > 0) ...[
+        Icon(Icons.circle, size: 8,
+            color: label != null ? Colors.grey : (online ? Colors.green : offlineColor)),
+        if (label != null) ...[
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withValues(alpha: 0.55),
+            ),
+          ),
+        ] else if (sinceMs != null && sinceMs > 0) ...[
           const SizedBox(width: 4),
           Text(
             _timeStampLabel(sinceMs),
@@ -1259,11 +1273,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                 ),
               const SizedBox(height: 2),
-              // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）
+              // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）；
+              // **对方尚未加入**时灯变灰、右侧显示「待加入 / Waiting」——时间对
+              // 未加入的人没有意义，摆个"上次离线时间"反而误导（老板 2026-09-26）
               _statusLine(
                 online: _peerOnline,
                 offlineColor: Colors.red,
                 sinceMs: _peerSinceMs,
+                label: _peerJoined == false ? l10n.spaceListPeerPending : null,
               ),
             ],
           ),

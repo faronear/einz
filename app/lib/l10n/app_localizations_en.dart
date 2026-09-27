@@ -985,7 +985,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get spaceListPeerPending => 'Not joined yet';
+  String get spaceListPeerPending => 'Waiting';
 
   @override
   String get voiceCallMenuCall => 'Voice call';

@@ -1811,7 +1811,7 @@ abstract class AppLocalizations {
   /// Status line on a space card when the other side has not joined yet
   ///
   /// In en, this message translates to:
-  /// **'Not joined yet'**
+  /// **'Waiting'**
   String get spaceListPeerPending;
 
   /// Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip
