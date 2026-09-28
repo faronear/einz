@@ -329,16 +329,21 @@ jobs:
           codesign --verify -v build/macos/Build/Products/Release/einz.app
       - name: Zip app bundle
         # 命名与本地打包对齐（buildMacos.sh）：配 secrets = -dist（Developer ID 可分发），
-        # 未配 = -dev（ad-hoc 兜底）；CI 无时间串，版本号（APP_BUILD_NAME）已够区分构建
+        # 未配 = -dev（ad-hoc 兜底）；CI 无时间串，版本号（APP_BUILD_NAME）已够区分构建。
+        # 同时落一个 *.version.txt 旁车文件（内容就是版本号一行）：Release 资产名固定
+        # 不带版本号（固定名才能覆盖老文件、不堆积多版本），自动更新脚本
+        # （scripts/updateMacosApp.js）先拉这个小文件比版本，新了才下载几百 MB 的 zip
         run: >
           SUFFIX=${{ steps.devid.outputs.configured == 'true' && 'dist' || 'dev' }};
           cd app/build/macos/Build/Products/Release &&
-          zip -r -y "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.zip" einz.app
+          zip -r -y "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.zip" einz.app &&
+          echo "$APP_BUILD_NAME" > "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.version.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: einz-macos
           path: |
             einz-app-macos-*.zip
+            einz-app-macos-*.version.txt
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -347,6 +352,7 @@ jobs:
           make_latest: true
           files: |
             einz-app-macos-*.zip
+            einz-app-macos-*.version.txt
 
   # macOS 桌面 CLI（einz-tui-macos）分架构两个产物：
   # dart compile exe 只产出宿主架构，且 Dart 不支持 macOS 跨架构编译，
