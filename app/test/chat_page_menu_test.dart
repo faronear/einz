@@ -865,11 +865,12 @@ void main() {
     expect(find.text('只能用中文字、英文字母、数字、下划线(_)、中划线(-)'), findsOneWidget,
         reason: '含空格/感叹号的通道名保存应红字警示');
 
-    // 超长（>32）→ 红字警示
+    // 超长（>32）→ **输入框自己就卡住**（老板 2026-09-28：以前能一直敲，
+    // 点保存才红字警示"最多 32 个字符"）
     await tester.enterText(dialogField, 'a' * 33);
-    await tester.tap(find.text('保存'));
-    await tester.pumpAndSettle();
-    expect(find.text('最多 32 个字符'), findsOneWidget, reason: '超长通道名应红字警示');
+    await tester.pump();
+    expect(tester.widget<TextField>(dialogField).controller!.text.length, 32,
+        reason: '第 33 个字符敲不进去');
 
     // 开始填写即消红字
     await tester.enterText(dialogField, '我的手机');
@@ -945,11 +946,11 @@ void main() {
     expect(find.text('只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符'), findsOneWidget,
         reason: '含空格的名字保存应红字警示');
 
-    // 超长（>32）→ 红字警示
+    // 超长（>32）→ **输入框自己就卡住**（老板 2026-09-28：以前点保存才红字警示）
     await tester.enterText(dialogField, 'a' * 33);
-    await tester.tap(find.text('保存'));
-    await tester.pumpAndSettle();
-    expect(find.text('最多 32 个字符'), findsOneWidget, reason: '超长名字应红字警示');
+    await tester.pump();
+    expect(tester.widget<TextField>(dialogField).controller!.text.length, 32,
+        reason: '第 33 个字符敲不进去');
 
     // 填写即消红字 → 保存成功关窗（名字用带 emoji 的——与通道名规则的差别：
     // 表情符在人名里是允许的）

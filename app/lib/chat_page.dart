@@ -5528,29 +5528,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 居中余量（(32-20)/2 = 6），到图标**视觉边缘**正好 22px，
                             // 与对方一侧（Invite 文字 22px）一致（老板 2026-09-26）
                             const SizedBox(width: 16),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                if (_myMemberName.isNotEmpty)
-                                  Flexible(
-                                    child: Text(_myMemberName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.end,
-                                        // 与对方一侧同号（15），两侧视觉对称
-                                        style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w500)),
+                            // Flexible 要包在**Column 外面**（老板 2026-09-28 实测的溢出：
+                            // 名字长到 44 字时，这一行要 767px、只给 376px →
+                            // "overflowed by 391 pixels on the right"）。
+                            // 里面的 Flexible 只管**上下**（名字与状态行挤不开时压名字）；
+                            // 横向不给任何约束 —— 名字有多长，Column 就有多宽。
+                            // 对方那半格一直是外侧包 Flexible 的写法（2026-09-24 修的），
+                            // 我方这半漏了。
+                            Flexible(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  if (_myMemberName.isNotEmpty)
+                                    Flexible(
+                                      child: Text(_myMemberName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.end,
+                                          // 与对方一侧同号（15），两侧视觉对称
+                                          style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w500)),
+                                    ),
+                                  const SizedBox(height: 1),
+                                  _statusLine(
+                                    online: _ws?.connected.value ?? false,
+                                    offlineColor:
+                                        _ws == null ? Colors.grey : Colors.red,
+                                    sinceMs: _mySinceMs,
                                   ),
-                                const SizedBox(height: 1),
-                                _statusLine(
-                                  online: _ws?.connected.value ?? false,
-                                  offlineColor:
-                                      _ws == null ? Colors.grey : Colors.red,
-                                  sinceMs: _mySinceMs,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             const SizedBox(width: 8),
                             _statusAvatar(

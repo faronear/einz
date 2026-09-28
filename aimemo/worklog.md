@@ -10617,3 +10617,26 @@ CLI/TUI 的 `/entrance`、`/myname` 也没动（老板说的是"输入框"）。
 **验证**：`chat_page_menu_test.dart`「改名对话框：名字/通道名最多 32 字符」（人名框、
 通道名框各输 40 个字符 → 框里只剩 32）；`widget_test.dart`「名字输入框卡 32 字符」
 （向导首步同样只剩 32）。两例通过，`flutter analyze` 干净。
+
+## 2026-09-28 状态条「我方」半格：长名字溢出（既有失败，老板点名修）
+
+**现象**：`chat_page_menu_test.dart` 的「长名字不撑破状态条与汉堡菜单」报
+`A RenderFlex overflowed by 391 pixels on the right`。这条用例 2026-09-24 就是为它加的，
+后来回归了；用临时 `FlutterError.onError` 打出 creator 链定位到 **chat_page.dart 状态条
+我方那半格**（`Flexible > Align > Padding > Row`，只允许 376px、长名字要 767px）。
+
+**根因**：`Flexible` 包错了层。对方那半格（`_buildPeerStatus`）写的是
+`Row[头像, SizedBox, Flexible(child: Column(...Text...))]` —— Flexible 在 Column **外面**，
+Row 才会把"剩下的宽度"给它、Text 才走「…」。我方那半格把 Flexible 放在了 Column **里面**：
+那是**竖直**方向的弹性（名字与状态行挤不开时压名字），横向一点约束都没有 → 名字多长
+Column 就多宽 → 整行溢出。两处只差一层，2026-09-24 只修了对方那半。
+
+**改法**：把我方那半的 `Column` 也包进 `Flexible`（`chat_page.dart` 状态条内，箭头与头像
+之间那块）。内侧的 `Flexible` 保留原样（继续管上下压缩）。
+
+**顺带更新的两处用例**（行为按老板要求变了，不是回归）：改名弹窗的「当前通道弹窗…」与
+「我的个人资料弹窗…」原来断言"输入 >32 字符 → 保存时红字 `最多 32 个字符`"；现在输入框
+自己就卡在 32，保存不会再报这个错 → 改为断言 `controller.text.length == 32`。
+
+**验证**：`chat_page_menu_test.dart` 整个文件 34 例全绿；`multi_space_pages_test.dart`、
+`ui_style_switch_test.dart` 也绿；`flutter analyze` 干净。
