@@ -7,8 +7,10 @@ import 'package:flutter/material.dart';
 /// 有的地方是手型、有的不是，鼠标移过去要靠"猜这里能不能点"（老板 2026-09-26：
 /// "全局可单击的东西都应该变手型，全局统一"）。
 ///
-/// 用法：把裸 `GestureDetector` 换成 `Clickable`，参数同名透传。回调整体为 null 时
-/// 光标保持默认（不假装可点）。
+/// 用法：把裸 `GestureDetector` 换成 `Clickable`，参数同名透传。**单击/双击/右键**
+/// 任一存在时光标变手型；**只有长按**的（如消息气泡长按弹菜单）光标保持默认箭头
+/// ——长按没有"点"的语义，全部手型会让气泡与真正可单击的引用块/链接分不清
+/// （老板 2026-09-28：仅在能单击的对象上显示手型）。
 ///
 /// 只负责光标，**不**加悬浮变色/涟漪——那些交给 Material 系组件（`InkWell`）。
 class Clickable extends StatelessWidget {
@@ -35,14 +37,10 @@ class Clickable extends StatelessWidget {
   final HitTestBehavior behavior;
   final Widget? child;
 
+  // 手型只认**单击类**手势（tap/doubleTap/secondaryTap）：纯长按的（消息气泡
+  // 菜单）保持默认箭头，把手型留给真正"一点就有动作"的对象（老板 2026-09-28）
   bool get _interactive =>
-      onTap != null ||
-      onDoubleTap != null ||
-      onLongPress != null ||
-      onLongPressStart != null ||
-      onLongPressEnd != null ||
-      onLongPressUp != null ||
-      onSecondaryTap != null;
+      onTap != null || onDoubleTap != null || onSecondaryTap != null;
 
   @override
   Widget build(BuildContext context) {
