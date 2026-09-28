@@ -581,7 +581,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '每次打开都重新下载并解密，本机不留明文副本，更私密。';
 
   @override
-  String get chatPageAttachmentStorageStored => '本地留存';
+  String get chatPageAttachmentStorageStored => '本地保存';
 
   @override
   String get chatPageAttachmentStorageStoredDesc =>
