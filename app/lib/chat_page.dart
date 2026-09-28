@@ -9,6 +9,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'widgets/linkified_text.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:open_filex/open_filex.dart';
@@ -4817,7 +4819,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       case 'system':
         return _buildSystemHint(m);
       default:
-        return Text(m.plaintext);
+        // 文本消息：自动扫描明文里的 URL 渲染成可点链接（方案1，老板 2026-09-28）。
+        // gradient 深色气泡下链接用白色（正文同色系），素雅气泡用品牌蓝（组件默认）。
+        return LinkifiedText(m.plaintext,
+            linkColor: _uiStyle == 'gradient' ? Colors.white : const Color(0xFF2271F7));
     }
   }
 
