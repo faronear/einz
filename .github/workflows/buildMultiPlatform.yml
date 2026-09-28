@@ -333,11 +333,15 @@ jobs:
         # 同时落一个 *.version.txt 旁车文件（内容就是版本号一行）：Release 资产名固定
         # 不带版本号（固定名才能覆盖老文件、不堆积多版本），自动更新脚本
         # （scripts/updateMacosApp.js）先拉这个小文件比版本，新了才下载几百 MB 的 zip
-        run: >
-          SUFFIX=${{ steps.devid.outputs.configured == 'true' && 'dist' || 'dev' }};
-          cd app/build/macos/Build/Products/Release &&
-          zip -r -y "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.zip" einz.app &&
-          echo "$APP_BUILD_NAME" > "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.version.txt"
+        run: |
+          SUFFIX=${{ steps.devid.outputs.configured == 'true' && 'dist' || 'dev' }}
+          # APP_BUILD_NAME 是 Build step 里 eval 的变量，不跨 step——这里现场重取
+          # （appVersion.js 由当前 UTC 时间确定性生成，同一构建内两次调用结果一致；
+          # 上一版直接 echo "$APP_BUILD_NAME" 写出了空 version.txt，2026-09-28 实测）
+          NAME="$(node ../scripts/appVersion.js --build-name)"
+          cd app/build/macos/Build/Products/Release
+          zip -r -y "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.zip" einz.app
+          echo "$NAME" > "$GITHUB_WORKSPACE/einz-app-macos-$SUFFIX.version.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: einz-macos
