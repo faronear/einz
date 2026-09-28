@@ -1177,6 +1177,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 别暗示这里能切（老板 2026-09-24 定）。
   bool get _multiSpace => (VaultSession.current?.spaces.length ?? 0) > 1;
 
+  /// 顶栏的「品牌名（+ 下拉箭头）」这一块。
+  ///
+  /// 多空间时整块可点 → 打开「切换我的秘境」弹层，箭头紧贴在标题文字右侧
+  /// （老板 2026-09-28：原先是独立 IconButton，自带的 8px 内边距把箭头推得很远，
+  /// 不像和标题是一体的）。单空间时不画箭头、也不可点（别暗示这里能切）。
+  Widget _brandTitle() {
+    final l10n = AppLocalizations.of(context)!;
+    final titleRow = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(l10n.chatPageTitleBrand,
+                style: const TextStyle(fontSize: 17),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ),
+          // 颜色继承 AppBar 的 IconTheme（AppBar 给整个 toolbar 套了 IconTheme.merge）
+          if (_multiSpace) ...[
+            const SizedBox(width: 2),
+            const Icon(Icons.arrow_drop_down, size: 20),
+          ],
+        ],
+      ),
+    );
+    if (!_multiSpace) return titleRow;
+    return Tooltip(
+      message: l10n.spaceListSwitch,
+      child: InkWell(mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(10),
+        onTap: _openSpacePicker,
+        child: titleRow,
+      ),
+    );
+  }
+
   /// 状态条上的头像。
   ///
   /// 边长 = [kStatusAvatarSize]：跟随"名字 + 红绿灯"两行的高度，**上下不留白**，
@@ -5111,43 +5148,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 抬头只显示品牌名+slogan（不暴露空间 ID，对普通用户无意义）；
         // 在线状态由对话顶部条双灯呈现（「我的」灯三态：灰=未连接服务/绿=已连接/红=断线）
         //
-        // logo + 品牌名**整块可点** → 等同菜单里的「关于秘境」（老板 2026-09-24：
-        // 别闲着）。命中区含 logo 与标题文字。
+        // 顶栏左半边现在分成**两个**点击对象（老板 2026-09-28）：
+        //   ① logo 一块 → 「关于秘境」弹层；
+        //   ② 标题「我的秘境」+ 下拉箭头 一块 → 「切换我的秘境」弹层，箭头紧挨着
+        //      标题文字（原先是独立 IconButton，离文字一个图标按钮那么远）。
+        //      只在 2 个及以上空间时给：单空间别暗示这里能切（2026-09-24 定），
+        //      此时标题不可点。
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
+            Tooltip(
+              message: l10n.aboutPageTitle,
               child: InkWell(mouseCursor: SystemMouseCursors.click,
                 borderRadius: BorderRadius.circular(10),
                 onTap: _openAboutPage,
-                child: Padding(
-                  // 给按住/长按的半透明高亮留出边距（否则会紧贴标题文字的最右缘）
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const BrandLogo(),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: Text(l10n.chatPageTitleBrand,
-                            style: const TextStyle(fontSize: 17),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
+                child: const Padding(
+                  // 给按住/长按的半透明高亮留出边距（否则会紧贴 logo 边缘）
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  child: BrandLogo(),
                 ),
               ),
             ),
-            // 「切换秘境」：放在「logo + 我的秘境」右侧（老板 2026-09-26 挪过来——
-            // 原先挂在状态条的对方名字旁，点它等于"要换掉对方"，有点伤人）。
-            // 只在 2 个及以上空间时给：单空间别暗示这里能切（2026-09-24 定）。
-            if (_multiSpace)
-              IconButton(
-                icon: const Icon(Icons.arrow_drop_down),
-                tooltip: l10n.spaceListSwitch,
-                onPressed: _openSpacePicker,
-              ),
+            Flexible(child: _brandTitle()),
             // 其它秘境有未读 → 汇总角标（老板 2026-09-26）：不打开「选择秘境」
             // 也能一眼看到"别的秘境来消息了"。
             if (_otherUnreadTotal > 0) _UnreadBadge(count: _otherUnreadTotal),

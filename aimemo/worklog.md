@@ -10519,3 +10519,32 @@ Spacer 分走一半，长歌名能多显示一些字。
 
 副作用：引用图片/视频时，输入栏引用条的高度由 40 的缩略图决定（约 52），比文字引用条
 （约 36）高一些——老板要的就是看得清。
+
+## 2026-09-28 顶栏左半边拆成两个点击对象
+
+**老板要求**：原先「logo + 我的秘境」整块一块可点（→ 关于弹层）、下拉箭头是独立
+IconButton。改成：① logo 单独可点 → 「关于秘境」；② 标题「我的秘境」+ 下拉箭头合成
+一块可点 → 「切换我的秘境」；箭头适当挪近标题文字。
+
+**改动**（`app/lib/chat_page.dart`）
+
+- `title:` 的 Row 现在是 `[logoInkWell, Flexible(_brandTitle()), 未读角标]`。
+- logo 那边：`Tooltip(aboutPageTitle) > InkWell > Padding(h8,v10) > BrandLogo`。
+- 新增 `_brandTitle()`（`chat_page.dart:1185`）：多空间时返回
+  `Tooltip(spaceListSwitch) > InkWell > Padding(h8,v11) > Row[Flexible(Text), 2px, Icon(arrow_drop_down, 20)]`；
+  单空间时同一个 `titleRow` 但**不包 InkWell**（不可点）。
+- 箭头从 `IconButton` 换成裸 `Icon(size: 20)` + 2px 间距：IconButton 自带的 8px 内边距
+  就是它"离文字远"的主因；颜色仍走 AppBar 给整个 toolbar 套的 `IconTheme.merge`
+  （framework `app_bar.dart:1158`），不用自己染。
+
+**决策**：单空间时标题**不可点**（老板 2026-09-28 拍板）。代价是把原先"整块可点→关于"
+的大命中区丢了，「关于」只剩 logo 一个小目标 + ☰ 菜单；换来的是标题语义始终等于
+"切换"、不会在不同状态下做不同的事。
+
+**测试**（`app/test/chat_page_menu_test.dart`，只 analyze 过，未本地跑——按老板习惯由他真机验）
+
+- 旧用例断言箭头在 `chatPageStatusBar` 内，2026-09-26 搬走后就已失效，本次一并改写：
+  改为断言箭头与品牌名同在一个 InkWell 里、点它直接开「切换我的秘境」弹层。
+- 旧用例「点标题→关于」改「点 logo→关于」（`find.byType(BrandLogo)`）。
+- 边距用例补两空间前置（多空间才存在那块 InkWell），并顺带量 logo 那块。
+- 单空间用例改为断言：无箭头、标题无 InkWell 祖先、logo 仍可点。

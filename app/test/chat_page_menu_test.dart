@@ -9,6 +9,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:einz/brand_logo.dart';
 import 'package:einz/widgets/about_sheet.dart';
 import 'package:einz/chat_page.dart';
 import 'package:einz/data/app_lock.dart';
@@ -1289,10 +1290,11 @@ void main() {
     expect(find.text('切换我的秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
-  testWidgets('状态条（对方名字旁）下拉箭头：一步打开空间弹层（老板 2026-09-24）',
+  testWidgets('顶栏「我的秘境 + 下拉箭头」：一步打开空间弹层（老板 2026-09-28）',
       (WidgetTester tester) async {
-    // 老板动机：从对话页切空间原先是「☰ → 扫菜单 → 点『切换我的秘境』」三步；
-    // 改为状态条上对方名字旁一个下拉箭头，一点即开——省一次跳转 + 一次扫菜单。
+    // 老板动机：切空间原先是「☰ → 扫菜单 → 点『切换我的秘境』」三步，后来变成状态条
+    // 上的箭头（2026-09-26），现在是顶栏标题自带箭头、和标题合成一块（2026-09-28）：
+    // 箭头紧贴文字，看着就是「点标题能切秘境」。
     // 注意：箭头**只在有 2 个及以上空间时**出现（单空间不给切换暗示）。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -1323,16 +1325,23 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 箭头在顶部状态条内（对方在线圆点/名字旁），不是别处的图标
+    // 箭头挂在 AppBar 的标题上，不再落在顶部状态条里（2026-09-26 搬走）
     final chevron = find.byIcon(Icons.arrow_drop_down);
-    expect(chevron, findsOneWidget, reason: '多空间时状态条应出现下拉箭头');
+    expect(chevron, findsOneWidget, reason: '多空间时顶栏标题旁应出现下拉箭头');
     expect(
       find.ancestor(
           of: chevron,
           matching: find.byKey(const ValueKey('chatPageStatusBar'))),
-      findsOneWidget,
-      reason: '箭头应落在 chatPageStatusBar 内',
+      findsNothing,
+      reason: '箭头不应再落在 chatPageStatusBar 内',
     );
+
+    // 箭头与品牌名同属**一块**可点区（点谁都是同一个结果）
+    final tapArea = find.ancestor(of: chevron, matching: find.byType(InkWell));
+    expect(tapArea, findsOneWidget, reason: '标题 + 箭头整块可点');
+    expect(find.descendant(of: tapArea, matching: find.text('我的秘境')),
+        findsOneWidget,
+        reason: '品牌名应和箭头在同一块可点区里');
 
     // 一步点开：直接进空间选择弹层（标题即证明弹层已弹出；文案由老板润色，不 assert 按钮文案）
     await tester.tap(chevron);
@@ -1340,7 +1349,9 @@ void main() {
     expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
   });
 
-  testWidgets('顶栏 logo + 品牌名可点：等同菜单里的「关于秘境」', (WidgetTester tester) async {
+  testWidgets('顶栏 logo 可点：等同菜单里的「关于秘境」（老板 2026-09-28）',
+      (WidgetTester tester) async {
+    // 2026-09-28：品牌名那块改去开「切换我的秘境」，logo 单独成为「关于」的入口。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -1362,20 +1373,28 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300));
 
-    // 标题（品牌名）整块可点 → 弹出「关于秘境」弹层（2026-09-25 起为底部弹层）
-    await tester.tap(find.text('我的秘境'));
+    // 点 logo → 弹出「关于秘境」弹层（2026-09-25 起为底部弹层）
+    await tester.tap(find.byType(BrandLogo));
     await tester.pumpAndSettle();
     expect(find.byType(AboutSheet), findsOneWidget,
-        reason: '点标题应弹出「关于秘境」弹层');
+        reason: '点 logo 应弹出「关于秘境」弹层');
     expect(find.byType(BottomSheet), findsOneWidget);
   });
 
-  testWidgets('顶栏标题的可点区域四周留边距（按住高亮不贴文字边缘）',
+  testWidgets('顶栏两块可点区的高亮都四周留边距（不贴内容边缘）',
       (WidgetTester tester) async {
     // 老板 2026-09-24：按住 logo+标题时，半透明高亮只贴到文字最右缘、没有余量。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
+    // 两个空间（多空间时「我的秘境 + 箭头」那块才可点）
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(const AppLockPayload(
+        spaceKeyB64: 'a2V5LWE=', spaceId: 'space-a', entranceId: 'dev-a', token: 'tok-a'));
+    await lock.addSpace(const AppLockPayload(
+        spaceKeyB64: 'a2V5LWI=', spaceId: 'space-b', entranceId: 'dev-b', token: 'tok-b'));
+    await lock.loadVault();
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1394,19 +1413,28 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300));
 
-    final ink = tester.getSize(find
-        .ancestor(of: find.text('我的秘境'), matching: find.byType(InkWell))
-        .first);
-    final row = tester.getSize(find
-        .ancestor(of: find.text('我的秘境'), matching: find.byType(Row))
-        .first);
-    expect(ink.width, closeTo(row.width + 16, 0.5), reason: '高亮左右各留 8px 边距');
+    // logo 那块：高亮 = logo(28) + 左右各 8
+    final logoSize = tester.getSize(find.byType(BrandLogo));
+    final logoInk = tester.getSize(
+        find.ancestor(of: find.byType(BrandLogo), matching: find.byType(InkWell)).first);
+    expect(logoInk.width, closeTo(logoSize.width + 16, 0.5),
+        reason: 'logo 高亮左右各留 8px');
+
+    // 品牌名 + 箭头那块：高亮 = 该行宽度 + 左右各 8
+    final titleInkFinder =
+        find.ancestor(of: find.text('我的秘境'), matching: find.byType(InkWell)).first;
+    final titleInk = tester.getSize(titleInkFinder);
+    final titleRow = tester.getSize(
+        find.descendant(of: titleInkFinder, matching: find.byType(Row)).first);
+    expect(titleInk.width, closeTo(titleRow.width + 16, 0.5),
+        reason: '标题行高亮左右各留 8px');
   });
 
-  testWidgets('只有一个空间时：状态条不出现下拉箭头，也不给可按芯片底色',
+  testWidgets('只有一个空间时：顶栏不给下拉箭头，品牌名也不可点',
       (WidgetTester tester) async {
     // 老板 2026-09-24：单空间常常就是"只想和某一个人用"，别暗示这里能切换；
     // 真要加空间，去汉堡菜单里找（菜单项保留）。
+    // 2026-09-28：箭头原本挂在状态条的对方名字旁，现已挪到顶栏品牌名右侧。
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
@@ -1435,10 +1463,14 @@ void main() {
 
     final statusBar = find.byKey(const ValueKey('chatPageStatusBar'));
     expect(statusBar, findsOneWidget);
-    expect(find.descendant(of: statusBar, matching: find.byIcon(Icons.arrow_drop_down)),
-        findsNothing, reason: '单空间不给下拉箭头');
-    expect(find.descendant(of: statusBar, matching: find.byType(Tooltip)),
-        findsNothing, reason: '单空间没有「切换我的秘境」的芯片（无 Tooltip）');
+    expect(find.byIcon(Icons.arrow_drop_down), findsNothing,
+        reason: '单空间顶栏不给下拉箭头');
+    expect(find.ancestor(of: find.text('我的秘境'), matching: find.byType(InkWell)),
+        findsNothing,
+        reason: '单空间时品牌名不可点（不暗示这里能切换）');
+    expect(find.ancestor(of: find.byType(BrandLogo), matching: find.byType(InkWell)),
+        findsOneWidget,
+        reason: 'logo 那块照旧可点（开「关于」）');
     expect(find.descendant(of: statusBar, matching: find.byIcon(Icons.circle)),
         findsWidgets, reason: '圆点（在线状态）仍应在');
   });
