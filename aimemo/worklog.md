@@ -10593,3 +10593,27 @@ multi_space_pages` 全绿。
 **顺带发现（未修，等老板定）**：`chat_page_menu_test.dart` 的「长名字不撑破状态条与
 汉堡菜单」**在 d3fda2d 上就已失败**（`A RenderFlex overflowed by 391 pixels on the right`）
 ——与今天的改动无关，是既有的状态条横向溢出/用例过期问题。
+
+## 2026-09-28 名称输入框：32 字符硬上限（不再等提交才报错）
+
+**老板要求**：通道名（服务端上限 32）在输入框里就拦住——"现在的状况是可以无限输入，
+然后提交时报错"；人名同样处理。
+
+**改法**：三处"用户输入名称"的输入框加 `maxLength`，常量直接用 shared 策略里的
+`kEntranceNameMaxLength` / `kMemberNameMaxLength`（不另写 32）：
+
+- `chat_page.dart` 的 `_showRenameDialog` 名称框：`renameEntrance ? kEntranceNameMaxLength : kMemberNameMaxLength`
+- `setup_page.dart` 向导的"我的名字"（`_creatorName`）与"伴侣名字"（`_peerNameCtrl`）：`kMemberNameMaxLength`
+
+**一并隐藏计数器**：`InputDecoration(counterText: '')`。上限只是防超长，弹窗/向导里不想
+多出一行 "3/32"（App UI 保持简单）。注意 `counterText` 显式给空串后，framework 就不会
+再自动填 `n/32`（`input_decorator.dart` 只在 counterText 非空时才建 counter），也就不用
+占一行高度。
+
+**没做的事**：提交时的白名单校验（`checkEntranceNamePolicy` / `checkMemberNamePolicy`）
+原样保留——那不是长度校验而是字符集校验，输入框拦不了（服务端另有 400 兜底）。
+CLI/TUI 的 `/entrance`、`/myname` 也没动（老板说的是"输入框"）。
+
+**验证**：`chat_page_menu_test.dart`「改名对话框：名字/通道名最多 32 字符」（人名框、
+通道名框各输 40 个字符 → 框里只剩 32）；`widget_test.dart`「名字输入框卡 32 字符」
+（向导首步同样只剩 32）。两例通过，`flutter analyze` 干净。

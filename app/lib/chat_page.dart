@@ -2478,6 +2478,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   border: const OutlineInputBorder(),
                   filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
                   fillColor: Colors.white,
+                  // 不显示 "3/32" 计数器（老板 2026-09-28）：上限只是防超长，
+                  // 弹窗里不必多一行；下面 maxLength 才是硬拦
+                  counterText: '',
                   suffixIcon: isEditing
                       ? null
                       : IconButton(
@@ -2487,6 +2490,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           onPressed: () => editing.value = true,
                         ),
                 ),
+                // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
+                // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量，通道名与
+                // 人名各按自己的规则（这里的拦截不替代提交时的白名单校验）。
+                maxLength: renameEntrance ? kEntranceNameMaxLength : kMemberNameMaxLength,
                 // 开始填写即清除空名警示（与向导输入框一致）
                 onChanged: (_) {
                   if (nameError.value != null) nameError.value = null;

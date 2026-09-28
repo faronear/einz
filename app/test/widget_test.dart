@@ -73,6 +73,22 @@ void main() {
     expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
   });
 
+  testWidgets('名字输入框卡 32 字符：第 33 个敲不进去（老板 2026-09-28）',
+      (WidgetTester tester) async {
+    // 以前没有上限：能一直敲，点「下一步」才被策略拒
+    await tester.pumpWidget(wrapApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('创建秘境'));
+    await tester.pumpAndSettle();
+
+    final field = find.byType(TextField).first;
+    await tester.enterText(field, 'z' * 40);
+    await tester.pump();
+    expect(tester.widget<TextField>(field).controller!.text.length,
+        kMemberNameMaxLength,
+        reason: '名字最多 32 字符（与 shared member_name_policy 同一常量）');
+  });
+
   testWidgets('入口页选「加入秘境」→ token 页（粘贴/扫码）',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp());

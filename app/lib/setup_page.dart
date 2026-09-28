@@ -1418,6 +1418,9 @@ class _SetupPageState extends State<SetupPage> {
           focusNode: _nameFocus, // 方案 1：聚焦时滚出性别卡
           autofocus: true,
           style: const TextStyle(fontSize: 20),
+          // 名字长度硬上限（老板 2026-09-28）：输满就敲不进去，不再等"下一步"才报错。
+          // 上限与 shared 的 member_name_policy 同一个常量（这里的拦截不替代它的白名单校验）。
+          maxLength: kMemberNameMaxLength,
           // 开始填写即清除「名字为空」红字（不依赖再点下一步）
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
@@ -1425,6 +1428,7 @@ class _SetupPageState extends State<SetupPage> {
           decoration: InputDecoration(
             hintText: l10n.wizardNameHintInput,
             border: const OutlineInputBorder(),
+            counterText: '', // 不显示 "3/32" 计数器（只做硬拦）
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),
@@ -1486,12 +1490,15 @@ class _SetupPageState extends State<SetupPage> {
           focusNode: _peerNameFocus, // 方案 1：聚焦时滚出性别卡
           autofocus: true,
           style: const TextStyle(fontSize: 20),
+          // 与上面「我的名字」同一条上限（老板 2026-09-28）
+          maxLength: kMemberNameMaxLength,
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
           },
           decoration: InputDecoration(
             hintText: l10n.wizardPeerNameHintInput,
             border: const OutlineInputBorder(),
+            counterText: '', // 不显示 "3/32" 计数器（只做硬拦）
           ),
         ),
         if (_localError != null) _localErrorHint(_localError!),

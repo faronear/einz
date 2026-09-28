@@ -444,6 +444,60 @@ void main() {
     expect(find.text('新名字'), findsOneWidget);
   });
 
+  testWidgets('改名对话框：名字/通道名最多 32 字符，第 33 个敲不进去（老板 2026-09-28）',
+      (WidgetTester tester) async {
+    // 以前输入框没有上限：能一直敲，点保存才被策略拒（白敲一通）。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-a',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _FakeApi(),
+        enableWs: false,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    /// 打开菜单项 [menuItem] 的弹窗，把名字/通道名输入框填成 [input]，返回框里的实际文本
+    Future<String> typeInto(String menuItem, String input) async {
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining(menuItem));
+      await tester.pumpAndSettle();
+      // 初始只读：先点「编辑」进可编辑态（只读态不接键盘输入）
+      await tester.tap(find.byIcon(Icons.edit));
+      await tester.pumpAndSettle();
+      final field = find
+          .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
+          .first;
+      await tester.enterText(field, input);
+      await tester.pump();
+      final text = tester.widget<TextField>(field).controller!.text;
+      // 关掉弹窗，回到聊天页（下一轮还要开菜单）
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      return text;
+    }
+
+    // 我的名字（member_name：按**码点**算，与 shared member_name_policy 同一常量）
+    final mine = await typeInto('我的身份', 'x' * 40);
+    expect(mine.length, kMemberNameMaxLength, reason: '第 33 个字符应敲不进去');
+
+    // 我的通道名（entrance_name：同样 32）
+    final entrance = await typeInto('当前通道', 'y' * 40);
+    expect(entrance.length, kEntranceNameMaxLength, reason: '第 33 个字符应敲不进去');
+  });
+
   testWidgets('改名对话框：点输入框任意位置即进编辑态（不必点编辑图标）', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
