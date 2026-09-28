@@ -10548,3 +10548,48 @@ IconButton。改成：① logo 单独可点 → 「关于秘境」；② 标题�
 - 旧用例「点标题→关于」改「点 logo→关于」（`find.byType(BrandLogo)`）。
 - 边距用例补两空间前置（多空间才存在那块 InkWell），并顺带量 logo 那块。
 - 单空间用例改为断言：无箭头、标题无 InkWell 祖先、logo 仍可点。
+
+## 2026-09-28 弹层卡片区：排不下就在内部滚动（矮窗口不再溢出）
+
+**老板报告**：mac 桌面端「切换我的秘境」弹层，4 个以上空间（卡片两行以上）时把窗口
+调矮，弹层底部出现黄黑斜条纹 + `Bottom overflowed by N pixels`，而且内容是死的、
+鼠标滚轮滚不出被盖住的卡片。他随后指出「更多通道」弹层同样如此（卡片矮，所以要不
+那么矮的窗口才暴露）。
+
+**根因（两条都记下，容易踩第二次）**
+
+1. 弹层能有多高**不等于窗口高度**：`showModalBottomSheet` 默认把内容限在视口高度的
+   **9/16**（framework `material/bottom_sheet.dart:32`，
+   `_kDefaultScrollControlDisabledMaxHeightRatio`）。窗口一矮这个上限就很小。
+   实测：800×600 的测试视口下，弹层内容区只有 **337.5**（= 600 × 9/16）。
+2. 两个弹层的卡片区都是 `Column(min) + Wrap`，**没有任何滚动容器** → 超过上限只能溢出。
+
+**改法**：新增 `app/lib/widgets/scrollable_card_area.dart` 的 `ScrollableCardArea`，
+两处弹层把卡片网格套进去：
+
+- 内部 = `Flexible(fit: FlexFit.loose) > Scrollbar > ListView(shrinkWrap: true)`。
+- 高度**不猜数值**：`Flexible` 直接吃"弹层 Column 分给它的剩余空间"——标题、间距、
+  底部按钮都是 Column 里排在它前后的非弹性子项，`RenderFlex._computeSizes` 第一趟
+  已把它们量过，所以这里拿到的就是扣掉它们之后剩多少（窗口/上限怎么变都自动跟）。
+  前提：**必须是弹层 Column 的直接子项**。
+- 为什么 `ListView(shrinkWrap: true)` 而不是 `SingleChildScrollView`：前者"有就到内容、
+  没有再到上限"，卡片排得下时与原来完全一致（不滚动、弹层贴内容）；后者会吃满上限，
+  一两张卡时下面空一大截。
+- 只让卡片区滚：标题与底部「添加秘境 / 新建通道」固定露在外面（那是随时要用的入口）。
+
+**走过的弯路（别再试）**
+
+- 一开始按"窗口高度 × 0.6 / 窗口高度 − 170"算卡片区上限 → 仍然溢出 142px：因为真正的
+  可用高度是 337.5（9/16），不是窗口的 600。
+- 在 `home:` 里套 `MediaQuery(size: …)` 改不了弹层：路由挂在 Navigator 的 Overlay 上，
+  拿到的是 **App 级** MediaQuery。测试里要改窗口得用 `tester.view.physicalSize`。
+- 拖拽要拖**视口**（`find.byType(ListView)`），拖那张高度远超视口的 `Wrap` 会打不中
+  （中心点在屏幕外）。
+
+**验证**：`app/test/space_picker_scroll_test.dart`（新增 2 例：矮窗口 8 空间→可滚且不溢出；
+2 空间→不出现滚动余量）。`flutter analyze` 干净；`space_picker_scroll / space_switcher_avatar /
+multi_space_pages` 全绿。
+
+**顺带发现（未修，等老板定）**：`chat_page_menu_test.dart` 的「长名字不撑破状态条与
+汉堡菜单」**在 d3fda2d 上就已失败**（`A RenderFlex overflowed by 391 pixels on the right`）
+——与今天的改动无关，是既有的状态条横向溢出/用例过期问题。

@@ -12,6 +12,7 @@ import '../data/vault_session.dart';
 import '../l10n/app_localizations.dart';
 import '../setup_page.dart';
 import 'pin_prompt.dart';
+import 'scrollable_card_area.dart';
 
 /// 空间选择结果：选中某个空间，或"去新建/加入一个空间"。
 class SpacePick {
@@ -246,33 +247,39 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                     style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.outline)),
               )
             else
-              // 卡片**边长按可用宽度反算**，保证一行正好 3 张（老板 2026-09-24：
-              // iPhone 16 上固定 120 时，2 张空太多、3 张放不下）。
-              // 不满 3 张的行由 Wrap 默认的 `WrapAlignment.start` 靠左。
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final size = _cardSizeFor(constraints.maxWidth);
-                  return Wrap(
-                    spacing: _kCardSpacing,
-                    runSpacing: _kCardSpacing,
-                    children: [
-                      for (final space in spaces)
-                        _SpaceCard(
-                          size: size,
-                          name: _titleOf(space),
-                          peerGender: _names[space.spaceId]?.peerGender ?? '',
-                          peerMemberId: _names[space.spaceId]?.peerMemberId ?? '',
-                          peerPending: _names[space.spaceId]?.peerJoined == false,
-                          server: effectiveServer,
-                          api: widget.api,
-                          unread: _unread[space.spaceId] ?? 0,
-                          current: space.spaceId == _activeId,
-                          onTap: () =>
-                              Navigator.of(context).pop(SpacePick.space(space.spaceId)),
-                        ),
-                    ],
-                  );
-                },
+              // 卡片排到两行以上 + 窗口矮 → 在这一块内部滚动（不再把整个弹层撑破，
+              // 老板 2026-09-28 桌面实测）。卡片排得下时不滚动、观感与原来一致。
+              // 卡片排到两行以上 + 窗口矮 → 在这一块内部滚动（不再把整个弹层撑破，
+              // 老板 2026-09-28 桌面实测）。卡片排得下时不滚动、观感与原来一致。
+              ScrollableCardArea(
+                // 卡片**边长按可用宽度反算**，保证一行正好 3 张（老板 2026-09-24：
+                // iPhone 16 上固定 120 时，2 张空太多、3 张放不下）。
+                // 不满 3 张的行由 Wrap 默认的 `WrapAlignment.start` 靠左。
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final size = _cardSizeFor(constraints.maxWidth);
+                    return Wrap(
+                      spacing: _kCardSpacing,
+                      runSpacing: _kCardSpacing,
+                      children: [
+                        for (final space in spaces)
+                          _SpaceCard(
+                            size: size,
+                            name: _titleOf(space),
+                            peerGender: _names[space.spaceId]?.peerGender ?? '',
+                            peerMemberId: _names[space.spaceId]?.peerMemberId ?? '',
+                            peerPending: _names[space.spaceId]?.peerJoined == false,
+                            server: effectiveServer,
+                            api: widget.api,
+                            unread: _unread[space.spaceId] ?? 0,
+                            current: space.spaceId == _activeId,
+                            onTap: () =>
+                                Navigator.of(context).pop(SpacePick.space(space.spaceId)),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ),
             const SizedBox(height: 8),
             // 「添加秘境」：**常态就是淡灰底**，提示"这里可以点"；鼠标悬浮/按住再渐变深色
