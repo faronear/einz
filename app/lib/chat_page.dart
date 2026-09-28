@@ -5510,9 +5510,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   message: l10n.chatPageMenuEntranceList,
                                   child: SizedBox(
                                     // 正圆：非正方形会被 CircleBorder 拉成椭圆、顶到
-                                    // 状态条上下边缘（与 invite 同源的问题）
-                                    width: kStatusControlSize,
-                                    height: kStatusControlSize,
+                                    // 状态条上下边缘（与 invite 同源的问题）。
+                                    // 边长与呼叫图标同源（kStatusAvatarSize=40）：
+                                    // 32 的背景圈偏小、间距发紧（老板 2026-09-28）
+                                    width: kStatusAvatarSize,
+                                    height: kStatusAvatarSize,
                                     // 「手机 + 显示器」并排：比下拉箭头更能表达
                                     // "我有多条通道/设备"（老板 2026-09-26）
                                     child: Icon(Icons.devices,
