@@ -1235,7 +1235,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuEntranceList.
   ///
   /// In en, this message translates to:
-  /// **'More entrances'**
+  /// **'All my entrances'**
   String get chatPageMenuEntranceList;
 
   /// No description provided for @chatPageEntranceListFailed.

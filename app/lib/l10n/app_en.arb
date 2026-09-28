@@ -303,7 +303,7 @@
   "chatPageMenuBurnLabel": "Burn-after-read",
   "chatPageMenuMyNameLabel": "My identity",
   "chatPageMenuEntranceNameLabel": "Current entrance",
-  "chatPageMenuEntranceList": "More entrances",
+  "chatPageMenuEntranceList": "All my entrances",
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
   "chatPageEntranceListNew": "Generate entrance token",
   "chatPageEntranceListRefresh": "Refresh",

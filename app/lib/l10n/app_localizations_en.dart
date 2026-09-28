@@ -652,7 +652,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuEntranceNameLabel => 'Current entrance';
 
   @override
-  String get chatPageMenuEntranceList => 'More entrances';
+  String get chatPageMenuEntranceList => 'All my entrances';
 
   @override
   String get chatPageEntranceListFailed =>

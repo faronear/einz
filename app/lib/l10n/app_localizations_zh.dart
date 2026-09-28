@@ -618,7 +618,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuEntranceNameLabel => '当前通道';
 
   @override
-  String get chatPageMenuEntranceList => '更多通道';
+  String get chatPageMenuEntranceList => '我的所有通道';
 
   @override
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
