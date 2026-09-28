@@ -310,6 +310,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 对方与我方各一份，口径与「更多通道」卡片一致（见 [_sinceOfRow]）。
   int? _peerSinceMs;
   int? _mySinceMs;
+  /// 我的通道总数（含本机这条，按 member 维度）：通道轮询（_refreshPeerOnline）
+  /// 顺带维护，汉堡菜单「更多通道」项的 devices 图标旁显示（老板 2026-09-28）。
+  /// null = 还没拉到（离线/未轮询过），菜单里就不显示数字。
+  int? _myEntranceCount;
 
   /// **其它**空间（非当前）的未读数：spaceId → 条数。用于顶部「切换秘境」旁的汇总角标。
   final Map<String, int> _otherUnread = {};
@@ -349,8 +353,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 顶栏的阅后即焚标记：沙漏 + 档位（如 `⧗ 1h`）。**点击直接进档位弹层**
   /// （与菜单里的「阅后即焚」是同一个动作，只是把这个"会丢消息"的状态提到明面上）。
   ///
-  /// 图标与消息气泡里同族（`_BurnHourglass` 的 `hourglass_top/bottom`），但这里是
-  /// **静态**的（不翻转）；尺寸 24 = 锁屏等顶栏图标同大（老板 2026-09-24，火苗太小时改）。
+  /// 图标与消息气泡里同族（`_BurnHourglass`），并同样**动态翻转**（老板 2026-09-28：
+  /// 菜单里是动态的，顶栏这个静态的显得不一致，一并动态化）；尺寸 24 = 锁屏等
+  /// 顶栏图标同大（老板 2026-09-24，火苗太小时改）。未焚毁态才有翻转，
+  /// `burned: false` 恒真——顶栏标记只在焚毁**生效前**显示。
   /// 配色不单独指定：跟锁屏等顶栏图标同色。
   Widget _buildBurnBadge(AppLocalizations l10n) {
     return Tooltip(
@@ -363,7 +369,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.hourglass_top, size: 24),
+              const _BurnHourglass(burned: false, size: 24),
               const SizedBox(width: 2),
               Text(_burnBadgeText(_burnSeconds),
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -2297,16 +2303,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         mySince = _sinceOfRow(d, online: _ws?.connected.value ?? false);
         break;
       }
+      // 我的通道总数（member 维度，含本机这条）——与通道列表弹层的过滤同口径
+      // （本机 + member_id 等于我的其它行）；轮询拿不到 mine 时保持旧值。
+      final myCount = (mine != null && mine.isNotEmpty)
+          ? entrances.where((d) => d['member_id'] == mine).length
+          : _myEntranceCount;
       if (mounted &&
           (online != _peerOnline ||
               joined != _peerJoined ||
               peerSince != _peerSinceMs ||
-              mySince != _mySinceMs)) {
+              mySince != _mySinceMs ||
+              myCount != _myEntranceCount)) {
         setState(() {
           _peerOnline = online;
           _peerJoined = joined;
           _peerSinceMs = peerSince;
           _mySinceMs = mySince;
+          _myEntranceCount = myCount;
         });
       }
     } catch (_) {
@@ -5351,7 +5364,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'entrancelist',
-                  child: Text(l10n.chatPageMenuEntranceList, style: captionStyle),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuEntranceList, style: captionStyle),
+                      const Spacer(),
+                      // 右侧 devices 图标 + 通道总数：与状态条「更多通道」入口同族
+                      // （老板 2026-09-28）；数量是 member 维度（含本机），
+                      // 轮询没拉到（离线）就不显示，不占位
+                      Icon(Icons.devices, size: 18, color: labelStyle.color),
+                      if (_myEntranceCount != null) ...[
+                        const SizedBox(width: 4),
+                        _menuValue('$_myEntranceCount', valueStyle),
+                      ],
+                    ],
+                  ),
                 ),
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
@@ -5360,6 +5386,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuBurnLabel, style: captionStyle),
                       const Spacer(),
+                      // 沙漏图标与顶栏标记同族（_BurnHourglass，老板 2026-09-28）：
+                      // 未焚毁态是翻转动画的实沙漏；尺寸与 devices 图标一致（18）
+                      const _BurnHourglass(burned: false, size: 18),
+                      const SizedBox(width: 4),
                       // 不设期限（0）不显示档位值，菜单项只显示「阅后即焚」；
                       // 选了具体时长才在右侧显示（老板 2026-09-15）
                       if (_burnSeconds > 0)
@@ -5395,7 +5425,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'about',
-                  child: Text(l10n.chatPageMenuAbout, style: labelStyle),
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuAbout, style: labelStyle),
+                      const Spacer(),
+                      // 右侧品牌 logo：与 devices/沙漏图标同大小（18，老板 2026-09-28）
+                      const BrandLogo(size: 18),
+                    ],
+                  ),
                 ),
                 // 空间组：紧贴「退出」上方（老板 2026-09-22：切换空间属"离开当前空间"
                 // 一类操作，放在关于之下、退出之上）。回调由入口注入——聊天页自己不读
@@ -5405,7 +5442,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                     height: kMenuRowHeight,
                     value: 'switchspace',
-                    child: Text(l10n.spaceListSwitch, style: labelStyle),
+                    child: Row(
+                      children: [
+                        Text(l10n.spaceListSwitch, style: labelStyle),
+                        const Spacer(),
+                        // 右侧 dynamic_feed 多窗口叠加：表达"多个空间"（老板
+                        // 2026-09-28 定稿：layers/collections 对比后选回 dynamic_feed）
+                        Icon(Icons.dynamic_feed, size: 18, color: labelStyle.color),
+                      ],
+                    ),
                   ),
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
@@ -7060,22 +7105,29 @@ class _SendingPlaneState extends State<_SendingPlane>
 /// hourglass_bottom 之间缓慢翻转，暗示倒计时在流逝；**已焚毁（[burned]）时改为
 /// 静态空沙漏**——沙漏已经漏完了，还在翻转不符合直觉（老板 2026-09-12）。
 /// 颜色不指定 → 继承 IconTheme（渐变风格下为白系，与相邻的时间/时长文字一致）。
+/// 尺寸默认 11（消息气泡时间行的小标）；汉堡菜单等大号场景传 [size] 覆盖
+/// （老板 2026-09-28：菜单里与 devices 图标同大小）。
 class _BurnHourglass extends StatelessWidget {
-  const _BurnHourglass({this.burned = false});
+  const _BurnHourglass({this.burned = false, this.size = 11});
 
   /// 该消息是否已被焚毁/删除（到期或手动删除）——是则显示静态空沙漏。
   final bool burned;
 
+  /// 图标边长。
+  final double size;
+
   @override
   Widget build(BuildContext context) {
     // 已焚毁：静态空沙漏（不创建动画控制器，避免无谓的逐帧重建）
-    if (burned) return const Icon(Icons.hourglass_empty, size: 11);
-    return const _HourglassFlip();
+    if (burned) return Icon(Icons.hourglass_empty, size: size);
+    return _HourglassFlip(size: size);
   }
 }
 
 class _HourglassFlip extends StatefulWidget {
-  const _HourglassFlip();
+  const _HourglassFlip({this.size = 11});
+
+  final double size;
 
   @override
   State<_HourglassFlip> createState() => _HourglassFlipState();
@@ -7100,7 +7152,7 @@ class _HourglassFlipState extends State<_HourglassFlip>
       animation: _controller,
       builder: (context, _) => Icon(
         _controller.value < 0.5 ? Icons.hourglass_top : Icons.hourglass_bottom,
-        size: 11,
+        size: widget.size,
       ),
     );
   }
