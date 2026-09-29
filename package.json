@@ -8,6 +8,7 @@
   },
   "scripts": {
     "todo": "node scripts/runScriptByIndex.js",
+    "clearSFC": "find $(realpath .) -type f \\( -name '*SFConf*' -o -name '*.sbak' \\) | while read item; do echo \"$item\"; rm -f \"$item\"; done",
     "l10n": "echo Generating app_localizations_xx.dart from app_xx.arb; cd app && flutter gen-l10n",
     "pub-patches": "bash scripts/patchPubCache.sh",
     "server-run-dev": "cd server && npm run dev",
