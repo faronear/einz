@@ -1331,7 +1331,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyStatePending.
   ///
   /// In en, this message translates to:
-  /// **'A confirmation email is on its way — alerts start once you open the link in it.'**
+  /// **'A confirmation email is on its way — alerts start once you open the link in it. Come back to the app and this updates on its own.'**
   String get chatPageNotifyStatePending;
 
   /// No description provided for @chatPageNotifySent.

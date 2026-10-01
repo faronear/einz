@@ -203,6 +203,9 @@ EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 a
 - **发件地址没有代码内默认值**：`EINZ_MAIL_FROM` 空着就是关闭的一部分（不给你悄悄套一个
   没登记过的地址——那会以"发出去了但被全数拒收/落垃圾箱"的形式静默失败）。想换发件地址，
   改 .env 这一行即可，不用改代码。
+- `EINZ_MAIL_BASE_URL`（默认 `https://einz.yuanjinx.com`）只影响**摘要信**里的退订链接
+  （tick 定时发信、没有请求上下文）。**确认信**里的链接按"请求自己的地址"生成，所以本地
+  连 `http://localhost:3000` 时链接自动就是 localhost，不用手改邮件里的域名。
 - 发件域名（`tic.cc`）只需要**DNS 上加 SPF/DKIM + 在 Email Delivery 里登记 approved sender**：
   出站发信不需要备案，与"einz.tic.cc 没备案、不能在国内提供入站服务"是两件事，别混。
 - 验出网（`EINZ_PROBE_TO` 给一个自己的邮箱，会真的发出一封测试信）：

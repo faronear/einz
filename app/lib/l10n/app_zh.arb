@@ -319,7 +319,7 @@
   "chatPageNotifyOnValue": "已开启",
   "chatPageNotifyPendingValue": "待确认",
   "chatPageNotifyOffValue": "已关闭",
-  "chatPageNotifyStatePending": "已经发了一封确认邮件，点邮件里的链接才会生效。",
+  "chatPageNotifyStatePending": "已经发了一封确认邮件，点邮件里的链接才会生效。生效后回到 App 会自动更新，不用重启。",
   "chatPageNotifySent": "确认邮件已发往 {email}，点邮件里的链接就生效了。",
   "@chatPageNotifySent": {
     "placeholders": {

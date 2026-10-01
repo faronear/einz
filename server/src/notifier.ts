@@ -602,7 +602,7 @@ export interface NotifyEmailStatus {
 export async function setNotifyEmail(
   token: string,
   rawEmail: string,
-  opts: { mailer?: Mailer | null; lang?: string | null } = {}
+  opts: { mailer?: Mailer | null; lang?: string | null; baseUrl?: string } = {}
 ): Promise<NotifyEmailStatus> {
   const { entrance_id, space_id, member_id } = requireSession(token);
   const email = normalizeEmail(rawEmail);
@@ -646,6 +646,11 @@ export async function setNotifyEmail(
   if (mailer == null) {
     throw new ApiError("MAIL_DISABLED", "邮件通知未启用：服务端缺 SMTP 配置", 503);
   }
+  // 确认链接用**请求自己的地址**（与邀请链接同一条规矩，见 app.requestBaseUrl）：
+  // 客户端连 localhost:3000 时链接就该指 localhost:3000，连正式域名就指正式域名——
+  // 否则本地联调必须手工把邮件里的域名改成 localhost 才能点（2026-10-01 老板实测）。
+  // 邮件里的链接指向"发这封信时你正在用的那台服务端"，语义上也更对。
+  const linkBase = opts.baseUrl ?? mailer.config.baseUrl;
   const verifyToken = ensureVerifyToken(email, now);
   const unsubscribeToken = ensureUnsubscribeToken(email, now);
   // 收件人自己的名字（写进称呼）；没有名字就不称呼——"对方"是给**发送者**留的回退，
@@ -658,8 +663,8 @@ export async function setNotifyEmail(
   await mailer.send(
     buildVerificationMail(
       email,
-      `${mailer.config.baseUrl}/notify/verify?token=${encodeURIComponent(verifyToken)}`,
-      `${mailer.config.baseUrl}/notify/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`,
+      `${linkBase}/notify/verify?token=${encodeURIComponent(verifyToken)}`,
+      `${linkBase}/notify/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`,
       own,
       lang
     )

@@ -632,7 +632,12 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     sendJson(res, 200, await setNotifyEmail(
       bearerToken(req),
       String(b.email ?? ''),
-      { lang: typeof b.lang === 'string' ? b.lang : null }
+      {
+        lang: typeof b.lang === 'string' ? b.lang : null,
+        // 确认链接按**请求自己的地址**生成（同邀请链接）：连 localhost 就指 localhost，
+        // 连正式域名就指正式域名——本地联调不必再手工改邮件里的域名。
+        baseUrl: requestBaseUrl(req)
+      }
     ))
     return
   }

@@ -21,6 +21,7 @@ import {
   notifyParams,
   planNotifications,
   runNotifyTick,
+  setNotifyEmail,
   type NotifyPlan,
 } from "../src/notifier.js";
 import type { MailConfig, Mailer, OutgoingMail } from "../src/mailer.js";
@@ -106,6 +107,12 @@ function seed(opts: SeedOpts = {}): number {
     `INSERT INTO notify_emails (email, verified_at, created_at)
      VALUES (?, ?, ?)`,
   ).run(EMAIL, opts.unverified ? null : now, now);
+
+  // 会话（只有 setNotifyEmail 那条路径需要认证；planNotifications 是纯读）
+  db.prepare(
+    `INSERT INTO sessions (session_token, entrance_id, space_id, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(hashSessionToken("tok-me"), MY_DEVICE, SPACE, now + 3_600_000, now);
 
   const msg = db.prepare(
     `INSERT INTO messages (message_id, space_id, sender_entrance_id, sender_member_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
@@ -294,6 +301,46 @@ test("邮件通知：⑦ 正文里绝不能有消息内容——只有谁/几条
     assert.match(mail.text!, /https:\/\/einz\.yuanjinx\.com\/notify\/unsubscribe\?token=tok-abc/);
     // 红线：密文/明文内容一个字都不许出现（服务端本来也只有密文可拿到）
     assert.doesNotMatch(mail.text!, /\bc\b|今晚|secret/);
+  });
+});
+
+test("邮件通知：⑨ 确认链接跟着**请求自己的地址**走（本地联调不必手改邮件里的域名）", async () => {
+  await new Promise<void>((resolve, reject) => {
+    const dir = mkdtempSync(join(tmpdir(), "einz-notify-link-"));
+    const done = (err?: unknown): void => {
+      rmSync(dir, { recursive: true, force: true });
+      if (err) reject(err);
+      else resolve();
+    };
+    try {
+      openDb(join(dir, "notify.db"));
+      seed({ unverified: true });
+      const sent: OutgoingMail[] = [];
+      // baseUrl 模拟"客户端连的是 http://localhost:3000"（app.ts 的 requestBaseUrl）
+      void setNotifyEmail("tok-me", EMAIL, {
+        mailer: fakeMailer(sent),
+        lang: "en",
+        baseUrl: "http://localhost:3000",
+      }).then((status) => {
+        try {
+          assert.equal(status.state, "pending");
+          assert.equal(status.verification_sent, true);
+          assert.equal(sent.length, 1);
+          assert.match(
+            sent[0]!.text!,
+            /http:\/\/localhost:3000\/notify\/verify\?token=/,
+            "确认链接必须指向发信这台服务端，而不是固定域名",
+          );
+          assert.match(sent[0]!.text!, /http:\/\/localhost:3000\/notify\/unsubscribe\?token=/);
+          assert.doesNotMatch(sent[0]!.text!, /yuanjinx/, "不该混进固定域名");
+          done();
+        } catch (e) {
+          done(e);
+        }
+      });
+    } catch (e) {
+      done(e);
+    }
   });
 });
 

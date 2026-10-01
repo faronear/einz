@@ -704,7 +704,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageNotifyStatePending =>
-      'A confirmation email is on its way — alerts start once you open the link in it.';
+      'A confirmation email is on its way — alerts start once you open the link in it. Come back to the app and this updates on its own.';
 
   @override
   String chatPageNotifySent(String email) {

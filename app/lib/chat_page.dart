@@ -292,6 +292,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 邮件通知状态（菜单项右侧值 + 弹窗内容）。null = 还没拉到/离线拉不到→菜单只显示标签，
   /// 不猜状态（猜错比不显示更糟：他会以为已经开了）。
   NotifyEmailStatus? _notifyEmail;
+  /// 只在"待确认"期间跑的轮询（20s）：确认是**在 App 外面点邮件链接**完成的，服务端
+  /// 没有任何通道能通知 App 它翻转了——不轮询的话只有重启才能看到（老板 2026-10-01 实测）。
+  Timer? _notifyTicker;
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
   VoiceCallService? _voiceCall; // 语音通话（前台通话；信令走 WS，PROTOCOL.md §8.4）
   late String _myMemberName; // 我的名字（菜单显示；改名后 setState 刷新）
@@ -1724,6 +1727,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 拉取邮件通知状态（GET /notify/email）。best-effort：拉不到就保持原值/null——
   /// 它是菜单上一个装饰性的当前值，不值得为它弹任何错误（老板 2026-09 定的
   /// "可观测性放代码里，不放 UI"）。
+  ///
+  /// 刷新时机（**翻转只可能发生在 App 外面**，所以光靠 initState 一次不够）：
+  ///   · initState
+  ///   · 从后台回到前台（去浏览器点链接再回来，是最常见的那条路径）
+  ///   · 打开设置弹窗前
+  ///   · 保存/停用之后
+  ///   · 还停在"待确认"时每 20s 轮询一次（见 [_syncNotifyTicker]，翻了就停）
   Future<void> _refreshNotifyEmail() async {
     if (!mounted || _session.token.isEmpty || effectiveServer.isEmpty) return;
     try {
@@ -1731,8 +1741,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final status = await _withAuth((t) => api.getNotifyEmail(t));
       if (!mounted) return;
       setState(() => _notifyEmail = status);
+      _syncNotifyTicker();
     } catch (_) {
       // 离线/服务端未启用：保持未知
+    }
+  }
+
+  /// 只在 `pending` 期间挂着 20s 的轮询：等那封确认邮件被点开。
+  /// 一旦翻转（生效/没设置/已关闭）就撤掉——不给一个只在极少数时候有用的值常驻轮询。
+  void _syncNotifyTicker() {
+    final pending = _notifyEmail?.isPending ?? false;
+    if (pending && _notifyTicker == null) {
+      _notifyTicker = Timer.periodic(const Duration(seconds: 20), (_) {
+        unawaited(_refreshNotifyEmail());
+      });
+    } else if (!pending && _notifyTicker != null) {
+      _notifyTicker?.cancel();
+      _notifyTicker = null;
     }
   }
 
@@ -1742,6 +1767,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 已设置时额外给一个「停用」（DELETE），不给"改地址"以外的第二入口（改地址＝重填再保存）。
   Future<void> _showNotifyDialog() async {
     final l10n = AppLocalizations.of(context)!;
+    // 开弹窗前先拉一次最新状态：它可能已经在 App 外面被翻转（确认邮件点过了），
+    // 而缓存的 `_notifyEmail` 还停在旧值上——照旧值弹窗会把用户带偏（比如又显示一遍
+    // "待确认"，或者输入框里填着已经被删掉的地址）。
+    await _refreshNotifyEmail();
+    if (!mounted) return;
     final before = _notifyEmail;
     final ctrl = TextEditingController(text: before?.email ?? '');
     // 红字警示（空/格式不对/后台失败）与提交中标记，都只在弹窗内有效
@@ -3010,6 +3040,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     attachmentStorageNotifier.removeListener(_onAttachmentStorageChanged);
     _ticker?.cancel();
     _peerTicker?.cancel();
+    _notifyTicker?.cancel(); // 邮件通知"待确认"期间的那一路轮询
     _recordTimer?.cancel();
     _highlightTimer?.cancel(); // 跳转高亮定时清除（防 dispose 后 setState）
     _ampSub?.cancel();
@@ -3061,6 +3092,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 回到前台：把后台时停掉的 WS 接回来（通话中的那次没停，这里幂等重连）
       _startRealtime();
       unawaited(_refreshOtherUnread());
+      // 邮件通知：确认链接是在 App 外面（浏览器）点的，回前台正是最该重查的时刻
+      unawaited(_refreshNotifyEmail());
       final relock = _lockTimer.shouldRelock(now: DateTime.now());
       _lockTimer.clear();
       // 不需要锁的两条路径：没离开够久（用户一直在看）、或本机压根没设锁屏码。

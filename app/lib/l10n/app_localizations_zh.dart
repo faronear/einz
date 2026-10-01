@@ -667,7 +667,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageNotifyOffValue => '已关闭';
 
   @override
-  String get chatPageNotifyStatePending => '已经发了一封确认邮件，点邮件里的链接才会生效。';
+  String get chatPageNotifyStatePending =>
+      '已经发了一封确认邮件，点邮件里的链接才会生效。生效后回到 App 会自动更新，不用重启。';
 
   @override
   String chatPageNotifySent(String email) {
