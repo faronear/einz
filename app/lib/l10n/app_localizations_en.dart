@@ -684,6 +684,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'If you have new messages and haven\'t been online for a while, we\'ll email you here. Alert emails never contain message text.';
 
   @override
+  String get chatPageNotifyAllSpaces =>
+      'This setting applies to all spaces on this device.';
+
+  @override
   String get chatPageNotifyEmailLabel => 'Email';
 
   @override
@@ -697,7 +701,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageNotifyOnValue => 'On';
 
   @override
-  String get chatPageNotifyPendingValue => 'Confirm by email';
+  String get chatPageNotifyPendingValue => 'Confirmed';
 
   @override
   String get chatPageNotifyOffValue => 'Off';

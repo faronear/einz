@@ -1292,6 +1292,12 @@ abstract class AppLocalizations {
   /// **'If you have new messages and haven\'t been online for a while, we\'ll email you here. Alert emails never contain message text.'**
   String get chatPageNotifyHint;
 
+  /// No description provided for @chatPageNotifyAllSpaces.
+  ///
+  /// In en, this message translates to:
+  /// **'This setting applies to all spaces on this device.'**
+  String get chatPageNotifyAllSpaces;
+
   /// No description provided for @chatPageNotifyEmailLabel.
   ///
   /// In en, this message translates to:
@@ -1319,7 +1325,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyPendingValue.
   ///
   /// In en, this message translates to:
-  /// **'Confirm by email'**
+  /// **'Confirmed'**
   String get chatPageNotifyPendingValue;
 
   /// No description provided for @chatPageNotifyOffValue.

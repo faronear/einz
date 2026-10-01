@@ -1761,6 +1761,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 把邮箱通知设置**扇出到本机所有空间**（老板 2026-10-01 定：通知按设备共享，
+  /// 不按空间各设各的）。逐空间走它自己的会话调 [action]（PUT/DELETE），
+  /// 全部 best-effort：某个空间会话过期/离线拉不到就跳过，不影响其它空间，
+  /// 也不打扰用户（与 _refreshNotifyEmail 同一条"装饰性功能不弹错"原则）。
+  ///
+  /// 服务端按**地址**聚合验证状态（notify_emails.verified_at），同一地址在别的
+  /// 空间已验证过时 PUT 直接返回 verified、不重发确认信——扇出因此是便宜的。
+  Future<void> _fanoutNotifyEmail(Future<void> Function(String token) action) async {
+    final vault = VaultSession.current;
+    final spaces = vault?.spaces ?? const <AppLockPayload>[];
+    if (spaces.length < 2) return;
+    for (final space in spaces) {
+      if (space.spaceId == widget.spaceId) continue; // 当前空间已由调用方处理
+      if ((space.token ?? '').isEmpty) continue;
+      try {
+        // 走各空间的会话（同 _refreshOtherUnread）：直接用 Vault 里的旧 token 会 401
+        await SpaceSessions.ofPayload(space, db: widget.db).call(action);
+      } catch (_) {
+        // 单个空间失败不阻塞其余空间
+      }
+    }
+  }
+
   /// 邮件通知设置（菜单项，2026-10-01）：填邮箱 → 服务端发一封确认信 → 点信里链接生效。
   ///
   /// **必须把"已填但没确认"这一档显示出来**：否则用户填完以为已经开了，其实一封也收不到。
@@ -1790,6 +1813,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             Text(
               l10n.chatPageNotifyHint,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(ctx).colorScheme.outline,
+              ),
+            ),
+            // 设置按设备共享（老板 2026-10-01）：说清楚，免得用户以为只管当前空间
+            Text(
+              l10n.chatPageNotifyAllSpaces,
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(ctx).colorScheme.outline,
@@ -1851,6 +1882,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           final api = widget.api ?? ApiClient(effectiveServer);
                           await _withAuth((t) => api.deleteNotifyEmail(t));
                           if (!mounted) return;
+                          unawaited(_fanoutNotifyEmail(
+                              (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
                           await _refreshNotifyEmail();
                           if (ctx.mounted) Navigator.of(ctx).pop(true);
                           if (mounted) showTopNotice(context, l10n.chatPageNotifyRemoved);
@@ -1897,6 +1930,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         final status =
                             await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
                         if (!mounted) return;
+                        unawaited(_fanoutNotifyEmail(
+                            (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
                         await _refreshNotifyEmail();
                         if (ctx.mounted) Navigator.of(ctx).pop(true);
                         if (mounted) {

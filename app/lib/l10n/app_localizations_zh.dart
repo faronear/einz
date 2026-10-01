@@ -649,6 +649,9 @@ class AppLocalizationsZh extends AppLocalizations {
       '你长时间不在线时，如果有新消息，我们会往这个邮箱发一封提醒。提醒邮件里不会有消息内容。';
 
   @override
+  String get chatPageNotifyAllSpaces => '保存后应用于本机所有秘境。';
+
+  @override
   String get chatPageNotifyEmailLabel => '邮箱';
 
   @override
