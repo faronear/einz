@@ -1865,7 +1865,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           busy.value = false;
                         }
                       },
-                child: Text(l10n.chatPageNotifyStop),
+                // busy 期间请求要好几秒才回，换旋转图标，同保存按钮（老板 2026-10-01）
+                child: isBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.4),
+                      )
+                    : Text(l10n.chatPageNotifyStop),
               ),
             ),
           ValueListenableBuilder<bool>(
