@@ -178,6 +178,9 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       last_sent_at    INTEGER,           -- 冷却判定用
       sent_day        TEXT,              -- 'YYYY-MM-DD'（UTC 日界）：日上限的计数字段
       sent_count      INTEGER NOT NULL DEFAULT 0,
+      -- 邮件正文语言（'zh' | 'en'）：服务端无从知道收件人读哪种语言，只能由客户端
+      -- （它知道自己的界面语言）在 PUT /notify/email 时顺手报上来。默认 zh。
+      lang            TEXT,
       created_at      INTEGER NOT NULL
     );
 
@@ -255,6 +258,12 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   // 迁移：space_members 补 email（邮件通知的目标地址；未设置是 NULL，不用空串）
   try {
     db.exec(`ALTER TABLE space_members ADD COLUMN email TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：notify_emails 补 lang（邮件正文语言；存量行 NULL → 按 zh 处理）
+  try {
+    db.exec(`ALTER TABLE notify_emails ADD COLUMN lang TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }

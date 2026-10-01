@@ -31,12 +31,14 @@
 - `[⏸]` **语音通话 Phase A**：`flutter_webrtc` 在 Xcode 26.3 + Codemagic 下的构建与真机打通
 - `[x]` 字段改名**执行**（2026-09-23，见 `renamePlan.zhcn.md`）
 - `[x]` **中文「设备」→「通道」清扫 + CLI `/device`→`/entrance`**（2026-09-23，见 `renamePlan.zhcn.md` §7）
-- `[ ]` **邮件通知（替代后台推送）——服务端已落地，App 入口待做**
-  server 侧 `[x]` 2026-10-01：`notify_emails`/`notify_tokens` 表 + `space_members.email`、
-  `notifier.ts`（派生式 tick + 四道闸门）、`mailer.ts`、`PUT|GET|DELETE /notify/email` +
-  `GET /notify/verify|unsubscribe`、`npm run mail:probe`、`server/test/notify.test.ts` 10 例全绿。
-  `[ ]` App 设置页（填邮箱 / 待验证 / 生效中状态）+ 英文版邮件正文
-  `[ ]` **上线前必验**：大陆服务器到 Oracle SMTP 的出站 `npm run mail:probe`（详见 worklog 2026-10-01）
+- `[x]` **邮件通知（替代后台推送）**——2026-10-01 全线完成
+  server `[x]`：`notify_emails`/`notify_tokens` 表 + `space_members.email`、`notifier.ts`
+  （派生式 tick + 四道闸门）、`mailer.ts`、`PUT|GET|DELETE /notify/email` +
+  `GET /notify/verify|unsubscribe`、`npm run mail:probe`、`server/test/notify.test.ts` 11 例全绿。
+  App `[x]`：菜单「邮件通知」（在「锁屏码」上面）+ 设置弹窗（填邮箱/停用/待确认提示）、
+  中英双版邮件正文（`lang` 由客户端上报）、ARB 键 15 个、`_FakeApi` 补 stub。
+  `[x]` 大陆服务器 → Oracle SMTP 出站：老板实测**通过**（不必换服务商）。
+  `[ ]` **真机自测**：填邮箱 → 收确认信 → 点链接 → 离线收一封摘要信（按老板惯例他自测）
 - `[ ]` **撤销的 App 入口**（通道列表「撤销这条通道」：口令 + 二次确认；`ApiClient.revokeEntrance` 已就绪）
 - `[ ]` **macOS 分发签名 + 公证**（2026-09-18 记）：Developer ID Application 证书 →
   `codesign --options runtime --timestamp` → `notarytool submit` + `stapler staple` →

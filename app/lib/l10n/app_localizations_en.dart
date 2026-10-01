@@ -674,6 +674,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePinSetValue => 'Set';
 
   @override
+  String get chatPageNotifyLabel => 'Email alerts';
+
+  @override
+  String get chatPageNotifyTitle => 'Email alerts';
+
+  @override
+  String get chatPageNotifyHint =>
+      'If you have new messages and haven\'t been online for a while, we\'ll email you here. Alert emails never contain message text.';
+
+  @override
+  String get chatPageNotifyEmailLabel => 'Email';
+
+  @override
+  String get chatPageNotifyEmptyError => 'Enter an email address first';
+
+  @override
+  String get chatPageNotifyInvalidError =>
+      'That doesn\'t look like an email address';
+
+  @override
+  String get chatPageNotifyOnValue => 'On';
+
+  @override
+  String get chatPageNotifyPendingValue => 'Confirm by email';
+
+  @override
+  String get chatPageNotifyOffValue => 'Off';
+
+  @override
+  String get chatPageNotifyStatePending =>
+      'A confirmation email is on its way — alerts start once you open the link in it.';
+
+  @override
+  String chatPageNotifySent(String email) {
+    return 'Confirmation sent to $email. Open the link in it to turn alerts on.';
+  }
+
+  @override
+  String chatPageNotifyDone(String email) {
+    return 'On. We\'ll email $email when you have new messages and haven\'t been online for a while.';
+  }
+
+  @override
+  String get chatPageNotifyRemoved => 'Email alerts turned off.';
+
+  @override
+  String get chatPageNotifyStop => 'Turn off';
+
+  @override
+  String chatPageNotifyFailed(String error) {
+    return 'Could not save: $error';
+  }
+
+  @override
   String get chatPageBurnHeading => 'Burn-after-read';
 
   @override

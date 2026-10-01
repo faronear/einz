@@ -86,6 +86,34 @@ class _FakeApi extends ApiClient {
   Future<void> updateEntranceName(String entranceName, String token) async {
     // 改通道名成功（无网络，供保存路径测试）
   }
+
+  /// 邮件通知（菜单项，2026-10-01）：内存里存一份状态，默认"没设置"。
+  /// 刻意在这里 stub 掉——不 stub 的话 widget 测试会真的去连 `http://fake`
+  /// （initState 里拉一次状态），白等几秒重试。
+  NotifyEmailStatus notifyEmailStatus = NotifyEmailStatus(state: 'none');
+  String? savedNotifyEmail;
+  String? savedNotifyLang;
+  bool notifyEmailDeleted = false;
+
+  @override
+  Future<NotifyEmailStatus> getNotifyEmail(String token) async => notifyEmailStatus;
+
+  @override
+  Future<NotifyEmailStatus> setNotifyEmail(
+    String email,
+    String token, {
+    String lang = 'zh',
+  }) async {
+    savedNotifyEmail = email;
+    savedNotifyLang = lang;
+    return notifyEmailStatus = NotifyEmailStatus(email: email, state: 'verified');
+  }
+
+  @override
+  Future<void> deleteNotifyEmail(String token) async {
+    notifyEmailDeleted = true;
+    notifyEmailStatus = NotifyEmailStatus(state: 'none');
+  }
 }
 
 // ── 修改口令：辅助（弹窗打开/输入/确认）──

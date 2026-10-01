@@ -201,8 +201,30 @@ test("邮件通知：③ 静默窗一到，20 条 ≠ 20 封：聚成一封摘�
     const plan: NotifyPlan = plans[0]!;
     assert.equal(plan.total, 3);
     assert.equal(plan.entries.length, 2, "两个发送者 → 两行摘要（不按消息条数铺开）");
-    const names = plan.entries.map((e) => e.senderName).sort();
-    assert.deepEqual(names, ["对方", "小张"], "没名字的那位退到「对方」");
+    // 没名字的那位在计划里是 null：退成「对方」还是“Someone”是**正文**的事（按语言）
+    assert.equal(plan.entries.filter((e) => e.senderName == null).length, 1);
+    assert.ok(plan.entries.some((e) => e.senderName === "小张"));
+  });
+});
+
+test("邮件通知：⑨ 正文按上报的语言走（英文版不掺中文，同样没有消息内容）", () => {
+  withDb(() => {
+    const now = seed();
+    getDb().prepare(`UPDATE notify_emails SET lang = 'en' WHERE email = ?`).run(EMAIL);
+    const plan = planNotifications(now)[0]!;
+    assert.equal(plan.lang, "en");
+    const mail = buildSummaryMail(
+      plan,
+      { baseUrl: "https://einz.yuanjinx.com" } as MailConfig,
+      "tok-abc",
+    );
+    assert.match(mail.subject, /You have 3 unread messages/);
+    // 没名字的那位按语言退成 "Someone"（中文版是「对方」）；有名字的照原名直出
+    assert.match(mail.text!, /Someone/);
+    assert.match(mail.text!, /Open Einz to read them/);
+    assert.match(mail.text!, /end-to-end encrypted/);
+    assert.match(mail.text!, /Stop these emails: https:\/\/einz\.yuanjinx\.com\/notify\/unsubscribe\?token=tok-abc/);
+    assert.doesNotMatch(mail.text!, /你在 Einz/, "英文版里不能残留中文套话");
   });
 });
 

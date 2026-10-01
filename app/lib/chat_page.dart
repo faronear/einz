@@ -289,6 +289,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 当前附件存储模式：'secured'=不留存明文（默认）/ 'stored'=明文留在本机、直接打开。
   late String _attachmentStorage;
   bool _hasPin = false; // 本机是否已设置启动锁（菜单项「PIN: 已设置/未设置」）
+  /// 邮件通知状态（菜单项右侧值 + 弹窗内容）。null = 还没拉到/离线拉不到→菜单只显示标签，
+  /// 不猜状态（猜错比不显示更糟：他会以为已经开了）。
+  NotifyEmailStatus? _notifyEmail;
   WsRealtimeService? _ws; // WS 实时（收到 message.new 立即刷新；断线自动重连）
   VoiceCallService? _voiceCall; // 语音通话（前台通话；信令走 WS，PROTOCOL.md §8.4）
   late String _myMemberName; // 我的名字（菜单显示；改名后 setState 刷新）
@@ -633,6 +636,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _inputFocusNode.addListener(_onInputFocusChanged);
     _loadBurnLabel();
     _refreshPinStatus();
+    _refreshNotifyEmail(); // 菜单项「邮件通知」的当前值（拉不到就保持 null，不显示）
     // 首帧同步取值（同进程内延续上次选择，避免首帧 LateInitializationError），
     // 随后用持久化值校正（_loadUiStyle 异步）
     _uiStyle = uiStyleNotifier.value;
@@ -1706,6 +1710,191 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final has = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
     if (!mounted || has == _hasPin) return;
     setState(() => _hasPin = has);
+  }
+
+  /// 「邮件通知」菜单项右侧的当前值（没设置/没拉到 → null，不显示）。
+  Widget? _notifyMenuValue(AppLocalizations l10n, TextStyle valueStyle) {
+    final status = _notifyEmail;
+    if (status == null || status.isNone) return null;
+    if (status.isVerified) return _menuValue(l10n.chatPageNotifyOnValue, valueStyle);
+    if (status.isPending) return _menuValue(l10n.chatPageNotifyPendingValue, valueStyle);
+    return _menuValue(l10n.chatPageNotifyOffValue, valueStyle); // inactive（已退订/硬退信）
+  }
+
+  /// 拉取邮件通知状态（GET /notify/email）。best-effort：拉不到就保持原值/null——
+  /// 它是菜单上一个装饰性的当前值，不值得为它弹任何错误（老板 2026-09 定的
+  /// "可观测性放代码里，不放 UI"）。
+  Future<void> _refreshNotifyEmail() async {
+    if (!mounted || _session.token.isEmpty || effectiveServer.isEmpty) return;
+    try {
+      final api = widget.api ?? ApiClient(effectiveServer);
+      final status = await _withAuth((t) => api.getNotifyEmail(t));
+      if (!mounted) return;
+      setState(() => _notifyEmail = status);
+    } catch (_) {
+      // 离线/服务端未启用：保持未知
+    }
+  }
+
+  /// 邮件通知设置（菜单项，2026-10-01）：填邮箱 → 服务端发一封确认信 → 点信里链接生效。
+  ///
+  /// **必须把"已填但没确认"这一档显示出来**：否则用户填完以为已经开了，其实一封也收不到。
+  /// 已设置时额外给一个「停用」（DELETE），不给"改地址"以外的第二入口（改地址＝重填再保存）。
+  Future<void> _showNotifyDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final before = _notifyEmail;
+    final ctrl = TextEditingController(text: before?.email ?? '');
+    // 红字警示（空/格式不对/后台失败）与提交中标记，都只在弹窗内有效
+    final error = ValueNotifier<String?>(null);
+    final busy = ValueNotifier<bool>(false);
+    // 正文语言：服务端不知道收件人读哪种语言，按本机界面语言上报（zh / 其它一律 en）
+    final lang = Localizations.localeOf(context).languageCode == 'zh' ? 'zh' : 'en';
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Center(child: Text(l10n.chatPageNotifyTitle)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.chatPageNotifyHint,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(ctx).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: l10n.chatPageNotifyEmailLabel,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (_) {
+                if (error.value != null) error.value = null;
+              },
+            ),
+            // 已填但还没点链接：这一档不点明，用户会以为已经生效
+            if (before?.isPending ?? false) ...[
+              const SizedBox(height: 10),
+              Text(
+                l10n.chatPageNotifyStatePending,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.outline,
+                ),
+              ),
+            ],
+            ValueListenableBuilder<String?>(
+              valueListenable: error,
+              builder: (_, err, _) => err == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        err,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          // 停用（已设置时才出现）：撤掉本空间的邮箱，不再发信
+          if (!(before?.isNone ?? true))
+            ValueListenableBuilder<bool>(
+              valueListenable: busy,
+              builder: (_, isBusy, _) => TextButton(
+                onPressed: isBusy
+                    ? null
+                    : () async {
+                        busy.value = true;
+                        try {
+                          final api = widget.api ?? ApiClient(effectiveServer);
+                          await _withAuth((t) => api.deleteNotifyEmail(t));
+                          if (!mounted) return;
+                          await _refreshNotifyEmail();
+                          if (ctx.mounted) Navigator.of(ctx).pop(true);
+                          if (mounted) showTopNotice(context, l10n.chatPageNotifyRemoved);
+                        } on ApiException catch (e) {
+                          if (ctx.mounted) {
+                            error.value =
+                                backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                        } finally {
+                          busy.value = false;
+                        }
+                      },
+                child: Text(l10n.chatPageNotifyStop),
+              ),
+            ),
+          ValueListenableBuilder<bool>(
+            valueListenable: busy,
+            builder: (_, isBusy, _) => FilledButton(
+              onPressed: isBusy
+                  ? null
+                  : () async {
+                      final email = ctrl.text.trim();
+                      if (email.isEmpty) {
+                        error.value = l10n.chatPageNotifyEmptyError;
+                        return;
+                      }
+                      // 本机先粗筛（服务端另有 400 兜底）：只卡"有 @ 且两段都非空、不含空格"
+                      if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                        error.value = l10n.chatPageNotifyInvalidError;
+                        return;
+                      }
+                      busy.value = true;
+                      try {
+                        final api = widget.api ?? ApiClient(effectiveServer);
+                        final status =
+                            await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
+                        if (!mounted) return;
+                        await _refreshNotifyEmail();
+                        if (ctx.mounted) Navigator.of(ctx).pop(true);
+                        if (mounted) {
+                          showTopNotice(
+                            context,
+                            status.isVerified
+                                ? l10n.chatPageNotifyDone(email)
+                                : l10n.chatPageNotifySent(email),
+                          );
+                        }
+                      } on ApiException catch (e) {
+                        if (ctx.mounted) {
+                          error.value =
+                              backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                      } finally {
+                        busy.value = false;
+                      }
+                    },
+              child: Text(l10n.save),
+            ),
+          ),
+        ],
+      ),
+    );
+    // 对话框 route 关闭动画完成后才 dispose（与改名弹窗同款：立刻 dispose 会触发
+    // TextField 卸载后向已销毁 controller 加 listener 的红屏断言）
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      ctrl.dispose();
+      error.dispose();
+      busy.dispose();
+    });
+    if (saved == true && mounted) await _refreshNotifyEmail();
   }
 
   /// 修改口令（escrow 托管口令，空间级）：旧口令验证 → 新口令重加密上传
@@ -5242,6 +5431,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showBurnPicker);
                 case 'advanced':
                   _menuAction(_showAdvancedSheet);
+                case 'notify':
+                  _menuAction(_showNotifyDialog);
                 case 'pin':
                   _menuAction(_showSetLockDialog);
                 case 'about':
@@ -5277,6 +5468,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   fontSize: 14,
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w500);
+              // 「邮件通知」右侧值：没拉到（null）或没设置（none）时**不显示**——
+              // 与「锁屏码」同款处理（老板 2026-09-15），静默比瞎显示"未设置"好
+              final notifyValue = _notifyMenuValue(l10n, valueStyle);
               return [
                 // 菜单分组（老板 2026-09-24 定；2026-09-25 删「生成开通码」项，
                 // 改由「通道列表」弹层里的「新建通道」按钮承担）：
@@ -5303,6 +5497,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(l10n.chatPageMenuStyleLabel, style: captionStyle),
                       const Spacer(),
                       _menuValue(_uiStyleLabel(_uiStyle, l10n), valueStyle),
+                    ],
+                  ),
+                ),
+                // 邮件通知（2026-10-01）：没进应用商店 → 没有后台推送，用邮件把离线的
+                // 人拉回来。位置在「锁屏码」**上面**（老板 2026-10-01 定），仍属分组①
+                // （外观与锁）。
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
+                  height: kMenuRowHeight,
+                  value: 'notify',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageNotifyLabel, style: captionStyle),
+                      const Spacer(),
+                      ?notifyValue,
                     ],
                   ),
                 ),

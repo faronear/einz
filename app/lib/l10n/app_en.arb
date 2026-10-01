@@ -310,6 +310,42 @@
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
   "chatPagePinSetValue": "Set",
+  "chatPageNotifyLabel": "Email alerts",
+  "chatPageNotifyTitle": "Email alerts",
+  "chatPageNotifyHint": "If you have new messages and haven't been online for a while, we'll email you here. Alert emails never contain message text.",
+  "chatPageNotifyEmailLabel": "Email",
+  "chatPageNotifyEmptyError": "Enter an email address first",
+  "chatPageNotifyInvalidError": "That doesn't look like an email address",
+  "chatPageNotifyOnValue": "On",
+  "chatPageNotifyPendingValue": "Confirm by email",
+  "chatPageNotifyOffValue": "Off",
+  "chatPageNotifyStatePending": "A confirmation email is on its way — alerts start once you open the link in it.",
+  "chatPageNotifySent": "Confirmation sent to {email}. Open the link in it to turn alerts on.",
+  "@chatPageNotifySent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageNotifyDone": "On. We'll email {email} when you have new messages and haven't been online for a while.",
+  "@chatPageNotifyDone": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageNotifyRemoved": "Email alerts turned off.",
+  "chatPageNotifyStop": "Turn off",
+  "chatPageNotifyFailed": "Could not save: {error}",
+  "@chatPageNotifyFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "@chatPageLocaleSwitched": {
     "placeholders": {
       "label": {

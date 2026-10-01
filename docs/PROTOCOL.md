@@ -405,7 +405,7 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 ```json
 // PUT /notify/email（设置 + 发出确认信）
-{ "email": "luk@example.com" }
+{ "email": "luk@example.com", "lang": "zh" | "en" }
 // 响应 200
 { "email": "luk@example.com", "state": "verified" | "pending", "verification_sent": true }
 
@@ -421,6 +421,9 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
   `inactive` 已退订或曾硬退信。只有 `verified` 才可能收到提醒。
 - **必须先点确认链接**：持有会话的任意成员都能往任意地址发起登记，少了这一道就成了
   骚扰通道。同一地址在别的空间已验证过 → 这次直接生效，不麻烦人点第二次。
+- `lang` 决定**邮件正文语言**（`zh`/`en`，缺省按 `zh`）。服务端无从知道收件人读哪种
+  语言，只有客户端知道自己的界面语言，所以由它在 PUT 时顺手上报；同一地址后一次
+  设置会刷新它（换界面语言后重填一次即可）。
 - 邮箱挂在 `space_members.email`（member 级），但**发信按地址聚合**：同一个地址在多个
   空间有未读 → 合并成**一封**摘要信。member_id 是按空间生成的，服务端没有跨空间的
   "人"，而去重本来就该发生在收件箱那一层。

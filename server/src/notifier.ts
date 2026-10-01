@@ -71,7 +71,8 @@ export function notifyParams(): NotifyParams {
 export interface NotifyEntry {
   spaceId: string;
   senderMemberId: string;
-  senderName: string;
+  /** 发送者显示名；没名字是 null（正文里按语言退成「对方」/「Someone」）。 */
+  senderName: string | null;
   count: number;
   lastAt: number;
 }
@@ -85,6 +86,13 @@ export interface NotifyPlan {
   total: number;
   /** entries 里最新一条的时刻（=这封信的时点）。 */
   newestAt: number;
+  lang: MailLang;
+}
+
+/** 邮件正文语言。库里是 NULL（存量行）或别的值时一律按 zh，别让脏数据把正文变成空白。 */
+export type MailLang = "zh" | "en";
+export function mailLang(raw: string | null | undefined): MailLang {
+  return raw === "en" ? "en" : "zh";
 }
 
 // ── 邮箱地址的处理 ─────────────────────────────────────────────────────────
@@ -119,7 +127,7 @@ export function planNotifications(now = Date.now()): NotifyPlan[] {
   const emails = db
     .prepare(
       `SELECT email, verified_at, unsubscribe_at, hard_bounce_at, pause_until,
-              last_sent_at, sent_day, sent_count
+              last_sent_at, sent_day, sent_count, lang
          FROM notify_emails`
     )
     .all() as {
@@ -131,6 +139,7 @@ export function planNotifications(now = Date.now()): NotifyPlan[] {
     last_sent_at: number | null;
     sent_day: string | null;
     sent_count: number;
+    lang: string | null;
   }[];
 
   const plans: NotifyPlan[] = [];
@@ -169,6 +178,7 @@ export function planNotifications(now = Date.now()): NotifyPlan[] {
       entries,
       total: entries.reduce((s, e) => s + e.count, 0),
       newestAt: Math.max(...entries.map((e) => e.lastAt)),
+      lang: mailLang(row.lang),
     });
   }
   return plans;
@@ -244,13 +254,16 @@ function cleanName(raw: string | null): string | null {
   return s.length > 0 ? s : null;
 }
 
-/** 发送者显示名；没有名字的行退到「对方」——绝不把 member_id 这种内部锚点写进邮件。 */
-function displayNameOf(spaceId: string, memberId: string): string {
-  if (memberId.length === 0) return "对方";
+/**
+ * 发送者显示名；没有名字的行是 null——绝不把 member_id 这种内部锚点写进邮件。
+ * 退到「对方」/「Someone」是**正文**的事（见 SUMMARY_COPY，按语言退）。
+ */
+function displayNameOf(spaceId: string, memberId: string): string | null {
+  if (memberId.length === 0) return null;
   const row = getDb()
     .prepare(`SELECT display_name FROM space_members WHERE space_id = ? AND member_id = ?`)
     .get(spaceId, memberId) as { display_name: string | null } | undefined;
-  return cleanName(row?.display_name ?? null) ?? "对方";
+  return cleanName(row?.display_name ?? null);
 }
 
 // ── 发送 ───────────────────────────────────────────────────────────────────
@@ -395,64 +408,152 @@ export function maskEmail(email: string): string {
 // ── 邮件正文 ───────────────────────────────────────────────────────────────
 
 /**
- * 摘要信正文。**刻意不含任何消息内容**——服务端只有密文，而且邮件会在对方邮箱里
- * 明文躺好几年，正文泄露等于把整条加密链路短路掉。
+ * 中英两套文案。语言由客户端在设置邮箱时上报（服务端无法知道收件人读哪种语言）。
+ *
+ * 两条写作约定：
+ * - **正文里绝不含消息内容**——服务端只有密文，而且邮件会在对方邮箱里明文躺好几年，
+ *   正文泄露等于把整条加密链路短路掉。所以每封信都只能回答"谁、几条、几点"。
+ * - 英文一律**句首大写，不做 Title Case**（老板 2026-09 定的全站文案规则，邮件同样适用）；
+ *   品牌名 Einz 照原样。
  */
-export function buildSummaryMail(plan: NotifyPlan, cfg: MailConfig, unsubscribeToken: string): OutgoingMail {
+interface SummaryCopy {
+  subject(total: number): string;
+  greeting(name: string | null): string | null;
+  count(total: number): string;
+  /** 一行摘要：发送者 + 条数 + 时刻。 */
+  entry(name: string, count: number, stamp: string): string;
+  openApp(): string;
+  noContent(): string;
+  stop(url: string): string;
+  unnamed(): string;
+}
+
+const SUMMARY_COPY: Record<MailLang, SummaryCopy> = {
+  zh: {
+    subject: (total) => `[Einz] 你有 ${total} 条未读消息`,
+    greeting: (name) => (name == null ? null : `${name}：`),
+    count: (total) => `你在 Einz 有 ${total} 条未读消息：`,
+    entry: (name, count, stamp) => `  ${name}    ${count} 条    ${stamp}`,
+    openApp: () => "打开 Einz 就能看到。",
+    noContent: () => "消息是端到端加密的，这封邮件里没有正文，以后也不会有。",
+    stop: (url) => `不想再收到这类提醒：${url}`,
+    unnamed: () => "对方",
+  },
+  en: {
+    subject: (total) => `[Einz] You have ${total} unread ${total === 1 ? "message" : "messages"}`,
+    greeting: (name) => (name == null ? null : `${name},`),
+    count: (total) =>
+      `You have ${total} unread ${total === 1 ? "message" : "messages"} in Einz:`,
+    entry: (name, count, stamp) =>
+      `  ${name}    ${count} ${count === 1 ? "message" : "messages"}    ${stamp}`,
+    openApp: () => "Open Einz to read them.",
+    noContent: () =>
+      "Messages are end-to-end encrypted — this email has no message text in it, and never will.",
+    stop: (url) => `Stop these emails: ${url}`,
+    unnamed: () => "Someone",
+  },
+};
+
+/** 摘要信（"有人在找你"）。 */
+export function buildSummaryMail(
+  plan: NotifyPlan,
+  cfg: MailConfig,
+  unsubscribeToken: string
+): OutgoingMail {
+  const copy = SUMMARY_COPY[plan.lang];
   const unsubscribeUrl = `${cfg.baseUrl}/notify/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`;
-  const lines = plan.entries.map((e) => `  ${e.senderName}    ${e.count} 条    ${formatStamp(e.lastAt)}`);
+  const lines = plan.entries.map((e) =>
+    copy.entry(e.senderName ?? copy.unnamed(), e.count, formatStamp(e.lastAt))
+  );
 
   const text = [
-    plan.displayName == null ? null : `${plan.displayName}：`,
+    copy.greeting(plan.displayName),
     null,
-    `你在 Einz 有 ${plan.total} 条未读消息：`,
+    copy.count(plan.total),
     null,
     ...lines,
     null,
-    "打开 Einz 就能看到。",
+    copy.openApp(),
     null,
-    "消息是端到端加密的，这封邮件里没有正文，以后也不会有。",
+    copy.noContent(),
     null,
     "——",
-    `不想再收到这类提醒：${unsubscribeUrl}`,
+    copy.stop(unsubscribeUrl),
   ]
     .filter((l) => l !== null)
     .join("\n");
 
   return {
     to: plan.email,
-    subject: `[Einz] 你有 ${plan.total} 条未读消息`,
+    subject: copy.subject(plan.total),
     text,
     unsubscribeUrl,
   };
 }
+
+interface VerifyCopy {
+  subject(): string;
+  greeting(name: string | null): string | null;
+  why(): string;
+  confirm(url: string): string;
+  notYou(): string;
+  noContent(): string;
+  stop(url: string): string;
+}
+
+const VERIFY_COPY: Record<MailLang, VerifyCopy> = {
+  zh: {
+    subject: () => "[Einz] 确认这个邮箱接收消息提醒",
+    greeting: (name) => (name == null ? null : `${name}：`),
+    why: () =>
+      "这个邮箱被填成了 Einz 的消息提醒地址——你在 Einz 有新消息时，我们会往这里发一封提醒。",
+    confirm: (url) => `确认要接收请点这个链接：${url}`,
+    notYou: () => "如果不是你填的，忽略这封邮件就好——不点链接就什么都不会发生。",
+    noContent: () => "提醒邮件里不会有消息正文：消息是端到端加密的，服务端只保管密文。",
+    stop: (url) => `不接收提醒：${url}`,
+  },
+  en: {
+    subject: () => "[Einz] Confirm this email for message alerts",
+    greeting: (name) => (name == null ? null : `${name},`),
+    why: () =>
+      "This address was set to receive Einz message alerts — we'll email here when you have new messages and haven't been online for a while.",
+    confirm: (url) => `Confirm it's yours: ${url}`,
+    notYou: () =>
+      "If it wasn't you, just ignore this email — nothing happens until the link is opened.",
+    noContent: () =>
+      "Alert emails never contain message text: messages are end-to-end encrypted and the server only stores ciphertext.",
+    stop: (url) => `No alerts: ${url}`,
+  },
+};
 
 /** 验证信：把地址填进来的人不一定是地址的主人，所以必须过这一道（防滥用 + 防手滑）。 */
 export function buildVerificationMail(
   email: string,
   verifyUrl: string,
   unsubscribeUrl: string | null,
-  displayName: string | null
+  displayName: string | null,
+  lang: MailLang
 ): OutgoingMail {
+  const copy = VERIFY_COPY[lang];
   const text = [
-    displayName == null ? null : `${displayName}：`,
+    copy.greeting(displayName),
     null,
-    "这个邮箱被填成了 Einz 的消息提醒地址——你在 Einz 有新消息时，我们会往这里发一封提醒。",
+    copy.why(),
     null,
-    `确认要接收请点这个链接：${verifyUrl}`,
+    copy.confirm(verifyUrl),
     null,
-    "如果不是你填的，忽略这封邮件就好——不点链接就什么都不会发生。",
+    copy.notYou(),
     null,
     "——",
-    "提醒邮件里不会有消息正文：消息是端到端加密的，服务端只保管密文。",
-    unsubscribeUrl == null ? null : `不接收提醒：${unsubscribeUrl}`,
+    copy.noContent(),
+    unsubscribeUrl == null ? null : copy.stop(unsubscribeUrl),
   ]
     .filter((l) => l !== null)
     .join("\n");
 
   return {
     to: email,
-    subject: "[Einz] 确认这个邮箱接收消息提醒",
+    subject: copy.subject(),
     text,
     ...(unsubscribeUrl ? { unsubscribeUrl } : {}),
   };
@@ -501,7 +602,7 @@ export interface NotifyEmailStatus {
 export async function setNotifyEmail(
   token: string,
   rawEmail: string,
-  opts: { mailer?: Mailer | null } = {}
+  opts: { mailer?: Mailer | null; lang?: string | null } = {}
 ): Promise<NotifyEmailStatus> {
   const { entrance_id, space_id, member_id } = requireSession(token);
   const email = normalizeEmail(rawEmail);
@@ -509,20 +610,25 @@ export async function setNotifyEmail(
 
   const db = getDb();
   const now = Date.now();
+  const lang = mailLang(opts.lang);
   const existing = db.prepare(`SELECT * FROM notify_emails WHERE email = ?`).get(email) as
     | { email: string; verified_at: number | null; unsubscribe_at: number | null; hard_bounce_at: number | null }
     | undefined;
 
   if (existing == null) {
-    db.prepare(`INSERT INTO notify_emails (email, created_at) VALUES (?, ?)`).run(email, now);
+    db.prepare(`INSERT INTO notify_emails (email, lang, created_at) VALUES (?, ?, ?)`).run(
+      email,
+      lang,
+      now
+    );
   } else {
-    // 重新登记 = 明确的"我还要收"：清掉退订与退信停发。它是本人主动动作（持有会话），
-    // 不清的话换过邮箱的人永远救不回来。
-    if (existing.unsubscribe_at != null || existing.hard_bounce_at != null) {
-      db.prepare(
-        `UPDATE notify_emails SET unsubscribe_at = NULL, hard_bounce_at = NULL, pause_until = NULL WHERE email = ?`
-      ).run(email);
-    }
+    // 重新登记 = 明确的"我还要收"：清掉退订与退信停发、并按本次上报刷新正文语言。
+    // 它是本人主动动作（持有会话），不清的话换过邮箱的人永远救不回来。
+    db.prepare(
+      `UPDATE notify_emails
+          SET unsubscribe_at = NULL, hard_bounce_at = NULL, pause_until = NULL, lang = ?
+        WHERE email = ?`
+    ).run(lang, email);
   }
 
   const row = db.prepare(`SELECT verified_at FROM notify_emails WHERE email = ?`).get(email) as {
@@ -554,7 +660,8 @@ export async function setNotifyEmail(
       email,
       `${mailer.config.baseUrl}/notify/verify?token=${encodeURIComponent(verifyToken)}`,
       `${mailer.config.baseUrl}/notify/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`,
-      own
+      own,
+      lang
     )
   );
   return { email, state: "pending", verification_sent: true };

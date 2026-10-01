@@ -244,6 +244,42 @@ class ApiClient {
     await _post('/members/name', {'member_name': memberName}, token: token);
   }
 
+  /// 邮件通知状态（GET /notify/email，PROTOCOL.md §7.5）。
+  ///
+  /// 服务端未配 SMTP 时本端点仍可查（只是设置会 503），所以失败按调用方自己的
+  /// 需要决定是否提示。
+  Future<NotifyEmailStatus> getNotifyEmail(String token) async {
+    final res = await _get(Api.notifyEmail, token: token);
+    return NotifyEmailStatus.fromJson(res);
+  }
+
+  /// 设置提醒邮箱（PUT /notify/email）并让服务端发一封确认信。
+  ///
+  /// 返回的 [NotifyEmailStatus.state] 是设置**之后**的真实状态：`pending` = 已发出
+  /// 确认信、还没点链接（此时不会收到提醒）；`verified` = 生效中（同一地址在别的
+  /// 空间已验证过时会直接落到这一档，不再麻烦人点第二次）。
+  /// [lang] = 提醒邮件的正文语言（`zh`/`en`）：服务端不知道收件人读哪种语言，
+  /// 只有客户端知道自己的界面语言，顺手报给它。
+  /// 失败码：服务端未启用邮件通知 → 503 `MAIL_DISABLED`。
+  Future<NotifyEmailStatus> setNotifyEmail(
+    String email,
+    String token, {
+    String lang = 'zh',
+  }) async {
+    final res = await _put(
+      Api.notifyEmail,
+      {'email': email, 'lang': lang},
+      token: token,
+    );
+    return NotifyEmailStatus.fromJson(res);
+  }
+
+  /// 撤掉本空间的提醒邮箱（DELETE /notify/email）：地址若已无人使用，服务端会把
+  /// 它连同退订 token 一起物理删除。
+  Future<void> deleteNotifyEmail(String token) async {
+    await _delete(Api.notifyEmail, token: token);
+  }
+
   /// 撤销**本空间内**的另一条通道（POST /entrances/:id/revoke，PROTOCOL.md §7.2）。
   ///
   /// 授权（2026-09-16）：同 space 内可互撤，但**每次都要校验共享口令**——撤销会让  /// 对方客户端自毁本地数据，属不可逆操作。失败码：口令错 401 `ESCROW_VERIFY_FAILED`、
@@ -429,10 +465,22 @@ class ApiClient {
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body,
       {String? token, bool withToken = true}) {
+    return _send('POST', path, body, token: token, withToken: withToken);
+  }
+
+  /// PUT（目前只有 `PUT /notify/email` 用它：设置是幂等的整体替换，不是"创建一个新资源"，
+  /// 语义上就该是 PUT 而不是 POST——为此给 `_openRequest` 加了 PUT 分支）。
+  Future<Map<String, dynamic>> _put(String path, Map<String, dynamic> body,
+      {String? token, bool withToken = true}) {
+    return _send('PUT', path, body, token: token, withToken: withToken);
+  }
+
+  Future<Map<String, dynamic>> _send(String method, String path, Map<String, dynamic> body,
+      {String? token, bool withToken = true}) {
     return _withRetry(() async {
       final client = _client;
       try {
-        final req = await _openRequest('POST', '$baseUrl$path');
+        final req = await _openRequest(method, '$baseUrl$path');
         req.headers.contentType = ContentType.json;
         if (withToken && token != null) {
           req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
@@ -479,6 +527,8 @@ class ApiClient {
     switch (method) {
       case 'POST':
         req = await _client.postUrl(Uri.parse(url));
+      case 'PUT':
+        req = await _client.putUrl(Uri.parse(url));
       case 'GET':
         req = await _client.getUrl(Uri.parse(url));
       case 'DELETE':

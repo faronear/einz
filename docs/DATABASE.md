@@ -185,6 +185,7 @@ CREATE TABLE notify_emails (
     last_sent_at   INTEGER,            -- 冷却判定
     sent_day       TEXT,               -- 'YYYY-MM-DD'（UTC 日界）：日上限计数
     sent_count     INTEGER NOT NULL DEFAULT 0,
+    lang           TEXT,               -- 邮件正文语言 'zh' | 'en'（客户端上报，缺省 zh）
     created_at     INTEGER NOT NULL
 );
 

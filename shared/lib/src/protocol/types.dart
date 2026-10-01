@@ -39,6 +39,9 @@ class Api {
   static const installUid = '/entrances/install-uid';
   // 未读条数（多空间列表角标）：服务端派生——消息 + 我上报的读取水位（receipts）。
   static const messagesUnread = '/messages/unread';
+  // 邮件通知（PROTOCOL.md §7.5）：没进应用商店 → 没有后台推送，给离线的对方发一封
+  // 摘要信把他拉回来。PUT 设置（并发确认信）／GET 查状态／DELETE 撤掉。
+  static const notifyEmail = '/notify/email';
 }
 
 /// 认证挑战结果。
@@ -69,6 +72,42 @@ class SessionResult {
         spaceId: json['space_id'] as String,
         expiresIn: json['expires_in'] as int,
       );
+}
+
+/// 邮件通知状态（`GET` / `PUT` /notify/email，PROTOCOL.md §7.5）。
+///
+/// [state] 是服务端的四种状态之一：
+/// - `none`：没设置过；
+/// - `pending`：已发出确认信，等收件人点链接（**此时还不会收到任何提醒**）；
+/// - `verified`：生效中；
+/// - `inactive`：已退订或曾硬退信。
+///
+/// 提醒邮件的正文语言由 [lang] 决定（`zh` / `en`，PUT 时随邮箱一起上报）——
+/// 服务端无从知道收件人读哪种语言，只能由客户端（知道界面语言）顺手告诉它。
+class NotifyEmailStatus {
+  NotifyEmailStatus({
+    this.email,
+    required this.state,
+    this.verificationSent = false,
+  });
+
+  /// 已设置的提醒邮箱（`none` 时为 null）。
+  final String? email;
+  final String state;
+  /// 本次 PUT 是否真的投出了确认信（老地址已验证过时不需要重发）。
+  final bool verificationSent;
+
+  factory NotifyEmailStatus.fromJson(Map<String, dynamic> json) => NotifyEmailStatus(
+        email: json['email'] as String?,
+        state: (json['state'] as String?) ?? 'none',
+        verificationSent: (json['verification_sent'] as bool?) ?? false,
+      );
+
+  bool get isNone => state == 'none';
+  /// 已点过确认链接、真的会收到提醒。
+  bool get isVerified => state == 'verified';
+  /// 填了但还没确认（Pending）——这一档必须让用户看见，否则他会以为已经开了。
+  bool get isPending => state == 'pending';
 }
 
 /// 通道绑定结果（v2）：`POST /spaces` 与 `POST /spaces/join` 都直接返回这三个 id，

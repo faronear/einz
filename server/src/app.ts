@@ -627,7 +627,13 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'PUT' && path === '/notify/email') {
     limitByIp(req, 'auth')
     const b = (await readJsonBody(req) ?? {}) as Record<string, unknown>
-    sendJson(res, 200, await setNotifyEmail(bearerToken(req), String(b.email ?? '')))
+    // lang：提醒邮件的正文语言（zh/en），客户端按自己的界面语言上报——服务端
+    // 无从知道收件人读哪种语言。缺/非法值一律按 zh 处理（notifier.mailLang）。
+    sendJson(res, 200, await setNotifyEmail(
+      bearerToken(req),
+      String(b.email ?? ''),
+      { lang: typeof b.lang === 'string' ? b.lang : null }
+    ))
     return
   }
   if (method === 'GET' && path === '/notify/email') {

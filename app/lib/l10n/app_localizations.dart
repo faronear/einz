@@ -1274,6 +1274,96 @@ abstract class AppLocalizations {
   /// **'Set'**
   String get chatPagePinSetValue;
 
+  /// No description provided for @chatPageNotifyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email alerts'**
+  String get chatPageNotifyLabel;
+
+  /// No description provided for @chatPageNotifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Email alerts'**
+  String get chatPageNotifyTitle;
+
+  /// No description provided for @chatPageNotifyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If you have new messages and haven\'t been online for a while, we\'ll email you here. Alert emails never contain message text.'**
+  String get chatPageNotifyHint;
+
+  /// No description provided for @chatPageNotifyEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get chatPageNotifyEmailLabel;
+
+  /// No description provided for @chatPageNotifyEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an email address first'**
+  String get chatPageNotifyEmptyError;
+
+  /// No description provided for @chatPageNotifyInvalidError.
+  ///
+  /// In en, this message translates to:
+  /// **'That doesn\'t look like an email address'**
+  String get chatPageNotifyInvalidError;
+
+  /// No description provided for @chatPageNotifyOnValue.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get chatPageNotifyOnValue;
+
+  /// No description provided for @chatPageNotifyPendingValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm by email'**
+  String get chatPageNotifyPendingValue;
+
+  /// No description provided for @chatPageNotifyOffValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get chatPageNotifyOffValue;
+
+  /// No description provided for @chatPageNotifyStatePending.
+  ///
+  /// In en, this message translates to:
+  /// **'A confirmation email is on its way — alerts start once you open the link in it.'**
+  String get chatPageNotifyStatePending;
+
+  /// No description provided for @chatPageNotifySent.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation sent to {email}. Open the link in it to turn alerts on.'**
+  String chatPageNotifySent(String email);
+
+  /// No description provided for @chatPageNotifyDone.
+  ///
+  /// In en, this message translates to:
+  /// **'On. We\'ll email {email} when you have new messages and haven\'t been online for a while.'**
+  String chatPageNotifyDone(String email);
+
+  /// No description provided for @chatPageNotifyRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Email alerts turned off.'**
+  String get chatPageNotifyRemoved;
+
+  /// No description provided for @chatPageNotifyStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off'**
+  String get chatPageNotifyStop;
+
+  /// No description provided for @chatPageNotifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save: {error}'**
+  String chatPageNotifyFailed(String error);
+
   /// No description provided for @chatPageBurnHeading.
   ///
   /// In en, this message translates to:

@@ -639,6 +639,58 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinSetValue => '已设置';
 
   @override
+  String get chatPageNotifyLabel => '邮件通知';
+
+  @override
+  String get chatPageNotifyTitle => '邮件通知';
+
+  @override
+  String get chatPageNotifyHint =>
+      '你长时间不在线时，如果有新消息，我们会往这个邮箱发一封提醒。提醒邮件里不会有消息内容。';
+
+  @override
+  String get chatPageNotifyEmailLabel => '邮箱';
+
+  @override
+  String get chatPageNotifyEmptyError => '先填一个邮箱地址';
+
+  @override
+  String get chatPageNotifyInvalidError => '邮箱地址格式不对';
+
+  @override
+  String get chatPageNotifyOnValue => '已开启';
+
+  @override
+  String get chatPageNotifyPendingValue => '待确认';
+
+  @override
+  String get chatPageNotifyOffValue => '已关闭';
+
+  @override
+  String get chatPageNotifyStatePending => '已经发了一封确认邮件，点邮件里的链接才会生效。';
+
+  @override
+  String chatPageNotifySent(String email) {
+    return '确认邮件已发往 $email，点邮件里的链接就生效了。';
+  }
+
+  @override
+  String chatPageNotifyDone(String email) {
+    return '已开启：有新消息又长时间不在线时，会往 $email 发提醒。';
+  }
+
+  @override
+  String get chatPageNotifyRemoved => '已停止邮件提醒。';
+
+  @override
+  String get chatPageNotifyStop => '停用';
+
+  @override
+  String chatPageNotifyFailed(String error) {
+    return '设置失败：$error';
+  }
+
+  @override
   String get chatPageBurnHeading => '阅后即焚';
 
   @override
