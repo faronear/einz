@@ -1,23 +1,28 @@
 # Einz Server 镜像（multi-stage）
 # 注意：better-sqlite3 为原生模块，用 Debian (slim) 基座以复用官方预编译二进制，避免 Alpine 编译问题。
 #
-# ── 构建期网络（2026-10-01 实测补上）────────────────────────────────────────────
-# 国内构建机上 `npm ci` 会以这种姿势失败（老板实测，构建耗时 152s 后挂掉）：
-#   1) better-sqlite3 的 prebuild 要从 GitHub Releases 下（node-gyp 之前的那一步）→ 超时；
-#   2) 于是回退源码编译，node-gyp 又要去 nodejs.org 下 Node 头文件 → 又超时。
-# 下面三个镜像变量把这两步也挪到 npmmirror 上，任一步不通都还有备份路径：
-#   · npm_config_registry                          —— tarball（package-lock.json 里本来就是这个源）
-#   · npm_config_better_sqlite3_binary_host_mirror —— 预编译包，走镜像就不用编译了（省几分钟）
-#   · npm_config_disturl                           —— 万不得已回退编译时，Node 头文件也走镜像
-# 变量名是 prebuild-install / node-gyp 写死的（见 prebuild-install/util.js getEnvPrefix），别改。
-# 海外构建想走官方源：docker build --build-arg NPM_MIRROR=https://registry.npmjs.org \
-#   --build-arg NODE_MIRROR=https://nodejs.org/download/release \
-#   --build-arg BETTER_SQLITE3_MIRROR=https://github.com/WiseLibs/better-sqlite3/releases/download
+# ── 依赖源（2026-10-01 老板定：**默认走官方源**）────────────────────────────────
+# 与 `package-lock.json` 里的 resolved 保持一致：lock 写官方源，安装时也不替换它。
+# 但保留三个可变点，因为大陆构建机跨境拉 GitHub / nodejs.org **会间歇性超时**
+# （实测：prebuild 拉 GitHub Releases 超时 → 回退源码编译 → 拉 Node 头文件又超时），
+# 网络差时可一次性切镜像救急，**不必改文件**：
+#
+#   sudo docker compose build \
+#     --build-arg NPM_MIRROR=https://registry.npmmirror.com \
+#     --build-arg NODE_MIRROR=https://npmmirror.com/mirrors/node \
+#     --build-arg BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3 \
+#     server
+#   sudo docker compose up -d server
+#
+# 变量名是 prebuild-install / node-gyp 写死的（`prebuild-install/util.js` 的
+# getEnvPrefix = `npm_config_<pkgname>_binary_host[_mirror]`），别改名。
+# BETTER_SQLITE3_MIRROR 默认**留空**：空值会被 prebuild-install 当"没设置"，
+# 于是走它自己的内置默认（github-from-package），与不加这个 ENV 完全等价。
 FROM node:22-slim AS build
 WORKDIR /app
-ARG NPM_MIRROR=https://registry.npmmirror.com
-ARG NODE_MIRROR=https://npmmirror.com/mirrors/node
-ARG BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3
+ARG NPM_MIRROR=https://registry.npmjs.org
+ARG NODE_MIRROR=https://nodejs.org/download/release
+ARG BETTER_SQLITE3_MIRROR
 ENV npm_config_registry=${NPM_MIRROR} \
     npm_config_disturl=${NODE_MIRROR} \
     npm_config_better_sqlite3_binary_host_mirror=${BETTER_SQLITE3_MIRROR}
@@ -33,10 +38,10 @@ RUN npx tsc
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-# 构建期网络：同 build 阶段（这个阶段也要 npm ci，同样会去拉 better-sqlite3）
-ARG NPM_MIRROR=https://registry.npmmirror.com
-ARG NODE_MIRROR=https://npmmirror.com/mirrors/node
-ARG BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3
+# 依赖源：同 build 阶段（这个阶段也要 npm ci，同样会去拉 better-sqlite3）
+ARG NPM_MIRROR=https://registry.npmjs.org
+ARG NODE_MIRROR=https://nodejs.org/download/release
+ARG BETTER_SQLITE3_MIRROR
 ENV npm_config_registry=${NPM_MIRROR} \
     npm_config_disturl=${NODE_MIRROR} \
     npm_config_better_sqlite3_binary_host_mirror=${BETTER_SQLITE3_MIRROR}

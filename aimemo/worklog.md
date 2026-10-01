@@ -10852,3 +10852,25 @@ registry 配置切源**。国内构建照样走镜像（快），海外构建才
 **遗留（未做，已知会复发）**：以后在本机 `npm install <新依赖>`，npm 会把镜像地址**再写回**
 lock（本机 registry 就是镜像）。要根治得给个"加完依赖跑一下"的小脚本（把 host 换回官方），
 或者接受每次手工清理。已告诉老板，等他定。
+### 追加：依赖源改回官方（老板 2026-10-01 定）
+
+落地完 lock 去污染之后，老板决定**构建也走官方源**（理由：生产服务器上老代码版本已经成功
+部署过，跨境网络是一阵好一阵坏，"多试几次就行"；不想让镜像成为构建的隐含前提）。
+
+于是把 Dockerfile 的三个 ARG 默认值从镜像改成官方，同时**保留可变点当逃生口**：
+- `NPM_MIRROR=https://registry.npmjs.org`
+- `NODE_MIRROR=https://nodejs.org/download/release`
+- `BETTER_SQLITE3_MIRROR`（**默认留空**：空值被 prebuild-install 当"没设置"，于是走它内置的
+  github-from-package 默认地址——与不加这个 ENV 完全等价，零行为变化）
+
+**实测两个分支**（直接调 prebuild-install/util.js 的 getDownloadUrl，这是真正会踩的地方）：
+- 空 ENV → `https://github.com/WiseLibs/better-sqlite3/releases/download/v11.10.0/…tar.gz` ✅
+- 传镜像 → `https://npmmirror.com/mirrors/better-sqlite3/v11.10.0/…tar.gz` ✅
+
+网络差时的一条逃生命令（不改文件）：
+`sudo docker compose build --build-arg NPM_MIRROR=… --build-arg NODE_MIRROR=… --build-arg BETTER_SQLITE3_MIRROR=… server && sudo docker compose up -d server`
+（compose 的 `up --build` 不接受 --build-arg，得先 `build` 再 `up`。）
+
+**注意**：`BETTER_SQLITE3_MIRROR` 默认留空这一点是刻意的——better-sqlite3 的 package.json
+里 `binary` 字段是 null，官方地址由 github-from-package 从 repository 推出来；写死一个
+"官方 URL"反而可能在它换仓库时变成错的。
