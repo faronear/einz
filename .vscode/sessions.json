@@ -1,0 +1,96 @@
+{
+  "$schema": "https://cdn.statically.io/gh/nguyenngoclongdev/cdn/main/schema/v11/terminal-keeper.json",
+  "theme": "tribe",
+  "active": "einz",
+  "activateOnStartup": true,
+  "keepExistingTerminals": false,
+  "sessions": {
+    "default": [
+      {
+        "name": "hello",
+        "autoExecuteCommands": true,
+        "icon": "person",
+        "color": "terminal.ansiGreen",
+        "commands": [
+          "echo hello"
+        ]
+      }
+    ],
+    "einz": [
+      {
+        "name": "codebuddy",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz && codebuddy -c -y"
+        ]
+      },
+      {
+        "name": "atomcode",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz && atomcode -c -y"
+        ]
+      },
+      {
+        "name": "终端",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz"
+        ]
+      },
+      {
+        "name": "本机server",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz && npm run server-run-dev"
+        ]
+      },
+      {
+        "name": "tui1--本机",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz && npm run tui2local-1"
+        ]
+      },
+      {
+        "name": "安卓--本机",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz",
+          "npm run app-apk-boot2run --mode=local"
+        ]
+      },
+      {
+        "name": "苹果--本机",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz",
+          "npm run app-ios-boot",
+          "npm run app-ios-run-local"
+        ]
+      },
+      {
+        "name": "MacOS--本机",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz",
+          "npm run app-mac-run-local"
+        ]
+      },
+      {
+        "name": "远端server",
+        "autoExecuteCommands": true,
+        "commands": [
+          "ssh.sh cn1"
+        ]
+      },
+      {
+        "name": "tui-oddsgame--远端",
+        "autoExecuteCommands": true,
+        "commands": [
+          "cd ~/einz/cli && dart bin/einz_tui.dart --store ~/.einz/oddsgame.json"
+        ]
+      }
+    ]
+  }
+}

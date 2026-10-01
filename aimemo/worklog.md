@@ -10766,3 +10766,11 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 `npm run server-mail-probe`（与既有 `server-run-dev` 同款）。
 **不需要在命令行上拼机密**：.env 里有那 5 项就够了，命令行只留 `EINZ_PROBE_TO`
 （收件人是一次性的、不属于服务配置；若想连它也省掉，写进 .env 也行）。
+**部署状态（2026-10-01 确认）**：服务器上 `docker compose up -d --build server` 之后，日志里
+出现了 `[einz] 邮件通知：已启用 tick=60s 静默=120s 冷却=30min 日上限=8` —— 服务端这一侧
+**已上线启用**（SMTP 凭据已进容器）。此前也已确认：Oracle SMTP 出站可连、探针邮件实收。
+
+**还没走完的闭环**（真机那轮）：App 填邮箱 → 收确认信 → 点链接（日志应出现
+`邮件通知：h***@tic.cc 已验证`）→ 菜单显示「已开启」→ 关掉 App、对方发几条 → 2 分钟后收
+摘要信（日志出现 `已发 h***@tic.cc（N 条未读，M 个来源）`）。另：要确认提醒邮件**落收件箱
+而不是垃圾箱**（SPF/DKIM）。
