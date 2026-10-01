@@ -10774,3 +10774,11 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 `邮件通知：h***@tic.cc 已验证`）→ 菜单显示「已开启」→ 关掉 App、对方发几条 → 2 分钟后收
 摘要信（日志出现 `已发 h***@tic.cc（N 条未读，M 个来源）`）。另：要确认提醒邮件**落收件箱
 而不是垃圾箱**（SPF/DKIM）。
+**本地开发怎么带 SMTP 凭据（2026-10-01）**：老板问"本机 npm run dev 时机密写哪儿 / 要命令行里？"
+改 dev 脚本自带 env 文件加载（node 22 的 `--env-file-if-exists`，零依赖、零代码改动）：
+`node --env-file-if-exists=${EINZ_ENV_FILE:-../../deployment/.env} --import tsx src/app.ts`。
+于是 `deployment/.env` 这一份同时服务于 **dev / mail:probe / compose**，不必拼命令行；
+命令行上的值优先（临时换一组值时用）；不想让密码进工作区（该目录两机同步）就用
+`EINZ_ENV_FILE=~/.einz-mail.env` 指到工作区外面。
+**生产容器仍然不读任何 .env**（只认 compose 注入的变量），本地这招不影响线上。
+已实测：本地 `EINZ_ENV_FILE` 指一份临时文件 → 日志出现「邮件通知：已启用 …」。

@@ -188,6 +188,15 @@ EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 a
 
 - **缺任一变量 → 功能整体关闭**（聊天照常，只是不发信），`PUT /notify/email` 返回
   `503 MAIL_DISABLED`。区别于 `EINZ_DB_BACKUP_KEY`：那个缺失是**拒绝执行**，这个是**静默降级**。
+- **本机开发（`npm run dev`）不用手写命令行**：dev 脚本已带
+  `node --env-file-if-exists=${EINZ_ENV_FILE:-../../deployment/.env}`，自动加载同一个
+  `deployment/.env`；命令行上的值**优先于**文件里的（想临时换一组值就写在命令行上）。
+  不想把密码放进工作区（这个目录是两机同步的），就把文件放到工作区外面再指过去：
+  ```bash
+  EINZ_ENV_FILE=~/.einz-mail.env npm run dev      # server/ 下
+  EINZ_ENV_FILE=~/.einz-mail.env npm run mail:probe
+  ```
+  **生产容器不读任何 .env**（只认 compose 注入的变量），所以这招不会影响线上行为。
 - **发件地址没有代码内默认值**：`EINZ_MAIL_FROM` 空着就是关闭的一部分（不给你悄悄套一个
   没登记过的地址——那会以"发出去了但被全数拒收/落垃圾箱"的形式静默失败）。想换发件地址，
   改 .env 这一行即可，不用改代码。
