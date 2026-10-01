@@ -10722,3 +10722,18 @@ tick 投递记账）全绿；`npm test` 全套通过；`npx tsc --noEmit` 干净
 `server` 11 例全绿（新增第 ⑨ 例：英文正文不含中文套话、同样没有消息内容）。
 **flutter test 按老板惯例由他自测**（`chat_page_menu_test.dart` 的 `_FakeApi` 已补
 get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白等重试）。
+## 2026-10-01 邮件通知：凭据没配（问老板要），部署接线补上
+
+老板问"你还没问我要 SMTP 信息，你已经设好了吗？"——**没有**。代码从环境变量读凭据，
+我手上一条都没有，功能因此一直是关闭状态（不是半残：tick 空转，PUT 返回 503）。
+
+**补的接线**（不含任何凭据，全是占位引用）：
+- `deployment/docker-compose.nocaddy.cn.yml`（在用的国内模板）与 `docker-compose.nocaddy.yml`
+  （海外兜底模板）各加 5 行 `EINZ_SMTP_HOST/PORT/USER/PASS`、`EINZ_MAIL_FROM`，
+  取值来自 `deployment/.env`（已 gitignore，与 `EINZ_DB_BACKUP_KEY` 同一套路）。
+  变量没设时展开成空串 → `loadMailConfig()` 返回 null → 功能整体关闭，不报错。
+- `docs/DEPLOYMENT.md` §3.2.1：变量清单 + "缺任一即关闭"+"能发出去 ≠ 能进收件箱"
+  （approved sender + SPF/DKIM 要另外验）+ `npm run mail:probe` 的用法。
+
+**还差**：老板把 SMTP 凭据填进服务器上的 `/opt/einz/deployment/.env`（或把值给我，我写好
+那几行给他复制），然后 `docker compose up -d server`。填之前功能是关的，填完才启用。

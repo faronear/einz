@@ -40,6 +40,14 @@ services:
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
       # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore）。
       - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
+      # 邮件通知（2026-10-01）：留空 = 功能整体关闭（聊天照常，只是不发信）。
+      # 值同样来自 deployment/.env；发件地址必须是 Email Delivery 里登记过的
+      # approved sender，且域名要配 SPF/DKIM，否则落垃圾箱。
+      - EINZ_SMTP_HOST=${EINZ_SMTP_HOST}
+      - EINZ_SMTP_PORT=${EINZ_SMTP_PORT}
+      - EINZ_SMTP_USER=${EINZ_SMTP_USER}
+      - EINZ_SMTP_PASS=${EINZ_SMTP_PASS}
+      - EINZ_MAIL_FROM=${EINZ_MAIL_FROM}
     ports:
       - "127.0.0.1:3000:3000" # 仅宿主回环可见：系统级 Caddy 反代到这里，不对外直开
     volumes:

@@ -171,6 +171,30 @@ docker compose ps                       # 两个服务均 healthy/running
 > （由 compose 自动读取 `deployment/.env` 提供，.env 已在 .gitignore、不入库）。
 > 未设置时 `npm run backup` 会拒绝执行（防误备份明文）。
 
+#### 3.2.1 邮件通知（可选，不配 = 关闭）
+
+没进应用商店 → 没有后台推送，所以服务端给离线的一方**发一封邮件**把他拉回来
+（`docs/PROTOCOL.md` §7.5）。凭据同样走 `deployment/.env`（compose `docker-compose.*.yml`
+模板已预置注入，部署时拷贝到服务器上的 `docker-compose.yml` 记得带上这几行）：
+
+```bash
+# deployment/.env（服务器本机，不入库）
+EINZ_SMTP_HOST=smtp.email.<region>.oci.oraclecloud.com   # 甲骨文 Email Delivery
+EINZ_SMTP_PORT=587                                        # 587=STARTTLS；465 时加 EINZ_SMTP_SECURE=1
+EINZ_SMTP_USER=ocid1.user.oc1..aaaa…                      # 控制台生成的 SMTP 凭据用户名
+EINZ_SMTP_PASS='...'                                      # 控制台生成的 SMTP 凭据（**不是登录密码**）
+EINZ_MAIL_FROM='Einz <notify@einz.yuanjinx.com>'          # 必须已登记为 approved sender
+```
+
+- **缺任一变量 → 功能整体关闭**（聊天照常，只是不发信），`PUT /notify/email` 返回
+  `503 MAIL_DISABLED`。区别于 `EINZ_DB_BACKUP_KEY`：那个缺失是**拒绝执行**，这个是**静默降级**。
+- 上线前先验出网（`EINZ_PROBE_TO` 给一个自己的邮箱，会真的发出一封测试信）：
+  ```bash
+  EINZ_PROBE_TO=you@example.com npm run mail:probe
+  ```
+- 发件域名要配 **SPF/DKIM** 并在 Email Delivery 里登记 approved sender，否则要么被拒收、
+  要么落垃圾箱——能发出去 ≠ 能进收件箱，这俩要分开验。
+
 ### 3.3 验证部署
 
 ```bash
