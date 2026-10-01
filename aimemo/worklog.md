@@ -10640,3 +10640,57 @@ Column 就多宽 → 整行溢出。两处只差一层，2026-09-24 只修了对
 
 **验证**：`chat_page_menu_test.dart` 整个文件 34 例全绿；`multi_space_pages_test.dart`、
 `ui_style_switch_test.dart` 也绿；`flutter analyze` 干净。
+## 2026-10-01 邮件通知：用邮件补上没有后台推送的洞（服务端先落地）
+
+**起因**：没进应用商店 → 没有后台推送。对方离线期间的来信他完全不知道，只能等下次打开
+App 才看得到。老板手上有甲骨文云的免费邮件额度与 SMTP 凭据，问"每条消息都发邮件太频繁，
+该用什么方式发"。
+
+**方案讨论中的三个决定**（老板拍板）：
+1. 节流参数取**推荐档**：静默窗 2 分钟 / 冷却 30 分钟 / 日上限 8 封（不是为省 Oracle 额度——
+   按现在的用户量一年也吃不完，真正的成本是"收件人被烦到开过滤规则"）。
+2. 邮箱**挂 member_id（每个空间各填一次），但发信按邮箱地址聚合**——不新建 person 表。
+   member_id 是按空间生成的 UUID（`spaces.ts` create/join 各 `randomUUID`），同一个人在别的
+   空间就是另一行；好在噪声发生在**收件箱**里，去重该在那儿做：同一地址 → 一封摘要信。
+3. 这一轮**只做服务端 + 邮件管道**，App 设置页下一轮（SMTP 是否通、邮件是否落收件箱，
+   这些风险要在写 UI 之前暴露掉）。
+
+**实现要点**（`server/src/notifier.ts`、`server/src/mailer.ts`）：
+
+- **派生，不做待发账本**。直觉写法是 postMessage 时写一张 pending 表，但那要额外挂两个钩子
+  （上线要取消 pending、postMessage 要记账），而"该不该发"依赖的状态——未读、在线、最后活动——
+  **在没有任何消息时也在变**。这些状态全在库里，每轮 tick 现算一遍是最短路径：没有 pending
+  表、没有取消钩子、也就没有"账本和现实不一致"这类 bug。数据量几个空间几条消息，全表扫的
+  代价远小于多一张表的维护代价。
+- **四道闸门**：① 真有未读（口径完全复用 `receipts.unreadCount`）② 他真的走开了（名下所有
+  通道无 WS 连接，且 `max(last_seen, offline_since)` **早于**最新那条未读＝消息到了之后没回来过）
+  ③ 静默窗 ④ 冷却 + 日上限。第②条顺带实现了"上线即作废"，而且不需要任何钩子——
+  `touchLastSeen` / 心跳本来就刷 last_seen。
+- **刻意不在 `/notify/*` 端点里刷新 last_seen**（对比 `syncMessages` 会刷）：有人在设置页添删
+  邮箱，不该因此把他标成"在线"从而错过本该发的提醒。
+- **未配 SMTP 时整体关闭**（而不是半残地跑），缺 `EINZ_SMTP_HOST/USER/PASS`、`EINZ_MAIL_FROM`
+  任一就空转，`PUT /notify/email` 返回 503。这与 `EINZ_DB_BACKUP_KEY` 缺失即
+  拒绝启动不同——邮件是可选能力，没有凭据的部署应当照常聊天。
+- 失败处理按 SMTP 响应码分成"永久钉死（5xx → hard_bounce_at）"和"指数退避重试"两种：反复给
+  不存在的地址发信，掉的是**发件域名**的信誉，那是所有通知一起陪葬的事。
+- 引入唯一一个外部依赖 `nodemailer`（**零传递依赖**，已核实）。选它而不是手写 SMTP 的原因：
+  中文显示名要靠 RFC 2047 encoded-word + base64/quoted-printable 正文，这块手写出错概率高，
+  不值得。仓库的 `package-lock.json` 本来就全是 npmmirror 地址，不存在"被镜像污染"的额外问题。
+
+**新增**：`notify_emails` / `notify_tokens` 两表 + `space_members.email` 列（沿用 `db.ts` 的
+`ALTER TABLE` try/catch 迁移惯例）；`PUT|GET|DELETE /notify/email` +
+`GET /notify/verify|unsubscribe`（后两个免鉴权 + 免协议版本，已在 `app.ts` 两处豁免清单登记理由）；
+`npm run mail:probe` 连通性探针。
+
+**没做的事 / 已知坑**：
+- App 设置页、以及英文版邮件正文（现在只有中文版），跟着 UI 那一轮做。
+- **上线前必须先验的未知数**：服务器在中国大陆，Oracle Email Delivery 的 SMTP 在境外，国内
+  云厂商普遍封杀出站 25 端口。所以上线第一步不是配 DNS/SPF，而是在服务器上跑
+  `npm run mail:probe`——TCP 出不去的话，整条路径要换（换 587，或换支持 HTTPS API 的服务商）。
+- 语音通话邀请仍**不落库**（`ws.ts` 只搬），所以离线来电依旧彻底丢失；邮件是补这个洞的天然
+  位置，但那要改通话信令的存储形态，另开一轮。
+- 一个人换邮箱时，旧地址立刻失效（列只有一个值），确认新的之前这段时间收不到提醒。
+
+**验证**：新增 `server/test/notify.test.ts` 10 例（覆盖四道闸门、跨空间聚合、正文红线、
+tick 投递记账）全绿；`npm test` 全套通过；`npx tsc --noEmit` 干净。`邮件通知：⑧` 用例验证
+"第二轮在冷却里一封都没多发出去"。

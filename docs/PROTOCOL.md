@@ -100,6 +100,11 @@
 | POST | /avatar | 上传本人头像 | Bearer |
 | GET | /avatar/:memberId | 取头像（免认证，公开可读） | — |
 | GET | /join/:token | 邀请落地页（提示用 App 打开） | — |
+| PUT | /notify/email | 设置"我"的提醒邮箱并发出确认信（§7.5） | Bearer |
+| GET | /notify/email | 查看自己的提醒邮箱与状态（§7.5） | Bearer |
+| DELETE | /notify/email | 撤掉邮箱（无人再用则整行及其 token 物理删除） | Bearer |
+| GET | /notify/verify?token= | 邮箱确认链接（邮件里点开，HTML 落地页） | — |
+| GET | /notify/unsubscribe?token= | 退订链接（邮件底部；永不失效） | — |
 
 **Multiverse（v2）空间端点**（详见 `PROTOCOL_MULTIVERSE.md` §4）：
 
@@ -389,6 +394,49 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
 
 - 通道撤销时其 Token 一并清除。
 - **推送永不携带消息正文**，只发 `{ "type": "new_message", "space_id": "…" }` 提示（productLens §10）。
+
+### 7.5 邮件通知 PUT/GET/DELETE /notify/email（离线提醒，2026-10-01）
+
+> 起因：Einz 没上应用商店 → **没有后台推送**；对方离线期间的来信他完全不知道，只能等
+> 下次打开 App 才看到。邮件是唯一自带推送能力的现成通道：服务端给离线的一方发一封
+> **摘要信**，让他知道有人在找他。**邮件里永远不会有消息正文**（服务端只有 ciphertext，
+> 而且邮件会在对方邮箱里明文躺几年——把正文放进去等于把整条加密链路短路掉）。
+> 节流设计与"为什么不做待发账本"写在 `server/src/notifier.ts` 顶部注释。
+
+```json
+// PUT /notify/email（设置 + 发出确认信）
+{ "email": "luk@example.com" }
+// 响应 200
+{ "email": "luk@example.com", "state": "verified" | "pending", "verification_sent": true }
+
+// GET /notify/email
+{ "email": "luk@example.com", "state": "none" | "pending" | "verified" | "inactive",
+  "verification_sent": false }
+
+// DELETE /notify/email
+{ "ok": true }
+```
+
+- `state`：`none` 没设置 / `pending` 待点确认链接 / `verified` 生效中 /
+  `inactive` 已退订或曾硬退信。只有 `verified` 才可能收到提醒。
+- **必须先点确认链接**：持有会话的任意成员都能往任意地址发起登记，少了这一道就成了
+  骚扰通道。同一地址在别的空间已验证过 → 这次直接生效，不麻烦人点第二次。
+- 邮箱挂在 `space_members.email`（member 级），但**发信按地址聚合**：同一个地址在多个
+  空间有未读 → 合并成**一封**摘要信。member_id 是按空间生成的，服务端没有跨空间的
+  "人"，而去重本来就该发生在收件箱那一层。
+- **四道闸门，缺一不发**（参数均可用环境变量覆盖）：① 真有未读（口径同 `GET /messages/unread`）
+  ② 他真的走开了（名下所有通道都无 WS 连接，且未读到达后他**没回来过**——这一刀比其余
+  三刀省下的邮件都多）③ 静默窗 2 分钟（`EINZ_NOTIFY_QUIET_MS`，连珠炮合成一封）
+  ④ 冷却 30 分钟（`EINZ_NOTIFY_COOLDOWN_MS`）+ 每天 ≤ 8 封（`EINZ_NOTIFY_DAILY_MAX`）。
+- **服务端未配 SMTP 时整体关闭**（不会半残运行）：缺 `EINZ_SMTP_HOST`/`EINZ_SMTP_USER`/
+  `EINZ_SMTP_PASS`/`EINZ_MAIL_FROM` 任一即空转，此时 `PUT /notify/email` 返回
+  `503 MAIL_DISABLED`。上线前用 `npm run mail:probe` 验一遍出网。
+- 每封信底部都有一键退订链接（`List-Unsubscribe` 头），退订只翻转自己那一位标记；
+  `DELETE /notify/email` 在无人再用该地址时把 `notify_emails` 整行与 token **物理删除**。
+- 隐私：`email` 是服务端**唯一**能直接指向真人的字段 → 不出现在任何对外响应（含
+  `GET /space`）、不写审计 detail、日志里只以 `l***@example.com` 形式出现。
+  per-space 备份会带上整行 `space_members`（含 email），但那是 AES-256-GCM 加密归档
+  （`einz-server-backup-v1`），密级与以往的空间备份一致，不需要额外处理。
 
 ### 7.4 密钥托管 POST/GET/DELETE /key-escrow（口令托管）
 

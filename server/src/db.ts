@@ -127,6 +127,9 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       status       TEXT NOT NULL DEFAULT 'active',
       -- 伴侣预置行未加入 → joined_at 为 NULL，激活时写入
       joined_at    INTEGER,
+      -- 邮件通知的目标地址（NOT NULL 约束没有：未设置用 NULL，不用空串）。
+      -- 写进来 ≠ 可发信：必须先点验证链接（见 notify_emails.verified_at）。
+      email        TEXT,
       PRIMARY KEY (space_id, member_id),
       UNIQUE (space_id, slot)
     );
@@ -153,6 +156,40 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       updated_at         INTEGER NOT NULL,
       PRIMARY KEY (space_id, member_id)
     );
+
+    -- ── 邮件通知（2026-10-01）——──────────────────────────────────────────────
+    -- 起因：没进应用商店 → 没有后台推送；离线期间的来信对方完全不知道（上线才知道）。
+    -- 手段：给离线的对方发一封邮件，借邮件系统自带的推送能力把他拉回来。
+    --
+    -- 三条不可动摇的边界：
+    -- ① **邮件里永远不会有正文**——服务端只有 ciphertext，"谁、几条、几点"是全部信息。
+    --    这不是妥协：邮件会明文躺在对方邮箱里好几年，安全等级低于 App 内的密文。
+    -- ② **邮箱按地址**（不是按 member）聚合：member_id 是按空间生成的（spaces.ts），
+    --    同一个人在别的空间是另一行；同一个地址可能挂在多个 member 上。去重发信的
+    --    粒度因此必须是"地址"（跨空间合并成一封摘要），而不是"人"。
+    -- ③ **未验证不发**：有人把别人的地址填进来就成了骚扰通道，所以必须以点击验证链接为本钱的
+    --    准入闸门（verified_at IS NULL → 一律不发）。
+    CREATE TABLE IF NOT EXISTS notify_emails (
+      email           TEXT PRIMARY KEY,  -- 规范化后的小写全址（跨空间的自然键）
+      verified_at     INTEGER,           -- 点过验证链接的时刻；NULL = 未验证 → 不发
+      unsubscribe_at  INTEGER,           -- 退订（每一封邮件底部都有一次性去重专用链接）
+      hard_bounce_at  INTEGER,           -- 硬退信（地址不存在等永久失败）→ 永久停发
+      pause_until     INTEGER,           -- 软失败（连不上 SMTP 等）后的退避截止时刻（ms）
+      last_sent_at    INTEGER,           -- 冷却判定用
+      sent_day        TEXT,              -- 'YYYY-MM-DD'（UTC 日界）：日上限的计数字段
+      sent_count      INTEGER NOT NULL DEFAULT 0,
+      created_at      INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS notify_tokens (
+      token      TEXT PRIMARY KEY,
+      email      TEXT NOT NULL,
+      kind       TEXT NOT NULL,  -- verify（24h 有效，一次性）| unsubscribe（长期有效，复用）
+      expires_at INTEGER NOT NULL,
+      used_at    INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_notify_tokens_email ON notify_tokens (email, kind);
 
     -- ── 审计表（只追加，永久保留；供"谁在哪条通道上、什么时候做了什么"回溯）──
     -- 不参与业务语义：删除或清空不影响聊天功能（老板 2026-09-13 要求详尽留痕）。
@@ -212,6 +249,12 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   // 迁移：entrances 表补充 offline_since（最后断开时刻；App/CLI 显示"离线 since 时刻"用）
   try {
     db.exec(`ALTER TABLE entrances ADD COLUMN offline_since INTEGER`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：space_members 补 email（邮件通知的目标地址；未设置是 NULL，不用空串）
+  try {
+    db.exec(`ALTER TABLE space_members ADD COLUMN email TEXT`);
   } catch {
     // 列已存在（新库）→ 忽略
   }

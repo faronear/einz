@@ -58,6 +58,13 @@ import {
   preflightJoin
 } from './spaces.js'
 import { logActivity, logSyncActivity, metaOf } from './audit.js'
+import {
+  consumeNotifyToken,
+  deleteNotifyEmail,
+  getNotifyEmail,
+  setNotifyEmail,
+  startNotifier
+} from './notifier.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
 const LOG_REQUESTS = (process.env.LOG_LEVEL ?? 'info') !== 'quiet'
@@ -139,7 +146,10 @@ server.on('upgrade', (req, socket, head) => {
  *   `POST /spaces`（空间自举，创建者还没有凭证）、`POST /spaces/join{,/preflight}`、
  *   `GET /spaces/lookup`（按地址定位，给未入网者用）、
  *   `GET /avatar/:memberId`（本人自愿上传的展示图）、
- *   `POST /spaces/{id}/key-escrow` 的**口令取包分支**（加入方只有口令）。
+ *   `POST /spaces/{id}/key-escrow` 的**口令取包分支**（加入方只有口令）、
+ *   `GET /notify/verify`、`GET /notify/unsubscribe`（邮件里点开的链接，浏览器带不来
+ *   Bearer；token 是随机不可猜的，能力也仅限翻转自己那一位标记——见
+ *   notifier.consumeNotifyToken 的注释）。
  *   新增免鉴权端点必须在此处登记并说明理由。
  */
 async function route (req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -612,6 +622,43 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     return
   }
 
+  // 邮件通知（2026-10-01）：没进应用商店 → 没有后台推送，给离线的对方发一封摘要信，
+  // 借邮件系统自带的推送把他拉回来。节流策略与"为什么不做账本"见 notifier.ts 顶部。
+  if (method === 'PUT' && path === '/notify/email') {
+    limitByIp(req, 'auth')
+    const b = (await readJsonBody(req) ?? {}) as Record<string, unknown>
+    sendJson(res, 200, await setNotifyEmail(bearerToken(req), String(b.email ?? '')))
+    return
+  }
+  if (method === 'GET' && path === '/notify/email') {
+    sendJson(res, 200, getNotifyEmail(bearerToken(req)))
+    return
+  }
+  if (method === 'DELETE' && path === '/notify/email') {
+    sendJson(res, 200, deleteNotifyEmail(bearerToken(req)))
+    return
+  }
+  if (method === 'GET' && path === '/notify/verify') {
+    const r = consumeNotifyToken(url.searchParams.get('token') ?? '', 'verify')
+    sendHtml(res, notifyPage(
+      r.ok ? '邮箱已确认' : '链接不可用',
+      r.ok
+        ? '以后你在 Einz 有新消息又长时间没上线时，我们会往这个邮箱发一封提醒。'
+        : '这个确认链接已经用过或者过期了。在 App 里重新填一次邮箱就能收到一封新的。'
+    ))
+    return
+  }
+  if (method === 'GET' && path === '/notify/unsubscribe') {
+    const r = consumeNotifyToken(url.searchParams.get('token') ?? '', 'unsubscribe')
+    sendHtml(res, notifyPage(
+      r.ok ? '已停止发送' : '链接不可用',
+      r.ok
+        ? '不会再有 Einz 的消息提醒寄到这里了。想恢复时在 App 里重新填一次这个邮箱即可。'
+        : '链接失效了。在 App 里删掉再重新填一次邮箱，会拿到新的退订链接。'
+    ))
+    return
+  }
+
   // 空间
   if (method === 'GET' && path === '/space') {
     sendJson(res, 200, getSpace(bearerToken(req)))
@@ -628,10 +675,19 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
  *
  * 豁免（有意为之）：
  * - `GET /health`：外部监控/```curl``` 健康检查，不该被协议版本卡住；
- * - `GET /join/:token`：在浏览器里打开的邀请落地页，浏览器无法自定义请求头。
+ * - `GET /join/:token`：在浏览器里打开的邀请落地页，浏览器无法自定义请求头；
+ * - `GET /notify/verify`、`GET /notify/unsubscribe`：同样是邮件里点开的浏览器链接
+ *   （token 在 query 里，能力仅限翻转自己那一位标记）。
  */
 function assertProtocolVersion (req: IncomingMessage, path: string): void {
-  if (path === '/health' || path.startsWith('/join/')) return
+  if (
+    path === '/health' ||
+    path.startsWith('/join/') ||
+    path === '/notify/verify' ||
+    path === '/notify/unsubscribe'
+  ) {
+    return
+  }
   const raw = req.headers['x-protocol-version']
   const version = Array.isArray(raw) ? raw[0] : raw
   if (version !== String(PROTOCOL_VERSION)) {
@@ -650,11 +706,44 @@ function sendJson (res: ServerResponse, status: number, data: unknown): void {
   res.end(JSON.stringify(data))
 }
 
+function sendHtml (res: ServerResponse, html: string): void {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+  res.end(html)
+}
+
+/** 邮件里点开的落地页（验证 / 退订）：与邀请页同一套卡片样式。
+ *  刻意**不回显任何链接参数**——token 出现在 URL 里，没必要再让它出现在页面里。 */
+function notifyPage (title: string, message: string): string {
+  return `<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title}</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FFF5FA;color:#33415A;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
+  .card{max-width:480px;background:#fff;border:1px solid #E9D5E0;border-radius:16px;padding:32px;box-shadow:0 4px 16px rgba(51,65,90,.08);text-align:center}
+  h1{font-size:20px;color:#2271F7;margin:0 0 12px}
+  p{font-size:14px;line-height:1.7;margin:8px 0}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>${title}</h1>
+  <p>${message}</p>
+</div>
+</body>
+</html>`
+}
+
 // 定期清理过期 challenge/session 与孤儿附件（两阶段上传失败残留的 blob）
 setInterval(() => {
   cleanupExpired()
   cleanupOrphanAttachments()
 }, 60 * 60 * 1000).unref()
+
+// 邮件通知的定时 tick（自身按 SMTP 配置决定是否真的跑，见 notifier.startNotifier）
+startNotifier()
 
 server.listen(PORT, () => {
   console.log(`[einz] server listening on :${PORT}`)

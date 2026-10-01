@@ -168,6 +168,34 @@ CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- ── 邮件通知（2026-10-01：没进应用商店 → 没有后台推送，用邮件把离线的人拉回来）──
+-- 完整设计（节流四道闸门、为什么是"派生"而非"待发账本"、为什么按地址聚合）
+-- 写在 server/src/notifier.ts 顶部注释里，这里只记数据形状。
+--
+-- 红线：**邮件里永远不会有消息内容**（服务端只有 ciphertext），两个数据形状上的体现是
+-- ① 没有任何表存待通知的"内容摘要"，② space_members.email 是唯一的 PII 字段，
+--    所以它不参与任何对外响应（GET /space 不含它），日志里也只以掩码形式出现。
+CREATE TABLE notify_emails (
+    email          TEXT PRIMARY KEY,   -- 规范化后的小写全址（跨空间的自然键）
+    verified_at    INTEGER,            -- 点过验证链接；NULL = 不许发
+    unsubscribe_at INTEGER,            -- 已退订
+    hard_bounce_at INTEGER,            -- 硬退信（5xx，地址不存在）→ 永久停发
+    pause_until    INTEGER,            -- 软失败（连不上 SMTP 等）后的退避截止
+    last_sent_at   INTEGER,            -- 冷却判定
+    sent_day       TEXT,               -- 'YYYY-MM-DD'（UTC 日界）：日上限计数
+    sent_count     INTEGER NOT NULL DEFAULT 0,
+    created_at     INTEGER NOT NULL
+);
+
+CREATE TABLE notify_tokens (
+    token      TEXT PRIMARY KEY,
+    email      TEXT NOT NULL,
+    kind       TEXT NOT NULL,          -- verify（24h、一次性）| unsubscribe（长期、可复用）
+    expires_at INTEGER NOT NULL,
+    used_at    INTEGER,
+    created_at INTEGER NOT NULL
+);
 ```
 
 ### 2.1 审计表（只追加，永久保留）
