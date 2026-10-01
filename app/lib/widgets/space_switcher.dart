@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:einz_shared/einz_shared.dart';
@@ -120,6 +121,13 @@ Future<void> addSpaceFlow(
       existingPin: pin, // 已有锁：向导不再问一次锁屏码
       onCompleted: (payload) async {
         await lock.addSpace(payload, pin: pin); // 新空间成为当前空间
+        // 邮箱通知按设备共享（老板 2026-10-01）：新空间自动继承本机已设置的提醒
+        // 邮箱——否则每加一个空间都得去弹窗里重存一次。后台 best-effort，
+        // 失败静默（没继承上无非是重存一次），不阻塞进聊天页。
+        final inherited = _notifyEmailSourceSpaces(payload.spaceId);
+        if (inherited.isNotEmpty) {
+          unawaited(_inheritNotifyEmail(inherited, payload, db: db));
+        }
         if (!context.mounted) return;
         Navigator.of(context).pop(); // 关掉向导 → 回到聊天页
         if (!context.mounted) return;
@@ -127,6 +135,49 @@ Future<void> addSpaceFlow(
       },
     ),
   ));
+}
+
+/// 找一个**已设置了提醒邮箱**的旧空间（新空间继承地址的来源）。全离线判断不了
+/// "有没有设置"——需要逐个空间问服务端，所以这里只挑出候选（其它空间），真正的
+/// GET 在 [_inheritNotifyEmail] 里做，拿到第一个有地址的就停。
+List<AppLockPayload> _notifyEmailSourceSpaces(String newSpaceId) {
+  final vault = VaultSession.current;
+  return (vault?.spaces ?? const <AppLockPayload>[])
+      .where((s) => s.spaceId != newSpaceId && (s.token ?? '').isNotEmpty)
+      .toList();
+}
+
+/// 把旧空间已设置的提醒邮箱回填到新空间（join/create 完成钩子，老板 2026-10-01）：
+/// 逐个旧空间 GET 邮箱状态 → 拿到地址 → 对新空间 PUT。全部 best-effort：
+/// 会话过期/离线/服务端没开邮件通知都静默放弃——这是锦上添花，不值得打扰用户
+/// （"可观测性放代码里，不放 UI"既定原则）。地址在服务端是**地址级**验证
+/// （notify_emails.verified_at），已验证地址 PUT 过去直接 verified，不重发确认信。
+Future<void> _inheritNotifyEmail(
+  List<AppLockPayload> sources,
+  AppLockPayload newSpace, {
+  LocalDatabase? db,
+}) async {
+  final client = ApiClient(effectiveServer);
+  String? email;
+  String lang = 'zh';
+  for (final source in sources) {
+    try {
+      final status =
+          await SpaceSessions.ofPayload(source, db: db).call((t) => client.getNotifyEmail(t));
+      if (status.email == null || status.email!.isEmpty) continue;
+      email = status.email;
+      break; // 第一个有地址的就够了（按设备共享，各空间本就一致）
+    } catch (_) {
+      // 该空间拉不到（会话过期/离线）→ 换下一个
+    }
+  }
+  if (email == null) return; // 本机还没设过邮箱，没东西可继承
+  try {
+    await SpaceSessions.ofPayload(newSpace, db: db)
+        .call((t) => client.setNotifyEmail(email!, t, lang: lang));
+  } catch (_) {
+    // 回填失败就算了：用户在弹窗里重存一次即可
+  }
 }
 
 class _SpacePickerSheet extends StatefulWidget {
