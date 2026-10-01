@@ -3733,6 +3733,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   label: l10n.chatPageActionQuote,
                   onTap: () => Navigator.of(ctx).pop('quote'),
                 ),
+                // 文字消息才有「拷贝」（媒体消息无文本可拷）
+                if (m.env.type == 'text')
+                  _buildActionCard(
+                    icon: Icons.copy_outlined,
+                    label: l10n.chatPageCopy,
+                    onTap: () => Navigator.of(ctx).pop('copy'),
+                  ),
                 // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
                 _buildActionCard(
                   icon: Icons.timer_outlined,
@@ -3757,6 +3764,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (action == 'quote') {
       setState(() => _quoteTarget = m);
       _inputFocusNode.requestFocus();
+    } else if (action == 'copy') {
+      await Clipboard.setData(ClipboardData(text: m.plaintext.trim()));
+      if (mounted) showTopNotice(context, l10n.setupCreateCopied);
     } else if (action == 'burn') {
       await _setMessageBurn(m);
     }
