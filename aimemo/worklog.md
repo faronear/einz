@@ -10782,3 +10782,10 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 `EINZ_ENV_FILE=~/.einz-mail.env` 指到工作区外面。
 **生产容器仍然不读任何 .env**（只认 compose 注入的变量），本地这招不影响线上。
 已实测：本地 `EINZ_ENV_FILE` 指一份临时文件 → 日志出现「邮件通知：已启用 …」。
+**修一个自己写错的路径（2026-10-01，老板跑出来才暴露）**：dev 脚本里的
+`--env-file-if-exists=../../deployment/.env` 多退了一层——npm 脚本的 cwd 是 `server/`，
+`server/../../` 是仓库的**上一级**。应为 `../deployment/.env`。
+（`mail:probe` 的 `../../deployment/.env` 是对的：它按**脚本自身位置** `server/scripts/` 算。）
+教训：这条路径当时只用 `EINZ_ENV_FILE` 显式指定测过，默认值一次都没真跑——**默认值不跑一遍
+就等于没测**。已按老板的实际用法（仓库根 `npm run server-run-dev`）复测：日志出现
+「邮件通知：已启用 …」。

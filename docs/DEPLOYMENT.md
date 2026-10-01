@@ -189,8 +189,11 @@ EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 a
 - **缺任一变量 → 功能整体关闭**（聊天照常，只是不发信），`PUT /notify/email` 返回
   `503 MAIL_DISABLED`。区别于 `EINZ_DB_BACKUP_KEY`：那个缺失是**拒绝执行**，这个是**静默降级**。
 - **本机开发（`npm run dev`）不用手写命令行**：dev 脚本已带
-  `node --env-file-if-exists=${EINZ_ENV_FILE:-../../deployment/.env}`，自动加载同一个
-  `deployment/.env`；命令行上的值**优先于**文件里的（想临时换一组值就写在命令行上）。
+  `node --env-file-if-exists=${EINZ_ENV_FILE:-../deployment/.env}`（相对 `server/`），
+  自动加载同一个 `deployment/.env`；命令行上的值**优先于**文件里的（想临时换一组值就
+  写在命令行上）。
+  （`mail:probe` 的路径是 `../../deployment/.env`，因为它是按**脚本自身位置**
+  `server/scripts/` 算的——两个写法指向同一个文件。）
   不想把密码放进工作区（这个目录是两机同步的），就把文件放到工作区外面再指过去：
   ```bash
   EINZ_ENV_FILE=~/.einz-mail.env npm run dev      # server/ 下
@@ -205,7 +208,7 @@ EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 a
 - 验出网（`EINZ_PROBE_TO` 给一个自己的邮箱，会真的发出一封测试信）：
   ```bash
   cd server
-  EINZ_PROBE_TO=you@example.com npm run mail:probe   # 自动读 ../../deployment/.env
+  EINZ_PROBE_TO=you@example.com npm run mail:probe   # 自动读 deployment/.env（按脚本位置算）
   ```
   在**本机**验也可以——把那 5 个变量直接写在命令行上（命令行优先于 .env），
   或 `EINZ_ENV_FILE=某个文件路径 npm run mail:probe`。本机验的是**凭据与投递**
