@@ -10834,3 +10834,21 @@ better-sqlite3 的 `prebuild-install` 拉 GitHub Releases 超时 → 回退 `nod
 
 **没能自己验的部分**：docker 在本机没起（OrbStack 没跑），所以只验了镜像 URL 可达 + 语法，
 真实验证在服务器的重建上。
+## 2026-10-01 npm lock 去镜像污染（79 行）
+
+**背景**：`server/package-lock.json` 的 79 处 `resolved` 全指向 `registry.npmmirror.com`
+（最早那版 lock 就是），与老板"lock 不能被镜像污染"的规矩（pubspec 三份都干净）不一致。
+根因：老板本机 `npm config get registry` = npmmirror，本机生成的 lock 就会写成镜像地址。
+
+**改法**：只把 79 行 host 换成 `registry.npmjs.org`，版本与 `integrity` 一字不动（同一份
+tarball），零漂移。**实测确认了关键机制**：npm 的 `replace-registry-host` 默认 `npmjs`，
+会把 lock 里的官方源地址替换成**安装时配置的** registry——
+`npm ci --registry=https://registry.npmmirror.com`（空 cache 强制联网）实测：
+57 次取 registry.npmmirror.com、54 次取 cdn.npmmirror.com、**0 次官方源**，退出码 0。
+
+所以正解不是"镜像 or 官方"二选一，而是：**lock 写官方源（干净、可移植）+ 安装时用
+registry 配置切源**。国内构建照样走镜像（快），海外构建才可能走官方源。
+
+**遗留（未做，已知会复发）**：以后在本机 `npm install <新依赖>`，npm 会把镜像地址**再写回**
+lock（本机 registry 就是镜像）。要根治得给个"加完依赖跑一下"的小脚本（把 host 换回官方），
+或者接受每次手工清理。已告诉老板，等他定。
