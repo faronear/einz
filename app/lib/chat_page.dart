@@ -1800,6 +1800,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 红字警示（空/格式不对/后台失败）与提交中标记，都只在弹窗内有效
     final error = ValueNotifier<String?>(null);
     final busy = ValueNotifier<bool>(false);
+    // 「已设置 ↔ 未设置」两阶段（老板 2026-10-02）：已设置时输入框只读、只给「停用」；
+    // 停用成功不关弹窗，原地切成空白可编辑输入框 + 「保存」。初始值取开弹窗时的状态。
+    final active = ValueNotifier<bool>(!(before?.isNone ?? true));
     // 正文语言：服务端不知道收件人读哪种语言，按本机界面语言上报（zh / 其它一律 en）
     final lang = Localizations.localeOf(context).languageCode == 'zh' ? 'zh' : 'en';
 
@@ -1827,16 +1830,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: ctrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: l10n.chatPageNotifyEmailLabel,
-                border: const OutlineInputBorder(),
+            // 已设置 → 只读（停用后由 active 切回可编辑）；未设置 → 正常输入
+            ValueListenableBuilder<bool>(
+              valueListenable: active,
+              builder: (_, isActive, _) => TextField(
+                controller: ctrl,
+                readOnly: isActive,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageNotifyEmailLabel,
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (_) {
+                  if (error.value != null) error.value = null;
+                },
               ),
-              onChanged: (_) {
-                if (error.value != null) error.value = null;
-              },
             ),
             // 已填但还没点链接：这一档不点明，用户会以为已经生效
             if (before?.isPending ?? false) ...[
@@ -1869,100 +1877,104 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
-          // 停用（已设置时才出现）：撤掉本空间的邮箱，不再发信
-          if (!(before?.isNone ?? true))
-            ValueListenableBuilder<bool>(
-              valueListenable: busy,
-              builder: (_, isBusy, _) => TextButton(
-                onPressed: isBusy
-                    ? null
-                    : () async {
-                        busy.value = true;
-                        try {
-                          final api = widget.api ?? ApiClient(effectiveServer);
-                          await _withAuth((t) => api.deleteNotifyEmail(t));
-                          if (!mounted) return;
-                          unawaited(_fanoutNotifyEmail(
-                              (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
-                          await _refreshNotifyEmail();
-                          if (ctx.mounted) Navigator.of(ctx).pop(true);
-                          if (mounted) showTopNotice(context, l10n.chatPageNotifyRemoved);
-                        } on ApiException catch (e) {
-                          if (ctx.mounted) {
-                            error.value =
-                                backendError(l10n, l10n.chatPageNotifyFailed(e.message));
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
-                        } finally {
-                          busy.value = false;
-                        }
-                      },
-                // busy 期间请求要好几秒才回，换旋转图标，同保存按钮（老板 2026-10-01）
-                child: isBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2.4),
-                      )
-                    : Text(l10n.chatPageNotifyStop),
-              ),
-            ),
+          // 按钮互斥（老板 2026-10-02）：已设置只给「停用」，未设置只给「保存」。
           ValueListenableBuilder<bool>(
-            valueListenable: busy,
-            builder: (_, isBusy, _) => FilledButton(
-              onPressed: isBusy
-                  ? null
-                  : () async {
-                      final email = ctrl.text.trim();
-                      if (email.isEmpty) {
-                        error.value = l10n.chatPageNotifyEmptyError;
-                        return;
-                      }
-                      // 本机先粗筛（服务端另有 400 兜底）：只卡"有 @ 且两段都非空、不含空格"
-                      if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-                        error.value = l10n.chatPageNotifyInvalidError;
-                        return;
-                      }
-                      busy.value = true;
-                      try {
-                        final api = widget.api ?? ApiClient(effectiveServer);
-                        final status =
-                            await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
-                        if (!mounted) return;
-                        unawaited(_fanoutNotifyEmail(
-                            (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
-                        await _refreshNotifyEmail();
-                        if (ctx.mounted) Navigator.of(ctx).pop(true);
-                        if (mounted) {
-                          showTopNotice(
-                            context,
-                            status.isVerified
-                                ? l10n.chatPageNotifyDone(email)
-                                : l10n.chatPageNotifySent(email),
-                          );
-                        }
-                      } on ApiException catch (e) {
-                        if (ctx.mounted) {
-                          error.value =
-                              backendError(l10n, l10n.chatPageNotifyFailed(e.message));
-                        }
-                      } catch (e) {
-                        if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
-                      } finally {
-                        busy.value = false;
-                      }
-                    },
-              // busy 期间请求要好几秒才回（服务端要发确认信），换成旋转图标，
-              // 否则按钮灰着没动静，用户会以为没点上（老板 2026-10-01）
-              child: isBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2.4),
-                    )
-                  : Text(l10n.save),
-            ),
+            valueListenable: active,
+            builder: (_, isActive, _) => isActive
+                ? ValueListenableBuilder<bool>(
+                    valueListenable: busy,
+                    builder: (_, isBusy, _) => TextButton(
+                      onPressed: isBusy
+                          ? null
+                          : () async {
+                              busy.value = true;
+                              try {
+                                final api = widget.api ?? ApiClient(effectiveServer);
+                                await _withAuth((t) => api.deleteNotifyEmail(t));
+                                if (!mounted) return;
+                                unawaited(_fanoutNotifyEmail(
+                                    (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
+                                await _refreshNotifyEmail();
+                                // 不关弹窗：原地切回"未设置"态（空白可编辑 + 保存）
+                                ctrl.clear();
+                                active.value = false;
+                              } on ApiException catch (e) {
+                                if (ctx.mounted) {
+                                  error.value =
+                                      backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                                }
+                              } catch (e) {
+                                if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                              } finally {
+                                busy.value = false;
+                              }
+                            },
+                      // busy 期间请求要好几秒才回，换旋转图标，同保存按钮（老板 2026-10-01）
+                      child: isBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2.4),
+                            )
+                          : Text(l10n.chatPageNotifyStop),
+                    ),
+                  )
+                : ValueListenableBuilder<bool>(
+                    valueListenable: busy,
+                    builder: (_, isBusy, _) => FilledButton(
+                      onPressed: isBusy
+                          ? null
+                          : () async {
+                              final email = ctrl.text.trim();
+                              if (email.isEmpty) {
+                                error.value = l10n.chatPageNotifyEmptyError;
+                                return;
+                              }
+                              // 本机先粗筛（服务端另有 400 兜底）：只卡"有 @ 且两段都非空、不含空格"
+                              if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                                error.value = l10n.chatPageNotifyInvalidError;
+                                return;
+                              }
+                              busy.value = true;
+                              try {
+                                final api = widget.api ?? ApiClient(effectiveServer);
+                                final status =
+                                    await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
+                                if (!mounted) return;
+                                unawaited(_fanoutNotifyEmail(
+                                    (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
+                                await _refreshNotifyEmail();
+                                if (ctx.mounted) Navigator.of(ctx).pop(true);
+                                if (mounted) {
+                                  showTopNotice(
+                                    context,
+                                    status.isVerified
+                                        ? l10n.chatPageNotifyDone(email)
+                                        : l10n.chatPageNotifySent(email),
+                                  );
+                                }
+                              } on ApiException catch (e) {
+                                if (ctx.mounted) {
+                                  error.value =
+                                      backendError(l10n, l10n.chatPageNotifyFailed(e.message));
+                                }
+                              } catch (e) {
+                                if (ctx.mounted) error.value = l10n.chatPageNotifyFailed('$e');
+                              } finally {
+                                busy.value = false;
+                              }
+                            },
+                      // busy 期间请求要好几秒才回（服务端要发确认信），换成旋转图标，
+                      // 否则按钮灰着没动静，用户会以为没点上（老板 2026-10-01）
+                      child: isBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2.4),
+                            )
+                          : Text(l10n.save),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -1973,6 +1985,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ctrl.dispose();
       error.dispose();
       busy.dispose();
+      active.dispose();
     });
     if (saved == true && mounted) await _refreshNotifyEmail();
   }
