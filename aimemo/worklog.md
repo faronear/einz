@@ -10814,3 +10814,23 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 `app.requestBaseUrl`）——已改：PUT 时把 `requestBaseUrl(req)` 传进 notifier，确认信里的
 确认/退订链接都用它；摘要信（tick 发、无请求上下文）仍用 `EINZ_MAIL_BASE_URL`。
 新增用例 ⑨ 钉住这条（断言链接是 localhost 且不含 yuanjinx），共 12 例全绿。
+## 2026-10-01 服务器 docker 构建失败：npm ci 跨境超时（better-sqlite3）
+
+**现象**：`docker compose up -d --build server` 在 `[build 5/8] RUN npm ci` 挂了 152s 后失败：
+better-sqlite3 的 `prebuild-install` 拉 GitHub Releases 超时 → 回退 `node-gyp rebuild`
+→ 又要从 nodejs.org 拉 Node 头文件 → `ETIMEDOUT`。Dockerfile 里那段注释早就预警了
+"预编译拉不到要回退源码编译"，但只装了工具链、**没给镜像**，所以回退路径照样走不通。
+
+**改法**：Dockerfile 两个阶段各加三个镜像变量（名字是 prebuild-install / node-gyp 写死的，
+见 `prebuild-install/util.js` 的 `getEnvPrefix`，别改）：
+- `npm_config_registry` —— tarball（lock 里本来就是这个源）
+- `npm_config_better_sqlite3_binary_host_mirror` —— **预编译包也走镜像，直接不用编译**（省几分钟）；
+  拼出的 URL 是 `{mirror}/v{version}/better-sqlite3-v{version}-node-v{abi}-linux-x64.tar.gz`，
+  已 curl 验证 npmmirror 上有这个文件（1.0MB，200）
+- `npm_config_disturl` —— 万不得已回退编译时，Node 头文件也走镜像（已验证 9.9MB，200）
+都留成 `ARG`，海外构建可用 `--build-arg` 指回官方源。
+
+**顺带**：DEPLOYMENT.md 排障表补两行（构建跨境超时 / 邮件通知"未启用"的两种成因）。
+
+**没能自己验的部分**：docker 在本机没起（OrbStack 没跑），所以只验了镜像 URL 可达 + 语法，
+真实验证在服务器的重建上。

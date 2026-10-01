@@ -434,6 +434,8 @@ docker compose up -d
 | `flutter analyze`/`build` 中文路径报错 | 仓库路径含非 ASCII（已知缺陷）                            | 拷贝到纯 ASCII 路径构建（如`/tmp/einz-build`），产物拷回    |
 | 撤销后通道仍能认证                     | Server 版本过旧（未含 Phase 4 撤销感知）                  | 重新`npm run build` 部署                                    |
 | 备份命令拒绝执行                       | 未设置`EINZ_DB_BACKUP_KEY`                                | 设置 base64 32B 密钥（§3.2/§5.1）                           |
+| **docker 构建挂在 `RUN npm ci`**       | 大陆构建机跨境拉 GitHub（better-sqlite3 预编译包）与 nodejs.org（Node 头文件）双双超时 | Dockerfile 已内置 npmmirror 三个镜像变量（2026-10-01）；若仍失败，先 `curl -sI -L https://npmmirror.com/mirrors/better-sqlite3/` 验镜像可达，或用 `--build-arg` 覆盖，或改在本机构建后 `docker save \| ssh cn1 docker load` |
+| 邮件通知"未启用"                       | `deployment/.env` 少变量，或服务器上那份**不入库**的 `docker-compose.yml` 没补那 5 行 | §3.2.1；`docker compose exec server sh -c 'env \| grep EINZ_SMTP'` 看有没有 |
 
 ---
 
