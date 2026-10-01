@@ -10759,3 +10759,10 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 **本机（iMac）能不能验**：能，而且值得先在本机验——本机验的是**凭据与投递**（能不能进
 收件箱），服务器验的是**出网**（TCP 出不出得去）。变量直接写在命令行上即可（优先于 .env）。
 本机若在大陆，出网可能要先开 Tailscale exit node。
+**补（同日）**：老板问"探针读 `../../deployment/.env` 是指 `server/package.json` 还是根
+`package.json`"。答：`mail:probe` **只定义在 `server/package.json`**（根 package.json 原本没有），
+且 .env 路径按**脚本自身位置**算（`server/scripts/../../deployment/.env` = `einz/deployment/.env`），
+与 cwd 无关，所以从哪个目录跑都对。顺手在根 package.json 加了转发脚本
+`npm run server-mail-probe`（与既有 `server-run-dev` 同款）。
+**不需要在命令行上拼机密**：.env 里有那 5 项就够了，命令行只留 `EINZ_PROBE_TO`
+（收件人是一次性的、不属于服务配置；若想连它也省掉，写进 .env 也行）。
