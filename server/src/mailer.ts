@@ -57,8 +57,10 @@ export class MailError extends Error {
  * - `EINZ_SMTP_PORT` 默认 587
  * - `EINZ_SMTP_SECURE` `1/true` = 直连 TLS；默认按端口推（465 → true）
  * - `EINZ_SMTP_USER` / `EINZ_SMTP_PASS` 必填（Oracle 是 `ocid1.user.…` + SMTP 凭据）
- * - `EINZ_MAIL_FROM` 必填
- * - `EINZ_MAIL_BASE_URL` 默认 `https://einz.yuanjinx.com`
+ * - `EINZ_MAIL_FROM` 必填（**没有代码内默认值**：空着就是"不启用"的一部分，不给你悄悄
+ *   套一个未在 Email Delivery 登记的 sender——那会以"发出去了但被全数拒收/落垃圾箱"的
+ *   形式静默失败）
+ * - `EINZ_MAIL_BASE_URL` 默认 `https://einz.yuanjinx.com`（邮件里验证/退订链接的站点）
  */
 export function loadMailConfig(): MailConfig | null {
   const host = (process.env.EINZ_SMTP_HOST ?? "").trim();

@@ -182,18 +182,32 @@ docker compose ps                       # 两个服务均 healthy/running
 EINZ_SMTP_HOST=smtp.email.<region>.oci.oraclecloud.com   # 甲骨文 Email Delivery
 EINZ_SMTP_PORT=587                                        # 587=STARTTLS；465 时加 EINZ_SMTP_SECURE=1
 EINZ_SMTP_USER=ocid1.user.oc1..aaaa…                      # 控制台生成的 SMTP 凭据用户名
-EINZ_SMTP_PASS='...'                                      # 控制台生成的 SMTP 凭据（**不是登录密码**）
-EINZ_MAIL_FROM='Einz <notify@einz.yuanjinx.com>'          # 必须已登记为 approved sender
+EINZ_SMTP_PASS='…'                                        # 控制台生成的 SMTP 凭据（**不是登录密码**）
+EINZ_MAIL_FROM='Einz <hi@tic.cc>'                         # 必须已登记为 approved sender
 ```
 
 - **缺任一变量 → 功能整体关闭**（聊天照常，只是不发信），`PUT /notify/email` 返回
   `503 MAIL_DISABLED`。区别于 `EINZ_DB_BACKUP_KEY`：那个缺失是**拒绝执行**，这个是**静默降级**。
-- 上线前先验出网（`EINZ_PROBE_TO` 给一个自己的邮箱，会真的发出一封测试信）：
+- **发件地址没有代码内默认值**：`EINZ_MAIL_FROM` 空着就是关闭的一部分（不给你悄悄套一个
+  没登记过的地址——那会以"发出去了但被全数拒收/落垃圾箱"的形式静默失败）。想换发件地址，
+  改 .env 这一行即可，不用改代码。
+- 发件域名（`tic.cc`）只需要**DNS 上加 SPF/DKIM + 在 Email Delivery 里登记 approved sender**：
+  出站发信不需要备案，与"einz.tic.cc 没备案、不能在国内提供入站服务"是两件事，别混。
+- 验出网（`EINZ_PROBE_TO` 给一个自己的邮箱，会真的发出一封测试信）：
   ```bash
-  EINZ_PROBE_TO=you@example.com npm run mail:probe
+  cd server
+  EINZ_PROBE_TO=you@example.com npm run mail:probe   # 自动读 ../../deployment/.env
   ```
-- 发件域名要配 **SPF/DKIM** 并在 Email Delivery 里登记 approved sender，否则要么被拒收、
-  要么落垃圾箱——能发出去 ≠ 能进收件箱，这俩要分开验。
+  在**本机**验也可以——把那 5 个变量直接写在命令行上（命令行优先于 .env），
+  或 `EINZ_ENV_FILE=某个文件路径 npm run mail:probe`。本机验的是**凭据与投递**
+  （能不能进收件箱），服务器验的是**出网**（TCP 出不出得去），两件事分开看：
+  ```bash
+  EINZ_SMTP_HOST=… EINZ_SMTP_PORT=587 EINZ_SMTP_USER=… EINZ_SMTP_PASS='…' \
+  EINZ_MAIL_FROM='Einz <hi@tic.cc>' EINZ_PROBE_TO=you@example.com npm run mail:probe
+  ```
+  失败时按类型读：`ENOTFOUND / ECONNREFUSED / 超时` = 网络不通（本机在大陆就先开
+  Tailscale exit node）；`535` = 用户名或密码错；`553/554` = 发件地址没登记为
+  approved sender；到信箱里找不着 = SPF/DKIM 没配对。
 
 ### 3.3 验证部署
 

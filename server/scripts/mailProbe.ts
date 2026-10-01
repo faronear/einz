@@ -6,19 +6,67 @@
  * 每一家都放行。先花十秒确认"这条路通不通"，再决定要不要配 A 记录、SPF/DKIM——
  * 顺序反了就是配完一堆 DNS 才发现 TCP 根本出不去。
  *
- * 用法：
- *   EINZ_SMTP_HOST=smtp.email.<region>.oci.oraclecloud.com \
- *   EINZ_SMTP_PORT=587 EINZ_SMTP_USER=ocid1.user.… EINZ_SMTP_PASS='…' \
- *   EINZ_MAIL_FROM='Einz <notify@einz.yuanjinx.com>' \
- *   EINZ_PROBE_TO=you@example.com npm run mail:probe
+ * 用法（两种，任选）：
+ *   1) 环境变量已经在 `deployment/.env` 里（服务器上的常规形态）→ 直接跑，脚本会自己
+ *      去读 `../../deployment/.env`（可用 `EINZ_ENV_FILE` 指向别处）：
+ *        EINZ_PROBE_TO=you@example.com npm run mail:probe
+ *   2) 临时用一组值试（例如在本机 iMac 上验凭据）→ 直接写在命令行上，命令行优先：
+ *        EINZ_SMTP_HOST=smtp.email.<region>.oci.oraclecloud.com \
+ *        EINZ_SMTP_PORT=587 EINZ_SMTP_USER=ocid1.user.… EINZ_SMTP_PASS='…' \
+ *        EINZ_MAIL_FROM='Einz <hi@tic.cc>' \
+ *        EINZ_PROBE_TO=you@example.com npm run mail:probe
+ *
+ * 为什么要自己读 .env（而不是让用户先 source）：**服务端进程不读 .env**——它的变量由
+ * docker compose 注入（deployment/docker-compose.*.yml）。但探针是**运维手动在宿主机上
+ * 跑**的，那一刻 shell 里什么都没有，于是"明明填好了 .env 却报缺配置"。这个脚本是运维
+ * 工具，替它把这一步做掉是合理的；服务端那条路径刻意保持"只认环境变量"，避免容器里
+ * 悄悄吃到一个陈旧的 .env。
  */
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { loadMailConfig, createMailer, MailError } from "../src/mailer.js";
 
+/**
+ * 从 `KEY=VALUE` 文件里补环境变量（**不覆盖**已有的真实环境变量：命令行优先）。
+ * 只认最简单的形态：忽略空行与 `#` 注释、去掉行尾注释不做、去掉 `export ` 前缀、
+ * 剥掉成对的引号。够用了——别把它做成通用 dotenv。
+ */
+function loadEnvFile(path: string): number {
+  if (!existsSync(path)) return 0;
+  let loaded = 0;
+  for (const rawLine of readFileSync(path, "utf8").split("\n")) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim().replace(/^export\s+/, "");
+    let value = line.slice(eq + 1).trim();
+    const quoted =
+      (value.startsWith("'") && value.endsWith("'")) ||
+      (value.startsWith('"') && value.endsWith('"'));
+    if (quoted && value.length >= 2) value = value.slice(1, -1);
+    if (key.length === 0 || process.env[key] !== undefined) continue; // 已有的优先
+    process.env[key] = value;
+    loaded += 1;
+  }
+  return loaded;
+}
+
+/** 探针所在目录 → 仓库根的 deployment/.env（可用 EINZ_ENV_FILE 覆盖）。 */
+const ENV_FILE =
+  process.env.EINZ_ENV_FILE ??
+  resolve(import.meta.dirname ?? process.cwd(), "../../deployment/.env");
+
 async function main(): Promise<void> {
+  const loaded = loadEnvFile(ENV_FILE);
+  if (loaded > 0) console.log(`· 已加载 ${ENV_FILE}（${loaded} 个变量；命令行上的值优先）`);
+
   const to = (process.env.EINZ_PROBE_TO ?? "").trim();
   const cfg = loadMailConfig();
   if (cfg == null) {
     console.error("✗ 缺少 SMTP 配置（需要 EINZ_SMTP_HOST / EINZ_SMTP_USER / EINZ_SMTP_PASS / EINZ_MAIL_FROM）");
+    console.error(`  已尝试读取：${ENV_FILE}（不存在或里面没这几项；也可用 EINZ_ENV_FILE 指定别的文件）`);
+    console.error("  或直接写在命令行上（见本文件顶部注释的用法 2）。");
     process.exitCode = 1;
     return;
   }
