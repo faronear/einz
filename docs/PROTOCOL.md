@@ -82,7 +82,6 @@
 | POST | /auth/challenge | 获取密封 challenge（`entrance_id` + `space_id`） | 通道公钥 |
 | POST | /auth/verify | 提交明文换取 session | challenge |
 | POST | /messages | 上传新消息密文 | Bearer |
-| DELETE | /messages | 删除本空间全部消息与附件（通道保留；删除前保存序号高水位，新消息序号不回卷） | Bearer |
 | GET | /sync?after=<seq>&limit=<n> | 增量拉取（§5） | Bearer |
 | POST | /attachments | 上传附件 blob（分片可选） | Bearer |
 | GET | /attachments/:id | 下载附件 blob | Bearer |

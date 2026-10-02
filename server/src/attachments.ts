@@ -188,23 +188,3 @@ export function cleanupOrphanAttachments(): number {
   }
   return orphans.length;
 }
-
-/** 删除一个空间的全部附件（行 + blob 文件），返回删除数量。高级安全「删除所有消息」用。
- *  文件逐个 best-effort（缺失/占用跳过，记录照删）；记录删除数以实际 SQL changes 为准。 */
-export function clearSpaceAttachments(spaceId: string): number {
-  assertSafeSpaceId(spaceId);
-  const db = getDb();
-  const rows = db
-    .prepare(`SELECT attachment_id, storage_path FROM attachments WHERE space_id = ?`)
-    .all(spaceId) as { attachment_id: string; storage_path: string }[];
-  for (const r of rows) {
-    try {
-      const full = join(FILES_ROOT, r.storage_path);
-      if (existsSync(full)) rmSync(full, { force: true });
-    } catch {
-      // 文件缺失/占用 → 记录仍删（残留文件由 cleanupOrphanAttachments 兜底）
-    }
-  }
-  const res = db.prepare(`DELETE FROM attachments WHERE space_id = ?`).run(spaceId);
-  return res.changes;
-}

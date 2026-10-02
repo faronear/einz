@@ -2728,8 +2728,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (picked == 'passphrase') {
       await _showChangePassphraseDialog();
     } else if (picked == 'clear') {
-      // 「删除所有消息」（老板 2026-10-02）：与销毁通道同一条确认闸门
-      // （通道名 + 已设时的锁屏码），只是文案说明通道保留。
+      // 「删除所有消息」（老板 2026-10-02 定稿：**纯本机删除**，服务端不删）：
+      // 只清本机这份历史，服务端与对方设备上的消息原样保留——本通道继续从原
+      // 同步锚点收新消息。确认闸门与销毁通道同一条（通道名 + 已设时的锁屏码），
+      // 弹窗备注按老板文案说明"通道保留、继续收新消息、其他通道不受影响"。
       final entranceName = await _resolveMyEntranceName();
       final hasPin = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
       if (!mounted) return;
@@ -2741,9 +2743,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
       if (!ok || !mounted) return;
       try {
-        await _withAuth((t) => (widget.api ?? ApiClient(effectiveServer)).clearMessages(t));
-        // 本地同步清：消息行 + 附件元数据行 + stored 模式的明文副本；
-        // 刻意不动 sync_state 锚点（服务端已保存序号高水位，新消息 seq 仍高于游标）
+        // 本机清：消息行 + 附件元数据行 + stored 模式的明文副本 + 媒体缓存。
+        // 刻意**不动 sync_state 锚点**：服务端消息仍在，锚点＝已同步到的最新序号，
+        // 新消息继续从锚点之后增量同步（清零会让下次 sync 整表重拉服务端历史，
+        // 恰好违背"本机删除"的意图）。
         await _repo.clearLocalHistory();
         unawaited(AttachmentStore.clearSpace(widget.spaceId));
         if (!mounted) return;
@@ -2756,7 +2759,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (mounted) showTopNotice(context, l10n.clearMessagesDone);
       } catch (e) {
         if (!mounted) return;
-        // 失败如实提示：本地没清、服务端可能也没清，重试即再走一遍闸门
         showTopNotice(context, backendError(l10n, l10n.clearMessagesFailed('$e')));
       }
     } else if (picked == 'leave') {

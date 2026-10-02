@@ -239,7 +239,6 @@ CREATE TABLE entrance_activity (
 | ----------------- | ------------------------- | ---------------------------------------------------------------------------- |
 | `auth.login`      | `POST /auth/verify`       | `expires_in`                                                                 |
 | `message.post`    | `POST /messages`          | `message_id`、`server_sequence`、`type`（**发送**证据，通道级）              |
-| `message.clear`   | `DELETE /messages`        | `cleared`、`attachments`（高级安全「删除所有消息」，2026-10-02）             |
 | `sync`            | `GET /sync`               | `after_sequence`、`last_sequence`、`received`、`has_more`（**接收**证据）      |
 | `receipt`         | `POST /receipts`          | `reported_delivered`、`reported_read`、`delivered_upto_seq`、`read_upto_seq` |
 | `push.register`   | `POST /push/register`     | `platform`、`token_prefix`（**只落前 8 位**，不落完整推送凭证）              |

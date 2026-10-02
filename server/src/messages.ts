@@ -2,7 +2,7 @@ import { getDb } from "./db.js";
 import { ApiError, touchLastSeen } from "./auth.js";
 import { requireSession } from "./guard.js";
 import { type ServerConfig } from "./config.js";
-import { attachmentsForMessages, clearSpaceAttachments, type AttachmentMeta } from "./attachments.js";
+import { attachmentsForMessages, type AttachmentMeta } from "./attachments.js";
 import { assertSafeMessageId } from "./safeId.js";
 
 const ALLOWED_TYPES = new Set(["text", "image", "video", "voice", "audio", "file", "system"]);
@@ -55,27 +55,6 @@ function validateEnvelope(body: unknown): MessageEnvelope {
   };
 }
 
-/** meta 键前缀：per-space 的 server_sequence 高水位。「删除所有消息」把消息行整表
- *  清掉后，靠它保证序号**绝不回卷**（见 clearMessages 文档）。 */
-const SEQ_WATERMARK_PREFIX = "messages_seq_watermark.";
-
-function seqWatermark(spaceId: string): number {
-  const row = getDb()
-    .prepare(`SELECT value FROM meta WHERE key = ?`)
-    .get(`${SEQ_WATERMARK_PREFIX}${spaceId}`) as { value: string } | undefined;
-  const n = Number(row?.value);
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0;
-}
-
-function saveSeqWatermark(spaceId: string, seq: number): void {
-  getDb()
-    .prepare(
-      `INSERT INTO meta (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    )
-    .run(`${SEQ_WATERMARK_PREFIX}${spaceId}`, String(seq));
-}
-
 /** POST /messages：持久化密文并分配 server_sequence；同一 message_id 幂等（PROTOCOL.md §5.1）。
  *  Multiverse：写入 session 绑定的 Space（legacy 回落 cfg.space_id），幂等与
  *  server_sequence 均按 Space 隔离（PROTOCOL_MULTIVERSE.md §3.6）。 */
@@ -107,14 +86,10 @@ export function postMessage(token: string, body: unknown): { message_id: string;
   }
 
   const now = Date.now();
-  // Multiverse：server_sequence 按 Space 独立递增（不是全局）。
-  // 高水位夹紧（2026-10-02）：消息行可被 clearMessages 整表清掉，但序号不回卷——
-  // 否则清空后客户端的同步游标（after=旧水位）会永远收不到新消息（新消息 seq 从
-  // 1 重新分配，被 WHERE server_sequence > after 滤掉），且无任何报错。
-  const maxRow = db
-    .prepare(`SELECT COALESCE(MAX(server_sequence), 0) AS max_seq FROM messages WHERE space_id = ?`)
-    .get(spaceId) as { max_seq: number };
-  const nextSeq = { next: Math.max(maxRow.max_seq, seqWatermark(spaceId)) + 1 };
+  // Multiverse：server_sequence 按 Space 独立递增（不是全局）
+  const nextSeq = db
+    .prepare(`SELECT COALESCE(MAX(server_sequence), 0) + 1 AS next FROM messages WHERE space_id = ?`)
+    .get(spaceId) as { next: number };
 
   db.prepare(
     `INSERT INTO messages (message_id, space_id, sender_entrance_id, sender_member_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
@@ -122,29 +97,6 @@ export function postMessage(token: string, body: unknown): { message_id: string;
   ).run(env.message_id, spaceId, env.sender_entrance_id, env.sender_member_id ?? null, env.type, env.key_version, env.nonce, env.ciphertext, nextSeq.next, now);
 
   return { message_id: env.message_id, server_sequence: nextSeq.next, created_at: now };
-}
-
-/** DELETE /messages：删除本空间的全部消息与附件（高级安全「删除所有消息」，老板 2026-10-02）。
- *  通道保留、继续可用、继续收新消息；消息按 space 隔离，其他空间的通道不受影响。
- *
- *  删除前把序号高水位持久化进 meta：消息行整表清掉后 server_sequence **绝不回卷**——
- *  否则双方客户端的同步游标（after=旧水位）会永远滤掉重新从 1 分配的新消息，
- *  且无任何报错（历史重演：回执/同步类 bug 全是"静默丢数据"最难查）。 */
-export function clearMessages(token: string): { cleared: number; attachments: number } {
-  const { entrance_id, space_id: sessionSpace } = requireSession(token);
-  touchLastSeen(entrance_id);
-  const spaceId = sessionSpace ?? ""; // guard 已拒绝无空间会话，此处只是类型收窄
-
-  const db = getDb();
-  const maxRow = db
-    .prepare(`SELECT COALESCE(MAX(server_sequence), 0) AS max_seq FROM messages WHERE space_id = ?`)
-    .get(spaceId) as { max_seq: number };
-  if (maxRow.max_seq > seqWatermark(spaceId)) {
-    saveSeqWatermark(spaceId, maxRow.max_seq);
-  }
-  const attachments = clearSpaceAttachments(spaceId);
-  const res = db.prepare(`DELETE FROM messages WHERE space_id = ?`).run(spaceId);
-  return { cleared: res.changes, attachments };
 }
 
 /** GET /sync?after=&limit=：按 server_sequence 增量拉取（PROTOCOL.md §5.2）。 */

@@ -243,9 +243,11 @@ class MessageRepository {
     return row?.lastServerSequence ?? 0;
   }
 
-  /// 清空本空间全部本地消息与附件元数据（高级安全「删除所有消息」服务端成功后的
-  /// 本地同步清）。刻意**不动 sync_state 锚点**：服务端删除前保存了序号高水位，
-  /// 新消息 seq 继续高于本地游标，锚点原样即可对上（清零反而会整表重拉旧序号）。
+  /// 清空本空间全部**本机**消息与附件元数据（高级安全「删除所有消息」，2026-10-02
+  /// 老板定稿：纯本机删除，服务端与对方设备不动）。
+  /// 刻意**不动 sync_state 锚点**：服务端消息仍在，锚点＝已同步到的最新序号，
+  /// 新消息继续从锚点之后增量同步（清零会让下次 sync 整表重拉服务端历史，
+  /// 恰好违背"本机删除"的意图）。
   Future<void> clearLocalHistory() async {
     await (db.delete(db.localAttachments)..where((a) => a.spaceId.equals(spaceId))).go();
     await (db.delete(db.localMessages)..where((m) => m.spaceId.equals(spaceId))).go();
