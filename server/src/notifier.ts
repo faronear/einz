@@ -642,6 +642,20 @@ export async function setNotifyEmail(
   if (row.verified_at != null) {
     return { email, state: "verified", verification_sent: false };
   }
+  // 扇出防重（2026-10-02 老板实测踩到）：App 会把同一地址紧接着 PUT 到本机其它空间，
+  // 几秒内连发 N 次。若 60s 内已有一枚未用的 verify token（= 刚发过确认信），
+  // 复用它且不重发——否则 ensureVerifyToken 会把旧 token 删掉重造，
+  // N 封信里只有最后一枚链接有效，前面的全是死链接。
+  const recentToken = db
+    .prepare(
+      `SELECT token, created_at FROM notify_tokens
+        WHERE email = ? AND kind = 'verify' AND used_at IS NULL AND expires_at >= ?
+        ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(email, now) as { token: string; created_at: number } | undefined;
+  if (recentToken != null && now - (recentToken as any).created_at < 60_000) {
+    return { email, state: "pending", verification_sent: false };
+  }
   const mailer = opts.mailer === undefined ? currentMailer() : opts.mailer;
   if (mailer == null) {
     throw new ApiError("MAIL_DISABLED", "邮件通知未启用：服务端缺 SMTP 配置", 503);

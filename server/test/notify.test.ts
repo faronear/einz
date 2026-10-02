@@ -18,6 +18,7 @@ import { hashSessionToken } from "../src/auth.js";
 import { getDb, openDb } from "../src/db.js";
 import {
   buildSummaryMail,
+  consumeNotifyToken,
   notifyParams,
   planNotifications,
   runNotifyTick,
@@ -256,6 +257,61 @@ test("邮件通知：④ 冷却期内不发；日上限到了也不发", () => {
     // 换一天（sent_day 过期）→ 恢复
     db.prepare(`UPDATE notify_emails SET sent_day = ? WHERE email = ?`).run("2020-01-01", EMAIL);
     assert.equal(planNotifications(now).length, 1);
+  });
+});
+
+test("邮件通知：⑩ 扇出防重——60s 内重复 PUT 未验证地址不重发、token 不被冲掉", async () => {
+  await new Promise<void>((resolve, reject) => {
+    const dir = mkdtempSync(join(tmpdir(), "einz-notify-fanout-"));
+    const done = (err?: unknown): void => {
+      rmSync(dir, { recursive: true, force: true });
+      if (err) reject(err);
+      else resolve();
+    };
+    try {
+      openDb(join(dir, "notify.db"));
+      seed({ unverified: true });
+      // 第二个空间的会话（模拟扇出 PUT 用另一空间的会话调同一地址）：
+      // 需要该空间里在册的 entrance + 成员身份（requireSession 校验白名单）
+      const db2 = getDb();
+      db2.prepare(
+        `INSERT INTO entrances (entrance_id, member_id, public_key, status, last_seen, created_at)
+         VALUES (?, ?, 'pk', 'active', ?, ?)`,
+      ).run("dev-me-b", ME, Date.now() - 60 * 60_000, Date.now());
+      db2.prepare(
+        `INSERT INTO space_members (space_id, member_id, slot, display_name, status, joined_at)
+         VALUES (?, ?, 0, '我', 'active', ?)`,
+      ).run(OTHER_SPACE, ME, Date.now());
+      db2.prepare(
+        `INSERT INTO sessions (session_token, entrance_id, space_id, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).run(hashSessionToken("tok-other-space"), "dev-me-b", "space-b", Date.now() + 3_600_000, Date.now());
+      const sent: OutgoingMail[] = [];
+      const opts = { mailer: fakeMailer(sent), lang: "zh", baseUrl: "http://localhost:3000" };
+      void setNotifyEmail("tok-me", EMAIL, opts)
+        .then((first) => {
+          assert.equal(first.state, "pending");
+          assert.equal(first.verification_sent, true);
+          // 第二次 PUT（模拟 App 扇出到另一个空间，几秒内）：不重发
+          return setNotifyEmail("tok-other-space", EMAIL, opts);
+        })
+        .then((second) => {
+          try {
+            assert.equal(second.state, "pending");
+            assert.equal(second.verification_sent, false, "60s 内不重发确认信");
+            assert.equal(sent.length, 1, "只发了一封");
+            // 第一封信里的 verify token 仍可用（没被第二次 PUT 冲掉）
+            const link = /\/notify\/verify\?token=([A-Za-z0-9_-]+)/.exec(sent[0]!.text!)![1]!;
+            assert.deepEqual(consumeNotifyToken(link, "verify"), { ok: true, email: EMAIL });
+            done();
+          } catch (e) {
+            done(e);
+          }
+        })
+        .catch(done);
+    } catch (e) {
+      done(e);
+    }
   });
 });
 
