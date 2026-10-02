@@ -492,6 +492,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGenderLabel => 'Gender';
 
   @override
+  String get chatPageRenameEntranceTitle => 'Current entrance';
+
+  @override
+  String get chatPageRenameEntranceHint =>
+      'Rename the current entrance, up to 32 characters';
+
+  @override
   String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';
 
   @override
@@ -651,9 +658,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceListThisDevice => 'Current entrance name';
-
-  @override
-  String get chatPageEntranceListAll => 'All my entrances';
 
   @override
   String get chatPageEntranceListNew => 'Generate entrance token';

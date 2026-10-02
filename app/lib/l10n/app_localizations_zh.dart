@@ -468,6 +468,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
+  String get chatPageRenameEntranceTitle => '当前通道';
+
+  @override
+  String get chatPageRenameEntranceHint => '修改当前通道名称，不超过32字符';
+
+  @override
   String get chatPageRenameEntranceEmptyError => '请填写通道名称';
 
   @override
@@ -617,9 +623,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceListThisDevice => '当前通道名称';
-
-  @override
-  String get chatPageEntranceListAll => '我的所有通道';
 
   @override
   String get chatPageEntranceListNew => '新建通道';

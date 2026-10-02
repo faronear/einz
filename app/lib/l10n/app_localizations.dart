@@ -956,6 +956,18 @@ abstract class AppLocalizations {
   /// **'Gender'**
   String get chatPageGenderLabel;
 
+  /// No description provided for @chatPageRenameEntranceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Current entrance'**
+  String get chatPageRenameEntranceTitle;
+
+  /// No description provided for @chatPageRenameEntranceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename the current entrance, up to 32 characters'**
+  String get chatPageRenameEntranceHint;
+
   /// No description provided for @chatPageRenameEntranceEmptyError.
   ///
   /// In en, this message translates to:
@@ -1231,12 +1243,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Current entrance name'**
   String get chatPageEntranceListThisDevice;
-
-  /// No description provided for @chatPageEntranceListAll.
-  ///
-  /// In en, this message translates to:
-  /// **'All my entrances'**
-  String get chatPageEntranceListAll;
 
   /// No description provided for @chatPageEntranceListNew.
   ///

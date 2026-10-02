@@ -2898,15 +2898,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => AlertDialog(
         // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(child: Text(l10n.chatPageMenuEntranceList)),
+        title: Center(child: Text(l10n.chatPageRenameEntranceTitle)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 说明"名称只属于当前秘境"：多空间下同一条通道在每个秘境各有名称，
-            // 不点明会让人以为改的是全局名（老板 2026-09-22 定：承认 per-space）
+            // 大标题下的备注（老板 2026-10-02）：点明这里改的是什么、上限多少
             Text(
-              l10n.chatPageEntranceScopeHint,
+              l10n.chatPageRenameEntranceHint,
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(ctx).colorScheme.outline,
@@ -2974,8 +2973,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             onPressed: () async {
               final err = await _applyEntranceName(ctrl.text, l10n);
               if (err != null) {
-                if (ctx.mounted) showTopNotice(ctx, err);
-                return; // 校验/保存失败：留在弹窗里（错误已顶部通知）
+                // 错误**就地显示**：红字挂在输入框下方（与 PIN 修改弹窗同款），
+                // 不再弹弹窗外的顶部通知条（老板 2026-10-02）
+                nameError.value = err;
+                return; // 校验/保存失败：留在弹窗里改
               }
               if (ctx.mounted) Navigator.of(ctx).pop(true);
             },
