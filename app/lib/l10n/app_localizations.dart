@@ -1406,6 +1406,24 @@ abstract class AppLocalizations {
   /// **'Quote'**
   String get chatPageActionQuote;
 
+  /// No description provided for @chatPageActionSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get chatPageActionSave;
+
+  /// No description provided for @chatPageAttachmentSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get chatPageAttachmentSaved;
+
+  /// No description provided for @chatPageFileSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed: {error}'**
+  String chatPageFileSaveFailed(Object error);
+
   /// No description provided for @chatPageActionBurn.
   ///
   /// In en, this message translates to:

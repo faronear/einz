@@ -715,6 +715,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageActionQuote => '引用';
 
   @override
+  String get chatPageActionSave => '保存';
+
+  @override
+  String get chatPageAttachmentSaved => '已保存。';
+
+  @override
+  String chatPageFileSaveFailed(Object error) {
+    return '保存失败: $error';
+  }
+
+  @override
   String get chatPageActionBurn => '阅后即焚';
 
   @override

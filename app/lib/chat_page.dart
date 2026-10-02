@@ -4014,6 +4014,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     label: l10n.chatPageCopy,
                     onTap: () => Navigator.of(ctx).pop('copy'),
                   ),
+                // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件
+                // 存到本机（系统保存对话框选位置）；放「引用」后面
+                if (m.attachment != null)
+                  _buildActionCard(
+                    icon: Icons.save_alt,
+                    label: l10n.chatPageActionSave,
+                    onTap: () => Navigator.of(ctx).pop('save'),
+                  ),
                 // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
                 _buildActionCard(
                   icon: Icons.timer_outlined,
@@ -4041,6 +4049,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } else if (action == 'copy') {
       await Clipboard.setData(ClipboardData(text: m.plaintext.trim()));
       if (mounted) showTopNotice(context, l10n.setupCreateCopied);
+    } else if (action == 'save') {
+      await _saveAttachment(m);
     } else if (action == 'burn') {
       await _setMessageBurn(m);
     }
@@ -5110,6 +5120,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (thumb == null) throw StateError('视频缩略图取帧失败');
         return thumb;
       });
+
+  /// 保存媒体附件到本机（长按菜单「保存」，老板 2026-10-02）：弹出系统保存
+  /// 对话框（桌面）选位置 / 写应用文档目录（移动）。文件名用消息正文里的原名；
+  /// 写入失败弹顶部通知（下载/解密失败同口径）。
+  Future<void> _saveAttachment(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final bytes = await _attachmentBytes(m);
+      // 原名兜底：语音固定 .m4a；其余从正文取后缀
+      final ext = _attachmentExtOf(m);
+      final base = m.env.type == 'voice'
+          ? 'voice-${m.env.messageId.substring(0, 8)}'
+          : m.plaintext.trim().isEmpty
+              ? m.env.messageId.substring(0, 8)
+              : m.plaintext.trim();
+      final fileName = base.contains('.') || ext.isEmpty ? base : '$base.$ext';
+      // file_picker 12.x：saveFile 同 pickFiles 一样是静态方法（返回目标 Uri，取消为 null）
+      final target = await FilePicker.saveFile(
+        fileName: fileName,
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      // 用户取消（null）不算失败，静默返回
+      if (target == null) return;
+      showTopNotice(context, l10n.chatPageAttachmentSaved);
+    } catch (e) {
+      if (!mounted) return;
+      showTopNotice(context, l10n.chatPageFileSaveFailed('$e'));
+    }
+  }
 
   /// 附件明文：发送端优先本地密文解密（上传完成前/失败后也能即时显示），
   /// 无本地密文（接收端）走服务端拉取。
@@ -6310,7 +6350,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         // 点击直接执行，不用进长按菜单；墓碑消息
                                         // 无内容可操作，不显示
                                         if (!m.deleted) ...[
-                                          const SizedBox(width: 2),
+                                          // 时间戳 → 引用图标：比动作间间隔多 4（补齐
+                                          // 图标自身 padding 造成的不对称，老板 2026-10-02）
+                                          const SizedBox(width: 6),
                                           _bubbleQuickAction(
                                             m,
                                             icon: Icons.format_quote,
@@ -6321,6 +6363,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             },
                                           ),
                                           const SizedBox(width: 2),
+                                          // 拷贝仅文字消息；媒体消息（图片/视频/音频/
+                                          // 文件）换成「保存」——直接写本机，同长按
+                                          // 菜单「保存」（老板 2026-10-02）
                                           if (m.env.type == 'text')
                                             _bubbleQuickAction(
                                               m,
@@ -6334,6 +6379,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                     this.context, l10n.setupCreateCopied);
                                               },
                                             ),
+                                          if (m.attachment != null)
+                                            _bubbleQuickAction(
+                                              m,
+                                              icon: Icons.save_alt,
+                                              label: l10n.chatPageActionSave,
+                                              onTap: () => _saveAttachment(m),
+                                            ),
                                         ],
                                         if (m.expiresAt != null) ...[
                                           const SizedBox(width: 4),
@@ -6346,7 +6398,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           if (!m.deleted)
                                             Material(
                                               color: Colors.transparent,
-                                              shape: const CircleBorder(), // 圆形背景（同快捷动作）
+                                              // 长条控件（沙漏+时长）用圆角矩形背景，
+                                              // 不跟快捷图标走圆形（老板 2026-10-02）
+                                              borderRadius: BorderRadius.circular(12),
                                               clipBehavior: Clip.antiAlias,
                                               child: InkWell(
                                                 // 悬浮/点击背景同快捷动作/状态栏图标

@@ -754,6 +754,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageActionQuote => 'Quote';
 
   @override
+  String get chatPageActionSave => 'Save';
+
+  @override
+  String get chatPageAttachmentSaved => 'Saved.';
+
+  @override
+  String chatPageFileSaveFailed(Object error) {
+    return 'Save failed: $error';
+  }
+
+  @override
   String get chatPageActionBurn => 'Burn after reading';
 
   @override
