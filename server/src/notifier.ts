@@ -509,16 +509,15 @@ export function buildSummaryMail (
 
   const text = [
     copy.greeting(plan.displayName),
-    null,
+    '\n',
     copy.count(plan.total),
-    null,
+    '\n',
     ...lines,
-    null,
+    '\n',
     copy.openApp(),
-    null,
+    '\n',
     copy.noContent(),
-    null,
-    '——',
+    '\n——\n',
     copy.stop(unsubscribeUrl)
   ]
     .filter(l => l !== null)
