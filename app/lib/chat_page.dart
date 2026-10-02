@@ -142,8 +142,9 @@ class _EntranceNameRowState extends State<_EntranceNameRow> {
   bool _saving = false;
   String? _error;
 
-  /// 「本机」标记（l10n）；valueStyle 覆盖不了它的淡色，所以单独存 labelStyle
-  String get _thisDeviceLabel => AppLocalizations.of(context)!.chatPageEntranceListThisDevice;
+  /// 「当前通道」小标题（l10n，2026-10-02 老板定：从行内挪到输入框上方）
+  String get _currentEntranceLabel =>
+      AppLocalizations.of(context)!.chatPageEntranceListThisDevice;
 
   @override
   void dispose() {
@@ -170,78 +171,117 @@ class _EntranceNameRowState extends State<_EntranceNameRow> {
 
   @override
   Widget build(BuildContext context) {
-    final name = _ctrl.text.trim();
+    // 小标题（淡色 caption、粗体，老板 2026-10-02 定）：「当前通道」在输入框上方
+    final sectionLabel = TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: Theme.of(context).colorScheme.onSurfaceVariant);
     if (!_editing) {
-      return InkWell(
-        mouseCursor: SystemMouseCursors.click,
-        onTap: () {
-          setState(() => _editing = true);
-          WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
+      // 只读态沿用原「当前通道」弹窗的式样（老板 2026-10-02）：OutlineInputBorder
+      // 边框 + 只读文字 + 右侧铅笔——光秃秃一行文字没有"可点击"的暗示。
+      // 透明背景（不加白底，与编辑态白底区分，同原弹窗口径）。
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_currentEntranceLabel, style: sectionLabel),
+          const SizedBox(height: 4),
+          Row(
             children: [
-              Text(_thisDeviceLabel, style: widget.labelStyle),
-              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  name.isNotEmpty ? name : widget.hint,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: widget.valueStyle,
+                child: InkWell(
+                  mouseCursor: SystemMouseCursors.click,
+                  onTap: () {
+                    setState(() => _editing = true);
+                    WidgetsBinding.instance.addPostFrameCallback(
+                        (_) => _focus.requestFocus());
+                  },
+                  borderRadius: BorderRadius.circular(4),
+                  child: TextField(
+                    controller: _ctrl,
+                    readOnly: true,
+                    style: widget.valueStyle,
+                    // 拦截输入框自己拿焦点/光标，点击统一走 onTap 进编辑态
+                    showCursor: false,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                      counterText: '',
+                      // 名字为空时框内兜底显示 id（与原菜单行同口径），淡色不与真名混淆
+                      hintText:
+                          widget.initialName.trim().isEmpty ? widget.hint : null,
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.edit, size: 18),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          setState(() => _editing = true);
+                          WidgetsBinding.instance.addPostFrameCallback(
+                              (_) => _focus.requestFocus());
+                        },
+                      ),
+                    ),
+                    onTap: () {
+                      setState(() => _editing = true);
+                      WidgetsBinding.instance
+                          .addPostFrameCallback((_) => _focus.requestFocus());
+                    },
+                  ),
                 ),
               ),
-              Icon(Icons.edit, size: 16, color: widget.labelStyle.color),
             ],
           ),
-        ),
+        ],
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: TextField(
-            controller: _ctrl,
-            focusNode: _focus,
-            autofocus: false,
-            maxLength: kEntranceNameMaxLength,
-            style: widget.valueStyle,
-            decoration: InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor: Colors.white,
-              counterText: '',
-              border: const OutlineInputBorder(),
-              errorText: _error,
-            ),
-            onSubmitted: (_) => _saving ? null : _save(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _saving
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
-              )
-            : IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: '保存',
-                icon: const Icon(Icons.check, size: 18),
-                onPressed: _save,
+        Text(_currentEntranceLabel, style: sectionLabel),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _ctrl,
+                focusNode: _focus,
+                autofocus: false,
+                maxLength: kEntranceNameMaxLength,
+                style: widget.valueStyle,
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  counterText: '',
+                  border: const OutlineInputBorder(),
+                  errorText: _error,
+                ),
+                onSubmitted: (_) => _saving ? null : _save(),
               ),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          tooltip: '取消',
-          icon: const Icon(Icons.close, size: 18),
-          onPressed: () => setState(() {
-            _editing = false;
-            _error = null;
-            _ctrl.text = widget.initialName;
-          }),
+            ),
+            const SizedBox(width: 8),
+            _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                  )
+                : IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: '保存',
+                    icon: const Icon(Icons.check, size: 18),
+                    onPressed: _save,
+                  ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: '取消',
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: () => setState(() {
+                _editing = false;
+                _error = null;
+                _ctrl.text = widget.initialName;
+              }),
+            ),
+          ],
         ),
       ],
     );
@@ -2312,7 +2352,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  // 标题下备注行（老板 2026-10-02）：沿用原「当前通道」弹窗的说明文案，
+                  // 式样同「阅后即焚」弹层标题下的说明（淡色小字、居中）。
+                  // 上移 5（老板 2026-10-02：标题行由 40 的刷新按钮撑起，视觉间隙
+                  // 约 10，减半增加整体感——与阅后即焚弹层的标题-备注收缩同步做）
+                  Transform.translate(
+                    offset: const Offset(0, -5),
+                    child: Center(
+                      child: Text(
+                        l10n.chatPageEntranceScopeHint,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(ctx).colorScheme.outline),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   // 当前通道行（2026-10-02 合并「通道名称」入口至此）：本机标记 +
                   // 通道名 + 铅笔。点名字或铅笔 → 行内变白底输入框 + 保存/取消，
                   // 复用 _applyEntranceName 的校验与保存（与改名弹窗同一条逻辑）
@@ -2339,7 +2395,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       );
                     },
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 20),
+                  // 「所有通道」小标题（老板 2026-10-02 定）：与上方「当前通道」
+                  // 小标题同款淡色 caption，隔开改名行与卡片组
+                  Text(l10n.chatPageEntranceListAll,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                  const SizedBox(height: 4),
                   // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
                   // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
                   // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；

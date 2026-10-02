@@ -646,7 +646,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load other entrances (offline?)';
 
   @override
-  String get chatPageEntranceListThisDevice => 'This device';
+  String get chatPageEntranceScopeHint =>
+      'An entrance is the dedicated line between a device and a space. You can setup an entrance to the same space on each of your devices.';
+
+  @override
+  String get chatPageEntranceListThisDevice => 'Current entrance name';
+
+  @override
+  String get chatPageEntranceListAll => 'All my entrances';
 
   @override
   String get chatPageEntranceListNew => 'Generate entrance token';

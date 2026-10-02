@@ -1220,11 +1220,23 @@ abstract class AppLocalizations {
   /// **'Could not load other entrances (offline?)'**
   String get chatPageEntranceListFailed;
 
+  /// No description provided for @chatPageEntranceScopeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'An entrance is the dedicated line between a device and a space. You can setup an entrance to the same space on each of your devices.'**
+  String get chatPageEntranceScopeHint;
+
   /// No description provided for @chatPageEntranceListThisDevice.
   ///
   /// In en, this message translates to:
-  /// **'This device'**
+  /// **'Current entrance name'**
   String get chatPageEntranceListThisDevice;
+
+  /// No description provided for @chatPageEntranceListAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All my entrances'**
+  String get chatPageEntranceListAll;
 
   /// No description provided for @chatPageEntranceListNew.
   ///

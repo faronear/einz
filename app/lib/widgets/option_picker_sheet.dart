@@ -105,9 +105,11 @@ class _OptionPickerSheetState extends State<OptionPickerSheet> {
         builder: (ctx, setSheetState) => Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 标题**居中**（老板 2026-09-15）：靠左会与下面的选项行分不清层次
+            // 标题**居中**（老板 2026-09-15）：靠左会与下面的选项行分不清层次。
+            // 下边距 5（老板 2026-10-02：原标题-备注 10 太开，减半增加整体感；
+            // 有 note 的弹层由此获得紧凑的标题组）
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 5),
               child: Center(
                 child: Text(widget.title,
                     style: const TextStyle(
