@@ -2751,6 +2751,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         unawaited(AttachmentStore.clearSpace(widget.spaceId));
         if (!mounted) return;
         setState(() {
+          // 内存列表立即清屏（老板 2026-10-02 实测缺陷：只清库不清内存，要切空间
+          // 再切回来才消失——_refreshLocal 是增量合并，拉不到"新"消息，冲不掉
+          // 还在内存里的旧列表）。分页游标一并复位：本地库已空，没有更早历史；
+          // 引用条若正引用被删的消息一并撤掉（悬挂引用会把已删内容带进下一条发送）。
+          _messages = [];
+          _hasMoreOlder = false;
+          _quoteTarget = null;
           _imageCache.clear();
           _videoCache.clear();
           _videoThumbCache.clear();
