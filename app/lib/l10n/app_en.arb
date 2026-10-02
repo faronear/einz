@@ -301,7 +301,7 @@
   "chatPageMenuMyNameLabel": "My identity",
   "chatPageMenuEntranceList": "My entrances",
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
-  "chatPageEntranceScopeHint": "An entrance is the dedicated line between a device and a space. You can setup an entrance to the same space on each of your devices.",
+  "chatPageEntranceScopeHint": "Entrances are dedicated lines between devices and spaces. Every entrance works with only a single device in a single space.",
   "chatPageEntranceListThisDevice": "Current entrance name",
   "chatPageEntranceListAll": "All my entrances",
   "chatPageEntranceListNew": "Generate entrance token",

@@ -1223,7 +1223,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance is the dedicated line between a device and a space. You can setup an entrance to the same space on each of your devices.'**
+  /// **'Entrances are dedicated lines between devices and spaces. Every entrance works with only a single device in a single space.'**
   String get chatPageEntranceScopeHint;
 
   /// No description provided for @chatPageEntranceListThisDevice.

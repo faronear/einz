@@ -12,6 +12,11 @@
 	     沙盒下必须显式声明，否则 open panel 选完也读不到内容 -->
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
+	<!-- 保存对话框（FilePicker.saveFile，长按菜单/气泡「保存」）：写用户选中的位置
+	     需要 read-write（老板 2026-10-02 实测：只有 read-only 时 saveFile 弹
+	     platformexception entitlement_required_write）。 -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
 	<!-- 这里**不能**再出现 keychain-access-groups：它只能由 provisioning profile
 	     授权，Developer ID 分发没有 profile → 内核 Taskgated 判 Invalid Signature，
 	     双击即「应用程序无法打开」。桌面端已改用文件型 Keychain

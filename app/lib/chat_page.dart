@@ -6430,7 +6430,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               ),
                                             )
                                           else ...[
-                                            // 墓碑（已焚毁/已删除）：纯显示不可点
+                                            // 墓碑（已焚毁/已删除）：纯显示不可点。
+                                            // 前面多补 4（老板 2026-10-02）：活消息那路
+                                            // 沙漏带 4 padding，墓碑裸排会窄一截
+                                            const SizedBox(width: 4),
                                             _BurnHourglass(burned: m.deleted),
                                             const SizedBox(width: 2),
                                             Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,

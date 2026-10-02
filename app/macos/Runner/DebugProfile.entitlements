@@ -16,6 +16,11 @@
 	     就是这个差异：Release.entitlements 早就有这一项，DebugProfile 漏了）。 -->
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
+	<!-- 保存对话框（FilePicker.saveFile，长按菜单/气泡「保存」）：写用户选中的位置
+	     需要 read-write（老板 2026-10-02 实测：只有 read-only 时 saveFile 弹
+	     platformexception entitlement_required_write）。 -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)cc.tic.einz</string>

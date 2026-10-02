@@ -647,7 +647,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      'An entrance is the dedicated line between a device and a space. You can setup an entrance to the same space on each of your devices.';
+      'Entrances are dedicated lines between devices and spaces. Every entrance works with only a single device in a single space.';
 
   @override
   String get chatPageEntranceListThisDevice => 'Current entrance name';
