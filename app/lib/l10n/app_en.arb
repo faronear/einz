@@ -303,7 +303,7 @@
   "chatPageMenuMyNameLabel": "My identity",
   "chatPageMenuEntranceList": "My entrances",
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
-  "chatPageEntranceScopeHint": "Entrances are dedicated lines between devices and spaces. Every entrance works with only a single device in a single space.",
+  "chatPageEntranceScopeHint": "An entrance connects a device to a space. Below are all your entrances to this space.",
   "chatPageEntranceListThisDevice": "Current entrance name",
   "chatPageEntranceListNew": "Generate entrance token",
   "chatPageEntranceListRefresh": "Refresh",

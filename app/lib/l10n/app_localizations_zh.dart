@@ -618,8 +618,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
 
   @override
-  String get chatPageEntranceScopeHint =>
-      '通道是你的设备连接到秘境的专属线路。每个通道只能用于一个设备和一个秘境。';
+  String get chatPageEntranceScopeHint => '通道是设备连接到秘境的专属线路。以下是您的连接到当前秘境的所有通道。';
 
   @override
   String get chatPageEntranceListThisDevice => '当前通道名称';
