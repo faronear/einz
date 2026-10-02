@@ -2394,31 +2394,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             right: 6,
                                             // 本机 = 编辑图标（老板 2026-10-02：当前通道
                                             // 改名从这张卡进——点击关掉弹层，错峰弹改名
-                                            // 弹窗）；已撤销 = 阻止图标。编辑角标给
-                                            // **纯圆底** + 6 内边距（老板 2026-10-02：
-                                            // 之前 padding 0、图标贴边挤成方框，难看）。
+                                            // 弹窗）；已撤销 = 阻止图标。编辑角标**显式**
+                                            // Material 圆形底 + 6 内边距（老板 2026-10-02：
+                                            // IconButton 默认底衬是圆角矩形不是纯圆，
+                                            // padding 0 时图标贴边更难看）。
                                             child: isLocal
-                                                ? IconButton(
-                                                    tooltip: l10n.chatPageEdit,
-                                                    icon: const Icon(Icons.edit,
-                                                        size: 14),
-                                                    style: IconButton.styleFrom(
+                                                ? Tooltip(
+                                                    message: l10n.chatPageEdit,
+                                                    child: Material(
+                                                      color:
+                                                          Colors.transparent,
                                                       shape: const CircleBorder(),
-                                                      padding:
-                                                          const EdgeInsets.all(6),
+                                                      clipBehavior:
+                                                          Clip.antiAlias,
+                                                      child: InkWell(
+                                                        customBorder:
+                                                            const CircleBorder(),
+                                                        onTap: () {
+                                                          // 先收起弹层再开弹窗（与
+                                                          // 「新建通道」同款错峰，避免
+                                                          // Overlay 交叉卸载断言）
+                                                          Navigator.of(ctx).pop();
+                                                          _menuAction(
+                                                              _showRenameEntranceDialog);
+                                                        },
+                                                        child: const Padding(
+                                                          padding:
+                                                              EdgeInsets.all(6),
+                                                          child: Icon(
+                                                              Icons.edit,
+                                                              size: 14),
+                                                        ),
+                                                      ),
                                                     ),
-                                                    visualDensity:
-                                                        VisualDensity.compact,
-                                                    constraints:
-                                                        const BoxConstraints(),
-                                                    onPressed: () {
-                                                      // 先收起弹层再开弹窗（与
-                                                      // 「新建通道」同款错峰，避免
-                                                      // Overlay 交叉卸载断言）
-                                                      Navigator.of(ctx).pop();
-                                                      _menuAction(
-                                                          _showRenameEntranceDialog);
-                                                    },
                                                   )
                                                 : Icon(
                                                     Icons.block,
