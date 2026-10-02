@@ -23,6 +23,9 @@ class AboutSheet extends StatefulWidget {
   static Future<void> show(BuildContext context) {
     return showModalBottomSheet<void>(
       context: context,
+      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）：
+      // 窗口缩小先保持弹层高度，压到上边沿才一起往下压。
+      isScrollControlled: true,
       builder: (_) => const AboutSheet(),
     );
   }

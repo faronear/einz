@@ -209,6 +209,8 @@ class _LockPageState extends State<LockPage> {
     if (!mounted) return;
     final picked = await showModalBottomSheet<String>(
       context: context,
+      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

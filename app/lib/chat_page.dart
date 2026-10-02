@@ -1560,6 +1560,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showStylePicker() async {
     await showModalBottomSheet<void>(
       context: context,
+      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
+      isScrollControlled: true,
       builder: (_) => UiStylePickerSheet(
         settings: UiStyleSettings(widget.db ?? LocalDatabase.shared),
       ),
@@ -2507,6 +2509,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final picked = await showModalBottomSheet<String>(
       context: context,
+      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
+      isScrollControlled: true,
       builder: (ctx) {
         final red = Theme.of(ctx).colorScheme.error;
         return SafeArea(
@@ -3964,6 +3968,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final action = await showModalBottomSheet<String>(
       context: context,
+      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -4894,6 +4900,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context)!;
     final kind = await showModalBottomSheet<_AttachmentKind>(
       context: context,
+      // 允许用满窗高（与「我的通道」等弹层同口径，老板 2026-10-02）
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
