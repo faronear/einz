@@ -1972,7 +1972,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2.4),
                             )
-                          : Text(l10n.save),
+                          : Text(l10n.chatPageEmailSubmit),
                     ),
                   ),
           ),
@@ -2925,7 +2925,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 }
               }
             },
-            child: Text(l10n.save),
+            child: Text(l10n.chatPageRenamingSubmit),
           ),
         ],
       ),

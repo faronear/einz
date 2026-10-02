@@ -524,7 +524,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageExitMessage => '即将关闭本应用。';
 
   @override
-  String get save => '保存';
+  String get chatPageEmailSubmit => '保存';
+
+  @override
+  String get chatPageRenamingSubmit => '保存';
 
   @override
   String get chatPageChangePassphraseTitle => '修改共享口令';

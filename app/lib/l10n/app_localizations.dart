@@ -1052,11 +1052,17 @@ abstract class AppLocalizations {
   /// **'Exits Einz on this device.'**
   String get chatPageExitMessage;
 
-  /// No description provided for @save.
+  /// No description provided for @chatPageEmailSubmit.
   ///
   /// In en, this message translates to:
   /// **'Save'**
-  String get save;
+  String get chatPageEmailSubmit;
+
+  /// No description provided for @chatPageRenamingSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get chatPageRenamingSubmit;
 
   /// No description provided for @chatPageChangePassphraseTitle.
   ///
@@ -1325,7 +1331,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyPendingValue.
   ///
   /// In en, this message translates to:
-  /// **'Confirmed'**
+  /// **'Waiting confirm'**
   String get chatPageNotifyPendingValue;
 
   /// No description provided for @chatPageNotifyOffValue.

@@ -550,7 +550,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageExitMessage => 'Exits Einz on this device.';
 
   @override
-  String get save => 'Save';
+  String get chatPageEmailSubmit => 'Save';
+
+  @override
+  String get chatPageRenamingSubmit => 'Save';
 
   @override
   String get chatPageChangePassphraseTitle => 'Change passphrase';
@@ -701,7 +704,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageNotifyOnValue => 'On';
 
   @override
-  String get chatPageNotifyPendingValue => 'Confirmed';
+  String get chatPageNotifyPendingValue => 'Waiting confirm';
 
   @override
   String get chatPageNotifyOffValue => 'Off';
