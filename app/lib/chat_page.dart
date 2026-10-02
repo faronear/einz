@@ -5606,20 +5606,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                // 邮件通知（2026-10-01）：没进应用商店 → 没有后台推送，用邮件把离线的
-                // 人拉回来。位置在「锁屏码」**上面**（老板 2026-10-01 定），仍属分组①
-                // （外观与锁）。
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
-                  height: kMenuRowHeight,
-                  value: 'notify',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageNotifyLabel, style: captionStyle),
-                      const Spacer(),
-                      ?notifyValue,
-                    ],
-                  ),
-                ),
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'pin',
@@ -5659,6 +5645,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             ? const Icon(Icons.person, size: 16)
                             : null,
                       ),
+                    ],
+                  ),
+                ),
+                // 邮件通知（2026-10-01）：没进应用商店 → 没有后台推送，用邮件把离线的
+                // 人拉回来。2026-10-02 起挪到「我的头像」之后（老板定），属分组②
+                // （身份·通道·内容）。
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
+                  height: kMenuRowHeight,
+                  value: 'notify',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageNotifyLabel, style: captionStyle),
+                      const Spacer(),
+                      // 图标在值文字左边、图标+文字整体靠右（老板 2026-10-02；
+                      // 与 devices/沙漏行同款右簇排布），尺寸同族 18
+                      Icon(Icons.mark_email_unread_outlined,
+                          size: 18, color: labelStyle.color),
+                      if (notifyValue != null) ...[
+                        const SizedBox(width: 4),
+                        notifyValue,
+                      ],
                     ],
                   ),
                 ),
