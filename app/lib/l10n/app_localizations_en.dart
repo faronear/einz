@@ -492,16 +492,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGenderLabel => 'Gender';
 
   @override
-  String get chatPageRenameEntranceTitle => 'Current entrance';
-
-  @override
-  String get chatPageRenameEntranceLabel => 'Entrance name';
-
-  @override
-  String get chatPageEntranceScopeHint =>
-      'An entrance is the dedicated line between a device and a space. Settings here apply only to this entrance.';
-
-  @override
   String get chatPageRenameEntranceEmptyError => 'Enter the entrance name';
 
   @override
@@ -533,9 +523,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageCopy => 'Copy';
 
   @override
-  String get chatPagePublicKeyCopied => 'Public key copied';
-
-  @override
   String get chatPageEdit => 'Edit';
 
   @override
@@ -550,7 +537,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageExitMessage => 'Exits Einz on this device.';
 
   @override
-  String get chatPageEmailSubmit => 'Save';
+  String get chatPageEmailSubmit => 'Submit';
 
   @override
   String get chatPageRenamingSubmit => 'Save';
@@ -652,14 +639,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuMyNameLabel => 'My identity';
 
   @override
-  String get chatPageMenuEntranceNameLabel => 'Current entrance';
-
-  @override
-  String get chatPageMenuEntranceList => 'All my entrances';
+  String get chatPageMenuEntranceList => 'My entrances';
 
   @override
   String get chatPageEntranceListFailed =>
       'Could not load other entrances (offline?)';
+
+  @override
+  String get chatPageEntranceListThisDevice => 'This device';
 
   @override
   String get chatPageEntranceListNew => 'Generate entrance token';
@@ -903,12 +890,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatPageEntranceRevoked =>
       'Entrance revoked — local data cleared, please set up again';
-
-  @override
-  String get chatPageEntrancePublicKeyLabel => 'Public key of this entrance';
-
-  @override
-  String get chatPageEntrancePublicKeyFailed => 'Not recorded';
 
   @override
   String get burnOptionOff => 'Off (Do not burn anymore)';

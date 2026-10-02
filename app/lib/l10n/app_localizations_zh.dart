@@ -468,15 +468,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGenderLabel => '性别';
 
   @override
-  String get chatPageRenameEntranceTitle => '当前通道';
-
-  @override
-  String get chatPageRenameEntranceLabel => '通道名称';
-
-  @override
-  String get chatPageEntranceScopeHint => '通道是设备连接到秘境的专属线路。当前通道的设置仅对本机和当前秘境有效。';
-
-  @override
   String get chatPageRenameEntranceEmptyError => '请填写通道名称';
 
   @override
@@ -507,9 +498,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageCopy => '复制';
 
   @override
-  String get chatPagePublicKeyCopied => '已复制公钥';
-
-  @override
   String get chatPageEdit => '编辑';
 
   @override
@@ -524,7 +512,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageExitMessage => '即将关闭本应用。';
 
   @override
-  String get chatPageEmailSubmit => '保存';
+  String get chatPageEmailSubmit => '提交';
 
   @override
   String get chatPageRenamingSubmit => '保存';
@@ -618,13 +606,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuMyNameLabel => '我的身份';
 
   @override
-  String get chatPageMenuEntranceNameLabel => '当前通道';
-
-  @override
-  String get chatPageMenuEntranceList => '我的所有通道';
+  String get chatPageMenuEntranceList => '我的通道';
 
   @override
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
+
+  @override
+  String get chatPageEntranceListThisDevice => '本机';
 
   @override
   String get chatPageEntranceListNew => '新建通道';
@@ -860,12 +848,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageEntranceRevoked => '这条通道已被撤销，本地数据已清除，请重新配置';
-
-  @override
-  String get chatPageEntrancePublicKeyLabel => '通道公钥';
-
-  @override
-  String get chatPageEntrancePublicKeyFailed => '未记录';
 
   @override
   String get burnOptionOff => '关闭（不再自动焚毁）';

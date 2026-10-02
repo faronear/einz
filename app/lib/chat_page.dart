@@ -109,6 +109,145 @@ double _entranceCardSizeFor(double availableWidth) {
   return raw.floorToDouble().clamp(64.0, _entranceCardMaxSize).toDouble();
 }
 
+/// 「我的通道」弹层顶部的当前通道行（2026-10-02 合并「通道名称」入口）：
+/// 常态 = 「本机」淡色标记 + 通道名（valueStyle 深色）+ 铅笔图标；点名字或铅笔
+/// → 行内变白底输入框 + 保存（转圈）/ 取消。保存走 [applyName]（复用改名弹窗
+/// 的校验与提交逻辑），成功后回到只读态并显示新名字，失败红字留在编辑态。
+class _EntranceNameRow extends StatefulWidget {
+  const _EntranceNameRow({
+    required this.initialName,
+    required this.hint,
+    required this.labelStyle,
+    required this.valueStyle,
+    required this.applyName,
+  });
+
+  final String initialName;
+  /// 名字为空时的兜底显示（member_id / entrance_id），与原菜单行为一致
+  final String hint;
+  final TextStyle labelStyle;
+  final TextStyle valueStyle;
+  /// 返回 true = 保存成功（退出编辑态）；false = 失败（错误已由回调展示，留在编辑态）
+  final Future<bool> Function(String name) applyName;
+
+  @override
+  State<_EntranceNameRow> createState() => _EntranceNameRowState();
+}
+
+class _EntranceNameRowState extends State<_EntranceNameRow> {
+  late final TextEditingController _ctrl =
+      TextEditingController(text: widget.initialName);
+  final _focus = FocusNode();
+  bool _editing = false;
+  bool _saving = false;
+  String? _error;
+
+  /// 「本机」标记（l10n）；valueStyle 覆盖不了它的淡色，所以单独存 labelStyle
+  String get _thisDeviceLabel => AppLocalizations.of(context)!.chatPageEntranceListThisDevice;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final ok = await widget.applyName(_ctrl.text);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (ok) {
+        _editing = false;
+        _error = null;
+      } else {
+        // 错误文案由 applyName 弹顶部通知；这里只留在编辑态让用户改
+        _error = ' ';
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _ctrl.text.trim();
+    if (!_editing) {
+      return InkWell(
+        mouseCursor: SystemMouseCursors.click,
+        onTap: () {
+          setState(() => _editing = true);
+          WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Text(_thisDeviceLabel, style: widget.labelStyle),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  name.isNotEmpty ? name : widget.hint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: widget.valueStyle,
+                ),
+              ),
+              Icon(Icons.edit, size: 16, color: widget.labelStyle.color),
+            ],
+          ),
+        ),
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _ctrl,
+            focusNode: _focus,
+            autofocus: false,
+            maxLength: kEntranceNameMaxLength,
+            style: widget.valueStyle,
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              counterText: '',
+              border: const OutlineInputBorder(),
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _saving ? null : _save(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _saving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              )
+            : IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: '保存',
+                icon: const Icon(Icons.check, size: 18),
+                onPressed: _save,
+              ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: '取消',
+          icon: const Icon(Icons.close, size: 18),
+          onPressed: () => setState(() {
+            _editing = false;
+            _error = null;
+            _ctrl.text = widget.initialName;
+          }),
+        ),
+      ],
+    );
+  }
+}
+
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -2174,6 +2313,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  // 当前通道行（2026-10-02 合并「通道名称」入口至此）：本机标记 +
+                  // 通道名 + 铅笔。点名字或铅笔 → 行内变白底输入框 + 保存/取消，
+                  // 复用 _applyEntranceName 的校验与保存（与改名弹窗同一条逻辑）
+                  // 样式与菜单行同口径：淡色 13 标记 / 深色 14 值（itemBuilder 里的
+                  // captionStyle/valueStyle 是菜单局部变量，这里就地定义同款）
+                  Builder(
+                    builder: (ctx) {
+                      final labelStyle = TextStyle(
+                          fontSize: 13, color: Theme.of(ctx).colorScheme.onSurfaceVariant);
+                      final valueStyle = TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(ctx).colorScheme.onSurface,
+                          fontWeight: FontWeight.w500);
+                      return _EntranceNameRow(
+                        initialName: _myEntranceName,
+                        hint: myId.isEmpty ? widget.entranceId : myId,
+                        labelStyle: labelStyle,
+                        valueStyle: valueStyle,
+                        applyName: (name) async {
+                          final err = await _applyEntranceName(name, l10n);
+                          if (err != null && ctx.mounted) showTopNotice(ctx, err);
+                          return err == null;
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 6),
                   // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
                   // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
                   // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
@@ -2708,14 +2874,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 修改我的名字/通道名称（服务端同步 + 本地刷新菜单显示）。
-  Future<void> _showRenameDialog({required bool renameEntrance}) async {
+  /// 保存通道名（改名弹窗与「我的通道」弹层共用）：校验白名单 → PUT → 更新本地
+  /// profile。返回 null = 成功；否则返回已本地化的错误文案（调用方自行展示——
+  /// 弹窗走红字、弹层走顶部通知）。
+  Future<String?> _applyEntranceName(String rawName, AppLocalizations l10n) async {
+    final name = rawName.trim();
+    if (name.isEmpty) return l10n.chatPageRenameEntranceEmptyError;
+    // 通道名字符白名单 + 长度上限（老板 2026-09-16）：只允许中英文、数字、
+    // `_`、`-`，≤32；不合规提示重输（服务端另有 400 兜底）
+    final violation = checkEntranceNamePolicy(name);
+    if (violation != null) {
+      return violation == EntranceNameViolation.tooLong
+          ? l10n.chatPageRenameEntranceTooLongError(kEntranceNameMaxLength)
+          : l10n.chatPageRenameEntranceInvalidError;
+    }
+    try {
+      final api = widget.api ?? ApiClient(effectiveServer);
+      await _withAuth((t) => api.updateEntranceName(name, t));
+      _myEntranceName = name;
+      // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
+      // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
+      // app 菜单改名后退出重进回到 memberB）
+      await _saveProfile();
+      return null;
+    } on ApiException catch (e) {
+      return backendError(l10n, l10n.chatPageRenameFailed(e.message));
+    } catch (e) {
+      return l10n.chatPageRenameFailed('$e');
+    }
+  }
+
+  /// 修改我的名字（服务端同步 + 本地刷新菜单显示）。
+  /// （原「当前通道」改名弹窗 2026-10-02 并入「我的通道」弹层，公钥展示一并删除。）
+  Future<void> _showRenameDialog() async {
     final l10n = AppLocalizations.of(context)!;
-    final ctrl = TextEditingController(text: renameEntrance ? _myEntranceName : _myMemberName);
-    // 公钥只读展示（我的通道弹窗）：静态文本控制器，随对话框关闭释放
-    final pubKeyCtrl = TextEditingController(
-      text: widget.publicKeyB64 ?? l10n.chatPageEntrancePublicKeyFailed,
-    );
+    final ctrl = TextEditingController(text: _myMemberName);
     // 性别只读展示（我的个人资料弹窗）：框内显示 男/女，随对话框关闭释放
     final genderCtrl = TextEditingController(
       text: _myGender == 'female'
@@ -2734,28 +2927,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => AlertDialog(
         // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
-        title: Center(
-            child: Text(renameEntrance
-                ? l10n.chatPageRenameEntranceTitle
-                : l10n.chatPageRenameNameTitle)),
+        title: Center(child: Text(l10n.chatPageRenameNameTitle)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 本机信息弹窗：说明"名称与公钥只属于当前秘境"——多空间下同一条通道在
-            // 每个秘境各有一套（名称可不同、公钥必然不同），不点明会让人以为改的是
-            // 全局通道名（老板 2026-09-22 定：承认 per-space，不强行统一）。
-            if (renameEntrance) ...[
-              Text(
-                l10n.chatPageEntranceScopeHint,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(ctx).colorScheme.outline,
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            // 名字/通道名输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+            // 名字输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
             // 白底可编辑、按钮消失（老板要求 2026-09-09）。
             // 点框内任意位置也进编辑态（老板 2026-09-23）：用 TextField 自带的
             // onTap 派发，不额外套 GestureDetector（会和输入框内部手势抢 arena）
@@ -2771,7 +2948,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   nameFocus.requestFocus();
                 },
                 decoration: InputDecoration(
-                  labelText: renameEntrance ? l10n.chatPageRenameEntranceLabel : l10n.chatPageRenameNameLabel,
+                  labelText: l10n.chatPageRenameNameLabel,
                   border: const OutlineInputBorder(),
                   filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
                   fillColor: Colors.white,
@@ -2788,9 +2965,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                 ),
                 // 输入框里直接拦住超长（老板 2026-09-28）：以前能一直敲、点保存才被
-                // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量，通道名与
-                // 人名各按自己的规则（这里的拦截不替代提交时的白名单校验）。
-                maxLength: renameEntrance ? kEntranceNameMaxLength : kMemberNameMaxLength,
+                // 策略拒（白敲一通）。上限用 shared 策略里的同一个常量
+                // （这里的拦截不替代提交时的白名单校验）。
+                maxLength: kMemberNameMaxLength,
                 // 开始填写即清除空名警示（与向导输入框一致）
                 onChanged: (_) {
                   if (nameError.value != null) nameError.value = null;
@@ -2813,54 +2990,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                     ),
             ),
-            // 我的通道弹窗：公钥只读展示——放在通道名称之后（textarea 样式，边框
-            // 左上角「公钥」标签，右侧拷贝按钮；只读不加背景色，沿用弹窗背景）
-            if (renameEntrance) ...[
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: pubKeyCtrl,
-                readOnly: true,
-                maxLines: 2,
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.grey),
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageEntrancePublicKeyLabel,
-                  border: const OutlineInputBorder(),
-                  // 公钥只读：不加背景色，沿用弹窗背景（可编辑的通道名称才是白底）
-                  suffixIcon: IconButton(
-                    tooltip: l10n.chatPageCopy,
-                    icon: const Icon(Icons.copy, size: 18),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: widget.publicKeyB64 == null
-                        ? null
-                        : () {
-                            Clipboard.setData(ClipboardData(text: widget.publicKeyB64!));
-                            showTopNotice(ctx, l10n.chatPagePublicKeyCopied);
-                          },
-                  ),
-                ),
-              ),
-            ],
-            // 我的个人资料弹窗：性别用与名字输入框同款组件（只读）——「性别」标签
+            // 性别用与名字输入框同款组件（只读）——「性别」标签
             // 在边框左上角（同「我的名字」），框内显示 男/女 + 性别图标
             // （老板要求 2026-09-09）
-            if (!renameEntrance) ...[
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: genderCtrl,
-                readOnly: true,
-                style: const TextStyle(fontSize: 16),
-                decoration: InputDecoration(
-                  labelText: l10n.chatPageGenderLabel,
-                  border: const OutlineInputBorder(), // 与名字输入框同款边框
-                  // 只读展示：不加背景色（沿用弹窗背景），与白底可编辑的名字输入框区分
-                  suffixIcon: _myGender == 'male'
-                      ? const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 24)
-                      : _myGender == 'female'
-                          ? const Icon(Icons.female, color: Color(0xFFD6529C), size: 24)
-                          : null,
-                ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: genderCtrl,
+              readOnly: true,
+              style: const TextStyle(fontSize: 16),
+              decoration: InputDecoration(
+                labelText: l10n.chatPageGenderLabel,
+                border: const OutlineInputBorder(), // 与名字输入框同款边框
+                // 只读展示：不加背景色（沿用弹窗背景），与白底可编辑的名字输入框区分
+                suffixIcon: _myGender == 'male'
+                    ? const Icon(Icons.male, color: Color(0xFF3BAFFD), size: 24)
+                    : _myGender == 'female'
+                        ? const Icon(Icons.female, color: Color(0xFFD6529C), size: 24)
+                        : null,
               ),
-            ],
+            ),
           ],
         ),
         actions: [
@@ -2869,47 +3017,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             onPressed: () async {
               final name = ctrl.text.trim();
               if (name.isEmpty) {
-                // 空/全空格：红字警示并停留（不再静默跳过）；人名与通道名各用各的提示
-                nameError.value = renameEntrance
-                    ? l10n.chatPageRenameEntranceEmptyError
-                    : l10n.chatPageRenameMyselfEmptyError;
+                // 空/全空格：红字警示并停留（不再静默跳过）
+                nameError.value = l10n.chatPageRenameMyselfEmptyError;
                 return;
               }
-              // 通道名字符白名单 + 长度上限（老板 2026-09-16）：只允许中英文、
-              // 数字、`_`、`-`，≤32；不合规提示重输（服务端另有 400 兜底）
-              if (renameEntrance) {
-                final violation = checkEntranceNamePolicy(name);
-                if (violation != null) {
-                  nameError.value = violation == EntranceNameViolation.tooLong
-                      ? l10n.chatPageRenameEntranceTooLongError(kEntranceNameMaxLength)
-                      : l10n.chatPageRenameEntranceInvalidError;
-                  return;
-                }
-              }
               // 用户名称白名单（老板 2026-09-16）：中英文/数字/`_`/`-`/emoji，≤32
-              if (!renameEntrance) {
-                final violation = checkMemberNamePolicy(name);
-                if (violation != null) {
-                  nameError.value = violation == MemberNameViolation.tooLong
-                      ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
-                      : l10n.chatPageRenameNameInvalidError;
-                  return;
-                }
+              final violation = checkMemberNamePolicy(name);
+              if (violation != null) {
+                nameError.value = violation == MemberNameViolation.tooLong
+                    ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
+                    : l10n.chatPageRenameNameInvalidError;
+                return;
               }
               // 不允许改成与对方相同的名字（老板 2026-09-10）
-              if (!renameEntrance && widget.peerName != null && name == widget.peerName) {
+              if (widget.peerName != null && name == widget.peerName) {
                 nameError.value = l10n.chatPageRenameSameAsPeerError;
                 return;
               }
               try {
                 final api = widget.api ?? ApiClient(effectiveServer);
-                if (renameEntrance) {
-                  await _withAuth((t) => api.updateEntranceName(name, t));
-                  _myEntranceName = name;
-                } else {
-                  await _withAuth((t) => api.updateMemberName(name, t));
-                  _myMemberName = name;
-                }
+                await _withAuth((t) => api.updateMemberName(name, t));
+                _myMemberName = name;
                 // 同步本地 profile：重启后 ChatPage 从 profile 恢复新名字
                 // （否则 loadProfile 读到向导完成时的旧名——2026-09-07 老板实测
                 // app 菜单改名后退出重进回到 memberB）
@@ -2934,7 +3062,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
     Future<void>.delayed(const Duration(milliseconds: 400), () {
       ctrl.dispose();
-      pubKeyCtrl.dispose();
       genderCtrl.dispose();
       nameError.dispose();
       editing.dispose();
@@ -5544,11 +5671,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 case 'about':
                   _menuAction(_openAboutPage);
                 case 'name':
-                  _menuAction(() => _showRenameDialog(renameEntrance: false));
+                  _menuAction(_showRenameDialog);
                 case 'avatar':
                   _menuAction(_showAvatarUpload);
-                case 'devname':
-                  _menuAction(() => _showRenameDialog(renameEntrance: true));
                 case 'entrancelist':
                   _menuAction(_showEntranceListSheet);
                 case 'switchspace':
@@ -5669,19 +5794,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
-                  height: kMenuRowHeight,
-                  value: 'devname',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuEntranceNameLabel, style: captionStyle),
-                      const Spacer(),
-                      _menuValue(_myEntranceName.isEmpty ? l10n.chatPageNameUnset : _myEntranceName, valueStyle),
-                    ],
-                  ),
-                ),
                 // 「通道列表」：我本人在本空间的其他通道（老板 2026-09-25：多设备登录
-                // 时看一眼"我还有哪些线挂着、在不在线"）
+                // 时看一眼"我还有哪些线挂着、在不在线"）。2026-10-02 合并原「当前通道」
+                // 菜单项：改名入口收进弹层顶部的当前通道行，菜单只留这一项「我的通道」
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'entrancelist',

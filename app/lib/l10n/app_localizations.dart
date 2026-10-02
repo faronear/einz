@@ -956,24 +956,6 @@ abstract class AppLocalizations {
   /// **'Gender'**
   String get chatPageGenderLabel;
 
-  /// No description provided for @chatPageRenameEntranceTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Current entrance'**
-  String get chatPageRenameEntranceTitle;
-
-  /// No description provided for @chatPageRenameEntranceLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Entrance name'**
-  String get chatPageRenameEntranceLabel;
-
-  /// No description provided for @chatPageEntranceScopeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'An entrance is the dedicated line between a device and a space. Settings here apply only to this entrance.'**
-  String get chatPageEntranceScopeHint;
-
   /// No description provided for @chatPageRenameEntranceEmptyError.
   ///
   /// In en, this message translates to:
@@ -1022,12 +1004,6 @@ abstract class AppLocalizations {
   /// **'Copy'**
   String get chatPageCopy;
 
-  /// No description provided for @chatPagePublicKeyCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Public key copied'**
-  String get chatPagePublicKeyCopied;
-
   /// No description provided for @chatPageEdit.
   ///
   /// In en, this message translates to:
@@ -1055,7 +1031,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEmailSubmit.
   ///
   /// In en, this message translates to:
-  /// **'Save'**
+  /// **'Submit'**
   String get chatPageEmailSubmit;
 
   /// No description provided for @chatPageRenamingSubmit.
@@ -1232,16 +1208,10 @@ abstract class AppLocalizations {
   /// **'My identity'**
   String get chatPageMenuMyNameLabel;
 
-  /// No description provided for @chatPageMenuEntranceNameLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Current entrance'**
-  String get chatPageMenuEntranceNameLabel;
-
   /// No description provided for @chatPageMenuEntranceList.
   ///
   /// In en, this message translates to:
-  /// **'All my entrances'**
+  /// **'My entrances'**
   String get chatPageMenuEntranceList;
 
   /// No description provided for @chatPageEntranceListFailed.
@@ -1249,6 +1219,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not load other entrances (offline?)'**
   String get chatPageEntranceListFailed;
+
+  /// No description provided for @chatPageEntranceListThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get chatPageEntranceListThisDevice;
 
   /// No description provided for @chatPageEntranceListNew.
   ///
@@ -1663,18 +1639,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Entrance revoked — local data cleared, please set up again'**
   String get chatPageEntranceRevoked;
-
-  /// No description provided for @chatPageEntrancePublicKeyLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Public key of this entrance'**
-  String get chatPageEntrancePublicKeyLabel;
-
-  /// No description provided for @chatPageEntrancePublicKeyFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Not recorded'**
-  String get chatPageEntrancePublicKeyFailed;
 
   /// No description provided for @burnOptionOff.
   ///
