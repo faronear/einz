@@ -2398,6 +2398,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 复用 _applyEntranceName 的校验与保存（与改名弹窗同一条逻辑）
                   // 样式与菜单行同口径：淡色 13 标记 / 深色 14 值（itemBuilder 里的
                   // captionStyle/valueStyle 是菜单局部变量，这里就地定义同款）
+                  //
+                  // 窗口矮时中间这一整块（当前通道行 + 「所有通道」小标题 + 卡片 +
+                  // 失败提示）在内部滚动：标题与底部「新建通道」固定在两端。原先
+                  // 只把卡片区做成可滚，但改名行/小标题/各段间距是死的——窗口矮到
+                  // 弹层上限小于这些固定项之和时，Flexible 缩到 0 也不够，弹层底部
+                  // 照样 "Bottom overflowed"（老板 2026-10-02 mac 实测）。
+                  ScrollableCardArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                   Builder(
                     builder: (ctx) {
                       final labelStyle = TextStyle(
@@ -2462,10 +2473,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
                   // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
                   // 右上角固定角标：本机=绿勾、已撤销=阻止图标+整卡蒙版（老板 2026-09-26）
-                  // 通道多 + 窗口矮 → 在这一块内部滚动，不再把整个弹层撑破
-                  // （老板 2026-09-28 桌面实测；与「切换我的秘境」同一处口径）。
-                  ScrollableCardArea(
-                    child: LayoutBuilder(
+                  // 通道多 + 窗口矮 → 随中间整块在外层 ScrollableCardArea 里滚动
+                  // （外层已把改名行/小标题一并纳入；与「切换我的秘境」同一处口径）。
+                  LayoutBuilder(
                       builder: (context, constraints) {
                         final size = _entranceCardSizeFor(constraints.maxWidth);
                         return Wrap(
@@ -2621,13 +2631,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                  ),
                   if (loaded == null)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Text(l10n.chatPageEntranceListFailed,
                           style: TextStyle(fontSize: 13, color: scheme.outline)),
                     ),
+                      ],
+                    ),
+                  ),
                   // 卡片与「新建通道」之间的留白（老板 2026-09-25：原先紧挨着）
                   const SizedBox(height: 12),
                   // 「新建通道」：与「切换我的秘境」弹层的「添加秘境」同款外观——常态淡灰底
