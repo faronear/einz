@@ -73,6 +73,10 @@ Future<SpacePick?> showSpacePicker(
 }) =>
     showModalBottomSheet<SpacePick>(
       context: context,
+      // 允许弹层用到满窗高（与「我的通道」弹层同口径，老板 2026-10-02）：
+      // 默认上限 9/16 屏时窗口一开始缩小弹层就跟着缩；开了之后弹层高度保持
+      // 到窗口压到其上边沿才一起往下压，矮窗由卡片区内滚吸收。
+      isScrollControlled: true,
       builder: (_) => _SpacePickerSheet(
         db: db ?? LocalDatabase.shared,
         api: api,
