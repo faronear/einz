@@ -181,6 +181,11 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
       -- 邮件正文语言（'zh' | 'en'）：服务端无从知道收件人读哪种语言，只能由客户端
       -- （它知道自己的界面语言）在 PUT /notify/email 时顺手报上来。默认 zh。
       lang            TEXT,
+      -- 同一批未读已重提的次数（"同一批"= 最新未读消息没变，见 notifier.ts）。
+      -- 收件人一直不读 → 提到 remind_max 次就停，不无限轰炸。
+      remind_count    INTEGER NOT NULL DEFAULT 0,
+      -- 上次发信时那批未读的最新时刻（ms）：与本轮未读的 newestAt 比对，判断是不是同一批。
+      reminded_at     INTEGER,
       created_at      INTEGER NOT NULL
     );
 
@@ -264,6 +269,17 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   // 迁移：notify_emails 补 lang（邮件正文语言；存量行 NULL → 按 zh 处理）
   try {
     db.exec(`ALTER TABLE notify_emails ADD COLUMN lang TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：notify_emails 补 remind_count / reminded_at（同一批未读的计次封顶，防"永远不读 → 永远通知"）
+  try {
+    db.exec(`ALTER TABLE notify_emails ADD COLUMN remind_count INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  try {
+    db.exec(`ALTER TABLE notify_emails ADD COLUMN reminded_at INTEGER`);
   } catch {
     // 列已存在（新库）→ 忽略
   }

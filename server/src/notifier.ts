@@ -52,6 +52,8 @@ export interface NotifyParams {
   cooldownMs: number
   /** 日上限：每天最多几封（到点后本日不再发）。 */
   dailyMax: number
+  /** 计次封顶：同一批未读（最新一条没变）最多重提几封，到点后除非有新消息进来。 */
+  remindMax: number
 }
 
 /** 参数都可用环境变量覆盖（改参数不必改代码，重启即生效）。默认值＝老板 2026-10-01 选定档。 */
@@ -64,7 +66,8 @@ export function notifyParams (): NotifyParams {
     tickMs: num('EINZ_NOTIFY_TICK_MS', 60_000),
     quietMs: num('EINZ_NOTIFY_QUIET_MS', 120_000),
     cooldownMs: num('EINZ_NOTIFY_COOLDOWN_MS', 30 * 60_000),
-    dailyMax: num('EINZ_NOTIFY_DAILY_MAX', 8)
+    dailyMax: num('EINZ_NOTIFY_DAILY_MAX', 8),
+    remindMax: num('EINZ_NOTIFY_REMIND_MAX', 5)
   }
 }
 
@@ -124,13 +127,14 @@ export function normalizeEmail (raw: string): string | null {
  */
 export function planNotifications (now = Date.now()): NotifyPlan[] {
   const db = getDb()
-  const { quietMs, cooldownMs, dailyMax } = notifyParams()
+  const { quietMs, cooldownMs, dailyMax, remindMax } = notifyParams()
   const day = dayKey(now)
 
   const emails = db
     .prepare(
       `SELECT email, verified_at, unsubscribe_at, hard_bounce_at, pause_until,
-              last_sent_at, sent_day, sent_count, lang
+              last_sent_at, sent_day, sent_count, lang,
+              remind_count, reminded_at
          FROM notify_emails`
     )
     .all() as {
@@ -143,6 +147,8 @@ export function planNotifications (now = Date.now()): NotifyPlan[] {
     sent_day: string | null
     sent_count: number
     lang: string | null
+    remind_count: number
+    reminded_at: number | null
   }[]
 
   const plans: NotifyPlan[] = []
@@ -180,12 +186,25 @@ export function planNotifications (now = Date.now()): NotifyPlan[] {
     if (entries.length === 0) continue
 
     entries.sort((a, b) => b.lastAt - a.lastAt)
+    const newestAt = Math.max(...entries.map(e => e.lastAt))
+
+    // ⑤ 计次封顶：同一批未读（最新一条没变）重提满 remindMax 封就停。
+    //    "新一批" = 本轮 newestAt 晚于上次发信时记录的 reminded_at → 有新消息进来，
+    //    计数清零重新算；收件人一直不读就最多被拍 remindMax 封，不会无限轰炸。
+    const sameBatch =
+      row.reminded_at != null && newestAt <= row.reminded_at
+    if (
+      sameBatch &&
+      row.remind_count >= remindMax
+    )
+      continue
+
     plans.push({
       email: row.email,
       displayName,
       entries,
       total: entries.reduce((s, e) => s + e.count, 0),
-      newestAt: Math.max(...entries.map(e => e.lastAt)),
+      newestAt,
       lang: mailLang(row.lang)
     })
   }
@@ -313,7 +332,7 @@ export async function runNotifyTick (
     try {
       const unsubscribeToken = ensureUnsubscribeToken(plan.email, now)
       await mailer.send(buildSummaryMail(plan, mailer.config, unsubscribeToken))
-      markSent(plan.email, now)
+      markSent(plan.email, now, plan.newestAt)
       failureStreak.delete(plan.email)
       sent += 1
       console.log(
@@ -363,17 +382,33 @@ export function startNotifier (): void {
   timer.unref()
 }
 
-function markSent (email: string, now: number): void {
+function markSent (email: string, now: number, newestAt: number): void {
   const day = dayKey(now)
   const db = getDb()
   const row = db
-    .prepare(`SELECT sent_day, sent_count FROM notify_emails WHERE email = ?`)
-    .get(email) as { sent_day: string | null; sent_count: number } | undefined
+    .prepare(
+      `SELECT sent_day, sent_count, remind_count, reminded_at FROM notify_emails WHERE email = ?`
+    )
+    .get(email) as
+    | {
+        sent_day: string | null
+        sent_count: number
+        remind_count: number
+        reminded_at: number | null
+      }
+    | undefined
   if (row == null) return
   const count = row.sent_day === day ? row.sent_count + 1 : 1
+  // 计次封顶记账：同批未读（newestAt 没变）递增；新一批（有新消息）清零重计。
+  const streak = row.reminded_at != null && newestAt <= row.reminded_at
+    ? row.remind_count + 1
+    : 1
   db.prepare(
-    `UPDATE notify_emails SET last_sent_at = ?, sent_day = ?, sent_count = ? WHERE email = ?`
-  ).run(now, day, count, email)
+    `UPDATE notify_emails
+        SET last_sent_at = ?, sent_day = ?, sent_count = ?,
+            remind_count = ?, reminded_at = ?
+      WHERE email = ?`
+  ).run(now, day, count, streak, newestAt, email)
 }
 
 /**

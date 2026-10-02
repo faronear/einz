@@ -260,6 +260,35 @@ test("邮件通知：④ 冷却期内不发；日上限到了也不发", () => {
   });
 });
 
+test("邮件通知：⑤ 计次封顶——同一批未读重提满 remindMax 封就停，新消息进来重新计数", () => {
+  process.env.EINZ_NOTIFY_REMIND_MAX = "3";
+  try {
+    withDb(() => {
+      const now = seed();
+      const db = getDb();
+      const messagesAt = now - 10 * 60_000;
+      // 上次发信记账：同批未读已重提 3 封（reminded_at = 消息时刻）
+      db.prepare(
+        `UPDATE notify_emails SET remind_count = 3, reminded_at = ? WHERE email = ?`,
+      ).run(messagesAt, EMAIL);
+      assert.equal(planNotifications(now).length, 0, "同一批未读拍到上限 → 停发");
+
+      // 对方又发一条新消息（seq 5）→ 新一批 → 恢复发信
+      getDb()
+        .prepare(
+          `INSERT INTO messages (message_id, space_id, sender_entrance_id, sender_member_id, type, key_version, nonce, ciphertext, server_sequence, created_at)
+           VALUES ('m5', ?, ?, ?, 'text', 1, 'n', 'c', 5, ?)`,
+        )
+        .run(SPACE, PEER_DEVICE, PEER, messagesAt + 60_000);
+      const plans = planNotifications(now);
+      assert.equal(plans.length, 1, "新一批未读 → 重新允许提醒");
+      assert.equal(plans[0]!.total, 4, "未读含新消息一共 4 条");
+    });
+  } finally {
+    delete process.env.EINZ_NOTIFY_REMIND_MAX;
+  }
+});
+
 test("邮件通知：⑩ 扇出防重——60s 内重复 PUT 未验证地址不重发、token 不被冲掉", async () => {
   await new Promise<void>((resolve, reject) => {
     const dir = mkdtempSync(join(tmpdir(), "einz-notify-fanout-"));
