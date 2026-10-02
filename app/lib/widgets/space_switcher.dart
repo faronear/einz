@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../chat_entry.dart';
 import '../data/app_lock.dart';
 import '../data/local_database.dart';
+import '../data/notify_settings.dart';
 import '../data/server_config.dart';
 import '../data/space_session.dart';
 import '../data/vault_session.dart';
@@ -124,10 +125,17 @@ Future<void> addSpaceFlow(
         // 邮箱通知按设备共享（老板 2026-10-01）：新空间自动继承本机已设置的提醒
         // 邮箱——否则每加一个空间都得去弹窗里重存一次。后台 best-effort，
         // 失败静默（没继承上无非是重存一次），不阻塞进聊天页。
-        final inherited = _notifyEmailSourceSpaces(payload.spaceId);
-        if (inherited.isNotEmpty) {
-          unawaited(_inheritNotifyEmail(inherited, payload, db: db));
-        }
+        // 尊重「应用于本机所有秘境」偏好（老板 2026-10-02）：不勾＝用户明确只要
+        // 当前秘境收信，新建空间就不该被自动绑上。
+        unawaited(NotifyAllSpacesPref(database)
+            .load()
+            .then((all) async {
+              if (!all) return;
+              final sources = _notifyEmailSourceSpaces(payload.spaceId);
+              if (sources.isEmpty) return;
+              await _inheritNotifyEmail(sources, payload, db: db);
+            })
+            .catchError((_) {}));
         if (!context.mounted) return;
         Navigator.of(context).pop(); // 关掉向导 → 回到聊天页
         if (!context.mounted) return;

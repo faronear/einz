@@ -1271,13 +1271,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyLabel.
   ///
   /// In en, this message translates to:
-  /// **'Email alerts'**
+  /// **'My email alerts'**
   String get chatPageNotifyLabel;
 
   /// No description provided for @chatPageNotifyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Email alerts'**
+  /// **'My email alerts'**
   String get chatPageNotifyTitle;
 
   /// No description provided for @chatPageNotifyHint.
@@ -1289,7 +1289,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyAllSpaces.
   ///
   /// In en, this message translates to:
-  /// **'This setting applies to all spaces on this device.'**
+  /// **'Apply this setting to all spaces on this device.'**
   String get chatPageNotifyAllSpaces;
 
   /// No description provided for @chatPageNotifyEmailLabel.

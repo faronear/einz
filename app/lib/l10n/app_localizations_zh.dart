@@ -636,17 +636,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePinSetValue => '已设置';
 
   @override
-  String get chatPageNotifyLabel => '邮件通知';
+  String get chatPageNotifyLabel => '我的邮件通知';
 
   @override
-  String get chatPageNotifyTitle => '邮件通知';
+  String get chatPageNotifyTitle => '我的邮件通知';
 
   @override
   String get chatPageNotifyHint =>
       '你长时间不在线时，如果有新消息，我们会往这个邮箱发一封提醒。提醒邮件里不会有消息内容。';
 
   @override
-  String get chatPageNotifyAllSpaces => '保存后应用于本机所有秘境。';
+  String get chatPageNotifyAllSpaces => '应用于本机所有秘境。';
 
   @override
   String get chatPageNotifyEmailLabel => '邮箱';

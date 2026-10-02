@@ -25,6 +25,7 @@ import 'brand_logo.dart';
 import 'data/attachment_storage_settings.dart';
 import 'data/attachment_store.dart';
 import 'data/burn_after_settings.dart';
+import 'data/notify_settings.dart';
 import 'data/app_lock.dart';
 import 'data/local_database.dart';
 import 'data/server_config.dart';
@@ -1982,6 +1983,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 「已设置 ↔ 未设置」两阶段（老板 2026-10-02）：已设置时输入框只读、只给「停用」；
     // 停用成功不关弹窗，原地切成空白可编辑输入框 + 「保存」。初始值取开弹窗时的状态。
     final active = ValueNotifier<bool>(!(before?.isNone ?? true));
+    // 应用范围勾选（老板 2026-10-02）：回显上次勾选的持久化偏好（默认勾选＝
+    // 保存/停用同步扇出到本机所有秘境，2026-10-01 起的既有行为）；不勾＝只作用于
+    // 当前秘境，且新建空间不再自动继承（_inheritNotifyEmail 读同一份偏好）。
+    // 服务端本来就是地址级验证 + 空间级绑定，扇不扇出纯客户端决定，不冲突。
+    final allSpaces = ValueNotifier<bool>(true);
+    unawaited(NotifyAllSpacesPref(widget.db ?? LocalDatabase.shared)
+        .load()
+        .then((v) => allSpaces.value = v));
     // 正文语言：服务端不知道收件人读哪种语言，按本机界面语言上报（zh / 其它一律 en）
     final lang = Localizations.localeOf(context).languageCode == 'zh' ? 'zh' : 'en';
 
@@ -1995,14 +2004,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             Text(
               l10n.chatPageNotifyHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(ctx).colorScheme.outline,
-              ),
-            ),
-            // 设置按设备共享（老板 2026-10-01）：说清楚，免得用户以为只管当前空间
-            Text(
-              l10n.chatPageNotifyAllSpaces,
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(ctx).colorScheme.outline,
@@ -2023,6 +2024,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 onChanged: (_) {
                   if (error.value != null) error.value = null;
                 },
+              ),
+            ),
+            // 应用范围勾选（老板 2026-10-02）：默认勾选＝保存/停用同步到本机所有秘境
+            // （原静态文案「保存后应用于本机所有秘境。」升级为可选项）。
+            // 放在 Email 输入框下方（老板 2026-10-02）
+            ValueListenableBuilder<bool>(
+              valueListenable: allSpaces,
+              builder: (_, all, _) => CheckboxListTile(
+                value: all,
+                onChanged: (v) {
+                  final next = v ?? true;
+                  allSpaces.value = next;
+                  // 勾选即落盘：它是设备级默认策略（新空间继承钩子也读它），
+                  // 不等点保存——关掉弹窗也应该记住
+                  unawaited(NotifyAllSpacesPref(widget.db ?? LocalDatabase.shared)
+                      .save(next));
+                },
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  l10n.chatPageNotifyAllSpaces,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(ctx).colorScheme.outline,
+                  ),
+                ),
               ),
             ),
             // 已填但还没点链接：这一档不点明，用户会以为已经生效
@@ -2071,8 +2099,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 final api = widget.api ?? ApiClient(effectiveServer);
                                 await _withAuth((t) => api.deleteNotifyEmail(t));
                                 if (!mounted) return;
-                                unawaited(_fanoutNotifyEmail(
-                                    (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
+                                // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
+                                // 不勾＝只停当前秘境，其它秘境的绑定原样保留
+                                if (allSpaces.value) {
+                                  unawaited(_fanoutNotifyEmail(
+                                      (t) => api.deleteNotifyEmail(t))); // 其它空间同步撤，best-effort
+                                }
                                 await _refreshNotifyEmail();
                                 // 不关弹窗：原地切回"未设置"态（空白可编辑 + 保存）
                                 ctrl.clear();
@@ -2120,8 +2152,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 final status =
                                     await _withAuth((t) => api.setNotifyEmail(email, t, lang: lang));
                                 if (!mounted) return;
-                                unawaited(_fanoutNotifyEmail(
-                                    (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
+                                // 勾选「应用于本机所有秘境」才扇出（老板 2026-10-02）；
+                                // 不勾＝只绑当前秘境，其它秘境不动
+                                if (allSpaces.value) {
+                                  unawaited(_fanoutNotifyEmail(
+                                      (t) => api.setNotifyEmail(email, t, lang: lang))); // 其它空间同步绑，best-effort
+                                }
                                 await _refreshNotifyEmail();
                                 if (ctx.mounted) Navigator.of(ctx).pop(true);
                                 if (mounted) {
@@ -2165,6 +2201,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       error.dispose();
       busy.dispose();
       active.dispose();
+      allSpaces.dispose();
     });
     if (saved == true && mounted) await _refreshNotifyEmail();
   }

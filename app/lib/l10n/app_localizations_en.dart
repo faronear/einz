@@ -671,10 +671,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePinSetValue => 'Set';
 
   @override
-  String get chatPageNotifyLabel => 'Email alerts';
+  String get chatPageNotifyLabel => 'My email alerts';
 
   @override
-  String get chatPageNotifyTitle => 'Email alerts';
+  String get chatPageNotifyTitle => 'My email alerts';
 
   @override
   String get chatPageNotifyHint =>
@@ -682,7 +682,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageNotifyAllSpaces =>
-      'This setting applies to all spaces on this device.';
+      'Apply this setting to all spaces on this device.';
 
   @override
   String get chatPageNotifyEmailLabel => 'Email';
