@@ -463,6 +463,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       child: Tooltip(
         message: label,
         child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
           // 悬浮/点击背景（老板 2026-10-02）：与状态栏电话/设备图标同档
           // hover/highlight 色，浅灰淡染——gradient 深色气泡下黑 alpha 同样可见
           hoverColor: Colors.black.withValues(alpha: 0.05),
@@ -6386,6 +6387,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               borderRadius: BorderRadius.circular(12),
                                               clipBehavior: Clip.antiAlias,
                                               child: InkWell(
+                                                mouseCursor: SystemMouseCursors.click,
                                                 // 悬浮/点击背景同快捷动作/状态栏图标
                                                 hoverColor: Colors.black.withValues(alpha: 0.05),
                                                 highlightColor:
