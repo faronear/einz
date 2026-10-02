@@ -2394,17 +2394,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                             right: 6,
                                             // 本机 = 编辑图标（老板 2026-10-02：当前通道
                                             // 改名从这张卡进——点击关掉弹层，错峰弹改名
-                                            // 弹窗）；已撤销 = 阻止图标。编辑角标用小号
-                                            // IconButton（内边距 2）扩一点热区好按。
+                                            // 弹窗）；已撤销 = 阻止图标。编辑角标给
+                                            // **纯圆底** + 6 内边距（老板 2026-10-02：
+                                            // 之前 padding 0、图标贴边挤成方框，难看）。
                                             child: isLocal
                                                 ? IconButton(
                                                     tooltip: l10n.chatPageEdit,
                                                     icon: const Icon(Icons.edit,
                                                         size: 14),
+                                                    style: IconButton.styleFrom(
+                                                      shape: const CircleBorder(),
+                                                      padding:
+                                                          const EdgeInsets.all(6),
+                                                    ),
                                                     visualDensity:
                                                         VisualDensity.compact,
-                                                    padding:
-                                                        const EdgeInsets.all(2),
                                                     constraints:
                                                         const BoxConstraints(),
                                                     onPressed: () {
