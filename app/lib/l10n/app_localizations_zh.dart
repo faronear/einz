@@ -938,6 +938,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedDestroyEntrance => '销毁本通道';
 
   @override
+  String get advancedClearMessages => '删除所有消息';
+
+  @override
+  String get clearMessagesMessage =>
+      '删除当前通道保存的所有消息和附件。本通道仍然可用，将继续收到新消息。其他通道不受影响。';
+
+  @override
+  String get clearMessagesConfirm => '删除';
+
+  @override
+  String get clearMessagesDone => '已删除全部消息。';
+
+  @override
+  String clearMessagesFailed(String error) {
+    return '删除失败: $error';
+  }
+
+  @override
   String get leaveSpaceTitle => '销毁本通道？';
 
   @override

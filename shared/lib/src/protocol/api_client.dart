@@ -280,6 +280,13 @@ class ApiClient {
     await _delete(Api.notifyEmail, token: token);
   }
 
+  /// 删除本空间全部消息与附件（高级安全「删除所有消息」，DELETE /messages）：
+  /// 通道保留、继续收新消息；服务端删除前保存序号高水位，新消息序号不回卷。
+  /// 返回 {cleared, attachments}（删除条数）。
+  Future<Map<String, dynamic>> clearMessages(String token) async {
+    return _delete(Api.messages, token: token);
+  }
+
   /// 撤销**本空间内**的另一条通道（POST /entrances/:id/revoke，PROTOCOL.md §7.2）。
   ///
   /// 授权（2026-09-16）：同 space 内可互撤，但**每次都要校验共享口令**——撤销会让  /// 对方客户端自毁本地数据，属不可逆操作。失败码：口令错 401 `ESCROW_VERIFY_FAILED`、

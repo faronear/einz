@@ -981,6 +981,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedDestroyEntrance => 'Destroy this entrance';
 
   @override
+  String get advancedClearMessages => 'Delete all messages';
+
+  @override
+  String get clearMessagesMessage =>
+      'Deletes all messages and attachments saved in the current entrance. The entrance stays usable and will keep receiving new messages. Other entrances are unaffected.';
+
+  @override
+  String get clearMessagesConfirm => 'Delete';
+
+  @override
+  String get clearMessagesDone => 'All messages deleted.';
+
+  @override
+  String clearMessagesFailed(String error) {
+    return 'Delete failed: $error';
+  }
+
+  @override
   String get leaveSpaceTitle => 'Destroy this entrance?';
 
   @override

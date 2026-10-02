@@ -98,11 +98,6 @@ const double _entranceCardMaxSize = (_entranceSheetMaxWidth -
         _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
     _entranceCardsPerRow;
 
-/// 「更多通道」弹层标题右端「刷新」按钮的边长 = IconButton 的 compact 触控盒
-/// （`kMinInteractiveDimension` 48 − visualDensity.compact 各 4）。左侧放同宽占位，
-/// 标题才**恰好居中**（卡片在下面，标题不能被按钮推歪）。
-const double _entranceRefreshSize = 40;
-
 double _entranceCardSizeFor(double availableWidth) {
   final raw =
       (availableWidth - _entranceCardSpacing * (_entranceCardsPerRow - 1)) /
@@ -2375,67 +2370,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 标题**居中**、上 14 下 10（老板 2026-09-25：与「界面语言」等
-                  // 弹层标题的居中与留白口径对齐）。右端挂「刷新」（老板 2026-09-26）：
-                  // 就地重拉 /entrances 重建卡片，不用退出弹层、也不用等 30s 轮询。
-                  // 横向 padding 由 16 收到 0，让刷新按钮与下面的卡片**右对齐**；
-                  // 左边放同宽占位，标题仍在弹层正中（不会被按钮推歪）。
-                  // 纵向 14/10 → 4/0：这一行的高度由 40 的按钮撑起（标题文字只占约 19），
-                  // 减掉上下各约 10.5 的盒子余量后，标题**看上去**离顶边/卡片仍是 14/10。
+                  // 标题**居中**、上 14 下 5（与「界面语言」等弹层标题的居中与
+                  // 留白口径对齐）。标题行不再挂「刷新」（老板 2026-10-02：挪到
+                  // 下方「我的所有通道」小标题旁，离它刷新的对象更近），纯标题。
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: _entranceRefreshSize),
-                        Expanded(
-                          child: Center(
-                            child: Text(l10n.chatPageMenuEntranceList,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 16)),
-                          ),
-                        ),
-                        SizedBox(
-                          width: _entranceRefreshSize,
-                          height: _entranceRefreshSize,
-                          // 拉取中换成同尺寸的转圈：位置与大小都不跳
-                          child: refreshing
-                              ? const Center(
-                                  child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2)),
-                                )
-                              : IconButton(
-                                  icon: const Icon(Icons.refresh, size: 20),
-                                  tooltip: l10n.chatPageEntranceListRefresh,
-                                  visualDensity: VisualDensity.compact,
-                                  onPressed: () async {
-                                    setSheetState(() => refreshing = true);
-                                    await load();
-                                    // 弹层可能在这期间被关掉 → 不能再 setState
-                                    if (!ctx.mounted) return;
-                                    setSheetState(() => refreshing = false);
-                                  },
-                                ),
-                        ),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(0, 14, 0, 5),
+                    child: Center(
+                      child: Text(l10n.chatPageMenuEntranceList,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
                   ),
                   // 标题下备注行（老板 2026-10-02）：沿用原「当前通道」弹窗的说明文案，
                   // 式样同「阅后即焚」弹层标题下的说明（淡色小字、居中）。
-                  // 上移 5（老板 2026-10-02：标题行由 40 的刷新按钮撑起，视觉间隙
-                  // 约 10，减半增加整体感——与阅后即焚弹层的标题-备注收缩同步做）
-                  Transform.translate(
-                    offset: const Offset(0, -5),
-                    child: Center(
-                      child: Text(
-                        l10n.chatPageEntranceScopeHint,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(ctx).colorScheme.outline),
-                      ),
+                  Center(
+                    child: Text(
+                      l10n.chatPageEntranceScopeHint,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(ctx).colorScheme.outline),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -2467,12 +2421,42 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ),
                   const SizedBox(height: 20),
                   // 「所有通道」小标题（老板 2026-10-02 定）：与上方「当前通道」
-                  // 小标题同款淡色 caption，隔开改名行与卡片组
-                  Text(l10n.chatPageEntranceListAll,
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                  // 小标题同款淡色 caption，隔开改名行与卡片组。「刷新」挂在标题
+                  // 旁（老板 2026-10-02：从弹层标题右端挪来，离它刷新的卡片更近）
+                  Row(
+                    children: [
+                      Text(l10n.chatPageEntranceListAll,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        // 拉取中换成同尺寸的转圈：位置与大小都不跳
+                        child: refreshing
+                            ? const Padding(
+                                padding: EdgeInsets.all(3),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : IconButton(
+                                icon: const Icon(Icons.refresh, size: 14),
+                                tooltip: l10n.chatPageEntranceListRefresh,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () async {
+                                  setSheetState(() => refreshing = true);
+                                  await load();
+                                  // 弹层可能在这期间被关掉 → 不能再 setState
+                                  if (!ctx.mounted) return;
+                                  setSheetState(() => refreshing = false);
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
                   // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
@@ -2716,6 +2700,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 title: Text(l10n.chatPageMenuChangePassphrase),
                 onTap: () => Navigator.of(ctx).pop('passphrase'),
               ),
+              // 「删除所有消息」（老板 2026-10-02）：清本通道的消息+附件，通道保留。
+              // 破坏性递进：排在本通道销毁（更彻底）之前
+              ListTile(
+                leading: const Icon(Icons.delete_sweep_outlined),
+                title: Text(l10n.advancedClearMessages),
+                onTap: () => Navigator.of(ctx).pop('clear'),
+              ),
               ListTile(
                 leading: Icon(Icons.warning_amber_rounded, color: red),
                 title: Text(l10n.advancedDestroyEntrance),
@@ -2736,6 +2727,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     if (picked == 'passphrase') {
       await _showChangePassphraseDialog();
+    } else if (picked == 'clear') {
+      // 「删除所有消息」（老板 2026-10-02）：与销毁通道同一条确认闸门
+      // （通道名 + 已设时的锁屏码），只是文案说明通道保留。
+      final entranceName = await _resolveMyEntranceName();
+      final hasPin = await AppLockService(widget.db ?? LocalDatabase.shared).isSetup;
+      if (!mounted) return;
+      final ok = await confirmClearMessages(
+        context,
+        db: widget.db,
+        entranceName: entranceName,
+        hasPin: hasPin,
+      );
+      if (!ok || !mounted) return;
+      try {
+        await _withAuth((t) => (widget.api ?? ApiClient(effectiveServer)).clearMessages(t));
+        // 本地同步清：消息行 + 附件元数据行 + stored 模式的明文副本；
+        // 刻意不动 sync_state 锚点（服务端已保存序号高水位，新消息 seq 仍高于游标）
+        await _repo.clearLocalHistory();
+        unawaited(AttachmentStore.clearSpace(widget.spaceId));
+        if (!mounted) return;
+        setState(() {
+          _imageCache.clear();
+          _videoCache.clear();
+          _videoThumbCache.clear();
+        });
+        await _refreshLocal();
+        if (mounted) showTopNotice(context, l10n.clearMessagesDone);
+      } catch (e) {
+        if (!mounted) return;
+        // 失败如实提示：本地没清、服务端可能也没清，重试即再走一遍闸门
+        showTopNotice(context, backendError(l10n, l10n.clearMessagesFailed('$e')));
+      }
     } else if (picked == 'leave') {
       // 阀门所需的两个输入：通道名（确认清的是这条）与"是否设了锁屏码"（决定要不要验）。
       // 都用 await 取，过一遍 mounted 再传进弹窗。

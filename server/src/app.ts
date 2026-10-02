@@ -12,7 +12,7 @@ import {
   createChallenge,
   verifyChallenge
 } from './auth.js'
-import { postMessage, syncMessages } from './messages.js'
+import { postMessage, syncMessages, clearMessages } from './messages.js'
 import { getReceipts, postReceipts, unreadCount } from './receipts.js'
 import {
   getAttachmentBlob,
@@ -354,6 +354,24 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
         server_sequence: result.server_sequence,
         type: envelope.type ?? null
       },
+      meta: metaOf(req)
+    })
+    sendJson(res, 200, result)
+    return
+  }
+  // 高级安全「删除所有消息」（老板 2026-10-02）：删本空间全部消息+附件，通道保留、
+  // 继续收新消息。服务端在删除前保存序号高水位（见 messages.clearMessages），双方
+  // 客户端的同步游标不会因清空而失联。审计 kind: message.clear——破坏性操作，
+  // runbook 要能一眼看到。
+  if (method === 'DELETE' && path === '/messages') {
+    const token = bearerToken(req)
+    const sess = requireSession(token)
+    const result = clearMessages(token)
+    logActivity({
+      entranceId: sess.entrance_id,
+      spaceId: sess.space_id,
+      kind: 'message.clear',
+      detail: { cleared: result.cleared, attachments: result.attachments },
       meta: metaOf(req)
     })
     sendJson(res, 200, result)

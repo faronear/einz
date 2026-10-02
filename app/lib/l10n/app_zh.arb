@@ -509,6 +509,18 @@
   "aboutServerDevNote": "开发地址（非生产），仅用于开发调试",
   "advancedMenuTitle": "高级安全",
   "advancedDestroyEntrance": "销毁本通道",
+  "advancedClearMessages": "删除所有消息",
+  "clearMessagesMessage": "删除当前通道保存的所有消息和附件。本通道仍然可用，将继续收到新消息。其他通道不受影响。",
+  "clearMessagesConfirm": "删除",
+  "clearMessagesDone": "已删除全部消息。",
+  "clearMessagesFailed": "删除失败: {error}",
+  "@clearMessagesFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "leaveSpaceTitle": "销毁本通道？",
   "leaveSpaceMessage": "彻底删除当前通道保存的全部消息、附件和凭证，并回到秘境向导页。当前秘境本身仍然存在，其他通道也不受影响。此操作无法撤销！",
   "resetEntranceNameLabel": "{name}",

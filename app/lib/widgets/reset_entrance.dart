@@ -76,6 +76,29 @@ Future<bool> retireSpaceQuietly(SpaceSession session, {ApiClient? api}) async {
   }
 }
 
+/// 「删除所有消息」（高级安全，老板 2026-10-02）的确认闸门：与销毁通道同一条
+/// [_confirmDestructive] 弹窗（说明小字 + 通道名 + 已设时的锁屏码），文案换成
+/// 清消息专用（销毁会撤通道，本操作通道保留——措辞必须分开）。
+Future<bool> confirmClearMessages(
+  BuildContext context, {
+  LocalDatabase? db,
+  required String entranceName,
+  bool hasPin = false,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  return _confirmDestructive(
+    context,
+    db: db ?? LocalDatabase.shared,
+    entranceName: entranceName,
+    hasPin: hasPin,
+    copy: ConfirmDialogCopy(
+      title: l10n.advancedClearMessages,
+      message: l10n.clearMessagesMessage,
+      confirmLabel: l10n.clearMessagesConfirm,
+    ),
+  );
+}
+
 /// 「销毁本秘境通道」——**空间级**破坏性操作（聊天页菜单 → 高级）。
 ///
 /// 语义（老板 2026-09-22 定）：站在某个空间里点破坏性入口，用户心里想的就是"结束这个

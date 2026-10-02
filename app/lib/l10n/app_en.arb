@@ -509,6 +509,18 @@
   "aboutServerDevNote": "Development address for debugging only",
   "advancedMenuTitle": "Advanced security",
   "advancedDestroyEntrance": "Destroy this entrance",
+  "advancedClearMessages": "Delete all messages",
+  "clearMessagesMessage": "Deletes all messages and attachments saved in the current entrance. The entrance stays usable and will keep receiving new messages. Other entrances are unaffected.",
+  "clearMessagesConfirm": "Delete",
+  "clearMessagesDone": "All messages deleted.",
+  "clearMessagesFailed": "Delete failed: {error}",
+  "@clearMessagesFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "leaveSpaceTitle": "Destroy this entrance?",
   "leaveSpaceMessage": "Permanently erases all messages, attachments and credentials of the current entrance, then takes you back to the setup wizard. The space itself and its data are kept; other entrances are unaffected. This cannot be undone!",
   "resetEntranceNameLabel": "{name}",

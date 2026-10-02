@@ -243,6 +243,14 @@ class MessageRepository {
     return row?.lastServerSequence ?? 0;
   }
 
+  /// 清空本空间全部本地消息与附件元数据（高级安全「删除所有消息」服务端成功后的
+  /// 本地同步清）。刻意**不动 sync_state 锚点**：服务端删除前保存了序号高水位，
+  /// 新消息 seq 继续高于本地游标，锚点原样即可对上（清零反而会整表重拉旧序号）。
+  Future<void> clearLocalHistory() async {
+    await (db.delete(db.localAttachments)..where((a) => a.spaceId.equals(spaceId))).go();
+    await (db.delete(db.localMessages)..where((m) => m.spaceId.equals(spaceId))).go();
+  }
+
   /// 发送一条消息：加密 → 落库（pending）→ 尝试立即上传；失败留队。
   /// [quote] 引用快照（{messageId, preview}）、[meta] 附加数据（如音频时长秒数）
   /// ——二者任一非空时载荷包装为 JSON（密文内传输，Server 不可见）。

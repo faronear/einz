@@ -1796,6 +1796,36 @@ abstract class AppLocalizations {
   /// **'Destroy this entrance'**
   String get advancedDestroyEntrance;
 
+  /// No description provided for @advancedClearMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all messages'**
+  String get advancedClearMessages;
+
+  /// No description provided for @clearMessagesMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Deletes all messages and attachments saved in the current entrance. The entrance stays usable and will keep receiving new messages. Other entrances are unaffected.'**
+  String get clearMessagesMessage;
+
+  /// No description provided for @clearMessagesConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get clearMessagesConfirm;
+
+  /// No description provided for @clearMessagesDone.
+  ///
+  /// In en, this message translates to:
+  /// **'All messages deleted.'**
+  String get clearMessagesDone;
+
+  /// No description provided for @clearMessagesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String clearMessagesFailed(String error);
+
   /// No description provided for @leaveSpaceTitle.
   ///
   /// In en, this message translates to:
