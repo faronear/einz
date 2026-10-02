@@ -2160,6 +2160,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     showModalBottomSheet<void>(
       context: context,
+      // 允许弹层用到满窗高：默认上限是 9/16 屏，窗口矮时标题/备注/「新建通道」
+      // 这些固定项之和就可能超过它，Flexible 缩到 0 也不够 → 底部黑黄条纹
+      // "Bottom overflowed"（老板 2026-10-02 mac 实测）。开起来后只有窗口矮到
+      // 固定项本身装不下（<约 180px）才会溢出，正常窗口都由中间卡片区内部滚动吸收。
+      isScrollControlled: true,
       // StatefulBuilder：「刷新」按钮要就地重建卡片（老板 2026-09-26）——关掉弹层
       // 再开一次会有"收起+展开"两段动画，看着像卡了一下
       builder: (_) => StatefulBuilder(
