@@ -105,184 +105,8 @@ double _entranceCardSizeFor(double availableWidth) {
   return raw.floorToDouble().clamp(64.0, _entranceCardMaxSize).toDouble();
 }
 
-/// 「我的通道」弹层顶部的当前通道行（2026-10-02 合并「通道名称」入口）：
-/// 常态 = 「本机」淡色标记 + 通道名（valueStyle 深色）+ 铅笔图标；点名字或铅笔
-/// → 行内变白底输入框 + 保存（转圈）/ 取消。保存走 [applyName]（复用改名弹窗
-/// 的校验与提交逻辑），成功后回到只读态并显示新名字，失败红字留在编辑态。
-class _EntranceNameRow extends StatefulWidget {
-  const _EntranceNameRow({
-    required this.initialName,
-    required this.hint,
-    required this.labelStyle,
-    required this.valueStyle,
-    required this.applyName,
-  });
-
-  final String initialName;
-  /// 名字为空时的兜底显示（member_id / entrance_id），与原菜单行为一致
-  final String hint;
-  final TextStyle labelStyle;
-  final TextStyle valueStyle;
-  /// 返回 true = 保存成功（退出编辑态）；false = 失败（错误已由回调展示，留在编辑态）
-  final Future<bool> Function(String name) applyName;
-
-  @override
-  State<_EntranceNameRow> createState() => _EntranceNameRowState();
-}
-
-class _EntranceNameRowState extends State<_EntranceNameRow> {
-  late final TextEditingController _ctrl =
-      TextEditingController(text: widget.initialName);
-  final _focus = FocusNode();
-  bool _editing = false;
-  bool _saving = false;
-  String? _error;
-
-  /// 「当前通道」小标题（l10n，2026-10-02 老板定：从行内挪到输入框上方）
-  String get _currentEntranceLabel =>
-      AppLocalizations.of(context)!.chatPageEntranceListThisDevice;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    final ok = await widget.applyName(_ctrl.text);
-    if (!mounted) return;
-    setState(() {
-      _saving = false;
-      if (ok) {
-        _editing = false;
-        _error = null;
-      } else {
-        // 错误文案由 applyName 弹顶部通知；这里只留在编辑态让用户改
-        _error = ' ';
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // 小标题（淡色 caption、粗体，老板 2026-10-02 定）：「当前通道」在输入框上方
-    final sectionLabel = TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant);
-    if (!_editing) {
-      // 只读态沿用原「当前通道」弹窗的式样（老板 2026-10-02）：OutlineInputBorder
-      // 边框 + 只读文字 + 右侧铅笔——光秃秃一行文字没有"可点击"的暗示。
-      // 透明背景（不加白底，与编辑态白底区分，同原弹窗口径）。
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(_currentEntranceLabel, style: sectionLabel),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  mouseCursor: SystemMouseCursors.click,
-                  onTap: () {
-                    setState(() => _editing = true);
-                    WidgetsBinding.instance.addPostFrameCallback(
-                        (_) => _focus.requestFocus());
-                  },
-                  borderRadius: BorderRadius.circular(4),
-                  child: TextField(
-                    controller: _ctrl,
-                    readOnly: true,
-                    style: widget.valueStyle,
-                    // 拦截输入框自己拿焦点/光标，点击统一走 onTap 进编辑态
-                    showCursor: false,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                      counterText: '',
-                      // 名字为空时框内兜底显示 id（与原菜单行同口径），淡色不与真名混淆
-                      hintText:
-                          widget.initialName.trim().isEmpty ? widget.hint : null,
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.edit, size: 18),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () {
-                          setState(() => _editing = true);
-                          WidgetsBinding.instance.addPostFrameCallback(
-                              (_) => _focus.requestFocus());
-                        },
-                      ),
-                    ),
-                    onTap: () {
-                      setState(() => _editing = true);
-                      WidgetsBinding.instance
-                          .addPostFrameCallback((_) => _focus.requestFocus());
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(_currentEntranceLabel, style: sectionLabel),
-        const SizedBox(height: 4),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _ctrl,
-                focusNode: _focus,
-                autofocus: false,
-                maxLength: kEntranceNameMaxLength,
-                style: widget.valueStyle,
-                decoration: InputDecoration(
-                  isDense: true,
-                  filled: true,
-                  fillColor: Colors.white,
-                  counterText: '',
-                  border: const OutlineInputBorder(),
-                  errorText: _error,
-                ),
-                onSubmitted: (_) => _saving ? null : _save(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2.4),
-                  )
-                : IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: '保存',
-                    icon: const Icon(Icons.check, size: 18),
-                    onPressed: _save,
-                  ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: '取消',
-              icon: const Icon(Icons.close, size: 18),
-              onPressed: () => setState(() {
-                _editing = false;
-                _error = null;
-                _ctrl.text = widget.initialName;
-              }),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
+/// 「我的通道」弹层标题行右端「刷新」按钮的占位/按钮边长（标题居中靠它配平）。
+const double _entranceRefreshSize = 40;
 
 /// 聊天页：本地历史 + 发送 + 自动轮询同步（最小可用，无 WS 长连接）。
 class ChatPage extends StatefulWidget {
@@ -2371,18 +2195,52 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 标题**居中**、上 14 下 5（与「界面语言」等弹层标题的居中与
-                  // 留白口径对齐）。标题行不再挂「刷新」（老板 2026-10-02：挪到
-                  // 下方「我的所有通道」小标题旁，离它刷新的对象更近），纯标题。
+                  // 留白口径对齐）。右端挂「刷新」：就地重拉 /entrances 重建卡片，
+                  // 不用退出弹层、也不用等 30s 轮询。横向 padding 由 16 收到 0，
+                  // 让刷新按钮与下面的卡片**右对齐**；左边放同宽占位，标题仍在弹层
+                  // 正中（不会被按钮推歪）。
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 14, 0, 5),
-                    child: Center(
-                      child: Text(l10n.chatPageMenuEntranceList,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
+                    padding: const EdgeInsets.fromLTRB(0, 4, 0, 5),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: _entranceRefreshSize),
+                        Expanded(
+                          child: Center(
+                            child: Text(l10n.chatPageMenuEntranceList,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 16)),
+                          ),
+                        ),
+                        SizedBox(
+                          width: _entranceRefreshSize,
+                          height: _entranceRefreshSize,
+                          // 拉取中换成同尺寸的转圈：位置与大小都不跳
+                          child: refreshing
+                              ? const Center(
+                                  child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2)),
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.refresh, size: 20),
+                                  tooltip: l10n.chatPageEntranceListRefresh,
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () async {
+                                    setSheetState(() => refreshing = true);
+                                    await load();
+                                    // 弹层可能在这期间被关掉 → 不能再 setState
+                                    if (!ctx.mounted) return;
+                                    setSheetState(() => refreshing = false);
+                                  },
+                                ),
+                        ),
+                      ],
                     ),
                   ),
-                  // 标题下备注行（老板 2026-10-02）：沿用原「当前通道」弹窗的说明文案，
-                  // 式样同「阅后即焚」弹层标题下的说明（淡色小字、居中）。
+                  // 标题下备注行：沿用原「当前通道」弹窗的说明文案，式样同「阅后即焚」
+                  // 弹层标题下的说明（淡色小字、居中）。
                   Center(
                     child: Text(
                       l10n.chatPageEntranceScopeHint,
@@ -2393,89 +2251,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // 当前通道行（2026-10-02 合并「通道名称」入口至此）：本机标记 +
-                  // 通道名 + 铅笔。点名字或铅笔 → 行内变白底输入框 + 保存/取消，
-                  // 复用 _applyEntranceName 的校验与保存（与改名弹窗同一条逻辑）
-                  // 样式与菜单行同口径：淡色 13 标记 / 深色 14 值（itemBuilder 里的
-                  // captionStyle/valueStyle 是菜单局部变量，这里就地定义同款）
-                  //
-                  // 窗口矮时中间这一整块（当前通道行 + 「所有通道」小标题 + 卡片 +
-                  // 失败提示）在内部滚动：标题与底部「新建通道」固定在两端。原先
-                  // 只把卡片区做成可滚，但改名行/小标题/各段间距是死的——窗口矮到
-                  // 弹层上限小于这些固定项之和时，Flexible 缩到 0 也不够，弹层底部
-                  // 照样 "Bottom overflowed"（老板 2026-10-02 mac 实测）。
-                  ScrollableCardArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                  Builder(
-                    builder: (ctx) {
-                      final labelStyle = TextStyle(
-                          fontSize: 13, color: Theme.of(ctx).colorScheme.onSurfaceVariant);
-                      final valueStyle = TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(ctx).colorScheme.onSurface,
-                          fontWeight: FontWeight.w500);
-                      return _EntranceNameRow(
-                        initialName: _myEntranceName,
-                        hint: myId.isEmpty ? widget.entranceId : myId,
-                        labelStyle: labelStyle,
-                        valueStyle: valueStyle,
-                        applyName: (name) async {
-                          final err = await _applyEntranceName(name, l10n);
-                          if (err != null && ctx.mounted) showTopNotice(ctx, err);
-                          return err == null;
-                        },
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  // 「所有通道」小标题（老板 2026-10-02 定）：与上方「当前通道」
-                  // 小标题同款淡色 caption，隔开改名行与卡片组。「刷新」挂在标题
-                  // 旁（老板 2026-10-02：从弹层标题右端挪来，离它刷新的卡片更近）
-                  Row(
-                    children: [
-                      Text(l10n.chatPageEntranceListAll,
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
-                      const SizedBox(width: 4),
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        // 拉取中换成同尺寸的转圈：位置与大小都不跳
-                        child: refreshing
-                            ? const Padding(
-                                padding: EdgeInsets.all(3),
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
-                            : IconButton(
-                                icon: const Icon(Icons.refresh, size: 14),
-                                tooltip: l10n.chatPageEntranceListRefresh,
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                onPressed: () async {
-                                  setSheetState(() => refreshing = true);
-                                  await load();
-                                  // 弹层可能在这期间被关掉 → 不能再 setState
-                                  if (!ctx.mounted) return;
-                                  setSheetState(() => refreshing = false);
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
                   // 通道卡片：**一行 3 张**（与秘境卡片同口径，边长按可用宽度反算，
                   // 老板 2026-09-25）。卡片 = 边框 + 名称 + 状态红绿灯（绿在线/红离线/
                   // 灰已撤销）+ 时间（在线→上线时刻；离线/已撤销→下线时刻；无数据不显示）；
-                  // 右上角固定角标：本机=绿勾、已撤销=阻止图标+整卡蒙版（老板 2026-09-26）
-                  // 通道多 + 窗口矮 → 随中间整块在外层 ScrollableCardArea 里滚动
-                  // （外层已把改名行/小标题一并纳入；与「切换我的秘境」同一处口径）。
-                  LayoutBuilder(
+                  // 右上角固定角标：本机=编辑图标（点击改名）、已撤销=阻止图标+整卡蒙版
+                  // （老板 2026-10-02：当前通道改名改从本机卡片进，弹层不再放改名行）
+                  // 通道多 + 窗口矮 → 随中间整块在外层 ScrollableCardArea 里滚动。
+                  ScrollableCardArea(
+                    child: LayoutBuilder(
                       builder: (context, constraints) {
                         final size = _entranceCardSizeFor(constraints.maxWidth);
                         return Wrap(
@@ -2609,18 +2392,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           Positioned(
                                             top: 6,
                                             right: 6,
-                                            // 本机绿勾语义同空间卡片上的对勾（标"当前这个"）；
-                                            // 已撤销用阻止图标，比文字更省宽度
-                                            child: Icon(
-                                              isLocal
-                                                  ? Icons.check_circle
-                                                  : Icons.block,
-                                              size: 14,
-                                              color: isLocal
-                                                  ? Colors.green
-                                                  : Colors.black.withValues(
-                                                      alpha: 0.45),
-                                            ),
+                                            // 本机 = 编辑图标（老板 2026-10-02：当前通道
+                                            // 改名从这张卡进——点击关掉弹层，错峰弹改名
+                                            // 弹窗）；已撤销 = 阻止图标。编辑角标用小号
+                                            // IconButton（内边距 2）扩一点热区好按。
+                                            child: isLocal
+                                                ? IconButton(
+                                                    tooltip: l10n.chatPageEdit,
+                                                    icon: const Icon(Icons.edit,
+                                                        size: 14),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    padding:
+                                                        const EdgeInsets.all(2),
+                                                    constraints:
+                                                        const BoxConstraints(),
+                                                    onPressed: () {
+                                                      // 先收起弹层再开弹窗（与
+                                                      // 「新建通道」同款错峰，避免
+                                                      // Overlay 交叉卸载断言）
+                                                      Navigator.of(ctx).pop();
+                                                      _menuAction(
+                                                          _showRenameEntranceDialog);
+                                                    },
+                                                  )
+                                                : Icon(
+                                                    Icons.block,
+                                                    size: 14,
+                                                    color: Colors.black
+                                                        .withValues(alpha: 0.45),
+                                                  ),
                                           ),
                                       ],
                                     ),
@@ -2631,15 +2432,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         );
                       },
                     ),
+                  ),
                   if (loaded == null)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Text(l10n.chatPageEntranceListFailed,
                           style: TextStyle(fontSize: 13, color: scheme.outline)),
                     ),
-                      ],
-                    ),
-                  ),
                   // 卡片与「新建通道」之间的留白（老板 2026-09-25：原先紧挨着）
                   const SizedBox(height: 12),
                   // 「新建通道」：与「切换我的秘境」弹层的「添加秘境」同款外观——常态淡灰底
@@ -3080,6 +2879,120 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (e) {
       return l10n.chatPageRenameFailed('$e');
     }
+  }
+
+  /// 修改通道名称（服务端同步 + 本地刷新）——「我的通道」弹层里本机卡片右上角的
+  /// 编辑角标进入（老板 2026-10-02：改名入口从弹层顶部的行挪回弹窗）。内容即
+  /// 原合并前的「当前通道」弹窗（标题/通道名称输入框/说明文案），公钥展示不再要
+  /// （5b74cf4 已删）。校验与提交走 [_applyEntranceName]（与弹层行内改名同一条逻辑）。
+  Future<void> _showRenameEntranceDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final ctrl = TextEditingController(text: _myEntranceName);
+    // 名称为空/不合规警示（红字显示在输入框下方；开始填写即消）
+    final nameError = ValueNotifier<String?>(null);
+    // 名字/通道名编辑态切换：初始只读透明 + 右侧编辑按钮；点编辑 → 白底可编辑、按钮消失
+    final editing = ValueNotifier<bool>(false);
+    // 名称输入框焦点：点框内任意位置进编辑态时手动取焦（只读态点击不会自动取焦）
+    final nameFocus = FocusNode();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中）
+        title: Center(child: Text(l10n.chatPageMenuEntranceList)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 说明"名称只属于当前秘境"：多空间下同一条通道在每个秘境各有名称，
+            // 不点明会让人以为改的是全局名（老板 2026-09-22 定：承认 per-space）
+            Text(
+              l10n.chatPageEntranceScopeHint,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(ctx).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 10),
+            // 通道名称输入框：初始只读 + 透明背景，右侧「编辑」按钮；点编辑 →
+            // 白底可编辑、按钮消失。点框内任意位置也进编辑态（老板 2026-09-23）
+            ValueListenableBuilder<bool>(
+              valueListenable: editing,
+              builder: (_, isEditing, _) => TextField(
+                controller: ctrl,
+                focusNode: nameFocus,
+                readOnly: !isEditing,
+                onTap: () {
+                  if (editing.value) return;
+                  editing.value = true;
+                  nameFocus.requestFocus();
+                },
+                decoration: InputDecoration(
+                  labelText: l10n.chatPageEntranceListThisDevice,
+                  border: const OutlineInputBorder(),
+                  filled: isEditing, // 编辑态白底；只读态透明（沿用弹窗背景）
+                  fillColor: Colors.white,
+                  counterText: '',
+                  suffixIcon: isEditing
+                      ? null
+                      : IconButton(
+                          tooltip: l10n.chatPageEdit,
+                          icon: const Icon(Icons.edit, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => editing.value = true,
+                        ),
+                ),
+                // 输入框里直接拦住超长（老板 2026-09-28）：上限用 shared 策略里的
+                // 同一个常量（这里的拦截不替代提交时的白名单校验）
+                maxLength: kEntranceNameMaxLength,
+                // 开始填写即清除警示（与向导输入框一致）
+                onChanged: (_) {
+                  if (nameError.value != null) nameError.value = null;
+                },
+              ),
+            ),
+            ValueListenableBuilder<String?>(
+              valueListenable: nameError,
+              builder: (_, err, _) => err == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        err,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.cancel)),
+          FilledButton(
+            onPressed: () async {
+              final err = await _applyEntranceName(ctrl.text, l10n);
+              if (err != null) {
+                if (ctx.mounted) showTopNotice(ctx, err);
+                return; // 校验/保存失败：留在弹窗里（错误已顶部通知）
+              }
+              if (ctx.mounted) Navigator.of(ctx).pop(true);
+            },
+            child: Text(l10n.chatPageRenamingSubmit),
+          ),
+        ],
+      ),
+    );
+    // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖
+    // controller；立即 dispose 会触发红屏断言 _dependents.isEmpty）
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      ctrl.dispose();
+      nameError.dispose();
+      editing.dispose();
+      nameFocus.dispose();
+    });
+    if (saved == true && mounted) setState(() {}); // 刷新弹层/菜单显示的新名字
   }
 
   /// 修改我的名字（服务端同步 + 本地刷新菜单显示）。
