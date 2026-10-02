@@ -627,6 +627,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 气泡时间行里的快捷动作小按钮（老板 2026-10-02）：**只留图标**（文字版实测
+  /// 每条消息都带字，视觉太重），尺寸/颜色同时间戳淡色档，点击直接执行动作——
+  /// 不用进长按菜单。悬浮/点击背景效果同状态栏电话/设备图标（Material+InkWell）。
+  Widget _bubbleQuickAction(
+    HistoryMessage m, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(), // 圆形背景（老板 2026-10-02：同状态栏电话图标）
+      clipBehavior: Clip.antiAlias,
+      child: Tooltip(
+        message: label,
+        child: InkWell(
+          // 悬浮/点击背景（老板 2026-10-02）：与状态栏电话/设备图标同档
+          // hover/highlight 色，浅灰淡染——gradient 深色气泡下黑 alpha 同样可见
+          hoverColor: Colors.black.withValues(alpha: 0.05),
+          highlightColor: Colors.black.withValues(alpha: 0.08),
+          onTap: onTap,
+          child: Padding(
+            // 热区：padding 4（老板 2026-10-02：6 会撑大气泡，收到 4），
+            // 相邻动作另加 2 间隔
+            padding: const EdgeInsets.all(4),
+            child: Icon(icon, size: 12, color: subtle),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 自己消息的发送状态小标（老板 2026-09-12）：
   /// - pending → 纸飞机（发送中）
   /// - sent → 单勾（服务端已收下）
@@ -6272,22 +6305,88 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 color: _uiStyle == 'gradient'
                                                     ? Colors.white70
                                                     : Colors.grey)),
+                                        // 快捷动作（老板 2026-10-02）：时间后、焚毁
+                                        // 指示前——引用 + 拷贝（拷贝仅文字消息）。
+                                        // 点击直接执行，不用进长按菜单；墓碑消息
+                                        // 无内容可操作，不显示
+                                        if (!m.deleted) ...[
+                                          const SizedBox(width: 2),
+                                          _bubbleQuickAction(
+                                            m,
+                                            icon: Icons.format_quote,
+                                            label: l10n.chatPageActionQuote,
+                                            onTap: () {
+                                              setState(() => _quoteTarget = m);
+                                              _inputFocusNode.requestFocus();
+                                            },
+                                          ),
+                                          const SizedBox(width: 2),
+                                          if (m.env.type == 'text')
+                                            _bubbleQuickAction(
+                                              m,
+                                              icon: Icons.copy_outlined,
+                                              label: l10n.chatPageCopy,
+                                              onTap: () async {
+                                                await Clipboard.setData(
+                                                    ClipboardData(text: m.plaintext.trim()));
+                                                if (!mounted) return;
+                                                showTopNotice(
+                                                    this.context, l10n.setupCreateCopied);
+                                              },
+                                            ),
+                                        ],
                                         if (m.expiresAt != null) ...[
                                           const SizedBox(width: 4),
                                           // 沙漏=阅后即焚倒计时（老板 2026-09-12，
                                           // 替代原来的时钟图标，避免与发送中混淆）；
-                                          // 已焚毁/已删除 → 静态空沙漏（不再翻转）
-                                          _BurnHourglass(burned: m.deleted),
-                                          const SizedBox(width: 2),
-                                          // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
-                                          // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
-                                          Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
-                                                  manual: m.burnManual),
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: _uiStyle == 'gradient'
-                                                      ? Colors.white70
-                                                      : Colors.grey)),
+                                          // 已焚毁/已删除 → 静态空沙漏（不再翻转）。
+                                          // 可点（老板 2026-10-02）：点击进档位设置
+                                          // 弹层（同长按菜单「阅后即焚」）——仅活消息；
+                                          // 墓碑无内容可操作，保持纯显示
+                                          if (!m.deleted)
+                                            Material(
+                                              color: Colors.transparent,
+                                              shape: const CircleBorder(), // 圆形背景（同快捷动作）
+                                              clipBehavior: Clip.antiAlias,
+                                              child: InkWell(
+                                                // 悬浮/点击背景同快捷动作/状态栏图标
+                                                hoverColor: Colors.black.withValues(alpha: 0.05),
+                                                highlightColor:
+                                                    Colors.black.withValues(alpha: 0.08),
+                                                onTap: () => _setMessageBurn(m),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(4),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      _BurnHourglass(burned: m.deleted),
+                                                      const SizedBox(width: 2),
+                                                      // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
+                                                      // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
+                                                      Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
+                                                              manual: m.burnManual),
+                                                          style: TextStyle(
+                                                              fontSize: 11,
+                                                              color: _uiStyle == 'gradient'
+                                                                  ? Colors.white70
+                                                                  : Colors.grey)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          else ...[
+                                            // 墓碑（已焚毁/已删除）：纯显示不可点
+                                            _BurnHourglass(burned: m.deleted),
+                                            const SizedBox(width: 2),
+                                            Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
+                                                    manual: m.burnManual),
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: _uiStyle == 'gradient'
+                                                        ? Colors.white70
+                                                        : Colors.grey)),
+                                          ],
                                         ],
                                       ],
                                     ),
