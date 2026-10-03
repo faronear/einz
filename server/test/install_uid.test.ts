@@ -55,15 +55,15 @@ test('create/join 落库：同一 install_uid 把不同空间的 entrance_id 关
   await withDb(async () => {
     // 设备 D 创建空间 A
     const spaceA = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-d', 'iPhone', UID_D,
     )
     // 另一台设备 E 创建空间 B，然后设备 D 用开通码加入 B（同一个 install_uid）
     const spaceB = await createSpace(
-      undefined, '对方', 'female', '伴侣', 'male',
+      undefined, '对方', 'female',
       undefined, undefined, 'pk-e', 'Pixel', UID_E,
     )
-    const joined = joinSpace(spaceB.joinToken, 'pk-d2', 'iPhone', 1, UID_D)
+    const joined = joinSpace(spaceB.joinToken, 'pk-d2', 'iPhone', undefined, UID_D)
 
     assert.equal(uidOf(spaceA.entranceId), UID_D, 'create 应落 install_uid')
     assert.equal(uidOf(joined.entranceId), UID_D, '同一设备的 join 应落同一个 install_uid')
@@ -80,7 +80,7 @@ test('create/join 落库：同一 install_uid 把不同空间的 entrance_id 关
 test('补登：存量行（NULL）由 POST /entrances/install-uid 幂等填上，非法输入 400', async () => {
   await withDb(async () => {
     const space = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-d', 'iPhone', undefined, // 模拟升级前的旧客户端：不带 uid
     )
     assert.equal(uidOf(space.entranceId), null, '不带 install_uid 时留 NULL（不阻断入网）')
@@ -106,7 +106,7 @@ test('补登：存量行（NULL）由 POST /entrances/install-uid 幂等填上�
 test('不外泄：/space 与 /entrances 的响应体里都不能出现 install_uid', async () => {
   await withDb(async () => {
     const space = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-d', 'iPhone', UID_D,
     )
     const spaceResult = JSON.stringify(getSpace(space.sessionToken))
@@ -122,14 +122,14 @@ test('不外泄：/space 与 /entrances 的响应体里都不能出现 install_u
 test('同设备重复加入同一空间 → 409 ENTRANCE_ALREADY_EXISTS，且不消费开通码', async () => {
   await withDb(async () => {
     const space = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-d', 'iPhone', UID_D,
     )
-    const token = createJoinToken(space.spaceId).joinToken
+    const token = createJoinToken(space.spaceId, undefined, 'invite').joinToken
 
     // 同一个 install_uid 再来一次 → 拒（它在这个空间已经有未撤销的通道了）
     assert.throws(
-      () => joinSpace(token, 'pk-d2', 'iPhone', 1, UID_D),
+      () => joinSpace(token, 'pk-d2', 'iPhone', undefined, UID_D),
       (e: unknown) =>
         e instanceof ApiError && e.code === 'ENTRANCE_ALREADY_EXISTS' && e.httpStatus === 409,
       '同一设备重复加入必须被拒',
@@ -140,7 +140,7 @@ test('同设备重复加入同一空间 → 409 ENTRANCE_ALREADY_EXISTS，且不
       '被拒时不得插进第二条通道',
     )
     // 被拒发生在消费 token 之前 → 这个开通码还能给别的设备用
-    const other = joinSpace(token, 'pk-e', 'Pixel', 1, UID_E)
+    const other = joinSpace(token, 'pk-e', 'Pixel', undefined, UID_E)
     assert.ok(other.sessionToken, '另一个设备应能用同一个开通码加入')
   })
 })
@@ -148,13 +148,13 @@ test('同设备重复加入同一空间 → 409 ENTRANCE_ALREADY_EXISTS，且不
 test('原通道已退役（revoked）→ 同设备允许重新加入', async () => {
   await withDb(async () => {
     const space = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-d', 'iPhone', UID_D,
     )
     retireEntrance(space.sessionToken) // 本机这条通道不要了
-    const token = createJoinToken(space.spaceId).joinToken
+    const token = createJoinToken(space.spaceId, undefined, 'invite').joinToken
 
-    const again = joinSpace(token, 'pk-d2', 'iPhone', 1, UID_D)
+    const again = joinSpace(token, 'pk-d2', 'iPhone', undefined, UID_D)
     assert.ok(again.entranceId, '退役后同设备应能重新加入')
   })
 })
@@ -162,12 +162,12 @@ test('原通道已退役（revoked）→ 同设备允许重新加入', async () 
 test('不带 install_uid（存量/未升级客户端）→ 服务端不拦', async () => {
   await withDb(async () => {
     const space = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-d', 'iPhone', undefined,
     )
-    const token = createJoinToken(space.spaceId).joinToken
+    const token = createJoinToken(space.spaceId, undefined, 'invite').joinToken
 
-    const joined = joinSpace(token, 'pk-d2', 'iPhone', 1, undefined)
+    const joined = joinSpace(token, 'pk-d2', 'iPhone', undefined, undefined)
     assert.ok(joined.entranceId, '缺 install_uid 时不拦（那道闸门在客户端）')
   })
 })

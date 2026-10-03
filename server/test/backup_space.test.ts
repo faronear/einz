@@ -41,7 +41,7 @@ function withPaths (fn: (paths: BackupPaths) => Promise<void>): Promise<void> {
 
 /** 建一个空间并上传一个附件，返回空间 id 与 attachment_id。 */
 async function makeSpaceWithAttachment (name: string, seed: string) {
-  const space = await createSpace(undefined, name, 'male', '伴侣', 'female', undefined, undefined, `pk-${seed}`, 'iPhone')
+  const space = await createSpace(undefined, name, 'male', undefined, undefined, `pk-${seed}`, 'iPhone')
   const blob = Buffer.from(`blob-${seed}`, 'utf8')
   const attachmentId = `${seed}aaaaaaa-1111-2222-3333-444444444444`
   storeAttachment(

@@ -110,7 +110,6 @@ Future<int> _run() async {
     final created = await api.createSpace(
       publicKey: 'pk-a',
       creatorName: 'Lukas',
-      peerName: 'Alice',
       escrowPassphrase: kPassphrase,
       sealedSpaceKey: PassphraseEnvelope(
         salt: Uint8List.fromList(List.filled(16, 1)),

@@ -506,7 +506,8 @@ const SUMMARY_COPY: Record<MailLang, SummaryCopy> = {
     openApp: () => '打开 Einz 就能看到。',
     noContent: () => '消息是端到端加密的，这封邮件里没有正文，以后也不会有。',
     stop: url => `不想再收到这类提醒：${url}`,
-    unnamed: () => '对方'
+    // 群聊一期（2026-10-03）：群空间里无名发送者不再必然是"对方"（可能是任一成员）
+    unnamed: () => '有人'
   },
   en: {
     subject: total =>

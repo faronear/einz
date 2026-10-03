@@ -62,7 +62,7 @@ function withPaths (fn: (paths: BackupPaths) => Promise<void>): Promise<void> {
 async function makeSpace (name: string, seed: number) {
   const publicKey = Buffer.alloc(32, seed).toString('base64')
   return await createSpace(
-    undefined, name, 'male', '伴侣', 'female', undefined, undefined, publicKey, 'iPhone',
+    undefined, name, 'male', undefined, undefined, publicKey, 'iPhone',
   )
 }
 

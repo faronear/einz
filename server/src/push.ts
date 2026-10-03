@@ -41,20 +41,29 @@ export function unregisterPushToken(token: string): { ok: true } {
  * 当前实现为占位：从 push_tokens 取目标通道，记录日志（不泄露内容）。
  */
 export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
-  // **只投给同一 Space 的其他通道**：entrances 表没有 space_id，通道经
+  // **只投给同一 Space 的其他成员的通道**：entrances 表没有 space_id，通道经
   // member_id → space_members 归属 Space。此前只按 `entrance_id != 自己` 过滤 →
-  // 会把提示推给这台服务器上**所有空间**的通道（跨空间泄露"谁在发消息"）。
+  // 会把提示推给这台服务器上**所有空间**的通道（跨空间泄露"谁在发消息"）；
+  // 群聊一期（2026-10-03）再修正为**按 member 排除**：发送者的其他通道
+  // （同一人的手机+电脑）也不投——否则自己换设备会收到"别人在发消息"的假提示。
   // 同时跳过已撤销的通道（status != 'active'）。
+  const senderMemberId = getDb()
+    .prepare(`SELECT member_id FROM entrances WHERE entrance_id = ?`)
+    .get(exceptEntranceId) as { member_id: string | null } | undefined;
   const rows = getDb()
     .prepare(
       `SELECT p.entrance_id, p.platform, p.token
          FROM push_tokens p
          JOIN entrances d  ON d.entrance_id = p.entrance_id
          JOIN space_members sm ON sm.member_id = d.member_id AND sm.space_id = ?
-        WHERE p.entrance_id != ?
-          AND d.status = 'active'`,
+        WHERE d.status = 'active'
+          AND (? IS NULL OR d.member_id != ?)`,
     )
-    .all(spaceId, exceptEntranceId) as { entrance_id: string; platform: string; token: string }[];
+    .all(
+      spaceId,
+      senderMemberId?.member_id ?? null,
+      senderMemberId?.member_id ?? "",
+    ) as { entrance_id: string; platform: string; token: string }[];
 
   for (const row of rows) {
     // Phase 3: 调用 APNs / FCM 发送 { type: "new_message", space_id }，无正文。

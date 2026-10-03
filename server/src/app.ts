@@ -37,10 +37,13 @@ import {
 } from './escrow.js'
 import {
   attachWs,
+  broadcastMemberJoined,
   broadcastNewMessage,
   broadcastProfileUpdated,
+  broadcastSpaceUpgraded,
   notifyRevoked
 } from './ws.js'
+import { getSpaceMode } from './spaces.js'
 import { PROTOCOL_VERSION } from './protocolVersion.js'
 import {
   bearerToken,
@@ -224,11 +227,10 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     const body = await readJsonBody(req)
     const r = await createSpace(
       body?.space_id == null ? undefined : String(body.space_id),
-      // creator_name = 创建者（第一人）的显示名；v1 的 display_name 字段已废弃改名
+      // creator_name = 创建者（第一人）的显示名；v1 的 display_name 字段已废弃改名。
+      // 群聊一期（2026-10-03）：create 不再收 peer_name/peer_gender——partner 加入时自己填名。
       body?.creator_name == null ? undefined : String(body.creator_name),
       body?.creator_gender == null ? undefined : String(body.creator_gender),
-      body?.peer_name == null ? undefined : String(body.peer_name),
-      body?.peer_gender == null ? undefined : String(body.peer_gender),
       body?.sealed_space_key,
       body?.escrow_passphrase == null
         ? undefined
@@ -264,8 +266,17 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       body?.entrance_name == null ? undefined : String(body.entrance_name),
       body?.slot == null ? undefined : Number(body.slot),
       // 安装级标识（多空间）
-      body?.install_uid == null ? undefined : String(body.install_uid)
+      body?.install_uid == null ? undefined : String(body.install_uid),
+      // 群聊一期（2026-10-03）：新身份自填名字/性别（invite 流；channel 流不带）
+      body?.member_name == null ? undefined : String(body.member_name),
+      body?.member_gender == null ? undefined : String(body.member_gender)
     )
+    // 群聊一期（2026-10-03）：join 成功后广播——新成员入网（成员名单刷新）；
+    // 若此 join 触发了 duo → group 升格（防御闸路径），补发升格帧让在线通道
+    // 落系统消息/隐藏通话入口。升格主要发生在 join-tokens 签发点（那里没有
+    // spaceId 之外的上下文，且签发者自己会收到 space.upgraded）。
+    broadcastMemberJoined(r.spaceId, r.memberId)
+    if (getSpaceMode(r.spaceId) === 'group') broadcastSpaceUpgraded(r.spaceId)
     sendJson(res, 200, r)
     return
   }
@@ -275,10 +286,15 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     path.endsWith('/join-tokens')
   ) {
     const spaceId = path.slice('/spaces/'.length, -'/join-tokens'.length)
+    const body = await readJsonBody(req)
     // C1 修复：签发开通码 = 空间级操作，必须持该空间成员会话（此前任何人
     // 拿到 spaceId 就能自签开通码、以 slot=0 冒充创建者加通道）
-    requireSpaceMember(optionalBearerToken(req), spaceId)
-    const r = createJoinToken(spaceId, requestBaseUrl(req))
+    const sess = requireSpaceMember(optionalBearerToken(req), spaceId)
+    // 群聊一期（2026-10-03）：body.purpose 选定 token 类型（invite/channel）；
+    // channel token 记录签发者身份（issuer_member_id），join 时做绑定校验——
+    // 杜绝"任何成员的 channel token 任选他人身份加通道"的冒充面。
+    const purpose = body?.purpose === 'invite' ? 'invite' : 'channel'
+    const r = createJoinToken(spaceId, requestBaseUrl(req), purpose, sess.member_id)
     sendJson(res, 201, r)
     return
   }

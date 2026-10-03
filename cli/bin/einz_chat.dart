@@ -261,11 +261,15 @@ Future<void> _printEnvelope(EntranceStore store, MessageEnvelope env) async {
   final isMine = env.senderMemberId != null && store.memberId != null
       ? env.senderMemberId == store.memberId
       : env.senderEntranceId == store.entranceId;
-  final sender = isMine ? '我' : '你';
+  // 群聊一期（2026-10-03）：显示名 = 我 →「我」，他人 → memberNames 里的名字
+  //（GET /space 缓存），无名回落「对方」。多人群里"你"不再成立（可能是任一成员）。
+  final senderName = isMine
+      ? '我'
+      : (env.senderMemberId != null ? store.memberNames[env.senderMemberId] : null) ?? '对方';
   final color = isMine ? _green : _yellow;
   final seq = env.serverSequence;
   final seqTag = seq == null ? '未同步' : 'seq=$seq';
-  stdout.writeln(_paint('[$sender $seqTag v${env.keyVersion}] $plain', color));
+  stdout.writeln(_paint('[$senderName $seqTag v${env.keyVersion}] $plain', color));
 }
 
 /// 简易 UUIDv7（与 einz.dart 一致的近似实现）。

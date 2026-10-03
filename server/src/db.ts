@@ -329,6 +329,33 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   } catch {
     // 列已存在（新库）→ 忽略
   }
+  // 迁移：spaces 补 mode（群聊一期 2026-10-03）：'duo' | 'group'。
+  // duo=二人私密空间（上限 2、通话可用）；group=多人群空间（上限 maxMembersPerSpace、
+  // 通话禁用）。创建一律落 'duo'，伴侣入网后签发 invite token 自动升格 'group'
+  // （单向不可逆）。存量空间回填 'duo' → 现存情侣空间天然是严格二人空间，零迁移成本。
+  try {
+    db.exec(`ALTER TABLE spaces ADD COLUMN mode TEXT NOT NULL DEFAULT 'duo'`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：join_tokens 补 purpose（群聊一期 2026-10-03）：'invite' | 'channel'。
+  // invite=邀请新成员（新身份）；channel=发起人在新设备加通道（绑定发起人 slot）。
+  // 存量 token 无法追溯签发意图 → 回填 'channel'（保守侧：channel 校验更严，
+  // 必须带 slot 且等于发起人 slot，不会误开新身份）。
+  try {
+    db.exec(`ALTER TABLE join_tokens ADD COLUMN purpose TEXT NOT NULL DEFAULT 'channel'`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
+  // 迁移：join_tokens 补 issuer_member_id（channel token 绑定发起人身份）。
+  // created_by_entrance 存的是角色字面量（"creator"/"member"），追溯不到签发者
+  // member → channel token 的"仅发起人本人可在新设备加通道"校验需要本列。
+  // 存量行为 NULL：其 channel 校验退化为"slot 行已有人即可"（无绑定可查）。
+  try {
+    db.exec(`ALTER TABLE join_tokens ADD COLUMN issuer_member_id TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
   // 迁移：messages.server_sequence 由全局 UNIQUE 改为 (space_id, server_sequence)
   // 复合唯一（Multiverse：序号按 Space 独立递增，PROTOCOL_MULTIVERSE.md §3.6）。
   // SQLite 无法 ALTER 删除 UNIQUE，检测到旧的"单列 server_sequence 唯一自动索引"

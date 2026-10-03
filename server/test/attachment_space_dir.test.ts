@@ -43,7 +43,7 @@ function makeBlob (seed: string): { blob: Buffer; sha256: string } {
 
 test('新上传落在本空间目录下', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male', '伴侣', 'female', undefined, undefined, 'pk-a', 'iPhone')
+    const space = await createSpace(undefined, '我', 'male', undefined, undefined, 'pk-a', 'iPhone')
     const { blob, sha256 } = makeBlob('one')
     const attachmentId = 'aaaaaaaa-1111-2222-3333-444444444444'
     const stored = storeAttachment(
@@ -60,8 +60,8 @@ test('新上传落在本空间目录下', async () => {
 
 test('两个空间的附件各自成目录，互不串', async () => {
   await withDb(async () => {
-    const a = await createSpace(undefined, '我', 'male', '伴侣', 'female', undefined, undefined, 'pk-a', 'iPhone')
-    const b = await createSpace(undefined, '他', 'male', '伴侣', 'female', undefined, undefined, 'pk-b', 'Pixel')
+    const a = await createSpace(undefined, '我', 'male', undefined, undefined, 'pk-a', 'iPhone')
+    const b = await createSpace(undefined, '他', 'male', undefined, undefined, 'pk-b', 'Pixel')
     const one = makeBlob('a')
     const two = makeBlob('b')
     const idA = 'aaaaaaaa-0000-0000-0000-00000000000a'
@@ -76,8 +76,8 @@ test('两个空间的附件各自成目录，互不串', async () => {
 
 test('下载按库里的 storage_path 读（旧规则的存量行仍可读）', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male', '伴侣', 'female', undefined, undefined, 'pk-a', 'iPhone')
-    const joined = joinSpace(space.joinToken, 'pk-b', 'Pixel', 1)
+    const space = await createSpace(undefined, '我', 'male', undefined, undefined, 'pk-a', 'iPhone')
+    const joined = joinSpace(space.joinToken, 'pk-b', 'Pixel')
     const { blob, sha256 } = makeBlob('read')
     const attachmentId = 'cccccccc-2222-3333-4444-555555555555'
     storeAttachment(

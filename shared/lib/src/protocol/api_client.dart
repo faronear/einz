@@ -99,13 +99,17 @@ class ApiClient {
   }
 
   /// Multiverse：加入空间（POST /spaces/join——通道登记 + session 签发，绑定该
-  /// Space，PROTOCOL_MULTIVERSE.md §4.1）。
+  /// Space，PROTOCOL_MULTIVERSE.md §4.1）。群聊一期（2026-10-03）slot 显式语义：
+  /// **不带 slot = 新身份**（invite token，[memberName]/[memberGender] 自填）；
+  /// **带 slot = 已有成员加通道**（channel token，身份由链接绑定，不传名字）。
   Future<SpaceJoinResult> joinSpace({
     required String token,
     required String publicKey,
     String? entranceName,
     int? slot,
     String? installUid,
+    String? memberName, // 新身份自填名字（invite 流）
+    String? memberGender, // 新身份自填性别（invite 流）
   }) async {
     final res = await _post(
       Api.spaceJoin,
@@ -116,6 +120,8 @@ class ApiClient {
         if (slot != null) 'slot': slot,
         // 安装级标识（多空间：同一安装各空间同名，服务端内部关联用）
         if (installUid != null && installUid.isNotEmpty) 'install_uid': installUid,
+        if (memberName != null && memberName.isNotEmpty) 'member_name': memberName,
+        if (memberGender != null && memberGender.isNotEmpty) 'member_gender': memberGender,
       },
       withToken: false,
     );
@@ -123,14 +129,13 @@ class ApiClient {
   }
 
   /// Multiverse：创建空间（POST /spaces——创建者通道登记 + session + 首个
-  /// join token，PROTOCOL_MULTIVERSE.md §4.1）。creatorName/peerName 为
-  /// 第一人（创建者）与第二人（对方）的名字（create 时预置两身份，join 按身份选择）。
+  /// join token，PROTOCOL_MULTIVERSE.md §4.1）。群聊一期（2026-10-03）：
+  /// **只填创建者**——不再预置对方（peer_name/peer_gender 已删，v3），
+  /// partner 加入时自己填名。
   Future<SpaceCreateResult> createSpace({
     String? spaceId,
     String? creatorName,
     String? creatorGender,
-    String? peerName,
-    String? peerGender,
     PassphraseEnvelope? sealedSpaceKey,
     String? escrowPassphrase,
     String? publicKey,
@@ -144,9 +149,6 @@ class ApiClient {
         if (creatorName != null && creatorName.isNotEmpty) 'creator_name': creatorName,
         if (creatorGender != null && creatorGender.isNotEmpty)
           'creator_gender': creatorGender,
-        if (peerName != null && peerName.isNotEmpty) 'peer_name': peerName,
-        if (peerGender != null && peerGender.isNotEmpty)
-          'peer_gender': peerGender,
         if (sealedSpaceKey != null) 'sealed_space_key': sealedSpaceKey.toJson(),
         if (escrowPassphrase != null && escrowPassphrase.isNotEmpty)
           'escrow_passphrase': escrowPassphrase,
@@ -165,10 +167,13 @@ class ApiClient {
   ///
   /// 需认证：签发邀请凭证 = 空间级操作，服务端要求调用方持该空间成员会话
   /// （2026-09-15 评审 C1 修复；此前免认证，任何人拿到 spaceId 即可自签）。
-  Future<JoinTokenResult> createJoinToken(String spaceId, String token) async {
+  /// 群聊一期（2026-10-03）：[purpose] 选定 token 类型——`invite` = 邀请新成员
+  /// （duo 满员后签发即自动升格 group，方案 C）；`channel` = 发起人在新设备
+  /// 加通道（绑定发起人身份）。
+  Future<JoinTokenResult> createJoinToken(String spaceId, String token, {String purpose = 'channel'}) async {
     final res = await _post(
       '/spaces/$spaceId/join-tokens',
-      const {},
+      {'purpose': purpose},
       token: token,
     );
     return JoinTokenResult.fromJson(res);

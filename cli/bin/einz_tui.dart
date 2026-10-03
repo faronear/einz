@@ -1023,8 +1023,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       spaceId: spaceId,
       creatorName: displayName,
       creatorGender: _genderCode(myGender), // 中文 → male/female（与 enroll 一致——老板 2026-09-10）
-      peerName: peerName,
-      peerGender: _genderCode(peerGender),
+      // 群聊一期（2026-10-03）：create 不再预置对方（v3）——partner 加入时自己填名
       sealedSpaceKey: sealed,
       escrowPassphrase: passphrase,
       publicKey: store.publicKey,
@@ -2399,7 +2398,13 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
     // 气泡矩形 col 1 → cols - rightPad，与右侧我方气泡（col 9 → cols）左右对称
     final bubbleBackground = _sameGenderSecondCyan(m.env.senderMemberId) ??
         _genderBubble(_state?.memberGenders[m.env.senderMemberId]);
-    final label = '[$time]';
+    // 群聊一期（2026-10-03）：气泡标签带发送者名（群内"对方"不止一人，
+    // 名字取 memberNames 缓存，无名回落顶部条的对方名 → '-'）
+    final senderName = (m.env.senderMemberId != null
+            ? _state?.memberNames[m.env.senderMemberId]
+            : null) ??
+        _peerNameOf(_state!);
+    final label = '[$senderName $time]';
     final labelW = _displayWidth(label);
     final lane = labelW + 1; // 气泡内左侧标签栏宽（含标签后一个空格）
     final rightPad = sideMargin; // 右侧留白 = 我方气泡左侧留白（8 列）

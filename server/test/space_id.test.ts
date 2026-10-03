@@ -32,7 +32,7 @@ async function withDb (fn: () => Promise<void>): Promise<void> {
 test('客户端自报的 UUIDv4 通过（正常路径不受影响）', async () => {
   await withDb(async () => {
     const uuid = '3f2a1b4c-5d6e-4f70-8a91-2b3c4d5e6f70'
-    const space = await createSpace(uuid, '我', 'male', '伴侣', 'female')
+    const space = await createSpace(uuid, '我', 'male')
     assert.equal(space.spaceId, uuid, '合法 space_id 应原样采用')
   })
 })
@@ -52,7 +52,7 @@ test('路径穿越/非法字符一律 400，且不得落库', async () => {
       if (id === '') continue
       // createSpace 是 async：断言的是 rejected promise，不是同步 throw
       await assert.rejects(
-        () => createSpace(id, '我', 'male', '伴侣', 'female'),
+        () => createSpace(id, '我', 'male'),
         (e: unknown) => e instanceof ApiError && e.httpStatus === 400,
         `非法 space_id 应 400：${id}`,
       )
@@ -62,8 +62,8 @@ test('路径穿越/非法字符一律 400，且不得落库', async () => {
 
 test('不传 space_id 时服务端自生成（randomUUID，恒合规）', async () => {
   await withDb(async () => {
-    const a = await createSpace(undefined, '我', 'male', '伴侣', 'female')
-    const b = await createSpace('', '我', 'male', '伴侣', 'female')
+    const a = await createSpace(undefined, '我', 'male')
+    const b = await createSpace('', '我', 'male')
     assert.match(a.spaceId, /^[0-9a-f-]{36}$/, '未传时服务端生成 UUID')
     assert.notEqual(a.spaceId, b.spaceId, '两次生成不得相同')
   })

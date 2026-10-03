@@ -4,6 +4,7 @@ import type { MessageEnvelope } from "./messages.js";
 import { getDb } from "./db.js";
 import { logConnection, metaOf, type RequestMeta } from "./audit.js";
 import { PROTOCOL_VERSION } from "./protocolVersion.js";
+import { getSpaceMode } from "./spaces.js";
 import { checkRateLimit } from "./ratelimit.js";
 
 interface Conn {
@@ -123,6 +124,32 @@ export function broadcastProfileUpdated(
   }
 }
 
+/** duo → group 升格（群聊一期方案 C）：通知同空间**全部**在线通道（含发起者
+ *  自己的其他通道——每个人都要在聊天流落系统消息、隐藏通话入口）。
+ *  消息本身 E2EE，服务端不能伪造密文 → 客户端收到帧后各自在本地落系统消息
+ *  （文案自渲染），服务端不落库。 */
+export function broadcastSpaceUpgraded(spaceId: string): void {
+  for (const [, conn] of conns) {
+    if (conn.spaceId !== spaceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(JSON.stringify({ id: 0, type: "space.upgraded", payload: { space_id: spaceId, mode: "group" } }));
+    }
+  }
+}
+
+/** 新成员加入（群聊一期）：通知同空间全部在线通道刷新成员名单。
+ *  与 peer.online 不同——peer.online 是"通道上线/下线"（同一人的其他通道
+ *  不算），member.joined 是**新身份**入网（成员数 +1），人人需要刷新。
+ *  服务端不发成员资料（名字在客户端 side channel 同步），只发信号。 */
+export function broadcastMemberJoined(spaceId: string, memberId: string): void {
+  for (const [, conn] of conns) {
+    if (conn.spaceId !== spaceId) continue;
+    if (conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(JSON.stringify({ id: 0, type: "member.joined", payload: { space_id: spaceId, member_id: memberId } }));
+    }
+  }
+}
+
 /** 通话信令帧类型（PROTOCOL.md §8.4；与 shared 的 `kWsTypeCall*` 手工对齐）。 */
 const CALL_TYPES = new Set([
   "call.invite",
@@ -231,6 +258,10 @@ export function attachWs(wss: WebSocketServer): void {
         // 限流放在这里而不是 ratelimit.limitByIp：那是 HTTP 专用，WS 路径没接限流，
         // 而 call.ice 一通电话能来几十条，不限流等于给了一个免费放大器。
         if (typeof frame.type === "string" && CALL_TYPES.has(frame.type)) {
+          // 群聊一期（2026-10-03）：通话仅限 duo 空间——group 空间静默丢弃信令
+          // （客户端已隐藏入口，这里服务端兜底；静默而非报错，客户端状态机
+          // 自会按超时兜底，无需新增错误码语义）。
+          if (getSpaceMode(spaceId) === "group") return;
           const payload = (frame.payload ?? {}) as Record<string, unknown>;
           const callId = payload.call_id;
           if (typeof callId !== "string" || callId.length === 0 || callId.length > 64) return;

@@ -9,11 +9,17 @@ library;
 /// - `2` = 该次改名之后的 wire（`sender_device_id`→`sender_entrance_id`、
 ///   `person_id`→`member_id`、WS 帧 `device.revoked`→`entrance.revoked`、
 ///   错误码 `DEVICE_REVOKED`→`ENTRANCE_REVOKED`、`/devices/*`→`/entrances/*` 等，
-///   见 docs/GLOSSARY.md「wire 字段改名」）。
+///   见 docs/GLOSSARY.md「wire 字段改名」）；
+/// - `3` = 群聊一期（2026-10-03，aimemo/groupChatDesign.md）：create 删
+///   `peer_name`/`peer_gender`（不再预置伴侣）、join slot 显式语义（不带 slot =
+///   新身份 / 带 slot = 加通道，需 channel token）、join 请求新增
+///   `member_name`/`member_gender`、join-tokens 请求新增 `purpose`、
+///   preflight 响应新增 `mode`/`purpose`/`inviterName`、WS 新增
+///   `member.joined`/`space.upgraded` 帧。无老客户端兼容（一次性升级）。
 ///
-/// REST（[ApiClient]）与 WS（ws_client）共用这一份，别再各写一个字面量。
+/// REST（ApiClient）与 WS（ws_client）共用这一份，别再各写一个字面量。
 /// 服务端对应 `server/src/protocolVersion.ts`（改动请两端同步）。
-const String kProtocolVersion = '2';
+const String kProtocolVersion = '3';
 
 /// 认证 / 同步相关 REST 端点（PROTOCOL.md §4）。
 class Api {
@@ -149,26 +155,42 @@ class SpaceMemberSlot {
       );
 }
 
-/// 空间公开信息 + 两身份 slot（**不含空间名**：spaces.display_name 已删，
-/// 2026-09-16——join 方需要的"对方是谁"由 slots 里的身份名提供）。
+/// 空间公开信息 + 成员 slot 列表（**不含空间名**：spaces.display_name 已删，
+/// 2026-09-16）。群聊一期（2026-10-03）新增 [mode]/[purpose]/[inviterName]：
+/// 客户端按 [purpose] 分流加入向导（invite=新成员自填名 / channel=设备接入，
+/// 身份由链接绑定），不再展示身份选择页。
 class SpaceJoinPreflight {
   const SpaceJoinPreflight({
     required this.spaceId,
     required this.status,
     required this.memberCount,
     required this.slots,
+    this.mode = 'duo',
+    this.purpose = 'channel',
+    this.inviterName,
   });
 
   final String spaceId;
   final String status;
   final int memberCount;
   final List<SpaceMemberSlot> slots;
+  /// 空间模式：'duo' | 'group'（旧服务端缺省回 duo）。
+  final String mode;
+  /// token 类型：'invite' | 'channel'（旧服务端缺省回 channel——老 token 无
+  /// purpose 列时服务端按 channel 语义回填）。
+  final String purpose;
+  /// 受邀人（token 签发者近似）显示名——invite 显示"XX 邀请你"，
+  /// channel 显示"XX 的设备接入"。无名成员空间为 null。
+  final String? inviterName;
 
   factory SpaceJoinPreflight.fromJson(Map<String, dynamic> json) =>
       SpaceJoinPreflight(
         spaceId: json['spaceId'] as String,
         status: json['status'] as String,
         memberCount: json['memberCount'] as int,
+        mode: (json['mode'] as String?) ?? 'duo',
+        purpose: (json['purpose'] as String?) ?? 'channel',
+        inviterName: json['inviterName'] as String?,
         slots: (json['slots'] as List<dynamic>? ?? const [])
             .map((e) => SpaceMemberSlot.fromJson(e as Map<String, dynamic>))
             .toList(),

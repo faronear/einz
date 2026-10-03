@@ -24,6 +24,12 @@ export interface ServerConfig {
    *  资源——用它做总闸。计数含已撤销（revoked）的通道：**销毁不退还额度**，否则
    *  "反复开通/销毁"可无限刷（老板 2026-09-23 定）。 */
   max_entrances_per_space: number;
+  /** 单空间成员（身份）数量上限（serverConfig.json 的 maxMembersPerSpace：
+   *  0=不限；n=最多 n 个身份）。群聊一期（2026-10-03）：duo 空间上限恒为 2
+   *  （第三个身份 join 时触发自动升格 group），group 空间用本值；建议默认 4。
+   *  与 maxEntrancesPerSpace 互补：那道闸管"通道总量"（含已撤销、防刷），这道闸
+   *  管"身份总量"（同身份多通道不重复计数）。 */
+  max_members_per_space: number;
 }
 
 /** 读取 serverConfig.json（默认 server/config/serverConfig.json——本机配置
@@ -31,8 +37,8 @@ export interface ServerConfig {
  *  /config/serverConfig.json，两种形态都是"config/ 目录 + 同名文件"）。
  *  服务端每次启动读取一次（改配置需重启生效；文件缺失或解析失败按默认值处理）。
  *  当前支持字段：maxSpaces、maxEntrancesPerSpace。 */
-let fileConfigCache: { maxSpaces?: number; maxEntrancesPerSpace?: number } | null = null;
-function readFileConfig(): { maxSpaces?: number; maxEntrancesPerSpace?: number } {
+let fileConfigCache: { maxSpaces?: number; maxEntrancesPerSpace?: number; maxMembersPerSpace?: number } | null = null;
+function readFileConfig(): { maxSpaces?: number; maxEntrancesPerSpace?: number; maxMembersPerSpace?: number } {
   if (fileConfigCache != null) return fileConfigCache;
   const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../config/serverConfig.json");
   if (existsSync(path)) {
@@ -40,6 +46,7 @@ function readFileConfig(): { maxSpaces?: number; maxEntrancesPerSpace?: number }
       fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as {
         maxSpaces?: number;
         maxEntrancesPerSpace?: number;
+        maxMembersPerSpace?: number;
       };
     } catch (e) {
       console.warn(`[einz] serverConfig.json 解析失败（按默认配置继续）: ${e}`);
@@ -62,11 +69,16 @@ export function loadConfig(): ServerConfig {
     typeof fc.maxEntrancesPerSpace === "number" && fc.maxEntrancesPerSpace >= 0
       ? Math.floor(fc.maxEntrancesPerSpace)
       : 0;
+  const maxMembersPerSpace =
+    typeof fc.maxMembersPerSpace === "number" && fc.maxMembersPerSpace >= 0
+      ? Math.floor(fc.maxMembersPerSpace)
+      : 0;
   return {
     protocol_version: "v2-multiverse",
     capabilities: ["spaces", "join-tokens"],
     max_spaces: maxSpaces,
     max_entrances_per_space: maxEntrancesPerSpace,
+    max_members_per_space: maxMembersPerSpace,
   };
 }
 

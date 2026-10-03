@@ -52,12 +52,12 @@ function entranceCount (spaceId: string): number {
 test('上限 2：创建占 1 条，第 2 条能进，第 3 条被拒（409）', async () => {
   await withDb(async () => {
     const space = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-a', 'iPhone',
     )
     assert.equal(entranceCount(space.spaceId), 1, '创建者的第一条通道就占额度')
 
-    joinSpace(space.joinToken, 'pk-b', 'Pixel', 1)
+    joinSpace(space.joinToken, 'pk-b', 'Pixel')
     assert.equal(entranceCount(space.spaceId), 2, '第 2 条通道应放行')
 
     const third = createJoinToken(space.spaceId)
@@ -73,10 +73,10 @@ test('上限 2：创建占 1 条，第 2 条能进，第 3 条被拒（409）', 
 test('销毁不退额度：退役（revoked）后仍占额度，不能靠反复开通/销毁刷量', async () => {
   await withDb(async () => {
     const space = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-a', 'iPhone',
     )
-    const second = joinSpace(space.joinToken, 'pk-b', 'Pixel', 1)
+    const second = joinSpace(space.joinToken, 'pk-b', 'Pixel')
     // 第二条通道自助退役：entrances 行只标记 revoked、不删除
     retireEntrance(second.sessionToken)
     const revoked = getDb()
@@ -97,16 +97,16 @@ test('销毁不退额度：退役（revoked）后仍占额度，不能靠反复�
 test('上限按空间隔离：A 满了不影响 B', async () => {
   await withDb(async () => {
     const a = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-a1', 'iPhone',
     )
-    joinSpace(a.joinToken, 'pk-a2', 'Pixel', 1)
+    joinSpace(a.joinToken, 'pk-a2', 'Pixel')
     const b = await createSpace(
-      undefined, '我', 'male', '伴侣', 'female',
+      undefined, '我', 'male',
       undefined, undefined, 'pk-b1', 'Mac',
     )
     // B 只登记了创建者这一条 → 仍能加入
-    joinSpace(b.joinToken, 'pk-b2', 'iPad', 1)
+    joinSpace(b.joinToken, 'pk-b2', 'iPad')
     assert.equal(entranceCount(b.spaceId), 2, 'B 空间的通道应正常登记')
     assert.equal(entranceCount(a.spaceId), 2)
   })
