@@ -5544,6 +5544,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return others >= 2;
   }
 
+  /// 本空间是否显示消息气泡旁的发送者头像：group（多人）默认开、duo（两人）
+  /// 默认关（状态条里已有双方头像，逐条再挂是重复——2026-09-26 决策保留）；
+  /// `--dart-define=SHOW_MESSAGE_AVATARS=true` 强制开（含 duo，临时验证用）。
+  bool get _showMessageAvatars => kShowMessageAvatarsOverride || _isGroupSpace;
+
   /// group 气泡色板——gradient（深色、白字）与 plain（浅 tint）各 4 色：
   /// 与 duo 的品牌色系一致（蓝/粉/青/紫），饱和度对齐两人空间的视觉基调。
   static const List<Color> _groupBubblePaletteGradient = [
@@ -6442,8 +6447,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 final m = _messages[i];
                 final mine = m.sender == 'me';
                 // 发送者 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底。
-                // 只在开关打开时才需要（关掉时不做无谓的查表，也避免"变量未使用"）
-                final avatarMemberId = kShowMessageAvatars
+                // 只在显示头像时才需要（关掉时不做无谓的查表，也避免"变量未使用"）
+                final avatarMemberId = _showMessageAvatars
                     ? (m.env.senderMemberId ??
                         _repo.memberIdOfEntrance(m.env.senderEntranceId))
                     : null;
@@ -6455,7 +6460,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 气泡旁的头像：默认**关**（状态条里已有双方头像，逐条再挂一个是
                       // 重复），但代码留着 —— 将来**多人秘境**里"这句是谁说的"必须逐条
                       // 标注，那时打开开关即可（老板 2026-09-26）。
-                      if (kShowMessageAvatars && !mine) ...[
+                      if (_showMessageAvatars && !mine) ...[
                         _MessageAvatar(
                             memberId: avatarMemberId,
                             server: effectiveServer,
@@ -6676,7 +6681,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      if (kShowMessageAvatars && mine) ...[
+                      if (_showMessageAvatars && mine) ...[
                         const SizedBox(width: 6),
                         _MessageAvatar(
                             memberId: avatarMemberId,
@@ -7508,15 +7513,15 @@ class _WaveformPainter extends CustomPainter {
 
 /// 消息发送者头像：按 memberId 从服务端加载（静态缓存避免重复请求），
 /// 未设置/加载失败显示默认图标；点击有头像时放大到全屏查看。
-/// 是否在每条消息气泡旁显示发送者头像。
+/// 是否在每条消息气泡旁显示发送者头像（编译期开关，`--dart-define` 可覆盖默认）。
 ///
-/// 默认**关**（2026-09-26）：状态条里已经有双方头像，逐条消息再挂一个是重复。
-/// 保留这条通路是因为**将来的多人秘境**——多人时"这句是谁说的"必须逐条标注，
-/// 那时把它打开即可；临时验证效果可以 `--dart-define=SHOW_MESSAGE_AVATARS=true`。
-///
-/// 用 `bool.fromEnvironment`（编译期常量、但分析器不知道值）而不是写死 false：
-/// 写死会让整段 `if` 被判定为死代码，将来改开关时反而不好维护。
-const bool kShowMessageAvatars = bool.fromEnvironment('SHOW_MESSAGE_AVATARS');
+/// 群聊一期（2026-10-03）起**按空间类型自动调整**：
+/// - duo（两人）空间：默认**关**——状态条里已有双方头像，逐条再挂是重复
+///   （2026-09-26 原决策，保留）；`--dart-define=SHOW_MESSAGE_AVATARS=true`
+///   可强制显示（临时验证效果用）。
+/// - group（多人）空间：默认**开**——"这句是谁说的"必须逐条标注（原注释
+///   预留的场景已到来）。
+const bool kShowMessageAvatarsOverride = bool.fromEnvironment('SHOW_MESSAGE_AVATARS');
 
 /// 状态条里**操作控件**（电话图标 / 下拉箭头 / 邀请链接）的背景高度。
 ///
