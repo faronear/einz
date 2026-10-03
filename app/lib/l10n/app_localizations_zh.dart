@@ -615,6 +615,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuEntranceList => '我的通道';
 
   @override
+  String get chatPageMenuMembers => '空间成员';
+
+  @override
+  String get chatPageMembersTitle => '空间成员';
+
+  @override
+  String get chatPageMembersInvitePartner => '邀请伴侣';
+
+  @override
+  String get chatPageMembersInviteNew => '邀请新成员';
+
+  @override
+  String get chatPageMembersUpgradeConfirmTitle => '升级为群聊';
+
+  @override
+  String chatPageMembersUpgradeConfirmBody(Object maxMembers) {
+    return '升级后本空间最多 $maxMembers 人、语音通话将停用，且不可逆。确定继续？';
+  }
+
+  @override
+  String get chatPageMembersUpgradeConfirmBodyNoLimit =>
+      '升级后语音通话将停用，且不可逆。确定继续？';
+
+  @override
+  String get chatPageMembersUpgraded => '已升级为群聊，语音通话不可用';
+
+  @override
+  String get chatPageMembersMe => '我';
+
+  @override
+  String get chatPageMembersChannelToken => '在其他设备加入我的账号';
+
+  @override
+  String get chatPageMembersTokenCopied => '邀请链接已复制';
+
+  @override
+  String get chatPageMembersFull => '成员已满';
+
+  @override
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
 
   @override

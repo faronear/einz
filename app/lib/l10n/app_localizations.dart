@@ -1226,6 +1226,78 @@ abstract class AppLocalizations {
   /// **'My entrances'**
   String get chatPageMenuEntranceList;
 
+  /// No description provided for @chatPageMenuMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Space members'**
+  String get chatPageMenuMembers;
+
+  /// No description provided for @chatPageMembersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Space members'**
+  String get chatPageMembersTitle;
+
+  /// No description provided for @chatPageMembersInvitePartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite partner'**
+  String get chatPageMembersInvitePartner;
+
+  /// No description provided for @chatPageMembersInviteNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite new member'**
+  String get chatPageMembersInviteNew;
+
+  /// No description provided for @chatPageMembersUpgradeConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to group'**
+  String get chatPageMembersUpgradeConfirmTitle;
+
+  /// No description provided for @chatPageMembersUpgradeConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'After upgrading this space allows at most {maxMembers} members and voice calls will be disabled. This cannot be undone. Continue?'**
+  String chatPageMembersUpgradeConfirmBody(Object maxMembers);
+
+  /// No description provided for @chatPageMembersUpgradeConfirmBodyNoLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice calls will be disabled after upgrading, and this cannot be undone. Continue?'**
+  String get chatPageMembersUpgradeConfirmBodyNoLimit;
+
+  /// No description provided for @chatPageMembersUpgraded.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgraded to group — voice calls are disabled'**
+  String get chatPageMembersUpgraded;
+
+  /// No description provided for @chatPageMembersMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Me'**
+  String get chatPageMembersMe;
+
+  /// No description provided for @chatPageMembersChannelToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Add my account on another device'**
+  String get chatPageMembersChannelToken;
+
+  /// No description provided for @chatPageMembersTokenCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite link copied'**
+  String get chatPageMembersTokenCopied;
+
+  /// No description provided for @chatPageMembersFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Space is full'**
+  String get chatPageMembersFull;
+
   /// No description provided for @chatPageEntranceListFailed.
   ///
   /// In en, this message translates to:

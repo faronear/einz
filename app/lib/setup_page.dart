@@ -100,9 +100,10 @@ class _SetupPageState extends State<SetupPage> {
   final _peerNameCtrl = TextEditingController(); // create 步骤 2：伴侣（第二人）名字（必填）
   String? _peerGender; // create 步骤 2：伴侣性别（'male'/'female'，必选）
   String? _peerGenderError; // 伴侣性别未选提醒
-  List<SpaceMemberSlot> _joinSlots = const []; // join：preflight 返回的两身份 slot（身份选择页展示）
-  int? _chosenSlot; // join 步骤 2：所选身份（0=第一人/创建者，1=第二人/伴侣）
-  String? _slotError; // 身份未选提醒
+  // 群聊一期（2026-10-03）：join 按 purpose 分流——'invite' = 新成员（步骤 2 填
+  // 自己的名字/性别，复用 _creatorName/_myGender）；'channel' = 发起人设备接入
+  // （身份由 token 绑定，服务端自动解析，无名字页）。身份选择页已删。
+  String? _joinPurpose; // preflight 返回的 token 类型（'invite'|'channel'；null=未验证）
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -141,9 +142,9 @@ class _SetupPageState extends State<SetupPage> {
   // token，故可在 joinSpace 之前反复试口令；joinSpace 才消费一次性 token——
   // 老板 2026-09-12：输错口令不该烧 token，也不该导致重输正确口令仍被拒）
   String? _joinSpaceId;
-  // 已成功 join 的 token + 身份（用于跳过重复 joinSpace——一次性 token 不能消费两次）
+  // 已成功 join 的 token（用于跳过重复 joinSpace——一次性 token 不能消费两次）。
+  // 群聊一期（2026-10-03）：身份选择删除，join 身份由 purpose 决定，无需记录 slot
   String? _joinedToken;
-  int? _joinedSlot;
   // 开通码（join token）是否已通过 preflight。通过后置 true：输入框锁为只读，
   // 且再点「下一步」不再重复校验——token 已被 joinSpace 消费，重校验必然失败
   // （老板 2026-09-12）
@@ -601,7 +602,9 @@ class _SetupPageState extends State<SetupPage> {
       case _WizardRole.create:
         return 6; // name/member/passphrase/pin/done（伴侣名字/性别必填，老板 2026-09-10 定稿）
       case _WizardRole.join:
-        return 5; // identity/invite/passphrase/pin/done
+        // 群聊一期（2026-10-03）：身份选择页删除。invite = token/名字/口令/PIN/done；
+        // channel = token/口令/PIN/done（少一页名字——身份由 token 绑定）。
+        return _joinPurpose == 'channel' ? 4 : 5;
       case _WizardRole.offline:
         return 3; // envelope/pin/done
       case null:
@@ -743,8 +746,10 @@ class _SetupPageState extends State<SetupPage> {
     String? localError;
     String? genderError;
     var invalid = false;
-    // 名字+性别页（create 步骤 1——Multiverse join 改为身份选择页，不再自填名字）
-    if (_role == _WizardRole.create && _step == 1) {
+    // 名字+性别页：create 步骤 1 / join 步骤 2（群聊一期 2026-10-03：invite
+    // token 的新成员在此自填名字/性别，复用同一组输入；channel 不经过此页）
+    if ((_role == _WizardRole.create && _step == 1) ||
+        (_role == _WizardRole.join && _step == 2)) {
       final mine = _creatorName.text.trim();
       if (mine.isEmpty) {
         localError = l10n.wizardNameRequired;
@@ -756,14 +761,6 @@ class _SetupPageState extends State<SetupPage> {
       }
       if (_myGender == null) {
         genderError = l10n.wizardGenderRequired;
-        invalid = true;
-      }
-    }
-    // 身份选择页（join 步骤 2）：必须选择是哪一个用户（老板 2026-09-10 定稿）
-    String? slotError;
-    if (_role == _WizardRole.join && _step == 2) {
-      if (_chosenSlot == null) {
-        slotError = l10n.wizardSlotRequired;
         invalid = true;
       }
     }
@@ -823,7 +820,6 @@ class _SetupPageState extends State<SetupPage> {
         _localError = localError;
         _genderError = genderError;
         _peerGenderError = peerGenderError;
-        _slotError = slotError;
       });
       // 性别未选等红字警告：滚入可见区（键盘已收起，整页露出，用户看得到该怎么改）
       _revealCurrentGenderError();
@@ -841,6 +837,15 @@ class _SetupPageState extends State<SetupPage> {
       final ok = await _verifyJoinToken();
       if (!mounted) return;
       if (!ok) return;
+      // 群聊一期（2026-10-03）：channel token（设备接入）身份由链接绑定，
+      // 无名字页——验证通过直跳口令页；invite 落到步骤 2 填自己名字
+      if (_joinPurpose == 'channel') {
+        setState(() {
+          _step = 3; // join 口令页
+          _localError = null;
+        });
+        return;
+      }
     }
     // join 口令页（步骤 3）：输入口令必须与首条通道创建时一致（解密 escrow
     // 口令密保箱成功）才放行进 PIN 步骤——错误口令/未托管提示后停留本页
@@ -935,11 +940,8 @@ class _SetupPageState extends State<SetupPage> {
         _joinToken = '';
         _joinSpaceId = null; // 一并清：残留旧 spaceId 会拿旧空间去验口令
         _joinedToken = null;
-        _joinedSlot = null;
         _joinTokenVerified = false; // 回入口页重选角色：token 状态全部作废
-        _joinSlots = const [];
-        _chosenSlot = null;
-        _slotError = null;
+        _joinPurpose = null; // 群聊一期：purpose 一并作废（步骤数随之恢复）
         _createLink = null;
         _localError = null;
         _status = null;
@@ -1020,7 +1022,9 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepJoinToken();
           case 2:
-            return _buildStepJoinIdentity();
+            // 群聊一期（2026-10-03）：身份选择页删除——invite token = 填自己
+            // 名字/性别（复用 create 的名字页）；channel 不经过此步（步骤数少一页）
+            return _buildStepName();
           case 3:
             return _buildStepPassphrase();
           case 4:
@@ -1351,18 +1355,16 @@ class _SetupPageState extends State<SetupPage> {
     // 老板实测：设 PIN 重启解锁后顶部条丢名字）
     await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
       spaceId: _spaceId.text.trim(), // per-space 资料（多空间）
-      // 本人名字：join=所选身份（create 预置）；create=自填
-      memberName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
-      // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
-      // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
-      peerName: _role == _WizardRole.join ? _joinPeerName : _peerNameCtrl.text.trim(),
+      // 本人名字：join=步骤 2 自填（invite 新成员）；create=自填
+      memberName: _joinSelectedName,
+      // 对方名字：群聊一期（2026-10-03）create 不再预置伴侣、join 按名字选身份的
+      // 流程已删 → 对方名字由聊天页 /space 成员表拉取，此处留空
+      peerName: '',
       entranceName: entranceName,
-      // 本人性别：join=所选身份性别；create=自填
-      myGender: _role == _WizardRole.join ? _joinSelectedGender : (_myGender ?? ''),
-      // 对方性别：join=另一个身份 slot 的性别；create=向导所选伴侣性别
-      // （v1 语义；v2 曾写死空串 → 对方气泡一律灰色——老板 2026-09-11）
-      peerGender:
-          _role == _WizardRole.join ? _joinPeerGender : (_peerGender ?? ''),
+      // 本人性别：join=步骤 2 自选；create=自填
+      myGender: _myGender ?? '',
+      // 对方性别：同上——由聊天页从 /space 成员表获取（旧预置流程已删）
+      peerGender: '',
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     final completed = widget.onCompleted;
@@ -1386,11 +1388,11 @@ class _SetupPageState extends State<SetupPage> {
         spaceKey: sk,
         keyVersion: 1,
         token: token,
-        memberName: _role == _WizardRole.join ? _joinSelectedName : _creatorName.text.trim(),
+        memberName: _joinSelectedName,
         memberId: enroll.memberId,
-        // 对方名字：join=另一个身份 slot 的预置名字（= 创建者录入的伴侣名字）；
-        // create=伴侣名字（预置）。**不用预检的空间名**——那是创建者自己的名字
-        peerName: _role == _WizardRole.join ? _joinPeerName : _peerNameCtrl.text.trim(),
+        // 对方名字：群聊一期（2026-10-03）旧预置流程已删——由聊天页从 /space
+        // 成员表拉取，此处留空
+        peerName: '',
         entranceName: entranceName,
         publicKeyB64: kp.publicKeyB64,
         privateKeyB64: kp.privateKeyB64,
@@ -1528,123 +1530,10 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 步骤 2（join，Multiverse）：选择「选择身份」——create 已录入两人
-  /// 身份（preflight slots），加入者可能是第二人，也可能是第一人的其他通道，
-  /// 不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）。
-  /// 样式沿用 v1 性别选择卡（老板 2026-09-11）：左右双卡片、粉蓝表性别、
-  /// 男女图标 + 各自名字、无在线状态、选中放大覆盖相邻未选中卡。
-  Widget _buildStepJoinIdentity() {
-    final l10n = AppLocalizations.of(context)!;
-    final pair = _joinSlots.length == 2; // 恰好两位成员 → v1 左右双卡片
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _stepHeader(l10n.wizardTitleJoinIdentity, l10n.wizardJoinIdentityHint),
-        if (_joinSlots.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text(
-              l10n.wizardJoinNoSlots,
-              style: const TextStyle(fontSize: 14),
-            ),
-          )
-        else if (pair) ...[
-          const SizedBox(height: 4),
-          _buildCardPair(
-            leftCard: _buildSlotCard(_joinSlots[0],
-                alignment: Alignment.centerLeft), // 锚左外缘：选中向右扩展覆盖右侧卡
-            rightCard: _buildSlotCard(_joinSlots[1],
-                alignment: Alignment.centerRight), // 锚右外缘：选中向左扩展覆盖左侧卡
-            leftSelected: _chosenSlot == _joinSlots[0].slot,
-            rightSelected: _chosenSlot == _joinSlots[1].slot,
-          ),
-        ] else
-          for (final s in _joinSlots)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildSlotCard(s, alignment: Alignment.center),
-            ),
-        if (_slotError != null) _localErrorHint(_slotError!),
-      ],
-    );
-  }
-
-  /// 身份卡（v1 样式）：性别色 + 男女图标 + 名字（无在线状态、无性别后缀）。
-  Widget _buildSlotCard(SpaceMemberSlot s, {required Alignment alignment}) {
-    final style = _slotStyle(s);
-    return _buildSelectableCard(
-      label: s.displayName ?? '（未命名）',
-      icon: style.$1,
-      color: style.$2,
-      selected: _chosenSlot == s.slot,
-      alignment: alignment,
-      onTap: () => setState(() {
-        _chosenSlot = s.slot;
-        _slotError = null; // 选中即清除未选提醒
-      }),
-    );
-  }
-
-  /// slot → (图标, 颜色)：按性别映射——男=天蓝+male 图标、女=品牌粉+female 图标；
-  /// 性别缺失时按位次兜底（slot 0=创建者→男蓝，slot 1=第二人→女粉）。
-  (IconData, Color) _slotStyle(SpaceMemberSlot s) {
-    final g = s.gender; // 局部变量才能被空安全提升（getter 不可提升）
-    final female = (g == 'female' || g == '女') ||
-        ((g == null || g.isEmpty) && s.slot == 1);
-    return female
-        ? (Icons.female, const Color(0xFFD6529C))
-        : (Icons.male, const Color(0xFF3BAFFD));
-  }
-
   /// join 所选身份（create 预置）的名字——本人在消息流里的显示名。
-  String get _joinSelectedName {
-    if (_chosenSlot == null) return '';
-    for (final s in _joinSlots) {
-      if (s.slot == _chosenSlot) return s.displayName ?? '';
-    }
-    return '';
-  }
-
-  /// 性别归一（服务端 'male'/'female' 或中文 '男'/'女' → App 'male'/'female'）。
-  static String _normalizeGender(String? g) {
-    if (g == null || g.isEmpty) return '';
-    if (g == 'male' || g == '男') return 'male';
-    if (g == 'female' || g == '女') return 'female';
-    return g;
-  }
-
-  /// join 所选身份的性别（服务端中英文 → App 'male'/'female'，气泡配色用）。
-  String get _joinSelectedGender {
-    if (_chosenSlot == null) return '';
-    for (final s in _joinSlots) {
-      if (s.slot == _chosenSlot) return _normalizeGender(s.gender);
-    }
-    return '';
-  }
-
-  /// join 时对方（另一个身份 slot）的名字——对话顶部条左侧显示用。
-  /// **不能**用预检返回的 `displayName`（那是**空间名**，create 时写入的是创建者
-  /// 自己的名字）：A 创建空间、A 的第二条通道（App）加入、B 尚未加入时，
-  /// 空间名就是 A → 顶部条两边都显示 A（老板 2026-09-16 实测）。
-  /// 与 [_joinPeerGender] 对称：对方 = 另一个身份 slot 的预置名字
-  /// （create 时录入的伴侣名字，B 未加入也有值）。
-  String get _joinPeerName {
-    if (_chosenSlot == null) return '';
-    for (final s in _joinSlots) {
-      if (s.slot != _chosenSlot) return s.displayName ?? '';
-    }
-    return '';
-  }
-
-  /// join 时对方（另一个身份 slot）的性别——消息气泡配色用（v1 语义：
-  /// join=另一人的性别；此前 v2 写死空串 → 对方气泡一律灰色回退）。
-  String get _joinPeerGender {
-    if (_chosenSlot == null) return '';
-    for (final s in _joinSlots) {
-      if (s.slot != _chosenSlot) return _normalizeGender(s.gender);
-    }
-    return '';
-  }
+  /// 群聊一期（2026-10-03）：身份选择页删除——invite 新成员的名字来自步骤 2
+  /// 自填（_creatorName），channel 设备接入复用发起人身份（发起人已有名字）。
+  String get _joinSelectedName => _creatorName.text.trim();
 
   /// 步骤 1（join，Multiverse）：输入邀请链接或 token（粘贴/扫码）。
   /// 「下一步」每次按当前输入 preflight 校验：通过直接进下一页，失败红字停留
@@ -1730,9 +1619,9 @@ class _SetupPageState extends State<SetupPage> {
         _joinSpaceId = pre.spaceId; // 供口令页先验口令（不消费 token）
         // 换 token（或换身份）后，之前的"已 join"标记作废：需重新 joinSpace
         _joinedToken = null;
-        _joinedSlot = null;
-        _joinSlots = pre.slots; // 身份选择页（步骤 2）展示两身份
-        _chosenSlot = null; // 换 token 后重置身份选择
+        // 群聊一期（2026-10-03）：身份选择页已删——按 purpose 分流：
+        // invite → 步骤 2 = 填自己名字/性别；channel → 直进口令页（身份由 token 绑定）
+        _joinPurpose = pre.purpose;
         _joinTokenVerified = true; // 已验证：输入框锁只读，且不再重复校验
         _localError = null;
       });
@@ -1898,8 +1787,8 @@ class _SetupPageState extends State<SetupPage> {
             spaceId: spaceId,
             creatorName: _creatorName.text.trim(),
             creatorGender: _myGender,
-            peerName: _peerNameCtrl.text.trim(),
-            peerGender: _peerGender,
+            // 群聊一期（2026-10-03）：create 不再预置对方（v3 协议）——
+            // partner 加入时自己填名
             sealedSpaceKey: sealed,
             escrowPassphrase: passphrase.isEmpty ? null : passphrase,
             publicKey: kp.publicKeyB64,
@@ -2404,17 +2293,18 @@ class _SetupPageState extends State<SetupPage> {
       // 2) 口令通过 → 才 join 提交（通道登记 + session 签发，真正消费 token）。
       //    已经用同一 token+身份 join 过就不再重复提交（如从 PIN 步点「上一步」
       //    退回口令页再点「下一步」——重复 joinSpace 会撞"token 已用"而卡死）
-      final alreadyJoined = _sessionToken != null &&
-          _spaceKey != null &&
-          _joinedToken == _joinToken &&
-          _joinedSlot == _chosenSlot;
+      final alreadyJoined = _sessionToken != null && _spaceKey != null && _joinedToken == _joinToken;
       if (!alreadyJoined) {
         final join = await (widget.joinOverride?.call(_joinToken) ??
             api.joinSpace(
               token: _joinToken,
               publicKey: kp.publicKeyB64,
-              slot: _chosenSlot, // 身份选择（0=第一人/创建者，1=第二人/伴侣）
+              // 群聊一期（2026-10-03）：不再传 slot——invite 开新身份（服务端
+              // 分配最小空槽），channel 由 token 绑定身份（服务端自动解析发起人槽位）
               entranceName: await _autoEntranceName(),
+              // invite 新成员自填的名字/性别（channel 不带——身份由 token 绑定）
+              memberName: _joinPurpose == 'invite' ? _creatorName.text.trim() : null,
+              memberGender: _joinPurpose == 'invite' ? _myGender : null,
               // 安装级标识（多空间）：同一条通道各空间共用，服务端内部关联用
               installUid: await AppLockService(widget.db ?? LocalDatabase.shared).installUid(),
             ));
@@ -2426,7 +2316,6 @@ class _SetupPageState extends State<SetupPage> {
           spaceId: join.spaceId,
         );
         _joinedToken = _joinToken;
-        _joinedSlot = _chosenSlot;
       }
       _spaceKey = base64Decode(payload.spaceKeyB64);
       // preflight 的 spaceId 与 join 返回的是同一个（此处直接用，便于跳过分支复用）

@@ -54,8 +54,10 @@ CREATE TABLE spaces (
     updated_at       INTEGER NOT NULL
 );
 
--- 空间成员（两个身份槽位：0=创建者/第一人，1=伴侣/第二人。
--- member_id 是身份锚点，同一身份多通道共享；伴侣预置行 member_id 为 NULL 直到加入）
+-- 空间成员（群聊一期 2026-10-03：slot 开放为小整数槽位——新身份 join 分配
+-- 最小空 slot，加通道复用已有行；duo 空间仍恒两槽 0/1。
+-- member_id 是身份锚点，同一身份多通道共享。v3 起 create 不再预置伴侣行，
+-- 存量 pending 行（member_id NULL）语义退化为"未预置名字的空槽"）
 -- 名称的唯一数据源就是这里的 display_name（v1 的 meta person_name:* 已删除）
 CREATE TABLE space_members (
     space_id     TEXT NOT NULL REFERENCES spaces(space_id),
@@ -70,10 +72,17 @@ CREATE TABLE space_members (
 );
 
 -- 一次性加入凭证（邀请链接里的 token；**只存 SHA-256 hash**，24h 过期、用后作废）
+-- 群聊一期（2026-10-03）增列：
+--   purpose = 'invite'（邀请新成员，开新身份）| 'channel'（发起人设备接入）；
+--   issuer_member_id = channel token 绑定的发起人身份（join 校验"仅本人可接入"；
+--   存量行为 NULL，退化按"slot 已有人"放行）。
+--   存量 token 无 purpose 追溯 → 回填 'channel'（保守侧）。
 CREATE TABLE join_tokens (
     space_id          TEXT NOT NULL REFERENCES spaces(space_id),
     token_hash        TEXT PRIMARY KEY,
     created_by_entrance TEXT NOT NULL,
+    purpose           TEXT NOT NULL DEFAULT 'channel',
+    issuer_member_id  TEXT,
     expires_at        INTEGER NOT NULL,
     used_at           INTEGER,
     created_at        INTEGER NOT NULL

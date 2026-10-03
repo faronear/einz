@@ -78,7 +78,9 @@ spaces (
 space_members (
   space_id          TEXT NOT NULL REFERENCES spaces(space_id),
   member_id         TEXT NOT NULL,           -- 空间内 UUID
-  slot      INTEGER NOT NULL,        -- 0/1，UNIQUE(space_id, slot)
+  slot      INTEGER NOT NULL,        -- 小整数槽位（UNIQUE(space_id, slot)）；
+                                    -- 群聊一期（2026-10-03）开放为 N 槽：
+                                    -- 新身份 join 分配最小空 slot，加通道复用已有行
   display_name      TEXT,
   gender            TEXT,
   status            TEXT NOT NULL DEFAULT 'active',
@@ -86,14 +88,23 @@ space_members (
   PRIMARY KEY (space_id, member_id)
 )
 
-join_tokens (
-  space_id          TEXT NOT NULL REFERENCES spaces(space_id),
+spaces（群聊一期 2026-10-03 增列）
+  mode  TEXT NOT NULL DEFAULT 'duo'  -- 'duo'=二人私密（上限 2、通话可用）；
+                                     -- 'group'=群空间（上限 maxMembersPerSpace、通话禁用）
+                                     -- 创建一律 'duo'；duo 满员签发 invite token
+                                     -- 自动升格 'group'（单向不可逆，方案 C）
+
+join_tokens（群聊一期 2026-10-03 增列）
+  purpose           TEXT NOT NULL DEFAULT 'channel',
+                    -- 'invite'=邀请新成员（开新身份）；'channel'=发起人设备接入
+  issuer_member_id  TEXT,            -- channel 绑定发起人身份（join 校验用；
+                                     -- 存量行为 NULL，退化按"slot 已有人"放行）
+  created_by_entrance TEXT NOT NULL, -- 角色字面量（"creator"/"member"，非通道 id）
   token_hash        TEXT PRIMARY KEY,
-  created_by_entrance TEXT NOT NULL,
+  space_id          TEXT NOT NULL REFERENCES spaces(space_id),
   expires_at        INTEGER NOT NULL,
   used_at           INTEGER,                 -- NULL=未用
   created_at        INTEGER NOT NULL
-)
 
 entrances（v1 表增加空间归属）
   entrance_id         TEXT PRIMARY KEY,        -- UUIDv4（或保留 v1 现有 id 迁移）
@@ -127,8 +138,11 @@ GET /health
 POST /spaces
   创建 Space（首条通道自举，无 token）。
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,
-          memberName?, peerName?, customId? }   // memberName=第一人名字（2026-09-16 由 displayName 改名）
-  响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token（含链接）
+          memberName?, customId? }
+  （群聊一期 2026-10-03：peer_name/peer_gender 已删（v3）——create 不预置
+    伴侣，partner 加入时自填名字；新空间一律 mode='duo'）
+  响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token
+    （purpose='invite'——"邀请伴侣"链接；含链接）
   错误：DEVICE_ALREADY_BOUND / ADDRESS_TAKEN / INVALID_ADDRESS / SPACE_LIMIT_REACHED
        （SPACE_LIMIT_REACHED：现有空间数 ≥ serverConfig.json 的 maxSpaces，409）
 
@@ -137,14 +151,26 @@ GET /spaces/lookup?address=... | ?custom_id=...
   { spaceId, status, memberCount }   （1/2 状态；无空间名——2026-09-16 起）
   不返回成员姓名、性别、消息数量、通道信息。
 
+POST /spaces/join/preflight
+  轻量校验 token（不消费），返回空间公开信息 + 分流向导用字段：
+  响应：{ spaceId, status, mode, memberCount, purpose, inviterName, slots }
+  （mode='duo'|'group'；purpose='invite'|'channel'——客户端据此走"新成员
+    自填名"或"设备接入"向导，不再有身份选择页；inviterName 为签发者近似名）
+
 POST /spaces/join
-  用 join token 完成加入（第 3 步身份登记 + 取钥可在此前后拆分，见 §5）。
-  请求：{ token, publicKey, entranceName?, slot?, gender? }
-  （无名字字段：身份名取自 create 时为该 slot 预置的名字——2026-09-16）
+  用 join token 完成加入（群聊一期 2026-10-03，v3：slot 显式语义）。
+  请求：{ token, publicKey, entranceName?, installUid?,
+          memberName?, memberGender? }    // invite 新成员自填（channel 不带）
+  slot 语义：
+  - invite token：不带 slot（服务端分配最小空 slot、生成新 member_id）；
+    带 slot → 400
+  - channel token：**不需要**带 slot——服务端按 token 绑定的 issuer_member_id
+    自动解析发起人槽位；客户端显式带 slot 且不一致 → 403（防错用）
   响应：200 { spaceId, memberId, slot, sessionToken }
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
-       ENTRANCE_LIMIT_REACHED（该空间通道数已达 maxEntrancesPerSpace，409）
-  （无"满员"错误：同身份可多通道，通道数只受 maxEntrancesPerSpace 约束——见 §6）
+       ENTRANCE_LIMIT_REACHED（通道数上限，409）/
+       SPACE_FULL（group 成员数达 maxMembersPerSpace，409）/
+       DUO_FULL（duo 满且升格不可用——maxMembersPerSpace ≤ 2 的部署，409）
 ```
 
 ### 4.2 成员端点（加入后/创建者）
@@ -152,8 +178,13 @@ POST /spaces/join
 ```text
 POST /spaces/{spaceId}/join-tokens
   现有成员生成一次性开通码（join token，可刷新/撤销）。
-  请求：{ }  →  201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
-  错误：NOT_A_MEMBER（无满员概念：不限通道数，随时可生成新开通码）
+  请求：{ purpose: 'invite' | 'channel' }（群聊一期 2026-10-03，缺省 'channel'）
+  - invite：邀请新成员（新身份）。duo 满员（伴侣已入网）时**签发即自动升格
+    group**（方案 C，单向不可逆）；maxMembersPerSpace ≤ 2 的部署 → 409。
+  - channel：发起人在新设备加通道——token 记录签发者 member（issuer 绑定），
+    join 时校验"仅发起人本人可接入"（防任选他人身份冒充）。
+  → 201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
+  错误：NOT_A_MEMBER / UPGRADE_NOT_ALLOWED（升格被上限闸拒绝，409）
 
 DELETE /spaces/{spaceId}/join-tokens/{tokenHash}
   撤销未用 token（创建者补救手段）。
@@ -164,29 +195,30 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 
 ## 5. 加入流程（join）API 序列
 
-对应 App 向导五步（与老板 2026-09-10 确认的顺序）：
+对应 App 向导（群聊一期 2026-10-03 起按 purpose 分流，身份选择页已删）：
 
 ```text
-① 输入 token/粘贴链接/扫码        → POST /spaces/join（带 token，未带身份）
-     前置校验：TOKEN_INVALID/EXPIRED/USED 在此拦截（fail fast）
-② 空间确认                        → GET /spaces/lookup?address=...（或 join 响应
-     携带的 spaceId/名称/状态）
-③ 身份登记（名字/性别）           → POST /spaces/join（补 identity 字段，
-     服务端事务：锁 Space 行 → 校验 token → 标记 used → 绑定 slot
-     （slot 已有人 → 复用其 member_id：同身份多通道；**不校验成员/通道数**））
-④ 口令 escrow 取 Space Key        → POST /spaces/{spaceId}/key-escrow/verify
+① 输入 token/粘贴链接/扫码        → POST /spaces/join/preflight
+     前置校验：TOKEN_INVALID/EXPIRED/USED 在此拦截（fail fast，不消费 token）；
+     返回 purpose/inviterName/mode/memberCount 供确认页展示
+② 身份分支（按 preflight 的 purpose）：
+   - invite（新成员）：填写自己的名字/性别
+   - channel（设备接入）：无此步——身份由 token 绑定（issuer），服务端自动解析
+③ 口令 escrow 取 Space Key        → POST /spaces/{spaceId}/key-escrow
      （提交口令，解开创建者托管的口令密封包，返回 space_key 密封内容）
+④ join 提交                       → POST /spaces/join（真正消费 token）
+     服务端事务：锁 Space 行 → 校验 purpose×slot → 标记 used →
+     invite 分配最小空 slot/新 member_id；channel 复用 issuer 的 slot/member_id；
+     新身份时 duo 满 2 人 → 自动升格 group（方案 C 防御闸）→ 查成员数上限
 ⑤ 设置 PIN                       → 本机操作（AppLock），无服务端调用
 → 进入 ChatPage
 ```
 
 实现说明：
-- ① 与 ③ 可以合并为一次 `POST /spaces/join`（请求同时带 token + 身份），
-  也可以拆两次（先验 token、后提交身份）——取决于 App 是否想先展示空间确认
-  再让用户填身份；协议层两个字段都是可选组，服务端在 ③ 时做事务提交。
-- ① 的 fail-fast 校验要求服务端能按 token 查出 Space 状态且不消费 token
-  （新增轻量 `POST /spaces/join/preflight` 或复用 lookup 语义）。
-- create（首条通道）流程不变：身份 → 设口令（escrow）→ PIN，无 token。
+- App 实现为一次 `POST /spaces/join` 合并提交（token + 名字/性别）；协议层
+  字段都是可选组，服务端在 ④ 时做事务提交。
+- create（首条通道）流程：创建者名字 → 设口令（escrow）→ PIN，无 token；
+  create 回传的首张 join token purpose='invite'（"邀请伴侣"链接）。
 
 ## 6. 错误码（Multiverse 加入相关）
 
@@ -197,6 +229,9 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `TOKEN_USED` | token 已被消费（一次性） | 410 |
 | `SPACE_LIMIT_REACHED` | 空间数量已达上限（serverConfig.json 的 maxSpaces；与"成员/通道数"无关） | 409 |
 | `ENTRANCE_LIMIT_REACHED` | 该空间的通道（登记项）数量已达上限（serverConfig.json 的 maxEntrancesPerSpace；**计数含已撤销**——销毁不退额度，防反复开通/销毁刷量） | 409 |
+| `SPACE_FULL` | group 空间成员（身份）数已达上限（serverConfig.json 的 maxMembersPerSpace；同身份多通道不重复计数） | 409 |
+| `DUO_FULL` | duo 空间已满 2 人且自动升格不可用（maxMembersPerSpace ≤ 2 的部署）——升格可用的部署会先自动转 group 再重查上限，不落到此码 | 409 |
+| `UPGRADE_NOT_ALLOWED` | duo → group 升格被拒（maxMembersPerSpace ≤ 2 的部署签发 invite token 时） | 409 |
 | `SPACE_NOT_FOUND` | 空间不存在/已归档 | 404 |
 | `NOT_A_MEMBER` | 当前 session 不是该 Space 成员 | 403 |
 | `DEVICE_ALREADY_BOUND` | 该通道已绑定一个 Space，拒绝再创建/加入 | 409 |

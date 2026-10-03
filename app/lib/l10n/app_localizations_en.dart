@@ -649,6 +649,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuEntranceList => 'My entrances';
 
   @override
+  String get chatPageMenuMembers => 'Space members';
+
+  @override
+  String get chatPageMembersTitle => 'Space members';
+
+  @override
+  String get chatPageMembersInvitePartner => 'Invite partner';
+
+  @override
+  String get chatPageMembersInviteNew => 'Invite new member';
+
+  @override
+  String get chatPageMembersUpgradeConfirmTitle => 'Upgrade to group';
+
+  @override
+  String chatPageMembersUpgradeConfirmBody(Object maxMembers) {
+    return 'After upgrading this space allows at most $maxMembers members and voice calls will be disabled. This cannot be undone. Continue?';
+  }
+
+  @override
+  String get chatPageMembersUpgradeConfirmBodyNoLimit =>
+      'Voice calls will be disabled after upgrading, and this cannot be undone. Continue?';
+
+  @override
+  String get chatPageMembersUpgraded =>
+      'Upgraded to group — voice calls are disabled';
+
+  @override
+  String get chatPageMembersMe => 'Me';
+
+  @override
+  String get chatPageMembersChannelToken => 'Add my account on another device';
+
+  @override
+  String get chatPageMembersTokenCopied => 'Invite link copied';
+
+  @override
+  String get chatPageMembersFull => 'Space is full';
+
+  @override
   String get chatPageEntranceListFailed =>
       'Could not load other entrances (offline?)';
 

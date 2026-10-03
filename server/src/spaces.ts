@@ -353,14 +353,12 @@ export function joinSpace(
   if (tk.expires_at < Date.now()) throw new ApiError("TOKEN_EXPIRED", "join token expired", 410);
   // purpose × slot 显式语义（群聊一期 2026-10-03，方案 B）：
   // - invite → 必须不带 slot（开新身份，自填名字）；带 slot 属客户端错用
-  // - channel → 必须带 slot，且等于发起人 slot（绑定校验：issuer_member_id 有值时
-  //   以 token 绑定的身份为准；存量 NULL 行退化按"slot 已有人"放行）
+  // - channel → 身份由 token 绑定（issuer_member_id）：客户端**不需要**带 slot
+  //   （发起人 slot 服务端自己查得出）；带了则必须与绑定一致（防错用）。
+  //   存量 token（issuer NULL、purpose=channel 回填）退化要求带 slot（无绑定可查）。
   const purpose: "invite" | "channel" = tk.purpose === "invite" ? "invite" : "channel";
   if (purpose === "invite" && slot != null) {
     throw new ApiError("INVALID_REQUEST", "invite token 不能指定 slot（将开新身份）", 400);
-  }
-  if (purpose === "channel" && slot == null) {
-    throw new ApiError("INVALID_REQUEST", "channel token 必须携带发起人的 slot", 400);
   }
 
   const doJoin = getDb().transaction(() => {
@@ -389,18 +387,23 @@ export function joinSpace(
     let chosenSlot: number;
     let isExistingIdentity = false;
     let member: { member_id: string | null; status: string } | undefined;
-    if (slot != null) {
-      chosenSlot = Math.floor(slot);
-      // channel 绑定校验（方案 B）：token 记录了发起人身份时，slot 行必须就是
-      // 那个身份——杜绝"任何成员的 channel token 任选他人身份加通道"的冒充面。
-      // 存量 token（issuer NULL）退化按"slot 已有人"放行（无法追溯，保守放行）。
+    if (slot != null || (purpose === "channel" && tk.issuer_member_id != null)) {
+      // channel：身份由 token 绑定（issuer）→ 服务端自动解析发起人 slot（客户端
+      // 无需知道 slot 这个内部概念）；客户端显式带 slot 时必须与绑定一致（防错用）。
+      // 存量 channel token（issuer NULL）必须由客户端带 slot（无绑定可查）。
       if (purpose === "channel" && tk.issuer_member_id != null) {
         const bound = getDb()
           .prepare(`SELECT slot FROM space_members WHERE space_id = ? AND member_id = ?`)
           .get(tk.space_id, tk.issuer_member_id) as { slot: number } | undefined;
-        if (!bound || bound.slot !== chosenSlot) {
+        if (!bound) {
+          throw new ApiError("INVALID_REQUEST", "channel token 的绑定身份已不存在", 403);
+        }
+        if (slot != null && Math.floor(slot) !== bound.slot) {
           throw new ApiError("INVALID_REQUEST", "channel token 与身份不匹配（仅发起人本人可接入）", 403);
         }
+        chosenSlot = bound.slot;
+      } else {
+        chosenSlot = Math.floor(slot!);
       }
       const existing = getDb()
         .prepare(`SELECT member_id, status FROM space_members WHERE space_id = ? AND slot = ?`)

@@ -39,9 +39,9 @@ B 加入（口令取钥）→ 双端互通对话。
 | --- | --- |
 | **space_id / space_address** | 空间唯一标识（UUID）与对外地址（由空间公钥经 Keccak-256 + EIP-55 派生）。创建空间时由客户端生成 space_id 一并提交 |
 | **Space Key** | 32B 随机空间密钥（端到端加密用），创建者本地生成；加入方凭**口令**从口令密保箱取回 |
-| **口令（passphrase）** | 创建空间时设定，两人共用；对方凭它解出 Space Key。**别和邀请链接混淆** |
-| **邀请链接 / join token** | 一次性（默认 24h、用后作废），创建者 `/invite` 生成；B 拿它加入空间 |
-| **member / slot** | 空间内两个身份槽位：`0`=创建者/第一人，`1`=伴侣/第二人。member_id 是空间内随机 UUID；同一身份可多条通道（"自己/对方"按 member_id 判断） |
+| **口令（passphrase）** | 创建空间时设定，全体成员共用；加入方凭它解出 Space Key。**别和邀请链接混淆** |
+| **邀请链接 / join token** | 一次性（默认 24h、用后作废），分两种（群聊一期 2026-10-03）：**invite**=邀请新成员（duo 满员签发即自动升格 group）；**channel**=自己在其他设备接入（绑定本人身份） |
+| **member / slot** | 空间成员身份：duo 恒 2 人，group 最多 `maxMembersPerSpace` 人（由 duo 自动升格，单向不可逆、通话停用）。slot 是内部槽位（新身份分配最小空槽）；同一身份可多条通道（"自己/他人"按 member_id 判断） |
 | **通道登记** | 由 `POST /spaces`（创建者）/ `POST /spaces/join`（凭 join token）完成，**同时签发绑定该空间的会话**——没有独立的登记步骤 |
 | **通道在册状态** | `entrances` 表（`active` / `revoked`）；未登记 → 401/403 `FORBIDDEN`（只警告），已撤销 → 403 `ENTRANCE_REVOKED`（客户端自毁本地数据），无需任何配置文件 |
 
@@ -91,7 +91,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc \
   --store ~/.einz/a.json
 # 引导流程：
 #   选 c 创建秘境
-#   我的名字（如 lukas）+ 性别；伴侣名字（如 Alice，预置在 slot=1，等她加入时确认）
+#   我的名字（如 lukas）+ 性别（群聊一期：不再预置对方——伴侣加入时自己填名）
 #   设置共享口令（如 faronear，两分钟后对方凭它接入；≥8 位）
 #   ✅ 成功创建秘境！地址: 0x…（自动上传密保箱、签发会话、进入会话）
 ```
@@ -113,7 +113,7 @@ dart run bin/einz_tui.dart --server https://einz.tic.cc `
 # 引导流程：
 #   选 j 加入秘境
 #   粘贴 A 给的邀请链接（或纯 token）
-#   ✅ 开通码验证通过 → 选择身份（1=第一人 / 2=伴侣，一般选 2）
+#   ✅ 邀请链接验证通过 → 填写自己的名字/性别（invite 新成员；设备接入链接无此步）
 #   输入 A 设置的共享口令（⚠️ 输口令，不是邀请链接；Windows 隐藏回显无星号）
 #   ✅ 口令验证通过，成功加入秘境（取回 Space Key + 登记通道 + 签发会话）
 ```
