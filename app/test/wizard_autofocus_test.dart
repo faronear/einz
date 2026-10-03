@@ -66,17 +66,10 @@ void main() {
     expect(_firstFieldFocused(tester), isTrue, reason: '第 1 步打开就该聚焦名字框');
   });
 
-  testWidgets('向导：下一步进入第 2 步（对方名字）应聚焦', (WidgetTester tester) async {
+  testWidgets('向导：下一步进入第 2 步（共享口令，群聊一期无伴侣页）应聚焦', (WidgetTester tester) async {
     await _pumpCreate(tester);
     await _fillAndNext(tester, name: 'Lukas', gender: '男');
-    expect(_firstFieldFocused(tester), isTrue, reason: '第 2 步应聚焦对方名字框');
-  });
-
-  testWidgets('向导：再下一步进入第 3 步（共享口令）应聚焦', (WidgetTester tester) async {
-    await _pumpCreate(tester);
-    await _fillAndNext(tester, name: 'Lukas', gender: '男');
-    await _fillAndNext(tester, name: 'Alice', gender: '女');
-    expect(_firstFieldFocused(tester), isTrue, reason: '第 3 步应聚焦口令框');
+    expect(_firstFieldFocused(tester), isTrue, reason: '第 2 步应聚焦口令框（伴侣页已删，群聊一期）');
   });
 
   testWidgets('向导：join 流程第 1 步（开通码）应聚焦', (WidgetTester tester) async {

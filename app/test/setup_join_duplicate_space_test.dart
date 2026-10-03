@@ -34,6 +34,7 @@ Future<void> _pumpToJoinToken(WidgetTester tester, LocalDatabase db) async {
           spaceId: 'space-test',
           status: 'waiting',
           memberCount: 1,
+          purpose: 'invite',
           slots: [
             SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
             SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
@@ -74,7 +75,7 @@ void main() {
 
     expect(find.text(_dupMessage), findsOneWidget, reason: '必须给出「已添加过」的红字');
     expect(find.text('验证开通码'), findsWidgets, reason: '应停留在开通码页');
-    expect(find.text('选择身份'), findsNothing, reason: '不得放行进下一步');
+    expect(find.text('关于我'), findsNothing, reason: '不得放行进下一步（名字页，群聊一期）');
   });
 
   testWidgets('内存 Vault 里已有该 spaceId → 同样拦下（权威来源）', (WidgetTester tester) async {
@@ -93,7 +94,7 @@ void main() {
     await _submitToken(tester, 'TOKEN-DUP');
 
     expect(find.text(_dupMessage), findsOneWidget);
-    expect(find.text('选择身份'), findsNothing);
+    expect(find.text('关于我'), findsNothing);
   });
 
   testWidgets('本机没有该秘境 → 照常放行（别误伤正常加入）', (WidgetTester tester) async {
@@ -103,6 +104,6 @@ void main() {
     await _submitToken(tester, 'TOKEN-OK');
 
     expect(find.text(_dupMessage), findsNothing, reason: '没添加过就不该报错');
-    expect(find.text('选择身份'), findsOneWidget, reason: '没添加过就该照常放行');
+    expect(find.text('关于我'), findsOneWidget, reason: '没添加过就该照常放行（名字页，群聊一期）');
   });
 }

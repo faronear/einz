@@ -97,9 +97,8 @@ class _SetupPageState extends State<SetupPage> {
   final _creatorName = TextEditingController(); // 首条通道：第一个用户的名字
   String? _myGender; // create 步骤 1：我的性别（'male'/'female'，登记时随 creator_name 同步服务端）
   String? _genderError; // 性别未选提醒（红字显示在选项卡下方；选中即清除）
-  final _peerNameCtrl = TextEditingController(); // create 步骤 2：伴侣（第二人）名字（必填）
-  String? _peerGender; // create 步骤 2：伴侣性别（'male'/'female'，必选）
-  String? _peerGenderError; // 伴侣性别未选提醒
+  // 群聊一期（2026-10-03）：create 不再预置伴侣（v3）——原 _peerNameCtrl/
+  // _peerGender/_peerGenderError/_buildStepPeer 已删；partner 加入时自填名字
   // 群聊一期（2026-10-03）：join 按 purpose 分流——'invite' = 新成员（步骤 2 填
   // 自己的名字/性别，复用 _creatorName/_myGender）；'channel' = 发起人设备接入
   // （身份由 token 绑定，服务端自动解析，无名字页）。身份选择页已删。
@@ -335,9 +334,8 @@ class _SetupPageState extends State<SetupPage> {
     return switch (_role!) {
       _WizardRole.create => switch (_step) {
           1 => _nameFocus, // 我的名字
-          2 => _peerNameFocus, // 对方名字
-          3 => _passphraseFocus, // 共享口令
-          4 => _pinFocus, // 锁屏码（已设锁屏码时该步无输入框，requestFocus 自然空转）
+          2 => _passphraseFocus, // 共享口令（群聊一期：伴侣页删除，口令前移）
+          3 => _pinFocus, // 锁屏码（已设锁屏码时该步无输入框，requestFocus 自然空转）
           _ => null,
         },
       _WizardRole.join => switch (_step) {
@@ -600,7 +598,9 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        return 6; // name/member/passphrase/pin/done（伴侣名字/性别必填，老板 2026-09-10 定稿）
+        // 群聊一期（2026-10-03）：伴侣名字页删除（create 不预置对方，v3）——
+        // name/passphrase/pin/done
+        return 5;
       case _WizardRole.join:
         // 群聊一期（2026-10-03）：身份选择页删除。invite = token/名字/口令/PIN/done；
         // channel = token/口令/PIN/done（少一页名字——身份由 token 绑定）。
@@ -612,9 +612,10 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 当前是否为 PIN 步骤（create=5 / join=4 / offline=2）。
+  /// 当前是否为 PIN 步骤（create=3 / join=4 / offline=2；群聊一期 2026-10-03：
+  /// create 伴侣页删除 → PIN 从 4 前移到 3）。
   bool get _isPinStep =>
-      (_role == _WizardRole.create && _step == 4) ||
+      (_role == _WizardRole.create && _step == 3) ||
       (_role == _WizardRole.join && _step == 4) ||
       (_role == _WizardRole.offline && _step == 2);
 
@@ -764,30 +765,10 @@ class _SetupPageState extends State<SetupPage> {
         invalid = true;
       }
     }
-    // 伴侣页（create 步骤 2）：名字与性别都必填（老板 2026-09-10 定稿——
-    // create 录入两人身份，join 时按身份选择而非自填名字）
-    String? peerGenderError;
-    if (_role == _WizardRole.create && _step == 2) {
-      final member = _peerNameCtrl.text.trim();
-      if (member.isEmpty) {
-        localError = l10n.wizardPeerNameRequired;
-        invalid = true;
-      } else if (checkMemberNamePolicy(member) case final v?) {
-        localError = _nameRuleError(v);
-        invalid = true;
-      } else if (isSameMemberName(member, _creatorName.text.trim())) {
-        // 两人不能同名（老板 2026-09-10 定，2026-09-24 收紧为大小写不敏感；TUI 早已
-        // 收口，App 此前漏了——2026-09-23 实测）：join 时是"按名字选身份"，两个名字
-        // 相同（含仅大小写不同）就没法判别你是哪一位
-        localError = l10n.wizardPeerNameSameName;
-        invalid = true;
-      }
-      if (_peerGender == null) {
-        peerGenderError = l10n.wizardGenderRequired;
-        invalid = true;
-      }
-    }
-    if ((_role == _WizardRole.create && _step == 3) ||
+    // 群聊一期（2026-10-03）：伴侣名字页删除——create 不预置对方（v3），
+    // 无伴侣名字/性别校验（_peerNameCtrl/_peerGender 仅存量遗留，不再使用）
+    // 口令页（create 步骤 2 / join 步骤 3；群聊一期：create 伴侣页删除 → 口令前移）
+    if ((_role == _WizardRole.create && _step == 2) ||
         (_role == _WizardRole.join && _step == 3)) {
       final pass = _escrowPassphrase.text.trim();
       if (pass.isEmpty) {
@@ -819,7 +800,6 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _localError = localError;
         _genderError = genderError;
-        _peerGenderError = peerGenderError;
       });
       // 性别未选等红字警告：滚入可见区（键盘已收起，整页露出，用户看得到该怎么改）
       _revealCurrentGenderError();
@@ -1009,10 +989,10 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepName();
           case 2:
-            return _buildStepPeer();
-          case 3:
+            // 群聊一期（2026-10-03）：伴侣名字页删除——create 不预置对方（v3），
+            // partner 加入时自己填名。create = name/passphrase/pin/done
             return _buildStepPassphrase();
-          case 4:
+          case 3:
             return _lockAlreadySet ? _buildStepPinReuse() : _buildStepPin();
           default:
             return _buildStepDone();
@@ -1481,54 +1461,6 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  /// 步骤 2（create，Multiverse）：伴侣（第二人）的名字/性别——必填（老板
-  /// 2026-09-10 定稿：create 录入两人身份，join 时按身份选择而非自填名字）。
-  Widget _buildStepPeer() {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _stepHeader(l10n.wizardTitlePeerName, l10n.wizardPeerNameHint),
-        TextField(
-          controller: _peerNameCtrl,
-          focusNode: _peerNameFocus, // 方案 1：聚焦时滚出性别卡
-          autofocus: true,
-          style: const TextStyle(fontSize: 20),
-          // 与上面「我的名字」同一条上限（老板 2026-09-28）
-          maxLength: kMemberNameMaxLength,
-          onChanged: (_) {
-            if (_localError != null) setState(() => _localError = null);
-          },
-          decoration: InputDecoration(
-            hintText: l10n.wizardPeerNameHintInput,
-            border: const OutlineInputBorder(),
-            counterText: '', // 不显示 "3/32" 计数器（只做硬拦）
-          ),
-        ),
-        if (_localError != null) _localErrorHint(_localError!),
-        const SizedBox(height: 20),
-        Container(
-          key: _peerGenderRevealKey, // 校验失败红字警告滚入可见区的锚点
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildGenderSelector(
-                selected: _peerGender,
-                label: l10n.wizardPeerGenderLabel,
-                maleLabel: l10n.wizardGenderMale,
-                femaleLabel: l10n.wizardGenderFemale,
-                onChanged: (g) => setState(() {
-                  _peerGender = g;
-                  _peerGenderError = null; // 选中即清除未选提醒
-                }),
-              ),
-              if (_peerGenderError != null) _localErrorHint(_peerGenderError!),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 
   /// join 所选身份（create 预置）的名字——本人在消息流里的显示名。
   /// 群聊一期（2026-10-03）：身份选择页删除——invite 新成员的名字来自步骤 2

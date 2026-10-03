@@ -102,13 +102,14 @@ void main() {
     expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
   });
 
-  testWidgets('join：token 校验通过（preflight）→ 直接进入身份选择页',
+  testWidgets('join：token 校验通过（preflight）→ 直接进入名字页（群聊一期）',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrapApp(
       preflightOverride: (token) async => const SpaceJoinPreflight(
         spaceId: 'space-test',
         status: 'waiting',
         memberCount: 1,
+        purpose: 'invite',
         slots: [
           SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
           SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
@@ -122,7 +123,7 @@ void main() {
     await tester.tap(find.text('下一步')); // preflight 通过 → 直接进下一页（不再停留显示确认卡片）
     await tester.pumpAndSettle();
     expect(find.text('加入 Lukas 的秘境'), findsNothing, reason: '不再显示空间确认卡片');
-    expect(find.text('选择身份'), findsOneWidget, reason: '有效 token 应直接放行到身份选择页');
+    expect(find.text('关于我'), findsOneWidget, reason: '有效 token 应直接放行到名字页（invite 自填名，群聊一期）');
   });
 
   testWidgets('join：RATE_LIMITED 不能算到开通码头上，要说出要等多久', (WidgetTester tester) async {
