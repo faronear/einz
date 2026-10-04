@@ -227,7 +227,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardMyNameLabel.
   ///
   /// In en, this message translates to:
-  /// **'Name (can be changed later)'**
+  /// **'Name'**
   String get wizardMyNameLabel;
 
   /// No description provided for @wizardNameRequired.
@@ -323,19 +323,19 @@ abstract class AppLocalizations {
   /// No description provided for @wizardSpaceKindHint.
   ///
   /// In en, this message translates to:
-  /// **'Pick one — this cannot be changed later'**
+  /// **'How many people will this space have?'**
   String get wizardSpaceKindHint;
 
   /// No description provided for @wizardSpaceKindDuo.
   ///
   /// In en, this message translates to:
-  /// **'Two-person space'**
+  /// **'Duo space'**
   String get wizardSpaceKindDuo;
 
   /// No description provided for @wizardSpaceKindDuoDesc.
   ///
   /// In en, this message translates to:
-  /// **'Just the two of you, with voice calls'**
+  /// **'For just the two of you, no one else can be added later.'**
   String get wizardSpaceKindDuoDesc;
 
   /// No description provided for @wizardSpaceKindGroup.
@@ -347,7 +347,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardSpaceKindGroupDesc.
   ///
   /// In en, this message translates to:
-  /// **'For several people, no voice calls'**
+  /// **'For multiple persons, every member can invite new ones.'**
   String get wizardSpaceKindGroupDesc;
 
   /// No description provided for @wizardSpaceKindRequired.
@@ -407,7 +407,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The passphrase is shared by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.'**
+  /// **'The passphrase is the only key to access the space, shared by you and your partner. Memorize it and never leak it!'**
   String get wizardPassphraseHint;
 
   /// No description provided for @wizardPassphraseMinLengthHint.
@@ -437,7 +437,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The passphrase is shared by you and your partner to protect private messages. Don\'t know it? Ask your partner.'**
+  /// **'The passphrase is the only key to access the space, shared by you and your partner. Don\'t know it? Ask your partner.'**
   String get wizardJoinPassphraseHint;
 
   /// No description provided for @wizardJoinPassphraseWrong.
@@ -479,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeDialogMessage.
   ///
   /// In en, this message translates to:
-  /// **'Just the two of you, end-to-end encrypted for total privacy. Enter now and start chatting!'**
+  /// **'The space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!'**
   String get welcomeDialogMessage;
 
   /// No description provided for @welcomeDialogStart.
@@ -503,7 +503,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupEntryHint.
   ///
   /// In en, this message translates to:
-  /// **'Einz is a secret space for two partners. You can create a new one, or join an existing one by invitation.'**
+  /// **'Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.'**
   String get setupEntryHint;
 
   /// No description provided for @setupEntryCreate.
@@ -551,19 +551,19 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'Open the dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
+  /// **'Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste the token or invite link'**
+  /// **'New entrance token'**
   String get setupTokenInputHint;
 
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the token'**
+  /// **'Enter the new entrance token'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
@@ -839,19 +839,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogTitleInvite.
   ///
   /// In en, this message translates to:
-  /// **'Invite someone to this space'**
+  /// **'Invite my partner'**
   String get chatPageInviteDialogTitleInvite;
 
   /// No description provided for @chatPageInviteDialogTitleAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Add my new device to this space'**
+  /// **'Add a new entrance'**
   String get chatPageInviteDialogTitleAttachSelf;
 
   /// No description provided for @chatPageInviteDialogTitleRecover.
   ///
   /// In en, this message translates to:
-  /// **'Re-invite them onto a new device'**
+  /// **'Re-invite the partner to this space'**
   String get chatPageInviteDialogTitleRecover;
 
   /// No description provided for @chatPageInviteJoinLink.
@@ -899,7 +899,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCopyCodeTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy token'**
+  /// **'Copy new entrance token'**
   String get chatPageInviteCopyCodeTooltip;
 
   /// No description provided for @chatPageInviteLinkCopied.
@@ -911,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCodeCopied.
   ///
   /// In en, this message translates to:
-  /// **'Token copied'**
+  /// **'New entrance token copied'**
   String get chatPageInviteCodeCopied;
 
   /// No description provided for @chatPageInviteFailed.
@@ -1265,31 +1265,31 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinInviteHint.
   ///
   /// In en, this message translates to:
-  /// **'{name} invited you to this space ({count} members)'**
+  /// **'Invited by {name}'**
   String wizardJoinInviteHint(String name, int count);
 
   /// No description provided for @wizardJoinInviteHintNoName.
   ///
   /// In en, this message translates to:
-  /// **'You were invited to this space ({count} members)'**
+  /// **'Invited to join a space'**
   String wizardJoinInviteHintNoName(int count);
 
-  /// No description provided for @wizardJoinChannelHint.
+  /// No description provided for @wizardJoinAttachHint.
   ///
   /// In en, this message translates to:
-  /// **'This link adds {name}\'s own account on another device'**
-  String wizardJoinChannelHint(String name);
+  /// **'Add a new entrance of {name}'**
+  String wizardJoinAttachHint(String name);
 
   /// No description provided for @wizardJoinRecoverHint.
   ///
   /// In en, this message translates to:
-  /// **'{name} is adding {target}\'s identity to this device; existing entrances stay untouched'**
+  /// **'Invited by {name} to add a new entrance of {target}'**
   String wizardJoinRecoverHint(String name, String target);
 
   /// No description provided for @wizardJoinRecoverHintNoName.
   ///
   /// In en, this message translates to:
-  /// **'This link adds {target}\'s identity to this device; existing entrances stay untouched'**
+  /// **'Invited to add a new entrance of {target}'**
   String wizardJoinRecoverHintNoName(String target);
 
   /// No description provided for @chatPageMenuMembers.
@@ -1937,7 +1937,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutIntro.
   ///
   /// In en, this message translates to:
-  /// **'Einz is a secret space for just two partners: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.'**
+  /// **'Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.'**
   String get aboutIntro;
 
   /// No description provided for @aboutVersionLabel.

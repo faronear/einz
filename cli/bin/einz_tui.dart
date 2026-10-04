@@ -129,7 +129,7 @@ class _TuiState {
   /// member_id → gender（GET /health、/space 拉取，对方消息背景色用）。
   Map<String, String> memberGenders = {};
 
-  /// member_id → slot（GET /space 拉取，0=第一人/创建者，1=第二人/伴侣；
+  /// member_id → slot（GET /space 拉取，0=第一人/创建者，1=第二人/同伴；
   /// 同性别时第二人气泡取青色用）。
   Map<String, int> memberSlots = {};
 
@@ -147,7 +147,7 @@ class _TuiState {
 
 _TuiState? _state;
 
-/// 首条通道 create 时询问的性别（我的/伴侣）：仅接受 男/女（否则重新询问），
+/// 首条通道 create 时询问的性别（我的/同伴）：仅接受 男/女（否则重新询问），
 /// 登记时随名字一并提交服务端（person_gender/peer_gender）。
 String? myGender;
 String? peerGender;
@@ -551,7 +551,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
   // 已移除（老板 2026-09-15）。身份现在由 /space join 的 preflight slots 选择。
   store.save(storePath);
 
-  // Multiverse：未绑定空间的新通道第一步选择「加入伴侣的秘境」/「创建新秘境」
+  // Multiverse：未绑定空间的新通道第一步选择「加入同伴的秘境」/「创建新秘境」
   //（对齐 App 入口页，老板 2026-09-10）——create→名字/性别→口令创建；
   // join→token→名字/口令加入。已绑定通道（重启）跳过。
   if (store.spaceKey == null) {
@@ -834,7 +834,7 @@ Future<void> _finalizeOnboarding(ChatSession session) async {
   session.messages.add(_systemMessage(session, '----------------'));
   // 欢迎辞与读秒拆成两条 system 消息（老板 2026-09-18）：读秒独立成条且逐秒
   // 追加数字不覆盖——"5 4 3 …"式历史可回看，最后 5 4 3 2 1 完整呈现
-  session.messages.add(_systemMessage(session, '一切就绪！即将进入秘境与伴侣聊天 💞'));
+  session.messages.add(_systemMessage(session, '一切就绪！即将进入秘境与同伴聊天 💞'));
   ChatMessage countdownMsg =
       _systemMessage(session, _welcomeCountdownText(null, _kWelcomeCountdownSeconds));
   session.messages.add(countdownMsg);
@@ -935,19 +935,19 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       _scheduleRender();
     }
   }
-  // 群聊一期（2026-10-03，v3）：create **不再预置伴侣**——只录创建者自己。
-  // 伴侣（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
+  // 群聊一期（2026-10-03，v3）：create **不再预置同伴**——只录创建者自己。
+  // 同伴（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
   // ① 名字归属本人（创建者替对方起名、改不了，是老流程的长期别扭处）；
   // ② 群空间里"对方"不止一人，预置两人身份的协议本身就不成立。
-  // 原"伴侣的名字/性别"两个必填问答整段删除（2026-10-04 审查：param 已不上报，
+  // 原"同伴的名字/性别"两个必填问答整段删除（2026-10-04 审查：param 已不上报，
   // 留着就是白问 + 顶部条显示一个服务端根本不存在的名字）。
-  // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让伴侣无法
+  // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让同伴无法
   // 凭口令加入、本机也没有口令密保箱可用）
   String passphrase;
   while (true) {
     if (!_state!.running) return; // 口令阶段 /exit：不继续创建
     passphrase = (await _prompt(session,
-            '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:',
+            '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）:',
             required: true))
         .trim();
     if (passphrase.isEmpty) continue; // 防御：输入循环 required 已拦截留空回车
@@ -970,7 +970,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       spaceId: spaceId,
       keyVersion: 1,
     );
-    session.messages.add(_systemMessage(session, '✅ 共享口令已设置，请通过安全的方式分享给伴侣。'));
+    session.messages.add(_systemMessage(session, '✅ 共享口令已设置，请通过安全的方式分享给同伴。'));
     session.messages.add(_systemMessage(session, '----------------'));
     final created = await _busy(session, '⏳ 正在创建秘境...', () => api.createSpace(
       spaceId: spaceId,
@@ -996,7 +996,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
     // （老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.memberName = displayName;
-    // 群聊一期（2026-10-03）：不再落"伴侣名字"——空间里还没有第二个人，顶部条
+    // 群聊一期（2026-10-03）：不再落"同伴名字"——空间里还没有第二个人，顶部条
     // 由 /space 的成员表驱动（有谁显示谁），不再靠创建者的预置撑着。
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
@@ -1061,7 +1061,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
             _systemMessage(session, '   目前已有 ${pre.memberCount} 位成员'));
       }
     } else if (!pre.targetIsIssuer && (pre.targetName ?? '').isNotEmpty) {
-      final who = pre.inviterName ?? '伙伴';
+      final who = pre.inviterName ?? '同伴';
       session.messages.add(_systemMessage(
           session, '🔄「${who}」帮你把身份「${pre.targetName}」接到本机（你原有通道不受影响）'));
     } else {
@@ -1837,7 +1837,7 @@ List<String> _byOnlineOrder(Map<String, int> sinceById) {
   return [for (final e in entries) e.key];
 }
 
-/// 对方显示名：memberNames 里非我的一项 → store.peerName（create 预置的伴侣名 /
+/// 对方显示名：memberNames 里非我的一项 → store.peerName（create 预置的同伴名 /
 /// join 时另一身份槽位的名字）→ '-'。
 /// 本通道身份未确认（新通道引导中/未登记，memberId 为空）时对方是谁不确定——
 /// 不猜测名称表第一项（此前会把 memberA 的名字当成对方展示，引导中左右两侧
@@ -2914,7 +2914,7 @@ Future<void> _uploadAttachmentInBackground(ChatSession session, String path) asy
 /// （老板 2026-09-23：以前是清完就退出进程，得自己重新敲命令启动）。
 ///
 /// 闸门刻意**全离线**：通道名比对 + 本机锁屏码，不联网、不问空间口令。理由见
-/// `server/src/entrances.ts` 的 `retireEntrance`：空间口令是**共享**给伴侣的加入凭证，
+/// `server/src/entrances.ts` 的 `retireEntrance`：空间口令是**共享**给同伴的加入凭证，
 /// 不该获得销毁我这条通道的权力；而校验它必须联网，会让"连着一台死服务器"这个
 /// 最常见的重置场景直接自锁。
 ///
@@ -3042,7 +3042,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: 生成一次性开通码，24小时有效，邀请伴侣或自己开通一条新通道到本秘境。',
+        '/invite :: 生成一次性开通码，24小时有效，邀请同伴或自己开通一条新通道到本秘境。',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3110,7 +3110,7 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(
             s.session,
             '❓ 本通道尚未绑定秘境\n'
-            '   输入开通码（或邀请链接）加入伴侣的秘境；\n'
+            '   输入开通码（或邀请链接）加入同伴的秘境；\n'
             '   新建秘境请先 /space create'));
         s.status = '⌛️ 等待开通码输入…';
         break;
@@ -3289,7 +3289,7 @@ Future<void> _execCommand(String line) async {
       break;
     case '/revoke':
       // 撤销同空间某条通道（PROTOCOL.md §7.2，老板 2026-09-16）：
-      // **同 space 内可互撤**（自己的另一条 / 伴侣的通道），但每次都要校验共享口令——
+      // **同 space 内可互撤**（自己的另一条 / 同伴的通道），但每次都要校验共享口令——
       // 撤销会让对方客户端**清空本地数据**（含历史消息与附件），不可逆，故三重确认：
       // 选通道（序号/通道名）→ **抄一遍目标通道名** → 输入口令。任一步取消都不做任何改动。
       // **任一步留空回车即取消**（老板 2026-09-23：此前 required 拦空回车，用户被困，
@@ -3415,7 +3415,7 @@ Future<void> _execCommand(String line) async {
       //   ① 输入本机通道名（确认清的是这条，挡误触/顺手回车）
       //   ② 本机锁屏码（已设才验；锁屏码只属于本机持有者，不像空间口令那样是共享凭证）
       //   ③ 服务端退役尽力而为（失败只提示残留，不拦清算——离线也必须能重置）
-      // 为什么不校验空间口令：那是共享给伴侣的加入凭证，不该有销毁我这条通道的权力；
+      // 为什么不校验空间口令：那是共享给同伴的加入凭证，不该有销毁我这条通道的权力；
       // 而且校验必须联网。详见 docs/SECURITY.md。
       await _execReset(s.storePath);
       break;
@@ -3582,7 +3582,7 @@ Future<void> _execInvite() async {
     // 这个秘境" → invite（开新身份；duo 满 2 人时服务端 409）。想给自己另一台
     // 设备开通道，用 `/invite attach`。
     // 「帮别人找回身份」（attach 指向他人）需要共享口令，CLI 一期不做——
-    // 丢了设备的人请用 App 找伙伴生成找回链接。
+    // 丢了设备的人请用 App 找同伴生成找回链接。
     final api = ApiClient(s.session.server);
     final r = await _busy(
         s.session,
@@ -3870,7 +3870,7 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
       session.messages.add(_systemMessage(
           session,
           serverFile == null
-              ? '✅ 密保箱已用新口令重建（请线下告知伴侣新口令）'
+              ? '✅ 密保箱已用新口令重建（请线下告知同伴新口令）'
               : '✅ 口令已修改（新通道绑定时请使用新口令）'));
       _scheduleRender();
       return;
@@ -3887,7 +3887,7 @@ Future<void> _changeEscrowPassphrase(EntranceStore store, ChatSession session) a
 ///
 /// 为什么要三态（2026-09-15）：`_setupEscrowPassphrase` 上传时**不校验旧口令**
 /// （它只在"确认服务端无箱"的引导分支里用）。若把"查不到"当成"没有箱"去提示用户
-/// 重设，用户输入新口令就会**顶掉**原有密保箱（等于把伴侣锁在门外）。所以查不到时
+/// 重设，用户输入新口令就会**顶掉**原有密保箱（等于把同伴锁在门外）。所以查不到时
 /// 一律不提示，留到下次会话正常时再判定。
 Future<bool?> _serverHasEscrow(EntranceStore store, String server) async {
   final token = store.sessionToken;
@@ -3907,7 +3907,7 @@ Future<void> _setupEscrowPassphrase(EntranceStore store, String storePath, ChatS
     // 向导里的一步（不是"动作"）：**只有锁屏码可以空回车跳过**（老板 2026-09-23 定），
     // 共享口令必须给值 → required（留空回车被输入循环静默拒绝，停在原地继续等）
     final p1 = await _prompt(
-        session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境伴侣）:',
+        session, '❓ 设置共享口令（务必牢记，严禁泄漏！仅可将口令分享给秘境同伴）:',
         required: true);
     if (!_state!.running) break;
     final policyError = _passphrasePolicyError(p1);

@@ -8,7 +8,7 @@
   "settings": "设置",
   "skip": "跳过",
   "close": "关闭",
-  "setupPageEnvelopeKeyHint": "密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境伴侣获取。",
+  "setupPageEnvelopeKeyHint": "密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境同伴获取。",
   "setupPageNeedPassphrase": "请设置共享口令",
   "upgradeRequiredTitle": "需要升级",
   "upgradeRequiredBody": "这个版本已经不被服务器支持了（最低需要 {min}）。升级后才能继续使用。",
@@ -30,7 +30,7 @@
       }
     }
   },
-  "wizardMyNameLabel": "我的名字（以后可以随时修改）",
+  "wizardMyNameLabel": "名字",
   "wizardNameRequired": "请填写我的名字",
   "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。",
   "wizardNameTooLongError": "名字最多 {max} 个字符",
@@ -41,7 +41,7 @@
       }
     }
   },
-  "wizardMyGenderLabel": "我的性别",
+  "wizardMyGenderLabel": "性别",
   "wizardGenderMale": "男",
   "wizardGenderFemale": "女",
   "wizardGenderRequired": "请选择性别",
@@ -53,11 +53,11 @@
   "wizardDone": "完成",
   "wizardTitleName": "关于我",
   "wizardTitleSpaceKind": "秘境类型",
-  "wizardSpaceKindHint": "先定类型，之后不能改",
+  "wizardSpaceKindHint": "这个秘境里将有几个人？",
   "wizardSpaceKindDuo": "双人秘境",
-  "wizardSpaceKindDuoDesc": "只有你们两个人，可以用语音通话",
+  "wizardSpaceKindDuoDesc": "仅限两人，永远没有其他人。",
   "wizardSpaceKindGroup": "群组秘境",
-  "wizardSpaceKindGroupDesc": "几个人一起聊，不支持语音通话",
+  "wizardSpaceKindGroupDesc": "多人群组，每个成员都可以添加新人。",
   "wizardSpaceKindRequired": "请选择秘境类型",
   "wizardSpaceLimit": "秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境",
   "wizardTitlePassphrase": "设置共享口令",
@@ -74,19 +74,19 @@
       }
     }
   },
-  "wizardPassphraseHint": "共享口令由你和伴侣共同持有，用于保护私密消息。务必牢记，不可泄漏；只可与秘境伴侣分享。",
+  "wizardPassphraseHint": "共享口令由你和同伴共同保管，是打开秘境的唯一钥匙，务必牢记、严禁泄漏！",
   "wizardPassphraseMinLengthHint": "至少 8 位",
   "wizardPassphraseTooShort": "口令不得少于 8 位",
   "wizardPassphraseConfirmHint": "再输一次以确认",
   "wizardPassphraseMismatch": "两次输入的口令不一致",
-  "wizardJoinPassphraseHint": "共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？询问你的秘境伴侣。",
+  "wizardJoinPassphraseHint": "共享口令由你和同伴共同保管，是打开秘境的唯一钥匙。不知道口令？询问你的秘境同伴。",
   "wizardJoinPassphraseWrong": "口令错误：请确认首条通道创建时设置的口令",
   "wizardSwitchToEnvelope": "改用线下密保信封",
   "wizardSwitchToPassphrase": "改用共享口令",
   "wizardPinHint": "每次启动秘境，需输入锁屏码才能进入。当前也可先跳过，进入秘境后能够随时设置。",
   "welcomeDialogTitleCreate": "一切就绪！",
   "welcomeDialogTitleJoin": "一切就绪！",
-  "welcomeDialogMessage": "仅限两人，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！",
+  "welcomeDialogMessage": "秘境已开启，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！",
   "welcomeDialogStart": "进入秘境",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
@@ -97,7 +97,7 @@
     }
   },
   "setupEntryTitle": "秘境向导",
-  "setupEntryHint": "秘境是仅限两人的私密世界，可以从头创建，或者受邀加入。",
+  "setupEntryHint": "秘境是端到端加密的私密聊天和共享空间，可以从头创建，或者受邀加入。",
   "setupEntryCreate": "创建秘境",
   "setupEntryJoin": "加入秘境",
   "setupEntryLegacyServer": "服务器版本过低，请升级后再使用",
@@ -119,8 +119,8 @@
     }
   },
   "setupTokenTitle": "验证开通码",
-  "setupTokenHint": "开启本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。",
-  "setupTokenInputHint": "开通码或邀请链接",
+  "setupTokenHint": "开启从本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。",
+  "setupTokenInputHint": "开通码",
   "setupTokenNeedInput": "请填写开通码",
   "setupTokenInvalid": "开通码无效",
   "setupTokenExpired": "开通码已过期",
@@ -137,7 +137,7 @@
       }
     }
   },
-  "setupCreateShareTitle": "快把邀请链接发给伴侣，一起体验秘境：",
+  "setupCreateShareTitle": "快把邀请链接发给同伴，一起体验秘境：",
   "setupCreateCopy": "复制邀请链接",
   "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
@@ -157,7 +157,7 @@
   "setupPageScanInvite": "扫码填入开通码",
   "setupPageScannerHint": "把开通码二维码对准取景框",
   "setupPageNoEscrow": "❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。",
-  "setupPageEscrowFailed": "❌ 共享口令验证失败。请询问你的伴侣。",
+  "setupPageEscrowFailed": "❌ 共享口令验证失败。请询问你的同伴。",
   "@setupPageEscrowFailed": {
     "placeholders": {
       "error": {
@@ -199,7 +199,7 @@
   "chatPageClearLockMessage": "确定要删除锁屏码吗？删除后下次启动将直接进入聊天。",
   "chatPageInviteDialogTitleInvite": "邀请加入本秘境",
   "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",
-  "chatPageInviteDialogTitleRecover": "让对方在新设备接入",
+  "chatPageInviteDialogTitleRecover": "让对方重新接入本秘境",
   "chatPageInviteJoinLink": "邀请",
   "chatPageInviteRegenerate": "重新生成",
   "chatPageInviteDialogHintInvite": "把它发给要邀请的人，凭它即可加入本秘境。24 小时内一次性有效。",
@@ -291,7 +291,7 @@
   "chatPageChangePassphraseSame": "新口令不能与当前口令相同",
   "chatPageChangePassphraseOldRequired": "请先输入当前口令",
   "chatPageChangePassphraseOldWrong": "当前口令错误",
-  "chatPageChangePassphraseDone": "✅ 共享口令已修改（请告知伴侣，以后必须使用新口令）",
+  "chatPageChangePassphraseDone": "✅ 共享口令已修改（请告知同伴，以后必须使用新口令）",
   "chatPageChangePassphraseFailed": "修改口令失败: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
@@ -300,7 +300,7 @@
       }
     }
   },
-  "chatPageEscrowRotatedNotice": "伴侣已重设共享口令，以后必须使用新口令",
+  "chatPageEscrowRotatedNotice": "同伴已重设共享口令，以后必须使用新口令",
   "chatPageMenuLocaleLabel": "界面语言",
   "chatPageMenuAttachmentStorage": "附件存储",
   "chatPageAttachmentStorageSecured": "远程托管",
@@ -317,11 +317,11 @@
   "chatPageMenuBurnLabel": "阅后即焚",
   "chatPageMenuMyNameLabel": "我的身份",
   "chatPageMenuEntranceList": "我的通道",
-  "wizardJoinInviteHint": "{name} 邀请你加入这个秘境（目前 {count} 人）",
-  "wizardJoinInviteHintNoName": "你被邀请加入这个秘境（目前 {count} 人）",
-  "wizardJoinChannelHint": "这是「{name}」在另一台设备接入自己账号的链接",
-  "wizardJoinRecoverHint": "「{name}」帮你把「{target}」的身份接到这台设备上，原有通道不受影响",
-  "wizardJoinRecoverHintNoName": "这条链接把「{target}」的身份接到这台设备上，原有通道不受影响",
+  "wizardJoinInviteHint": "被 {name} 邀请加入秘境",
+  "wizardJoinInviteHintNoName": "被邀请加入秘境",
+  "wizardJoinAttachHint": "新增一条 {name} 的通道",
+  "wizardJoinRecoverHint": "{name} 重新邀请 {target} 接入秘境",
+  "wizardJoinRecoverHintNoName": "重新邀请 {target} 接入秘境",
   "@wizardJoinRecoverHint": {"placeholders": {"name": {"type": "String"}, "target": {"type": "String"}}},
   "@wizardJoinRecoverHintNoName": {"placeholders": {"target": {"type": "String"}}},
   "@wizardJoinInviteHint": {
@@ -341,7 +341,7 @@
       }
     }
   },
-  "@wizardJoinChannelHint": {
+  "@wizardJoinAttachHint": {
     "placeholders": {
       "name": {
         "type": "String"
@@ -352,8 +352,8 @@
   "chatPageMembersTitle": "空间成员",
   "chatPageMembersMe": "我",
   "chatPageMembersUnnamed": "未命名",
-  "chatPageMembersInvitePartner": "邀请伴侣",
-  "chatPageMembersReinvitePartner": "让伴侣在新设备接入",
+  "chatPageMembersInvitePartner": "邀请同伴",
+  "chatPageMembersReinvitePartner": "让同伴在新设备接入",
   "chatPageMembersReinviteHint": "她换了设备、重装了 App，或想再挂一台设备时，把这条链接发给她——原有通道不受影响",
   "chatPageMembersRecoverTooltip": "让 TA 在新设备接入（原有通道不受影响）",
   "chatPageMembersRecoverTitle": "为「{name}」生成新设备接入链接",
@@ -568,7 +568,7 @@
   },
   "chatPageMenuAbout": "关于秘境",
   "aboutPageTitle": "关于秘境",
-  "aboutIntro": "秘境是仅限两人的私密聊天和共享空间，端到端加密所有消息和附件，没有任何第三方（包括秘境自身）能够读到内容，严格保障隐私安全。",
+  "aboutIntro": "秘境是端到端加密的私密聊天和共享空间，没有任何第三方（包括秘境自身）能够偷看内容，严格保障隐私安全。",
   "aboutVersionLabel": "版本号",
   "aboutServerLabel": "服务器地址",
   "aboutServerDevNote": "开发地址（非生产），仅用于开发调试",

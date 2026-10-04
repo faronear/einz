@@ -34,7 +34,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get close => '关闭';
 
   @override
-  String get setupPageEnvelopeKeyHint => '密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境伴侣获取。';
+  String get setupPageEnvelopeKeyHint => '密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境同伴获取。';
 
   @override
   String get setupPageNeedPassphrase => '请设置共享口令';
@@ -79,7 +79,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardMyNameLabel => '我的名字（以后可以随时修改）';
+  String get wizardMyNameLabel => '名字';
 
   @override
   String get wizardNameRequired => '请填写我的名字';
@@ -93,7 +93,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardMyGenderLabel => '我的性别';
+  String get wizardMyGenderLabel => '性别';
 
   @override
   String get wizardGenderMale => '男';
@@ -129,19 +129,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleSpaceKind => '秘境类型';
 
   @override
-  String get wizardSpaceKindHint => '先定类型，之后不能改';
+  String get wizardSpaceKindHint => '这个秘境里将有几个人？';
 
   @override
   String get wizardSpaceKindDuo => '双人秘境';
 
   @override
-  String get wizardSpaceKindDuoDesc => '只有你们两个人，可以用语音通话';
+  String get wizardSpaceKindDuoDesc => '仅限两人，永远没有其他人。';
 
   @override
   String get wizardSpaceKindGroup => '群组秘境';
 
   @override
-  String get wizardSpaceKindGroupDesc => '几个人一起聊，不支持语音通话';
+  String get wizardSpaceKindGroupDesc => '多人群组，每个成员都可以添加新人。';
 
   @override
   String get wizardSpaceKindRequired => '请选择秘境类型';
@@ -174,8 +174,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint =>
-      '共享口令由你和伴侣共同持有，用于保护私密消息。务必牢记，不可泄漏；只可与秘境伴侣分享。';
+  String get wizardPassphraseHint => '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙，务必牢记、严禁泄漏！';
 
   @override
   String get wizardPassphraseMinLengthHint => '至少 8 位';
@@ -191,7 +190,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseHint =>
-      '共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？询问你的秘境伴侣。';
+      '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙。不知道口令？询问你的秘境同伴。';
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首条通道创建时设置的口令';
@@ -212,7 +211,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogTitleJoin => '一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '仅限两人，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！';
+  String get welcomeDialogMessage => '秘境已开启，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！';
 
   @override
   String get welcomeDialogStart => '进入秘境';
@@ -226,7 +225,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupEntryTitle => '秘境向导';
 
   @override
-  String get setupEntryHint => '秘境是仅限两人的私密世界，可以从头创建，或者受邀加入。';
+  String get setupEntryHint => '秘境是端到端加密的私密聊天和共享空间，可以从头创建，或者受邀加入。';
 
   @override
   String get setupEntryCreate => '创建秘境';
@@ -254,10 +253,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenTitle => '验证开通码';
 
   @override
-  String get setupTokenHint => '开启本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
+  String get setupTokenHint => '开启从本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
 
   @override
-  String get setupTokenInputHint => '开通码或邀请链接';
+  String get setupTokenInputHint => '开通码';
 
   @override
   String get setupTokenNeedInput => '请填写开通码';
@@ -280,7 +279,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupCreateShareTitle => '快把邀请链接发给伴侣，一起体验秘境：';
+  String get setupCreateShareTitle => '快把邀请链接发给同伴，一起体验秘境：';
 
   @override
   String get setupCreateCopy => '复制邀请链接';
@@ -324,7 +323,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupPageEscrowFailed(String error) {
-    return '❌ 共享口令验证失败。请询问你的伴侣。';
+    return '❌ 共享口令验证失败。请询问你的同伴。';
   }
 
   @override
@@ -413,7 +412,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogTitleAttachSelf => '添加我的新通道';
 
   @override
-  String get chatPageInviteDialogTitleRecover => '让对方在新设备接入';
+  String get chatPageInviteDialogTitleRecover => '让对方重新接入本秘境';
 
   @override
   String get chatPageInviteJoinLink => '邀请';
@@ -579,7 +578,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseOldWrong => '当前口令错误';
 
   @override
-  String get chatPageChangePassphraseDone => '✅ 共享口令已修改（请告知伴侣，以后必须使用新口令）';
+  String get chatPageChangePassphraseDone => '✅ 共享口令已修改（请告知同伴，以后必须使用新口令）';
 
   @override
   String chatPageChangePassphraseFailed(String error) {
@@ -587,7 +586,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEscrowRotatedNotice => '伴侣已重设共享口令，以后必须使用新口令';
+  String get chatPageEscrowRotatedNotice => '同伴已重设共享口令，以后必须使用新口令';
 
   @override
   String get chatPageMenuLocaleLabel => '界面语言';
@@ -641,27 +640,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String wizardJoinInviteHint(String name, int count) {
-    return '$name 邀请你加入这个秘境（目前 $count 人）';
+    return '被 $name 邀请加入秘境';
   }
 
   @override
   String wizardJoinInviteHintNoName(int count) {
-    return '你被邀请加入这个秘境（目前 $count 人）';
+    return '被邀请加入秘境';
   }
 
   @override
-  String wizardJoinChannelHint(String name) {
-    return '这是「$name」在另一台设备接入自己账号的链接';
+  String wizardJoinAttachHint(String name) {
+    return '新增一条 $name 的通道';
   }
 
   @override
   String wizardJoinRecoverHint(String name, String target) {
-    return '「$name」帮你把「$target」的身份接到这台设备上，原有通道不受影响';
+    return '$name 重新邀请 $target 接入秘境';
   }
 
   @override
   String wizardJoinRecoverHintNoName(String target) {
-    return '这条链接把「$target」的身份接到这台设备上，原有通道不受影响';
+    return '重新邀请 $target 接入秘境';
   }
 
   @override
@@ -677,10 +676,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersUnnamed => '未命名';
 
   @override
-  String get chatPageMembersInvitePartner => '邀请伴侣';
+  String get chatPageMembersInvitePartner => '邀请同伴';
 
   @override
-  String get chatPageMembersReinvitePartner => '让伴侣在新设备接入';
+  String get chatPageMembersReinvitePartner => '让同伴在新设备接入';
 
   @override
   String get chatPageMembersReinviteHint =>
@@ -1027,8 +1026,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageTitle => '关于秘境';
 
   @override
-  String get aboutIntro =>
-      '秘境是仅限两人的私密聊天和共享空间，端到端加密所有消息和附件，没有任何第三方（包括秘境自身）能够读到内容，严格保障隐私安全。';
+  String get aboutIntro => '秘境是端到端加密的私密聊天和共享空间，没有任何第三方（包括秘境自身）能够偷看内容，严格保障隐私安全。';
 
   @override
   String get aboutVersionLabel => '版本号';

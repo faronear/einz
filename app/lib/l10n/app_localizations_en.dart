@@ -80,7 +80,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get wizardMyNameLabel => 'Name (can be changed later)';
+  String get wizardMyNameLabel => 'Name';
 
   @override
   String get wizardNameRequired => 'Enter your name';
@@ -131,19 +131,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitleSpaceKind => 'Space type';
 
   @override
-  String get wizardSpaceKindHint => 'Pick one — this cannot be changed later';
+  String get wizardSpaceKindHint => 'How many people will this space have?';
 
   @override
-  String get wizardSpaceKindDuo => 'Two-person space';
+  String get wizardSpaceKindDuo => 'Duo space';
 
   @override
-  String get wizardSpaceKindDuoDesc => 'Just the two of you, with voice calls';
+  String get wizardSpaceKindDuoDesc =>
+      'For just the two of you, no one else can be added later.';
 
   @override
   String get wizardSpaceKindGroup => 'Group space';
 
   @override
-  String get wizardSpaceKindGroupDesc => 'For several people, no voice calls';
+  String get wizardSpaceKindGroupDesc =>
+      'For multiple persons, every member can invite new ones.';
 
   @override
   String get wizardSpaceKindRequired => 'Please choose a space type';
@@ -178,7 +180,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardPassphraseHint =>
-      'The passphrase is shared by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.';
+      'The passphrase is the only key to access the space, shared by you and your partner. Memorize it and never leak it!';
 
   @override
   String get wizardPassphraseMinLengthHint => 'At least 8 characters';
@@ -195,7 +197,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardJoinPassphraseHint =>
-      'The passphrase is shared by you and your partner to protect private messages. Don\'t know it? Ask your partner.';
+      'The passphrase is the only key to access the space, shared by you and your partner. Don\'t know it? Ask your partner.';
 
   @override
   String get wizardJoinPassphraseWrong =>
@@ -219,7 +221,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeDialogMessage =>
-      'Just the two of you, end-to-end encrypted for total privacy. Enter now and start chatting!';
+      'The space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!';
 
   @override
   String get welcomeDialogStart => 'Enter Einz';
@@ -234,7 +236,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupEntryHint =>
-      'Einz is a secret space for two partners. You can create a new one, or join an existing one by invitation.';
+      'Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.';
 
   @override
   String get setupEntryCreate => 'Create';
@@ -265,13 +267,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenHint =>
-      'Open the dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
+      'Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
 
   @override
-  String get setupTokenInputHint => 'Paste the token or invite link';
+  String get setupTokenInputHint => 'New entrance token';
 
   @override
-  String get setupTokenNeedInput => 'Enter the token';
+  String get setupTokenNeedInput => 'Enter the new entrance token';
 
   @override
   String get setupTokenInvalid => 'Invalid token';
@@ -430,15 +432,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
-  String get chatPageInviteDialogTitleInvite => 'Invite someone to this space';
+  String get chatPageInviteDialogTitleInvite => 'Invite my partner';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf =>
-      'Add my new device to this space';
+  String get chatPageInviteDialogTitleAttachSelf => 'Add a new entrance';
 
   @override
   String get chatPageInviteDialogTitleRecover =>
-      'Re-invite them onto a new device';
+      'Re-invite the partner to this space';
 
   @override
   String get chatPageInviteJoinLink => 'Invite';
@@ -466,13 +467,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => 'Copy token';
+  String get chatPageInviteCopyCodeTooltip => 'Copy new entrance token';
 
   @override
   String get chatPageInviteLinkCopied => 'Invite link copied';
 
   @override
-  String get chatPageInviteCodeCopied => 'Token copied';
+  String get chatPageInviteCodeCopied => 'New entrance token copied';
 
   @override
   String chatPageInviteFailed(String error) {
@@ -676,27 +677,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String wizardJoinInviteHint(String name, int count) {
-    return '$name invited you to this space ($count members)';
+    return 'Invited by $name';
   }
 
   @override
   String wizardJoinInviteHintNoName(int count) {
-    return 'You were invited to this space ($count members)';
+    return 'Invited to join a space';
   }
 
   @override
-  String wizardJoinChannelHint(String name) {
-    return 'This link adds $name\'s own account on another device';
+  String wizardJoinAttachHint(String name) {
+    return 'Add a new entrance of $name';
   }
 
   @override
   String wizardJoinRecoverHint(String name, String target) {
-    return '$name is adding $target\'s identity to this device; existing entrances stay untouched';
+    return 'Invited by $name to add a new entrance of $target';
   }
 
   @override
   String wizardJoinRecoverHintNoName(String target) {
-    return 'This link adds $target\'s identity to this device; existing entrances stay untouched';
+    return 'Invited to add a new entrance of $target';
   }
 
   @override
@@ -1076,7 +1077,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutIntro =>
-      'Einz is a secret space for just two partners: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.';
+      'Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.';
 
   @override
   String get aboutVersionLabel => 'Version';

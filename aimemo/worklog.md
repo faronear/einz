@@ -2353,7 +2353,7 @@ chat_initial_scroll 29/29 全过；未提交等老板检查后提交（2026-09-1
 **验证（注意 Node 版本）：** better-sqlite3 原生模块为 Node 22（ABI 127）编译，
 **测试/运行必须用 v22**（系统默认 v18 加载失败；v20 也不匹配）。
 `npm run build`（tsc）0 错；`npm test`（v22）冒烟全绿；手动 e2e 8 步全过：
-health 能力 ✓ 创建空间 ✓ lookup 1/2 ✓ 伙伴加入 ✓ TOKEN_USED ✓
+health 能力 ✓ 创建空间 ✓ lookup 1/2 ✓ 同伴加入 ✓ TOKEN_USED ✓
 TOKEN_INVALID ✓ 满员生成新 token ✓ 新 token 加入 → SPACE_FULL ✓。
 已提交到 feature/multiverse 分支。
 
@@ -7152,6 +7152,7 @@ labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row +
 不需清库、可自愈；换**服务器** = spaceId/token/密钥对全失效，必须清库 + 重新入网。
 
 **A 地址层重构（2707031）**
+
 - 新增 `app/lib/data/server_config.dart`：`kEinzServer`（编译期 dart-define）+
   `effectiveServer`（进程全局，main() 定一次）+ `probeServer()`
 - 删 `data/server_settings.dart` 与 `app_state['server']` 持久层（save() 本就零调用）
@@ -7162,11 +7163,13 @@ labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row +
 - 删 18 处 initialServer/server 透传 + 43 处测试注入；净减 181 行
 
 **B 出厂域名候选列表（225200a）**
-- `kFactoryServerCandidates`（目前只有 einz.tic.cc，加备用/备案域名 = 加一行常量）+ 
+
+- `kFactoryServerCandidates`（目前只有 einz.tic.cc，加备用/备案域名 = 加一行常量）+
   `resolveServer()`：命令行/编译期覆盖不探测直接用；否则并发探测取第一个 /health 成功
 - `isNonFactoryServer` → `isDevServer`（连备用域名不算开发包）
 
 **C 桌面端 `--reset`（fefd557）**
+
 - 动因：老板桌面端测试流程（打包 → `--server` 指向 dev → 测 → 原包发布）完后，本机
   store 属于开发服务器，连生产既用不了也卸不掉
 - `data/local_reset.dart`：`resetLocalData()` 清 drift 全表 + 安全存储明文包 +
@@ -7175,9 +7178,10 @@ labelStyle 的淡色），锁屏页当时只有纯文字。补成同样的 Row +
 - StartupGate：带 `--reset` → 首帧弹确认（写明"需重新邀请才能回来"）→ 清盘 → 落设置页
 
 **D TUI 同构（2a8db9e）**
+
 - `store.server` 收窄为"用户显式选择"（引导手输 / `/server`），出厂默认值每次重读、
   不再落盘 → 改 localConfig.json 立即生效，不再被老 store 钉住
-- 删 `serverArg` 原值比对（_onboard/_runGuide 参数一并移除），改 `serverPicked` 布尔
+- 删 `serverArg` 原值比对（\_onboard/\_runGuide 参数一并移除），改 `serverPicked` 布尔
 - `_defaultServer()`：localConfig.json 找不到时打一行提示（原为静默走硬编码）
 
 **验证**：`dart analyze` app/cli 均干净（flutter analyze 因 pub 网络失败，用 dart analyze 代替）；
@@ -7263,6 +7267,7 @@ agent 的写入。
     -bash: ./einz-tui-macos: Bad CPU type in executable
 
 **根因**：`einz-tui-macos` 是 Dart CLI（`dart compile exe` 出品），不是 Flutter GUI。
+
 - `dart compile exe` **只产出宿主架构**：在 arm64 runner（GitHub 现 `macos-latest` 是
   Apple Silicon）上编出来就是纯 arm64。
 - **Dart 不支持 macOS 跨架构编译**：实测 `--target-os macos --target-arch arm64` 在 x64
@@ -7284,7 +7289,7 @@ arm64+x64。出问题的是 `einz-tui-macos` 这个命令行工具，它和 GUI 
   不再拉整个 Flutter），各自 upload-artifact。
 - 新增 `macos-cli-combine` job（`needs: macos-cli`）：`actions/download-artifact@v4`
   （按 artifact 名建子目录）把两份下载下来，`lipo -create -output einz-tui-macos
-  artifacts/einz-tui-macos-x64/einz-tui-x64 artifacts/einz-tui-macos-arm64/einz-tui-arm64`
+artifacts/einz-tui-macos-x64/einz-tui-x64 artifacts/einz-tui-macos-arm64/einz-tui-arm64`
   合成通用二进制，`lipo -info` 验证后上传 artifact 与 release。
 
 下一次 CI 跑完，`einz-tui-macos` 即 arm64+x64 通用，Intel 与 Apple Silicon 的 Mac 都能直接跑。
@@ -7315,11 +7320,11 @@ MacBook 是全新安装 → 第一次就 `deleteAll` → 立刻 -34018。
 
 **实测证据**（macOS 15.7.7 / iMac19,1，`/tmp/kcprobe` Swift 探针 + 真实 App）：
 
-| 签名 | 沙盒 | 数据保护 Keychain | 文件型 Keychain |
-| --- | --- | --- | --- |
-| Developer ID | 无 | -34018 | **status=0** |
-| Developer ID | 有（无 keychain 组） | -34018 | **status=0** |
-| ad-hoc | 有（无 keychain 组） | -34018 | **status=0** |
+| 签名         | 沙盒                 | 数据保护 Keychain | 文件型 Keychain |
+| ------------ | -------------------- | ----------------- | --------------- |
+| Developer ID | 无                   | -34018            | **status=0**    |
+| Developer ID | 有（无 keychain 组） | -34018            | **status=0**    |
+| ad-hoc       | 有（无 keychain 组） | -34018            | **status=0**    |
 
 **修复**（`0acddd7`）：`SecureStore` 的 `MacOsOptions` 显式
 `usesDataProtectionKeychain: false`（仅 macOS；iOS 不受影响）。语义差异：文件型
@@ -7330,6 +7335,7 @@ StartupGate 正常放行；把真实 App 重新签成沙盒版并用新 bundle i
 启动无错。
 
 **顺带确认的两件事（待老板决策，未动手）**：
+
 1. **沙盒其实可以恢复**：32a73dc「去沙盒」的理由（沙盒+Keychain+Developer ID 三角
    死锁）不成立——死锁是数据保护 Keychain 带来的，换文件型 Keychain 后沙盒版同样
    跑通（上表）。恢复沙盒的好处：数据回到 `~/Library/Containers/cc.tic.einz/`，
@@ -7375,7 +7381,7 @@ SIGKILL；dev 渠道本就只供本机调试）。老板决定：**沙盒加回*
 
 - entitlements = app-sandbox + files.user-selected.read-only + network.client；
   无 `embedded.provisionprofile`；Developer ID + Hardened Runtime(`flags=runtime`)
-  + 公证已 staple；`spctl -a -vv` = `accepted, source=Notarized Developer ID`。
+  - 公证已 staple；`spctl -a -vv` = `accepted, source=Notarized Developer ID`。
 - 真机启动：`-34018` 计数 0，无 StartupGate 失败日志；DB 落在
   `~/Library/Containers/cc.tic.einz/Data/Documents/einz.sqlite`（沙盒生效），
   `~/Documents/einz.sqlite` 不再被触碰（旧文件是去沙盒那版留下的残留）。
@@ -7416,6 +7422,7 @@ iOS/Android 上该目录恒存在 → 只在桌面端炸）。
 落盘；只有 `_VideoPreview` 硬编码走 `MediaCache`（不建目录的那条）→ 视频是唯一必炸的。
 
 **修复**：
+
 - `MediaCache._cacheDirectory()` 里 `if (!await dir.exists()) await dir.create(recursive: true)`。
 - `_VideoPreview`：初始化失败给**可点重试**的错误态（图标 + `chatPageVideoLoadFailed`），
   初始化中显示转圈——此前"加载中"和"失败"共用同一个空白 SizedBox，这正是这个 bug
@@ -7466,7 +7473,7 @@ iOS/Android 上该目录恒存在 → 只在桌面端炸）。
   改成直接用仓库里的 `macos/Runner/Release.entitlements`（沙盒 + 出站网络 +
   用户选择文件三个布尔项）。保留 `rm -f embedded.provisionprofile`。
 - **ad-hoc 兜底（未配 secrets）**：两行 `plutil -remove keychain-access-groups /
-  get-task-allow` 已无对应键（entitlements 文件里本来就没有了），删掉；改为直接带
+get-task-allow` 已无对应键（entitlements 文件里本来就没有了），删掉；改为直接带
   `Release.entitlements` 签名。
 - 顶部说明同步：macOS 两渠道（-dist Developer ID+公证+沙盒 / -dev ad-hoc）与所需
   secrets 列清。
@@ -7476,10 +7483,10 @@ ad-hoc 没有 Team ID，Hardened Runtime 会打开 Library Validation → dyld �
 framework 时报 `mapping process and mapped file (non-platform) have different Team
 IDs`，进程直接起不来。本机对同一产物做了 A/B：
 
-| ad-hoc 签名 | 结果 |
-| --- | --- |
+| ad-hoc 签名              | 结果                                          |
+| ------------------------ | --------------------------------------------- |
 | 不带 `--options runtime` | 启动正常（`flags=0x2(adhoc)`），-34018 计数 0 |
-| 带 `--options runtime` | dyld 拒绝加载 framework，起不来 |
+| 带 `--options runtime`   | dyld 拒绝加载 framework，起不来               |
 
 Developer ID 那条能开 runtime，是因为所有组件同属一个 Team ID；ad-hoc 没这个前提。
 **`app/macos/buildMacos.sh --adhoc` 分支原来是带 runtime 的 → 该模式产出的包本来就
@@ -7488,6 +7495,7 @@ Developer ID 那条能开 runtime，是因为所有组件同属一个 Team ID；
 验证：`ruby -rpsych` 解析 workflow（5 个 job）、`bash -n buildMacos.sh` 均通过；
 ad-hoc 真机 A/B 如上表。dist 侧本机公证产物此前已验证（沙盒 entitlement + 无
 profile + spctl accepted + 启动 -34018 计数 0）。
+
 ## 2026-09-21 锁屏：三个入口统一 canDismiss=false，无 PIN 不进锁屏页
 
 老板追问「上次修的锁屏绕过是不是只修了桌面端」→ 查证：`2597415`（8/29 自动锁屏
@@ -7517,6 +7525,7 @@ MacBook 上先发现）。真·平台专属的只有「隐藏拍照/拍摄入口
   进锁屏页；已设 PIN → 顶栏锁屏入口进的是严格锁屏（PopScope.canPop=false）。
 
 踩坑两条（下次直接复用）：
+
 - 生命周期状态机有合法转移约束，`handleAppLifecycleStateChanged` 不能
   `paused → resumed` 直跳，须按 `paused → hidden → inactive → resumed` 走，否则
   `AppLifecycleListener` 断言炸。
@@ -7534,11 +7543,11 @@ MacBook 上先发现）。真·平台专属的只有「隐藏拍照/拍摄入口
 老板问：这 2 条 `UnimplementedError: init() has not been implemented.` 是不是
 「桌面版拍照/拍摄出错」的根因？**不是**，三件事要分清：
 
-| 现象 | 真因 | 状态 |
-| --- | --- | --- |
-| 桌面端点拍照/拍摄报错 | `image_picker` 桌面平台遇 `ImageSource.camera` 抛 `StateError` | 73c9842 已修（桌面不摆入口） |
-| 桌面端视频在消息流里空白 | `MediaCache` 缓存目录不存在 → `writeAsBytes` 抛异常 | 73c9842 已修（补建目录） |
-| `flutter test` 里 video 预览 `UnimplementedError` | `video_player_platform_interface` 的默认兜底（`.../video_player_platform_interface.dart:43`），**只在没有任何平台实现注册时**走到；`flutter test` 宿主进程不注册插件。真机/桌面 App 由 `video_player_avfoundation` 等注册，73c9842 实测 macOS 上三种样本 `initialize()` 全正常 | 与产品无关 |
+| 现象                                              | 真因                                                                                                                                                                                                                                                                           | 状态                         |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| 桌面端点拍照/拍摄报错                             | `image_picker` 桌面平台遇 `ImageSource.camera` 抛 `StateError`                                                                                                                                                                                                                 | 73c9842 已修（桌面不摆入口） |
+| 桌面端视频在消息流里空白                          | `MediaCache` 缓存目录不存在 → `writeAsBytes` 抛异常                                                                                                                                                                                                                            | 73c9842 已修（补建目录）     |
+| `flutter test` 里 video 预览 `UnimplementedError` | `video_player_platform_interface` 的默认兜底（`.../video_player_platform_interface.dart:43`），**只在没有任何平台实现注册时**走到；`flutter test` 宿主进程不注册插件。真机/桌面 App 由 `video_player_avfoundation` 等注册，73c9842 实测 macOS 上三种样本 `initialize()` 全正常 | 与产品无关                   |
 
 **真正的问题是我上次改 UI 留下的测试失效**：`chat_quote_video_test.dart` 的
 `videoBubble()` 找的是 180×100 的 `SizedBox`（旧失败态），而 73c9842 把失败态换成了
@@ -7561,9 +7570,10 @@ MacBook 上先发现）。真·平台专属的只有「隐藏拍照/拍摄入口
 一刻"正是网络最可能还没通的时候。
 
 **改动**（老板选项 1）：
+
 - `server_config.dart`：`resolveServer()` 增加可选 `probe` 参数（注入探测函数，
   测试用 fake；重试时复用页面注入的那个）。
-- `setup_page.dart:_reprobe()`：每轮重试**先** `resolveServer(null, probe: ...)` 
+- `setup_page.dart:_reprobe()`：每轮重试**先** `resolveServer(null, probe: ...)`
   并发重选（谁通换谁，`正在连接 <地址>` 小字随之刷新），再探测新地址。
   `isDevServer`（`--server` / 编译期 dart-define）时不重选——人为指定的地址不该被
   候选列表劫持（否则 dev 指向 localhost 会被冲成生产域名）。
@@ -7602,6 +7612,7 @@ bool.fromEnvironment('dart.vm.product')`（VM 自带环境量，Flutter 的 kRel
 源码运行不参与第二条（`resolvedExecutable` 那时指向 dart 自身）。
 
 实测（编一个 exe 放到 /tmp/tuiprobe，旁边放 3999、另一个目录放 4000）：
+
 - cwd=/tmp/othercwd → 用 4000（cwd 优先 ✅）
 - cwd 无配置 → 用 3999（exe 同目录兜底 ✅）
 - `--server 4100` → 用 4100（**产物同样接受 --server**，优先于任何配置 ✅）
@@ -7612,6 +7623,7 @@ bool.fromEnvironment('dart.vm.product')`（VM 自带环境量，Flutter 的 kRel
 GUI 要先把 4 个无 Linux 实现的插件按平台处理掉**。
 
 **已做（老板选"先加 Linux TUI job"）**：
+
 - `.github/workflows/buildMultiPlatform.yml` 新增 `linux-cli` job（ubuntu-latest +
   dart-lang/setup-dart + `dart compile exe bin/einz_tui.dart`），产物
   `einz-tui-linux-x64.tar.gz`（二进制 + `README-linux-tui.txt`），同 macOS CLI 一样
@@ -7648,11 +7660,11 @@ path_provider、device_info_plus、package_info_plus。也就是说 Linux GUI �
 老板发现 `--adhoc` 出的包也叫 `einz-gui-macos-dist-v*.zip`（原来不分模式统一用 -dist），
 会误导。改成按渠道命名：
 
-| 模式 | 产物名 |
-| --- | --- |
-| 默认（Developer ID + 公证） | `einz-gui-macos-dist-v<时间>.zip` |
-| `--no-notary` | `einz-gui-macos-dist-nonotary-v<时间>.zip` |
-| `--adhoc` | `einz-gui-macos-dev-v<时间>.zip` |
+| 模式                        | 产物名                                     |
+| --------------------------- | ------------------------------------------ |
+| 默认（Developer ID + 公证） | `einz-gui-macos-dist-v<时间>.zip`          |
+| `--no-notary`               | `einz-gui-macos-dist-nonotary-v<时间>.zip` |
+| `--adhoc`                   | `einz-gui-macos-dev-v<时间>.zip`           |
 
 `--no-notary` 刻意与 `-dist` 分开：Developer ID 已签但没公证，本机/放行过的机器能跑，
 下载到新机器会被 Gatekeeper 拦——不该被当成可分发产物发出去。
@@ -7678,6 +7690,7 @@ tvOS/watchOS/visionOS），并下了两个 profile：`Einz Dist Adhoc` 与 `Einz
 **只有 iOS 是 `cc.tic.einz.ios`**。
 
 **描述文件不进仓库**（老板问"要不要拷进项目目录"，答案是不用）：
+
 - 安装位置：iOS → `~/Library/MobileDevice/Provisioning Profiles/<UUID>.mobileprovision`
   （双击 .mobileprovision 即可装）；macOS → `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`
 - 工程里只写 profile **名字**（`PROVISIONING_PROFILE_SPECIFIER`）
@@ -7687,6 +7700,7 @@ tvOS/watchOS/visionOS），并下了两个 profile：`Einz Dist Adhoc` 与 `Einz
   `rm -f embedded.provisionprofile`；带 profile 反而让异机被 Taskgated 杀）。
 
 改动（4 个文件 + workflow 注释）：
+
 - `ios/Runner.xcodeproj`：Runner 三个配置 `PRODUCT_BUNDLE_IDENTIFIER` → `cc.tic.einz`
   （specifier 仍是 "Einz Dist Adhoc"，新 profile 同名，不用改）
 - `ios/exportOptionsAdhoc.plist`：provisioningProfiles 的 key 换 bundle id
@@ -7711,6 +7725,7 @@ tvOS/watchOS/visionOS），并下了两个 profile：`Einz Dist Adhoc` 与 `Einz
 App，Keychain 按 application-identifier 隔离，旧条目读不到；聊天记录在服务器不丢）。
 
 **未动的残留**（改名有风险/无收益，等老板定）：
+
 - iOS 测试目标 `com.example.einz.RunnerTests`（自动签名，改了可能要新 App ID）
 - Android `namespace = "com.example.einz"`（只影响 R/BuildConfig 包名；
   对外标识 `applicationId` 已经是 cc.tic.einz）
@@ -7776,6 +7791,7 @@ to, using or accessing the encryption within Apple's operating system"**，后�
 一个 AlertDialog（点一次红色按钮就清），没有任何知识因子。
 
 **决策过程（与老板两轮往复）**：
+
 1. 老板原方案是"和 app 一样用空间口令验证"。**我不同意，老板采纳了替代方案**——
    理由：① 空间口令是**共享**给伴侣的加入凭证，让它能销毁"我这台设备"是权限倒挂；
    ② 客户端不存任何本地校验因子（"服务器为唯一真相源"），校验必须联网，而重置的头号
@@ -7785,6 +7801,7 @@ to, using or accessing the encryption within Apple's operating system"**，后�
    session 且**不发 device.revoked**（否则偷到 session 就能远程擦设备，给口令闸门开旁路）。
 
 **落地**（server / shared / app / cli 四处 + 文档）：
+
 - `POST /devices/retire`（无请求体）：devices 置 revoked + last_seen=0，清
   push_tokens/sessions/challenges，**不删 devices 行**；`ws.forgetDeviceConnection`
   先广播 `peer.offline` 再把 conn 摘出在线表（不 close、不发自毁帧）。
@@ -7828,13 +7845,14 @@ media_cache）核实原稿断言，结果修正 6 处、补入 4 个漏掉的耦
 ## 2026-09-22 多空间 M0.5 开工（分支 feature/multiSpace）：Spaces 表 + Vault
 
 **做了什么**（数据底座，**没有任何 UI 改动**）：
+
 - `local_database.dart`：新增 `Spaces` 表（无 server 列、无密钥列），schemaVersion 6→7，
   v7 迁移只建表——**首行不灌数据**，因为 PIN 模式下迁移阶段解不开密文包，改为解锁/读到
   凭证时幂等补写（该决策已写进文档 §3.2）。
 - `app_lock.dart`：新增 `VaultPayload`（spaces/activeSpaceId/deviceName，旧单 payload 读时
   归一，不重写旧密文）；`AppLockService` 加 `loadVault/saveVault/addSpace/removeSpace/
-  setActiveSpace/unlockVault/loadPlainVault/writePinVault/writePlainVault`；`unlock/loadPlain/
-  savePlain/setPin` 语义不变（返回 active 空间）；`clear()` 连 Spaces 行 + per-space 资料键
+setActiveSpace/unlockVault/loadPlainVault/writePinVault/writePlainVault`；`unlock/loadPlain/
+savePlain/setPin` 语义不变（返回 active 空间）；`clear()` 连 Spaces 行 + per-space 资料键
   一起清。加了一道护栏：PIN 模式下不传 pin 调 Vault 读写直接 `StateError`（防静默降级明文）。
 - 新增 `test/vault_test.dart` 13 条用例。全量 `flutter test`：main 138 过 0 失败 → 分支
   **151 过 0 失败**。
@@ -7854,7 +7872,7 @@ Vault 猜 active 空间**，结果 7 个 widget 测试挂死（pumpAndSettle 10 
 ## 2026-09-22 多空间 M1：数据隔离（撤销自毁逐空间化 + 附件 spaceId + per-space 设置）
 
 1. **撤销自毁逐空间化**（最高优先级那条）：`_onDeviceRevoked` 从 `clear() + 删全表 +
-   MediaCache.deleteAll + AttachmentStore.clear` 改为 `removeSpace(widget.spaceId)`，只清
+MediaCache.deleteAll + AttachmentStore.clear` 改为 `removeSpace(widget.spaceId)`，只清
    该空间；其他空间原样保留。**PIN 模式的坑**：重写密文包需要 pin，但撤销发生在聊天页
    （那儿没有 pin，也不该为了这个功能把 pin 留在页面里）→ 方案是"数据立刻清 + 该空间记
    pending，下次 unlockVault 时补摘凭证条目"。宁可多一个 pending 机制，也不降级成明文、
@@ -7926,13 +7944,13 @@ pub 缓存域名。
 库路径：`~/Library/Containers/cc.tic.einz/Data/Documents/einz.sqlite`（**不是** `~/Documents/
 einz.sqlite`，那是旧文件；macOS 沙盒容器才是真的）。关键三行：
 
-| 项 | 值 |
-| --- | --- |
-| 两条行的 status / server_sequence | `failed` / **123、124（非空！）** |
-| 两条行的 sender_device_id | `1395a5d0`（DoomBase，旧设备） |
-| 全库其它 62 条来自 1395a5d0 的 | 全 `delivered` |
-| local_created_at | 都是 9/21 11:59:52（同批 100+24 行 = 新设备锚点 0 全量拉取） |
-| sync_state 锚点 / peer_receipts | 138 / Vic=137 → 这两条**本该是双勾** |
+| 项                                | 值                                                           |
+| --------------------------------- | ------------------------------------------------------------ |
+| 两条行的 status / server_sequence | `failed` / **123、124（非空！）**                            |
+| 两条行的 sender_device_id         | `1395a5d0`（DoomBase，旧设备）                               |
+| 全库其它 62 条来自 1395a5d0 的    | 全 `delivered`                                               |
+| local_created_at                  | 都是 9/21 11:59:52（同批 100+24 行 = 新设备锚点 0 全量拉取） |
+| sync_state 锚点 / peer_receipts   | 138 / Vic=137 → 这两条**本该是双勾**                         |
 
 ### 真实因果链（比服务器上那份诊断多一环）
 
@@ -7992,9 +8010,9 @@ pending 分支只剩真正的 pending 会走到。
 
 ### 两条切服务器的路径（都已固化成脚本）
 
-| 脚本 | 机制 | 等价命令 |
-| --- | --- | --- |
-| `npm run desk-mac-run-local` | 第 1 层：运行期 `--server` | `cd app && flutter run -d macos -a --server=http://localhost:3000` |
+| 脚本                               | 机制                        | 等价命令                                                                        |
+| ---------------------------------- | --------------------------- | ------------------------------------------------------------------------------- |
+| `npm run desk-mac-run-local`       | 第 1 层：运行期 `--server`  | `cd app && flutter run -d macos -a --server=http://localhost:3000`              |
 | `npm run desk-mac-run-localConfig` | 第 2 层：编译期 dart-define | `cd app && flutter run -d macos --dart-define-from-file=localConfig.macos.json` |
 
 `-a/--dart-entrypoint-args` 能当 `--server` 用，是因为桌面端工具把它拼进 app 可执行文件的
@@ -8094,9 +8112,9 @@ Application Support、媒体缓存走 Caches），再配 `--dart-define=einzSecu
 老板指出的冲突：站在某个空间里点「重置设备」，用户想的是"结束这个空间"，实际却抹掉
 本机所有空间。定成两档：
 
-| 档 | 入口 | 范围 | 服务端 |
-| --- | --- | --- | --- |
-| 空间级「退出并清除这个空间」 | 聊天页 → 高级（原位置） | 只这一个空间 | 退役这个空间那一行（best-effort） |
+| 档                            | 入口                     | 范围            | 服务端                            |
+| ----------------------------- | ------------------------ | --------------- | --------------------------------- |
+| 空间级「退出并清除这个空间」  | 聊天页 → 高级（原位置）  | 只这一个空间    | 退役这个空间那一行（best-effort） |
 | 设备级「清除本设备全部数据…」 | **只在**空间列表溢出菜单 | 全部空间 + 整库 | 逐个空间各退役一行（best-effort） |
 
 - `retireDevice(token)` 的既有语义本来就是"退役会话对应的那一行"= 一个空间的虚拟设备，
@@ -8206,12 +8224,11 @@ D1–D5 决策点、执行清单。
 另：`aimemo/projectPlan.md` 最后更新停在 2026-09-09、内容是 Phase 0–4，与 Multiverse 后
 的现状脱节（多空间一直记在 multiSpaceDesign §8）——待老板决定是刷新还是作废。
 
-**改名计划拍板（2026-09-22）**：D1 `person_id` → **`member_id`**（不叫 partner_id，
+**改名计划拍板（2026-09-22）**：D1 `person_id` → **`member_id`**（不叫 partner*id，
 因 `partner` 在本仓库已是"第二人专属"词）、D2 HTTP 路径不改（只改字段）、
-D3 名字类字段一并改 `member_*`、D4 两个改名合并进同一协议窗口、
-D5 等 M3 收尾且多空间上线稳定后再执行。另留 **D6**（我的倾向）：`POST /spaces` 的
-`person_name`（创建者/slot 0）改 `creator_name`，与既有的 `partner_name`（第二人）成对
-——即"泛称用 member_*、具体插槽用 creator_*/partner_*"；老板不特别指定就按此执行。
+D3 名字类字段一并改 `member*_`、D4 两个改名合并进同一协议窗口、
+D5 等 M3 收尾且多空间上线稳定后再执行。另留 **D6**（我的倾向）：`POST /spaces`的`person*name`（创建者/slot 0）改 `creator_name`，与既有的 `partner_name`（第二人）成对
+——即"泛称用 member*_、具体插槽用 creator*\*/partner*\*"；老板不特别指定就按此执行。
 决定已写回 `aimemo/renamePlan.zhcn.md` §5；执行清单待开工时逐条勾。
 
 ## 2026-09-22 多空间 M3 完成：未读（服务端派生）+ projectPlan 索引化
@@ -8236,7 +8253,7 @@ D5 等 M3 收尾且多空间上线稳定后再执行。另留 **D6**（我的倾
 于是：
 
 - **服务端**：新增 `GET /messages/unread`（会话绑定空间）。数「`server_sequence > 我的
-  read_upto_seq` 且发送者不是我」——判定"不是我"**走 person 维度**（同一身份可能有多台登记项，
+read_upto_seq` 且发送者不是我」——判定"不是我"**走 person 维度**（同一身份可能有多台登记项，
   只比 device_id 会把自己另一台设备发来的消息算成未读）；没有 receipts 行 = 从没读过 = 全算未读。
   放在 `receipts.ts`（读取水位语义的归属地），复用 `personOfDevice`。
 - **shared**：`ApiClient.unreadCount(token)` + `Api.messagesUnread`。
@@ -8349,6 +8366,7 @@ PIN 依旧只在解锁那一刻存在 → 聊天页可直接一跳切空间，�
 **③ 两个破坏性入口都不需要。** —— 老板判断：`移除某个空间` 就是聊天页菜单里的
 「退出并清除这个空间」（同一件事，留两处只会让人以为是两种操作）；`清除本机所有数据`
 太危险，不呈现给用户。于是：
+
 - SpaceListPage 删掉长按「移除」+ 顶栏溢出菜单（本页**零破坏性操作**）；
 - 设备级 `confirmResetDevice` 连同 `resetDeviceTitle/Message/Confirm`、
   `spaceListResetDevice` 一起删除；`data/local_reset.dart` 的 `resetLocalData()`
@@ -8434,7 +8452,7 @@ removeSpace 同步内存会话）+ 复位全局会话；全量 `flutter test` **
 1. 直连开发服务器实测两个端点：
    - `GET /health` → **200**（全站兜底桶 600/min 没满）
    - `POST /spaces/join/preflight` → **429 `RATE_LIMITED`，retry after 61s**
-   → 满的是 **auth 桶**（60 次 / 5 分钟），成员为 `/spaces/lookup`、
+     → 满的是 **auth 桶**（60 次 / 5 分钟），成员为 `/spaces/lookup`、
      `/spaces/join/preflight`、`/spaces/join`、`/auth/challenge`。
 2. `lsof -iTCP:3000` → **单个 dartvm 客户端挂着 ~29 条 ESTABLISHED 连接**
    （健康客户端只会有个位数）→ 有客户端在疯狂重连。
@@ -8453,7 +8471,8 @@ removeSpace 同步内存会话）+ 复位全局会话；全量 `flutter test` **
 **为什么"休息几小时后第一次"照样中**：auth 桶是 5 分钟滚动窗口，跟休息多久无关——
 卡住的客户端一直在跑，配额随时是满的。
 **影响面不止开发**：会话 TTL 24h，线上客户端到期后都会进这个循环（耗电 + 打服务端
-+ 连累同 IP 的他人加入）。
+
+- 连累同 IP 的他人加入）。
 
 ### 修
 
@@ -8538,6 +8557,7 @@ cli `dart analyze` 无 issue。
    `setupTokenOtherServer` 改回"该**邀请链接**来自 …"（本来说的就是链接里的域名）。
 
 **最终用词（写进 GLOSSARY）**：
+
 - **令牌 / token** = 那条一次性授权本身（"填写令牌""令牌无效""复制令牌"）
 - **邀请链接 / invite link** = 承载令牌的那个链接，落地页是邀请页
 - **入口 / entrance** = 这个秘境里的身份；**本机 / device** = 这台物理机器
@@ -8555,6 +8575,7 @@ cli `dart analyze` 无 issue。
   本来就全用 passphrase 且已写 "shared with your partner"，改动最小。
 
 **两条支持改名的硬证据**（不是"更准确"这种主观理由）：
+
 1. 今天必须靠一整句 hint 去教所有权模型 —— `wizardJoinPassphraseHint`「口令是与伴侣共享的
    密码…如果不知道口令，请询问伴侣」；改名 = 把解释提到名字里；
 2. 同一个东西在 UI 里既叫「密保口令」（7 处）又叫「口令」（20 多处），而"密保"是**机制词**
@@ -8581,8 +8602,8 @@ shared `dart test` 52 通过、`dart analyze`（cli）无 issue。
 - 菜单项与弹窗标题：`advancedLeaveSpace` / `leaveSpaceTitle` → 销毁秘境入口 / Destroy this entrance；
 - 弹窗正文重写（把这层语义说清）：
   「将销毁本机在这个秘境里的入口，并清除本机上的聊天记录与密钥。
-   秘境本身与服务器上的数据都还在，其他空间也不受影响——**以后凭新的令牌可以重新加入**。
-   此操作无法撤销！」
+  秘境本身与服务器上的数据都还在，其他空间也不受影响——**以后凭新的令牌可以重新加入**。
+  此操作无法撤销！」
 - 测试 4 处断言 + `multiSpaceDesign §5.5` 表格 + `projectPlan` 待办 + 代码注释同步
   （历史记录 worklog 不改）。
 
@@ -8617,6 +8638,7 @@ shared `dart test` 52 通过、`dart analyze`（cli）无 issue。
 关键是代码清晰准确、不留历史缺陷"。讨论后拍 D1–D6，一次做完、一次提交。
 
 **与旧计划的三处关键差异**（旧 `renamePlan` 整篇重写）：
+
 1. **目标名 `entry_id` 作废** → 改 **`entrance_id`**。旧名早于 2026-09-23 的「入口→通道 / entrance」
    定名，而代码里 `entrance` 已是既成事实（`maxEntrancesPerSpace`、`advancedDestroyEntrance`、
    `entrance_limit.test.ts`），叫 `entry_id` 会造出第三个词。
@@ -8630,6 +8652,7 @@ shared `dart test` 52 通过、`dart analyze`（cli）无 issue。
 
 **执行方式**：一个显式映射脚本（193 个不同标识符，按 `\b` 整词匹配 + 保护 v1 老字面量），
 自动跑完 115 个代码文件；再手工收口语义分裂点。脚本之外手工处理：
+
 - `person_name` 的**两个去向**（创建者 vs 泛称成员名）——不能全局替换；
 - HTTP 路径：`/devices/*`→`/entrances/*`，`/devices/uid`→`/entrances/install-uid`，
   `POST /devices/person-name`→**`POST /partners/name`**（它改的是"我"这位成员的名字）；
@@ -8651,6 +8674,7 @@ analyze 立刻报错，已回滚；③ drain 到中文注释时把"设备"当通
 v1 老 meta 字面量）。drift 本地库升 v8，用 `ALTER TABLE RENAME COLUMN` 保数据（非破坏性）。
 
 **留给下一批**（写进 `renamePlan` §7，别把这批 diff 冲淡）：
+
 1. 中文「设备」→「通道」注释/文档清扫（代码 ~780 处）——**必须逐处判断**通道 vs 本机，禁止全局替换；
 2. CLI 命令 `/device`（改名通道）与 App 菜单项「通道名称」不一致，是否改 `/entrance` 由老板定（UI 词归老板）；
 3. 带日期的历史快照（`architectureReview*`、`upgradeToMultiverse`、`worklog`、`db.ts` 清理 v1 meta 的字面量）保持原样。
@@ -8670,6 +8694,7 @@ v1 老 meta 字面量）。drift 本地库升 v8，用 `ALTER TABLE RENAME COLUM
 （help/usage/`case`/policy 注释）。
 
 **踩到的坑（都靠 grep 复核抓回来）**：
+
 - 盲目 `设备→通道` 会造出「多**台**通道」「某**台**通道」「这台通道」——量词必须是「条」，逐处改成 `台通道→条通道`；
 - 「安装级**设备**标识」一度变成「安装级**通道**标识」（install_uid 是安装层，不是通道层）→ 统一为「安装级标识」；
 - 「**重置设备**」（安装层动作）一度变成「重置**通道**」→ 统一为「重置本机」；
@@ -8685,6 +8710,7 @@ shared/app/cli 三包 `flutter analyze` 无 issue；`flutter gen-l10n` 重生成
 **遗留**：`productLens` §12/§14 仍是 v1 口径（已在 projectPlan 待办里）；历史快照按老板意见保持旧名。
 
 **更正（同日，老板指出）**：
+
 1. 「**重置本机**」用词错——那个动作只清**一个通道/空间**的数据（App 的空间级「销毁本通道」= `removeSpace`；
    CLI `/reset` = 删这个 store），不是清本机所有空间。全部改回 **「重置本通道」**。
    连带把这一批里被我误命名的东西一起纠正：文件 `app/lib/widgets/reset_install.dart` → **`reset_entrance.dart`**
@@ -8709,6 +8735,7 @@ shared/app/cli 三包 `flutter analyze` 无 issue；`flutter gen-l10n` 重生成
 `while(true)` 重试循环，提示语自己写着"（或 /exit 退出）"。
 
 **定的规则**（写进 `cli/bin/einz_tui.dart` 的 `_prompt` 文档注释）：
+
 - **向导必填** → `_prompt(required: true)`：留空拦住；那里的"取消"= 不做这件事 = 离开向导，逃生门 `/exit`；
 - **动作内一步** → 新助手 **`_promptAction`**：留空回车 = 放弃这个动作（返回 `null`，
   调用方先判 `running` 再打印"已取消（未做任何改动）"）。
@@ -8723,6 +8750,7 @@ Esc（raw 循环里 ↑↓ 输入历史就是 `\x1b[A`/`\x1b[B`，都以 ESC 开
 得加超时状态机，容易把箭头键弄坏）；命令化 `/revoke <序号>`（口令类动作没法命令化）。
 
 **验证**：
+
 - `cli/test/revoke_command_check.py` **全绿**，并新增 **③b** 用例：序号步 / 口令步留空回车 →
   "已取消"且命令照常可用（TUI 未被困）；
 - `cli/test/guide_input_rules_check.py` **全绿**——确认向导必填**仍然**拦空回车（没把边界搞混）。
@@ -8731,6 +8759,7 @@ Esc（raw 循环里 ↑↓ 输入历史就是 `\x1b[A`/`\x1b[B`，都以 ESC 开
   这些探针此前**一直红着**，没人发现（印证"无 CI 的探针会静默失效"）。
 
 **更正（同日，老板补充规则）**：
+
 1. **向导必填的空回车必须"静默拒绝"，不是"打一条提示"**。老板原话："如果不输入而直接回车，就拒绝接受，
    也**不用输出反馈**，就继续等在哪里等用户继续输入。但实际上是回车后就会输出一条新的系统消息
    '请输入内容'之类的。" ——早先的实现虽然**确实拦住了**（不提交、不前进），但每按一次回车都往消息流里
@@ -8766,6 +8795,7 @@ docs/DEPLOYMENT.md、docs/ONBOARDING.md 的命令表同步标注。
 `/devices`、`/device` 各走一次别名（只读路径）。
 
 **踩到的坑（探针侧，都记下来免得再踩）**：
+
 - `wait_text` 命中即返回，会把同一批输出里更靠后的内容一起吞掉 → 分两次等会假阴性；应"只等最后一个，
   再在同一条缓冲里断言前面几项"。
 - TUI 在 `processing`（`_busy`：打包/上传/建会话）期间**吞掉所有输入**（`ein_z_tui.dart:2517`）→
@@ -8804,6 +8834,7 @@ reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通�
 
 **① 卡片配色**（改了三轮才对，记下最终语义）：**被选中 → 饱和深色，未选中 → 对应淡色**。
 两档都直接对齐对话里的气泡色：
+
 - 选中 = 「渐变粉蓝」主题的气泡色 → 女 `#B83D80`（深粉）/ 男 `#2271F7`（深蓝）
 - 未选中 = 「素雅纯色」主题的气泡色 → 女 `#D6529C` / 男 `#3BAFFD` 的 **18% tint**
 - 共同源头：`chat_page.dart` 的 `_bubbleColor({required bool mine})`（gradient 分支 / plain 分支）
@@ -8846,6 +8877,7 @@ reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通�
 
 **拦点**：`setup_page._verifyJoinToken` —— preflight 之后（此时才知道目标 spaceId）、
 **消费一次性邀请码之前**。这三条都是选它而不是选 `addSpace` 的理由：
+
 1. 能判断的最早时机，用户不用白走完身份/口令/锁屏码几步；
 2. token 还没被 `joinSpace` 消费 → 被拒的邀请码**仍可发给别的设备用**，且零服务端副作用；
 3. join 流程的必经关口（`_joinSpaceId` 只在此设置，口令页依赖它）→ 一处拦住，
@@ -8858,6 +8890,7 @@ reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通�
 测试里必须 `setUp(() => VaultSession.publish(null))` 复位，否则串味。
 
 **顺带查清的两件事**：
+
 - 已有测试 `vault_test.dart` 的「同 spaceId 再次 addSpace 是覆盖，不产生重复项」**故意**文档化了
   upsert=覆盖这个原语。所以这次**没动 `addSpace` 语义**（入口已拦；改语义要连带改这条测试）。
   真要在 `addSpace` 也硬拦，得先把那个测试的语义重写——留给老板决定。
@@ -8871,10 +8904,11 @@ reset 闸门措辞「请输入通道名「X」以确认重置本通道」、通�
 **① 服务端也拒（老板："前后端要保持一致"）**——`joinSpace` 事务内，按 `install_uid` 查该空间
 是否已有**未撤销**（`status != 'revoked'`）的通道，命中抛新码 `ENTRANCE_ALREADY_EXISTS`（409）。
 三个位置细节都是有意的：
+
 - 放在**消费开通码之前**（token 的一次性 UPDATE 前）→ 被拒的邀请码还能给别的设备用，零写入；
 - 放在**通道上限检查之前** → 设备重复是更可操作的错因，先报它不会把人引去看额度；
 - `install_uid` 为 null（存量行 / 未升级客户端）→ **不拦**，那道闸门在客户端。
-App 与 TUI 都把新错误码接上了（原先会落进"通用失败"，用户看不懂）。
+  App 与 TUI 都把新错误码接上了（原先会落进"通用失败"，用户看不懂）。
 
 ⚠️ **与 `installUid.ts` 既有定位的张力**：那里 2026-09-22 明确写过这个字段"不参与任何破坏性
 操作的授权或范围判断"。本次用法是**否决**（denylist），不是授权，也没扩大任何操作范围——所以我
@@ -8910,7 +8944,7 @@ PROTOCOL_VERSION_MISMATCH；② 不发 Authorization → join-tokens 早已要�
 **它为什么坏**（三处互不相干，都是"后来的改动没跟上"，与功能无关）：
 ① `new_join_token()` 不发 `X-Protocol-Version: 1` → 400 PROTOCOL_VERSION_MISMATCH；
 ② 同一请求不发 Authorization → `POST /spaces/:id/join-tokens` 早就要成员会话（C1 修复），
-  而它**读了 store 里的 session_token 却没用上**；
+而它**读了 store 里的 session_token 却没用上**；
 ③ 收尾锚点 `输入回车` 没了——2026-09-15 起向导收尾改成「欢迎辞 + 自动倒计时」，不按回车了。
 
 **第 4 个坑才是真难查的（值得单独记住）**：
@@ -8932,16 +8966,18 @@ pty 缓冲被阻塞 → 倒计时循环里 `await Future.delayed(1s)` 的续体�
 顺带：既然只有 ~6 秒且就是设计里的倒计时，**原本那条"要不要缩短 UX"的观察作废**，不是问题。
 
 **App 侧没有这个问题**（2026-09-23 老板追问后核实）：
+
 - App 的「一切就绪！」是**模态对话框**（`setup_page._showWelcomeDialog`，`barrierDismissible:
-  false`）——期间本来就不能打字，也不假装接受输入；
+false`）——期间本来就不能打字，也不假装接受输入；
 - 点「开始聊天」→ `_finish()`：`saveProfile`（本地库）→ `onCompleted`（addSpace + switchToSpace）
   → 聊天页，全是本地写 + 导航，这一路径上没有长的网络等待；
 - 聊天页的输入 `TextField`（chat_page.dart 的 composer）**没有任何基于同步状态的
   enabled/readOnly 门**（唯一的可见性开关是录音态的 `Visibility`）。
-结论：**App 不存在"能打却被打字丢弃"的机制**。注意这是**读代码**得出的，不是真机量测——
-要绝对确定可以真机上试，或我补一条"进聊天页立刻输入"的 widget 测试。
+  结论：**App 不存在"能打却被打字丢弃"的机制**。注意这是**读代码**得出的，不是真机量测——
+  要绝对确定可以真机上试，或我补一条"进聊天页立刻输入"的 widget 测试。
 
 **本地跑这套 E2E 的标准姿势**（别用默认 3999，避免误杀别人实例）：
+
 ```bash
 mkdir -p /tmp/einz-e2e/files /tmp/einz-e2e/avatars
 PORT=3991 EINZ_DB=/tmp/einz-e2e/einz.sqlite.db EINZ_FILES=/tmp/einz-e2e/files \
@@ -8949,6 +8985,7 @@ PORT=3991 EINZ_DB=/tmp/einz-e2e/einz.sqlite.db EINZ_FILES=/tmp/einz-e2e/files \
 EINZ_E2E_PORT=3991 python3 cli/test/cliMultiverseE2E.py
 EINZ_E2E_PORT=3991 python3 cli/test/guide_input_rules_check.py   # 它自己起 server，不需要上面这步
 ```
+
 注意 `cliMultiverseE2E` 要外部先起 server，`guide_input_rules_check` 自己会起。
 
 ## 2026-09-24 · 切换秘境入口从「☰ 菜单」搬到状态条（commit `e1ae4b6`）
@@ -8980,6 +9017,7 @@ EINZ_E2E_PORT=3991 python3 cli/test/guide_input_rules_check.py   # 它自己起 
 零 PIN 改动**。菜里那条「切换我的秘境」保留（同一动作两个入口，文案一致不会被误读）。
 
 **关于「PIN 是否存在于对话页」——基本正交**：
+
 - 现状 PIN 只在锁屏页/启动门/向导；"切空间不需要 PIN"靠 `VaultSession`（解锁后的 Vault
   常驻内存）+ 明文键 `active_space`。
 - (A)+(B) 的结构**方向上略微利好**"PIN 不入对话页"：切换/管理回到"门侧上下文"，
@@ -8988,6 +9026,7 @@ EINZ_E2E_PORT=3991 python3 cli/test/guide_input_rules_check.py   # 它自己起 
 - 本次选的"状态条箭头"路径**完全不碰这题**：不新增常驻页面，也不动 PIN 纪律。
 
 **同一轮修的长名字溢出**（老板把名字改长后实测两个 bug）：
+
 1. **汉堡菜单**黄条 + `right overflowed by 69 pixels`：菜单带值行原先是
    `Text + Spacer + Text` 无上限 → 新增共享常量 `kMenuValueMaxWidth = 180`
    （`widgets/menu_metrics.dart`）+ 助手 `_menuValue`（`ConstrainedBox` + 单行 + 省略号 +
@@ -9135,7 +9174,7 @@ worklog 拖到下一轮，导致复盘要靠 `git log` 反推——这条已写�
 - App drift `schemaVersion` **8→9**：`from==8` 走 `renameColumn partner_id→member_id`；
   `from<8` 在 v8 分支直接落到最终列名（不两跳）。
 - 红线：`app/lib/l10n/*`（中英 UI 文案值）**一字不动**；`aimemo` 历史快照
-  （architectureReview* / upgradeToMultiverse / renameReview20260923 / worklog 既有条目）
+  （architectureReview\* / upgradeToMultiverse / renameReview20260923 / worklog 既有条目）
   一字不动；`db.ts` 的 v1 meta 字面量 `person_name:%` 等保留。
 - 顺带修正：`docs/DATABASE.md` 两处 v1 meta 键名原写 `partner_name:*` 与代码字面量
   `person_name:%` 不符 → 校正为 `person_name:*`。
@@ -9267,12 +9306,6 @@ await m.addColumn(localAttachments, spaceId);    // ✗ 列已存在 → "duplic
 - 待办（建议）：`StartupGate` 的失败页目前只有"重试"——可加一个「清除本机数据并重来」
   逃生口，避免任何迁移失败都把 App 锁死（本次没做，等老板定）。
 
-
-
-
-
-
-
 ## 2026-09-24 逃生口：App 启动失败页「清除本机数据并重来」；TUI `--reset` + 坏 store 兜底
 
 承接上一条（迁移 brick）。老板同意加逃生口，并要求修 TUI 同款"历史数据不匹配新后台就
@@ -9283,9 +9316,9 @@ await m.addColumn(localAttachments, spaceId);    // ✗ 列已存在 → "duplic
 - `StartupGate` 失败页新增「清除本机数据并重来」（红色 TextButton + 确认弹窗，不可逆）。
 - **两条路**：① 本地库还能打开 → `resetLocalData`（按行清）→ **原地**回向导；
   ② 库打不开（迁移失败/损坏，按行清也走不动）→ 兜底 `hardResetLocalData`（`close` 连接
-  + 删 `Documents[/dev-*]/einz.sqlite{,-wal,-shm}` + 清安全存储/附件·媒体缓存）→ 提示
-  "请完全退出并重新打开 App"。
-  - 为什么②必须重启：drift 的 `LazyDatabase` **一旦 `close()` 不能重开**，本进程的
+  - 删 `Documents[/dev-*]/einz.sqlite{,-wal,-shm}` + 清安全存储/附件·媒体缓存）→ 提示
+    "请完全退出并重新打开 App"。
+  * 为什么②必须重启：drift 的 `LazyDatabase` **一旦 `close()` 不能重开**，本进程的
     `LocalDatabase` 不可再用（`main.dart` 里已注明）。
 - 新 l10n 键：`startupInitClearData` / `-Title` / `-Message`、`startupInitClearedRestart`
   （en 为模板 + zh，同步生成 `app_localizations*`）。
@@ -9321,6 +9354,7 @@ await m.addColumn(localAttachments, spaceId);    // ✗ 列已存在 → "duplic
 App 侧不中招（drift 列由迁移 `renameColumn` 改过）。
 
 **修复**（`cli/lib/store.dart`）：
+
 - `_normalizeEnvelopeKeys()`：旧键→现键（**只改键名、值不变**；AAD 用的是值 → 旧历史仍可
   解密），且**非破坏性**（返回副本，兼容 `const` map）。
 - `historyEnvelopes` / `pendingEnvelopes`：逐条 try/catch，坏/无法解析的**跳过**，
@@ -9353,6 +9387,7 @@ App 侧不中招（drift 列由迁移 `renameColumn` 改过）。
 （不解锁就看不见），只能在读路径归一。
 
 **修复**（`app/lib/data/app_lock.dart`）：
+
 - `AppLockPayload.fromJson` 改走 `_pickString/_pickStringOrNull`（按候选键序取第一个存在的
   字符串）：`entrance_id ← device_id`、两把通道密钥同理（**值不变**，换键名读）。
 - 必填字段全缺失时显式抛 `FormatException`（调用方按"锁屏码错误"处理），不再让裸 TypeError
@@ -9374,6 +9409,7 @@ app_lock 新增 1 条：旧 profile 键读回）。
 
 **决策（老板拍板）**：既然不存在要兼容的存量，就不背这层兼容包袱（与仓库一贯立场一致：
 当初删归档密钥层也是同一个理由）。于是：
+
 - `633d06e`（App 密钥包 + profile 的旧键归一）→ **整体回滚**（代码 + 4 条测试）。
 - `942d54e`（CLI）→ **只回滚归一的一半**：`_normalizeEnvelopeKeys` 删掉；逐条 try/catch
   跳过坏信封**保留**——那不是兼容，是抗灾（一条坏数据不该让整机崩到连 /reset 都够不着）。
@@ -9413,6 +9449,7 @@ tic.cc（CF）。
 ## 2026-09-25 CF 隧道打通并实测（tic.cc 双入口正式生效）
 
 **两个坑（都排掉了）**：
+
 1. **重复连接器**：host 上按早期指引装过一个 cloudflared，与 docker 内那个是**同一条隧道**
    （token 是隧道级凭证，可被任意实例复用）→ 两个连接器、回源地址不同（一个只能
    `server:3000`、一个只能 `127.0.0.1:3000`）→ CF 轮询到谁谁 502。删 host 那个 + 删旧
@@ -9424,12 +9461,12 @@ tic.cc（CF）。
 
 **实测（本机中国大陆）**：
 
-| 路径 | tic.cc | yuanjinx（对照） |
-| --- | --- | --- |
-| `/health` | 200 ok | 200（~22ms） |
-| `/space` 缺/带 `X-Protocol-Version` | 400 / 401 | 400 / 401 |
-| WS 升级（HTTP/1.1`101`） | ✓ 101 Switching Protocols | ✓ |
-| 连测稳定性 | 200/200/200 | — |
+| 路径                                | tic.cc                    | yuanjinx（对照） |
+| ----------------------------------- | ------------------------- | ---------------- |
+| `/health`                           | 200 ok                    | 200（~22ms）     |
+| `/space` 缺/带 `X-Protocol-Version` | 400 / 401                 | 400 / 401        |
+| WS 升级（HTTP/1.1`101`）            | ✓ 101 Switching Protocols | ✓                |
+| 连测稳定性                          | 200/200/200               | —                |
 
 tic.cc 总耗时 ~1.2–1.7s（`colo=PDX`），yuanjinx ~22ms。→ 境内该走 yuanjinx，候选列表并发
 探测会自动这么选，符合设计；tic.cc 留给境外。cloudflared 已改 `--protocol http2`（QUIC 在大
@@ -9451,12 +9488,12 @@ CF 状态可能 Display Degraded，待观察。
 
 **依据（`t <url>/health`，增量：TCP=TLS前、TLS、稳态往返=TTFB−TLS）**：
 
-| 位置 | tic.cc total | yuanjinx total | tic.cc 稳态往返 | yuanjinx 稳态往返 |
-| --- | --- | --- | --- | --- |
-| 中国 iMac | 1546ms | **25ms** | 858ms | ~0 |
-| 波兰 | 1006ms | **766ms** | 887ms | 223ms |
-| 德国 | **853ms** | 877ms | 711ms | 277ms |
-| 美西 | **678ms** | 764ms | 269ms | 208ms |
+| 位置      | tic.cc total | yuanjinx total | tic.cc 稳态往返 | yuanjinx 稳态往返 |
+| --------- | ------------ | -------------- | --------------- | ----------------- |
+| 中国 iMac | 1546ms       | **25ms**       | 858ms           | ~0                |
+| 波兰      | 1006ms       | **766ms**      | 887ms           | 223ms             |
+| 德国      | **853ms**    | 877ms          | 711ms           | 277ms             |
+| 美西      | **678ms**    | 764ms          | 269ms           | 208ms             |
 
 - 只有美西 tic.cc 快（11%），且全靠**握手便宜**；聊天是长连接 WS，握手只付一次，
   **稳态每条消息往返 tic.cc 在四个点全都 ≥ 直连**（美西 269 vs 208ms）。
@@ -9537,10 +9574,10 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 ### 补充（老板 2026-09-25 定）
 
 - 「邀请加入」底色/ink 改成与「添加秘境」**完全同款**：常态黑 5% 底 + 悬浮 10% + 按住 14%
-  + `clipBehavior: Clip.antiAlias`（原先常态全透明、悬浮 5%、按住 8%，看不出能点）。
-  接着左右内边距从 6 改成**直接用芯片那个 `pad`（左 16 / 右 10）**——文字贴着灰底框看着紧，
-  老板要求"和状态芯片的间距一样"。用同一个常量而不是抄一个数：以后改芯片内边距它会跟着走。
-  芯片右 10 是给下拉箭头留的，链接没有箭头 → 文字偏左 3px，看不出。
+  - `clipBehavior: Clip.antiAlias`（原先常态全透明、悬浮 5%、按住 8%，看不出能点）。
+    接着左右内边距从 6 改成**直接用芯片那个 `pad`（左 16 / 右 10）**——文字贴着灰底框看着紧，
+    老板要求"和状态芯片的间距一样"。用同一个常量而不是抄一个数：以后改芯片内边距它会跟着走。
+    芯片右 10 是给下拉箭头留的，链接没有箭头 → 文字偏左 3px，看不出。
 - 内边距一变大，芯片与 invite 之间原来那个 15px 间隙**看着就太远了**（总距离 15+16=31）
   → 收到 **8**。
 - invite 的弧角 12 → **24**，与相邻的状态芯片同值（老板实测："弧角比状态芯片的小"）。
@@ -9581,10 +9618,10 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 
 ### 为什么不做 Title Case（数据来自当时的全量扫描）
 
-| | 标题 Title Case | 全句首大写 |
-|---|---|---|
-| 需要人工归类"这是不是标题"的边界串 | **38 条**（tooltip 13 / 字段标签 8 / 输入提示 10 / 提示语 7） | 0 |
-| 一身两用、怎么归都不对的键 | **11 个** | 0 |
+|                                    | 标题 Title Case                                               | 全句首大写 |
+| ---------------------------------- | ------------------------------------------------------------- | ---------- |
+| 需要人工归类"这是不是标题"的边界串 | **38 条**（tooltip 13 / 字段标签 8 / 输入提示 10 / 提示语 7） | 0          |
+| 一身两用、怎么归都不对的键         | **11 个**                                                     | 0          |
 
 （当时英文条目 283 条、多词 220 条。）
 
@@ -9681,6 +9718,7 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 老板："macOS 正式版只有一个空间（Vic），用 /invite 加 Hardservice 报『这个秘境已经添加过了』。"
 
 ### 根因：凭证与缓存不一致（死锁）
+
 - 报错点 `setup_page.dart:1702` `_isSpaceAlreadyAdded()`：查 **Vault（内存/Keychain）** 与 **spaces 表**，
   任一命中即拦；而空间卡片**只认 Vault**（`space_switcher.dart:185`）→ "② 有行、① 没凭证"时，
   用户既看不到、也加不进来。
@@ -9698,6 +9736,7 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
   教训：本机跑 macOS 只能走 `npm run app-mac-run-local`（带 `einzSecurePrefix=einz.secure.dev.`）。
 
 ### 处理
+
 - 立刻解卡：退出全部 einz 实例（含那个 debug）→ 备份到 /tmp/einz_backup_0925 →
   删掉 spaces 表里 040aa7cd 那一行（该空间在本机 0 消息/0 附件/0 锚点，不丢东西）→ 可重新 /invite 加入。
 - 代码自愈（方案 2）：`app_lock.dart` 的 `_syncAllSpaceRows` 改名为 `_syncSpaceRows` 并**顺带删掉**
@@ -9713,6 +9752,7 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 本机闸门、也可能来自服务端 ENTRANCE_ALREADY_EXISTS，两者处置完全不同，白绕一轮排查）。
 
 ### 定的口径（老板三选一拍板）
+
 - **只标后台**：后台错误加「后台：」；本机（前端）错误保持原文案、不加前缀。
   两类仍一眼可分（有前缀 vs 无），且不给日常本地校验提示增加噪音。
 - **判定口径严格：只认 `ApiException`**——服务端响应构造出的异常（含 `HTTP_<status>`
@@ -9720,6 +9760,7 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 - **范围：只改 Flutter app**（TUI 的 ⚠️ 提示暂不动——它连统一报错函数都没有，另议）。
 
 ### 落地
+
 - `app/lib/error_text.dart`（新）：`backendError(l10n, message)`。全仓库搜 `backendError(`
   即得后台错误的完整清单——这是"编码特征"那一半：分类不靠人记，靠函数入口。
 - l10n 新增 `errorBackend`：zh「后台：{message}」/ en「Server: {message}」（句首大写）。
@@ -9741,32 +9782,37 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 因为 `message_repository` 把异常吞了，上层根本拿不到 ApiException。老板："做"。
 
 ### 前提：让上层拿得到服务端的话
+
 - `message_repository.dart` `send()`：服务端明确拒绝（4xx，[_isServerRejection]）时
-  标 failed **后继续 rethrow**；网络类失败照旧不上抛（pending 交给 _flushPending 幂等重试，
+  标 failed **后继续 rethrow**；网络类失败照旧不上抛（pending 交给 \_flushPending 幂等重试，
   弹提示只会吵）。语义不变：**只有"重试也没用"的才上报**。
 - `sendAttachment()`：同理，4xx 上抛（仍不标 failed——附件 blob 无法自动补传，
   标失败会误导用户重试；但用户至少能知道为什么卡住）。
 
 ### 新增 10 个 `on ApiException` 分支（都在泛型 catch 之前）
-| 位置 | 文案 |
-|---|---|
-| chat_page `_send` | 发送失败 |
+
+| 位置                                      | 文案           |
+| ----------------------------------------- | -------------- |
+| chat_page `_send`                         | 发送失败       |
 | chat_page 邀请码（生成 + 重新生成，2 处） | 开通码生成失败 |
-| chat_page 头像上传 | 头像上传失败 |
-| chat_page 改名 | 修改失败 |
-| chat_page 语音发送 | 录音失败 |
-| chat_page 文件/媒体发送 | 发送失败 |
-| chat_page 附件下载 | 下载失败 |
-| chat_page 改口令（取密保箱 + 上传，2 处） | 修改口令失败 |
+| chat_page 头像上传                        | 头像上传失败   |
+| chat_page 改名                            | 修改失败       |
+| chat_page 语音发送                        | 录音失败       |
+| chat_page 文件/媒体发送                   | 发送失败       |
+| chat_page 附件下载                        | 下载失败       |
+| chat_page 改口令（取密保箱 + 上传，2 处） | 修改口令失败   |
+
 都走 `backendError(l10n, <原文案>(e.message))`——用服务端给的 message，不是 code（用户看得懂）。
 
 ### 刻意没做
+
 - **同步/拉取失败**：它是后台重试的状态（顶部常驻「离线 · N 条待发送」），不是一次用户动作。
   给它弹错误条会随轮询每几十秒闪一次。要标的话应把原因并进常驻条，另议。
 - 静默链路（GET /space 资料、头像拉取、entrance 列表、媒体渲染）本来就不给用户看文案，
   加前缀无从加起。
 
 ### 测试
+
 - 新增：服务端拒绝发送 → 顶部提示带「后台：」（chat_send_status_test）。
 - 既有 4 例按新语义更新（4xx 的 send 现在会抛：`expectLater(...throwsA(isA<ApiException>()))`）。
 - `flutter analyze` 无告警，全量 213 项通过。
@@ -9777,12 +9823,14 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 确认是「朵」那张卡，且**聊天页能看到、只有卡片不行** → 客户端问题。
 
 ### 排查
+
 - 服务端直连验证（带 `X-Protocol-Version: 2` 头，否则一律 400）：
   `GET /avatar/a02ef9c4…`（朵）→ **200，1.36MB**；`GET /avatar/2ad87f7f…`（Vic）→ **404**（服务端没这份图）；
   Hardservice（040aa7cd）本机 per-space 资料里**没有 peerMemberId** → 卡片连请求都不发。
   → 服务端有图、聊天页也能显示 ⇒ 图没问题，是卡片那一环。
 
 ### 根因：异步数据 + StatefulWidget 只在 initState 拉一次
+
 - 弹层 `_SpacePickerSheetState._load()` 是异步的（先读 Spaces 表、再逐空间读 per-space 资料），
   **首帧**建卡片时 `_names` 还是空 → `_PeerAvatar` 拿到 `memberId = ""` →
   `initState` 那次 `_load()` 直接 return。
@@ -9792,6 +9840,7 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
   而头像把结果存在 State 里，所以必须自己补拉。
 
 ### 修法
+
 - `_PeerAvatarState` 加 `didUpdateWidget`：memberId 变了且还没图 → 补拉一次（`space_switcher.dart`）。
 - 回归测试 `test/space_switcher_avatar_test.dart`：假 ApiClient 记录 getAvatar 调用 +
   断言默认人形图标消失。**已验证撤掉修复时该测试会红**（不是事后补个永远绿的测试）。
@@ -9830,6 +9879,7 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 ## 2026-09-26 「更多通道」卡片三改：已撤销外观 / 绿勾挪位 / 离线显示下线时间
 
 老板四条（按到达顺序）：
+
 1. 被撤销的通道卡看不出特别的外观 → 要蒙版或右上角固定「已撤销」图标；
 2. 本机卡的绿勾紧贴通道名 → 挪到卡片右上角固定位置；
 3. 离线卡红点后面没有文字，比别的卡矮一点 → 红灯后也要显示下线时间；
@@ -9860,8 +9910,9 @@ tic.cc 仍在（编译进去的），现在探测会快速失败、不影响选�
 
 内容（名称 + 红绿灯 + 时间）流式排布，右上角 `Positioned(top: 6, right: 6)` 放**固定角标**：
 本机 = 绿勾 `Icons.check_circle`（从名称行挪走）、已撤销 = `Icons.block` + 整卡降透明度 0.55
-+ 极淡灰底（蒙版）。两者互斥（`revoked` 已含 `!isLocal`），共用一个角标位；有角标的卡名称行
-右侧留 18px，长名字不会钻到图标底下。
+
+- 极淡灰底（蒙版）。两者互斥（`revoked` 已含 `!isLocal`），共用一个角标位；有角标的卡名称行
+  右侧留 18px，长名字不会钻到图标底下。
 
 ### 踩坑：等高不能用 `minHeight` 幻数
 
@@ -9891,7 +9942,7 @@ app 全量 **218 项通过**（goldens 跳过）；`app/pubspec.lock` 未被镜�
 时不用退出弹层、也不用等 30s 的对方在线轮询。
 
 - **放在标题右端**，与下面卡片**右对齐**：标题原来是 `Padding(fromLTRB(16,14,16,10)) +
-  Center` 居中；改成一行 `Row`，中间 `Expanded(Center(标题))`，左端放一个与按钮**等宽
+Center` 居中；改成一行 `Row`，中间 `Expanded(Center(标题))`，左端放一个与按钮**等宽
   的占位**（`_entranceRefreshSize = 40`）——左右对称，标题仍**恰好居中**，不会被按钮推歪。
   横向 padding 16→0（标题仍在弹层正中，因为 Center 后面的可用宽度是对称的），
   这样按钮右缘才与卡片对齐。这个 40 = `kMinInteractiveDimension` 48 − `visualDensity.compact`
@@ -10006,11 +10057,11 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 **证据**（`spaces.created_at` = 该空间写进 Vault 的时刻 = token 签发时刻，
 `_syncSpaceRow` 首次插入取 `DateTime.now()`）：
 
-| 空间 | token 签发 | 距 08:14 | session | 头像 |
-|---|---|---|---|---|
-| **我和 Vic** | 09-24 23:44 | **32.5h** | ✗ | **invalid session** |
-| Hardservice | 09-25 20:24 | 11.8h | ✓ | 成功 |
-| 朵 | 09-25 22:28 | 9.8h | ✓ | 成功 |
+| 空间         | token 签发  | 距 08:14  | session | 头像                |
+| ------------ | ----------- | --------- | ------- | ------------------- |
+| **我和 Vic** | 09-24 23:44 | **32.5h** | ✗       | **invalid session** |
+| Hardservice  | 09-25 20:24 | 11.8h     | ✓       | 成功                |
+| 朵           | 09-25 22:28 | 9.8h      | ✓       | 成功                |
 
 旁证：Vic 空间**聊天是正常的**（本地 5 条消息，最新 07:58:45，就在报错前后）——同步/WS
 走内存续期。同一个空间里只有"非同步/WS"的请求在挂。
@@ -10063,7 +10114,6 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 **老板侧立即生效须知**：这是纯客户端修复——重新打包安装后，「我和 Vic」这个空间
 （以及任何超 24h 的空间）会自动续期，头像/改名/更多通道都会恢复正常。
 
-
 ## 2026-09-26 语音通话：转 Phase B，按最终产品做（新分支 feat/voiceCall）
 
 **转折点**：老板受够了手工粘贴 SDP 跨机互传——切到微信就把 Einz 断线（iOS 前台限制），
@@ -10072,11 +10122,11 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 
 ### 已完成（分支 `feat/voiceCall`，领先 main 3 个提交）
 
-1. **信令通路**（B-1）：`PROTOCOL.md` §8.4（7 个 call.* 帧 + 服务端约定）；
-   `shared/ws_client.dart` 加 `kWsTypeCall*` / `WsCallEvent` / **新的 `send()`**
-   （此前 WsClient 只有 `listen` 没有 `add`，客户端根本发不出帧）；
-   `server/ws.ts` 加 `CALL_TYPES` 白名单 + `broadcastCall()`（同空间转发、补 `from_entrance_id`）
-   + 形状校验 + **按通道限流 120 帧/10s**（WS 路径此前完全没接限流）。
+1. **信令通路**（B-1）：`PROTOCOL.md` §8.4（7 个 call._ 帧 + 服务端约定）；
+   `shared/ws_client.dart` 加 `kWsTypeCall_`/`WsCallEvent`/ **新的`send()`**
+（此前 WsClient 只有 `listen`没有`add`，客户端根本发不出帧）；
+`server/ws.ts`加`CALL_TYPES`白名单 +`broadcastCall()`（同空间转发、补 `from_entrance_id`）
+   - 形状校验 + **按通道限流 120 帧/10s**（WS 路径此前完全没接限流）。
 2. **通话服务**（B-2）`app/lib/data/voice_call_service.dart`：状态机
    （calling/ringing/connecting/active/ended + 6 种结束原因）、trickle ICE、
    忙线自动回 `reject(busy)`、振铃 60s 超时；**接通后重设音频会话 + 通话期间常亮**
@@ -10094,7 +10144,7 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 ### 待办
 
 - B-4 通话记录（双向同步为 system 消息）
-- **服务端需老板重启**才生效（call.* 转发）
+- **服务端需老板重启**才生效（call.\* 转发）
 - 真机自测：iOS 走 Ad Hoc（正式 bundle `cc.tic.einz`，会覆盖手机上 CI 版，测完重装即可）；
   Android 用 debug APK
 
@@ -10160,13 +10210,13 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 
 落点（三层，覆盖全项目）：
 
-| 层 | 手段 | 覆盖量 |
-| --- | --- | --- |
-| Material 按钮 / ListTile | `main.dart` 的 Theme（iconButton/textButton/elevated/outlined/filled + listTileTheme） | 59 处 + `PopupMenuButton` 内部 |
-| `InkWell` | 逐处补 `mouseCursor`（脚本批量，跨 7 文件） | 17 处 |
-| 裸手势 | 换成新组件 `widgets/clickable.dart`（MouseRegion + GestureDetector 同名透传；回调全 null 时不变手型） | 17 处 |
-| `PopupMenuItem` | **框架内建 InkWell、不吃 Theme**，只能逐处传 `mouseCursor` | 19 处 |
-| `PopupMenuButton` 图标 | 框架不接受 `mouseCursor` 参数 → 包一层 `MouseRegion`（只覆盖图标区，外圈留白仍是箭头） | 3 处 |
+| 层                       | 手段                                                                                                  | 覆盖量                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------ |
+| Material 按钮 / ListTile | `main.dart` 的 Theme（iconButton/textButton/elevated/outlined/filled + listTileTheme）                | 59 处 + `PopupMenuButton` 内部 |
+| `InkWell`                | 逐处补 `mouseCursor`（脚本批量，跨 7 文件）                                                           | 17 处                          |
+| 裸手势                   | 换成新组件 `widgets/clickable.dart`（MouseRegion + GestureDetector 同名透传；回调全 null 时不变手型） | 17 处                          |
+| `PopupMenuItem`          | **框架内建 InkWell、不吃 Theme**，只能逐处传 `mouseCursor`                                            | 19 处                          |
+| `PopupMenuButton` 图标   | 框架不接受 `mouseCursor` 参数 → 包一层 `MouseRegion`（只覆盖图标区，外圈留白仍是箭头）                | 3 处                           |
 
 已扫过其它框架级可点组件（Dropdown/ExpansionTile/MenuAnchor/Chip/SwitchListTile…）：项目里没用。
 
@@ -10388,12 +10438,12 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 
 **做法**：`_buildAudioBar` 之前只有消息气泡和菜单预览条两处用，现在四处共用：
 
-| 调用处 | waveformWidth | foreground | tappable |
-| ------ | ------------- | ---------- | -------- |
-| 消息流气泡 `_buildMessageContent` | 120 | `_audioForegroundOnBubble` | true |
-| 菜单预览条 `_buildMessagePreviewRow` | 88 | `_audioForegroundOnBubble` | true |
-| 输入栏引用条 `_buildQuoteBanner` | 88 | 主题蓝（浅底，跟气泡走白会看不见） | true |
-| 气泡引用块 `_buildQuoteBlockContent` | 88 | gradient 白70 / 主题蓝 | **false** |
+| 调用处                               | waveformWidth | foreground                         | tappable  |
+| ------------------------------------ | ------------- | ---------------------------------- | --------- |
+| 消息流气泡 `_buildMessageContent`    | 120           | `_audioForegroundOnBubble`         | true      |
+| 菜单预览条 `_buildMessagePreviewRow` | 88            | `_audioForegroundOnBubble`         | true      |
+| 输入栏引用条 `_buildQuoteBanner`     | 88            | 主题蓝（浅底，跟气泡走白会看不见） | true      |
+| 气泡引用块 `_buildQuoteBlockContent` | 88            | gradient 白70 / 主题蓝             | **false** |
 
 - `foreground` 做成**必填参数**而不是内部按主题算：四处底色不同（深色气泡 / 6% 黑引用条
   / 引用块），靠 ambient 或统一按气泡取色必然有一处看不见（当天刚踩过"菜单里图标变黑"）。
@@ -10422,16 +10472,17 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 
 1. `_buildFileCard` 加 `tappable` / `foreground` 两个参数，四处共用（与音频条对称）：
 
-   | 调用处 | tappable | foreground |
-   | ------ | -------- | ---------- |
-   | 消息流气泡 | true | `_mediaForegroundOnBubble` |
-   | 菜单预览条（改用完整名片，不再自己拼"图标+文件名"只读行） | true | 同上 |
-   | 输入栏引用条（新增 file 分支） | true | 主题蓝（浅底） |
-   | 气泡引用块 | **false** | 白70 / 主题蓝 |
+   | 调用处                                                    | tappable  | foreground                 |
+   | --------------------------------------------------------- | --------- | -------------------------- |
+   | 消息流气泡                                                | true      | `_mediaForegroundOnBubble` |
+   | 菜单预览条（改用完整名片，不再自己拼"图标+文件名"只读行） | true      | 同上                       |
+   | 输入栏引用条（新增 file 分支）                            | true      | 主题蓝（浅底）             |
+   | 气泡引用块                                                | **false** | 白70 / 主题蓝              |
 
    tappable=false 时**整块点击让给外层的"跳到原消息"**，但**文件图标单独可点**（`Clickable`
-   + `behavior: opaque`，30×30 整块命中，不只字形那几个像素）——与音频条的"播放键仍可点"
-   完全对称。
+   - `behavior: opaque`，30×30 整块命中，不只字形那几个像素）——与音频条的"播放键仍可点"
+     完全对称。
+
 2. 引用快照新增 `size` 字段（file 类型才有），这样原消息**未加载**时引用块的兜底简版
    也能显示尺寸；老快照没有这个字段 → 不显示那行（产品未上线，不必兼容）。
 3. 引用条里 file/audio 都用 `Flexible` 包一层（下面第 4 点的原因），并顺手去掉多余的
@@ -10442,7 +10493,7 @@ invalid session"。→ 一查是个**结构性**问题，不是头像的事。
 - `Row` 的**非 flex 子项**在主轴（宽度）上拿到的是**无界**约束（`_constraintsForNonFlexChild`
   只约束 cross 轴）；`canFlex = incoming constraints.biggest.isFinite`，与 `mainAxisSize`
   **无关**——父约束无界时，`Flexible` 会被当成非 flex 子项、拿到无限宽度 → `maxLines +
-  ellipsis` 根本不触发，长文本一路撑出去。
+ellipsis` 根本不触发，长文本一路撑出去。
 - 所以音频文件名那行（`Row[playButton, Column[波形行, Row[Flexible(Text)]]]` 的第二层）
   在四处都破：内层 Row 是外层 Row 的非 flex 子项 → 无限宽。修法是给**右列 Column 套
   `Flexible`**，让它变成外层 Row 唯一的 flex 子项 → 拿到"父上限 − 播放键"的**有界**宽度
@@ -10640,6 +10691,7 @@ Column 就多宽 → 整行溢出。两处只差一层，2026-09-24 只修了对
 
 **验证**：`chat_page_menu_test.dart` 整个文件 34 例全绿；`multi_space_pages_test.dart`、
 `ui_style_switch_test.dart` 也绿；`flutter analyze` 干净。
+
 ## 2026-10-01 邮件通知：用邮件补上没有后台推送的洞（服务端先落地）
 
 **起因**：没进应用商店 → 没有后台推送。对方离线期间的来信他完全不知道，只能等下次打开
@@ -10647,6 +10699,7 @@ App 才看得到。老板手上有甲骨文云的免费邮件额度与 SMTP 凭�
 该用什么方式发"。
 
 **方案讨论中的三个决定**（老板拍板）：
+
 1. 节流参数取**推荐档**：静默窗 2 分钟 / 冷却 30 分钟 / 日上限 8 封（不是为省 Oracle 额度——
    按现在的用户量一年也吃不完，真正的成本是"收件人被烦到开过滤规则"）。
 2. 邮箱**挂 member_id（每个空间各填一次），但发信按邮箱地址聚合**——不新建 person 表。
@@ -10683,6 +10736,7 @@ App 才看得到。老板手上有甲骨文云的免费邮件额度与 SMTP 凭�
 `npm run mail:probe` 连通性探针。
 
 **没做的事 / 已知坑**：
+
 - App 设置页、以及英文版邮件正文（现在只有中文版），跟着 UI 那一轮做。
 - **上线前必须先验的未知数**：服务器在中国大陆，Oracle Email Delivery 的 SMTP 在境外，国内
   云厂商普遍封杀出站 25 端口。所以上线第一步不是配 DNS/SPF，而是在服务器上跑
@@ -10694,12 +10748,14 @@ App 才看得到。老板手上有甲骨文云的免费邮件额度与 SMTP 凭�
 **验证**：新增 `server/test/notify.test.ts` 10 例（覆盖四道闸门、跨空间聚合、正文红线、
 tick 投递记账）全绿；`npm test` 全套通过；`npx tsc --noEmit` 干净。`邮件通知：⑧` 用例验证
 "第二轮在冷却里一封都没多发出去"。
+
 ## 2026-10-01 邮件通知第二轮：App 设置页 + 中英双版正文（SMTP 出网已实测通过）
 
 前置：老板在服务器上实测 Oracle SMTP **可连通**，上一轮记的"上线前必验未知数"解除，
 不必换服务商。
 
 **App 设置页**（菜单「邮件通知」，位置在「锁屏码」上面——老板指定）：
+
 - 菜单项右侧值与「锁屏码」同款处理：只在"有话可说"时显示（已开启 / 待确认 / 已关闭），
   **没拉到状态就不显示**。理由：猜错比不显示更糟——显示"未设置"而实际拉不到，用户会以为
   功能坏了；显示"已开启"而实际没开，他一封也收不到还以为被屏蔽了。
@@ -10722,12 +10778,14 @@ tick 投递记账）全绿；`npm test` 全套通过；`npx tsc --noEmit` 干净
 `server` 11 例全绿（新增第 ⑨ 例：英文正文不含中文套话、同样没有消息内容）。
 **flutter test 按老板惯例由他自测**（`chat_page_menu_test.dart` 的 `_FakeApi` 已补
 get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白等重试）。
+
 ## 2026-10-01 邮件通知：凭据没配（问老板要），部署接线补上
 
 老板问"你还没问我要 SMTP 信息，你已经设好了吗？"——**没有**。代码从环境变量读凭据，
 我手上一条都没有，功能因此一直是关闭状态（不是半残：tick 空转，PUT 返回 503）。
 
 **补的接线**（不含任何凭据，全是占位引用）：
+
 - `deployment/docker-compose.nocaddy.cn.yml`（在用的国内模板）与 `docker-compose.nocaddy.yml`
   （海外兜底模板）各加 5 行 `EINZ_SMTP_HOST/PORT/USER/PASS`、`EINZ_MAIL_FROM`，
   取值来自 `deployment/.env`（已 gitignore，与 `EINZ_DB_BACKUP_KEY` 同一套路）。
@@ -10737,6 +10795,7 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 
 **还差**：老板把 SMTP 凭据填进服务器上的 `/opt/einz/deployment/.env`（或把值给我，我写好
 那几行给他复制），然后 `docker compose up -d server`。填之前功能是关的，填完才启用。
+
 ## 2026-10-01 邮件通知：探针找不到 .env（老板踩到）+ 发件地址默认值在哪
 
 老板："我在服务器上填好了 deployment/.env，但在 server/ 下跑 npm run mail:probe 报缺配置，
@@ -10789,6 +10848,7 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 教训：这条路径当时只用 `EINZ_ENV_FILE` 显式指定测过，默认值一次都没真跑——**默认值不跑一遍
 就等于没测**。已按老板的实际用法（仓库根 `npm run server-run-dev`）复测：日志出现
 「邮件通知：已启用 …」。
+
 ## 2026-10-01 邮件通知：状态不刷新（老板实测）—— 确认是在 App 外面发生的
 
 **现象**：iPhone 模拟器上填了邮箱、点了确认链接（还手工把链接域名改成 localhost:3000），
@@ -10798,6 +10858,7 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 （浏览器）发生的一次服务端状态翻转——服务端没有任何通道能通知 App，缓存自然一直是旧的。
 
 **改法（四条刷新时机 + 一条有界轮询）**：
+
 1. 从后台回到前台（`didChangeAppLifecycleState` 的 resumed 分支）——去浏览器点链接再回来，
    这是最常见的那条路径；
 2. 打开设置弹窗前先拉一次（照旧值弹窗会把用户带偏：又显示一遍"待确认"，或输入框里填着
@@ -10814,6 +10875,7 @@ get/set/delete 三个 stub，否则 initState 会真的去连 `http://fake` 白�
 `app.requestBaseUrl`）——已改：PUT 时把 `requestBaseUrl(req)` 传进 notifier，确认信里的
 确认/退订链接都用它；摘要信（tick 发、无请求上下文）仍用 `EINZ_MAIL_BASE_URL`。
 新增用例 ⑨ 钉住这条（断言链接是 localhost 且不含 yuanjinx），共 12 例全绿。
+
 ## 2026-10-01 服务器 docker 构建失败：npm ci 跨境超时（better-sqlite3）
 
 **现象**：`docker compose up -d --build server` 在 `[build 5/8] RUN npm ci` 挂了 152s 后失败：
@@ -10823,17 +10885,19 @@ better-sqlite3 的 `prebuild-install` 拉 GitHub Releases 超时 → 回退 `nod
 
 **改法**：Dockerfile 两个阶段各加三个镜像变量（名字是 prebuild-install / node-gyp 写死的，
 见 `prebuild-install/util.js` 的 `getEnvPrefix`，别改）：
+
 - `npm_config_registry` —— tarball（lock 里本来就是这个源）
 - `npm_config_better_sqlite3_binary_host_mirror` —— **预编译包也走镜像，直接不用编译**（省几分钟）；
   拼出的 URL 是 `{mirror}/v{version}/better-sqlite3-v{version}-node-v{abi}-linux-x64.tar.gz`，
   已 curl 验证 npmmirror 上有这个文件（1.0MB，200）
 - `npm_config_disturl` —— 万不得已回退编译时，Node 头文件也走镜像（已验证 9.9MB，200）
-都留成 `ARG`，海外构建可用 `--build-arg` 指回官方源。
+  都留成 `ARG`，海外构建可用 `--build-arg` 指回官方源。
 
 **顺带**：DEPLOYMENT.md 排障表补两行（构建跨境超时 / 邮件通知"未启用"的两种成因）。
 
 **没能自己验的部分**：docker 在本机没起（OrbStack 没跑），所以只验了镜像 URL 可达 + 语法，
 真实验证在服务器的重建上。
+
 ## 2026-10-01 npm lock 去镜像污染（79 行）
 
 **背景**：`server/package-lock.json` 的 79 处 `resolved` 全指向 `registry.npmmirror.com`
@@ -10852,18 +10916,21 @@ registry 配置切源**。国内构建照样走镜像（快），海外构建才
 **遗留（未做，已知会复发）**：以后在本机 `npm install <新依赖>`，npm 会把镜像地址**再写回**
 lock（本机 registry 就是镜像）。要根治得给个"加完依赖跑一下"的小脚本（把 host 换回官方），
 或者接受每次手工清理。已告诉老板，等他定。
+
 ### 追加：依赖源改回官方（老板 2026-10-01 定）
 
 落地完 lock 去污染之后，老板决定**构建也走官方源**（理由：生产服务器上老代码版本已经成功
 部署过，跨境网络是一阵好一阵坏，"多试几次就行"；不想让镜像成为构建的隐含前提）。
 
 于是把 Dockerfile 的三个 ARG 默认值从镜像改成官方，同时**保留可变点当逃生口**：
+
 - `NPM_MIRROR=https://registry.npmjs.org`
 - `NODE_MIRROR=https://nodejs.org/download/release`
 - `BETTER_SQLITE3_MIRROR`（**默认留空**：空值被 prebuild-install 当"没设置"，于是走它内置的
   github-from-package 默认地址——与不加这个 ENV 完全等价，零行为变化）
 
 **实测两个分支**（直接调 prebuild-install/util.js 的 getDownloadUrl，这是真正会踩的地方）：
+
 - 空 ENV → `https://github.com/WiseLibs/better-sqlite3/releases/download/v11.10.0/…tar.gz` ✅
 - 传镜像 → `https://npmmirror.com/mirrors/better-sqlite3/v11.10.0/…tar.gz` ✅
 
@@ -10898,6 +10965,7 @@ shared 默认值是 `'channel'` → 展示出去的码是"绑定签发者身份"
 上根本不存在能邀请新成员的入口。
 
 **已修（服务端/shared）：**
+
 - `createJoinToken` 的 `purpose` 改**必填**（默认 channel 是 P0 的直接成因，改必填把这类
   错误前移到编译期；同步修了 app/test 里两个 fake——它们此前让 `flutter analyze` 直接红）
 - `push.ts` 的 `? IS NULL OR d.member_id != ?` 恒真分支（member_id 为 NULL 时连发送者
@@ -10922,6 +10990,7 @@ purpose 分流（invite 自填名字/性别、channel 不填不带 slot）；`/i
 `/invite channel` 才签 channel。
 
 **App 端重做（chat_page 回到群聊前基线重写）：**
+
 - 成员弹层：名单（按槽位）+ 每人通道数 + 「我」标记；邀请按状态分流（邀请伴侣 / 邀请新
   成员 + 升格确认带人数上限）；满员只留说明（不给一个按了报错的按钮）；
   「在其他设备加入我的账号」= channel；**无退出入口**
@@ -10940,6 +11009,7 @@ purpose 分流（invite 自填名字/性别、channel 不填不带 slot）；`/i
 二期有本地系统消息设施再升级。
 
 **已知遗留：**
+
 - `server/test/peer_status.test.ts` **跑不完**（在 `a584b91` 的干净 worktree 上同样卡住
   → 与本次改动无关，但它让 `npm test` 永远跑不到头）。未修。
 - per-member 已读水位（设计里的 schema v10）、本地成员名单落库、引用回复/通知文案泛化、
@@ -11014,9 +11084,9 @@ invite 只会去开第三个身份，撞 DUO_FULL；channel token 只能绑签�
 **方案（老板认可）**：不新造"定向邀请"这个特例，而是把 `channel` 和"找回"合并成同一个
 概念——**attach = 进一个已有身份**，target 指向谁就进谁：
 
-| purpose | 语义 | 约束 |
-| --- | --- | --- |
-| `invite` | 开**新身份** | 受人数上限约束（duo 满 2 → DUO_FULL；group 看配置） |
+| purpose  | 语义           | 约束                                                                               |
+| -------- | -------------- | ---------------------------------------------------------------------------------- |
+| `invite` | 开**新身份**   | 受人数上限约束（duo 满 2 → DUO_FULL；group 看配置）                                |
 | `attach` | 进**已有身份** | target == 签发者 → 我换设备；target == 别人 → 帮对方找回。**永不撤销**任何现有通道 |
 
 这样"只要还有一个安装存在，空间就永续"是**结构性**成立的（group 里成员丢设备同样适用，
@@ -11028,6 +11098,7 @@ invite 只会去开第三个身份，撞 DUO_FULL；channel token 只能绑签�
 指向自己不要口令（会话即所有权，与"自助退役"同口径）。
 
 **客户端**：
+
 - duo 满 2 人 → 成员弹层给「让伴侣在新设备接入」（先要口令，再出链接）；
   group → 每个非我成员行一个「让 TA 在新设备接入」
 - 「我在其他设备接入」= attach 指向自己（改名后的原 channel）
@@ -11063,6 +11134,7 @@ CFBundleShortVersionString、Android 的 versionName 都是它。时间戳式、
 正好当"最低版本"用；跨时区打包也不会出现"后打的包版本更小"。
 
 **落地**：
+
 - 服务端：`serverConfig.json` 加 `minAppVersion`（空串=不设下限）+ `appDownloadUrl`；
   `/health` **配了才下发**这两个键（空串一律当没配——防手滑写空把所有人挡在门外）
 - App：新增 `lib/widgets/version_gate.dart`
@@ -11095,12 +11167,12 @@ CFBundleShortVersionString、Android 的 versionName 都是它。时间戳式、
 可言）和**对方尚未加入 / 性别未知**（原来这种干脆不给底色，落在默认表面色上——灰扑扑
 且和"还没刷新"分不清）。老板给了四条规则，让我补群组那个色。
 
-| 空间 | 取色 | 未选中（淡） | 当前（深） |
-| --- | --- | --- | --- |
-| duo + 性别已知 | 按性别（不变） | 女 #D6529C / 男 #3BAFFD @18% | 女 #B83D80 / 男 #2271F7 |
-| duo + 性别未知 | **青** | #26C6DA @22% | #00838F |
-| group | **紫**（我挑的） | #9575CD @18% | #6A4FB6 |
-| 当前空间 | — | — | 再加**两层外阴影**做立体 |
+| 空间           | 取色             | 未选中（淡）                 | 当前（深）               |
+| -------------- | ---------------- | ---------------------------- | ------------------------ |
+| duo + 性别已知 | 按性别（不变）   | 女 #D6529C / 男 #3BAFFD @18% | 女 #B83D80 / 男 #2271F7  |
+| duo + 性别未知 | **青**           | #26C6DA @22%                 | #00838F                  |
+| group          | **紫**（我挑的） | #9575CD @18%                 | #6A4FB6                  |
+| 当前空间       | —                | —                            | 再加**两层外阴影**做立体 |
 
 **为什么挑紫**：粉/蓝/青已经被"女/男/未知"占着，群组借其中任何一个都会让人误判类型；
 紫与它们同处品牌色系（群聊气泡色板里本来就有第 4 色紫），且不带性别联想。
@@ -11113,6 +11185,7 @@ CFBundleShortVersionString、Android 的 versionName 都是它。时间戳式、
 
 **数据从哪来**：卡片要按空间类型分流，而类型此前**没落过盘**。补上 per-space 资料的
 `mode` 键（`app_lock.saveProfile`）：
+
 - 写入点：聊天页 `_refreshProfileFromServer`（/space 刚下发过 mode）、向导完成时
   （create = 第 2 步选的那个；join = preflight 下发的 `preflight.mode`，新存
   `_joinSpaceMode`）——所以**建完空间立刻**打开切空间弹层就是对的，不必等聊天页拉过 /space
@@ -11174,6 +11247,7 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 的 `a584b91`；我接手时只把**语义**改成了 `attach`，没把字面量清干净。
 
 **两层问题**（都对）：
+
 1. **术语层**：`docs/GLOSSARY.md` 明写"英文**不用** `channel`（会被读成 Slack/WebSocket/
    Go channel）"——是项目**明确否决**过的词，上个 agent 用了它。
 2. **更根本**：这个字段**也不该叫 `entrance`**。`purpose` 回答的是"这次 join 要**开新
@@ -11182,6 +11256,7 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
    这个名字区分不了两个分支。所以结论是**保留 invite / attach**，清掉残留的 channel。
 
 **清掉的**：
+
 - DB 迁移的列默认值 `DEFAULT 'channel'` → `'attach'`（只影响**新库**：已迁移过的库
   SQLite 改不了列默认值；而且代码里没有任何插入省略 purpose——它纯粹是"别再留下坏词"）
 - CLI 的 `/invite channel` 别名 → 删掉，只认 `/invite attach`
@@ -11203,11 +11278,11 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 
 **三种场景**（`chat_page._showInviteDialog` 内判定，复用服务端的 purpose + target）：
 
-| 场景 | 判定 | 标题 | 说明 |
-| --- | --- | --- | --- |
-| 邀请新成员 | `purpose == 'invite'` | 邀请开通码已生成 | 把这个码发给要邀请的人——对方用它加入，成为新成员 |
-| 我换设备 | `purpose == 'attach'` 且 target 缺省/是我 | 我的新设备开通码已生成 | 在另一台设备的 App 里打开这个码，以「我的身份」接入 |
-| 帮 TA 找回 | `purpose == 'attach'` 且 target 是别人 | TA 的新设备开通码已生成 | 把这个码发给「{name}」——TA 在新设备上打开，就以自己的身份接入（原有通道不受影响） |
+| 场景       | 判定                                      | 标题                    | 说明                                                                              |
+| ---------- | ----------------------------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| 邀请新成员 | `purpose == 'invite'`                     | 邀请开通码已生成        | 把这个码发给要邀请的人——对方用它加入，成为新成员                                  |
+| 我换设备   | `purpose == 'attach'` 且 target 缺省/是我 | 我的新设备开通码已生成  | 在另一台设备的 App 里打开这个码，以「我的身份」接入                               |
+| 帮 TA 找回 | `purpose == 'attach'` 且 target 是别人    | TA 的新设备开通码已生成 | 把这个码发给「{name}」——TA 在新设备上打开，就以自己的身份接入（原有通道不受影响） |
 
 - 判定用 `targetMemberId != _myMemberId`（**不靠名字比字符串**，允许同名成员）
 - 找回文案带对方名字：`_recoverMemberIdentity` 顺手把 `memberName` 传进弹窗
@@ -11325,16 +11400,16 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 
 **改了什么**（`app_zh.arb` / `app_en.arb`，中英各 8 条）：
 
-| key | 改成 | 为什么 |
-| --- | --- | --- |
-| `chatPageInviteRegenerate` | 重新生成 / **Regenerate** | 老板一度改成「重新邀请 / Re-invite」——**这个按钮是"重新签发一张码"**（旧码用掉/过期），且三种场景共用（含"添加我的新通道"）；在给自己加设备时写"重新邀请"讲不通 |
-| `chatPageInviteDialogTitleInvite` | 邀请加入本秘境 / Invite someone to this space | 老板用了「伙伴 / buddy」→ 全 App 其他地方统一是「伴侣 / partner」，同一人两种叫法伤小白；而且这条在**群组空间**也出现（那是朋友/同事，不是"伴侣/伙伴"）→ **干脆不写人称**，两种空间都成立。英文同时补了宾语（原 "Invite someone to join" 悬空） |
-| `chatPageInviteDialogTitleAttachSelf` | 添加我的新通道 / Add my new device to this space | "Attach" 是内部词，用户更认 "Add" |
-| `chatPageInviteDialogTitleRecover` | 让对方在新设备接入 / Re-invite them onto a new device | 英文原 "Re-invite someone to **attach**" 悬空；中文统一到"不写人称"，且与成员弹层入口「让伴侣在新设备接入」同构 |
-| `chatPageInviteDialogHintInvite` | 把它发给要邀请的人… / Send this token to whoever you're inviting… | 去掉「特别伙伴 / buddy」（同上：术语 + 群空间不适用） |
-| `chatPageInviteDialogHintAttachSelf` | **在你的另一台设备上用这个码新建一条通道接入本秘境** / **Use this token on your other device**… | 原英文 **"your another device" 是语法错**；原中文"发送给你的另一台设备"也不对——你不是"发给设备"，是**在那台设备上用它** |
-| `chatPageInviteDialogHintRecover` | …TA 在新设备上打开就能回到自己的身份，**原有通道不受影响** / …Their existing entrances keep working. | 英文原 "attach a new entrance to this space" 是内部黑话；且**丢了"原有通道不受影响"这句安抚**（老板"绝不撤销对方通道"那条要求的用户侧表达），补回 |
-| `chatPageEntranceListNew` | 在我的其他设备上新建通道 / **Add an entrance on another device** | 英文原 "Open a new entrance" 丢了"在另一台设备上"，且 "open" 像是"在这里打开" |
+| key                                   | 改成                                                                                                 | 为什么                                                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chatPageInviteRegenerate`            | 重新生成 / **Regenerate**                                                                            | 老板一度改成「重新邀请 / Re-invite」——**这个按钮是"重新签发一张码"**（旧码用掉/过期），且三种场景共用（含"添加我的新通道"）；在给自己加设备时写"重新邀请"讲不通                                                                                 |
+| `chatPageInviteDialogTitleInvite`     | 邀请加入本秘境 / Invite someone to this space                                                        | 老板用了「同伴 / buddy」→ 全 App 其他地方统一是「伴侣 / partner」，同一人两种叫法伤小白；而且这条在**群组空间**也出现（那是朋友/同事，不是"伴侣/同伴"）→ **干脆不写人称**，两种空间都成立。英文同时补了宾语（原 "Invite someone to join" 悬空） |
+| `chatPageInviteDialogTitleAttachSelf` | 添加我的新通道 / Add my new device to this space                                                     | "Attach" 是内部词，用户更认 "Add"                                                                                                                                                                                                               |
+| `chatPageInviteDialogTitleRecover`    | 让对方在新设备接入 / Re-invite them onto a new device                                                | 英文原 "Re-invite someone to **attach**" 悬空；中文统一到"不写人称"，且与成员弹层入口「让伴侣在新设备接入」同构                                                                                                                                 |
+| `chatPageInviteDialogHintInvite`      | 把它发给要邀请的人… / Send this token to whoever you're inviting…                                    | 去掉「特别同伴 / buddy」（同上：术语 + 群空间不适用）                                                                                                                                                                                           |
+| `chatPageInviteDialogHintAttachSelf`  | **在你的另一台设备上用这个码新建一条通道接入本秘境** / **Use this token on your other device**…      | 原英文 **"your another device" 是语法错**；原中文"发送给你的另一台设备"也不对——你不是"发给设备"，是**在那台设备上用它**                                                                                                                         |
+| `chatPageInviteDialogHintRecover`     | …TA 在新设备上打开就能回到自己的身份，**原有通道不受影响** / …Their existing entrances keep working. | 英文原 "attach a new entrance to this space" 是内部黑话；且**丢了"原有通道不受影响"这句安抚**（老板"绝不撤销对方通道"那条要求的用户侧表达），补回                                                                                               |
+| `chatPageEntranceListNew`             | 在我的其他设备上新建通道 / **Add an entrance on another device**                                     | 英文原 "Open a new entrance" 丢了"在另一台设备上"，且 "open" 像是"在这里打开"                                                                                                                                                                   |
 
 **已重新生成** `app_localizations_*.dart`（此前 arb 与生成代码不一致——老板改完没跑 gen-l10n，
 页面显示的还是旧串）。四个套件 46 条全绿；`flutter analyze` 干净。
@@ -11350,15 +11425,15 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 
 ### 1. 剩余 18 条全清（三处共 249+22 条全绿）
 
-| 文件 | 红 → | 根因 |
-| --- | --- | --- |
-| `wizard_envelope_entry_test` | 5 → 0 | create 流程多了**类型页**（名字→类型→口令→PIN），测试还按老步号 |
-| `setup_join_passphrase_test` | 6 → 0 | 性别卡要点**图标**（点文字命中不了）+ 文案 |
-| `wizard_autofocus_test` | 1 → 0 | 第 2 步成了类型页（无输入框），"聚焦首框"要挪到第 3 步 |
-| `peer_invite_link_test` | 2 → 0 | 状态条那格从「邀请加入」改成「邀请」 |
-| `option_picker_sheet_test` | 1 → 0 | 弹层上限从"窗口 90%"改成**满窗高**（2026-10-02 统一） |
-| `chat_quote_image/video_test` | 2 → 0 | 引用条缩略图 24 → **40**（与引用块同尺寸，2026-09-27）；引用条**不再显示文件名** |
-| `chat_profile_refresh_test` | 1 → 0 | 测试把占位名写成「待加入」，与状态行 `spaceListPeerPending`**同名撞成 2 个** → 换成「占位名」 |
+| 文件                          | 红 →  | 根因                                                                                          |
+| ----------------------------- | ----- | --------------------------------------------------------------------------------------------- |
+| `wizard_envelope_entry_test`  | 5 → 0 | create 流程多了**类型页**（名字→类型→口令→PIN），测试还按老步号                               |
+| `setup_join_passphrase_test`  | 6 → 0 | 性别卡要点**图标**（点文字命中不了）+ 文案                                                    |
+| `wizard_autofocus_test`       | 1 → 0 | 第 2 步成了类型页（无输入框），"聚焦首框"要挪到第 3 步                                        |
+| `peer_invite_link_test`       | 2 → 0 | 状态条那格从「邀请加入」改成「邀请」                                                          |
+| `option_picker_sheet_test`    | 1 → 0 | 弹层上限从"窗口 90%"改成**满窗高**（2026-10-02 统一）                                         |
+| `chat_quote_image/video_test` | 2 → 0 | 引用条缩略图 24 → **40**（与引用块同尺寸，2026-09-27）；引用条**不再显示文件名**              |
+| `chat_profile_refresh_test`   | 1 → 0 | 测试把占位名写成「待加入」，与状态行 `spaceListPeerPending`**同名撞成 2 个** → 换成「占位名」 |
 
 **所有文案断言一律改成 `_zh.<key>`**（`lookupAppLocalizations(const Locale('zh'))`）——
 这就是老板那条原则的落地：断言绑 key，不绑字面值；以后改文案不会再弄红测试。
@@ -11381,6 +11456,7 @@ scripts/testAll.sh cli --e2e  # 额外跑 cli/test/*.py 的 pty E2E 探针（需
 ```
 
 三个细节：
+
 - **本地与 CI 共用这一份**（CI 的每个 job 就是 `scripts/testAll.sh <target>`），
   不维护第二套命令——这正是之前"我说全过、其实没跑 app 测试"的根因，用单一入口堵掉。
 - **pubspec.lock 守卫**：开发机 `PUB_HOSTED_URL` 指中国镜像，`pub get` 会把 lock 里的

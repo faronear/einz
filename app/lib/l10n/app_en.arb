@@ -30,7 +30,7 @@
       }
     }
   },
-  "wizardMyNameLabel": "Name (can be changed later)",
+  "wizardMyNameLabel": "Name",
   "wizardNameRequired": "Enter your name",
   "wizardNameInvalidError": "Only Chinese/English letters, digits, _ , - and emoji are allowed.",
   "wizardNameTooLongError": "At most {max} characters",
@@ -53,11 +53,11 @@
   "wizardDone": "Done",
   "wizardTitleName": "About me",
   "wizardTitleSpaceKind": "Space type",
-  "wizardSpaceKindHint": "Pick one — this cannot be changed later",
-  "wizardSpaceKindDuo": "Two-person space",
-  "wizardSpaceKindDuoDesc": "Just the two of you, with voice calls",
+  "wizardSpaceKindHint": "How many people will this space have?",
+  "wizardSpaceKindDuo": "Duo space",
+  "wizardSpaceKindDuoDesc": "For just the two of you, no one else can be added later.",
   "wizardSpaceKindGroup": "Group space",
-  "wizardSpaceKindGroupDesc": "For several people, no voice calls",
+  "wizardSpaceKindGroupDesc": "For multiple persons, every member can invite new ones.",
   "wizardSpaceKindRequired": "Please choose a space type",
   "wizardSpaceLimit": "Space limit reached (server maxSpaces), cannot create",
   "wizardTitlePassphrase": "Set passphrase",
@@ -74,19 +74,19 @@
       }
     }
   },
-  "wizardPassphraseHint": "The passphrase is shared by you and your partner to protect private messages. Memorize it and never leak it; share it only with your partner.",
+  "wizardPassphraseHint": "The passphrase is the only key to access the space, shared by you and your partner. Memorize it and never leak it!",
   "wizardPassphraseMinLengthHint": "At least 8 characters",
   "wizardPassphraseTooShort": "Passphrase must be at least 8 characters",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
   "wizardPassphraseMismatch": "Passphrases do not match",
-  "wizardJoinPassphraseHint": "The passphrase is shared by you and your partner to protect private messages. Don't know it? Ask your partner.",
+  "wizardJoinPassphraseHint": "The passphrase is the only key to access the space, shared by you and your partner. Don't know it? Ask your partner.",
   "wizardJoinPassphraseWrong": "Wrong passphrase: use the one set on the first entrance",
   "wizardSwitchToEnvelope": "Use key envelope instead (offline)",
   "wizardSwitchToPassphrase": "Use a shared passphrase instead",
   "wizardPinHint": "Device-specific lock PIN. Enter it each time you launch.",
   "welcomeDialogTitleCreate": "All set!",
   "welcomeDialogTitleJoin": "All set!",
-  "welcomeDialogMessage": "Just the two of you, end-to-end encrypted for total privacy. Enter now and start chatting!",
+  "welcomeDialogMessage": "The space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!",
   "welcomeDialogStart": "Enter Einz",
   "setupPageKeyGenFailed": "❌ Key generation failed: {error}",
   "@setupPageKeyGenFailed": {
@@ -97,7 +97,7 @@
     }
   },
   "setupEntryTitle": "Einz wizard",
-  "setupEntryHint": "Einz is a secret space for two partners. You can create a new one, or join an existing one by invitation.",
+  "setupEntryHint": "Einz is an end-to-end encrypted space for private chatting and sharing. You can create a new one, or join an existing one by invitation.",
   "setupEntryCreate": "Create",
   "setupEntryJoin": "Join",
   "setupEntryLegacyServer": "Server version too old — please upgrade",
@@ -119,9 +119,9 @@
     }
   },
   "setupTokenTitle": "Verify token",
-  "setupTokenHint": "Open the dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
-  "setupTokenInputHint": "Paste the token or invite link",
-  "setupTokenNeedInput": "Enter the token",
+  "setupTokenHint": "Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
+  "setupTokenInputHint": "New entrance token",
+  "setupTokenNeedInput": "Enter the new entrance token",
   "setupTokenInvalid": "Invalid token",
   "setupTokenExpired": "Token expired",
   "setupTokenUsed": "Token already used",
@@ -197,9 +197,9 @@
   "chatPageSetLockCleared": "PIN deleted. You can enter the space directly at next launch.",
   "chatPageClearLockTitle": "Delete PIN?",
   "chatPageClearLockMessage": "Delete the PIN? After deletion, next app launch will go straight into chat.",
-  "chatPageInviteDialogTitleInvite": "Invite someone to this space",
-  "chatPageInviteDialogTitleAttachSelf": "Add my new device to this space",
-  "chatPageInviteDialogTitleRecover": "Re-invite them onto a new device",
+  "chatPageInviteDialogTitleInvite": "Invite my partner",
+  "chatPageInviteDialogTitleAttachSelf": "Add a new entrance",
+  "chatPageInviteDialogTitleRecover": "Re-invite the partner to this space",
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
   "chatPageInviteDialogHintInvite": "Send this token to whoever you're inviting so they can join this space. One-time use, valid for 24 hours.",
@@ -214,9 +214,9 @@
     }
   },
   "chatPageInviteCopyLinkTooltip": "Copy invite link",
-  "chatPageInviteCopyCodeTooltip": "Copy token",
+  "chatPageInviteCopyCodeTooltip": "Copy new entrance token",
   "chatPageInviteLinkCopied": "Invite link copied",
-  "chatPageInviteCodeCopied": "Token copied",
+  "chatPageInviteCodeCopied": "New entrance token copied",
   "chatPageInviteFailed": "Failed to create the token: {error}",
   "@chatPageInviteFailed": {
     "placeholders": {
@@ -317,11 +317,11 @@
   "chatPageMenuBurnLabel": "Burn-after-read",
   "chatPageMenuMyNameLabel": "My identity",
   "chatPageMenuEntranceList": "My entrances",
-  "wizardJoinInviteHint": "{name} invited you to this space ({count} members)",
-  "wizardJoinInviteHintNoName": "You were invited to this space ({count} members)",
-  "wizardJoinChannelHint": "This link adds {name}'s own account on another device",
-  "wizardJoinRecoverHint": "{name} is adding {target}'s identity to this device; existing entrances stay untouched",
-  "wizardJoinRecoverHintNoName": "This link adds {target}'s identity to this device; existing entrances stay untouched",
+  "wizardJoinInviteHint": "Invited by {name}",
+  "wizardJoinInviteHintNoName": "Invited to join a space",
+  "wizardJoinAttachHint": "Add a new entrance of {name}",
+  "wizardJoinRecoverHint": "Invited by {name} to add a new entrance of {target}",
+  "wizardJoinRecoverHintNoName": "Invited to add a new entrance of {target}",
   "@wizardJoinRecoverHint": {"placeholders": {"name": {"type": "String"}, "target": {"type": "String"}}},
   "@wizardJoinRecoverHintNoName": {"placeholders": {"target": {"type": "String"}}},
   "@wizardJoinInviteHint": {
@@ -341,7 +341,7 @@
       }
     }
   },
-  "@wizardJoinChannelHint": {
+  "@wizardJoinAttachHint": {
     "placeholders": {
       "name": {
         "type": "String"
@@ -578,7 +578,7 @@
   },
   "chatPageMenuAbout": "About Einz",
   "aboutPageTitle": "About Einz",
-  "aboutIntro": "Einz is a secret space for just two partners: all messages and attachments are end-to-end encrypted, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.",
+  "aboutIntro": "Einz is an end-to-end encrypted space for private chatting and sharing, and no third party — including Einz itself — can read them, strictly safeguarding your privacy.",
   "aboutVersionLabel": "Version",
   "aboutServerLabel": "Server",
   "aboutServerDevNote": "Development address for debugging only",
