@@ -26,8 +26,11 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required EntranceKeyPair kp}) 
       probeServer: (_) async => const ServerHealth(
           ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
       // Multiverse join：token 校验（preflight）用 fake
+      // purpose='invite' → 走"新成员自填名"向导（2026-10-03 起身份选择页已删；
+      // 不写 purpose 会落到 attach：那会**跳过名字页**，与本测试的步骤假设不符）
       preflightOverride: (token) async => const SpaceJoinPreflight(
           spaceId: 'space-test', status: 'waiting', memberCount: 1,
+          purpose: 'invite',
           slots: [
             SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
             SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
@@ -38,13 +41,17 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required EntranceKeyPair kp}) 
     ),
   ));
   await tester.pumpAndSettle();
-  // Multiverse join：入口页 → 加入 → token（preflight 通过）→ 身份选择 → 口令页
+  // Multiverse join：入口页 → 加入 → token（preflight 通过）→ 名字页 → 口令页
+  // （2026-10-03 起：身份选择页已删，invite 流改成"自己填名字 + 性别"）
   await tester.tap(find.text('加入秘境'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
-  await tester.tap(find.text('下一步')); // preflight 通过 → 直接进身份选择页（不再显示确认卡片）
+  await tester.tap(find.text('下一步')); // preflight 通过 → 直接进名字页
   await tester.pumpAndSettle();
-  await tester.tap(find.textContaining('Alice')); // 选第二人（伴侣）
+  await tester.enterText(find.byType(TextField), '小芳');
+  await tester.testTextInput.receiveAction(TextInputAction.done); // 收键盘露出性别卡
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Icons.female));
   await tester.pumpAndSettle();
   await tester.tap(find.text('下一步'));
   await tester.pumpAndSettle(); // → 口令页

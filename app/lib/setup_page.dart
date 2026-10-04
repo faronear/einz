@@ -1419,55 +1419,38 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---- 场景 A（create）：身份名字 → 口令 → PIN → 完成（通道名已自动设置，不再询问） ----
 
-  /// 加入方知情条（群聊一期 2026-10-03）：这条链接是谁发的、空间现在几个人。
+  /// 加入方**备注文案**（2026-10-03/04）：这条链接是谁发的、要做什么。
   ///
-  /// 两者都由 preflight 给（inviterName 是**签发者本人**的名字——服务端按
-  /// join_tokens.issuer_member_id 查的，不是"随便挑一个成员"）。身份选择页删掉后，
-  /// 这里是加入者判断"我要进的是谁的、几人的空间"的唯一依据。
-  Widget _joinPurposeHint(AppLocalizations l10n) {
+  /// 由 preflight 给（inviterName 是**签发者本人**的名字——服务端按
+  /// join_tokens.issuer_member_id 查的，不是"随便挑一个成员"；targetName 是
+  /// attach 要进入的那个身份）。身份选择页删掉后，这里是加入者判断
+  /// "我要进的是谁的、会怎样"的唯一依据。
+  ///
+  /// **渲染位置**：作为 `_stepHeader` 的备注行（大标题「关于我」的正下方）——
+  /// 2026-10-04 老板改的要求：最早它是一条带图标的行浮在大标题上方（左上角），
+  /// 看着像横插进来的横幅；放进备注位才和"标题 + 说明"的既有版式一致。
+  ///
+  /// 没有可说的（不是 join / 信息缺失）→ null，调用方回落到该页本来的备注。
+  String? _joinNoteText(AppLocalizations l10n) {
+    if (_role != _WizardRole.join) return null;
     final who = (_joinInviterName ?? '').trim();
     final target = (_joinTargetName ?? '').trim();
-    final Text? line;
     if (_joinPurpose == 'invite') {
-      line = Text(
-        who.isEmpty
-            ? l10n.wizardJoinInviteHintNoName(_joinMemberCount)
-            : l10n.wizardJoinInviteHint(who, _joinMemberCount),
-        style: const TextStyle(fontSize: 12),
-      );
-    } else if (!_joinTargetIsIssuer && target.isNotEmpty) {
-      // **找回**：别的成员把我接回我自己的身份（我丢了设备）。
-      // 这条要说得最清楚——收到它的人往往正一头雾水"我是不是要重新加入"。
-      line = Text(
-        who.isEmpty
-            ? l10n.wizardJoinRecoverHintNoName(target)
-            : l10n.wizardJoinRecoverHint(who, target),
-        style: const TextStyle(fontSize: 12),
-      );
-    } else if (who.isNotEmpty || target.isNotEmpty) {
-      // 我在另一台设备接入自己的账号（签发者 = 目标）
-      line = Text(l10n.wizardJoinChannelHint(who.isEmpty ? target : who),
-          style: const TextStyle(fontSize: 12));
-    } else {
-      line = null;
+      return who.isEmpty
+          ? l10n.wizardJoinInviteHintNoName(_joinMemberCount)
+          : l10n.wizardJoinInviteHint(who, _joinMemberCount);
     }
-    if (line == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-              _joinPurpose == 'invite'
-                  ? Icons.person_add_alt_1
-                  : (_joinTargetIsIssuer ? Icons.devices : Icons.history),
-              size: 16,
-              color: const Color(0xFF2271F7)),
-          const SizedBox(width: 6),
-          Expanded(child: line),
-        ],
-      ),
-    );
+    // attach：区分"我换设备"与"别人帮我找回"（targetIsIssuer 由服务端给，
+    // 不靠名字比字符串——允许同名成员）
+    if (!_joinTargetIsIssuer && target.isNotEmpty) {
+      return who.isEmpty
+          ? l10n.wizardJoinRecoverHintNoName(target)
+          : l10n.wizardJoinRecoverHint(who, target);
+    }
+    if (who.isNotEmpty || target.isNotEmpty) {
+      return l10n.wizardJoinChannelHint(who.isEmpty ? target : who);
+    }
+    return null;
   }
 
   /// 步骤 2（create，2026-10-04）：秘境类型——**双人 / 群组，创建时定死、之后
@@ -1567,11 +1550,10 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 群聊一期（2026-10-03）：join 的 invite 流在这一页自填名字——**先把
-        // "谁邀请的我、这个空间现在有几个人"说清楚**（preflight 提供）。原「选择
-        // 身份」页删掉后这是唯一的知情入口：链接是谁发的、要进的是几人空间。
-        if (_role == _WizardRole.join) _joinPurposeHint(l10n),
-        _stepHeader(l10n.wizardTitleName, l10n.wizardNameHint),
+        // 加入方知情说明：「谁邀请的我 / 这是谁的找回链接」作为**大标题下方的
+        // 备注**（2026-10-04 老板改版式：原先是带图标的一行浮在标题上方，像横幅）。
+        // 没有可说的（create 流）就回落到本页本来的备注。
+        _stepHeader(l10n.wizardTitleName, _joinNoteText(l10n) ?? l10n.wizardNameHint),
         TextField(
           controller: _creatorName,
           focusNode: _nameFocus, // 方案 1：聚焦时滚出性别卡
@@ -2094,10 +2076,6 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 群聊一期（2026-10-03）：channel 流（设备接入）没有名字页，所以"这条链接
-        // 是谁的、几人空间"只能在口令页说（invite 流那份在名字页，见 _buildStepName）。
-        if (_role == _WizardRole.join && _joinPurpose == 'attach')
-          _joinPurposeHint(l10n),
         // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
         // 文字链接；仅后续通道 join 适用——首条通道无对端可导出密封信封）
         Row(
@@ -2109,9 +2087,15 @@ class _SetupPageState extends State<SetupPage> {
                 _role == _WizardRole.join
                     ? l10n.wizardJoinPassphraseTitle
                     : l10n.wizardTitlePassphrase,
-                _role == _WizardRole.join
-                    ? l10n.wizardJoinPassphraseHint
-                    : l10n.wizardPassphraseHint,
+                // attach 流（设备接入 / 别人帮我找回）没有名字页，所以"这条链接是
+                // 谁的、要做什么"落在**这一页的备注位**（2026-10-04 老板改版式：
+                // 原先是带图标的一行浮在大标题上方）。invite 流那份在名字页。
+                (_role == _WizardRole.join && _joinPurpose == 'attach'
+                        ? _joinNoteText(l10n)
+                        : null) ??
+                    (_role == _WizardRole.join
+                        ? l10n.wizardJoinPassphraseHint
+                        : l10n.wizardPassphraseHint),
               ),
             ),
             if (_role == _WizardRole.join)
