@@ -211,6 +211,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
         String peerGender,
         String peerMemberId,
         bool peerJoined,
+        bool isGroup,
       })> _names = {};
   Map<String, int> _unread = {};
   String? _activeId;
@@ -232,6 +233,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
           String peerGender,
           String peerMemberId,
           bool peerJoined,
+          bool isGroup,
         })>{};
     for (final row in rows) {
       var name = row.name;
@@ -255,6 +257,9 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
         // 对方是否已入网：**只有明确的 false 才显示「待加入」**（null = 本机还没判断过，
         // 什么都不说——宁可少显示，也不要把"还没刷新"误报成"对方没来"）。
         peerJoined: (p['peerJoined'] as bool?) != false,
+        // 空间类型（'duo' | 'group'）：创建时定死、永不改变，落在 per-space 资料里
+        // （见 app_lock.saveProfile 的 mode 参数）。老记录没有这个键 → 回退 duo。
+        isGroup: ((p['mode'] as String?) ?? 'duo') == 'group',
       );
     }
     final vault = VaultSession.current;
@@ -332,6 +337,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                             peerGender: _names[space.spaceId]?.peerGender ?? '',
                             peerMemberId: _names[space.spaceId]?.peerMemberId ?? '',
                             peerPending: _names[space.spaceId]?.peerJoined == false,
+                            isGroup: _names[space.spaceId]?.isGroup ?? false,
                             server: effectiveServer,
                             api: widget.api,
                             unread: _unread[space.spaceId] ?? 0,
@@ -386,6 +392,48 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
   }
 }
 
+/// 切空间卡片底色（老板 2026-10-04 定的四条规则）：
+///
+/// | 空间 | 取色 | 未选中（淡） | 当前（深） |
+/// | --- | --- | --- | --- |
+/// | duo + 性别已知 | 按性别 | 女 #D6529C / 男 #3BAFFD 的 18% tint | 女 #B83D80 / 男 #2271F7 |
+/// | duo + 性别未知（对方还没加入 / 从没登记过性别） | **青** | #26C6DA 22% tint | #00838F |
+/// | group | **紫** | #9575CD 18% tint | #6A4FB6 |
+///
+/// - 粉/蓝是**性别的象征色**（与对话气泡同源：淡 = 素雅主题气泡、深 = 渐变主题气泡）。
+/// - 青 = "**还不知道是谁**"：系统里已在两处用它表同一件事——同性别第二人气泡
+///   （`chat_page._bubbleColor`）与群气泡色板第 3 色。沿用，不新造色。
+/// - 紫是给群组的（老板让我挑）：粉/蓝/青分别被"女/男/未知"占着，群组不该借用其中
+///   任何一个（否则一眼看不出这是个群）；紫与它们同处品牌色系（群气泡色板里就有），
+///   且不带性别联想的包袱。
+///
+/// 提成顶层函数是为了**可单测**（`test/space_card_color_test.dart` 逐条钉住上表）。
+Color spaceCardColor({
+  required bool isGroup,
+  required String peerGender,
+  required bool current,
+}) {
+  if (isGroup) {
+    return current
+        ? const Color(0xFF6A4FB6) // 深紫
+        : const Color(0xFF9575CD).withValues(alpha: 0.18); // 紫 tint
+  }
+  if (peerGender == 'female') {
+    return current
+        ? const Color(0xFFB83D80)
+        : const Color(0xFFD6529C).withValues(alpha: 0.18);
+  }
+  if (peerGender == 'male') {
+    return current
+        ? const Color(0xFF2271F7)
+        : const Color(0xFF3BAFFD).withValues(alpha: 0.18);
+  }
+  // 性别未知（对方尚未加入 / 没登记过性别）→ 青
+  return current
+      ? const Color(0xFF00838F)
+      : const Color(0xFF26C6DA).withValues(alpha: 0.22);
+}
+
 class _SpaceCard extends StatelessWidget {
   const _SpaceCard({
     required this.size,
@@ -393,6 +441,7 @@ class _SpaceCard extends StatelessWidget {
     required this.peerGender,
     required this.peerMemberId,
     required this.peerPending,
+    required this.isGroup,
     required this.server,
     required this.api,
     required this.unread,
@@ -412,36 +461,25 @@ class _SpaceCard extends StatelessWidget {
   /// 对方**明确尚未加入**（服务端通道表里除我之外没有别的成员）→ 名字下显示「待加入」。
   /// 注意与 `peerMemberId` 为空的区别：后者也可能是"本机还没刷新过"，那种情况不该报状态。
   final bool peerPending;
+
+  /// 群组空间（mode='group'）→ 用紫色，不按性别取色（一群人没有"对方的性别"可言）。
+  final bool isGroup;
   final String server;
   final ApiClient? api;
   final int unread;
   final bool current;
   final VoidCallback onTap;
 
-  /// 卡片底色（老板 2026-09-23 定的对照关系）：
-  /// - **被选中** → 饱和"深色"：女 #B83D80（深粉）/ 男 #2271F7（深蓝）——与对话里
-  ///   **渐变粉蓝主题** 的气泡同色（见 chat_page.dart 的 _bubbleColor）。
-  /// - **未选中** → 对应的"淡色"：女 #D6529C / 男 #3BAFFD 的 18% tint——与对话里
-  ///   **素雅纯色主题** 的气泡同色。
-  /// - 性别未登记 → 不给底色（选中 / 未选中都不给），用 Card 默认表面色。
-  Color? get _background {
-    if (peerGender == 'female') {
-      return current
-          ? const Color(0xFFB83D80)
-          : const Color(0xFFD6529C).withValues(alpha: 0.18);
-    }
-    if (peerGender == 'male') {
-      return current
-          ? const Color(0xFF2271F7)
-          : const Color(0xFF3BAFFD).withValues(alpha: 0.18);
-    }
-    return null;
-  }
+  /// 卡片底色（规则见顶层 [spaceCardColor]）：当前空间用深色，其余用同色淡 tint。
+  Color get _background => spaceCardColor(
+        isGroup: isGroup,
+        peerGender: peerGender,
+        current: current,
+      );
 
-  /// 前景色（名字 / 对勾）：只有"选中 + 有底色"（即深色底）才用白色，
-  /// 淡色底 / 无底色都返回 null → 回退主题默认深色字。
-  Color? get _foreground =>
-      (current && _background != null) ? Colors.white : null;
+  /// 前景色（名字 / 对勾）：**当前空间**一定是深色底 → 白字；其余（淡色 tint）
+  /// 返回 null → 回退主题默认深色字。
+  Color? get _foreground => current ? Colors.white : null;
 
   @override
   Widget build(BuildContext context) {
@@ -463,11 +501,22 @@ class _SpaceCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: _background,
           borderRadius: BorderRadius.circular(12),
+          // **当前正在使用的空间：用阴影做出"浮起来"的立体感**（老板 2026-10-04）。
+          // 两层叠加才像立体：近处一层小而实（贴着卡片边缘，交代"它离你更近"），
+          // 远处一层大而柔（环境光晕）。单层阴影只会看着像描了一圈灰边。
+          // 一律外阴影、不叠在底色上——早期用 Material elevation 会往底色叠
+          // surfaceTint 把颜色压暗（老板说的"发暗"），这里不碰底色。
           boxShadow: current
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.26),
-                    blurRadius: 10,
+                    color: Colors.black.withValues(alpha: 0.30),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
                   ),
                 ]
               : const <BoxShadow>[],

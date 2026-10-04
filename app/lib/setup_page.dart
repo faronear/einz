@@ -117,6 +117,9 @@ class _SetupPageState extends State<SetupPage> {
   /// "我在另一台设备接入" vs "别人帮我找回"）。名字不能靠字符串比——允许同名。
   String? _joinTargetName;
   bool _joinTargetIsIssuer = false;
+  /// 目标空间的类型（preflight 下发；'duo'|'group'）。加入完成后落进 per-space
+  /// 资料，供「切换我的秘境」卡片配色——不必等聊天页拉一次 /space。
+  String? _joinSpaceMode;
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -1381,6 +1384,9 @@ class _SetupPageState extends State<SetupPage> {
       myGender: _myGender ?? '',
       // 对方性别：同上——由聊天页从 /space 成员表获取（旧预置流程已删）
       peerGender: '',
+      // 空间类型：create = 第 2 步选的那个；join = preflight 下发的。
+      // 落盘后「切换我的秘境」的卡片立刻能按类型配色（不必等聊天页拉过 /space）。
+      mode: _role == _WizardRole.create ? _spaceKind : _joinSpaceMode,
     );
     if (!mounted) return; // await 后守卫，避免 use_build_context_synchronously
     final completed = widget.onCompleted;
@@ -1733,6 +1739,7 @@ class _SetupPageState extends State<SetupPage> {
         _joinMemberCount = pre.memberCount;
         _joinTargetName = pre.targetName;
         _joinTargetIsIssuer = pre.targetIsIssuer;
+        _joinSpaceMode = pre.mode;
         _joinTokenVerified = true; // 已验证：输入框锁只读，且不再重复校验
         _localError = null;
       });

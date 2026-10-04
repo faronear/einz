@@ -969,6 +969,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         peerGender: _peerGender,
         mySlot: _mySlot,
         peerSlot: _peerSlot,
+        // 空间类型（切空间卡片的群组配色要用）：/space 刚下发过，带上
+        mode: _spaceMode,
       );
     } catch (_) {
       // 网络失败：保持快照值（下次刷新再试）
@@ -3572,6 +3574,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       peerGender: _peerGender,
       mySlot: _mySlot,
       peerSlot: _peerSlot,
+      // 空间类型（切空间卡片的群组配色要用）
+      mode: _spaceMode,
     );
   }
 

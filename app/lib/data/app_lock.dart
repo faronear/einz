@@ -520,9 +520,27 @@ class AppLockService {
     String peerGender = '', // 对方性别（male/female；消息气泡配色用）
     int? mySlot, // 本人身份槽位（0=第一人/创建者，1=第二人；同性别气泡青色用）
     int? peerSlot, // 对方身份槽位（同上；对方气泡配色判定用）
+    /// 空间类型（'duo' | 'group'）。**null = 保持原值**，见下。
+    String? mode,
   }) async {
     final sid = spaceId;
-    await _set(sid == null ? _kProfile : _profileKey(sid), jsonEncode({
+    final key = sid == null ? _kProfile : _profileKey(sid);
+    // mode 是**空间的固有属性**（创建时定死、永不改变），但这份资料是**整份覆盖写**：
+    // 改名 / 换头像那条路径（`ChatPage._saveProfile`）未必知道 mode，传 null 就沿用
+    // 原值——否则打开一次空间就可能把已记下的 'group' 冲回 'duo'，切空间卡片
+    // 的群组配色随之丢失。与 `savePeerPresence` 同一手法（只读改写自己关心的键）。
+    var effectiveMode = mode;
+    if (effectiveMode == null) {
+      final raw = await _get(key);
+      if (raw != null) {
+        try {
+          effectiveMode = (jsonDecode(raw) as Map<String, dynamic>)['mode'] as String?;
+        } catch (_) {
+          // 坏 JSON：当作没记过（下面回退 'duo'）
+        }
+      }
+    }
+    await _set(key, jsonEncode({
       'memberName': memberName,
       'peerName': peerName,
       'entranceName': entranceName,
@@ -530,6 +548,7 @@ class AppLockService {
       'peerGender': peerGender,
       'mySlot': mySlot,
       'peerSlot': peerSlot,
+      'mode': effectiveMode ?? 'duo',
     }));
     if (sid != null) {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(
@@ -562,6 +581,9 @@ class AppLockService {
         'peerMemberId': (m['peerMemberId'] as String?) ?? '',
         // 对方是否已入网（null = 还判断过/本机没刷新过，卡片据此显示「待加入」）
         'peerJoined': m['peerJoined'] as bool?,
+        // 空间类型（'duo' | 'group'；老记录没有这个键 → 回退 'duo'）。
+        // 「切换我的秘境」的卡片配色按它分流（群组空间用紫色），2026-10-04。
+        'mode': (m['mode'] as String?) ?? 'duo',
       };
     } catch (_) {
       return const {};
