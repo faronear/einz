@@ -79,7 +79,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardNameHint => '我的名字（以后可以随时修改）';
+  String get wizardMyNameLabel => '我的名字（以后可以随时修改）';
 
   @override
   String get wizardNameRequired => '请填写我的名字';
@@ -91,9 +91,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String wizardNameTooLongError(int max) {
     return '名字最多 $max 个字符';
   }
-
-  @override
-  String get wizardNameHintInput => '我的昵称';
 
   @override
   String get wizardMyGenderLabel => '我的性别';

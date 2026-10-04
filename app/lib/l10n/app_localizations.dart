@@ -224,11 +224,11 @@ abstract class AppLocalizations {
   /// **'Connecting to {server}…'**
   String wizardProbeConnecting(String server);
 
-  /// No description provided for @wizardNameHint.
+  /// No description provided for @wizardMyNameLabel.
   ///
   /// In en, this message translates to:
   /// **'Name (can be changed later)'**
-  String get wizardNameHint;
+  String get wizardMyNameLabel;
 
   /// No description provided for @wizardNameRequired.
   ///
@@ -247,12 +247,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'At most {max} characters'**
   String wizardNameTooLongError(int max);
-
-  /// No description provided for @wizardNameHintInput.
-  ///
-  /// In en, this message translates to:
-  /// **'Name'**
-  String get wizardNameHintInput;
 
   /// No description provided for @wizardMyGenderLabel.
   ///

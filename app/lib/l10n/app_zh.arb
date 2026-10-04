@@ -30,7 +30,7 @@
       }
     }
   },
-  "wizardNameHint": "我的名字（以后可以随时修改）",
+  "wizardMyNameLabel": "我的名字（以后可以随时修改）",
   "wizardNameRequired": "请填写我的名字",
   "wizardNameInvalidError": "名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。",
   "wizardNameTooLongError": "名字最多 {max} 个字符",
@@ -41,7 +41,6 @@
       }
     }
   },
-  "wizardNameHintInput": "我的昵称",
   "wizardMyGenderLabel": "我的性别",
   "wizardGenderMale": "男",
   "wizardGenderFemale": "女",

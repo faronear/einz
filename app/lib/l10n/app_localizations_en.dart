@@ -80,7 +80,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get wizardNameHint => 'Name (can be changed later)';
+  String get wizardMyNameLabel => 'Name (can be changed later)';
 
   @override
   String get wizardNameRequired => 'Enter your name';
@@ -93,9 +93,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String wizardNameTooLongError(int max) {
     return 'At most $max characters';
   }
-
-  @override
-  String get wizardNameHintInput => 'Name';
 
   @override
   String get wizardMyGenderLabel => 'Gender';

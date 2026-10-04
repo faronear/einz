@@ -966,7 +966,10 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 归一化的向导输入步骤页头：大标题（大号醒目，水平居中）+ 解释说明（较小较淡，左对齐）。
   /// 全向导各输入页统一用此头部，保证视觉与结构一致。
-  Widget _stepHeader(String title, String hint) {
+  /// [hint] 是**大标题下方的备注**（可省：没有可说的就只渲染标题，不留空行）。
+  /// 注意别把字段标签（如「我的名字…」「我的性别」）塞进这里——那是 [_fieldLabel]。
+  Widget _stepHeader(String title, [String? hint]) {
+    final note = hint?.trim() ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -979,14 +982,16 @@ class _SetupPageState extends State<SetupPage> {
             height: 1.2,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          hint,
-          style: TextStyle(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        if (note.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            note,
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 20),
       ],
     );
@@ -1550,10 +1555,13 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 加入方知情说明：「谁邀请的我 / 这是谁的找回链接」作为**大标题下方的
-        // 备注**（2026-10-04 老板改版式：原先是带图标的一行浮在标题上方，像横幅）。
-        // 没有可说的（create 流）就回落到本页本来的备注。
-        _stepHeader(l10n.wizardTitleName, _joinNoteText(l10n) ?? l10n.wizardNameHint),
+        // 大标题的备注是**独立的一条**（2026-10-04 老板两轮改版式）：
+        // · join 流 → 「谁邀请的我 / 这是谁的找回链接」（原先是带图标的一行浮在
+        //   标题上方，像横幅；现在落在备注位）
+        // · create 流 → 没有可说的，就只有大标题（不再借用输入框的标签充数）
+        _stepHeader(l10n.wizardTitleName, _joinNoteText(l10n)),
+        // 名字输入框的**标签**（老板 2026-10-04：它和「我的性别」同级，不是标题备注）
+        _fieldLabel(l10n.wizardMyNameLabel),
         TextField(
           controller: _creatorName,
           focusNode: _nameFocus, // 方案 1：聚焦时滚出性别卡
@@ -1566,9 +1574,10 @@ class _SetupPageState extends State<SetupPage> {
           onChanged: (_) {
             if (_localError != null) setState(() => _localError = null);
           },
-          decoration: InputDecoration(
-            hintText: l10n.wizardNameHintInput,
-            border: const OutlineInputBorder(),
+          decoration: const InputDecoration(
+            // 不再放占位符：上面已有标签「我的名字…」，再来一句"我的昵称"是重复
+            // （性别卡那组也是"标签 + 控件"，没有占位文案）
+            border: OutlineInputBorder(),
             counterText: '', // 不显示 "3/32" 计数器（只做硬拦）
           ),
         ),
@@ -1934,6 +1943,26 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
+  /// 字段标签（输入框/选择卡上方的说明行）：14 号、次要色，下留 8。
+  ///
+  /// 「我的名字（以后可以随时修改）」与「我的性别」共用这一份 —— 老板 2026-10-04
+  /// 指出前者是**名字输入框的标签**（不是大标题的备注）；两处样式必须一样。
+  Widget _fieldLabel(String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   /// 性别选择：左蓝（男）/右粉（女）两个卡片，与品牌色一致；选中者放大 +
   /// 横向扩展覆盖相邻卡（_buildCardPair），未选中压缩半透明。
   Widget _buildGenderSelector({
@@ -1946,14 +1975,7 @@ class _SetupPageState extends State<SetupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
+        _fieldLabel(label),
         _buildCardPair(
           leftCard: _buildSelectableCard(
             label: maleLabel,

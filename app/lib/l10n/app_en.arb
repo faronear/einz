@@ -30,7 +30,7 @@
       }
     }
   },
-  "wizardNameHint": "Name (can be changed later)",
+  "wizardMyNameLabel": "Name (can be changed later)",
   "wizardNameRequired": "Enter your name",
   "wizardNameInvalidError": "Only Chinese/English letters, digits, _ , - and emoji are allowed.",
   "wizardNameTooLongError": "At most {max} characters",
@@ -41,7 +41,6 @@
       }
     }
   },
-  "wizardNameHintInput": "Name",
   "wizardMyGenderLabel": "Gender",
   "wizardGenderMale": "Male",
   "wizardGenderFemale": "Female",

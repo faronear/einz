@@ -59,7 +59,9 @@ void main() {
     await tester.tap(find.text('创建秘境'));
     await tester.pumpAndSettle();
 
-    // 进入 create 名字步骤（AppBar 标题 wizardAppBarCreate + 输入框 hint「我的名字（以后可以随时修改）」）
+    // 进入 create 名字步骤（AppBar 标题 wizardAppBarCreate +
+    // 输入框上方的**字段标签**「我的名字（以后可以随时修改）」——
+    // 2026-10-04 老板定：它是输入框的标签（与「我的性别」同级），不是大标题的备注）
     expect(find.text('创建秘境'), findsWidgets);
     expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);
