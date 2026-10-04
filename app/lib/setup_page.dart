@@ -965,7 +965,7 @@ class _SetupPageState extends State<SetupPage> {
     });
   }
 
-  /// 归一化的向导输入步骤页头：大标题（大号醒目，水平居中）+ 解释说明（较小较淡，左对齐）。
+  /// 归一化的向导输入步骤页头：大标题（大号醒目，水平居中）+ 解释说明（较小较淡，居中）。
   /// 全向导各输入页统一用此头部，保证视觉与结构一致。
   /// [hint] 是**大标题下方的备注**（可省：没有可说的就只渲染标题，不留空行）。
   /// 注意别把字段标签（如「我的名字…」「我的性别」）塞进这里——那是 [_fieldLabel]。
@@ -987,6 +987,7 @@ class _SetupPageState extends State<SetupPage> {
           const SizedBox(height: 8),
           Text(
             note,
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1457,7 +1458,7 @@ class _SetupPageState extends State<SetupPage> {
           : l10n.wizardJoinRecoverHint(who, target);
     }
     if (who.isNotEmpty || target.isNotEmpty) {
-      return l10n.wizardJoinChannelHint(who.isEmpty ? target : who);
+      return l10n.wizardJoinAttachHint(who.isEmpty ? target : who);
     }
     return null;
   }
