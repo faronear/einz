@@ -11280,3 +11280,39 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 `chatPageEntranceListNew`→"在我的其他设备上新建通道"，且**没有重新生成**，arb 与生成代码
 已经不一致）。这不是我改的 → 本次提交**只 add 我自己的文件**，l10n 那批原样留在工作区，
 不碰、不提交、不 revert。
+
+---
+
+## 2026-10-04（十）翻新两个过时测试文件（菜单/主题）
+
+动画修好后露出的一批陈年 rot，老板让一并翻新。`chat_page_menu_test` 从 **21 红 → 全绿
+（34 条）**，`ui_style_switch_test` **4 红 → 全绿（5 条）**。
+
+### 根因是两类（都不是断言写错，是"入口变了"）
+
+1. **`_menuAction` 的 300ms 错峰延迟**（占绝大多数，约 17 条）：菜单项 / 高级弹层条目 /
+   通道卡改名角标都用 `Future.delayed(300ms)` 等上一个弹层收起再开下一个。而
+   `pumpAndSettle()` 只推到"没有待排帧"就停、**跨不过这 300ms** → 弹层/弹窗还没出现，
+   断言自然找 0 个。修法：新增共享 helper `tapDeferred(tester, finder)`
+   （`test/real_async_settle.dart`，点完显式 `pump(350ms)` 再 settle），把这类点击
+   全换过去。**教训**：这不是"测试写错了"，是它们当年就没跟上错峰改造——而动画问题
+   把这一切盖住了。
+2. **2026-10-02「我的通道」弹层合并**（`5b74cf4`）：当前通道不再有独立菜单项
+   （改名改从弹层里本机卡的**编辑角标**进）、弹窗里的**公钥展示被删**。所以
+   `当前通道弹窗：…公钥置顶+复制` 那条整体重写成 `通道改名弹窗：…`，
+   入口走 `_openCurrentEntranceRename()`（菜单 → 我的通道 → 本机卡角标）。
+
+### 顺手做的两件"防复发"
+
+- **文案断言一律改从 l10n 取**（`lookupAppLocalizations(const Locale('zh'))`）：
+  这套文案（菜单项/弹层标题/校验红字）被改过好几次、测试跟着烂好几次。
+  取**同一份生成代码**，以后改文案不会再让测试腐烂（也让老板现在正在改的那批 l10n
+  不会立刻把测试弄红）。
+- 改名弹窗有 **400ms 延迟 dispose**（TextField 卸载后才丢 controller）：测试结束前必须
+  `pump(500ms)` 推过去，否则报 `A Timer is still pending`（两条测试踩到）。
+
+### 验证
+
+四个套件全绿：`chat_page_menu_test` 34、`ui_style_switch_test` 5、
+`entrance_list_sheet_test` 7、`invite_dialog_layout_test`（合计 46 passed）。
+`flutter analyze` 干净。

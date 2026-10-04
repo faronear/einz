@@ -53,6 +53,9 @@ class _FakeApi extends ApiClient {
   }
 }
 
+/// 文案断言一律从 l10n 取（与页面用的是同一份生成代码）。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 void main() {
   // 菜单里的翻转沙漏（_HourglassFlip）是常驻动画，关掉它免得 pumpAndSettle 超时
   disableAnimationsInTests();
@@ -112,21 +115,20 @@ void main() {
     // 打开菜单 → 界面主题
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('界面主题'), findsOneWidget, reason: '菜单项应为「界面主题」');
-    await tester.tap(find.text('界面主题'));
-    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageMenuStyleLabel), findsOneWidget, reason: '菜单项应为「界面主题」');
+    await tapDeferred(tester, find.text(_zh.chatPageMenuStyleLabel));
 
     // 弹窗：标题 + 两个风格（名称+描述）
-    expect(find.text('界面主题'), findsOneWidget);
-    expect(find.text('素雅纯色'), findsOneWidget);
-    expect(find.text('渐变粉蓝'), findsOneWidget);
-    expect(find.textContaining('浅粉纯色背景'), findsOneWidget, reason: '纯色风格应有一句描述');
-    expect(find.textContaining('粉蓝渐变背景'), findsOneWidget, reason: '渐变风格应有一句描述');
+    expect(find.text(_zh.chatPageMenuStyleLabel), findsOneWidget);
+    expect(find.text(_zh.chatPageUiStylePlain), findsOneWidget);
+    expect(find.text(_zh.chatPageUiStyleGradient), findsOneWidget);
+    expect(find.textContaining(_zh.chatPageUiStylePlainDesc), findsOneWidget, reason: '纯色风格应有一句描述');
+    expect(find.textContaining(_zh.chatPageUiStyleGradientDesc), findsOneWidget, reason: '渐变风格应有一句描述');
 
     // 点选渐变粉蓝 → 立即生效并立即关窗回到对话页（老板要求 2026-09-13）
-    await tester.tap(find.text('渐变粉蓝'));
+    await tester.tap(find.text(_zh.chatPageUiStyleGradient));
     await tester.pumpAndSettle();
-    expect(find.text('界面主题'), findsNothing, reason: '点选后弹窗应立即关闭回到对话页');
+    expect(find.text(_zh.chatPageMenuStyleLabel), findsNothing, reason: '点选后弹窗应立即关闭回到对话页');
     expect(gradientBackground, findsOneWidget, reason: '点选渐变后聊天页背景应切换为渐变');
 
     // 全屏渐变（同向导）：body 延伸到 AppBar 之后、AppBar 透明、状态条/输入条
@@ -147,11 +149,10 @@ void main() {
     // 重新打开弹窗 → 点回素雅纯色 → 关窗、渐变背景消失
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面主题'));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuStyleLabel));
+    await tester.tap(find.text(_zh.chatPageUiStylePlain));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('素雅纯色'));
-    await tester.pumpAndSettle();
-    expect(find.text('界面主题'), findsNothing, reason: '点选后弹窗应立即关闭');
+    expect(find.text(_zh.chatPageMenuStyleLabel), findsNothing, reason: '点选后弹窗应立即关闭');
     expect(gradientBackground, findsNothing, reason: '切回纯色后渐变背景应移除');
     final scaffoldAfter = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffoldAfter.extendBodyBehindAppBar, isFalse, reason: '切回纯色后恢复原有布局（body 不从 AppBar 后延伸）');
@@ -164,12 +165,11 @@ void main() {
     // 改成验证"未点选任何风格时下滑 / 系统返回也能关掉弹窗"
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面主题'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPageMenuStyleLabel));
     expect(find.byIcon(Icons.close), findsNothing, reason: '设置弹层统一不设关闭按钮');
     await tester.binding.handlePopRoute(); // 模拟系统返回/下滑关闭
     await tester.pumpAndSettle();
-    expect(find.text('界面主题'), findsNothing, reason: '返回后弹窗应关闭');
+    expect(find.text(_zh.chatPageMenuStyleLabel), findsNothing, reason: '返回后弹窗应关闭');
     expect(tester.takeException(), isNull);
   });
 
@@ -231,12 +231,11 @@ void main() {
     // 打开风格弹层：渐变粉蓝应有对勾，素雅纯色没有（此前 bug：冷启动后弹层误选纯色）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面主题'));
-    await tester.pumpAndSettle();
-    final gradientRow = find.ancestor(of: find.text('渐变粉蓝'), matching: find.byType(Row)).first;
+    await tapDeferred(tester, find.text(_zh.chatPageMenuStyleLabel));
+    final gradientRow = find.ancestor(of: find.text(_zh.chatPageUiStyleGradient), matching: find.byType(Row)).first;
     expect(find.descendant(of: gradientRow, matching: find.byIcon(Icons.check)), findsOneWidget,
         reason: '冷启动后弹层应选中渐变粉蓝');
-    final plainRow = find.ancestor(of: find.text('素雅纯色'), matching: find.byType(Row)).first;
+    final plainRow = find.ancestor(of: find.text(_zh.chatPageUiStylePlain), matching: find.byType(Row)).first;
     expect(find.descendant(of: plainRow, matching: find.byIcon(Icons.check)), findsNothing,
         reason: '素雅纯色不应处于选中态');
   });
@@ -278,9 +277,8 @@ void main() {
     // 切到渐变风格
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面主题'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('渐变粉蓝'));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuStyleLabel));
+    await tester.tap(find.text(_zh.chatPageUiStyleGradient));
     await tester.pumpAndSettle();
 
     // 消息列表底部应直达输入栏顶部（无 SafeArea 顶部 inset 造成的空隙）
@@ -342,9 +340,8 @@ void main() {
     // 切到渐变风格
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('界面主题'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('渐变粉蓝'));
+    await tapDeferred(tester, find.text(_zh.chatPageMenuStyleLabel));
+    await tester.tap(find.text(_zh.chatPageUiStyleGradient));
     await tester.pumpAndSettle();
 
     // 气泡底色：本人男→深蓝、对方女→深粉（渐变下不再用浅 tint）

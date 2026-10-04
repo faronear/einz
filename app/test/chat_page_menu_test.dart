@@ -158,10 +158,8 @@ Future<_FakeApi> _openChangePassphraseDialog(WidgetTester tester, LocalDatabase 
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
   // 口令入口现在收在「高级」底部弹层里（对话页菜单 → 高级 → 修改口令）
-  await tester.tap(find.text('高级安全'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('修改共享口令'));
-  await tester.pumpAndSettle();
+  await tapDeferred(tester, find.text(_zh.advancedMenuTitle));
+  await tapDeferred(tester, find.text(_zh.chatPageMenuChangePassphrase));
   return api;
 }
 
@@ -179,6 +177,26 @@ Future<void> _enterDialogFields(WidgetTester tester,
 Future<void> _confirmChange(WidgetTester tester) async {
   await tester.tap(find.widgetWithText(FilledButton, '修改'));
   await tester.pumpAndSettle();
+}
+
+/// 文案断言一律从 l10n 取（与页面用的是同一份生成代码）：改文案不会再让测试腐烂。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
+/// 打开「我的通道」弹层（菜单项 `chatPageMenuEntranceList`）。
+Future<void> _openEntranceSheet(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.menu));
+  await tester.pumpAndSettle();
+  await tapDeferred(tester, find.text(_zh.chatPageMenuEntranceList));
+}
+
+/// 「我的通道」弹层 → 本机那张卡的改名角标 → 通道改名弹窗。
+/// （2026-10-02 起当前通道名不再有独立菜单项，改名从这张卡进。）
+Future<void> _openCurrentEntranceRename(WidgetTester tester) async {
+  await _openEntranceSheet(tester);
+  await tapDeferred(
+    tester,
+    find.descendant(of: find.byType(BottomSheet), matching: find.byIcon(Icons.edit)),
+  );
 }
 
 void main() {
@@ -233,19 +251,18 @@ void main() {
     await tester.pumpAndSettle();
     // 菜单应包含各功能项（「导出完整备份」已按老板决策移除）
     // 口令/重置收在「高级」二级弹层里，菜单里只出现「高级」
-    expect(find.text('高级安全'), findsOneWidget);
+    expect(find.text(_zh.advancedMenuTitle), findsOneWidget);
     // 我的身份/当前通道（未传 → 显示「未设置」）+ 退出本应用
     expect(find.text('我的身份'), findsOneWidget);
-    expect(find.text('当前通道'), findsOneWidget);
+    expect(find.text(_zh.chatPageMenuEntranceList), findsOneWidget);
     expect(find.text('退出本应用'), findsOneWidget);
     expect(find.text('我的头像'), findsOneWidget); // 头像菜单项
-    expect(find.text('高级安全'), findsOneWidget);
-    expect(find.text('锁屏码'), findsOneWidget);
+    expect(find.text(_zh.advancedMenuTitle), findsOneWidget);
+    expect(find.text(_zh.chatPagePinLabel), findsOneWidget);
     // 点"PIN: 未设置"菜单项
-    await tester.tap(find.text('锁屏码'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
     // 弹窗应出现（设置启动锁）
-    expect(find.text('设置锁屏码'), findsOneWidget);
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget);
     // 返回：模拟系统返回键（与真机"返回"一致；barrier/取消按钮均走 Navigator.pop）
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -279,9 +296,8 @@ void main() {
     // 打开菜单 → PIN 菜单项
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('锁屏码'));
-    await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsOneWidget);
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget);
 
     // 输入有效 PIN（两次一致）——限定在弹窗内查找，避免匹配聊天页消息输入框
     // （本机未设 PIN → 弹窗只有两框：新 PIN / 确认 PIN）
@@ -296,7 +312,7 @@ void main() {
     // 不应有任何异常（若 setPin/async UI 竞态触发 _dependents.isEmpty 则此处失败）
     expect(tester.takeException(), isNull);
     // 弹窗应已关闭，锁已落盘
-    expect(find.text('设置锁屏码'), findsNothing);
+    expect(find.text(_zh.chatPageSetLockTitle), findsNothing);
     expect(await AppLockService(db).isSetup, true);
   });
 
@@ -333,8 +349,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('锁屏码'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
     // 已设 PIN → 多出「当前锁屏码」框（共 3 框：旧/新/确认）
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
@@ -371,7 +386,7 @@ void main() {
     final confirmDialog = find.byType(AlertDialog).last;
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('取消')));
     await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsOneWidget); // 设置弹窗仍在
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget); // 设置弹窗仍在
     expect(await AppLockService(db).isSetup, true, reason: '取消不清锁');
   });
 
@@ -409,8 +424,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('锁屏码'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
     final fields =
         find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
     // 旧码正确 + 新码两栏留空 → 清空确认 → 确认
@@ -421,7 +435,7 @@ void main() {
     await tester.tap(find.descendant(of: confirmDialog, matching: find.text('确认')));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置锁屏码'), findsNothing, reason: '清空成功后设置弹窗应关闭');
+    expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '清空成功后设置弹窗应关闭');
     expect(await AppLockService(db).isSetup, false, reason: '锁包应已删除');
     // 打开菜单：锁屏码项不应再有「已设置」尾缀（回归点——此前仍显示已设置）
     await tester.tap(find.byIcon(Icons.menu));
@@ -456,8 +470,7 @@ void main() {
     // 打开菜单 → 点「我的身份」（未传 memberName → 显示"我的身份: 未设置"）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('我的身份'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.textContaining(_zh.chatPageRenameNameTitle));
     // 改名对话框输入新名字 → 保存（成功 → 关闭对话框）；
     // 弹窗内含两个输入框：可编辑名字在前、只读性别在后 → 取 .first
     await tester.tap(find.byIcon(Icons.edit)); // 初始只读：先点「编辑」进入可编辑态
@@ -503,8 +516,7 @@ void main() {
     Future<String> typeInto(String menuItem, String input) async {
       await tester.tap(find.byIcon(Icons.menu));
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining(menuItem));
-      await tester.pumpAndSettle();
+      await tapDeferred(tester, find.textContaining(menuItem));
       // 初始只读：先点「编辑」进可编辑态（只读态不接键盘输入）
       await tester.tap(find.byIcon(Icons.edit));
       await tester.pumpAndSettle();
@@ -517,6 +529,27 @@ void main() {
       // 关掉弹窗，回到聊天页（下一轮还要开菜单）
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
+      // 取消也会走弹窗的 400ms 延迟 dispose：推过去，别留挂着的定时器
+      await tester.pump(const Duration(milliseconds: 500));
+      return text;
+    }
+
+    /// 同上，但走「我的通道」弹层 → 本机卡的改名角标
+    /// （2026-10-02 起当前通道名不再有独立菜单项）。
+    Future<String> typeIntoEntrance(String input) async {
+      await _openCurrentEntranceRename(tester);
+      await tester.tap(find.byIcon(Icons.edit)); // 初始只读 → 进可编辑态
+      await tester.pumpAndSettle();
+      final field = find
+          .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
+          .first;
+      await tester.enterText(field, input);
+      await tester.pump();
+      final text = tester.widget<TextField>(field).controller!.text;
+      await tester.tap(find.text(_zh.cancel));
+      await tester.pumpAndSettle();
+      // 同上：取消后等 400ms 延迟 dispose 走完
+      await tester.pump(const Duration(milliseconds: 500));
       return text;
     }
 
@@ -524,8 +557,9 @@ void main() {
     final mine = await typeInto('我的身份', 'x' * 40);
     expect(mine.length, kMemberNameMaxLength, reason: '第 33 个字符应敲不进去');
 
-    // 我的通道名（entrance_name：同样 32）
-    final entrance = await typeInto('当前通道', 'y' * 40);
+    // 我的通道名（entrance_name：同样 32）——当前通道名没有独立菜单项，
+    // 从「我的通道」弹层本机卡的改名角标进（见 _openCurrentEntranceRename）
+    final entrance = await typeIntoEntrance('y' * 40);
     expect(entrance.length, kEntranceNameMaxLength, reason: '第 33 个字符应敲不进去');
   });
 
@@ -554,8 +588,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('我的身份'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.textContaining(_zh.chatPageRenameNameTitle));
     expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
     // 点名字输入框本身（不是右侧编辑图标）→ 也应切到编辑态
     await tester.tap(
@@ -604,15 +637,14 @@ void main() {
     // 打开菜单 → 点「退出本应用」
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('退出本应用'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPageMenuExit));
     // 确认弹窗显示（不点确认——exit(0) 会终止测试进程）
-    expect(find.text('退出本应用？'), findsOneWidget);
+    expect(find.text(_zh.chatPageExitTitle), findsOneWidget);
     expect(find.text('即将关闭本应用。'), findsOneWidget);
     // 点取消关闭弹窗（不触发 exit）
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(find.text('退出本应用？'), findsNothing);
+    expect(find.text(_zh.chatPageExitTitle), findsNothing);
   });
 
   testWidgets('回车发送后输入框焦点保持（与图标发送一致）', (WidgetTester tester) async {
@@ -674,16 +706,15 @@ void main() {
     // 打开菜单 → PIN: 未设置 → 设置 PIN 弹窗（两个输入框都不输入 = 设为空）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('锁屏码'));
-    await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsOneWidget); // 弹窗标题
+    await tapDeferred(tester, find.text(_zh.chatPagePinLabel));
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget); // 弹窗标题
     // 两空点「提交」：本来就没设 PIN → 直接返回（老板 2026-09-14）——不弹清空确认、
     // 不调后台、不做任何写盘，只在顶部通知里说一句
     await tester.tap(find.text('提交'));
     await tester.pumpAndSettle();
     expect(find.text('删除锁屏码？'), findsNothing);
     expect(find.text('锁屏码仍然为空，下次启动应用可直接进入秘境。'), findsOneWidget); // 顶部通知
-    expect(find.text('设置锁屏码'), findsNothing, reason: '先关弹窗再弹通知（老板 2026-09-23）');
+    expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '先关弹窗再弹通知（老板 2026-09-23）');
     final lock = AppLockService(db);
     expect(await lock.isSetup, false);
     expect(await lock.hasConfig, false, reason: '本来就没锁可清：不做任何写盘');
@@ -793,8 +824,7 @@ void main() {
     // 菜单 → 修改我的身份（菜单项标签：我的身份）→ 输入新名字 → 保存
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('我的身份'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPageRenameNameTitle));
     final renameField = find
         .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
         .first; // 弹窗内可编辑名字框在前、只读性别框在后
@@ -803,6 +833,9 @@ void main() {
     await tester.enterText(renameField, 'Alice');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
+    // 改名弹窗用 400ms 延迟 dispose（TextField 卸载后才丢 controller）：推过去，
+    // 否则测试结束时定时器还挂着 → "A Timer is still pending" 断言
+    await tester.pump(const Duration(milliseconds: 500));
 
     // profile 应已更新（改名后 _saveProfile 按当前空间写入）
     final p = await AppLockService(db).loadProfile(spaceId: 'space-demo');
@@ -829,11 +862,10 @@ void main() {
     expect(find.text('memberB'), findsNothing, reason: '不应回到旧名 memberB');
   });
 
-  testWidgets('当前通道弹窗：标题/备注/公钥置顶+复制、空名保存红字警示', (WidgetTester tester) async {
+  testWidgets('通道改名弹窗：标题/标签/空名与非法字符红字、33 字敲不进去', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final spaceKey = await generateSpaceKey();
-    final api = _FakeApi();
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -845,75 +877,69 @@ void main() {
         spaceKey: spaceKey,
         keyVersion: 1,
         token: 'tok',
-        publicKeyB64: 'dGVzdC1wdWJrZXk=',
-        privateKeyB64: 'dGVzdC1wcml2a2V5',
         db: db,
-        api: api,
+        api: _FakeApi(),
         enableWs: false,
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 菜单 → 本通道（当前通道）
-    await tester.tap(find.byIcon(Icons.menu));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('当前通道'));
-    await tester.pumpAndSettle();
+    // 入口：「我的通道」弹层 → 本机卡的**改名角标**（2026-10-02 起当前通道名不再有
+    // 独立菜单项；同期也删掉了弹窗里的公钥展示，所以这里不再断言公钥）
+    await _openCurrentEntranceRename(tester);
 
-    // 弹窗标题与备注（老板 2026-09-23 新文案）
-    expect(find.text('当前通道'), findsWidgets, reason: '弹窗标题应为「当前通道」');
-    expect(find.text('通道是设备连接到秘境的专属线路。当前通道的设置仅对本机和当前秘境有效。'), findsOneWidget,
-        reason: '应显示通道备注说明');
-    expect(find.text('通道公钥'), findsOneWidget, reason: '公钥标签');
-    expect(find.text('dGVzdC1wdWJrZXk='), findsOneWidget, reason: '公钥值应显示在只读框内');
-    expect(find.byIcon(Icons.copy), findsOneWidget, reason: '公钥框右侧应有复制按钮');
-    expect(find.text('通道名称'), findsWidgets, reason: '输入框标签');
-
-    // 空名点保存 → 红字警示并停留（不静默）；对话框含两个输入框：只读公钥在前、
-    // 可编辑通道名在后 → 取 .last
-    final dialogField = find
-        .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
-        .first; // 通道名称已排到公钥之前：可编辑名称框在前、只读公钥在后
+    expect(find.text(_zh.chatPageRenameEntranceTitle), findsOneWidget, reason: '弹窗标题');
+    expect(find.text(_zh.chatPageEntranceListThisDevice), findsWidgets, reason: '输入框标签');
+    // 初始只读态有「编辑」按钮；点它就进可编辑态
     expect(find.byIcon(Icons.edit), findsOneWidget, reason: '初始只读态应有「编辑」按钮');
-    await tester.tap(find.byIcon(Icons.edit)); // 点编辑 → 白底可编辑、按钮消失
+    await tester.tap(find.byIcon(Icons.edit));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.edit), findsNothing, reason: '点编辑后按钮应消失');
-    await tester.tap(find.text('保存'));
+
+    final dialogField = find
+        .descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))
+        .first;
+
+    // 空名保存 → 红字警示并停留（不静默）
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();
-    expect(find.text('请填写通道名称'), findsOneWidget, reason: '空通道名保存应红字警示');
+    expect(find.text(_zh.chatPageRenameEntranceEmptyError), findsOneWidget,
+        reason: '空通道名保存应红字警示');
 
     // 全空格同样警示
     await tester.enterText(dialogField, '   ');
-    await tester.tap(find.text('保存'));
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();
-    expect(find.text('请填写通道名称'), findsOneWidget, reason: '全空格通道名保存应红字警示');
+    expect(find.text(_zh.chatPageRenameEntranceEmptyError), findsOneWidget,
+        reason: '全空格通道名保存应红字警示');
 
-    // 不合规字符（空格、标点）→ 红字警示并停留（老板 2026-09-16：通道名只允许
-    // 中文字/英文字母/数字/`_`/`-`）
+    // 不合规字符（空格、标点）→ 红字警示并停留（通道名只允许中文字/英文字母/数字/_/-）
     await tester.enterText(dialogField, 'My Phone!');
-    await tester.tap(find.text('保存'));
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();
-    expect(find.text('只能用中文字、英文字母、数字、下划线(_)、中划线(-)'), findsOneWidget,
+    expect(find.text(_zh.chatPageRenameEntranceInvalidError), findsOneWidget,
         reason: '含空格/感叹号的通道名保存应红字警示');
 
-    // 超长（>32）→ **输入框自己就卡住**（老板 2026-09-28：以前能一直敲，
-    // 点保存才红字警示"最多 32 个字符"）
+    // 超长（>32）→ **输入框自己就卡住**（老板 2026-09-28）
     await tester.enterText(dialogField, 'a' * 33);
     await tester.pump();
-    expect(tester.widget<TextField>(dialogField).controller!.text.length, 32,
+    expect(tester.widget<TextField>(dialogField).controller!.text.length,
+        kEntranceNameMaxLength,
         reason: '第 33 个字符敲不进去');
 
     // 开始填写即消红字
     await tester.enterText(dialogField, '我的手机');
     await tester.pumpAndSettle();
-    expect(find.text('请填写通道名称'), findsNothing, reason: '开始填写后红字应消失');
+    expect(find.text(_zh.chatPageRenameEntranceEmptyError), findsNothing,
+        reason: '开始填写后红字应消失');
 
     // 有效名称 → 保存成功关闭弹窗（400ms 延迟 dispose 不红屏）
-    await tester.tap(find.text('保存'));
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
-    expect(find.text('当前通道'), findsNothing, reason: '保存成功应关闭弹窗');
+    expect(find.text(_zh.chatPageRenameEntranceTitle), findsNothing,
+        reason: '保存成功应关闭弹窗');
   });
 
   testWidgets('我的个人资料弹窗：标题/标签新文案、名字框下性别图标高亮、空名保存红字', (WidgetTester tester) async {
@@ -945,8 +971,7 @@ void main() {
     // 菜单 → 我的身份（打开个人资料弹窗）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('我的身份'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.chatPageRenameNameTitle));
 
     // 标题「我的身份」、输入框标签「名字」、名字框下性别彩色图标（男高亮）
     expect(find.text('我的身份'), findsOneWidget, reason: '弹窗标题应为「我的身份」');
@@ -1327,16 +1352,15 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('切换我的秘境'), findsOneWidget, reason: '保留的一条');
+    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '保留的一条');
     expect(find.text('空间管理'), findsNothing, reason: '合并后不应再出现');
     // 该项在弹层偏下，先滚到可见再点
-    await tester.ensureVisible(find.text('切换我的秘境'));
+    await tester.ensureVisible(find.text(_zh.spaceListSwitch));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('切换我的秘境'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.spaceListSwitch));
     expect(switched, 0);
     // 就地弹层（不是新页面）：能看到「切换我的秘境」内容与通往第一屏的入口
-    expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
+    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '弹层标题');
     expect(find.text('添加秘境'), findsOneWidget, reason: '弹层底部通往第一屏');
   });
 
@@ -1367,13 +1391,12 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('切换我的秘境'), findsOneWidget);
-    await tester.ensureVisible(find.text('切换我的秘境'));
+    expect(find.text(_zh.spaceListSwitch), findsOneWidget);
+    await tester.ensureVisible(find.text(_zh.spaceListSwitch));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('切换我的秘境'));
-    await tester.pumpAndSettle();
+    await tapDeferred(tester, find.text(_zh.spaceListSwitch));
     expect(managed, 0);
-    expect(find.text('切换我的秘境'), findsOneWidget, reason: '没有任何注入也照常开弹层');
+    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '没有任何注入也照常开弹层');
   });
 
   testWidgets('顶栏「我的秘境 + 下拉箭头」：一步打开空间弹层（老板 2026-09-28）',
@@ -1432,7 +1455,7 @@ void main() {
     // 一步点开：直接进空间选择弹层（标题即证明弹层已弹出；文案由老板润色，不 assert 按钮文案）
     await tester.tap(chevron);
     await tester.pumpAndSettle();
-    expect(find.text('切换我的秘境'), findsOneWidget, reason: '弹层标题');
+    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '弹层标题');
   });
 
   testWidgets('顶栏 logo 可点：等同菜单里的「关于秘境」（老板 2026-09-28）',
@@ -1650,13 +1673,11 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('高级安全'));
-    await tester.pumpAndSettle();
-    expect(find.text('销毁本通道'), findsOneWidget, reason: '空间级文案');
+    await tapDeferred(tester, find.text(_zh.advancedMenuTitle));
+    expect(find.text(_zh.advancedDestroyEntrance), findsOneWidget, reason: '空间级文案');
     expect(find.text('清除本设备全部数据'), findsNothing, reason: '整机清空不该出现在单个空间里');
 
-    await tester.tap(find.text('销毁本通道'));
-    await tester.pumpAndSettle(); // 弹层关闭 → 300ms 错开 → 确认弹窗
+    await tapDeferred(tester, find.text(_zh.advancedDestroyEntrance));
     expect(find.text('销毁本通道？'), findsOneWidget, reason: '闸门弹窗（通道名 + 锁屏码）');
     expect(find.text('请输入当前通道名称“iPhone”'), findsOneWidget, reason: '闸门框上备注：照抄通道名');
     expect(find.text('iPhone'), findsWidgets, reason: '框内 hint 显示通道名');

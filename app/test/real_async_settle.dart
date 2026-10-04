@@ -24,6 +24,17 @@ void disableAnimationsInTests() {
   });
 }
 
+/// 点「错峰」入口（菜单项 / 高级弹层条目 / 通道卡改名角标）后再 settle。
+///
+/// 这些入口都用 `Future.delayed(300ms)` 等上一个弹层收起动画走完再开下一个
+/// （`_menuAction` 与高级弹层是同一手法）；而 `pumpAndSettle` 只推到"没有待排帧"就停、
+/// **跨不过这 300ms**，所以点完必须显式把假时钟推过去，否则弹层/弹窗还没出现、断言就找 0 个。
+Future<void> tapDeferred(WidgetTester tester, Finder finder) async {
+  await tester.tap(finder);
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+}
+
 /// 让**真实异步**（FFI 解密、图片解码）在 widget 测试里跑完。
 ///
 /// widget 测试跑在 FakeAsync 里，`pump` 只推假时钟，推不动真实异步；而 `runAsync`
