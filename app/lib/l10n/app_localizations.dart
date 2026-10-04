@@ -200,35 +200,11 @@ abstract class AppLocalizations {
   /// **'Name (can be changed later)'**
   String get wizardNameHint;
 
-  /// No description provided for @wizardPeerNameHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Partner\'s name (can be changed later)'**
-  String get wizardPeerNameHint;
-
-  /// No description provided for @wizardPeerNameHintInput.
-  ///
-  /// In en, this message translates to:
-  /// **'Partner\'s name'**
-  String get wizardPeerNameHintInput;
-
   /// No description provided for @wizardNameRequired.
   ///
   /// In en, this message translates to:
   /// **'Enter your name'**
   String get wizardNameRequired;
-
-  /// No description provided for @wizardPeerNameRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter your partner\'s name'**
-  String get wizardPeerNameRequired;
-
-  /// No description provided for @wizardPeerNameSameName.
-  ///
-  /// In en, this message translates to:
-  /// **'The two names must be different'**
-  String get wizardPeerNameSameName;
 
   /// No description provided for @wizardNameInvalidError.
   ///
@@ -253,12 +229,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gender'**
   String get wizardMyGenderLabel;
-
-  /// No description provided for @wizardPeerGenderLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Partner\'s gender'**
-  String get wizardPeerGenderLabel;
 
   /// No description provided for @wizardGenderMale.
   ///
@@ -320,35 +290,47 @@ abstract class AppLocalizations {
   /// **'About me'**
   String get wizardTitleName;
 
-  /// No description provided for @wizardTitlePeerName.
+  /// No description provided for @wizardTitleSpaceKind.
   ///
   /// In en, this message translates to:
-  /// **'About partner'**
-  String get wizardTitlePeerName;
+  /// **'Space type'**
+  String get wizardTitleSpaceKind;
 
-  /// No description provided for @wizardTitleJoinIdentity.
+  /// No description provided for @wizardSpaceKindHint.
   ///
   /// In en, this message translates to:
-  /// **'Choose your identity'**
-  String get wizardTitleJoinIdentity;
+  /// **'Pick one — this cannot be changed later'**
+  String get wizardSpaceKindHint;
 
-  /// No description provided for @wizardJoinIdentityHint.
+  /// No description provided for @wizardSpaceKindDuo.
   ///
   /// In en, this message translates to:
-  /// **'One space has exactly two partners. Which one is you?'**
-  String get wizardJoinIdentityHint;
+  /// **'Two-person space'**
+  String get wizardSpaceKindDuo;
 
-  /// No description provided for @wizardJoinNoSlots.
+  /// No description provided for @wizardSpaceKindDuoDesc.
   ///
   /// In en, this message translates to:
-  /// **'No preset members — cannot join'**
-  String get wizardJoinNoSlots;
+  /// **'Just the two of you, with voice calls'**
+  String get wizardSpaceKindDuoDesc;
 
-  /// No description provided for @wizardSlotRequired.
+  /// No description provided for @wizardSpaceKindGroup.
   ///
   /// In en, this message translates to:
-  /// **'Pick an identity'**
-  String get wizardSlotRequired;
+  /// **'Group space'**
+  String get wizardSpaceKindGroup;
+
+  /// No description provided for @wizardSpaceKindGroupDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'For several people, no voice calls'**
+  String get wizardSpaceKindGroupDesc;
+
+  /// No description provided for @wizardSpaceKindRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please choose a space type'**
+  String get wizardSpaceKindRequired;
 
   /// No description provided for @wizardSpaceLimit.
   ///
@@ -1280,40 +1262,22 @@ abstract class AppLocalizations {
   /// **'Invite new member'**
   String get chatPageMembersInviteNew;
 
-  /// No description provided for @chatPageMembersUpgradeConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Upgrade to group'**
-  String get chatPageMembersUpgradeConfirmTitle;
-
-  /// No description provided for @chatPageMembersUpgradeConfirmBody.
-  ///
-  /// In en, this message translates to:
-  /// **'After upgrading this space allows at most {maxMembers} members and voice calls will be disabled. This cannot be undone. Continue?'**
-  String chatPageMembersUpgradeConfirmBody(int maxMembers);
-
-  /// No description provided for @chatPageMembersUpgradeConfirmBodyNoLimit.
-  ///
-  /// In en, this message translates to:
-  /// **'Voice calls will be disabled after upgrading, and this cannot be undone. Continue?'**
-  String get chatPageMembersUpgradeConfirmBodyNoLimit;
-
-  /// No description provided for @chatPageMembersUpgraded.
-  ///
-  /// In en, this message translates to:
-  /// **'Upgraded to group — voice calls are disabled'**
-  String get chatPageMembersUpgraded;
-
   /// No description provided for @chatPageMembersChannelToken.
   ///
   /// In en, this message translates to:
   /// **'Add my account on another device'**
   String get chatPageMembersChannelToken;
 
+  /// No description provided for @chatPageMembersDuoLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a two-person space; it cannot take more members. Create a group space for a bigger conversation'**
+  String get chatPageMembersDuoLocked;
+
   /// No description provided for @chatPageMembersFull.
   ///
   /// In en, this message translates to:
-  /// **'Space is full'**
+  /// **'Group is full'**
   String get chatPageMembersFull;
 
   /// No description provided for @chatPageMembersFullWithMax.

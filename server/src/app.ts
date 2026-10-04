@@ -40,10 +40,8 @@ import {
   broadcastMemberJoined,
   broadcastNewMessage,
   broadcastProfileUpdated,
-  broadcastSpaceUpgraded,
   notifyRevoked
 } from './ws.js'
-import { getSpaceMode } from './spaces.js'
 import { PROTOCOL_VERSION } from './protocolVersion.js'
 import {
   bearerToken,
@@ -239,7 +237,10 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       body?.entrance_name == null ? undefined : String(body.entrance_name),
       // 安装级标识（多空间）：同一物理设备各空间一行同名，服务端据此做内部关联
       body?.install_uid == null ? undefined : String(body.install_uid),
-      requestBaseUrl(req) // 邀请链接按请求真实 Host 生成
+      requestBaseUrl(req), // 邀请链接按请求真实 Host 生成
+      // 空间模式（2026-10-04）：'duo'（默认）| 'group'——**创建时定死**，之后
+      // 任何端点都不会再改它（升格机制已整体取消）
+      body?.mode == null ? undefined : String(body.mode)
     )
     sendJson(res, 201, r)
     return
@@ -271,14 +272,10 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       body?.member_name == null ? undefined : String(body.member_name),
       body?.member_gender == null ? undefined : String(body.member_gender)
     )
-    // 群聊一期（2026-10-03）：join 成功后按需广播两种帧——
-    // - member.joined：仅**新身份**入网（自己加通道不算，否则别人的客户端会
-    //   收到"来了新人"的假信号，2026-10-04 审查修）；
-    // - space.upgraded：仅当这次 join 真的触发了 duo → group 升格（防御闸路径）。
-    //   正常升格发生在签发 invite 时（见 /join-tokens 路由），那里也广播一次；
-    //   幂等性由"mode 变化"判定，客户端不会重复落系统消息。
+    // 群聊一期（2026-10-03）：join 成功后广播——仅**新身份**入网（自己加通道不算，
+    // 否则别人的客户端会收到"来了新人"的假信号）。没有升格帧了：mode 创建时定死
+    // （2026-10-04 取消升格）。
     if (r.isNewMember) broadcastMemberJoined(r.spaceId, r.memberId)
-    if (r.upgraded) broadcastSpaceUpgraded(r.spaceId)
     sendJson(res, 200, r)
     return
   }
@@ -295,16 +292,9 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 群聊一期（2026-10-03）：body.purpose 选定 token 类型（invite/channel）；
     // channel token 记录签发者身份（issuer_member_id），join 时做绑定校验——
     // 杜绝"任何成员的 channel token 任选他人身份加通道"的冒充面。
+    // 签发**无空间级副作用**（2026-10-04 取消升格：duo 满员签 invite 直接 409）。
     const purpose = body?.purpose === 'invite' ? 'invite' : 'channel'
-    const modeBefore = getSpaceMode(spaceId)
     const r = createJoinToken(spaceId, requestBaseUrl(req), purpose, sess.member_id)
-    // 升格主路径（方案 C）：duo 满员后签发 invite 即升格 group。升格只有签发者
-    // 看到确认弹窗，其他成员靠这条广播在聊天流里落系统消息知情（客户端各自治
-    // 渲染文案——消息是 E2EE，服务端不能伪造密文）。按"mode 真的变了"判定，
-    // 幂等、不会重复广播。
-    if (getSpaceMode(spaceId) === 'group' && modeBefore !== 'group') {
-      broadcastSpaceUpgraded(spaceId)
-    }
     sendJson(res, 201, r)
     return
   }

@@ -103,6 +103,11 @@ class _SetupPageState extends State<SetupPage> {
   // 自己的名字/性别，复用 _creatorName/_myGender）；'channel' = 发起人设备接入
   // （身份由 token 绑定，服务端自动解析，无名字页）。身份选择页已删。
   String? _joinPurpose; // preflight 返回的 token 类型（'invite'|'channel'；null=未验证）
+  // 群聊一期（2026-10-04 老板拍板「不支持升格」）：create 第 2 步选秘境类型
+  // （'duo' 双人 | 'group' 群组）——**创建时定死、之后永不改变**，所以这一页
+  // 是单向的、必须在建空间之前问。null = 还没选（必选，拦住不让继续）。
+  String? _spaceKind;
+  String? _spaceKindError;
   // 群聊一期（2026-10-03）：preflight 带回的"谁发的链接 / 空间现在几个人"——
   // 替代被删掉的「选择身份（对方是谁）」页，是加入者唯一的知情入口。
   String? _joinInviterName;
@@ -335,8 +340,9 @@ class _SetupPageState extends State<SetupPage> {
     return switch (_role!) {
       _WizardRole.create => switch (_step) {
           1 => _nameFocus, // 我的名字
-          2 => _passphraseFocus, // 共享口令（群聊一期：伴侣页删除，口令前移）
-          3 => _pinFocus, // 锁屏码（已设锁屏码时该步无输入框，requestFocus 自然空转）
+          // 2 = 秘境类型（只有两张卡片，没有输入框）
+          3 => _passphraseFocus, // 共享口令
+          4 => _pinFocus, // 锁屏码（已设锁屏码时该步无输入框，requestFocus 自然空转）
           _ => null,
         },
       _WizardRole.join => switch (_step) {
@@ -599,8 +605,9 @@ class _SetupPageState extends State<SetupPage> {
   int get _stepCount {
     switch (_role) {
       case _WizardRole.create:
-        // 群聊一期（2026-10-03）：伴侣名字页删除（create 不预置对方，v3）——
-        // name/passphrase/pin/done
+        // 2026-10-04：类型页插在第 2 步（关于我 → **类型** → 口令 → PIN → 完成）。
+        // 共 4 个输入页 + 完成页 = 5，正好对上 _buildProgressDots 的 5 个圆点。
+        // （此前是 3 个输入页却写 5：第 4 个圆点永远点不亮——顺手修掉。）
         return 5;
       case _WizardRole.join:
         // 群聊一期（2026-10-03）：身份选择页删除。invite = token/名字/口令/PIN/done；
@@ -617,10 +624,9 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  /// 当前是否为 PIN 步骤（create=3 / join=4 / offline=2；群聊一期 2026-10-03：
-  /// create 伴侣页删除 → PIN 从 4 前移到 3）。
+  /// 当前是否为 PIN 步骤（create=4 / join=4 / offline=2）。
   bool get _isPinStep =>
-      (_role == _WizardRole.create && _step == 3) ||
+      (_role == _WizardRole.create && _step == 4) ||
       (_role == _WizardRole.join && _step == 4) ||
       (_role == _WizardRole.offline && _step == 2);
 
@@ -765,10 +771,15 @@ class _SetupPageState extends State<SetupPage> {
         invalid = true;
       }
     }
-    // 群聊一期（2026-10-03）：伴侣名字页删除——create 不预置对方（v3），
-    // 无伴侣名字/性别校验（_peerNameCtrl/_peerGender 仅存量遗留，不再使用）
-    // 口令页（create 步骤 2 / join 步骤 3；群聊一期：create 伴侣页删除 → 口令前移）
-    if ((_role == _WizardRole.create && _step == 2) ||
+    // 类型页（create 步骤 2，2026-10-04）：必选——它是不可逆决定（双人秘境
+    // 永远只有两个人、群组秘境永远没有语音通话），不允许空着往下走
+    String? spaceKindError;
+    if (_role == _WizardRole.create && _step == 2 && _spaceKind == null) {
+      spaceKindError = l10n.wizardSpaceKindRequired;
+      invalid = true;
+    }
+    // 口令页（create 步骤 3 / join 步骤 3）
+    if ((_role == _WizardRole.create && _step == 3) ||
         (_role == _WizardRole.join && _step == 3)) {
       final pass = _escrowPassphrase.text.trim();
       if (pass.isEmpty) {
@@ -800,6 +811,7 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         _localError = localError;
         _genderError = genderError;
+        _spaceKindError = spaceKindError;
       });
       // 性别未选等红字警告：滚入可见区（键盘已收起，整页露出，用户看得到该怎么改）
       _revealCurrentGenderError();
@@ -887,10 +899,9 @@ class _SetupPageState extends State<SetupPage> {
       }
       return; // _run* 内部推进 _step
     }
-    // create 口令页（群聊一期 2026-10-03 步号前移：伴侣页删除 → 口令页 3→2）
-    // → 自动自举登记（登记时上传本人名字/性别；通道名已自动设置不再询问），
-    // 成功才进口令之后的 PIN 步骤
-    if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
+    // create 口令页（步骤 3）→ 自动自举登记（登记时上传本人名字/性别 + 空间类型；
+    // 通道名已自动设置不再询问），成功才进口令之后的 PIN 步骤
+    if (_role == _WizardRole.create && _step == 3 && _enroll == null) {
       await _runBootstrap();
       if (!mounted) return;
       if (_enroll == null) return; // 自举失败：留在本步展示错误/改用加入
@@ -999,10 +1010,11 @@ class _SetupPageState extends State<SetupPage> {
           case 1:
             return _buildStepName();
           case 2:
-            // 群聊一期（2026-10-03）：伴侣名字页删除——create 不预置对方（v3），
-            // partner 加入时自己填名。create = name/passphrase/pin/done
-            return _buildStepPassphrase();
+            // 2026-10-04：秘境类型（双人/群组）——创建时定死、之后不可改
+            return _buildStepSpaceKind();
           case 3:
+            return _buildStepPassphrase();
+          case 4:
             return _lockAlreadySet ? _buildStepPinReuse() : _buildStepPin();
           default:
             return _buildStepDone();
@@ -1435,6 +1447,95 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
+  /// 步骤 2（create，2026-10-04）：秘境类型——**双人 / 群组，创建时定死、之后
+  /// 不可改**（老板拍板：不支持升格）。
+  ///
+  /// 为什么通栏上下两张卡、而不是性别选择那套左右放大卡：这两张要带说明文字
+  ///（能不能语音通话 / 几个人），左右并排时说明会被挤成窄条；而且这是不可逆
+  /// 决定，值得看清楚了再点。
+  Widget _buildStepSpaceKind() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(l10n.wizardTitleSpaceKind, l10n.wizardSpaceKindHint),
+        _buildKindCard(
+          value: 'duo',
+          title: l10n.wizardSpaceKindDuo,
+          desc: l10n.wizardSpaceKindDuoDesc,
+          icon: Icons.favorite_outline,
+          color: const Color(0xFFD6529C), // 品牌粉：双人=亲密场景
+        ),
+        const SizedBox(height: 12),
+        _buildKindCard(
+          value: 'group',
+          title: l10n.wizardSpaceKindGroup,
+          desc: l10n.wizardSpaceKindGroupDesc,
+          icon: Icons.groups_outlined,
+          color: const Color(0xFF3BAFFD), // 品牌蓝（与双人粉色区分开）
+        ),
+        if (_spaceKindError != null) _localErrorHint(_spaceKindError!),
+      ],
+    );
+  }
+
+  /// 类型卡（通栏）：图标 + 标题 + 一行说明；选中态 = 品牌色描边 + 淡色底 + 勾。
+  Widget _buildKindCard({
+    required String value,
+    required String title,
+    required String desc,
+    required IconData icon,
+    required Color color,
+  }) {
+    final selected = _spaceKind == value;
+    return Material(
+      color: selected ? color.withValues(alpha: 0.12) : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() {
+          // 点已选中的卡不反选：这是必选项，没有"取消选择"这回事
+          _spaceKind = value;
+          _spaceKindError = null; // 选中即清除未选红字
+        }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? color : const Color(0xFFDDDDDD),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: color.withValues(alpha: selected ? 1.0 : 0.25),
+                child: Icon(icon, size: 20, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(desc,
+                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              if (selected) Icon(Icons.check_circle, size: 20, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 步骤 1（create）：第一个用户的名字；密钥已由 [_autoGenerateKey] 自动生成
   /// （不展示密钥信息——技术细节，小白用户不需要看）；"下一步"触发自举登记
   /// （通道名已自动设置，不再单独询问）。
@@ -1782,7 +1883,10 @@ class _SetupPageState extends State<SetupPage> {
             creatorName: _creatorName.text.trim(),
             creatorGender: _myGender,
             // 群聊一期（2026-10-03）：create 不再预置对方（v3 协议）——
-            // partner 加入时自己填名
+            // partner 加入时自己填名。
+            // 2026-10-04：带上是第 2 步选的秘境类型——**创建时定死、永不改变**
+            // （没有升格；服务端把非法值回退 'duo'，此处 _spaceKind 已被校验必选）
+            mode: _spaceKind ?? 'duo',
             sealedSpaceKey: sealed,
             escrowPassphrase: passphrase.isEmpty ? null : passphrase,
             publicKey: kp.publicKeyB64,

@@ -524,7 +524,6 @@ Authorization: Bearer <session_token>
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
 | S→C | `profile.updated` | `{ "entrance_id": "…", "member_id": "…", "member_name": "…", "entrance_name": "…" }` | 成员改名/改通道名（客户端立即更新显示、头像缓存失效） |
 | S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加通道（channel token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |
-| S→C | `space.upgraded` | `{ "space_id": "…", "mode": "group" }` | 群聊一期（2026-10-03）：duo → group 升格完成（单向不可逆、通话停用）。**只在 mode 真发生变化时发一次**（签发 invite 时、或 join 触发的防御性升格），幂等。消息是 E2EE、服务端伪造不了密文 → 客户端各自渲染提示文案，服务端不落库 |
 
 ### 8.3 顺序与重连
 
@@ -540,7 +539,8 @@ Authorization: Bearer <session_token>
 
 **群聊一期（2026-10-03）：通话仅限 duo 空间**——group 空间的 `call.*` 帧服务端
 **静默丢弃**（不报错、不新增错误码；客户端已隐藏通话入口，服务端这层是兜底）。
-群空间即使当前只有 2 人也不通话（升格成群的代价就是失去通话能力）。
+群空间即使只有 2 个人也不通话——**类型在创建时选定，通话能力那一刻就定了**
+（2026-10-04 取消升格：没有「两人空间后来变成群」这回事）。
 
 | 方向 | type | payload | 说明 |
 | --- | --- | --- | --- |

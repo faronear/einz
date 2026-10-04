@@ -132,10 +132,15 @@ class ApiClient {
   /// join token，PROTOCOL_MULTIVERSE.md §4.1）。群聊一期（2026-10-03）：
   /// **只填创建者**——不再预置对方（peer_name/peer_gender 已删，v3），
   /// partner 加入时自己填名。
+  ///
+  /// [mode]（2026-10-04）：'duo'（默认）| 'group'——**创建时定死、之后永不改变**。
+  /// duo = 二人私密空间（上限恒 2、可语音通话）；group = 群空间（上限
+  /// maxMembersPerSpace、禁通话）。没有升格：duo 想变群只能另建空间。
   Future<SpaceCreateResult> createSpace({
     String? spaceId,
     String? creatorName,
     String? creatorGender,
+    String mode = 'duo',
     PassphraseEnvelope? sealedSpaceKey,
     String? escrowPassphrase,
     String? publicKey,
@@ -156,6 +161,8 @@ class ApiClient {
         if (entranceName != null && entranceName.isNotEmpty) 'entrance_name': entranceName,
         // 安装级标识（多空间：同一安装各空间同名，服务端内部关联用）
         if (installUid != null && installUid.isNotEmpty) 'install_uid': installUid,
+        // 空间模式（创建时定死；服务端把非法值一律回退 'duo'）
+        'mode': mode,
       },
       withToken: false,
     );
@@ -168,8 +175,9 @@ class ApiClient {
   /// 需认证：签发邀请凭证 = 空间级操作，服务端要求调用方持该空间成员会话
   /// （2026-09-15 评审 C1 修复；此前免认证，任何人拿到 spaceId 即可自签）。
   /// 群聊一期（2026-10-03）：[purpose] 选定 token 类型——`invite` = 邀请新成员
-  /// （duo 满员后签发即自动升格 group，方案 C）；`channel` = 发起人在新设备
-  /// 加通道（绑定发起人身份）。
+  /// （**仅 group 空间可用**：duo 满 2 人时服务端 409 DUO_FULL，2026-10-04 取消
+  /// 升格后不再有"签发即升级"）；`channel` = 发起人在新设备加通道（绑定发起人
+  /// 身份）。
   ///
   /// **必填、无默认值**：两种 token 语义相反（一个开新身份、一个绑发起人自己的
   /// 身份），给默认值就等于让"忘传"静默退化成另一种语义——2026-10-04 审查实测：

@@ -20,11 +20,6 @@ const String kWsTypeReceiptUpdated = 'receipt.updated';
 /// 都要刷新成员名单。
 const String kWsTypeMemberJoined = 'member.joined';
 
-/// 群聊一期（2026-10-03）：duo → group 升格（单向不可逆、通话停用）。
-/// 升格只有发起邀请的那一方看到确认弹窗，其他成员靠这一帧在聊天流里落系统
-/// 消息知情。消息是 E2EE，服务端伪造不了密文，故只发信号、文案由客户端渲染。
-const String kWsTypeSpaceUpgraded = 'space.upgraded';
-
 /// 语音通话信令（PROTOCOL.md §8.4）。
 ///
 /// 服务端只做**同空间哑转发**：不解析 sdp/candidate、不落库、不进 `server_sequence`。
@@ -122,14 +117,6 @@ class WsMemberJoinedEvent extends WsEvent {
   const WsMemberJoinedEvent({required super.type, required this.memberId});
 
   final String memberId;
-}
-
-/// space.upgraded（群聊一期）：duo → group 升格完成。客户端收到后落一条系统
-/// 消息（"已升级为群聊，语音通话不可用"）并隐藏通话入口。
-class WsSpaceUpgradedEvent extends WsEvent {
-  const WsSpaceUpgradedEvent({required super.type, required this.mode});
-
-  final String mode;
 }
 
 /// 对方回执（已送达/已读）更新：单调高水位，按 member 一行。
@@ -381,12 +368,6 @@ class WsClient {
           onEvent?.call(WsMemberJoinedEvent(
             type: type,
             memberId: payload['member_id'] as String? ?? '',
-          ));
-          break;
-        case kWsTypeSpaceUpgraded:
-          onEvent?.call(WsSpaceUpgradedEvent(
-            type: type,
-            mode: payload['mode'] as String? ?? 'group',
           ));
           break;
         case kWsTypeReceiptUpdated:

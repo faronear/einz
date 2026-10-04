@@ -91,8 +91,8 @@ space_members (
 spaces（群聊一期 2026-10-03 增列）
   mode  TEXT NOT NULL DEFAULT 'duo'  -- 'duo'=二人私密（上限 2、通话可用）；
                                      -- 'group'=群空间（上限 maxMembersPerSpace、通话禁用）
-                                     -- 创建一律 'duo'；duo 满员签发 invite token
-                                     -- 自动升格 'group'（单向不可逆，方案 C）
+                                     -- 缺省 'duo'；**创建时选定，之后永不 UPDATE**
+                                     -- **创建时选定、之后永不 UPDATE**（无升格）
 
 join_tokens（群聊一期 2026-10-03 增列）
   purpose           TEXT NOT NULL DEFAULT 'channel',
@@ -138,9 +138,11 @@ GET /health
 POST /spaces
   创建 Space（首条通道自举，无 token）。
   请求：{ spaceAddress, spacePublicKey, creatorPublicKey, sealedSpaceKey,
-          memberName?, customId? }
+          memberName?, customId?, mode? }
   （群聊一期 2026-10-03：peer_name/peer_gender 已删（v3）——create 不预置
-    伴侣，partner 加入时自填名字；新空间一律 mode='duo'）
+    伴侣，partner 加入时自填名字。
+    2026-10-04：新增 `mode`（'duo' 缺省 | 'group'）——**创建时选定、永不改变**
+    （取消升格）；非法值一律回退 'duo'）
   响应：201 { spaceId, spaceAddress, joinToken }   ← 返回首个 join token
     （purpose='invite'——"邀请伴侣"链接；含链接）
   错误：DEVICE_ALREADY_BOUND / ADDRESS_TAKEN / INVALID_ADDRESS / SPACE_LIMIT_REACHED
@@ -169,14 +171,14 @@ POST /spaces/join
   - channel token：**不需要**带 slot——服务端按 token 绑定的 issuer_member_id
     自动解析发起人槽位；客户端显式带 slot 且不一致 → 403（防错用）
   响应：200 { spaceId, memberId, slot, sessionToken, entranceId, spaceAddress,
-              isNewMember, upgraded }
+              isNewMember }
     isNewMember=true 仅当这次 join **新建了身份**（false = 已有成员加通道）——
     服务端据此决定是否广播 member.joined；
-    upgraded=true 仅当这次 join 真的把 duo 升成了 group（防御闸路径）。
+
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
        ENTRANCE_LIMIT_REACHED（通道数上限，409）/
        SPACE_FULL（group 成员数达 maxMembersPerSpace，409）/
-       DUO_FULL（duo 满且升格不可用——maxMembersPerSpace ≤ 2 的部署，409）
+       DUO_FULL（duo 已满 2 人——双人秘境不许第三个身份，409）
 ```
 
 ### 4.2 成员端点（加入后/创建者）
@@ -187,12 +189,12 @@ POST /spaces/{spaceId}/join-tokens
   请求：{ purpose: 'invite' | 'channel' }（群聊一期 2026-10-03；**必填语义**——
   缺省 'channel' 是历史行为，客户端必须显式传：两种码语义相反，漏传会让
   "邀请伴侣"变成"把自己身份送出去"）
-  - invite：邀请新成员（新身份）。duo 满员（伴侣已入网）时**签发即自动升格
-    group**（方案 C，单向不可逆）；maxMembersPerSpace ≤ 2 的部署 → 409。
+  - invite：邀请新成员（新身份）。**仅 group 空间可签发**——duo 已满 2 人时
+    409 DUO_FULL（双人秘境不会有第三个人）；签发无任何空间级副作用。
   - channel：发起人在新设备加通道——token 记录签发者 member（issuer 绑定），
     join 时校验"仅发起人本人可接入"（防任选他人身份冒充）。
   → 201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
-  错误：NOT_A_MEMBER / UPGRADE_NOT_ALLOWED（升格被上限闸拒绝，409）
+  错误：NOT_A_MEMBER / DUO_FULL（duo 满 2 人，409）
 
 DELETE /spaces/{spaceId}/join-tokens/{tokenHash}
   撤销未用 token（创建者补救手段）。
@@ -217,7 +219,7 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 ④ join 提交                       → POST /spaces/join（真正消费 token）
      服务端事务：锁 Space 行 → 校验 purpose×slot → 标记 used →
      invite 分配最小空 slot/新 member_id；channel 复用 issuer 的 slot/member_id；
-     新身份时 duo 满 2 人 → 自动升格 group（方案 C 防御闸）→ 查成员数上限
+     新身份时按创建时定死的 mode 查上限（duo 恒 2 / group 看 maxMembersPerSpace）
 ⑤ 设置 PIN                       → 本机操作（AppLock），无服务端调用
 → 进入 ChatPage
 ```
@@ -238,8 +240,8 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 | `SPACE_LIMIT_REACHED` | 空间数量已达上限（serverConfig.json 的 maxSpaces；与"成员/通道数"无关） | 409 |
 | `ENTRANCE_LIMIT_REACHED` | 该空间的通道（登记项）数量已达上限（serverConfig.json 的 maxEntrancesPerSpace；**计数含已撤销**——销毁不退额度，防反复开通/销毁刷量） | 409 |
 | `SPACE_FULL` | group 空间成员（身份）数已达上限（serverConfig.json 的 maxMembersPerSpace；同身份多通道不重复计数） | 409 |
-| `DUO_FULL` | duo 空间已满 2 人且自动升格不可用（maxMembersPerSpace ≤ 2 的部署）——升格可用的部署会先自动转 group 再重查上限，不落到此码 | 409 |
-| `UPGRADE_NOT_ALLOWED` | duo → group 升格被拒（maxMembersPerSpace ≤ 2 的部署签发 invite token 时） | 409 |
+| `DUO_FULL` | duo 空间已满 2 人（双人秘境不允许第三个身份；签发 invite 与 join 两处都会落到此码） | 409 |
+
 | `SPACE_NOT_FOUND` | 空间不存在/已归档 | 404 |
 | `NOT_A_MEMBER` | 当前 session 不是该 Space 成员 | 403 |
 | `DEVICE_ALREADY_BOUND` | 该通道已绑定一个 Space，拒绝再创建/加入 | 409 |

@@ -50,9 +50,18 @@ CREATE TABLE spaces (
     space_address    TEXT NOT NULL UNIQUE,
     space_public_key TEXT NOT NULL UNIQUE,
     status           TEXT NOT NULL DEFAULT 'waiting',  -- waiting | active | archived
+    mode             TEXT NOT NULL DEFAULT 'duo',      -- duo | group（群聊一期 2026-10-03 增列）
     created_at       INTEGER NOT NULL,
     updated_at       INTEGER NOT NULL
 );
+
+-- mode 的语义（2026-10-04 老板拍板取消升格后**彻底简化**）：
+--   duo   = 二人私密空间：成员上限恒 2（第 3 个身份 → DUO_FULL），**可语音通话**
+--   group = 群空间：上限 serverConfig.json 的 maxMembersPerSpace（0=不限），禁通话
+--   · **创建时选定，之后永不 UPDATE**（库里没有任何一条 SQL 会改它）——
+--     不存在"两人空间后来变成群"：想加人只能另建 group 空间（历史留在旧空间）
+--   · 存量空间回填 'duo'：现存情侣空间天然是严格二人空间，零迁移成本
+--   · 非法/缺省值一律回退 'duo'（create 入口处归一，不落脏值）
 
 -- 空间成员（群聊一期 2026-10-03：slot 开放为小整数槽位——新身份 join 分配
 -- 最小空 slot，加通道复用已有行；duo 空间仍恒两槽 0/1。

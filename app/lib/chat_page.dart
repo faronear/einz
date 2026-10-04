@@ -358,8 +358,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 本空间成员数（身份数，同身份多通道只算一个）。
   int get _memberCount => _memberSlots.length;
 
-  /// 还能不能再邀请新成员（满员 = 服务端上限已达；0=不限）。
-  bool get _canInviteMore => _maxMembers <= 0 || _memberCount < _maxMembers;
+  /// 还能不能再邀请新成员（2026-10-04：mode 创建时定死，没有升格）：
+  /// - duo：**只在还没第二个人时**能邀请（那是"邀请伴侣"）；满 2 人即永久关闭
+  ///   ——第三个人不是"满了"，是双人秘境不允许；
+  /// - group：未达服务端 maxMembersPerSpace（0=不限）。
+  bool get _canInvite => _isGroup
+      ? (_maxMembers <= 0 || _memberCount < _maxMembers)
+      : _memberCount < 2;
 
   /// 是否在气泡旁显示发送者头像：group 默认开、duo 默认关；
   /// `--dart-define=SHOW_MESSAGE_AVATARS=true` 强制开（含 duo）。
@@ -854,20 +859,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     unawaited(_refreshProfileFromServer());
   }
 
-  /// 群聊一期：duo → group 升格（space.upgraded）——单向不可逆、通话停用。
-  ///
-  /// 升格只有发起邀请的那一方看到确认弹窗，其他成员靠这一帧知情。
-  /// **文案落顶部提示而不是聊天流**：消息是 E2EE，服务端伪造不了密文，客户端
-  /// 也没有"本地-only 系统消息"的落库通路（硬造一条会污染 seq/同步语义）——
-  /// 与 passphrase.rotated 同口径（2026-10-04 定）。待二期有本地系统消息设施
-  /// 再升格为常驻消息。
-  void _onSpaceUpgraded(WsSpaceUpgradedEvent event) {
-    if (!mounted) return;
-    setState(() => _spaceMode = 'group');
-    showTopNotice(context, AppLocalizations.of(context)!.chatPageMembersUpgraded);
-    unawaited(_refreshProfileFromServer());
-  }
-
   /// 空间口令被重设（Server 广播 passphrase.rotated）：只发通知不弹窗——
   /// 修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
@@ -1160,9 +1151,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       onProfileUpdated: _onProfileUpdated,
       onReceiptUpdated: _onReceiptUpdated,
       onCall: _onCallSignal,
-      // 群聊一期（2026-10-03）：新身份入网 / 空间升格为群聊
       onMemberJoined: _onMemberJoined,
-      onSpaceUpgraded: _onSpaceUpgraded,
     );
   }
 
@@ -2210,13 +2199,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 供"初次打开"与"刷新"共用。
   /// 空间成员（群聊一期 2026-10-03）：成员名单 + 两种邀请入口。
   ///
-  /// 入口语义（aimemo/groupChatDesign.md）：
-  /// - **邀请伴侣 / 邀请新成员** = `invite` token（开**新身份**）。伴侣还没入网时
-  ///   就是"邀请伴侣"（不升格）；已入网仍是 duo 时点它 → 先弹升格确认（升级后禁用
-  ///   语音通话、最多 N 人、不可逆），确认后生成。
-  /// - **在其他设备加入我的账号** = `channel` token（绑定**我自己的**身份，仅本人
-  ///   可用，杜绝"任选他人身份加通道"的冒充面）。
-  /// - 满员（服务端 maxMembersPerSpace 已达）→ 只留一行说明，不给按钮。
+  /// 入口语义（2026-10-04 定稿：**没有升格**，mode 创建时定死）：
+  /// - **邀请伴侣**（duo 且还没第二个人）＝ `invite` token（开新身份）；
+  /// - **邀请新成员**（group 且未满员）＝ 同上；
+  /// - **duo 已满 2 人 → 不出现邀请入口**，只留一行"双人秘境不可增加成员"——
+  ///   duo 永远不会变成群，第三个人不是"满了"，是**不允许**；
+  /// - **在其他设备加入我的账号** ＝ `channel` token（绑定**我自己的**身份，
+  ///   仅本人可用，杜绝"任选他人身份加通道"的冒充面）；
   /// - **无退出入口**（一期：入群即不退群）。
   Future<void> _showMembersSheet() async {
     final l10n = AppLocalizations.of(context)!;
@@ -2240,7 +2229,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 成员名单按槽位（入群先后）排；本机那份资料可能还没拉到 → 至少列"我"
     final entries = _memberSlots.entries.toList()
       ..sort((a, b) => a.value.compareTo(b.value));
-    final partnerJoined = _memberCount >= 2;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -2304,35 +2292,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                 const SizedBox(height: 10),
-                // 邀请入口：满员 → 只留说明；duo 且伴侣已入网 → 升格确认；其余直接生成
-                if (!_canInviteMore)
+                // 邀请入口：能邀就一个按钮；不能邀就给一行说法（入口直接消失会让人
+                // 以为坏了）。duo 满 2 人与 group 满员的**原因不同**，文案也分开。
+                if (!_canInvite)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      // 给"按钮去哪了"一个说法（设计文档的风险表：入口直接消失会
-                      // 让人以为坏了）——人数是服务端 maxMembersPerSpace 卡的
-                      _maxMembers > 0
-                          ? l10n.chatPageMembersFullWithMax(_memberCount, _maxMembers)
-                          : l10n.chatPageMembersFull,
+                      _isGroup
+                          ? (_maxMembers > 0
+                              ? l10n.chatPageMembersFullWithMax(_memberCount, _maxMembers)
+                              : l10n.chatPageMembersFull)
+                          : l10n.chatPageMembersDuoLocked,
                       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                     ),
                   )
                 else
                   FilledButton.tonalIcon(
                     icon: const Icon(Icons.person_add_alt_1, size: 18),
-                    label: Text(partnerJoined && !_isGroup
+                    // duo 里第二个人还没来 = "邀请伴侣"；group = "邀请新成员"
+                    label: Text(_isGroup
                         ? l10n.chatPageMembersInviteNew
                         : l10n.chatPageMembersInvitePartner),
-                    onPressed: () async {
+                    onPressed: () {
                       Navigator.of(ctx).pop();
-                      // duo 满 2 人签 invite 会触发服务端升格（方案 C）——
-                      // 升格代价（通话停用/不可逆）先确认
-                      if (partnerJoined && !_isGroup) {
-                        final ok = await _confirmGroupUpgrade();
-                        if (!ok || !mounted) return;
-                      }
-                      if (!mounted) return;
-                      await _showInviteDialog(purpose: 'invite');
+                      unawaited(_showInviteDialog(purpose: 'invite'));
                     },
                   ),
                 const SizedBox(height: 8),
@@ -2351,33 +2334,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         );
       },
     );
-  }
-
-  /// 升格确认（方案 C）：说明"最多 N 人 + 通话停用 + 不可逆"，返回是否继续。
-  /// [l10n.chatPageMembersUpgradeConfirmBody] 带上限数字（maxMembersPerSpace > 0
-  /// 时）；服务器不限制人数（0）则用不限版文案。
-  Future<bool> _confirmGroupUpgrade() async {
-    final l10n = AppLocalizations.of(context)!;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageMembersUpgradeConfirmTitle)),
-        content: Text(_maxMembers > 0
-            ? l10n.chatPageMembersUpgradeConfirmBody(_maxMembers)
-            : l10n.chatPageMembersUpgradeConfirmBodyNoLimit),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-          ),
-        ],
-      ),
-    );
-    return ok ?? false;
   }
 
   Future<void> _showEntranceListSheet() async {

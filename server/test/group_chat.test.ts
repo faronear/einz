@@ -1,5 +1,8 @@
-// 群聊一期（2026-10-03）服务端行为：duo/group 双模式、双 purpose token、
-// 自动升格（方案 C）、成员数上限。见 aimemo/groupChatDesign.md。
+// 群聊一期（2026-10-03）服务端行为：duo/group 双模式、双 purpose token、成员数上限。
+//
+// **2026-10-04 老板拍板取消升格**：mode 在 create 时定死、永不改变——duo 恒 2 人
+//（第 3 个身份一律 DUO_FULL），group 上限看 serverConfig.json 的 maxMembersPerSpace。
+// 本文件覆盖"上限不受限（0=不限）"的默认配置；受限配置在 group_chat_limit.test.ts。
 //
 // 运行：npm test（tsx test/group_chat.test.ts）——需要 Node v22（better-sqlite3 ABI）
 import assert from 'node:assert/strict'
@@ -9,13 +12,10 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 import { ApiError } from '../src/auth.js'
-import { openDb } from '../src/db.js'
-import { createSpace, createJoinToken, getSpaceMode, joinSpace, maybeUpgradeToGroup } from '../src/spaces.js'
+import { getDb, openDb } from '../src/db.js'
+import { createSpace, createJoinToken, getSpaceMode, joinSpace } from '../src/spaces.js'
 
-// maxMembersPerSpace=2 走专用进程级配置（config.ts 惰性缓存，进程内不可重读）；
-// 其余用例跑默认配置（0=不限）——分两个文件级 test 序列各自独立进程不现实，
-// node:test 单进程共享缓存，故 ≤2 的拒绝路径用 loadConfig 返回值直接断言闸门条件，
-// 不依赖进程级配置切换。
+/** 本文件专属进程：空配置 = 什么都不限（config.ts 首次 loadConfig 时才读）。 */
 const configDir = mkdtempSync(join(tmpdir(), 'einz-group-cfg-'))
 process.env.EINZ_CONFIG = join(configDir, 'serverConfig.json')
 writeFileSync(process.env.EINZ_CONFIG, JSON.stringify({}))
@@ -31,29 +31,70 @@ async function withDb (fn: () => Promise<void> | void): Promise<void> {
   }
 }
 
-test('创建即 duo：mode 落 duo、不再预置伴侣行', async () => {
+/** createSpace 的参数表很长且是位置参数，包一层省得每处数逗号。 */
+function create (
+  mode?: 'duo' | 'group',
+  creatorName = '我',
+): Promise<{ spaceId: string; joinToken: string; creatorMemberId: string }> {
+  return createSpace(
+    undefined, creatorName, 'male',
+    undefined, undefined, undefined, undefined, undefined, undefined,
+    mode,
+  )
+}
+
+test('create 不带 mode → 落 duo（老客户端缺省行为）', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
+    const space = await create()
     assert.equal(getSpaceMode(space.spaceId), 'duo')
   })
 })
 
-test('invite token：不带 slot 开新身份（自填名字），第二人入网仍 duo', async () => {
+test('create 带 mode=group → 落 group', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
+    const space = await create('group')
+    assert.equal(getSpaceMode(space.spaceId), 'group')
+  })
+})
+
+test('create 带非法 mode → 回退 duo（不 500、不落脏值）', async () => {
+  await withDb(async () => {
+    const space = await createSpace(
+      undefined, '我', 'male',
+      undefined, undefined, undefined, undefined, undefined, undefined,
+      'GROUP' as unknown as 'group', // 大小写/未知值一律回退
+    )
+    assert.equal(getSpaceMode(space.spaceId), 'duo')
+  })
+})
+
+test('创建不预置伴侣行：只有创建者一个身份', async () => {
+  await withDb(async () => {
+    const space = await create()
+    const n = (getDb()
+      .prepare(`SELECT COUNT(*) AS n FROM space_members WHERE space_id = ?`)
+      .get(space.spaceId) as { n: number }).n
+    assert.equal(n, 1, 'v3 起 create 不再预置 slot 1 的伴侣行')
+  })
+})
+
+test('duo：invite token 不带 slot 开新身份（自填名字），mode 保持 duo', async () => {
+  await withDb(async () => {
+    const space = await create()
     const joined = joinSpace(
       space.joinToken, 'pk-b', 'Pixel',
       undefined, undefined, '小芳', 'female',
     )
     assert.notEqual(joined.memberId, space.creatorMemberId, '第二人应是新身份')
     assert.equal(joined.slot, 1, '新身份分到最小空 slot')
-    assert.equal(getSpaceMode(space.spaceId), 'duo', '伴侣入网不升格')
+    assert.equal(joined.isNewMember, true)
+    assert.equal(getSpaceMode(space.spaceId), 'duo', 'duo 永远是 duo（无升格）')
   })
 })
 
 test('invite token 带 slot → 400（不能指定 slot）', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
+    const space = await create()
     assert.throws(
       () => joinSpace(space.joinToken, 'pk-b', 'Pixel', 0),
       (e: unknown) => e instanceof ApiError && e.code === 'INVALID_REQUEST',
@@ -61,9 +102,9 @@ test('invite token 带 slot → 400（不能指定 slot）', async () => {
   })
 })
 
-test('channel token：绑定发起人身份，接他人 slot → 403；接自己 slot → 复用身份、不升格', async () => {
+test('channel token：绑定发起人身份，接他人 slot → 403；接自己 → 复用身份', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
+    const space = await create()
     const partner = joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
     // 伴侣签 channel token（绑定伴侣身份），尝试冒充创建者 slot 0
     const channel = createJoinToken(space.spaceId, undefined, 'channel', partner.memberId)
@@ -72,45 +113,81 @@ test('channel token：绑定发起人身份，接他人 slot → 403；接自己
       (e: unknown) => e instanceof ApiError && e.httpStatus === 403,
       'channel token 不能接入他人身份',
     )
-    // 绑定自己 slot → 放行（成员数不变，仍是 2 人 duo）
+    // 绑定自己 slot → 放行（成员数不变）
     const own = createJoinToken(space.spaceId, undefined, 'channel', partner.memberId)
     const again = joinSpace(own.joinToken, 'pk-d', 'iPad', partner.slot)
     assert.equal(again.memberId, partner.memberId, '加通道复用同一身份')
-    assert.equal(getSpaceMode(space.spaceId), 'duo', '加通道不升格')
+    assert.equal(again.isNewMember, false, '加通道不算新成员（不广播 member.joined）')
   })
 })
 
-test('方案 C：duo 满员后签发 invite 自动升格 group；第三人入网分 slot 2', async () => {
+test('duo 满 2 人：签不出 invite（DUO_FULL，且不落 token）', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
+    const space = await create()
     joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
-    const invite = createJoinToken(space.spaceId, undefined, 'invite', space.creatorMemberId)
-    assert.equal(getSpaceMode(space.spaceId), 'group', '签发 invite 即升格')
-    const third = joinSpace(invite.joinToken, 'pk-c', 'Mac', undefined, undefined, '小刚')
-    assert.equal(third.slot, 2, '第三人分到 slot 2')
+    const before = (getDb()
+      .prepare(`SELECT COUNT(*) AS n FROM join_tokens WHERE space_id = ?`)
+      .get(space.spaceId) as { n: number }).n
+    assert.throws(
+      () => createJoinToken(space.spaceId, undefined, 'invite', space.creatorMemberId),
+      (e: unknown) => e instanceof ApiError && e.code === 'DUO_FULL' && e.httpStatus === 409,
+      '双人秘境里"邀请新成员"是不可能的动作，当场拒绝',
+    )
+    const after = (getDb()
+      .prepare(`SELECT COUNT(*) AS n FROM join_tokens WHERE space_id = ?`)
+      .get(space.spaceId) as { n: number }).n
+    assert.equal(after, before, '拒绝路径不该留下已签发的 token')
   })
 })
 
-test('默认配置（0=不限）：group 可扩到 4 人', async () => {
+test('duo 满 2 人：第三人 join（手工造 invite 码）→ DUO_FULL，成员数不变', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
+    const space = await create()
     joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
-    const i2 = createJoinToken(space.spaceId, undefined, 'invite')
-    joinSpace(i2.joinToken, 'pk-c', 'Mac', undefined, undefined, '小刚')
-    const i3 = createJoinToken(space.spaceId, undefined, 'invite')
-    joinSpace(i3.joinToken, 'pk-d', 'iPad', undefined, undefined, '小美')
+    // 绕过签发闸门造一张 invite（模拟"码签发于闸门上线之前"）
+    const { newJoinToken } = await import('../src/spaces.js')
+    const t = newJoinToken(space.spaceId, 'member', 'invite', space.creatorMemberId)
+    assert.throws(
+      () => joinSpace(t.token, 'pk-c', 'Mac', undefined, undefined, '小刚'),
+      (e: unknown) => e instanceof ApiError && e.code === 'DUO_FULL',
+    )
+    const n = (getDb()
+      .prepare(`SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND member_id IS NOT NULL`)
+      .get(space.spaceId) as { n: number }).n
+    assert.equal(n, 2, '成员数没变')
+    assert.equal(getSpaceMode(space.spaceId), 'duo')
+  })
+})
+
+test('duo 满 2 人：加通道（channel）不受影响——不新增身份', async () => {
+  await withDb(async () => {
+    const space = await create()
+    joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
+    const channel = createJoinToken(space.spaceId, undefined, 'channel', space.creatorMemberId)
+    const again = joinSpace(channel.joinToken, 'pk-c', 'Mac')
+    assert.equal(again.memberId, space.creatorMemberId, '复用创建者身份')
+  })
+})
+
+test('group（默认配置 0=不限）：invite 可扩到 4 人，slot 递增', async () => {
+  await withDb(async () => {
+    const space = await create('group')
+    const b = joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
+    assert.equal(b.slot, 1)
+    const i2 = createJoinToken(space.spaceId, undefined, 'invite', space.creatorMemberId)
+    const c = joinSpace(i2.joinToken, 'pk-c', 'Mac', undefined, undefined, '小刚')
+    assert.equal(c.slot, 2)
+    const i3 = createJoinToken(space.spaceId, undefined, 'invite', b.memberId)
+    const d = joinSpace(i3.joinToken, 'pk-d', 'iPad', undefined, undefined, '小美')
+    assert.equal(d.slot, 3)
     assert.equal(getSpaceMode(space.spaceId), 'group')
   })
 })
 
-// 注：maxMembersPerSpace ≤ 2 的拒绝路径（UPGRADE_NOT_ALLOWED）需要进程级配置，
-// 在 group_chat_limit.test.ts 里用真实配置跑（本文件是"0=不限"的配置）。
-
 test('存量 pending 行：新身份**复用** slot 1（不留下填不上的幽灵行）', async () => {
   await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
+    const space = await create()
     // 模拟存量库的 pending 行（slot 1, member_id NULL——旧版 create 预置的伴侣位）
-    const { getDb } = await import('../src/db.js')
     getDb()
       .prepare(
         `INSERT INTO space_members (space_id, member_id, slot, display_name, gender, status, joined_at)

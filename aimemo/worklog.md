@@ -10945,3 +10945,61 @@ purpose 分流（invite 自填名字/性别、channel 不填不带 slot）；`/i
 - per-member 已读水位（设计里的 schema v10）、本地成员名单落库、引用回复/通知文案泛化、
   成员邮箱设置：未做（下一批）。
 
+---
+
+## 2026-10-04（续）测试全绿 + 取消升格（第二次重做）
+
+### ① 修 `peer_status` 挂死：根因是 pv=2 硬编码 + dist 陈旧
+
+按老板要求单独查。根因两层：
+
+1. **pv 版本漂移**：群聊提交把 `PROTOCOL_VERSION` 2→3，但 **5 个测试文件**
+   （smoke/audit/entrance_retire/peer_status/receipts）里 WS 握手还硬写 `?pv=2`。
+   服务端收到版本不符是**直接 4400 关连接、不发 hello** → 等 hello 的测试永久挂死
+   （这就是 `npm test` 跑 51 分钟不完的元凶）。另外 6 个文件的 REST 头也硬写
+   `X-Protocol-Version: 2`。**全部改成从 `src/protocolVersion.ts` 引常量**——单一
+   来源，以后 bump 版本不会再漏。
+2. **dist 陈旧**：6 个测试是 spawn `dist/app.js` 跑的，而本机 `dist/` 是 10-02 编的
+   （pv 还是 2）。测试"跑在旧产物上"——与源码不一致时极难排查。**`npm test` 改为
+   先 `npm run build`**。
+
+修完 `npm test` 从"永远跑不完"变成 **34 秒全绿**。
+
+### ② 取消升格（老板拍板）
+
+老板考虑"创建时就选双人/群组"，我最初反对（"加了页也省不掉升格"）。他随后拍板
+**"一旦定了是双人，就永远不变"**——这条前提把我反对的核心论据消掉了，于是改成支持。
+收益是真正删掉一整块机制（不是换个触发点）：
+
+- 服务端：`maybeUpgradeToGroup`、`UPGRADE_NOT_ALLOWED`、签发 invite 时的升格闸门、
+  join 的防御闸、`upgraded` 字段、`broadcastSpaceUpgraded` 全删；上限收敛成两条
+  互不干扰的规则（duo 恒 2 → `DUO_FULL`；group 看 `maxMembersPerSpace` → `SPACE_FULL`）
+- `spaces.mode` 由"两态 + 单向迁移"退化为"**创建时定死、永不 UPDATE**"（无状态机）
+- shared：`mode` 进 create；`space.upgraded` 帧与事件类删除
+- App：**创建向导第 2 步加类型页**（两张通栏卡 + 一行说明 + 必选；放在"关于我"之后
+  ——第 1 页已经是"创建/加入"二选一，不想连着两页做选择）；成员弹层里 duo 满 2 人
+  不再给邀请按钮，改一行"这是双人秘境，不可增加成员；需要多人一起聊请新建群组秘境"
+- **副产品**：昨天那句"升格系统消息做不了（没有本地系统消息设施）"直接不复存在；
+  "用了半年的空间突然不能打电话"这个 UX 暗坑也没有了
+- 顺手补的服务端漏洞：`join` 的自填名字此前**没过白名单**（create 一直在校验），
+  手搓请求能塞任意串 → 补 `assertMemberName`
+
+### ③ 顺手清掉的债
+
+- setup_page 里 10 条随"伴侣名字页/身份选择页"删除而失效的 l10n 字符串（死键）
+- create 向导 `_stepCount=5` 但只有 3 个输入页 → 第 4 个进度圆点永远点不亮；
+  加了类型页后正好对上 4 页 + 完成页（不再有"两个完成页"）
+- `_showInviteDialog` 的 purpose 必填化后，把散落的 4 个调用点都显式标注了语义
+
+### ④ 存量 v3 遗留测试（另一批 rot）
+
+smoke/audit/receipts/two_space_isolation/member_name 仍在按 v2 语义建空间/加入
+（`peer_name`、`slot: 1`）→ 全部改为 v3：不带 slot、自填 `member_name`；smoke 的
+"peer_name 预置应落 slot=1"断言改为"v3 create 只录创建者一人 + 缺省 mode=duo"。
+`group_chat.test.ts` 12 条 + `group_chat_limit.test.ts` 4 条重写（覆盖 create mode
+三态、duo 恒 2 的两处闸、group 上限、channel 绑定、pending 行复用）。
+
+**验证**：`npm test` 全绿（34s，19 个文件）；`flutter analyze` / `dart analyze` 干净。
+真机自测仍留给老板。
+
+

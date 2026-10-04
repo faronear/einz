@@ -19,6 +19,7 @@ import { test } from 'node:test'
 
 import { ApiError } from '../src/auth.js'
 import { assertMemberName } from '../src/memberName.js'
+import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
 const ROOT = join(import.meta.dirname, '..')
 
@@ -41,7 +42,7 @@ async function waitReady (port: number, timeoutMs = 10_000): Promise<void> {
 function req (port: number, path: string, init?: RequestInit): Promise<Response> {
   return fetch(`http://127.0.0.1:${port}${path}`, {
     ...init,
-    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': PROTOCOL_VERSION, ...(init?.headers as Record<string, string> | undefined) }
   })
 }
 
@@ -61,7 +62,7 @@ test('assertMemberName：合规放行（含 emoji），不合规 400', () => {
   }
 })
 
-test('端到端：create 的两个名字与改名都按白名单收口', async () => {
+test('端到端：create 的创建者名、join 的自填名、改名都按白名单收口', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-member-'))
   const port = freePort()
   const proc: ChildProcess = spawn(process.execPath, [join(ROOT, 'dist/app.js')], {
@@ -71,25 +72,22 @@ test('端到端：create 的两个名字与改名都按白名单收口', async (
   try {
     await waitReady(port)
 
-    // 1) create：两个名字（我的 / 伴侣的）任一含空格 → 400（都是用户输入的，不消毒）
-    const createWith = async (creatorName: string, peerName: string): Promise<number> => {
+    // 1) create：创建者名字含空格 → 400（名字是用户输入的，只拒收不消毒）
+    //    v3（2026-10-03）起 create **只录创建者**——不再有 peer_name，
+    //    "两人同名"这类与"按名字选身份"绑定的旧规则随之作废。
+    const createWith = async (creatorName: string): Promise<number> => {
       const res = await req(port, '/spaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           creator_name: creatorName,
-          peer_name: peerName,
           public_key: Buffer.alloc(32, 7).toString('base64')
         })
       })
       return res.status
     }
-    assert.equal(await createWith('Mr Lukas', 'Alice'), 400, '我的名字含空格应被拒')
-    assert.equal(await createWith('Lukas', 'My Love'), 400, '伴侣名字含空格应被拒')
-    // 1b) 两人同名 → 400（老板 2026-09-10 定：join 按名字选身份，同名无法判别）
-    assert.equal(await createWith('Lukas', 'Lukas'), 400, '两人同名应被拒')
-    // 2026-09-24 收紧：仅大小写不同也算同名（trim + 大小写不敏感）
-    assert.equal(await createWith('Lukas', 'lukas'), 400, '仅大小写不同的同名应被拒')
+    assert.equal(await createWith('Mr Lukas'), 400, '我的名字含空格应被拒')
+    assert.equal(await createWith('a'.repeat(33)), 400, '超长名字应被拒')
 
     // 2) create：合规名字（含 emoji）→ 201
     const create = await req(port, '/spaces', {
@@ -97,18 +95,36 @@ test('端到端：create 的两个名字与改名都按白名单收口', async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         creator_name: '小猪🐷',
-        peer_name: 'Alice-01',
         public_key: Buffer.alloc(32, 7).toString('base64')
       })
     })
     assert.equal(create.status, 201, '合规名字应创建成功')
-    const { sessionToken } = (await create.json()) as { sessionToken: string }
+    const created = (await create.json()) as { sessionToken: string; joinToken: string }
+    const { sessionToken } = created
     const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }
 
     const space = (await (await req(port, '/space', { headers: auth })).json()) as {
       member_names: Record<string, string>
     }
     assert.ok(Object.values(space.member_names).includes('小猪🐷'), 'emoji 名字应原样入库')
+
+    // 2b) join 的自填名字同样收口（2026-10-04 补的服务端校验——此前只有 create
+    //     在拦，CLI/手搓请求能塞进任意串）。带空格 → 400。
+    const joinWith = async (memberName: string): Promise<number> => {
+      const res = await req(port, '/spaces/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: created.joinToken,
+          public_key: Buffer.alloc(32, 8).toString('base64'),
+          member_name: memberName,
+          member_gender: 'female'
+        })
+      })
+      return res.status
+    }
+    assert.equal(await joinWith('My Love'), 400, '加入者自填名含空格应被拒')
+    assert.equal(await joinWith('阿猪🐷_01'), 200, '合规名字应能加入')
 
     // 3) 改名：不合规 400；合规（emoji）200 生效
     for (const bad of ['Mr Lukas', '名字。', 'a'.repeat(33)]) {

@@ -63,19 +63,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNameHint => '我的名字（以后可以随时修改）';
 
   @override
-  String get wizardPeerNameHint => '伴侣的名字（以后可以随时修改）';
-
-  @override
-  String get wizardPeerNameHintInput => '伴侣的昵称';
-
-  @override
   String get wizardNameRequired => '请填写我的名字';
-
-  @override
-  String get wizardPeerNameRequired => '请填写伴侣的名字';
-
-  @override
-  String get wizardPeerNameSameName => '两人的名字不能相同';
 
   @override
   String get wizardNameInvalidError => '名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。';
@@ -90,9 +78,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardMyGenderLabel => '我的性别';
-
-  @override
-  String get wizardPeerGenderLabel => '伴侣的性别';
 
   @override
   String get wizardGenderMale => '男';
@@ -125,19 +110,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardTitleName => '关于我';
 
   @override
-  String get wizardTitlePeerName => '关于伴侣';
+  String get wizardTitleSpaceKind => '秘境类型';
 
   @override
-  String get wizardTitleJoinIdentity => '选择身份';
+  String get wizardSpaceKindHint => '先定类型，之后不能改';
 
   @override
-  String get wizardJoinIdentityHint => '一个秘境仅限两人，你是哪一位？';
+  String get wizardSpaceKindDuo => '双人秘境';
 
   @override
-  String get wizardJoinNoSlots => '该秘境未预置成员身份，无法加入';
+  String get wizardSpaceKindDuoDesc => '只有你们两个人，可以用语音通话';
 
   @override
-  String get wizardSlotRequired => '必须选择一个身份';
+  String get wizardSpaceKindGroup => '群组秘境';
+
+  @override
+  String get wizardSpaceKindGroupDesc => '几个人一起聊，不支持语音通话';
+
+  @override
+  String get wizardSpaceKindRequired => '请选择秘境类型';
 
   @override
   String get wizardSpaceLimit => '秘境数量已达上限（服务器 maxSpaces 限制），暂不能新建秘境';
@@ -648,25 +639,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersInviteNew => '邀请新成员';
 
   @override
-  String get chatPageMembersUpgradeConfirmTitle => '升级为群聊';
-
-  @override
-  String chatPageMembersUpgradeConfirmBody(int maxMembers) {
-    return '升级后本空间最多 $maxMembers 人、语音通话将停用，且不可逆。确定继续？';
-  }
-
-  @override
-  String get chatPageMembersUpgradeConfirmBodyNoLimit =>
-      '升级后语音通话将停用，且不可逆。确定继续？';
-
-  @override
-  String get chatPageMembersUpgraded => '已升级为群聊，语音通话不可用';
-
-  @override
   String get chatPageMembersChannelToken => '在其他设备加入我的账号';
 
   @override
-  String get chatPageMembersFull => '成员已满';
+  String get chatPageMembersDuoLocked => '这是双人秘境，不可增加成员；需要多人一起聊请新建群组秘境';
+
+  @override
+  String get chatPageMembersFull => '群成员已满';
 
   @override
   String chatPageMembersFullWithMax(int current, int max) {

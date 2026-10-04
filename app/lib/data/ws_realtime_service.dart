@@ -52,9 +52,6 @@ class WsRealtimeService {
   /// 与 [onPeerStatus] 不同：那是通道上下线，这个是成员数 +1。
   void Function(WsMemberJoinedEvent event)? onMemberJoined;
 
-  /// 空间升格为群聊回调（群聊一期 space.upgraded——单向不可逆、通话停用）。
-  void Function(WsSpaceUpgradedEvent event)? onSpaceUpgraded;
-
   /// 建立连接（自动重连直到 [stop]）。
   ///
   /// **幂等**：已有连接（或正在重连）时直接返回，**不建第二条**。
@@ -72,7 +69,6 @@ class WsRealtimeService {
     void Function(WsReceiptUpdatedEvent event)? onReceiptUpdated,
     void Function(WsCallEvent event)? onCall,
     void Function(WsMemberJoinedEvent event)? onMemberJoined,
-    void Function(WsSpaceUpgradedEvent event)? onSpaceUpgraded,
   }) {
     if (_client != null) return; // 幂等：已有连接就不再建（见方法头注释）
     this.onMessageNew = onMessageNew;
@@ -83,7 +79,6 @@ class WsRealtimeService {
     this.onReceiptUpdated = onReceiptUpdated;
     this.onCall = onCall;
     this.onMemberJoined = onMemberJoined;
-    this.onSpaceUpgraded = onSpaceUpgraded;
     _client = WsClient(
       server: server,
       token: _token,
@@ -108,7 +103,6 @@ class WsRealtimeService {
         if (e is WsReceiptUpdatedEvent) this.onReceiptUpdated?.call(e);
         if (e is WsCallEvent) this.onCall?.call(e);
         if (e is WsMemberJoinedEvent) this.onMemberJoined?.call(e);
-        if (e is WsSpaceUpgradedEvent) this.onSpaceUpgraded?.call(e);
       },
       onStatus: (s) => connected.value = s == WsStatus.connected,
     )..start();

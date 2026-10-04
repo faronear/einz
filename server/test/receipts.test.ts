@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { WebSocket } from 'ws'
 import assert from 'node:assert/strict'
+import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
 // 所有请求默认带协议版本头（与客户端一致）：服务端对 API 路径做硬校验，
 // 缺头/版本不符 → 400 PROTOCOL_VERSION_MISMATCH（PROTOCOL.md §1，2026-09-15 补实现）。
@@ -22,7 +23,7 @@ const RAW_FETCH = globalThis.fetch
 globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
   RAW_FETCH(input, {
     ...init,
-    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': PROTOCOL_VERSION, ...(init?.headers as Record<string, string> | undefined) }
   })) as typeof fetch
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -76,7 +77,8 @@ class Entrance {
       body: JSON.stringify({
         public_key: `pk-${this.label}`,
         creator_name: 'Lukas',
-        peer_name: 'Alice',
+        // v3（2026-10-03）：create 不再预置对方（peer_name 已删）——第二人的
+        // 名字由他加入时自填 member_name（见下方 joinSpace）
         escrow_passphrase: 'pass123',
         sealed_space_key: {
           format: 'einz-backup-v1',
@@ -107,7 +109,9 @@ class Entrance {
       body: JSON.stringify({
         token,
         public_key: `pk-${this.label}`,
-        slot: 1,
+        // v3：invite token **不带 slot**（带 slot 会 400）；新身份自填名字
+        member_name: this.label,
+        member_gender: 'female',
         entrance_name: this.label
       })
     })
@@ -238,7 +242,7 @@ async function main (): Promise<void> {
     // 7) Alice 在线时，Bob 上报 read=2 → Alice 应通过 WS 收到 receipt.updated
     await new Promise<void>((done, fail) => {
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=2`,
+        `ws://127.0.0.1:${port}/ws?pv=${PROTOCOL_VERSION}`,
         { headers: { Authorization: `Bearer ${alice.sessionToken}` } }
       )
       const timer = setTimeout(() => fail(new Error('WS receipt.updated timeout')), 5000)

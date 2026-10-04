@@ -11,11 +11,12 @@ library;
 ///   错误码 `DEVICE_REVOKED`→`ENTRANCE_REVOKED`、`/devices/*`→`/entrances/*` 等，
 ///   见 docs/GLOSSARY.md「wire 字段改名」）；
 /// - `3` = 群聊一期（2026-10-03，aimemo/groupChatDesign.md）：create 删
-///   `peer_name`/`peer_gender`（不再预置伴侣）、join slot 显式语义（不带 slot =
-///   新身份 / 带 slot = 加通道，需 channel token）、join 请求新增
+///   `peer_name`/`peer_gender`（不再预置伴侣）、**create 新增 `mode`（duo|group，
+///   创建时定死、永不改变——2026-10-04 取消升格）**、join slot 显式语义（不带
+///   slot = 新身份 / 带 slot = 加通道，需 channel token）、join 请求新增
 ///   `member_name`/`member_gender`、join-tokens 请求新增 `purpose`、
 ///   preflight 响应新增 `mode`/`purpose`/`inviterName`、WS 新增
-///   `member.joined`/`space.upgraded` 帧。无老客户端兼容（一次性升级）。
+///   `member.joined` 帧。无老客户端兼容（一次性升级）。
 ///
 /// REST（ApiClient）与 WS（ws_client）共用这一份，别再各写一个字面量。
 /// 服务端对应 `server/src/protocolVersion.ts`（改动请两端同步）。
@@ -338,7 +339,8 @@ class SpaceResult {
   final String mode;
 
   /// 本服务器单空间成员上限（serverConfig.json 的 maxMembersPerSpace；0=不限）。
-  /// 客户端据此在满员时隐藏邀请入口、升格确认里写明"最多 N 人"。
+  /// **只对 group 生效**（duo 恒 2，与这个值无关）。客户端据此在满员时隐藏邀请
+  /// 入口、在成员弹层里写明"最多 N 人"。
   final int maxMembers;
 
   factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(

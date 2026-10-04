@@ -23,6 +23,7 @@ import { hashSessionToken } from '../src/auth.js'
 import { listEntrances, retireEntrance } from '../src/entrances.js'
 import { getDb, openDb } from '../src/db.js'
 import { attachWs } from '../src/ws.js'
+import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
 /** 一个 Space 两人：a1（p1，本次退役的那台）与 b1（p2，观察方）。 */
 function seed (): void {
@@ -82,7 +83,7 @@ interface Client {
 }
 
 function connect (port: number, token: string): Promise<Client> {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?pv=2`, {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?pv=${PROTOCOL_VERSION}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const client: Client = { ws, frames: [] }

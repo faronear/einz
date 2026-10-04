@@ -124,19 +124,6 @@ export function broadcastProfileUpdated(
   }
 }
 
-/** duo → group 升格（群聊一期方案 C）：通知同空间**全部**在线通道（含发起者
- *  自己的其他通道——每个人都要在聊天流落系统消息、隐藏通话入口）。
- *  消息本身 E2EE，服务端不能伪造密文 → 客户端收到帧后各自在本地落系统消息
- *  （文案自渲染），服务端不落库。 */
-export function broadcastSpaceUpgraded(spaceId: string): void {
-  for (const [, conn] of conns) {
-    if (conn.spaceId !== spaceId) continue;
-    if (conn.ws.readyState === WebSocket.OPEN) {
-      conn.ws.send(JSON.stringify({ id: 0, type: "space.upgraded", payload: { space_id: spaceId, mode: "group" } }));
-    }
-  }
-}
-
 /** 新成员加入（群聊一期）：通知同空间全部在线通道刷新成员名单。
  *  与 peer.online 不同——peer.online 是"通道上线/下线"（同一人的其他通道
  *  不算），member.joined 是**新身份**入网（成员数 +1），人人需要刷新。

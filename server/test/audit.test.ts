@@ -19,6 +19,7 @@ import { join, resolve } from 'node:path'
 import { WebSocket } from 'ws'
 import assert from 'node:assert/strict'
 import Database from 'better-sqlite3'
+import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
 // 所有请求默认带协议版本头（与客户端一致）：服务端对 API 路径做硬校验，
 // 缺头/版本不符 → 400 PROTOCOL_VERSION_MISMATCH（PROTOCOL.md §1，2026-09-15 补实现）。
@@ -26,7 +27,7 @@ const RAW_FETCH = globalThis.fetch
 globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
   RAW_FETCH(input, {
     ...init,
-    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': PROTOCOL_VERSION, ...(init?.headers as Record<string, string> | undefined) }
   })) as typeof fetch
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -99,7 +100,7 @@ async function main (): Promise<void> {
     // 2) WS 上线 → 下线（等服务端写完 close 事件）
     await new Promise<void>((done, fail) => {
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=2`,
+        `ws://127.0.0.1:${port}/ws?pv=${PROTOCOL_VERSION}`,
         { headers: { Authorization: `Bearer ${created.sessionToken}` } }
       )
       ws.on('open', () => {

@@ -64,19 +64,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardNameHint => 'Name (can be changed later)';
 
   @override
-  String get wizardPeerNameHint => 'Partner\'s name (can be changed later)';
-
-  @override
-  String get wizardPeerNameHintInput => 'Partner\'s name';
-
-  @override
   String get wizardNameRequired => 'Enter your name';
-
-  @override
-  String get wizardPeerNameRequired => 'Enter your partner\'s name';
-
-  @override
-  String get wizardPeerNameSameName => 'The two names must be different';
 
   @override
   String get wizardNameInvalidError =>
@@ -92,9 +80,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardMyGenderLabel => 'Gender';
-
-  @override
-  String get wizardPeerGenderLabel => 'Partner\'s gender';
 
   @override
   String get wizardGenderMale => 'Male';
@@ -127,20 +112,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitleName => 'About me';
 
   @override
-  String get wizardTitlePeerName => 'About partner';
+  String get wizardTitleSpaceKind => 'Space type';
 
   @override
-  String get wizardTitleJoinIdentity => 'Choose your identity';
+  String get wizardSpaceKindHint => 'Pick one — this cannot be changed later';
 
   @override
-  String get wizardJoinIdentityHint =>
-      'One space has exactly two partners. Which one is you?';
+  String get wizardSpaceKindDuo => 'Two-person space';
 
   @override
-  String get wizardJoinNoSlots => 'No preset members — cannot join';
+  String get wizardSpaceKindDuoDesc => 'Just the two of you, with voice calls';
 
   @override
-  String get wizardSlotRequired => 'Pick an identity';
+  String get wizardSpaceKindGroup => 'Group space';
+
+  @override
+  String get wizardSpaceKindGroupDesc => 'For several people, no voice calls';
+
+  @override
+  String get wizardSpaceKindRequired => 'Please choose a space type';
 
   @override
   String get wizardSpaceLimit =>
@@ -682,26 +672,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersInviteNew => 'Invite new member';
 
   @override
-  String get chatPageMembersUpgradeConfirmTitle => 'Upgrade to group';
-
-  @override
-  String chatPageMembersUpgradeConfirmBody(int maxMembers) {
-    return 'After upgrading this space allows at most $maxMembers members and voice calls will be disabled. This cannot be undone. Continue?';
-  }
-
-  @override
-  String get chatPageMembersUpgradeConfirmBodyNoLimit =>
-      'Voice calls will be disabled after upgrading, and this cannot be undone. Continue?';
-
-  @override
-  String get chatPageMembersUpgraded =>
-      'Upgraded to group — voice calls are disabled';
-
-  @override
   String get chatPageMembersChannelToken => 'Add my account on another device';
 
   @override
-  String get chatPageMembersFull => 'Space is full';
+  String get chatPageMembersDuoLocked =>
+      'This is a two-person space; it cannot take more members. Create a group space for a bigger conversation';
+
+  @override
+  String get chatPageMembersFull => 'Group is full';
 
   @override
   String chatPageMembersFullWithMax(int current, int max) {

@@ -25,6 +25,7 @@ import { WebSocket } from 'ws'
 import assert from 'node:assert/strict'
 import Database from 'better-sqlite3'
 import { pwhashStr } from '../src/crypto.js'
+import { PROTOCOL_VERSION } from '../src/protocolVersion.js'
 
 // 所有请求默认带协议版本头（与客户端一致）：服务端对 API 路径做硬校验，
 // 缺头/版本不符 → 400 PROTOCOL_VERSION_MISMATCH（PROTOCOL.md §1，2026-09-15 补实现）。
@@ -32,7 +33,7 @@ const RAW_FETCH = globalThis.fetch
 globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1] = {}) =>
   RAW_FETCH(input, {
     ...init,
-    headers: { 'X-Protocol-Version': '2', ...(init?.headers as Record<string, string> | undefined) }
+    headers: { 'X-Protocol-Version': PROTOCOL_VERSION, ...(init?.headers as Record<string, string> | undefined) }
   })) as typeof fetch
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -101,13 +102,15 @@ class TestEntrance {
 
   /** 创建空间（v2 入口）：**一步完成通道登记 + 签发绑定该空间的会话**。
    *  替代已删除的 v1 `POST /entrances/enroll`（v1 收敛，2026-09-15）。 */
-  async createSpace (port: number, creatorName = '测试空间', peerName?: string): Promise<string> {
+  async createSpace (port: number, creatorName = '测试空间', mode?: 'duo' | 'group'): Promise<string> {
     const res = await fetch(`http://127.0.0.1:${port}/spaces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         creator_name: creatorName,
-        ...(peerName ? { peer_name: peerName } : {}),
+        // v3（2026-10-03）：create 不再预置对方（peer_name 已删）；
+        // 2026-10-04：新增 mode，**创建时定死**（缺省 duo）
+        ...(mode ? { mode } : {}),
         public_key: sodium.to_base64(this.keypair.publicKey, B64),
         entrance_name: 'dev-a'
       })
@@ -137,8 +140,15 @@ class TestEntrance {
     return ((await res.json()) as { joinToken: string }).joinToken
   }
 
-  /** 加入空间（v2 入口）：登记通道 + 签发会话 + 返回自己的身份槽位。 */
-  async joinSpace (port: number, token: string, slot = 1): Promise<void> {
+  /** 加入空间（v3 入口）：登记通道 + 签发会话。
+   *  **不带 slot**——invite token 由服务端分配最小空槽开新身份（带 slot 会 400），
+   *  新身份的名字/性别由加入者自填（`member_name`/`member_gender`）。 */
+  async joinSpace (
+    port: number,
+    token: string,
+    memberName = '伴侣',
+    memberGender = 'female'
+  ): Promise<void> {
     const res = await fetch(`http://127.0.0.1:${port}/spaces/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,7 +156,8 @@ class TestEntrance {
         token,
         public_key: sodium.to_base64(this.keypair.publicKey, B64),
         entrance_name: 'dev-b',
-        slot: slot
+        member_name: memberName,
+        member_gender: memberGender
       })
     })
     assert.equal(res.status, 200, 'join space should succeed')
@@ -469,7 +480,7 @@ async function main (): Promise<void> {
     await new Promise<void>((done, fail) => {
       // 凭证走握手头（PROTOCOL.md §8.1：token 不放 URL query）
       const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/ws?pv=2`,
+        `ws://127.0.0.1:${port}/ws?pv=${PROTOCOL_VERSION}`,
         { headers: { Authorization: `Bearer ${devA.sessionToken}` } }
       )
       const timer = setTimeout(
@@ -569,12 +580,12 @@ async function main (): Promise<void> {
       'escrow cleared after delete'
     )
 
-    // 12) 名称表（v2）：创建空间时带 peer_name → 落 space_members.display_name，
-    //     GET /space 的 member_names 应含双方名字。**名称的唯一数据源是
-    //     space_members**——v1 的 meta `person_name:*` 表已随收敛删除，所以这里
-    //     按 v2 的读法断言（此前两个用例查 meta，已作废）。
+    // 12) 名称表：创建者名字落 space_members.display_name，GET /space 的
+    //     member_names 能读到。**名称的唯一数据源是 space_members**——v1 的
+    //     meta `person_name:*` 表已随收敛删除，所以这里按库里的读法断言。
+    //     （v3 起 create 不再预置"伴侣名字"：第二人的名字由他加入时自填。）
     const preset = new TestEntrance(sodium.randombytes_buf(32))
-    await preset.createSpace(port, '我', 'Alice')
+    await preset.createSpace(port, '我')
     const infoRes = await fetch(`http://127.0.0.1:${port}/space`, {
       headers: { Authorization: `Bearer ${preset.sessionToken}` }
     })
@@ -587,18 +598,18 @@ async function main (): Promise<void> {
       '我',
       '创建者名字应落 space_members.display_name'
     )
-    // member 预置名落在 space_members 的 slot=1 行（该行 member_id 仍为 NULL，
-    // 等伴侣加入后才出现在 /space 的 member_names —— 这是"预置"语义，不是丢数据）
+    // v3：create **不预置**伴侣行——空间里只有创建者一个身份，
+    // 第二人的名字等他拿 invite 链接加入时自填（见 group_chat.test.ts）
     const dbPreset = new Database(join(tempDir, 'einz.sqlite.db'), { readonly: true })
-    const peerRow = dbPreset
-      .prepare(`SELECT display_name FROM space_members WHERE space_id = ? AND slot = 1`)
-      .get(preset.spaceId) as { display_name: string | null } | undefined
+    const rows = dbPreset
+      .prepare(`SELECT COUNT(*) AS n FROM space_members WHERE space_id = ?`)
+      .get(preset.spaceId) as { n: number }
+    const presetMode = dbPreset
+      .prepare(`SELECT mode FROM spaces WHERE space_id = ?`)
+      .get(preset.spaceId) as { mode: string } | undefined
     dbPreset.close()
-    assert.equal(
-      peerRow?.display_name,
-      'Alice',
-      'peer_name 预置应落 space_members slot=1（后续通道引导可按名字选身份）'
-    )
+    assert.equal(rows.n, 1, 'v3 create 只录创建者一人')
+    assert.equal(presetMode?.mode, 'duo', 'create 缺省 mode=duo')
 
     // 12b) 改名后名称表即时更新（回归：90ec740 把 getSpace 改读 space_members，
     //      但 updateMemberName 仍只写 meta → GET /space 返回旧名——TUI 右上角自己
@@ -896,7 +907,7 @@ async function main (): Promise<void> {
 
       // B 在线（WS）；A 始终不连 WS
       const ws6 = new WebSocket(
-        `ws://127.0.0.1:${port6}/ws?pv=2`,
+        `ws://127.0.0.1:${port6}/ws?pv=${PROTOCOL_VERSION}`,
         { headers: { Authorization: `Bearer ${b6.sessionToken}` } }
       )
       const got = new Promise<Record<string, string>>((done, fail) => {
