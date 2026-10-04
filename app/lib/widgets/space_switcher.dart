@@ -212,6 +212,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
         String peerMemberId,
         bool peerJoined,
         bool isGroup,
+        List<SpaceMemberBrief> others,
       })> _names = {};
   Map<String, int> _unread = {};
   String? _activeId;
@@ -234,6 +235,7 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
           String peerMemberId,
           bool peerJoined,
           bool isGroup,
+          List<SpaceMemberBrief> others,
         })>{};
     for (final row in rows) {
       var name = row.name;
@@ -260,6 +262,13 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
         // 空间类型（'duo' | 'group'）：创建时定死、永不改变，落在 per-space 资料里
         // （见 app_lock.saveProfile 的 mode 参数）。老记录没有这个键 → 回退 duo。
         isGroup: ((p['mode'] as String?) ?? 'duo') == 'group',
+        // 除我之外的成员（按加入先后）：群组卡片平铺 2×2 用。老记录/离线还没拉过
+        // → 空列表（卡片退回"单一头像 + 待加入"那套）
+        others: [
+          for (final m in (p['otherMembers'] as List<dynamic>? ?? const []))
+            if (m is Map)
+              (memberId: (m['id'] as String?) ?? '', name: (m['name'] as String?) ?? ''),
+        ],
       );
     }
     final vault = VaultSession.current;
@@ -338,6 +347,8 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                             peerMemberId: _names[space.spaceId]?.peerMemberId ?? '',
                             peerPending: _names[space.spaceId]?.peerJoined == false,
                             isGroup: _names[space.spaceId]?.isGroup ?? false,
+                            others: _names[space.spaceId]?.others ??
+                                const <SpaceMemberBrief>[],
                             server: effectiveServer,
                             api: widget.api,
                             unread: _unread[space.spaceId] ?? 0,
@@ -392,6 +403,9 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
   }
 }
 
+/// 切空间卡片上要平铺的一个成员（群组空间用）：member_id（拉头像）+ 显示名。
+typedef SpaceMemberBrief = ({String memberId, String name});
+
 /// 切空间卡片底色（老板 2026-10-04 定的四条规则）：
 ///
 /// | 空间 | 取色 | 未选中（淡） | 当前（深） |
@@ -442,6 +456,7 @@ class _SpaceCard extends StatelessWidget {
     required this.peerMemberId,
     required this.peerPending,
     required this.isGroup,
+    required this.others,
     required this.server,
     required this.api,
     required this.unread,
@@ -464,6 +479,9 @@ class _SpaceCard extends StatelessWidget {
 
   /// 群组空间（mode='group'）→ 用紫色，不按性别取色（一群人没有"对方的性别"可言）。
   final bool isGroup;
+
+  /// 本空间**除我之外**的成员（按加入先后）：群组卡片平铺 2×2 头像+名字用。
+  final List<SpaceMemberBrief> others;
   final String server;
   final ApiClient? api;
   final int unread;
@@ -480,6 +498,164 @@ class _SpaceCard extends StatelessWidget {
   /// 前景色（名字 / 对勾）：**当前空间**一定是深色底 → 白字；其余（淡色 tint）
   /// 返回 null → 回退主题默认深色字。
   Color? get _foreground => current ? Colors.white : null;
+
+  /// 单人（duo）卡片的正文：头像在上、名字在下，整块**居中**
+  /// （老板 2026-09-23 / 2026-09-24）。
+  Widget _buildSingleBody(BuildContext context, ThemeData theme) {
+    // 头像半径随卡片收缩：老板定的 24（"头像再大两号"）是**大卡片**上的取值，
+    // 卡片边长最小可到 64（`_cardSizeFor` 的下限，窄窗口），那时内容区只有 48，
+    // 固定的 Ø48 头像 + 6 间距 + 「待加入」那行必然溢出（实测 6px，2026-10-04）。
+    // 0.22 的系数在手机上（边长 ~111）刚好回到 24，桌面（194）也是 24 → 观感不变，
+    // 只在窄窗口里等比缩小。
+    final singleRadius =
+        (size * 0.22).clamp(10.0, _PeerAvatar.defaultRadius).toDouble();
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _PeerAvatar(
+            memberId: peerMemberId, server: server, api: api, radius: singleRadius),
+        const SizedBox(height: 6),
+        // Flexible：名字最多 2 行、超出「…」，空间不够时也只会被压缩而不会把卡片撑破
+        // （老板 2026-09-24）。「待加入」时收成 1 行：卡片是固定正方形，要给状态行留位置。
+        Flexible(
+          child: Text(
+            name,
+            maxLines: peerPending ? 1 : 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        // 「待加入」（老板 2026-09-25）：把"对方还没来"与"来了但没设头像"区分开——
+        // 后者不显示任何状态行。
+        if (peerPending) ...[
+          const SizedBox(height: 2),
+          Text(
+            AppLocalizations.of(context)!.spaceListPeerPending,
+            style: TextStyle(
+              fontSize: 11,
+              color: (_foreground ?? theme.colorScheme.onSurfaceVariant)
+                  .withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 群组卡片的正文：**除我之外**的成员按加入先后平铺成 2×2（头像 + 名字）。
+  ///
+  /// 尺寸全部由卡片边长 [size] 反算：边长跨度很大（窄窗下限 64 → 桌面弹层上限 194），
+  /// 写死像素在两头都会出事（要么溢出、要么小得看不清）。三条自适应规则：
+  /// - 头像半径、名字字号都按**格子的边长**成比例取，并各自夹在合理区间；
+  /// - 格子小到装不下"头像 + 一行名字"（< 32）→ **只画头像**，宁可少画也不溢出；
+  /// - 超过 4 个成员 → 前 3 个 + 第 4 格显示「+N」（默认配置 4 人再去掉我最多 3 个，
+  ///   这条是给自部署把 maxMembersPerSpace 调大留的）。
+  Widget _buildMembersGrid(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // 内容区 = 边长 − 内边距 8×2；两列之间留 4
+    final cell = (size - 16 - 4) / 2;
+    final radius = (cell * 0.32).clamp(8.0, 26.0);
+    final nameSize = (cell * 0.22).clamp(8.0, 13.0);
+    final showName = cell >= 32;
+
+    final overflow = others.length > 4 ? others.length - 3 : 0;
+    final shown = overflow > 0 ? others.take(3).toList() : others;
+    final cells = <Widget>[
+      for (final m in shown)
+        _memberCell(context, l10n,
+            memberId: m.memberId, name: m.name, radius: radius,
+            showName: showName, nameSize: nameSize),
+      if (overflow > 0) _overflowCell(context, overflow, radius, showName, nameSize),
+    ];
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var row = 0; row < 2; row++) ...[
+            if (row > 0) const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var col = 0; col < 2; col++) ...[
+                  if (col > 0) const SizedBox(width: 4),
+                  SizedBox(
+                    // 格子正方：2×2 铺满卡片内容区，单数成员时最后一格留空
+                    width: cell,
+                    height: cell,
+                    child: row * 2 + col < cells.length
+                        ? cells[row * 2 + col]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 一格成员：小头像 + 一行名字（名字空 → 「未命名」；格子太矮就不画名字）。
+  Widget _memberCell(
+    BuildContext context,
+    AppLocalizations l10n, {
+    required String memberId,
+    required String name,
+    required double radius,
+    required bool showName,
+    required double nameSize,
+  }) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _PeerAvatar(memberId: memberId, server: server, api: api, radius: radius),
+        if (showName) ...[
+          const SizedBox(height: 2),
+          Text(
+            name.isEmpty ? l10n.chatPageMembersUnnamed : name,
+            maxLines: 1,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            // height 写死：格子的高度是**算出来**的（cell = 2*radius + 2 + 行高），
+            // 行高交给字体默认值会让某些平台字体（行距 1.4+）把格子撑破。
+            style: TextStyle(
+                fontSize: nameSize, fontWeight: FontWeight.w500, height: 1.1),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 第 4 格：成员超过 4 个时的「+N」。
+  Widget _overflowCell(
+    BuildContext context,
+    int count,
+    double radius,
+    bool showName,
+    double nameSize,
+  ) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircleAvatar(
+          radius: radius,
+          backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.12),
+          child: Text('+$count',
+              style: TextStyle(fontSize: radius * 0.8, fontWeight: FontWeight.w600)),
+        ),
+        if (showName) ...[
+          const SizedBox(height: 2),
+          // 占位：与其它格（头像 + 名字）等高，保证 2×2 的行基线对齐
+          Text(' ', style: TextStyle(fontSize: nameSize, height: 1.1)),
+        ],
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -544,43 +720,11 @@ class _SpaceCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // 头像在上、名字在下，整块**居中**（老板 2026-09-23 / 2026-09-24）
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        _PeerAvatar(
-                          memberId: peerMemberId,
-                          server: server,
-                          api: api,
-                        ),
-                        const SizedBox(height: 6),
-                        // Flexible：名字最多 2 行、超出「…」，空间不够时也只会被压缩
-                        // 而不会把卡片撑破（老板 2026-09-24）。
-                        // 「待加入」时收到 1 行：卡片是固定正方形，要给下面那行状态留位置。
-                        Flexible(
-                          child: Text(
-                            name,
-                            maxLines: peerPending ? 1 : 2,
-                            textAlign: TextAlign.center,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        // 「待加入」（老板 2026-09-25）：把"对方还没来"与"来了但没设头像"
-                        // 区分开——后者不显示任何状态行。
-                        if (peerPending) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            AppLocalizations.of(context)!.spaceListPeerPending,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: (_foreground ?? theme.colorScheme.onSurfaceVariant)
-                                  .withValues(alpha: 0.85),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                    // 内容：群组空间平铺成员（2×2），其余是"头像在上+名字在下"的居中块
+                    if (isGroup && others.isNotEmpty)
+                      _buildMembersGrid(context)
+                    else
+                      _buildSingleBody(context, theme),
                     // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来。
                     // **左上角**（老板 2026-09-24）：右下角会盖住名字；与右上角的未读角标各占一角。
                     AnimatedOpacity(
@@ -632,6 +776,7 @@ class _PeerAvatar extends StatefulWidget {
     required this.memberId,
     required this.server,
     this.api,
+    this.radius = defaultRadius,
   });
 
   /// 对方的 member_id（空串 = 未知 → 直接显示默认头像，不发请求）。
@@ -639,8 +784,13 @@ class _PeerAvatar extends StatefulWidget {
   final String server;
   final ApiClient? api;
 
-  /// 头像半径：18 → 24（老板 2026-09-24：空间的核心是对方是谁，头像再大两号）
-  static const double radius = 24;
+  /// 本实例的头像半径。单人卡片用 [defaultRadius]（24，老板 2026-09-24："空间的
+  /// 核心是对方是谁，头像再大两号"）；群组卡片的 2×2 小格按格子边长传更小的值
+  /// （见 `_SpaceCard._buildMembersGrid`）。
+  final double radius;
+
+  /// 单人卡片的头像半径：18 → 24（老板 2026-09-24）
+  static const double defaultRadius = 24;
 
   @override
   State<_PeerAvatar> createState() => _PeerAvatarState();
@@ -682,11 +832,11 @@ class _PeerAvatarState extends State<_PeerAvatar> {
   Widget build(BuildContext context) {
     final bytes = _bytes;
     return CircleAvatar(
-      radius: _PeerAvatar.radius,
+      radius: widget.radius,
       backgroundColor: Colors.grey.shade300,
       backgroundImage: bytes != null ? MemoryImage(bytes) : null,
       // 默认头像：人形图标（尺寸按半径等比：radius 24 → 26）
-      child: bytes == null ? const Icon(Icons.person, size: 26) : null,
+      child: bytes == null ? Icon(Icons.person, size: widget.radius * 1.08) : null,
     );
   }
 }

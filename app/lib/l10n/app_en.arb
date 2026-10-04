@@ -352,7 +352,6 @@
   "chatPagePassphraseShow": "Show",
   "chatPagePassphraseHide": "Hide",
   "chatPageMembersInviteNew": "Invite new member",
-  "chatPageMembersChannelToken": "Add my account on another device",
   "chatPageMembersFull": "Group is full",
   "chatPageMembersFullWithMax": "Space is full ({current}/{max})",
   "@chatPageMembersFullWithMax": {

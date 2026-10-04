@@ -522,6 +522,12 @@ class AppLockService {
     int? peerSlot, // 对方身份槽位（同上；对方气泡配色判定用）
     /// 空间类型（'duo' | 'group'）。**null = 保持原值**，见下。
     String? mode,
+    /// 本空间**除我之外**的成员，按加入先后（`[{'id': ..., 'name': ...}]`）。
+    /// **null = 保持原值**（同 mode：改名/换头像那条路径不知道成员名单，不能把它抹掉）。
+    /// 用途：群组空间的切空间卡片要平铺成员头像+名字（2026-10-04）。
+    /// 存"除我之外"而不是全量：卡片渲染方（`space_widget/space_switcher`）手里
+    /// 没有"我是谁"（`AppLockPayload` 不含 memberId），存全量还得再补一条通道。
+    List<Map<String, String>>? otherMembers,
   }) async {
     final sid = spaceId;
     final key = sid == null ? _kProfile : _profileKey(sid);
@@ -530,13 +536,28 @@ class AppLockService {
     // 原值——否则打开一次空间就可能把已记下的 'group' 冲回 'duo'，切空间卡片
     // 的群组配色随之丢失。与 `savePeerPresence` 同一手法（只读改写自己关心的键）。
     var effectiveMode = mode;
-    if (effectiveMode == null) {
+    List<Map<String, String>>? effectiveMembers = otherMembers;
+    if (effectiveMode == null || effectiveMembers == null) {
       final raw = await _get(key);
       if (raw != null) {
         try {
-          effectiveMode = (jsonDecode(raw) as Map<String, dynamic>)['mode'] as String?;
+          final m = jsonDecode(raw) as Map<String, dynamic>;
+          effectiveMode ??= m['mode'] as String?;
+          if (effectiveMembers == null) {
+            final list = m['otherMembers'];
+            if (list is List) {
+              effectiveMembers = [
+                for (final e in list)
+                  if (e is Map)
+                    {
+                      'id': (e['id'] as String?) ?? '',
+                      'name': (e['name'] as String?) ?? '',
+                    },
+              ];
+            }
+          }
         } catch (_) {
-          // 坏 JSON：当作没记过（下面回退 'duo'）
+          // 坏 JSON：当作没记过（下面回退 'duo' / 空名单）
         }
       }
     }
@@ -549,6 +570,7 @@ class AppLockService {
       'mySlot': mySlot,
       'peerSlot': peerSlot,
       'mode': effectiveMode ?? 'duo',
+      'otherMembers': effectiveMembers ?? const <Map<String, String>>[],
     }));
     if (sid != null) {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(
@@ -584,6 +606,16 @@ class AppLockService {
         // 空间类型（'duo' | 'group'；老记录没有这个键 → 回退 'duo'）。
         // 「切换我的秘境」的卡片配色按它分流（群组空间用紫色），2026-10-04。
         'mode': (m['mode'] as String?) ?? 'duo',
+        // 本空间**除我之外**的成员（按加入先后）：群组卡片平铺头像+名字用。
+        // 老记录没有这个键 → 空列表（卡片退回单头像/「待加入」）。
+        'otherMembers': [
+          for (final e in (m['otherMembers'] as List<dynamic>? ?? const []))
+            if (e is Map)
+              {
+                'id': (e['id'] as String?) ?? '',
+                'name': (e['name'] as String?) ?? '',
+              },
+        ],
       };
     } catch (_) {
       return const {};

@@ -137,6 +137,169 @@ void main() {
     expect(find.byType(Divider), findsNothing, reason: '分隔线已去掉');
   });
 
+  testWidgets('群组卡片：平铺成员（2×2、按加入顺序、不含我）', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    // 群组空间：类型 + "除我之外"的成员（按加入先后）
+    await lock.saveProfile(
+      spaceId: 'space-a',
+      memberName: '我A',
+      peerName: '不该出现的名字',
+      entranceName: 'iPhone',
+      mode: 'group',
+      otherMembers: const [
+        {'id': 'm1', 'name': '阿蓝'},
+        {'id': 'm2', 'name': '小绿'},
+        {'id': 'm3', 'name': '小刚'},
+      ],
+    );
+    await lock.loadVault();
+
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showSpacePicker(ctx, db: db, api: _SoloEntranceApi()),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await _settle(tester);
+
+    // 三个成员的名字都平铺出来；卡片标题（peerName）不再出现
+    expect(find.text('阿蓝'), findsOneWidget);
+    expect(find.text('小绿'), findsOneWidget);
+    expect(find.text('小刚'), findsOneWidget);
+    expect(find.text('不该出现的名字'), findsNothing,
+        reason: '群组卡片平铺成员，不再显示"对方的"单个名字');
+    expect(tester.takeException(), isNull, reason: '2×2 布局不得溢出');
+  });
+
+  testWidgets('群组卡片：成员超过 4 个 → 前 3 个 + 「+N」', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    await lock.saveProfile(
+      spaceId: 'space-a',
+      memberName: '我A',
+      peerName: '',
+      entranceName: 'iPhone',
+      mode: 'group',
+      otherMembers: const [
+        {'id': 'm1', 'name': '甲'},
+        {'id': 'm2', 'name': '乙'},
+        {'id': 'm3', 'name': '丙'},
+        {'id': 'm4', 'name': '丁'},
+        {'id': 'm5', 'name': '戊'},
+      ],
+    );
+    await lock.loadVault();
+
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showSpacePicker(ctx, db: db, api: _SoloEntranceApi()),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await _settle(tester);
+
+    expect(find.text('甲'), findsOneWidget);
+    expect(find.text('丙'), findsOneWidget);
+    expect(find.text('丁'), findsNothing, reason: '第 4 格让给「+N」');
+    expect(find.text('+2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('群组卡片：窄窗口（卡片边长逼近下限）也不溢出', (WidgetTester tester) async {
+    // 卡片边长由可用宽度反算，窄到 200 时就压到 `_cardSizeFor` 的下限 64——
+    // 那时格子只有 22px，网格必须自动退化成"只画头像"而不是硬塞名字。
+    tester.view.physicalSize = const Size(200, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    await lock.saveProfile(
+      spaceId: 'space-a',
+      memberName: '我A',
+      peerName: '',
+      entranceName: 'iPhone',
+      mode: 'group',
+      otherMembers: const [
+        {'id': 'm1', 'name': '阿蓝'},
+        {'id': 'm2', 'name': '小绿'},
+      ],
+    );
+    await lock.loadVault();
+
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showSpacePicker(ctx, db: db, api: _SoloEntranceApi()),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await _settle(tester);
+
+    expect(tester.takeException(), isNull, reason: '极小卡片也不得 overflow');
+  });
+
+  testWidgets('duo 卡片：仍走"单个头像 + 对方名字"（不受群组改动影响）',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final lock = AppLockService(db);
+    await lock.ensureFreshInstall();
+    await lock.savePlain(_payloadA);
+    await lock.saveProfile(
+      spaceId: 'space-a',
+      memberName: '我A',
+      peerName: '对方A',
+      entranceName: 'iPhone',
+      // 没写 mode → 回退 duo；即便有 otherMembers 也不该平铺
+      otherMembers: const [
+        {'id': 'm1', 'name': '阿蓝'},
+      ],
+    );
+    await lock.loadVault();
+
+    await tester.pumpWidget(_app(Scaffold(
+      body: Builder(
+        builder: (ctx) => TextButton(
+          onPressed: () => showSpacePicker(ctx, db: db, api: _SoloEntranceApi()),
+          child: const Text('开'),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('开'));
+    await _settle(tester);
+
+    expect(find.text('对方A'), findsOneWidget);
+    expect(find.text('阿蓝'), findsNothing, reason: 'duo 卡片不铺成员');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('空间卡片：长名字不撑破卡片（省略号 + 不溢出）', (WidgetTester tester) async {
     // 老板 2026-09-24：头像调大、名字字号调大后，要防止长名字撑破卡片。
     tester.view.physicalSize = const Size(390, 844);

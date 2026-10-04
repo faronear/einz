@@ -958,6 +958,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _mySlot = mySlot;
         _peerSlot = peerSlot;
       });
+      // 「切换我的秘境」的群组卡片要平铺成员：把**除我之外**的成员按加入先后
+      // （槽位升序 = 入群顺序，见服务端"新身份分配最小空槽"）落进 per-space 资料。
+      final otherMembers = [
+        for (final e in (space.memberSlots.entries.where((e) => e.key != mine).toList()
+          ..sort((a, b) => a.value.compareTo(b.value))))
+          {'id': e.key, 'name': space.memberNames[e.key] ?? ''},
+      ];
       // 校正结果回写本地快照：否则下次启动（尤其离线）又用回入网时的旧值
       // （setState 只覆盖非空值，故不会把已有名字写成空）；按 spaceId 写，仅落当前空间
       await AppLockService(widget.db ?? LocalDatabase.shared).saveProfile(
@@ -971,6 +978,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         peerSlot: _peerSlot,
         // 空间类型（切空间卡片的群组配色要用）：/space 刚下发过，带上
         mode: _spaceMode,
+        otherMembers: otherMembers,
       );
     } catch (_) {
       // 网络失败：保持快照值（下次刷新再试）
@@ -2443,19 +2451,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       unawaited(_showInviteDialog(purpose: 'invite'));
                     },
                   ),
-                const SizedBox(height: 8),
-                // 「我在其他设备接入」= attach 指向**我自己**（不需要口令：
-                // 对自己的身份动手，会话即所有权，与"自助退役"同口径）
-                FilledButton.tonalIcon(
-                  icon: const Icon(Icons.devices, size: 18),
-                  label: Text(l10n.chatPageMembersChannelToken),
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    unawaited(_showInviteDialog(
-                        purpose: 'attach', targetMemberId: _myMemberId));
-                  },
-                ),
               ],
+              // 注：「给自己加一台设备」的入口**不在这里**（老板 2026-10-04）——
+              // 这个弹层只管"空间里有谁、怎么把人拉进来/找回来"；
+              // 给自己开通道属于"我的线"，统一放在菜单「我的通道」里的「新建通道」。
+
             ),
           ),
         );
@@ -2852,7 +2852,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         Navigator.of(ctx).pop();
                         // 「新建通道」= 我本人在另一台设备接入 → channel token
                         // （绑定我的身份）。邀**新成员**才是 invite，别搞反。
-                        _menuAction(() => _showInviteDialog(purpose: 'channel'));
+                        _menuAction(() => _showInviteDialog(purpose: 'attach'));
                       },
                       hoverColor: Colors.black.withValues(alpha: 0.10),
                       highlightColor: Colors.black.withValues(alpha: 0.14),

@@ -730,9 +730,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersInviteNew => 'Invite new member';
 
   @override
-  String get chatPageMembersChannelToken => 'Add my account on another device';
-
-  @override
   String get chatPageMembersFull => 'Group is full';
 
   @override

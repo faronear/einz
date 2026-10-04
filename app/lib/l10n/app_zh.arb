@@ -352,7 +352,6 @@
   "chatPagePassphraseShow": "显示",
   "chatPagePassphraseHide": "隐藏",
   "chatPageMembersInviteNew": "邀请新成员",
-  "chatPageMembersChannelToken": "在其他设备加入我的账号",
   "chatPageMembersFull": "群成员已满",
   "chatPageMembersFullWithMax": "成员已满（{current}/{max}）",
   "chatPageEntranceListFailed": "无法获取其他通道（当前离线？）",

@@ -1352,12 +1352,6 @@ abstract class AppLocalizations {
   /// **'Invite new member'**
   String get chatPageMembersInviteNew;
 
-  /// No description provided for @chatPageMembersChannelToken.
-  ///
-  /// In en, this message translates to:
-  /// **'Add my account on another device'**
-  String get chatPageMembersChannelToken;
-
   /// No description provided for @chatPageMembersFull.
   ///
   /// In en, this message translates to:

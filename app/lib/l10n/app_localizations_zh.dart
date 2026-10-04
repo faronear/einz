@@ -695,9 +695,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersInviteNew => '邀请新成员';
 
   @override
-  String get chatPageMembersChannelToken => '在其他设备加入我的账号';
-
-  @override
   String get chatPageMembersFull => '群成员已满';
 
   @override
