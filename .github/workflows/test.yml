@@ -1,0 +1,74 @@
+# Einz 测试（GitHub Actions）
+#
+# 与 buildMultiPlatform.yml **分开**：那个只管"能不能出包"（macOS runner 计费 10x，
+# 只在 main / tag 上跑）；这个只管"改动有没有弄坏测试"（全是 Linux runner，1x）。
+# 分开的好处：改一行业务代码不必跑一遍全平台打包就能知道测试红没红。
+#
+# 触发：
+#   - push 任意分支：分支上改了东西立刻知道（Linux 便宜；纯文档改动被 paths-ignore 挡掉）
+#   - pull_request：PR 上先跑
+#   - workflow_dispatch：手动
+#
+# 三个 job 直接复用 `scripts/testAll.sh <target>`——**本地怎么跑、CI 就怎么跑**，
+# 不维护第二套命令（这条是刻意的：之前"我说的测试全过"其实只覆盖 analyze + server，
+# app 那 250 条 widget 测试没人跑、静默红了一片）。
+#
+# ⚠️ 只在 **GitHub**（github remote）上生效。push 到 origin（git.tic.cc）不会触发。
+name: Test
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'docs/**'
+      - 'aimemo/**'
+      - '**.md'
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支连续推送时取消前一次没跑完的：省额度，也只关心最新那次
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: app（analyze + 全量 widget 测试）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # shared/lib/src/sodium.dart 走 DynamicLibrary.open 加载系统 libsodium（Linux
+      # 候选路径里有 /usr/lib/x86_64-linux-gnu/libsodium.so）；libsodium-dev 提供该 .so
+      - name: 装 libsodium（测试要动态加载）
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsodium-dev
+      - name: 跑测试
+        run: scripts/testAll.sh app
+
+  cli:
+    name: cli（analyze + dart test）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: 跑测试
+        run: scripts/testAll.sh cli
+
+  server:
+    name: server（build + 全部测试）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 跑测试
+        run: scripts/testAll.sh server

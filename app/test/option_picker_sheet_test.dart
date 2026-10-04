@@ -84,8 +84,9 @@ void main() {
   });
 
   testWidgets('经 showOptionPickerSheet 打开时可超过 9/16 上限', (WidgetTester tester) async {
-    // 桌面版窗口可以是扁的：默认 9/16（600 → 337.5px）会把底部档位裁掉，
-    // 老板 2026-09-25 要求允许弹层占更多高度 → 上限抬到 0.9（540px）。
+    // 桌面版窗口可以是扁的：默认 9/16（600 → 337.5px）会把底部档位裁掉。
+    // 2026-09-25 先抬到 0.9（540）；2026-10-02 起统一改成 `isScrollControlled: true`
+    // = **可用满窗高**（与「我的通道」等弹层同口径），所以上限是窗口高度本身。
     const n = 20;
     await tester.pumpWidget(_app(Scaffold(
       body: Builder(
@@ -112,6 +113,6 @@ void main() {
     expect(tester.takeException(), isNull, reason: '矮窗口下不应溢出');
     final sheetHeight = tester.getSize(find.byType(OptionPickerSheet)).height;
     expect(sheetHeight, greaterThan(400), reason: '应能占掉大半屏（远高于 337.5）');
-    expect(sheetHeight, lessThanOrEqualTo(600 * 0.9), reason: '仍不超过窗口的 90%');
+    expect(sheetHeight, lessThanOrEqualTo(600.0), reason: '上限 = 满窗高（不再卡 90%）');
   });
 }

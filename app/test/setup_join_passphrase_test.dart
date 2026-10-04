@@ -82,7 +82,7 @@ Future<void> pumpToJoinToken(
     ),
   ));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('加入秘境')); // 入口页 → 加入
+  await tester.tap(find.text(_zh.setupEntryJoin)); // 入口页 → 加入
   await tester.pumpAndSettle();
 }
 
@@ -96,25 +96,28 @@ Future<void> pumpToJoinPassphrase(
   await pumpToJoinToken(
       tester, correctPass: correctPass, payload: payload, join: join);
   await tester.enterText(find.byType(TextField), 'TOKEN-1'); // token
-  await tester.tap(find.text('下一步')); // preflight 通过 → 直接进名字页（不再显示确认卡片）
+  await tester.tap(find.text(_zh.wizardNext)); // preflight 通过 → 直接进名字页（不再显示确认卡片）
   await tester.pumpAndSettle();
   // 群聊一期（2026-10-03）：身份选择页删除——invite 新成员自填名字/性别
   await tester.enterText(find.byType(TextField), '小芳'); // 自己的名字
   // 收起键盘：性别卡在名字框下方，小屏会被键盘遮住点不到
   await tester.testTextInput.receiveAction(TextInputAction.done);
   await tester.pumpAndSettle();
-  await tester.tap(find.text('女'));
+  await tester.tap(find.byIcon(Icons.female));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('下一步'));
+  await tester.tap(find.text(_zh.wizardNext));
   await tester.pumpAndSettle(); // → 口令页
   // 口令页应为「验证」语义：标题与提示都是验证措辞
-  expect(find.text('验证共享口令'), findsOneWidget); // 标题（join=验证套，create=设置套）
-  expect(find.text('共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？询问你的秘境伴侣。'),
+  expect(find.text(_zh.wizardJoinPassphraseTitle), findsOneWidget); // 标题（join=验证套，create=设置套）
+  expect(find.text(_zh.wizardJoinPassphraseHint),
       findsOneWidget); // hint
   // join 提交（POST /spaces/join）成功后若出 SnackBar 停留 4 秒：等其消失避免遮挡
   await tester.pump(const Duration(seconds: 5));
   await tester.pumpAndSettle();
 }
+
+/// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
 
 void main() {
   setUpAll(() async {
@@ -127,21 +130,21 @@ void main() {
   testWidgets('错误口令：提示口令错误并停留口令页（不进入 PIN 页）', (WidgetTester tester) async {
     await pumpToJoinPassphrase(tester, correctPass: '正确口令-abc', payload: payload);
     await tester.enterText(find.byType(TextField), '随便输入的口令');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('口令错误：请确认首条通道创建时设置的口令'), findsOneWidget,
+    expect(find.text(_zh.wizardJoinPassphraseWrong), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
-    expect(find.text('共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？询问你的秘境伴侣。'),
+    expect(find.text(_zh.wizardJoinPassphraseHint),
         findsOneWidget, reason: '应停留在口令页');
-    expect(find.text('设置锁屏码'), findsNothing, reason: '不应进入 PIN 页');
+    expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '不应进入 PIN 页');
   });
 
   testWidgets('正确口令：通过验证进入 PIN 页', (WidgetTester tester) async {
     await pumpToJoinPassphrase(tester, correctPass: '正确口令-abc', payload: payload);
     await tester.enterText(find.byType(TextField), '正确口令-abc');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
+    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '口令一致应放行进 PIN 步骤');
   });
 
   testWidgets('先输错再输对：token 只被消费一次，重输正确口令仍可加入', (WidgetTester tester) async {
@@ -164,18 +167,18 @@ void main() {
 
     // 1) 先输错：应停在口令页，且**不能**已经消费 token
     await tester.enterText(find.byType(TextField), '随便输入的口令');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('口令错误：请确认首条通道创建时设置的口令'), findsOneWidget,
+    expect(find.text(_zh.wizardJoinPassphraseWrong), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
     expect(joinCalls, 0, reason: '验口令之前不应消费一次性 token');
 
     // 2) 重输正确口令：旧实现此时 joinSpace 报「token 已用」→ 永远失败
     //    （老板 2026-09-12 反馈：一直「口令验证失败。请询问秘境伴侣获得口令。」）
     await tester.enterText(find.byType(TextField), '正确口令-abc');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsWidgets, reason: '重输正确口令应放行进 PIN 步骤');
+    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '重输正确口令应放行进 PIN 步骤');
     expect(joinCalls, 1, reason: 'token 只应被消费一次');
   });
 
@@ -189,12 +192,12 @@ void main() {
     await pumpToJoinPassphrase(
         tester, correctPass: '正确口令-abc', payload: payload, join: fakeJoin);
     await tester.enterText(find.byType(TextField), '正确口令-abc');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('后台：这个秘境已经添加过了'), findsOneWidget,
+    expect(find.textContaining('后台：${_zh.setupTokenSpaceAlreadyAdded}'), findsOneWidget,
         reason: '服务端说的错误必须带「后台：」前缀');
-    expect(find.text('设置锁屏码'), findsNothing, reason: '被拒后不得放行');
+    expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '被拒后不得放行');
   });
 
   testWidgets('PIN 页退回口令页再前进：不重复消费 token（仍能进 PIN 页）', (WidgetTester tester) async {
@@ -214,19 +217,19 @@ void main() {
     await pumpToJoinPassphrase(
         tester, correctPass: '正确口令-abc', payload: payload, join: fakeJoin);
     await tester.enterText(find.byType(TextField), '正确口令-abc');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('设置锁屏码'), findsWidgets, reason: '首次应放行进 PIN 步骤');
+    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '首次应放行进 PIN 步骤');
     expect(joinCalls, 1);
 
     // 退回口令页 → 再点下一步：不应再调 joinSpace（token 是一次性的）
-    await tester.tap(find.text('上一步'));
+    await tester.tap(find.text(_zh.wizardBack));
     await tester.pumpAndSettle();
-    expect(find.text('验证共享口令'), findsOneWidget, reason: '应退回口令页');
-    await tester.tap(find.text('下一步'));
+    expect(find.text(_zh.wizardJoinPassphraseTitle), findsOneWidget, reason: '应退回口令页');
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     expect(joinCalls, 1, reason: '重复前进不应再消费 token');
-    expect(find.text('设置锁屏码'), findsWidgets, reason: '应再次放行进 PIN 步骤');
+    expect(find.text(_zh.chatPageSetLockTitle), findsWidgets, reason: '应再次放行进 PIN 步骤');
   });
 
   testWidgets('开通码验证通过后即锁定：退回本页再前进不重复校验', (WidgetTester tester) async {
@@ -248,20 +251,20 @@ void main() {
 
     await pumpToJoinToken(tester, preflight: fakePreflight);
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     expect(find.text('关于我'), findsOneWidget, reason: '有效 token 应放行到名字页（invite 自填名，群聊一期）');
     expect(preflightCalls, 1);
 
     // 退回开通码页：输入框应锁只读（防止改坏已验证的 token）
-    await tester.tap(find.text('上一步'));
+    await tester.tap(find.text(_zh.wizardBack));
     await tester.pumpAndSettle();
     expect(find.text('TOKEN-1'), findsOneWidget, reason: '退回后仍显示原开通码');
     expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue,
         reason: '已验证通过的开通码应锁为只读');
 
     // 再点下一步：不应再发后台校验（否则 token 被消费后必然失败，把用户卡死）
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     expect(preflightCalls, 1, reason: '已验证过就不应重复校验');
     expect(find.text('关于我'), findsOneWidget, reason: '应直接放行到名字页（invite 自填名，群聊一期）');
@@ -270,9 +273,9 @@ void main() {
   testWidgets('未托管口令（服务器无 escrow 包）：提示并停留', (WidgetTester tester) async {
     await pumpToJoinPassphrase(tester, correctPass: '正确口令-abc', payload: null);
     await tester.enterText(find.byType(TextField), '正确口令-abc');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('共享口令由你和伴侣共同持有，用于保护私密消息。不知道口令？询问你的秘境伴侣。'),
+    expect(find.text(_zh.wizardJoinPassphraseHint),
         findsOneWidget, reason: '未托管时停留口令页');
   });
 
@@ -280,18 +283,18 @@ void main() {
     await pumpToJoinToken(tester,
         preflight: (_) async => throw ApiException('TOKEN_INVALID', 'invalid'));
     await tester.enterText(find.byType(TextField), '错误TOKEN');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
     // 后台：TOKEN_INVALID 是服务端说的（2026-09-25 起统一带「后台：」前缀）
     expect(find.text('后台：开通码无效'), findsOneWidget, reason: '无效 token 必须被拦截并提示');
     expect(find.text('验证开通码'), findsWidgets, reason: '应停留在 token 页（setupTokenTitle）');
-    expect(find.text('验证共享口令'), findsNothing, reason: '不应进入口令页');
+    expect(find.text(_zh.wizardJoinPassphraseTitle), findsNothing, reason: '不应进入口令页');
   });
 
   testWidgets('正确 token：preflight 通过 → 直接进入名字页（无确认卡片，群聊一期）', (WidgetTester tester) async {
     await pumpToJoinToken(tester); // 默认 preflight 成功
     await tester.enterText(find.byType(TextField), '正确TOKEN');
-    await tester.tap(find.text('下一步')); // preflight 通过 → 直接进下一页
+    await tester.tap(find.text(_zh.wizardNext)); // preflight 通过 → 直接进下一页
     await tester.pumpAndSettle();
     expect(find.text('关于我'), findsOneWidget, reason: '有效 token 应直接放行到名字页（invite 自填名）');
     expect(find.text('加入 Lukas 的秘境'), findsNothing, reason: '不再显示空间确认卡片');

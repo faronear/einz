@@ -145,7 +145,7 @@ void main() {
     await AppLockService(db).saveProfile(
       spaceId: 'space-late',
       memberName: '我',
-      peerName: '待加入',
+      peerName: '占位名',
       entranceName: 'dev-me',
       myGender: 'male',
       peerGender: 'male', // 同性别：必须靠 slot 才能区分气泡颜色
@@ -169,7 +169,9 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('待加入'), findsOneWidget, reason: '对方未加入时先用 profile 里的占位名');
+    // 占位名故意不叫「待加入」：状态行自己也有一行「待加入/等待」
+    // （spaceListPeerPending，2026-09-26 加的），同名会撞成 2 个
+    expect(find.text('占位名'), findsOneWidget, reason: '对方未加入时先用 profile 里的占位名');
 
     // 对方加入并上线（WS 关闭 → 靠 30s 对端在线轮询发现）
     api.peerJoined = true;

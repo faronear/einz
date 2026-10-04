@@ -91,6 +91,9 @@ Future<void> _pumpChat(WidgetTester tester, ApiClient api) async {
   await tester.pumpAndSettle();
 }
 
+/// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 void main() {
   testWidgets('对方已加入（在用通道，离线）→ 不显示「邀请加入」', (tester) async {
     await _pumpChat(
@@ -99,7 +102,7 @@ void main() {
           _mine(),
           _peer(status: 'active'),
         ]));
-    expect(find.text('邀请加入'), findsNothing);
+    expect(find.text(_zh.chatPageInviteJoinLink), findsNothing);
   });
 
   testWidgets('对方通道已撤销 → 显示「邀请加入」（重置设备后正是该邀请的时候）', (tester) async {
@@ -109,21 +112,21 @@ void main() {
           _mine(),
           _peer(status: 'revoked'),
         ]));
-    expect(find.text('邀请加入'), findsOneWidget);
+    expect(find.text(_zh.chatPageInviteJoinLink), findsOneWidget);
   });
 
   testWidgets('空间里只有我自己 → 显示「邀请加入」', (tester) async {
     await _pumpChat(tester, _EntranceFakeApi(rows: [_mine()]));
-    expect(find.text('邀请加入'), findsOneWidget);
+    expect(find.text(_zh.chatPageInviteJoinLink), findsOneWidget);
   });
 
   testWidgets('还没问到（请求在途）→ 不显示，避免首帧闪一下', (tester) async {
     await _pumpChat(tester, _EntranceFakeApi(neverCompletes: true));
-    expect(find.text('邀请加入'), findsNothing);
+    expect(find.text(_zh.chatPageInviteJoinLink), findsNothing);
   });
 
   testWidgets('拉不到通道（离线/服务不可达）→ 不显示，不能常驻一个假邀请', (tester) async {
     await _pumpChat(tester, _EntranceFakeApi(failsToLoad: true));
-    expect(find.text('邀请加入'), findsNothing);
+    expect(find.text(_zh.chatPageInviteJoinLink), findsNothing);
   });
 }

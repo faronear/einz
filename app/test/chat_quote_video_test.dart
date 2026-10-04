@@ -180,7 +180,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('引用视频并发送：引用条是缩略图 + 文件名，引用块是缩略图',
+  testWidgets('引用视频并发送：引用条与引用块都只显示缩略图（文件名已移除）',
       (WidgetTester tester) async {
     await pumpWithVideo(tester);
 
@@ -190,9 +190,11 @@ void main() {
     await tester.tap(find.text('引用'));
     await settleRealAsync(tester);
     await tester.pumpAndSettle();
-    expect(_thumbOf(24), findsOneWidget, reason: '输入栏引用条应显示视频缩略图');
-    expect(find.text('video.mp4'), findsOneWidget,
-        reason: '引用条在缩略图右侧仍显示文件名');
+    expect(_thumbOf(40), findsOneWidget, reason: '输入栏引用条应显示视频缩略图（与引用块同尺寸 40，2026-09-27 统一）');
+    // 2026-09-27（老板）：引用条里不再显示文件名——只剩缩略图，尺寸也放大到与
+    // 引用块一致（kQuoteThumbSize）
+    expect(find.text('video.mp4'), findsNothing,
+        reason: '引用条已不显示文件名，只有缩略图');
 
     await tester.enterText(find.byType(TextField), '看这个');
     await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -203,6 +205,11 @@ void main() {
     expect(_thumbOf(40), findsOneWidget, reason: '引用块应显示视频首帧缩略图');
     expect(find.textContaining('video.mp4'), findsNothing,
         reason: '引用块不再显示文件名');
-    expect(_thumbOf(24), findsNothing, reason: '发送后输入栏引用条应清空');
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('chatPageInputBar')),
+            matching: _thumbOf(40)),
+        findsNothing,
+        reason: '发送后输入栏引用条应清空（引用条与引用块同尺寸，改用输入栏作用域判定）');
   });
 }

@@ -11341,3 +11341,61 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 
 **顺带**：`entrance_list_sheet_test` 里还残留一处硬写的开通码弹窗标题 → 改走 l10n，
 以后改文案不会再弄红测试。
+
+---
+
+## 2026-10-04（十二）清完剩余 18 条 + 一条命令跑全套 + CI
+
+老板：两个都做；并且定了一条原则——**测试不该依赖具体文案，而应该追随文案键**。
+
+### 1. 剩余 18 条全清（三处共 249+22 条全绿）
+
+| 文件 | 红 → | 根因 |
+| --- | --- | --- |
+| `wizard_envelope_entry_test` | 5 → 0 | create 流程多了**类型页**（名字→类型→口令→PIN），测试还按老步号 |
+| `setup_join_passphrase_test` | 6 → 0 | 性别卡要点**图标**（点文字命中不了）+ 文案 |
+| `wizard_autofocus_test` | 1 → 0 | 第 2 步成了类型页（无输入框），"聚焦首框"要挪到第 3 步 |
+| `peer_invite_link_test` | 2 → 0 | 状态条那格从「邀请加入」改成「邀请」 |
+| `option_picker_sheet_test` | 1 → 0 | 弹层上限从"窗口 90%"改成**满窗高**（2026-10-02 统一） |
+| `chat_quote_image/video_test` | 2 → 0 | 引用条缩略图 24 → **40**（与引用块同尺寸，2026-09-27）；引用条**不再显示文件名** |
+| `chat_profile_refresh_test` | 1 → 0 | 测试把占位名写成「待加入」，与状态行 `spaceListPeerPending`**同名撞成 2 个** → 换成「占位名」 |
+
+**所有文案断言一律改成 `_zh.<key>`**（`lookupAppLocalizations(const Locale('zh'))`）——
+这就是老板那条原则的落地：断言绑 key，不绑字面值；以后改文案不会再弄红测试。
+
+### 2. 顺手抓到并修了一个**真 bug**（不是测试的错）
+
+`cli/bin/einz_tui.dart` 的 `formatMessage` 里，群聊一期加的那段
+`... ?? _peerNameOf(_state!)` 硬解包了 `_state`；而 `formatMessage` 会被 CLI 单测
+**在没有 TUI 状态时**直接调用 → `Null check operator used on a null value`，
+4 条 `format_message_test` 全崩。改成读局部 `tuiState` 并 `?? '-'`。
+**这正是"探针无 CI 会静默腐烂"的反面**：有了全量测试，这种真 bug 才浮出水面。
+
+### 3. 一条命令跑全套：`scripts/testAll.sh`
+
+```
+scripts/testAll.sh            # app + cli + server
+scripts/testAll.sh app        # 只跑 app（analyze + 全量 widget 测试）
+scripts/testAll.sh server     # 只跑 server（npm test，内含 build + tsc）
+scripts/testAll.sh cli --e2e  # 额外跑 cli/test/*.py 的 pty E2E 探针（需先起 3999 端口真 server）
+```
+
+三个细节：
+- **本地与 CI 共用这一份**（CI 的每个 job 就是 `scripts/testAll.sh <target>`），
+  不维护第二套命令——这正是之前"我说全过、其实没跑 app 测试"的根因，用单一入口堵掉。
+- **pubspec.lock 守卫**：开发机 `PUB_HOSTED_URL` 指中国镜像，`pub get` 会把 lock 里的
+  pub.dev 源改写成镜像源。脚本跑前快照、跑后若被改写就**还原并提示**（测试脚本只该读仓库）。
+- `cli/test/*.py` 是 **pty E2E**（要真 server + 终端时序），默认不跑，`--e2e` 才跑。
+
+### 4. CI：`.github/workflows/test.yml`
+
+与出包工作流**分开**（那个 macOS 计费 10x，只在 main/tag；这个全 Linux 1x）。
+三个 job：app（flutter + `apt install libsodium-dev`，因为 `sodium.dart` 走
+`DynamicLibrary.open` 找系统 libsodium）/ cli（dart SDK）/ server（node 22）。
+触发：**push 任意分支** + pull_request + 手动；`concurrency` 取消同分支上一次没跑完的；
+纯文档改动被 paths-ignore 挡掉。
+
+⚠️ 只在 **GitHub remote**（github.com/faronear/einz）生效——push 到 origin（git.tic.cc）不触发。
+
+**验证**：`scripts/testAll.sh` 本地全绿（app 249 passed + 1 skipped、cli 22、server 全绿）；
+workflow YAML 用 ruby 解析过。**CI 本身没法在本地跑**，要等推到 GitHub 才知分晓。

@@ -41,7 +41,7 @@ Future<void> _pumpCreate(WidgetTester tester) async {
   ));
   await tester.pumpAndSettle();
   // 探测成功后停在入口页（选择秘境：创建/加入）→ 进 create 流程第 1 步
-  await tester.tap(find.text('创建秘境'));
+  await tester.tap(find.text(_zh.setupEntryCreate));
   await tester.pumpAndSettle();
 }
 
@@ -50,7 +50,7 @@ Future<void> _fillAndNext(WidgetTester tester, {required String name, required S
   await tester.enterText(find.byType(TextField).first, name);
   await tester.tap(find.text(gender));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('下一步'));
+  await tester.tap(find.text(_zh.wizardNext));
   await tester.pumpAndSettle();
 }
 
@@ -62,23 +62,35 @@ bool _firstFieldFocused(WidgetTester tester) {
   return tf.focusNode?.hasFocus ?? false;
 }
 
+/// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 void main() {
   testWidgets('向导：打开第 1 步（名字）即聚焦', (WidgetTester tester) async {
     await _pumpCreate(tester);
     expect(_firstFieldFocused(tester), isTrue, reason: '第 1 步打开就该聚焦名字框');
   });
 
-  testWidgets('向导：下一步进入第 2 步（共享口令，群聊一期无伴侣页）应聚焦', (WidgetTester tester) async {
+  testWidgets('向导：第 2 步是类型页（无输入框），第 3 步口令页才应聚焦',
+      (WidgetTester tester) async {
+    // 2026-10-04 起 create = 名字(1) → **类型(2)** → 口令(3) → PIN(4)。
+    // 类型页是两张卡片、没有输入框——"聚焦首框"对它没有意义，别硬套。
     await _pumpCreate(tester);
-    await _fillAndNext(tester, name: 'Lukas', gender: '男');
-    expect(_firstFieldFocused(tester), isTrue, reason: '第 2 步应聚焦口令框（伴侣页已删，群聊一期）');
+    await _fillAndNext(tester, name: 'Lukas', gender: _zh.wizardGenderMale);
+    expect(find.text(_zh.wizardTitleSpaceKind), findsOneWidget, reason: '第 2 步是类型页');
+    expect(find.byType(TextField), findsNothing, reason: '类型页只有卡片、没有输入框');
+    await tester.tap(find.text(_zh.wizardSpaceKindDuo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.wizardNext));
+    await tester.pumpAndSettle(); // → 口令页
+    expect(_firstFieldFocused(tester), isTrue, reason: '第 3 步（口令页）应聚焦首个口令框');
   });
 
   testWidgets('向导：join 流程第 1 步（开通码）应聚焦', (WidgetTester tester) async {
     await _pumpCreate(tester);
-    await tester.tap(find.text('上一步')); // 回到入口页（create 第 1 步 → 入口页）
+    await tester.tap(find.text(_zh.wizardBack)); // 回到入口页（create 第 1 步 → 入口页）
     await tester.pumpAndSettle();
-    await tester.tap(find.text('加入秘境'));
+    await tester.tap(find.text(_zh.setupEntryJoin));
     await tester.pumpAndSettle();
     expect(_firstFieldFocused(tester), isTrue, reason: 'join 第 1 步应聚焦开通码框');
   });
@@ -86,7 +98,7 @@ void main() {
   testWidgets('向导：返回上一步也应聚焦该步第一个框', (WidgetTester tester) async {
     await _pumpCreate(tester);
     await _fillAndNext(tester, name: 'Lukas', gender: '男');
-    await tester.tap(find.text('上一步'));
+    await tester.tap(find.text(_zh.wizardBack));
     await tester.pumpAndSettle();
     expect(_firstFieldFocused(tester), isTrue, reason: '返回第 1 步应聚焦名字框');
   });

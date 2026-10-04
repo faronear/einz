@@ -2373,10 +2373,14 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
         _genderBubble(_state?.memberGenders[m.env.senderMemberId]);
     // 群聊一期（2026-10-03）：气泡标签带发送者名（群内"对方"不止一人，
     // 名字取 memberNames 缓存，无名回落顶部条的对方名 → '-'）
+    // formatMessage 也会在**没有 TUI 状态**时被调用（CLI 单测直接调它渲染），
+    // 所以这里不能硬解包 `_state!`——2026-10-04：那正好把 4 条 format_message
+    // 测试炸成 "Null check operator used on a null value"。
+    final tuiState = _state;
     final senderName = (m.env.senderMemberId != null
-            ? _state?.memberNames[m.env.senderMemberId]
+            ? tuiState?.memberNames[m.env.senderMemberId]
             : null) ??
-        _peerNameOf(_state!);
+        (tuiState == null ? '-' : _peerNameOf(tuiState));
     final label = '[$senderName $time]';
     final labelW = _displayWidth(label);
     final lane = labelW + 1; // 气泡内左侧标签栏宽（含标签后一个空格）

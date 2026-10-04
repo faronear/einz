@@ -62,29 +62,36 @@ Future<void> pumpToPassphrase(
   if (join) {
     // join：入口页 → 加入 → token 页（preflight 通过）→ 名字页（invite 自填名，
     // 群聊一期：身份选择页已删）→ 口令页
-    await tester.tap(find.text('加入秘境'));
+    await tester.tap(find.text(_zh.setupEntryJoin));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
-    await tester.tap(find.text('下一步')); // preflight 通过 → 直接进名字页
+    await tester.tap(find.text(_zh.wizardNext)); // preflight 通过 → 直接进名字页
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '小芳'); // invite 新成员自填名字
     await tester.testTextInput.receiveAction(TextInputAction.done); // 收键盘露出性别卡
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.female)); // 选性别女
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle(); // → 口令页
   } else {
     // create：入口页 → 新建 → 名字页（填名字+性别）→ 口令页（群聊一期：伴侣页已删）
-    await tester.tap(find.text('创建秘境'));
+    await tester.tap(find.text(_zh.setupEntryCreate));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Lukas');
     await tester.tap(find.byIcon(Icons.male)); // 选性别男
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
+    await tester.pumpAndSettle(); // → 类型页（2026-10-04 起 create 多了这一步）
+    await tester.tap(find.text(_zh.wizardSpaceKindDuo)); // 选「双人秘境」
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle(); // → 口令页（自动自举 createOverride 放行）
   }
 }
+
+/// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
 
 void main() {
   testWidgets('首条通道 create 口令页：不显示信封导入入口', (WidgetTester tester) async {
@@ -126,33 +133,40 @@ void main() {
     ));
     await tester.pumpAndSettle();
     // Multiverse：探测成功 → 空间入口页 → 新建 → 名字页（步骤 1）
-    await tester.tap(find.text('创建秘境'));
+    await tester.tap(find.text(_zh.setupEntryCreate));
     await tester.pumpAndSettle();
     // 名字与性别都未填：点下一步 → 两项红字同时出现（统一检查，不因首个失败跳过其余）
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('请填写我的名字'), findsOneWidget, reason: '名字必填：未填应红字提醒');
-    expect(find.text('请选择性别'), findsOneWidget, reason: '性别必选：未选应红字提醒');
-    expect(find.text('关于我'), findsOneWidget, reason: '应停留在步骤 1（我的名字页）');
+    expect(find.text(_zh.wizardNameRequired), findsOneWidget, reason: '名字必填：未填应红字提醒');
+    expect(find.text(_zh.wizardGenderRequired), findsOneWidget, reason: '性别必选：未选应红字提醒');
+    expect(find.text(_zh.wizardTitleName), findsOneWidget, reason: '应停留在步骤 1（我的名字页）');
     // 只填名字：旧「名字为空」红字不残留（每轮先清 + 填写即消），性别红字保留
     await tester.enterText(find.byType(TextField), 'Lukas');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('请填写我的名字'), findsNothing, reason: '名字已填：旧红字不应残留');
-    expect(find.text('请选择性别'), findsOneWidget, reason: '性别仍未选，红字保留');
-    // 选中「男」后下一步 → 放行进入步骤 2（口令页；群聊一期伴侣页已删）
+    expect(find.text(_zh.wizardNameRequired), findsNothing, reason: '名字已填：旧红字不应残留');
+    expect(find.text(_zh.wizardGenderRequired), findsOneWidget, reason: '性别仍未选，红字保留');
+    // 选中「男」后下一步 → 进入步骤 2 = **类型页**（2026-10-04 新加的一步：
+    // 双人 / 群组，创建时定死不可改），选完类型才到口令页
     await tester.tap(find.byIcon(Icons.male));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('请选择性别'), findsNothing, reason: '选中性别后提醒应消失');
-    expect(find.text('设置共享口令'), findsOneWidget,
-        reason: '应进入步骤 2（口令页——群聊一期：create 不预置对方，伴侣页已删）');
+    expect(find.text(_zh.wizardGenderRequired), findsNothing, reason: '选中性别后提醒应消失');
+    expect(find.text(_zh.wizardTitleSpaceKind), findsOneWidget,
+        reason: '应进入步骤 2：仙境类型（双人/群组，创建时定死）');
+    await tester.tap(find.text(_zh.wizardSpaceKindDuo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_zh.wizardNext));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.wizardTitlePassphrase), findsOneWidget,
+        reason: '选完类型 → 口令页（create 不预置对方，伴侣页已删）');
   });
 
   testWidgets('create 口令页：口令需二次输入确认（两个输入框）', (WidgetTester tester) async {
     await pumpToPassphrase(tester); // create
-    expect(find.text('设置共享口令'), findsOneWidget, reason: 'create 口令页');
+    expect(find.text(_zh.wizardTitlePassphrase), findsOneWidget, reason: 'create 口令页');
     expect(find.byType(TextField), findsNWidgets(2),
         reason: '首条通道设置口令需输入两次（口令 + 确认）——老板 2026-09-12');
   });
@@ -190,38 +204,38 @@ void main() {
     // 两次不一致：停留本页 + 红字
     await tester.enterText(find.byType(TextField).at(0), 'secret-pass-1');
     await tester.enterText(find.byType(TextField).at(1), 'secret-pass-2');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('两次输入的口令不一致'), findsOneWidget, reason: '不一致应红字提醒');
-    expect(find.text('设置共享口令'), findsOneWidget, reason: '不一致应停留口令页');
+    expect(find.text(_zh.wizardPassphraseMismatch), findsOneWidget, reason: '不一致应红字提醒');
+    expect(find.text(_zh.wizardTitlePassphrase), findsOneWidget, reason: '不一致应停留口令页');
 
     // 改为一致：放行进入 PIN 步骤
     await tester.enterText(find.byType(TextField).at(1), 'secret-pass-1');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('两次输入的口令不一致'), findsNothing, reason: '一致后旧红字不应残留');
-    expect(find.text('设置锁屏码'), findsOneWidget, reason: '一致应放行进 PIN 步骤');
+    expect(find.text(_zh.wizardPassphraseMismatch), findsNothing, reason: '一致后旧红字不应残留');
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget, reason: '一致应放行进 PIN 步骤');
   });
 
   testWidgets('create 口令页：首框有长度提示；不足 8 位 → 红字拦截（不卡字符种类）', (WidgetTester tester) async {
     await pumpToPassphrase(tester);
-    expect(find.text('至少 8 位'), findsOneWidget,
+    expect(find.text(_zh.wizardPassphraseMinLengthHint), findsOneWidget,
         reason: '首个口令框应有长度提示语');
 
     // 7 位（不足 8）：红字拦截，停留本页
     await tester.enterText(find.byType(TextField).at(0), '1234567');
     await tester.enterText(find.byType(TextField).at(1), '1234567');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 8 位'), findsOneWidget, reason: '不足 8 位应红字提醒');
-    expect(find.text('设置共享口令'), findsOneWidget, reason: '不足 8 位应停留口令页');
+    expect(find.text(_zh.wizardPassphraseTooShort), findsOneWidget, reason: '不足 8 位应红字提醒');
+    expect(find.text(_zh.wizardTitlePassphrase), findsOneWidget, reason: '不足 8 位应停留口令页');
 
     // 8 位纯数字：放行（老板 2026-09-15：只卡最短长度，字符种类由用户自定）
     await tester.enterText(find.byType(TextField).at(0), '12345678');
     await tester.enterText(find.byType(TextField).at(1), '12345678');
-    await tester.tap(find.text('下一步'));
+    await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text('口令不得少于 8 位'), findsNothing, reason: '够 8 位不该再报长度');
-    expect(find.text('设置锁屏码'), findsOneWidget, reason: '满足策略应放行进 PIN 步骤');
+    expect(find.text(_zh.wizardPassphraseTooShort), findsNothing, reason: '够 8 位不该再报长度');
+    expect(find.text(_zh.chatPageSetLockTitle), findsOneWidget, reason: '满足策略应放行进 PIN 步骤');
   });
 }

@@ -143,7 +143,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('引用'));
     await tester.pumpAndSettle();
-    expect(_imageOf(24), findsOneWidget, reason: '输入栏引用条也应显示缩略图');
+    expect(_imageOf(40), findsOneWidget, reason: '输入栏引用条也应显示缩略图（与引用块同尺寸 40，2026-09-27 统一）');
 
     await tester.enterText(find.byType(TextField), '看这个');
     await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -153,6 +153,11 @@ void main() {
     expect(_imageOf(40), findsOneWidget, reason: '引用块应显示原图缩略图');
     expect(find.textContaining('photo.png'), findsNothing,
         reason: '引用块不再显示文件名');
-    expect(_imageOf(24), findsNothing, reason: '发送后输入栏引用条应清空');
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('chatPageInputBar')),
+            matching: _imageOf(40)),
+        findsNothing,
+        reason: '发送后输入栏引用条应清空（引用条与引用块同尺寸，改用输入栏作用域判定）');
   });
 }
