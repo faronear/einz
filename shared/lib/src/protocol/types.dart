@@ -157,9 +157,9 @@ class SpaceMemberSlot {
 }
 
 /// 空间公开信息 + 成员 slot 列表（**不含空间名**：spaces.display_name 已删，
-/// 2026-09-16）。群聊一期（2026-10-03）新增 [mode]/[purpose]/[inviterName]：
-/// 客户端按 [purpose] 分流加入向导（invite=新成员自填名 / channel=设备接入，
-/// 身份由链接绑定），不再展示身份选择页。
+/// 2026-09-16）。2026-10-03/04 新增 [mode]/[purpose]/[inviterName]/[targetName]：
+/// 客户端按 [purpose] 分流加入向导（invite=新身份、自己填名字 / attach=进已有
+/// 身份、名字早就有），不再展示身份选择页。
 class SpaceJoinPreflight {
   const SpaceJoinPreflight({
     required this.spaceId,
@@ -167,8 +167,10 @@ class SpaceJoinPreflight {
     required this.memberCount,
     required this.slots,
     this.mode = 'duo',
-    this.purpose = 'channel',
+    this.purpose = 'attach',
     this.inviterName,
+    this.targetName,
+    this.targetIsIssuer = false,
   });
 
   final String spaceId;
@@ -177,12 +179,20 @@ class SpaceJoinPreflight {
   final List<SpaceMemberSlot> slots;
   /// 空间模式：'duo' | 'group'（旧服务端缺省回 duo）。
   final String mode;
-  /// token 类型：'invite' | 'channel'（旧服务端缺省回 channel——老 token 无
-  /// purpose 列时服务端按 channel 语义回填）。
+  /// token 类型（2026-10-04 收敛）：
+  /// - `invite` = 开**新身份**（新成员，向导里自己填名字）
+  /// - `attach` = 进**已有身份**（我在新设备接入 / 帮别人找回身份）
+  /// 旧服务端/老 token 缺省回 attach（安全侧：不会误开新身份）。
   final String purpose;
-  /// 受邀人（token 签发者近似）显示名——invite 显示"XX 邀请你"，
-  /// channel 显示"XX 的设备接入"。无名成员空间为 null。
+  /// 签发者显示名——invite 显示"XX 邀请你"，attach 显示"XX 的链接"。
+  /// 无名成员空间为 null。
   final String? inviterName;
+  /// attach 时"要进入的那个身份"的显示名（invite 恒为 null）——向导据此显示
+  /// 「回到 <名字> 的身份」并跳过填名字（那是同一个身份，名字已经有了）。
+  final String? targetName;
+  /// attach 的目标是不是**签发者自己**（true = "我在另一台设备接入"，
+  /// false = "别人帮我找回"）。不能靠名字比字符串——同名成员是允许的。
+  final bool targetIsIssuer;
 
   factory SpaceJoinPreflight.fromJson(Map<String, dynamic> json) =>
       SpaceJoinPreflight(
@@ -190,8 +200,10 @@ class SpaceJoinPreflight {
         status: json['status'] as String,
         memberCount: json['memberCount'] as int,
         mode: (json['mode'] as String?) ?? 'duo',
-        purpose: (json['purpose'] as String?) ?? 'channel',
+        purpose: (json['purpose'] as String?) ?? 'attach',
         inviterName: json['inviterName'] as String?,
+        targetName: json['targetName'] as String?,
+        targetIsIssuer: (json['targetIsIssuer'] as bool?) ?? false,
         slots: (json['slots'] as List<dynamic>? ?? const [])
             .map((e) => SpaceMemberSlot.fromJson(e as Map<String, dynamic>))
             .toList(),

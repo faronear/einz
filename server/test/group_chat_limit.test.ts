@@ -93,3 +93,23 @@ test('duo：上限 2 的服务器上，第 3 人照样 DUO_FULL（不是 SPACE_F
     )
   })
 })
+
+test('group 满员：**找回**入口不受上限影响（attach 指向已有身份始终可用）', async () => {
+  await withDb(async () => {
+    const space = await create('group')
+    const b = joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小绿')
+    // 满员（上限 2）：开新身份被拒……
+    const invite = createJoinToken(space.spaceId, undefined, 'invite', space.creatorMemberId)
+    assert.throws(
+      () => joinSpace(invite.joinToken, 'pk-c', 'Mac', undefined, undefined, '第三人'),
+      (e: unknown) => e instanceof ApiError && e.code === 'SPACE_FULL',
+    )
+    // ……但"帮 B 找回身份"永远可用（B 丢了设备时唯一的归路）
+    const recover = createJoinToken(
+      space.spaceId, undefined, 'attach', space.creatorMemberId, b.memberId,
+    )
+    const back = joinSpace(recover.joinToken, 'pk-b-new', 'Pixel2')
+    assert.equal(back.memberId, b.memberId, '回到 B 自己的身份')
+    assert.equal(back.isNewMember, false)
+  })
+})

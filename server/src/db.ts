@@ -356,6 +356,17 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   } catch {
     // 列已存在（新库）→ 忽略
   }
+  // 迁移：join_tokens 补 target_member_id（2026-10-04：**定向** token）。
+  // 语义：这次 join 要进入**哪个已有身份**——
+  //   指向自己 = 我在新设备接入（旧的 channel 语义）；指向别人 = 帮对方找回身份
+  //   （对方丢了/换了设备，而他自己没有安装可签发）。NULL = 不开已有身份，
+  //   另见 purpose='invite'（开新身份）。
+  // 存量行为 NULL：老 attach(channel) token 退回用 issuer_member_id 兜（见 joinSpace）。
+  try {
+    db.exec(`ALTER TABLE join_tokens ADD COLUMN target_member_id TEXT`);
+  } catch {
+    // 列已存在（新库）→ 忽略
+  }
   // 迁移：messages.server_sequence 由全局 UNIQUE 改为 (space_id, server_sequence)
   // 复合唯一（Multiverse：序号按 Space 独立递增，PROTOCOL_MULTIVERSE.md §3.6）。
   // SQLite 无法 ALTER 删除 UNIQUE，检测到旧的"单列 server_sequence 唯一自动索引"

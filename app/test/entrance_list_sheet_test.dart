@@ -68,6 +68,8 @@ class _FakeEntranceApi extends ApiClient {
     String spaceId,
     String token, {
     required String purpose,
+    String? targetMemberId,
+    String? passphrase,
   }) async =>
       const JoinTokenResult(
         joinToken: 'e1-TESTTOKEN123456789012345678901234567890',

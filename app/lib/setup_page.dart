@@ -99,10 +99,10 @@ class _SetupPageState extends State<SetupPage> {
   String? _genderError; // 性别未选提醒（红字显示在选项卡下方；选中即清除）
   // 群聊一期（2026-10-03）：create 不再预置伴侣（v3）——原 _peerNameCtrl/
   // _peerGender/_peerGenderError/_buildStepPeer 已删；partner 加入时自填名字
-  // 群聊一期（2026-10-03）：join 按 purpose 分流——'invite' = 新成员（步骤 2 填
-  // 自己的名字/性别，复用 _creatorName/_myGender）；'channel' = 发起人设备接入
-  // （身份由 token 绑定，服务端自动解析，无名字页）。身份选择页已删。
-  String? _joinPurpose; // preflight 返回的 token 类型（'invite'|'channel'；null=未验证）
+  // 2026-10-03/04：join 按 purpose 分流——'invite' = 开**新身份**（步骤 2 填
+  // 自己的名字/性别，复用 _creatorName/_myGender）；'attach' = 进**已有身份**
+  // （身份由 token 的 target 决定、服务端自动解析，无名字页）。身份选择页已删。
+  String? _joinPurpose; // preflight 返回的 token 类型（'invite'|'attach'；null=未验证）
   // 群聊一期（2026-10-04 老板拍板「不支持升格」）：create 第 2 步选秘境类型
   // （'duo' 双人 | 'group' 群组）——**创建时定死、之后永不改变**，所以这一页
   // 是单向的、必须在建空间之前问。null = 还没选（必选，拦住不让继续）。
@@ -112,6 +112,10 @@ class _SetupPageState extends State<SetupPage> {
   // 替代被删掉的「选择身份（对方是谁）」页，是加入者唯一的知情入口。
   String? _joinInviterName;
   int _joinMemberCount = 0;
+  /// attach 流：要进入的那个身份的显示名 + 是不是签发者自己（决定文案：
+  /// "我在另一台设备接入" vs "别人帮我找回"）。名字不能靠字符串比——允许同名。
+  String? _joinTargetName;
+  bool _joinTargetIsIssuer = false;
   final _spaceId = TextEditingController(); // 真实 spaceId（enroll/扫码/托管返回后填入）
   final _envelopeKey = TextEditingController();
   final _escrowPassphrase = TextEditingController();
@@ -831,7 +835,7 @@ class _SetupPageState extends State<SetupPage> {
       if (!ok) return;
       // 群聊一期（2026-10-03）：channel token（设备接入）身份由链接绑定，
       // 无名字页——验证通过直跳口令页；invite 落到步骤 2 填自己名字
-      if (_joinPurpose == 'channel') {
+      if (_joinPurpose == 'attach') {
         setState(() {
           _step = 3; // join 口令页
           _localError = null;
@@ -942,7 +946,7 @@ class _SetupPageState extends State<SetupPage> {
       // 群聊一期（2026-10-03）：channel 流跳过了名字页（身份由 token 绑定），
       // 口令页「上一步」应直接回 token 页——不能落到步骤 2（名字页对本流无意义，
       // 且填了名字也不会被提交）
-      if (_role == _WizardRole.join && _step == 3 && _joinPurpose == 'channel') {
+      if (_role == _WizardRole.join && _step == 3 && _joinPurpose == 'attach') {
         _step = 1;
         _localError = null;
         _status = null;
@@ -1417,6 +1421,7 @@ class _SetupPageState extends State<SetupPage> {
   /// 这里是加入者判断"我要进的是谁的、几人的空间"的唯一依据。
   Widget _joinPurposeHint(AppLocalizations l10n) {
     final who = (_joinInviterName ?? '').trim();
+    final target = (_joinTargetName ?? '').trim();
     final Text? line;
     if (_joinPurpose == 'invite') {
       line = Text(
@@ -1425,9 +1430,18 @@ class _SetupPageState extends State<SetupPage> {
             : l10n.wizardJoinInviteHint(who, _joinMemberCount),
         style: const TextStyle(fontSize: 12),
       );
-    } else if (who.isNotEmpty) {
-      // channel 且查不到签发者：什么都不说，别编一个
-      line = Text(l10n.wizardJoinChannelHint(who),
+    } else if (!_joinTargetIsIssuer && target.isNotEmpty) {
+      // **找回**：别的成员把我接回我自己的身份（我丢了设备）。
+      // 这条要说得最清楚——收到它的人往往正一头雾水"我是不是要重新加入"。
+      line = Text(
+        who.isEmpty
+            ? l10n.wizardJoinRecoverHintNoName(target)
+            : l10n.wizardJoinRecoverHint(who, target),
+        style: const TextStyle(fontSize: 12),
+      );
+    } else if (who.isNotEmpty || target.isNotEmpty) {
+      // 我在另一台设备接入自己的账号（签发者 = 目标）
+      line = Text(l10n.wizardJoinChannelHint(who.isEmpty ? target : who),
           style: const TextStyle(fontSize: 12));
     } else {
       line = null;
@@ -1438,8 +1452,12 @@ class _SetupPageState extends State<SetupPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(_joinPurpose == 'invite' ? Icons.person_add_alt_1 : Icons.devices,
-              size: 16, color: const Color(0xFF2271F7)),
+          Icon(
+              _joinPurpose == 'invite'
+                  ? Icons.person_add_alt_1
+                  : (_joinTargetIsIssuer ? Icons.devices : Icons.history),
+              size: 16,
+              color: const Color(0xFF2271F7)),
           const SizedBox(width: 6),
           Expanded(child: line),
         ],
@@ -1616,16 +1634,16 @@ class _SetupPageState extends State<SetupPage> {
 
   /// join 所选身份（create 预置）的名字——本人在消息流里的显示名。
   /// 群聊一期（2026-10-03）：身份选择页删除——invite 新成员的名字来自步骤 2
-  /// 自填（_creatorName），channel 设备接入复用发起人身份（发起人已有名字）。
+  /// 自填（_creatorName），attach 进已有身份（身份由链接的 target 决定）。
   ///
-  /// channel 流**没有名字页**（身份由链接绑定，不该再问一遍名字），此时
-  /// `_creatorName` 是空的 → 落库会写空名（顶部条/气泡名要等 /space 拉回来才
-  /// 有）。签发者**就是我本人**，preflight 的 inviterName 即我的名字 → 用它兜底
-  /// （2026-10-04 审查修：否则离线首次进入时"我"这一格是空的）。
+  /// attach 流**没有名字页**（不该再问一遍名字），此时 `_creatorName` 是空的 →
+  /// 落库会写空名（顶部条/气泡名要等 /space 拉回来才有）。token 的 target 就是
+  /// 这条身份的名字 → 用它兜底（2026-10-04：从"签发者名字"改成"目标名字"，
+  /// 因为目标现在可以是别人）。
   String get _joinSelectedName {
     final typed = _creatorName.text.trim();
     if (typed.isNotEmpty) return typed;
-    return (_joinInviterName ?? '').trim();
+    return (_joinTargetName ?? _joinInviterName ?? '').trim();
   }
 
   /// 步骤 1（join，Multiverse）：输入邀请链接或 token（粘贴/扫码）。
@@ -1717,6 +1735,8 @@ class _SetupPageState extends State<SetupPage> {
         _joinPurpose = pre.purpose;
         _joinInviterName = pre.inviterName;
         _joinMemberCount = pre.memberCount;
+        _joinTargetName = pre.targetName;
+        _joinTargetIsIssuer = pre.targetIsIssuer;
         _joinTokenVerified = true; // 已验证：输入框锁只读，且不再重复校验
         _localError = null;
       });
@@ -2071,7 +2091,7 @@ class _SetupPageState extends State<SetupPage> {
       children: [
         // 群聊一期（2026-10-03）：channel 流（设备接入）没有名字页，所以"这条链接
         // 是谁的、几人空间"只能在口令页说（invite 流那份在名字页，见 _buildStepName）。
-        if (_role == _WizardRole.join && _joinPurpose == 'channel')
+        if (_role == _WizardRole.join && _joinPurpose == 'attach')
           _joinPurposeHint(l10n),
         // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
         // 文字链接；仅后续通道 join 适用——首条通道无对端可导出密封信封）

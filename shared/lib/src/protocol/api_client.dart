@@ -169,29 +169,41 @@ class ApiClient {
     return SpaceCreateResult.fromJson(res);
   }
 
-  /// Multiverse：生成绑定新通道的邀请（POST /spaces/{id}/join-tokens——
-  /// 24h 一次性 token，新通道 /space join 绑定）。
+  /// Multiverse：生成一次性进入凭证（POST /spaces/{id}/join-tokens——
+  /// 24h 一次性 token，/spaces/join 消费）。
   ///
-  /// 需认证：签发邀请凭证 = 空间级操作，服务端要求调用方持该空间成员会话
+  /// 需认证：签发凭证 = 空间级操作，服务端要求调用方持该空间成员会话
   /// （2026-09-15 评审 C1 修复；此前免认证，任何人拿到 spaceId 即可自签）。
-  /// 群聊一期（2026-10-03）：[purpose] 选定 token 类型——`invite` = 邀请新成员
-  /// （**仅 group 空间可用**：duo 满 2 人时服务端 409 DUO_FULL，2026-10-04 取消
-  /// 升格后不再有"签发即升级"）；`channel` = 发起人在新设备加通道（绑定发起人
-  /// 身份）。
   ///
-  /// **必填、无默认值**：两种 token 语义相反（一个开新身份、一个绑发起人自己的
-  /// 身份），给默认值就等于让"忘传"静默退化成另一种语义——2026-10-04 审查实测：
-  /// 状态条邀请入口漏传 purpose，拿默认 `channel` 的码给伴侣 → 伴侣以**签发者
-  /// 本人**的身份入网（冒充），且界面上完全没有报错。强制显式传参，把这类错误
-  /// 前移到编译期。
+  /// [purpose]（2026-10-04 收敛为两种，**必填、无默认值**）：
+  /// - `invite`：开**新身份**（邀请一个新人，加入时自己填名字）。受人数上限约束
+  ///   ——duo 满 2 人时服务端 409 `DUO_FULL`（双人秘境永远不会有第三个人）。
+  /// - `attach`：进**已有身份**。[targetMemberId] 指向谁就进谁——
+  ///   · 缺省/等于自己 → 「我在另一台设备接入」
+  ///   · 指向别人 → **帮对方找回身份**（他丢了/换了设备，且没有安装可自己签发）
+  ///
+  /// 为什么 purpose 不给默认值：两种语义相反（一个开新身份、一个进已有身份），
+  /// 给默认值就等于让"忘传"静默退化成另一种——2026-10-04 审查实测：状态条邀请
+  /// 入口漏传 purpose，拿默认值的码给伴侣 → 伴侣以**签发者本人**的身份入网
+  /// （冒充），界面上完全没有报错。强制显式传参，把这类错误前移到编译期。
+  ///
+  /// [passphrase]：仅当 `attach` 指向**别人**时需要（服务端校验共享口令——
+  /// 「对别人的身份动手」与「撤销别人通道」同一档授权）。
   Future<JoinTokenResult> createJoinToken(
     String spaceId,
     String token, {
     required String purpose,
+    String? targetMemberId,
+    String? passphrase,
   }) async {
     final res = await _post(
       '/spaces/$spaceId/join-tokens',
-      {'purpose': purpose},
+      {
+        'purpose': purpose,
+        if (targetMemberId != null && targetMemberId.isNotEmpty)
+          'target_member_id': targetMemberId,
+        if (passphrase != null && passphrase.isNotEmpty) 'passphrase': passphrase,
+      },
       token: token,
     );
     return JoinTokenResult.fromJson(res);

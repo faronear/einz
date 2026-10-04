@@ -1042,12 +1042,13 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     session.messages.add(_systemMessage(session, '----------------'));
     session.messages.add(_systemMessage(
         session, '✅✅✅ 即将加入秘境！'));
-    // 群聊一期（2026-10-03，v3）：身份**由链接（purpose）决定**，不再让加入者
-    // 在成员名单里自选（那是冒充面——任选他人身份即可以其名义加通道）：
+    // 2026-10-03/04：身份**由链接（purpose）决定**，不再让加入者在成员名单里自选
+    // （那是冒充面——任选他人身份即可以其名义加通道）：
     // - invite：我是**新成员** → 自己填名字/性别，join 不带 slot（服务端分配
     //   最小空槽生成新身份）；
-    // - channel：这是我**本人在另一台设备**接入 → 身份由 token 绑定、服务端自己
-    //   解析，既不用填名字也不能带 slot。
+    // - attach：进**已有身份**（服务端按 token 的 target 解析，不填名字、不带 slot）：
+    //   · target 是签发者自己 = 我本人在另一台设备接入
+    //   · target 是别人 = **别的成员帮我找回身份**（我丢了/换了设备）
     // （2026-10-04 审查：旧代码恒带 slot，而 create 现在签发的是 invite token →
     //   服务端 400「invite token 不能指定 slot」，CLI 加入流程整个不可用。）
     final isInvite = pre.purpose == 'invite';
@@ -1059,8 +1060,12 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
         session.messages.add(
             _systemMessage(session, '   目前已有 ${pre.memberCount} 位成员'));
       }
+    } else if (!pre.targetIsIssuer && (pre.targetName ?? '').isNotEmpty) {
+      final who = pre.inviterName ?? '伙伴';
+      session.messages.add(_systemMessage(
+          session, '🔄「${who}」帮你把身份「${pre.targetName}」接到本机（你原有通道不受影响）'));
     } else {
-      final who = pre.inviterName ?? '本人';
+      final who = pre.inviterName ?? pre.targetName ?? '本人';
       session.messages.add(_systemMessage(session, '📱 这是「${who}」在另一台设备接入的链接'));
     }
     session.messages.add(_systemMessage(session, '----------------'));
@@ -3424,7 +3429,9 @@ Future<void> _execCommand(String line) async {
       // 已废弃——新通道用 /space join <链接或 token> 绑定）。
       // 群聊一期（2026-10-03）：`/invite` = 邀请新成员；`/invite channel` =
       // 给自己另一台设备开通道（链接绑定本人身份）。
-      _invitePurpose = arg.trim() == 'channel' ? 'channel' : 'invite';
+      // `attach`（别名 `channel`，2026-10-04 改名）= 进已有身份；其余 = invite
+      _invitePurpose =
+          (arg.trim() == 'attach' || arg.trim() == 'channel') ? 'attach' : 'invite';
       await _execInvite();
       break;
     case '/myname':
@@ -3551,7 +3558,7 @@ Future<void> _execCommand(String line) async {
 /// /invite [memberA|memberB] [对方名称]：补发一次性开通码（默认 memberB=邀请对方，
 /// 给第二使用者；memberA=给自己加新通道）。需先 /auth 激活。
 /// `/invite` 本次签发的 token 类型（'invite' | 'channel'，见 `/invite channel`）。
-String _invitePurpose = 'invite';
+String _invitePurpose = 'invite'; // 'invite'（开新身份）| 'attach'（我进已有身份）
 
 Future<void> _execInvite() async {
   final s = _state!;
@@ -3568,9 +3575,11 @@ Future<void> _execInvite() async {
     return;
   }
   try {
-    // 群聊一期（2026-10-03）：purpose 必填。CLI 的 `/invite` 语义一直是"邀请
-    // 对方来这个秘境" → invite（开新身份）。想给自己另一台设备开通道，用
-    // `/invite channel`（身份由链接绑定，仅本人可用）。
+    // purpose 必填（2026-10-04 收敛）。CLI 的 `/invite` 语义一直是"邀请对方来
+    // 这个秘境" → invite（开新身份；duo 满 2 人时服务端 409）。想给自己另一台
+    // 设备开通道，用 `/invite attach`。
+    // 「帮别人找回身份」（attach 指向他人）需要共享口令，CLI 一期不做——
+    // 丢了设备的人请用 App 找伙伴生成找回链接。
     final api = ApiClient(s.session.server);
     final r = await _busy(
         s.session,
@@ -3578,7 +3587,7 @@ Future<void> _execInvite() async {
         () => api.createJoinToken(
               store.spaceId!,
               store.sessionToken!,
-              purpose: _invitePurpose == 'channel' ? 'channel' : 'invite',
+              purpose: _invitePurpose == 'attach' ? 'attach' : 'invite',
             ));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
     s.session.messages.add(_systemMessage(s.session, '✅ 开通码已生成（24 小时内一次性有效）：\n🛡️  ${r.joinToken}\n📎 ${r.link}'));

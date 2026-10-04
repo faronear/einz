@@ -621,6 +621,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String wizardJoinRecoverHint(String name, String target) {
+    return '「$name」帮你把「$target」的身份接到这台设备上，原有通道不受影响';
+  }
+
+  @override
+  String wizardJoinRecoverHintNoName(String target) {
+    return '这条链接把「$target」的身份接到这台设备上，原有通道不受影响';
+  }
+
+  @override
   String get chatPageMenuMembers => '空间成员';
 
   @override
@@ -636,13 +646,40 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersInvitePartner => '邀请伴侣';
 
   @override
+  String get chatPageMembersReinvitePartner => '让伴侣在新设备接入';
+
+  @override
+  String get chatPageMembersReinviteHint =>
+      '她换了设备、重装了 App，或想再挂一台设备时，把这条链接发给她——原有通道不受影响';
+
+  @override
+  String get chatPageMembersRecoverTooltip => '让 TA 在新设备接入（原有通道不受影响）';
+
+  @override
+  String chatPageMembersRecoverTitle(String name) {
+    return '为「$name」生成新设备接入链接';
+  }
+
+  @override
+  String get chatPagePassphrasePromptTitle => '输入共享口令';
+
+  @override
+  String get chatPagePassphrasePromptHint => '对别人的身份动手需要口令授权（与「撤销别人的通道」同一档）';
+
+  @override
+  String get chatPagePassphraseFieldHint => '共享口令';
+
+  @override
+  String get chatPagePassphraseShow => '显示';
+
+  @override
+  String get chatPagePassphraseHide => '隐藏';
+
+  @override
   String get chatPageMembersInviteNew => '邀请新成员';
 
   @override
   String get chatPageMembersChannelToken => '在其他设备加入我的账号';
-
-  @override
-  String get chatPageMembersDuoLocked => '这是双人秘境，不可增加成员；需要多人一起聊请新建群组秘境';
 
   @override
   String get chatPageMembersFull => '群成员已满';

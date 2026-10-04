@@ -60,9 +60,11 @@ test('上限 2：创建占 1 条，第 2 条能进，第 3 条被拒（409）', 
     joinSpace(space.joinToken, 'pk-b', 'Pixel')
     assert.equal(entranceCount(space.spaceId), 2, '第 2 条通道应放行')
 
-    const third = createJoinToken(space.spaceId)
+    // 第 3 条通道：给**已有的**创建者身份再加一台设备（attach 指向自己）——
+    // 2026-10-04 起 attach 必须显式给目标（缺省=签发者，这里显式写出来更清楚）
+    const third = createJoinToken(space.spaceId, undefined, 'attach', space.creatorMemberId)
     assert.throws(
-      () => joinSpace(third.joinToken, 'pk-c', 'Mac', 0),
+      () => joinSpace(third.joinToken, 'pk-c', 'Mac'),
       (e: unknown) => e instanceof ApiError && e.code === 'ENTRANCE_LIMIT_REACHED' && e.httpStatus === 409,
       '第 3 条通道应被上限拒绝',
     )
@@ -85,9 +87,9 @@ test('销毁不退额度：退役（revoked）后仍占额度，不能靠反复�
     assert.equal(revoked.status, 'revoked')
     assert.equal(entranceCount(space.spaceId), 2, '撤销的通道仍计入额度')
 
-    const third = createJoinToken(space.spaceId)
+    const third = createJoinToken(space.spaceId, undefined, 'attach', second.memberId)
     assert.throws(
-      () => joinSpace(third.joinToken, 'pk-c', 'Mac', 1),
+      () => joinSpace(third.joinToken, 'pk-c', 'Mac'),
       (e: unknown) => e instanceof ApiError && e.code === 'ENTRANCE_LIMIT_REACHED',
       '销毁过的通道不退还额度，第 3 条仍应被拒',
     )

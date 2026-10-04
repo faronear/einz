@@ -96,8 +96,10 @@ spaces（群聊一期 2026-10-03 增列）
 
 join_tokens（群聊一期 2026-10-03 增列）
   purpose           TEXT NOT NULL DEFAULT 'channel',
-                    -- 'invite'=邀请新成员（开新身份）；'channel'=发起人设备接入
-  issuer_member_id  TEXT,            -- channel 绑定发起人身份（join 校验用；
+                    -- 'invite'=开新身份；'attach'=进已有身份（旧值 'channel' 归一成它）
+  issuer_member_id  TEXT,            -- 签发者身份（preflight 报"谁发的"；attach 存量兜底）
+  target_member_id  TEXT,            -- attach 要进入的身份（== issuer 自己换设备；
+                    --   == 别人 = 帮对方找回身份）；NULL = 退回 issuer
                                      -- 存量行为 NULL，退化按"slot 已有人"放行）
   created_by_entrance TEXT NOT NULL, -- 角色字面量（"creator"/"member"，非通道 id）
   token_hash        TEXT PRIMARY KEY,
@@ -155,21 +157,23 @@ GET /spaces/lookup?address=... | ?custom_id=...
 
 POST /spaces/join/preflight
   轻量校验 token（不消费），返回空间公开信息 + 分流向导用字段：
-  响应：{ spaceId, status, mode, memberCount, purpose, inviterName, slots }
-  （mode='duo'|'group'；purpose='invite'|'channel'——客户端据此走"新成员
-    自填名"或"设备接入"向导，不再有身份选择页；inviterName 是**签发者本人**
-    的名字——按 join_tokens.issuer_member_id 查 space_members，查不到（存量
-    token 无 issuer）才退回"第一个有名字的 active 成员"）
+  响应：{ spaceId, status, mode, memberCount, purpose, inviterName, targetName,
+          targetIsIssuer, slots }
+  （mode='duo'|'group'；purpose='invite'|'attach'——客户端据此走"新成员自填名"
+    或"进已有身份"向导，不再有身份选择页；inviterName 是**签发者本人**的名字
+    （按 issuer_member_id 查，查不到才退回"第一个有名字的成员"）；
+    targetName = attach 要进入的身份的显示名（invite 恒 null）；
+    targetIsIssuer = 目标是签发者自己（true="我换设备"，false="别人帮我找回"））
 
 POST /spaces/join
   用 join token 完成加入（群聊一期 2026-10-03，v3：slot 显式语义）。
   请求：{ token, publicKey, entranceName?, installUid?,
-          memberName?, memberGender? }    // invite 新成员自填（channel 不带）
+          memberName?, memberGender? }    // invite 新成员自填（attach 不带）
   slot 语义：
   - invite token：不带 slot（服务端分配最小空 slot、生成新 member_id）；
     带 slot → 400
-  - channel token：**不需要**带 slot——服务端按 token 绑定的 issuer_member_id
-    自动解析发起人槽位；客户端显式带 slot 且不一致 → 403（防错用）
+  - attach token：**不需要**带 slot——服务端按 token 的 target_member_id 自动
+    解析那个身份的槽位；客户端显式带 slot 且不一致 → 403（防错用）
   响应：200 { spaceId, memberId, slot, sessionToken, entranceId, spaceAddress,
               isNewMember }
     isNewMember=true 仅当这次 join **新建了身份**（false = 已有成员加通道）——
@@ -186,15 +190,19 @@ POST /spaces/join
 ```text
 POST /spaces/{spaceId}/join-tokens
   现有成员生成一次性开通码（join token，可刷新/撤销）。
-  请求：{ purpose: 'invite' | 'channel' }（群聊一期 2026-10-03；**必填语义**——
-  缺省 'channel' 是历史行为，客户端必须显式传：两种码语义相反，漏传会让
-  "邀请伴侣"变成"把自己身份送出去"）
+  请求：{ purpose: 'invite' | 'attach', target_member_id?, passphrase? }
+  （**必填语义**——两种码语义相反，漏传会让"邀请伴侣"变成"把自己身份送出去"，
+    故客户端必须显式传；服务端把未知值归一成 'attach'）
   - invite：邀请新成员（新身份）。**仅 group 空间可签发**——duo 已满 2 人时
     409 DUO_FULL（双人秘境不会有第三个人）；签发无任何空间级副作用。
-  - channel：发起人在新设备加通道——token 记录签发者 member（issuer 绑定），
-    join 时校验"仅发起人本人可接入"（防任选他人身份冒充）。
+  - attach：进**已有身份**——token 记 target_member_id：
+    · 缺省 / == 签发者 → 我在另一台设备接入（会话即所有权，不要口令）
+    · == 别的成员 → 帮对方找回身份（他丢了设备）——**路由层校验共享口令**
+      （与撤销别人通道同档）；目标必须是本空间成员，否则 400
   → 201 { joinToken, link: "https://<host>/join/<token>", expiresAt }
-  错误：NOT_A_MEMBER / DUO_FULL（duo 满 2 人，409）
+  错误：NOT_A_MEMBER / DUO_FULL（duo 满 2 人签 invite，409）/ INVALID_REQUEST（400：
+       invite 带 target、attach 无目标、目标不属于本空间）/ ESCROW_VERIFY_FAILED（401：
+       attach 指向他人但口令错）/ PASSPHRASE_NOT_SET（409：未托管口令）
 
 DELETE /spaces/{spaceId}/join-tokens/{tokenHash}
   撤销未用 token（创建者补救手段）。
@@ -205,20 +213,22 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 
 ## 5. 加入流程（join）API 序列
 
-对应 App 向导（群聊一期 2026-10-03 起按 purpose 分流，身份选择页已删）：
+对应 App 向导（2026-10-03/04 起按 purpose 分流，身份选择页已删）：
 
 ```text
 ① 输入 token/粘贴链接/扫码        → POST /spaces/join/preflight
      前置校验：TOKEN_INVALID/EXPIRED/USED 在此拦截（fail fast，不消费 token）；
-     返回 purpose/inviterName/mode/memberCount 供确认页展示
+     返回 purpose/inviterName/targetName/targetIsIssuer/mode/memberCount 供确认页展示
 ② 身份分支（按 preflight 的 purpose）：
    - invite（新成员）：填写自己的名字/性别
-   - channel（设备接入）：无此步——身份由 token 绑定（issuer），服务端自动解析
+   - attach（进已有身份）：无此步——身份由 token 的 target 决定，服务端自动解析
+     （文案：targetIsIssuer=true = 「我在另一台设备接入」；false = 「XX 帮你找回
+     身份（<targetName>）」——丢了设备的人靠这条回来）
 ③ 口令 escrow 取 Space Key        → POST /spaces/{spaceId}/key-escrow
      （提交口令，解开创建者托管的口令密封包，返回 space_key 密封内容）
 ④ join 提交                       → POST /spaces/join（真正消费 token）
      服务端事务：锁 Space 行 → 校验 purpose×slot → 标记 used →
-     invite 分配最小空 slot/新 member_id；channel 复用 issuer 的 slot/member_id；
+     invite 分配最小空 slot/新 member_id；attach 复用 target 的 slot/member_id；
      新身份时按创建时定死的 mode 查上限（duo 恒 2 / group 看 maxMembersPerSpace）
 ⑤ 设置 PIN                       → 本机操作（AppLock），无服务端调用
 → 进入 ChatPage
@@ -228,7 +238,8 @@ POST /spaces/{spaceId}/key-escrow   （沿用 v1 escrow 语义，按空间隔离
 - App 实现为一次 `POST /spaces/join` 合并提交（token + 名字/性别）；协议层
   字段都是可选组，服务端在 ④ 时做事务提交。
 - create（首条通道）流程：创建者名字 → 设口令（escrow）→ PIN，无 token；
-  create 回传的首张 join token purpose='invite'（"邀请伴侣"链接）。
+  create 回传的首张 join token purpose='invite'（"邀请伴侣"链接）；
+  duo 满 2 人后签不出 invite，但 attach 永远可用——这是"伴侣丢了设备"的归路。
 
 ## 6. 错误码（Multiverse 加入相关）
 

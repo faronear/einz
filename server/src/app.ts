@@ -30,6 +30,7 @@ import {
 } from './entrances.js'
 import { getSpace, registerPushToken, unregisterPushToken } from './push.js'
 import {
+  assertSpacePassphrase,
   deleteKeyEscrow,
   escrowForSpace,
   getKeyEscrow,
@@ -45,6 +46,7 @@ import {
 import { PROTOCOL_VERSION } from './protocolVersion.js'
 import {
   bearerToken,
+  isSpaceMember,
   optionalBearerToken,
   requireSession,
   requireSpaceMember
@@ -289,12 +291,40 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // C1 修复：签发开通码 = 空间级操作，必须持该空间成员会话（此前任何人
     // 拿到 spaceId 就能自签开通码、以 slot=0 冒充创建者加通道）
     const sess = requireSpaceMember(optionalBearerToken(req), spaceId)
-    // 群聊一期（2026-10-03）：body.purpose 选定 token 类型（invite/channel）；
-    // channel token 记录签发者身份（issuer_member_id），join 时做绑定校验——
-    // 杜绝"任何成员的 channel token 任选他人身份加通道"的冒充面。
-    // 签发**无空间级副作用**（2026-10-04 取消升格：duo 满员签 invite 直接 409）。
-    const purpose = body?.purpose === 'invite' ? 'invite' : 'channel'
-    const r = createJoinToken(spaceId, requestBaseUrl(req), purpose, sess.member_id)
+    // 两种 token（2026-10-04 收敛）：
+    //   invite = 开新身份（邀请新人；duo 满 2 人 → 409）
+    //   attach = 进已有身份（target 缺省 = 自己；指向**别人** = 帮对方找回身份）
+    // 兼容：老字面量 'channel' 等价于 attach（归一化落在下面这一行里，不留分支）
+    const purpose = body?.purpose === 'invite' ? 'invite' : 'attach'
+    const targetMemberId =
+      body?.target_member_id == null ? undefined : String(body.target_member_id)
+    // 对**别人的身份**动手 = 与"撤销别人通道"同一档授权：要共享口令。
+    // 顺序刻意对齐 revokeEntrance——先做便宜的目标合法性检查（目标必须在本空间），
+    // 再验口令，免得"错的目标"也消耗口令尝试预算。
+    if (purpose === 'attach' && targetMemberId != null && targetMemberId !== sess.member_id) {
+      if (!isSpaceMember(spaceId, targetMemberId)) {
+        throw new ApiError('INVALID_REQUEST', '目标身份不属于本空间', 400)
+      }
+      await assertSpacePassphrase(spaceId, body?.passphrase)
+    }
+    const r = createJoinToken(
+      spaceId,
+      requestBaseUrl(req),
+      purpose,
+      sess.member_id,
+      targetMemberId,
+    )
+    // 审计：谁给谁发了什么码（**不记口令**；target 与签发者不同 = 定向找回）
+    logActivity({
+      entranceId: sess.entrance_id,
+      spaceId,
+      kind: 'join_token.issue',
+      detail: {
+        purpose,
+        target_member_id: targetMemberId ?? sess.member_id
+      },
+      meta: metaOf(req)
+    })
     sendJson(res, 201, r)
     return
   }

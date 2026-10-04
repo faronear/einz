@@ -1658,12 +1658,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// [purpose]（群聊一期 2026-10-03）：`invite` = 邀请新成员（开新身份；duo 满员
   /// 后签发即自动升格 group）；`channel` = 我本人在另一台设备接入（绑定我的身份）。
   /// **必传**：两种码语义相反，share 错一种等于把对方变成我（2026-10-04 审查
-  /// 实测的 P0）。弹窗内「重新生成」必须沿用同一个 purpose。
-  Future<void> _showInviteDialog({required String purpose}) async {
+  /// 实测的 P0）。弹窗内「重新生成」必须沿用同一组参数。
+  ///
+  /// [targetMemberId] / [passphrase]（2026-10-04 定向 token）：`attach` 指向
+  /// **别人**时用——passphrase 是"对别人的身份动手"的授权因子，由调用方先向
+  /// 用户要到（见 [_promptSharedPassphrase]）。
+  Future<void> _showInviteDialog({
+    required String purpose,
+    String? targetMemberId,
+    String? passphrase,
+  }) async {
     // 老板决策：点顶栏添加按钮直接生成开通码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      var r = await _withAuth((t) => api.createJoinToken(widget.spaceId, t, purpose: purpose));
+      var r = await _withAuth((t) => api.createJoinToken(
+            widget.spaceId,
+            t,
+            purpose: purpose,
+            targetMemberId: targetMemberId,
+            passphrase: passphrase,
+          ));
       if (!mounted) return;
       // 「重新生成」进行中的标记（放在 builder 外：StatefulBuilder 用箭头函数，没地方声明）
       var busy = false;
@@ -1758,8 +1772,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   if (busy) return; // 进行中：忽略重复点击
                   setLocal(() => busy = true);
                   try {
-                    final fresh = await _withAuth(
-                        (t) => api.createJoinToken(widget.spaceId, t, purpose: purpose));
+                    final fresh = await _withAuth((t) => api.createJoinToken(
+                          widget.spaceId,
+                          t,
+                          purpose: purpose,
+                          targetMemberId: targetMemberId,
+                          passphrase: passphrase,
+                        ));
                     if (!ctx.mounted) return;
                     r = fresh; // 就地刷新：二维码 / 开通码 / 链接 ✓
                     setLocal(() {});
@@ -2197,7 +2216,68 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// "现在谁在线"时不用退出弹层，也不用等 30s 的对方在线轮询。为它把弹层主体套进
   /// StatefulBuilder（卡片/失败提示读它承载的可变状态），拉取逻辑收在 `load()` 里
   /// 供"初次打开"与"刷新"共用。
-  /// 空间成员（群聊一期 2026-10-03）：成员名单 + 两种邀请入口。
+  /// 索要共享口令（2026-10-04）：**对别人的身份动手**时的授权因子——与"撤销
+  /// 别人的通道"同一档（`revokeEntrance` 也要口令）。返回 null = 用户取消。
+  ///
+  /// 为什么不复用 `_ChangePassphraseDialog`：那个是"改口令"的完整表单（新旧两个
+  /// 输入 + 轮换逻辑），这里只要一个"证明你是持口令者"的输入框。
+  Future<String?> _promptSharedPassphrase({
+    required String title,
+    required String hint,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ctrl = TextEditingController();
+    var obscure = true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Center(child: Text(title)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: l10n.chatPagePassphraseFieldHint,
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                    tooltip: obscure
+                        ? l10n.chatPagePassphraseShow
+                        : l10n.chatPagePassphraseHide,
+                    onPressed: () => setLocal(() => obscure = !obscure),
+                  ),
+                ),
+                onSubmitted: (_) => Navigator.of(ctx).pop(true),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+    final text = ctrl.text.trim();
+    ctrl.dispose();
+    if (ok != true || text.isEmpty) return null;
+    return text;
+  }
+
+  /// 空间成员（群聊一期 2026-10-03）：成员名单 + 邀请/找回入口。
   ///
   /// 入口语义（2026-10-04 定稿：**没有升格**，mode 创建时定死）：
   /// - **邀请伴侣**（duo 且还没第二个人）＝ `invite` token（开新身份）；
@@ -2282,27 +2362,70 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           Text('${entranceCounts![e.key]}',
                               style: TextStyle(
                                   fontSize: 13, color: scheme.onSurfaceVariant)),
-                          const SizedBox(width: 8),
                         ],
-                        if (e.key == _myMemberId)
+                        if (e.key == _myMemberId) ...[
+                          const SizedBox(width: 8),
                           Text(l10n.chatPageMembersMe,
                               style: TextStyle(
                                   fontSize: 12, color: scheme.onSurfaceVariant)),
+                        ] else if (_isGroup) ...[
+                          const SizedBox(width: 4),
+                          // 群空间：每个成员一行「找回」——他丢了/换了设备时，别的成员
+                          // 能把他接回自己的身份（他没有安装，没法自己签发）。
+                          // duo 不走这里（只有一个人可找，用下面那个大按钮更清楚）。
+                          IconButton(
+                            icon: const Icon(Icons.person_add_alt_1, size: 18),
+                            tooltip: l10n.chatPageMembersRecoverTooltip,
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              // 先收起成员弹层再弹口令框（避免两层 modal 叠着）
+                              Navigator.of(ctx).pop();
+                              unawaited(_recoverMemberIdentity(
+                                  e.key, _memberNames[e.key]));
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 const SizedBox(height: 10),
-                // 邀请入口：能邀就一个按钮；不能邀就给一行说法（入口直接消失会让人
-                // 以为坏了）。duo 满 2 人与 group 满员的**原因不同**，文案也分开。
-                if (!_canInvite)
+                // 邀请 / 找回入口（2026-10-04 定稿）：
+                // - duo 还没第二个人 → 「邀请伴侣」（invite，开新身份）
+                // - duo 已有两个人 → 「重新邀请伴侣」（attach 定向到对方）——她丢了
+                //   设备时唯一的归路；**不再有"不可增加成员"的锁死提示**（那是给
+                //   "想加第三个人"的，而这一格回答的是"怎么让伴侣回来"）
+                // - group 未满 → 「邀请新成员」；满 → 只留一行说明（找回入口在成员行上）
+                if (!_isGroup && _memberCount >= 2)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FilledButton.tonalIcon(
+                        icon: const Icon(Icons.person_add_alt_1, size: 18),
+                        label: Text(l10n.chatPageMembersReinvitePartner),
+                        onPressed: () {
+                          final target = entries
+                              .where((e) => e.key != _myMemberId)
+                              .map((e) => e.key)
+                              .firstOrNull;
+                          if (target == null) return;
+                          Navigator.of(ctx).pop();
+                          unawaited(_recoverMemberIdentity(
+                              target, _memberNames[target]));
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      Text(l10n.chatPageMembersReinviteHint,
+                          style: TextStyle(
+                              fontSize: 12, color: scheme.onSurfaceVariant)),
+                    ],
+                  )
+                else if (!_canInvite)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      _isGroup
-                          ? (_maxMembers > 0
-                              ? l10n.chatPageMembersFullWithMax(_memberCount, _maxMembers)
-                              : l10n.chatPageMembersFull)
-                          : l10n.chatPageMembersDuoLocked,
+                      _maxMembers > 0
+                          ? l10n.chatPageMembersFullWithMax(_memberCount, _maxMembers)
+                          : l10n.chatPageMembersFull,
                       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                     ),
                   )
@@ -2319,13 +2442,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     },
                   ),
                 const SizedBox(height: 8),
-                // channel 入口：绑定自己身份的新设备接入
+                // 「我在其他设备接入」= attach 指向**我自己**（不需要口令：
+                // 对自己的身份动手，会话即所有权，与"自助退役"同口径）
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.devices, size: 18),
                   label: Text(l10n.chatPageMembersChannelToken),
                   onPressed: () {
                     Navigator.of(ctx).pop();
-                    unawaited(_showInviteDialog(purpose: 'channel'));
+                    unawaited(_showInviteDialog(
+                        purpose: 'attach', targetMemberId: _myMemberId));
                   },
                 ),
               ],
@@ -2333,6 +2458,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         );
       },
+    );
+  }
+
+  /// 帮某个成员**找回他的身份**（2026-10-04）：定向 attach token。
+  ///
+  /// 场景：对方丢了手机 / 重装了 App，而他自己**没有任何安装**可以自己签发——
+  /// 这时只有别的成员能把他接回来。只要空间里还有一个安装存在，这个空间就不会
+  /// 作废（这是结构性保证，不是给 duo 打的补丁）。
+  ///
+  /// 对**别人的身份**动手要共享口令（与"撤销别人的通道"同一档授权）：先要口令，
+  /// 再签码；用户取消就什么都不做。
+  Future<void> _recoverMemberIdentity(String memberId, String? memberName) async {
+    final l10n = AppLocalizations.of(context)!;
+    final who = (memberName ?? '').trim();
+    final name = who.isEmpty ? l10n.chatPageMembersUnnamed : who;
+    final passphrase = await _promptSharedPassphrase(
+      title: l10n.chatPageMembersRecoverTitle(name),
+      hint: l10n.chatPagePassphrasePromptHint,
+    );
+    if (passphrase == null || !mounted) return;
+    await _showInviteDialog(
+      purpose: 'attach',
+      targetMemberId: memberId,
+      passphrase: passphrase,
     );
   }
 

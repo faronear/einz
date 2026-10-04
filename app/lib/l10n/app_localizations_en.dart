@@ -654,6 +654,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String wizardJoinRecoverHint(String name, String target) {
+    return '$name is adding $target\'s identity to this device; existing entrances stay untouched';
+  }
+
+  @override
+  String wizardJoinRecoverHintNoName(String target) {
+    return 'This link adds $target\'s identity to this device; existing entrances stay untouched';
+  }
+
+  @override
   String get chatPageMenuMembers => 'Space members';
 
   @override
@@ -669,14 +679,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersInvitePartner => 'Invite partner';
 
   @override
+  String get chatPageMembersReinvitePartner => 'Let partner add a new device';
+
+  @override
+  String get chatPageMembersReinviteHint =>
+      'When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched';
+
+  @override
+  String get chatPageMembersRecoverTooltip =>
+      'Let them add a new device (existing entrances stay)';
+
+  @override
+  String chatPageMembersRecoverTitle(String name) {
+    return 'Create a new-device link for $name';
+  }
+
+  @override
+  String get chatPagePassphrasePromptTitle => 'Enter shared passphrase';
+
+  @override
+  String get chatPagePassphrasePromptHint =>
+      'Acting on someone else\'s identity requires the shared passphrase (same as revoking their entrance)';
+
+  @override
+  String get chatPagePassphraseFieldHint => 'Shared passphrase';
+
+  @override
+  String get chatPagePassphraseShow => 'Show';
+
+  @override
+  String get chatPagePassphraseHide => 'Hide';
+
+  @override
   String get chatPageMembersInviteNew => 'Invite new member';
 
   @override
   String get chatPageMembersChannelToken => 'Add my account on another device';
-
-  @override
-  String get chatPageMembersDuoLocked =>
-      'This is a two-person space; it cannot take more members. Create a group space for a bigger conversation';
 
   @override
   String get chatPageMembersFull => 'Group is full';

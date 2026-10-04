@@ -84,17 +84,22 @@ CREATE TABLE space_members (
 );
 
 -- 一次性加入凭证（邀请链接里的 token；**只存 SHA-256 hash**，24h 过期、用后作废）
--- 群聊一期（2026-10-03）增列：
---   purpose = 'invite'（邀请新成员，开新身份）| 'channel'（发起人设备接入）；
---   issuer_member_id = channel token 绑定的发起人身份（join 校验"仅本人可接入"；
---   存量行为 NULL，退化按"slot 已有人"放行）。
---   存量 token 无 purpose 追溯 → 回填 'channel'（保守侧）。
+-- 2026-10-03/04 增列：
+--   purpose = 'invite'（开**新身份**：邀请一个新人）| 'attach'（进**已有身份**）
+--   issuer_member_id = 签发者身份（preflight 报"是谁发的"；attach 的存量兜底）
+--   target_member_id = attach 要进入的身份：
+--     · == 签发者        → "我在另一台设备接入"
+--     · == 别的成员      → **帮对方找回身份**（他丢了/换了设备、没有安装可自己签发）
+--     · NULL + purpose=attach + 存量 issuer → 退回 issuer（那时 attach 只能指向自己）
+--   授权：attach 指向**别人**时路由层要校验共享口令（与撤销别人通道同档，见 SECURITY.md）
+--   存量 token 无 purpose 追溯 → 回填 'channel'，读取时归一成 'attach'（保守侧）
 CREATE TABLE join_tokens (
     space_id          TEXT NOT NULL REFERENCES spaces(space_id),
     token_hash        TEXT PRIMARY KEY,
     created_by_entrance TEXT NOT NULL,
     purpose           TEXT NOT NULL DEFAULT 'channel',
     issuer_member_id  TEXT,
+    target_member_id  TEXT,
     expires_at        INTEGER NOT NULL,
     used_at           INTEGER,
     created_at        INTEGER NOT NULL

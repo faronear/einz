@@ -13,7 +13,7 @@ import { test } from 'node:test'
 
 import { ApiError } from '../src/auth.js'
 import { getDb, openDb } from '../src/db.js'
-import { createSpace, createJoinToken, getSpaceMode, joinSpace } from '../src/spaces.js'
+import { createSpace, createJoinToken, getSpaceMode, joinSpace, preflightJoin } from '../src/spaces.js'
 
 /** 本文件专属进程：空配置 = 什么都不限（config.ts 首次 loadConfig 时才读）。 */
 const configDir = mkdtempSync(join(tmpdir(), 'einz-group-cfg-'))
@@ -102,19 +102,19 @@ test('invite token 带 slot → 400（不能指定 slot）', async () => {
   })
 })
 
-test('channel token：绑定发起人身份，接他人 slot → 403；接自己 → 复用身份', async () => {
+test('attach token：指向自己 = 我在新设备接入（客户端带错的 slot → 403）', async () => {
   await withDb(async () => {
     const space = await create()
     const partner = joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
     // 伴侣签 channel token（绑定伴侣身份），尝试冒充创建者 slot 0
-    const channel = createJoinToken(space.spaceId, undefined, 'channel', partner.memberId)
+    const channel = createJoinToken(space.spaceId, undefined, 'attach', partner.memberId)
     assert.throws(
       () => joinSpace(channel.joinToken, 'pk-c', 'Mac', 0),
       (e: unknown) => e instanceof ApiError && e.httpStatus === 403,
-      'channel token 不能接入他人身份',
+      '带的 slot 与 token 的目标身份不一致 → 403（防错用）',
     )
     // 绑定自己 slot → 放行（成员数不变）
-    const own = createJoinToken(space.spaceId, undefined, 'channel', partner.memberId)
+    const own = createJoinToken(space.spaceId, undefined, 'attach', partner.memberId)
     const again = joinSpace(own.joinToken, 'pk-d', 'iPad', partner.slot)
     assert.equal(again.memberId, partner.memberId, '加通道复用同一身份')
     assert.equal(again.isNewMember, false, '加通道不算新成员（不广播 member.joined）')
@@ -163,7 +163,7 @@ test('duo 满 2 人：加通道（channel）不受影响——不新增身份', 
   await withDb(async () => {
     const space = await create()
     joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
-    const channel = createJoinToken(space.spaceId, undefined, 'channel', space.creatorMemberId)
+    const channel = createJoinToken(space.spaceId, undefined, 'attach', space.creatorMemberId)
     const again = joinSpace(channel.joinToken, 'pk-c', 'Mac')
     assert.equal(again.memberId, space.creatorMemberId, '复用创建者身份')
   })
@@ -181,6 +181,75 @@ test('group（默认配置 0=不限）：invite 可扩到 4 人，slot 递增', 
     const d = joinSpace(i3.joinToken, 'pk-d', 'iPad', undefined, undefined, '小美')
     assert.equal(d.slot, 3)
     assert.equal(getSpaceMode(space.spaceId), 'group')
+  })
+})
+
+
+test('attach 指向**别人**：进入对方的身份（同 memberId/slot，不新增成员）', async () => {
+  await withDb(async () => {
+    const space = await create()
+    const b = joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小绿')
+    // B 给 A 签发"找回"链接（HTTP 层会额外要求共享口令，这里直接测领域逻辑）
+    const recover = createJoinToken(
+      space.spaceId, undefined, 'attach', b.memberId, space.creatorMemberId,
+    )
+    const back = joinSpace(recover.joinToken, 'pk-a-new', 'iPhone')
+    assert.equal(back.memberId, space.creatorMemberId, '必须回到 A 自己的身份')
+    assert.equal(back.slot, 0, '槽位不变')
+    assert.equal(back.isNewMember, false, '不是新成员')
+    // 成员数没变；A 的身份名字也没被改（attach 不写名字）
+    const row = getDb()
+      .prepare(`SELECT display_name FROM space_members WHERE space_id = ? AND slot = 0`)
+      .get(space.spaceId) as { display_name: string | null }
+    assert.equal(row.display_name, '我')
+  })
+})
+
+test('attach：目标不属于本空间 → 400；指向不存在的身份 → 400', async () => {
+  await withDb(async () => {
+    const space = await create()
+    assert.throws(
+      () => createJoinToken(space.spaceId, undefined, 'attach', space.creatorMemberId, 'ghost'),
+      (e: unknown) => e instanceof ApiError && e.httpStatus === 400,
+    )
+  })
+})
+
+test('invite 带 target → 400（两种语义不能混用，别静默忽略）', async () => {
+  await withDb(async () => {
+    const space = await create('group')
+    assert.throws(
+      () => createJoinToken(space.spaceId, undefined, 'invite', space.creatorMemberId, space.creatorMemberId),
+      (e: unknown) => e instanceof ApiError && e.httpStatus === 400,
+    )
+  })
+})
+
+test('attach 必须有目标：self 缺省 = 签发者；两者都没有 → 400', async () => {
+  await withDb(async () => {
+    const space = await create()
+    // 缺省（不传 target）→ 落到签发者自己
+    const t1 = createJoinToken(space.spaceId, undefined, 'attach', space.creatorMemberId)
+    const pre1 = preflightJoin(t1.joinToken)
+    assert.equal(pre1.purpose, 'attach')
+    assert.equal(pre1.targetIsIssuer, true)
+    assert.equal(pre1.targetName, '我')
+    // 签发者与目标都缺 → 400（无法判断进谁的身份）
+    assert.throws(
+      () => createJoinToken(space.spaceId, undefined, 'attach'),
+      (e: unknown) => e instanceof ApiError && e.httpStatus === 400,
+    )
+  })
+})
+
+test('preflight：invite 的 targetName 恒为 null（开新身份，没有"要接回的身份"）', async () => {
+  await withDb(async () => {
+    const space = await create('group')
+    const pre = preflightJoin(space.joinToken)
+    assert.equal(pre.purpose, 'invite')
+    assert.equal(pre.targetName, null)
+    assert.equal(pre.targetIsIssuer, false)
+    assert.equal(pre.inviterName, '我')
   })
 })
 

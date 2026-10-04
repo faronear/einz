@@ -36,24 +36,38 @@ function base58url(bytes: Buffer): string {
 }
 
 /** 生成一次性 join token（e1_ 前缀），写库（只存 hash），返回明文与到期时间。
- *  issuerMemberId：签发者身份——channel token 用它**绑定发起人**（join 校验
- *  "仅本人可在新设备接入"），invite token 用它给 preflight 报**精确的受邀人
- *  名字**。两种 purpose 都应当传（2026-10-04 审查）。 */
+ *
+ *  两个维度（2026-10-04 收敛，见 createJoinToken 的说明）：
+ *  - purpose：`invite` = 开**新身份**；`attach` = 进**已有身份**
+ *  - targetMemberId：attach 时"进谁的身份"（null = 存量 token，退回看 issuer）
+ *
+ *  issuerMemberId：签发者身份——attach token 用它兜存量、并给 preflight 报
+ *  精确的"是谁发的"；invite token 只用于后者。两种 purpose 都应当传。 */
 export function newJoinToken(
   spaceId: string,
   createdByEntrance: string,
-  purpose: "invite" | "channel" = "channel",
+  purpose: "invite" | "attach" = "attach",
   issuerMemberId?: string,
+  targetMemberId?: string,
 ): { token: string; hash: string; expiresAt: number } {
   const token = "e1_" + base58url(randomBytes(32));
   const hash = createHash("sha256").update(token).digest("hex");
   const expiresAt = Date.now() + TOKEN_TTL_MS;
   getDb()
     .prepare(
-      `INSERT INTO join_tokens (space_id, token_hash, created_by_entrance, purpose, issuer_member_id, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO join_tokens (space_id, token_hash, created_by_entrance, purpose, issuer_member_id, target_member_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(spaceId, hash, createdByEntrance, purpose, issuerMemberId ?? null, expiresAt, Date.now());
+    .run(
+      spaceId,
+      hash,
+      createdByEntrance,
+      purpose,
+      issuerMemberId ?? null,
+      targetMemberId ?? null,
+      expiresAt,
+      Date.now(),
+    );
   return { token, hash, expiresAt };
 }
 
@@ -252,18 +266,26 @@ export function preflightJoin(
   status: string;
   mode: string;
   memberCount: number;
-  /** token 类型（群聊一期 2026-10-03）：invite=新成员加入（自填名字）；
-   *  channel=发起人的新设备接入（身份由链接绑定）。客户端据此分流向导。 */
-  purpose: "invite" | "channel";
-  /** 受邀人（token 签发者）显示名——invite 显示"XX 邀请你"，channel 显示
-   *  "XX 的设备接入"。 */
+  /** token 类型（2026-10-04 收敛）：
+   *  - `invite` = 开**新身份**（新成员加入，自己填名字；受人数上限约束）
+   *  - `attach` = 进**已有身份**（我在新设备接入 / 帮别人找回身份） */
+  purpose: "invite" | "attach";
+  /** 签发者显示名——invite 显示"XX 邀请你"，attach 显示"XX 的链接"。 */
   inviterName: string | null;
+  /** attach 时"要进入的那个身份"的显示名（invite 恒为 null）。
+   *  客户端据此显示「回到 <名字> 的身份」并**跳过填名字那一步**（那是同一个身份，
+   *  名字已经有了；要改走菜单里的「我的身份」）。 */
+  targetName: string | null;
+  /** attach 的目标是不是**签发者自己**（true = "我在另一台设备接入"；
+   *  false = "别人帮我找回"）。客户端据此选文案——不能靠名字比字符串：
+   *  同名成员是允许的。 */
+  targetIsIssuer: boolean;
   slots: { slot: number; displayName: string | null; gender: string | null; status: string }[];
 } {
   const hash = createHash("sha256").update(token).digest("hex");
   const tk = getDb()
     .prepare(
-      `SELECT space_id, expires_at, used_at, purpose, issuer_member_id FROM join_tokens WHERE token_hash = ?`,
+      `SELECT space_id, expires_at, used_at, purpose, issuer_member_id, target_member_id FROM join_tokens WHERE token_hash = ?`,
     )
     .get(hash) as {
     space_id: string;
@@ -271,6 +293,7 @@ export function preflightJoin(
     used_at: number | null;
     purpose: string;
     issuer_member_id: string | null;
+    target_member_id: string | null;
   } | undefined;
   if (!tk) throw new ApiError("TOKEN_INVALID", "invalid join token", 400);
   if (tk.used_at != null) throw new ApiError("TOKEN_USED", "join token already used", 410);
@@ -303,38 +326,53 @@ export function preflightJoin(
   const memberCount = slots.filter((s) => s.status === "active").length;
   // 受邀人名字：**精确取签发者**（join_tokens.issuer_member_id → space_members
   // .display_name）。created_by_entrance 存的是角色字面量（"creator"/"member"，
-  // 见 createSpace），追溯不到人——2026-10-04 审查改为签发时一律回填 issuer
-  // （invite/channel 都记），确认页才不会把 B 发的邀请显示成 A 的名字。
+  // 见 createSpace），追溯不到人——2026-10-04 审查改为签发时一律回填 issuer，
+  // 确认页才不会把 B 发的邀请显示成 A 的名字。
   // 存量/无 issuer 的 token 退回"第一个有名字的 active 成员"近似。
-  const issuerName =
-    tk.issuer_member_id == null
+  const nameOfMember = (memberId: string | null): string | null =>
+    memberId == null
       ? null
       : ((
           getDb()
             .prepare(
               `SELECT display_name FROM space_members WHERE space_id = ? AND member_id = ?`,
             )
-            .get(tk.space_id, tk.issuer_member_id) as { display_name: string | null } | undefined
+            .get(tk.space_id, memberId) as { display_name: string | null } | undefined
         )?.display_name ?? null);
   const inviterName =
-    issuerName ??
+    nameOfMember(tk.issuer_member_id) ??
     slots.find((s) => s.status === "active" && s.displayName != null)?.displayName ??
     null;
+  const purpose: "invite" | "attach" = tk.purpose === "invite" ? "invite" : "attach";
+  // attach 的目标身份：新的看 target_member_id（可指向别人 = 帮对方找回）；
+  // 存量老 token（target NULL）退回 issuer_member_id（那时只能指向自己）
+  const attachTargetId =
+    purpose === "attach" ? (tk.target_member_id ?? tk.issuer_member_id) : null;
   return {
     spaceId: tk.space_id,
     status: sp.status,
     mode: sp.mode === "group" ? "group" : "duo",
     memberCount,
-    purpose: tk.purpose === "invite" ? "invite" : "channel",
+    purpose,
     inviterName,
+    // attach 的目标身份：新的看 target_member_id，存量老 token 退回 issuer（那时候
+    // "attach 只能指向自己"）
+    targetName: purpose === "attach"
+      ? (nameOfMember(tk.target_member_id ?? tk.issuer_member_id) ??
+         slots.find((s) => s.displayName != null)?.displayName ??
+         null)
+      : null,
+    targetIsIssuer:
+      purpose === "attach" &&
+      attachTargetId != null &&
+      attachTargetId === tk.issuer_member_id,
     slots,
   };
 }
 
 /** 加入 Space：事务内消费 token（未用/未过期/未满员）并插入第二位成员；
  *  满员后空间转 active。U3：加入通道登记（entrances，服务端分配 UUID）并签发
- *  绑定该 Space 的 session——加入后可立即进聊天（PROTOCOL_MULTIVERSE.md §4.1）。 */
-export function joinSpace(
+ *  绑定该 Space 的 session——加入后可立即进聊天（PROTOCOL_MULTIVERSE.md §4.1）。 */export function joinSpace(
   token: string,
   publicKey: string,
   entranceName?: string,
@@ -358,29 +396,36 @@ export function joinSpace(
   }
   const hash = createHash("sha256").update(token).digest("hex");
   const tk = getDb()
-    .prepare(`SELECT space_id, expires_at, used_at, purpose, issuer_member_id FROM join_tokens WHERE token_hash = ?`)
+    .prepare(`SELECT space_id, expires_at, used_at, purpose, issuer_member_id, target_member_id FROM join_tokens WHERE token_hash = ?`)
     .get(hash) as {
     space_id: string;
     expires_at: number;
     used_at: number | null;
     purpose: string;
     issuer_member_id: string | null;
+    target_member_id: string | null;
   } | undefined;
   if (!tk) throw new ApiError("TOKEN_INVALID", "invalid join token", 400);
   if (tk.used_at != null) throw new ApiError("TOKEN_USED", "join token already used", 410);
   if (tk.expires_at < Date.now()) throw new ApiError("TOKEN_EXPIRED", "join token expired", 410);
-  // purpose × slot 显式语义（群聊一期 2026-10-03，方案 B）：
-  // - invite → 必须不带 slot（开新身份，自填名字）；带 slot 属客户端错用
-  // - channel → 身份由 token 绑定（issuer_member_id）：客户端**不需要**带 slot
-  //   （发起人 slot 服务端自己查得出）；带了则必须与绑定一致（防错用）。
-  //   存量 token（issuer NULL、purpose=channel 回填）退化要求带 slot（无绑定可查）。
-  const purpose: "invite" | "channel" = tk.purpose === "invite" ? "invite" : "channel";
+  // purpose × slot 显式语义（2026-10-04 收敛为两种）：
+  // - invite → 开新身份：**必须不带 slot**（服务端分配最小空槽、生成新 member_id）
+  // - attach → 进已有身份：身份由 token 的 target_member_id 决定（客户端**不需要**
+  //   知道 slot 这个内部概念）；客户端显式带 slot 时必须与目标一致（防错用）。
+  //   存量老 token（purpose='channel' 回填、target NULL）退回看 issuer_member_id；
+  //   两者都没有（更老的库）才要求客户端带 slot。
+  const purpose: "invite" | "attach" = tk.purpose === "invite" ? "invite" : "attach";
+  // attach 要进入的目标身份：新 token 看 target_member_id（可指向**别人**——
+  // 帮丢了设备的成员找回身份）；存量老 token（target NULL）退回 issuer_member_id
+  // （那时 attach 只能指向签发者自己）。
+  const attachTargetId =
+    purpose === "attach" ? (tk.target_member_id ?? tk.issuer_member_id) : null;
   if (purpose === "invite" && slot != null) {
     throw new ApiError("INVALID_REQUEST", "invite token 不能指定 slot（将开新身份）", 400);
   }
   // 新成员自填的名字同样过白名单（2026-10-04 补：create 一直在校验 creator_name，
   // 而 join 这条"名字也是用户手输"的路径此前漏了——CLI/手搓请求能塞进任意串）。
-  // 只有传了才校验（与 create 同口径：必填由客户端引导负责）。
+  // attach **不该**带名字：那是已有身份，名字早就有了（要改走 /members/name）。
   if (memberDisplayName != null) assertMemberName(memberDisplayName);
 
   const doJoin = getDb().transaction(() => {
@@ -410,19 +455,19 @@ export function joinSpace(
     let chosenSlot: number;
     let isExistingIdentity = false;
     let member: { member_id: string | null; status: string } | undefined;
-    if (slot != null || (purpose === "channel" && tk.issuer_member_id != null)) {
-      // channel：身份由 token 绑定（issuer）→ 服务端自动解析发起人 slot（客户端
-      // 无需知道 slot 这个内部概念）；客户端显式带 slot 时必须与绑定一致（防错用）。
-      // 存量 channel token（issuer NULL）必须由客户端带 slot（无绑定可查）。
-      if (purpose === "channel" && tk.issuer_member_id != null) {
+    if (slot != null || (purpose === "attach" && attachTargetId != null)) {
+      // attach：身份由 token 的 target 决定 → 服务端自动解析它的 slot（客户端
+      // 无需知道 slot 这个内部概念）；客户端显式带 slot 时必须与目标一致（防错用）。
+      // 存量 attach token（target/issuer 皆为 NULL）才需要客户端带 slot。
+      if (purpose === "attach" && attachTargetId != null) {
         const bound = getDb()
           .prepare(`SELECT slot FROM space_members WHERE space_id = ? AND member_id = ?`)
-          .get(tk.space_id, tk.issuer_member_id) as { slot: number } | undefined;
+          .get(tk.space_id, attachTargetId) as { slot: number } | undefined;
         if (!bound) {
-          throw new ApiError("INVALID_REQUEST", "channel token 的绑定身份已不存在", 403);
+          throw new ApiError("INVALID_REQUEST", "这条链接指向的身份已不存在", 403);
         }
         if (slot != null && Math.floor(slot) !== bound.slot) {
-          throw new ApiError("INVALID_REQUEST", "channel token 与身份不匹配（仅发起人本人可接入）", 403);
+          throw new ApiError("INVALID_REQUEST", "这条链接与指定身份不匹配", 403);
         }
         chosenSlot = bound.slot;
       } else {
@@ -432,7 +477,7 @@ export function joinSpace(
         .prepare(`SELECT member_id, status FROM space_members WHERE space_id = ? AND slot = ?`)
         .get(tk.space_id, chosenSlot) as { member_id: string | null; status: string } | undefined;
       if (!existing || existing.member_id == null) {
-        throw new ApiError("INVALID_REQUEST", "该 slot 无已有成员（加通道需绑定已有身份）", 400);
+        throw new ApiError("INVALID_REQUEST", "该 slot 无已有成员（进已有身份需绑定已有身份）", 400);
       }
       isExistingIdentity = true;
       member = existing;
@@ -611,33 +656,63 @@ export function joinSpace(
 }
 
 /** 生成一次性开通码（英文仍称 token；成员认证由 U1 Space-scoped session 补齐）。
- *  purpose（群聊一期 2026-10-03，方案 B）：
- *  - 'invite'：邀请新成员（新身份，自己填名字）；
- *  - 'channel'：发起人在新设备加通道（绑定发起人身份，仅本人可用）。
+ *
+ *  两种 purpose（2026-10-04 收敛，替掉原来的 invite/channel）：
+ *  - `invite`：开**新身份**（邀请一个新人进来，自己填名字）。受人数上限约束——
+ *    duo 满 2 人一律 DUO_FULL（双人秘境永远不会有第三个人）。
+ *  - `attach`：进**已有身份**。targetMemberId 指向谁就进谁：
+ *    · == 签发者自己 → "我在另一台设备接入"（原 channel）
+ *    · == 别人 → **帮对方找回身份**（他丢了/换了设备，而他没有安装可自己签发）
+ *    这条能力让"只要还有一个安装存在，空间就永续"成为结构性的保证，而不是
+ *    给 duo 打的补丁（group 里成员丢设备同样适用）。
  *
  *  **签发不做任何空间级副作用**（2026-10-04 老板拍板取消升格）：早期版本在这里
  *  做 duo → group 自动升格，导致"我只是想邀请个人"会静默把空间变成不可逆的群、
- *  还掐掉通话能力。现在 mode 创建时就定死了，这里只发码。 */
+ *  还掐掉通话能力。现在 mode 创建时就定死了，这里只发码。
+ *
+ *  对**别人的身份**动手（attach 指向他人）需要调用方先校验共享口令——与"撤销
+ *  别人的通道"同一档授权，见 app.ts 的 /join-tokens 路由。 */
 export function createJoinToken(
   spaceId: string,
   baseUrl?: string, // 邀请链接 base（按请求真实 Host 生成，2026-09-11）
-  purpose: "invite" | "channel" = "channel",
-  issuerMemberId?: string, // 签发者身份（channel token 绑定用；由调用层从 session 取）
+  purpose: "invite" | "attach" = "attach",
+  issuerMemberId?: string, // 签发者身份（由调用层从 session 取）
+  targetMemberId?: string, // attach 的目标身份；缺省 = 签发者自己
 ): { joinToken: string; link: string; expiresAt: number } {
   const sp = getDb()
     .prepare(`SELECT mode FROM spaces WHERE space_id = ?`)
     .get(spaceId) as { mode: string } | undefined;
   if (!sp) throw new ApiError("SPACE_NOT_FOUND", "space not found", 404);
-  // 兜底：duo 满 2 人的空间**签不出 invite**（永远不会有第三个人进来）。
+  let target: string | undefined;
+  if (purpose === "attach") {
+    target = targetMemberId ?? issuerMemberId;
+    if (target == null) {
+      throw new ApiError("INVALID_REQUEST", "attach token 必须指明要进入的身份", 400);
+    }
+    // 目标必须是**本空间的成员**（否则等于给一个不存在的身份发码；也挡住
+    // "拿别的空间的 member_id 来试"这种越权探测）
+    const ok = getDb()
+      .prepare(`SELECT 1 FROM space_members WHERE space_id = ? AND member_id = ?`)
+      .get(spaceId, target);
+    if (!ok) {
+      throw new ApiError("INVALID_REQUEST", "目标身份不属于本空间", 400);
+    }
+  } else if (targetMemberId != null) {
+    // invite 是"开新身份"，带 target 说明客户端把两种语义搞混了 → 明确报错，
+    // 不要静默忽略（静默忽略会让客户端以为"定向成功"）
+    throw new ApiError("INVALID_REQUEST", "invite token 不能指定目标身份", 400);
+  }
+  // 兜底：duo 满 2 人的空间**签不出开新身份的 invite**（永远不会有第三个人进来）。
   // 客户端已经隐藏这个入口，这里防的是老客户端/手搓请求——让它当场拿到明确
   // 错误，而不是拿着一张注定 join 失败的码去分享。
+  // 注意：**attach 不受此限**——"帮对方找回身份"必须永远可用（2026-10-04）。
   if (purpose === "invite" && sp.mode !== "group" && countActiveMembers(spaceId) >= 2) {
     throw new ApiError(
       "DUO_FULL",
-      "这是双人秘境，成员已满（2 人）——需要更多人请另建群组秘境",
+      "这是双人秘境，不可增加成员——需要更多人请另建群组秘境",
       409,
     );
   }
-  const t = newJoinToken(spaceId, "member", purpose, issuerMemberId);
+  const t = newJoinToken(spaceId, "member", purpose, issuerMemberId, target);
   return { joinToken: t.token, link: (baseUrl ?? DEFAULT_LINK_BASE) + "/join/" + t.token, expiresAt: t.expiresAt };
 }

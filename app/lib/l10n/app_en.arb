@@ -302,6 +302,10 @@
   "wizardJoinInviteHint": "{name} invited you to this space ({count} members)",
   "wizardJoinInviteHintNoName": "You were invited to this space ({count} members)",
   "wizardJoinChannelHint": "This link adds {name}'s own account on another device",
+  "wizardJoinRecoverHint": "{name} is adding {target}'s identity to this device; existing entrances stay untouched",
+  "wizardJoinRecoverHintNoName": "This link adds {target}'s identity to this device; existing entrances stay untouched",
+  "@wizardJoinRecoverHint": {"placeholders": {"name": {"type": "String"}, "target": {"type": "String"}}},
+  "@wizardJoinRecoverHintNoName": {"placeholders": {"target": {"type": "String"}}},
   "@wizardJoinInviteHint": {
     "placeholders": {
       "name": {
@@ -331,9 +335,18 @@
   "chatPageMembersMe": "Me",
   "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvitePartner": "Invite partner",
+  "chatPageMembersReinvitePartner": "Let partner add a new device",
+  "chatPageMembersReinviteHint": "When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched",
+  "chatPageMembersRecoverTooltip": "Let them add a new device (existing entrances stay)",
+  "chatPageMembersRecoverTitle": "Create a new-device link for {name}",
+  "@chatPageMembersRecoverTitle": {"placeholders": {"name": {"type": "String"}}},
+  "chatPagePassphrasePromptTitle": "Enter shared passphrase",
+  "chatPagePassphrasePromptHint": "Acting on someone else's identity requires the shared passphrase (same as revoking their entrance)",
+  "chatPagePassphraseFieldHint": "Shared passphrase",
+  "chatPagePassphraseShow": "Show",
+  "chatPagePassphraseHide": "Hide",
   "chatPageMembersInviteNew": "Invite new member",
   "chatPageMembersChannelToken": "Add my account on another device",
-  "chatPageMembersDuoLocked": "This is a two-person space; it cannot take more members. Create a group space for a bigger conversation",
   "chatPageMembersFull": "Group is full",
   "chatPageMembersFullWithMax": "Space is full ({current}/{max})",
   "@chatPageMembersFullWithMax": {

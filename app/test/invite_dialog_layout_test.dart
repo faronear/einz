@@ -60,6 +60,8 @@ class _InviteFakeApi extends ApiClient {
     String spaceId,
     String token, {
     required String purpose,
+    String? targetMemberId,
+    String? passphrase,
   }) async =>
       const JoinTokenResult(
         joinToken: 'e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789',

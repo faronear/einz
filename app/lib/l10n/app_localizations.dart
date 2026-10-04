@@ -1226,6 +1226,18 @@ abstract class AppLocalizations {
   /// **'This link adds {name}\'s own account on another device'**
   String wizardJoinChannelHint(String name);
 
+  /// No description provided for @wizardJoinRecoverHint.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is adding {target}\'s identity to this device; existing entrances stay untouched'**
+  String wizardJoinRecoverHint(String name, String target);
+
+  /// No description provided for @wizardJoinRecoverHintNoName.
+  ///
+  /// In en, this message translates to:
+  /// **'This link adds {target}\'s identity to this device; existing entrances stay untouched'**
+  String wizardJoinRecoverHintNoName(String target);
+
   /// No description provided for @chatPageMenuMembers.
   ///
   /// In en, this message translates to:
@@ -1256,6 +1268,60 @@ abstract class AppLocalizations {
   /// **'Invite partner'**
   String get chatPageMembersInvitePartner;
 
+  /// No description provided for @chatPageMembersReinvitePartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Let partner add a new device'**
+  String get chatPageMembersReinvitePartner;
+
+  /// No description provided for @chatPageMembersReinviteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched'**
+  String get chatPageMembersReinviteHint;
+
+  /// No description provided for @chatPageMembersRecoverTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Let them add a new device (existing entrances stay)'**
+  String get chatPageMembersRecoverTooltip;
+
+  /// No description provided for @chatPageMembersRecoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new-device link for {name}'**
+  String chatPageMembersRecoverTitle(String name);
+
+  /// No description provided for @chatPagePassphrasePromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter shared passphrase'**
+  String get chatPagePassphrasePromptTitle;
+
+  /// No description provided for @chatPagePassphrasePromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Acting on someone else\'s identity requires the shared passphrase (same as revoking their entrance)'**
+  String get chatPagePassphrasePromptHint;
+
+  /// No description provided for @chatPagePassphraseFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared passphrase'**
+  String get chatPagePassphraseFieldHint;
+
+  /// No description provided for @chatPagePassphraseShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get chatPagePassphraseShow;
+
+  /// No description provided for @chatPagePassphraseHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get chatPagePassphraseHide;
+
   /// No description provided for @chatPageMembersInviteNew.
   ///
   /// In en, this message translates to:
@@ -1267,12 +1333,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add my account on another device'**
   String get chatPageMembersChannelToken;
-
-  /// No description provided for @chatPageMembersDuoLocked.
-  ///
-  /// In en, this message translates to:
-  /// **'This is a two-person space; it cannot take more members. Create a group space for a bigger conversation'**
-  String get chatPageMembersDuoLocked;
 
   /// No description provided for @chatPageMembersFull.
   ///
