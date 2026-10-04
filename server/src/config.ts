@@ -30,24 +30,40 @@ export interface ServerConfig {
    *  与 maxEntrancesPerSpace 互补：那道闸管"通道总量"（含已撤销、防刷），这道闸
    *  管"身份总量"（同身份多通道不重复计数）。 */
   max_members_per_space: number;
+  /** 服务端要求的最低 App 版本（serverConfig.json 的 minAppVersion）。
+   *  **格式 yymm.ddhh.mm**（见 scripts/appVersion.js，UTC）——与 App 自身的
+   *  CFBundleShortVersionString / versionName 是同一个串，客户端可直接比大小。
+   *  null = 不设下限（默认）。用途（2026-10-04）：客户端启动时核对，低于它就在
+   *  首屏弹**不可关闭**的升级窗口——"服务端已经不支持你这个客户端了"。
+   *  为什么不用 protocol_version 代替：那是 wire 兼容闸（服务端会硬拒），
+   *  这个是**产品级**闸——比如某个版本有安全缺陷、或协议还能用但功能已不可靠，
+   *  运维改配置即可把旧客户端挡在门外，不必动代码。 */
+  min_app_version: string | null;
+  /** 升级入口 URL（serverConfig.json 的 appDownloadUrl）：下发到客户端，
+   *  供强制升级窗口里的「下载新版本」按钮使用。null = 不给链接（客户端只显示版本信息）。 */
+  app_download_url: string | null;
 }
 
 /** 读取 serverConfig.json（默认 server/config/serverConfig.json——本机配置
  *  不入 git；可用环境变量 `EINZ_CONFIG` 指向别处，Docker 部署靠它读挂载进来的
  *  /config/serverConfig.json，两种形态都是"config/ 目录 + 同名文件"）。
  *  服务端每次启动读取一次（改配置需重启生效；文件缺失或解析失败按默认值处理）。
- *  当前支持字段：maxSpaces、maxEntrancesPerSpace。 */
-let fileConfigCache: { maxSpaces?: number; maxEntrancesPerSpace?: number; maxMembersPerSpace?: number } | null = null;
-function readFileConfig(): { maxSpaces?: number; maxEntrancesPerSpace?: number; maxMembersPerSpace?: number } {
+ *  当前支持字段：maxSpaces、maxEntrancesPerSpace、maxMembersPerSpace、
+ *  minAppVersion、appDownloadUrl。 */
+interface FileConfig {
+  maxSpaces?: number;
+  maxEntrancesPerSpace?: number;
+  maxMembersPerSpace?: number;
+  minAppVersion?: string;
+  appDownloadUrl?: string;
+}
+let fileConfigCache: FileConfig | null = null;
+function readFileConfig(): FileConfig {
   if (fileConfigCache != null) return fileConfigCache;
   const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../config/serverConfig.json");
   if (existsSync(path)) {
     try {
-      fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as {
-        maxSpaces?: number;
-        maxEntrancesPerSpace?: number;
-        maxMembersPerSpace?: number;
-      };
+      fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as FileConfig;
     } catch (e) {
       console.warn(`[einz] serverConfig.json 解析失败（按默认配置继续）: ${e}`);
       fileConfigCache = {};
@@ -73,12 +89,24 @@ export function loadConfig(): ServerConfig {
     typeof fc.maxMembersPerSpace === "number" && fc.maxMembersPerSpace >= 0
       ? Math.floor(fc.maxMembersPerSpace)
       : 0;
+  // 版本号两条都按"非空字符串才算设了"处理：空串/非字符串一律当没配（别把
+  // 手滑写空当成"要求所有客户端升级"）
+  const minAppVersion =
+    typeof fc.minAppVersion === "string" && fc.minAppVersion.trim().length > 0
+      ? fc.minAppVersion.trim()
+      : null;
+  const appDownloadUrl =
+    typeof fc.appDownloadUrl === "string" && fc.appDownloadUrl.trim().length > 0
+      ? fc.appDownloadUrl.trim()
+      : null;
   return {
     protocol_version: "v2-multiverse",
     capabilities: ["spaces", "join-tokens"],
     max_spaces: maxSpaces,
     max_entrances_per_space: maxEntrancesPerSpace,
     max_members_per_space: maxMembersPerSpace,
+    min_app_version: minAppVersion,
+    app_download_url: appDownloadUrl,
   };
 }
 

@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'brand_logo.dart';
@@ -12,6 +14,7 @@ import 'data/server_config.dart';
 import 'l10n/app_localizations.dart';
 import 'lock_page.dart';
 import 'setup_page.dart';
+import 'widgets/version_gate.dart';
 
 /// Einz 移动端（及桌面端）入口。
 ///
@@ -188,6 +191,14 @@ class _StartupGateState extends State<StartupGate> {
   void initState() {
     super.initState();
     _check();
+    // 版本闸（2026-10-04）：核对服务端要求的最低 App 版本，不被支持就弹关不掉的
+    // 升级窗口。放在首屏（所有入口——锁屏 / 向导 / 直接进聊天——都先经过这里），
+    // 且**不 await**：探测在后台跑（3s 超时），正常客户端冷启动不受影响。
+    // 语言尚未就绪时 showDialog 会拿默认 locale，可接受——这扇窗只在极少数
+    // "客户端已过期"的场景出现，文案错过一次语言不影响"必须升级"这个指令。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(checkVersionGate(context));
+    });
   }
 
   Future<void> _check() async {

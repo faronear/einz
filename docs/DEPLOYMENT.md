@@ -74,9 +74,9 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server http://localhost:3000
 dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 ```
 
-选 `j` 加入 → 粘贴 A 给的邀请链接（或开通码）→ 选择自己是哪一个身份（1/2）→
-输入 A 设置的共享口令（用它从口令密保箱取回 Space Key，同时完成通道登记 + 签发会话）→
-进入会话。
+选 `j` 加入 → 粘贴 A 给的邀请链接（或开通码）→ **填写自己的名字/性别**（v3 起不再
+让人在名单里选身份：身份由链接本身决定）→ 输入 A 设置的共享口令（用它从口令密保箱取回
+Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 
 > `server/config/serverConfig.json`（不入 git，可选）里 `maxSpaces` 控制**新空间数量上限**：
 > `0`=不限、`1`=退回单空间、`n`=最多 n 个；改后重启生效。当前为 `0` 时服务端启动会打一条
@@ -86,6 +86,19 @@ dart run bin/einz_tui.dart --store /tmp/b.json --server http://localhost:3000
 > `n`=该秘境最多 n 条通道，**防滥用**（一个秘境被灌进成百上千条通道会白吃存储与推送）。
 > 计数**含已撤销/已销毁的通道**（这些行只在库里被标记、不删除）——销毁不退额度，否则
 > "反复开通→销毁"可无限刷。超限加入时返回 `ENTRANCE_LIMIT_REACHED`（409）。改后重启生效。
+
+> 同一文件里的 `maxMembersPerSpace` 控制**单空间成员（身份）数量上限**：`0`=不限、`n`=最多
+> n 个身份（建议 4）。注意**双人秘境恒为 2 人**、与这个值无关（空间类型在创建时选定、不可改，
+> 详见 `aimemo/groupChatDesign.md`）；超限加入返回 `SPACE_FULL`（409）。
+>
+> **强制升级闸（2026-10-04）**：`minAppVersion` 声明**服务端支持的最低 App 版本**，格式
+> `yymm.ddhh.mm`（UTC，与 App 打包时注入的版本号是同一个串，见 `scripts/appVersion.js`），
+> 例如 `"2610.0412.30"`；空串/不填 = 不设下限（默认）。低于它的客户端**启动时在首屏弹
+> 不可关闭的升级窗口**（`/health` 下发 `min_app_version`）。配套的 `appDownloadUrl` 是升级
+> 窗口里「下载新版本」按钮的目标 URL（不填则只显示版本信息、不给按钮）。改后重启生效。
+> 用途：某个客户端版本有安全缺陷、或协议虽还能用但功能已不可靠时，改配置就能把旧客户端
+> 挡在门外，不必动代码。**开发时若连着配了闸门的服务器**，用
+> `--dart-define=SKIP_VERSION_GATE=true` 跑本地包。
 
 ### 2.3 双端收发
 

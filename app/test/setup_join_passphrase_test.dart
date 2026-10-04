@@ -11,6 +11,7 @@ import 'package:einz_shared/einz_shared.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
+import 'package:einz/data/server_config.dart';
 
 /// 假 escrow：口令匹配返回 payload，不匹配抛 FormatException（模拟解密失败），
 /// payload 为 null 表示未托管。
@@ -57,7 +58,8 @@ Future<void> pumpToJoinToken(
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+      probeServer: (_) async => const ServerHealth(
+          ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
       preflightOverride: preflight ??
           (token) async => const SpaceJoinPreflight(
               spaceId: 'space-test',

@@ -11046,5 +11046,43 @@ invite 只会去开第三个身份，撞 DUO_FULL；channel token 只能绑签�
 安装就没人能签发入口，这是 Space Key 模型的固有边界。建议写进产品 FAQ，并提醒用户
 口令别只存在一个人的脑子里。
 
+---
 
+## 2026-10-04（四）启动时的强制升级闸（`minAppVersion`）
 
+老板去真机测 duo，同时把待办里的"启动时强制升级"交给我做。
+
+**为什么要它**（与 `PROTOCOL_VERSION` 的分工）：协议版本是 **wire 兼容闸**——不符就
+400 / WS 4400 硬拒，客户端表现是"什么都用不了但不知道为什么"；这道闸是 **产品级闸**：
+协议也许还能用，但某个客户端版本有安全缺陷、或功能已不可靠时，运维**改一行配置**就能
+把旧客户端挡在门外，不必改代码、不必发新版。顺带把"协议不符"这种硬故障变成一句人话。
+
+**版本号从哪来**（这次才看清）：不是 pubspec 里那个写死的 `0.0.0`，而是打包时由
+`scripts/appVersion.js` 注入的 **`yymm.ddhh.mm`（UTC）**——iOS/macOS 的
+CFBundleShortVersionString、Android 的 versionName 都是它。时间戳式、天然单调，
+正好当"最低版本"用；跨时区打包也不会出现"后打的包版本更小"。
+
+**落地**：
+- 服务端：`serverConfig.json` 加 `minAppVersion`（空串=不设下限）+ `appDownloadUrl`；
+  `/health` **配了才下发**这两个键（空串一律当没配——防手滑写空把所有人挡在门外）
+- App：新增 `lib/widgets/version_gate.dart`
+  - `compareAppVersions()` **逐段按整数**比（不是字符串比：`2610.100.00` < `2610.0959.00`，
+    字符串会得出相反结论）；段数不齐缺的当 0、解析不出的段当 0（服务端配置手写，
+    不该让客户端崩）
+  - `isAppVersionUnsupported()`：本机版本为空（拿不到包信息）或服务端不设下限 → **不拦**
+    （宁可漏拦，不误拦；把用户锁在门外是更糟的错误）
+  - 挂在 `main.dart` 的 `StartupGate.initState`（首屏、所有入口都经过它），**不 await**：
+    探测在首帧后异步跑，正常客户端冷启动不受影响；探不通（离线/服务器挂了）**不弹**
+    ——离线仍能看历史，这是产品承诺
+  - 窗口 `barrierDismissible: false` + `PopScope(canPop: false)`，关不掉；
+    唯一出口是「重新检查」（运维改回配置/刚推新包后不必杀进程）与「下载新版本」
+- 开发逃生口：`--dart-define=SKIP_VERSION_GATE=true`（开发包版本是 `0.0.0`，连着配了
+  闸门的服务器会被自己挡住）
+- 顺手修：`DEPLOYMENT.md` 里 TUI 加入流程还写着"选择自己是哪一个身份（1/2）"（v3 已删）
+
+**顺带重构**：探针返回值从 3 元位置元组改成 `ServerHealth` 类（加了两个字段后 5 元，
+读写两边都数不清）——setup_page 两处调用点与 7 个测试 fake 同步。
+
+**验证**：`server/test/min_app_version.test.ts` 3 条（配了/空串/只配版本不配链接）；
+`app/test/version_gate_test.dart` 7 条纯逻辑（含"字符串比较会错"的那一例）；全量
+`npm test` 绿；`flutter analyze` / `dart analyze` 干净。弹窗 UI 仍由老板真机自测。

@@ -30,6 +30,7 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz_shared/einz_shared.dart';
+import 'package:einz/data/server_config.dart';
 
 // golden 固定设备密钥对：登记/认证等步骤需要确定性密钥，真实随机密钥会使
 // golden 每次渲染不同而失配；测试注入固定值保证确定性。
@@ -142,7 +143,7 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('zh'),
-      home: SetupPage(db: db, probeServer: (_) async => (false, '', const <String>[])),
+      home: SetupPage(db: db, probeServer: (_) async => const ServerHealth()),
     ));
     await tester.pump();
     await expectLater(find.byType(SetupPage), matchesGoldenFile('goldens/setup_step1_detect.png'));
@@ -231,7 +232,8 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => (probeOk, '', const <String>[]),
+        probeServer: (_) async => ServerHealth(
+            ok: probeOk, protocolVersion: '', capabilities: const <String>[]),
         authOverride: auth,
         keyPairOverride: keyPair,
       ),

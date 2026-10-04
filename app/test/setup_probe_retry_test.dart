@@ -27,7 +27,10 @@ void main() {
         // 第一次探测失败（服务端不可达），之后成功（服务器就绪）
         probeServer: (_) async {
           probeCalls++;
-          return (probeCalls > 1, 'v2-multiverse', const <String>[]);
+          return ServerHealth(
+              ok: probeCalls > 1,
+              protocolVersion: 'v2-multiverse',
+              capabilities: const <String>[]);
         },
       ),
     ));
@@ -72,8 +75,10 @@ void main() {
         // 主域名永远不通，备用域名（候选第二项）通
         probeServer: (server) async {
           probed.add(server);
-          final ok = server == kServerCandidates[1];
-          return (ok, 'multiverse', const <String>[]);
+          return ServerHealth(
+              ok: server == kServerCandidates[1],
+              protocolVersion: 'multiverse',
+              capabilities: const <String>[]);
         },
       ),
     ));

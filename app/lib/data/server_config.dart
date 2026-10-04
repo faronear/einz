@@ -75,7 +75,7 @@ bool get isDevServer => !kServerCandidates.contains(effectiveServer);
 /// 覆盖过的情况下传 null 会把开发地址冲掉（调用方负责判 [isDevServer]）。
 Future<String> resolveServer(
   String? argServer, {
-  Future<(bool, String, List<String>)> Function(String server)? probe,
+  Future<ServerHealth> Function(String server)? probe,
 }) async {
   final probeServerFn = probe ?? probeServer;
   if (argServer != null && argServer.isNotEmpty) return argServer;
@@ -87,7 +87,7 @@ Future<String> resolveServer(
   var pending = kServerCandidates.length;
   for (final candidate in kServerCandidates) {
     probeServerFn(candidate).then((r) {
-      if (r.$1 && !picked.isCompleted) picked.complete(candidate);
+      if (r.ok && !picked.isCompleted) picked.complete(candidate);
       pending--;
       if (pending == 0 && !picked.isCompleted) picked.complete(kPrimaryServer);
     });
@@ -95,26 +95,71 @@ Future<String> resolveServer(
   return picked.future;
 }
 
+/// /health 的探测结果（PROTOCOL_MULTIVERSE.md §4.1）。
+///
+/// 为什么是一个类而不是元组：2026-10-04 加了"最低 App 版本"两个字段后，位置元组
+/// 变成 5 元、读写两边都数不清，改成具名字段。
+class ServerHealth {
+  const ServerHealth({
+    this.ok = false,
+    this.protocolVersion = '',
+    this.capabilities = const <String>[],
+    this.minAppVersion,
+    this.appDownloadUrl,
+  });
+
+  /// 是否探通（200 + 可解析）。false 时其余字段无意义。
+  final bool ok;
+
+  /// 服务端的协议版本（`v2-multiverse`；旧服务端空串）。
+  final String protocolVersion;
+
+  /// 能力清单（不支持 spaces 的旧服务端为空 → 向导显示"该服务器太旧"）。
+  final List<String> capabilities;
+
+  /// 服务端要求的最低 App 版本（`min_app_version`；null = 不设下限）。
+  /// 格式 `yymm.ddhh.mm`（见 `scripts/appVersion.js`），与 App 自身的
+  /// CFBundleShortVersionString / versionName 同一个串，可直接比大小。
+  final String? minAppVersion;
+
+  /// 升级入口 URL（`app_download_url`；null = 服务端不给链接）。
+  final String? appDownloadUrl;
+}
+
 /// 快速健康探测（GET {server}/health，3s 超时）。
 ///
-/// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不返回全局 member 表
+/// Multiverse：返回协议版本与能力清单——/health 不返回全局 member 表
 /// （PROTOCOL_MULTIVERSE.md §4.1）；协议版本用于旧服务器提示（不支持 spaces 的
-/// 旧 Server 明确升级提示，§8.1）。
-Future<(bool, String, List<String>)> probeServer(String server) async {
+/// 旧 Server 明确升级提示，§8.1）。**另含最低 App 版本**（2026-10-04）：
+/// 客户端启动时据此判断"我是不是已经不被支持了"（见 widgets/version_gate.dart）。
+Future<ServerHealth> probeServer(String server) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
   try {
     final req = await client.getUrl(Uri.parse('$server/health'));
     final res = await req.close();
     final body = await res.transform(utf8.decoder).join();
-    if (res.statusCode != 200) return (false, '', const <String>[]);
+    if (res.statusCode != 200) return const ServerHealth();
     final json = jsonDecode(body) as Map<String, dynamic>;
     final pv = json['protocol_version'] as String? ?? '';
     final caps = (json['capabilities'] as List<dynamic>? ?? const [])
         .map((e) => e as String)
         .toList();
-    return (true, pv, caps);
+    // 空串/非字符串一律当没配（服务端也是这么归一化的）
+    String? nonEmpty(Object? v) {
+      if (v is! String) return null;
+      final t = v.trim();
+      return t.isEmpty ? null : t;
+    }
+
+    return ServerHealth(
+      ok: true,
+      protocolVersion: pv,
+      capabilities: caps,
+      minAppVersion: nonEmpty(json['min_app_version']),
+      appDownloadUrl: nonEmpty(json['app_download_url']),
+    );
   } catch (_) {
-    return (false, '', const <String>[]);
+    return const ServerHealth();
   } finally {
     client.close(force: true);
   }

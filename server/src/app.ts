@@ -178,7 +178,16 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       protocol_version: cfg.protocol_version,
       version: SERVER_VERSION,
       uptime_sec: Math.floor(process.uptime()),
-      capabilities: cfg.capabilities
+      capabilities: cfg.capabilities,
+      // 客户端启动时的**强制升级闸**（2026-10-04）：低于 min_app_version 的客户端
+      // 会在首屏弹不可关闭的升级窗口。只在服务端配了才下发（没配就不出现这个键，
+      // 老客户端对未知键天然无感）。两个字段都非密、无元数据风险。
+      ...(cfg.min_app_version == null
+        ? {}
+        : { min_app_version: cfg.min_app_version }),
+      ...(cfg.app_download_url == null
+        ? {}
+        : { app_download_url: cfg.app_download_url })
     })
     return
   }

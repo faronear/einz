@@ -40,6 +40,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageNeedPassphrase => '请设置共享口令';
 
   @override
+  String get upgradeRequiredTitle => '需要升级';
+
+  @override
+  String upgradeRequiredBody(String min) {
+    return '这个版本已经不被服务器支持了（最低需要 $min）。升级后才能继续使用。';
+  }
+
+  @override
+  String upgradeRequiredCurrent(String current) {
+    return '当前版本：$current';
+  }
+
+  @override
+  String get upgradeRequiredDownload => '下载新版本';
+
+  @override
+  String get upgradeRequiredRecheck => '重新检查';
+
+  @override
   String get wizardJoinPassphraseRequired => '请输入共享口令进行验证';
 
   @override

@@ -158,6 +158,36 @@ abstract class AppLocalizations {
   /// **'Enter a shared passphrase'**
   String get setupPageNeedPassphrase;
 
+  /// No description provided for @upgradeRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update required'**
+  String get upgradeRequiredTitle;
+
+  /// No description provided for @upgradeRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This version is no longer supported by the server (needs at least {min}). Please update to continue.'**
+  String upgradeRequiredBody(String min);
+
+  /// No description provided for @upgradeRequiredCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current version: {current}'**
+  String upgradeRequiredCurrent(String current);
+
+  /// No description provided for @upgradeRequiredDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download update'**
+  String get upgradeRequiredDownload;
+
+  /// No description provided for @upgradeRequiredRecheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get upgradeRequiredRecheck;
+
   /// No description provided for @wizardJoinPassphraseRequired.
   ///
   /// In en, this message translates to:

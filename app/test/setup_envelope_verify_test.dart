@@ -11,6 +11,7 @@ import 'package:einz_shared/einz_shared.dart'; // sodium() 由 einZ_shared re-ex
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
+import 'package:einz/data/server_config.dart';
 
 /// 走到信封页：入口页 → 加入 → token（preflight）→ 名字 → 口令页 → 切「改用线下密保信封」。
 Future<void> pumpToEnvelope(WidgetTester tester, {required EntranceKeyPair kp}) async {
@@ -22,7 +23,8 @@ Future<void> pumpToEnvelope(WidgetTester tester, {required EntranceKeyPair kp}) 
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+      probeServer: (_) async => const ServerHealth(
+          ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
       // Multiverse join：token 校验（preflight）用 fake
       preflightOverride: (token) async => const SpaceJoinPreflight(
           spaceId: 'space-test', status: 'waiting', memberCount: 1,

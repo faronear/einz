@@ -1,5 +1,7 @@
 {
   "maxSpaces": 0,
   "maxEntrancesPerSpace": 0,
-  "maxMembersPerSpace": 0
+  "maxMembersPerSpace": 0,
+  "minAppVersion": "",
+  "appDownloadUrl": ""
 }

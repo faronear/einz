@@ -10,6 +10,7 @@ import 'package:einz_shared/einz_shared.dart';
 import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
+import 'package:einz/data/server_config.dart';
 
 /// 打开向导并走到口令页。join=true 走 Multiverse join 路径（入口页 → token
 /// preflight → 名字 → 口令）；false=create（首条通道，名字页——createSpace 无
@@ -26,7 +27,8 @@ Future<void> pumpToPassphrase(
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+      probeServer: (_) async => const ServerHealth(
+          ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
       // Multiverse join：token 校验（preflight）用 fake——默认走真实 ApiClient。
       // 群聊一期（2026-10-03）：purpose='invite' → 走"新成员自填名"向导
       preflightOverride: join
@@ -106,7 +108,8 @@ void main() {
       locale: const Locale('zh'),
       home: SetupPage(
         db: db,
-        probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+        probeServer: (_) async => const ServerHealth(
+          ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
         // 步骤 1 放行后触发 Multiverse 创建（_runBootstrap → POST /spaces），
         // 需 createOverride fake 返回成功结果才能放行到口令页
         createOverride: () async => const SpaceCreateResult(

@@ -18,6 +18,7 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
+import 'package:einz/data/server_config.dart';
 
 const _dupMessage = '这个秘境已经添加过了（一台设备只能有一条通道到同一个秘境）';
 
@@ -29,7 +30,8 @@ Future<void> _pumpToJoinToken(WidgetTester tester, LocalDatabase db) async {
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
+      probeServer: (_) async => const ServerHealth(
+          ok: true, protocolVersion: 'v2-multiverse', capabilities: <String>[]),
       preflightOverride: (token) async => const SpaceJoinPreflight(
           spaceId: 'space-test',
           status: 'waiting',

@@ -16,6 +16,7 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz_shared/einz_shared.dart';
+import 'package:einz/data/server_config.dart';
 
 final EntranceKeyPair _keyPair = EntranceKeyPair(
   entranceId: 'dev-focus',
@@ -33,7 +34,8 @@ Future<void> _pumpCreate(WidgetTester tester) async {
     locale: const Locale('zh'),
     home: SetupPage(
       db: db,
-      probeServer: (_) async => (true, 'multiverse', const <String>[]),
+      probeServer: (_) async => const ServerHealth(
+          ok: true, protocolVersion: 'multiverse', capabilities: <String>[]),
       keyPairOverride: _keyPair,
     ),
   ));

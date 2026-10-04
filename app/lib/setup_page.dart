@@ -56,9 +56,10 @@ class SetupPage extends StatefulWidget {
   final LocalDatabase? db;
 
   /// 服务器探测回调（测试注入 fake 保 golden 稳定）；默认用真实 probeServer。
-  /// Multiverse：返回 (能连, 协议版本, 能力清单)——/health 不再返回 member 表，
+  /// Multiverse：返回 /health 的探测结果（协议版本、能力清单，以及"最低 App
+  /// 版本"——后者由 main.dart 的版本闸消费）；/health 不再返回 member 表，
   /// 角色改由空间入口页让用户选择。
-  final Future<(bool, String, List<String>)> Function(String server)? probeServer;
+  final Future<ServerHealth> Function(String server)? probeServer;
 
   /// Multiverse join preflight 注入（测试用；默认真实 ApiClient.preflightJoin）。
   final Future<SpaceJoinPreflight> Function(String token)? preflightOverride;
@@ -256,7 +257,9 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _initServer() async {
     try {
       final probe = widget.probeServer ?? probeServer;
-      final (ok, pv, caps) = await probe(effectiveServer);
+      final health = await probe(effectiveServer);
+      final ok = health.ok;
+      final pv = health.protocolVersion;
       if (!mounted) return;
       setState(() {
         _probeFailed = !ok;
@@ -311,7 +314,9 @@ class _SetupPageState extends State<SetupPage> {
       }
     }
     final probe = widget.probeServer ?? probeServer;
-    final (ok, pv, caps) = await probe(effectiveServer);
+    final health = await probe(effectiveServer);
+    final ok = health.ok;
+    final pv = health.protocolVersion;
     if (!mounted) return;
     if (ok) {
       _probeRetryTimer?.cancel();
