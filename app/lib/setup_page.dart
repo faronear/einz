@@ -623,8 +623,8 @@ class _SetupPageState extends State<SetupPage> {
         return 5;
       case _WizardRole.join:
         // 群聊一期（2026-10-03）：身份选择页删除。invite = token/名字/口令/PIN/done；
-        // channel = token/口令/PIN/done——**页码沿用 invite 的编号**（token=1、
-        // 口令=3、PIN=4、done=5，channel 由 token 页直接跳到口令页、跳过 2）。
+        // attach = token/口令/PIN/done——**页码沿用 invite 的编号**（token=1、
+        // 口令=3、PIN=4、done=5，attach 由 token 页直接跳到口令页、跳过 2）。
         // stepCount 恒为 5：若按"少一页"记 4，PIN 步（4）会撞上 done 判定
         // （_step == _stepCount）被当成完成页——底部按钮消失、chrome 变 done 样式
         //（实测 bug：PIN 输入框透明 + 无上一步/下一步/跳过）。
@@ -766,7 +766,7 @@ class _SetupPageState extends State<SetupPage> {
     String? genderError;
     var invalid = false;
     // 名字+性别页：create 步骤 1 / join 步骤 2（群聊一期 2026-10-03：invite
-    // token 的新成员在此自填名字/性别，复用同一组输入；channel 不经过此页）
+    // token 的新成员在此自填名字/性别，复用同一组输入；attach 不经过此页）
     if ((_role == _WizardRole.create && _step == 1) ||
         (_role == _WizardRole.join && _step == 2)) {
       final mine = _creatorName.text.trim();
@@ -841,7 +841,7 @@ class _SetupPageState extends State<SetupPage> {
       final ok = await _verifyJoinToken();
       if (!mounted) return;
       if (!ok) return;
-      // 群聊一期（2026-10-03）：channel token（设备接入）身份由链接绑定，
+      // attach token（进已有身份）身份由链接决定，
       // 无名字页——验证通过直跳口令页；invite 落到步骤 2 填自己名字
       if (_joinPurpose == 'attach') {
         setState(() {
@@ -951,7 +951,7 @@ class _SetupPageState extends State<SetupPage> {
         _status = null;
         return;
       }
-      // 群聊一期（2026-10-03）：channel 流跳过了名字页（身份由 token 绑定），
+      // attach 流跳过了名字页（身份由 token 决定），
       // 口令页「上一步」应直接回 token 页——不能落到步骤 2（名字页对本流无意义，
       // 且填了名字也不会被提交）
       if (_role == _WizardRole.join && _step == 3 && _joinPurpose == 'attach') {
@@ -1042,7 +1042,7 @@ class _SetupPageState extends State<SetupPage> {
             return _buildStepJoinToken();
           case 2:
             // 群聊一期（2026-10-03）：身份选择页删除——invite token = 填自己
-            // 名字/性别（复用 create 的名字页）；channel 不经过此步（步骤数少一页）
+            // 名字/性别（复用 create 的名字页）；attach 不经过此步（少一页）
             return _buildStepName();
           case 3:
             return _buildStepPassphrase();
@@ -1733,7 +1733,7 @@ class _SetupPageState extends State<SetupPage> {
         // 换 token（或换身份）后，之前的"已 join"标记作废：需重新 joinSpace
         _joinedToken = null;
         // 群聊一期（2026-10-03）：身份选择页已删——按 purpose 分流：
-        // invite → 步骤 2 = 填自己名字/性别；channel → 直进口令页（身份由 token 绑定）
+        // invite → 步骤 2 = 填自己名字/性别；attach → 直进口令页（身份由链接定）
         _joinPurpose = pre.purpose;
         _joinInviterName = pre.inviterName;
         _joinMemberCount = pre.memberCount;
@@ -2440,9 +2440,9 @@ class _SetupPageState extends State<SetupPage> {
               token: _joinToken,
               publicKey: kp.publicKeyB64,
               // 群聊一期（2026-10-03）：不再传 slot——invite 开新身份（服务端
-              // 分配最小空槽），channel 由 token 绑定身份（服务端自动解析发起人槽位）
+              // 分配最小空槽），attach 由 token 决定进谁的身份（服务端解析槽位）
               entranceName: await _autoEntranceName(),
-              // invite 新成员自填的名字/性别（channel 不带——身份由 token 绑定）
+              // invite 新成员自填的名字/性别（attach 不带——身份由 token 决定）
               memberName: _joinPurpose == 'invite' ? _creatorName.text.trim() : null,
               memberGender: _joinPurpose == 'invite' ? _myGender : null,
               // 安装级标识（多空间）：同一条通道各空间共用，服务端内部关联用

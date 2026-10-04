@@ -279,7 +279,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       body?.slot == null ? undefined : Number(body.slot),
       // 安装级标识（多空间）
       body?.install_uid == null ? undefined : String(body.install_uid),
-      // 群聊一期（2026-10-03）：新身份自填名字/性别（invite 流；channel 流不带）
+      // 新身份自填名字/性别（invite 流；attach 流不带——身份早就有名字了）
       body?.member_name == null ? undefined : String(body.member_name),
       body?.member_gender == null ? undefined : String(body.member_gender)
     )
@@ -303,7 +303,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 两种 token（2026-10-04 收敛）：
     //   invite = 开新身份（邀请新人；duo 满 2 人 → 409）
     //   attach = 进已有身份（target 缺省 = 自己；指向**别人** = 帮对方找回身份）
-    // 兼容：老字面量 'channel' 等价于 attach（归一化落在下面这一行里，不留分支）
+    // 兼容：老字面量 'channel'（2026-10-04 前的名字）等价于 attach——
+    // 归一化就落在下面这一行里，不留分支；老 token 行也照此处理
     const purpose = body?.purpose === 'invite' ? 'invite' : 'attach'
     const targetMemberId =
       body?.target_member_id == null ? undefined : String(body.target_member_id)

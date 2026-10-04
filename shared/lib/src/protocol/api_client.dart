@@ -101,7 +101,7 @@ class ApiClient {
   /// Multiverse：加入空间（POST /spaces/join——通道登记 + session 签发，绑定该
   /// Space，PROTOCOL_MULTIVERSE.md §4.1）。群聊一期（2026-10-03）slot 显式语义：
   /// **不带 slot = 新身份**（invite token，[memberName]/[memberGender] 自填）；
-  /// **带 slot = 已有成员加通道**（channel token，身份由链接绑定，不传名字）。
+  /// **带 slot = 进已有身份**（attach token，身份由链接绑定，不传名字）。
   Future<SpaceJoinResult> joinSpace({
     required String token,
     required String publicKey,

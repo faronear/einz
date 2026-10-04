@@ -338,19 +338,25 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   } catch {
     // 列已存在（新库）→ 忽略
   }
-  // 迁移：join_tokens 补 purpose（群聊一期 2026-10-03）：'invite' | 'channel'。
-  // invite=邀请新成员（新身份）；channel=发起人在新设备加通道（绑定发起人 slot）。
-  // 存量 token 无法追溯签发意图 → 回填 'channel'（保守侧：channel 校验更严，
-  // 必须带 slot 且等于发起人 slot，不会误开新身份）。
+  // 迁移：join_tokens 补 purpose（2026-10-03）：'invite' | 'attach'。
+  //   invite = 开**新身份**；attach = 进**已有身份**（target 缺省=签发者自己，
+  //   指向别人 = 帮对方找回）。
+  // ⚠️ 历史：这两个值最初叫 'invite' / 'channel'，2026-10-04 改名为 attach——
+  //   ① 语义上要覆盖"帮别人找回"，channel（通道）对那个场景不成立；
+  //   ② 术语上 GLOSSARY 明确"英文不用 channel"（会被读成 Slack/WebSocket 频道）。
+  //   读取处一律 `purpose === 'invite' ? invite : attach`，所以**老行里的 'channel'
+  //   仍然按 attach 处理**，不需要数据迁移。
+  //   下面这个 DEFAULT 只对**新库**生效（已迁移过的库 SQLite 改不了列默认值），
+  //   而且代码里没有任何插入省略 purpose——它纯粹是"别再留下被否决的词"。
   try {
-    db.exec(`ALTER TABLE join_tokens ADD COLUMN purpose TEXT NOT NULL DEFAULT 'channel'`);
+    db.exec(`ALTER TABLE join_tokens ADD COLUMN purpose TEXT NOT NULL DEFAULT 'attach'`);
   } catch {
     // 列已存在（新库）→ 忽略
   }
-  // 迁移：join_tokens 补 issuer_member_id（channel token 绑定发起人身份）。
+  // 迁移：join_tokens 补 issuer_member_id（attach token 的签发者身份）。
   // created_by_entrance 存的是角色字面量（"creator"/"member"），追溯不到签发者
-  // member → channel token 的"仅发起人本人可在新设备加通道"校验需要本列。
-  // 存量行为 NULL：其 channel 校验退化为"slot 行已有人即可"（无绑定可查）。
+  // member → attach token 需要它来解析"进谁的身份"（target 缺省即签发者）。
+  // 存量行为 NULL：退化要求客户端显式带 slot（无绑定可查）。
   try {
     db.exec(`ALTER TABLE join_tokens ADD COLUMN issuer_member_id TEXT`);
   } catch {
@@ -358,10 +364,10 @@ export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz
   }
   // 迁移：join_tokens 补 target_member_id（2026-10-04：**定向** token）。
   // 语义：这次 join 要进入**哪个已有身份**——
-  //   指向自己 = 我在新设备接入（旧的 channel 语义）；指向别人 = 帮对方找回身份
+  //   指向自己 = 我在新设备接入；指向别人 = 帮对方找回身份
   //   （对方丢了/换了设备，而他自己没有安装可签发）。NULL = 不开已有身份，
   //   另见 purpose='invite'（开新身份）。
-  // 存量行为 NULL：老 attach(channel) token 退回用 issuer_member_id 兜（见 joinSpace）。
+  // 存量行为 NULL：改名前的 attach（那时叫 channel）token 退回用 issuer_member_id 兜。
   try {
     db.exec(`ALTER TABLE join_tokens ADD COLUMN target_member_id TEXT`);
   } catch {

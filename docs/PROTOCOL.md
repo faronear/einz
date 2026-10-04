@@ -523,7 +523,7 @@ Authorization: Bearer <session_token>
 | S→C | `peer.offline` | `{ "entrance_id": "dev1", "member_id": "per1" }` | 对端通道下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 member 通道） |
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
 | S→C | `profile.updated` | `{ "entrance_id": "…", "member_id": "…", "member_name": "…", "entrance_name": "…" }` | 成员改名/改通道名（客户端立即更新显示、头像缓存失效） |
-| S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加通道（channel token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |
+| S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加设备（attach token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |
 
 ### 8.3 顺序与重连
 

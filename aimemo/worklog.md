@@ -11165,3 +11165,30 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 属于"我的线"，统一放在菜单「我的通道」里的「新建通道」（那里本来就有这个入口）。
 删按钮 + 删对应的 l10n 键；顺手把「我的通道 → 新建通道」的 purpose 字面量从已废弃的
 `'channel'` 改成 `'attach'`（服务端本来就把它归一成 attach，但客户端别再写旧值）。
+
+---
+
+## 2026-10-04（七）清理 purpose 里的旧词 `channel`
+
+老板问"为何 purpose 用 channel 而不是 entrance"。——这个词不是我起的，来自上一个 agent
+的 `a584b91`；我接手时只把**语义**改成了 `attach`，没把字面量清干净。
+
+**两层问题**（都对）：
+1. **术语层**：`docs/GLOSSARY.md` 明写"英文**不用** `channel`（会被读成 Slack/WebSocket/
+   Go channel）"——是项目**明确否决**过的词，上个 agent 用了它。
+2. **更根本**：这个字段**也不该叫 `entrance`**。`purpose` 回答的是"这次 join 要**开新
+   身份**还是**进已有身份**"，是一对动作；`entrance` 是名词（一条通道），
+   `purpose: 'entrance'` 读成"目的是通道"；而且**每次 join 都建通道**（invite 也建），
+   这个名字区分不了两个分支。所以结论是**保留 invite / attach**，清掉残留的 channel。
+
+**清掉的**：
+- DB 迁移的列默认值 `DEFAULT 'channel'` → `'attach'`（只影响**新库**：已迁移过的库
+  SQLite 改不了列默认值；而且代码里没有任何插入省略 purpose——它纯粹是"别再留下坏词"）
+- CLI 的 `/invite channel` 别名 → 删掉，只认 `/invite attach`
+- app/lib + shared 里一批"现在时"的注释（chat_page / setup_page / api_client / types）
+- 文档里的列默认值与措辞（DATABASE / PROTOCOL_MULTIVERSE / PROTOCOL）
+- **保留**的 channel 全部是**历史说明**（"最初叫 channel，2026-10-04 改名 attach"）——
+  老行里的 'channel' 仍然按 attach 处理（读取处一律"非 invite 即 attach"），不需要数据迁移
+- 设计文档里那句 `purpose（invite | channel）` 加了改名指引（原文当历史保留）
+
+**没动的**：`MethodChannel`（Flutter 平台通道，与术语无关）。

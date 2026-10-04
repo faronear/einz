@@ -1551,7 +1551,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
             child: InkWell(mouseCursor: SystemMouseCursors.click,
               // 群聊一期（2026-10-03）：purpose 必传——这一块是"邀请对方来这个
-              // 秘境"，必须是 invite（开新身份）。漏传会退化成 channel（绑定
+              // 秘境"，必须是 invite（开新身份）。漏传会退化成 attach（绑定
               // 我自己的身份），对方拿去加入就变成"我"（2026-10-04 审查实测）。
               onTap: () => _showInviteDialog(purpose: 'invite'),
               // 与「我的」状态芯片同一档（那块也没有常驻底色）
@@ -1665,8 +1665,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 二维码与展示内容 = 邀请链接（`https://einz.tic.cc/join/<token>`），对方 App/
   /// CLI 可扫码或粘贴链接加入；口令由对方加入时另行输入（降级 B，与 TUI 一致）。
   ///
-  /// [purpose]（群聊一期 2026-10-03）：`invite` = 邀请新成员（开新身份；duo 满员
-  /// 后签发即自动升格 group）；`channel` = 我本人在另一台设备接入（绑定我的身份）。
+  /// [purpose]（2026-10-04 收敛）：`invite` = 开**新身份**（邀请新成员）；
+  /// `attach` = 进**已有身份**（缺省=我自己换设备；指向别人 = 帮对方找回）。
   /// **必传**：两种码语义相反，share 错一种等于把对方变成我（2026-10-04 审查
   /// 实测的 P0）。弹窗内「重新生成」必须沿用同一组参数。
   ///
@@ -2294,8 +2294,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// - **邀请新成员**（group 且未满员）＝ 同上；
   /// - **duo 已满 2 人 → 不出现邀请入口**，只留一行"双人秘境不可增加成员"——
   ///   duo 永远不会变成群，第三个人不是"满了"，是**不允许**；
-  /// - **在其他设备加入我的账号** ＝ `channel` token（绑定**我自己的**身份，
-  ///   仅本人可用，杜绝"任选他人身份加通道"的冒充面）；
+  /// - 「给自己加一台设备」不在这里 —— 那是"我的线"，在菜单「我的通道」里；
   /// - **无退出入口**（一期：入群即不退群）。
   Future<void> _showMembersSheet() async {
     final l10n = AppLocalizations.of(context)!;
@@ -2850,8 +2849,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // Overlay 交叉卸载断言）
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        // 「新建通道」= 我本人在另一台设备接入 → channel token
-                        // （绑定我的身份）。邀**新成员**才是 invite，别搞反。
+                        // 「新建通道」= 我本人在另一台设备接入 → attach token
+                        // （进我自己的身份）。邀**新成员**才是 invite，别搞反。
                         _menuAction(() => _showInviteDialog(purpose: 'attach'));
                       },
                       hoverColor: Colors.black.withValues(alpha: 0.10),

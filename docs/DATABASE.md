@@ -92,12 +92,14 @@ CREATE TABLE space_members (
 --     · == 别的成员      → **帮对方找回身份**（他丢了/换了设备、没有安装可自己签发）
 --     · NULL + purpose=attach + 存量 issuer → 退回 issuer（那时 attach 只能指向自己）
 --   授权：attach 指向**别人**时路由层要校验共享口令（与撤销别人通道同档，见 SECURITY.md）
---   存量 token 无 purpose 追溯 → 回填 'channel'，读取时归一成 'attach'（保守侧）
+--   历史：这两个值最初叫 'invite' / 'channel'，2026-10-04 把 channel 改名为 attach
+--   （语义上要覆盖"帮别人找回"；术语上 GLOSSARY 明确"英文不用 channel"）。
+--   老行里的 'channel' 仍按 attach 处理（读取处一律非 invite 即 attach），无需数据迁移
 CREATE TABLE join_tokens (
     space_id          TEXT NOT NULL REFERENCES spaces(space_id),
     token_hash        TEXT PRIMARY KEY,
     created_by_entrance TEXT NOT NULL,
-    purpose           TEXT NOT NULL DEFAULT 'channel',
+    purpose           TEXT NOT NULL DEFAULT 'attach',
     issuer_member_id  TEXT,
     target_member_id  TEXT,
     expires_at        INTEGER NOT NULL,

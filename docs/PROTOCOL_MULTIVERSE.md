@@ -95,8 +95,9 @@ spaces（群聊一期 2026-10-03 增列）
                                      -- **创建时选定、之后永不 UPDATE**（无升格）
 
 join_tokens（群聊一期 2026-10-03 增列）
-  purpose           TEXT NOT NULL DEFAULT 'channel',
-                    -- 'invite'=开新身份；'attach'=进已有身份（旧值 'channel' 归一成它）
+  purpose           TEXT NOT NULL DEFAULT 'attach',
+                    -- 'invite'=开新身份；'attach'=进已有身份
+                    -- （旧值 'channel' 是改名前的字面量，读取时归一成 attach）
   issuer_member_id  TEXT,            -- 签发者身份（preflight 报"谁发的"；attach 存量兜底）
   target_member_id  TEXT,            -- attach 要进入的身份（== issuer 自己换设备；
                     --   == 别人 = 帮对方找回身份）；NULL = 退回 issuer

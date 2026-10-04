@@ -1152,9 +1152,9 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
       token: token,
       publicKey: store.publicKey,
       // 群聊一期（2026-10-03）：**永不传 slot**——invite 开新身份（服务端分配
-      // 最小空槽，传了反而 400）；channel 由 token 绑定身份（服务端自己查得出）。
+      // 最小空槽，传了反而 400）；attach 由 token 决定进谁的身份（服务端自己查得出）。
       entranceName: store.entranceName,
-      // 新身份自填的名字/性别（invite 流；channel 流不带——身份由链接绑定）
+      // 新身份自填的名字/性别（invite 流；attach 流不带——身份由链接绑定）
       memberName: isInvite ? myName : null,
       memberGender: isInvite ? _genderCode(myGender) : null,
       // 安装级标识（多空间：服务端据此认出同一台物理设备的多行）
@@ -3427,11 +3427,10 @@ Future<void> _execCommand(String line) async {
     case '/invite':
       // Multiverse：生成绑定新通道的邀请（join token——24h 一次性；v1 开通码
       // 已废弃——新通道用 /space join <链接或 token> 绑定）。
-      // 群聊一期（2026-10-03）：`/invite` = 邀请新成员；`/invite channel` =
-      // 给自己另一台设备开通道（链接绑定本人身份）。
-      // `attach`（别名 `channel`，2026-10-04 改名）= 进已有身份；其余 = invite
-      _invitePurpose =
-          (arg.trim() == 'attach' || arg.trim() == 'channel') ? 'attach' : 'invite';
+      // `/invite` = 邀请新成员（开新身份）；`/invite attach` = 给自己另一台
+      // 设备开通道（链接决定进谁的身份）。其余写法一律当 invite。
+      // （`attach` 是 2026-10-04 定的名字，旧名 channel 已不再接受）
+      _invitePurpose = arg.trim() == 'attach' ? 'attach' : 'invite';
       await _execInvite();
       break;
     case '/myname':
@@ -3557,7 +3556,7 @@ Future<void> _execCommand(String line) async {
 
 /// /invite [memberA|memberB] [对方名称]：补发一次性开通码（默认 memberB=邀请对方，
 /// 给第二使用者；memberA=给自己加新通道）。需先 /auth 激活。
-/// `/invite` 本次签发的 token 类型（'invite' | 'channel'，见 `/invite channel`）。
+/// `/invite` 本次签发的 token 类型（'invite' | 'attach'，见 `/invite attach`）。
 String _invitePurpose = 'invite'; // 'invite'（开新身份）| 'attach'（我进已有身份）
 
 Future<void> _execInvite() async {

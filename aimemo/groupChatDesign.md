@@ -50,10 +50,14 @@
 - slot 0/1 → 开放为小整数槽位（保留 UNIQUE(space_id, slot)）；join 的 slot 参数改为
   显式语义（无老客户端兼容）：**不带 slot = 新身份**（分配最小空 slot、生成新
   member_id），**带 slot = 已有成员加通道**（slot 必须已有人，否则报错）
-- join_tokens 加 `purpose` 字段（`invite` | `channel`，**发起人生成时选定**）：
-  invite = 邀请新成员（新身份）；channel = 绑定发起人自己的 slot（由
+- join_tokens 加 `purpose` 字段（**发起人生成时选定**）：
+  invite = 邀请新成员（新身份）；另一个值 = 绑定发起人自己的 slot（由
   created_by_entrance → member → slot 查出），仅该成员可在新设备加通道——
   彻底消除"任何成员任选他人身份加通道"的冒充面（现状身份选择页允许选任意人）
+  > **2026-10-04 改名**：那个值当时叫 `channel`，现已改名 **`attach`** 并扩展为
+  > "进**已有身份**"（target 指向别人 = 帮对方找回）。原因：① 要覆盖"帮别人找回"，
+  > channel（通道）对那个场景不成立；② `docs/GLOSSARY.md` 明确"英文不用 channel"。
+  > 下文沿用当时的 `channel` 字样，读作 `attach`。
 - join 校验：purpose=invite → 必须不带 slot（新身份，分配最小空槽）；purpose=channel
   → 必须带 slot 且 == 发起人 slot（不符 403）；原"任选已有身份"路径删除
 - 人数上限两道互不干扰的闸（2026-10-04 修订）：**duo 恒 2**（第 3 个身份一律

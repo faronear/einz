@@ -378,7 +378,7 @@ export function preflightJoin(
   entranceName?: string,
   slot?: number,
   installUid?: string, // 安装级标识（多空间：同一物理设备各空间一行同名）
-  memberDisplayName?: string, // 新身份自填名字（群聊一期：invite 流必填，channel 流不带）
+  memberDisplayName?: string, // 新身份自填名字（invite 流才用；attach 流不带）
   memberGender?: string, // 新身份自填性别（同上）
 ): {
   spaceId: string;
@@ -412,7 +412,7 @@ export function preflightJoin(
   // - invite → 开新身份：**必须不带 slot**（服务端分配最小空槽、生成新 member_id）
   // - attach → 进已有身份：身份由 token 的 target_member_id 决定（客户端**不需要**
   //   知道 slot 这个内部概念）；客户端显式带 slot 时必须与目标一致（防错用）。
-  //   存量老 token（purpose='channel' 回填、target NULL）退回看 issuer_member_id；
+  //   存量老 token（purpose 曾是 'channel'、target NULL）退回看 issuer_member_id；
   //   两者都没有（更老的库）才要求客户端带 slot。
   const purpose: "invite" | "attach" = tk.purpose === "invite" ? "invite" : "attach";
   // attach 要进入的目标身份：新 token 看 target_member_id（可指向**别人**——
@@ -451,7 +451,7 @@ export function preflightJoin(
     // - 不带 slot = 新身份：分配最小空 slot、生成新 member_id（自己填名）；
     // - 带 slot = 已有成员加通道：slot 必须已有人（member_id 非 NULL），否则报错；
     //   （purpose 校验在调用层 joinSpace 之外做——见 app.ts：invite 不带 slot、
-    //   channel 必带且等于发起人 slot；此处按 slot 参数语义兜底。）
+    //   attach 必带且等于目标 slot；此处按 slot 参数语义兜底。）
     let chosenSlot: number;
     let isExistingIdentity = false;
     let member: { member_id: string | null; status: string } | undefined;
@@ -657,11 +657,11 @@ export function preflightJoin(
 
 /** 生成一次性开通码（英文仍称 token；成员认证由 U1 Space-scoped session 补齐）。
  *
- *  两种 purpose（2026-10-04 收敛，替掉原来的 invite/channel）：
+ *  两种 purpose（2026-10-04 收敛并改名，见下）：
  *  - `invite`：开**新身份**（邀请一个新人进来，自己填名字）。受人数上限约束——
  *    duo 满 2 人一律 DUO_FULL（双人秘境永远不会有第三个人）。
  *  - `attach`：进**已有身份**。targetMemberId 指向谁就进谁：
- *    · == 签发者自己 → "我在另一台设备接入"（原 channel）
+ *    · == 签发者自己 → "我在另一台设备接入"
  *    · == 别人 → **帮对方找回身份**（他丢了/换了设备，而他没有安装可自己签发）
  *    这条能力让"只要还有一个安装存在，空间就永续"成为结构性的保证，而不是
  *    给 duo 打的补丁（group 里成员丢设备同样适用）。

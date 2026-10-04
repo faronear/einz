@@ -13,7 +13,7 @@ library;
 /// - `3` = 群聊一期（2026-10-03，aimemo/groupChatDesign.md）：create 删
 ///   `peer_name`/`peer_gender`（不再预置伴侣）、**create 新增 `mode`（duo|group，
 ///   创建时定死、永不改变——2026-10-04 取消升格）**、join slot 显式语义（不带
-///   slot = 新身份 / 带 slot = 加通道，需 channel token）、join 请求新增
+///   slot = 新身份 / 带 slot = 进已有身份，需 attach token）、join 请求新增
 ///   `member_name`/`member_gender`、join-tokens 请求新增 `purpose`、
 ///   preflight 响应新增 `mode`/`purpose`/`inviterName`、WS 新增
 ///   `member.joined` 帧。无老客户端兼容（一次性升级）。
