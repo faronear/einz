@@ -164,7 +164,6 @@ class _SetupPageState extends State<SetupPage> {
   // （老板 2026-09-12）
   bool _joinTokenVerified = false;
 
-  String? _createLink; // Multiverse create：空间邀请链接（完成页展示分享）
 
 
   bool _probeFailed = false;
@@ -946,7 +945,6 @@ class _SetupPageState extends State<SetupPage> {
         _joinedToken = null;
         _joinTokenVerified = false; // 回入口页重选角色：token 状态全部作废
         _joinPurpose = null; // 群聊一期：purpose 一并作废（步骤数随之恢复）
-        _createLink = null;
         _localError = null;
         _status = null;
         return;
@@ -1928,7 +1926,6 @@ class _SetupPageState extends State<SetupPage> {
       // spaceId → 聊天页生成开通码 POST /spaces//join-tokens 报 SPACE_NOT_FOUND
       // （2026-09-11 老板真机报告）；与 join 对齐补填服务端返回的 spaceId
       _spaceId.text = created.spaceId;
-      _createLink = created.link; // 完成页展示空间邀请链接
     } on ApiException catch (e) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
@@ -2337,40 +2334,6 @@ class _SetupPageState extends State<SetupPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.welcomeDialogMessage),
-            // Multiverse：create 完成后展示空间邀请链接（分享给伴侣加入）
-            if (isCreate && _createLink != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                l10n.setupCreateShareTitle,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _createLink!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF2271F7)),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
-                    tooltip: l10n.setupCreateCopy,
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: _createLink!));
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.setupCreateCopied),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
         actions: [
