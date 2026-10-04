@@ -61,7 +61,32 @@ on:
       - 'v*'
 
 jobs:
+  # 测试先行（方案 B，2026-10-04）：所有出包 job 都 `needs: [test]`——**测试不过就不出包**。
+  # 为什么放在这里而不是只靠 testAll.yml：main 推送与 **tag 发版**都得被 gate，而
+  # tag 推送不触发 testAll.yml（那是发版前唯一能拦住的时机）。
+  # 与之配套：testAll.yml 的 push 排除了 main，免得同一个提交在 main 上跑两遍测试。
+  test:
+    name: test（analyze + app/cli/server 全部测试）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # cli 的 analyze/test 用 flutter 自带的 dart（flutter-action 会把它放进 PATH），
+      # 所以不必再 setup-dart
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # shared/lib/src/sodium.dart 走 DynamicLibrary.open 找系统 libsodium
+      - name: 装 libsodium（app 测试要动态加载）
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsodium-dev
+      - name: 跑全部测试（scripts/testAll.sh，与本地/CI 其他地方同一份）
+        run: scripts/testAll.sh all
+
   android:
+    needs: [test]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'android' }}
     runs-on: ubuntu-latest
     steps:
@@ -162,6 +187,7 @@ jobs:
           files: app/einz-app-android.apk
 
   windows:
+    needs: [test]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows' }}
     runs-on: windows-latest
     steps:
@@ -224,6 +250,7 @@ jobs:
             einz-tui-windows.zip
 
   macos:
+    needs: [test]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
     runs-on: macos-latest
     steps:
@@ -369,6 +396,7 @@ jobs:
   # 的 job 会永远 Queued 不报错；macos-15-intel 是最后的 Intel 镜像（至 2027-08），
   # 之后 GitHub Actions 不再有 x86_64 macOS，届时需另寻方案（如自建 runner）。
   macos-cli:
+    needs: [test]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos' }}
     strategy:
       matrix:
@@ -409,6 +437,7 @@ jobs:
   # 打包 .so 会被 glibc 版本绑住（runner 是 glibc 2.39，老发行版跑不了），所以只随包
   # 放一份运行说明，让用户按发行版装：apt install libsodium23 / dnf install libsodium。
   linux-cli:
+    needs: [test]
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux' }}
     runs-on: ubuntu-latest
     steps:
@@ -454,6 +483,7 @@ jobs:
           path: einz-tui-linux-x64.tar.gz
 
   ios:
+    needs: [test]
     # `inputs.platform == 'all'` 不能漏：其余 job 都有，iOS 曾漏掉 → 手动选 all 时
     # 它会整 job skip（2026-09-21 老板实测）
     if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'ios' }}

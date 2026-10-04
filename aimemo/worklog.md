@@ -11399,3 +11399,27 @@ scripts/testAll.sh cli --e2e  # 额外跑 cli/test/*.py 的 pty E2E 探针（需
 
 **验证**：`scripts/testAll.sh` 本地全绿（app 249 passed + 1 skipped、cli 22、server 全绿）；
 workflow YAML 用 ruby 解析过。**CI 本身没法在本地跑**，要等推到 GitHub 才知分晓。
+
+---
+
+## 2026-10-04（十三）CI 收口：test.yml → testAll.yml，测试 gate 住出包（方案 B）
+
+老板问"以后一推送是不是 test 和 buildMultiPlatform 两个都跑？把 test 接进出包工作流
+是不是就跑两遍了？"——先把实际触发条件说清（当时是：推特性分支只 test；推 main 两个都跑；
+推 tag 只 build），然后按**方案 B** 收口：
+
+- `test.yml` **改名 `testAll.yml`**（名字区分开）。
+- `testAll.yml` 的 push 加 `branches-ignore: [main]`——**main 的测试交给下面那个 gate job**，
+  否则同一提交在 main 上跑两遍。
+- `buildMultiPlatform.yml` 加 `test` job（`scripts/testAll.sh all`），六个出包 job
+  （android/windows/macos/macos-cli/linux-cli/ios）全部 `needs: [test]`：
+  **测试不过就不出包**。这条把原来最大的缺口补上了——**推 tag 发版时测试根本不会跑**
+  （tag 不触发 testAll.yml），现在被 gate 住。
+- 顺手修一个本来就有的重复：`concurrency` 组从 `test-${{ github.ref }}` 改成
+  `testAll-${{ github.head_ref || github.ref_name }}`——同一分支**开了 PR 之后**，
+  push 触发与 PR 触发的 ref 不同（`refs/heads/x` vs `refs/pull/N/merge`），
+  旧组名不归一 → 同一次提交跑两遍；现在两者共组、互相取消。
+- PR 触发也加了 `paths-ignore`（纯文档 PR 不再白跑）。
+
+两处 CI 都只是调 `scripts/testAll.sh`，逻辑仍只有一份。YAML 用 ruby 解析校验过；
+**CI 本身还没在 GitHub 上实跑**，要等推送后看第一次结果。

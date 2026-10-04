@@ -1,34 +1,47 @@
 # Einz 测试（GitHub Actions）
 #
-# 与 buildMultiPlatform.yml **分开**：那个只管"能不能出包"（macOS runner 计费 10x，
-# 只在 main / tag 上跑）；这个只管"改动有没有弄坏测试"（全是 Linux runner，1x）。
-# 分开的好处：改一行业务代码不必跑一遍全平台打包就能知道测试红没红。
+# 与 buildMultiPlatform.yml 的分工（**方案 B**，2026-10-04 老板定）：
+#   - 这个工作流：**特性分支的 push** 与 **PR** —— 改一行业务代码立刻知道测试红没红
+#     （全 Linux runner，1x；出包那个 macOS 计费 10x）。
+#   - 出包工作流：自己的 `test` job 先跑、所有出包 job `needs: [test]`，**测试不过不出包**；
+#     main 推送与 **tag 发版**都走那条路（tag 是唯一能在发版前拦住的时机）。
+#   → 所以这里的 push **排除 main**（`branches-ignore: [main]`），否则同一提交在 main
+#     上会跑两遍测试。
 #
 # 触发：
-#   - push 任意分支：分支上改了东西立刻知道（Linux 便宜；纯文档改动被 paths-ignore 挡掉）
-#   - pull_request：PR 上先跑
-#   - workflow_dispatch：手动
+#   - push 非 main 分支（纯文档改动被 paths-ignore 挡掉）
+#   - pull_request
+#   - workflow_dispatch
 #
 # 三个 job 直接复用 `scripts/testAll.sh <target>`——**本地怎么跑、CI 就怎么跑**，
 # 不维护第二套命令（这条是刻意的：之前"我说的测试全过"其实只覆盖 analyze + server，
 # app 那 250 条 widget 测试没人跑、静默红了一片）。
 #
 # ⚠️ 只在 **GitHub**（github remote）上生效。push 到 origin（git.tic.cc）不会触发。
-name: Test
+name: Test All
 
 on:
   push:
-    branches: ['**']
+    # main 交给 buildMultiPlatform.yml 里那个 gate 用的 test job（方案 B）——
+    # 这里排除掉，免得同一提交在 main 上跑两遍测试
+    branches-ignore:
+      - main
     paths-ignore:
       - 'docs/**'
       - 'aimemo/**'
       - '**.md'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'aimemo/**'
+      - '**.md'
   workflow_dispatch:
 
-# 同一分支连续推送时取消前一次没跑完的：省额度，也只关心最新那次
+# 同一分支连续推送时取消前一次没跑完的：省额度，也只关心最新那次。
+# 组名用 `head_ref || ref_name`：**PR 触发与分支 push 触发归一成同一个组**
+# （前者是 `feature/x`、后者是 `refs/heads/feature/x`，不归一的话同一次提交会跑两遍）。
 concurrency:
-  group: test-${{ github.ref }}
+  group: testAll-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
