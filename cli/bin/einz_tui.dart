@@ -935,59 +935,12 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       _scheduleRender();
     }
   }
-  // 伴侣（第二人）名字/性别必填（老板 2026-09-10 定稿——create 录入两人身份，
-  // join 时按身份选择而非自填名字）
-  String peerName;
-  while (true) {
-    peerName = (await _prompt(session, '❓ 伴侣的名字（后期可改）:',
-            required: true))
-        .trim();
-    if (!_state!.running) return;
-    if (peerName.isEmpty) {
-      session.messages.add(_systemMessage(session, '⚠️ 伴侣名字必填，请输入'));
-      _scheduleRender();
-      continue;
-    }
-    // 用户名称白名单（同"我的名字"）：不合规提示重输
-    final nameViolation = checkMemberNamePolicy(peerName);
-    if (nameViolation != null) {
-      session.messages.add(_systemMessage(session, _memberNameRuleHint(nameViolation)));
-      _scheduleRender();
-      continue;
-    }
-    // 不允许和第一人同名（老板 2026-09-10 定；2026-09-24 收紧为大小写不敏感）
-    if (isSameMemberName(peerName, displayName)) {
-      session.messages.add(
-          _systemMessage(session, '⚠️ 伴侣名字不能与我的名字相同（$displayName），请重新输入'));
-      _scheduleRender();
-      continue;
-    }
-    session.messages.add(_systemMessage(session, '✅ ${peerName}'));
-    session.messages.add(_systemMessage(session, '----------------'));
-    break;
-  }
-  String peerGender;
-  // 只接受数字 1/2（老板 2026-09-10：不接受"男/女/male/female"文字输入）
-  while (true) {
-    peerGender = (await _prompt(session, '❓ 伴侣的性别是\n  1: 男\n  2: 女',
-            required: true))
-        .trim();
-    if (!_state!.running) return;
-    if (peerGender == '1') {
-      peerGender = '男';
-      session.messages.add(_systemMessage(session, '✅ ${peerGender}'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      break;
-    }
-    if (peerGender == '2') {
-      peerGender = '女';
-      session.messages.add(_systemMessage(session, '✅ ${peerGender}'));
-      session.messages.add(_systemMessage(session, '----------------'));
-      break;
-    }
-    session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
-    _scheduleRender();
-  }
+  // 群聊一期（2026-10-03，v3）：create **不再预置伴侣**——只录创建者自己。
+  // 伴侣（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
+  // ① 名字归属本人（创建者替对方起名、改不了，是老流程的长期别扭处）；
+  // ② 群空间里"对方"不止一人，预置两人身份的协议本身就不成立。
+  // 原"伴侣的名字/性别"两个必填问答整段删除（2026-10-04 审查：param 已不上报，
+  // 留着就是白问 + 顶部条显示一个服务端根本不存在的名字）。
   // 共享口令必填（老板 2026-09-11：不输入口令不能完成创建——留空会让伴侣无法
   // 凭口令加入、本机也没有口令密保箱可用）
   String passphrase;
@@ -1043,9 +996,8 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
     // （老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.memberName = displayName;
-    // 伴侣名字落盘：对方尚未加入时 GET /space 的 member 表里没有他（member_id 未
-    // 由加入者生成），顶部条左段靠这条兜底显示名字（否则刚创建后一直是 '-'）
-    store.peerName = peerName;
+    // 群聊一期（2026-10-03）：不再落"伴侣名字"——空间里还没有第二个人，顶部条
+    // 由 /space 的成员表驱动（有谁显示谁），不再靠创建者的预置撑着。
     store.save(storePath);
     session.messages.add(_systemMessage(session, '🎉 成功创建秘境！地址: ${created.spaceAddress}'));
     // session.messages.add(_systemMessage(session, '📎 邀请新通道（24 小时有效、仅可用一次）：\n ${created.link}\n🛡️  ${created.joinToken}''));
@@ -1090,43 +1042,62 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     session.messages.add(_systemMessage(session, '----------------'));
     session.messages.add(_systemMessage(
         session, '✅✅✅ 即将加入秘境！'));
-    // 展示 create 时预置的两身份——加入者可能是第二人，也可能是第一人的其他
-    // 通道，不能靠名字判别身份，必须显式选择（老板 2026-09-10 定稿）
-    final slots = pre.slots;
-    if (slots.isEmpty) {
-      session.messages.add(_systemMessage(session, '⚠️ 该秘境未预置成员身份，无法加入'));
-      return;
-    }
-    session.messages.add(_systemMessage(session, '❓ 一个秘境仅限两人。你是哪一位？'));
-    session.messages.add(_systemMessage(session, '----------------'));
-    for (final s in slots) {
-      // 名字背景色按性别（粉/蓝——复用 _genderBubble 与消息气泡背景色一致；
-      // 不显示性别/在线状态——老板 2026-09-10）
-      final bg = _genderBubble(s.gender);
-      session.messages.add(
-          _systemMessage(session, '  $bg$_white${s.displayName ?? '（未命名）'}$_reset'));
-    }
-    var chosenSlot = -1;
-    while (chosenSlot < 0) {
-      final choice = (await _prompt(
-              session, '❓ 完整输入你的名字（注意大小写）:', required: true))
-          .trim();
-      if (!_state!.running) return;
-      final matches = <int>[];
-      for (final s in slots) {
-        if (s.displayName == choice) matches.add(s.slot);
+    // 群聊一期（2026-10-03，v3）：身份**由链接（purpose）决定**，不再让加入者
+    // 在成员名单里自选（那是冒充面——任选他人身份即可以其名义加通道）：
+    // - invite：我是**新成员** → 自己填名字/性别，join 不带 slot（服务端分配
+    //   最小空槽生成新身份）；
+    // - channel：这是我**本人在另一台设备**接入 → 身份由 token 绑定、服务端自己
+    //   解析，既不用填名字也不能带 slot。
+    // （2026-10-04 审查：旧代码恒带 slot，而 create 现在签发的是 invite token →
+    //   服务端 400「invite token 不能指定 slot」，CLI 加入流程整个不可用。）
+    final isInvite = pre.purpose == 'invite';
+    if (isInvite) {
+      final who = pre.inviterName;
+      session.messages.add(_systemMessage(
+          session, who == null ? '👋 你被邀请加入这个秘境' : '👋 ${who} 邀请你加入这个秘境'));
+      if (pre.memberCount > 0) {
+        session.messages.add(
+            _systemMessage(session, '   目前已有 ${pre.memberCount} 位成员'));
       }
-      if (matches.length == 1) {
-        chosenSlot = matches.first;
+    } else {
+      final who = pre.inviterName ?? '本人';
+      session.messages.add(_systemMessage(session, '📱 这是「${who}」在另一台设备接入的链接'));
+    }
+    session.messages.add(_systemMessage(session, '----------------'));
+    String? myName;
+    String? myGender;
+    if (isInvite) {
+      // 新成员自填名字（与 create 里"我的名字"同一条白名单）
+      while (true) {
+        myName = (await _prompt(session, '❓ 你的名字（后期可改）:', required: true)).trim();
+        if (!_state!.running) return;
+        if (myName.isEmpty) continue; // 防御：required 已拦空回车
+        final nameViolation = checkMemberNamePolicy(myName);
+        if (nameViolation != null) {
+          session.messages.add(_systemMessage(session, _memberNameRuleHint(nameViolation)));
+          _scheduleRender();
+          continue;
+        }
         break;
       }
-      session.messages.add(_systemMessage(session,
-          matches.isEmpty ? '⚠️ 名字不匹配，请完整输入列表中的名字' : '⚠️ 存在同名成员，无法选择——请先让对方改名'));
-      _scheduleRender();
+      // 性别（只接受 1/2，与 create 同口径——气泡配色用）
+      while (true) {
+        final g = (await _prompt(session, '❓ 你的性别是\n  1: 男\n  2: 女', required: true)).trim();
+        if (!_state!.running) return;
+        if (g == '1') {
+          myGender = '男';
+          break;
+        }
+        if (g == '2') {
+          myGender = '女';
+          break;
+        }
+        session.messages.add(_systemMessage(session, '⚠️ 请输入 1（男）或 2（女）'));
+        _scheduleRender();
+      }
+      session.messages.add(_systemMessage(session, '✅ ${myName}'));
+      session.messages.add(_systemMessage(session, '----------------'));
     }
-    final myName = slots.firstWhere((s) => s.slot == chosenSlot).displayName;
-    session.messages.add(_systemMessage(session, '✅ 我是 ${myName}'));
-    session.messages.add(_systemMessage(session, '----------------'));
     // 口令必填，且**先校验再 join**：joinSpace 会消费一次性 join token，旧实现先
     // join（烧掉 token）再验口令——口令一错既回不到口令环节、token 也废了，用户
     // 被踢回「输入开通码」。改为用 preflight 已拿到的 spaceId 先调
@@ -1175,8 +1146,12 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     final join = await _busy(session, '⏳ 正在加入秘境...', () => api.joinSpace(
       token: token,
       publicKey: store.publicKey,
-      slot: chosenSlot,
+      // 群聊一期（2026-10-03）：**永不传 slot**——invite 开新身份（服务端分配
+      // 最小空槽，传了反而 400）；channel 由 token 绑定身份（服务端自己查得出）。
       entranceName: store.entranceName,
+      // 新身份自填的名字/性别（invite 流；channel 流不带——身份由链接绑定）
+      memberName: isInvite ? myName : null,
+      memberGender: isInvite ? _genderCode(myGender) : null,
       // 安装级标识（多空间：服务端据此认出同一台物理设备的多行）
       installUid: store.ensureInstallUid(),
     ));
@@ -1192,15 +1167,8 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     // "尚未设置共享口令"再问一遍（老板 2026-09-15 反馈）。
     store.escrowUploaded = true;
     store.memberName = myName ?? '成员';
-    // 对方名字落盘：取另一身份槽位的预置名（create 录入的两人身份）。我选了
-    // slot=0（同第一人的另一条通道）而第二人还没加入时，GET /space 的 member 表里
-    // 没有他 → 顶部条左段靠这条兜底显示名字，而不是 '-'
-    for (final slot in slots) {
-      if (slot.slot != chosenSlot && slot.displayName != null) {
-        store.peerName = slot.displayName;
-        break;
-      }
-    }
+    // 群聊一期（2026-10-03）：不再从"另一个 slot 的预置名"推对方名字——
+    // 空间里可能有多人、也可能还没人，顶部条统一由 /space 成员表驱动。
     store.save(storePath);
     session.messages.add(_systemMessage(session, '✅ 口令验证通过，成功加入秘境。'));
     session.messages.add(_systemMessage(session, '----------------'));
@@ -3453,7 +3421,10 @@ Future<void> _execCommand(String line) async {
       }
     case '/invite':
       // Multiverse：生成绑定新通道的邀请（join token——24h 一次性；v1 开通码
-      // 已废弃——新通道用 /space join <链接或 token> 绑定）
+      // 已废弃——新通道用 /space join <链接或 token> 绑定）。
+      // 群聊一期（2026-10-03）：`/invite` = 邀请新成员；`/invite channel` =
+      // 给自己另一台设备开通道（链接绑定本人身份）。
+      _invitePurpose = arg.trim() == 'channel' ? 'channel' : 'invite';
       await _execInvite();
       break;
     case '/myname':
@@ -3579,6 +3550,9 @@ Future<void> _execCommand(String line) async {
 
 /// /invite [memberA|memberB] [对方名称]：补发一次性开通码（默认 memberB=邀请对方，
 /// 给第二使用者；memberA=给自己加新通道）。需先 /auth 激活。
+/// `/invite` 本次签发的 token 类型（'invite' | 'channel'，见 `/invite channel`）。
+String _invitePurpose = 'invite';
+
 Future<void> _execInvite() async {
   final s = _state!;
   final store = s.session.store;
@@ -3594,8 +3568,18 @@ Future<void> _execInvite() async {
     return;
   }
   try {
+    // 群聊一期（2026-10-03）：purpose 必填。CLI 的 `/invite` 语义一直是"邀请
+    // 对方来这个秘境" → invite（开新身份）。想给自己另一台设备开通道，用
+    // `/invite channel`（身份由链接绑定，仅本人可用）。
     final api = ApiClient(s.session.server);
-    final r = await _busy(s.session, '⏳ 开通码生成中......', () => api.createJoinToken(store.spaceId!, store.sessionToken!));
+    final r = await _busy(
+        s.session,
+        '⏳ 开通码生成中......',
+        () => api.createJoinToken(
+              store.spaceId!,
+              store.sessionToken!,
+              purpose: _invitePurpose == 'channel' ? 'channel' : 'invite',
+            ));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
     s.session.messages.add(_systemMessage(s.session, '✅ 开通码已生成（24 小时内一次性有效）：\n🛡️  ${r.joinToken}\n📎 ${r.link}'));
     s.status = ''; // 反馈在消息区，状态栏保持干净

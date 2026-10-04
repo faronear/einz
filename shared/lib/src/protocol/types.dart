@@ -313,6 +313,8 @@ class SpaceResult {
     this.memberNames = const {},
     this.memberGenders = const {},
     this.memberSlots = const {},
+    this.mode = 'duo',
+    this.maxMembers = 0,
   });
 
   final String spaceId;
@@ -324,9 +326,20 @@ class SpaceResult {
   /// member_id → gender（male/female，显示层用）。
   final Map<String, String> memberGenders;
 
-  /// member_id → slot（0=第一人/创建者，1=第二人/伴侣；
+  /// member_id → slot（小整数槽位：新身份 join 分配最小空槽，duo 恒 0/1；
   /// 同性别气泡配色区分「第二个人」用，老服务端无此键时为空表）。
+  ///
+  /// 群聊一期附带用途：**键集合就是本空间全部成员**（含未设置名字的成员——
+  /// memberNames 只收有名字的），客户端列成员名单请以这里为准。
   final Map<String, int> memberSlots;
+
+  /// 空间模式（群聊一期 2026-10-03）：'duo' = 二人私密空间（上限 2、通话可用）；
+  /// 'group' = 群空间（上限 [maxMembers]、通话禁用）。旧服务端缺省回 'duo'。
+  final String mode;
+
+  /// 本服务器单空间成员上限（serverConfig.json 的 maxMembersPerSpace；0=不限）。
+  /// 客户端据此在满员时隐藏邀请入口、升格确认里写明"最多 N 人"。
+  final int maxMembers;
 
   factory SpaceResult.fromJson(Map<String, dynamic> json) => SpaceResult(
         spaceId: json['space_id'] as String,
@@ -339,6 +352,8 @@ class SpaceResult {
             .map((k, v) => MapEntry(k, v as String)),
         memberSlots: (json['member_slots'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as int)),
+        mode: (json['mode'] as String?) ?? 'duo',
+        maxMembers: (json['max_members'] as num?)?.toInt() ?? 0,
       );
 }
 

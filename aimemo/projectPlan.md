@@ -19,7 +19,7 @@
 | --- | --- | --- |
 | **多空间**（一条通道进多个秘境） | M0.5 ✅ / M1 ✅ / M2 ✅ / **M3 ✅（2026-09-22 完成）**——剩真机自测 | `aimemo/multiSpaceDesign.zhcn.md` §8（里程碑）、§9（决策） |
 | **字段改名**（`device_id`→`entrance_id`、`person_id`→**`member_id`**、`device_uid`→`install_uid`） | `[x]` **2026-09-23 主线完成**（一次性机械替换，无 alias）；身份词 **2026-09-24 续改 `partner`→`member`**（界面文案不动） | `aimemo/renamePlan.zhcn.md` §9 |
-| **多人群聊（一期）** | `[>]` 代码完成（2026-10-03，feature/groupChat 分支）——服务端/shared/App/CLI 全落地、测试全绿，剩真机自测 | `aimemo/groupChatDesign.md` |
+| **多人群聊（一期）** | `[>]` **2026-10-04 重做 App 端 + 修服务端/CLI 回归**（feature/groupChat 分支）——服务端/shared 保留并修 6 处；App 端 chat_page 从群聊前基线重做（成员弹层/顶部条 N 人/群气泡名与色板/升格帧/group 禁通话）；CLI 创建·加入按 v3 修回可用。剩真机自测 | `aimemo/groupChatDesign.md` |
 | **语音实时通话** | `[⏸]` 待评审（评审通过才拆任务） | `aimemo/voiceCall.zhcn.md` |
 
 ## 待办（跨专项；一行一项，细节在各自文档）

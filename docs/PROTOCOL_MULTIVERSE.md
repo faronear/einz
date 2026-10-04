@@ -155,7 +155,9 @@ POST /spaces/join/preflight
   轻量校验 token（不消费），返回空间公开信息 + 分流向导用字段：
   响应：{ spaceId, status, mode, memberCount, purpose, inviterName, slots }
   （mode='duo'|'group'；purpose='invite'|'channel'——客户端据此走"新成员
-    自填名"或"设备接入"向导，不再有身份选择页；inviterName 为签发者近似名）
+    自填名"或"设备接入"向导，不再有身份选择页；inviterName 是**签发者本人**
+    的名字——按 join_tokens.issuer_member_id 查 space_members，查不到（存量
+    token 无 issuer）才退回"第一个有名字的 active 成员"）
 
 POST /spaces/join
   用 join token 完成加入（群聊一期 2026-10-03，v3：slot 显式语义）。
@@ -166,7 +168,11 @@ POST /spaces/join
     带 slot → 400
   - channel token：**不需要**带 slot——服务端按 token 绑定的 issuer_member_id
     自动解析发起人槽位；客户端显式带 slot 且不一致 → 403（防错用）
-  响应：200 { spaceId, memberId, slot, sessionToken }
+  响应：200 { spaceId, memberId, slot, sessionToken, entranceId, spaceAddress,
+              isNewMember, upgraded }
+    isNewMember=true 仅当这次 join **新建了身份**（false = 已有成员加通道）——
+    服务端据此决定是否广播 member.joined；
+    upgraded=true 仅当这次 join 真的把 duo 升成了 group（防御闸路径）。
   错误：TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_USED / DEVICE_ALREADY_BOUND /
        ENTRANCE_LIMIT_REACHED（通道数上限，409）/
        SPACE_FULL（group 成员数达 maxMembersPerSpace，409）/
@@ -178,7 +184,9 @@ POST /spaces/join
 ```text
 POST /spaces/{spaceId}/join-tokens
   现有成员生成一次性开通码（join token，可刷新/撤销）。
-  请求：{ purpose: 'invite' | 'channel' }（群聊一期 2026-10-03，缺省 'channel'）
+  请求：{ purpose: 'invite' | 'channel' }（群聊一期 2026-10-03；**必填语义**——
+  缺省 'channel' 是历史行为，客户端必须显式传：两种码语义相反，漏传会让
+  "邀请伴侣"变成"把自己身份送出去"）
   - invite：邀请新成员（新身份）。duo 满员（伴侣已入网）时**签发即自动升格
     group**（方案 C，单向不可逆）；maxMembersPerSpace ≤ 2 的部署 → 409。
   - channel：发起人在新设备加通道——token 记录签发者 member（issuer 绑定），

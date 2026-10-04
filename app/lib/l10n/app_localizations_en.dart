@@ -649,10 +649,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMenuEntranceList => 'My entrances';
 
   @override
+  String wizardJoinInviteHint(String name, int count) {
+    return '$name invited you to this space ($count members)';
+  }
+
+  @override
+  String wizardJoinInviteHintNoName(int count) {
+    return 'You were invited to this space ($count members)';
+  }
+
+  @override
+  String wizardJoinChannelHint(String name) {
+    return 'This link adds $name\'s own account on another device';
+  }
+
+  @override
   String get chatPageMenuMembers => 'Space members';
 
   @override
   String get chatPageMembersTitle => 'Space members';
+
+  @override
+  String get chatPageMembersMe => 'Me';
+
+  @override
+  String get chatPageMembersUnnamed => 'Unnamed';
 
   @override
   String get chatPageMembersInvitePartner => 'Invite partner';
@@ -664,7 +685,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersUpgradeConfirmTitle => 'Upgrade to group';
 
   @override
-  String chatPageMembersUpgradeConfirmBody(Object maxMembers) {
+  String chatPageMembersUpgradeConfirmBody(int maxMembers) {
     return 'After upgrading this space allows at most $maxMembers members and voice calls will be disabled. This cannot be undone. Continue?';
   }
 
@@ -677,16 +698,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Upgraded to group — voice calls are disabled';
 
   @override
-  String get chatPageMembersMe => 'Me';
-
-  @override
   String get chatPageMembersChannelToken => 'Add my account on another device';
 
   @override
-  String get chatPageMembersTokenCopied => 'Invite link copied';
+  String get chatPageMembersFull => 'Space is full';
 
   @override
-  String get chatPageMembersFull => 'Space is full';
+  String chatPageMembersFullWithMax(int current, int max) {
+    return 'Space is full ($current/$max)';
+  }
 
   @override
   String get chatPageEntranceListFailed =>

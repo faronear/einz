@@ -170,7 +170,17 @@ class ApiClient {
   /// 群聊一期（2026-10-03）：[purpose] 选定 token 类型——`invite` = 邀请新成员
   /// （duo 满员后签发即自动升格 group，方案 C）；`channel` = 发起人在新设备
   /// 加通道（绑定发起人身份）。
-  Future<JoinTokenResult> createJoinToken(String spaceId, String token, {String purpose = 'channel'}) async {
+  ///
+  /// **必填、无默认值**：两种 token 语义相反（一个开新身份、一个绑发起人自己的
+  /// 身份），给默认值就等于让"忘传"静默退化成另一种语义——2026-10-04 审查实测：
+  /// 状态条邀请入口漏传 purpose，拿默认 `channel` 的码给伴侣 → 伴侣以**签发者
+  /// 本人**的身份入网（冒充），且界面上完全没有报错。强制显式传参，把这类错误
+  /// 前移到编译期。
+  Future<JoinTokenResult> createJoinToken(
+    String spaceId,
+    String token, {
+    required String purpose,
+  }) async {
     final res = await _post(
       '/spaces/$spaceId/join-tokens',
       {'purpose': purpose},

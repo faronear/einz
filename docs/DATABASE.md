@@ -57,7 +57,10 @@ CREATE TABLE spaces (
 -- 空间成员（群聊一期 2026-10-03：slot 开放为小整数槽位——新身份 join 分配
 -- 最小空 slot，加通道复用已有行；duo 空间仍恒两槽 0/1。
 -- member_id 是身份锚点，同一身份多通道共享。v3 起 create 不再预置伴侣行，
--- 存量 pending 行（member_id NULL）语义退化为"未预置名字的空槽"）
+-- 存量 pending 行（member_id NULL）= **空槽**：新身份 join 的"最小空 slot"
+-- 判定把它算作空，就地坐进去（UPDATE 而非 INSERT），加入者自填的名字覆盖创建者
+-- 的预置名。不这么做的话存量情侣空间的第二人会落到 slot 2、slot 1 留一个永远
+-- 填不上的幽灵行，连带"同性别第二人取青色"（判据 slot=1）一起失效）
 -- 名称的唯一数据源就是这里的 display_name（v1 的 meta person_name:* 已删除）
 CREATE TABLE space_members (
     space_id     TEXT NOT NULL REFERENCES spaces(space_id),

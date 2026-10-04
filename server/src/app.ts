@@ -271,12 +271,14 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       body?.member_name == null ? undefined : String(body.member_name),
       body?.member_gender == null ? undefined : String(body.member_gender)
     )
-    // 群聊一期（2026-10-03）：join 成功后广播——新成员入网（成员名单刷新）；
-    // 若此 join 触发了 duo → group 升格（防御闸路径），补发升格帧让在线通道
-    // 落系统消息/隐藏通话入口。升格主要发生在 join-tokens 签发点（那里没有
-    // spaceId 之外的上下文，且签发者自己会收到 space.upgraded）。
-    broadcastMemberJoined(r.spaceId, r.memberId)
-    if (getSpaceMode(r.spaceId) === 'group') broadcastSpaceUpgraded(r.spaceId)
+    // 群聊一期（2026-10-03）：join 成功后按需广播两种帧——
+    // - member.joined：仅**新身份**入网（自己加通道不算，否则别人的客户端会
+    //   收到"来了新人"的假信号，2026-10-04 审查修）；
+    // - space.upgraded：仅当这次 join 真的触发了 duo → group 升格（防御闸路径）。
+    //   正常升格发生在签发 invite 时（见 /join-tokens 路由），那里也广播一次；
+    //   幂等性由"mode 变化"判定，客户端不会重复落系统消息。
+    if (r.isNewMember) broadcastMemberJoined(r.spaceId, r.memberId)
+    if (r.upgraded) broadcastSpaceUpgraded(r.spaceId)
     sendJson(res, 200, r)
     return
   }
@@ -294,7 +296,15 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // channel token 记录签发者身份（issuer_member_id），join 时做绑定校验——
     // 杜绝"任何成员的 channel token 任选他人身份加通道"的冒充面。
     const purpose = body?.purpose === 'invite' ? 'invite' : 'channel'
+    const modeBefore = getSpaceMode(spaceId)
     const r = createJoinToken(spaceId, requestBaseUrl(req), purpose, sess.member_id)
+    // 升格主路径（方案 C）：duo 满员后签发 invite 即升格 group。升格只有签发者
+    // 看到确认弹窗，其他成员靠这条广播在聊天流里落系统消息知情（客户端各自治
+    // 渲染文案——消息是 E2EE，服务端不能伪造密文）。按"mode 真的变了"判定，
+    // 幂等、不会重复广播。
+    if (getSpaceMode(spaceId) === 'group' && modeBefore !== 'group') {
+      broadcastSpaceUpgraded(spaceId)
+    }
     sendJson(res, 201, r)
     return
   }

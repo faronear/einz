@@ -10874,3 +10874,74 @@ lock（本机 registry 就是镜像）。要根治得给个"加完依赖跑一�
 **注意**：`BETTER_SQLITE3_MIRROR` 默认留空这一点是刻意的——better-sqlite3 的 package.json
 里 `binary` 字段是 null，官方地址由 github-from-package 从 repository 推出来；写死一个
 "官方 URL"反而可能在它换仓库时变成错的。
+
+---
+
+## 2026-10-04 群聊一期：审查另一个 agent 的落地 + App 端重做
+
+**背景：** 老板怀疑 `a584b91` 之后的 5 个 App commit（`0a43c6d`/`eaf48fd`/`4d38603`/
+`b146972`/`67c8466`）有错（此前已自行揪出两个），并报了一个现象：新空间生成邀请码后
+在本机加入 → `This space is already added`。要求审查，必要时撤销重做。
+
+**审查结论：不全部 revert，但 App 端重做。** 服务端/shared 忠实于设计方案且有测试，
+v3 协议改动本身必要；App 端只完成了"加入向导改造"，chat_page 那 242 行里混着致命错
+和死代码，而设计里最难的部分（peer 假设泛化）几乎没动。
+
+**报的那个现象本身是误会**：`setup_page._isSpaceAlreadyAdded` 是本机闸门（一台设备对
+一个秘境只存一条通道，2026-09-23 加的），同设备拿自己的码加入必然被拦——邀请码能不能
+给伴侣用，**不能在本机上测**。
+
+**但顺着它挖出了 P0**：状态条/菜单的邀请入口调 `createJoinToken` 时**没传 purpose**，
+shared 默认值是 `'channel'` → 展示出去的码是"绑定签发者身份"的 channel token。伴侣在
+另一台设备用它**不会报错**，而是静默变成"我"（冒充）。成员弹层更荒唐：先签一张 invite
+（触发升格），再调 `_showInviteDialog` 又签一张 channel，**显示的是后者** → 等于当时 UI
+上根本不存在能邀请新成员的入口。
+
+**已修（服务端/shared）：**
+- `createJoinToken` 的 `purpose` 改**必填**（默认 channel 是 P0 的直接成因，改必填把这类
+  错误前移到编译期；同步修了 app/test 里两个 fake——它们此前让 `flutter analyze` 直接红）
+- `push.ts` 的 `? IS NULL OR d.member_id != ?` 恒真分支（member_id 为 NULL 时连发送者
+  自己都推，且删掉了原来的 `p.entrance_id != ?` 兜底 → 回归；两道都留）
+- `app.ts` 广播：原来**每次** join 都发 `member.joined`、group 下**每次**都发
+  `space.upgraded`（含自己加通道）→ joinSpace 返回 `isNewMember`/`upgraded`，按语义发；
+  升格主路径（签发 invite 时）补广播一次
+- preflight 的 `inviterName` 原来是"第一个有名字的 active 成员"（group 里 B 发的邀请会
+  显示 A 的名字）→ invite 也回填 issuer，按 `issuer_member_id` 精确查
+- `GET /space` 增发 `mode` / `max_members`：客户端原先只能靠"成员数 ≥3"猜 group，而 duo
+  满员签发 invite 的那一刻 mode 已是 group（那时就得停用通话）
+- 存量 pending 行：原实现"跳过 slot 1"（与设计文档相反）→ 改回**复用**（空槽判定把
+  member_id NULL 算作空）。否则存量情侣空间的第二人落到 slot 2、slot 1 留幽灵行，连带
+  "同性别第二人取青色"（判据 slot=1）失效
+- 测试：`group_chat.test.ts` 里那条假断言（`assert.ok(2 <= 2)`，什么都没验证就把
+  UPGRADE_NOT_ALLOWED 路径标成已覆盖）换成 `group_chat_limit.test.ts`（专用进程跑
+  maxMembersPerSpace=2 的拒绝路径，4 条真实用例）
+
+**已修（CLI，v3 下已坏）：** create 不再问"伴侣的名字"（问了也不上报，白问 + 顶部条显示
+一个服务端不存在的名字）；join 不再恒传 slot（invite token 下必 400）→ 按 preflight 的
+purpose 分流（invite 自填名字/性别、channel 不填不带 slot）；`/invite` 默认 invite，
+`/invite channel` 才签 channel。
+
+**App 端重做（chat_page 回到群聊前基线重写）：**
+- 成员弹层：名单（按槽位）+ 每人通道数 + 「我」标记；邀请按状态分流（邀请伴侣 / 邀请新
+  成员 + 升格确认带人数上限）；满员只留说明（不给一个按了报错的按钮）；
+  「在其他设备加入我的账号」= channel；**无退出入口**
+- 顶部条：duo 仍是对方名字；group 是其他成员名字列表（"A、B、C"）
+- 群气泡：member_id 稳定哈希色板（duo 配色规则一字未改）+ 群内默认显示头像 +
+  **气泡内逐条标注发送者名字**（原实现只有头像/颜色，没有名字）
+- group 隐藏语音通话入口（服务端已静默丢弃 call.\*，挂出来点了没人接只能等超时）
+- 处理 `member.joined`（重拉成员名单）/ `space.upgraded`（置 group + 顶部提示）
+- setup_page：channel 流补名字兜底（用 preflight 的 inviterName——签发者就是我本人）；
+  加入页显示"谁邀请的你 + 目前几人"（替代被删掉的"选择身份"页，是冒充面的知情入口）
+- 新加 l10n 全部有实际使用点（上一版加了 12 条有 5 条从未使用）
+
+**升格系统消息的取舍（与设计方案不同，已记在此）：** 设计要"升格时在聊天流落一条系统
+消息"。没做——消息是 E2EE、服务端伪造不了密文，而客户端**没有"本地-only 系统消息"的落
+库通路**，硬造一条会污染 seq/同步语义。暂按 `passphrase.rotated` 同口径走顶部提示，待
+二期有本地系统消息设施再升级。
+
+**已知遗留：**
+- `server/test/peer_status.test.ts` **跑不完**（在 `a584b91` 的干净 worktree 上同样卡住
+  → 与本次改动无关，但它让 `npm test` 永远跑不到头）。未修。
+- per-member 已读水位（设计里的 schema v10）、本地成员名单落库、引用回复/通知文案泛化、
+  成员邮箱设置：未做（下一批）。
+

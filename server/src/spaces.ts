@@ -36,8 +36,9 @@ function base58url(bytes: Buffer): string {
 }
 
 /** 生成一次性 join token（e1_ 前缀），写库（只存 hash），返回明文与到期时间。
- *  issuerMemberId：channel token 绑定发起人身份（join 校验用）；invite token
- *  开新身份，无需绑定。 */
+ *  issuerMemberId：签发者身份——channel token 用它**绑定发起人**（join 校验
+ *  "仅本人可在新设备接入"），invite token 用它给 preflight 报**精确的受邀人
+ *  名字**。两种 purpose 都应当传（2026-10-04 审查）。 */
 export function newJoinToken(
   spaceId: string,
   createdByEntrance: string,
@@ -62,7 +63,7 @@ export function newJoinToken(
  *  签发即升格），join 消费 token 时防御性再升一次（防 token 签发于升格代码
  *  上线前）。仅当 maxMembersPerSpace > 2 时允许升格，否则抛错（调用方负责
  *  在此之前隐藏邀请入口，这里是服务端兜底）。 */
-export function maybeUpgradeToGroup(spaceId: string): void {
+export function maybeUpgradeToGroup(spaceId: string): boolean {
   const cfg = loadConfig();
   if (cfg.max_members_per_space > 0 && cfg.max_members_per_space <= 2) {
     throw new ApiError(
@@ -71,11 +72,14 @@ export function maybeUpgradeToGroup(spaceId: string): void {
       409,
     );
   }
-  getDb()
+  const r = getDb()
     .prepare(
       `UPDATE spaces SET mode = 'group', updated_at = ? WHERE space_id = ? AND mode = 'duo'`,
     )
     .run(Date.now(), spaceId);
+  // 返回"这次调用是否真的升格了"：升格是幂等的，调用方要据此决定要不要广播
+  // space.upgraded（否则每次签发 invite / 每次 join 都广播，客户端刷系统消息）。
+  return r.changes > 0;
 }
 
 /** 读空间 mode（'duo' | 'group'；未知空间 undefined）。 */
@@ -225,7 +229,8 @@ export async function createSpace(
   // created_by_entrance 列存的是**创建者角色字面量**（"creator"/"member"），
   // 不是某条 entrance_id——列名沿用历史，勿据此列反查通道。
   // purpose='invite'：创建后回传的首张链接是"邀请伴侣"（群聊一期 2026-10-03）。
-  const t = newJoinToken(spaceId, "creator", "invite");
+  // issuer 记创建者身份：preflight 的 inviterName 才能精确到人（见 preflightJoin）。
+  const t = newJoinToken(spaceId, "creator", "invite", creatorMemberId);
   return {
     spaceId,
     spaceAddress,
@@ -275,8 +280,16 @@ export function preflightJoin(
 } {
   const hash = createHash("sha256").update(token).digest("hex");
   const tk = getDb()
-    .prepare(`SELECT space_id, expires_at, used_at, purpose FROM join_tokens WHERE token_hash = ?`)
-    .get(hash) as { space_id: string; expires_at: number; used_at: number | null; purpose: string } | undefined;
+    .prepare(
+      `SELECT space_id, expires_at, used_at, purpose, issuer_member_id FROM join_tokens WHERE token_hash = ?`,
+    )
+    .get(hash) as {
+    space_id: string;
+    expires_at: number;
+    used_at: number | null;
+    purpose: string;
+    issuer_member_id: string | null;
+  } | undefined;
   if (!tk) throw new ApiError("TOKEN_INVALID", "invalid join token", 400);
   if (tk.used_at != null) throw new ApiError("TOKEN_USED", "join token already used", 410);
   if (tk.expires_at < Date.now()) throw new ApiError("TOKEN_EXPIRED", "join token expired", 410);
@@ -306,12 +319,25 @@ export function preflightJoin(
     status: m.status,
   }));
   const memberCount = slots.filter((s) => s.status === "active").length;
-  // 受邀人名字：created_by_entrance 存的是角色字面量（"creator"/"member"，
-  // 见 createSpace），追溯不到签发通道 → 用"已激活成员里最早加入的名字"
-  // 近似（duo 场景即创建者；group 场景足够供确认页展示）。精确到人的
-  // 绑定需要 join_tokens 加签发者 member 列——列二期，一期接受近似。
+  // 受邀人名字：**精确取签发者**（join_tokens.issuer_member_id → space_members
+  // .display_name）。created_by_entrance 存的是角色字面量（"creator"/"member"，
+  // 见 createSpace），追溯不到人——2026-10-04 审查改为签发时一律回填 issuer
+  // （invite/channel 都记），确认页才不会把 B 发的邀请显示成 A 的名字。
+  // 存量/无 issuer 的 token 退回"第一个有名字的 active 成员"近似。
+  const issuerName =
+    tk.issuer_member_id == null
+      ? null
+      : ((
+          getDb()
+            .prepare(
+              `SELECT display_name FROM space_members WHERE space_id = ? AND member_id = ?`,
+            )
+            .get(tk.space_id, tk.issuer_member_id) as { display_name: string | null } | undefined
+        )?.display_name ?? null);
   const inviterName =
-    slots.find((s) => s.status === "active" && s.displayName != null)?.displayName ?? null;
+    issuerName ??
+    slots.find((s) => s.status === "active" && s.displayName != null)?.displayName ??
+    null;
   return {
     spaceId: tk.space_id,
     status: sp.status,
@@ -334,7 +360,20 @@ export function joinSpace(
   installUid?: string, // 安装级标识（多空间：同一物理设备各空间一行同名）
   memberDisplayName?: string, // 新身份自填名字（群聊一期：invite 流必填，channel 流不带）
   memberGender?: string, // 新身份自填性别（同上）
-): { spaceId: string; memberId: string; slot: number; sessionToken: string; spaceAddress: string } {
+): {
+  spaceId: string;
+  memberId: string;
+  slot: number;
+  sessionToken: string;
+  entranceId: string;
+  spaceAddress: string;
+  /** 这次 join 是否**新建了身份**（false = 已有成员加通道）。WS 广播据此决定
+   *  要不要发 member.joined——自己的另一台设备接入不该让别人以为"来了新人"。 */
+  isNewMember: boolean;
+  /** 这次 join 是否触发了 duo → group 升格（防御闸路径；正常路径在签发 invite
+   *  时升格）。服务端据此广播 space.upgraded 一次。 */
+  upgraded: boolean;
+} {
   if (publicKey.length === 0) {
     throw new ApiError("INVALID_REQUEST", "publicKey 必填（加入通道公钥）", 400);
   }
@@ -386,6 +425,7 @@ export function joinSpace(
     //   channel 必带且等于发起人 slot；此处按 slot 参数语义兜底。）
     let chosenSlot: number;
     let isExistingIdentity = false;
+    let upgraded = false; // 本事务内是否真的升格了（供广播判定）
     let member: { member_id: string | null; status: string } | undefined;
     if (slot != null || (purpose === "channel" && tk.issuer_member_id != null)) {
       // channel：身份由 token 绑定（issuer）→ 服务端自动解析发起人 slot（客户端
@@ -414,22 +454,30 @@ export function joinSpace(
       isExistingIdentity = true;
       member = existing;
     } else {
-      // 新身份：最小空 slot（跳过 pending/已有行——存量 pending 行语义为
-      // "未预置名字的空槽"，新身份不占用它，避免复用创建者预期的 slot 1）
+      // 新身份：**最小空 slot**。空 = 没有这一行，**或**这一行还是 pending
+      // （member_id NULL）。后者是存量库的"伴侣预置位"——v3 起 create 不再预置，
+      // 存量 pending 行的语义退化为"未预置名字的空槽"，伴侣拿 invite 链接加入
+      // 就该坐进去（aimemo/groupChatDesign.md「一次性升级步骤」第 4 条）；
+      // 跳过它的话，存量情侣空间的第二人会落到 slot 2、slot 1 留一个永远填不上
+      // 的幽灵行，连带"同性别第二人取青色"（判据 slot=1）也一起失效。
       const rows = getDb()
-        .prepare(`SELECT slot FROM space_members WHERE space_id = ? ORDER BY slot`)
-        .all(tk.space_id) as { slot: number }[];
-      const used = new Set(rows.map((r) => r.slot));
+        .prepare(`SELECT slot, member_id FROM space_members WHERE space_id = ? ORDER BY slot`)
+        .all(tk.space_id) as { slot: number; member_id: string | null }[];
+      const taken = new Set(
+        rows.filter((r) => r.member_id != null).map((r) => r.slot),
+      );
       chosenSlot = 0;
-      while (used.has(chosenSlot)) chosenSlot++;
-      member = undefined; // 行随后新建（下方 INSERT）
+      while (taken.has(chosenSlot)) chosenSlot++;
+      // 命中 pending 行 → 复用它（下方 UPDATE），否则新建（下方 INSERT）
+      const pending = rows.find((r) => r.slot === chosenSlot && r.member_id == null);
+      member = pending == null ? undefined : { member_id: null, status: "pending" };
     }
     if (!isExistingIdentity) {
       // 成员数上限（新增身份才检查）：
       const activeCount = countActiveMembers(tk.space_id);
       if (mode === "duo" && activeCount >= 2) {
         // duo 已满 2 人却有新身份要加入 → 按方案 C 自动升格 group（防御闸）
-        maybeUpgradeToGroup(tk.space_id);
+        upgraded = maybeUpgradeToGroup(tk.space_id);
       }
       if (cfg.max_members_per_space > 0 && activeCount >= cfg.max_members_per_space) {
         throw new ApiError(
@@ -442,7 +490,25 @@ export function joinSpace(
       }
     }
     let memberId = member?.member_id ?? null;
-    if (memberId == null) {
+    if (memberId == null && member != null) {
+      // 命中的是**存量 pending 行**（member_id NULL）：就地坐进去，不改 slot。
+      // 创建者预置的那个名字由加入者自填的名字覆盖——v3 起名字归属本人。
+      memberId = randomUUID();
+      getDb()
+        .prepare(
+          `UPDATE space_members
+              SET member_id = ?, display_name = ?, gender = ?, status = 'active', joined_at = ?
+            WHERE space_id = ? AND slot = ? AND member_id IS NULL`,
+        )
+        .run(
+          memberId,
+          memberDisplayName ?? null,
+          normGender(memberGender) ?? null,
+          Date.now(),
+          tk.space_id,
+          chosenSlot,
+        );
+    } else if (memberId == null) {
       // 新身份首加入：建行 + 生成 member_id（join 方自填名字/性别，群聊一期：
       // 名字来自 join 请求的 member_name/性别 member_gender，缺省 NULL）
       memberId = randomUUID();
@@ -543,7 +609,16 @@ export function joinSpace(
     getDb()
       .prepare(`UPDATE spaces SET status = 'active', updated_at = ? WHERE space_id = ?`)
       .run(Date.now(), tk.space_id);
-    return { spaceId: tk.space_id, memberId, slot: chosenSlot, sessionToken, entranceId, spaceAddress: sp.space_address };
+    return {
+      spaceId: tk.space_id,
+      memberId,
+      slot: chosenSlot,
+      sessionToken,
+      entranceId,
+      spaceAddress: sp.space_address,
+      isNewMember: !isExistingIdentity,
+      upgraded,
+    };
   });
   return doJoin();
 }

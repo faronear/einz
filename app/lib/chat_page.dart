@@ -311,11 +311,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _peerOnline = false; // 对方在线状态（last_seen 距今 <60s）
   String? _peerMemberId; // 对方 memberId（状态条头像用；来自 /space 成员表）
   Uint8List? _peerAvatarBytes; // 对方头像 bytes（状态条显示；拿不到就默认人形）
-  /// 群聊一期（2026-10-03）：全成员资料（memberId → 名字/性别），/space 拉取后
-  /// 维护——group 空间气泡配色/头像按发送者 member 查这里；duo 空间不用
-  /// （走 _myGender/_peerGender 原路径，配色规则原样保留）。
-  final Map<String, String> _memberNames = {};
-  final Map<String, String> _memberGenders = {};
   /// 状态条要显示的「上线 / 下线时刻」（ms；null = 还不知道，不显示）：
   /// 对方与我方各一份，口径与「更多通道」卡片一致（见 [_sinceOfRow]）。
   int? _peerSinceMs;
@@ -324,6 +319,58 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 顺带维护，汉堡菜单「更多通道」项的 devices 图标旁显示（老板 2026-09-28）。
   /// null = 还没拉到（离线/未轮询过），菜单里就不显示数字。
   int? _myEntranceCount;
+
+  /// 群聊一期（2026-10-03）：
+  /// 本空间**全部成员**：member_id → 槽位（/space 的 member_slots——含还没设置
+  /// 名字的成员；member_names 只收有名字的，不能拿来数人头）。槽位用于按加入
+  /// 顺序列名单。
+  final Map<String, int> _memberSlots = {};
+  /// member_id → 显示名（/space 的 member_names；群空间里逐条消息标注"谁说的"）。
+  final Map<String, String> _memberNames = {};
+  /// 空间模式（'duo' | 'group'，/space 下发）。**不靠"成员数 ≥3"猜**——duo 满员
+  /// 签发 invite 后、第三人还没加入时 mode 已经是 group（那时就得停用通话了）。
+  String _spaceMode = 'duo';
+  /// 本服务器单空间成员上限（/space 下发；0=不限）。满员时隐藏邀请入口用。
+  int _maxMembers = 0;
+
+  /// 群聊判定：直接读服务端下发的 mode（不靠"成员数 ≥3"猜——duo 满员后签发
+  /// invite 的那一刻就已升格，此时第三人还没进来，但通话必须立刻停用）。
+  bool get _isGroup => _spaceMode == 'group';
+
+  /// 顶部条那一格的主文案（群聊一期 2026-10-03）：
+  /// - duo：沿用"对方名字"（两人世界里这一格就是那一个人）；
+  /// - group：**其他成员的名字列表**（"A、B、C"），按槽位（入群先后）排、过长
+  ///   由 Text 的省略号截断。不再假装有"唯一一个对方"。
+  String get _statusTitle {
+    if (!_isGroup) return _peerName;
+    final others = _memberSlots.entries
+        .where((e) => e.key != _myMemberId)
+        .toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final names = others
+        .map((e) => _memberNames[e.key] ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+    if (names.isEmpty) return _peerName; // 还没拉到名单：退回旧值，别闪成空白
+    return names.join('、');
+  }
+
+  /// 本空间成员数（身份数，同身份多通道只算一个）。
+  int get _memberCount => _memberSlots.length;
+
+  /// 还能不能再邀请新成员（满员 = 服务端上限已达；0=不限）。
+  bool get _canInviteMore => _maxMembers <= 0 || _memberCount < _maxMembers;
+
+  /// 是否在气泡旁显示发送者头像：group 默认开、duo 默认关；
+  /// `--dart-define=SHOW_MESSAGE_AVATARS=true` 强制开（含 duo）。
+  bool get _showMessageAvatars => kShowMessageAvatarsOverride || _isGroup;
+
+  /// 发送者显示名（群内逐条标注）：成员表里的名字，查不到回落"未命名"。
+  String _senderNameOf(String? memberId) {
+    if (memberId == null) return '';
+    final name = _memberNames[memberId];
+    return (name == null || name.isEmpty) ? '' : name;
+  }
 
   /// **其它**空间（非当前）的未读数：spaceId → 条数。用于顶部「切换秘境」旁的汇总角标。
   final Map<String, int> _otherUnread = {};
@@ -801,6 +848,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
   }
 
+  /// 群聊一期：新**身份**入网（member.joined）——成员数 +1，立刻重拉 /space 刷新
+  /// 成员名单与顶部条（否则要等下一次轮询/重启才看到新人）。
+  void _onMemberJoined(WsMemberJoinedEvent event) {
+    unawaited(_refreshProfileFromServer());
+  }
+
+  /// 群聊一期：duo → group 升格（space.upgraded）——单向不可逆、通话停用。
+  ///
+  /// 升格只有发起邀请的那一方看到确认弹窗，其他成员靠这一帧知情。
+  /// **文案落顶部提示而不是聊天流**：消息是 E2EE，服务端伪造不了密文，客户端
+  /// 也没有"本地-only 系统消息"的落库通路（硬造一条会污染 seq/同步语义）——
+  /// 与 passphrase.rotated 同口径（2026-10-04 定）。待二期有本地系统消息设施
+  /// 再升格为常驻消息。
+  void _onSpaceUpgraded(WsSpaceUpgradedEvent event) {
+    if (!mounted) return;
+    setState(() => _spaceMode = 'group');
+    showTopNotice(context, AppLocalizations.of(context)!.chatPageMembersUpgraded);
+    unawaited(_refreshProfileFromServer());
+  }
+
   /// 空间口令被重设（Server 广播 passphrase.rotated）：只发通知不弹窗——
   /// 修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
@@ -872,15 +939,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         break;
       }
       final myName = space.memberNames[mine] ?? '';
-      // 群聊一期（2026-10-03）：全成员资料快照——group 气泡/头像按发送者 member
-      // 查这里；duo 的 _peerName/_peerGender 原字段继续走原逻辑（下方的
-      // "第一个非我成员"选取对 duo 仍等价于唯一对方）
+      // 群聊一期（2026-10-03）：全成员资料快照——群空间的顶部条名单、逐条消息
+      // 的发送者名字、成员管理弹层都从这里取；duo 的 _peerName/_peerGender 原
+      // 字段继续走原逻辑（下方"第一个非我成员"对 duo 仍等价于唯一对方）。
+      _memberSlots
+        ..clear()
+        ..addAll(space.memberSlots); // 含未命名成员（memberNames 会漏）
       _memberNames
         ..clear()
         ..addAll(space.memberNames);
-      _memberGenders
-        ..clear()
-        ..addAll(space.memberGenders);
+      _spaceMode = space.mode;
+      _maxMembers = space.maxMembers;
       // 身份槽位（0=第一人/创建者，1=第二人）：同性别第二人气泡取青色的判据
       // （老服务端 member_slots 为空表 → 保持 null，不启用青色）
       final mySlot = space.memberSlots[mine];
@@ -1091,6 +1160,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       onProfileUpdated: _onProfileUpdated,
       onReceiptUpdated: _onReceiptUpdated,
       onCall: _onCallSignal,
+      // 群聊一期（2026-10-03）：新身份入网 / 空间升格为群聊
+      onMemberJoined: _onMemberJoined,
+      onSpaceUpgraded: _onSpaceUpgraded,
     );
   }
 
@@ -1444,9 +1516,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_peerName.isNotEmpty)
+              if (_statusTitle.isNotEmpty)
                 Flexible(
-                  child: Text(_peerName,
+                  child: Text(_statusTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       // 15 号：要**明显大于**下面的状态行（11）但不喧宾夺主——
@@ -1479,7 +1551,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             shape: const StadiumBorder(), // 胶囊：随状态条高度自适应（写死 24 会变圆角矩形）
             clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
             child: InkWell(mouseCursor: SystemMouseCursors.click,
-              onTap: _showInviteDialog,
+              // 群聊一期（2026-10-03）：purpose 必传——这一块是"邀请对方来这个
+              // 秘境"，必须是 invite（开新身份）。漏传会退化成 channel（绑定
+              // 我自己的身份），对方拿去加入就变成"我"（2026-10-04 审查实测）。
+              onTap: () => _showInviteDialog(purpose: 'invite'),
               // 与「我的」状态芯片同一档（那块也没有常驻底色）
               hoverColor: Colors.black.withValues(alpha: 0.05),
               highlightColor: Colors.black.withValues(alpha: 0.08),
@@ -1509,7 +1584,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 两个互斥，见下面的 `trailing`）。与 invite 同口径：常态无底色、同一档
     // hover/highlight、同一个 `pad`、同一个 24 圆角；蓝色电话图标（品牌深蓝
     // #2271F7 与 invite 链接同源），文字省掉——电话图标语义够明确，状态条也挤。
-    final Widget callButton = _peerJoined == true
+    //
+    // 群聊一期（2026-10-03）：**群空间不挂**——群内通话一期不做，服务端也会
+    // 静默丢弃 call.* 信令（挂出来点了没人接，只能干等超时）。
+    final Widget callButton = _peerJoined == true && !_isGroup
         ? Tooltip(
             message: l10n.voiceCallMenuCall,
             child: Material(
@@ -1587,137 +1665,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// v2，24h 一次性、需本人会话认证；旧 v1 createInvite 已废弃，不再生成 v1 邀请码）。
   /// 二维码与展示内容 = 邀请链接（`https://einz.tic.cc/join/<token>`），对方 App/
   /// CLI 可扫码或粘贴链接加入；口令由对方加入时另行输入（降级 B，与 TUI 一致）。
-  /// 空间成员管理弹层（群聊一期 2026-10-03）：成员名单 + 邀请入口。
-  /// - 邀请按状态分流：伴侣未入网 → 「邀请伴侣」（invite，不升格）；
-  ///   伴侣已入网且仍是 duo → 「邀请新成员」（先弹升格确认——通话停用/不可逆，
-  ///   服务端签发 invite 时自动升格 group，方案 C）；
-  ///   group → 「邀请新成员」（直接生成）。
-  /// - 「在其他设备加入我的账号」= channel token（绑定自己身份）。
-  Future<void> _showMembersSheet() async {
-    final l10n = AppLocalizations.of(context)!;
-    final partnerJoined = _memberNames.keys
-        .where((k) => k != _myMemberId && _memberNames[k] != null)
-        .length >= (_myMemberId != null ? 1 : 2);
-    final isGroup = _isGroupSpace;
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) {
-        final scheme = Theme.of(ctx).colorScheme;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Center(
-                    child: Text(l10n.chatPageMembersTitle,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 16)),
-                  ),
-                ),
-                // 成员名单（/space 快照；离线时至少有我）
-                for (final entry in _memberNames.entries)
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: scheme.secondaryContainer,
-                      child: Text(
-                        entry.value.isNotEmpty ? entry.value.characters.first : '?',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    title: Text(entry.value,
-                        style: const TextStyle(fontSize: 14)),
-                    trailing: entry.key == _myMemberId
-                        ? Text(l10n.chatPageMembersMe,
-                            style: TextStyle(
-                                fontSize: 12, color: scheme.onSurfaceVariant))
-                        : null,
-                  ),
-                const SizedBox(height: 8),
-                // 邀请入口：duo 未满员（伴侣未入网）= 邀请伴侣；其余 = 邀请新成员
-                FilledButton.tonalIcon(
-                  icon: const Icon(Icons.person_add_alt_1, size: 18),
-                  label: Text(partnerJoined && !isGroup
-                      ? l10n.chatPageMembersInviteNew
-                      : l10n.chatPageMembersInvitePartner),
-                  onPressed: () async {
-                    Navigator.of(ctx).pop();
-                    // duo 满 2 人签 invite 会触发服务端升格（方案 C）——
-                    // 升格代价（通话停用/不可逆）先确认
-                    if (partnerJoined && !isGroup) {
-                      final ok = await _confirmGroupUpgrade();
-                      if (!ok || !mounted) return;
-                    }
-                    if (!mounted) return;
-                    await _generateInviteLink(purpose: 'invite');
-                  },
-                ),
-                const SizedBox(height: 8),
-                // channel 入口：绑定自己身份的新设备接入
-                FilledButton.tonalIcon(
-                  icon: const Icon(Icons.devices, size: 18),
-                  label: Text(l10n.chatPageMembersChannelToken),
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    unawaited(_generateInviteLink(purpose: 'channel'));
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// 升格确认（方案 C）：说明通话停用/不可逆，返回是否继续。
-  Future<bool> _confirmGroupUpgrade() async {
-    final l10n = AppLocalizations.of(context)!;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(child: Text(l10n.chatPageMembersUpgradeConfirmTitle)),
-        content: Text(l10n.chatPageMembersUpgradeConfirmBodyNoLimit),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-          ),
-        ],
-      ),
-    );
-    return ok ?? false;
-  }
-
-  /// 生成邀请链接（复用 [_showInviteDialog] 的二维码弹窗，指定 purpose）。
-  Future<void> _generateInviteLink({required String purpose}) async {
-    try {
-      final api = widget.api ?? ApiClient(effectiveServer);
-      await _withAuth((t) => api.createJoinToken(widget.spaceId, t, purpose: purpose));
-      if (!mounted) return;
-      await _showInviteDialog();
-    } catch (_) {
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context)!;
-      showTopNotice(context, backendError(l10n, l10n.chatPageInviteFailed('')));
-    }
-  }
-
-  Future<void> _showInviteDialog() async {
+  ///
+  /// [purpose]（群聊一期 2026-10-03）：`invite` = 邀请新成员（开新身份；duo 满员
+  /// 后签发即自动升格 group）；`channel` = 我本人在另一台设备接入（绑定我的身份）。
+  /// **必传**：两种码语义相反，share 错一种等于把对方变成我（2026-10-04 审查
+  /// 实测的 P0）。弹窗内「重新生成」必须沿用同一个 purpose。
+  Future<void> _showInviteDialog({required String purpose}) async {
     // 老板决策：点顶栏添加按钮直接生成开通码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
-      var r = await _withAuth((t) => api.createJoinToken(widget.spaceId, t));
+      var r = await _withAuth((t) => api.createJoinToken(widget.spaceId, t, purpose: purpose));
       if (!mounted) return;
       // 「重新生成」进行中的标记（放在 builder 外：StatefulBuilder 用箭头函数，没地方声明）
       var busy = false;
@@ -1813,7 +1770,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   setLocal(() => busy = true);
                   try {
                     final fresh = await _withAuth(
-                        (t) => api.createJoinToken(widget.spaceId, t));
+                        (t) => api.createJoinToken(widget.spaceId, t, purpose: purpose));
                     if (!ctx.mounted) return;
                     r = fresh; // 就地刷新：二维码 / 开通码 / 链接 ✓
                     setLocal(() {});
@@ -2251,6 +2208,178 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// "现在谁在线"时不用退出弹层，也不用等 30s 的对方在线轮询。为它把弹层主体套进
   /// StatefulBuilder（卡片/失败提示读它承载的可变状态），拉取逻辑收在 `load()` 里
   /// 供"初次打开"与"刷新"共用。
+  /// 空间成员（群聊一期 2026-10-03）：成员名单 + 两种邀请入口。
+  ///
+  /// 入口语义（aimemo/groupChatDesign.md）：
+  /// - **邀请伴侣 / 邀请新成员** = `invite` token（开**新身份**）。伴侣还没入网时
+  ///   就是"邀请伴侣"（不升格）；已入网仍是 duo 时点它 → 先弹升格确认（升级后禁用
+  ///   语音通话、最多 N 人、不可逆），确认后生成。
+  /// - **在其他设备加入我的账号** = `channel` token（绑定**我自己的**身份，仅本人
+  ///   可用，杜绝"任选他人身份加通道"的冒充面）。
+  /// - 满员（服务端 maxMembersPerSpace 已达）→ 只留一行说明，不给按钮。
+  /// - **无退出入口**（一期：入群即不退群）。
+  Future<void> _showMembersSheet() async {
+    final l10n = AppLocalizations.of(context)!;
+    final api = widget.api ?? ApiClient(effectiveServer);
+    // 每个成员挂了几条通道（/entrances 现拉；失败就不显示数字，不拦别的）
+    Map<String, int>? entranceCounts;
+    try {
+      final rows = await _withAuth((t) => api.listEntrances(t));
+      final counts = <String, int>{};
+      for (final d in rows) {
+        final id = d['member_id'] as String?;
+        if (id == null || id.isEmpty) continue;
+        if (d['status'] != null && d['status'] != 'active') continue; // 已撤销的不算
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+      entranceCounts = counts;
+    } catch (_) {
+      entranceCounts = null;
+    }
+    if (!mounted) return;
+    // 成员名单按槽位（入群先后）排；本机那份资料可能还没拉到 → 至少列"我"
+    final entries = _memberSlots.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final partnerJoined = _memberCount >= 2;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Center(
+                    child: Text(l10n.chatPageMembersTitle,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                  ),
+                ),
+                // 成员名单（/space 快照；离线时至少有我）
+                for (final e in entries)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: scheme.secondaryContainer,
+                          child: Text(
+                            (_memberNames[e.key] ?? '').isNotEmpty
+                                ? _memberNames[e.key]!.characters.first
+                                : '?',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            (_memberNames[e.key] ?? '').isNotEmpty
+                                ? _memberNames[e.key]!
+                                : l10n.chatPageMembersUnnamed,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        // 通道数（该身份挂了几台设备）
+                        if (entranceCounts?[e.key] != null) ...[
+                          Icon(Icons.devices, size: 16, color: scheme.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text('${entranceCounts![e.key]}',
+                              style: TextStyle(
+                                  fontSize: 13, color: scheme.onSurfaceVariant)),
+                          const SizedBox(width: 8),
+                        ],
+                        if (e.key == _myMemberId)
+                          Text(l10n.chatPageMembersMe,
+                              style: TextStyle(
+                                  fontSize: 12, color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                // 邀请入口：满员 → 只留说明；duo 且伴侣已入网 → 升格确认；其余直接生成
+                if (!_canInviteMore)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      // 给"按钮去哪了"一个说法（设计文档的风险表：入口直接消失会
+                      // 让人以为坏了）——人数是服务端 maxMembersPerSpace 卡的
+                      _maxMembers > 0
+                          ? l10n.chatPageMembersFullWithMax(_memberCount, _maxMembers)
+                          : l10n.chatPageMembersFull,
+                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                    ),
+                  )
+                else
+                  FilledButton.tonalIcon(
+                    icon: const Icon(Icons.person_add_alt_1, size: 18),
+                    label: Text(partnerJoined && !_isGroup
+                        ? l10n.chatPageMembersInviteNew
+                        : l10n.chatPageMembersInvitePartner),
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      // duo 满 2 人签 invite 会触发服务端升格（方案 C）——
+                      // 升格代价（通话停用/不可逆）先确认
+                      if (partnerJoined && !_isGroup) {
+                        final ok = await _confirmGroupUpgrade();
+                        if (!ok || !mounted) return;
+                      }
+                      if (!mounted) return;
+                      await _showInviteDialog(purpose: 'invite');
+                    },
+                  ),
+                const SizedBox(height: 8),
+                // channel 入口：绑定自己身份的新设备接入
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.devices, size: 18),
+                  label: Text(l10n.chatPageMembersChannelToken),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    unawaited(_showInviteDialog(purpose: 'channel'));
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 升格确认（方案 C）：说明"最多 N 人 + 通话停用 + 不可逆"，返回是否继续。
+  /// [l10n.chatPageMembersUpgradeConfirmBody] 带上限数字（maxMembersPerSpace > 0
+  /// 时）；服务器不限制人数（0）则用不限版文案。
+  Future<bool> _confirmGroupUpgrade() async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Center(child: Text(l10n.chatPageMembersUpgradeConfirmTitle)),
+        content: Text(_maxMembers > 0
+            ? l10n.chatPageMembersUpgradeConfirmBody(_maxMembers)
+            : l10n.chatPageMembersUpgradeConfirmBodyNoLimit),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   Future<void> _showEntranceListSheet() async {
     final l10n = AppLocalizations.of(context)!;
     final api = widget.api ?? ApiClient(effectiveServer);
@@ -2614,7 +2743,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // Overlay 交叉卸载断言）
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        _menuAction(_showInviteDialog);
+                        // 「新建通道」= 我本人在另一台设备接入 → channel token
+                        // （绑定我的身份）。邀**新成员**才是 invite，别搞反。
+                        _menuAction(() => _showInviteDialog(purpose: 'channel'));
                       },
                       hoverColor: Colors.black.withValues(alpha: 0.10),
                       highlightColor: Colors.black.withValues(alpha: 0.14),
@@ -4345,8 +4476,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     // 与消息流一致：按发言人性别配色（男天蓝 / 女品牌粉）
-                    // 群聊一期：group 空间按发送者 member 取哈希色板（duo 原规则不变）
-                    color: _bubbleColor(mine: mine, senderMemberId: avatarMemberId),
+                    color: _bubbleColor(mine: mine),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: DefaultTextStyle.merge(
@@ -5499,15 +5629,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 浅 tint 在渐变背景上区分度不足，老板要求 2026-09-09）。
   /// 两人同性别时第二个人（slot=1）取青色（2026-09-17 老板要求）——
   /// 槽位未知（老服务端/未拉取）或性别不同/未登记时不启用。
-  ///
-  /// 群聊一期（2026-10-03）：[senderMemberId] 非空且空间成员数 > 2（group）时
-  /// 按 member 哈希取色板（不按 slot 轮换——槽位复用/空槽会让颜色漂移）；
-  /// duo 空间不传/成员 ≤2 → 原两人配色规则**原样保留**（含同性别第二人青色）。
+  /// 群聊一期（2026-10-03）：[senderMemberId] 非空**且**空间是 group 时，按
+  /// member_id 的稳定哈希取色板（不按 slot 轮换——槽位复用/空槽会让颜色漂移）；
+  /// duo 空间**原配色规则原样保留**（含同性别第二人取青色，老板 2026-09-17 定）。
   Color _bubbleColor({required bool mine, String? senderMemberId}) {
-    // group 分支：按发送者 member_id 稳定哈希从色板取色（自己恒走我方色）
-    if (!mine && senderMemberId != null && _isGroupSpace) {
-      final gradient = _uiStyle == 'gradient';
-      final palette = gradient ? _groupBubblePaletteGradient : _groupBubblePalettePlain;
+    if (!mine && senderMemberId != null && _isGroup) {
+      final palette = _uiStyle == 'gradient'
+          ? _groupBubblePaletteGradient
+          : _groupBubblePalettePlain;
       return palette[_groupColorIndex(senderMemberId)];
     }
     final gender = mine ? _myGender : _peerGender;
@@ -5534,42 +5663,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
   }
 
-  /// 群聊判定：/space 成员表里"非我"的成员数 ≥ 2 → group。
-  /// 不依赖服务端 mode 字段（客户端不必新增依赖；duo 恒两人，天然不误判）。
-  bool get _isGroupSpace {
-    var others = 0;
-    for (final key in _memberNames.keys) {
-      if (key != _myMemberId) others++;
-    }
-    return others >= 2;
-  }
-
-  /// 本空间是否显示消息气泡旁的发送者头像：group（多人）默认开、duo（两人）
-  /// 默认关（状态条里已有双方头像，逐条再挂是重复——2026-09-26 决策保留）；
-  /// `--dart-define=SHOW_MESSAGE_AVATARS=true` 强制开（含 duo，临时验证用）。
-  bool get _showMessageAvatars => kShowMessageAvatarsOverride || _isGroupSpace;
-
-  /// group 气泡色板——gradient（深色、白字）与 plain（浅 tint）各 4 色：
-  /// 与 duo 的品牌色系一致（蓝/粉/青/紫），饱和度对齐两人空间的视觉基调。
+  /// 群空间气泡色板——gradient（深色、白字）与 plain（浅 tint）各 4 色：沿用
+  /// duo 的品牌色系（蓝/粉/青/紫），饱和度对齐两人空间的视觉基调。
+  ///
+  /// 为什么不用 slot 取模：槽位是内部实现（新身份分配最小空槽、存量库还有
+  /// pending 行），同一成员在不同设备/不同时刻算出来的颜色必须一致 → 用
+  /// member_id 哈希（恒定）。
   static const List<Color> _groupBubblePaletteGradient = [
     Color(0xFF2271F7), // 品牌深蓝
     Color(0xFFB83D80), // 深粉
     Color(0xFF00838F), // 深青
-    Color(0xFF6A4FB6), // 紫（新引入，与品牌色系协调）
+    Color(0xFF6A4FB6), // 紫
   ];
   static const List<Color> _groupBubblePalettePlain = [
-    Color(0xFF3BAFFD), // 天蓝 tint 系
-    Color(0xFFD6529C), // 品牌粉 tint 系
-    Color(0xFF26C6DA), // 青 tint 系
-    Color(0xFF9575CD), // 紫 tint
+    Color(0x2E3BAFFD), // 天蓝 tint（alpha 0.18——与 duo 的素雅档同深度）
+    Color(0x2ED6529C), // 品牌粉 tint（同上）
+    Color(0x3826C6DA), // 青 tint（alpha 0.22——与 duo 同性别第二人同深度）
+    Color(0x389575CD), // 紫 tint
   ];
 
-  /// member_id → 色板下标：取 id 前 8 位的稳定哈希（FNV-1a 32 位）模色板长度。
-  /// 同一成员在任何设备/会话取色一致；id 变化（不可能——member_id 恒定）才会漂移。
+  /// member_id → 色板下标：取 id 的稳定哈希（FNV-1a 32 位）模色板长度。
   static int _groupColorIndex(String memberId) {
     var hash = 0x811c9dc5;
-    final limit = memberId.length < 8 ? memberId.length : 8;
-    for (var i = 0; i < limit; i++) {
+    for (var i = 0; i < memberId.length; i++) {
       hash ^= memberId.codeUnitAt(i);
       hash = (hash * 0x01000193) & 0xFFFFFFFF;
     }
@@ -6025,10 +6141,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   _menuAction(_showRenameDialog);
                 case 'avatar':
                   _menuAction(_showAvatarUpload);
-                case 'entrancelist':
-                  _menuAction(_showEntranceListSheet);
                 case 'members':
                   _menuAction(_showMembersSheet);
+                case 'entrancelist':
+                  _menuAction(_showEntranceListSheet);
                 case 'switchspace':
                   _menuAction(_openSpacePicker);
                 case 'exit':
@@ -6147,7 +6263,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                // 空间成员（群聊一期 2026-10-03）：成员名单 + 邀请/升格入口
+                // 「空间成员」（群聊一期 2026-10-03）：成员名单 + 邀请新成员 /
+                // 「在其他设备加入我的账号」。紧挨「我的通道」——一个是"这个空间
+                // 里有谁"，一个是"我在这个空间挂了几条线"，同属身份·通道分组。
                 PopupMenuItem(mouseCursor: SystemMouseCursors.click,
                   height: kMenuRowHeight,
                   value: 'members',
@@ -6155,6 +6273,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuMembers, style: captionStyle),
                       const Spacer(),
+                      // 右簇：人数 + group 图标（与「我的通道」的 devices + 数字同款）
+                      if (_memberCount > 0) ...[
+                        Text('$_memberCount', style: valueStyle),
+                        const SizedBox(width: 4),
+                      ],
                       Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
                     ],
                   ),
@@ -6447,22 +6570,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 final m = _messages[i];
                 final mine = m.sender == 'me';
                 // 发送者 memberId：信封字段优先，缺失（旧版附件/语音消息）用通道映射兜底。
-                // 只在显示头像时才需要（关掉时不做无谓的查表，也避免"变量未使用"）
-                final avatarMemberId = _showMessageAvatars
-                    ? (m.env.senderMemberId ??
-                        _repo.memberIdOfEntrance(m.env.senderEntranceId))
-                    : null;
+                // 群聊一期：group 空间的**气泡配色**与**发送者名字**都要它，不能只在
+                // 头像开关打开时才算（配色永远按 member 走）。
+                final senderMemberId =
+                    m.env.senderMemberId ?? _repo.memberIdOfEntrance(m.env.senderEntranceId);
                 return Align(
                   alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 气泡旁的头像：默认**关**（状态条里已有双方头像，逐条再挂一个是
-                      // 重复），但代码留着 —— 将来**多人秘境**里"这句是谁说的"必须逐条
-                      // 标注，那时打开开关即可（老板 2026-09-26）。
+                      // 气泡旁的头像：duo 默认**关**（状态条里已有双方头像，逐条再挂
+                      // 一个是重复——老板 2026-09-26）；**group 默认开**（"这句是谁
+                      // 说的"必须逐条标注，注释里预留的场景已到来）。
+                      // `--dart-define=SHOW_MESSAGE_AVATARS=true` 可强制开（含 duo）。
                       if (_showMessageAvatars && !mine) ...[
                         _MessageAvatar(
-                            memberId: avatarMemberId,
+                            memberId: senderMemberId,
                             server: effectiveServer,
                             api: widget.api),
                         const SizedBox(width: 6),
@@ -6492,12 +6615,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             // 不变——边框方案实测闪烁期间气泡尺寸变化，已弃用）
                             color: m.env.messageId == _highlightMessageId
                                 ? const Color(0xFFFF9800)
-                                // 群聊一期：group 空间按发送者 member 取哈希色板（duo 原规则不变）
-                                : _bubbleColor(
-                                    mine: mine,
-                                    senderMemberId: m.env.senderMemberId ??
-                                        _repo.memberIdOfEntrance(m.env.senderEntranceId),
-                                  ),
+                                // 群聊一期：group 空间按发送者 member 取哈希色板
+                                // （duo 走原来的性别/槽位规则，一字未改）
+                                : _bubbleColor(mine: mine, senderMemberId: senderMemberId),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: DefaultTextStyle.merge(
@@ -6519,6 +6639,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     : CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  // 群聊一期（2026-10-03）：群空间里"这句是谁说的"
+                                  // 逐条标注——放在气泡内、时间行上方（duo 不显示：
+                                  // 两人世界里只有"对方"，状态条已经写着了）。
+                                  if (!mine && _isGroup && !m.deleted) ...[
+                                    Text(
+                                      _senderNameOf(senderMemberId),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: _uiStyle == 'gradient'
+                                            ? Colors.white
+                                            : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                  ],
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 2),
                                     child: Row(
@@ -6684,7 +6822,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       if (_showMessageAvatars && mine) ...[
                         const SizedBox(width: 6),
                         _MessageAvatar(
-                            memberId: avatarMemberId,
+                            memberId: senderMemberId,
                             server: effectiveServer,
                             api: widget.api),
                       ],
@@ -7513,14 +7651,14 @@ class _WaveformPainter extends CustomPainter {
 
 /// 消息发送者头像：按 memberId 从服务端加载（静态缓存避免重复请求），
 /// 未设置/加载失败显示默认图标；点击有头像时放大到全屏查看。
-/// 是否在每条消息气泡旁显示发送者头像（编译期开关，`--dart-define` 可覆盖默认）。
+/// 是否在每条消息气泡旁显示发送者头像（编译期开关，`--dart-define` 可覆盖）。
 ///
-/// 群聊一期（2026-10-03）起**按空间类型自动调整**：
-/// - duo（两人）空间：默认**关**——状态条里已有双方头像，逐条再挂是重复
-///   （2026-09-26 原决策，保留）；`--dart-define=SHOW_MESSAGE_AVATARS=true`
-///   可强制显示（临时验证效果用）。
-/// - group（多人）空间：默认**开**——"这句是谁说的"必须逐条标注（原注释
-///   预留的场景已到来）。
+/// 群聊一期（2026-10-03）起**按空间类型自动**（见 [_ChatPageState._showMessageAvatars]）：
+/// duo 默认关（状态条已有双方头像）、group 默认开（必须逐条标注是谁说的）；
+/// `--dart-define=SHOW_MESSAGE_AVATARS=true` 强制全开（临时验证用）。
+///
+/// 用 `bool.fromEnvironment`（编译期常量、但分析器不知道值）而不是写死 false：
+/// 写死会让整段 `if` 被判定为死代码，将来改开关时反而不好维护。
 const bool kShowMessageAvatarsOverride = bool.fromEnvironment('SHOW_MESSAGE_AVATARS');
 
 /// 状态条里**操作控件**（电话图标 / 下拉箭头 / 邀请链接）的背景高度。

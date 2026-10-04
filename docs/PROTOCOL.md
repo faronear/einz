@@ -90,7 +90,7 @@
 | POST | /entrances/retire | **本机自助退役**（§7.2.1，无请求体，只认 session） | Bearer |
 | POST | /push/register | 注册 Push Token | Bearer |
 | DELETE | /push/register | 注销 Push Token | Bearer |
-| GET | /space | 空间信息（space_id、成员通道） | Bearer |
+| GET | /space | 空间信息（space_id、成员通道、member 名称/性别/槽位表；群聊一期 2026-10-03 起含 `mode` 与 `max_members`） | Bearer |
 | POST | /receipts | 上报自己的送达/已读高水位（§5.4） | Bearer |
 | GET | /receipts | 拉取本 space 全部回执行（§5.4） | Bearer |
 | GET | /messages/unread | 未读条数（服务端派生：消息 + 我的读取水位；多空间列表角标用） | Bearer |
@@ -522,6 +522,9 @@ Authorization: Bearer <session_token>
 | S→C | `peer.online` | `{ "entrance_id": "dev1", "member_id": "per1", "online_since": 1787900000000 }` | 对端通道上线（WS 连接建立时广播；**不发给同 member 的通道**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
 | S→C | `peer.offline` | `{ "entrance_id": "dev1", "member_id": "per1" }` | 对端通道下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 member 通道） |
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成开通码/改口令时按需检测 updated_at 再要求输入新口令） |
+| S→C | `profile.updated` | `{ "entrance_id": "…", "member_id": "…", "member_name": "…", "entrance_name": "…" }` | 成员改名/改通道名（客户端立即更新显示、头像缓存失效） |
+| S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加通道（channel token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |
+| S→C | `space.upgraded` | `{ "space_id": "…", "mode": "group" }` | 群聊一期（2026-10-03）：duo → group 升格完成（单向不可逆、通话停用）。**只在 mode 真发生变化时发一次**（签发 invite 时、或 join 触发的防御性升格），幂等。消息是 E2EE、服务端伪造不了密文 → 客户端各自渲染提示文案，服务端不落库 |
 
 ### 8.3 顺序与重连
 
@@ -534,6 +537,10 @@ Authorization: Bearer <session_token>
 服务端**不解析** `sdp` / `candidate`、**不落库、不进 `server_sequence`**、**不参与通话状态机**
 ——振铃超时、忙线、挂断全部由客户端自行判定，避免服务端状态与断线重连纠缠。
 断线重连**不补**通话信令（通话已随连接断开而结束）。
+
+**群聊一期（2026-10-03）：通话仅限 duo 空间**——group 空间的 `call.*` 帧服务端
+**静默丢弃**（不报错、不新增错误码；客户端已隐藏通话入口，服务端这层是兜底）。
+群空间即使当前只有 2 人也不通话（升格成群的代价就是失去通话能力）。
 
 | 方向 | type | payload | 说明 |
 | --- | --- | --- | --- |

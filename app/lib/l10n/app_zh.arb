@@ -302,18 +302,46 @@
   "chatPageMenuBurnLabel": "阅后即焚",
   "chatPageMenuMyNameLabel": "我的身份",
   "chatPageMenuEntranceList": "我的通道",
+  "wizardJoinInviteHint": "{name} 邀请你加入这个秘境（目前 {count} 人）",
+  "wizardJoinInviteHintNoName": "你被邀请加入这个秘境（目前 {count} 人）",
+  "wizardJoinChannelHint": "这是「{name}」在另一台设备接入自己账号的链接",
+  "@wizardJoinInviteHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@wizardJoinInviteHintNoName": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@wizardJoinChannelHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageMenuMembers": "空间成员",
   "chatPageMembersTitle": "空间成员",
+  "chatPageMembersMe": "我",
+  "chatPageMembersUnnamed": "未命名",
   "chatPageMembersInvitePartner": "邀请伴侣",
   "chatPageMembersInviteNew": "邀请新成员",
   "chatPageMembersUpgradeConfirmTitle": "升级为群聊",
   "chatPageMembersUpgradeConfirmBody": "升级后本空间最多 {maxMembers} 人、语音通话将停用，且不可逆。确定继续？",
   "chatPageMembersUpgradeConfirmBodyNoLimit": "升级后语音通话将停用，且不可逆。确定继续？",
   "chatPageMembersUpgraded": "已升级为群聊，语音通话不可用",
-  "chatPageMembersMe": "我",
   "chatPageMembersChannelToken": "在其他设备加入我的账号",
-  "chatPageMembersTokenCopied": "邀请链接已复制",
   "chatPageMembersFull": "成员已满",
+  "chatPageMembersFullWithMax": "成员已满（{current}/{max}）",
   "chatPageEntranceListFailed": "无法获取其他通道（当前离线？）",
   "chatPageEntranceScopeHint": "通道是设备连接到秘境的专属线路。以下是您的连接到当前秘境的所有通道。",
   "chatPageEntranceListThisDevice": "当前通道名称",

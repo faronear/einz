@@ -1,7 +1,7 @@
 import { getDb } from "./db.js";
 import { ApiError } from "./auth.js";
 import { requireSession } from "./guard.js";
-import { type ServerConfig } from "./config.js";
+import { type ServerConfig, loadConfig } from "./config.js";
 import { entranceScopeClause } from "./guard.js";
 
 export interface PushTokenBody {
@@ -52,15 +52,24 @@ export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
     .get(exceptEntranceId) as { member_id: string | null } | undefined;
   const rows = getDb()
     .prepare(
+      // 排除发送者自己：**两道都留**——
+      // ① `d.member_id != ?`（member 维度）排掉发送者的**其他通道**（手机+电脑）；
+      // ② `p.entrance_id != ?`（通道维度）兜住 member_id 为 NULL 的存量行——
+      //    只留 ① 时 `? IS NULL OR ...` 会让整个条件恒真，连发送者那条通道都推
+      //    （2026-10-04 审查发现的回归）。
+      // 发送者身份查不到（member_id NULL）时 ① 退化为 `d.member_id IS NOT NULL`，
+      // ② 仍然生效。
       `SELECT p.entrance_id, p.platform, p.token
          FROM push_tokens p
          JOIN entrances d  ON d.entrance_id = p.entrance_id
          JOIN space_members sm ON sm.member_id = d.member_id AND sm.space_id = ?
         WHERE d.status = 'active'
+          AND p.entrance_id != ?
           AND (? IS NULL OR d.member_id != ?)`,
     )
     .all(
       spaceId,
+      exceptEntranceId,
       senderMemberId?.member_id ?? null,
       senderMemberId?.member_id ?? "",
     ) as { entrance_id: string; platform: string; token: string }[];
@@ -79,8 +88,9 @@ export function sendPushHint(spaceId: string, exceptEntranceId: string): void {
  *  entrances 表，跨空间泄漏 member/在线状态（2026-09-15 评审 C2）。 */
 export function getSpace(
   token: string
-): { space_id: string; entrances: unknown[]; member_names: Record<string, string>; member_genders: Record<string, string>; member_slots: Record<string, number> } {
+): { space_id: string; entrances: unknown[]; member_names: Record<string, string>; member_genders: Record<string, string>; member_slots: Record<string, number>; mode: string; max_members: number } {
   const sess = requireSession(token);
+  const cfg = loadConfig();
   const scope = entranceScopeClause(sess.space_id);
   const entrances = getDb()
     .prepare(`SELECT d.entrance_id, d.member_id, d.status, d.last_seen FROM entrances d WHERE d.status = 'active' AND (${scope.sql})`)
@@ -97,5 +107,19 @@ export function getSpace(
     if (m.gender != null) memberGenders[m.member_id] = m.gender;
     memberSlots[m.member_id] = m.slot;
   }
-  return { space_id: sess.space_id, entrances, member_names: memberNames, member_genders: memberGenders, member_slots: memberSlots };
+  // 群聊一期（2026-10-03）：mode + 成员上限下发客户端——客户端据此隐藏群空间
+  // 的通话入口、满员时隐藏邀请入口、升格确认里显示"最多 N 人"。客户端不该
+  // 靠"成员数 ≥ 3"猜：duo 满员签发 invite 后、第三人还没加入时 mode 已是 group。
+  const modeRow = getDb()
+    .prepare(`SELECT mode FROM spaces WHERE space_id = ?`)
+    .get(sess.space_id) as { mode: string } | undefined;
+  return {
+    space_id: sess.space_id,
+    entrances,
+    member_names: memberNames,
+    member_genders: memberGenders,
+    member_slots: memberSlots,
+    mode: modeRow?.mode === 'group' ? 'group' : 'duo',
+    max_members: cfg.max_members_per_space,
+  };
 }

@@ -103,21 +103,10 @@ test('默认配置（0=不限）：group 可扩到 4 人', async () => {
   })
 })
 
-test('闸门条件：maxMembersPerSpace ≤ 2 时 maybeUpgradeToGroup 拒绝（UPGRADE_NOT_ALLOWED）', async () => {
-  await withDb(async () => {
-    const space = await createSpace(undefined, '我', 'male')
-    joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
-    // 闸门读 loadConfig()——进程级缓存已按空配置加载（0=不限，放行）。
-    // ≤2 的拒绝路径 = 同一条件表达式的另一分支，这里以条件本身验证语义：
-    // 阈值为 2 时 (2 > 0 && 2 <= 2) = true → 必须拒绝。直接对闸门函数
-    // 注入不可行（读全局配置），故断言放行分支 + 表达式语义双覆盖。
-    maybeUpgradeToGroup(space.spaceId)
-    assert.equal(getSpaceMode(space.spaceId), 'group', '不限配置下放行')
-    assert.ok(2 <= 2, 'maxMembersPerSpace=2 时条件为真 → 升格拒绝（集成部署覆盖）')
-  })
-})
+// 注：maxMembersPerSpace ≤ 2 的拒绝路径（UPGRADE_NOT_ALLOWED）需要进程级配置，
+// 在 group_chat_limit.test.ts 里用真实配置跑（本文件是"0=不限"的配置）。
 
-test('存量 pending 行：新身份不复用 slot 1（避免占掉创建者预期的伴侣位）', async () => {
+test('存量 pending 行：新身份**复用** slot 1（不留下填不上的幽灵行）', async () => {
   await withDb(async () => {
     const space = await createSpace(undefined, '我', 'male')
     // 模拟存量库的 pending 行（slot 1, member_id NULL——旧版 create 预置的伴侣位）
@@ -129,6 +118,21 @@ test('存量 pending 行：新身份不复用 slot 1（避免占掉创建者预�
       )
       .run(space.spaceId)
     const joined = joinSpace(space.joinToken, 'pk-b', 'Pixel', undefined, undefined, '小芳')
-    assert.equal(joined.slot, 2, '新身份跳过 pending 行占用的 slot 1')
+    assert.equal(joined.slot, 1, '存量伴侣位就是给伴侣坐的（否则 slot 1 成幽灵行）')
+    assert.notEqual(joined.memberId, space.creatorMemberId)
+    // 名字归本人：加入者自填的名字覆盖创建者预置的名字
+    const row = getDb()
+      .prepare(`SELECT display_name, status, member_id FROM space_members WHERE space_id = ? AND slot = 1`)
+      .get(space.spaceId) as { display_name: string | null; status: string; member_id: string | null }
+    assert.equal(row.display_name, '小芳')
+    assert.equal(row.status, 'active')
+    assert.ok(row.member_id != null)
+    // 只有两位成员：幽灵行没有变成"第三位"
+    const n = (getDb()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND member_id IS NOT NULL`,
+      )
+      .get(space.spaceId) as { n: number }).n
+    assert.equal(n, 2)
   })
 })

@@ -615,10 +615,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMenuEntranceList => '我的通道';
 
   @override
+  String wizardJoinInviteHint(String name, int count) {
+    return '$name 邀请你加入这个秘境（目前 $count 人）';
+  }
+
+  @override
+  String wizardJoinInviteHintNoName(int count) {
+    return '你被邀请加入这个秘境（目前 $count 人）';
+  }
+
+  @override
+  String wizardJoinChannelHint(String name) {
+    return '这是「$name」在另一台设备接入自己账号的链接';
+  }
+
+  @override
   String get chatPageMenuMembers => '空间成员';
 
   @override
   String get chatPageMembersTitle => '空间成员';
+
+  @override
+  String get chatPageMembersMe => '我';
+
+  @override
+  String get chatPageMembersUnnamed => '未命名';
 
   @override
   String get chatPageMembersInvitePartner => '邀请伴侣';
@@ -630,7 +651,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersUpgradeConfirmTitle => '升级为群聊';
 
   @override
-  String chatPageMembersUpgradeConfirmBody(Object maxMembers) {
+  String chatPageMembersUpgradeConfirmBody(int maxMembers) {
     return '升级后本空间最多 $maxMembers 人、语音通话将停用，且不可逆。确定继续？';
   }
 
@@ -642,16 +663,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersUpgraded => '已升级为群聊，语音通话不可用';
 
   @override
-  String get chatPageMembersMe => '我';
-
-  @override
   String get chatPageMembersChannelToken => '在其他设备加入我的账号';
 
   @override
-  String get chatPageMembersTokenCopied => '邀请链接已复制';
+  String get chatPageMembersFull => '成员已满';
 
   @override
-  String get chatPageMembersFull => '成员已满';
+  String chatPageMembersFullWithMax(int current, int max) {
+    return '成员已满（$current/$max）';
+  }
 
   @override
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';

@@ -302,18 +302,63 @@
   "chatPageMenuBurnLabel": "Burn-after-read",
   "chatPageMenuMyNameLabel": "My identity",
   "chatPageMenuEntranceList": "My entrances",
+  "wizardJoinInviteHint": "{name} invited you to this space ({count} members)",
+  "wizardJoinInviteHintNoName": "You were invited to this space ({count} members)",
+  "wizardJoinChannelHint": "This link adds {name}'s own account on another device",
+  "@wizardJoinInviteHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@wizardJoinInviteHintNoName": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@wizardJoinChannelHint": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageMenuMembers": "Space members",
   "chatPageMembersTitle": "Space members",
+  "chatPageMembersMe": "Me",
+  "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvitePartner": "Invite partner",
   "chatPageMembersInviteNew": "Invite new member",
   "chatPageMembersUpgradeConfirmTitle": "Upgrade to group",
   "chatPageMembersUpgradeConfirmBody": "After upgrading this space allows at most {maxMembers} members and voice calls will be disabled. This cannot be undone. Continue?",
+  "@chatPageMembersUpgradeConfirmBody": {
+    "placeholders": {
+      "maxMembers": {
+        "type": "int"
+      }
+    }
+  },
   "chatPageMembersUpgradeConfirmBodyNoLimit": "Voice calls will be disabled after upgrading, and this cannot be undone. Continue?",
   "chatPageMembersUpgraded": "Upgraded to group — voice calls are disabled",
-  "chatPageMembersMe": "Me",
   "chatPageMembersChannelToken": "Add my account on another device",
-  "chatPageMembersTokenCopied": "Invite link copied",
   "chatPageMembersFull": "Space is full",
+  "chatPageMembersFullWithMax": "Space is full ({current}/{max})",
+  "@chatPageMembersFullWithMax": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
   "chatPageEntranceScopeHint": "An entrance connects a device to a space. Below are all your entrances to this space.",
   "chatPageEntranceListThisDevice": "Current entrance name",

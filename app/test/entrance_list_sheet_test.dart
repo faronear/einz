@@ -64,7 +64,11 @@ class _FakeEntranceApi extends ApiClient {
       );
 
   @override
-  Future<JoinTokenResult> createJoinToken(String spaceId, String token) async =>
+  Future<JoinTokenResult> createJoinToken(
+    String spaceId,
+    String token, {
+    required String purpose,
+  }) async =>
       const JoinTokenResult(
         joinToken: 'e1-TESTTOKEN123456789012345678901234567890',
         link: 'https://einz.tic.cc/join/e1-TESTTOKEN12345678901234567890',
