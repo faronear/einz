@@ -8302,7 +8302,21 @@ class _HourglassFlipState extends State<_HourglassFlip>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1600),
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 「减少动态效果」（含 widget 测试：见 test/real_async_settle.dart 的
+    // disableAnimationsInTests）→ 不翻转。**关键是停掉 ticker**：只把画面换成
+    // 静态图标、控制器还在 repeat 的话，帧仍会一直排下去，`pumpAndSettle` 照样
+    // 超时。恢复动态偏好时再续上。
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -8312,6 +8326,10 @@ class _HourglassFlipState extends State<_HourglassFlip>
 
   @override
   Widget build(BuildContext context) {
+    // 减少动态效果 → 静态沙漏（取上壶：与"时间在往下漏"的直觉一致）
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      return Icon(Icons.hourglass_top, size: widget.size);
+    }
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) => Icon(

@@ -1,4 +1,4 @@
-// 「更多通道」菜单弹层（老板 2026-09-25）：列出**当前通道（带绿勾、列第一位）+
+// 「我的通道」菜单弹层（老板 2026-09-25）：列出**当前通道（带绿勾、列第一位）+
 // 我本人的其他通道**（对方 member 的通道不列；离线时当前通道照列）；列表下方
 // 「新建通道」链接 → 生成开通码弹窗。
 //
@@ -18,6 +18,7 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/data/space_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
+import 'real_async_settle.dart';
 
 /// fake api：/entrances 与 /space 都按编排返回（无网络）。
 class _FakeEntranceApi extends ApiClient {
@@ -133,9 +134,13 @@ Future<void> _openEntranceListSheet(
 
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.text('更多通道'));
+  await tester.ensureVisible(find.text(_zh.chatPageMenuEntranceList));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('更多通道'));
+  await tester.tap(find.text(_zh.chatPageMenuEntranceList));
+  // 菜单项 → `_menuAction` 有 300ms 错峰延迟（等菜单收起再开弹层）；pumpAndSettle
+  // 只推到"没有待排帧"就停，可能还没跨过这 300ms → 先显式推过去
+  // （invite_dialog_layout_test 里是同一个套路）。
+  await tester.pump(const Duration(milliseconds: 350));
   await tester.pumpAndSettle();
 }
 
@@ -153,11 +158,11 @@ Finder sheetDot(Color color) => find.descendant(
           w is Icon && w.icon == Icons.circle && w.color == color),
     );
 
-/// 弹层内的**本机绿勾**（Icons.check_circle；与状态灯的实心圆是两个图标，不会撞）。
+/// 弹层内的**本机角标**（Icons.edit，2026-10-02 起「本机」那张卡右上角是"改名"入口；
+/// 与状态灯的实心圆是两个图标，不会撞）。
 Finder sheetLocalCheck() => find.descendant(
       of: find.byType(BottomSheet),
-      matching:
-          find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.check_circle),
+      matching: find.byWidgetPredicate((w) => w is Icon && w.icon == Icons.edit),
     );
 
 /// 弹层内的**已撤销角标**（Icons.block）。
@@ -217,7 +222,12 @@ class _StaleTokenApi extends _FakeEntranceApi {
   }
 }
 
+/// 文案断言一律从 l10n 取（与页面用的是同一份生成代码）：改文案不会再让测试腐烂。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 void main() {
+  // 菜单里的翻转沙漏（_HourglassFlip）是常驻动画，关掉它免得 pumpAndSettle 超时
+  disableAnimationsInTests();
   setUpAll(() async {
     await sodium();
   });
@@ -283,7 +293,7 @@ void main() {
     await _openEntranceListSheet(tester, db, api);
 
     // 弹层标题（菜单已关，文本只在弹层里）
-    expect(sheetText('更多通道'), findsOneWidget);
+    expect(sheetText(_zh.chatPageMenuEntranceList), findsOneWidget);
     // 四张卡片：iPhone（本机·在线）/ iPad（在线）/ MacBook（离线）/ 旧手机（已撤销）
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetText('iPad'), findsOneWidget);
@@ -325,8 +335,14 @@ void main() {
     expect(sheetRevokedMark(), findsOneWidget);
     expect(dimmedCardOf('旧手机'), findsOneWidget, reason: '已撤销卡应有蒙版（整卡降透明度）');
     expect(dimmedCardOf('iPad'), findsNothing, reason: '正常卡不该蒙版');
-    // 角标**固定在卡片右上角**（与名称长短无关）：两种角标到各自卡片右上角的
-    // 内缩量应一致（老板 2026-09-26：绿勾原先紧贴名称，位置随名字跑）
+    // 角标**固定在卡片右上角**（与名称长短无关；老板 2026-09-26：绿勾原先紧贴
+    // 名称，位置随名字跑）。
+    //
+    // 注：两种角标的**图标**到卡边距离天然差 6px——本机那个是可点的"改名"按钮
+    // （2026-10-02 起，Material 圆底 + 6px 内边距，图标因此内缩 6），已撤销那个
+    // 是裸图标。两者**锚点**（Positioned 6,6）一致，差的是按钮自身的 padding。
+    // 所以这里放宽到 7 兜住这 6px；仍能拦住"角标跟着名字跑"的回归（那样差值会是
+    // 几十像素，因为两张卡的名字长短不同：'iPhone' vs '旧手机'）。
     final checkRect = tester.getRect(sheetLocalCheck());
     final markRect = tester.getRect(sheetRevokedMark());
     final phoneCard = cardOf(tester, 'iPhone');
@@ -335,32 +351,32 @@ void main() {
     double insetTop(double cardTop, Rect badge) => badge.top - cardTop;
     expect(
       insetRight(phoneCard.right, checkRect),
-      closeTo(insetRight(oldCard.right, markRect), 1),
-      reason: '两种角标距卡片右边缘的距离应一致（固定位，不随名称长短跑）',
+      closeTo(insetRight(oldCard.right, markRect), 7),
+      reason: '两种角标都固定在右上角（差 6px = 改名按钮自带的内边距，不是跟着名字跑）',
     );
     expect(
       insetTop(phoneCard.top, checkRect),
-      closeTo(insetTop(oldCard.top, markRect), 1),
-      reason: '两种角标距卡片上边缘的距离应一致',
+      closeTo(insetTop(oldCard.top, markRect), 7),
+      reason: '同上：两种角标都固定在右上角',
     );
     // 角标该在右上角：位于卡片右上象限，且在名称右侧
     expect(checkRect.right, greaterThan(phoneCard.center.dx));
     expect(checkRect.top, lessThan(phoneCard.center.dy));
     expect(checkRect.right, greaterThan(tester.getRect(sheetText('iPhone')).right),
-        reason: '绿勾不该再贴名称右缘');
+        reason: '本机角标不该再贴名称右缘');
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
     // 「新建通道」按钮（图标+文字居中、有背景）：点击后通道列表弹层收起，
     // 再弹出生成开通码弹窗（老板 2026-09-25）
-    expect(sheetText('新建通道'), findsOneWidget);
-    await tester.tap(sheetText('新建通道'));
+    expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
+    await tester.tap(sheetText(_zh.chatPageEntranceListNew));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
     expect(find.text('我的新设备开通码已生成'), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing,
         reason: '点「新建通道」后通道列表弹层应已收起');
   });
 
-  testWidgets('只有自己一条通道时也要显示自己（带绿勾）', (tester) async {
+  testWidgets('只有自己一条通道时也要显示自己（带本机角标）', (tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -378,14 +394,14 @@ void main() {
     await _openEntranceListSheet(tester, db, api);
 
     // 只有一张卡：当前通道 + 绿勾 + 绿灯 + 时间
-    expect(sheetText('更多通道'), findsOneWidget);
+    expect(sheetText(_zh.chatPageMenuEntranceList), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetLocalCheck(), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);
     expect(sheetDot(Colors.red), findsNothing);
     expect(sheetTimeText(), findsOneWidget);
     // 「新建通道」按钮在
-    expect(sheetText('新建通道'), findsOneWidget);
+    expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
   });
 
   testWidgets('没有时间可显示的卡片也与别的等高（时间行恒占一行，老板 2026-09-26）',
@@ -436,14 +452,14 @@ void main() {
     await _openEntranceListSheet(tester, db, _BrokenEntranceApi());
 
     // 当前通道（本机）照常显示（绿勾 + 绿灯；拉不到服务端时间 → 不显示时间）
-    expect(sheetText('更多通道'), findsOneWidget);
+    expect(sheetText(_zh.chatPageMenuEntranceList), findsOneWidget);
     expect(sheetText('iPhone'), findsOneWidget);
     expect(sheetLocalCheck(), findsOneWidget);
     expect(sheetDot(Colors.green), findsOneWidget);
     expect(sheetTimeText(), findsNothing);
     // 其他通道区失败提示 + 「新建通道」仍在
     expect(sheetTextContaining('无法获取其他通道'), findsOneWidget);
-    expect(sheetText('新建通道'), findsOneWidget);
+    expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
   });
 
   testWidgets('点标题右端的刷新：就地重拉 /entrances，卡片在线状况跟着变', (tester) async {

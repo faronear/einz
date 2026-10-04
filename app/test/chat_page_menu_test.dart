@@ -19,6 +19,7 @@ import 'package:einz/data/vault_session.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/lock_page.dart';
 import 'package:einz_shared/einz_shared.dart';
+import 'real_async_settle.dart';
 
 /// 最小 fake ApiClient：sync 返回编排好的加密消息（模拟 Server 分配
 /// server_sequence；默认空——只测菜单交互，不涉网络）。
@@ -181,6 +182,8 @@ Future<void> _confirmChange(WidgetTester tester) async {
 }
 
 void main() {
+  // 菜单里的翻转沙漏（_HourglassFlip）是常驻动画，关掉它免得 pumpAndSettle 超时
+  disableAnimationsInTests();
   setUpAll(() async {
     await sodium(); // setPin 的 Argon2id/XChaCha20 需要 libsodium
   });

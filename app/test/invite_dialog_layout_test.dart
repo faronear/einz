@@ -8,6 +8,7 @@ import 'package:einz/data/local_database.dart';
 import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'real_async_settle.dart';
 
 /// 开通码弹窗布局回归测试（2026-09-08 老板真机报告：app 使用一段时间后点
 /// 菜单生成开通码，经常整个屏幕变暗但弹窗不出现，flutter run 报
@@ -70,7 +71,12 @@ class _InviteFakeApi extends ApiClient {
       );
 }
 
+/// 文案断言一律从 l10n 取（与页面用的是同一份生成代码）：改文案不会再让测试腐烂。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 void main() {
+  // 菜单里的翻转沙漏（_HourglassFlip）是常驻动画，关掉它免得 pumpAndSettle 超时
+  disableAnimationsInTests();
   testWidgets('开通码弹窗：首帧不抛布局异常且二维码真实可见', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -91,17 +97,19 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100)); // 初始加载（空历史）
 
-    // 菜单 → 更多通道 → 新建通道（2026-09-25 起菜单不再有「生成开通码」项，
-    // 入口移到「更多通道」弹层里的「新建通道」按钮）
+    // 菜单 → 我的通道 → 新建通道（2026-09-25 起菜单不再有「生成开通码」项，
+    // 入口移到「我的通道」弹层里的「新建通道」按钮）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('更多通道'));
+    await tester.ensureVisible(find.text(_zh.chatPageMenuEntranceList));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('更多通道'));
+    await tester.tap(find.text(_zh.chatPageMenuEntranceList));
+    // _menuAction 有 300ms 错峰延迟（等菜单收起再开弹层）：pumpAndSettle 推不到它
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     // 点「新建通道」：通道列表弹层收起，300ms 错峰后才打开弹窗（chat_page
     // _menuAction 设计），随后 createJoinToken（fake 瞬时返回）→ showDialog
-    await tester.tap(find.text('新建通道'));
+    await tester.tap(find.text(_zh.chatPageEntranceListNew));
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(); // 弹窗首帧（原 bug：此帧抛固有尺寸异常 → 遮罩变暗）
     expect(tester.takeException(), isNull,
@@ -109,7 +117,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 弹窗内容齐全
-    expect(find.text('我的新设备开通码已生成'), findsOneWidget);
+    expect(find.text(_zh.chatPageInviteDialogTitleAttachSelf), findsOneWidget);
     // token（次级小字，在上）+ 邀请链接（主展示，在下）——顺序见 chat_page 注释
     expect(find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
         findsWidgets);

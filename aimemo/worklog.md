@@ -11224,3 +11224,59 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 复现过，与本次改动无关。这两条测试断言的开通码标题我已按新文案同步（见上），但要等那个
 帧不停的问题修好才能跑绿。候选排查方向：弹层打开后有常驻动画/ticker（`transientCallbackCount`
 停在非 0）。未深挖。
+
+---
+
+## 2026-10-04（九）菜单里那个"永不停止的动画"——根因与修复
+
+老板让查"打开弹层后 pumpAndSettle 一路帧不停"的问题。**根因找到并修好了。**
+
+### 根因：汉堡菜单里「阅后即焚」那行的翻转沙漏
+
+`chat_page.dart` 的 `_BurnHourglass`/`_HourglassFlip`：未焚毁时用
+`AnimationController(1600ms)..repeat(reverse: true)` 在两态之间无限翻转。
+它出现在**菜单固定一行**里（`_BurnHourglass(burned: false)`），所以只要菜单被打开，
+帧就永远排下去 → `pumpAndSettle` 等 10 分钟（假时钟）后超时。
+
+- 实测：打开菜单前后 `transientCallbackCount` 0 → 3，且不回落；点聊天区空白则仍是 0
+  （所以不是"任何点击"，是菜单这条链）。
+- `PROTOCOL`…无关；`_SendingPlane` 有 `disableAnimations` 守卫，沙漏**没有**。
+- 影响面：**4 个测试文件的全部用例**（`chat_page_menu_test` / `entrance_list_sheet_test`
+  / `invite_dialog_layout_test` / `ui_style_switch_test`）——它们都会开菜单。
+  这解释了为什么它们"在干净 HEAD 上就全红"。
+
+### 修复
+
+1. **生产代码** `_HourglassFlip`：`disableAnimations`（系统"减少动态效果"）为真时
+   **停掉 ticker** 并退化为静态上壶图标。关键点：只换画面不停 ticker 是没用的——
+   帧仍会排下去（`_SendingPlane` 现有写法就有这个漏洞，先不动它）。
+2. **测试基建** `test/real_async_settle.dart` 新增 `disableAnimationsInTests()`
+   （setUp/tearDown 里设/清 `accessibilityFeaturesTestValue`），在 4 个会开菜单的
+   测试 `main()` 开头调用一次——与 `chat_send_status_test` 里那套是同一手法，抽成公共函数。
+
+### 顺带修掉的"rot"（动画一修好，下面这些真面目才露出来）
+
+- `_menuAction` 有 **300ms 错峰延迟**（等菜单收起再开弹层）：`pumpAndSettle()` 推不过去
+  → 两个测试里改成显式 `pump(350ms)` 再 settle。
+- 「我的所有通道」→「我的通道」、弹层按钮「新建通道」→「给我的其他设备生成开通码」、
+  本机角标「绿勾」→「编辑图标」：都是 2026-10-02 那次「我的通道」弹层合并
+  （commit `5b74cf4`）之后没同步的断言。
+- **文案断言改成从 l10n 取**（`lookupAppLocalizations(const Locale('zh'))`）——
+  这套文案被改过三次、测试跟着烂三次，取同一份生成代码就再也不会腐烂。
+- 角标几何断言放宽到 7px 并写明原因：本机角标是"改名按钮"（自带 6px 内边距，
+  2026-10-02），已撤销是裸图标 → 两者**图标**到卡边天然差 6px，锚点其实一致。
+
+### 现状
+
+- `entrance_list_sheet_test` 7/7 ✅、`invite_dialog_layout_test` ✅、`ui_style_switch_test`
+  仍 4 条红、`chat_page_menu_test` 仍 25 条红 —— 后两个是它们**自己的**陈年 rot
+  （`chat_page_menu_test` 里"公钥置顶+复制"那几条测的是已被删掉的功能），与动画无关，
+  是独立的一批活。
+
+### ⚠️ 并发编辑
+
+提交前 `git status` 发现 `app/lib/l10n/app_zh.arb` / `app_en.arb` 在两分钟前被**别人**
+改过（`chatPageInviteDialogTitleInvite`→"邀请伴侣加入本秘境"、`AttachSelf`→"开启我的新通道"、
+`chatPageEntranceListNew`→"在我的其他设备上新建通道"，且**没有重新生成**，arb 与生成代码
+已经不一致）。这不是我改的 → 本次提交**只 add 我自己的文件**，l10n 那批原样留在工作区，
+不碰、不提交、不 revert。
