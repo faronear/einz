@@ -600,8 +600,12 @@ class _SetupPageState extends State<SetupPage> {
         return 5;
       case _WizardRole.join:
         // 群聊一期（2026-10-03）：身份选择页删除。invite = token/名字/口令/PIN/done；
-        // channel = token/口令/PIN/done（少一页名字——身份由 token 绑定）。
-        return _joinPurpose == 'channel' ? 4 : 5;
+        // channel = token/口令/PIN/done——**页码沿用 invite 的编号**（token=1、
+        // 口令=3、PIN=4、done=5，channel 由 token 页直接跳到口令页、跳过 2）。
+        // stepCount 恒为 5：若按"少一页"记 4，PIN 步（4）会撞上 done 判定
+        // （_step == _stepCount）被当成完成页——底部按钮消失、chrome 变 done 样式
+        //（实测 bug：PIN 输入框透明 + 无上一步/下一步/跳过）。
+        return 5;
       case _WizardRole.offline:
         return 3; // envelope/pin/done
       case null:
@@ -920,7 +924,16 @@ class _SetupPageState extends State<SetupPage> {
         _status = null;
         return;
       }
-      // 步骤 2 及以上：逐级回退（create=名字 / join=身份 / offline=密保信封）
+      // 群聊一期（2026-10-03）：channel 流跳过了名字页（身份由 token 绑定），
+      // 口令页「上一步」应直接回 token 页——不能落到步骤 2（名字页对本流无意义，
+      // 且填了名字也不会被提交）
+      if (_role == _WizardRole.join && _step == 3 && _joinPurpose == 'channel') {
+        _step = 1;
+        _localError = null;
+        _status = null;
+        return;
+      }
+      // 步骤 2 及以上：逐级回退（create=名字 / join=名字（invite）/ offline=密保信封）
       if (_step > 1) _step--;
       _localError = null;
       _status = null;
