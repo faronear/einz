@@ -11316,3 +11316,28 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 四个套件全绿：`chat_page_menu_test` 34、`ui_style_switch_test` 5、
 `entrance_list_sheet_test` 7、`invite_dialog_layout_test`（合计 46 passed）。
 `flutter analyze` 干净。
+
+---
+
+## 2026-10-04（十一）开通码弹窗文案定稿（老板改 + 我的评审意见）
+
+老板自己在改这批文案，让我评审"是否符合场景逻辑、英文语感"。评审后他全部同意，我直接落地。
+
+**改了什么**（`app_zh.arb` / `app_en.arb`，中英各 8 条）：
+
+| key | 改成 | 为什么 |
+| --- | --- | --- |
+| `chatPageInviteRegenerate` | 重新生成 / **Regenerate** | 老板一度改成「重新邀请 / Re-invite」——**这个按钮是"重新签发一张码"**（旧码用掉/过期），且三种场景共用（含"添加我的新通道"）；在给自己加设备时写"重新邀请"讲不通 |
+| `chatPageInviteDialogTitleInvite` | 邀请加入本秘境 / Invite someone to this space | 老板用了「伙伴 / buddy」→ 全 App 其他地方统一是「伴侣 / partner」，同一人两种叫法伤小白；而且这条在**群组空间**也出现（那是朋友/同事，不是"伴侣/伙伴"）→ **干脆不写人称**，两种空间都成立。英文同时补了宾语（原 "Invite someone to join" 悬空） |
+| `chatPageInviteDialogTitleAttachSelf` | 添加我的新通道 / Add my new device to this space | "Attach" 是内部词，用户更认 "Add" |
+| `chatPageInviteDialogTitleRecover` | 让对方在新设备接入 / Re-invite them onto a new device | 英文原 "Re-invite someone to **attach**" 悬空；中文统一到"不写人称"，且与成员弹层入口「让伴侣在新设备接入」同构 |
+| `chatPageInviteDialogHintInvite` | 把它发给要邀请的人… / Send this token to whoever you're inviting… | 去掉「特别伙伴 / buddy」（同上：术语 + 群空间不适用） |
+| `chatPageInviteDialogHintAttachSelf` | **在你的另一台设备上用这个码新建一条通道接入本秘境** / **Use this token on your other device**… | 原英文 **"your another device" 是语法错**；原中文"发送给你的另一台设备"也不对——你不是"发给设备"，是**在那台设备上用它** |
+| `chatPageInviteDialogHintRecover` | …TA 在新设备上打开就能回到自己的身份，**原有通道不受影响** / …Their existing entrances keep working. | 英文原 "attach a new entrance to this space" 是内部黑话；且**丢了"原有通道不受影响"这句安抚**（老板"绝不撤销对方通道"那条要求的用户侧表达），补回 |
+| `chatPageEntranceListNew` | 在我的其他设备上新建通道 / **Add an entrance on another device** | 英文原 "Open a new entrance" 丢了"在另一台设备上"，且 "open" 像是"在这里打开" |
+
+**已重新生成** `app_localizations_*.dart`（此前 arb 与生成代码不一致——老板改完没跑 gen-l10n，
+页面显示的还是旧串）。四个套件 46 条全绿；`flutter analyze` 干净。
+
+**顺带**：`entrance_list_sheet_test` 里还残留一处硬写的开通码弹窗标题 → 改走 l10n，
+以后改文案不会再弄红测试。

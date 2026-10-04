@@ -371,7 +371,7 @@ void main() {
     expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
     await tester.tap(sheetText(_zh.chatPageEntranceListNew));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
-    expect(find.text('我的新设备开通码已生成'), findsOneWidget);
+    expect(find.text(_zh.chatPageInviteDialogTitleAttachSelf), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing,
         reason: '点「新建通道」后通道列表弹层应已收起');
   });

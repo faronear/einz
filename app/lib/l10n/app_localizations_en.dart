@@ -430,15 +430,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
-  String get chatPageInviteDialogTitleInvite => 'Invite code created';
+  String get chatPageInviteDialogTitleInvite => 'Invite someone to this space';
 
   @override
   String get chatPageInviteDialogTitleAttachSelf =>
-      'My new-device code created';
+      'Add my new device to this space';
 
   @override
   String get chatPageInviteDialogTitleRecover =>
-      'Their new-device code created';
+      'Re-invite them onto a new device';
 
   @override
   String get chatPageInviteJoinLink => 'Invite';
@@ -448,15 +448,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      'Send this code to the person you\'re inviting — they use it to join as a new member. One-time use, valid for 24 hours.';
+      'Send this token to whoever you\'re inviting so they can join this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Open this code in the app on another device to sign in as yourself. One-time use, valid for 24 hours.';
+      'Use this token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintRecover(String name) {
-    return 'Send this code to $name — they open it on a new device to sign in as themselves. Existing entrances are unaffected. One-time use, valid for 24 hours.';
+    return 'Send this token to $name so they can connect from a new device. Their existing entrances keep working. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -769,7 +769,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListThisDevice => 'Current entrance name';
 
   @override
-  String get chatPageEntranceListNew => 'Generate entrance token';
+  String get chatPageEntranceListNew => 'Add an entrance on another device';
 
   @override
   String get chatPageEntranceListRefresh => 'Refresh';
