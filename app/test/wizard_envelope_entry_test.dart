@@ -27,12 +27,14 @@ Future<void> pumpToPassphrase(
     home: SetupPage(
       db: db,
       probeServer: (_) async => (true, 'v2-multiverse', const <String>[]),
-      // Multiverse join：token 校验（preflight）用 fake——默认走真实 ApiClient
+      // Multiverse join：token 校验（preflight）用 fake——默认走真实 ApiClient。
+      // 群聊一期（2026-10-03）：purpose='invite' → 走"新成员自填名"向导
       preflightOverride: join
           ? (token) async => const SpaceJoinPreflight(
               spaceId: 'space-test',
               status: 'waiting',
               memberCount: 1,
+              purpose: 'invite',
               slots: [
                 SpaceMemberSlot(slot: 0, displayName: 'Lukas', gender: 'male', status: 'active'),
                 SpaceMemberSlot(slot: 1, displayName: 'Alice', gender: 'female', status: 'pending'),
@@ -56,30 +58,29 @@ Future<void> pumpToPassphrase(
   await tester.pumpAndSettle();
 
   if (join) {
-    // join：入口页 → 加入 → token 页（preflight 通过）→ 身份选择页（选第二人）→ 口令页
+    // join：入口页 → 加入 → token 页（preflight 通过）→ 名字页（invite 自填名，
+    // 群聊一期：身份选择页已删）→ 口令页
     await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'TOKEN-1');
-    await tester.tap(find.text('下一步')); // preflight 通过 → 直接进身份选择页（不再显示确认卡片）
+    await tester.tap(find.text('下一步')); // preflight 通过 → 直接进名字页
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Alice')); // 选第二人（伴侣）
+    await tester.enterText(find.byType(TextField), '小芳'); // invite 新成员自填名字
+    await tester.testTextInput.receiveAction(TextInputAction.done); // 收键盘露出性别卡
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.female)); // 选性别女
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle(); // → 口令页
   } else {
-    // create：入口页 → 新建 → 名字页（填名字+性别）→ 伴侣页（填名字+性别）→ 口令页
+    // create：入口页 → 新建 → 名字页（填名字+性别）→ 口令页（群聊一期：伴侣页已删）
     await tester.tap(find.text('创建秘境'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Lukas');
     await tester.tap(find.byIcon(Icons.male)); // 选性别男
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
-    await tester.pumpAndSettle(); // → 伴侣页
-    await tester.enterText(find.byType(TextField), 'Alice');
-    await tester.tap(find.byIcon(Icons.female)); // 选伴侣性别女
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一步'));
-    await tester.pumpAndSettle(); // → 口令页
+    await tester.pumpAndSettle(); // → 口令页（自动自举 createOverride 放行）
   }
 }
 
@@ -136,14 +137,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('请填写我的名字'), findsNothing, reason: '名字已填：旧红字不应残留');
     expect(find.text('请选择性别'), findsOneWidget, reason: '性别仍未选，红字保留');
-    // 选中「男」后下一步 → 放行进入步骤 2（伴侣页）
+    // 选中「男」后下一步 → 放行进入步骤 2（口令页；群聊一期伴侣页已删）
     await tester.tap(find.byIcon(Icons.male));
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
     expect(find.text('请选择性别'), findsNothing, reason: '选中性别后提醒应消失');
-    expect(find.text('关于伴侣'), findsOneWidget,
-        reason: '应进入步骤 2（伴侣页——名字/性别必填，老板 2026-09-10 定稿）');
+    expect(find.text('设置共享口令'), findsOneWidget,
+        reason: '应进入步骤 2（口令页——群聊一期：create 不预置对方，伴侣页已删）');
   });
 
   testWidgets('create 口令页：口令需二次输入确认（两个输入框）', (WidgetTester tester) async {

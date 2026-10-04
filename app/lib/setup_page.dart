@@ -126,14 +126,12 @@ class _SetupPageState extends State<SetupPage> {
   // FocusScope.unfocus，依赖 Scaffold 的 resizeToAvoidBottomInset——
   // Android 已配 adjustResize，行为同 iOS。
   final _nameFocus = FocusNode();
-  final _peerNameFocus = FocusNode();
   // 其余步骤的「首框」节点：切步骤后由 [_focusFirstFieldOfStep] 显式 requestFocus
-  final _passphraseFocus = FocusNode(); // create/join 第 3 步（共享口令）
+  final _passphraseFocus = FocusNode(); // create 第 2 步 / join 第 3 步（共享口令）
   final _inviteFocus = FocusNode(); // join 第 1 步（开通码）
   final _envelopeFocus = FocusNode(); // offline 第 1 步（密保信封）
-  final _pinFocus = FocusNode(); // 第 4 步 / offline 第 2 步（锁屏码）
+  final _pinFocus = FocusNode(); // create 第 3 步 / join 第 4 步 / offline 第 2 步（锁屏码）
   final _myGenderRevealKey = GlobalKey();
-  final _peerGenderRevealKey = GlobalKey();
   // Multiverse join：preflight 验证通过的 token（后续步骤/最终提交用）与
   // 空间显示名（进入聊天页的对方名字）
   String _joinToken = '';
@@ -189,7 +187,6 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     _nameFocus.dispose();
-    _peerNameFocus.dispose();
     _passphraseFocus.dispose();
     _inviteFocus.dispose();
     _envelopeFocus.dispose();
@@ -209,9 +206,9 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void initState() {
     super.initState();
-    // 方案 1：名字/伴侣名输入框聚焦时，键盘升起后把性别卡滚入可见区（见 _revealGender）
+    // 方案 1：名字输入框聚焦时，键盘升起后把性别卡滚入可见区（见 _revealGender）。
+    // 群聊一期（2026-10-03）：伴侣名字页已删，不再监听 _peerNameFocus
     _nameFocus.addListener(_onNameFocusChange);
-    _peerNameFocus.addListener(_onPeerNameFocusChange);
     _initServer();
     _autoGenerateKey(); // 对齐 TUI：本地无通道记录即自动生成公私钥，无需用户点按钮
   }
@@ -690,10 +687,6 @@ class _SetupPageState extends State<SetupPage> {
     if (_nameFocus.hasFocus) _revealGender(_myGenderRevealKey, 1.0);
   }
 
-  void _onPeerNameFocusChange() {
-    if (_peerNameFocus.hasFocus) _revealGender(_peerGenderRevealKey, 1.0);
-  }
-
   // 把指定 key 的控件滚入最近滚动视图的可见区；延迟一拍等键盘收起动画结束再算视口
   // （键盘收起后 Scaffold 视口变高，才能把红字警告完整露出来）。
   void _revealGender(GlobalKey key, [double alignment = 0.0]) {
@@ -711,10 +704,9 @@ class _SetupPageState extends State<SetupPage> {
   // 校验失败停留本页时：把当前页的性别红字警告滚入可见区（见 _nextStep 已先收键盘）。
   void _revealCurrentGenderError() {
     GlobalKey? key;
+    // 群聊一期（2026-10-03）：create 伴侣页已删 → 仅 create 第 1 步有性别卡
     if (_role == _WizardRole.create && _step == 1) {
       key = _myGenderRevealKey;
-    } else if (_role == _WizardRole.create && _step == 2) {
-      key = _peerGenderRevealKey;
     }
     if (key != null) _revealGender(key);
   }
@@ -887,9 +879,10 @@ class _SetupPageState extends State<SetupPage> {
       }
       return; // _run* 内部推进 _step
     }
-    // create 步骤 3（口令页）→ 自动自举登记（登记时上传本人+伴侣名字/性别；
-    // 通道名已自动设置不再询问），成功才进口令之后的 PIN 步骤
-    if (_role == _WizardRole.create && _step == 3 && _enroll == null) {
+    // create 口令页（群聊一期 2026-10-03 步号前移：伴侣页删除 → 口令页 3→2）
+    // → 自动自举登记（登记时上传本人名字/性别；通道名已自动设置不再询问），
+    // 成功才进口令之后的 PIN 步骤
+    if (_role == _WizardRole.create && _step == 2 && _enroll == null) {
       await _runBootstrap();
       if (!mounted) return;
       if (_enroll == null) return; // 自举失败：留在本步展示错误/改用加入
