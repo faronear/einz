@@ -197,10 +197,22 @@
   "chatPageSetLockCleared": "PIN deleted. You can enter the space directly at next launch.",
   "chatPageClearLockTitle": "Delete PIN?",
   "chatPageClearLockMessage": "Delete the PIN? After deletion, next app launch will go straight into chat.",
-  "chatPageInviteDialogTitle": "Token created",
+  "chatPageInviteDialogTitleInvite": "Invite code created",
+  "chatPageInviteDialogTitleAttachSelf": "My new-device code created",
+  "chatPageInviteDialogTitleRecover": "Their new-device code created",
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
-  "chatPageInviteDialogHint": "Send it to your partner — or another device of your own — to setup a new entrance into this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintInvite": "Send this code to the person you're inviting — they use it to join as a new member. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintAttachSelf": "Open this code in the app on another device to sign in as yourself. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintRecover": "Send this code to {name} — they open it on a new device to sign in as themselves. Existing entrances are unaffected. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogRecoverFallbackName": "them",
+  "@chatPageInviteDialogHintRecover": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageInviteCopyLinkTooltip": "Copy invite link",
   "chatPageInviteCopyCodeTooltip": "Copy token",
   "chatPageInviteLinkCopied": "Invite link copied",

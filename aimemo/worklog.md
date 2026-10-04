@@ -11192,3 +11192,35 @@ pixels`——**单人卡片**在最小边长（64）时，固定的 Ø48 头像 
 - 设计文档里那句 `purpose（invite | channel）` 加了改名指引（原文当历史保留）
 
 **没动的**：`MethodChannel`（Flutter 平台通道，与术语无关）。
+
+---
+
+## 2026-10-04（八）开通码弹窗：标题/说明按 token 类型拆成三套文案
+
+老板：token 分成 invite / attach 后，弹窗标题与说明还是共享的（"发送给伴侣**或**自己的
+其他设备"），对小白是误导——invite 的码给错人 = 放陌生人进群；找回的码发给本人以外的人
+也没有意义。要求拆成不同的文案键。
+
+**三种场景**（`chat_page._showInviteDialog` 内判定，复用服务端的 purpose + target）：
+
+| 场景 | 判定 | 标题 | 说明 |
+| --- | --- | --- | --- |
+| 邀请新成员 | `purpose == 'invite'` | 邀请开通码已生成 | 把这个码发给要邀请的人——对方用它加入，成为新成员 |
+| 我换设备 | `purpose == 'attach'` 且 target 缺省/是我 | 我的新设备开通码已生成 | 在另一台设备的 App 里打开这个码，以「我的身份」接入 |
+| 帮 TA 找回 | `purpose == 'attach'` 且 target 是别人 | TA 的新设备开通码已生成 | 把这个码发给「{name}」——TA 在新设备上打开，就以自己的身份接入（原有通道不受影响） |
+
+- 判定用 `targetMemberId != _myMemberId`（**不靠名字比字符串**，允许同名成员）
+- 找回文案带对方名字：`_recoverMemberIdentity` 顺手把 `memberName` 传进弹窗
+  （新参数 `targetName`）；名字空 → 退回「对方」（`chatPageInviteDialogRecoverFallbackName`）
+- 说明里明写"原有通道不受影响"——与上一轮"签发/使用找回链接绝不撤销对方通道"的口径一致
+- l10n：删掉共享的 `chatPageInviteDialogTitle` / `chatPageInviteDialogHint`，
+  换成 3 标题 + 3 说明 + 1 兜底名（中英各 7 条）
+
+**验证**：`flutter gen-l10n` + `flutter analyze` 干净（UI 仍由老板真机自测）。
+
+**顺带发现（未修，报给老板）**：`app/test/entrance_list_sheet_test.dart`（7 条）与
+`app/test/invite_dialog_layout_test.dart`（1 条）**在干净 HEAD 上就全部失败**
+（`pumpAndSettle timed out`，打开弹层一路帧不停）——我用 `git stash` 在无改动的 HEAD 上
+复现过，与本次改动无关。这两条测试断言的开通码标题我已按新文案同步（见上），但要等那个
+帧不停的问题修好才能跑绿。候选排查方向：弹层打开后有常驻动画/ticker（`transientCallbackCount`
+停在非 0）。未深挖。

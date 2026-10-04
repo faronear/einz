@@ -1673,9 +1673,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// [targetMemberId] / [passphrase]（2026-10-04 定向 token）：`attach` 指向
   /// **别人**时用——passphrase 是"对别人的身份动手"的授权因子，由调用方先向
   /// 用户要到（见 [_promptSharedPassphrase]）。
+  ///
+  /// [targetName] 仅用于**找回**场景的说明文案（"把这个码发给「X」"）。调用方
+  /// 已经知道要找的是谁，顺手传进来；缺省（拿不到名字）则文案退成"对方"。
   Future<void> _showInviteDialog({
     required String purpose,
     String? targetMemberId,
+    String? targetName,
     String? passphrase,
   }) async {
     // 老板决策：点顶栏添加按钮直接生成开通码（不再先弹"开通通道"确认窗）
@@ -1692,13 +1696,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 「重新生成」进行中的标记（放在 builder 外：StatefulBuilder 用箭头函数，没地方声明）
       var busy = false;
       final l10n = AppLocalizations.of(context)!;
+      // 三种场景各说各的话（老板 2026-10-04：原来标题/说明是共享的，
+      // "发送给伴侣或自己的其他设备"会把小白绕晕——尤其是**找回**：码不该发给
+      // 伴侣本人以外的人，而 invite 的码给错人等于让陌生人进群）。判定规则：
+      //   invite              → 邀请新成员（开新身份）
+      //   attach + 目标是别人 → 找回（帮对方回到他自己的身份）
+      //   attach + 缺省/是我  → 我本人在新设备接入
+      final isRecover = purpose == 'attach' &&
+          targetMemberId != null &&
+          targetMemberId != _myMemberId;
+      final title = isRecover
+          ? l10n.chatPageInviteDialogTitleRecover
+          : purpose == 'invite'
+              ? l10n.chatPageInviteDialogTitleInvite
+              : l10n.chatPageInviteDialogTitleAttachSelf;
+      final hint = isRecover
+          ? l10n.chatPageInviteDialogHintRecover(
+              (targetName ?? '').trim().isEmpty
+                  ? l10n.chatPageInviteDialogRecoverFallbackName
+                  : targetName!.trim())
+          : purpose == 'invite'
+              ? l10n.chatPageInviteDialogHintInvite
+              : l10n.chatPageInviteDialogHintAttachSelf;
       await showDialog<void>(
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setLocal) => AlertDialog(
             // 标题居中（老板 2026-09-25：菜单下的弹窗标题一律居中，不居左）——
             // 与底部弹层的标题口径一致（Center；正文/字段仍靠左）
-            title: Center(child: Text(l10n.chatPageInviteDialogTitle)),
+            title: Center(child: Text(title)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1706,7 +1732,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 靠左对齐——本弹窗除二维码外其余内容均靠左
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(l10n.chatPageInviteDialogHint,
+                  child: Text(hint,
                       style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ),
                 const SizedBox(height: 12),
@@ -2482,6 +2508,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await _showInviteDialog(
       purpose: 'attach',
       targetMemberId: memberId,
+      // 说明文案里要出现"发给谁"；名字空 → 弹窗退成「对方」
+      targetName: memberName,
       passphrase: passphrase,
     );
   }

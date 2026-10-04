@@ -109,7 +109,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 弹窗内容齐全
-    expect(find.text('开通码已生成'), findsOneWidget);
+    expect(find.text('我的新设备开通码已生成'), findsOneWidget);
     // token（次级小字，在上）+ 邀请链接（主展示，在下）——顺序见 chat_page 注释
     expect(find.text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'),
         findsWidgets);

@@ -197,10 +197,22 @@
   "chatPageSetLockCleared": "已删除锁屏码，下次启动应用可直接进入秘境。",
   "chatPageClearLockTitle": "删除锁屏码？",
   "chatPageClearLockMessage": "确定要删除锁屏码吗？删除后下次启动将直接进入聊天。",
-  "chatPageInviteDialogTitle": "开通码已生成",
+  "chatPageInviteDialogTitleInvite": "邀请开通码已生成",
+  "chatPageInviteDialogTitleAttachSelf": "我的新设备开通码已生成",
+  "chatPageInviteDialogTitleRecover": "TA 的新设备开通码已生成",
   "chatPageInviteJoinLink": "邀请",
   "chatPageInviteRegenerate": "重新生成",
-  "chatPageInviteDialogHint": "发送给伴侣或自己的其他设备，开启一条新通道加入当前秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintInvite": "把这个码发给要邀请的人——对方用它加入，成为这个秘境的新成员。24 小时内一次性有效。",
+  "chatPageInviteDialogHintAttachSelf": "在另一台设备的 App 里打开这个码，就能以「我的身份」接入。24 小时内一次性有效。",
+  "chatPageInviteDialogHintRecover": "把这个码发给「{name}」——TA 在新设备上打开，就以自己的身份接入（原有通道不受影响）。24 小时内一次性有效。",
+  "chatPageInviteDialogRecoverFallbackName": "对方",
+  "@chatPageInviteDialogHintRecover": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageInviteCopyLinkTooltip": "复制邀请链接",
   "chatPageInviteCopyCodeTooltip": "复制开通码",
   "chatPageInviteLinkCopied": "邀请链接已复制",

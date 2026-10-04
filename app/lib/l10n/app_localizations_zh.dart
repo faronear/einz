@@ -407,7 +407,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockMessage => '确定要删除锁屏码吗？删除后下次启动将直接进入聊天。';
 
   @override
-  String get chatPageInviteDialogTitle => '开通码已生成';
+  String get chatPageInviteDialogTitleInvite => '邀请开通码已生成';
+
+  @override
+  String get chatPageInviteDialogTitleAttachSelf => '我的新设备开通码已生成';
+
+  @override
+  String get chatPageInviteDialogTitleRecover => 'TA 的新设备开通码已生成';
 
   @override
   String get chatPageInviteJoinLink => '邀请';
@@ -416,8 +422,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteRegenerate => '重新生成';
 
   @override
-  String get chatPageInviteDialogHint =>
-      '发送给伴侣或自己的其他设备，开启一条新通道加入当前秘境。24 小时内一次性有效。';
+  String get chatPageInviteDialogHintInvite =>
+      '把这个码发给要邀请的人——对方用它加入，成为这个秘境的新成员。24 小时内一次性有效。';
+
+  @override
+  String get chatPageInviteDialogHintAttachSelf =>
+      '在另一台设备的 App 里打开这个码，就能以「我的身份」接入。24 小时内一次性有效。';
+
+  @override
+  String chatPageInviteDialogHintRecover(String name) {
+    return '把这个码发给「$name」——TA 在新设备上打开，就以自己的身份接入（原有通道不受影响）。24 小时内一次性有效。';
+  }
+
+  @override
+  String get chatPageInviteDialogRecoverFallbackName => '对方';
 
   @override
   String get chatPageInviteCopyLinkTooltip => '复制邀请链接';

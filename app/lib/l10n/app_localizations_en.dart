@@ -430,7 +430,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
-  String get chatPageInviteDialogTitle => 'Token created';
+  String get chatPageInviteDialogTitleInvite => 'Invite code created';
+
+  @override
+  String get chatPageInviteDialogTitleAttachSelf =>
+      'My new-device code created';
+
+  @override
+  String get chatPageInviteDialogTitleRecover =>
+      'Their new-device code created';
 
   @override
   String get chatPageInviteJoinLink => 'Invite';
@@ -439,8 +447,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteRegenerate => 'Regenerate';
 
   @override
-  String get chatPageInviteDialogHint =>
-      'Send it to your partner — or another device of your own — to setup a new entrance into this space. One-time use, valid for 24 hours.';
+  String get chatPageInviteDialogHintInvite =>
+      'Send this code to the person you\'re inviting — they use it to join as a new member. One-time use, valid for 24 hours.';
+
+  @override
+  String get chatPageInviteDialogHintAttachSelf =>
+      'Open this code in the app on another device to sign in as yourself. One-time use, valid for 24 hours.';
+
+  @override
+  String chatPageInviteDialogHintRecover(String name) {
+    return 'Send this code to $name — they open it on a new device to sign in as themselves. Existing entrances are unaffected. One-time use, valid for 24 hours.';
+  }
+
+  @override
+  String get chatPageInviteDialogRecoverFallbackName => 'them';
 
   @override
   String get chatPageInviteCopyLinkTooltip => 'Copy invite link';

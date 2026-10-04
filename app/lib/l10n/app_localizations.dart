@@ -836,11 +836,23 @@ abstract class AppLocalizations {
   /// **'Delete the PIN? After deletion, next app launch will go straight into chat.'**
   String get chatPageClearLockMessage;
 
-  /// No description provided for @chatPageInviteDialogTitle.
+  /// No description provided for @chatPageInviteDialogTitleInvite.
   ///
   /// In en, this message translates to:
-  /// **'Token created'**
-  String get chatPageInviteDialogTitle;
+  /// **'Invite code created'**
+  String get chatPageInviteDialogTitleInvite;
+
+  /// No description provided for @chatPageInviteDialogTitleAttachSelf.
+  ///
+  /// In en, this message translates to:
+  /// **'My new-device code created'**
+  String get chatPageInviteDialogTitleAttachSelf;
+
+  /// No description provided for @chatPageInviteDialogTitleRecover.
+  ///
+  /// In en, this message translates to:
+  /// **'Their new-device code created'**
+  String get chatPageInviteDialogTitleRecover;
 
   /// No description provided for @chatPageInviteJoinLink.
   ///
@@ -854,11 +866,29 @@ abstract class AppLocalizations {
   /// **'Regenerate'**
   String get chatPageInviteRegenerate;
 
-  /// No description provided for @chatPageInviteDialogHint.
+  /// No description provided for @chatPageInviteDialogHintInvite.
   ///
   /// In en, this message translates to:
-  /// **'Send it to your partner — or another device of your own — to setup a new entrance into this space. One-time use, valid for 24 hours.'**
-  String get chatPageInviteDialogHint;
+  /// **'Send this code to the person you\'re inviting — they use it to join as a new member. One-time use, valid for 24 hours.'**
+  String get chatPageInviteDialogHintInvite;
+
+  /// No description provided for @chatPageInviteDialogHintAttachSelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Open this code in the app on another device to sign in as yourself. One-time use, valid for 24 hours.'**
+  String get chatPageInviteDialogHintAttachSelf;
+
+  /// No description provided for @chatPageInviteDialogHintRecover.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this code to {name} — they open it on a new device to sign in as themselves. Existing entrances are unaffected. One-time use, valid for 24 hours.'**
+  String chatPageInviteDialogHintRecover(String name);
+
+  /// No description provided for @chatPageInviteDialogRecoverFallbackName.
+  ///
+  /// In en, this message translates to:
+  /// **'them'**
+  String get chatPageInviteDialogRecoverFallbackName;
 
   /// No description provided for @chatPageInviteCopyLinkTooltip.
   ///
