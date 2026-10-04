@@ -12,9 +12,10 @@
  *   审计 `partner.rename`→`member.rename`、各 `partner_*` 字段→`member_*`）**合入同一
  *   个尚未发布的 v2 窗口**，不另起 v3。
  * - `3` = 群聊一期（2026-10-03，aimemo/groupChatDesign.md）：create 删
- *   `peer_name`/`peer_gender`、join slot 显式语义（新身份 vs 加通道）、join 新增
- *   `member_name`/`member_gender`、join-tokens 新增 `purpose`、preflight 新增
- *   `mode`/`purpose`/`inviterName`、WS 新增 `member.joined`/`space.upgraded`。
+ *   `peer_name`/`peer_gender`、**create 新增 `mode`**（duo|group，2026-10-04：
+ *   创建时定死、永不改变——取消升格）、join slot 显式语义（新身份 vs 加通道）、
+ *   join 新增 `member_name`/`member_gender`、join-tokens 新增 `purpose`、
+ *   preflight 新增 `mode`/`purpose`/`inviterName`、WS 新增 `member.joined`。
  *   无老客户端兼容（一次性升级，服务端先行拒收旧版）。
  *
  * **单一来源**：REST 校验（app.ts）与 WS 校验（ws.ts）都从这里取，别再各写一份
