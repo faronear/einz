@@ -11928,3 +11928,21 @@ The relevant error-causing widget was: TextField … chat_page.dart:2308
 
 **验证**：新测试 1 条绿（且已证明能抓 bug）；`chat_page_menu_test` / `entrance_list_sheet_test`
 / `invite_dialog_layout_test` / `widget_test` **50 条绿**；`flutter analyze` 干净。
+
+### 2026-10-05（九·补）切语言的红屏：是前面崩溃的余波，已随修复消失
+
+老板复测：**没问题了**。
+
+复盘结论（与当时的猜测 1 吻合）：那次"从中文切到英文红底黄字"**不是语言功能自己的 bug**，
+而是**前面 re-invite 崩溃的余波**——异常发生在某条 route 的卸载/重建期，留下的
+InheritedWidget 依赖不再成立；而"切语言"会更新 `Localizations` → `notifyClients`
+遍历**全部**依赖者 → 那条不成立的依赖在这里才炸出来。前面两个 bug（route 交叉卸载 +
+controller 立即 dispose）修掉后，语言切换自然就正常了。
+
+**产出的守卫测试**：`app/test/locale_switch_test.dart`——用 `_LocaleHost` 照抄 EinzApp 的
+语言接线（监听 `localeNotifier` → 用新 locale 重建 MaterialApp），跑真实的
+「菜单 → 语言 → 选 English」全流程，逐帧断言无异常。这条链路此前**零覆盖**。
+文件头如实写了"当时**没能复现**那个红屏"，以及复现失败后的两个猜测——免得后人误以为
+"测试是绿的 ⇒ 这里从来没出过问题"。
+
+（注：`members_reinvite_test.dart` 是能复现的——临时把 dispose 改回立即它就红。）
