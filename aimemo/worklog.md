@@ -11946,3 +11946,30 @@ controller 立即 dispose）修掉后，语言切换自然就正常了。
 "测试是绿的 ⇒ 这里从来没出过问题"。
 
 （注：`members_reinvite_test.dart` 是能复现的——临时把 dispose 改回立即它就红。）
+
+---
+
+## 2026-10-05（十）「我的同伴」英文按 duo / group 分单复数
+
+老板看完撞车分析后定：**duo → `My companion`，group → `My companions`**（中文不变，仍是「我的同伴」；
+中文不分单复数）。
+
+- 实现用 ICU `select`（不是两套键）：EN 的 `chatPageMenuMembers` / `chatPageMembersTitle` 值改成
+  `{mode, select, duo{My companion} other{My companions}}` + `@` 里声明占位符 `mode`；
+  zh 保持纯文本（生成的方法同样多一个 `mode` 形参，zh 忽略它——实测 gen-l10n 允许未使用的占位符）。
+- 代码两处按 `_isGroup ? 'group' : 'duo'` 传参（弹层标题 + 菜单项）；
+  `members_reinvite_test` 的断言跟着签名走。
+- 为什么按**空间类型**而不是人数：duo 里那是**伴侣**、group 里是**密友**——单复数跟着"空间的形态"，
+  比跟着"此刻有几个人"更稳定（新 duo 还没第二个人时也该是单数）。
+
+### 顺带核对：代码/后台/DB 是否早已统一为 `member`
+
+老板问的。查了 `server/src` + `shared/lib` + `app/lib` + `cli`：**是，统一为 `member`**。
+全仓 `partner` 只剩三类，都不是活的标识符：
+1. **历史注释**（"串术语改名 partner→member"、"partner 加入时自己填名"）；
+2. **老库迁移**：`local_database.dart` v9 把存量库的 `partner_id` → `member_id`
+   （`peer_receipts` / `spaces`）——只服务旧安装，不是现役列；
+3. **两个 l10n 键名**：`chatPageMembersInvitePartner` / `chatPageMembersReinvitePartner`
+   ——键名带 Partner 是「邀请伴侣」时代的遗留，UI 早就是「邀请 / 重新邀请」了（名不副实，待清）。
+
+**验证**：`flutter analyze` 干净；`members_reinvite_test` + `widget_test` 10 条绿。

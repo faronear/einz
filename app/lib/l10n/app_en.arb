@@ -348,8 +348,10 @@
       }
     }
   },
-  "chatPageMenuMembers": "My companions",
-  "chatPageMembersTitle": "My companions",
+  "chatPageMenuMembers": "{mode, select, duo{My companion} other{My companions}}",
+  "@chatPageMenuMembers": {"placeholders": {"mode": {"type": "String"}}},
+  "chatPageMembersTitle": "{mode, select, duo{My companion} other{My companions}}",
+  "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersUnnamed": "Unnamed",
   "chatPageMembersInvitePartner": "Invite",
   "chatPageMembersReinvitePartner": "Re-invite",

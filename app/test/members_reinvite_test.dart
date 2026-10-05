@@ -103,8 +103,8 @@ void main() {
     // 菜单 → 空间成员 → 卡片上的「重新邀请」
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.text(_zh.chatPageMenuMembers));
-    expect(find.text(_zh.chatPageMembersTitle), findsOneWidget, reason: '成员弹层应已打开');
+    await tapDeferred(tester, find.text(_zh.chatPageMenuMembers('duo')));
+    expect(find.text(_zh.chatPageMembersTitle('duo')), findsOneWidget, reason: '成员弹层应已打开');
     await tapDeferred(tester, find.text(_zh.chatPageMembersReinvitePartner));
 
     // 口令弹窗

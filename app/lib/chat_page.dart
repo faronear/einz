@@ -2381,7 +2381,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Center(
-                      child: Text(l10n.chatPageMembersTitle,
+                      child: Text(
+                          l10n.chatPageMembersTitle(_isGroup ? 'group' : 'duo'),
                           style: const TextStyle(
                               fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
@@ -6447,7 +6448,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   value: 'members',
                   child: Row(
                     children: [
-                      Text(l10n.chatPageMenuMembers, style: captionStyle),
+                      Text(l10n.chatPageMenuMembers(_isGroup ? 'group' : 'duo'),
+                          style: captionStyle),
                       const Spacer(),
                       // 右簇：group 图标 + 除我之外的人数（图标在前、数字在后，与
                       // 「我的通道」devices 行同风格）；仅群聊显示（老板 2026-10-05）

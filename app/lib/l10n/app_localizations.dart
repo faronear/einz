@@ -1295,14 +1295,14 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMenuMembers.
   ///
   /// In en, this message translates to:
-  /// **'My companions'**
-  String get chatPageMenuMembers;
+  /// **'{mode, select, duo{My companion} other{My companions}}'**
+  String chatPageMenuMembers(String mode);
 
   /// No description provided for @chatPageMembersTitle.
   ///
   /// In en, this message translates to:
-  /// **'My companions'**
-  String get chatPageMembersTitle;
+  /// **'{mode, select, duo{My companion} other{My companions}}'**
+  String chatPageMembersTitle(String mode);
 
   /// No description provided for @chatPageMembersUnnamed.
   ///

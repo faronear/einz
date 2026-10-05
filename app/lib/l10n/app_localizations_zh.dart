@@ -664,10 +664,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageMenuMembers => '我的同伴';
+  String chatPageMenuMembers(String mode) {
+    return '我的同伴';
+  }
 
   @override
-  String get chatPageMembersTitle => '我的同伴';
+  String chatPageMembersTitle(String mode) {
+    return '我的同伴';
+  }
 
   @override
   String get chatPageMembersUnnamed => '未命名';
