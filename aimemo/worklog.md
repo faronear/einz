@@ -11735,3 +11735,19 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
   **en 是模板**——`l10n.yaml` 的 `template-arb-file: app_en.arb`，所以占位符类型只在 en 声明即可）。
 
 验证：gen-l10n + analyze 干净（UI 仍由老板真机自测）。
+
+### 2026-10-05（四·补2）邀请占位卡加淡色占位词
+
+老板同意。**复用现成键** `spaceListPeerPending`（zh「待加入」/ en「Waiting」）——它本来就是
+"还没加入"的共用词，已被 `chat_page:1542`（状态条）与 `space_switcher:534`（空间列表）用了，
+这次是第三处。
+
+- `_membersCard` 加 `faintName`（名字是占位词 → 次要色），与前一个 `muted` 并列：
+  `color: (muted || faintName) ? onSurfaceVariant : null`。
+- 邀请卡：`name: l10n.spaceListPeerPending, faintName: true`。
+
+⚠️ 备注：`spaceListPeerPending` 这名字带 `spaceList` 前缀，但已跨三处使用（聊天页状态条、
+空间列表、成员弹层）——**不再是"空间列表专属"**。要不要改成中性名（如 `memberPending`）
+待老板定；本次不动。
+
+验证：analyze 干净（UI 由老板真机自测）。

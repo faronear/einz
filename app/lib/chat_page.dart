@@ -2323,7 +2323,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// **每行一张成员卡**——底色=该成员性别色（男浅蓝 / 女浅粉 / 性别未知=中性灰）；
   /// 左：真实头像 + 名字；右：可点的文字按钮（已有成员=「重新邀请」）。
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
-  /// - **尚未加入**的卡：默认头像、不显示名字（duo 里对方还没来 = 就是那一张）；
+  /// - **尚未加入**的卡：默认头像 + 淡色占位词「待加入」（`spaceListPeerPending`）；
+  ///   duo 里对方还没来 = 就是那一张；
   /// - 未满员时列表末尾追加一张「邀请」占位卡（新人还没有卡片可挂按钮）；
   /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
   /// - 群组满员时，末尾那张卡**变灰**（不可点、无按钮），只写「成员已满（n/m）」；
@@ -2370,12 +2371,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             e.key, _memberNames[e.key]));
                       },
                     ),
-                  // 未满 → 末尾一张邀请占位卡（新人没有卡片可挂按钮）
+                  // 未满 → 末尾一张邀请占位卡（默认头像 + 淡色"待加入"占位词）
                   if (_canInvite)
                     _membersCard(
-                      memberId: null, // 默认头像、不显示名字
+                      memberId: null, // 默认头像
                       gender: '',
-                      name: null,
+                      name: l10n.spaceListPeerPending, // 占位词（"待加入"）
+                      faintName: true,
                       actionLabel: _isGroup
                           ? l10n.chatPageMembersInviteNew
                           : l10n.chatPageMembersInvitePartner,
@@ -2412,6 +2414,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     String? actionLabel, // null / muted = 不放按钮（"已满"卡）
     VoidCallback? onAction, // null = 不可点
     bool muted = false,
+    bool faintName = false, // 名字是"待加入"这类占位词 → 淡色
   }) {
     final hasName = (name ?? '').trim().isNotEmpty;
     final scheme = Theme.of(context).colorScheme;
@@ -2439,7 +2442,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     hasName ? name! : '', // 尚未加入：不显示名字
                     style: TextStyle(
                       fontSize: 15,
-                      color: muted ? scheme.onSurfaceVariant : null,
+                      color:
+                          (muted || faintName) ? scheme.onSurfaceVariant : null,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
