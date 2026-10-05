@@ -8,6 +8,17 @@ import 'clickable.dart';
 OverlayEntry? _currentEntry;
 Timer? _dismissTimer;
 
+/// 对话页用的「状态条下方」额外偏移：状态胶囊高 `kStatusAvatarSize`(40) + 下 margin 6。
+///
+/// **为什么不用测量**：状态胶囊的高度由头像决定（`kStatusAvatarSize = 40`，左块没有纵向
+/// 内边距），加 `margin 4 / 6` 就是常量。`kStatusAvatarSize` 定义在 chat_page.dart，
+/// 而 chat_page import 了本文件——**不能反向 import**（会成环），所以这里写死 46 并注明来源。
+///
+/// 背景（老板 2026-10-05）：通知原先**故意**盖住状态条（2026-09-10 为躲开标题栏里的
+/// 汉堡菜单），但现在状态胶囊里也有可点对象了（对方芯片 / 头像 / 邀请链接）→ 改为落在
+/// 它**下方**（消息列表顶部，那一带没有可点对象）。
+const double kNoticeExtraTopBelowStatusBar = 46;
+
 /// 顶部通知（替代底部 SnackBar——不遮挡输入框等底部功能按钮）。
 ///
 /// 用法：`showTopNotice(context, '文案')`。如需在 async 间隙 / 路由 pop 之后
@@ -18,11 +29,13 @@ void showTopNotice(
   BuildContext context,
   String message, {
   Duration duration = const Duration(seconds: 4),
+  double extraTop = 0,
 }) {
   showTopNoticeOn(
     Overlay.of(context, rootOverlay: true),
     message,
     duration: duration,
+    extraTop: extraTop,
   );
 }
 
@@ -31,6 +44,7 @@ void showTopNoticeOn(
   OverlayState overlay,
   String message, {
   Duration duration = const Duration(seconds: 4),
+  double extraTop = 0,
 }) {
   _dismissTimer?.cancel();
   _currentEntry?.remove();
@@ -39,6 +53,7 @@ void showTopNoticeOn(
     builder: (_) => _TopNoticeBanner(
       message: message,
       duration: duration,
+      extraTop: extraTop,
       onDismissed: () {
         if (entry.mounted) entry.remove();
         if (_currentEntry == entry) _currentEntry = null;
@@ -55,11 +70,15 @@ class _TopNoticeBanner extends StatefulWidget {
     required this.message,
     required this.duration,
     required this.onDismissed,
+    this.extraTop = 0,
   });
 
   final String message;
   final Duration duration;
   final VoidCallback onDismissed;
+
+  /// 额外下移量（对话页传 `kNoticeExtraTopBelowStatusBar` = 落到状态胶囊下方）。
+  final double extraTop;
 
   @override
   State<_TopNoticeBanner> createState() => _TopNoticeBannerState();
@@ -105,7 +124,7 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
       // 同高开始（padding.top + kToolbarHeight + 4 = 状态条 margin top）——此前
       // top +8 再叠加内层 Padding top 8，背景从状态条中部开始、只遮下半部分。
       // 不用 SafeArea（top 已显式避开状态栏，避免重复内边距）。
-      top: MediaQuery.paddingOf(context).top + kToolbarHeight + 4,
+      top: MediaQuery.paddingOf(context).top + kToolbarHeight + 4 + widget.extraTop,
       left: 0,
       right: 0,
       child: Clickable(
@@ -125,7 +144,7 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                   // 简化视觉（老板要求 2026-09-10）：清淡浅粉白底，不用粉蓝
                   // 渐变；浅粉细描边 + 淡灰影浮起，不抢眼
                   color: const Color(0xFFFFF5FA), // 浅粉白纸感（同 Scaffold 背景）
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: const Color(0xFFE9D5E0), // 浅粉描边（同输入框描边）
                     width: 1,
@@ -139,9 +158,10 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                   ],
                 ),
                 child: Padding(
+                  // 做薄（老板 2026-10-05）：通知现在落在消息列表上方，越薄遮挡越少
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
-                    vertical: 10,
+                    vertical: 6,
                   ),
                   child: Row(
                     children: [
@@ -153,7 +173,7 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                         ),
                         child: Padding(
                           padding: EdgeInsets.all(3),
-                          child: BrandLogo(size: 22, radius: 6),
+                          child: BrandLogo(size: 18, radius: 5),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -165,7 +185,7 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                           // 深蓝灰常规字重（清淡底上可读；不加粗、无任何装饰）
                           style: const TextStyle(
                             color: Color(0xFF33415A),
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                             height: 1.3,
                           ),

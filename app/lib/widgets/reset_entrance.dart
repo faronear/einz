@@ -139,7 +139,8 @@ Future<bool> confirmLeaveSpace(
   // 凭证条目等下次解锁再摘（见 AppLockService.removeSpace 文档）。
   await AppLockService(database).removeSpace(spaceId);
   if (!retired && context.mounted) {
-    showTopNotice(context, l10n.resetEntranceServerResidualHint);
+    showTopNotice(context, l10n.resetEntranceServerResidualHint,
+        extraTop: kNoticeExtraTopBelowStatusBar);
   }
   return true;
 }

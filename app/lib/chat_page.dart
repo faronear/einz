@@ -794,7 +794,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       VoiceCallEndReason.failed => l10n.voiceCallEndedFailed,
     };
     final overlay = Overlay.of(context, rootOverlay: true);
-    showTopNoticeOn(overlay, message);
+    showTopNoticeOn(overlay, message, extraTop: kNoticeExtraTopBelowStatusBar);
     unawaited(_recordCallInChat(reason, wasCaller, duration));
     _voiceCall?.reset();
   }
@@ -880,7 +880,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
     if (!mounted) return;
-    showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice(_isGroup ? 'group' : 'duo'));
+    _notice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice(_isGroup ? 'group' : 'duo'));
   }
 
   /// 对方改名/换头像（Server 广播 profile.updated）：立即更新顶部条对方名；
@@ -1016,7 +1016,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
       if (serverAt != null && knownAt != null && serverAt > knownAt) {
         if (!mounted) return;
-        showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice(_isGroup ? 'group' : 'duo'));
+        _notice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice(_isGroup ? 'group' : 'duo'));
         _escrowUpdatedAt = serverAt; // 记录已知时间（防 WS 重连/重复补查刷屏）
       }
     } catch (_) {
@@ -1097,7 +1097,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await step(() => AppLockService(db).removeSpace(widget.spaceId));
     SpaceSessions.forget(widget.spaceId); // 凭证已删：会话（含 refresh 闭包）一并丢掉
     if (!mounted) return;
-    showTopNotice(context, AppLocalizations.of(context)!.chatPageEntranceRevoked);
+    _notice(context, AppLocalizations.of(context)!.chatPageEntranceRevoked);
     // 还有其他空间 → 切到下一个；一个都不剩 → 回向导（2026-09-24：不再一律回向导，
     // 多空间下被撤销的只是一条通道，其他秘境应当照常可用）。
     final vault = VaultSession.current;
@@ -1225,7 +1225,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
     if (picked == current) return;
     if (!mounted) return;
-    showTopNotice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
+    _notice(context, AppLocalizations.of(context)!.chatPageLocaleSwitched(kLocaleLabels[picked]!));
   }
 
   /// 加载持久化的界面主题（默认素雅纯色，保留原有视觉效果）。
@@ -1784,7 +1784,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: r.joinToken));
                         if (!ctx.mounted) return;
-                        showTopNotice(ctx, l10n.chatPageInviteCodeCopied);
+                        _notice(ctx, l10n.chatPageInviteCodeCopied);
                       },
                     ),
                   ],
@@ -1810,7 +1810,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: r.link));
                         if (!ctx.mounted) return;
-                        showTopNotice(ctx, l10n.chatPageInviteLinkCopied);
+                        _notice(ctx, l10n.chatPageInviteLinkCopied);
                       },
                     ),
                   ],
@@ -1840,11 +1840,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     setLocal(() {});
                   } on ApiException catch (e) {
                     if (!ctx.mounted) return;
-                    showTopNotice(
+                    _notice(
                         ctx, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
                   } catch (e) {
                     if (!ctx.mounted) return;
-                    showTopNotice(ctx, l10n.chatPageInviteFailed('$e'));
+                    _notice(ctx, l10n.chatPageInviteFailed('$e'));
                   } finally {
                     if (ctx.mounted) setLocal(() => busy = false);
                   }
@@ -1860,10 +1860,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } on ApiException catch (e) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
-      showTopNotice(context, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
+      _notice(context, backendError(l10n, l10n.chatPageInviteFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(
+      _notice(
           context, AppLocalizations.of(context)!.chatPageInviteFailed('$e'));
     }
   }
@@ -2177,7 +2177,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 await _refreshNotifyEmail();
                                 if (ctx.mounted) Navigator.of(ctx).pop(true);
                                 if (mounted) {
-                                  showTopNotice(
+                                  _notice(
                                     context,
                                     status.isVerified
                                         ? l10n.chatPageNotifyDone(email)
@@ -2241,7 +2241,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
     );
     if (changed == true && mounted) {
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageChangePassphraseDone(_isGroup ? 'group' : 'duo'));
+      _notice(context, AppLocalizations.of(context)!.chatPageChangePassphraseDone(_isGroup ? 'group' : 'duo'));
     }
   }
 
@@ -2264,6 +2264,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       action();
     }));
   }
+
+  /// 对话页的通知：锚在**状态胶囊下方**（`kNoticeExtraTopBelowStatusBar`）。
+  ///
+  /// 胶囊里现在有可点对象（对方芯片 / 我方头像 / 未加入时的「邀请链接」），通知别再盖它
+  /// （老板 2026-10-05 改版式；此前 2026-09-10 是"故意盖住状态条"以躲开标题栏的汉堡菜单）。
+  /// 其它页面（向导 / 锁屏 / 重置）没有这条胶囊，继续用默认位置（AppBar 正下方）。
+  void _notice(BuildContext context, String message,
+          {Duration duration = const Duration(seconds: 4)}) =>
+      showTopNotice(context, message,
+          duration: duration, extraTop: kNoticeExtraTopBelowStatusBar);
 
   /// 「通道列表」底部弹层：**当前通道（带绿勾、列第一位）+ 我本人在本空间的其他通道**
   /// （老板 2026-09-25：多设备登录时一眼看到"我还有哪些线挂着、在不在线"；
@@ -3022,10 +3032,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           _videoThumbCache.clear();
         });
         await _refreshLocal();
-        if (mounted) showTopNotice(context, l10n.clearMessagesDone);
+        if (mounted) _notice(context, l10n.clearMessagesDone);
       } catch (e) {
         if (!mounted) return;
-        showTopNotice(context, backendError(l10n, l10n.clearMessagesFailed('$e')));
+        _notice(context, backendError(l10n, l10n.clearMessagesFailed('$e')));
       }
     } else if (picked == 'leave') {
       // 阀门所需的两个输入：通道名（确认清的是这条）与"是否设了锁屏码"（决定要不要验）。
@@ -3270,7 +3280,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty || bytes.length > 2 * 1024 * 1024) {
       if (mounted) {
-        showTopNotice(context, l10n.chatPageAvatarTooLarge);
+        _notice(context, l10n.chatPageAvatarTooLarge);
       }
       return;
     }
@@ -3289,13 +3299,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 消息流里的头像走静态缓存：主动失效才会重拉（否则要重启才更新）
       _MessageAvatarState.invalidate(pid);
       setState(() => _myAvatarBytes = bytes);
-      showTopNotice(context, l10n.chatPageAvatarUploaded);
+      _notice(context, l10n.chatPageAvatarUploaded);
     } on ApiException catch (e) {
       if (!mounted) return;
-      showTopNotice(context, backendError(l10n, l10n.chatPageAvatarFailed(e.message)));
+      _notice(context, backendError(l10n, l10n.chatPageAvatarFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, l10n.chatPageAvatarFailed('$e'));
+      _notice(context, l10n.chatPageAvatarFailed('$e'));
     }
   }
 
@@ -3585,11 +3595,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 if (ctx.mounted) Navigator.of(ctx).pop(true);
               } on ApiException catch (e) {
                 if (ctx.mounted) {
-                  showTopNotice(ctx, backendError(l10n, l10n.chatPageRenameFailed(e.message)));
+                  _notice(ctx, backendError(l10n, l10n.chatPageRenameFailed(e.message)));
                 }
               } catch (e) {
                 if (ctx.mounted) {
-                  showTopNotice(ctx, l10n.chatPageRenameFailed('$e'));
+                  _notice(ctx, l10n.chatPageRenameFailed('$e'));
                 }
               }
             },
@@ -3685,7 +3695,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await settings.save(seconds);
     if (!mounted) return;
     setState(() => _burnSeconds = seconds);
-    showTopNotice(
+    _notice(
       context,
       seconds == 0
           ? l10n.chatPageBurnOff
@@ -3703,7 +3713,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final ok = await _repo.setMessageBurn(m.env.messageId, seconds);
     if (!mounted) return;
     if (!ok) {
-      showTopNotice(context, l10n.chatPageBurnFailed);
+      _notice(context, l10n.chatPageBurnFailed);
       return;
     }
     // 就地更新列表里该消息的 burn 状态（倒计时即刻生效，不用整表刷新）
@@ -3724,7 +3734,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             x,
       ];
     });
-    showTopNotice(
+    _notice(
       context,
       seconds == 0
           ? l10n.chatPageBurnOff
@@ -4291,13 +4301,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } on ApiException catch (e) {
       // 后台：服务端明确拒绝（4xx）——气泡已标 failed，这里把服务端给的理由说出来
       if (!mounted) return;
-      showTopNotice(
+      _notice(
           context,
           backendError(AppLocalizations.of(context)!,
               AppLocalizations.of(context)!.chatPageSendFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
+      _notice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
     }
   }
 
@@ -4458,7 +4468,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _inputFocusNode.requestFocus();
     } else if (action == 'copy') {
       await Clipboard.setData(ClipboardData(text: m.plaintext.trim()));
-      if (mounted) showTopNotice(context, l10n.setupCreateCopied);
+      if (mounted) _notice(context, l10n.setupCreateCopied);
     } else if (action == 'save') {
       await _saveAttachment(m);
     } else if (action == 'burn') {
@@ -5009,7 +5019,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 要么读到全零数据（波形极小、文件 0 字节发不出）。
       if (!await recorder.hasPermission()) {
         if (!mounted) return;
-        showTopNotice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
+        _notice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
         return;
       }
       final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
@@ -5040,7 +5050,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceStartFailed('$e'));
+      _notice(context, AppLocalizations.of(context)!.chatPageVoiceStartFailed('$e'));
     }
   }
 
@@ -5061,7 +5071,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
       if (!mounted) return;
       // 空录音（权限被系统拒后仍可能走到这里）不再静默回文字态，给明确反馈
-      if (!ok) showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceEmpty);
+      if (!ok) _notice(context, AppLocalizations.of(context)!.chatPageVoiceEmpty);
       setState(() {
         _inputMode = ok ? _InputMode.preview : _InputMode.text;
         if (!ok) _recordingPath = null;
@@ -5072,7 +5082,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _inputMode = _InputMode.text;
         _recordingPath = null;
       });
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
+      _notice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
     }
   }
 
@@ -5112,10 +5122,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } on ApiException catch (e) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
-      showTopNotice(context, backendError(l10n, l10n.chatPageVoiceFailed(e.message)));
+      _notice(context, backendError(l10n, l10n.chatPageVoiceFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
+      _notice(context, AppLocalizations.of(context)!.chatPageVoiceFailed('$e'));
     }
   }
 
@@ -5161,7 +5171,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } catch (e) {
       if (!mounted) return;
       setState(() => _previewPlaying = false);
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
+      _notice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
     }
   }
 
@@ -5256,7 +5266,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioMetaMissing);
+      _notice(context, AppLocalizations.of(context)!.chatPageAudioMetaMissing);
       return;
     }
     // 正在播放同一条 → 停止
@@ -5310,7 +5320,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _playingMessageId = null;
         _audioStartedMessageId = null;
       });
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
+      _notice(context, AppLocalizations.of(context)!.chatPageAudioPlayFailed('$e'));
     }
   }
 
@@ -5465,10 +5475,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } on ApiException catch (e) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
-      showTopNotice(context, backendError(l10n, l10n.chatPageSendFailed(e.message)));
+      _notice(context, backendError(l10n, l10n.chatPageSendFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
+      _notice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
     }
   }
 
@@ -5556,10 +5566,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (!mounted) return;
       // 用户取消（null）不算失败，静默返回
       if (target == null) return;
-      showTopNotice(context, l10n.chatPageAttachmentSaved);
+      _notice(context, l10n.chatPageAttachmentSaved);
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, l10n.chatPageFileSaveFailed('$e'));
+      _notice(context, l10n.chatPageFileSaveFailed('$e'));
     }
   }
 
@@ -6163,7 +6173,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final att = m.attachment;
     if (att == null) {
       if (!mounted) return;
-      showTopNotice(context, l10n.chatPageAttachmentMetaMissing);
+      _notice(context, l10n.chatPageAttachmentMetaMissing);
       return;
     }
     // 留存副本还在 → 直接交给系统应用打开
@@ -6190,13 +6200,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final file = File('${dir.path}/${m.plaintext}');
       await file.writeAsBytes(bytes);
       if (!mounted) return;
-      showTopNotice(context, l10n.chatPageSaved(file.path));
+      _notice(context, l10n.chatPageSaved(file.path));
     } on ApiException catch (e) {
       if (!mounted) return;
-      showTopNotice(context, backendError(l10n, l10n.chatPageDownloadFailed(e.message)));
+      _notice(context, backendError(l10n, l10n.chatPageDownloadFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
-      showTopNotice(context, l10n.chatPageDownloadFailed('$e'));
+      _notice(context, l10n.chatPageDownloadFailed('$e'));
     }
   }
 
@@ -6205,7 +6215,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final res = await OpenFilex.open(path);
     if (!mounted) return;
     if (res.type != ResultType.done) {
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageFileOpenFailed(res.message));
+      _notice(context, AppLocalizations.of(context)!.chatPageFileOpenFailed(res.message));
     }
   }
 
@@ -6872,7 +6882,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 await Clipboard.setData(
                                                     ClipboardData(text: m.plaintext.trim()));
                                                 if (!mounted) return;
-                                                showTopNotice(
+                                                _notice(
                                                     this.context, l10n.setupCreateCopied);
                                               },
                                             ),
@@ -7238,7 +7248,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活）
         final overlay = Overlay.of(context, rootOverlay: true);
         Navigator.of(context).pop(); // 无改动：不回 true（菜单不做无谓刷新）
-        showTopNoticeOn(overlay, l10n.chatPageSetLockNoPinNotice);
+        showTopNoticeOn(overlay, l10n.chatPageSetLockNoPinNotice, extraTop: kNoticeExtraTopBelowStatusBar);
         return;
       }
       // async gap 前同步捕获 overlay（根 Overlay 在路由 pop 后仍存活），避免 use_build_context_synchronously
@@ -7262,7 +7272,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         await AppLockService(widget.db).clearPackage();
         if (!mounted) return;
         Navigator.of(context).pop(true); // 菜单刷新「PIN: 未设置」
-        showTopNoticeOn(overlay, l10n.chatPageSetLockCleared);
+        showTopNoticeOn(overlay, l10n.chatPageSetLockCleared, extraTop: kNoticeExtraTopBelowStatusBar);
       } catch (e) {
         if (!mounted) return;
         setState(() => _error = l10n.setPinDialogSetupFailed('$e'));
@@ -7294,7 +7304,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       await AppLockService(widget.db).setPin(pin, payload: widget.payload);
       if (!mounted) return;
       Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
-      showTopNoticeOn(overlay, l10n.chatPageSetLockDone);
+      showTopNoticeOn(overlay, l10n.chatPageSetLockDone, extraTop: kNoticeExtraTopBelowStatusBar);
     } catch (e) {
       if (!mounted) return; // 弹窗可能已被关闭（barrier/返回），避免 setState on disposed
       setState(() => _error = l10n.setPinDialogSetupFailed('$e'));

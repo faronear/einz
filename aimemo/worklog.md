@@ -12025,3 +12025,31 @@ controller 立即 dispose）修掉后，语言切换自然就正常了。
 - **删死键** `setupCreateShareTitle`（zh 值 + en 值 + `@`；全仓零引用）。
 
 **验证**：`flutter analyze` 干净；6 个套件 **52 条绿**；`grep partner` in app_en.arb = **0**。
+
+---
+
+## 2026-10-05（十三）顶部通知：从"盖住状态条"挪到"状态条下方" + 做薄
+
+老板：通知条总挡住状态条（当年是他要求的——为躲开标题栏里可点的汉堡菜单），但**现在状态
+胶囊里也有可点对象**（对方芯片 / 我方头像 / 未加入时的「邀请链接」），想换位置。
+
+- **先纠正一个前提**：老板以为"标题栏与状态条之间有一段间距"，实测**只有 4px**
+  （状态胶囊的 `margin-top`）——他看到的是 AppBar 自身留白（logo 的 `padding vertical 10`），
+  放不下一行。所以"塞进两者之间"不可行：要么盖住胶囊（回到老问题），要么把整块内容顶下去。
+- **定为「状态条下方」**：那一段是消息列表顶部，是这一屏唯一没有可点对象的地方。
+- 实现：
+  - `top_notice` 加可选 `extraTop` + 公开常量 **`kNoticeExtraTopBelowStatusBar = 46`**
+    （= `kStatusAvatarSize` 40 + 下 margin 6；胶囊高由头像决定 → **是常量、无需测量**；
+    `kStatusAvatarSize` 在 chat_page 里，而 chat_page import 本文件 → **反向 import 会成环**，
+    所以写死 46 并注明来源）。
+  - `chat_page` 新增私有包装 `_notice(...)`（**46 处调用点全走它**）；另有 4 处"先捕获 overlay
+    再 show"的地方（`_onCallEnded` / 设锁屏码三处）补 `extraTop`。
+  - `reset_entrance` 的那条通知也落在对话页之上 → 同样下沉。
+  - 其它页面（向导 / 锁屏）没有这条胶囊 → **保持原位**（AppBar 正下方），不受影响。
+  - **做薄**（老板要求）：内边距 `vertical 10→6`、Logo 徽章 `22→18`、字号 `14→13`、
+    圆角 `14→12` → 高度约 **50px → 38px**（薄了 1/4，落在消息列表上方时遮挡更少）。
+- **踩坑**：批量把 `showTopNotice(` 替换成 `_notice(` 时，把**包装函数体内**那一句也替换了
+  → 自递归，且 `extraTop` 报"未定义"；analyze 抓出来后改回。**教训：先插包装再全局替换时，
+  要排除包装自身（替换完再回头修那一处）。**
+
+**验证**：`flutter analyze` 干净；7 个套件 **62 条绿**（含 `chat_send_status_test`——它断言通知文案）。
