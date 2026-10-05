@@ -2508,8 +2508,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ? l10n.chatPageInviteDialogReinviteFallbackName
         : who;
     final passphrase = await _promptSharedPassphrase(
-      title: l10n.chatPageMembersReinviteTitle,
-      hint: l10n.chatPagePassphrasePromptHint(name),
+      title: l10n.chatPageReinvitePassphraseTitle,
+      hint: l10n.chatPageReinvitePassphraseHint(name),
     );
     if (passphrase == null || !mounted) return;
     await _showInviteDialog(

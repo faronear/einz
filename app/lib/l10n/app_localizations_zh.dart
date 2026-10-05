@@ -688,13 +688,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersReinviteTooltip => '让 TA 的新设备加入本秘境（原有通道不受影响）';
 
   @override
-  String get chatPageMembersReinviteTitle => '验证共享口令';
+  String get chatPageReinvitePassphraseTitle => '验证共享口令';
 
   @override
-  String get chatPagePassphrasePromptTitle => '输入共享口令';
-
-  @override
-  String chatPagePassphrasePromptHint(String name) {
+  String chatPageReinvitePassphraseHint(String name) {
     return '验证后，即可重新邀请 $name';
   }
 

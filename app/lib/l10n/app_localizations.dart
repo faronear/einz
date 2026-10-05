@@ -1340,23 +1340,17 @@ abstract class AppLocalizations {
   /// **'Let them add a new device (existing entrances stay)'**
   String get chatPageMembersReinviteTooltip;
 
-  /// No description provided for @chatPageMembersReinviteTitle.
+  /// No description provided for @chatPageReinvitePassphraseTitle.
   ///
   /// In en, this message translates to:
   /// **'Verify passphrase'**
-  String get chatPageMembersReinviteTitle;
+  String get chatPageReinvitePassphraseTitle;
 
-  /// No description provided for @chatPagePassphrasePromptTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter shared passphrase'**
-  String get chatPagePassphrasePromptTitle;
-
-  /// No description provided for @chatPagePassphrasePromptHint.
+  /// No description provided for @chatPageReinvitePassphraseHint.
   ///
   /// In en, this message translates to:
   /// **'After verification you can re-invite {name}'**
-  String chatPagePassphrasePromptHint(String name);
+  String chatPageReinvitePassphraseHint(String name);
 
   /// No description provided for @chatPagePassphraseFieldHint.
   ///

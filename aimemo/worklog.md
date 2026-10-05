@@ -11659,3 +11659,19 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 
 `gen-l10n` + `flutter analyze` 干净；`chat_page_menu_test` / `entrance_list_sheet_test` /
 `invite_dialog_layout_test` / `widget_test` **50 条全绿**。
+
+### 2026-10-05（三·补）re-invite 口令弹窗的键名收口 + 删死键
+
+（接上节「两处待老板定」，老板同意，已修）
+
+- `chatPageMembersReinviteTitle` → **`chatPageReinvitePassphraseTitle`**（值不变：验证共享口令 / Verify passphrase）
+- `chatPagePassphrasePromptHint` → **`chatPageReinvitePassphraseHint`**（值不变：验证后，即可重新邀请 {name}；
+  `@` 元数据一并改名）
+  —— 标题与说明**同前缀**，不再一个 `…Reinvite…` 一个 `…PassphrasePrompt…`。
+- 删除死键 **`chatPagePassphrasePromptTitle`**（输入共享口令 / Enter shared passphrase，已无任何引用）。
+- 调用点（`chat_page._reinviteMemberIdentity`）两个实参同步改名。
+
+保留 generic 的 `chatPagePassphraseFieldHint` / `chatPagePassphraseShow` / `chatPagePassphraseHide`
+（字段标签与显示/隐藏开关，本来就是通用件）。
+
+验证：gen-l10n + analyze 干净；4 个套件 **50 条全绿**。

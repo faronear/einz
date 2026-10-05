@@ -727,13 +727,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Let them add a new device (existing entrances stay)';
 
   @override
-  String get chatPageMembersReinviteTitle => 'Verify passphrase';
+  String get chatPageReinvitePassphraseTitle => 'Verify passphrase';
 
   @override
-  String get chatPagePassphrasePromptTitle => 'Enter shared passphrase';
-
-  @override
-  String chatPagePassphrasePromptHint(String name) {
+  String chatPageReinvitePassphraseHint(String name) {
     return 'After verification you can re-invite $name';
   }
 
