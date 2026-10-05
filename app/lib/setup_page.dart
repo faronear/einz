@@ -1454,8 +1454,8 @@ class _SetupPageState extends State<SetupPage> {
     // 不靠名字比字符串——允许同名成员）
     if (!_joinTargetIsIssuer && target.isNotEmpty) {
       return who.isEmpty
-          ? l10n.wizardJoinRecoverHintNoName(target)
-          : l10n.wizardJoinRecoverHint(who, target);
+          ? l10n.wizardJoinReinviteHintNoName(target)
+          : l10n.wizardJoinReinviteHint(who, target);
     }
     if (who.isNotEmpty || target.isNotEmpty) {
       return l10n.wizardJoinAttachHint(who.isEmpty ? target : who);

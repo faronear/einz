@@ -1699,21 +1699,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 三种场景各说各的话（老板 2026-10-04：原来标题/说明是共享的，
       // "发送给伴侣或自己的其他设备"会把小白绕晕——尤其是**找回**：码不该发给
       // 伴侣本人以外的人，而 invite 的码给错人等于让陌生人进群）。判定规则：
-      //   invite              → 邀请新成员（开新身份）
-      //   attach + 目标是别人 → 找回（帮对方回到他自己的身份）
-      //   attach + 缺省/是我  → 我本人在新设备接入
-      final isRecover = purpose == 'attach' &&
+      //   invite              → 邀请加入（开新身份）
+      //   attach + 目标是别人 → re-invite（再次邀请：帮对方在新设备加入）
+      //   attach + 缺省/是我  → 我的新通道码（我本人在新设备加入）
+      final isReinvite = purpose == 'attach' &&
           targetMemberId != null &&
           targetMemberId != _myMemberId;
-      final title = isRecover
-          ? l10n.chatPageInviteDialogTitleRecover
+      final title = isReinvite
+          ? l10n.chatPageInviteDialogTitleReinvite
           : purpose == 'invite'
               ? l10n.chatPageInviteDialogTitleInvite
               : l10n.chatPageInviteDialogTitleAttachSelf;
-      final hint = isRecover
-          ? l10n.chatPageInviteDialogHintRecover(
+      final hint = isReinvite
+          ? l10n.chatPageInviteDialogHintReinvite(
               (targetName ?? '').trim().isEmpty
-                  ? l10n.chatPageInviteDialogRecoverFallbackName
+                  ? l10n.chatPageInviteDialogReinviteFallbackName
                   : targetName!.trim())
           : purpose == 'invite'
               ? l10n.chatPageInviteDialogHintInvite
@@ -2410,12 +2410,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           // duo 不走这里（只有一个人可找，用下面那个大按钮更清楚）。
                           IconButton(
                             icon: const Icon(Icons.person_add_alt_1, size: 18),
-                            tooltip: l10n.chatPageMembersRecoverTooltip,
+                            tooltip: l10n.chatPageMembersReinviteTooltip,
                             visualDensity: VisualDensity.compact,
                             onPressed: () {
                               // 先收起成员弹层再弹口令框（避免两层 modal 叠着）
                               Navigator.of(ctx).pop();
-                              unawaited(_recoverMemberIdentity(
+                              unawaited(_reinviteMemberIdentity(
                                   e.key, _memberNames[e.key]));
                             },
                           ),
@@ -2444,7 +2444,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               .firstOrNull;
                           if (target == null) return;
                           Navigator.of(ctx).pop();
-                          unawaited(_recoverMemberIdentity(
+                          unawaited(_reinviteMemberIdentity(
                               target, _memberNames[target]));
                         },
                       ),
@@ -2488,7 +2488,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 帮某个成员**找回他的身份**（2026-10-04）：定向 attach token。
+  /// **re-invite**（再次邀请）：把某个成员的身份接回一台新设备——定向 attach token。
+  /// （2026-10-05 定名：内部场景名 `recover` → `re-invite`，与 `invite` 同族；
+  /// 用户可见动词统一为「加入」。）
   ///
   /// 场景：对方丢了手机 / 重装了 App，而他自己**没有任何安装**可以自己签发——
   /// 这时只有别的成员能把他接回来。只要空间里还有一个安装存在，这个空间就不会
@@ -2496,12 +2498,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// 对**别人的身份**动手要共享口令（与"撤销别人的通道"同一档授权）：先要口令，
   /// 再签码；用户取消就什么都不做。
-  Future<void> _recoverMemberIdentity(String memberId, String? memberName) async {
+  Future<void> _reinviteMemberIdentity(String memberId, String? memberName) async {
     final l10n = AppLocalizations.of(context)!;
     final who = (memberName ?? '').trim();
     final name = who.isEmpty ? l10n.chatPageMembersUnnamed : who;
     final passphrase = await _promptSharedPassphrase(
-      title: l10n.chatPageMembersRecoverTitle(name),
+      title: l10n.chatPageMembersReinviteTitle(name),
       hint: l10n.chatPagePassphrasePromptHint,
     );
     if (passphrase == null || !mounted) return;

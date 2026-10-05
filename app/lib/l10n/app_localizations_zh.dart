@@ -409,10 +409,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => '邀请加入本秘境';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => '添加我的新通道';
+  String get chatPageInviteDialogTitleAttachSelf => '我的新通道码';
 
   @override
-  String get chatPageInviteDialogTitleRecover => '让对方重新接入本秘境';
+  String get chatPageInviteDialogTitleReinvite => '再次邀请加入本秘境';
 
   @override
   String get chatPageInviteJoinLink => '邀请';
@@ -426,15 +426,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '在你的另一台设备上用这个码新建一条通道接入本秘境。24 小时内一次性有效。';
+      '在你的另一台设备上用这个码新建一条通道加入本秘境。24 小时内一次性有效。';
 
   @override
-  String chatPageInviteDialogHintRecover(String name) {
+  String chatPageInviteDialogHintReinvite(String name) {
     return '把它发给「$name」——TA 在新设备上打开就能回到自己的身份，原有通道不受影响。24 小时内一次性有效。';
   }
 
   @override
-  String get chatPageInviteDialogRecoverFallbackName => '对方';
+  String get chatPageInviteDialogReinviteFallbackName => '对方';
 
   @override
   String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
@@ -654,13 +654,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String wizardJoinRecoverHint(String name, String target) {
-    return '$name 重新邀请 $target 接入秘境';
+  String wizardJoinReinviteHint(String name, String target) {
+    return '$name 重新邀请 $target 加入秘境';
   }
 
   @override
-  String wizardJoinRecoverHintNoName(String target) {
-    return '重新邀请 $target 接入秘境';
+  String wizardJoinReinviteHintNoName(String target) {
+    return '重新邀请 $target 加入秘境';
   }
 
   @override
@@ -676,21 +676,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersUnnamed => '未命名';
 
   @override
-  String get chatPageMembersInvitePartner => '邀请同伴';
+  String get chatPageMembersInvitePartner => '邀请';
 
   @override
-  String get chatPageMembersReinvitePartner => '让同伴在新设备接入';
+  String get chatPageMembersReinvitePartner => '重新邀请';
 
   @override
   String get chatPageMembersReinviteHint =>
       '她换了设备、重装了 App，或想再挂一台设备时，把这条链接发给她——原有通道不受影响';
 
   @override
-  String get chatPageMembersRecoverTooltip => '让 TA 在新设备接入（原有通道不受影响）';
+  String get chatPageMembersReinviteTooltip => '让 TA 的新设备加入本秘境（原有通道不受影响）';
 
   @override
-  String chatPageMembersRecoverTitle(String name) {
-    return '为「$name」生成新设备接入链接';
+  String chatPageMembersReinviteTitle(String name) {
+    return '为「$name」生成新设备链接';
   }
 
   @override
@@ -723,13 +723,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
 
   @override
-  String get chatPageEntranceScopeHint => '通道是设备连接到秘境的专属线路。以下是您的连接到当前秘境的所有通道。';
+  String get chatPageEntranceScopeHint => '通道是设备连接到秘境的专属线路。以下是您连接到当前秘境的所有通道。';
 
   @override
   String get chatPageEntranceListThisDevice => '当前通道名称';
 
   @override
-  String get chatPageEntranceListNew => '在我的其他设备上新建通道';
+  String get chatPageEntranceListNew => '生成新通道码';
 
   @override
   String get chatPageEntranceListRefresh => '刷新';

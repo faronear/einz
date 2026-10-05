@@ -270,10 +270,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
 
   @override
-  String get setupTokenInputHint => 'New entrance token';
+  String get setupTokenInputHint => 'New-entrance token';
 
   @override
-  String get setupTokenNeedInput => 'Enter the new entrance token';
+  String get setupTokenNeedInput => 'Enter the new-entrance token';
 
   @override
   String get setupTokenInvalid => 'Invalid token';
@@ -432,14 +432,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
-  String get chatPageInviteDialogTitleInvite => 'Invite my partner';
+  String get chatPageInviteDialogTitleInvite => 'Invite partner';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => 'Add a new entrance';
+  String get chatPageInviteDialogTitleAttachSelf => 'New-entrance token';
 
   @override
-  String get chatPageInviteDialogTitleRecover =>
-      'Re-invite the partner to this space';
+  String get chatPageInviteDialogTitleReinvite => 'Re-invite partner';
 
   @override
   String get chatPageInviteJoinLink => 'Invite';
@@ -449,31 +448,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      'Send this token to whoever you\'re inviting so they can join this space. One-time use, valid for 24 hours.';
+      'Send this token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
       'Use this token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.';
 
   @override
-  String chatPageInviteDialogHintRecover(String name) {
-    return 'Send this token to $name so they can connect from a new device. Their existing entrances keep working. One-time use, valid for 24 hours.';
+  String chatPageInviteDialogHintReinvite(String name) {
+    return 'Send this token to $name to join this space. One-time use, valid for 24 hours.';
   }
 
   @override
-  String get chatPageInviteDialogRecoverFallbackName => 'them';
+  String get chatPageInviteDialogReinviteFallbackName => 'them';
 
   @override
   String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => 'Copy new entrance token';
+  String get chatPageInviteCopyCodeTooltip => 'Copy new-entrance token';
 
   @override
   String get chatPageInviteLinkCopied => 'Invite link copied';
 
   @override
-  String get chatPageInviteCodeCopied => 'New entrance token copied';
+  String get chatPageInviteCodeCopied => 'New-entrance token copied';
 
   @override
   String chatPageInviteFailed(String error) {
@@ -691,12 +690,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String wizardJoinRecoverHint(String name, String target) {
+  String wizardJoinReinviteHint(String name, String target) {
     return 'Invited by $name to add a new entrance of $target';
   }
 
   @override
-  String wizardJoinRecoverHintNoName(String target) {
+  String wizardJoinReinviteHintNoName(String target) {
     return 'Invited to add a new entrance of $target';
   }
 
@@ -713,21 +712,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersUnnamed => 'Unnamed';
 
   @override
-  String get chatPageMembersInvitePartner => 'Invite partner';
+  String get chatPageMembersInvitePartner => 'Invite';
 
   @override
-  String get chatPageMembersReinvitePartner => 'Let partner add a new device';
+  String get chatPageMembersReinvitePartner => 'Re-invite';
 
   @override
   String get chatPageMembersReinviteHint =>
       'When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched';
 
   @override
-  String get chatPageMembersRecoverTooltip =>
+  String get chatPageMembersReinviteTooltip =>
       'Let them add a new device (existing entrances stay)';
 
   @override
-  String chatPageMembersRecoverTitle(String name) {
+  String chatPageMembersReinviteTitle(String name) {
     return 'Create a new-device link for $name';
   }
 
@@ -770,7 +769,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListThisDevice => 'Current entrance name';
 
   @override
-  String get chatPageEntranceListNew => 'Add an entrance on another device';
+  String get chatPageEntranceListNew => 'Generate new-entrance token';
 
   @override
   String get chatPageEntranceListRefresh => 'Refresh';

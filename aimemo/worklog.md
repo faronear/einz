@@ -11499,3 +11499,67 @@ workflow YAML 用 ruby 解析过。**CI 本身没法在本地跑**，要等推�
 
 两处 CI 都只是调 `scripts/testAll.sh`，逻辑仍只有一份。YAML 用 ruby 解析校验过；
 **CI 本身还没在 GitHub 上实跑**，要等推送后看第一次结果。
+
+---
+
+## 2026-10-05（一）概念收敛：`recover` → `re-invite`；用户可见动词统一「加入」
+
+老板要"概念/用词简化"：三个开通码场景（invite / attach-self / recover）里，把 `recover`
+改叫 **re-invite**——理由：`recover` 听起来像"给自己恢复"，`re-invite` 明确是"给对方"，
+且与 `invite` 成族。结论：**改场景用词，不动机制**。
+
+### 关键判断：改名 ≠ 合并
+
+- 服务端**只有两个 purpose**：`invite` / `attach`（`server/src/app.ts:308`）。`recover`
+  不是第三个 purpose，是 **"attach 指向别人"这个场景**的名字（`isRecover`、一串
+  `...Recover` 的 l10n 键、文档里的说法）。
+- **invite 与 re-invite 效果相反**：invite 会**新增成员**（duo 满 2 → 409，
+  `spaces.ts:709`）；re-invite（attach→别人）**不新增成员**、空间满也**永远可用**
+  （`spaces.ts:687`）。所以**用词可以并族，purpose/代码路径不能并**。
+- GLOSSARY 护栏：`docs/GLOSSARY.md:70` 当年特意把「邀请」改成「开通码」，因为「邀请」
+  预设接收方是别人、而开通码也能给自己用。**对象词保持中立的「开通码」**；邀请族只用在
+  "给对方"的两个场景，"我自己的新设备"那条**不叫邀请**。
+
+### 落地（`recover` → `re-invite`）
+
+- l10n 键 7 对改名（含 `@` 元数据）：`chatPageInviteDialogTitleRecover→…Reinvite`、
+  `…HintRecover→…HintReinvite`、`…RecoverFallbackName→…ReinviteFallbackName`、
+  `chatPageMembersRecoverTooltip/Title→…ReinviteTooltip/Title`、
+  `wizardJoinRecoverHint(NoName)→…ReinviteHint(NoName)`。
+  （顺带消掉成员弹层里 `Recover*` 与 `Reinvite*` 两套键并存的重复）
+- 代码标识符：`isRecover→isReinvite`、`_recoverMemberIdentity→_reinviteMemberIdentity`
+  （`chat_page.dart`、`setup_page.dart`）。
+- **用户可见动词统一「加入」**（老板定），`接入` 从用户可见文案退场：
+  - `chatPageInviteDialogTitleReinvite` = 「再次邀请加入本秘境」（原「邀请接入本秘境」）
+  - `…HintAttachSelf` = 「…新建一条通道**加入**本秘境」
+  - `chatPageMembersReinviteTooltip` = 「让 TA 的新设备**加入**本秘境（原有通道不受影响）」
+  - `chatPageMembersReinviteTitle` = 「为「{name}」生成新设备链接」
+  - `wizardJoinReinviteHint(NoName)` = 「…重新邀请 {target} **加入**秘境」
+- 文档：`docs/GLOSSARY.md`（第 19 行 + 新增「2026-10-05 反转」说明）、
+  `aimemo/groupChatDesign.md`。
+
+### 一起提交老板的在途文案
+
+老板这批改动（`app_*.arb` 的三条标题/成员按钮/`entranceScopeHint` 标点等）与本次同一目标，
+按他要求**一起提交**。他改的关键值：`…TitleInvite`=邀请加入本秘境、
+`…TitleAttachSelf`=我的新通道码、`…TitleReinvite`(原 Recover)=邀请接入本秘境→（已按"统一加入"改为
+再次邀请加入本秘境）、成员按钮 `Invite/Reinvite`。
+
+### 边界与未决
+
+- **不碰**：server 的 `purpose` 值（仍 invite/attach）、DB 列、协议——纯概念/文案层。
+- **报给老板待决**：
+  1. EN `chatPageInviteDialogHintReinvite` 被改成 "…to join this space."——**丢了**
+     "from a new device / their existing entrances keep working"（那条"绝不撤销现有通道"
+     的安抚），且 "join" 把 re-invite 说成"新成员加入"。
+  2. EN 两条标题用 `partner`（`Invite partner` / `Re-invite partner`）——在 **group 空间**
+     不成立（被邀的是朋友/同事）。
+- **开放式设计问题**（已在对话中提，待老板定）：`join` 确认是"设备级"（`setupTokenHint`
+  "开启从本机到秘境的专属通道"）；可把 invite/attach+target 视为**一条轴**——
+  "一台设备以一个已声明的身份接入（新 / 某个已有身份）"，标签由 target 派生。
+
+### 验证
+
+`flutter gen-l10n` + `flutter analyze` 干净；涉及开通码/向导的 7 个套件 **67 条全绿**
+（invite_dialog_layout / entrance_list_sheet / chat_page_menu / ui_style_switch /
+setup_join_passphrase / wizard_envelope_entry / wizard_autofocus）。

@@ -557,13 +557,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenInputHint.
   ///
   /// In en, this message translates to:
-  /// **'New entrance token'**
+  /// **'New-entrance token'**
   String get setupTokenInputHint;
 
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the new entrance token'**
+  /// **'Enter the new-entrance token'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
@@ -839,20 +839,20 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogTitleInvite.
   ///
   /// In en, this message translates to:
-  /// **'Invite my partner'**
+  /// **'Invite partner'**
   String get chatPageInviteDialogTitleInvite;
 
   /// No description provided for @chatPageInviteDialogTitleAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Add a new entrance'**
+  /// **'New-entrance token'**
   String get chatPageInviteDialogTitleAttachSelf;
 
-  /// No description provided for @chatPageInviteDialogTitleRecover.
+  /// No description provided for @chatPageInviteDialogTitleReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Re-invite the partner to this space'**
-  String get chatPageInviteDialogTitleRecover;
+  /// **'Re-invite partner'**
+  String get chatPageInviteDialogTitleReinvite;
 
   /// No description provided for @chatPageInviteJoinLink.
   ///
@@ -869,7 +869,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintInvite.
   ///
   /// In en, this message translates to:
-  /// **'Send this token to whoever you\'re inviting so they can join this space. One-time use, valid for 24 hours.'**
+  /// **'Send this token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintInvite;
 
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
@@ -878,17 +878,17 @@ abstract class AppLocalizations {
   /// **'Use this token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
-  /// No description provided for @chatPageInviteDialogHintRecover.
+  /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Send this token to {name} so they can connect from a new device. Their existing entrances keep working. One-time use, valid for 24 hours.'**
-  String chatPageInviteDialogHintRecover(String name);
+  /// **'Send this token to {name} to join this space. One-time use, valid for 24 hours.'**
+  String chatPageInviteDialogHintReinvite(String name);
 
-  /// No description provided for @chatPageInviteDialogRecoverFallbackName.
+  /// No description provided for @chatPageInviteDialogReinviteFallbackName.
   ///
   /// In en, this message translates to:
   /// **'them'**
-  String get chatPageInviteDialogRecoverFallbackName;
+  String get chatPageInviteDialogReinviteFallbackName;
 
   /// No description provided for @chatPageInviteCopyLinkTooltip.
   ///
@@ -899,7 +899,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCopyCodeTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy new entrance token'**
+  /// **'Copy new-entrance token'**
   String get chatPageInviteCopyCodeTooltip;
 
   /// No description provided for @chatPageInviteLinkCopied.
@@ -911,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCodeCopied.
   ///
   /// In en, this message translates to:
-  /// **'New entrance token copied'**
+  /// **'New-entrance token copied'**
   String get chatPageInviteCodeCopied;
 
   /// No description provided for @chatPageInviteFailed.
@@ -1280,17 +1280,17 @@ abstract class AppLocalizations {
   /// **'Add a new entrance of {name}'**
   String wizardJoinAttachHint(String name);
 
-  /// No description provided for @wizardJoinRecoverHint.
+  /// No description provided for @wizardJoinReinviteHint.
   ///
   /// In en, this message translates to:
   /// **'Invited by {name} to add a new entrance of {target}'**
-  String wizardJoinRecoverHint(String name, String target);
+  String wizardJoinReinviteHint(String name, String target);
 
-  /// No description provided for @wizardJoinRecoverHintNoName.
+  /// No description provided for @wizardJoinReinviteHintNoName.
   ///
   /// In en, this message translates to:
   /// **'Invited to add a new entrance of {target}'**
-  String wizardJoinRecoverHintNoName(String target);
+  String wizardJoinReinviteHintNoName(String target);
 
   /// No description provided for @chatPageMenuMembers.
   ///
@@ -1319,13 +1319,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMembersInvitePartner.
   ///
   /// In en, this message translates to:
-  /// **'Invite partner'**
+  /// **'Invite'**
   String get chatPageMembersInvitePartner;
 
   /// No description provided for @chatPageMembersReinvitePartner.
   ///
   /// In en, this message translates to:
-  /// **'Let partner add a new device'**
+  /// **'Re-invite'**
   String get chatPageMembersReinvitePartner;
 
   /// No description provided for @chatPageMembersReinviteHint.
@@ -1334,17 +1334,17 @@ abstract class AppLocalizations {
   /// **'When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched'**
   String get chatPageMembersReinviteHint;
 
-  /// No description provided for @chatPageMembersRecoverTooltip.
+  /// No description provided for @chatPageMembersReinviteTooltip.
   ///
   /// In en, this message translates to:
   /// **'Let them add a new device (existing entrances stay)'**
-  String get chatPageMembersRecoverTooltip;
+  String get chatPageMembersReinviteTooltip;
 
-  /// No description provided for @chatPageMembersRecoverTitle.
+  /// No description provided for @chatPageMembersReinviteTitle.
   ///
   /// In en, this message translates to:
   /// **'Create a new-device link for {name}'**
-  String chatPageMembersRecoverTitle(String name);
+  String chatPageMembersReinviteTitle(String name);
 
   /// No description provided for @chatPagePassphrasePromptTitle.
   ///
@@ -1415,7 +1415,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
-  /// **'Add an entrance on another device'**
+  /// **'Generate new-entrance token'**
   String get chatPageEntranceListNew;
 
   /// No description provided for @chatPageEntranceListRefresh.

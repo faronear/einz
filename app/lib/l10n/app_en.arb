@@ -120,8 +120,8 @@
   },
   "setupTokenTitle": "Verify token",
   "setupTokenHint": "Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
-  "setupTokenInputHint": "New entrance token",
-  "setupTokenNeedInput": "Enter the new entrance token",
+  "setupTokenInputHint": "New-entrance token",
+  "setupTokenNeedInput": "Enter the new-entrance token",
   "setupTokenInvalid": "Invalid token",
   "setupTokenExpired": "Token expired",
   "setupTokenUsed": "Token already used",
@@ -197,16 +197,16 @@
   "chatPageSetLockCleared": "PIN deleted. You can enter the space directly at next launch.",
   "chatPageClearLockTitle": "Delete PIN?",
   "chatPageClearLockMessage": "Delete the PIN? After deletion, next app launch will go straight into chat.",
-  "chatPageInviteDialogTitleInvite": "Invite my partner",
-  "chatPageInviteDialogTitleAttachSelf": "Add a new entrance",
-  "chatPageInviteDialogTitleRecover": "Re-invite the partner to this space",
+  "chatPageInviteDialogTitleInvite": "Invite partner",
+  "chatPageInviteDialogTitleAttachSelf": "New-entrance token",
+  "chatPageInviteDialogTitleReinvite": "Re-invite partner",
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
-  "chatPageInviteDialogHintInvite": "Send this token to whoever you're inviting so they can join this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintInvite": "Send this token to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
   "chatPageInviteDialogHintAttachSelf": "Use this token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintRecover": "Send this token to {name} so they can connect from a new device. Their existing entrances keep working. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogRecoverFallbackName": "them",
-  "@chatPageInviteDialogHintRecover": {
+  "chatPageInviteDialogHintReinvite": "Send this token to {name} to join this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogReinviteFallbackName": "them",
+  "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
       "name": {
         "type": "String"
@@ -214,9 +214,9 @@
     }
   },
   "chatPageInviteCopyLinkTooltip": "Copy invite link",
-  "chatPageInviteCopyCodeTooltip": "Copy new entrance token",
+  "chatPageInviteCopyCodeTooltip": "Copy new-entrance token",
   "chatPageInviteLinkCopied": "Invite link copied",
-  "chatPageInviteCodeCopied": "New entrance token copied",
+  "chatPageInviteCodeCopied": "New-entrance token copied",
   "chatPageInviteFailed": "Failed to create the token: {error}",
   "@chatPageInviteFailed": {
     "placeholders": {
@@ -320,10 +320,10 @@
   "wizardJoinInviteHint": "Invited by {name}",
   "wizardJoinInviteHintNoName": "Invited to join a space",
   "wizardJoinAttachHint": "Add a new entrance of {name}",
-  "wizardJoinRecoverHint": "Invited by {name} to add a new entrance of {target}",
-  "wizardJoinRecoverHintNoName": "Invited to add a new entrance of {target}",
-  "@wizardJoinRecoverHint": {"placeholders": {"name": {"type": "String"}, "target": {"type": "String"}}},
-  "@wizardJoinRecoverHintNoName": {"placeholders": {"target": {"type": "String"}}},
+  "wizardJoinReinviteHint": "Invited by {name} to add a new entrance of {target}",
+  "wizardJoinReinviteHintNoName": "Invited to add a new entrance of {target}",
+  "@wizardJoinReinviteHint": {"placeholders": {"name": {"type": "String"}, "target": {"type": "String"}}},
+  "@wizardJoinReinviteHintNoName": {"placeholders": {"target": {"type": "String"}}},
   "@wizardJoinInviteHint": {
     "placeholders": {
       "name": {
@@ -352,12 +352,12 @@
   "chatPageMembersTitle": "Space members",
   "chatPageMembersMe": "Me",
   "chatPageMembersUnnamed": "Unnamed",
-  "chatPageMembersInvitePartner": "Invite partner",
-  "chatPageMembersReinvitePartner": "Let partner add a new device",
+  "chatPageMembersInvitePartner": "Invite",
+  "chatPageMembersReinvitePartner": "Re-invite",
   "chatPageMembersReinviteHint": "When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched",
-  "chatPageMembersRecoverTooltip": "Let them add a new device (existing entrances stay)",
-  "chatPageMembersRecoverTitle": "Create a new-device link for {name}",
-  "@chatPageMembersRecoverTitle": {"placeholders": {"name": {"type": "String"}}},
+  "chatPageMembersReinviteTooltip": "Let them add a new device (existing entrances stay)",
+  "chatPageMembersReinviteTitle": "Create a new-device link for {name}",
+  "@chatPageMembersReinviteTitle": {"placeholders": {"name": {"type": "String"}}},
   "chatPagePassphrasePromptTitle": "Enter shared passphrase",
   "chatPagePassphrasePromptHint": "Acting on someone else's identity requires the shared passphrase (same as revoking their entrance)",
   "chatPagePassphraseFieldHint": "Shared passphrase",
@@ -379,7 +379,7 @@
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
   "chatPageEntranceScopeHint": "An entrance connects a device to a space. Below are all your entrances to this space.",
   "chatPageEntranceListThisDevice": "Current entrance name",
-  "chatPageEntranceListNew": "Add an entrance on another device",
+  "chatPageEntranceListNew": "Generate new-entrance token",
   "chatPageEntranceListRefresh": "Refresh",
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",
