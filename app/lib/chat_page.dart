@@ -853,7 +853,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 对方的名字/性别/身份槽位都还是空 → 同性别两人气泡会是同一个颜色
     // （老板 2026-09-22 实测）。这里补拉一次把身份补齐。
     if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
-    if (mounted && online != _peerOnline) setState(() => _peerOnline = online);
+    if (mounted && online != _peerOnline) {
+      setState(() {
+        _peerOnline = online;
+        // 灯与「时刻」必须同一帧到位。此前这里只翻 _peerOnline，_peerSinceMs 要等
+        // 下一次 30s 轮询（_refreshPeerOnline）才算出来 → 绿灯先亮、约 1 分钟后
+        // 才出时间（老板 2026-10-05 真机实测：iOS 建 duo、macOS 加入）。而
+        // peer.online 的 payload **自带 online_since**（服务端 ws.ts 广播时带上；
+        // 语义"进入在线态的时刻，重连不刷新"——与轮询里 _sinceOfRow 的在线分支
+        // 同源），直接用即可，不用再等一次网络往返。
+        if (online && event.onlineSince != null) {
+          _peerSinceMs = event.onlineSince;
+        }
+      });
+      // 事件没带时刻（peer.offline 一律不带；老服务端 peer.online 也可能为空）→
+      // 拉一次补齐，别让状态里缺时间。
+      if (event.onlineSince == null) unawaited(_refreshPeerOnline());
+    }
   }
 
   /// 群聊一期：新**身份**入网（member.joined）——成员数 +1，立刻重拉 /space 刷新

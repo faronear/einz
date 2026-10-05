@@ -11764,3 +11764,31 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 - **值不变**（zh「待加入」/ en「Waiting」），所以断言该文案的测试不受影响。
 
 验证：gen-l10n + analyze 干净。
+
+---
+
+## 2026-10-05（五）修 bug：绿灯亮了却不显示「上线时间」，要等约 1 分钟
+
+**现象**（老板真机）：iOS 建 duo、macOS 加入 → iOS 上对方灯立刻变绿，但灯旁**没有时间**；
+约 1 分钟后才出现上线时间。
+
+**根因**：状态条有两条更新路径，只喂了一条。
+- 灯（`_peerOnline`）走 **WS 广播** `_onPeerStatus`（`chat_page:846`）——**立即**翻绿。
+- 时间（`_peerSinceMs`）只在 **30s 轮询** `_refreshPeerOnline`（`_sinceOfRow`）里算。
+→ 灯先亮、时间要等下一次轮询（30–60s），正好对上"约 1 分钟"。
+
+**而 WS 事件本来就带时刻**：服务端 `ws.ts:68` 在 `peer.online` 的 payload 上放了
+`online_since`；客户端 `ws_client.dart:349` 已解析成 `WsPeerStatusEvent.onlineSince`
+——只是 `_onPeerStatus` 收了没用。语义也对得上：`online_since` = "进入在线态的时刻，
+重连不刷新"，与轮询里 `_sinceOfRow` 的在线分支同源。
+
+**修法**（一处，客户端，零协议改动）：`_onPeerStatus` 里翻 `_peerOnline` 的同一帧，
+若 `event.onlineSince != null` 就一起写 `_peerSinceMs`；事件**没**带时刻的情形
+（`peer.offline` 一律不带；老服务端 `peer.online` 也可能空）再补一次 `_refreshPeerOnline()`
+兜底。
+
+**遗留（未做，供老板定）**：`peer.offline` 的 payload 没有"下线时刻"，所以红灯的时间仍是
+"拉一次才补齐"（现在会立即拉，约百毫秒级，而不是等 30s）。要彻底对称，得服务端在
+`peer.offline` 上也带上 `offline_since`（协议小改）——本次没动。
+
+**测试**：全仓没有覆盖 `_onPeerStatus` 的测试（grep 过）。`flutter analyze` 干净。
