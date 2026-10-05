@@ -2018,10 +2018,16 @@ abstract class AppLocalizations {
   /// **'⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance'**
   String get resetEntranceServerResidualHint;
 
+  /// No description provided for @spaceListHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap another space to switch to it'**
+  String get spaceListHint;
+
   /// No description provided for @spaceListTitle.
   ///
   /// In en, this message translates to:
-  /// **'Switch my space'**
+  /// **'My spaces'**
   String get spaceListTitle;
 
   /// No description provided for @spaceListEmpty.
@@ -2039,7 +2045,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListSwitch.
   ///
   /// In en, this message translates to:
-  /// **'Switch my space'**
+  /// **'My spaces'**
   String get spaceListSwitch;
 
   /// No description provided for @promptLockCodeTitle.

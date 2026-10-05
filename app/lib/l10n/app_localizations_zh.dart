@@ -1090,7 +1090,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '⚠️ 本地数据已清除，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道';
 
   @override
-  String get spaceListTitle => '切换我的秘境';
+  String get spaceListHint => '点击其他秘境即可切换';
+
+  @override
+  String get spaceListTitle => '我的秘境';
 
   @override
   String get spaceListEmpty => '还没有加入任何秘境';
@@ -1099,7 +1102,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceListAdd => '添加秘境';
 
   @override
-  String get spaceListSwitch => '切换我的秘境';
+  String get spaceListSwitch => '我的秘境';
 
   @override
   String get promptLockCodeTitle => '输入锁屏码';

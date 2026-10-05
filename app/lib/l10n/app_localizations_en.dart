@@ -1166,7 +1166,10 @@ class AppLocalizationsEn extends AppLocalizations {
       '⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance';
 
   @override
-  String get spaceListTitle => 'Switch my space';
+  String get spaceListHint => 'Tap another space to switch to it';
+
+  @override
+  String get spaceListTitle => 'My spaces';
 
   @override
   String get spaceListEmpty => 'No spaces joined yet';
@@ -1175,7 +1178,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListAdd => 'Add a space';
 
   @override
-  String get spaceListSwitch => 'Switch my space';
+  String get spaceListSwitch => 'My spaces';
 
   @override
   String get promptLockCodeTitle => 'Enter your PIN';

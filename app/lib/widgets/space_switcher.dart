@@ -316,6 +316,18 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
                         fontWeight: FontWeight.w600, fontSize: 16)),
               ),
             ),
+            // 标题下备注行（老板 2026-10-06）：式样同「通道列表」/「阅后即焚」弹层
+            // 标题下的说明——淡色小字、居中。
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Center(
+                child: Text(l10n.spaceListHint,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.outline)),
+              ),
+            ),
             // 小卡片瀑布流：每张卡片 = 一个空间（强调"空间"概念，而不是聊天对象）
             if (spaces.isEmpty)
               Padding(

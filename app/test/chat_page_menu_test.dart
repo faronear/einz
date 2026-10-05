@@ -1352,15 +1352,16 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '保留的一条');
+    expect(find.text(_zh.spaceListSwitch), findsWidgets, reason: '保留的一条（与顶栏品牌名同名，可能命中多个）');
     expect(find.text('空间管理'), findsNothing, reason: '合并后不应再出现');
     // 该项在弹层偏下，先滚到可见再点
-    await tester.ensureVisible(find.text(_zh.spaceListSwitch));
+    final menuItem = find.widgetWithText(PopupMenuItem<String>, _zh.spaceListSwitch);
+    await tester.ensureVisible(menuItem);
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.text(_zh.spaceListSwitch));
+    await tapDeferred(tester, menuItem);
     expect(switched, 0);
     // 就地弹层（不是新页面）：能看到「切换我的秘境」内容与通往第一屏的入口
-    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '弹层标题');
+    expect(find.text(_zh.spaceListSwitch), findsWidgets, reason: '弹层标题（与顶栏品牌名同名）');
     expect(find.text('添加秘境'), findsOneWidget, reason: '弹层底部通往第一屏');
   });
 
@@ -1391,12 +1392,13 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.spaceListSwitch), findsOneWidget);
-    await tester.ensureVisible(find.text(_zh.spaceListSwitch));
+    expect(find.text(_zh.spaceListSwitch), findsWidgets);
+    final menuItem = find.widgetWithText(PopupMenuItem<String>, _zh.spaceListSwitch);
+    await tester.ensureVisible(menuItem);
     await tester.pumpAndSettle();
-    await tapDeferred(tester, find.text(_zh.spaceListSwitch));
+    await tapDeferred(tester, menuItem);
     expect(managed, 0);
-    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '没有任何注入也照常开弹层');
+    expect(find.text(_zh.spaceListSwitch), findsWidgets, reason: '没有任何注入也照常开弹层（与顶栏品牌名同名）');
   });
 
   testWidgets('顶栏「我的秘境 + 下拉箭头」：一步打开空间弹层（老板 2026-09-28）',
@@ -1455,7 +1457,7 @@ void main() {
     // 一步点开：直接进空间选择弹层（标题即证明弹层已弹出；文案由老板润色，不 assert 按钮文案）
     await tester.tap(chevron);
     await tester.pumpAndSettle();
-    expect(find.text(_zh.spaceListSwitch), findsOneWidget, reason: '弹层标题');
+    expect(find.text(_zh.spaceListSwitch), findsWidgets, reason: '弹层标题（与顶栏品牌名同名）');
   });
 
   testWidgets('顶栏 logo 可点：等同菜单里的「关于秘境」（老板 2026-09-28）',
