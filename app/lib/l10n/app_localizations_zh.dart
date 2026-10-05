@@ -698,6 +698,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersInviteNew => '邀请新成员';
 
   @override
+  String chatPageMembersFullWithMax(int current, int max) {
+    return '成员已满（$current/$max）';
+  }
+
+  @override
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
 
   @override

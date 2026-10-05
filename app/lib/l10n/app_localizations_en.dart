@@ -736,6 +736,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersInviteNew => 'Invite new member';
 
   @override
+  String chatPageMembersFullWithMax(int current, int max) {
+    return 'Space is full ($current/$max)';
+  }
+
+  @override
   String get chatPageEntranceListFailed =>
       'Could not load other entrances (offline?)';
 

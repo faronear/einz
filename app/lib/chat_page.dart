@@ -2326,7 +2326,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// - **尚未加入**的卡：默认头像、不显示名字（duo 里对方还没来 = 就是那一张）；
   /// - 未满员时列表末尾追加一张「邀请」占位卡（新人还没有卡片可挂按钮）；
   /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
-  /// - 满员时**不显示**邀请卡，也**不再**单列"已满"说明（老板 2026-10-05 要求去掉）；
+  /// - 群组满员时，末尾那张卡**变灰**（不可点、无按钮），只写「成员已满（n/m）」；
   /// - 「给自己加一台设备」不在这里（那是"我的线"，在菜单「我的通道」→「新建通道」）；
   /// - **无退出入口**（一期：入群即不退群）。
   Future<void> _showMembersSheet() async {
@@ -2383,6 +2383,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         Navigator.of(ctx).pop();
                         unawaited(_showInviteDialog(purpose: 'invite'));
                       },
+                    )
+                  else if (_isGroup)
+                    // 群组满员：末尾那张卡变灰（不可点、无按钮），只说"已满"。
+                    // duo 满员不走这里——duo 用成员卡上的「重新邀请」表达"满"。
+                    _membersCard(
+                      memberId: null,
+                      gender: '',
+                      name: l10n.chatPageMembersFullWithMax(
+                          _memberCount, _maxMembers),
+                      muted: true,
                     ),
                 ],
               ),
@@ -2399,14 +2409,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     required String? memberId,
     required String gender,
     required String? name,
-    required String actionLabel,
-    required VoidCallback onAction,
+    String? actionLabel, // null / muted = 不放按钮（"已满"卡）
+    VoidCallback? onAction, // null = 不可点
+    bool muted = false,
   }) {
     final hasName = (name ?? '').trim().isNotEmpty;
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
-        color: _genderTint(gender),
+        color: muted ? _genderTint('') : _genderTint(gender),
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -2425,18 +2437,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 Expanded(
                   child: Text(
                     hasName ? name! : '', // 尚未加入：不显示名字
-                    style: const TextStyle(fontSize: 15),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: muted ? scheme.onSurfaceVariant : null,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: onAction,
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
+                // 有动作才放按钮；"已满"卡（muted）没有按钮
+                if (actionLabel != null) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: onAction,
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: Text(actionLabel),
                   ),
-                  child: Text(actionLabel),
-                ),
+                ],
               ],
             ),
           ),

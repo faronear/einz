@@ -11718,3 +11718,20 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 
 `flutter gen-l10n` + `flutter analyze` 干净。**未跑 widget 测试、未构建**（UI 改动由老板
 真机自测——既定分工；且全仓测试没有引用这个弹层的键，已确认）。
+
+### 2026-10-05（四·补）群组满员：末尾灰卡
+
+老板问"群成员已满提示原本出现在哪"，答：原来在**弹层底部顶替邀请按钮的那一行灰字**，
+且**只有群组**会走到（duo 满 2 人先被"重新邀请伴侣"分支接走）；另外
+`chatPageMembersFull`（不带数字那版）**早已不可达**（只有 `_maxMembers>0` 的群才会满，
+那时拼的是 `FullWithMax`）。
+
+老板选了"末尾灰卡"（简化/复用、不堆元素）：
+- `_membersCard` 加 `muted` + `actionLabel/onAction` 可选：muted → 底色取中性灰
+  （`_genderTint('')`）、文字次要色、**不放按钮**、`InkWell.onTap=null` 不可点。
+- 弹层末尾：`if (_canInvite) 邀请卡 else if (_isGroup) 满员灰卡`
+  （文字=`chatPageMembersFullWithMax(_memberCount, _maxMembers)`）。
+- 加回 `chatPageMembersFullWithMax`（zh 值 + en 值 + `@` 占位符元数据 current/max int；
+  **en 是模板**——`l10n.yaml` 的 `template-arb-file: app_en.arb`，所以占位符类型只在 en 声明即可）。
+
+验证：gen-l10n + analyze 干净（UI 仍由老板真机自测）。

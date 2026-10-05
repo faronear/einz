@@ -1358,6 +1358,12 @@ abstract class AppLocalizations {
   /// **'Invite new member'**
   String get chatPageMembersInviteNew;
 
+  /// No description provided for @chatPageMembersFullWithMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Space is full ({current}/{max})'**
+  String chatPageMembersFullWithMax(int current, int max);
+
   /// No description provided for @chatPageEntranceListFailed.
   ///
   /// In en, this message translates to:
