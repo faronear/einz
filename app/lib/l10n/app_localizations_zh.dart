@@ -422,15 +422,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      '把以下通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
+      '把下方通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '使用以下通道码，在另一台设备上加入本秘境。24 小时内一次性有效。';
+      '使用下方通道码，在另一台设备上加入本秘境。24 小时内一次性有效。';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '把以下通道码发给 $name，凭它重新加入本秘境，原有通道不受影响。24 小时内一次性有效。';
+    return '把下方通道码发给 $name，凭它重新加入本秘境。原有通道不受影响。24 小时内一次性有效。';
   }
 
   @override

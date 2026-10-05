@@ -202,9 +202,9 @@
   "chatPageInviteDialogTitleReinvite": "Re-invite",
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
-  "chatPageInviteDialogHintInvite": "Send the following entrance token to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintAttachSelf": "Use the following entrance token on your other device to connect to this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintReinvite": "Send the following entrance token to {name} to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintInvite": "Send the entrance token below to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintAttachSelf": "Use the entrance token below on your other device to connect to this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintReinvite": "Send the entrance token below to {name} to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.",
   "chatPageInviteDialogReinviteFallbackName": "them",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {

@@ -869,19 +869,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintInvite.
   ///
   /// In en, this message translates to:
-  /// **'Send the following entrance token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
+  /// **'Send the entrance token below to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintInvite;
 
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Use the following entrance token on your other device to connect to this space. One-time use, valid for 24 hours.'**
+  /// **'Use the entrance token below on your other device to connect to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Send the following entrance token to {name} to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.'**
+  /// **'Send the entrance token below to {name} to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.

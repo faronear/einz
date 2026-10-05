@@ -6449,12 +6449,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPageMenuMembers, style: captionStyle),
                       const Spacer(),
-                      // 右簇：人数 + group 图标（与「我的通道」的 devices + 数字同款）
-                      if (_memberCount > 0) ...[
-                        Text('$_memberCount', style: valueStyle),
-                        const SizedBox(width: 4),
+                      // 右簇：group 图标 + 除我之外的人数（图标在前、数字在后，与
+                      // 「我的通道」devices 行同风格）；仅群聊显示（老板 2026-10-05）
+                      // ——duo 只有对方一个人，图标+计数没有信息量。_memberCount 是
+                      // 身份数（含我），减 1 得同伴数；轮询没拉到就不显示数字。
+                      if (_isGroup) ...[
+                        Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
+                        if (_memberCount > 1) ...[
+                          const SizedBox(width: 4),
+                          _menuValue('${_memberCount - 1}', valueStyle),
+                        ],
                       ],
-                      Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
                     ],
                   ),
                 ),
