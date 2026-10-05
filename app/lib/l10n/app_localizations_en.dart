@@ -449,15 +449,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      'Send this entrance token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
+      'Send the following entrance token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Use this entrance token on your other device to connect to this space. One-time use, valid for 24 hours.';
+      'Use the following entrance token on your other device to connect to this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'Send this entrance token to $name to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.';
+    return 'Send the following entrance token to $name to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -701,10 +701,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageMenuMembers => 'Space members';
+  String get chatPageMenuMembers => 'My companions';
 
   @override
-  String get chatPageMembersTitle => 'Space members';
+  String get chatPageMembersTitle => 'My companions';
 
   @override
   String get chatPageMembersUnnamed => 'Unnamed';

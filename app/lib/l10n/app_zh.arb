@@ -197,14 +197,14 @@
   "chatPageSetLockCleared": "已删除锁屏码，下次启动应用可直接进入秘境。",
   "chatPageClearLockTitle": "删除锁屏码？",
   "chatPageClearLockMessage": "确定要删除锁屏码吗？删除后下次启动将直接进入聊天。",
-  "chatPageInviteDialogTitleInvite": "邀请加入本秘境",
+  "chatPageInviteDialogTitleInvite": "邀请",
   "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",
-  "chatPageInviteDialogTitleReinvite": "再次邀请加入本秘境",
+  "chatPageInviteDialogTitleReinvite": "重新邀请",
   "chatPageInviteJoinLink": "邀请",
   "chatPageInviteRegenerate": "重新生成",
-  "chatPageInviteDialogHintInvite": "发给受邀人，凭它加入本秘境。24 小时内一次性有效。",
-  "chatPageInviteDialogHintAttachSelf": "使用这个通道码，在另一台设备上加入本秘境。24 小时内一次性有效。",
-  "chatPageInviteDialogHintReinvite": "发给 {name}，凭它新建一条通道加入本秘境，原有通道不受影响。24 小时内一次性有效。",
+  "chatPageInviteDialogHintInvite": "把以下通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintAttachSelf": "使用以下通道码，在另一台设备上加入本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintReinvite": "把以下通道码发给 {name}，凭它重新加入本秘境，原有通道不受影响。24 小时内一次性有效。",
   "chatPageInviteDialogReinviteFallbackName": "对方",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
@@ -348,8 +348,8 @@
       }
     }
   },
-  "chatPageMenuMembers": "空间成员",
-  "chatPageMembersTitle": "空间成员",
+  "chatPageMenuMembers": "我的同伴",
+  "chatPageMembersTitle": "我的同伴",
   "chatPageMembersUnnamed": "未命名",
   "chatPageMembersInvitePartner": "邀请",
   "chatPageMembersReinvitePartner": "重新邀请",

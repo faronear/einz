@@ -6418,25 +6418,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                // 「空间成员」（群聊一期 2026-10-03）：成员名单 + 邀请新成员 /
-                // 「在其他设备加入我的账号」。紧挨「我的通道」——一个是"这个空间
-                // 里有谁"，一个是"我在这个空间挂了几条线"，同属身份·通道分组。
-                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
-                  height: kMenuRowHeight,
-                  value: 'members',
-                  child: Row(
-                    children: [
-                      Text(l10n.chatPageMenuMembers, style: captionStyle),
-                      const Spacer(),
-                      // 右簇：人数 + group 图标（与「我的通道」的 devices + 数字同款）
-                      if (_memberCount > 0) ...[
-                        Text('$_memberCount', style: valueStyle),
-                        const SizedBox(width: 4),
-                      ],
-                      Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
-                    ],
-                  ),
-                ),
                 // 「通道列表」：我本人在本空间的其他通道（老板 2026-09-25：多设备登录
                 // 时看一眼"我还有哪些线挂着、在不在线"）。2026-10-02 合并原「当前通道」
                 // 菜单项：改名入口收进弹层顶部的当前通道行，菜单只留这一项「我的通道」
@@ -6455,6 +6436,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         const SizedBox(width: 4),
                         _menuValue('$_myEntranceCount', valueStyle),
                       ],
+                    ],
+                  ),
+                ),
+                // 「我的同伴」（2026-10-05 由「空间成员」改名，老板定）：成员名单 +
+                // 邀请新成员。紧跟「我的通道」之后（老板定排序）——先看"我在这个
+                // 空间挂了几条线"，再看"这个空间里有谁"。
+                PopupMenuItem(mouseCursor: SystemMouseCursors.click,
+                  height: kMenuRowHeight,
+                  value: 'members',
+                  child: Row(
+                    children: [
+                      Text(l10n.chatPageMenuMembers, style: captionStyle),
+                      const Spacer(),
+                      // 右簇：人数 + group 图标（与「我的通道」的 devices + 数字同款）
+                      if (_memberCount > 0) ...[
+                        Text('$_memberCount', style: valueStyle),
+                        const SizedBox(width: 4),
+                      ],
+                      Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
                     ],
                   ),
                 ),

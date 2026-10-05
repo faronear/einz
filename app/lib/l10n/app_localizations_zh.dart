@@ -406,13 +406,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageClearLockMessage => '确定要删除锁屏码吗？删除后下次启动将直接进入聊天。';
 
   @override
-  String get chatPageInviteDialogTitleInvite => '邀请加入本秘境';
+  String get chatPageInviteDialogTitleInvite => '邀请';
 
   @override
   String get chatPageInviteDialogTitleAttachSelf => '添加我的新通道';
 
   @override
-  String get chatPageInviteDialogTitleReinvite => '再次邀请加入本秘境';
+  String get chatPageInviteDialogTitleReinvite => '重新邀请';
 
   @override
   String get chatPageInviteJoinLink => '邀请';
@@ -421,15 +421,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteRegenerate => '重新生成';
 
   @override
-  String get chatPageInviteDialogHintInvite => '发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
+  String get chatPageInviteDialogHintInvite =>
+      '把以下通道码发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '使用这个通道码，在另一台设备上加入本秘境。24 小时内一次性有效。';
+      '使用以下通道码，在另一台设备上加入本秘境。24 小时内一次性有效。';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '发给 $name，凭它新建一条通道加入本秘境，原有通道不受影响。24 小时内一次性有效。';
+    return '把以下通道码发给 $name，凭它重新加入本秘境，原有通道不受影响。24 小时内一次性有效。';
   }
 
   @override
@@ -663,10 +664,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageMenuMembers => '空间成员';
+  String get chatPageMenuMembers => '我的同伴';
 
   @override
-  String get chatPageMembersTitle => '空间成员';
+  String get chatPageMembersTitle => '我的同伴';
 
   @override
   String get chatPageMembersUnnamed => '未命名';
