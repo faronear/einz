@@ -2501,10 +2501,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _reinviteMemberIdentity(String memberId, String? memberName) async {
     final l10n = AppLocalizations.of(context)!;
     final who = (memberName ?? '').trim();
-    final name = who.isEmpty ? l10n.chatPageMembersUnnamed : who;
+    // 说明文案里嵌「重新邀请 <谁>」；这人没设过名字 → 退回「对方」
+    // （`chatPageMembersUnnamed`「未命名」是列表里的占位名，塞进整句读着生硬；
+    //  也与紧跟着的开通码弹窗同一兜底，两处一致）
+    final name = who.isEmpty
+        ? l10n.chatPageInviteDialogReinviteFallbackName
+        : who;
     final passphrase = await _promptSharedPassphrase(
-      title: l10n.chatPageMembersReinviteTitle(name),
-      hint: l10n.chatPagePassphrasePromptHint,
+      title: l10n.chatPageMembersReinviteTitle,
+      hint: l10n.chatPagePassphrasePromptHint(name),
     );
     if (passphrase == null || !mounted) return;
     await _showInviteDialog(

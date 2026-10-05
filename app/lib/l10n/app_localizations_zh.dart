@@ -253,7 +253,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenTitle => '验证通道码';
 
   @override
-  String get setupTokenHint => '凭通道码开启从本机到秘境的专属通道。24 小时内一次性有效，可由本秘境任一已认证的通道生成。';
+  String get setupTokenHint => '凭通道码让本机加入本秘境。24 小时内一次性有效，可由本秘境任一已认证的通道生成。';
 
   @override
   String get setupTokenInputHint => '通道码';
@@ -688,15 +688,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersReinviteTooltip => '让 TA 的新设备加入本秘境（原有通道不受影响）';
 
   @override
-  String chatPageMembersReinviteTitle(String name) {
-    return '为「$name」生成新设备链接';
-  }
+  String get chatPageMembersReinviteTitle => '验证共享口令';
 
   @override
   String get chatPagePassphrasePromptTitle => '输入共享口令';
 
   @override
-  String get chatPagePassphrasePromptHint => '对别人的身份动手需要口令授权（与「撤销别人的通道」同一档）';
+  String chatPagePassphrasePromptHint(String name) {
+    return '验证后，即可重新邀请 $name';
+  }
 
   @override
   String get chatPagePassphraseFieldHint => '共享口令';

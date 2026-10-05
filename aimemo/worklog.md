@@ -11629,3 +11629,33 @@ token 仍 24h 过期 + 一次性，所以**暂不做显性作废**。
 - zh：**凭通道码开启从本机到秘境的专属通道。24 小时内一次性有效，可由本秘境任一已认证的通道生成。**
 - en（再收一版，老板提「还有三个 entrance」）：**An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.**
   （相对老板试写版：`your device`→`this device` 对齐「本机」口径；`of the space`→`in the space`；去掉 `after verification`——本屏就是验证页，重复。entrance 3→2。）
+
+---
+
+## 2026-10-05（三）re-invite 口令提示：`{name}` 接线 + 两处提醒
+
+老板在 `chatPagePassphrasePromptHint` 里嵌了 `{name}`（zh「验证后，即可重新邀请 {name}」/
+en「After verification you can re-invite {name}」），但不知道怎么改代码。缺的两块补上：
+
+1. **ARB 要声明占位符**：加 `@chatPagePassphrasePromptHint: {placeholders: {name: String}}`
+   （zh/en 各一行）。**不声明 gen-l10n 会报错**——这是"嵌了 {name} 却不生效"的直接原因。
+2. **调用点要传参**：`chat_page._reinviteMemberIdentity` 里
+   `hint: l10n.chatPagePassphrasePromptHint` → `(name)`。
+   兜底从 `chatPageMembersUnnamed`（未命名）换成 `chatPageInviteDialogReinviteFallbackName`
+   （对方）——「未命名」是成员列表里的占位名，塞进整句读着生硬；「对方」与紧跟着的
+   开通码弹窗是同一个兜底，两处一致。
+
+顺带（老板同批改动，已一并提交）：`setupTokenHint` zh 收成「凭通道码让本机加入本秘境…」；
+re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享口令 / Verify passphrase）。
+
+### 两处待老板定
+
+- `chatPagePassphrasePromptTitle`（输入共享口令 / Enter shared passphrase）**现在没有任何引用**
+  （标题被换成 `chatPageMembersReinviteTitle`）→ 死键。要么删，要么标题改回它。
+- 键名 `chatPageMembersReinviteTitle` 现在装的是"口令提示的标题"，名不副实；
+  若要留，建议改成 `chatPageReinvitePassphraseTitle`。
+
+### 验证
+
+`gen-l10n` + `flutter analyze` 干净；`chat_page_menu_test` / `entrance_list_sheet_test` /
+`invite_dialog_layout_test` / `widget_test` **50 条全绿**。

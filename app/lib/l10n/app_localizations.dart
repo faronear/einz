@@ -1343,8 +1343,8 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMembersReinviteTitle.
   ///
   /// In en, this message translates to:
-  /// **'Create a new-device link for {name}'**
-  String chatPageMembersReinviteTitle(String name);
+  /// **'Verify passphrase'**
+  String get chatPageMembersReinviteTitle;
 
   /// No description provided for @chatPagePassphrasePromptTitle.
   ///
@@ -1355,8 +1355,8 @@ abstract class AppLocalizations {
   /// No description provided for @chatPagePassphrasePromptHint.
   ///
   /// In en, this message translates to:
-  /// **'Acting on someone else\'s identity requires the shared passphrase (same as revoking their entrance)'**
-  String get chatPagePassphrasePromptHint;
+  /// **'After verification you can re-invite {name}'**
+  String chatPagePassphrasePromptHint(String name);
 
   /// No description provided for @chatPagePassphraseFieldHint.
   ///
