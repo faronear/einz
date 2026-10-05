@@ -119,7 +119,7 @@
     }
   },
   "setupTokenTitle": "Verify entrance token",
-  "setupTokenHint": "An entrance token opens a dedicated entrance from this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.",
+  "setupTokenHint": "An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.",
   "setupTokenInputHint": "Entrance token",
   "setupTokenNeedInput": "Enter the entrance token",
   "setupTokenInvalid": "Invalid entrance token",

@@ -11627,4 +11627,5 @@ token 仍 24h 过期 + 一次性，所以**暂不做显性作废**。
 
 「通道 / 通道码 / 通道」三连词读着重，收成更顺的一句：
 - zh：**凭通道码开启从本机到秘境的专属通道。24 小时内一次性有效，可由本秘境任一已认证的通道生成。**
-- en：**An entrance token opens a dedicated entrance from this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.**
+- en（再收一版，老板提「还有三个 entrance」）：**An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.**
+  （相对老板试写版：`your device`→`this device` 对齐「本机」口径；`of the space`→`in the space`；去掉 `after verification`——本屏就是验证页，重复。entrance 3→2。）

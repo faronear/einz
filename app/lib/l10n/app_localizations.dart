@@ -551,7 +551,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance token opens a dedicated entrance from this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.'**
+  /// **'An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.

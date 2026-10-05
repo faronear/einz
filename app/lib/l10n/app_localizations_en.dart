@@ -267,7 +267,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenHint =>
-      'An entrance token opens a dedicated entrance from this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.';
+      'An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.';
 
   @override
   String get setupTokenInputHint => 'Entrance token';
