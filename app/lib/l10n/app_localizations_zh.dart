@@ -669,9 +669,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersTitle => '空间成员';
 
   @override
-  String get chatPageMembersMe => '我';
-
-  @override
   String get chatPageMembersUnnamed => '未命名';
 
   @override
@@ -679,13 +676,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageMembersReinvitePartner => '重新邀请';
-
-  @override
-  String get chatPageMembersReinviteHint =>
-      '她换了设备、重装了 App，或想再挂一台设备时，把这条链接发给她——原有通道不受影响';
-
-  @override
-  String get chatPageMembersReinviteTooltip => '让 TA 的新设备加入本秘境（原有通道不受影响）';
 
   @override
   String get chatPageReinvitePassphraseTitle => '验证共享口令';
@@ -706,14 +696,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageMembersInviteNew => '邀请新成员';
-
-  @override
-  String get chatPageMembersFull => '群成员已满';
-
-  @override
-  String chatPageMembersFullWithMax(int current, int max) {
-    return '成员已满（$current/$max）';
-  }
 
   @override
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';

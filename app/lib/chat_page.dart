@@ -327,6 +327,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final Map<String, int> _memberSlots = {};
   /// member_id → 显示名（/space 的 member_names；群空间里逐条消息标注"谁说的"）。
   final Map<String, String> _memberNames = {};
+  /// member_id → 性别（/space 的 member_genders；成员弹层的卡片底色按它取色，
+  /// 未知性别的成员退成中性灰）。
+  final Map<String, String> _memberGenders = {};
   /// 空间模式（'duo' | 'group'，/space 下发）。**不靠"成员数 ≥3"猜**——duo 满员
   /// 签发 invite 后、第三人还没加入时 mode 已经是 group（那时就得停用通话了）。
   String _spaceMode = 'duo';
@@ -939,6 +942,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _memberNames
         ..clear()
         ..addAll(space.memberNames);
+      _memberGenders
+        ..clear()
+        ..addAll(space.memberGenders);
       _spaceMode = space.mode;
       _maxMembers = space.maxMembers;
       // 身份槽位（0=第一人/创建者，1=第二人）：同性别第二人气泡取青色的判据
@@ -2313,178 +2319,129 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return text;
   }
 
-  /// 空间成员（群聊一期 2026-10-03）：成员名单 + 邀请/找回入口。
-  ///
-  /// 入口语义（2026-10-04 定稿：**没有升格**，mode 创建时定死）：
-  /// - **邀请伴侣**（duo 且还没第二个人）＝ `invite` token（开新身份）；
-  /// - **邀请新成员**（group 且未满员）＝ 同上；
-  /// - **duo 已满 2 人 → 不出现邀请入口**，只留一行"双人秘境不可增加成员"——
-  ///   duo 永远不会变成群，第三个人不是"满了"，是**不允许**；
-  /// - 「给自己加一台设备」不在这里 —— 那是"我的线"，在菜单「我的通道」里；
+  /// 空间成员弹层（**2026-10-05 重做**，老板定的版式）：
+  /// **每行一张成员卡**——底色=该成员性别色（男浅蓝 / 女浅粉 / 性别未知=中性灰）；
+  /// 左：真实头像 + 名字；右：可点的文字按钮（已有成员=「重新邀请」）。
+  /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
+  /// - **尚未加入**的卡：默认头像、不显示名字（duo 里对方还没来 = 就是那一张）；
+  /// - 未满员时列表末尾追加一张「邀请」占位卡（新人还没有卡片可挂按钮）；
+  /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
+  /// - 满员时**不显示**邀请卡，也**不再**单列"已满"说明（老板 2026-10-05 要求去掉）；
+  /// - 「给自己加一台设备」不在这里（那是"我的线"，在菜单「我的通道」→「新建通道」）；
   /// - **无退出入口**（一期：入群即不退群）。
   Future<void> _showMembersSheet() async {
     final l10n = AppLocalizations.of(context)!;
-    final api = widget.api ?? ApiClient(effectiveServer);
-    // 每个成员挂了几条通道（/entrances 现拉；失败就不显示数字，不拦别的）
-    Map<String, int>? entranceCounts;
-    try {
-      final rows = await _withAuth((t) => api.listEntrances(t));
-      final counts = <String, int>{};
-      for (final d in rows) {
-        final id = d['member_id'] as String?;
-        if (id == null || id.isEmpty) continue;
-        if (d['status'] != null && d['status'] != 'active') continue; // 已撤销的不算
-        counts[id] = (counts[id] ?? 0) + 1;
-      }
-      entranceCounts = counts;
-    } catch (_) {
-      entranceCounts = null;
-    }
-    if (!mounted) return;
-    // 成员名单按槽位（入群先后）排；本机那份资料可能还没拉到 → 至少列"我"
-    final entries = _memberSlots.entries.toList()
+    // 其他成员（不含我），按加入先后（槽位升序 = 入群顺序）排
+    final others = _memberSlots.entries
+        .where((e) => e.key != _myMemberId)
+        .toList()
       ..sort((a, b) => a.value.compareTo(b.value));
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true, // 与「我的通道」等弹层同口径（老板 2026-10-02）
       builder: (ctx) {
-        final scheme = Theme.of(ctx).colorScheme;
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Center(
-                    child: Text(l10n.chatPageMembersTitle,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 16)),
-                  ),
-                ),
-                // 成员名单（/space 快照；离线时至少有我）
-                for (final e in entries)
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: scheme.secondaryContainer,
-                          child: Text(
-                            (_memberNames[e.key] ?? '').isNotEmpty
-                                ? _memberNames[e.key]!.characters.first
-                                : '?',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            (_memberNames[e.key] ?? '').isNotEmpty
-                                ? _memberNames[e.key]!
-                                : l10n.chatPageMembersUnnamed,
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        // 通道数（该身份挂了几台设备）
-                        if (entranceCounts?[e.key] != null) ...[
-                          Icon(Icons.devices, size: 16, color: scheme.onSurfaceVariant),
-                          const SizedBox(width: 4),
-                          Text('${entranceCounts![e.key]}',
-                              style: TextStyle(
-                                  fontSize: 13, color: scheme.onSurfaceVariant)),
-                        ],
-                        if (e.key == _myMemberId) ...[
-                          const SizedBox(width: 8),
-                          Text(l10n.chatPageMembersMe,
-                              style: TextStyle(
-                                  fontSize: 12, color: scheme.onSurfaceVariant)),
-                        ] else if (_isGroup) ...[
-                          const SizedBox(width: 4),
-                          // 群空间：每个成员一行「找回」——他丢了/换了设备时，别的成员
-                          // 能把他接回自己的身份（他没有安装，没法自己签发）。
-                          // duo 不走这里（只有一个人可找，用下面那个大按钮更清楚）。
-                          IconButton(
-                            icon: const Icon(Icons.person_add_alt_1, size: 18),
-                            tooltip: l10n.chatPageMembersReinviteTooltip,
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
-                              // 先收起成员弹层再弹口令框（避免两层 modal 叠着）
-                              Navigator.of(ctx).pop();
-                              unawaited(_reinviteMemberIdentity(
-                                  e.key, _memberNames[e.key]));
-                            },
-                          ),
-                        ],
-                      ],
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Center(
+                      child: Text(l10n.chatPageMembersTitle,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
                   ),
-                const SizedBox(height: 10),
-                // 邀请 / 找回入口（2026-10-04 定稿）：
-                // - duo 还没第二个人 → 「邀请伴侣」（invite，开新身份）
-                // - duo 已有两个人 → 「重新邀请伴侣」（attach 定向到对方）——她丢了
-                //   设备时唯一的归路；**不再有"不可增加成员"的锁死提示**（那是给
-                //   "想加第三个人"的，而这一格回答的是"怎么让伴侣回来"）
-                // - group 未满 → 「邀请新成员」；满 → 只留一行说明（找回入口在成员行上）
-                if (!_isGroup && _memberCount >= 2)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FilledButton.tonalIcon(
-                        icon: const Icon(Icons.person_add_alt_1, size: 18),
-                        label: Text(l10n.chatPageMembersReinvitePartner),
-                        onPressed: () {
-                          final target = entries
-                              .where((e) => e.key != _myMemberId)
-                              .map((e) => e.key)
-                              .firstOrNull;
-                          if (target == null) return;
-                          Navigator.of(ctx).pop();
-                          unawaited(_reinviteMemberIdentity(
-                              target, _memberNames[target]));
-                        },
-                      ),
-                      const SizedBox(height: 6),
-                      Text(l10n.chatPageMembersReinviteHint,
-                          style: TextStyle(
-                              fontSize: 12, color: scheme.onSurfaceVariant)),
-                    ],
-                  )
-                else if (!_canInvite)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      _maxMembers > 0
-                          ? l10n.chatPageMembersFullWithMax(_memberCount, _maxMembers)
-                          : l10n.chatPageMembersFull,
-                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                  for (final e in others)
+                    _membersCard(
+                      memberId: e.key,
+                      gender: _memberGenders[e.key] ?? '',
+                      name: _memberNames[e.key],
+                      actionLabel: l10n.chatPageMembersReinvitePartner,
+                      onAction: () {
+                        // 先收起成员弹层再弹口令框（避免两层 modal 叠着）
+                        Navigator.of(ctx).pop();
+                        unawaited(_reinviteMemberIdentity(
+                            e.key, _memberNames[e.key]));
+                      },
                     ),
-                  )
-                else
-                  FilledButton.tonalIcon(
-                    icon: const Icon(Icons.person_add_alt_1, size: 18),
-                    // duo 里第二个人还没来 = "邀请伴侣"；group = "邀请新成员"
-                    label: Text(_isGroup
-                        ? l10n.chatPageMembersInviteNew
-                        : l10n.chatPageMembersInvitePartner),
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      unawaited(_showInviteDialog(purpose: 'invite'));
-                    },
-                  ),
-              ],
-              // 注：「给自己加一台设备」的入口**不在这里**（老板 2026-10-04）——
-              // 这个弹层只管"空间里有谁、怎么把人拉进来/找回来"；
-              // 给自己开通道属于"我的线"，统一放在菜单「我的通道」里的「新建通道」。
-
+                  // 未满 → 末尾一张邀请占位卡（新人没有卡片可挂按钮）
+                  if (_canInvite)
+                    _membersCard(
+                      memberId: null, // 默认头像、不显示名字
+                      gender: '',
+                      name: null,
+                      actionLabel: _isGroup
+                          ? l10n.chatPageMembersInviteNew
+                          : l10n.chatPageMembersInvitePartner,
+                      onAction: () {
+                        Navigator.of(ctx).pop();
+                        unawaited(_showInviteDialog(purpose: 'invite'));
+                      },
+                    ),
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  /// 成员卡（每行一张）：底色=性别色；左头像+名字，右文字按钮；**整卡可点**。
+  /// [memberId] 为空 = "尚未加入"的占位卡（默认头像、不显示名字）。
+  Widget _membersCard({
+    required String? memberId,
+    required String gender,
+    required String? name,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    final hasName = (name ?? '').trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: _genderTint(gender),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onAction,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                _MessageAvatar(
+                  memberId: memberId,
+                  server: effectiveServer,
+                  api: widget.api,
+                  radius: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hasName ? name! : '', // 尚未加入：不显示名字
+                    style: const TextStyle(fontSize: 15),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: onAction,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(actionLabel),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -7919,11 +7876,15 @@ class _StatusAvatarState extends State<_StatusAvatar> {
 }
 
 class _MessageAvatar extends StatefulWidget {
-  const _MessageAvatar({this.memberId, required this.server, this.api});
+  const _MessageAvatar(
+      {this.memberId, required this.server, this.api, this.radius = 16});
 
   final String? memberId;
   final String server;
   final ApiClient? api;
+
+  /// 头像半径（成员卡里放大到 20；消息区保持 16）。
+  final double radius;
 
   @override
   State<_MessageAvatar> createState() => _MessageAvatarState();
@@ -8023,10 +7984,12 @@ class _MessageAvatarState extends State<_MessageAvatar> {
     return Clickable(
       onTap: bytes != null ? _showFullscreen : null,
       child: CircleAvatar(
-        radius: 16,
+        radius: widget.radius,
         backgroundColor: Colors.grey.shade300,
         backgroundImage: bytes != null ? MemoryImage(bytes) : null,
-        child: bytes == null ? const Icon(Icons.person, size: 18) : null,
+        child: bytes == null
+            ? Icon(Icons.person, size: widget.radius + 2)
+            : null,
       ),
     );
   }

@@ -1304,12 +1304,6 @@ abstract class AppLocalizations {
   /// **'Space members'**
   String get chatPageMembersTitle;
 
-  /// No description provided for @chatPageMembersMe.
-  ///
-  /// In en, this message translates to:
-  /// **'Me'**
-  String get chatPageMembersMe;
-
   /// No description provided for @chatPageMembersUnnamed.
   ///
   /// In en, this message translates to:
@@ -1327,18 +1321,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Re-invite'**
   String get chatPageMembersReinvitePartner;
-
-  /// No description provided for @chatPageMembersReinviteHint.
-  ///
-  /// In en, this message translates to:
-  /// **'When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched'**
-  String get chatPageMembersReinviteHint;
-
-  /// No description provided for @chatPageMembersReinviteTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Let them add a new device (existing entrances stay)'**
-  String get chatPageMembersReinviteTooltip;
 
   /// No description provided for @chatPageReinvitePassphraseTitle.
   ///
@@ -1375,18 +1357,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invite new member'**
   String get chatPageMembersInviteNew;
-
-  /// No description provided for @chatPageMembersFull.
-  ///
-  /// In en, this message translates to:
-  /// **'Group is full'**
-  String get chatPageMembersFull;
-
-  /// No description provided for @chatPageMembersFullWithMax.
-  ///
-  /// In en, this message translates to:
-  /// **'Space is full ({current}/{max})'**
-  String chatPageMembersFullWithMax(int current, int max);
 
   /// No description provided for @chatPageEntranceListFailed.
   ///

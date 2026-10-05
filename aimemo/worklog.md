@@ -11675,3 +11675,46 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 （字段标签与显示/隐藏开关，本来就是通用件）。
 
 验证：gen-l10n + analyze 干净；4 个套件 **50 条全绿**。
+
+---
+
+## 2026-10-05（四）「空间成员」弹层重做：成员卡流
+
+老板定版式：**每行一张成员卡，底色=该成员性别色**；左对齐「头像 + 人名」，
+右对齐「邀请 / 重新邀请」文字按钮；**不列我自己**；卡片流下方**不再**有独立的
+邀请/重新邀请按钮与说明。
+
+### 三个先问清的点（AskUserQuestion）
+
+1. 群组里「邀请新成员」放哪？→ **列表末尾加一张邀请卡**（新人没有卡片可挂按钮）。
+2. 「通道数」小角标？→ **去掉**。
+3. 已加入成员的头像？→ **真实头像**（复用消息区 `_MessageAvatar`；没有则默认人形图标）。
+
+### 落地
+
+- `chat_page._showMembersSheet` 重写 + 新增 `_membersCard()`：
+  - 卡 = `Material(color: _genderTint(gender))`（男浅蓝 / 女浅粉 / 性别未知=中性灰）
+    + `InkWell` **整卡可点**（老板偏好：别让人去点中某个小控件）+ 右 `TextButton`。
+  - 头像用 `_MessageAvatar`（会给它加 `radius` 参数，默认 16 不变，卡里用 20）。
+  - 未满员 → 末尾追加「邀请」占位卡（默认头像、**不显名字**）；群组用
+    `chatPageMembersInviteNew`（邀请新成员）、duo 用 `chatPageMembersInvitePartner`（邀请）。
+  - 已有成员卡 → `chatPageMembersReinvitePartner`（重新邀请）→ `_reinviteMemberIdentity`。
+  - 外层套 `SingleChildScrollView`（成员多时不溢出）。
+- 新增 `_memberGenders`（member_id → 性别）：此前只存了 `_myGender`/`_peerGender`，
+  **per-member 性别没有**；现在从 `/space` 的 `member_genders` 填（服务端 push.ts 对
+  所有成员下发）。
+- **死键清理**（弹层不再用）：`chatPageMembersMe` / `chatPageMembersReinviteHint` /
+  `chatPageMembersReinviteTooltip` / `chatPageMembersFull` / `chatPageMembersFullWithMax`。
+  ⚠️ 踩坑：删 `@chatPageMembersFullWithMax` 时只删掉了单行键名，**下面多行的
+  `placeholders` 块成了孤儿** → `gen-l10n` 报 JSON FormatException。已修。
+  （教训：删 ARB 键要连**多行 @ 元数据块**一起删，不能只删首行。）
+
+### 待老板定（未做）
+
+- 满员时**没有任何提示**（原「群成员已满」那行按"不要说明"去掉了）——要不要补一句淡色说明。
+- 未加入占位卡的**名字区是空的**（按"不显示名字"）；要不要给个淡色占位词（如「待加入」）。
+
+### 验证
+
+`flutter gen-l10n` + `flutter analyze` 干净。**未跑 widget 测试、未构建**（UI 改动由老板
+真机自测——既定分工；且全仓测试没有引用这个弹层的键，已确认）。

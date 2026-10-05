@@ -707,9 +707,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersTitle => 'Space members';
 
   @override
-  String get chatPageMembersMe => 'Me';
-
-  @override
   String get chatPageMembersUnnamed => 'Unnamed';
 
   @override
@@ -717,14 +714,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMembersReinvitePartner => 'Re-invite';
-
-  @override
-  String get chatPageMembersReinviteHint =>
-      'When she changes devices, reinstalls the app, or just wants another device, send her this link — existing entrances stay untouched';
-
-  @override
-  String get chatPageMembersReinviteTooltip =>
-      'Let them add a new device (existing entrances stay)';
 
   @override
   String get chatPageReinvitePassphraseTitle => 'Verify passphrase';
@@ -745,14 +734,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMembersInviteNew => 'Invite new member';
-
-  @override
-  String get chatPageMembersFull => 'Group is full';
-
-  @override
-  String chatPageMembersFullWithMax(int current, int max) {
-    return 'Space is full ($current/$max)';
-  }
 
   @override
   String get chatPageEntranceListFailed =>
