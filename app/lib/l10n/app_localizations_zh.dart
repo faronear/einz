@@ -1121,11 +1121,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memberPending => '待加入';
 
   @override
-  String chatPageStatusOthersOnline(int online, int total) {
-    return '$online/$total';
-  }
-
-  @override
   String get voiceCallMenuCall => '语音通话';
 
   @override

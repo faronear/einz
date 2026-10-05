@@ -641,18 +641,6 @@
   "@memberPending": {
     "description": "Status word when a member has not joined yet (shared by the space card, space list, and members sheet)"
   },
-  "chatPageStatusOthersOnline": "{online}/{total}",
-  "@chatPageStatusOthersOnline": {
-    "description": "Group space top bar, second line: how many others are online / how many others there are. BOTH numbers exclude me.",
-    "placeholders": {
-      "online": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
   "voiceCallMenuCall": "Voice call",
   "@voiceCallMenuCall": {
     "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"

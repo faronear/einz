@@ -1200,11 +1200,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get memberPending => 'Waiting';
 
   @override
-  String chatPageStatusOthersOnline(int online, int total) {
-    return '$online/$total';
-  }
-
-  @override
   String get voiceCallMenuCall => 'Voice call';
 
   @override

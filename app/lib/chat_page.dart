@@ -340,37 +340,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// invite 的那一刻就已升格，此时第三人还没进来，但通话必须立刻停用）。
   bool get _isGroup => _spaceMode == 'group';
 
-  /// 顶部条那一格的主文案（群聊一期 2026-10-03）：
-  /// - duo：沿用"对方名字"（两人世界里这一格就是那一个人）；
-  /// - group：**其他成员的名字列表**（"A、B、C"），按槽位（入群先后）排、过长
-  ///   由 Text 的省略号截断。不再假装有"唯一一个对方"。
-  String get _statusTitle {
-    if (!_isGroup) return _peerName;
-    final others = _memberSlots.entries
-        .where((e) => e.key != _myMemberId)
-        .toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
-    final names = others
-        .map((e) => _memberNames[e.key] ?? '')
-        .where((n) => n.isNotEmpty)
-        .toList();
-    if (names.isEmpty) return _peerName; // 还没拉到名单：退回旧值，别闪成空白
-    return names.join('、');
-  }
-
   /// 本空间成员数（身份数，同身份多通道只算一个）。
   int get _memberCount => _memberSlots.length;
-
-  /// 群空间顶部状态条第二行要显示的「**其他人在线数**」（**不含我自己**）。
-  /// 由通道轮询 [\_refreshPeerOnline] 维护（在线按 member 去重：同一 member 有
-  /// 任一条通道在线就算他在线）。老板 2026-10-05：群空间这一行不摆红绿灯——那一格
-  /// 是一群人，"某一个人在不在线"没有意义，人数才是信息。
-  int _othersOnline = 0;
-
-  /// 同上，**其他人总数**（不含我自己）：以 /space 的成员表为准
-  /// （`_memberCount - 1`），拿不到时退回通道表里出现过的 member 数（见轮询里
-  /// 的 `max` 说明）。名单还没拉到时（`_memberSlots` 为空）界面不显示这一行。
-  int _othersTotal = 0;
 
   /// 还能不能再邀请新成员（2026-10-04：mode 创建时定死，没有升格）：
   /// - duo：**只在还没第二个人时**能邀请（那是"邀请伴侣"）；满 2 人即永久关闭
@@ -880,9 +851,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
     }
     // 什么时候还要重拉一次 /entrances：
-    // - **群空间**：这一格显示的是「其他人在线数」，**任何**一条别人的通道上下线
-    //   都可能改变人数 → 一律重算。而且必须重拉、不能就地加减：同一 member 可能
-    //   有多条通道，断一条不代表人下线（要按 member 去重才是"人在线"）。
+    // - **群空间**：左上角摆的是**成员头像条**、右侧还挂着「邀请」入口，而那个入口
+    //   看的是"有没有别人在用通道"（`_peerJoined`）——任何一条别人的通道上下线都可能
+    //   改变它（群里的邀请入口与 duo 同款，只在"还没人加入"时出现）。重拉一下最省事。
     // - duo：仅当事件没带时刻（连着老服务端）才补拉，别白跑。
     if (_isGroup || (changed && event.since == null)) {
       unawaited(_refreshPeerOnline());
@@ -1533,30 +1504,71 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 状态条第二行（**其他成员那一侧**）——两种空间形态说的不是一件事：
+  /// 群空间状态条左侧：**只摆其他成员的头像**（一排），不写名字、不标在线状态
+  /// （老板 2026-10-05 定）。
   ///
-  /// - **duo**：红绿灯 + 上/下线时刻（未加入时右侧显示「待加入」）——两人世界里
-  ///   "对方在不在"就是这一格的信息；
-  /// - **group**：**不摆灯**，改成「其他人在线数 / 其他人总数」（**两个数都不含
-  ///   我自己**，老板 2026-10-05）。群空间里"某一个人在不在线"没有意义，人数才是。
-  ///   名单还没拉到（`_memberSlots` 空）时留空，免得先闪一个 "0/0"。
-  Widget _leftStatusSubLine(AppLocalizations l10n) {
-    if (!_isGroup) {
-      return _statusLine(
-        online: _peerOnline,
-        offlineColor: Colors.red,
-        sinceMs: _peerSinceMs,
-        label: _peerJoined == false ? l10n.memberPending : null,
-      );
-    }
-    if (_memberSlots.isEmpty) return const SizedBox.shrink();
-    return Text(
-      // 与 _statusLine 里的时刻同一号、同一灰度，两版视觉一致
-      l10n.chatPageStatusOthersOnline(_othersOnline, _othersTotal),
-      style: TextStyle(
-        fontSize: 11,
-        color: Colors.black.withValues(alpha: 0.55),
-      ),
+  /// - 成员按**加入先后**（槽位升序）排；不含我自己（我在右侧那一块）。
+  /// - **最多占状态条一半宽**（老板：接近一半就收住）。装不下时，最后一个头像
+  ///   **向右渐隐**——一眼看出"后面还有人"，又不会把胶囊撑破。选渐隐而不是
+  ///   "+N"：头像没法像文字那样省略，而渐隐既省地方又不引入新文案。
+  /// - **只构建装得下的那几个**：群大了也不该为看不见的头像去拉图（每个头像都是
+  ///   一次带缓存的异步取图）。
+  /// - 一个其他成员都没有时返回空（此时左侧只剩「邀请」入口，见 `_buildPeerStatus`）。
+  Widget _memberAvatarStrip() {
+    final others = _memberSlots.entries
+        .where((e) => e.key != _myMemberId)
+        .toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    if (others.isEmpty) return const SizedBox.shrink();
+
+    // 状态条胶囊宽 = 屏宽 − 左右 margin（各 12）；左半 = 一半。
+    // ⚠️ 这个 24 与状态条 Container 的 `margin: fromLTRB(12, 4, 12, 6)` 耦合，
+    // 改 margin 要一起改（与 top_notice 那个 46 是同一类耦合）。
+    final maxWidth = (MediaQuery.sizeOf(context).width - 24) / 2;
+
+    const size = kStatusMemberAvatarSize;
+    const gap = 4.0;
+    // 渐隐区宽度：够看出一截"淡下去"，又不至于吞掉一整个头像
+    const fade = 16.0;
+
+    final natural = others.length * size + (others.length - 1) * gap;
+    final truncated = natural > maxWidth;
+    final budget = truncated ? maxWidth - fade : maxWidth;
+
+    var count = ((budget + gap) / (size + gap)).floor();
+    if (count < 1) count = 1;
+    if (count > others.length) count = others.length;
+    final shown = others.take(count).toList();
+    final stripWidth = shown.length * size + (shown.length - 1) * gap;
+
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < shown.length; i++) ...[
+          if (i > 0) const SizedBox(width: gap),
+          _MessageAvatar(
+            memberId: shown[i].key,
+            server: effectiveServer,
+            api: widget.api,
+            radius: size / 2,
+          ),
+        ],
+      ],
+    );
+    if (!truncated) return row;
+
+    // 渐隐：`BlendMode.dstIn` + 不透明→透明的渐变（白 = 留、透明 = 丢）
+    final fadeStart = ((stripWidth - fade) / stripWidth).clamp(0.0, 1.0);
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) => LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: const [Colors.white, Colors.white, Colors.transparent],
+        stops: [0, fadeStart, 1],
+      ).createShader(rect),
+      // 定宽 = 头像条的自然宽：Row 恰好放得下，不会触发溢出（否则 Flex 会报黄条）
+      child: SizedBox(width: stripWidth, height: size, child: row),
     );
   }
 
@@ -1574,46 +1586,57 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildPeerStatus(AppLocalizations l10n) {
     // 左/上/下都 0：这一格以**头像**打头，头像要**三面贴住胶囊内壁**（老板
     // 2026-09-26）；右 10 给箭头/右缘留白。行高由头像决定，头像即贴边。
-    const pad = EdgeInsets.fromLTRB(0, 0, 10, 0);
+    //
+    // **群空间例外**（老板 2026-10-05）：左侧只摆**成员头像条**，首个头像要离胶囊
+    // 左缘留白（一排小头像贴着边会显得被切掉），且整条**竖直居中**（头像比胶囊矮）。
+    final pad = _isGroup
+        ? const EdgeInsets.fromLTRB(10, 0, 10, 0)
+        : const EdgeInsets.fromLTRB(0, 0, 10, 0);
     // 芯片内容**只到箭头为止**（老板 2026-09-25）：「邀请加入」链接在芯片外
     // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别。
-        // **群空间例外**（老板 2026-10-05）：这一格是**一群人**，不显示某一个人的
-        // 头像、也不用性别底色 —— 改用创建空间时「群组秘境」那一页同一枚图标
-        // （`Icons.groups_outlined`，见 setup_page 的 `_buildStepSpaceKind`），
-        // 一眼看出"这里是多人空间"。名字那一行已经是名单（见 _statusTitle）。
-        _isGroup
-            ? _statusAvatar(icon: Icons.groups_outlined)
-            : _statusAvatar(bytes: _peerAvatarBytes, gender: _peerGender),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Column(
+    final content = _isGroup
+        // 群空间：**没有人名、没有在线状态**，只有一排成员头像（老板 2026-10-05）。
+        // Align 让它竖直居中（外层的 stretch 会给到满高 40，而头像只有 32）。
+        ? Align(alignment: Alignment.centerLeft, child: _memberAvatarStrip())
+        : Row(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_statusTitle.isNotEmpty)
-                Flexible(
-                  child: Text(_statusTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      // 15 号：要**明显大于**下面的状态行（11）但不喧宾夺主——
-                      // 名字是这一格的主信息，原来 13 与 11 几乎看不出主次
-                      // （老板 2026-09-26）
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
+              _statusAvatar(bytes: _peerAvatarBytes, gender: _peerGender),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_peerName.isNotEmpty)
+                      Flexible(
+                        child: Text(_peerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            // 15 号：要**明显大于**下面的状态行（11）但不喧宾夺主
+                            // ——名字是这一格的主信息，原来 13 与 11 几乎看不出主次
+                            // （老板 2026-09-26）
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w500)),
+                      ),
+                    const SizedBox(height: 1),
+                    // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）；
+                    // **对方尚未加入**时灯变灰、右侧显示「待加入 / Waiting」——时间
+                    // 对未加入的人没有意义，摆个"上次离线时间"反而误导（2026-09-26）
+                    _statusLine(
+                      online: _peerOnline,
+                      offlineColor: Colors.red,
+                      sinceMs: _peerSinceMs,
+                      label: _peerJoined == false ? l10n.memberPending : null,
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 1),
-              // 第二行：duo = 红绿灯 + 时刻；group = 其他人在线数/总数（详见该方法）
-              _leftStatusSubLine(l10n),
+              ),
+              // 切换秘境的入口**不在这里**——已挪到顶部标题栏「logo + 我的秘境」右侧
+              // （老板 2026-09-26：挂在对方名字旁边，点它等于"要换掉对方"，有点伤人）。
             ],
-          ),
-        ),
-        // 切换秘境的入口**不在这里**——已挪到顶部标题栏「logo + 我的秘境」右侧
-        // （老板 2026-09-26：挂在对方名字旁边，点它等于"要换掉对方"，有点伤人）。
-      ],
-    );
+          );
 
     final Widget inviteLink = _peerJoined != false
         ? const SizedBox.shrink()
@@ -3225,29 +3248,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final status = d['status'];
         return status == null || status == 'active';
       });
-      // 群空间状态条第二行要显示的「其他人 在线 / 总数」（**都不含我自己**）：
-      // - 在线按 **member** 维度去重——同一 member 有任一条通道在线就算他在线
-      //   （与上面 `online` 那句"在线是人的维度"同一口径）；
-      // - 总数以 /space 的成员表为准（`_memberCount` 含我，故 -1）；万一成员表
-      //   还没更新（刚被拉进群等），取通道表里出现过的 member 数，二者取 `max`
-      //   ——宁可与界面名单一致，也别出现"2 人在聊却显示 0/0"。
-      final seenOthers = <String>{};
-      final onlineOthers = <String>{};
-      for (final d in entrances) {
-        if (d['entrance_id'] == widget.entranceId) continue;
-        final pid = d['member_id'] as String?;
-        if (pid == null || pid.isEmpty) continue;
-        if (mine != null && mine.isNotEmpty && pid == mine) continue;
-        seenOthers.add(pid);
-        if (_isRowOnline(d, now)) onlineOthers.add(pid);
-      }
-      final othersTotal = _memberCount > 0
-          ? (_memberCount - 1) > seenOthers.length
-              ? _memberCount - 1
-              : seenOthers.length
-          : seenOthers.length;
-      final othersOnline =
-          onlineOthers.length > othersTotal ? othersTotal : onlineOthers.length;
       // 状态条上的「上线/下线时刻」：对方取"在线的那条通道"（没有就取第一条），
       // 我方取本机通道；口径统一走 _sinceOfRow。
       final peerOnlineRow = peer.where((d) => _isRowOnline(d, now)).firstOrNull;
@@ -3271,17 +3271,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               joined != _peerJoined ||
               peerSince != _peerSinceMs ||
               mySince != _mySinceMs ||
-              myCount != _myEntranceCount ||
-              othersOnline != _othersOnline ||
-              othersTotal != _othersTotal)) {
+              myCount != _myEntranceCount)) {
         setState(() {
           _peerOnline = online;
           _peerJoined = joined;
           _peerSinceMs = peerSince;
           _mySinceMs = mySince;
           _myEntranceCount = myCount;
-          _othersOnline = othersOnline;
-          _othersTotal = othersTotal;
         });
       }
     } catch (_) {
@@ -6453,8 +6449,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     children: [
                       Text(l10n.chatPagePinLabel, style: captionStyle),
                       const Spacer(),
-                      // 未设置时只显示「锁屏码」，不显示「未设置」尾缀（老板 2026-09-15）
-                      if (_hasPin) _menuValue(l10n.chatPagePinSetValue, valueStyle),
+                      // 右簇：锁屏图标恒显；已设置再加「已设置」文字（图标在前、
+                      // 文字在后，与「我的通道」devices 行同风格）；未设置只有图标，
+                      // 不显示「未设置」尾缀（老板 2026-09-15）
+                      Icon(Icons.lock_outline, size: 18, color: labelStyle.color),
+                      if (_hasPin) ...[
+                        const SizedBox(width: 4),
+                        _menuValue(l10n.chatPagePinSetValue, valueStyle),
+                      ],
                     ],
                   ),
                 ),
@@ -7945,6 +7947,12 @@ const double kStatusControlSize = 32;
 /// 状态条上的头像边长（= 名字 + 红绿灯两行的高度）。头像**上下不留白**，
 /// 三面贴住胶囊内壁（老板 2026-09-26）。
 const double kStatusAvatarSize = 40;
+
+/// 状态条左侧「成员头像条」里每个头像的直径。
+///
+/// 比右侧我自己的 [kStatusAvatarSize]（40）**小一号**：一排人挤在 40 高里会堵，
+/// 小一号也更像"一串成员"。群空间专用（老板 2026-10-05）。
+const double kStatusMemberAvatarSize = 32;
 
 /// 消息气泡旁的头像直径（`_MessageAvatar` 的默认半径 16 × 2）。
 ///

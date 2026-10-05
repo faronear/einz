@@ -1,15 +1,13 @@
-// 回归：**群空间**顶部状态条的两处形态（老板 2026-10-05 定）。
+// 回归：**群空间**顶部状态条**左侧**的形态（老板 2026-10-05 定）。
 //
-// 群空间里那一格代表的是"一群人"，所以两处都要跟着变：
-//  ① 头像位置不再显示某个人的头像 → 换成创建空间时「群组秘境」那枚图标
-//     （`Icons.groups_outlined`，与 setup_page 的类型选择页同一枚）；
-//  ② 第二行不再是红绿灯（"某一个人在不在线"没意义）→ 改成
-//     「**其他人在线数 / 其他人总数**」，**两个数都不含我自己**。
+// 左侧 = **一排其他成员的头像**：
+//  ① 不含我自己（我在右侧那一块）；
+//  ② **没有人名**（原先那行 "Member0、Member1、Member2" 已去掉）；
+//  ③ **没有在线状态**（红绿灯 / 人数都没有）；
+//  ④ 装不下时**末尾渐隐**（`ShaderMask`），且**只构建装得下的那几个**
+//     ——群大了不该为看不见的头像去拉图。
 //
-// 本测试同时钉住"按 member 去重"：成员 Alice 挂了**两条**通道，
-// 人数必须是 1 而不是 2（在线是"人"的维度）。
-//
-// l10n：断言只绑 key（`chatPageStatusOthersOnline`），不绑字面文案。
+// 本文件不依赖文案（新设计里左侧没有文字），所以不引 l10n 取词。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -20,57 +18,43 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'real_async_settle.dart';
 
-final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
-
-/// 4 个成员（我 + 3 人）、上限 5 的群空间；通道表里 Alice 有**两条**通道。
+/// [others] = 除我之外的成员数；名单与通道表按它生成。
 class _GroupApi extends ApiClient {
-  _GroupApi() : super('http://fake');
+  _GroupApi(this.others) : super('http://fake');
+
+  final int others;
 
   @override
-  Future<SpaceResult> getSpace(String token) async => const SpaceResult(
+  Future<SpaceResult> getSpace(String token) async => SpaceResult(
         spaceId: 'space-demo',
-        entrances: [],
+        entrances: [
+          for (var i = 0; i < others; i++)
+            SpaceEntrance(
+                entranceId: 'dev-o$i', memberId: 'member-o$i', status: 'active'),
+        ],
         memberNames: {
           'member-me': 'Lukas',
-          'member-a': 'Alice',
-          'member-b': 'Bob',
-          'member-c': 'Carol',
+          for (var i = 0; i < others; i++) 'member-o$i': 'Member$i',
         },
         memberGenders: {
           'member-me': 'male',
-          'member-a': 'female',
-          'member-b': 'male',
-          'member-c': 'female',
+          for (var i = 0; i < others; i++) 'member-o$i': 'female',
         },
+        // 槽位即入群顺序（左侧头像条按它排）
         memberSlots: {
           'member-me': 0,
-          'member-a': 1,
-          'member-b': 2,
-          'member-c': 3,
+          for (var i = 0; i < others; i++) 'member-o$i': i + 1,
         },
         mode: 'group',
-        maxMembers: 5,
+        maxMembers: 0,
       );
 
   @override
-  Future<List<Map<String, dynamic>>> listEntrances(String token) async => const [
-        // 我自己（本机这条）——两个数字都不该把我算进去
-        {'entrance_id': 'dev-a', 'member_id': 'member-me', 'connected_at': 1000},
-        // 我自己的**另一台设备**（也在线）：按 entrance_id 排除不掉它，
-        // 必须靠"排除我自己的 member"那道判断 —— 它同样不该算成"另一个人"。
-        {'entrance_id': 'dev-a2', 'member_id': 'member-me', 'connected_at': 1000},
-        // Alice：**两条**通道都在线 → 按 member 去重后只算 1 个人
-        {'entrance_id': 'dev-b', 'member_id': 'member-a', 'connected_at': 1000},
-        {'entrance_id': 'dev-c', 'member_id': 'member-a', 'connected_at': 1000},
-        // Bob：在线
-        {'entrance_id': 'dev-d', 'member_id': 'member-b', 'connected_at': 1000},
-        // Carol：离线（connected_at 为 null = 没有实时连接）
-        {
-          'entrance_id': 'dev-e',
-          'member_id': 'member-c',
-          'connected_at': null,
-          'last_seen': 0,
-        },
+  Future<List<Map<String, dynamic>>> listEntrances(String token) async => [
+        // 每个其他成员都有一条在用通道 → `_peerJoined == true` → 不显示「邀请」入口，
+        // 断言里就只剩头像条本身，干净。
+        for (var i = 0; i < others; i++)
+          {'entrance_id': 'dev-o$i', 'member_id': 'member-o$i', 'connected_at': 1000},
       ];
 
   @override
@@ -87,7 +71,7 @@ class _GroupApi extends ApiClient {
       NotifyEmailStatus(state: 'none');
 }
 
-Future<void> _pumpGroupChat(WidgetTester tester, LocalDatabase db) async {
+Future<void> _pump(WidgetTester tester, LocalDatabase db, int others) async {
   final spaceKey = await generateSpaceKey();
   await tester.pumpWidget(MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -95,12 +79,12 @@ Future<void> _pumpGroupChat(WidgetTester tester, LocalDatabase db) async {
     locale: const Locale('zh'),
     home: ChatPage(
       spaceId: 'space-demo',
-      entranceId: 'dev-a',
+      entranceId: 'dev-me',
       spaceKey: spaceKey,
       keyVersion: 1,
       token: 'tok',
       db: db,
-      api: _GroupApi(),
+      api: _GroupApi(others),
       enableWs: false,
       memberId: 'member-me',
       memberName: 'Lukas',
@@ -108,38 +92,70 @@ Future<void> _pumpGroupChat(WidgetTester tester, LocalDatabase db) async {
       peerName: '',
     ),
   ));
-  // /space（成员表）+ /entrances（人数）都是 initState 里发起的异步
-  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump(const Duration(milliseconds: 300)); // /space + /entrances
   await tester.pumpAndSettle();
 }
+
+/// 状态条里的头像数（含**我自己**那一个——它在右侧）。
+int _statusAvatars(WidgetTester tester) => tester
+    .widgetList(find.descendant(
+        of: find.byKey(const ValueKey('chatPageStatusBar')),
+        matching: find.byType(CircleAvatar)))
+    .length;
 
 void main() {
   disableAnimationsInTests();
 
-  testWidgets('群空间状态条：群组图标 + 「其他人在线数/总数」（都不含我自己）',
+  testWidgets('群空间状态条左侧：只有其他成员的头像，没有人名与在线状态',
       (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
-    await _pumpGroupChat(tester, db);
+    await _pump(tester, db, 3);
 
-    // ① 左侧头像位置换成了「群组秘境」那枚图标（不是单人形）
-    expect(find.byIcon(Icons.groups_outlined), findsOneWidget,
-        reason: '群空间左侧应显示群组图标（与创建空间时选类型那页同一枚）');
-    // 单人图标只剩**我自己**那半格（我还没设头像，空头像就是单人形）
-    expect(find.byIcon(Icons.person), findsOneWidget,
-        reason: '单人图标只应剩"我自己"那一个（左侧已换成群组图标）');
+    final statusBar = find.byKey(const ValueKey('chatPageStatusBar'));
+    expect(statusBar, findsOneWidget);
 
-    // ② 第一行仍是名单（按加入顺序，不含我自己）
-    expect(find.text('Alice、Bob、Carol'), findsOneWidget,
-        reason: '第一行是其他成员名单');
+    // ① 三个其他成员的头像 + 我自己那一个 = 4
+    expect(_statusAvatars(tester), 4,
+        reason: '左侧应摆其他成员的头像（3 个），加我自己共 4 个');
 
-    // ③ 第二行是人数：Alice/Bob 在线、Carol 离线 → 2/3；
-    //    Alice 的两条通道按 member 去重后只算 1 个人
-    expect(find.text(_zh.chatPageStatusOthersOnline(2, 3)), findsOneWidget,
-        reason: '第二行应为「其他人在线数/其他人总数」，且不含我自己');
+    // ② 左侧**没有人名**（原来的 "Member0、Member1、Member2" 已去掉）
+    for (var i = 0; i < 3; i++) {
+      expect(find.descendant(of: statusBar, matching: find.text('Member$i')),
+          findsNothing,
+          reason: '群空间状态条左侧不该再写人名');
+    }
 
-    // ④ 红绿灯只在**我自己那一侧**（左侧群空间不摆灯）
-    expect(find.byIcon(Icons.circle), findsOneWidget,
-        reason: '群空间左侧不该有红绿灯（只剩我自己那半格的灯）');
+    // ③ 没有群组图标（上一版那个 Icons.groups_outlined 已被头像条取代）
+    expect(
+        find.descendant(
+            of: statusBar, matching: find.byIcon(Icons.groups_outlined)),
+        findsNothing);
+
+    // ④ 没超上限 → 不该有渐隐
+    expect(find.descendant(of: statusBar, matching: find.byType(ShaderMask)),
+        findsNothing,
+        reason: '头像条没超过一半宽时不需要渐隐');
+  });
+
+  testWidgets('成员多到超过一半宽：只摆装得下的那几个，且末尾渐隐',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    const others = 15;
+    await _pump(tester, db, others);
+
+    final statusBar = find.byKey(const ValueKey('chatPageStatusBar'));
+    final avatars = _statusAvatars(tester);
+
+    // 渐隐出现（说明确实截断了）
+    expect(find.descendant(of: statusBar, matching: find.byType(ShaderMask)),
+        findsWidgets,
+        reason: '头像条超出上限时应在末尾渐隐');
+
+    // 没有把 15 个都建出来：只摆装得下的（+1 是我自己）
+    expect(avatars, greaterThan(1), reason: '至少要有头像');
+    expect(avatars, lessThan(1 + others),
+        reason: '超过上限的部分不该被构建（更不该为看不见的头像去拉图）');
   });
 }
