@@ -5,7 +5,8 @@
 //  ② **没有人名**（原先那行 "Member0、Member1、Member2" 已去掉）；
 //  ③ 人数在头像**右侧**，且**整块不越过胶囊中线**（老板：最多顶到一半宽的最右侧）；
 //  ④ 头像装不下时**末尾渐隐**（`ShaderMask`），且**只构建装得下的那几个**
-//     ——群大了不该为看不见的头像去拉图；**人数不参与截断**（它是信息）。
+//     ——群大了不该为看不见的头像去拉图；**人数不参与截断**（它是信息）；
+//  ⑤ **至少有一条通道在线**的成员，头像上叠一圈**绿环**（离线的不叠）。
 //
 // 本文件只绑 l10n 键（`chatPageStatusOthersOnline`），不绑字面文案。
 
@@ -186,6 +187,19 @@ void main() {
     expect(find.descendant(of: _statusBar, matching: find.byType(ShaderMask)),
         findsNothing,
         reason: '头像条没超上限时不需要渐隐');
+
+    // ⑧ 在线与否一眼可辨：o0、o1 在线（套绿环），o2 离线（不套）
+    expect(find.byKey(const ValueKey('statusAvatarOnline-member-o0')),
+        findsOneWidget,
+        reason: '有通道在线的成员，头像应套绿环');
+    expect(find.byKey(const ValueKey('statusAvatarOnline-member-o1')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('statusAvatarOnline-member-o2')),
+        findsNothing,
+        reason: '没有通道在线的成员不该套环');
+    expect(find.byKey(const ValueKey('statusAvatarOnline-member-me')),
+        findsNothing,
+        reason: '"其他成员"不含我自己，我自己那一格不套环');
   });
 
   testWidgets('成员多到超过一半宽：只摆装得下的那几个、末尾渐隐，人数照常显示',
@@ -213,6 +227,11 @@ void main() {
             matching: find.text(_zh.chatPageStatusOthersOnline(14, 15))),
         findsOneWidget,
         reason: '人数是信息，无论头像截不截断都要显示');
+
+    // 截断归截断，在线的环照常画（o0 在线）
+    expect(find.byKey(const ValueKey('statusAvatarOnline-member-o0')),
+        findsOneWidget,
+        reason: '头像条被截断也照样标出谁在线');
 
     // 整块仍然不越过胶囊中线
     final capsule = tester.getRect(_statusBar);

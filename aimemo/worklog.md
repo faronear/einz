@@ -12359,3 +12359,44 @@ o1 在线、o2 离线）、**人数在头像右侧**、**整块不越过胶囊�
 ### 验证
 
 `flutter analyze` 干净；**全量 app 测试 255 passed + 1 skipped / 0 failed**。
+
+---
+
+## 2026-10-05（二十）在线成员的头像套一圈绿环
+
+老板：能不能让**至少有一条通道在线**的同伴，在状态条头像里和不在线的区分开？
+
+### 选择：绿环（而不是"把离线的调暗"）
+
+- **绿环**：与状态条那颗"在线"绿灯**同色**（`Colors.green`），沿用 App 已有的"绿=在线"
+  语言；而且是**加法**——离线的保持原样，不会让整条头像条灰下去（这个 App 里多数人
+  没设头像，显示的是浅色底 + 人形图标，把它们调暗反而谁都看不出差别）。
+- **环画在头像内侧边缘**、占位尺寸仍是 32 **不变大**：头像条是按"每个都占满 32"算
+  装得下几个的（含末尾渐隐那段的换算），尺寸一变这整套要跟着动，还容易被 `Flexible`
+  判溢出。代价是头像可见区被环吃掉约 2.5px（Instagram/故事环也是这个做法）。
+
+### 实现
+
+- 新增 `Set<String> _onlineOthers`（**至少有一条通道在线**的其他成员 member_id）。
+  口径与已有的 `_othersOnline` 计数**同一份计算**（在线是"人"的维度：同一 member 任一条
+  通道在线即算在线，按 member 去重），只是这次把集合留下来而不只留个数字。
+  进 `setState` 的条件用 `setEquals` 比（Set 不能用 `!=` 比内容）。
+- `_stripAvatar(memberId)`：不在线 → 直接返回头像；在线 → `SizedBox(32) + Stack
+  (StackFit.expand)[头像, 带圆环 border 的 DecoratedBox]`。
+  （`StackFit.expand` 必须配**定宽**的 `SizedBox`：Row 给子项的是无界宽度，
+  直接 expand 会报错。）
+- 环上挂 `ValueKey('statusAvatarOnline-<$memberId>')` 供测试数"谁在线"
+  （头像本身没有可断言的视觉属性）。
+
+### 回归测试（在既有 2 条上各加一段）
+
+① 3 个成员（o0 两条通道在线、o1 在线、o2 离线）→ o0/o1 有环、**o2 没有**、
+**我自己那一格没有**（"其他成员"不含我）；② 15 个成员 → 头像条被截断时**环照常画**。
+
+**变异验证**：临时给所有成员都套环 → 测试①立刻红
+（`Found 1 widget with key 'statusAvatarOnline-member-o2'` … "none were expected"）→
+恢复 → 绿。
+
+### 验证
+
+`flutter analyze` 干净；**全量 app 测试 255 passed + 1 skipped / 0 failed**。

@@ -352,6 +352,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 拿不到时退回通道表里出现过的 member 数（见轮询里的 `max` 说明）。
   int _othersTotal = 0;
 
+  /// **至少有一条通道在线**的其他成员（member_id 集合，不含我自己）。
+  ///
+  /// 头像条据此把在线的人**套一圈绿环**（老板 2026-10-05：要与不在线的区分开）。
+  /// 口径与 [_othersOnline] 同一份计算——在线是**人**的维度（同一 member 有任一条
+  /// 通道在线就算他在线），所以这里存的是去重后的 member_id。
+  Set<String> _onlineOthers = <String>{};
+
   /// 还能不能再邀请新成员（2026-10-04：mode 创建时定死，没有升格）：
   /// - duo：**只在还没第二个人时**能邀请（那是"邀请伴侣"）；满 2 人即永久关闭
   ///   ——第三个人不是"满了"，是双人秘境不允许；
@@ -1567,6 +1574,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       .toList()
     ..sort((a, b) => a.value.compareTo(b.value));
 
+  /// 头像条里的**一个**头像。
+  ///
+  /// [memberId] 该成员**至少有一条通道在线**（`_onlineOthers`）时，在头像上叠一圈
+  /// **绿环**——与状态条那颗"在线"绿灯同色（`Colors.green`），一眼看出这一串里谁在。
+  ///
+  /// 环画在头像**内侧边缘**、占位尺寸仍是 [kStatusMemberAvatarSize]，**不变大**：
+  /// 头像条按"每个都占满 32"来算装得下几个（含末尾渐隐那段的换算），尺寸一变这整套
+  /// 都得跟着动，还容易被 `Flexible` 判溢出。代价是头像可见区被环吃掉约 2.5px，
+  /// 在 32 的尺寸上可以接受（Instagram/故事环也是这个做法）。
+  Widget _stripAvatar(String memberId) {
+    final avatar = _MessageAvatar(
+      memberId: memberId,
+      server: effectiveServer,
+      api: widget.api,
+      radius: kStatusMemberAvatarSize / 2,
+    );
+    if (!_onlineOthers.contains(memberId)) return avatar;
+    return SizedBox(
+      width: kStatusMemberAvatarSize,
+      height: kStatusMemberAvatarSize,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          avatar,
+          DecoratedBox(
+            // key 供测试数"谁在线"（头像本身没有可断言的视觉属性）
+            key: ValueKey('statusAvatarOnline-$memberId'),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.green, width: 2.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 其他成员的头像条。[budget] = 分给它的宽度上限（**已扣掉人数那一段**）。
   ///
   /// - 装不下时末尾**渐隐**（而非 "+N"）：头像没法像文字那样省略，渐隐既省地方
@@ -1594,12 +1638,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       children: [
         for (var i = 0; i < shown.length; i++) ...[
           if (i > 0) const SizedBox(width: gap),
-          _MessageAvatar(
-            memberId: shown[i].key,
-            server: effectiveServer,
-            api: widget.api,
-            radius: size / 2,
-          ),
+          _stripAvatar(shown[i].key),
         ],
       ],
     );
@@ -3344,7 +3383,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               mySince != _mySinceMs ||
               myCount != _myEntranceCount ||
               othersOnline != _othersOnline ||
-              othersTotal != _othersTotal)) {
+              othersTotal != _othersTotal ||
+              !setEquals(_onlineOthers, onlineOthers))) {
         setState(() {
           _peerOnline = online;
           _peerJoined = joined;
@@ -3353,6 +3393,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           _myEntranceCount = myCount;
           _othersOnline = othersOnline;
           _othersTotal = othersTotal;
+          // 存副本：局部那个 Set 只是本轮的中间结果
+          _onlineOthers = Set<String>.of(onlineOthers);
         });
       }
     } catch (_) {
