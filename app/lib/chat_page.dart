@@ -6836,10 +6836,42 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       // 说的"必须逐条标注，注释里预留的场景已到来）。
                       // `--dart-define=SHOW_MESSAGE_AVATARS=true` 可强制开（含 duo）。
                       if (_showMessageAvatars && !mine) ...[
-                        _MessageAvatar(
-                            memberId: senderMemberId,
-                            server: effectiveServer,
-                            api: widget.api),
+                        // 头像 + **头像下方的发言人名字**（群聊，老板 2026-10-05）：
+                        // 名字从气泡内搬到这里——气泡里只剩内容，读起来更像"对话"。
+                        // 列宽固定 = 头像直径（[kMessageAvatarDiameter]），所以名字再长
+                        // 也只在**自己那一列**里省略，不会把气泡推歪。
+                        SizedBox(
+                          width: kMessageAvatarDiameter,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _MessageAvatar(
+                                  memberId: senderMemberId,
+                                  server: effectiveServer,
+                                  api: widget.api,
+                                  radius: kMessageAvatarDiameter / 2),
+                              // 群空间才标名字（duo 两人世界里只有"对方"，状态条已写着）；
+                              // 墓碑消息（已删除/焚毁）不标——正文都没了，署名无意义
+                              if (_isGroup && !m.deleted) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  _senderNameOf(senderMemberId),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  // 与原来气泡内那行同一套颜色规则：gradient 主题下
+                                  // 聊天区是深色粉蓝渐变，要白字才看得见
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: _uiStyle == 'gradient'
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                         const SizedBox(width: 6),
                       ],
                       Clickable(
@@ -6891,24 +6923,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                     : CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  // 群聊一期（2026-10-03）：群空间里"这句是谁说的"
-                                  // 逐条标注——放在气泡内、时间行上方（duo 不显示：
-                                  // 两人世界里只有"对方"，状态条已经写着了）。
-                                  if (!mine && _isGroup && !m.deleted) ...[
-                                    Text(
-                                      _senderNameOf(senderMemberId),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: _uiStyle == 'gradient'
-                                            ? Colors.white
-                                            : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                  ],
+                                  // 发言人名字**不在气泡里**（老板 2026-10-05）：
+                                  // 搬到气泡左侧、头像下方（见上面那处 SizedBox）。
+                                  // 气泡内只留内容本身，读起来更像"对话"。
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 2),
                                     child: Row(
@@ -7928,6 +7945,13 @@ const double kStatusControlSize = 32;
 /// 状态条上的头像边长（= 名字 + 红绿灯两行的高度）。头像**上下不留白**，
 /// 三面贴住胶囊内壁（老板 2026-09-26）。
 const double kStatusAvatarSize = 40;
+
+/// 消息气泡旁的头像直径（`_MessageAvatar` 的默认半径 16 × 2）。
+///
+/// 群聊里**发言人名字列宽就取它**（名字在头像下方，老板 2026-10-05）：列宽固定 =
+/// 头像直径，所以再长的名字也只在自己那一列里省略，**不会把气泡推歪**——
+/// 气泡左缘在每条消息上都是对齐的。
+const double kMessageAvatarDiameter = 32;
 
 /// 顶部「切换秘境」旁的**未读汇总角标**（其它空间的未读总数）。
 ///
