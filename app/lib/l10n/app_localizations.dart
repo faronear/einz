@@ -2027,7 +2027,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListTitle.
   ///
   /// In en, this message translates to:
-  /// **'My spaces'**
+  /// **'My Einz spaces'**
   String get spaceListTitle;
 
   /// No description provided for @spaceListEmpty.
@@ -2045,7 +2045,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListSwitch.
   ///
   /// In en, this message translates to:
-  /// **'My spaces'**
+  /// **'My Einz spaces'**
   String get spaceListSwitch;
 
   /// No description provided for @promptLockCodeTitle.

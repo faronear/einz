@@ -1169,7 +1169,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListHint => 'Tap another space to switch to it';
 
   @override
-  String get spaceListTitle => 'My spaces';
+  String get spaceListTitle => 'My Einz spaces';
 
   @override
   String get spaceListEmpty => 'No spaces joined yet';
@@ -1178,7 +1178,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListAdd => 'Add a space';
 
   @override
-  String get spaceListSwitch => 'My spaces';
+  String get spaceListSwitch => 'My Einz spaces';
 
   @override
   String get promptLockCodeTitle => 'Enter your PIN';
