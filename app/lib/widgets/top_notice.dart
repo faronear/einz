@@ -144,7 +144,10 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                   // 简化视觉（老板要求 2026-09-10）：清淡浅粉白底，不用粉蓝
                   // 渐变；浅粉细描边 + 淡灰影浮起，不抢眼
                   color: const Color(0xFFFFF5FA), // 浅粉白纸感（同 Scaffold 背景）
-                  borderRadius: BorderRadius.circular(12),
+                  // 与对话页「状态胶囊」同一个圆角（chat_page 的 circular(24)）——
+                  // 两边数值要一起改。注意：24 比通知自身高度的一半还大，会被 Flutter
+                  // 钳到"半高"，所以两者画出来都是**完整的胶囊弧**（视觉一致，老板 2026-10-05）。
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                     color: const Color(0xFFE9D5E0), // 浅粉描边（同输入框描边）
                     width: 1,
