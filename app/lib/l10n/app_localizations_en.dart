@@ -189,7 +189,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'duo': 'your companion',
       'other': 'your companions',
     });
-    return 'The passphrase is the only key to access the space, shared by you and $_temp0. Memorize it and never leak it!';
+    return 'The passphrase is the secret key to access the space, shared by you and $_temp0. Memorize it and never leak it!';
   }
 
   @override
@@ -215,12 +215,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'duo': 'your companion',
       'other': 'your companions',
     });
-    return 'The passphrase is the only key to access the space, shared by you and $_temp0. Don\'t know it? Ask $_temp1.';
+    return 'The passphrase is the secret key to access the space, shared by you and $_temp0. Don\'t know it? Ask $_temp1.';
   }
 
   @override
-  String get wizardJoinPassphraseWrong =>
-      'Wrong passphrase: use the one set on the first entrance';
+  String get wizardJoinPassphraseWrong => 'Wrong passphrase.';
 
   @override
   String get wizardSwitchToEnvelope => 'Use key envelope instead (offline)';
@@ -230,7 +229,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardPinHint =>
-      'Device-specific lock PIN. Enter it each time you launch.';
+      'Lock your space with a device-specific PIN. Anyone who launches the app will be required to enter the PIN to unlock. You can also leave it blank for now, and set it later in the space.';
 
   @override
   String get welcomeDialogTitleCreate => 'All set!';

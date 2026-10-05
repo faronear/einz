@@ -177,7 +177,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String wizardPassphraseHint(String mode) {
-    return '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙，务必牢记、严禁泄漏！';
+    return '共享口令是打开秘境的唯一钥匙，由你和同伴共同保管。务必牢记、严禁泄漏给秘境之外的任何人！';
   }
 
   @override
@@ -194,11 +194,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String wizardJoinPassphraseHint(String mode) {
-    return '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙。不知道口令？询问你的秘境同伴。';
+    return '共享口令是打开秘境的唯一钥匙，由你和同伴共同保管。不知道口令？询问你的秘境同伴。';
   }
 
   @override
-  String get wizardJoinPassphraseWrong => '口令错误：请确认首条通道创建时设置的口令';
+  String get wizardJoinPassphraseWrong => '口令错误！请询问你的秘境同伴获取正确的口令。';
 
   @override
   String get wizardSwitchToEnvelope => '改用线下密保信封';
@@ -207,7 +207,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardSwitchToPassphrase => '改用共享口令';
 
   @override
-  String get wizardPinHint => '每次启动秘境，需输入锁屏码才能进入。当前也可先跳过，进入秘境后能够随时设置。';
+  String get wizardPinHint =>
+      '在本机上保护你的秘境，任何人启动app时将需要验证锁屏码。当前也可先跳过，进入秘境后能够随时设置。';
 
   @override
   String get welcomeDialogTitleCreate => '一切就绪！';

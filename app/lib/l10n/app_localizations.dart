@@ -407,7 +407,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The passphrase is the only key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Memorize it and never leak it!'**
+  /// **'The passphrase is the secret key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Memorize it and never leak it!'**
   String wizardPassphraseHint(String mode);
 
   /// No description provided for @wizardPassphraseMinLengthHint.
@@ -437,13 +437,13 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The passphrase is the only key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Don\'t know it? Ask {mode, select, duo{your companion} other{your companions}}.'**
+  /// **'The passphrase is the secret key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Don\'t know it? Ask {mode, select, duo{your companion} other{your companions}}.'**
   String wizardJoinPassphraseHint(String mode);
 
   /// No description provided for @wizardJoinPassphraseWrong.
   ///
   /// In en, this message translates to:
-  /// **'Wrong passphrase: use the one set on the first entrance'**
+  /// **'Wrong passphrase.'**
   String get wizardJoinPassphraseWrong;
 
   /// No description provided for @wizardSwitchToEnvelope.
@@ -461,7 +461,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPinHint.
   ///
   /// In en, this message translates to:
-  /// **'Device-specific lock PIN. Enter it each time you launch.'**
+  /// **'Lock your space with a device-specific PIN. Anyone who launches the app will be required to enter the PIN to unlock. You can also leave it blank for now, and set it later in the space.'**
   String get wizardPinHint;
 
   /// No description provided for @welcomeDialogTitleCreate.
