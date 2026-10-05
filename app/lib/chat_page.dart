@@ -1683,8 +1683,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
     final content = _isGroup
         // 群空间：**没有人名**——只有一排成员头像 + 「在线/总数」（老板 2026-10-05）。
-        // Align 让它竖直居中（外层的 stretch 会给到满高 40，而头像只有 32）。
-        ? Align(alignment: Alignment.centerLeft, child: _othersSummary(l10n))
+        // Align 只为竖直居中（外层 stretch 给到满高 40，头像只有 32）；
+        // **必须 widthFactor:1**——Align 默认横向撑满约束，会把左半条占满、
+        // 把「邀请加入」链接推到状态条正中（老板 2026-10-06 实测），
+        // 收缩到内容宽后 invite 紧跟人数（与 duo 未加入时同款位置）。
+        ? Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1.0,
+            child: _othersSummary(l10n))
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -6637,16 +6643,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(l10n.chatPageMenuMembers(_isGroup ? 'group' : 'duo'),
                           style: captionStyle),
                       const Spacer(),
-                      // 右簇：group 图标 + 除我之外的人数（图标在前、数字在后，与
-                      // 「我的通道」devices 行同风格）；仅群聊显示（老板 2026-10-05）
-                      // ——duo 只有对方一个人，图标+计数没有信息量。_memberCount 是
-                      // 身份数（含我），减 1 得同伴数；轮询没拉到就不显示数字。
-                      if (_isGroup) ...[
-                        Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
-                        if (_memberCount > 1) ...[
-                          const SizedBox(width: 4),
-                          _menuValue('${_memberCount - 1}', valueStyle),
-                        ],
+                      // 「我的同伴」右簇：group_outlined 图标恒显（duo 也显示，
+                      // 老板 2026-10-06 定回原图标）；
+                      // 仅群聊追加除我之外的人数（图标在前、数字在后，与「我的通道」
+                      // devices 行同风格）——duo 不标人数。_memberCount 是身份数
+                      // （含我），减 1 得同伴数；轮询没拉到就不显示数字。
+                      Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
+                      if (_isGroup && _memberCount > 1) ...[
+                        const SizedBox(width: 4),
+                        _menuValue('${_memberCount - 1}', valueStyle),
                       ],
                     ],
                   ),
