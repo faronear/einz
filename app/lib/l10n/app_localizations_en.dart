@@ -173,7 +173,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time entrance token.';
+      'This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.';
 
   @override
   String get wizardEnrollGoJoin => 'Use Join flow';
@@ -310,15 +310,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String setupTokenOtherServer(String other, String current) {
     return 'the invite link is from $other but this app is connected to $current; they cannot work with each other.';
-  }
-
-  @override
-  String setupCreateShareTitle(String mode) {
-    String _temp0 = intl.Intl.selectLogic(mode, {
-      'duo': 'your companion',
-      'other': 'your companions',
-    });
-    return 'Send the invite link to $_temp0 and explore the space together:';
   }
 
   @override
@@ -478,7 +469,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Use the entrance token below on your other device to connect to this space. One-time use, valid for 24 hours.';
+      'Use the entrance token below on another device to connect to this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
@@ -576,7 +567,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageRenameSameAsPeerError =>
-      'Can\'t match your partner\'s name — pick another';
+      'Can\'t use the same name as someone else — pick another';
 
   @override
   String get chatPageCopy => 'Copy';
@@ -915,7 +906,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageDeleteConfirmMessage =>
-      'Removed only on this device; the other side is unaffected and it can\'t be undone. Delete?';
+      'Removed only on this device; the others aren\'t affected, and it can\'t be undone. Delete?';
 
   @override
   String get chatPageDeleteCancel => 'Cancel';
@@ -1173,7 +1164,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetEntranceServerResidualHint =>
-      '⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list';
+      '⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance';
 
   @override
   String get spaceListTitle => 'Switch my space';

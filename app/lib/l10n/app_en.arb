@@ -65,7 +65,7 @@
   "wizardJoinPassphraseTitle": "Verify passphrase",
   "wizardTitlePin": "Set PIN",
   "wizardTitleEnvelope": "Key envelope",
-  "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with your partner's one-time entrance token.",
+  "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.",
   "wizardEnrollGoJoin": "Use Join flow",
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",
   "@wizardEnrollFailed": {
@@ -140,8 +140,6 @@
       }
     }
   },
-  "setupCreateShareTitle": "Send the invite link to {mode, select, duo{your companion} other{your companions}} and explore the space together:",
-  "@setupCreateShareTitle": {"placeholders": {"mode": {"type": "String"}}},
   "setupCreateCopy": "Copy invite link",
   "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",
@@ -207,7 +205,7 @@
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
   "chatPageInviteDialogHintInvite": "Send the entrance token below to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintAttachSelf": "Use the entrance token below on your other device to connect to this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintAttachSelf": "Use the entrance token below on another device to connect to this space. One-time use, valid for 24 hours.",
   "chatPageInviteDialogHintReinvite": "Send the entrance token below to {name} to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.",
   "chatPageInviteDialogReinviteFallbackName": "them",
   "@chatPageInviteDialogHintReinvite": {
@@ -270,7 +268,7 @@
       }
     }
   },
-  "chatPageRenameSameAsPeerError": "Can't match your partner's name — pick another",
+  "chatPageRenameSameAsPeerError": "Can't use the same name as someone else — pick another",
   "chatPageCopy": "Copy",
   "chatPageEdit": "Edit",
   "chatPageRenameFailed": "Rename failed: {error}",
@@ -450,7 +448,7 @@
   "chatPageFileSaveFailed": "Save failed: {error}",
   "chatPageActionBurn": "Burn after reading",
   "chatPageDeleteConfirmTitle": "Delete message",
-  "chatPageDeleteConfirmMessage": "Removed only on this device; the other side is unaffected and it can't be undone. Delete?",
+  "chatPageDeleteConfirmMessage": "Removed only on this device; the others aren't affected, and it can't be undone. Delete?",
   "chatPageDeleteCancel": "Cancel",
   "chatPageDeleteConfirmOk": "Delete",
   "chatPageSendFailed": "Send failed: {error}",
@@ -621,7 +619,7 @@
   "resetEntranceConfirmWord": "RESET",
   "resetEntrancePinLabel": "PIN",
   "resetEntrancePinHint": "Enter this device's PIN",
-  "resetEntranceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner's entrance list",
+  "resetEntranceServerResidualHint": "⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance",
   "spaceListTitle": "Switch my space",
   "spaceListEmpty": "No spaces joined yet",
   "spaceListAdd": "Add a space",

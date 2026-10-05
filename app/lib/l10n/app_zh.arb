@@ -137,7 +137,6 @@
       }
     }
   },
-  "setupCreateShareTitle": "快把邀请链接发给同伴，一起体验秘境：",
   "setupCreateCopy": "复制邀请链接",
   "setupCreateCopied": "已复制",
   "setupPageInitFailed": "初始化失败，正在自动重试…",
@@ -266,7 +265,7 @@
       }
     }
   },
-  "chatPageRenameSameAsPeerError": "不能与对方同名，请换个名字",
+  "chatPageRenameSameAsPeerError": "不能与同伴同名，请换个名字",
   "chatPageCopy": "复制",
   "chatPageEdit": "编辑",
   "chatPageRenameFailed": "修改失败: {error}",
@@ -432,7 +431,7 @@
   "chatPageFileSaveFailed": "保存失败: {error}",
   "chatPageActionBurn": "阅后即焚",
   "chatPageDeleteConfirmTitle": "删除消息",
-  "chatPageDeleteConfirmMessage": "删除后仅在本机消失，对方不受影响，且无法恢复。确定删除这条消息吗？",
+  "chatPageDeleteConfirmMessage": "删除后仅在本机消失，同伴不受影响，且无法恢复。确定删除这条消息吗？",
   "chatPageDeleteCancel": "取消",
   "chatPageDeleteConfirmOk": "删除",
   "chatPageSendFailed": "发送失败: {error}",
@@ -603,7 +602,7 @@
   "resetEntranceConfirmWord": "重置",
   "resetEntrancePinLabel": "锁屏码",
   "resetEntrancePinHint": "请输入本机锁屏码",
-  "resetEntranceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道",
+  "resetEntranceServerResidualHint": "⚠️ 本地数据已清除，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道",
   "spaceListTitle": "切换我的秘境",
   "spaceListEmpty": "还没有加入任何秘境",
   "spaceListAdd": "添加秘境",

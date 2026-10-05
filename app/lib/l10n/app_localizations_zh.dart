@@ -284,11 +284,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String setupCreateShareTitle(String mode) {
-    return '快把邀请链接发给同伴，一起体验秘境：';
-  }
-
-  @override
   String get setupCreateCopy => '复制邀请链接';
 
   @override
@@ -529,7 +524,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageRenameSameAsPeerError => '不能与对方同名，请换个名字';
+  String get chatPageRenameSameAsPeerError => '不能与同伴同名，请换个名字';
 
   @override
   String get chatPageCopy => '复制';
@@ -840,7 +835,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageDeleteConfirmMessage =>
-      '删除后仅在本机消失，对方不受影响，且无法恢复。确定删除这条消息吗？';
+      '删除后仅在本机消失，同伴不受影响，且无法恢复。确定删除这条消息吗？';
 
   @override
   String get chatPageDeleteCancel => '取消';
@@ -1091,7 +1086,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetEntranceServerResidualHint =>
-      '⚠️ 本地数据已清除，但服务端退役未完成，对方的通道列表里可能仍留有这条通道';
+      '⚠️ 本地数据已清除，但服务端退役未完成，同伴的通道列表里可能仍留有这条通道';
 
   @override
   String get spaceListTitle => '切换我的秘境';

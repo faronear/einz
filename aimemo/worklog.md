@@ -12002,3 +12002,26 @@ controller 立即 dispose）修掉后，语言切换自然就正常了。
 
 **验证**：`flutter analyze` 干净；`setup_join_passphrase` / `wizard_envelope_entry` /
 `wizard_autofocus` / `members_reinvite` / `widget_test` 共 **31 条绿**。
+
+---
+
+## 2026-10-05（十二）收尾：zh 3 条「对方」→「同伴」；EN 从 8 处 partner 清到 **0**；删死键
+
+老板定：改前 3 条 + 删死键；另外**保留** "Add my new entrance"（理由：token 都绑定到人，
+用 `my` 把"这条新通道是谁的"表达出来，别处就不用费口舌），并愿意把同屏的 `your` 去掉。
+
+- **zh 3 条「对方」→「同伴」**：`chatPageRenameSameAsPeerError`（不能与同伴同名）、
+  `resetEntranceServerResidualHint`（同伴的通道列表）、`chatPageDeleteConfirmMessage`（同伴不受影响）。
+- **这 3 条的 EN 用中性说法、不硬塞 companion**——它们说的是"另一个成员"而非"同伴这个角色"：
+  `Can't use the same name as someone else` / `the others may still see this entrance` /
+  `the others aren't affected`。归纳成规则：**对"同伴"这个角色说话 → `companion`（带 `mode` select）；
+  泛指"另一个成员" → `the others` / `someone else`。**
+- `wizardEnrollExists`（zh=对方）的 EN 也从 `partner` 换成中性 `the other person`
+  ——不能叫 companion：用户还没加入，对方还不是他的同伴。
+- **EN 里 `partner` 计数 = 0**（原来 8 处）。
+- **AttachSelf 邀请弹窗**：标题保留 `Add my new entrance`；说明里的 `your` 去掉
+  → `Use the entrance token below on another device to connect to this space.`
+  （中文那句老板已改成「使用下方通道码，在另一台设备上加入本秘境」）→ 同屏只剩一个 `my`，不再混用。
+- **删死键** `setupCreateShareTitle`（zh 值 + en 值 + `@`；全仓零引用）。
+
+**验证**：`flutter analyze` 干净；6 个套件 **52 条绿**；`grep partner` in app_en.arb = **0**。

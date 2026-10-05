@@ -389,7 +389,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
-  /// **'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time entrance token.'**
+  /// **'This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.'**
   String get wizardEnrollExists;
 
   /// No description provided for @wizardEnrollGoJoin.
@@ -595,12 +595,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'the invite link is from {other} but this app is connected to {current}; they cannot work with each other.'**
   String setupTokenOtherServer(String other, String current);
-
-  /// No description provided for @setupCreateShareTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Send the invite link to {mode, select, duo{your companion} other{your companions}} and explore the space together:'**
-  String setupCreateShareTitle(String mode);
 
   /// No description provided for @setupCreateCopy.
   ///
@@ -875,7 +869,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Use the entrance token below on your other device to connect to this space. One-time use, valid for 24 hours.'**
+  /// **'Use the entrance token below on another device to connect to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
   /// No description provided for @chatPageInviteDialogHintReinvite.
@@ -1043,7 +1037,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageRenameSameAsPeerError.
   ///
   /// In en, this message translates to:
-  /// **'Can\'t match your partner\'s name — pick another'**
+  /// **'Can\'t use the same name as someone else — pick another'**
   String get chatPageRenameSameAsPeerError;
 
   /// No description provided for @chatPageCopy.
@@ -1583,7 +1577,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageDeleteConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'Removed only on this device; the other side is unaffected and it can\'t be undone. Delete?'**
+  /// **'Removed only on this device; the others aren\'t affected, and it can\'t be undone. Delete?'**
   String get chatPageDeleteConfirmMessage;
 
   /// No description provided for @chatPageDeleteCancel.
@@ -2021,7 +2015,7 @@ abstract class AppLocalizations {
   /// No description provided for @resetEntranceServerResidualHint.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Local data erased, but retiring it on the server failed; this entrance may still show up in your partner\'s entrance list'**
+  /// **'⚠️ Local data erased, but retiring it on the server failed; the others may still see this entrance'**
   String get resetEntranceServerResidualHint;
 
   /// No description provided for @spaceListTitle.
