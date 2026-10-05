@@ -185,9 +185,13 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
                     children: [
                       // 通知图标（老板 2026-10-05 定）：小喇叭——"这是在播报一件事"。
                       // 换掉了原来的白底品牌 Logo 徽章（那个白方块在深底上是全条最亮的
-                      // 东西、比文字还抢眼）。用浅色描边图标，与文字同色不喧哗。
+                      // 东西、比文字还抢眼）。
+                      // 试色：品牌粉 #D6529C（老板 2026-10-05 让试"品牌粉"）。
+                      // 注：粉在深蓝灰底上对比度约 2.7:1（做装饰图形够看，但不是高对比）；
+                      // 若要"整条都换成品牌粉"，则 13px 白字在 #D6529C 上只有 ~3.8:1，
+                      // 低于正文可读线（现在深底是 ~9:1）——那是另一档，得老板点头。
                       const Icon(Icons.campaign,
-                          size: 16, color: Color(0xFFFFF5FA)),
+                          size: 16, color: Color(0xFFD6529C)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
