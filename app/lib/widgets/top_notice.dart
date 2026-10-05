@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../brand_logo.dart';
 import 'clickable.dart';
 
 OverlayEntry? _currentEntry;
@@ -50,14 +49,30 @@ void showTopNoticeOn(
   _currentEntry?.remove();
   late final OverlayEntry entry;
   entry = OverlayEntry(
-    builder: (_) => _TopNoticeBanner(
-      message: message,
-      duration: duration,
-      extraTop: extraTop,
-      onDismissed: () {
-        if (entry.mounted) entry.remove();
-        if (_currentEntry == entry) _currentEntry = null;
-      },
+    // ⚠️ 这层 `DefaultTextStyle` 是**修 bug 用的，别删**（2026-10-05 定位到根因）：
+    //
+    // 通知是插进**根 Overlay** 的，`OverlayEntry` 不是任何路由 `Material` 的后代 →
+    // 里面的文字拿不到 `Material` 提供的 `bodyMedium`，只能继承 `MaterialApp`
+    // **故意**设的兜底样式 `_errorTextStyle`（flutter/lib/src/material/app.dart:45）：
+    //      红字 / 48px / w900 / **黄色双下划线** / fontFamily 'monospace'
+    // 通知自己的 `TextStyle` 只覆盖 color/fontSize/fontWeight/height，于是
+    // **decoration 与 fontFamily 会漏过来**（实测确认：underline + 黄 + double +
+    // monospace）→ 每行文字下方一道黄线（"两条" = 文字有两行）。
+    // 这就是"换底色 / 加透明 / 改描边全治不好"的原因：黄线不是我们画的，是**继承**来的；
+    // 2026-09-08 与 2026-09-10 那两次"换色解决"只是错觉。
+    // Flutter 官方注释给的办法正是"放进 `Material`，或另设 `DefaultTextStyle`"
+    // （同上文件 39~44 行）——这里取后者，放在**所有通知的唯一入口**，一处管全部。
+    builder: (overlayContext) => DefaultTextStyle(
+      style: Theme.of(overlayContext).textTheme.bodyMedium ?? const TextStyle(),
+      child: _TopNoticeBanner(
+        message: message,
+        duration: duration,
+        extraTop: extraTop,
+        onDismissed: () {
+          if (entry.mounted) entry.remove();
+          if (_currentEntry == entry) _currentEntry = null;
+        },
+      ),
     ),
   );
   _currentEntry = entry;
@@ -141,53 +156,47 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  // 简化视觉（老板要求 2026-09-10）：清淡浅粉白底，不用粉蓝
-                  // 渐变；浅粉细描边 + 淡灰影浮起，不抢眼
-                  color: const Color(0xFFFFF5FA), // 浅粉白纸感（同 Scaffold 背景）
+                  // **深底浅字**（老板 2026-10-05 定）：通知是"临时抢注意力"的东西，
+                  // 浅粉白那版和状态条一个风格、落在它下方时抓不住眼睛。
+                  // ⚠️ 2026-09-08 / 09-10 曾把"文字下面的黄色横线"误判成配色问题，反复在
+                  // 浅底/深底之间来回改——**那是错的**。黄线真因是根 Overlay 里的文字
+                  // 继承了 `MaterialApp` 的兜底样式 `_errorTextStyle`（黄色双下划线 +
+                  // monospace），与底色无关；已在 `showTopNoticeOn` 一处修掉
+                  // （见那里的注释与 `test/notice_style_test.dart`）。**配色现在可以自由选。**
+                  color: const Color(0xFF33415A), // 深蓝灰（= 通知正文原本的颜色，仍在品牌色系内）
                   // 与对话页「状态胶囊」同一个圆角（chat_page 的 circular(24)）——
                   // 两边数值要一起改。注意：24 比通知自身高度的一半还大，会被 Flutter
                   // 钳到"半高"，所以两者画出来都是**完整的胶囊弧**（视觉一致，老板 2026-10-05）。
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: const Color(0xFFE9D5E0), // 浅粉描边（同输入框描边）
-                    width: 1,
-                  ),
+                  // 深底不需要描边（浅粉描边是浅底版的）
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0x1F33415A), // 淡灰影（12% 深蓝灰）
-                      blurRadius: 12,
+                      color: const Color(0x3333415A), // 深底压在浅背景上要"浮起来"，影子稍重
+                      blurRadius: 14,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Padding(
-                  // 做薄（老板 2026-10-05）：通知现在落在消息列表上方，越薄遮挡越少
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
+                  // 做薄（老板 2026-10-05）：通知现在落在消息列表上方，越薄遮挡越少。
+                  // 左边 12（略小于右 14）：行首是图标，图标自身有留白，视觉上才居中。
+                  padding: const EdgeInsets.fromLTRB(12, 6, 14, 6),
                   child: Row(
                     children: [
-                      // 白色圆角徽章 + 品牌 Logo
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.all(Radius.circular(9)),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(3),
-                          child: BrandLogo(size: 18, radius: 5),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
+                      // 通知图标（老板 2026-10-05 定）：小喇叭——"这是在播报一件事"。
+                      // 换掉了原来的白底品牌 Logo 徽章（那个白方块在深底上是全条最亮的
+                      // 东西、比文字还抢眼）。用浅色描边图标，与文字同色不喧哗。
+                      const Icon(Icons.campaign,
+                          size: 16, color: Color(0xFFFFF5FA)),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           widget.message,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          // 深蓝灰常规字重（清淡底上可读；不加粗、无任何装饰）
+                          // 浅字（深底上可读；不加粗、无任何装饰）
                           style: const TextStyle(
-                            color: Color(0xFF33415A),
+                            color: Color(0xFFFFF5FA),
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                             height: 1.3,

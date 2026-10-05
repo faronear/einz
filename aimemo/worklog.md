@@ -12096,3 +12096,83 @@ controller 立即 dispose）修掉后，语言切换自然就正常了。
    真要竖条得把半径降到 ~12，并用 `Stack` + `ClipRRect` 裁两端。
 
 **验证**：工作区干净；`flutter analyze` 干净；`chat_send_status_test` 10 条绿（已提交版）。
+
+---
+
+## 2026-10-05（十五）✅ 通知条"黄色下划线"真因找到并修好（换了三次色，都不是它）
+
+前面三次换色（深底白字 / 加透明 / 浅底墨字+深描边）全部失败，老板说"返回原版竟然也有了"
+——于是要了**真机截图**，一眼定案。
+
+### 真因：样式**继承**，与配色无关
+
+截图里那是**黄色双下划线**。Flutter 里这个形状只有一个来源——`MaterialApp` 给全 App 设的
+兜底 `DefaultTextStyle`：
+
+```dart
+// flutter/lib/src/material/app.dart:45（由 MaterialApp 的 textStyle: 参数启用）
+const TextStyle _errorTextStyle = TextStyle(
+  color: Color(0xD0FF0000), fontFamily: 'monospace', fontSize: 48.0,
+  fontWeight: FontWeight.w900,
+  decoration: TextDecoration.underline,
+  decorationColor: Color(0xFFFFFF00),            // ← 黄
+  decorationStyle: TextDecorationStyle.double,   // ← 双线
+  debugLabel: 'fallback style; consider putting your text in a Material',
+);
+```
+
+Flutter 自己的注释（同文件 39~44 行）就写着：*看到文字用了这个样式，说明它没被 `Material`
+包着——请放进 `Material`，或另设 `DefaultTextStyle`。*
+
+通知插在**根 Overlay**（`Overlay.of(context, rootOverlay: true)`），`OverlayEntry`
+**不是任何路由 `Material` 的后代** → 拿不到 `Material` 提供的 `bodyMedium`，
+只能继承这个兜底样式。而通知自己的 `TextStyle` 只覆盖 color/fontSize/fontWeight/height，
+**decoration 与 fontFamily 就漏了过来**。
+
+**探针实测**（临时测试，已删）：
+
+| | 通知文字（根 Overlay） | 路由内文字（对照） |
+| --- | --- | --- |
+| decoration | **underline** | none |
+| decorationColor | **黄 (1,1,0)** | — |
+| decorationStyle | **double** | — |
+| fontFamily | **monospace** | Roboto |
+
+→ **每行文字下方一道黄线**，两行文字就是老板说的"两条"。
+顺带一个连带 bug：**安卓端通知文字是等宽字体**（iOS 上 `monospace` 解析不到才躲着没露）。
+
+### 修法（一处管全部）
+
+`showTopNoticeOn` 是**所有通知的唯一入口**，在它的 `OverlayEntry` 外面套一层主题的
+`DefaultTextStyle`：
+
+```dart
+builder: (overlayContext) => DefaultTextStyle(
+  style: Theme.of(overlayContext).textTheme.bodyMedium ?? const TextStyle(),
+  child: _TopNoticeBanner(...),
+),
+```
+
+排查过：全仓**只有这一处** `OverlayEntry`（`chat_page` 里那几个 `Overlay.of` 只是把
+overlay 传给这个入口），所以一处就够。
+
+### 回归测试（并验证过它真能抓 bug）
+
+`app/test/notice_style_test.dart`：断言通知文字的解析样式**不是 underline / 不是黄 /
+不是 double / 不是 monospace**。临时把修复撤掉 → 测试立刻红（`Actual:
+TextDecoration.underline`）；恢复 → 绿。**这条链此前零覆盖。**
+
+### ⚠️ 附带推翻的历史结论
+
+2026-09-08「白字阴影在渐变上像下划线」、2026-09-10「浓渐变 + 加粗白字的视觉现象」——
+**两次都是误判**：换色只是让现象看着变淡，真因从未被触及。所以这三次返工的教训是：
+**遇到"视觉现象"先要截图**（本轮前三次都是闭眼猜），并先怀疑**样式继承**这类"看不见的来源"。
+
+### 之后：配色自由了
+
+老板确认「没有黄线了」→ 同日试**深底浅字**（深蓝灰 `#33415A` + 纸感白 `#FFF5FA`），
+并把白底品牌 Logo 徽章换成**通知图标 `Icons.campaign`（小喇叭）**（那个白方块在深底上是
+全条最亮的东西、比文字还抢眼）。老板看后「可以接受」，本版提交。
+
+**验证**：`flutter analyze` 干净；`notice_style_test` + `chat_send_status_test` 11 条绿；
+老板真机确认黄线消失、深底浅字可接受。
