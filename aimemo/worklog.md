@@ -11622,3 +11622,9 @@ token 仍 24h 过期 + 一次性，所以**暂不做显性作废**。
 
 `scripts/testAll.sh` **exit=0**：app 227 passed + 1 skipped、cli 全绿、server 全绿；
 `flutter analyze` 干净。
+
+### 2026-10-05（二·补）`setupTokenHint` 收句
+
+「通道 / 通道码 / 通道」三连词读着重，收成更顺的一句：
+- zh：**凭通道码开启从本机到秘境的专属通道。24 小时内一次性有效，可由本秘境任一已认证的通道生成。**
+- en：**An entrance token opens a dedicated entrance from this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.**

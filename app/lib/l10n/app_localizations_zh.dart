@@ -253,7 +253,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenTitle => '验证通道码';
 
   @override
-  String get setupTokenHint => '开启从本机到秘境的专属通道。通道码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
+  String get setupTokenHint => '凭通道码开启从本机到秘境的专属通道。24 小时内一次性有效，可由本秘境任一已认证的通道生成。';
 
   @override
   String get setupTokenInputHint => '通道码';
