@@ -5988,15 +5988,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 浅 tint 在渐变背景上区分度不足，老板要求 2026-09-09）。
   /// 两人同性别时第二个人（slot=1）取青色（2026-09-17 老板要求）——
   /// 槽位未知（老服务端/未拉取）或性别不同/未登记时不启用。
-  /// 群聊一期（2026-10-03）：[senderMemberId] 非空**且**空间是 group 时，按
-  /// member_id 的稳定哈希取色板（不按 slot 轮换——槽位复用/空槽会让颜色漂移）；
-  /// duo 空间**原配色规则原样保留**（含同性别第二人取青色，老板 2026-09-17 定）。
+  /// 群聊一期（2026-10-03 按 member_id 哈希取色板；2026-10-06 老板废除随机取模，
+  /// 改回按性别）：[senderMemberId] 非空**且**空间是 group 时，从 /space 下发的
+  /// [_memberGenders] 查发送者性别配色；未知性别退回青色。duo 空间原配色规则
+  /// 原样保留（含同性别第二人取青色，老板 2026-09-17 定）。
   Color _bubbleColor({required bool mine, String? senderMemberId}) {
     if (!mine && senderMemberId != null && _isGroup) {
-      final palette = _uiStyle == 'gradient'
-          ? _groupBubblePaletteGradient
-          : _groupBubblePalettePlain;
-      return palette[_groupColorIndex(senderMemberId)];
+      final gender = _memberGenders[senderMemberId] ?? '';
+      if (_uiStyle == 'gradient') {
+        if (gender == 'female') return const Color(0xFFB83D80); // 深粉（品牌粉加深）
+        if (gender == 'male') return const Color(0xFF2271F7); // 品牌深蓝
+        return const Color(0xFF00838F); // 未知性别 → 深青（老板 2026-10-06）
+      }
+      if (gender == 'female') return const Color(0xFFD6529C).withValues(alpha: 0.18);
+      if (gender == 'male') return const Color(0xFF3BAFFD).withValues(alpha: 0.18);
+      return const Color(0xFF26C6DA).withValues(alpha: 0.22); // 未知性别 → 青 tint
     }
     final gender = mine ? _myGender : _peerGender;
     final slot = mine ? _mySlot : _peerSlot;
@@ -6020,35 +6026,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (gender == 'female') return const Color(0xFFD6529C).withValues(alpha: 0.18);
     if (gender == 'male') return const Color(0xFF3BAFFD).withValues(alpha: 0.18);
     return mine ? Colors.indigo.shade100 : Colors.grey.shade200;
-  }
-
-  /// 群空间气泡色板——gradient（深色、白字）与 plain（浅 tint）各 4 色：沿用
-  /// duo 的品牌色系（蓝/粉/青/紫），饱和度对齐两人空间的视觉基调。
-  ///
-  /// 为什么不用 slot 取模：槽位是内部实现（新身份分配最小空槽、存量库还有
-  /// pending 行），同一成员在不同设备/不同时刻算出来的颜色必须一致 → 用
-  /// member_id 哈希（恒定）。
-  static const List<Color> _groupBubblePaletteGradient = [
-    Color(0xFF2271F7), // 品牌深蓝
-    Color(0xFFB83D80), // 深粉
-    Color(0xFF00838F), // 深青
-    Color(0xFF6A4FB6), // 紫
-  ];
-  static const List<Color> _groupBubblePalettePlain = [
-    Color(0x2E3BAFFD), // 天蓝 tint（alpha 0.18——与 duo 的素雅档同深度）
-    Color(0x2ED6529C), // 品牌粉 tint（同上）
-    Color(0x3826C6DA), // 青 tint（alpha 0.22——与 duo 同性别第二人同深度）
-    Color(0x389575CD), // 紫 tint
-  ];
-
-  /// member_id → 色板下标：取 id 的稳定哈希（FNV-1a 32 位）模色板长度。
-  static int _groupColorIndex(String memberId) {
-    var hash = 0x811c9dc5;
-    for (var i = 0; i < memberId.length; i++) {
-      hash ^= memberId.codeUnitAt(i);
-      hash = (hash * 0x01000193) & 0xFFFFFFFF;
-    }
-    return hash % _groupBubblePaletteGradient.length;
   }
 
   /// **气泡上**的媒体前景色（音频播放键/波形、文件图标）：gradient 深色气泡用白，
