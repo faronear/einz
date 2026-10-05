@@ -12176,3 +12176,55 @@ TextDecoration.underline`）；恢复 → 绿。**这条链此前零覆盖。**
 
 **验证**：`flutter analyze` 干净；`notice_style_test` + `chat_send_status_test` 11 条绿；
 老板真机确认黄线消失、深底浅字可接受。
+
+---
+
+## 2026-10-05（十六）群空间顶部状态条的左侧两处形态
+
+老板定的版式：群空间那一格代表的是**一群人**，所以两处跟着变。
+
+| 位置 | duo（不变） | **group（新）** |
+| --- | --- | --- |
+| 左侧头像 | 对方头像（没设头像 → 性别底色 + 单人图标） | **群组图标 `Icons.groups_outlined`** ——就是创建空间时选「群组秘境」那一页同一枚（`setup_page:1490`）；不用性别底色、不可点开大图 |
+| 第一行 | 对方名字 | 其他成员名单（`Alice、Bob、Carol`）——**本来就有，未改**，这次补测试钉住 |
+| 第二行 | 红绿灯 + 上/下线时刻 | **「其他人在线数 / 其他人总数」**，**两个数都不含我自己** |
+
+### 实现
+
+- `_StatusAvatar` 加 `icon` 参数（默认 `Icons.person`）；`_statusAvatar()` 透传。
+- 新增 `_leftStatusSubLine(l10n)`：duo 走原来的 `_statusLine`；group 返回一个
+  `Text(l10n.chatPageStatusOthersOnline(online, total))`（同号同灰度），名单未到时留空。
+- l10n 新增 `chatPageStatusOthersOnline` = `"{online}/{total}"`（int ×2 占位符）。
+- 人数在**已有的**通道轮询 `_refreshPeerOnline` 里顺手算（那里本来就拉 `/entrances`）：
+  - **在线按 member 去重**——同一 member 有任一条通道在线就算他在线（与 `online` 那句
+    "在线是人的维度"同一口径）；
+  - **总数**取 `_memberCount - 1`（含我，故 -1），拿不到成员表时退回通道表里出现过的
+    member 数，二者取 `max`（宁可与界面名单一致，也别出现"2 人在聊却显示 0/0"）。
+- `_onPeerStatus`（WS 上下线广播）在**群空间**一律重算：人数可能因任何一条别人的通道
+  变化，且**必须重拉**而不是就地加减（同一 member 多条通道，断一条不代表人下线）。
+  duo 保持原语义（只在事件缺时刻时补拉）。顺手把"这次事件是否改变状态"提成 `changed`
+  变量——原来在 `setState` 之后比 `online != _peerOnline` 已经比不出来了。
+
+### 回归测试 `app/test/group_status_bar_test.dart`（4 断言）
+
+群组图标 / 单人图标只剩我自己那一个 / 第一行名单 / `2/3` / 红绿灯只剩我自己那半格。
+fake 里刻意放了三种边角，覆盖真正的去重与排除逻辑：
+- Alice **两条**通道都在线 → 按 member 去重后只算 **1 人**（不是 2）；
+- Carol 离线（`connected_at: null`）；
+- **我自己另一台设备**也在线 —— 靠 `entrance_id` 排除不掉它，必须靠"排除我自己的
+  member"那道判断。
+
+**变异验证（重要）**：第一次把"排除我自己"改成 `if (false)`，测试**仍然绿**——查出原因
+是我自己的行被前一行 `entrance_id == widget.entranceId` 提前 `continue` 掉了，
+`mine` 那道判断根本没走到 → **测试漏了它本该守的场景**。补上"我自己的第二台设备"后
+再变异 → 测试红（找不到 `2/3`），恢复 → 绿。**这条测试现在是真的在守着东西。**
+
+### 验证
+
+`flutter analyze` 干净；`group_status_bar_test` 等 5 个套件 **47 条绿**。
+
+### 未改（供老板定）
+
+- **我自己那一侧**（右侧）仍有红绿灯 + 时刻——那说的是**我自己的连接**，与左侧
+  "一群人"不同义，本次没动。
+- 只剩我一个人时显示 `0/0`（两个数都是 0，字面正确）。

@@ -361,6 +361,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 本空间成员数（身份数，同身份多通道只算一个）。
   int get _memberCount => _memberSlots.length;
 
+  /// 群空间顶部状态条第二行要显示的「**其他人在线数**」（**不含我自己**）。
+  /// 由通道轮询 [\_refreshPeerOnline] 维护（在线按 member 去重：同一 member 有
+  /// 任一条通道在线就算他在线）。老板 2026-10-05：群空间这一行不摆红绿灯——那一格
+  /// 是一群人，"某一个人在不在线"没有意义，人数才是信息。
+  int _othersOnline = 0;
+
+  /// 同上，**其他人总数**（不含我自己）：以 /space 的成员表为准
+  /// （`_memberCount - 1`），拿不到时退回通道表里出现过的 member 数（见轮询里
+  /// 的 `max` 说明）。名单还没拉到时（`_memberSlots` 为空）界面不显示这一行。
+  int _othersTotal = 0;
+
   /// 还能不能再邀请新成员（2026-10-04：mode 创建时定死，没有升格）：
   /// - duo：**只在还没第二个人时**能邀请（那是"邀请伴侣"）；满 2 人即永久关闭
   ///   ——第三个人不是"满了"，是双人秘境不允许；
@@ -853,7 +864,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 对方的名字/性别/身份槽位都还是空 → 同性别两人气泡会是同一个颜色
     // （老板 2026-09-22 实测）。这里补拉一次把身份补齐。
     if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
-    if (mounted && online != _peerOnline) {
+    // 在 setState 之前记下"这次事件是否改变了状态"——下面要用，改完就比不出来了
+    final changed = online != _peerOnline;
+    if (mounted && changed) {
       setState(() {
         _peerOnline = online;
         // 灯与「时刻」必须同一帧到位。此前这里只翻 _peerOnline，_peerSinceMs 要等
@@ -865,8 +878,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 一次网络往返。
         if (event.since != null) _peerSinceMs = event.since;
       });
-      // 事件没带时刻（连着老服务端）→ 拉一次补齐，别让状态里缺时间。
-      if (event.since == null) unawaited(_refreshPeerOnline());
+    }
+    // 什么时候还要重拉一次 /entrances：
+    // - **群空间**：这一格显示的是「其他人在线数」，**任何**一条别人的通道上下线
+    //   都可能改变人数 → 一律重算。而且必须重拉、不能就地加减：同一 member 可能
+    //   有多条通道，断一条不代表人下线（要按 member 去重才是"人在线"）。
+    // - duo：仅当事件没带时刻（连着老服务端）才补拉，别白跑。
+    if (_isGroup || (changed && event.since == null)) {
+      unawaited(_refreshPeerOnline());
     }
   }
 
@@ -1375,11 +1394,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// - 没设头像时，底色按**性别**取淡粉/淡蓝（与空间卡片、状态芯片同一组色），
   ///   未登记性别回退淡灰；
-  /// - 有头像时可点开**全屏大图**（老板 2026-09-26）。
-  Widget _statusAvatar({Uint8List? bytes, String gender = '', VoidCallback? onTap}) {
+  /// - 有头像时可点开**全屏大图**（老板 2026-09-26）；
+  /// - [icon] 覆盖"没头像时"的默认图标（群空间用 `Icons.groups_outlined`）。
+  Widget _statusAvatar({
+    Uint8List? bytes,
+    String gender = '',
+    VoidCallback? onTap,
+    IconData icon = Icons.person,
+  }) {
     return _StatusAvatar(
       bytes: bytes,
       tint: _genderTint(gender),
+      icon: icon,
       // 默认：有头像才可点（看大图）；本人那头像由调用方传入 onTap（空头像也能点）
       onTap: onTap ??
           (bytes == null ? null : () => unawaited(_showAvatarFullscreen(bytes))),
@@ -1507,6 +1533,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 状态条第二行（**其他成员那一侧**）——两种空间形态说的不是一件事：
+  ///
+  /// - **duo**：红绿灯 + 上/下线时刻（未加入时右侧显示「待加入」）——两人世界里
+  ///   "对方在不在"就是这一格的信息；
+  /// - **group**：**不摆灯**，改成「其他人在线数 / 其他人总数」（**两个数都不含
+  ///   我自己**，老板 2026-10-05）。群空间里"某一个人在不在线"没有意义，人数才是。
+  ///   名单还没拉到（`_memberSlots` 空）时留空，免得先闪一个 "0/0"。
+  Widget _leftStatusSubLine(AppLocalizations l10n) {
+    if (!_isGroup) {
+      return _statusLine(
+        online: _peerOnline,
+        offlineColor: Colors.red,
+        sinceMs: _peerSinceMs,
+        label: _peerJoined == false ? l10n.memberPending : null,
+      );
+    }
+    if (_memberSlots.isEmpty) return const SizedBox.shrink();
+    return Text(
+      // 与 _statusLine 里的时刻同一号、同一灰度，两版视觉一致
+      l10n.chatPageStatusOthersOnline(_othersOnline, _othersTotal),
+      style: TextStyle(
+        fontSize: 11,
+        color: Colors.black.withValues(alpha: 0.55),
+      ),
+    );
+  }
+
   /// 顶栏状态条左侧的「对方」这一块。
   ///
   /// - **2 个及以上空间** → 做成可按芯片（底色按对方性别取**淡粉/淡蓝** + 右侧圆角
@@ -1527,8 +1580,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 对方头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
-        _statusAvatar(bytes: _peerAvatarBytes, gender: _peerGender),
+        // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别。
+        // **群空间例外**（老板 2026-10-05）：这一格是**一群人**，不显示某一个人的
+        // 头像、也不用性别底色 —— 改用创建空间时「群组秘境」那一页同一枚图标
+        // （`Icons.groups_outlined`，见 setup_page 的 `_buildStepSpaceKind`），
+        // 一眼看出"这里是多人空间"。名字那一行已经是名单（见 _statusTitle）。
+        _isGroup
+            ? _statusAvatar(icon: Icons.groups_outlined)
+            : _statusAvatar(bytes: _peerAvatarBytes, gender: _peerGender),
         const SizedBox(width: 8),
         Flexible(
           child: Column(
@@ -1546,15 +1605,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
                 ),
               const SizedBox(height: 1),
-              // 绿灯旁是上线时间、红灯旁是下线时间（老板 2026-09-26 设计）；
-              // **对方尚未加入**时灯变灰、右侧显示「待加入 / Waiting」——时间对
-              // 未加入的人没有意义，摆个"上次离线时间"反而误导（老板 2026-09-26）
-              _statusLine(
-                online: _peerOnline,
-                offlineColor: Colors.red,
-                sinceMs: _peerSinceMs,
-                label: _peerJoined == false ? l10n.memberPending : null,
-              ),
+              // 第二行：duo = 红绿灯 + 时刻；group = 其他人在线数/总数（详见该方法）
+              _leftStatusSubLine(l10n),
             ],
           ),
         ),
@@ -3173,6 +3225,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final status = d['status'];
         return status == null || status == 'active';
       });
+      // 群空间状态条第二行要显示的「其他人 在线 / 总数」（**都不含我自己**）：
+      // - 在线按 **member** 维度去重——同一 member 有任一条通道在线就算他在线
+      //   （与上面 `online` 那句"在线是人的维度"同一口径）；
+      // - 总数以 /space 的成员表为准（`_memberCount` 含我，故 -1）；万一成员表
+      //   还没更新（刚被拉进群等），取通道表里出现过的 member 数，二者取 `max`
+      //   ——宁可与界面名单一致，也别出现"2 人在聊却显示 0/0"。
+      final seenOthers = <String>{};
+      final onlineOthers = <String>{};
+      for (final d in entrances) {
+        if (d['entrance_id'] == widget.entranceId) continue;
+        final pid = d['member_id'] as String?;
+        if (pid == null || pid.isEmpty) continue;
+        if (mine != null && mine.isNotEmpty && pid == mine) continue;
+        seenOthers.add(pid);
+        if (_isRowOnline(d, now)) onlineOthers.add(pid);
+      }
+      final othersTotal = _memberCount > 0
+          ? (_memberCount - 1) > seenOthers.length
+              ? _memberCount - 1
+              : seenOthers.length
+          : seenOthers.length;
+      final othersOnline =
+          onlineOthers.length > othersTotal ? othersTotal : onlineOthers.length;
       // 状态条上的「上线/下线时刻」：对方取"在线的那条通道"（没有就取第一条），
       // 我方取本机通道；口径统一走 _sinceOfRow。
       final peerOnlineRow = peer.where((d) => _isRowOnline(d, now)).firstOrNull;
@@ -3196,13 +3271,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               joined != _peerJoined ||
               peerSince != _peerSinceMs ||
               mySince != _mySinceMs ||
-              myCount != _myEntranceCount)) {
+              myCount != _myEntranceCount ||
+              othersOnline != _othersOnline ||
+              othersTotal != _othersTotal)) {
         setState(() {
           _peerOnline = online;
           _peerJoined = joined;
           _peerSinceMs = peerSince;
           _mySinceMs = mySince;
           _myEntranceCount = myCount;
+          _othersOnline = othersOnline;
+          _othersTotal = othersTotal;
         });
       }
     } catch (_) {
@@ -7892,11 +7971,16 @@ class _UnreadBadge extends StatelessWidget {
 /// 用 [ClipOval] 关住，避免放大后顶出胶囊被裁）+ 压暗一层。触屏没有 hover，
 /// 这些层不会出现，等于零影响。
 class _StatusAvatar extends StatefulWidget {
-  const _StatusAvatar({this.bytes, required this.tint, this.onTap});
+  const _StatusAvatar(
+      {this.bytes, required this.tint, this.onTap, this.icon = Icons.person});
 
   final Uint8List? bytes;
   final Color tint;
   final VoidCallback? onTap;
+
+  /// 没头像时显示的图标。默认单人形；**群空间**传 `Icons.groups_outlined`
+  /// ——那一格代表的是一群人，不是某一个人（老板 2026-10-05）。
+  final IconData icon;
 
   @override
   State<_StatusAvatar> createState() => _StatusAvatarState();
@@ -7910,7 +7994,7 @@ class _StatusAvatarState extends State<_StatusAvatar> {
     final avatar = CircleAvatar(
       backgroundColor: widget.tint,
       backgroundImage: widget.bytes != null ? MemoryImage(widget.bytes!) : null,
-      child: widget.bytes == null ? const Icon(Icons.person, size: 22) : null,
+      child: widget.bytes == null ? Icon(widget.icon, size: 22) : null,
     );
     final body = SizedBox(
       width: kStatusAvatarSize,
