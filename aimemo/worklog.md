@@ -11890,3 +11890,41 @@ offline_since / 老服务端不带 → null）；`server/test/peer_status.test.t
 `invite_dialog_layout_test` **41 条全绿**（这三个正是依赖 300ms 错峰的）。
 ⭐ 待老板真机复测。**本次没写回归测试**——交叉卸载依赖真实动画时序，widget 测试里未必
 稳定复现；老板要的话我再补（参照 2026-09-05 那个同类崩溃的做法）。
+
+---
+
+## 2026-10-05（九）re-invite 红屏：第二个 bug（controller 立即 dispose）+ 补回归测试
+
+老板复测上一轮的修复：**仍然闪一下红底黄字，但很快自己恢复**。说明是两个坑叠着，
+修掉第一个（route 交叉卸载，整屏红、**不恢复**）之后，第二个才露出来。
+
+**真凶**：`_promptSharedPassphrase` 在 `showDialog` 返回后**立即** `ctrl.dispose()`。
+`showDialog` 的 future 在 route **pop 那一刻**就完成，可弹窗的**退出动画**还在跑
+（~150ms）——期间过渡层 rebuild（`_AnimatedState.didUpdateWidget`）会往 controller
+**加 listener**，而它已被销毁 → 断言红屏；动画跑完弹窗真正卸载，错误就停了
+→ 表现正是"闪一下又恢复"。测试复现到的原文：
+
+```
+A TextEditingController was used after being disposed.
+#2 ChangeNotifier.addListener
+#4 _AnimatedState.didUpdateWidget
+The relevant error-causing widget was: TextField … chat_page.dart:2308
+```
+
+**这个坑本仓库早已知**：`chat_page.dart` 里有 **4 处**注释写着"TextField 卸载动画中向
+已销毁 controller 加 listener 的红屏断言"，并统一用 **延迟 400ms dispose** 规避
+（改名弹窗、改通道名弹窗、设锁屏码弹窗…）。**`_promptSharedPassphrase` 是唯一的漏网者**
+（全仓扫 `.dispose()` 只剩它一处是立即的）。
+
+**修法**：改成与其余 4 处同一手法——`Future.delayed(400ms, ctrl.dispose)`。
+
+**补了回归测试** `app/test/members_reinvite_test.dart`：
+成员弹层 → 重新邀请 → 输口令 → 确认 → 通道码弹窗，**全程** `takeException()` 必须为 null
+（含口令弹窗退出动画那几帧）。并**验证过它真能抓到 bug**：把 dispose 临时改回立即 →
+测试红（就是上面那段错误）；改回延迟 → 绿。这个文件同时是"成员弹层 + 口令 + re-invite"
+这条链的第一份测试覆盖。
+
+**教训**：`showDialog` 的 future 完成 ≠ 弹窗卸载完成；controller 要等退出动画之后再释放。
+
+**验证**：新测试 1 条绿（且已证明能抓 bug）；`chat_page_menu_test` / `entrance_list_sheet_test`
+/ `invite_dialog_layout_test` / `widget_test` **50 条绿**；`flutter analyze` 干净。

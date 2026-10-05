@@ -2338,7 +2338,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
     );
     final text = ctrl.text.trim();
-    ctrl.dispose();
+    // 对话框 route 关闭动画完成后才 dispose（TextField 卸载后不再依赖 controller；
+    // 立即 dispose 会触发"向已销毁 controller 加 listener"的红屏断言——表现正是
+    // **闪一下红底黄字又自己恢复**，因为错只发生在退出动画那几帧里）。
+    // 与改名弹窗 / 设锁屏码弹窗同一手法（见 _showRenameEntranceDialog 等处的注释）。
+    Future<void>.delayed(const Duration(milliseconds: 400), ctrl.dispose);
     if (ok != true || text.isEmpty) return null;
     return text;
   }
