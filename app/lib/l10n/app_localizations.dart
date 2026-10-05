@@ -2078,6 +2078,12 @@ abstract class AppLocalizations {
   /// **'Waiting'**
   String get memberPending;
 
+  /// Group space top bar, right of the member avatars: how many others are online / how many others there are. BOTH numbers exclude me.
+  ///
+  /// In en, this message translates to:
+  /// **'{online}/{total}'**
+  String chatPageStatusOthersOnline(int online, int total);
+
   /// Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip
   ///
   /// In en, this message translates to:

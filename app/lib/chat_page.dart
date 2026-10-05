@@ -343,6 +343,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 本空间成员数（身份数，同身份多通道只算一个）。
   int get _memberCount => _memberSlots.length;
 
+  /// 群空间状态条要显示的「**其他人在线数**」（**不含我自己**）：由通道轮询
+  /// [\_refreshPeerOnline] 维护——在线按 **member** 去重（同一 member 有任一条通道
+  /// 在线就算他在线）。老板 2026-10-05：显示在成员头像条右侧。
+  int _othersOnline = 0;
+
+  /// 同上，**其他人总数**（不含我自己）：以 /space 的成员表为准（`_memberCount - 1`），
+  /// 拿不到时退回通道表里出现过的 member 数（见轮询里的 `max` 说明）。
+  int _othersTotal = 0;
+
   /// 还能不能再邀请新成员（2026-10-04：mode 创建时定死，没有升格）：
   /// - duo：**只在还没第二个人时**能邀请（那是"邀请伴侣"）；满 2 人即永久关闭
   ///   ——第三个人不是"满了"，是双人秘境不允许；
@@ -851,9 +860,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
     }
     // 什么时候还要重拉一次 /entrances：
-    // - **群空间**：左上角摆的是**成员头像条**、右侧还挂着「邀请」入口，而那个入口
-    //   看的是"有没有别人在用通道"（`_peerJoined`）——任何一条别人的通道上下线都可能
-    //   改变它（群里的邀请入口与 duo 同款，只在"还没人加入"时出现）。重拉一下最省事。
+    // - **群空间**：左上角摆着「其他人在线数 / 总数」——任何一条别人的通道上下线都
+    //   可能改变人数 → 一律重算。**必须重拉、不能就地加减**：同一 member 可能有多条
+    //   通道，断一条不代表人下线（要按 member 去重才是"人在线"）。顺带也刷新了
+    //   决定「邀请」入口的 `_peerJoined`。
     // - duo：仅当事件没带时刻（连着老服务端）才补拉，别白跑。
     if (_isGroup || (changed && event.since == null)) {
       unawaited(_refreshPeerOnline());
@@ -1504,38 +1514,76 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 群空间状态条左侧：**只摆其他成员的头像**（一排），不写名字、不标在线状态
-  /// （老板 2026-10-05 定）。
+  /// 群空间状态条左侧：**其他成员的头像条 + 「在线人数/总人数」**（老板 2026-10-05 定）。
   ///
-  /// - 成员按**加入先后**（槽位升序）排；不含我自己（我在右侧那一块）。
-  /// - **最多占状态条一半宽**（老板：接近一半就收住）。装不下时，最后一个头像
-  ///   **向右渐隐**——一眼看出"后面还有人"，又不会把胶囊撑破。选渐隐而不是
-  ///   "+N"：头像没法像文字那样省略，而渐隐既省地方又不引入新文案。
-  /// - **只构建装得下的那几个**：群大了也不该为看不见的头像去拉图（每个头像都是
-  ///   一次带缓存的异步取图）。
-  /// - 一个其他成员都没有时返回空（此时左侧只剩「邀请」入口，见 `_buildPeerStatus`）。
-  Widget _memberAvatarStrip() {
-    final others = _memberSlots.entries
-        .where((e) => e.key != _myMemberId)
-        .toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
-    if (others.isEmpty) return const SizedBox.shrink();
-
+  /// - 头像按**加入先后**（槽位升序）排，不含我自己（我在右侧那一块）；
+  /// - 两个数字**也都不含我自己**（`_othersOnline` / `_othersTotal`）；
+  /// - **整块最多占状态条一半宽**（老板：最多顶到一半宽的最右侧）。人数**先占**
+  ///   它自己那段宽度——它是信息、不参与截断；**剩下的才给头像**，装不下时头像
+  ///   末尾**渐隐**。
+  Widget _othersSummary(AppLocalizations l10n) {
     // 状态条胶囊宽 = 屏宽 − 左右 margin（各 12）；左半 = 一半。
     // ⚠️ 这个 24 与状态条 Container 的 `margin: fromLTRB(12, 4, 12, 6)` 耦合，
     // 改 margin 要一起改（与 top_notice 那个 46 是同一类耦合）。
-    final maxWidth = (MediaQuery.sizeOf(context).width - 24) / 2;
+    //
+    // 再扣掉胶囊左缘到本块内容的 10px（`_buildPeerStatus` 里那个 `pad.left`，
+    // 两处要一起改）——不扣的话内容右缘会**越过中线 10px**，和右侧挤到一起。
+    const leadingPad = 10.0;
+    final maxWidth =
+        (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad;
 
+    final countLabel =
+        l10n.chatPageStatusOthersOnline(_othersOnline, _othersTotal);
+    // 12 号：比 duo 那行时刻（11）略大一档——这一格没有别的大字，11 会显得发飘
+    final countStyle = TextStyle(
+      fontSize: 12,
+      color: Colors.black.withValues(alpha: 0.55),
+    );
+    // 先量出人数的宽度（用 TextPainter，**不是** LayoutBuilder：这一格在
+    // IntrinsicHeight 里，而 IntrinsicHeight 查不了 LayoutBuilder 的固有尺寸）
+    final painter = TextPainter(
+      text: TextSpan(text: countLabel, style: countStyle),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    const gap = 8.0;
+
+    final others = _otherMembers;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (others.isNotEmpty) ...[
+          _avatarStrip(others, maxWidth - painter.width - gap),
+          const SizedBox(width: gap),
+        ],
+        Text(countLabel, style: countStyle, maxLines: 1),
+      ],
+    );
+  }
+
+  /// 除我之外的成员，按**加入先后**（槽位升序）。
+  List<MapEntry<String, int>> get _otherMembers => _memberSlots.entries
+      .where((e) => e.key != _myMemberId)
+      .toList()
+    ..sort((a, b) => a.value.compareTo(b.value));
+
+  /// 其他成员的头像条。[budget] = 分给它的宽度上限（**已扣掉人数那一段**）。
+  ///
+  /// - 装不下时末尾**渐隐**（而非 "+N"）：头像没法像文字那样省略，渐隐既省地方
+  ///   又不引入新文案，一眼看出"后面还有人"；
+  /// - **只构建装得下的那几个**：群大了也不该为看不见的头像去拉图（每个头像都是
+  ///   一次带缓存的异步取图）。
+  Widget _avatarStrip(List<MapEntry<String, int>> others, double budget) {
     const size = kStatusMemberAvatarSize;
     const gap = 4.0;
     // 渐隐区宽度：够看出一截"淡下去"，又不至于吞掉一整个头像
     const fade = 16.0;
-
+    // 兜底：budget 太小时至少摆一个（超过一点也不会撑破胶囊——它只是"一半宽"的软上限）
     final natural = others.length * size + (others.length - 1) * gap;
-    final truncated = natural > maxWidth;
-    final budget = truncated ? maxWidth - fade : maxWidth;
+    final truncated = natural > budget;
+    final usable = truncated ? budget - fade : budget;
 
-    var count = ((budget + gap) / (size + gap)).floor();
+    var count = ((usable + gap) / (size + gap)).floor();
     if (count < 1) count = 1;
     if (count > others.length) count = others.length;
     final shown = others.take(count).toList();
@@ -1595,9 +1643,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 芯片内容**只到箭头为止**（老板 2026-09-25）：「邀请加入」链接在芯片外
     // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
     final content = _isGroup
-        // 群空间：**没有人名、没有在线状态**，只有一排成员头像（老板 2026-10-05）。
+        // 群空间：**没有人名**——只有一排成员头像 + 「在线/总数」（老板 2026-10-05）。
         // Align 让它竖直居中（外层的 stretch 会给到满高 40，而头像只有 32）。
-        ? Align(alignment: Alignment.centerLeft, child: _memberAvatarStrip())
+        ? Align(alignment: Alignment.centerLeft, child: _othersSummary(l10n))
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -3248,6 +3296,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final status = d['status'];
         return status == null || status == 'active';
       });
+      // 群空间要显示的「其他人在线 / 总数」（**都不含我自己**）：
+      // - 在线按 **member** 去重——同一 member 有任一条通道在线就算他在线
+      //   （与上面 `online` 那句"在线是人的维度"同一口径）；
+      // - 总数以 /space 的成员表为准（`_memberCount` 含我，故 -1）；万一成员表还没
+      //   更新（刚被拉进群等），取通道表里出现过的 member 数，二者取 `max`——
+      //   宁可与头像条里的人数一致，也别出现"头像有两个、却写着 0/0"。
+      final seenOthers = <String>{};
+      final onlineOthers = <String>{};
+      for (final d in entrances) {
+        if (d['entrance_id'] == widget.entranceId) continue;
+        final pid = d['member_id'] as String?;
+        if (pid == null || pid.isEmpty) continue;
+        if (mine != null && mine.isNotEmpty && pid == mine) continue;
+        seenOthers.add(pid);
+        if (_isRowOnline(d, now)) onlineOthers.add(pid);
+      }
+      final othersTotal = _memberCount > 0
+          ? (_memberCount - 1) > seenOthers.length
+              ? _memberCount - 1
+              : seenOthers.length
+          : seenOthers.length;
+      final othersOnline =
+          onlineOthers.length > othersTotal ? othersTotal : onlineOthers.length;
       // 状态条上的「上线/下线时刻」：对方取"在线的那条通道"（没有就取第一条），
       // 我方取本机通道；口径统一走 _sinceOfRow。
       final peerOnlineRow = peer.where((d) => _isRowOnline(d, now)).firstOrNull;
@@ -3271,13 +3342,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               joined != _peerJoined ||
               peerSince != _peerSinceMs ||
               mySince != _mySinceMs ||
-              myCount != _myEntranceCount)) {
+              myCount != _myEntranceCount ||
+              othersOnline != _othersOnline ||
+              othersTotal != _othersTotal)) {
         setState(() {
           _peerOnline = online;
           _peerJoined = joined;
           _peerSinceMs = peerSince;
           _mySinceMs = mySince;
           _myEntranceCount = myCount;
+          _othersOnline = othersOnline;
+          _othersTotal = othersTotal;
         });
       }
     } catch (_) {

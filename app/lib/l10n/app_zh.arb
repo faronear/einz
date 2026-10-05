@@ -624,6 +624,7 @@
   "@memberPending": {
     "description": "成员尚未加入时的状态词（空间卡片、空间列表、成员弹层共用）"
   },
+  "chatPageStatusOthersOnline": "{online}/{total}",
   "voiceCallMenuCall": "语音通话",
   "@voiceCallMenuCall": {
     "description": "Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip"
