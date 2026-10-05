@@ -13,7 +13,7 @@
 #   - pull_request
 #   - workflow_dispatch
 #
-# 三个 job 直接复用 `scripts/testAll.sh <target>`——**本地怎么跑、CI 就怎么跑**，
+# 四个 job 直接复用 `scripts/testAll.sh <target>`——**本地怎么跑、CI 就怎么跑**，
 # 不维护第二套命令（这条是刻意的：之前"我说的测试全过"其实只覆盖 analyze + server，
 # app 那 250 条 widget 测试没人跑、静默红了一片）。
 #
@@ -63,6 +63,21 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libsodium-dev
       - name: 跑测试
         run: scripts/testAll.sh app
+
+  shared:
+    name: shared（analyze + dart test）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      # shared/test 的 key_escrow / passphrase 用例会走 argon2id，而 shared/lib/src/
+      # sodium.dart 用 DynamicLibrary.open 找**系统** libsodium——与 app job 同一原因
+      - name: 装 libsodium（测试要动态加载）
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsodium-dev
+      - name: 跑测试
+        run: scripts/testAll.sh shared
 
   cli:
     name: cli（analyze + dart test）

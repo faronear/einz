@@ -11831,3 +11831,27 @@ offline_since / 老服务端不带 → null）；`server/test/peer_status.test.t
 
 所以 **shared 的测试既不在"一条命令跑全套"里，也不在 CI 里**（本次是我手动
 `cd shared && dart test` 跑的）。要不要补一个 `shared` target（+ `testAll.yml` 加一个 job）？
+
+---
+
+## 2026-10-05（七）把 `shared` 补进 testAll 与 CI
+
+上轮发现 `scripts/testAll.sh` 没有 `shared` 这个 target → shared 的 10 个测试文件
+（`ws_client_test` / `key_escrow_test` / `member_name_policy_test` …）**平时根本没人跑**。
+老板让补。
+
+- `scripts/testAll.sh`：加 `shared` target（`dart analyze` + `dart test`），
+  放在 app 与 cli 之间（依赖顺序）；`LOCK_FILES` 也把 `shared/pubspec.lock` 纳入
+  pubspec.lock 守卫（同一套镜像源还原逻辑）。
+- `.github/workflows/testAll.yml`：加 `shared` job（`dart-lang/setup-dart`，
+  与 cli job 同构）。
+  ⚠️ **该 job 必须装 libsodium**：`shared/test` 的 key_escrow / passphrase 用例会走
+  argon2id，而 `shared/lib/src/sodium.dart` 是用 `DynamicLibrary.open` 找**系统**
+  libsodium（不是 pub 包自带的）——本机 macOS 靠 Homebrew 的 `/usr/local/lib/libsodium.dylib`
+  才跑得起来，Linux runner 上同理要 `libsodium-dev`。这条是从**本地能跑、CI 会红**的
+  差异里挖出来的。
+- `all` 自动包含 shared，所以 `buildMultiPlatform.yml` 那个出包前的 `test` job
+  （`scripts/testAll.sh all`）**顺带也被覆盖**，无需改动。
+
+**验证**：`bash -n` 语法 OK；`ruby -ryaml` 解析出 `app,shared,cli,server`；
+`scripts/testAll.sh shared` **52 通过 / exit 0**。CI 本身仍要推 GitHub 才知分晓。
