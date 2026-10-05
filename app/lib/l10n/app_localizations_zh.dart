@@ -34,7 +34,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get close => '关闭';
 
   @override
-  String get setupPageEnvelopeKeyHint => '密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境同伴获取。';
+  String setupPageEnvelopeKeyHint(String mode) {
+    return '密保信封是线下安全交接的一段不对称加密文本。请询问你的秘境同伴获取。';
+  }
 
   @override
   String get setupPageNeedPassphrase => '请设置共享口令';
@@ -174,7 +176,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint => '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙，务必牢记、严禁泄漏！';
+  String wizardPassphraseHint(String mode) {
+    return '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙，务必牢记、严禁泄漏！';
+  }
 
   @override
   String get wizardPassphraseMinLengthHint => '至少 8 位';
@@ -189,8 +193,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardPassphraseMismatch => '两次输入的口令不一致';
 
   @override
-  String get wizardJoinPassphraseHint =>
-      '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙。不知道口令？询问你的秘境同伴。';
+  String wizardJoinPassphraseHint(String mode) {
+    return '共享口令由你和同伴共同保管，是打开秘境的唯一钥匙。不知道口令？询问你的秘境同伴。';
+  }
 
   @override
   String get wizardJoinPassphraseWrong => '口令错误：请确认首条通道创建时设置的口令';
@@ -279,7 +284,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get setupCreateShareTitle => '快把邀请链接发给同伴，一起体验秘境：';
+  String setupCreateShareTitle(String mode) {
+    return '快把邀请链接发给同伴，一起体验秘境：';
+  }
 
   @override
   String get setupCreateCopy => '复制邀请链接';
@@ -578,7 +585,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageChangePassphraseOldWrong => '当前口令错误';
 
   @override
-  String get chatPageChangePassphraseDone => '✅ 共享口令已修改（请告知同伴，以后必须使用新口令）';
+  String chatPageChangePassphraseDone(String mode) {
+    return '✅ 共享口令已修改（请告知同伴，以后必须使用新口令）';
+  }
 
   @override
   String chatPageChangePassphraseFailed(String error) {
@@ -586,7 +595,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageEscrowRotatedNotice => '同伴已重设共享口令，以后必须使用新口令';
+  String chatPageEscrowRotatedNotice(String mode) {
+    return '同伴已重设共享口令，以后必须使用新口令';
+  }
 
   @override
   String get chatPageMenuLocaleLabel => '界面语言';
@@ -677,10 +688,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageMembersUnnamed => '未命名';
 
   @override
-  String get chatPageMembersInvitePartner => '邀请';
+  String get chatPageMembersInvite => '邀请';
 
   @override
-  String get chatPageMembersReinvitePartner => '重新邀请';
+  String get chatPageMembersReinvite => '重新邀请';
 
   @override
   String get chatPageReinvitePassphraseTitle => '验证共享口令';

@@ -105,7 +105,7 @@ void main() {
     await tester.pumpAndSettle();
     await tapDeferred(tester, find.text(_zh.chatPageMenuMembers('duo')));
     expect(find.text(_zh.chatPageMembersTitle('duo')), findsOneWidget, reason: '成员弹层应已打开');
-    await tapDeferred(tester, find.text(_zh.chatPageMembersReinvitePartner));
+    await tapDeferred(tester, find.text(_zh.chatPageMembersReinvite));
 
     // 口令弹窗
     expect(find.text(_zh.chatPageReinvitePassphraseTitle), findsOneWidget,

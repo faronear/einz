@@ -11973,3 +11973,32 @@ controller 立即 dispose）修掉后，语言切换自然就正常了。
    ——键名带 Partner 是「邀请伴侣」时代的遗留，UI 早就是「邀请 / 重新邀请」了（名不副实，待清）。
 
 **验证**：`flutter analyze` 干净；`members_reinvite_test` + `widget_test` 10 条绿。
+
+---
+
+## 2026-10-05（十一）英文「同伴」统一为 companion（duo 单数 / group 复数）+ 清两个错名键
+
+老板定：**EN 用 `companion`**（duo → `my companion`，group → `my companions`），并把上一轮
+发现的「EN 8 条还写着 partner」一起收。
+
+- **6 条 zh=同伴 的英文改成 ICU `select`**（占位符 `mode`）：密保信封提示、创建向导口令提示、
+  加入向导口令提示、建完分享标题、改口令完成通知、口令被重设通知。
+  - `mode` 形参穿线：`chat_page` 4 处 `_isGroup ? 'group' : 'duo'`；
+    **`_ChangePassphraseDialog` 新增 `spaceMode`**（它是独立 widget，拿不到 `_isGroup`）；
+    `setup_page` 新增 `_copyMode`（`(_role == create ? _spaceKind : _joinSpaceMode) ?? 'duo'`）。
+  - ⚠️ **踩坑**：`final int keyVersion;` 在 ChatPage 与 `_ChangePassphraseDialog` 里**各有一份**，
+    我的锚点匹配错了类 → 把 `spaceMode` 字段塞进了 ChatPage（analyze 报"final 未初始化 /
+    initializing formal for non-existent field"）。已挪回 dialog。**教训：改字段别用只匹配一行
+    的锚点，要用紧跟其后的私有注释做唯一定位。**
+- **3 条 zh=对方 的暂未动**（`wizardEnrollExists` / `chatPageRenameSameAsPeerError` /
+  `resetEntranceServerResidualHint`）——老板要先看中文能不能也改「同伴」，等他的决定。
+  所以 EN 里现在还剩 3 处 `partner`（原来 8 处）。
+- **键名去掉 Partner**：`chatPageMembersInvitePartner` → `chatPageMembersInvite`；
+  `chatPageMembersReinvitePartner` → `chatPageMembersReinvite`（zh/en + 调用点 + 测试断言）。
+- **GLOSSARY**：成员那行的「界面用词」列还写着「空间成员」（已过期）→ 改成「我的同伴」+
+  英文 My companion/My companions；「命名约定」补一条「同伴」，写明**英文不用 `partner`**
+  与**代码/DB/wire 一律 `member`**。
+- **发现死键**：`setupCreateShareTitle` **零引用**（`grep` 全仓无调用）——待清。
+
+**验证**：`flutter analyze` 干净；`setup_join_passphrase` / `wizard_envelope_entry` /
+`wizard_autofocus` / `members_reinvite` / `widget_test` 共 **31 条绿**。

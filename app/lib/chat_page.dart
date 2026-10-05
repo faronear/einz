@@ -880,7 +880,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 修改口令时（按需）才要求输入新口令。
   void _onPassphraseRotated(WsPassphraseRotatedEvent event) {
     if (!mounted) return;
-    showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice);
+    showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice(_isGroup ? 'group' : 'duo'));
   }
 
   /// 对方改名/换头像（Server 广播 profile.updated）：立即更新顶部条对方名；
@@ -1016,7 +1016,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final knownAt = _escrowUpdatedAt ?? widget.escrowUpdatedAt;
       if (serverAt != null && knownAt != null && serverAt > knownAt) {
         if (!mounted) return;
-        showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice);
+        showTopNotice(context, AppLocalizations.of(context)!.chatPageEscrowRotatedNotice(_isGroup ? 'group' : 'duo'));
         _escrowUpdatedAt = serverAt; // 记录已知时间（防 WS 重连/重复补查刷屏）
       }
     } catch (_) {
@@ -2232,6 +2232,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         spaceKeyB64: base64Encode(widget.spaceKey),
         spaceId: widget.spaceId,
         keyVersion: widget.keyVersion,
+        spaceMode: _isGroup ? 'group' : 'duo',
         session: _session,
         api: widget.api,
         onPassphraseUpdated: (updatedAt) {
@@ -2240,7 +2241,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ),
     );
     if (changed == true && mounted) {
-      showTopNotice(context, AppLocalizations.of(context)!.chatPageChangePassphraseDone);
+      showTopNotice(context, AppLocalizations.of(context)!.chatPageChangePassphraseDone(_isGroup ? 'group' : 'duo'));
     }
   }
 
@@ -2392,7 +2393,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       memberId: e.key,
                       gender: _memberGenders[e.key] ?? '',
                       name: _memberNames[e.key],
-                      actionLabel: l10n.chatPageMembersReinvitePartner,
+                      actionLabel: l10n.chatPageMembersReinvite,
                       onAction: () {
                         // 先收起成员弹层；**等它收完再弹口令框**——紧接着 showDialog
                         // 会让两条 route 在 Overlay 里交叉卸载（见 _waitRouteHandoff）。
@@ -2410,7 +2411,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       faintName: true,
                       actionLabel: _isGroup
                           ? l10n.chatPageMembersInviteNew
-                          : l10n.chatPageMembersInvitePartner,
+                          : l10n.chatPageMembersInvite,
                       onAction: () {
                         Navigator.of(ctx).pop();
                         _menuAction(
@@ -7381,6 +7382,7 @@ class _ChangePassphraseDialog extends StatefulWidget {
     required this.spaceKeyB64,
     required this.spaceId,
     required this.keyVersion,
+    required this.spaceMode,
     required this.session,
     required this.onPassphraseUpdated,
     this.api, // 测试注入（fake api，不触网）；默认按 server 新建
@@ -7391,6 +7393,10 @@ class _ChangePassphraseDialog extends StatefulWidget {
   final String spaceKeyB64;
   final String spaceId;
   final int keyVersion;
+
+  /// 秘境类型（'duo' | 'group'）——这句文案里「同伴」的单复数按它选
+  /// （`wizardPassphraseHint` 的 ICU select 形参 mode）。
+  final String spaceMode;
 
   /// 本空间的会话（**不是裸 token**）：改口令要连发两次带鉴权请求（读密保箱 + 上传），
   /// 拿裸 token 的话 24h 后这两步都会 401「invalid session」（见 data/space_session.dart）。
@@ -7539,7 +7545,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
           // 说明文字（与创建向导**共用同一句** wizardPassphraseHint，老板 2026-09-15
           // 要求统一口径；样式与通道码 / PIN 弹窗一致：大标题下小字说明）
           Text(
-            l10n.wizardPassphraseHint,
+            l10n.wizardPassphraseHint(widget.spaceMode),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.outline,

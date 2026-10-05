@@ -109,7 +109,7 @@ Future<void> pumpToJoinPassphrase(
   await tester.pumpAndSettle(); // → 口令页
   // 口令页应为「验证」语义：标题与提示都是验证措辞
   expect(find.text(_zh.wizardJoinPassphraseTitle), findsOneWidget); // 标题（join=验证套，create=设置套）
-  expect(find.text(_zh.wizardJoinPassphraseHint),
+  expect(find.text(_zh.wizardJoinPassphraseHint('duo')),
       findsOneWidget); // hint
   // join 提交（POST /spaces/join）成功后若出 SnackBar 停留 4 秒：等其消失避免遮挡
   await tester.pump(const Duration(seconds: 5));
@@ -134,7 +134,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_zh.wizardJoinPassphraseWrong), findsOneWidget,
         reason: '错误口令必须被拦截并提示');
-    expect(find.text(_zh.wizardJoinPassphraseHint),
+    expect(find.text(_zh.wizardJoinPassphraseHint('duo')),
         findsOneWidget, reason: '应停留在口令页');
     expect(find.text(_zh.chatPageSetLockTitle), findsNothing, reason: '不应进入 PIN 页');
   });
@@ -275,7 +275,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '正确口令-abc');
     await tester.tap(find.text(_zh.wizardNext));
     await tester.pumpAndSettle();
-    expect(find.text(_zh.wizardJoinPassphraseHint),
+    expect(find.text(_zh.wizardJoinPassphraseHint('duo')),
         findsOneWidget, reason: '未托管时停留口令页');
   });
 

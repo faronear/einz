@@ -149,8 +149,8 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageEnvelopeKeyHint.
   ///
   /// In en, this message translates to:
-  /// **'A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.'**
-  String get setupPageEnvelopeKeyHint;
+  /// **'A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.'**
+  String setupPageEnvelopeKeyHint(String mode);
 
   /// No description provided for @setupPageNeedPassphrase.
   ///
@@ -407,8 +407,8 @@ abstract class AppLocalizations {
   /// No description provided for @wizardPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The passphrase is the only key to access the space, shared by you and your partner. Memorize it and never leak it!'**
-  String get wizardPassphraseHint;
+  /// **'The passphrase is the only key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Memorize it and never leak it!'**
+  String wizardPassphraseHint(String mode);
 
   /// No description provided for @wizardPassphraseMinLengthHint.
   ///
@@ -437,8 +437,8 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinPassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'The passphrase is the only key to access the space, shared by you and your partner. Don\'t know it? Ask your partner.'**
-  String get wizardJoinPassphraseHint;
+  /// **'The passphrase is the only key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Don\'t know it? Ask {mode, select, duo{your companion} other{your companions}}.'**
+  String wizardJoinPassphraseHint(String mode);
 
   /// No description provided for @wizardJoinPassphraseWrong.
   ///
@@ -599,8 +599,8 @@ abstract class AppLocalizations {
   /// No description provided for @setupCreateShareTitle.
   ///
   /// In en, this message translates to:
-  /// **'Send the invite link to your partner:'**
-  String get setupCreateShareTitle;
+  /// **'Send the invite link to {mode, select, duo{your companion} other{your companions}} and explore the space together:'**
+  String setupCreateShareTitle(String mode);
 
   /// No description provided for @setupCreateCopy.
   ///
@@ -1151,8 +1151,8 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageChangePassphraseDone.
   ///
   /// In en, this message translates to:
-  /// **'✅ Shared passphrase updated — tell your partner; new entrances must use the new one'**
-  String get chatPageChangePassphraseDone;
+  /// **'✅ Shared passphrase updated — tell {mode, select, duo{your companion} other{your companions}}; new entrances must use the new one'**
+  String chatPageChangePassphraseDone(String mode);
 
   /// No description provided for @chatPageChangePassphraseFailed.
   ///
@@ -1163,8 +1163,8 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEscrowRotatedNotice.
   ///
   /// In en, this message translates to:
-  /// **'Your partner reset the shared passphrase — use the new one to create entrance tokens or change it'**
-  String get chatPageEscrowRotatedNotice;
+  /// **'{mode, select, duo{Your companion} other{Your companions}} reset the shared passphrase — use the new one to create entrance tokens or change it'**
+  String chatPageEscrowRotatedNotice(String mode);
 
   /// No description provided for @chatPageMenuLocaleLabel.
   ///
@@ -1310,17 +1310,17 @@ abstract class AppLocalizations {
   /// **'Unnamed'**
   String get chatPageMembersUnnamed;
 
-  /// No description provided for @chatPageMembersInvitePartner.
+  /// No description provided for @chatPageMembersInvite.
   ///
   /// In en, this message translates to:
   /// **'Invite'**
-  String get chatPageMembersInvitePartner;
+  String get chatPageMembersInvite;
 
-  /// No description provided for @chatPageMembersReinvitePartner.
+  /// No description provided for @chatPageMembersReinvite.
   ///
   /// In en, this message translates to:
   /// **'Re-invite'**
-  String get chatPageMembersReinvitePartner;
+  String get chatPageMembersReinvite;
 
   /// No description provided for @chatPageReinvitePassphraseTitle.
   ///

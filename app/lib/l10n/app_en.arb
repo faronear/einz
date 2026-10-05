@@ -8,7 +8,8 @@
   "settings": "Settings",
   "skip": "Skip",
   "close": "Close",
-  "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.",
+  "setupPageEnvelopeKeyHint": "A key envelope is an asymmetrically encrypted text handed over in person. Ask {mode, select, duo{your companion} other{your companions}} for it.",
+  "@setupPageEnvelopeKeyHint": {"placeholders": {"mode": {"type": "String"}}},
   "setupPageNeedPassphrase": "Enter a shared passphrase",
   "upgradeRequiredTitle": "Update required",
   "upgradeRequiredBody": "This version is no longer supported by the server (needs at least {min}). Please update to continue.",
@@ -74,12 +75,14 @@
       }
     }
   },
-  "wizardPassphraseHint": "The passphrase is the only key to access the space, shared by you and your partner. Memorize it and never leak it!",
+  "wizardPassphraseHint": "The passphrase is the only key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Memorize it and never leak it!",
+  "@wizardPassphraseHint": {"placeholders": {"mode": {"type": "String"}}},
   "wizardPassphraseMinLengthHint": "At least 8 characters",
   "wizardPassphraseTooShort": "Passphrase must be at least 8 characters",
   "wizardPassphraseConfirmHint": "Re-enter passphrase",
   "wizardPassphraseMismatch": "Passphrases do not match",
-  "wizardJoinPassphraseHint": "The passphrase is the only key to access the space, shared by you and your partner. Don't know it? Ask your partner.",
+  "wizardJoinPassphraseHint": "The passphrase is the only key to access the space, shared by you and {mode, select, duo{your companion} other{your companions}}. Don't know it? Ask {mode, select, duo{your companion} other{your companions}}.",
+  "@wizardJoinPassphraseHint": {"placeholders": {"mode": {"type": "String"}}},
   "wizardJoinPassphraseWrong": "Wrong passphrase: use the one set on the first entrance",
   "wizardSwitchToEnvelope": "Use key envelope instead (offline)",
   "wizardSwitchToPassphrase": "Use a shared passphrase instead",
@@ -137,7 +140,8 @@
       }
     }
   },
-  "setupCreateShareTitle": "Send the invite link to your partner:",
+  "setupCreateShareTitle": "Send the invite link to {mode, select, duo{your companion} other{your companions}} and explore the space together:",
+  "@setupCreateShareTitle": {"placeholders": {"mode": {"type": "String"}}},
   "setupCreateCopy": "Copy invite link",
   "setupCreateCopied": "Copied",
   "setupPageInitFailed": "Initialization failed, retrying…",
@@ -291,7 +295,8 @@
   "chatPageChangePassphraseSame": "New passphrase cannot be the same as the current one",
   "chatPageChangePassphraseOldRequired": "Enter your current passphrase first",
   "chatPageChangePassphraseOldWrong": "Wrong current passphrase",
-  "chatPageChangePassphraseDone": "✅ Shared passphrase updated — tell your partner; new entrances must use the new one",
+  "chatPageChangePassphraseDone": "✅ Shared passphrase updated — tell {mode, select, duo{your companion} other{your companions}}; new entrances must use the new one",
+  "@chatPageChangePassphraseDone": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageChangePassphraseFailed": "Failed to change passphrase: {error}",
   "@chatPageChangePassphraseFailed": {
     "placeholders": {
@@ -300,7 +305,8 @@
       }
     }
   },
-  "chatPageEscrowRotatedNotice": "Your partner reset the shared passphrase — use the new one to create entrance tokens or change it",
+  "chatPageEscrowRotatedNotice": "{mode, select, duo{Your companion} other{Your companions}} reset the shared passphrase — use the new one to create entrance tokens or change it",
+  "@chatPageEscrowRotatedNotice": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMenuLocaleLabel": "Language",
   "chatPageMenuAttachmentStorage": "Attachment storage",
   "chatPageAttachmentStorageSecured": "Remote only",
@@ -353,8 +359,8 @@
   "chatPageMembersTitle": "{mode, select, duo{My companion} other{My companions}}",
   "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersUnnamed": "Unnamed",
-  "chatPageMembersInvitePartner": "Invite",
-  "chatPageMembersReinvitePartner": "Re-invite",
+  "chatPageMembersInvite": "Invite",
+  "chatPageMembersReinvite": "Re-invite",
   "chatPageReinvitePassphraseTitle": "Verify passphrase",
   "chatPageReinvitePassphraseHint": "After verification you can re-invite {name}",
   "@chatPageReinvitePassphraseHint": {"placeholders": {"name": {"type": "String"}}},

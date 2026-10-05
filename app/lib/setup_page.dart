@@ -2121,8 +2121,8 @@ class _SetupPageState extends State<SetupPage> {
                         ? _joinNoteText(l10n)
                         : null) ??
                     (_role == _WizardRole.join
-                        ? l10n.wizardJoinPassphraseHint
-                        : l10n.wizardPassphraseHint),
+                        ? l10n.wizardJoinPassphraseHint(_copyMode)
+                        : l10n.wizardPassphraseHint(_copyMode)),
               ),
             ),
             if (_role == _WizardRole.join)
@@ -2502,6 +2502,11 @@ class _SetupPageState extends State<SetupPage> {
 
   // ---- 场景 C（offline）：密保信封导入 ----
 
+  /// 文案里"同伴"的单复数要用**秘境类型**：duo=单数、group=复数
+  /// （英文 ICU select 的 `mode` 形参）。拿不到就退 'duo'（极早期渲染）。
+  String get _copyMode =>
+      (_role == _WizardRole.create ? _spaceKind : _joinSpaceMode) ?? 'duo';
+
   /// 步骤 1（offline）：粘贴密保信封（对方用本通道公钥密封的 Space Key）。
   /// 同时需填写一次性通道码（非首条通道必须凭码登记后才能认证）。
   Widget _buildStepEnvelope() {
@@ -2516,7 +2521,7 @@ class _SetupPageState extends State<SetupPage> {
           children: [
             Expanded(
               child: _stepHeader(
-                  l10n.wizardTitleEnvelope, l10n.setupPageEnvelopeKeyHint),
+                  l10n.wizardTitleEnvelope, l10n.setupPageEnvelopeKeyHint(_copyMode)),
             ),
             _DogEarSwitch(
               icon: Icons.password,

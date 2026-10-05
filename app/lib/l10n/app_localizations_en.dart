@@ -34,8 +34,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get close => 'Close';
 
   @override
-  String get setupPageEnvelopeKeyHint =>
-      'A key envelope is an asymmetrically encrypted text handed over in person. Ask your partner for it.';
+  String setupPageEnvelopeKeyHint(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': 'your companion',
+      'other': 'your companions',
+    });
+    return 'A key envelope is an asymmetrically encrypted text handed over in person. Ask $_temp0 for it.';
+  }
 
   @override
   String get setupPageNeedPassphrase => 'Enter a shared passphrase';
@@ -179,8 +184,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get wizardPassphraseHint =>
-      'The passphrase is the only key to access the space, shared by you and your partner. Memorize it and never leak it!';
+  String wizardPassphraseHint(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': 'your companion',
+      'other': 'your companions',
+    });
+    return 'The passphrase is the only key to access the space, shared by you and $_temp0. Memorize it and never leak it!';
+  }
 
   @override
   String get wizardPassphraseMinLengthHint => 'At least 8 characters';
@@ -196,8 +206,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardPassphraseMismatch => 'Passphrases do not match';
 
   @override
-  String get wizardJoinPassphraseHint =>
-      'The passphrase is the only key to access the space, shared by you and your partner. Don\'t know it? Ask your partner.';
+  String wizardJoinPassphraseHint(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': 'your companion',
+      'other': 'your companions',
+    });
+    String _temp1 = intl.Intl.selectLogic(mode, {
+      'duo': 'your companion',
+      'other': 'your companions',
+    });
+    return 'The passphrase is the only key to access the space, shared by you and $_temp0. Don\'t know it? Ask $_temp1.';
+  }
 
   @override
   String get wizardJoinPassphraseWrong =>
@@ -294,7 +313,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get setupCreateShareTitle => 'Send the invite link to your partner:';
+  String setupCreateShareTitle(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': 'your companion',
+      'other': 'your companions',
+    });
+    return 'Send the invite link to $_temp0 and explore the space together:';
+  }
 
   @override
   String get setupCreateCopy => 'Copy invite link';
@@ -610,8 +635,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageChangePassphraseOldWrong => 'Wrong current passphrase';
 
   @override
-  String get chatPageChangePassphraseDone =>
-      '✅ Shared passphrase updated — tell your partner; new entrances must use the new one';
+  String chatPageChangePassphraseDone(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': 'your companion',
+      'other': 'your companions',
+    });
+    return '✅ Shared passphrase updated — tell $_temp0; new entrances must use the new one';
+  }
 
   @override
   String chatPageChangePassphraseFailed(String error) {
@@ -619,8 +649,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatPageEscrowRotatedNotice =>
-      'Your partner reset the shared passphrase — use the new one to create entrance tokens or change it';
+  String chatPageEscrowRotatedNotice(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'duo': 'Your companion',
+      'other': 'Your companions',
+    });
+    return '$_temp0 reset the shared passphrase — use the new one to create entrance tokens or change it';
+  }
 
   @override
   String get chatPageMenuLocaleLabel => 'Language';
@@ -722,10 +757,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageMembersUnnamed => 'Unnamed';
 
   @override
-  String get chatPageMembersInvitePartner => 'Invite';
+  String get chatPageMembersInvite => 'Invite';
 
   @override
-  String get chatPageMembersReinvitePartner => 'Re-invite';
+  String get chatPageMembersReinvite => 'Re-invite';
 
   @override
   String get chatPageReinvitePassphraseTitle => 'Verify passphrase';
