@@ -543,6 +543,57 @@ class _SpaceCard extends StatelessWidget {
     );
   }
 
+  /// **还没有人加入**（duo 对方未加入 / group 除我之外无人）时的占位正文
+  /// （老板 2026-10-06）：名字区域只显示「待加入」，**不再显示我自己的名字/头像**。
+  /// 图标：duo = 默认个人头像（灰底人形，与 `_PeerAvatar` 无 id 时的默认同款）；
+  /// group = 创建向导第一页「群组秘境」卡片同款 `groups_outlined`（品牌蓝）。
+  Widget _buildPendingBody(BuildContext context, ThemeData theme) {
+    final singleRadius =
+        (size * 0.22).clamp(10.0, _PeerAvatar.defaultRadius).toDouble();
+    final iconRadius = isGroup ? (size * 0.28).clamp(12.0, 30.0) : singleRadius;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // group：向导第一页同款图标（groups_outlined，品牌蓝）；
+        // duo：默认个人头像（与 _PeerAvatar 的默认态一致：灰底 + 人形图标）
+        if (isGroup)
+          CircleAvatar(
+            radius: iconRadius,
+            backgroundColor:
+                const Color(0xFF3BAFFD).withValues(alpha: 0.18),
+            child: Icon(Icons.groups_outlined,
+                size: iconRadius * 1.1, color: const Color(0xFF3BAFFD)),
+          )
+        else
+          CircleAvatar(
+            radius: singleRadius,
+            backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.12),
+            child: Icon(Icons.person,
+                size: singleRadius,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+          ),
+        const SizedBox(height: 6),
+        Flexible(
+          child: Text(
+            AppLocalizations.of(context)!.memberPending,
+            maxLines: 1,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            // 「待加入」比正常名字淡一档（老板 2026-10-06）：它是状态不是名字，
+            // 不该与人名同样抢眼。当前空间白字底下也压 alpha 保持淡感。
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: (_foreground ?? theme.colorScheme.onSurface)
+                  .withValues(alpha: 0.55),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 群组卡片的正文：**除我之外**的成员按加入先后平铺成 2×2（头像 + 名字）。
   ///
   /// 尺寸全部由卡片边长 [size] 反算：边长跨度很大（窄窗下限 64 → 桌面弹层上限 194），
@@ -720,9 +771,14 @@ class _SpaceCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // 内容：群组空间平铺成员（2×2），其余是"头像在上+名字在下"的居中块
+                    // 内容：群组有人时平铺成员（2×2）；**还没有人加入**（peerPending）
+                    // 时 duo/group 都显示占位正文（老板 2026-10-06：duo=默认头像，
+                    // group=向导第一页同款群组图标；名字区域都是「待加入」——
+                    // 不再显示我自己的名字和头像）；其余是"头像在上+名字在下"居中块
                     if (isGroup && others.isNotEmpty)
                       _buildMembersGrid(context)
+                    else if (peerPending)
+                      _buildPendingBody(context, theme)
                     else
                       _buildSingleBody(context, theme),
                     // 对勾用淡入而非 if(current)：跟着底色一起出现，不在淡色底上先白着跳出来。
