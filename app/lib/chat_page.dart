@@ -6643,12 +6643,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       Text(l10n.chatPageMenuMembers(_isGroup ? 'group' : 'duo'),
                           style: captionStyle),
                       const Spacer(),
-                      // 「我的同伴」右簇：group_outlined 图标恒显（duo 也显示，
-                      // 老板 2026-10-06 定回原图标）；
-                      // 仅群聊追加除我之外的人数（图标在前、数字在后，与「我的通道」
-                      // devices 行同风格）——duo 不标人数。_memberCount 是身份数
-                      // （含我），减 1 得同伴数；轮询没拉到就不显示数字。
-                      Icon(Icons.group_outlined, size: 18, color: labelStyle.color),
+                      // 「我的同伴」右簇：图标按空间类型区分（老板 2026-10-06）——
+                      // duo = group_outlined（双人剪影），group = groups_outlined
+                      // （多人，与创建向导「群组秘境」卡片同款）；仅群聊追加除我之外
+                      // 的人数（图标在前、数字在后，与「我的通道」devices 行同风格）
+                      // ——duo 不标人数。_memberCount 是身份数（含我），减 1 得同伴
+                      // 数；轮询没拉到就不显示数字。
+                      Icon(
+                        _isGroup ? Icons.groups_outlined : Icons.group_outlined,
+                        size: 18,
+                        color: labelStyle.color,
+                      ),
                       if (_isGroup && _memberCount > 1) ...[
                         const SizedBox(width: 4),
                         _menuValue('${_memberCount - 1}', valueStyle),
