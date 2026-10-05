@@ -211,7 +211,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeDialogTitleJoin => '一切就绪！';
 
   @override
-  String get welcomeDialogMessage => '秘境已开启，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！';
+  String get welcomeDialogMessage => '你的秘境已开启，所有消息端到端加密，确保绝对隐私。进入秘境，开始聊天吧！';
 
   @override
   String get welcomeDialogStart => '进入秘境';
@@ -253,7 +253,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenTitle => '验证通道码';
 
   @override
-  String get setupTokenHint => '凭通道码让本机加入本秘境。24 小时内一次性有效，可由本秘境任一已认证的通道生成。';
+  String get setupTokenHint => '连接本机到本秘境。24 小时内一次性有效，可由本秘境任一已认证的通道生成。';
 
   @override
   String get setupTokenInputHint => '通道码';
@@ -271,7 +271,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupTokenUsed => '通道码已被使用';
 
   @override
-  String get setupTokenSpaceAlreadyAdded => '这个秘境已经添加过了（一台设备只能有一条通道到同一个秘境）';
+  String get setupTokenSpaceAlreadyAdded => '本机已经有通道加入了这个秘境（一台设备只能有一条通道到同一个秘境）';
 
   @override
   String setupTokenOtherServer(String other, String current) {
@@ -409,7 +409,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => '邀请加入本秘境';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => '我的新通道码';
+  String get chatPageInviteDialogTitleAttachSelf => '添加我的新通道';
 
   @override
   String get chatPageInviteDialogTitleReinvite => '再次邀请加入本秘境';
@@ -425,7 +425,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      '在你的另一台设备上用这个码新建一条通道加入本秘境。24 小时内一次性有效。';
+      '使用这个通道码，在另一台设备上加入本秘境。24 小时内一次性有效。';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
@@ -712,7 +712,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListThisDevice => '当前通道名称';
 
   @override
-  String get chatPageEntranceListNew => '生成新通道码';
+  String get chatPageEntranceListNew => '添加我的新通道';
 
   @override
   String get chatPageEntranceListRefresh => '刷新';

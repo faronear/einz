@@ -479,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeDialogMessage.
   ///
   /// In en, this message translates to:
-  /// **'The space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!'**
+  /// **'Your space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!'**
   String get welcomeDialogMessage;
 
   /// No description provided for @welcomeDialogStart.
@@ -551,7 +551,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.'**
+  /// **'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
@@ -587,7 +587,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenSpaceAlreadyAdded.
   ///
   /// In en, this message translates to:
-  /// **'This space is already added (one device can hold only one entrance to a space)'**
+  /// **'This device has already an entrance to this space (one device can hold only one entrance to a space)'**
   String get setupTokenSpaceAlreadyAdded;
 
   /// No description provided for @setupTokenOtherServer.
@@ -845,7 +845,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogTitleAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'My new entrance token'**
+  /// **'Add my new entrance'**
   String get chatPageInviteDialogTitleAttachSelf;
 
   /// No description provided for @chatPageInviteDialogTitleReinvite.
@@ -875,13 +875,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Use this entrance token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.'**
+  /// **'Use this entrance token on your other device to connect to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Send this entrance token to {name} to add a new entrance. Their existing entrances keep working. One-time use, valid for 24 hours.'**
+  /// **'Send this entrance token to {name} to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.
@@ -1385,7 +1385,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
-  /// **'Generate a new entrance token'**
+  /// **'Add my new entrance'**
   String get chatPageEntranceListNew;
 
   /// No description provided for @chatPageEntranceListRefresh.

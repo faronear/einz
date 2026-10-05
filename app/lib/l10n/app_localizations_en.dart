@@ -221,7 +221,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeDialogMessage =>
-      'The space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!';
+      'Your space is ready, end-to-end encrypted for total privacy. Enter now and start chatting!';
 
   @override
   String get welcomeDialogStart => 'Enter Einz';
@@ -267,7 +267,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenHint =>
-      'An entrance token connects this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.';
+      'Connect this device to the space. Valid for one-time use within 24 hours; generate it from any verified entrance in the space.';
 
   @override
   String get setupTokenInputHint => 'Entrance token';
@@ -286,7 +286,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupTokenSpaceAlreadyAdded =>
-      'This space is already added (one device can hold only one entrance to a space)';
+      'This device has already an entrance to this space (one device can hold only one entrance to a space)';
 
   @override
   String setupTokenOtherServer(String other, String current) {
@@ -436,7 +436,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteDialogTitleInvite => 'Invite';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => 'My new entrance token';
+  String get chatPageInviteDialogTitleAttachSelf => 'Add my new entrance';
 
   @override
   String get chatPageInviteDialogTitleReinvite => 'Re-invite';
@@ -453,11 +453,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Use this entrance token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.';
+      'Use this entrance token on your other device to connect to this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'Send this entrance token to $name to add a new entrance. Their existing entrances keep working. One-time use, valid for 24 hours.';
+    return 'Send this entrance token to $name to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -752,7 +752,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListThisDevice => 'Current entrance name';
 
   @override
-  String get chatPageEntranceListNew => 'Generate a new entrance token';
+  String get chatPageEntranceListNew => 'Add my new entrance';
 
   @override
   String get chatPageEntranceListRefresh => 'Refresh';

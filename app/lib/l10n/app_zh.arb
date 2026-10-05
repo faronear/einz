@@ -86,7 +86,7 @@
   "wizardPinHint": "每次启动秘境，需输入锁屏码才能进入。当前也可先跳过，进入秘境后能够随时设置。",
   "welcomeDialogTitleCreate": "一切就绪！",
   "welcomeDialogTitleJoin": "一切就绪！",
-  "welcomeDialogMessage": "秘境已开启，所有消息端到端加密，确保绝对隐私。现在就进入秘境，开始聊天吧！",
+  "welcomeDialogMessage": "你的秘境已开启，所有消息端到端加密，确保绝对隐私。进入秘境，开始聊天吧！",
   "welcomeDialogStart": "进入秘境",
   "setupPageKeyGenFailed": "❌ 密钥生成失败: {error}",
   "@setupPageKeyGenFailed": {
@@ -119,13 +119,13 @@
     }
   },
   "setupTokenTitle": "验证通道码",
-  "setupTokenHint": "凭通道码让本机加入本秘境。24 小时内一次性有效，可由本秘境任一已认证的通道生成。",
+  "setupTokenHint": "连接本机到本秘境。24 小时内一次性有效，可由本秘境任一已认证的通道生成。",
   "setupTokenInputHint": "通道码",
   "setupTokenNeedInput": "请填写通道码",
   "setupTokenInvalid": "通道码无效",
   "setupTokenExpired": "通道码已过期",
   "setupTokenUsed": "通道码已被使用",
-  "setupTokenSpaceAlreadyAdded": "这个秘境已经添加过了（一台设备只能有一条通道到同一个秘境）",
+  "setupTokenSpaceAlreadyAdded": "本机已经有通道加入了这个秘境（一台设备只能有一条通道到同一个秘境）",
   "setupTokenOtherServer": "该邀请链接来自 {other}，本机连的是 {current}，不能混用",
   "@setupTokenOtherServer": {
     "placeholders": {
@@ -198,12 +198,12 @@
   "chatPageClearLockTitle": "删除锁屏码？",
   "chatPageClearLockMessage": "确定要删除锁屏码吗？删除后下次启动将直接进入聊天。",
   "chatPageInviteDialogTitleInvite": "邀请加入本秘境",
-  "chatPageInviteDialogTitleAttachSelf": "我的新通道码",
+  "chatPageInviteDialogTitleAttachSelf": "添加我的新通道",
   "chatPageInviteDialogTitleReinvite": "再次邀请加入本秘境",
   "chatPageInviteJoinLink": "邀请",
   "chatPageInviteRegenerate": "重新生成",
   "chatPageInviteDialogHintInvite": "发给受邀人，凭它加入本秘境。24 小时内一次性有效。",
-  "chatPageInviteDialogHintAttachSelf": "在你的另一台设备上用这个码新建一条通道加入本秘境。24 小时内一次性有效。",
+  "chatPageInviteDialogHintAttachSelf": "使用这个通道码，在另一台设备上加入本秘境。24 小时内一次性有效。",
   "chatPageInviteDialogHintReinvite": "发给 {name}，凭它新建一条通道加入本秘境，原有通道不受影响。24 小时内一次性有效。",
   "chatPageInviteDialogReinviteFallbackName": "对方",
   "@chatPageInviteDialogHintReinvite": {
@@ -364,7 +364,7 @@
   "chatPageEntranceListFailed": "无法获取其他通道（当前离线？）",
   "chatPageEntranceScopeHint": "通道是设备连接到秘境的专属线路。以下是您连接到当前秘境的所有通道。",
   "chatPageEntranceListThisDevice": "当前通道名称",
-  "chatPageEntranceListNew": "生成新通道码",
+  "chatPageEntranceListNew": "添加我的新通道",
   "chatPageEntranceListRefresh": "刷新",
   "chatPagePinLabel": "锁屏码",
   "chatPageLockNow": "锁屏",
