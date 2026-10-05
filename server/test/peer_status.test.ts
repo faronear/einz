@@ -147,7 +147,7 @@ function lastAbout (
   return hits.length === 0 ? undefined : hits[hits.length - 1]!.payload
 }
 
-test('online_since：进入在线态的时刻——重连不刷新；peer.offline 不带该字段', async () => {
+test('online_since：进入在线态的时刻——重连不刷新；peer.offline 带 offline_since', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'einz-since-'))
   const wss = new WebSocketServer({ port: 0 })
   attachWs(wss)
@@ -191,9 +191,15 @@ test('online_since：进入在线态的时刻——重连不刷新；peer.offlin
     b1Again.ws.close()
     await waitFor('a1 收到 b1 的 peer.offline', () =>
       a1.frames.some(f => f.type === 'peer.offline' && f.payload.entrance_id === 'b1'))
+    const offlineFrame = lastAbout(a1.frames, 'peer.offline', 'b1') ?? {}
     assert.ok(
-      !('online_since' in (lastAbout(a1.frames, 'peer.offline', 'b1') ?? {})),
+      !('online_since' in offlineFrame),
       'peer.offline 不带 online_since（已下线，上线时刻无意义）',
+    )
+    assert.equal(
+      typeof offlineFrame.offline_since,
+      'number',
+      'peer.offline 应带 offline_since——对端红灯旁立刻显示下线时间（2026-10-05）',
     )
 
     b1.ws.close()

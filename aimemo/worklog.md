@@ -11792,3 +11792,42 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 `peer.offline` 上也带上 `offline_since`（协议小改）——本次没动。
 
 **测试**：全仓没有覆盖 `_onPeerStatus` 的测试（grep 过）。`flutter analyze` 干净。
+
+---
+
+## 2026-10-05（六）对称修：`peer.offline` 也带下线时刻（红灯即有时间）
+
+上一轮只修了上线（绿灯即有时间）；下线仍"红灯先亮、时间等下一次 30s 轮询"。这轮补对称。
+
+**服务端**
+- `ws.ts`：`broadcastPeerStatus()` 加第三参 `offlineSinceMs`；`peer.offline` 的 payload
+  带 `offline_since`（与 `entrances.offline_since` **同值**——close 时那个 `atMs`，
+  退役时那个 `now`）。close 处传 `atMs`；`forgetEntranceConnection()` 加参透传。
+- `entrances.ts`：`retireEntrance` 把 `Date.now()` 提到 `const now`，**同一值**既写库
+  又给广播，避免两次取时钟差几毫秒。
+- 注：**心跳超时那条路刻意不广播**（原有设计，见 ws.ts 心跳注释），所以那条仍是轮询兜底
+  ——本次不碰（"别顺手改成先广播再删"是代码里写死的告诫）。
+
+**shared**
+- `WsPeerStatusEvent`：`onlineSince` → **`since`**（把两帧的"起始时刻"归一；调用方用
+  `type` 区分是上线还是下线时刻）；解析 `payload['online_since'] ?? payload['offline_since']`。
+  这样 app 侧不必再分两种情况（`event.since` 一把写）。
+
+**app**
+- `_onPeerStatus`：翻 `_peerOnline` 的同一帧里写 `_peerSinceMs = event.since`；
+  `since == null`（老服务端）才补一次 `_refreshPeerOnline()`。
+
+**文档**：`docs/PROTOCOL.md` 事件表 `peer.offline` 行补 `offline_since`；§7.2.1 退役那句
+标注"带 `offline_since`"。
+
+**测试**：`shared/test/ws_client_test.dart`（改成 3 帧：上线带 online_since / 下线带
+offline_since / 老服务端不带 → null）；`server/test/peer_status.test.ts`（断言
+`peer.offline.offline_since` 是 number）。
+
+**验证**：`flutter analyze` 干净；`shared` `dart test` **52 通过**；`server` `npm test`
+**exit=0**（75 个 ok / 0 fail，含 build + tsc）。
+
+### ⚠️ 顺带发现的缺口：`scripts/testAll.sh` 没有 `shared` 这个 target
+
+所以 **shared 的测试既不在"一条命令跑全套"里，也不在 CI 里**（本次是我手动
+`cd shared && dart test` 跑的）。要不要补一个 `shared` target（+ `testAll.yml` 加一个 job）？

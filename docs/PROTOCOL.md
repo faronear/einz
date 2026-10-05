@@ -377,7 +377,7 @@ receipts(space_id, member_id, delivered_upto_seq, read_upto_seq, updated_at)
 - **退役绝不发 `entrance.revoked` 帧，也不主动关闭 WS**（`ws.forgetEntranceConnection`）：
   那帧是客户端自毁本地数据的授权信号，而本端点只认 session——若由它发出，偷到 session
   的人就能远程擦通道，等于给 §7.2 的口令闸门挖了一条旁路。取而代之的是给对端广播一次
-  `peer.offline`，让对方立刻看到这条通道下线。
+  `peer.offline`（带 `offline_since`，见 §8 事件表），让对方立刻看到这条通道下线。
 - 失败码：无/失效 token → `401 UNAUTHORIZED`；已撤销通道的会话 → `403 ENTRANCE_REVOKED`。
   客户端约定：**先调它、再清本地数据**（token 就存在本地，清完就调不动了）；调用失败时
   是否仍清本地由客户端决定——现实现是照清，并如实提示"服务端可能仍有残留"。
@@ -520,7 +520,7 @@ Authorization: Bearer <session_token>
 | S→C | `receipt.updated` | `{ "member_id": "…", "delivered_upto_seq": 12, "read_upto_seq": 10 }` | 对方回执（已送达/已读）高水位更新（§7） |
 | S→C | `entrance.revoked` | `{ "entrance_id": "…" }` | 本通道被撤销 → 客户端退出会话。**只由 §7.2 的撤销发出**；自助退役（§7.2.1）刻意不发此帧，改发 `peer.offline` |
 | S→C | `peer.online` | `{ "entrance_id": "dev1", "member_id": "per1", "online_since": 1787900000000 }` | 对端通道上线（WS 连接建立时广播；**不发给同 member 的通道**——自己的另一台不是"对方"）。`online_since` 同 §7.1：进入在线态时刻，重连不刷新 |
-| S→C | `peer.offline` | `{ "entrance_id": "dev1", "member_id": "per1" }` | 对端通道下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 member 通道） |
+| S→C | `peer.offline` | `{ "entrance_id": "dev1", "member_id": "per1", "offline_since": 1787900009999 }` | 对端通道下线（WS 断开时广播——App 立即更新对方在线状态；同样跳过同 member 通道）。`offline_since` = 断线时刻（与 `entrances.offline_since` 同值）→ 对端"红灯 + 下线时间"立刻到位，无需再等轮询 |
 | S→C | `passphrase.rotated` | `{ "entrance_id": "dev1" }` | 空间口令已被重设（客户端收到后只发通知不弹窗；生成通道码/改口令时按需检测 updated_at 再要求输入新口令） |
 | S→C | `profile.updated` | `{ "entrance_id": "…", "member_id": "…", "member_name": "…", "entrance_name": "…" }` | 成员改名/改通道名（客户端立即更新显示、头像缓存失效） |
 | S→C | `member.joined` | `{ "space_id": "…", "member_id": "…" }` | 群聊一期（2026-10-03）：**新身份**入网（成员数 +1）。只在新身份 join 时发——自己加设备（attach token）**不发**（否则别人会以为来了新人）。客户端收到后重拉 `GET /space` 刷新成员名单 |

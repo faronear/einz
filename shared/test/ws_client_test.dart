@@ -82,7 +82,7 @@ void main() {
     await client.stop();
   });
 
-  test('peer.online/peer.offline：解析 entrance_id/member_id/online_since', () async {
+  test('peer.online/peer.offline：解析 entrance_id/member_id/since（上线/下线时刻）', () async {
     final (server, base, conns) = await _startWsServer();
     addTearDown(() => server.close(force: true));
     final events = <WsEvent>[];
@@ -102,16 +102,30 @@ void main() {
     conns.first.add(jsonEncode({
       'id': 0,
       'type': 'peer.offline',
+      'payload': {
+        'entrance_id': 'dev-b',
+        'member_id': 'per-b',
+        'offline_since': 1787900009999,
+      },
+    }));
+    // 老服务端：两帧都可能不带时刻 → since 为 null（调用方回退轮询）
+    conns.first.add(jsonEncode({
+      'id': 0,
+      'type': 'peer.offline',
       'payload': {'entrance_id': 'dev-b', 'member_id': 'per-b'},
     }));
     await Future.delayed(const Duration(milliseconds: 200));
 
-    final online = events.whereType<WsPeerStatusEvent>().first;
-    expect(online.entranceId, 'dev-b');
-    expect(online.memberId, 'per-b');
-    expect(online.onlineSince, 1787900000000);
-    // 离线帧不带该字段（已下线，上线时刻无意义）
-    expect(events.whereType<WsPeerStatusEvent>().last.onlineSince, isNull);
+    final statuses = events.whereType<WsPeerStatusEvent>().toList();
+    expect(statuses, hasLength(3));
+    // 上线帧 → online_since
+    expect(statuses[0].entranceId, 'dev-b');
+    expect(statuses[0].memberId, 'per-b');
+    expect(statuses[0].since, 1787900000000);
+    // 下线帧 → offline_since（服务端 2026-10-05 起带上；灯亮即有时间）
+    expect(statuses[1].since, 1787900009999);
+    // 老服务端不带时刻 → null
+    expect(statuses[2].since, isNull);
     await client.stop();
   });
 

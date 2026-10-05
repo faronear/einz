@@ -125,16 +125,19 @@ export function retireEntrance(token: string): { ok: true } {
   const caller = requireSession(token)
 
   const db = getDb()
-  // offline_since 同 revoke：退役后显示层要有一行时间（= 退役时刻）
+  // offline_since 同 revoke：退役后显示层要有一行时间（= 退役时刻）。
+  // 同一个 now 也传给广播（peer.offline 的 offline_since）→ 对端红线旁的时间
+  // 与 /entrances 查到的完全一致，不必再等一次往返（老板 2026-10-05）。
+  const now = Date.now()
   db.prepare(
     `UPDATE entrances SET status = 'revoked', last_seen = 0, offline_since = ? WHERE entrance_id = ?`
-  ).run(Date.now(), caller.entrance_id)
+  ).run(now, caller.entrance_id)
   db.prepare(`DELETE FROM push_tokens WHERE entrance_id = ?`).run(caller.entrance_id)
   db.prepare(`DELETE FROM sessions WHERE entrance_id = ?`).run(caller.entrance_id)
   db.prepare(`DELETE FROM challenges WHERE entrance_id = ?`).run(caller.entrance_id)
 
   // 自己的 WS 连接还在 conns 里：摘掉并让对端立刻看到下线（不发自毁帧，见 ws 注释）
-  forgetEntranceConnection(caller.entrance_id)
+  forgetEntranceConnection(caller.entrance_id, now)
 
   return { ok: true }
 }

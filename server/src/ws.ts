@@ -55,8 +55,15 @@ function spaceOfEntrance(entranceId: string): string | null {
  *  对方灯点亮（老板 2026-09-16 实测：B 从未加入却显示在线）。
  *  payload 带 member_id：客户端（可能连着旧版服务端）据此二次过滤。
  *  peer.online 另带 online_since：接收方据此把该通道插到"在线通道列表"的正确
- *  位置（按上线顺序，最新上线在最前），省掉一次 /entrances 往返（老板 2026-09-16）。 */
-function broadcastPeerStatus(exceptEntranceId: string, type: "peer.online" | "peer.offline"): void {
+ *  位置（按上线顺序，最新上线在最前），省掉一次 /entrances 往返（老板 2026-09-16）。
+ *  peer.offline 另带 offline_since（= 写库的断线时刻）：接收方红灯旁的下线时间
+ *  立刻就有，同样省一次往返（老板 2026-10-05）。离线广播只有"干净 close"与
+ *  "自助退役"两条路会走到（心跳超时那条刻意不广播，见下方心跳注释）。 */
+function broadcastPeerStatus(
+  exceptEntranceId: string,
+  type: "peer.online" | "peer.offline",
+  offlineSinceMs?: number,
+): void {
   const origin = conns.get(exceptEntranceId);
   const spaceId = origin?.spaceId ?? null;
   if (spaceId == null) return;
@@ -65,7 +72,11 @@ function broadcastPeerStatus(exceptEntranceId: string, type: "peer.online" | "pe
     entrance_id: exceptEntranceId,
     member_id: originMemberId,
   };
-  if (type === "peer.online") payload.online_since = origin?.onlineSince ?? null;
+  if (type === "peer.online") {
+    payload.online_since = origin?.onlineSince ?? null;
+  } else {
+    payload.offline_since = offlineSinceMs ?? null;
+  }
   const frame = JSON.stringify({ id: 0, type, payload });
   for (const [entranceId, conn] of conns) {
     if (entranceId === exceptEntranceId) continue;
@@ -286,8 +297,9 @@ export function attachWs(wss: WebSocketServer): void {
 
     ws.on("close", (code, reason) => {
       const atMs = Date.now();
-      // 先广播离线（peer 广播按发起方空间分组，此时 conn 还在 conns）再删除
-      broadcastPeerStatus(entranceId, "peer.offline");
+      // 先广播离线（peer 广播按发起方空间分组，此时 conn 还在 conns）再删除；
+      // 带上 atMs：就是下面写进 entrances.offline_since 的那个时刻，两端一致
+      broadcastPeerStatus(entranceId, "peer.offline", atMs);
       if (conns.get(entranceId) === conn) conns.delete(entranceId);
       // WS 断开 = 离线：last_seen 置 0（App 判定离线），断线时刻落到 offline_since
       // —— 显示层的"离线时间"取 max(last_seen, offline_since)（见 entrances.listEntrances）。
@@ -368,9 +380,9 @@ export function broadcastNewMessage(exceptEntranceId: string, message: MessageEn
  * 摘出的效果：心跳不再给它刷 last_seen（ws.ts 心跳只遍历 conns），也不再收到任何广播，
  * 对端下一次 /entrances 或轮询就看不到它在线——无需等待 30s 轮询兜底。
  */
-export function forgetEntranceConnection(entranceId: string): void {
+export function forgetEntranceConnection(entranceId: string, offlineSinceMs?: number): void {
   // 顺序不能反：broadcastPeerStatus 靠 conns 里的连接取空间与人身份，摘掉就广播不了
-  broadcastPeerStatus(entranceId, "peer.offline");
+  broadcastPeerStatus(entranceId, "peer.offline", offlineSinceMs);
   conns.delete(entranceId);
 }
 

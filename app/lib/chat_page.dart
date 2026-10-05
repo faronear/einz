@@ -858,17 +858,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _peerOnline = online;
         // 灯与「时刻」必须同一帧到位。此前这里只翻 _peerOnline，_peerSinceMs 要等
         // 下一次 30s 轮询（_refreshPeerOnline）才算出来 → 绿灯先亮、约 1 分钟后
-        // 才出时间（老板 2026-10-05 真机实测：iOS 建 duo、macOS 加入）。而
-        // peer.online 的 payload **自带 online_since**（服务端 ws.ts 广播时带上；
-        // 语义"进入在线态的时刻，重连不刷新"——与轮询里 _sinceOfRow 的在线分支
-        // 同源），直接用即可，不用再等一次网络往返。
-        if (online && event.onlineSince != null) {
-          _peerSinceMs = event.onlineSince;
-        }
+        // 才出时间（老板 2026-10-05 真机实测：iOS 建 duo、macOS 加入）。
+        // 现在**两帧都自带时刻**：peer.online 带 online_since（进入在线态，重连
+        // 不刷新），peer.offline 带 offline_since（断线时刻）；`WsPeerStatusEvent
+        // .since` 已把两者归一（服务端 ws.ts 广播时带上），直接写即可，不用再等
+        // 一次网络往返。
+        if (event.since != null) _peerSinceMs = event.since;
       });
-      // 事件没带时刻（peer.offline 一律不带；老服务端 peer.online 也可能为空）→
-      // 拉一次补齐，别让状态里缺时间。
-      if (event.onlineSince == null) unawaited(_refreshPeerOnline());
+      // 事件没带时刻（连着老服务端）→ 拉一次补齐，别让状态里缺时间。
+      if (event.since == null) unawaited(_refreshPeerOnline());
     }
   }
 

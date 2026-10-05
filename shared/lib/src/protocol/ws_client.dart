@@ -73,19 +73,22 @@ class WsEntranceRevokedEvent extends WsEvent {
 /// peer.online/peer.offline：对端通道上下线通知（App 实时更新对方在线状态）。
 /// [memberId] 为上下线通道所属身份：与其相同身份的通道（我自己的另一条）不算
 /// "对方"，接收方须忽略（旧服务端不带该字段时为 null——按原行为处理）。
-/// [onlineSince] 仅 peer.online 携带：该通道进入在线态的时刻（ms，重连不刷新），
-/// 接收方据此按上线顺序排列对端的在线通道（最新上线在最前；旧服务端为 null）。
+/// [since] = **本次状态的起始时刻**（ms）：上线帧取 `online_since`（进入在线态的
+/// 时刻，重连不刷新，接收方据此按上线顺序排列在线通道）；下线帧取 `offline_since`
+/// （断线时刻）。两帧在 wire 上各带各的字段，这里统一成一个 `since`——调用方用
+/// `type` 即知它是"上线时刻"还是"下线时刻"。旧服务端两帧都可能不带 → null，
+/// 调用方回退到轮询 /entrances 兜底。
 class WsPeerStatusEvent extends WsEvent {
   const WsPeerStatusEvent({
     required super.type,
     required this.entranceId,
     this.memberId,
-    this.onlineSince,
+    this.since,
   });
 
   final String entranceId;
   final String? memberId;
-  final int? onlineSince;
+  final int? since;
 }
 
 /// passphrase.rotated：空间口令已被重设（客户端收到后只发通知，不弹窗）。
@@ -346,7 +349,7 @@ class WsClient {
             type: type,
             entranceId: payload['entrance_id'] as String? ?? '',
             memberId: payload['member_id'] as String?,
-            onlineSince: payload['online_since'] as int?,
+            since: (payload['online_since'] ?? payload['offline_since']) as int?,
           ));
           break;
         case kWsTypePassphraseRotated:
