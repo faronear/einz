@@ -631,9 +631,9 @@
       }
     }
   },
-  "spaceListPeerPending": "Waiting",
-  "@spaceListPeerPending": {
-    "description": "Status line on a space card when the other side has not joined yet"
+  "memberPending": "Waiting",
+  "@memberPending": {
+    "description": "Status word when a member has not joined yet (shared by the space card, space list, and members sheet)"
   },
   "voiceCallMenuCall": "Voice call",
   "@voiceCallMenuCall": {

@@ -2078,11 +2078,11 @@ abstract class AppLocalizations {
   /// **'Server: {message}'**
   String errorBackend(String message);
 
-  /// Status line on a space card when the other side has not joined yet
+  /// Status word when a member has not joined yet (shared by the space card, space list, and members sheet)
   ///
   /// In en, this message translates to:
   /// **'Waiting'**
-  String get spaceListPeerPending;
+  String get memberPending;
 
   /// Tooltip of the voice call button in the chat page top bar / 聊天页顶部栏语音通话按钮的 tooltip
   ///

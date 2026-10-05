@@ -11751,3 +11751,16 @@ re-invite 口令弹窗标题改用 `chatPageMembersReinviteTitle`（验证共享
 待老板定；本次不动。
 
 验证：analyze 干净（UI 由老板真机自测）。
+
+### 2026-10-05（四·补3）`spaceListPeerPending` → `memberPending`
+
+老板同意。这个键早就不只服务"空间列表"了（聊天页状态条 + 空间列表 + 成员弹层的邀请卡，
+共三处），名字里的 `spaceList` 前缀已名不副实。
+
+- 键名 + `@` 键改名（zh/en）；顺手把 `@` 里的 `description` 从"空间卡片上对方尚未加入时的
+  状态行"泛化成"成员尚未加入时的状态词（空间卡片、空间列表、成员弹层共用）"。
+- 调用点 3 处 + 1 处测试注释同步（`chat_page.dart` ×3、`space_switcher.dart` ×1、
+  `chat_profile_refresh_test.dart` 注释）。
+- **值不变**（zh「待加入」/ en「Waiting」），所以断言该文案的测试不受影响。
+
+验证：gen-l10n + analyze 干净。

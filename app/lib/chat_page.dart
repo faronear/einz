@@ -1539,7 +1539,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 online: _peerOnline,
                 offlineColor: Colors.red,
                 sinceMs: _peerSinceMs,
-                label: _peerJoined == false ? l10n.spaceListPeerPending : null,
+                label: _peerJoined == false ? l10n.memberPending : null,
               ),
             ],
           ),
@@ -2323,7 +2323,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// **每行一张成员卡**——底色=该成员性别色（男浅蓝 / 女浅粉 / 性别未知=中性灰）；
   /// 左：真实头像 + 名字；右：可点的文字按钮（已有成员=「重新邀请」）。
   /// - **不列我自己**；卡片流下方**不再**有独立的邀请/重新邀请按钮与说明；
-  /// - **尚未加入**的卡：默认头像 + 淡色占位词「待加入」（`spaceListPeerPending`）；
+  /// - **尚未加入**的卡：默认头像 + 淡色占位词「待加入」（`memberPending`）；
   ///   duo 里对方还没来 = 就是那一张；
   /// - 未满员时列表末尾追加一张「邀请」占位卡（新人还没有卡片可挂按钮）；
   /// - **整张卡可点**（老板偏好：别让人去点中某个小控件）；
@@ -2376,7 +2376,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     _membersCard(
                       memberId: null, // 默认头像
                       gender: '',
-                      name: l10n.spaceListPeerPending, // 占位词（"待加入"）
+                      name: l10n.memberPending, // 占位词（"待加入"）
                       faintName: true,
                       actionLabel: _isGroup
                           ? l10n.chatPageMembersInviteNew

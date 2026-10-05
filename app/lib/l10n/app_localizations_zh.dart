@@ -1107,7 +1107,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get spaceListPeerPending => '待加入';
+  String get memberPending => '待加入';
 
   @override
   String get voiceCallMenuCall => '语音通话';

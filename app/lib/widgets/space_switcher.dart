@@ -531,7 +531,7 @@ class _SpaceCard extends StatelessWidget {
         if (peerPending) ...[
           const SizedBox(height: 2),
           Text(
-            AppLocalizations.of(context)!.spaceListPeerPending,
+            AppLocalizations.of(context)!.memberPending,
             style: TextStyle(
               fontSize: 11,
               color: (_foreground ?? theme.colorScheme.onSurfaceVariant)
