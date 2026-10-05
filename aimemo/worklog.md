@@ -11855,3 +11855,38 @@ offline_since / 老服务端不带 → null）；`server/test/peer_status.test.t
 
 **验证**：`bash -n` 语法 OK；`ruby -ryaml` 解析出 `app,shared,cli,server`；
 `scripts/testAll.sh shared` **52 通过 / exit 0**。CI 本身仍要推 GitHub 才知分晓。
+
+---
+
+## 2026-10-05（八）修崩溃：re-invite 验证口令后整屏红底黄字
+
+**现象**（老板 iOS 真机）：成员弹层点「重新邀请」→ 输入共享口令验证 → 整屏红底黄字，
+断言 `framework.dart:6430 ...'() { // check that it really is our descendant …'`。
+
+**根因**：该断言在 `InheritedElement.notifyClients` 里——遍历 `_dependents` 时要求每个
+依赖者仍是它的**后代**；不成立 = 有 element 正在/已被移出，却还挂在依赖表里。本仓库
+**早就踩过同一类**：`chat_page_menu_test.dart` 文件头注释 + `_menuAction` 的 doc 都写着
+"MenuRoute/DialogRoute 在 Overlay 里交叉卸载会触发断言崩溃（2026-09-05 修复）"，
+约定是**错峰 300ms** 再做下一步。
+
+而 re-invite 是**唯一没走错峰**的一条路：
+- 成员卡 `onAction`：`Navigator.of(ctx).pop()` 之后**同步**弹口令框
+  → 弹层 exit 动画没跑完就 push 一个 DialogRoute（交叉卸载 ①）；
+- 口令框 pop 后 `_reinviteMemberIdentity` 立刻开通道码弹窗（中间只有一次网络往返，
+  本地 dev server 很快 → 大概率仍在 exit 动画内）→ 交叉卸载 ②（老板这次撞的就是这步）。
+
+（注：这不是本次成员弹层重做引入的——旧的"大按钮 / 行内图标"也是同一写法。）
+
+**修法**（复用既有约定，不发明新机制）：
+- 把 300ms 错峰抽成 `_waitRouteHandoff()` + 常量 `_kRouteHandoff`；`_menuAction` 收窄成
+  它的 fire-and-forget 版（16 处调用行为不变）。
+- 成员卡 / 邀请卡的 `onAction`：pop 后走 `_menuAction(...)`。
+- `_reinviteMemberIdentity`：口令弹窗之后 `await _waitRouteHandoff()` 再开通道码弹窗。
+
+**确认无需改的**：全屏看头像里「先关大图再选图」（`chat_page.dart:1452`）——紧接着调的是
+**系统文件选择器**（不是 Flutter route），不构成 route 交叉卸载。
+
+**验证**：`flutter analyze` 干净；`chat_page_menu_test` / `entrance_list_sheet_test` /
+`invite_dialog_layout_test` **41 条全绿**（这三个正是依赖 300ms 错峰的）。
+⭐ 待老板真机复测。**本次没写回归测试**——交叉卸载依赖真实动画时序，widget 测试里未必
+稳定复现；老板要的话我再补（参照 2026-09-05 那个同类崩溃的做法）。

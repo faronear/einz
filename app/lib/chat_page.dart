@@ -2244,14 +2244,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 打开「关于秘境」页（版本号 / 服务器地址 / 一句话说明）。
-  /// 菜单项动作：等菜单关闭动画跑完再开新 route——MenuRoute/DialogRoute 在 Overlay 里
-  /// 交叉卸载会触发断言崩溃（2026-09-05 修复），所以统一在这里错峰 300ms。
+  /// 「让上一条 route 收完、再开下一条」的错峰等待。
+  ///
+  /// route 刚 pop、exit 动画还没跑完就直接 push 下一条（`showDialog` /
+  /// `showModalBottomSheet`），两条 route 会在 Overlay 里**交叉卸载** → 触发
+  /// `InheritedElement` 的 `_dependents` 断言（整屏红底黄字：framework.dart 的
+  /// "check that it really is our descendant"）。300ms 取 Material 各类 route
+  /// exit 动画的上界。（2026-09-05 首修；2026-10-05 re-invite 又踩到。）
+  ///
+  /// 凡是"弹层/弹窗里点一下 → 换另一个弹层/弹窗"的衔接都要过这里。
+  static const Duration _kRouteHandoff = Duration(milliseconds: 300);
+  Future<void> _waitRouteHandoff() => Future<void>.delayed(_kRouteHandoff);
+
+  /// 过渡动作（fire-and-forget 版）：等上一条 route 收完再执行。
   void _menuAction(VoidCallback action) {
-    Future<void>.delayed(const Duration(milliseconds: 300), () {
+    unawaited(_waitRouteHandoff().then((_) {
       if (!mounted) return;
       action();
-    });
+    }));
   }
 
   /// 「通道列表」底部弹层：**当前通道（带绿勾、列第一位）+ 我本人在本空间的其他通道**
@@ -2379,9 +2389,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       name: _memberNames[e.key],
                       actionLabel: l10n.chatPageMembersReinvitePartner,
                       onAction: () {
-                        // 先收起成员弹层再弹口令框（避免两层 modal 叠着）
+                        // 先收起成员弹层；**等它收完再弹口令框**——紧接着 showDialog
+                        // 会让两条 route 在 Overlay 里交叉卸载（见 _waitRouteHandoff）。
                         Navigator.of(ctx).pop();
-                        unawaited(_reinviteMemberIdentity(
+                        _menuAction(() => _reinviteMemberIdentity(
                             e.key, _memberNames[e.key]));
                       },
                     ),
@@ -2397,7 +2408,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           : l10n.chatPageMembersInvitePartner,
                       onAction: () {
                         Navigator.of(ctx).pop();
-                        unawaited(_showInviteDialog(purpose: 'invite'));
+                        _menuAction(
+                            () => _showInviteDialog(purpose: 'invite'));
                       },
                     )
                   else if (_isGroup)
@@ -2505,6 +2517,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       hint: l10n.chatPageReinvitePassphraseHint(name),
     );
     if (passphrase == null || !mounted) return;
+    // 口令弹窗刚 pop（exit 动画还没跑完）→ 直接开通道码弹窗会交叉卸载，同上。
+    await _waitRouteHandoff();
+    if (!mounted) return;
     await _showInviteDialog(
       purpose: 'attach',
       targetMemberId: memberId,
