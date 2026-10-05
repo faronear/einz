@@ -64,7 +64,7 @@
   "wizardJoinPassphraseTitle": "Verify passphrase",
   "wizardTitlePin": "Set PIN",
   "wizardTitleEnvelope": "Key envelope",
-  "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with your partner's one-time token.",
+  "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with your partner's one-time entrance token.",
   "wizardEnrollGoJoin": "Use Join flow",
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",
   "@wizardEnrollFailed": {
@@ -102,7 +102,7 @@
   "setupEntryJoin": "Join",
   "setupEntryLegacyServer": "Server version too old — please upgrade",
   "setupTokenAppTooOld": "This app is too old for the server ({code}). Please update the app and try again",
-  "setupTokenRateLimited": "Too many requests — retry in {seconds}s (this is not a problem with the token)",
+  "setupTokenRateLimited": "Too many requests — retry in {seconds}s (this is not a problem with the entrance token)",
   "@setupTokenRateLimited": {
     "placeholders": {
       "seconds": {
@@ -110,7 +110,7 @@
       }
     }
   },
-  "setupTokenRateLimitedNoWait": "Too many requests — try again later (this is not a problem with the token)",
+  "setupTokenRateLimitedNoWait": "Too many requests — try again later (this is not a problem with the entrance token)",
   "@setupTokenAppTooOld": {
     "placeholders": {
       "code": {
@@ -118,13 +118,13 @@
       }
     }
   },
-  "setupTokenTitle": "Verify token",
-  "setupTokenHint": "Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
-  "setupTokenInputHint": "New-entrance token",
-  "setupTokenNeedInput": "Enter the new-entrance token",
-  "setupTokenInvalid": "Invalid token",
-  "setupTokenExpired": "Token expired",
-  "setupTokenUsed": "Token already used",
+  "setupTokenTitle": "Verify entrance token",
+  "setupTokenHint": "Open a dedicated entrance from this device to the space. An entrance token is valid for one-time use within 24 hours, generated from any verified entrance in the space.",
+  "setupTokenInputHint": "Entrance token",
+  "setupTokenNeedInput": "Enter the entrance token",
+  "setupTokenInvalid": "Invalid entrance token",
+  "setupTokenExpired": "Entrance token expired",
+  "setupTokenUsed": "Entrance token already used",
   "setupTokenSpaceAlreadyAdded": "This space is already added (one device can hold only one entrance to a space)",
   "setupTokenOtherServer": "the invite link is from {other} but this app is connected to {current}; they cannot work with each other.",
   "@setupTokenOtherServer": {
@@ -154,8 +154,8 @@
   "startupInitClearDataMessage": "Erases everything stored on this device — secret spaces, messages, attachments, lock screen code and keys — and returns to setup. Use only when retry keeps failing; this cannot be undone.",
   "startupInitClearedRestart": "Local data cleared. Fully quit and reopen the app.",
   "setupPagePasteEnvelope": "⚠️ Paste the key envelope (base64)",
-  "setupPageScanInvite": "Scan token QR code",
-  "setupPageScannerHint": "Point the camera at the token QR code",
+  "setupPageScanInvite": "Scan entrance token QR code",
+  "setupPageScannerHint": "Point the camera at the entrance token QR code",
   "setupPageNoEscrow": "❌ No escrow package for the shared passphrase on the server — set it on the first entrance first",
   "setupPageEscrowFailed": "❌ Shared passphrase join failed: {error}",
   "@setupPageEscrowFailed": {
@@ -197,14 +197,14 @@
   "chatPageSetLockCleared": "PIN deleted. You can enter the space directly at next launch.",
   "chatPageClearLockTitle": "Delete PIN?",
   "chatPageClearLockMessage": "Delete the PIN? After deletion, next app launch will go straight into chat.",
-  "chatPageInviteDialogTitleInvite": "Invite partner",
-  "chatPageInviteDialogTitleAttachSelf": "New-entrance token",
-  "chatPageInviteDialogTitleReinvite": "Re-invite partner",
+  "chatPageInviteDialogTitleInvite": "Invite",
+  "chatPageInviteDialogTitleAttachSelf": "My new entrance token",
+  "chatPageInviteDialogTitleReinvite": "Re-invite",
   "chatPageInviteJoinLink": "Invite",
   "chatPageInviteRegenerate": "Regenerate",
-  "chatPageInviteDialogHintInvite": "Send this token to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintAttachSelf": "Use this token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.",
-  "chatPageInviteDialogHintReinvite": "Send this token to {name} to join this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintInvite": "Send this entrance token to whoever you're inviting to join this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintAttachSelf": "Use this entrance token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.",
+  "chatPageInviteDialogHintReinvite": "Send this entrance token to {name} to add a new entrance. Their existing entrances keep working. One-time use, valid for 24 hours.",
   "chatPageInviteDialogReinviteFallbackName": "them",
   "@chatPageInviteDialogHintReinvite": {
     "placeholders": {
@@ -214,10 +214,10 @@
     }
   },
   "chatPageInviteCopyLinkTooltip": "Copy invite link",
-  "chatPageInviteCopyCodeTooltip": "Copy new-entrance token",
+  "chatPageInviteCopyCodeTooltip": "Copy entrance token",
   "chatPageInviteLinkCopied": "Invite link copied",
-  "chatPageInviteCodeCopied": "New-entrance token copied",
-  "chatPageInviteFailed": "Failed to create the token: {error}",
+  "chatPageInviteCodeCopied": "Entrance token copied",
+  "chatPageInviteFailed": "Failed to create the entrance token: {error}",
   "@chatPageInviteFailed": {
     "placeholders": {
       "error": {
@@ -300,7 +300,7 @@
       }
     }
   },
-  "chatPageEscrowRotatedNotice": "Your partner reset the shared passphrase — use the new one to create tokens or change it",
+  "chatPageEscrowRotatedNotice": "Your partner reset the shared passphrase — use the new one to create entrance tokens or change it",
   "chatPageMenuLocaleLabel": "Language",
   "chatPageMenuAttachmentStorage": "Attachment storage",
   "chatPageAttachmentStorageSecured": "Remote only",
@@ -379,7 +379,7 @@
   "chatPageEntranceListFailed": "Could not load other entrances (offline?)",
   "chatPageEntranceScopeHint": "An entrance connects a device to a space. Below are all your entrances to this space.",
   "chatPageEntranceListThisDevice": "Current entrance name",
-  "chatPageEntranceListNew": "Generate new-entrance token",
+  "chatPageEntranceListNew": "Generate a new entrance token",
   "chatPageEntranceListRefresh": "Refresh",
   "chatPagePinLabel": "PIN",
   "chatPageLockNow": "Lock now",

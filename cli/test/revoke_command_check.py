@@ -185,7 +185,7 @@ def onboard_join(label, store, port, token, home):
     if '创建秘境' not in wait_text(m, '创建秘境', timeout=30):
         print(f'❌ {label}: 未等到入口'); raise SystemExit(1)
     send(m, 'j\r')
-    wait_text(m, '输入开通码', timeout=20)
+    wait_text(m, '输入通道码', timeout=20)
     send(m, token + '\r')
     out = wait_text(m, '完整输入你的名字', timeout=20)
     if '完整输入你的名字' not in out:

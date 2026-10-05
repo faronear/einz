@@ -86,13 +86,13 @@ void main() {
     expect(_firstFieldFocused(tester), isTrue, reason: '第 3 步（口令页）应聚焦首个口令框');
   });
 
-  testWidgets('向导：join 流程第 1 步（开通码）应聚焦', (WidgetTester tester) async {
+  testWidgets('向导：join 流程第 1 步（通道码）应聚焦', (WidgetTester tester) async {
     await _pumpCreate(tester);
     await tester.tap(find.text(_zh.wizardBack)); // 回到入口页（create 第 1 步 → 入口页）
     await tester.pumpAndSettle();
     await tester.tap(find.text(_zh.setupEntryJoin));
     await tester.pumpAndSettle();
-    expect(_firstFieldFocused(tester), isTrue, reason: 'join 第 1 步应聚焦开通码框');
+    expect(_firstFieldFocused(tester), isTrue, reason: 'join 第 1 步应聚焦通道码框');
   });
 
   testWidgets('向导：返回上一步也应聚焦该步第一个框', (WidgetTester tester) async {

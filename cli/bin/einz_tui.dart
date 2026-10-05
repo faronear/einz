@@ -117,7 +117,7 @@ class _TuiState {
   /// 退出标志。
   bool running = true;
 
-  /// 等待开通码输入（/auth 未登记引导）：输入循环的下一次输入按开通码处理。
+  /// 等待通道码输入（/auth 未登记引导）：输入循环的下一次输入按通道码处理。
   bool pendingJoinToken = false;
 
   /// 等待共享口令输入（/space 重新接入引导）：输入循环的下一次输入按口令处理。
@@ -580,10 +580,10 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
         while (true) {
           // 必填（老板 2026-09-15）：留空回车不接受，继续等待输入
           final token =
-              (await _prompt(session, '❓ 输入开通码或邀请链接:', required: true)).trim();
+              (await _prompt(session, '❓ 输入通道码或邀请链接:', required: true)).trim();
           if (!_state!.running) return;
           if (token.isEmpty) {
-            session.messages.add(_systemMessage(session, '⚠️ 请输入开通码或邀请链接（可由任意一条已开通的通道生成）'));
+            session.messages.add(_systemMessage(session, '⚠️ 请输入通道码或邀请链接（可由任意一条已开通的通道生成）'));
             _scheduleRender();
             continue;
           }
@@ -606,7 +606,7 @@ Future<void> _runGuide(ChatSession session, String storePath, String server) asy
     session.messages.add(_systemMessage(
         session,
         '⚠️ 本机 store 缺少通道登记信息（旧版遗留）\n'
-        '  请用 /space create 新建秘境，或用 /space join <开通码或邀请链接> 加入已有秘境；\n'
+        '  请用 /space create 新建秘境，或用 /space join <通道码或邀请链接> 加入已有秘境；\n'
         '  若想彻底重来：/reset 清除本地数据并重新入网（或退出后加 --reset 重启）'));
     session.messages.add(_systemMessage(session, '----------------'));
     _scheduleRender();
@@ -1032,13 +1032,13 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
   // 兼容完整邀请链接：https://host/join/<token> → 提取 token
   final token = input.contains('/join/') ? input.split('/join/').last.trim() : input.trim();
   if (token.isEmpty) {
-    session.messages.add(_systemMessage(session, '🔧 用法: /space join <开通码或邀请链接>'));
+    session.messages.add(_systemMessage(session, '🔧 用法: /space join <通道码或邀请链接>'));
     return;
   }
   try {
     final api = ApiClient(server);
-    final pre = await _busy(session, '⏳ 校验开通码中......', () => api.preflightJoin(token));
-    session.messages.add(_systemMessage(session, '✅ 开通码验证成功'));
+    final pre = await _busy(session, '⏳ 校验通道码中......', () => api.preflightJoin(token));
+    session.messages.add(_systemMessage(session, '✅ 通道码验证成功'));
     session.messages.add(_systemMessage(session, '----------------'));
     session.messages.add(_systemMessage(
         session, '✅✅✅ 即将加入秘境！'));
@@ -1105,7 +1105,7 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     }
     // 口令必填，且**先校验再 join**：joinSpace 会消费一次性 join token，旧实现先
     // join（烧掉 token）再验口令——口令一错既回不到口令环节、token 也废了，用户
-    // 被踢回「输入开通码」。改为用 preflight 已拿到的 spaceId 先调
+    // 被踢回「输入通道码」。改为用 preflight 已拿到的 spaceId 先调
     // /spaces/{id}/key-escrow 验口令（不消费 token），错了就停在口令环节重输，
     // 直到正确或 /exit（老板 2026-09-12）。
     EscrowPayload? verified;
@@ -1188,11 +1188,11 @@ Future<void> _spaceJoin(ChatSession session, EntranceStore store, String storePa
     // 原始 ApiException 很长又不好懂，单独翻译成人话 + 给出可操作的等待时间。
     if (e.code == 'RATE_LIMITED') {
       session.messages.add(_systemMessage(
-          session, '⚠️ 操作太频繁，被服务端限流了（保护机制，不是你的开通码有问题）'));
+          session, '⚠️ 操作太频繁，被服务端限流了（保护机制，不是你的通道码有问题）'));
       session.messages.add(_systemMessage(
           session, '   $e —— 等提示的秒数过后再试；自用服务器也可以直接重启服务端清空计数。'));
     } else if (e.code == 'ENTRANCE_LIMIT_REACHED') {
-      // 通道数量上限（serverConfig.json maxEntrancesPerSpace）：不是开通码的问题，
+      // 通道数量上限（serverConfig.json maxEntrancesPerSpace）：不是通道码的问题，
       // 是这个秘境的通道已经开满了（含已销毁的——销毁不退额度）
       session.messages.add(_systemMessage(
           session, '⚠️ 该秘境的通道数量已达服务器上限，无法再开通新通道（$e）'));
@@ -1302,7 +1302,7 @@ Future<void> main(List<String> args) async {
     await _unlockPin(session);
   }
   await session.loadHistory();
-  // 引导阶段提示（自举/托管/开通码指引）作为 system 消息进入对话流——
+  // 引导阶段提示（自举/托管/通道码指引）作为 system 消息进入对话流——
   // 必须在 loadHistory 之后加入（loadHistory 开头会 clear messages，否则被清掉）
   for (final note in _guidanceNotes) {
     session.messages.add(_systemMessage(session, note));
@@ -2605,13 +2605,13 @@ Future<void> _runInputLoop() async {
         if (gc != null) {
           final answer = _state!.input.toString().trim();
           if (answer.startsWith('/')) {
-            // / 开头的输入按命令处理，不当作口令/开通码回答提交（用户：要求
+            // / 开头的输入按命令处理，不当作口令/通道码回答提交（用户：要求
             // 输入口令时 /exit 被当口令发送核对进"口令对接中"——应直接退出）
             _state!.input.clear();
             _state!.cursor = 0; // 同步复位光标：否则下个字符 _insertAtCursor 越界崩溃
             if (answer == '/exit' || answer == '/quit') {
               // 引导问答中的退出命令：逃生门——否则任何输入都被吞为回答，
-              // 用户困在开通码/口令重试循环无法退出
+              // 用户困在通道码/口令重试循环无法退出
               _state!.running = false;
               _abortPendingGuide();
               _restoreTerminal();
@@ -2673,7 +2673,7 @@ Future<void> _runInputLoop() async {
         final line = _state!.input.toString().trim();
         _state!.input.clear();
         _state!.cursor = 0;
-        // 输入历史（↑↓ 浏览复用）：口令/开通码等机密输入不进历史
+        // 输入历史（↑↓ 浏览复用）：口令/通道码等机密输入不进历史
         if (!_state!.hiddenInput &&
             !_state!.pendingJoinToken &&
             !_state!.pendingSpaceKey &&
@@ -3042,7 +3042,7 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: 生成一次性开通码，24小时有效，邀请同伴或自己开通一条新通道到本秘境。',
+        '/invite :: 生成一次性通道码，24小时有效，邀请同伴或自己开通一条新通道到本秘境。',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3110,9 +3110,9 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(
             s.session,
             '❓ 本通道尚未绑定秘境\n'
-            '   输入开通码（或邀请链接）加入同伴的秘境；\n'
+            '   输入通道码（或邀请链接）加入同伴的秘境；\n'
             '   新建秘境请先 /space create'));
-        s.status = '⌛️ 等待开通码输入…';
+        s.status = '⌛️ 等待通道码输入…';
         break;
       }
       // 已经带了地址 = 想换服务器——那不是 /auth 的活（换服务器用 /server）
@@ -3429,7 +3429,7 @@ Future<void> _execCommand(String line) async {
         unawaited(_uploadAttachmentInBackground(s.session, arg));
       }
     case '/invite':
-      // Multiverse：生成绑定新通道的邀请（join token——24h 一次性；v1 开通码
+      // Multiverse：生成绑定新通道的邀请（join token——24h 一次性；v1 通道码
       // 已废弃——新通道用 /space join <链接或 token> 绑定）。
       // `/invite` = 邀请新成员（开新身份）；`/invite attach` = 给自己另一台
       // 设备开通道（链接决定进谁的身份）。其余写法一律当 invite。
@@ -3558,7 +3558,7 @@ Future<void> _execCommand(String line) async {
   }
 }
 
-/// /invite [memberA|memberB] [对方名称]：补发一次性开通码（默认 memberB=邀请对方，
+/// /invite [memberA|memberB] [对方名称]：补发一次性通道码（默认 memberB=邀请对方，
 /// 给第二使用者；memberA=给自己加新通道）。需先 /auth 激活。
 /// `/invite` 本次签发的 token 类型（'invite' | 'attach'，见 `/invite attach`）。
 String _invitePurpose = 'invite'; // 'invite'（开新身份）| 'attach'（我进已有身份）
@@ -3586,17 +3586,17 @@ Future<void> _execInvite() async {
     final api = ApiClient(s.session.server);
     final r = await _busy(
         s.session,
-        '⏳ 开通码生成中......',
+        '⏳ 通道码生成中......',
         () => api.createJoinToken(
               store.spaceId!,
               store.sessionToken!,
               purpose: _invitePurpose == 'attach' ? 'attach' : 'invite',
             ));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
-    s.session.messages.add(_systemMessage(s.session, '✅ 开通码已生成（24 小时内一次性有效）：\n🛡️  ${r.joinToken}\n📎 ${r.link}'));
+    s.session.messages.add(_systemMessage(s.session, '✅ 通道码已生成（24 小时内一次性有效）：\n🛡️  ${r.joinToken}\n📎 ${r.link}'));
     s.status = ''; // 反馈在消息区，状态栏保持干净
   } catch (e) {
-    s.session.messages.add(_systemMessage(s.session, '❌ 开通码生成失败: $e'));
+    s.session.messages.add(_systemMessage(s.session, '❌ 通道码生成失败: $e'));
     s.status = '';
   }
 }
@@ -3660,13 +3660,13 @@ Future<void> _execOpen(List<String> parts) async {
 /// 输入循环接管的"邀请链接加入"（/auth 未绑定时的引导）。
 ///
 /// 走 `/space join` 的同一条路径（`_spaceJoin`）：preflight 校验 → 口令取钥 →
-/// joinSpace 登记通道 + 签发空间会话 + 取 Space Key。**v1 的开通码登记已随
+/// joinSpace 登记通道 + 签发空间会话 + 取 Space Key。**v1 的通道码登记已随
 /// Multiverse 收敛删除**（2026-09-15 P1）：通道登记不再有单独的入口。
 Future<void> _handleJoinTokenInput(String token) async {
   final s = _state!;
   s.pendingJoinToken = false;
   if (token.isEmpty) {
-    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供开通码，无法绑定到秘境'));
+    s.session.messages.add(_systemMessage(s.session, '⚠️ 您尚未提供通道码，无法绑定到秘境'));
     return;
   }
   s.status = '';
@@ -4095,7 +4095,7 @@ ChatMessage _systemMessage(ChatSession session, String text) {
 /// hidden=true 时输入行回显 *）。返回用户提交的回答（输入循环回车时 complete）。
 ///
 /// **选哪个提示函数**（2026-09-23 定的规则）：
-/// - **向导必填**（秘境入口 c/j、名字、性别、开通码、身份选择、共享口令、口令接入）
+/// - **向导必填**（秘境入口 c/j、名字、性别、通道码、身份选择、共享口令、口令接入）
 ///   → 用本函数 + `required: true`：留空回车**静默拒绝**（不提交、也不打提示，原地继续等）。
 ///   向导里**唯一允许空回车跳过的是锁屏码**（`_askSetPin` 不带 `required`）。
 ///   这里的"取消"= 不做这件事 = 离开向导，逃生门是 `/exit` / Ctrl+C。

@@ -10,8 +10,8 @@ import 'package:einz_shared/einz_shared.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'real_async_settle.dart';
 
-/// 开通码弹窗布局回归测试（2026-09-08 老板真机报告：app 使用一段时间后点
-/// 菜单生成开通码，经常整个屏幕变暗但弹窗不出现，flutter run 报
+/// 通道码弹窗布局回归测试（2026-09-08 老板真机报告：app 使用一段时间后点
+/// 菜单生成通道码，经常整个屏幕变暗但弹窗不出现，flutter run 报
 /// RenderIntrinsicWidth / RenderBox was not laid out 连锁异常；且弹窗里的
 /// 二维码从未显示过）。
 ///
@@ -77,7 +77,7 @@ final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
 void main() {
   // 菜单里的翻转沙漏（_HourglassFlip）是常驻动画，关掉它免得 pumpAndSettle 超时
   disableAnimationsInTests();
-  testWidgets('开通码弹窗：首帧不抛布局异常且二维码真实可见', (WidgetTester tester) async {
+  testWidgets('通道码弹窗：首帧不抛布局异常且二维码真实可见', (WidgetTester tester) async {
     final db = LocalDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await tester.pumpWidget(MaterialApp(
@@ -97,7 +97,7 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100)); // 初始加载（空历史）
 
-    // 菜单 → 我的通道 → 新建通道（2026-09-25 起菜单不再有「生成开通码」项，
+    // 菜单 → 我的通道 → 新建通道（2026-09-25 起菜单不再有「生成通道码」项，
     // 入口移到「我的通道」弹层里的「新建通道」按钮）
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
@@ -123,7 +123,7 @@ void main() {
         findsWidgets);
     expect(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), findsWidgets);
 
-    // 顺序（老板 2026-09-22）：**纯开通码在上、邀请链接在下**——多数人直接复制开通码，
+    // 顺序（老板 2026-09-22）：**纯通道码在上、邀请链接在下**——多数人直接复制通道码，
     // 链接留给"点开看邀请页"的场景。用几何位置钉住，防止以后又被调回去。
     final tokenY = tester
         .getTopLeft(find.text('e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789').first)
@@ -133,7 +133,7 @@ void main() {
             .text('https://einz.tic.cc/join/e1-ABCDEFGHJKLMNPQRSTUVWXYZ23456789')
             .first)
         .dy;
-    expect(tokenY, lessThan(linkY), reason: '纯开通码应在邀请链接上方');
+    expect(tokenY, lessThan(linkY), reason: '纯通道码应在邀请链接上方');
 
     // 二维码真实可见（原 bug：CustomPaint 绘制面 0x0，从未显示）
     final qrPaint = find.byWidgetPredicate(

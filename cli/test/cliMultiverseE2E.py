@@ -158,7 +158,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
         sys.exit(1)
     send(m, "J\r")  # 输入 J（join）——大小写均可
     name, out, _ = read_until(m, [
-        ("ask_token", re.compile(r"输入开通码")),
+        ("ask_token", re.compile(r"输入通道码")),
     ], prefix=label)
     if wrong_token:
         send(m, wrong_token + "\r")
@@ -172,7 +172,7 @@ def join_flow(label, store, token, identity_name, wrong_token=None, quit_after_w
             print(f"FAIL {label}: 错误 token 未被拒绝。输出:\n", out[-600:])
             sys.exit(1)
         name, out, _ = read_until(m, [
-            ("ask_token_again", re.compile(r"输入开通码")),
+            ("ask_token_again", re.compile(r"输入通道码")),
         ], prefix=label)
         if name != "ask_token_again":
             print(f"FAIL {label}: 被拒后未直接重输 token（回到首问？）。输出:\n", out[-600:])
@@ -281,7 +281,7 @@ def main():
             SERVER + "/spaces/" + store_a["space_id"] + "/join-tokens", method="POST")
         # 服务端后来加的两道收口，缺任一都会让本函数失败（探针曾因此静默失效很久）：
         # ① 协议版本头——缺 → 400 PROTOCOL_VERSION_MISMATCH；
-        # ② 成员会话——C1 修复后「签发开通码」必须持该空间成员会话，缺 → 401。
+        # ② 成员会话——C1 修复后「签发通道码」必须持该空间成员会话，缺 → 401。
         req.add_header("X-Protocol-Version", "2")
         req.add_header("Authorization", "Bearer " + store_a["session_token"])
         with urllib.request.urlopen(req, timeout=5) as r:
@@ -306,7 +306,7 @@ def main():
         sys.exit(1)
     print("A: 向导收尾完成（欢迎辞 + 自动倒计时）")
     out3 = send_when_ready(m_a, "A-invite", "/invite",
-                           re.compile(r"开通码已生成"))
+                           re.compile(r"通道码已生成"))
     if out3 is None:
         print("FAIL A: /invite 未生成绑定邀请（重发多次仍无反应）")
         sys.exit(1)

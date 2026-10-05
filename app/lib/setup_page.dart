@@ -135,7 +135,7 @@ class _SetupPageState extends State<SetupPage> {
   late final Listenable _pinInputsChanged = Listenable.merge([_pin, _confirm]);
   String? _pinError; // PIN 步骤红色提示（输入框下方）
   bool _pinSkipped = false; // 用户选择"不设置锁屏码"（底部按钮=跳过时）：跳过 setPin，仍完成前置并进下一步
-  final _joinTokenCtrl = TextEditingController(); // 加入通道时填的一次性开通码（或整条邀请链接）
+  final _joinTokenCtrl = TextEditingController(); // 加入通道时填的一次性通道码（或整条邀请链接）
   // 键盘遮挡处理：
   // 方案 1（聚焦即滚出性别卡）：名字/伴侣名输入框聚焦时把性别卡滚入可见区；
   // 方案 2（点下一步收键盘并滚到警告）：_nextStep 先收键盘再把红字警告滚入可见区。
@@ -145,7 +145,7 @@ class _SetupPageState extends State<SetupPage> {
   final _nameFocus = FocusNode();
   // 其余步骤的「首框」节点：切步骤后由 [_focusFirstFieldOfStep] 显式 requestFocus
   final _passphraseFocus = FocusNode(); // create 第 2 步 / join 第 3 步（共享口令）
-  final _inviteFocus = FocusNode(); // join 第 1 步（开通码）
+  final _inviteFocus = FocusNode(); // join 第 1 步（通道码）
   final _envelopeFocus = FocusNode(); // offline 第 1 步（密保信封）
   final _pinFocus = FocusNode(); // create 第 3 步 / join 第 4 步 / offline 第 2 步（锁屏码）
   final _myGenderRevealKey = GlobalKey();
@@ -159,7 +159,7 @@ class _SetupPageState extends State<SetupPage> {
   // 已成功 join 的 token（用于跳过重复 joinSpace——一次性 token 不能消费两次）。
   // 群聊一期（2026-10-03）：身份选择删除，join 身份由 purpose 决定，无需记录 slot
   String? _joinedToken;
-  // 开通码（join token）是否已通过 preflight。通过后置 true：输入框锁为只读，
+  // 通道码（join token）是否已通过 preflight。通过后置 true：输入框锁为只读，
   // 且再点「下一步」不再重复校验——token 已被 joinSpace 消费，重校验必然失败
   // （老板 2026-09-12）
   bool _joinTokenVerified = false;
@@ -357,7 +357,7 @@ class _SetupPageState extends State<SetupPage> {
           _ => null,
         },
       _WizardRole.join => switch (_step) {
-          1 => _inviteFocus, // 开通码
+          1 => _inviteFocus, // 通道码
           // 2 = 选择身份（只有卡片，没有输入框）
           3 => _passphraseFocus,
           4 => _pinFocus,
@@ -571,7 +571,7 @@ class _SetupPageState extends State<SetupPage> {
                 if (_role != null && _step < _stepCount)
                   Row(
                     children: [
-                      // 第 1 页（选择页）无上一步；步骤 1（create=关于我 / join=开通码）
+                      // 第 1 页（选择页）无上一步；步骤 1（create=关于我 / join=通道码）
                       // 起可回退——步骤 1 回到第 1 页选择页（老板 2026-09-11）；
                       // 信封页（offline 步骤 1）回退到 join 口令页（_backStep 内处理）
                       TextButton(
@@ -934,7 +934,7 @@ class _SetupPageState extends State<SetupPage> {
         _status = null;
         return;
       }
-      // 各角色步骤 1（create=关于我 / join=开通码）：回到第 1 页空间入口页
+      // 各角色步骤 1（create=关于我 / join=通道码）：回到第 1 页空间入口页
       // （清空角色重新选择创建/加入；join 的 token 相关状态一并重置，避免
       // 换角色/重进后残留旧 token 直接跳过校验）
       if (_step == 1) {
@@ -1714,7 +1714,7 @@ class _SetupPageState extends State<SetupPage> {
       // 向导，本机会把原有那条通道 upsert **顶替**掉——旧通道凭证消失、本地消息却被新通道
       // 继承，而服务端并不知情、旧通道也没退役（既丢数据、又在服务端留孤儿）。
       //
-      // 放在这里（preflight 之后、**消费 token 之前**）：开通码是一次性的，此时还没被消费，
+      // 放在这里（preflight 之后、**消费 token 之前**）：通道码是一次性的，此时还没被消费，
       // 拒绝后仍可发给别的设备用；也没有任何服务端副作用。
       if (await _isSpaceAlreadyAdded(pre.spaceId)) {
         if (!mounted) return false;
@@ -1787,7 +1787,7 @@ class _SetupPageState extends State<SetupPage> {
   ///
   /// [raw] 是用户原始输入：**仅用于把"邀请无效"的成因说清**（见下），不参与判定 token。
   ///
-  /// 两条经验（老板 2026-09-22 实测"iOS 生成开通码、Android 用 → 报无效"）：
+  /// 两条经验（老板 2026-09-22 实测"iOS 生成通道码、Android 用 → 报无效"）：
   /// 1. `TOKEN_INVALID` 最常见的成因**不是把码打错了**，而是**两台设备连的不是同一台
   ///    服务器**（客户端侧解析已核：粘贴完整链接、扫码都会正确取出 token）→ 把链接里的
   ///    域名与本机所连的域名一并报出来，省得对着"无效"猜；
@@ -1802,7 +1802,7 @@ class _SetupPageState extends State<SetupPage> {
       case 'RATE_LIMITED':
         // 限流**不是邀请的问题**（2026-09-22 实测：同一 IP 上有别的客户端在疯狂
         // 重新认证，把配额吃光了，邀请加入因此被连坐）。必须把"等几秒"说出来，
-        // 并且别把它混在"邀请无效"里——那会让人一直去查开通码。
+        // 并且别把它混在"邀请无效"里——那会让人一直去查通道码。
         final secs = _retryAfterSeconds(message);
         return secs == null
             ? l10n.setupTokenRateLimitedNoWait
@@ -1835,20 +1835,20 @@ class _SetupPageState extends State<SetupPage> {
     return m == null ? null : int.tryParse(m.group(1)!);
   }
 
-  /// 从用户输入取"邀请链接的域名"；不是链接（纯开通码）返回 null。
+  /// 从用户输入取"邀请链接的域名"；不是链接（纯通道码）返回 null。
   ///
   /// 本机开发别名（localhost / 127.0.0.1 / ::1 / 10.0.2.2）归一成同一个标记再比较——
   /// iOS 模拟器连 `localhost:3000`、Android 模拟器连 `10.0.2.2:3000` 是**同一台**
   /// 开发服务器，不能因为主机名不同就误报"用了不同服务器"。
   String? _linkHost(String raw) {
-    if (!raw.contains('/join/')) return null; // 纯开通码：没有域名可谈
+    if (!raw.contains('/join/')) return null; // 纯通道码：没有域名可谈
     final host = Uri.tryParse(raw)?.host ?? '';
     if (host.isEmpty) return null;
     const localAliases = {'localhost', '127.0.0.1', '::1', '0.0.0.0', '10.0.2.2'};
     return localAliases.contains(host) ? 'local' : host;
   }
 
-  /// 邀请链接扫码入口（老板要求 2026-09-10；扫到裸开通码也照样接受）：扫码后自动填入并自动
+  /// 邀请链接扫码入口（老板要求 2026-09-10；扫到裸通道码也照样接受）：扫码后自动填入并自动
   /// 下一步（复用「下一步」的服务端校验——码无效则提示并停留本页）。
   Future<void> _scanInviteQr() async {
     final code = await Navigator.of(context).push<String>(
@@ -1924,7 +1924,7 @@ class _SetupPageState extends State<SetupPage> {
         spaceId: created.spaceId,
       );
       // 此前 create 流程漏填 _spaceId.text（仅 join/offline 填写）→ ChatPage 拿空
-      // spaceId → 聊天页生成开通码 POST /spaces//join-tokens 报 SPACE_NOT_FOUND
+      // spaceId → 聊天页生成通道码 POST /spaces//join-tokens 报 SPACE_NOT_FOUND
       // （2026-09-11 老板真机报告）；与 join 对齐补填服务端返回的 spaceId
       _spaceId.text = created.spaceId;
     } on ApiException catch (e) {
@@ -2356,7 +2356,7 @@ class _SetupPageState extends State<SetupPage> {
     return const SizedBox.shrink();
   }
 
-  // ---- 场景 B（join）：身份名字 → 开通码 → 口令 → PIN ----
+  // ---- 场景 B（join）：身份名字 → 通道码 → 口令 → PIN ----
 
   /// join 口令页（步骤 3）「验证接入口令」：**先验口令 → 再 join 提交**。
   /// 顺序很关键：joinSpace（POST /spaces/join）会消费 24h 一次性 token，旧实现
@@ -2503,14 +2503,14 @@ class _SetupPageState extends State<SetupPage> {
   // ---- 场景 C（offline）：密保信封导入 ----
 
   /// 步骤 1（offline）：粘贴密保信封（对方用本通道公钥密封的 Space Key）。
-  /// 同时需填写一次性开通码（非首条通道必须凭码登记后才能认证）。
+  /// 同时需填写一次性通道码（非首条通道必须凭码登记后才能认证）。
   Widget _buildStepEnvelope() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 标题行右侧：密保信封⇄口令互切图标（老板要求 2026-09-10，替代原下方
-        // 文字链接；切回口令页保留已输入的口令与开通码，任一完成都进入 PIN 步骤）
+        // 文字链接；切回口令页保留已输入的口令与通道码，任一完成都进入 PIN 步骤）
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2558,7 +2558,7 @@ class _SetupPageState extends State<SetupPage> {
 
   /// 从密保信封页切回「口令」页（回到进入信封页前的角色：create 步骤 2 / join 步骤 3）。
   /// 不能用 _selectRole（它会重置 _step=1 回身份页）；直接切角色+步骤，
-  /// 已输入的开通码/口令保留，任一方案完成都进入 PIN 步骤。
+  /// 已输入的通道码/口令保留，任一方案完成都进入 PIN 步骤。
   void _switchToPassphrase() {
     setState(() {
       _role = _preEnvelopeRole;

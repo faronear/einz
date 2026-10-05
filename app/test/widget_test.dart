@@ -16,6 +16,9 @@ import 'package:einz/setup_page.dart';
 import 'package:einz_shared/einz_shared.dart';
 import 'package:einz/data/server_config.dart';
 
+/// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 void main() {
   setUpAll(() async {
     await sodium(); // 自动建钥需要 libsodium（macOS 经 LIBSODIUM_PATH/brew 可用）
@@ -60,10 +63,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // 进入 create 名字步骤（AppBar 标题 wizardAppBarCreate +
-    // 输入框上方的**字段标签**「我的名字（以后可以随时修改）」——
-    // 2026-10-04 老板定：它是输入框的标签（与「我的性别」同级），不是大标题的备注）
+    // 输入框上方的**字段标签**（wizardMyNameLabel，与 wizardMyGenderLabel 同级）——
+    // 2026-10-04 老板定：它是输入框的标签，不是大标题的备注；文案从 l10n 取
     expect(find.text('创建秘境'), findsWidgets);
-    expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
+    expect(find.text(_zh.wizardMyNameLabel), findsOneWidget);
     expect(find.text('下一步'), findsOneWidget);
 
     // 名字含空格 → 下一步被拦下并出红字（老板 2026-09-16：名字字符白名单，
@@ -74,7 +77,7 @@ void main() {
     expect(find.text('名字只能用中文字、英文字母、数字、下划线(_)、中划线(-)和表情符。'),
         findsOneWidget, reason: '含空格的名字必须被拦下并提示');
     // 仍停在名字步骤（没被放行到下一页）
-    expect(find.text('我的名字（以后可以随时修改）'), findsOneWidget);
+    expect(find.text(_zh.wizardMyNameLabel), findsOneWidget);
   });
 
   testWidgets('名字输入框卡 32 字符：第 33 个敲不进去（老板 2026-09-28）',
@@ -101,8 +104,8 @@ void main() {
     await tester.tap(find.text('加入秘境'));
     await tester.pumpAndSettle();
 
-    // join token 输入页（标题 setupTokenTitle「验证开通码」+ 扫码）
-    expect(find.text('验证开通码'), findsOneWidget);
+    // join token 输入页（标题 setupTokenTitle「验证通道码」+ 扫码）
+    expect(find.text(_zh.setupTokenTitle), findsOneWidget);
     expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
   });
 
@@ -130,10 +133,10 @@ void main() {
     expect(find.text('关于我'), findsOneWidget, reason: '有效 token 应直接放行到名字页（invite 自填名，群聊一期）');
   });
 
-  testWidgets('join：RATE_LIMITED 不能算到开通码头上，要说出要等多久', (WidgetTester tester) async {
+  testWidgets('join：RATE_LIMITED 不能算到通道码头上，要说出要等多久', (WidgetTester tester) async {
     // 老板 2026-09-22 实测：两台模拟器都是最新包，加入仍报 "Invalid invitation
     // (RATE_LIMITED)"。真因是**同一 IP 上有别的客户端在死循环重新认证**，把服务端的
-    // auth 配额（60 次 / 5 分钟）吃光了，开通码加入被连坐。把它显示成"开通码无效"会把
+    // auth 配额（60 次 / 5 分钟）吃光了，通道码加入被连坐。把它显示成"通道码无效"会把
     // 排查彻底引偏——必须单列，并把等待秒数说出来。
     await tester.pumpWidget(wrapApp(
       preflightOverride: (token) async => throw ApiException(
@@ -146,15 +149,15 @@ void main() {
     await tester.tap(find.text('下一步'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('61'), findsOneWidget, reason: '应报出还要等多少秒');
-    expect(find.textContaining('不是开通码本身的问题'), findsOneWidget,
-        reason: '必须说明这不是开通码的问题');
-    expect(find.text('开通码无效'), findsNothing, reason: '不能伪装成开通码无效');
+    // 整条文案由 l10n 拼（含秒数；后台错误统一带「后台：」前缀），不硬写
+    expect(find.text('后台：${_zh.setupTokenRateLimited('61')}'), findsOneWidget,
+        reason: '应报出等待秒数，并说明这不是通道码本身的问题');
+    expect(find.text(_zh.setupTokenInvalid), findsNothing, reason: '不能伪装成通道码无效');
   });
 
-  testWidgets('join：TOKEN_INVALID + 外域开通码链接 → 报错带出两个域名（跨服务器）',
+  testWidgets('join：TOKEN_INVALID + 外域通道码链接 → 报错带出两个域名（跨服务器）',
       (WidgetTester tester) async {
-    // 老板 2026-09-22 实测：iOS 生成开通码、Android 使用 → 报"开通码链接无效"。
+    // 老板 2026-09-22 实测：iOS 生成通道码、Android 使用 → 报"通道码链接无效"。
     // 客户端解析（粘贴完整链接/扫码）已核正确，最常见的真实成因是**两台设备连的不是
     // 同一台服务器** → 报错必须把域名说出来，否则只能对着"无效"猜。
     await tester.pumpWidget(wrapApp(

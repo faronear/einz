@@ -201,7 +201,7 @@ POST /spaces/join
 
 ```text
 POST /spaces/{spaceId}/join-tokens
-  现有成员生成一次性开通码（join token，可刷新/撤销）。
+  现有成员生成一次性通道码（join token，可刷新/撤销）。
   请求：{ purpose: 'invite' | 'attach', target_member_id?, passphrase? }
   （**必填语义**——两种码语义相反，漏传会让"邀请伴侣"变成"把自己身份送出去"，
     故客户端必须显式传；服务端把未知值归一成 'attach'）

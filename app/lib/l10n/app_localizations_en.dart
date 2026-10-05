@@ -168,7 +168,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time token.';
+      'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time entrance token.';
 
   @override
   String get wizardEnrollGoJoin => 'Use Join flow';
@@ -255,34 +255,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return 'Too many requests — retry in ${seconds}s (this is not a problem with the token)';
+    return 'Too many requests — retry in ${seconds}s (this is not a problem with the entrance token)';
   }
 
   @override
   String get setupTokenRateLimitedNoWait =>
-      'Too many requests — try again later (this is not a problem with the token)';
+      'Too many requests — try again later (this is not a problem with the entrance token)';
 
   @override
-  String get setupTokenTitle => 'Verify token';
+  String get setupTokenTitle => 'Verify entrance token';
 
   @override
   String get setupTokenHint =>
-      'Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
+      'Open a dedicated entrance from this device to the space. An entrance token is valid for one-time use within 24 hours, generated from any verified entrance in the space.';
 
   @override
-  String get setupTokenInputHint => 'New-entrance token';
+  String get setupTokenInputHint => 'Entrance token';
 
   @override
-  String get setupTokenNeedInput => 'Enter the new-entrance token';
+  String get setupTokenNeedInput => 'Enter the entrance token';
 
   @override
-  String get setupTokenInvalid => 'Invalid token';
+  String get setupTokenInvalid => 'Invalid entrance token';
 
   @override
-  String get setupTokenExpired => 'Token expired';
+  String get setupTokenExpired => 'Entrance token expired';
 
   @override
-  String get setupTokenUsed => 'Token already used';
+  String get setupTokenUsed => 'Entrance token already used';
 
   @override
   String get setupTokenSpaceAlreadyAdded =>
@@ -330,10 +330,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPagePasteEnvelope => '⚠️ Paste the key envelope (base64)';
 
   @override
-  String get setupPageScanInvite => 'Scan token QR code';
+  String get setupPageScanInvite => 'Scan entrance token QR code';
 
   @override
-  String get setupPageScannerHint => 'Point the camera at the token QR code';
+  String get setupPageScannerHint =>
+      'Point the camera at the entrance token QR code';
 
   @override
   String get setupPageNoEscrow =>
@@ -432,13 +433,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete the PIN? After deletion, next app launch will go straight into chat.';
 
   @override
-  String get chatPageInviteDialogTitleInvite => 'Invite partner';
+  String get chatPageInviteDialogTitleInvite => 'Invite';
 
   @override
-  String get chatPageInviteDialogTitleAttachSelf => 'New-entrance token';
+  String get chatPageInviteDialogTitleAttachSelf => 'My new entrance token';
 
   @override
-  String get chatPageInviteDialogTitleReinvite => 'Re-invite partner';
+  String get chatPageInviteDialogTitleReinvite => 'Re-invite';
 
   @override
   String get chatPageInviteJoinLink => 'Invite';
@@ -448,15 +449,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintInvite =>
-      'Send this token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
+      'Send this entrance token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Use this token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.';
+      'Use this entrance token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'Send this token to $name to join this space. One-time use, valid for 24 hours.';
+    return 'Send this entrance token to $name to add a new entrance. Their existing entrances keep working. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -466,17 +467,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageInviteCopyLinkTooltip => 'Copy invite link';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => 'Copy new-entrance token';
+  String get chatPageInviteCopyCodeTooltip => 'Copy entrance token';
 
   @override
   String get chatPageInviteLinkCopied => 'Invite link copied';
 
   @override
-  String get chatPageInviteCodeCopied => 'New-entrance token copied';
+  String get chatPageInviteCodeCopied => 'Entrance token copied';
 
   @override
   String chatPageInviteFailed(String error) {
-    return 'Failed to create the token: $error';
+    return 'Failed to create the entrance token: $error';
   }
 
   @override
@@ -619,7 +620,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEscrowRotatedNotice =>
-      'Your partner reset the shared passphrase — use the new one to create tokens or change it';
+      'Your partner reset the shared passphrase — use the new one to create entrance tokens or change it';
 
   @override
   String get chatPageMenuLocaleLabel => 'Language';
@@ -769,7 +770,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageEntranceListThisDevice => 'Current entrance name';
 
   @override
-  String get chatPageEntranceListNew => 'Generate new-entrance token';
+  String get chatPageEntranceListNew => 'Generate a new entrance token';
 
   @override
   String get chatPageEntranceListRefresh => 'Refresh';

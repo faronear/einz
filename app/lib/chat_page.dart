@@ -1008,7 +1008,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 并把"被撤销 / 服务器不认这条通道"的副作用补上（会话层只负责续期，不碰 UI 与数据清理）。
   ///
   /// 为什么必须有它：会话 24h 过期后，只有同步/WS 会续期（各写自己那份 token），
-  /// 而头像上传/改名/开通码/更多通道/未读角标这些**直接请求**原来拿的是构造时固化的
+  /// 而头像上传/改名/通道码/更多通道/未读角标这些**直接请求**原来拿的是构造时固化的
   /// `widget.token` → 全部 401「invalid session」且重启不恢复（2026-09-26 老板实测）。
   Future<T> _withAuth<T>(Future<T> Function(String token) fn) async {
     try {
@@ -1571,7 +1571,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     child: Text(l10n.chatPageInviteJoinLink,
                         style: const TextStyle(
                             fontSize: 12,
-                            // 链接蓝 = 品牌深蓝 #2271F7，与开通码弹窗里那条邀请链接
+                            // 链接蓝 = 品牌深蓝 #2271F7，与通道码弹窗里那条邀请链接
                             // （本文件 `_showInviteDialog`）同一个蓝，语义同源。
                             color: Color(0xFF2271F7))),
                   ),
@@ -1682,7 +1682,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     String? targetName,
     String? passphrase,
   }) async {
-    // 老板决策：点顶栏添加按钮直接生成开通码（不再先弹"开通通道"确认窗）
+    // 老板决策：点顶栏添加按钮直接生成通道码（不再先弹"开通通道"确认窗）
     try {
       final api = widget.api ?? ApiClient(effectiveServer);
       var r = await _withAuth((t) => api.createJoinToken(
@@ -1740,13 +1740,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 固有尺寸异常（见 _InviteQrCode 注释），此处不用它
                 Center(child: _InviteQrCode(data: r.link)),
                 const SizedBox(height: 12),
-                // 顺序（老板 2026-09-22）：**纯开通码在上、邀请链接在下**——
-                // 多数人是直接复制开通码；链接留给『点开看邀请页』的场景。
+                // 顺序（老板 2026-09-22）：**纯通道码在上、邀请链接在下**——
+                // 多数人是直接复制通道码；链接留给『点开看邀请页』的场景。
                 Row(
                   children: [
                     Expanded(
                       child: SelectableText(r.joinToken,
-                          // 开通码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
+                          // 通道码是主体：颜色深（跟随主题 onSurface，浅色下近黑）+ 加粗；
                           // 字号与链接同为 12——老板 2026-09-22：16 号太大，回到 12
                           style: TextStyle(
                               fontSize: 12,
@@ -1816,7 +1816,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           passphrase: passphrase,
                         ));
                     if (!ctx.mounted) return;
-                    r = fresh; // 就地刷新：二维码 / 开通码 / 链接 ✓
+                    r = fresh; // 就地刷新：二维码 / 通道码 / 链接 ✓
                     setLocal(() {});
                   } on ApiException catch (e) {
                     if (!ctx.mounted) return;
@@ -2239,7 +2239,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 即使只有自己一条通道也要显示自己；对方 member 的通道不列）。
   /// 每条通道 = **卡片**（边框 + 名称 + 状态红绿灯；本机那张右上角一个**绿勾**、恒列第一位）；
   /// 列表下方「新建通道」（与「切换我的秘境」弹层的「添加秘境」同款外观：
-  /// 常态淡灰底、图标+文字居中）→ 生成开通码弹窗（_showInviteDialog）。
+  /// 常态淡灰底、图标+文字居中）→ 生成通道码弹窗（_showInviteDialog）。
   ///
   /// 数据源 = GET /entrances（在线判定与顶栏同源：connected_at 非 null 即在线，
   /// 旧服务端无该字段时退回 last_seen<60s）。红绿灯：绿=在线 红=离线 灰=已撤销
@@ -2867,13 +2867,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   // 卡片与「新建通道」之间的留白（老板 2026-09-25：原先紧挨着）
                   const SizedBox(height: 12),
                   // 「新建通道」：与「切换我的秘境」弹层的「添加秘境」同款外观——常态淡灰底
-                  // 提示可点、图标+文字居中（老板 2026-09-25）；点击生成开通码
+                  // 提示可点、图标+文字居中（老板 2026-09-25）；点击生成通道码
                   Material(
                     color: Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                     clipBehavior: Clip.antiAlias, // 让 ink 跟着圆角裁
                     child: InkWell(mouseCursor: SystemMouseCursors.click,
-                      // 点「新建通道」：**先收起通道列表弹层**，再弹开通码
+                      // 点「新建通道」：**先收起通道列表弹层**，再弹通道码
                       // （老板 2026-09-25）；_menuAction 内部 300ms 错峰，等弹层
                       // 收起动画跑完再 show（同菜单项开新 route 的口径，避免
                       // Overlay 交叉卸载断言）
@@ -6310,7 +6310,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               // 与「锁屏码」同款处理（老板 2026-09-15），静默比瞎显示"未设置"好
               final notifyValue = _notifyMenuValue(l10n, valueStyle);
               return [
-                // 菜单分组（老板 2026-09-24 定；2026-09-25 删「生成开通码」项，
+                // 菜单分组（老板 2026-09-24 定；2026-09-25 删「生成通道码」项，
                 // 改由「通道列表」弹层里的「新建通道」按钮承担）：
                 //   ① 外观与锁：界面语言 / 界面主题 / 锁屏码
                 //   ② 身份·通道·内容：我的身份 / 我的头像 / 当前通道 / 通道列表 /
@@ -7513,7 +7513,7 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 说明文字（与创建向导**共用同一句** wizardPassphraseHint，老板 2026-09-15
-          // 要求统一口径；样式与开通码 / PIN 弹窗一致：大标题下小字说明）
+          // 要求统一口径；样式与通道码 / PIN 弹窗一致：大标题下小字说明）
           Text(
             l10n.wizardPassphraseHint,
             style: TextStyle(
@@ -8029,7 +8029,7 @@ class _MessageAvatarState extends State<_MessageAvatar> {
 
 /// 邀请链接二维码（自绘，替代 QrImageView）。
 ///
-/// QrImageView（qr_flutter 4.1.0）两个坑（2026-09-08 老板真机报告：生成开通码
+/// QrImageView（qr_flutter 4.1.0）两个坑（2026-09-08 老板真机报告：生成通道码
 /// 时屏幕变暗但弹窗不出现；且弹窗里的二维码从未显示）：
 /// 1. 内部无条件包 LayoutBuilder，而 AlertDialog 用 IntrinsicWidth 包裹内容做
 ///    固有尺寸测量 → performLayout 抛 "LayoutBuilder does not support returning

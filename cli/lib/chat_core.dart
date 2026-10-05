@@ -47,7 +47,7 @@ class ChatMessage {
   /// 插入顺序（全局单调递增）：仅作排序平局决胜，保证同等时间戳/序号的消息稳定有序。
   final int order;
 
-  /// 系统提示消息（如开通码、引导提示）：sender 显示为 system（不参与"我/对方"）。
+  /// 系统提示消息（如通道码、引导提示）：sender 显示为 system（不参与"我/对方"）。
   final bool isSystem;
 
   /// 消息载荷 meta 袋（密文内 `{"plaintext":…,"meta":…}` 的 meta）：
@@ -186,10 +186,10 @@ class ChatSession {
     final api = ApiClient(target);
     final s = await sodium();
 
-    // 未登记（登记失败/开通码输错）时 entranceId 为 null——先检查，避免空断言崩溃
+    // 未登记（登记失败/通道码输错）时 entranceId 为 null——先检查，避免空断言崩溃
     final entranceId = store.entranceId;
     if (entranceId == null) {
-      throw StateError('通道尚未绑定秘境，请先 /space create（新建）或 /space join <开通码或邀请链接>（加入）');
+      throw StateError('通道尚未绑定秘境，请先 /space create（新建）或 /space join <通道码或邀请链接>（加入）');
     }
     // spaceId 必须一并提交：否则拿到的是"无 space 的 legacy 会话"，/sync 与
     // /messages 会落到空 space 桶 → 会话过期自动续期后消息全空（P1 收敛）。

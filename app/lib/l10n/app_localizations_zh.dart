@@ -163,7 +163,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardEnrollExists =>
-      '该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性开通码加入。';
+      '该服务器已有秘境（由另一条通道创建）。请改用“加入”向导，凭对方提供的一次性通道码加入。';
 
   @override
   String get wizardEnrollGoJoin => '改用“加入”向导';
@@ -243,32 +243,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String setupTokenRateLimited(String seconds) {
-    return '请求太频繁：请 $seconds 秒后再试（这不是开通码本身的问题）';
+    return '请求太频繁：请 $seconds 秒后再试（这不是通道码本身的问题）';
   }
 
   @override
-  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是开通码本身的问题）';
+  String get setupTokenRateLimitedNoWait => '请求太频繁，请稍后再试（这不是通道码本身的问题）';
 
   @override
-  String get setupTokenTitle => '验证开通码';
+  String get setupTokenTitle => '验证通道码';
 
   @override
-  String get setupTokenHint => '开启从本机到秘境的专属通道。开通码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
+  String get setupTokenHint => '开启从本机到秘境的专属通道。通道码 24 小时内一次性有效，可从本秘境任一已认证的通道生成。';
 
   @override
-  String get setupTokenInputHint => '开通码';
+  String get setupTokenInputHint => '通道码';
 
   @override
-  String get setupTokenNeedInput => '请填写开通码';
+  String get setupTokenNeedInput => '请填写通道码';
 
   @override
-  String get setupTokenInvalid => '开通码无效';
+  String get setupTokenInvalid => '通道码无效';
 
   @override
-  String get setupTokenExpired => '开通码已过期';
+  String get setupTokenExpired => '通道码已过期';
 
   @override
-  String get setupTokenUsed => '开通码已被使用';
+  String get setupTokenUsed => '通道码已被使用';
 
   @override
   String get setupTokenSpaceAlreadyAdded => '这个秘境已经添加过了（一台设备只能有一条通道到同一个秘境）';
@@ -313,10 +313,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPagePasteEnvelope => '⚠️ 请粘贴密保信封（base64）';
 
   @override
-  String get setupPageScanInvite => '扫码填入开通码';
+  String get setupPageScanInvite => '扫码填入通道码';
 
   @override
-  String get setupPageScannerHint => '把开通码二维码对准取景框';
+  String get setupPageScannerHint => '把通道码二维码对准取景框';
 
   @override
   String get setupPageNoEscrow => '❌ 服务器上找不到共享口令的密保箱，无法凭口令加入。请尝试其他方式。';
@@ -421,8 +421,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteRegenerate => '重新生成';
 
   @override
-  String get chatPageInviteDialogHintInvite =>
-      '把它发给要邀请的人，凭它即可加入本秘境。24 小时内一次性有效。';
+  String get chatPageInviteDialogHintInvite => '发给受邀人，凭它加入本秘境。24 小时内一次性有效。';
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
@@ -430,7 +429,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '把它发给「$name」——TA 在新设备上打开就能回到自己的身份，原有通道不受影响。24 小时内一次性有效。';
+    return '发给 $name，凭它新建一条通道加入本秘境，原有通道不受影响。24 小时内一次性有效。';
   }
 
   @override
@@ -440,17 +439,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageInviteCopyLinkTooltip => '复制邀请链接';
 
   @override
-  String get chatPageInviteCopyCodeTooltip => '复制开通码';
+  String get chatPageInviteCopyCodeTooltip => '复制通道码';
 
   @override
   String get chatPageInviteLinkCopied => '邀请链接已复制';
 
   @override
-  String get chatPageInviteCodeCopied => '开通码已复制';
+  String get chatPageInviteCodeCopied => '通道码已复制';
 
   @override
   String chatPageInviteFailed(String error) {
-    return '开通码生成失败: $error';
+    return '通道码生成失败: $error';
   }
 
   @override

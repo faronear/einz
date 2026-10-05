@@ -9,7 +9,7 @@ import 'vault_session.dart';
 /// 为什么必须收敛到一处（2026-09-26 老板线上实测）：会话 24h 过期后，
 /// 同步（`MessageRepository._withAutoAuth`）与 WS（`WsRealtimeService.updateToken`）
 /// 各写**自己内存里那份** token，而聊天页/空间列表里的直接请求用的是构造时固化的
-/// `widget.token`（= Vault 里那个死 token）→ 头像上传、改名、开通码、更多通道、
+/// `widget.token`（= Vault 里那个死 token）→ 头像上传、改名、通道码、更多通道、
 /// 未读角标、退役…… 全部 401「invalid session」，而且**重启也不恢复**
 /// （续期结果从不落盘）。所以：**带鉴权的请求一律走 [call]，不要再把
 /// `AppLockPayload.token` 直接塞给 ApiClient。**

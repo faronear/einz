@@ -655,7 +655,7 @@ export function preflightJoin(
   return doJoin();
 }
 
-/** 生成一次性开通码（英文仍称 token；成员认证由 U1 Space-scoped session 补齐）。
+/** 生成一次性通道码（英文仍称 token；成员认证由 U1 Space-scoped session 补齐）。
  *
  *  两种 purpose（2026-10-04 收敛并改名，见下）：
  *  - `invite`：开**新身份**（邀请一个新人进来，自己填名字）。受人数上限约束——

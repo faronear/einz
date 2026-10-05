@@ -1,6 +1,6 @@
 // 「我的通道」菜单弹层（老板 2026-09-25）：列出**当前通道（带绿勾、列第一位）+
 // 我本人的其他通道**（对方 member 的通道不列；离线时当前通道照列）；列表下方
-// 「新建通道」链接 → 生成开通码弹窗。
+// 「新建通道」链接 → 生成通道码弹窗。
 //
 // 数据源 = GET /entrances（fake api 编排）；卡片 = 通道名 + 状态红绿灯 + 时间。
 // 时间**不带 "since" 前缀**（老板 2026-09-26：太占地方），且所有卡片等高
@@ -367,7 +367,7 @@ void main() {
     // 对方通道不出现
     expect(sheetText('Alice的iPad'), findsNothing);
     // 「新建通道」按钮（图标+文字居中、有背景）：点击后通道列表弹层收起，
-    // 再弹出生成开通码弹窗（老板 2026-09-25）
+    // 再弹出生成通道码弹窗（老板 2026-09-25）
     expect(sheetText(_zh.chatPageEntranceListNew), findsOneWidget);
     await tester.tap(sheetText(_zh.chatPageEntranceListNew));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));

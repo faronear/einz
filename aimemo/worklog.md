@@ -11563,3 +11563,62 @@ workflow YAML 用 ruby 解析过。**CI 本身没法在本地跑**，要等推�
 `flutter gen-l10n` + `flutter analyze` 干净；涉及开通码/向导的 7 个套件 **67 条全绿**
 （invite_dialog_layout / entrance_list_sheet / chat_page_menu / ui_style_switch /
 setup_join_passphrase / wizard_envelope_entry / wizard_autofocus）。
+
+---
+
+## 2026-10-05（二）一轴模型 + 「开通码」→「通道码」/「entrance token」
+
+老板定了两件事：对象词 **zh=通道码、en=entrance token**；一轴模型落地。
+
+### 一轴模型（写进 GLOSSARY 与代码注释）
+
+> **一个通道码 = 一台设备 + 一个"已声明的身份"接入秘境。**
+
+身份只有两种：`new`（`invite`）或某个 `member_id`（`attach`，`target_member_id`
+指向谁就是谁，NULL = 新身份）。三种场景——邀请 / 我的新设备 / 再次邀请——是**同一个对象、
+同一种码**，只是 target 取值不同；`invite / re-invite / 我的新通道码`只是**签发方视角的
+场景标签**。这也解释了老板当年"取消邀请概念"与今天的"拆分绑定"为何是同一件事：
+**码始终中立（对接收方），变的是"声明给谁用"。**
+
+### 改名（zh 通道码 / en entrance token）
+
+- **对象词换掉**：「开通码」→「通道码」，en `token`→`entrance token`。
+  理由：①与核心名词同源（通道 / 通道名 / 通道列表），不再两套词；②中英同根更直。
+  代价（老板认了）：丢了"开通"的动作感 → 动态含义交给周围文案（一次性 / 24 小时 /
+  新建一条通道）。
+- **范围**：app l10n（zh 15 处 + en 17 条）、app 代码注释 31 处、server 注释/落地页 7 处、
+  cli（bin 26 + lib 3 + tests 14）、docs 6 篇。**代码/协议不动**——`join_tokens` 表、
+  wire 字段仍叫 `token`（界面用词不牵动代码命名）。
+- `docs/GLOSSARY.md` 的「开通码」条整体重写：一句话定义（一轴）+ 改名理由 +
+  「邀请链接」条同步（它承载**通道码**）。历史只留"此前叫「开通码」"。
+
+### 一并定的两处文案
+
+- `chatPageInviteDialogHintInvite`（zh）：「发给**受邀请人**」→「发给**受邀人**」。
+- `chatPageInviteDialogHintReinvite`（zh/en）：**加回「原有通道不受影响 / their existing
+  entrances keep working」**——上一版被删，但这是老板 2026-10-04 明确要的安抚
+  （"绝不撤销现有通道"的用户侧表达），也是成员最怕的点（换设备会不会顶掉旧设备）。
+
+### 顺带修：两批"硬写文案"的测试 rot
+
+全量跑出 5 条红，两类：
+1. **我这次改名弄红的**：`widget_test` / `setup_join_duplicate_space_test` /
+   `setup_join_passphrase_test` 里硬写了「验证开通码」「开通码无效」「不是开通码本身的问题」。
+2. **老板 `a382429`（伴侣→同伴）弄红的**：`widget_test` 断言硬写了
+   「我的名字（以后可以随时修改）」，而该标签已被改成「名字」（`wizardMyNameLabel`）。
+
+修法一律按既定原则：**断言绑 l10n 键**（`_zh.setupTokenTitle` / `_zh.wizardMyNameLabel` /
+`'后台：${_zh.setupTokenInvalid}'`；限流那条整句用 `_zh.setupTokenRateLimited('61')` 拼，
+含「后台：」前缀）。顺手把测试里残留的「开通码」注释/测试名清成「通道码」（32 处；
+golden 用显式路径，改测试名安全）。**教训复现**：改了文案没人跑全量测试 → 静默红；
+这次是 `scripts/testAll.sh` 一眼看出来。
+
+### 2026-10-05（补）小群定位
+
+老板：group 只是**三五个密友**的私密讨论（一两位好友用过后提的需求），
+token 仍 24h 过期 + 一次性，所以**暂不做显性作废**。
+
+### 验证
+
+`scripts/testAll.sh` **exit=0**：app 227 passed + 1 skipped、cli 全绿、server 全绿；
+`flutter analyze` 干净。

@@ -218,9 +218,9 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
 <div class="card">
   <h1>💌 Einz 私密空间邀请</h1>
   <p>这是一份 <strong>Einz</strong>（双人私密加密聊天空间）的加入邀请。</p>
-  <p>请使用 Einz App 打开本链接，或在 App 中加入时粘贴下面的开通码：</p>
+  <p>请使用 Einz App 打开本链接，或在 App 中加入时粘贴下面的通道码：</p>
   <div class="token">${token}</div>
-  <p class="hint">开通码 24 小时内有效、仅可使用一次。</p>
+  <p class="hint">通道码 24 小时内有效、仅可使用一次。</p>
 </div>
 </body>
 </html>`
@@ -297,8 +297,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   ) {
     const spaceId = path.slice('/spaces/'.length, -'/join-tokens'.length)
     const body = await readJsonBody(req)
-    // C1 修复：签发开通码 = 空间级操作，必须持该空间成员会话（此前任何人
-    // 拿到 spaceId 就能自签开通码、以 slot=0 冒充创建者加通道）
+    // C1 修复：签发通道码 = 空间级操作，必须持该空间成员会话（此前任何人
+    // 拿到 spaceId 就能自签通道码、以 slot=0 冒充创建者加通道）
     const sess = requireSpaceMember(optionalBearerToken(req), spaceId)
     // 两种 token（2026-10-04 收敛）：
     //   invite = 开新身份（邀请新人；duo 满 2 人 → 409）

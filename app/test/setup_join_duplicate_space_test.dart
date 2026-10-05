@@ -6,7 +6,7 @@
 // （Vault 按 spaceId 存一份凭证），所以重复添加必须拦。
 //
 // 拦点在 `_verifyJoinToken`：preflight 之后（此时才知道目标 spaceId）、**消费一次性
-// 之前**（被拒绝的开通码还能发给别的设备用，且没有任何服务端副作用）。
+// 之前**（被拒绝的通道码还能发给别的设备用，且没有任何服务端副作用）。
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -20,9 +20,7 @@ import 'package:einz/l10n/app_localizations.dart';
 import 'package:einz/setup_page.dart';
 import 'package:einz/data/server_config.dart';
 
-const _dupMessage = '这个秘境已经添加过了（一台设备只能有一条通道到同一个秘境）';
-
-/// 打开 join 向导并停在「验证开通码」页（入口页 → 加入）。
+/// 打开 join 向导并停在「验证通道码」页（入口页 → 加入）。
 Future<void> _pumpToJoinToken(WidgetTester tester, LocalDatabase db) async {
   await tester.pumpWidget(MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -60,6 +58,9 @@ LocalDatabase _newDb() {
   return db;
 }
 
+/// 文案断言一律从 l10n 取（与页面同一份生成代码），改文案不会弄红测试。
+final AppLocalizations _zh = lookupAppLocalizations(const Locale('zh'));
+
 void main() {
   setUpAll(() async {
     await sodium(); // 向导会自动建钥，需要 libsodium
@@ -75,8 +76,8 @@ void main() {
     await _pumpToJoinToken(tester, db);
     await _submitToken(tester, 'TOKEN-DUP');
 
-    expect(find.text(_dupMessage), findsOneWidget, reason: '必须给出「已添加过」的红字');
-    expect(find.text('验证开通码'), findsWidgets, reason: '应停留在开通码页');
+    expect(find.text(_zh.setupTokenSpaceAlreadyAdded), findsOneWidget, reason: '必须给出「已添加过」的红字');
+    expect(find.text(_zh.setupTokenTitle), findsWidgets, reason: '应停留在通道码页');
     expect(find.text('关于我'), findsNothing, reason: '不得放行进下一步（名字页，群聊一期）');
   });
 
@@ -95,7 +96,7 @@ void main() {
     await _pumpToJoinToken(tester, db);
     await _submitToken(tester, 'TOKEN-DUP');
 
-    expect(find.text(_dupMessage), findsOneWidget);
+    expect(find.text(_zh.setupTokenSpaceAlreadyAdded), findsOneWidget);
     expect(find.text('关于我'), findsNothing);
   });
 
@@ -105,7 +106,7 @@ void main() {
     await _pumpToJoinToken(tester, db);
     await _submitToken(tester, 'TOKEN-OK');
 
-    expect(find.text(_dupMessage), findsNothing, reason: '没添加过就不该报错');
+    expect(find.text(_zh.setupTokenSpaceAlreadyAdded), findsNothing, reason: '没添加过就不该报错');
     expect(find.text('关于我'), findsOneWidget, reason: '没添加过就该照常放行（名字页，群聊一期）');
   });
 }

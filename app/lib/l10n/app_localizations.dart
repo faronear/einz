@@ -389,7 +389,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardEnrollExists.
   ///
   /// In en, this message translates to:
-  /// **'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time token.'**
+  /// **'This server already has a space (created by another entrance). Use the Join flow with your partner\'s one-time entrance token.'**
   String get wizardEnrollExists;
 
   /// No description provided for @wizardEnrollGoJoin.
@@ -533,55 +533,55 @@ abstract class AppLocalizations {
   /// No description provided for @setupTokenRateLimited.
   ///
   /// In en, this message translates to:
-  /// **'Too many requests — retry in {seconds}s (this is not a problem with the token)'**
+  /// **'Too many requests — retry in {seconds}s (this is not a problem with the entrance token)'**
   String setupTokenRateLimited(String seconds);
 
   /// No description provided for @setupTokenRateLimitedNoWait.
   ///
   /// In en, this message translates to:
-  /// **'Too many requests — try again later (this is not a problem with the token)'**
+  /// **'Too many requests — try again later (this is not a problem with the entrance token)'**
   String get setupTokenRateLimitedNoWait;
 
   /// No description provided for @setupTokenTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verify token'**
+  /// **'Verify entrance token'**
   String get setupTokenTitle;
 
   /// No description provided for @setupTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'Open a dedicated entrance from this device to the space. A token is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
+  /// **'Open a dedicated entrance from this device to the space. An entrance token is valid for one-time use within 24 hours, generated from any verified entrance in the space.'**
   String get setupTokenHint;
 
   /// No description provided for @setupTokenInputHint.
   ///
   /// In en, this message translates to:
-  /// **'New-entrance token'**
+  /// **'Entrance token'**
   String get setupTokenInputHint;
 
   /// No description provided for @setupTokenNeedInput.
   ///
   /// In en, this message translates to:
-  /// **'Enter the new-entrance token'**
+  /// **'Enter the entrance token'**
   String get setupTokenNeedInput;
 
   /// No description provided for @setupTokenInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Invalid token'**
+  /// **'Invalid entrance token'**
   String get setupTokenInvalid;
 
   /// No description provided for @setupTokenExpired.
   ///
   /// In en, this message translates to:
-  /// **'Token expired'**
+  /// **'Entrance token expired'**
   String get setupTokenExpired;
 
   /// No description provided for @setupTokenUsed.
   ///
   /// In en, this message translates to:
-  /// **'Token already used'**
+  /// **'Entrance token already used'**
   String get setupTokenUsed;
 
   /// No description provided for @setupTokenSpaceAlreadyAdded.
@@ -665,13 +665,13 @@ abstract class AppLocalizations {
   /// No description provided for @setupPageScanInvite.
   ///
   /// In en, this message translates to:
-  /// **'Scan token QR code'**
+  /// **'Scan entrance token QR code'**
   String get setupPageScanInvite;
 
   /// No description provided for @setupPageScannerHint.
   ///
   /// In en, this message translates to:
-  /// **'Point the camera at the token QR code'**
+  /// **'Point the camera at the entrance token QR code'**
   String get setupPageScannerHint;
 
   /// No description provided for @setupPageNoEscrow.
@@ -839,19 +839,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogTitleInvite.
   ///
   /// In en, this message translates to:
-  /// **'Invite partner'**
+  /// **'Invite'**
   String get chatPageInviteDialogTitleInvite;
 
   /// No description provided for @chatPageInviteDialogTitleAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'New-entrance token'**
+  /// **'My new entrance token'**
   String get chatPageInviteDialogTitleAttachSelf;
 
   /// No description provided for @chatPageInviteDialogTitleReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Re-invite partner'**
+  /// **'Re-invite'**
   String get chatPageInviteDialogTitleReinvite;
 
   /// No description provided for @chatPageInviteJoinLink.
@@ -869,19 +869,19 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintInvite.
   ///
   /// In en, this message translates to:
-  /// **'Send this token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
+  /// **'Send this entrance token to whoever you\'re inviting to join this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintInvite;
 
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Use this token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.'**
+  /// **'Use this entrance token on your other device to add a new entrance to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Send this token to {name} to join this space. One-time use, valid for 24 hours.'**
+  /// **'Send this entrance token to {name} to add a new entrance. Their existing entrances keep working. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.
@@ -899,7 +899,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCopyCodeTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Copy new-entrance token'**
+  /// **'Copy entrance token'**
   String get chatPageInviteCopyCodeTooltip;
 
   /// No description provided for @chatPageInviteLinkCopied.
@@ -911,13 +911,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteCodeCopied.
   ///
   /// In en, this message translates to:
-  /// **'New-entrance token copied'**
+  /// **'Entrance token copied'**
   String get chatPageInviteCodeCopied;
 
   /// No description provided for @chatPageInviteFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to create the token: {error}'**
+  /// **'Failed to create the entrance token: {error}'**
   String chatPageInviteFailed(String error);
 
   /// No description provided for @chatPageTitleBrand.
@@ -1163,7 +1163,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEscrowRotatedNotice.
   ///
   /// In en, this message translates to:
-  /// **'Your partner reset the shared passphrase — use the new one to create tokens or change it'**
+  /// **'Your partner reset the shared passphrase — use the new one to create entrance tokens or change it'**
   String get chatPageEscrowRotatedNotice;
 
   /// No description provided for @chatPageMenuLocaleLabel.
@@ -1415,7 +1415,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceListNew.
   ///
   /// In en, this message translates to:
-  /// **'Generate new-entrance token'**
+  /// **'Generate a new entrance token'**
   String get chatPageEntranceListNew;
 
   /// No description provided for @chatPageEntranceListRefresh.
