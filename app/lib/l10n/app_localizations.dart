@@ -869,7 +869,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintAttachSelf.
   ///
   /// In en, this message translates to:
-  /// **'Use the dedicated entrance token below on another device to connect to this space. One-time use, valid for 24 hours.'**
+  /// **'Use the dedicated entrance token below on my another device to connect to this space. One-time use, valid for 24 hours.'**
   String get chatPageInviteDialogHintAttachSelf;
 
   /// No description provided for @chatPageInviteDialogHintReinvite.

@@ -468,7 +468,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageInviteDialogHintAttachSelf =>
-      'Use the dedicated entrance token below on another device to connect to this space. One-time use, valid for 24 hours.';
+      'Use the dedicated entrance token below on my another device to connect to this space. One-time use, valid for 24 hours.';
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
