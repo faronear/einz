@@ -12540,3 +12540,40 @@ M 级改动。放弃。）
 
 `flutter analyze` 干净；`scripts/testAll.sh app` **258 passed + 1 skipped / 0 failed**
 （该次运行的工作区包含并发会话的在途改动）。
+
+## 2026-10-06 Push 到 GitHub + 修两处「非代码」的 CI 红
+
+老板说 Push。`feature/groupChat` 推到 **github**（新分支），CI 全绿。
+
+### 为什么是 github 而不是 origin
+
+- `origin` = `git.tic.cc`（美国）**当前不可用**：`git ls-remote origin` 报
+  `unable to update url base from redirection` → `redirect: https://m.baidu.com/`
+  （典型的 GFW/ISP 劫持页），根本没连到仓库。
+- `github` = `github.com/faronear/einz` 可用，且 `main` / `feature/multiverse` 都在上面，
+  Test All 工作流也只在 github 上生效（workflow 头部注释已写明）。
+- 结果：`feature/groupChat` 建在新分支上，remote 与本地一致（`9bf5e97`）。
+  未设 upstream（`-u`），所以以后 `git push` 仍没有默认远端——要固化的话说一声。
+
+### 网络：github 连接极不稳定
+
+同一分钟里 `curl https://github.com` 超时、`git ls-remote` exit=124（timeout）、
+`git push` 报 `Failed to connect to port 443 after 75s`——**重试才成功**。
+（老规矩：请老板开 Tailscale exit node 会稳很多。）
+
+### CI 红了两处，都与本次业务改动无关、但都得修
+
+1. **`scripts/testAll.sh` 缺可执行位**（`100644`，自 2026-10-04 `7fc2528` 入库起就是）。
+   4 个 job 都是**直接** `scripts/testAll.sh <target>` → 全部在"跑测试"步
+   `Permission denied`（exit 126）。→ `git update-index --chmod=+x`（`a31eae4`）。
+   注意这是**存量**问题：Test All 工作流此前从没绿过。
+2. **cli job 漏装 libsodium**：`app` / `shared` 两个 job 都有
+   `apt-get install libsodium-dev`，`cli` 没有 → `send_optimistic` /
+   `attach_optimistic` 的 `setUpAll` 报"无法加载 libsodium"（其余 19 条绿）。
+   → 补同一步（`9bf5e97`）。
+3. 修完：`Test All` #37403253982 **completed/success**，4 job 全绿
+   （app 2m23s / cli 43s / shared 41s / server 44s）。
+
+### 本地验证
+
+`bash scripts/testAll.sh`（四个目标全跑）**全部通过 ✅**。
