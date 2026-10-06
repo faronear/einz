@@ -12577,3 +12577,18 @@ M 级改动。放弃。）
 ### 本地验证
 
 `bash scripts/testAll.sh`（四个目标全跑）**全部通过 ✅**。
+
+## 2026-10-06 feature/groupChat 合并回 main（快进），工作分支切到 main
+
+老板："把 groupChat 合并回 main 里，以后主推 main"。
+
+- `main` 是 `feature/groupChat` 的**严格祖先** → 快进合并，无冲突、无合并提交
+  （`dda7fe4 → 7eab9c4`）。做法上先 `git fetch . feature/groupChat:main` 移 ref、
+  再 `git switch main`，**避免切分支时工作区短暂回退**（另一会话在同一工作区）。
+- 树内容与合并前**逐字节相同**（`git status` 空），故无需重跑测试：
+  该树 = CI 已验证通过的 `9bf5e97` 的树 + `aimemo/` 下一条 worklog（CI 忽略 `aimemo/**`）。
+- HEAD 现在在 `main`（`feature/groupChat` 保留，仍指向同一提交）。
+
+**⚠️ 推 main 是发布动作**：`buildMultiPlatform.yml` 在 **push main** 时会跑全平台构建
+（macOS 10x / Windows 2x 额度），且 **iOS 构建成功即自动上传 TestFlight**、
+macOS 走 Developer ID 签名+公证。所以合并已在本地完成，**推送留给老板**（或等我确认）。
