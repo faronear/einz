@@ -87,6 +87,11 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
+      # cli/test 里 send_optimistic / attach_optimistic 的 setUpAll 会 await sodium()，
+      # 同样走 DynamicLibrary.open 找系统 libsodium——与 app / shared job 同一原因。
+      # （缺这一步时这两个用例 setUpAll 直接红，其余 19 条仍绿。）
+      - name: 装 libsodium（测试要动态加载）
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsodium-dev
       - name: 跑测试
         run: scripts/testAll.sh cli
 
