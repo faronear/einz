@@ -12,69 +12,85 @@
 // 加短名：改下面的 builtinAlias，或在 package.json 的 config 里加一条
 // （"ipad": "iPad Pro 13-inch (M4)"），config 里的优先。
 
-const { execSync } = require('child_process');
-const path = require('path');
+const { execSync } = require('child_process')
+const path = require('path')
 
 const builtinAlias = {
   ip16: 'iPhone 16',
   ip16plus: 'iPhone 16 Plus',
   ip16pro: 'iPhone 16 Pro',
-  ip16pm: 'iPhone 16 Pro Max',
-};
+  ip16pm: 'iPhone 16 Pro Max'
+}
 
-const rootDir = path.resolve(__dirname, '..');
-let pkgConfig = {};
+const rootDir = path.resolve(__dirname, '..')
+let pkgConfig = {}
 try {
-  pkgConfig = require(path.join(rootDir, 'package.json')).config || {};
+  pkgConfig = require(path.join(rootDir, 'package.json')).config || {}
 } catch (error) {
-  pkgConfig = {};
+  pkgConfig = {}
 }
 
-const input = (process.argv[2] || '').trim() || String(pkgConfig.default || 'ip16@26.3').trim();
+const input =
+  (process.argv[2] || '').trim() ||
+  String(pkgConfig.defaultIosEmu || 'ip16@26.3').trim()
 
-if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)) {
-  console.log(input);
-  process.exit(0);
+if (
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)
+) {
+  console.log(input)
+  process.exit(0)
 }
 
-const at = input.lastIndexOf('@');
-const left = (at === -1 ? input : input.slice(0, at)).trim();
-const version = at === -1 ? '' : input.slice(at + 1).trim().replace(/^iOS\s*/i, '');
-const deviceName = pkgConfig[left] || builtinAlias[left.toLowerCase()] || left;
+const at = input.lastIndexOf('@')
+const left = (at === -1 ? input : input.slice(0, at)).trim()
+const version =
+  at === -1
+    ? ''
+    : input
+        .slice(at + 1)
+        .trim()
+        .replace(/^iOS\s*/i, '')
+const deviceName = pkgConfig[left] || builtinAlias[left.toLowerCase()] || left
 
-const json = JSON.parse(execSync('xcrun simctl list devices available -j').toString());
-const runtimeKeyFor = (want) => `iOS-${want.replace(/\./g, '-')}`;
-const versionOf = (runtimeKey) => {
-  const matched = runtimeKey.match(/iOS-(\d+)(?:-(\d+))?/);
-  return matched ? [Number(matched[1]), Number(matched[2] || 0)] : [0, 0];
-};
+const json = JSON.parse(
+  execSync('xcrun simctl list devices available -j').toString()
+)
+const runtimeKeyFor = want => `iOS-${want.replace(/\./g, '-')}`
+const versionOf = runtimeKey => {
+  const matched = runtimeKey.match(/iOS-(\d+)(?:-(\d+))?/)
+  return matched ? [Number(matched[1]), Number(matched[2] || 0)] : [0, 0]
+}
 
-const matched = [];
+const matched = []
 for (const [runtimeKey, devices] of Object.entries(json.devices)) {
   if (!/iOS-/.test(runtimeKey)) {
-    continue;
+    continue
   }
   if (version && !runtimeKey.includes(runtimeKeyFor(version))) {
-    continue;
+    continue
   }
   for (const device of devices) {
     if (device.name.toLowerCase() === deviceName.toLowerCase()) {
-      matched.push({ ...device, runtimeKey });
+      matched.push({ ...device, runtimeKey })
     }
   }
 }
 
 if (matched.length === 0) {
-  console.error(`❌ 本机没有匹配的模拟器：${input}（机型「${deviceName}」${version ? ` + iOS ${version}` : ''}）`);
-  console.error('   看有哪些：xcrun simctl list devices available');
-  process.exit(1);
+  console.error(
+    `❌ 本机没有匹配的模拟器：${input}（机型「${deviceName}」${
+      version ? ` + iOS ${version}` : ''
+    }）`
+  )
+  console.error('   看有哪些：xcrun simctl list devices available')
+  process.exit(1)
 }
 
 // 同名多台（比如 18.1 和 26.3 各一台）→ 取系统版本最高的那台
 matched.sort((a, b) => {
-  const [aMajor, aMinor] = versionOf(a.runtimeKey);
-  const [bMajor, bMinor] = versionOf(b.runtimeKey);
-  return bMajor - aMajor || bMinor - aMinor;
-});
+  const [aMajor, aMinor] = versionOf(a.runtimeKey)
+  const [bMajor, bMinor] = versionOf(b.runtimeKey)
+  return bMajor - aMajor || bMinor - aMinor
+})
 
-console.log(matched[0].udid);
+console.log(matched[0].udid)

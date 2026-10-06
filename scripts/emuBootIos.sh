@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 启动 iOS 模拟器 —— 「选哪一台」的复杂度和灵活性都集中在这里。
 #
-#   npm run app-ios-boot                     # 默认 config.default（ip16@26.3）
+#   npm run app-ios-boot                     # 默认 ip16@26.3
 #   npm run app-ios-boot -- ip16@26.3        # 短名@系统版本（推荐，跨机器通用）
 #   npm run app-ios-boot -- ip16pro@26.3     # iPhone 16 Pro / iOS 26.3
 #   npm run app-ios-boot -- ip16@18.1        # iPhone 16 / iOS 18.1
