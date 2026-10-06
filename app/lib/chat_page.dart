@@ -359,6 +359,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 通道在线就算他在线），所以这里存的是去重后的 member_id。
   Set<String> _onlineOthers = <String>{};
 
+  /// 每个其他成员**最近一次状态变化的时刻**（ms，不含我自己）：头像条排序用
+  /// （老板 2026-10-06：最新上线的排最前，下线的沉底）。在线成员取"上线时刻"
+  /// （`_sinceOfRow(online:true)`，即已连了多久），离线成员取"下线时刻"。
+  /// 同一 member 多条通道取**最大值**（最近的那条）。由通道轮询维护。
+  final Map<String, int> _otherSinceMs = {};
+
   /// 还能不能再邀请新成员（2026-10-04：mode 创建时定死，没有升格）：
   /// - duo：**只在还没第二个人时**能邀请（那是"邀请伴侣"）；满 2 人即永久关闭
   ///   ——第三个人不是"满了"，是双人秘境不允许；
@@ -1592,11 +1598,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 除我之外的成员，按**加入先后**（槽位升序）。
-  List<MapEntry<String, int>> get _otherMembers => _memberSlots.entries
-      .where((e) => e.key != _myMemberId)
-      .toList()
-    ..sort((a, b) => a.value.compareTo(b.value));
+  /// 除我之外的成员：**在线的在前**，同在线内按"上线时刻"**新近优先**；离线的
+  /// 沉底，同离线内按"下线时刻"**新近优先**；都拿不到时刻的按加入先后（槽位）兜底
+  /// （老板 2026-10-06：最新上线的排最前，下线的放最后）。
+  List<MapEntry<String, int>> get _otherMembers {
+    int since(String memberId) => _otherSinceMs[memberId] ?? 0;
+    int slotOf(MapEntry<String, int> e) => e.value;
+    bool online(MapEntry<String, int> e) => _onlineOthers.contains(e.key);
+    int compare(MapEntry<String, int> a, MapEntry<String, int> b) {
+      // 在线组排前；同组内时刻大的（更近）排前；无时刻的按槽位（加入先后）
+      final group = online(b) == online(a) ? 0 : (online(b) ? 1 : -1);
+      if (group != 0) return group;
+      final sa = since(a.key);
+      final sb = since(b.key);
+      if (sa != 0 || sb != 0) return sb.compareTo(sa);
+      return slotOf(a).compareTo(slotOf(b));
+    }
+
+    return _memberSlots.entries
+        .where((e) => e.key != _myMemberId)
+        .toList()
+      ..sort(compare);
+  }
 
   /// 头像条里的**一个**头像。
   ///
@@ -3416,13 +3439,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       //   宁可与头像条里的人数一致，也别出现"头像有两个、却写着 0/0"。
       final seenOthers = <String>{};
       final onlineOthers = <String>{};
+      // 头像条排序的"最近状态变化时刻"（见 _otherSinceMs）：同一 member 多条通道
+      // 取 max——最近动过的那条说了算。
+      final sinceByMember = <String, int>{};
       for (final d in entrances) {
         if (d['entrance_id'] == widget.entranceId) continue;
         final pid = d['member_id'] as String?;
         if (pid == null || pid.isEmpty) continue;
         if (mine != null && mine.isNotEmpty && pid == mine) continue;
         seenOthers.add(pid);
-        if (_isRowOnline(d, now)) onlineOthers.add(pid);
+        final rowOnline = _isRowOnline(d, now);
+        if (rowOnline) onlineOthers.add(pid);
+        final since = _sinceOfRow(d, online: rowOnline);
+        if (since != null) {
+          final prev = sinceByMember[pid];
+          if (prev == null || since > prev) sinceByMember[pid] = since;
+        }
       }
       final othersTotal = _memberCount > 0
           ? (_memberCount - 1) > seenOthers.length
@@ -3457,6 +3489,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               myCount != _myEntranceCount ||
               othersOnline != _othersOnline ||
               othersTotal != _othersTotal ||
+              !mapEquals(sinceByMember, _otherSinceMs) ||
               !setEquals(_onlineOthers, onlineOthers))) {
         setState(() {
           _peerOnline = online;
@@ -3466,8 +3499,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           _myEntranceCount = myCount;
           _othersOnline = othersOnline;
           _othersTotal = othersTotal;
-          // 存副本：局部那个 Set 只是本轮的中间结果
+          // 存副本：局部那个 Set/Map 只是本轮的中间结果
           _onlineOthers = Set<String>.of(onlineOthers);
+          _otherSinceMs
+            ..clear()
+            ..addAll(sinceByMember);
         });
       }
     } catch (_) {
