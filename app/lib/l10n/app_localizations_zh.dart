@@ -433,7 +433,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return '把下方通道码发给 $name，凭它重新加入本秘境。原有通道不受影响。24 小时内一次性有效。';
+    return '把下方通道码发给“$name”，凭它重新加入本秘境。原有通道不受影响。24 小时内一次性有效。';
   }
 
   @override
@@ -619,7 +619,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageAttachmentStorageSubmit => '提交';
 
   @override
-  String get chatPageAttachmentStorageWarnClear => '切到「远程托管」会立即删除本机已留存的附件明文';
+  String get chatPageAttachmentStorageWarnClear => '切到“远程托管”会立即删除本机已留存的附件明文';
 
   @override
   String get chatPageMenuStyleLabel => '界面主题';
@@ -647,7 +647,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String wizardJoinInviteHint(String name, int count) {
-    return '被 $name 邀请加入秘境';
+    return '被“$name”邀请加入秘境';
   }
 
   @override
@@ -657,17 +657,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String wizardJoinAttachHint(String name) {
-    return '新增一条 $name 的通道';
+    return '新增一条“$name”的通道';
   }
 
   @override
   String wizardJoinReinviteHint(String name, String target) {
-    return '$name 重新邀请 $target 加入秘境';
+    return '“$name”重新邀请“$target”加入秘境';
   }
 
   @override
   String wizardJoinReinviteHintNoName(String target) {
-    return '重新邀请 $target 加入秘境';
+    return '重新邀请“$target”加入秘境';
   }
 
   @override
@@ -697,7 +697,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatPageReinvitePassphraseHint(String name) {
-    return '验证后，即可重新邀请 $name';
+    return '验证后，即可重新邀请“$name”';
   }
 
   @override

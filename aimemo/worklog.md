@@ -12485,3 +12485,58 @@ M 级改动。放弃。）
   3 个秘境数据一行未动（复核：spaces 3 行、profiles 3 个、消息 1 条）。
 - 效果：那 10 个秘境不再被 install_uid 闸门挡住，想重进再发一次邀请码即可；本机
   3 个在用的秘境照常（重启 App 后 spaces 仍 3 行，未再冒出孤儿键）。
+
+---
+
+## 2026-10-06 人名统一用弯引号「“ ”」（中英一致）；不用 @、不用 emoji 前缀
+
+老板先问"英文人名用什么包括、能不能也用「」"，讨论后定：**不分语言，人名一律弯引号
+`“{name}”`**——理由见下。落地时又发现仓库里引号惯例本来就不统一，一并收敛。
+
+### 为什么不用 `@name`（老板一度提的方案）
+
+- **前提不成立**：`member_name_policy.dart` / `server/src/memberName.ts` 的白名单是
+  `[0-9A-Za-z_-] + 汉字 + emoji`，**不含空格、不含 `@`、不含引号括号**（最长 32 字符）。
+  所以 `@(name)` / `@"name"` 里那对括号是为一个被 policy 挡掉的情况付的成本——纯多余，
+  还比 `“name”` 多一个字符。
+- **`@` 在聊天产品里是"提及/通知"的既定语义**，这里只是说明文案里的指代（不可点、
+  不通知）→ 用户会去点，且这个符号被装饰用掉，将来做真·提及时会撞。本仓库里 `@`
+  已经等于"邮箱地址"（chat_page 的邮箱校验）。
+- **emoji 小人像前缀也不合适**：本项目文案里现存的 emoji 全是有语义的状态标记
+  （`❌ / ⚠️ / ✅`，中英对称）；人名前放装饰性 👤 会让"开头图标=状态"失效。而且
+  "人名+图标"真正合适的落点是列表/卡片，那里已经有头像了；这 7 条都是句子。
+  真要加，正确做法是 `Icons.person_outline` 的 `WidgetSpan` + 加粗名字（并因此不再需要
+  引号）——但那是"改 l10n 结构"的重量级方案，本次不做。
+
+### 为什么弯引号、且中英同一个
+
+- `“ ”` 本来就是**大陆中文的标准双引号**（不是英文专用），中英各用一种颜色最省心；
+- `resetEntranceNameHint` 中英**本来就都是** `“{name}”` → 选它等于把已有的不一致抹平；
+- 仓库里另一处 `chatPageAttachmentStorageWarnClear` 是 zh `「远程托管」` + en 直引号
+  `"Remote only"`——一并统一掉。
+
+### 改动（各 7 处，zh / en 对称）
+
+人名嵌在句子里的 6 条 + 引号惯例 1 条：
+`chatPageInviteDialogHintReinvite`、`wizardJoinInviteHint`、`wizardJoinAttachHint`、
+`wizardJoinReinviteHint`、`wizardJoinReinviteHintNoName`、`chatPageReinvitePassphraseHint`、
+`chatPageAttachmentStorageWarnClear`。
+
+- zh 顺手**去掉了人名两侧多余的半角空格**（`被 {name} 邀请` → `被“{name}”邀请`）——
+  引号已足够分隔，原来的空格是"拉丁字母名字"的权宜之计。
+- **没动**：`resetEntranceNameLabel`（整条就是一个名字，给单值包引号很怪）、
+  `resetEntranceNameHint`（本来就是 `“ ”`）。
+- `flutter gen-l10n` 重新生成 `app_localizations*.dart`。
+
+### 并发隔离（重要）
+
+同一工作区**另一会话**正在改同一批 l10n 文件（"下方通道码"→"专属通道码" /
+`entrance token`→`dedicated entrance token`，以及 `chat_page.dart` 的成员卡整卡可点）——
+且**改了 ARB 但没重新生成**。本次提交在 **blob 层面**隔离：索引里放的是
+`HEAD + 我的 7 处`（不含他们的改动、`chat_page.dart` 完全不碰），他们的改动原样留在
+工作区未暂存。提交后 `git status` 应显示这些文件 `MM`（我的已暂存、他们的未暂存）。
+
+### 验证
+
+`flutter analyze` 干净；`scripts/testAll.sh app` **258 passed + 1 skipped / 0 failed**
+（该次运行的工作区包含并发会话的在途改动）。

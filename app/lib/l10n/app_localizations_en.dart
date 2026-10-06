@@ -472,7 +472,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageInviteDialogHintReinvite(String name) {
-    return 'Send the entrance token below to $name to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.';
+    return 'Send the entrance token below to “$name” to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.';
   }
 
   @override
@@ -672,7 +672,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAttachmentStorageWarnClear =>
-      'Switching to \"Remote only\" immediately deletes locally stored attachments';
+      'Switching to “Remote only” immediately deletes locally stored attachments';
 
   @override
   String get chatPageMenuStyleLabel => 'Theme';
@@ -702,7 +702,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String wizardJoinInviteHint(String name, int count) {
-    return 'Invited by $name';
+    return 'Invited by “$name”';
   }
 
   @override
@@ -712,17 +712,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String wizardJoinAttachHint(String name) {
-    return 'Add a new entrance of $name';
+    return 'Add a new entrance of “$name”';
   }
 
   @override
   String wizardJoinReinviteHint(String name, String target) {
-    return 'Invited by $name to add a new entrance of $target';
+    return 'Invited by “$name” to add a new entrance of “$target”';
   }
 
   @override
   String wizardJoinReinviteHintNoName(String target) {
-    return 'Invited to add a new entrance of $target';
+    return 'Invited to add a new entrance of “$target”';
   }
 
   @override
@@ -761,7 +761,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatPageReinvitePassphraseHint(String name) {
-    return 'After verification you can re-invite $name';
+    return 'After verification you can re-invite “$name”';
   }
 
   @override

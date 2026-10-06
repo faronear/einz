@@ -875,7 +875,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageInviteDialogHintReinvite.
   ///
   /// In en, this message translates to:
-  /// **'Send the entrance token below to {name} to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.'**
+  /// **'Send the entrance token below to “{name}” to join this space again. Existing entrances keep working. One-time use, valid for 24 hours.'**
   String chatPageInviteDialogHintReinvite(String name);
 
   /// No description provided for @chatPageInviteDialogReinviteFallbackName.
@@ -1205,7 +1205,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageAttachmentStorageWarnClear.
   ///
   /// In en, this message translates to:
-  /// **'Switching to \"Remote only\" immediately deletes locally stored attachments'**
+  /// **'Switching to “Remote only” immediately deletes locally stored attachments'**
   String get chatPageAttachmentStorageWarnClear;
 
   /// No description provided for @chatPageMenuStyleLabel.
@@ -1259,7 +1259,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinInviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Invited by {name}'**
+  /// **'Invited by “{name}”'**
   String wizardJoinInviteHint(String name, int count);
 
   /// No description provided for @wizardJoinInviteHintNoName.
@@ -1271,19 +1271,19 @@ abstract class AppLocalizations {
   /// No description provided for @wizardJoinAttachHint.
   ///
   /// In en, this message translates to:
-  /// **'Add a new entrance of {name}'**
+  /// **'Add a new entrance of “{name}”'**
   String wizardJoinAttachHint(String name);
 
   /// No description provided for @wizardJoinReinviteHint.
   ///
   /// In en, this message translates to:
-  /// **'Invited by {name} to add a new entrance of {target}'**
+  /// **'Invited by “{name}” to add a new entrance of “{target}”'**
   String wizardJoinReinviteHint(String name, String target);
 
   /// No description provided for @wizardJoinReinviteHintNoName.
   ///
   /// In en, this message translates to:
-  /// **'Invited to add a new entrance of {target}'**
+  /// **'Invited to add a new entrance of “{target}”'**
   String wizardJoinReinviteHintNoName(String target);
 
   /// No description provided for @chatPageMenuMembers.
@@ -1331,7 +1331,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageReinvitePassphraseHint.
   ///
   /// In en, this message translates to:
-  /// **'After verification you can re-invite {name}'**
+  /// **'After verification you can re-invite “{name}”'**
   String chatPageReinvitePassphraseHint(String name);
 
   /// No description provided for @chatPagePassphraseFieldHint.
