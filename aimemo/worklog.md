@@ -12468,3 +12468,20 @@ M 级改动。放弃。）
 - 本次只修"改/清锁屏码"这条**确定性**截断路径；若当时真的是 Keychain 条目丢失
   （跨 bundle id 的 `.ios` 旧组、整机清空等），凭证已不可恢复，那种截断无法在 App 内
   挽回——已在上面说明为什么不加死胡同式的守卫。
+
+### 本地 dev 环境一致性清理（老板选「一致性清理」口径）
+
+先备份（`sqlite3 .backup` 一致快照，无需停服）：`/tmp/einz-cleanup-20261006/`
+（`server-einz.sqlite.db`、`client-einz.sqlite`）。
+
+- **服务端**（`server/data/einz.sqlite.db`，WAL，直连 UPDATE）：把 `install_uid=feef527b…`
+  在"本地已无凭证的 10 个秘境"里的通道标 `status='revoked'`（**只改状态、不删行，可回退**）。
+  保留本地在用的 3 条（`91ddbe5e` ccc / `7cbef591` rose / `e0bfb17a` xixi）。复核：
+  该 install 现在 active=3 / revoked=12。用直连 SQL 而非 `/entrances/:id/revoke`
+  是为了**不发 `entrance.revoked` 广播**（避免影响别端）。
+- **客户端**（模拟器库；改前先 `xcrun simctl terminate` 释放 drift 连接）：删掉 7 个
+  无凭证秘境的残留——12 条 local_messages、6 条孤儿附件、3 条 sync_state、7 条
+  peer_receipts、7 个 `app_lock.profile.*`、1 个 `space.*` 设置键。保留下来的
+  3 个秘境数据一行未动（复核：spaces 3 行、profiles 3 个、消息 1 条）。
+- 效果：那 10 个秘境不再被 install_uid 闸门挡住，想重进再发一次邀请码即可；本机
+  3 个在用的秘境照常（重启 App 后 spaces 仍 3 行，未再冒出孤儿键）。
