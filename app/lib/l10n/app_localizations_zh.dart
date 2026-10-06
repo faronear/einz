@@ -676,6 +676,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatPageMembersHint => '如果同伴不慎丢失了所有通道，点击重新邀请，生成专属通道码，让同伴凭它重新加入秘境。';
+
+  @override
   String chatPageMembersTitle(String mode) {
     return '我的同伴';
   }
@@ -707,7 +710,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPagePassphraseHide => '隐藏';
 
   @override
-  String get chatPageMembersInviteNew => '邀请新成员';
+  String get chatPageMembersInviteNew => '邀请新同伴';
 
   @override
   String chatPageMembersFullWithMax(int current, int max) {
@@ -718,7 +721,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageEntranceListFailed => '无法获取其他通道（当前离线？）';
 
   @override
-  String get chatPageEntranceScopeHint => '通道是设备连接到秘境的专属线路。以下是您连接到当前秘境的所有通道。';
+  String get chatPageEntranceScopeHint => '通道是设备连接到秘境的专属线路。以下是您绑定到当前秘境的所有通道。';
 
   @override
   String get chatPageEntranceListThisDevice => '当前通道名称';

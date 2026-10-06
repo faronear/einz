@@ -2566,6 +2566,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               fontWeight: FontWeight.w600, fontSize: 16)),
                     ),
                   ),
+                  // 标题下备注行（老板 2026-10-06）：式样同「我的秘境」「通道列表」
+                  // 弹层标题下的说明——淡色小字、居中。duo **对方尚未加入**时不显示
+                  // （那时按钮是「邀请」新同伴，与备注说的「重新邀请」不符；对方
+                  // 加入后 duo 按钮也是「重新邀请」，同样适用这条备注）。
+                  if (!(!_isGroup && _peerJoined == false))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Center(
+                        child: Text(l10n.chatPageMembersHint,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(ctx).colorScheme.outline)),
+                      ),
+                    ),
                   for (final e in others)
                     _membersCard(
                       memberId: e.key,
@@ -2580,21 +2595,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             e.key, _memberNames[e.key]));
                       },
                     ),
-                  // 未满 → 末尾一张邀请占位卡（默认头像 + 淡色"待加入"占位词）
-                  if (_canInvite)
+                  // 未满 → 末尾一张邀请卡（duo 保留"默认头像+待加入+邀请"版式；
+                  // **群组改加号行**（老板 2026-10-06）：头像与"待加入"占位词去掉，
+                  // 与「添加秘境」/「新建通道」同款——加号图标 + 文字整体居中；
+                  // 底色暂保持原中性 tint，等老板检查）
+                  if (_canInvite && !_isGroup)
                     _membersCard(
                       memberId: null, // 默认头像
                       gender: '',
                       name: l10n.memberPending, // 占位词（"待加入"）
                       faintName: true,
-                      actionLabel: _isGroup
-                          ? l10n.chatPageMembersInviteNew
-                          : l10n.chatPageMembersInvite,
+                      actionLabel: l10n.chatPageMembersInvite,
                       onAction: () {
                         Navigator.of(ctx).pop();
                         _menuAction(
                             () => _showInviteDialog(purpose: 'invite'));
                       },
+                    )
+                  else if (_canInvite && _isGroup)
+                    Material(
+                      color: _genderTint(''), // 底色暂保持不变，等老板检查
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(mouseCursor: SystemMouseCursors.click,
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          _menuAction(
+                              () => _showInviteDialog(purpose: 'invite'));
+                        },
+                        hoverColor: Colors.black.withValues(alpha: 0.05),
+                        highlightColor: Colors.black.withValues(alpha: 0.08),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.add),
+                              const SizedBox(width: 6),
+                              Text(l10n.chatPageMembersInviteNew),
+                            ],
+                          ),
+                        ),
+                      ),
                     )
                   else if (_isGroup)
                     // 群组满员：末尾那张卡变灰（不可点、无按钮），只说"已满"。

@@ -1292,6 +1292,12 @@ abstract class AppLocalizations {
   /// **'{mode, select, duo{My companion} other{My companions}}'**
   String chatPageMenuMembers(String mode);
 
+  /// No description provided for @chatPageMembersHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If a companion loses all entrances, tap Re-invite to generate a dedicated entrance token for them to rejoin this space.'**
+  String get chatPageMembersHint;
+
   /// No description provided for @chatPageMembersTitle.
   ///
   /// In en, this message translates to:
@@ -1349,7 +1355,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMembersInviteNew.
   ///
   /// In en, this message translates to:
-  /// **'Invite new member'**
+  /// **'Invite new companion'**
   String get chatPageMembersInviteNew;
 
   /// No description provided for @chatPageMembersFullWithMax.
@@ -1367,7 +1373,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageEntranceScopeHint.
   ///
   /// In en, this message translates to:
-  /// **'An entrance connects a device to a space. Below are all your entrances to this space.'**
+  /// **'An entrance connects a device to a space. Below are all your authorized entrances to this space.'**
   String get chatPageEntranceScopeHint;
 
   /// No description provided for @chatPageEntranceListThisDevice.

@@ -735,6 +735,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatPageMembersHint =>
+      'If a companion loses all entrances, tap Re-invite to generate a dedicated entrance token for them to rejoin this space.';
+
+  @override
   String chatPageMembersTitle(String mode) {
     String _temp0 = intl.Intl.selectLogic(mode, {
       'duo': 'My companion',
@@ -770,7 +774,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePassphraseHide => 'Hide';
 
   @override
-  String get chatPageMembersInviteNew => 'Invite new member';
+  String get chatPageMembersInviteNew => 'Invite new companion';
 
   @override
   String chatPageMembersFullWithMax(int current, int max) {
@@ -783,7 +787,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageEntranceScopeHint =>
-      'An entrance connects a device to a space. Below are all your entrances to this space.';
+      'An entrance connects a device to a space. Below are all your authorized entrances to this space.';
 
   @override
   String get chatPageEntranceListThisDevice => 'Current entrance name';
