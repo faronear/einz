@@ -2705,7 +2705,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 成员卡（每行一张）：底色=性别色；左头像+名字，右文字按钮；**整卡可点**。
+  /// 成员卡（每行一张）：底色=性别色；左头像+名字，右文字按钮。
+  /// **只有右侧按钮可点**（老板 2026-10-06：整卡可点不需要，误触会直接弹出口令框）。
   /// [memberId] 为空 = "尚未加入"的占位卡（默认头像、不显示名字）。
   Widget _membersCard({
     required String? memberId,
@@ -2724,43 +2725,41 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         color: muted ? _genderTint('') : _genderTint(gender),
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onAction,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                _MessageAvatar(
-                  memberId: memberId,
-                  server: effectiveServer,
-                  api: widget.api,
-                  radius: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    hasName ? name! : '', // 尚未加入：不显示名字
-                    style: TextStyle(
-                      fontSize: 15,
-                      color:
-                          (muted || faintName) ? scheme.onSurfaceVariant : null,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+        // 卡片本体不再是 InkWell（原来整卡 onTap=onAction）；只留普通容器。
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              _MessageAvatar(
+                memberId: memberId,
+                server: effectiveServer,
+                api: widget.api,
+                radius: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  hasName ? name! : '', // 尚未加入：不显示名字
+                  style: TextStyle(
+                    fontSize: 15,
+                    color:
+                        (muted || faintName) ? scheme.onSurfaceVariant : null,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                // 有动作才放按钮；"已满"卡（muted）没有按钮
-                if (actionLabel != null) ...[
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: onAction,
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    child: Text(actionLabel),
+              ),
+              // 有动作才放按钮；"已满"卡（muted）没有按钮
+              if (actionLabel != null) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: onAction,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
                   ),
-                ],
+                  child: Text(actionLabel),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),
