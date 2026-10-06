@@ -1556,7 +1556,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     const gap = 8.0;
 
     final others = _otherMembers;
-    return Row(
+    final Widget body = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (others.isNotEmpty) ...[
@@ -1565,6 +1565,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ],
         Text(countLabel, style: countStyle, maxLines: 1),
       ],
+    );
+    // **有人加入后整块做成可点胶囊**（老板 2026-10-06）：点开「我的同伴」弹层。
+    // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）；
+    // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
+    // 头像条现在与右方头像同高（40）上下顶满胶囊（老板 2026-10-06），**左右也贴边**：
+    // 外层 `pad.left(10)` 推离 10，这里左移 10 回到边缘、左内边距 0（头像三面贴壁，
+    // 与 duo 的我方/对方头像同一口径）。没有人加入（others 空）时纯展示，不可点。
+    if (others.isEmpty) return body;
+    return Transform.translate(
+      offset: const Offset(-10, 0),
+      child: Material(
+        color: Colors.transparent,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(mouseCursor: SystemMouseCursors.click,
+          onTap: _showMembersSheet,
+          hoverColor: Colors.black.withValues(alpha: 0.05),
+          highlightColor: Colors.black.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
+            child: body,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1619,7 +1643,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   一次带缓存的异步取图）。
   Widget _avatarStrip(List<MapEntry<String, int>> others, double budget) {
     const size = kStatusMemberAvatarSize;
-    const gap = 4.0;
+    // 头像之间**不留空隙**（老板 2026-10-06：像连排印章，与右侧我方头像同高顶满）
+    const gap = 0.0;
     // 渐隐区宽度：够看出一截"淡下去"，又不至于吞掉一整个头像
     const fade = 16.0;
     // 兜底：budget 太小时至少摆一个（超过一点也不会撑破胶囊——它只是"一半宽"的软上限）
@@ -8096,9 +8121,10 @@ const double kStatusAvatarSize = 40;
 
 /// 状态条左侧「成员头像条」里每个头像的直径。
 ///
-/// 比右侧我自己的 [kStatusAvatarSize]（40）**小一号**：一排人挤在 40 高里会堵，
-/// 小一号也更像"一串成员"。群空间专用（老板 2026-10-05）。
-const double kStatusMemberAvatarSize = 32;
+/// 与右侧我自己的 [kStatusAvatarSize]（40）**同尺寸**：老板 2026-10-06 改版——
+/// 头像条要像右侧头像一样**上下顶满**状态条高（40），头像之间**不留空隙**；
+/// 32 的小一号挤在胶囊里反而要留边。群空间专用。
+const double kStatusMemberAvatarSize = 40;
 
 /// 消息气泡旁的头像直径（`_MessageAvatar` 的默认半径 16 × 2）。
 ///
