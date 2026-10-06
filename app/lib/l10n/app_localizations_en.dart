@@ -815,7 +815,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageNotifyHint =>
-      'If you have new messages and haven\'t been online for a while, we\'ll email you here. Alert emails never contain message text.';
+      'If you have new messages and haven\'t been online for a while, a notification email will be sent here. Alert emails never contain message text.';
 
   @override
   String get chatPageNotifyAllSpaces =>

@@ -388,7 +388,7 @@
   "chatPagePinSetValue": "Set",
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
-  "chatPageNotifyHint": "If you have new messages and haven't been online for a while, we'll email you here. Alert emails never contain message text.",
+  "chatPageNotifyHint": "If you have new messages and haven't been online for a while, a notification email will be sent here. Alert emails never contain message text.",
   "chatPageNotifyAllSpaces": "Apply this setting to all spaces on this device.",
   "chatPageNotifyEmailLabel": "Email",
   "chatPageNotifyEmptyError": "Enter an email address first",

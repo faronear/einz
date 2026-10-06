@@ -311,7 +311,11 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 对**别人的身份**动手 = 与"撤销别人通道"同一档授权：要共享口令。
     // 顺序刻意对齐 revokeEntrance——先做便宜的目标合法性检查（目标必须在本空间），
     // 再验口令，免得"错的目标"也消耗口令尝试预算。
-    if (purpose === 'attach' && targetMemberId != null && targetMemberId !== sess.member_id) {
+    if (
+      purpose === 'attach' &&
+      targetMemberId != null &&
+      targetMemberId !== sess.member_id
+    ) {
       if (!isSpaceMember(spaceId, targetMemberId)) {
         throw new ApiError('INVALID_REQUEST', '目标身份不属于本空间', 400)
       }
@@ -322,7 +326,7 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       requestBaseUrl(req),
       purpose,
       sess.member_id,
-      targetMemberId,
+      targetMemberId
     )
     // 审计：谁给谁发了什么码（**不记口令**；target 与签发者不同 = 定向找回）
     logActivity({
@@ -383,7 +387,10 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     const body = await readJsonBody(req)
     const entranceId = String(body?.entrance_id ?? '')
     // space 必填：会话必须绑定空间（v1 收敛后不再有"无 space 会话"这种形态）
-    const result = await createChallenge(entranceId, String(body?.space_id ?? ''))
+    const result = await createChallenge(
+      entranceId,
+      String(body?.space_id ?? '')
+    )
     sendJson(res, 200, result)
     return
   }
@@ -682,19 +689,19 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   // 借邮件系统自带的推送把他拉回来。节流策略与"为什么不做账本"见 notifier.ts 顶部。
   if (method === 'PUT' && path === '/notify/email') {
     limitByIp(req, 'auth')
-    const b = (await readJsonBody(req) ?? {}) as Record<string, unknown>
+    const b = ((await readJsonBody(req)) ?? {}) as Record<string, unknown>
     // lang：提醒邮件的正文语言（zh/en），客户端按自己的界面语言上报——服务端
     // 无从知道收件人读哪种语言。缺/非法值一律按 zh 处理（notifier.mailLang）。
-    sendJson(res, 200, await setNotifyEmail(
-      bearerToken(req),
-      String(b.email ?? ''),
-      {
+    sendJson(
+      res,
+      200,
+      await setNotifyEmail(bearerToken(req), String(b.email ?? ''), {
         lang: typeof b.lang === 'string' ? b.lang : null,
         // 确认链接按**请求自己的地址**生成（同邀请链接）：连 localhost 就指 localhost，
         // 连正式域名就指正式域名——本地联调不必再手工改邮件里的域名。
         baseUrl: requestBaseUrl(req)
-      }
-    ))
+      })
+    )
     return
   }
   if (method === 'GET' && path === '/notify/email') {
@@ -707,22 +714,31 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
   if (method === 'GET' && path === '/notify/verify') {
     const r = consumeNotifyToken(url.searchParams.get('token') ?? '', 'verify')
-    sendHtml(res, notifyPage(
-      r.ok ? '邮箱已确认' : '链接不可用',
-      r.ok
-        ? '以后你在 Einz 有新消息又长时间没上线时，我们会往这个邮箱发一封提醒。'
-        : '这个确认链接已经用过或者过期了。在 App 里重新填一次邮箱就能收到一封新的。'
-    ))
+    sendHtml(
+      res,
+      notifyPage(
+        r.ok ? '邮箱已确认' : '链接不可用',
+        r.ok
+          ? '以后你在 Einz 有新消息又长时间没上线时，这个邮箱会收到一封提醒。'
+          : '这个确认链接已经用过或者过期了。在 App 里重新填一次邮箱就能收到一封新的。'
+      )
+    )
     return
   }
   if (method === 'GET' && path === '/notify/unsubscribe') {
-    const r = consumeNotifyToken(url.searchParams.get('token') ?? '', 'unsubscribe')
-    sendHtml(res, notifyPage(
-      r.ok ? '已停止发送' : '链接不可用',
-      r.ok
-        ? '不会再有 Einz 的消息提醒寄到这里了。想恢复时在 App 里重新填一次这个邮箱即可。'
-        : '链接失效了。在 App 里删掉再重新填一次邮箱，会拿到新的退订链接。'
-    ))
+    const r = consumeNotifyToken(
+      url.searchParams.get('token') ?? '',
+      'unsubscribe'
+    )
+    sendHtml(
+      res,
+      notifyPage(
+        r.ok ? '已停止发送' : '链接不可用',
+        r.ok
+          ? '不会再有 Einz 的消息提醒寄到这里了。想恢复时在 App 里重新填一次这个邮箱即可。'
+          : '链接失效了。在 App 里删掉再重新填一次邮箱，会拿到新的退订链接。'
+      )
+    )
     return
   }
 

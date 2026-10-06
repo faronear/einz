@@ -748,8 +748,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageNotifyTitle => '我的邮件通知';
 
   @override
-  String get chatPageNotifyHint =>
-      '你长时间不在线时，如果有新消息，我们会往这个邮箱发一封提醒。提醒邮件里不会有消息内容。';
+  String get chatPageNotifyHint => '你长时间不在线时，如果有新消息，这个邮箱会收到一封提醒。提醒邮件里不会有消息内容。';
 
   @override
   String get chatPageNotifyAllSpaces => '应用于本机所有秘境。';

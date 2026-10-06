@@ -191,13 +191,8 @@ export function planNotifications (now = Date.now()): NotifyPlan[] {
     // ⑤ 计次封顶：同一批未读（最新一条没变）重提满 remindMax 封就停。
     //    "新一批" = 本轮 newestAt 晚于上次发信时记录的 reminded_at → 有新消息进来，
     //    计数清零重新算；收件人一直不读就最多被拍 remindMax 封，不会无限轰炸。
-    const sameBatch =
-      row.reminded_at != null && newestAt <= row.reminded_at
-    if (
-      sameBatch &&
-      row.remind_count >= remindMax
-    )
-      continue
+    const sameBatch = row.reminded_at != null && newestAt <= row.reminded_at
+    if (sameBatch && row.remind_count >= remindMax) continue
 
     plans.push({
       email: row.email,
@@ -400,9 +395,10 @@ function markSent (email: string, now: number, newestAt: number): void {
   if (row == null) return
   const count = row.sent_day === day ? row.sent_count + 1 : 1
   // 计次封顶记账：同批未读（newestAt 没变）递增；新一批（有新消息）清零重计。
-  const streak = row.reminded_at != null && newestAt <= row.reminded_at
-    ? row.remind_count + 1
-    : 1
+  const streak =
+    row.reminded_at != null && newestAt <= row.reminded_at
+      ? row.remind_count + 1
+      : 1
   db.prepare(
     `UPDATE notify_emails
         SET last_sent_at = ?, sent_day = ?, sent_count = ?,
@@ -582,8 +578,8 @@ const VERIFY_COPY: Record<MailLang, VerifyCopy> = {
     subject: () => '[Einz] 确认这个邮箱接收消息提醒',
     greeting: name => (name == null ? null : `${name}：`),
     why: () =>
-      '这个邮箱被填成了 Einz 的消息提醒地址——你在 Einz 有新消息时，我们会往这里发一封提醒。',
-    confirm: url => `确认要接收请点这个链接：${url}`,
+      '这个邮箱被填成了 Einz 的消息提醒地址——你在 Einz 有新消息时，这个邮箱会收到一封提醒。',
+    confirm: url => `确认要接收提醒，请点这个链接：${url}`,
     notYou: () =>
       '如果不是你填的，忽略这封邮件就好——不点链接就什么都不会发生。',
     noContent: () =>

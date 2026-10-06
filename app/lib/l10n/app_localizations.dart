@@ -1427,7 +1427,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyHint.
   ///
   /// In en, this message translates to:
-  /// **'If you have new messages and haven\'t been online for a while, we\'ll email you here. Alert emails never contain message text.'**
+  /// **'If you have new messages and haven\'t been online for a while, a notification email will be sent here. Alert emails never contain message text.'**
   String get chatPageNotifyHint;
 
   /// No description provided for @chatPageNotifyAllSpaces.

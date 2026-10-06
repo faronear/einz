@@ -371,7 +371,7 @@
   "chatPagePinSetValue": "已设置",
   "chatPageNotifyLabel": "我的邮件通知",
   "chatPageNotifyTitle": "我的邮件通知",
-  "chatPageNotifyHint": "你长时间不在线时，如果有新消息，我们会往这个邮箱发一封提醒。提醒邮件里不会有消息内容。",
+  "chatPageNotifyHint": "你长时间不在线时，如果有新消息，这个邮箱会收到一封提醒。提醒邮件里不会有消息内容。",
   "chatPageNotifyAllSpaces": "应用于本机所有秘境。",
   "chatPageNotifyEmailLabel": "邮箱",
   "chatPageNotifyEmptyError": "先填一个邮箱地址",
