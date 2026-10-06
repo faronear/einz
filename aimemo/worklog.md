@@ -12592,3 +12592,7 @@ M 级改动。放弃。）
 **⚠️ 推 main 是发布动作**：`buildMultiPlatform.yml` 在 **push main** 时会跑全平台构建
 （macOS 10x / Windows 2x 额度），且 **iOS 构建成功即自动上传 TestFlight**、
 macOS 走 Developer ID 签名+公证。所以合并已在本地完成，**推送留给老板**（或等我确认）。
+
+**老板决定（2026-10-06）：先不推**。合并停在本地 `main=3aaf77e`（工作区干净、HEAD 在
+main）。要推时用 `git push github main`——注意 main 的 upstream 仍是 `origin`（tic.cc，
+当前不可用），光 `git push` 打不到 github；要改 upstream 说一声。
