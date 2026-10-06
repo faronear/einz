@@ -7507,7 +7507,13 @@ class _SetLockDialogState extends State<_SetLockDialog> {
 
     // 已设锁屏码：修改与清空都必须先验证当前锁屏码（老板 2026-09-14 定）——
     // 否则"清空 → 重设"两步即可绕过验证；手机被他人短暂拿到就能装一个自己的 PIN。
-    // 验证走 AppLockService.unlock（与锁屏同一套防爆破：连错 5 次锁 30 秒）。
+    // 验证走 AppLockService.unlockVault（与锁屏同一套防爆破：连错 5 次锁 30 秒）。
+    //
+    // 顺带把整包 Vault 取出来：多空间下"改 / 清锁屏码"必须把**全部空间**一起搬
+    // （改：重加密整包；清：整包转明文）。已有的明文包在 PIN 模式下按设计不存在，
+    // 不给整包就只能写进当前这一个空间、静默丢掉其他秘境——见 AppLockService.setPin /
+    // savePlain 的 existing 参数（2026-10-06 模拟器实测的截断 bug）。
+    VaultPayload? existingVault;
     if (_hasPin) {
       if (oldPin.isEmpty) {
         setState(() => _error = l10n.chatPageSetLockOldRequired);
@@ -7518,7 +7524,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
         _error = null;
       });
       try {
-        await AppLockService(widget.db).unlock(oldPin);
+        existingVault = await AppLockService(widget.db).unlockVault(oldPin);
       } on AppLockLockedException catch (e) {
         if (!mounted) return;
         setState(() {
@@ -7573,7 +7579,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
       );
       if (confirmed != true) return; // 取消：留在本弹窗（不执行清除）
       try {
-        await AppLockService(widget.db).savePlain(widget.payload);
+        await AppLockService(widget.db).savePlain(widget.payload, existing: existingVault);
         await AppLockService(widget.db).clearPackage();
         if (!mounted) return;
         Navigator.of(context).pop(true); // 菜单刷新「PIN: 未设置」
@@ -7606,7 +7612,7 @@ class _SetLockDialogState extends State<_SetLockDialog> {
     final overlay = Overlay.of(context, rootOverlay: true);
     // 设置/重设不再弹二次确认（老板 2026-09-14：新码/确认两栏已足够，多一次确认多余）
     try {
-      await AppLockService(widget.db).setPin(pin, payload: widget.payload);
+      await AppLockService(widget.db).setPin(pin, payload: widget.payload, existing: existingVault);
       if (!mounted) return;
       Navigator.of(context).pop(true); // true = 设置成功（菜单刷新「PIN: 已设置」）
       showTopNoticeOn(overlay, l10n.chatPageSetLockDone, extraTop: kNoticeExtraTopBelowStatusBar);

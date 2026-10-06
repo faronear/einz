@@ -12400,3 +12400,71 @@ o1 在线、o2 离线）、**人数在头像右侧**、**整块不越过胶囊�
 ### 验证
 
 `flutter analyze` 干净；**全量 app 测试 255 passed + 1 skipped / 0 failed**。
+
+---
+
+## 2026-10-06 修 Vault 合并截断 bug：多空间下改/清锁屏码会静默丢掉其他秘境
+
+老板："`npm run app-ios-boot && npm run app-ios-run-local` 之后 iOS app 不再显示之前
+设置好的通道，重新设置却报『后台：本机已经有通道加入了这个秘境』。请调查，并评估
+要不要弱化这条限制（允许同安装多条通道指向同一秘境、主人不同）。"
+
+### 调查（模拟器 + 服务端真库实测，非推断）
+
+| 证据 | 结果 |
+|---|---|
+| 模拟器库 `spaces` 表 | **只剩 3 行**（ccc / rose / xixi） |
+| 同库 `app_state` | `install_uid=feef527b…`；**10 个** `app_lock.profile.*` |
+| 服务端库该 install_uid | **13 条 active 通道**（跨 7 个"本地已无凭证"的空间） |
+| Keychain | 当前明文 vault 条目只装得下 3 个空间 |
+
+→ 本地 Vault 只剩 3 个秘境、服务端还留着其余 7 个通道；2026-09-25 那次"残档自愈"
+（`_syncSpaceRows` 删掉 Vault 里没有的 spaces 行）又把本地闸门 `_isSpaceAlreadyAdded`
+的证据删了，于是**本地放行 → 撞服务端 install_uid 闸门**，报带「后台：」前缀的
+`ENTRANCE_ALREADY_EXISTS`。`app-ios-boot / app-ios-run-local` 都不清库不卸载，只是重启
+让它显形（只有 `-new` 变体会 uninstall）。
+
+**真因（可复现）**：`app_lock.dart` 的 `_mergedVault` 写成
+`loadPlainVault() ?? VaultPayload.single(payload)`。而 PIN 模式下明文包**按设计不存在**
+（`writePinVault` 会清掉它）→ 走 `single(payload)` → 「修改锁屏码」「清空锁屏码」变成
+**只写当前这一个空间**，其他秘境静默消失。多空间 + 有 PIN 的用户一改锁屏码就中招。
+
+### 决定：不放宽限制（老板拍板）
+
+"只为测试不值得放宽限制；为了测试我可以另想办法，不该让生产环境冒险、混乱。"
+（同安装多通道指向同秘境、主人不同——服务端 1 行即可，但会让 invite 类加入的
+install_uid 闸门完全失效；客户端还要把一切 spaceId 键升到 (spaceId, entranceId)，
+M 级改动。放弃。）
+
+### 改动
+
+- `AppLockService.setPin / savePlain` 新增可选的 **`existing`（整包 Vault）**；
+  合并基底改由 `_mergeBase(payload, explicit)` 决定：
+  有 `explicit` 用它 → 否则读明文包 → 再没有且 `isSetup`（PIN 模式）→
+  **抛 `AppLockException` 拒绝写入**（宁可报错也不静默截断）→ 都没有才是全新安装，
+  退化为单空间。
+- `chat_page.dart` 的设锁弹窗：验证旧码时顺手 `unlockVault(oldPin)` 取出整包，
+  「改锁屏码」「清空锁屏码」两条路都把整包传进去。
+- 为什么不做"读不到旧 Vault 就拒绝"的全量守卫：`SecureStore.read` 只在条目**真的
+  不存在**或 JSON 损坏时返回 null（访问失败是抛异常）。这两种情况下其他空间的
+  Space Key 反正已经取不出来了，阻断加入只是造一个死胡同——所以只在"能拿到整包却没给"
+  这个**调用方 bug** 上设闸。
+
+### 回归测试 `app/test/vault_test.dart`（+3，落在 PIN 模式 group）
+
+① 改锁屏码带 `existing` → 两空间都在；② 清锁屏码带 `existing` → 两空间都在；
+③ 不给 `existing` → `setPin`/`savePlain` 都抛 `AppLockException`，且原密文包原封不动。
+**变异验证**：把 `_mergeBase` 临时换回旧实现（忽略 explicit、无守卫）→ ①②
+`Actual: ['space-b']`（正是被截断）、③ 不抛 → 三条全红；还原 → 绿。
+
+### 验证
+
+`flutter analyze` 干净；`scripts/testAll.sh app` **258 passed + 1 skipped / 0 failed**。
+
+### 遗留（供老板定）
+
+- 那 7 个空间本地凭证已彻底丢失（Space Key 只在 escrow/口令里），dev 环境要么弃掉、
+  要么把服务端这些通道标 `revoked` 后重新用邀请码加入。
+- 本次只修"改/清锁屏码"这条**确定性**截断路径；若当时真的是 Keychain 条目丢失
+  （跨 bundle id 的 `.ios` 旧组、整机清空等），凭证已不可恢复，那种截断无法在 App 内
+  挽回——已在上面说明为什么不加死胡同式的守卫。

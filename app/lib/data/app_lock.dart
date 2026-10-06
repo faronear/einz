@@ -120,8 +120,11 @@ class AppLockService {
   ///
   /// 多空间下写的是**整个 Vault**：该空间并入现有 Vault 并置为 active
   /// （旧单包读时自动归一，见 [VaultPayload.fromJson]）。
-  Future<void> savePlain(AppLockPayload payload) async {
-    await writePlainVault(await _mergedVault(payload));
+  ///
+  /// [existing]：调用方已知的整包（如"清空锁屏码"路径刚用旧码解出的那份）。
+  /// 已有锁屏码时**必须**给，否则拒绝写入而非静默截断——见 [_mergeBase]。
+  Future<void> savePlain(AppLockPayload payload, {VaultPayload? existing}) async {
+    await writePlainVault(await _mergeOnto(payload, existing));
   }
 
   /// 读取明文 Space Key 包（跳过 PIN 的无锁配置）；不存在返回 null。
@@ -336,9 +339,33 @@ class AppLockService {
   }
 
   /// 现有 Vault 并入 [payload]（按 spaceId 覆盖或追加），并置为 active。
-  Future<VaultPayload> _mergedVault(AppLockPayload payload) async {
-    final vault = await loadPlainVault() ?? VaultPayload.single(payload);
+  Future<VaultPayload> _mergeOnto(
+      AppLockPayload payload, VaultPayload? existing) async {
+    final vault = await _mergeBase(payload, existing);
     return vault.upsert(payload).copyWith(activeSpaceId: payload.spaceId);
+  }
+
+  /// 取"合并基底"（现有 Vault）。
+  ///
+  /// 只有**确实没有任何 Vault**（全新安装）时才退化为"只有 [payload] 一个空间"。
+  ///
+  /// 教训（2026-10-06 模拟器实测）：已有锁屏码时明文包**按设计不存在**
+  /// （[writePinVault] 会清掉它），原先这里一句 `?? VaultPayload.single(payload)`
+  /// 就把"修改 / 清空锁屏码"变成了"只留当前这一个空间"——多空间用户一改锁屏码，
+  /// 其他秘境静默消失（本地凭证没了、服务端通道还在 → 之后重新加入撞
+  /// `ENTRANCE_ALREADY_EXISTS`，卡死）。所以 PIN 模式必须由调用方给出整包
+  /// [explicit]（改/清锁屏码的路径手里有旧码，解一次就能拿到），拿不到就
+  /// **拒绝写入**，绝不静默截断。
+  Future<VaultPayload> _mergeBase(
+      AppLockPayload payload, VaultPayload? explicit) async {
+    if (explicit != null) return explicit;
+    final plain = await loadPlainVault();
+    if (plain != null) return plain;
+    if (await isSetup) {
+      throw const AppLockException(
+          '已有锁屏码：合并 Vault 需要提供现有整包，拒绝只写当前空间以免丢失其他秘境');
+    }
+    return VaultPayload.single(payload);
   }
 
   /// Vault 与 Spaces 表对齐（列表页展示名字/未读用）：Vault 里每个空间都保证有行，
@@ -412,8 +439,12 @@ class AppLockService {
   ///
   /// [payload] 并入现有 Vault 并置为 active——覆盖写"唯一一个空间"的旧语义在多空间下
   /// 会丢掉其他空间，故这里只覆盖同 spaceId 的那一项。
-  Future<void> setPin(String pin, {required AppLockPayload payload}) async {
-    await writePinVault(pin, await _mergedVault(payload));
+  ///
+  /// [existing]：**修改锁屏码**（本来就有 PIN）时必须给——此时明文包按设计不存在，
+  /// 只能把"刚验证旧码后解出的整包"传进来，否则其他空间会被静默丢掉（见 [_mergeBase]）。
+  Future<void> setPin(String pin,
+      {required AppLockPayload payload, VaultPayload? existing}) async {
+    await writePinVault(pin, await _mergeOnto(payload, existing));
   }
 
   /// 恢复码兑底已删除（老板决策）：PIN 丢失即无法解锁本设备密钥包。

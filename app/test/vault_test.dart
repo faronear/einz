@@ -168,6 +168,50 @@ void main() {
         throwsA(isA<AppLockLockedException>()),
       );
     });
+
+    // 2026-10-06 截断 bug 回归：PIN 模式下明文包按设计不存在，而"改 / 清锁屏码"
+    // 原先会退化成"只写当前这一个空间"——多空间用户一改锁屏码，其他秘境静默消失。
+    test('已有 PIN 时改锁屏码：带 existing 整包合并，其他空间不丢', () async {
+      await lock.setPin('123456', payload: payloadA);
+      await lock.addSpace(payloadB, pin: '123456');
+      // 模拟聊天页：先用旧码解出整包，再拿它改码
+      final existing = await lock.unlockVault('123456');
+      await lock.setPin('654321', payload: payloadB, existing: existing);
+
+      final vault = await lock.unlockVault('654321');
+      expect(vault.spaces.map((s) => s.spaceId), ['space-a', 'space-b']);
+    });
+
+    test('已有 PIN 时清锁屏码：带 existing → 整包转明文，其他空间不丢', () async {
+      await lock.setPin('123456', payload: payloadA);
+      await lock.addSpace(payloadB, pin: '123456');
+      final existing = await lock.unlockVault('123456');
+
+      await lock.savePlain(payloadB, existing: existing); // 模拟聊天页「清空锁屏码」
+      await lock.clearPackage();
+
+      final vault = (await lock.loadVault())!;
+      expect(vault.spaces.map((s) => s.spaceId), ['space-a', 'space-b']);
+    });
+
+    test('已有 PIN 时不给 existing：拒绝合并，不静默只留当前空间', () async {
+      await lock.setPin('123456', payload: payloadA);
+      await lock.addSpace(payloadB, pin: '123456');
+
+      // 改码 / 清码两条路都必须传整包：拿不到宁可报错，也绝不截断
+      await expectLater(
+        lock.setPin('654321', payload: payloadB),
+        throwsA(isA<AppLockException>()),
+      );
+      await expectLater(
+        lock.savePlain(payloadB),
+        throwsA(isA<AppLockException>()),
+      );
+
+      // 原密文包原封不动：两个空间都还在
+      final vault = await lock.unlockVault('123456');
+      expect(vault.spaces.map((s) => s.spaceId), ['space-a', 'space-b']);
+    });
   });
 
   group('当前空间（active）：切换不需要锁屏码', () {
