@@ -107,7 +107,12 @@ class _StyleOptionCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Material(
-        color: active ? scheme.secondaryContainer.withValues(alpha: 0.55) : Colors.transparent,
+        // 未选中项也有**淡淡的底色**（老板 2026-10-06）：plain 的示例图是近白的
+        // 浅粉 #FFF5FA，与弹层底色几乎分不出边界——给未选中卡 3% 黑的中性底，
+        // 选中项仍是更明显的浅粉高亮（secondaryContainer 55%），层次不变。
+        color: active
+            ? scheme.secondaryContainer.withValues(alpha: 0.55)
+            : Colors.black.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(14),
