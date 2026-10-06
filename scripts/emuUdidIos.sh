@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 输出要跑 App 的那台模拟器 UDID，供 app-ios-emu-run-* 使用。
+# 输出要跑 App 的那台模拟器 UDID，供 app-ios-run-* 使用。
 #
 # 不给参数（默认）：纯 booted 语义——打「当前已启动的那台」。
 #                   有多台同时开着会直接报错，避免稀里糊涂打到另一台上。
 # 给参数（覆盖）  ：解析成指定的那台，跳过 booted 检查。
-#                   EMU=ip16@26.3 npm run app-ios-emu-run-local
+#                   EMU=ip16@26.3 npm run app-ios-run-local
 #                   （flutter run 会自己把它启动起来，不用先 boot）
 set -euo pipefail
 
@@ -28,7 +28,7 @@ if (( count > 1 )); then
   echo "❌ 有 ${count} 台模拟器同时开着，不知道该打哪台：" >&2
   xcrun simctl list devices booted >&2
   echo "   关掉多余的：xcrun simctl shutdown <UDID>" >&2
-  echo "   或者直接指定：EMU=ip16@26.3 npm run app-ios-emu-run-local" >&2
+  echo "   或者直接指定：EMU=ip16@26.3 npm run app-ios-run-local" >&2
   exit 1
 fi
 
