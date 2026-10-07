@@ -1,0 +1,113 @@
+# https://help.seafile.com/syncing_client/excluding_files/
+# 注释。通配符：* 匹配0到若干个字符，包括代表目录的/。? 匹配1个字符，包括/。
+# seafile-ignore.txt 只能控制在客户端需要忽略哪些文件。你依然可以在 seahub 的 web 界面创建这些被客户端忽略的文件。
+# 在这种情况下，
+# 这些文件会被同步到客户端，但是用户在客户端对这些文件的后续修改会被忽略，不会被同步回服务器。
+# 文件在服务器端的后续更改会被同步到客户端，如果客户端也同时修改了这些文件，系统会生成冲突文件。
+# seafile-ignore.txt 只能忽略还没有被同步的文件。对于已经被同步的文件，如果后来把它添加到 seafile-ignore.txt 中，系统只会忽略后续更改，已经上传的版本不会受影响。
+
+### seafile-ignore.global.txt ###
+### global ignore settings in opx/sysconfig/nixhome/seafile-ignore.global.txt
+
+# 自定义的后缀名，凡有 sfignore 后缀的都不进行同步
+*.sfignore
+*.sfignore/
+*.sfignore.*
+*.sfignore.*/
+*.sfomit
+*.sfomit.*
+*.sfomit/
+*.sfomit.*/
+*.nosf
+*.nosf.*
+*.nosf/
+*.nosf.*/
+
+## everything 'git pull or fetch' will update `.git/FETCH_HEAD`, even if the content doesn't change. To avoid too many useless updates of this file in Seafile history:
+FETCH_HEAD
+*/FETCH_HEAD
+
+.Trash/
+.Trashes/
+
+.DS_Store
+*/.DS_Store
+*.aae # AAE 文件主要在苹果的照片应用程序中使用，保存对原始照片所做的编辑，比如，裁剪、旋转或调整亮度等操作的信息。
+
+.thumbnails
+*/.thumbnails
+
+Thumbs.db
+*/Thumbs.db
+thumbs.db
+*/thumbs.db
+
+_desktop.ini
+*/_desktop.ini
+
+._*
+*/._*
+
+.$*
+*/.$*
+
+~$*
+*/~$*
+
+node_modules/
+*/node_modules/
+
+pages4loader.json5
+*/pages4loader.json5
+
+.deploy_git/
+*/.deploy_git/
+
+# next.js 项目
+.next/
+*/.next/
+
+# HBuilder 目录
+unpackage/
+*/unpackage/
+
+Icon
+OneDrive/Icon
+
+# wrangler project
+
+.dev.vars*
+*/.dev.vars*
+.wrangler/
+*/.wrangler/
+
+.playwright-mcp/
+*/.playwright-mcp/
+
+# Flutter/Dart 机器本地产物（各端由 `flutter pub get` / `pod install` / 构建在本机重生成，不跨机同步）。
+# 双机开发时 .dart_tool/package_config.json 内是绝对路径（file:///Users/<用户>/.pub-cache/...），同步过去会让另一台机器编译报 No such file or directory。
+# 注：pub 缓存在 ~/.pub-cache，位于资料库根之外，seafile 同步不到，无需在此列出。
+# 注：build/ 未全局忽略，以防波及用了该常见词的目录；按需放各项目 seafile-ignore.local.txt。
+
+# ---- Dart / Flutter：包解析 + 构建产物（核心，换机必跑 `flutter pub get` 重生成）----
+.dart_tool/
+*/.dart_tool/
+.flutter-plugins-dependencies
+*/.flutter-plugins-dependencies
+build/
+*/build/
+
+# ---- iOS / macOS：CocoaPods 检出目录（Podfile.lock 仍提交共享，只忽略 Pods/ 实体）----
+Pods/
+*/Pods/
+
+# ---- Android：本机 SDK 路径 + 构建缓存（换机必跑 `flutter build` 重生成 local.properties）----
+local.properties
+*/local.properties
+.gradle/
+*/.gradle/
+.kotlin/
+*/.kotlin/
+
+### seafile-ignore.local.txt ###
+### Followings are project-specific ignore settings merged by opx/sysconfig/seafile_ignore_find2merge.js
