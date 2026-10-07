@@ -12768,3 +12768,34 @@ server/src/app.ts join-tokens 端点），仅 TUI 未接。本次补齐三种签
 - 本地起 server：`cd server && PORT=3901 node dist/app.js`
 - 仓库 origin = https://git.tic.cc/fon/einz；撤回已推送的 commit 需强推同步远端
   （本次 dfc07d1 即如此处理）
+
+### /invite 三种签法落地：给自己其他设备 / 给指定成员的专属码（2026-10-07 老板提问）
+
+**问题：** 通道码与用户身份绑定。/invite 只能签"给新人"的码；给自己其他设备、给指定
+成员的专属码怎么签？
+
+**结论：** 服务端（app.ts join-tokens：purpose + target_member_id + 共享口令校验）与
+ApiClient.createJoinToken（targetMemberId/passphrase 参数）早已支持，仅 TUI 未接。
+
+**实现（cli/bin/einz_tui.dart）：** `/invite <arg>` 三种签法——
+- `/invite` → 新成员（开新身份，加入时自填名字）
+- `/invite attach` → 我自己的其他设备（进我的已有身份，免口令）
+- `/invite attach <名字|member_id>` → 指定成员的专属码（进他的已有身份）：
+  · 目标从 memberNames（GET /space）解析；找不到 → 报现有名单；同名多个 → 要求 member_id
+  · 目标=别人 → 先问共享口令（hidden 输入，服务端按"对别人身份动手=撤销同档授权"硬校验）
+  · 目标=自己 → 归一为不定向（免口令，与 /invite attach 等价）
+  · 失败按码给人话提示 _inviteErrorHint（与 _revokeErrorHint 同构：说清"未签发任何码、无副作用"）
+- /help 同步三种签法说明
+
+**E2E 验证（pty + 本地 server，11/11 通过）：** A 建空间 → B 用 /invite 码加入 →
+A 侧五条路径（新人码 / attach 免口令 / attach Alice 免口令 / attach Nobody 报错 /
+attach Bob 错口令拒绝→对口令出码）→ preflight 确认专属码 purpose=attach 且指向 Bob →
+C 用专属码加入（不问名字，attach 流）→ C 的 member_id == B 的 member_id（同一身份）。
+
+**测试脚本教训（重要）：**
+- 倒计时/长等待期间必须**持续 drain pty**：只 sleep 不读会让输出堆积把 TUI 卡死
+  （表现为"命令无响应"假象——debug2 全程排水后 hello 立即回显，定位到根因）
+- 全屏重绘会把旧消息（含旧通道码）重打一遍且逐行绘制顺序自下而上：取"新码"的唯一
+  可靠判据是**只出现在本轮新输出里的 e1_**（旧码必在之前的缓冲里出现过）；
+  wait_text 断言也要传 offset 只搜新输出，防旧文本误命中（曾致 TOKEN_USED 假失败）
+- server 匿名端点 curl 需带 `X-Protocol-Version: 3` 头，否则 PROTOCOL_VERSION_MISMATCH

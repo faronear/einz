@@ -3043,7 +3043,8 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: 生成一次性通道码，24小时有效，邀请同伴或自己开通一条新通道到本秘境。',
+        '/invite :: 生成一次性通道码（24小时有效）——/invite 邀请新成员；'
+        '/invite attach 给我自己的其他设备；/invite attach <名字> 给指定成员签专属码（需共享口令）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3430,13 +3431,13 @@ Future<void> _execCommand(String line) async {
         unawaited(_uploadAttachmentInBackground(s.session, arg));
       }
     case '/invite':
-      // Multiverse：生成绑定新通道的邀请（join token——24h 一次性；v1 通道码
-      // 已废弃——新通道用 /space join <链接或 token> 绑定）。
-      // `/invite` = 邀请新成员（开新身份）；`/invite attach` = 给自己另一台
-      // 设备开通道（链接决定进谁的身份）。其余写法一律当 invite。
-      // （`attach` 是 2026-10-04 定的名字，旧名 channel 已不再接受）
-      _invitePurpose = arg.trim() == 'attach' ? 'attach' : 'invite';
-      await _execInvite();
+      // Multiverse：生成一次性通道码（join token——24h 一次性；v1 通道码已废弃
+      // ——新通道用 /space join <链接或 token> 绑定）。三种签发（2026-10-07）：
+      //   /invite               → 邀请新成员（开新身份，加入时自己填名字）
+      //   /invite attach        → 给我自己的另一台设备开通道（进我的已有身份）
+      //   /invite attach <名字> → 给指定成员签专属码（进他的已有身份；
+      //                           需共享口令——对别人身份动手与撤销同档授权）
+      await _execInvite(arg);
       break;
     case '/myname':
       // 重设个人显示名（memberName）：本地 + 服务端同步 + 刷新名称表
@@ -3561,10 +3562,12 @@ Future<void> _execCommand(String line) async {
 
 /// /invite [memberA|memberB] [对方名称]：补发一次性通道码（默认 memberB=邀请对方，
 /// 给第二使用者；memberA=给自己加新通道）。需先 /auth 激活。
-/// `/invite` 本次签发的 token 类型（'invite' | 'attach'，见 `/invite attach`）。
-String _invitePurpose = 'invite'; // 'invite'（开新身份）| 'attach'（我进已有身份）
+/// `/invite` 本次签发的目标成员（null = 非定向：invite 开新身份 / attach 进自己）。
+/// `/invite attach <名字>` 时由 member 表解析出来，随 createJoinToken 的
+/// targetMemberId 传给服务端。
+String? _inviteTargetMemberId;
 
-Future<void> _execInvite() async {
+Future<void> _execInvite(String arg) async {
   final s = _state!;
   final store = s.session.store;
   if (store.spaceKey == null || store.spaceId == null) {
@@ -3578,12 +3581,63 @@ Future<void> _execInvite() async {
     s.status = '';
     return;
   }
+  // 解析三种签法：`invite` / `attach`（不定向）/ `attach <名字|member_id>`（定向）。
+  // 其余写法一律当 invite（宽松兼容——老习惯 `/invite` 不带参是主路径）。
+  final trimmed = arg.trim();
+  final isAttach = trimmed == 'attach' || trimmed.startsWith('attach ');
+  final targetArg = isAttach ? trimmed.substring('attach'.length).trim() : '';
+  _inviteTargetMemberId = null; // 每次签发前复位：上一条的定向不残留
+  if (isAttach && targetArg.isNotEmpty) {
+    // 定向 attach：目标必须是本空间**已有成员**（含我——显式写自己的名字也合法）。
+    // 名称表来自 GET /space 的 member_names（_refreshMemberNames 维护，含未入网
+    // 前的预置名）；找不到就报可用名单，不做模糊猜测（匹配多义时用户该写 member_id）。
+    final myId = store.memberId;
+    final matches = <String>[];
+    for (final e in s.memberNames.entries) {
+      if (e.value == targetArg || e.key == targetArg) matches.add(e.key);
+    }
+    if (matches.isEmpty) {
+      final names = s.memberNames.values.toList()..sort();
+      s.session.messages.add(_systemMessage(s.session,
+          '⚠️ 本空间没有名为「$targetArg」的成员——现有成员：${names.isEmpty ? '（名称表为空，稍后 /sync 刷新）' : names.join('、')}\n'
+          '可用 /entrances 查看通道与使用者对应关系'));
+      s.status = '';
+      return;
+    }
+    if (matches.length > 1) {
+      s.session.messages.add(_systemMessage(s.session,
+          '⚠️ 有 ${matches.length} 个成员同名「$targetArg」——请用 member_id 精确指定（/entrances 可查）'));
+      s.status = '';
+      return;
+    }
+    _inviteTargetMemberId = matches.first;
+    if (_inviteTargetMemberId == myId) {
+      // 显式指定自己 = 与 `/invite attach` 等价（服务端缺省 target 就是自己），
+      // 不需要口令——归一成不定向，少问一次口令。
+      _inviteTargetMemberId = null;
+    }
+  }
+  // 定向到**别人**：需要共享口令（服务端硬校验——对别人的身份动手与撤销同档授权）。
+  // 先在本机问好，避免请求发出去才 400。取消/留空 = 放弃签发。
+  String? passphrase;
+  if (_inviteTargetMemberId != null) {
+    final targetName = s.memberNames[_inviteTargetMemberId] ?? _inviteTargetMemberId!;
+    s.session.messages.add(_systemMessage(s.session,
+        '⚠️ 即将为「$targetName」签发专属通道码——拿到码的人将以 $targetName 的身份接入本秘境。'));
+    final entered = await _promptAction(s.session,
+        '❓ 输入共享口令以授权签发，或直接回车取消:', hidden: true);
+    if (!s.running) return;
+    if (entered == null) {
+      s.session.messages.add(_systemMessage(s.session, '✅ 已取消（未签发任何通道码）'));
+      s.status = '';
+      return;
+    }
+    passphrase = entered;
+  }
   try {
-    // purpose 必填（2026-10-04 收敛）。CLI 的 `/invite` 语义一直是"邀请对方来
-    // 这个秘境" → invite（开新身份；duo 满 2 人时服务端 409）。想给自己另一台
-    // 设备开通道，用 `/invite attach`。
-    // 「帮别人找回身份」（attach 指向他人）需要共享口令，CLI 一期不做——
-    // 丢了设备的人请用 App 找同伴生成找回链接。
+    // purpose 必填（2026-10-04 收敛）。`/invite` = 邀请新成员（开新身份；
+    // duo 满 2 人时服务端 409）。`/invite attach` = 给自己另一台设备开通道；
+    // `/invite attach <名字>` = 给指定成员签专属码（服务端校验共享口令）。
     final api = ApiClient(s.session.server);
     final r = await _busy(
         s.session,
@@ -3591,16 +3645,41 @@ Future<void> _execInvite() async {
         () => api.createJoinToken(
               store.spaceId!,
               store.sessionToken!,
-              purpose: _invitePurpose == 'attach' ? 'attach' : 'invite',
+              purpose: isAttach ? 'attach' : 'invite',
+              targetMemberId: _inviteTargetMemberId,
+              passphrase: passphrase,
             ));
     // 邀请作为对话流中的一条 system 消息显示（随消息区滚动，不占顶部状态栏）
-    s.session.messages.add(_systemMessage(s.session, '✅ 通道码已生成（24 小时内一次性有效）：\n🛡️  ${r.joinToken}\n📎 ${r.link}'));
+    final targetLabel = isAttach
+        ? (_inviteTargetMemberId == null
+            ? '我的其他设备'
+            : '成员「${s.memberNames[_inviteTargetMemberId] ?? _inviteTargetMemberId}」的其他设备')
+        : '新成员';
+    s.session.messages.add(_systemMessage(s.session,
+        '✅ 通道码已生成（$targetLabel · 24 小时内一次性有效）：\n🛡️  ${r.joinToken}\n📎 ${r.link}'));
     s.status = ''; // 反馈在消息区，状态栏保持干净
+  } on ApiException catch (e) {
+    s.session.messages
+        .add(_systemMessage(s.session, '❌ 通道码生成失败: ${_inviteErrorHint(e)}'));
+    s.status = '';
   } catch (e) {
     s.session.messages.add(_systemMessage(s.session, '❌ 通道码生成失败: $e'));
     s.status = '';
   }
 }
+
+/// /invite 失败的按码提示（与 _revokeErrorHint 同一设计：说清"发生了什么、
+/// 有没有副作用"——签发失败没有任何状态被改动，但口令错/限流要提示清楚）。
+String _inviteErrorHint(ApiException e) => switch (e.code) {
+      'ESCROW_VERIFY_FAILED' => '⚠️ 共享口令错误——未签发任何通道码（重试：/invite attach <名字>）',
+      'ESCROW_RATE_LIMITED' => '⚠️ 口令尝试过多被限流——稍等再试（未签发任何通道码）',
+      'PASSPHRASE_NOT_SET' =>
+        '⚠️ 本空间还没有可校验的共享口令——先用 /passphrase 设置口令，再给指定成员签专属码',
+      'INVALID_REQUEST' => '⚠️ 请求被拒（${e.message}）——未签发任何通道码',
+      'FORBIDDEN' => '⚠️ 目标身份不属于本空间或会话失效——未签发任何通道码',
+      'DUO_FULL' => '⚠️ 这是双人秘境，成员已满——不能再邀请新成员',
+      _ => '⚠️ ${e.message}——未签发任何通道码',
+    };
 
 /// /open <序号>：打开消息流中固定序号为 N 的附件消息（消息里显示的 `#N` 即此序号，
 /// 时间序从前往后、新附件只追加新号），下载解密后用系统默认应用打开。不带参默认 1。
