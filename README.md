@@ -10,7 +10,7 @@ server/      Node.js + TypeScript 服务器（多空间哑转发器，通道在�
 shared/      纯 Dart 共享核心（crypto / protocol / sync）—— App 与 CLI 共用
 cli/         Dart CLI 测试端（无 UI，Phase 0–4 测试驱动）
 app/         Flutter 手机客户端（V1）
-deployment/  Docker Compose + Caddy
+serverDocker/  Docker Compose + Caddy
 aimemo/      记忆与工作空间（productLens / projectPlan / worklog / userProfile）
 ```
 

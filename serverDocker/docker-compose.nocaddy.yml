@@ -1,7 +1,7 @@
 # Einz 服务端单机部署 —— 无内置 Caddy 版（方案 B）
 # 适用：宿主机已运行系统级 Caddy（systemd），由系统 Caddy 做总入口反代到
 #       本服务的 127.0.0.1:3000；本 compose 不启动 Caddy 容器、不占用宿主
-#       80/443（与 deployment/docker-compose.withcaddy.yml 内置 Caddy 版二选一，
+#       80/443（与 serverDocker/docker-compose.withcaddy.yml 内置 Caddy 版二选一，
 #       两者端口互不冲突，可在同一台机器上并存而不打架）。
 #
 # 使用前：
@@ -15,7 +15,7 @@
 #            }
 #        }
 #      （Caddy 自动申请/续期 TLS；WS 升级由 reverse_proxy 自动处理）
-#   2. 启动：docker compose -f deployment/docker-compose.nocaddy.yml up -d
+#   2. 启动：docker compose -f serverDocker/docker-compose.nocaddy.yml up -d
 #
 # 注：**配置文件是可选的**——设备与空间都在库里（v1 的静态白名单 config.json 已废），
 #     `./config` 里现在只放 `serverConfig.json`（当前字段：maxSpaces，改后重启
@@ -38,10 +38,10 @@ services:
       - EINZ_AVATARS=/data/avatars
       - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
-      # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore）。
+      # 由 compose 自动读取本目录 .env 文件提供（serverDocker/.env 已在 .gitignore）。
       - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
       # 邮件通知（2026-10-01）：留空 = 功能整体关闭（聊天照常，只是不发信）。
-      # 值同样来自 deployment/.env；发件地址必须是 Email Delivery 里登记过的
+      # 值同样来自 serverDocker/.env；发件地址必须是 Email Delivery 里登记过的
       # approved sender，且域名要配 SPF/DKIM，否则落垃圾箱。
       - EINZ_SMTP_HOST=${EINZ_SMTP_HOST}
       - EINZ_SMTP_PORT=${EINZ_SMTP_PORT}

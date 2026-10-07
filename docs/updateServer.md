@@ -39,15 +39,15 @@ git init
 git remote add origin https://git.tic.cc/fon/einz
 git fetch origin
 git checkout -b main origin/main
-git update-index --assume-unchanged deployment/Caddyfile   # 关键：Caddyfile 保留 VPS 域名，pull 不再覆盖
+git update-index --assume-unchanged serverDocker/Caddyfile   # 关键：Caddyfile 保留 VPS 域名，pull 不再覆盖
 git status --short                                          # 应只显示本地未跟踪项（data/ .env 等）
 ```
 
 **为什么安全：**
 
-- 本地化文件 `deployment/.env`（备份密钥）、`server/data/`、`*.db`
+- 本地化文件 `serverDocker/.env`（备份密钥）、`server/data/`、`*.db`
   全部在仓库 .gitignore 中 → git 操作不触碰，**本地数据零风险**；
-- 唯一例外 `deployment/Caddyfile`：仓库内是占位域名 `private.example.com`，
+- 唯一例外 `serverDocker/Caddyfile`：仓库内是占位域名 `private.example.com`，
   VPS 部署时已 sed 成真实域名（einz.tic.cc）→ 用 `assume-unchanged` 标记，pull 不覆盖。
 
 ---
@@ -68,7 +68,7 @@ git push origin main
 ```bash
 cd $EINZ_ROOT
 git pull --ff-only
-cd deployment
+cd serverDocker
 docker compose up -d --build server      # server 代码进镜像，必须 --build
 docker compose ps                         # 确认 running/healthy
 
@@ -76,7 +76,7 @@ docker compose ps                         # 确认 running/healthy
 curl -s -o /dev/null -w "%{http_code}" https://einz.tic.cc/key-escrow
 ```
 
-> Caddy 容器与 `deployment/.env` 无需改动。
+> Caddy 容器与 `serverDocker/.env` 无需改动。
 
 ---
 
@@ -100,8 +100,8 @@ dart run bin/einz_tui.dart --store /tmp/a.json --server https://einz.tic.cc
 ```bash
 cd $EINZ_ROOT
 git log --oneline -5                      # 找上一版本 commit
-git checkout <上一commit> -- server/ deployment/ shared/
-cd deployment && docker compose up -d --build server
+git checkout <上一commit> -- server/ serverDocker/ shared/
+cd serverDocker && docker compose up -d --build server
 ```
 
 ---
@@ -114,8 +114,8 @@ cd deployment && docker compose up -d --build server
 | 通道在册状态      | 无需改动（既有设备与会话不受影响）                                                                                                                                                               |
 | Caddy / HTTPS     | 无需改动（Caddyfile 已 assume-unchanged）                                                                                                                                                      |
 | **头像目录**      | 必须配 `EINZ_AVATARS=/data/avatars`。默认路径在**容器内**（`/app/data/avatars`），不在卷里 → 每次 `--build` 重建容器会把所有人的头像清空（2026-09-26 实测）。模板已加，VPS 上那份 `docker-compose.yml` 是拷贝出来的、不入库，**要手动补** |
-| 备份密钥          | `docker-compose.yml` 已原生支持从 `deployment/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose             |
+| 备份密钥          | `docker-compose.yml` 已原生支持从 `serverDocker/.env` 读取 `EINZ_DB_BACKUP_KEY`（.env 被 gitignore 忽略、pull 不覆盖）——**pull 覆盖 compose 也不影响密钥注入**，无需再手动改 compose             |
 | 旧部署升级        | 若 .env 里还是旧变量名 `EINZ_BACKUP_KEY`（2026-08 前部署）：手动改名为 `EINZ_DB_BACKUP_KEY` 后 `docker compose up -d --build server`——否则 backup 脚本找不到新变量名会拒绝执行（防误备份明文） |
 | App 侧            | 需重新安装 APK 才能启用新 UI（CLI 不受影响）                                                                                                                                                   |
 | 首次在 VPS 用 git | 先 `git config --global user.email/user.name`（避免提交时报错）                                                                                                                                |
-| pull 冲突         | 若 `git pull` 报冲突：多半是 Caddyfile 被误改——先 `git checkout -- deployment/Caddyfile` 还原，再 `git update-index --assume-unchanged deployment/Caddyfile`                                   |
+| pull 冲突         | 若 `git pull` 报冲突：多半是 Caddyfile 被误改——先 `git checkout -- serverDocker/Caddyfile` 还原，再 `git update-index --assume-unchanged serverDocker/Caddyfile`                                   |

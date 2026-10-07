@@ -4,7 +4,7 @@
  * 背景：头像存在服务端文件里（`avatars/<member_id>`，见 `src/avatars.ts`），
  * 而备份此前只打包 DB + `EINZ_FILES`——**恢复一次备份就把所有人的头像丢掉**。
  * 更早的坑：头像目录默认落在容器内、不在卷里，`--build` 重建容器即清空
- * （见 deployment/docker-compose.*.yml 的 EINZ_AVATARS）。
+ * （见 serverDocker/docker-compose.*.yml 的 EINZ_AVATARS）。
  *
  * 三条边界：
  *   ① 全量备份带头像，恢复后回来；

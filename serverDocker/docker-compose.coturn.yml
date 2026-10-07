@@ -5,7 +5,7 @@
 #     把 coturn 塞进去会让每次重建 server 都多带一个容器；
 #   - TURN 只在跨网打洞失败时才用得上，可单独启停、单独观察。
 #
-# 用法（在 deployment/ 目录下）：
+# 用法（在 serverDocker/ 目录下）：
 #   1) cp coturn/turnserver.conf.example coturn/turnserver.conf
 #   2) 编辑 turnserver.conf：填 user= 的密码、realm、external-ip（若在 NAT 后）
 #   3) docker compose -f docker-compose.coturn.yml up -d

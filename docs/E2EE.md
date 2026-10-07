@@ -476,7 +476,7 @@ Einz 涉及多个"密钥"概念，命名与用途对照如下：
 | ---------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------- |
 | **Space Key**          | 32B 对称密钥                             | 消息/附件 E2EE 加密（§5/§6）；key_version 轮换 + 归档（§9.2）                          | 双方通道（App 锁 PIN 包 / 口令托管保管）  |
 | **口令派生密钥**       | 无独立实体（口令经 Argon2id 派生，§4.3） | CLI backup/restore 备份文件、App 锁 PIN/恢复码、口令密保箱加密（三处复用 backup.dart） | 口令持有者（恢复码 / PIN / 接入口令）     |
-| **EINZ_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B）        | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文）                 | 部署者（deployment/.env，gitignore 保护） |
+| **EINZ_DB_BACKUP_KEY** | Server 部署环境变量（base64 32B）        | Server 数据库备份文件加密（backup.ts）；未设置拒绝备份（防误备份明文）                 | 部署者（serverDocker/.env，gitignore 保护） |
 
 > 注：Server 备份密钥 2026-08 起从 `EINZ_BACKUP_KEY` 更名为 `EINZ_DB_BACKUP_KEY`，
 > 避免与 CLI 的 backup（口令派生）概念混淆；旧部署升级需同步改 `.env` 变量名（docs/updateServer.md §5）。

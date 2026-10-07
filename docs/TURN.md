@@ -18,7 +18,7 @@ TURN 只是把 **UDP 包原样转发**，媒体是 DTLS-SRTP 端到端加密，T
 ## 1. 部署（国内机 `einz.yuanjinx.com`）
 
 ```bash
-cd <仓库>/deployment
+cd <仓库>/serverDocker
 cp coturn/turnserver.conf.example coturn/turnserver.conf
 # 改三处：user= 的密码、realm、external-ip（云主机有公网网卡就不用填）
 #   生成密码：openssl rand -hex 16

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Einz 部署环境变量脚本（deployment/.env）
+# Einz 部署环境变量脚本（serverDocker/.env）
 #
-# 用法：bash deployment/.env.sh（脚本可执行，也可 ./.env.sh）
-#   - 每次调用自动确保 deployment/.env 存在并包含 EINZ_DB_BACKUP_KEY；
+# 用法：bash serverDocker/env.sh（脚本可执行，也可 ./env.sh）
+#   - 每次调用自动确保 serverDocker/.env 存在并包含 EINZ_DB_BACKUP_KEY；
 #   - 密钥缺失或为占位值时，用 python3 生成随机 32 字节 base64 密钥并写入；
 #   - 幂等：已存在有效非空密钥则不重复添加。
 #
-# 其他环境变量（如需）：直接在 deployment/.env 中手动添加/编辑即可。
+# 其他环境变量（如需）：直接在 serverDocker/.env 中手动添加/编辑即可。
 # .env 已在 .gitignore 中，不入库、git pull 不覆盖。
 set -euo pipefail
-cd "$(dirname "$0")"   # 脚本所在目录（deployment/）
+cd "$(dirname "$0")"   # 脚本所在目录（serverDocker/）
 
 ENV_FILE=".env"
 KEY_NAME="EINZ_DB_BACKUP_KEY"

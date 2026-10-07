@@ -12650,3 +12650,35 @@ server 当时在运行（PID 21160 持有该库）→ 没敢动数据。启用�
 
 > 注：本次提交只带了本改动；工作区里 `.vscode/sessions.json` 与根 `package.json` 的
 > `devDependencies` 是**别的会话**留下的，已用 `git apply --cached` 隔离，未夹带提交。
+
+## 2026-10-07 目录改名 `deployment/` → `serverDocker/`
+
+**诉求（老板）**：让它在目录排序里挨着 `server/`（两者确是一套代码）。
+
+**先评估后动手**：牵涉面 = 6 处功能引用 + 一批文档 + **生产 VPS 上的部署根**。代码侧风险低；
+风险集中在 VPS——`deployment/` 里有一堆**不在 git** 的实体文件（`docker-compose.yml`、
+`.env`、`data/`、`config/`、`Caddyfile`），`git pull` 不会搬它们。
+
+### 本机（已做）
+
+- 先提交老板手动改的部署文件（`acb473b`）：新增「中国 origin + CF 隧道」双入口
+  compose（`docker-compose.nocaddy.cftunnel.yml`，由旧 `nocaddy.cn.yml` 改名而来）、
+  `Caddyfile.example` 注释。
+- `git mv deployment serverDocker`——连 ignored 的 `deployment/.env` 一并搬到。
+- 功能引用 6 处：`server/package.json`（dev 的 `../serverDocker/.env`）、
+  `server/scripts/mailProbe.ts`（`../../serverDocker/.env`）、根 `package.json`
+  （`server-run-docker` / `server-run-docker-new` / `server-update-remote`）、
+  `.gitignore` 两行。
+- 文档：`docs/DEPLOYMENT.md`(24 处)、`docs/updateServer.md`(9)、`docs/ONBOARDING.md`、
+  `docs/E2EE.md`、`docs/TURN.md`、`README.md`、各 compose 注释、一处测试注释。
+- 顺手修存量小错：`DEPLOYMENT.md` 的 `mdeployment/` 笔误；`cftunnel.yml` 注释仍指向
+  已改名的 `docker-compose.nocaddy.cn.yml`；`env.sh` / `ONBOARDING` 里 `.env.sh` → `env.sh`。
+- 验证：`bash scripts/testAll.sh server` → **全部通过 ✅**。
+- 历史不动：`aimemo/*` 与 `.atomcode/memory.md` 里的旧引用按流水/旧账保留。
+
+### VPS（一次性搬迁）
+
+约在 `/faronear/einz`（历史文档里路径不一：`/opt/einz` / `/faronear/only` 都出现过，
+以实际为准）。要点：`git pull` 前先把不在 git 的实体文件与 `assume-unchanged` 处理好，
+否则 `git pull` 会出现「新目录缺 compose/.env/data」+「旧目录残留」的半坏状态。
+

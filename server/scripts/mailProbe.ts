@@ -7,8 +7,8 @@
  * 顺序反了就是配完一堆 DNS 才发现 TCP 根本出不去。
  *
  * 用法（两种，任选）：
- *   1) 环境变量已经在 `deployment/.env` 里（服务器上的常规形态）→ 直接跑，脚本会自己
- *      去读 `../../deployment/.env`（可用 `EINZ_ENV_FILE` 指向别处）：
+ *   1) 环境变量已经在 `serverDocker/.env` 里（服务器上的常规形态）→ 直接跑，脚本会自己
+ *      去读 `../../serverDocker/.env`（可用 `EINZ_ENV_FILE` 指向别处）：
  *        EINZ_PROBE_TO=you@example.com npm run mail:probe
  *   2) 临时用一组值试（例如在本机 iMac 上验凭据）→ 直接写在命令行上，命令行优先：
  *        EINZ_SMTP_HOST=smtp.email.<region>.oci.oraclecloud.com \
@@ -17,7 +17,7 @@
  *        EINZ_PROBE_TO=you@example.com npm run mail:probe
  *
  * 为什么要自己读 .env（而不是让用户先 source）：**服务端进程不读 .env**——它的变量由
- * docker compose 注入（deployment/docker-compose.*.yml）。但探针是**运维手动在宿主机上
+ * docker compose 注入（serverDocker/docker-compose.*.yml）。但探针是**运维手动在宿主机上
  * 跑**的，那一刻 shell 里什么都没有，于是"明明填好了 .env 却报缺配置"。这个脚本是运维
  * 工具，替它把这一步做掉是合理的；服务端那条路径刻意保持"只认环境变量"，避免容器里
  * 悄悄吃到一个陈旧的 .env。
@@ -52,10 +52,10 @@ function loadEnvFile(path: string): number {
   return loaded;
 }
 
-/** 探针所在目录 → 仓库根的 deployment/.env（可用 EINZ_ENV_FILE 覆盖）。 */
+/** 探针所在目录 → 仓库根的 serverDocker/.env（可用 EINZ_ENV_FILE 覆盖）。 */
 const ENV_FILE =
   process.env.EINZ_ENV_FILE ??
-  resolve(import.meta.dirname ?? process.cwd(), "../../deployment/.env");
+  resolve(import.meta.dirname ?? process.cwd(), "../../serverDocker/.env");
 
 async function main(): Promise<void> {
   const loaded = loadEnvFile(ENV_FILE);

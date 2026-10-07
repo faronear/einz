@@ -24,10 +24,10 @@
 #           ⚠ URL 写容器名 server——cloudflared 与 server 在本 compose 的 einz 网络内；
 #             不要写 caddy:443，CF 已在边缘终止客户端 TLS。
 #           ⚠ 先删 DNS 里指向 127.0.0.1 的旧 A 记录：同一主机名已有记录会建不了 CNAME。
-#   2. deployment/.env 里补一行（.env 已在 .gitignore，不入库；改 token 要**替换**旧行，
+#   2. serverDocker/.env 里补一行（.env 已在 .gitignore，不入库；改 token 要**替换**旧行，
 #      不要追加第二条）：
 #        CF_TUNNEL_TOKEN=<第 1 步复制的 token>
-#      同时确认 EINZ_DB_BACKUP_KEY 已由 `bash deployment/env.sh` 生成。
+#      同时确认 EINZ_DB_BACKUP_KEY 已由 `bash serverDocker/env.sh` 生成。
 #   3. 系统级 Caddy（如 /etc/caddy/Caddyfile）配置备案域名站点，例如：
 #        einz.yuanjinx.com {
 #            reverse_proxy 127.0.0.1:3000
@@ -38,11 +38,11 @@
 #            }
 #        }
 #      （WS 升级由 reverse_proxy 自动处理）
-#   4. 启动：docker compose -f deployment/docker-compose.nocaddy.cn.yml up -d
-#      查看隧道连接：docker compose -f deployment/docker-compose.nocaddy.cn.yml \
+#   4. 启动：docker compose -f serverDocker/docker-compose.nocaddy.cftunnel.yml up -d
+#      查看隧道连接：docker compose -f serverDocker/docker-compose.nocaddy.cftunnel.yml \
 #                      logs -f cloudflared     # 期望 4 条 "Registered tunnel connection"
 #
-# ⚠ 与 deployment/docker-compose.nocaddy.yml **不能同时启动**（两者都发布
+# ⚠ 与 serverDocker/docker-compose.nocaddy.yml **不能同时启动**（两者都发布
 #   127.0.0.1:3000，会抢端口）；本文件是它的中国双入口升级版，二选一。
 # ⚠ 中国大陆对 UDP/QUIC 常有干扰：若 cloudflared 反复掉线，把下面 command 换成
 #   `tunnel --no-autoupdate --protocol http2 run`（强制走 TCP 443）。
@@ -68,11 +68,11 @@ services:
       - EINZ_AVATARS=/data/avatars
       - EINZ_FILES=/data/files
       # 备份密钥（server 备份/恢复归档 AES-256-GCM 用，docs/DEPLOYMENT.md §5）：
-      # 由 compose 自动读取本目录 .env 文件提供（deployment/.env 已在 .gitignore）。
+      # 由 compose 自动读取本目录 .env 文件提供（serverDocker/.env 已在 .gitignore）。
       - EINZ_DB_BACKUP_KEY=${EINZ_DB_BACKUP_KEY}
       # 邮件通知（2026-10-01：没进应用商店 → 没有后台推送，给离线的一方发一封摘要信）。
       # **全部留空 = 功能整体关闭**（聊天照常，只是不发信），所以没配凭据也不会报错；
-      # 配了才启用。值同样来自 deployment/.env，改完 `docker compose up -d server`。
+      # 配了才启用。值同样来自 serverDocker/.env，改完 `docker compose up -d server`。
       # 上线前先用 `npm run mail:probe` 验出网（服务器在大陆、SMTP 在境外）。
       - EINZ_SMTP_HOST=${EINZ_SMTP_HOST}
       - EINZ_SMTP_PORT=${EINZ_SMTP_PORT}
