@@ -12721,3 +12721,50 @@ sudo env COMPOSE_PROGRESS=plain docker compose -f docker-compose.yml -f docker-c
 （慢但可靠）。
 
 
+
+## 2026-10-07 TUI 退出清屏 + 通道码签发扩展
+
+### /exit 后聊天画面残留终端（老板提出）
+
+**现象：** TUI 聊天后 /exit 退出，整幅聊天画面残留在终端里，要手动慢慢顶出窗口。
+
+**根因：** TUI 是全屏重绘应用（\x1B[2J 清屏式渲染），但退出路径只恢复终端模式、不清屏；
+且 pty 下 main 收尾链路（await guide → farewell）常挂起，真正生效的是各处 2 秒兜底
+exit(0)——清屏必须挂进兜底路径本身。
+
+**修复（cli/bin/einz_tui.dart，commit 4868a3a）：**
+- 新增 `_wipeScreen()`：向 **stderr** 写 `\x1B[2J\x1B[3J\x1B[H`（清屏+清回滚缓冲+光标回家）
+- 新增 `_scheduleExitWithWipe()`：立即清屏 + 保留原 2 秒兜底 exit(0)；
+  四处退出兜底（Ctrl+C / 引导 /exit / whenComplete / 命令 /exit）统一走它
+- main 正常收尾路径补清屏；`_printFarewell` 改写 stderr（stdout 退出瞬间可能已关）
+
+**验证：** pty + 本地 server（`PORT=3901 node dist/app.js`，默认 3000 撞占用）。
+
+### 同性别第二人气泡底色：保持亮青（老板定夺）
+
+曾试改深青 `\x1b[48;5;30m` 提升白字可读性，老板实测后定夺：**亮青更中性，深青太男性化**
+——撤回该改动，`_bgCyan` 维持亮青 `\x1b[106m`。白字可读性问题日后可考虑改文字色而非底色。
+
+### 通道码签发扩展：/invite attach <名字>（老板提问驱动）
+
+**问题：** 通道码与用户身份绑定，/invite 只能签"给新人"的码；给自己其他设备、给指定
+成员的专属码怎么签？
+
+**结论：** 服务端与 ApiClient 早已支持（purpose=attach + targetMemberId + 共享口令校验，
+server/src/app.ts join-tokens 端点），仅 TUI 未接。本次补齐三种签法：
+- `/invite` → 新成员（开新身份）
+- `/invite attach` → 我自己的其他设备（进我的已有身份，免口令）
+- `/invite attach <名字|member_id>` → 指定成员的专属码（进他的已有身份；需共享口令，
+  服务端按"对别人身份动手=撤销同档授权"硬校验；目标=自己时归一为免口令）
+
+解析用 memberNames（GET /space），找不到报现有名单、同名多个要求 member_id 精确指定；
+失败按码给人话提示（_inviteErrorHint，与 _revokeErrorHint 同构）。
+
+### 附带发现
+
+- cli/test 的 pty 冒烟脚本 CLI 路径硬编码 `/Users/Shared/productX/einz/cli`（本机为
+  /Volumes/repodisk/productX/einz），跨机跑之前要替换；`guide_exit_check.py` 在干净
+  baseline 上也失败（引导流程已变为"秘境向导 c/j"，非回归）
+- 本地起 server：`cd server && PORT=3901 node dist/app.js`
+- 仓库 origin = https://git.tic.cc/fon/einz；撤回已推送的 commit 需强推同步远端
+  （本次 dfc07d1 即如此处理）
