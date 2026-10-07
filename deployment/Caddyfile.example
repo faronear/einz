@@ -2,7 +2,7 @@
 # 把 private.example.com 替换为真实域名；Caddy 自动申请/续期证书。
 
 private.example.com {
-    reverse_proxy server:3000
+    reverse_proxy server:3000 # docker caddy: server, host caddy: 127.0.0.1
 
     encode gzip
 
