@@ -12845,3 +12845,33 @@ l10n `chatPageMembersUnnamed`（「未命名」/`Unnamed`），与成员弹层�
 不在树上，断言不受影响；头像数（`CircleAvatar`）与几何也不受 Tooltip 包裹影响。
 
 **验证：** `flutter analyze` 无 issue；桌面 hover 观感老板自测。
+
+### /entoken 命令族：通道码签发重命名定稿（2026-10-07 老板定名）
+
+**定名：** `/entoken` = "为我自己生成通道码"（attach for myself），命令族三种签法：
+- `/entoken` → 我自己的其他设备（attach 进我的身份，免口令）
+- `/entoken invite` → 新成员（开新身份）；`/invite` 保留为它的**别名**（无参等价；
+  带旧参数 /invite attach* 不静默改签——身份语义签错＝冒充，只给指路提示）
+- `/entoken reinvite` → 其他成员的专属码（进他的已有身份，需共享口令）：
+  **duo（一个同伴）验证口令后直接出码；group（多个同伴）验证口令后列成员清单
+  让用户选（序号或名字），再出码**
+
+**实现（cli/bin/einz_tui.dart）：** `_execEntoken`（分发）+ `_issueToken`（三种签法
+共用出码）+ `_reinvite`（同伴名单来自 memberSlots 键集=全部成员，旧服务端退回
+memberNames；口令**本地校验**——GET /key-escrow + openPackage 解封，失败不发签发
+请求，与 /revoke 同口径）；`_inviteErrorHint` → `_entokenErrorHint`；/help 与
+状态栏提示同步更新。
+
+**验证：** dart analyze 干净、format_message 10 条全过；pty E2E **11/11**：
+①entoken 免口令出码+preflight 指向 Alice ②invite 出码→Bob 加入 ③错口令被拒
+④duo reinvite 直出 Bob 专属码 ⑤/invite 别名（duo 满员 409 正确拒绝）⑥/invite
+带参指路 ⑦未知用法提示 ⑧sqlite 翻 group ⑩group reinvite 列 Bob/Carol 清单→
+选 Carol 出码→preflight 指向 Carol。
+
+**E2E 顺带修出一个真 bug：** `_onPeerStatus` 把"上线刷新成员表"放在 `peerOnline`
+布尔变化的 if 里——group 中第一个同伴上线后布尔已是 true，第二个同伴上线不再触发
+刷新， Carol 永远进不了成员表（duo 无感、group E2E 才暴露）。已把刷新移出布尔判定。
+
+**渲染坑复认：** 同步完成的命令分支只靠 whenComplete 的 microtask 渲染，真实终端
+不显示（本文件既有已知行为）——/invite 带参指路、_execEntoken 默认分支、_reinvite
+同步早退三处补 `_scheduleRender()`。纯同步分支必须显式调度，这是第二次踩同一坑。
