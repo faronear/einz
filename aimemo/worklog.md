@@ -12676,9 +12676,48 @@ server 当时在运行（PID 21160 持有该库）→ 没敢动数据。启用�
 - 验证：`bash scripts/testAll.sh server` → **全部通过 ✅**。
 - 历史不动：`aimemo/*` 与 `.atomcode/memory.md` 里的旧引用按流水/旧账保留。
 
-### VPS（一次性搬迁）
+### VPS 一次性搬迁（已执行，2026-10-07）
 
-约在 `/faronear/einz`（历史文档里路径不一：`/opt/einz` / `/faronear/only` 都出现过，
-以实际为准）。要点：`git pull` 前先把不在 git 的实体文件与 `assume-unchanged` 处理好，
-否则 `git pull` 会出现「新目录缺 compose/.env/data」+「旧目录残留」的半坏状态。
+实际路径 `/faronear/einz`（root 所有；`ssh.sh cn1` 登录为 `adot`，需 sudo）。**不在 git 的
+实体文件**：`.env`、`Caddyfile`（被 .gitignore 忽略）、`data/`、`config/serverConfig.json`、
+`coturn/turnserver.conf`、`docker-compose.yml`（→ nocaddy.yml 的软链）。VPS 上**没有**
+`assume-unchanged`（老文档那条其实没生效——`Caddyfile` 只是被 .gitignore 忽略而已）。
+
+步骤：
+1. 停旧项目：`cd deployment && sudo docker compose -f docker-compose.yml -f docker-compose.coturn.yml down`
+2. `sudo git pull --ff-only`（→ `9f7d74a`；git 搬走**已跟踪**文件，未跟踪/忽略的留在旧目录）
+3. 把残留的非 git 文件 `mv` 进 `serverDocker/`，删掉空 `deployment/`
+4. 构建镜像（官方源太慢，改用镜像源，见下）
+5. `up -d` → 新项目名 `serverdocker`：`serverdocker-server-1` + `einz-coturn`
+6. **修宿主 Caddy**：`/etc/caddy/Caddyfile:28` 的 `import /faronear/einz/deployment/Caddyfile`
+   → `/faronear/einz/serverDocker/Caddyfile`，`caddy validate` 通过后 `systemctl reload caddy`。
+   ⚠️ 这是**仓库外唯一**引用旧路径的地方（已全盘 grep `/etc` 与 crontab 确认）；不改则
+   reload 后整站挂。
+
+验证：`/health` 本机与公网（`einz.yuanjinx.com`、`einz.cn1.yuanjinx.com`）均 **200**；
+日志有真实客户端重连（`/sync`、WS connect）→ **库完好**；启动日志确认
+`[einz] SQLite: /data/einz.sqlite.db（来源：EINZ_DB）`。旧镜像 `deployment-server` 留作悬空，
+可 `docker image prune` 清。
+
+> 小插曲：第一轮 `up -d --build`（官方源）跑 ~9 分钟无进度，我停掉本地 ssh，但 **BuildKit
+> 仍继续跑**（孤儿构建）；随后用镜像源重跑成功，两者 tag 相同、不冲突。
+
+### 国内服务器构建：改用镜像源（不改代码）
+
+Dockerfile 默认仍是官方源（GitHub CI 不受影响）；只在**构建命令行**注入三个 `--build-arg`：
+
+```bash
+cd /faronear/einz/serverDocker
+sudo env COMPOSE_PROGRESS=plain docker compose build \
+  --build-arg NPM_MIRROR=https://registry.npmmirror.com \
+  --build-arg NODE_MIRROR=https://npmmirror.com/mirrors/node \
+  --build-arg BETTER_SQLITE3_MIRROR=https://npmmirror.com/mirrors/better-sqlite3 \
+  server
+sudo env COMPOSE_PROGRESS=plain docker compose -f docker-compose.yml -f docker-compose.coturn.yml up -d
+```
+
+`npm ci` 不写 `package-lock.json`，宿主代码/lock 零改动。实测：镜像源下 `npm ci` 约 6 分钟、
+`tsc` 14 秒、导出镜像 ~72 秒；`better-sqlite3` 若无预编译包会回退 `node-gyp` 源码编 SQLite
+（慢但可靠）。
+
 
