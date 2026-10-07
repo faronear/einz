@@ -5,17 +5,6 @@
   "activateOnStartup": true,
   "keepExistingTerminals": true,
   "sessions": {
-    "default": [
-      {
-        "name": "hello",
-        "autoExecuteCommands": true,
-        "icon": "person",
-        "color": "terminal.ansiGreen",
-        "commands": [
-          "echo hello"
-        ]
-      }
-    ],
     "einz": [
       {
         "name": "codebuddy",
