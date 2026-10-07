@@ -12846,6 +12846,21 @@ l10n `chatPageMembersUnnamed`（「未命名」/`Unnamed`），与成员弹层�
 
 **验证：** `flutter analyze` 无 issue；桌面 hover 观感老板自测。
 
+## 2026-10-08 修 bug：群空间状态条头像，点离线头像误开全览页
+
+**老板报：** 桌面版点状态条上**在线的**头像 → 进「我的同伴」弹层（正确）；点**离线的**头像 →
+却打开了头像全览页（错误）。
+
+**根因（不是"在线/离线"，是"有没有头像图"）：** `_MessageAvatar` 内部对头像包了
+`Clickable(onTap: bytes != null ? _showFullscreen : null)`——**只要这个成员有头像图**，
+点按就被它抢走开全览页；**没有头像图**的（默认人形图标）`onTap` 为 null，点击才落到外层
+"我的同伴"胶囊的 `InkWell`。老板看到的"在线 vs 离线"是巧合（在线的恰好没设头像）。
+
+**修法：** `_MessageAvatar` 增加 `openFullscreenOnTap`（默认 true，消息区/成员卡照旧）；
+状态条头像条 `_stripAvatar` 传 **false** → 那一串的点按一律落到外层胶囊，行为一致。
+
+**验证：** `flutter analyze` 无 issue；桌面点击观感老板自测。
+
 ### /entoken 命令族：通道码签发重命名定稿（2026-10-07 老板定名）
 
 **定名：** `/entoken` = "为我自己生成通道码"（attach for myself），命令族三种签法：

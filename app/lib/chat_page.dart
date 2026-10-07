@@ -1643,6 +1643,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       server: effectiveServer,
       api: widget.api,
       radius: kStatusMemberAvatarSize / 2,
+      // 点按不打开头像全览：状态条这一串的点按应落到外层「我的同伴」胶囊。
+      // 否则**有头像图片**的成员（与在线与否无关）会被 `_MessageAvatar` 抢走点击、
+      // 误开全览页（老板 2026-10-08 报：离线头像点了开全览）。
+      openFullscreenOnTap: false,
     );
     final Widget visual = _onlineOthers.contains(memberId)
         ? SizedBox(
@@ -8317,7 +8321,11 @@ class _StatusAvatarState extends State<_StatusAvatar> {
 
 class _MessageAvatar extends StatefulWidget {
   const _MessageAvatar(
-      {this.memberId, required this.server, this.api, this.radius = 16});
+      {this.memberId,
+      required this.server,
+      this.api,
+      this.radius = 16,
+      this.openFullscreenOnTap = true});
 
   final String? memberId;
   final String server;
@@ -8325,6 +8333,11 @@ class _MessageAvatar extends StatefulWidget {
 
   /// 头像半径（成员卡里放大到 20；消息区保持 16）。
   final double radius;
+
+  /// 点按是否打开头像大图。**状态条的头像条传 false**——那一串的点按应落到外层
+  /// 「我的同伴」胶囊；否则**有头像图片**的成员会被这里抢走点击、误开全览页，
+  /// 而无图的成员又能正常进弹层（同一排头像行为不一致，老板 2026-10-08 报）。
+  final bool openFullscreenOnTap;
 
   @override
   State<_MessageAvatar> createState() => _MessageAvatarState();
@@ -8422,7 +8435,9 @@ class _MessageAvatarState extends State<_MessageAvatar> {
   Widget build(BuildContext context) {
     final bytes = _bytes;
     return Clickable(
-      onTap: bytes != null ? _showFullscreen : null,
+      onTap: (widget.openFullscreenOnTap && bytes != null)
+          ? _showFullscreen
+          : null,
       child: CircleAvatar(
         radius: widget.radius,
         backgroundColor: Colors.grey.shade300,
