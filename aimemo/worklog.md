@@ -12799,3 +12799,29 @@ C 用专属码加入（不问名字，attach 流）→ C 的 member_id == B 的 
   可靠判据是**只出现在本轮新输出里的 e1_**（旧码必在之前的缓冲里出现过）；
   wait_text 断言也要传 offset 只搜新输出，防旧文本误命中（曾致 TOKEN_USED 假失败）
 - server 匿名端点 curl 需带 `X-Protocol-Version: 3` 头，否则 PROTOCOL_VERSION_MISMATCH
+
+## 2026-10-08 修 bug：切换进空间读完，未读角标不清（"看到最新即已读"）
+
+**老板报的现象：** 多空间时其它空间的红色数字角标正常；但**已切换到那个有角标的空间、读了
+新消息**，下次打开 App 该空间仍显示角标。
+
+**根因（服务端派生 + 客户端上报时机缺口）：** 角标 = `GET /messages/unread` 现算「`server_sequence`
+晚于我的 `receipts.read_upto_seq`、且非本人 member 发」的条数。客户端**只在两处**推进读取水位：
+① 回前台且列表贴底（`didChangeAppLifecycleState` → `_scheduleReadReport`）；② WS **实时**新消息且
+贴底（`_refreshLocal(realtime: true)`）。而"切进一个空间、读它的积压"走的是 **sync 补拉**，
+`_loadInitial` **只报"已送达"、从不报"已读"**（2026-09-12 决定："补拉的历史不等于人看过"）。
+于是切进去读完 → 没有实时消息、也没切后台再回前台 → 水位原地不动 → 换出去/重开 App 角标还在。
+
+**老板拍板（AskUserQuestion）：** 选「看到最新即已读」——放宽 2026-09-12 那条，等同主流 IM。
+
+**改动（仅 `app/lib/chat_page.dart`，`flutter analyze` 0 issue）：**
+- `_loadInitial` 在跳最新之后补一次 `_scheduleReadReport()`（首屏/切换进入即视为看到最新）；
+- 新增 `_onScrollForRead` 滚动监听（与 `_maybeLoadOlder` 并列 `_scrollController` listener，
+  dispose 一并移除）：`extentAfter <= 48` 且**越过"离开底部→回到贴底"的边沿**时上报一次，
+  避免拖动中每帧排回调；覆盖"手动滚回底部"这条路径。
+- `_loadInitial` 显式补报是必要的：内容不足一屏时 `jumpTo` 不一定触发监听。
+- 三道光卡（前台 / `ModalRoute.isCurrent` / `extentAfter<=48`）不变，仍在 `_scheduleReadReport` 内判定。
+- 同步更新 `multiSpaceDesign.zhcn.md` §4.2（记下修订与代价）。
+
+**代价（已接受）：** 冷启动自动进入某空间也会把积压标已读——高水位模型固有语义。
+**验证：** `flutter analyze` 无 issue；真机行为老板自测（未代跑测试/构建）。

@@ -213,6 +213,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Timer? _ticker;
   // 分页加载（UI 懒渲染）：上滑到顶部加载更早历史；ticker 只增量追加新增
   final ScrollController _scrollController = ScrollController();
+  // 上一次滚动时列表是否贴底：`_onScrollForRead` 用它取"离开底部→回到贴底"的跨越沿
+  bool _lastScrollAtBottom = false;
   bool _hasMoreOlder = true;
   bool _loadingOlder = false;
   // 首屏本地历史是否已上屏（用于守卫 _refreshLocal：未加载时 _lastLoadedSequence=0
@@ -733,6 +735,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _loadMyAvatar();
     _loadInitial();
     _scrollController.addListener(_maybeLoadOlder);
+    _scrollController.addListener(_onScrollForRead);
     _inputFocusNode.addListener(_onInputFocusChanged);
     _loadBurnLabel();
     _refreshPinStatus();
@@ -4092,6 +4095,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _voiceCall?.dispose();
     _unreadTimer?.cancel();
     _scrollController.removeListener(_maybeLoadOlder);
+    _scrollController.removeListener(_onScrollForRead);
     _inputFocusNode.removeListener(_onInputFocusChanged);
     _scrollController.dispose();
     _input.dispose();
@@ -4182,10 +4186,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 首次载入即定位到最新消息（老板实测 2026-09-09：原来停在最早消息处，
       // 要等 ticker 自动刷新才滚到底）——直接跳转不播动画，进入即见最新
       _scrollToLatest(animate: false);
-      // 首屏回填只上报"已送达"——**不**上报已读（补拉的历史不等于人看过，
-      // 老板 2026-09-12）。已读只由「WS 实时到达 + 用户前台看着」或「resume
-      // 到前台且列表贴底」推进。
+      // 首屏回填上报"已送达"。
       unawaited(_reportDeliveredIfAdvanced());
+      // 已读：**看到最新即已读**（老板 2026-10-08 拍板，放宽 2026-09-12 的
+      // "补拉的历史不等于人看过/首屏不报已读"）——进入或切换到本空间后列表已
+      // 跳到最新，用户就在看着它。不补这一次的话，切进来读完、没有实时消息、
+      // 也没切后台再回前台时，读取水位永不推进 → 换出去/重开 App 角标还在。
+      // 前台/本页最上层/列表贴底三道光卡仍由 _scheduleReadReport 把关。
+      _scheduleReadReport();
       // 载入对方回执 → 自己消息可显示双勾（sync 内已拉过，此处兜底一次）
       unawaited(_loadPeerReceipts());
       // 启动孤儿清理：本地库已无对应消息的缓存 + 历史遗留 temp 文件（不阻塞首屏）。
@@ -4336,6 +4344,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (s != null) return s;
     }
     return 0;
+  }
+
+  /// 滚动位置变化：列表一旦贴底（用户或自动跳转把最新消息带到眼前）即视为
+  /// "看到最新"，上报已读。只在"离开底部 → 回到贴底"的跨越时刻触发一次，避免
+  /// 拖动过程中每帧都排一次回调。首屏/切换进入的那次跳底由 `_loadInitial` 显式
+  /// 补报（内容不足一屏时 `jumpTo` 不一定触发监听）。是否真的够格上报（前台 /
+  /// 本页最上层 / 仍贴底）交给 `_scheduleReadReport` 判定。
+  void _onScrollForRead() {
+    if (!_scrollController.hasClients) return;
+    final atBottom = _scrollController.position.extentAfter <= 48;
+    if (atBottom == _lastScrollAtBottom) return; // 状态没变，不重复触发
+    _lastScrollAtBottom = atBottom;
+    if (atBottom) _scheduleReadReport(); // 上滑离开底部时不报，回到底部才报
   }
 
   /// 滚动到接近顶部时加载更早的历史（分页）。
