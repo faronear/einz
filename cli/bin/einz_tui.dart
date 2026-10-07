@@ -1343,6 +1343,7 @@ Future<void> main(List<String> args) async {
   _exitRaw();
   session.stopWs();
   _sigwinchSub?.cancel(); // 取消终端尺寸监听：否则 event loop 不空闲，进程挂起回不到命令行
+  _wipeScreen(); // 清屏+清回滚缓冲：不留 TUI 画面残骸把 shell 提示符顶出窗口
   _printFarewell(session);
   try {
     stdout.flush(); // 确保退出语输出后再退出
@@ -2596,7 +2597,7 @@ Future<void> _runInputLoop() async {
         if (!completer.isCompleted) completer.complete();
         // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
         // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-        Future.delayed(const Duration(seconds: 2), () => exit(0));
+        _scheduleExitWithWipe();
         return;
       }
       if (code == 13 || code == 10) {
@@ -2620,7 +2621,7 @@ Future<void> _runInputLoop() async {
               inputChanged = true;
               // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
               // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-              Future.delayed(const Duration(seconds: 2), () => exit(0));
+              _scheduleExitWithWipe();
               return;
             }
             final cur = _state!.session; // 用当前的（/reset 会换掉 _state）
@@ -2705,7 +2706,7 @@ Future<void> _runInputLoop() async {
             if (!completer.isCompleted) completer.complete();
             // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS 连接中）
             // 挂起到不了 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-            Future.delayed(const Duration(seconds: 2), () => exit(0));
+            _scheduleExitWithWipe();
           } else {
             // busy 期间的「稍后再发」提示退场（若还挂着——后续 handler 自己写的状态不动）
             if (_state!.status == _kBusyResendHint) _state!.status = '';
@@ -3552,7 +3553,7 @@ Future<void> _execCommand(String line) async {
       s.running = false;
       // 兜底：main 收尾（await guide/stopWs）在部分场景（如重启后 WS/同步挂起）
       // 到不了末尾的 exit(0)——2 秒后强制退出（进程退出自动关闭连接）
-      Future.delayed(const Duration(seconds: 2), () => exit(0));
+      _scheduleExitWithWipe();
     default:
       s.session.messages.add(_systemMessage(s.session, '未知命令: $cmd（/help 查看）'));
   }
@@ -3703,12 +3704,33 @@ Future<void> _handleSpaceKeyInput(String passphrase) async {
   }
 }
 
+/// 退出兜底：立即清屏（不留 TUI 残骸），2 秒后强制退出。
+/// main 收尾（farewell→exit(0)）在部分场景（WS/同步挂起）到不了，统一走这里。
+void _scheduleExitWithWipe() {
+  _wipeScreen();
+  Future.delayed(const Duration(seconds: 2), () => exit(0));
+}
+
+/// 退出时清屏 + 清回滚缓冲（\x1B[2J\x1B[3J\x1B[H）：TUI 是全屏重绘应用，
+/// 不清的话整幅聊天画面残留在终端里，shell 提示符只能被慢慢"顶"出窗口。
+/// 写 stderr：pty 下退出瞬间 stdout 可能已关（见 _printFarewell）。
+/// 只用于 main 收尾的正常退出路径；撤销自毁路径另有自己的清屏提示。
+void _wipeScreen() {
+  try {
+    stderr.write('$_clearHome');
+    stderr.flush();
+  } catch (_) {}
+}
+
 void _printFarewell(ChatSession session) {
   // /exit 后 stdout 流可能已关闭（pty 下 stdin/stdout 共享 fd，退出流程副作用），
-  // 退出信息尽力而为——写入失败忽略，避免 "StreamSink is bound to a stream" 崩溃
+  // 退出信息尽力而为——写入失败忽略，避免 "StreamSink is bound to a stream" 崩溃。
+  // 写 stderr（pty 实测 stdout 在清屏后已不可写，farewell 会被静默吞掉；
+  // stderr 独立 sink 必达——与 _wipeScreen / _exitRevoked 同口径）
   try {
-    stdout.writeln();
-    stdout.writeln('${_gray}已退出 Einz（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
+    stderr.writeln();
+    stderr.writeln('${_gray}已退出 Einz（最后同步锚点 ${session.store.lastServerSequence}）${_reset}');
+    stderr.flush();
   } catch (_) {}
 }
 
