@@ -273,9 +273,17 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
     }
     final vault = VaultSession.current;
     final activeId = vault == null ? null : await lock.resolveActiveSpaceId(vault);
+    // **名字先上屏**（老板 2026-10-07）：名字/性别/头像 id 全是本地数据，不该等网络——
+    // 以前和未读数一起 setState，生产环境网络慢时卡片先显示一串 spaceId 很久才换成人名。
+    if (!mounted) return;
+    setState(() {
+      _names = out;
+      _activeId = activeId;
+    });
     // 未读：服务端派生（GET /messages/unread），逐个空间 best-effort。
     // **走各空间的会话**（不是裸 token）：会话 24h 过期，拿 Vault 里那份旧 token 直接
     // 请求会 401 → 被 catchError 吞成 0 → 未读角标静默消失（2026-09-26 修）。
+    // 与名字拆开：网络慢/失败只影响角标，不再拖累名字显示。
     final client = widget.api ?? ApiClient(effectiveServer);
     final spaces = vault?.spaces ?? const <AppLockPayload>[];
     final counts = await Future.wait([
@@ -288,8 +296,6 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
     ]);
     if (!mounted) return;
     setState(() {
-      _names = out;
-      _activeId = activeId;
       _unread = {for (var i = 0; i < spaces.length; i++) spaces[i].spaceId: counts[i]};
     });
   }
@@ -406,12 +412,15 @@ class _SpacePickerSheetState extends State<_SpacePickerSheet> {
   }
 
   /// 卡片上的名字：**对方名字**优先（老板 2026-09-22：卡片代表空间，上面写对方的名字即可）；
-  /// 取不到再退回"我的名字"、空间 id。
+  /// 取不到再退回"我的名字"。
+  ///
+  /// 名字还没到（本地还没读过 / 网络没刷新过）→ **空串，什么都不显示**
+  /// （老板 2026-10-07：宁可先空着，也不显示一串 spaceId 当名字）。
   String _titleOf(AppLockPayload space) {
     final n = _names[space.spaceId];
     if ((n?.peerName ?? '').isNotEmpty) return n!.peerName;
     if ((n?.name ?? '').isNotEmpty) return n!.name;
-    return space.spaceId;
+    return '';
   }
 }
 

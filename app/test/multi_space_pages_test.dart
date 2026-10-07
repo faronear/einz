@@ -391,6 +391,10 @@ void main() {
     await lock.setActiveSpace('space-a');
 
     await lock.loadVault();
+    // 名字走本地 per-space 资料（2026-10-07 起卡片名字为空就**什么都不显示**，
+    // 不再退回 spaceId——所以没名字的卡片点不了文字，这里给 space-b 写一个名字）。
+    await lock.saveProfile(
+        spaceId: 'space-b', memberName: '我', peerName: '乙二', entranceName: 'iPhone');
     SpacePick? picked;
     await tester.pumpWidget(_app(Scaffold(
       body: Builder(
@@ -405,7 +409,7 @@ void main() {
     )));
     await tester.tap(find.text('开'));
     await _settle(tester);
-    await tester.tap(find.text('space-b')); // 卡片没名字时显示 spaceId（本用例未写资料）
+    await tester.tap(find.text('乙二')); // 卡片显示对方名字（本用例刚写入的资料）
     await _settle(tester);
 
     expect(picked, isNotNull);
