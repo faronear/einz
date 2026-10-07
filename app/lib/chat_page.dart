@@ -1626,6 +1626,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 头像条里的**一个**头像。
   ///
+  /// 桌面端鼠标悬停时显示**这个头像对应的人名**（`Tooltip`；触屏没有 hover，
+  /// 天然不触发——与项目"不做平台判断、靠 hover 只对有鼠标的设备生效"的惯例一致）。
+  /// 名字查不到（未命名成员）回落「未命名」，与成员弹层同口径。
+  ///
   /// [memberId] 该成员**至少有一条通道在线**（`_onlineOthers`）时，在头像上叠一圈
   /// **绿环**——与状态条那颗"在线"绿灯同色（`Colors.green`），一眼看出这一串里谁在。
   ///
@@ -1640,24 +1644,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       api: widget.api,
       radius: kStatusMemberAvatarSize / 2,
     );
-    if (!_onlineOthers.contains(memberId)) return avatar;
-    return SizedBox(
-      width: kStatusMemberAvatarSize,
-      height: kStatusMemberAvatarSize,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          avatar,
-          DecoratedBox(
-            // key 供测试数"谁在线"（头像本身没有可断言的视觉属性）
-            key: ValueKey('statusAvatarOnline-$memberId'),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.green, width: 2.5),
+    final Widget visual = _onlineOthers.contains(memberId)
+        ? SizedBox(
+            width: kStatusMemberAvatarSize,
+            height: kStatusMemberAvatarSize,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                avatar,
+                DecoratedBox(
+                  // key 供测试数"谁在线"（头像本身没有可断言的视觉属性）
+                  key: ValueKey('statusAvatarOnline-$memberId'),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.green, width: 2.5),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
+          )
+        : avatar;
+    final name = _senderNameOf(memberId);
+    return Tooltip(
+      message: name.isEmpty
+          ? AppLocalizations.of(context)!.chatPageMembersUnnamed
+          : name,
+      child: visual,
     );
   }
 

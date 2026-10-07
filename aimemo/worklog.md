@@ -12825,3 +12825,23 @@ C 用专属码加入（不问名字，attach 流）→ C 的 member_id == B 的 
 
 **代价（已接受）：** 冷启动自动进入某空间也会把积压标已读——高水位模型固有语义。
 **验证：** `flutter analyze` 无 issue；真机行为老板自测（未代跑测试/构建）。
+
+## 2026-10-08 群空间状态条头像：桌面端悬停显示人名 tooltip
+
+**老板要求：** 桌面版鼠标放到多人空间状态条的头像上，显示「这个头像对应的人名」。
+
+**改动（`app/lib/chat_page.dart`，`_stripAvatar`）：** 给每个成员头像包一层原生
+`Tooltip(message: 人名)`，覆盖在线（带绿环）与离线两种。名字取 `_senderNameOf(memberId)`
+（`_memberNames`，来自 `GET /space` 的 member_names）；查不到（未命名成员）回落
+l10n `chatPageMembersUnnamed`（「未命名」/`Unnamed`），与成员弹层同口径。
+
+**为什么不加平台判断：** 沿用项目惯例——直接用「天然只在有 hover 的设备上生效」的 widget，
+触屏不触发；全 `app/lib` 无 `defaultTargetPlatform` 用法，`_StatusAvatar` 的 hover 效果同理。
+（注意：原生 Tooltip 在触屏上是长按触发；该区块外层是打开「我的同伴」的 InkWell，
+长按原本无动作，故不冲突。）
+
+**未回归确认（静态）：** 既有 `group_status_bar_test.dart` 断言「左侧没有人名文本」
+（`find.text('Member$i')` findsNothing）——Tooltip 的文案只在显示时才建 Text，未悬停时
+不在树上，断言不受影响；头像数（`CircleAvatar`）与几何也不受 Tooltip 包裹影响。
+
+**验证：** `flutter analyze` 无 issue；桌面 hover 观感老板自测。
