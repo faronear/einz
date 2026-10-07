@@ -99,6 +99,16 @@ Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 > 用途：某个客户端版本有安全缺陷、或协议虽还能用但功能已不可靠时，改配置就能把旧客户端
 > 挡在门外，不必动代码。**开发时若连着配了闸门的服务器**，用
 > `--dart-define=SKIP_VERSION_GATE=true` 跑本地包。
+>
+> **数据文件位置（2026-10-07）**：`dataStore` 指定 SQLite 数据文件路径——绝对路径，或
+> **相对 `serverConfig.json` 所在目录**的相对路径（如 `"../data/einz.nosf.sqlite.db"`）。
+> 空/不填 = 内置默认 `server/data/einz.sqlite.db`。**优先级：`EINZ_DB` 环境变量 > `dataStore`
+> > 内置默认**——Docker 生产由 compose 的 `EINZ_DB` 覆盖（见 §3.1），本项主要给"不设 env
+> 的场景"（本机开发）一个持久默认值。相对路径以配置文件目录为基准（本机 `server/config/`、
+> 容器 `/config/`），同一串在两处都成立。
+> 典型用途：工作区经 Seafile 多机同步时，把库命名成带 `.nosf.` **中缀**的文件
+> （`einz.nosf.sqlite.db`）以命中全局忽略规则 `*.nosf.*`——**必须中缀**，后缀写法
+> `…db.nosf` 的 `-wal`/`-shm` 边车（`…db.nosf-wal`）匹配不到，库照样被同步坏。
 
 ### 2.3 双端收发
 
@@ -152,14 +162,19 @@ deployment/
 前置：一台 VPS（域名 DNS 指向它，开放 80/443）、Docker + Compose。
 
 **服务端配置（可选）**：`deployment/config/serverConfig.json` 会被挂到容器
-`/config/`，由 `EINZ_CONFIG` 指向——当前唯一字段 `maxSpaces`（新空间数量上限：
-`0`=不限、`1`=退回单空间、`n`=最多 n 个；改后**重启容器**生效）。文件不存在时服务端
-照常启动（走默认值 `0`）。示例：
+`/config/`，由 `EINZ_CONFIG` 指向。字段：`maxSpaces`（新空间数量上限）、
+`maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`minAppVersion` /
+`appDownloadUrl`（强制升级闸）、`dataStore`（数据文件路径，见 §2.2）。改后**重启容器**生效；
+文件不存在时服务端照常启动（走默认值）。示例：
 
 ```bash
 mkdir -p deployment/config
 echo '{"maxSpaces": 1}' > deployment/config/serverConfig.json
 ```
+
+> **容器内数据文件路径以 `EINZ_DB` 为准**（compose 里 `/data/einz.sqlite.db`，指向挂载卷）。
+> 既然设了 `EINZ_DB`，它优先于 `dataStore`——所以生产不需要、也不应该用 `dataStore` 改路径，
+> 免得库落到卷外、重建容器即丢。`dataStore` 是给本机开发用的（见 §2.2）。
 
 > 本机开发（非 Docker）同理：放 `server/config/serverConfig.json`（同名字段、
 > 同样不入 git，见 §2.2）——两种形态都是"config/ 目录 + serverConfig.json"，

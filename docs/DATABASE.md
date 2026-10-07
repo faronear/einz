@@ -23,6 +23,11 @@
 
 ## 2. Server SQLite（einz.sqlite.db）
 
+> 文件路径可配（2026-10-07）：`serverConfig.json` 的 `dataStore`（绝对路径，或相对配置
+> 文件目录）覆盖默认名；环境变量 `EINZ_DB` 又优先于它。解析见 `src/configFile.ts` /
+> `src/db.ts` 的 `openDb()`；备份/恢复/审计（`src/backup.ts`）共用同一套解析，保证
+> 指向同一份库。默认 `server/data/einz.sqlite.db`（容器内由 `EINZ_DB=/data/einz.sqlite.db` 覆盖）。
+
 ```sql
 -- 通道（v2：由 POST /spaces / POST /spaces/join 登记；表本身是全局表，
 -- 归属空间靠 entrances.member_id → space_members 推导）

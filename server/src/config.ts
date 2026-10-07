@@ -1,8 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { getDb } from "./db.js";
-
-const HERE = resolve(import.meta.dirname ?? process.cwd());
+import { readFileConfig } from "./configFile.js";
 
 export interface EntranceConfig {
   entrance_id: string;
@@ -44,39 +41,13 @@ export interface ServerConfig {
   app_download_url: string | null;
 }
 
-/** 读取 serverConfig.json（默认 server/config/serverConfig.json——本机配置
- *  不入 git；可用环境变量 `EINZ_CONFIG` 指向别处，Docker 部署靠它读挂载进来的
- *  /config/serverConfig.json，两种形态都是"config/ 目录 + 同名文件"）。
- *  服务端每次启动读取一次（改配置需重启生效；文件缺失或解析失败按默认值处理）。
- *  当前支持字段：maxSpaces、maxEntrancesPerSpace、maxMembersPerSpace、
- *  minAppVersion、appDownloadUrl。 */
-interface FileConfig {
-  maxSpaces?: number;
-  maxEntrancesPerSpace?: number;
-  maxMembersPerSpace?: number;
-  minAppVersion?: string;
-  appDownloadUrl?: string;
-}
-let fileConfigCache: FileConfig | null = null;
-function readFileConfig(): FileConfig {
-  if (fileConfigCache != null) return fileConfigCache;
-  const path = process.env.EINZ_CONFIG ?? resolve(HERE, "../config/serverConfig.json");
-  if (existsSync(path)) {
-    try {
-      fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as FileConfig;
-    } catch (e) {
-      console.warn(`[einz] serverConfig.json 解析失败（按默认配置继续）: ${e}`);
-      fileConfigCache = {};
-    }
-  } else {
-    fileConfigCache = {};
-  }
-  return fileConfigCache;
-}
-
 /** 加载服务配置：v2 Multiverse 下空间由客户端 POST /spaces 创建——服务端不再
  *  持有/生成全局 space_id（老板 2026-09-10）；白名单靠动态登记；maxSpaces
- *  来自 config.json（每次启动读取）。 */
+ *  来自 config.json（每次启动读取）。
+ *
+ *  注意：配置文件里的 `dataStore`（SQLite 路径）**刻意不在这里**——它属于服务端内部
+ *  事实，不该随 /health 下发（ServerConfig 是给客户端看的）。它的读取见 configFile.ts，
+ *  消费方是 db.ts / backup.ts。 */
 export function loadConfig(): ServerConfig {
   const fc = readFileConfig();
   const maxSpaces =

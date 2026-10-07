@@ -16,6 +16,7 @@ import { join, resolve, dirname, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { getDb } from "./db.js";
+import { resolveDataStorePath } from "./configFile.js";
 import { assertSafeSpaceId } from "./safeId.js";
 
 const FORMAT = "einz-server-backup-v1";
@@ -46,9 +47,11 @@ export interface BackupPaths {
   dataDir: string; // <data>/ 根目录（backups/ 也在这里）
 }
 
-/** 从环境变量解析备份路径（与 app.ts / db.ts 默认值一致）。 */
+/** 从环境变量解析备份路径（与 db.ts 的 openDb 优先级一致：EINZ_DB > dataStore > 默认）。
+ *  `dataStore` 必须参与——否则备份/恢复会指向与运行中的服务**不同的库文件**
+ *  （历史上就踩过恢复写到 app.db、服务读 einz.sqlite.db 导致"恢复等于没恢复"）。 */
 export function resolveBackupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
-  const db = env.EINZ_DB ?? resolve(HERE, "../data/einz.sqlite.db");
+  const db = env.EINZ_DB ?? resolveDataStorePath() ?? resolve(HERE, "../data/einz.sqlite.db");
   const files = env.EINZ_FILES ?? resolve(HERE, "../data/files");
   const avatars = env.EINZ_AVATARS ?? resolve(HERE, "../data/avatars");
   const dataDir = resolve(dirname(db));

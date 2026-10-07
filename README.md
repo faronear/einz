@@ -40,7 +40,9 @@ npm run dev
 ```
 
 可选：`server/config/serverConfig.json`（本机配置，不入 git）里的 `maxSpaces`
-（0=不限 / 1=单空间 / n=上限，改后重启生效）。
+（0=不限 / 1=单空间 / n=上限，改后重启生效）；`dataStore` 可自定义 SQLite 数据文件路径
+（绝对路径，或相对配置文件目录；空/不填 = 默认 `server/data/einz.sqlite.db`。
+优先级 `EINZ_DB` 环境变量 > `dataStore` > 默认）。
 
 ## 本地开发配置（App）
 
@@ -63,4 +65,4 @@ flutter run --dart-define-from-file=localConfig.json   # flutter run/build 都�
   `ios-run-dev-new`（+ `ios-refresh` 热重载、`ios-reload` 热重启），Android 模拟器 `npm run apk-run-dev` /
   `apk-run-dev-new`。`scripts/build_ios.sh` 已移除，相关能力并入 npm 脚本。
 - 调试入口（手动）：`flutter run --dart-define-from-file=localConfig.json -d <UDID>`（run 同样支持）
-- 服务端对应：`server/config/serverConfig.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）
+- 服务端对应：`server/config/serverConfig.json`（不入 git）的 `maxSpaces`（0=不限 / 1=单空间 / n=上限，改后重启生效）、`dataStore`（数据文件路径）

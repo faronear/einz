@@ -77,6 +77,7 @@ mkdir -p ~/.einz
 >
 > 可选：`server/config/serverConfig.json` 的 `maxSpaces` 控制新空间数量上限（0=不限）。
 > 自用建议设 1~2，否则等于对公网开放建空间（服务端启动会打告警）。
+> 同文件的 `dataStore` 可指定 SQLite 数据文件路径（默认 `server/data/einz.sqlite.db`）。
 
 ---
 

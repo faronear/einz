@@ -2,16 +2,46 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveDataStorePath } from "./configFile.js";
 
 let db: Database.Database | null = null;
 
 // 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** 打开（或创建）SQLite，按 DATABASE.md §2 建表。 */
-export function openDb(path = process.env.EINZ_DB ?? resolve(HERE, "../data/einz.sqlite.db")): Database.Database {
-  mkdirSync(dirname(path), { recursive: true });
-  db = new Database(path);
+const DEFAULT_DB_PATH = resolve(HERE, "../data/einz.sqlite.db");
+
+/** 打开（或创建）SQLite，按 DATABASE.md §2 建表。
+ *
+ *  库路径优先级（2026-10-07 引入 dataStore）：
+ *    显式参数 > `EINZ_DB`（运行环境注入：容器卷 / 测试临时目录）
+ *             > serverConfig.json 的 `dataStore`（持久配置）
+ *             > 内置默认 server/data/einz.sqlite.db
+ *  分层而非重复：`EINZ_DB` 是**运行时覆盖**（Docker compose、测试靠它，必须保留），
+ *  `dataStore` 是**默认值来源**（每台开发机在配置里设一次，不必各自 export）。 */
+export function openDb(path?: string): Database.Database {
+  let resolved: string;
+  let source: string;
+  if (path != null) {
+    resolved = path;
+    source = "参数";
+  } else if (process.env.EINZ_DB != null && process.env.EINZ_DB !== "") {
+    resolved = process.env.EINZ_DB;
+    source = "EINZ_DB";
+  } else {
+    const fromConfig = resolveDataStorePath();
+    if (fromConfig != null) {
+      resolved = fromConfig;
+      source = "serverConfig.json:dataStore";
+    } else {
+      resolved = DEFAULT_DB_PATH;
+      source = "默认";
+    }
+  }
+  // 留一行可追溯：配错路径（指向空库）是"数据仿佛消失"的典型事故，日志里要看得见。
+  console.log(`[einz] SQLite: ${resolve(resolved)}（来源：${source}）`);
+  mkdirSync(dirname(resolved), { recursive: true });
+  db = new Database(resolved);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 

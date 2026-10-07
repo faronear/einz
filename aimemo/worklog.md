@@ -12596,3 +12596,57 @@ macOS 走 Developer ID 签名+公证。所以合并已在本地完成，**推送
 **老板决定（2026-10-06）：先不推**。合并停在本地 `main=3aaf77e`（工作区干净、HEAD 在
 main）。要推时用 `git push github main`——注意 main 的 upstream 仍是 `origin`（tic.cc，
 当前不可用），光 `git push` 打不到 github；要改 upstream 说一声。
+
+## 2026-10-07 serverConfig 新增 `dataStore`（自定义 SQLite 文件路径）
+
+**诉求（老板）**：本机（iMac / macbook）经 Seafile 同步整个工作区，`server/data/einz.sqlite.db`
+跟着被同步 → 两台机器各写一份，冲突副本、库损坏。想把库改成带 `.nosf.` 的名字，命中
+Seafile 全局忽略规则（`seafile-ignore.txt` 合并进来的 `*.nosf` / `*.nosf.*`）。
+
+- **先评估后动手**：摆了三案——① 直接改代码默认文件名；② 加配置项 `dataStore`；③ 只用
+  环境变量 `EINZ_DB`。老板选 ②（保留产品默认名干净、命名成为每机选择）。
+- **一处纠错**：我中途说成"只有 `npm run dev` 用 `EINZ_DB`"，表述不准（实际是"只有 dev
+  自动读 `.env` 文件"）——`EINZ_DB` 被生产 3 个 compose、9 个 server 测试、8 个 cli 探针、
+  备份/恢复/审计广泛依赖，**删不得**。已向老板澄清。
+- **命名细节（易踩）**：必须用 `.nosf.` **中缀**（`einz.nosf.sqlite.db`）。后缀写法
+  `…db.nosf` 的 SQLite 边车是 `…db.nosf-wal` / `-shm`，**不匹配** `*.nosf` 也不匹配
+  `*.nosf.*`（`.nosf-` ≠ `.nosf.`）→ 边车照样被同步，库照样坏。中缀则三件套一起被忽略。
+
+### 落地
+
+- 新增 `server/src/configFile.ts`：`serverConfig.json` 定位/读取的唯一入口
+  （`configFilePath()` / `readFileConfig()` / `resolveDataStoreValue()` 纯函数 /
+  `resolveDataStorePath()`）。抽出来的目的是**解开 `db.ts` ↔ `config.ts` 的循环 import**
+  （config.ts 依赖 db.ts 的 getDb；db.ts 又要读配置拿 dataStore）。
+- `db.ts` `openDb()` 优先级：**显式参数 > `EINZ_DB` > `dataStore` > 内置默认**
+  （空串 `EINZ_DB` 当未设）。启动打一行 `[einz] SQLite: <绝对路径>（来源：…）`——
+  配错路径指向空库是"数据仿佛消失"的典型事故，得留痕。
+  分层而非重复：`EINZ_DB` = 运行时覆盖（容器/测试），`dataStore` = 持久默认值来源。
+- `backup.ts` `resolveBackupPaths()` 同步接入 `dataStore`——否则备份/恢复/审计会指向与
+  运行中的服务**不同的库文件**（历史坑：恢复写 app.db、服务读 einz.sqlite.db，"恢复等于
+  没恢复"）。
+- `config.ts`：删掉本地 FileConfig/readFileConfig，改从 configFile.js 引；`dataStore`
+  **刻意不进 `ServerConfig`**（那是 `/health` 下发给客户端的，路径属服务端内部）。
+- `serverConfig.example.json` 加 `"dataStore": ""`；根 `package.json` 的
+  `server-run-dev-new` 通配 `einz.sqlite.db*` → `einz*.sqlite.db*`（否则设了 `.nosf` 名后
+  "重置"删的是旧文件，静默不生效）。相对路径以**配置文件目录**为基准，故同一串在本机
+  （`server/config` → `server/data`）与容器（`/config` → `/data`）都成立。
+- 测试：新增 `server/test/data_store.test.ts`（5 条：纯函数语义 ×3 + 生效 + `EINZ_DB` 覆盖），
+  登记进 `server/package.json` 的 test 链。
+- 文档：`DEPLOYMENT.md` §2.2/§3.1、`README.md`、`DATABASE.md` §2、`ONBOARDING.md`。
+
+### 验证
+
+`bash scripts/testAll.sh server` → **全部通过 ✅**（含 build + tsc + 全部测试）。
+
+### 待老板执行：数据文件改名（我未代做）
+
+server 当时在运行（PID 21160 持有该库）→ 没敢动数据。启用步骤：
+
+1. `server/config/serverConfig.json` 加 `"dataStore": "../data/einz.nosf.sqlite.db"`
+   （该文件不入 git 但**会被 Seafile 同步** → 设一次两台机器都生效）
+2. **停服**，把三件套一起改名：`einz.sqlite.db{,-wal,-shm}` → `einz.nosf.sqlite.db{,-wal,-shm}`
+3. 重启。**每台机器各自做第 2 步**（新名字被 Seafile 忽略，两台从此各持一份、互不同步）
+
+> 注：本次提交只带了本改动；工作区里 `.vscode/sessions.json` 与根 `package.json` 的
+> `devDependencies` 是**别的会话**留下的，已用 `git apply --cached` 隔离，未夹带提交。

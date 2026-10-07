@@ -11,7 +11,7 @@
     "pub-patches": "bash scripts/patchPubCache.sh",
     "server-run-dev": "cd server && npm run dev",
     "server-mail-probe": "cd server && npm run mail:probe",
-    "server-run-dev-new": "rm -fr server/data/einz.sqlite.db* && rm -fr server/data/files && npm run server-run-dev",
+    "server-run-dev-new": "rm -fr server/data/einz*.sqlite.db* && rm -fr server/data/files && npm run server-run-dev",
     "server-run-docker": "cd deployment; git pull; docker compose up -d --build server; docker compose logs -f server",
     "server-run-docker-new": "rm -fr deployment/data/einz.sqlite.db* && rm -fr deployment/data/files && npm run server-run-docker",
     "server-update-remote": "ssh.sh cn1 'cd /faronear/einz/deployment && sudo git pull && docker compose up -d --build server && docker compose logs -f server'",

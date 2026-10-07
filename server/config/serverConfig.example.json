@@ -3,5 +3,6 @@
   "maxEntrancesPerSpace": 0,
   "maxMembersPerSpace": 0,
   "minAppVersion": "",
-  "appDownloadUrl": ""
+  "appDownloadUrl": "",
+  "dataStore": ""
 }
