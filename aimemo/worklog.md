@@ -12905,3 +12905,25 @@ CLI 的 `_onPeerStatus` group bug 修出后，对照 App `chat_page.dart` 发现
 
 **验证：** flutter analyze 干净；chat_profile_refresh_test（对方加入补拉身份）、
 chat_bubble_gender_test + chat_page_menu_test（35 条）全过。
+
+### App 拷贝图标可视区偏高：缩字号与邻居光学对齐（2026-10-08 老板反馈）
+
+**现象：** 消息气泡快捷按钮和长按消息操作菜单里，拷贝图标的可视区都比邻居按钮
+（引用/保存）高一点。
+
+**根因（字形几何）：** `Icons.copy_outlined` 的纸张轮廓竖向占 20/24 视框，而邻居
+`save_alt` 18/24、`format_quote` 仅 10/24——同 size 下拷贝天然高一档，属图标字形
+差异，非布局 bug。
+
+**选型：** Material 无"纸面为正方形"的经典拷贝字形——`copy_all` 是四角括号风格
+（语义偏"选择框"）、`filter_none`/`file_copy` 与现字形同比例，换了不解决 → 采
+老板备选方案：保留拷贝隐喻、按比例缩小（8%）。
+
+**改动（app/lib/chat_page.dart）：**
+- `_bubbleQuickAction` / `_buildActionCard` 各加可选 `iconSize`（缺省 12/26 不影响
+  其他调用点）
+- 气泡快捷拷贝 12 → 11；长按菜单拷贝卡片 26 → 24
+- 邀请弹窗两处 `Icons.copy`（2024/2050）是独立 IconButton、无邻居可比高，不动
+
+**验证：** flutter analyze 干净；chat_page_menu_test + chat_bubble_gender_test
+35 条全过；goldens 默认跳过（-Dgolden=true 才真跑，符合既定政策）。

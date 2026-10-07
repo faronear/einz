@@ -520,6 +520,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    double iconSize = 12,
   }) {
     final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
     return Material(
@@ -539,7 +540,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             // 热区：padding 4（老板 2026-10-02：6 会撑大气泡，收到 4），
             // 相邻动作另加 2 间隔
             padding: const EdgeInsets.all(4),
-            child: Icon(icon, size: 12, color: subtle),
+            child: Icon(icon, size: iconSize, color: subtle),
           ),
         ),
       ),
@@ -4786,7 +4787,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 // 文字消息才有「拷贝」（媒体消息无文本可拷）
                 if (m.env.type == 'text')
                   _buildActionCard(
+                    // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote
+                    // 高一档（2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24
+                    // 与邻居光学对齐
                     icon: Icons.copy_outlined,
+                    iconSize: 24,
                     label: l10n.chatPageCopy,
                     onTap: () => Navigator.of(ctx).pop('copy'),
                   ),
@@ -4894,11 +4899,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 底部菜单的操作卡片：圆角方形，内含图标与文字；destructive 用红色标示
   /// 删除等不可逆操作。长按消息菜单与输入栏「+」附件菜单共用。
+  /// [iconSize] 供字形偏高的图标（如 copy_outlined 竖向占 20/24）单独缩小，
+  /// 与邻居图标光学对齐（2026-10-08）；缺省 26 与原尺寸一致。
   Widget _buildActionCard({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
     bool destructive = false,
+    double iconSize = 26,
   }) {
     final foreground = destructive ? Colors.red.shade400 : null;
     return Material(
@@ -4912,7 +4920,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 26, color: foreground),
+              Icon(icon, size: iconSize, color: foreground),
               const SizedBox(height: 8),
               Text(
                 label,
@@ -7236,7 +7244,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           if (m.env.type == 'text')
                                             _bubbleQuickAction(
                                               m,
+                                              // 拷贝字形竖向占 20/24，比邻居
+                                              // save_alt(18/24)/format_quote(10/24)
+                                              // 天然高一档——缩 1 与邻居光学对齐
+                                              //（2026-10-08 老板反馈：拷贝按钮偏高）
                                               icon: Icons.copy_outlined,
+                                              iconSize: 11,
                                               label: l10n.chatPageCopy,
                                               onTap: () async {
                                                 await Clipboard.setData(
