@@ -849,6 +849,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 上线成员的身份资料是否还不全（触发补拉 /space 的判据）：
+  /// member_id 未知（旧服务端广播不带），或该成员**不在性别表里**（成员表还是
+  /// 上次拉取的旧快照——如离线期间新加入的同伴）。已在表里的成员不触发，
+  /// 避免每次上下线都白跑一次 /space。
+  bool _peerProfileIncomplete(String? memberId) {
+    if (memberId == null || memberId.isEmpty) return true;
+    return !_memberGenders.containsKey(memberId);
+  }
+
   /// 对端上下线（Server 广播——立即更新对方在线状态，不等 30s 轮询）。
   void _onPeerStatus(WsPeerStatusEvent event) {
     if (event.entranceId == widget.entranceId) return; // 本通道自身的事件忽略
@@ -856,10 +865,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 这里兜住旧服务端——旧 payload 无 member_id 时按原行为处理）
     if (event.memberId != null && event.memberId == widget.memberId) return;
     final online = event.type == kWsTypePeerOnline;
-    // 对方刚上线（多半是刚加入本空间）：initState 那次 /space 只有我一人，
-    // 对方的名字/性别/身份槽位都还是空 → 同性别两人气泡会是同一个颜色
-    // （老板 2026-09-22 实测）。这里补拉一次把身份补齐。
-    if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
+    // 上线成员的身份信息还不全（group 里第二个同伴上线时 _peerOnline 已是 true，
+    // 旧 guard 会被挡住 → 名字/性别缺失直到下次广播/重启；CLI 同款 bug 在 group
+    // E2E 暴露，2026-10-07 对齐修复）：不在表里就补拉，而不是只看 _peerOnline 翻转
+    if (online && _peerProfileIncomplete(event.memberId)) {
+      unawaited(_refreshProfileFromServer());
+    }
     // 在 setState 之前记下"这次事件是否改变了状态"——下面要用，改完就比不出来了
     final changed = online != _peerOnline;
     if (mounted && changed) {
@@ -3439,8 +3450,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         return pid != mine;
       }).toList();
       final online = peer.isNotEmpty && peer.any((d) => _isRowOnline(d, now));
-      // 对方由离线转在线（含"刚加入空间"——WS 事件可能漏，这里兜底）：补拉身份
-      if (online && !_peerOnline) unawaited(_refreshProfileFromServer());
+      // 对方由离线转在线（含"刚加入空间"——WS 事件可能漏，这里兜底）：补拉身份。
+      // 判据改为「在线成员的身份不全」而非 _peerOnline 翻转：group 里已有同伴在线时
+      // 布尔不翻转，新加入的同伴会被挡住（CLI 同款 bug，2026-10-07 对齐修复）。
+      if (online &&
+          peer.any((d) {
+            if (!_isRowOnline(d, now)) return false;
+            return _peerProfileIncomplete(d['member_id'] as String?);
+          })) {
+        unawaited(_refreshProfileFromServer());
+      }
       // 「对方已加入」= 有**在用**通道。撤销不会删行，只把 status 标成 revoked
       // （server/src/entrances.ts）——拿"行存在"当已加入，会让密友重置设备/通道被撤
       // 之后反而不给邀请入口，恰恰丢了最该邀请的那一刻。status 缺省（老服务端）按

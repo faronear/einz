@@ -12890,3 +12890,18 @@ memberNames；口令**本地校验**——GET /key-escrow + openPackage 解封�
 **渲染坑复认：** 同步完成的命令分支只靠 whenComplete 的 microtask 渲染，真实终端
 不显示（本文件既有已知行为）——/invite 带参指路、_execEntoken 默认分支、_reinvite
 同步早退三处补 `_scheduleRender()`。纯同步分支必须显式调度，这是第二次踩同一坑。
+
+### App 对齐修复：同款"上线刷新成员表"guard 的 group 边缘缺口（2026-10-07）
+
+CLI 的 `_onPeerStatus` group bug 修出后，对照 App `chat_page.dart` 发现两处同款 guard
+（WS 广播 :862 与 30s 轮询 :3443）：`online && !_peerOnline` 才补拉身份——group 中
+已有同伴在线时布尔不翻转，新加入同伴（尤其离线期间入群、错过 member.joined 广播的）
+名字/性别缺失，气泡退青色、名字显示 member_id。
+
+**对齐修复（老板确认顺手做）：** 判据从"布尔翻转"改为"上线成员身份不全"——新增
+`_peerProfileIncomplete(memberId)`（member_id 未知，或不在 `_memberGenders` 表里
+= 成员表还是旧快照），两处 guard 都改用它：已在表里的成员不触发，避免每次上下线
+白跑 /space。App 原有的 `member.joined` 无条件刷新兜底（:891）保留不动。
+
+**验证：** flutter analyze 干净；chat_profile_refresh_test（对方加入补拉身份）、
+chat_bubble_gender_test + chat_page_menu_test（35 条）全过。
