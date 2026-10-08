@@ -5861,24 +5861,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         case _AttachmentKind.photo:
           image = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1600);
           if (image == null) return;
+          if (!_withinAttachmentLimit(await image.length())) return;
           fileName = _pickedFileName(image, fallback: 'image.jpg');
           type = 'image';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.galleryImage:
           image = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1600);
           if (image == null) return;
+          if (!_withinAttachmentLimit(await image.length())) return;
           fileName = _pickedFileName(image, fallback: 'image.jpg');
           type = 'image';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.videoCamera:
           image = await _picker.pickVideo(source: ImageSource.camera, maxDuration: const Duration(minutes: 1));
           if (image == null) return;
+          if (!_withinAttachmentLimit(await image.length())) return;
           fileName = _pickedFileName(image, fallback: 'video.mp4');
           type = 'video';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
         case _AttachmentKind.videoGallery:
           image = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 1));
           if (image == null) return;
+          if (!_withinAttachmentLimit(await image.length())) return;
           fileName = _pickedFileName(image, fallback: 'video.mp4');
           type = 'video';
           await _sendAttachmentOptimistic(fileBytes: await image.readAsBytes(), fileName: fileName, type: type);
@@ -5888,6 +5892,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           final audioFiles = await FilePicker.pickFiles(type: FileType.audio);
           if (audioFiles.isEmpty) return;
           final audio = audioFiles.first;
+          if (!_withinAttachmentLimit(await audio.length())) return;
           final audioName = audio.name;
           final audioBytes = await audio.readAsBytes();
           // 发送前读一遍时长（audioplayers 设源取总时长，不播放），放进载荷
@@ -5904,6 +5909,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           final anyFiles = await FilePicker.pickFiles(type: FileType.any);
           if (anyFiles.isEmpty) return;
           final any = anyFiles.first;
+          if (!_withinAttachmentLimit(await any.length())) return;
           final anyName = any.name;
           final anyBytes = await any.readAsBytes();
           await _sendAttachmentOptimistic(
@@ -5916,10 +5922,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } on ApiException catch (e) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
-      _notice(context, backendError(l10n, l10n.chatPageSendFailed(e.message)));
+      _notice(
+          context,
+          _isAttachmentTooLarge(e)
+              ? _attachmentSendError(l10n, e)
+              : backendError(l10n, l10n.chatPageSendFailed(e.message)));
     } catch (e) {
       if (!mounted) return;
-      _notice(context, AppLocalizations.of(context)!.chatPageSendFailed('$e'));
+      _notice(context, _attachmentSendError(AppLocalizations.of(context)!, e));
     }
   }
 
@@ -5940,12 +5950,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return false;
   }
 
-  /// 附件发送失败文案：**超限**单独给人话（老板 2026-10-08：此前 1GB 视频只看到
+  /// 服务端是否因**附件过大**而拒（413 / PAYLOAD_TOO_LARGE）。拖放与选择器两条
+  /// 附件入口共用：据此把"技术串"换成"文件太大"的人话。
+  bool _isAttachmentTooLarge(Object error) =>
+      error is ApiException &&
+      (error.code == 'PAYLOAD_TOO_LARGE' || error.httpStatus == 413);
+
+  /// 附件发送失败文案：**超限**单独给人话（老板 2026-10-08：此前只看到
   /// `ApiException(PAYLOAD_TOO_LARGE): request body exceeds … bytes` 这种技术串）；
-  /// 其余照旧走 `chatPageSendFailed`。
+  /// 其余照旧走 `chatPageSendFailed`。上限未知（旧服务端）时退化为不带数字的版本。
   String _attachmentSendError(AppLocalizations l10n, Object error) {
-    if (error is ApiException &&
-        (error.code == 'PAYLOAD_TOO_LARGE' || error.httpStatus == 413)) {
+    if (_isAttachmentTooLarge(error)) {
       final limit = serverMaxAttachmentBytes;
       return limit == null
           ? l10n.chatPageAttachmentTooLargeUnknown

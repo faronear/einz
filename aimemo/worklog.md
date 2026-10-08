@@ -13193,6 +13193,29 @@ E2E（pty 双窗口）4/4：`1/1●BobG`（B 在线）→ B 退出后 `0/1○Bob
 **验证：** `flutter analyze` 无 issue；shared `dart test` 52 passed；server `npm test`
 22 个文件全绿（含新断言）。真机拖拽/大文件表现老板自测。
 
+### 附件大小预检补全到「选择器」路径（2026-10-08，接上条）
+
+**背景：** 上条只给**拖放**路径加了大小预检 +「太大」人话；相册/相机/文件对话框走的
+`_sendMedia` 仍是"读满内存 → 加密 → 上传 → 413 → 技术串"的老路。老板要求补上。
+
+**改动（`app/lib/chat_page.dart`）：**
+- `_sendMedia` 六个分支在 `readAsBytes()` **之前**统一预检：XFile 用 `await x.length()`；
+  file_picker 的 `PlatformFile` 用 `await p.length()`（**v3.4 无 `.size` 字段，是 `length()`**）；
+  超限即 `return`（一次选择只有一个文件）。
+- 抽出 `_isAttachmentTooLarge(e)`（413 / `PAYLOAD_TOO_LARGE`）供两条路径共用；
+  `_sendMedia` 的 `ApiException` 分支：超限 → 人话（**不带**「后台：」前缀），其余照旧
+  `backendError(...)`；通用 catch 也改走 `_attachmentSendError`。
+
+**顺带核实（答老板问「压缩是否对拍照/选择器生效」）：**
+`pickImage(maxWidth: 1600)` 只在**移动端**生效——桌面端（macos/windows/linux 的
+image_picker 实现）把 `maxWidth/maxHeight/imageQuality` **静默忽略**
+（`image_picker_macos-0.2.2+1/lib/image_picker_macos.dart:153` "silently ignored"，
+windows/linux 同）。即桌面端"选择器图片"与"拖入图片"其实都是原图；先前"两者不一致"
+的说法只在移动端成立。同源事实：桌面端 `maxDuration`（视频 1 分钟上限）同样被忽略。
+
+**验证：** `flutter analyze` 无 issue（首轮误用 `PlatformFile.size` 报 2 处
+`undefined_getter`，改 `length()` 后干净）。真机行为老板自测。
+
 ### TUI /switch <store路径>：不退出进程切换空间（2026-10-08 老板要求实现）
 
 **背景：** 单 store 多空间方案评估后维持现状（改动大、动加密收口），改做轻量的
