@@ -1746,9 +1746,10 @@ void _render() {
   final peerName = _peerNameOf(s);
   final peerDot = s.peerOnline ? '$_green●$_white' : '${_white}○';
   // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
-  // 在线成员在前（●绿）、离线在后（○白），人名用 () 包起（老板 2026-10-08 补充），
-  // 右侧 n/N = 在线人数/总人数（**不含我**）。总宽不超过左段 1/3 限长（超宽截断
-  // 由 _titleBarThree 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
+  // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
+  // 在前（●绿）、离线在后（○白），人名之间用竖线 | 分隔（每人自带灯，不用括号
+  // ——老板 2026-10-08 修正）。总宽不超过左段 1/3 限长（超宽截断由 _titleBarThree
+  // 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
   final String leftSeg;
   if (s.isGroupSpace) {
     leftSeg = _groupMemberListLabel(s);
@@ -1924,10 +1925,9 @@ String _entranceCountLabel(int onlineCount, int totalCount) {
   return ' #$onlineCount/$totalCount';
 }
 
-/// group 空间标题栏左段：成员名单（老板 2026-10-08）——
-/// 在线成员在前（●绿）、离线在后（○白），人名用 () 包起（老板补充）；
-/// 右侧 ` n/N` = 在线人数/总人数（**不含我**）。在线者按上线时刻降序（与 duo
-/// 段同一排序函数），离线者按 memberSlots 槽位序稳定排列。
+/// group 空间标题栏左段：`n/N ●名|○名`（老板 2026-10-08）——
+/// 最左 n/N = 在线人数/总人数（**不含我**）；其后成员名单，在线在前（●绿）、
+/// 离线在后（○白），人名之间竖线 | 分隔（每人自带灯，不用括号——老板修正）。
 /// 我自己不出现在名单里；成员表尚未拉到（离线启动）时名单为空，仅显示 0/0。
 /// 超宽截断由 _titleBarThree 统一处理（尾部先丢——离线名单排最后先被截）。
 String _groupMemberListLabel(_TuiState s) {
@@ -1945,15 +1945,22 @@ String _groupMemberListLabel(_TuiState s) {
   // 在线/离线都保持 memberNames 迭代序（成员表顺序稳定——/space 成员表按槽位
   // 返回；在线细分排序无稳定数据源，member 序即可预期，不做花哨排序）
   final buf = StringBuffer();
-  String nameOf(String pid) => '(${s.memberNames[pid] ?? pid})';
+  final total = online.length + offline.length;
+  buf.write('${_green}${online.length}$_white/$total');
+  const sep = '|';
+  var first = true;
+  void append(String pid, String dot) {
+    if (!first) buf.write(sep);
+    first = false;
+    buf.write('$dot$_white${s.memberNames[pid] ?? pid}');
+  }
+
   for (final pid in online) {
-    buf.write('$_green●$_white${nameOf(pid)}');
+    append(pid, '$_green●');
   }
   for (final pid in offline) {
-    buf.write('${_white}○$_white${nameOf(pid)}');
+    append(pid, '${_white}○');
   }
-  final total = online.length + offline.length;
-  buf.write(' ${_green}${online.length}$_white/$total');
   return buf.toString();
 }
 
