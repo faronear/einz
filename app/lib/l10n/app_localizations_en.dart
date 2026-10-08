@@ -169,7 +169,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardTitlePin => 'Set PIN';
 
   @override
-  String get wizardTitleEnvelope => 'Key envelope';
+  String get wizardTitleEnvelope => 'Verify key envelope';
 
   @override
   String get wizardEnrollExists =>

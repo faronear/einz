@@ -64,7 +64,7 @@
   "wizardTitlePassphrase": "Set passphrase",
   "wizardJoinPassphraseTitle": "Verify passphrase",
   "wizardTitlePin": "Set PIN",
-  "wizardTitleEnvelope": "Key envelope",
+  "wizardTitleEnvelope": "Verify key envelope",
   "wizardEnrollExists": "This server already has a space (created by another entrance). Use the Join flow with a one-time entrance token from the other person.",
   "wizardEnrollGoJoin": "Use Join flow",
   "wizardEnrollFailed": "❌ Enrollment failed: {error}",

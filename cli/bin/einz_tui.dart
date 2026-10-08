@@ -1932,14 +1932,14 @@ void _render() {
   buf.write('\x1B[$rows;1H\x1B[K');
   if (s.scrollTop < s.lastMaxStart) {
     // 历史浏览模式：正在看更早的消息（未贴底），提示翻页键；到底后自动回正常状态
-    buf.write(_barLine(_bgBlack, '📜 历史浏览（PgUp/PgDn 或滚轮翻页，翻到底自动回到最新）', cols));
+    buf.write(_barLine(_bgBlack, '📜 历史浏览（PgUp/PgDn, Shift+↑/↓ 或鼠标滚轮；翻到底自动回到最新）', cols));
   } else if (s.status.isNotEmpty) {
     buf.write(
         _barLine(_bgBlack, '⚙ ${_truncateByWidth(s.status, cols - 4)}', cols));
   } else {
     buf.write(_barLine(
         _bgBlack,
-        '⚙ ${_truncateByWidth('/help 查看命令 /entoken 生成通道码 /attach 发送文件', cols - 4)}',
+        '⚙ ${_truncateByWidth('/help 查看命令 /entoken 生成通道码 /exit 退出系统 /attach 发送文件', cols - 4)}',
         cols));
   }
   // 光标定位到输入编辑位置（与 _renderInputLine 一致，←→ 移动后光标跟随）
@@ -3241,13 +3241,13 @@ Future<void> _execCommand(String line) async {
       // 合并为**一条**系统消息（老板 2026-10-08）：此前每条命令一条消息，
       // 每行都带 [时间 秘境] 前缀，视觉零散；单条消息内按 \n 分行，只有一个前缀。
       final sorted = [...helpEntries]..sort((a, b) => a.$1.compareTo(b.$1));
-      final helpText = StringBuffer('您可输入以下系统命令：\n');
+      final helpText = StringBuffer('可输入以下系统命令：\n');
       for (final (cmd, desc) in sorted) {
-        helpText.writeln(desc.isEmpty ? cmd : '$cmd 👉 $desc');
+        helpText.writeln(desc.isEmpty ? cmd : '$cmd 👉 $desc\n');
       }
       helpText.write(
-          '\n翻页查看历史 👉 PgUp/PgDn 一屏快翻；Shift+↑/↓ 逐行慢走；鼠标滚轮每次 3 行。'
-          '翻上去后状态栏显示 📜 历史浏览（新消息不打断）；任一向下键翻到底自动回到最新');
+          '翻页 👉 PgUp/PgDn 一屏快翻；Shift+↑/↓ 逐行慢走；鼠标滚轮每次 3 行。'
+          '翻上去后状态栏显示 📜 历史浏览；任一向下键翻到底自动回到最新');
       s.session.messages.add(_systemMessage(s.session, helpText.toString()));
       s.status = '';
     case '/server':

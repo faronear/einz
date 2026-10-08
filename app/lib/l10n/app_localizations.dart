@@ -383,7 +383,7 @@ abstract class AppLocalizations {
   /// No description provided for @wizardTitleEnvelope.
   ///
   /// In en, this message translates to:
-  /// **'Key envelope'**
+  /// **'Verify key envelope'**
   String get wizardTitleEnvelope;
 
   /// No description provided for @wizardEnrollExists.
