@@ -2036,11 +2036,8 @@ String _groupMemberListLabel(_TuiState s) {
   final total = online.length + offline.length;
   buf.write('${_green}${online.length}$_white/$total');
   const sep = ' ';
-  var first = true;
   void append(String pid, String dot) {
-    //if (!first) 
     buf.write(sep);
-    first = false;
     buf.write('$dot$_white${s.memberNames[pid] ?? pid}');
   }
 
@@ -3213,101 +3210,45 @@ Future<void> _execCommand(String line) async {
   switch (cmd) {
     case '/help':
     case '/':
-      // 命令列表作为 system 消息进消息流（随消息区滚动，不占顶部状态栏）
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '您可输入以下系统命令：',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/attach <文件路径> 👉 上传文件',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/auth 👉 激活/续期当前服务器的机密线路（换服务器用 /server）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/status 👉 查看服务器/连接/绑定/通道状态（排障用，只读）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/entrance <通道名> 👉 修改当前通道名称（别名 /device）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/entrances 👉 查看秘境里的通道列表（同空间全部通道；别名 /devices）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/revoke <通道序号> 👉 强制撤销某条通道（需共享口令；被撤通道将清空本地数据）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/reset 👉 重置本通道（输入通道名 + 本机锁屏码确认，清空本地数据后回到入网向导）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/switch <store路径> 👉 切换到另一个秘境的 store 文件（不退出进程；目标秘境有锁屏码需先验证）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/exit 👉 立刻退出',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '翻页查看历史 👉 PgUp/PgDn 一屏快翻；Shift+↑/↓ 逐行慢走；鼠标滚轮每次 3 行。'
-        '翻上去后状态栏显示 📜 历史浏览（新消息不打断）；任一向下键翻到底自动回到最新',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/history',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/entoken 👉 生成一次性通道码（24小时有效）——/entoken 给我自己的其他设备；'
-        '/entoken invite 给新成员；/entoken reinvite 给指定成员签专属码（需共享口令，duo 直接出码、group 选成员）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/invite 👉 /entoken invite 的别名——给新成员生成通道码',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/reinvite 👉 /entoken reinvite 的快捷方式——给指定成员签专属码（需共享口令，duo 直接出码、group 选成员）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/passphrase <random> 👉 修改共享口令；random 生成随机 12 词恢复码',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/backup <路径> 👉 导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/pin <PIN> 👉 查看状态、设置或清空锁屏码',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/myname <名字> 👉 修改我的名字',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/server <地址> 👉 查看当前服务端；带地址参数：切换服务端（仅本次生效）',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/space 👉 查看当前连接的秘境',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/sync 👉 同步最新消息流',
-      ));
-      s.session.messages.add(_systemMessage(
-        s.session,
-        '/open <附件序号> 👉 打开 #序号 的附件消息',
-      ));
+      // 命令列表作为 system 消息进消息流（随消息区滚动，不占顶部状态栏）。
+      // 按命令字母序输出（老板 2026-10-08）：列表 + sort，新增命令时只需往列表
+      // 加一行，顺序自动维持。首条非命令条目（翻页说明）排列表最后。
+      const helpEntries = <(String, String)>[
+        ('/attach <文件路径>', '上传文件'),
+        ('/auth', '激活/续期当前服务器的机密线路（换服务器用 /server）'),
+        ('/backup <路径>', '导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）'),
+        ('/entrance <通道名>', '修改当前通道名称（别名 /device）'),
+        ('/entrances', '查看秘境里的通道列表（同空间全部通道；别名 /devices）'),
+        ('/entoken', '生成一次性通道码，24小时有效（/entoken 👉 给我自己的其他设备；'
+            '/entoken invite 👉 给新成员；/entoken reinvite 👉 给指定成员签专属码。）'),
+        ('/exit', '立刻退出'),
+        ('/history', ''),
+        ('/help', '查看命令列表（本条）'),
+        ('/invite', '/entoken invite 的别名：给尚未加入的新成员生成通道码'),
+        ('/myname <名字>', '修改我的名字'),
+        ('/open <附件序号>', '打开 #序号 的附件消息'),
+        ('/passphrase <random>', '修改共享口令；random 生成随机 12 词恢复码'),
+        ('/pin <PIN>', '查看状态、设置或清空锁屏码'),
+        ('/reinvite', '/entoken reinvite 的别名：给已经加入的指定成员生成专属通道码'),
+        ('/reset', '重置本通道（输入通道名 + 本机锁屏码确认，清空本地数据后回到入网向导）'),
+        ('/revoke <通道序号>', '强制撤销某条通道（需共享口令；被撤通道将清空本地数据）'),
+        ('/server <地址>', '查看当前服务端；带地址参数：切换服务端（仅本次生效）'),
+        ('/space', '查看当前连接的秘境'),
+        ('/status', '查看服务器/连接/绑定/通道状态（排障用，只读）'),
+        ('/switch <store路径>', '切换到另一个秘境的 store 文件（不退出进程；目标秘境有锁屏码需先验证）'),
+        ('/sync', '同步最新消息流'),
+      ];
+      // 合并为**一条**系统消息（老板 2026-10-08）：此前每条命令一条消息，
+      // 每行都带 [时间 秘境] 前缀，视觉零散；单条消息内按 \n 分行，只有一个前缀。
+      final sorted = [...helpEntries]..sort((a, b) => a.$1.compareTo(b.$1));
+      final helpText = StringBuffer('您可输入以下系统命令：\n');
+      for (final (cmd, desc) in sorted) {
+        helpText.writeln(desc.isEmpty ? cmd : '$cmd 👉 $desc');
+      }
+      helpText.write(
+          '\n翻页查看历史 👉 PgUp/PgDn 一屏快翻；Shift+↑/↓ 逐行慢走；鼠标滚轮每次 3 行。'
+          '翻上去后状态栏显示 📜 历史浏览（新消息不打断）；任一向下键翻到底自动回到最新');
+      s.session.messages.add(_systemMessage(s.session, helpText.toString()));
       s.status = '';
     case '/server':
       // 无参数：先输出当前服务器（状态），再给出详细用法
@@ -3687,7 +3628,7 @@ Future<void> _execCommand(String line) async {
       //   /entoken reinvite  → 给其他成员生成专属码（需共享口令：
       //                        duo 直接出码；group 验口令后列成员选择）
       await _execEntoken(arg);
-      s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/entoken 👉 为自己生成通道码\n/entoken invite 👉 为新同伴生成通道码\n/entoken reinvite 👉 为选择的同伴生成通道码'));
+      s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/entoken 👉 为自己生成通道码\n/entoken invite 👉 为尚未加入的同伴生成通道码\n/entoken reinvite 👉 为已加入的同伴生成通道码（需共享口令，duo 直接出码、group 选成员）'));
       break;
     case '/invite':
       // /entoken invite 的别名（给新人生成通道码）。旧写法 /invite attach* 已
@@ -3696,7 +3637,7 @@ Future<void> _execCommand(String line) async {
         await _execEntoken('invite');
       } else {
         s.session.messages.add(_systemMessage(s.session,
-            '⚠️ /invite 只用于给新人生成通道码（= /entoken invite）。\n'
+            '⚠️ /invite （= /entoken invite）只用于给新人生成通道码。\n'
             '  给我自己的其他设备：/entoken\n'
             '  给指定成员签专属码：/entoken reinvite'));
         // 同步完成的分支：whenComplete 的 microtask 渲染真实终端不显示（本文件
@@ -3706,7 +3647,7 @@ Future<void> _execCommand(String line) async {
       }
       break;
     case '/reinvite':
-      // /entoken reinvite 的快捷方式（给其他成员生成专属通道码——duo 直接出码，
+      // /entoken reinvite 的别名（给其他成员生成专属通道码——duo 直接出码，
       // group 验口令后列成员选择）。
       await _execEntoken('reinvite');
       break;
@@ -3916,7 +3857,7 @@ Future<void> _reinvite(_TuiState s) async {
       .toList();
   if (memberIds.isEmpty) {
     s.session.messages.add(_systemMessage(s.session,
-        '⚠️ 本空间还没有其他成员——/entoken reinvite 用于给已有成员签专属码；邀请新成员用 /entoken invite'));
+        '⚠️ 本空间还没有其他成员。（/entoken reinvite 用于给已有成员签专属码；邀请新成员用 /entoken invite）'));
     // 纯同步分支：microtask 渲染在真实终端不显示（本文件已知行为），显式调度
     _scheduleRender();
     s.status = '';
@@ -3940,7 +3881,7 @@ Future<void> _reinvite(_TuiState s) async {
             .file;
     if (envelope == null) {
       s.session.messages.add(_systemMessage(s.session,
-          '⚠️ 本空间没有可校验的共享口令（未设置或被清除）——先用 /passphrase 设置口令'));
+          '⚠️ 本空间没有可校验的共享口令（未设置或被清除），可先用 /passphrase 设置口令'));
       s.status = '';
       return;
     }
