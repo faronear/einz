@@ -61,6 +61,7 @@ dependencies:
   package_info_plus: ^10.2.1
   flutter_webrtc: ^1.6.2+hotfix.3
   wakelock_plus: ^1.8.0
+  gal: ^2.3.3
 
 dev_dependencies:
   flutter_test:

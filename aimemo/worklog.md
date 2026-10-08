@@ -12949,3 +12949,35 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 
 **验证：** dart analyze 干净；pty E2E 3/3——duo 创建落库 mode=duo、group 创建
 落库 mode=group、非法输入（x/9）两次重问后最终选群组正确落库（sqlite spaces.mode）。
+
+## 2026-10-08 手机端图片/视频保存到相册 + 全屏加「保存」按钮
+
+**老板要求（两问）：** ① 手机 App 点消息气泡上的下载图标，图片消息现在存到 App 文件
+系统，要改成**默认存系统相册**（图片、视频）；② 图片/视频**点开全屏**时，底部放一个
+下载按钮（自己头像例外——它现在是「更换头像」按钮，不改）。
+
+**新增依赖：`gal ^2.3.3`**（老板拍板用 gal；项目本来没有写相册的能力）。平台配置：
+- iOS：`NSPhotoLibraryAddUsageDescription` **已在** Info.plist（当年就写好了"保存下载解密的
+  照片/视频到相册"）；
+- Android：补 `WRITE_EXTERNAL_STORAGE`（`maxSdkVersion=28`）——Android 10+ 走 MediaStore
+  无需权限，只有 ≤9 需要；
+- macOS 13 / iOS 15 的部署目标均 ≥ gal 要求的 11，无需动 Podfile；
+- `flutter pub get` 顺带改了 windows 的生成注册文件（gal 也声明了 windows 平台）。
+
+**落地：**
+- 新增 `app/lib/data/media_saver.dart`：`canSaveToGallery`（仅移动端）、
+  `saveImageToGallery(bytes, name)` / `saveVideoToGallery(path)`（首次调用申请权限，
+  被拒抛错）。桌面端没有"相册"，调用方在桌面走 `FilePicker.saveFile`。
+- `_saveAttachment`（长按菜单/气泡「保存」）：**移动端且图片/视频** → 存相册；其余
+  （音频/文件、桌面端一切）→ 原 `FilePicker.saveFile`。视频走 `MediaCache.ensure` 拿
+  本地 mp4 路径（复用播放缓存，不重复落盘）。
+- 全屏「保存」按钮（图标 `Icons.download_outlined`、文案复用 `chatPageActionSave`
+  「保存」）：图片全屏 `_showFullImage(m, bytes)`、视频全屏 `_VideoPreview.onDownload`、
+  **别人的**头像全屏（状态条对端头像传 `saveName`、`_MessageAvatar.onSaveImage`）。
+  都是**先关全屏再保存**——顶部提示是聊天页覆盖层，压在 Dialog 下会看不见。
+- **自己的头像**：状态条本人那头像仍是「更换头像」（`allowReplace`）；消息列表/长按
+  预览里我自己的头像大图**不给**保存按钮（老板："自己的头像不改"）。
+- 新增 `_saveImageBytesToDevice` / `_saveAvatarImage`（头像字节按显示名落 `*.jpg`）。
+
+**验证：** `flutter analyze` 无 issue；真机（相册权限弹窗、图片/视频落相册）老板自测。
+未代跑测试/构建。⚠️ 老板构建时 `ios/Podfile.lock` 会新增 gal 一条（该文件已入库）。

@@ -8,6 +8,10 @@
     <!-- 语音通话（WebRTC）：改音频路由（免提/听筒）+ ICE 期间切换网络 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+    <!-- 保存图片/视频到系统相册（gal）：Android 10+ 走 MediaStore 无需权限；
+         仅 Android 9 及以下需要这条写权限（老板 2026-10-08） -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application

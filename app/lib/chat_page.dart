@@ -33,6 +33,7 @@ import 'error_text.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
+import 'data/media_saver.dart';
 import 'data/message_repository.dart';
 import 'data/space_session.dart';
 import 'data/ui_style_settings.dart';
@@ -1405,11 +1406,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   未登记性别回退淡灰；
   /// - 有头像时可点开**全屏大图**（老板 2026-09-26）；
   /// - [icon] 覆盖"没头像时"的默认图标（群空间用 `Icons.groups_outlined`）。
+  /// - [saveName] 全屏大图里「下载」按钮保存用的文件名（通常传对方的显示名）。
   Widget _statusAvatar({
     Uint8List? bytes,
     String gender = '',
     VoidCallback? onTap,
     IconData icon = Icons.person,
+    String? saveName,
   }) {
     return _StatusAvatar(
       bytes: bytes,
@@ -1417,7 +1420,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       icon: icon,
       // 默认：有头像才可点（看大图）；本人那头像由调用方传入 onTap（空头像也能点）
       onTap: onTap ??
-          (bytes == null ? null : () => unawaited(_showAvatarFullscreen(bytes))),
+          (bytes == null
+              ? null
+              : () => unawaited(
+                  _showAvatarFullscreen(bytes, saveName: saveName))),
     );
   }
 
@@ -1437,7 +1443,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// （点了关掉大图再进选图流程）。这样"点头像"这一个动作既能看、也能换，
   /// 不用再回菜单里找那一项（老板 2026-09-26）。对方的头像不给这个按钮——
   /// 我们没有权限改别人的头像。
-  Future<void> _showAvatarFullscreen(Uint8List bytes, {bool allowReplace = false}) async {
+  ///
+  /// [saveName]：**非本人**头像底部给一个「保存」按钮（老板 2026-10-08），
+  /// 用它作保存的文件名（一般传对方显示名）。本人头像保持「更换头像」不变。
+  Future<void> _showAvatarFullscreen(Uint8List bytes,
+      {bool allowReplace = false, String? saveName}) async {
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
@@ -1490,6 +1500,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             icon: const Icon(Icons.photo_camera_outlined),
                             label: Text(
                                 AppLocalizations.of(ctx)!.chatPageAvatarChange),
+                          ),
+                        ),
+                      )
+                    else
+                      // 对方头像：底部「保存」（移动端入相册、桌面弹保存对话框）。
+                      // 先关大图再保存——顶部提示是聊天页的覆盖层，压在 Dialog 下面
+                      // 会看不见（与上面「更换头像」同一处置）。
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 32,
+                        child: Center(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              unawaited(_saveAvatarImage(saveName, bytes));
+                            },
+                            icon: const Icon(Icons.download_outlined),
+                            label:
+                                Text(AppLocalizations.of(ctx)!.chatPageActionSave),
                           ),
                         ),
                       ),
@@ -1774,7 +1804,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
-              _statusAvatar(bytes: _peerAvatarBytes, gender: _peerGender),
+              _statusAvatar(
+                  bytes: _peerAvatarBytes,
+                  gender: _peerGender,
+                  saveName: _peerName),
               const SizedBox(width: 8),
               Flexible(
                 child: Column(
@@ -2766,6 +2799,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 server: effectiveServer,
                 api: widget.api,
                 radius: 20,
+                onSaveImage: (bytes) =>
+                    _saveAvatarImage(_senderNameOf(memberId), bytes),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -4999,7 +5034,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             children: [
               if (!mine) ...[
                 _MessageAvatar(
-                    memberId: avatarMemberId, server: effectiveServer, api: widget.api),
+                    memberId: avatarMemberId,
+                    server: effectiveServer,
+                    api: widget.api,
+                    onSaveImage: (bytes) =>
+                        _saveAvatarImage(_senderNameOf(avatarMemberId), bytes)),
                 const SizedBox(width: 8),
               ],
               Flexible(
@@ -5859,7 +5898,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (context, snap) {
         if (snap.hasData) {
           return _VideoPreview(
-              bytes: snap.data!, spaceId: widget.spaceId, messageId: m.env.messageId);
+              bytes: snap.data!,
+              spaceId: widget.spaceId,
+              messageId: m.env.messageId,
+              onDownload: () => unawaited(_saveAttachment(m)));
         }
         if (snap.hasError) {
           return Clickable(
@@ -5907,9 +5949,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         return thumb;
       });
 
-  /// 保存媒体附件到本机（长按菜单「保存」，老板 2026-10-02）：弹出系统保存
-  /// 对话框（桌面）选位置 / 写应用文档目录（移动）。文件名用消息正文里的原名；
-  /// 写入失败弹顶部通知（下载/解密失败同口径）。
+  /// 保存媒体附件到设备（长按菜单/气泡「保存」+ 全屏「保存」，老板 2026-10-02）：
+  /// - **移动端的图片/视频**：存**系统相册**（`gal`；老板 2026-10-08，不再落到 App
+  ///   自己的文件系统里）；
+  /// - 其余（音频/文件，以及桌面端的一切）：弹系统保存对话框（`FilePicker.saveFile`）选位置。
+  /// 文件名用消息正文里的原名；失败弹顶部通知（下载/解密失败同口径）。
   Future<void> _saveAttachment(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
     try {
@@ -5922,6 +5966,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ? m.env.messageId.substring(0, 8)
               : m.plaintext.trim();
       final fileName = base.contains('.') || ext.isEmpty ? base : '$base.$ext';
+
+      if (canSaveToGallery && (m.env.type == 'image' || m.env.type == 'video')) {
+        // 相册：图片直接写字节；视频 gal 需要文件路径——复用播放用的解密缓存
+        // （确定性路径按 messageId，本来已落盘的话不再重复写）
+        if (m.env.type == 'image') {
+          await saveImageToGallery(bytes, name: base);
+        } else {
+          final file = await MediaCache.ensure(
+              widget.spaceId, m.env.messageId, 'mp4', () async => bytes);
+          await saveVideoToGallery(file.path);
+        }
+        if (!mounted) return;
+        _notice(context, l10n.chatPageAttachmentSaved);
+        return;
+      }
+
       // file_picker 12.x：saveFile 同 pickFiles 一样是静态方法（返回目标 Uri，取消为 null）
       final target = await FilePicker.saveFile(
         fileName: fileName,
@@ -5935,6 +5995,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (!mounted) return;
       _notice(context, l10n.chatPageFileSaveFailed('$e'));
     }
+  }
+
+  /// 保存一段**图片字节**到设备（头像大图的「保存」按钮用）：移动端入相册，
+  /// 桌面端弹系统保存对话框。[fileName] 带扩展名（桌面端保存对话框用；相册侧只取
+  /// 去掉扩展名的基名）。
+  Future<void> _saveImageBytesToDevice(Uint8List bytes, String fileName) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      if (canSaveToGallery) {
+        await saveImageToGallery(bytes, name: fileName);
+      } else {
+        final target =
+            await FilePicker.saveFile(fileName: fileName, bytes: bytes);
+        if (target == null) return; // 用户取消
+      }
+      if (!mounted) return;
+      _notice(context, l10n.chatPageAttachmentSaved);
+    } catch (e) {
+      if (!mounted) return;
+      _notice(context, l10n.chatPageFileSaveFailed('$e'));
+    }
+  }
+
+  /// 头像大图「保存」：[name] 为显示名（一般是对端/成员名，可能为空）→ 落一个
+  /// `*.jpg` 文件名（桌面端保存对话框会显示它）。
+  Future<void> _saveAvatarImage(String? name, Uint8List bytes) {
+    final base = (name ?? '').trim();
+    final safe = base.isEmpty ? 'avatar' : base.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    return _saveImageBytesToDevice(
+        bytes, safe.contains('.') ? safe : '$safe.jpg');
   }
 
   /// 附件明文：发送端优先本地密文解密（上传完成前/失败后也能即时显示），
@@ -6007,7 +6097,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (context, snap) {
         if (snap.hasData) {
           return Clickable(
-            onTap: () => _showFullImage(snap.data!),
+            onTap: () => _showFullImage(m, snap.data!),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.memory(snap.data!, width: 180, height: 180, fit: BoxFit.cover),
@@ -6040,7 +6130,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 全屏查看图片（品牌粉蓝渐变大图 + 双指缩放 + 右上角关闭，与头像全屏一致）。
   /// useSafeArea:false + 直角 shape：背景铺满整屏，不留圆角和上下安全区空隙。
   /// 背景 = kBrandGradient（老板 2026-09-15：全屏查看用首屏同款渐变，更有品牌感）。
-  Future<void> _showFullImage(Uint8List bytes) async {
+  /// 底部「保存」按钮（老板 2026-10-08）：移动端存相册 / 桌面弹保存对话框。
+  Future<void> _showFullImage(HistoryMessage m, Uint8List bytes) async {
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
@@ -6068,6 +6159,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         child: IconButton(
                           icon: const Icon(Icons.close, color: Colors.white),
                           onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ),
+                    ),
+                    // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
+                    // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 32,
+                      child: Center(
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            unawaited(_saveAttachment(m));
+                          },
+                          icon: const Icon(Icons.download_outlined),
+                          label:
+                              Text(AppLocalizations.of(ctx)!.chatPageActionSave),
                         ),
                       ),
                     ),
@@ -7121,7 +7230,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   memberId: senderMemberId,
                                   server: effectiveServer,
                                   api: widget.api,
-                                  radius: kMessageAvatarDiameter / 2),
+                                  radius: kMessageAvatarDiameter / 2,
+                                  onSaveImage: (bytes) => _saveAvatarImage(
+                                      _senderNameOf(senderMemberId), bytes)),
                               // 群空间才标名字（duo 两人世界里只有"对方"，状态条已写着）；
                               // 墓碑消息（已删除/焚毁）不标——正文都没了，署名无意义
                               if (_isGroup && !m.deleted) ...[
@@ -7367,6 +7478,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                       if (_showMessageAvatars && mine) ...[
                         const SizedBox(width: 6),
+                        // 自己的头像大图不给「保存」（老板 2026-10-08：自己的头像不改）
                         _MessageAvatar(
                             memberId: senderMemberId,
                             server: effectiveServer,
@@ -8357,7 +8469,8 @@ class _MessageAvatar extends StatefulWidget {
       required this.server,
       this.api,
       this.radius = 16,
-      this.openFullscreenOnTap = true});
+      this.openFullscreenOnTap = true,
+      this.onSaveImage});
 
   final String? memberId;
   final String server;
@@ -8370,6 +8483,11 @@ class _MessageAvatar extends StatefulWidget {
   /// 「我的同伴」胶囊；否则**有头像图片**的成员会被这里抢走点击、误开全览页，
   /// 而无图的成员又能正常进弹层（同一排头像行为不一致，老板 2026-10-08 报）。
   final bool openFullscreenOnTap;
+
+  /// 全屏大图底部「保存」按钮的回调（老板 2026-10-08：别人的头像大图可下载）。
+  /// null = 不放按钮（如状态条头像条：它压根不开全屏）。存哪儿由聊天页决定
+  /// （移动端入相册、桌面弹保存对话框）。
+  final Future<void> Function(Uint8List bytes)? onSaveImage;
 
   @override
   State<_MessageAvatar> createState() => _MessageAvatarState();
@@ -8428,14 +8546,17 @@ class _MessageAvatarState extends State<_MessageAvatar> {
 
   /// 全屏查看头像（品牌粉蓝渐变大图 + 右上角关闭；隐藏系统状态栏 = 沉浸感）。
   /// 背景 = kBrandGradient，与图片全屏一致（老板 2026-09-15）。
+  /// 底部「保存」按钮（老板 2026-10-08）：仅在调用方给了 [onSaveImage] 时出现
+  /// （别人的头像可下载；状态条头像条不开全屏、也没给回调）。
   Future<void> _showFullscreen() async {
     final bytes = _bytes;
     if (bytes == null) return;
+    final onSave = widget.onSaveImage;
     await withImmersiveFullscreen(() => showDialog<void>(
           context: context,
           barrierDismissible: true,
           useSafeArea: false,
-          builder: (_) => Dialog(
+          builder: (ctx) => Dialog(
             backgroundColor: Colors.transparent,
             insetPadding: EdgeInsets.zero,
             shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
@@ -8451,10 +8572,28 @@ class _MessageAvatarState extends State<_MessageAvatar> {
                       child: SafeArea(
                         child: IconButton(
                           icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: () => Navigator.of(ctx).pop(),
                         ),
                       ),
                     ),
+                    // 先关大图再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见
+                    if (onSave != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 32,
+                        child: Center(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              unawaited(onSave(bytes));
+                            },
+                            icon: const Icon(Icons.download_outlined),
+                            label: Text(
+                                AppLocalizations.of(ctx)!.chatPageActionSave),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -8520,11 +8659,18 @@ class _InviteQrCode extends StatelessWidget {
 /// （老板 2026-09-11：改回 v1 直接显示视频）。
 class _VideoPreview extends StatefulWidget {
   const _VideoPreview(
-      {required this.bytes, required this.spaceId, required this.messageId});
+      {required this.bytes,
+      required this.spaceId,
+      required this.messageId,
+      this.onDownload});
 
   final Uint8List bytes;
   final String spaceId; // 缓存按空间分目录（与服务端 files/<space_id>/ 同构）
   final String messageId; // 解密缓存确定性键：重复预览复用同一缓存文件
+
+  /// 全屏播放器底部「保存」按钮的回调（老板 2026-10-08）。null = 不放按钮。
+  /// 具体存哪儿由聊天页决定：移动端入相册、桌面弹保存对话框（见 `_saveAttachment`）。
+  final VoidCallback? onDownload;
 
   @override
   State<_VideoPreview> createState() => _VideoPreviewState();
@@ -8666,6 +8812,25 @@ class _VideoPreviewState extends State<_VideoPreview> {
                         ),
                       ),
                     ),
+                    // 底部「保存」（老板 2026-10-08）：移动端存相册、桌面弹保存对话框。
+                    // 先关全屏再保存——顶部提示是聊天页覆盖层，压在 Dialog 下面看不见。
+                    if (widget.onDownload != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 32,
+                        child: Center(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              widget.onDownload!();
+                            },
+                            icon: const Icon(Icons.download_outlined),
+                            label: Text(
+                                AppLocalizations.of(ctx)!.chatPageActionSave),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
