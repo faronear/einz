@@ -2618,11 +2618,27 @@ Future<void> _runInputLoop() async {
             _scrollMessages(s, -s.lastMsgArea > 0 ? -s.lastMsgArea : -1);
           case 'pgdn':
             _scrollMessages(s, s.lastMsgArea > 0 ? s.lastMsgArea : 1);
+          // Shift+↑/↓：翻页备用键（PgUp/PgDn 在部分终端失效），步长一屏
+          case 'shiftup':
+            _scrollMessages(s, -(s.lastMsgArea > 0 ? s.lastMsgArea : 1));
+          case 'shiftdown':
+            _scrollMessages(s, s.lastMsgArea > 0 ? s.lastMsgArea : 1);
           case 'wheelup':
             _scrollMessages(s, -3); // 滚轮上滚：向上翻 3 行
           case 'wheeldown':
             _scrollMessages(s, 3); // 滚轮下滚：向下翻 3 行
         }
+        inputChanged = true;
+        continue;
+      }
+      if (code == 2 || code == 6) {
+        // Ctrl+B / Ctrl+F：翻页备用键（2026-10-08 老板反馈 PgUp/PgDn 无效——
+        // 紧凑键盘根本没有这两个键/被系统改键）。单字节控制码（0x02/0x06）
+        // 不经终端转义序列，任何键盘设置、任何终端/SSH 客户端都原样送达。
+        // 步长与 PgUp/PgDn 一致（一屏）； Emacs 键位直觉：B=Back、F=Forward。
+        final s = _state!;
+        final step = s.lastMsgArea > 0 ? s.lastMsgArea : 1;
+        _scrollMessages(s, code == 2 ? -step : step);
         inputChanged = true;
         continue;
       }
@@ -2821,11 +2837,15 @@ String? _escAction(String seq) {
     '\x1B[B' || '\x1BOB' => 'down',
     '\x1B[C' || '\x1BOC' => 'right',
     '\x1B[D' || '\x1BOD' => 'left',
+    // Shift+↑/↓（2026-10-08 老板：VSCode 内置终端 PgUp/PgDn 无效，要求备用键）：
+    // 1;2 修饰位是 xterm 标准；ESC a/b 是 rxvt 系变体
+    '\x1B[1;2A' || '\x1Ba' => 'shiftup',
+    '\x1B[1;2B' || '\x1Bb' => 'shiftdown',
     '\x1B[H' => 'home',
     '\x1B[F' => 'end',
     '\x1B[3~' => 'delete',
-    '\x1B[5~' => 'pgup',
-    '\x1B[6~' => 'pgdn',
+    '\x1B[5~' || '\x1BO5~' => 'pgup', // SS3 变体：部分终端/SSH 客户端（应用小键盘模式）发送
+    '\x1B[6~' || '\x1BO6~' => 'pgdn',
     _ => null,
   };
 }

@@ -13051,3 +13051,20 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 
 验证：dart analyze 干净；pty 实测——回显行带 48;5;243 中灰底、普通"我的消息"
 仍男蓝底 104 且无误用灰底。
+
+### TUI 翻页备用键：Ctrl+B/F + Shift+↑/↓ + SS3 变体（2026-10-08 老板反馈 PgUp/PgDn 无效）
+
+**根因：** 老板在 VSCode 内置终端 PgUp/PgDn 无效（独立 terminal 正常）——部分终端
+默认不把 PgUp/PgDn 传给应用（VSCode 拿去滚终端缓冲区）。另外紧凑键盘可能根本没有
+这两个键。
+
+**三路加固（cli/bin/einz_tui.dart）：**
+- Ctrl+B / Ctrl+F（0x02/0x06）：单字节控制码不经转义序列，任何键盘/终端/SSH 都
+  原样送达，步长一屏（Emacs 直觉 B=Back、F=Forward）
+- Shift+↑/↓（老板指定）：xterm 标准 CSI 1;2A/B + rxvt 变体 ESC a/b
+- PgUp/PgDn 补 SS3 变体 \x1BO5~/\x1BO6~（应用小键盘模式）
+
+**验证：** dart analyze 干净；pty E2E 5/5——PgUp 进入历史浏览、Ctrl+B 续翻、
+Shift+↑ 上翻、SS3 变体解析、三套下翻键翻到底自动回最新。
+测试坑：30 行窗口 + 12 条单行消息不够滚（maxStart=0，PgUp 无处可翻、指示不出现），
+不是键解析问题——16 行 + 20 条才可复现。
