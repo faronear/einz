@@ -60,6 +60,15 @@ class _TuiState {
   /// 判定维度是"人"：同一 member 的多条通道是我自己的通道，不算对方。
   bool peerOnline = false;
 
+  /// 空间模式（GET /space 的 mode）：group=true 时标题栏左段从 duo 的"对方状态"
+  /// 切换为成员名单（在线在前、离线在后，右侧 n/N 不含自己——老板 2026-10-08）。
+  /// 缺省 false：未拉取过 /space（离线启动等）按 duo 渲染，行为与旧版一致。
+  bool isGroupSpace = false;
+
+  /// 成员在线表（member_id → 是否有任一通道在线）：group 名单的点灯依据。
+  /// _refreshPeerOnline 从 /entrances 按 member_id 聚合（同一人多通道任一在线即在线）。
+  final Map<String, bool> memberOnline = {};
+
   /// 我的**其它通道**总数（不含本机；listEntrances 轮询统计）——右段 `#n/m` 的分母。
   /// 本机由 `@通道名` 独立表示，不计入这一对数字（老板 2026-09-16）。
   int myOtherEntranceTotal = 0;
@@ -1736,14 +1745,24 @@ void _render() {
   };
   final peerName = _peerNameOf(s);
   final peerDot = s.peerOnline ? '$_green●$_white' : '${_white}○';
+  // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
+  // 在线成员在前（●绿）、离线在后（○白），人名用 () 包起（老板 2026-10-08 补充），
+  // 右侧 n/N = 在线人数/总人数（**不含我**）。总宽不超过左段 1/3 限长（超宽截断
+  // 由 _titleBarThree 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
+  final String leftSeg;
+  if (s.isGroupSpace) {
+    leftSeg = _groupMemberListLabel(s);
+  } else {
+    final peerEntrances = _peerEntranceLabel(s);
+    leftSeg = '$peerDot $peerName'
+        '${_entranceCountLabel(s.peerEntranceOnline, s.peerEntranceTotal)}$peerEntrances';
+  }
   // 三段式标题栏：对方状态贴左缘、我的状态贴右缘（与消息左右分栏一致——
   // 对方消息在左、我的消息在右）、品牌名 "Einz" 居中。
   // 三段各占全宽 1/3 上限、互不挤压，超宽的一段自己截断（含品牌名）；
   // 因此每段都是"尾部先丢"——两侧的灯与名字在前，通道名在后最先被截。
-  final peerEntrances = _peerEntranceLabel(s);
   final titleText = _titleBarThree(
-    '$peerDot $peerName'
-        '${_entranceCountLabel(s.peerEntranceOnline, s.peerEntranceTotal)}$peerEntrances',
+    leftSeg,
     // 品牌名 bold 展示后必须关闭粗体（ESC[22m）再继续——否则 bold 状态泄漏到
     // 右段，终端把右段的绿点（ESC[32m）按亮绿渲染，比左段标准绿更亮
     // （老板反馈 2026-09-10：左侧在线绿灯不如右侧明亮）
@@ -1903,6 +1922,39 @@ String _peerNameOf(_TuiState s) {
 String _entranceCountLabel(int onlineCount, int totalCount) {
   if (totalCount <= 0) return '';
   return ' #$onlineCount/$totalCount';
+}
+
+/// group 空间标题栏左段：成员名单（老板 2026-10-08）——
+/// 在线成员在前（●绿）、离线在后（○白），人名用 () 包起（老板补充）；
+/// 右侧 ` n/N` = 在线人数/总人数（**不含我**）。在线者按上线时刻降序（与 duo
+/// 段同一排序函数），离线者按 memberSlots 槽位序稳定排列。
+/// 我自己不出现在名单里；成员表尚未拉到（离线启动）时名单为空，仅显示 0/0。
+/// 超宽截断由 _titleBarThree 统一处理（尾部先丢——离线名单排最后先被截）。
+String _groupMemberListLabel(_TuiState s) {
+  final myPid = s.session.store.memberId;
+  final online = <String>[];
+  final offline = <String>[];
+  for (final pid in s.memberNames.keys) {
+    if (pid == myPid) continue; // 名单不含我（n/N 同口径）
+    if (s.memberOnline[pid] ?? false) {
+      online.add(pid);
+    } else {
+      offline.add(pid);
+    }
+  }
+  // 在线/离线都保持 memberNames 迭代序（成员表顺序稳定——/space 成员表按槽位
+  // 返回；在线细分排序无稳定数据源，member 序即可预期，不做花哨排序）
+  final buf = StringBuffer();
+  String nameOf(String pid) => '(${s.memberNames[pid] ?? pid})';
+  for (final pid in online) {
+    buf.write('$_green●$_white${nameOf(pid)}');
+  }
+  for (final pid in offline) {
+    buf.write('${_white}○$_white${nameOf(pid)}');
+  }
+  final total = online.length + offline.length;
+  buf.write(' ${_green}${online.length}$_white/$total');
+  return buf.toString();
 }
 
 /// 对方在线通道片段：`#A#B#C`——**逐个列出对方所有在线通道**，按上线时刻降序
@@ -2201,6 +2253,8 @@ Future<void> _refreshPeerOnline() async {
     int peerTotal = 0;
     int peerOnline = 0;
     final peerSince = <String, int>{}; // 在线对方通道 → 上线时刻（降序展示）
+    // 成员在线聚合（group 名单点灯）：member_id → 任一通道在线
+    final memberOnlineAgg = <String, bool>{};
     // 在线我方**其它**通道 → 上线时刻（降序展示；不含本机）
     final myOtherSince = <String, int>{};
     for (final d in entrances) {
@@ -2229,6 +2283,9 @@ Future<void> _refreshPeerOnline() async {
         if (isOnline) myOtherSince[devId] = since;
         continue;
       }
+      // 成员在线聚合（group 名单）：同一 member 任一通道在线即在线（含本机 member）
+      //（pid 此处已非空——空 member_id 的通道在前面已 continue）
+      memberOnlineAgg[pid] = (memberOnlineAgg[pid] ?? false) || isOnline;
       peerTotal++;
       if (isOnline) {
         peerOnline++;
@@ -2245,11 +2302,15 @@ Future<void> _refreshPeerOnline() async {
         myOtherTotal != s.myOtherEntranceTotal ||
         peerOnline != s.peerEntranceOnline ||
         peerTotal != s.peerEntranceTotal ||
-        entrancesChanged;
+        entrancesChanged ||
+        !_sameBoolMap(memberOnlineAgg, s.memberOnline); // group 名单点灯变化也要重绘
     s.peerOnline = online;
     s.myOtherEntranceTotal = myOtherTotal;
     s.peerEntranceOnline = peerOnline;
     s.peerEntranceTotal = peerTotal;
+    s.memberOnline
+      ..clear()
+      ..addAll(memberOnlineAgg);
     s.peerOnlineSince
       ..clear()
       ..addAll(peerSince);
@@ -4245,6 +4306,7 @@ Future<void> _refreshMemberNames(_TuiState s) async {
     s.memberNames = r.memberNames;
     s.memberGenders = r.memberGenders;
     s.memberSlots = r.memberSlots;
+    s.isGroupSpace = r.mode == 'group'; // group 名单渲染开关（老板 2026-10-08）
     final store = s.session.store;
     // 对方**真实**名字（对方已加入才有——同一身份多通道共享同一 memberId）→ 校正
     // 预置名快照：否则对方改名后旧预置名会一直留着，把 /myname 的同名判据误伤
@@ -4275,6 +4337,15 @@ Future<void> _refreshMemberNames(_TuiState s) async {
   } catch (_) {
     // 拉取失败不影响聊天（前缀回退"我/对方"，配色用本地缓存）
   }
+}
+
+/// 两个 String→bool 映射内容是否完全一致（group 成员在线表变化检测用）。
+bool _sameBoolMap(Map<String, bool> a, Map<String, bool> b) {
+  if (a.length != b.length) return false;
+  for (final e in a.entries) {
+    if (b[e.key] != e.value) return false;
+  }
+  return true;
 }
 
 /// 两个 String→String 映射内容是否完全一致（用于避免无变化时反复落盘）。

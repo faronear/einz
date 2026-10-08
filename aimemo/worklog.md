@@ -13118,3 +13118,28 @@ WS 连入时踢掉旧连接（4408 duplicate）；客户端 WsClient 断线自�
 **代价**：顶栏整块缩进 +2（多套一层），diff 里那 160 余行是纯缩进位移，无逻辑变化。
 
 **验证：** `flutter analyze` 无 issue；桌面/真机长按观感老板自测。
+
+### TUI group 标题栏：对方状态 → 成员名单（2026-10-08 老板要求）
+
+**要求：** group 空间不再按 duo 模式显示单个"对方状态"，改成与 App 类似的名单——
+在线在前、离线在后，右侧 n/N（在线/总人数，**不含我**），不超左侧 1/3 限长
+（超宽由 _titleBarThree 统一尾部截断）；人名用 () 包起（老板补充）。
+
+**实现（cli/bin/einz_tui.dart）：**
+- `_TuiState` 加 `isGroupSpace`（GET /space 的 mode，_refreshMemberNames 捕获）+
+  `memberOnline`（member_id → 任一通道在线，_refreshPeerOnline 按 member_id 聚合）
+- 标题栏左段分支：group → `_groupMemberListLabel`（●绿(名) 在前、○白(名) 在后、
+  ` n/N`；名单不含我；成员序 = /space 成员表序）；duo → 原对方状态不变
+- 变化检测把 memberOnline 表纳入（成员上下线即使计数不变也重绘）
+
+**验证：** dart analyze 干净；pty 双窗口 E2E 4/4——A 建 group → /entoken invite
+出码（invite 免口令）→ B 加入后 A 侧名单 `●(BobG) 1/1` → B 退出后翻转为
+`○(BobG) 0/1`（服务端 close 即 last_seen=0 + peer.offline 广播，秒级翻转）。
+
+**E2E 归因教训（5 连失败全是脚本问题，产品代码零 bug）：**
+- group 的 /entoken **invite 免口令**（此前误等口令提示）；B 加入向导文案是
+  「你的名字/你的性别是/验证共享口令」（非「我的…/锁屏码」）
+- 断言别只看"最后一帧首行"：全屏重绘的行序会复用，直接在末帧全文搜特征
+- **先按原始字节分帧、再剥转义**——先 plain() 会把 \x1b[2J 分割符剥掉，
+  rsplit 永远命中历史帧（本次最大坑：dbg 已证产品渲染正确，脚本却读旧帧）
+- stderr 调试 + 分帧诊断输出是定位"数据对、画面读错"的利器
