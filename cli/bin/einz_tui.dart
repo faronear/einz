@@ -1548,7 +1548,7 @@ Future<void> _execSwitch(_TuiState s, String path) async {
   final name = store.entranceName;
   final spaceShort = store.spaceId == null ? '' : '（${store.spaceId!.substring(0, 8)}）';
   session.messages.add(_systemMessage(session,
-      '✅ 已切换到秘境 ${name ?? path}$spaceShort\n  服务器: $server\n  返回原秘境: 再次 /switch <原 store 路径>（其锁屏码届时需再验）'));
+      '✅ 已切换到秘境 ${name ?? path}$spaceShort\n  服务器: $server\n  返回原秘境: 再次 /switch <原 store 路径>'));
   _startPeerPolling();
   // 立即拉成员表（mode/group 名单/名字缓存）与在线状态：启动路径靠向导/探针触发，
   // 切换路径没有这些钩子——不拉的话标题栏先以 duo 形态渲染、名单要等 30s 轮询
@@ -1829,10 +1829,10 @@ void _render() {
     WsStatus.connected => '$_green●$_white',
     WsStatus.connecting => '$_yellow↻$_white',
     WsStatus.reconnecting => '$_red✗$_white',
-    WsStatus.stopped => '${_red}○',
+    WsStatus.stopped => '$_red○$_white',
   };
   final peerName = _peerNameOf(s);
-  final peerDot = s.peerOnline ? '$_green●$_white' : '${_red}○';
+  final peerDot = s.peerOnline ? '$_green●$_white' : '$_red○$_white';
   // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
   // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
   // 在前（●绿）、离线在后（○红），人名之间用竖线 | 分隔（每人自带灯，不用括号
@@ -2048,7 +2048,7 @@ String _groupMemberListLabel(_TuiState s) {
     append(pid, '$_green●');
   }
   for (final pid in offline) {
-    append(pid, '${_red}○');
+    append(pid, '$_red○$_white');
   }
   return buf.toString();
 }
