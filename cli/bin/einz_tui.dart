@@ -3220,39 +3220,44 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/attach <文件路径> :: 上传文件',
+        '/attach <文件路径> 👉 上传文件',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/auth :: 激活/续期当前服务器的机密线路（换服务器用 /server）',
+        '/auth 👉 激活/续期当前服务器的机密线路（换服务器用 /server）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/status :: 查看服务器/连接/绑定/通道状态（排障用，只读）',
+        '/status 👉 查看服务器/连接/绑定/通道状态（排障用，只读）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/entrance <通道名> :: 修改当前通道名称（别名 /device）',
+        '/entrance <通道名> 👉 修改当前通道名称（别名 /device）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/entrances :: 查看秘境里的通道列表（同空间全部通道；别名 /devices）',
+        '/entrances 👉 查看秘境里的通道列表（同空间全部通道；别名 /devices）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/revoke <通道序号> :: 强制撤销某条通道（需共享口令；被撤通道将清空本地数据）',
+        '/revoke <通道序号> 👉 强制撤销某条通道（需共享口令；被撤通道将清空本地数据）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/reset :: 重置本通道（输入通道名 + 本机锁屏码确认，清空本地数据后回到入网向导）',
+        '/reset 👉 重置本通道（输入通道名 + 本机锁屏码确认，清空本地数据后回到入网向导）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/switch <store路径> :: 切换到另一个秘境的 store 文件（不退出进程；目标秘境有锁屏码需先验证）',
+        '/switch <store路径> 👉 切换到另一个秘境的 store 文件（不退出进程；目标秘境有锁屏码需先验证）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/exit :: 立刻退出',
+        '/exit 👉 立刻退出',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
+        '翻页查看历史 👉 PgUp/PgDn 一屏快翻；Shift+↑/↓ 逐行慢走；鼠标滚轮每次 3 行。'
+        '翻上去后状态栏显示 📜 历史浏览（新消息不打断）；任一向下键翻到底自动回到最新',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
@@ -3260,48 +3265,48 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/entoken :: 生成一次性通道码（24小时有效）——/entoken 给我自己的其他设备；'
+        '/entoken 👉 生成一次性通道码（24小时有效）——/entoken 给我自己的其他设备；'
         '/entoken invite 给新成员；/entoken reinvite 给指定成员签专属码（需共享口令，duo 直接出码、group 选成员）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/invite :: /entoken invite 的别名——给新成员生成通道码',
+        '/invite 👉 /entoken invite 的别名——给新成员生成通道码',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/reinvite :: /entoken reinvite 的快捷方式——给指定成员签专属码（需共享口令，duo 直接出码、group 选成员）',
+        '/reinvite 👉 /entoken reinvite 的快捷方式——给指定成员签专属码（需共享口令，duo 直接出码、group 选成员）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/passphrase <random> :: 修改共享口令；random 生成随机 12 词恢复码',
+        '/passphrase <random> 👉 修改共享口令；random 生成随机 12 词恢复码',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/backup <路径> :: 导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）',
+        '/backup <路径> 👉 导出加密备份（Space Key+历史+归档密钥；恢复码打印一次，请离线保存）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/pin <PIN> :: 查看状态、设置或清空锁屏码',
+        '/pin <PIN> 👉 查看状态、设置或清空锁屏码',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/myname <名字> :: 修改我的名字',
+        '/myname <名字> 👉 修改我的名字',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/server <地址> :: 查看当前服务端；带地址参数：切换服务端（仅本次生效）',
+        '/server <地址> 👉 查看当前服务端；带地址参数：切换服务端（仅本次生效）',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/space :: 查看当前连接的秘境',
+        '/space 👉 查看当前连接的秘境',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/sync :: 同步最新消息流',
+        '/sync 👉 同步最新消息流',
       ));
       s.session.messages.add(_systemMessage(
         s.session,
-        '/open <附件序号> :: 打开 #序号 的附件消息',
+        '/open <附件序号> 👉 打开 #序号 的附件消息',
       ));
       s.status = '';
     case '/server':
