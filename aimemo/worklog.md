@@ -13192,3 +13192,28 @@ E2E（pty 双窗口）4/4：`1/1●BobG`（B 在线）→ B 退出后 `0/1○Bob
 
 **验证：** `flutter analyze` 无 issue；shared `dart test` 52 passed；server `npm test`
 22 个文件全绿（含新断言）。真机拖拽/大文件表现老板自测。
+
+### TUI /switch <store路径>：不退出进程切换空间（2026-10-08 老板要求实现）
+
+**背景：** 单 store 多空间方案评估后维持现状（改动大、动加密收口），改做轻量的
+`/switch`——每个空间独立 store 文件，切换 = 加载另一个 store 换装，零 store 结构
+与加密改动。
+
+**实现（cli/bin/einz_tui.dart）：**
+- `/switch <路径>` 分支 + `_execSwitch`：加载目标 store → PIN 闸门（**目标有 PIN
+  才验**——"进来要解锁、离开不设卡"，老板口径：不重验当前空间；会话内 _prompt
+  hidden 输入，不能复用启动期 _unlockPin 的同步 readByteSync——会与 raw 模式
+  stdin 订阅抢字节）→ 换装四件套（停旧 WS/轮询 + flushPending 兜底 → 换 _state →
+  loadHistory → 欢迎块 + _startPeerPolling + **立即 _refreshMemberNames**
+  （启动路径靠向导钩子拉 mode/名单，切换路径没有，不拉标题栏先渲染 duo 形态））
+- 失败/取消不半切换：路径不存在、PIN 留空取消、验证错误重试——任一都保持原会话
+- `~` 展开；/help 补条目
+
+**踩坑记录：**
+- store.spaceAddress 是 0x 空间地址（链上标识）**不是 HTTP URL**——拿它当 server
+  打请求全部静默失败（dbg 才抓到）；server 沿用当前会话（跨服务器切换暂不支持）
+- store2 自己建的 group 唯一成员是自己，名单口径不含我 → `0/0` 空名单是正确渲染
+
+**验证：** dart analyze 干净（唯一 warning 是老板工作区未提交的名单分隔改动）；编译
+通过；pty E2E 7/7——错误路径拒绝、PIN 留空取消不半切换、验 PIN 切换成功、切换后
+group 形态标题栏、切回无 PIN 直切、旧消息仍在、再进目标空间再次验 PIN（对称）。

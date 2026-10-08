@@ -1469,6 +1469,94 @@ void _exitRevoked(String storePath) {
   exit(0);
 }
 
+/// 展开 ~ 为用户主目录（/switch 路径输入便利性；无 ~ 原样返回）。
+String _expandHomePath(String path) {
+  if (path == '~') return Platform.environment['HOME'] ?? path;
+  if (path.startsWith('~/')) {
+    final home = Platform.environment['HOME'];
+    if (home != null) return '$home${path.substring(1)}';
+  }
+  return path;
+}
+
+/// `/switch <store路径>`：不退出进程切换到另一个空间的 store（老板 2026-10-08）。
+///
+/// 流程：加载目标 store → 目标有 PIN 先解锁（会话内 _prompt 隐藏输入——不能复用
+/// 启动期 _unlockPin 的同步 readByteSync，会与 raw 模式 stdin 订阅抢字节；
+/// **进来才解锁、离开不设卡**——当前空间已解锁过，切换=离开，无再验理由）→
+/// 复用 _resetToFreshStart 的换装四件套（停旧 WS/轮询 → 换 _state → 重启轮询）→
+/// loadHistory → 清屏重绘。任一步失败保持原会话不动（不半切换）。
+Future<void> _execSwitch(_TuiState s, String path) async {
+  EntranceStore store;
+  try {
+    store = EntranceStore.load(path);
+  } catch (e) {
+    s.session.messages.add(_systemMessage(s.session, '❌ store 读取失败: $e'));
+    _scheduleRender();
+    return;
+  }
+  // 目标空间的 server：store.spaceAddress 是 0x 空间地址（链上标识），不是
+  // HTTP URL——服务器沿用当前会话（/space create/join 时两 store 本就同源；
+  // 跨服务器的空间切换暂不支持，届时可让 store 额外记录 server URL）。
+  final server = s.session.server;
+
+  // PIN 闸门（切换前验，失败不切换）：目标有 PIN 才问。会话内问答走 _prompt
+  // （hidden 回显 *），验证错误重试，留空/取消不切换。
+  if (store.pinHash != null) {
+    s.session.messages.add(_systemMessage(
+        s.session, '🔒 目标秘境设有锁屏码，验证通过后切换（留空取消）'));
+    _scheduleRender();
+    var ok = false;
+    while (_state!.running) {
+      final pin = await _prompt(s.session, '❓ 目标秘境锁屏码:', hidden: true);
+      if (!_state!.running) return; // /exit：中止一切
+      if (pin.trim().isEmpty) {
+        s.session.messages.add(_systemMessage(s.session, '✅ 已取消切换（未做任何改动）'));
+        _scheduleRender();
+        return;
+      }
+      if (await _verifyPin(store.pinHash!, pin.trim())) {
+        ok = true;
+        break;
+      }
+      s.session.messages.add(_systemMessage(s.session, '⚠️ 锁屏码验证错误，请重新输入（留空取消）'));
+      _scheduleRender();
+    }
+    if (!ok) return;
+  }
+
+  // ── 换装四件套（同 _resetToFreshStart①③）：此后不回退 ──
+  // ① 停旧会话后台任务：WS 与 30s 轮询都读全局 _state，不停会串到新会话。
+  //    补发一次离线队列（best effort）：切换前一秒刚发的消息不丢（本来实时落盘，
+  //    这里只是把"已在队列、网络可达"的尽快送出去——失败留队列，下次上线补发）。
+  final old = _state;
+  old?.session.onChanged = null;
+  _peerTimer?.cancel();
+  try {
+    await old?.session.flushPending();
+  } catch (_) {}
+  old?.session.stopWs();
+
+  // ② 换掉全局会话/状态（输入循环读 _state!，换完即生效）
+  final session = ChatSession(store, path, server);
+  session.onEntranceRevoked = () => _exitRevoked(path);
+  _state = _TuiState(session, path);
+  session.onChanged = _scheduleRender;
+  await session.loadHistory();
+
+  // ③ 欢迎块 + 重启轮询 + 清屏重绘（wipe 式全量重绘自然清掉旧空间画面）
+  final name = store.entranceName;
+  final spaceShort = store.spaceId == null ? '' : '（${store.spaceId!.substring(0, 8)}）';
+  session.messages.add(_systemMessage(session,
+      '✅ 已切换到秘境 ${name ?? path}$spaceShort\n  服务器: $server\n  返回原秘境: 再次 /switch <原 store 路径>（其锁屏码届时需再验）'));
+  _startPeerPolling();
+  // 立即拉成员表（mode/group 名单/名字缓存）与在线状态：启动路径靠向导/探针触发，
+  // 切换路径没有这些钩子——不拉的话标题栏先以 duo 形态渲染、名单要等 30s 轮询
+  await _refreshMemberNames(_state!);
+  _refreshPeerOnline();
+  _render();
+}
+
 /// `/reset` 的收尾：清完本地数据后提示并退出。用户下次启动 TUI 会走全新入网向导。
 /// `/reset` 的收尾：清本地数据后**原地回到"刚启动 TUI 的样子"**（老板 2026-09-23）——
 /// 不退出进程，而是重建一条全新通道并重跑入网引导：新公私钥（+ 新 install_uid）→
@@ -3160,6 +3248,10 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
+        '/switch <store路径> :: 切换到另一个秘境的 store 文件（不退出进程；目标秘境有锁屏码需先验证）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
         '/exit :: 立刻退出',
       ));
       s.session.messages.add(_systemMessage(
@@ -3541,6 +3633,29 @@ Future<void> _execCommand(String line) async {
       }
     case '/history':
       s.session.messages.add(_systemMessage(s.session, '本地消息 ${s.session.messages.length} 条（上方滚动区）'));
+    case '/switch':
+      // 切换到另一个 store 文件（不退出进程）——多空间日常用法（老板 2026-10-08）。
+      // 目标空间有 PIN 才要求解锁（"进来要解锁，离开不设卡"——只验目标，不重验
+      // 当前空间）；失败/取消不半切换，保持原会话。
+      {
+        final path = _expandHomePath(arg.trim());
+        if (path.isEmpty) {
+          s.session.messages
+              .add(_systemMessage(s.session, '🔧 用法: /switch <store 文件路径>'));
+          break;
+        }
+        if (path == s.storePath) {
+          s.session.messages
+              .add(_systemMessage(s.session, '⚠️ 已经在这个秘境里了（无需切换）'));
+          break;
+        }
+        if (!File(path).existsSync()) {
+          s.session.messages.add(_systemMessage(s.session, '❌ store 文件不存在: $path'));
+          break;
+        }
+        await _execSwitch(s, path);
+      }
+      break;
     case '/reset':
       // 重置本通道（老板 2026-09-21）：清掉本地 store 与附件缓存，回到全新入网向导。
       // 不可逆，故三道闸门：**全部离线**，不依赖网络、不碰共享口令——
