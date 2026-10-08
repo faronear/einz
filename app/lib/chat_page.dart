@@ -7266,11 +7266,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
                         // 其余项无 key，不阻碍懒构建回收
                         key: m.env.messageId == _jumpTargetId ? _jumpTargetKey : null,
-                        // 长按菜单**不挂在这一层**：它包着整条气泡（含顶栏的时间/快捷
-                        // 动作/沙漏），长按顶栏会连菜单一起冒出来——桌面长按顶栏按钮误开
-                        // 菜单、手机长按顶栏又该出 tooltip（老板 2026-10-08）。
-                        // 改挂在**消息正文**上（见下面 `_buildMessageContent` 外层）。
-                        // 本层只留跳转定位的 key 与气泡容器。
+                        // 长按菜单挂**整条气泡**（老板 2026-10-08 定：气泡任意位置都能
+                        // 开菜单）。唯一例外是顶栏（时间/快捷动作/沙漏）——它在内层
+                        // **吸收**掉长按，见下面那处 GestureDetector。
+                        onLongPress:
+                            m.deleted ? null : () => _showMessageActions(m),
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
                           // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变
@@ -7316,168 +7316,171 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   // 发言人名字**不在气泡里**（老板 2026-10-05）：
                                   // 搬到气泡左侧、头像下方（见上面那处 SizedBox）。
                                   // 气泡内只留内容本身，读起来更像"对话"。
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 2),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // 自己消息：发送状态小标放在**时间前面**（老板
-                                        // 2026-09-12：原来放末尾，会被阅后即焚标记挤到
-                                        // 中间/后面，无法一眼看出"这条发出去没"）。
-                                        // 墓碑消息（删除/焚毁）**同样显示**（老板
-                                        // 2026-09-13）：删除/焚毁只是"在本设备隐藏正文"，
-                                        // 不影响消息在服务器与对方的路径——所以状态与
-                                        // 点按重发都该照旧可用。
-                                        if (mine) ...[
-                                          _buildSendStatusIcon(m),
-                                          const SizedBox(width: 4),
-                                        ],
-                                        Text(_messageTimeLabel(m),
-                                            style: TextStyle(
-                                                fontSize: 11,
-                                                color: _uiStyle == 'gradient'
-                                                    ? Colors.white70
-                                                    : Colors.grey)),
-                                        // 快捷动作（老板 2026-10-02）：时间后、焚毁
-                                        // 指示前——引用 + 拷贝（拷贝仅文字消息）。
-                                        // 点击直接执行，不用进长按菜单；墓碑消息
-                                        // 无内容可操作，不显示
-                                        if (!m.deleted) ...[
-                                          // 时间戳 → 引用图标：比动作间间隔多 4（补齐
-                                          // 图标自身 padding 造成的不对称，老板 2026-10-02）
-                                          const SizedBox(width: 6),
-                                          _bubbleQuickAction(
-                                            m,
-                                            icon: Icons.format_quote,
-                                            label: l10n.chatPageActionQuote,
-                                            onTap: () {
-                                              setState(() => _quoteTarget = m);
-                                              _inputFocusNode.requestFocus();
-                                            },
-                                          ),
-                                          const SizedBox(width: 2),
-                                          // 拷贝仅文字消息；媒体消息（图片/视频/音频/
-                                          // 文件）换成「保存」——直接写本机，同长按
-                                          // 菜单「保存」（老板 2026-10-02）
-                                          if (m.env.type == 'text')
+                                  //
+                                  // 顶栏**吸收长按**：不让它冒泡到外层气泡的长按菜单
+                                  // （老板 2026-10-08：长按气泡任意位置都该开菜单，
+                                  // 唯独顶栏不行——桌面长按顶栏按钮会误开菜单；手机
+                                  // 长按顶栏该出 tooltip，Tooltip 在更内层，手势竞技场
+                                  // 里本来就赢，这里只挡"没有 tooltip 的空白"）。
+                                  // opaque = 整条顶栏矩形都挡，连图标之间的间隙也不漏。
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onLongPress: () {},
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(bottom: 2),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // 自己消息：发送状态小标放在**时间前面**（老板
+                                          // 2026-09-12：原来放末尾，会被阅后即焚标记挤到
+                                          // 中间/后面，无法一眼看出"这条发出去没"）。
+                                          // 墓碑消息（删除/焚毁）**同样显示**（老板
+                                          // 2026-09-13）：删除/焚毁只是"在本设备隐藏正文"，
+                                          // 不影响消息在服务器与对方的路径——所以状态与
+                                          // 点按重发都该照旧可用。
+                                          if (mine) ...[
+                                            _buildSendStatusIcon(m),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          Text(_messageTimeLabel(m),
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: _uiStyle == 'gradient'
+                                                      ? Colors.white70
+                                                      : Colors.grey)),
+                                          // 快捷动作（老板 2026-10-02）：时间后、焚毁
+                                          // 指示前——引用 + 拷贝（拷贝仅文字消息）。
+                                          // 点击直接执行，不用进长按菜单；墓碑消息
+                                          // 无内容可操作，不显示
+                                          if (!m.deleted) ...[
+                                            // 时间戳 → 引用图标：比动作间间隔多 4（补齐
+                                            // 图标自身 padding 造成的不对称，老板 2026-10-02）
+                                            const SizedBox(width: 6),
                                             _bubbleQuickAction(
                                               m,
-                                              // 拷贝字形竖向占 20/24，比邻居
-                                              // save_alt(18/24)/format_quote(10/24)
-                                              // 天然高一档——缩 1 与邻居光学对齐
-                                              //（2026-10-08 老板反馈：拷贝按钮偏高）
-                                              icon: Icons.copy_outlined,
-                                              iconSize: 11,
-                                              label: l10n.chatPageCopy,
-                                              onTap: () async {
-                                                await Clipboard.setData(
-                                                    ClipboardData(text: m.plaintext.trim()));
-                                                if (!mounted) return;
-                                                _notice(
-                                                    this.context, l10n.setupCreateCopied);
+                                              icon: Icons.format_quote,
+                                              label: l10n.chatPageActionQuote,
+                                              onTap: () {
+                                                setState(() => _quoteTarget = m);
+                                                _inputFocusNode.requestFocus();
                                               },
                                             ),
-                                          if (m.attachment != null)
-                                            _bubbleQuickAction(
-                                              m,
-                                              icon: Icons.save_alt,
-                                              label: l10n.chatPageActionSave,
-                                              onTap: () => _saveAttachment(m),
-                                            ),
-                                        ],
-                                        if (m.expiresAt != null) ...[
-                                          const SizedBox(width: 4),
-                                          // 沙漏=阅后即焚倒计时（老板 2026-09-12，
-                                          // 替代原来的时钟图标，避免与发送中混淆）；
-                                          // 已焚毁/已删除 → 静态空沙漏（不再翻转）。
-                                          // 可点（老板 2026-10-02）：点击进档位设置
-                                          // 弹层（同长按菜单「阅后即焚」）——仅活消息；
-                                          // 墓碑无内容可操作，保持纯显示
-                                          if (!m.deleted)
-                                            Material(
-                                              color: Colors.transparent,
-                                              // 长条控件（沙漏+时长）用圆角矩形背景，
-                                              // 不跟快捷图标走圆形（老板 2026-10-02）
-                                              borderRadius: BorderRadius.circular(12),
-                                              clipBehavior: Clip.antiAlias,
-                                              child: Tooltip(
-                                                // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
-                                                // （老板 2026-10-08；此前只有这处没有）
-                                                message: l10n.chatPageActionBurn,
-                                                child: InkWell(
-                                                  mouseCursor: SystemMouseCursors.click,
-                                                  // 悬浮/点击背景同快捷动作/状态栏图标
-                                                  hoverColor:
-                                                      Colors.black.withValues(alpha: 0.05),
-                                                  highlightColor:
-                                                      Colors.black.withValues(alpha: 0.08),
-                                                  onTap: () => _setMessageBurn(m),
-                                                  child: SizedBox(
-                                                    // 与引用/拷贝/保存圆钮**同高**
-                                                    // （老板 2026-10-08：原来被文字撑高一截）
-                                                    height: _bubbleTimeRowControlHeight,
-                                                    child: Padding(
-                                                      padding: const EdgeInsets.symmetric(
-                                                          horizontal: 4),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          _BurnHourglass(burned: m.deleted),
-                                                          const SizedBox(width: 2),
-                                                          // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
-                                                          // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
-                                                          Text(
-                                                              _burnTagLabel(m.expiresAt,
-                                                                      m.burnAfterSeconds,
-                                                                      manual: m.burnManual),
-                                                              style: TextStyle(
-                                                                  fontSize: 11,
-                                                                  color: _uiStyle == 'gradient'
-                                                                      ? Colors.white70
-                                                                      : Colors.grey)),
-                                                        ],
+                                            const SizedBox(width: 2),
+                                            // 拷贝仅文字消息；媒体消息（图片/视频/音频/
+                                            // 文件）换成「保存」——直接写本机，同长按
+                                            // 菜单「保存」（老板 2026-10-02）
+                                            if (m.env.type == 'text')
+                                              _bubbleQuickAction(
+                                                m,
+                                                // 拷贝字形竖向占 20/24，比邻居
+                                                // save_alt(18/24)/format_quote(10/24)
+                                                // 天然高一档——缩 1 与邻居光学对齐
+                                                //（2026-10-08 老板反馈：拷贝按钮偏高）
+                                                icon: Icons.copy_outlined,
+                                                iconSize: 11,
+                                                label: l10n.chatPageCopy,
+                                                onTap: () async {
+                                                  await Clipboard.setData(
+                                                      ClipboardData(text: m.plaintext.trim()));
+                                                  if (!mounted) return;
+                                                  _notice(
+                                                      this.context, l10n.setupCreateCopied);
+                                                },
+                                              ),
+                                            if (m.attachment != null)
+                                              _bubbleQuickAction(
+                                                m,
+                                                icon: Icons.save_alt,
+                                                label: l10n.chatPageActionSave,
+                                                onTap: () => _saveAttachment(m),
+                                              ),
+                                          ],
+                                          if (m.expiresAt != null) ...[
+                                            const SizedBox(width: 4),
+                                            // 沙漏=阅后即焚倒计时（老板 2026-09-12，
+                                            // 替代原来的时钟图标，避免与发送中混淆）；
+                                            // 已焚毁/已删除 → 静态空沙漏（不再翻转）。
+                                            // 可点（老板 2026-10-02）：点击进档位设置
+                                            // 弹层（同长按菜单「阅后即焚」）——仅活消息；
+                                            // 墓碑无内容可操作，保持纯显示
+                                            if (!m.deleted)
+                                              Material(
+                                                color: Colors.transparent,
+                                                // 长条控件（沙漏+时长）用圆角矩形背景，
+                                                // 不跟快捷图标走圆形（老板 2026-10-02）
+                                                borderRadius: BorderRadius.circular(12),
+                                                clipBehavior: Clip.antiAlias,
+                                                child: Tooltip(
+                                                  // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
+                                                  // （老板 2026-10-08；此前只有这处没有）
+                                                  message: l10n.chatPageActionBurn,
+                                                  child: InkWell(
+                                                    mouseCursor: SystemMouseCursors.click,
+                                                    // 悬浮/点击背景同快捷动作/状态栏图标
+                                                    hoverColor:
+                                                        Colors.black.withValues(alpha: 0.05),
+                                                    highlightColor:
+                                                        Colors.black.withValues(alpha: 0.08),
+                                                    onTap: () => _setMessageBurn(m),
+                                                    child: SizedBox(
+                                                      // 与引用/拷贝/保存圆钮**同高**
+                                                      // （老板 2026-10-08：原来被文字撑高一截）
+                                                      height: _bubbleTimeRowControlHeight,
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.symmetric(
+                                                            horizontal: 4),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            _BurnHourglass(burned: m.deleted),
+                                                            const SizedBox(width: 2),
+                                                            // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
+                                                            // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
+                                                            Text(
+                                                                _burnTagLabel(m.expiresAt,
+                                                                        m.burnAfterSeconds,
+                                                                        manual: m.burnManual),
+                                                                style: TextStyle(
+                                                                    fontSize: 11,
+                                                                    color: _uiStyle == 'gradient'
+                                                                        ? Colors.white70
+                                                                        : Colors.grey)),
+                                                          ],
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                            )
-                                          else ...[
-                                            // 墓碑（已焚毁/已删除）：纯显示不可点。
-                                            // 前面多补 4（老板 2026-10-02）：活消息那路
-                                            // 沙漏带 4 padding，墓碑裸排会窄一截
-                                            const SizedBox(width: 4),
-                                            _BurnHourglass(burned: m.deleted),
-                                            const SizedBox(width: 2),
-                                            Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
-                                                    manual: m.burnManual),
-                                                style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: _uiStyle == 'gradient'
-                                                        ? Colors.white70
-                                                        : Colors.grey)),
+                                              )
+                                            else ...[
+                                              // 墓碑（已焚毁/已删除）：纯显示不可点。
+                                              // 前面多补 4（老板 2026-10-02）：活消息那路
+                                              // 沙漏带 4 padding，墓碑裸排会窄一截
+                                              const SizedBox(width: 4),
+                                              _BurnHourglass(burned: m.deleted),
+                                              const SizedBox(width: 2),
+                                              Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
+                                                      manual: m.burnManual),
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: _uiStyle == 'gradient'
+                                                          ? Colors.white70
+                                                          : Colors.grey)),
+                                            ],
                                           ],
                                         ],
-                                      ],
+                                      ),
                                     ),
                                   ),
                                   // 墓碑消息（已删除/已焚毁）：只保留时间（+时钟+时长）
                                   // 记录，正文与引用块隐藏（老板决策 2026-09-09）
                                   if (!m.deleted) ...[
-                                    // 长按**只挂在正文上**（老板 2026-10-08）：图片/视频/
-                                    // 音频/文件等附件也都走 `_buildMessageContent`，
-                                    // 所以它们照样能长按出菜单；顶栏不行（见上）。
-                                    Clickable(
-                                      onLongPress: () => _showMessageActions(m),
-                                      child: _buildMessageContent(m),
-                                    ),
+                                    _buildMessageContent(m),
                                     // 被引用的消息放在正文下方（老板要求 2026-09-09：
                                     // 引用块应在消息正文下面，而不是上面）
                                     // 点击引用卡跳转到原消息位置（老板要求 2026-09-10）
                                     if (m.quote != null)
                                       Clickable(
-                                        // 引用块也是正文的一部分 → 长按同样出菜单
-                                        onLongPress: () => _showMessageActions(m),
                                         onTap: () => _jumpToMessage(
                                             m.quote!['messageId'] as String? ?? ''),
                                         child: Container(
