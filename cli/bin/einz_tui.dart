@@ -38,6 +38,7 @@ const _bgPink = '$_esc[105m'; // 亮品红背景：对方消息整条底色（�
 const _bgBlue = '$_esc[104m'; // 亮蓝背景：男性对方消息整条底色
 const _bgTeal = '$_esc[48;5;37m'; // 青绿背景（256 色 #00AFAF）：性别未知的对方消息整条底色
 const _bgCyan = '$_esc[106m'; // 亮青背景：两人同性别时第二个人的消息整条底色（2026-09-17 老板要求）
+const _bgEcho = '$_esc[48;5;243m'; // 中灰背景（256 色 #767676）：本地命令回显（/xxx）——与对话气泡的粉/蓝/青区分开（2026-10-08 老板要求）
 const _bgBlack = '$_esc[40m'; // 黑色背景：标题栏/底部状态行整行底色
 
 // \x1B[2J 清屏 + \x1B[3J 清除回滚缓冲 + \x1B[H 光标回家：全屏重绘应用（类似 vim/htop）
@@ -2442,13 +2443,19 @@ List<String> formatMessage(ChatMessage m, int cols, {Map<String, int>? attachmen
   // 标签贴最右），背景按我的性别配色——男蓝、女品红、性别未知（旧空间未登记/尚未拉取）
   // 青绿底；两人同性别时第二个人（我）取亮青（2026-09-17 老板要求）；前导留白不上色。
   // 兼容服务端两种取值：App 提交规范 male/female，旧 TUI 提交过中文 男/女。
+  // 本地命令回显（echo- 前缀，2026-10-08 老板要求）：中灰底——与对话气泡的
+  // 粉/蓝/青家族一眼区分开（命令不是对话）。中灰上黑标签 ≈4.7:1、白正文
+  // ≈4.4:1，对比度均可用；灰调也贴合"这是本地操作记录、不是聊天内容"的语义。
+  final bool isCommandEcho = m.env.messageId.startsWith('echo-');
   final rawGender = _state?.memberGenders[m.env.senderMemberId];
-  final String peerBackground = _sameGenderSecondCyan(m.env.senderMemberId) ??
-      (rawGender == 'male' || rawGender == '男'
-          ? _bgBlue
-          : rawGender == 'female' || rawGender == '女'
-              ? _bgPink
-              : _bgTeal); // 性别未知：青绿底（2026-09-10 老板要求）
+  final String peerBackground = isCommandEcho
+      ? _bgEcho
+      : _sameGenderSecondCyan(m.env.senderMemberId) ??
+          (rawGender == 'male' || rawGender == '男'
+              ? _bgBlue
+              : rawGender == 'female' || rawGender == '女'
+                  ? _bgPink
+                  : _bgTeal); // 性别未知：青绿底（2026-09-10 老板要求）
   // 我的消息标签：[状态 时间]（老板 2026-09-13：去掉名字、状态提到时间前面），
   // 已读（read）时状态字符标蓝——TUI 独有（App 已读只留数据档位不展示）。
   final status = _state?.session.sentStatusOf(m) ?? '';
