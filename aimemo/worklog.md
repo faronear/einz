@@ -12934,3 +12934,18 @@ chat_bubble_gender_test + chat_page_menu_test（35 条）全过。
 group 验口令后列成员选择），行为完全同主命令；/help 补别名条目。
 验证：dart analyze 干净；编译版 pty 快速验证——聊天态发 /reinvite 直接触发
 共享口令问答（duo 场景），与 /entoken reinvite 行为一致。
+
+### TUI 创建秘境补「类型」问答：duo/group 对齐 App（2026-10-08 老板发现 + 确认方案）
+
+**问题（老板发现）：** TUI 创建空间从不问 duo/group——`_spaceCreate` 调
+`api.createSpace` 没传 mode，ApiClient 缺省 'duo' 把 TUI 创建入口悄悄锁死双人
+（App 向导 2026-10-04 就有类型卡；服务端与 ApiClient 早就支持）。不一致：TUI 能
+加入 group、能在 group 里 /reinvite 列成员，唯独不能创建 group。
+
+**老板选定：向导加一问。** 实现（cli/bin/einz_tui.dart）：`_spaceCreate` 在性别
+问答之后插入「❓ 秘境类型（创建后不可更改）1: 双人（2 人）/ 2: 群组（多人）」
+必选问答（数字 1/2，与性别问答同风格；非法输入重问），显式 `mode: spaceMode`
+传 createSpace。/space create 命令与向导走同一函数，自动贯通。
+
+**验证：** dart analyze 干净；pty E2E 3/3——duo 创建落库 mode=duo、group 创建
+落库 mode=group、非法输入（x/9）两次重问后最终选群组正确落库（sqlite spaces.mode）。

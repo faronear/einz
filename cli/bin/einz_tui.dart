@@ -935,6 +935,34 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       _scheduleRender();
     }
   }
+  // 秘境类型（2026-10-08 对齐 App 向导第 2 步）：duo/group **创建时定死、之后
+  // 不可改**（老板拍板：不支持升格）。此前 TUI 从不询问——ApiClient 缺省 'duo'
+  // 把 TUI 的创建入口悄悄锁死双人（能加入 group 却不能创建）。
+  // 只接受数字 1/2（与性别问答同风格：不接受文字输入）
+  String spaceMode;
+  while (true) {
+    final k = (await _prompt(session, '❓ 秘境类型（创建后不可更改）\n  1: 双人（2 人）\n  2: 群组（多人）',
+            required: true))
+        .trim();
+    if (!_state!.running) return;
+    if (k == '1') {
+      spaceMode = 'duo';
+      session.messages.add(_systemMessage(session, '✅ 双人秘境（2 人）'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+      break;
+    }
+    if (k == '2') {
+      spaceMode = 'group';
+      session.messages.add(_systemMessage(session, '✅ 群组秘境（多人）'));
+      session.messages.add(_systemMessage(session, '----------------'));
+      _scheduleRender();
+      break;
+    }
+    session.messages
+        .add(_systemMessage(session, '⚠️ 请输入 1（双人）或 2（群组）'));
+    _scheduleRender();
+  }
   // 群聊一期（2026-10-03，v3）：create **不再预置同伴**——只录创建者自己。
   // 同伴（以及群里每一个新人）用 invite 链接加入时**自己填名字/性别**：
   // ① 名字归属本人（创建者替对方起名、改不了，是老流程的长期别扭处）；
@@ -976,6 +1004,9 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
       spaceId: spaceId,
       creatorName: displayName,
       creatorGender: _genderCode(myGender), // 中文 → male/female（与 enroll 一致——老板 2026-09-10）
+      // 秘境类型（2026-10-08 对齐 App）：向导第 2 步所选，创建时定死——
+      // 不传则 ApiClient 缺省 'duo'（TUI 建群缺口已补）
+      mode: spaceMode,
       // 群聊一期（2026-10-03）：create 不再预置对方（v3）——partner 加入时自己填名
       sealedSpaceKey: sealed,
       escrowPassphrase: passphrase,
