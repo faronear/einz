@@ -14,6 +14,9 @@ PODS:
   - flutter_webrtc (1.6.2):
     - Flutter
     - WebRTC-SDK (= 150.7871.01)
+  - gal (1.0.0):
+    - Flutter
+    - FlutterMacOS
   - image_picker_ios (0.0.1):
     - Flutter
   - libsodium (1.0.20)
@@ -57,6 +60,7 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
+  - gal (from `.symlinks/plugins/gal/darwin`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - libsodium (from `./Libraries`)
   - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
@@ -86,6 +90,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_secure_storage_darwin/darwin"
   flutter_webrtc:
     :path: ".symlinks/plugins/flutter_webrtc/ios"
+  gal:
+    :path: ".symlinks/plugins/gal/darwin"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   libsodium:
@@ -114,6 +120,7 @@ SPEC CHECKSUMS:
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   flutter_webrtc: 99283145164f482a16bf7122ef407b5d59d43158
+  gal: baecd024ebfd13c441269ca7404792a7152fde89
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   libsodium: 4f02ecd7a46e9954c79582988fd34b4d20957237
   libwebp: af5937a13536ef73f3784d69cc342b98961acf33

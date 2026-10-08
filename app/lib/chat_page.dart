@@ -83,6 +83,11 @@ const int _entranceCardsPerRow = 3;
 /// （实测 800 / 1600 宽的视口，内容区都是 640、居中）。
 const double _entranceSheetMaxWidth = 640;
 
+/// 气泡时间行里各小控件的**统一高度**（老板 2026-10-08）：引用/拷贝/保存的圆钮，
+/// 以及「沙漏+时长」胶囊——三者的背景高度必须一样（此前沙漏那块的文字把胶囊撑得
+/// 比圆钮高一截）。20 = 12 图标 + 上下各 4（沿用原来的热区口径，不撑大气泡）。
+const double _bubbleTimeRowControlHeight = 20;
+
 /// 弹层内容区左右的内边距（下面 Padding 的 16）。
 const double _entranceSheetHPadding = 16;
 
@@ -537,11 +542,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           hoverColor: Colors.black.withValues(alpha: 0.05),
           highlightColor: Colors.black.withValues(alpha: 0.08),
           onTap: onTap,
-          child: Padding(
-            // 热区：padding 4（老板 2026-10-02：6 会撑大气泡，收到 4），
-            // 相邻动作另加 2 间隔
-            padding: const EdgeInsets.all(4),
-            child: Icon(icon, size: iconSize, color: subtle),
+          child: SizedBox.square(
+            // 固定方形热区 = 时间行统一高度（老板 2026-10-08：圆钮与"沙漏+时长"
+            // 胶囊背景一样高）。不再用 padding 撑——那样图标大小一变高度就变了。
+            dimension: _bubbleTimeRowControlHeight,
+            child: Center(child: Icon(icon, size: iconSize, color: subtle)),
           ),
         ),
       ),
@@ -1517,7 +1522,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               Navigator.of(ctx).pop();
                               unawaited(_saveAvatarImage(saveName, bytes));
                             },
-                            icon: const Icon(Icons.download_outlined),
+                            icon: const Icon(Icons.save_alt),
                             label:
                                 Text(AppLocalizations.of(ctx)!.chatPageActionSave),
                           ),
@@ -6174,7 +6179,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                             Navigator.of(ctx).pop();
                             unawaited(_saveAttachment(m));
                           },
-                          icon: const Icon(Icons.download_outlined),
+                          icon: const Icon(Icons.save_alt),
                           label:
                               Text(AppLocalizations.of(ctx)!.chatPageActionSave),
                         ),
@@ -7261,9 +7266,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // 仅跳转目标项持有 GlobalKey（ensureVisible 定位用）；
                         // 其余项无 key，不阻碍懒构建回收
                         key: m.env.messageId == _jumpTargetId ? _jumpTargetKey : null,
-                        // 墓碑消息（已删除/已焚毁）不激发长按菜单（无内容可操作）
-                        onLongPress:
-                            m.deleted ? null : () => _showMessageActions(m),
+                        // 长按菜单**不挂在这一层**：它包着整条气泡（含顶栏的时间/快捷
+                        // 动作/沙漏），长按顶栏会连菜单一起冒出来——桌面长按顶栏按钮误开
+                        // 菜单、手机长按顶栏又该出 tooltip（老板 2026-10-08）。
+                        // 改挂在**消息正文**上（见下面 `_buildMessageContent` 外层）。
+                        // 本层只留跳转定位的 key 与气泡容器。
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
                           // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变
@@ -7393,30 +7400,44 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               // 不跟快捷图标走圆形（老板 2026-10-02）
                                               borderRadius: BorderRadius.circular(12),
                                               clipBehavior: Clip.antiAlias,
-                                              child: InkWell(
-                                                mouseCursor: SystemMouseCursors.click,
-                                                // 悬浮/点击背景同快捷动作/状态栏图标
-                                                hoverColor: Colors.black.withValues(alpha: 0.05),
-                                                highlightColor:
-                                                    Colors.black.withValues(alpha: 0.08),
-                                                onTap: () => _setMessageBurn(m),
-                                                child: Padding(
-                                                  padding: const EdgeInsets.all(4),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      _BurnHourglass(burned: m.deleted),
-                                                      const SizedBox(width: 2),
-                                                      // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
-                                                      // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
-                                                      Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
-                                                              manual: m.burnManual),
-                                                          style: TextStyle(
-                                                              fontSize: 11,
-                                                              color: _uiStyle == 'gradient'
-                                                                  ? Colors.white70
-                                                                  : Colors.grey)),
-                                                    ],
+                                              child: Tooltip(
+                                                // 与相邻的引用/拷贝/保存圆钮一样给 tooltip
+                                                // （老板 2026-10-08；此前只有这处没有）
+                                                message: l10n.chatPageActionBurn,
+                                                child: InkWell(
+                                                  mouseCursor: SystemMouseCursors.click,
+                                                  // 悬浮/点击背景同快捷动作/状态栏图标
+                                                  hoverColor:
+                                                      Colors.black.withValues(alpha: 0.05),
+                                                  highlightColor:
+                                                      Colors.black.withValues(alpha: 0.08),
+                                                  onTap: () => _setMessageBurn(m),
+                                                  child: SizedBox(
+                                                    // 与引用/拷贝/保存圆钮**同高**
+                                                    // （老板 2026-10-08：原来被文字撑高一截）
+                                                    height: _bubbleTimeRowControlHeight,
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 4),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          _BurnHourglass(burned: m.deleted),
+                                                          const SizedBox(width: 2),
+                                                          // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
+                                                          // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
+                                                          Text(
+                                                              _burnTagLabel(m.expiresAt,
+                                                                      m.burnAfterSeconds,
+                                                                      manual: m.burnManual),
+                                                              style: TextStyle(
+                                                                  fontSize: 11,
+                                                                  color: _uiStyle == 'gradient'
+                                                                      ? Colors.white70
+                                                                      : Colors.grey)),
+                                                        ],
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -7443,12 +7464,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   // 墓碑消息（已删除/已焚毁）：只保留时间（+时钟+时长）
                                   // 记录，正文与引用块隐藏（老板决策 2026-09-09）
                                   if (!m.deleted) ...[
-                                    _buildMessageContent(m),
+                                    // 长按**只挂在正文上**（老板 2026-10-08）：图片/视频/
+                                    // 音频/文件等附件也都走 `_buildMessageContent`，
+                                    // 所以它们照样能长按出菜单；顶栏不行（见上）。
+                                    Clickable(
+                                      onLongPress: () => _showMessageActions(m),
+                                      child: _buildMessageContent(m),
+                                    ),
                                     // 被引用的消息放在正文下方（老板要求 2026-09-09：
                                     // 引用块应在消息正文下面，而不是上面）
                                     // 点击引用卡跳转到原消息位置（老板要求 2026-09-10）
                                     if (m.quote != null)
                                       Clickable(
+                                        // 引用块也是正文的一部分 → 长按同样出菜单
+                                        onLongPress: () => _showMessageActions(m),
                                         onTap: () => _jumpToMessage(
                                             m.quote!['messageId'] as String? ?? ''),
                                         child: Container(
@@ -8588,7 +8617,7 @@ class _MessageAvatarState extends State<_MessageAvatar> {
                               Navigator.of(ctx).pop();
                               unawaited(onSave(bytes));
                             },
-                            icon: const Icon(Icons.download_outlined),
+                            icon: const Icon(Icons.save_alt),
                             label: Text(
                                 AppLocalizations.of(ctx)!.chatPageActionSave),
                           ),
@@ -8825,7 +8854,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
                               Navigator.of(ctx).pop();
                               widget.onDownload!();
                             },
-                            icon: const Icon(Icons.download_outlined),
+                            icon: const Icon(Icons.save_alt),
                             label: Text(
                                 AppLocalizations.of(ctx)!.chatPageActionSave),
                           ),
