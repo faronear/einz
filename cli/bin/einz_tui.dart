@@ -3052,6 +3052,10 @@ Future<void> _execCommand(String line) async {
       ));
       s.session.messages.add(_systemMessage(
         s.session,
+        '/reinvite :: /entoken reinvite 的快捷方式——给指定成员签专属码（需共享口令，duo 直接出码、group 选成员）',
+      ));
+      s.session.messages.add(_systemMessage(
+        s.session,
         '/passphrase <random> :: 修改共享口令；random 生成随机 12 词恢复码',
       ));
       s.session.messages.add(_systemMessage(
@@ -3086,8 +3090,8 @@ Future<void> _execCommand(String line) async {
     case '/server':
       // 无参数：先输出当前服务器（状态），再给出详细用法
       if (arg.isEmpty) {
-        s.session.messages.add(_systemMessage(s.session, '✅ 当前服务器: ${s.session.server}\n\n'
-            '🔧 用法: /server <地址> —— 切换本次会话的服务器并激活，仅本次生效，不长期保留。'));
+        s.session.messages.add(_systemMessage(s.session, '✅ 当前服务器: ${s.session.server}'));
+        s.session.messages.add(_systemMessage(s.session, '🔧 用法: /server <地址> 👉 切换本次会话的服务器并激活，仅本次生效，不长期保留。'));
         s.status = '';
       } else {
         try {
@@ -3202,13 +3206,10 @@ Future<void> _execCommand(String line) async {
         if (s.session.hasSpace) {
           s.session.messages.add(_systemMessage(s.session,
               '✅ 当前通道已绑定到秘境${addr != null ? '（地址: $addr）' : ''}'));
-          s.session.messages.add(_systemMessage(
-              s.session, '🔧 用法: /space address | /space create | /space join <邀请链接或 token>'));
         } else {
           s.session.messages.add(_systemMessage(s.session, '⚠️ 当前通道尚未绑定秘境'));
-          s.session.messages.add(_systemMessage(
-              s.session, '🔧 用法: /space create 新建私密空间；/space join <邀请链接或 token> 加入已有空间'));
         }
+        s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/space 👉 查询当前空间\n/space address 👉 显示当前空间地址 \n/space create 👉 新建私密空间\n/space join <邀请链接或 token> 👉 加入已有空间'));
         break;
       }
       {
@@ -3218,7 +3219,7 @@ Future<void> _execCommand(String line) async {
           final addr = s.session.store.spaceAddress;
           if (addr == null || addr.isEmpty) {
             s.session.messages.add(
-                _systemMessage(s.session, '⚠️ 尚未绑定秘境（无秘境地址）——/space create 或 /space join 后可见'));
+                _systemMessage(s.session, '⚠️ 尚未绑定秘境（无秘境地址）'));
           } else {
             s.session.messages.add(_systemMessage(s.session, '📍 秘境地址: $addr'));
           }
@@ -3238,7 +3239,7 @@ Future<void> _execCommand(String line) async {
           break;
         }
         s.session.messages.add(
-            _systemMessage(s.session, '未知子命令: $sub —— 🔧 用法: /space [address|create|join <链接>]'));
+            _systemMessage(s.session, '未知子命令: $sub'));
       }
       break;
     case '/passphrase':
@@ -3263,7 +3264,7 @@ Future<void> _execCommand(String line) async {
             s.session.store.pinHash == null ? '⚠️ 锁屏码：未设置' : '✅ 锁屏码：已设置'));
         // 先输出状态，再给出详细用法
         s.session.messages.add(_systemMessage(s.session,
-            '🔧 用法: /pin <PIN> —— 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）；/pin \'\' 重置为空（取消锁屏码）'));
+            '🔧 用法: \n/pin <PIN> 👉 设置锁屏码（$_kPinMinLength 位数字，如 /pin 123456）\n/pin \'\' 👉 重置为空（取消锁屏码）'));
       } else if (arg == "''") {
         s.session.store.pinHash = null;
         s.session.store.save(s.storePath);
@@ -3441,6 +3442,7 @@ Future<void> _execCommand(String line) async {
       //   /entoken reinvite  → 给其他成员生成专属码（需共享口令：
       //                        duo 直接出码；group 验口令后列成员选择）
       await _execEntoken(arg);
+      s.session.messages.add(_systemMessage(s.session, '🔧 用法: \n/entoken 👉 为自己生成通道码\n/entoken invite 👉 为新同伴生成通道码\n/entoken reinvite 👉 为选择的同伴生成通道码'));
       break;
     case '/invite':
       // /entoken invite 的别名（给新人生成通道码）。旧写法 /invite attach* 已
@@ -3458,6 +3460,11 @@ Future<void> _execCommand(String line) async {
         s.status = '';
       }
       break;
+    case '/reinvite':
+      // /entoken reinvite 的快捷方式（给其他成员生成专属通道码——duo 直接出码，
+      // group 验口令后列成员选择）。
+      await _execEntoken('reinvite');
+      break;
     case '/myname':
       // 重设个人显示名（memberName）：本地 + 服务端同步 + 刷新名称表
       if (arg.isEmpty) {
@@ -3466,8 +3473,7 @@ Future<void> _execCommand(String line) async {
             s.memberNames[s.session.store.memberId] ??
             '(未设置)';
         s.session.messages.add(_systemMessage(s.session, '当前名字: $current'));
-        s.session.messages.add(
-            _systemMessage(s.session, '🔧 用法: /myname <名字> —— 修改我的显示名字（如 /myname Lukas）'));
+        s.session.messages.add(_systemMessage(s.session, '🔧 用法: /myname <名字> 👉 修改我的显示名字（如 /myname Lukas）'));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));
         s.status = '';
@@ -3513,7 +3519,7 @@ Future<void> _execCommand(String line) async {
         s.session.messages.add(_systemMessage(s.session, 
         '当前通道名: $current\n'
         '通道公钥: ${s.session.store.publicKey}\n'
-        '🔧 用法: /entrance <通道名> —— 修改本通道名称（如 /entrance MyMac）'
+        '🔧 用法: /entrance <通道名> 👉 修改本通道名称（如 /entrance MyMac）'
         ));
       } else if (s.session.store.sessionToken == null) {
         s.session.messages.add(_systemMessage(s.session, '⚠️ 会话未激活，请先 /auth'));

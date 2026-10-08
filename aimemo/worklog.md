@@ -12927,3 +12927,10 @@ chat_bubble_gender_test + chat_page_menu_test（35 条）全过。
 
 **验证：** flutter analyze 干净；chat_page_menu_test + chat_bubble_gender_test
 35 条全过；goldens 默认跳过（-Dgolden=true 才真跑，符合既定政策）。
+
+### CLI/TUI：/reinvite 快捷别名（2026-10-08 老板要求）
+
+`/reinvite` = `/entoken reinvite` 的快捷方式（给其他成员签专属码——duo 直接出码，
+group 验口令后列成员选择），行为完全同主命令；/help 补别名条目。
+验证：dart analyze 干净；编译版 pty 快速验证——聊天态发 /reinvite 直接触发
+共享口令问答（duo 场景），与 /entoken reinvite 行为一致。
