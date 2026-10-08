@@ -941,7 +941,7 @@ Future<void> _spaceCreate(ChatSession session, EntranceStore store, String store
   // 只接受数字 1/2（与性别问答同风格：不接受文字输入）
   String spaceMode;
   while (true) {
-    final k = (await _prompt(session, '❓ 秘境类型（创建后不可更改）\n  1: 双人（2 人）\n  2: 群组（多人）',
+    final k = (await _prompt(session, '❓ 秘境类型（创建后不可更改）\n  1: 双人秘境：仅限两人，永远没有其他人。\n  2: 群组秘境：多人群组，每个成员都可以添加新人。）',
             required: true))
         .trim();
     if (!_state!.running) return;
@@ -2721,6 +2721,14 @@ Future<void> _runInputLoop() async {
           continue;
         }
         busy = true;
+        // 命令回显（老板 2026-10-08）：聊天态输入的 /xxx 也按"我的消息"入列——
+        // 纯本地展示（不加密/不入队/不上服务器/重启不留痕），结果消息紧随其后。
+        // 口令/通道码输入分支不回显（机密输入不留痕）；引导期问答不经此处
+        if (line.startsWith('/') &&
+            !_state!.pendingJoinToken &&
+            !_state!.pendingSpaceKey) {
+          _state!.session.addCommandEcho(line);
+        }
         final future = (_state!.pendingJoinToken)
             ? (line.startsWith('/') ? _execCommand(line) : _handleJoinTokenInput(line)) // / 开头按命令（/exit 退出），否则按邀请链接
             : (_state!.pendingSpaceKey)

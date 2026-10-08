@@ -94,6 +94,34 @@ class ChatSession {
   /// 展示缓存（按 server_sequence 升序；未同步的排最后）。
   final List<ChatMessage> messages = [];
 
+  /// 本地命令回显计数器（messageId 唯一性，见 [_systemMessage] 同款设计）
+  int _echoSeq = 0;
+
+  /// 输入的斜杠命令（/xxx）本地回显：按"我的消息"入列展示（与普通消息同风格
+  /// ——我的名字/时间/气泡），让命令历史留在消息流里可回看（老板 2026-10-08）。
+  /// **纯本地展示**：不加密、不入离线队列、不上服务器，也不落盘——
+  /// [loadHistory] 只重建 store 持久化内容，重启后回显与系统提示消息一样
+  /// 不再出现（老板 2026-10-08 要求）。messageId 用 `echo-` 前缀，
+  /// [sentStatusOf] 据此不显示发送状态符（永不发送，不存在 pending）。
+  void addCommandEcho(String line) {
+    messages.add(ChatMessage(
+      env: MessageEnvelope(
+        v: 1,
+        type: 'text',
+        keyVersion: store.keyVersion,
+        messageId: 'echo-${_echoSeq++}',
+        senderEntranceId: store.entranceId ?? '-',
+        senderMemberId: store.memberId,
+        nonce: '',
+        ciphertext: '',
+      ),
+      plain: line,
+      isMine: true,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    ));
+    _sortMessages();
+  }
+
   /// 展示缓存变化回调（UI 用）：消息被乐观上屏 / 同步追加 / WS 到达时触发重绘。
   /// 在 [_sortMessages] 末尾统一调用——这样离线发送时乐观上屏的消息能在
   /// `flushPending()` 的网络等待**之前**就刷新到屏幕（老板 2026-09-13：App 能
@@ -393,6 +421,8 @@ class ChatSession {
   /// 非我的消息 / 系统消息返回空串。
   String sentStatusOf(ChatMessage m) {
     if (!m.isMine || m.isSystem) return '';
+    // 本地命令回显（echo- 前缀，TUI _commandEcho）：永不发送，不显示状态符
+    if (m.env.messageId.startsWith('echo-')) return '';
     if (store.hasPending(m.env.messageId)) return 'pending';
     final seq = m.seq;
     if (seq == null) return 'pending';

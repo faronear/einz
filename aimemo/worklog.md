@@ -12981,3 +12981,27 @@ group 验口令后列成员选择），行为完全同主命令；/help 补别�
 
 **验证：** `flutter analyze` 无 issue；真机（相册权限弹窗、图片/视频落相册）老板自测。
 未代跑测试/构建。⚠️ 老板构建时 `ios/Podfile.lock` 会新增 gal 一条（该文件已入库）。
+
+### TUI 斜杠命令回显：/xxx 按我的消息入列（2026-10-08 老板要求）
+
+**要求：** 输入 /entoken 等命令后不出现在消息列表里，改为把 /xxx 输入也列入消息；
+且**下次启动后与系统提示消息一样不作为历史消息出现**（老板补充）。
+
+**实现：**
+- `chat_core.dart` 新增 `ChatSession.addCommandEcho(line)`：伪造"我的消息"气泡入
+  `messages` 展示缓存（isMine + 自己的 memberId/entranceId、与普通消息同风格渲染）；
+  **纯本地展示**——不加密、不入离线队列、不上服务器、不落盘，loadHistory 只重建
+  store 持久化内容 → 重启后回显自然消失（与 _systemMessage 同机制）
+- messageId 用 `echo-` 前缀，`sentStatusOf` 据此不显示发送状态符（永不发送，
+  不存在 pending ⋯）
+- TUI 输入循环 busy 提交点回显（命令执行前入列，结果消息紧随其后）；仅聊天态
+  /xxx——口令/通道码输入分支（机密不留痕）与引导期问答（pendingGuideCompleter
+  在提交点之前）都不回显
+
+**边界核实：** /backup 导出用 store.history 不经 messages（回显不混入备份）；
+同步锚点/离线队列全在 store 侧不受影响；未知命令 = 回显在上 + 报错紧随。
+
+**验证：** dart analyze 干净；pty E2E 6/6——回显入列且在结果消息之前、未知命令
+回显+报错并存、store.history 条数不变（未持久化）、重启后最后一帧仅状态栏提示
+1 次（回显/结果均不留痕）。测试脚本两个假阳性教训：plain() 要用 bytes 正则；
+跨帧计数会被全屏重绘重复刷新——断言只看最后一帧（rsplit 清屏序列）。
