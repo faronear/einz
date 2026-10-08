@@ -1734,20 +1734,20 @@ void _render() {
   buf.write(_clearHome);
 
   // 顶部标题栏（第 1 行）：黑色背景整行 + 白色文字，
-  // 与消息流明显区分；我的灯（绿●=在线，红✗=断线重连，黄↻=连接中，白○=离线）。
+  // 与消息流明显区分；我的灯（绿●=在线，红✗=断线重连，黄↻=连接中，红○=离线）。
   // 状态灯颜色序列后立即回到白字（不 reset，背景持续），整行铺满后统一 reset。
   final ws = s.session.wsStatus;
   final myDot = switch (ws) {
     WsStatus.connected => '$_green●$_white',
     WsStatus.connecting => '$_yellow↻$_white',
     WsStatus.reconnecting => '$_red✗$_white',
-    WsStatus.stopped => '${_white}○',
+    WsStatus.stopped => '${_red}○',
   };
   final peerName = _peerNameOf(s);
-  final peerDot = s.peerOnline ? '$_green●$_white' : '${_white}○';
+  final peerDot = s.peerOnline ? '$_green●$_white' : '${_red}○';
   // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
   // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
-  // 在前（●绿）、离线在后（○白），人名之间用竖线 | 分隔（每人自带灯，不用括号
+  // 在前（●绿）、离线在后（○红），人名之间用竖线 | 分隔（每人自带灯，不用括号
   // ——老板 2026-10-08 修正）。总宽不超过左段 1/3 限长（超宽截断由 _titleBarThree
   // 统一处理，尾部先丢——离线名单排最后先被截，符合优先级）。
   final String leftSeg;
@@ -1927,7 +1927,7 @@ String _entranceCountLabel(int onlineCount, int totalCount) {
 
 /// group 空间标题栏左段：`n/N ●名|○名`（老板 2026-10-08）——
 /// 最左 n/N = 在线人数/总人数（**不含我**）；其后成员名单，在线在前（●绿）、
-/// 离线在后（○白），人名之间竖线 | 分隔（每人自带灯，不用括号——老板修正）。
+/// 离线在后（○红），人名之间竖线 | 分隔（每人自带灯，不用括号——老板修正）。
 /// 我自己不出现在名单里；成员表尚未拉到（离线启动）时名单为空，仅显示 0/0。
 /// 超宽截断由 _titleBarThree 统一处理（尾部先丢——离线名单排最后先被截）。
 String _groupMemberListLabel(_TuiState s) {
@@ -1947,10 +1947,11 @@ String _groupMemberListLabel(_TuiState s) {
   final buf = StringBuffer();
   final total = online.length + offline.length;
   buf.write('${_green}${online.length}$_white/$total');
-  const sep = '|';
+  const sep = ' ';
   var first = true;
   void append(String pid, String dot) {
-    if (!first) buf.write(sep);
+    //if (!first) 
+    buf.write(sep);
     first = false;
     buf.write('$dot$_white${s.memberNames[pid] ?? pid}');
   }
@@ -1959,7 +1960,7 @@ String _groupMemberListLabel(_TuiState s) {
     append(pid, '$_green●');
   }
   for (final pid in offline) {
-    append(pid, '${_white}○');
+    append(pid, '${_red}○');
   }
   return buf.toString();
 }
