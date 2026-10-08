@@ -179,6 +179,10 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       version: SERVER_VERSION,
       uptime_sec: Math.floor(process.uptime()),
       capabilities: cfg.capabilities,
+      // 附件 blob 大小上限（字节）：客户端据此在**读取/加密之前**预检——拖入超大文件
+      // （如 1GB 视频）时即时给一句人话，而不是把内存读满再吃 413（2026-10-08）。
+      // 纯静态配置值，非密、无元数据风险（与 capabilities 同级）。
+      max_attachment_bytes: MAX_ATTACHMENT_BYTES,
       // 客户端启动时的**强制升级闸**（2026-10-04）：低于 min_app_version 的客户端
       // 会在首屏弹不可关闭的升级窗口。只在服务端配了才下发（没配就不出现这个键，
       // 老客户端对未知键天然无感）。两个字段都非密、无元数据风险。

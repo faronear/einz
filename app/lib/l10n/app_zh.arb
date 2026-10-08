@@ -715,5 +715,26 @@
   "chatPageAvatarChange": "更换头像",
   "@chatPageAvatarChange": {
     "description": "头像大图上的按钮：点了去选图（空头像时点状态条头像直接走这个动作）"
+  },
+  "chatPageDropHint": "松手发送",
+  "@chatPageDropHint": {
+    "description": "桌面端拖入文件时的高亮浮层主文案"
+  },
+  "chatPageDropHintSub": "图片 / 视频 / 音频 / 文件",
+  "@chatPageDropHintSub": {
+    "description": "桌面端拖入文件时的高亮浮层副文案，列出可拖入的类型"
+  },
+  "chatPageAttachmentTooLarge": "文件太大，服务器上限为 {limit}",
+  "@chatPageAttachmentTooLarge": {
+    "description": "拖入/选中的文件超出服务器附件上限时提示；{limit} 形如 '64 MB'",
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageAttachmentTooLargeUnknown": "文件太大，服务器拒收了",
+  "@chatPageAttachmentTooLargeUnknown": {
+    "description": "附件超限被服务器拒绝，但客户端不知道具体上限（旧服务端）"
   }
 }

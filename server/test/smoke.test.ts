@@ -335,6 +335,13 @@ async function main (): Promise<void> {
     assert.equal(wrongVersion.status, 400, '协议版本不符必须 400')
     const healthNoVersion = await RAW_FETCH(`http://127.0.0.1:${port}/health`)
     assert.equal(healthNoVersion.status, 200, '/health 免协议版本校验（监控/curl 用）')
+    // /health 必须下发附件上限：客户端据此在读取/加密前预检，超限即时提示
+    // （否则拖入超大文件要等很久才吃 413；2026-10-08）
+    const healthBody = (await healthNoVersion.json()) as { max_attachment_bytes?: unknown }
+    assert.ok(
+      typeof healthBody.max_attachment_bytes === 'number' && healthBody.max_attachment_bytes > 0,
+      '/health 必须下发正的 max_attachment_bytes'
+    )
 
     // 1) 未登记通道挑战 → 403 FORBIDDEN（带了 space_id 仍应拒绝：通道不在 entrances 表）
     //    **code 必须是 FORBIDDEN，不能是 ENTRANCE_REVOKED**：库被清/从未登记≠被撤销，

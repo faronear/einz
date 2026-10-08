@@ -1195,4 +1195,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageAvatarChange => '更换头像';
+
+  @override
+  String get chatPageDropHint => '松手发送';
+
+  @override
+  String get chatPageDropHintSub => '图片 / 视频 / 音频 / 文件';
+
+  @override
+  String chatPageAttachmentTooLarge(String limit) {
+    return '文件太大，服务器上限为 $limit';
+  }
+
+  @override
+  String get chatPageAttachmentTooLargeUnknown => '文件太大，服务器拒收了';
 }

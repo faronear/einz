@@ -58,6 +58,13 @@ const List<String> kServerCandidates = [
 /// **给默认值而非 late**：单元测试不走 `main()`，late 未初始化会直接崩。
 String effectiveServer = kPrimaryServer;
 
+/// 服务端附件大小上限（字节）：由 `/health` 的 `max_attachment_bytes` 探得，
+/// [probeServer] 探通时顺带写入。
+///
+/// **null = 未知**（旧服务端不报此字段 / 本次启动还没探到）——此时附件发送**不做**
+/// 本地预检，交给服务端拒绝：宁可慢一点，也不误拦服务端其实允许的大文件。
+int? serverMaxAttachmentBytes;
+
 /// 当前地址是否**不在**出厂候选里（= 开发覆盖：`--server` 或编译期 dart-define）。
 ///
 /// 关于页据此标注——开发包一眼可辨，避免误把连着 localhost 的包当正式包。
@@ -106,6 +113,7 @@ class ServerHealth {
     this.capabilities = const <String>[],
     this.minAppVersion,
     this.appDownloadUrl,
+    this.maxAttachmentBytes,
   });
 
   /// 是否探通（200 + 可解析）。false 时其余字段无意义。
@@ -124,6 +132,10 @@ class ServerHealth {
 
   /// 升级入口 URL（`app_download_url`；null = 服务端不给链接）。
   final String? appDownloadUrl;
+
+  /// 服务端附件大小上限（`max_attachment_bytes`，字节；null = 旧服务端不报）。
+  /// 客户端在发送附件前据此预检，超限即时给"太大"的人话（见 `serverMaxAttachmentBytes`）。
+  final int? maxAttachmentBytes;
 }
 
 /// 快速健康探测（GET {server}/health，3s 超时）。
@@ -150,6 +162,13 @@ Future<ServerHealth> probeServer(String server) async {
       final t = v.trim();
       return t.isEmpty ? null : t;
     }
+    // 附件上限：非正整数一律当没报（旧服务端不报 / 配置写错）→ 客户端不做预检
+    final mabRaw = json['max_attachment_bytes'];
+    final maxAttachmentBytes = (mabRaw is int && mabRaw > 0) ? mabRaw : null;
+    // 顺带缓存到进程级：附件发送前的预检要用。本函数是所有 /health 探测的唯一收口，
+    // 放这里可保证"探到就更新、探不到保持原值"（返回 const ServerHealth() 的失败路径
+    // 不会走到这里，故不会把已探到的值清空）。
+    serverMaxAttachmentBytes = maxAttachmentBytes;
 
     return ServerHealth(
       ok: true,
@@ -157,6 +176,7 @@ Future<ServerHealth> probeServer(String server) async {
       capabilities: caps,
       minAppVersion: nonEmpty(json['min_app_version']),
       appDownloadUrl: nonEmpty(json['app_download_url']),
+      maxAttachmentBytes: maxAttachmentBytes,
     );
   } catch (_) {
     return const ServerHealth();

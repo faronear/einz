@@ -138,13 +138,17 @@ GET /health
   只返回服务健康、协议版本、能力（不再返回全局 member 名称表）。
   响应示例：{ "status": "ok", "protocol_version": "v2-multiverse",
               "version": "<server 版本>", "uptime_sec": 123,
-              "capabilities": [...] }
+              "capabilities": [...], "max_attachment_bytes": 67108864 }
   **可选字段（2026-10-04，强制升级闸）**：配了才出现——
     · `min_app_version`：服务端支持的**最低 App 版本**，格式 `yymm.ddhh.mm`
       （UTC，与 App 打包注入的 CFBundleShortVersionString 同一个串）；
       客户端启动时核对，低于它 → 首屏弹**不可关闭**的升级窗口。
     · `app_download_url`：升级窗口里「下载新版本」按钮的 URL。
   两个字段都非密、无元数据风险（不含任何空间/成员信息）。空串 = 没配（不下发）。
+  **`max_attachment_bytes`（2026-10-08）**：附件 blob 大小上限（字节，默认 64 MiB，
+  环境变量 `EINZ_MAX_ATTACHMENT_BYTES` 可覆盖）。客户端发送附件前据此**本地预检**：
+  超限即时提示、不把超大文件读满内存再上传。旧服务端不下发此字段时客户端**不做预检**
+  （退化为由服务端 413 拒绝）。同样非密、无元数据风险（纯静态配置值）。
   与 `protocol_version` 的分工：后者是 wire 兼容闸（服务端硬拒，REST 400 / WS 4400），
   前者是**产品级**闸（协议也许还能用，但某版本有缺陷/不可靠时，改配置即可把旧客户端
   挡在门外，不必改代码）。客户端实现见 `app/lib/widgets/version_gate.dart`。

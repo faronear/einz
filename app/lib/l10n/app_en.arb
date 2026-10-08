@@ -743,5 +743,26 @@
   "chatPageAvatarChange": "Change avatar",
   "@chatPageAvatarChange": {
     "description": "Button on the fullscreen avatar: opens the picker (an empty avatar goes straight here)"
+  },
+  "chatPageDropHint": "Drop to send",
+  "@chatPageDropHint": {
+    "description": "Desktop drag-and-drop overlay main line, shown while files are dragged over the window"
+  },
+  "chatPageDropHintSub": "Images, videos, audio, files",
+  "@chatPageDropHintSub": {
+    "description": "Desktop drag-and-drop overlay subtitle listing the accepted kinds"
+  },
+  "chatPageAttachmentTooLarge": "This file is too large; the server limit is {limit}",
+  "@chatPageAttachmentTooLarge": {
+    "description": "Shown when a dropped/picked file exceeds the server attachment limit; {limit} is a string like '64 MB'",
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "chatPageAttachmentTooLargeUnknown": "The file is too large and was rejected by the server",
+  "@chatPageAttachmentTooLargeUnknown": {
+    "description": "Oversized attachment rejected by the server, but the client does not know the limit (old server)"
   }
 }

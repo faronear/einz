@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,36 @@ enum _AttachmentKind { emoji, photo, galleryImage, videoCamera, videoGallery, au
 /// 系统文件对话框，照常可用。
 bool get _hasCameraCapture =>
     !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
+/// 本平台是否能从系统拖文件进来（仅桌面）。移动端无此交互，且 desktop_drop 的
+/// Android 实现还是 preview，不挂上去更稳。
+bool get _fileDropSupported =>
+    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+/// 拖入文件的类型归类（扩展名 → 附件类型）。桌面拖放与相册/文件对话框各入口
+/// 共用同一个发送收口（`_ChatPageState._sendAttachmentOptimistic`）。
+const Set<String> _kDropImageExts = {
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'tif', 'tiff', 'avif',
+};
+const Set<String> _kDropVideoExts = {
+  'mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm', 'wmv', 'flv', 'mpeg', 'mpg', '3gp', 'ts',
+};
+const Set<String> _kDropAudioExts = {
+  'mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'opus', 'wma', 'amr', 'aiff', 'aif', 'caf',
+};
+
+/// 扩展名 → 附件类型：命中 image/video/audio 之一，其余归 'file'（与 `_sendMedia`
+/// 的 file_picker 分支同口径）。无法解码/伪装的扩展名 v1 不嗅探内容，按名归类。
+String _dropAttachmentType(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  final ext = (dot >= 0 && dot < fileName.length - 1)
+      ? fileName.substring(dot + 1).toLowerCase()
+      : '';
+  if (_kDropImageExts.contains(ext)) return 'image';
+  if (_kDropVideoExts.contains(ext)) return 'video';
+  if (_kDropAudioExts.contains(ext)) return 'audio';
+  return 'file';
+}
 
 /// 输入区模式：text=文字输入框；hint=提示态（录音条显示「长按开始录音」，入口按钮变键盘、
 /// 点击回文字态）；recording=按住录音中（波形实时）；preview=松手后预览态（试听/取消，
@@ -264,6 +295,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
   // 表情面板展开中（输入栏内联，与键盘互斥：打开时收起键盘；输入框重新获焦时自动收起）
   bool _emojiPanelOpen = false;
+  // 桌面端拖入文件的高亮浮层开关（desktop_drop 的 onDragEntered/Exited 驱动）
+  bool _fileDragHover = false;
   String? _recordingPath; // 本次录音临时文件（录音中/预览态存续，发送或取消后清空）
   final List<double> _voiceSamples = []; // 本次录音振幅采样（录音中实时追加，预览态冻结）
   StreamSubscription<Amplitude>? _ampSub; // 录音振幅流订阅（波形驱动）
@@ -5890,6 +5923,78 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 附件大小上限的显示串（如 `64 MB`）：只在"太大"提示里报出服务端上限用。
+  String _maxAttachmentLabel(int bytes) =>
+      '${(bytes / (1024 * 1024)).round()} MB';
+
+  /// 附件大小**本地预检**：仅当服务端已告知上限（`/health` 的 max_attachment_bytes）
+  /// 时生效。超限立刻返回 false 并弹**人话**——避免把超大文件读满内存再走加密/上传
+  /// （老板 2026-10-08：拖 1GB 视频要等很久才报错）。上限未知时不拦（宁可慢，不误拦）。
+  bool _withinAttachmentLimit(int size) {
+    final limit = serverMaxAttachmentBytes;
+    if (limit == null || size <= limit) return true;
+    _notice(
+        context,
+        AppLocalizations.of(context)!
+            .chatPageAttachmentTooLarge(_maxAttachmentLabel(limit)));
+    return false;
+  }
+
+  /// 附件发送失败文案：**超限**单独给人话（老板 2026-10-08：此前 1GB 视频只看到
+  /// `ApiException(PAYLOAD_TOO_LARGE): request body exceeds … bytes` 这种技术串）；
+  /// 其余照旧走 `chatPageSendFailed`。
+  String _attachmentSendError(AppLocalizations l10n, Object error) {
+    if (error is ApiException &&
+        (error.code == 'PAYLOAD_TOO_LARGE' || error.httpStatus == 413)) {
+      final limit = serverMaxAttachmentBytes;
+      return limit == null
+          ? l10n.chatPageAttachmentTooLargeUnknown
+          : l10n.chatPageAttachmentTooLarge(_maxAttachmentLabel(limit));
+    }
+    return l10n.chatPageSendFailed('$error');
+  }
+
+  /// 桌面端拖入文件直接发送（desktop_drop）：按扩展名归类到现有附件类型，逐个
+  /// 复用 [_sendAttachmentOptimistic]（与相册/文件对话框同一收口）。多文件**顺序**
+  /// 发送，避免并发上传；拖进来的目录等非普通文件直接跳过。
+  Future<void> _sendDroppedFiles(List<XFile> files) async {
+    if (files.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    for (final f in files) {
+      // 拖进来的可能是目录（readAsBytes 会抛）——只处理普通文件
+      if (!kIsWeb && f.path.isNotEmpty) {
+        final st = FileStat.statSync(f.path);
+        if (st.type != FileSystemEntityType.file) continue;
+      }
+      try {
+        // 超限立刻失败（人话），不把超大文件读满内存再上传（老板 2026-10-08）
+        if (!_withinAttachmentLimit(await f.length())) continue;
+        final bytes = await f.readAsBytes();
+        final type = _dropAttachmentType(f.name);
+        if (type == 'audio') {
+          // 与「音频文件」入口同款：发前探一次时长，对端开箱即显示（老板 2026-09-13）
+          final seconds = await _probeAudioDuration(bytes);
+          await _sendAttachmentOptimistic(
+            fileBytes: bytes,
+            fileName: f.name,
+            type: 'audio',
+            caption: f.name,
+            meta: seconds > 0 ? {kMetaAudioDurationSeconds: seconds} : null,
+          );
+        } else if (type == 'file') {
+          await _sendAttachmentOptimistic(
+              fileBytes: bytes, fileName: f.name, type: 'file', caption: f.name);
+        } else {
+          await _sendAttachmentOptimistic(
+              fileBytes: bytes, fileName: f.name, type: type);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        _notice(context, _attachmentSendError(l10n, e));
+      }
+    }
+  }
+
   // ---------- 视频：下载解密 → 临时文件 → video_player 播放 ----------
 
   /// 视频消息：内联预览（首帧 + 播放按钮），点击全屏播放；发送端本地密文
@@ -6677,7 +6782,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
+    final page = Scaffold(
       // gradient 风格：body 延伸到 AppBar 之后，AppBar 透明浮在渐变上（同向导全屏
       // 渐变做法）；plain 风格保持原有布局（AppBar 浅粉底，body 从其下方开始）
       extendBodyBehindAppBar: _uiStyle == 'gradient',
@@ -7666,7 +7771,66 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ],
             ),
           ),
+          // 桌面端拖入文件的高亮浮层（覆盖整页，松手即发送）
+          if (_fileDragHover) const Positioned.fill(child: _DropHintOverlay()),
         ],
+      ),
+    );
+    // 桌面端：整页套一个投递区，从访达/资源管理器拖文件进来即发送；移动端不挂
+    // （无此交互，且 desktop_drop 的 Android 实现是 preview，不挂更稳）。
+    if (!_fileDropSupported) return page;
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _fileDragHover = true),
+      onDragExited: (_) => setState(() => _fileDragHover = false),
+      onDragDone: (detail) {
+        setState(() => _fileDragHover = false);
+        unawaited(_sendDroppedFiles(detail.files));
+      },
+      child: page,
+    );
+  }
+}
+
+/// 拖入文件时覆盖整页的提示浮层（松手即发送）。
+class _DropHintOverlay extends StatelessWidget {
+  const _DropHintOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // IgnorePointer：只做视觉提示，不拦截指针（拖放命中在最外层的 DropTarget）
+    return IgnorePointer(
+      child: ColoredBox(
+        color: const Color(0x66000000),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 8)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.move_to_inbox_outlined,
+                    size: 48, color: Color(0xFF3BAFFD)),
+                const SizedBox(height: 12),
+                Text(l10n.chatPageDropHint,
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF33415A))),
+                const SizedBox(height: 4),
+                Text(l10n.chatPageDropHintSub,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF5C6B82))),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

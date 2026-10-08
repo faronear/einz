@@ -406,6 +406,10 @@ class ApiClient {
           'nonce': nonce,
         }));
         req.headers.contentType = ContentType.binary;
+        // 显式声明长度：不设时 Dart 会改用 chunked，服务端只能边收边判超限，
+        // 客户端要等它读完一大截才等到（且可能只是连接被掐断而非干净的 413）。
+        // 设了长度 → 服务端按 Content-Length **立刻** 413，客户端拿到明确错误码。
+        req.contentLength = blob.length;
         req.add(blob);
         final res = await req.close().timeout(responseTimeout);
         final text = await res.transform(utf8.decoder).join().timeout(responseTimeout);

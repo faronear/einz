@@ -1275,4 +1275,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAvatarChange => 'Change avatar';
+
+  @override
+  String get chatPageDropHint => 'Drop to send';
+
+  @override
+  String get chatPageDropHintSub => 'Images, videos, audio, files';
+
+  @override
+  String chatPageAttachmentTooLarge(String limit) {
+    return 'This file is too large; the server limit is $limit';
+  }
+
+  @override
+  String get chatPageAttachmentTooLargeUnknown =>
+      'The file is too large and was rejected by the server';
 }

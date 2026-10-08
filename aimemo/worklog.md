@@ -13154,3 +13154,41 @@ WS 连入时踢掉旧连接（4408 duplicate）；客户端 WsClient 断线自�
 
 E2E（pty 双窗口）4/4：`1/1●BobG`（B 在线）→ B 退出后 `0/1○BobG`（秒级翻转），
 断言同步验证无括号残留。dart analyze 干净。
+
+### 桌面端拖拽发送附件（2026-10-08）
+
+**需求（老板）：** 桌面版支持把图片/视频/音频/文件从访达/资源管理器拖进窗口直接发送。
+先做**最小可用**（只加入口，不动内部结构），老板实测通过后再补压缩等附加特性。
+
+**实现（最小可用）：**
+- `app/pubspec.yaml` 加 `desktop_drop ^0.8.4`：返回 `cross_file.XFile`，与既有
+  image_picker/file_picker **同类型**，零转换；macOS/Windows/Linux 支持。
+- `ChatPage.build` 把整页 `Scaffold` 装上 `DropTarget`（**仅桌面**：`_fileDropSupported`；
+  移动端不挂，避开 desktop_drop 的 Android preview 实现）。
+- `_sendDroppedFiles`：按扩展名归类到现有类型（image/video/audio/file），逐个**顺序**
+  复用 `_sendAttachmentOptimistic`（加密/上传/渲染**零改动**）；目录等非普通文件跳过；
+  音频复用 `_probeAudioDuration` 探时长（与「音频文件」入口同款）。
+- 拖入时整页高亮浮层 `_DropHintOverlay`（「松手发送」），新增 ARB 键 2 个（中英）。
+
+**老板实测：** 图片/mp3/mp4/pdf 单发与多类型混发均成功；100MB mp4 成功；但 1GB mp4
+「过好久才报错，报错也偏技术化」。
+
+**大文件改进（第二轮）：**
+- 根因：客户端**先把整文件读进内存再加密**，服务端 413 要等这些做完才轮到 → 慢。
+- `server/src/app.ts`：`/health` 下发 `max_attachment_bytes`（= `EINZ_MAX_ATTACHMENT_BYTES`，
+  默认 64 MiB）；纯静态配置值，非密、无元数据风险。`server/test/smoke.test.ts` 加断言。
+- `app/lib/data/server_config.dart`：`ServerHealth.maxAttachmentBytes`；`probeServer`
+  探通时顺带写入进程级 `serverMaxAttachmentBytes`（所有 /health 探测的唯一收口）。
+- `app/lib/chat_page.dart`：拖入文件**读字节前** `f.length()` 预检，超限即时弹人话
+  （`文件太大，服务器上限为 64 MB`）；413 亦映射成人话。**上限未知时不预检**——宁可慢，
+  不误拦服务端其实允许的大文件。
+- `shared/.../protocol/api_client.dart`：`postAttachment` 显式设 `contentLength`（原来走
+  chunked，服务端只能边收边判，甚至只是掐断连接；现在凭长度**立刻** 413）。
+- `docs/PROTOCOL_MULTIVERSE.md` §4.1 记该字段。
+
+**待确认（老板）：** 「100MB 成功」与服务端默认 64 MiB 对不上——重启服务端后提示里的
+数字即真实上限；要更大就在 `serverDocker/.env` 设 `EINZ_MAX_ATTACHMENT_BYTES`（客户端
+自动跟随，不必改代码）。
+
+**验证：** `flutter analyze` 无 issue；shared `dart test` 52 passed；server `npm test`
+22 个文件全绿（含新断言）。真机拖拽/大文件表现老板自测。

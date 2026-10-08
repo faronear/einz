@@ -2221,6 +2221,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change avatar'**
   String get chatPageAvatarChange;
+
+  /// Desktop drag-and-drop overlay main line, shown while files are dragged over the window
+  ///
+  /// In en, this message translates to:
+  /// **'Drop to send'**
+  String get chatPageDropHint;
+
+  /// Desktop drag-and-drop overlay subtitle listing the accepted kinds
+  ///
+  /// In en, this message translates to:
+  /// **'Images, videos, audio, files'**
+  String get chatPageDropHintSub;
+
+  /// Shown when a dropped/picked file exceeds the server attachment limit; {limit} is a string like '64 MB'
+  ///
+  /// In en, this message translates to:
+  /// **'This file is too large; the server limit is {limit}'**
+  String chatPageAttachmentTooLarge(String limit);
+
+  /// Oversized attachment rejected by the server, but the client does not know the limit (old server)
+  ///
+  /// In en, this message translates to:
+  /// **'The file is too large and was rejected by the server'**
+  String get chatPageAttachmentTooLargeUnknown;
 }
 
 class _AppLocalizationsDelegate
