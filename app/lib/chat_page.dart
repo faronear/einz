@@ -290,6 +290,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// ticker 轮询的"上一轮是否还在跑"（重入保护：避免离线时并发堆积）。
   bool _tickerRefreshInFlight = false;
 
+  /// 上一轮 ticker 刷新的开始时刻（配合 [_tickerRefreshInFlight] 做卡死兜底）。
+  DateTime? _tickerRefreshStartedAt;
+
   /// 当前 ticker 周期（用于判断是否需要按退避重设）。
   Duration? _currentTickerInterval;
   _InputMode _inputMode = _InputMode.text; // 输入区模式（文字/提示/录音中/预览）
@@ -1267,7 +1270,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _restartTicker(_tickerInterval); // 基准随 WS 状态变（在线 30s / 离线 3s），再乘退避
     if (mounted) setState(() {}); // 刷新标题红绿灯（在线绿/离线红）
     _refreshPeerOnline(); // 连接恢复时顺带刷新对方在线状态
-    if (online) _checkEscrowRotated(); // 上线补查：离线期间口令被重设则发通知
+    if (!online) return;
+    // 在线（含断线重连）= 网络/服务端已可达：若正处于"离线/未识别"状态，**立即同步
+    // 一次**，别干等下一轮轮询。
+    // 为什么必须（老板 2026-10-09 报告「开 App 显示离线、不自动恢复、重启才好」）：
+    // 离线时轮询按失败次数退避（最长 60s），而每次 WS 状态翻转都会 _restartTicker
+    // 把倒计时清零——重连后若不主动同步，恢复会被拖到几十秒，甚至在持续抖动时
+    // 永远等不到下一轮。以「连上」为触发点直接同步，让恢复与 ticker 周期解耦。
+    // 仅在确有离线迹象时才补这一次：正常在线不额外发请求，避免 WS 抖动（连上即被
+    // 顶）时把 /sync 打成一串。
+    if (_consecutiveSyncFailures > 0 || _entranceUnrecognized) {
+      unawaited(_refresh());
+    }
+    _checkEscrowRotated(); // 上线补查：离线期间口令被重设则发通知
   }
 
   /// 加载本设备阅后即焚档位秒数（每设备独立，纯本地）。
@@ -4774,12 +4789,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 同步成功：复位退避（周期回到基准），并清掉"服务器不认本通道"的常驻提示
   /// （后台库被复原后应自动恢复正常，无需用户干预）。
   void _onSyncSucceeded() {
-    if (_entranceUnrecognized && mounted) {
-      setState(() => _entranceUnrecognized = false);
-    }
-    if (_consecutiveSyncFailures == 0) return;
+    final wasUnrecognized = _entranceUnrecognized;
+    final hadFailures = _consecutiveSyncFailures > 0;
+    _entranceUnrecognized = false;
     _consecutiveSyncFailures = 0;
     _ensureTickerInterval();
+    // 提示条由 `_consecutiveSyncFailures` / `_entranceUnrecognized` 驱动：任一复位都必须
+    // 重建，否则条会残留在屏上。此前只有失败路径 setState，"自动恢复"其实靠
+    // `_refreshLocal` 顺带重建才凑巧生效——那一路径一旦不重建（异常被吞等）就永久卡住。
+    if ((wasUnrecognized || hadFailures) && mounted) setState(() {});
   }
 
   /// 同步失败：累加退避计数并重设 ticker 周期。
@@ -4814,11 +4832,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 轮询触发：**上一轮没跑完就跳过本次**（离线时单轮可能耗 30s，若不跳过会
   /// 并发堆积大量请求，耗电/耗流量/刷日志——老板 2026-09-13 提出）。
+  ///
+  /// 卡死兜底：单轮刷新若因网络层极端情况永不返回（重入标记再也不会被清），会让
+  /// 轮询**永久停摆**——表现就是"离线提示不自动恢复、重启 App 才好"（老板
+  /// 2026-10-09）。故记录开始时刻，超过阈值仍未结束就放行新一轮：宁可偶发一次
+  /// 并发，也不要把轮询彻底掐死。
   void _onTick() {
-    if (_tickerRefreshInFlight) return;
+    if (_tickerRefreshInFlight) {
+      final started = _tickerRefreshStartedAt;
+      if (started != null &&
+          DateTime.now().difference(started) < const Duration(minutes: 2)) {
+        return;
+      }
+    }
     _tickerRefreshInFlight = true;
+    _tickerRefreshStartedAt = DateTime.now();
     _refresh().whenComplete(() {
       _tickerRefreshInFlight = false;
+      _tickerRefreshStartedAt = null;
       _ensureTickerInterval();
     });
   }

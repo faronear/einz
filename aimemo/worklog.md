@@ -13317,3 +13317,36 @@ chat_profile_refresh / ui_style_switch / chat_bubble_gender / multi_space_isolat
 秘境」、邮件通知几处、`chatPageMembersInviteNew`）；因 arb 重生成后两个硬编码旧文案
 的测试（`chat_page_menu_test`、`multi_space_pages_test`）改绑 l10n 键，不再锁死文案。
 
+### 修 bug：开 App 显示「离线·仅可查看本地消息」不自动恢复（2026-10-09 老板报告）
+
+**现象：** 开 App 有时出现常驻条「离线 · 仅可查看本地消息，无法收发」，**不会自动
+恢复**，必须彻底退出 App 重开才好。
+
+**查实（`app/lib/chat_page.dart`）：**
+- 该条由 `_consecutiveSyncFailures > 0` 驱动；复位只发生在 `_onSyncSucceeded`。
+- 恢复（即复位）**完全依赖轮询 ticker 再发一轮 `_refresh`**——一旦 ticker 不再触发，
+  条就永久留着，正对上"要重启"。写临时 widget 测试确认：只要 ticker 正常再跑一轮，
+  条会清（`_refreshLocal` 顺带 setState），所以问题不是"复位逻辑错"而是"轮询没再跑"。
+- 两处让轮询停摆的缺陷：
+  1. **恢复被退避 + WS 翻转拖死**：离线时轮询按失败次数退避（最长 60s），而
+     `_onWsStatusChanged` 每次 WS 状态翻转都 `_restartTicker` 把倒计时清零——重连后
+     不主动同步，恢复会被拖到几十秒，持续抖动时（连上即被顶）甚至永远等不到下一轮。
+  2. **重入守卫无卡死兜底**：`_onTick` 用 `_tickerRefreshInFlight` 防并发堆积，若某轮
+     `_refresh` 因网络层极端挂起永不返回，标记再也不会被清 → 轮询永久停摆。
+  3. 附带：`_onSyncSucceeded` 复位后**没有 setState**（此前靠 `_refreshLocal` 顺带
+     重建才凑巧生效，脆弱）。
+
+**修复（三处，均 best-effort、不改正常在线时的请求量）：**
+- `_onWsStatusChanged`：WS 变在线且**确有离线迹象**（`_consecutiveSyncFailures>0 ||
+  _entranceUnrecognized`）时立即 `_refresh()`——以"连上"为恢复触发点，与 ticker 周期
+  解耦；正常在线不额外发请求，避免 WS 抖动把 `/sync` 打成一串。
+- `_onSyncSucceeded`：复位 `_consecutiveSyncFailures`/`_entranceUnrecognized` 后按需
+  `setState`（对称于失败路径）。
+- `_onTick`：记录本轮开始时刻，超过 2 分钟仍未结束就放行新一轮（宁可偶发一次并发，
+  也不让轮询被永久掐死）。
+
+**验证：** `flutter analyze lib/chat_page.dart` 干净；`chat_send_status_test` /
+`group_status_bar_test` 全绿（含"离线提示出现"回归）；临时复现用例确认 ticker 恢复
+后提示条会消失，跑完即删。真机自动恢复行为由老板自测。
+
+
