@@ -1632,13 +1632,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 群空间状态条左侧（老板 2026-10-09 改）：**成员头像条 + 两行文字**。
   ///
-  /// 布局：`[成员头像条] [ 名字列 ]`，名字列两行——
+  /// 布局：`[头像位] [ 名字列 ]`，名字列两行——
   /// - 第一行 = **群组名字**（样式同「我的状态胶囊」的名字行：15 号 w500）；
   ///   空名字时只显示一个**编辑图标**（点击进 [\_showGroupNameDialog] 起名）；
   /// - 第二行 = **「在线人数/总人数」**，「在线人数」用**绿色**（同在线灯），
   ///   「/总人数」保持原灰。两个数都不含我自己（`_othersOnline` / `_othersTotal`）。
   ///
-  /// - 头像按**加入先后**（槽位升序）排，不含我自己（我在右侧那一块）；
+  /// - 头像位**恒在**：有人加入 = 成员头像条（按**加入先后**槽位升序排，不含
+  ///   我自己——我在右侧那一块）；还没人加入 = **群组头像占位**（groups_outlined
+  ///   圆底，与菜单「我的同伴」图标同款）。两者都可点 → 「我的同伴」弹层。
+  ///   占位必须占着 40px：否则编辑图标/人数直接顶到状态条胶囊左缘（老板实测）；
   /// - **整块最多占状态条一半宽**（老板：最多顶到一半宽的最右侧）。名字列的宽度
   ///   **先占**（信息，不参与截断），**剩下的给头像**；名字过长时省略、头像装不下
   ///   时末尾**渐隐**。
@@ -1692,19 +1695,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 量出来的名字宽**只用来给头像分预算**（名字是信息、优先，剩下的给头像），
     // **不再拿来钉死名字列宽**——TextPainter 量出的宽与真实渲染可能有出入（字体
     // 回退/字距等），偏小会把名字提前截断（老板 2026-10-09 macOS 实测：离中线
-    // 还很远就出现省略号）。名字列给「去掉头像条后剩下的全部宽度」，要不要
+    // 还很远就出现省略号）。名字列给「去掉头像位后剩下的全部宽度」，要不要
     // 省略由文本自己按真实渲染宽决定。
-    final avatarMin = others.isEmpty ? 0.0 : kStatusMemberAvatarSize;
+    //
+    // 头像位**恒在**：有人加入 = 成员头像条；还没人加入 = 群组头像占位（同样
+    // 40px）——没有这个占位，编辑图标/人数会直接顶到状态条胶囊左缘（老板
+    // 2026-10-09 实测"顶到边缘之外"）。
+    const avatarMin = kStatusMemberAvatarSize;
     var want = nameWidth > countWidth ? nameWidth : countWidth;
     final wantCap = maxWidth - avatarMin - gap; // 至少留一个头像位 + 间距
     if (want > wantCap) want = wantCap;
     if (want < 0) want = 0;
-    final avatarBudget = others.isEmpty ? 0.0 : (maxWidth - want - gap);
+    final avatarBudget = maxWidth - want - gap;
     final stripCount =
         others.isEmpty ? 0 : _stripAvatarCount(avatarBudget, others.length);
-    final stripWidth = stripCount * kStatusMemberAvatarSize;
-    final nameColMax =
-        (maxWidth - (others.isEmpty ? 0 : stripWidth + gap)).clamp(0.0, maxWidth);
+    final slotWidth = others.isEmpty
+        ? avatarMin
+        : stripCount * kStatusMemberAvatarSize;
+    final nameColMax = (maxWidth - slotWidth - gap).clamp(0.0, maxWidth);
 
     // 第一行：有名字显示名字（点了改名）；没名字显示编辑图标（点了起名）。
     // 名字也做成**可点胶囊**（老板 2026-10-09）：悬浮/按住变色，与状态条其他
@@ -1753,36 +1761,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       maxLines: 1,
     );
 
-    // 头像条：有人加入时做成**可点胶囊**（点开「我的同伴」弹层）。
-    // **只包头像条**，不含右边的群名/人数（老板 2026-10-09）：群名已可单独单击改名，
-    // 人数/群名就不该再落进"我的同伴"的可点区。
+    // 头像位：有人加入 = 成员头像条；还没人加入 = **群组头像占位**（老板
+    // 2026-10-09）——图标与菜单「我的同伴」行的 `groups_outlined` 同款，尺寸同
+    // 成员头像（40），圆底用性别未知的中性灰（`_genderTint('')`，与「待加入」
+    // 卡片同源）。**两者都可点**，都开「我的同伴」弹层（老板追加）。
+    // **只包头像位**，不含右边的群名/人数：群名已可单独单击改名，人数/群名
+    // 就不该再落进"我的同伴"的可点区。
     // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
-    // 头像条与右方头像同高（40）上下顶满胶囊、**左缘贴边**（`_buildPeerStatus`
+    // 头像位与右方头像同高（40）上下顶满胶囊、**左缘贴边**（`_buildPeerStatus`
     // 的群空间 `pad.left` 已是 0，不再需要早先"推离 10 再左移 10"的补偿——
     // 那个 Transform 只挪绘制不挪布局槽，胶囊收窄到只包头像条后会把头像与
-    // 群名之间的**视觉**间距撑大 10px，老板 2026-10-09 实测）。没有人加入
-    // （others 空）时没有头像条。
-    final Widget avatarCapsule = others.isEmpty
-        ? const SizedBox.shrink()
-        : Material(
-            color: Colors.transparent,
-            shape: const StadiumBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(mouseCursor: SystemMouseCursors.click,
-              onTap: _showMembersSheet,
-              hoverColor: Colors.black.withValues(alpha: 0.05),
-              highlightColor: Colors.black.withValues(alpha: 0.08),
-              child: _avatarStrip(others, avatarBudget),
-            ),
-          );
+    // 群名之间的**视觉**间距撑大 10px，老板 2026-10-09 实测）。
+    final Widget avatarSlot = Material(
+      color: Colors.transparent,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(mouseCursor: SystemMouseCursors.click,
+        onTap: _showMembersSheet,
+        hoverColor: Colors.black.withValues(alpha: 0.05),
+        highlightColor: Colors.black.withValues(alpha: 0.08),
+        child: others.isEmpty
+            ? SizedBox(
+                width: kStatusMemberAvatarSize,
+                height: kStatusMemberAvatarSize,
+                child: CircleAvatar(
+                  backgroundColor: _genderTint(''),
+                  child: const Icon(Icons.groups_outlined, size: 22),
+                ),
+              )
+            : _avatarStrip(others, avatarBudget),
+      ),
+    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (others.isNotEmpty) ...[
-          avatarCapsule,
-          const SizedBox(width: gap),
-        ],
+        avatarSlot,
+        const SizedBox(width: gap),
         ConstrainedBox(
           constraints: BoxConstraints(maxWidth: nameColMax),
           child: Column(
