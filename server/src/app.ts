@@ -15,6 +15,7 @@ import {
 import { postMessage, syncMessages } from './messages.js'
 import { getReceipts, postReceipts, unreadCount } from './receipts.js'
 import {
+  attachmentMetaByMessage,
   getAttachmentBlob,
   storeAttachment,
   cleanupOrphanAttachments
@@ -505,6 +506,14 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // H1：附件 blob 上限（默认 64 MiB，EINZ_MAX_ATTACHMENT_BYTES 可覆盖）
     const blob = await readBody(req, MAX_ATTACHMENT_BYTES)
     sendJson(res, 200, storeAttachment(token, meta as never, blob))
+    return
+  }
+  // 按 message_id 查附件元数据（接收端自愈用，2026-10-09）：必须放在下方
+  // /attachments/:id 通配之前——否则 "by-message" 会被当成 attachment_id 去取 blob
+  if (method === 'GET' && path === '/attachments/by-message') {
+    const token = bearerToken(req)
+    const qs = new URL(req.url ?? '', 'http://localhost').searchParams.get('message_id') ?? ''
+    sendJson(res, 200, attachmentMetaByMessage(token, qs))
     return
   }
   const attMatch = path.match(/^\/attachments\/([^/]+)$/)

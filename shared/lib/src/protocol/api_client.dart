@@ -446,6 +446,17 @@ class ApiClient {
     });
   }
 
+  /// 按 message_id 取附件元数据（接收端自愈用，2026-10-09）：
+  /// sync 竞态漏掉的附件行事后补拉。服务端无对应附件行 → 404（[ApiException]
+  /// httpStatus=404）——调用方据此区分「服务端真没有」与「还没建好」，
+  /// 决定放弃重试还是继续。
+  Future<Map<String, dynamic>> attachmentMetaByMessage(
+      String messageId, String token) async {
+    final res = await _get('${Api.attachments}/by-message?message_id=$messageId',
+        token: token);
+    return res;
+  }
+
   Future<({List<MessageEnvelope> messages, List<Map<String, dynamic>> attachmentsMeta, int lastSequence, bool hasMore})> sync(
     String token, {
     int after = 0,

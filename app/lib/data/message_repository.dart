@@ -383,6 +383,11 @@ class MessageRepository {
               blob: enc.cipher,
               token: tok,
             ));
+        // blob 已上传 → 标记（方案2 防孤儿，2026-10-09）：补发路径据此判断
+        // 要不要补传 blob；见 [_ensureAttachmentUploaded]
+        await (db.update(db.localAttachments)
+              ..where((a) => a.attachmentId.equals(attachmentId)))
+            .write(LocalAttachmentsCompanion(status: const Value('uploaded')));
         // 5) 发消息
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
@@ -468,6 +473,29 @@ class MessageRepository {
       // 网络抖动忽略，下次 sync 再拉
     }
     return added;
+  }
+
+  /// 自愈某条消息缺失的附件元数据（接收端 sync 竞态修复，2026-10-09）。
+  ///
+  /// 背景：两阶段上传下服务端附件行偶尔**晚于**消息行建好约 1~2 秒；若接收端
+  /// 恰好在这个窗口内 sync，消息行已落库而附件行还没建 → 永久漏拉（anchor 已
+  /// 越过该 seq，不会再回拉），该消息 UI 显示"无附件"。此方法按 messageId 向
+  /// 服务端补拉附件元数据并插入本地库。
+  ///
+  /// 返回值：true=补到了（UI 可刷新）；false=服务端 404（**确认**没有，停止重试，
+  /// 如超大附件被拒的孤儿消息）。网络/认证异常上抛由调用方决定（保留重试机会）。
+  Future<bool> healAttachmentMeta(HistoryMessage m) async {
+    final t = token;
+    if (t == null) return false;
+    Map<String, dynamic> meta;
+    try {
+      meta = await api.attachmentMetaByMessage(m.env.messageId, t);
+    } on ApiException catch (e) {
+      if (e.httpStatus == 404) return false; // 服务端确认没有 → 别再试
+      rethrow;
+    }
+    await _insertAttachmentMeta(meta);
+    return true;
   }
 
   /// 上报自己的送达/已读高水位（服务端只前进；本端也应只在前进时调用）。
@@ -571,6 +599,13 @@ class MessageRepository {
       final env = MessageEnvelope.fromJson(jsonDecode(row.ciphertext) as Map<String, dynamic>);
       _pendingUploads.add(row.messageId);
       try {
+        // 防孤儿（2026-10-09）：附件消息必须先确保 blob 在服务端，再发消息。
+        // blob 上传失败（含超限 413 这类明确拒绝）→ 这条本轮不发，避免服务端
+        // 收下一条永远没有附件的消息（接收端只能看到 🎬📎 文件名兜底行）。
+        if (_isAttachmentType(env.type)) {
+          final ok = await _ensureAttachmentUploaded(env.messageId);
+          if (!ok) continue;
+        }
         final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
         await _markSent(env.messageId, result.serverSequence, result.createdAt);
         flushed++;
@@ -581,6 +616,51 @@ class MessageRepository {
       }
     }
     return flushed;
+  }
+
+  /// 附件类消息的 env.type（与 sendAttachment 的 type 参数同域）。
+  static bool _isAttachmentType(String type) =>
+      type == 'image' || type == 'video' || type == 'voice' || type == 'audio' || type == 'file';
+
+  /// 确保某条附件消息的 blob 已上传到服务端（方案2 防孤儿，2026-10-09）。
+  ///
+  /// 查本地附件行 status：uploaded → 直接 true；pending → 用本地密文副本
+  /// （local_cipher，发送端必有）补传——服务端按 attachment_id 幂等，重复上传
+  /// 安全；无副本或补传被服务端明确拒绝（如超 64MB 上限 413，重试也无望）→
+  /// false，并把消息标 failed（用户点按重发时再走同一闸门）。
+  Future<bool> _ensureAttachmentUploaded(String messageId) async {
+    final att = await (db.select(db.localAttachments)
+          ..where((a) => a.messageId.equals(messageId)))
+        .getSingleOrNull();
+    if (att == null) return false; // 无附件行的"附件消息"：数据残缺，别发孤儿
+    if (att.status == 'uploaded') return true;
+    final cipher = att.localCipher;
+    if (cipher == null) return false;
+    final t = token;
+    if (t == null) return false;
+    try {
+      await _withAutoAuth((tok) => api.postAttachment(
+            messageId: messageId,
+            attachmentId: att.attachmentId,
+            keyVersion: att.keyVersion,
+            size: att.size,
+            sha256: att.sha256,
+            nonce: att.nonce,
+            blob: cipher,
+            token: tok,
+          ));
+    } on ApiException catch (e) {
+      if (_isServerRejection(e)) {
+        // 明确拒绝（超限/元数据不合法）：重试无望，标 failed 让用户看到，
+        // 且**绝不**再把消息发出去（否则就是 seq21 那种孤儿）
+        await _setStatus(messageId, 'failed');
+      }
+      return false;
+    }
+    await (db.update(db.localAttachments)
+          ..where((a) => a.attachmentId.equals(att.attachmentId)))
+        .write(LocalAttachmentsCompanion(status: const Value('uploaded')));
+    return true;
   }
 
   /// 对账：把"服务端早已收下（serverSequence 非空）却停在 failed"的行置回 sent。
@@ -958,6 +1038,12 @@ class MessageRepository {
     });
     _pendingUploads.add(messageId);
     try {
+      // 防孤儿（2026-10-09）：与 _flushPending 同一闸门——blob 不在服务端先补传；
+      // 补传被明确拒绝（超限等）→ 标 failed，绝不发消息本体
+      if (_isAttachmentType(env.type)) {
+        final ok = await _ensureAttachmentUploaded(messageId);
+        if (!ok) return;
+      }
       final result = await _withAutoAuth((tok) => api.postMessage(env, tok));
       await _markSent(env.messageId, result.serverSequence, result.createdAt);
     } on Exception catch (e) {

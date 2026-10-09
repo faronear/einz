@@ -279,6 +279,60 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 若仍每 3s 发一轮会并发堆积 → 必须重入保护 + 退避。
   int _consecutiveSyncFailures = 0;
 
+  /// 附件元数据自愈（2026-10-09）：sync 竞态下个别消息的附件行被永久漏拉
+  /// （服务端后建附件行、anchor 已越过消息 seq）。`_healAttachments` 每轮
+  /// sync 后补拉缺附件的媒体消息。[kHealAttachmentMaxRetries] 次失败（网络抖动
+  /// 累计）后放弃该条；404（服务端**确认**没有，如超大附件被拒的孤儿）立即放弃。
+  static const int _kHealAttachmentMaxRetries = 5;
+
+  /// 每条消息的自愈尝试计数：网络失败 +1；404 直接置满（确定结论，别再问）。
+  final Map<String, int> _healAttempts = {};
+
+  /// 自愈重入保护：ticker 每 3s 一次 unawaited，单条补拉慢（弱网）时会叠轮。
+  bool _healInFlight = false;
+
+  /// 自愈一批缺附件的媒体消息（每轮 sync 后调用）。修好的触发一次刷新。
+  Future<void> _healAttachments() async {
+    if (_healInFlight || _wiped || _repo.token == null) return;
+    final missing = [
+      for (final m in _messages)
+        if (!m.deleted &&
+            m.attachment == null &&
+            // 只补"服务端已收下"的：自己发的 pending/failed（seq=null）本地必有
+            // 附件行，缺了是别的问题，补拉也问不到
+            m.env.serverSequence != null &&
+            (_healAttempts[m.env.messageId] ?? 0) < _kHealAttachmentMaxRetries &&
+            _isMediaLike(m.env.type))
+          m,
+    ];
+    if (missing.isEmpty) return;
+    _healInFlight = true;
+    try {
+      var fixed = false;
+      for (final m in missing) {
+        try {
+          if (await _repo.healAttachmentMeta(m)) {
+            fixed = true; // 补到了；计数清零不再动它
+          } else {
+            // 404：服务端确认没有 → 立即放弃这条（置满计数），继续修其它
+            _healAttempts[m.env.messageId] = _kHealAttachmentMaxRetries;
+          }
+        } on Exception {
+          // 网络/认证抖动：计数+1，留给下轮（到上限自然放弃）
+          _healAttempts[m.env.messageId] =
+              (_healAttempts[m.env.messageId] ?? 0) + 1;
+        }
+      }
+      if (fixed && mounted) await _refreshLocal();
+    } finally {
+      _healInFlight = false;
+    }
+  }
+
+  /// 媒体类消息（缺附件元数据时才有自愈意义；文本/系统消息本就无附件）。
+  bool _isMediaLike(String type) =>
+      type == 'image' || type == 'video' || type == 'audio' || type == 'file';
+
   /// 服务器不认这条通道（认证 403 `FORBIDDEN`：后台库被重置 / 本通道未登记）。
   /// **只警告，绝不销毁本地数据**（老板 2026-09-16：运维失误不该导致客户端抹数据）——
   /// 与"通道被明确撤销"（403 `ENTRANCE_REVOKED` / `entrance.revoked` 帧）严格区分：
@@ -4843,6 +4897,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // 同步时顺带拉了对方回执（repo.sync 内）→ 载入渲染缓存
       await _loadPeerReceipts();
       await _refreshLocal(realtime: realtime);
+      // 自愈：sync 竞态漏掉的附件元数据（2026-10-09）——补拉后触发刷新
+      unawaited(_healAttachments());
       _onSyncSucceeded();
     } catch (_) {
       // 网络抖动忽略，下次轮询重试（并按连续失败次数退避）
@@ -6264,12 +6320,43 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   // ---------- 视频：下载解密 → 临时文件 → video_player 播放 ----------
 
+  /// 附件元数据缺失的媒体消息兜底 UI（2026-10-09）：明确的「附件不可用 ·
+  /// 点按重试」，替代此前的 `🎬/📎 文件名` 乱码行（两个 emoji：iOS 渲染成
+  /// 豆腐块、Android 看着像"视频+别针"，都不是真媒体观感）。
+  /// 点按 = 清媒体缓存 + 立即触发一次附件元数据自愈（服务端有数据的话，
+  /// 一轮 sync 周期内自动修复；确认没有的（孤儿）保持本行）。
+  Widget _attachmentUnusable(HistoryMessage m) {
+    final l10n = AppLocalizations.of(context)!;
+    return Clickable(
+      onTap: () {
+        _retryAttachment(m);
+        unawaited(_healAttachments());
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.broken_image_outlined, size: 16),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              '${l10n.chatPageAttachmentUnusable} · ${l10n.chatPageAttachmentRetry}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 视频消息：内联预览（首帧 + 播放按钮），点击全屏播放；发送端本地密文
   /// 即时显示、接收端服务端拉取（老板 2026-09-11：改回直接显示）。
   Widget _buildVideo(
       HistoryMessage m) {
     final att = m.attachment;
-    if (att == null) return Text('🎬 ${m.plaintext}');
+    // 附件元数据缺失（sync 竞态漏拉/超大被拒的孤儿）：不再是 `🎬 📎 文件名`
+    // 那行乱码（两个 emoji 渲染差异 + 假"视频"观感）——明确「不可用 + 点按重试」
+    // （2026-10-09）。重试 = 清缓存 + 触发附件元数据自愈
+    if (att == null) return _attachmentUnusable(m);
     return FutureBuilder<Uint8List>(
       future: _videoBytes(m),
       builder: (context, snap) {
@@ -6468,7 +6555,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildImage(
       HistoryMessage m) {
     final att = m.attachment;
-    if (att == null) return Text('📷 ${m.plaintext}');
+    if (att == null) return _attachmentUnusable(m);
     return FutureBuilder<Uint8List>(
       future: _imageBytes(m),
       builder: (context, snap) {
@@ -6798,6 +6885,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       {required double waveformWidth,
       required Color foreground,
       required bool tappable}) {
+    // 附件元数据缺失（sync 竞态漏拉）：波形条是"假"的（按 messageId 画的装饰），
+    // 会误导成可播放——改显示统一的「不可用·重试」行（2026-10-09）
+    if (m.attachment == null) return _attachmentUnusable(m);
     final playing = _playingMessageId == m.env.messageId;
     final seconds = _audioDurationSeconds(m);
     final isVoice = m.env.type == 'voice';

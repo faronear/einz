@@ -162,6 +162,24 @@ export function attachmentsForMessages(messageIds: string[]): AttachmentMeta[] {
     .all(...messageIds) as AttachmentMeta[];
 }
 
+/** 按 message_id 取单条附件元数据（GET /attachments/by-message，供接收端自愈）。
+ *  无对应附件行（服务端就没有、或消息本身无附件）抛 404 NOT_FOUND——客户端据此
+ *  区分「真没有」与「还没建好」，决定停止或继续重试（2026-10-09 接收端竞态修复）。
+ *  鉴权 + 空间归属校验与 [getAttachmentBlob] 同口径（不向非成员确认存在性）。 */
+export function attachmentMetaByMessage(token: string, messageId: string): AttachmentMeta {
+  const { entrance_id, space_id } = requireSession(token);
+  touchLastSeen(entrance_id);
+  assertSafeId(messageId, "message_id");
+  const row = getDb()
+    .prepare(
+      `SELECT attachment_id, message_id, key_version, size, sha256, nonce, storage_path, created_at
+       FROM attachments WHERE message_id = ? AND space_id = ?`
+    )
+    .get(messageId, space_id) as AttachmentMeta | undefined;
+  if (!row) throw new ApiError("NOT_FOUND", "attachment not found", 404);
+  return row;
+}
+
 /** 孤儿附件窗口：两阶段上传（先 blob 后 message，PROTOCOL.md §6.1）正常间隔毫秒级，
  *  超过该窗口仍无对应 message 的 blob 视为孤儿（blob 已传但消息未发出/发送失败）。 */
 const ORPHAN_WINDOW_MS = 10 * 60 * 1000;
