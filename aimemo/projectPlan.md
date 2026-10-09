@@ -143,3 +143,4 @@
 - [x] 备份与恢复（模型 A：本地加密备份 + 恢复码，shared backup.dart + CLI backup/restore）
 - [x] 安全测试 / 离线 / 网络故障 / 服务重启测试（phase4_e2e.sh 段 C/D/E/F 全过）
 - [x] Server 备份脚本（SQLite Backup API）与恢复演练（npm run backup/restore，演练通过）
+- [x] 附件元数据自愈 + 发送端防孤儿（2026-10-09）：修复「macOS 发 .mov 在 iOS/Android 显示 🎬📎 文件名乱码、长按无保存」——根因接收端缺 local_attachments 行，两成因：① 服务端附件行晚于消息行约1-2s建成，接收端恰在此窗口 sync 永久漏拉（anchor 已越过）→ 新增 GET /attachments/by-message + repo.healAttachmentMeta + ChatPage 每轮 sync 后 _healAttachments（404 立即放弃/网络失败计数上限/重入保护）；② 超大附件（>64MB 413）blob 上传失败仍发消息本体 → 孤儿消息（数据不可恢复）→ _flushPending/retryMessage 发消息前先 _ensureAttachmentUploaded 补传（服务端幂等），明确拒绝标 failed 绝不发孤儿；兜底UI：attachment==null 媒体气泡改「附件不可用·点按重试」（_attachmentUnusable，替代乱码行）。验证：tsc 过/新端点四语义实测（200+meta/404/404/400）/repository+store 30 测试过/analyze 无告警；提交 c4f4f85。注：l10n 两键（chatPageAttachmentUnusable/Retry）被 c89670f（另一会话）提前带入库

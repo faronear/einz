@@ -13479,3 +13479,71 @@ gen-l10n 重生成，测试 10 例全绿。
 判离线」与实现口径（`myWsOnline` 只作用于本机行，其它设备按服务端 connected_at）
 不一致；按方案 A 修测试（`myOtherOnlineSince` 期望 `{'mine2': now}`），
 shared 67 用例全绿。commit `28acc89`。
+
+
+## 2026-10-09 头像全屏与气泡顶栏 UI 系列（老板逐项验收）
+
+**头像全屏（状态条点开的大图）：**
+- 气泡消息旁「我的头像」全屏补「保存」按钮（此前只有对方头像有）；
+- 底部统一「保存」（本人/对方一致，与图片/视频全屏口径同），本人的
+  「更换头像」从底部移到**顶部居中**（原 FilledButton 样式不变——中途曾
+  改成白色图标按钮被老板打回），关闭键独立浮右上角；三个迭代提交已
+  squash 为 `d055221`；
+- 过程失误两次：整文件 `git add` 把老板在途的胶囊改动裹进提交（两次都
+  在提交前 diff 复核发现，`git apply --cached` 按 hunk 拆出重做）。
+  已录长期记忆：提交前必须核对 hunk 归属。
+
+**气泡顶栏快捷图标加大（手机点按）：**
+- 时间行控件统一高度 20→28（引用/拷贝/保存圆钮与沙漏胶囊同步）、
+  图标 12→16（拷贝 15/沙漏 14 光学对齐）、时间戳 11→12；
+- 沙漏图标默认 size=11 写死未跟随，单独修（气泡两处传 size:14）；
+- 焚毁时刻文字老板对比后定稿保持 11。commit `6505260`。
+
+**gitignore：** android/.kotlin（Kotlin 2.0+ 本机缓存）补入。`47041f8`。
+
+**安卓构建（boot2run 失败）根因：** ~/.gradle/init.gradle 补齐阿里云镜像
+注入——desktop_drop 等旧插件自带 `buildscript{google()}`、gal 等各自
+`allprojects{google()}` 都绕过 settings 配置直连 dl.google.com 超时。
+镜像只在本机用户级 init.gradle，不进 git（老板要求仓库保持通用）。
+之后 `flutter run -d emulator-5554` 装上模拟器。
+
+
+## 2026-10-09 附件元数据自愈 + 发送端防孤儿（.mov 乱码根因修复）
+
+**现象：** macOS 发的 IMG_7096.MOV 在 iOS 显示「两个豆腐块+文件名」、
+Android 显示「视频摄像机+别针+文件名」，长按弹层无「保存」；同屏另一
+视频正常。老板提供本地测试口令并授权自行解密。
+
+**定位（未走解密，三库比对定案）：** `_buildVideo` 的 `att==null` 兜底
+`Text('🎬 ${m.plaintext}')`，而明文兜底是 `📎 文件名` → 拼出行内两个
+emoji（Android 有字形/iOS 豆腐块）；长按预览的"视频"是取帧失败的摄像机
+占位；无「保存」因 `m.attachment==null`。根因=接收端 `local_attachments`
+缺行，翻 macOS/iOS/server 三份 sqlite 锁定**两个独立成因**：
+1. seq24（49MB）：服务端 attachments.created_at 晚于 messages 约 1.2s
+   （两阶段上传的窗口），iOS 恰在此窗口 sync → 消息行落库、附件行没拉到，
+   anchor 推进后永久漏拉（服务端数据完好，可自愈）；
+2. seq21（102.8MB > 64MB 上限）：blob 上传 413 失败但消息行仍发出 →
+   服务端孤儿消息，附件数据已丢（不可恢复）。
+
+**修复（commit `c4f4f85`，方案1+2+3 全做）：**
+- 服务端新增 `GET /attachments/by-message?message_id=`（鉴权+空间归属
+  校验同 getAttachmentBlob；无附件行 404；非法字符 400）；
+- shared ApiClient 加 `attachmentMetaByMessage`；repo 加 `healAttachmentMeta`
+  （404 → false 确认没有；其余异常上抛）；
+- ChatPage 每轮 sync 后 `_healAttachments`：补拉缺附件的媒体消息（仅
+  serverSequence 非空的；404 置满计数立即放弃、网络失败计数到 5 放弃、
+  `_healInFlight` 重入保护）——接手时这版逻辑有三处 bug（`_healAttempts
+  [key]!` 空指针崩溃、404 break 错位导致后续消息被跳过、无重入保护），
+  换模型后逐一修正；
+- 防孤儿：`local_attachments.status`（pending|uploaded|downloaded，此前
+  从未写入）启用为 blob 上传标记；`_flushPending`/`retryMessage` 发消息
+  前先 `_ensureAttachmentUploaded` 补传（服务端按 attachment_id 幂等）；
+  明确拒绝（413 等）标 failed **绝不发消息本体**；
+- 兜底 UI `_attachmentUnusable`：媒体气泡 att==null 时显示
+  「附件不可用 · 点按重试」（新 l10n 键×2，被另一会话 c89670f 提前带入
+  库），替代乱码行；点按清缓存+触发自愈；image/video/audioBar 三处接入。
+
+**验证：** server tsc 过；新端点四语义实测（200+完整meta / 404孤儿 /
+404文本 / 400非法字符，dev 会话 token 造哈希行后 curl）；repository+
+attachment_store 30 测试全绿；flutter analyze 无告警；三端热重载。
+seq21 那条数据已丢只待焚毁/删除；seq24 类历史漏拉下一轮 sync 即自愈。
