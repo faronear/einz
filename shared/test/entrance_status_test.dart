@@ -134,9 +134,9 @@ void main() {
       ];
       final s = summarizeEntrances(rows,
           myEntranceId: 'me', myMemberId: 'm1', myWsOnline: false);
-      // 本机 WS 断开：自己的在线通道都不算在线
+      // 本机 WS 断开：只影响本机那一行；我的其它设备按服务端判定（mine2 在线）
       expect(s.myOtherTotal, 1);
-      expect(s.myOtherOnlineSince, isEmpty);
+      expect(s.myOtherOnlineSince, {'mine2': now});
       expect(s.peerOnlineCount, 1);
       expect(s.peerActiveTotal, 2);
       expect(s.peerOnlineSince, {'p1': now});
