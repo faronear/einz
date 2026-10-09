@@ -531,6 +531,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageRenameNameLabel => 'Name';
 
   @override
+  String get chatPageGroupNameTitle => 'Group name';
+
+  @override
+  String get chatPageGroupNameLabel => 'Name';
+
+  @override
   String get chatPageGenderLabel => 'Gender';
 
   @override
@@ -774,7 +780,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPagePassphraseHide => 'Hide';
 
   @override
-  String get chatPageMembersInviteNew => 'Invite new companion';
+  String get chatPageMembersInviteNew => 'Invite a new companion';
 
   @override
   String chatPageMembersFullWithMax(int current, int max) {
@@ -815,7 +821,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageNotifyHint =>
-      'If you have new messages and haven\'t been online for a while, a notification email will be sent here. Alert emails never contain message text.';
+      'If you have new messages and haven\'t been online for a while, a notification will be sent to your email address.';
 
   @override
   String get chatPageNotifyAllSpaces =>
@@ -842,7 +848,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageNotifyStatePending =>
-      'A confirmation email is on its way — alerts start once you open the link in it. Come back to the app and this updates on its own.';
+      'A confirmation email is on its way. Please check your email and open the link in it to allowzba email alerts.';
 
   @override
   String chatPageNotifySent(String email) {
@@ -1179,7 +1185,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceListEmpty => 'No spaces joined yet';
 
   @override
-  String get spaceListAdd => 'Add a space';
+  String get spaceListAdd => 'Add another space';
 
   @override
   String get spaceListSwitch => 'My Einz spaces';

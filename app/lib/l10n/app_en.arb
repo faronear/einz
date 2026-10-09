@@ -245,6 +245,8 @@
   "chatPageMenuMore": "Menu",
   "chatPageRenameNameTitle": "My identity",
   "chatPageRenameNameLabel": "Name",
+  "chatPageGroupNameTitle": "Group name",
+  "chatPageGroupNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",
   "chatPageRenameEntranceHint": "Rename the current entrance, up to 32 characters",
@@ -366,7 +368,7 @@
   "chatPagePassphraseFieldHint": "Shared passphrase",
   "chatPagePassphraseShow": "Show",
   "chatPagePassphraseHide": "Hide",
-  "chatPageMembersInviteNew": "Invite new companion",
+  "chatPageMembersInviteNew": "Invite a new companion",
   "chatPageMembersFullWithMax": "Space is full ({current}/{max})",
   "@chatPageMembersFullWithMax": {
     "placeholders": {
@@ -388,7 +390,7 @@
   "chatPagePinSetValue": "Set",
   "chatPageNotifyLabel": "My email alerts",
   "chatPageNotifyTitle": "My email alerts",
-  "chatPageNotifyHint": "If you have new messages and haven't been online for a while, a notification email will be sent here. Alert emails never contain message text.",
+  "chatPageNotifyHint": "If you have new messages and haven't been online for a while, a notification will be sent to your email address.",
   "chatPageNotifyAllSpaces": "Apply this setting to all spaces on this device.",
   "chatPageNotifyEmailLabel": "Email",
   "chatPageNotifyEmptyError": "Enter an email address first",
@@ -396,7 +398,7 @@
   "chatPageNotifyOnValue": "On",
   "chatPageNotifyPendingValue": "Waiting confirm",
   "chatPageNotifyOffValue": "Off",
-  "chatPageNotifyStatePending": "A confirmation email is on its way — alerts start once you open the link in it. Come back to the app and this updates on its own.",
+  "chatPageNotifyStatePending": "A confirmation email is on its way. Please check your email and open the link in it to allowzba email alerts.",
   "chatPageNotifySent": "Confirmation sent to {email}. Open the link in it to turn alerts on.",
   "@chatPageNotifySent": {
     "placeholders": {
@@ -624,7 +626,7 @@
   "spaceListHint": "Tap another space to switch to it",
   "spaceListTitle": "My Einz spaces",
   "spaceListEmpty": "No spaces joined yet",
-  "spaceListAdd": "Add a space",
+  "spaceListAdd": "Add another space",
   "spaceListSwitch": "My Einz spaces",
   "promptLockCodeTitle": "Enter your PIN",
   "promptLockCodeHint": "Verify this device's lock screen code first",

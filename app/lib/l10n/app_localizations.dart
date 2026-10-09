@@ -980,6 +980,18 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get chatPageRenameNameLabel;
 
+  /// No description provided for @chatPageGroupNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get chatPageGroupNameTitle;
+
+  /// No description provided for @chatPageGroupNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get chatPageGroupNameLabel;
+
   /// No description provided for @chatPageGenderLabel.
   ///
   /// In en, this message translates to:
@@ -1355,7 +1367,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMembersInviteNew.
   ///
   /// In en, this message translates to:
-  /// **'Invite new companion'**
+  /// **'Invite a new companion'**
   String get chatPageMembersInviteNew;
 
   /// No description provided for @chatPageMembersFullWithMax.
@@ -1427,7 +1439,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyHint.
   ///
   /// In en, this message translates to:
-  /// **'If you have new messages and haven\'t been online for a while, a notification email will be sent here. Alert emails never contain message text.'**
+  /// **'If you have new messages and haven\'t been online for a while, a notification will be sent to your email address.'**
   String get chatPageNotifyHint;
 
   /// No description provided for @chatPageNotifyAllSpaces.
@@ -1475,7 +1487,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageNotifyStatePending.
   ///
   /// In en, this message translates to:
-  /// **'A confirmation email is on its way — alerts start once you open the link in it. Come back to the app and this updates on its own.'**
+  /// **'A confirmation email is on its way. Please check your email and open the link in it to allowzba email alerts.'**
   String get chatPageNotifyStatePending;
 
   /// No description provided for @chatPageNotifySent.
@@ -2045,7 +2057,7 @@ abstract class AppLocalizations {
   /// No description provided for @spaceListAdd.
   ///
   /// In en, this message translates to:
-  /// **'Add a space'**
+  /// **'Add another space'**
   String get spaceListAdd;
 
   /// No description provided for @spaceListSwitch.

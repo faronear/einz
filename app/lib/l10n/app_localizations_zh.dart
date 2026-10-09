@@ -492,6 +492,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageRenameNameLabel => '名字';
 
   @override
+  String get chatPageGroupNameTitle => '群组名字';
+
+  @override
+  String get chatPageGroupNameLabel => '名字';
+
+  @override
   String get chatPageGenderLabel => '性别';
 
   @override
@@ -748,7 +754,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageNotifyTitle => '我的邮件通知';
 
   @override
-  String get chatPageNotifyHint => '你长时间不在线时，如果有新消息，这个邮箱会收到一封提醒。提醒邮件里不会有消息内容。';
+  String get chatPageNotifyHint => '你长时间不在线时，如果有新消息，你的邮箱会收到一封提醒。';
 
   @override
   String get chatPageNotifyAllSpaces => '应用于本机所有秘境。';
@@ -772,8 +778,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageNotifyOffValue => '已关闭';
 
   @override
-  String get chatPageNotifyStatePending =>
-      '已经发了一封确认邮件，点邮件里的链接才会生效。生效后回到 App 会自动更新，不用重启。';
+  String get chatPageNotifyStatePending => '一封确认邮件已发往您的邮箱，点击邮件里的链接即可生效。';
 
   @override
   String chatPageNotifySent(String email) {
@@ -1101,7 +1106,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceListEmpty => '还没有加入任何秘境';
 
   @override
-  String get spaceListAdd => '添加秘境';
+  String get spaceListAdd => '添加另一个秘境';
 
   @override
   String get spaceListSwitch => '我的秘境';
