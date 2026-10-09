@@ -1483,13 +1483,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   /// 全屏看头像大图（点状态条上的头像触发）。
   ///
-  /// [allowReplace]：**本人的**头像为 true → 大图底部多一个「更换头像」按钮
-  /// （点了关掉大图再进选图流程）。这样"点头像"这一个动作既能看、也能换，
-  /// 不用再回菜单里找那一项（老板 2026-09-26）。对方的头像不给这个按钮——
-  /// 我们没有权限改别人的头像。
+  /// [allowReplace]：**本人的**头像为 true → 大图顶部（关闭键旁）多一个
+  /// 「更换头像」按钮（点了关掉大图再进选图流程）。这样"点头像"这一个动作
+  /// 既能看、也能换，不用再回菜单里找那一项（老板 2026-09-26）。
+  /// 对方的头像不给这个按钮——我们没有权限改别人的头像。
   ///
-  /// [saveName]：**非本人**头像底部给一个「保存」按钮（老板 2026-10-08），
-  /// 用它作保存的文件名（一般传对方显示名）。本人头像保持「更换头像」不变。
+  /// 底部「保存」按钮（老板 2026-10-09）：**本人/对方头像都给**，与图片/视频
+  /// 全屏口径一致（保存动作用 [saveName] 作文件名，本人头像传自己的显示名）。
   Future<void> _showAvatarFullscreen(Uint8List bytes,
       {bool allowReplace = false, String? saveName}) async {
     await withImmersiveFullscreen(() => showDialog<void>(
@@ -1518,6 +1518,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
+                    // 顶部一行：右上是关闭键；本人的头像再放「更换头像」
+                    // （老板 2026-10-09：底部让位给「保存」，与图片/视频全屏一致；
+                    // 按钮与「保存」同款居中横排，关闭键浮在右上角）
+                    if (allowReplace)
+                      Positioned(
+                        top: 8,
+                        left: 0,
+                        right: 0,
+                        child: SafeArea(
+                          child: Center(
+                            child: FilledButton.icon(
+                              // 先关大图再进选图：不关的话选图弹层会叠在它上面，
+                              // 取消选图后回到一张"已经没意义"的大图（头像还没换）
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                unawaited(_showAvatarUpload());
+                              },
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(
+                                  AppLocalizations.of(ctx)!.chatPageAvatarChange),
+                            ),
+                          ),
+                        ),
+                      ),
+                    // 右上角关闭键（独立一层，「更换头像」居中不挤占它）
                     Positioned(
                       top: 8,
                       right: 8,
@@ -1528,45 +1553,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
-                    if (allowReplace)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 32,
-                        child: Center(
-                          child: FilledButton.icon(
-                            // 先关大图再进选图：不关的话选图弹层会叠在它上面，
-                            // 取消选图后回到一张"已经没意义"的大图（头像还没换）
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              unawaited(_showAvatarUpload());
-                            },
-                            icon: const Icon(Icons.photo_camera_outlined),
-                            label: Text(
-                                AppLocalizations.of(ctx)!.chatPageAvatarChange),
-                          ),
-                        ),
-                      )
-                    else
-                      // 对方头像：底部「保存」（移动端入相册、桌面弹保存对话框）。
-                      // 先关大图再保存——顶部提示是聊天页的覆盖层，压在 Dialog 下面
-                      // 会看不见（与上面「更换头像」同一处置）。
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 32,
-                        child: Center(
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              unawaited(_saveAvatarImage(saveName, bytes));
-                            },
-                            icon: const Icon(Icons.save_alt),
-                            label:
-                                Text(AppLocalizations.of(ctx)!.chatPageActionSave),
-                          ),
+                    // 底部「保存」（移动端入相册、桌面弹保存对话框）。先关大图再
+                    // 保存——顶部提示是聊天页的覆盖层，压在 Dialog 下面会看不见。
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 32,
+                      child: Center(
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            unawaited(_saveAvatarImage(saveName, bytes));
+                          },
+                          icon: const Icon(Icons.save_alt),
+                          label:
+                              Text(AppLocalizations.of(ctx)!.chatPageActionSave),
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -7472,12 +7476,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               bytes: _myAvatarBytes,
                               gender: _myGender,
                               // 空头像：点它没有大图可看 → 直接进换头像流程；
-                              // 有头像：开大图，大图里再给「更换头像」按钮
+                              // 有头像：开大图，顶部「更换头像」+ 底部「保存」
                               onTap: _myAvatarBytes == null
                                   ? () => unawaited(_showAvatarUpload())
                                   : () => unawaited(_showAvatarFullscreen(
                                       _myAvatarBytes!,
-                                      allowReplace: true)),
+                                      allowReplace: true,
+                                      saveName: _myMemberName)),
                             ),
                           ],
                         ),
