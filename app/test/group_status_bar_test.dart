@@ -444,6 +444,37 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
   });
 
+  testWidgets('头像条↔群名的间距 = 我的名字↔我的头像的间距（老板 2026-10-09）',
+      (WidgetTester tester) async {
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _pump(tester, db, 3);
+
+    // 先起个群名，第一行才有名字可量
+    await tester.tap(
+        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
+    await tester.pumpAndSettle();
+    await tester.enterText(_dialogField, 'Crew');
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+
+    final avatars = find.descendant(of: _statusBar, matching: find.byType(CircleAvatar));
+    final stripRight = tester.getRect(avatars.at(2)).right; // 头像条最右那个
+    final groupNameLeft = tester.getRect(
+        find.descendant(of: _statusBar, matching: find.text('Crew'))).left;
+    final myNameRight = tester.getRect(
+        find.descendant(of: _statusBar, matching: find.text('Lukas'))).right;
+    final myAvatarLeft = tester.getRect(avatars.last).left; // 我自己的头像（最右）
+
+    final gapGroup = groupNameLeft - stripRight;
+    final gapMine = myAvatarLeft - myNameRight;
+    expect(gapGroup, closeTo(gapMine, 2),
+        reason: '头像条↔群名的视觉间距应与"我的名字↔我的头像"一致'
+            '（实测 gapGroup=$gapGroup gapMine=$gapMine）');
+    // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
+    await tester.pump(const Duration(milliseconds: 450));
+  });
+
   testWidgets('长群名用到接近中线才省略，整块不溢出（macOS 截图回归）',
       (WidgetTester tester) async {
     // 老板 2026-10-09：群名离状态条一半还很远就被截断。根因是名字列被

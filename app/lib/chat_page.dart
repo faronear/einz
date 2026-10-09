@@ -1644,9 +1644,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // ⚠️ 这个 24 与状态条 Container 的 `margin: fromLTRB(12, 4, 12, 6)` 耦合，
     // 改 margin 要一起改（与 top_notice 那个 46 是同一类耦合）。
     //
-    // 再扣掉 `_buildPeerStatus` 那层 Padding 的**左右各 10**（两处要一起改）——
-    // 只扣左不扣右的话，内容会超出可用宽 10px（实测 RenderFlex overflow 10px）。
-    const leadingPad = 20.0;
+    // 再扣掉 `_buildPeerStatus` 那层 Padding 的**右 10**（两处要一起改；左边距
+    // 是 0——头像条左缘贴边，见 `_buildPeerStatus` 的 pad 注释）——不扣的话
+    // 内容会超出可用宽 10px（实测 RenderFlex overflow 10px）。
+    const leadingPad = 10.0;
     final maxWidth =
         (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad;
 
@@ -1753,22 +1754,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // **只包头像条**，不含右边的群名/人数（老板 2026-10-09）：群名已可单独单击改名，
     // 人数/群名就不该再落进"我的同伴"的可点区。
     // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
-    // 头像条与右方头像同高（40）上下顶满胶囊，**左右也贴边**：外层 `pad.left(10)`
-    // 推离 10，这里左移 10 回到边缘、左内边距 0。没有人加入（others 空）时没有头像条。
+    // 头像条与右方头像同高（40）上下顶满胶囊、**左缘贴边**（`_buildPeerStatus`
+    // 的群空间 `pad.left` 已是 0，不再需要早先"推离 10 再左移 10"的补偿——
+    // 那个 Transform 只挪绘制不挪布局槽，胶囊收窄到只包头像条后会把头像与
+    // 群名之间的**视觉**间距撑大 10px，老板 2026-10-09 实测）。没有人加入
+    // （others 空）时没有头像条。
     final Widget avatarCapsule = others.isEmpty
         ? const SizedBox.shrink()
-        : Transform.translate(
-            offset: const Offset(-10, 0),
-            child: Material(
-              color: Colors.transparent,
-              shape: const StadiumBorder(),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(mouseCursor: SystemMouseCursors.click,
-                onTap: _showMembersSheet,
-                hoverColor: Colors.black.withValues(alpha: 0.05),
-                highlightColor: Colors.black.withValues(alpha: 0.08),
-                child: _avatarStrip(others, avatarBudget),
-              ),
+        : Material(
+            color: Colors.transparent,
+            shape: const StadiumBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(mouseCursor: SystemMouseCursors.click,
+              onTap: _showMembersSheet,
+              hoverColor: Colors.black.withValues(alpha: 0.05),
+              highlightColor: Colors.black.withValues(alpha: 0.08),
+              child: _avatarStrip(others, avatarBudget),
             ),
           );
 
@@ -1948,10 +1949,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 2026-09-26）；右 10 给箭头/右缘留白。行高由头像决定，头像即贴边。
     //
     // **群空间例外**（老板 2026-10-05；2026-10-09 改两行）：左侧摆**成员头像条**
-    // + 右侧两行（群组名字 / 在线·总数），首个头像要离胶囊左缘留白（一排小头像贴着边
-    // 会显得被切掉），整块**竖直居中**（头像比胶囊矮）。
+    // + 右侧两行（群组名字 / 在线·总数），整块**竖直居中**（头像比胶囊矮）。
+    // 左边距与 duo 同为 0（头像条左缘贴边）——2026-10-09 曾改成 left:10 再用
+    // Transform 左移 10 补偿，胶囊收窄到只包头像条后那 10px 会灌进"头像↔群名"
+    // 的视觉间距（比右侧"我的头像↔我的名字"明显宽），已一并收回。
     final pad = _isGroup
-        ? const EdgeInsets.fromLTRB(10, 0, 10, 0)
+        ? const EdgeInsets.fromLTRB(0, 0, 10, 0)
         : const EdgeInsets.fromLTRB(0, 0, 10, 0);
     // 芯片内容**只到箭头为止**（老板 2026-09-25）：「邀请加入」链接在芯片外
     // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
