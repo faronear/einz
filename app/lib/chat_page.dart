@@ -1403,11 +1403,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 别暗示这里能切（老板 2026-09-24 定）。
   bool get _multiSpace => (VaultSession.current?.spaces.length ?? 0) > 1;
 
-  /// 顶栏的「品牌名（+ 下拉箭头）」这一块。
+  /// 顶栏的「品牌名（+ 多空间图标）」这一块。
   ///
-  /// 多空间时整块可点 → 打开「切换我的秘境」弹层，箭头紧贴在标题文字右侧
+  /// 多空间时整块可点 → 打开「切换我的秘境」弹层，图标放在标题文字右侧
   /// （老板 2026-09-28：原先是独立 IconButton，自带的 8px 内边距把箭头推得很远，
-  /// 不像和标题是一体的）。单空间时不画箭头、也不可点（别暗示这里能切）。
+  /// 不像和标题是一体的）。单空间时不画图标、也不可点（别暗示这里能切）。
   Widget _brandTitle() {
     final l10n = AppLocalizations.of(context)!;
     final titleRow = Padding(
@@ -1423,7 +1423,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
           // 颜色继承 AppBar 的 IconTheme（AppBar 给整个 toolbar 套了 IconTheme.merge）
           if (_multiSpace) ...[
-            const SizedBox(width: 2),
+            // 6px：旧小箭头（arrow_drop_down）字形小、图标框自带留白，视觉间隙
+            // 差不多是这个数；换成 dynamic_feed 后字形几乎满框，2px 会紧贴标题
+            // （老板 2026-10-09：不好看，留回小箭头时的间距）。
+            const SizedBox(width: 6),
             // 与汉堡菜单「切换我的秘境」行同款图标（dynamic_feed 多窗口叠加，
             // 表达"多个空间"，老板 2026-09-28 定稿）
             const Icon(Icons.dynamic_feed, size: 20),
