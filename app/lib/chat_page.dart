@@ -7801,11 +7801,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
                       if (_showMessageAvatars && mine) ...[
                         const SizedBox(width: 6),
-                        // 自己的头像大图不给「保存」（老板 2026-10-08：自己的头像不改）
+                        // 自己的头像大图也给「保存」（老板 2026-10-09：与对方头像
+                        // 一致——气泡旁点开的头像只是"查看"，保存动作与"我"无关）
                         _MessageAvatar(
                             memberId: senderMemberId,
                             server: effectiveServer,
-                            api: widget.api),
+                            api: widget.api,
+                            radius: kMessageAvatarDiameter / 2,
+                            onSaveImage: (bytes) => _saveAvatarImage(
+                                _senderNameOf(senderMemberId), bytes)),
                       ],
                     ],
                   ),
