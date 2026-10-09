@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 引导输入规则回归（老板 2026-09-11）
-#   0) create 各必填问答（秘境向导/我的名字/我的性别/伴侣的名字/伴侣的性别）
+#   0) create 各必填问答（秘境向导/我的名字/我的性别/秘境类型）
 #      留空回车 → 必须被**静默拒绝**：不提交、不前进，也**不打印任何提示**
 #      （老板 2026-09-23：早先会打一条「请输入内容」，每按一次回车就把提问往上顶
 #       一行、屏幕跟着跳；提示还在上面、光标还在输入行就够了）
@@ -121,8 +121,7 @@ def main():
             ('秘境向导', 'c\r'),
             ('我的名字', 'Lukas\r'),
             ('我的性别', '1\r'),
-            ('伴侣的名字', 'Alice\r'),
-            ('伴侣的性别', '2\r'),
+            ('秘境类型', '1\r'),  # v3：不再预置同伴——2026-10-08 起改为类型问答，1=双人
         ]
         for i, (expect, payload) in enumerate(steps):
             out = wait_text(m, expect)
@@ -197,8 +196,10 @@ def main():
         req = urllib.request.Request(
             f'http://127.0.0.1:{port}/spaces/{store_a["space_id"]}/join-tokens',
             method='POST',
+            data=json.dumps({'purpose': 'invite'}).encode(),  # B 是开新身份（invite 流才问名字）
             headers={'Authorization': f'Bearer {store_a["session_token"]}',
-                     'X-Protocol-Version': '2'})
+                     'Content-Type': 'application/json',
+                     'X-Protocol-Version': '3'})
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
                 join_token = json.load(r)['joinToken']
@@ -212,7 +213,8 @@ def main():
         b_steps = [
             ('秘境向导', 'j\r'),
             ('输入通道码', join_token + '\r'),
-            ('完整输入你的名字', 'Alice\r'),
+            ('你的名字', 'Alice\r'),
+            ('你的性别', '2\r'),
         ]
         for i, (expect, payload) in enumerate(b_steps):
             out = wait_text(m2, expect)

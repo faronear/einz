@@ -93,14 +93,13 @@ def start_server(port, db_path):
     raise RuntimeError('server 未就绪')
 
 def onboard(label, store, port, home):
-    """入网全流程：入口 → 我的名字/性别 → 伴侣名字/性别 → 共享口令 → 锁屏码 → 进入聊天态。"""
+    """入网全流程：入口 → 我的名字/性别 → 秘境类型(双人) → 共享口令 → 锁屏码 → 进入聊天态。"""
     m, p = start_tui(store, port, home)
     for expect, payload in [
         ('秘境向导', 'c\r'),
         ('我的名字', f'{label}\r'),
         ('我的性别', '1\r'),
-        ('伴侣的名字', f'{label}-p\r'),
-        ('伴侣的性别', '2\r'),
+        ('秘境类型', '1\r'),  # v3：不再预置同伴——2026-10-08 起改为类型问答，1=双人
     ]:
         out = wait_text(m, expect, timeout=30)
         if expect not in out:
@@ -133,7 +132,7 @@ def http_status(port, method, path, body=None, token=None):
     req = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method)
     req.add_header('Content-Type', 'application/json')
     # 协议版本头是硬校验（PROTOCOL.md §1）：缺头 → 400 PROTOCOL_VERSION_MISMATCH
-    req.add_header('X-Protocol-Version', '2')
+    req.add_header('X-Protocol-Version', '3')
     if token:
         req.add_header('Authorization', f'Bearer {token}')
 
@@ -160,12 +159,14 @@ def http(port, method, path, body=None, token=None):
 def join_revoker(port, store_path):
     """让"另一条通道"从 HTTP 侧加入本空间，返回它的会话（撤销不允许撤自己，需要第三方）。"""
     st = json.load(open(store_path))
-    # 签发加入码要**空间成员会话**（C1 回归后该端点必须带 Bearer；旧版探针漏了 → 401）
+    # 签发加入码要**空间成员会话**（C1 回归后该端点必须带 Bearer；旧版探针漏了 → 401）。
+    # 不传 purpose = attach（target 缺省 = 签发者自己）——进已有身份，服务端按 token
+    # 的 target 自动解析 slot（2026-10-04 收敛后客户端不需要带 slot；带错反而 403）。
     jt = http(port, 'POST', f'/spaces/{st["space_id"]}/join-tokens',
               token=st['session_token'])['joinToken']
     revoker = http(port, 'POST', '/spaces/join', {
         'token': jt, 'public_key': 'pk-revoker',
-        'slot': 1, 'entrance_name': 'revoker'})
+        'entrance_name': 'revoker'})
     return revoker['sessionToken']
 
 def revoke(port, entrance_id, passphrase, token):

@@ -9,7 +9,7 @@
 - **部署形态：** Multiverse 多租户（`spaces` 表 + 动态登记；**一条通道可进多个秘境**，
   见 `docs/GLOSSARY.md` 的术语分层）
 - **架构依据：** `aimemo/productLens.zhcn.md`（Draft v2.0）
-- **最后更新：** 2026-09-22
+- **最后更新：** 2026-10-09
 
 ---
 
@@ -48,8 +48,24 @@
   （凭口令取 Space Key）替代直接传 sealed 文件；配套考察加密 store
 - `[ ]` 文档债：`projectPlan` 之外的旧文档复核（`docs/DATABASE.md`/`PROTOCOL.md` 的
   Draft v0.1 头、`aimemo/upgradeToMultiverse.md` 是否仍与实际一致）
+- `[x]` **3 个 pty E2E 测试 rot 修复**（2026-10-09 完成）：根因=e2421d6 新增「秘境类型」
+  问答 + 预置名机制删除 + 2026-10-04 purpose 收敛（invite=开新身份/attach=进已有身份、
+  attach 不再问名字）+ 协议版本升 3。修复 4 个测试：presence/revoked/revoke_command/
+  guide_input_rules——创建流喂 名字→性别→`1`(双人)→口令；B 加入用 invite token（自填
+  名字/性别）；C/revoker 用 attach token（不问名字，不能带 slot）；对方未加入时左段
+  断言 `○ -`（预置名兜底已删）；全部 X-Protocol-Version: 3。4 个 E2E 全部跑绿。
 - `[ ]` 待定（承接 productLens §16）：消息删除语义 / 已读回执粒度 / 一次性配置形式（归 SETUP.md）
 - `[ ]` 环境依赖项：Android 真机验证、iOS 真机构建签名（待 Apple 付费账号）
+- `[x]` **红绿灯判定统一四态模型**（2026-10-09，commit 8372360）：shared 新增
+  `entrance_status.dart` 唯一实现（行级三态 online/offline/**revoked**、rowSince 时刻口径、
+  MemberPresence.revokedOnly、summarizeEntrances 汇总——**撤销通道不计入 #n/m 总数**）；
+  TUI 标题栏对方灯三态（绿●/灰⊘全撤/红○离线）+ 我的灯 stopped 转灰 + group 名单 ⊘ +
+  `/entrances` ⊘ 标记 + `/status` 文案；App chat_page 六处内联判定收敛到 shared +
+  「我的」灯四态接线（灰=未连接/黄=连接中/绿=已连接/红=断线重连，WsStatus 暴露自
+  ws_realtime_service）。验证：shared/cli analyze+test 全过、app 258 测试全过。
+  **App 通道卡片判定保持纯服务端口径**（`entranceRowState(d)` 不传 myEntranceId——
+  卡片每行灯按服务端 connected_at 走，与合并前一致；"本机以本地 WS 为准"只用在
+  标题栏「我的」灯与 #n/m 计数两处）。
 
 ---
 

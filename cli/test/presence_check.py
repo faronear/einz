@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # 在线状态回归（老板 2026-09-16 实测）：同一身份的第二条通道 ≠ 对方
 #
-#   场景：A 创建空间（Lukas，伴侣 Alice 尚未加入）→ A 的第二条通道 C 用**同一身份**
-#   Lukas 加入 → 两台 TUI 都把尚未加入的对方显示成绿灯在线。
+#   场景：A 创建空间（Lukas，双人）→ A 的第二条通道 C 用**同一身份** Lukas 加入 →
+#   两台 TUI 都把尚未加入的对方显示成绿灯在线。
 #   根因：在线状态按 device 判定、却按 member 展示——同一 member 的新 device 被当成"对方"。
 #
 #   断言（抓 pty 真实渲染的标题栏最后一帧）：
@@ -11,9 +11,8 @@
 #        由 "@通道名" 表示、不参与这对数字——老板 2026-09-16 改版）；
 #     ③ 正控制：真正的第二人 B（Alice）加入后，A/C 显示 "● Alice"（绿灯没被改坏）。
 #
-#   附带覆盖（老板 2026-09-16 修复）：**对方尚未加入**时左段也要显示对方名字——
-#   create 录入的伴侣预置名落盘 store.peer_name 兜底（此前是只读不写的死变量
-#   peerPresetName，恒为 null → 一直显示 '-'）。
+#   注（2026-10-09 适配）：v3 起创建不再预置同伴名字（问答已删）→ 对方未加入时
+#   左段名字回落为 '-'；B 用 invite token 加入时自填名字 Alice。
 #
 # 运行：cd server && npm run build（本用例跑 dist）&& python3 cli/test/presence_check.py
 import fcntl
@@ -165,8 +164,8 @@ def finish_onboarding(master, label):
     sys.exit(1)
 
 
-def join_flow(label, store, port, token, identity):
-    """加入流程：J → 通道码 → 完整名字选身份 → 口令 → 加入成功。"""
+def join_flow(label, store, port, token, identity=None):
+    """加入流程：J → 通道码 → （invite 流：自填名字/性别；attach 流：无）→ 口令 → 加入成功。"""
     master, p = start_tui(store, port)
     if '创建秘境' not in wait_text(master, '创建秘境'):
         print(f'FAIL {label}: 未等到创建/加入选择')
@@ -174,11 +173,16 @@ def join_flow(label, store, port, token, identity):
     send(master, 'J\r')
     wait_text(master, '输入通道码')
     send(master, token + '\r')
-    out = wait_text(master, '完整输入你的名字')
-    if '完整输入你的名字' not in out:
-        print(f'FAIL {label}: 未等到身份选择（加入失败？）:\n{out[-600:]}')
-        sys.exit(1)
-    send(master, identity + '\r')
+    if identity is not None:
+        # invite 流（开新身份）：自填名字 → 性别
+        out = wait_text(master, '你的名字')
+        if '你的名字' not in out:
+            print(f'FAIL {label}: 未等到名字问答（加入失败？）:\n{out[-600:]}')
+            sys.exit(1)
+        send(master, identity + '\r')
+        wait_text(master, '你的性别')
+        send(master, '2\r')  # 女性成员——气泡配色走女性（与旧行为一致）
+    # attach 流（同一身份加通道）不问名字/性别，直接到口令
     wait_text(master, '验证共享口令')
     send(master, PASSPHRASE + '\r')
     if '成功加入秘境' not in wait_text(master, '成功加入秘境'):
@@ -188,15 +192,20 @@ def join_flow(label, store, port, token, identity):
     return master, p
 
 
-def new_join_token(port, store_path):
-    """用空间成员会话签发一次性加入凭证（需 Bearer + 协议版本头）。"""
+def new_join_token(port, store_path, purpose='attach'):
+    """用空间成员会话签发一次性加入凭证（需 Bearer + 协议版本头）。
+
+    purpose='invite' = 开新身份（duo 满 2 人 → 409）；'attach' = 进已有身份
+    （target 缺省 = 签发者自己——同一身份加第二通道用这个）。"""
     with open(store_path) as f:
         store = json.load(f)
     req = urllib.request.Request(
         f'http://127.0.0.1:{port}/spaces/{store["space_id"]}/join-tokens',
         method='POST',
+        data=json.dumps({'purpose': purpose}).encode(),
         headers={'Authorization': 'Bearer ' + store['session_token'],
-                 'X-Protocol-Version': '2'})
+                 'Content-Type': 'application/json',
+                 'X-Protocol-Version': '3'})
     with urllib.request.urlopen(req, timeout=5) as r:
         return json.load(r)['joinToken']
 
@@ -222,7 +231,7 @@ def main():
             print('FAIL: server 未就绪（先在 server/ 跑 npm run build）')
             sys.exit(1)
 
-        # ---------- A：创建空间（我 Lukas / 伴侣 Alice）----------
+        # ---------- A：创建空间（我 Lukas，双人秘境）----------
         store_a = os.path.join(WORK, 'a.json')
         m_a, p_a = start_tui(store_a, port)
         spawned += [p_a]
@@ -234,10 +243,9 @@ def main():
         send(m_a, 'Lukas\r')
         wait_text(m_a, '我的性别')
         send(m_a, '1\r')
-        wait_text(m_a, '伴侣的名字')
-        send(m_a, 'Alice\r')
-        wait_text(m_a, '伴侣的性别')
-        send(m_a, '2\r')
+        # v3：不再预置同伴——改为「秘境类型」问答（2026-10-08 起）
+        wait_text(m_a, '秘境类型')
+        send(m_a, '1\r')  # 1 = 双人秘境
         wait_text(m_a, '设置共享口令')
         send(m_a, PASSPHRASE + '\r')
         if '成功创建秘境' not in wait_text(m_a, '成功创建秘境'):
@@ -247,15 +255,15 @@ def main():
         print('A: 空间创建完成并进入聊天态')
 
         # 基线：只有 A 一条通道 → 右段无 #n/m（我的其它通道 0 台，整段省略）；
-        # 对方未加入 → 左段 "○ Alice"（create 录入的伴侣预置名；member 表里查不到他）
-        text = wait_screen(m_a, lambda t: '○ Alice' in t or '● Alice' in t,
-                           'A 进入稳定态（左段显示对方名字）')
+        # 对方未加入 → 左段 "○ -"（v3 不再预置同伴名，_peerNameOf 回退 '-'）
+        text = wait_screen(m_a, lambda t: '○ -' in t,
+                           'A 进入稳定态（左段显示对方占位）')
         left, _, right = split_bar(title_bar(text))
-        if '● Alice' in left:
+        if '●' in left:
             print('FAIL 基线: A 只有一条通道时对方就显示在线:\n', text[-600:])
             sys.exit(1)
-        if left != '○ Alice':
-            print(f'FAIL 基线: 对方未加入时左段应为「○ Alice」（预置名兜底），实际「{left}」:\n',
+        if not left.startswith('○ -'):
+            print(f'FAIL 基线: 对方未加入时左段应为「○ -」（无预置名兜底），实际「{left}」:\n',
                   text[-600:])
             sys.exit(1)
         if '#' in right:
@@ -264,47 +272,35 @@ def main():
             sys.exit(1)
         print(f'A: 基线通过（左段 {left}、右段 {right} 无计数）')
 
-        # 附（老板 2026-09-16）：对方未加入时 member 表里没有他，"/myname 不许与对方
-        # 同名"的判据也要算上预置名（否则我能改成和伴侣预置名一样，加入时撞同名）
-        send(m_a, '/myname Alice\r')
-        wait_screen(m_a, lambda t: '名字不能与对方相同' in t,
-                    'A 拒绝改成对方预置名 Alice')
-        print('A: /myname Alice 被拒（判据含预置名）✓')
-        # 正控制：不冲突的名字应改成功，再改回来（不影响后续右段名字断言）
-        send(m_a, '/myname LukasX\r')
-        wait_screen(m_a, lambda t: '我的名字已更新' in t, 'A 改名 LukasX')
-        send(m_a, '/myname Lukas\r')
-        wait_screen(m_a, lambda t: '我的名字已更新: LukasX → Lukas' in t, 'A 改回 Lukas')
-        print('A: /myname LukasX → Lukas 正常 ✓（判据没误伤）')
-
         # ---------- C：A 的第二条通道（选同一身份 Lukas）----------
         store_c = os.path.join(WORK, 'c.json')
-        m_c, p_c = join_flow('C', store_c, port, new_join_token(port, store_a), 'Lukas')
+        m_c, p_c = join_flow('C', store_c, port, new_join_token(port, store_a))
         spawned += [p_c]
         finish_onboarding(m_c, 'C')
 
         # ① ②：C 上线后两台右段都该显示 #1/1（我的另一条通道在线），且对方仍离线
         # （修复后同一人的通道上下线不再互推广播，A 要等下一次 30s 轮询才刷新计数）
         for label, m in (('C', m_c), ('A', m_a)):
-            t = wait_screen(m, lambda t: '#1/1' in t or '● Alice' in t,
+            t = wait_screen(m, lambda t: '#1/1' in t,
                             f'{label} 更新我的通道计数', timeout=90)
             left, _, right = split_bar(title_bar(t))
-            if '● Alice' in left:
+            if '●' in left:
                 print(f'FAIL {label}: 同身份通道上线后，尚未加入的对方被显示在线:\n', t[-600:])
                 sys.exit(1)
-            if left != '○ Alice':
-                print(f'FAIL {label}: 尚未加入的对方应显示「○ Alice」（预置名兜底），实际「{left}」:\n',
+            if not left.startswith('○ -'):
+                print(f'FAIL {label}: 尚未加入的对方应显示「○ -」（无预置名兜底），实际「{left}」:\n',
                       t[-600:])
                 sys.exit(1)
             if '#1/1' not in right:
                 print(f'FAIL {label}: 右段应显示「#1/1」（我的另一条通道在线），实际「{right}」:\n',
                       t[-600:])
                 sys.exit(1)
-            print(f'{label}: #1/1 ✓ 且对方仍离线（○ Alice）✓')
+            print(f'{label}: #1/1 ✓ 且对方仍离线（○ -）✓')
 
         # ---------- ③ 正控制：真正的第二人 B（Alice）加入 → 双方应亮绿灯 ----------
         store_b = os.path.join(WORK, 'b.json')
-        m_b, p_b = join_flow('B', store_b, port, new_join_token(port, store_a), 'Alice')
+        m_b, p_b = join_flow('B', store_b, port,
+                             new_join_token(port, store_a, purpose='invite'), 'Alice')
         spawned += [p_b]
         finish_onboarding(m_b, 'B')
         for label, m in (('A', m_a), ('C', m_c)):
@@ -316,9 +312,8 @@ def main():
                 sys.exit(1)
             print(f'{label}: 对方 Alice 上线 → ● Alice ✓（绿灯未被改坏）')
 
-        # ---------- ④ 对方改名 → 预置名快照要跟上（否则同名判据卡住旧名字）----------
-        # B 把名字改成 Alicia：A/C 左段应跟着变；此后 "Alice" 这个名字已无人使用，
-        # A 应该能改成它（判据里若还留着旧预置名 "Alice" 就会被误拒）。
+        # ---------- ④ 对方改名 → 左段要跟上（否则标题栏卡住旧名字）----------
+        # B 把名字改成 Alicia：A/C 左段应跟着变；此后 "Alice" 这个名字已无人使用。
         send(m_b, '/myname Alicia\r')
         if '我的名字已更新' not in wait_text(m_b, '我的名字已更新'):
             print('FAIL B: 改名 Alicia 未成功')
@@ -330,10 +325,6 @@ def main():
                 print(f'FAIL {label}: 对方改名后左段应为「● Alicia」，实际「{left}」:\n', t[-600:])
                 sys.exit(1)
             print(f'{label}: 对方改名 → ● Alicia ✓')
-        send(m_a, '/myname Alice\r')
-        wait_screen(m_a, lambda t: '我的名字已更新: Lukas → Alice' in t,
-                    'A 可以改用已空出的旧预置名 Alice')
-        print('A: /myname Alice 成功 ✓（预置名快照已跟上改名，未误拒）')
         print('PASS: 多通道在线状态回归 4 项全过')
     finally:
         for p in spawned:

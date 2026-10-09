@@ -165,8 +165,7 @@ def onboard_create(label, store, port, home):
         ('秘境向导', 'c\r'),
         ('我的名字', f'{CREATOR}\r'),
         ('我的性别', '1\r'),
-        ('伴侣的名字', f'{MEMBER}\r'),
-        ('伴侣的性别', '2\r'),
+        ('秘境类型', '1\r'),  # v3：不再预置同伴——2026-10-08 起改为类型问答，1=双人
     ]:
         out = wait_text(m, expect, timeout=30)
         if expect not in out:
@@ -187,10 +186,13 @@ def onboard_join(label, store, port, token, home):
     send(m, 'j\r')
     wait_text(m, '输入通道码', timeout=20)
     send(m, token + '\r')
-    out = wait_text(m, '完整输入你的名字', timeout=20)
-    if '完整输入你的名字' not in out:
-        print(f'❌ {label}: 未到身份选择'); print(out[-600:]); raise SystemExit(1)
+    # invite 流（开新身份）：自填名字 → 性别（2026-10-04 purpose 收敛后的序列）
+    out = wait_text(m, '你的名字', timeout=20)
+    if '你的名字' not in out:
+        print(f'❌ {label}: 未到名字问答'); print(out[-600:]); raise SystemExit(1)
     send(m, MEMBER + '\r')
+    wait_text(m, '你的性别', timeout=20)
+    send(m, '2\r')  # 女（数字输入——老板定稿）
     wait_text(m, '验证共享口令', timeout=20)
     send(m, PASSPHRASE + '\r')
     if '成功加入秘境' not in wait_text(m, '成功加入秘境', timeout=30):
@@ -204,15 +206,17 @@ def http(port, method, path, body=None, token=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method)
     req.add_header('Content-Type', 'application/json')
-    req.add_header('X-Protocol-Version', '2')
+    req.add_header('X-Protocol-Version', '3')
     if token:
         req.add_header('Authorization', f'Bearer {token}')
     with urllib.request.urlopen(req, timeout=10) as r:
         return json.load(r)
 
-def new_join_token(port, store_path):
+def new_join_token(port, store_path, purpose='invite'):
+    """签发加入码：B 是开新身份（invite）；attach（进已有身份）才需要显式传。"""
     st = json.load(open(store_path))
     return http(port, 'POST', f'/spaces/{st["space_id"]}/join-tokens',
+                body={'purpose': purpose},
                 token=st['session_token'])['joinToken']
 
 def parse_row_numbers(frame):
