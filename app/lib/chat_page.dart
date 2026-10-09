@@ -1634,7 +1634,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///
   /// 布局：`[头像位] [ 名字列 ]`，名字列两行——
   /// - 第一行 = **群组名字**（样式同「我的状态胶囊」的名字行：15 号 w500）；
-  ///   空名字时只显示一个**编辑图标**（点击进 [\_showGroupNameDialog] 起名）；
+  ///   空名字时显示灰字「设置群名」+ 编辑图标（点击进 [\_showGroupNameDialog] 起名）；
   /// - 第二行 = **「在线人数/总人数」**，「在线人数」用**绿色**（同在线灯），
   ///   「/总人数」保持原灰。两个数都不含我自己（`_othersOnline` / `_othersTotal`）。
   ///
@@ -1686,11 +1686,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
 
     const gap = 8.0;
-    // 编辑图标占位宽（18 图标 + 左右各 2 内边距）；没有名字时第一行只摆它
+    // 编辑图标占位宽（4 间距 + 18 图标）；没有名字时它跟在灰字提示后面
     const editIconWidth = 22.0;
+    // 「设置群名」灰字占位（老板 2026-10-09）：没名字时光一个图标看不出能点/
+    // 是干什么的，灰字把动作说出来。英文用 "Set group name"（比 "Set name"
+    // 明确——这里改的是群名，不是我的名字）。
+    final hintStyle = TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w400,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
     final countWidth = measure(countLabel, countStyle);
-    final nameWidth =
-        _groupName.isEmpty ? editIconWidth : measure(_groupName, nameStyle);
+    final nameWidth = _groupName.isEmpty
+        ? measure(l10n.chatPageGroupNameEmptyHint, hintStyle) + editIconWidth
+        : measure(_groupName, nameStyle);
 
     // 量出来的名字宽**只用来给头像分预算**（名字是信息、优先，剩下的给头像），
     // **不再拿来钉死名字列宽**——TextPainter 量出的宽与真实渲染可能有出入（字体
@@ -1714,21 +1723,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         : stripCount * kStatusMemberAvatarSize;
     final nameColMax = (maxWidth - slotWidth - gap).clamp(0.0, maxWidth);
 
-    // 第一行：有名字显示名字（点了改名）；没名字显示编辑图标（点了起名）。
-    // 名字也做成**可点胶囊**（老板 2026-10-09）：悬浮/按住变色，与状态条其他
-    // 可点元素同口径（invite/通话图标/更多通道箭头）。
+    // 第一行：有名字显示名字（点了改名）；没名字显示灰字「设置群名」+ 编辑
+    // 图标（点了起名）——灰字把动作说出来，光一个图标看不出能干什么（老板
+    // 2026-10-09）。名字也做成**可点胶囊**：悬浮/按住变色，与状态条其他可点
+    // 元素同口径（invite/通话图标/更多通道箭头）。
     final Widget nameLine = _groupName.isEmpty
-        ? Tooltip(
-            message: l10n.chatPageEdit,
-            child: InkWell(
-              mouseCursor: SystemMouseCursors.click,
-              borderRadius: BorderRadius.circular(6),
+        ? Material(
+            color: Colors.transparent,
+            shape: const StadiumBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(mouseCursor: SystemMouseCursors.click,
               onTap: _showGroupNameDialog,
+              hoverColor: Colors.black.withValues(alpha: 0.05),
+              highlightColor: Colors.black.withValues(alpha: 0.08),
               child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: Icon(Icons.edit,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(l10n.chatPageGroupNameEmptyHint, style: hintStyle),
+                  const SizedBox(width: 4),
+                  Icon(Icons.edit,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ]),
               ),
             ),
           )
@@ -1784,8 +1800,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ? SizedBox(
                 width: kStatusMemberAvatarSize,
                 height: kStatusMemberAvatarSize,
-                child: CircleAvatar(
-                  backgroundColor: _genderTint(''),
+                // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
+                // Material 的墨水层上，InkWell 的悬浮/按住高亮才能盖在它上面——
+                // 不透明 child 会把高亮整个挡住（老板 2026-10-09：占位头像也要
+                // 有悬浮/点击背景效果，与状态条其他可点对象一致）。
+                child: Ink(
+                  decoration: BoxDecoration(
+                    color: _genderTint(''),
+                    shape: BoxShape.circle,
+                  ),
                   child: const Icon(Icons.groups_outlined, size: 22),
                 ),
               )

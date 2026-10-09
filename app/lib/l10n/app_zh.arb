@@ -243,6 +243,7 @@
   "chatPageRenameNameTitle": "我的身份",
   "chatPageRenameNameLabel": "名字",
   "chatPageGroupNameTitle": "群组名字",
+  "chatPageGroupNameEmptyHint": "群名",
   "chatPageGroupNameLabel": "名字",
   "chatPageGenderLabel": "性别",
   "chatPageRenameEntranceTitle": "当前通道",
@@ -502,6 +503,8 @@
   "chatPagePlaying": "播放中…",
   "chatPageVoiceLabel": "语音",
   "chatPageAttachmentMetaMissing": "附件元数据缺失",
+  "chatPageAttachmentUnusable": "附件不可用",
+  "chatPageAttachmentRetry": "点按重试",
   "chatPageSaved": "已保存: {path}",
   "@chatPageSaved": {
     "placeholders": {

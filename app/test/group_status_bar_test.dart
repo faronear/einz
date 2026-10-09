@@ -265,10 +265,16 @@ void main() {
     addTearDown(db.close);
     await _pump(tester, db, 3);
 
-    // ① 一开始没有名字：第一行只有编辑图标
+    // ① 一开始没有名字：第一行是灰字「设置群名」+ 编辑图标
     expect(find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)),
         findsOneWidget,
         reason: '没有群名时第一行应显示编辑图标');
+    expect(
+        find.descendant(
+            of: _statusBar,
+            matching: find.text(_zh.chatPageGroupNameEmptyHint)),
+        findsOneWidget,
+        reason: '没有群名时编辑图标前应有灰字「设置群名」占位（老板 2026-10-09）');
     expect(find.descendant(of: _statusBar, matching: find.text('Crew')),
         findsNothing);
 
@@ -473,6 +479,36 @@ void main() {
             '（实测 gapGroup=$gapGroup gapMine=$gapMine）');
     // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
     await tester.pump(const Duration(milliseconds: 450));
+  });
+
+  testWidgets('还没人加入：最左侧显示群组头像占位（可点开「我的同伴」），编辑图标不顶边',
+      (WidgetTester tester) async {
+    // 老板 2026-10-09：没人加入时编辑图标/人数直接顶到状态条左缘之外；
+    // 应在最左摆一个群组头像（与菜单「我的同伴」图标同款），且可点开成员弹层。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _pump(tester, db, 0);
+
+    final capsule = tester.getRect(_statusBar);
+
+    // ① 群组头像占位在场（groups_outlined，与菜单「我的同伴」同款）
+    final placeholder = find.descendant(
+        of: _statusBar, matching: find.byIcon(Icons.groups_outlined));
+    expect(placeholder, findsOneWidget);
+
+    // ② 占位占满一个头像位（40）→ 编辑图标不再顶到胶囊左缘
+    final editRect = tester.getRect(find.descendant(
+        of: _statusBar, matching: find.byIcon(Icons.edit)));
+    expect(editRect.left,
+        greaterThanOrEqualTo(capsule.left + kStatusMemberAvatarSize - 1),
+        reason: '编辑图标应排在头像占位右侧，不顶到胶囊边缘');
+
+    // ③ 点占位 → 开「我的同伴」弹层
+    await tester.tap(placeholder);
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageMembersTitle('group')), findsOneWidget,
+        reason: '群组头像占位也应可点开「我的同伴」');
+    await tester.pump(const Duration(milliseconds: 450)); // 冲掉弹层计时器
   });
 
   testWidgets('长群名用到接近中线才省略，整块不溢出（macOS 截图回归）',

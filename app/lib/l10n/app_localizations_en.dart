@@ -534,6 +534,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGroupNameTitle => 'Group name';
 
   @override
+  String get chatPageGroupNameEmptyHint => 'Name';
+
+  @override
   String get chatPageGroupNameLabel => 'Name';
 
   @override
@@ -1025,6 +1028,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageAttachmentMetaMissing => 'Attachment metadata missing';
+
+  @override
+  String get chatPageAttachmentUnusable => 'Attachment unavailable';
+
+  @override
+  String get chatPageAttachmentRetry => 'Tap to retry';
 
   @override
   String chatPageSaved(String path) {

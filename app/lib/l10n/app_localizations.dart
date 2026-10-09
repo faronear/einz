@@ -986,6 +986,12 @@ abstract class AppLocalizations {
   /// **'Group name'**
   String get chatPageGroupNameTitle;
 
+  /// No description provided for @chatPageGroupNameEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get chatPageGroupNameEmptyHint;
+
   /// No description provided for @chatPageGroupNameLabel.
   ///
   /// In en, this message translates to:
@@ -1789,6 +1795,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Attachment metadata missing'**
   String get chatPageAttachmentMetaMissing;
+
+  /// No description provided for @chatPageAttachmentUnusable.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment unavailable'**
+  String get chatPageAttachmentUnusable;
+
+  /// No description provided for @chatPageAttachmentRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to retry'**
+  String get chatPageAttachmentRetry;
 
   /// No description provided for @chatPageSaved.
   ///

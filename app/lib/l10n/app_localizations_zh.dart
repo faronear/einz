@@ -495,6 +495,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGroupNameTitle => '群组名字';
 
   @override
+  String get chatPageGroupNameEmptyHint => '群名';
+
+  @override
   String get chatPageGroupNameLabel => '名字';
 
   @override
@@ -951,6 +954,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatPageAttachmentMetaMissing => '附件元数据缺失';
+
+  @override
+  String get chatPageAttachmentUnusable => '附件不可用';
+
+  @override
+  String get chatPageAttachmentRetry => '点按重试';
 
   @override
   String chatPageSaved(String path) {

@@ -246,6 +246,7 @@
   "chatPageRenameNameTitle": "My identity",
   "chatPageRenameNameLabel": "Name",
   "chatPageGroupNameTitle": "Group name",
+  "chatPageGroupNameEmptyHint": "Name",
   "chatPageGroupNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",
@@ -519,6 +520,8 @@
   "chatPagePlaying": "Playing…",
   "chatPageVoiceLabel": "Voice",
   "chatPageAttachmentMetaMissing": "Attachment metadata missing",
+  "chatPageAttachmentUnusable": "Attachment unavailable",
+  "chatPageAttachmentRetry": "Tap to retry",
   "chatPageSaved": "Saved: {path}",
   "@chatPageSaved": {
     "placeholders": {
