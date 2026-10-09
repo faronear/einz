@@ -13350,3 +13350,23 @@ chat_profile_refresh / ui_style_switch / chat_bubble_gender / multi_space_isolat
 后提示条会消失，跑完即删。真机自动恢复行为由老板自测。
 
 
+## 2026-10-09 阅后即焚时钟标签统一显示焚毁时刻
+
+**背景：** 老板确认阅后即焚计时起点为「本设备接收时刻」（`_insertLocal` 落库时
+`expiresAt = now + burn`，每设备独立），随后决定气泡里所有阅后即焚的时间显示
+统一改为 `expiresAt` 时刻本身——取消旧的两种格式（手动设置的「修改时间+时长」
+如 ⏰ 20:47+5m、全局快照的纯时长如 ⏰ 5m）。
+
+**改动（app/lib/chat_page.dart）：**
+- `_burnTagLabel` 重写：直接显示 `expiresAt`，格式复用 `_timeStampLabel`
+  （当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM，与其他时间戳口径一致）；
+- 删除只为旧格式服务的 `_burnDurationLabel`、`_burnSetTimeLabel`（无其他引用）；
+- 顶栏档位标记（⧗ 1h）是设置项非消息，不动。
+
+**验证：** `flutter analyze lib/chat_page.dart` 干净；`chat_page_menu_test` 34 用例全绿。
+
+**同日另一修：** `shared` 的 `entrance_status_test` 一用例自 8372360 起即红
+（worktree 干净 baseline 验证为既有问题）：断言「本机 WS 断开时我名下全部通道
+判离线」与实现口径（`myWsOnline` 只作用于本机行，其它设备按服务端 connected_at）
+不一致；按方案 A 修测试（`myOtherOnlineSince` 期望 `{'mine2': now}`），
+shared 67 用例全绿。commit `28acc89`。
