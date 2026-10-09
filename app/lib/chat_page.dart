@@ -1576,17 +1576,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// [label] 用于"既不在线也不是普通离线"的状态（当前只有**对方尚未加入**）：
   /// 灯变灰、右侧显示这个短标签而不是时间（老板 2026-09-26：未加入时时间没有意义，
   /// 摆一个"上次离线时间"反而误导）。
+  /// [connecting] 黄灯 = 正在连接（老板 2026-10-08：与 TUI「我的灯」统一四态思维
+  /// 模型——灰=未连接服务 / 黄=连接中 / 绿=已连接 / 红=断线重连）；「我的」灯传
+  /// WsStatus 得到，对方灯无此态。
   Widget _statusLine({
     required bool online,
-    required Color offlineColor,
+    Color offlineColor = Colors.red,
+    bool connecting = false,
     int? sinceMs,
     String? label,
   }) {
+    final dotColor = label != null
+        ? Colors.grey
+        : (online ? Colors.green : (connecting ? Colors.amber : offlineColor));
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.circle, size: 8,
-            color: label != null ? Colors.grey : (online ? Colors.green : offlineColor)),
+        Icon(Icons.circle, size: 8, color: dotColor),
         if (label != null) ...[
           const SizedBox(width: 4),
           Text(
@@ -2968,7 +2974,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final scheme = Theme.of(ctx).colorScheme;
-          final now = DateTime.now().millisecondsSinceEpoch;
           // 局部 final：rows / myMemberId 是被 load() 改写的捕获变量，Dart 不做空提升
           final loaded = rows;
           final myId = myMemberId ?? '';
@@ -3073,35 +3078,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 final name = (d['entrance_name'] as String? ?? '').trim();
                                 final entranceId = d['entrance_id'] as String? ?? '';
                                 final isLocal = d['_local'] == true;
-                                final revoked = !isLocal &&
-                                    d['status'] != null &&
-                                    d['status'] != 'active';
-                                final connectedAt = d['connected_at'];
-                                final last = d['last_seen'];
-                                final online = !revoked &&
-                                    (d.containsKey('connected_at')
-                                        ? connectedAt != null
-                                        : (last is num && now - last < 60 * 1000));
-                                // 时间戳：在线 → 上线时刻（online_since 兜底 connected_at）；
-                                // 离线/已撤销 → **下线时刻**（老板 2026-09-26）＝
-                                // max(last_seen, offline_since)：offline_since 是服务端断开
-                                // 那一刻落的（干净下线时 last_seen 归零，只剩它有值）；
-                                // last_seen 会被心跳/REST 刷新，服务端重启这类"close 没跑到"
-                                // 的情况反而是更新的证据 → 取两者较晚者最准。都是 0 才不显示。
-                                final sinceMs = (d['online_since'] as num?)?.toInt() ??
-                                    (connectedAt is num ? connectedAt.toInt() : null);
-                                final offlineSince =
-                                    (d['offline_since'] as num?)?.toInt() ?? 0;
-                                final lastSeen = last is num ? last.toInt() : 0;
+                                // 三态判定与时刻口径走 shared 唯一实现（与 TUI 同源，
+                                // 2026-10-08 合并）：已撤销是独立状态（区别于离线，
+                                // 卡片灰灯 + 蒙版 + 阻止角标）；时间戳：在线 → 上线
+                                // 时刻（online_since 兜底 connected_at）；离线/已撤销
+                                // → 下线时刻 max(last_seen, offline_since)（详见
+                                // shared entrance_status.dart 注释）。
+                                // 判定用纯服务端口径（不传 myEntranceId——卡片里**每行**
+                                // 的灯都按服务端 connected_at/last_seen 走，与合并前
+                                // 行为一致；本机灯"以本地 WS 为准"只用在标题栏「我的」
+                                // 那一处，见 _statusLine 调用点）。
+                                final rowState = entranceRowState(d);
+                                final revoked =
+                                    rowState == EntranceRowState.revoked;
+                                final online = rowState == EntranceRowState.online;
                                 final int stamp;
                                 if (isLocal) {
                                   stamp = localSinceMs;
-                                } else if (online) {
-                                  stamp = sinceMs ?? 0;
                                 } else {
-                                  stamp = lastSeen > offlineSince
-                                      ? lastSeen
-                                      : offlineSince;
+                                  stamp = rowSince(d, online: online);
                                 }
                                 // 右上角固定角标：本机 = 绿勾、已撤销 = 阻止图标
                                 // 两者互斥（revoked 已含 !isLocal）→ 共用一个角标位
@@ -3471,33 +3466,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 未加入时状态条对方芯片右侧显示「邀请加入」链接（老板 2026-09-25）。
   bool? _peerJoined;
 
-  /// 对方在线判定：对方有实时 WS 连接（connected_at 非 null）= 在线；
-  /// 旧服务器无 connected_at 字段时退回 last_seen 距今 < 60s 兜底
-  /// （30s 轮询 + WS 状态变化时刷新）。
-  /// 一行通道是否在线：有实时 WS 连接即在线（server 重启/未入网时立即准确）；
-  /// 没有 `connected_at` 字段的老服务端回退看 `last_seen`（60s 内算在线）——
-  /// last_seen 会被轮询 touchLastSeen 持续刷新，不能单独代表实时连接
-  /// （修复"未入网却显示绿灯"）。
-  bool _isRowOnline(Map<String, dynamic> d, int now) {
-    if (d.containsKey('connected_at')) return d['connected_at'] != null;
-    final last = d['last_seen'];
-    if (last is! num) return false;
-    return now - last < 60 * 1000;
-  }
+  /// 对方在线判定（shared 唯一口径——与 TUI 同源，2026-10-08 合并）：
+  /// 有实时 WS 连接（connected_at 非 null）= 在线；老服务端无该字段时退回
+  /// last_seen 距今 < 60s 兜底（last_seen 会被轮询 touchLastSeen 持续刷新，
+  /// 不能单独代表实时连接——"未入网却显示绿灯"修复）。
+  bool _isRowOnline(Map<String, dynamic> d, int now) => isEntranceOnline(d);
 
   /// 一行通道数据里"当前状态的时刻"（ms；0/缺失 → null）——与「更多通道」卡片
-  /// 同一口径（那里有详细注释）：在线取 `online_since`（兜底 `connected_at`）；
-  /// 离线取 `max(last_seen, offline_since)`（干净下线时 last_seen 归零，只剩
-  /// offline_since；服务端重启等"close 没跑到"的情况反而 last_seen 更新）。
+  /// 同一口径（shared rowSince 唯一实现，见其注释）：在线取 `online_since`
+  /// （兜底 `connected_at`）；离线取 `max(last_seen, offline_since)`。
   int? _sinceOfRow(Map<String, dynamic> d, {required bool online}) {
-    if (online) {
-      final connectedAt = d['connected_at'];
-      return (d['online_since'] as num?)?.toInt() ??
-          (connectedAt is num ? connectedAt.toInt() : null);
-    }
-    final lastSeen = (d['last_seen'] as num?)?.toInt() ?? 0;
-    final offlineSince = (d['offline_since'] as num?)?.toInt() ?? 0;
-    final stamp = lastSeen > offlineSince ? lastSeen : offlineSince;
+    final stamp = rowSince(d, online: online);
     return stamp > 0 ? stamp : null;
   }
 
@@ -3538,34 +3517,30 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       // （server/src/entrances.ts）——拿"行存在"当已加入，会让密友重置设备/通道被撤
       // 之后反而不给邀请入口，恰恰丢了最该邀请的那一刻。status 缺省（老服务端）按
       // 在用算，与通道列表弹层的 revoked 判定同口径。
-      final joined = peer.any((d) {
-        final status = d['status'];
-        return status == null || status == 'active';
-      });
+      final joined = peer.any((d) => !isEntranceRevoked(d));
       // 群空间要显示的「其他人在线 / 总数」（**都不含我自己**）：
-      // - 在线按 **member** 去重——同一 member 有任一条通道在线就算他在线
-      //   （与上面 `online` 那句"在线是人的维度"同一口径）；
+      // - 在线按 **member** 去重——同一 member 有任一条**在用**通道在线就算他在线
+      //   （与上面 `online` 那句"在线是人的维度"同一口径；撤销通道不点亮——
+      //   shared aggregateMemberStates 唯一实现，App/TUI 同源）；
       // - 总数以 /space 的成员表为准（`_memberCount` 含我，故 -1）；万一成员表还没
       //   更新（刚被拉进群等），取通道表里出现过的 member 数，二者取 `max`——
       //   宁可与头像条里的人数一致，也别出现"头像有两个、却写着 0/0"。
-      final seenOthers = <String>{};
-      final onlineOthers = <String>{};
+      final presences = aggregateMemberStates(
+        entrances,
+        myMemberId: (mine == null || mine.isEmpty) ? null : mine,
+        myEntranceId: widget.entranceId,
+        myWsOnline: _ws?.connected.value ?? false,
+      );
+      final seenOthers = presences.keys.toSet();
+      final onlineOthers = presences.entries
+          .where((e) => e.value.online)
+          .map((e) => e.key)
+          .toSet();
       // 头像条排序的"最近状态变化时刻"（见 _otherSinceMs）：同一 member 多条通道
-      // 取 max——最近动过的那条说了算。
+      // 取 max——最近动过的那条说了算（shared MemberPresence.maxSince）。
       final sinceByMember = <String, int>{};
-      for (final d in entrances) {
-        if (d['entrance_id'] == widget.entranceId) continue;
-        final pid = d['member_id'] as String?;
-        if (pid == null || pid.isEmpty) continue;
-        if (mine != null && mine.isNotEmpty && pid == mine) continue;
-        seenOthers.add(pid);
-        final rowOnline = _isRowOnline(d, now);
-        if (rowOnline) onlineOthers.add(pid);
-        final since = _sinceOfRow(d, online: rowOnline);
-        if (since != null) {
-          final prev = sinceByMember[pid];
-          if (prev == null || since > prev) sinceByMember[pid] = since;
-        }
+      for (final e in presences.entries) {
+        if (e.value.maxSince > 0) sinceByMember[e.key] = e.value.maxSince;
       }
       final othersTotal = _memberCount > 0
           ? (_memberCount - 1) > seenOthers.length
@@ -3584,13 +3559,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       int? mySince;
       for (final d in entrances) {
         if (d['entrance_id'] != widget.entranceId) continue;
-        mySince = _sinceOfRow(d, online: _ws?.connected.value ?? false);
+        // 本机行：在线与否以本地 WS 为准（shared 唯一口径），时刻同样走 rowSince
+        final stamp = rowSince(d, online: _ws?.connected.value ?? false);
+        mySince = stamp > 0 ? stamp : null;
         break;
       }
-      // 我的通道总数（member 维度，含本机这条）——与通道列表弹层的过滤同口径
-      // （本机 + member_id 等于我的其它行）；轮询拿不到 mine 时保持旧值。
+      // 我的通道总数（member 维度，含本机这条）——已撤销的不计入（老板 2026-10-08：
+      // 撤销后不算通道总数，与 TUI #n/m 同口径）；轮询拿不到 mine 时保持旧值。
       final myCount = (mine != null && mine.isNotEmpty)
-          ? entrances.where((d) => d['member_id'] == mine).length
+          ? entrances
+              .where((d) => d['member_id'] == mine && !isEntranceRevoked(d))
+              .length
           : _myEntranceCount;
       if (mounted &&
           (online != _peerOnline ||
@@ -7288,8 +7267,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   const SizedBox(height: 1),
                                   _statusLine(
                                     online: _ws?.connected.value ?? false,
+                                    // 四态思维模型（老板 2026-10-08，与 TUI 同源）：
+                                    // 灰=未连接服务 / 黄=连接中 / 绿=已连接 / 红=断线重连
                                     offlineColor:
                                         _ws == null ? Colors.grey : Colors.red,
+                                    connecting:
+                                        _ws?.status.value == WsStatus.connecting,
                                     sinceMs: _mySinceMs,
                                   ),
                                 ],

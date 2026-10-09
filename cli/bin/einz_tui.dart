@@ -56,18 +56,23 @@ class _TuiState {
   /// 存储文件路径（/pin 设置后保存用）。
   final String storePath;
 
-  /// 对方是否在线（listEntrances last_seen<60s 轮询 + peer.online/offline 广播更新）。
+  /// 对方是否在线（summarizeEntrances 轮询 + peer.online/offline 广播更新）。
   /// 判定维度是"人"：同一 member 的多条通道是我自己的通道，不算对方。
   bool peerOnline = false;
+
+  /// 对方通道**全部已撤销**（无在用通道、仅有已撤销通道）——标题栏第三态灯
+  /// （老板 2026-10-08：撤销是独立状态，绝不同于离线）。
+  bool peerAllRevoked = false;
 
   /// 空间模式（GET /space 的 mode）：group=true 时标题栏左段从 duo 的"对方状态"
   /// 切换为成员名单（在线在前、离线在后，右侧 n/N 不含自己——老板 2026-10-08）。
   /// 缺省 false：未拉取过 /space（离线启动等）按 duo 渲染，行为与旧版一致。
   bool isGroupSpace = false;
 
-  /// 成员在线表（member_id → 是否有任一通道在线）：group 名单的点灯依据。
-  /// _refreshPeerOnline 从 /entrances 按 member_id 聚合（同一人多通道任一在线即在线）。
-  final Map<String, bool> memberOnline = {};
+  /// 成员存在感表（member_id → MemberPresence）：group 名单的点灯依据。
+  /// _refreshPeerOnline 从 /entrances 聚合（同一人多通道任一**在用**通道在线即在线；
+  /// 仅有已撤销通道的成员是 revokedOnly 第三态，2026-10-08）。
+  final Map<String, MemberPresence> memberOnline = {};
 
   /// 我的**其它通道**总数（不含本机；listEntrances 轮询统计）——右段 `#n/m` 的分母。
   /// 本机由 `@通道名` 独立表示，不计入这一对数字（老板 2026-09-16）。
@@ -1822,17 +1827,22 @@ void _render() {
   buf.write(_clearHome);
 
   // 顶部标题栏（第 1 行）：黑色背景整行 + 白色文字，
-  // 与消息流明显区分；我的灯（绿●=在线，红✗=断线重连，黄↻=连接中，红○=离线）。
+  // 与消息流明显区分；我的灯四态（与 App 状态条同一思维模型，老板 2026-10-08）：
+  // 绿●=已连接 黄↻=连接中 红✗=断线重连 灰○=未连接服务。
   // 状态灯颜色序列后立即回到白字（不 reset，背景持续），整行铺满后统一 reset。
   final ws = s.session.wsStatus;
   final myDot = switch (ws) {
     WsStatus.connected => '$_green●$_white',
     WsStatus.connecting => '$_yellow↻$_white',
     WsStatus.reconnecting => '$_red✗$_white',
-    WsStatus.stopped => '$_red○$_white',
+    WsStatus.stopped => '$_gray○$_white',
   };
   final peerName = _peerNameOf(s);
-  final peerDot = s.peerOnline ? '$_green●$_white' : '$_red○$_white';
+  // 对方灯三态（老板 2026-10-08：撤销是独立状态，绝不同于离线）：
+  // 绿●=有在线通道 灰⊘=通道全被撤销 红○=离线（含对方未加入）
+  final peerDot = s.peerOnline
+      ? '$_green●$_white'
+      : (s.peerAllRevoked ? '$_gray⊘$_white' : '$_red○$_white');
   // group 空间（2026-10-08 老板要求）：左段不用 duo 的"对方状态"，改成员名单——
   // 最左 n/N = 在线/总人数（**不含我**，老板：提到最左）；其后成员名单，在线成员
   // 在前（●绿）、离线在后（○红），人名之间用竖线 | 分隔（每人自带灯，不用括号
@@ -2021,19 +2031,23 @@ String _entranceCountLabel(int onlineCount, int totalCount) {
 String _groupMemberListLabel(_TuiState s) {
   final myPid = s.session.store.memberId;
   final online = <String>[];
+  final revoked = <String>[];
   final offline = <String>[];
   for (final pid in s.memberNames.keys) {
     if (pid == myPid) continue; // 名单不含我（n/N 同口径）
-    if (s.memberOnline[pid] ?? false) {
+    final p = s.memberOnline[pid];
+    if (p?.online ?? false) {
       online.add(pid);
+    } else if (p?.revokedOnly ?? false) {
+      revoked.add(pid); // 仅有已撤销通道（无在用通道）——独立态（老板 2026-10-08）
     } else {
       offline.add(pid);
     }
   }
-  // 在线/离线都保持 memberNames 迭代序（成员表顺序稳定——/space 成员表按槽位
-  // 返回；在线细分排序无稳定数据源，member 序即可预期，不做花哨排序）
+  // 在线/已撤销/离线都保持 memberNames 迭代序（成员表顺序稳定——/space 成员表按
+  // 槽位返回；细分排序无稳定数据源，member 序即可预期，不做花哨排序）
   final buf = StringBuffer();
-  final total = online.length + offline.length;
+  final total = online.length + revoked.length + offline.length;
   buf.write('${_green}${online.length}$_white/$total');
   const sep = ' ';
   void append(String pid, String dot) {
@@ -2043,6 +2057,9 @@ String _groupMemberListLabel(_TuiState s) {
 
   for (final pid in online) {
     append(pid, '$_green●');
+  }
+  for (final pid in revoked) {
+    append(pid, '$_gray⊘');
   }
   for (final pid in offline) {
     append(pid, '$_red○$_white');
@@ -2143,7 +2160,10 @@ class _EntranceRow {
   final bool revoked;
 
   /// 列表行文本（/entrances 与 /revoke 的列表、确认提示共用，保证逐字一致）。
-  String get line => '\n  $no) ${online ? '🟢' : '⚪'} $label [$memberName] $tag$when';
+  /// 圈标三态（与标题栏灯同语义，老板 2026-10-08）：🟢=在线 ⊘=已撤销（独立态，
+  /// 区别于离线）⚪=离线。消息流是纯文本（不渲染 ANSI），故此处只用符号不带颜色。
+  String get line =>
+      '\n  $no) ${online ? '🟢' : (revoked ? '⊘' : '⚪')} $label [$memberName] $tag$when';
 }
 
 /// 拉取**同空间全部通道**（我 + 对方，不只是自己的通道）并格式化为带序号的行。
@@ -2160,7 +2180,6 @@ Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
   }
   final entrances = await ApiClient(server).listEntrances(token);
   final myId = s.session.store.entranceId;
-  final now = DateTime.now().millisecondsSinceEpoch;
   final myWsOnline = s.session.wsStatus == WsStatus.connected;
   final rows = <_EntranceRow>[];
   var no = 0;
@@ -2170,36 +2189,16 @@ Future<List<_EntranceRow>> _fetchEntranceRows(_TuiState s) async {
     // 抄不对的坑（App 侧同样是 trim 后再显示/比对）
     final devName = (d['entrance_name'] as String? ?? '').trim();
     final member = (d['member_id'] ?? '-') as String;
-    final last = d['last_seen'];
-    final connectedAt = d['connected_at'];
-    final revoked = d['status'] != null && d['status'] != 'active';
-    // 上线时刻：online_since（进入在线态，重连不刷新，与顶部条同源）→ connected_at
-    final sinceMs = (d['online_since'] as num?)?.toInt() ??
-        (connectedAt is num ? connectedAt.toInt() : null);
-    // 在线判定：本机以本地 WS 状态为准（与顶部条一致）；其余有实时连接
-    // （connected_at 非 null）即在线；旧服务端无该字段时退回 last_seen<60s
-    final online = !revoked &&
-        (devId == myId
-            ? myWsOnline
-            : (d.containsKey('connected_at')
-                ? connectedAt != null
-                : (last is num && now - last < 60 * 1000)));
     final isMe = devId == myId;
-    // 在线 → 上线时刻；离线/已撤销 → **下线时刻**（老板 2026-09-17：两种都用 `since`
-    // 一个词就行）。下线时刻 = max(last_seen, offline_since)：
-    // - 服务端 WS 断开时把 last_seen 置 0（ws.ts），断线时刻只落在 offline_since
-    //   （2026-09-26 新增该字段；在此之前这里 stamp=0，干净下线的通道根本不显示时间）；
-    // - last_seen 会被心跳/REST 刷新，服务端重启这类"close 没跑到"的情况它反倒是更新的
-    //   证据（比上一次会话留下的 offline_since 新），故取两者较晚者；
-    // - 两个都是 0 → 不显示（直接格式化会变成 1970-01-01，老板 2026-09-16 实测）。
-    final offlineSince = (d['offline_since'] as num?)?.toInt() ?? 0;
-    final lastSeen = last is num ? last.toInt() : 0;
-    final int stamp;
-    if (online) {
-      stamp = sinceMs ?? 0;
-    } else {
-      stamp = lastSeen > offlineSince ? lastSeen : offlineSince;
-    }
+    // 三态判定与时刻口径走 shared 唯一实现（App 同口径）：已撤销 → 独立状态
+    // （区别于离线，老板 2026-10-08）；在线 → 上线时刻；离线/已撤销 → 下线时刻
+    // （= 撤销时刻，服务端撤销时 last_seen/offline_since 都写 now；口径细节见
+    // shared entrance_status.dart 文件头注释）
+    final state = entranceRowState(d,
+        myEntranceId: myId, myWsOnline: myWsOnline);
+    final online = state == EntranceRowState.online;
+    final revoked = state == EntranceRowState.revoked;
+    final stamp = rowSince(d, online: online);
     final when = stamp > 0
         ? ' since ${_fmtEntranceTimeLocal(stamp)} (${_fmtEntranceTimeUtc(stamp)})'
         : '';
@@ -2310,7 +2309,7 @@ void _onPeerStatus(WsPeerStatusEvent event) {
   _refreshPeerOnline();
 }
 
-/// 查询对方在线状态（listEntrances last_seen<60s——同 App 判定），更新顶部条。
+/// 查询对方在线状态（shared summarizeEntrances 统一口径——同 App），更新顶部条。
 Future<void> _refreshPeerOnline() async {
   final s = _state;
   if (s == null) return;
@@ -2319,98 +2318,50 @@ Future<void> _refreshPeerOnline() async {
   if (server.isEmpty || token == null) return;
   try {
     final entrances = await ApiClient(server).listEntrances(token);
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final myId = s.session.store.entranceId;
-    final myPid = s.session.store.memberId;
     // 本机是否在线取本地 WS 状态（首屏轮询常早于 WS 建连，此时服务端 connected_at
-    // 还是 null —— 否则刚启动会先显示"0/2台在线"再跳成 1/2）
-    final myWsOnline = s.session.wsStatus == WsStatus.connected;
-    // 通道在线 = 有实时 WS 连接（connected_at 非 null）；旧服务器无该字段时退回
-    // last_seen<60s（last_seen 会被轮询 touchLastSeen 持续刷新，不代表实时连接）
-    bool entranceOnline(Map d) {
-      // 本机一律以本地 WS 状态为准，**不回退服务端**：服务端要等心跳超时（最多 30s）
-      // 才把本机判离线，那段时间会出现"本机灯已红/↻、而 #n/m 仍把自己算作在线"的
-      // 自相矛盾（老板 2026-09-16）。
-      if (d['entrance_id'] == myId) return myWsOnline;
-      if (d.containsKey('connected_at')) return d['connected_at'] != null;
-      final last = d['last_seen'];
-      if (last is! num) return false;
-      return now - last < 60 * 1000;
-    }
-    // 顺带维护通道名映射、对方在线通道（顶部条对方 #通道名）与双方通道计数。
-    // 关键：在线是"人"维度的——同一 member 的其它通道是我自己的通道，不能点亮
-    // 对方（此前只按 entrance_id != 自己 判定 → 我的第二条通道一上线，尚未加入的
-    // 对方 B 就显示绿灯——老板 2026-09-16 实测）。
-    s.entranceNames.clear();
-    int myOtherTotal = 0; // 我的其它通道总数（不含本机——它由 @通道名 表示）
-    int peerTotal = 0;
-    int peerOnline = 0;
-    final peerSince = <String, int>{}; // 在线对方通道 → 上线时刻（降序展示）
-    // 成员在线聚合（group 名单点灯）：member_id → 任一通道在线
-    final memberOnlineAgg = <String, bool>{};
-    // 在线我方**其它**通道 → 上线时刻（降序展示；不含本机）
-    final myOtherSince = <String, int>{};
-    for (final d in entrances) {
-      if (d['status'] != null && d['status'] != 'active') continue; // 已撤销不计
-      final devId = (d['entrance_id'] as String?) ?? '';
-      final devName = (d['entrance_name'] as String?) ?? '';
-      if (devId.isNotEmpty && devName.isNotEmpty) s.entranceNames[devId] = devName;
-      final pid = d['member_id'] as String?;
-      final isOnline = entranceOnline(d);
-      // 上线时刻：online_since（进入在线态，重连不刷新）→ 退回 connected_at → 0
-      final since = (d['online_since'] as num?)?.toInt() ??
-          (d['connected_at'] as num?)?.toInt() ??
-          0;
-      if (pid == null || myPid == null) {
-        // 身份尚未落位（新通道引导中）：退回按通道判定，不统计多通道数
-        if (devId != myId && isOnline) {
-          peerOnline++;
-          peerSince[devId] = since;
-        }
-        continue;
-      }
-      if (pid == myPid) {
-        // 本机不参与 #n/m 与通道列表（它由 @通道名 单独表示，不论在线与否）
-        if (devId == myId) continue;
-        myOtherTotal++;
-        if (isOnline) myOtherSince[devId] = since;
-        continue;
-      }
-      // 成员在线聚合（group 名单）：同一 member 任一通道在线即在线（含本机 member）
-      //（pid 此处已非空——空 member_id 的通道在前面已 continue）
-      memberOnlineAgg[pid] = (memberOnlineAgg[pid] ?? false) || isOnline;
-      peerTotal++;
-      if (isOnline) {
-        peerOnline++;
-        peerSince[devId] = since;
-      }
-    }
-    final online = peerOnline > 0;
+    // 还是 null —— 否则刚启动会先显示"0/2台在线"再跳成 1/2；判定细节见
+    // shared entrance_status.dart 文件头注释）
+    final my = summarizeEntrances(
+      entrances,
+      myEntranceId: s.session.store.entranceId,
+      myMemberId: s.session.store.memberId,
+      myWsOnline: s.session.wsStatus == WsStatus.connected,
+    );
     // 通道集合变化也要重绘：A 下 B 上（在线数不变）时顶部条应换成 B 的名字
-    final entrancesChanged = peerSince.length != s.peerOnlineSince.length ||
-        peerSince.entries.any((e) => s.peerOnlineSince[e.key] != e.value) ||
-        myOtherSince.length != s.myOtherOnlineSince.length ||
-        myOtherSince.entries.any((e) => s.myOtherOnlineSince[e.key] != e.value);
-    final changed = online != s.peerOnline ||
-        myOtherTotal != s.myOtherEntranceTotal ||
-        peerOnline != s.peerEntranceOnline ||
-        peerTotal != s.peerEntranceTotal ||
+    final entrancesChanged = my.peerOnlineSince.length != s.peerOnlineSince.length ||
+        my.peerOnlineSince.entries.any((e) => s.peerOnlineSince[e.key] != e.value) ||
+        my.myOtherOnlineSince.length != s.myOtherOnlineSince.length ||
+        my.myOtherOnlineSince.entries.any((e) => s.myOtherOnlineSince[e.key] != e.value);
+    // 通道名映射变化（新通道出现/名字变化）也要重绘
+    final namesChanged = !_sameStringMap(my.nameMap, s.entranceNames);
+    final changed = my.peerHasOnline != s.peerOnline ||
+        my.peerAllRevoked != s.peerAllRevoked ||
+        my.myOtherTotal != s.myOtherEntranceTotal ||
+        my.peerOnlineCount != s.peerEntranceOnline ||
+        my.peerActiveTotal != s.peerEntranceTotal ||
+        namesChanged ||
         entrancesChanged ||
-        !_sameBoolMap(memberOnlineAgg, s.memberOnline); // group 名单点灯变化也要重绘
-    s.peerOnline = online;
-    s.myOtherEntranceTotal = myOtherTotal;
-    s.peerEntranceOnline = peerOnline;
-    s.peerEntranceTotal = peerTotal;
-    s.memberOnline
-      ..clear()
-      ..addAll(memberOnlineAgg);
-    s.peerOnlineSince
-      ..clear()
-      ..addAll(peerSince);
-    s.myOtherOnlineSince
-      ..clear()
-      ..addAll(myOtherSince);
-    if (changed) _render();
+        !_samePresenceMap(my.memberStates, s.memberOnline); // group 名单点灯变化也要重绘
+    if (changed) {
+      s.peerOnline = my.peerHasOnline;
+      s.peerAllRevoked = my.peerAllRevoked;
+      s.myOtherEntranceTotal = my.myOtherTotal;
+      s.peerEntranceOnline = my.peerOnlineCount;
+      s.peerEntranceTotal = my.peerActiveTotal; // 已撤销不计入总数（老板 2026-10-08）
+      s.entranceNames
+        ..clear()
+        ..addAll(my.nameMap); // 对方 #通道名 / 本机 @通道名 的映射（改名广播另行补写）
+      s.memberOnline
+        ..clear()
+        ..addAll(my.memberStates);
+      s.peerOnlineSince
+        ..clear()
+        ..addAll(my.peerOnlineSince);
+      s.myOtherOnlineSince
+        ..clear()
+        ..addAll(my.myOtherOnlineSince);
+      _render();
+    }
   } catch (_) {
     // 查询失败保持上次状态（断网/未认证）
   }
@@ -3348,7 +3299,7 @@ Future<void> _execCommand(String line) async {
               '   服务器: ${s.session.server}（$origin）\n'
               '   机密线路: ${st.sessionToken != null ? '已激活' : '未激活'}\n'
               '   实时连接 ws: $ws\n'
-              '   对方: ${s.peerOnline ? '在线' : '离线'}\n'
+              '   对方: ${s.peerOnline ? '在线' : (s.peerAllRevoked ? '通道已撤销' : '离线')}\n'
               '   秘境 id: ${st.spaceId ?? '未绑定'}\n'
               '   秘境密钥: ${st.spaceKey != null ? '已就位' : '无'}\n'
               '   通道名称: ${st.entranceName ?? '未命名'}\n'
@@ -4408,8 +4359,9 @@ Future<void> _refreshMemberNames(_TuiState s) async {
   }
 }
 
-/// 两个 String→bool 映射内容是否完全一致（group 成员在线表变化检测用）。
-bool _sameBoolMap(Map<String, bool> a, Map<String, bool> b) {
+/// 两个成员存在感映射内容是否完全一致（group 成员点灯变化检测用；
+/// MemberPresence 已实现 ==，值比较即可）。
+bool _samePresenceMap(Map<String, MemberPresence> a, Map<String, MemberPresence> b) {
   if (a.length != b.length) return false;
   for (final e in a.entries) {
     if (b[e.key] != e.value) return false;

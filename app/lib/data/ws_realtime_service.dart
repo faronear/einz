@@ -27,6 +27,10 @@ class WsRealtimeService {
   /// WS 是否在线（chat_page 监听：在线 → 轮询降频兜底；离线 → 恢复高频轮询）。
   final ValueNotifier<bool> connected = ValueNotifier(false);
 
+  /// WS 四态（与 TUI「我的灯」同一思维模型，老板 2026-10-08：状态条「我的」灯
+  /// 需要区分 灰=未连接 / 黄=连接中 / 绿=已连接 / 红=断线重连）。
+  final ValueNotifier<WsStatus> status = ValueNotifier(WsStatus.stopped);
+
   /// 新消息到达回调（WS 在线时 chat_page 收到即增量刷新，无需等轮询）。
   void Function()? onMessageNew;
 
@@ -104,7 +108,10 @@ class WsRealtimeService {
         if (e is WsCallEvent) this.onCall?.call(e);
         if (e is WsMemberJoinedEvent) this.onMemberJoined?.call(e);
       },
-      onStatus: (s) => connected.value = s == WsStatus.connected,
+      onStatus: (s) {
+        status.value = s;
+        connected.value = s == WsStatus.connected;
+      },
     )..start();
   }
 
