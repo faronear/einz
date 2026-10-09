@@ -559,6 +559,10 @@ class AppLockService {
     /// 存"除我之外"而不是全量：卡片渲染方（`space_widget/space_switcher`）手里
     /// 没有"我是谁"（`AppLockPayload` 不含 memberId），存全量还得再补一条通道。
     List<Map<String, String>>? otherMembers,
+    /// **群组名字**（群空间状态条第一行；仅本机存储，不跨成员同步）。
+    /// **null = 保持原值**（同 mode/otherMembers：`_refreshProfileFromServer` 那条
+    /// 整份覆盖写的路径不知道群名，不能把它抹掉）。空串 = 明确清除名字。
+    String? groupName,
   }) async {
     final sid = spaceId;
     final key = sid == null ? _kProfile : _profileKey(sid);
@@ -568,12 +572,14 @@ class AppLockService {
     // 的群组配色随之丢失。与 `savePeerPresence` 同一手法（只读改写自己关心的键）。
     var effectiveMode = mode;
     List<Map<String, String>>? effectiveMembers = otherMembers;
-    if (effectiveMode == null || effectiveMembers == null) {
+    String? effectiveGroupName = groupName;
+    if (effectiveMode == null || effectiveMembers == null || effectiveGroupName == null) {
       final raw = await _get(key);
       if (raw != null) {
         try {
           final m = jsonDecode(raw) as Map<String, dynamic>;
           effectiveMode ??= m['mode'] as String?;
+          effectiveGroupName ??= m['groupName'] as String?;
           if (effectiveMembers == null) {
             final list = m['otherMembers'];
             if (list is List) {
@@ -602,6 +608,7 @@ class AppLockService {
       'peerSlot': peerSlot,
       'mode': effectiveMode ?? 'duo',
       'otherMembers': effectiveMembers ?? const <Map<String, String>>[],
+      'groupName': effectiveGroupName ?? '',
     }));
     if (sid != null) {
       await (db.update(db.spaces)..where((s) => s.spaceId.equals(sid))).write(
@@ -647,6 +654,8 @@ class AppLockService {
                 'name': (e['name'] as String?) ?? '',
               },
         ],
+        // 群组名字（仅本机；群空间状态条第一行用）。老记录没有 → 空串。
+        'groupName': (m['groupName'] as String?) ?? '',
       };
     } catch (_) {
       return const {};

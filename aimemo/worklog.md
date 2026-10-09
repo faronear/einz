@@ -13287,3 +13287,33 @@ group 形态标题栏、切回无 PIN 直切、旧消息仍在、再进目标空
   合并为单条消息后行序恢复自然顺向，断言反而简单
 - pty 向导问答偶发时序竞态（连卡三局的"锁屏码"超时）：每步 wait 后 drain 0.8s
   消除；server 跑一天积累状态也可能有关——全新 sqlite 复跑即过
+
+### App 顶栏切换图标 + group 状态条群名/绿色在线人数（2026-10-09 老板要求）
+
+**① 顶栏「我的秘境」切换入口图标**（`app/lib/chat_page.dart` `_brandTitle`）：
+`Icons.arrow_drop_down` → `Icons.dynamic_feed`（与汉堡菜单「切换我的秘境」行
+同款图标，size 保持 20）；`chat_page_menu_test.dart` 两处图标断言同步。
+
+**② group 空间状态条左侧改两行**（`app/lib/chat_page.dart` `_othersSummary`）：
+布局由「头像条 + 在线/总数」改成 `[成员头像条] [ 群名 / 在线·总数 ]`——
+- 第一行**群组名字**（样式同「我的状态胶囊」名字行：15 号 w500）；**无名字时
+  只显示一个编辑图标**，点击进编辑弹窗；
+- 第二行「在线人数/总人数」，**在线人数绿色**（与在线灯同色）、`/总数` 保持原灰
+  （`Text.rich` 两段 span）；
+- 宽度预算不变（整块 ≤ 胶囊一半 − leadingPad），名字列先占、剩余给头像（保证至少
+  一个头像位），名字过长省略、头像装不下末尾渐隐。
+
+**群名仅本机存储**（老板确认，不跨成员同步）：`app/lib/data/app_lock.dart`
+`saveProfile`/`loadProfile` 增加 `groupName`（`null`=保持原值，与 mode/otherMembers
+同款，防 `_refreshProfileFromServer` 整份覆盖写抹掉）；ChatPage 从 per-space 资料
+恢复、`_saveProfile()` 回写。新增 l10n `chatPageGroupNameTitle/Label`（en/zh）。
+
+**测试：** `group_status_bar_test.dart` 人数改按 `Text.rich` 纯文本匹配 + 绿色断言，
+新增「无名字→编辑图标→起名→落资料→清空」「重启后恢复」两用例；相关回归全绿
+（chat_page_menu / multi_space_pages / space_switcher_avatar / app_lock /
+chat_profile_refresh / ui_style_switch / chat_bubble_gender / multi_space_isolation）。
+
+**备注：** 本次提交连带老板工作区**未提交的文案改动**（`spaceListAdd`→「添加另一个
+秘境」、邮件通知几处、`chatPageMembersInviteNew`）；因 arb 重生成后两个硬编码旧文案
+的测试（`chat_page_menu_test`、`multi_space_pages_test`）改绑 l10n 键，不再锁死文案。
+

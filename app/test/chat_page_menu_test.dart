@@ -1362,7 +1362,7 @@ void main() {
     expect(switched, 0);
     // 就地弹层（不是新页面）：能看到「切换我的秘境」内容与通往第一屏的入口
     expect(find.text(_zh.spaceListSwitch), findsWidgets, reason: '弹层标题（与顶栏品牌名同名）');
-    expect(find.text('添加秘境'), findsOneWidget, reason: '弹层底部通往第一屏');
+    expect(find.text(_zh.spaceListAdd), findsOneWidget, reason: '弹层底部通往第一屏');
   });
 
   testWidgets('菜单：聊天页不再依赖任何注入也能开「切换秘境」（不再需要 pin）',
@@ -1436,9 +1436,10 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300)); // 等 sync 异步完成
 
-    // 箭头挂在 AppBar 的标题上，不再落在顶部状态条里（2026-09-26 搬走）
-    final chevron = find.byIcon(Icons.arrow_drop_down);
-    expect(chevron, findsOneWidget, reason: '多空间时顶栏标题旁应出现下拉箭头');
+    // 切换图标挂在 AppBar 的标题上，不再落在顶部状态条里（2026-09-26 搬走）。
+    // 图标与汉堡菜单「切换我的秘境」行同款（dynamic_feed）
+    final chevron = find.byIcon(Icons.dynamic_feed);
+    expect(chevron, findsOneWidget, reason: '多空间时顶栏标题旁应出现切换图标');
     expect(
       find.ancestor(
           of: chevron,
@@ -1574,8 +1575,8 @@ void main() {
 
     final statusBar = find.byKey(const ValueKey('chatPageStatusBar'));
     expect(statusBar, findsOneWidget);
-    expect(find.byIcon(Icons.arrow_drop_down), findsNothing,
-        reason: '单空间顶栏不给下拉箭头');
+    expect(find.byIcon(Icons.dynamic_feed), findsNothing,
+        reason: '单空间顶栏不给切换图标');
     expect(find.ancestor(of: find.text('我的秘境'), matching: find.byType(InkWell)),
         findsNothing,
         reason: '单空间时品牌名不可点（不暗示这里能切换）');

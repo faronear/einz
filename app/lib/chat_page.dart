@@ -377,6 +377,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 本服务器单空间成员上限（/space 下发；0=不限）。满员时隐藏邀请入口用。
   int _maxMembers = 0;
 
+  /// **群组名字**（群空间状态条第一行；老板 2026-10-09）。
+  ///
+  /// **仅本机存储**（per-space 资料里的 `groupName`，不跨成员同步）：服务端没有
+  /// 空间名字段（`spaces.display_name` 早已删除）。空串 = 还没起名 → 状态条第一行
+  /// 只显示一个编辑图标。
+  String _groupName = '';
+
   /// 群聊判定：直接读服务端下发的 mode（不靠"成员数 ≥3"猜——duo 满员后签发
   /// invite 的那一刻就已升格，此时第三人还没进来，但通话必须立刻停用）。
   bool get _isGroup => _spaceMode == 'group';
@@ -752,6 +759,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (_peerGender.isEmpty) _peerGender = p['peerGender'] as String? ?? '';
         _mySlot = p['mySlot'] as int?; // 槽位无"空值语义"问题，直接恢复
         _peerSlot = p['peerSlot'] as int?;
+        // 群组名字（仅本机）：无 widget 入参，直接以 profile 为准
+        _groupName = p['groupName'] as String? ?? '';
       });
       // 快照可能过期（对方改名 / v2 早期把对方性别写死空串）→ 以服务端为准校正
       // 名字与性别（老板 2026-09-11：App 重启后一直显示旧的对方名字）
@@ -1419,7 +1428,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 颜色继承 AppBar 的 IconTheme（AppBar 给整个 toolbar 套了 IconTheme.merge）
           if (_multiSpace) ...[
             const SizedBox(width: 2),
-            const Icon(Icons.arrow_drop_down, size: 20),
+            // 与汉堡菜单「切换我的秘境」行同款图标（dynamic_feed 多窗口叠加，
+            // 表达"多个空间"，老板 2026-09-28 定稿）
+            const Icon(Icons.dynamic_feed, size: 20),
           ],
         ],
       ),
@@ -1616,13 +1627,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 群空间状态条左侧：**其他成员的头像条 + 「在线人数/总人数」**（老板 2026-10-05 定）。
+  /// 群空间状态条左侧（老板 2026-10-09 改）：**成员头像条 + 两行文字**。
+  ///
+  /// 布局：`[成员头像条] [ 名字列 ]`，名字列两行——
+  /// - 第一行 = **群组名字**（样式同「我的状态胶囊」的名字行：15 号 w500）；
+  ///   空名字时只显示一个**编辑图标**（点击进 [\_showGroupNameDialog] 起名）；
+  /// - 第二行 = **「在线人数/总人数」**，「在线人数」用**绿色**（同在线灯），
+  ///   「/总人数」保持原灰。两个数都不含我自己（`_othersOnline` / `_othersTotal`）。
   ///
   /// - 头像按**加入先后**（槽位升序）排，不含我自己（我在右侧那一块）；
-  /// - 两个数字**也都不含我自己**（`_othersOnline` / `_othersTotal`）；
-  /// - **整块最多占状态条一半宽**（老板：最多顶到一半宽的最右侧）。人数**先占**
-  ///   它自己那段宽度——它是信息、不参与截断；**剩下的才给头像**，装不下时头像
-  ///   末尾**渐隐**。
+  /// - **整块最多占状态条一半宽**（老板：最多顶到一半宽的最右侧）。名字列的宽度
+  ///   **先占**（信息，不参与截断），**剩下的给头像**；名字过长时省略、头像装不下
+  ///   时末尾**渐隐**。
   Widget _othersSummary(AppLocalizations l10n) {
     // 状态条胶囊宽 = 屏宽 − 左右 margin（各 12）；左半 = 一半。
     // ⚠️ 这个 24 与状态条 Container 的 `margin: fromLTRB(12, 4, 12, 6)` 耦合，
@@ -1634,39 +1650,108 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final maxWidth =
         (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad;
 
-    final countLabel =
-        l10n.chatPageStatusOthersOnline(_othersOnline, _othersTotal);
     // 12 号：比 duo 那行时刻（11）略大一档——这一格没有别的大字，11 会显得发飘
     final countStyle = TextStyle(
       fontSize: 12,
       color: Colors.black.withValues(alpha: 0.55),
     );
-    // 先量出人数的宽度（用 TextPainter，**不是** LayoutBuilder：这一格在
-    // IntrinsicHeight 里，而 IntrinsicHeight 查不了 LayoutBuilder 的固有尺寸）
-    final painter = TextPainter(
-      text: TextSpan(text: countLabel, style: countStyle),
-      textDirection: Directionality.of(context),
-      maxLines: 1,
-    )..layout();
-    const gap = 8.0;
+    // 名字行：与「我的状态胶囊」的名字行同款（15 号 w500）
+    const nameStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w500);
 
     final others = _otherMembers;
+    final countLabel = '$_othersOnline/$_othersTotal';
+
+    // 量宽用 TextPainter（**不是** LayoutBuilder：这一格在 IntrinsicHeight 里，
+    // 而 IntrinsicHeight 查不了 LayoutBuilder 的固有尺寸）
+    double measure(String s, TextStyle st) {
+      final p = TextPainter(
+        text: TextSpan(text: s, style: st),
+        textDirection: Directionality.of(context),
+        maxLines: 1,
+      )..layout();
+      return p.width;
+    }
+
+    const gap = 8.0;
+    // 编辑图标占位宽（18 图标 + 左右各 2 内边距）；没有名字时第一行只摆它
+    const editIconWidth = 22.0;
+    final countWidth = measure(countLabel, countStyle);
+    final nameWidth =
+        _groupName.isEmpty ? editIconWidth : measure(_groupName, nameStyle);
+
+    // 名字列先占它自己那段宽（名字/人数取宽者），但**给头像留至少一个位**；
+    // 名字过长被这里截住 → 文本用省略号收尾，头像不被完全挤掉。
+    final avatarMin = others.isEmpty ? 0.0 : (kStatusMemberAvatarSize + gap);
+    var colWidth = nameWidth > countWidth ? nameWidth : countWidth;
+    final colCap = maxWidth - avatarMin;
+    if (colWidth > colCap) colWidth = colCap;
+    if (colWidth < 0) colWidth = 0;
+    final avatarBudget = others.isEmpty ? 0.0 : (maxWidth - colWidth - gap);
+
+    // 第一行：有名字显示名字（点了改名）；没名字显示编辑图标（点了起名）
+    final Widget nameLine = _groupName.isEmpty
+        ? Tooltip(
+            message: l10n.chatPageEdit,
+            child: InkWell(
+              mouseCursor: SystemMouseCursors.click,
+              borderRadius: BorderRadius.circular(6),
+              onTap: _showGroupNameDialog,
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(Icons.edit,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+          )
+        : InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            borderRadius: BorderRadius.circular(6),
+            onTap: _showGroupNameDialog,
+            child: Text(_groupName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: nameStyle),
+          );
+
+    // 第二行：「在线人数」绿 + 「/总人数」灰（在线灯同色，一眼看出谁在）
+    final Widget countLine = Text.rich(
+      TextSpan(children: [
+        TextSpan(
+            text: '$_othersOnline',
+            style: countStyle.copyWith(color: Colors.green)),
+        TextSpan(text: '/$_othersTotal', style: countStyle),
+      ]),
+      maxLines: 1,
+    );
+
     final Widget body = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (others.isNotEmpty) ...[
-          _avatarStrip(others, maxWidth - painter.width - gap),
+          _avatarStrip(others, avatarBudget),
           const SizedBox(width: gap),
         ],
-        Text(countLabel, style: countStyle, maxLines: 1),
+        SizedBox(
+          width: colWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              nameLine,
+              const SizedBox(height: 1),
+              countLine,
+            ],
+          ),
+        ),
       ],
     );
-    // **有人加入后整块做成可点胶囊**（老板 2026-10-06）：点开「我的同伴」弹层。
-    // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）；
+    // **有人加入后整块做成可点胶囊**（老板 2026-10-06）：点开「我的同伴」弹层
+    // （名字行内部那个 InkWell 优先接管「改名」，其余区域落到这里进成员弹层）。
     // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
-    // 头像条现在与右方头像同高（40）上下顶满胶囊（老板 2026-10-06），**左右也贴边**：
-    // 外层 `pad.left(10)` 推离 10，这里左移 10 回到边缘、左内边距 0（头像三面贴壁，
-    // 与 duo 的我方/对方头像同一口径）。没有人加入（others 空）时纯展示，不可点。
+    // 头像条与右方头像同高（40）上下顶满胶囊，**左右也贴边**：外层 `pad.left(10)`
+    // 推离 10，这里左移 10 回到边缘、左内边距 0。没有人加入（others 空）时纯展示，
+    // 不可点（但第一行的名字/编辑图标照常可点）。
     if (others.isEmpty) return body;
     return Transform.translate(
       offset: const Offset(-10, 0),
@@ -1827,16 +1912,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 左/上/下都 0：这一格以**头像**打头，头像要**三面贴住胶囊内壁**（老板
     // 2026-09-26）；右 10 给箭头/右缘留白。行高由头像决定，头像即贴边。
     //
-    // **群空间例外**（老板 2026-10-05）：左侧只摆**成员头像条**，首个头像要离胶囊
-    // 左缘留白（一排小头像贴着边会显得被切掉），且整条**竖直居中**（头像比胶囊矮）。
+    // **群空间例外**（老板 2026-10-05；2026-10-09 改两行）：左侧摆**成员头像条**
+    // + 右侧两行（群组名字 / 在线·总数），首个头像要离胶囊左缘留白（一排小头像贴着边
+    // 会显得被切掉），整块**竖直居中**（头像比胶囊矮）。
     final pad = _isGroup
         ? const EdgeInsets.fromLTRB(10, 0, 10, 0)
         : const EdgeInsets.fromLTRB(0, 0, 10, 0);
     // 芯片内容**只到箭头为止**（老板 2026-09-25）：「邀请加入」链接在芯片外
     // 并排（见本方法末尾）——否则点它到底是邀请还是切换空间说不清。
     final content = _isGroup
-        // 群空间：**没有人名**——只有一排成员头像 + 「在线/总数」（老板 2026-10-05）。
-        // Align 只为竖直居中（外层 stretch 给到满高 40，头像只有 32）；
+        // 群空间：成员头像条 + 两行（**群组名字** / **在线·总数**），见 _othersSummary。
+        // Align 只为竖直居中（外层 stretch 给到满高 40，内容比胶囊矮）；
         // **必须 widthFactor:1**——Align 默认横向撑满约束，会把左半条占满、
         // 把「邀请加入」链接推到状态条正中（老板 2026-10-06 实测），
         // 收缩到内容宽后 invite 紧跟人数（与 duo 未加入时同款位置）。
@@ -3845,6 +3931,96 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (saved == true && mounted) setState(() {}); // 刷新弹层/菜单显示的新名字
   }
 
+  /// 编辑**群组名字**（群空间状态条第一行；老板 2026-10-09）。
+  ///
+  /// **仅本机**——写进 per-space 资料（`groupName`），不跨成员同步（服务端没有空间
+  /// 名字段）。允许**清空**：空串 = 回到"没有名字"态，状态条第一行重新只显示编辑
+  /// 图标。非空走成员名同一套白名单校验（中英文/数字/_/-/emoji，≤
+  /// [kMemberNameMaxLength]）。
+  Future<void> _showGroupNameDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final ctrl = TextEditingController(text: _groupName);
+    final nameError = ValueNotifier<String?>(null);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        // 标题居中（与菜单下其它弹窗一致）
+        title: Center(child: Text(l10n.chatPageGroupNameTitle)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: l10n.chatPageGroupNameLabel,
+                border: const OutlineInputBorder(),
+                // 不显示 "3/32" 计数器（同改名弹窗：上限只是防超长）
+                counterText: '',
+              ),
+              // 输入框里直接拦住超长（同改名弹窗）
+              maxLength: kMemberNameMaxLength,
+              onChanged: (_) {
+                if (nameError.value != null) nameError.value = null;
+              },
+            ),
+            ValueListenableBuilder<String?>(
+              valueListenable: nameError,
+              builder: (_, err, _) => err == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        err,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.cancel)),
+          FilledButton(
+            onPressed: () {
+              final name = ctrl.text.trim();
+              // 允许清空：空 = 回到"没有名字"（状态条第一行显示编辑图标）
+              if (name.isNotEmpty) {
+                // 用户名称白名单（与改名同源）：非空才校验
+                final violation = checkMemberNamePolicy(name);
+                if (violation != null) {
+                  nameError.value = violation == MemberNameViolation.tooLong
+                      ? l10n.chatPageRenameNameTooLongError(kMemberNameMaxLength)
+                      : l10n.chatPageRenameNameInvalidError;
+                  return;
+                }
+              }
+              Navigator.of(ctx).pop(true);
+            },
+            child: Text(l10n.chatPageRenamingSubmit),
+          ),
+        ],
+      ),
+    );
+    // 对话框 route 关闭动画完成后才 dispose（同 _showRenameDialog：立即 dispose
+    // 会触发红屏断言 _dependents.isEmpty）
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      ctrl.dispose();
+      nameError.dispose();
+    });
+    if (saved == true && mounted) {
+      _groupName = ctrl.text.trim();
+      await _saveProfile(); // 落 per-space 资料（重启后从 profile 恢复）
+      if (mounted) setState(() {});
+    }
+  }
+
   /// 修改我的名字（服务端同步 + 本地刷新菜单显示）。
   /// （原「当前通道」改名弹窗 2026-10-02 并入「我的通道」弹层，公钥展示一并删除。）
   Future<void> _showRenameDialog() async {
@@ -4025,6 +4201,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       peerSlot: _peerSlot,
       // 空间类型（切空间卡片的群组配色要用）
       mode: _spaceMode,
+      // 群组名字（仅本机；群空间状态条第一行用）
+      groupName: _groupName,
     );
   }
 
