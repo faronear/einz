@@ -116,8 +116,9 @@ const double _entranceSheetMaxWidth = 640;
 
 /// 气泡时间行里各小控件的**统一高度**（老板 2026-10-08）：引用/拷贝/保存的圆钮，
 /// 以及「沙漏+时长」胶囊——三者的背景高度必须一样（此前沙漏那块的文字把胶囊撑得
-/// 比圆钮高一截）。20 = 12 图标 + 上下各 4（沿用原来的热区口径，不撑大气泡）。
-const double _bubbleTimeRowControlHeight = 20;
+/// 比圆钮高一截）。28 = 16 图标 + 上下各 6（2026-10-09 老板要求加大：原 20×20
+/// 热区远小于 44pt 最小触控标准，手机难点中；气泡约增高 8px）。
+const double _bubbleTimeRowControlHeight = 28;
 
 /// 弹层内容区左右的内边距（下面 Padding 的 16）。
 const double _entranceSheetHPadding = 16;
@@ -569,7 +570,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
-    double iconSize = 12,
+    double iconSize = 16,
   }) {
     final subtle = _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
     return Material(
@@ -7641,7 +7642,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           ],
                                           Text(_messageTimeLabel(m),
                                               style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: 12,
                                                   color: _uiStyle == 'gradient'
                                                       ? Colors.white70
                                                       : Colors.grey)),
@@ -7674,7 +7675,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                 // 天然高一档——缩 1 与邻居光学对齐
                                                 //（2026-10-08 老板反馈：拷贝按钮偏高）
                                                 icon: Icons.copy_outlined,
-                                                iconSize: 11,
+                                                iconSize: 15,
                                                 label: l10n.chatPageCopy,
                                                 onTap: () async {
                                                   await Clipboard.setData(
@@ -7729,8 +7730,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                         child: Row(
                                                           mainAxisSize: MainAxisSize.min,
                                                           children: [
-                                                            _BurnHourglass(burned: m.deleted),
-                                                            const SizedBox(width: 2),
+                                                            _BurnHourglass(
+                                                                burned:
+                                                                    m.deleted,
+                                                                size: 14),
+                                                            const SizedBox(
+                                                                width: 2),
                                                             // 时钟标签：焚毁时刻 HH:MM（精确到分钟，老板 2026-10-09）
                                                             Text(
                                                                 _burnTagLabel(m.expiresAt,
@@ -7753,7 +7758,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               // 前面多补 4（老板 2026-10-02）：活消息那路
                                               // 沙漏带 4 padding，墓碑裸排会窄一截
                                               const SizedBox(width: 4),
-                                              _BurnHourglass(burned: m.deleted),
+                                              _BurnHourglass(
+                                                  burned: m.deleted, size: 14),
                                               const SizedBox(width: 2),
                                               Text(_burnTagLabel(m.expiresAt, m.burnAfterSeconds,
                                                       manual: m.burnManual),
