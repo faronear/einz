@@ -694,33 +694,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 阅后即焚时长紧凑标注（1m / 5m / 30m / 1h / 1d / 7d）。
-  String _burnDurationLabel(int seconds) {
-    if (seconds <= 0) return '';
-    if (seconds % 86400 == 0) return '${seconds ~/ 86400}d';
-    if (seconds % 3600 == 0) return '${seconds ~/ 3600}h';
-    if (seconds % 60 == 0) return '${seconds ~/ 60}m';
-    return '${seconds}s';
-  }
-
-  /// 阅后即焚「设置（修改）时间」紧凑标注（HH:MM）。由到期时间戳反推：
-  /// setMessageBurn 设 expiresAt = 设置时刻 + 时长，故 设置时刻 = expiresAt - 时长。
-  String _burnSetTimeLabel(int? expiresAt, int burnSeconds) {
-    if (expiresAt == null || burnSeconds <= 0) return '';
-    final t = DateTime.fromMillisecondsSinceEpoch(expiresAt - burnSeconds * 1000);
-    final hh = t.hour.toString().padLeft(2, '0');
-    final mm = t.minute.toString().padLeft(2, '0');
-    return '$hh:$mm';
-  }
-
-  /// 阅后即焚时钟标签：只有用户长按单条消息手动设置的才标注「设置(修改)时间+时长」
-  /// （如 ⏰ 20:47+5m，便于看出倒计时起点）；由全局设置快照的只标时长（如 ⏰ 5m），
-  /// 首次接收时间已由 [m.createdAt] 的时间戳给出（老板 2026-09-12）。
+  /// 阅后即焚时钟标签：显示焚毁时刻（expiresAt），格式与其他时间戳一致
+  /// （当天 HH:MM / 当年 mm-dd HH:MM / 跨年 yyyy-mm-dd HH:MM）——
+  /// 不再区分手动/全局（手动原本的「修改时间+时长」、全局的纯时长统一取消，
+  /// 老板 2026-10-09）。expiresAt 缺失时无标签。
   String _burnTagLabel(int? expiresAt, int burnSeconds, {required bool manual}) {
-    final dur = _burnDurationLabel(burnSeconds);
-    if (!manual) return dur;
-    final setTime = _burnSetTimeLabel(expiresAt, burnSeconds);
-    return setTime.isNotEmpty ? '$setTime+$dur' : dur;
+    if (expiresAt == null || expiresAt <= 0) return '';
+    return _timeStampLabel(expiresAt);
   }
 
   @override
@@ -7746,8 +7726,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                                           children: [
                                                             _BurnHourglass(burned: m.deleted),
                                                             const SizedBox(width: 2),
-                                                            // 时钟标签：手动设置 → ⏰ <修改时间>+<时长>
-                                                            // （如 ⏰ 20:47+5m）；全局设置 → 只标时长（⏰ 5m）
+                                                            // 时钟标签：焚毁时刻 HH:MM（精确到分钟，老板 2026-10-09）
                                                             Text(
                                                                 _burnTagLabel(m.expiresAt,
                                                                         m.burnAfterSeconds,
