@@ -328,4 +328,153 @@ void main() {
     expect(find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)),
         findsNothing);
   });
+
+  testWidgets('群名输入校验与人名同一套：白名单拦截 + 最长 32 字',
+      (WidgetTester tester) async {
+    // 老板 2026-10-09：群名采用和人名一样的字符、长度规则（同一 policy 收口）。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _pump(tester, db, 3);
+
+    await tester.tap(
+        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
+    await tester.pumpAndSettle();
+
+    // ① 人名白名单外的字符（空格）→ 拦下，弹窗不开
+    await tester.enterText(_dialogField, 'Mr Lukas');
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageRenameNameInvalidError), findsOneWidget,
+        reason: '人名白名单外的字符应被拦截（与人名同一套规则）');
+
+    // ② 最长 32 字：第 33 个字符敲不进去（同改名输入框）
+    await tester.enterText(_dialogField, 'a' * 33);
+    final field = tester.widget<TextField>(_dialogField);
+    expect(field.maxLength, kMemberNameMaxLength,
+        reason: '输入框上限应同人名（kMemberNameMaxLength）');
+    expect(field.controller!.text.length, kMemberNameMaxLength,
+        reason: '第 33 个字符应敲不进去');
+
+    // ③ 合法名字 → 保存成功
+    await tester.enterText(_dialogField, 'Crew');
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: _statusBar, matching: find.text('Crew')),
+        findsOneWidget);
+    // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
+    await tester.pump(const Duration(milliseconds: 450));
+  });
+
+  testWidgets('「我的同伴」胶囊只包头像条：点人数/群名不开成员弹层',
+      (WidgetTester tester) async {
+    // 老板 2026-10-09：群名已可单独单击改名，人数/群名不该再落进"我的同伴"可点区。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _pump(tester, db, 3);
+    final membersSheet = find.text(_zh.chatPageMembersTitle('group'));
+
+    // 先起个群名，第一行才有名字可点
+    await tester.tap(
+        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
+    await tester.pumpAndSettle();
+    await tester.enterText(_dialogField, 'Crew');
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+
+    // ① 点人数（第二行「2/3」）→ 不开成员弹层
+    await tester.tap(
+        find.descendant(of: _statusBar, matching: _countFinder('2/3')));
+    await tester.pumpAndSettle();
+    expect(membersSheet, findsNothing, reason: '人数不属于「我的同伴」可点区');
+
+    // ② 点群名 → 开的是**群名编辑**弹窗，不是成员弹层
+    await tester.tap(find.descendant(of: _statusBar, matching: find.text('Crew')));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageGroupNameTitle), findsOneWidget,
+        reason: '点群名应开改名弹窗');
+    expect(membersSheet, findsNothing, reason: '群名可点区属于「改名」而非成员弹层');
+    await tester.tap(find.text(_zh.cancel));
+    await tester.pumpAndSettle();
+
+    // ③ 点头像条 → 开「我的同伴」
+    await tester.tap(find.descendant(
+        of: _statusBar,
+        matching: find.byType(CircleAvatar).first));
+    await tester.pumpAndSettle();
+    expect(membersSheet, findsOneWidget, reason: '头像条才是「我的同伴」入口');
+    // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
+    await tester.pump(const Duration(milliseconds: 450));
+  });
+
+  testWidgets('点我的名字 → 打开「我的身份」弹窗', (WidgetTester tester) async {
+    // 老板 2026-10-09：状态条里我的名字也做成可点（与菜单「我的身份」同入口）。
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final spaceKey = await generateSpaceKey();
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('zh'),
+      home: ChatPage(
+        spaceId: 'space-demo',
+        entranceId: 'dev-me',
+        spaceKey: spaceKey,
+        keyVersion: 1,
+        token: 'tok',
+        db: db,
+        api: _GroupApi(3),
+        enableWs: false,
+        memberId: 'member-me',
+        memberName: 'Lukas',
+        entranceName: 'iPhone',
+        peerName: '',
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.descendant(
+        of: _statusBar, matching: find.text('Lukas')));
+    await tester.pumpAndSettle();
+    expect(find.text(_zh.chatPageRenameNameTitle), findsOneWidget,
+        reason: '点我的名字应打开「我的身份」弹窗');
+    await tester.tap(find.text(_zh.cancel));
+    await tester.pumpAndSettle();
+    // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
+    await tester.pump(const Duration(milliseconds: 450));
+  });
+
+  testWidgets('长群名用到接近中线才省略，整块不溢出（macOS 截图回归）',
+      (WidgetTester tester) async {
+    // 老板 2026-10-09：群名离状态条一半还很远就被截断。根因是名字列被
+    // TextPainter 量出的宽**钉死**（量宽偏小 → 提前省略）。现在量宽只用于
+    // 分头像预算，名字列拿"去掉头像条后剩下的全部宽度"。
+    tester.view.physicalSize = const Size(960, 652);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final db = LocalDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _pump(tester, db, 3);
+
+    const longName = '群群群群群群群群群群群群群群群群群群群群群群群群群群群群群群群群';
+    await tester.tap(
+        find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)));
+    await tester.pumpAndSettle();
+    await tester.enterText(_dialogField, longName);
+    await tester.tap(find.text(_zh.chatPageRenamingSubmit));
+    await tester.pumpAndSettle();
+
+    final capsule = tester.getRect(_statusBar);
+    final nameRect = tester.getRect(find.descendant(
+        of: _statusBar, matching: find.textContaining('群')));
+    final midline = capsule.left + capsule.width / 2;
+    expect(nameRect.right, greaterThan(midline - 60),
+        reason: '长群名应一直用到接近中线才省略（不再提前截断）');
+    expect(nameRect.right, lessThanOrEqualTo(midline + 0.5),
+        reason: '但也不该越过中线');
+    // 冲掉弹窗 controller 延迟 dispose 的 400ms 计时器（同上）
+    await tester.pump(const Duration(milliseconds: 450));
+  });
 }

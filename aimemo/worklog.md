@@ -13317,6 +13317,46 @@ chat_profile_refresh / ui_style_switch / chat_bubble_gender / multi_space_isolat
 秘境」、邮件通知几处、`chatPageMembersInviteNew`）；因 arb 重生成后两个硬编码旧文案
 的测试（`chat_page_menu_test`、`multi_space_pages_test`）改绑 l10n 键，不再锁死文案。
 
+### 群名/状态条四缺陷（2026-10-09 老板 macOS 截图 + 口述）
+
+**老板报的四条**：① 群名离状态条中线还很远就被省略号截断（macOS 截图：
+群名只用到 ~1/4 宽，右侧「我的」名字却用到 ~90%）；② 群名可单独单击后，点
+头像条开「我的同伴」的胶囊不该再包含人数和群名；③ 状态条里我的名字也做成
+可点，点开「我的身份」弹窗；④ 群名采用和人名一样的字符/长度规则。
+追加要求：可点的群名/我的名字要有**胶囊背景**，悬浮/按住变色，与状态条其他
+可点元素同口径。老板还怀疑「Invite 字样在已有同伴加入后看不见但占位」——查实
+不是：`trailing` 在 `peerJoined != false` 且群空间时都是 `SizedBox.shrink()`，不占位。
+
+**① 截断的根因（`_othersSummary`）**：
+- 名字列宽被 `SizedBox(width: 量出的宽)` **钉死**，而 `measure()` 用裸
+  `TextStyle` 量——没并入环境 `DefaultTextStyle`、也没带 `textScaler`，与渲染端
+  `Text` 的解析不一致，量出的宽**偏小** → 名字提前省略（截图里名字列只有
+  ~120 逻辑像素，远小于本该给它的上限 ~370）。
+- 附带：`leadingPad` 只扣了 `pad.left(10)` 没扣 `pad.right(10)`，长名顶满时
+  实测 **RenderFlex overflow 10px**（widget 测试复现）。
+**修**：量宽只用来**分头像预算**（名字优先、剩下的给头像，这个次序不变）；
+名字列改 `ConstrainedBox(maxWidth: 去掉头像条后的全部剩余)`，要不要省略由文本
+按真实渲染宽自己决定。`measure()` 修成 `DefaultTextStyle.merge(style)` +
+`MediaQuery.textScalerOf`（与渲染端同源）。`leadingPad` 10→20。实测：960 宽
+窗口下 32 字群名右缘 464（中线 480）、1200 宽下 584（中线 600），均不再提前。
+
+**② 胶囊只包头像条**：`Material+InkWell` 从整块 `body` 收窄到只包
+`_avatarStrip`（`Transform.translate(-10)` 贴左缘保留）；点人数/点群名不再开
+「我的同伴」，点群名开改名弹窗、点头像条才开成员弹层。
+
+**③④ 我的名字可点 + 输入校验**：右侧我的名字包 `Material(StadiumBorder)+
+InkWell(onTap: _showRenameDialog)`（=「我的身份」弹窗，与菜单同入口）+ 同款
+hover/highlight；群名同样包胶囊。④ 查实**本来就同人名同一套**：群名弹窗用的
+就是 `checkMemberNamePolicy` + `maxLength: kMemberNameMaxLength`，补测试锁死。
+
+**重构**：头像条"摆几个"的换算从 `_avatarStrip` 提出成 `_stripAvatarCount`，
+名字列的头像预算与渐隐 ShaderMask 共用同一算法。
+
+**测试**：`group_status_bar_test.dart` +4 例（胶囊只包头像条 / 点我的名字开
+「我的身份」/ 长群名用到接近中线才省略专名右缘≤中线 / 群名校验同人名同一套），
+连同原有 4 例共 8 例全绿；chat_page_menu / chat_send_status / chat_profile_refresh
+/ widget / ui_style_switch 共 60 例全绿。真机观感（含悬浮底色）由老板自测。
+
 ### 修 bug：开 App 显示「离线·仅可查看本地消息」不自动恢复（2026-10-09 老板报告）
 
 **现象：** 开 App 有时出现常驻条「离线 · 仅可查看本地消息，无法收发」，**不会自动

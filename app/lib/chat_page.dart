@@ -1644,9 +1644,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // ⚠️ 这个 24 与状态条 Container 的 `margin: fromLTRB(12, 4, 12, 6)` 耦合，
     // 改 margin 要一起改（与 top_notice 那个 46 是同一类耦合）。
     //
-    // 再扣掉胶囊左缘到本块内容的 10px（`_buildPeerStatus` 里那个 `pad.left`，
-    // 两处要一起改）——不扣的话内容右缘会**越过中线 10px**，和右侧挤到一起。
-    const leadingPad = 10.0;
+    // 再扣掉 `_buildPeerStatus` 那层 Padding 的**左右各 10**（两处要一起改）——
+    // 只扣左不扣右的话，内容会超出可用宽 10px（实测 RenderFlex overflow 10px）。
+    const leadingPad = 20.0;
     final maxWidth =
         (MediaQuery.sizeOf(context).width - 24) / 2 - leadingPad;
 
@@ -1662,11 +1662,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final countLabel = '$_othersOnline/$_othersTotal';
 
     // 量宽用 TextPainter（**不是** LayoutBuilder：这一格在 IntrinsicHeight 里，
-    // 而 IntrinsicHeight 查不了 LayoutBuilder 的固有尺寸）
+    // 而 IntrinsicHeight 查不了 LayoutBuilder 的固有尺寸）。
+    // 样式要**先并入环境 DefaultTextStyle**、再带上 **textScaler**——渲染端
+    // `Text` 就是这么解析的（style 并入 DefaultTextStyle + MediaQuery 的
+    // textScaler）。只用裸 style 量，量出的宽会偏小，名字就被提前截断
+    // （老板 2026-10-09 macOS 实测：离中线还很远就出现省略号）。
     double measure(String s, TextStyle st) {
       final p = TextPainter(
-        text: TextSpan(text: s, style: st),
+        text: TextSpan(
+            text: s, style: DefaultTextStyle.of(context).style.merge(st)),
         textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
         maxLines: 1,
       )..layout();
       return p.width;
@@ -1679,16 +1685,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final nameWidth =
         _groupName.isEmpty ? editIconWidth : measure(_groupName, nameStyle);
 
-    // 名字列先占它自己那段宽（名字/人数取宽者），但**给头像留至少一个位**；
-    // 名字过长被这里截住 → 文本用省略号收尾，头像不被完全挤掉。
-    final avatarMin = others.isEmpty ? 0.0 : (kStatusMemberAvatarSize + gap);
-    var colWidth = nameWidth > countWidth ? nameWidth : countWidth;
-    final colCap = maxWidth - avatarMin;
-    if (colWidth > colCap) colWidth = colCap;
-    if (colWidth < 0) colWidth = 0;
-    final avatarBudget = others.isEmpty ? 0.0 : (maxWidth - colWidth - gap);
+    // 量出来的名字宽**只用来给头像分预算**（名字是信息、优先，剩下的给头像），
+    // **不再拿来钉死名字列宽**——TextPainter 量出的宽与真实渲染可能有出入（字体
+    // 回退/字距等），偏小会把名字提前截断（老板 2026-10-09 macOS 实测：离中线
+    // 还很远就出现省略号）。名字列给「去掉头像条后剩下的全部宽度」，要不要
+    // 省略由文本自己按真实渲染宽决定。
+    final avatarMin = others.isEmpty ? 0.0 : kStatusMemberAvatarSize;
+    var want = nameWidth > countWidth ? nameWidth : countWidth;
+    final wantCap = maxWidth - avatarMin - gap; // 至少留一个头像位 + 间距
+    if (want > wantCap) want = wantCap;
+    if (want < 0) want = 0;
+    final avatarBudget = others.isEmpty ? 0.0 : (maxWidth - want - gap);
+    final stripCount =
+        others.isEmpty ? 0 : _stripAvatarCount(avatarBudget, others.length);
+    final stripWidth = stripCount * kStatusMemberAvatarSize;
+    final nameColMax =
+        (maxWidth - (others.isEmpty ? 0 : stripWidth + gap)).clamp(0.0, maxWidth);
 
-    // 第一行：有名字显示名字（点了改名）；没名字显示编辑图标（点了起名）
+    // 第一行：有名字显示名字（点了改名）；没名字显示编辑图标（点了起名）。
+    // 名字也做成**可点胶囊**（老板 2026-10-09）：悬浮/按住变色，与状态条其他
+    // 可点元素同口径（invite/通话图标/更多通道箭头）。
     final Widget nameLine = _groupName.isEmpty
         ? Tooltip(
             message: l10n.chatPageEdit,
@@ -1704,14 +1720,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           )
-        : InkWell(
-            mouseCursor: SystemMouseCursors.click,
-            borderRadius: BorderRadius.circular(6),
-            onTap: _showGroupNameDialog,
-            child: Text(_groupName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: nameStyle),
+        : Material(
+            color: Colors.transparent,
+            shape: const StadiumBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(mouseCursor: SystemMouseCursors.click,
+              onTap: _showGroupNameDialog,
+              hoverColor: Colors.black.withValues(alpha: 0.05),
+              highlightColor: Colors.black.withValues(alpha: 0.08),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Text(_groupName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: nameStyle),
+              ),
+            ),
           );
 
     // 第二行：「在线人数」绿 + 「/总人数」灰（在线灯同色，一眼看出谁在）
@@ -1725,15 +1749,38 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       maxLines: 1,
     );
 
-    final Widget body = Row(
+    // 头像条：有人加入时做成**可点胶囊**（点开「我的同伴」弹层）。
+    // **只包头像条**，不含右边的群名/人数（老板 2026-10-09）：群名已可单独单击改名，
+    // 人数/群名就不该再落进"我的同伴"的可点区。
+    // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
+    // 头像条与右方头像同高（40）上下顶满胶囊，**左右也贴边**：外层 `pad.left(10)`
+    // 推离 10，这里左移 10 回到边缘、左内边距 0。没有人加入（others 空）时没有头像条。
+    final Widget avatarCapsule = others.isEmpty
+        ? const SizedBox.shrink()
+        : Transform.translate(
+            offset: const Offset(-10, 0),
+            child: Material(
+              color: Colors.transparent,
+              shape: const StadiumBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(mouseCursor: SystemMouseCursors.click,
+                onTap: _showMembersSheet,
+                hoverColor: Colors.black.withValues(alpha: 0.05),
+                highlightColor: Colors.black.withValues(alpha: 0.08),
+                child: _avatarStrip(others, avatarBudget),
+              ),
+            ),
+          );
+
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (others.isNotEmpty) ...[
-          _avatarStrip(others, avatarBudget),
+          avatarCapsule,
           const SizedBox(width: gap),
         ],
-        SizedBox(
-          width: colWidth,
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: nameColMax),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1745,30 +1792,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ),
       ],
-    );
-    // **有人加入后整块做成可点胶囊**（老板 2026-10-06）：点开「我的同伴」弹层
-    // （名字行内部那个 InkWell 优先接管「改名」，其余区域落到这里进成员弹层）。
-    // 平时**无底色**，鼠标悬浮/按住才显色（与 invite/通话图标同口径的 hover/highlight）。
-    // 头像条与右方头像同高（40）上下顶满胶囊，**左右也贴边**：外层 `pad.left(10)`
-    // 推离 10，这里左移 10 回到边缘、左内边距 0。没有人加入（others 空）时纯展示，
-    // 不可点（但第一行的名字/编辑图标照常可点）。
-    if (others.isEmpty) return body;
-    return Transform.translate(
-      offset: const Offset(-10, 0),
-      child: Material(
-        color: Colors.transparent,
-        shape: const StadiumBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(mouseCursor: SystemMouseCursors.click,
-          onTap: _showMembersSheet,
-          hoverColor: Colors.black.withValues(alpha: 0.05),
-          highlightColor: Colors.black.withValues(alpha: 0.08),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
-            child: body,
-          ),
-        ),
-      ),
     );
   }
 
@@ -1854,20 +1877,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ///   又不引入新文案，一眼看出"后面还有人"；
   /// - **只构建装得下的那几个**：群大了也不该为看不见的头像去拉图（每个头像都是
   ///   一次带缓存的异步取图）。
+  /// 头像条在 [budget] 宽内摆几个（**只构建装得下的那几个**）。
+  /// 渐隐换算（`_avatarStrip` 的 ShaderMask 宽度）与名字列的头像预算共用这套算法，
+  /// 改 `size`/`fade` 要连着渐隐那段一起看。
+  int _stripAvatarCount(double budget, int total) {
+    const size = kStatusMemberAvatarSize;
+    // 渐隐区宽度：够看出一截"淡下去"，又不至于吞掉一整个头像
+    const fade = 16.0;
+    final natural = total * size; // 头像之间不留空隙（老板 2026-10-06：像连排印章）
+    // 兜底：budget 太小时至少摆一个（超过一点也不会撑破胶囊——它只是"一半宽"的软上限）
+    final usable = natural > budget ? budget - fade : budget;
+    var count = usable ~/ size;
+    if (count < 1) count = 1;
+    if (count > total) count = total;
+    return count;
+  }
+
   Widget _avatarStrip(List<MapEntry<String, int>> others, double budget) {
     const size = kStatusMemberAvatarSize;
     // 头像之间**不留空隙**（老板 2026-10-06：像连排印章，与右侧我方头像同高顶满）
     const gap = 0.0;
     // 渐隐区宽度：够看出一截"淡下去"，又不至于吞掉一整个头像
     const fade = 16.0;
-    // 兜底：budget 太小时至少摆一个（超过一点也不会撑破胶囊——它只是"一半宽"的软上限）
     final natural = others.length * size + (others.length - 1) * gap;
     final truncated = natural > budget;
-    final usable = truncated ? budget - fade : budget;
 
-    var count = ((usable + gap) / (size + gap)).floor();
-    if (count < 1) count = 1;
-    if (count > others.length) count = others.length;
+    final count = _stripAvatarCount(budget, others.length);
     final shown = others.take(count).toList();
     final stripWidth = shown.length * size + (shown.length - 1) * gap;
 
@@ -7449,14 +7484,33 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 children: [
                                   if (_myMemberName.isNotEmpty)
                                     Flexible(
-                                      child: Text(_myMemberName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          textAlign: TextAlign.end,
-                                          // 与对方一侧同号（15），两侧视觉对称
-                                          style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w500)),
+                                      // 名字做成**可点胶囊**（老板 2026-10-09）：点击开
+                                      // 「我的身份」弹窗（与菜单里「我的身份」同一入口），
+                                      // 悬浮/按住变色，与状态条其他可点元素同口径。
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        shape: const StadiumBorder(),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: InkWell(mouseCursor: SystemMouseCursors.click,
+                                          onTap: _showRenameDialog,
+                                          hoverColor:
+                                              Colors.black.withValues(alpha: 0.05),
+                                          highlightColor:
+                                              Colors.black.withValues(alpha: 0.08),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            child: Text(_myMemberName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.end,
+                                                // 与对方一侧同号（15），两侧视觉对称
+                                                style: const TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w500)),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   const SizedBox(height: 1),
                                   _statusLine(
