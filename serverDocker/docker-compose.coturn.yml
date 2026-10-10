@@ -13,6 +13,16 @@
 #
 # 用 host 网络：TURN 要用 49152–65535 这一大段 UDP 端口，且需要知道真实公网 IP，
 # 走 docker 桥接 + 端口映射既麻烦又容易在 external-ip 上踩坑。
+#
+# 独立项目名（老板 2026-10-09）：此前 VPS 搬迁时曾用
+# `-f docker-compose.yml -f docker-compose.coturn.yml` 启动，coturn 被打上主项目
+# （serverdocker）标签——此后每次只 `up server` 都报 "Found orphan containers
+# ([einz-coturn])"（无害，但 `--remove-orphans` 会把 TURN 删掉，跨网通话打洞失败）。
+# `name:` 把它钉进独立项目 einz-turn，与主 compose 彻底分离，孤儿警告永绝。
+# VPS 一次性迁移（会重建容器，几秒中断，只影响正在进行的跨网通话）：
+#   docker rm -f einz-coturn        # 旧容器挂在主项目 serverdocker 下，新文件 down 不到它
+#   docker compose -f docker-compose.coturn.yml up -d   # 新项目 einz-turn 重建
+name: einz-turn
 services:
   coturn:
     image: coturn/coturn:latest

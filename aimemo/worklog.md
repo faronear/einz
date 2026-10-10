@@ -13547,3 +13547,23 @@ emoji（Android 有字形/iOS 豆腐块）；长按预览的"视频"是取帧失
 404文本 / 400非法字符，dev 会话 token 造哈希行后 curl）；repository+
 attachment_store 30 测试全绿；flutter analyze 无告警；三端热重载。
 seq21 那条数据已丢只待焚毁/删除；seq24 类历史漏拉下一轮 sync 即自愈。
+
+
+## 2026-10-09 VPS 孤儿容器警告根治（方案B：coturn 独立项目名）
+
+**背景：** 老板 VPS `git pull && docker compose up -d --build server` 成功但
+报 `Found orphan containers ([einz-coturn])`。排查：coturn 在独立文件
+`docker-compose.coturn.yml`，但 VPS 搬迁时曾用 `-f 主 -f coturn` 一起启动，
+coturn 被打上主项目（serverdocker）标签——与目录改名无关，纯粹是"上次带的
+文件集与这次不一致"。警告本身无害（不动 `--remove-orphans` 就不删），但那
+个参数一旦随手加上会删掉 TURN 容器，跨网语音打洞失败。
+
+**修复（方案B，老板拍板）：** compose 顶部加 `name: einz-turn`——coturn 钉进
+独立项目，与主 compose 彻底分离，`up server` 永不再报孤儿。文件头注释写明
+VPS 一次性迁移命令（`docker rm -f einz-coturn` 后按新文件 `up -d` 重建——旧
+容器挂主项目标签，新文件 `down` 不到它，必须 rm）。commit 见 main 分支。
+
+**切分支注意：** 老板昨夜在 MacBook 的 feat/voice-transcript 分支有 WIP
+（sherpa_onnx pods、package.json 的 server-update-remote 加 sudo git pull、
+sessions.json）——用带说明的 stash 保存（`stash@{0}`），未丢弃；main 上的
+方案B 改动不含这些。
