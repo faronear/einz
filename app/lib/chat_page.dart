@@ -2070,10 +2070,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               // 头像放**最左**（老板 2026-09-26 新设计）；没设头像时底色按性别
+              // 点击统一开「My companion」弹层（老板 2026-10-10：与群空间头像条
+              // 全局一致——不再走头像全屏大图）。
               _statusAvatar(
                   bytes: _peerAvatarBytes,
                   gender: _peerGender,
-                  saveName: _peerName),
+                  saveName: _peerName,
+                  onTap: _showMembersSheet),
               const SizedBox(width: 8),
               Flexible(
                 child: Column(
