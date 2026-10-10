@@ -112,6 +112,7 @@ class ServerHealth {
     this.protocolVersion = '',
     this.capabilities = const <String>[],
     this.minAppVersion,
+    this.recommendAppVersion,
     this.appDownloadUrl,
     this.maxAttachmentBytes,
   });
@@ -129,6 +130,12 @@ class ServerHealth {
   /// 格式 `yymm.ddhh.mm`（见 `scripts/appVersion.js`），与 App 自身的
   /// CFBundleShortVersionString / versionName 同一个串，可直接比大小。
   final String? minAppVersion;
+
+  /// 服务端**推荐**的 App 版本（`recommend_app_version`；null = 不设建议，
+  /// 2026-10-10）。**建议更新**级别：本机版本低于它（但 ≥ [minAppVersion]）时，
+  /// 启动弹**可关闭**的升级提醒——与 [minAppVersion] 的"必须"（不可关闭窗口）
+  /// 相对。格式同 [minAppVersion]。
+  final String? recommendAppVersion;
 
   /// 升级入口 URL（`app_download_url`；null = 服务端不给链接）。
   final String? appDownloadUrl;
@@ -175,6 +182,7 @@ Future<ServerHealth> probeServer(String server) async {
       protocolVersion: pv,
       capabilities: caps,
       minAppVersion: nonEmpty(json['min_app_version']),
+      recommendAppVersion: nonEmpty(json['recommend_app_version']),
       appDownloadUrl: nonEmpty(json['app_download_url']),
       maxAttachmentBytes: maxAttachmentBytes,
     );

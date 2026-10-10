@@ -29,6 +29,7 @@ export interface FileConfig {
   maxMembersPerSpace?: number;
   minAppVersion?: string;
   appDownloadUrl?: string;
+  recommendAppVersion?: string;
   /** SQLite 数据文件的路径：绝对路径，或**相对 serverConfig.json 所在目录**的相对路径
    *  （如 `"../data/einz.nosf.sqlite.db"`）。空/未设 → 退回内置默认。
    *

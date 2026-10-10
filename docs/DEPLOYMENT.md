@@ -97,7 +97,14 @@ Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 > 不可关闭的升级窗口**（`/health` 下发 `min_app_version`）。配套的 `appDownloadUrl` 是升级
 > 窗口里「下载新版本」按钮的目标 URL（不填则只显示版本信息、不给按钮）。改后重启生效。
 > 用途：某个客户端版本有安全缺陷、或协议虽还能用但功能已不可靠时，改配置就能把旧客户端
-> 挡在门外，不必动代码。**开发时若连着配了闸门的服务器**，用
+> 挡在门外，不必动代码。
+>
+> **建议更新（2026-10-10）**：`recommendAppVersion` 声明**服务端推荐的 App 版本**（格式
+> 同上）。客户端版本 ≥ `minAppVersion` 但低于它时，启动弹**可关闭**的升级提醒
+> （`/health` 下发 `recommend_app_version`）——不拦人，用户可「以后再说」，下次启动再提醒。
+> 两个都低时**必须**优先（只弹不可关闭的窗口）；`appDownloadUrl` 两档共用。
+> 用途：推了新版本想让老用户升级、但不想强制（当前版本还能正常用）。
+> **开发时若连着配了闸门的服务器**，用
 > `--dart-define=SKIP_VERSION_GATE=true` 跑本地包。
 >
 > **数据文件位置（2026-10-07）**：`dataStore` 指定 SQLite 数据文件路径——绝对路径，或
@@ -163,8 +170,9 @@ serverDocker/
 
 **服务端配置（可选）**：`serverDocker/config/serverConfig.json` 会被挂到容器
 `/config/`，由 `EINZ_CONFIG` 指向。字段：`maxSpaces`（新空间数量上限）、
-`maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`minAppVersion` /
-`appDownloadUrl`（强制升级闸）、`dataStore`（数据文件路径，见 §2.2）。改后**重启容器**生效；
+`maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`minAppVersion`（强制
+> 升级下限）/ `recommendAppVersion`（建议更新版本）/ `appDownloadUrl`（升级窗口下载按钮
+> URL，两档共用）、`dataStore`（数据文件路径，见 §2.2）。改后**重启容器**生效；
 文件不存在时服务端照常启动（走默认值）。示例：
 
 ```bash

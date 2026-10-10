@@ -188,6 +188,30 @@ abstract class AppLocalizations {
   /// **'Check again'**
   String get upgradeRequiredRecheck;
 
+  /// No description provided for @upgradeRecommendedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get upgradeRecommendedTitle;
+
+  /// No description provided for @upgradeRecommendedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A newer version {latest} is available. You can keep using this version for now.'**
+  String upgradeRecommendedBody(String latest);
+
+  /// No description provided for @upgradeRecommendedDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download update'**
+  String get upgradeRecommendedDownload;
+
+  /// No description provided for @upgradeRecommendedLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get upgradeRecommendedLater;
+
   /// No description provided for @wizardJoinPassphraseRequired.
   ///
   /// In en, this message translates to:

@@ -13615,3 +13615,13 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
 - 附件不可用兜底排查（老板提问「点按重试有用吗」）：发现并修复①手动重试不复位 _healAttempts 导致点按无效的 bug；②孤儿消息（404 确认无附件）重试永远无效却仍显示「点按重试」——新增 _healConfirmedMissing 打标，UI 去掉重试邀请且不可点。l10n 复用现有文案未新增。analyze + 相关测试全过。
 - 「附件不可用」兜底行样式定稿（老板选淡灰方案）：图标+文字用时间戳同款淡灰/white70、字号 12，与红色「发送失败」告警区分；红色语义独占。
 - 撤回功能上线（老板 2026-10-10 方案）：服务端 POST /messages/recall 单事务校验 delivered 水位后真删消息+附件+文件；app 长按菜单「撤回」（自己未送达消息）；**墓碑消息也可撤**（本地墓碑不影响服务端行，菜单只剩撤回项+灰字占位）；本地删除/阅后即焚不联动服务端，撤回必须显性触发（老板拍板）。server recall.test.ts 5 场景全过。
+- 版本闸加**建议更新**档（老板 2026-10-10，与既有"必须更新"并列为两档）：
+  服务端 `serverConfig.json` 新增 `recommendAppVersion`（格式同 minAppVersion），
+  `/health` 配了才下发 `recommend_app_version`（空串=没配，同款防手滑归一化）；
+  客户端 `version_gate.dart` 改为 `VersionGateLevel`（none/recommended/required）判定，
+  required 优先——低于必须下限弹原不可关闭窗，否则低于建议版本弹**可关闭**的提醒
+  （「以后再说」+「下载新版本」，可点外部/Esc 关闭，复用 appDownloadUrl 链接行）。
+  老板拍板两点：①提示形式=可关闭弹窗（非横幅）；②每次启动都提示，不做本地记忆。
+  验证：server min_app_version.test.ts 6/6（+3 新用例）；app version_gate_test 14/14
+  （+6 新用例，含"恰好等于必须下限→只提醒不拦"的边界）；npm test 全链绿、
+  flutter analyze 干净。文档同步：PROTOCOL_MULTIVERSE.md §4.1、DEPLOYMENT.md 配置节。

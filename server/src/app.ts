@@ -190,6 +190,11 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       ...(cfg.min_app_version == null
         ? {}
         : { min_app_version: cfg.min_app_version }),
+      // **建议更新**（2026-10-10）：版本低于它（但 ≥ 强制下限）的客户端弹**可关闭**的
+      // 升级提醒。同 min_app_version：只在配了才下发。
+      ...(cfg.recommend_app_version == null
+        ? {}
+        : { recommend_app_version: cfg.recommend_app_version }),
       ...(cfg.app_download_url == null
         ? {}
         : { app_download_url: cfg.app_download_url })

@@ -57,4 +57,67 @@ void main() {
       expect(isAppVersionUnsupported('', '2610.0412.30'), isFalse);
     });
   });
+
+  group('appVersionGateLevel（2026-10-10 两档判定）', () {
+    const min = '2609.0101.00';
+    const rec = '2610.0412.30';
+
+    test('低于必须下限 → required（即使也低于建议版本）', () {
+      expect(
+        appVersionGateLevel('2608.2359.59', minVersion: min, recommendVersion: rec),
+        VersionGateLevel.required,
+      );
+    });
+
+    test('边界：恰好等于必须下限不算"低于" → recommended（只提醒，不拦）', () {
+      expect(
+        appVersionGateLevel(min, minVersion: min, recommendVersion: rec),
+        VersionGateLevel.recommended,
+      );
+    });
+
+    test('≥ 必须下限、低于建议版本 → recommended', () {
+      expect(
+        appVersionGateLevel('2610.0412.29', minVersion: min, recommendVersion: rec),
+        VersionGateLevel.recommended,
+      );
+    });
+
+    test('≥ 建议版本 → none', () {
+      expect(
+        appVersionGateLevel(rec, minVersion: min, recommendVersion: rec),
+        VersionGateLevel.none,
+      );
+      expect(
+        appVersionGateLevel('2610.0413.00', minVersion: min, recommendVersion: rec),
+        VersionGateLevel.none,
+      );
+    });
+
+    test('只配建议、不配必须：低于建议 → recommended（不拦，只提醒）', () {
+      expect(
+        appVersionGateLevel('2609.0101.00', recommendVersion: rec),
+        VersionGateLevel.recommended,
+      );
+      expect(
+        appVersionGateLevel(rec, recommendVersion: rec),
+        VersionGateLevel.none,
+      );
+    });
+
+    test('什么都不配 → none', () {
+      expect(appVersionGateLevel('2608.0101.00'), VersionGateLevel.none);
+      expect(
+        appVersionGateLevel('2608.0101.00', minVersion: '', recommendVersion: '   '),
+        VersionGateLevel.none,
+      );
+    });
+
+    test('拿不到本机版本（空串）→ 一律 none（宁可漏拦/漏提醒，不误拦）', () {
+      expect(
+        appVersionGateLevel('', minVersion: min, recommendVersion: rec),
+        VersionGateLevel.none,
+      );
+    });
+  });
 }

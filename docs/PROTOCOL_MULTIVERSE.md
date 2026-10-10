@@ -143,7 +143,11 @@ GET /health
     · `min_app_version`：服务端支持的**最低 App 版本**，格式 `yymm.ddhh.mm`
       （UTC，与 App 打包注入的 CFBundleShortVersionString 同一个串）；
       客户端启动时核对，低于它 → 首屏弹**不可关闭**的升级窗口。
-    · `app_download_url`：升级窗口里「下载新版本」按钮的 URL。
+    · `recommend_app_version`（2026-10-10，**建议更新**）：服务端**推荐**的 App 版本，
+      格式同上。客户端版本 ≥ `min_app_version` 但低于它 → 首屏弹**可关闭**的升级提醒
+      （不拦人）；两个都低时**必须**优先（只弹不可关闭的窗口）。只配它不配
+      `min_app_version` 时：低于它的客户端只被提醒、不被拦。
+    · `app_download_url`：升级窗口里「下载新版本」按钮的 URL（两档共用）。
   两个字段都非密、无元数据风险（不含任何空间/成员信息）。空串 = 没配（不下发）。
   **`max_attachment_bytes`（2026-10-08）**：附件 blob 大小上限（字节，默认 64 MiB，
   环境变量 `EINZ_MAX_ATTACHMENT_BYTES` 可覆盖）。客户端发送附件前据此**本地预检**：

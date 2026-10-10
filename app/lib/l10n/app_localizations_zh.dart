@@ -61,6 +61,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get upgradeRequiredRecheck => '重新检查';
 
   @override
+  String get upgradeRecommendedTitle => '有新版本';
+
+  @override
+  String upgradeRecommendedBody(String latest) {
+    return '已有新版本 $latest。当前版本仍可继续使用，建议抽空升级。';
+  }
+
+  @override
+  String get upgradeRecommendedDownload => '下载新版本';
+
+  @override
+  String get upgradeRecommendedLater => '以后再说';
+
+  @override
   String get wizardJoinPassphraseRequired => '请输入共享口令进行验证';
 
   @override

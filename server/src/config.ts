@@ -36,6 +36,12 @@ export interface ServerConfig {
    *  这个是**产品级**闸——比如某个版本有安全缺陷、或协议还能用但功能已不可靠，
    *  运维改配置即可把旧客户端挡在门外，不必动代码。 */
   min_app_version: string | null;
+  /** 服务端**推荐**的 App 版本（serverConfig.json 的 recommendAppVersion）。
+   *  **建议更新**级别（2026-10-10）：客户端版本 ≥ min_app_version 但 < 本值时，
+   *  启动弹**可关闭**的升级提醒——"有新版本了"，不拦人。与 min_app_version
+   *  的分工：后者是"必须"（不可关闭窗口），本值是"建议"（可关闭）。
+   *  null = 不设建议（默认）。格式同 min_app_version（yymm.ddhh.mm）。 */
+  recommend_app_version: string | null;
   /** 升级入口 URL（serverConfig.json 的 appDownloadUrl）：下发到客户端，
    *  供强制升级窗口里的「下载新版本」按钮使用。null = 不给链接（客户端只显示版本信息）。 */
   app_download_url: string | null;
@@ -66,6 +72,11 @@ export function loadConfig(): ServerConfig {
     typeof fc.minAppVersion === "string" && fc.minAppVersion.trim().length > 0
       ? fc.minAppVersion.trim()
       : null;
+  // 建议更新版本同款归一化：空串/非字符串一律当没配
+  const recommendAppVersion =
+    typeof fc.recommendAppVersion === "string" && fc.recommendAppVersion.trim().length > 0
+      ? fc.recommendAppVersion.trim()
+      : null;
   const appDownloadUrl =
     typeof fc.appDownloadUrl === "string" && fc.appDownloadUrl.trim().length > 0
       ? fc.appDownloadUrl.trim()
@@ -77,6 +88,7 @@ export function loadConfig(): ServerConfig {
     max_entrances_per_space: maxEntrancesPerSpace,
     max_members_per_space: maxMembersPerSpace,
     min_app_version: minAppVersion,
+    recommend_app_version: recommendAppVersion,
     app_download_url: appDownloadUrl,
   };
 }
