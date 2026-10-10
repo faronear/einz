@@ -288,6 +288,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 每条消息的自愈尝试计数：网络失败 +1；404 直接置满（确定结论，别再问）。
   final Map<String, int> _healAttempts = {};
 
+  /// 服务端**确认**无附件（自愈补拉 404）的消息 id：孤儿消息（超大附件被拒/
+  /// 发送失败）重试永远无效，UI 据此去掉「点按重试」邀请（老板 2026-10-10）。
+  /// 内存 Set 即可——重启后自愈首轮再 404 会重新标上。
+  final Set<String> _healConfirmedMissing = {};
+
   /// 自愈重入保护：ticker 每 3s 一次 unawaited，单条补拉慢（弱网）时会叠轮。
   bool _healInFlight = false;
 
@@ -314,8 +319,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (await _repo.healAttachmentMeta(m)) {
             fixed = true; // 补到了；计数清零不再动它
           } else {
-            // 404：服务端确认没有 → 立即放弃这条（置满计数），继续修其它
+            // 404：服务端确认没有 → 立即放弃这条（置满计数），继续修其它；
+            // 同时打上「确认缺失」标（UI 去掉「点按重试」邀请）
             _healAttempts[m.env.messageId] = _kHealAttachmentMaxRetries;
+            _healConfirmedMissing.add(m.env.messageId);
+            if (mounted) setState(() {});
           }
         } on Exception {
           // 网络/认证抖动：计数+1，留给下轮（到上限自然放弃）
@@ -6329,28 +6337,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 附件元数据缺失的媒体消息兜底 UI（2026-10-09）：明确的「附件不可用 ·
   /// 点按重试」，替代此前的 `🎬/📎 文件名` 乱码行（两个 emoji：iOS 渲染成
   /// 豆腐块、Android 看着像"视频+别针"，都不是真媒体观感）。
-  /// 点按 = 清媒体缓存 + 立即触发一次附件元数据自愈（服务端有数据的话，
-  /// 一轮 sync 周期内自动修复；确认没有的（孤儿）保持本行）。
+  /// 点按 = 清媒体缓存 + 复位该条的自愈计数 + 立即触发一次附件元数据自愈
+  /// （服务端有数据的话，一轮 sync 周期内自动修复；服务端确认没有的（孤儿，
+  /// 404）不显示本行——见 [_healConfirmedMissing]）。
   Widget _attachmentUnusable(HistoryMessage m) {
     final l10n = AppLocalizations.of(context)!;
+    final confirmedMissing = _healConfirmedMissing.contains(m.env.messageId);
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.broken_image_outlined, size: 16),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            // 服务端确认无附件（孤儿消息）：重试注定 404，不再邀请点按
+            // （老板 2026-10-10）；网络抖动等不确定原因才保留重试入口
+            confirmedMissing
+                ? l10n.chatPageAttachmentUnusable
+                : '${l10n.chatPageAttachmentUnusable} · ${l10n.chatPageAttachmentRetry}',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+    if (confirmedMissing) return row;
     return Clickable(
       onTap: () {
         _retryAttachment(m);
+        // 网络抖动累计放弃（计数置满）的，手动重试必须复位计数——否则
+        // _healAttachments 的筛选直接跳过这条，点按毫无反应（bug 修复）
+        _healAttempts.remove(m.env.messageId);
         unawaited(_healAttachments());
       },
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.broken_image_outlined, size: 16),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              '${l10n.chatPageAttachmentUnusable} · ${l10n.chatPageAttachmentRetry}',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+      child: row,
     );
   }
 
