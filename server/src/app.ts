@@ -4,7 +4,8 @@ import {
   type ServerResponse
 } from 'node:http'
 import { WebSocketServer } from 'ws'
-import { loadConfig, type ServerConfig } from './config.js'
+import { loadConfig } from './config.js'
+import { startConfigWatcher } from './configFile.js'
 import { getDb, openDb } from './db.js'
 import {
   cleanupExpired,
@@ -76,11 +77,15 @@ const SERVER_VERSION = '1.0.0'
 // 协议版本（PROTOCOL.md §1）：REST 头 X-Protocol-Version / WS 握手 ?pv=。
 // 单一来源见 ./protocolVersion.ts（与 ws.ts 共用，别再各写一份）。
 openDb() // 先开库（所有路由依赖 db 就绪）
-const cfg: ServerConfig = loadConfig()
+// 后台监听 serverConfig.json：变更时自动重读 → 产品参数（maxSpaces / 上限 /
+// 版本闸）**改配置不用重启**（2026-10-10，见 configFile.ts 的 startConfigWatcher）。
+// dataStore（DB 路径）除外——它只在 openDb() 时消费，改了要重启。
+startConfigWatcher()
 // 免认证的 POST /spaces 会一直开着（新空间创建者没有任何凭证可用），所以
 // maxSpaces 是"公网开放注册"的唯一总闸：0 = 不限 → 任何人都能无限建空间
-// （2026-09-15 评审 H2）。这里只提醒，改配置由老板决定。
-if (cfg.max_spaces === 0) {
+// （2026-09-15 评审 H2）。这里只提醒，改配置由老板决定（启动时提醒一次；
+// 之后热改配置不再重复提醒）。
+if (loadConfig().max_spaces === 0) {
   console.warn('[einz] maxSpaces=0（不限）')
 }
 
@@ -174,6 +179,8 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
     // 只报告服务健康、协议版本与能力：**不返回消息总量 / 在线连接数 / 成员元数据**
     // （2026-09-15 评审：免鉴权公网端点吐业务量属元数据泄露；Multiverse 下更要避免
     // 跨空间泄漏，空间状态由受保护 API 获取，见 PROTOCOL_MULTIVERSE.md §4.1）
+    // 每请求取新配置（startConfigWatcher 热加载后 /health 实时反映文件内容）
+    const cfg = loadConfig()
     sendJson(res, 200, {
       status: 'ok',
       protocol_version: cfg.protocol_version,

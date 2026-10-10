@@ -13,6 +13,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { watch, type FSWatcher } from "chokidar";
 
 // 用 fileURLToPath 兼容旧 Node（import.meta.dirname 需 Node 20.11+）
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -40,24 +41,71 @@ export interface FileConfig {
   dataStore?: string;
 }
 
+/** 缓存 = "最后一次读成功的配置"（2026-10-10 起可热更新）：
+ * - **首次**读取（无缓存）：文件缺失/解析失败 → 空配置 `{}`（冷启动没有"旧值"可保留）；
+ * - **热加载**（已有缓存）：文件缺失/解析失败 → **保留旧值**——运维手滑写坏 JSON
+ *   不该把线上配置清成默认值（例如把 minAppVersion 清空 = 强制升级闸失效）。 */
 let fileConfigCache: FileConfig | null = null;
 
-/** 读取并缓存 serverConfig.json（每次进程读一次；文件缺失或解析失败按空配置继续）。
- *  缓存是进程级的：测试若要在同一进程里改配置，必须在**首次读取前**设好 `EINZ_CONFIG`。 */
+/** 从磁盘读一次 serverConfig.json（不缓存、不抛错）。
+ *  返回 null = 本次读失败（缺失/解析失败）；[isHot] 决定是否保留旧值。 */
+function readConfigFromDisk(path: string, isHot: boolean): FileConfig | null {
+  if (!existsSync(path)) return null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      console.warn(`[einz] serverConfig.json 不是 JSON 对象（保留${isHot ? "旧配置" : "默认配置"}）`);
+      return null;
+    }
+    return parsed as FileConfig;
+  } catch (e) {
+    console.warn(`[einz] serverConfig.json 解析失败（保留${isHot ? "旧配置" : "默认配置"}）: ${e}`);
+    return null;
+  }
+}
+
+/** 读取 serverConfig.json（带缓存；热加载由 [startConfigWatcher] 驱动）。
+ *  测试若要在同一进程里改配置，必须在**首次读取前**设好 `EINZ_CONFIG`。 */
 export function readFileConfig(): FileConfig {
   if (fileConfigCache != null) return fileConfigCache;
-  const path = configFilePath();
-  if (existsSync(path)) {
-    try {
-      fileConfigCache = JSON.parse(readFileSync(path, "utf8")) as FileConfig;
-    } catch (e) {
-      console.warn(`[einz] serverConfig.json 解析失败（按默认配置继续）: ${e}`);
-      fileConfigCache = {};
-    }
-  } else {
-    fileConfigCache = {};
-  }
+  fileConfigCache = readConfigFromDisk(configFilePath(), false) ?? {};
   return fileConfigCache;
+}
+
+/** 让下一次 [readFileConfig] 重读磁盘（只失效缓存，不立刻读——调用方随后会读）。 */
+export function invalidateConfigCache(): void {
+  fileConfigCache = null;
+}
+
+/** 后台监听 serverConfig.json，变更时自动失效缓存 → **改配置不用重启**（2026-10-10）。
+ *
+ *  参考 pex 项目的 envar-tool.js（chokidar watch + 变更时重读）；einz 侧的差异：
+ *  ① 失效缓存而非合并进长命对象（einz 的 FileConfig 是扁平的，消费方每次
+ *     loadConfig() 都会重新归一化）；② 读失败保留旧值（见 [fileConfigCache] 注释）。
+ *
+ *  生效范围：所有"每次请求 loadConfig()"的字段（maxSpaces / 通道成员上限 /
+ *  minAppVersion / recommendAppVersion / appDownloadUrl，/health 实时下发）；
+ *  **dataStore（SQLite 路径）除外**——它只在启动 openDb() 时消费，改了要重启。
+ *
+ *  只在 server 入口（app.ts）启动一次；测试进程**不调**本函数（避免测试里
+ *  挂出关不掉的 watcher、且测试配置本来就是进程级固定的）。
+ *  文件缺失时照常监听（chokidar 对不存在的路径会等它出现）——运维临时删掉
+ *  配置文件 → 保留旧值；重新写好后自动生效。 */
+export function startConfigWatcher(): FSWatcher {
+  const path = configFilePath();
+  return watch(path, {
+    // 只认 change：新建/删除/重命名由 change 覆盖不了的语义在热加载里都不成立
+    // （"删文件 = 用默认配置"太危险，故读失败一律保留旧值）；
+    // awaitWriteFinish 防"编辑器先写一半再落盘"触发两次解析失败
+    // （einz 的保留旧值策略下只是多一次 warn，但能避免无谓日志）。
+    ignoreInitial: true,
+    awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 },
+  }).on("change", () => {
+    const fresh = readConfigFromDisk(path, true);
+    if (fresh === null) return; // 保留旧值（fileConfigCache 不动）
+    fileConfigCache = fresh;
+    console.log(`[einz] serverConfig.json 已热加载（${path}）`);
+  });
 }
 
 /** 纯函数：把 `dataStore` 的值解析成绝对路径。

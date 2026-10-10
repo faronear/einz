@@ -13631,3 +13631,16 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   ② 删掉「重新检查」按钮（老板建议：实际只有运维改回配置时有意义，对终端用户是干扰项；
   l10n 键 upgradeRequiredRecheck 一并删除，en/zh + gen-l10n）。
   analyze + version_gate_test 14/14 全绿。
+- serverConfig.json **热加载**（老板 2026-10-10，参考 pex 项目 envar-tool.js 的
+  chokidar 方案）：server 新增依赖 chokidar，`configFile.ts` 加 `startConfigWatcher()`
+  ——后台监听配置文件，change 时重读并更新缓存；`app.ts` 入口启动 watcher，
+  `/health` 从模块级 `const cfg` 改为每请求 `loadConfig()`（spaces/push 本就是
+  每请求读，随缓存失效自动生效）。
+  两个刻意设计：① **dataStore 不热载**（DB 只在启动 openDb 时消费，改了要重启）；
+  ② **写坏 JSON 保留旧配置**（不冷启动回默认值——运维手滑清掉 minAppVersion =
+  强制升级闸失效，代价太大；解析失败打 warn）。测试进程不启动 watcher（配置
+  本来就是进程级固定的，避免挂出关不掉的 watcher）。
+  实测：临时配置起 server → 改文件（不重启）/health 立即反映新版本号/链接 →
+  写坏 JSON 保留旧值 + warn。npm test 全链绿。
+  DEPLOYMENT.md 同步：各字段"改后重启生效"改为"自动热加载"，新增"配置热加载"
+  小节说明分界（dataStore 例外 + 坏文件保留旧值）。
