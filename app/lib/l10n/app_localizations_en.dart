@@ -46,20 +46,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupPageNeedPassphrase => 'Enter a shared passphrase';
 
   @override
-  String get upgradeRequiredTitle => 'Update required';
+  String get upgradeFrozenTitle => 'Update required';
 
   @override
-  String upgradeRequiredBody(String min) {
+  String upgradeFrozenBody(String min) {
     return 'Your app version is no longer supported (needs at least $min). Please update to continue.';
   }
 
   @override
-  String upgradeRequiredCurrent(String current) {
+  String upgradeCurrent(String current) {
     return 'Current version: $current';
   }
 
   @override
-  String get upgradeRequiredDownload => 'Download update';
+  String get upgradeFrozenDownload => 'Download update';
 
   @override
   String get upgradeCoolingTitle => 'Update available';

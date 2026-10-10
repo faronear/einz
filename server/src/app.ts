@@ -191,14 +191,14 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
       // （如 1GB 视频）时即时给一句人话，而不是把内存读满再吃 413（2026-10-08）。
       // 纯静态配置值，非密、无元数据风险（与 capabilities 同级）。
       max_attachment_bytes: MAX_ATTACHMENT_BYTES,
-      // 客户端启动时的**强制升级闸**（2026-10-04）：低于 min_app_version 的客户端
-      // 会在首屏弹不可关闭的升级窗口。只在服务端配了才下发（没配就不出现这个键，
-      // 老客户端对未知键天然无感）。两个字段都非密、无元数据风险。
-      ...(cfg.min_app_version == null
+      // 客户端启动时的**冻结闸**（2026-10-04，原"强制升级闸"）：低于 cold_app_version
+      // （frozen，不可用）的客户端会在首屏弹不可关闭的升级窗口。只在服务端配了才下发
+      // （没配就不出现这个键，老客户端对未知键天然无感）。两个字段都非密、无元数据风险。
+      ...(cfg.cold_app_version == null
         ? {}
-        : { min_app_version: cfg.min_app_version }),
-      // **冷却中的版本**（2026-10-10）：低于 hot_app_version（但 ≥ 最低下限）的
-      // 客户端弹**可关闭**的升级提醒。同 min_app_version：只在配了才下发。
+        : { cold_app_version: cfg.cold_app_version }),
+      // **冷却中的版本**（2026-10-10）：低于 hot_app_version（但 ≥ cold_app_version）
+      // 的客户端弹**可关闭**的升级提醒。同 cold_app_version：只在配了才下发。
       ...(cfg.hot_app_version == null
         ? {}
         : { hot_app_version: cfg.hot_app_version }),

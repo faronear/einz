@@ -27,22 +27,24 @@ export interface ServerConfig {
    *  与 maxEntrancesPerSpace 互补：那道闸管"通道总量"（含已撤销、防刷），这道闸
    *  管"身份总量"（同身份多通道不重复计数）。 */
   max_members_per_space: number;
-  /** 当前可用的最低 App 版本（serverConfig.json 的 minAppVersion）——低于它 = 已不可用。
-   *  **版本三态语义（2026-10-10 老板定）**：hot_app_version = 当前正热用的版本；
-   *  本值 = 当前可用的最低版本；介于两者之间 = **正在冷却**（仍可用，客户端启动弹
-   *  可关闭的升级提醒），低于本值 = 不可用（弹**不可关闭**的升级窗口）。
+  /** 冻结线：当前可用的最低 App 版本（serverConfig.json 的 coldAppVersion）——
+   *  低于它 = **frozen（冻结，不可用）**。
+   *  **版本三态语义（2026-10-10 老板定，温度序列）**：hot_app_version = 当前正热用的
+   *  版本；本值 = 冻结线；介于两者之间 = **cooling（正在冷却，仍可用，客户端启动弹
+   *  可关闭的升级提醒）**；低于本值 = **frozen（弹**不可关闭**的升级窗口）**。
+   *  注意 cold 是"线"不是"态"——状态只有 cooling / frozen。
    *  **格式 yymm.ddhh.mm**（见 scripts/appVersion.js，UTC）——与 App 自身的
    *  CFBundleShortVersionString / versionName 是同一个串，客户端可直接比大小。
-   *  null = 不设下限（默认）。
+   *  null = 不设冻结线（默认）。
    *  为什么不用 protocol_version 代替：那是 wire 兼容闸（服务端会硬拒），
    *  这个是**产品级**闸——比如某个版本有安全缺陷、或协议还能用但功能已不可靠，
    *  运维改配置即可把旧客户端挡在门外，不必动代码。 */
-  min_app_version: string | null;
+  cold_app_version: string | null;
   /** 当前正热用的 App 版本（serverConfig.json 的 hotAppVersion）——低于它但
-   *  ≥ min_app_version = **正在冷却**（2026-10-10 老板定：hot / cooling / 不可用
-   *  三态，见 min_app_version 注释）。冷却中的客户端启动弹**可关闭**的升级提醒
-   *  ——"有新版本了"，不拦人。null = 不设热版本（默认，不下发冷却提醒）。
-   *  格式同 min_app_version（yymm.ddhh.mm）。 */
+   *  ≥ cold_app_version = **cooling（正在冷却）**（2026-10-10 老板定：hot / cooling /
+   *  frozen 温度三态，见 cold_app_version 注释）。冷却中的客户端启动弹**可关闭**的
+   *  升级提醒——"有新版本了"，不拦人。null = 不设热版本（默认，不下发冷却提醒）。
+   *  格式同 cold_app_version（yymm.ddhh.mm）。 */
   hot_app_version: string | null;
   /** 升级入口 URL（serverConfig.json 的 appDownloadUrl）：下发到客户端，
    *  供强制升级窗口里的「下载新版本」按钮使用。null = 不给链接（客户端只显示版本信息）。 */
@@ -70,9 +72,9 @@ export function loadConfig(): ServerConfig {
       : 0;
   // 版本号两条都按"非空字符串才算设了"处理：空串/非字符串一律当没配（别把
   // 手滑写空当成"要求所有客户端升级"）
-  const minAppVersion =
-    typeof fc.minAppVersion === "string" && fc.minAppVersion.trim().length > 0
-      ? fc.minAppVersion.trim()
+  const coldAppVersion =
+    typeof fc.coldAppVersion === "string" && fc.coldAppVersion.trim().length > 0
+      ? fc.coldAppVersion.trim()
       : null;
   // 热版本（hotAppVersion）同款归一化：空串/非字符串一律当没配
   const hotAppVersion =
@@ -89,7 +91,7 @@ export function loadConfig(): ServerConfig {
     max_spaces: maxSpaces,
     max_entrances_per_space: maxEntrancesPerSpace,
     max_members_per_space: maxMembersPerSpace,
-    min_app_version: minAppVersion,
+    cold_app_version: coldAppVersion,
     hot_app_version: hotAppVersion,
     app_download_url: appDownloadUrl,
   };

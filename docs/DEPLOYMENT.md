@@ -92,25 +92,26 @@ Space Key，同时完成通道登记 + 签发会话）→ 进入会话。
 > n 个身份（建议 4）。注意**双人秘境恒为 2 人**、与这个值无关（空间类型在创建时选定、不可改，
 > 详见 `aimemo/groupChatDesign.md`）；超限加入返回 `SPACE_FULL`（409）。
 >
-> **强制升级闸（2026-10-04）**：`minAppVersion` 声明**服务端支持的最低 App 版本**，格式
-> `yymm.ddhh.mm`（UTC，与 App 打包时注入的版本号是同一个串，见 `scripts/appVersion.js`），
-> 例如 `"2610.0412.30"`；空串/不填 = 不设下限（默认）。低于它的客户端**启动时在首屏弹
-> 不可关闭的升级窗口**（`/health` 下发 `min_app_version`）。配套的 `appDownloadUrl` 是升级
+> **冻结闸（2026-10-04，原"强制升级闸"）**：`coldAppVersion` 声明**冻结线**——服务端
+> 当前可用的最低 App 版本，格式 `yymm.ddhh.mm`（UTC，与 App 打包时注入的版本号是同一个串，
+> 见 `scripts/appVersion.js`），例如 `"2610.0412.30"`；空串/不填 = 不设冻结线（默认）。
+> 低于它的客户端（**frozen，冻结不可用**）**启动时在首屏弹不可关闭的升级窗口**
+> （`/health` 下发 `cold_app_version`）。配套的 `appDownloadUrl` 是升级
 > 窗口里「下载新版本」按钮的目标 URL（不填则只显示版本信息、不给按钮）。改后自动热加载。
 > 用途：某个客户端版本有安全缺陷、或协议虽还能用但功能已不可靠时，改配置就能把旧客户端
 > 挡在门外，不必动代码。
 >
 > **冷却提醒（2026-10-10，原"建议更新"）**：`hotAppVersion` 声明**服务端当前正热用的
-> App 版本**（格式同上）。**版本三态语义（老板定）**：`hotAppVersion` = 当前正热用；
-> `minAppVersion` = 当前可用的最低版本；**介于两者之间 = 正在冷却**——仍正常可用，
-> 客户端启动弹**可关闭**的升级提醒（`/health` 下发 `hot_app_version`）——不拦人，
-> 用户可「以后再说」，下次启动再提醒。两个都低时"不可用"判定优先（只弹不可关闭的
-> 窗口）；`appDownloadUrl` 两档共用。
+> App 版本**（格式同上）。**温度三态语义（老板定）**：`hotAppVersion` = 当前正热用
+> （hot）；`coldAppVersion` = 冻结线；**介于两者之间 = cooling（正在冷却）**——仍正常
+> 可用，客户端启动弹**可关闭**的升级提醒（`/health` 下发 `hot_app_version`）——不拦人，
+> 用户可「以后再说」，下次启动再提醒；低于冻结线 = **frozen（冻结）**，弹不可关闭的
+> 窗口（frozen 判定优先）。注意 cold 是"线"不是"态"。`appDownloadUrl` 两档共用。
 > 用途：推了新版本让老用户升级、但不想拦（冷却中的版本仍正常可用）。
 >
 > **配置热加载（2026-10-10）**：服务端后台监听 `serverConfig.json`（chokidar），
 > 文件落盘后自动重读——**产品参数（`maxSpaces` / `maxEntrancesPerSpace` /
-> `maxMembersPerSpace` / `minAppVersion` / `hotAppVersion` / `appDownloadUrl`）
+> `maxMembersPerSpace` / `coldAppVersion` / `hotAppVersion` / `appDownloadUrl`）
 > 改完即生效，不用重启**（`/health` 与各限额端点每请求读最新配置）。两个边界：
 > ① `dataStore`（SQLite 路径）**不热加载**——DB 只在启动时打开，改了要重启；
 > ② 文件写坏（JSON 解析失败）时**保留上一次的好配置**（并打 warn 日志），不会把线上
@@ -181,8 +182,8 @@ serverDocker/
 
 **服务端配置（可选）**：`serverDocker/config/serverConfig.json` 会被挂到容器
 `/config/`，由 `EINZ_CONFIG` 指向。字段：`maxSpaces`（新空间数量上限）、
-`maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`minAppVersion`（当前
-> 可用最低版本）/ `hotAppVersion`（当前正热用版本）/ `appDownloadUrl`（升级窗口下载按钮
+`maxEntrancesPerSpace` / `maxMembersPerSpace`（通道 / 成员上限）、`coldAppVersion`（冻结
+> 线，当前可用最低版本）/ `hotAppVersion`（当前正热用版本）/ `appDownloadUrl`（升级窗口下载按钮
 > URL，两档共用）、`dataStore`（数据文件路径，见 §2.2）。除 `dataStore`（DB 路径，
 > 改了要**重启容器**）外，其余字段**改后自动热加载、不用重启**（2026-10-10，见上节
 > "配置热加载"）；文件不存在时服务端照常启动（走默认值）。示例：

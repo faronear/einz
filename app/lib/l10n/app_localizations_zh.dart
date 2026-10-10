@@ -42,20 +42,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setupPageNeedPassphrase => '请设置共享口令';
 
   @override
-  String get upgradeRequiredTitle => '必须升级';
+  String get upgradeFrozenTitle => '必须升级';
 
   @override
-  String upgradeRequiredBody(String min) {
+  String upgradeFrozenBody(String min) {
     return '您正在使用的版本已经过期（最低需要 $min）。升级后才能继续使用。';
   }
 
   @override
-  String upgradeRequiredCurrent(String current) {
+  String upgradeCurrent(String current) {
     return '当前版本：$current';
   }
 
   @override
-  String get upgradeRequiredDownload => '下载新版本';
+  String get upgradeFrozenDownload => '下载新版本';
 
   @override
   String get upgradeCoolingTitle => '有新版本';

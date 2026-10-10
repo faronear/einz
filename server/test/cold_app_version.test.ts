@@ -1,16 +1,16 @@
 /**
- * 回归：`/health` 的**最低 App 版本闸**（2026-10-04）。
+ * 回归：`/health` 的**版本闸**（2026-10-04 起；2026-10-10 温度三态 hot/cooling/frozen）。
  *
- * 服务端在 serverConfig.json 里配 `minAppVersion`（格式 yymm.ddhh.mm）后，/health
- * 多下发 `min_app_version`（+ 可选 `app_download_url`）；客户端启动时据此决定要不要
- * 弹"必须升级"的不可关闭窗口（见 app/lib/widgets/version_gate.dart）。
+ * 服务端在 serverConfig.json 里配 `coldAppVersion`（冻结线，格式 yymm.ddhh.mm）后，/health
+ * 多下发 `cold_app_version`（+ 可选 `hot_app_version` / `app_download_url`）；客户端启动时
+ * 据此决定弹哪种窗（见 app/lib/widgets/version_gate.dart）。
  *
  * 两条边界：
  *   ① 配了 → 两个字段都出现，值得原样；
  *   ② 没配（或写空串）→ **键根本不出现**（老客户端对未知键无感，但"空值"会让人
  *      以为配了）——这一条同时防"手滑写空串把所有人挡在门外"。
  *
- * 运行：npm test（tsx test/min_app_version.test.ts）——需要 Node v22（better-sqlite3 ABI）
+ * 运行：npm test（tsx test/cold_app_version.test.ts）——需要 Node v22（better-sqlite3 ABI）
  */
 import assert from 'node:assert/strict'
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -74,15 +74,15 @@ async function health (port: number): Promise<Record<string, unknown>> {
   return (await res.json()) as Record<string, unknown>
 }
 
-test('/health：配了 minAppVersion → 下发 min_app_version + app_download_url', async () => {
+test('/health：配了 coldAppVersion → 下发 cold_app_version + app_download_url', async () => {
   await withServer(
     {
-      minAppVersion: '2610.0412.30',
+      coldAppVersion: '2610.0412.30',
       appDownloadUrl: 'https://example.com/einz/latest'
     },
     async port => {
       const body = await health(port)
-      assert.equal(body.min_app_version, '2610.0412.30')
+      assert.equal(body.cold_app_version, '2610.0412.30')
       assert.equal(body.app_download_url, 'https://example.com/einz/latest')
       // 老字段不受影响
       assert.equal(body.status, 'ok')
@@ -92,20 +92,20 @@ test('/health：配了 minAppVersion → 下发 min_app_version + app_download_u
 })
 
 test('/health：没配（或写空串）→ 两个键都不出现', async () => {
-  await withServer({ minAppVersion: '', appDownloadUrl: '   ' }, async port => {
+  await withServer({ coldAppVersion: '', appDownloadUrl: '   ' }, async port => {
     const body = await health(port)
     assert.ok(
-      !('min_app_version' in body),
+      !('cold_app_version' in body),
       '空串一律当作没配——否则手滑写空会把所有客户端挡在门外'
     )
     assert.ok(!('app_download_url' in body), '只有空格也算没配')
   })
 })
 
-test('/health：只配 minAppVersion 不配下载链接 → 只下发前者', async () => {
-  await withServer({ minAppVersion: '2610.0412.30' }, async port => {
+test('/health：只配 coldAppVersion 不配下载链接 → 只下发前者', async () => {
+  await withServer({ coldAppVersion: '2610.0412.30' }, async port => {
     const body = await health(port)
-    assert.equal(body.min_app_version, '2610.0412.30')
+    assert.equal(body.cold_app_version, '2610.0412.30')
     assert.ok(!('app_download_url' in body), '没配链接就不给按钮（客户端只显示版本信息）')
   })
 })
@@ -115,13 +115,13 @@ test('/health：只配 minAppVersion 不配下载链接 → 只下发前者', as
 test('/health：配了 hotAppVersion → 下发 hot_app_version', async () => {
   await withServer(
     {
-      minAppVersion: '2609.0101.00',
+      coldAppVersion: '2609.0101.00',
       hotAppVersion: '2610.0412.30',
       appDownloadUrl: 'https://example.com/einz/latest'
     },
     async port => {
       const body = await health(port)
-      assert.equal(body.min_app_version, '2609.0101.00')
+      assert.equal(body.cold_app_version, '2609.0101.00')
       assert.equal(body.hot_app_version, '2610.0412.30')
       assert.equal(body.app_download_url, 'https://example.com/einz/latest')
     }
@@ -129,9 +129,9 @@ test('/health：配了 hotAppVersion → 下发 hot_app_version', async () => {
 })
 
 test('/health：hotAppVersion 没配/写空串 → 键不出现', async () => {
-  await withServer({ minAppVersion: '2610.0412.30', hotAppVersion: '   ' }, async port => {
+  await withServer({ coldAppVersion: '2610.0412.30', hotAppVersion: '   ' }, async port => {
     const body = await health(port)
-    assert.equal(body.min_app_version, '2610.0412.30')
+    assert.equal(body.cold_app_version, '2610.0412.30')
     assert.ok(
       !('hot_app_version' in body),
       '空串一律当没配（防手滑写空让所有客户端弹"冷却提醒"）'
@@ -139,10 +139,10 @@ test('/health：hotAppVersion 没配/写空串 → 键不出现', async () => {
   })
 })
 
-test('/health：只配 hotAppVersion 不配 minAppVersion → 只下发前者', async () => {
+test('/health：只配 hotAppVersion 不配 coldAppVersion → 只下发前者', async () => {
   await withServer({ hotAppVersion: '2610.0412.30' }, async port => {
     const body = await health(port)
     assert.equal(body.hot_app_version, '2610.0412.30')
-    assert.ok(!('min_app_version' in body), '没配强制下限就不下发 min_app_version')
+    assert.ok(!('cold_app_version' in body), '没配强制下限就不下发 cold_app_version')
   })
 })

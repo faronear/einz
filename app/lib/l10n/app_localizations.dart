@@ -158,29 +158,29 @@ abstract class AppLocalizations {
   /// **'Enter a shared passphrase'**
   String get setupPageNeedPassphrase;
 
-  /// No description provided for @upgradeRequiredTitle.
+  /// No description provided for @upgradeFrozenTitle.
   ///
   /// In en, this message translates to:
   /// **'Update required'**
-  String get upgradeRequiredTitle;
+  String get upgradeFrozenTitle;
 
-  /// No description provided for @upgradeRequiredBody.
+  /// No description provided for @upgradeFrozenBody.
   ///
   /// In en, this message translates to:
   /// **'Your app version is no longer supported (needs at least {min}). Please update to continue.'**
-  String upgradeRequiredBody(String min);
+  String upgradeFrozenBody(String min);
 
-  /// No description provided for @upgradeRequiredCurrent.
+  /// No description provided for @upgradeCurrent.
   ///
   /// In en, this message translates to:
   /// **'Current version: {current}'**
-  String upgradeRequiredCurrent(String current);
+  String upgradeCurrent(String current);
 
-  /// No description provided for @upgradeRequiredDownload.
+  /// No description provided for @upgradeFrozenDownload.
   ///
   /// In en, this message translates to:
   /// **'Download update'**
-  String get upgradeRequiredDownload;
+  String get upgradeFrozenDownload;
 
   /// No description provided for @upgradeCoolingTitle.
   ///

@@ -28,7 +28,7 @@ export interface FileConfig {
   maxSpaces?: number;
   maxEntrancesPerSpace?: number;
   maxMembersPerSpace?: number;
-  minAppVersion?: string;
+  coldAppVersion?: string;
   appDownloadUrl?: string;
   hotAppVersion?: string;
   /** SQLite 数据文件的路径：绝对路径，或**相对 serverConfig.json 所在目录**的相对路径
@@ -44,7 +44,7 @@ export interface FileConfig {
 /** 缓存 = "最后一次读成功的配置"（2026-10-10 起可热更新）：
  * - **首次**读取（无缓存）：文件缺失/解析失败 → 空配置 `{}`（冷启动没有"旧值"可保留）；
  * - **热加载**（已有缓存）：文件缺失/解析失败 → **保留旧值**——运维手滑写坏 JSON
- *   不该把线上配置清成默认值（例如把 minAppVersion 清空 = 强制升级闸失效）。 */
+ *   不该把线上配置清成默认值（例如把 coldAppVersion 清空 = 强制升级闸失效）。 */
 let fileConfigCache: FileConfig | null = null;
 
 /** 从磁盘读一次 serverConfig.json（不缓存、不抛错）。
@@ -84,7 +84,7 @@ export function invalidateConfigCache(): void {
  *     loadConfig() 都会重新归一化）；② 读失败保留旧值（见 [fileConfigCache] 注释）。
  *
  *  生效范围：所有"每次请求 loadConfig()"的字段（maxSpaces / 通道成员上限 /
- *  minAppVersion / hotAppVersion / appDownloadUrl，/health 实时下发）；
+ *  coldAppVersion / hotAppVersion / appDownloadUrl，/health 实时下发）；
  *  **dataStore（SQLite 路径）除外**——它只在启动 openDb() 时消费，改了要重启。
  *
  *  只在 server 入口（app.ts）启动一次；测试进程**不调**本函数（避免测试里

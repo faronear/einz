@@ -13658,3 +13658,19 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   工作），只留 version_gate_test.dart 手工修。**全局子串替换必须带词边界**（regex
   `\brec\b` 或完整标识符），教训记入 memory。
   验证：server npm test 24/24 全绿；flutter analyze 干净；version_gate_test 14/14。
+- **温度词汇定稿：minAppVersion → coldAppVersion，frozen 态**（老板 2026-10-10 改主意，
+  按我推荐的全套温度三态执行，趁未 push）：配置键/wire 键 `coldAppVersion` /
+  `cold_app_version`（**冻结线**：当前可用的最低版本，低于它 = frozen 冻结不可用，
+  弹不可关闭窗）；`hotAppVersion` / `hot_app_version`（当前正热用版本）。温度序列：
+  **hot（正热用）→ cooling（正在冷却，仍可用，可关闭提醒）→ frozen（冻结，不可用，
+  不可关闭窗）**——cold 是"线"不是"态"（状态只有 cooling/frozen），已钉进注释与文档。
+  全链路替换（全部完整标识符，无子串污染）：serverConfig 键（example.json + 本机测试
+  config）、FileConfig/ServerConfig 字段、/health 下发键、ServerHealth.coldAppVersion、
+  isAppVersionUnsupported → **isAppVersionFrozen**、VersionGateLevel.required →
+  **frozen**、_FrozenUpgradeDialog、l10n upgradeRequired* → **upgradeFrozen***
+  （Current 行两档共用 → **upgradeCurrent**，en/zh + gen-l10n）、双侧测试、
+  服务端测试文件 git mv min_app_version.test.ts → **cold_app_version.test.ts**
+  （package.json 测试链同步）、PROTOCOL_MULTIVERSE.md §4.1 / DEPLOYMENT.md /
+  productLens 同步。注意：装过 2026-10-04 后旧包的 wire 键 min_app_version 失效，
+  需重装/重编（自用 + 未 push，可接受）。
+  验证：server npm test 24/24 全绿；flutter analyze 干净；version_gate_test 14/14。

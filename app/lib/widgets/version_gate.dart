@@ -6,12 +6,13 @@ import '../data/server_config.dart';
 import '../l10n/app_localizations.dart';
 import 'linkified_text.dart';
 
-/// 版本闸（2026-10-04）：服务端在 `/health` 里声明 `min_app_version` 时，
+/// 版本闸（2026-10-04）：服务端在 `/health` 里声明 `cold_app_version` 时，
 /// **低于它的客户端在首屏弹一个关不掉的升级窗口**——"服务端已经不支持你了"。
 ///
-/// 2026-10-10 起分**三态**（老板定）：`hot_app_version` = 当前正热用的版本；
-/// `min_app_version` = 当前可用的最低版本——低于它弹**关不掉**的升级窗口（拦人）；
-/// 介于两者之间 = **正在冷却**（弹可关闭的提醒，不拦人）。
+/// 2026-10-10 起分**温度三态**（老板定）：`hot_app_version` = 当前正热用的版本；
+/// `cold_app_version` = 冻结线（当前可用的最低版本）；介于两者之间 = **cooling
+/// （正在冷却，弹可关闭的提醒，不拦人）**；低于冻结线 = **frozen（冻结，弹关不掉的
+/// 升级窗口）**。注意 cold 是"线"不是"态"——状态只有 cooling / frozen。
 ///
 /// 为什么要有这道闸（与 `PROTOCOL_VERSION` 的分工）：
 /// - `protocol_version` 是 **wire 兼容闸**：版本不符服务端直接 400 / WS 4400，
@@ -31,13 +32,13 @@ import 'linkified_text.dart';
 /// 任何真实下限 —— 连着配了闸门的服务器时会被自己挡在门外。
 const bool kSkipVersionGate = bool.fromEnvironment('SKIP_VERSION_GATE');
 
-/// 版本闸级别（2026-10-10 起三态：hot / cooling / 不可用）。
+/// 版本闸级别（2026-10-10 起温度三态：hot / cooling / frozen）。
 ///
-/// - [required]：低于**最低可用版本**（min_app_version）→ 弹**关不掉**的升级窗口（拦人）；
-/// - [cooling]：低于**当前热版本**（hot_app_version）但未低于最低可用 → **正在冷却**，
+/// - [frozen]：低于**冻结线**（cold_app_version）→ 弹**关不掉**的升级窗口（拦人）；
+/// - [cooling]：低于**当前热版本**（hot_app_version）但未低于冻结线 → **正在冷却**，
 ///   弹**可关闭**的升级提醒（不拦人）；
 /// - [none]：已达热版本，或服务端什么都没设。
-enum VersionGateLevel { none, cooling, required }
+enum VersionGateLevel { none, cooling, frozen }
 
 /// 版本号比较（`yymm.ddhh.mm`，见 `scripts/appVersion.js`）。
 ///
@@ -58,36 +59,36 @@ int compareAppVersions(String a, String b) {
   return 0;
 }
 
-/// 本机版本是否已不被服务端支持。
+/// 本机版本是否已冻结（frozen：低于服务端冻结线，不可用）。
 ///
-/// [appVersion] 为空（拿不到包信息）/ [minVersion] 为空（服务端不设下限）→ 一律
-/// **不支持判定为"不支持"**（false）：宁可漏拦，不误拦。拿不到自己的版本就无从比较，
+/// [appVersion] 为空（拿不到包信息）/ [coldVersion] 为空（服务端不设冻结线）→ 一律
+/// 判为"未冻结"（false）：宁可漏拦，不误拦。拿不到自己的版本就无从比较，
 /// 把用户锁在门外是比"放行一个旧版本"更糟的错误。
-bool isAppVersionUnsupported(String appVersion, String? minVersion) {
+bool isAppVersionFrozen(String appVersion, String? coldVersion) {
   if (appVersion.trim().isEmpty) return false;
-  final min = minVersion?.trim() ?? '';
-  if (min.isEmpty) return false;
-  return compareAppVersions(appVersion, min) < 0;
+  final cold = coldVersion?.trim() ?? '';
+  if (cold.isEmpty) return false;
+  return compareAppVersions(appVersion, cold) < 0;
 }
 
 /// 版本闸级别判定（2026-10-10）：服务端下发的两个版本号 + 本机版本 → 弹哪种窗。
 ///
-/// **required 优先**：低于最低可用版本就是"不可用"（被拦着的人不需要再看到
-/// 冷却提醒）；否则低于热版本 → **cooling**（正在冷却）；都不低（或服务端没设 /
+/// **frozen 优先**：低于冻结线就是"冻结"（被拦着的人不需要再看到冷却提醒）；
+/// 否则低于热版本 → **cooling**（正在冷却）；都不低（或服务端没设 /
 /// 版本号空串）→ **none**。
 ///
 /// [appVersion] 为空（拿不到包信息）→ 一律 **none**：宁可漏拦/漏提醒，不误拦
-/// （与 [isAppVersionUnsupported] 同一政策）。
+/// （与 [isAppVersionFrozen] 同一政策）。
 VersionGateLevel appVersionGateLevel(
   String appVersion, {
-  String? minVersion,
+  String? coldVersion,
   String? hotVersion,
 }) {
   if (appVersion.trim().isEmpty) return VersionGateLevel.none;
-  final min = minVersion?.trim() ?? '';
+  final cold = coldVersion?.trim() ?? '';
   final hot = hotVersion?.trim() ?? '';
-  if (min.isNotEmpty && compareAppVersions(appVersion, min) < 0) {
-    return VersionGateLevel.required;
+  if (cold.isNotEmpty && compareAppVersions(appVersion, cold) < 0) {
+    return VersionGateLevel.frozen;
   }
   if (hot.isNotEmpty && compareAppVersions(appVersion, hot) < 0) {
     return VersionGateLevel.cooling;
@@ -110,7 +111,7 @@ Future<String> appVersionString() async {
   return _cachedAppVersion!;
 }
 
-/// 启动时核对版本级别；低于最低可用版本弹**关不掉**的升级窗口，冷却中弹可关闭的提醒。
+/// 启动时核对版本级别；低于冻结线（frozen）弹**关不掉**的升级窗口，冷却中弹可关闭的提醒。
 ///
 /// 调用点：`StartupGate.initState`（首屏，所有入口——锁屏 / 向导 / 直接进聊天——
 /// 都会先经过它）。探测失败静默返回，不影响任何流程。
@@ -135,20 +136,20 @@ Future<void> checkVersionGate(
 
   final current = await (appVersion ?? appVersionString)();
   final level = appVersionGateLevel(current,
-      minVersion: health.minAppVersion,
+      coldVersion: health.coldAppVersion,
       hotVersion: health.hotAppVersion);
   if (level == VersionGateLevel.none || !context.mounted) return;
 
   await showDialog<void>(
     context: context,
-    // 只有低于最低可用版本才关不掉（点外面不行、返回键/ Esc 也不行）：拦着的人
+    // 只有 frozen（低于冻结线）才关不掉（点外面不行、返回键/ Esc 也不行）：拦着的人
     // 给一个能划走的窗就等于没拦。**冷却**级别可关闭——它只是"有新版本"的提醒，
     // 产品上用户有权忽略（老板 2026-10-10 定）。
-    barrierDismissible: level != VersionGateLevel.required,
-    builder: (ctx) => level == VersionGateLevel.required
-        ? _RequiredUpgradeDialog(
+    barrierDismissible: level != VersionGateLevel.frozen,
+    builder: (ctx) => level == VersionGateLevel.frozen
+        ? _FrozenUpgradeDialog(
             currentVersion: current,
-            minVersion: health.minAppVersion!,
+            coldVersion: health.coldAppVersion!,
             downloadUrl: health.appDownloadUrl,
           )
         : _CoolingUpgradeDialog(
@@ -170,16 +171,16 @@ Future<void> openAppDownloadUrl(BuildContext context, String? url) async {
   }
 }
 
-/// **必须**升级窗（关不掉）：服务端已不支持本版本。
-class _RequiredUpgradeDialog extends StatelessWidget {
-  const _RequiredUpgradeDialog({
+/// **冻结**升级窗（关不掉）：本版本已 frozen（低于冻结线），服务端不再支持。
+class _FrozenUpgradeDialog extends StatelessWidget {
+  const _FrozenUpgradeDialog({
     required this.currentVersion,
-    required this.minVersion,
+    required this.coldVersion,
     this.downloadUrl,
   });
 
   final String currentVersion;
-  final String minVersion;
+  final String coldVersion;
   final String? downloadUrl;
 
   @override
@@ -190,14 +191,14 @@ class _RequiredUpgradeDialog extends StatelessWidget {
     return PopScope(
       canPop: false,
       child: AlertDialog(
-        title: Center(child: Text(l10n.upgradeRequiredTitle)),
+        title: Center(child: Text(l10n.upgradeFrozenTitle)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.upgradeRequiredBody(minVersion)),
+            Text(l10n.upgradeFrozenBody(coldVersion)),
             const SizedBox(height: 10),
-            Text(l10n.upgradeRequiredCurrent(currentVersion),
+            Text(l10n.upgradeCurrent(currentVersion),
                 style: const TextStyle(fontSize: 12, color: Colors.grey)),
             if (hasUrl) ...[
               const SizedBox(height: 10),
@@ -211,7 +212,7 @@ class _RequiredUpgradeDialog extends StatelessWidget {
           if (hasUrl)
             FilledButton(
               onPressed: () => openAppDownloadUrl(context, downloadUrl),
-              child: Text(l10n.upgradeRequiredDownload),
+              child: Text(l10n.upgradeFrozenDownload),
             ),
         ],
       ),
@@ -221,7 +222,7 @@ class _RequiredUpgradeDialog extends StatelessWidget {
 
 /// **冷却**升级窗（可关闭，2026-10-10）：当前版本正在冷却——仍可用，但有更新的热版本。
 ///
-/// 与 [_RequiredUpgradeDialog] 的区别就在语气与可关闭性：没有"重新检查"
+/// 与 [_FrozenUpgradeDialog] 的区别就在语气与可关闭性：没有"重新检查"
 /// （它不是故障，没有"再问一次服务器"的意义），关闭 = 用户选择忽略，下次
 /// 启动再提醒（老板 2026-10-10 定：每次启动都提示，不做本地记忆）。
 class _CoolingUpgradeDialog extends StatelessWidget {
@@ -248,11 +249,11 @@ class _CoolingUpgradeDialog extends StatelessWidget {
         children: [
           Text(l10n.upgradeCoolingBody(hotVersion)),
           const SizedBox(height: 10),
-          Text(l10n.upgradeRequiredCurrent(currentVersion),
+          Text(l10n.upgradeCurrent(currentVersion),
               style: const TextStyle(fontSize: 12, color: Colors.grey)),
           if (hasUrl) ...[
             const SizedBox(height: 10),
-            // 链接本身可点（= 点「下载新版本」按钮），同 _RequiredUpgradeDialog
+            // 链接本身可点（= 点「下载新版本」按钮），同 _FrozenUpgradeDialog
             LinkifiedText(url, style: const TextStyle(fontSize: 12)),
           ],
         ],

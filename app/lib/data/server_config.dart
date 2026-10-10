@@ -111,7 +111,7 @@ class ServerHealth {
     this.ok = false,
     this.protocolVersion = '',
     this.capabilities = const <String>[],
-    this.minAppVersion,
+    this.coldAppVersion,
     this.hotAppVersion,
     this.appDownloadUrl,
     this.maxAttachmentBytes,
@@ -126,15 +126,17 @@ class ServerHealth {
   /// 能力清单（不支持 spaces 的旧服务端为空 → 向导显示"该服务器太旧"）。
   final List<String> capabilities;
 
-  /// 服务端要求的最低 App 版本（`min_app_version`；null = 不设下限）。
-  /// 格式 `yymm.ddhh.mm`（见 `scripts/appVersion.js`），与 App 自身的
+  /// 冻结线：当前可用的最低 App 版本（`cold_app_version`；null = 不设冻结线）。
+  /// 低于它 = **frozen（冻结，不可用）**。**版本三态（2026-10-10 老板定）**见
+  /// [hotAppVersion]。格式 `yymm.ddhh.mm`（见 `scripts/appVersion.js`），与 App 自身的
   /// CFBundleShortVersionString / versionName 同一个串，可直接比大小。
-  final String? minAppVersion;
+  final String? coldAppVersion;
 
   /// 当前正热用的 App 版本（`hot_app_version`；null = 不设热版本，2026-10-10）。
-  /// **三态语义（2026-10-10 老板定）**：本值 = 当前正热用；[minAppVersion] =
-  /// 当前可用的最低版本；本机版本低于本值（但 ≥ [minAppVersion]）= **正在冷却**
-  /// ——启动弹**可关闭**的升级提醒（不拦人）。格式同 [minAppVersion]。
+  /// **温度三态语义（2026-10-10 老板定）**：本值 = 当前正热用（hot）；
+  /// [coldAppVersion] = 冻结线；本机版本低于本值（但 ≥ 冻结线）= **cooling（正在
+  /// 冷却，仍可用）**——启动弹**可关闭**的升级提醒；低于冻结线 = **frozen（冻结）**
+  /// ——弹**不可关闭**的升级窗口。注意 cold 是"线"不是"态"。格式同 [coldAppVersion]。
   final String? hotAppVersion;
 
   /// 升级入口 URL（`app_download_url`；null = 服务端不给链接）。
@@ -149,8 +151,9 @@ class ServerHealth {
 ///
 /// Multiverse：返回协议版本与能力清单——/health 不返回全局 member 表
 /// （PROTOCOL_MULTIVERSE.md §4.1）；协议版本用于旧服务器提示（不支持 spaces 的
-/// 旧 Server 明确升级提示，§8.1）。**另含最低 App 版本**（2026-10-04）：
-/// 客户端启动时据此判断"我是不是已经不被支持了"（见 widgets/version_gate.dart）。
+/// 旧 Server 明确升级提示，§8.1）。**另含版本闸两个边界值**（2026-10-04 起，
+/// 2026-10-10 温度三态）：coldAppVersion（冻结线）/ hotAppVersion（当前热版本），
+/// 客户端启动时据此判断 frozen / cooling / none（见 widgets/version_gate.dart）。
 Future<ServerHealth> probeServer(String server) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
   try {
@@ -181,7 +184,7 @@ Future<ServerHealth> probeServer(String server) async {
       ok: true,
       protocolVersion: pv,
       capabilities: caps,
-      minAppVersion: nonEmpty(json['min_app_version']),
+      coldAppVersion: nonEmpty(json['cold_app_version']),
       hotAppVersion: nonEmpty(json['hot_app_version']),
       appDownloadUrl: nonEmpty(json['app_download_url']),
       maxAttachmentBytes: maxAttachmentBytes,
