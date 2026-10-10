@@ -754,7 +754,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatPageMembersHint =>
-      'If a companion loses all entrances, tap Re-invite to generate a dedicated entrance token for them to rejoin this space.';
+      'If a companion loses all entrances into this space, tap “Re-invite” to generate a dedicated entrance token to rejoin this space.';
 
   @override
   String chatPageMembersTitle(String mode) {

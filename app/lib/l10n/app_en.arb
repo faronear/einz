@@ -360,7 +360,7 @@
   },
   "chatPageMenuMembers": "{mode, select, duo{My companion} other{My companions}}",
   "@chatPageMenuMembers": {"placeholders": {"mode": {"type": "String"}}},
-  "chatPageMembersHint": "If a companion loses all entrances, tap Re-invite to generate a dedicated entrance token for them to rejoin this space.",
+  "chatPageMembersHint": "If a companion loses all entrances into this space, tap “Re-invite” to generate a dedicated entrance token to rejoin this space.",
   "chatPageMembersTitle": "{mode, select, duo{My companion} other{My companions}}",
   "@chatPageMembersTitle": {"placeholders": {"mode": {"type": "String"}}},
   "chatPageMembersUnnamed": "Unnamed",

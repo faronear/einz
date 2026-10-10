@@ -1331,7 +1331,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatPageMembersHint.
   ///
   /// In en, this message translates to:
-  /// **'If a companion loses all entrances, tap Re-invite to generate a dedicated entrance token for them to rejoin this space.'**
+  /// **'If a companion loses all entrances into this space, tap “Re-invite” to generate a dedicated entrance token to rejoin this space.'**
   String get chatPageMembersHint;
 
   /// No description provided for @chatPageMembersTitle.

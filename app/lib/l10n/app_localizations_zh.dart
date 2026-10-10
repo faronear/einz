@@ -694,7 +694,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get chatPageMembersHint => '如果同伴不慎丢失了所有通道，点击重新邀请，生成专属通道码，让同伴凭它重新加入秘境。';
+  String get chatPageMembersHint => '如果有同伴不慎丢失了进入秘境的通道，点击“重新邀请”生成专属通道码以重新加入。';
 
   @override
   String chatPageMembersTitle(String mode) {
