@@ -35,10 +35,10 @@
         ]
       },
       {
-        "name": "tui1--本机",
+        "name": "tui--本机",
         "autoExecuteCommands": true,
         "commands": [
-          "cd ~/einz && npm run tui2local-1"
+          "cd ~/einz && npm run tui2local"
         ]
       },
       {
