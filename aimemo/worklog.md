@@ -4,6 +4,38 @@
 
 ---
 
+## 2026-10-10 语音转写补完：WAV 录音格式 + 模型首次使用下载
+
+**背景：** 语音转写 Phase 1 MVP（2026-10-09 b856c75）落地时留了两个待拍板项：
+§8 录音格式（m4a 无法被 sherpa readWave 直接转写）、§11 模型分发。老板 2026-10-10
+拍板：录音改 WAV；模型首次使用时下载。
+
+**改动（feat/voice-transcript，本次提交）：**
+
+- **录音改 16kHz 单声道 WAV**（§8 方案 1）：`RecordConfig(encoder: AudioEncoder.wav,
+  sampleRate: 16000, numChannels: 1)`；发送文件名 `voice.wav` + meta 加
+  `kMetaVoiceContainerWav=true`（新 meta 键已登记 `docs/PROTOCOL.md` §5.1 与
+  `shared/.../message_payload.dart`）。旧消息无此键 = m4a：播放照常（系统 AAC 解码），
+  手动转写入口点按提示"旧格式不支持转写"（新 l10n 键 ×3 语言），不打哑炮。
+  `_voiceExtOf` 在播放/转写/留存目录/手动入口四处统一扩展名口径，避免新旧错配。
+- **模型下载器** `app/lib/data/voice_transcript_model.dart`（新文件）：SenseVoice-Small
+  int8（model.int8.onnx 239233841B + tokens.txt，sha256 基线 2026-10-10 实测）下载到
+  `<ApplicationSupport>/voice_transcript/<kModelVersion>/`；双源（hf-mirror 优先、
+  huggingface.co 回落）、`.part` Range 断点续传（换源前清 .part 防拼坏）、大小+sha256
+  边下边算、全就绪才写 `.ok`。`VoiceTranscriptService.modelDir` 缺省走
+  `VoiceTranscriptModel.installedDir()`（`modelReady` 随之变 async），显式注入保留给测试。
+- **UI**：`_downloadVoiceModel` 进度对话框（LinearProgress + MB/百分比 + 取消按钮，
+  取消置 cancelled 标志让下载循环及时退出；失败 SnackBar 带错误原文）。
+  手动转写流程：wav 判定 → 模型未就绪则先下载 → 入队。
+
+**验证：** `flutter analyze` 零告警；`shared` 测试 66 过 1 失败（ws_client "连接成功"
+——HEAD 干净基线 worktree 复跑**同样失败**，既有环境抖动，与本改动无关：未动 WS 层）；
+app 迁移测试全过。iOS/macOS Podfile.lock + windows generated_plugins.cmake 更新
+（sherpa_onnx 原生插件注册，2026-10-09 pub 操作遗留未提交）。
+
+**遗留（老板侧）：** 真机验证 wav 录音音质/转写链路 + iOS/Android 原生构建
+（sherpa_onnx 重 FFI 插件首次进真机构建）；SenseVoice vs Paraformer A/B 仍待做。
+
 ## 2026-08-28
 
 ### 架构评审与 productLens 重构（v1.0 → v2.0）

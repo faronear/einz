@@ -1,6 +1,7 @@
 # Einz 语音消息自动转写方案（voiceTranscript）
 
-> 状态：**[待评审]**（2026-10-09 由讨论整理，尚未开工；评审通过后才进入 `projectPlan.md` 任务列表）
+> 状态：**[已实现]**（Phase 1 MVP 2026-10-09 b856c75；2026-10-10 补齐 §8 wav 录音格式 + §11 模型首次使用下载。
+> 真机 A/B 与原生构建验证遗留，见 §12）
 > 关联：`aimemo/productLens.zhcn.md` §1.3 / §6.2 语音消息、`app/lib/chat_page.dart`（录音/播放）、
 > `shared/lib/src/protocol/message_payload.dart`（载荷 meta）、`aimemo/voiceCall.zhcn.md`（端侧插件先例）、
 > `docs/PROTOCOL.md`、`docs/SECURITY.md`
@@ -53,8 +54,9 @@
 - **引擎**：`sherpa-onnx`（k2-fsa，Apache-2.0）。官方 Flutter 包 `sherpa_onnx`（FFI），
   同时覆盖 iOS / Android；非流式离线识别。
 - **前端处理**：可选 Silero VAD 切掉录音两端的静音，提升准确率、缩短耗时。
-- **音频格式**：ASR 需要 **16 kHz 单声道 PCM**。语音消息时长上限 **60s**（`chat_page.dart`），
-  当前 `record` 录的是 m4a/AAC，**必须先解决格式问题**（见 §8）。
+- **音频格式**：ASR 需要 **16 kHz 单声道 PCM**。语音消息时长上限 **60s**（`chat_page.dart`）。
+  2026-10-10 起录音改存 **16 kHz 单声道 WAV**（见 §8，老板拍板）——`record` 直接出 wav、零转换；
+  旧消息维持 m4a（播放不受影响，转写入口提示"旧格式不支持转写"）。
 
 ---
 
@@ -138,7 +140,11 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
    或走平台原生 `MediaCodec` / `AVAudioConverter` 平台通道，工作量大）。
 3. 录音同时**旁路录一份 wav** 仅用于 ASR：改动录音链路，双写文件。
 
-倾向 **1**；Phase 0 一并验证音量/音质与体积是否可接受。
+**已拍板（老板 2026-10-10）：采用方案 1**——录音改 `AudioEncoder.wav` + 16kHz 单声道（`record` 直接支持）。
+协议层加 `meta.voiceContainerWav=true` 标识新消息（旧消息无此键 = m4a；`docs/PROTOCOL.md` §5.1 已登记），
+`_voiceExtOf` 在播放/转写/留存目录/手动入口四处统一扩展名口径；旧 m4a 消息播放照常（系统 AAC 解码），
+手动转写入口点按提示"旧格式不支持转写"，不打哑炮。体积代价 60s≈1.9MB 可接受；wav 音质
+未真机 A/B（若出问题可回退方案 2 解码，存量数据不受影响）。
 
 ---
 
@@ -162,37 +168,50 @@ ASR 输入需 16 kHz 单声道 PCM，现有录音是 m4a/AAC。三条路：
 
 ---
 
-## 11. 模型分发（待定）
+## 11. 模型分发（2026-10-10 已定：首次使用时下载）
 
 | 方式 | 优点 | 代价 |
 | ---- | ---- | ---- |
 | **打包进产物**（build 时脚本下载，**不进 git**） | 装好即离线可用、无下载逻辑 | 产物 +79~230 MB |
 | **首次使用时下载** | 产物小 | 需处理下载/进度/失败/存储 |
 
-- **不要把模型二进制提交进 git**（仓库卫生）；打包方案由 build 脚本在构建期拉取。
+**结论**：模型二进制**不进 git、不打包进产物**；首次点「手动转写」时由
+`VoiceTranscriptModel.ensureDownloaded` 下载到
+`<ApplicationSupport>/voice_transcript/<kModelVersion>/`，此后 `installedDir` 直接命中本地（离线可用）。
+
+实现要点（`app/lib/data/voice_transcript_model.dart`）：
+
+- 双源：hf-mirror.com 优先（大陆可达），失败回落 huggingface.co；
+- 断点续传：`.part` 临时文件按已收字节 Range 续传（仅对**同一主机**有效——换源前清 `.part` 重下）；
+- 完整性：大小 + sha256 边下边算（不把 239MB 读进内存），基线见 `_files`
+  （model.int8.onnx 239233841B / tokens.txt 315894B，sha256 为 2026-10-10 基线）；
+- 原子性：全部文件就绪后才写 `.ok` 标记，不完整目录视为未安装；
+- 版本演进：换模型 = 新 `kModelVersion` 目录 + 重新下载，永不覆盖旧目录；转写表
+  `modelVersion` 列同步更新（stale 判定自动生效）。
 - 与 A/B 两模型都留出**替换余地**（模型文件 + 配置可换）。
 
 ---
 
 ## 12. 分阶段计划
 
-### Phase 0 — 可行性验证（先做，半天~一天）
+### Phase 0 — 可行性验证（遗留项：真机 A/B + 原生构建）
 
-- [ ] 接入 `sherpa_onnx` 插件，**iOS / Android 各编过一次**（本项目已在 `device_info_plus`、
-      `flutter_webrtc` 上踩过原生构建坑——这是唯一可能翻车的点）
+- [x] 接入 `sherpa_onnx` 插件（2026-10-09，b856c75）；**iOS / Android 各编过一次** ——
+      待老板真机验证（`device_info_plus`、`flutter_webrtc` 先例提示这是唯一可能翻车的点）
 - [ ] 用一段**真实录音**跑通离线转写（先 macOS 桌面或直接真机）
-- [ ] 解决 §8 音频格式（建议先试 wav 路径）
+- [x] 解决 §8 音频格式（2026-10-10：wav 路径，见 §8 结论）
 - [ ] SenseVoice / Paraformer-zh-small **各跑一遍**，比较口语短句 / 中英混说 / 标点
 - [ ] **验收**：两端真机能对一段语音自动出文字；构建不翻车
 
-### Phase 1 — MVP
+### Phase 1 — MVP（2026-10-09~10 全部完成）
 
-- [ ] 新增本地表 + schema 升级
-- [ ] 转写服务（后台 isolate + 队列）
-- [ ] 录音格式调整（§8）
-- [ ] 气泡下方渲染 + 转写中/失败态 + 手动入口
-- [ ] 级联删除（配合阅后即焚/删除）
-- [ ] 多语言文案
+- [x] 新增本地表 + schema 升级（v10，2026-10-09）
+- [x] 转写服务（后台 isolate + 队列）
+- [x] 录音格式调整（§8，2026-10-10）
+- [x] 气泡下方渲染 + 转写中/失败态 + 手动入口
+- [x] 级联删除（配合阅后即焚/删除）
+- [x] 多语言文案
+- [x] 模型分发落地（§11 首次使用下载，2026-10-10）
 
 ### Phase 2 — 打磨（按需）
 

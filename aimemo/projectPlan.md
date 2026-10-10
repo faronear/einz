@@ -56,8 +56,11 @@
   下方转写行四态（done/pending/failed·stale·unavailable 可点入口，watch 单行刷新）。
   验证：全量 analyze 零告警、迁移测试更新到 v10 通过、group/multi_space 测试全过。
   `chat_page_menu_test` 语音用例**基线（cf2eb0a worktree）同点失败**（25s 断言，媒体
-  mock 既有问题）非回归。**待 Phase 0**：模型分发（不进 git）、真机 A/B（SenseVoice vs
-  Paraformer）、录音格式 m4a→16kHz WAV（§8，未做——转写行当前依赖 ASR 前解码）。
+  mock 既有问题）非回归。2026-10-10 补齐两块：录音改 16kHz 单声道 WAV（§8 方案 1，
+  `meta.voiceContainerWav` 标识新消息，`_voiceExtOf` 统一四处扩展名口径）+ 模型首次
+  使用下载（§11，hf-mirror 双源、Range 续传、sha256 校验，~228MB 不进 git/不打包）。
+  **遗留 Phase 0 验证**：真机 A/B（SenseVoice vs Paraformer + wav 音质）、iOS/Android
+  原生构建跑一遍（sherpa_onnx 重 FFI，唯一可能翻车点）。
 - `[x]` **3 个 pty E2E 测试 rot 修复**（2026-10-09 完成）：根因=e2421d6 新增「秘境类型」
   问答 + 预置名机制删除 + 2026-10-04 purpose 收敛（invite=开新身份/attach=进已有身份、
   attach 不再问名字）+ 协议版本升 3。修复 4 个测试：presence/revoked/revoke_command/

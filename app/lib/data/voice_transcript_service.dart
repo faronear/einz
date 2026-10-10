@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'local_database.dart';
+import 'voice_transcript_model.dart';
 
 /// 语音消息本地转写服务（`aimemo/voiceTranscript.zhcn.md` §6/§7/§9）。
 ///
@@ -20,13 +21,15 @@ class VoiceTranscriptService {
 
   final LocalDatabase _db;
 
-  /// SenseVoice 模型目录（含 model.int8.onnx + tokens.txt）。
-  /// null = 未配置 → 一律 `unavailable`（Phase 0 后由 build 脚本/下载器填充）。
+  /// 模型目录（含 model.int8.onnx + tokens.txt）。
+  /// null = 走 [VoiceTranscriptModel.installedDir]（首次点转写时由 ChatPage
+  /// 下载，见 §11——模型不进 git）。显式传入仅供测试注入。
   final String? modelDir;
+
   /// 当前模型版本标识（进 `model_version` 列，判定 stale 的开关）。
-  /// Phase 0 A/B 换模型时改这里即可触发全量 stale。
+  /// 单一事实源在下载器（目录名与版本同源演进），这里只引用。
   static const String kModelId = 'sense-voice-small';
-  static const String kModelVersion = '2024-07-17-int8';
+  static const String kModelVersion = VoiceTranscriptModel.kModelVersion;
 
   /// 失败重试上限（§9：建议 2 次）。
   static const int maxRetries = 2;
@@ -35,8 +38,14 @@ class VoiceTranscriptService {
   Future<void>? _tail;
   sherpa.OfflineRecognizer? _recognizer;
 
-  /// 模型文件是否就绪（决定「自动转写」还是「unavailable」）。
-  bool get modelReady => modelDir != null;
+  /// 解析可用的模型目录：显式注入优先；否则查下载器安装状态
+  /// （文件 + .ok 标记齐全才算——下载中断的目录不算就绪）。
+  Future<String?> _resolveModelDir() async =>
+      modelDir ?? await VoiceTranscriptModel.installedDir();
+
+  /// 模型是否就绪（决定「自动转写」还是「unavailable」）。异步：查安装状态。
+  Future<bool> get modelReady async =>
+      await _resolveModelDir() != null;
 
   /// 入队一条语音消息的转写（收到且音频已解密后调用；幂等——已有 done 行跳过）。
   ///
@@ -64,7 +73,8 @@ class VoiceTranscriptService {
         existing.audioSha256 == cipherSha256) {
       return;
     }
-    if (!modelReady) {
+    final dir = await _resolveModelDir();
+    if (dir == null) {
       await _upsert(messageId, status: 'unavailable', cipherSha256: cipherSha256);
       return;
     }
@@ -73,7 +83,7 @@ class VoiceTranscriptService {
     while (true) {
       attempt++;
       try {
-        final r = await _runIsolate(plainPath);
+        final r = await _runIsolate(plainPath, dir);
         await _upsert(messageId,
             status: 'done',
             text: r.$1,
@@ -93,9 +103,9 @@ class VoiceTranscriptService {
   /// 只把顶层函数 + 纯值参数送进 isolate——闭包捕获 `this` 会把 drift 句柄
   /// （不可跨 isolate）一起带上导致运行时崩溃；recognizer 在 isolate 内新建，
   /// sherpa-onnx 的 FFI 句柄本就不能跨 isolate 传递。
-  Future<(String, String)> _runIsolate(String plainPath) {
-    final dir = modelDir!;
-    return Isolate.run(() => transcribeWavFile(path: plainPath, modelDir: dir));
+  Future<(String, String)> _runIsolate(String plainPath, String modelDir) {
+    return Isolate.run(
+        () => transcribeWavFile(path: plainPath, modelDir: modelDir));
   }
 
   /// isolate 顶层入口：加载模型 → 转写一个 wav 文件 → (text, language)。

@@ -34,6 +34,7 @@ import 'error_text.dart';
 import 'data/locale_settings.dart';
 import 'data/lock_timer.dart';
 import 'data/media_cache.dart';
+import 'data/voice_transcript_model.dart';
 import 'data/voice_transcript_service.dart';
 import 'data/media_saver.dart';
 import 'data/message_repository.dart';
@@ -5775,8 +5776,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _notice(context, AppLocalizations.of(context)!.chatPageVoicePermissionDenied);
         return;
       }
-      final path = '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await recorder.start(const RecordConfig(), path: path);
+      // 16kHz 单声道 WAV（voiceTranscript.zhcn.md §8/§14-2，老板 2026-10-10 拍板）：
+      // 本地转写（sherpa readWave）只吃 PCM wav——m4a 无法转写；体积代价
+      // 60s≈1.9MB 可接受。旧版 m4a 语音消息照常播放（AAC 解码走系统），
+      // 只是转写入口会提示"旧格式不支持转写"。
+      final path =
+          '${Directory.systemTemp.path}/einz_voice_${DateTime.now().millisecondsSinceEpoch}.wav';
+      await recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
       // 振幅流：实时驱动录音条波形（record 插件内部无订阅者时不做事）
       _voiceSamples.clear();
       _recordSeconds = 0;
@@ -5860,10 +5873,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       }
       await _sendAttachmentOptimistic(
         fileBytes: await f.readAsBytes(),
-        fileName: 'voice.m4a',
+        fileName: 'voice.wav',
         type: 'voice',
         caption: caption,
-        meta: {kMetaAudioDurationSeconds: _recordSeconds},
+        meta: {
+          kMetaAudioDurationSeconds: _recordSeconds,
+          // 旧客户端忽略未知 meta 键（payload.meta 设计就是向前兼容）；
+          // 新客户端据此把 voice 附件扩展名收敛为 wav（见 _voiceExtOf）
+          kMetaVoiceContainerWav: true,
+        },
       );
       await f.delete().catchError((_) => f);
       if (!mounted) return;
@@ -6038,7 +6056,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _playingMessageId = m.env.messageId;
         _audioStartedMessageId = null; // 旧波形进度先复位
       });
-      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+      final ext = _voiceExtOf(m);
       // 与图片/视频一致走 [_attachmentBytes]：发送端优先用**本地密文**解密——
       // 上传还在传（没拿到 server_sequence）时文件本来就在本机，点了就该能播
       // （老板 2026-09-15）；此前这里直连 fetchAttachment 走网络 → 落"音频播放失败"
@@ -6515,9 +6533,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// 是否"留存"模式（附件明文长期留在本机）。
   bool get _storeAttachments => _attachmentStorage == 'stored';
 
-  /// 附件在长期目录里的扩展名（语音固定 m4a，其余按正文后缀）。
-  String _attachmentExtOf(HistoryMessage m) =>
-      m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+  /// 附件在长期目录里的扩展名（语音按 meta 收敛 wav/m4a，其余按正文后缀）。
+  String _attachmentExtOf(HistoryMessage m) => _voiceExtOf(m);
+
+  /// 语音（voice）附件扩展名：新录音带 `kMetaVoiceContainerWav` → wav；
+  /// 旧消息（无此键）→ m4a。非语音消息按明文后缀。转写/播放/留存目录
+  /// 四处共用此口径，避免新旧消息扩展名错配。
+  String _voiceExtOf(HistoryMessage m) {
+    if (m.env.type != 'voice') return _extOf(m.plaintext);
+    return m.meta?[kMetaVoiceContainerWav] == true ? 'wav' : 'm4a';
+  }
 
   /// 本机留存的明文副本（stored 模式且文件仍在）→ 直接读；否则 null。
   Future<File?> _storedFile(HistoryMessage m) async {
@@ -6563,7 +6588,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       try {
         final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
         for (final m in voices) {
-          final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+          final ext = _voiceExtOf(m);
           // 明文缓存：stored 模式长期目录已由 _autoStore 落盘；否则确保缓存存在
           final file = (_storeAttachments
                   ? await AttachmentStore.ensure(widget.spaceId, m.env.messageId,
@@ -7096,13 +7121,86 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  /// 手动/重转入口（§10）：把行置回 pending 重新入队。模型未就绪时行保持
-  /// unavailable（不露错误——转写是纯增强功能）。
+  /// 模型下载（§11，模型 ~228MB 不进 git）：进度对话框（百分比+MB），可取消。
+  /// 返回 true=模型就绪；false=用户取消或下载失败（失败已 notice 说明）。
+  Future<bool> _downloadVoiceModel() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l10n = AppLocalizations.of(context)!;
+    var cancelled = false;
+    var received = await VoiceTranscriptModel.downloadedBytes();
+    if (!mounted) return false;
+    final total = VoiceTranscriptModel.totalBytes;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
+        void progress(int rec, int tot) {
+          if (!ctx.mounted) return;
+          setState(() => received = rec);
+        }
+
+        // 进度对话框打开即开跑；失败把错误顶到 SnackBar 并关窗
+        unawaited(() async {
+          try {
+            await VoiceTranscriptModel.ensureDownloaded(
+              onProgress: progress,
+              cancelled: () => cancelled,
+            );
+            if (ctx.mounted) Navigator.of(ctx).pop(true);
+          } catch (e) {
+            if (ctx.mounted) Navigator.of(ctx).pop(false);
+            messenger?.showSnackBar(SnackBar(
+                content: Text(l10n.voiceTranscriptDownloadFailed('$e'))));
+          }
+        }());
+        final pct = total == 0 ? 0 : (received * 100 / total).clamp(0, 100);
+        return AlertDialog(
+          title: Text(l10n.voiceTranscriptDownloading),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(value: total == 0 ? null : received / total),
+              const SizedBox(height: 8),
+              Text(
+                  '${(received / 1048576).toStringAsFixed(1)} / '
+                  '${(total / 1048576).toStringAsFixed(0)} MB  ·  ${pct.toStringAsFixed(0)}%',
+                  style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                cancelled = true;
+                Navigator.of(ctx).pop(false);
+              },
+              child: Text(l10n.cancel),
+            ),
+          ],
+        );
+      }),
+    );
+    return ok ?? false;
+  }
+
+  /// 手动/重转入口（§10）：旧 m4a 明确提示不支持转写（别"点了没反应"）；
+  /// 模型未就绪先下载（进度对话框可取消，§11 模型不进 git）；就绪后清旧行
+  /// 重新入队。失败静默——转写是纯增强功能，行留在原状态下次还能点。
   Future<void> _retryVoiceTranscript(HistoryMessage m) async {
     if (m.attachment == null) return;
+    // 旧格式（m4a）：sherpa readWave 只吃 PCM wav——直接说明，不打哑炮
+    if (_voiceExtOf(m) != 'wav') {
+      if (!mounted) return;
+      _notice(context,
+          AppLocalizations.of(context)!.voiceTranscriptLegacyAudio);
+      return;
+    }
     try {
+      if (!await VoiceTranscriptModel.isReady()) {
+        final ok = await _downloadVoiceModel();
+        if (!ok || !mounted) return;
+      }
       final t = _transcriber ??= VoiceTranscriptService(_voiceDb);
-      final ext = m.env.type == 'voice' ? 'm4a' : _extOf(m.plaintext);
+      final ext = _voiceExtOf(m);
       final file = (_storeAttachments
               ? await AttachmentStore.ensure(
                   widget.spaceId, m.env.messageId, ext, () => _attachmentBytes(m))

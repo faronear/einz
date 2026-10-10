@@ -523,6 +523,16 @@
   "voiceTranscriptRetry": "Transcription failed, tap to retry",
   "voiceTranscriptStale": "Re-transcribe available",
   "voiceTranscriptManual": "Tap to transcribe",
+  "voiceTranscriptLegacyAudio": "Legacy voice messages (m4a) can't be transcribed — only new recordings can",
+  "voiceTranscriptDownloading": "Downloading transcription model",
+  "voiceTranscriptDownloadFailed": "Model download failed: {error}",
+  "@voiceTranscriptDownloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageAttachmentMetaMissing": "Attachment metadata missing",
   "chatPageAttachmentUnusable": "Attachment unavailable",
   "chatPageAttachmentRetry": "Tap to retry",

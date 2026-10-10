@@ -1039,6 +1039,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceTranscriptManual => 'Tap to transcribe';
 
   @override
+  String get voiceTranscriptLegacyAudio =>
+      'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can';
+
+  @override
+  String get voiceTranscriptDownloading => 'Downloading transcription model';
+
+  @override
+  String voiceTranscriptDownloadFailed(String error) {
+    return 'Model download failed: $error';
+  }
+
+  @override
   String get chatPageAttachmentMetaMissing => 'Attachment metadata missing';
 
   @override

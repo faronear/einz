@@ -42,6 +42,11 @@ dependencies:
   einz_shared:
     path: ../shared
 
+  # 语音转写模型下载（voice_transcript_model.dart）：http 拉流 + crypto 边下边算 sha256
+  http: ^1.2.0
+  crypto: ^3.0.0
+  path: ^1.9.0
+
   drift: ^2.34.3
   drift_flutter: ^0.3.1
   sqlite3_flutter_libs: ^0.6.0+eol

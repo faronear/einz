@@ -1814,6 +1814,24 @@ abstract class AppLocalizations {
   /// **'Tap to transcribe'**
   String get voiceTranscriptManual;
 
+  /// No description provided for @voiceTranscriptLegacyAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy voice messages (m4a) can\'t be transcribed — only new recordings can'**
+  String get voiceTranscriptLegacyAudio;
+
+  /// No description provided for @voiceTranscriptDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading transcription model'**
+  String get voiceTranscriptDownloading;
+
+  /// No description provided for @voiceTranscriptDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Model download failed: {error}'**
+  String voiceTranscriptDownloadFailed(String error);
+
   /// No description provided for @chatPageAttachmentMetaMissing.
   ///
   /// In en, this message translates to:

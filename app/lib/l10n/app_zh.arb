@@ -506,6 +506,16 @@
   "voiceTranscriptRetry": "转写失败，点按重试",
   "voiceTranscriptStale": "可重新转写",
   "voiceTranscriptManual": "点按转写文字",
+  "voiceTranscriptLegacyAudio": "旧版语音（m4a）不支持转写，新录的语音才能转",
+  "voiceTranscriptDownloading": "正在下载转写模型",
+  "voiceTranscriptDownloadFailed": "转写模型下载失败：{error}",
+  "@voiceTranscriptDownloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "chatPageAttachmentMetaMissing": "附件元数据缺失",
   "chatPageAttachmentUnusable": "附件不可用",
   "chatPageAttachmentRetry": "点按重试",
