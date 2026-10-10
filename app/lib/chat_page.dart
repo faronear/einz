@@ -7646,7 +7646,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                               child: Text(_myMemberName,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
-                                                  textAlign: TextAlign.end,
+                                                  // 不用 textAlign.end：长名被 ellipsis 截断后
+                                                  // Text 盒子=约束宽度，比截断文字略宽，end 对齐
+                                                  // 会把富余量挤到左侧（胶囊左边缘空一截）。
+                                                  // 默认 start 对齐，富余量落在"…"右侧，几乎不可见。
                                                   // 与对方一侧同号（15），两侧视觉对称
                                                   style: const TextStyle(
                                                       fontSize: 15,
