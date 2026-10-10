@@ -13609,3 +13609,6 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
 `ef65860 + 2731f3a`（worklog 一处冲突取并集）；`c89670f` 的灰字占位随后以
 `51fc12d` 再次移除。本地 main = origin/main + 3，push 为正常 fast-forward，
 无需 force。上节【接线说明】作废。
+
+## 2026-10-10
+- 全 app 可点击元素交互反馈统一（老板提出）：Clickable 组件升级为自带遮罩——桌面悬浮 black@5%、点按/长按 black@10%，遮罩画在子组件上层（InkWell 会被不透明子项盖住故弃用）；形状参数 circle/borderRadius 逐调用点补齐；深底通知条用白色遮罩；纯长按元素（气泡菜单）仍无反馈。266 测试全过，commit e4ce046。
