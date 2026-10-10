@@ -269,12 +269,6 @@ void main() {
     expect(find.descendant(of: _statusBar, matching: find.byIcon(Icons.edit)),
         findsOneWidget,
         reason: '没有群名时第一行应显示编辑图标');
-    expect(
-        find.descendant(
-            of: _statusBar,
-            matching: find.text(_zh.chatPageGroupNameEmptyHint)),
-        findsOneWidget,
-        reason: '没有群名时编辑图标前应有灰字「设置群名」占位（老板 2026-10-09）');
     expect(find.descendant(of: _statusBar, matching: find.text('Crew')),
         findsNothing);
 

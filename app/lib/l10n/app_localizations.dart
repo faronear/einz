@@ -986,12 +986,6 @@ abstract class AppLocalizations {
   /// **'Group name'**
   String get chatPageGroupNameTitle;
 
-  /// No description provided for @chatPageGroupNameEmptyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Name'**
-  String get chatPageGroupNameEmptyHint;
-
   /// No description provided for @chatPageGroupNameLabel.
   ///
   /// In en, this message translates to:

@@ -495,9 +495,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageGroupNameTitle => '群组名字';
 
   @override
-  String get chatPageGroupNameEmptyHint => '群名';
-
-  @override
   String get chatPageGroupNameLabel => '名字';
 
   @override
