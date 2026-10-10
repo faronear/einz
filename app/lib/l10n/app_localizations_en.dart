@@ -49,13 +49,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get upgradeFrozenTitle => 'Update required';
 
   @override
-  String upgradeFrozenBody(String min) {
-    return 'Your app version is no longer supported (needs at least $min). Please update to continue.';
-  }
-
-  @override
-  String upgradeCurrent(String current) {
-    return 'Current version: $current';
+  String upgradeFrozenBody(String min, String current) {
+    return 'Your app version $current is no longer supported, you need at least $min. Please update to continue.';
   }
 
   @override
@@ -66,7 +61,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String upgradeCoolingBody(String latest) {
-    return 'A newer version $latest is available. Your current version is cooling down but still usable.';
+    return 'A newer version $latest is available. Please update at your convenient time.';
   }
 
   @override

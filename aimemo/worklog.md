@@ -13674,3 +13674,9 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   productLens 同步。注意：装过 2026-10-04 后旧包的 wire 键 min_app_version 失效，
   需重装/重编（自用 + 未 push，可接受）。
   验证：server npm test 24/24 全绿；flutter analyze 干净；version_gate_test 14/14。
+- 老板自改弹窗文案（简化：`upgradeCurrent` 合并进 `upgradeFrozenBody` 两参
+  `(min, current)`，冷却文案去掉"正在冷却"表述），改完 app 无法启动——`version_gate.dart`
+  的调用没跟上（冻结窗单参调用、冷却窗还在传已删的 currentVersion 行）。
+  补全：冻结窗改 `upgradeFrozenBody(coldVersion, currentVersion)`；冷却窗删
+  `currentVersion` 字段与传参（死代码）。analyze 干净、version_gate_test 14/14。
+  （教训已多次出现：老板常改 l10n 措辞，引用点必须同步——见 memory。）

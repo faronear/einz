@@ -167,14 +167,8 @@ abstract class AppLocalizations {
   /// No description provided for @upgradeFrozenBody.
   ///
   /// In en, this message translates to:
-  /// **'Your app version is no longer supported (needs at least {min}). Please update to continue.'**
-  String upgradeFrozenBody(String min);
-
-  /// No description provided for @upgradeCurrent.
-  ///
-  /// In en, this message translates to:
-  /// **'Current version: {current}'**
-  String upgradeCurrent(String current);
+  /// **'Your app version {current} is no longer supported, you need at least {min}. Please update to continue.'**
+  String upgradeFrozenBody(String min, String current);
 
   /// No description provided for @upgradeFrozenDownload.
   ///
@@ -191,7 +185,7 @@ abstract class AppLocalizations {
   /// No description provided for @upgradeCoolingBody.
   ///
   /// In en, this message translates to:
-  /// **'A newer version {latest} is available. Your current version is cooling down but still usable.'**
+  /// **'A newer version {latest} is available. Please update at your convenient time.'**
   String upgradeCoolingBody(String latest);
 
   /// No description provided for @upgradeCoolingDownload.

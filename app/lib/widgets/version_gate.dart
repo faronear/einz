@@ -153,7 +153,6 @@ Future<void> checkVersionGate(
             downloadUrl: health.appDownloadUrl,
           )
         : _CoolingUpgradeDialog(
-            currentVersion: current,
             hotVersion: health.hotAppVersion!,
             downloadUrl: health.appDownloadUrl,
           ),
@@ -196,10 +195,7 @@ class _FrozenUpgradeDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.upgradeFrozenBody(coldVersion)),
-            const SizedBox(height: 10),
-            Text(l10n.upgradeCurrent(currentVersion),
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(l10n.upgradeFrozenBody(coldVersion, currentVersion)),
             if (hasUrl) ...[
               const SizedBox(height: 10),
               // 链接本身可点（= 点「下载新版本」按钮，开外部浏览器）；
@@ -227,12 +223,10 @@ class _FrozenUpgradeDialog extends StatelessWidget {
 /// 启动再提醒（老板 2026-10-10 定：每次启动都提示，不做本地记忆）。
 class _CoolingUpgradeDialog extends StatelessWidget {
   const _CoolingUpgradeDialog({
-    required this.currentVersion,
     required this.hotVersion,
     this.downloadUrl,
   });
 
-  final String currentVersion;
   final String hotVersion;
   final String? downloadUrl;
 
@@ -248,9 +242,6 @@ class _CoolingUpgradeDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(l10n.upgradeCoolingBody(hotVersion)),
-          const SizedBox(height: 10),
-          Text(l10n.upgradeCurrent(currentVersion),
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
           if (hasUrl) ...[
             const SizedBox(height: 10),
             // 链接本身可点（= 点「下载新版本」按钮），同 _FrozenUpgradeDialog
