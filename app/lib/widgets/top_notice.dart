@@ -144,6 +144,9 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner>
       right: 0,
       child: Clickable(
         onTap: _dismiss,
+        // 深蓝灰底：黑色遮罩看不见，反馈换成白色系（老板 2026-10-10 统一交互反馈）
+        overlayColor: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         child: FadeTransition(
           opacity: _slide,
           child: SlideTransition(

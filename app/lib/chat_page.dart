@@ -6568,6 +6568,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (snap.hasData) {
           return Clickable(
             onTap: () => _showFullImage(m, snap.data!),
+            borderRadius: BorderRadius.circular(8),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.memory(snap.data!, width: 180, height: 180, fit: BoxFit.cover),
@@ -7990,6 +7991,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       Clickable(
                                         onTap: () => _jumpToMessage(
                                             m.quote!['messageId'] as String? ?? ''),
+                                        borderRadius: BorderRadius.circular(8),
                                         child: Container(
                                           margin: const EdgeInsets.only(top: 4),
                                           padding: const EdgeInsets.symmetric(
@@ -9060,7 +9062,7 @@ class _StatusAvatarState extends State<_StatusAvatar> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: Clickable(onTap: widget.onTap, child: body),
+      child: Clickable(onTap: widget.onTap, circle: true, child: body),
     );
   }
 }
@@ -9211,6 +9213,7 @@ class _MessageAvatarState extends State<_MessageAvatar> {
       onTap: (widget.openFullscreenOnTap && bytes != null)
           ? _showFullscreen
           : null,
+      circle: true,
       child: CircleAvatar(
         radius: widget.radius,
         backgroundColor: Colors.grey.shade300,
@@ -9326,6 +9329,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
       return Clickable(
         key: const ValueKey('videoPreview'),
         onTap: _init,
+        borderRadius: BorderRadius.circular(8),
         child: Container(
           width: 180,
           height: 100,
@@ -9357,6 +9361,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
     return Clickable(
       key: const ValueKey('videoPreview'),
       onTap: () => _playFullscreen(c),
+      borderRadius: BorderRadius.circular(8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: SizedBox(
