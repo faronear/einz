@@ -6343,10 +6343,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _attachmentUnusable(HistoryMessage m) {
     final l10n = AppLocalizations.of(context)!;
     final confirmedMissing = _healConfirmedMissing.contains(m.env.messageId);
+    // 系统提示不用用户内容色：淡灰小字同气泡时间戳一族（老板 2026-10-10，
+    // 淡灰方案——红色留给「发送失败 · 点击重发」，两种状态不混淆）
+    final subtle =
+        _uiStyle == 'gradient' ? Colors.white70 : Colors.grey;
     final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.broken_image_outlined, size: 16),
+        Icon(Icons.broken_image_outlined, size: 14, color: subtle),
         const SizedBox(width: 4),
         Flexible(
           child: Text(
@@ -6356,6 +6360,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ? l10n.chatPageAttachmentUnusable
                 : '${l10n.chatPageAttachmentUnusable} · ${l10n.chatPageAttachmentRetry}',
             overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: subtle),
           ),
         ),
       ],
