@@ -13567,3 +13567,40 @@ VPS 一次性迁移命令（`docker rm -f einz-coturn` 后按新文件 `up -d` �
 （sherpa_onnx pods、package.json 的 server-update-remote 加 sudo git pull、
 sessions.json）——用带说明的 stash 保存（`stash@{0}`），未丢弃；main 上的
 方案B 改动不含这些。
+
+## 【接线说明】本地 main 与 origin/main 分叉——完成当前任务后别 pull/push（2026-10-10）
+
+**现状：** 本地 main = `7e2935d + 5faff04`（5faff04 = 群名占位灰字撤回 + Ink 悬浮底色，
+是对已推送的 c89670f 的重写）；origin/main = `7e2935d + c89670f + c4f4f85(附件自愈)
++ cf2eb0a + 08b2342(coturn)`。两边分叉（ahead 1 / behind 4）。
+
+**约定（在接线完成前）：**
+- **不要** 对本地 main 执行 `git pull` / `git reset --hard origin/main`——pull 会把
+  已撤回的灰字占位合并回来，reset 会丢掉 5faff04 和未提交 WIP；
+- **不要** 直接 `git push`——非 fast-forward 会被拒，别用 force 绕；
+- **可以** 继续在本地 main 上正常提交当前任务的成果（工作区已基于 5faff04，
+  你的 WIP 与群名改动不重叠，放心写）。
+
+## 【CI 红修复】语音菜单用例被附件自愈闸门拦截（2026-10-10）
+
+**现象：** `npm run testAll` 在 GitHub CI 失败——app 全量 widget 测试 1 例红：
+`chat_page_menu_test.dart:1122`「长按语音消息：菜单预览行显示 播放键+波形+时长
+且播放键可点」期望 `find.text('25s')` 命中 1 个、实际 0。shared/cli/server
+全绿，仅此一处。
+
+**根因：** 附件自愈修复给 `_buildAudioBarBody` 加了 `att==null → 「附件不可用」`
+渲染闸门；该用例的合成 voice 消息只有信封没有附件行（`_FakeApi.sync` 返回空
+`attachmentsMeta`），被闸门拦下，时长文本整个不渲染。本地复现同红。
+
+**修复：** `_FakeApi` 加 `attachmentsMeta` 注入参数（sync 原样返回 → 走真实
+`_insertAttachmentMeta` 落库路径，不改产品代码），用例补 voice 的 meta 四字段。
+单例复绿后 `testAll.sh app` 全绿（analyze + 全量）。
+
+**插曲：** 重落发生于另一 agent 会话 `git reset 7e2935d` 丢弃 c4f4f85 之后——
+c4f4f85 内容（含本修复）已重落为 `6cdb987`；coturn yml 与 aimemo 记录随本
+提交重落。origin/main 接线（5faff04 重写了已推送的 c89670f，直接 push 会被
+拒）由老板决定时机；接线前勿 pull/reset --hard，见上节说明。
+
+**接线（由我会做，等当前任务提交完成后）：** 把新提交 `rebase --onto
+origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只剩新改动），
+再补一个「撤回灰字占位」小提交 → 之后 push 是正常 fast-forward，无需 force。
