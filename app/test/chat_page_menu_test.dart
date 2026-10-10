@@ -24,9 +24,15 @@ import 'real_async_settle.dart';
 /// 最小 fake ApiClient：sync 返回编排好的加密消息（模拟 Server 分配
 /// server_sequence；默认空——只测菜单交互，不涉网络）。
 class _FakeApi extends ApiClient {
-  _FakeApi({this.messages = const [], this.escrowFile}) : super('http://fake');
+  _FakeApi({this.messages = const [], this.escrowFile, this.attachmentsMeta = const []})
+      : super('http://fake');
 
   final List<MessageEnvelope> messages;
+
+  /// sync 附加返回的附件元数据（2026-10-09）：语音/图片/视频气泡渲染依赖
+  /// 本地附件行（att==null 会显示"附件不可用"兜底）——需要在无附件消息的
+  /// 测试里注入对应 meta，走真实 sync 落库路径。
+  final List<Map<String, dynamic>> attachmentsMeta;
 
   /// 假口令密保箱 + 上传捕获（修改口令测试用）。
   /// 上传成功后 getKeyEscrow 返回新上传的包且 updatedAt 推进
@@ -72,7 +78,7 @@ class _FakeApi extends ApiClient {
     ];
     return (
       messages: withSeq,
-      attachmentsMeta: <Map<String, dynamic>>[],
+      attachmentsMeta: attachmentsMeta,
       lastSequence: seq,
       hasMore: false,
     );
@@ -1099,7 +1105,16 @@ void main() {
       keyVersion: 1,
       type: 'voice',
     );
-    final api = _FakeApi(messages: [voice]);
+    final api = _FakeApi(messages: [voice], attachmentsMeta: [
+      {
+        'attachment_id': 'att-voice-1',
+        'message_id': 'msg-voice-1',
+        'key_version': 1,
+        'size': 1024,
+        'sha256': 'fake-sha256',
+        'nonce': 'fake-nonce',
+      },
+    ]);
 
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
