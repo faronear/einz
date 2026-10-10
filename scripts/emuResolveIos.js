@@ -32,7 +32,7 @@ try {
 
 const input =
   (process.argv[2] || '').trim() ||
-  String(pkgConfig.defaultIosEmu || 'ip16@26.3').trim()
+  String(process.env.EMU || pkgConfig.defaultIosEmu || '').trim()
 
 if (
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)
@@ -55,6 +55,35 @@ const deviceName = pkgConfig[left] || builtinAlias[left.toLowerCase()] || left
 const json = JSON.parse(
   execSync('xcrun simctl list devices available -j').toString()
 )
+
+// 空规格（裸 npm run app-ios-boot）：有 Booted 直接用它；否则挑可用的
+// iPhone 里系统版本最高的那台——任何机器上都能裸跑，不再钉死某机型。
+if (!input) {
+  const all = []
+  for (const [runtimeKey, devices] of Object.entries(json.devices)) {
+    if (!/iOS-/.test(runtimeKey)) continue
+    for (const d of devices) all.push({ ...d, runtimeKey })
+  }
+  const booted = all.find(d => d.state === 'Booted')
+  if (booted) {
+    console.log(booted.udid)
+    process.exit(0)
+  }
+  const iPhones = all.filter(d => /iPhone/i.test(d.name))
+  if (iPhones.length === 0) {
+    console.error('❌ 本机没有可用的 iPhone 模拟器')
+    console.error('   看有哪些：xcrun simctl list devices available')
+    process.exit(1)
+  }
+  iPhones.sort((a, b) => {
+    const [aMajor, aMinor] = versionOf(a.runtimeKey)
+    const [bMajor, bMinor] = versionOf(b.runtimeKey)
+    return bMajor - aMajor || bMinor - aMinor
+  })
+  console.log(iPhones[0].udid)
+  process.exit(0)
+}
+
 const runtimeKeyFor = want => `iOS-${want.replace(/\./g, '-')}`
 const versionOf = runtimeKey => {
   const matched = runtimeKey.match(/iOS-(\d+)(?:-(\d+))?/)

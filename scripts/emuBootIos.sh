@@ -27,5 +27,11 @@ if xcrun simctl boot "${udid}" 2>/dev/null; then
 else
   echo "（已在运行，跳过 boot）"
 fi
-open "$(xcode-select -p)/Applications/Simulator.app"
+# Xcode 27 起不再随附 Simulator.app（simctl 独立工作）；有就开 GUI，没有就跳过
+SIM_APP="$(xcode-select -p)/Applications/Simulator.app"
+if [ -d "$SIM_APP" ]; then
+  open "$SIM_APP"
+else
+  echo "（本机 Xcode 无 Simulator.app（Xcode 27+ 已移除），跳过开 GUI；flutter run 会自带窗口）"
+fi
 xcrun simctl list devices booted
