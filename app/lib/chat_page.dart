@@ -1848,19 +1848,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         hoverColor: Colors.black.withValues(alpha: 0.05),
         highlightColor: Colors.black.withValues(alpha: 0.08),
         child: others.isEmpty
-            ? SizedBox(
-                width: kStatusMemberAvatarSize,
-                height: kStatusMemberAvatarSize,
-                // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
-                // Material 的墨水层上，InkWell 的悬浮/按住高亮才能盖在它上面——
-                // 不透明 child 会把高亮整个挡住（老板 2026-10-09：占位头像也要
-                // 有悬浮/点击背景效果，与状态条其他可点对象一致）。
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: _genderTint(''),
-                    shape: BoxShape.circle,
+            ? Tooltip(
+                // 状态条 tooltip 全量补齐（老板 2026-10-10）：空群占位头像提示
+                // 点它开「我的同伴」弹层。已有成员时头像条里每个头像自带人名
+                // tooltip（`_stripAvatar`），整条不再套。
+                message: l10n.chatPageMyGroupCompanionsTooltip,
+                child: SizedBox(
+                  width: kStatusMemberAvatarSize,
+                  height: kStatusMemberAvatarSize,
+                  // 圆底用 **Ink** 画（不是 CircleAvatar/Container）：Ink 画在
+                  // Material 的墨水层上，InkWell 的悬浮/按住高亮才能盖在它上面——
+                  // 不透明 child 会把高亮整个挡住（老板 2026-10-09：占位头像也要
+                  // 有悬浮/点击背景效果，与状态条其他可点对象一致）。
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      color: _genderTint(''),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.groups_outlined, size: 22),
                   ),
-                  child: const Icon(Icons.groups_outlined, size: 22),
                 ),
               )
             : _avatarStrip(others, avatarBudget),
@@ -7618,27 +7624,31 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       // 名字做成**可点胶囊**（老板 2026-10-09）：点击开
                                       // 「我的身份」弹窗（与菜单里「我的身份」同一入口），
                                       // 悬浮/按住变色，与状态条其他可点元素同口径。
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        shape: const StadiumBorder(),
-                                        clipBehavior: Clip.antiAlias,
-                                        child: InkWell(mouseCursor: SystemMouseCursors.click,
-                                          onTap: _showRenameDialog,
-                                          hoverColor:
-                                              Colors.black.withValues(alpha: 0.05),
-                                          highlightColor:
-                                              Colors.black.withValues(alpha: 0.08),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            child: Text(_myMemberName,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                textAlign: TextAlign.end,
-                                                // 与对方一侧同号（15），两侧视觉对称
-                                                style: const TextStyle(
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.w500)),
+                                      child: Tooltip(
+                                        // 状态条 tooltip 全量补齐（老板 2026-10-10）
+                                        message: l10n.chatPageMyNameTooltip,
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          shape: const StadiumBorder(),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: InkWell(mouseCursor: SystemMouseCursors.click,
+                                            onTap: _showRenameDialog,
+                                            hoverColor:
+                                                Colors.black.withValues(alpha: 0.05),
+                                            highlightColor:
+                                                Colors.black.withValues(alpha: 0.08),
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6, vertical: 2),
+                                              child: Text(_myMemberName,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.end,
+                                                  // 与对方一侧同号（15），两侧视觉对称
+                                                  style: const TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight: FontWeight.w500)),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -7658,17 +7668,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _statusAvatar(
-                              bytes: _myAvatarBytes,
-                              gender: _myGender,
-                              // 空头像：点它没有大图可看 → 直接进换头像流程；
-                              // 有头像：开大图，顶部「更换头像」+ 底部「保存」
-                              onTap: _myAvatarBytes == null
-                                  ? () => unawaited(_showAvatarUpload())
-                                  : () => unawaited(_showAvatarFullscreen(
-                                      _myAvatarBytes!,
-                                      allowReplace: true,
-                                      saveName: _myMemberName)),
+                            Tooltip(
+                              // 状态条 tooltip 全量补齐（老板 2026-10-10）
+                              message: l10n.chatPageMyAvatarTooltip,
+                              child: _statusAvatar(
+                                bytes: _myAvatarBytes,
+                                gender: _myGender,
+                                // 空头像：点它没有大图可看 → 直接进换头像流程；
+                                // 有头像：开大图，顶部「更换头像」+ 底部「保存」
+                                onTap: _myAvatarBytes == null
+                                    ? () => unawaited(_showAvatarUpload())
+                                    : () => unawaited(_showAvatarFullscreen(
+                                        _myAvatarBytes!,
+                                        allowReplace: true,
+                                        saveName: _myMemberName)),
+                              ),
                             ),
                           ],
                         ),
