@@ -58,49 +58,49 @@ void main() {
     });
   });
 
-  group('appVersionGateLevel（2026-10-10 两档判定）', () {
+  group('appVersionGateLevel（2026-10-10 三态判定）', () {
     const min = '2609.0101.00';
-    const rec = '2610.0412.30';
+    const hot = '2610.0412.30';
 
-    test('低于必须下限 → required（即使也低于建议版本）', () {
+    test('低于最低可用版本 → required（即使也低于热版本）', () {
       expect(
-        appVersionGateLevel('2608.2359.59', minVersion: min, recommendVersion: rec),
+        appVersionGateLevel('2608.2359.59', minVersion: min, hotVersion: hot),
         VersionGateLevel.required,
       );
     });
 
-    test('边界：恰好等于必须下限不算"低于" → recommended（只提醒，不拦）', () {
+    test('边界：恰好等于最低可用版本不算"低于" → cooling（正在冷却，只提醒不拦）', () {
       expect(
-        appVersionGateLevel(min, minVersion: min, recommendVersion: rec),
-        VersionGateLevel.recommended,
+        appVersionGateLevel(min, minVersion: min, hotVersion: hot),
+        VersionGateLevel.cooling,
       );
     });
 
-    test('≥ 必须下限、低于建议版本 → recommended', () {
+    test('≥ 最低可用版本、低于热版本 → cooling（正在冷却）', () {
       expect(
-        appVersionGateLevel('2610.0412.29', minVersion: min, recommendVersion: rec),
-        VersionGateLevel.recommended,
+        appVersionGateLevel('2610.0412.29', minVersion: min, hotVersion: hot),
+        VersionGateLevel.cooling,
       );
     });
 
-    test('≥ 建议版本 → none', () {
+    test('≥ 热版本 → none', () {
       expect(
-        appVersionGateLevel(rec, minVersion: min, recommendVersion: rec),
+        appVersionGateLevel(hot, minVersion: min, hotVersion: hot),
         VersionGateLevel.none,
       );
       expect(
-        appVersionGateLevel('2610.0413.00', minVersion: min, recommendVersion: rec),
+        appVersionGateLevel('2610.0413.00', minVersion: min, hotVersion: hot),
         VersionGateLevel.none,
       );
     });
 
-    test('只配建议、不配必须：低于建议 → recommended（不拦，只提醒）', () {
+    test('只配热版本、不配最低可用：低于热版本 → cooling（不拦，只提醒）', () {
       expect(
-        appVersionGateLevel('2609.0101.00', recommendVersion: rec),
-        VersionGateLevel.recommended,
+        appVersionGateLevel('2609.0101.00', hotVersion: hot),
+        VersionGateLevel.cooling,
       );
       expect(
-        appVersionGateLevel(rec, recommendVersion: rec),
+        appVersionGateLevel(hot, hotVersion: hot),
         VersionGateLevel.none,
       );
     });
@@ -108,14 +108,14 @@ void main() {
     test('什么都不配 → none', () {
       expect(appVersionGateLevel('2608.0101.00'), VersionGateLevel.none);
       expect(
-        appVersionGateLevel('2608.0101.00', minVersion: '', recommendVersion: '   '),
+        appVersionGateLevel('2608.0101.00', minVersion: '', hotVersion: '   '),
         VersionGateLevel.none,
       );
     });
 
     test('拿不到本机版本（空串）→ 一律 none（宁可漏拦/漏提醒，不误拦）', () {
       expect(
-        appVersionGateLevel('', minVersion: min, recommendVersion: rec),
+        appVersionGateLevel('', minVersion: min, hotVersion: hot),
         VersionGateLevel.none,
       );
     });

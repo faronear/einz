@@ -112,7 +112,7 @@ class ServerHealth {
     this.protocolVersion = '',
     this.capabilities = const <String>[],
     this.minAppVersion,
-    this.recommendAppVersion,
+    this.hotAppVersion,
     this.appDownloadUrl,
     this.maxAttachmentBytes,
   });
@@ -131,11 +131,11 @@ class ServerHealth {
   /// CFBundleShortVersionString / versionName 同一个串，可直接比大小。
   final String? minAppVersion;
 
-  /// 服务端**推荐**的 App 版本（`recommend_app_version`；null = 不设建议，
-  /// 2026-10-10）。**建议更新**级别：本机版本低于它（但 ≥ [minAppVersion]）时，
-  /// 启动弹**可关闭**的升级提醒——与 [minAppVersion] 的"必须"（不可关闭窗口）
-  /// 相对。格式同 [minAppVersion]。
-  final String? recommendAppVersion;
+  /// 当前正热用的 App 版本（`hot_app_version`；null = 不设热版本，2026-10-10）。
+  /// **三态语义（2026-10-10 老板定）**：本值 = 当前正热用；[minAppVersion] =
+  /// 当前可用的最低版本；本机版本低于本值（但 ≥ [minAppVersion]）= **正在冷却**
+  /// ——启动弹**可关闭**的升级提醒（不拦人）。格式同 [minAppVersion]。
+  final String? hotAppVersion;
 
   /// 升级入口 URL（`app_download_url`；null = 服务端不给链接）。
   final String? appDownloadUrl;
@@ -182,7 +182,7 @@ Future<ServerHealth> probeServer(String server) async {
       protocolVersion: pv,
       capabilities: caps,
       minAppVersion: nonEmpty(json['min_app_version']),
-      recommendAppVersion: nonEmpty(json['recommend_app_version']),
+      hotAppVersion: nonEmpty(json['hot_app_version']),
       appDownloadUrl: nonEmpty(json['app_download_url']),
       maxAttachmentBytes: maxAttachmentBytes,
     );

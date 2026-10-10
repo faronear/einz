@@ -62,18 +62,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get upgradeRequiredDownload => 'Download update';
 
   @override
-  String get upgradeRecommendedTitle => 'Update available';
+  String get upgradeCoolingTitle => 'Update available';
 
   @override
-  String upgradeRecommendedBody(String latest) {
-    return 'A newer version $latest is available. You can keep using this version for now.';
+  String upgradeCoolingBody(String latest) {
+    return 'A newer version $latest is available. Your current version is cooling down but still usable.';
   }
 
   @override
-  String get upgradeRecommendedDownload => 'Download update';
+  String get upgradeCoolingDownload => 'Download update';
 
   @override
-  String get upgradeRecommendedLater => 'Later';
+  String get upgradeCoolingLater => 'Later';
 
   @override
   String get wizardJoinPassphraseRequired => 'Enter the shared passphrase';

@@ -182,29 +182,29 @@ abstract class AppLocalizations {
   /// **'Download update'**
   String get upgradeRequiredDownload;
 
-  /// No description provided for @upgradeRecommendedTitle.
+  /// No description provided for @upgradeCoolingTitle.
   ///
   /// In en, this message translates to:
   /// **'Update available'**
-  String get upgradeRecommendedTitle;
+  String get upgradeCoolingTitle;
 
-  /// No description provided for @upgradeRecommendedBody.
+  /// No description provided for @upgradeCoolingBody.
   ///
   /// In en, this message translates to:
-  /// **'A newer version {latest} is available. You can keep using this version for now.'**
-  String upgradeRecommendedBody(String latest);
+  /// **'A newer version {latest} is available. Your current version is cooling down but still usable.'**
+  String upgradeCoolingBody(String latest);
 
-  /// No description provided for @upgradeRecommendedDownload.
+  /// No description provided for @upgradeCoolingDownload.
   ///
   /// In en, this message translates to:
   /// **'Download update'**
-  String get upgradeRecommendedDownload;
+  String get upgradeCoolingDownload;
 
-  /// No description provided for @upgradeRecommendedLater.
+  /// No description provided for @upgradeCoolingLater.
   ///
   /// In en, this message translates to:
   /// **'Later'**
-  String get upgradeRecommendedLater;
+  String get upgradeCoolingLater;
 
   /// No description provided for @wizardJoinPassphraseRequired.
   ///

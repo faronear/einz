@@ -13644,3 +13644,17 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   写坏 JSON 保留旧值 + warn。npm test 全链绿。
   DEPLOYMENT.md 同步：各字段"改后重启生效"改为"自动热加载"，新增"配置热加载"
   小节说明分界（dataStore 例外 + 坏文件保留旧值）。
+- **版本语义重命名：recommend → hot/cooling 三态**（老板 2026-10-10，趁未 push 全
+  前后端统一）：`hotAppVersion`（当前正热用的版本）/ `minAppVersion`（当前可用的
+  最低版本）/ 介于两者之间 = **正在冷却**（仍可用，弹可关闭提醒），低于 min =
+  不可用（弹不可关闭窗）。全链路替换：serverConfig.json 键名（example.json）、
+  FileConfig/ServerConfig 字段（hotAppVersion / hot_app_version）、/health 下发键、
+  ServerHealth.hotAppVersion、VersionGateLevel 枚举 recommended → **cooling**、
+  _CoolingUpgradeDialog、l10n upgradeRecommended* → **upgradeCooling***（en/zh +
+  gen-l10n，文案微调"当前版本正在冷却，仍可继续使用"）、双侧测试与
+  PROTOCOL_MULTIVERSE.md §4.1 / DEPLOYMENT.md / productLens 全部同步。
+  **教训**：批量替换 `rec` → `hot` 时误匹配了 receipt/record/recommended 等单词里
+  的子串，污染 11 个无关测试文件——tar 备份后 git restore 恢复（该批文件无未提交
+  工作），只留 version_gate_test.dart 手工修。**全局子串替换必须带词边界**（regex
+  `\brec\b` 或完整标识符），教训记入 memory。
+  验证：server npm test 24/24 全绿；flutter analyze 干净；version_gate_test 14/14。

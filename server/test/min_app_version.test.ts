@@ -110,39 +110,39 @@ test('/health：只配 minAppVersion 不配下载链接 → 只下发前者', as
   })
 })
 
-// —— 建议更新（2026-10-10）：recommend_app_version ——
+// —— 冷却中的版本（2026-10-10）：hot_app_version ——
 
-test('/health：配了 recommendAppVersion → 下发 recommend_app_version', async () => {
+test('/health：配了 hotAppVersion → 下发 hot_app_version', async () => {
   await withServer(
     {
       minAppVersion: '2609.0101.00',
-      recommendAppVersion: '2610.0412.30',
+      hotAppVersion: '2610.0412.30',
       appDownloadUrl: 'https://example.com/einz/latest'
     },
     async port => {
       const body = await health(port)
       assert.equal(body.min_app_version, '2609.0101.00')
-      assert.equal(body.recommend_app_version, '2610.0412.30')
+      assert.equal(body.hot_app_version, '2610.0412.30')
       assert.equal(body.app_download_url, 'https://example.com/einz/latest')
     }
   )
 })
 
-test('/health：recommendAppVersion 没配/写空串 → 键不出现', async () => {
-  await withServer({ minAppVersion: '2610.0412.30', recommendAppVersion: '   ' }, async port => {
+test('/health：hotAppVersion 没配/写空串 → 键不出现', async () => {
+  await withServer({ minAppVersion: '2610.0412.30', hotAppVersion: '   ' }, async port => {
     const body = await health(port)
     assert.equal(body.min_app_version, '2610.0412.30')
     assert.ok(
-      !('recommend_app_version' in body),
-      '空串一律当没配（防手滑写空让所有客户端弹"建议更新"）'
+      !('hot_app_version' in body),
+      '空串一律当没配（防手滑写空让所有客户端弹"冷却提醒"）'
     )
   })
 })
 
-test('/health：只配 recommendAppVersion 不配 minAppVersion → 只下发前者', async () => {
-  await withServer({ recommendAppVersion: '2610.0412.30' }, async port => {
+test('/health：只配 hotAppVersion 不配 minAppVersion → 只下发前者', async () => {
+  await withServer({ hotAppVersion: '2610.0412.30' }, async port => {
     const body = await health(port)
-    assert.equal(body.recommend_app_version, '2610.0412.30')
+    assert.equal(body.hot_app_version, '2610.0412.30')
     assert.ok(!('min_app_version' in body), '没配强制下限就不下发 min_app_version')
   })
 })

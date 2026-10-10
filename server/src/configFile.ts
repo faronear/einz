@@ -30,7 +30,7 @@ export interface FileConfig {
   maxMembersPerSpace?: number;
   minAppVersion?: string;
   appDownloadUrl?: string;
-  recommendAppVersion?: string;
+  hotAppVersion?: string;
   /** SQLite 数据文件的路径：绝对路径，或**相对 serverConfig.json 所在目录**的相对路径
    *  （如 `"../data/einz.nosf.sqlite.db"`）。空/未设 → 退回内置默认。
    *
@@ -84,7 +84,7 @@ export function invalidateConfigCache(): void {
  *     loadConfig() 都会重新归一化）；② 读失败保留旧值（见 [fileConfigCache] 注释）。
  *
  *  生效范围：所有"每次请求 loadConfig()"的字段（maxSpaces / 通道成员上限 /
- *  minAppVersion / recommendAppVersion / appDownloadUrl，/health 实时下发）；
+ *  minAppVersion / hotAppVersion / appDownloadUrl，/health 实时下发）；
  *  **dataStore（SQLite 路径）除外**——它只在启动 openDb() 时消费，改了要重启。
  *
  *  只在 server 入口（app.ts）启动一次；测试进程**不调**本函数（避免测试里

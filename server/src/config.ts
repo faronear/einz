@@ -27,21 +27,23 @@ export interface ServerConfig {
    *  与 maxEntrancesPerSpace 互补：那道闸管"通道总量"（含已撤销、防刷），这道闸
    *  管"身份总量"（同身份多通道不重复计数）。 */
   max_members_per_space: number;
-  /** 服务端要求的最低 App 版本（serverConfig.json 的 minAppVersion）。
+  /** 当前可用的最低 App 版本（serverConfig.json 的 minAppVersion）——低于它 = 已不可用。
+   *  **版本三态语义（2026-10-10 老板定）**：hot_app_version = 当前正热用的版本；
+   *  本值 = 当前可用的最低版本；介于两者之间 = **正在冷却**（仍可用，客户端启动弹
+   *  可关闭的升级提醒），低于本值 = 不可用（弹**不可关闭**的升级窗口）。
    *  **格式 yymm.ddhh.mm**（见 scripts/appVersion.js，UTC）——与 App 自身的
    *  CFBundleShortVersionString / versionName 是同一个串，客户端可直接比大小。
-   *  null = 不设下限（默认）。用途（2026-10-04）：客户端启动时核对，低于它就在
-   *  首屏弹**不可关闭**的升级窗口——"服务端已经不支持你这个客户端了"。
+   *  null = 不设下限（默认）。
    *  为什么不用 protocol_version 代替：那是 wire 兼容闸（服务端会硬拒），
    *  这个是**产品级**闸——比如某个版本有安全缺陷、或协议还能用但功能已不可靠，
    *  运维改配置即可把旧客户端挡在门外，不必动代码。 */
   min_app_version: string | null;
-  /** 服务端**推荐**的 App 版本（serverConfig.json 的 recommendAppVersion）。
-   *  **建议更新**级别（2026-10-10）：客户端版本 ≥ min_app_version 但 < 本值时，
-   *  启动弹**可关闭**的升级提醒——"有新版本了"，不拦人。与 min_app_version
-   *  的分工：后者是"必须"（不可关闭窗口），本值是"建议"（可关闭）。
-   *  null = 不设建议（默认）。格式同 min_app_version（yymm.ddhh.mm）。 */
-  recommend_app_version: string | null;
+  /** 当前正热用的 App 版本（serverConfig.json 的 hotAppVersion）——低于它但
+   *  ≥ min_app_version = **正在冷却**（2026-10-10 老板定：hot / cooling / 不可用
+   *  三态，见 min_app_version 注释）。冷却中的客户端启动弹**可关闭**的升级提醒
+   *  ——"有新版本了"，不拦人。null = 不设热版本（默认，不下发冷却提醒）。
+   *  格式同 min_app_version（yymm.ddhh.mm）。 */
+  hot_app_version: string | null;
   /** 升级入口 URL（serverConfig.json 的 appDownloadUrl）：下发到客户端，
    *  供强制升级窗口里的「下载新版本」按钮使用。null = 不给链接（客户端只显示版本信息）。 */
   app_download_url: string | null;
@@ -72,10 +74,10 @@ export function loadConfig(): ServerConfig {
     typeof fc.minAppVersion === "string" && fc.minAppVersion.trim().length > 0
       ? fc.minAppVersion.trim()
       : null;
-  // 建议更新版本同款归一化：空串/非字符串一律当没配
-  const recommendAppVersion =
-    typeof fc.recommendAppVersion === "string" && fc.recommendAppVersion.trim().length > 0
-      ? fc.recommendAppVersion.trim()
+  // 热版本（hotAppVersion）同款归一化：空串/非字符串一律当没配
+  const hotAppVersion =
+    typeof fc.hotAppVersion === "string" && fc.hotAppVersion.trim().length > 0
+      ? fc.hotAppVersion.trim()
       : null;
   const appDownloadUrl =
     typeof fc.appDownloadUrl === "string" && fc.appDownloadUrl.trim().length > 0
@@ -88,7 +90,7 @@ export function loadConfig(): ServerConfig {
     max_entrances_per_space: maxEntrancesPerSpace,
     max_members_per_space: maxMembersPerSpace,
     min_app_version: minAppVersion,
-    recommend_app_version: recommendAppVersion,
+    hot_app_version: hotAppVersion,
     app_download_url: appDownloadUrl,
   };
 }
