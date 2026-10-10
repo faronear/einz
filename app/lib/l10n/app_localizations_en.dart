@@ -906,6 +906,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageActionDelete => 'Delete now';
 
   @override
+  String get chatPageActionRecall => 'Recall';
+
+  @override
+  String get chatPageRecallBlocked => 'Already delivered, can\'t recall';
+
+  @override
+  String get chatPageRecallFailed => 'Recall failed, try again later';
+
+  @override
+  String get chatPageDeletedMessage => '(This message was deleted)';
+
+  @override
   String get chatPageActionQuote => 'Quote';
 
   @override

@@ -834,6 +834,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatPageActionDelete => '立刻删除';
 
   @override
+  String get chatPageActionRecall => '撤回';
+
+  @override
+  String get chatPageRecallBlocked => '对方已接收，无法撤回';
+
+  @override
+  String get chatPageRecallFailed => '撤回失败，请稍后重试';
+
+  @override
+  String get chatPageDeletedMessage => '（该消息已删除）';
+
+  @override
   String get chatPageActionQuote => '引用';
 
   @override

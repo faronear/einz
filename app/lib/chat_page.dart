@@ -5155,6 +5155,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // ---------- 长按消息操作：引用 / 删除（2 人世界不做转发） ----------
 
   /// 长按消息弹出操作菜单：引用 / 删除。
+  /// 长按菜单是否有内容可给（决定气泡长按是否响应）：
+  /// - 未墓碑：常规菜单（引用/拷贝/保存/撤回/焚毁/删除）总有项；
+  /// - 墓碑：仅当**可撤回**时给菜单（老板 2026-10-10：本地墓碑不影响服务端
+  ///   行，未送达的自己消息仍该能撤；其余操作对已删内容无意义）。
+  bool _messageHasActions(HistoryMessage m) =>
+      !m.deleted ||
+      (m.sender == 'mine' &&
+          m.env.serverSequence != null &&
+          m.status != 'failed');
+
+  /// 「撤回」可见条件（与 [_messageHasActions] 的墓碑分支同口径）：
+  /// 自己消息、服务端已收下、对方尚未拉取（本地状态粗筛，权威判定在服务端）。
+  bool _messageRecallable(HistoryMessage m) =>
+      m.sender == 'mine' &&
+      m.env.serverSequence != null &&
+      m.status != 'failed';
+
   Future<void> _showMessageActions(HistoryMessage m) async {
     final l10n = AppLocalizations.of(context)!;
     final action = await showModalBottomSheet<String>(
@@ -5167,49 +5184,70 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             // 顶部：发言人头像 + 该消息正文（按性别气泡风格，单行截断不溢出；
             // 老板要求 2026-09-10）；底色与被引消息的引用块同款浅灰，代替原来
-            // 的分隔横线（老板要求 2026-09-13）
-            _buildMessagePreviewRow(m),
+            // 的分隔横线（老板要求 2026-09-13）。
+            // 墓碑消息不展示内容（已删/已焚毁）：改一条灰字占位（老板 2026-10-10
+            // 起墓碑也可开菜单——只剩撤回一项）
+            m.deleted ? _tombstoneMenuPlaceholder() : _buildMessagePreviewRow(m),
             // 操作项改为圆角方形卡片（图标 + 文字），不再是列表式 ListTile
             // （老板要求 2026-09-13）
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: _buildActionCardGrid([
-                _buildActionCard(
-                  icon: Icons.format_quote,
-                  label: l10n.chatPageActionQuote,
-                  onTap: () => Navigator.of(ctx).pop('quote'),
-                ),
-                // 文字消息才有「拷贝」（媒体消息无文本可拷）
-                if (m.env.type == 'text')
+                // 墓碑消息：只留「撤回」（内容已隐藏，引用/拷贝/保存/焚毁/删除
+                // 均无意义；删除本来也是打本地墓碑，已做了）
+                if (m.deleted) ...[
                   _buildActionCard(
-                    // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote
-                    // 高一档（2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24
-                    // 与邻居光学对齐
-                    icon: Icons.copy_outlined,
-                    iconSize: 24,
-                    label: l10n.chatPageCopy,
-                    onTap: () => Navigator.of(ctx).pop('copy'),
+                    icon: Icons.undo_outlined,
+                    label: l10n.chatPageActionRecall,
+                    onTap: () => Navigator.of(ctx).pop('recall'),
                   ),
-                // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件
-                // 存到本机（系统保存对话框选位置）；放「引用」后面
-                if (m.attachment != null)
+                ] else ...[
                   _buildActionCard(
-                    icon: Icons.save_alt,
-                    label: l10n.chatPageActionSave,
-                    onTap: () => Navigator.of(ctx).pop('save'),
+                    icon: Icons.format_quote,
+                    label: l10n.chatPageActionQuote,
+                    onTap: () => Navigator.of(ctx).pop('quote'),
                   ),
-                // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
-                _buildActionCard(
-                  icon: Icons.timer_outlined,
-                  label: l10n.chatPageActionBurn,
-                  onTap: () => Navigator.of(ctx).pop('burn'),
-                ),
-                _buildActionCard(
-                  icon: Icons.delete_outline,
-                  label: l10n.chatPageActionDelete,
-                  destructive: true,
-                  onTap: () => Navigator.of(ctx).pop('delete'),
-                ),
+                  // 文字消息才有「拷贝」（媒体消息无文本可拷）
+                  if (m.env.type == 'text')
+                    _buildActionCard(
+                      // 拷贝字形竖向占 20/24，同 26 号下比 save_alt/format_quote
+                      // 高一档（2026-10-08 老板反馈：拷贝卡片偏高）——缩到 24
+                      // 与邻居光学对齐
+                      icon: Icons.copy_outlined,
+                      iconSize: 24,
+                      label: l10n.chatPageCopy,
+                      onTap: () => Navigator.of(ctx).pop('copy'),
+                    ),
+                  // 媒体消息才有「保存」（老板 2026-10-02）：图片/视频/音频/文件
+                  // 存到本机（系统保存对话框选位置）；放「引用」后面
+                  if (m.attachment != null)
+                    _buildActionCard(
+                      icon: Icons.save_alt,
+                      label: l10n.chatPageActionSave,
+                      onTap: () => Navigator.of(ctx).pop('save'),
+                    ),
+                  // 单条消息阅后即焚：可新设/调整档位、选「无限」取消（老板要求 2026-09-10）
+                  _buildActionCard(
+                    icon: Icons.timer_outlined,
+                    label: l10n.chatPageActionBurn,
+                    onTap: () => Navigator.of(ctx).pop('burn'),
+                  ),
+                  // 撤回（2026-10-10）：仅「已发出且对方尚未拉取」的自己消息——
+                  // 服务端按 delivered 高水位原子判定，客户端只做**粗筛**减少
+                  // 无效入口（最终判定的权威在服务端 409）
+                  if (_messageRecallable(m))
+                    _buildActionCard(
+                      icon: Icons.undo_outlined,
+                      label: l10n.chatPageActionRecall,
+                      onTap: () => Navigator.of(ctx).pop('recall'),
+                    ),
+                  _buildActionCard(
+                    icon: Icons.delete_outline,
+                    label: l10n.chatPageActionDelete,
+                    destructive: true,
+                    onTap: () => Navigator.of(ctx).pop('delete'),
+                  ),
+                ]
               ]),
             ),
           ],
@@ -5219,6 +5257,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) return;
     if (action == 'delete') {
       await _deleteMessage(m);
+    } else if (action == 'recall') {
+      await _recallMessage(m);
     } else if (action == 'quote') {
       setState(() => _quoteTarget = m);
       _inputFocusNode.requestFocus();
@@ -5339,6 +5379,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// Row 撑满整行并按消息流对齐（对方靠左、我的靠右）——此前 mainAxisSize.min
   /// 短消息整行收缩被弹窗居中，长消息撑满贴边，视觉效果不稳定（老板要求
   /// 2026-09-10 修复）。
+  /// 长按菜单顶部占位行（墓碑消息专用，2026-10-10）：消息已删/已焚毁，
+  /// 不展示内容，只留一条淡灰说明——菜单里只剩「撤回」一项
+  Widget _tombstoneMenuPlaceholder() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        AppLocalizations.of(context)!.chatPageDeletedMessage,
+        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
   Widget _buildMessagePreviewRow(HistoryMessage m) {
     final mine = m.sender == 'me';
     final avatarMemberId =
@@ -5473,6 +5532,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await _repo.tombstoneMessage(m.env.messageId);
     await MediaCache.deleteFor(widget.spaceId, m.env.messageId); // 定点删媒体解密缓存
     unawaited(AttachmentStore.deleteFor(widget.spaceId, m.env.messageId)); // 留存明文同样删
+    if (!mounted) return;
+    setState(() {
+      _messages = [
+        for (final x in _messages)
+          if (x.env.messageId == m.env.messageId) _asDeleted(x) else x,
+      ];
+    });
+  }
+
+  /// 撤回一条「已发出、对方尚未拉取」的自己消息（2026-10-10）：
+  /// 服务端原子校验 delivered 水位后真删（对方永远拉不到），本机走本地墓碑。
+  /// 409（对方已拉取）→ 提示不可撤；其余错误静默提示失败（不墓碑）。
+  Future<void> _recallMessage(HistoryMessage m) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      await _repo.recallMessage(m.env.messageId);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _notice(context,
+          e.httpStatus == 409 ? l10n.chatPageRecallBlocked : l10n.chatPageRecallFailed);
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      _notice(context, l10n.chatPageRecallFailed);
+      return;
+    }
+    if (!mounted) return;
+    await MediaCache.deleteFor(widget.spaceId, m.env.messageId);
+    unawaited(AttachmentStore.deleteFor(widget.spaceId, m.env.messageId));
     if (!mounted) return;
     setState(() {
       _messages = [
@@ -7797,8 +7885,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         // 长按菜单挂**整条气泡**（老板 2026-10-08 定：气泡任意位置都能
                         // 开菜单）。唯一例外是顶栏（时间/快捷动作/沙漏）——它在内层
                         // **吸收**掉长按，见下面那处 GestureDetector。
-                        onLongPress:
-                            m.deleted ? null : () => _showMessageActions(m),
+                        // 墓碑消息仅当可撤回时开菜单（老板 2026-10-10：本地墓碑不
+                        // 影响服务端行，未送达的仍可撤）
+                        onLongPress: _messageHasActions(m)
+                            ? () => _showMessageActions(m)
+                            : null,
                         child: AnimatedContainer(
                           // 高亮渐变节奏（老板要求 2026-09-10）：渐变成橘黄 1.5s、
                           // 停留 0s、渐变回去 1.5s——duration 1500ms 管渐变

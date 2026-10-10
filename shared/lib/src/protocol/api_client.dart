@@ -227,6 +227,14 @@ class ApiClient {
     return PostMessageResult.fromJson(res);
   }
 
+  /// 撤回一条「已发出、对方尚未拉取」的消息（2026-10-10）。
+  /// 服务端原子校验：本 space 其他成员 delivered 高水位 < 本条 seq 才删行。
+  /// 失败抛 [ApiException]：409 `ALREADY_DELIVERED` = 对方已拉取，不可撤；
+  /// 403 非本人发送；404 消息不存在/不属于本 space。
+  Future<void> recallMessage(String messageId, String token) async {
+    await _post('${Api.messages}/recall', {'message_id': messageId}, token: token);
+  }
+
   /// 注册 Push Token（PROTOCOL.md §7.3）：platform = ios | android。
   /// 推送只发"有新消息"提示，绝不携带正文（productLens §10）。
   Future<void> registerPushToken(String platform, String pushToken, String token) async {

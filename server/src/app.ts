@@ -12,7 +12,7 @@ import {
   createChallenge,
   verifyChallenge
 } from './auth.js'
-import { postMessage, syncMessages } from './messages.js'
+import { postMessage, recallMessage, syncMessages } from './messages.js'
 import { getReceipts, postReceipts, unreadCount } from './receipts.js'
 import {
   attachmentMetaByMessage,
@@ -422,6 +422,24 @@ async function route (req: IncomingMessage, res: ServerResponse): Promise<void> 
         server_sequence: result.server_sequence,
         type: envelope.type ?? null
       },
+      meta: metaOf(req)
+    })
+    sendJson(res, 200, result)
+    return
+  }
+  // 撤回：删除「已发出、对方尚未拉取」的消息（服务端原子校验 delivered 水位）
+  if (method === 'POST' && path === '/messages/recall') {
+    const body = await readJsonBody(req)
+    const token = bearerToken(req)
+    const sess = requireSession(token)
+    const messageId = String((body as Record<string, unknown>)?.message_id ?? '')
+    const result = recallMessage(token, messageId)
+    // 审计：撤回证据（只记元数据，不碰密文）
+    logActivity({
+      entranceId: sess.entrance_id,
+      spaceId: sess.space_id,
+      kind: 'message.recall',
+      detail: { message_id: result.message_id, server_sequence: result.server_sequence },
       meta: metaOf(req)
     })
     sendJson(res, 200, result)

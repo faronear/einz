@@ -432,6 +432,10 @@
     }
   },
   "chatPageActionDelete": "立刻删除",
+  "chatPageActionRecall": "撤回",
+  "chatPageRecallBlocked": "对方已接收，无法撤回",
+  "chatPageRecallFailed": "撤回失败，请稍后重试",
+  "chatPageDeletedMessage": "（该消息已删除）",
   "chatPageActionQuote": "引用",
   "chatPageActionSave": "保存",
   "chatPageAttachmentSaved": "已保存。",

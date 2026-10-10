@@ -449,6 +449,10 @@
     }
   },
   "chatPageActionDelete": "Delete now",
+  "chatPageActionRecall": "Recall",
+  "chatPageRecallBlocked": "Already delivered, can't recall",
+  "chatPageRecallFailed": "Recall failed, try again later",
+  "chatPageDeletedMessage": "(This message was deleted)",
   "chatPageActionQuote": "Quote",
   "chatPageActionSave": "Save",
   "chatPageAttachmentSaved": "Saved.",

@@ -432,6 +432,22 @@ class MessageRepository {
     );
   }
 
+  /// 撤回一条「已发出、对方尚未拉取」的消息（2026-10-10）：
+  /// 服务端原子校验 delivered 水位后真删消息行+附件（对方永远拉不到），
+  /// 成功后本机走现有本地墓碑（UI 立即消失，保留时间记录）。
+  ///
+  /// 失败原样抛 [ApiException]：409 `ALREADY_DELIVERED` = 对方已拉取不可撤
+  /// （UI 提示）；403 非本人；404 消息不在服务端（可能已被撤）——404 也按
+  /// 成功处理（本地照常墓碑，结果一致：这条消息没了）。
+  Future<void> recallMessage(String messageId) async {
+    try {
+      await _withAutoAuth((tok) => api.recallMessage(messageId, tok));
+    } on ApiException catch (e) {
+      if (e.httpStatus != 404) rethrow;
+    }
+    await tombstoneMessage(messageId);
+  }
+
   /// 增量同步：翻页拉全量 → 落库 → 推进锚点 → 补发 pending 队列。
   /// 返回本次新增的消息条数。
   Future<int> sync() async {

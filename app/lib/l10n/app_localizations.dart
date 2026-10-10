@@ -1580,6 +1580,30 @@ abstract class AppLocalizations {
   /// **'Delete now'**
   String get chatPageActionDelete;
 
+  /// No description provided for @chatPageActionRecall.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall'**
+  String get chatPageActionRecall;
+
+  /// No description provided for @chatPageRecallBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Already delivered, can\'t recall'**
+  String get chatPageRecallBlocked;
+
+  /// No description provided for @chatPageRecallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recall failed, try again later'**
+  String get chatPageRecallFailed;
+
+  /// No description provided for @chatPageDeletedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'(This message was deleted)'**
+  String get chatPageDeletedMessage;
+
   /// No description provided for @chatPageActionQuote.
   ///
   /// In en, this message translates to:
