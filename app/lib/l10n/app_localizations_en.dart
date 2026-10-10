@@ -534,6 +534,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatPageGroupNameTitle => 'Group name';
 
   @override
+  String get chatPageGroupNameEditTooltip => 'Change group name';
+
+  @override
   String get chatPageGroupNameLabel => 'Name';
 
   @override

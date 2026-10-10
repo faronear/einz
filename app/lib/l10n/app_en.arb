@@ -246,6 +246,7 @@
   "chatPageRenameNameTitle": "My identity",
   "chatPageRenameNameLabel": "Name",
   "chatPageGroupNameTitle": "Group name",
+  "chatPageGroupNameEditTooltip": "Change group name",
   "chatPageGroupNameLabel": "Name",
   "chatPageGenderLabel": "Gender",
   "chatPageRenameEntranceTitle": "Current entrance",

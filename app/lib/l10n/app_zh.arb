@@ -243,6 +243,7 @@
   "chatPageRenameNameTitle": "我的身份",
   "chatPageRenameNameLabel": "名字",
   "chatPageGroupNameTitle": "群组名字",
+  "chatPageGroupNameEditTooltip": "修改群名",
   "chatPageGroupNameLabel": "名字",
   "chatPageGenderLabel": "性别",
   "chatPageRenameEntranceTitle": "当前通道",

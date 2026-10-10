@@ -1773,9 +1773,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 第一行：有名字显示名字（点了改名）；没名字只显示编辑图标（点了起名）。
     // 名字也做成**可点胶囊**：悬浮/按住变色，与状态条其他可点元素同口径
     // （invite/通话图标/更多通道箭头）。
-    final Widget nameLine = _groupName.isEmpty
+    Widget nameLine = _groupName.isEmpty
         ? Tooltip(
-            message: l10n.chatPageEdit,
+            message: l10n.chatPageGroupNameEditTooltip,
             child: Material(
               color: Colors.transparent,
               shape: const StadiumBorder(),
@@ -1810,6 +1810,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           );
+    // 悬停提示「修改群名」——有名字时光看胶囊看不出来能点改名（老板 2026-10-10）
+    // 空名态上面已自带 Tooltip（灰字+图标一并提示）
+    nameLine = Tooltip(
+      message: l10n.chatPageGroupNameEditTooltip,
+      child: nameLine,
+    );
 
     // 第二行：「在线人数」绿 + 「/总人数」灰（在线灯同色，一眼看出谁在）
     final Widget countLine = Text.rich(
