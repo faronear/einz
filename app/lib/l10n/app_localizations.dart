@@ -986,6 +986,30 @@ abstract class AppLocalizations {
   /// **'Group name'**
   String get chatPageGroupNameTitle;
 
+  /// No description provided for @chatPageGroupNameEditTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Change group name'**
+  String get chatPageGroupNameEditTooltip;
+
+  /// No description provided for @chatPageMyAvatarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Change my avatar'**
+  String get chatPageMyAvatarTooltip;
+
+  /// No description provided for @chatPageMyNameTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Change my name'**
+  String get chatPageMyNameTooltip;
+
+  /// No description provided for @chatPageMyGroupCompanionsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'My group companions'**
+  String get chatPageMyGroupCompanionsTooltip;
+
   /// No description provided for @chatPageGroupNameLabel.
   ///
   /// In en, this message translates to:
