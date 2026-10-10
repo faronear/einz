@@ -7606,10 +7606,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                            // 与「名字/时间」的间距 16px：加上图标在 32 宽容器里的
-                            // 居中余量（(32-20)/2 = 6），到图标**视觉边缘**正好 22px，
-                            // 与对方一侧（Invite 文字 22px）一致（老板 2026-09-26）
-                            const SizedBox(width: 16),
+                            // 与「名字/时间」的间距 6px：加上图标在 32 宽容器里的
+                            // 居中余量（(32-20)/2 = 6），到图标**视觉边缘**正好 12px，
+                            // 与状态条其他间距一致（原 16px 视觉偏大，老板 2026-10-10）
+                            const SizedBox(width: 6),
                             // Flexible 要包在**Column 外面**（老板 2026-09-28 实测的溢出：
                             // 名字长到 44 字时，这一行要 767px、只给 376px →
                             // "overflowed by 391 pixels on the right"）。
