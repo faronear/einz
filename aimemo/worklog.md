@@ -13680,3 +13680,15 @@ origin/main 5faff04`（c4f4f85 内容两边一致会自动对齐，净效果只�
   补全：冻结窗改 `upgradeFrozenBody(coldVersion, currentVersion)`；冷却窗删
   `currentVersion` 字段与传参（死代码）。analyze 干净、version_gate_test 14/14。
   （教训已多次出现：老板常改 l10n 措辞，引用点必须同步——见 memory。）
+
+## 2026-10-10（macbook · main 分支工作日）
+
+- 状态条 tooltip 全量补齐（`014abc5`）：我的头像/我的名字/空群占位头像三处新增；
+  群名沿用 `6023413` 的「修改群名」。
+- duo 左侧对方头像点击统一开 My companion 弹层（`cbe1190`），不再走头像全屏大图，
+  与群空间头像条全局一致。
+- iOS 模拟器脚本适配（`161e758`）：emuResolveIos.js 空规格回退（Booted → 最新
+  iPhone）；emuBootIos.sh 对 Xcode 27 无 Simulator.app 加守卫。macbook 装好
+  Xcode 27 + CocoaPods，iPhone 17 (iOS 27) 模拟器可跑 app。
+- macbook 与 iMac 多机分工：macbook 在 main（今天 4 个提交，未推送），iMac 在
+  feat/voice-transcript；voice WIP 暂存 stash@{0}，合并时按 main 解 tooltip 冲突。
